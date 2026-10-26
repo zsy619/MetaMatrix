@@ -1,0 +1,465 @@
+{
+  "id": "canvas_five_step",
+  "type": "five_step",
+  "schemaVersion": 1,
+  "theme": {
+    "background": {
+      "pattern": "none",
+      "color": "#faf8f5"
+    }
+  },
+  "columns": [
+    {
+      "id": "demand",
+      "header": "需求",
+      "footerLabel": "逐级拆解",
+      "qualitativeBlockIds": [
+        "demand_persona",
+        "demand_problems"
+      ],
+      "quantitativeBlockId": "demand_quant"
+    },
+    {
+      "id": "solution",
+      "header": "解决方案",
+      "footerLabel": "全局预判",
+      "qualitativeBlockIds": [
+        "solution_core"
+      ],
+      "quantitativeBlockId": "solution_quant"
+    },
+    {
+      "id": "business",
+      "header": "商业模式",
+      "footerLabel": "专业选项",
+      "qualitativeBlockIds": [
+        "business_model",
+        "business_unit"
+      ],
+      "quantitativeBlockId": "business_quant"
+    },
+    {
+      "id": "growth",
+      "header": "增长",
+      "footerLabel": "努力定量",
+      "qualitativeBlockIds": [
+        "growth_metric",
+        "growth_channels"
+      ],
+      "quantitativeBlockId": "growth_quant"
+    },
+    {
+      "id": "moat",
+      "header": "壁垒",
+      "footerLabel": "动态更新",
+      "qualitativeBlockIds": [
+        "moat_qual"
+      ],
+      "quantitativeBlockId": "moat_quant"
+    }
+  ],
+  "blocks": [
+    {
+      "id": "demand_persona",
+      "title": "画像",
+      "items": [
+        {
+          "id": "fs_demand_persona_1",
+          "text": "1) 想做大的创业者",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fs_demand_persona_2",
+          "text": "2) 筹备到 B 轮（<5kw）",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fs_demand_persona_3",
+          "text": "3) 务实有学习陪伴潜力",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "demand_problems",
+      "title": "问题",
+      "items": [
+        {
+          "id": "fs_demand_problems_1",
+          "text": "缺少认知/执行框架",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fs_demand_problems_2",
+          "text": "解决真实创业问题",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fs_demand_problems_3",
+          "text": "希望融资 & 赛道领先",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "demand_quant",
+      "title": "定量",
+      "items": [
+        {
+          "id": "fs_demand_quant_1",
+          "text": "服务规模：3-5w",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "600"
+          }
+        },
+        {
+          "id": "fs_demand_quant_2",
+          "text": "业务天花板：2-5 亿",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "600"
+          }
+        }
+      ]
+    },
+    {
+      "id": "solution_core",
+      "title": "产品内核",
+      "items": [
+        {
+          "id": "fs_solution_core_1",
+          "text": "1) 真实创业问题",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fs_solution_core_2",
+          "text": "2) 大规模低门槛",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fs_solution_core_3",
+          "text": "3) 市场显著最佳",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fs_solution_core_4",
+          "text": "4) 成体系必修课",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "solution_quant",
+      "title": "定量",
+      "items": [
+        {
+          "id": "fs_solution_quant_1",
+          "text": "作业率 50-70%",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "600"
+          }
+        },
+        {
+          "id": "fs_solution_quant_2",
+          "text": "NPS 80-90%",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "600"
+          }
+        },
+        {
+          "id": "fs_solution_quant_3",
+          "text": "续费率 60%",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "600"
+          }
+        }
+      ]
+    },
+    {
+      "id": "business_model",
+      "title": "商业模型",
+      "items": [
+        {
+          "id": "fs_business_model_1",
+          "text": "1) 获客：投放 + 推荐",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fs_business_model_2",
+          "text": "2) 转化：直播体验课",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fs_business_model_3",
+          "text": "3) 粘性：年费会员",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fs_business_model_4",
+          "text": "4) 高客单：MBA",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "business_unit",
+      "title": "关键单元模型",
+      "items": [
+        {
+          "id": "fs_business_unit_1",
+          "text": "1) 单用户首单：ROI",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fs_business_unit_2",
+          "text": "2) 单用户生命周期：有利润",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "business_quant",
+      "title": "定量",
+      "items": [
+        {
+          "id": "fs_business_quant_1",
+          "text": "首单 ROI = 1.5-2",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "600"
+          }
+        },
+        {
+          "id": "fs_business_quant_2",
+          "text": "3 年 ROI = 3",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "600"
+          }
+        }
+      ]
+    },
+    {
+      "id": "growth_metric",
+      "title": "第一指标",
+      "items": [
+        {
+          "id": "fs_growth_metric_1",
+          "text": "1w1w150w（规模/质量/安全；单月）",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "growth_channels",
+      "title": "获客渠道",
+      "items": [
+        {
+          "id": "fs_growth_channels_1",
+          "text": "1) 公众号投放",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fs_growth_channels_2",
+          "text": "2) 老带新推荐",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fs_growth_channels_3",
+          "text": "3) 自营私域流量",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "growth_quant",
+      "title": "定量",
+      "items": [
+        {
+          "id": "fs_growth_quant_1",
+          "text": "里程碑 1：1w1w150w",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "600"
+          }
+        },
+        {
+          "id": "fs_growth_quant_2",
+          "text": "里程碑 2：3w3w800w",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "600"
+          }
+        }
+      ]
+    },
+    {
+      "id": "moat_qual",
+      "title": "壁垒",
+      "items": [
+        {
+          "id": "fs_moat_qual_1",
+          "text": "1) 早期创业必修课第一品牌：强",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fs_moat_qual_2",
+          "text": "2) 方法论的迁移成本：中",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fs_moat_qual_3",
+          "text": "3) 课程研发的规模优势：中",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "moat_quant",
+      "title": "定量",
+      "items": [
+        {
+          "id": "fs_moat_quant_1",
+          "text": "品牌壁垒：势能积累中",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "600"
+          }
+        },
+        {
+          "id": "fs_moat_quant_2",
+          "text": "迁移成本：60% 续费率",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "600"
+          }
+        },
+        {
+          "id": "fs_moat_quant_3",
+          "text": "课程交付：边际成本 = 0",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "600"
+          }
+        },
+        {
+          "id": "fs_moat_quant_4",
+          "text": "运营交付：规模翻番，成本涨 30%",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "600"
+          }
+        }
+      ]
+    }
+  ]
+}

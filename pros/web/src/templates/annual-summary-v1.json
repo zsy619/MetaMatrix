@@ -1,0 +1,121 @@
+{
+  "id": "canvas_annual_summary",
+  "type": "annual_summary",
+  "schemaVersion": 1,
+  "theme": {
+    "background": {
+      "pattern": "none",
+      "color": "#ffffff"
+    }
+  },
+  "title": "个人年度工作总结模板",
+  "labels": {
+    "businessHint": "请说出你参与的重点业务中，你取得的最关键的TOP3进展",
+    "growthHint": "请说出你今年在工作中进步最大的TOP3能力",
+    "improveHint": "请说出你目前最想提升的TOP3能力，以及配套的改进计划"
+  },
+  "blocks": [
+    {
+      "id": "business_progress",
+      "title": "重点业务进展",
+      "prompt": "请说出你参与的重点业务中，你取得的最关键的TOP3进展",
+      "items": [
+        {
+          "id": "item_bp_1",
+          "text": "进展 1：…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "item_bp_2",
+          "text": "进展 2：…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "item_bp_3",
+          "text": "进展 3：…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "personal_growth",
+      "title": "个人成长进步",
+      "prompt": "请说出你今年在工作中进步最大的TOP3能力",
+      "items": [
+        {
+          "id": "item_pg_1",
+          "text": "能力 1：…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "item_pg_2",
+          "text": "能力 2：…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "item_pg_3",
+          "text": "能力 3：…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "improvement",
+      "title": "不足与改进计划",
+      "prompt": "请说出你目前最想提升的TOP3能力，以及配套的改进计划",
+      "items": [
+        {
+          "id": "item_im_1",
+          "text": "提升点 1 + 改进计划：…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "item_im_2",
+          "text": "提升点 2 + 改进计划：…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "item_im_3",
+          "text": "提升点 3 + 改进计划：…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    }
+  ]
+}

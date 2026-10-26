@@ -1,0 +1,489 @@
+<script setup lang="ts">
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { storeToRefs } from 'pinia'
+import {
+  useDocumentStore,
+  isTemplateId,
+  TEMPLATE_META,
+  type TemplateId,
+} from '../stores/document'
+import { useUiStore } from '../stores/ui'
+import { useAuthStore } from '../stores/auth'
+import CanvasViewport from '../components/canvas/CanvasViewport.vue'
+import PageSettingsPanel from '../components/PageSettingsPanel.vue'
+import type { DocumentSummary } from '../api/documents'
+import {
+  getAIContext,
+  listRevisions,
+  diffRevisions,
+} from '../api/documents'
+import { ElMessage, ElMessageBox } from 'element-plus'
+
+const route = useRoute()
+const router = useRouter()
+const documentStore = useDocumentStore()
+const ui = useUiStore()
+const auth = useAuthStore()
+const { dirty, saving, document_id } = storeToRefs(documentStore)
+
+const statusMsg = ref('')
+const docsOpen = ref(false)
+const myDocs = ref<DocumentSummary[]>([])
+const docsLoading = ref(false)
+
+const templateId = computed<TemplateId>(() => {
+  const raw = String(route.params.templateId ?? 'dual-triangle')
+  return isTemplateId(raw) ? raw : 'dual-triangle'
+})
+
+const badge = computed(() => TEMPLATE_META[templateId.value].badge)
+const syncLabel = computed(() => {
+  if (saving.value) return '同步中…'
+  if (statusMsg.value) return statusMsg.value
+  if (!auth.isAuthenticated) return dirty.value ? '本地未保存' : '仅本地'
+  if (dirty.value) return '未同步'
+  return document_id.value ? '已同步' : '未建档'
+})
+
+let saveTimer: ReturnType<typeof setTimeout> | null = null
+
+function scheduleAutoSave() {
+  if (saveTimer) clearTimeout(saveTimer)
+  saveTimer = setTimeout(() => {
+    void doSave(false)
+  }, 1200)
+}
+
+watch(
+  () => dirty.value,
+  (d) => {
+    if (d) scheduleAutoSave()
+  },
+)
+
+async function bootstrap() {
+  statusMsg.value = ''
+  const qid = typeof route.query.documentId === 'string' ? route.query.documentId : ''
+  if (qid && auth.isAuthenticated) {
+    try {
+      await documentStore.load(qid)
+      return
+    } catch (e) {
+      statusMsg.value = e instanceof Error ? e.message : '打开文档失败'
+    }
+  }
+  documentStore.loadFromTemplate(templateId.value)
+  if (auth.isAuthenticated && !documentStore.document_id) {
+    // Prefer most recent server doc for this template if no local draft dirty path
+    try {
+      const list = await documentStore.listMyDocuments(templateId.value)
+      if (list.length > 0 && !documentStore.dirty) {
+        // keep local draft if present; otherwise open latest
+        const localExists = Boolean(documentStore.loadLocal(templateId.value))
+        if (!localExists) {
+          await documentStore.load(list[0].id)
+          router.replace({
+            name: 'canvas',
+            params: { templateId: templateId.value },
+            query: { documentId: list[0].id },
+          })
+        }
+      }
+    } catch {
+      /* ignore list errors */
+    }
+  }
+}
+
+watch(
+  templateId,
+  () => {
+    void bootstrap()
+  },
+  { immediate: true },
+)
+
+watch(
+  () => route.query.documentId,
+  (id, prev) => {
+    if (id && id !== prev) void bootstrap()
+  },
+)
+
+onBeforeUnmount(() => {
+  if (saveTimer) clearTimeout(saveTimer)
+})
+
+
+async function copyAIContext(asPlain: boolean) {
+  if (!requireLogin()) return
+  if (!document_id.value) {
+    ElMessage.warning('请先保存文档到云端')
+    return
+  }
+  try {
+    const ctx = await getAIContext(document_id.value)
+    const text = asPlain
+      ? `# ${ctx.title}\n\n${ctx.plainText || ctx.summary}`
+      : JSON.stringify(ctx, null, 2)
+    await navigator.clipboard.writeText(text)
+    ElMessage.success(asPlain ? '已复制纯文本' : '已复制 AI 上下文 JSON')
+  } catch (e) {
+    statusMsg.value = e instanceof Error ? e.message : 'AI 上下文失败'
+  }
+}
+
+async function diffPrevRevision() {
+  if (!requireLogin()) return
+  if (!document_id.value) {
+    ElMessage.warning('请先保存文档到云端')
+    return
+  }
+  try {
+    const revs = await listRevisions(document_id.value)
+    if (revs.length < 2) {
+      ElMessage.info('暂无上一版可对比（至少需要两个存版）')
+      return
+    }
+    // revs ordered DESC: [0]=head, [1]=previous
+    const prev = revs[1]
+    const diff = await diffRevisions(document_id.value, prev.id)
+    const body =
+      (diff.unified && diff.unified.trim()) ||
+      diff.textDiff
+        .map((op) => {
+          const prefix = op.op === 'insert' ? '+ ' : op.op === 'delete' ? '- ' : '  '
+          return prefix + op.text
+        })
+        .join('\n') ||
+      '(无文本差异)'
+    const hashNote = diff.contentHashChanged ? 'contentHash 已变化' : 'contentHash 相同'
+    await ElMessageBox.alert(
+      `<pre style="max-height:360px;overflow:auto;white-space:pre-wrap;font-size:12px;text-align:left">${escapeHtml(body)}\n\njsonPatch: ${diff.jsonPatch?.length ?? 0} ops\n${hashNote}</pre>`,
+      `与上一版对比（${prev.label || prev.id.slice(0, 8)}）`,
+      { dangerouslyUseHTMLString: true, confirmButtonText: '关闭' },
+    )
+  } catch (e) {
+    statusMsg.value = e instanceof Error ? e.message : '对比失败'
+  }
+}
+
+function escapeHtml(s: string) {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+}
+
+function goGuide() {
+  router.push({ name: 'guide' })
+}
+
+function requireLogin(): boolean {
+  if (auth.isAuthenticated) return true
+  router.push({
+    name: 'login',
+    query: { redirect: route.fullPath },
+  })
+  return false
+}
+
+async function doSave(checkpoint: boolean) {
+  statusMsg.value = ''
+  documentStore.persistLocal(templateId.value)
+  if (!auth.isAuthenticated) {
+    statusMsg.value = '已存本地（登录后可同步云端）'
+    documentStore.dirty = false
+    return
+  }
+  const taskName = (documentStore.doc_title || '').trim()
+  // 首次云端创建必须有任务名称
+  if (!documentStore.document_id && !taskName) {
+    statusMsg.value = '请先在右侧填写任务名称后再同步云端'
+    return
+  }
+  // 任务名为空时跳过云端 PUT，仅本地
+  if (documentStore.document_id && !taskName) {
+    statusMsg.value = '任务名称为空，已仅存本地'
+    documentStore.dirty = false
+    return
+  }
+  try {
+    await documentStore.save({
+      checkpoint,
+      title: taskName || undefined,
+      notes: documentStore.doc_notes,
+    })
+    if (documentStore.document_id && route.query.documentId !== documentStore.document_id) {
+      router.replace({
+        name: 'canvas',
+        params: { templateId: templateId.value },
+        query: { documentId: documentStore.document_id },
+      })
+    }
+    statusMsg.value = checkpoint ? '已存版' : '已同步'
+  } catch (e) {
+    statusMsg.value = e instanceof Error ? e.message : '保存失败'
+  }
+}
+
+async function newDocument() {
+  if (!requireLogin()) return
+  let name = ''
+  try {
+    const { value } = await ElMessageBox.prompt(
+      '请输入新任务名称',
+      '新建任务',
+      {
+        confirmButtonText: '创建',
+        cancelButtonText: '取消',
+        inputPlaceholder: '任务名称',
+        inputValue: TEMPLATE_META[templateId.value]?.name || '',
+        inputValidator: (v) => {
+          if (!v || !String(v).trim()) return '任务名称不能为空'
+          return true
+        },
+      },
+    )
+    name = String(value).trim()
+  } catch {
+    return
+  }
+  documentStore.resetToTemplate(templateId.value)
+  documentStore.doc_title = name
+  documentStore.doc_notes = ''
+  try {
+    const id = await documentStore.createOnServer({
+      templateId: templateId.value,
+      title: name,
+      notes: '',
+    })
+    router.replace({
+      name: 'canvas',
+      params: { templateId: templateId.value },
+      query: { documentId: id },
+    })
+    statusMsg.value = '已新建'
+  } catch (e) {
+    statusMsg.value = e instanceof Error ? e.message : '新建失败'
+  }
+}
+
+async function openDocsPanel() {
+  if (!requireLogin()) return
+  docsOpen.value = true
+  docsLoading.value = true
+  try {
+    myDocs.value = await documentStore.listMyDocuments(templateId.value)
+  } catch (e) {
+    statusMsg.value = e instanceof Error ? e.message : '列表失败'
+  } finally {
+    docsLoading.value = false
+  }
+}
+
+async function openDoc(id: string) {
+  docsOpen.value = false
+  await documentStore.load(id)
+  router.replace({
+    name: 'canvas',
+    params: { templateId: templateId.value },
+    query: { documentId: id },
+  })
+}
+
+async function manualCheckpoint() {
+  if (!requireLogin()) return
+  try {
+    await documentStore.checkpoint('manual-snapshot')
+    statusMsg.value = '已手动存版'
+  } catch (e) {
+    statusMsg.value = e instanceof Error ? e.message : '存版失败'
+  }
+}
+</script>
+
+<template>
+  <div class="home">
+    <header class="topbar">
+      <div class="brand">
+        <el-button size="small" text @click="goGuide">← 返回引导</el-button>
+        <strong>元矩阵 MetaMatrix</strong>
+        <span class="badge">{{ badge }}</span>
+      </div>
+      <div class="actions">
+        <span class="meta">{{ syncLabel }}</span>
+        <template v-if="auth.isAuthenticated">
+          <span class="user">{{ auth.user?.displayName || auth.user?.email }}</span>
+          <el-button size="small" @click="openDocsPanel">我的文档</el-button>
+          <el-button size="small" @click="newDocument">新建</el-button>
+          <el-button size="small" @click="manualCheckpoint">存版</el-button>
+          <el-button size="small" @click="copyAIContext(false)">AI 上下文</el-button>
+          <el-button size="small" @click="diffPrevRevision">与上一版对比</el-button>
+        </template>
+        <el-button
+          v-else
+          size="small"
+          @click="requireLogin()"
+        >
+          登录同步
+        </el-button>
+        <el-button size="small" type="primary" :loading="saving" @click="doSave(false)">
+          保存
+        </el-button>
+        <el-button size="small" @click="ui.toggleConfigPanel">
+          设置
+        </el-button>
+      </div>
+    </header>
+    <div class="workspace">
+      <main class="main">
+        <CanvasViewport />
+      </main>
+      <PageSettingsPanel />
+    </div>
+
+    <el-drawer v-model="docsOpen" title="我的文档" size="360px">
+      <p v-if="docsLoading">加载中…</p>
+      <ul v-else class="doc-list">
+        <li v-if="myDocs.length === 0" class="empty">暂无该模板下的文档</li>
+        <li
+          v-for="d in myDocs"
+          :key="d.id"
+          class="doc-item"
+          :class="{ active: d.id === document_id }"
+        >
+          <button type="button" @click="openDoc(d.id)">
+            <strong>{{ d.title || '未命名' }}</strong>
+            <span>修订 {{ new Date(d.updatedAt).toLocaleString('zh-CN', { hour12: false }) }}</span>
+            <span class="sub">创建 {{ new Date(d.createdAt).toLocaleString('zh-CN', { hour12: false }) }}</span>
+            <span v-if="d.notes" class="notes">{{ d.notes }}</span>
+          </button>
+        </li>
+      </ul>
+    </el-drawer>
+  </div>
+</template>
+
+<style scoped>
+.home {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+  overflow: hidden;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 16px;
+  background: #fff;
+  border-bottom: 1px solid #dadce0;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.badge {
+  font-size: 12px;
+  color: #1a73e8;
+  background: #e8f0fe;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.meta {
+  font-size: 12px;
+  color: #5f6368;
+}
+
+.user {
+  font-size: 12px;
+  color: #3c4043;
+}
+
+.workspace {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: row;
+  overflow: hidden;
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.doc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.doc-item button {
+  width: 100%;
+  text-align: left;
+  border: 1px solid #dadce0;
+  border-radius: 8px;
+  background: #fff;
+  padding: 10px 12px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.doc-item.active button {
+  border-color: #1a73e8;
+  background: #e8f0fe;
+}
+
+.doc-item span {
+  font-size: 12px;
+  color: #5f6368;
+}
+
+.doc-item .sub {
+  font-size: 11px;
+  color: #80868b;
+}
+
+.doc-item .notes {
+  font-size: 11px;
+  color: #5f6368;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.empty {
+  color: #5f6368;
+  font-size: 13px;
+}
+</style>

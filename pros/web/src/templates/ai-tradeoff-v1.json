@@ -1,0 +1,159 @@
+{
+  "id": "canvas_ai_tradeoff",
+  "type": "ai_tradeoff",
+  "schemaVersion": 1,
+  "theme": {
+    "background": {
+      "pattern": "none",
+      "color": "#ffffff"
+    }
+  },
+  "title": "AI场景取舍评估画布",
+  "columns": {
+    "value": {
+      "header": "价值侧：实现以后的收益"
+    },
+    "cost": {
+      "header": "成本侧：实现过程的卡点"
+    }
+  },
+  "footerNote": "注：可以1-10分打分，并且增加事实论证解释",
+  "blocks": [
+    {
+      "id": "a1",
+      "column": "value",
+      "title": "A1.价值差异",
+      "prompt": "做AI对效率/价值影响大吗？能否量化到财务指标？",
+      "items": [
+        {
+          "id": "item_a1_1",
+          "text": "打分：  / 事实：",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "b1",
+      "column": "cost",
+      "title": "B1.容错高低",
+      "prompt": "是否有人做判断？容错高低？",
+      "items": [
+        {
+          "id": "item_b1_1",
+          "text": "打分：  / 事实：",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "a2",
+      "column": "value",
+      "title": "A2.复现频率",
+      "prompt": "执行频次如何？低频还是高频？",
+      "items": [
+        {
+          "id": "item_a2_1",
+          "text": "打分：  / 事实：",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "b2",
+      "column": "cost",
+      "title": "B2.流程清晰",
+      "prompt": "业务流程是否清晰、标准化？",
+      "items": [
+        {
+          "id": "item_b2_1",
+          "text": "打分：  / 事实：",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "a3",
+      "column": "value",
+      "title": "A3.规模卡点",
+      "prompt": "是否是你的规模化复制卡点？",
+      "items": [
+        {
+          "id": "item_a3_1",
+          "text": "打分：  / 事实：",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "b3",
+      "column": "cost",
+      "title": "B3.决策明确",
+      "prompt": "是否有清晰的判断与评估逻辑？",
+      "items": [
+        {
+          "id": "item_b3_1",
+          "text": "打分：  / 事实：",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "a4",
+      "column": "value",
+      "title": "A4.核心能力",
+      "prompt": "这是不是你对外的核心竞争力？",
+      "items": [
+        {
+          "id": "item_a4_1",
+          "text": "打分：  / 事实：",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "b4",
+      "column": "cost",
+      "title": "B4.数据可行",
+      "prompt": "数据够不够？是否 AI 友好可取用？",
+      "items": [
+        {
+          "id": "item_b4_1",
+          "text": "打分：  / 事实：",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    }
+  ]
+}

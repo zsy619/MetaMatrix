@@ -1,0 +1,186 @@
+{
+  "id": "canvas_deliberate_practice",
+  "type": "deliberate_practice",
+  "schemaVersion": 1,
+  "theme": {
+    "background": {
+      "pattern": "none",
+      "color": "#f3f4f6"
+    }
+  },
+  "labels": {
+    "premiseTitle": "前提：长期追求",
+    "deliberateIsPremise": "「刻意」是前提",
+    "practiceHasMethod": "「练习」有方法",
+    "extractDown": "提炼",
+    "improveUp": "提高"
+  },
+  "nodes": {
+    "a": {
+      "title": "A.固定套路",
+      "color": "#2B7DE9"
+    },
+    "b": {
+      "title": "B.非舒适区",
+      "color": "#00A685"
+    },
+    "c": {
+      "title": "C.及时反馈",
+      "color": "#F99D1C"
+    },
+    "d": {
+      "title": "D.大量重复",
+      "color": "#00A685",
+      "subtitle": "10倍重复=10倍进步"
+    }
+  },
+  "blocks": [
+    {
+      "id": "premise",
+      "title": "前提要点",
+      "items": [
+        {
+          "id": "item_premise_1",
+          "text": "保持渴望",
+          "style": {
+            "color": "#5f6368",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "item_premise_2",
+          "text": "提高动力",
+          "style": {
+            "color": "#5f6368",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "item_premise_3",
+          "text": "提升专注",
+          "style": {
+            "color": "#5f6368",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "node_a",
+      "title": "A.固定套路",
+      "items": [
+        {
+          "id": "item_a_1",
+          "text": "稳定范式",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "item_a_2",
+          "text": "稳定发挥",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "item_a_3",
+          "text": "借假修真",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "node_b",
+      "title": "B.非舒适区",
+      "items": [
+        {
+          "id": "item_b_1",
+          "text": "避免无脑",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "item_b_2",
+          "text": "能力拉满",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "item_b_3",
+          "text": "持续进步",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "node_c",
+      "title": "C.及时反馈",
+      "items": [
+        {
+          "id": "item_c_1",
+          "text": "理解差距",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "item_c_2",
+          "text": "纠正偏差",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "item_c_3",
+          "text": "加速练习",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "node_d",
+      "title": "D.大量重复",
+      "items": [
+        {
+          "id": "item_d_1",
+          "text": "10倍重复=10倍进步",
+          "style": {
+            "color": "#00A685",
+            "fontSize": 14,
+            "fontWeight": "650"
+          }
+        }
+      ]
+    }
+  ]
+}

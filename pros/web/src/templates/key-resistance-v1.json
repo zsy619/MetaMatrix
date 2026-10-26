@@ -1,0 +1,92 @@
+{
+  "id": "canvas_key_resistance",
+  "type": "key_resistance",
+  "schemaVersion": 1,
+  "theme": {
+    "background": {
+      "pattern": "none",
+      "color": "#ffffff"
+    }
+  },
+  "rateLabel": "",
+  "rows": [
+    {
+      "id": "row_1",
+      "resistance": [
+        {
+          "id": "item_r1_1",
+          "text": "",
+          "style": { "color": "#3c4043", "fontSize": 13, "fontWeight": "500" }
+        }
+      ],
+      "eliminate": [
+        {
+          "id": "item_e1_1",
+          "text": "",
+          "style": { "color": "#3c4043", "fontSize": 13, "fontWeight": "500" }
+        }
+      ],
+      "notes": [
+        {
+          "id": "item_n1_1",
+          "text": "",
+          "style": { "color": "#3c4043", "fontSize": 13, "fontWeight": "500" }
+        }
+      ]
+    },
+    {
+      "id": "row_2",
+      "resistance": [
+        {
+          "id": "item_r2_1",
+          "text": "",
+          "style": { "color": "#3c4043", "fontSize": 13, "fontWeight": "500" }
+        }
+      ],
+      "eliminate": [
+        {
+          "id": "item_e2_1",
+          "text": "",
+          "style": { "color": "#3c4043", "fontSize": 13, "fontWeight": "500" }
+        }
+      ],
+      "notes": [
+        {
+          "id": "item_n2_1",
+          "text": "",
+          "style": { "color": "#3c4043", "fontSize": 13, "fontWeight": "500" }
+        }
+      ]
+    },
+    {
+      "id": "row_3",
+      "resistance": [
+        {
+          "id": "item_r3_1",
+          "text": "",
+          "style": { "color": "#3c4043", "fontSize": 13, "fontWeight": "500" }
+        }
+      ],
+      "eliminate": [
+        {
+          "id": "item_e3_1",
+          "text": "",
+          "style": { "color": "#3c4043", "fontSize": 13, "fontWeight": "500" }
+        }
+      ],
+      "notes": [
+        {
+          "id": "item_n3_1",
+          "text": "",
+          "style": { "color": "#3c4043", "fontSize": 13, "fontWeight": "500" }
+        }
+      ]
+    }
+  ],
+  "tipsTitle": "【注】画布撰写Tips:",
+  "tips": [
+    "消除深度：降低 < 消除 < 逆转",
+    "消除时机：被动 < 主动 < 铺垫",
+    "消除成本：动嘴 < 动手 < 动钱"
+  ]
+}

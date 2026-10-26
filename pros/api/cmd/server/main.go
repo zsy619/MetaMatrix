@@ -1,0 +1,77 @@
+package main
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"time"
+
+	"metamatrix/api/internal/config"
+	"metamatrix/api/internal/db"
+	"metamatrix/api/internal/handler"
+	"metamatrix/api/internal/middleware"
+	"metamatrix/api/internal/service"
+
+	"github.com/cloudwego/hertz/pkg/app"
+	"github.com/cloudwego/hertz/pkg/app/server"
+	"github.com/hertz-contrib/cors"
+)
+
+func main() {
+	cfg := config.Load()
+
+	gdb, err := db.Connect(cfg.DatabaseURL)
+	if err != nil {
+		log.Fatalf("db connect: %v", err)
+	}
+	if err := db.AutoMigrate(gdb); err != nil {
+		log.Fatalf("migrate: %v", err)
+	}
+
+	authSvc := service.NewAuthService(gdb, cfg.JWTSecret)
+	docSvc := service.NewDocumentsService(gdb)
+	authH := handler.NewAuthHandler(authSvc)
+	docH := handler.NewDocumentsHandler(docSvc)
+
+	h := server.Default(
+		server.WithHostPorts(fmt.Sprintf(":%d", cfg.Port)),
+	)
+
+	h.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"http://localhost:5173", "http://127.0.0.1:5173"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "Accept"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}))
+
+	h.GET("/health", func(ctx context.Context, c *app.RequestContext) {
+		c.JSON(200, map[string]string{"status": "ok"})
+	})
+
+	h.POST("/auth/register", authH.Register)
+	h.POST("/auth/login", authH.Login)
+	h.GET("/auth/me", middleware.AuthRequired(cfg.JWTSecret), authH.Me)
+
+	docs := h.Group("/documents", middleware.AuthRequired(cfg.JWTSecret))
+	{
+		docs.POST("", docH.Create)
+		docs.GET("", docH.List)
+		// Static paths before :id
+		docs.GET("/search", docH.Search)
+		docs.GET("/ai-corpus", docH.AICorpus)
+		docs.GET("/:id", docH.Get)
+		docs.PUT("/:id", docH.Update)
+		docs.DELETE("/:id", docH.Delete)
+		docs.GET("/:id/ai-context", docH.AIContext)
+		docs.POST("/:id/revisions", docH.CreateRevision)
+		docs.GET("/:id/revisions", docH.ListRevisions)
+		docs.GET("/:id/revisions/:rid/materialize", docH.Materialize)
+		docs.GET("/:id/revisions/:rid/diff", docH.Diff)
+		docs.POST("/:id/restore", docH.Restore)
+	}
+
+	log.Printf("MetaMatrix API (Hertz+GORM) listening on http://localhost:%d", cfg.Port)
+	h.Spin()
+}

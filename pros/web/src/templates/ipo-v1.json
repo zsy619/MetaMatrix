@@ -1,0 +1,79 @@
+{
+  "id": "canvas_ipo",
+  "type": "ipo",
+  "schemaVersion": 1,
+  "theme": {
+    "background": {
+      "pattern": "none",
+      "color": "#f7f5f0"
+    }
+  },
+  "blocks": [
+    {
+      "id": "input",
+      "title": "输入",
+      "items": [
+        {
+          "id": "item_ipo_input_1",
+          "text": "",
+          "style": { "color": "#3c4043", "fontSize": 13, "fontWeight": "500" }
+        }
+      ]
+    },
+    {
+      "id": "process",
+      "title": "处理",
+      "items": [
+        {
+          "id": "item_ipo_process_1",
+          "text": "",
+          "style": { "color": "#3c4043", "fontSize": 13, "fontWeight": "500" }
+        }
+      ]
+    },
+    {
+      "id": "output",
+      "title": "输出",
+      "items": [
+        {
+          "id": "item_ipo_output_1",
+          "text": "",
+          "style": { "color": "#3c4043", "fontSize": 13, "fontWeight": "500" }
+        }
+      ]
+    },
+    {
+      "id": "goal",
+      "title": "目标",
+      "items": [
+        {
+          "id": "item_ipo_goal_1",
+          "text": "",
+          "style": { "color": "#3c4043", "fontSize": 13, "fontWeight": "500" }
+        }
+      ]
+    },
+    {
+      "id": "pattern",
+      "title": "模型",
+      "items": [
+        {
+          "id": "item_ipo_pattern_1",
+          "text": "",
+          "style": { "color": "#3c4043", "fontSize": 13, "fontWeight": "500" }
+        }
+      ]
+    },
+    {
+      "id": "feedback",
+      "title": "反馈",
+      "items": [
+        {
+          "id": "item_ipo_feedback_1",
+          "text": "",
+          "style": { "color": "#3c4043", "fontSize": 13, "fontWeight": "500" }
+        }
+      ]
+    }
+  ]
+}

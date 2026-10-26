@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: metamatrix-postgres
+    restart: unless-stopped
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: metamatrix
+      POSTGRES_PASSWORD: metamatrix
+      POSTGRES_DB: metamatrix
+    volumes:
+      - metamatrix_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U metamatrix -d metamatrix"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  metamatrix_pgdata:

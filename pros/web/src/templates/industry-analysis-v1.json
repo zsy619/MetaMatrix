@@ -1,0 +1,109 @@
+{
+  "id": "canvas_industry_analysis",
+  "type": "industry_analysis",
+  "schemaVersion": 1,
+  "theme": {
+    "background": {
+      "pattern": "none",
+      "color": "#ffffff"
+    }
+  },
+  "blocks": [
+    {
+      "id": "chain",
+      "title": "拆解你的产业链",
+      "subtitle": "行业目前现状如何拆解",
+      "items": [
+        {
+          "id": "item_chain_1",
+          "text": "产业链拆解：",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "changes",
+      "title": "洞察行业里的变化",
+      "subtitle": "行业有哪些底层变化",
+      "items": [
+        {
+          "id": "item_changes_1",
+          "text": "底层变化：",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "steady_b",
+      "title": "预判下一个稳态B点",
+      "subtitle": "未来行业会变成什么样",
+      "items": [
+        {
+          "id": "item_steady_1",
+          "text": "稳态B点预判：",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "cycle",
+      "title": "判断行业周期",
+      "subtitle": "行业目前的周期、是否是好的创业时机",
+      "items": [
+        {
+          "id": "item_cycle_1",
+          "text": "周期判断：",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ceiling",
+      "title": "行业天花板大小",
+      "subtitle": "你对目前市场现状、增速、未来天花板的测算",
+      "items": [
+        {
+          "id": "item_ceiling_1",
+          "text": "天花板测算：",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "concentration",
+      "title": "行业集中度",
+      "subtitle": "市场头部产品的市场份额",
+      "items": [
+        {
+          "id": "item_conc_1",
+          "text": "集中度与份额：",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    }
+  ]
+}

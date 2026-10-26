@@ -1,0 +1,93 @@
+{
+  "id": "canvas_product_content",
+  "type": "product_content",
+  "schemaVersion": 1,
+  "theme": {
+    "background": {
+      "pattern": "none",
+      "color": "#ffffff"
+    }
+  },
+  "blocks": [
+    {
+      "id": "user",
+      "title": "用户",
+      "prompt": "你的目标用户",
+      "items": [
+        {
+          "id": "item_user_1",
+          "text": "目标用户：",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "metrics",
+      "title": "核心指标",
+      "prompt": "决定产品质量的1-3个指标，注意是关键转化率",
+      "items": [
+        {
+          "id": "item_metrics_1",
+          "text": "关键转化指标：",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "add_hypotheses",
+      "title": "加法:备选内核假设",
+      "prompt": "你有哪些备选的产品内核假设？建议充分做加法（关键假设搬到右边格子中，建议删除）",
+      "items": [
+        {
+          "id": "item_add_1",
+          "text": "备选假设：",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "core_hypotheses",
+      "title": "减法:产品内核假设",
+      "prompt": "你认为最重要的内核要素，建议3-5条，不超过7条",
+      "items": [
+        {
+          "id": "item_core_1",
+          "text": "核心假设：",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "validation",
+      "title": "验证:迭代认知手段",
+      "prompt": "你打算用什么方法验证、修正认知？专家访谈、调研、MVP测试等",
+      "items": [
+        {
+          "id": "item_validation_1",
+          "text": "验证方法：",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    }
+  ]
+}

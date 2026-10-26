@@ -1,0 +1,128 @@
+{
+  "id": "canvas_deep_review",
+  "type": "deep_review",
+  "schemaVersion": 1,
+  "theme": {
+    "background": {
+      "pattern": "none",
+      "color": "#ffffff"
+    }
+  },
+  "title": "深度复盘关键成果",
+  "projectName": "",
+  "reviewTime": "",
+  "blocks": [
+    {
+      "id": "overall",
+      "title": "整体评价",
+      "prompt": "预期目标和实际结果，是否符合预期\n（低于预期-基本符合-符合预期-超出预期-大大超出预期）",
+      "items": [
+        {
+          "id": "item_ov_1",
+          "text": "在此填写整体评价…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "highlights",
+      "title": "亮点共识",
+      "prompt": "哪些超出预期，背后成功因素",
+      "items": [
+        {
+          "id": "item_hl_1",
+          "text": "在此填写亮点共识…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "problems",
+      "title": "问题共识",
+      "prompt": "哪些不足和失败，背后失败原因",
+      "items": [
+        {
+          "id": "item_pr_1",
+          "text": "在此填写问题共识…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "keep",
+      "title": "坚持做",
+      "prompt": "哪些事情要坚持做",
+      "items": [
+        {
+          "id": "item_kp_1",
+          "text": "在此填写要坚持做的事…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "stop",
+      "title": "放弃做",
+      "prompt": "哪些事情可以放弃",
+      "items": [
+        {
+          "id": "item_st_1",
+          "text": "在此填写可放弃的事…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "new_tasks",
+      "title": "新任务",
+      "prompt": "有哪些新任务 / 新使命 / 新假设",
+      "items": [
+        {
+          "id": "item_nt_1",
+          "text": "在此填写新任务…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "assets",
+      "title": "过程资产",
+      "prompt": "有哪些方法论、清单、SOP 可以沉淀。\n帮助下一次成功，大幅提升效率。",
+      "items": [
+        {
+          "id": "item_as_1",
+          "text": "在此填写可沉淀的过程资产…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    }
+  ]
+}

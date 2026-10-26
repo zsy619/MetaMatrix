@@ -1,0 +1,268 @@
+{
+  "id": "canvas_incident_review",
+  "type": "incident_review",
+  "schemaVersion": 1,
+  "theme": {
+    "background": {
+      "pattern": "none",
+      "color": "#ffffff"
+    }
+  },
+  "title": "Case Study: 故障复盘",
+  "labels": {
+    "descriptionHint": "详细描述出 bug 的环境准备（测试包、有问题的 commit），问题现场的录屏/截图，coredump 文件，监控曲线等。",
+    "evidenceTitle": "问题现场录屏/截图",
+    "probabilityTitle": "问题发生概率",
+    "probabilityHint": "• 必现——描述必现路径/场景\n• 概率复现——出现概率 + 描述偶现路径/场景",
+    "processHint": "问题发生的时间线及行为",
+    "rootCauseHint": "定位过程及问题原因",
+    "solutionHint": "解决策略及代码修改截图 / commit",
+    "solutionTip": "可以区分不同版本的策略，release 分支和 master 分支分别如何处理，分级处理尽量减少对 release 分支的侵入。",
+    "impactClient": "客户端问题：引入版本、影响版本、影响用户数、场景、发现渠道",
+    "impactServer": "服务端问题：涉及接口/服务、影响端/版本、影响用户数、影响功能、发现渠道",
+    "relatedHint": "填写关联需求名称或附上链接。若无明确需求，可按实际情况留空。",
+    "reflectionHint": "改进与 Todo，明确真正有借鉴意义、会落实的措施",
+    "timeCol": "时间",
+    "behaviorCol": "行为"
+  },
+  "blocks": [
+    {
+      "id": "description",
+      "title": "详细描述",
+      "required": true,
+      "items": [
+        {
+          "id": "item_desc_1",
+          "text": "在此填写问题详细描述、环境与复现材料…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "evidence",
+      "title": "问题现场录屏/截图",
+      "required": true,
+      "items": [
+        {
+          "id": "item_ev_1",
+          "text": "在此粘贴/描述录屏、截图、coredump、监控曲线等…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "probability",
+      "title": "问题发生概率",
+      "required": true,
+      "items": [
+        {
+          "id": "item_prob_1",
+          "text": "必现——描述必现路径/场景",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "item_prob_2",
+          "text": "概率复现——出现概率 + 描述偶现路径/场景",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "root_cause",
+      "title": "原因分析",
+      "required": true,
+      "items": [
+        {
+          "id": "item_rc_1",
+          "text": "在此填写定位过程及问题原因…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "solution",
+      "title": "解决方案",
+      "required": true,
+      "items": [
+        {
+          "id": "item_sol_1",
+          "text": "在此填写解决策略及代码修改说明 / commit…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "impact",
+      "title": "影响范围",
+      "required": true,
+      "items": [
+        {
+          "id": "item_imp_1",
+          "text": "客户端：引入版本 / 影响版本 / 影响用户数 / 场景 / 发现渠道",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "item_imp_2",
+          "text": "服务端：涉及接口/服务 / 影响端/版本 / 影响用户数 / 影响功能 / 发现渠道",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "related_req",
+      "title": "关联需求",
+      "required": false,
+      "items": [
+        {
+          "id": "item_rel_1",
+          "text": "关联需求名称或链接（可空）",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "reflection",
+      "title": "反思总结",
+      "required": true,
+      "items": [
+        {
+          "id": "item_ref_1",
+          "text": "改进与 Todo：明确会落实的措施…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    }
+  ],
+  "timelineRows": [
+    {
+      "id": "tl_1",
+      "time": "2022/03/01 10:05",
+      "behavior": [
+        {
+          "id": "item_tl1_1",
+          "text": "收到第一个用户反馈",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "tl_2",
+      "time": "2022/03/01 10:06",
+      "behavior": [
+        {
+          "id": "item_tl2_1",
+          "text": "Oncall 研发开始排查，同步相关同学",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "tl_3",
+      "time": "2022/03/01 10:07",
+      "behavior": [
+        {
+          "id": "item_tl3_1",
+          "text": "初步定位问题",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "tl_4",
+      "time": "2022/03/01 10:09",
+      "behavior": [
+        {
+          "id": "item_tl4_1",
+          "text": "解决问题",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "tl_5",
+      "time": "2022/03/01 10:10",
+      "behavior": [
+        {
+          "id": "item_tl5_1",
+          "text": "上线",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "tl_6",
+      "time": "2022/03/01 10:11",
+      "behavior": [
+        {
+          "id": "item_tl6_1",
+          "text": "事故解除",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    }
+  ]
+}

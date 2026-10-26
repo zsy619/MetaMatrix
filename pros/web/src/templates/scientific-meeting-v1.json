@@ -1,0 +1,75 @@
+{
+  "id": "canvas_scientific_meeting",
+  "type": "scientific_meeting",
+  "schemaVersion": 1,
+  "theme": {
+    "background": {
+      "pattern": "none",
+      "color": "#fffde7"
+    }
+  },
+  "meetingType": "",
+  "organizer": "",
+  "blocks": [
+    {
+      "id": "goals",
+      "title": "目标",
+      "prompt": "大家愿意花时间开会，希望达成的具体目标和价值",
+      "items": [
+        {
+          "id": "item_sm_goals_1",
+          "text": "",
+          "style": { "color": "#3c4043", "fontSize": 13, "fontWeight": "500" }
+        }
+      ]
+    },
+    {
+      "id": "no_meeting_problems",
+      "title": "如果不开会有哪些问题：",
+      "prompt": "",
+      "items": [
+        {
+          "id": "item_sm_nmp_1",
+          "text": "",
+          "style": { "color": "#3c4043", "fontSize": 13, "fontWeight": "500" }
+        }
+      ]
+    },
+    {
+      "id": "principles",
+      "title": "原则",
+      "prompt": "为了达成目标，大家要遵循的原则 / 保持的开会氛围和做事姿势",
+      "items": [
+        {
+          "id": "item_sm_prin_1",
+          "text": "",
+          "style": { "color": "#3c4043", "fontSize": 13, "fontWeight": "500" }
+        }
+      ]
+    },
+    {
+      "id": "process",
+      "title": "关键流程",
+      "prompt": "为了提升效率，具体开会的执行过程，第一第二第三步",
+      "items": [
+        {
+          "id": "item_sm_proc_1",
+          "text": "",
+          "style": { "color": "#3c4043", "fontSize": 13, "fontWeight": "500" }
+        }
+      ]
+    },
+    {
+      "id": "efficiency_means",
+      "title": "提升会议效率的手段：",
+      "prompt": "",
+      "items": [
+        {
+          "id": "item_sm_eff_1",
+          "text": "",
+          "style": { "color": "#3c4043", "fontSize": 13, "fontWeight": "500" }
+        }
+      ]
+    }
+  ]
+}

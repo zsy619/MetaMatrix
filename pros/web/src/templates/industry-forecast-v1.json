@@ -1,0 +1,92 @@
+{
+  "id": "canvas_industry_forecast",
+  "type": "industry_forecast",
+  "schemaVersion": 1,
+  "theme": {
+    "background": {
+      "pattern": "none",
+      "color": "#ffffff"
+    }
+  },
+  "title": "行业预判分析框架",
+  "blocks": [
+    {
+      "id": "chain",
+      "number": 1,
+      "title": "拆解你的产业链",
+      "subtitle": "行业目前现状、如何拆解",
+      "items": [
+        {
+          "id": "item_if_chain_1",
+          "text": "产业链拆解：",
+          "style": { "color": "#3c4043", "fontSize": 13, "fontWeight": "500" }
+        }
+      ]
+    },
+    {
+      "id": "changes",
+      "number": 2,
+      "title": "洞察行业里的变化",
+      "subtitle": "行业有哪些底层变化",
+      "items": [
+        {
+          "id": "item_if_changes_1",
+          "text": "底层变化：",
+          "style": { "color": "#3c4043", "fontSize": 13, "fontWeight": "500" }
+        }
+      ]
+    },
+    {
+      "id": "steady_b",
+      "number": 3,
+      "title": "预判下一个稳态B点",
+      "subtitle": "未来行业会变成什么样",
+      "items": [
+        {
+          "id": "item_if_steady_1",
+          "text": "稳态B点预判：",
+          "style": { "color": "#3c4043", "fontSize": 13, "fontWeight": "500" }
+        }
+      ]
+    },
+    {
+      "id": "cycle",
+      "number": 4,
+      "title": "判断行业周期",
+      "subtitle": "行业现在周期、创业时机",
+      "items": [
+        {
+          "id": "item_if_cycle_1",
+          "text": "周期判断：",
+          "style": { "color": "#3c4043", "fontSize": 13, "fontWeight": "500" }
+        }
+      ]
+    },
+    {
+      "id": "ceiling",
+      "number": 5,
+      "title": "行业天花板大小",
+      "subtitle": "市场现状、增速、未来天花板",
+      "items": [
+        {
+          "id": "item_if_ceiling_1",
+          "text": "天花板测算：",
+          "style": { "color": "#3c4043", "fontSize": 13, "fontWeight": "500" }
+        }
+      ]
+    },
+    {
+      "id": "concentration",
+      "number": 6,
+      "title": "行业集中度",
+      "subtitle": "市场头部产品的市场份额",
+      "items": [
+        {
+          "id": "item_if_conc_1",
+          "text": "集中度与份额：",
+          "style": { "color": "#3c4043", "fontSize": 13, "fontWeight": "500" }
+        }
+      ]
+    }
+  ]
+}

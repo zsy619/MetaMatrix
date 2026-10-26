@@ -1,0 +1,138 @@
+# ============================================================
+# 元矩阵 MetaMatrix — 仓库根级忽略规则
+#
+# 目录结构：docs/（文档） + pros/api（Go 后端）+ pros/web（Vue3 前端）
+#
+# 判定原则（第一性原理）：
+#   只有「无法由源码可复现生成」的文件才允许进入版本库。
+#   - 能被 npm install / go build / vite build 复现 → 排除
+#   - 含机器特征或密钥（.env）→ 排除
+#   - 人工撰写、承载业务逻辑或锁定依赖版本 → 必须提交
+#
+# 注意：gitignore 只对「尚未被追踪」的文件生效。
+#      若某文件已被 git add 过，需执行 git rm --cached <路径> 才能真正排除。
+# ============================================================
+
+# ---------- 操作系统产物 ----------
+# macOS：Finder 会在目录内写入 .DS_Store，必须排除
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+.fseventsd
+.TemporaryItems
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+.Trash-*
+.fuse_hidden*
+
+# ---------- 编辑器 / IDE ----------
+# VS Code：仅保留可安全共享的两个文件，
+# 其余（tasks.json / launch.json 等含本机绝对路径）一律排除
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.code-workspace
+
+# JetBrains（GoLand / WebStorm / IntelliJ）
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Vim / Emacs / Sublime
+*.swp
+*.swo
+.*.tmp
+\#*#
+*~
+*.sublime-project
+*.sublime-workspace
+
+# ---------- 密钥与本地环境变量 ----------
+# pros/api/.env 承载 DATABASE_URL 与 JWT_SECRET，绝不入库。
+# .env.example 是无密钥的模板，必须提交，故显式反选。
+.env
+.env.local
+.env.*.local
+.env.*
+!.env.example
+
+# ---------- Node / Vite 前端（pros/web） ----------
+# 依赖目录：由 package-lock.json + npm ci 完全可复现
+node_modules/
+jspm_packages/
+
+# 构建产物
+dist/
+dist-ssr/
+build/
+
+# 框架 / 打包器缓存
+.vite/
+.nuxt/
+.next/
+.cache/
+.parcel-cache/
+.temp/
+.turbo/
+
+# TypeScript 增量编译信息（可由 vue-tsc -b 重新生成）
+*.tsbuildinfo
+
+# 包管理器日志
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ---------- Go 后端（pros/api） ----------
+# 编译产物
+*.exe
+*.exe~
+*.dll
+*.dylib
+*.so
+*.so.*
+*.test
+
+# 覆盖率与性能剖析文件
+*.coverprofile
+*.cover
+coverage.out
+coverage.html
+*.gcda
+*.gcno
+*.pprof
+*.prof
+
+# 构建 / 临时目录
+bin/
+tmp/
+build/
+
+# ---------- 日志 ----------
+*.log
+logs/
+log/
+
+# ---------- Docker / PostgreSQL ----------
+# 本地 compose 若从 named volume 改为 bind mount，数据目录不应入库
+docker-data/
+pgdata/
+
+# ---------- 临时 / 备份文件 ----------
+*.tmp
+*.bak
+*.backup
+*.orig
+*.rej

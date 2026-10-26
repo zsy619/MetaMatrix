@@ -1,0 +1,94 @@
+{
+  "id": "canvas_conversion_tradeoff",
+  "type": "conversion_tradeoff",
+  "schemaVersion": 1,
+  "theme": {
+    "background": {
+      "pattern": "none",
+      "color": "#ffffff"
+    }
+  },
+  "title": "",
+  "columnLabels": {
+    "priority": "优先级",
+    "drive": "动力",
+    "resistance": "阻力",
+    "touchpoint": "触点"
+  },
+  "rows": [
+    {
+      "id": "row_1",
+      "priorityLabel": "Top3",
+      "drive": [
+        {
+          "id": "item_d1_1",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ],
+      "resistance": [
+        {
+          "id": "item_r1_1",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ],
+      "touchpoint": [
+        {
+          "id": "item_t1_1",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "row_2",
+      "priorityLabel": "其他备选",
+      "drive": [
+        {
+          "id": "item_d2_1",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ],
+      "resistance": [
+        {
+          "id": "item_r2_1",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ],
+      "touchpoint": [
+        {
+          "id": "item_t2_1",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    }
+  ]
+}

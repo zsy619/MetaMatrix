@@ -1,0 +1,62 @@
+# ============================================================
+# 元矩阵 MetaMatrix · API（Go + Hertz + GORM + PostgreSQL）
+# 仅覆盖本目录，仓库级公共规则见上级 .gitignore
+# ============================================================
+
+# ---------- 密钥 / 本地环境 ----------
+# .env 包含 DATABASE_URL 与 JWT_SECRET，禁止入库；
+# .env.example 为无密钥模板，必须提交
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# ---------- Go 编译产物 ----------
+*.exe
+*.exe~
+*.dll
+*.dylib
+*.so
+*.so.*
+*.test
+
+# go build ./cmd/server 会在当前目录生成可执行文件
+/server
+/metamatrix
+
+# ---------- 构建 / 临时目录 ----------
+/bin/
+/tmp/
+/build/
+/dist/
+
+# ---------- 覆盖率与剖析 ----------
+*.coverprofile
+*.cover
+coverage.out
+coverage.html
+*.gcda
+*.gcno
+*.pprof
+*.prof
+
+# ---------- 日志 ----------
+*.log
+/logs/
+
+# ---------- 数据库本地数据 ----------
+# compose 默认使用 named volume；若改为 bind mount 则落到此目录
+pgdata/
+docker-data/
+*.db
+*.sqlite
+*.sqlite3
+
+# ---------- 编辑器 / 操作系统 ----------
+.idea/
+*.iml
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+.AppleDouble
+._*

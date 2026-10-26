@@ -1,0 +1,148 @@
+{
+  "id": "canvas_y_model",
+  "type": "y_model",
+  "schemaVersion": 2,
+  "theme": {
+    "background": {
+      "pattern": "none",
+      "color": "#ffffff"
+    }
+  },
+  "center": {
+    "title": "我的认知",
+    "subtitle": "知行合一的因果规律"
+  },
+  "labels": {
+    "theory": "理论",
+    "facts": "事实",
+    "anchor": "解决真正问题",
+    "toolsPrefix": "∴ 配套的组织和管理工具：",
+    "step1": "Step 1 范围",
+    "step2": "Step 2 目标",
+    "step3": "Step 3 框架",
+    "step4": "Step4 预判",
+    "step5": "Step 5 配套"
+  },
+  "blocks": [
+    {
+      "id": "theory_existing",
+      "title": "使用现成模型/规律",
+      "items": [
+        {
+          "id": "item_theory_existing_1",
+          "text": "在此填写现成模型/规律…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "theory_build",
+      "title": "自己建模型",
+      "items": [
+        {
+          "id": "item_theory_build_1",
+          "text": "在此填写自建模型…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "facts_hypothesis",
+      "title": "提出新假设",
+      "items": [
+        {
+          "id": "item_facts_hypothesis_1",
+          "text": "在此填写新假设…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "facts_analysis",
+      "title": "如何定性定量分析",
+      "items": [
+        {
+          "id": "item_facts_analysis_1",
+          "text": "在此填写定性定量方法…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "scope",
+      "title": "圈定问题范围",
+      "items": [
+        {
+          "id": "item_scope_1",
+          "text": "在此圈定问题范围…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "cognition_cause",
+      "title": "理解因：基本可行框架 (2-5条)",
+      "items": [
+        {
+          "id": "item_cognition_cause_1",
+          "text": "在此填写框架条目…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "cognition_effect",
+      "title": "理解果：我的目标 (TopN)",
+      "items": [
+        {
+          "id": "item_cognition_effect_1",
+          "text": "在此填写目标条目…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "tools",
+      "title": "配套的组织和管理工具",
+      "items": [
+        {
+          "id": "item_tools_1",
+          "text": "在此填写配套组织与管理工具…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    }
+  ]
+}

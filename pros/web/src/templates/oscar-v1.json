@@ -1,0 +1,98 @@
+{
+  "id": "canvas_oscar",
+  "type": "oscar",
+  "schemaVersion": 1,
+  "theme": {
+    "background": {
+      "pattern": "none",
+      "color": "#f5f0e8"
+    }
+  },
+  "blocks": [
+    {
+      "id": "objective",
+      "letter": "O",
+      "title": "O 调研目标",
+      "prompt": "你到底想通过调研获得什么?",
+      "items": [
+        {
+          "id": "item_o_1",
+          "text": "调研目标：",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "scope",
+      "letter": "S",
+      "title": "S 调研范围",
+      "prompt": "你如何判断哪些是关键信息?",
+      "items": [
+        {
+          "id": "item_s_1",
+          "text": "关键信息判断：",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "checklist",
+      "letter": "C",
+      "title": "C 调研清单",
+      "prompt": "你如何判断哪些是关键产品?",
+      "items": [
+        {
+          "id": "item_c_1",
+          "text": "关键产品判断：",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "acquire",
+      "letter": "A",
+      "title": "A 获取情报",
+      "prompt": "你打算通过哪些手段获取信息?",
+      "items": [
+        {
+          "id": "item_a_1",
+          "text": "获取手段：",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "utilize",
+      "letter": "R",
+      "title": "R 用好情报",
+      "prompt": "你打算怎么用好这些信息达成目标?",
+      "items": [
+        {
+          "id": "item_r_1",
+          "text": "情报用法：",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    }
+  ]
+}

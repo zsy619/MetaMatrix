@@ -1,0 +1,49 @@
+# ============================================================
+# 元矩阵 MetaMatrix · Web（Vue 3 + TypeScript + Vite + Pinia）
+# 仅覆盖本目录，仓库级公共规则见上级 .gitignore
+# ============================================================
+
+# ---------- Logs ----------
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ---------- Dependencies ----------
+node_modules
+
+# ---------- Build output ----------
+dist
+dist-ssr
+build
+*.tsbuildinfo
+
+# Vite / 打包器缓存
+.vite/
+.cache/
+.temp/
+.turbo/
+
+# ---------- Local env ----------
+# Vite 的 .env.local / .env.*.local 为本机覆盖，禁止入库
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# 其他本地覆盖文件
+*.local
+
+# ---------- Editor directories and files ----------
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
