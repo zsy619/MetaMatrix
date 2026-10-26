@@ -18,13 +18,25 @@ export interface EditableBlockLike {
   items: QuadrantItem[]
 }
 
-const props = defineProps<{
-  block: EditableBlockLike
-  /** 紧凑模式：底部横条等 */
-  compact?: boolean
-  /** 隐藏标题（标题已由外层 section 展示时） */
-  hideTitle?: boolean
-}>()
+const props = withDefaults(
+  defineProps<{
+    block: EditableBlockLike
+    /** 紧凑模式：底部横条等 */
+    compact?: boolean
+    /** 隐藏标题（标题已由外层 section 展示时） */
+    hideTitle?: boolean
+    /**
+     * 是否显示右上角「+」新增段落按钮。
+     * 使用 RichTextEditor 时应为 false（默认）：正文由 RTE 直接编辑，无需按条目添加。
+     */
+    showAdd?: boolean
+  }>(),
+  {
+    compact: false,
+    hideTitle: false,
+    showAdd: false,
+  },
+)
 
 const selection = useSelectionStore()
 const documentStore = useDocumentStore()
@@ -96,6 +108,7 @@ function onCloseMaximize(event?: Event) {
       <h3 class="ym-block-title">{{ block.title }}</h3>
       <div class="ym-block-actions">
         <button
+          v-if="showAdd"
           type="button"
           class="add-item-btn"
           title="新增段落"
@@ -127,6 +140,7 @@ function onCloseMaximize(event?: Event) {
     </div>
     <div v-else class="ym-block-toolbar">
       <button
+        v-if="showAdd"
         type="button"
         class="add-item-btn muted"
         title="新增段落"
@@ -194,6 +208,7 @@ function onCloseMaximize(event?: Event) {
           <h3 class="pm-title">{{ block.title || '编辑面板' }}</h3>
           <div class="pm-actions">
             <button
+              v-if="showAdd"
               type="button"
               class="pm-icon-btn"
               title="新增段落"

@@ -11,9 +11,17 @@ import RichTextEditor from '../RichTextEditor.vue'
 import PanelAttachments from './PanelAttachments.vue'
 import { itemsToHtml, syncItemsFromHtml } from '../../utils/itemsHtml'
 
-const props = defineProps<{
-  cell: QuadrantCell
-}>()
+const props = withDefaults(
+  defineProps<{
+    cell: QuadrantCell
+    /**
+     * 是否显示右上角「+」新增段落按钮。
+     * 使用 RichTextEditor 时应为 false（默认）。
+     */
+    showAdd?: boolean
+  }>(),
+  { showAdd: false },
+)
 
 const selection = useSelectionStore()
 const documentStore = useDocumentStore()
@@ -103,6 +111,7 @@ function onCloseMaximize(event?: Event) {
       </span>
       <div class="cell-actions">
         <button
+          v-if="showAdd"
           type="button"
           class="add-item-btn"
           title="新增段落"
@@ -175,6 +184,7 @@ function onCloseMaximize(event?: Event) {
           <h3 class="pm-title">{{ cell.title }}</h3>
           <div class="pm-actions">
             <button
+              v-if="showAdd"
               type="button"
               class="pm-icon-btn"
               title="新增段落"
