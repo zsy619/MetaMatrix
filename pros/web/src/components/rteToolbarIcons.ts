@@ -74,6 +74,59 @@ export const IconFootnote = svgIcon([
   'M9 17h4',
 ])
 
+/** 表格弹窗 · 行数：圆角方框 + 水平分隔线 */
+export const IconTableRows: Component = {
+  name: 'IconTableRows',
+  render() {
+    return h(
+      'svg',
+      {
+        viewBox: '0 0 24 24',
+        width: '1em',
+        height: '1em',
+        fill: 'none',
+        stroke: 'currentColor',
+        'stroke-width': 1.6,
+        'stroke-linecap': 'round',
+        'stroke-linejoin': 'round',
+        xmlns: 'http://www.w3.org/2000/svg',
+      },
+      [
+        h('rect', { x: 4, y: 4, width: 16, height: 16, rx: 2.5 }),
+        h('path', { d: 'M4.5 10h15' }),
+        h('path', { d: 'M4.5 14h15' }),
+      ],
+    )
+  },
+}
+
+/** 表格弹窗 · 列数：圆角方框 + 垂直分隔线 */
+export const IconTableCols: Component = {
+  name: 'IconTableCols',
+  render() {
+    return h(
+      'svg',
+      {
+        viewBox: '0 0 24 24',
+        width: '1em',
+        height: '1em',
+        fill: 'none',
+        stroke: 'currentColor',
+        'stroke-width': 1.6,
+        'stroke-linecap': 'round',
+        'stroke-linejoin': 'round',
+        xmlns: 'http://www.w3.org/2000/svg',
+      },
+      [
+        h('rect', { x: 4, y: 4, width: 16, height: 16, rx: 2.5 }),
+        h('path', { d: 'M10 4.5v15' }),
+        h('path', { d: 'M14 4.5v15' }),
+      ],
+    )
+  },
+}
+
+
 export const toolbarIconMap: Record<string, Component> = {
   undo: RefreshLeft,
   redo: RefreshRight,

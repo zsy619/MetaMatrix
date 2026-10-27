@@ -73,6 +73,8 @@ const editor = useEditor({
       listItem: false,
       bulletList: false,
       orderedList: false,
+      // TipTap 3 StarterKit 自带 Underline；关掉以免与下方 Underline 重复注册
+      underline: false,
     }),
     Underline,
     TextStyle,

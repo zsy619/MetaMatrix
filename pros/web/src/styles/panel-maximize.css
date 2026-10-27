@@ -196,3 +196,21 @@
   border-color: #fff;
   color: #fff;
 }
+
+
+/* 最大化正文为富文本编辑器时：去掉内边距，工具栏贴齐卡片顶栏 */
+.pm-body:has(.rte-root.expanded) {
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.pm-body:has(.rte-root.expanded) > .pm-rte,
+.pm-body:has(.rte-root.expanded) > .rte-root {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  border: none;
+  border-radius: 0;
+}

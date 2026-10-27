@@ -1,11 +1,11 @@
 import type { QuadrantItem } from '../types/canvas'
 
-/** 顶层块级标签（TipTap 文档根下的兄弟节点） */
+/** 顶层块级标签（TipTap 文档根下的兄弟节点；img/video 为块级媒体） */
 const BLOCK_TAG_RE =
-  /^(p|h[1-6]|ul|ol|blockquote|pre|hr|table|div)$/i
+  /^(p|h[1-6]|ul|ol|blockquote|pre|hr|table|div|img|video)$/i
 
-/** 即使没有可见文本也要保留的结构块（空表格、分隔线） */
-const STRUCTURAL_BLOCK_RE = /^(hr|table)$/i
+/** 即使没有可见文本也要保留的结构块（空表格、分隔线、图片、视频） */
+const STRUCTURAL_BLOCK_RE = /^(hr|table|img|video)$/i
 
 export function looksLikeHtml(value: string): boolean {
   return /<\/?[a-z][\s\S]*>/i.test(value)
@@ -35,8 +35,10 @@ function normalizeHtml(html: string): string {
   return html.replace(/\s+/g, ' ').trim()
 }
 
-/** 是否空文档（仅空段落 / 无可见文本） */
+/** 是否空文档（仅空段落 / 无可见文本；含图片/视频则非空） */
 export function isEmptyHtml(html: string): boolean {
+  // <img>/<video> 无文本节点，剥离标签后为空，但属于有效内容
+  if (/<(img|video)\b/i.test(html)) return false
   const plain = html
     .replace(/<br\s*\/?>/gi, '')
     .replace(/&nbsp;/gi, ' ')
@@ -49,10 +51,12 @@ function isStructuralBlock(tagName: string): boolean {
   return STRUCTURAL_BLOCK_RE.test(tagName)
 }
 
-/** 空段落丢弃；table/hr 即使无文字也保留 */
+/** 空段落丢弃；table/hr/img/video 即使无文字也保留 */
 function shouldKeepBlock(html: string, tagName: string): boolean {
   if (isStructuralBlock(tagName)) return true
-  if (/^<(hr|table)\b/i.test(html.trim())) return true
+  if (/^<(hr|table|img|video)\b/i.test(html.trim())) return true
+  // 块内嵌媒体（少数情况下包在 p/div 里）
+  if (/<(img|video)\b/i.test(html)) return true
   // 块级公式：文本可能仅在 data-tex，仍需保留
   if (/data-type=["']math-display["']/i.test(html)) return true
   return !isEmptyHtml(html)
@@ -90,8 +94,9 @@ function findMatchingClose(html: string, openStart: number, tagName: string): nu
 
 /**
  * 把编辑器 HTML 拆成顶层块文本数组。
- * 按顶层 p/h1-h6/ul/ol/blockquote/pre/hr/table/div 切分；
+ * 按顶层 p/h1-h6/ul/ol/blockquote/pre/hr/table/div/img/video 切分；
  * 不切开 table 等块内部的嵌套标签（否则单元格里的 <p> 会把表格拆碎）。
+ * <img> 按 void 块整段保留；<video>…</video> 按配对闭合保留，避免输入文字时丢掉。
  * 拆不出则整份 HTML 作为单条。
  */
 export function htmlToBlockTexts(html: string): string[] {
@@ -141,8 +146,8 @@ export function htmlToBlockTexts(html: string): string[] {
       continue
     }
 
-    // <hr> / <hr /> 自闭合
-    if (tagLower === 'hr') {
+    // <hr> / <img> 等 void / 自闭合：整段标签作为一块
+    if (tagLower === 'hr' || tagLower === 'img') {
       const block = s.slice(i, openEnd + 1)
       if (shouldKeepBlock(block, tagLower)) parts.push(block)
       i = openEnd + 1

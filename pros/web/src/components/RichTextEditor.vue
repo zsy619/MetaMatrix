@@ -19,7 +19,8 @@ import { ElMessage } from 'element-plus'
 import { looksLikeHtml, escapeHtml } from '../utils/itemsHtml'
 import { Annotation } from '../extensions/annotation'
 import { MathInline, MathDisplay, renderKatex } from '../extensions/math'
-import { toolbarIconMap } from './rteToolbarIcons'
+import { Video } from '../extensions/video'
+import { toolbarIconMap, IconTableRows, IconTableCols } from './rteToolbarIcons'
 import type { Component } from 'vue'
 import JSZip from 'jszip'
 
@@ -80,7 +81,32 @@ function normalizeHtml(html: string): string {
   return html.replace(/\s+/g, ' ').trim()
 }
 
+/** 表格菜单状态（须在 useEditor 之前声明，供 contextmenu 回调闭包使用） */
+const tableMenuOpen = ref(false)
+const tableOpsSheetOpen = ref(false)
+const tableCtx = ref<{ open: boolean; x: number; y: number }>({
+  open: false,
+  x: 0,
+  y: 0,
+})
+
+function closeTableCtx() {
+  if (!tableCtx.value.open) return
+  tableCtx.value = { ...tableCtx.value, open: false }
+}
+
+function openTableContextMenu(event: MouseEvent) {
+  tableCtx.value = {
+    open: true,
+    x: event.clientX,
+    y: event.clientY,
+  }
+  tableMenuOpen.value = false
+  tableOpsSheetOpen.value = false
+}
+
 const editor = useEditor({
+
   content: toEditorContent(props.modelValue),
   extensions: [
     StarterKit.configure({
@@ -91,6 +117,13 @@ const editor = useEditor({
       bulletList: {},
       orderedList: {},
       listItem: {},
+      // TipTap 3 StarterKit 自带 Link；关掉以免与下方 Link.configure 重复，
+      // 否则 data:/blob: 附件链接会被默认协议校验剥掉 href
+      link: false,
+      // TipTap 3 StarterKit 也自带 Underline；关掉以免与下方 Underline 重复注册
+      underline: false,
+      // 拖拽图片到同行时更明显的落点指示（飞书式并排）
+      dropcursor: { color: '#5b8cff', width: 2 },
     }),
     Underline,
     TextStyle,
@@ -102,12 +135,58 @@ const editor = useEditor({
     }),
     Link.configure({
       openOnClick: false,
+      // data/blob：本地附件 DataURL / ObjectURL 可作为链接芯片插入
+      protocols: ['http', 'https', 'data', 'blob'],
       HTMLAttributes: { class: 'rte-link' },
+      isAllowedUri: (url, ctx) => {
+        if (!url) return false
+        if (/^(data|blob):/i.test(url)) return true
+        return ctx.defaultValidate(url)
+      },
     }),
     Image.configure({
-      inline: false,
+      // inline：多张可落在同一段落内并排（飞书式同行）；仍可拖拽重排
+      inline: true,
       allowBase64: true,
       HTMLAttributes: { class: 'rte-image' },
+      // TipTap 内置 ResizableNodeView：悬停/选中显示锚点，拖拽缩放并写入 width/height
+      resize: {
+        enabled: true,
+        // 8 锚点：四角 + 四边中点
+        directions: [
+          'top-left',
+          'top',
+          'top-right',
+          'left',
+          'right',
+          'bottom-left',
+          'bottom',
+          'bottom-right',
+        ],
+        minWidth: 48,
+        minHeight: 48,
+        alwaysPreserveAspectRatio: true,
+      },
+    }),
+    Video.configure({
+      inline: true,
+      HTMLAttributes: { class: 'rte-video' },
+      resize: {
+        enabled: true,
+        directions: [
+          'top-left',
+          'top',
+          'top-right',
+          'left',
+          'right',
+          'bottom-left',
+          'bottom',
+          'bottom-right',
+        ],
+        minWidth: 48,
+        minHeight: 48,
+        alwaysPreserveAspectRatio: true,
+      },
     }),
     Table.configure({ resizable: false }),
     TableRow,
@@ -147,6 +226,23 @@ const editor = useEditor({
       event.preventDefault()
       window.open(href, '_blank', 'noopener,noreferrer')
       return true
+    },
+    handleDOMEvents: {
+      contextmenu: (_view, event) => {
+        const target = event.target as HTMLElement | null
+        if (!target?.closest?.('td, th, table, .tableWrapper')) return false
+        event.preventDefault()
+        openTableContextMenu(event)
+        return true
+      },
+      mousedown: (_view, event) => {
+        // 左键点编辑区时收起表格菜单；右键留给 contextmenu
+        if (event.button === 2) return false
+        if (tableMenuOpen.value) tableMenuOpen.value = false
+        if (tableOpsSheetOpen.value) tableOpsSheetOpen.value = false
+        if (tableCtx.value.open) closeTableCtx()
+        return false
+      },
     },
     handleKeyDown(_view, event) {
       // Extra shortcuts (StarterKit already covers Mod-b/i etc.)
@@ -275,33 +371,602 @@ function toggleCodeBlock() {
   chain()?.toggleCodeBlock().run()
 }
 
+/** —— 插入链接 —— */
+const linkDialogOpen = ref(false)
+const linkText = ref('')
+const linkHref = ref('')
+
+function resetLinkDialog() {
+  linkText.value = ''
+  linkHref.value = ''
+}
+
+function openLinkDialog() {
+  const ed = editor.value
+  resetLinkDialog()
+  if (ed) {
+    const { from, to, empty } = ed.state.selection
+    if (!empty) {
+      linkText.value = ed.state.doc.textBetween(from, to, ' ')
+    }
+    const prev = ed.getAttributes('link').href as string | undefined
+    if (prev) linkHref.value = prev
+  }
+  linkDialogOpen.value = true
+  moreOpen.value = false
+}
+
+function closeLinkDialog() {
+  linkDialogOpen.value = false
+  resetLinkDialog()
+}
+
 function insertLink() {
-  const prev = editor.value?.getAttributes('link').href as string | undefined
-  const url = window.prompt('输入链接 URL', prev || 'https://')
-  if (url === null) return
-  if (!url.trim()) {
-    chain()?.extendMarkRange('link').unsetLink().run()
+  openLinkDialog()
+}
+
+function confirmInsertLink() {
+  const ed = editor.value
+  if (!ed) return
+  const href = linkHref.value.trim()
+  const text = linkText.value.trim()
+  if (!href) {
+    ElMessage.warning('请输入链接地址')
     return
   }
-  chain()?.extendMarkRange('link').setLink({ href: url.trim() }).run()
+  if (!/^https?:\/\//i.test(href) && !href.startsWith('/') && !href.startsWith('#') && !href.startsWith('mailto:')) {
+    ElMessage.warning('请输入有效的链接地址（http/https）')
+    return
+  }
+  const { empty } = ed.state.selection
+  if (!empty) {
+    // 有选区：更新链接；若填写了不同文本则替换选区文本并加链接
+    if (text && text !== ed.state.doc.textBetween(ed.state.selection.from, ed.state.selection.to, ' ')) {
+      ed.chain()
+        .focus()
+        .insertContent(`<a href="${href.replace(/"/g, '&quot;')}" class="rte-link">${escapeHtml(text)}</a>`)
+        .run()
+    } else {
+      ed.chain().focus().extendMarkRange('link').setLink({ href }).run()
+    }
+  } else if (text) {
+    ed.chain()
+      .focus()
+      .insertContent(`<a href="${href.replace(/"/g, '&quot;')}" class="rte-link">${escapeHtml(text)}</a>`)
+      .run()
+  } else {
+    ed.chain().focus().setLink({ href }).run()
+  }
+  closeLinkDialog()
+}
+
+/** —— 插入图片 —— */
+type ImageDialogTab = 'personal' | 'external'
+type ImageCategory = { id: string; name: string }
+type StoredImage = {
+  id: string
+  src: string
+  name: string
+  categoryId: string
+  createdAt: number
+}
+
+const IMAGE_CAT_LS = 'metamatrix-rte-image-categories'
+const IMAGE_ASSET_LS = 'metamatrix-rte-image-assets'
+
+const imageDialogOpen = ref(false)
+const imageDialogTab = ref<ImageDialogTab>('personal')
+const imageSidebarKey = ref<'all' | 'uncategorized' | string>('all')
+const imageCategories = ref<ImageCategory[]>([])
+const imageAssets = ref<StoredImage[]>([])
+const imageSelectedIds = ref<Set<string>>(new Set())
+const imageSelectAll = ref(false)
+const imageExternalUrls = ref('')
+const imageFileInputRef = ref<HTMLInputElement | null>(null)
+const addingCategory = ref(false)
+const newCategoryName = ref('')
+
+function loadImageStore() {
+  try {
+    const cats = JSON.parse(localStorage.getItem(IMAGE_CAT_LS) || '[]') as ImageCategory[]
+    const assets = JSON.parse(localStorage.getItem(IMAGE_ASSET_LS) || '[]') as StoredImage[]
+    imageCategories.value = Array.isArray(cats) ? cats : []
+    imageAssets.value = Array.isArray(assets) ? assets : []
+  } catch {
+    imageCategories.value = []
+    imageAssets.value = []
+  }
+}
+
+function saveImageStore() {
+  try {
+    localStorage.setItem(IMAGE_CAT_LS, JSON.stringify(imageCategories.value))
+    localStorage.setItem(IMAGE_ASSET_LS, JSON.stringify(imageAssets.value))
+  } catch {
+    /* quota / private mode */
+  }
+}
+
+const filteredImageAssets = computed(() => {
+  const key = imageSidebarKey.value
+  if (key === 'all') return imageAssets.value
+  if (key === 'uncategorized') {
+    return imageAssets.value.filter((a) => !a.categoryId || a.categoryId === 'uncategorized')
+  }
+  return imageAssets.value.filter((a) => a.categoryId === key)
+})
+
+function resetImageDialog() {
+  imageDialogTab.value = 'personal'
+  imageSidebarKey.value = 'all'
+  imageSelectedIds.value = new Set()
+  imageSelectAll.value = false
+  imageExternalUrls.value = ''
+  addingCategory.value = false
+  newCategoryName.value = ''
+}
+
+function openImageDialog() {
+  loadImageStore()
+  resetImageDialog()
+  imageDialogOpen.value = true
+  moreOpen.value = false
+}
+
+function closeImageDialog() {
+  imageDialogOpen.value = false
+  resetImageDialog()
 }
 
 function insertImage() {
-  const url = window.prompt('输入图片 URL（或留空取消）', 'https://')
-  if (!url || !url.trim()) return
-  chain()?.setImage({ src: url.trim() }).run()
+  openImageDialog()
+}
+
+function uid() {
+  return `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 9)}`
+}
+
+/** 弹层 z-index 4100+，默认 ElMessage(~3000) 会被挡住，导致「点确定没反应」 */
+function rteToast(
+  type: 'success' | 'warning' | 'error' | 'info',
+  message: string,
+) {
+  ElMessage({ type, message, zIndex: 5000, duration: 2800 })
+}
+
+const VIDEO_EXT_RE = /\.(mp4|webm|mov|m4v|ogg|ogv|mkv)$/i
+const ATTACH_MAX_BYTES = 8 * 1024 * 1024
+const VIDEO_MAX_BYTES = 50 * 1024 * 1024
+
+function isVideoFile(file: File): boolean {
+  if (file.type && file.type.startsWith('video/')) return true
+  return VIDEO_EXT_RE.test(file.name || '')
+}
+
+function currentCategoryIdForUpload() {
+  const key = imageSidebarKey.value
+  if (key === 'all' || key === 'uncategorized') return 'uncategorized'
+  return key
+}
+
+function toggleImageSelect(id: string) {
+  const next = new Set(imageSelectedIds.value)
+  if (next.has(id)) next.delete(id)
+  else next.add(id)
+  imageSelectedIds.value = next
+  imageSelectAll.value =
+    filteredImageAssets.value.length > 0 &&
+    filteredImageAssets.value.every((a) => next.has(a.id))
+}
+
+function onImageSelectAllChange() {
+  const checked = !imageSelectAll.value
+  imageSelectAll.value = checked
+  if (checked) {
+    imageSelectedIds.value = new Set(filteredImageAssets.value.map((a) => a.id))
+  } else {
+    imageSelectedIds.value = new Set()
+  }
+}
+
+function startAddCategory() {
+  addingCategory.value = true
+  newCategoryName.value = ''
+}
+
+function confirmAddCategory() {
+  const name = newCategoryName.value.trim()
+  if (!name) {
+    addingCategory.value = false
+    return
+  }
+  if (imageCategories.value.some((c) => c.name === name)) {
+    rteToast('warning', '分类已存在')
+    return
+  }
+  const cat: ImageCategory = { id: uid(), name }
+  imageCategories.value = [...imageCategories.value, cat]
+  saveImageStore()
+  imageSidebarKey.value = cat.id
+  addingCategory.value = false
+  newCategoryName.value = ''
+}
+
+function triggerLocalImagePick() {
+  imageFileInputRef.value?.click()
+}
+
+function readFileAsDataURL(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result || ''))
+    reader.onerror = () => reject(reader.error)
+    reader.readAsDataURL(file)
+  })
+}
+
+async function onLocalImageFilesChange(event: Event) {
+  const input = event.target as HTMLInputElement
+  const files = Array.from(input.files || []).filter((f) => f.type.startsWith('image/'))
+  input.value = ''
+  if (!files.length) {
+    rteToast('warning', '请选择图片文件')
+    return
+  }
+  const catId = currentCategoryIdForUpload()
+  const added: StoredImage[] = []
+  for (const file of files) {
+    try {
+      const src = await readFileAsDataURL(file)
+      if (!src) continue
+      added.push({
+        id: uid(),
+        src,
+        name: file.name,
+        categoryId: catId,
+        createdAt: Date.now(),
+      })
+    } catch {
+      /* skip broken file */
+    }
+  }
+  if (!added.length) {
+    rteToast('error', '图片读取失败')
+    return
+  }
+  imageAssets.value = [...added, ...imageAssets.value]
+  saveImageStore()
+  const next = new Set(imageSelectedIds.value)
+  added.forEach((a) => next.add(a.id))
+  imageSelectedIds.value = next
+  // MVP：本地上传后直接插入编辑器
+  insertImageSrcs(added.map((a) => a.src))
+  closeImageDialog()
+  rteToast('success', `已插入 ${added.length} 张图片`)
+}
+
+function parseExternalImageUrls(raw: string): string[] {
+  const lines = raw
+    .split(/[\n\r]+/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+  const urls: string[] = []
+  const seen = new Set<string>()
+  for (const line of lines) {
+    // also allow space/comma separated on one line
+    const parts = line.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean)
+    for (const part of parts) {
+      if (!/^https?:\/\//i.test(part)) continue
+      if (seen.has(part)) continue
+      seen.add(part)
+      urls.push(part)
+    }
+  }
+  return urls
+}
+
+function insertImageSrcs(srcs: string[]) {
+  const ed = editor.value
+  if (!ed || !srcs.length) return
+  // 多张一次插入：同一段落内并排；默认宽度便于同行展示（仍可拖拽锚点缩放）
+  const multi = srcs.length > 1
+  const defaultWidth = multi ? Math.max(140, Math.floor(560 / Math.min(srcs.length, 4))) : null
+  const nodes = srcs.map((src) => ({
+    type: 'image' as const,
+    attrs: defaultWidth ? { src, width: defaultWidth } : { src },
+  }))
+  ed.chain().focus().insertContent(nodes).run()
+}
+
+function confirmInsertImages() {
+  if (imageDialogTab.value === 'external') {
+    const urls = parseExternalImageUrls(imageExternalUrls.value)
+    if (!urls.length) {
+      rteToast('warning', '请输入至少一个有效的图片 URL（http/https，每行一个）')
+      return
+    }
+    insertImageSrcs(urls)
+    closeImageDialog()
+    rteToast('success', `已插入 ${urls.length} 张图片`)
+    return
+  }
+  const selected = imageAssets.value.filter((a) => imageSelectedIds.value.has(a.id))
+  if (!selected.length) {
+    rteToast('warning', '请选择图片，或使用「本地图片上传」')
+    return
+  }
+  insertImageSrcs(selected.map((a) => a.src))
+  closeImageDialog()
+  rteToast('success', `已插入 ${selected.length} 张图片`)
+}
+
+/** —— 插入视频（与图片弹窗同构） —— */
+type VideoDialogTab = 'personal' | 'external'
+type VideoCategory = { id: string; name: string }
+type StoredVideo = {
+  id: string
+  src: string
+  name: string
+  categoryId: string
+  createdAt: number
+}
+
+const VIDEO_CAT_LS = 'metamatrix-rte-video-categories'
+const VIDEO_ASSET_LS = 'metamatrix-rte-video-assets'
+
+const videoDialogOpen = ref(false)
+const videoDialogTab = ref<VideoDialogTab>('personal')
+const videoSidebarKey = ref<'all' | 'uncategorized' | string>('all')
+const videoCategories = ref<VideoCategory[]>([])
+const videoAssets = ref<StoredVideo[]>([])
+const videoSelectedIds = ref<Set<string>>(new Set())
+const videoSelectAll = ref(false)
+const videoExternalUrls = ref('')
+const videoFileInputRef = ref<HTMLInputElement | null>(null)
+const videoAddingCategory = ref(false)
+const videoNewCategoryName = ref('')
+
+function loadVideoStore() {
+  try {
+    const cats = JSON.parse(localStorage.getItem(VIDEO_CAT_LS) || '[]') as VideoCategory[]
+    const assets = JSON.parse(localStorage.getItem(VIDEO_ASSET_LS) || '[]') as StoredVideo[]
+    videoCategories.value = Array.isArray(cats) ? cats : []
+    videoAssets.value = Array.isArray(assets) ? assets.filter((a) => !!a.src) : []
+  } catch {
+    videoCategories.value = []
+    videoAssets.value = []
+  }
+}
+
+function saveVideoStore() {
+  try {
+    localStorage.setItem(VIDEO_CAT_LS, JSON.stringify(videoCategories.value))
+    // blob: 仅会话有效，不落库；http(s) 可持久。DataURL 过大则丢弃 src 以免撑爆配额
+    const persistable = videoAssets.value
+      .filter((a) => a.src && !a.src.startsWith('blob:'))
+      .map((a) =>
+        a.src.startsWith('data:') && a.src.length > 400_000
+          ? { ...a, src: '' }
+          : a,
+      )
+      .filter((a) => !!a.src)
+      .slice(0, 40)
+    localStorage.setItem(VIDEO_ASSET_LS, JSON.stringify(persistable))
+  } catch {
+    try {
+      localStorage.setItem(VIDEO_CAT_LS, JSON.stringify(videoCategories.value))
+      const light = videoAssets.value
+        .filter((a) => /^https?:\/\//i.test(a.src))
+        .slice(0, 30)
+      localStorage.setItem(VIDEO_ASSET_LS, JSON.stringify(light))
+    } catch {
+      /* private mode */
+    }
+  }
+}
+
+const filteredVideoAssets = computed(() => {
+  const key = videoSidebarKey.value
+  if (key === 'all') return videoAssets.value
+  if (key === 'uncategorized') {
+    return videoAssets.value.filter((a) => !a.categoryId || a.categoryId === 'uncategorized')
+  }
+  return videoAssets.value.filter((a) => a.categoryId === key)
+})
+
+function resetVideoDialog() {
+  videoDialogTab.value = 'personal'
+  videoSidebarKey.value = 'all'
+  videoSelectedIds.value = new Set()
+  videoSelectAll.value = false
+  videoExternalUrls.value = ''
+  videoAddingCategory.value = false
+  videoNewCategoryName.value = ''
+}
+
+function openVideoDialog() {
+  loadVideoStore()
+  resetVideoDialog()
+  videoDialogOpen.value = true
+  moreOpen.value = false
+}
+
+function closeVideoDialog() {
+  videoDialogOpen.value = false
+  resetVideoDialog()
 }
 
 function insertVideo() {
-  const url = window.prompt('输入视频 URL', 'https://')
-  if (!url || !url.trim()) return
-  const src = url.trim()
-  chain()
-    ?.insertContent(
-      `<p><a href="${src}" target="_blank" rel="noopener">🎬 视频：${src}</a></p>`,
+  openVideoDialog()
+}
+
+function currentVideoCategoryIdForUpload() {
+  const key = videoSidebarKey.value
+  if (key === 'all' || key === 'uncategorized') return 'uncategorized'
+  return key
+}
+
+function toggleVideoSelect(id: string) {
+  const next = new Set(videoSelectedIds.value)
+  if (next.has(id)) next.delete(id)
+  else next.add(id)
+  videoSelectedIds.value = next
+  videoSelectAll.value =
+    filteredVideoAssets.value.length > 0 &&
+    filteredVideoAssets.value.every((a) => next.has(a.id))
+}
+
+function onVideoSelectAllChange() {
+  const checked = !videoSelectAll.value
+  videoSelectAll.value = checked
+  if (checked) {
+    videoSelectedIds.value = new Set(filteredVideoAssets.value.map((a) => a.id))
+  } else {
+    videoSelectedIds.value = new Set()
+  }
+}
+
+function startAddVideoCategory() {
+  videoAddingCategory.value = true
+  videoNewCategoryName.value = ''
+}
+
+function confirmAddVideoCategory() {
+  const name = videoNewCategoryName.value.trim()
+  if (!name) {
+    videoAddingCategory.value = false
+    return
+  }
+  if (videoCategories.value.some((c) => c.name === name)) {
+    rteToast('warning', '分类已存在')
+    return
+  }
+  const cat: VideoCategory = { id: uid(), name }
+  videoCategories.value = [...videoCategories.value, cat]
+  saveVideoStore()
+  videoSidebarKey.value = cat.id
+  videoAddingCategory.value = false
+  videoNewCategoryName.value = ''
+}
+
+function triggerLocalVideoPick() {
+  videoFileInputRef.value?.click()
+}
+
+async function onLocalVideoFilesChange(event: Event) {
+  const input = event.target as HTMLInputElement
+  const rawFiles = Array.from(input.files || [])
+  input.value = ''
+  const files = rawFiles.filter(isVideoFile)
+  if (!files.length) {
+    rteToast('warning', '请选择视频文件（mp4 / webm / mov 等）')
+    return
+  }
+  const catId = currentVideoCategoryIdForUpload()
+  const added: StoredVideo[] = []
+  let skippedSize = 0
+  for (const file of files) {
+    if (file.size > VIDEO_MAX_BYTES) {
+      skippedSize += 1
+      rteToast(
+        'warning',
+        `${file.name} 超过 ${Math.round(VIDEO_MAX_BYTES / (1024 * 1024))}MB，已跳过`,
+      )
+      continue
+    }
+    try {
+      // 视频用 blob URL：避免 DataURL 撑爆内存 / localStorage，插入仍可用
+      const src = URL.createObjectURL(file)
+      if (!src) continue
+      added.push({
+        id: uid(),
+        src,
+        name: file.name,
+        categoryId: catId,
+        createdAt: Date.now(),
+      })
+    } catch {
+      /* skip */
+    }
+  }
+  if (!added.length) {
+    rteToast(
+      'error',
+      skippedSize ? '所选视频均超出大小限制' : '视频读取失败，请换 mp4/webm/mov 再试',
     )
-    .run()
-  ElMessage.info('已插入视频链接占位')
+    return
+  }
+  videoAssets.value = [...added, ...videoAssets.value]
+  saveVideoStore()
+  const next = new Set(videoSelectedIds.value)
+  added.forEach((a) => next.add(a.id))
+  videoSelectedIds.value = next
+  // 与图片一致：本地上传后直接插入并关闭；库保存失败也不影响本次插入
+  insertVideoSrcs(added.map((a) => a.src))
+  closeVideoDialog()
+  rteToast('success', `已插入 ${added.length} 个视频`)
+}
+
+function parseExternalVideoUrls(raw: string): string[] {
+  const lines = raw
+    .split(/[\n\r]+/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+  const urls: string[] = []
+  const seen = new Set<string>()
+  for (const line of lines) {
+    const parts = line.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean)
+    for (const part of parts) {
+      if (!/^https?:\/\//i.test(part)) continue
+      if (seen.has(part)) continue
+      seen.add(part)
+      urls.push(part)
+    }
+  }
+  return urls
+}
+
+function insertVideoSrcs(srcs: string[]) {
+  const ed = editor.value
+  const valid = (srcs || []).map((s) => (s || '').trim()).filter(Boolean)
+  if (!ed || !valid.length) return
+  // 与 insertImageSrcs 同构：一次 insertContent 多个 inline video 节点
+  const multi = valid.length > 1
+  const defaultWidth = multi ? Math.max(140, Math.floor(560 / Math.min(valid.length, 4))) : null
+  const nodes = valid.map((src) => ({
+    type: 'video' as const,
+    attrs: defaultWidth
+      ? { src, controls: true, width: defaultWidth }
+      : { src, controls: true },
+  }))
+  ed.chain().focus().insertContent(nodes).run()
+}
+
+function confirmInsertVideos() {
+  if (videoDialogTab.value === 'external') {
+    const urls = parseExternalVideoUrls(videoExternalUrls.value)
+    if (!urls.length) {
+      rteToast('warning', '请输入至少一个有效的视频 URL（http/https，每行一个）')
+      return
+    }
+    insertVideoSrcs(urls)
+    closeVideoDialog()
+    rteToast('success', `已插入 ${urls.length} 个视频`)
+    return
+  }
+  const selected = videoAssets.value.filter((a) => videoSelectedIds.value.has(a.id))
+  if (!selected.length) {
+    rteToast('warning', '请选择视频，或使用「本地视频上传」')
+    return
+  }
+  const usable = selected.map((a) => a.src).filter((s) => !!s && String(s).trim())
+  if (!usable.length) {
+    rteToast('warning', '所选视频缺少文件数据，请重新上传')
+    return
+  }
+  insertVideoSrcs(usable)
+  closeVideoDialog()
+  rteToast('success', `已插入 ${usable.length} 个视频`)
 }
 
 /** —— 公式编辑器 —— */
@@ -507,10 +1172,6 @@ function stepTableCols(delta: number) {
   tableCols.value = clampInt(tableCols.value + delta, 1, 8)
 }
 
-function insertTable() {
-  openTableDialog()
-}
-
 function confirmInsertTable() {
   const ed = editor.value
   if (!ed) return
@@ -520,6 +1181,137 @@ function confirmInsertTable() {
   tableCols.value = cols
   ed.chain().focus().insertTable({ rows, cols, withHeaderRow: true }).run()
   closeTableDialog()
+}
+
+/** —— 表格内常用操作（合并/拆分/插删行列） —— */
+type TableOpItem = {
+  key: string
+  label: string
+  run: () => void
+  disabled?: () => boolean
+  danger?: boolean
+  sepBefore?: boolean
+}
+
+function isInTable() {
+  return editor.value?.isActive('table') ?? false
+}
+
+function canMergeCells() {
+  return editor.value?.can().mergeCells() ?? false
+}
+
+function canSplitCell() {
+  return editor.value?.can().splitCell() ?? false
+}
+
+function closeTableMenu() {
+  tableMenuOpen.value = false
+}
+
+function closeTableOpsSheet() {
+  tableOpsSheetOpen.value = false
+}
+
+function closeAllTableUi() {
+  closeTableMenu()
+  closeTableOpsSheet()
+  closeTableCtx()
+}
+
+function runTableCommand(command: () => boolean) {
+  const ed = editor.value
+  if (!ed) return
+  // 保持 CellSelection：菜单已 @mousedown.prevent，勿额外打乱选区
+  command()
+  closeAllTableUi()
+}
+
+function tableAddRowBefore() {
+  runTableCommand(() => editor.value!.chain().focus().addRowBefore().run())
+}
+function tableAddRowAfter() {
+  runTableCommand(() => editor.value!.chain().focus().addRowAfter().run())
+}
+function tableAddColBefore() {
+  runTableCommand(() => editor.value!.chain().focus().addColumnBefore().run())
+}
+function tableAddColAfter() {
+  runTableCommand(() => editor.value!.chain().focus().addColumnAfter().run())
+}
+function tableDeleteRow() {
+  runTableCommand(() => editor.value!.chain().focus().deleteRow().run())
+}
+function tableDeleteCol() {
+  runTableCommand(() => editor.value!.chain().focus().deleteColumn().run())
+}
+function tableMergeCells() {
+  if (!canMergeCells()) return
+  runTableCommand(() => editor.value!.chain().focus().mergeCells().run())
+}
+function tableSplitCell() {
+  if (!canSplitCell()) return
+  runTableCommand(() => editor.value!.chain().focus().splitCell().run())
+}
+function tableToggleHeaderRow() {
+  runTableCommand(() => editor.value!.chain().focus().toggleHeaderRow().run())
+}
+function tableDeleteTable() {
+  runTableCommand(() => editor.value!.chain().focus().deleteTable().run())
+}
+
+const tableOpItems = computed((): TableOpItem[] => {
+  void editor.value?.state
+  return [
+    { key: 'row-before', label: '向上插入行', run: tableAddRowBefore },
+    { key: 'row-after', label: '向下插入行', run: tableAddRowAfter },
+    { key: 'col-before', label: '向左插入列', run: tableAddColBefore },
+    { key: 'col-after', label: '向右插入列', run: tableAddColAfter },
+    {
+      key: 'del-row',
+      label: '删除行',
+      run: tableDeleteRow,
+      sepBefore: true,
+    },
+    { key: 'del-col', label: '删除列', run: tableDeleteCol },
+    {
+      key: 'merge',
+      label: '合并单元格',
+      run: tableMergeCells,
+      disabled: () => !canMergeCells(),
+      sepBefore: true,
+    },
+    {
+      key: 'split',
+      label: '拆分单元格',
+      run: tableSplitCell,
+      disabled: () => !canSplitCell(),
+    },
+    {
+      key: 'header',
+      label: '切换表头行',
+      run: tableToggleHeaderRow,
+      sepBefore: true,
+    },
+    {
+      key: 'del-table',
+      label: '删除表格',
+      run: tableDeleteTable,
+      danger: true,
+      sepBefore: true,
+    },
+  ]
+})
+
+/** 工具栏「表格」：表内展开操作菜单；表外打开插入弹窗（紧凑「更多」同逻辑） */
+function onTableToolClick() {
+  moreOpen.value = false
+  if (isInTable()) {
+    tableOpsSheetOpen.value = true
+    closeTableCtx()
+    return
+  }
+  openTableDialog()
 }
 
 const NOTE_TYPES = [
@@ -618,9 +1410,271 @@ function confirmInsertNote() {
   resetNoteDialog()
 }
 
-function onAttachment() {
-  ElMessage.info('附件请使用面板下方「相关资料」上传')
+/** —— 选择附件（单栏：分类素材，无外部链接） —— */
+type AttachCategory = { id: string; name: string }
+type StoredAttach = {
+  id: string
+  src: string
+  name: string
+  mime: string
+  size: number
+  categoryId: string
+  createdAt: number
 }
+
+const ATTACH_CAT_LS = 'metamatrix-rte-attach-categories'
+const ATTACH_ASSET_LS = 'metamatrix-rte-attach-assets'
+
+const attachDialogOpen = ref(false)
+const attachSidebarKey = ref<'all' | 'uncategorized' | string>('all')
+const attachCategories = ref<AttachCategory[]>([])
+const attachAssets = ref<StoredAttach[]>([])
+const attachSelectedIds = ref<Set<string>>(new Set())
+const attachSelectAll = ref(false)
+const attachFileInputRef = ref<HTMLInputElement | null>(null)
+const attachAddingCategory = ref(false)
+const attachNewCategoryName = ref('')
+
+function loadAttachStore() {
+  try {
+    const cats = JSON.parse(localStorage.getItem(ATTACH_CAT_LS) || '[]') as AttachCategory[]
+    const assets = JSON.parse(localStorage.getItem(ATTACH_ASSET_LS) || '[]') as StoredAttach[]
+    attachCategories.value = Array.isArray(cats) ? cats : []
+    attachAssets.value = Array.isArray(assets) ? assets : []
+  } catch {
+    attachCategories.value = []
+    attachAssets.value = []
+  }
+}
+
+function saveAttachStore() {
+  try {
+    localStorage.setItem(ATTACH_CAT_LS, JSON.stringify(attachCategories.value))
+    const persistable = attachAssets.value
+      .filter((a) => a.src && !String(a.src).startsWith('blob:'))
+      .map((a) => ({
+        ...a,
+        src: a.src.startsWith('data:') && a.src.length > 200_000 ? '' : a.src,
+      }))
+      .filter((a) => !!a.src)
+    try {
+      localStorage.setItem(ATTACH_ASSET_LS, JSON.stringify(persistable))
+    } catch {
+      const light = persistable
+        .filter((a) => /^https?:\/\//i.test(a.src) || a.src.length < 80_000)
+        .slice(0, 40)
+      localStorage.setItem(ATTACH_ASSET_LS, JSON.stringify(light))
+    }
+  } catch {
+    /* quota / private mode */
+  }
+}
+
+const filteredAttachAssets = computed(() => {
+  const key = attachSidebarKey.value
+  if (key === 'all') return attachAssets.value
+  if (key === 'uncategorized') {
+    return attachAssets.value.filter((a) => !a.categoryId || a.categoryId === 'uncategorized')
+  }
+  return attachAssets.value.filter((a) => a.categoryId === key)
+})
+
+function resetAttachDialog() {
+  attachSidebarKey.value = 'all'
+  attachSelectedIds.value = new Set()
+  attachSelectAll.value = false
+  attachAddingCategory.value = false
+  attachNewCategoryName.value = ''
+}
+
+function openAttachDialog() {
+  loadAttachStore()
+  resetAttachDialog()
+  attachDialogOpen.value = true
+  moreOpen.value = false
+}
+
+function closeAttachDialog() {
+  attachDialogOpen.value = false
+  resetAttachDialog()
+}
+
+function onAttachment() {
+  openAttachDialog()
+}
+
+function currentAttachCategoryId() {
+  const key = attachSidebarKey.value
+  if (key === 'all' || key === 'uncategorized') return 'uncategorized'
+  return key
+}
+
+function toggleAttachSelect(id: string) {
+  const next = new Set(attachSelectedIds.value)
+  if (next.has(id)) next.delete(id)
+  else next.add(id)
+  attachSelectedIds.value = next
+  attachSelectAll.value =
+    filteredAttachAssets.value.length > 0 &&
+    filteredAttachAssets.value.every((a) => next.has(a.id))
+}
+
+function onAttachSelectAllChange() {
+  const checked = !attachSelectAll.value
+  attachSelectAll.value = checked
+  if (checked) {
+    attachSelectedIds.value = new Set(filteredAttachAssets.value.map((a) => a.id))
+  } else {
+    attachSelectedIds.value = new Set()
+  }
+}
+
+function startAddAttachCategory() {
+  attachAddingCategory.value = true
+  attachNewCategoryName.value = ''
+}
+
+function confirmAddAttachCategory() {
+  const name = attachNewCategoryName.value.trim()
+  if (!name) {
+    attachAddingCategory.value = false
+    return
+  }
+  if (attachCategories.value.some((c) => c.name === name)) {
+    rteToast('warning', '分类已存在')
+    return
+  }
+  const cat: AttachCategory = { id: uid(), name }
+  attachCategories.value = [...attachCategories.value, cat]
+  saveAttachStore()
+  attachSidebarKey.value = cat.id
+  attachAddingCategory.value = false
+  attachNewCategoryName.value = ''
+}
+
+function triggerLocalAttachPick() {
+  attachFileInputRef.value?.click()
+}
+
+function formatAttachSize(n: number) {
+  if (n < 1024) return `${n} B`
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function attachExtIcon(name: string) {
+  const ext = (name.split('.').pop() || '').toLowerCase()
+  if (['pdf'].includes(ext)) return 'PDF'
+  if (['doc', 'docx'].includes(ext)) return 'DOC'
+  if (['xls', 'xlsx', 'csv'].includes(ext)) return 'XLS'
+  if (['ppt', 'pptx'].includes(ext)) return 'PPT'
+  if (['zip', 'rar', '7z'].includes(ext)) return 'ZIP'
+  if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(ext)) return 'IMG'
+  if (['mp4', 'webm', 'mov'].includes(ext)) return 'VID'
+  if (['mp3', 'wav', 'aac'].includes(ext)) return 'AUD'
+  if (['txt', 'md', 'json'].includes(ext)) return 'TXT'
+  return 'FILE'
+}
+
+async function onLocalAttachFilesChange(event: Event) {
+  const input = event.target as HTMLInputElement
+  const files = Array.from(input.files || [])
+  input.value = ''
+  if (!files.length) {
+    rteToast('warning', '请选择附件文件')
+    return
+  }
+  const catId = currentAttachCategoryId()
+  const added: StoredAttach[] = []
+  for (const file of files) {
+    if (file.size > ATTACH_MAX_BYTES) {
+      rteToast('warning', `${file.name} 超过 8MB，已跳过（本地预览限制）`)
+      continue
+    }
+    try {
+      // 优先 blob（插入可靠、不受 Link/配额影响）；小文件额外尝试 dataURL 便于素材库持久化
+      let src = URL.createObjectURL(file)
+      if (file.size <= 2 * 1024 * 1024) {
+        try {
+          const dataUrl = await readFileAsDataURL(file)
+          if (dataUrl) src = dataUrl
+        } catch {
+          /* keep blob */
+        }
+      }
+      if (!src) continue
+      added.push({
+        id: uid(),
+        src,
+        name: file.name,
+        mime: file.type || 'application/octet-stream',
+        size: file.size,
+        categoryId: catId,
+        createdAt: Date.now(),
+      })
+    } catch {
+      /* skip */
+    }
+  }
+  if (!added.length) {
+    rteToast('error', '附件读取失败')
+    return
+  }
+  attachAssets.value = [...added, ...attachAssets.value]
+  saveAttachStore()
+  const next = new Set(attachSelectedIds.value)
+  added.forEach((a) => next.add(a.id))
+  attachSelectedIds.value = next
+  insertAttachItems(added)
+  closeAttachDialog()
+  rteToast('success', `已插入 ${added.length} 个附件`)
+}
+
+function insertAttachItems(items: StoredAttach[]) {
+  const ed = editor.value
+  if (!ed || !items.length) return
+  const usable = items.filter((a) => !!a.src && String(a.src).trim())
+  if (!usable.length) return
+  // 用 JSON 节点+link mark 插入，避免超长 href 的 HTML 解析丢标；data/blob 已在 Link 白名单
+  const nodes: Record<string, unknown>[] = []
+  usable.forEach((a, i) => {
+    if (i > 0) nodes.push({ type: 'text', text: ' ' })
+    nodes.push({
+      type: 'text',
+      text: `📎 ${a.name}`,
+      marks: [
+        {
+          type: 'link',
+          attrs: {
+            href: a.src,
+            target: '_blank',
+            rel: 'noopener noreferrer nofollow',
+            class: 'rte-attachment-link rte-link',
+            title: a.name,
+          },
+        },
+      ],
+    })
+  })
+  ed.chain().focus().insertContent(nodes).run()
+}
+
+function confirmInsertAttaches() {
+  const selected = attachAssets.value.filter((a) => attachSelectedIds.value.has(a.id))
+  if (!selected.length) {
+    rteToast('warning', '请选择附件，或使用「本地附件上传」')
+    return
+  }
+  const usable = selected.filter((a) => a.src)
+  if (!usable.length) {
+    rteToast('warning', '所选附件缺少文件数据，请重新上传')
+    return
+  }
+  insertAttachItems(usable)
+  closeAttachDialog()
+  rteToast('success', `已插入 ${usable.length} 个附件`)
+}
+
 const importMenuOpen = ref(false)
 const importFileInputRef = ref<HTMLInputElement | null>(null)
 const linkImportOpen = ref(false)
@@ -900,9 +1954,11 @@ const PRIMARY_KEYS = new Set(['heading', 'bold', 'italic', 'list'])
 type ToolItem = {
   key: string
   label: string
+  /** 悬停完整说明；缺省用 label */
+  title?: string
   icon: string
   iconComp?: Component
-  kind?: 'heading' | 'list' | 'more' | 'btn' | 'color' | 'align' | 'import' | 'divider'
+  kind?: 'heading' | 'list' | 'more' | 'btn' | 'color' | 'align' | 'import' | 'table' | 'divider'
   active?: () => boolean
   run?: () => void
 }
@@ -914,13 +1970,26 @@ function toolIcon(key: string): Component | undefined {
 const allTools = computed((): ToolItem[] => {
   void editor.value?.state // reactive tick
   const ic = (key: string) => toolIcon(key)
+  /**
+   * 最大化工具栏分组（对齐知乎专栏写作页）：
+   * 操作 | 文字 | 段落高级 | 插入 | 其他
+   * 目录已按产品要求移除，勿恢复。
+   */
   return [
+    // —— 操作 ——
     { key: 'undo', label: '撤销', icon: '↶', iconComp: ic('undo'), run: undo },
     { key: 'redo', label: '重做', icon: '↷', iconComp: ic('redo'), run: redo },
-    { key: 'clear', label: '清除格式', icon: '⌫', iconComp: ic('clear'), run: clearFormat },
-    { key: 'div-1', label: '', icon: '', kind: 'divider' },
+    {
+      key: 'clear',
+      label: '清除',
+      title: '清除格式',
+      icon: '⌫',
+      iconComp: ic('clear'),
+      run: clearFormat,
+    },
+    { key: 'div-ops', label: '', icon: '', kind: 'divider' },
+    // —— 文字 ——
     { key: 'heading', label: '标题', icon: 'H▾', iconComp: ic('heading'), kind: 'heading' },
-    { key: 'div-2', label: '', icon: '', kind: 'divider' },
     {
       key: 'bold',
       label: '加粗',
@@ -955,7 +2024,8 @@ const allTools = computed((): ToolItem[] => {
     },
     {
       key: 'codeInline',
-      label: '行内代码',
+      label: '行内码',
+      title: '行内代码',
       icon: '`',
       iconComp: ic('codeInline'),
       active: () => isActive('code'),
@@ -971,10 +2041,9 @@ const allTools = computed((): ToolItem[] => {
     },
     { key: 'color', label: '颜色', icon: 'A', iconComp: ic('color'), kind: 'color' },
     { key: 'align', label: '对齐', icon: '≡', iconComp: ic('align'), kind: 'align' },
-    { key: 'div-3', label: '', icon: '', kind: 'divider' },
     { key: 'list', label: '列表', icon: '☰▾', iconComp: ic('list'), kind: 'list' },
-    { key: 'div-4', label: '', icon: '', kind: 'divider' },
-    // 目录已按产品要求移除，勿恢复
+    { key: 'div-text', label: '', icon: '', kind: 'divider' },
+    // —— 高级（段落）——
     {
       key: 'quote',
       label: '引用',
@@ -992,8 +2061,8 @@ const allTools = computed((): ToolItem[] => {
       active: () => isActive('codeBlock'),
       run: toggleCodeBlock,
     },
-    { key: 'div-5', label: '', icon: '', kind: 'divider' },
-    { key: 'note', label: '注释', icon: '[1]', iconComp: ic('note'), run: insertNote },
+    { key: 'div-block', label: '', icon: '', kind: 'divider' },
+    // —— 插入 ——
     { key: 'image', label: '图片', icon: '🖼', iconComp: ic('image'), run: insertImage },
     { key: 'video', label: '视频', icon: '▶', iconComp: ic('video'), run: insertVideo },
     {
@@ -1004,19 +2073,17 @@ const allTools = computed((): ToolItem[] => {
       active: () => isActive('link'),
       run: insertLink,
     },
-    { key: 'div-6', label: '', icon: '', kind: 'divider' },
     { key: 'formula', label: '公式', icon: 'Σ', iconComp: ic('formula'), run: insertFormula },
-    { key: 'table', label: '表格', icon: '▦', iconComp: ic('table'), run: insertTable },
-    { key: 'div-7', label: '', icon: '', kind: 'divider' },
+    { key: 'table', label: '表格', icon: '▦', iconComp: ic('table'), kind: 'table', active: () => isInTable(), run: onTableToolClick },
     { key: 'attach', label: '附件', icon: '☁▾', iconComp: ic('attach'), run: onAttachment },
+    { key: 'note', label: '注释', icon: '[1]', iconComp: ic('note'), run: insertNote },
+    { key: 'div-insert', label: '', icon: '', kind: 'divider' },
+    // —— 其他 ——
     { key: 'import', label: '导入', icon: '⇪▾', iconComp: ic('import'), kind: 'import', run: onImport },
     // 草稿备份：按产品要求先隐藏入口（保留 onDraftBackup 逻辑）
     // { key: 'draft', label: '草稿备份', icon: '⏱', run: onDraftBackup },
   ]
 })
-
-/** 紧凑模式也常驻顶栏的交互型工具（下拉，无法塞进「更多」） */
-const COMPACT_ALWAYS = new Set(['color', 'align'])
 
 /**
  * 仅最大化（expanded）时展示：不进紧凑顶栏，也不进「更多」。
@@ -1028,12 +2095,9 @@ const EXPANDED_ONLY_KEYS = new Set(['import'])
 const visibleTools = computed(() => {
   const all = allTools.value
   if (props.expanded) return all
-  // 紧凑模式：主工具 + 常驻下拉；去掉分隔线避免空洞
+  // 非最大化：仅 标题/加粗/斜体/列表；其余进「更多」；隐藏导入/更改；无分隔线
   return all.filter(
-    (t) =>
-      t.kind !== 'divider' &&
-      !EXPANDED_ONLY_KEYS.has(t.key) &&
-      (PRIMARY_KEYS.has(t.key) || COMPACT_ALWAYS.has(t.key)),
+    (t) => t.kind !== 'divider' && !EXPANDED_ONLY_KEYS.has(t.key) && PRIMARY_KEYS.has(t.key),
   )
 })
 
@@ -1044,7 +2108,6 @@ const moreTools = computed(() => {
     (t) =>
       t.kind !== 'divider' &&
       !PRIMARY_KEYS.has(t.key) &&
-      !COMPACT_ALWAYS.has(t.key) &&
       !EXPANDED_ONLY_KEYS.has(t.key),
   )
 })
@@ -1239,6 +2302,54 @@ defineExpose({ focusEditor, editor, onDraftBackup })
           aria-hidden="true"
         />
         <div
+          v-else-if="t.kind === 'table'"
+          class="rte-tool-wrap"
+          @mouseleave="closeTableMenu"
+        >
+          <button
+            type="button"
+            class="rte-tool"
+            :class="{ active: tableMenuOpen || isInTable() }"
+            title="表格"
+            @click.stop="tableMenuOpen = !tableMenuOpen"
+          >
+            <span class="rte-tool-icon">
+              <component
+                :is="t.iconComp || toolIcon('table')"
+                class="rte-ep-icon"
+              />
+              <span class="rte-caret">▾</span>
+            </span>
+            <span class="rte-tool-label">表格</span>
+          </button>
+          <div
+            v-if="tableMenuOpen"
+            class="rte-menu rte-table-menu"
+            @mousedown.prevent
+          >
+            <template v-if="isInTable()">
+              <template v-for="op in tableOpItems" :key="op.key">
+                <div v-if="op.sepBefore" class="rte-menu-sep" aria-hidden="true" />
+                <button
+                  type="button"
+                  :class="{ danger: op.danger }"
+                  :disabled="op.disabled?.()"
+                  @click="op.run()"
+                >
+                  {{ op.label }}
+                </button>
+              </template>
+              <div class="rte-menu-sep" aria-hidden="true" />
+            </template>
+            <button
+              type="button"
+              @click="closeTableMenu(); openTableDialog()"
+            >
+              插入表格
+            </button>
+          </div>
+        </div>
+        <div
           v-else-if="t.kind === 'import'"
           class="rte-tool-wrap"
           @mouseleave="closeImportMenu"
@@ -1285,7 +2396,8 @@ defineExpose({ focusEditor, editor, onDraftBackup })
           type="button"
           class="rte-tool"
           :class="{ active: t.active?.() }"
-          :title="t.label"
+          :title="t.title || t.label"
+          :aria-label="t.title || t.label"
           @click="t.run?.()"
         >
           <span class="rte-tool-icon">
@@ -1339,7 +2451,7 @@ defineExpose({ focusEditor, editor, onDraftBackup })
               />
               <template v-else>{{ mt.icon }}</template>
             </span>
-            <span>{{ mt.label }}</span>
+            <span>{{ mt.title || mt.label }}</span>
           </button>
         </div>
       </div>
@@ -1652,6 +2764,79 @@ defineExpose({ focusEditor, editor, onDraftBackup })
       </div>
     </Teleport>
 
+    <!-- 表格右键菜单 -->
+    <Teleport to="body">
+      <div
+        v-if="tableCtx.open"
+        class="rte-table-ctx-mask"
+        @mousedown="closeTableCtx"
+        @contextmenu.prevent="closeTableCtx"
+      >
+        <div
+          class="rte-table-ctx"
+          :style="{ left: tableCtx.x + 'px', top: tableCtx.y + 'px' }"
+          @mousedown.stop.prevent
+        >
+          <template v-for="op in tableOpItems" :key="'ctx-' + op.key">
+            <div v-if="op.sepBefore" class="rte-menu-sep" aria-hidden="true" />
+            <button
+              type="button"
+              :class="{ danger: op.danger }"
+              :disabled="op.disabled?.()"
+              @click="op.run()"
+            >
+              {{ op.label }}
+            </button>
+          </template>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- 紧凑「更多」进入的表格操作面板 -->
+    <Teleport to="body">
+      <div
+        v-if="tableOpsSheetOpen"
+        class="rte-modal-overlay"
+        @mousedown.self="closeTableOpsSheet"
+      >
+        <div
+          class="rte-table-ops-sheet"
+          role="dialog"
+          aria-label="表格操作"
+          @mousedown.stop
+        >
+          <h3 class="rte-table-title">表格操作</h3>
+          <div class="rte-table-ops-list">
+            <template v-for="op in tableOpItems" :key="'sheet-' + op.key">
+              <div v-if="op.sepBefore" class="rte-menu-sep" aria-hidden="true" />
+              <button
+                type="button"
+                class="rte-table-ops-item"
+                :class="{ danger: op.danger }"
+                :disabled="op.disabled?.()"
+                @click="op.run()"
+              >
+                {{ op.label }}
+              </button>
+            </template>
+            <div class="rte-menu-sep" aria-hidden="true" />
+            <button
+              type="button"
+              class="rte-table-ops-item"
+              @click="closeTableOpsSheet(); openTableDialog()"
+            >
+              插入表格
+            </button>
+          </div>
+          <div class="rte-modal-actions">
+            <button type="button" class="rte-modal-cancel" @click="closeTableOpsSheet">
+              取消
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
     <!-- 插入表格 -->
     <Teleport to="body">
       <div
@@ -1669,7 +2854,9 @@ defineExpose({ focusEditor, editor, onDraftBackup })
           <h3 class="rte-table-title">插入表格</h3>
 
           <div class="rte-table-field">
-            <span class="rte-table-field-icon" aria-hidden="true">☰</span>
+            <span class="rte-table-field-icon" aria-hidden="true">
+              <component :is="IconTableRows" class="rte-table-field-svg" />
+            </span>
             <input
               class="rte-table-input"
               type="number"
@@ -1686,7 +2873,9 @@ defineExpose({ focusEditor, editor, onDraftBackup })
           </div>
 
           <div class="rte-table-field">
-            <span class="rte-table-field-icon" aria-hidden="true"> entr</span>
+            <span class="rte-table-field-icon" aria-hidden="true">
+              <component :is="IconTableCols" class="rte-table-field-svg" />
+            </span>
             <input
               class="rte-table-input"
               type="number"
@@ -1759,6 +2948,574 @@ defineExpose({ focusEditor, editor, onDraftBackup })
         </div>
       </div>
     </Teleport>
+
+    <!-- 插入链接 -->
+    <Teleport to="body">
+      <div
+        v-if="linkDialogOpen"
+        class="rte-modal-overlay"
+        @mousedown.self="closeLinkDialog"
+      >
+        <div
+          class="rte-link-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-label="插入链接"
+          @mousedown.stop
+        >
+          <h3 class="rte-table-title">插入链接</h3>
+          <div class="rte-note-field rte-note-text-field" style="width: 100%; margin-bottom: 12px">
+            <span class="rte-note-field-icon" aria-hidden="true">T</span>
+            <input
+              v-model="linkText"
+              type="text"
+              class="rte-note-input"
+              placeholder="输入链接文本"
+              maxlength="500"
+              @keydown.enter.prevent="confirmInsertLink"
+            />
+          </div>
+          <div class="rte-note-field rte-note-link-field">
+            <span class="rte-note-field-icon rte-note-link-icon" aria-hidden="true">🔗</span>
+            <input
+              v-model="linkHref"
+              type="url"
+              class="rte-note-input"
+              placeholder="输入链接地址"
+              maxlength="2000"
+              @keydown.enter.prevent="confirmInsertLink"
+            />
+          </div>
+          <div class="rte-modal-actions">
+            <button type="button" class="rte-modal-cancel" @click="closeLinkDialog">
+              取消
+            </button>
+            <button type="button" class="rte-modal-confirm" @click="confirmInsertLink">
+              确认
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- 选择附件：单栏分类素材（无外部链接） -->
+    <Teleport to="body">
+      <div
+        v-if="attachDialogOpen"
+        class="rte-modal-overlay"
+        @mousedown.self="closeAttachDialog"
+      >
+        <div
+          class="rte-image-dialog rte-attach-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-label="选择附件"
+          @mousedown.stop
+        >
+          <div class="rte-attach-title-bar">
+            <h3 class="rte-attach-title">选择附件</h3>
+          </div>
+
+          <div class="rte-image-personal">
+            <aside class="rte-image-sidebar">
+              <button
+                type="button"
+                class="rte-image-side-item"
+                :class="{ active: attachSidebarKey === 'all' }"
+                @click="attachSidebarKey = 'all'"
+              >
+                <span class="rte-image-side-ico" aria-hidden="true">📎</span>
+                <span class="rte-image-side-label">我的附件</span>
+              </button>
+              <button
+                type="button"
+                class="rte-image-side-item"
+                :class="{ active: attachSidebarKey === 'uncategorized' }"
+                @click="attachSidebarKey = 'uncategorized'"
+              >
+                <span class="rte-image-side-ico" aria-hidden="true">📁</span>
+                <span class="rte-image-side-label">未分类</span>
+              </button>
+              <button
+                v-for="cat in attachCategories"
+                :key="cat.id"
+                type="button"
+                class="rte-image-side-item"
+                :class="{ active: attachSidebarKey === cat.id }"
+                @click="attachSidebarKey = cat.id"
+              >
+                <span class="rte-image-side-ico" aria-hidden="true">📁</span>
+                <span class="rte-image-side-label">{{ cat.name }}</span>
+              </button>
+              <div class="rte-image-side-spacer" />
+              <div v-if="attachAddingCategory" class="rte-image-add-cat-form">
+                <input
+                  v-model="attachNewCategoryName"
+                  type="text"
+                  class="rte-image-add-cat-input"
+                  placeholder="分类名称"
+                  maxlength="40"
+                  @keydown.enter.prevent="confirmAddAttachCategory"
+                  @keydown.esc.prevent="attachAddingCategory = false"
+                />
+                <button
+                  type="button"
+                  class="rte-image-add-cat-ok"
+                  @click="confirmAddAttachCategory"
+                >
+                  确定
+                </button>
+              </div>
+              <button
+                v-else
+                type="button"
+                class="rte-image-side-item rte-image-add-cat"
+                @click="startAddAttachCategory"
+              >
+                <span class="rte-image-side-ico" aria-hidden="true">📁+</span>
+                <span class="rte-image-side-label">添加分类</span>
+              </button>
+            </aside>
+
+            <div class="rte-image-main">
+              <div class="rte-image-main-top">
+                <label class="rte-image-select-all">
+                  <input
+                    type="checkbox"
+                    :checked="attachSelectAll"
+                    @change="onAttachSelectAllChange"
+                  />
+                  <span>本页全选</span>
+                </label>
+              </div>
+              <div
+                class="rte-image-grid"
+                :class="{ empty: filteredAttachAssets.length === 0 }"
+              >
+                <button
+                  type="button"
+                  class="rte-image-upload-card"
+                  title="本地附件上传"
+                  @click="triggerLocalAttachPick"
+                >
+                  <span class="rte-image-upload-ico" aria-hidden="true">
+                    <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+                      <rect
+                        x="10"
+                        y="6"
+                        width="28"
+                        height="36"
+                        rx="3"
+                        stroke="#5b8cff"
+                        stroke-width="2"
+                      />
+                      <path
+                        d="M18 18h12M18 24h12M18 30h8"
+                        stroke="#5b8cff"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                      />
+                      <circle cx="36" cy="36" r="9" fill="#5b8cff" />
+                      <path
+                        d="M36 32v8M32 36h8"
+                        stroke="#fff"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                      />
+                    </svg>
+                  </span>
+                  <span class="rte-image-upload-label">本地附件上传</span>
+                </button>
+                <button
+                  v-for="asset in filteredAttachAssets"
+                  :key="asset.id"
+                  type="button"
+                  class="rte-image-thumb rte-attach-thumb"
+                  :class="{ selected: attachSelectedIds.has(asset.id) }"
+                  :title="asset.name"
+                  @click="toggleAttachSelect(asset.id)"
+                >
+                  <span class="rte-attach-thumb-ext">{{ attachExtIcon(asset.name) }}</span>
+                  <span class="rte-attach-thumb-name">{{ asset.name }}</span>
+                  <span class="rte-attach-thumb-size">{{ formatAttachSize(asset.size) }}</span>
+                  <span
+                    class="rte-image-thumb-check"
+                    :class="{ on: attachSelectedIds.has(asset.id) }"
+                  />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="rte-modal-actions rte-image-actions">
+            <button type="button" class="rte-modal-cancel" @click="closeAttachDialog">
+              取消
+            </button>
+            <button
+              type="button"
+              class="rte-modal-confirm"
+              @click="confirmInsertAttaches"
+            >
+              确认
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- 插入图片：个人素材 / 外部链接 -->
+    <Teleport to="body">
+      <div
+        v-if="imageDialogOpen"
+        class="rte-modal-overlay"
+        @mousedown.self="closeImageDialog"
+      >
+        <div
+          class="rte-image-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-label="插入图片"
+          @mousedown.stop
+        >
+          <div class="rte-image-tabs">
+            <button
+              type="button"
+              class="rte-image-tab"
+              :class="{ active: imageDialogTab === 'personal' }"
+              @click="imageDialogTab = 'personal'"
+            >
+              个人素材
+            </button>
+            <button
+              type="button"
+              class="rte-image-tab"
+              :class="{ active: imageDialogTab === 'external' }"
+              @click="imageDialogTab = 'external'"
+            >
+              外部链接
+            </button>
+          </div>
+
+          <div v-if="imageDialogTab === 'personal'" class="rte-image-personal">
+            <aside class="rte-image-sidebar">
+              <button
+                type="button"
+                class="rte-image-side-item"
+                :class="{ active: imageSidebarKey === 'all' }"
+                @click="imageSidebarKey = 'all'"
+              >
+                <span class="rte-image-side-ico" aria-hidden="true">👤</span>
+                <span class="rte-image-side-label">我的图片</span>
+              </button>
+              <button
+                type="button"
+                class="rte-image-side-item"
+                :class="{ active: imageSidebarKey === 'uncategorized' }"
+                @click="imageSidebarKey = 'uncategorized'"
+              >
+                <span class="rte-image-side-ico" aria-hidden="true">📁</span>
+                <span class="rte-image-side-label">未分类</span>
+              </button>
+              <button
+                v-for="cat in imageCategories"
+                :key="cat.id"
+                type="button"
+                class="rte-image-side-item"
+                :class="{ active: imageSidebarKey === cat.id }"
+                @click="imageSidebarKey = cat.id"
+              >
+                <span class="rte-image-side-ico" aria-hidden="true">📁</span>
+                <span class="rte-image-side-label">{{ cat.name }}</span>
+              </button>
+              <div class="rte-image-side-spacer" />
+              <div v-if="addingCategory" class="rte-image-add-cat-form">
+                <input
+                  v-model="newCategoryName"
+                  type="text"
+                  class="rte-image-add-cat-input"
+                  placeholder="分类名称"
+                  maxlength="40"
+                  @keydown.enter.prevent="confirmAddCategory"
+                  @keydown.esc.prevent="addingCategory = false"
+                />
+                <button type="button" class="rte-image-add-cat-ok" @click="confirmAddCategory">
+                  确定
+                </button>
+              </div>
+              <button
+                v-else
+                type="button"
+                class="rte-image-side-item rte-image-add-cat"
+                @click="startAddCategory"
+              >
+                <span class="rte-image-side-ico" aria-hidden="true">📁+</span>
+                <span class="rte-image-side-label">添加分类</span>
+              </button>
+            </aside>
+
+            <div class="rte-image-main">
+              <div class="rte-image-main-top">
+                <label class="rte-image-select-all">
+                  <input
+                    type="checkbox"
+                    :checked="imageSelectAll"
+                    @change="onImageSelectAllChange"
+                  />
+                  <span>本页全选</span>
+                </label>
+              </div>
+              <div
+                class="rte-image-grid"
+                :class="{ empty: filteredImageAssets.length === 0 }"
+              >
+                <button
+                  type="button"
+                  class="rte-image-upload-card"
+                  title="本地图片上传"
+                  @click="triggerLocalImagePick"
+                >
+                  <span class="rte-image-upload-ico" aria-hidden="true">
+                    <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+                      <rect x="6" y="10" width="36" height="28" rx="4" stroke="#5b8cff" stroke-width="2"/>
+                      <path d="M14 30l7-8 5 6 4-4 8 6" stroke="#5b8cff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                      <circle cx="18" cy="18" r="2.5" fill="#5b8cff"/>
+                      <circle cx="36" cy="12" r="8" fill="#5b8cff"/>
+                      <path d="M36 8v8M32 12h8" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                  </span>
+                  <span class="rte-image-upload-label">本地图片上传</span>
+                </button>
+                <button
+                  v-for="asset in filteredImageAssets"
+                  :key="asset.id"
+                  type="button"
+                  class="rte-image-thumb"
+                  :class="{ selected: imageSelectedIds.has(asset.id) }"
+                  :title="asset.name"
+                  @click="toggleImageSelect(asset.id)"
+                >
+                  <img :src="asset.src" :alt="asset.name" />
+                  <span
+                    class="rte-image-thumb-check"
+                    :class="{ on: imageSelectedIds.has(asset.id) }"
+                  />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div v-else class="rte-image-external">
+            <p class="rte-link-import-hint">每行一个图片 URL，支持一次插入多张。</p>
+            <textarea
+              v-model="imageExternalUrls"
+              class="rte-image-url-textarea"
+              placeholder="https://example.com/a.png&#10;https://example.com/b.jpg"
+              spellcheck="false"
+            />
+          </div>
+
+          <div class="rte-modal-actions rte-image-actions">
+            <button type="button" class="rte-modal-cancel" @click="closeImageDialog">
+              取消
+            </button>
+            <button type="button" class="rte-modal-confirm" @click="confirmInsertImages">
+              确认
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- 插入视频：个人素材 / 外部链接（布局复用图片弹窗样式） -->
+    <Teleport to="body">
+      <div
+        v-if="videoDialogOpen"
+        class="rte-modal-overlay"
+        @mousedown.self="closeVideoDialog"
+      >
+        <div
+          class="rte-image-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-label="插入视频"
+          @mousedown.stop
+        >
+          <div class="rte-image-tabs">
+            <button
+              type="button"
+              class="rte-image-tab"
+              :class="{ active: videoDialogTab === 'personal' }"
+              @click="videoDialogTab = 'personal'"
+            >
+              个人素材
+            </button>
+            <button
+              type="button"
+              class="rte-image-tab"
+              :class="{ active: videoDialogTab === 'external' }"
+              @click="videoDialogTab = 'external'"
+            >
+              外部链接
+            </button>
+          </div>
+
+          <div v-if="videoDialogTab === 'personal'" class="rte-image-personal">
+            <aside class="rte-image-sidebar">
+              <button
+                type="button"
+                class="rte-image-side-item"
+                :class="{ active: videoSidebarKey === 'all' }"
+                @click="videoSidebarKey = 'all'"
+              >
+                <span class="rte-image-side-ico" aria-hidden="true">🎬</span>
+                <span class="rte-image-side-label">我的视频</span>
+              </button>
+              <button
+                type="button"
+                class="rte-image-side-item"
+                :class="{ active: videoSidebarKey === 'uncategorized' }"
+                @click="videoSidebarKey = 'uncategorized'"
+              >
+                <span class="rte-image-side-ico" aria-hidden="true">📁</span>
+                <span class="rte-image-side-label">未分类</span>
+              </button>
+              <button
+                v-for="cat in videoCategories"
+                :key="cat.id"
+                type="button"
+                class="rte-image-side-item"
+                :class="{ active: videoSidebarKey === cat.id }"
+                @click="videoSidebarKey = cat.id"
+              >
+                <span class="rte-image-side-ico" aria-hidden="true">📁</span>
+                <span class="rte-image-side-label">{{ cat.name }}</span>
+              </button>
+              <div class="rte-image-side-spacer" />
+              <div v-if="videoAddingCategory" class="rte-image-add-cat-form">
+                <input
+                  v-model="videoNewCategoryName"
+                  type="text"
+                  class="rte-image-add-cat-input"
+                  placeholder="分类名称"
+                  maxlength="40"
+                  @keydown.enter.prevent="confirmAddVideoCategory"
+                  @keydown.esc.prevent="videoAddingCategory = false"
+                />
+                <button type="button" class="rte-image-add-cat-ok" @click="confirmAddVideoCategory">
+                  确定
+                </button>
+              </div>
+              <button
+                v-else
+                type="button"
+                class="rte-image-side-item rte-image-add-cat"
+                @click="startAddVideoCategory"
+              >
+                <span class="rte-image-side-ico" aria-hidden="true">📁+</span>
+                <span class="rte-image-side-label">添加分类</span>
+              </button>
+            </aside>
+
+            <div class="rte-image-main">
+              <div class="rte-image-main-top">
+                <label class="rte-image-select-all">
+                  <input
+                    type="checkbox"
+                    :checked="videoSelectAll"
+                    @change="onVideoSelectAllChange"
+                  />
+                  <span>本页全选</span>
+                </label>
+              </div>
+              <div
+                class="rte-image-grid"
+                :class="{ empty: filteredVideoAssets.length === 0 }"
+              >
+                <button
+                  type="button"
+                  class="rte-image-upload-card"
+                  title="本地视频上传"
+                  @click="triggerLocalVideoPick"
+                >
+                  <span class="rte-image-upload-ico" aria-hidden="true">
+                    <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+                      <rect x="6" y="10" width="36" height="28" rx="4" stroke="#5b8cff" stroke-width="2"/>
+                      <path d="M20 18l12 6-12 6V18z" fill="#5b8cff"/>
+                      <circle cx="36" cy="12" r="8" fill="#5b8cff"/>
+                      <path d="M36 8v8M32 12h8" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                  </span>
+                  <span class="rte-image-upload-label">本地视频上传</span>
+                </button>
+                <button
+                  v-for="asset in filteredVideoAssets"
+                  :key="asset.id"
+                  type="button"
+                  class="rte-image-thumb rte-video-thumb"
+                  :class="{ selected: videoSelectedIds.has(asset.id) }"
+                  :title="asset.name"
+                  @click="toggleVideoSelect(asset.id)"
+                >
+                  <video :src="asset.src" muted preload="metadata" />
+                  <span class="rte-video-thumb-name">{{ asset.name }}</span>
+                  <span
+                    class="rte-image-thumb-check"
+                    :class="{ on: videoSelectedIds.has(asset.id) }"
+                  />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div v-else class="rte-image-external">
+            <p class="rte-link-import-hint">每行一个视频 URL，支持一次插入多个。</p>
+            <textarea
+              v-model="videoExternalUrls"
+              class="rte-image-url-textarea"
+              placeholder="https://example.com/a.mp4&#10;https://example.com/b.webm"
+              spellcheck="false"
+            />
+          </div>
+
+          <div class="rte-modal-actions rte-image-actions">
+            <button type="button" class="rte-modal-cancel" @click="closeVideoDialog">
+              取消
+            </button>
+            <button
+              type="button"
+              class="rte-modal-confirm"
+              @click="confirmInsertVideos"
+            >
+              确认
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+        <input
+      ref="attachFileInputRef"
+      type="file"
+      multiple
+      class="rte-hidden-file"
+      @change="onLocalAttachFilesChange"
+    />
+<input
+      ref="imageFileInputRef"
+      type="file"
+      class="rte-hidden-file"
+      accept="image/*"
+      multiple
+      @change="onLocalImageFilesChange"
+    />
+    <input
+      ref="videoFileInputRef"
+      type="file"
+      class="rte-hidden-file"
+      accept="video/*,.mp4,.webm,.mov,.m4v,.ogg,.ogv"
+      multiple
+      @change="onLocalVideoFilesChange"
+    />
   </div>
 </template>
 
@@ -1813,6 +3570,11 @@ defineExpose({ focusEditor, editor, onDraftBackup })
 .rte-tool.active {
   background: #f2f3f5;
   color: #1d2129;
+}
+
+.rte-tool:focus-visible {
+  outline: 2px solid rgba(26, 115, 232, 0.45);
+  outline-offset: 1px;
 }
 
 .rte-tool-icon {
@@ -1968,7 +3730,150 @@ defineExpose({ focusEditor, editor, onDraftBackup })
 .rte-root :deep(.tiptap img.rte-image),
 .rte-root :deep(.ProseMirror img.rte-image) {
   max-width: 100%;
+  height: auto;
   border-radius: 4px;
+  display: inline-block;
+  vertical-align: bottom;
+}
+
+.rte-root :deep(.tiptap video.rte-video),
+.rte-root :deep(.ProseMirror video.rte-video),
+.rte-root :deep([data-resize-wrapper] > video.rte-video) {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+  display: block;
+  background: #0f172a;
+}
+
+/* 飞书式：图片/视频均为 inline + ResizableNodeView，同行并排、可拖到其他行 */
+.rte-root :deep(.tiptap p),
+.rte-root :deep(.ProseMirror p) {
+  line-height: 1.6;
+}
+.rte-root :deep([data-resize-container][data-node='image']),
+.rte-root :deep([data-resize-container][data-node='video']) {
+  display: inline-flex;
+  vertical-align: bottom;
+  max-width: calc(100% - 8px);
+  margin: 0.25em 8px 0.25em 0;
+  cursor: grab;
+  overflow: visible;
+  position: relative;
+}
+.rte-root :deep([data-resize-container][data-node='image']:active),
+.rte-root :deep([data-resize-container][data-node='video']:active) {
+  cursor: grabbing;
+}
+.rte-root :deep([data-resize-wrapper]) {
+  max-width: 100%;
+  width: max-content;
+  line-height: 0;
+  border-radius: 4px;
+  /* 锚点用 translate 超出边缘，勿裁切 */
+  overflow: visible;
+}
+.rte-root :deep([data-resize-wrapper] > img.rte-image) {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+.rte-root :deep([data-resize-container]:hover [data-resize-wrapper]),
+.rte-root :deep([data-resize-container].ProseMirror-selectednode [data-resize-wrapper]),
+.rte-root :deep([data-resize-container][data-resize-state='true'] [data-resize-wrapper]) {
+  outline: 2px solid #5b8cff;
+  outline-offset: 1px;
+}
+/* 统一 8 锚点外观。TipTap ResizableNodeView 对边中点会设 inline
+   left:0;right:0 或 top:0;bottom:0 拉成整条边，需 !important 压回四边中间的方块锚点 */
+.rte-root :deep([data-resize-handle]) {
+  width: 10px !important;
+  height: 10px !important;
+  background: #fff;
+  border: 2px solid #5b8cff;
+  border-radius: 2px;
+  box-sizing: border-box;
+  z-index: 10;
+  opacity: 0;
+  pointer-events: none;
+  box-shadow: 0 0 0 1px rgba(91, 140, 255, 0.25);
+}
+.rte-root :deep([data-resize-handle='top-left']) {
+  top: 0 !important;
+  left: 0 !important;
+  right: auto !important;
+  bottom: auto !important;
+  transform: translate(-50%, -50%);
+  cursor: nwse-resize;
+}
+.rte-root :deep([data-resize-handle='top-right']) {
+  top: 0 !important;
+  right: 0 !important;
+  left: auto !important;
+  bottom: auto !important;
+  transform: translate(50%, -50%);
+  cursor: nesw-resize;
+}
+.rte-root :deep([data-resize-handle='bottom-left']) {
+  bottom: 0 !important;
+  left: 0 !important;
+  top: auto !important;
+  right: auto !important;
+  transform: translate(-50%, 50%);
+  cursor: nesw-resize;
+}
+.rte-root :deep([data-resize-handle='bottom-right']) {
+  bottom: 0 !important;
+  right: 0 !important;
+  top: auto !important;
+  left: auto !important;
+  transform: translate(50%, 50%);
+  cursor: nwse-resize;
+}
+/* 左右边中点：覆盖 TipTap inline top:0;bottom:0 全高拉伸 */
+.rte-root :deep([data-resize-handle='left']),
+.rte-root :deep([data-resize-handle='right']) {
+  top: 50% !important;
+  bottom: auto !important;
+  cursor: ew-resize;
+}
+.rte-root :deep([data-resize-handle='left']) {
+  left: 0 !important;
+  right: auto !important;
+  transform: translate(-50%, -50%);
+}
+.rte-root :deep([data-resize-handle='right']) {
+  right: 0 !important;
+  left: auto !important;
+  transform: translate(50%, -50%);
+}
+/* 上下边中点：覆盖 TipTap inline left:0;right:0 全宽拉伸 */
+.rte-root :deep([data-resize-handle='top']),
+.rte-root :deep([data-resize-handle='bottom']) {
+  left: 50% !important;
+  right: auto !important;
+  cursor: ns-resize;
+}
+.rte-root :deep([data-resize-handle='top']) {
+  top: 0 !important;
+  bottom: auto !important;
+  transform: translate(-50%, -50%);
+}
+.rte-root :deep([data-resize-handle='bottom']) {
+  bottom: 0 !important;
+  top: auto !important;
+  transform: translate(-50%, 50%);
+}
+.rte-root :deep([data-resize-container]:hover [data-resize-handle]),
+.rte-root :deep([data-resize-container].ProseMirror-selectednode [data-resize-handle]),
+.rte-root :deep([data-resize-container][data-resize-state='true'] [data-resize-handle]) {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* 行间落点更易辨认（跨行拖拽） */
+.rte-root :deep(.ProseMirror-dropcursor) {
+  color: #5b8cff;
 }
 
 .rte-root :deep(.tiptap table),
@@ -1991,6 +3896,105 @@ defineExpose({ focusEditor, editor, onDraftBackup })
 .rte-root :deep(.tiptap th),
 .rte-root :deep(.ProseMirror th) {
   background: #f5f6f8;
+}
+
+.rte-root :deep(.tiptap td.selectedCell),
+.rte-root :deep(.ProseMirror td.selectedCell),
+.rte-root :deep(.tiptap th.selectedCell),
+.rte-root :deep(.ProseMirror th.selectedCell) {
+  background: rgba(91, 140, 255, 0.16);
+  /* 多选合并时可见的选区 */
+  position: relative;
+  z-index: 1;
+}
+
+.rte-menu-sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: #eef0f3;
+}
+
+.rte-menu button:disabled,
+.rte-table-ctx button:disabled,
+.rte-table-ops-item:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.rte-menu button.danger,
+.rte-table-ctx button.danger,
+.rte-table-ops-item.danger {
+  color: #f53f3f;
+}
+
+.rte-table-menu {
+  min-width: 148px;
+}
+
+.rte-table-ctx-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+}
+
+.rte-table-ctx {
+  position: fixed;
+  z-index: 5001;
+  min-width: 160px;
+  padding: 4px;
+  background: #fff;
+  border: 1px solid #e5e6eb;
+  border-radius: 8px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.14);
+  display: flex;
+  flex-direction: column;
+}
+
+.rte-table-ctx button {
+  border: none;
+  background: transparent;
+  text-align: left;
+  padding: 7px 12px;
+  font-size: 13px;
+  color: #1d2129;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.rte-table-ctx button:hover:not(:disabled) {
+  background: #f2f3f5;
+}
+
+.rte-table-ops-sheet {
+  width: min(320px, 92vw);
+  background: #fff;
+  border-radius: 10px;
+  padding: 16px 16px 12px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.16);
+}
+
+.rte-table-ops-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 8px 0 12px;
+  max-height: min(52vh, 420px);
+  overflow: auto;
+}
+
+.rte-table-ops-item {
+  border: none;
+  background: transparent;
+  text-align: left;
+  padding: 9px 12px;
+  font-size: 13px;
+  color: #1d2129;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.rte-table-ops-item:hover:not(:disabled) {
+  background: #f2f3f5;
 }
 
 .rte-root :deep(.tiptap a.rte-link),
@@ -2258,6 +4262,7 @@ defineExpose({ focusEditor, editor, onDraftBackup })
   width: 16px;
   height: 16px;
   color: #4e5969;
+  flex-shrink: 0;
 }
 .rte-tool.active .rte-ep-icon,
 .rte-tool:hover .rte-ep-icon {
@@ -2272,6 +4277,267 @@ defineExpose({ focusEditor, editor, onDraftBackup })
   line-height: 1;
   margin-left: 1px;
 }
+
+/*
+ * 最大化（expanded）工具栏：对齐知乎专栏写作页
+ * 大图标在上 + 短中文标题在下；分组用竖线分隔；扁平浅色横条。
+ * 仅 .rte-root.expanded 生效；非最大化保持紧凑小按钮。
+ */
+/* 最大化：去掉嵌套边框，铺满面板最大化卡片（知乎专栏写作页一体感） */
+.rte-root.expanded {
+  border: none;
+  border-radius: 0;
+  background: #fff;
+}
+
+.rte-root.expanded .rte-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  align-content: flex-start;
+  gap: 0;
+  row-gap: 4px;
+  padding: 10px 16px 12px;
+  border-bottom: 1px solid #ebebeb;
+  background: #fafafa;
+  box-shadow: none;
+  /* 必须 visible：absolute 下拉（导入/标题/列表/颜色/对齐）否则被 overflow-y:hidden 裁切 */
+  /* 窄视口靠 flex-wrap 换行，不再横向滚动（滚动容器无法同时 overflow-y:visible） */
+  overflow: visible;
+  position: relative;
+  z-index: 5;
+}
+
+.rte-root.expanded .rte-tool-wrap {
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+.rte-root.expanded .rte-tool {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 5px;
+  min-width: 56px;
+  width: 56px;
+  max-width: 72px;
+  height: auto;
+  min-height: 56px;
+  padding: 8px 6px 6px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #646464;
+  line-height: 1.15;
+  transition: background 0.12s ease, color 0.12s ease;
+  box-sizing: border-box;
+}
+
+.rte-root.expanded .rte-tool:hover {
+  background: rgba(0, 0, 0, 0.04);
+  color: #121212;
+  box-shadow: none;
+}
+
+.rte-root.expanded .rte-tool:active {
+  background: rgba(0, 0, 0, 0.06);
+  transform: none;
+}
+
+.rte-root.expanded .rte-tool.active {
+  background: rgba(15, 111, 255, 0.08);
+  color: #0f6fff;
+  box-shadow: none;
+}
+
+.rte-root.expanded .rte-tool:focus-visible {
+  outline: 2px solid rgba(15, 111, 255, 0.35);
+  outline-offset: 1px;
+}
+
+.rte-root.expanded .rte-tool-icon {
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  font-size: 0;
+  line-height: 0;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.rte-root.expanded .rte-tool:hover .rte-tool-icon,
+.rte-root.expanded .rte-tool.active .rte-tool-icon {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+.rte-root.expanded .rte-ep-icon {
+  width: 24px;
+  height: 24px;
+  font-size: 24px;
+  color: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 自绘 stroke SVG 在大尺寸下略加粗，接近知乎线稿 */
+.rte-root.expanded .rte-ep-icon svg {
+  width: 24px;
+  height: 24px;
+  stroke-width: 1.85;
+}
+
+.rte-root.expanded .rte-tool:hover .rte-ep-icon {
+  color: #121212;
+}
+
+.rte-root.expanded .rte-tool.active .rte-ep-icon {
+  color: #0f6fff;
+}
+
+.rte-root.expanded .rte-tool-label {
+  font-size: 12px;
+  font-weight: 400;
+  color: #8590a6;
+  letter-spacing: 0;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
+  max-width: none;
+  transform: none;
+  text-align: center;
+}
+
+.rte-root.expanded .rte-tool:hover .rte-tool-label {
+  color: #646464;
+}
+
+.rte-root.expanded .rte-tool.active .rte-tool-label {
+  color: #0f6fff;
+  font-weight: 500;
+}
+
+.rte-root.expanded .rte-caret {
+  font-size: 9px;
+  margin-left: 1px;
+  margin-top: 0;
+  color: #8590a6;
+  position: static;
+  right: auto;
+  bottom: auto;
+  line-height: 1;
+}
+
+.rte-root.expanded .rte-tool-divider {
+  width: 1px;
+  align-self: center;
+  flex: 0 0 auto;
+  min-height: 40px;
+  height: 40px;
+  margin: 0 8px;
+  background: #e0e0e0;
+  border-radius: 0;
+  pointer-events: none;
+}
+
+.rte-root.expanded .rte-menu,
+.rte-root.expanded .rte-import-menu,
+.rte-root.expanded .rte-table-menu,
+.rte-root.expanded .rte-more-menu {
+  top: calc(100% + 6px);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(18, 18, 18, 0.12);
+  border: 1px solid #ebebeb;
+  /* 盖过编辑区；仍在 .pm-overlay(z=4000) 内，无需抬到 body */
+  z-index: 50;
+}
+
+/* 导入在工具条末尾：右对齐弹出，避免被 .rte-root{overflow:hidden} 右侧裁切 */
+.rte-root.expanded .rte-import-menu {
+  left: auto;
+  right: 0;
+}
+
+.rte-root.expanded .rte-menu button {
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+/* 最大化编辑区略增字号与留白 */
+.rte-root.expanded .rte-canvas {
+  padding: 20px 32px 28px;
+  background: #fff;
+}
+
+.rte-root.expanded :deep(.tiptap),
+.rte-root.expanded :deep(.ProseMirror) {
+  font-size: 15px;
+  line-height: 1.85;
+  min-height: 160px;
+}
+
+/* 非最大化：紧凑小按钮（标题/加粗/斜体/列表 + 更多），不做知乎式大图标 */
+.rte-root:not(.expanded) .rte-toolbar {
+  gap: 2px 2px;
+  padding: 4px 6px 3px;
+  background: #fff;
+  overflow: visible;
+}
+
+.rte-root:not(.expanded) .rte-tool {
+  min-width: 34px;
+  max-width: 48px;
+  width: auto;
+  min-height: 0;
+  height: auto;
+  padding: 3px 5px 2px;
+  gap: 1px;
+  border-radius: 4px;
+}
+
+.rte-root:not(.expanded) .rte-tool-icon {
+  width: auto;
+  height: 16px;
+  min-height: 16px;
+}
+
+.rte-root:not(.expanded) .rte-tool-label {
+  font-size: 10px;
+  color: #86909c;
+  transform: scale(0.95);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.rte-root:not(.expanded) .rte-ep-icon {
+  width: 15px;
+  height: 15px;
+  font-size: 15px;
+}
+
+.rte-root:not(.expanded) .rte-ep-icon svg {
+  width: 15px;
+  height: 15px;
+}
+
+.rte-root:not(.expanded) .rte-tool-divider {
+  display: none;
+}
+
 .rte-import-menu {
   position: absolute;
   top: 100%;
@@ -2374,6 +4640,10 @@ defineExpose({ focusEditor, editor, onDraftBackup })
 </style>
 
 <style>
+/* 盖过 .rte-modal-overlay(4100)，避免弹窗内 toast 被挡住变成「没反应」 */
+.el-message {
+  z-index: 5000 !important;
+}
 .rte-note-overlay {
   position: fixed;
   inset: 0;
@@ -2611,8 +4881,9 @@ defineExpose({ focusEditor, editor, onDraftBackup })
 
 /* 公式编辑器 */
 .rte-formula-dialog {
-  width: min(820px, 96vw);
-  max-height: min(640px, 92vh);
+  width: min(920px, 96vw);
+  height: min(620px, 92vh);
+  max-height: min(620px, 92vh);
   background: #fff;
   border: 1px solid #e5e6eb;
   border-radius: 10px;
@@ -2622,6 +4893,7 @@ defineExpose({ focusEditor, editor, onDraftBackup })
   display: flex;
   flex-direction: column;
   gap: 12px;
+  overflow: hidden;
 }
 .rte-formula-header {
   display: flex;
@@ -2663,8 +4935,9 @@ defineExpose({ focusEditor, editor, onDraftBackup })
   display: grid;
   grid-template-columns: 1.15fr 0.85fr;
   gap: 12px;
-  min-height: 320px;
-  flex: 1;
+  min-height: 0;
+  flex: 1 1 auto;
+  height: 0;
   min-width: 0;
 }
 .rte-formula-left,
@@ -2683,7 +4956,8 @@ defineExpose({ focusEditor, editor, onDraftBackup })
 .rte-formula-symbols {
   padding: 8px 8px 4px;
   overflow: auto;
-  max-height: 160px;
+  max-height: 220px;
+  flex-shrink: 0;
   border-bottom: 1px solid #eef0f3;
 }
 .rte-formula-group {
@@ -2723,7 +4997,7 @@ defineExpose({ focusEditor, editor, onDraftBackup })
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 13px;
   color: #1d2129;
-  min-height: 140px;
+  min-height: 200px;
 }
 .rte-formula-tex::placeholder {
   color: #a9b4c8;
@@ -2804,8 +5078,16 @@ defineExpose({ focusEditor, editor, onDraftBackup })
 .rte-table-field-icon {
   color: #a9aeb8;
   width: 18px;
-  text-align: center;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
+}
+.rte-table-field-svg {
+  width: 18px;
+  height: 18px;
+  display: block;
 }
 .rte-table-input {
   flex: 1;
@@ -2851,6 +5133,389 @@ defineExpose({ focusEditor, editor, onDraftBackup })
   font-size: 12px;
   color: #86909c;
   line-height: 1.5;
+}
+
+
+/* 插入链接 */
+.rte-link-dialog {
+  width: min(420px, 100%);
+  background: #fff;
+  border: 1px solid #e5e6eb;
+  border-radius: 10px;
+  box-shadow: 0 16px 48px rgba(15, 23, 42, 0.16);
+  padding: 22px 24px 20px;
+  box-sizing: border-box;
+}
+
+/* 插入图片 — 固定宽高，避免空/满库时跳动 */
+
+/* 选择附件（复用图片弹窗骨架，单栏标题） */
+.rte-attach-dialog .rte-attach-title-bar {
+  flex-shrink: 0;
+  padding: 14px 20px 10px;
+  border-bottom: 1px solid #eef0f3;
+}
+.rte-attach-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #1d2129;
+  text-align: center;
+}
+.rte-attach-thumb {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px 8px 10px;
+  background: #f7f8fa;
+  overflow: hidden;
+}
+.rte-attach-thumb-ext {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 4px;
+  background: #5b8cff;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.rte-attach-thumb-name {
+  width: 100%;
+  font-size: 12px;
+  color: #1d2129;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 4px;
+  box-sizing: border-box;
+}
+.rte-attach-thumb-size {
+  font-size: 11px;
+  color: #86909c;
+}
+.rte-root .rte-attachment-link,
+.rte-root a.rte-attachment-link {
+  color: #3b5bdb;
+  text-decoration: underline;
+  word-break: break-all;
+}
+
+.rte-image-dialog {
+  width: 720px;
+  height: 520px;
+  max-width: 96vw;
+  max-height: 92vh;
+  background: #fff;
+  border: 1px solid #e5e6eb;
+  border-radius: 10px;
+  box-shadow: 0 16px 48px rgba(15, 23, 42, 0.16);
+  padding: 0 0 16px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.rte-image-tabs {
+  display: flex;
+  gap: 28px;
+  padding: 14px 20px 0;
+  border-bottom: 1px solid #eef0f3;
+  flex-shrink: 0;
+}
+.rte-image-tab {
+  position: relative;
+  border: none;
+  background: transparent;
+  padding: 0 2px 12px;
+  font-size: 14px;
+  color: #4e5969;
+  cursor: pointer;
+}
+.rte-image-tab.active {
+  color: #1d2129;
+  font-weight: 600;
+}
+.rte-image-tab.active::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: #5b8cff;
+  border-radius: 1px;
+}
+.rte-image-personal {
+  display: grid;
+  grid-template-columns: 200px 1fr; /* 加宽左侧分类，避免中文换行 */
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 0; /* fill remaining fixed dialog body */
+  overflow: hidden;
+}
+.rte-image-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 10px;
+  border-right: 1px solid #eef0f3;
+  background: #fafbfc;
+  overflow-x: hidden;
+  overflow-y: auto;
+  min-width: 0;
+}
+.rte-image-side-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  border: none;
+  background: transparent;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #4e5969;
+  cursor: pointer;
+  white-space: nowrap; /* 图标+文字单行 */
+  min-width: 0;
+  box-sizing: border-box;
+}
+.rte-image-side-item:hover,
+.rte-image-side-item.active {
+  background: #eef3ff;
+  color: #3b5bdb;
+}
+.rte-image-side-ico {
+  width: 20px;
+  text-align: center;
+  flex-shrink: 0;
+  font-size: 13px;
+  line-height: 1;
+}
+.rte-image-side-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rte-image-side-spacer {
+  flex: 1;
+  min-height: 12px;
+}
+.rte-image-add-cat {
+  color: #86909c;
+}
+.rte-image-add-cat-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px;
+}
+.rte-image-add-cat-input {
+  height: 32px;
+  border: 1px solid #e5e6eb;
+  border-radius: 4px;
+  padding: 0 8px;
+  font-size: 12px;
+  outline: none;
+}
+.rte-image-add-cat-input:focus {
+  border-color: #8da5ff;
+}
+.rte-image-add-cat-ok {
+  height: 28px;
+  border: none;
+  border-radius: 4px;
+  background: #8da5ff;
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+}
+.rte-image-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  padding: 10px 14px 8px;
+  overflow: hidden;
+}
+.rte-image-main-top {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+.rte-image-select-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #86909c;
+  cursor: pointer;
+  user-select: none;
+}
+.rte-image-grid {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 12px;
+  align-content: start;
+  padding-bottom: 4px;
+}
+/* 空库：上传卡片在主内容区水平+垂直居中 */
+.rte-image-grid.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  grid-template-columns: none;
+}
+.rte-image-upload-card {
+  width: 148px;
+  height: 148px;
+  flex: 0 0 auto;
+  border: 1px dashed #c9cdd4;
+  border-radius: 8px;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  cursor: pointer;
+  color: #4e5969;
+  padding: 12px;
+  box-sizing: border-box;
+}
+.rte-image-grid:not(.empty) .rte-image-upload-card {
+  width: auto;
+  height: auto;
+  aspect-ratio: 1;
+}
+.rte-image-upload-card:hover {
+  border-color: #5b8cff;
+  background: #f7f9ff;
+}
+.rte-image-upload-label {
+  font-size: 13px;
+  color: #4e5969;
+}
+.rte-image-thumb {
+  position: relative;
+  aspect-ratio: 1;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  overflow: hidden;
+  padding: 0;
+  background: #f2f3f5;
+  cursor: pointer;
+}
+.rte-image-thumb.selected {
+  border-color: #5b8cff;
+}
+.rte-image-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.rte-video-thumb {
+  display: flex;
+  flex-direction: column;
+  background: #0f172a;
+}
+.rte-video-thumb video {
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  object-fit: cover;
+  display: block;
+  pointer-events: none;
+}
+.rte-video-thumb-name {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 4px 6px;
+  font-size: 11px;
+  color: #fff;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.65));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+}
+.rte-image-thumb-check {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  border: 1.5px solid #fff;
+  background: rgba(0, 0, 0, 0.25);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.15);
+}
+.rte-image-thumb-check.on {
+  background: #5b8cff;
+  border-color: #5b8cff;
+}
+.rte-image-thumb-check.on::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 4px;
+  height: 8px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+.rte-image-external {
+  padding: 16px 20px 8px;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 0; /* same fixed body slot as personal tab */
+  display: flex;
+  flex-direction: column;
+}
+.rte-image-url-textarea {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #e5e6eb;
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: #1d2129;
+  resize: none; /* keep dialog height fixed */
+  outline: none;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  line-height: 1.5;
+}
+.rte-image-url-textarea:focus {
+  border-color: #8da5ff;
+  box-shadow: 0 0 0 2px rgba(141, 165, 255, 0.2);
+}
+.rte-image-url-textarea::placeholder {
+  color: #a9b4c8;
+}
+.rte-image-actions {
+  padding: 8px 20px 0;
+  flex-shrink: 0;
 }
 
 </style>
