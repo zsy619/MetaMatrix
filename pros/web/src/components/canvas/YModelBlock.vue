@@ -41,20 +41,25 @@ const props = withDefaults(
 const selection = useSelectionStore()
 const documentStore = useDocumentStore()
 
-const maximizeKey = computed(() => panelMaximizeKey('block', props.block.id))
+const maximizeKey = computed(() =>
+  panelMaximizeKey('block', props.block?.id ?? ''),
+)
 const { isMaximized, toggleMaximize, closeMaximize } =
   usePanelMaximize(maximizeKey)
 
-const selected = computed(
-  () =>
+const selected = computed(() => {
+  const id = props.block?.id
+  if (!id) return false
+  return (
     (selection.kind === 'block' ||
       (selection.kind === 'item' && selection.itemContainerKind === 'block')) &&
-    selection.blockId === props.block.id,
-)
+    selection.blockId === id
+  )
+})
 
-const isEmpty = computed(() => props.block.items.length === 0)
+const isEmpty = computed(() => (props.block?.items?.length ?? 0) === 0)
 
-const editorHtml = computed(() => itemsToHtml(props.block.items))
+const editorHtml = computed(() => itemsToHtml(props.block?.items ?? []))
 
 function onEditorHtml(html: string) {
   syncItemsFromHtml(props.block.items, html, {

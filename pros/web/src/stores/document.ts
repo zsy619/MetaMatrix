@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, toRaw } from 'vue'
 import { ApiError } from '../api/http'
 import * as documentsApi from '../api/documents'
 import { getToken } from '../api/http'
@@ -14,10 +14,12 @@ import type {
   QuadrantPosition,
   YModelDocumentJSON,
   DeliberatePracticeDocumentJSON,
+  DeliberatePracticeBlockId,
   DemandTriangleDocumentJSON,
   DemandTriangleDirection,
   DemandTriangleScores,
   FiveStepDocumentJSON,
+  FiveStepDivisionDocumentJSON,
   AiTradeoffDocumentJSON,
   ProductContentDocumentJSON,
   OscarDocumentJSON,
@@ -31,10 +33,28 @@ import type {
   IndustryForecastDocumentJSON,
   ScientificMeetingDocumentJSON,
   IpoDocumentJSON,
+  IpoBlockId,
   IncidentReviewDocumentJSON,
   IncidentReviewTimelineRow,
   AnnualSummaryDocumentJSON,
   DeepReviewDocumentJSON,
+  PmRetroValueDocumentJSON,
+  TimeMatrixDocumentJSON,
+  WorkStateZonesDocumentJSON,
+  OnlineOfflineCommDocumentJSON,
+  PmSensitivity6dDocumentJSON,
+  PmSensitivity6dAxisId,
+  PmSensitivity6dScores,
+  PmCompetencyDocumentJSON,
+  PmCompetencyAxisId,
+  PmCompetencyScores,
+  PmSolutionTriangleDocumentJSON,
+  PmSolutionTriangleAxisId,
+  PmSolutionTriangleScores,
+  GrowthAssumptionsDocumentJSON,
+  GrowthAssumptionsCellKey,
+  GrowthAssumptionsRow,
+  BusinessFormulaDocumentJSON,
   PanelAttachment,
   AttachmentsByPanelId,
 } from '../types/canvas'
@@ -43,8 +63,13 @@ import {
   isBlockCanvasDoc,
   isDeliberatePracticeDoc,
   isDemandTriangleDoc,
+  isPmSensitivity6dDoc,
+  isPmCompetencyDoc,
+  isPmSolutionTriangleDoc,
+  isIpoDoc,
   isDualTriangleDoc,
   isFiveStepDoc,
+  isFiveStepDivisionDoc,
   isIndustryAnalysisDoc,
   isIndustryForecastDoc,
   isKeyResistanceDoc,
@@ -57,6 +82,7 @@ import {
   isIncidentReviewDoc,
   isAnnualSummaryDoc,
   isDeepReviewDoc,
+  isGrowthAssumptionsDoc,
   normalizeYModelDoc,
 } from '../types/canvas'
 import dualTriangleTemplate from '../templates/dual-triangle-v1.json'
@@ -65,6 +91,7 @@ import yModelTemplate from '../templates/y-model-v1.json'
 import deliberatePracticeTemplate from '../templates/deliberate-practice-v1.json'
 import demandTriangleTemplate from '../templates/demand-triangle-v1.json'
 import fiveStepTemplate from '../templates/five-step-v1.json'
+import fiveStepDivisionTemplate from '../templates/five-step-division-v1.json'
 import aiTradeoffTemplate from '../templates/ai-tradeoff-v1.json'
 import productContentTemplate from '../templates/product-content-v1.json'
 import oscarTemplate from '../templates/oscar-v1.json'
@@ -77,6 +104,15 @@ import ipoTemplate from '../templates/ipo-v1.json'
 import incidentReviewTemplate from '../templates/incident-review-v1.json'
 import annualSummaryTemplate from '../templates/annual-summary-v1.json'
 import deepReviewTemplate from '../templates/deep-review-v1.json'
+import pmRetroValueTemplate from '../templates/pm-retro-value-v1.json'
+import timeMatrixTemplate from '../templates/time-matrix-v1.json'
+import workStateZonesTemplate from '../templates/work-state-zones-v1.json'
+import onlineOfflineCommTemplate from '../templates/online-offline-comm-v1.json'
+import pmSensitivity6dTemplate from '../templates/pm-sensitivity-6d-v1.json'
+import pmCompetencyTemplate from '../templates/pm-competency-v1.json'
+import pmSolutionTriangleTemplate from '../templates/pm-solution-triangle-v1.json'
+import growthAssumptionsTemplate from '../templates/growth-assumptions-v1.json'
+import businessFormulaTemplate from '../templates/business-formula-v1.json'
 
 export type TemplateId =
   | 'dual-triangle'
@@ -85,6 +121,7 @@ export type TemplateId =
   | 'deliberate-practice'
   | 'demand-triangle'
   | 'five-step'
+  | 'five-step-division'
   | 'ai-tradeoff'
   | 'product-content'
   | 'oscar'
@@ -97,6 +134,15 @@ export type TemplateId =
   | 'incident-review'
   | 'annual-summary'
   | 'deep-review'
+  | 'pm-retro-value'
+  | 'time-matrix'
+  | 'work-state-zones'
+  | 'online-offline-comm'
+  | 'pm-sensitivity-6d'
+  | 'pm-competency'
+  | 'pm-solution-triangle'
+  | 'growth-assumptions'
+  | 'business-formula'
 
 const TEMPLATES: Record<TemplateId, CanvasDocumentJSON> = {
   'dual-triangle': dualTriangleTemplate as DualTriangleDocumentJSON,
@@ -106,6 +152,7 @@ const TEMPLATES: Record<TemplateId, CanvasDocumentJSON> = {
     deliberatePracticeTemplate as DeliberatePracticeDocumentJSON,
   'demand-triangle': demandTriangleTemplate as DemandTriangleDocumentJSON,
   'five-step': fiveStepTemplate as FiveStepDocumentJSON,
+  'five-step-division': fiveStepDivisionTemplate as FiveStepDivisionDocumentJSON,
   'ai-tradeoff': aiTradeoffTemplate as AiTradeoffDocumentJSON,
   'product-content': productContentTemplate as ProductContentDocumentJSON,
   oscar: oscarTemplate as OscarDocumentJSON,
@@ -118,105 +165,209 @@ const TEMPLATES: Record<TemplateId, CanvasDocumentJSON> = {
   'incident-review': incidentReviewTemplate as IncidentReviewDocumentJSON,
   'annual-summary': annualSummaryTemplate as AnnualSummaryDocumentJSON,
   'deep-review': deepReviewTemplate as DeepReviewDocumentJSON,
+  'pm-retro-value': pmRetroValueTemplate as PmRetroValueDocumentJSON,
+  'time-matrix': timeMatrixTemplate as TimeMatrixDocumentJSON,
+  'work-state-zones': workStateZonesTemplate as WorkStateZonesDocumentJSON,
+  'online-offline-comm': onlineOfflineCommTemplate as OnlineOfflineCommDocumentJSON,
+  'pm-sensitivity-6d': pmSensitivity6dTemplate as PmSensitivity6dDocumentJSON,
+  'pm-competency': pmCompetencyTemplate as PmCompetencyDocumentJSON,
+  'pm-solution-triangle': pmSolutionTriangleTemplate as PmSolutionTriangleDocumentJSON,
+  'growth-assumptions': growthAssumptionsTemplate as GrowthAssumptionsDocumentJSON,
+  'business-formula': businessFormulaTemplate as BusinessFormulaDocumentJSON,
 }
 
 export function isTemplateId(id: string): id is TemplateId {
   return id in TEMPLATES
 }
 
+
+/** Deep-clone plain canvas JSON. Vue proxies are not structuredClone-safe. */
+function cloneDoc<T>(value: T): T {
+  return JSON.parse(JSON.stringify(toRaw(value as object))) as T
+}
+
+
+export type TemplateCategory = 'method' | 'growth' | 'industry' | 'org' | 'review'
+
+export const CATEGORY_LABELS: Record<TemplateCategory, string> = {
+  method: '方法框架',
+  growth: '产品增长',
+  industry: '行业调研',
+  org: '组织协作',
+  review: '复盘总结',
+}
+
 export const TEMPLATE_META: Record<
   TemplateId,
-  { name: string; badge: string; description: string }
+  { name: string; badge: string; description: string; category: TemplateCategory }
 > = {
   'dual-triangle': {
     name: '双三角构建梳理',
     badge: '双三角 · MVP',
     description: '人类三角 × AI 三角，梳理创造力、场景与系统能力闭环。',
+    category: 'method',
   },
   'star-quadrant': {
     name: 'STAR 四象限',
     badge: 'STAR · MVP',
     description: 'Seek / Try / Act / Reflect 四象限，个人与组织的上下限探索。',
+    category: 'method',
   },
   'y-model': {
     name: 'Y 模型无限进步',
     badge: 'Y模型 · MVP',
     description: '理论 × 事实驱动认知升级，从真正问题到组织工具的进步闭环。',
+    category: 'method',
   },
   'deliberate-practice': {
     name: '刻意练习',
     badge: '刻意练习 · MVP',
     description: '固定套路 → 非舒适区 → 及时反馈，以大量重复驱动持续进步。',
+    category: 'method',
   },
   'demand-triangle': {
     name: '需求评估三角形',
     badge: '需求评估 · MVP',
     description: '普遍性 × 频次 × 刚性三维雷达，叠加对比多个业务方向的需求强度。',
+    category: 'growth',
   },
   'five-step': {
     name: '五步法',
     badge: '五步法 · MVP',
     description: '需求 → 解决方案 → 商业模式 → 增长 → 壁垒，定性定量一体的方法论画布。',
+    category: 'growth',
+  },
+  'five-step-division': {
+    name: '五步法（分工版）',
+    badge: '五步法分工 · MVP',
+    description: '需求 → 解决方案 → 商业模式 → 增长 → 壁垒，按定性取舍 / 定量测量 / 团队分工拆解。',
+    category: 'growth',
   },
   'ai-tradeoff': {
     name: 'AI场景取舍评估',
     badge: '取舍评估 · MVP',
     description: '价值侧 × 成本侧二维取舍，用 1-10 分与事实论证筛选值得做的 AI 场景。',
+    category: 'growth',
   },
   'product-content': {
     name: '产品内核画布',
     badge: '产品内核 · MVP',
     description: '用户 × 核心指标，加法备选与减法内核假设，并用验证手段迭代认知。',
+    category: 'growth',
   },
   oscar: {
     name: 'OSCAR调研画布',
     badge: 'OSCAR · MVP',
     description: '目标 → 范围 → 清单 → 获取 → 用好情报，结构化调研闭环。',
+    category: 'industry',
   },
   'industry-analysis': {
     name: '行业分析画布',
     badge: '行业分析 · MVP',
     description: '产业链拆解、变化洞察、稳态预判，叠加周期、天花板与集中度判断。',
+    category: 'industry',
   },
   'key-resistance': {
     name: '关键阻力分析画布',
     badge: '关键阻力 · MVP',
     description: '阻力假设 × 消除假设 × 策略文案，动态多行拆解关键转化阻力。',
+    category: 'growth',
   },
   'conversion-tradeoff': {
     name: '转化率取舍画布',
     badge: '转化取舍 · MVP',
     description: '优先级 × 动力 × 阻力 × 触点，动态多行拆解转化率取舍。',
+    category: 'growth',
   },
   'industry-forecast': {
     name: '行业预判分析框架',
     badge: '行业预判 · MVP',
     description: '六步行业预判：产业链、变化、稳态B点、周期、天花板与集中度。',
+    category: 'industry',
   },
   'scientific-meeting': {
-    name: '科学开会思考画布',
+    name: '科学开会思考',
     badge: '科学开会 · MVP',
     description: '目标 → 原则 → 关键流程，用结构化三栏梳理高效会议。',
+    category: 'org',
   },
   ipo: {
     name: 'IPO梳理画布',
     badge: 'IPO · MVP',
     description: '输入 → 处理 → 输出，叠加目标、模型与反馈闭环的 IPO 梳理画布。',
+    category: 'org',
   },
   'incident-review': {
     name: '故障复盘',
     badge: '故障复盘 · MVP',
     description: '详细描述 → 发生过程 → 原因分析 → 解决方案 → 影响范围 → 关联需求 → 反思总结。',
+    category: 'review',
   },
   'annual-summary': {
     name: '个人年度工作总结',
     badge: '年度总结 · MVP',
     description: '重点业务进展 · 个人成长进步 · 不足与改进计划，结构化年度复盘。',
+    category: 'review',
   },
   'deep-review': {
     name: '深度复盘关键成果',
     badge: '深度复盘 · MVP',
     description: '整体评价 → 亮点/问题共识 → 坚持/放弃/新任务 → 过程资产沉淀。',
+    category: 'review',
+  },
+  'pm-retro-value': {
+    name: '项目管理复盘挖掘价值',
+    badge: '复盘挖掘 · MVP',
+    description: 'Before 不挖 vs After 认真挖：把过程资产沉淀为方法、清单与 SOP。',
+    category: 'review',
+  },
+  'time-matrix': {
+    name: '时间管理矩阵',
+    badge: '时间矩阵 · MVP',
+    description: '重要 × 紧急四象限（艾森豪威尔矩阵），按 A/B/C/D 分类梳理待办与精力分配。',
+    category: 'method',
+  },
+  'work-state-zones': {
+    name: '人生红点工作状态区间',
+    badge: '工作状态 · MVP',
+    description: '自治 × 舒适区四象限：幸福做事 / 无限进步 / 低头做事 / 自我怀疑，梳理红点工作状态。',
+    category: 'method',
+  },
+  'pm-sensitivity-6d': {
+    name: '项目管理6维敏感度模型',
+    badge: '6维敏感度 · MVP',
+    description: '预算/老板/风险/协作/人力/时间六维雷达，拖拽评分评估项目敏感度，并记录备注。',
+    category: 'method',
+  },
+  'pm-competency': {
+    name: '项目管理竞争力测评',
+    badge: '竞争力测评 · MVP',
+    description: '意识 × 定方案 × 拆计划 × 管执行 × 做复盘五维雷达，0–100 拖拽评分测评项目管理竞争力。',
+    category: 'method',
+  },
+  'pm-solution-triangle': {
+    name: '项目管理方案评估三角形',
+    badge: '方案评估 · MVP',
+    description: '投入产出比ROI × 机会成本 × 机会窗口三角雷达，0–100 拖拽评分评估项目管理方案，并记录备注。',
+    category: 'method',
+  },
+  'online-offline-comm': {
+    name: '线上线下沟通',
+    badge: '线上线下 · MVP',
+    description: '线上/线下 × 异步/同步四象限，梳理文档、看板、消息、当面与封闭研发等沟通方式。',
+    category: 'org',
+  },
+  'growth-assumptions': {
+    name: '增长假设清单',
+    badge: '增长假设 · MVP',
+    description: '关键假设 → 提出者/时间 → 负责人 → 验证结果，表格化跟踪增长假设。',
+    category: 'growth',
+  },
+  'business-formula': {
+    name: '业务公式',
+    badge: '业务公式 · MVP',
+    description: '深度解构业务逻辑，发现增长杠杆',
+    category: 'growth',
   },
 }
 
@@ -254,6 +405,9 @@ export const useDocumentStore = defineStore('document', () => {
     isDemandTriangleDoc(current_data.value),
   )
   const isFiveStep = computed(() => isFiveStepDoc(current_data.value))
+  const isFiveStepDivision = computed(() =>
+    isFiveStepDivisionDoc(current_data.value),
+  )
   const isAiTradeoff = computed(() => isAiTradeoffDoc(current_data.value))
   const isProductContent = computed(() =>
     isProductContentDoc(current_data.value),
@@ -388,6 +542,82 @@ export const useDocumentStore = defineStore('document', () => {
 
   function removeKeyResistanceRow(rowId: string): boolean {
     const doc = asKeyResistance()
+    if (!doc) return false
+    if (doc.rows.length <= 1) return false
+    const before = doc.rows.length
+    doc.rows = doc.rows.filter((r) => r.id !== rowId)
+    if (doc.rows.length === before) return false
+    markDirty()
+    return true
+  }
+
+
+  const GA_CELLS: GrowthAssumptionsCellKey[] = [
+    'assumption',
+    'proposer',
+    'proposedAt',
+    'owner',
+    'result',
+  ]
+
+  function asGrowthAssumptions(): GrowthAssumptionsDocumentJSON | null {
+    return isGrowthAssumptionsDoc(current_data.value)
+      ? current_data.value
+      : null
+  }
+
+  function parseGrowthAssumptionsCellId(
+    blockId: string,
+  ): { rowId: string; cell: GrowthAssumptionsCellKey } | null {
+    const idx = blockId.lastIndexOf(':')
+    if (idx <= 0) return null
+    const rowId = blockId.slice(0, idx)
+    const cell = blockId.slice(idx + 1) as GrowthAssumptionsCellKey
+    if (!GA_CELLS.includes(cell)) return null
+    return { rowId, cell }
+  }
+
+  function findGrowthAssumptionsCell(
+    blockId: string,
+  ): { row: GrowthAssumptionsRow; cell: GrowthAssumptionsCellKey } | null {
+    const doc = asGrowthAssumptions()
+    if (!doc) return null
+    const parsed = parseGrowthAssumptionsCellId(blockId)
+    if (!parsed) return null
+    const row = doc.rows.find((r) => r.id === parsed.rowId)
+    if (!row) return null
+    return { row, cell: parsed.cell }
+  }
+
+  function emptyGrowthAssumptionsRow(): GrowthAssumptionsRow {
+    const mk = (): QuadrantItem[] => [
+      {
+        id: createItemId(),
+        text: '',
+        style: { color: '#3c4043', fontSize: 13, fontWeight: '500' },
+      },
+    ]
+    return {
+      id: createRowId(),
+      assumption: mk(),
+      proposer: mk(),
+      proposedAt: mk(),
+      owner: mk(),
+      result: mk(),
+    }
+  }
+
+  function addGrowthAssumptionsRow(): GrowthAssumptionsRow | null {
+    const doc = asGrowthAssumptions()
+    if (!doc) return null
+    const row = emptyGrowthAssumptionsRow()
+    doc.rows = [...doc.rows, row]
+    markDirty()
+    return row
+  }
+
+  function removeGrowthAssumptionsRow(rowId: string): boolean {
+    const doc = asGrowthAssumptions()
     if (!doc) return false
     if (doc.rows.length <= 1) return false
     const before = doc.rows.length
@@ -597,7 +827,7 @@ export const useDocumentStore = defineStore('document', () => {
     }
     const template = TEMPLATES[id]
     current_data.value = normalizeLoadedDoc(
-      structuredClone(template) as CanvasDocumentJSON,
+      cloneDoc(template) as CanvasDocumentJSON,
     )
     dirty.value = false
     head_revision_id.value = null
@@ -619,7 +849,7 @@ export const useDocumentStore = defineStore('document', () => {
     activeTemplateId.value = id
     const template = TEMPLATES[id]
     current_data.value = normalizeLoadedDoc(
-      structuredClone(template) as CanvasDocumentJSON,
+      cloneDoc(template) as CanvasDocumentJSON,
     )
     dirty.value = false
     head_revision_id.value = null
@@ -865,7 +1095,7 @@ export const useDocumentStore = defineStore('document', () => {
     const data =
       opts?.data ??
       current_data.value ??
-      (structuredClone(TEMPLATES[tid]) as CanvasDocumentJSON)
+      (cloneDoc(TEMPLATES[tid]) as CanvasDocumentJSON)
     const title =
       (opts?.title != null ? opts.title : doc_title.value) ||
       TEMPLATE_META[tid]?.name ||
@@ -882,7 +1112,7 @@ export const useDocumentStore = defineStore('document', () => {
         notes,
         canvasType,
         templateId: tid,
-        data: normalizeLoadedDoc(structuredClone(data) as CanvasDocumentJSON),
+        data: normalizeLoadedDoc(cloneDoc(data) as CanvasDocumentJSON),
       })
       current_data.value = normalizeLoadedDoc(doc.currentData)
       document_id.value = doc.id
@@ -1101,6 +1331,19 @@ export const useDocumentStore = defineStore('document', () => {
       return item
     }
 
+
+    const ga = findGrowthAssumptionsCell(blockId)
+    if (ga) {
+      const item: QuadrantItem = {
+        id: partial?.id ?? createItemId(),
+        text: partial?.text ?? '新条目',
+        ...(partial?.style ? { style: { ...partial.style } } : {}),
+      }
+      ga.row[ga.cell] = [...ga.row[ga.cell], item]
+      markDirty()
+      return item
+    }
+
     const ct = findConversionTradeoffCell(blockId)
     if (ct) {
       const item: QuadrantItem = {
@@ -1164,6 +1407,29 @@ export const useDocumentStore = defineStore('document', () => {
       const nextItems = items.slice()
       nextItems[itemIdx] = next
       kr.row[kr.cell] = nextItems
+      markDirty()
+      return true
+    }
+
+
+    const ga = findGrowthAssumptionsCell(blockId)
+    if (ga) {
+      const items = ga.row[ga.cell]
+      const itemIdx = items.findIndex((it) => it.id === id)
+      if (itemIdx < 0) return false
+      const item = items[itemIdx]
+      const next: QuadrantItem = { ...item }
+      if (patch.text !== undefined) {
+        next.text = patch.text
+      }
+      if (patch.style === null) {
+        delete next.style
+      } else if (patch.style !== undefined) {
+        next.style = { ...(item.style ?? {}), ...patch.style }
+      }
+      const nextItems = items.slice()
+      nextItems[itemIdx] = next
+      ga.row[ga.cell] = nextItems
       markDirty()
       return true
     }
@@ -1254,6 +1520,17 @@ export const useDocumentStore = defineStore('document', () => {
       return true
     }
 
+
+    const ga = findGrowthAssumptionsCell(blockId)
+    if (ga) {
+      const items = ga.row[ga.cell]
+      const itemIdx = items.findIndex((it) => it.id === id)
+      if (itemIdx < 0) return false
+      ga.row[ga.cell] = items.filter((it) => it.id !== id)
+      markDirty()
+      return true
+    }
+
     const ct = findConversionTradeoffCell(blockId)
     if (ct) {
       const items = ct.row[ct.cell]
@@ -1291,6 +1568,473 @@ export const useDocumentStore = defineStore('document', () => {
     return true
   }
 
+
+
+  function asPmSensitivity6d(): PmSensitivity6dDocumentJSON | null {
+    return isPmSensitivity6dDoc(current_data.value) ? current_data.value : null
+  }
+
+  function updatePmSensitivity6dScore(
+    axis: PmSensitivity6dAxisId,
+    value: number,
+  ): boolean {
+    const d = asPmSensitivity6d()
+    if (!d) return false
+    const raw = Number(value)
+    if (!Number.isFinite(raw)) return false
+    const v = Math.min(100, Math.max(0, Math.round(raw)))
+    d.scores = { ...d.scores, [axis]: v }
+    markDirty()
+    return true
+  }
+
+  function updatePmSensitivity6dScores(
+    patch: Partial<PmSensitivity6dScores>,
+  ): boolean {
+    const d = asPmSensitivity6d()
+    if (!d) return false
+    const next = { ...d.scores }
+    for (const key of Object.keys(patch) as PmSensitivity6dAxisId[]) {
+      const raw = patch[key]
+      if (raw == null) continue
+      const n = Number(raw)
+      if (!Number.isFinite(n)) continue
+      next[key] = Math.min(100, Math.max(0, Math.round(n)))
+    }
+    d.scores = next
+    markDirty()
+    return true
+  }
+
+  const PM_SENSITIVITY_6D_AXIS_ORDER: PmSensitivity6dAxisId[] = [
+    'budget',
+    'boss',
+    'risk',
+    'collaboration',
+    'manpower',
+    'time',
+  ]
+
+  const PM_SENSITIVITY_6D_DEFAULT_TITLE: Record<PmSensitivity6dAxisId, string> = {
+    budget: '预算敏感',
+    boss: '老板敏感',
+    risk: '风险敏感',
+    collaboration: '协作敏感',
+    manpower: '人力敏感',
+    time: '时间敏感',
+  }
+
+  /** 确保六轴各有一块 RTE；旧 1–4 分制一次性 ×25 迁到 0–100 */
+  function ensurePmSensitivity6dBlocks(): boolean {
+    const d = asPmSensitivity6d()
+    if (!d) return false
+    let changed = false
+
+    if (!Array.isArray(d.blocks)) {
+      d.blocks = []
+      changed = true
+    }
+    if (!d.axes || typeof d.axes !== 'object') {
+      d.axes = {} as PmSensitivity6dDocumentJSON['axes']
+      changed = true
+    }
+    if (!d.scores || typeof d.scores !== 'object') {
+      d.scores = {} as PmSensitivity6dScores
+      changed = true
+    }
+
+    for (const axis of PM_SENSITIVITY_6D_AXIS_ORDER) {
+      if (!d.axes[axis]) {
+        d.axes[axis] = {
+          id: axis,
+          title: PM_SENSITIVITY_6D_DEFAULT_TITLE[axis],
+        }
+        changed = true
+      }
+    }
+
+    // 旧 1–4 环吸附分制：若当前最大分 ≤4，一次性 ×25 迁到 0–100
+    const scoreVals = PM_SENSITIVITY_6D_AXIS_ORDER.map((a) => Number(d.scores[a]))
+    const finite = scoreVals.filter((n) => Number.isFinite(n))
+    if (finite.length > 0) {
+      const maxScore = Math.max(...finite)
+      if (maxScore <= 4) {
+        const nextScores = { ...d.scores }
+        for (const axis of PM_SENSITIVITY_6D_AXIS_ORDER) {
+          const raw = Number(d.scores[axis])
+          const base = Number.isFinite(raw) ? raw : 0
+          nextScores[axis] = Math.min(100, Math.max(0, Math.round(base * 25)))
+        }
+        d.scores = nextScores
+        changed = true
+      }
+    }
+
+    for (const axis of PM_SENSITIVITY_6D_AXIS_ORDER) {
+      const raw = Number(d.scores[axis])
+      if (!Number.isFinite(raw)) {
+        d.scores[axis] = 0
+        changed = true
+      } else {
+        const clamped = Math.min(100, Math.max(0, Math.round(raw)))
+        if (clamped !== d.scores[axis]) {
+          d.scores[axis] = clamped
+          changed = true
+        }
+      }
+    }
+
+    const byId = new Map(d.blocks.map((b) => [b.id as string, b]))
+    const next = PM_SENSITIVITY_6D_AXIS_ORDER.map((axis) => {
+      const existing = byId.get(axis)
+      const title =
+        d.axes[axis]?.title || PM_SENSITIVITY_6D_DEFAULT_TITLE[axis] || axis
+      if (existing) {
+        if (existing.title !== title) {
+          changed = true
+          return { ...existing, id: axis, title }
+        }
+        return { ...existing, id: axis }
+      }
+      changed = true
+      return {
+        id: axis,
+        title,
+        items: [
+          {
+            id: createItemId(),
+            text: '',
+            style: { color: '#3c4043', fontSize: 14, fontWeight: '500' as const },
+          },
+        ],
+      }
+    })
+
+    if (
+      changed ||
+      d.blocks.length !== next.length ||
+      d.blocks.some((b, i) => b.id !== next[i].id)
+    ) {
+      d.blocks = next
+      markDirty()
+      return true
+    }
+    return false
+  }
+
+  function asPmCompetency(): PmCompetencyDocumentJSON | null {
+    return isPmCompetencyDoc(current_data.value) ? current_data.value : null
+  }
+
+  function updatePmCompetencyScore(
+    axis: PmCompetencyAxisId,
+    value: number,
+  ): boolean {
+    const d = asPmCompetency()
+    if (!d) return false
+    const raw = Number(value)
+    if (!Number.isFinite(raw)) return false
+    const v = Math.min(100, Math.max(0, raw))
+    d.scores = { ...d.scores, [axis]: v }
+    markDirty()
+    return true
+  }
+
+  function updatePmCompetencyScores(
+    patch: Partial<PmCompetencyScores>,
+  ): boolean {
+    const d = asPmCompetency()
+    if (!d) return false
+    const next = { ...d.scores }
+    for (const key of Object.keys(patch) as PmCompetencyAxisId[]) {
+      const raw = patch[key]
+      if (raw == null) continue
+      const n = Number(raw)
+      if (!Number.isFinite(n)) continue
+      next[key] = Math.min(100, Math.max(0, n))
+    }
+    d.scores = next
+    markDirty()
+    return true
+  }
+
+
+  const PM_COMPETENCY_AXIS_ORDER: PmCompetencyAxisId[] = [
+    'awareness',
+    'review',
+    'execution',
+    'plan',
+    'proposal',
+  ]
+
+  /** 确保五轴各有一块 RTE（替换旧 notes；缺轴则补齐） */
+  function ensurePmCompetencyBlocks(): boolean {
+    const d = asPmCompetency()
+    if (!d) return false
+    if (!Array.isArray(d.blocks)) {
+      d.blocks = []
+    }
+    if (!d.axes || typeof d.axes !== 'object') {
+      d.axes = {} as PmCompetencyDocumentJSON['axes']
+    }
+    for (const axis of PM_COMPETENCY_AXIS_ORDER) {
+      if (!d.axes[axis]) {
+        d.axes[axis] = { id: axis, title: axis }
+      }
+    }
+    const byId = new Map(d.blocks.map((b) => [b.id, b]))
+    let changed = false
+    const next = PM_COMPETENCY_AXIS_ORDER.map((axis) => {
+      const existing = byId.get(axis)
+      const title = d.axes[axis]?.title || axis
+      if (existing) {
+        if (existing.title !== title) {
+          changed = true
+          return { ...existing, title }
+        }
+        return existing
+      }
+      changed = true
+      return {
+        id: axis,
+        title,
+        items: [
+          {
+            id: createItemId(),
+            text: '',
+            style: { color: '#3c4043', fontSize: 14, fontWeight: '500' as const },
+          },
+        ],
+      }
+    })
+    if (
+      changed ||
+      d.blocks.length !== next.length ||
+      d.blocks.some((b, i) => b.id !== next[i].id)
+    ) {
+      d.blocks = next
+      markDirty()
+      return true
+    }
+    return false
+  }
+
+  function asPmSolutionTriangle(): PmSolutionTriangleDocumentJSON | null {
+    return isPmSolutionTriangleDoc(current_data.value) ? current_data.value : null
+  }
+
+  function updatePmSolutionTriangleScore(
+    axis: PmSolutionTriangleAxisId,
+    value: number,
+  ): boolean {
+    const d = asPmSolutionTriangle()
+    if (!d) return false
+    const raw = Number(value)
+    if (!Number.isFinite(raw)) return false
+    const v = Math.min(100, Math.max(0, raw))
+    d.scores = { ...d.scores, [axis]: v }
+    markDirty()
+    return true
+  }
+
+  function updatePmSolutionTriangleScores(
+    patch: Partial<PmSolutionTriangleScores>,
+  ): boolean {
+    const d = asPmSolutionTriangle()
+    if (!d) return false
+    const next = { ...d.scores }
+    for (const key of Object.keys(patch) as PmSolutionTriangleAxisId[]) {
+      const raw = patch[key]
+      if (raw == null) continue
+      const n = Number(raw)
+      if (!Number.isFinite(n)) continue
+      next[key] = Math.min(100, Math.max(0, n))
+    }
+    d.scores = next
+    markDirty()
+    return true
+  }
+
+  const PM_SOLUTION_TRIANGLE_AXIS_ORDER: PmSolutionTriangleAxisId[] = [
+    'roi',
+    'opportunity_cost',
+    'opportunity_window',
+  ]
+
+  /** 确保三轴各有一块 RTE（替换旧 notes；缺轴则补齐） */
+  function ensurePmSolutionTriangleBlocks(): boolean {
+    const d = asPmSolutionTriangle()
+    if (!d) return false
+    if (!Array.isArray(d.blocks)) {
+      d.blocks = []
+    }
+    if (!d.axes || typeof d.axes !== 'object') {
+      d.axes = {} as PmSolutionTriangleDocumentJSON['axes']
+    }
+    for (const axis of PM_SOLUTION_TRIANGLE_AXIS_ORDER) {
+      if (!d.axes[axis]) {
+        d.axes[axis] = { id: axis, title: axis }
+      }
+    }
+    const byId = new Map(d.blocks.map((b) => [b.id, b]))
+    let changed = false
+    const next = PM_SOLUTION_TRIANGLE_AXIS_ORDER.map((axis) => {
+      const existing = byId.get(axis)
+      const title = d.axes[axis]?.title || axis
+      if (existing) {
+        if (existing.title !== title) {
+          changed = true
+          return { ...existing, title }
+        }
+        return existing
+      }
+      changed = true
+      return {
+        id: axis,
+        title,
+        items: [
+          {
+            id: createItemId(),
+            text: '',
+            style: { color: '#3c4043', fontSize: 14, fontWeight: '500' as const },
+          },
+        ],
+      }
+    })
+    // drop legacy notes / unknown blocks
+    if (
+      changed ||
+      d.blocks.length !== next.length ||
+      d.blocks.some((b, i) => b.id !== next[i].id)
+    ) {
+      d.blocks = next
+      markDirty()
+      return true
+    }
+    return false
+  }
+
+
+  const IPO_BLOCK_ORDER: IpoBlockId[] = [
+    'input',
+    'process',
+    'output',
+    'goal',
+    'pattern',
+    'feedback',
+  ]
+
+  const IPO_DEFAULT_TITLE: Record<IpoBlockId, string> = {
+    input: '输入',
+    process: '处理',
+    output: '输出',
+    goal: '目标',
+    pattern: '模型',
+    feedback: '反馈',
+  }
+
+  function asIpo(): IpoDocumentJSON | null {
+    return isIpoDoc(current_data.value) ? current_data.value : null
+  }
+
+  /** 确保 IPO 六块各有一块 RTE（缺块则补齐；未知块丢弃） */
+  function ensureIpoBlocks(): boolean {
+    const d = asIpo()
+    if (!d) return false
+    if (!Array.isArray(d.blocks)) {
+      d.blocks = []
+    }
+    const byId = new Map(d.blocks.map((b) => [b.id, b]))
+    let changed = false
+    const next = IPO_BLOCK_ORDER.map((id) => {
+      const existing = byId.get(id)
+      if (existing) {
+        return existing
+      }
+      changed = true
+      return {
+        id,
+        title: IPO_DEFAULT_TITLE[id],
+        items: [
+          {
+            id: createItemId(),
+            text: '',
+            style: { color: '#3c4043', fontSize: 13, fontWeight: '500' as const },
+          },
+        ],
+      }
+    })
+    if (
+      changed ||
+      d.blocks.length !== next.length ||
+      d.blocks.some((b, i) => b.id !== next[i].id)
+    ) {
+      d.blocks = next
+      markDirty()
+      return true
+    }
+    return false
+  }
+
+
+  const DP_BLOCK_ORDER: DeliberatePracticeBlockId[] = [
+    'premise',
+    'node_a',
+    'node_b',
+    'node_c',
+    'node_d',
+  ]
+
+  const DP_DEFAULT_TITLE: Record<DeliberatePracticeBlockId, string> = {
+    premise: '前提要点',
+    node_a: 'A.固定套路',
+    node_b: 'B.非舒适区',
+    node_c: 'C.及时反馈',
+    node_d: 'D.大量重复',
+  }
+
+  function asDeliberatePractice(): DeliberatePracticeDocumentJSON | null {
+    return isDeliberatePracticeDoc(current_data.value) ? current_data.value : null
+  }
+
+  /** 确保刻意练习五块各有一块 RTE（缺块则补齐；保留已有 items） */
+  function ensureDeliberatePracticeBlocks(): boolean {
+    const d = asDeliberatePractice()
+    if (!d) return false
+    if (!Array.isArray(d.blocks)) {
+      d.blocks = []
+    }
+    const byId = new Map(d.blocks.map((b) => [b.id, b]))
+    let changed = false
+    const next = DP_BLOCK_ORDER.map((id) => {
+      const existing = byId.get(id)
+      if (existing) {
+        return existing
+      }
+      changed = true
+      return {
+        id,
+        title: DP_DEFAULT_TITLE[id],
+        items: [
+          {
+            id: createItemId(),
+            text: '',
+            style: { color: '#3c4043', fontSize: 14, fontWeight: '500' as const },
+          },
+        ],
+      }
+    })
+    if (
+      changed ||
+      d.blocks.length !== next.length ||
+      d.blocks.some((b, i) => b.id !== next[i].id)
+    ) {
+      d.blocks = next
+      markDirty()
+      return true
+    }
+    return false
+  }
 
   function asDemandTriangle(): DemandTriangleDocumentJSON | null {
     return isDemandTriangleDoc(current_data.value) ? current_data.value : null
@@ -1390,6 +2134,7 @@ export const useDocumentStore = defineStore('document', () => {
     isDeliberatePractice,
     isDemandTriangle,
     isFiveStep,
+    isFiveStepDivision,
     isAiTradeoff,
     isProductContent,
     isOscar,
@@ -1429,9 +2174,22 @@ export const useDocumentStore = defineStore('document', () => {
     ensureDemandDirection,
     updateDemandDirectionScores,
     removeDemandDirection,
+    updatePmSensitivity6dScore,
+    updatePmSensitivity6dScores,
+    ensurePmSensitivity6dBlocks,
+    updatePmCompetencyScore,
+    updatePmCompetencyScores,
+    ensurePmCompetencyBlocks,
+    updatePmSolutionTriangleScore,
+    updatePmSolutionTriangleScores,
+    ensurePmSolutionTriangleBlocks,
+    ensureIpoBlocks,
+    ensureDeliberatePracticeBlocks,
     updateKeyResistanceRateLabel,
     addKeyResistanceRow,
     removeKeyResistanceRow,
+    addGrowthAssumptionsRow,
+    removeGrowthAssumptionsRow,
     updateConversionTradeoffPriorityLabel,
     addConversionTradeoffRow,
     removeConversionTradeoffRow,

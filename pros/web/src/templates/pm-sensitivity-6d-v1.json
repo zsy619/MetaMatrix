@@ -1,0 +1,95 @@
+{
+  "id": "canvas_pm_sensitivity_6d",
+  "type": "pm_sensitivity_6d",
+  "schemaVersion": 1,
+  "theme": {
+    "background": {
+      "pattern": "none",
+      "color": "#ffffff"
+    }
+  },
+  "axes": {
+    "budget": { "id": "budget", "title": "预算敏感" },
+    "boss": { "id": "boss", "title": "老板敏感" },
+    "risk": { "id": "risk", "title": "风险敏感" },
+    "collaboration": { "id": "collaboration", "title": "协作敏感" },
+    "manpower": { "id": "manpower", "title": "人力敏感" },
+    "time": { "id": "time", "title": "时间敏感" }
+  },
+  "scores": {
+    "budget": 100,
+    "boss": 25,
+    "risk": 50,
+    "collaboration": 25,
+    "manpower": 50,
+    "time": 100
+  },
+  "blocks": [
+    {
+      "id": "budget",
+      "title": "预算敏感",
+      "items": [
+        {
+          "id": "item_pm6d_budget_1",
+          "text": "",
+          "style": { "color": "#3c4043", "fontSize": 14, "fontWeight": "500" }
+        }
+      ]
+    },
+    {
+      "id": "boss",
+      "title": "老板敏感",
+      "items": [
+        {
+          "id": "item_pm6d_boss_1",
+          "text": "",
+          "style": { "color": "#3c4043", "fontSize": 14, "fontWeight": "500" }
+        }
+      ]
+    },
+    {
+      "id": "risk",
+      "title": "风险敏感",
+      "items": [
+        {
+          "id": "item_pm6d_risk_1",
+          "text": "",
+          "style": { "color": "#3c4043", "fontSize": 14, "fontWeight": "500" }
+        }
+      ]
+    },
+    {
+      "id": "collaboration",
+      "title": "协作敏感",
+      "items": [
+        {
+          "id": "item_pm6d_collaboration_1",
+          "text": "",
+          "style": { "color": "#3c4043", "fontSize": 14, "fontWeight": "500" }
+        }
+      ]
+    },
+    {
+      "id": "manpower",
+      "title": "人力敏感",
+      "items": [
+        {
+          "id": "item_pm6d_manpower_1",
+          "text": "",
+          "style": { "color": "#3c4043", "fontSize": 14, "fontWeight": "500" }
+        }
+      ]
+    },
+    {
+      "id": "time",
+      "title": "时间敏感",
+      "items": [
+        {
+          "id": "item_pm6d_time_1",
+          "text": "",
+          "style": { "color": "#3c4043", "fontSize": 14, "fontWeight": "500" }
+        }
+      ]
+    }
+  ]
+}

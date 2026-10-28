@@ -330,16 +330,18 @@ function onRemoveRow(rowId: string) {
 }
 
 .ir-panel {
-  min-height: 88px;
+  min-height: 400px;
   border: 1px solid #e0e0e0;
   border-radius: 4px;
   background: #fafafa;
   padding: 4px;
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
 }
 
 .ir-panel--sub {
-  min-height: 72px;
+  min-height: 400px;
 }
 
 .ir-panel--accent {
@@ -347,7 +349,8 @@ function onRemoveRow(rowId: string) {
 }
 
 .ir-panel :deep(.ym-block) {
-  min-height: 72px;
+  flex: 1;
+  min-height: 0;
   background: transparent;
   border: none;
   box-shadow: none;
@@ -414,7 +417,7 @@ function onRemoveRow(rowId: string) {
   display: grid;
   grid-template-columns: 180px minmax(0, 1fr) 40px;
   border-bottom: 1px solid #e8eaed;
-  min-height: 56px;
+  min-height: 400px;
 }
 
 .ir-tl-row:last-child {
@@ -440,7 +443,7 @@ function onRemoveRow(rowId: string) {
 
 .ir-tl-cell--behavior :deep(.ym-block) {
   flex: 1;
-  min-height: 48px;
+  min-height: 0;
   background: transparent;
   border: none;
   box-shadow: none;

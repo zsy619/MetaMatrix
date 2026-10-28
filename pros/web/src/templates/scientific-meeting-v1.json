@@ -5,33 +5,21 @@
   "theme": {
     "background": {
       "pattern": "none",
-      "color": "#fffde7"
+      "color": "#f8f2d4"
     }
   },
   "meetingType": "",
   "organizer": "",
   "blocks": [
     {
-      "id": "goals",
+      "id": "goal",
       "title": "目标",
       "prompt": "大家愿意花时间开会，希望达成的具体目标和价值",
       "items": [
         {
-          "id": "item_sm_goals_1",
-          "text": "",
-          "style": { "color": "#3c4043", "fontSize": 13, "fontWeight": "500" }
-        }
-      ]
-    },
-    {
-      "id": "no_meeting_problems",
-      "title": "如果不开会有哪些问题：",
-      "prompt": "",
-      "items": [
-        {
-          "id": "item_sm_nmp_1",
-          "text": "",
-          "style": { "color": "#3c4043", "fontSize": 13, "fontWeight": "500" }
+          "id": "item_sm_goal_1",
+          "text": "<p>如果不开会有哪些问题：</p>",
+          "style": { "color": "#202124", "fontSize": 14, "fontWeight": "500" }
         }
       ]
     },
@@ -43,7 +31,7 @@
         {
           "id": "item_sm_prin_1",
           "text": "",
-          "style": { "color": "#3c4043", "fontSize": 13, "fontWeight": "500" }
+          "style": { "color": "#202124", "fontSize": 14, "fontWeight": "500" }
         }
       ]
     },
@@ -54,20 +42,8 @@
       "items": [
         {
           "id": "item_sm_proc_1",
-          "text": "",
-          "style": { "color": "#3c4043", "fontSize": 13, "fontWeight": "500" }
-        }
-      ]
-    },
-    {
-      "id": "efficiency_means",
-      "title": "提升会议效率的手段：",
-      "prompt": "",
-      "items": [
-        {
-          "id": "item_sm_eff_1",
-          "text": "",
-          "style": { "color": "#3c4043", "fontSize": 13, "fontWeight": "500" }
+          "text": "<p>提升会议效率的手段：</p>",
+          "style": { "color": "#202124", "fontSize": 14, "fontWeight": "500" }
         }
       ]
     }

@@ -1,0 +1,67 @@
+{
+  "id": "canvas_time_matrix",
+  "type": "time_matrix",
+  "schemaVersion": 1,
+  "theme": {
+    "background": {
+      "pattern": "none",
+      "color": "#ffffff"
+    }
+  },
+  "axes": {
+    "importanceHigh": "重要",
+    "importanceLow": "不重要",
+    "urgencyLow": "不紧急",
+    "urgencyHigh": "紧急"
+  },
+  "blocks": [
+    {
+      "id": "a",
+      "title": "A.重要但不紧急",
+      "tone": "pink",
+      "items": [
+        {
+          "id": "item_tm_a_1",
+          "text": "",
+          "style": { "color": "#3c4043", "fontSize": 13, "fontWeight": "500" }
+        }
+      ]
+    },
+    {
+      "id": "b",
+      "title": "B.重要且紧急",
+      "tone": "yellow",
+      "items": [
+        {
+          "id": "item_tm_b_1",
+          "text": "",
+          "style": { "color": "#3c4043", "fontSize": 13, "fontWeight": "500" }
+        }
+      ]
+    },
+    {
+      "id": "c",
+      "title": "C.不重要不紧急",
+      "tone": "cream",
+      "items": [
+        {
+          "id": "item_tm_c_1",
+          "text": "",
+          "style": { "color": "#3c4043", "fontSize": 13, "fontWeight": "500" }
+        }
+      ]
+    },
+    {
+      "id": "d",
+      "title": "D.紧急但不重要",
+      "tone": "green",
+      "items": [
+        {
+          "id": "item_tm_d_1",
+          "text": "",
+          "style": { "color": "#3c4043", "fontSize": 13, "fontWeight": "500" }
+        }
+      ]
+    }
+  ]
+}

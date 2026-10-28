@@ -1,0 +1,1003 @@
+{
+  "id": "canvas_five_step_division",
+  "type": "five_step_division",
+  "schemaVersion": 1,
+  "theme": {
+    "background": {
+      "pattern": "none",
+      "color": "#faf8f5"
+    }
+  },
+  "columns": [
+    {
+      "id": "demand",
+      "header": "需求"
+    },
+    {
+      "id": "solution",
+      "header": "解决方案"
+    },
+    {
+      "id": "business",
+      "header": "商业模式"
+    },
+    {
+      "id": "growth",
+      "header": "增长"
+    },
+    {
+      "id": "moat",
+      "header": "壁垒"
+    }
+  ],
+  "rows": [
+    {
+      "id": "qualitative",
+      "label": "定性取舍"
+    },
+    {
+      "id": "quantitative",
+      "label": "定量测量"
+    },
+    {
+      "id": "team",
+      "label": "团队分工"
+    }
+  ],
+  "blocks": [
+    {
+      "id": "demand_qualitative",
+      "title": "定性取舍",
+      "items": [
+        {
+          "id": "fsd_dq_h1",
+          "text": "<p><strong style=\"font-weight: 650\">画像:</strong></p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "650"
+          }
+        },
+        {
+          "id": "fsd_dq_1",
+          "text": "<p>1) 想做大的创业者</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fsd_dq_2",
+          "text": "<p>2) 筹备到 B 轮（<5kw）</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fsd_dq_3",
+          "text": "<p>3) 务实有学习陪伴潜力</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fsd_dq_h2",
+          "text": "<p><strong style=\"font-weight: 650\">问题:</strong></p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "650"
+          }
+        },
+        {
+          "id": "fsd_dq_4",
+          "text": "<p>1) 缺少认知/执行框架</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fsd_dq_5",
+          "text": "<p>2) 解决真实创业问题</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fsd_dq_6",
+          "text": "<p>3) 希望融资 & 赛道领先</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fsd_dq_h3",
+          "text": "<p><span style=\"color: #d93025\"><strong style=\"font-weight: 650\">非用户:</strong></span></p>",
+          "style": {
+            "color": "#d93025",
+            "fontSize": 13,
+            "fontWeight": "650"
+          }
+        },
+        {
+          "id": "fsd_dq_7",
+          "text": "<p><span style=\"color: #d93025\">1) 没创业想法的大学生</span></p>",
+          "style": {
+            "color": "#d93025",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fsd_dq_8",
+          "text": "<p><span style=\"color: #d93025\">2) 只做单店的生意人</span></p>",
+          "style": {
+            "color": "#d93025",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fsd_dq_9",
+          "text": "<p><span style=\"color: #d93025\">3) 纯社交型创业者</span></p>",
+          "style": {
+            "color": "#d93025",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "demand_quantitative",
+      "title": "定量测量",
+      "items": [
+        {
+          "id": "fsd_dqt_1",
+          "text": "<p>1) 人群规模：100-500万</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "600"
+          }
+        },
+        {
+          "id": "fsd_dqt_2",
+          "text": "<p>2) 服务规模：3-5w</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "600"
+          }
+        },
+        {
+          "id": "fsd_dqt_3",
+          "text": "<p>3) 业务天花板：2-5亿</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "600"
+          }
+        }
+      ]
+    },
+    {
+      "id": "demand_team",
+      "title": "团队分工",
+      "items": [
+        {
+          "id": "fsd_dt_1",
+          "text": "<p>1) 销售展开：SABC 区分</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fsd_dt_2",
+          "text": "<p>2) 产品展开：分层运营</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "solution_qualitative",
+      "title": "定性取舍",
+      "items": [
+        {
+          "id": "fsd_sq_h1",
+          "text": "<p><strong style=\"font-weight: 650\">产品内核:</strong></p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "650"
+          }
+        },
+        {
+          "id": "fsd_sq_1",
+          "text": "<p>1) 真实创业问题</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fsd_sq_2",
+          "text": "<p>2) 大规模低门槛</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fsd_sq_3",
+          "text": "<p>3) 市场显著最佳</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fsd_sq_4",
+          "text": "<p>4) 成体系必修课</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fsd_sq_h2",
+          "text": "<p><span style=\"color: #d93025\"><strong style=\"font-weight: 650\">非内核:</strong></span></p>",
+          "style": {
+            "color": "#d93025",
+            "fontSize": 13,
+            "fontWeight": "650"
+          }
+        },
+        {
+          "id": "fsd_sq_5",
+          "text": "<p><span style=\"color: #d93025\">1) 直播互动课</span></p>",
+          "style": {
+            "color": "#d93025",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fsd_sq_6",
+          "text": "<p><span style=\"color: #d93025\">2) Truman 讲课</span></p>",
+          "style": {
+            "color": "#d93025",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fsd_sq_7",
+          "text": "<p><span style=\"color: #d93025\">3) 社交资源对接</span></p>",
+          "style": {
+            "color": "#d93025",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fsd_sq_8",
+          "text": "<p><span style=\"color: #d93025\">4) 以太背书</span></p>",
+          "style": {
+            "color": "#d93025",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "solution_quantitative",
+      "title": "定量测量",
+      "items": [
+        {
+          "id": "fsd_sqt_h1",
+          "text": "<p><strong style=\"font-weight: 650\">内核转化率1: 作业率</strong></p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "650"
+          }
+        },
+        {
+          "id": "fsd_sqt_1",
+          "text": "<p>阶段结果: 50%-60%</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "600"
+          }
+        },
+        {
+          "id": "fsd_sqt_h2",
+          "text": "<p><strong style=\"font-weight: 650\">内核转化率2: 续费率</strong></p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "650"
+          }
+        },
+        {
+          "id": "fsd_sqt_2",
+          "text": "<p>阶段结果: 综合续费率 60%</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "600"
+          }
+        }
+      ]
+    },
+    {
+      "id": "solution_team",
+      "title": "团队分工",
+      "items": [
+        {
+          "id": "fsd_st_1",
+          "text": "<p>按 SKU 拆：大会员 / MBA / 训战营</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "650"
+          }
+        },
+        {
+          "id": "fsd_st_h1",
+          "text": "<p><strong style=\"font-weight: 650\">打磨关键转化率:</strong></p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "650"
+          }
+        },
+        {
+          "id": "fsd_st_2",
+          "text": "<p>1) 复盘营购买率</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fsd_st_3",
+          "text": "<p>2) 会员续费率</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fsd_st_4",
+          "text": "<p>3) 综合推荐率 K</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "business_qualitative",
+      "title": "定性取舍",
+      "items": [
+        {
+          "id": "fsd_bq_h1",
+          "text": "<p><strong style=\"font-weight: 650\">商业模型:</strong></p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "650"
+          }
+        },
+        {
+          "id": "fsd_bq_1",
+          "text": "<p>1) 获客：投放+推荐</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fsd_bq_2",
+          "text": "<p>2) 转化：直播体验课</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fsd_bq_3",
+          "text": "<p>3) 粘性：年费会员</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fsd_bq_4",
+          "text": "<p>4) 高客单：MBA</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fsd_bq_h2",
+          "text": "<p><strong style=\"font-weight: 650\">单元模型:</strong></p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "650"
+          }
+        },
+        {
+          "id": "fsd_bq_5",
+          "text": "<p>单元模型1: 单用户首单模型（14天）</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fsd_bq_6",
+          "text": "<p>单元模型2: 单用户生命周期模型（3年）</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fsd_bq_7",
+          "text": "<p>单元模型3: 单 MBA 生命周期模型（3年）</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fsd_bq_8",
+          "text": "<p>单元模型4: 单场训战营模型（新增）</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "business_quantitative",
+      "title": "定量测量",
+      "items": [
+        {
+          "id": "fsd_bqt_1",
+          "text": "<p>单元模型1: 首单 ROI=1.5-2</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "600"
+          }
+        },
+        {
+          "id": "fsd_bqt_2",
+          "text": "<p>单元模型2: 3年 ROI=3-4</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "600"
+          }
+        },
+        {
+          "id": "fsd_bqt_3",
+          "text": "<p>单元模型3: 单 MBA 3年 ROI=2-3</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "600"
+          }
+        },
+        {
+          "id": "fsd_bqt_4",
+          "text": "<p>单元模型4: 单场 ROI 净利润>50%</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "600"
+          }
+        },
+        {
+          "id": "fsd_bqt_5",
+          "text": "<p>（区间为悲观-乐观情况）</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "business_team",
+      "title": "团队分工",
+      "items": [
+        {
+          "id": "fsd_bt_1",
+          "text": "<p>1) 现金流年度预测</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fsd_bt_2",
+          "text": "<p>2) 现金流安全管理</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "growth_qualitative",
+      "title": "定性取舍",
+      "items": [
+        {
+          "id": "fsd_gq_h1",
+          "text": "<p><strong style=\"font-weight: 650\">渠道:</strong></p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "650"
+          }
+        },
+        {
+          "id": "fsd_gq_1",
+          "text": "<p>1) 公众号投放</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fsd_gq_2",
+          "text": "<p>2) 老带新推荐</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fsd_gq_3",
+          "text": "<p>3) 自营私域流量</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fsd_gq_4",
+          "text": "<p>4) 抖音投放</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fsd_gq_5",
+          "text": "<p>5) 视频号投放</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fsd_gq_h2",
+          "text": "<p><strong style=\"font-weight: 650\">试错/搁置:</strong></p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "650"
+          }
+        },
+        {
+          "id": "fsd_gq_6",
+          "text": "<p>1) 知乎投放</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fsd_gq_7",
+          "text": "<p>2) 资料导流</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fsd_gq_8",
+          "text": "<p>3) 公众号转载矩阵</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "growth_quantitative",
+      "title": "定量测量",
+      "items": [
+        {
+          "id": "fsd_gqt_1",
+          "text": "<p>1) 里程碑1: 1w1w150w</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "600"
+          }
+        },
+        {
+          "id": "fsd_gqt_2",
+          "text": "<p>2) 里程碑2: 3w3w800w</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "600"
+          }
+        },
+        {
+          "id": "fsd_gqt_h1",
+          "text": "<p><strong style=\"font-weight: 650\">核心业务公式:</strong></p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "650"
+          }
+        },
+        {
+          "id": "fsd_gqt_3",
+          "text": "<p>1. 复盘营转化公式</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fsd_gqt_4",
+          "text": "<p>2. 我请客推荐公式</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fsd_gqt_5",
+          "text": "<p>3. 会员留存运营公式</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "growth_team",
+      "title": "团队分工",
+      "items": [
+        {
+          "id": "fsd_gt_h1",
+          "text": "<p><strong style=\"font-weight: 650\">工业化生产:</strong></p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "650"
+          }
+        },
+        {
+          "id": "fsd_gt_1",
+          "text": "<p>1) 工业化生产素材</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fsd_gt_2",
+          "text": "<p>2) 工业化生产课程</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fsd_gt_3",
+          "text": "<p>3) 工业化生产案例</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fsd_gt_4",
+          "text": "<p>4) 工业化生产训练</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fsd_gt_h2",
+          "text": "<p><strong style=\"font-weight: 650\">核心基本功:</strong></p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "650"
+          }
+        },
+        {
+          "id": "fsd_gt_5",
+          "text": "<p>1) 教研做课基本功</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fsd_gt_6",
+          "text": "<p>2) 增长实验基本功</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fsd_gt_7",
+          "text": "<p>3) 专业交付基本功</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fsd_gt_8",
+          "text": "<p>4) 培训+苦练基本功</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "moat_qualitative",
+      "title": "定性取舍",
+      "items": [
+        {
+          "id": "fsd_mq_h1",
+          "text": "<p><strong style=\"font-weight: 650\">壁垒:</strong></p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "650"
+          }
+        },
+        {
+          "id": "fsd_mq_1",
+          "text": "<p>1) 早期创业必修课第一品牌：强</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fsd_mq_2",
+          "text": "<p>2) 方法论迁移成本：中</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fsd_mq_3",
+          "text": "<p>3) 课程研发的规模优势：中</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fsd_mq_h2",
+          "text": "<p><span style=\"color: #d93025\"><strong style=\"font-weight: 650\">非壁垒:</strong></span></p>",
+          "style": {
+            "color": "#d93025",
+            "fontSize": 13,
+            "fontWeight": "650"
+          }
+        },
+        {
+          "id": "fsd_mq_4",
+          "text": "<p><span style=\"color: #d93025\">1) 技术壁垒：无</span></p>",
+          "style": {
+            "color": "#d93025",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fsd_mq_5",
+          "text": "<p><span style=\"color: #d93025\">2) knowhow：长期无</span></p>",
+          "style": {
+            "color": "#d93025",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fsd_mq_6",
+          "text": "<p><span style=\"color: #d93025\">3) 网络效应：暂时无</span></p>",
+          "style": {
+            "color": "#d93025",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "moat_quantitative",
+      "title": "定量测量",
+      "items": [
+        {
+          "id": "fsd_mqt_0",
+          "text": "<p>以 3000 万为基础，业务翻一倍，成本只需增加 30-50%。</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "600"
+          }
+        },
+        {
+          "id": "fsd_mqt_1",
+          "text": "<p>1) 品牌壁垒：势能积累中</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "600"
+          }
+        },
+        {
+          "id": "fsd_mqt_2",
+          "text": "<p>2) 迁移成本：60% 续费率</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "600"
+          }
+        },
+        {
+          "id": "fsd_mqt_3",
+          "text": "<p>3) 课程交付：边际成本=0</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "600"
+          }
+        },
+        {
+          "id": "fsd_mqt_4",
+          "text": "<p>4) 运营交付：规模翻番，成本涨 30%</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "600"
+          }
+        }
+      ]
+    },
+    {
+      "id": "moat_team",
+      "title": "团队分工",
+      "items": [
+        {
+          "id": "fsd_mt_h1",
+          "text": "<p><strong style=\"font-weight: 650\">对抗规模不经济:</strong></p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "650"
+          }
+        },
+        {
+          "id": "fsd_mt_1",
+          "text": "<p>1) 持续替代 Truman 的专家身份</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fsd_mt_2",
+          "text": "<p>2) 持续升级 IT 系统和算法化</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "fsd_mt_3",
+          "text": "<p>3) 持续完成 SKU 标准化</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    }
+  ]
+}

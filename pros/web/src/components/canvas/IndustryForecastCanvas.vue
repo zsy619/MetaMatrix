@@ -84,12 +84,24 @@ const bgColor = computed(
   position: absolute;
   inset: 0;
   z-index: 10;
-  overflow: hidden;
+  /* Page scrolls when stacked panels (each ≥400px) exceed the viewport */
+  overflow-x: hidden;
+  overflow-y: auto;
   box-sizing: border-box;
   padding: 0;
   display: flex;
   flex-direction: column;
   min-height: 0;
+  scrollbar-gutter: stable;
+}
+
+.industry-forecast-canvas::-webkit-scrollbar {
+  width: 8px;
+}
+
+.industry-forecast-canvas::-webkit-scrollbar-thumb {
+  background: rgba(93, 64, 55, 0.35);
+  border-radius: 999px;
 }
 
 .if-header {
@@ -112,23 +124,23 @@ const bgColor = computed(
 }
 
 .if-grid {
-  flex: 1;
-  min-height: 0;
+  /* Fill viewport when space allows; never shrink below panel min-heights */
+  flex: 1 0 auto;
   width: 100%;
-  height: 100%;
+  min-height: min-content;
   display: flex;
   flex-direction: column;
   border: 2px solid #5d4037;
   border-top: none;
-  overflow: hidden;
+  overflow: visible;
   background: #fff;
 }
 
 .if-row--top {
-  flex: 1.2 1 0;
+  flex: 1.2 0 400px;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  min-height: 0;
+  min-height: 400px;
   border-bottom: 2px solid #5d4037;
 }
 
@@ -136,7 +148,7 @@ const bgColor = computed(
   display: flex;
   flex-direction: column;
   min-width: 0;
-  min-height: 0;
+  min-height: 400px;
   padding: 12px 14px 14px;
   box-sizing: border-box;
   background: #fff;
@@ -149,7 +161,8 @@ const bgColor = computed(
 }
 
 .if-cell--full {
-  flex: 0.85 1 0;
+  flex: 0.85 0 400px;
+  min-height: 400px;
   border-right: none;
   border-bottom: 2px solid #5d4037;
 }
@@ -203,25 +216,21 @@ const bgColor = computed(
 }
 
 @media (max-width: 720px) {
-  .industry-forecast-canvas {
-    overflow-y: auto;
-    overflow-x: hidden;
-  }
-
   .if-row--top {
     flex: none;
     grid-template-columns: 1fr;
+    min-height: 0;
   }
 
   .if-cell {
     border-right: none;
     border-bottom: 2px solid #5d4037;
-    min-height: 160px;
+    min-height: 400px;
   }
 
   .if-cell--full {
     flex: none;
-    min-height: 140px;
+    min-height: 400px;
   }
 
   .if-cell--full:last-child {

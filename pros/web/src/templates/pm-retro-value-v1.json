@@ -1,0 +1,71 @@
+{
+  "id": "canvas_pm_retro_value",
+  "type": "pm_retro_value",
+  "schemaVersion": 1,
+  "theme": {
+    "background": {
+      "pattern": "none",
+      "color": "#f7f1cc"
+    }
+  },
+  "title": "复盘挖掘价值4：过程资产",
+  "blocks": [
+    {
+      "id": "before",
+      "title": "Before: LEO不挖",
+      "items": [
+        {
+          "id": "item_before_1",
+          "text": "<p style=\"text-align: center\">\"做完这次，下次我就有经验了\"</p>",
+          "style": {
+            "color": "#202124",
+            "fontSize": 16,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "after",
+      "title": "After: LEO认真挖",
+      "items": [
+        {
+          "id": "item_after_methods_h",
+          "text": "<p><span style=\"color: #d65a46\"><strong>关键的方法：</strong></span></p>"
+        },
+        {
+          "id": "item_after_methods_1",
+          "text": "<p>1. 是否选入手册：评价工具质量4个维度。</p>"
+        },
+        {
+          "id": "item_after_methods_2",
+          "text": "<p>2. 如何写二维码卖点：底部二维码话术的5种策略。</p>"
+        },
+        {
+          "id": "item_after_lists_h",
+          "text": "<p><span style=\"color: #d65a46\"><strong>关键的清单：</strong></span></p>"
+        },
+        {
+          "id": "item_after_lists_1",
+          "text": "<p>1. 《手册视觉VI规范清单》</p>"
+        },
+        {
+          "id": "item_after_lists_2",
+          "text": "<p>2. 《手册易错点校对清单》</p>"
+        },
+        {
+          "id": "item_after_lists_3",
+          "text": "<p>3. 《手册版权字体规范》</p>"
+        },
+        {
+          "id": "item_after_sop_h",
+          "text": "<p><span style=\"color: #d65a46\"><strong>关键执行SOP：</strong></span></p>"
+        },
+        {
+          "id": "item_after_sop_1",
+          "text": "<p>1. 《手册终稿校对&amp;配合SOP》</p>"
+        }
+      ]
+    }
+  ]
+}

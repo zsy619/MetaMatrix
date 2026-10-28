@@ -120,16 +120,19 @@ const SECTIONS: {
 }
 
 .as-panel {
-  min-height: 160px;
+  min-height: 400px;
   border: 1px solid #e8eaed;
   border-radius: 4px;
   background: #fafafa;
   padding: 4px;
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
 }
 
 .as-panel :deep(.ym-block) {
-  min-height: 148px;
+  flex: 1;
+  min-height: 0;
   background: transparent;
   border: none;
   box-shadow: none;

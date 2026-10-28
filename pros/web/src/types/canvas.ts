@@ -366,6 +366,54 @@ export interface FiveStepDocumentJSON {
   blocks: FiveStepBlock[]
 }
 
+
+/** 五步法（分工版）· 列 id */
+export type FiveStepDivisionColumnId =
+  | 'demand'
+  | 'solution'
+  | 'business'
+  | 'growth'
+  | 'moat'
+
+/** 五步法（分工版）· 行 id */
+export type FiveStepDivisionRowId =
+  | 'qualitative'
+  | 'quantitative'
+  | 'team'
+
+/** 五步法（分工版）可编辑方块 id：{col}_{row} */
+export type FiveStepDivisionBlockId =
+  `${FiveStepDivisionColumnId}_${FiveStepDivisionRowId}`
+
+export interface FiveStepDivisionBlock {
+  id: FiveStepDivisionBlockId
+  title: string
+  items: QuadrantItem[]
+}
+
+export interface FiveStepDivisionColumn {
+  id: FiveStepDivisionColumnId
+  /** 黄底表头文案 */
+  header: string
+}
+
+export interface FiveStepDivisionRow {
+  id: FiveStepDivisionRowId
+  /** 左侧竖排维度标签 */
+  label: string
+}
+
+/** 五步法（分工版）画布文档 */
+export interface FiveStepDivisionDocumentJSON {
+  id: string
+  type: 'five_step_division'
+  schemaVersion: number
+  theme: CanvasTheme
+  columns: FiveStepDivisionColumn[]
+  rows: FiveStepDivisionRow[]
+  blocks: FiveStepDivisionBlock[]
+}
+
 /** AI场景取舍评估 · 单元格 id */
 export type AiTradeoffCellId =
   | 'a1'
@@ -566,11 +614,9 @@ export interface IndustryForecastDocumentJSON {
 
 /** 科学开会思考画布 · 方块 id */
 export type ScientificMeetingBlockId =
-  | 'goals'
-  | 'no_meeting_problems'
+  | 'goal'
   | 'principles'
   | 'process'
-  | 'efficiency_means'
 
 export interface ScientificMeetingBlock {
   id: ScientificMeetingBlockId
@@ -723,6 +769,278 @@ export interface DeepReviewDocumentJSON {
   blocks: DeepReviewBlock[]
 }
 
+/** 项目管理复盘挖掘价值 · 方块 id */
+export type PmRetroValueBlockId = 'before' | 'after'
+
+export interface PmRetroValueBlock {
+  id: PmRetroValueBlockId
+  title: string
+  items: QuadrantItem[]
+}
+
+/** 项目管理复盘挖掘价值（Before/After 双栏过程资产） */
+export interface PmRetroValueDocumentJSON {
+  id: string
+  type: 'pm_retro_value'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  blocks: PmRetroValueBlock[]
+}
+
+/** 时间管理矩阵（艾森豪威尔） · 象限 id */
+export type TimeMatrixBlockId = 'a' | 'b' | 'c' | 'd'
+
+export type TimeMatrixTone = 'pink' | 'yellow' | 'cream' | 'green'
+
+export interface TimeMatrixBlock {
+  id: TimeMatrixBlockId
+  title: string
+  tone: TimeMatrixTone
+  items: QuadrantItem[]
+}
+
+export interface TimeMatrixAxes {
+  importanceHigh: string
+  importanceLow: string
+  urgencyLow: string
+  urgencyHigh: string
+}
+
+/** 时间管理矩阵画布文档 */
+export interface TimeMatrixDocumentJSON {
+  id: string
+  type: 'time_matrix'
+  schemaVersion: number
+  theme: CanvasTheme
+  axes: TimeMatrixAxes
+  blocks: TimeMatrixBlock[]
+}
+
+
+
+
+/** 人生红点工作状态区间 · 象限 id */
+export type WorkStateZonesBlockId = 'a' | 'b' | 'c' | 'd'
+
+export type WorkStateZonesTone = 'green' | 'yellow' | 'pink' | 'grey'
+
+export interface WorkStateZonesBlock {
+  id: WorkStateZonesBlockId
+  title: string
+  description: string
+  tone: WorkStateZonesTone
+  items: QuadrantItem[]
+}
+
+export interface WorkStateZonesAxisEnd {
+  label: string
+  sub: string
+}
+
+export interface WorkStateZonesAxes {
+  autonomyHigh: WorkStateZonesAxisEnd
+  autonomyLow: WorkStateZonesAxisEnd
+  comfort: WorkStateZonesAxisEnd
+  nonComfort: WorkStateZonesAxisEnd
+}
+
+/** 人生红点工作状态区间画布文档 */
+export interface WorkStateZonesDocumentJSON {
+  id: string
+  type: 'work_state_zones'
+  schemaVersion: number
+  theme: CanvasTheme
+  axes: WorkStateZonesAxes
+  blocks: WorkStateZonesBlock[]
+}
+
+
+/** 线上线下沟通 · 象限 id */
+export type OnlineOfflineCommBlockId = 'a' | 'b' | 'c' | 'd'
+
+export type OnlineOfflineCommTone = 'blue' | 'green' | 'purple' | 'pink'
+
+export interface OnlineOfflineCommBlock {
+  id: OnlineOfflineCommBlockId
+  title: string
+  tone: OnlineOfflineCommTone
+  items: QuadrantItem[]
+}
+
+export interface OnlineOfflineCommAxes {
+  online: string
+  offline: string
+  asyncComm: string
+  syncComm: string
+}
+
+/** 线上线下沟通画布文档 */
+export interface OnlineOfflineCommDocumentJSON {
+  id: string
+  type: 'online_offline_comm'
+  schemaVersion: number
+  theme: CanvasTheme
+  axes: OnlineOfflineCommAxes
+  blocks: OnlineOfflineCommBlock[]
+}
+
+
+/** 项目管理6维敏感度 · 轴 id */
+export type PmSensitivity6dAxisId =
+  | 'budget'
+  | 'boss'
+  | 'risk'
+  | 'collaboration'
+  | 'manpower'
+  | 'time'
+
+export interface PmSensitivity6dAxisMeta {
+  id: PmSensitivity6dAxisId
+  title: string
+}
+
+/** 分值连续 0–100（外缘=100） */
+export type PmSensitivity6dScores = Record<PmSensitivity6dAxisId, number>
+
+export interface PmSensitivity6dBlock {
+  /** 与雷达轴一一对应 */
+  id: PmSensitivity6dAxisId
+  title: string
+  items: QuadrantItem[]
+}
+
+/** 项目管理6维敏感度模型画布文档 */
+export interface PmSensitivity6dDocumentJSON {
+  id: string
+  type: 'pm_sensitivity_6d'
+  schemaVersion: number
+  theme: CanvasTheme
+  axes: Record<PmSensitivity6dAxisId, PmSensitivity6dAxisMeta>
+  scores: PmSensitivity6dScores
+  blocks: PmSensitivity6dBlock[]
+}
+
+
+/** 项目管理竞争力测评 · 轴 id */
+export type PmCompetencyAxisId =
+  | 'awareness'
+  | 'proposal'
+  | 'plan'
+  | 'execution'
+  | 'review'
+
+export interface PmCompetencyAxisMeta {
+  id: PmCompetencyAxisId
+  title: string
+}
+
+/** 分值连续 0–100（外缘=100） */
+export type PmCompetencyScores = Record<PmCompetencyAxisId, number>
+
+export interface PmCompetencyBlock {
+  /** 与雷达轴一一对应 */
+  id: PmCompetencyAxisId
+  title: string
+  items: QuadrantItem[]
+}
+
+/** 项目管理竞争力测评画布文档 */
+export interface PmCompetencyDocumentJSON {
+  id: string
+  type: 'pm_competency'
+  schemaVersion: number
+  theme: CanvasTheme
+  axes: Record<PmCompetencyAxisId, PmCompetencyAxisMeta>
+  scores: PmCompetencyScores
+  blocks: PmCompetencyBlock[]
+}
+
+
+/** 项目管理方案评估三角形 · 轴 id */
+export type PmSolutionTriangleAxisId =
+  | 'roi'
+  | 'opportunity_cost'
+  | 'opportunity_window'
+
+export interface PmSolutionTriangleAxisMeta {
+  id: PmSolutionTriangleAxisId
+  title: string
+}
+
+/** 分值连续 0–100（外缘=100） */
+export type PmSolutionTriangleScores = Record<PmSolutionTriangleAxisId, number>
+
+export interface PmSolutionTriangleBlock {
+  /** 与雷达轴一一对应 */
+  id: PmSolutionTriangleAxisId
+  title: string
+  items: QuadrantItem[]
+}
+
+/** 项目管理方案评估三角形画布文档 */
+export interface PmSolutionTriangleDocumentJSON {
+  id: string
+  type: 'pm_solution_triangle'
+  schemaVersion: number
+  theme: CanvasTheme
+  axes: Record<PmSolutionTriangleAxisId, PmSolutionTriangleAxisMeta>
+  scores: PmSolutionTriangleScores
+  blocks: PmSolutionTriangleBlock[]
+}
+
+
+
+/** 增长假设清单 · 列 */
+export type GrowthAssumptionsCellKey =
+  | 'assumption'
+  | 'proposer'
+  | 'proposedAt'
+  | 'owner'
+  | 'result'
+
+export interface GrowthAssumptionsColumn {
+  key: GrowthAssumptionsCellKey
+  label: string
+}
+
+export interface GrowthAssumptionsRow {
+  id: string
+  assumption: QuadrantItem[]
+  proposer: QuadrantItem[]
+  proposedAt: QuadrantItem[]
+  owner: QuadrantItem[]
+  result: QuadrantItem[]
+}
+
+/** 增长假设清单画布文档 */
+export interface GrowthAssumptionsDocumentJSON {
+  id: string
+  type: 'growth_assumptions'
+  schemaVersion: number
+  theme: CanvasTheme
+  columns: GrowthAssumptionsColumn[]
+  rows: GrowthAssumptionsRow[]
+}
+
+
+/** 业务公式画布文档 */
+export interface BusinessFormulaSavedItem {
+  name: string
+  content: string
+}
+
+export interface BusinessFormulaDocumentJSON {
+  id: string
+  type: 'business_formula'
+  schemaVersion: number
+  theme: CanvasTheme
+  formulaText: string
+  layout: 'horizontal' | 'vertical'
+  palette: 'rainbow' | 'classic' | 'business' | 'warm' | 'cool'
+  savedFormulas: BusinessFormulaSavedItem[]
+}
+
 export type CanvasDocumentJSON = (
   | QuadrantDocumentJSON
   | DualTriangleDocumentJSON
@@ -730,6 +1048,7 @@ export type CanvasDocumentJSON = (
   | DeliberatePracticeDocumentJSON
   | DemandTriangleDocumentJSON
   | FiveStepDocumentJSON
+  | FiveStepDivisionDocumentJSON
   | AiTradeoffDocumentJSON
   | ProductContentDocumentJSON
   | OscarDocumentJSON
@@ -742,6 +1061,15 @@ export type CanvasDocumentJSON = (
   | IncidentReviewDocumentJSON
   | AnnualSummaryDocumentJSON
   | DeepReviewDocumentJSON
+  | PmRetroValueDocumentJSON
+  | TimeMatrixDocumentJSON
+  | WorkStateZonesDocumentJSON
+  | OnlineOfflineCommDocumentJSON
+  | PmSensitivity6dDocumentJSON
+  | PmCompetencyDocumentJSON
+  | PmSolutionTriangleDocumentJSON
+  | GrowthAssumptionsDocumentJSON
+  | BusinessFormulaDocumentJSON
 ) & WithPanelAttachments
 
 /** 带 blocks 的画布（双三角 / Y 模型 / 刻意练习） */
@@ -751,6 +1079,7 @@ export type BlockCanvasDocumentJSON =
   | DeliberatePracticeDocumentJSON
   | DemandTriangleDocumentJSON
   | FiveStepDocumentJSON
+  | FiveStepDivisionDocumentJSON
   | AiTradeoffDocumentJSON
   | ProductContentDocumentJSON
   | OscarDocumentJSON
@@ -761,6 +1090,13 @@ export type BlockCanvasDocumentJSON =
   | IncidentReviewDocumentJSON
   | AnnualSummaryDocumentJSON
   | DeepReviewDocumentJSON
+  | PmRetroValueDocumentJSON
+  | TimeMatrixDocumentJSON
+  | WorkStateZonesDocumentJSON
+  | OnlineOfflineCommDocumentJSON
+  | PmSensitivity6dDocumentJSON
+  | PmCompetencyDocumentJSON
+  | PmSolutionTriangleDocumentJSON
 
 export function isDualTriangleDoc(
   doc: CanvasDocumentJSON | null | undefined,
@@ -895,6 +1231,13 @@ export function isFiveStepDoc(
   return !!doc && doc.type === 'five_step'
 }
 
+
+export function isFiveStepDivisionDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is FiveStepDivisionDocumentJSON {
+  return !!doc && doc.type === 'five_step_division'
+}
+
 export function isAiTradeoffDoc(
   doc: CanvasDocumentJSON | null | undefined,
 ): doc is AiTradeoffDocumentJSON {
@@ -970,6 +1313,69 @@ export function isDeepReviewDoc(
   return !!doc && doc.type === 'deep_review'
 }
 
+
+export function isPmRetroValueDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is PmRetroValueDocumentJSON {
+  return !!doc && doc.type === 'pm_retro_value'
+}
+
+export function isTimeMatrixDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is TimeMatrixDocumentJSON {
+  return !!doc && doc.type === 'time_matrix'
+}
+
+
+export function isWorkStateZonesDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is WorkStateZonesDocumentJSON {
+  return !!doc && doc.type === 'work_state_zones'
+}
+
+
+export function isOnlineOfflineCommDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is OnlineOfflineCommDocumentJSON {
+  return !!doc && doc.type === 'online_offline_comm'
+}
+
+
+export function isPmSensitivity6dDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is PmSensitivity6dDocumentJSON {
+  return !!doc && doc.type === 'pm_sensitivity_6d'
+}
+
+
+export function isPmCompetencyDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is PmCompetencyDocumentJSON {
+  return !!doc && doc.type === 'pm_competency'
+}
+
+
+export function isPmSolutionTriangleDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is PmSolutionTriangleDocumentJSON {
+  return !!doc && doc.type === 'pm_solution_triangle'
+}
+
+
+
+export function isGrowthAssumptionsDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is GrowthAssumptionsDocumentJSON {
+  return !!doc && doc.type === 'growth_assumptions'
+}
+
+export function isBusinessFormulaDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is BusinessFormulaDocumentJSON {
+  return !!doc && doc.type === 'business_formula'
+}
+
+
 export function isBlockCanvasDoc(
   doc: CanvasDocumentJSON | null | undefined,
 ): doc is BlockCanvasDocumentJSON {
@@ -979,6 +1385,7 @@ export function isBlockCanvasDoc(
     isDeliberatePracticeDoc(doc) ||
     isDemandTriangleDoc(doc) ||
     isFiveStepDoc(doc) ||
+    isFiveStepDivisionDoc(doc) ||
     isAiTradeoffDoc(doc) ||
     isProductContentDoc(doc) ||
     isOscarDoc(doc) ||
@@ -988,7 +1395,14 @@ export function isBlockCanvasDoc(
     isIpoDoc(doc) ||
     isIncidentReviewDoc(doc) ||
     isAnnualSummaryDoc(doc) ||
-    isDeepReviewDoc(doc)
+    isDeepReviewDoc(doc) ||
+    isPmRetroValueDoc(doc) ||
+    isTimeMatrixDoc(doc) ||
+    isWorkStateZonesDoc(doc) ||
+    isOnlineOfflineCommDoc(doc) ||
+    isPmSensitivity6dDoc(doc) ||
+    isPmCompetencyDoc(doc) ||
+    isPmSolutionTriangleDoc(doc)
   )
 }
 
@@ -1002,6 +1416,7 @@ export function isQuadrantDoc(
     doc.type !== 'deliberate_practice' &&
     doc.type !== 'demand_triangle' &&
     doc.type !== 'five_step' &&
+    doc.type !== 'five_step_division' &&
     doc.type !== 'ai_tradeoff' &&
     doc.type !== 'product_content' &&
     doc.type !== 'oscar' &&
@@ -1013,6 +1428,15 @@ export function isQuadrantDoc(
     doc.type !== 'ipo' &&
     doc.type !== 'incident_review' &&
     doc.type !== 'annual_summary' &&
-    doc.type !== 'deep_review'
+    doc.type !== 'deep_review' &&
+    doc.type !== 'pm_retro_value' &&
+    doc.type !== 'time_matrix' &&
+    doc.type !== 'work_state_zones' &&
+    doc.type !== 'online_offline_comm' &&
+    doc.type !== 'pm_sensitivity_6d' &&
+    doc.type !== 'pm_competency' &&
+    doc.type !== 'pm_solution_triangle' &&
+    doc.type !== 'growth_assumptions' &&
+    doc.type !== 'business_formula'
   )
 }

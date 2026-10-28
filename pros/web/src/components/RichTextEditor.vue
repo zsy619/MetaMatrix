@@ -345,12 +345,49 @@ function toggleCode() {
 function toggleHighlight() {
   chain()?.toggleHighlight().run()
 }
+function setHighlightColor(color: string) {
+  if (!color) {
+    chain()?.unsetHighlight().run()
+    return
+  }
+  chain()?.setHighlight({ color }).run()
+}
 function setColor(color: string) {
   if (!color) {
     chain()?.unsetColor().run()
     return
   }
   chain()?.setColor(color).run()
+}
+function applyTextColor(color: string) {
+  setColor(color)
+  colorOpen.value = false
+  moreColorOpen.value = false
+  moreOpen.value = false
+}
+function applyHighlightColor(color: string) {
+  setHighlightColor(color)
+  highlightOpen.value = false
+  moreHighlightOpen.value = false
+  moreOpen.value = false
+}
+function currentTextColor(): string {
+  const ed = editor.value
+  if (!ed) return ''
+  const c = ed.getAttributes('textStyle')?.color
+  return typeof c === 'string' ? c.toLowerCase() : ''
+}
+function currentHighlightColor(): string {
+  const ed = editor.value
+  if (!ed) return ''
+  const attrs = ed.getAttributes('highlight')
+  if (!attrs || !attrs.color) {
+    return ed.isActive('highlight') ? '__default__' : ''
+  }
+  return String(attrs.color).toLowerCase()
+}
+function colorsEqual(a: string, b: string) {
+  return (a || '').toLowerCase() === (b || '').toLowerCase()
 }
 function setAlign(align: 'left' | 'center' | 'right' | 'justify') {
   chain()?.setTextAlign(align).run()
@@ -1140,6 +1177,9 @@ function openTableDialog() {
   resetTableDialog()
   tableDialogOpen.value = true
   moreOpen.value = false
+  tableMenuOpen.value = false
+  tableOpsSheetOpen.value = false
+  closeTableCtx()
 }
 
 function closeTableDialog() {
@@ -1179,7 +1219,17 @@ function confirmInsertTable() {
   const cols = clampInt(tableCols.value, 1, 8)
   tableRows.value = rows
   tableCols.value = cols
-  ed.chain().focus().insertTable({ rows, cols, withHeaderRow: true }).run()
+  closeAllTableUi()
+  // 优先在当前光标插入；失败时落到文末再试（嵌套块/异常选区）
+  const opts = { rows, cols, withHeaderRow: true }
+  let ok = ed.chain().focus().insertTable(opts).run()
+  if (!ok) {
+    ok = ed.chain().focus('end').insertTable(opts).run()
+  }
+  if (!ok) {
+    rteToast('warning', '无法插入表格，请将光标放到正文段落后再试')
+    return
+  }
   closeTableDialog()
 }
 
@@ -1303,14 +1353,38 @@ const tableOpItems = computed((): TableOpItem[] => {
   ]
 })
 
-/** 工具栏「表格」：表内展开操作菜单；表外打开插入弹窗（紧凑「更多」同逻辑） */
+/**
+ * 紧凑「更多」：表外直接开插入弹窗；表内开操作面板。
+ * 最大化工具条请用 onTableToolbarButtonClick（表内下拉、表外弹窗）。
+ */
 function onTableToolClick() {
   moreOpen.value = false
+  closeImportMenu()
   if (isInTable()) {
+    tableMenuOpen.value = false
     tableOpsSheetOpen.value = true
     closeTableCtx()
     return
   }
+  closeTableMenu()
+  openTableDialog()
+}
+
+/** 最大化工具栏「表格」按钮：表外一键插入弹窗；表内切换操作下拉 */
+function onTableToolbarButtonClick() {
+  moreOpen.value = false
+  closeImportMenu()
+  headingOpen.value = false
+  listOpen.value = false
+  colorOpen.value = false
+  highlightOpen.value = false
+  alignOpen.value = false
+  if (isInTable()) {
+    tableMenuOpen.value = !tableMenuOpen.value
+    closeTableCtx()
+    return
+  }
+  closeTableMenu()
   openTableDialog()
 }
 
@@ -1936,18 +2010,135 @@ const headingOpen = ref(false)
 const listOpen = ref(false)
 const moreOpen = ref(false)
 const colorOpen = ref(false)
+const highlightOpen = ref(false)
+const moreColorOpen = ref(false)
+const moreHighlightOpen = ref(false)
 const alignOpen = ref(false)
+const customColorOpen = ref(false)
+const customColorHex = ref('#165dff')
 
-const COLOR_PRESETS = [
-  '#1d2129',
-  '#f53f3f',
-  '#ff7d00',
-  '#f7ba1e',
-  '#00b42a',
-  '#165dff',
-  '#722ed1',
-  '#86909c',
+/**
+ * Word 风格字体颜色：主题颜色（10 列 × 6 行：基色 + 明暗变体）+ 标准颜色一行。
+ * 色值对齐 Office 常见主题调色板。
+ */
+const WORD_THEME_COLORS: string[][] = [
+  ['#FFFFFF', '#F2F2F2', '#D8D8D8', '#BFBFBF', '#A5A5A5', '#7F7F7F'],
+  ['#000000', '#7F7F7F', '#595959', '#3F3F3F', '#262626', '#0C0C0C'],
+  ['#E7E6E6', '#D0CECE', '#AEABAB', '#757070', '#3A3838', '#171616'],
+  ['#44546A', '#D6DCE4', '#ADB9CA', '#8496B0', '#323F4F', '#222A35'],
+  ['#5B9BD5', '#DEEBF6', '#BDD7EE', '#9CC2E5', '#2E75B5', '#1F4E79'],
+  ['#ED7D31', '#FBE4D5', '#F7CAAC', '#F4B183', '#C55A11', '#833C0B'],
+  ['#A5A5A5', '#EDEDED', '#DBDBDB', '#C9C9C9', '#7B7B7B', '#525252'],
+  ['#FFC000', '#FFF2CC', '#FFE699', '#FFD966', '#BF9000', '#7F6000'],
+  ['#4472C4', '#D6DCE4', '#B4C6E7', '#8EA9DB', '#2F5496', '#1F3864'],
+  ['#70AD47', '#E2EFD9', '#C5E0B3', '#A8D08D', '#548235', '#375623'],
 ]
+
+/** 按行展开主题色网格（第 0 行为基色，其后为明暗），供 CSS grid 按行渲染 */
+const WORD_THEME_ROWS = (() => {
+  const rows: string[][] = []
+  const cols = WORD_THEME_COLORS.length
+  const depth = WORD_THEME_COLORS[0]?.length ?? 0
+  for (let r = 0; r < depth; r++) {
+    rows.push(Array.from({ length: cols }, (_, c) => WORD_THEME_COLORS[c][r]))
+  }
+  return rows
+})()
+
+const WORD_STANDARD_COLORS = [
+  '#C00000',
+  '#FF0000',
+  '#FFC000',
+  '#FFFF00',
+  '#92D050',
+  '#00B050',
+  '#00B0F0',
+  '#0070C0',
+  '#002060',
+  '#7030A0',
+]
+
+/** Word 荧光笔常用色（无颜色单独按钮） */
+const WORD_HIGHLIGHT_COLORS = [
+  { color: '#FFFF00', label: '黄色' },
+  { color: '#00FF00', label: '鲜绿' },
+  { color: '#00FFFF', label: '青绿' },
+  { color: '#FF00FF', label: '粉红' },
+  { color: '#0000FF', label: '蓝色' },
+  { color: '#FF0000', label: '红色' },
+  { color: '#000080', label: '深蓝' },
+  { color: '#008080', label: '青色' },
+  { color: '#008000', label: '绿色' },
+  { color: '#800080', label: '紫色' },
+  { color: '#800000', label: '深红' },
+  { color: '#808000', label: '深黄' },
+  { color: '#808080', label: '灰色 50%' },
+  { color: '#C0C0C0', label: '灰色 25%' },
+  { color: '#000000', label: '黑色' },
+]
+
+function closeColorMenus() {
+  colorOpen.value = false
+  moreColorOpen.value = false
+  customColorOpen.value = false
+}
+
+function closeHighlightMenus() {
+  highlightOpen.value = false
+  moreHighlightOpen.value = false
+}
+
+function toggleColorMenu() {
+  closeHighlightMenus()
+  headingOpen.value = false
+  listOpen.value = false
+  alignOpen.value = false
+  customColorOpen.value = false
+  colorOpen.value = !colorOpen.value
+}
+
+function toggleHighlightMenu() {
+  closeColorMenus()
+  headingOpen.value = false
+  listOpen.value = false
+  alignOpen.value = false
+  highlightOpen.value = !highlightOpen.value
+}
+
+function applyCustomColor() {
+  let hex = customColorHex.value.trim()
+  if (!hex) return
+  if (!hex.startsWith('#')) hex = `#${hex}`
+  if (!/^#[0-9a-fA-F]{6}$/.test(hex) && !/^#[0-9a-fA-F]{3}$/.test(hex)) return
+  applyTextColor(hex)
+}
+function onCustomColorNativeInput(event: Event) {
+  const el = event.target as HTMLInputElement | null
+  if (el?.value) customColorHex.value = el.value
+}
+
+/** 主题色按行展平后的一维列表（10 列 × 6 行） */
+const WORD_THEME_FLAT = WORD_THEME_ROWS.flat()
+
+function onMoreToolClick(t: ToolItem) {
+  if (t.kind === 'color') {
+    moreHighlightOpen.value = false
+    moreColorOpen.value = !moreColorOpen.value
+    customColorOpen.value = false
+    return
+  }
+  if (t.key === 'highlight') {
+    moreColorOpen.value = false
+    customColorOpen.value = false
+    moreHighlightOpen.value = !moreHighlightOpen.value
+    return
+  }
+  moreColorOpen.value = false
+  moreHighlightOpen.value = false
+  customColorOpen.value = false
+  moreOpen.value = false
+  t.run?.()
+}
 
 const PRIMARY_KEYS = new Set(['heading', 'bold', 'italic', 'list'])
 
@@ -1958,7 +2149,7 @@ type ToolItem = {
   title?: string
   icon: string
   iconComp?: Component
-  kind?: 'heading' | 'list' | 'more' | 'btn' | 'color' | 'align' | 'import' | 'table' | 'divider'
+  kind?: 'heading' | 'list' | 'more' | 'btn' | 'color' | 'highlight' | 'align' | 'import' | 'table' | 'attach' | 'divider'
   active?: () => boolean
   run?: () => void
 }
@@ -1981,7 +2172,7 @@ const allTools = computed((): ToolItem[] => {
     { key: 'redo', label: '重做', icon: '↷', iconComp: ic('redo'), run: redo },
     {
       key: 'clear',
-      label: '清除',
+      label: '清除格式',
       title: '清除格式',
       icon: '⌫',
       iconComp: ic('clear'),
@@ -2036,8 +2227,8 @@ const allTools = computed((): ToolItem[] => {
       label: '高亮',
       icon: '🖍',
       iconComp: ic('highlight'),
+      kind: 'highlight',
       active: () => isActive('highlight'),
-      run: toggleHighlight,
     },
     { key: 'color', label: '颜色', icon: 'A', iconComp: ic('color'), kind: 'color' },
     { key: 'align', label: '对齐', icon: '≡', iconComp: ic('align'), kind: 'align' },
@@ -2075,7 +2266,7 @@ const allTools = computed((): ToolItem[] => {
     },
     { key: 'formula', label: '公式', icon: 'Σ', iconComp: ic('formula'), run: insertFormula },
     { key: 'table', label: '表格', icon: '▦', iconComp: ic('table'), kind: 'table', active: () => isInTable(), run: onTableToolClick },
-    { key: 'attach', label: '附件', icon: '☁▾', iconComp: ic('attach'), run: onAttachment },
+    { key: 'attach', label: '附件', icon: '☁▾', iconComp: ic('attach'), kind: 'attach', run: onAttachment },
     { key: 'note', label: '注释', icon: '[1]', iconComp: ic('note'), run: insertNote },
     { key: 'div-insert', label: '', icon: '', kind: 'divider' },
     // —— 其他 ——
@@ -2112,13 +2303,11 @@ const moreTools = computed(() => {
   )
 })
 
-function runMoreTool(t: ToolItem) {
-  moreOpen.value = false
-  t.run?.()
-}
-
 function closeMore() {
   moreOpen.value = false
+  moreColorOpen.value = false
+  moreHighlightOpen.value = false
+  customColorOpen.value = false
 }
 
 function onRootMouseDown(event: MouseEvent) {
@@ -2165,13 +2354,14 @@ defineExpose({ focusEditor, editor, onDraftBackup })
             class="rte-tool"
             :class="{ active: isActive('heading') }"
             title="标题"
-            @click.stop="headingOpen = !headingOpen"
+            @click.stop="closeColorMenus(); closeHighlightMenus(); listOpen = false; alignOpen = false; headingOpen = !headingOpen"
           >
             <span class="rte-tool-icon">
               <component :is="toolIcon('heading')" class="rte-ep-icon" />
-              <span class="rte-caret">▾</span>
             </span>
-            <span class="rte-tool-label">标题</span>
+            <span class="rte-tool-label"
+              >标题<span class="rte-caret" aria-hidden="true"></span
+            ></span>
           </button>
           <div v-if="headingOpen" class="rte-menu" @mousedown.prevent>
             <button type="button" @click="setHeading(0); headingOpen = false">
@@ -2200,13 +2390,14 @@ defineExpose({ focusEditor, editor, onDraftBackup })
               active: isActive('bulletList') || isActive('orderedList'),
             }"
             title="列表"
-            @click.stop="listOpen = !listOpen"
+            @click.stop="closeColorMenus(); closeHighlightMenus(); headingOpen = false; alignOpen = false; listOpen = !listOpen"
           >
             <span class="rte-tool-icon">
               <component :is="toolIcon('list')" class="rte-ep-icon" />
-              <span class="rte-caret">▾</span>
             </span>
-            <span class="rte-tool-label">列表</span>
+            <span class="rte-tool-label"
+              >列表<span class="rte-caret" aria-hidden="true"></span
+            ></span>
           </button>
           <div v-if="listOpen" class="rte-menu" @mousedown.prevent>
             <button
@@ -2224,38 +2415,146 @@ defineExpose({ focusEditor, editor, onDraftBackup })
           </div>
         </div>
         <div
-          v-else-if="t.kind === 'color'"
+          v-else-if="t.kind === 'highlight'"
           class="rte-tool-wrap"
-          @mouseleave="colorOpen = false"
+          @mouseleave="highlightOpen = false"
         >
           <button
             type="button"
             class="rte-tool"
-            title="文字颜色"
-            @click.stop="colorOpen = !colorOpen"
+            :class="{ active: isActive('highlight') || highlightOpen }"
+            title="突出显示"
+            @click.stop="toggleHighlightMenu"
           >
-            <span class="rte-tool-icon rte-color-icon">
+            <span class="rte-tool-icon">
+              <component :is="toolIcon('highlight')" class="rte-ep-icon" />
+            </span>
+            <span class="rte-tool-label">高亮</span>
+          </button>
+          <div
+            v-if="highlightOpen"
+            class="rte-menu rte-color-menu rte-highlight-menu"
+            @mousedown.prevent
+          >
+            <button
+              type="button"
+              class="rte-color-action"
+              :class="{ selected: !isActive('highlight') }"
+              @click="applyHighlightColor('')"
+            >
+              无颜色
+            </button>
+            <div class="rte-color-section-label">高亮颜色</div>
+            <div class="rte-highlight-swatches">
+              <button
+                v-for="h in WORD_HIGHLIGHT_COLORS"
+                :key="h.color"
+                type="button"
+                class="rte-swatch"
+                :class="{
+                  selected: colorsEqual(currentHighlightColor(), h.color),
+                  'is-light': h.color === '#FFFF00' || h.color === '#00FF00' || h.color === '#00FFFF' || h.color === '#C0C0C0',
+                }"
+                :style="{ background: h.color }"
+                :title="h.label"
+                @click="applyHighlightColor(h.color)"
+              />
+            </div>
+          </div>
+        </div>
+        <div
+          v-else-if="t.kind === 'color'"
+          class="rte-tool-wrap"
+          @mouseleave="closeColorMenus"
+        >
+          <button
+            type="button"
+            class="rte-tool"
+            :class="{ active: colorOpen }"
+            title="字体颜色"
+            @click.stop="toggleColorMenu"
+          >
+            <span
+              class="rte-tool-icon rte-color-icon"
+              :style="{ textDecorationColor: currentTextColor() || '#1d2129' }"
+            >
               <component :is="toolIcon('color')" class="rte-ep-icon" />
             </span>
             <span class="rte-tool-label">颜色</span>
           </button>
-          <div v-if="colorOpen" class="rte-menu rte-color-menu" @mousedown.prevent>
+          <div
+            v-if="colorOpen"
+            class="rte-menu rte-color-menu"
+            @mousedown.prevent
+          >
             <button
               type="button"
-              @click="setColor(''); colorOpen = false"
+              class="rte-color-action"
+              :class="{ selected: !currentTextColor() }"
+              @click="applyTextColor('')"
             >
-              默认
+              自动
             </button>
-            <div class="rte-color-swatches">
+            <div class="rte-color-section-label">主题颜色</div>
+            <div class="rte-theme-grid">
               <button
-                v-for="c in COLOR_PRESETS"
-                :key="c"
+                v-for="(c, i) in WORD_THEME_FLAT"
+                :key="'th-' + i + '-' + c"
                 type="button"
                 class="rte-swatch"
+                :class="{
+                  selected: colorsEqual(currentTextColor(), c),
+                  'is-light': c === '#FFFFFF' || c.toLowerCase() === '#ffffff',
+                }"
                 :style="{ background: c }"
                 :title="c"
-                @click="setColor(c); colorOpen = false"
+                @click="applyTextColor(c)"
               />
+            </div>
+            <div class="rte-color-section-label">标准颜色</div>
+            <div class="rte-standard-row">
+              <button
+                v-for="c in WORD_STANDARD_COLORS"
+                :key="'st-' + c"
+                type="button"
+                class="rte-swatch"
+                :class="{ selected: colorsEqual(currentTextColor(), c) }"
+                :style="{ background: c }"
+                :title="c"
+                @click="applyTextColor(c)"
+              />
+            </div>
+            <div class="rte-color-sep" />
+            <button
+              type="button"
+              class="rte-color-action"
+              @click.stop="customColorOpen = !customColorOpen"
+            >
+              其他颜色…
+            </button>
+            <div v-if="customColorOpen" class="rte-custom-color" @click.stop>
+              <input
+                v-model="customColorHex"
+                type="color"
+                class="rte-custom-color-native"
+                title="选取颜色"
+                @input="onCustomColorNativeInput"
+              />
+              <input
+                v-model="customColorHex"
+                type="text"
+                class="rte-custom-color-hex"
+                maxlength="7"
+                placeholder="#165dff"
+                @keydown.enter.prevent="applyCustomColor"
+              />
+              <button
+                type="button"
+                class="rte-custom-color-ok"
+                @click="applyCustomColor"
+              >
+                确定
+              </button>
             </div>
           </div>
         </div>
@@ -2274,7 +2573,7 @@ defineExpose({ focusEditor, editor, onDraftBackup })
                 isActive({ textAlign: 'justify' }),
             }"
             title="对齐"
-            @click.stop="alignOpen = !alignOpen"
+            @click.stop="closeColorMenus(); closeHighlightMenus(); headingOpen = false; listOpen = false; alignOpen = !alignOpen"
           >
             <span class="rte-tool-icon">
               <component :is="toolIcon('align')" class="rte-ep-icon" />
@@ -2309,40 +2608,48 @@ defineExpose({ focusEditor, editor, onDraftBackup })
           <button
             type="button"
             class="rte-tool"
-            :class="{ active: tableMenuOpen || isInTable() }"
-            title="表格"
-            @click.stop="tableMenuOpen = !tableMenuOpen"
+            :class="{ active: tableMenuOpen || tableDialogOpen || isInTable() }"
+            :title="isInTable() ? '表格操作' : '插入表格'"
+            :aria-haspopup="isInTable() ? 'menu' : 'dialog'"
+            :aria-expanded="isInTable() ? tableMenuOpen : undefined"
+            @click.stop="onTableToolbarButtonClick"
           >
             <span class="rte-tool-icon">
               <component
                 :is="t.iconComp || toolIcon('table')"
                 class="rte-ep-icon"
               />
-              <span class="rte-caret">▾</span>
             </span>
-            <span class="rte-tool-label">表格</span>
+            <span class="rte-tool-label"
+              >表格<span
+                v-if="isInTable()"
+                class="rte-caret"
+                aria-hidden="true"
+              ></span
+            ></span>
           </button>
           <div
-            v-if="tableMenuOpen"
+            v-if="tableMenuOpen && isInTable()"
             class="rte-menu rte-table-menu"
+            role="menu"
             @mousedown.prevent
           >
-            <template v-if="isInTable()">
-              <template v-for="op in tableOpItems" :key="op.key">
-                <div v-if="op.sepBefore" class="rte-menu-sep" aria-hidden="true" />
-                <button
-                  type="button"
-                  :class="{ danger: op.danger }"
-                  :disabled="op.disabled?.()"
-                  @click="op.run()"
-                >
-                  {{ op.label }}
-                </button>
-              </template>
-              <div class="rte-menu-sep" aria-hidden="true" />
+            <template v-for="op in tableOpItems" :key="op.key">
+              <div v-if="op.sepBefore" class="rte-menu-sep" aria-hidden="true" />
+              <button
+                type="button"
+                role="menuitem"
+                :class="{ danger: op.danger }"
+                :disabled="op.disabled?.()"
+                @click="op.run()"
+              >
+                {{ op.label }}
+              </button>
             </template>
+            <div class="rte-menu-sep" aria-hidden="true" />
             <button
               type="button"
+              role="menuitem"
               @click="closeTableMenu(); openTableDialog()"
             >
               插入表格
@@ -2366,9 +2673,10 @@ defineExpose({ focusEditor, editor, onDraftBackup })
                 :is="t.iconComp || toolIcon('import')"
                 class="rte-ep-icon"
               />
-              <span class="rte-caret">▾</span>
             </span>
-            <span class="rte-tool-label">导入</span>
+            <span class="rte-tool-label"
+              >导入<span class="rte-caret" aria-hidden="true"></span
+            ></span>
           </button>
           <div
             v-if="importMenuOpen"
@@ -2391,6 +2699,25 @@ defineExpose({ focusEditor, editor, onDraftBackup })
             </button>
           </div>
         </div>
+        <button
+          v-else-if="t.kind === 'attach'"
+          type="button"
+          class="rte-tool"
+          :class="{ active: attachDialogOpen }"
+          :title="t.title || t.label"
+          :aria-label="t.title || t.label"
+          aria-haspopup="dialog"
+          @click="t.run?.()"
+        >
+          <span class="rte-tool-icon">
+            <component
+              :is="t.iconComp || toolIcon('attach')"
+              class="rte-ep-icon"
+            />
+            <span class="rte-caret rte-caret-on-icon" aria-hidden="true"></span>
+          </span>
+          <span class="rte-tool-label">附件</span>
+        </button>
         <button
           v-else
           type="button"
@@ -2433,26 +2760,145 @@ defineExpose({ focusEditor, editor, onDraftBackup })
         <div
           v-if="moreOpen"
           class="rte-more-menu"
+          :class="{ 'has-flyout': moreColorOpen || moreHighlightOpen }"
           @mousedown.prevent
         >
-          <button
-            v-for="mt in moreTools"
-            :key="mt.key"
-            type="button"
-            class="rte-more-item"
-            :class="{ active: mt.active?.() }"
-            @click="runMoreTool(mt)"
-          >
-            <span class="rte-more-icon">
-              <component
-                v-if="mt.iconComp"
-                :is="mt.iconComp"
-                class="rte-ep-icon"
-              />
-              <template v-else>{{ mt.icon }}</template>
-            </span>
-            <span>{{ mt.title || mt.label }}</span>
-          </button>
+          <template v-for="mt in moreTools" :key="mt.key">
+            <button
+              type="button"
+              class="rte-more-item"
+              :class="{
+                active:
+                  mt.active?.() ||
+                  (mt.kind === 'color' && moreColorOpen) ||
+                  (mt.key === 'highlight' && moreHighlightOpen),
+              }"
+              @click="onMoreToolClick(mt)"
+            >
+              <span class="rte-more-icon">
+                <component
+                  v-if="mt.iconComp"
+                  :is="mt.iconComp"
+                  class="rte-ep-icon"
+                />
+                <template v-else>{{ mt.icon }}</template>
+              </span>
+              <span>{{ mt.title || mt.label }}</span>
+              <span
+                v-if="mt.kind === 'color' || mt.key === 'highlight' || mt.kind === 'attach'"
+                class="rte-more-caret"
+              >{{ mt.kind === 'attach' ? '▾' : '▸' }}</span>
+            </button>
+            <div
+              v-if="mt.kind === 'color' && moreColorOpen"
+              class="rte-menu rte-color-menu rte-more-flyout"
+              @mousedown.prevent
+            >
+              <button
+                type="button"
+                class="rte-color-action"
+                :class="{ selected: !currentTextColor() }"
+                @click="applyTextColor('')"
+              >
+                自动
+              </button>
+              <div class="rte-color-section-label">主题颜色</div>
+              <div class="rte-theme-grid">
+                <button
+                  v-for="(c, i) in WORD_THEME_FLAT"
+                  :key="'mth-' + i + '-' + c"
+                  type="button"
+                  class="rte-swatch"
+                  :class="{
+                    selected: colorsEqual(currentTextColor(), c),
+                    'is-light': c === '#FFFFFF' || c.toLowerCase() === '#ffffff',
+                  }"
+                  :style="{ background: c }"
+                  :title="c"
+                  @click="applyTextColor(c)"
+                />
+              </div>
+              <div class="rte-color-section-label">标准颜色</div>
+              <div class="rte-standard-row">
+                <button
+                  v-for="c in WORD_STANDARD_COLORS"
+                  :key="'mst-' + c"
+                  type="button"
+                  class="rte-swatch"
+                  :class="{ selected: colorsEqual(currentTextColor(), c) }"
+                  :style="{ background: c }"
+                  :title="c"
+                  @click="applyTextColor(c)"
+                />
+              </div>
+              <div class="rte-color-sep" />
+              <button
+                type="button"
+                class="rte-color-action"
+                @click.stop="customColorOpen = !customColorOpen"
+              >
+                其他颜色…
+              </button>
+              <div v-if="customColorOpen" class="rte-custom-color" @click.stop>
+                <input
+                  v-model="customColorHex"
+                  type="color"
+                  class="rte-custom-color-native"
+                  title="选取颜色"
+                  @input="onCustomColorNativeInput"
+                />
+                <input
+                  v-model="customColorHex"
+                  type="text"
+                  class="rte-custom-color-hex"
+                  maxlength="7"
+                  placeholder="#165dff"
+                  @keydown.enter.prevent="applyCustomColor"
+                />
+                <button
+                  type="button"
+                  class="rte-custom-color-ok"
+                  @click="applyCustomColor"
+                >
+                  确定
+                </button>
+              </div>
+            </div>
+            <div
+              v-if="mt.key === 'highlight' && moreHighlightOpen"
+              class="rte-menu rte-color-menu rte-highlight-menu rte-more-flyout"
+              @mousedown.prevent
+            >
+              <button
+                type="button"
+                class="rte-color-action"
+                :class="{ selected: !isActive('highlight') }"
+                @click="applyHighlightColor('')"
+              >
+                无颜色
+              </button>
+              <div class="rte-color-section-label">高亮颜色</div>
+              <div class="rte-highlight-swatches">
+                <button
+                  v-for="h in WORD_HIGHLIGHT_COLORS"
+                  :key="'mh-' + h.color"
+                  type="button"
+                  class="rte-swatch"
+                  :class="{
+                    selected: colorsEqual(currentHighlightColor(), h.color),
+                    'is-light':
+                      h.color === '#FFFF00' ||
+                      h.color === '#00FF00' ||
+                      h.color === '#00FFFF' ||
+                      h.color === '#C0C0C0',
+                  }"
+                  :style="{ background: h.color }"
+                  :title="h.label"
+                  @click="applyHighlightColor(h.color)"
+                />
+              </div>
+            </div>
+          </template>
         </div>
       </div>
     </div>
@@ -3929,6 +4375,7 @@ defineExpose({ focusEditor, editor, onDraftBackup })
 
 .rte-table-menu {
   min-width: 148px;
+  z-index: 60;
 }
 
 .rte-table-ctx-mask {
@@ -4182,31 +4629,202 @@ defineExpose({ focusEditor, editor, onDraftBackup })
 
 
 .rte-color-menu {
-  min-width: 140px;
-  padding: 6px;
+  min-width: 232px;
+  width: 232px;
+  padding: 8px;
+  box-sizing: border-box;
+  /* 覆盖 .rte-menu button 的左对齐大内边距，色块需紧凑 */
+  gap: 0;
 }
-.rte-color-swatches {
+.rte-color-menu .rte-color-action {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 6px 8px;
+  margin: 0 0 4px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  font-size: 12px;
+  color: #1d2129;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+.rte-color-menu .rte-color-action:hover {
+  background: #f2f3f5;
+}
+.rte-color-menu .rte-color-action.selected {
+  background: #e8f3ff;
+  border-color: #94bfff;
+}
+.rte-color-section-label {
+  margin: 6px 2px 4px;
+  font-size: 11px;
+  line-height: 1.2;
+  color: #86909c;
+  font-weight: 500;
+  user-select: none;
+}
+.rte-theme-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
-  margin-top: 6px;
+  grid-template-columns: repeat(10, 18px);
+  grid-template-rows: repeat(6, 18px);
+  gap: 2px;
+  justify-content: start;
+  margin: 0 2px 4px;
+}
+.rte-standard-row,
+.rte-highlight-swatches {
+  display: grid;
+  grid-template-columns: repeat(10, 18px);
+  gap: 2px;
+  justify-content: start;
+  margin: 0 2px 4px;
+}
+.rte-highlight-swatches {
+  grid-template-columns: repeat(5, 18px);
+}
+.rte-color-sep {
+  height: 1px;
+  background: #e5e6eb;
+  margin: 6px 0 4px;
 }
 .rte-swatch {
-  width: 22px;
-  height: 22px;
-  border-radius: 4px;
-  border: 1px solid rgba(0, 0, 0, 0.12);
+  width: 18px;
+  height: 18px;
+  border-radius: 2px;
+  border: 1px solid rgba(0, 0, 0, 0.18);
   padding: 0;
+  margin: 0;
   cursor: pointer;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  position: relative;
+  background-clip: padding-box;
+}
+.rte-color-menu .rte-swatch {
+  /* 覆盖通用 .rte-menu button 样式 */
+  text-align: center;
+  padding: 0 !important;
+  font-size: 0;
+  border-radius: 2px;
+  min-width: 18px;
+  width: 18px;
+  height: 18px;
+}
+.rte-swatch.is-light {
+  border-color: rgba(0, 0, 0, 0.28);
 }
 .rte-swatch:hover {
-  outline: 2px solid #165dff;
+  outline: 1px solid #1d2129;
   outline-offset: 1px;
+  z-index: 1;
+}
+.rte-swatch.selected {
+  outline: 1px solid #165dff;
+  outline-offset: 1px;
+  box-shadow: inset 0 0 0 1px #fff;
+  z-index: 1;
+}
+.rte-swatch.selected::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 45%;
+  width: 4px;
+  height: 7px;
+  border: solid #fff;
+  border-width: 0 1.5px 1.5px 0;
+  transform: translate(-50%, -55%) rotate(45deg);
+  box-shadow: 1px 0 0 rgba(0, 0, 0, 0.15);
+}
+.rte-swatch.is-light.selected::after {
+  border-color: #1d2129;
+  box-shadow: none;
+}
+.rte-custom-color {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 2px 2px;
+}
+.rte-custom-color-native {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid #e5e6eb;
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+}
+.rte-custom-color-hex {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  border: 1px solid #e5e6eb;
+  border-radius: 4px;
+  padding: 0 8px;
+  font-size: 12px;
+  color: #1d2129;
+  box-sizing: border-box;
+}
+.rte-custom-color-hex:focus {
+  outline: none;
+  border-color: #165dff;
+}
+.rte-custom-color-ok {
+  height: 28px;
+  padding: 0 10px !important;
+  border: 1px solid #e5e6eb !important;
+  border-radius: 4px !important;
+  background: #f7f8fa !important;
+  font-size: 12px !important;
+  color: #1d2129 !important;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.rte-custom-color-ok:hover {
+  background: #eef0f3 !important;
 }
 .rte-color-icon {
   text-decoration: underline;
   text-decoration-thickness: 2px;
   text-underline-offset: 2px;
+  text-decoration-color: #1d2129;
+}
+.rte-more-caret {
+  margin-left: auto;
+  color: #c0c4cc;
+  font-size: 11px;
+}
+.rte-more-wrap {
+  position: relative;
+}
+.rte-more-menu.has-flyout {
+  overflow: visible;
+  max-height: none;
+}
+.rte-more-flyout {
+  position: relative;
+  left: 0;
+  right: auto;
+  top: auto;
+  margin: 4px 0 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  z-index: 40;
+}
+.rte-root.expanded .rte-color-menu {
+  /* 颜色面板较宽：优先左对齐；若贴右可由工具条 overflow:visible + bridge 兜底 */
+  left: 0;
+  right: auto;
+}
+.rte-root.expanded .rte-color-menu::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -8px;
+  height: 8px;
 }
 .rte-bubble {
   display: flex;
@@ -4258,32 +4876,49 @@ defineExpose({ focusEditor, editor, onDraftBackup })
   background: #e5e6eb;
   flex-shrink: 0;
 }
-.rte-ep-icon {
+:deep(.rte-ep-icon) {
   width: 16px;
   height: 16px;
   color: #4e5969;
   flex-shrink: 0;
 }
-.rte-tool.active .rte-ep-icon,
-.rte-tool:hover .rte-ep-icon {
+.rte-tool.active :deep(.rte-ep-icon),
+.rte-tool:hover :deep(.rte-ep-icon) {
   color: #1d2129;
 }
 .rte-tool-icon {
   gap: 1px;
 }
 .rte-caret {
-  font-size: 9px;
-  color: #86909c;
-  line-height: 1;
+  display: inline-block;
+  width: 8px;
+  height: 8px;
   margin-left: 1px;
+  position: relative;
+  flex-shrink: 0;
+  color: #86909c;
+  font-size: 0;
+  line-height: 0;
+  vertical-align: middle;
+}
+.rte-caret::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-left: 3px solid transparent;
+  border-right: 3px solid transparent;
+  border-top: 4px solid currentColor;
+  transform: translate(-50%, -40%);
 }
 
 /*
- * 最大化（expanded）工具栏：对齐知乎专栏写作页
- * 大图标在上 + 短中文标题在下；分组用竖线分隔；扁平浅色横条。
+ * 最大化（expanded）工具栏：对齐知乎专栏写作页（live zhuanlan.zhihu.com/write）
  * 仅 .rte-root.expanded 生效；非最大化保持紧凑小按钮。
  */
-/* 最大化：去掉嵌套边框，铺满面板最大化卡片（知乎专栏写作页一体感） */
+/* 最大化：去掉嵌套边框，铺满面板最大化卡片 */
 .rte-root.expanded {
   border: none;
   border-radius: 0;
@@ -4293,16 +4928,16 @@ defineExpose({ focusEditor, editor, onDraftBackup })
 .rte-root.expanded .rte-toolbar {
   display: flex;
   flex-wrap: wrap;
-  align-items: stretch;
-  align-content: flex-start;
+  align-items: center;
+  align-content: center;
   gap: 0;
-  row-gap: 4px;
-  padding: 10px 16px 12px;
-  border-bottom: 1px solid #ebebeb;
-  background: #fafafa;
-  box-shadow: none;
-  /* 必须 visible：absolute 下拉（导入/标题/列表/颜色/对齐）否则被 overflow-y:hidden 裁切 */
-  /* 窄视口靠 flex-wrap 换行，不再横向滚动（滚动容器无法同时 overflow-y:visible） */
+  row-gap: 6px;
+  min-height: 64px;
+  padding: 10px 0 10px 20px;
+  border-bottom: none;
+  /* 知乎：底部 0.5px 发丝线，而非粗 border */
+  box-shadow: inset 0 -0.5px 0 rgba(235, 235, 235);
+  background: #fff;
   overflow: visible;
   position: relative;
   z-index: 5;
@@ -4311,55 +4946,115 @@ defineExpose({ focusEditor, editor, onDraftBackup })
 .rte-root.expanded .rte-tool-wrap {
   display: inline-flex;
   flex: 0 0 auto;
+  margin-right: 20px;
+  position: relative;
 }
 
+/* 组内工具间距 20px；下拉类约 45px 宽，双字约 32px，四字约 52px */
 .rte-root.expanded .rte-tool {
   display: inline-flex;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-start;
-  gap: 5px;
-  min-width: 56px;
-  width: 56px;
-  max-width: 72px;
-  height: auto;
-  min-height: 56px;
-  padding: 8px 6px 6px;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: #646464;
-  line-height: 1.15;
-  transition: background 0.12s ease, color 0.12s ease;
+  justify-content: center;
+  gap: 0;
   box-sizing: border-box;
+  height: 44px;
+  min-height: 44px;
+  min-width: 32px;
+  width: auto;
+  max-width: none;
+  padding: 2px 4px;
+  margin-right: 20px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #373a40;
+  line-height: 1.2;
+  transition: background 0.12s ease, color 0.12s ease;
 }
 
+/* wrap 已承担间距，避免双重 margin */
+.rte-root.expanded .rte-tool-wrap > .rte-tool {
+  margin-right: 0;
+  min-width: 45px; /* 标题/列表/表格/导入等下拉 */
+}
+
+/* 带下拉三角的工具（含附件）≈45px */
+.rte-root.expanded .rte-tool:has(.rte-caret) {
+  min-width: 45px;
+}
+
+/* 附件等：图标右下角下拉下标（对齐知乎） */
+.rte-tool-icon {
+  position: relative;
+}
+.rte-caret-on-icon {
+  position: absolute !important;
+  right: -2px;
+  bottom: -1px;
+  width: 8px !important;
+  height: 8px !important;
+  margin: 0 !important;
+  color: #86909c;
+  pointer-events: none;
+}
+.rte-root.expanded .rte-caret-on-icon {
+  right: -4px;
+  bottom: -2px;
+  width: 10px !important;
+  height: 10px !important;
+  color: inherit;
+}
+.rte-root.expanded .rte-caret-on-icon::before {
+  border-left-width: 3px;
+  border-right-width: 3px;
+  border-top-width: 4px;
+}
+/* 非最大化勿裁切带 caret 的 label */
+.rte-root:not(.expanded) .rte-tool:has(.rte-caret) .rte-tool-label {
+  overflow: visible;
+  text-overflow: clip;
+  max-width: none;
+}
+
+
 .rte-root.expanded .rte-tool:hover {
-  background: rgba(0, 0, 0, 0.04);
-  color: #121212;
+  background: rgba(0, 0, 0, 0.04); /* GBK10A 近似 */
+  color: #373a40;
   box-shadow: none;
 }
 
 .rte-root.expanded .rte-tool:active {
-  background: rgba(0, 0, 0, 0.06);
+  background: transparent;
   transform: none;
 }
 
+/* 知乎：激活仅改色为 #1772F6，底仍为白（无蓝色底） */
 .rte-root.expanded .rte-tool.active {
-  background: rgba(15, 111, 255, 0.08);
-  color: #0f6fff;
+  background: transparent;
+  color: #1772f6;
   box-shadow: none;
 }
 
+.rte-root.expanded .rte-tool:disabled,
+.rte-root.expanded .rte-tool.is-disabled {
+  color: #b2b3b6;
+  background: transparent;
+  cursor: default;
+  pointer-events: none;
+}
+
 .rte-root.expanded .rte-tool:focus-visible {
-  outline: 2px solid rgba(15, 111, 255, 0.35);
+  outline: 2px solid rgba(23, 114, 246, 0.35);
   outline-offset: 1px;
 }
 
+/* 图标槽 24×24；:deep 保证打到子组件根 SVG（scoped 下 class 落在组件 vnode 上） */
 .rte-root.expanded .rte-tool-icon {
-  width: 28px;
-  height: 28px;
-  min-height: 28px;
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  min-height: 24px;
   padding: 0;
   border: none;
   border-radius: 0;
@@ -4368,11 +5063,13 @@ defineExpose({ focusEditor, editor, onDraftBackup })
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 1px;
-  font-size: 0;
+  gap: 0;
+  /* 勿用 font-size:0 — 若 SVG 仍以 1em 计宽会被坍成 0；固定 24 与知乎槽位一致 */
+  font-size: 24px;
   line-height: 0;
   position: relative;
   flex-shrink: 0;
+  overflow: visible;
 }
 
 .rte-root.expanded .rte-tool:hover .rte-tool-icon,
@@ -4382,73 +5079,114 @@ defineExpose({ focusEditor, editor, onDraftBackup })
   box-shadow: none;
 }
 
-.rte-root.expanded .rte-ep-icon {
-  width: 24px;
-  height: 24px;
+.rte-root.expanded :deep(.rte-ep-icon),
+.rte-root.expanded :deep(.rte-tool-icon > svg),
+.rte-root.expanded :deep(svg.rte-ep-icon) {
+  width: 24px !important;
+  height: 24px !important;
+  min-width: 24px;
+  min-height: 24px;
   font-size: 24px;
   color: inherit;
+  display: block;
+  flex-shrink: 0;
+  overflow: visible;
+  box-sizing: content-box;
+}
+
+.rte-root.expanded :deep(.rte-ep-icon svg) {
+  width: 24px !important;
+  height: 24px !important;
+  stroke-width: 1.7;
+}
+
+.rte-root.expanded .rte-tool:hover :deep(.rte-ep-icon) {
+  color: #373a40;
+}
+
+.rte-root.expanded .rte-tool.active :deep(.rte-ep-icon) {
+  color: #1772f6;
+}
+
+.rte-root.expanded .rte-tool:disabled :deep(.rte-ep-icon),
+.rte-root.expanded .rte-tool.is-disabled :deep(.rte-ep-icon) {
+  color: #b2b3b6;
+}
+
+/* 知乎 caption：11px / #373A40；激活同为蓝 */
+.rte-root.expanded .rte-tool-label {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-}
-
-/* 自绘 stroke SVG 在大尺寸下略加粗，接近知乎线稿 */
-.rte-root.expanded .rte-ep-icon svg {
-  width: 24px;
-  height: 24px;
-  stroke-width: 1.85;
-}
-
-.rte-root.expanded .rte-tool:hover .rte-ep-icon {
-  color: #121212;
-}
-
-.rte-root.expanded .rte-tool.active .rte-ep-icon {
-  color: #0f6fff;
-}
-
-.rte-root.expanded .rte-tool-label {
-  font-size: 12px;
+  gap: 0;
+  font-size: 11px;
   font-weight: 400;
-  color: #8590a6;
+  color: #373a40;
   letter-spacing: 0;
-  line-height: 1.25;
+  line-height: 16px;
   white-space: nowrap;
   overflow: visible;
   text-overflow: clip;
   max-width: none;
   transform: none;
   text-align: center;
+  margin-top: 0;
 }
 
 .rte-root.expanded .rte-tool:hover .rte-tool-label {
-  color: #646464;
+  color: #373a40;
 }
 
 .rte-root.expanded .rte-tool.active .rte-tool-label {
-  color: #0f6fff;
-  font-weight: 500;
+  color: #1772f6;
+  font-weight: 400;
 }
 
+.rte-root.expanded .rte-tool:disabled .rte-tool-label,
+.rte-root.expanded .rte-tool.is-disabled .rte-tool-label {
+  color: #b2b3b6;
+}
+
+/* 下拉三角：贴在 label 右下，16×16 槽位 */
 .rte-root.expanded .rte-caret {
-  font-size: 9px;
-  margin-left: 1px;
-  margin-top: 0;
-  color: #8590a6;
-  position: static;
-  right: auto;
-  bottom: auto;
-  line-height: 1;
+  display: inline-block;
+  box-sizing: border-box;
+  width: 16px;
+  height: 16px;
+  margin: 0 0 0 -2px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 0;
+  line-height: 0;
+  position: relative;
+  flex-shrink: 0;
+  vertical-align: middle;
 }
 
+.rte-root.expanded .rte-caret::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid currentColor;
+  transform: translate(-50%, -35%);
+}
+
+/* 分组发丝竖线 1×20 #EBECED；线后 16px 再接下组 */
 .rte-root.expanded .rte-tool-divider {
   width: 1px;
+  height: 20px;
+  min-height: 20px;
   align-self: center;
   flex: 0 0 auto;
-  min-height: 40px;
-  height: 40px;
-  margin: 0 8px;
-  background: #e0e0e0;
+  margin: 0 16px 0 0;
+  background: #ebeced;
   border-radius: 0;
   pointer-events: none;
 }
@@ -4457,16 +5195,29 @@ defineExpose({ focusEditor, editor, onDraftBackup })
 .rte-root.expanded .rte-import-menu,
 .rte-root.expanded .rte-table-menu,
 .rte-root.expanded .rte-more-menu {
+  /* 视觉上离按钮 6px，但用伪元素填满空隙，避免 @mouseleave 在移入菜单时误关 */
   top: calc(100% + 6px);
   border-radius: 8px;
   box-shadow: 0 8px 24px rgba(18, 18, 18, 0.12);
   border: 1px solid #ebebeb;
-  /* 盖过编辑区；仍在 .pm-overlay(z=4000) 内，无需抬到 body */
   z-index: 50;
 }
 
-/* 导入在工具条末尾：右对齐弹出，避免被 .rte-root{overflow:hidden} 右侧裁切 */
-.rte-root.expanded .rte-import-menu {
+.rte-root.expanded .rte-menu::before,
+.rte-root.expanded .rte-import-menu::before,
+.rte-root.expanded .rte-table-menu::before,
+.rte-root.expanded .rte-more-menu::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -8px;
+  height: 8px;
+}
+
+/* 导入 / 表格偏右：右对齐弹出，避免被 .rte-root{overflow:hidden} 右侧裁切 */
+.rte-root.expanded .rte-import-menu,
+.rte-root.expanded .rte-table-menu {
   left: auto;
   right: 0;
 }
@@ -4523,13 +5274,17 @@ defineExpose({ focusEditor, editor, onDraftBackup })
   max-width: 100%;
 }
 
-.rte-root:not(.expanded) .rte-ep-icon {
+.rte-root:not(.expanded) :deep(.rte-ep-icon),
+.rte-root:not(.expanded) :deep(.rte-tool-icon > svg) {
   width: 15px;
   height: 15px;
+  min-width: 15px;
+  min-height: 15px;
   font-size: 15px;
+  display: block;
 }
 
-.rte-root:not(.expanded) .rte-ep-icon svg {
+.rte-root:not(.expanded) :deep(.rte-ep-icon svg) {
   width: 15px;
   height: 15px;
 }

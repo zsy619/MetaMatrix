@@ -1,0 +1,56 @@
+{
+  "id": "canvas_pm_solution_triangle",
+  "type": "pm_solution_triangle",
+  "schemaVersion": 1,
+  "theme": {
+    "background": {
+      "pattern": "none",
+      "color": "#ffffff"
+    }
+  },
+  "axes": {
+    "roi": { "id": "roi", "title": "投入产出比ROI" },
+    "opportunity_cost": { "id": "opportunity_cost", "title": "机会成本" },
+    "opportunity_window": { "id": "opportunity_window", "title": "机会窗口" }
+  },
+  "scores": {
+    "roi": 70,
+    "opportunity_cost": 90,
+    "opportunity_window": 50
+  },
+  "blocks": [
+    {
+      "id": "roi",
+      "title": "投入产出比ROI",
+      "items": [
+        {
+          "id": "item_pmst_roi_1",
+          "text": "",
+          "style": { "color": "#3c4043", "fontSize": 14, "fontWeight": "500" }
+        }
+      ]
+    },
+    {
+      "id": "opportunity_cost",
+      "title": "机会成本",
+      "items": [
+        {
+          "id": "item_pmst_cost_1",
+          "text": "",
+          "style": { "color": "#3c4043", "fontSize": 14, "fontWeight": "500" }
+        }
+      ]
+    },
+    {
+      "id": "opportunity_window",
+      "title": "机会窗口",
+      "items": [
+        {
+          "id": "item_pmst_window_1",
+          "text": "",
+          "style": { "color": "#3c4043", "fontSize": 14, "fontWeight": "500" }
+        }
+      ]
+    }
+  ]
+}

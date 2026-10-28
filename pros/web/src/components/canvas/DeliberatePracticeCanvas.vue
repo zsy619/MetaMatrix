@@ -1,15 +1,40 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+} from 'vue'
 import type {
   DeliberatePracticeBlock,
   DeliberatePracticeBlockId,
   DeliberatePracticeDocumentJSON,
 } from '../../types/canvas'
+import { useDocumentStore } from '../../stores/document'
+import {
+  panelMaximizeKey,
+  usePanelMaximize,
+} from '../../composables/usePanelMaximize'
 import YModelBlockCard from './YModelBlock.vue'
 
 const props = defineProps<{
   doc: DeliberatePracticeDocumentJSON
 }>()
+
+const documentStore = useDocumentStore()
+
+/** Sync before first render so hidden YModelBlock hosts have real ids (v-if). */
+documentStore.ensureDeliberatePracticeBlocks()
+
+const BLOCK_ORDER: DeliberatePracticeBlockId[] = [
+  'premise',
+  'node_a',
+  'node_b',
+  'node_c',
+  'node_d',
+]
 
 const byId = computed(() => {
   const map = new Map<DeliberatePracticeBlockId, DeliberatePracticeBlock>()
@@ -23,6 +48,13 @@ function block(id: DeliberatePracticeBlockId): DeliberatePracticeBlock | undefin
   return byId.value.get(id)
 }
 
+const hostBlocks = computed(() =>
+  BLOCK_ORDER.map((id) => ({
+    id,
+    block: block(id),
+  })),
+)
+
 const bgColor = computed(
   () => props.doc.theme.background.color || '#f3f4f6',
 )
@@ -31,21 +63,72 @@ const colorA = computed(() => props.doc.nodes.a.color)
 const colorB = computed(() => props.doc.nodes.b.color)
 const colorC = computed(() => props.doc.nodes.c.color)
 const colorD = computed(() => props.doc.nodes.d.color)
+
+/* ---- 节点 / 前提点击 → 全局 panel-maximize 全屏富文本 ---- */
+const activeEditorId = ref<DeliberatePracticeBlockId | null>(null)
+
+const activeMaximizeKey = computed(() => {
+  const id = activeEditorId.value
+  if (!id) return 'dp:idle'
+  const b = block(id)
+  return b ? panelMaximizeKey('block', b.id) : 'dp:idle'
+})
+
+const { maximizedPanelKey } = usePanelMaximize(activeMaximizeKey)
+
+function openEditor(id: DeliberatePracticeBlockId) {
+  documentStore.ensureDeliberatePracticeBlocks()
+  const b = block(id)
+  if (!b) return
+  activeEditorId.value = id
+  const key = panelMaximizeKey('block', b.id)
+  nextTick(() => {
+    maximizedPanelKey.value = key
+  })
+}
+
+function onNodeActivate(id: DeliberatePracticeBlockId, event: Event) {
+  event.preventDefault()
+  event.stopPropagation()
+  openEditor(id)
+}
+
+watch(maximizedPanelKey, (key) => {
+  if (!key && activeEditorId.value) {
+    activeEditorId.value = null
+  }
+})
+
+onMounted(() => {
+  documentStore.ensureDeliberatePracticeBlocks()
+})
+
+onBeforeUnmount(() => {
+  if (
+    activeEditorId.value &&
+    maximizedPanelKey.value === activeMaximizeKey.value
+  ) {
+    maximizedPanelKey.value = null
+  }
+})
 </script>
 
 <template>
-  <div class="dp-canvas" :style="{ backgroundColor: bgColor }">
-    <!-- 顶部前提区：标题 | 橙条+三点 | 刻意标签 -->
+  <div class="dp-canvas" :style="{ backgroundColor: bgColor }" aria-label="刻意练习画布">
+    <!-- 顶部前提区：标题 + 刻意标签（无内联编辑器） -->
     <header class="dp-premise">
-      <div class="premise-row">
+      <div
+        class="premise-row premise-row--clickable"
+        role="button"
+        tabindex="0"
+        :aria-label="`最大化编辑${doc.labels.premiseTitle}`"
+        @click="onNodeActivate('premise', $event)"
+        @keydown.enter.prevent="openEditor('premise')"
+        @keydown.space.prevent="openEditor('premise')"
+      >
         <h2 class="premise-title">{{ doc.labels.premiseTitle }}</h2>
-        <div class="premise-list" :style="{ borderColor: '#F99D1C' }">
-          <YModelBlockCard
-            v-if="block('premise')"
-            :block="block('premise')!"
-            hide-title
-            compact
-          />
+        <div class="premise-chrome" :style="{ borderColor: '#F99D1C' }" aria-hidden="true">
+          <span class="premise-hint">点击编辑前提要点</span>
         </div>
         <div class="side-tag deliberate-tag">
           {{ doc.labels.deliberateIsPremise }}
@@ -69,13 +152,22 @@ const colorD = computed(() => props.doc.nodes.d.color)
     </div>
 
     <!--
-      Grid layout — panels OUTSIDE the SVG (no absolute overlays on triangle):
+      Grid layout — stage shows diagram + titles only:
         row1: A A A | tag
         row2: C mid B | tag
     -->
     <div class="dp-triangle-area">
-      <!-- A: top row spanning side+mid columns -->
-      <section class="dp-panel panel-a" :style="{ '--accent': colorA }">
+      <!-- A: top -->
+      <section
+        class="dp-panel panel-a dp-panel--clickable"
+        :style="{ '--accent': colorA }"
+        role="button"
+        tabindex="0"
+        :aria-label="`最大化编辑${doc.nodes.a.title}`"
+        @click="onNodeActivate('node_a', $event)"
+        @keydown.enter.prevent="openEditor('node_a')"
+        @keydown.space.prevent="openEditor('node_a')"
+      >
         <div class="panel-header">
           <div class="panel-badge" :style="{ background: colorA }">
             <svg viewBox="0 0 24 24" class="badge-icon" aria-hidden="true">
@@ -86,17 +178,19 @@ const colorD = computed(() => props.doc.nodes.d.color)
             {{ doc.nodes.a.title }}
           </h3>
         </div>
-        <div class="panel-body" :style="{ borderColor: colorA }">
-          <YModelBlockCard
-            v-if="block('node_a')"
-            :block="block('node_a')!"
-            hide-title
-          />
-        </div>
       </section>
 
-      <!-- C: left column -->
-      <section class="dp-panel panel-c" :style="{ '--accent': colorC }">
+      <!-- C: left -->
+      <section
+        class="dp-panel panel-c dp-panel--clickable"
+        :style="{ '--accent': colorC }"
+        role="button"
+        tabindex="0"
+        :aria-label="`最大化编辑${doc.nodes.c.title}`"
+        @click="onNodeActivate('node_c', $event)"
+        @keydown.enter.prevent="openEditor('node_c')"
+        @keydown.space.prevent="openEditor('node_c')"
+      >
         <div class="panel-header">
           <div class="panel-badge" :style="{ background: colorC }">
             <svg viewBox="0 0 24 24" class="badge-icon" aria-hidden="true">
@@ -107,16 +201,9 @@ const colorD = computed(() => props.doc.nodes.d.color)
             {{ doc.nodes.c.title }}
           </h3>
         </div>
-        <div class="panel-body" :style="{ borderColor: colorC }">
-          <YModelBlockCard
-            v-if="block('node_c')"
-            :block="block('node_c')!"
-            hide-title
-          />
-        </div>
       </section>
 
-      <!-- Mid: clean SVG triangle + D only (no A/B/C text panels) -->
+      <!-- Mid: SVG triangle + D title/subtitle -->
       <div class="dp-mid">
         <svg
           class="dp-cycle-svg"
@@ -164,11 +251,9 @@ const colorD = computed(() => props.doc.nodes.d.color)
             stroke-width="3.5"
             marker-end="url(#dpArrow)"
           />
-          <!-- Decorative vertex pins only (no panels) -->
           <circle cx="320" cy="56" r="14" :fill="colorA" stroke="#fff" stroke-width="3" />
           <circle cx="548" cy="430" r="14" :fill="colorB" stroke="#fff" stroke-width="3" />
           <circle cx="92" cy="430" r="14" :fill="colorC" stroke="#fff" stroke-width="3" />
-          <!-- D dashed ring — only ring -->
           <circle
             cx="320"
             cy="285"
@@ -181,27 +266,35 @@ const colorD = computed(() => props.doc.nodes.d.color)
           />
         </svg>
 
-        <!-- D: centered in dashed circle; one compact editor, no CSS dashed ring -->
-        <div class="dp-d">
+        <div
+          class="dp-d dp-d--clickable"
+          role="button"
+          tabindex="0"
+          :aria-label="`最大化编辑${doc.nodes.d.title}`"
+          @click="onNodeActivate('node_d', $event)"
+          @keydown.enter.prevent="openEditor('node_d')"
+          @keydown.space.prevent="openEditor('node_d')"
+        >
           <h3 class="d-title" :style="{ color: colorD }">
             {{ doc.nodes.d.title }}
           </h3>
           <p class="d-subtitle" :style="{ color: colorD }">
             {{ doc.nodes.d.subtitle }}
           </p>
-          <div class="d-editor">
-            <YModelBlockCard
-              v-if="block('node_d')"
-              :block="block('node_d')!"
-              hide-title
-              compact
-            />
-          </div>
         </div>
       </div>
 
-      <!-- B: right column -->
-      <section class="dp-panel panel-b" :style="{ '--accent': colorB }">
+      <!-- B: right -->
+      <section
+        class="dp-panel panel-b dp-panel--clickable"
+        :style="{ '--accent': colorB }"
+        role="button"
+        tabindex="0"
+        :aria-label="`最大化编辑${doc.nodes.b.title}`"
+        @click="onNodeActivate('node_b', $event)"
+        @keydown.enter.prevent="openEditor('node_b')"
+        @keydown.space.prevent="openEditor('node_b')"
+      >
         <div class="panel-header">
           <div class="panel-badge" :style="{ background: colorB }">
             <svg viewBox="0 0 24 24" class="badge-icon" aria-hidden="true">
@@ -212,18 +305,26 @@ const colorD = computed(() => props.doc.nodes.d.color)
             {{ doc.nodes.b.title }}
           </h3>
         </div>
-        <div class="panel-body" :style="{ borderColor: colorB }">
-          <YModelBlockCard
-            v-if="block('node_b')"
-            :block="block('node_b')!"
-            hide-title
-          />
-        </div>
       </section>
 
       <div class="side-tag practice-tag">
         {{ doc.labels.practiceHasMethod }}
       </div>
+    </div>
+
+    <!--
+      隐藏挂载五块 YModelBlock：点击节点/前提时写入全局 maximizedPanelKey，
+      由块内 Teleport .pm-overlay 铺满文档视口（panel-maximize 规则）。
+      必须用 v-if（非 v-show），避免空 id 挂载崩溃。
+    -->
+    <div class="dp-block-host" aria-hidden="true">
+      <template v-for="item in hostBlocks" :key="item.id">
+        <YModelBlockCard
+          v-if="item.block"
+          :block="item.block"
+          hide-title
+        />
+      </template>
     </div>
   </div>
 </template>
@@ -240,6 +341,8 @@ const colorD = computed(() => props.doc.nodes.d.color)
   flex-direction: column;
   gap: 2px;
   min-height: 0;
+  font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui,
+    sans-serif;
 }
 
 .dp-premise {
@@ -254,6 +357,28 @@ const colorD = computed(() => props.doc.nodes.d.color)
   align-items: stretch;
 }
 
+.premise-row--clickable {
+  cursor: pointer;
+  outline: none;
+  border-radius: 10px;
+  padding: 4px 6px;
+  margin: -4px -6px;
+  transition: background 0.15s ease;
+}
+
+.premise-row--clickable:hover {
+  background: rgba(249, 157, 28, 0.08);
+}
+
+.premise-row--clickable:focus-visible {
+  box-shadow: 0 0 0 2px rgba(249, 157, 28, 0.35);
+}
+
+.premise-row--clickable:hover .premise-title {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
 .premise-title {
   margin: 0;
   font-size: clamp(20px, 2.6vw, 28px);
@@ -265,22 +390,23 @@ const colorD = computed(() => props.doc.nodes.d.color)
   align-self: center;
 }
 
-.premise-list {
+.premise-chrome {
   min-width: 0;
-  min-height: 88px;
+  min-height: 52px;
   height: 100%;
   border-left: 3px solid #f99d1c;
-  padding-left: 10px;
+  padding-left: 12px;
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  border-radius: 0 8px 8px 0;
+  background: rgba(255, 255, 255, 0.45);
 }
 
-.premise-list :deep(.ym-block) {
-  border-style: dashed;
-  background: rgba(255, 255, 255, 0.55);
-  min-height: 80px;
-  height: 100%;
-  flex: 1;
+.premise-hint {
+  font-size: 13px;
+  font-weight: 600;
+  color: #80868b;
+  letter-spacing: 0.02em;
 }
 
 .side-tag {
@@ -295,6 +421,7 @@ const colorD = computed(() => props.doc.nodes.d.color)
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
   line-height: 1.3;
   align-self: center;
+  pointer-events: none;
 }
 
 .deliberate-tag {
@@ -337,13 +464,12 @@ const colorD = computed(() => props.doc.nodes.d.color)
   color: #80868b;
 }
 
-/* ===== Triangle area: CSS grid — panels never overlay SVG ===== */
 .dp-triangle-area {
   flex: 1;
   min-height: 0;
   width: 100%;
   display: grid;
-  grid-template-columns: minmax(200px, 1.05fr) minmax(280px, 1.4fr) minmax(200px, 1.05fr) auto;
+  grid-template-columns: minmax(160px, 1fr) minmax(280px, 1.5fr) minmax(160px, 1fr) auto;
   grid-template-rows: auto 1fr;
   grid-template-areas:
     'a a a tag'
@@ -355,17 +481,16 @@ const colorD = computed(() => props.doc.nodes.d.color)
 
 .panel-a {
   grid-area: a;
-  min-height: 120px;
 }
 
 .panel-c {
   grid-area: c;
-  min-height: 0;
+  align-self: start;
 }
 
 .panel-b {
   grid-area: b;
-  min-height: 0;
+  align-self: start;
 }
 
 .dp-mid {
@@ -384,15 +509,34 @@ const colorD = computed(() => props.doc.nodes.d.color)
   writing-mode: horizontal-tb;
 }
 
-/* Side / top editable panels */
 .dp-panel {
   display: flex;
   flex-direction: column;
   gap: 6px;
   min-width: 0;
-  min-height: 0;
-  height: 100%;
   box-sizing: border-box;
+}
+
+.dp-panel--clickable {
+  cursor: pointer;
+  outline: none;
+  border-radius: 12px;
+  padding: 8px 10px;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.dp-panel--clickable:hover {
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+.dp-panel--clickable:focus-visible {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.dp-panel--clickable:hover .panel-title {
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .panel-header {
@@ -428,38 +572,6 @@ const colorD = computed(() => props.doc.nodes.d.color)
   line-height: 1.2;
 }
 
-.panel-body {
-  border-left: 3px solid;
-  padding-left: 8px;
-  min-width: 0;
-  min-height: 0;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-
-.panel-body :deep(.ym-block),
-.premise-list :deep(.ym-block) {
-  height: 100%;
-  flex: 1;
-  background: rgba(255, 255, 255, 0.78);
-}
-
-.panel-a .panel-body :deep(.ym-block) {
-  min-height: 88px;
-}
-
-.panel-c .panel-body :deep(.ym-block),
-.panel-b .panel-body :deep(.ym-block) {
-  min-height: 160px;
-}
-
-.premise-list :deep(.ym-block) {
-  min-height: 80px;
-  background: rgba(255, 255, 255, 0.55);
-}
-
-/* Mid SVG — decorative only */
 .dp-cycle-svg {
   position: absolute;
   inset: 0;
@@ -469,7 +581,6 @@ const colorD = computed(() => props.doc.nodes.d.color)
   z-index: 0;
 }
 
-/* D sits in center of mid; sized to fit inside dashed circle */
 .dp-d {
   position: relative;
   z-index: 1;
@@ -479,10 +590,32 @@ const colorD = computed(() => props.doc.nodes.d.color)
   flex-direction: column;
   align-items: center;
   text-align: center;
-  gap: 2px;
-  /* Keep away from triangle base / side panels */
+  gap: 4px;
   margin-top: -4%;
   pointer-events: auto;
+  padding: 16px 12px;
+  border-radius: 16px;
+  box-sizing: border-box;
+}
+
+.dp-d--clickable {
+  cursor: pointer;
+  outline: none;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.dp-d--clickable:hover {
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 0 0 2px rgba(0, 166, 133, 0.28);
+}
+
+.dp-d--clickable:focus-visible {
+  box-shadow: 0 0 0 2px rgba(0, 166, 133, 0.45);
+}
+
+.dp-d--clickable:hover .d-title {
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .d-title {
@@ -502,25 +635,17 @@ const colorD = computed(() => props.doc.nodes.d.color)
   line-height: 1.25;
 }
 
-.d-editor {
-  width: 100%;
-  margin-top: 4px;
-  text-align: left;
-  display: flex;
-  flex-direction: column;
-  min-height: 72px;
-  max-height: 100px;
-}
-
-/* One editor only — no second dashed ring in CSS */
-.d-editor :deep(.ym-block) {
-  min-height: 72px;
-  max-height: 100px;
-  height: 100%;
-  flex: 1;
-  background: rgba(255, 255, 255, 0.88);
-  border-style: solid;
-  border-color: rgba(0, 166, 133, 0.25);
+.dp-block-host {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+  padding: 0;
+  margin: -1px;
 }
 
 @media (max-width: 900px) {
@@ -552,11 +677,6 @@ const colorD = computed(() => props.doc.nodes.d.color)
 
   .dp-mid {
     min-height: 280px;
-  }
-
-  .panel-c .panel-body :deep(.ym-block),
-  .panel-b .panel-body :deep(.ym-block) {
-    min-height: 120px;
   }
 
   .practice-tag {

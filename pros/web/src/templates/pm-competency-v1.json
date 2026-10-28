@@ -1,0 +1,82 @@
+{
+  "id": "canvas_pm_competency",
+  "type": "pm_competency",
+  "schemaVersion": 1,
+  "theme": {
+    "background": {
+      "pattern": "none",
+      "color": "#ffffff"
+    }
+  },
+  "axes": {
+    "awareness": { "id": "awareness", "title": "项目管理意识" },
+    "review": { "id": "review", "title": "基本功4：做复盘" },
+    "execution": { "id": "execution", "title": "基本功3：管执行" },
+    "plan": { "id": "plan", "title": "基本功2：拆计划" },
+    "proposal": { "id": "proposal", "title": "基本功1：定方案" }
+  },
+  "scores": {
+    "awareness": 100,
+    "review": 75,
+    "execution": 25,
+    "plan": 75,
+    "proposal": 100
+  },
+  "blocks": [
+    {
+      "id": "awareness",
+      "title": "项目管理意识",
+      "items": [
+        {
+          "id": "item_pmc_awareness_1",
+          "text": "",
+          "style": { "color": "#3c4043", "fontSize": 14, "fontWeight": "500" }
+        }
+      ]
+    },
+    {
+      "id": "review",
+      "title": "基本功4：做复盘",
+      "items": [
+        {
+          "id": "item_pmc_review_1",
+          "text": "",
+          "style": { "color": "#3c4043", "fontSize": 14, "fontWeight": "500" }
+        }
+      ]
+    },
+    {
+      "id": "execution",
+      "title": "基本功3：管执行",
+      "items": [
+        {
+          "id": "item_pmc_execution_1",
+          "text": "",
+          "style": { "color": "#3c4043", "fontSize": 14, "fontWeight": "500" }
+        }
+      ]
+    },
+    {
+      "id": "plan",
+      "title": "基本功2：拆计划",
+      "items": [
+        {
+          "id": "item_pmc_plan_1",
+          "text": "",
+          "style": { "color": "#3c4043", "fontSize": 14, "fontWeight": "500" }
+        }
+      ]
+    },
+    {
+      "id": "proposal",
+      "title": "基本功1：定方案",
+      "items": [
+        {
+          "id": "item_pmc_proposal_1",
+          "text": "",
+          "style": { "color": "#3c4043", "fontSize": 14, "fontWeight": "500" }
+        }
+      ]
+    }
+  ]
+}

@@ -240,13 +240,13 @@ function onRemoveRow(rowId: string) {
 .kr-row {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr)) 36px;
-  min-height: 110px;
+  min-height: 400px;
   border-bottom: 1px solid #dadce0;
 }
 
 .kr-cell {
   min-width: 0;
-  min-height: 0;
+  min-height: 400px;
   padding: 8px;
   box-sizing: border-box;
   border-right: 1px solid #dadce0;
@@ -256,7 +256,7 @@ function onRemoveRow(rowId: string) {
 
 .kr-cell :deep(.ym-block) {
   flex: 1;
-  min-height: 80px;
+  min-height: 0;
   background: rgba(248, 249, 250, 0.55);
 }
 
@@ -365,9 +365,14 @@ function onRemoveRow(rowId: string) {
     display: none;
   }
 
+  .kr-row {
+    min-height: 0;
+  }
+
   .kr-cell {
     border-right: none;
     border-bottom: 1px solid #eee;
+    min-height: 400px;
   }
 }
 </style>

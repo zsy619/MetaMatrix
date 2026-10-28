@@ -9,6 +9,7 @@ import {
   isDualTriangleDoc,
   isAiTradeoffDoc,
   isFiveStepDoc,
+  isFiveStepDivisionDoc,
   isIndustryAnalysisDoc,
   isIndustryForecastDoc,
   isKeyResistanceDoc,
@@ -21,6 +22,15 @@ import {
   isIncidentReviewDoc,
   isAnnualSummaryDoc,
   isDeepReviewDoc,
+  isPmRetroValueDoc,
+  isTimeMatrixDoc,
+  isWorkStateZonesDoc,
+  isOnlineOfflineCommDoc,
+  isPmSensitivity6dDoc,
+  isPmCompetencyDoc,
+  isPmSolutionTriangleDoc,
+  isGrowthAssumptionsDoc,
+  isBusinessFormulaDoc,
   isYModelDoc,
 } from '../../types/canvas'
 import BackgroundLayer from './BackgroundLayer.vue'
@@ -32,6 +42,7 @@ import YModelCanvas from './YModelCanvas.vue'
 import DeliberatePracticeCanvas from './DeliberatePracticeCanvas.vue'
 import DemandTriangleCanvas from './DemandTriangleCanvas.vue'
 import FiveStepCanvas from './FiveStepCanvas.vue'
+import FiveStepDivisionCanvas from './FiveStepDivisionCanvas.vue'
 import AiTradeoffCanvas from './AiTradeoffCanvas.vue'
 import ProductContentCanvas from './ProductContentCanvas.vue'
 import OscarCanvas from './OscarCanvas.vue'
@@ -44,6 +55,15 @@ import IpoCanvas from './IpoCanvas.vue'
 import IncidentReviewCanvas from './IncidentReviewCanvas.vue'
 import AnnualSummaryCanvas from './AnnualSummaryCanvas.vue'
 import DeepReviewCanvas from './DeepReviewCanvas.vue'
+import PmRetroValueCanvas from './PmRetroValueCanvas.vue'
+import TimeMatrixCanvas from './TimeMatrixCanvas.vue'
+import WorkStateZonesCanvas from './WorkStateZonesCanvas.vue'
+import OnlineOfflineCommCanvas from './OnlineOfflineCommCanvas.vue'
+import PmSensitivity6dCanvas from './PmSensitivity6dCanvas.vue'
+import PmCompetencyCanvas from './PmCompetencyCanvas.vue'
+import PmSolutionTriangleCanvas from './PmSolutionTriangleCanvas.vue'
+import GrowthAssumptionsCanvas from './GrowthAssumptionsCanvas.vue'
+import BusinessFormulaCanvas from './BusinessFormulaCanvas.vue'
 
 const documentStore = useDocumentStore()
 const ui = useUiStore()
@@ -64,6 +84,9 @@ const demandDoc = computed(() =>
 )
 const fiveStepDoc = computed(() =>
   isFiveStepDoc(current_data.value) ? current_data.value : null,
+)
+const fiveStepDivisionDoc = computed(() =>
+  isFiveStepDivisionDoc(current_data.value) ? current_data.value : null,
 )
 const aiTradeoffDoc = computed(() =>
   isAiTradeoffDoc(current_data.value) ? current_data.value : null,
@@ -101,6 +124,33 @@ const annualSummaryDoc = computed(() =>
 const deepReviewDoc = computed(() =>
   isDeepReviewDoc(current_data.value) ? current_data.value : null,
 )
+const pmRetroValueDoc = computed(() =>
+  isPmRetroValueDoc(current_data.value) ? current_data.value : null,
+)
+const timeMatrixDoc = computed(() =>
+  isTimeMatrixDoc(current_data.value) ? current_data.value : null,
+)
+const workStateZonesDoc = computed(() =>
+  isWorkStateZonesDoc(current_data.value) ? current_data.value : null,
+)
+const onlineOfflineCommDoc = computed(() =>
+  isOnlineOfflineCommDoc(current_data.value) ? current_data.value : null,
+)
+const pmSensitivity6dDoc = computed(() =>
+  isPmSensitivity6dDoc(current_data.value) ? current_data.value : null,
+)
+const pmCompetencyDoc = computed(() =>
+  isPmCompetencyDoc(current_data.value) ? current_data.value : null,
+)
+const pmSolutionTriangleDoc = computed(() =>
+  isPmSolutionTriangleDoc(current_data.value) ? current_data.value : null,
+)
+const growthAssumptionsDoc = computed(() =>
+  isGrowthAssumptionsDoc(current_data.value) ? current_data.value : null,
+)
+const businessFormulaDoc = computed(() =>
+  isBusinessFormulaDoc(current_data.value) ? current_data.value : null,
+)
 const quadrantDoc = computed(() =>
   isQuadrantDoc(current_data.value) ? current_data.value : null,
 )
@@ -129,6 +179,9 @@ const quadrantDoc = computed(() =>
         </template>
         <template v-else-if="fiveStepDoc">
           <FiveStepCanvas :doc="fiveStepDoc" />
+        </template>
+        <template v-else-if="fiveStepDivisionDoc">
+          <FiveStepDivisionCanvas :doc="fiveStepDivisionDoc" />
         </template>
         <template v-else-if="aiTradeoffDoc">
           <AiTradeoffCanvas :doc="aiTradeoffDoc" />
@@ -165,6 +218,33 @@ const quadrantDoc = computed(() =>
         </template>
         <template v-else-if="deepReviewDoc">
           <DeepReviewCanvas :doc="deepReviewDoc" />
+        </template>
+        <template v-else-if="pmRetroValueDoc">
+          <PmRetroValueCanvas :doc="pmRetroValueDoc" />
+        </template>
+        <template v-else-if="timeMatrixDoc">
+          <TimeMatrixCanvas :doc="timeMatrixDoc" />
+        </template>
+        <template v-else-if="workStateZonesDoc">
+          <WorkStateZonesCanvas :doc="workStateZonesDoc" />
+        </template>
+        <template v-else-if="onlineOfflineCommDoc">
+          <OnlineOfflineCommCanvas :doc="onlineOfflineCommDoc" />
+        </template>
+        <template v-else-if="pmSensitivity6dDoc">
+          <PmSensitivity6dCanvas :doc="pmSensitivity6dDoc" />
+        </template>
+        <template v-else-if="pmCompetencyDoc">
+          <PmCompetencyCanvas :doc="pmCompetencyDoc" />
+        </template>
+        <template v-else-if="pmSolutionTriangleDoc">
+          <PmSolutionTriangleCanvas :doc="pmSolutionTriangleDoc" />
+        </template>
+        <template v-else-if="growthAssumptionsDoc">
+          <GrowthAssumptionsCanvas :doc="growthAssumptionsDoc" />
+        </template>
+        <template v-else-if="businessFormulaDoc">
+          <BusinessFormulaCanvas :doc="businessFormulaDoc" />
         </template>
         <template v-else-if="quadrantDoc">
           <BackgroundLayer :background="quadrantDoc.theme.background" />

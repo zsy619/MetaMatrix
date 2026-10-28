@@ -1,0 +1,71 @@
+{
+  "id": "canvas_work_state_zones",
+  "type": "work_state_zones",
+  "schemaVersion": 1,
+  "theme": {
+    "background": {
+      "pattern": "none",
+      "color": "#ffffff"
+    }
+  },
+  "axes": {
+    "autonomyHigh": { "label": "自治", "sub": "短期/长期统一" },
+    "autonomyLow": { "label": "不自治", "sub": "没找到红点/追求" },
+    "comfort": { "label": "舒适区", "sub": "做会做事情" },
+    "nonComfort": { "label": "非舒适区", "sub": "挑战难题/修炼" }
+  },
+  "blocks": [
+    {
+      "id": "a",
+      "title": "幸福做事区",
+      "description": "持续享受成果",
+      "tone": "green",
+      "items": [
+        {
+          "id": "item_wsz_a_1",
+          "text": "",
+          "style": { "color": "#3c4043", "fontSize": 13, "fontWeight": "500" }
+        }
+      ]
+    },
+    {
+      "id": "b",
+      "title": "无限进步区",
+      "description": "持续挑战进步",
+      "tone": "yellow",
+      "items": [
+        {
+          "id": "item_wsz_b_1",
+          "text": "",
+          "style": { "color": "#3c4043", "fontSize": 13, "fontWeight": "500" }
+        }
+      ]
+    },
+    {
+      "id": "c",
+      "title": "低头做事区",
+      "description": "容易陷入工作",
+      "tone": "pink",
+      "items": [
+        {
+          "id": "item_wsz_c_1",
+          "text": "",
+          "style": { "color": "#3c4043", "fontSize": 13, "fontWeight": "500" }
+        }
+      ]
+    },
+    {
+      "id": "d",
+      "title": "自我怀疑区",
+      "description": "容易迷茫失控",
+      "tone": "grey",
+      "items": [
+        {
+          "id": "item_wsz_d_1",
+          "text": "",
+          "style": { "color": "#3c4043", "fontSize": 13, "fontWeight": "500" }
+        }
+      ]
+    }
+  ]
+}

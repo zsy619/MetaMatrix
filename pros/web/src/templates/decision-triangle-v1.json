@@ -1,0 +1,76 @@
+{
+  "id": "canvas_decision_triangle",
+  "type": "decision_triangle",
+  "schemaVersion": 1,
+  "theme": {
+    "background": {
+      "pattern": "none",
+      "color": "#f3f3f3"
+    }
+  },
+  "blocks": [
+    {
+      "id": "width",
+      "title": "宽度",
+      "tone": "yellow",
+      "hints": [
+        "关键收益项",
+        "关键成本项"
+      ],
+      "items": [
+        {
+          "id": "item_dt_w_1",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "height",
+      "title": "高度",
+      "tone": "orange",
+      "hints": [
+        "长期视角",
+        "公司视角",
+        "机会成本",
+        "时间窗口"
+      ],
+      "items": [
+        {
+          "id": "item_dt_h_1",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "depth",
+      "title": "深度",
+      "tone": "teal",
+      "hints": [
+        "优先级定性",
+        "部分定量",
+        "定量公式"
+      ],
+      "items": [
+        {
+          "id": "item_dt_d_1",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    }
+  ]
+}

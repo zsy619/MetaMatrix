@@ -14,6 +14,15 @@ const props = defineProps<{
 
 const documentStore = useDocumentStore()
 
+/** 附图：Step 标题（非可编辑 chrome） */
+const STEP_LABEL: Record<ScientificMeetingBlockId, string> = {
+  goal: 'Step1. 目标',
+  principles: 'Step2. 原则',
+  process: 'Step3. 关键流程',
+}
+
+const COLUMNS: ScientificMeetingBlockId[] = ['goal', 'principles', 'process']
+
 const byId = computed(() => {
   const map = new Map<ScientificMeetingBlockId, ScientificMeetingBlock>()
   for (const b of props.doc.blocks) {
@@ -27,7 +36,7 @@ function block(id: ScientificMeetingBlockId): ScientificMeetingBlock | undefined
 }
 
 const bgColor = computed(
-  () => props.doc.theme.background.color || '#fffde7',
+  () => props.doc.theme.background.color || '#f8f2d4',
 )
 
 function onMeetingType(event: Event) {
@@ -44,50 +53,25 @@ function onOrganizer(event: Event) {
 </script>
 
 <template>
-  <div class="scientific-meeting-canvas" :style="{ backgroundColor: bgColor }">
-    <div class="sm-grid" role="table" aria-label="科学开会思考画布">
-      <!-- Col 1 · 目标 -->
-      <section class="sm-col" v-show="block('goals')">
+  <div
+    class="scientific-meeting-canvas"
+    :style="{ backgroundColor: bgColor }"
+    aria-label="科学开会思考"
+  >
+    <div class="sm-grid" role="group">
+      <section
+        v-for="(id, idx) in COLUMNS"
+        :key="id"
+        class="sm-col"
+        :class="{ 'sm-col--last': idx === COLUMNS.length - 1 }"
+        v-show="block(id)"
+      >
         <header class="sm-col-head">
-          <h2 class="sm-step">Step 1. 目标</h2>
-          <p class="sm-prompt">{{ block('goals')!.prompt }}</p>
+          <h2 class="sm-step">{{ STEP_LABEL[id] }}</h2>
+          <p class="sm-prompt">{{ block(id)!.prompt }}</p>
         </header>
-        <div class="sm-main">
-          <YModelBlockCard :block="block('goals')!" hide-title />
-        </div>
-        <div class="sm-sub" v-show="block('no_meeting_problems')">
-          <h3 class="sm-sub-title">{{ block('no_meeting_problems')!.title }}</h3>
-          <div class="sm-sub-body">
-            <YModelBlockCard :block="block('no_meeting_problems')!" hide-title />
-          </div>
-        </div>
-      </section>
-
-      <!-- Col 2 · 原则 -->
-      <section class="sm-col" v-show="block('principles')">
-        <header class="sm-col-head">
-          <h2 class="sm-step">Step 2. 原则</h2>
-          <p class="sm-prompt">{{ block('principles')!.prompt }}</p>
-        </header>
-        <div class="sm-main sm-main--solo">
-          <YModelBlockCard :block="block('principles')!" hide-title />
-        </div>
-      </section>
-
-      <!-- Col 3 · 关键流程 -->
-      <section class="sm-col sm-col--last" v-show="block('process')">
-        <header class="sm-col-head">
-          <h2 class="sm-step">Step 3. 关键流程</h2>
-          <p class="sm-prompt">{{ block('process')!.prompt }}</p>
-        </header>
-        <div class="sm-main">
-          <YModelBlockCard :block="block('process')!" hide-title />
-        </div>
-        <div class="sm-sub" v-show="block('efficiency_means')">
-          <h3 class="sm-sub-title">{{ block('efficiency_means')!.title }}</h3>
-          <div class="sm-sub-body">
-            <YModelBlockCard :block="block('efficiency_means')!" hide-title />
-          </div>
+        <div class="sm-panel">
+          <YModelBlockCard :block="block(id)!" hide-title />
         </div>
       </section>
     </div>
@@ -99,9 +83,11 @@ function onOrganizer(event: Event) {
           type="text"
           class="sm-meta-input"
           :value="doc.meetingType"
-          placeholder="______"
+          placeholder="________"
           maxlength="48"
+          aria-label="会议类型"
           @input="onMeetingType"
+          @click.stop
         />
       </label>
       <label class="sm-meta">
@@ -110,9 +96,11 @@ function onOrganizer(event: Event) {
           type="text"
           class="sm-meta-input"
           :value="doc.organizer"
-          placeholder="______"
+          placeholder="________"
           maxlength="48"
+          aria-label="梳理人"
           @input="onOrganizer"
+          @click.stop
         />
       </label>
     </footer>
@@ -120,6 +108,7 @@ function onOrganizer(event: Event) {
 </template>
 
 <style scoped>
+/* 附图取样：背景 #f8f2d4，黑线/黑字，灰斜体副标题 */
 .scientific-meeting-canvas {
   position: absolute;
   inset: 0;
@@ -130,9 +119,9 @@ function onOrganizer(event: Event) {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  border: 2px solid #c9a227;
+  border: 1px solid #1a1a1a;
   border-radius: 2px;
-  background: #fffde7;
+  background: #f8f2d4;
 }
 
 .sm-grid {
@@ -148,11 +137,11 @@ function onOrganizer(event: Event) {
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  padding: 12px 12px 10px;
+  padding: 14px 14px 10px;
   box-sizing: border-box;
-  border-right: 2px solid #c9a227;
+  border-right: 1.5px solid #1a1a1a;
   gap: 8px;
-  background: #fffde7;
+  background: #f8f2d4;
 }
 
 .sm-col--last {
@@ -163,69 +152,48 @@ function onOrganizer(event: Event) {
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
 .sm-step {
   margin: 0;
-  font-size: clamp(15px, 1.5vw, 18px);
+  font-size: clamp(16px, 1.6vw, 20px);
   font-weight: 800;
-  color: #202124;
-  letter-spacing: 0.02em;
+  color: #1a1a1a;
+  letter-spacing: 0.01em;
   line-height: 1.3;
 }
 
 .sm-prompt {
   margin: 0;
-  font-size: clamp(11px, 1.1vw, 13px);
+  font-size: clamp(12px, 1.15vw, 14px);
   font-weight: 400;
-  color: #80868b;
-  line-height: 1.45;
+  font-style: italic;
+  color: #8e8a7a;
+  line-height: 1.5;
 }
 
-.sm-main {
-  flex: 1.4 1 0;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.sm-main--solo {
-  flex: 1 1 0;
-}
-
-.sm-main :deep(.ym-block),
-.sm-sub-body :deep(.ym-block) {
+.sm-panel {
   flex: 1;
-  min-height: 0;
-  background: rgba(255, 255, 255, 0.72);
-  border-color: #c9a227;
-}
-
-.sm-sub {
-  flex: 0.9 1 0;
-  min-height: 0;
+  min-height: 400px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding-top: 4px;
-  border-top: 1px dashed #c9a227;
+  overflow: auto;
+  box-sizing: border-box;
 }
 
-.sm-sub-title {
-  margin: 0;
-  flex-shrink: 0;
-  font-size: clamp(12px, 1.2vw, 14px);
-  font-weight: 700;
-  color: #5f6368;
-  line-height: 1.35;
-}
-
-.sm-sub-body {
+.sm-panel :deep(.ym-block) {
   flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
+  min-height: 400px;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+.sm-panel :deep(.ProseMirror) {
+  font-size: 14px;
+  line-height: 1.65;
+  color: #1a1a1a;
 }
 
 .sm-footer {
@@ -233,37 +201,37 @@ function onOrganizer(event: Event) {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 20px 32px;
-  padding: 10px 16px 12px;
-  border-top: 2px solid #c9a227;
-  background: #fff8e1;
+  gap: 24px 48px;
+  padding: 10px 18px 12px;
+  border-top: 1.5px solid #1a1a1a;
+  background: #f8f2d4;
 }
 
 .sm-meta {
   display: inline-flex;
   align-items: baseline;
   gap: 4px;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
-  color: #3c4043;
+  color: #1a1a1a;
 }
 
 .sm-meta-input {
-  min-width: 6em;
-  max-width: 14em;
+  min-width: 8em;
+  max-width: 16em;
   border: none;
-  border-bottom: 1.5px solid #9aa0a6;
+  border-bottom: 1.5px solid #1a1a1a;
   background: transparent;
   font: inherit;
   font-weight: 500;
-  color: #202124;
+  color: #1a1a1a;
   padding: 0 4px 1px;
   outline: none;
 }
 
 .sm-meta-input::placeholder {
-  color: #b0b4b8;
-  letter-spacing: 0.08em;
+  color: #b0aea0;
+  letter-spacing: 0.06em;
 }
 
 .sm-meta-input:focus {
@@ -281,8 +249,8 @@ function onOrganizer(event: Event) {
 
   .sm-col {
     border-right: none;
-    border-bottom: 2px solid #c9a227;
-    min-height: 220px;
+    border-bottom: 1.5px solid #1a1a1a;
+    min-height: 280px;
   }
 
   .sm-col--last {

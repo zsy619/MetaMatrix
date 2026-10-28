@@ -136,7 +136,9 @@ function onReviewTime(event: Event) {
   position: absolute;
   inset: 0;
   z-index: 10;
-  overflow: hidden;
+  /* Page scrolls when stacked panels (each ≥400px) exceed the viewport */
+  overflow-x: hidden;
+  overflow-y: auto;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -144,6 +146,16 @@ function onReviewTime(event: Event) {
   background: #ffffff;
   border: 1.5px solid #202124;
   border-radius: 2px;
+  scrollbar-gutter: stable;
+}
+
+.dr-canvas::-webkit-scrollbar {
+  width: 8px;
+}
+
+.dr-canvas::-webkit-scrollbar-thumb {
+  background: rgba(32, 33, 36, 0.28);
+  border-radius: 999px;
 }
 
 .dr-meta {
@@ -194,19 +206,21 @@ function onReviewTime(event: Event) {
 }
 
 .dr-grid {
-  flex: 1;
-  min-height: 0;
+  /* Never shrink content rows below panel min-heights */
+  flex: 1 0 auto;
+  width: 100%;
+  min-height: min-content;
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
-  grid-template-rows: minmax(0, 1.1fr) minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(0, 1.1fr);
-  overflow: hidden;
+  grid-template-rows: repeat(4, minmax(400px, auto));
+  overflow: visible;
 }
 
 .dr-cell {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  min-height: 0;
+  min-height: 400px;
   padding: 10px 12px 8px;
   box-sizing: border-box;
   border-right: 1.5px solid #202124;
@@ -257,7 +271,7 @@ function onReviewTime(event: Event) {
 
 .dr-panel {
   flex: 1;
-  min-height: 0;
+  min-height: 400px;
   display: flex;
   flex-direction: column;
   border: 1px dashed #dadce0;

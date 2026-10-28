@@ -195,7 +195,7 @@ function onRemoveRow(rowId: string) {
 .ct-row {
   display: grid;
   grid-template-columns: minmax(88px, 0.55fr) repeat(3, minmax(0, 1.15fr)) 36px;
-  min-height: 140px;
+  min-height: 400px;
   border-bottom: 1px solid #dadce0;
 }
 
@@ -239,7 +239,7 @@ function onRemoveRow(rowId: string) {
 
 .ct-cell {
   min-width: 0;
-  min-height: 0;
+  min-height: 400px;
   padding: 8px;
   box-sizing: border-box;
   border-right: 1px solid #dadce0;
@@ -249,7 +249,7 @@ function onRemoveRow(rowId: string) {
 
 .ct-cell :deep(.ym-block) {
   flex: 1;
-  min-height: 110px;
+  min-height: 0;
   background: rgba(248, 249, 250, 0.55);
 }
 
@@ -334,12 +334,20 @@ function onRemoveRow(rowId: string) {
     border-bottom: 1px solid #eee;
   }
 
+  .ct-row {
+    min-height: 0;
+  }
+
   .ct-priority {
     min-height: 48px;
   }
 
+  .ct-cell {
+    min-height: 400px;
+  }
+
   .ct-cell :deep(.ym-block) {
-    min-height: 96px;
+    min-height: 0;
   }
 }
 </style>

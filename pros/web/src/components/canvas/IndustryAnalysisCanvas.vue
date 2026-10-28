@@ -74,31 +74,44 @@ const bgColor = computed(
   position: absolute;
   inset: 0;
   z-index: 10;
-  overflow: hidden;
+  /* Page scrolls when stacked panels (each ≥400px) exceed the viewport */
+  overflow-x: hidden;
+  overflow-y: auto;
   box-sizing: border-box;
   padding: 0;
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  scrollbar-gutter: stable;
+}
+
+.industry-analysis-canvas::-webkit-scrollbar {
+  width: 8px;
+}
+
+.industry-analysis-canvas::-webkit-scrollbar-thumb {
+  background: rgba(32, 33, 36, 0.28);
+  border-radius: 999px;
 }
 
 .ia-grid {
-  flex: 1;
-  min-height: 0;
+  /* Fill viewport when space allows; never shrink below panel min-heights */
+  flex: 1 0 auto;
   width: 100%;
-  height: 100%;
+  min-height: min-content;
   display: flex;
   flex-direction: column;
   border: 2px solid #202124;
   border-radius: 2px;
-  overflow: hidden;
+  overflow: visible;
   background: #fff;
 }
 
 .ia-row--top {
-  flex: 1.2 1 0;
+  flex: 1.2 0 400px;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  min-height: 0;
+  min-height: 400px;
   border-bottom: 2px solid #202124;
 }
 
@@ -106,7 +119,7 @@ const bgColor = computed(
   display: flex;
   flex-direction: column;
   min-width: 0;
-  min-height: 0;
+  min-height: 400px;
   padding: 12px 14px 14px;
   box-sizing: border-box;
   background: #fff;
@@ -119,7 +132,8 @@ const bgColor = computed(
 }
 
 .ia-cell--full {
-  flex: 0.85 1 0;
+  flex: 0.85 0 400px;
+  min-height: 400px;
   border-right: none;
   border-bottom: 2px solid #202124;
 }
@@ -168,25 +182,21 @@ const bgColor = computed(
 }
 
 @media (max-width: 720px) {
-  .industry-analysis-canvas {
-    overflow-y: auto;
-    overflow-x: hidden;
-  }
-
   .ia-row--top {
     flex: none;
     grid-template-columns: 1fr;
+    min-height: 0;
   }
 
   .ia-cell {
     border-right: none;
     border-bottom: 2px solid #202124;
-    min-height: 160px;
+    min-height: 400px;
   }
 
   .ia-cell--full {
     flex: none;
-    min-height: 140px;
+    min-height: 400px;
   }
 
   .ia-cell--full:last-child {

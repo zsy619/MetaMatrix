@@ -92,13 +92,25 @@ const bgColor = computed(
   position: absolute;
   inset: 0;
   z-index: 10;
-  overflow: hidden;
+  /* Page scrolls when stacked cells (each ≥400px) exceed the viewport */
+  overflow-x: hidden;
+  overflow-y: auto;
   box-sizing: border-box;
   padding: 14px 18px 12px;
   display: flex;
   flex-direction: column;
   gap: 10px;
   min-height: 0;
+  scrollbar-gutter: stable;
+}
+
+.ai-tradeoff-canvas::-webkit-scrollbar {
+  width: 8px;
+}
+
+.ai-tradeoff-canvas::-webkit-scrollbar-thumb {
+  background: rgba(32, 33, 36, 0.28);
+  border-radius: 999px;
 }
 
 .at-title {
@@ -117,17 +129,18 @@ const bgColor = computed(
 }
 
 .at-grid {
-  flex: 1;
-  min-height: 0;
+  /* Never shrink content rows below panel min-heights */
+  flex: 1 0 auto;
   width: 100%;
+  min-height: min-content;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   grid-template-rows:
     auto
-    repeat(4, minmax(0, 1fr));
+    repeat(4, minmax(400px, auto));
   border: 1px solid #dadce0;
   border-radius: 4px;
-  overflow: hidden;
+  overflow: visible;
   background: #fff;
   gap: 0;
 }
@@ -157,7 +170,7 @@ const bgColor = computed(
   display: flex;
   flex-direction: column;
   min-width: 0;
-  min-height: 0;
+  min-height: 400px;
   padding: 10px 12px 12px;
   box-sizing: border-box;
   background: #fff;
@@ -228,15 +241,10 @@ const bgColor = computed(
 }
 
 @media (max-width: 720px) {
-  .ai-tradeoff-canvas {
-    overflow-y: auto;
-    overflow-x: hidden;
-  }
-
   .at-grid {
     grid-template-columns: 1fr;
     grid-template-rows: auto;
-    min-height: auto;
+    min-height: min-content;
   }
 
   .at-col-header.cost {
@@ -249,7 +257,7 @@ const bgColor = computed(
 
   .at-cell {
     border-right: none;
-    min-height: 140px;
+    min-height: 400px;
   }
 
   .at-cell--last-row {

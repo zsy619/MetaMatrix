@@ -1,0 +1,383 @@
+{
+  "id": "canvas_growth_assumptions",
+  "type": "growth_assumptions",
+  "schemaVersion": 1,
+  "theme": {
+    "background": {
+      "pattern": "none",
+      "color": "#ffffff"
+    }
+  },
+  "columns": [
+    {
+      "key": "assumption",
+      "label": "关键假设"
+    },
+    {
+      "key": "proposer",
+      "label": "提出者"
+    },
+    {
+      "key": "proposedAt",
+      "label": "提出时间"
+    },
+    {
+      "key": "owner",
+      "label": "项目负责人"
+    },
+    {
+      "key": "result",
+      "label": "验证结果"
+    }
+  ],
+  "rows": [
+    {
+      "id": "row_1",
+      "assumption": [
+        {
+          "id": "item_ga_a1_1",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ],
+      "proposer": [
+        {
+          "id": "item_ga_p1_1",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ],
+      "proposedAt": [
+        {
+          "id": "item_ga_t1_1",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ],
+      "owner": [
+        {
+          "id": "item_ga_o1_1",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ],
+      "result": [
+        {
+          "id": "item_ga_r1_1",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "row_2",
+      "assumption": [
+        {
+          "id": "item_ga_a2_2",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ],
+      "proposer": [
+        {
+          "id": "item_ga_p2_2",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ],
+      "proposedAt": [
+        {
+          "id": "item_ga_t2_2",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ],
+      "owner": [
+        {
+          "id": "item_ga_o2_2",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ],
+      "result": [
+        {
+          "id": "item_ga_r2_2",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "row_3",
+      "assumption": [
+        {
+          "id": "item_ga_a3_3",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ],
+      "proposer": [
+        {
+          "id": "item_ga_p3_3",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ],
+      "proposedAt": [
+        {
+          "id": "item_ga_t3_3",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ],
+      "owner": [
+        {
+          "id": "item_ga_o3_3",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ],
+      "result": [
+        {
+          "id": "item_ga_r3_3",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "row_4",
+      "assumption": [
+        {
+          "id": "item_ga_a4_4",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ],
+      "proposer": [
+        {
+          "id": "item_ga_p4_4",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ],
+      "proposedAt": [
+        {
+          "id": "item_ga_t4_4",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ],
+      "owner": [
+        {
+          "id": "item_ga_o4_4",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ],
+      "result": [
+        {
+          "id": "item_ga_r4_4",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "row_5",
+      "assumption": [
+        {
+          "id": "item_ga_a5_5",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ],
+      "proposer": [
+        {
+          "id": "item_ga_p5_5",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ],
+      "proposedAt": [
+        {
+          "id": "item_ga_t5_5",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ],
+      "owner": [
+        {
+          "id": "item_ga_o5_5",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ],
+      "result": [
+        {
+          "id": "item_ga_r5_5",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "row_6",
+      "assumption": [
+        {
+          "id": "item_ga_a6_6",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ],
+      "proposer": [
+        {
+          "id": "item_ga_p6_6",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ],
+      "proposedAt": [
+        {
+          "id": "item_ga_t6_6",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ],
+      "owner": [
+        {
+          "id": "item_ga_o6_6",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ],
+      "result": [
+        {
+          "id": "item_ga_r6_6",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    }
+  ]
+}
