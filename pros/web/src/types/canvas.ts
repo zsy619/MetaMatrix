@@ -467,6 +467,38 @@ export interface FiveStepDivisionDocumentJSON {
   blocks: FiveStepDivisionBlock[]
 }
 
+/** 五步法（基础版）· 列 / 方块 id（每列一块富文本） */
+export type FiveStepBasicColumnId =
+  | 'demand'
+  | 'solution'
+  | 'business'
+  | 'growth'
+  | 'moat'
+
+export type FiveStepBasicBlockId = FiveStepBasicColumnId
+
+export interface FiveStepBasicBlock {
+  id: FiveStepBasicBlockId
+  title: string
+  items: QuadrantItem[]
+}
+
+export interface FiveStepBasicColumn {
+  id: FiveStepBasicColumnId
+  /** 浅灰表头文案 */
+  header: string
+}
+
+/** 五步法（基础版）画布文档：五列空白，无定性/定量/页脚 */
+export interface FiveStepBasicDocumentJSON {
+  id: string
+  type: 'five_step_basic'
+  schemaVersion: number
+  theme: CanvasTheme
+  columns: FiveStepBasicColumn[]
+  blocks: FiveStepBasicBlock[]
+}
+
 /** AI场景取舍评估 · 单元格 id */
 export type AiTradeoffCellId =
   | 'a1'
@@ -1220,6 +1252,7 @@ export type CanvasDocumentJSON = (
   | DemandTriangleDocumentJSON
   | FiveStepDocumentJSON
   | FiveStepDivisionDocumentJSON
+  | FiveStepBasicDocumentJSON
   | AiTradeoffDocumentJSON
   | ProductContentDocumentJSON
   | OscarDocumentJSON
@@ -1255,6 +1288,7 @@ export type BlockCanvasDocumentJSON =
   | DemandTriangleDocumentJSON
   | FiveStepDocumentJSON
   | FiveStepDivisionDocumentJSON
+  | FiveStepBasicDocumentJSON
   | AiTradeoffDocumentJSON
   | ProductContentDocumentJSON
   | OscarDocumentJSON
@@ -1507,6 +1541,12 @@ export function isFiveStepDivisionDoc(
   return !!doc && doc.type === 'five_step_division'
 }
 
+export function isFiveStepBasicDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is FiveStepBasicDocumentJSON {
+  return !!doc && doc.type === 'five_step_basic'
+}
+
 export function isAiTradeoffDoc(
   doc: CanvasDocumentJSON | null | undefined,
 ): doc is AiTradeoffDocumentJSON {
@@ -1681,6 +1721,7 @@ export function isBlockCanvasDoc(
     isDemandTriangleDoc(doc) ||
     isFiveStepDoc(doc) ||
     isFiveStepDivisionDoc(doc) ||
+    isFiveStepBasicDoc(doc) ||
     isAiTradeoffDoc(doc) ||
     isProductContentDoc(doc) ||
     isOscarDoc(doc) ||

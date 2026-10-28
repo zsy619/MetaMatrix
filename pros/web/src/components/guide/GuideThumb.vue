@@ -223,6 +223,33 @@ defineProps<{
         <rect x="150" y="94" width="42" height="34" fill="#f5f2eb" stroke="#5f6368" stroke-width="0.55" />
       </svg>
 
+      <!-- 五步法（基础版）：浅灰表头 + 五列空白 -->
+      <svg
+        v-else-if="templateId === 'five-step-basic'"
+        class="thumb-svg"
+        viewBox="0 0 200 140"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <rect width="200" height="140" rx="10" fill="#ffffff" />
+        <g font-weight="600" text-anchor="middle" fill="#202124">
+          <rect x="8" y="12" width="36" height="20" fill="#f5f6f8" stroke="#e5e7eb" stroke-width="0.8" />
+          <text x="26" y="25" font-size="6.5">需求</text>
+          <rect x="44" y="12" width="36" height="20" fill="#f5f6f8" stroke="#e5e7eb" stroke-width="0.8" />
+          <text x="62" y="25" font-size="5.5">解决方案</text>
+          <rect x="80" y="12" width="36" height="20" fill="#f5f6f8" stroke="#e5e7eb" stroke-width="0.8" />
+          <text x="98" y="25" font-size="5.5">商业模式</text>
+          <rect x="116" y="12" width="36" height="20" fill="#f5f6f8" stroke="#e5e7eb" stroke-width="0.8" />
+          <text x="134" y="25" font-size="6.5">增长</text>
+          <rect x="152" y="12" width="40" height="20" fill="#f5f6f8" stroke="#e5e7eb" stroke-width="0.8" />
+          <text x="172" y="25" font-size="6.5">壁垒</text>
+        </g>
+        <rect x="8" y="32" width="36" height="96" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.8" />
+        <rect x="44" y="32" width="36" height="96" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.8" />
+        <rect x="80" y="32" width="36" height="96" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.8" />
+        <rect x="116" y="32" width="36" height="96" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.8" />
+        <rect x="152" y="32" width="40" height="96" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.8" />
+      </svg>
+
       <!-- AI场景取舍评估：2×4 网格示意 -->
       <svg
         v-else-if="templateId === 'ai-tradeoff'"

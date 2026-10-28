@@ -445,6 +445,11 @@ onMounted(async () => {
   border-color: #f9a825;
 }
 
+.card--five-step-basic:hover,
+.card--five-step-basic:focus-visible {
+  border-color: #9aa0a6;
+}
+
 .card--ai-tradeoff:hover,
 .card--ai-tradeoff:focus-visible {
   border-color: #d93025;

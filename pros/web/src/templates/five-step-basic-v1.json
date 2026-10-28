@@ -1,0 +1,60 @@
+{
+  "id": "canvas_five_step_basic",
+  "type": "five_step_basic",
+  "schemaVersion": 1,
+  "theme": {
+    "background": {
+      "pattern": "none",
+      "color": "#ffffff"
+    }
+  },
+  "columns": [
+    {
+      "id": "demand",
+      "header": "需求"
+    },
+    {
+      "id": "solution",
+      "header": "解决方案"
+    },
+    {
+      "id": "business",
+      "header": "商业模式"
+    },
+    {
+      "id": "growth",
+      "header": "增长"
+    },
+    {
+      "id": "moat",
+      "header": "壁垒"
+    }
+  ],
+  "blocks": [
+    {
+      "id": "demand",
+      "title": "需求",
+      "items": []
+    },
+    {
+      "id": "solution",
+      "title": "解决方案",
+      "items": []
+    },
+    {
+      "id": "business",
+      "title": "商业模式",
+      "items": []
+    },
+    {
+      "id": "growth",
+      "title": "增长",
+      "items": []
+    },
+    {
+      "id": "moat",
+      "title": "壁垒",
+      "items": []
+    }
+  ]
+}

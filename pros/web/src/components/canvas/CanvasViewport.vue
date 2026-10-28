@@ -10,6 +10,7 @@ import {
   isAiTradeoffDoc,
   isFiveStepDoc,
   isFiveStepDivisionDoc,
+  isFiveStepBasicDoc,
   isIndustryAnalysisDoc,
   isIndustryForecastDoc,
   isKeyResistanceDoc,
@@ -47,6 +48,7 @@ import DeliberatePracticeCanvas from './DeliberatePracticeCanvas.vue'
 import DemandTriangleCanvas from './DemandTriangleCanvas.vue'
 import FiveStepCanvas from './FiveStepCanvas.vue'
 import FiveStepDivisionCanvas from './FiveStepDivisionCanvas.vue'
+import FiveStepBasicCanvas from './FiveStepBasicCanvas.vue'
 import AiTradeoffCanvas from './AiTradeoffCanvas.vue'
 import ProductContentCanvas from './ProductContentCanvas.vue'
 import OscarCanvas from './OscarCanvas.vue'
@@ -95,6 +97,9 @@ const fiveStepDoc = computed(() =>
 )
 const fiveStepDivisionDoc = computed(() =>
   isFiveStepDivisionDoc(current_data.value) ? current_data.value : null,
+)
+const fiveStepBasicDoc = computed(() =>
+  isFiveStepBasicDoc(current_data.value) ? current_data.value : null,
 )
 const aiTradeoffDoc = computed(() =>
   isAiTradeoffDoc(current_data.value) ? current_data.value : null,
@@ -202,6 +207,9 @@ const quadrantDoc = computed(() =>
         </template>
         <template v-else-if="fiveStepDivisionDoc">
           <FiveStepDivisionCanvas :doc="fiveStepDivisionDoc" />
+        </template>
+        <template v-else-if="fiveStepBasicDoc">
+          <FiveStepBasicCanvas :doc="fiveStepBasicDoc" />
         </template>
         <template v-else-if="aiTradeoffDoc">
           <AiTradeoffCanvas :doc="aiTradeoffDoc" />

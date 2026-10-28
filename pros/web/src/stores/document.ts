@@ -21,6 +21,7 @@ import type {
   DemandTriangleNotesBlock,
   FiveStepDocumentJSON,
   FiveStepDivisionDocumentJSON,
+  FiveStepBasicDocumentJSON,
   AiTradeoffDocumentJSON,
   ProductContentDocumentJSON,
   OscarDocumentJSON,
@@ -82,6 +83,7 @@ import {
   isDualTriangleDoc,
   isFiveStepDoc,
   isFiveStepDivisionDoc,
+  isFiveStepBasicDoc,
   isIndustryAnalysisDoc,
   isIndustryForecastDoc,
   isKeyResistanceDoc,
@@ -106,6 +108,7 @@ import deliberatePracticeTemplate from '../templates/deliberate-practice-v1.json
 import demandTriangleTemplate from '../templates/demand-triangle-v1.json'
 import fiveStepTemplate from '../templates/five-step-v1.json'
 import fiveStepDivisionTemplate from '../templates/five-step-division-v1.json'
+import fiveStepBasicTemplate from '../templates/five-step-basic-v1.json'
 import aiTradeoffTemplate from '../templates/ai-tradeoff-v1.json'
 import productContentTemplate from '../templates/product-content-v1.json'
 import oscarTemplate from '../templates/oscar-v1.json'
@@ -140,6 +143,7 @@ export type TemplateId =
   | 'demand-triangle'
   | 'five-step'
   | 'five-step-division'
+  | 'five-step-basic'
   | 'ai-tradeoff'
   | 'product-content'
   | 'oscar'
@@ -175,6 +179,7 @@ const TEMPLATES: Record<TemplateId, CanvasDocumentJSON> = {
   'demand-triangle': demandTriangleTemplate as DemandTriangleDocumentJSON,
   'five-step': fiveStepTemplate as FiveStepDocumentJSON,
   'five-step-division': fiveStepDivisionTemplate as FiveStepDivisionDocumentJSON,
+  'five-step-basic': fiveStepBasicTemplate as FiveStepBasicDocumentJSON,
   'ai-tradeoff': aiTradeoffTemplate as AiTradeoffDocumentJSON,
   'product-content': productContentTemplate as ProductContentDocumentJSON,
   oscar: oscarTemplate as OscarDocumentJSON,
@@ -268,6 +273,12 @@ export const TEMPLATE_META: Record<
     name: '五步法（分工版）',
     badge: '五步法分工 · MVP',
     description: '需求 → 解决方案 → 商业模式 → 增长 → 壁垒，按定性取舍 / 定量测量 / 团队分工拆解。',
+    category: 'growth',
+  },
+  'five-step-basic': {
+    name: '五步法（基础版）',
+    badge: '五步法基础 · MVP',
+    description: '需求 → 解决方案 → 商业模式 → 增长 → 壁垒，五列等宽空白画布，格内直接填写。',
     category: 'growth',
   },
   'ai-tradeoff': {
@@ -458,6 +469,9 @@ export const useDocumentStore = defineStore('document', () => {
   const isFiveStep = computed(() => isFiveStepDoc(current_data.value))
   const isFiveStepDivision = computed(() =>
     isFiveStepDivisionDoc(current_data.value),
+  )
+  const isFiveStepBasic = computed(() =>
+    isFiveStepBasicDoc(current_data.value),
   )
   const isAiTradeoff = computed(() => isAiTradeoffDoc(current_data.value))
   const isProductContent = computed(() =>
@@ -2551,6 +2565,7 @@ export const useDocumentStore = defineStore('document', () => {
     isDemandTriangle,
     isFiveStep,
     isFiveStepDivision,
+    isFiveStepBasic,
     isAiTradeoff,
     isProductContent,
     isOscar,
