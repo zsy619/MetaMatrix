@@ -61,6 +61,23 @@ const AXIS_SHORT: Record<ProductFeatures5dAxisId, string> = {
   innovation: '创新性',
 }
 
+/**
+ * 五轴固定分色（浅色底可读，色相彼此拉开）。
+ * 圆点、顶点标签、底栏滑块共用同一色值。
+ * 开放性蓝 / 投入性琥珀 / 易错性红 / 迭代性绿 / 创新性紫
+ */
+const AXIS_COLOR: Record<ProductFeatures5dAxisId, string> = {
+  openness: '#1565C0',
+  engagement: '#9A5700',
+  error_prone: '#C62828',
+  iterativity: '#137333',
+  innovation: '#6A1B9A',
+}
+
+function axisColor(axis: ProductFeatures5dAxisId): string {
+  return AXIS_COLOR[axis]
+}
+
 const blocksById = computed(() => {
   const map = new Map<ProductFeatures5dAxisId, ProductFeatures5dBlock>()
   for (const b of props.doc.blocks) {
@@ -382,15 +399,13 @@ onBeforeUnmount(() => {
           style="cursor: grab"
           @pointerdown="onPointerDown(m.axis, $event)"
         >
-          <rect
-            :x="m.x - 8"
-            :y="m.y - 8"
-            width="16"
-            height="16"
-            rx="2"
-            fill="#4fc3f7"
+          <circle
+            :cx="m.x"
+            :cy="m.y"
+            r="8"
+            :fill="axisColor(m.axis)"
             stroke="#ffffff"
-            stroke-width="1.5"
+            stroke-width="2"
           />
           <title>
             {{ titleOf(m.axis) }}：{{ displayScore(m.score) }}（拖拽调分 / 点击最大化编辑）
@@ -403,6 +418,7 @@ onBeforeUnmount(() => {
           class="pf5d-vertex-label"
           role="button"
           tabindex="0"
+          :style="{ '--axis': axisColor(lb.axis) }"
           :aria-label="`最大化编辑${lb.title}`"
           @click="onLabelActivate(lb.axis, $event)"
           @keydown.enter.prevent="openEditor(lb.axis)"
@@ -437,6 +453,7 @@ onBeforeUnmount(() => {
         :key="`slider-${s.axis}`"
         class="pf5d-slider"
         :title="s.title"
+        :style="{ '--axis': axisColor(s.axis) }"
       >
         <span class="pf5d-slider-name">{{ s.title }}</span>
         <input
@@ -520,7 +537,7 @@ onBeforeUnmount(() => {
 }
 
 .pf5d-axis-label {
-  fill: #1a73e8;
+  fill: var(--axis, #1565c0);
   font-size: 15px;
   font-weight: 750;
   letter-spacing: 0.02em;
@@ -533,12 +550,12 @@ onBeforeUnmount(() => {
 }
 
 .pf5d-vertex-label:hover rect {
-  fill: #e8f0fe;
-  stroke: #1a73e8;
+  fill: #ffffff;
+  stroke: var(--axis, #1565c0);
 }
 
 .pf5d-vertex-label:focus-visible rect {
-  stroke: #1a73e8;
+  stroke: var(--axis, #1565c0);
   stroke-width: 2;
 }
 
@@ -550,8 +567,8 @@ onBeforeUnmount(() => {
   cursor: grabbing;
 }
 
-.pf5d-handle:hover rect {
-  fill: #29b6f6;
+.pf5d-handle:hover circle {
+  stroke-width: 2.5;
 }
 
 .pf5d-sliders {
@@ -580,7 +597,7 @@ onBeforeUnmount(() => {
   max-width: 48%;
   font-size: 11px;
   font-weight: 700;
-  color: #3c4043;
+  color: var(--axis, #1565c0);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -590,7 +607,7 @@ onBeforeUnmount(() => {
   flex: 1 1 auto;
   min-width: 0;
   height: 4px;
-  accent-color: #29b6f6;
+  accent-color: var(--axis, #1565c0);
   cursor: pointer;
 }
 
@@ -600,7 +617,7 @@ onBeforeUnmount(() => {
   font-variant-numeric: tabular-nums;
   font-size: 12px;
   font-weight: 800;
-  color: #0288d1;
+  color: var(--axis, #1565c0);
   text-align: right;
 }
 
