@@ -5,9 +5,13 @@ import { TEMPLATE_META, type TemplateId } from '../../stores/document'
 import GuideUserCard from './GuideUserCard.vue'
 
 const ASIDE_COLLAPSE_KEY = 'metamatrix:guide:asideCollapsed'
+const ASIDE_WIDTH_KEY = 'metamatrix:guide:asideWidth'
 const NARROW_MQ = '(max-width: 900px)'
+const DEFAULT_WIDTH = 300
+const MIN_WIDTH = 220
+const MAX_WIDTH_ABS = 480
 
-const props = defineProps<{
+defineProps<{
   recent: DocumentSummary[]
   authenticated: boolean
 }>()
@@ -20,7 +24,17 @@ const emit = defineEmits<{
 
 const collapsed = ref(false)
 const isNarrow = ref(false)
+const asideWidth = ref(DEFAULT_WIDTH)
+const dragging = ref(false)
 let mq: MediaQueryList | null = null
+let dragCleanup: (() => void) | null = null
+
+function clampWidth(w: number): number {
+  const vw = typeof window !== 'undefined' ? window.innerWidth : 1200
+  const maxByViewport = Math.floor(vw * 0.4)
+  const max = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH_ABS, maxByViewport))
+  return Math.round(Math.min(max, Math.max(MIN_WIDTH, w)))
+}
 
 function readPersistedCollapsed(): boolean | null {
   try {
@@ -36,6 +50,26 @@ function readPersistedCollapsed(): boolean | null {
 function persistCollapsed(value: boolean) {
   try {
     localStorage.setItem(ASIDE_COLLAPSE_KEY, value ? '1' : '0')
+  } catch {
+    /* ignore */
+  }
+}
+
+function readPersistedWidth(): number | null {
+  try {
+    const raw = localStorage.getItem(ASIDE_WIDTH_KEY)
+    if (raw == null) return null
+    const n = Number(raw)
+    if (Number.isFinite(n) && n > 0) return clampWidth(n)
+  } catch {
+    /* ignore */
+  }
+  return null
+}
+
+function persistWidth(value: number) {
+  try {
+    localStorage.setItem(ASIDE_WIDTH_KEY, String(value))
   } catch {
     /* ignore */
   }
@@ -66,12 +100,59 @@ function onMqChange() {
     const saved = readPersistedCollapsed()
     collapsed.value = saved ?? false
     emit('update:collapsed', collapsed.value)
+    asideWidth.value = readPersistedWidth() ?? DEFAULT_WIDTH
   }
 }
+
+function onResizePointerDown(e: PointerEvent) {
+  if (collapsed.value || isNarrow.value) return
+  if (e.button !== 0) return
+  e.preventDefault()
+  e.stopPropagation()
+
+  dragCleanup?.()
+  dragging.value = true
+  const startX = e.clientX
+  const startW = asideWidth.value
+
+  const onMove = (ev: PointerEvent) => {
+    // Left-edge handle: drag left → wider, drag right → narrower
+    const delta = startX - ev.clientX
+    asideWidth.value = clampWidth(startW + delta)
+  }
+
+  const onUp = () => {
+    dragging.value = false
+    persistWidth(asideWidth.value)
+    window.removeEventListener('pointermove', onMove)
+    window.removeEventListener('pointerup', onUp)
+    window.removeEventListener('pointercancel', onUp)
+    document.body.style.removeProperty('cursor')
+    document.body.style.removeProperty('user-select')
+    dragCleanup = null
+  }
+
+  dragCleanup = onUp
+  document.body.style.cursor = 'col-resize'
+  document.body.style.userSelect = 'none'
+  window.addEventListener('pointermove', onMove)
+  window.addEventListener('pointerup', onUp)
+  window.addEventListener('pointercancel', onUp)
+}
+
+const asideStyle = computed(() => {
+  if (collapsed.value || isNarrow.value) return undefined
+  const w = `${asideWidth.value}px`
+  return {
+    width: w,
+    flex: `0 0 ${w}`,
+  }
+})
 
 onMounted(() => {
   mq = window.matchMedia(NARROW_MQ)
   isNarrow.value = mq.matches
+  asideWidth.value = readPersistedWidth() ?? DEFAULT_WIDTH
   if (isNarrow.value) {
     collapsed.value = true
   } else {
@@ -83,6 +164,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   mq?.removeEventListener('change', onMqChange)
+  dragCleanup?.()
 })
 
 function templateLabel(d: DocumentSummary): string {
@@ -130,9 +212,23 @@ const panelTitle = computed(() => '我的最近文档')
       'guide-aside--collapsed': collapsed,
       'guide-aside--narrow': isNarrow,
       'guide-aside--overlay': isNarrow && !collapsed,
+      'guide-aside--dragging': dragging,
     }"
+    :style="asideStyle"
     :aria-label="panelTitle"
   >
+    <div
+      v-if="!collapsed && !isNarrow"
+      class="aside-resize-handle"
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="调整侧栏宽度"
+      :aria-valuenow="asideWidth"
+      :aria-valuemin="220"
+      :aria-valuemax="480"
+      @pointerdown="onResizePointerDown"
+    />
+
     <button
       v-if="collapsed"
       type="button"
@@ -206,9 +302,13 @@ const panelTitle = computed(() => '我的最近文档')
   transition: width 0.18s ease, flex-basis 0.18s ease;
 }
 
+.guide-aside--dragging {
+  transition: none;
+}
+
 .guide-aside--collapsed {
-  flex-basis: 44px;
-  width: 44px;
+  flex-basis: 44px !important;
+  width: 44px !important;
 }
 
 .guide-aside--overlay {
@@ -216,10 +316,42 @@ const panelTitle = computed(() => '我的最近文档')
   top: 0;
   right: 0;
   bottom: 0;
-  flex-basis: min(320px, 88vw);
-  width: min(320px, 88vw);
+  flex-basis: min(320px, 88vw) !important;
+  width: min(320px, 88vw) !important;
   box-shadow: -8px 0 28px rgba(32, 33, 36, 0.12);
   background: #f8f9fa;
+}
+
+.aside-resize-handle {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  transform: translateX(-50%);
+  z-index: 5;
+  cursor: col-resize;
+  touch-action: none;
+  background: transparent;
+}
+
+.aside-resize-handle::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  border-radius: 1px;
+  background: transparent;
+  transition: background 0.15s ease;
+}
+
+.aside-resize-handle:hover::after,
+.aside-resize-handle:focus-visible::after,
+.guide-aside--dragging .aside-resize-handle::after {
+  background: #1a73e8;
 }
 
 .aside-inner {
