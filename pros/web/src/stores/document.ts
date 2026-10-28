@@ -18,6 +18,7 @@ import type {
   DemandTriangleDocumentJSON,
   DemandTriangleDirection,
   DemandTriangleScores,
+  DemandTriangleNotesBlock,
   FiveStepDocumentJSON,
   FiveStepDivisionDocumentJSON,
   AiTradeoffDocumentJSON,
@@ -39,15 +40,23 @@ import type {
   AnnualSummaryDocumentJSON,
   DeepReviewDocumentJSON,
   PmRetroValueDocumentJSON,
+  RoiTradeoffDocumentJSON,
+  RoiDecisionDocumentJSON,
+  RoiDecisionRow,
+  RoiDecisionFixedBlockId,
   TimeMatrixDocumentJSON,
   WorkStateZonesDocumentJSON,
   OnlineOfflineCommDocumentJSON,
+  UnitModelQuadrantDocumentJSON,
   PmSensitivity6dDocumentJSON,
   PmSensitivity6dAxisId,
   PmSensitivity6dScores,
   PmCompetencyDocumentJSON,
   PmCompetencyAxisId,
   PmCompetencyScores,
+  ProductFeatures5dDocumentJSON,
+  ProductFeatures5dAxisId,
+  ProductFeatures5dScores,
   PmSolutionTriangleDocumentJSON,
   PmSolutionTriangleAxisId,
   PmSolutionTriangleScores,
@@ -59,12 +68,15 @@ import type {
   AttachmentsByPanelId,
 } from '../types/canvas'
 import {
+  demandTriangleNotesBlockId,
+  parseDemandTriangleNotesDirId,
   isAiTradeoffDoc,
   isBlockCanvasDoc,
   isDeliberatePracticeDoc,
   isDemandTriangleDoc,
   isPmSensitivity6dDoc,
   isPmCompetencyDoc,
+  isProductFeatures5dDoc,
   isPmSolutionTriangleDoc,
   isIpoDoc,
   isDualTriangleDoc,
@@ -74,6 +86,7 @@ import {
   isIndustryForecastDoc,
   isKeyResistanceDoc,
   isConversionTradeoffDoc,
+  isRoiDecisionDoc,
   isOscarDoc,
   isProductContentDoc,
   isQuadrantDoc,
@@ -105,11 +118,15 @@ import incidentReviewTemplate from '../templates/incident-review-v1.json'
 import annualSummaryTemplate from '../templates/annual-summary-v1.json'
 import deepReviewTemplate from '../templates/deep-review-v1.json'
 import pmRetroValueTemplate from '../templates/pm-retro-value-v1.json'
+import roiTradeoffTemplate from '../templates/roi-tradeoff-v1.json'
+import roiDecisionTemplate from '../templates/roi-decision-v1.json'
 import timeMatrixTemplate from '../templates/time-matrix-v1.json'
 import workStateZonesTemplate from '../templates/work-state-zones-v1.json'
 import onlineOfflineCommTemplate from '../templates/online-offline-comm-v1.json'
+import unitModelQuadrantTemplate from '../templates/unit-model-quadrant-v1.json'
 import pmSensitivity6dTemplate from '../templates/pm-sensitivity-6d-v1.json'
 import pmCompetencyTemplate from '../templates/pm-competency-v1.json'
+import productFeatures5dTemplate from '../templates/product-features-5d-v1.json'
 import pmSolutionTriangleTemplate from '../templates/pm-solution-triangle-v1.json'
 import growthAssumptionsTemplate from '../templates/growth-assumptions-v1.json'
 import businessFormulaTemplate from '../templates/business-formula-v1.json'
@@ -135,11 +152,15 @@ export type TemplateId =
   | 'annual-summary'
   | 'deep-review'
   | 'pm-retro-value'
+  | 'roi-tradeoff'
+  | 'roi-decision'
   | 'time-matrix'
   | 'work-state-zones'
   | 'online-offline-comm'
+  | 'unit-model-quadrant'
   | 'pm-sensitivity-6d'
   | 'pm-competency'
+  | 'product-features-5d'
   | 'pm-solution-triangle'
   | 'growth-assumptions'
   | 'business-formula'
@@ -166,11 +187,15 @@ const TEMPLATES: Record<TemplateId, CanvasDocumentJSON> = {
   'annual-summary': annualSummaryTemplate as AnnualSummaryDocumentJSON,
   'deep-review': deepReviewTemplate as DeepReviewDocumentJSON,
   'pm-retro-value': pmRetroValueTemplate as PmRetroValueDocumentJSON,
+  'roi-tradeoff': roiTradeoffTemplate as RoiTradeoffDocumentJSON,
+  'roi-decision': roiDecisionTemplate as RoiDecisionDocumentJSON,
   'time-matrix': timeMatrixTemplate as TimeMatrixDocumentJSON,
   'work-state-zones': workStateZonesTemplate as WorkStateZonesDocumentJSON,
   'online-offline-comm': onlineOfflineCommTemplate as OnlineOfflineCommDocumentJSON,
+  'unit-model-quadrant': unitModelQuadrantTemplate as UnitModelQuadrantDocumentJSON,
   'pm-sensitivity-6d': pmSensitivity6dTemplate as PmSensitivity6dDocumentJSON,
   'pm-competency': pmCompetencyTemplate as PmCompetencyDocumentJSON,
+  'product-features-5d': productFeatures5dTemplate as ProductFeatures5dDocumentJSON,
   'pm-solution-triangle': pmSolutionTriangleTemplate as PmSolutionTriangleDocumentJSON,
   'growth-assumptions': growthAssumptionsTemplate as GrowthAssumptionsDocumentJSON,
   'business-formula': businessFormulaTemplate as BusinessFormulaDocumentJSON,
@@ -321,6 +346,18 @@ export const TEMPLATE_META: Record<
     description: 'Before 不挖 vs After 认真挖：把过程资产沉淀为方法、清单与 SOP。',
     category: 'review',
   },
+  'roi-tradeoff': {
+    name: '综合决策ROI权衡',
+    badge: 'ROI权衡 · MVP',
+    description: '关键收益 × 关键成本双栏权衡，结构化梳理综合决策的 ROI。',
+    category: 'method',
+  },
+  'roi-decision': {
+    name: 'ROI决策评估',
+    badge: 'ROI决策 · MVP',
+    description: '维度 × 收益/成本动态矩阵，叠加机会成本、时间窗口与最终结论，评估决策 ROI。',
+    category: 'method',
+  },
   'time-matrix': {
     name: '时间管理矩阵',
     badge: '时间矩阵 · MVP',
@@ -345,6 +382,12 @@ export const TEMPLATE_META: Record<
     description: '意识 × 定方案 × 拆计划 × 管执行 × 做复盘五维雷达，0–100 拖拽评分测评项目管理竞争力。',
     category: 'method',
   },
+  'product-features-5d': {
+    name: '产品内容5维特征',
+    badge: '5维特征 · MVP',
+    description: '开放性 × 投入性 × 易错性 × 迭代性 × 创新性五维雷达，0–100 拖拽评分刻画产品内容特征。',
+    category: 'growth',
+  },
   'pm-solution-triangle': {
     name: '项目管理方案评估三角形',
     badge: '方案评估 · MVP',
@@ -356,6 +399,12 @@ export const TEMPLATE_META: Record<
     badge: '线上线下 · MVP',
     description: '线上/线下 × 异步/同步四象限，梳理文档、看板、消息、当面与封闭研发等沟通方式。',
     category: 'org',
+  },
+  'unit-model-quadrant': {
+    name: '单元模型象限',
+    badge: '单元模型 · MVP',
+    description: '单元模型成立与否 × 公司账成立与否四象限，区分健康模型、总部成本过高、放弃调整与不存在区间。',
+    category: 'growth',
   },
   'growth-assumptions': {
     name: '增长假设清单',
@@ -707,6 +756,148 @@ export const useDocumentStore = defineStore('document', () => {
     markDirty()
     return true
   }
+
+
+  const RD_FIXED_BLOCKS: RoiDecisionFixedBlockId[] = [
+    'opportunityCost',
+    'timeWindow',
+    'conclusion',
+  ]
+
+  const RD_FIXED_TITLE: Record<RoiDecisionFixedBlockId, string> = {
+    opportunityCost: '机会成本',
+    timeWindow: '时间窗口',
+    conclusion: '最终结论',
+  }
+
+  function asRoiDecision(): RoiDecisionDocumentJSON | null {
+    return isRoiDecisionDoc(current_data.value) ? current_data.value : null
+  }
+
+  function emptyRoiDecisionCellItems() {
+    return [
+      {
+        id: createItemId(),
+        text: '',
+        style: { color: '#202124', fontSize: 14, fontWeight: '500' as const },
+      },
+    ]
+  }
+
+  function makeRoiDecisionRow(dimension = '新维度'): RoiDecisionRow {
+    const id = createRowId()
+    return {
+      id,
+      dimension,
+      benefitBlockId: `${id}:benefit`,
+      costBlockId: `${id}:cost`,
+    }
+  }
+
+  function upsertRoiDecisionBlock(
+    byId: Map<string, { id: string; title: string; items: QuadrantItem[] }>,
+    id: string,
+    title: string,
+  ) {
+    const existing = byId.get(id)
+    if (existing) return existing
+    return {
+      id,
+      title,
+      items: emptyRoiDecisionCellItems(),
+    }
+  }
+
+  /** 确保 ROI 决策评估：每行收益/成本块 + 机会成本/时间窗口/最终结论 */
+  function ensureRoiDecisionBlocks(): boolean {
+    const d = asRoiDecision()
+    if (!d) return false
+    if (!Array.isArray(d.rows)) d.rows = []
+    if (!Array.isArray(d.blocks)) d.blocks = []
+    if (d.rows.length === 0) {
+      d.rows = [
+        makeRoiDecisionRow('基础ROI'),
+        makeRoiDecisionRow('长期视角'),
+        makeRoiDecisionRow('公司视角'),
+      ]
+    }
+
+    const byId = new Map(d.blocks.map((b) => [b.id, b]))
+    const next: typeof d.blocks = []
+    const keep = new Set<string>()
+
+    for (const row of d.rows) {
+      if (!row.benefitBlockId) row.benefitBlockId = `${row.id}:benefit`
+      if (!row.costBlockId) row.costBlockId = `${row.id}:cost`
+      keep.add(row.benefitBlockId)
+      keep.add(row.costBlockId)
+      next.push(upsertRoiDecisionBlock(byId, row.benefitBlockId, '收益项'))
+      next.push(upsertRoiDecisionBlock(byId, row.costBlockId, '成本项'))
+    }
+
+    for (const id of RD_FIXED_BLOCKS) {
+      keep.add(id)
+      next.push(upsertRoiDecisionBlock(byId, id, RD_FIXED_TITLE[id]))
+    }
+
+    const same =
+      d.blocks.length === next.length &&
+      d.blocks.every((b, i) => b.id === next[i].id && b === next[i])
+    if (!same) {
+      d.blocks = next
+      markDirty()
+      return true
+    }
+    return false
+  }
+
+  function updateRoiDecisionDimension(rowId: string, dimension: string): boolean {
+    const doc = asRoiDecision()
+    if (!doc) return false
+    const row = doc.rows.find((r) => r.id === rowId)
+    if (!row) return false
+    row.dimension = dimension
+    markDirty()
+    return true
+  }
+
+  function addRoiDecisionRow(dimension = '新维度'): RoiDecisionRow | null {
+    const doc = asRoiDecision()
+    if (!doc) return null
+    const row = makeRoiDecisionRow(dimension)
+    doc.rows = [...doc.rows, row]
+    // seed blocks immediately
+    if (!Array.isArray(doc.blocks)) doc.blocks = []
+    doc.blocks = [
+      ...doc.blocks,
+      {
+        id: row.benefitBlockId,
+        title: '收益项',
+        items: emptyRoiDecisionCellItems(),
+      },
+      {
+        id: row.costBlockId,
+        title: '成本项',
+        items: emptyRoiDecisionCellItems(),
+      },
+    ]
+    markDirty()
+    return row
+  }
+
+  function removeRoiDecisionRow(rowId: string): boolean {
+    const doc = asRoiDecision()
+    if (!doc) return false
+    if (doc.rows.length <= 1) return false
+    const row = doc.rows.find((r) => r.id === rowId)
+    if (!row) return false
+    doc.rows = doc.rows.filter((r) => r.id !== rowId)
+    const drop = new Set([row.benefitBlockId, row.costBlockId])
+    doc.blocks = doc.blocks.filter((b) => !drop.has(b.id))
+    markDirty()
+    return true
+  }
+
 
 
   function parseIncidentReviewTimelineCellId(
@@ -1819,6 +2010,128 @@ export const useDocumentStore = defineStore('document', () => {
     return false
   }
 
+
+  function asProductFeatures5d(): ProductFeatures5dDocumentJSON | null {
+    return isProductFeatures5dDoc(current_data.value) ? current_data.value : null
+  }
+
+  function updateProductFeatures5dScore(
+    axis: ProductFeatures5dAxisId,
+    value: number,
+  ): boolean {
+    const d = asProductFeatures5d()
+    if (!d) return false
+    const raw = Number(value)
+    if (!Number.isFinite(raw)) return false
+    const v = Math.min(100, Math.max(0, raw))
+    d.scores = { ...d.scores, [axis]: v }
+    markDirty()
+    return true
+  }
+
+  function updateProductFeatures5dScores(
+    patch: Partial<ProductFeatures5dScores>,
+  ): boolean {
+    const d = asProductFeatures5d()
+    if (!d) return false
+    const next = { ...d.scores }
+    for (const key of Object.keys(patch) as ProductFeatures5dAxisId[]) {
+      const raw = patch[key]
+      if (raw == null) continue
+      const n = Number(raw)
+      if (!Number.isFinite(n)) continue
+      next[key] = Math.min(100, Math.max(0, n))
+    }
+    d.scores = next
+    markDirty()
+    return true
+  }
+
+  const PRODUCT_FEATURES_5D_AXIS_ORDER: ProductFeatures5dAxisId[] = [
+    'openness',
+    'engagement',
+    'error_prone',
+    'iterativity',
+    'innovation',
+  ]
+
+  const PRODUCT_FEATURES_5D_DEFAULT_TITLE: Record<ProductFeatures5dAxisId, string> = {
+    openness: '开放性',
+    engagement: '投入性',
+    error_prone: '易错性',
+    iterativity: '迭代性',
+    innovation: '创新性',
+  }
+
+  /** 确保五轴各有一块 RTE（缺轴则补齐） */
+  function ensureProductFeatures5dBlocks(): boolean {
+    const d = asProductFeatures5d()
+    if (!d) return false
+    if (!Array.isArray(d.blocks)) {
+      d.blocks = []
+    }
+    if (!d.axes || typeof d.axes !== 'object') {
+      d.axes = {} as ProductFeatures5dDocumentJSON['axes']
+    }
+    if (!d.scores || typeof d.scores !== 'object') {
+      d.scores = {} as ProductFeatures5dScores
+    }
+    for (const axis of PRODUCT_FEATURES_5D_AXIS_ORDER) {
+      if (!d.axes[axis]) {
+        d.axes[axis] = {
+          id: axis,
+          title: PRODUCT_FEATURES_5D_DEFAULT_TITLE[axis],
+        }
+      }
+      if (d.scores[axis] == null || !Number.isFinite(Number(d.scores[axis]))) {
+        const defaults: ProductFeatures5dScores = {
+          openness: 100,
+          engagement: 60,
+          error_prone: 40,
+          iterativity: 50,
+          innovation: 100,
+        }
+        d.scores = { ...d.scores, [axis]: defaults[axis] }
+      }
+    }
+    const byId = new Map(d.blocks.map((b) => [b.id, b]))
+    let changed = false
+    const next = PRODUCT_FEATURES_5D_AXIS_ORDER.map((axis) => {
+      const existing = byId.get(axis)
+      const title =
+        d.axes[axis]?.title || PRODUCT_FEATURES_5D_DEFAULT_TITLE[axis] || axis
+      if (existing) {
+        if (existing.title !== title) {
+          changed = true
+          return { ...existing, title }
+        }
+        return existing
+      }
+      changed = true
+      return {
+        id: axis,
+        title,
+        items: [
+          {
+            id: createItemId(),
+            text: '',
+            style: { color: '#3c4043', fontSize: 14, fontWeight: '500' as const },
+          },
+        ],
+      }
+    })
+    if (
+      changed ||
+      d.blocks.length !== next.length ||
+      d.blocks.some((b, i) => b.id !== next[i].id)
+    ) {
+      d.blocks = next
+      markDirty()
+      return true
+    }
+    return false
+  }
+
   function asPmSolutionTriangle(): PmSolutionTriangleDocumentJSON | null {
     return isPmSolutionTriangleDoc(current_data.value) ? current_data.value : null
   }
@@ -2098,9 +2411,104 @@ export const useDocumentStore = defineStore('document', () => {
     if (!doc) return false
     const before = doc.directions.length
     doc.directions = doc.directions.filter((d) => d.id !== id)
-    if (doc.directions.length === before) return false
+    const notesId = demandTriangleNotesBlockId(id)
+    const beforeBlocks = doc.blocks.length
+    doc.blocks = doc.blocks.filter((b) => b.id !== notesId)
+    if (doc.directions.length === before && doc.blocks.length === beforeBlocks) {
+      return false
+    }
     markDirty()
     return true
+  }
+
+  /**
+   * 确保每个业务方向都有 notes:<dirId> 备注块（全屏 RTE）。
+   * 保留 legend；按当前方向 / 图例条目补齐；清理孤儿备注块。
+   */
+  function ensureDemandTriangleNotesBlocks(): boolean {
+    const doc = asDemandTriangle()
+    if (!doc) return false
+    if (!Array.isArray(doc.blocks)) {
+      doc.blocks = []
+    }
+    if (!Array.isArray(doc.directions)) {
+      doc.directions = []
+    }
+
+    const legend =
+      doc.blocks.find((b) => b.id === 'legend') ??
+      ({
+        id: 'legend' as const,
+        title: '业务方向',
+        items: [],
+      })
+
+    const dirIds = new Set<string>()
+    for (const d of doc.directions) dirIds.add(d.id)
+    for (const it of legend.items ?? []) dirIds.add(it.id)
+
+    const byId = new Map(doc.blocks.map((b) => [b.id, b]))
+    const notesBlocks: DemandTriangleNotesBlock[] = []
+    let changed = false
+
+    for (const dirId of dirIds) {
+      const nid = demandTriangleNotesBlockId(dirId)
+      const existing = byId.get(nid) as DemandTriangleNotesBlock | undefined
+      const legendItem = (legend.items ?? []).find((it) => it.id === dirId)
+      const plain = (legendItem?.text ?? '')
+        .replace(/<[^>]+>/g, '')
+        .trim()
+      const title = plain ? `${plain} · 备注` : '业务方向 · 备注'
+      if (existing) {
+        if (existing.title !== title) {
+          changed = true
+          notesBlocks.push({ ...existing, title })
+        } else {
+          notesBlocks.push(existing)
+        }
+      } else {
+        changed = true
+        notesBlocks.push({
+          id: nid,
+          title,
+          items: [
+            {
+              id: createItemId(),
+              text: '',
+              style: {
+                color: '#3c4043',
+                fontSize: 14,
+                fontWeight: '500' as const,
+              },
+            },
+          ],
+        })
+      }
+    }
+
+    const keptOthers = doc.blocks.filter((b) => {
+      if (b.id === 'legend') return false
+      const dir = parseDemandTriangleNotesDirId(String(b.id))
+      if (dir != null) return false
+      return true
+    })
+
+    const next = [legend, ...notesBlocks, ...keptOthers]
+    const sameLength = next.length === doc.blocks.length
+    const sameIds =
+      sameLength && next.every((b, i) => b.id === doc.blocks[i]?.id)
+    const sameTitles =
+      sameIds &&
+      next.every((b, i) => {
+        const prev = doc.blocks[i]
+        return !prev || prev.title === b.title
+      })
+    if (changed || !sameIds || !sameTitles) {
+      doc.blocks = next
+      markDirty()
+      return true
+    }
+    return false
   }
 
   /** 统一按容器更新条目（象限 position 或 blockId） */
@@ -2174,12 +2582,16 @@ export const useDocumentStore = defineStore('document', () => {
     ensureDemandDirection,
     updateDemandDirectionScores,
     removeDemandDirection,
+    ensureDemandTriangleNotesBlocks,
     updatePmSensitivity6dScore,
     updatePmSensitivity6dScores,
     ensurePmSensitivity6dBlocks,
     updatePmCompetencyScore,
     updatePmCompetencyScores,
     ensurePmCompetencyBlocks,
+    updateProductFeatures5dScore,
+    updateProductFeatures5dScores,
+    ensureProductFeatures5dBlocks,
     updatePmSolutionTriangleScore,
     updatePmSolutionTriangleScores,
     ensurePmSolutionTriangleBlocks,
@@ -2193,6 +2605,10 @@ export const useDocumentStore = defineStore('document', () => {
     updateConversionTradeoffPriorityLabel,
     addConversionTradeoffRow,
     removeConversionTradeoffRow,
+    ensureRoiDecisionBlocks,
+    updateRoiDecisionDimension,
+    addRoiDecisionRow,
+    removeRoiDecisionRow,
     updateIncidentReviewTimelineTime,
     addIncidentReviewTimelineRow,
     removeIncidentReviewTimelineRow,

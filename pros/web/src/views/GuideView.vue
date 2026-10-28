@@ -7,6 +7,7 @@ import { useAuthStore } from '../stores/auth'
 import type { DocumentSummary, SearchHit } from '../api/documents'
 import { listDocuments, searchDocuments } from '../api/documents'
 import GuideThumb from '../components/guide/GuideThumb.vue'
+import GuideAside from '../components/guide/GuideAside.vue'
 
 interface GuideCard {
   id: TemplateId
@@ -27,6 +28,7 @@ let searchTimer: ReturnType<typeof setTimeout> | null = null
 
 const activeCategory = ref<'all' | TemplateCategory>('all')
 const templateFilter = ref('')
+const asideCollapsed = ref(false)
 
 const categoryChips: { id: 'all' | TemplateCategory; label: string }[] = [
   { id: 'all', label: '全部' },
@@ -63,17 +65,11 @@ function openCanvas(id: TemplateId) {
   router.push({ name: 'canvas', params: { templateId: id } })
 }
 
-function goLogin() {
-  router.push({ name: 'login', query: { redirect: '/' } })
-}
-
-function goRegister() {
-  router.push({ name: 'register', query: { redirect: '/' } })
-}
-
-function logout() {
-  auth.logout()
+function onLogout() {
   recent.value = []
+  searchHits.value = []
+  searchQ.value = ''
+  searchErr.value = ''
 }
 
 async function refreshRecent() {
@@ -82,7 +78,7 @@ async function refreshRecent() {
     return
   }
   try {
-    recent.value = (await listDocuments()).slice(0, 8)
+    recent.value = (await listDocuments()).slice(0, 12)
   } catch {
     recent.value = []
   }
@@ -142,128 +138,124 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="guide">
-    <header class="hero">
-      <div class="hero-top">
+  <div class="guide-shell" :class="{ 'guide-shell--aside-collapsed': asideCollapsed }">
+    <div class="guide-main">
+      <header class="hero">
         <p class="eyebrow">MetaMatrix</p>
-        <div class="auth-bar">
-          <template v-if="auth.isAuthenticated">
-            <span class="who">{{ auth.user?.displayName || auth.user?.email }}</span>
-            <button type="button" class="linkish" @click="logout">退出</button>
-          </template>
-          <template v-else>
-            <button type="button" class="linkish" @click="goLogin">登录</button>
-            <button type="button" class="primaryish" @click="goRegister">注册</button>
-          </template>
-        </div>
-      </div>
-      <h1>元矩阵 MetaMatrix</h1>
-      <p class="lead">
-        选择一张画布模板，开始结构化梳理与可视化表达。登录后可同步到服务端（多用户）。
-      </p>
-      <section v-if="auth.isAuthenticated" class="search-box" aria-label="搜索我的画布">
-        <label class="search-label" for="guide-doc-search">搜索我的画布</label>
-        <div class="search-row">
-          <input
-            id="guide-doc-search"
-            v-model="searchQ"
-            type="search"
-            placeholder="输入关键词（标题或正文）…"
-            autocomplete="off"
-            @input="onSearchInput"
-            @keydown.enter.prevent="runSearch"
-          />
-          <button type="button" class="primaryish" :disabled="searching" @click="runSearch">
-            {{ searching ? '搜索中…' : '搜索' }}
-          </button>
-        </div>
-        <p v-if="searchErr" class="search-err">{{ searchErr }}</p>
-        <ul v-if="searchHits.length" class="search-hits">
-          <li v-for="h in searchHits" :key="h.id">
-            <button type="button" @click="openHit(h)">
-              <strong>{{ h.title }}</strong>
-              <span>{{ h.templateId || h.canvasType }} · {{ new Date(h.updatedAt).toLocaleString() }}</span>
-              <em v-if="h.snippet">{{ h.snippet }}</em>
+        <h1>元矩阵 MetaMatrix</h1>
+        <p class="lead">
+          选择一张画布模板，开始结构化梳理与可视化表达。登录后可同步到服务端（多用户）。
+        </p>
+        <section v-if="auth.isAuthenticated" class="search-box" aria-label="搜索我的画布">
+          <label class="search-label" for="guide-doc-search">搜索我的画布</label>
+          <div class="search-row">
+            <input
+              id="guide-doc-search"
+              v-model="searchQ"
+              type="search"
+              placeholder="输入关键词（标题或正文）…"
+              autocomplete="off"
+              @input="onSearchInput"
+              @keydown.enter.prevent="runSearch"
+            />
+            <button type="button" class="primaryish" :disabled="searching" @click="runSearch">
+              {{ searching ? '搜索中…' : '搜索' }}
             </button>
-          </li>
-        </ul>
-        <p v-else-if="searchQ.trim() && !searching" class="search-empty">无匹配文档</p>
-      </section>
-      <section v-if="auth.isAuthenticated && recent.length" class="recent" aria-label="最近文档">
-        <h2>我的最近文档</h2>
-        <ul>
-          <li v-for="d in recent" :key="d.id">
-            <button type="button" @click="openDoc(d)">
-              <strong>{{ d.title }}</strong>
-              <span>{{ d.templateId || d.canvasType }} · {{ new Date(d.updatedAt).toLocaleString() }}</span>
-            </button>
-          </li>
-        </ul>
-      </section>
-    </header>
-
-    <section class="templates" aria-label="画布模板">
-      <div class="templates-toolbar">
-        <div class="chips" role="tablist" aria-label="模板分类">
-          <button
-            v-for="chip in categoryChips"
-            :key="chip.id"
-            type="button"
-            role="tab"
-            class="chip"
-            :class="{ 'chip--active': activeCategory === chip.id }"
-            :aria-selected="activeCategory === chip.id"
-            @click="activeCategory = chip.id"
-          >
-            {{ chip.label }}
-          </button>
-        </div>
-        <div class="tpl-search">
-          <label class="visually-hidden" for="guide-tpl-search">搜索模板</label>
-          <input
-            id="guide-tpl-search"
-            v-model="templateFilter"
-            type="search"
-            placeholder="搜索模板名称或简介…"
-            autocomplete="off"
-          />
-        </div>
-      </div>
-
-      <p v-if="!filteredCards.length" class="tpl-empty">没有匹配的模板</p>
-
-      <div class="grid">
-        <button
-          v-for="card in filteredCards"
-          :key="card.id"
-          type="button"
-          class="card"
-          :class="`card--${card.id}`"
-          @click="openCanvas(card.id)"
-        >
-          <GuideThumb :template-id="card.id" />
-          <div class="body">
-            <div class="body-top">
-              <h2>{{ card.name }}</h2>
-              <span class="badge">{{ card.badge }}</span>
-            </div>
-            <p>{{ card.description }}</p>
-            <span class="cta">进入画布 →</span>
           </div>
-        </button>
-      </div>
-    </section>
+          <p v-if="searchErr" class="search-err">{{ searchErr }}</p>
+          <ul v-if="searchHits.length" class="search-hits">
+            <li v-for="h in searchHits" :key="h.id">
+              <button type="button" @click="openHit(h)">
+                <strong>{{ h.title }}</strong>
+                <span>{{ h.templateId || h.canvasType }} · {{ new Date(h.updatedAt).toLocaleString() }}</span>
+                <em v-if="h.snippet">{{ h.snippet }}</em>
+              </button>
+            </li>
+          </ul>
+          <p v-else-if="searchQ.trim() && !searching" class="search-empty">无匹配文档</p>
+        </section>
+      </header>
+
+      <section class="templates" aria-label="画布模板">
+        <div class="templates-toolbar">
+          <div class="chips" role="tablist" aria-label="模板分类">
+            <button
+              v-for="chip in categoryChips"
+              :key="chip.id"
+              type="button"
+              role="tab"
+              class="chip"
+              :class="{ 'chip--active': activeCategory === chip.id }"
+              :aria-selected="activeCategory === chip.id"
+              @click="activeCategory = chip.id"
+            >
+              {{ chip.label }}
+            </button>
+          </div>
+          <div class="tpl-search">
+            <label class="visually-hidden" for="guide-tpl-search">搜索模板</label>
+            <input
+              id="guide-tpl-search"
+              v-model="templateFilter"
+              type="search"
+              placeholder="搜索模板名称或简介…"
+              autocomplete="off"
+            />
+          </div>
+        </div>
+
+        <p v-if="!filteredCards.length" class="tpl-empty">没有匹配的模板</p>
+
+        <div class="grid">
+          <button
+            v-for="card in filteredCards"
+            :key="card.id"
+            type="button"
+            class="card"
+            :class="`card--${card.id}`"
+            @click="openCanvas(card.id)"
+          >
+            <GuideThumb :template-id="card.id" />
+            <div class="body">
+              <div class="body-top">
+                <h2>{{ card.name }}</h2>
+                <span class="badge">{{ card.badge }}</span>
+              </div>
+              <p>{{ card.description }}</p>
+              <span class="cta">进入画布 →</span>
+            </div>
+          </button>
+        </div>
+      </section>
+    </div>
+
+    <GuideAside
+      :recent="recent"
+      :authenticated="auth.isAuthenticated"
+      @open="openDoc"
+      @logout="onLogout"
+      @update:collapsed="asideCollapsed = $event"
+    />
   </div>
 </template>
 
 <style scoped>
-.guide {
+.guide-shell {
+  display: flex;
   width: 100%;
   height: 100%;
   max-height: 100%;
+  overflow: hidden;
+  background: #fafafa;
+}
+
+.guide-main {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
   overflow-x: hidden;
   overflow-y: auto;
-  padding: 48px 24px 56px;
+  padding: 40px 28px 56px;
   background:
     radial-gradient(ellipse 80% 50% at 50% -10%, #e8f0fe 0%, transparent 55%),
     #fafafa;
@@ -463,6 +455,12 @@ onMounted(async () => {
   border-color: #f9a825;
 }
 
+.card--product-features-5d:hover,
+.card--product-features-5d:focus-visible {
+  border-color: #29b6f6;
+}
+
+
 .card--oscar:hover,
 .card--oscar:focus-visible {
   border-color: #6495ed;
@@ -518,6 +516,16 @@ onMounted(async () => {
   border-color: #d65a46;
 }
 
+.card--roi-tradeoff:hover,
+.card--roi-tradeoff:focus-visible {
+  border-color: #FFEB3B;
+}
+
+.card--roi-decision:hover,
+.card--roi-decision:focus-visible {
+  border-color: #00BFFF;
+}
+
 .card--time-matrix:hover,
 .card--time-matrix:focus-visible {
   border-color: #fbe297;
@@ -526,6 +534,12 @@ onMounted(async () => {
 .card--work-state-zones:hover,
 .card--work-state-zones:focus-visible {
   border-color: #9ad751;
+}
+
+
+.card--unit-model-quadrant:hover,
+.card--unit-model-quadrant:focus-visible {
+  border-color: #2d9b8a;
 }
 
 .card--growth-assumptions:hover,
@@ -589,41 +603,19 @@ onMounted(async () => {
   color: #1a73e8;
 }
 
-.hero-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  width: min(1100px, 100%);
-  margin: 0 auto 8px;
-}
-
-.auth-bar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.who {
-  font-size: 13px;
-  color: #202124;
-}
-
-.linkish,
 .primaryish {
-  border: 1px solid #dadce0;
-  background: #ffffff;
+  border: 1px solid #1a73e8;
+  background: #1a73e8;
   border-radius: 999px;
   padding: 6px 12px;
   font-size: 13px;
   cursor: pointer;
-  color: #202124;
+  color: #ffffff;
 }
 
-.primaryish {
-  background: #1a73e8;
-  border-color: #1a73e8;
-  color: #ffffff;
+.primaryish:disabled {
+  opacity: 0.65;
+  cursor: default;
 }
 
 .search-box {
@@ -697,6 +689,11 @@ onMounted(async () => {
   color: #202124;
 }
 
+.search-hits span {
+  font-size: 12px;
+  color: #9aa0a6;
+}
+
 .search-hits em {
   font-style: normal;
   font-size: 12px;
@@ -706,43 +703,9 @@ onMounted(async () => {
   overflow: hidden;
 }
 
-.recent {
-  width: min(1100px, 100%);
-  margin: 20px auto 0;
-  text-align: left;
-}
-
-.recent h2 {
-  font-size: 16px;
-  margin: 0 0 10px;
-  color: #202124;
-}
-
-.recent ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 8px;
-}
-
-.recent button {
-  width: 100%;
-  text-align: left;
-  border: 1px solid #dadce0;
-  border-radius: 10px;
-  background: #ffffff;
-  padding: 10px 12px;
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  color: #202124;
-}
-
-.recent span {
-  font-size: 12px;
-  color: #9aa0a6;
+@media (max-width: 900px) {
+  .guide-main {
+    padding: 28px 16px 48px;
+  }
 }
 </style>

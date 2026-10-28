@@ -13,30 +13,66 @@
       "id": "universality",
       "title": "普遍性",
       "levels": [
-        { "label": "全民", "detail": "几亿量级" },
-        { "label": "大众", "detail": "千万/百万量级" },
-        { "label": "小众", "detail": "十万/几万量级" },
-        { "label": "特殊", "detail": "几千/几百量级" }
+        {
+          "label": "全民",
+          "detail": "几亿量级"
+        },
+        {
+          "label": "大众",
+          "detail": "千万/百万量级"
+        },
+        {
+          "label": "小众",
+          "detail": "十万/几万量级"
+        },
+        {
+          "label": "特殊",
+          "detail": "几千/几百量级"
+        }
       ]
     },
     "frequency": {
       "id": "frequency",
       "title": "频次",
       "levels": [
-        { "label": "高频", "detail": "一天一次" },
-        { "label": "中频", "detail": "一月一次" },
-        { "label": "低频", "detail": "一年一次" },
-        { "label": "极低", "detail": "一生一次" }
+        {
+          "label": "高频",
+          "detail": "一天一次"
+        },
+        {
+          "label": "中频",
+          "detail": "一月一次"
+        },
+        {
+          "label": "低频",
+          "detail": "一年一次"
+        },
+        {
+          "label": "极低",
+          "detail": "一生一次"
+        }
       ]
     },
     "rigidity": {
       "id": "rigidity",
       "title": "刚性",
       "levels": [
-        { "label": "非常刚", "detail": "加钱抢着用" },
-        { "label": "比较刚", "detail": "收费我也用" },
-        { "label": "不太刚", "detail": "免费我才用" },
-        { "label": "没刚性", "detail": "白给也不用" }
+        {
+          "label": "非常刚",
+          "detail": "加钱抢着用"
+        },
+        {
+          "label": "比较刚",
+          "detail": "收费我也用"
+        },
+        {
+          "label": "不太刚",
+          "detail": "免费我才用"
+        },
+        {
+          "label": "没刚性",
+          "detail": "白给也不用"
+        }
       ]
     }
   },
@@ -45,19 +81,31 @@
       "id": "dir_1",
       "color": "rgba(212, 175, 55, 0.38)",
       "stroke": "#c9a227",
-      "scores": { "universality": 0.92, "frequency": 0.88, "rigidity": 0.85 }
+      "scores": {
+        "universality": 0.92,
+        "frequency": 0.88,
+        "rigidity": 0.85
+      }
     },
     {
       "id": "dir_2",
       "color": "rgba(129, 199, 132, 0.4)",
       "stroke": "#66bb6a",
-      "scores": { "universality": 0.62, "frequency": 0.58, "rigidity": 0.55 }
+      "scores": {
+        "universality": 0.62,
+        "frequency": 0.58,
+        "rigidity": 0.55
+      }
     },
     {
       "id": "dir_3",
       "color": "rgba(77, 182, 172, 0.42)",
       "stroke": "#26a69a",
-      "scores": { "universality": 0.38, "frequency": 0.35, "rigidity": 0.42 }
+      "scores": {
+        "universality": 0.38,
+        "frequency": 0.35,
+        "rigidity": 0.42
+      }
     }
   ],
   "blocks": [
@@ -68,17 +116,74 @@
         {
           "id": "dir_1",
           "text": "第一个业务方向",
-          "style": { "color": "#3c4043", "fontSize": 14, "fontWeight": "600" }
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 14,
+            "fontWeight": "600"
+          }
         },
         {
           "id": "dir_2",
           "text": "第二个业务方向",
-          "style": { "color": "#3c4043", "fontSize": 14, "fontWeight": "600" }
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 14,
+            "fontWeight": "600"
+          }
         },
         {
           "id": "dir_3",
           "text": "第三个业务方向",
-          "style": { "color": "#3c4043", "fontSize": 14, "fontWeight": "600" }
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 14,
+            "fontWeight": "600"
+          }
+        }
+      ]
+    },
+    {
+      "id": "notes:dir_1",
+      "title": "第一个业务方向 · 备注",
+      "items": [
+        {
+          "id": "n_dir_1_1",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 14,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "notes:dir_2",
+      "title": "第二个业务方向 · 备注",
+      "items": [
+        {
+          "id": "n_dir_2_1",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 14,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "notes:dir_3",
+      "title": "第三个业务方向 · 备注",
+      "items": [
+        {
+          "id": "n_dir_3_1",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 14,
+            "fontWeight": "500"
+          }
         }
       ]
     }

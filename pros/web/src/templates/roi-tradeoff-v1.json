@@ -1,0 +1,44 @@
+{
+  "id": "canvas_roi_tradeoff",
+  "type": "roi_tradeoff",
+  "schemaVersion": 1,
+  "theme": {
+    "background": {
+      "pattern": "none",
+      "color": "#FDF5E6"
+    }
+  },
+  "title": "综合决策ROI权衡",
+  "blocks": [
+    {
+      "id": "benefits",
+      "title": "关键收益",
+      "items": [
+        {
+          "id": "item_benefits_list",
+          "text": "<p>1.</p><p>2.</p><p>3.</p><p>4.</p><p>5.</p><p>6.</p>",
+          "style": {
+            "color": "#202124",
+            "fontSize": 14,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "costs",
+      "title": "关键成本",
+      "items": [
+        {
+          "id": "item_costs_list",
+          "text": "<p>1.</p><p>2.</p><p>3.</p><p>4.</p><p>5.</p><p>6.</p>",
+          "style": {
+            "color": "#202124",
+            "fontSize": 14,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    }
+  ]
+}

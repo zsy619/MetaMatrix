@@ -708,6 +708,37 @@ defineProps<{
       </svg>
 
 
+      <!-- 产品内容5维特征：五边形雷达 -->
+      <svg
+        v-else-if="templateId === 'product-features-5d'"
+        class="thumb-svg"
+        viewBox="0 0 200 140"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <rect width="200" height="140" rx="10" fill="#ffffff" />
+        <polygon points="100.0,24.0 145.7,57.2 128.2,110.8 71.8,110.8 54.3,57.2" fill="none" stroke="#d0d4d9" stroke-width="1" />
+        <polygon points="100.0,33.6 136.5,60.1 122.6,103.1 77.4,103.1 63.5,60.1" fill="none" stroke="#d0d4d9" stroke-width="0.8" />
+        <polygon points="100.0,43.2 127.4,63.1 116.9,95.3 83.1,95.3 72.6,63.1" fill="none" stroke="#d0d4d9" stroke-width="0.8" />
+        <polygon points="100.0,52.8 118.3,66.1 111.3,87.5 88.7,87.5 81.7,66.1" fill="none" stroke="#d0d4d9" stroke-width="0.8" />
+        <polygon points="100.0,62.4 109.1,69.0 105.6,79.8 94.4,79.8 90.9,69.0" fill="none" stroke="#d0d4d9" stroke-width="0.8" />
+        <line x1="100.0" y1="72.0" x2="100.0" y2="24.0" stroke="#c5c9ce" stroke-width="0.8" />
+        <line x1="100.0" y1="72.0" x2="145.7" y2="57.2" stroke="#c5c9ce" stroke-width="0.8" />
+        <line x1="100.0" y1="72.0" x2="128.2" y2="110.8" stroke="#c5c9ce" stroke-width="0.8" />
+        <line x1="100.0" y1="72.0" x2="71.8" y2="110.8" stroke="#c5c9ce" stroke-width="0.8" />
+        <line x1="100.0" y1="72.0" x2="54.3" y2="57.2" stroke="#c5c9ce" stroke-width="0.8" />
+        <polygon points="100.0,24.0 127.4,63.1 111.3,87.5 85.9,91.4 54.3,57.2" fill="rgba(79,195,247,0.35)" stroke="#29b6f6" stroke-width="1.3" />
+        <rect x="97.0" y="21.0" width="6" height="6" rx="1" fill="#4fc3f7" />
+        <rect x="124.4" y="60.1" width="6" height="6" rx="1" fill="#4fc3f7" />
+        <rect x="108.3" y="84.5" width="6" height="6" rx="1" fill="#4fc3f7" />
+        <rect x="82.9" y="88.4" width="6" height="6" rx="1" fill="#4fc3f7" />
+        <rect x="51.3" y="54.2" width="6" height="6" rx="1" fill="#4fc3f7" />
+        <text x="100.0" y="14.0" text-anchor="middle" font-size="5.5" font-weight="700" fill="#3c4043">开放性</text>
+        <text x="162.0" y="52.0" text-anchor="start" font-size="5.5" font-weight="700" fill="#3c4043">投入性</text>
+        <text x="148.0" y="124.0" text-anchor="start" font-size="5.5" font-weight="700" fill="#3c4043">易错性</text>
+        <text x="52.0" y="124.0" text-anchor="end" font-size="5.5" font-weight="700" fill="#3c4043">迭代性</text>
+        <text x="38.0" y="52.0" text-anchor="end" font-size="5.5" font-weight="700" fill="#3c4043">创新性</text>
+      </svg>
+
       <!-- 项目管理方案评估三角形：等边三角雷达 -->
       <svg
         v-else-if="templateId === 'pm-solution-triangle'"
@@ -811,6 +842,101 @@ defineProps<{
         <text x="110" y="96" font-size="5" font-weight="700" fill="#d65a46">关键的清单：</text>
         <text x="110" y="108" font-size="4.5" fill="#202124">1. VI规范清单</text>
         <text x="110" y="120" font-size="5" font-weight="700" fill="#d65a46">关键执行SOP</text>
+      </svg>
+
+      <!-- 单元模型象限：米色底十字轴四色标题 -->
+      <svg
+        v-else-if="templateId === 'unit-model-quadrant'"
+        class="thumb-svg"
+        viewBox="0 0 200 140"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <rect width="200" height="140" rx="10" fill="#f5efe6" />
+        <text x="100" y="14" text-anchor="middle" font-size="6.5" font-weight="800" fill="#202124">单元模型长期成立</text>
+        <text x="18" y="76" text-anchor="middle" font-size="5.5" font-weight="800" fill="#202124">公司账不成立</text>
+        <text x="182" y="76" text-anchor="middle" font-size="5.5" font-weight="800" fill="#202124">公司账长期成立</text>
+        <text x="100" y="134" text-anchor="middle" font-size="6.5" font-weight="800" fill="#202124">单元模型不成立</text>
+        <line x1="100" y1="126" x2="100" y2="20" stroke="#111" stroke-width="1.6" marker-end="url(#umq-thumb-arrow)" />
+        <line x1="28" y1="72" x2="172" y2="72" stroke="#111" stroke-width="1.6" marker-end="url(#umq-thumb-arrow)" />
+        <defs>
+          <marker id="umq-thumb-arrow" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="6" markerHeight="6" orient="auto">
+            <path d="M 0 1 L 11 6 L 0 11 z" fill="#111" />
+          </marker>
+        </defs>
+        <text x="55" y="48" text-anchor="middle" font-size="6" font-weight="800" fill="#c9a227">总部成本过高</text>
+        <text x="145" y="48" text-anchor="middle" font-size="7" font-weight="800" fill="#2d9b8a">健康模型</text>
+        <text x="55" y="100" text-anchor="middle" font-size="6" font-weight="800" fill="#c94c4c">放弃 or 调整</text>
+        <text x="145" y="100" text-anchor="middle" font-size="7" font-weight="800" fill="#e0a85c">不存在</text>
+      </svg>
+
+
+      <!-- 综合决策ROI权衡：黄头双栏收益/成本 -->
+      <svg
+        v-else-if="templateId === 'roi-tradeoff'"
+        class="thumb-svg"
+        viewBox="0 0 200 140"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <rect width="200" height="140" rx="10" fill="#FDF5E6" />
+        <rect x="8" y="10" width="90" height="18" fill="#FFEB3B" />
+        <rect x="102" y="10" width="90" height="18" fill="#FFEB3B" />
+        <text x="18" y="22" font-size="7" font-weight="800" fill="#202124">关键收益</text>
+        <text x="112" y="22" font-size="7" font-weight="800" fill="#202124">关键成本</text>
+        <rect x="8" y="28" width="90" height="102" fill="#FDF5E6" stroke="#ffffff" stroke-width="1" />
+        <rect x="102" y="28" width="90" height="102" fill="#FDF5E6" stroke="#ffffff" stroke-width="1" />
+        <text x="16" y="46" font-size="5.5" fill="#202124">1.</text>
+        <text x="16" y="60" font-size="5.5" fill="#202124">2.</text>
+        <text x="16" y="74" font-size="5.5" fill="#202124">3.</text>
+        <text x="16" y="88" font-size="5.5" fill="#202124">4.</text>
+        <text x="16" y="102" font-size="5.5" fill="#202124">5.</text>
+        <text x="16" y="116" font-size="5.5" fill="#202124">6.</text>
+        <text x="110" y="46" font-size="5.5" fill="#202124">1.</text>
+        <text x="110" y="60" font-size="5.5" fill="#202124">2.</text>
+        <text x="110" y="74" font-size="5.5" fill="#202124">3.</text>
+        <text x="110" y="88" font-size="5.5" fill="#202124">4.</text>
+        <text x="110" y="102" font-size="5.5" fill="#202124">5.</text>
+        <text x="110" y="116" font-size="5.5" fill="#202124">6.</text>
+      </svg>
+
+
+      <!-- ROI决策评估：蓝头矩阵缩略 -->
+      <svg
+        v-else-if="templateId === 'roi-decision'"
+        class="thumb-svg"
+        viewBox="0 0 200 140"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <rect width="200" height="140" rx="10" fill="#E6F7FF" />
+        <!-- top headers -->
+        <rect x="8" y="8" width="40" height="14" fill="#00BFFF" stroke="#5f6368" stroke-width="0.6" />
+        <rect x="48" y="8" width="68" height="14" fill="#00BFFF" stroke="#5f6368" stroke-width="0.6" />
+        <rect x="116" y="8" width="68" height="14" fill="#00BFFF" stroke="#5f6368" stroke-width="0.6" />
+        <text x="28" y="18" text-anchor="middle" font-size="6" font-weight="800" fill="#111">维度</text>
+        <text x="82" y="18" text-anchor="middle" font-size="6" font-weight="800" fill="#111">收益项</text>
+        <text x="150" y="18" text-anchor="middle" font-size="6" font-weight="800" fill="#111">成本项</text>
+        <!-- rows -->
+        <rect x="8" y="22" width="40" height="28" fill="#E6F7FF" stroke="#5f6368" stroke-width="0.6" />
+        <rect x="48" y="22" width="68" height="28" fill="#E6F7FF" stroke="#5f6368" stroke-width="0.6" />
+        <rect x="116" y="22" width="68" height="28" fill="#E6F7FF" stroke="#5f6368" stroke-width="0.6" />
+        <text x="28" y="38" text-anchor="middle" font-size="5.5" font-weight="700" fill="#111">基础ROI</text>
+        <rect x="8" y="50" width="40" height="14" fill="#E6F7FF" stroke="#5f6368" stroke-width="0.6" />
+        <rect x="48" y="50" width="68" height="14" fill="#E6F7FF" stroke="#5f6368" stroke-width="0.6" />
+        <rect x="116" y="50" width="68" height="14" fill="#E6F7FF" stroke="#5f6368" stroke-width="0.6" />
+        <text x="28" y="60" text-anchor="middle" font-size="5" font-weight="700" fill="#111">长期视角</text>
+        <rect x="8" y="64" width="40" height="14" fill="#E6F7FF" stroke="#5f6368" stroke-width="0.6" />
+        <rect x="48" y="64" width="68" height="14" fill="#E6F7FF" stroke="#5f6368" stroke-width="0.6" />
+        <rect x="116" y="64" width="68" height="14" fill="#E6F7FF" stroke="#5f6368" stroke-width="0.6" />
+        <text x="28" y="74" text-anchor="middle" font-size="5" font-weight="700" fill="#111">公司视角</text>
+        <!-- middle -->
+        <rect x="8" y="82" width="88" height="12" fill="#00BFFF" stroke="#5f6368" stroke-width="0.6" />
+        <rect x="96" y="82" width="88" height="12" fill="#00BFFF" stroke="#5f6368" stroke-width="0.6" />
+        <text x="52" y="91" text-anchor="middle" font-size="5.5" font-weight="800" fill="#111">机会成本</text>
+        <text x="140" y="91" text-anchor="middle" font-size="5.5" font-weight="800" fill="#111">时间窗口</text>
+        <rect x="8" y="94" width="88" height="16" fill="#E6F7FF" stroke="#5f6368" stroke-width="0.6" />
+        <rect x="96" y="94" width="88" height="16" fill="#E6F7FF" stroke="#5f6368" stroke-width="0.6" />
+        <!-- conclusion -->
+        <rect x="8" y="114" width="176" height="18" fill="#E6F7FF" stroke="#5f6368" stroke-width="0.6" />
+        <text x="16" y="126" font-size="5.5" font-weight="800" fill="#111">最终结论</text>
       </svg>
 
       <!-- 业务公式：浅色树图缩略（白灰底） -->

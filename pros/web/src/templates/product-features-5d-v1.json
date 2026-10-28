@@ -1,0 +1,117 @@
+{
+  "id": "canvas_product_features_5d",
+  "type": "product_features_5d",
+  "schemaVersion": 1,
+  "theme": {
+    "background": {
+      "pattern": "none",
+      "color": "#ffffff"
+    }
+  },
+  "axes": {
+    "openness": {
+      "id": "openness",
+      "title": "开放性"
+    },
+    "engagement": {
+      "id": "engagement",
+      "title": "投入性"
+    },
+    "error_prone": {
+      "id": "error_prone",
+      "title": "易错性"
+    },
+    "iterativity": {
+      "id": "iterativity",
+      "title": "迭代性"
+    },
+    "innovation": {
+      "id": "innovation",
+      "title": "创新性"
+    }
+  },
+  "scores": {
+    "openness": 100,
+    "engagement": 60,
+    "error_prone": 40,
+    "iterativity": 50,
+    "innovation": 100
+  },
+  "blocks": [
+    {
+      "id": "openness",
+      "title": "开放性",
+      "items": [
+        {
+          "id": "item_pf5d_openness_1",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 14,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "engagement",
+      "title": "投入性",
+      "items": [
+        {
+          "id": "item_pf5d_engagement_1",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 14,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "error_prone",
+      "title": "易错性",
+      "items": [
+        {
+          "id": "item_pf5d_error_prone_1",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 14,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "iterativity",
+      "title": "迭代性",
+      "items": [
+        {
+          "id": "item_pf5d_iterativity_1",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 14,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "innovation",
+      "title": "创新性",
+      "items": [
+        {
+          "id": "item_pf5d_innovation_1",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 14,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    }
+  ]
+}

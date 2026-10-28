@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type {
   DemandTriangleAxisId,
   DemandTriangleDirection,
   DemandTriangleDocumentJSON,
+  DemandTriangleNotesBlock,
   DemandTriangleScores,
 } from '../../types/canvas'
+import { demandTriangleNotesBlockId } from '../../types/canvas'
 import { useSelectionStore } from '../../stores/selection'
 import { useDocumentStore } from '../../stores/document'
 import {
@@ -14,6 +16,7 @@ import {
 } from '../../composables/usePanelMaximize'
 import RichTextItem from '../RichTextItem.vue'
 import PanelAttachments from './PanelAttachments.vue'
+import YModelBlockCard from './YModelBlock.vue'
 
 const props = defineProps<{
   doc: DemandTriangleDocumentJSON
@@ -21,6 +24,9 @@ const props = defineProps<{
 
 const selection = useSelectionStore()
 const documentStore = useDocumentStore()
+
+// Sync notes blocks before first render (v-if hosts need defined ids).
+documentStore.ensureDemandTriangleNotesBlocks()
 
 const maximizeKey = computed(() => panelMaximizeKey('demand', 'legend'))
 const { isMaximized, toggleMaximize, closeMaximize } =
@@ -30,7 +36,9 @@ const bgColor = computed(
   () => props.doc.theme.background.color || '#f4f5f7',
 )
 
-const legendBlock = computed(() => props.doc.blocks.find((b) => b.id === 'legend'))
+const legendBlock = computed(() =>
+  props.doc.blocks.find((b) => b.id === 'legend'),
+)
 
 const legendItems = computed(() => legendBlock.value?.items ?? [])
 
@@ -39,6 +47,23 @@ const directionById = computed(() => {
   for (const d of props.doc.directions) map.set(d.id, d)
   return map
 })
+
+const notesBlocks = computed(() => {
+  const list: DemandTriangleNotesBlock[] = []
+  for (const b of props.doc.blocks) {
+    if (b.id !== 'legend' && String(b.id).startsWith('notes:')) {
+      list.push(b as DemandTriangleNotesBlock)
+    }
+  }
+  return list
+})
+
+function notesBlockOf(dirId: string): DemandTriangleNotesBlock | undefined {
+  const id = demandTriangleNotesBlockId(dirId)
+  return props.doc.blocks.find((b) => b.id === id) as
+    | DemandTriangleNotesBlock
+    | undefined
+}
 
 const PALETTE = [
   { color: 'rgba(212, 175, 55, 0.38)', stroke: '#c9a227' },
@@ -101,6 +126,7 @@ function onAddDirection(event: MouseEvent) {
       stroke: palette.stroke,
       scores: { universality: 0.55, frequency: 0.5, rigidity: 0.48 },
     })
+    documentStore.ensureDemandTriangleNotesBlocks()
     selection.selectBlockItem('legend', item.id)
   }
 }
@@ -131,10 +157,55 @@ function onCloseMaximize(event?: Event) {
   closeMaximize()
 }
 
-/* ---- radar geometry (viewBox 640×580) ---- */
-const CX = 330
-const CY = 318
-const R = 210
+/* ---- 备注：每方向 notes:<dirId> → 全局 panel-maximize 全屏 RTE ---- */
+const activeNotesDirId = ref<string | null>(null)
+
+const activeNotesMaximizeKey = computed(() => {
+  const dirId = activeNotesDirId.value
+  if (!dirId) return 'demand-notes:idle'
+  const b = notesBlockOf(dirId)
+  return b ? panelMaximizeKey('block', b.id) : 'demand-notes:idle'
+})
+
+const { maximizedPanelKey } = usePanelMaximize(activeNotesMaximizeKey)
+
+function openDirectionNotes(dirId: string, event?: Event) {
+  event?.stopPropagation()
+  event?.preventDefault()
+  documentStore.ensureDemandTriangleNotesBlocks()
+  const b = notesBlockOf(dirId)
+  if (!b) return
+  activeNotesDirId.value = dirId
+  selection.selectBlock(b.id)
+  const key = panelMaximizeKey('block', b.id)
+  nextTick(() => {
+    maximizedPanelKey.value = key
+  })
+}
+
+watch(maximizedPanelKey, (key) => {
+  if (!key && activeNotesDirId.value) {
+    activeNotesDirId.value = null
+  }
+})
+
+onMounted(() => {
+  documentStore.ensureDemandTriangleNotesBlocks()
+})
+
+onBeforeUnmount(() => {
+  if (
+    activeNotesDirId.value &&
+    maximizedPanelKey.value === activeNotesMaximizeKey.value
+  ) {
+    maximizedPanelKey.value = null
+  }
+})
+
+/* ---- radar geometry (viewBox 720×640，给顶点标签留边) ---- */
+const CX = 360
+const CY = 340
+const R = 220
 
 /** 顶 / 右下 / 左下 */
 const AXIS_ORDER: DemandTriangleAxisId[] = [
@@ -178,7 +249,11 @@ const overlays = computed(() =>
   }),
 )
 
-const vertexLabels = computed(() => {
+/**
+ * 轴标题 + 四级刻度：贴着顶点外侧排版（对齐参考图）。
+ * levels 外→内；标题在 levels 下方；装饰线在标题上方。
+ */
+const vertexPanels = computed(() => {
   const u = props.doc.axes.universality
   const f = props.doc.axes.frequency
   const r = props.doc.axes.rigidity
@@ -187,28 +262,26 @@ const vertexLabels = computed(() => {
   const [lx, ly] = polar(2, R)
   return [
     {
+      key: 'universality',
       axis: u,
-      x: tx,
-      y: ty,
-      anchor: 'middle' as const,
-      titleDy: -28,
-      scaleSide: 'top' as const,
+      side: 'top' as const,
+      // 百分比相对 viewBox，供 HTML 覆盖层使用
+      leftPct: (tx / 720) * 100,
+      topPct: (ty / 640) * 100,
     },
     {
+      key: 'rigidity',
       axis: r,
-      x: rx,
-      y: ry,
-      anchor: 'start' as const,
-      titleDy: 28,
-      scaleSide: 'right' as const,
+      side: 'right' as const,
+      leftPct: (rx / 720) * 100,
+      topPct: (ry / 640) * 100,
     },
     {
+      key: 'frequency',
       axis: f,
-      x: lx,
-      y: ly,
-      anchor: 'end' as const,
-      titleDy: 28,
-      scaleSide: 'left' as const,
+      side: 'left' as const,
+      leftPct: (lx / 720) * 100,
+      topPct: (ly / 640) * 100,
     },
   ]
 })
@@ -278,6 +351,25 @@ const vertexLabels = computed(() => {
               @update:model-value="(v) => documentStore.updateBlockItem('legend', item.id, { text: v })"
               @focus="() => selection.selectBlockItem('legend', item.id)"
             />
+            <div class="legend-row-actions">
+              <button
+                type="button"
+                class="legend-notes-btn"
+                title="备注"
+                @click="openDirectionNotes(item.id, $event)"
+              >
+                备注
+              </button>
+              <button
+                v-if="itemSelected(item.id)"
+                type="button"
+                class="legend-remove"
+                title="删除"
+                @click="onRemoveItem($event, item.id)"
+              >
+                ×
+              </button>
+            </div>
             <div
               v-if="itemSelected(item.id)"
               class="legend-scores"
@@ -317,15 +409,6 @@ const vertexLabels = computed(() => {
                 />
               </label>
             </div>
-            <button
-              v-if="itemSelected(item.id)"
-              type="button"
-              class="legend-remove"
-              title="删除"
-              @click="onRemoveItem($event, item.id)"
-            >
-              ×
-            </button>
           </li>
         </ul>
       </template>
@@ -419,6 +502,25 @@ const vertexLabels = computed(() => {
                   @update:model-value="(v) => documentStore.updateBlockItem('legend', item.id, { text: v })"
                   @focus="() => selection.selectBlockItem('legend', item.id)"
                 />
+                <div class="legend-row-actions">
+                  <button
+                    type="button"
+                    class="legend-notes-btn"
+                    title="备注"
+                    @click="openDirectionNotes(item.id, $event)"
+                  >
+                    备注
+                  </button>
+                  <button
+                    v-if="itemSelected(item.id)"
+                    type="button"
+                    class="legend-remove"
+                    title="删除"
+                    @click="onRemoveItem($event, item.id)"
+                  >
+                    ×
+                  </button>
+                </div>
                 <div
                   v-if="itemSelected(item.id)"
                   class="legend-scores"
@@ -458,15 +560,6 @@ const vertexLabels = computed(() => {
                     />
                   </label>
                 </div>
-                <button
-                  v-if="itemSelected(item.id)"
-                  type="button"
-                  class="legend-remove"
-                  title="删除"
-                  @click="onRemoveItem($event, item.id)"
-                >
-                  ×
-                </button>
               </li>
             </ul>
             <p v-if="legendItems.length === 0" class="pm-empty">点击 + 添加业务方向</p>
@@ -479,151 +572,94 @@ const vertexLabels = computed(() => {
 
     <!-- 雷达主体 -->
     <div class="dt-stage">
-      <svg
-        class="dt-radar"
-        viewBox="0 0 640 580"
-        xmlns="http://www.w3.org/2000/svg"
-        role="img"
-        aria-label="需求评估三角形"
-      >
-        <!-- 同心三角网格 -->
-        <polygon
-          v-for="(pts, idx) in rings"
-          :key="`ring-${idx}`"
-          :points="pts"
-          fill="none"
-          :stroke="idx === 0 ? '#9aa0a6' : '#c5c9ce'"
-          :stroke-width="idx === 0 ? 2.2 : 1.4"
-          opacity="0.85"
-        />
-
-        <!-- 中心到顶点轴线 -->
-        <line
-          v-for="(ln, i) in axisLines"
-          :key="`axis-${i}`"
-          :x1="ln.x1"
-          :y1="ln.y1"
-          :x2="ln.x2"
-          :y2="ln.y2"
-          stroke="#b0b4b8"
-          stroke-width="1.2"
-          stroke-dasharray="4 3"
-          opacity="0.7"
-        />
-
-        <!-- 业务方向叠绘 -->
-        <polygon
-          v-for="ov in overlays"
-          :key="ov.id"
-          :points="ov.points"
-          :fill="ov.fill"
-          :stroke="ov.stroke"
-          stroke-width="1.8"
-          stroke-linejoin="round"
-        />
-
-        <!-- 顶点装饰线 + 空心圆 -->
-        <g v-for="(v, i) in vertexLabels" :key="`deco-${i}`" opacity="0.55">
-          <template v-if="v.scaleSide === 'top'">
-            <line
-              :x1="v.x - 36"
-              :y1="v.y - 14"
-              :x2="v.x + 36"
-              :y2="v.y - 14"
-              stroke="#9aa0a6"
-              stroke-width="1"
-            />
-            <circle
-              :cx="v.x + 40"
-              :cy="v.y - 14"
-              r="3.5"
-              fill="none"
-              stroke="#9aa0a6"
-              stroke-width="1.2"
-            />
-          </template>
-          <template v-else-if="v.scaleSide === 'right'">
-            <line
-              :x1="v.x + 10"
-              :y1="v.y + 8"
-              :x2="v.x + 72"
-              :y2="v.y + 8"
-              stroke="#9aa0a6"
-              stroke-width="1"
-            />
-            <circle
-              :cx="v.x + 76"
-              :cy="v.y + 8"
-              r="3.5"
-              fill="none"
-              stroke="#9aa0a6"
-              stroke-width="1.2"
-            />
-          </template>
-          <template v-else>
-            <line
-              :x1="v.x - 10"
-              :y1="v.y + 8"
-              :x2="v.x - 72"
-              :y2="v.y + 8"
-              stroke="#9aa0a6"
-              stroke-width="1"
-            />
-            <circle
-              :cx="v.x - 76"
-              :cy="v.y + 8"
-              r="3.5"
-              fill="none"
-              stroke="#9aa0a6"
-              stroke-width="1.2"
-            />
-          </template>
-        </g>
-
-        <!-- 轴标题 -->
-        <text
-          v-for="(v, i) in vertexLabels"
-          :key="`title-${i}`"
-          :x="v.x"
-          :y="v.y + v.titleDy"
-          :text-anchor="v.anchor"
-          class="axis-title"
+      <div class="dt-radar-wrap">
+        <svg
+          class="dt-radar"
+          viewBox="0 0 720 640"
+          xmlns="http://www.w3.org/2000/svg"
+          role="img"
+          aria-label="需求评估三角形"
         >
-          {{ v.axis.title }}
-        </text>
-      </svg>
+          <!-- 同心三角网格 -->
+          <polygon
+            v-for="(pts, idx) in rings"
+            :key="`ring-${idx}`"
+            :points="pts"
+            fill="none"
+            :stroke="idx === 0 ? '#9aa0a6' : '#c5c9ce'"
+            :stroke-width="idx === 0 ? 2.2 : 1.4"
+            opacity="0.85"
+          />
 
-      <!-- HTML 刻度说明（比 SVG 文本更易排版） -->
-      <div class="scale-panel scale-top">
+          <!-- 中心到顶点轴线 -->
+          <line
+            v-for="(ln, i) in axisLines"
+            :key="`axis-${i}`"
+            :x1="ln.x1"
+            :y1="ln.y1"
+            :x2="ln.x2"
+            :y2="ln.y2"
+            stroke="#b0b4b8"
+            stroke-width="1.2"
+            stroke-dasharray="4 3"
+            opacity="0.7"
+          />
+
+          <!-- 业务方向叠绘 -->
+          <polygon
+            v-for="ov in overlays"
+            :key="ov.id"
+            :points="ov.points"
+            :fill="ov.fill"
+            :stroke="ov.stroke"
+            stroke-width="1.8"
+            stroke-linejoin="round"
+          />
+        </svg>
+
+        <!-- 顶点刻度面板：贴着三角边缘，非整屏漂浮 -->
         <div
-          v-for="(lv, i) in doc.axes.universality.levels"
-          :key="`u-${i}`"
-          class="scale-row"
+          v-for="vp in vertexPanels"
+          :key="vp.key"
+          class="axis-panel"
+          :class="`axis-panel--${vp.side}`"
+          :style="{
+            left: vp.leftPct + '%',
+            top: vp.topPct + '%',
+          }"
         >
-          <strong>{{ lv.label }}</strong>
-          <span>{{ lv.detail }}</span>
+          <div class="axis-levels">
+            <div
+              v-for="(lv, i) in vp.axis.levels"
+              :key="`${vp.key}-lv-${i}`"
+              class="axis-level-row"
+            >
+              <strong>{{ lv.label }}</strong>
+              <span class="axis-level-sep">：</span>
+              <span>{{ lv.detail }}</span>
+            </div>
+          </div>
+          <div class="axis-deco" aria-hidden="true">
+            <span class="axis-deco-line" />
+            <span class="axis-deco-dot" />
+          </div>
+          <div class="axis-title">{{ vp.axis.title }}</div>
         </div>
       </div>
-      <div class="scale-panel scale-left">
-        <div
-          v-for="(lv, i) in doc.axes.frequency.levels"
-          :key="`f-${i}`"
-          class="scale-row"
-        >
-          <strong>{{ lv.label }}</strong>
-          <span>{{ lv.detail }}</span>
-        </div>
-      </div>
-      <div class="scale-panel scale-right">
-        <div
-          v-for="(lv, i) in doc.axes.rigidity.levels"
-          :key="`r-${i}`"
-          class="scale-row"
-        >
-          <strong>{{ lv.label }}</strong>
-          <span>{{ lv.detail }}</span>
-        </div>
-      </div>
+    </div>
+
+    <!--
+      隐藏挂载各方向备注 YModelBlock：点击「备注」写入全局 maximizedPanelKey，
+      由块内 Teleport .pm-overlay 铺满文档视口（approach B，v-if 避免 undefined block.id）。
+    -->
+    <div class="dt-notes-host" aria-hidden="true">
+      <template v-for="block in notesBlocks" :key="block.id">
+        <YModelBlockCard
+          v-if="block"
+          :block="block"
+          hide-title
+        />
+      </template>
     </div>
   </div>
 </template>
@@ -637,9 +673,11 @@ const vertexLabels = computed(() => {
   box-sizing: border-box;
   padding: 18px 20px 20px;
   display: grid;
-  grid-template-columns: minmax(200px, 260px) minmax(0, 1fr);
+  grid-template-columns: minmax(200px, 280px) minmax(0, 1fr);
   grid-template-rows: 1fr;
   gap: 8px 4px;
+  font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui,
+    sans-serif;
 }
 
 .dt-legend {
@@ -718,7 +756,7 @@ const vertexLabels = computed(() => {
   display: grid;
   grid-template-columns: 14px minmax(0, 1fr) auto;
   grid-template-rows: auto auto;
-  column-gap: 10px;
+  column-gap: 8px;
   row-gap: 4px;
   align-items: center;
   padding: 4px 4px 4px 2px;
@@ -751,6 +789,36 @@ const vertexLabels = computed(() => {
   padding: 2px 0;
 }
 
+.legend-row-actions {
+  grid-column: 3;
+  grid-row: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.legend-notes-btn {
+  height: 22px;
+  padding: 0 7px;
+  border: 1px solid #dadce0;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #5f6368;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.legend-notes-btn:hover {
+  border-color: #1a73e8;
+  color: #1a73e8;
+  background: #e8f0fe;
+}
+
 .legend-scores {
   grid-column: 2 / 4;
   grid-row: 2;
@@ -776,8 +844,6 @@ const vertexLabels = computed(() => {
 }
 
 .legend-remove {
-  grid-column: 3;
-  grid-row: 1;
   width: 20px;
   height: 20px;
   border: none;
@@ -821,61 +887,120 @@ const vertexLabels = computed(() => {
   justify-content: center;
 }
 
-.dt-radar {
-  width: min(100%, 720px);
-  height: min(100%, 640px);
+.dt-radar-wrap {
+  position: relative;
+  width: min(100%, 780px);
+  height: min(100%, 700px);
   max-height: 100%;
+  aspect-ratio: 720 / 640;
+}
+
+.dt-radar {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   overflow: visible;
 }
 
-.axis-title {
-  fill: #3c4043;
-  font-size: 22px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-}
-
-.scale-panel {
+/* 顶点标签：锚在顶点坐标，按侧面偏移贴边 */
+.axis-panel {
   position: absolute;
+  z-index: 2;
+  pointer-events: none;
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  pointer-events: none;
-  z-index: 2;
+  gap: 4px;
+  max-width: 210px;
 }
 
-.scale-row {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  font-size: 12.5px;
-  line-height: 1.45;
-  color: #9aa0a6;
+.axis-panel--top {
+  transform: translate(-18%, calc(-100% - 10px));
+  align-items: flex-start;
 }
 
-.scale-row strong {
-  font-weight: 700;
-  color: #5f6368;
-  min-width: 3.4em;
-}
-
-.scale-top {
-  top: 1.5%;
-  left: 54%;
-  transform: none;
+.axis-panel--left {
+  transform: translate(calc(-100% - 8px), -72%);
+  align-items: flex-start;
   text-align: left;
 }
 
-.scale-left {
-  left: 1%;
-  bottom: 6%;
+.axis-panel--right {
+  transform: translate(8px, -72%);
   align-items: flex-start;
+  text-align: left;
 }
 
-.scale-right {
-  right: 1%;
-  bottom: 6%;
-  align-items: flex-start;
+.axis-levels {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.axis-level-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: #9aa0a6;
+  white-space: nowrap;
+}
+
+.axis-level-row strong {
+  font-weight: 700;
+  color: #5f6368;
+}
+
+.axis-level-sep {
+  color: #9aa0a6;
+  font-weight: 500;
+}
+
+.axis-deco {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  width: 78px;
+  margin-top: 2px;
+  opacity: 0.7;
+}
+
+.axis-panel--left .axis-deco {
+  flex-direction: row-reverse;
+}
+
+.axis-deco-line {
+  flex: 1;
+  height: 1px;
+  background: #9aa0a6;
+}
+
+.axis-deco-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: 1.2px solid #9aa0a6;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  background: transparent;
+}
+
+.axis-title {
+  font-size: 20px;
+  font-weight: 800;
+  color: #3c4043;
+  letter-spacing: 0.06em;
+  line-height: 1.2;
+}
+
+.dt-notes-host {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
 }
 
 @media (max-width: 960px) {
@@ -894,13 +1019,12 @@ const vertexLabels = computed(() => {
     min-height: 420px;
   }
 
-  .scale-panel {
+  .axis-level-row {
     font-size: 11px;
   }
 
   .axis-title {
-    font-size: 18px;
+    font-size: 16px;
   }
 }
-
 </style>

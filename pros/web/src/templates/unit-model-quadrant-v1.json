@@ -1,0 +1,67 @@
+{
+  "id": "canvas_unit_model_quadrant",
+  "type": "unit_model_quadrant",
+  "schemaVersion": 1,
+  "theme": {
+    "background": {
+      "pattern": "none",
+      "color": "#f5efe6"
+    }
+  },
+  "axes": {
+    "unitModelLongTerm": "单元模型长期成立",
+    "unitModelInvalid": "单元模型不成立",
+    "companyAccountInvalid": "公司账不成立",
+    "companyAccountLongTerm": "公司账长期成立"
+  },
+  "blocks": [
+    {
+      "id": "a",
+      "title": "健康模型",
+      "tone": "teal",
+      "items": [
+        {
+          "id": "item_umq_a_1",
+          "text": "<p style=\"text-align: center\"><strong style=\"color: #2d9b8a\">健康模型</strong></p>",
+          "style": { "color": "#3c4043", "fontSize": 13, "fontWeight": "500" }
+        }
+      ]
+    },
+    {
+      "id": "b",
+      "title": "总部成本过高（优化效率）",
+      "tone": "mustard",
+      "items": [
+        {
+          "id": "item_umq_b_1",
+          "text": "<p style=\"text-align: center\"><strong style=\"color: #c9a227\">总部成本过高（优化效率）</strong></p>",
+          "style": { "color": "#3c4043", "fontSize": 13, "fontWeight": "500" }
+        }
+      ]
+    },
+    {
+      "id": "c",
+      "title": "放弃 or 调整模型",
+      "tone": "red",
+      "items": [
+        {
+          "id": "item_umq_c_1",
+          "text": "<p style=\"text-align: center\"><strong style=\"color: #c94c4c\">放弃 or 调整模型</strong></p>",
+          "style": { "color": "#3c4043", "fontSize": 13, "fontWeight": "500" }
+        }
+      ]
+    },
+    {
+      "id": "d",
+      "title": "不存在",
+      "tone": "amber",
+      "items": [
+        {
+          "id": "item_umq_d_1",
+          "text": "<p style=\"text-align: center\"><strong style=\"color: #e0a85c\">不存在</strong></p>",
+          "style": { "color": "#3c4043", "fontSize": 13, "fontWeight": "500" }
+        }
+      ]
+    }
+  ]
+}

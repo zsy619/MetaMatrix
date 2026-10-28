@@ -294,10 +294,40 @@ export interface DemandTriangleDirection {
   scores: DemandTriangleScores
 }
 
-export interface DemandTriangleBlock {
+/** 业务方向图例块 */
+export interface DemandTriangleLegendBlock {
   id: 'legend'
   title: string
   items: QuadrantItem[]
+}
+
+/** 单方向备注富文本块 id：notes:<dirId> */
+export type DemandTriangleNotesBlockId = `notes:${string}`
+
+/** 单方向备注块（全屏 RTE） */
+export interface DemandTriangleNotesBlock {
+  id: DemandTriangleNotesBlockId
+  title: string
+  items: QuadrantItem[]
+}
+
+export type DemandTriangleBlock =
+  | DemandTriangleLegendBlock
+  | DemandTriangleNotesBlock
+
+/** notes:<dirId> */
+export function demandTriangleNotesBlockId(
+  dirId: string,
+): DemandTriangleNotesBlockId {
+  return `notes:${dirId}`
+}
+
+export function parseDemandTriangleNotesDirId(
+  blockId: string,
+): string | null {
+  if (!blockId.startsWith('notes:')) return null
+  const dirId = blockId.slice('notes:'.length)
+  return dirId || null
 }
 
 /** 需求评估三角形画布文档 */
@@ -788,6 +818,55 @@ export interface PmRetroValueDocumentJSON {
   blocks: PmRetroValueBlock[]
 }
 
+/** 综合决策ROI权衡 · 方块 id */
+export type RoiTradeoffBlockId = 'benefits' | 'costs'
+
+export interface RoiTradeoffBlock {
+  id: RoiTradeoffBlockId
+  title: string
+  items: QuadrantItem[]
+}
+
+/** 综合决策ROI权衡（关键收益 / 关键成本 双栏） */
+export interface RoiTradeoffDocumentJSON {
+  id: string
+  type: 'roi_tradeoff'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  blocks: RoiTradeoffBlock[]
+}
+
+/** ROI决策评估 · 固定面板 block id */
+export type RoiDecisionFixedBlockId =
+  | 'opportunityCost'
+  | 'timeWindow'
+  | 'conclusion'
+
+export interface RoiDecisionRow {
+  id: string
+  dimension: string
+  benefitBlockId: string
+  costBlockId: string
+}
+
+export interface RoiDecisionBlock {
+  id: string
+  title: string
+  items: QuadrantItem[]
+}
+
+/** ROI决策评估（维度×收益/成本动态行 + 机会成本/时间窗口 + 最终结论） */
+export interface RoiDecisionDocumentJSON {
+  id: string
+  type: 'roi_decision'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  rows: RoiDecisionRow[]
+  blocks: RoiDecisionBlock[]
+}
+
 /** 时间管理矩阵（艾森豪威尔） · 象限 id */
 export type TimeMatrixBlockId = 'a' | 'b' | 'c' | 'd'
 
@@ -886,6 +965,40 @@ export interface OnlineOfflineCommDocumentJSON {
 }
 
 
+/** 单元模型象限 · 块 id（a=右上健康 · b=左上总部成本 · c=左下放弃 · d=右下不存在） */
+export type UnitModelQuadrantBlockId = 'a' | 'b' | 'c' | 'd'
+
+export type UnitModelQuadrantTone = 'teal' | 'mustard' | 'red' | 'amber'
+
+export interface UnitModelQuadrantBlock {
+  id: UnitModelQuadrantBlockId
+  title: string
+  tone: UnitModelQuadrantTone
+  items: QuadrantItem[]
+}
+
+export interface UnitModelQuadrantAxes {
+  /** 上：单元模型长期成立 */
+  unitModelLongTerm: string
+  /** 下：单元模型不成立 */
+  unitModelInvalid: string
+  /** 左：公司账不成立 */
+  companyAccountInvalid: string
+  /** 右：公司账长期成立 */
+  companyAccountLongTerm: string
+}
+
+/** 单元模型象限分析画布文档 */
+export interface UnitModelQuadrantDocumentJSON {
+  id: string
+  type: 'unit_model_quadrant'
+  schemaVersion: number
+  theme: CanvasTheme
+  axes: UnitModelQuadrantAxes
+  blocks: UnitModelQuadrantBlock[]
+}
+
+
 /** 项目管理6维敏感度 · 轴 id */
 export type PmSensitivity6dAxisId =
   | 'budget'
@@ -956,6 +1069,41 @@ export interface PmCompetencyDocumentJSON {
   blocks: PmCompetencyBlock[]
 }
 
+
+
+/** 产品内容5维特征 · 轴 id */
+export type ProductFeatures5dAxisId =
+  | 'openness'
+  | 'engagement'
+  | 'error_prone'
+  | 'iterativity'
+  | 'innovation'
+
+export interface ProductFeatures5dAxisMeta {
+  id: ProductFeatures5dAxisId
+  title: string
+}
+
+/** 分值连续 0–100（外缘=100） */
+export type ProductFeatures5dScores = Record<ProductFeatures5dAxisId, number>
+
+export interface ProductFeatures5dBlock {
+  /** 与雷达轴一一对应 */
+  id: ProductFeatures5dAxisId
+  title: string
+  items: QuadrantItem[]
+}
+
+/** 产品内容5维特征画布文档 */
+export interface ProductFeatures5dDocumentJSON {
+  id: string
+  type: 'product_features_5d'
+  schemaVersion: number
+  theme: CanvasTheme
+  axes: Record<ProductFeatures5dAxisId, ProductFeatures5dAxisMeta>
+  scores: ProductFeatures5dScores
+  blocks: ProductFeatures5dBlock[]
+}
 
 /** 项目管理方案评估三角形 · 轴 id */
 export type PmSolutionTriangleAxisId =
@@ -1062,11 +1210,15 @@ export type CanvasDocumentJSON = (
   | AnnualSummaryDocumentJSON
   | DeepReviewDocumentJSON
   | PmRetroValueDocumentJSON
+  | RoiTradeoffDocumentJSON
+  | RoiDecisionDocumentJSON
   | TimeMatrixDocumentJSON
   | WorkStateZonesDocumentJSON
   | OnlineOfflineCommDocumentJSON
+  | UnitModelQuadrantDocumentJSON
   | PmSensitivity6dDocumentJSON
   | PmCompetencyDocumentJSON
+  | ProductFeatures5dDocumentJSON
   | PmSolutionTriangleDocumentJSON
   | GrowthAssumptionsDocumentJSON
   | BusinessFormulaDocumentJSON
@@ -1091,11 +1243,15 @@ export type BlockCanvasDocumentJSON =
   | AnnualSummaryDocumentJSON
   | DeepReviewDocumentJSON
   | PmRetroValueDocumentJSON
+  | RoiTradeoffDocumentJSON
+  | RoiDecisionDocumentJSON
   | TimeMatrixDocumentJSON
   | WorkStateZonesDocumentJSON
   | OnlineOfflineCommDocumentJSON
+  | UnitModelQuadrantDocumentJSON
   | PmSensitivity6dDocumentJSON
   | PmCompetencyDocumentJSON
+  | ProductFeatures5dDocumentJSON
   | PmSolutionTriangleDocumentJSON
 
 export function isDualTriangleDoc(
@@ -1320,6 +1476,18 @@ export function isPmRetroValueDoc(
   return !!doc && doc.type === 'pm_retro_value'
 }
 
+export function isRoiTradeoffDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is RoiTradeoffDocumentJSON {
+  return !!doc && doc.type === 'roi_tradeoff'
+}
+
+export function isRoiDecisionDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is RoiDecisionDocumentJSON {
+  return !!doc && doc.type === 'roi_decision'
+}
+
 export function isTimeMatrixDoc(
   doc: CanvasDocumentJSON | null | undefined,
 ): doc is TimeMatrixDocumentJSON {
@@ -1341,6 +1509,13 @@ export function isOnlineOfflineCommDoc(
 }
 
 
+export function isUnitModelQuadrantDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is UnitModelQuadrantDocumentJSON {
+  return !!doc && doc.type === 'unit_model_quadrant'
+}
+
+
 export function isPmSensitivity6dDoc(
   doc: CanvasDocumentJSON | null | undefined,
 ): doc is PmSensitivity6dDocumentJSON {
@@ -1354,6 +1529,13 @@ export function isPmCompetencyDoc(
   return !!doc && doc.type === 'pm_competency'
 }
 
+
+
+export function isProductFeatures5dDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is ProductFeatures5dDocumentJSON {
+  return !!doc && doc.type === 'product_features_5d'
+}
 
 export function isPmSolutionTriangleDoc(
   doc: CanvasDocumentJSON | null | undefined,
@@ -1397,11 +1579,15 @@ export function isBlockCanvasDoc(
     isAnnualSummaryDoc(doc) ||
     isDeepReviewDoc(doc) ||
     isPmRetroValueDoc(doc) ||
+    isRoiTradeoffDoc(doc) ||
+    isRoiDecisionDoc(doc) ||
     isTimeMatrixDoc(doc) ||
     isWorkStateZonesDoc(doc) ||
     isOnlineOfflineCommDoc(doc) ||
+    isUnitModelQuadrantDoc(doc) ||
     isPmSensitivity6dDoc(doc) ||
     isPmCompetencyDoc(doc) ||
+    isProductFeatures5dDoc(doc) ||
     isPmSolutionTriangleDoc(doc)
   )
 }
@@ -1409,34 +1595,6 @@ export function isBlockCanvasDoc(
 export function isQuadrantDoc(
   doc: CanvasDocumentJSON | null | undefined,
 ): doc is QuadrantDocumentJSON {
-  return (
-    !!doc &&
-    doc.type !== 'dual_triangle' &&
-    doc.type !== 'y_model' &&
-    doc.type !== 'deliberate_practice' &&
-    doc.type !== 'demand_triangle' &&
-    doc.type !== 'five_step' &&
-    doc.type !== 'five_step_division' &&
-    doc.type !== 'ai_tradeoff' &&
-    doc.type !== 'product_content' &&
-    doc.type !== 'oscar' &&
-    doc.type !== 'industry_analysis' &&
-    doc.type !== 'key_resistance' &&
-    doc.type !== 'conversion_tradeoff' &&
-    doc.type !== 'industry_forecast' &&
-    doc.type !== 'scientific_meeting' &&
-    doc.type !== 'ipo' &&
-    doc.type !== 'incident_review' &&
-    doc.type !== 'annual_summary' &&
-    doc.type !== 'deep_review' &&
-    doc.type !== 'pm_retro_value' &&
-    doc.type !== 'time_matrix' &&
-    doc.type !== 'work_state_zones' &&
-    doc.type !== 'online_offline_comm' &&
-    doc.type !== 'pm_sensitivity_6d' &&
-    doc.type !== 'pm_competency' &&
-    doc.type !== 'pm_solution_triangle' &&
-    doc.type !== 'growth_assumptions' &&
-    doc.type !== 'business_formula'
-  )
+  // Positive match only — unknown / other canvas types must not fall into STAR quadrant.
+  return !!doc && doc.type === 'quadrant'
 }

@@ -23,11 +23,15 @@ import {
   isAnnualSummaryDoc,
   isDeepReviewDoc,
   isPmRetroValueDoc,
+  isRoiTradeoffDoc,
+  isRoiDecisionDoc,
   isTimeMatrixDoc,
   isWorkStateZonesDoc,
   isOnlineOfflineCommDoc,
+  isUnitModelQuadrantDoc,
   isPmSensitivity6dDoc,
   isPmCompetencyDoc,
+  isProductFeatures5dDoc,
   isPmSolutionTriangleDoc,
   isGrowthAssumptionsDoc,
   isBusinessFormulaDoc,
@@ -56,11 +60,15 @@ import IncidentReviewCanvas from './IncidentReviewCanvas.vue'
 import AnnualSummaryCanvas from './AnnualSummaryCanvas.vue'
 import DeepReviewCanvas from './DeepReviewCanvas.vue'
 import PmRetroValueCanvas from './PmRetroValueCanvas.vue'
+import RoiTradeoffCanvas from './RoiTradeoffCanvas.vue'
+import RoiDecisionCanvas from './RoiDecisionCanvas.vue'
 import TimeMatrixCanvas from './TimeMatrixCanvas.vue'
 import WorkStateZonesCanvas from './WorkStateZonesCanvas.vue'
 import OnlineOfflineCommCanvas from './OnlineOfflineCommCanvas.vue'
+import UnitModelQuadrantCanvas from './UnitModelQuadrantCanvas.vue'
 import PmSensitivity6dCanvas from './PmSensitivity6dCanvas.vue'
 import PmCompetencyCanvas from './PmCompetencyCanvas.vue'
+import ProductFeatures5dCanvas from './ProductFeatures5dCanvas.vue'
 import PmSolutionTriangleCanvas from './PmSolutionTriangleCanvas.vue'
 import GrowthAssumptionsCanvas from './GrowthAssumptionsCanvas.vue'
 import BusinessFormulaCanvas from './BusinessFormulaCanvas.vue'
@@ -127,6 +135,12 @@ const deepReviewDoc = computed(() =>
 const pmRetroValueDoc = computed(() =>
   isPmRetroValueDoc(current_data.value) ? current_data.value : null,
 )
+const roiTradeoffDoc = computed(() =>
+  isRoiTradeoffDoc(current_data.value) ? current_data.value : null,
+)
+const roiDecisionDoc = computed(() =>
+  isRoiDecisionDoc(current_data.value) ? current_data.value : null,
+)
 const timeMatrixDoc = computed(() =>
   isTimeMatrixDoc(current_data.value) ? current_data.value : null,
 )
@@ -136,11 +150,17 @@ const workStateZonesDoc = computed(() =>
 const onlineOfflineCommDoc = computed(() =>
   isOnlineOfflineCommDoc(current_data.value) ? current_data.value : null,
 )
+const unitModelQuadrantDoc = computed(() =>
+  isUnitModelQuadrantDoc(current_data.value) ? current_data.value : null,
+)
 const pmSensitivity6dDoc = computed(() =>
   isPmSensitivity6dDoc(current_data.value) ? current_data.value : null,
 )
 const pmCompetencyDoc = computed(() =>
   isPmCompetencyDoc(current_data.value) ? current_data.value : null,
+)
+const productFeatures5dDoc = computed(() =>
+  isProductFeatures5dDoc(current_data.value) ? current_data.value : null,
 )
 const pmSolutionTriangleDoc = computed(() =>
   isPmSolutionTriangleDoc(current_data.value) ? current_data.value : null,
@@ -222,6 +242,12 @@ const quadrantDoc = computed(() =>
         <template v-else-if="pmRetroValueDoc">
           <PmRetroValueCanvas :doc="pmRetroValueDoc" />
         </template>
+        <template v-else-if="roiTradeoffDoc">
+          <RoiTradeoffCanvas :doc="roiTradeoffDoc" />
+        </template>
+        <template v-else-if="roiDecisionDoc">
+          <RoiDecisionCanvas :doc="roiDecisionDoc" />
+        </template>
         <template v-else-if="timeMatrixDoc">
           <TimeMatrixCanvas :doc="timeMatrixDoc" />
         </template>
@@ -231,11 +257,17 @@ const quadrantDoc = computed(() =>
         <template v-else-if="onlineOfflineCommDoc">
           <OnlineOfflineCommCanvas :doc="onlineOfflineCommDoc" />
         </template>
+        <template v-else-if="unitModelQuadrantDoc">
+          <UnitModelQuadrantCanvas :doc="unitModelQuadrantDoc" />
+        </template>
         <template v-else-if="pmSensitivity6dDoc">
           <PmSensitivity6dCanvas :doc="pmSensitivity6dDoc" />
         </template>
         <template v-else-if="pmCompetencyDoc">
           <PmCompetencyCanvas :doc="pmCompetencyDoc" />
+        </template>
+        <template v-else-if="productFeatures5dDoc">
+          <ProductFeatures5dCanvas :doc="productFeatures5dDoc" />
         </template>
         <template v-else-if="pmSolutionTriangleDoc">
           <PmSolutionTriangleCanvas :doc="pmSolutionTriangleDoc" />

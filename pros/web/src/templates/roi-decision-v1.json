@@ -1,0 +1,169 @@
+{
+  "id": "canvas_roi_decision",
+  "type": "roi_decision",
+  "schemaVersion": 1,
+  "theme": {
+    "background": {
+      "pattern": "none",
+      "color": "#E6F7FF"
+    }
+  },
+  "title": "ROI决策评估",
+  "rows": [
+    {
+      "id": "row_basic",
+      "dimension": "基础ROI",
+      "benefitBlockId": "row_basic:benefit",
+      "costBlockId": "row_basic:cost"
+    },
+    {
+      "id": "row_longterm",
+      "dimension": "长期视角",
+      "benefitBlockId": "row_longterm:benefit",
+      "costBlockId": "row_longterm:cost"
+    },
+    {
+      "id": "row_company",
+      "dimension": "公司视角",
+      "benefitBlockId": "row_company:benefit",
+      "costBlockId": "row_company:cost"
+    }
+  ],
+  "blocks": [
+    {
+      "id": "row_basic:benefit",
+      "title": "收益项",
+      "items": [
+        {
+          "id": "item_row_basic_benefit",
+          "text": "",
+          "style": {
+            "color": "#202124",
+            "fontSize": 14,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "row_basic:cost",
+      "title": "成本项",
+      "items": [
+        {
+          "id": "item_row_basic_cost",
+          "text": "",
+          "style": {
+            "color": "#202124",
+            "fontSize": 14,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "row_longterm:benefit",
+      "title": "收益项",
+      "items": [
+        {
+          "id": "item_row_longterm_benefit",
+          "text": "",
+          "style": {
+            "color": "#202124",
+            "fontSize": 14,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "row_longterm:cost",
+      "title": "成本项",
+      "items": [
+        {
+          "id": "item_row_longterm_cost",
+          "text": "",
+          "style": {
+            "color": "#202124",
+            "fontSize": 14,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "row_company:benefit",
+      "title": "收益项",
+      "items": [
+        {
+          "id": "item_row_company_benefit",
+          "text": "",
+          "style": {
+            "color": "#202124",
+            "fontSize": 14,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "row_company:cost",
+      "title": "成本项",
+      "items": [
+        {
+          "id": "item_row_company_cost",
+          "text": "",
+          "style": {
+            "color": "#202124",
+            "fontSize": 14,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "opportunityCost",
+      "title": "机会成本",
+      "items": [
+        {
+          "id": "item_opportunity_cost",
+          "text": "",
+          "style": {
+            "color": "#202124",
+            "fontSize": 14,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "timeWindow",
+      "title": "时间窗口",
+      "items": [
+        {
+          "id": "item_time_window",
+          "text": "",
+          "style": {
+            "color": "#202124",
+            "fontSize": 14,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "conclusion",
+      "title": "最终结论",
+      "items": [
+        {
+          "id": "item_conclusion",
+          "text": "",
+          "style": {
+            "color": "#202124",
+            "fontSize": 14,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    }
+  ]
+}
