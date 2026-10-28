@@ -10,18 +10,21 @@
   },
   "center": {
     "title": "我的认知",
-    "subtitle": "知行合一的因果规律"
+    "subtitle": "",
+    "prefix": "我的",
+    "blank": "",
+    "suffix": "认知"
   },
   "labels": {
     "theory": "理论",
     "facts": "事实",
     "anchor": "解决真正问题",
     "toolsPrefix": "∴ 配套的组织和管理工具：",
-    "step1": "Step 1 范围",
-    "step2": "Step 2 目标",
-    "step3": "Step 3 框架",
-    "step4": "Step4 预判",
-    "step5": "Step 5 配套"
+    "step1": "Step1",
+    "step2": "Step2",
+    "step3": "Step3",
+    "step4": "Step4",
+    "step5": "Step4"
   },
   "blocks": [
     {
@@ -86,11 +89,11 @@
     },
     {
       "id": "scope",
-      "title": "圈定问题范围",
+      "title": "解决真正问题",
       "items": [
         {
           "id": "item_scope_1",
-          "text": "在此圈定问题范围…",
+          "text": "在此填写真正要解决的问题…",
           "style": {
             "color": "#3c4043",
             "fontSize": 13,
@@ -101,7 +104,7 @@
     },
     {
       "id": "cognition_cause",
-      "title": "理解因：基本可行框架 (2-5条)",
+      "title": "理解因：我的框架 (1-5条)",
       "items": [
         {
           "id": "item_cognition_cause_1",
@@ -131,7 +134,7 @@
     },
     {
       "id": "tools",
-      "title": "配套的组织和管理工具",
+      "title": "∴ 配套的组织和管理工具：",
       "items": [
         {
           "id": "item_tools_1",

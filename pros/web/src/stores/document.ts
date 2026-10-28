@@ -96,6 +96,7 @@ import {
   isAnnualSummaryDoc,
   isDeepReviewDoc,
   isGrowthAssumptionsDoc,
+  coerceYModelDoc,
   normalizeYModelDoc,
 } from '../types/canvas'
 import dualTriangleTemplate from '../templates/dual-triangle-v1.json'
@@ -239,9 +240,10 @@ export const TEMPLATE_META: Record<
     category: 'method',
   },
   'y-model': {
-    name: 'Y 模型无限进步',
-    badge: 'Y模型 · MVP',
-    description: '理论 × 事实驱动认知升级，从真正问题到组织工具的进步闭环。',
+    name: '一堂Y模型：无限进步画布',
+    badge: 'Y模型 · 科学成事',
+    description:
+      '科学成事道路：理论 × 事实驱动「我的认知」，知行合一解决真正问题，并配套组织管理工具。',
     category: 'method',
   },
   'deliberate-practice': {
@@ -1004,7 +1006,7 @@ export const useDocumentStore = defineStore('document', () => {
     const local = loadLocal(id)
     const meta = loadLocalMeta(id)
     if (local) {
-      current_data.value = normalizeLoadedDoc(local)
+      current_data.value = normalizeLoadedDoc(local, id)
       dirty.value = false
       head_revision_id.value = null
       document_id.value = meta?.documentId || null
@@ -1019,6 +1021,7 @@ export const useDocumentStore = defineStore('document', () => {
     const template = TEMPLATES[id]
     current_data.value = normalizeLoadedDoc(
       cloneDoc(template) as CanvasDocumentJSON,
+      id,
     )
     dirty.value = false
     head_revision_id.value = null
@@ -1041,6 +1044,7 @@ export const useDocumentStore = defineStore('document', () => {
     const template = TEMPLATES[id]
     current_data.value = normalizeLoadedDoc(
       cloneDoc(template) as CanvasDocumentJSON,
+      id,
     )
     dirty.value = false
     head_revision_id.value = null
@@ -1050,8 +1054,12 @@ export const useDocumentStore = defineStore('document', () => {
   }
 
   /** 加载后温和升级已知模板结构（Y 模型 + attachmentsByPanelId） */
-  function normalizeLoadedDoc(doc: CanvasDocumentJSON): CanvasDocumentJSON {
-    let next: CanvasDocumentJSON = doc
+  function normalizeLoadedDoc(
+    doc: CanvasDocumentJSON,
+    templateId?: TemplateId | string | null,
+  ): CanvasDocumentJSON {
+    const tid = templateId ?? activeTemplateId.value
+    let next: CanvasDocumentJSON = coerceYModelDoc(doc, tid)
     if (isYModelDoc(next)) {
       next = normalizeYModelDoc(next)
     }

@@ -279,7 +279,10 @@ const quadrantDoc = computed(() =>
           <BusinessFormulaCanvas :doc="businessFormulaDoc" />
         </template>
         <template v-else-if="quadrantDoc">
-          <BackgroundLayer :background="quadrantDoc.theme.background" />
+          <BackgroundLayer
+            v-if="quadrantDoc.theme?.background"
+            :background="quadrantDoc.theme.background"
+          />
           <QuadrantGrid :quadrants="quadrantDoc.quadrants" />
           <AxesLayer :axes="quadrantDoc.axes" />
           <MarkersLayer :markers="quadrantDoc.markers" />

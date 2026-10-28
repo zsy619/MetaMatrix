@@ -188,11 +188,13 @@ export interface YModelBlock {
 export interface YModelCenter {
   /** 中心主标题，如「我的认知」 */
   title: string
-  /** 红字副标题，如「知行合一的因果规律」 */
+  /** 箴言/副标题，如「实事求是 解放思想」 */
   subtitle: string
-  /** @deprecated 旧版拆分标题，加载时会归一到 title */
+  /** Step2：「我的」 */
   prefix?: string
+  /** Step2：可填写的认知领域空白 */
   blank?: string
+  /** Step2：「认知」 */
   suffix?: string
   stepLabel?: string
 }
@@ -206,6 +208,12 @@ export interface YModelDocumentJSON {
   center: YModelCenter
   /** 分区标题文案 */
   labels: {
+    /** 页眉主标题：一堂Y模型：无限进步画布 */
+    pageTitle?: string
+    /** 页眉副标题：科学成事道路 */
+    pageSubtitle?: string
+    /** 页眉英文副标题 */
+    pageSubtitleEn?: string
     theory: string
     facts: string
     /** 竖脊底端静态锚点「解决真正问题」 */
@@ -215,7 +223,22 @@ export interface YModelDocumentJSON {
     step2: string
     step3: string
     step4: string
+    /** @deprecated 旧五步编号；现与 step4 同义保留兼容 */
     step5: string
+    /** 箴言前半「实事求是」 */
+    mottoSeek?: string
+    /** 箴言后半「解放思想」（强调色） */
+    mottoFree?: string
+    /** 左臂朝理论 */
+    arrowTheoryOut?: string
+    /** 左臂朝认知 */
+    arrowTheoryIn?: string
+    /** 右臂朝事实（强调色） */
+    arrowFactsOut?: string
+    /** 右臂朝认知 */
+    arrowFactsIn?: string
+    /** 竖脊「知行合一」 */
+    unity?: string
     /** @deprecated 旧字段，兼容读取 */
     problem?: string
     step3Theory?: string
@@ -1260,6 +1283,24 @@ export function isDualTriangleDoc(
   return !!doc && doc.type === 'dual_triangle'
 }
 
+/** Coerce legacy / poisoned drafts into canonical y_model before type guards. */
+export function coerceYModelDoc(
+  doc: CanvasDocumentJSON,
+  templateId?: string | null,
+): CanvasDocumentJSON {
+  const raw = doc as CanvasDocumentJSON & { type?: string; id?: string }
+  // Cast: poisoned drafts may carry hyphenated "y-model" outside the union.
+  const type = raw.type as string | undefined
+  const looksY =
+    type === 'y_model' ||
+    type === 'y-model' ||
+    raw.id === 'canvas_y_model' ||
+    templateId === 'y-model'
+  if (!looksY) return doc
+  if (type === 'y_model') return doc
+  return { ...doc, type: 'y_model' } as YModelDocumentJSON
+}
+
 export function isYModelDoc(
   doc: CanvasDocumentJSON | null | undefined,
 ): doc is YModelDocumentJSON {
@@ -1270,17 +1311,40 @@ export function isYModelDoc(
 export function normalizeYModelDoc(doc: YModelDocumentJSON): YModelDocumentJSON {
   const defaults = {
     title: '我的认知',
-    subtitle: '知行合一的因果规律',
+    subtitle: '实事求是 解放思想',
+    prefix: '我的',
+    suffix: '认知',
     labels: {
+      pageTitle: '一堂Y模型：无限进步画布',
+      pageSubtitle: '科学成事道路',
+      pageSubtitleEn:
+        'Yitang Y Model: Infinite Progress Canvas / Scientific Path To Success',
       theory: '理论',
       facts: '事实',
       anchor: '解决真正问题',
       toolsPrefix: '∴ 配套的组织和管理工具：',
-      step1: 'Step 1 范围',
-      step2: 'Step 2 目标',
-      step3: 'Step 3 框架',
-      step4: 'Step4 预判',
-      step5: 'Step 5 配套',
+      step1: 'Step1',
+      step2: 'Step2',
+      step3: 'Step3',
+      step4: 'Step4',
+      step5: 'Step4',
+      mottoSeek: '实事求是',
+      mottoFree: '解放思想',
+      arrowTheoryOut: '提炼建模',
+      arrowTheoryIn: '科学类比',
+      arrowFactsOut: '假设驱动',
+      arrowFactsIn: '定性定量',
+      unity: '知行合一',
+    },
+  }
+
+  // Persisted drafts may omit theme; YModelCanvas reads theme.background.color.
+  const theme = (doc.theme ?? {}) as CanvasTheme
+  const background = (theme.background ?? {}) as ThemeBackground
+  doc.theme = {
+    background: {
+      pattern: background.pattern || 'none',
+      color: background.color || '#ffffff',
     },
   }
 
@@ -1292,9 +1356,12 @@ export function normalizeYModelDoc(doc: YModelDocumentJSON): YModelDocumentJSON 
         ? fromParts
         : defaults.title
   }
-  if (!center.subtitle) {
+  if (!center.subtitle || center.subtitle === '知行合一的因果规律') {
     center.subtitle = defaults.subtitle
   }
+  if (!center.prefix) center.prefix = defaults.prefix
+  if (!center.suffix) center.suffix = defaults.suffix
+  if (center.blank == null) center.blank = ''
   doc.center = center
 
   const labels = { ...(doc.labels ?? {}) } as YModelDocumentJSON['labels']
@@ -1304,24 +1371,35 @@ export function normalizeYModelDoc(doc: YModelDocumentJSON): YModelDocumentJSON 
   if (!labels.theory) labels.theory = defaults.labels.theory
   if (!labels.facts) labels.facts = defaults.labels.facts
   if (!labels.toolsPrefix) labels.toolsPrefix = defaults.labels.toolsPrefix
+  if (!labels.pageTitle) labels.pageTitle = defaults.labels.pageTitle
+  if (!labels.pageSubtitle) labels.pageSubtitle = defaults.labels.pageSubtitle
+  if (!labels.pageSubtitleEn) labels.pageSubtitleEn = defaults.labels.pageSubtitleEn
+  if (!labels.mottoSeek) labels.mottoSeek = defaults.labels.mottoSeek
+  if (!labels.mottoFree) labels.mottoFree = defaults.labels.mottoFree
+  if (!labels.arrowTheoryOut) labels.arrowTheoryOut = defaults.labels.arrowTheoryOut
+  if (!labels.arrowTheoryIn) labels.arrowTheoryIn = defaults.labels.arrowTheoryIn
+  if (!labels.arrowFactsOut) labels.arrowFactsOut = defaults.labels.arrowFactsOut
+  if (!labels.arrowFactsIn) labels.arrowFactsIn = defaults.labels.arrowFactsIn
+  if (!labels.unity) labels.unity = defaults.labels.unity
 
-  // 旧版：step1=Step1, step3Theory/Facts=Step3, step4=配套
-  // 新版：step1范围 / step2目标 / step3框架 / step4预判 / step5配套
-  const looksLegacy =
-    !labels.step5 ||
+  // 旧五步文案 / 缺字段 → 合并稿四步（Step1–4）
+  const looksLegacySteps =
+    !labels.step1 ||
+    labels.step1.includes('范围') ||
     labels.step1 === 'Step 1' ||
+    labels.step2?.includes('目标') ||
+    labels.step3?.includes('框架') ||
+    labels.step4?.includes('预判') ||
+    labels.step5?.includes('配套') ||
     !!labels.step3Theory ||
     labels.step4 === 'Step 4'
 
-  if (looksLegacy) {
-    const oldStep4 = labels.step4
+  if (looksLegacySteps) {
     labels.step1 = defaults.labels.step1
-    labels.step2 = labels.step2 || defaults.labels.step2
-    labels.step3 = labels.step3 || defaults.labels.step3
+    labels.step2 = defaults.labels.step2
+    labels.step3 = defaults.labels.step3
     labels.step4 = defaults.labels.step4
-    labels.step5 =
-      labels.step5 ||
-      (oldStep4 && oldStep4 !== 'Step4 预判' ? oldStep4 : defaults.labels.step5)
+    labels.step5 = defaults.labels.step5
   } else {
     if (!labels.step1) labels.step1 = defaults.labels.step1
     if (!labels.step2) labels.step2 = defaults.labels.step2
@@ -1339,26 +1417,61 @@ export function normalizeYModelDoc(doc: YModelDocumentJSON): YModelDocumentJSON 
     blocks[problemIdx] = {
       ...prev,
       id: 'scope',
-      title: prev.title === '解决真正问题' ? '圈定问题范围' : prev.title || '圈定问题范围',
+      title:
+        prev.title === '圈定问题范围' || !prev.title
+          ? '解决真正问题'
+          : prev.title,
     }
   } else if (!hasScope) {
     blocks.push({
       id: 'scope',
-      title: '圈定问题范围',
+      title: '解决真正问题',
       items: [
         {
           id: 'item_scope_1',
-          text: '在此圈定问题范围…',
+          text: '在此填写真正要解决的问题…',
           style: { color: '#3c4043', fontSize: 13, fontWeight: '500' },
         },
       ],
     })
   }
 
-  // 温和更新框架标题文案（仅当仍是旧默认时）
+  /** 画面上全部虚线富文本框（缺则补齐，保 id 稳定） */
+  const requiredRteBlocks: Array<{ id: YModelBlockId; title: string; placeholder: string }> = [
+    { id: 'theory_existing', title: '使用现成模型/规律', placeholder: '在此填写现成模型/规律…' },
+    { id: 'theory_build', title: '自己建模型', placeholder: '在此填写自建模型…' },
+    { id: 'facts_hypothesis', title: '提出新假设', placeholder: '在此填写新假设…' },
+    { id: 'facts_analysis', title: '如何定性定量分析', placeholder: '在此填写定性定量方法…' },
+    { id: 'cognition_cause', title: '理解因：我的框架 (1-5条)', placeholder: '在此填写框架条目…' },
+    { id: 'cognition_effect', title: '理解果：我的目标 (TopN)', placeholder: '在此填写目标条目…' },
+    { id: 'tools', title: '∴ 配套的组织和管理工具：', placeholder: '在此填写配套组织与管理工具…' },
+  ]
+  const present = new Set(blocks.map((b) => b.id))
+  for (const req of requiredRteBlocks) {
+    if (present.has(req.id)) continue
+    blocks.push({
+      id: req.id,
+      title: req.title,
+      items: [
+        {
+          id: `item_${req.id}_1`,
+          text: req.placeholder,
+          style: { color: '#3c4043', fontSize: 13, fontWeight: '500' },
+        },
+      ],
+    })
+  }
+
+  // 温和对齐附图默认标题（仅当仍是旧默认时）
   for (const b of blocks) {
-    if (b.id === 'cognition_cause' && b.title === '理解因：我的框架 (1-5条)') {
-      b.title = '理解因：基本可行框架 (2-5条)'
+    if (b.id === 'cognition_cause' && b.title === '理解因：基本可行框架 (2-5条)') {
+      b.title = '理解因：我的框架 (1-5条)'
+    }
+    if (b.id === 'scope' && b.title === '圈定问题范围') {
+      b.title = '解决真正问题'
+    }
+    if (b.id === 'tools' && (b.title === '配套的组织和管理工具' || !b.title)) {
+      b.title = '∴ 配套的组织和管理工具：'
     }
   }
 

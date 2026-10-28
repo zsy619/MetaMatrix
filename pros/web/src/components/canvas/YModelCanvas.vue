@@ -5,18 +5,20 @@ import type {
   YModelBlockId,
   YModelDocumentJSON,
 } from '../../types/canvas'
+import { useDocumentStore } from '../../stores/document'
 import YModelBlockCard from './YModelBlock.vue'
 
 const props = defineProps<{
   doc: YModelDocumentJSON
 }>()
 
+const documentStore = useDocumentStore()
+
 const byId = computed(() => {
   const map = new Map<YModelBlockId, YModelBlock>()
   for (const b of props.doc.blocks) {
     map.set(b.id, b)
   }
-  // 旧文档未迁移时兜底
   if (!map.has('scope') && map.has('problem')) {
     map.set('scope', map.get('problem')!)
   }
@@ -28,16 +30,20 @@ function block(id: YModelBlockId): YModelBlock | undefined {
 }
 
 const bgColor = computed(
-  () => props.doc.theme.background.color || '#ffffff',
+  () => props.doc.theme?.background?.color || '#ffffff',
 )
 
-const centerTitle = computed(
-  () => props.doc.center.title || '我的认知',
-)
-
-const centerSubtitle = computed(
-  () => props.doc.center.subtitle || '知行合一的因果规律',
-)
+/** Step2：我的 ____ 认知 */
+const centerPrefix = computed(() => props.doc.center.prefix || '我的')
+const centerSuffix = computed(() => props.doc.center.suffix || '认知')
+const centerBlank = computed({
+  get: () => props.doc.center.blank ?? '',
+  set: (v: string) => {
+    if (!props.doc.center) return
+    props.doc.center.blank = v
+    documentStore.markDirty()
+  },
+})
 
 const labels = computed(() => {
   const l = props.doc.labels
@@ -45,12 +51,10 @@ const labels = computed(() => {
     theory: l.theory || '理论',
     facts: l.facts || '事实',
     anchor: l.anchor || l.problem || '解决真正问题',
-    toolsPrefix: l.toolsPrefix || '∴ 配套的组织和管理工具：',
-    step1: l.step1 && l.step1.includes('范围') ? l.step1 : 'Step 1 范围',
-    step2: l.step2 || 'Step 2 目标',
-    step3: l.step3 || 'Step 3 框架',
-    step4: l.step4 && l.step4.includes('预判') ? l.step4 : 'Step4 预判',
-    step5: l.step5 || 'Step 5 配套',
+    step1: l.step1 || 'Step1',
+    step2: l.step2 || 'Step2',
+    step3: l.step3 || 'Step3',
+    step4: l.step4 || 'Step4',
   }
 })
 </script>
@@ -59,162 +63,154 @@ const labels = computed(() => {
   <div class="y-model-canvas" :style="{ backgroundColor: bgColor }">
     <div class="ym-layout">
       <div class="ym-main">
-        <!-- 上左：理论 -->
-        <section class="ym-theory">
-          <h2 class="zone-title">{{ labels.theory }}</h2>
-          <div class="theory-blocks">
-            <YModelBlockCard
-              v-if="block('theory_existing')"
-              :block="block('theory_existing')!"
-            />
-            <YModelBlockCard
-              v-if="block('theory_build')"
-              :block="block('theory_build')!"
-            />
-          </div>
-        </section>
+        <!-- 左外：使用现成模型/规律（近理论臂） -->
+        <aside class="ym-left-outer">
+          <span class="step-tag step-tag-float">{{ labels.step3 }}</span>
+          <YModelBlockCard
+            v-if="block('theory_existing')"
+            :block="block('theory_existing')!"
+          />
+        </aside>
 
-        <!-- 中柱：完整 Y + 标题 + 锚点（跨上下两行） -->
-        <div class="ym-y-col" aria-hidden="false">
+        <!-- 中区：Y + 顶中双框 + 理论/事实 + Step2/Step1 -->
+        <div class="ym-y-stage">
           <svg
             class="ym-y-svg"
-            viewBox="0 0 240 520"
+            viewBox="0 0 320 520"
             preserveAspectRatio="xMidYMid meet"
             aria-hidden="true"
           >
             <defs>
               <marker
                 id="ymArrow"
-                markerWidth="8"
-                markerHeight="8"
+                markerWidth="7"
+                markerHeight="7"
                 refX="6"
-                refY="4"
+                refY="3.5"
                 orient="auto"
                 markerUnits="strokeWidth"
               >
-                <path d="M0,1 L7,4 L0,7 Z" fill="#9aa0a6" />
+                <path d="M0,0.8 L6.5,3.5 L0,6.2 Z" fill="#9aa0a6" />
               </marker>
               <marker
                 id="ymArrowRev"
-                markerWidth="8"
-                markerHeight="8"
-                refX="1"
-                refY="4"
+                markerWidth="7"
+                markerHeight="7"
+                refX="0.5"
+                refY="3.5"
                 orient="auto"
                 markerUnits="strokeWidth"
               >
-                <path d="M7,1 L0,4 L7,7 Z" fill="#9aa0a6" />
+                <path d="M6.5,0.8 L0,3.5 L6.5,6.2 Z" fill="#9aa0a6" />
               </marker>
             </defs>
-            <!-- 左上臂 -->
+            <!-- 左臂 -->
             <line
-              x1="28"
-              y1="48"
-              x2="120"
-              y2="200"
+              x1="48"
+              y1="72"
+              x2="160"
+              y2="220"
               stroke="#9aa0a6"
-              stroke-width="3"
+              stroke-width="2.4"
               stroke-linecap="round"
               marker-start="url(#ymArrowRev)"
               marker-end="url(#ymArrow)"
             />
-            <!-- 右上臂 -->
+            <!-- 右臂 -->
             <line
-              x1="212"
-              y1="48"
-              x2="120"
-              y2="200"
+              x1="272"
+              y1="72"
+              x2="160"
+              y2="220"
               stroke="#9aa0a6"
-              stroke-width="3"
+              stroke-width="2.4"
               stroke-linecap="round"
               marker-start="url(#ymArrowRev)"
               marker-end="url(#ymArrow)"
             />
             <!-- 竖脊 -->
             <line
-              x1="120"
-              y1="200"
-              x2="120"
+              x1="160"
+              y1="220"
+              x2="160"
               y2="470"
               stroke="#9aa0a6"
-              stroke-width="3"
+              stroke-width="2.4"
               stroke-linecap="round"
+              marker-start="url(#ymArrowRev)"
               marker-end="url(#ymArrow)"
             />
           </svg>
 
-          <span class="step-tag step-tag-red step4-tag">{{
-            labels.step4
-          }}</span>
+          <!-- 理论 / 事实 节点字 -->
+          <h2 class="zone-title zone-theory">{{ labels.theory }}</h2>
+          <h2 class="zone-title zone-facts">{{ labels.facts }}</h2>
 
-          <div class="ym-y-hub">
-            <h2 class="hub-title">{{ centerTitle }}</h2>
-            <p class="hub-subtitle">{{ centerSubtitle }}</p>
-          </div>
-
-          <p class="ym-anchor">{{ labels.anchor }}</p>
-        </div>
-
-        <!-- 上右：事实 -->
-        <section class="ym-facts">
-          <h2 class="zone-title zone-title-right">{{ labels.facts }}</h2>
-          <div class="facts-blocks">
+          <!-- 顶中：自己建模型 | 提出新假设（Y 叉口上方） -->
+          <div class="ym-top-mid">
+            <YModelBlockCard
+              v-if="block('theory_build')"
+              :block="block('theory_build')!"
+            />
             <YModelBlockCard
               v-if="block('facts_hypothesis')"
               :block="block('facts_hypothesis')!"
             />
+          </div>
+
+          <!-- Step2 枢纽 -->
+          <div class="ym-y-hub">
+            <span class="step-tag">{{ labels.step2 }}</span>
+            <div class="hub-title-row" aria-label="我的认知">
+              <span class="hub-prefix">{{ centerPrefix }}</span>
+              <input
+                v-model="centerBlank"
+                class="hub-blank"
+                type="text"
+                maxlength="24"
+                placeholder="____"
+                aria-label="填写认知领域"
+              />
+              <span class="hub-suffix">{{ centerSuffix }}</span>
+            </div>
+          </div>
+
+          <!-- Step1 底端锚点 -->
+          <div class="ym-anchor-wrap">
+            <span class="step-tag">{{ labels.step1 }}</span>
+            <p class="ym-anchor">{{ labels.anchor }}</p>
+          </div>
+        </div>
+
+        <!-- 右列：定性定量（近事实）+ 理解因/果（认知右侧） -->
+        <aside class="ym-right-col">
+          <div class="ym-right-top">
             <YModelBlockCard
               v-if="block('facts_analysis')"
               :block="block('facts_analysis')!"
             />
           </div>
-        </section>
-
-        <!-- 中左：Step1 范围 -->
-        <section class="ym-scope">
-          <span class="step-tag step-tag-red">{{ labels.step1 }}</span>
-          <div class="scope-body">
-            <YModelBlockCard
-              v-if="block('scope')"
-              :block="block('scope')!"
-            />
-          </div>
-        </section>
-
-        <!-- 中右：Step3 框架 + Step2 目标 -->
-        <section class="ym-right-stack">
-          <div class="stack-item">
-            <span class="step-tag step-tag-red">{{ labels.step3 }}</span>
+          <div class="ym-right-stack">
             <YModelBlockCard
               v-if="block('cognition_cause')"
               :block="block('cognition_cause')!"
             />
-          </div>
-          <div class="stack-item">
-            <span class="step-tag step-tag-red">{{ labels.step2 }}</span>
             <YModelBlockCard
               v-if="block('cognition_effect')"
               :block="block('cognition_effect')!"
             />
           </div>
-        </section>
+        </aside>
       </div>
 
-      <!-- 底栏 Step5 配套 -->
+      <!-- Step4 底栏：整条虚线框即 tools 富文本块 -->
       <section class="ym-tools">
-        <span class="step-tag step-tag-red tools-step">{{
-          labels.step5
-        }}</span>
-        <div class="tools-bar">
-          <span class="tools-prefix">{{ labels.toolsPrefix }}</span>
-          <div class="tools-block-wrap">
-            <YModelBlockCard
-              v-if="block('tools')"
-              :block="block('tools')!"
-              compact
-              hide-title
-            />
-          </div>
+        <span class="step-tag tools-step">{{ labels.step4 }}</span>
+        <div class="tools-block-wrap">
+          <YModelBlockCard
+            v-if="block('tools')"
+            :block="block('tools')!"
+          />
         </div>
       </section>
     </div>
@@ -228,108 +224,98 @@ const labels = computed(() => {
   z-index: 10;
   overflow: hidden;
   box-sizing: border-box;
-  padding: clamp(10px, 1.4vw, 18px) clamp(12px, 1.8vw, 22px)
-    clamp(10px, 1.2vw, 16px);
+  padding: clamp(10px, 1.3vw, 16px) clamp(12px, 1.6vw, 20px)
+    clamp(8px, 1vw, 12px);
+  display: flex;
+  flex-direction: column;
 }
 
 .ym-layout {
-  width: 100%;
-  height: 100%;
+  flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: clamp(10px, 1.2vw, 14px);
+  gap: clamp(8px, 1vw, 12px);
   box-sizing: border-box;
 }
 
-/* ===== 主体：三列 × 两行，中柱跨行画完整 Y ===== */
 .ym-main {
   flex: 1;
   min-height: 0;
   display: grid;
   grid-template-columns:
-    minmax(0, 1.05fr)
-    minmax(200px, 0.72fr)
-    minmax(0, 1.05fr);
-  grid-template-rows: minmax(0, 1fr) minmax(0, 1.25fr);
-  grid-template-areas:
-    'theory ycol facts'
-    'scope  ycol right';
-  gap: clamp(10px, 1.3vw, 16px) clamp(8px, 1.1vw, 14px);
+    minmax(140px, 0.85fr)
+    minmax(280px, 1.5fr)
+    minmax(160px, 0.95fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: clamp(8px, 1.1vw, 14px);
   align-items: stretch;
 }
 
-.ym-theory {
-  grid-area: theory;
+.ym-left-outer,
+.ym-right-col {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 2;
+  pointer-events: auto;
 }
 
-.ym-facts {
-  grid-area: facts;
+.ym-left-outer {
+  padding-top: clamp(8px, 1.5vh, 20px);
 }
 
-.ym-y-col {
-  grid-area: ycol;
+.step-tag-float {
+  align-self: flex-start;
 }
 
-.ym-scope {
-  grid-area: scope;
+.ym-left-outer :deep(.ym-block) {
+  flex: 1;
+  min-height: 160px;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.ym-right-col {
+  padding-top: clamp(4px, 1vh, 12px);
+}
+
+.ym-right-top {
+  flex: 0 1 32%;
+  min-height: 110px;
+  display: flex;
+  flex-direction: column;
+}
+
+.ym-right-top :deep(.ym-block) {
+  flex: 1;
 }
 
 .ym-right-stack {
-  grid-area: right;
-}
-
-.ym-theory,
-.ym-facts {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  min-height: 0;
-  gap: 8px;
-  z-index: 2;
-}
-
-.zone-title {
-  margin: 0;
-  font-size: clamp(18px, 2.2vw, 26px);
-  font-weight: 800;
-  color: #202124;
-  letter-spacing: 0.06em;
-  line-height: 1.2;
-  flex-shrink: 0;
-}
-
-.zone-title-right {
-  text-align: right;
-}
-
-.theory-blocks,
-.facts-blocks {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  grid-template-rows: 1fr 1fr;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 8%;
 }
 
-.theory-blocks :deep(.ym-block),
-.facts-blocks :deep(.ym-block) {
-  min-height: 120px;
-  background: rgba(255, 255, 255, 0.9);
+.ym-right-col :deep(.ym-block) {
+  min-height: 0;
+  background: rgba(255, 255, 255, 0.92);
 }
 
-/* ===== 中柱 Y ===== */
-.ym-y-col {
+/* ===== 中区 Y ===== */
+.ym-y-stage {
   position: relative;
   min-width: 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  padding: 8px 4px 4px;
   z-index: 1;
-  pointer-events: none;
 }
 
 .ym-y-svg {
@@ -339,13 +325,48 @@ const labels = computed(() => {
   height: 100%;
   pointer-events: none;
   z-index: 0;
-  opacity: 0.85;
+  opacity: 0.9;
 }
 
-.step4-tag {
+.zone-title {
+  position: absolute;
+  z-index: 2;
+  margin: 0;
+  font-size: clamp(20px, 2.5vw, 30px);
+  font-weight: 800;
+  color: #202124;
+  letter-spacing: 0.1em;
+  line-height: 1.2;
+  pointer-events: none;
+}
+
+.zone-theory {
+  top: 2%;
+  left: 4%;
+}
+
+.zone-facts {
+  top: 2%;
+  right: 4%;
+}
+
+.ym-top-mid {
   position: relative;
   z-index: 2;
-  margin-top: 2%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  width: min(100%, 420px);
+  margin-top: 8%;
+  min-height: 120px;
+  max-height: 34%;
+  flex: 0 1 auto;
+  pointer-events: auto;
+}
+
+.ym-top-mid :deep(.ym-block) {
+  min-height: 110px;
+  background: rgba(255, 255, 255, 0.94);
 }
 
 .ym-y-hub {
@@ -358,39 +379,74 @@ const labels = computed(() => {
   gap: 4px;
   margin-top: auto;
   margin-bottom: auto;
-  padding: 8px 6px;
-  /* 白底衬在 Y 交叉点上，避免字被线割开 */
+  padding: 8px 10px;
   background: linear-gradient(
     180deg,
     rgba(255, 255, 255, 0) 0%,
-    rgba(255, 255, 255, 0.92) 18%,
-    rgba(255, 255, 255, 0.92) 82%,
+    rgba(255, 255, 255, 0.95) 18%,
+    rgba(255, 255, 255, 0.95) 82%,
     rgba(255, 255, 255, 0) 100%
   );
+  pointer-events: auto;
 }
 
-.hub-title {
-  margin: 0;
-  font-size: clamp(26px, 3.4vw, 40px);
+.hub-title-row {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.hub-prefix,
+.hub-suffix {
+  font-size: clamp(22px, 3vw, 34px);
   font-weight: 900;
   color: #202124;
   letter-spacing: 0.08em;
   line-height: 1.15;
 }
 
-.hub-subtitle {
-  margin: 0;
-  font-size: clamp(12px, 1.35vw, 15px);
-  font-weight: 700;
-  color: #e53935;
+.hub-blank {
+  width: clamp(64px, 9vw, 110px);
+  min-width: 56px;
+  border: none;
+  border-bottom: 2px solid #202124;
+  background: transparent;
+  text-align: center;
+  font-size: clamp(18px, 2.4vw, 28px);
+  font-weight: 800;
+  color: #202124;
   letter-spacing: 0.04em;
-  line-height: 1.35;
+  line-height: 1.2;
+  padding: 0 4px 2px;
+  outline: none;
+}
+
+.hub-blank:focus {
+  border-bottom-color: #1a73e8;
+}
+
+.hub-blank::placeholder {
+  color: #202124;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  opacity: 0.55;
+}
+
+.ym-anchor-wrap {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin: 0 0 1%;
+  pointer-events: none;
 }
 
 .ym-anchor {
-  position: relative;
-  z-index: 2;
-  margin: 0 0 2%;
+  margin: 0;
   font-size: clamp(16px, 2vw, 22px);
   font-weight: 800;
   color: #202124;
@@ -399,83 +455,22 @@ const labels = computed(() => {
   text-align: center;
 }
 
-/* 中柱内可点区域：无（装饰层）；侧栏卡片自行接收点击 */
-.ym-scope,
-.ym-right-stack,
-.ym-theory,
-.ym-facts,
-.ym-tools {
-  pointer-events: auto;
-}
-
-/* ===== Step 红标签 ===== */
 .step-tag {
   display: inline-flex;
   align-items: center;
-  font-size: clamp(11px, 1.2vw, 13px);
+  font-size: clamp(11px, 1.15vw, 13px);
   font-weight: 700;
   letter-spacing: 0.04em;
   white-space: nowrap;
   line-height: 1.35;
   flex-shrink: 0;
-}
-
-.step-tag-red {
-  color: #e53935;
+  color: #80868b;
   background: transparent;
   border: none;
   padding: 0;
-  box-shadow: none;
 }
 
-/* ===== Step1 范围 ===== */
-.ym-scope {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-width: 0;
-  min-height: 0;
-  z-index: 2;
-}
-
-.scope-body {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.scope-body :deep(.ym-block) {
-  flex: 1;
-  min-height: 160px;
-  background: rgba(255, 255, 255, 0.92);
-}
-
-/* ===== 右栏：框架 / 目标 ===== */
-.ym-right-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  min-width: 0;
-  min-height: 0;
-  z-index: 2;
-}
-
-.stack-item {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.stack-item :deep(.ym-block) {
-  flex: 1;
-  min-height: 100px;
-  background: rgba(255, 255, 255, 0.92);
-}
-
-/* ===== Step5 底栏 ===== */
+/* Step4 */
 .ym-tools {
   flex: 0 0 auto;
   display: flex;
@@ -483,79 +478,52 @@ const labels = computed(() => {
   gap: 12px;
   min-height: 0;
   z-index: 2;
+  pointer-events: auto;
+  padding: 8px 4px 4px;
+  margin: 0 -4px -4px;
+  background: #eceff1;
+  border-radius: 2px;
 }
 
 .tools-step {
   flex-shrink: 0;
   align-self: center;
-}
-
-.tools-bar {
-  flex: 1;
-  min-width: 0;
-  min-height: 72px;
-  display: flex;
-  align-items: stretch;
-  gap: 14px;
-  padding: 10px 16px;
-  background: #eceff1;
-  border-radius: 4px;
-  border: 1.5px dashed #9aa0a6;
-  box-sizing: border-box;
-}
-
-.tools-prefix {
-  flex-shrink: 0;
-  align-self: center;
-  font-size: clamp(12px, 1.35vw, 14px);
-  font-weight: 700;
-  color: #3c4043;
-  white-space: nowrap;
+  padding-left: 8px;
+  color: #5f6368;
 }
 
 .tools-block-wrap {
   flex: 1;
   min-width: 0;
-  min-height: 52px;
+  min-height: 72px;
   display: flex;
   flex-direction: column;
+  margin: 6px 8px 6px 0;
 }
 
 .tools-block-wrap :deep(.ym-block) {
   flex: 1;
-  min-height: 52px;
-  background: rgba(255, 255, 255, 0.55);
-  border-color: #b0b4b8;
+  min-height: 72px;
+  background: rgba(255, 255, 255, 0.72);
 }
 
-/* ===== 宽屏加强 ===== */
 @media (min-width: 1100px) {
   .ym-main {
     grid-template-columns:
-      minmax(0, 1.08fr)
-      minmax(220px, 0.68fr)
-      minmax(0, 1.08fr);
+      minmax(160px, 0.9fr)
+      minmax(320px, 1.55fr)
+      minmax(180px, 1fr);
   }
 
-  .theory-blocks :deep(.ym-block),
-  .facts-blocks :deep(.ym-block) {
+  .ym-top-mid {
     min-height: 140px;
   }
 
-  .scope-body :deep(.ym-block) {
-    min-height: 200px;
-  }
-
-  .stack-item :deep(.ym-block) {
-    min-height: 110px;
-  }
-
-  .tools-bar {
+  .tools-block-wrap {
     min-height: 80px;
   }
 }
 
-/* ===== 窄屏：简化 Y，结构保留 ===== */
 @media (max-width: 960px) {
   .y-model-canvas {
     overflow-y: auto;
@@ -564,35 +532,35 @@ const labels = computed(() => {
 
   .ym-layout {
     height: auto;
-    min-height: 100%;
+    min-height: 0;
+    flex: none;
   }
 
   .ym-main {
     grid-template-columns: 1fr 1fr;
-    grid-template-rows: auto auto auto auto;
+    grid-template-rows: auto auto auto;
     grid-template-areas:
-      'theory facts'
-      'ycol ycol'
-      'scope right'
-      'scope right';
+      'left right'
+      'stage stage'
+      'stage stage';
     flex: none;
   }
 
-  .ym-y-col {
-    min-height: 160px;
-    padding: 12px 8px;
+  .ym-left-outer {
+    grid-area: left;
   }
 
-  .ym-y-svg {
-    opacity: 0.35;
+  .ym-right-col {
+    grid-area: right;
   }
 
-  .hub-title {
-    font-size: clamp(22px, 5vw, 28px);
+  .ym-y-stage {
+    grid-area: stage;
+    min-height: 360px;
   }
 
-  .scope-body :deep(.ym-block) {
-    min-height: 140px;
+  .ym-right-stack {
+    padding-top: 0;
   }
 }
 
@@ -600,30 +568,18 @@ const labels = computed(() => {
   .ym-main {
     grid-template-columns: 1fr;
     grid-template-areas:
-      'theory'
-      'facts'
-      'ycol'
-      'scope'
+      'left'
+      'stage'
       'right';
   }
 
-  .theory-blocks,
-  .facts-blocks {
-    grid-template-columns: 1fr;
+  .ym-top-mid {
+    width: 100%;
+    max-height: none;
   }
 
-  .zone-title-right {
-    text-align: left;
-  }
-
-  .tools-bar {
-    flex-direction: column;
-    gap: 8px;
-    min-height: 0;
-  }
-
-  .tools-prefix {
-    white-space: normal;
+  .tools-block-wrap {
+    min-height: 64px;
   }
 }
 </style>
