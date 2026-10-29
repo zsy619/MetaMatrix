@@ -24,7 +24,7 @@ function block(id: FiveStepBlockId): FiveStepBlock | undefined {
 }
 
 const bgColor = computed(
-  () => props.doc.theme.background.color || '#faf8f5',
+  () => props.doc.theme.background.color || '#ffffff',
 )
 </script>
 
@@ -89,10 +89,10 @@ const bgColor = computed(
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   align-content: stretch;
-  border: 2px solid #5f6368;
-  border-radius: 4px;
+  border: 1px solid #9aa0a6;
+  border-radius: 2px;
   overflow: hidden;
-  background: #e8e6e1;
+  background: #fff;
   gap: 0;
 }
 
@@ -105,8 +105,8 @@ const bgColor = computed(
     auto;
   min-width: 0;
   min-height: 0;
-  background: #faf8f5;
-  border-right: 1px solid #5f6368;
+  background: #fff;
+  border-right: 1px solid #9aa0a6;
 }
 
 .fs-col:last-child {
@@ -119,19 +119,19 @@ const bgColor = computed(
   align-items: center;
   justify-content: center;
   background: #ffff00;
-  border-bottom: 1px solid #5f6368;
-  padding: 10px 8px;
+  border-bottom: 1px solid #9aa0a6;
+  padding: 10px 10px;
   min-height: 42px;
   box-sizing: border-box;
 }
 
 .fs-header h2 {
   margin: 0;
-  font-size: clamp(15px, 1.6vw, 20px);
+  font-size: clamp(14px, 1.55vw, 18px);
   font-weight: 800;
   color: #202124;
-  letter-spacing: 0.08em;
-  line-height: 1.2;
+  letter-spacing: 0.04em;
+  line-height: 1.25;
   text-align: center;
 }
 
@@ -141,20 +141,20 @@ const bgColor = computed(
   flex-direction: column;
   min-height: 0;
   min-width: 0;
-  padding: 8px 8px 10px;
-  gap: 6px;
+  padding: 10px 12px 12px;
+  gap: 8px;
   box-sizing: border-box;
 }
 
 .fs-qual {
-  border-bottom: 1px solid #5f6368;
+  border-bottom: 1px solid #9aa0a6;
 }
 
 .fs-section-label {
   flex-shrink: 0;
   font-size: 11px;
   font-weight: 700;
-  color: #5f6368;
+  color: #9aa0a6;
   letter-spacing: 0.06em;
   line-height: 1.2;
 }
@@ -175,7 +175,7 @@ const bgColor = computed(
 .fs-quant :deep(.ym-block) {
   flex: 1;
   min-height: 0;
-  background: rgba(255, 255, 255, 0.55);
+  background: rgba(248, 249, 250, 0.55);
 }
 
 .fs-footer {
@@ -186,15 +186,15 @@ const bgColor = computed(
   padding: 9px 6px;
   min-height: 38px;
   box-sizing: border-box;
-  background: #eceae4;
-  border-top: 1px solid #5f6368;
+  background: #f1f3f4;
+  border-top: 1px solid #9aa0a6;
 }
 
 .fs-footer span {
   font-size: clamp(12px, 1.25vw, 15px);
   font-weight: 700;
   color: #202124;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   text-align: center;
   line-height: 1.25;
 }

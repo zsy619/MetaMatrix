@@ -228,7 +228,8 @@ const order: TimeMatrixBlockId[] = ['a', 'b', 'c', 'd']
   display: grid;
   grid-template-columns: 1fr 1fr;
   grid-template-rows: 1fr 1fr;
-  gap: clamp(16px, 2.2vh, 28px) clamp(16px, 2.2vw, 28px);
+  /* 与 star-quadrant（QuadrantGrid gap:0）一致：四格贴满象限、边到边 */
+  gap: 0;
   box-sizing: border-box;
 }
 
@@ -240,27 +241,16 @@ const order: TimeMatrixBlockId[] = ['a', 'b', 'c', 'd']
   justify-content: flex-start;
   min-width: 0;
   min-height: 0; /* 随网格撑满，不把页面撑出滚动条 */
+  width: 100%;
   height: 100%;
   border-radius: 0;
-  padding: clamp(14px, 2vh, 24px) clamp(12px, 1.5vw, 20px) 12px;
+  /* padding 对齐 QuadrantCell，面板本体仍占满格子 */
+  padding: 12px 14px 14px;
   box-sizing: border-box;
-  gap: 10px;
+  gap: 8px;
   border: none;
   box-shadow: none;
   overflow: hidden;
-}
-
-/* 空象限时标题更接近附图垂直居中 */
-.tm-cell:has(.ym-block.empty) {
-  justify-content: center;
-  padding-top: clamp(20px, 3vh, 36px);
-  padding-bottom: clamp(20px, 3vh, 36px);
-}
-
-.tm-cell:has(.ym-block.empty) .tm-body {
-  flex: 0 1 auto;
-  min-height: 48px;
-  max-height: 40%;
 }
 
 .tm-title {
@@ -277,11 +267,14 @@ const order: TimeMatrixBlockId[] = ['a', 'b', 'c', 'd']
 }
 
 .tm-body {
-  flex: 1;
+  flex: 1 1 auto;
   min-height: 0;
   min-width: 0;
+  width: 100%;
+  height: 100%;
   display: flex;
   flex-direction: column;
+  align-items: stretch;
   background: transparent;
   border-radius: 0;
   overflow: hidden;
@@ -289,13 +282,24 @@ const order: TimeMatrixBlockId[] = ['a', 'b', 'c', 'd']
 
 .tm-body :deep(.ym-block) {
   position: relative;
-  flex: 1;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  align-self: stretch;
   min-height: 0;
+  width: 100%;
   height: 100%;
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
   overflow: hidden;
+}
+
+.tm-body :deep(.ym-rte),
+.tm-body :deep(.rte-root) {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
 }
 
 .tm-body :deep(.ym-block-toolbar) {

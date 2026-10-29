@@ -58,6 +58,16 @@ const bgColor = computed(
           hide-title
         />
       </section>
+
+      <footer
+        v-for="(col, index) in doc.columns"
+        :key="`f-${col.id}`"
+        class="fsb-footer"
+        :class="{ 'is-last': index === doc.columns.length - 1 }"
+        role="cell"
+      >
+        <span>{{ col.footerLabel }}</span>
+      </footer>
     </div>
   </div>
 </template>
@@ -73,7 +83,7 @@ const bgColor = computed(
   display: flex;
   flex-direction: column;
   min-height: 0;
-  background: #ffffff;
+  background: #fff;
 }
 
 .fsb-table {
@@ -82,10 +92,13 @@ const bgColor = computed(
   min-height: 100%;
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  grid-template-rows: auto minmax(400px, 1fr);
+  grid-template-rows: auto minmax(420px, 1fr) auto;
   align-content: stretch;
-  border: 1px solid #e5e7eb;
-  background: #ffffff;
+  border: 1px solid #9aa0a6;
+  border-radius: 2px;
+  overflow: hidden;
+  background: #fff;
+  gap: 0;
   box-sizing: border-box;
 }
 
@@ -93,11 +106,11 @@ const bgColor = computed(
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f5f6f8;
-  border-right: 1px solid #e5e7eb;
-  border-bottom: 1px solid #e5e7eb;
-  padding: 14px 8px;
-  min-height: 52px;
+  background: #ffff00;
+  border-right: 1px solid #9aa0a6;
+  border-bottom: 1px solid #9aa0a6;
+  padding: 10px 10px;
+  min-height: 42px;
   box-sizing: border-box;
 }
 
@@ -107,11 +120,11 @@ const bgColor = computed(
 
 .fsb-header h2 {
   margin: 0;
-  font-size: clamp(14px, 1.35vw, 16px);
-  font-weight: 600;
-  color: #111111;
-  letter-spacing: 0.02em;
-  line-height: 1.3;
+  font-size: clamp(14px, 1.55vw, 18px);
+  font-weight: 800;
+  color: #202124;
+  letter-spacing: 0.04em;
+  line-height: 1.25;
   text-align: center;
   font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui,
     sans-serif;
@@ -121,9 +134,10 @@ const bgColor = computed(
   display: flex;
   flex-direction: column;
   min-width: 0;
-  min-height: 400px;
-  background: #ffffff;
-  border-right: 1px solid #e5e7eb;
+  min-height: 0;
+  padding: 10px 12px 12px;
+  background: #fff;
+  border-right: 1px solid #9aa0a6;
   box-sizing: border-box;
 }
 
@@ -133,7 +147,7 @@ const bgColor = computed(
 
 .fsb-cell :deep(.ym-block) {
   flex: 1;
-  min-height: 400px;
+  min-height: 0;
   height: 100%;
   background: transparent;
   box-shadow: none;
@@ -150,29 +164,30 @@ const bgColor = computed(
 
 .fsb-cell :deep(.ym-block-toolbar) {
   position: absolute;
-  top: 6px;
-  right: 6px;
+  top: 2px;
+  right: 2px;
   z-index: 4;
   padding: 0;
+  opacity: 0.7;
 }
 
 .fsb-cell :deep(.ym-block-body) {
-  padding: 8px 10px 4px;
+  padding: 0;
 }
 
-/* 格内编辑器铺满白底，不额外套一层边框 */
+/* 格内编辑器铺满奶油底，不额外套一层边框 */
 .fsb-cell :deep(.rte-root) {
   border: none;
   border-radius: 0;
   box-shadow: none;
-  background: #ffffff;
+  background: transparent;
   height: 100%;
 }
 
 .fsb-cell :deep(.rte-canvas) {
   flex: 1;
   min-height: 0;
-  background: #ffffff;
+  background: transparent;
 }
 
 .fsb-cell :deep(.rte-body),
@@ -180,7 +195,7 @@ const bgColor = computed(
 .fsb-cell :deep(.ProseMirror) {
   min-height: 100%;
   font-size: 14px;
-  line-height: 1.6;
+  line-height: 1.55;
   color: #202124;
 }
 
@@ -195,6 +210,33 @@ const bgColor = computed(
   content: none;
 }
 
+.fsb-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 9px 6px;
+  min-height: 38px;
+  box-sizing: border-box;
+  background: #f1f3f4;
+  border-top: 1px solid #9aa0a6;
+  border-right: 1px solid #9aa0a6;
+}
+
+.fsb-footer.is-last {
+  border-right: none;
+}
+
+.fsb-footer span {
+  font-size: clamp(12px, 1.25vw, 15px);
+  font-weight: 700;
+  color: #202124;
+  letter-spacing: 0.04em;
+  text-align: center;
+  line-height: 1.25;
+  font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui,
+    sans-serif;
+}
+
 @media (max-width: 900px) {
   .fsb-canvas {
     overflow: auto;
@@ -202,7 +244,7 @@ const bgColor = computed(
 
   .fsb-table {
     min-width: 900px;
-    min-height: 480px;
+    min-height: 560px;
   }
 }
 </style>

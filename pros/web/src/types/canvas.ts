@@ -324,10 +324,10 @@ export interface DemandTriangleLegendBlock {
   items: QuadrantItem[]
 }
 
-/** 单方向备注富文本块 id：notes:<dirId> */
+/** 单方向描述富文本块 id：notes:<dirId> */
 export type DemandTriangleNotesBlockId = `notes:${string}`
 
-/** 单方向备注块（全屏 RTE） */
+/** 单方向描述块（全屏 RTE） */
 export interface DemandTriangleNotesBlock {
   id: DemandTriangleNotesBlockId
   title: string
@@ -448,6 +448,8 @@ export interface FiveStepDivisionColumn {
   id: FiveStepDivisionColumnId
   /** 黄底表头文案 */
   header: string
+  /** 底部固定方法论标签 */
+  footerLabel: string
 }
 
 export interface FiveStepDivisionRow {
@@ -487,9 +489,11 @@ export interface FiveStepBasicColumn {
   id: FiveStepBasicColumnId
   /** 浅灰表头文案 */
   header: string
+  /** 底部固定方法论标签 */
+  footerLabel: string
 }
 
-/** 五步法（基础版）画布文档：五列空白，无定性/定量/页脚 */
+/** 五步法（基础版）画布文档：五列空白富文本 + 表头/页脚 */
 export interface FiveStepBasicDocumentJSON {
   id: string
   type: 'five_step_basic'
@@ -498,6 +502,118 @@ export interface FiveStepBasicDocumentJSON {
   columns: FiveStepBasicColumn[]
   blocks: FiveStepBasicBlock[]
 }
+
+
+/** 五步法（提高版）· 列 id */
+export type FiveStepAdvancedColumnId =
+  | 'demand'
+  | 'solution'
+  | 'business'
+  | 'growth'
+  | 'moat'
+
+/** 固定分区文案色调：normal=黑，negate=红（非用户/非内核/非壁垒） */
+export type FiveStepAdvancedSectionTone = 'normal' | 'negate'
+
+export type FiveStepAdvancedBlockId =
+  | 'demand_req'
+  | 'demand_non_user'
+  | 'solution_core'
+  | 'solution_non_core'
+  | 'business_unit'
+  | 'growth_metric'
+  | 'moat_barrier'
+  | 'moat_non_barrier'
+
+export interface FiveStepAdvancedBlock {
+  id: FiveStepAdvancedBlockId
+  title: string
+  items: QuadrantItem[]
+}
+
+export interface FiveStepAdvancedSection {
+  blockId: FiveStepAdvancedBlockId
+  /** 分区固定标题（在 RTE 外），如「需求：」「非用户：」 */
+  label: string
+  tone: FiveStepAdvancedSectionTone
+}
+
+export interface FiveStepAdvancedColumn {
+  id: FiveStepAdvancedColumnId
+  /** 亮黄表头文案 */
+  header: string
+  /** 底部固定方法论标签 */
+  footerLabel: string
+  sections: FiveStepAdvancedSection[]
+}
+
+/** 五步法（提高版）画布：黄头五列 + 分区固定标题 + 每区一块可最大化 RTE */
+export interface FiveStepAdvancedDocumentJSON {
+  id: string
+  type: 'five_step_advanced'
+  schemaVersion: number
+  theme: CanvasTheme
+  columns: FiveStepAdvancedColumn[]
+  blocks: FiveStepAdvancedBlock[]
+}
+
+
+export type FiveStepProColumnId =
+  | 'demand'
+  | 'solution'
+  | 'business'
+  | 'growth'
+  | 'moat'
+
+/** 固定分区文案色调：normal=黑字提示标签，negate=红（非用户/非内核/非壁垒） */
+export type FiveStepProSectionTone = 'normal' | 'negate'
+
+export type FiveStepProBlockId =
+  | 'demand_users'
+  | 'demand_scene'
+  | 'demand_non_user'
+  | 'solution_selling'
+  | 'solution_plan'
+  | 'solution_non_core'
+  | 'business_revenue'
+  | 'business_cost'
+  | 'growth_metric'
+  | 'growth_channel'
+  | 'moat_upper'
+  | 'moat_non_barrier'
+
+export interface FiveStepProBlock {
+  id: FiveStepProBlockId
+  title: string
+  items: QuadrantItem[]
+}
+
+export interface FiveStepProSection {
+  blockId: FiveStepProBlockId
+  /** 分区固定标题（在 RTE 外，黑字）；空字符串=不渲染（如壁垒上区空白） */
+  label: string
+  tone: FiveStepProSectionTone
+}
+
+export interface FiveStepProColumn {
+  id: FiveStepProColumnId
+  /** 亮黄表头文案 */
+  header: string
+  /** 底部固定方法论标签 */
+  footerLabel: string
+  sections: FiveStepProSection[]
+}
+
+/** 五步法（进阶版）画布：黄头五列 + 每 ● 提示独立可最大化 RTE（黑字固定标签）+ 红固定「非*」 */
+export interface FiveStepProDocumentJSON {
+  id: string
+  type: 'five_step_pro'
+  schemaVersion: number
+  theme: CanvasTheme
+  columns: FiveStepProColumn[]
+  blocks: FiveStepProBlock[]
+}
+
 
 /** AI场景取舍评估 · 单元格 id */
 export type AiTradeoffCellId =
@@ -1125,6 +1241,48 @@ export interface PmCompetencyDocumentJSON {
 }
 
 
+/** 科学开会十大原则 · 轴 id（顺时针自顶） */
+export type ScientificMeeting10pAxisId =
+  | 'democratic'
+  | 'implementable'
+  | 'motivating'
+  | 'inspiring'
+  | 'devoting'
+  | 'efficient'
+  | 'learning'
+  | 'responsible'
+  | 'pragmatic'
+  | 'friendly'
+
+export interface ScientificMeeting10pAxisMeta {
+  id: ScientificMeeting10pAxisId
+  title: string
+}
+
+/** 分值连续 0–100（外缘=100） */
+export type ScientificMeeting10pScores = Record<ScientificMeeting10pAxisId, number>
+
+export interface ScientificMeeting10pBlock {
+  /** 与花瓣轴一一对应 */
+  id: ScientificMeeting10pAxisId
+  title: string
+  items: QuadrantItem[]
+}
+
+/** 科学开会十大原则画布文档 */
+export interface ScientificMeeting10pDocumentJSON {
+  id: string
+  type: 'scientific_meeting_10p'
+  schemaVersion: number
+  theme: CanvasTheme
+  axes: Record<ScientificMeeting10pAxisId, ScientificMeeting10pAxisMeta>
+  scores: ScientificMeeting10pScores
+  blocks: ScientificMeeting10pBlock[]
+}
+
+
+
+
 
 /** 产品内容5维特征 · 轴 id */
 export type ProductFeatures5dAxisId =
@@ -1253,6 +1411,8 @@ export type CanvasDocumentJSON = (
   | FiveStepDocumentJSON
   | FiveStepDivisionDocumentJSON
   | FiveStepBasicDocumentJSON
+  | FiveStepAdvancedDocumentJSON
+  | FiveStepProDocumentJSON
   | AiTradeoffDocumentJSON
   | ProductContentDocumentJSON
   | OscarDocumentJSON
@@ -1274,6 +1434,7 @@ export type CanvasDocumentJSON = (
   | UnitModelQuadrantDocumentJSON
   | PmSensitivity6dDocumentJSON
   | PmCompetencyDocumentJSON
+  | ScientificMeeting10pDocumentJSON
   | ProductFeatures5dDocumentJSON
   | PmSolutionTriangleDocumentJSON
   | GrowthAssumptionsDocumentJSON
@@ -1289,6 +1450,8 @@ export type BlockCanvasDocumentJSON =
   | FiveStepDocumentJSON
   | FiveStepDivisionDocumentJSON
   | FiveStepBasicDocumentJSON
+  | FiveStepAdvancedDocumentJSON
+  | FiveStepProDocumentJSON
   | AiTradeoffDocumentJSON
   | ProductContentDocumentJSON
   | OscarDocumentJSON
@@ -1308,6 +1471,7 @@ export type BlockCanvasDocumentJSON =
   | UnitModelQuadrantDocumentJSON
   | PmSensitivity6dDocumentJSON
   | PmCompetencyDocumentJSON
+  | ScientificMeeting10pDocumentJSON
   | ProductFeatures5dDocumentJSON
   | PmSolutionTriangleDocumentJSON
 
@@ -1547,6 +1711,21 @@ export function isFiveStepBasicDoc(
   return !!doc && doc.type === 'five_step_basic'
 }
 
+
+export function isFiveStepAdvancedDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is FiveStepAdvancedDocumentJSON {
+  return !!doc && doc.type === 'five_step_advanced'
+}
+
+
+export function isFiveStepProDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is FiveStepProDocumentJSON {
+  return !!doc && doc.type === 'five_step_pro'
+}
+
+
 export function isAiTradeoffDoc(
   doc: CanvasDocumentJSON | null | undefined,
 ): doc is AiTradeoffDocumentJSON {
@@ -1683,6 +1862,15 @@ export function isPmCompetencyDoc(
 }
 
 
+export function isScientificMeeting10pDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is ScientificMeeting10pDocumentJSON {
+  return !!doc && doc.type === 'scientific_meeting_10p'
+}
+
+
+
+
 
 export function isProductFeatures5dDoc(
   doc: CanvasDocumentJSON | null | undefined,
@@ -1722,6 +1910,8 @@ export function isBlockCanvasDoc(
     isFiveStepDoc(doc) ||
     isFiveStepDivisionDoc(doc) ||
     isFiveStepBasicDoc(doc) ||
+    isFiveStepAdvancedDoc(doc) ||
+    isFiveStepProDoc(doc) ||
     isAiTradeoffDoc(doc) ||
     isProductContentDoc(doc) ||
     isOscarDoc(doc) ||
@@ -1741,6 +1931,7 @@ export function isBlockCanvasDoc(
     isUnitModelQuadrantDoc(doc) ||
     isPmSensitivity6dDoc(doc) ||
     isPmCompetencyDoc(doc) ||
+    isScientificMeeting10pDoc(doc) ||
     isProductFeatures5dDoc(doc) ||
     isPmSolutionTriangleDoc(doc)
   )

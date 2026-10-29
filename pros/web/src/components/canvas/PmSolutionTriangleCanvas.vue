@@ -55,6 +55,21 @@ const AXIS_SHORT: Record<PmSolutionTriangleAxisId, string> = {
   opportunity_window: '机会窗口',
 }
 
+/**
+ * 三顶点固定分色（浅色底可读，色相彼此拉开）。
+ * 圆点、顶点标签、底栏滑块共用同一色值。
+ * ROI蓝 / 机会成本红 / 机会窗口绿
+ */
+const AXIS_COLOR: Record<PmSolutionTriangleAxisId, string> = {
+  roi: '#1565C0',
+  opportunity_cost: '#C62828',
+  opportunity_window: '#137333',
+}
+
+function axisColor(axis: PmSolutionTriangleAxisId): string {
+  return AXIS_COLOR[axis]
+}
+
 const blocksById = computed(() => {
   const map = new Map<PmSolutionTriangleAxisId, PmSolutionTriangleBlock>()
   for (const b of props.doc.blocks) {
@@ -382,7 +397,7 @@ onBeforeUnmount(() => {
             width="16"
             height="16"
             rx="2"
-            fill="#1e88e5"
+            :fill="axisColor(m.axis)"
             stroke="#ffffff"
             stroke-width="1.5"
           />
@@ -397,6 +412,7 @@ onBeforeUnmount(() => {
           class="pmst-vertex-label"
           role="button"
           tabindex="0"
+          :style="{ '--axis': axisColor(lb.axis) }"
           :aria-label="`最大化编辑${lb.title}`"
           @click="onLabelActivate(lb.axis, $event)"
           @keydown.enter.prevent="openEditor(lb.axis)"
@@ -431,6 +447,7 @@ onBeforeUnmount(() => {
         :key="`slider-${s.axis}`"
         class="pmst-slider"
         :title="s.title"
+        :style="{ '--axis': axisColor(s.axis) }"
       >
         <span class="pmst-slider-name">{{ s.title }}</span>
         <input
@@ -514,7 +531,7 @@ onBeforeUnmount(() => {
 }
 
 .pmst-axis-label {
-  fill: #1a73e8;
+  fill: var(--axis, #1565c0);
   font-size: 18px;
   font-weight: 750;
   letter-spacing: 0.02em;
@@ -527,12 +544,12 @@ onBeforeUnmount(() => {
 }
 
 .pmst-vertex-label:hover rect {
-  fill: #e8f0fe;
-  stroke: #1a73e8;
+  fill: #ffffff;
+  stroke: var(--axis, #1565c0);
 }
 
 .pmst-vertex-label:focus-visible rect {
-  stroke: #1a73e8;
+  stroke: var(--axis, #1565c0);
   stroke-width: 2;
 }
 
@@ -545,7 +562,7 @@ onBeforeUnmount(() => {
 }
 
 .pmst-handle:hover rect {
-  fill: #1565c0;
+  stroke-width: 2.5;
 }
 
 .pmst-sliders {
@@ -574,7 +591,7 @@ onBeforeUnmount(() => {
   max-width: 46%;
   font-size: 12px;
   font-weight: 700;
-  color: #3c4043;
+  color: var(--axis, #1565c0);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -584,7 +601,7 @@ onBeforeUnmount(() => {
   flex: 1 1 auto;
   min-width: 0;
   height: 4px;
-  accent-color: #1e88e5;
+  accent-color: var(--axis, #1565c0);
   cursor: pointer;
 }
 
@@ -594,7 +611,7 @@ onBeforeUnmount(() => {
   font-variant-numeric: tabular-nums;
   font-size: 13px;
   font-weight: 800;
-  color: #1e88e5;
+  color: var(--axis, #1565c0);
   text-align: right;
 }
 

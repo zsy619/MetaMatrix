@@ -63,6 +63,24 @@ const AXIS_SHORT: Record<PmSensitivity6dAxisId, string> = {
   time: '时间',
 }
 
+/**
+ * 六轴固定分色（浅色底可读，色相彼此拉开）。
+ * 圆点、顶点标签、底栏滑块共用同一色值。
+ * 预算蓝 / 老板琥珀 / 风险红 / 协作绿 / 人力紫 / 时间青
+ */
+const AXIS_COLOR: Record<PmSensitivity6dAxisId, string> = {
+  budget: '#1565C0',
+  boss: '#9A5700',
+  risk: '#C62828',
+  collaboration: '#137333',
+  manpower: '#6A1B9A',
+  time: '#00838F',
+}
+
+function axisColor(axis: PmSensitivity6dAxisId): string {
+  return AXIS_COLOR[axis]
+}
+
 const blocksById = computed(() => {
   const map = new Map<PmSensitivity6dAxisId, PmSensitivity6dBlock>()
   for (const b of props.doc.blocks) {
@@ -393,7 +411,7 @@ onBeforeUnmount(() => {
             width="16"
             height="16"
             rx="2"
-            fill="#1e88e5"
+            :fill="axisColor(m.axis)"
             stroke="#ffffff"
             stroke-width="1.5"
           />
@@ -408,6 +426,7 @@ onBeforeUnmount(() => {
           class="pm6d-vertex-label"
           role="button"
           tabindex="0"
+          :style="{ '--axis': axisColor(lb.axis) }"
           :aria-label="`最大化编辑${lb.title}`"
           @click="onLabelActivate(lb.axis, $event)"
           @keydown.enter.prevent="openEditor(lb.axis)"
@@ -442,6 +461,7 @@ onBeforeUnmount(() => {
         :key="`slider-${s.axis}`"
         class="pm6d-slider"
         :title="s.title"
+        :style="{ '--axis': axisColor(s.axis) }"
       >
         <span class="pm6d-slider-name">{{ s.short }}</span>
         <input
@@ -524,7 +544,7 @@ onBeforeUnmount(() => {
 }
 
 .pm6d-axis-label {
-  fill: #1a73e8;
+  fill: var(--axis, #1565c0);
   font-size: 15px;
   font-weight: 750;
   letter-spacing: 0.02em;
@@ -537,12 +557,12 @@ onBeforeUnmount(() => {
 }
 
 .pm6d-vertex-label:hover rect {
-  fill: #e8f0fe;
-  stroke: #1a73e8;
+  fill: #ffffff;
+  stroke: var(--axis, #1565c0);
 }
 
 .pm6d-vertex-label:focus-visible rect {
-  stroke: #1a73e8;
+  stroke: var(--axis, #1565c0);
   stroke-width: 2;
 }
 
@@ -555,7 +575,7 @@ onBeforeUnmount(() => {
 }
 
 .pm6d-handle:hover rect {
-  fill: #1565c0;
+  stroke-width: 2.5;
 }
 
 .pm6d-sliders {
@@ -584,7 +604,7 @@ onBeforeUnmount(() => {
   max-width: 40%;
   font-size: 11px;
   font-weight: 700;
-  color: #3c4043;
+  color: var(--axis, #1565c0);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -594,7 +614,7 @@ onBeforeUnmount(() => {
   flex: 1 1 auto;
   min-width: 0;
   height: 4px;
-  accent-color: #29b6f6;
+  accent-color: var(--axis, #1565c0);
   cursor: pointer;
 }
 
@@ -604,7 +624,7 @@ onBeforeUnmount(() => {
   font-variant-numeric: tabular-nums;
   font-size: 12px;
   font-weight: 800;
-  color: #1e88e5;
+  color: var(--axis, #1565c0);
   text-align: right;
 }
 

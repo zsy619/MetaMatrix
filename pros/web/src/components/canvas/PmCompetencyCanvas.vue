@@ -61,6 +61,23 @@ const AXIS_SHORT: Record<PmCompetencyAxisId, string> = {
   review: '基本功4：做复盘',
 }
 
+/**
+ * 五轴固定分色（浅色底可读，色相彼此拉开）。
+ * 圆点、顶点标签、底栏滑块共用同一色值。
+ * 意识蓝 / 定方案琥珀 / 拆计划红 / 管执行绿 / 做复盘紫
+ */
+const AXIS_COLOR: Record<PmCompetencyAxisId, string> = {
+  awareness: '#1565C0',
+  proposal: '#9A5700',
+  plan: '#C62828',
+  execution: '#137333',
+  review: '#6A1B9A',
+}
+
+function axisColor(axis: PmCompetencyAxisId): string {
+  return AXIS_COLOR[axis]
+}
+
 const blocksById = computed(() => {
   const map = new Map<PmCompetencyAxisId, PmCompetencyBlock>()
   for (const b of props.doc.blocks) {
@@ -388,7 +405,7 @@ onBeforeUnmount(() => {
             width="16"
             height="16"
             rx="2"
-            fill="#64b5f6"
+            :fill="axisColor(m.axis)"
             stroke="#ffffff"
             stroke-width="1.5"
           />
@@ -403,6 +420,7 @@ onBeforeUnmount(() => {
           class="pmc-vertex-label"
           role="button"
           tabindex="0"
+          :style="{ '--axis': axisColor(lb.axis) }"
           :aria-label="`最大化编辑${lb.title}`"
           @click="onLabelActivate(lb.axis, $event)"
           @keydown.enter.prevent="openEditor(lb.axis)"
@@ -437,6 +455,7 @@ onBeforeUnmount(() => {
         :key="`slider-${s.axis}`"
         class="pmc-slider"
         :title="s.title"
+        :style="{ '--axis': axisColor(s.axis) }"
       >
         <span class="pmc-slider-name">{{ s.title }}</span>
         <input
@@ -520,7 +539,7 @@ onBeforeUnmount(() => {
 }
 
 .pmc-axis-label {
-  fill: #1a73e8;
+  fill: var(--axis, #1565c0);
   font-size: 15px;
   font-weight: 750;
   letter-spacing: 0.02em;
@@ -533,12 +552,12 @@ onBeforeUnmount(() => {
 }
 
 .pmc-vertex-label:hover rect {
-  fill: #e8f0fe;
-  stroke: #1a73e8;
+  fill: #ffffff;
+  stroke: var(--axis, #1565c0);
 }
 
 .pmc-vertex-label:focus-visible rect {
-  stroke: #1a73e8;
+  stroke: var(--axis, #1565c0);
   stroke-width: 2;
 }
 
@@ -551,7 +570,7 @@ onBeforeUnmount(() => {
 }
 
 .pmc-handle:hover rect {
-  fill: #42a5f5;
+  stroke-width: 2.5;
 }
 
 .pmc-sliders {
@@ -580,7 +599,7 @@ onBeforeUnmount(() => {
   max-width: 48%;
   font-size: 11px;
   font-weight: 700;
-  color: #3c4043;
+  color: var(--axis, #1565c0);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -590,7 +609,7 @@ onBeforeUnmount(() => {
   flex: 1 1 auto;
   min-width: 0;
   height: 4px;
-  accent-color: #42a5f5;
+  accent-color: var(--axis, #1565c0);
   cursor: pointer;
 }
 
@@ -600,7 +619,7 @@ onBeforeUnmount(() => {
   font-variant-numeric: tabular-nums;
   font-size: 12px;
   font-weight: 800;
-  color: #1e88e5;
+  color: var(--axis, #1565c0);
   text-align: right;
 }
 

@@ -1,0 +1,147 @@
+{
+  "id": "canvas_scientific_meeting_10p",
+  "type": "scientific_meeting_10p",
+  "schemaVersion": 1,
+  "theme": {
+    "background": {
+      "pattern": "none",
+      "color": "#ffffff"
+    }
+  },
+  "axes": {
+    "democratic": { "id": "democratic", "title": "民主" },
+    "implementable": { "id": "implementable", "title": "落实" },
+    "motivating": { "id": "motivating", "title": "激发" },
+    "inspiring": { "id": "inspiring", "title": "点燃" },
+    "devoting": { "id": "devoting", "title": "投入" },
+    "efficient": { "id": "efficient", "title": "高效" },
+    "learning": { "id": "learning", "title": "学习" },
+    "responsible": { "id": "responsible", "title": "责任" },
+    "pragmatic": { "id": "pragmatic", "title": "务实" },
+    "friendly": { "id": "friendly", "title": "良性" }
+  },
+  "scores": {
+    "democratic": 82,
+    "implementable": 78,
+    "motivating": 74,
+    "inspiring": 86,
+    "devoting": 80,
+    "efficient": 76,
+    "learning": 84,
+    "responsible": 79,
+    "pragmatic": 81,
+    "friendly": 77
+  },
+  "blocks": [
+    {
+      "id": "democratic",
+      "title": "民主",
+      "items": [
+        {
+          "id": "item_sm10p_democratic_1",
+          "text": "",
+          "style": { "color": "#3c4043", "fontSize": 14, "fontWeight": "500" }
+        }
+      ]
+    },
+    {
+      "id": "implementable",
+      "title": "落实",
+      "items": [
+        {
+          "id": "item_sm10p_implementable_1",
+          "text": "",
+          "style": { "color": "#3c4043", "fontSize": 14, "fontWeight": "500" }
+        }
+      ]
+    },
+    {
+      "id": "motivating",
+      "title": "激发",
+      "items": [
+        {
+          "id": "item_sm10p_motivating_1",
+          "text": "",
+          "style": { "color": "#3c4043", "fontSize": 14, "fontWeight": "500" }
+        }
+      ]
+    },
+    {
+      "id": "inspiring",
+      "title": "点燃",
+      "items": [
+        {
+          "id": "item_sm10p_inspiring_1",
+          "text": "",
+          "style": { "color": "#3c4043", "fontSize": 14, "fontWeight": "500" }
+        }
+      ]
+    },
+    {
+      "id": "devoting",
+      "title": "投入",
+      "items": [
+        {
+          "id": "item_sm10p_devoting_1",
+          "text": "",
+          "style": { "color": "#3c4043", "fontSize": 14, "fontWeight": "500" }
+        }
+      ]
+    },
+    {
+      "id": "efficient",
+      "title": "高效",
+      "items": [
+        {
+          "id": "item_sm10p_efficient_1",
+          "text": "",
+          "style": { "color": "#3c4043", "fontSize": 14, "fontWeight": "500" }
+        }
+      ]
+    },
+    {
+      "id": "learning",
+      "title": "学习",
+      "items": [
+        {
+          "id": "item_sm10p_learning_1",
+          "text": "",
+          "style": { "color": "#3c4043", "fontSize": 14, "fontWeight": "500" }
+        }
+      ]
+    },
+    {
+      "id": "responsible",
+      "title": "责任",
+      "items": [
+        {
+          "id": "item_sm10p_responsible_1",
+          "text": "",
+          "style": { "color": "#3c4043", "fontSize": 14, "fontWeight": "500" }
+        }
+      ]
+    },
+    {
+      "id": "pragmatic",
+      "title": "务实",
+      "items": [
+        {
+          "id": "item_sm10p_pragmatic_1",
+          "text": "",
+          "style": { "color": "#3c4043", "fontSize": 14, "fontWeight": "500" }
+        }
+      ]
+    },
+    {
+      "id": "friendly",
+      "title": "良性",
+      "items": [
+        {
+          "id": "item_sm10p_friendly_1",
+          "text": "",
+          "style": { "color": "#3c4043", "fontSize": 14, "fontWeight": "500" }
+        }
+      ]
+    }
+  ]
+}

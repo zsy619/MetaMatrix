@@ -11,6 +11,8 @@ import {
   isFiveStepDoc,
   isFiveStepDivisionDoc,
   isFiveStepBasicDoc,
+  isFiveStepAdvancedDoc,
+  isFiveStepProDoc,
   isIndustryAnalysisDoc,
   isIndustryForecastDoc,
   isKeyResistanceDoc,
@@ -32,6 +34,7 @@ import {
   isUnitModelQuadrantDoc,
   isPmSensitivity6dDoc,
   isPmCompetencyDoc,
+  isScientificMeeting10pDoc,
   isProductFeatures5dDoc,
   isPmSolutionTriangleDoc,
   isGrowthAssumptionsDoc,
@@ -49,6 +52,8 @@ import DemandTriangleCanvas from './DemandTriangleCanvas.vue'
 import FiveStepCanvas from './FiveStepCanvas.vue'
 import FiveStepDivisionCanvas from './FiveStepDivisionCanvas.vue'
 import FiveStepBasicCanvas from './FiveStepBasicCanvas.vue'
+import FiveStepAdvancedCanvas from './FiveStepAdvancedCanvas.vue'
+import FiveStepProCanvas from './FiveStepProCanvas.vue'
 import AiTradeoffCanvas from './AiTradeoffCanvas.vue'
 import ProductContentCanvas from './ProductContentCanvas.vue'
 import OscarCanvas from './OscarCanvas.vue'
@@ -70,6 +75,7 @@ import OnlineOfflineCommCanvas from './OnlineOfflineCommCanvas.vue'
 import UnitModelQuadrantCanvas from './UnitModelQuadrantCanvas.vue'
 import PmSensitivity6dCanvas from './PmSensitivity6dCanvas.vue'
 import PmCompetencyCanvas from './PmCompetencyCanvas.vue'
+import ScientificMeeting10pCanvas from './ScientificMeeting10pCanvas.vue'
 import ProductFeatures5dCanvas from './ProductFeatures5dCanvas.vue'
 import PmSolutionTriangleCanvas from './PmSolutionTriangleCanvas.vue'
 import GrowthAssumptionsCanvas from './GrowthAssumptionsCanvas.vue'
@@ -100,6 +106,12 @@ const fiveStepDivisionDoc = computed(() =>
 )
 const fiveStepBasicDoc = computed(() =>
   isFiveStepBasicDoc(current_data.value) ? current_data.value : null,
+)
+const fiveStepAdvancedDoc = computed(() =>
+  isFiveStepAdvancedDoc(current_data.value) ? current_data.value : null,
+)
+const fiveStepProDoc = computed(() =>
+  isFiveStepProDoc(current_data.value) ? current_data.value : null,
 )
 const aiTradeoffDoc = computed(() =>
   isAiTradeoffDoc(current_data.value) ? current_data.value : null,
@@ -164,6 +176,9 @@ const pmSensitivity6dDoc = computed(() =>
 const pmCompetencyDoc = computed(() =>
   isPmCompetencyDoc(current_data.value) ? current_data.value : null,
 )
+const scientificMeeting10pDoc = computed(() =>
+  isScientificMeeting10pDoc(current_data.value) ? current_data.value : null,
+)
 const productFeatures5dDoc = computed(() =>
   isProductFeatures5dDoc(current_data.value) ? current_data.value : null,
 )
@@ -210,6 +225,12 @@ const quadrantDoc = computed(() =>
         </template>
         <template v-else-if="fiveStepBasicDoc">
           <FiveStepBasicCanvas :doc="fiveStepBasicDoc" />
+        </template>
+        <template v-else-if="fiveStepAdvancedDoc">
+          <FiveStepAdvancedCanvas :doc="fiveStepAdvancedDoc" />
+        </template>
+        <template v-else-if="fiveStepProDoc">
+          <FiveStepProCanvas :doc="fiveStepProDoc" />
         </template>
         <template v-else-if="aiTradeoffDoc">
           <AiTradeoffCanvas :doc="aiTradeoffDoc" />
@@ -273,6 +294,9 @@ const quadrantDoc = computed(() =>
         </template>
         <template v-else-if="pmCompetencyDoc">
           <PmCompetencyCanvas :doc="pmCompetencyDoc" />
+        </template>
+        <template v-else-if="scientificMeeting10pDoc">
+          <ScientificMeeting10pCanvas :doc="scientificMeeting10pDoc" />
         </template>
         <template v-else-if="productFeatures5dDoc">
           <ProductFeatures5dCanvas :doc="productFeatures5dDoc" />

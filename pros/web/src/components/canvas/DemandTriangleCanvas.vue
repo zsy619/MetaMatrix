@@ -117,7 +117,7 @@ function onAddDirection(event: MouseEvent) {
   const n = legendItems.value.length
   const palette = PALETTE[n % PALETTE.length]
   const item = documentStore.addBlockItem('legend', {
-    text: `第${['一', '二', '三', '四', '五', '六'][n] ?? n + 1}个业务方向`,
+    text: `第${n + 1}个业务方向`,
     style: { color: '#3c4043', fontSize: 14, fontWeight: '600' },
   })
   if (item) {
@@ -157,7 +157,7 @@ function onCloseMaximize(event?: Event) {
   closeMaximize()
 }
 
-/* ---- 备注：每方向 notes:<dirId> → 全局 panel-maximize 全屏 RTE ---- */
+/* ---- 描述：每方向 notes:<dirId> → 全局 panel-maximize 全屏 RTE ---- */
 const activeNotesDirId = ref<string | null>(null)
 
 const activeNotesMaximizeKey = computed(() => {
@@ -355,10 +355,10 @@ const vertexPanels = computed(() => {
               <button
                 type="button"
                 class="legend-notes-btn"
-                title="备注"
+                title="描述"
                 @click="openDirectionNotes(item.id, $event)"
               >
-                备注
+                描述
               </button>
               <button
                 v-if="itemSelected(item.id)"
@@ -506,10 +506,10 @@ const vertexPanels = computed(() => {
                   <button
                     type="button"
                     class="legend-notes-btn"
-                    title="备注"
+                    title="描述"
                     @click="openDirectionNotes(item.id, $event)"
                   >
-                    备注
+                    描述
                   </button>
                   <button
                     v-if="itemSelected(item.id)"
@@ -649,7 +649,7 @@ const vertexPanels = computed(() => {
     </div>
 
     <!--
-      隐藏挂载各方向备注 YModelBlock：点击「备注」写入全局 maximizedPanelKey，
+      隐藏挂载各方向描述 YModelBlock：点击「描述」写入全局 maximizedPanelKey，
       由块内 Teleport .pm-overlay 铺满文档视口（approach B，v-if 避免 undefined block.id）。
     -->
     <div class="dt-notes-host" aria-hidden="true">

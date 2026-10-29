@@ -11,23 +11,28 @@
   "columns": [
     {
       "id": "demand",
-      "header": "需求"
+      "header": "需求",
+      "footerLabel": "逐级拆解"
     },
     {
       "id": "solution",
-      "header": "解决方案"
+      "header": "解决方案",
+      "footerLabel": "全局预判"
     },
     {
       "id": "business",
-      "header": "商业模式"
+      "header": "商业模式",
+      "footerLabel": "专业选项"
     },
     {
       "id": "growth",
-      "header": "增长"
+      "header": "增长",
+      "footerLabel": "努力定量"
     },
     {
       "id": "moat",
-      "header": "壁垒"
+      "header": "壁垒",
+      "footerLabel": "动态更新"
     }
   ],
   "blocks": [

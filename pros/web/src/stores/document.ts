@@ -22,6 +22,8 @@ import type {
   FiveStepDocumentJSON,
   FiveStepDivisionDocumentJSON,
   FiveStepBasicDocumentJSON,
+  FiveStepAdvancedDocumentJSON,
+  FiveStepProDocumentJSON,
   AiTradeoffDocumentJSON,
   ProductContentDocumentJSON,
   OscarDocumentJSON,
@@ -55,6 +57,9 @@ import type {
   PmCompetencyDocumentJSON,
   PmCompetencyAxisId,
   PmCompetencyScores,
+  ScientificMeeting10pDocumentJSON,
+  ScientificMeeting10pAxisId,
+  ScientificMeeting10pScores,
   ProductFeatures5dDocumentJSON,
   ProductFeatures5dAxisId,
   ProductFeatures5dScores,
@@ -77,6 +82,7 @@ import {
   isDemandTriangleDoc,
   isPmSensitivity6dDoc,
   isPmCompetencyDoc,
+  isScientificMeeting10pDoc,
   isProductFeatures5dDoc,
   isPmSolutionTriangleDoc,
   isIpoDoc,
@@ -84,6 +90,8 @@ import {
   isFiveStepDoc,
   isFiveStepDivisionDoc,
   isFiveStepBasicDoc,
+  isFiveStepAdvancedDoc,
+  isFiveStepProDoc,
   isIndustryAnalysisDoc,
   isIndustryForecastDoc,
   isKeyResistanceDoc,
@@ -109,6 +117,8 @@ import demandTriangleTemplate from '../templates/demand-triangle-v1.json'
 import fiveStepTemplate from '../templates/five-step-v1.json'
 import fiveStepDivisionTemplate from '../templates/five-step-division-v1.json'
 import fiveStepBasicTemplate from '../templates/five-step-basic-v1.json'
+import fiveStepAdvancedTemplate from '../templates/five-step-advanced-v1.json'
+import fiveStepProTemplate from '../templates/five-step-pro-v1.json'
 import aiTradeoffTemplate from '../templates/ai-tradeoff-v1.json'
 import productContentTemplate from '../templates/product-content-v1.json'
 import oscarTemplate from '../templates/oscar-v1.json'
@@ -130,6 +140,7 @@ import onlineOfflineCommTemplate from '../templates/online-offline-comm-v1.json'
 import unitModelQuadrantTemplate from '../templates/unit-model-quadrant-v1.json'
 import pmSensitivity6dTemplate from '../templates/pm-sensitivity-6d-v1.json'
 import pmCompetencyTemplate from '../templates/pm-competency-v1.json'
+import scientificMeeting10pTemplate from '../templates/scientific-meeting-10p-v1.json'
 import productFeatures5dTemplate from '../templates/product-features-5d-v1.json'
 import pmSolutionTriangleTemplate from '../templates/pm-solution-triangle-v1.json'
 import growthAssumptionsTemplate from '../templates/growth-assumptions-v1.json'
@@ -141,9 +152,11 @@ export type TemplateId =
   | 'y-model'
   | 'deliberate-practice'
   | 'demand-triangle'
-  | 'five-step'
-  | 'five-step-division'
   | 'five-step-basic'
+  | 'five-step-division'
+  | 'five-step-advanced'
+  | 'five-step-pro'
+  | 'five-step'
   | 'ai-tradeoff'
   | 'product-content'
   | 'oscar'
@@ -165,6 +178,7 @@ export type TemplateId =
   | 'unit-model-quadrant'
   | 'pm-sensitivity-6d'
   | 'pm-competency'
+  | 'scientific-meeting-10p'
   | 'product-features-5d'
   | 'pm-solution-triangle'
   | 'growth-assumptions'
@@ -177,9 +191,11 @@ const TEMPLATES: Record<TemplateId, CanvasDocumentJSON> = {
   'deliberate-practice':
     deliberatePracticeTemplate as DeliberatePracticeDocumentJSON,
   'demand-triangle': demandTriangleTemplate as DemandTriangleDocumentJSON,
-  'five-step': fiveStepTemplate as FiveStepDocumentJSON,
-  'five-step-division': fiveStepDivisionTemplate as FiveStepDivisionDocumentJSON,
   'five-step-basic': fiveStepBasicTemplate as FiveStepBasicDocumentJSON,
+  'five-step-division': fiveStepDivisionTemplate as FiveStepDivisionDocumentJSON,
+  'five-step-advanced': fiveStepAdvancedTemplate as FiveStepAdvancedDocumentJSON,
+  'five-step-pro': fiveStepProTemplate as FiveStepProDocumentJSON,
+  'five-step': fiveStepTemplate as FiveStepDocumentJSON,
   'ai-tradeoff': aiTradeoffTemplate as AiTradeoffDocumentJSON,
   'product-content': productContentTemplate as ProductContentDocumentJSON,
   oscar: oscarTemplate as OscarDocumentJSON,
@@ -201,6 +217,7 @@ const TEMPLATES: Record<TemplateId, CanvasDocumentJSON> = {
   'unit-model-quadrant': unitModelQuadrantTemplate as UnitModelQuadrantDocumentJSON,
   'pm-sensitivity-6d': pmSensitivity6dTemplate as PmSensitivity6dDocumentJSON,
   'pm-competency': pmCompetencyTemplate as PmCompetencyDocumentJSON,
+  'scientific-meeting-10p': scientificMeeting10pTemplate as ScientificMeeting10pDocumentJSON,
   'product-features-5d': productFeatures5dTemplate as ProductFeatures5dDocumentJSON,
   'pm-solution-triangle': pmSolutionTriangleTemplate as PmSolutionTriangleDocumentJSON,
   'growth-assumptions': growthAssumptionsTemplate as GrowthAssumptionsDocumentJSON,
@@ -263,22 +280,34 @@ export const TEMPLATE_META: Record<
     description: '普遍性 × 频次 × 刚性三维雷达，叠加对比多个业务方向的需求强度。',
     category: 'growth',
   },
-  'five-step': {
-    name: '五步法',
-    badge: '五步法 · MVP',
-    description: '需求 → 解决方案 → 商业模式 → 增长 → 壁垒，定性定量一体的方法论画布。',
+  'five-step-basic': {
+    name: '五步法（基础版）',
+    badge: '五步法 · 基础',
+    description: '系列入门：需求 → 解决方案 → 商业模式 → 增长 → 壁垒，五列等宽空白画布，格内直接填写。',
     category: 'growth',
   },
   'five-step-division': {
     name: '五步法（分工版）',
-    badge: '五步法分工 · MVP',
-    description: '需求 → 解决方案 → 商业模式 → 增长 → 壁垒，按定性取舍 / 定量测量 / 团队分工拆解。',
+    badge: '五步法 · 分工',
+    description: '系列分工：五列步骤 × 定性取舍 / 定量测量 / 团队分工，十五格协同拆解。',
     category: 'growth',
   },
-  'five-step-basic': {
-    name: '五步法（基础版）',
-    badge: '五步法基础 · MVP',
-    description: '需求 → 解决方案 → 商业模式 → 增长 → 壁垒，五列等宽空白画布，格内直接填写。',
+  'five-step-advanced': {
+    name: '五步法（提高版）',
+    badge: '五步法 · 提高',
+    description: '系列提高：分区固定标题 + 每区一块可编辑富文本，含红色「非*」对照。',
+    category: 'growth',
+  },
+  'five-step-pro': {
+    name: '五步法（进阶版）',
+    badge: '五步法 · 进阶',
+    description: '系列进阶：每个 ● 提示独立可最大化富文本，黑字固定标签在外，红色「非*」对照。',
+    category: 'growth',
+  },
+  'five-step': {
+    name: '五步法（原版）',
+    badge: '五步法 · 原版',
+    description: '系列原版：需求 → 解决方案 → 商业模式 → 增长 → 壁垒，定性定量一体的方法论画布。',
     category: 'growth',
   },
   'ai-tradeoff': {
@@ -395,6 +424,12 @@ export const TEMPLATE_META: Record<
     description: '意识 × 定方案 × 拆计划 × 管执行 × 做复盘五维雷达，0–100 拖拽评分测评项目管理竞争力。',
     category: 'method',
   },
+  'scientific-meeting-10p': {
+    name: '科学开会十大原则',
+    badge: '十大原则 · MVP',
+    description: '民主 × 落实 × 激发 × 点燃 × 投入 × 高效 × 学习 × 责任 × 务实 × 良性十瓣花，0–100 评分刻画科学开会原则践行度。',
+    category: 'org',
+  },
   'product-features-5d': {
     name: '产品内容5维特征',
     badge: '5维特征 · MVP',
@@ -472,6 +507,12 @@ export const useDocumentStore = defineStore('document', () => {
   )
   const isFiveStepBasic = computed(() =>
     isFiveStepBasicDoc(current_data.value),
+  )
+  const isFiveStepAdvanced = computed(() =>
+    isFiveStepAdvancedDoc(current_data.value),
+  )
+  const isFiveStepPro = computed(() =>
+    isFiveStepProDoc(current_data.value),
   )
   const isAiTradeoff = computed(() => isAiTradeoffDoc(current_data.value))
   const isProductContent = computed(() =>
@@ -1017,7 +1058,7 @@ export const useDocumentStore = defineStore('document', () => {
   function loadFromTemplate(templateId: TemplateId | string = 'dual-triangle') {
     const id: TemplateId = isTemplateId(templateId) ? templateId : 'dual-triangle'
     activeTemplateId.value = id
-    const local = loadLocal(id)
+    let local = loadLocal(id)
     const meta = loadLocalMeta(id)
     if (local) {
       current_data.value = normalizeLoadedDoc(local, id)
@@ -1077,10 +1118,78 @@ export const useDocumentStore = defineStore('document', () => {
     if (isYModelDoc(next)) {
       next = normalizeYModelDoc(next)
     }
+    if (isFiveStepProDoc(next)) {
+      next = normalizeFiveStepProDoc(next)
+    }
     if (!next.attachmentsByPanelId) {
       next = { ...next, attachmentsByPanelId: {} }
     }
     return next
+  }
+
+  /** 温和升级进阶版：旧 upper 合并块 → 每提示独立 RTE */
+  function normalizeFiveStepProDoc(
+    doc: FiveStepProDocumentJSON,
+  ): FiveStepProDocumentJSON {
+    const template = fiveStepProTemplate as FiveStepProDocumentJSON
+    const byId = new Map<string, (typeof doc.blocks)[number]>(
+      (Array.isArray(doc.blocks) ? doc.blocks : []).map((b) => [b.id, b]),
+    )
+    const requiredIds = template.blocks.map((b) => b.id)
+    const missing = requiredIds.some((id) => !byId.has(id))
+    const hasLegacy = [
+      'demand_upper',
+      'solution_upper',
+      'business_upper',
+      'growth_upper',
+    ].some((id) => byId.has(id))
+
+    const colSame =
+      Array.isArray(doc.columns) &&
+      doc.columns.length === template.columns.length &&
+      doc.columns.every((c, i) => {
+        const tc = template.columns[i]
+        return (
+          c.id === tc.id &&
+          Array.isArray(c.sections) &&
+          c.sections.length === tc.sections.length &&
+          c.sections.every(
+            (s, j) =>
+              s.blockId === tc.sections[j].blockId &&
+              s.label === tc.sections[j].label &&
+              s.tone === tc.sections[j].tone,
+          )
+        )
+      })
+
+    if (!missing && !hasLegacy && colSame) return doc
+
+    const nextBlocks = template.blocks.map((tb) => {
+      const existing = byId.get(tb.id)
+      if (existing) {
+        return {
+          id: tb.id,
+          title: existing.title || tb.title,
+          items: Array.isArray(existing.items) ? existing.items : [],
+        }
+      }
+      return { id: tb.id, title: tb.title, items: [] as typeof tb.items }
+    })
+
+    return {
+      ...doc,
+      columns: template.columns.map((c) => ({
+        id: c.id,
+        header: c.header,
+        footerLabel: c.footerLabel,
+        sections: c.sections.map((s) => ({
+          blockId: s.blockId,
+          label: s.label,
+          tone: s.tone,
+        })),
+      })),
+      blocks: nextBlocks,
+    }
   }
 
   function ensureAttachmentsMap(): AttachmentsByPanelId | null {
@@ -2033,6 +2142,128 @@ export const useDocumentStore = defineStore('document', () => {
   }
 
 
+
+  function asScientificMeeting10p(): ScientificMeeting10pDocumentJSON | null {
+    return isScientificMeeting10pDoc(current_data.value) ? current_data.value : null
+  }
+
+  function updateScientificMeeting10pScore(
+    axis: ScientificMeeting10pAxisId,
+    value: number,
+  ): boolean {
+    const d = asScientificMeeting10p()
+    if (!d) return false
+    const raw = Number(value)
+    if (!Number.isFinite(raw)) return false
+    const v = Math.min(100, Math.max(0, raw))
+    d.scores = { ...d.scores, [axis]: v }
+    markDirty()
+    return true
+  }
+
+  function updateScientificMeeting10pScores(
+    patch: Partial<ScientificMeeting10pScores>,
+  ): boolean {
+    const d = asScientificMeeting10p()
+    if (!d) return false
+    const next = { ...d.scores }
+    for (const key of Object.keys(patch) as ScientificMeeting10pAxisId[]) {
+      const raw = patch[key]
+      if (raw == null) continue
+      const n = Number(raw)
+      if (!Number.isFinite(n)) continue
+      next[key] = Math.min(100, Math.max(0, n))
+    }
+    d.scores = next
+    markDirty()
+    return true
+  }
+
+  const SM10P_AXIS_ORDER: ScientificMeeting10pAxisId[] = [
+    'democratic',
+    'implementable',
+    'motivating',
+    'inspiring',
+    'devoting',
+    'efficient',
+    'learning',
+    'responsible',
+    'pragmatic',
+    'friendly',
+  ]
+
+  const SM10P_DEFAULT_TITLE: Record<ScientificMeeting10pAxisId, string> = {
+    democratic: '民主',
+    implementable: '落实',
+    motivating: '激发',
+    inspiring: '点燃',
+    devoting: '投入',
+    efficient: '高效',
+    learning: '学习',
+    responsible: '责任',
+    pragmatic: '务实',
+    friendly: '良性',
+  }
+
+  /** 确保十瓣各有一块 RTE（缺轴则补齐） */
+  function ensureScientificMeeting10pBlocks(): boolean {
+    const d = asScientificMeeting10p()
+    if (!d) return false
+    if (!Array.isArray(d.blocks)) {
+      d.blocks = []
+    }
+    if (!d.axes || typeof d.axes !== 'object') {
+      d.axes = {} as ScientificMeeting10pDocumentJSON['axes']
+    }
+    if (!d.scores || typeof d.scores !== 'object') {
+      d.scores = {} as ScientificMeeting10pScores
+    }
+    for (const axis of SM10P_AXIS_ORDER) {
+      if (!d.axes[axis]) {
+        d.axes[axis] = { id: axis, title: SM10P_DEFAULT_TITLE[axis] }
+      }
+      if (d.scores[axis] == null || !Number.isFinite(Number(d.scores[axis]))) {
+        d.scores[axis] = 75
+      }
+    }
+    const byId = new Map(d.blocks.map((b) => [b.id, b]))
+    let changed = false
+    const next = SM10P_AXIS_ORDER.map((axis) => {
+      const existing = byId.get(axis)
+      const title = d.axes[axis]?.title || SM10P_DEFAULT_TITLE[axis]
+      if (existing) {
+        if (existing.title !== title) {
+          changed = true
+          return { ...existing, title }
+        }
+        return existing
+      }
+      changed = true
+      return {
+        id: axis,
+        title,
+        items: [
+          {
+            id: createItemId(),
+            text: '',
+            style: { color: '#3c4043', fontSize: 14, fontWeight: '500' as const },
+          },
+        ],
+      }
+    })
+    if (
+      changed ||
+      d.blocks.length !== next.length ||
+      d.blocks.some((b, i) => b.id !== next[i].id)
+    ) {
+      d.blocks = next
+      markDirty()
+      return true
+    }
+    return false
+  }
+
+
   function asProductFeatures5d(): ProductFeatures5dDocumentJSON | null {
     return isProductFeatures5dDoc(current_data.value) ? current_data.value : null
   }
@@ -2371,6 +2602,79 @@ export const useDocumentStore = defineStore('document', () => {
     return false
   }
 
+
+  /** 进阶版：每个 ● 提示独立 RTE；升级旧 demand_upper 等合并块 */
+  function ensureFiveStepProBlocks(): boolean {
+    if (!isFiveStepProDoc(current_data.value)) return false
+    const d = current_data.value
+    const template = fiveStepProTemplate as FiveStepProDocumentJSON
+    const requiredIds = template.blocks.map((b) => b.id)
+    const byId = new Map<string, (typeof d.blocks)[number]>(
+      (Array.isArray(d.blocks) ? d.blocks : []).map((b) => [b.id, b]),
+    )
+    const missing = requiredIds.some((id) => !byId.has(id))
+    const legacyIds = [
+      'demand_upper',
+      'solution_upper',
+      'business_upper',
+      'growth_upper',
+    ]
+    const hasLegacy = legacyIds.some((id) => byId.has(id))
+
+    if (!missing && !hasLegacy) {
+      // still sync columns section shape if drifted
+      const colSame =
+        Array.isArray(d.columns) &&
+        d.columns.length === template.columns.length &&
+        d.columns.every((c, i) => {
+          const tc = template.columns[i]
+          return (
+            c.id === tc.id &&
+            Array.isArray(c.sections) &&
+            c.sections.length === tc.sections.length &&
+            c.sections.every(
+              (s, j) =>
+                s.blockId === tc.sections[j].blockId &&
+                s.label === tc.sections[j].label &&
+                s.tone === tc.sections[j].tone,
+            )
+          )
+        })
+      if (colSame) return false
+    }
+
+    // Preserve user content on surviving / new ids; drop legacy uppers
+    const nextBlocks = template.blocks.map((tb) => {
+      const existing = byId.get(tb.id)
+      if (existing) {
+        return {
+          id: tb.id,
+          title: existing.title || tb.title,
+          items: Array.isArray(existing.items) ? existing.items : [],
+        }
+      }
+      return {
+        id: tb.id,
+        title: tb.title,
+        items: [],
+      }
+    })
+
+    d.columns = template.columns.map((c) => ({
+      id: c.id,
+      header: c.header,
+      footerLabel: c.footerLabel,
+      sections: c.sections.map((s) => ({
+        blockId: s.blockId,
+        label: s.label,
+        tone: s.tone,
+      })),
+    }))
+    d.blocks = nextBlocks
+    markDirty()
+    return true
+  }
+
   function asDemandTriangle(): DemandTriangleDocumentJSON | null {
     return isDemandTriangleDoc(current_data.value) ? current_data.value : null
   }
@@ -2444,8 +2748,8 @@ export const useDocumentStore = defineStore('document', () => {
   }
 
   /**
-   * 确保每个业务方向都有 notes:<dirId> 备注块（全屏 RTE）。
-   * 保留 legend；按当前方向 / 图例条目补齐；清理孤儿备注块。
+   * 确保每个业务方向都有 notes:<dirId> 描述块（全屏 RTE）。
+   * 保留 legend；按当前方向 / 图例条目补齐；清理孤儿描述块。
    */
   function ensureDemandTriangleNotesBlocks(): boolean {
     const doc = asDemandTriangle()
@@ -2480,7 +2784,7 @@ export const useDocumentStore = defineStore('document', () => {
       const plain = (legendItem?.text ?? '')
         .replace(/<[^>]+>/g, '')
         .trim()
-      const title = plain ? `${plain} · 备注` : '业务方向 · 备注'
+      const title = plain ? `${plain} · 描述` : '业务方向 · 描述'
       if (existing) {
         if (existing.title !== title) {
           changed = true
@@ -2566,6 +2870,8 @@ export const useDocumentStore = defineStore('document', () => {
     isFiveStep,
     isFiveStepDivision,
     isFiveStepBasic,
+    isFiveStepAdvanced,
+    isFiveStepPro,
     isAiTradeoff,
     isProductContent,
     isOscar,
@@ -2612,6 +2918,9 @@ export const useDocumentStore = defineStore('document', () => {
     updatePmCompetencyScore,
     updatePmCompetencyScores,
     ensurePmCompetencyBlocks,
+    updateScientificMeeting10pScore,
+    updateScientificMeeting10pScores,
+    ensureScientificMeeting10pBlocks,
     updateProductFeatures5dScore,
     updateProductFeatures5dScores,
     ensureProductFeatures5dBlocks,
@@ -2620,6 +2929,7 @@ export const useDocumentStore = defineStore('document', () => {
     ensurePmSolutionTriangleBlocks,
     ensureIpoBlocks,
     ensureDeliberatePracticeBlocks,
+    ensureFiveStepProBlocks,
     updateKeyResistanceRateLabel,
     addKeyResistanceRow,
     removeKeyResistanceRow,

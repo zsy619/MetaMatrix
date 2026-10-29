@@ -1,0 +1,130 @@
+{
+  "id": "canvas_five_step_advanced",
+  "type": "five_step_advanced",
+  "schemaVersion": 1,
+  "theme": {
+    "background": {
+      "pattern": "none",
+      "color": "#ffffff"
+    }
+  },
+  "columns": [
+    {
+      "id": "demand",
+      "header": "需求",
+      "footerLabel": "逐级拆解",
+      "sections": [
+        {
+          "blockId": "demand_req",
+          "label": "需求：",
+          "tone": "normal"
+        },
+        {
+          "blockId": "demand_non_user",
+          "label": "非用户：",
+          "tone": "negate"
+        }
+      ]
+    },
+    {
+      "id": "solution",
+      "header": "解决方案",
+      "footerLabel": "全局预判",
+      "sections": [
+        {
+          "blockId": "solution_core",
+          "label": "内核：",
+          "tone": "normal"
+        },
+        {
+          "blockId": "solution_non_core",
+          "label": "非内核：",
+          "tone": "negate"
+        }
+      ]
+    },
+    {
+      "id": "business",
+      "header": "商业模式",
+      "footerLabel": "专业选项",
+      "sections": [
+        {
+          "blockId": "business_unit",
+          "label": "单元模型：",
+          "tone": "normal"
+        }
+      ]
+    },
+    {
+      "id": "growth",
+      "header": "增长",
+      "footerLabel": "努力定量",
+      "sections": [
+        {
+          "blockId": "growth_metric",
+          "label": "指标：",
+          "tone": "normal"
+        }
+      ]
+    },
+    {
+      "id": "moat",
+      "header": "壁垒",
+      "footerLabel": "动态更新",
+      "sections": [
+        {
+          "blockId": "moat_barrier",
+          "label": "壁垒：",
+          "tone": "normal"
+        },
+        {
+          "blockId": "moat_non_barrier",
+          "label": "非壁垒：",
+          "tone": "negate"
+        }
+      ]
+    }
+  ],
+  "blocks": [
+    {
+      "id": "demand_req",
+      "title": "需求",
+      "items": []
+    },
+    {
+      "id": "demand_non_user",
+      "title": "非用户",
+      "items": []
+    },
+    {
+      "id": "solution_core",
+      "title": "内核",
+      "items": []
+    },
+    {
+      "id": "solution_non_core",
+      "title": "非内核",
+      "items": []
+    },
+    {
+      "id": "business_unit",
+      "title": "单元模型",
+      "items": []
+    },
+    {
+      "id": "growth_metric",
+      "title": "指标",
+      "items": []
+    },
+    {
+      "id": "moat_barrier",
+      "title": "壁垒",
+      "items": []
+    },
+    {
+      "id": "moat_non_barrier",
+      "title": "非壁垒",
+      "items": []
+    }
+  ]
+}

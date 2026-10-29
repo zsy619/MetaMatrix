@@ -35,7 +35,7 @@ function block(
 }
 
 const bgColor = computed(
-  () => props.doc.theme.background.color || '#faf8f5',
+  () => props.doc.theme.background.color || '#ffffff',
 )
 </script>
 
@@ -69,6 +69,16 @@ const bgColor = computed(
           />
         </div>
       </template>
+
+      <!-- 底行：空角 + 五列方法论页脚 -->
+      <div class="fsd-footer-corner" aria-hidden="true" />
+      <footer
+        v-for="col in doc.columns"
+        :key="`f-${col.id}`"
+        class="fsd-footer"
+      >
+        <span>{{ col.footerLabel }}</span>
+      </footer>
     </div>
   </div>
 </template>
@@ -91,19 +101,19 @@ const bgColor = computed(
   width: 100%;
   display: grid;
   grid-template-columns: 44px repeat(5, minmax(0, 1fr));
-  grid-template-rows: auto repeat(3, minmax(0, 1fr));
+  grid-template-rows: auto repeat(3, minmax(0, 1fr)) auto;
   align-content: stretch;
-  border: 2px solid #5f6368;
-  border-radius: 4px;
+  border: 1px solid #9aa0a6;
+  border-radius: 2px;
   overflow: hidden;
-  background: #e8e6e1;
+  background: #fff;
   gap: 0;
 }
 
 .fsd-corner {
   background: #ffff00;
-  border-right: 1px solid #5f6368;
-  border-bottom: 1px solid #5f6368;
+  border-right: 1px solid #9aa0a6;
+  border-bottom: 1px solid #9aa0a6;
   min-height: 42px;
 }
 
@@ -112,9 +122,9 @@ const bgColor = computed(
   align-items: center;
   justify-content: center;
   background: #ffff00;
-  border-right: 1px solid #5f6368;
-  border-bottom: 1px solid #5f6368;
-  padding: 10px 6px;
+  border-right: 1px solid #9aa0a6;
+  border-bottom: 1px solid #9aa0a6;
+  padding: 10px 10px;
   min-height: 42px;
   box-sizing: border-box;
 }
@@ -125,11 +135,11 @@ const bgColor = computed(
 
 .fsd-header h2 {
   margin: 0;
-  font-size: clamp(14px, 1.5vw, 18px);
+  font-size: clamp(14px, 1.55vw, 18px);
   font-weight: 800;
   color: #202124;
-  letter-spacing: 0.06em;
-  line-height: 1.2;
+  letter-spacing: 0.04em;
+  line-height: 1.25;
   text-align: center;
 }
 
@@ -137,9 +147,9 @@ const bgColor = computed(
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #faf8f5;
-  border-right: 1px solid #5f6368;
-  border-bottom: 1px solid #5f6368;
+  background: #fff;
+  border-right: 1px solid #9aa0a6;
+  border-bottom: 1px solid #9aa0a6;
   padding: 8px 4px;
   box-sizing: border-box;
   min-width: 0;
@@ -162,10 +172,10 @@ const bgColor = computed(
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  background: #faf8f5;
-  border-right: 1px solid #5f6368;
-  border-bottom: 1px solid #5f6368;
-  padding: 4px 6px 6px;
+  background: #fff;
+  border-right: 1px solid #9aa0a6;
+  border-bottom: 1px solid #9aa0a6;
+  padding: 8px 10px 10px;
   box-sizing: border-box;
 }
 
@@ -173,10 +183,14 @@ const bgColor = computed(
   border-right: none;
 }
 
-/* 最后一行无底边可保留网格感；保持底边与外框一致 */
-.fsd-grid > .fsd-row-label:nth-last-child(6),
-.fsd-grid > .fsd-cell:nth-last-child(-n + 5) {
+/* 页脚贴外框底边：去掉页脚底边；数据行保留底边与页脚分隔 */
+.fsd-footer-corner,
+.fsd-footer {
   border-bottom: none;
+}
+
+.fsd-footer:nth-child(6n) {
+  border-right: none;
 }
 
 .fsd-cell :deep(.ym-block) {
@@ -204,6 +218,33 @@ const bgColor = computed(
 
 .fsd-cell :deep(.ProseMirror p) {
   margin: 0 0 2px;
+}
+
+.fsd-footer-corner {
+  background: #f1f3f4;
+  border-right: 1px solid #9aa0a6;
+  min-height: 38px;
+  box-sizing: border-box;
+}
+
+.fsd-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 9px 6px;
+  min-height: 38px;
+  box-sizing: border-box;
+  background: #f1f3f4;
+  border-right: 1px solid #9aa0a6;
+}
+
+.fsd-footer span {
+  font-size: clamp(12px, 1.25vw, 15px);
+  font-weight: 700;
+  color: #202124;
+  letter-spacing: 0.04em;
+  text-align: center;
+  line-height: 1.25;
 }
 
 @media (max-width: 900px) {

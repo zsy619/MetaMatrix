@@ -38,13 +38,39 @@ const categoryChips: { id: 'all' | TemplateCategory; label: string }[] = [
   })),
 ]
 
-const allCards: GuideCard[] = (Object.keys(TEMPLATE_META) as TemplateId[]).map((id) => ({
-  id,
-  name: TEMPLATE_META[id].name,
-  badge: TEMPLATE_META[id].badge,
-  description: TEMPLATE_META[id].description,
-  category: TEMPLATE_META[id].category,
-}))
+/** 五步法系列固定相邻顺序：基础 → 分工 → 提高 → 进阶 → 原版 */
+const FIVE_STEP_SERIES: TemplateId[] = [
+  'five-step-basic',
+  'five-step-division',
+  'five-step-advanced',
+  'five-step-pro',
+  'five-step',
+]
+
+const allCards: GuideCard[] = (() => {
+  const ids = Object.keys(TEMPLATE_META) as TemplateId[]
+  const seriesSet = new Set(FIVE_STEP_SERIES)
+  const ordered: TemplateId[] = []
+  let seriesInserted = false
+  for (const id of ids) {
+    if (seriesSet.has(id)) {
+      if (!seriesInserted) {
+        ordered.push(...FIVE_STEP_SERIES)
+        seriesInserted = true
+      }
+      continue
+    }
+    ordered.push(id)
+  }
+  if (!seriesInserted) ordered.push(...FIVE_STEP_SERIES)
+  return ordered.map((id) => ({
+    id,
+    name: TEMPLATE_META[id].name,
+    badge: TEMPLATE_META[id].badge,
+    description: TEMPLATE_META[id].description,
+    category: TEMPLATE_META[id].category,
+  }))
+})()
 
 const filteredCards = computed(() => {
   const q = templateFilter.value.trim().toLowerCase()
@@ -56,7 +82,8 @@ const filteredCards = computed(() => {
     return (
       card.name.toLowerCase().includes(q) ||
       card.description.toLowerCase().includes(q) ||
-      card.badge.toLowerCase().includes(q)
+      card.badge.toLowerCase().includes(q) ||
+      (q.includes('五步') && FIVE_STEP_SERIES.includes(card.id))
     )
   })
 })
@@ -435,19 +462,17 @@ onMounted(async () => {
   border-color: #26a69a;
 }
 
+.card--five-step-basic:hover,
+.card--five-step-basic:focus-visible,
+.card--five-step-division:hover,
+.card--five-step-division:focus-visible,
+.card--five-step-advanced:hover,
+.card--five-step-advanced:focus-visible,
+.card--five-step-pro:hover,
+.card--five-step-pro:focus-visible,
 .card--five-step:hover,
 .card--five-step:focus-visible {
   border-color: #f9a825;
-}
-
-.card--five-step-division:hover,
-.card--five-step-division:focus-visible {
-  border-color: #f9a825;
-}
-
-.card--five-step-basic:hover,
-.card--five-step-basic:focus-visible {
-  border-color: #9aa0a6;
 }
 
 .card--ai-tradeoff:hover,
@@ -495,6 +520,13 @@ onMounted(async () => {
 .card--scientific-meeting:focus-visible {
   border-color: #1a1a1a;
 }
+
+
+.card--scientific-meeting-10p:hover,
+.card--scientific-meeting-10p:focus-visible {
+  border-color: #43A047;
+}
+
 
 .card--ipo:hover,
 .card--ipo:focus-visible {
