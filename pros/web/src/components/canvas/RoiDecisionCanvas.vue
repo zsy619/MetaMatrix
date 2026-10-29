@@ -176,7 +176,7 @@ onMounted(() => {
   position: absolute;
   inset: 0;
   z-index: 10;
-  /* Page scrolls when tall 基础ROI row (≥400px) + panels exceed the viewport */
+  /* Page scrolls when matrix rows (≥400px) + panels exceed the viewport */
   overflow-x: hidden;
   overflow-y: auto;
   box-sizing: border-box;
@@ -250,7 +250,8 @@ onMounted(() => {
 .rd-row {
   display: grid;
   grid-template-columns: minmax(96px, 0.7fr) minmax(0, 1.4fr) minmax(0, 1.4fr) 36px;
-  min-height: 140px;
+  /* Align with global panel min-height (≥400px), including newly added rows */
+  min-height: 400px;
   border-bottom: 1px solid #5f6368;
   background: #e6f7ff;
 }
@@ -265,8 +266,8 @@ onMounted(() => {
 
 .rd-dim {
   display: flex;
-  align-items: flex-start;
-  justify-content: flex-start;
+  align-items: center;
+  justify-content: center;
   padding: 12px 10px;
   box-sizing: border-box;
   border-right: 1px solid #5f6368;
@@ -279,7 +280,7 @@ onMounted(() => {
   border: none;
   border-bottom: 1.5px solid transparent;
   background: transparent;
-  text-align: left;
+  text-align: center;
   font-size: clamp(13px, 1.35vw, 16px);
   font-weight: 700;
   color: #111111;
@@ -319,7 +320,8 @@ onMounted(() => {
 
 .rd-cell :deep(.ym-block) {
   flex: 1;
-  min-height: 0;
+  /* Match .rd-panel :deep(.ym-block) global panel min-height */
+  min-height: 400px;
   background: transparent;
   border: none;
   box-shadow: none;
