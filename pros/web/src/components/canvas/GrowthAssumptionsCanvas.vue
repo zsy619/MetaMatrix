@@ -179,7 +179,7 @@ function onRemoveRow(rowId: string) {
 .ga-row {
   display: grid;
   grid-template-columns: 1.4fr 0.85fr 0.85fr 0.95fr 1.1fr 36px;
-  min-height: 120px;
+  min-height: 400px;
   border-bottom: 2px solid #111111;
   background: #ffffff;
 }
@@ -190,7 +190,7 @@ function onRemoveRow(rowId: string) {
 
 .ga-cell {
   min-width: 0;
-  min-height: 120px;
+  min-height: 400px;
   padding: 6px;
   box-sizing: border-box;
   border-right: 2px solid #111111;

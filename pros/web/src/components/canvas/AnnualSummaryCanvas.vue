@@ -39,7 +39,7 @@ const SECTIONS: {
   <div class="as-canvas" :style="{ backgroundColor: bgColor }">
     <div class="as-scroll">
       <header class="as-header">
-        <h1 class="as-title">{{ doc.title || '个人年度工作总结模板' }}</h1>
+        <h1 class="as-title">{{ doc.title || '个人年工作总结模板' }}</h1>
       </header>
 
       <section

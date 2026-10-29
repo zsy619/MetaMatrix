@@ -1,0 +1,826 @@
+{
+  "id": "canvas_five_step_challenge",
+  "type": "five_step_challenge",
+  "schemaVersion": 2,
+  "theme": {
+    "background": {
+      "pattern": "none",
+      "color": "#ffffff"
+    }
+  },
+  "columns": [
+    {
+      "id": "hypothesis",
+      "header": "假设",
+      "footerLabel": "机会预判",
+      "sections": [
+        {
+          "blockId": "hypothesis_global",
+          "label": "全局描述（业务）",
+          "tone": "normal"
+        },
+        {
+          "blockId": "hypothesis_stage",
+          "label": "阶段｜边界",
+          "tone": "normal"
+        },
+        {
+          "blockId": "hypothesis_self",
+          "label": "自身（选填）",
+          "tone": "normal"
+        }
+      ]
+    },
+    {
+      "id": "demand",
+      "header": "需求",
+      "footerLabel": "逐级拆解",
+      "sections": [
+        {
+          "blockId": "demand_split",
+          "label": "拆　细分用户",
+          "tone": "normal"
+        },
+        {
+          "blockId": "demand_push",
+          "label": "推",
+          "tone": "normal"
+        },
+        {
+          "blockId": "demand_eval",
+          "label": "评",
+          "tone": "normal"
+        },
+        {
+          "blockId": "demand_calc",
+          "label": "算",
+          "tone": "normal"
+        },
+        {
+          "blockId": "demand_non_user",
+          "label": "非用户",
+          "tone": "negate"
+        }
+      ]
+    },
+    {
+      "id": "solution",
+      "header": "解决方案",
+      "footerLabel": "全局预判",
+      "sections": [
+        {
+          "blockId": "solution_core",
+          "label": "产品内核（决定性）",
+          "tone": "normal"
+        },
+        {
+          "blockId": "solution_quant",
+          "label": "定量",
+          "tone": "normal"
+        },
+        {
+          "blockId": "solution_non_core",
+          "label": "非内核（优化型）",
+          "tone": "negate"
+        }
+      ]
+    },
+    {
+      "id": "business",
+      "header": "商业模式",
+      "footerLabel": "专业选项",
+      "sections": [
+        {
+          "blockId": "business_unit_io",
+          "label": "单元模型（收入｜支出）",
+          "tone": "normal"
+        },
+        {
+          "blockId": "business_roi",
+          "label": "单元模型（ROI）",
+          "tone": "normal"
+        }
+      ]
+    },
+    {
+      "id": "growth",
+      "header": "增长",
+      "footerLabel": "努力定量",
+      "sections": [
+        {
+          "blockId": "growth_metric",
+          "label": "指标",
+          "tone": "normal"
+        },
+        {
+          "blockId": "growth_channel",
+          "label": "渠道",
+          "tone": "normal"
+        },
+        {
+          "blockId": "growth_five_forces",
+          "label": "五力模型",
+          "tone": "normal"
+        }
+      ]
+    },
+    {
+      "id": "moat",
+      "header": "壁垒",
+      "footerLabel": "动态更新",
+      "sections": [
+        {
+          "blockId": "moat_barrier",
+          "label": "壁垒（强中弱，为什么）",
+          "tone": "normal"
+        },
+        {
+          "blockId": "moat_competitors",
+          "label": "竞品　直接·间接｜线上·线下",
+          "tone": "normal"
+        },
+        {
+          "blockId": "moat_crn",
+          "label": "CRN",
+          "tone": "normal"
+        },
+        {
+          "blockId": "moat_non_barrier",
+          "label": "非壁垒",
+          "tone": "negate"
+        }
+      ]
+    }
+  ],
+  "blocks": [
+    {
+      "id": "hypothesis_global",
+      "title": "全局描述",
+      "items": [
+        {
+          "id": "hg_m1",
+          "text": "<p><strong style=\"color: #7B1FA2; font-weight: 700\">《预判行业机会方法》</strong></p>",
+          "style": {
+            "color": "#7B1FA2",
+            "fontSize": 14,
+            "fontWeight": "700"
+          }
+        },
+        {
+          "id": "hg_1",
+          "text": "<p><span style=\"color: #3c4043\"> </span></p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "hypothesis_stage",
+      "title": "阶段｜边界",
+      "items": [
+        {
+          "id": "hs_1",
+          "text": "<p>☐ 1.0　☐ 2.0　☐ 3.0　☐ 4.0　☐ 5.0</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "hypothesis_self",
+      "title": "自身",
+      "items": [
+        {
+          "id": "hf_m1",
+          "text": "<p><strong style=\"color: #7B1FA2; font-weight: 700\">《重新理解机会预判》</strong></p>",
+          "style": {
+            "color": "#7B1FA2",
+            "fontSize": 14,
+            "fontWeight": "700"
+          }
+        },
+        {
+          "id": "hf_1",
+          "text": "<p><span style=\"color: #1565C0\">• 初心</span></p>",
+          "style": {
+            "color": "#1565C0",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "hf_2",
+          "text": "<p><span style=\"color: #1565C0\">• 能力</span></p>",
+          "style": {
+            "color": "#1565C0",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "hf_3",
+          "text": "<p><span style=\"color: #1565C0\">• 文化</span></p>",
+          "style": {
+            "color": "#1565C0",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "hf_4",
+          "text": "<p><span style=\"color: #1565C0\">• 资金</span></p>",
+          "style": {
+            "color": "#1565C0",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "hf_5",
+          "text": "<p><span style=\"color: #1565C0\">• 资源</span></p>",
+          "style": {
+            "color": "#1565C0",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "demand_split",
+      "title": "拆",
+      "items": [
+        {
+          "id": "ds_m1",
+          "text": "<p><strong style=\"color: #7B1FA2; font-weight: 700\">《需求分析：原点》</strong></p>",
+          "style": {
+            "color": "#7B1FA2",
+            "fontSize": 14,
+            "fontWeight": "700"
+          }
+        },
+        {
+          "id": "ds_1",
+          "text": "<p><span style=\"color: #3c4043\"> </span></p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "demand_push",
+      "title": "推",
+      "items": [
+        {
+          "id": "dp_1",
+          "text": "<p><span style=\"color: #1565C0\">• 1. 使用场景</span></p>",
+          "style": {
+            "color": "#1565C0",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "dp_2",
+          "text": "<p><span style=\"color: #1565C0\">• 2. 用户问题</span></p>",
+          "style": {
+            "color": "#1565C0",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "demand_eval",
+      "title": "评",
+      "items": [
+        {
+          "id": "de_q",
+          "text": "<p><strong style=\"font-weight: 650\">定量</strong></p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "650"
+          }
+        },
+        {
+          "id": "de_1",
+          "text": "<p><span style=\"color: #1565C0\">• 普遍</span></p>",
+          "style": {
+            "color": "#1565C0",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "de_2",
+          "text": "<p><span style=\"color: #1565C0\">• 频次</span></p>",
+          "style": {
+            "color": "#1565C0",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "de_3",
+          "text": "<p><span style=\"color: #1565C0\">• 刚性</span></p>",
+          "style": {
+            "color": "#1565C0",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "demand_calc",
+      "title": "算",
+      "items": [
+        {
+          "id": "dc_1",
+          "text": "<p><span style=\"color: #1565C0\">• TAM</span></p>",
+          "style": {
+            "color": "#1565C0",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "dc_2",
+          "text": "<p><span style=\"color: #1565C0\">• SAM</span></p>",
+          "style": {
+            "color": "#1565C0",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "dc_3",
+          "text": "<p><span style=\"color: #1565C0\">• SOM</span></p>",
+          "style": {
+            "color": "#1565C0",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "demand_non_user",
+      "title": "非用户",
+      "items": [
+        {
+          "id": "dn_1",
+          "text": "<p><span style=\"color: #EF6C00\">• </span></p>",
+          "style": {
+            "color": "#EF6C00",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "solution_core",
+      "title": "产品内核",
+      "items": [
+        {
+          "id": "sc_m1",
+          "text": "<p><strong style=\"color: #7B1FA2; font-weight: 700\">《产品内核》</strong></p>",
+          "style": {
+            "color": "#7B1FA2",
+            "fontSize": 14,
+            "fontWeight": "700"
+          }
+        },
+        {
+          "id": "sc_1",
+          "text": "<p><span style=\"color: #1565C0\">• </span></p>",
+          "style": {
+            "color": "#1565C0",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "sc_2",
+          "text": "<p><span style=\"color: #1565C0\">• </span></p>",
+          "style": {
+            "color": "#1565C0",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "sc_3",
+          "text": "<p><span style=\"color: #1565C0\">• </span></p>",
+          "style": {
+            "color": "#1565C0",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "solution_quant",
+      "title": "定量",
+      "items": [
+        {
+          "id": "sq_1",
+          "text": "<p><span style=\"color: #3c4043\"> </span></p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "solution_non_core",
+      "title": "非内核",
+      "items": [
+        {
+          "id": "sn_1",
+          "text": "<p><span style=\"color: #EF6C00\">• </span></p>",
+          "style": {
+            "color": "#EF6C00",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "business_unit_io",
+      "title": "单元模型（收入支出）",
+      "items": [
+        {
+          "id": "bio_m1",
+          "text": "<p><strong style=\"color: #7B1FA2; font-weight: 700\">《单元模型 1-5》</strong></p>",
+          "style": {
+            "color": "#7B1FA2",
+            "fontSize": 14,
+            "fontWeight": "700"
+          }
+        },
+        {
+          "id": "bio_1",
+          "text": "<p><strong style=\"font-weight: 650\">收入</strong></p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "650"
+          }
+        },
+        {
+          "id": "bio_2",
+          "text": "<p><span style=\"color: #3c4043\"> </span></p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "bio_3",
+          "text": "<p><strong style=\"font-weight: 650\">支出</strong></p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "650"
+          }
+        },
+        {
+          "id": "bio_4",
+          "text": "<p><span style=\"color: #3c4043\"> </span></p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "business_roi",
+      "title": "单元模型（ROI）",
+      "items": [
+        {
+          "id": "broi_m1",
+          "text": "<p><strong style=\"color: #7B1FA2; font-weight: 700\">《单元模型 ROI》</strong></p>",
+          "style": {
+            "color": "#7B1FA2",
+            "fontSize": 14,
+            "fontWeight": "700"
+          }
+        },
+        {
+          "id": "broi_1",
+          "text": "<p><strong style=\"font-weight: 650\">ROI：</strong></p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "650"
+          }
+        },
+        {
+          "id": "broi_2",
+          "text": "<p><span style=\"color: #1565C0\">• 利润</span></p>",
+          "style": {
+            "color": "#1565C0",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "broi_3",
+          "text": "<p><span style=\"color: #1565C0\">• 周期</span></p>",
+          "style": {
+            "color": "#1565C0",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "growth_metric",
+      "title": "指标",
+      "items": [
+        {
+          "id": "gm_m1",
+          "text": "<p><strong style=\"color: #7B1FA2; font-weight: 700\">《重新理解业务增长》</strong></p>",
+          "style": {
+            "color": "#7B1FA2",
+            "fontSize": 14,
+            "fontWeight": "700"
+          }
+        },
+        {
+          "id": "gm_1",
+          "text": "<p><strong style=\"font-weight: 650\">（名称，阶段目标）</strong></p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "650"
+          }
+        },
+        {
+          "id": "gm_2",
+          "text": "<p><span style=\"color: #1565C0\">• </span></p>",
+          "style": {
+            "color": "#1565C0",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "gm_3",
+          "text": "<p><span style=\"color: #1565C0\">• </span></p>",
+          "style": {
+            "color": "#1565C0",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "gm_4",
+          "text": "<p><span style=\"color: #1565C0\">• </span></p>",
+          "style": {
+            "color": "#1565C0",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "growth_channel",
+      "title": "渠道",
+      "items": [
+        {
+          "id": "gch_m1",
+          "text": "<p><strong style=\"color: #7B1FA2; font-weight: 700\">《渠道》</strong></p>",
+          "style": {
+            "color": "#7B1FA2",
+            "fontSize": 14,
+            "fontWeight": "700"
+          }
+        },
+        {
+          "id": "gcn_1",
+          "text": "<p><span style=\"color: #3c4043\"> </span></p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "gcf_1",
+          "text": "<p><span style=\"color: #3c4043\"> </span></p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "growth_five_forces",
+      "title": "五力模型",
+      "items": [
+        {
+          "id": "gf_1",
+          "text": "<p><span style=\"color: #1565C0\">• 探渠道</span></p>",
+          "style": {
+            "color": "#1565C0",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "gf_2",
+          "text": "<p><span style=\"color: #1565C0\">• 建模型</span></p>",
+          "style": {
+            "color": "#1565C0",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "gf_3",
+          "text": "<p><span style=\"color: #1565C0\">• 定指标</span></p>",
+          "style": {
+            "color": "#1565C0",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "gf_4",
+          "text": "<p><span style=\"color: #1565C0\">• 做实验</span></p>",
+          "style": {
+            "color": "#1565C0",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "gf_5",
+          "text": "<p><span style=\"color: #1565C0\">• 能打仗</span></p>",
+          "style": {
+            "color": "#1565C0",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "gfw_m1",
+          "text": "<p><strong style=\"color: #7B1FA2; font-weight: 700\">《重新理解增长飞轮》</strong></p>",
+          "style": {
+            "color": "#7B1FA2",
+            "fontSize": 14,
+            "fontWeight": "700"
+          }
+        }
+      ]
+    },
+    {
+      "id": "moat_barrier",
+      "title": "壁垒",
+      "items": [
+        {
+          "id": "mb_m1",
+          "text": "<p><strong style=\"color: #7B1FA2; font-weight: 700\">《壁垒》《集中度》</strong></p>",
+          "style": {
+            "color": "#7B1FA2",
+            "fontSize": 14,
+            "fontWeight": "700"
+          }
+        },
+        {
+          "id": "mb_1",
+          "text": "<p>例：√ 规模效应：弱</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "mb_2",
+          "text": "<p>☐ 无形资产</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "mb_3",
+          "text": "<p>☐ 转化成本</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "mb_4",
+          "text": "<p>☐ 技术壁垒</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "mb_5",
+          "text": "<p>☐ 网络效应</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "mb_6",
+          "text": "<p>☐ 规模效应</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "mb_7",
+          "text": "<p>☐ 成本优势</p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "moat_competitors",
+      "title": "竞品",
+      "items": [
+        {
+          "id": "mc_1",
+          "text": "<p><span style=\"color: #3c4043\"> </span></p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "moat_crn",
+      "title": "CRN",
+      "items": [
+        {
+          "id": "mcr_1",
+          "text": "<p><span style=\"color: #3c4043\"> </span></p>",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "moat_non_barrier",
+      "title": "非壁垒",
+      "items": [
+        {
+          "id": "mn_1",
+          "text": "<p><span style=\"color: #EF6C00\">• </span></p>",
+          "style": {
+            "color": "#EF6C00",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    }
+  ]
+}

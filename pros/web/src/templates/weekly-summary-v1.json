@@ -1,0 +1,121 @@
+{
+  "id": "canvas_weekly_summary",
+  "type": "weekly_summary",
+  "schemaVersion": 1,
+  "theme": {
+    "background": {
+      "pattern": "none",
+      "color": "#ffffff"
+    }
+  },
+  "title": "个人周工作总结模板",
+  "labels": {
+    "executionHint": "本周实际推进了哪些关键事项？结果如何？（TOP3）",
+    "blockersHint": "本周遇到的主要卡点是什么？你如何应对或计划如何应对？",
+    "nextHint": "下周必须优先完成的 TOP3 事项是什么？"
+  },
+  "blocks": [
+    {
+      "id": "week_execution",
+      "title": "本周关键执行",
+      "prompt": "本周实际推进了哪些关键事项？结果如何？（TOP3）",
+      "items": [
+        {
+          "id": "item_we_1",
+          "text": "进展 1：…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "item_we_2",
+          "text": "进展 2：…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "item_we_3",
+          "text": "进展 3：…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "week_blockers",
+      "title": "卡点与应对",
+      "prompt": "本周遇到的主要卡点是什么？你如何应对或计划如何应对？",
+      "items": [
+        {
+          "id": "item_wb_1",
+          "text": "卡点 1 + 应对：…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "item_wb_2",
+          "text": "卡点 2 + 应对：…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "item_wb_3",
+          "text": "卡点 3 + 应对：…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "week_priorities",
+      "title": "下周优先事项",
+      "prompt": "下周必须优先完成的 TOP3 事项是什么？",
+      "items": [
+        {
+          "id": "item_wp_1",
+          "text": "优先 1：…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "item_wp_2",
+          "text": "优先 2：…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "item_wp_3",
+          "text": "优先 3：…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    }
+  ]
+}

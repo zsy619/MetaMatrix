@@ -1,5 +1,14 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+  type Directive,
+} from 'vue'
+import { NodeSelection, TextSelection } from '@tiptap/pm/state'
 import { useEditor, EditorContent } from '@tiptap/vue-3'
 import { BubbleMenu } from '@tiptap/vue-3/menus'
 import StarterKit from '@tiptap/starter-kit'
@@ -20,7 +29,26 @@ import { looksLikeHtml, escapeHtml } from '../utils/itemsHtml'
 import { Annotation } from '../extensions/annotation'
 import { MathInline, MathDisplay, renderKatex } from '../extensions/math'
 import { Video } from '../extensions/video'
+import {
+  FormTextInput,
+  FormRadioGroup,
+  FormCheckboxGroup,
+  FormSelect,
+  FormTextarea,
+  FormNumberInput,
+  FormDateInput,
+  FormSwitch,
+  isFormNodeName,
+  type FormNodeName,
+} from '../extensions/forms'
+import FormPropertyInspector from './FormPropertyInspector.vue'
 import { toolbarIconMap, IconTableRows, IconTableCols } from './rteToolbarIcons'
+import {
+  RTE_DOC_TEMPLATES,
+  RTE_DOC_TEMPLATE_GROUPS,
+  getRteDocTemplate,
+  sanitizeRteJsonNodes,
+} from './rteDocTemplates'
 import type { Component } from 'vue'
 import JSZip from 'jszip'
 
@@ -78,7 +106,8 @@ function toEditorContent(value: string | undefined | null): string {
 }
 
 function normalizeHtml(html: string): string {
-  return html.replace(/\s+/g, ' ').trim()
+  // 去掉标签间空白，避免 itemsToHtml 往返与 getHTML 仅差换行时误触发 setContent
+  return html.replace(/>\s+</g, '><').replace(/\s+/g, ' ').trim()
 }
 
 /** 表格菜单状态（须在 useEditor 之前声明，供 contextmenu 回调闭包使用） */
@@ -200,6 +229,14 @@ const editor = useEditor({
     Annotation,
     MathInline,
     MathDisplay,
+    FormTextInput,
+    FormRadioGroup,
+    FormCheckboxGroup,
+    FormSelect,
+    FormTextarea,
+    FormNumberInput,
+    FormDateInput,
+    FormSwitch,
   ],
   editorProps: {
     attributes: {
@@ -264,11 +301,168 @@ const editor = useEditor({
     },
   },
   onUpdate: ({ editor: ed }) => {
-    emit('update:modelValue', ed.getHTML())
+    const html = ed.getHTML()
+    lastEmittedHtmlNorm = normalizeHtml(html)
+    emit('update:modelValue', html)
   },
   onFocus: () => emit('focus'),
   onBlur: () => emit('blur'),
+  onSelectionUpdate: ({ editor: ed }) => {
+    syncSelectedFormFromEditor(ed)
+  },
+  onTransaction: ({ editor: ed }) => {
+    if (selectedFormPos.value != null) formSelectionTick.value += 1
+    syncSelectedFormFromEditor(ed)
+  },
 })
+
+/** 最近一次由本编辑器 emit 出的 HTML（规范化后），用于忽略父级 items 往返回写 */
+let lastEmittedHtmlNorm = ''
+
+type CapturedFormSel = {
+  type: FormNodeName
+  name: string
+  pos: number
+}
+
+function captureSelectedFormTarget(ed: {
+  state: {
+    selection: unknown
+    doc: {
+      nodeAt: (pos: number) => { type: { name: string }; attrs: Record<string, unknown> } | null
+    }
+  }
+}): CapturedFormSel | null {
+  const sel = ed.state.selection
+  if (sel instanceof NodeSelection && isFormNodeName(sel.node.type.name)) {
+    return {
+      type: sel.node.type.name,
+      name: String(sel.node.attrs.name ?? ''),
+      pos: sel.from,
+    }
+  }
+  const pos = selectedFormPos.value
+  const typ = selectedFormType.value
+  if (pos == null || !typ) return null
+  const node = ed.state.doc.nodeAt(pos)
+  if (!node || node.type.name !== typ) return null
+  return {
+    type: typ,
+    name: String(node.attrs.name ?? ''),
+    pos,
+  }
+}
+
+function findFormNodePos(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ed: { state: { doc: { nodeAt: (pos: number) => any; descendants: (f: (node: any, pos: number) => boolean | void) => void; content: { size: number } } } },
+  target: CapturedFormSel,
+): number | null {
+  try {
+    const size = ed.state.doc.content.size
+    if (target.pos >= 0 && target.pos <= size) {
+      const at = ed.state.doc.nodeAt(target.pos)
+      if (at && at.type.name === target.type) {
+        if (!target.name || String(at.attrs.name ?? '') === target.name) {
+          return target.pos
+        }
+      }
+    }
+  } catch {
+    /* pos 越界时走扫描 */
+  }
+  let found: number | null = null
+  try {
+    ed.state.doc.descendants((node, pos) => {
+      if (found != null) return false
+      if (node.type.name !== target.type) return
+      if (target.name && String(node.attrs.name ?? '') !== target.name) return
+      found = pos
+      return false
+    })
+  } catch {
+    return null
+  }
+  return found
+}
+
+function restoreFormNodeSelection(
+  // TipTap Editor；用宽松类型避免 Transaction 链式与 Selection 泛型摩擦
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ed: any,
+  target: CapturedFormSel | null,
+): boolean {
+  if (!ed || !target || ed.isDestroyed) return false
+  const pos = findFormNodePos(ed, target)
+  if (pos == null) return false
+  try {
+    const tr = ed.state.tr
+      .setSelection(NodeSelection.create(ed.state.doc, pos))
+      .setMeta('addToHistory', false)
+    ed.view.dispatch(tr)
+    selectedFormPos.value = pos
+    selectedFormType.value = target.type
+    if (formInspectorDismissedPos.value !== pos) {
+      formInspectorPinned.value = true
+    }
+    formSelectionTick.value += 1
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** 文末若不是段落（常见 form* 原子），补空段落；不改选区（供外部 HTML 回写后调用）。 */
+function ensureTrailingParagraphIfNeeded(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ed: any,
+): boolean {
+  if (!ed || ed.isDestroyed) return false
+  const last = ed.state.doc.lastChild
+  if (!last || last.type.name === 'paragraph') return false
+  const paraType = ed.schema.nodes.paragraph
+  if (!paraType) return false
+  try {
+    const para = paraType.create()
+    const tr = ed.state.tr
+      .insert(ed.state.doc.content.size, para)
+      .setMeta('addToHistory', false)
+    ed.view.dispatch(tr)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** 保证文末可编辑段落，并把选区落到文末文本光标（避免 NodeSelection 卡在 form*）。 */
+function focusTextCaretAtEnd(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ed: any,
+): boolean {
+  if (!ed || ed.isDestroyed) return false
+  try {
+    ensureTrailingParagraphIfNeeded(ed)
+    const doc = ed.state.doc
+    const last = doc.lastChild
+    // 文末已是段落时，显式 TextSelection（勿用 Selection.atEnd：文末原子时会落成 NodeSelection）
+    if (last?.type.name === 'paragraph') {
+      const sel = TextSelection.create(doc, doc.content.size - 1)
+      if (!ed.state.selection.eq(sel)) {
+        ed.view.dispatch(ed.state.tr.setSelection(sel).scrollIntoView())
+      }
+      ed.view.focus()
+      return true
+    }
+    return Boolean(ed.chain().focus('end').run())
+  } catch {
+    try {
+      return Boolean(ed.chain().focus('end').run())
+    } catch {
+      return false
+    }
+  }
+}
+
 
 watch(
   () => props.modelValue,
@@ -276,9 +470,45 @@ watch(
     const ed = editor.value
     if (!ed) return
     const next = toEditorContent(value)
-    if (normalizeHtml(ed.getHTML()) === normalizeHtml(next)) return
+    const nextNorm = normalizeHtml(next)
+    const curNorm = normalizeHtml(ed.getHTML())
+    if (curNorm === nextNorm) return
+    // 父级 itemsToHtml/syncItemsFromHtml 回声：内容等价于刚 emit 的，勿整篇 setContent
+    if (lastEmittedHtmlNorm && lastEmittedHtmlNorm === nextNorm) return
     if (!looksLikeHtml(value ?? '') && ed.getText() === (value ?? '')) return
+
+    const captured = captureSelectedFormTarget(ed)
+    // 属性面板改表单期间：即使外部 HTML 有微小序列化差异，也优先原地保留选区，避免跳到文末
+    if (
+      captured &&
+      (inspectorInteracting.value || formInspectorPinned.value)
+    ) {
+      // 仍应用内容（真正外部变更），但随后立刻恢复 NodeSelection
+      ed.commands.setContent(next, { emitUpdate: false })
+      if (ensureTrailingParagraphIfNeeded(ed)) {
+        /* 补尾段后 HTML 变了，下面重读 */
+      }
+      lastEmittedHtmlNorm = normalizeHtml(ed.getHTML())
+      restoreFormNodeSelection(ed, captured)
+      void nextTick(() => restoreFormNodeSelection(editor.value, captured))
+      return
+    }
+
     ed.commands.setContent(next, { emitUpdate: false })
+    if (ensureTrailingParagraphIfNeeded(ed)) {
+      /* 补尾段：避免回写丢掉空 <p> 后文末卡在 form* */
+    }
+    lastEmittedHtmlNorm = normalizeHtml(ed.getHTML())
+    if (captured) {
+      restoreFormNodeSelection(ed, captured)
+    } else if (
+      ed.state.selection instanceof NodeSelection &&
+      isFormNodeName(ed.state.selection.node.type.name)
+    ) {
+      // 无显式表单选中意图时，不要把光标留在 form NodeSelection
+      focusTextCaretAtEnd(ed)
+      lastEmittedHtmlNorm = normalizeHtml(ed.getHTML())
+    }
   },
 )
 
@@ -290,9 +520,6 @@ watch(
   },
 )
 
-onBeforeUnmount(() => {
-  editor.value?.destroy()
-})
 
 /** 纯文字符数（去空白更贴近中文「字数」） */
 const charCount = computed(() => {
@@ -407,6 +634,393 @@ function setHorizontalRule() {
 function toggleCodeBlock() {
   chain()?.toggleCodeBlock().run()
 }
+
+/** —— 插入表单控件 —— */
+function insertFormRadio() {
+  editor.value?.chain().focus().insertFormRadioGroup().run()
+  formOpen.value = false
+  moreFormOpen.value = false
+  moreOpen.value = false
+}
+function insertFormCheckbox() {
+  editor.value?.chain().focus().insertFormCheckboxGroup().run()
+  formOpen.value = false
+  moreFormOpen.value = false
+  moreOpen.value = false
+}
+function insertFormText() {
+  editor.value?.chain().focus().insertFormTextInput().run()
+  formOpen.value = false
+  moreFormOpen.value = false
+  moreOpen.value = false
+}
+function insertFormSelect() {
+  editor.value?.chain().focus().insertFormSelect().run()
+  formOpen.value = false
+  moreFormOpen.value = false
+  moreOpen.value = false
+}
+function insertFormTextarea() {
+  editor.value?.chain().focus().insertFormTextarea().run()
+  formOpen.value = false
+  moreFormOpen.value = false
+  moreOpen.value = false
+}
+function insertFormNumber() {
+  editor.value?.chain().focus().insertFormNumberInput().run()
+  formOpen.value = false
+  moreFormOpen.value = false
+  moreOpen.value = false
+}
+function insertFormDate() {
+  editor.value?.chain().focus().insertFormDateInput({ kind: 'date' }).run()
+  formOpen.value = false
+  moreFormOpen.value = false
+  moreOpen.value = false
+}
+function insertFormDateTime() {
+  editor.value?.chain().focus().insertFormDateInput({ kind: 'datetime' }).run()
+  formOpen.value = false
+  moreFormOpen.value = false
+  moreOpen.value = false
+}
+function insertFormSwitch() {
+  editor.value?.chain().focus().insertFormSwitch().run()
+  formOpen.value = false
+  moreFormOpen.value = false
+  moreOpen.value = false
+}
+
+function closeTemplateMenus() {
+  templateOpen.value = false
+  moreTemplateOpen.value = false
+  moreOpen.value = false
+  formOpen.value = false
+}
+
+/**
+ * 插入内置文档模板。
+ * 根因修复：表单原子块插入后，TipTap setContent 不校正选区 / insertContent 的
+ * selectionToInsertionEnd(bias=-1) 会落成 NodeSelection 在 form* 上；
+ * 随后击键会整块替换该表单（内容异常），属性面板也会误弹出。
+ * 另：父级 syncItemsFromHtml 若丢掉尾部空 <p>，回写后文末再次落在 form* 上——
+ * itemsHtml 已保留「有内容后的空段落」；此处再强制 focusTextCaretAtEnd。
+ * 策略：统一 JSON 块数组；保证末尾可编辑段落；插入后文本选区在文末。
+ */
+function insertDocTemplate(id: string) {
+  const ed = editor.value
+  const tpl = getRteDocTemplate(id)
+  if (!ed || !tpl) return
+  const built = sanitizeRteJsonNodes(tpl.build())
+  if (!built.length) return
+  // 末尾补空段落，确保光标有可输入落点（即使 schema/插件未自动补）
+  const last = built[built.length - 1]
+  const blocks =
+    last?.type === 'paragraph' ? built : [...built, { type: 'paragraph' as const }]
+
+  // 先关菜单，避免插入时焦点/mouseleave 与菜单开关竞态
+  closeTemplateMenus()
+
+  try {
+    let ok = false
+    if (ed.isEmpty) {
+      // 传块数组（Fragment），避免 doc 包一层依赖 PM Fitter 解包
+      ok = ed.chain().focus().setContent(blocks).run()
+    } else {
+      ok = ed.chain().focus().insertContent(blocks).run()
+      // 约束父级（如表格单元格）可能拒绝块级表单：回退到文末插入
+      if (!ok) {
+        ok = ed.chain().focus('end').insertContent(blocks).run()
+      }
+    }
+    if (!ok) {
+      // 最后手段：整篇 JSON 合并（仍走 schema.nodeFromJSON，不走 HTML 以免丢 data-*）
+      const prev = ed.getJSON()
+      const prevBlocks = Array.isArray(prev.content) ? prev.content : []
+      const merged = ed.isEmpty ? blocks : [...prevBlocks, ...blocks]
+      ok = ed.chain().setContent(merged).run()
+    }
+    // 不依赖 chain 内 focus('end')：显式落到文末 TextSelection
+    focusTextCaretAtEnd(ed)
+    if (!ok) {
+      console.warn('[RTE] insertDocTemplate: command returned false', id)
+    }
+  } catch (err) {
+    console.error('[RTE] insertDocTemplate failed', id, err)
+  }
+
+  // 与 onUpdate 对齐，避免父级 items 往返回写再整篇 setContent 打乱选区
+  lastEmittedHtmlNorm = normalizeHtml(ed.getHTML())
+  // 父级 sync 一拍后 dual-assert，防止回声 setContent 再次卡在 form NodeSelection
+  void nextTick(() => {
+    const live = editor.value
+    if (!live || live.isDestroyed) return
+    focusTextCaretAtEnd(live)
+    lastEmittedHtmlNorm = normalizeHtml(live.getHTML())
+  })
+}
+
+/** —— 表单属性检查器（选中表单原子时右侧面板） —— */
+const formInspectorPinned = ref(false)
+/** 用户点关闭后暂不自动弹出，直到选区离开该节点 */
+const formInspectorDismissedPos = ref<number | null>(null)
+const selectedFormPos = ref<number | null>(null)
+const selectedFormType = ref<FormNodeName | null>(null)
+const formSelectionTick = ref(0)
+const inspectorInteracting = ref(false)
+
+function syncSelectedFormFromEditor(ed?: {
+  state: {
+    selection: unknown
+    doc: {
+      nodeAt: (
+        pos: number,
+      ) => { type: { name: string }; attrs: Record<string, unknown> } | null
+    }
+  }
+} | null) {
+  const editorInst = ed ?? editor.value
+  if (!editorInst) {
+    if (!inspectorInteracting.value) {
+      selectedFormPos.value = null
+      selectedFormType.value = null
+      formInspectorPinned.value = false
+    }
+    return
+  }
+  const sel = editorInst.state.selection
+  if (sel instanceof NodeSelection && isFormNodeName(sel.node.type.name)) {
+    selectedFormPos.value = sel.from
+    selectedFormType.value = sel.node.type.name
+    if (formInspectorDismissedPos.value === sel.from) {
+      formInspectorPinned.value = false
+      formSelectionTick.value += 1
+      return
+    }
+    formInspectorDismissedPos.value = null
+    formInspectorPinned.value = true
+    formSelectionTick.value += 1
+    return
+  }
+  // 选区已离开表单节点：允许下次再自动打开
+  formInspectorDismissedPos.value = null
+  // 属性面板内操作时编辑器可能短暂失焦：若节点仍在，保持面板
+  if (
+    inspectorInteracting.value &&
+    formInspectorPinned.value &&
+    selectedFormPos.value != null
+  ) {
+    const node = editorInst.state.doc.nodeAt(selectedFormPos.value)
+    if (node && isFormNodeName(node.type.name)) {
+      selectedFormType.value = node.type.name
+      formSelectionTick.value += 1
+      return
+    }
+  }
+  selectedFormPos.value = null
+  selectedFormType.value = null
+  formInspectorPinned.value = false
+  formSelectionTick.value += 1
+}
+
+const selectedFormAttrs = computed(() => {
+  void formSelectionTick.value
+  const ed = editor.value
+  const pos = selectedFormPos.value
+  const typ = selectedFormType.value
+  if (!ed || pos == null || !typ) return null
+  const node = ed.state.doc.nodeAt(pos)
+  if (!node || node.type.name !== typ) return null
+  return { ...node.attrs } as Record<string, unknown>
+})
+
+/** 最大化浮层三种视图：编辑 / 预览 / 源码 */
+type RteViewMode = 'edit' | 'preview' | 'source'
+const VIEW_MODE_OPTIONS: { id: RteViewMode; label: string; icon: string }[] = [
+  { id: 'edit', label: '编辑', icon: '✎' },
+  { id: 'preview', label: '预览', icon: '◎' },
+  { id: 'source', label: '源码', icon: '</>' },
+]
+const viewMode = ref<RteViewMode>('edit')
+const sourceHtml = ref('')
+const sourceDirty = ref(false)
+
+function getLiveEditorHtml(): string {
+  const ed = editor.value
+  if (!ed) return props.modelValue || '<p></p>'
+  return ed.getHTML()
+}
+
+/** 将源码写回 TipTap，并同步父级 modelValue（与 onUpdate 对齐） */
+function applySourceHtmlToEditor(raw: string, opts?: { focus?: boolean }) {
+  const ed = editor.value
+  if (!ed || ed.isDestroyed) return false
+  const next = toEditorContent(raw)
+  try {
+    ed.commands.setContent(next, { emitUpdate: false })
+  } catch (err) {
+    console.warn('[RTE] applySourceHtmlToEditor setContent failed', err)
+    return false
+  }
+  const html = ed.getHTML()
+  lastEmittedHtmlNorm = normalizeHtml(html)
+  emit('update:modelValue', html)
+  sourceDirty.value = false
+  if (opts?.focus !== false && viewMode.value === 'edit') {
+    try {
+      ed.commands.focus('end')
+    } catch {
+      /* ignore */
+    }
+  }
+  return true
+}
+
+function syncEditorEditableForMode(mode: RteViewMode) {
+  const ed = editor.value
+  if (!ed || ed.isDestroyed) return
+  try {
+    ed.setEditable(mode === 'edit')
+  } catch {
+    /* editor view 可能尚未就绪 */
+  }
+}
+
+/** BubbleMenu 常驻挂载（仅 editor 就绪），非编辑态不展示，避免 v-if 拆装触发 Vue emitsOptions null */
+function bubbleShouldShow(payload: {
+  editor: { isDestroyed?: boolean; isEditable?: boolean }
+  from: number
+  to: number
+}): boolean {
+  if (viewMode.value !== 'edit') return false
+  const ed = payload?.editor
+  if (!ed || ed.isDestroyed || ed.isEditable === false) return false
+  return payload.from !== payload.to
+}
+
+function setViewMode(next: RteViewMode) {
+  if (next === viewMode.value) return
+  const prev = viewMode.value
+
+  // 离开源码：先把 textarea 写回编辑器，再切模式
+  if (prev === 'source' && next !== 'source') {
+    applySourceHtmlToEditor(sourceHtml.value, { focus: next === 'edit' })
+  }
+
+  if (next === 'source') {
+    const raw = getLiveEditorHtml()
+    // 轻量换行，便于阅读；写回时 normalizeHtml / TipTap parse 不受影响
+    sourceHtml.value = raw.replace(/></g, '>\n<')
+    sourceDirty.value = false
+  }
+
+  viewMode.value = next
+  syncEditorEditableForMode(next)
+
+  if (next !== 'edit') {
+    // 预览/源码不展示表单属性面板
+    formInspectorPinned.value = false
+  }
+}
+
+function onSourceInput(event: Event) {
+  sourceHtml.value = (event.target as HTMLTextAreaElement).value
+  sourceDirty.value = true
+}
+
+function applySourceNow() {
+  applySourceHtmlToEditor(sourceHtml.value, { focus: false })
+  sourceHtml.value = getLiveEditorHtml()
+}
+
+onBeforeUnmount(() => {
+  document.removeEventListener('pointerdown', onDocPointerDownForMenus, true)
+  for (const t of menuCloseTimers.values()) clearTimeout(t)
+  menuCloseTimers.clear()
+  floatMenuEls.clear()
+  floatAnchors.clear()
+  // 最大化关闭时若停在源码态，先写回再销毁
+  if (viewMode.value === 'source') {
+    applySourceHtmlToEditor(sourceHtml.value, { focus: false })
+  }
+  if (editor.value && !editor.value.isDestroyed) editor.value.destroy()
+})
+
+const showFormInspector = computed(() => {
+  // 最大化浮层（expanded）下与工具同排显示（紧跟导入）；紧凑单元格不挤入
+  // 仅「编辑」模式展示表单属性面板
+  return Boolean(
+    props.expanded &&
+      viewMode.value === 'edit' &&
+      formInspectorPinned.value &&
+      selectedFormType.value &&
+      selectedFormAttrs.value,
+  )
+})
+
+function applySelectedFormPatch(patch: Record<string, unknown>) {
+  const ed = editor.value
+  const pos = selectedFormPos.value
+  const typ = selectedFormType.value
+  if (!ed || pos == null || !typ) return
+  const node = ed.state.doc.nodeAt(pos)
+  if (!node || node.type.name !== typ) return
+  const nextAttrs = { ...node.attrs, ...patch }
+  const captured: CapturedFormSel = {
+    type: typ,
+    name: String(nextAttrs.name ?? node.attrs.name ?? ''),
+    pos,
+  }
+
+  // 面板交互中：挡住 selection sync 清面板；并撑过父级 modelValue 回写
+  inspectorInteracting.value = true
+  let tr = ed.state.tr.setNodeMarkup(pos, undefined, nextAttrs)
+  try {
+    tr = tr.setSelection(NodeSelection.create(tr.doc, pos))
+  } catch {
+    /* 位置无效时忽略重选 */
+  }
+  tr.setMeta('addToHistory', true)
+  ed.view.dispatch(tr)
+  // 标记刚 emit 的内容，避免紧随其后的 props.modelValue watch 整篇 setContent
+  lastEmittedHtmlNorm = normalizeHtml(ed.getHTML())
+  formSelectionTick.value += 1
+
+  const reassert = () => {
+    const live = editor.value
+    if (!live) return
+    restoreFormNodeSelection(live, captured)
+  }
+  reassert()
+  queueMicrotask(reassert)
+  void nextTick(() => {
+    reassert()
+    requestAnimationFrame(() => {
+      reassert()
+      inspectorInteracting.value = false
+    })
+  })
+}
+
+function closeFormInspector() {
+  formInspectorDismissedPos.value = selectedFormPos.value
+  formInspectorPinned.value = false
+  inspectorInteracting.value = false
+  formSelectionTick.value += 1
+}
+
+function onFormInspectorMouseDown(_event: MouseEvent) {
+  inspectorInteracting.value = true
+}
+
+function onFormInspectorMouseUp() {
+  // 下一帧再允许 selection sync 清面板，避免输入框抢焦点时闪断
+  requestAnimationFrame(() => {
+    inspectorInteracting.value = false
+  })
+}
+
+
 
 /** —— 插入链接 —— */
 const linkDialogOpen = ref(false)
@@ -1376,6 +1990,7 @@ function onTableToolbarButtonClick() {
   closeImportMenu()
   headingOpen.value = false
   listOpen.value = false
+  formOpen.value = false
   colorOpen.value = false
   highlightOpen.value = false
   alignOpen.value = false
@@ -1759,6 +2374,253 @@ function closeImportMenu() {
   importMenuOpen.value = false
 }
 
+/** tool-wrap @mouseleave：仅当指针真正离开按钮+菜单时才关（避免点选项前被关掉） */
+/** 工具条下拉：fixed + Teleport 到 body，按按钮 rect 自动翻转/夹紧 */
+const FLOAT_VIEW_PAD = 8
+const FLOAT_GAP = 2
+const floatAnchors = new Map<string, HTMLElement>()
+const menuCloseTimers = new Map<string, ReturnType<typeof setTimeout>>()
+const floatMenuEls = new Map<string, HTMLElement>()
+/** 打开瞬间抑制 mouseleave / document pointerdown 误关 */
+let ignoreDocMenuCloseUntil = 0
+function markToolbarMenuOpening() {
+  ignoreDocMenuCloseUntil = Date.now() + 500
+  // 取消所有待关闭定时器
+  for (const [k, t] of menuCloseTimers) {
+    clearTimeout(t)
+    menuCloseTimers.delete(k)
+  }
+}
+
+function setFloatAnchor(key: string, el: unknown) {
+  if (el && el instanceof HTMLElement) floatAnchors.set(key, el)
+  else floatAnchors.delete(key)
+}
+
+function cancelMenuClose(key: string) {
+  const t = menuCloseTimers.get(key)
+  if (t != null) {
+    clearTimeout(t)
+    menuCloseTimers.delete(key)
+  }
+}
+
+function scheduleMenuClose(key: string, close: () => void) {
+  cancelMenuClose(key)
+  menuCloseTimers.set(
+    key,
+    setTimeout(() => {
+      menuCloseTimers.delete(key)
+      close()
+    }, 200),
+  )
+}
+
+function onToolMenuEnter(key: string) {
+  cancelMenuClose(key)
+}
+
+function onToolMenuLeave(
+  event: MouseEvent,
+  key: string,
+  close: () => void,
+) {
+  // Teleport 挂载/重排时浏览器常对 wrap 甩一次 relatedTarget=null 的 mouseleave
+  if (Date.now() < ignoreDocMenuCloseUntil) return
+  const wrap = event.currentTarget as HTMLElement | null
+  const next = event.relatedTarget as Node | null
+  if (wrap && next && wrap.contains(next)) return
+  const menu = floatMenuEls.get(key) || document.querySelector(`[data-rte-float-key="${key}"]`)
+  if (menu && next && menu.contains(next)) return
+  // 指针仍在菜单上（elementFromPoint）也不关
+  if (typeof document !== 'undefined' && document.elementFromPoint) {
+    const x = (event as MouseEvent).clientX
+    const y = (event as MouseEvent).clientY
+    if (Number.isFinite(x) && Number.isFinite(y)) {
+      const under = document.elementFromPoint(x, y)
+      if (under && (under.closest?.(`[data-rte-float-key="${key}"]`) || under.closest?.('.rte-float-menu'))) {
+        return
+      }
+    }
+  }
+  scheduleMenuClose(key, close)
+}
+
+function setFloatStyle(
+  el: HTMLElement,
+  prop: string,
+  value: string,
+) {
+  // 必须 important：若 CSS 带 !important，普通 inline 会被盖掉，菜单落在 body 流末尾
+  el.style.setProperty(prop, value, 'important')
+}
+
+function placeFloatMenuEl(menuEl: HTMLElement, key: string) {
+  let anchor = floatAnchors.get(key)
+  if (!anchor || !anchor.isConnected) {
+    const found = document.querySelector(`[data-rte-anchor="${key}"]`)
+    if (found instanceof HTMLElement) {
+      anchor = found
+      floatAnchors.set(key, found)
+    }
+  }
+  if (!anchor || !menuEl.isConnected) {
+    menuEl.style.setProperty('visibility', 'visible', 'important')
+    return
+  }
+
+  const rect = anchor.getBoundingClientRect()
+  const vw = window.innerWidth
+  const vh = window.innerHeight
+
+  setFloatStyle(menuEl, 'position', 'fixed')
+  setFloatStyle(menuEl, 'right', 'auto')
+  setFloatStyle(menuEl, 'bottom', 'auto')
+  setFloatStyle(menuEl, 'margin', '0')
+  setFloatStyle(menuEl, 'z-index', '5200')
+  // 先放到视口内可测，避免 top/left:auto 落在文档流末尾
+  setFloatStyle(menuEl, 'left', '0px')
+  setFloatStyle(menuEl, 'top', '0px')
+  setFloatStyle(menuEl, 'max-height', 'none')
+  menuEl.style.width = ''
+  setFloatStyle(menuEl, 'visibility', 'hidden')
+
+  const mw = Math.max(menuEl.offsetWidth, 1)
+  const mh = Math.max(menuEl.offsetHeight, 1)
+  const spaceBelow = vh - rect.bottom - FLOAT_VIEW_PAD
+  const spaceAbove = rect.top - FLOAT_VIEW_PAD
+  const preferBelow =
+    spaceBelow >= Math.min(mh, 220) || spaceBelow >= spaceAbove
+
+  let maxH: number
+  let top: number
+  if (preferBelow) {
+    maxH = Math.max(120, spaceBelow - FLOAT_GAP)
+    top = rect.bottom - FLOAT_GAP
+  } else {
+    maxH = Math.max(120, spaceAbove - FLOAT_GAP)
+    const usedH = Math.min(mh, maxH)
+    top = rect.top + FLOAT_GAP - usedH
+  }
+
+  const preferEnd =
+    key === 'import' || key === 'table' || key === 'more' || key.startsWith('more-')
+  let left = preferEnd ? rect.right - mw : rect.left
+  const maxW = Math.max(160, vw - FLOAT_VIEW_PAD * 2)
+  if (mw > maxW) {
+    menuEl.style.width = `${Math.floor(maxW)}px`
+    left = FLOAT_VIEW_PAD
+  } else {
+    if (left + mw > vw - FLOAT_VIEW_PAD) left = vw - FLOAT_VIEW_PAD - mw
+    if (left < FLOAT_VIEW_PAD) left = FLOAT_VIEW_PAD
+  }
+
+  if (top < FLOAT_VIEW_PAD) top = FLOAT_VIEW_PAD
+  if (top + Math.min(mh, maxH) > vh - FLOAT_VIEW_PAD) {
+    top = Math.max(FLOAT_VIEW_PAD, vh - FLOAT_VIEW_PAD - Math.min(mh, maxH))
+  }
+
+  setFloatStyle(menuEl, 'left', `${Math.round(left)}px`)
+  setFloatStyle(menuEl, 'top', `${Math.round(top)}px`)
+  setFloatStyle(menuEl, 'max-height', `${Math.round(maxH)}px`)
+  setFloatStyle(menuEl, 'visibility', 'visible')
+  menuEl.style.setProperty('--rte-float-max-h', `${Math.round(maxH)}px`)
+  if (menuEl.classList.contains('rte-template-menu')) {
+    setFloatStyle(menuEl, 'overflow', 'hidden')
+  } else {
+    setFloatStyle(menuEl, 'overflow-x', 'hidden')
+    setFloatStyle(menuEl, 'overflow-y', 'auto')
+  }
+}
+
+function repositionAllFloatMenus() {
+  for (const [key, el] of floatMenuEls) {
+    placeFloatMenuEl(el, key)
+  }
+}
+
+type FloatMenuEl = HTMLElement & { __rteFloatCleanup?: () => void }
+
+const vRteFloat: Directive<HTMLElement, string> = {
+  mounted(el, binding) {
+    const key = String(binding.value || '')
+    if (!key) return
+    const node = el as FloatMenuEl
+    node.classList.add('rte-float-menu')
+    node.dataset.rteFloatKey = key
+    floatMenuEls.set(key, node)
+    markToolbarMenuOpening()
+    let tries = 0
+    const place = () => {
+      placeFloatMenuEl(node, key)
+      // 回调 ref 有时晚于 Teleport mount：短重试
+      if (!floatAnchors.get(key) && tries < 10) {
+        tries += 1
+        requestAnimationFrame(place)
+      }
+    }
+    nextTick(() => {
+      place()
+      requestAnimationFrame(place)
+    })
+    const ro = new ResizeObserver(() => placeFloatMenuEl(node, key))
+    ro.observe(node)
+    const onWin = () => placeFloatMenuEl(node, key)
+    window.addEventListener('resize', onWin)
+    window.addEventListener('scroll', onWin, true)
+    node.__rteFloatCleanup = () => {
+      ro.disconnect()
+      window.removeEventListener('resize', onWin)
+      window.removeEventListener('scroll', onWin, true)
+      if (floatMenuEls.get(key) === node) floatMenuEls.delete(key)
+    }
+  },
+  updated(el, binding) {
+    const key = String(binding.value || '')
+    if (!key) return
+    floatMenuEls.set(key, el)
+    nextTick(() => placeFloatMenuEl(el, key))
+  },
+  unmounted(el) {
+    const node = el as FloatMenuEl
+    const key = node.dataset.rteFloatKey
+    node.__rteFloatCleanup?.()
+    delete node.__rteFloatCleanup
+    if (key && floatMenuEls.get(key) === node) floatMenuEls.delete(key)
+  },
+}
+
+function closeAllToolbarMenus() {
+  headingOpen.value = false
+  listOpen.value = false
+  formOpen.value = false
+  templateOpen.value = false
+  alignOpen.value = false
+  tableMenuOpen.value = false
+  importMenuOpen.value = false
+  closeColorMenus()
+  closeHighlightMenus()
+  closeMore()
+}
+
+function onDocPointerDownForMenus(e: PointerEvent) {
+  if (Date.now() < ignoreDocMenuCloseUntil) return
+  const t = e.target as HTMLElement | null
+  if (!t) return
+  if (
+    t.closest(
+      '.rte-tool-wrap, .rte-tool, .rte-float-menu, .rte-more-menu, .rte-more-flyout, .el-overlay, .el-dialog, .el-message-box, .rte-table-dialog, .rte-attach-dialog',
+    )
+  ) {
+    return
+  }
+  closeAllToolbarMenus()
+}
+
+onMounted(() => {
+  document.addEventListener('pointerdown', onDocPointerDownForMenus, true)
+})
+
 function onImport() {
   // 紧凑「更多」菜单入口：打开同款双选项
   importMenuOpen.value = true
@@ -2000,7 +2862,11 @@ function onPublishSettings() {
   ElMessage.info('发布设置即将支持')
 }
 function onPreview() {
-  ElMessage.info('预览即将支持')
+  if (props.expanded) {
+    setViewMode('preview')
+    return
+  }
+  ElMessage.info('请先最大化面板，再使用预览')
 }
 function onPublish() {
   ElMessage.success('内容已写入文档（面板内无需单独发布）')
@@ -2008,6 +2874,10 @@ function onPublish() {
 
 const headingOpen = ref(false)
 const listOpen = ref(false)
+const formOpen = ref(false)
+const templateOpen = ref(false)
+const moreFormOpen = ref(false)
+const moreTemplateOpen = ref(false)
 const moreOpen = ref(false)
 const colorOpen = ref(false)
 const highlightOpen = ref(false)
@@ -2092,6 +2962,8 @@ function toggleColorMenu() {
   closeHighlightMenus()
   headingOpen.value = false
   listOpen.value = false
+  formOpen.value = false
+  templateOpen.value = false
   alignOpen.value = false
   customColorOpen.value = false
   colorOpen.value = !colorOpen.value
@@ -2101,6 +2973,8 @@ function toggleHighlightMenu() {
   closeColorMenus()
   headingOpen.value = false
   listOpen.value = false
+  formOpen.value = false
+  templateOpen.value = false
   alignOpen.value = false
   highlightOpen.value = !highlightOpen.value
 }
@@ -2123,18 +2997,40 @@ const WORD_THEME_FLAT = WORD_THEME_ROWS.flat()
 function onMoreToolClick(t: ToolItem) {
   if (t.kind === 'color') {
     moreHighlightOpen.value = false
+    moreFormOpen.value = false
+    moreTemplateOpen.value = false
     moreColorOpen.value = !moreColorOpen.value
     customColorOpen.value = false
     return
   }
   if (t.key === 'highlight') {
     moreColorOpen.value = false
+    moreFormOpen.value = false
+    moreTemplateOpen.value = false
     customColorOpen.value = false
     moreHighlightOpen.value = !moreHighlightOpen.value
     return
   }
+  if (t.kind === 'form') {
+    moreColorOpen.value = false
+    moreHighlightOpen.value = false
+    moreTemplateOpen.value = false
+    customColorOpen.value = false
+    moreFormOpen.value = !moreFormOpen.value
+    return
+  }
+  if (t.kind === 'template') {
+    moreColorOpen.value = false
+    moreHighlightOpen.value = false
+    moreFormOpen.value = false
+    customColorOpen.value = false
+    moreTemplateOpen.value = !moreTemplateOpen.value
+    return
+  }
   moreColorOpen.value = false
   moreHighlightOpen.value = false
+  moreFormOpen.value = false
+  moreTemplateOpen.value = false
   customColorOpen.value = false
   moreOpen.value = false
   t.run?.()
@@ -2149,7 +3045,7 @@ type ToolItem = {
   title?: string
   icon: string
   iconComp?: Component
-  kind?: 'heading' | 'list' | 'more' | 'btn' | 'color' | 'highlight' | 'align' | 'import' | 'table' | 'attach' | 'divider'
+  kind?: 'heading' | 'list' | 'more' | 'btn' | 'color' | 'highlight' | 'align' | 'import' | 'table' | 'attach' | 'form' | 'template' | 'divider'
   active?: () => boolean
   run?: () => void
 }
@@ -2265,6 +3161,30 @@ const allTools = computed((): ToolItem[] => {
       run: insertLink,
     },
     { key: 'formula', label: '公式', icon: 'Σ', iconComp: ic('formula'), run: insertFormula },
+    {
+      key: 'form',
+      label: '表单',
+      icon: '☑▾',
+      iconComp: ic('form'),
+      kind: 'form',
+      active: () =>
+        isActive('formTextInput') ||
+        isActive('formRadioGroup') ||
+        isActive('formCheckboxGroup') ||
+        isActive('formSelect') ||
+        isActive('formTextarea') ||
+        isActive('formNumberInput') ||
+        isActive('formDateInput') ||
+        isActive('formSwitch'),
+    },
+    {
+      key: 'template',
+      label: '模板',
+      title: '插入模板',
+      icon: '📄▾',
+      iconComp: ic('template'),
+      kind: 'template',
+    },
     { key: 'table', label: '表格', icon: '▦', iconComp: ic('table'), kind: 'table', active: () => isInTable(), run: onTableToolClick },
     { key: 'attach', label: '附件', icon: '☁▾', iconComp: ic('attach'), kind: 'attach', run: onAttachment },
     { key: 'note', label: '注释', icon: '[1]', iconComp: ic('note'), run: insertNote },
@@ -2307,6 +3227,8 @@ function closeMore() {
   moreOpen.value = false
   moreColorOpen.value = false
   moreHighlightOpen.value = false
+  moreFormOpen.value = false
+  moreTemplateOpen.value = false
   customColorOpen.value = false
 }
 
@@ -2339,22 +3261,37 @@ defineExpose({ focusEditor, editor, onDraftBackup })
 <template>
   <div
     class="rte-root"
-    :class="{ compact, expanded, 'has-title': showTitle }"
+    :class="{
+      compact,
+      expanded,
+      'has-title': showTitle,
+      'has-form-inspector': showFormInspector,
+      'mode-edit': viewMode === 'edit',
+      'mode-preview': viewMode === 'preview',
+      'mode-source': viewMode === 'source',
+    }"
     @mousedown="onRootMouseDown"
   >
-    <div class="rte-toolbar" role="toolbar" aria-label="编辑工具栏">
+    <div
+      class="rte-toolbar"
+      role="toolbar"
+      aria-label="编辑工具栏"
+    >
+      <div class="rte-toolbar-tools">
       <template v-for="t in visibleTools" :key="t.key">
         <div
           v-if="t.kind === 'heading'"
           class="rte-tool-wrap"
-          @mouseleave="headingOpen = false"
+          @mouseenter="onToolMenuEnter('heading')"
+          @mouseleave="onToolMenuLeave($event, 'heading', () => (headingOpen = false))"
         >
           <button
             type="button"
             class="rte-tool"
+            :ref="(el) => setFloatAnchor('heading', el)" data-rte-anchor="heading"
             :class="{ active: isActive('heading') }"
             title="标题"
-            @click.stop="closeColorMenus(); closeHighlightMenus(); listOpen = false; alignOpen = false; headingOpen = !headingOpen"
+            @click.stop="markToolbarMenuOpening(); closeColorMenus(); closeHighlightMenus(); listOpen = false; formOpen = false; templateOpen = false; alignOpen = false; headingOpen = !headingOpen"
           >
             <span class="rte-tool-icon">
               <component :is="toolIcon('heading')" class="rte-ep-icon" />
@@ -2363,34 +3300,45 @@ defineExpose({ focusEditor, editor, onDraftBackup })
               >标题<span class="rte-caret" aria-hidden="true"></span
             ></span>
           </button>
-          <div v-if="headingOpen" class="rte-menu" @mousedown.prevent>
-            <button type="button" @click="setHeading(0); headingOpen = false">
-              正文
-            </button>
-            <button type="button" @click="setHeading(1); headingOpen = false">
-              标题 1
-            </button>
-            <button type="button" @click="setHeading(2); headingOpen = false">
-              标题 2
-            </button>
-            <button type="button" @click="setHeading(3); headingOpen = false">
-              标题 3
-            </button>
-          </div>
+          <Teleport to="body">
+            <div
+              v-if="headingOpen"
+              class="rte-menu"
+              v-rte-float="'heading'"
+              @mousedown.prevent
+              @mouseenter="onToolMenuEnter('heading')"
+              @mouseleave="onToolMenuLeave($event, 'heading', () => (headingOpen = false))"
+            >
+              <button type="button" @click="setHeading(0); headingOpen = false">
+                正文
+              </button>
+              <button type="button" @click="setHeading(1); headingOpen = false">
+                标题 1
+              </button>
+              <button type="button" @click="setHeading(2); headingOpen = false">
+                标题 2
+              </button>
+              <button type="button" @click="setHeading(3); headingOpen = false">
+                标题 3
+              </button>
+            </div>
+          </Teleport>
         </div>
         <div
           v-else-if="t.kind === 'list'"
           class="rte-tool-wrap"
-          @mouseleave="listOpen = false"
+          @mouseenter="onToolMenuEnter('list')"
+          @mouseleave="onToolMenuLeave($event, 'list', () => (listOpen = false))"
         >
           <button
             type="button"
             class="rte-tool"
+            :ref="(el) => setFloatAnchor('list', el)" data-rte-anchor="list"
             :class="{
               active: isActive('bulletList') || isActive('orderedList'),
             }"
             title="列表"
-            @click.stop="closeColorMenus(); closeHighlightMenus(); headingOpen = false; alignOpen = false; listOpen = !listOpen"
+            @click.stop="markToolbarMenuOpening(); closeColorMenus(); closeHighlightMenus(); headingOpen = false; formOpen = false; templateOpen = false; alignOpen = false; listOpen = !listOpen"
           >
             <span class="rte-tool-icon">
               <component :is="toolIcon('list')" class="rte-ep-icon" />
@@ -2399,80 +3347,226 @@ defineExpose({ focusEditor, editor, onDraftBackup })
               >列表<span class="rte-caret" aria-hidden="true"></span
             ></span>
           </button>
-          <div v-if="listOpen" class="rte-menu" @mousedown.prevent>
-            <button
-              type="button"
-              @click="toggleBulletList(); listOpen = false"
+          <Teleport to="body">
+            <div
+              v-if="listOpen"
+              class="rte-menu"
+              v-rte-float="'list'"
+              @mousedown.prevent
+              @mouseenter="onToolMenuEnter('list')"
+              @mouseleave="onToolMenuLeave($event, 'list', () => (listOpen = false))"
             >
-              无序列表
-            </button>
-            <button
-              type="button"
-              @click="toggleOrderedList(); listOpen = false"
-            >
-              有序列表
-            </button>
-          </div>
+              <button
+                type="button"
+                @click="toggleBulletList(); listOpen = false"
+              >
+                无序列表
+              </button>
+              <button
+                type="button"
+                @click="toggleOrderedList(); listOpen = false"
+              >
+                有序列表
+              </button>
+            </div>
+          </Teleport>
         </div>
         <div
-          v-else-if="t.kind === 'highlight'"
+          v-else-if="t.kind === 'form'"
           class="rte-tool-wrap"
-          @mouseleave="highlightOpen = false"
+          @mouseenter="onToolMenuEnter('form')"
+          @mouseleave="onToolMenuLeave($event, 'form', () => (formOpen = false))"
         >
           <button
             type="button"
             class="rte-tool"
+            :ref="(el) => setFloatAnchor('form', el)" data-rte-anchor="form"
+            :class="{
+              active:
+                formOpen ||
+                isActive('formTextInput') ||
+                isActive('formRadioGroup') ||
+                isActive('formCheckboxGroup') ||
+                isActive('formSelect') ||
+                isActive('formTextarea') ||
+                isActive('formNumberInput') ||
+                isActive('formDateInput') ||
+                isActive('formSwitch'),
+            }"
+            title="表单"
+            @click.stop="markToolbarMenuOpening(); closeColorMenus(); closeHighlightMenus(); headingOpen = false; listOpen = false; templateOpen = false; alignOpen = false; formOpen = !formOpen"
+          >
+            <span class="rte-tool-icon">
+              <component :is="toolIcon('form')" class="rte-ep-icon" />
+            </span>
+            <span class="rte-tool-label"
+              >表单<span class="rte-caret" aria-hidden="true"></span
+            ></span>
+          </button>
+          <Teleport to="body">
+            <div
+              v-if="formOpen"
+              class="rte-menu"
+              v-rte-float="'form'"
+              @mousedown.prevent
+              @mouseenter="onToolMenuEnter('form')"
+              @mouseleave="onToolMenuLeave($event, 'form', () => (formOpen = false))"
+            >
+              <button type="button" @click.stop="insertFormRadio()">
+                单选组
+              </button>
+              <button type="button" @click.stop="insertFormCheckbox()">
+                多选组
+              </button>
+              <button type="button" @click.stop="insertFormText()">
+                文本输入
+              </button>
+              <button type="button" @click.stop="insertFormTextarea()">
+                多行文本
+              </button>
+              <button type="button" @click.stop="insertFormNumber()">
+                数字输入
+              </button>
+              <button type="button" @click.stop="insertFormSelect()">
+                下拉选择
+              </button>
+              <button type="button" @click.stop="insertFormDate()">
+                日期
+              </button>
+              <button type="button" @click.stop="insertFormDateTime()">
+                日期时间
+              </button>
+              <button type="button" @click.stop="insertFormSwitch()">
+                开关
+              </button>
+              <div class="rte-menu-sep" aria-hidden="true" />
+              <button type="button" @click.stop="formOpen = false; openTableDialog()">
+                表格
+              </button>
+            </div>
+          </Teleport>
+        </div>
+        <div
+          v-else-if="t.kind === 'template'"
+          class="rte-tool-wrap"
+          @mouseenter="onToolMenuEnter('template')"
+          @mouseleave="onToolMenuLeave($event, 'template', () => (templateOpen = false))"
+        >
+          <button
+            type="button"
+            class="rte-tool"
+            :ref="(el) => setFloatAnchor('template', el)" data-rte-anchor="template"
+            :class="{ active: templateOpen }"
+            title="插入模板"
+            @click.stop="markToolbarMenuOpening(); closeColorMenus(); closeHighlightMenus(); headingOpen = false; listOpen = false; formOpen = false; alignOpen = false; templateOpen = !templateOpen"
+          >
+            <span class="rte-tool-icon">
+              <component :is="toolIcon('template')" class="rte-ep-icon" />
+            </span>
+            <span class="rte-tool-label"
+              >模板<span class="rte-caret" aria-hidden="true"></span
+            ></span>
+          </button>
+          <Teleport to="body">
+            <div
+              v-if="templateOpen"
+              class="rte-menu rte-template-menu"
+              v-rte-float="'template'"
+              @mousedown.prevent
+              @mouseenter="onToolMenuEnter('template')"
+              @mouseleave="onToolMenuLeave($event, 'template', () => (templateOpen = false))"
+            >
+              <div class="rte-template-menu-body">
+                <template v-for="g in RTE_DOC_TEMPLATE_GROUPS" :key="g.id">
+                  <div class="rte-menu-section-label">{{ g.label }}</div>
+                  <div class="rte-template-grid">
+                    <button
+                      v-for="tpl in RTE_DOC_TEMPLATES.filter((x) => x.group === g.id)"
+                      :key="tpl.id"
+                      type="button"
+                      class="rte-template-item"
+                      :title="tpl.description || tpl.label"
+                      @click.stop="insertDocTemplate(tpl.id)"
+                    >
+                      <span class="rte-template-item-label">{{ tpl.label }}</span>
+                      <span v-if="tpl.description" class="rte-template-item-desc">{{
+                        tpl.description
+                      }}</span>
+                    </button>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </Teleport>
+        </div>
+        <div
+          v-else-if="t.kind === 'highlight'"
+          class="rte-tool-wrap"
+          @mouseenter="onToolMenuEnter('highlight')"
+          @mouseleave="onToolMenuLeave($event, 'highlight', () => (highlightOpen = false))"
+        >
+          <button
+            type="button"
+            class="rte-tool"
+            :ref="(el) => setFloatAnchor('highlight', el)" data-rte-anchor="highlight"
             :class="{ active: isActive('highlight') || highlightOpen }"
             title="突出显示"
-            @click.stop="toggleHighlightMenu"
+            @click.stop="markToolbarMenuOpening(); toggleHighlightMenu()"
           >
             <span class="rte-tool-icon">
               <component :is="toolIcon('highlight')" class="rte-ep-icon" />
             </span>
             <span class="rte-tool-label">高亮</span>
           </button>
-          <div
-            v-if="highlightOpen"
-            class="rte-menu rte-color-menu rte-highlight-menu"
-            @mousedown.prevent
-          >
-            <button
-              type="button"
-              class="rte-color-action"
-              :class="{ selected: !isActive('highlight') }"
-              @click="applyHighlightColor('')"
+          <Teleport to="body">
+            <div
+              v-if="highlightOpen"
+              class="rte-menu rte-color-menu rte-highlight-menu"
+              v-rte-float="'highlight'"
+              @mousedown.prevent
+              @mouseenter="onToolMenuEnter('highlight')"
+              @mouseleave="onToolMenuLeave($event, 'highlight', () => (highlightOpen = false))"
             >
-              无颜色
-            </button>
-            <div class="rte-color-section-label">高亮颜色</div>
-            <div class="rte-highlight-swatches">
               <button
-                v-for="h in WORD_HIGHLIGHT_COLORS"
-                :key="h.color"
                 type="button"
-                class="rte-swatch"
-                :class="{
-                  selected: colorsEqual(currentHighlightColor(), h.color),
-                  'is-light': h.color === '#FFFF00' || h.color === '#00FF00' || h.color === '#00FFFF' || h.color === '#C0C0C0',
-                }"
-                :style="{ background: h.color }"
-                :title="h.label"
-                @click="applyHighlightColor(h.color)"
-              />
+                class="rte-color-action"
+                :class="{ selected: !isActive('highlight') }"
+                @click="applyHighlightColor('')"
+              >
+                无颜色
+              </button>
+              <div class="rte-color-section-label">高亮颜色</div>
+              <div class="rte-highlight-swatches">
+                <button
+                  v-for="h in WORD_HIGHLIGHT_COLORS"
+                  :key="h.color"
+                  type="button"
+                  class="rte-swatch"
+                  :class="{
+                    selected: colorsEqual(currentHighlightColor(), h.color),
+                    'is-light': h.color === '#FFFF00' || h.color === '#00FF00' || h.color === '#00FFFF' || h.color === '#C0C0C0',
+                  }"
+                  :style="{ background: h.color }"
+                  :title="h.label"
+                  @click="applyHighlightColor(h.color)"
+                />
+              </div>
             </div>
-          </div>
+          </Teleport>
         </div>
         <div
           v-else-if="t.kind === 'color'"
           class="rte-tool-wrap"
-          @mouseleave="closeColorMenus"
+          @mouseenter="onToolMenuEnter('color')"
+          @mouseleave="onToolMenuLeave($event, 'color', closeColorMenus)"
         >
           <button
             type="button"
             class="rte-tool"
+            :ref="(el) => setFloatAnchor('color', el)" data-rte-anchor="color"
             :class="{ active: colorOpen }"
             title="字体颜色"
-            @click.stop="toggleColorMenu"
+            @click.stop="markToolbarMenuOpening(); toggleColorMenu()"
           >
             <span
               class="rte-tool-icon rte-color-icon"
@@ -2482,11 +3576,15 @@ defineExpose({ focusEditor, editor, onDraftBackup })
             </span>
             <span class="rte-tool-label">颜色</span>
           </button>
-          <div
-            v-if="colorOpen"
-            class="rte-menu rte-color-menu"
-            @mousedown.prevent
-          >
+          <Teleport to="body">
+            <div
+              v-if="colorOpen"
+              class="rte-menu rte-color-menu"
+              v-rte-float="'color'"
+              @mousedown.prevent
+              @mouseenter="onToolMenuEnter('color')"
+              @mouseleave="onToolMenuLeave($event, 'color', closeColorMenus)"
+            >
             <button
               type="button"
               class="rte-color-action"
@@ -2556,16 +3654,19 @@ defineExpose({ focusEditor, editor, onDraftBackup })
                 确定
               </button>
             </div>
-          </div>
+            </div>
+          </Teleport>
         </div>
         <div
           v-else-if="t.kind === 'align'"
           class="rte-tool-wrap"
-          @mouseleave="alignOpen = false"
+          @mouseenter="onToolMenuEnter('align')"
+          @mouseleave="onToolMenuLeave($event, 'align', () => (alignOpen = false))"
         >
           <button
             type="button"
             class="rte-tool"
+            :ref="(el) => setFloatAnchor('align', el)" data-rte-anchor="align"
             :class="{
               active:
                 isActive({ textAlign: 'center' }) ||
@@ -2573,27 +3674,36 @@ defineExpose({ focusEditor, editor, onDraftBackup })
                 isActive({ textAlign: 'justify' }),
             }"
             title="对齐"
-            @click.stop="closeColorMenus(); closeHighlightMenus(); headingOpen = false; listOpen = false; alignOpen = !alignOpen"
+            @click.stop="markToolbarMenuOpening(); closeColorMenus(); closeHighlightMenus(); headingOpen = false; listOpen = false; formOpen = false; templateOpen = false; alignOpen = !alignOpen"
           >
             <span class="rte-tool-icon">
               <component :is="toolIcon('align')" class="rte-ep-icon" />
             </span>
             <span class="rte-tool-label">对齐</span>
           </button>
-          <div v-if="alignOpen" class="rte-menu" @mousedown.prevent>
-            <button type="button" @click="setAlign('left'); alignOpen = false">
-              左对齐
-            </button>
-            <button type="button" @click="setAlign('center'); alignOpen = false">
-              居中
-            </button>
-            <button type="button" @click="setAlign('right'); alignOpen = false">
-              右对齐
-            </button>
-            <button type="button" @click="setAlign('justify'); alignOpen = false">
-              两端对齐
-            </button>
-          </div>
+          <Teleport to="body">
+            <div
+              v-if="alignOpen"
+              class="rte-menu"
+              v-rte-float="'align'"
+              @mousedown.prevent
+              @mouseenter="onToolMenuEnter('align')"
+              @mouseleave="onToolMenuLeave($event, 'align', () => (alignOpen = false))"
+            >
+              <button type="button" @click="setAlign('left'); alignOpen = false">
+                左对齐
+              </button>
+              <button type="button" @click="setAlign('center'); alignOpen = false">
+                居中
+              </button>
+              <button type="button" @click="setAlign('right'); alignOpen = false">
+                右对齐
+              </button>
+              <button type="button" @click="setAlign('justify'); alignOpen = false">
+                两端对齐
+              </button>
+            </div>
+          </Teleport>
         </div>
         <div
           v-else-if="t.kind === 'divider'"
@@ -2603,16 +3713,18 @@ defineExpose({ focusEditor, editor, onDraftBackup })
         <div
           v-else-if="t.kind === 'table'"
           class="rte-tool-wrap"
-          @mouseleave="closeTableMenu"
+          @mouseenter="onToolMenuEnter('table')"
+          @mouseleave="onToolMenuLeave($event, 'table', closeTableMenu)"
         >
           <button
             type="button"
             class="rte-tool"
+            :ref="(el) => setFloatAnchor('table', el)" data-rte-anchor="table"
             :class="{ active: tableMenuOpen || tableDialogOpen || isInTable() }"
             :title="isInTable() ? '表格操作' : '插入表格'"
             :aria-haspopup="isInTable() ? 'menu' : 'dialog'"
             :aria-expanded="isInTable() ? tableMenuOpen : undefined"
-            @click.stop="onTableToolbarButtonClick"
+            @click.stop="markToolbarMenuOpening(); onTableToolbarButtonClick()"
           >
             <span class="rte-tool-icon">
               <component
@@ -2628,45 +3740,52 @@ defineExpose({ focusEditor, editor, onDraftBackup })
               ></span
             ></span>
           </button>
-          <div
-            v-if="tableMenuOpen && isInTable()"
-            class="rte-menu rte-table-menu"
-            role="menu"
-            @mousedown.prevent
-          >
-            <template v-for="op in tableOpItems" :key="op.key">
-              <div v-if="op.sepBefore" class="rte-menu-sep" aria-hidden="true" />
+          <Teleport to="body">
+            <div
+              v-if="tableMenuOpen && isInTable()"
+              class="rte-menu rte-table-menu"
+              v-rte-float="'table'"
+              role="menu"
+              @mousedown.prevent
+              @mouseenter="onToolMenuEnter('table')"
+              @mouseleave="onToolMenuLeave($event, 'table', closeTableMenu)"
+            >
+              <template v-for="op in tableOpItems" :key="op.key">
+                <div v-if="op.sepBefore" class="rte-menu-sep" aria-hidden="true" />
+                <button
+                  type="button"
+                  role="menuitem"
+                  :class="{ danger: op.danger }"
+                  :disabled="op.disabled?.()"
+                  @click="op.run()"
+                >
+                  {{ op.label }}
+                </button>
+              </template>
+              <div class="rte-menu-sep" aria-hidden="true" />
               <button
                 type="button"
                 role="menuitem"
-                :class="{ danger: op.danger }"
-                :disabled="op.disabled?.()"
-                @click="op.run()"
+                @click="closeTableMenu(); openTableDialog()"
               >
-                {{ op.label }}
+                插入表格
               </button>
-            </template>
-            <div class="rte-menu-sep" aria-hidden="true" />
-            <button
-              type="button"
-              role="menuitem"
-              @click="closeTableMenu(); openTableDialog()"
-            >
-              插入表格
-            </button>
-          </div>
+            </div>
+          </Teleport>
         </div>
         <div
           v-else-if="t.kind === 'import'"
           class="rte-tool-wrap"
-          @mouseleave="closeImportMenu"
+          @mouseenter="onToolMenuEnter('import')"
+          @mouseleave="onToolMenuLeave($event, 'import', closeImportMenu)"
         >
           <button
             type="button"
             class="rte-tool"
+            :ref="(el) => setFloatAnchor('import', el)" data-rte-anchor="import"
             :class="{ active: importMenuOpen }"
             title="导入"
-            @click.stop="importMenuOpen = !importMenuOpen"
+            @click.stop="markToolbarMenuOpening(); importMenuOpen = !importMenuOpen"
           >
             <span class="rte-tool-icon">
               <component
@@ -2678,26 +3797,31 @@ defineExpose({ focusEditor, editor, onDraftBackup })
               >导入<span class="rte-caret" aria-hidden="true"></span
             ></span>
           </button>
-          <div
-            v-if="importMenuOpen"
-            class="rte-import-menu"
-            @mousedown.prevent
-          >
-            <button type="button" class="rte-import-item" @click="pickImportDocument">
-              <span class="rte-import-left">
-                <component :is="toolIcon('importDoc')" class="rte-ep-icon" />
-                <span>导入文档</span>
-              </span>
-              <span class="rte-import-pill">MD/Doc</span>
-            </button>
-            <button type="button" class="rte-import-item" @click="openImportLinkDialog">
-              <span class="rte-import-left">
-                <component :is="toolIcon('importLink')" class="rte-ep-icon" />
-                <span>导入链接</span>
-              </span>
-              <span class="rte-import-pill">公众号</span>
-            </button>
-          </div>
+          <Teleport to="body">
+            <div
+              v-if="importMenuOpen"
+              class="rte-import-menu"
+              v-rte-float="'import'"
+              @mousedown.prevent
+              @mouseenter="onToolMenuEnter('import')"
+              @mouseleave="onToolMenuLeave($event, 'import', closeImportMenu)"
+            >
+              <button type="button" class="rte-import-item" @click.stop="pickImportDocument">
+                <span class="rte-import-left">
+                  <component :is="toolIcon('importDoc')" class="rte-ep-icon" />
+                  <span>导入文档</span>
+                </span>
+                <span class="rte-import-pill">MD/Doc</span>
+              </button>
+              <button type="button" class="rte-import-item" @click.stop="openImportLinkDialog">
+                <span class="rte-import-left">
+                  <component :is="toolIcon('importLink')" class="rte-ep-icon" />
+                  <span>导入链接</span>
+                </span>
+                <span class="rte-import-pill">公众号</span>
+              </button>
+            </div>
+          </Teleport>
         </div>
         <button
           v-else-if="t.kind === 'attach'"
@@ -2739,30 +3863,66 @@ defineExpose({ focusEditor, editor, onDraftBackup })
         </button>
       </template>
 
+      <!-- 紧跟工具流末尾（导入之后）：编辑 / 预览 / 源码，不作右侧贴边 -->
+      <template v-if="expanded">
+        <button
+          v-for="opt in VIEW_MODE_OPTIONS"
+          :key="'vm-' + opt.id"
+          type="button"
+          role="tab"
+          class="rte-tool rte-view-mode-tool"
+          :class="{ active: viewMode === opt.id }"
+          :title="opt.label"
+          :aria-selected="viewMode === opt.id"
+          @click="setViewMode(opt.id)"
+        >
+          <span class="rte-tool-icon rte-view-mode-glyph" aria-hidden="true">{{
+            opt.icon
+          }}</span>
+          <span class="rte-tool-label">{{ opt.label }}</span>
+        </button>
+        <button
+          v-if="viewMode === 'source' && sourceDirty"
+          type="button"
+          class="rte-tool rte-view-mode-tool rte-view-mode-apply"
+          title="将源码应用到文档"
+          @click="applySourceNow"
+        >
+          <span class="rte-tool-icon rte-view-mode-glyph" aria-hidden="true">↑</span>
+          <span class="rte-tool-label">应用</span>
+        </button>
+      </template>
+
       <!-- 未最大化：其余工具收进「更多」 -->
       <div
         v-if="!expanded && moreTools.length"
         class="rte-tool-wrap rte-more-wrap"
-        @mouseleave="closeMore"
+        @mouseenter="onToolMenuEnter('more')"
+        @mouseleave="onToolMenuLeave($event, 'more', closeMore)"
       >
         <button
           type="button"
           class="rte-tool"
+          :ref="(el) => setFloatAnchor('more', el)" data-rte-anchor="more"
           :class="{ active: moreOpen }"
           title="更多"
-          @click.stop="moreOpen = !moreOpen"
+          @click.stop="markToolbarMenuOpening(); moreOpen = !moreOpen"
         >
           <span class="rte-tool-icon">
             <component :is="toolIcon('more')" class="rte-ep-icon" />
           </span>
           <span class="rte-tool-label">更多</span>
         </button>
-        <div
-          v-if="moreOpen"
-          class="rte-more-menu"
-          :class="{ 'has-flyout': moreColorOpen || moreHighlightOpen }"
-          @mousedown.prevent
-        >
+        <Teleport to="body">
+          <div
+            v-if="moreOpen"
+            class="rte-more-menu"
+            v-rte-float="'more'"
+            :class="{ 'has-flyout': moreColorOpen || moreHighlightOpen || moreFormOpen || moreTemplateOpen }"
+            @mousedown.prevent
+            @mouseenter="onToolMenuEnter('more')"
+            @mouseleave="onToolMenuLeave($event, 'more', closeMore)"
+          >
           <template v-for="mt in moreTools" :key="mt.key">
             <button
               type="button"
@@ -2771,7 +3931,9 @@ defineExpose({ focusEditor, editor, onDraftBackup })
                 active:
                   mt.active?.() ||
                   (mt.kind === 'color' && moreColorOpen) ||
-                  (mt.key === 'highlight' && moreHighlightOpen),
+                  (mt.key === 'highlight' && moreHighlightOpen) ||
+                  (mt.kind === 'form' && moreFormOpen) ||
+                  (mt.kind === 'template' && moreTemplateOpen),
               }"
               @click="onMoreToolClick(mt)"
             >
@@ -2785,10 +3947,58 @@ defineExpose({ focusEditor, editor, onDraftBackup })
               </span>
               <span>{{ mt.title || mt.label }}</span>
               <span
-                v-if="mt.kind === 'color' || mt.key === 'highlight' || mt.kind === 'attach'"
+                v-if="mt.kind === 'color' || mt.key === 'highlight' || mt.kind === 'attach' || mt.kind === 'form' || mt.kind === 'template'"
                 class="rte-more-caret"
-              >{{ mt.kind === 'attach' ? '▾' : '▸' }}</span>
+              >{{ mt.kind === 'attach' || mt.kind === 'form' || mt.kind === 'template' ? '▾' : '▸' }}</span>
             </button>
+            <div
+              v-if="mt.kind === 'form' && moreFormOpen"
+              class="rte-menu rte-more-flyout"
+              @mousedown.prevent
+            >
+              <button type="button" @click="insertFormRadio()">单选组</button>
+              <button type="button" @click="insertFormCheckbox()">多选组</button>
+              <button type="button" @click="insertFormText()">文本输入</button>
+              <button type="button" @click="insertFormTextarea()">多行文本</button>
+              <button type="button" @click="insertFormNumber()">数字输入</button>
+              <button type="button" @click="insertFormSelect()">下拉选择</button>
+              <button type="button" @click="insertFormDate()">日期</button>
+              <button type="button" @click="insertFormDateTime()">日期时间</button>
+              <button type="button" @click="insertFormSwitch()">开关</button>
+              <div class="rte-menu-sep" aria-hidden="true" />
+              <button
+                type="button"
+                @click="moreFormOpen = false; moreOpen = false; openTableDialog()"
+              >
+                表格
+              </button>
+            </div>
+            <div
+              v-if="mt.kind === 'template' && moreTemplateOpen"
+              class="rte-menu rte-more-flyout rte-template-menu"
+              @mousedown.prevent
+            >
+              <div class="rte-template-menu-body">
+              <template v-for="g in RTE_DOC_TEMPLATE_GROUPS" :key="'m-' + g.id">
+                <div class="rte-menu-section-label">{{ g.label }}</div>
+                <div class="rte-template-grid">
+                  <button
+                    v-for="tpl in RTE_DOC_TEMPLATES.filter((x) => x.group === g.id)"
+                    :key="tpl.id"
+                    type="button"
+                    class="rte-template-item"
+                    :title="tpl.description || tpl.label"
+                    @click.stop="insertDocTemplate(tpl.id)"
+                  >
+                    <span class="rte-template-item-label">{{ tpl.label }}</span>
+                    <span v-if="tpl.description" class="rte-template-item-desc">{{
+                      tpl.description
+                    }}</span>
+                  </button>
+                </div>
+              </template>
+              </div>
+            </div>
             <div
               v-if="mt.kind === 'color' && moreColorOpen"
               class="rte-menu rte-color-menu rte-more-flyout"
@@ -2899,13 +4109,16 @@ defineExpose({ focusEditor, editor, onDraftBackup })
               </div>
             </div>
           </template>
-        </div>
+          </div>
+        </Teleport>
+      </div>
       </div>
     </div>
 
     <BubbleMenu
       v-if="editor"
       :editor="editor"
+      :should-show="bubbleShouldShow"
       :options="{ placement: 'top', offset: 8 }"
       class="rte-bubble"
     >
@@ -2971,19 +4184,64 @@ defineExpose({ focusEditor, editor, onDraftBackup })
       </button>
     </BubbleMenu>
 
-    <div class="rte-canvas" @click="onCanvasClick">
-      <input
-        v-if="showTitle"
-        class="rte-title"
-        type="text"
-        maxlength="100"
-        :value="localTitle"
-        placeholder="请输入标题（最多 100 个字）"
-        @input="onTitleInput"
-        @click.stop
+    <div
+      class="rte-workspace"
+      :class="{ 'has-form-inspector': showFormInspector }"
+    >
+      <div
+        v-show="viewMode !== 'source'"
+        class="rte-canvas"
+        :class="{ 'is-preview': viewMode === 'preview' }"
+        @click="onCanvasClick"
+      >
+        <input
+          v-if="showTitle && viewMode === 'edit'"
+          class="rte-title"
+          type="text"
+          maxlength="100"
+          :value="localTitle"
+          placeholder="请输入标题（最多 100 个字）"
+          @input="onTitleInput"
+          @click.stop
+        />
+        <div
+          v-if="showTitle && viewMode === 'edit'"
+          class="rte-title-sep"
+        />
+        <div
+          v-if="showTitle && viewMode === 'preview' && localTitle"
+          class="rte-title rte-title-preview"
+        >
+          {{ localTitle }}
+        </div>
+        <div
+          v-if="showTitle && viewMode === 'preview' && localTitle"
+          class="rte-title-sep"
+        />
+        <EditorContent :editor="editor" class="rte-body" />
+      </div>
+
+      <div v-if="viewMode === 'source'" class="rte-source-pane">
+        <label class="rte-source-label" for="rte-source-editor">HTML 源码</label>
+        <textarea
+          id="rte-source-editor"
+          class="rte-source-editor"
+          spellcheck="false"
+          :value="sourceHtml"
+          @input="onSourceInput"
+        />
+      </div>
+
+      <FormPropertyInspector
+        v-if="showFormInspector && selectedFormType && selectedFormAttrs"
+        :type="selectedFormType"
+        :attrs="selectedFormAttrs"
+        @patch="applySelectedFormPatch"
+        @close="closeFormInspector"
+        @mousedown="onFormInspectorMouseDown"
+        @mouseup="onFormInspectorMouseUp"
+        @mouseleave="onFormInspectorMouseUp"
       />
-      <div v-if="showTitle" class="rte-title-sep" />
-      <EditorContent :editor="editor" class="rte-body" />
     </div>
 
     <div v-if="showBottomBar" class="rte-bottom">
@@ -3980,6 +5238,91 @@ defineExpose({ focusEditor, editor, onDraftBackup })
   cursor: text;
 }
 
+.rte-toolbar-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 2px 4px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* 预览/源码：隐藏编辑工具，保留「编辑/预览/源码」模式按钮 */
+.rte-root.mode-preview .rte-toolbar-tools > :not(.rte-view-mode-tool),
+.rte-root.mode-source .rte-toolbar-tools > :not(.rte-view-mode-tool) {
+  display: none !important;
+}
+
+.rte-view-mode-glyph {
+  font-size: 14px !important;
+  font-weight: 600;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: -0.04em;
+}
+
+.rte-root.mode-preview {
+  cursor: default;
+}
+
+.rte-root.mode-preview .rte-canvas.is-preview {
+  background: #fafbfc;
+}
+
+.rte-root.mode-preview :deep(.ProseMirror) {
+  caret-color: transparent;
+}
+
+.rte-root.mode-preview :deep(.ProseMirror-selectednode) {
+  outline: none;
+}
+
+.rte-root.mode-preview :deep(input),
+.rte-root.mode-preview :deep(textarea),
+.rte-root.mode-preview :deep(select),
+.rte-root.mode-preview :deep(.rte-form-switch-input) {
+  pointer-events: none;
+}
+
+.rte-title-preview {
+  cursor: default;
+}
+
+.rte-source-pane {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 10px 14px 12px;
+  background: #1e1e1e;
+}
+
+.rte-source-label {
+  font-size: 11px;
+  color: #9cdcfe;
+  margin-bottom: 6px;
+}
+
+.rte-source-editor {
+  flex: 1;
+  min-height: 180px;
+  width: 100%;
+  box-sizing: border-box;
+  resize: none;
+  border: 1px solid #3c3c3c;
+  border-radius: 4px;
+  padding: 10px 12px;
+  background: #1e1e1e;
+  color: #d4d4d4;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  outline: none;
+}
+
+.rte-source-editor:focus {
+  border-color: #1a73e8;
+}
+
 .rte-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -3994,6 +5337,16 @@ defineExpose({ focusEditor, editor, onDraftBackup })
 
 .rte-tool-wrap {
   position: relative;
+  overflow: visible;
+  z-index: 1;
+}
+.rte-tool-wrap:has(.rte-menu),
+.rte-tool-wrap:has(.rte-import-menu),
+.rte-tool-wrap:has(.rte-table-menu),
+.rte-tool-wrap:has(.rte-more-menu),
+.rte-tool-wrap:has(.rte-color-menu),
+.rte-tool-wrap:has(.rte-template-menu) {
+  z-index: 50;
 }
 
 .rte-tool {
@@ -4048,7 +5401,7 @@ defineExpose({ focusEditor, editor, onDraftBackup })
   position: absolute;
   top: 100%;
   left: 0;
-  z-index: 20;
+  z-index: 200;
   min-width: 108px;
   padding: 4px;
   background: #fff;
@@ -4057,6 +5410,40 @@ defineExpose({ focusEditor, editor, onDraftBackup })
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
   display: flex;
   flex-direction: column;
+}
+
+/* Teleport + fixed：坐标由 JS inline+important 写入；禁止 top/left:auto !important */
+.rte-float-menu {
+  position: fixed !important;
+  z-index: 5200 !important;
+  margin: 0 !important;
+  box-sizing: border-box;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(18, 18, 18, 0.12);
+  border: 1px solid #ebebeb;
+  background: #fff;
+  max-height: var(--rte-float-max-h, min(72vh, 640px));
+}
+.rte-float-menu.rte-template-menu {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden !important;
+  padding: 0;
+}
+.rte-float-menu.rte-template-menu .rte-template-menu-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+.rte-float-menu.rte-import-menu,
+.rte-float-menu.rte-more-menu {
+  /* 覆盖 absolute/right:0，位置由 JS 写入 */
+}
+.rte-float-menu.rte-more-menu.has-flyout {
+  overflow: auto;
+  max-height: var(--rte-float-max-h, min(72vh, 640px));
 }
 
 .rte-menu button {
@@ -4360,6 +5747,83 @@ defineExpose({ focusEditor, editor, onDraftBackup })
   background: #eef0f3;
 }
 
+.rte-menu-section-label {
+  padding: 6px 10px 2px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #86909c;
+  letter-spacing: 0.02em;
+  user-select: none;
+}
+
+.rte-template-menu {
+  min-width: 340px;
+  max-width: 420px;
+  padding: 0;
+  /* 外层不裁切，避免挡住移入路径；滚动在 .rte-template-menu-body */
+  overflow: visible;
+}
+
+.rte-template-menu-body {
+  padding: 6px;
+  max-height: min(72vh, 640px);
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.rte-template-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin: 0 0 8px;
+}
+
+.rte-template-menu .rte-menu-section-label {
+  grid-column: 1 / -1;
+  padding: 6px 8px 4px;
+}
+
+.rte-template-menu .rte-template-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 2px;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  text-align: left;
+  line-height: 1.35;
+  white-space: normal;
+  border: 1px solid transparent;
+  border-radius: 6px;
+}
+
+.rte-template-menu .rte-template-item:hover {
+  background: #f2f3f5;
+  border-color: #e5e6eb;
+}
+
+.rte-template-item-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1d2129;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.rte-template-item-desc {
+  font-size: 11px;
+  font-weight: 400;
+  color: #86909c;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 .rte-menu button:disabled,
 .rte-table-ctx button:disabled,
 .rte-table-ops-item:disabled {
@@ -4586,7 +6050,7 @@ defineExpose({ focusEditor, editor, onDraftBackup })
   top: 100%;
   right: 0;
   left: auto;
-  z-index: 30;
+  z-index: 200;
   min-width: 148px;
   max-height: min(320px, 50vh);
   overflow: auto;
@@ -4923,15 +6387,17 @@ defineExpose({ focusEditor, editor, onDraftBackup })
   border: none;
   border-radius: 0;
   background: #fff;
+  /* 工具栏下拉需画出工具条；滚动交给 .rte-canvas */
+  overflow: visible;
 }
 
 .rte-root.expanded .rte-toolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  align-content: center;
+  align-content: flex-start;
   gap: 0;
-  row-gap: 6px;
+  row-gap: 4px;
   min-height: 64px;
   padding: 10px 0 10px 20px;
   border-bottom: none;
@@ -4940,7 +6406,40 @@ defineExpose({ focusEditor, editor, onDraftBackup })
   background: #fff;
   overflow: visible;
   position: relative;
-  z-index: 5;
+  /* 高于 .rte-workspace，避免下拉被正文层盖住 */
+  z-index: 40;
+}
+
+/* 工具可换行顺延；模式按钮在流末（导入后） */
+.rte-root.expanded .rte-toolbar-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  align-content: flex-start;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: visible;
+}
+
+/* 模式按钮：与普通工具同排同距，不贴右 */
+.rte-root.expanded .rte-view-mode-tool {
+  margin-right: 20px;
+  min-width: 32px;
+}
+
+.rte-root.expanded .rte-view-mode-glyph {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px !important;
+  line-height: 1;
+  color: inherit;
+}
+
+.rte-root.expanded .rte-view-mode-tool.rte-view-mode-apply {
+  color: #1772f6;
 }
 
 .rte-root.expanded .rte-tool-wrap {
@@ -5191,38 +6690,12 @@ defineExpose({ focusEditor, editor, onDraftBackup })
   pointer-events: none;
 }
 
-.rte-root.expanded .rte-menu,
-.rte-root.expanded .rte-import-menu,
-.rte-root.expanded .rte-table-menu,
-.rte-root.expanded .rte-more-menu {
-  /* 视觉上离按钮 6px，但用伪元素填满空隙，避免 @mouseleave 在移入菜单时误关 */
-  top: calc(100% + 6px);
-  border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(18, 18, 18, 0.12);
-  border: 1px solid #ebebeb;
-  z-index: 50;
-}
-
-.rte-root.expanded .rte-menu::before,
-.rte-root.expanded .rte-import-menu::before,
-.rte-root.expanded .rte-table-menu::before,
-.rte-root.expanded .rte-more-menu::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: -8px;
-  height: 8px;
-}
-
-/* 导入 / 表格偏右：右对齐弹出，避免被 .rte-root{overflow:hidden} 右侧裁切 */
-.rte-root.expanded .rte-import-menu,
-.rte-root.expanded .rte-table-menu {
-  left: auto;
-  right: 0;
-}
-
+/* 下拉已 Teleport 为 .rte-float-menu，不再依赖 absolute/右对齐兜底 */
 .rte-root.expanded .rte-menu button {
+  padding: 8px 12px;
+  font-size: 13px;
+}
+.rte-float-menu.rte-menu button {
   padding: 8px 12px;
   font-size: 13px;
 }
@@ -5297,7 +6770,7 @@ defineExpose({ focusEditor, editor, onDraftBackup })
   position: absolute;
   top: 100%;
   left: 0;
-  z-index: 40;
+  z-index: 200;
   min-width: 220px;
   padding: 6px;
   background: #fff;
@@ -5392,9 +6865,270 @@ defineExpose({ focusEditor, editor, onDraftBackup })
     rgba(0, 180, 42, 0.28) 60%
   );
 }
+
+/* —— 表单控件节点 —— */
+.rte-root :deep(.rte-form) {
+  margin: 0.55em 0;
+  padding: 10px 12px;
+  border: 1px solid #e5e6eb;
+  border-radius: 8px;
+  background: #fafbfc;
+}
+.rte-root :deep(.rte-form.ProseMirror-selectednode) {
+  outline: 2px solid #5b8cff;
+  outline-offset: 1px;
+}
+.rte-root :deep(.rte-form-label) {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1d2129;
+  margin-bottom: 8px;
+}
+.rte-root :deep(.rte-form-help) {
+  font-size: 12px;
+  line-height: 1.45;
+  color: #86909c;
+  margin: -4px 0 8px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.rte-root :deep(.rte-form-help[hidden]) {
+  display: none;
+}
+.rte-root :deep(.rte-form.is-readonly),
+.rte-root :deep(.rte-form.is-disabled) {
+  opacity: 0.92;
+}
+.rte-root :deep(.rte-form.is-disabled) {
+  opacity: 0.72;
+}
+.rte-root :deep(.rte-form-switch-row.is-locked) {
+  cursor: default;
+  opacity: 0.85;
+}
+.rte-root :deep(.rte-form-switch .rte-form-help) {
+  margin-top: 6px;
+  margin-bottom: 0;
+}
+.rte-root :deep(.rte-form-input) {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #c9cdd4;
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-size: 13px;
+  line-height: 1.4;
+  background: #fff;
+  color: #1d2129;
+}
+.rte-root :deep(.rte-form-input:focus) {
+  outline: none;
+  border-color: #5b8cff;
+  box-shadow: 0 0 0 2px rgba(91, 140, 255, 0.2);
+}
+.rte-root :deep(.rte-form-options) {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rte-root :deep(.rte-form[data-layout='row'] .rte-form-options) {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.rte-root :deep(.rte-form[data-layout='grid'] .rte-form-options) {
+  display: grid;
+  grid-template-columns: repeat(var(--rte-form-cols, 2), minmax(0, 1fr));
+  align-items: start;
+}
+.rte-root :deep(.rte-form-option) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #4e5969;
+  cursor: pointer;
+  user-select: none;
+}
+.rte-root :deep(.rte-form-option input) {
+  margin: 0;
+  accent-color: #1772f6;
+}
+.rte-root :deep(.rte-form-empty) {
+  font-size: 12px;
+  color: #86909c;
+}
+.rte-root :deep(.rte-form-required) {
+  margin-left: 2px;
+  color: #f53f3f;
+  font-weight: 700;
+}
+.rte-root :deep(.rte-form-invalid) {
+  border-color: #f53f3f;
+  background: #fff7f7;
+}
+.rte-root :deep(.rte-form-invalid .rte-form-input),
+.rte-root :deep(.rte-form-invalid .rte-form-select-control),
+.rte-root :deep(.rte-form-invalid .rte-form-textarea-control) {
+  border-color: #f53f3f;
+  box-shadow: 0 0 0 2px rgba(245, 63, 63, 0.15);
+}
+.rte-root :deep(.rte-form-textarea-control) {
+  min-height: 88px;
+  resize: vertical;
+  font-family: inherit;
+}
+.rte-root :deep(.rte-form-select-control) {
+  appearance: auto;
+  cursor: pointer;
+}
+.rte-root :deep(.rte-form-switch-row) {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+  margin: 0;
+}
+.rte-root :deep(.rte-form-switch-label) {
+  margin-bottom: 0;
+  flex: 1;
+}
+.rte-root :deep(.rte-form-switch-input) {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+}
+.rte-root :deep(.rte-form-switch-track) {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  border-radius: 999px;
+  background: #c9cdd4;
+  flex-shrink: 0;
+  transition: background 0.15s ease;
+}
+.rte-root :deep(.rte-form-switch-track.is-on),
+.rte-root :deep(.rte-form-switch.is-on .rte-form-switch-track) {
+  background: #1772f6;
+}
+.rte-root :deep(.rte-form-switch-thumb) {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: transform 0.15s ease;
+}
+.rte-root :deep(.rte-form-switch-track.is-on .rte-form-switch-thumb),
+.rte-root :deep(.rte-form-switch.is-on .rte-form-switch-thumb) {
+  transform: translateX(18px);
+}
+.rte-root :deep(.rte-form-number .rte-form-input),
+.rte-root :deep(.rte-form-date .rte-form-input) {
+  max-width: 280px;
+}
+
+/* —— 表单属性检查器：与正文并排（最大化浮层下尤佳） —— */
+.rte-workspace {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  overflow: hidden;
+  position: relative;
+  z-index: 1;
+}
+
+.rte-workspace .rte-canvas {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+.rte-workspace.has-form-inspector .rte-canvas {
+  border-right: none;
+}
+
+.rte-root.has-form-inspector.expanded .rte-workspace .rte-canvas {
+  padding-right: 20px;
+}
+
+.rte-root.has-form-inspector:not(.expanded) .rte-workspace {
+  /* 紧凑单元格内仍并排，属性栏略窄 */
+}
+.rte-root.has-form-inspector:not(.expanded) :deep(.fpi) {
+  width: 220px;
+}
+
+.rte-root.expanded :deep(.fpi) {
+  width: 300px;
+  position: relative;
+  z-index: 20;
+  overflow: visible;
+}
+
 </style>
 
 <style>
+/* unscoped：Teleport 到 body 的工具条菜单兜底（避免 scoped 未命中时看不见） */
+.rte-float-menu {
+  position: fixed !important;
+  z-index: 5200 !important;
+  margin: 0 !important;
+  box-sizing: border-box;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(18, 18, 18, 0.12);
+  border: 1px solid #ebebeb;
+  background: #fff;
+}
+.rte-float-menu.rte-menu,
+.rte-float-menu.rte-import-menu,
+.rte-float-menu.rte-more-menu {
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  min-width: 108px;
+  color: #1d2129;
+}
+.rte-float-menu.rte-import-menu {
+  min-width: 220px;
+  padding: 6px;
+  gap: 2px;
+}
+.rte-float-menu.rte-template-menu {
+  padding: 0;
+  min-width: 340px;
+  max-width: 420px;
+  overflow: hidden !important;
+}
+.rte-float-menu .rte-template-menu-body {
+  padding: 6px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  max-height: var(--rte-float-max-h, min(72vh, 640px));
+}
+.rte-float-menu button {
+  border: none;
+  background: transparent;
+  text-align: left;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: #1d2129;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.rte-float-menu button:hover {
+  background: #f2f3f5;
+}
+
 /* 盖过 .rte-modal-overlay(4100)，避免弹窗内 toast 被挡住变成「没反应」 */
 .el-message {
   z-index: 5000 !important;

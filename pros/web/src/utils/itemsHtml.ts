@@ -32,13 +32,16 @@ export function itemsToHtml(items: QuadrantItem[] | undefined | null): string {
 }
 
 function normalizeHtml(html: string): string {
-  return html.replace(/\s+/g, ' ').trim()
+  // 标签间空白在 getHTML ↔ itemsToHtml 往返中常被吃掉；比较时忽略以免误判变更
+  return html.replace(/>\s+</g, '><').replace(/\s+/g, ' ').trim()
 }
 
 /** 是否空文档（仅空段落 / 无可见文本；含图片/视频则非空） */
 export function isEmptyHtml(html: string): boolean {
   // <img>/<video> 无文本节点，剥离标签后为空，但属于有效内容
   if (/<(img|video)\b/i.test(html)) return false
+  if (/data-type=["']form-(text-input|radio-group|checkbox-group|select|textarea|number-input|date-input|switch)["']/i.test(html)) return false
+  if (/class=["'][^"']*rte-form/i.test(html)) return false
   const plain = html
     .replace(/<br\s*\/?>/gi, '')
     .replace(/&nbsp;/gi, ' ')
@@ -51,7 +54,7 @@ function isStructuralBlock(tagName: string): boolean {
   return STRUCTURAL_BLOCK_RE.test(tagName)
 }
 
-/** 空段落丢弃；table/hr/img/video 即使无文字也保留 */
+/** 空段落按上下文保留；table/hr/img/video/空列表即使无文字也保留 */
 function shouldKeepBlock(html: string, tagName: string): boolean {
   if (isStructuralBlock(tagName)) return true
   if (/^<(hr|table|img|video)\b/i.test(html.trim())) return true
@@ -59,6 +62,11 @@ function shouldKeepBlock(html: string, tagName: string): boolean {
   if (/<(img|video)\b/i.test(html)) return true
   // 块级公式：文本可能仅在 data-tex，仍需保留
   if (/data-type=["']math-display["']/i.test(html)) return true
+  // 表单控件：选项/值在 data-*，可能无可见文本
+  if (/data-type=["']form-(text-input|radio-group|checkbox-group|select|textarea|number-input|date-input|switch)["']/i.test(html)) return true
+  if (/class=["'][^"']*rte-form/i.test(html)) return true
+  // 空 ul/ol 仍是占位结构（模板常用 bullet('') / ordered('')）
+  if (/^(ul|ol)$/i.test(tagName)) return true
   return !isEmptyHtml(html)
 }
 
@@ -157,7 +165,15 @@ export function htmlToBlockTexts(html: string): string[] {
     // 空元素写法 <p />
     if (s[openEnd - 1] === '/') {
       const block = s.slice(i, openEnd + 1)
-      if (shouldKeepBlock(block, tagLower)) parts.push(block)
+      if (shouldKeepBlock(block, tagLower)) {
+        parts.push(block)
+      } else if (
+        tagLower === 'p' &&
+        parts.length > 0 &&
+        isEmptyHtml(block)
+      ) {
+        parts.push(block)
+      }
       i = openEnd + 1
       continue
     }
@@ -170,7 +186,17 @@ export function htmlToBlockTexts(html: string): string[] {
     }
 
     const block = s.slice(i, end)
-    if (shouldKeepBlock(block, tagLower)) parts.push(block)
+    if (shouldKeepBlock(block, tagLower)) {
+      parts.push(block)
+    } else if (
+      tagLower === 'p' &&
+      parts.length > 0 &&
+      isEmptyHtml(block)
+    ) {
+      // 保留「已有内容之后」的空段落：表单原子后的可编辑落点。
+      // 若丢掉尾段，items 回写后文末落在 form* 上 → NodeSelection / 误开属性面板。
+      parts.push(block)
+    }
     i = end
   }
 

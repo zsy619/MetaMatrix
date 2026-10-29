@@ -1,13 +1,18 @@
 <script setup lang="ts">
 import type { TemplateId } from '../../stores/document'
 
-defineProps<{
-  templateId: TemplateId
-}>()
+withDefaults(
+  defineProps<{
+    templateId: TemplateId
+    /** md = guide card preview; sm = aside recent-doc mini mark (~18–20px) */
+    size?: 'md' | 'sm'
+  }>(),
+  { size: 'md' },
+)
 </script>
 
 <template>
-  <div class="thumb" aria-hidden="true">
+  <div class="thumb" :class="{ 'thumb--sm': size === 'sm' }" aria-hidden="true">
       <!-- 双三角 -->
       <svg
         v-if="templateId === 'dual-triangle'"
@@ -313,6 +318,63 @@ defineProps<{
           <text x="133" y="111">努力定量</text>
           <rect x="152" y="100" width="40" height="18" fill="#f5f6f8" stroke="#9aa0a6" stroke-width="0.6" />
           <text x="172" y="111">动态更新</text>
+        </g>
+      </svg>
+
+
+      <!-- 五步法（挑战版）：六列黄头（假设+五步）+ 紫方法示意 + 橙非* -->
+      <svg
+        v-else-if="templateId === 'five-step-challenge'"
+        class="thumb-svg"
+        viewBox="0 0 200 140"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <rect width="200" height="140" rx="10" fill="#ffffff" />
+        <g font-size="5.2" font-weight="800" text-anchor="middle" fill="#202124">
+          <rect x="4" y="10" width="30" height="16" fill="#ffff00" stroke="#9aa0a6" stroke-width="0.7" />
+          <text x="19" y="21">假设</text>
+          <rect x="36" y="10" width="30" height="16" fill="#ffff00" stroke="#9aa0a6" stroke-width="0.7" />
+          <text x="51" y="21">需求</text>
+          <rect x="68" y="10" width="30" height="16" fill="#ffff00" stroke="#9aa0a6" stroke-width="0.7" />
+          <text x="83" y="21">方案</text>
+          <rect x="100" y="10" width="30" height="16" fill="#ffff00" stroke="#9aa0a6" stroke-width="0.7" />
+          <text x="115" y="21">模式</text>
+          <rect x="132" y="10" width="30" height="16" fill="#ffff00" stroke="#9aa0a6" stroke-width="0.7" />
+          <text x="147" y="21">增长</text>
+          <rect x="164" y="10" width="32" height="16" fill="#ffff00" stroke="#9aa0a6" stroke-width="0.7" />
+          <text x="180" y="21">壁垒</text>
+        </g>
+        <rect x="4" y="26" width="30" height="72" fill="#fff" stroke="#9aa0a6" stroke-width="0.55" />
+        <text x="6" y="38" font-size="3.6" font-weight="700" fill="#7B1FA2">《预判…》</text>
+        <text x="6" y="50" font-size="3.4" fill="#1565C0">• 初心</text>
+        <rect x="36" y="26" width="30" height="72" fill="#fff" stroke="#9aa0a6" stroke-width="0.55" />
+        <text x="38" y="38" font-size="3.6" font-weight="700" fill="#7B1FA2">《需求…》</text>
+        <text x="38" y="90" font-size="3.8" font-weight="700" fill="#EF6C00">非用户</text>
+        <rect x="68" y="26" width="30" height="72" fill="#fff" stroke="#9aa0a6" stroke-width="0.55" />
+        <text x="70" y="38" font-size="3.6" font-weight="700" fill="#7B1FA2">《产品…》</text>
+        <text x="70" y="90" font-size="3.8" font-weight="700" fill="#EF6C00">非内核</text>
+        <rect x="100" y="26" width="30" height="72" fill="#fff" stroke="#9aa0a6" stroke-width="0.55" />
+        <text x="102" y="38" font-size="3.6" font-weight="700" fill="#7B1FA2">《单元…》</text>
+        <text x="102" y="52" font-size="3.4" fill="#1565C0">• ROI</text>
+        <rect x="132" y="26" width="30" height="72" fill="#fff" stroke="#9aa0a6" stroke-width="0.55" />
+        <text x="134" y="38" font-size="3.6" font-weight="700" fill="#7B1FA2">《增长…》</text>
+        <text x="134" y="90" font-size="3.4" font-weight="700" fill="#7B1FA2">飞轮</text>
+        <rect x="164" y="26" width="32" height="72" fill="#fff" stroke="#9aa0a6" stroke-width="0.55" />
+        <text x="166" y="38" font-size="3.6" font-weight="700" fill="#7B1FA2">《壁垒…》</text>
+        <text x="166" y="90" font-size="3.8" font-weight="700" fill="#EF6C00">非壁垒</text>
+        <g font-size="4.2" font-weight="700" text-anchor="middle" fill="#5f6368">
+          <rect x="4" y="100" width="30" height="18" fill="#f5f6f8" stroke="#9aa0a6" stroke-width="0.55" />
+          <text x="19" y="111">机会预判</text>
+          <rect x="36" y="100" width="30" height="18" fill="#f5f6f8" stroke="#9aa0a6" stroke-width="0.55" />
+          <text x="51" y="111">逐级拆解</text>
+          <rect x="68" y="100" width="30" height="18" fill="#f5f6f8" stroke="#9aa0a6" stroke-width="0.55" />
+          <text x="83" y="111">全局预判</text>
+          <rect x="100" y="100" width="30" height="18" fill="#f5f6f8" stroke="#9aa0a6" stroke-width="0.55" />
+          <text x="115" y="111">专业选项</text>
+          <rect x="132" y="100" width="30" height="18" fill="#f5f6f8" stroke="#9aa0a6" stroke-width="0.55" />
+          <text x="147" y="111">努力定量</text>
+          <rect x="164" y="100" width="32" height="18" fill="#f5f6f8" stroke="#9aa0a6" stroke-width="0.55" />
+          <text x="180" y="111">动态更新</text>
         </g>
       </svg>
 
@@ -904,7 +966,7 @@ defineProps<{
 
 
 
-      <!-- 个人年度工作总结：三节纵向 -->
+      <!-- 个人年工作总结：三节纵向 -->
       <svg
         v-else-if="templateId === 'annual-summary'"
         class="thumb-svg"
@@ -912,7 +974,7 @@ defineProps<{
         xmlns="http://www.w3.org/2000/svg"
       >
         <rect width="200" height="140" rx="10" fill="#ffffff" />
-        <text x="12" y="16" font-size="7" font-weight="800" fill="#202124">个人年度工作总结模板</text>
+        <text x="12" y="16" font-size="7" font-weight="800" fill="#202124">个人年工作总结模板</text>
         <text x="12" y="34" font-size="6.5" font-weight="800" fill="#202124">重点业务进展</text>
         <line x1="12" y1="40" x2="12" y2="52" stroke="#dadce0" stroke-width="1.5" />
         <text x="18" y="48" font-size="5" font-style="italic" fill="#9aa0a6">TOP3 关键进展…</text>
@@ -921,6 +983,66 @@ defineProps<{
         <line x1="12" y1="88" x2="12" y2="98" stroke="#dadce0" stroke-width="1.5" />
         <rect x="12" y="100" width="176" height="10" fill="#fafafa" stroke="#e8eaed" stroke-width="0.6" />
         <text x="12" y="124" font-size="6.5" font-weight="800" fill="#202124">不足与改进计划</text>
+        <rect x="12" y="128" width="176" height="6" fill="#fafafa" stroke="#e8eaed" stroke-width="0.6" />
+      </svg>
+
+      <!-- 个人周工作总结：三节纵向 -->
+      <svg
+        v-else-if="templateId === 'weekly-summary'"
+        class="thumb-svg"
+        viewBox="0 0 200 140"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <rect width="200" height="140" rx="10" fill="#ffffff" />
+        <text x="12" y="16" font-size="7" font-weight="800" fill="#202124">个人周工作总结模板</text>
+        <text x="12" y="34" font-size="6.5" font-weight="800" fill="#202124">本周关键执行</text>
+        <line x1="12" y1="40" x2="12" y2="52" stroke="#dadce0" stroke-width="1.5" />
+        <text x="18" y="48" font-size="5" font-style="italic" fill="#9aa0a6">关键事项 TOP3…</text>
+        <rect x="12" y="54" width="176" height="14" fill="#fafafa" stroke="#e8eaed" stroke-width="0.6" />
+        <text x="12" y="82" font-size="6.5" font-weight="800" fill="#202124">卡点与应对</text>
+        <line x1="12" y1="88" x2="12" y2="98" stroke="#dadce0" stroke-width="1.5" />
+        <rect x="12" y="100" width="176" height="10" fill="#fafafa" stroke="#e8eaed" stroke-width="0.6" />
+        <text x="12" y="124" font-size="6.5" font-weight="800" fill="#202124">下周优先事项</text>
+        <rect x="12" y="128" width="176" height="6" fill="#fafafa" stroke="#e8eaed" stroke-width="0.6" />
+      </svg>
+
+      <!-- 个人月工作总结：三节纵向 -->
+      <svg
+        v-else-if="templateId === 'monthly-summary'"
+        class="thumb-svg"
+        viewBox="0 0 200 140"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <rect width="200" height="140" rx="10" fill="#ffffff" />
+        <text x="12" y="16" font-size="7" font-weight="800" fill="#202124">个人月工作总结模板</text>
+        <text x="12" y="34" font-size="6.5" font-weight="800" fill="#202124">目标完成情况</text>
+        <line x1="12" y1="40" x2="12" y2="52" stroke="#dadce0" stroke-width="1.5" />
+        <text x="18" y="48" font-size="5" font-style="italic" fill="#9aa0a6">对照目标 TOP3…</text>
+        <rect x="12" y="54" width="176" height="14" fill="#fafafa" stroke="#e8eaed" stroke-width="0.6" />
+        <text x="12" y="82" font-size="6.5" font-weight="800" fill="#202124">关键进展与贡献</text>
+        <line x1="12" y1="88" x2="12" y2="98" stroke="#dadce0" stroke-width="1.5" />
+        <rect x="12" y="100" width="176" height="10" fill="#fafafa" stroke="#e8eaed" stroke-width="0.6" />
+        <text x="12" y="124" font-size="6.5" font-weight="800" fill="#202124">差距与下月计划</text>
+        <rect x="12" y="128" width="176" height="6" fill="#fafafa" stroke="#e8eaed" stroke-width="0.6" />
+      </svg>
+
+      <!-- 个人季工作总结：三节纵向 -->
+      <svg
+        v-else-if="templateId === 'quarterly-summary'"
+        class="thumb-svg"
+        viewBox="0 0 200 140"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <rect width="200" height="140" rx="10" fill="#ffffff" />
+        <text x="12" y="16" font-size="7" font-weight="800" fill="#202124">个人季工作总结模板</text>
+        <text x="12" y="34" font-size="6.5" font-weight="800" fill="#202124">阶段性成果</text>
+        <line x1="12" y1="40" x2="12" y2="52" stroke="#dadce0" stroke-width="1.5" />
+        <text x="18" y="48" font-size="5" font-style="italic" fill="#9aa0a6">可量化成果 TOP3…</text>
+        <rect x="12" y="54" width="176" height="14" fill="#fafafa" stroke="#e8eaed" stroke-width="0.6" />
+        <text x="12" y="82" font-size="6.5" font-weight="800" fill="#202124">能力与方法沉淀</text>
+        <line x1="12" y1="88" x2="12" y2="98" stroke="#dadce0" stroke-width="1.5" />
+        <rect x="12" y="100" width="176" height="10" fill="#fafafa" stroke="#e8eaed" stroke-width="0.6" />
+        <text x="12" y="124" font-size="6.5" font-weight="800" fill="#202124">下季度方向</text>
         <rect x="12" y="128" width="176" height="6" fill="#fafafa" stroke="#e8eaed" stroke-width="0.6" />
       </svg>
 
@@ -1142,5 +1264,24 @@ defineProps<{
   display: block;
   width: 100%;
   height: 100%;
+}
+
+/* Aside recent-doc: mini template mark, same SVG language as left cards */
+.thumb--sm {
+  width: 20px;
+  height: 20px;
+  aspect-ratio: auto;
+  border-bottom: 0;
+  border-radius: 5px;
+  overflow: hidden;
+  background: transparent;
+  flex-shrink: 0;
+}
+
+.thumb--sm .thumb-svg {
+  width: 28px;
+  height: 20px;
+  margin-left: -4px;
+  /* slight crop to keep center composition readable at 20px */
 }
 </style>

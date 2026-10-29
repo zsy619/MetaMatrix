@@ -1,0 +1,121 @@
+{
+  "id": "canvas_monthly_summary",
+  "type": "monthly_summary",
+  "schemaVersion": 1,
+  "theme": {
+    "background": {
+      "pattern": "none",
+      "color": "#ffffff"
+    }
+  },
+  "title": "个人月工作总结模板",
+  "labels": {
+    "goalsHint": "本月核心目标的完成度与关键结果是什么？（对照目标写 TOP3）",
+    "progressHint": "本月对业务/团队的最重要进展或贡献 TOP3",
+    "gapHint": "与目标的主要差距是什么？下月如何调整？（TOP3）"
+  },
+  "blocks": [
+    {
+      "id": "month_goals",
+      "title": "目标完成情况",
+      "prompt": "本月核心目标的完成度与关键结果是什么？（对照目标写 TOP3）",
+      "items": [
+        {
+          "id": "item_mg_1",
+          "text": "目标 1：…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "item_mg_2",
+          "text": "目标 2：…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "item_mg_3",
+          "text": "目标 3：…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "month_progress",
+      "title": "关键进展与贡献",
+      "prompt": "本月对业务/团队的最重要进展或贡献 TOP3",
+      "items": [
+        {
+          "id": "item_mp_1",
+          "text": "进展 1：…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "item_mp_2",
+          "text": "进展 2：…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "item_mp_3",
+          "text": "进展 3：…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "month_gap_plan",
+      "title": "差距与下月计划",
+      "prompt": "与目标的主要差距是什么？下月如何调整？（TOP3）",
+      "items": [
+        {
+          "id": "item_mx_1",
+          "text": "差距/计划 1：…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "item_mx_2",
+          "text": "差距/计划 2：…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "item_mx_3",
+          "text": "差距/计划 3：…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    }
+  ]
+}

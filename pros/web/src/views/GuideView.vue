@@ -38,12 +38,13 @@ const categoryChips: { id: 'all' | TemplateCategory; label: string }[] = [
   })),
 ]
 
-/** 五步法系列固定相邻顺序：基础 → 分工 → 提高 → 进阶 → 原版 */
+/** 五步法系列固定相邻顺序：基础 → 分工 → 提高 → 进阶 → 挑战 → 原版 */
 const FIVE_STEP_SERIES: TemplateId[] = [
   'five-step-basic',
   'five-step-division',
   'five-step-advanced',
   'five-step-pro',
+  'five-step-challenge',
   'five-step',
 ]
 
@@ -470,6 +471,8 @@ onMounted(async () => {
 .card--five-step-advanced:focus-visible,
 .card--five-step-pro:hover,
 .card--five-step-pro:focus-visible,
+.card--five-step-challenge:hover,
+.card--five-step-challenge:focus-visible,
 .card--five-step:hover,
 .card--five-step:focus-visible {
   border-color: #f9a825;
@@ -539,7 +542,13 @@ onMounted(async () => {
 }
 
 .card--annual-summary:hover,
-.card--annual-summary:focus-visible {
+.card--annual-summary:focus-visible,
+.card--weekly-summary:hover,
+.card--weekly-summary:focus-visible,
+.card--monthly-summary:hover,
+.card--monthly-summary:focus-visible,
+.card--quarterly-summary:hover,
+.card--quarterly-summary:focus-visible {
   border-color: #5f6368;
 }
 

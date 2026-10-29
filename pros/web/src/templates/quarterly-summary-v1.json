@@ -1,0 +1,121 @@
+{
+  "id": "canvas_quarterly_summary",
+  "type": "quarterly_summary",
+  "schemaVersion": 1,
+  "theme": {
+    "background": {
+      "pattern": "none",
+      "color": "#ffffff"
+    }
+  },
+  "title": "个人季工作总结模板",
+  "labels": {
+    "outcomesHint": "本季度交付的阶段性成果 TOP3（尽量可量化）",
+    "capabilityHint": "本季度沉淀了哪些可复用的能力、方法或机制？",
+    "directionHint": "下季度要延续/加强/砍掉的方向各是什么？"
+  },
+  "blocks": [
+    {
+      "id": "quarter_outcomes",
+      "title": "阶段性成果",
+      "prompt": "本季度交付的阶段性成果 TOP3（尽量可量化）",
+      "items": [
+        {
+          "id": "item_qo_1",
+          "text": "成果 1：…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "item_qo_2",
+          "text": "成果 2：…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "item_qo_3",
+          "text": "成果 3：…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "quarter_capabilities",
+      "title": "能力与方法沉淀",
+      "prompt": "本季度沉淀了哪些可复用的能力、方法或机制？",
+      "items": [
+        {
+          "id": "item_qc_1",
+          "text": "沉淀 1：…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "item_qc_2",
+          "text": "沉淀 2：…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "item_qc_3",
+          "text": "沉淀 3：…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "quarter_direction",
+      "title": "下季度方向",
+      "prompt": "下季度要延续/加强/砍掉的方向各是什么？",
+      "items": [
+        {
+          "id": "item_qd_1",
+          "text": "延续：…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "item_qd_2",
+          "text": "加强：…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        },
+        {
+          "id": "item_qd_3",
+          "text": "砍掉：…",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 13,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    }
+  ]
+}

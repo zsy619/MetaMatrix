@@ -24,6 +24,7 @@ import type {
   FiveStepBasicDocumentJSON,
   FiveStepAdvancedDocumentJSON,
   FiveStepProDocumentJSON,
+  FiveStepChallengeDocumentJSON,
   AiTradeoffDocumentJSON,
   ProductContentDocumentJSON,
   OscarDocumentJSON,
@@ -41,6 +42,7 @@ import type {
   IncidentReviewDocumentJSON,
   IncidentReviewTimelineRow,
   AnnualSummaryDocumentJSON,
+  PeriodSummaryDocumentJSON,
   DeepReviewDocumentJSON,
   PmRetroValueDocumentJSON,
   RoiTradeoffDocumentJSON,
@@ -92,6 +94,7 @@ import {
   isFiveStepBasicDoc,
   isFiveStepAdvancedDoc,
   isFiveStepProDoc,
+  isFiveStepChallengeDoc,
   isIndustryAnalysisDoc,
   isIndustryForecastDoc,
   isKeyResistanceDoc,
@@ -104,6 +107,7 @@ import {
   isYModelDoc,
   isIncidentReviewDoc,
   isAnnualSummaryDoc,
+  isPeriodSummaryDoc,
   isDeepReviewDoc,
   isGrowthAssumptionsDoc,
   coerceYModelDoc,
@@ -119,6 +123,7 @@ import fiveStepDivisionTemplate from '../templates/five-step-division-v1.json'
 import fiveStepBasicTemplate from '../templates/five-step-basic-v1.json'
 import fiveStepAdvancedTemplate from '../templates/five-step-advanced-v1.json'
 import fiveStepProTemplate from '../templates/five-step-pro-v1.json'
+import fiveStepChallengeTemplate from '../templates/five-step-challenge-v1.json'
 import aiTradeoffTemplate from '../templates/ai-tradeoff-v1.json'
 import productContentTemplate from '../templates/product-content-v1.json'
 import oscarTemplate from '../templates/oscar-v1.json'
@@ -130,6 +135,9 @@ import scientificMeetingTemplate from '../templates/scientific-meeting-v1.json'
 import ipoTemplate from '../templates/ipo-v1.json'
 import incidentReviewTemplate from '../templates/incident-review-v1.json'
 import annualSummaryTemplate from '../templates/annual-summary-v1.json'
+import weeklySummaryTemplate from '../templates/weekly-summary-v1.json'
+import monthlySummaryTemplate from '../templates/monthly-summary-v1.json'
+import quarterlySummaryTemplate from '../templates/quarterly-summary-v1.json'
 import deepReviewTemplate from '../templates/deep-review-v1.json'
 import pmRetroValueTemplate from '../templates/pm-retro-value-v1.json'
 import roiTradeoffTemplate from '../templates/roi-tradeoff-v1.json'
@@ -156,6 +164,7 @@ export type TemplateId =
   | 'five-step-division'
   | 'five-step-advanced'
   | 'five-step-pro'
+  | 'five-step-challenge'
   | 'five-step'
   | 'ai-tradeoff'
   | 'product-content'
@@ -168,6 +177,9 @@ export type TemplateId =
   | 'ipo'
   | 'incident-review'
   | 'annual-summary'
+  | 'weekly-summary'
+  | 'monthly-summary'
+  | 'quarterly-summary'
   | 'deep-review'
   | 'pm-retro-value'
   | 'roi-tradeoff'
@@ -195,6 +207,7 @@ const TEMPLATES: Record<TemplateId, CanvasDocumentJSON> = {
   'five-step-division': fiveStepDivisionTemplate as FiveStepDivisionDocumentJSON,
   'five-step-advanced': fiveStepAdvancedTemplate as FiveStepAdvancedDocumentJSON,
   'five-step-pro': fiveStepProTemplate as FiveStepProDocumentJSON,
+  'five-step-challenge': fiveStepChallengeTemplate as FiveStepChallengeDocumentJSON,
   'five-step': fiveStepTemplate as FiveStepDocumentJSON,
   'ai-tradeoff': aiTradeoffTemplate as AiTradeoffDocumentJSON,
   'product-content': productContentTemplate as ProductContentDocumentJSON,
@@ -207,6 +220,9 @@ const TEMPLATES: Record<TemplateId, CanvasDocumentJSON> = {
   ipo: ipoTemplate as IpoDocumentJSON,
   'incident-review': incidentReviewTemplate as IncidentReviewDocumentJSON,
   'annual-summary': annualSummaryTemplate as AnnualSummaryDocumentJSON,
+  'weekly-summary': weeklySummaryTemplate as PeriodSummaryDocumentJSON,
+  'monthly-summary': monthlySummaryTemplate as PeriodSummaryDocumentJSON,
+  'quarterly-summary': quarterlySummaryTemplate as PeriodSummaryDocumentJSON,
   'deep-review': deepReviewTemplate as DeepReviewDocumentJSON,
   'pm-retro-value': pmRetroValueTemplate as PmRetroValueDocumentJSON,
   'roi-tradeoff': roiTradeoffTemplate as RoiTradeoffDocumentJSON,
@@ -304,6 +320,12 @@ export const TEMPLATE_META: Record<
     description: '系列进阶：每个 ● 提示独立可最大化富文本，黑字固定标签在外，红色「非*」对照。',
     category: 'growth',
   },
+  'five-step-challenge': {
+    name: '五步法（挑战版）',
+    badge: '五步法 · 挑战',
+    description: '系列挑战：假设 + 五步六列，附图方法全文预填可改富文本（紫方法名 / 橙非* / 蓝要点）。',
+    category: 'growth',
+  },
   'five-step': {
     name: '五步法（原版）',
     badge: '五步法 · 原版',
@@ -371,9 +393,27 @@ export const TEMPLATE_META: Record<
     category: 'review',
   },
   'annual-summary': {
-    name: '个人年度工作总结',
+    name: '个人年工作总结',
     badge: '年度总结 · MVP',
     description: '重点业务进展 · 个人成长进步 · 不足与改进计划，结构化年度复盘。',
+    category: 'review',
+  },
+  'weekly-summary': {
+    name: '个人周工作总结',
+    badge: '周总结 · MVP',
+    description: '本周关键执行 · 卡点与应对 · 下周优先事项，侧重执行复盘。',
+    category: 'review',
+  },
+  'monthly-summary': {
+    name: '个人月工作总结',
+    badge: '月总结 · MVP',
+    description: '目标完成情况 · 关键进展与贡献 · 差距与下月计划，侧重目标进展。',
+    category: 'review',
+  },
+  'quarterly-summary': {
+    name: '个人季工作总结',
+    badge: '季总结 · MVP',
+    description: '阶段性成果 · 能力与方法沉淀 · 下季度方向，侧重阶段性成果。',
     category: 'review',
   },
   'deep-review': {
@@ -514,6 +554,9 @@ export const useDocumentStore = defineStore('document', () => {
   const isFiveStepPro = computed(() =>
     isFiveStepProDoc(current_data.value),
   )
+  const isFiveStepChallenge = computed(() =>
+    isFiveStepChallengeDoc(current_data.value),
+  )
   const isAiTradeoff = computed(() => isAiTradeoffDoc(current_data.value))
   const isProductContent = computed(() =>
     isProductContentDoc(current_data.value),
@@ -539,6 +582,9 @@ export const useDocumentStore = defineStore('document', () => {
   )
   const isAnnualSummary = computed(() =>
     isAnnualSummaryDoc(current_data.value),
+  )
+  const isPeriodSummary = computed(() =>
+    isPeriodSummaryDoc(current_data.value),
   )
   const isDeepReview = computed(() => isDeepReviewDoc(current_data.value))
   const isQuadrant = computed(() => isQuadrantDoc(current_data.value))
@@ -2675,6 +2721,88 @@ export const useDocumentStore = defineStore('document', () => {
     return true
   }
 
+
+  /** 挑战版：六列 + 每要点独立 RTE；缺块/旧单列 blob 时用模板默认 items */
+  function ensureFiveStepChallengeBlocks(): boolean {
+    if (!isFiveStepChallengeDoc(current_data.value)) return false
+    const d = current_data.value
+    const template = fiveStepChallengeTemplate as FiveStepChallengeDocumentJSON
+    const requiredIds = template.blocks.map((b) => b.id)
+    const byId = new Map<string, (typeof d.blocks)[number]>(
+      (Array.isArray(d.blocks) ? d.blocks : []).map((b) => [b.id, b]),
+    )
+    const missing = requiredIds.some((id) => !byId.has(id))
+    // 旧版整列 blob + 商业模式曾拆的 business_unit / business_roi（保留 business_unit_io + business_roi；增长为 metric/channel/five_forces）
+    const legacyIds = [
+      'hypothesis',
+      'demand',
+      'solution',
+      'business',
+      'growth',
+      'moat',
+      'business_unit',
+      'growth_channel_now',
+      'growth_channel_future',
+      'growth_flywheel',
+    ]
+    const hasLegacy = legacyIds.some((id) => byId.has(id))
+
+    const colSame =
+      Array.isArray(d.columns) &&
+      d.columns.length === template.columns.length &&
+      d.columns.every((c, i) => {
+        const tc = template.columns[i]
+        return (
+          c.id === tc.id &&
+          c.header === tc.header &&
+          c.footerLabel === tc.footerLabel &&
+          Array.isArray(c.sections) &&
+          c.sections.length === tc.sections.length &&
+          c.sections.every(
+            (s, j) =>
+              s.blockId === tc.sections[j].blockId &&
+              s.label === tc.sections[j].label &&
+              s.tone === tc.sections[j].tone,
+          )
+        )
+      })
+
+    if (!missing && !hasLegacy && colSame) return false
+
+    // Preserve user content on surviving tip ids; drop legacy single-column blobs
+    const nextBlocks = template.blocks.map((tb) => {
+      const existing = byId.get(tb.id)
+      if (existing) {
+        return {
+          id: tb.id,
+          title: existing.title || tb.title,
+          items: Array.isArray(existing.items)
+            ? existing.items
+            : JSON.parse(JSON.stringify(tb.items)),
+        }
+      }
+      return {
+        id: tb.id,
+        title: tb.title,
+        items: JSON.parse(JSON.stringify(tb.items)),
+      }
+    })
+
+    d.columns = template.columns.map((c) => ({
+      id: c.id,
+      header: c.header,
+      footerLabel: c.footerLabel,
+      sections: c.sections.map((s) => ({
+        blockId: s.blockId,
+        label: s.label,
+        tone: s.tone,
+      })),
+    }))
+    d.blocks = nextBlocks
+    markDirty()
+    return true
+  }
+
   function asDemandTriangle(): DemandTriangleDocumentJSON | null {
     return isDemandTriangleDoc(current_data.value) ? current_data.value : null
   }
@@ -2872,6 +3000,7 @@ export const useDocumentStore = defineStore('document', () => {
     isFiveStepBasic,
     isFiveStepAdvanced,
     isFiveStepPro,
+    isFiveStepChallenge,
     isAiTradeoff,
     isProductContent,
     isOscar,
@@ -2882,6 +3011,7 @@ export const useDocumentStore = defineStore('document', () => {
     isScientificMeeting,
     isIncidentReview,
     isAnnualSummary,
+    isPeriodSummary,
     isDeepReview,
     isQuadrant,
     loadFromTemplate,
@@ -2930,6 +3060,7 @@ export const useDocumentStore = defineStore('document', () => {
     ensureIpoBlocks,
     ensureDeliberatePracticeBlocks,
     ensureFiveStepProBlocks,
+    ensureFiveStepChallengeBlocks,
     updateKeyResistanceRateLabel,
     addKeyResistanceRow,
     removeKeyResistanceRow,

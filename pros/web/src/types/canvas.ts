@@ -615,6 +615,73 @@ export interface FiveStepProDocumentJSON {
 }
 
 
+
+
+export type FiveStepChallengeColumnId =
+  | 'hypothesis'
+  | 'demand'
+  | 'solution'
+  | 'business'
+  | 'growth'
+  | 'moat'
+
+/** 固定分区文案色调：normal=黑，negate=橙（非用户/非内核/非壁垒，挑战版） */
+export type FiveStepChallengeSectionTone = 'normal' | 'negate'
+
+export type FiveStepChallengeBlockId =
+  | 'hypothesis_global'
+  | 'hypothesis_stage'
+  | 'hypothesis_self'
+  | 'demand_split'
+  | 'demand_push'
+  | 'demand_eval'
+  | 'demand_calc'
+  | 'demand_non_user'
+  | 'solution_core'
+  | 'solution_quant'
+  | 'solution_non_core'
+  | 'business_unit_io'
+  | 'business_roi'
+  | 'growth_metric'
+  | 'growth_channel'
+  | 'growth_five_forces'
+  | 'moat_barrier'
+  | 'moat_competitors'
+  | 'moat_crn'
+  | 'moat_non_barrier'
+
+export interface FiveStepChallengeBlock {
+  id: FiveStepChallengeBlockId
+  title: string
+  items: QuadrantItem[]
+}
+
+export interface FiveStepChallengeSection {
+  blockId: FiveStepChallengeBlockId
+  /** 分区固定标题（在 RTE 外）；空字符串=不渲染 */
+  label: string
+  tone: FiveStepChallengeSectionTone
+}
+
+export interface FiveStepChallengeColumn {
+  id: FiveStepChallengeColumnId
+  /** 亮黄表头文案 */
+  header: string
+  /** 底部固定方法论标签 */
+  footerLabel: string
+  sections: FiveStepChallengeSection[]
+}
+
+/** 五步法（挑战版）画布：黄头六列（假设+五步）+ 每要点独立可最大化 RTE（附图预填） */
+export interface FiveStepChallengeDocumentJSON {
+  id: string
+  type: 'five_step_challenge'
+  schemaVersion: number
+  theme: CanvasTheme
+  columns: FiveStepChallengeColumn[]
+  blocks: FiveStepChallengeBlock[]
+}
+
 /** AI场景取舍评估 · 单元格 id */
 export type AiTradeoffCellId =
   | 'a1'
@@ -915,7 +982,7 @@ export interface IncidentReviewDocumentJSON {
 }
 
 
-/** 个人年度工作总结 · 方块 id */
+/** 个人年工作总结 · 方块 id */
 export type AnnualSummaryBlockId =
   | 'business_progress'
   | 'personal_growth'
@@ -940,6 +1007,40 @@ export interface AnnualSummaryDocumentJSON {
     improveHint: string
   }
   blocks: AnnualSummaryBlock[]
+}
+
+
+/** 周/月/季工作总结 · 方块 */
+export interface PeriodSummaryBlock {
+  id: string
+  title: string
+  prompt: string
+  items: QuadrantItem[]
+}
+
+export type PeriodSummaryDocType =
+  | 'weekly_summary'
+  | 'monthly_summary'
+  | 'quarterly_summary'
+
+export interface PeriodSummaryDocumentJSON {
+  id: string
+  type: PeriodSummaryDocType
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  labels: Record<string, string>
+  blocks: PeriodSummaryBlock[]
+}
+
+export type WeeklySummaryDocumentJSON = PeriodSummaryDocumentJSON & {
+  type: 'weekly_summary'
+}
+export type MonthlySummaryDocumentJSON = PeriodSummaryDocumentJSON & {
+  type: 'monthly_summary'
+}
+export type QuarterlySummaryDocumentJSON = PeriodSummaryDocumentJSON & {
+  type: 'quarterly_summary'
 }
 
 /** 深度复盘关键成果 · 方块 id */
@@ -1413,6 +1514,7 @@ export type CanvasDocumentJSON = (
   | FiveStepBasicDocumentJSON
   | FiveStepAdvancedDocumentJSON
   | FiveStepProDocumentJSON
+  | FiveStepChallengeDocumentJSON
   | AiTradeoffDocumentJSON
   | ProductContentDocumentJSON
   | OscarDocumentJSON
@@ -1424,6 +1526,7 @@ export type CanvasDocumentJSON = (
   | IpoDocumentJSON
   | IncidentReviewDocumentJSON
   | AnnualSummaryDocumentJSON
+  | PeriodSummaryDocumentJSON
   | DeepReviewDocumentJSON
   | PmRetroValueDocumentJSON
   | RoiTradeoffDocumentJSON
@@ -1452,6 +1555,7 @@ export type BlockCanvasDocumentJSON =
   | FiveStepBasicDocumentJSON
   | FiveStepAdvancedDocumentJSON
   | FiveStepProDocumentJSON
+  | FiveStepChallengeDocumentJSON
   | AiTradeoffDocumentJSON
   | ProductContentDocumentJSON
   | OscarDocumentJSON
@@ -1461,6 +1565,7 @@ export type BlockCanvasDocumentJSON =
   | IpoDocumentJSON
   | IncidentReviewDocumentJSON
   | AnnualSummaryDocumentJSON
+  | PeriodSummaryDocumentJSON
   | DeepReviewDocumentJSON
   | PmRetroValueDocumentJSON
   | RoiTradeoffDocumentJSON
@@ -1726,6 +1831,13 @@ export function isFiveStepProDoc(
 }
 
 
+export function isFiveStepChallengeDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is FiveStepChallengeDocumentJSON {
+  return !!doc && doc.type === 'five_step_challenge'
+}
+
+
 export function isAiTradeoffDoc(
   doc: CanvasDocumentJSON | null | undefined,
 ): doc is AiTradeoffDocumentJSON {
@@ -1793,6 +1905,35 @@ export function isAnnualSummaryDoc(
   doc: CanvasDocumentJSON | null | undefined,
 ): doc is AnnualSummaryDocumentJSON {
   return !!doc && doc.type === 'annual_summary'
+}
+
+export function isPeriodSummaryDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is PeriodSummaryDocumentJSON {
+  return (
+    !!doc &&
+    (doc.type === 'weekly_summary' ||
+      doc.type === 'monthly_summary' ||
+      doc.type === 'quarterly_summary')
+  )
+}
+
+export function isWeeklySummaryDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is WeeklySummaryDocumentJSON {
+  return !!doc && doc.type === 'weekly_summary'
+}
+
+export function isMonthlySummaryDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is MonthlySummaryDocumentJSON {
+  return !!doc && doc.type === 'monthly_summary'
+}
+
+export function isQuarterlySummaryDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is QuarterlySummaryDocumentJSON {
+  return !!doc && doc.type === 'quarterly_summary'
 }
 
 export function isDeepReviewDoc(
@@ -1912,6 +2053,7 @@ export function isBlockCanvasDoc(
     isFiveStepBasicDoc(doc) ||
     isFiveStepAdvancedDoc(doc) ||
     isFiveStepProDoc(doc) ||
+    isFiveStepChallengeDoc(doc) ||
     isAiTradeoffDoc(doc) ||
     isProductContentDoc(doc) ||
     isOscarDoc(doc) ||
@@ -1921,6 +2063,7 @@ export function isBlockCanvasDoc(
     isIpoDoc(doc) ||
     isIncidentReviewDoc(doc) ||
     isAnnualSummaryDoc(doc) ||
+    isPeriodSummaryDoc(doc) ||
     isDeepReviewDoc(doc) ||
     isPmRetroValueDoc(doc) ||
     isRoiTradeoffDoc(doc) ||

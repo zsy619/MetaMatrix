@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
 
@@ -7,100 +7,158 @@ const emit = defineEmits<{ logout: [] }>()
 
 const router = useRouter()
 const auth = useAuthStore()
+const menuOpen = ref(false)
+const rootEl = ref<HTMLElement | null>(null)
 
-const displayName = computed(() => {
+/** 昵称：优先 displayName，其次 email */
+const nickname = computed(() => {
   if (!auth.isAuthenticated) return '未登录'
   return auth.user?.displayName || auth.user?.email || '已登录用户'
 })
 
+/** 计划/层级风格副标题（无 plan 字段时用「已登录」） */
 const subtitle = computed(() => {
   if (!auth.isAuthenticated) return '登录后同步文档与搜索'
-  const email = auth.user?.email
-  if (email && email !== displayName.value) return email
   return '已登录'
 })
 
-const initials = computed(() => {
+/** 圆形头像：取首字符（中文一字 / 拉丁首字母） */
+const avatarChar = computed(() => {
+  if (!auth.isAuthenticated) return '?'
   const raw = (auth.user?.displayName || auth.user?.email || '').trim()
   if (!raw) return '?'
-  const parts = raw.split(/[\s@._-]+/).filter(Boolean)
-  if (parts.length >= 2) {
-    return (parts[0][0] + parts[1][0]).toUpperCase()
-  }
-  return raw.slice(0, 2).toUpperCase()
+  const ch = Array.from(raw)[0] || '?'
+  return /[a-z]/i.test(ch) ? ch.toUpperCase() : ch
 })
 
 function goLogin() {
+  menuOpen.value = false
   router.push({ name: 'login', query: { redirect: '/' } })
 }
 
 function goRegister() {
+  menuOpen.value = false
   router.push({ name: 'register', query: { redirect: '/' } })
 }
 
 function onLogout() {
+  menuOpen.value = false
   auth.logout()
   emit('logout')
 }
+
+function toggleMenu() {
+  menuOpen.value = !menuOpen.value
+}
+
+function onDocPointerDown(e: PointerEvent) {
+  if (!menuOpen.value) return
+  const el = rootEl.value
+  if (el && e.target instanceof Node && !el.contains(e.target)) {
+    menuOpen.value = false
+  }
+}
+
+function onKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape') menuOpen.value = false
+}
+
+onMounted(() => {
+  document.addEventListener('pointerdown', onDocPointerDown)
+  document.addEventListener('keydown', onKeydown)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('pointerdown', onDocPointerDown)
+  document.removeEventListener('keydown', onKeydown)
+})
 </script>
 
 <template>
-  <div class="user-card" :class="{ 'user-card--guest': !auth.isAuthenticated }">
-    <div class="avatar" aria-hidden="true">{{ initials }}</div>
+  <div
+    ref="rootEl"
+    class="user-card"
+    :class="{ 'user-card--guest': !auth.isAuthenticated, 'user-card--menu-open': menuOpen }"
+  >
+    <div class="avatar" aria-hidden="true">{{ avatarChar }}</div>
     <div class="meta">
-      <div class="name" :title="displayName">{{ displayName }}</div>
+      <div class="name" :title="nickname">{{ nickname }}</div>
       <div class="sub" :title="subtitle">{{ subtitle }}</div>
     </div>
-    <div class="actions">
-      <template v-if="auth.isAuthenticated">
-        <button type="button" class="btn-ghost" @click="onLogout">退出</button>
-      </template>
-      <template v-else>
-        <button type="button" class="btn-ghost" @click="goLogin">登录</button>
-        <button type="button" class="btn-primary" @click="goRegister">注册</button>
-      </template>
+    <div class="menu-wrap">
+      <button
+        type="button"
+        class="ellipsis-btn"
+        :aria-expanded="menuOpen"
+        aria-haspopup="menu"
+        aria-label="账号菜单"
+        title="更多"
+        @click="toggleMenu"
+      >
+        <span class="ellipsis-glyph" aria-hidden="true">…</span>
+      </button>
+      <div v-if="menuOpen" class="menu" role="menu">
+        <template v-if="auth.isAuthenticated">
+          <button type="button" class="menu-item" role="menuitem" @click="onLogout">
+            退出登录
+          </button>
+        </template>
+        <template v-else>
+          <button type="button" class="menu-item" role="menuitem" @click="goLogin">
+            登录
+          </button>
+          <button type="button" class="menu-item menu-item--primary" role="menuitem" @click="goRegister">
+            注册
+          </button>
+        </template>
+      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
 .user-card {
+  position: relative;
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 10px 12px;
-  padding: 14px 14px 12px;
-  background: #ffffff;
+  gap: 10px;
+  padding: 10px 12px 12px;
+  background: transparent;
 }
 
 .avatar {
-  width: 36px;
-  height: 36px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  background: linear-gradient(135deg, #e8f0fe 0%, #d2e3fc 100%);
-  color: #1a73e8;
+  background: #e8eaed;
+  color: #3c4043;
   font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
+  font-weight: 600;
+  line-height: 1;
+  user-select: none;
 }
 
 .user-card--guest .avatar {
-  background: #f1f3f4;
-  color: #80868b;
+  background: #e8eaed;
+  color: #9aa0a6;
 }
 
 .meta {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
 }
 
 .name {
-  font-size: 13.5px;
-  font-weight: 650;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.25;
   color: #202124;
   white-space: nowrap;
   overflow: hidden;
@@ -108,43 +166,79 @@ function onLogout() {
 }
 
 .sub {
-  margin-top: 2px;
-  font-size: 11.5px;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.25;
   color: #9aa0a6;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  width: 100%;
+.menu-wrap {
+  position: relative;
+  flex-shrink: 0;
 }
 
-.btn-ghost,
-.btn-primary {
-  border: 1px solid #dadce0;
-  background: #ffffff;
-  border-radius: 999px;
-  padding: 5px 11px;
-  font-size: 12.5px;
+.ellipsis-btn {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #80868b;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.ellipsis-glyph {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  transform: translateY(-1px);
+}
+
+.ellipsis-btn:hover,
+.user-card--menu-open .ellipsis-btn {
+  background: rgba(32, 33, 36, 0.06);
+  color: #3c4043;
+}
+
+.menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  min-width: 128px;
+  padding: 4px;
+  border-radius: 10px;
+  background: #ffffff;
+  border: 1px solid #e8eaed;
+  box-shadow: 0 8px 24px rgba(32, 33, 36, 0.12);
+  z-index: 20;
+}
+
+.menu-item {
+  width: 100%;
+  text-align: left;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  padding: 8px 10px;
+  font-size: 12.5px;
   color: #202124;
+  cursor: pointer;
 }
 
-.btn-primary {
-  background: #1a73e8;
-  border-color: #1a73e8;
-  color: #ffffff;
+.menu-item:hover {
+  background: rgba(32, 33, 36, 0.06);
 }
 
-.btn-ghost:hover {
-  background: #f8f9fa;
-}
-
-.btn-primary:hover {
-  filter: brightness(0.96);
+.menu-item--primary {
+  color: #1a73e8;
+  font-weight: 600;
 }
 </style>

@@ -208,7 +208,8 @@
 /* 最大化正文为富文本编辑器时：去掉内边距，工具栏贴齐卡片顶栏 */
 .pm-body:has(.rte-root.expanded) {
   padding: 0;
-  overflow: hidden;
+  /* visible：工具栏下拉可越出工具条画到正文区；滚动仍由 .rte-canvas */
+  overflow: visible;
   display: flex;
   flex-direction: column;
 }
@@ -220,6 +221,7 @@
   height: 100%;
   border: none;
   border-radius: 0;
+  overflow: visible;
 }
 
 

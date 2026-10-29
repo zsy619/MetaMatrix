@@ -5,11 +5,18 @@ import type {
   WorkStateZonesBlockId,
   WorkStateZonesDocumentJSON,
 } from '../../types/canvas'
+import {
+  panelMaximizeKey,
+  usePanelMaximize,
+} from '../../composables/usePanelMaximize'
+import { useSelectionStore } from '../../stores/selection'
 import YModelBlockCard from './YModelBlock.vue'
 
 const props = defineProps<{
   doc: WorkStateZonesDocumentJSON
 }>()
+
+const selection = useSelectionStore()
 
 const byId = computed(() => {
   const map = new Map<WorkStateZonesBlockId, WorkStateZonesBlock>()
@@ -47,6 +54,22 @@ const TONE: Record<
 }
 
 const order: WorkStateZonesBlockId[] = ['a', 'b', 'c', 'd']
+
+/**
+ * 交互与 time-matrix 同构：格内 YModelBlock 直编 RTE；
+ * 点击象限标题区 → 写入全局 maximizedPanelKey，由块内 Teleport .pm-overlay
+ * 铺满文档视口（GLOBAL_RULES/panel-maximize）。
+ */
+const { maximizedPanelKey } = usePanelMaximize('wsz:idle')
+
+function onOpenQuadrant(id: WorkStateZonesBlockId, event?: Event) {
+  event?.preventDefault()
+  event?.stopPropagation()
+  const b = block(id)
+  if (!b) return
+  selection.selectBlock(b.id)
+  maximizedPanelKey.value = panelMaximizeKey('block', b.id)
+}
 </script>
 
 <template>
@@ -86,8 +109,8 @@ const order: WorkStateZonesBlockId[] = ['a', 'b', 'c', 'd']
               viewBox="0 0 12 12"
               refX="10"
               refY="6"
-              markerWidth="7"
-              markerHeight="7"
+              markerWidth="9"
+              markerHeight="9"
               orient="auto"
             >
               <path d="M 0 1 L 11 6 L 0 11 z" fill="#b85654" />
@@ -97,8 +120,8 @@ const order: WorkStateZonesBlockId[] = ['a', 'b', 'c', 'd']
               viewBox="0 0 12 12"
               refX="10"
               refY="6"
-              markerWidth="7"
-              markerHeight="7"
+              markerWidth="9"
+              markerHeight="9"
               orient="auto"
             >
               <path d="M 0 1 L 11 6 L 0 11 z" fill="#b85654" />
@@ -111,7 +134,7 @@ const order: WorkStateZonesBlockId[] = ['a', 'b', 'c', 'd']
             x2="50"
             y2="1.2"
             stroke="#b85654"
-            stroke-width="1.6"
+            stroke-width="2.6"
             vector-effect="non-scaling-stroke"
             marker-end="url(#wsz-arrow-v)"
           />
@@ -122,7 +145,7 @@ const order: WorkStateZonesBlockId[] = ['a', 'b', 'c', 'd']
             x2="98.8"
             y2="50"
             stroke="#b85654"
-            stroke-width="1.6"
+            stroke-width="2.6"
             vector-effect="non-scaling-stroke"
             marker-end="url(#wsz-arrow-h)"
           />
@@ -135,7 +158,15 @@ const order: WorkStateZonesBlockId[] = ['a', 'b', 'c', 'd']
             v-show="block(id)"
             class="wsz-cell"
           >
-            <div class="wsz-header">
+            <div
+              class="wsz-header"
+              role="button"
+              tabindex="0"
+              :aria-label="`最大化编辑 ${block(id)!.title}`"
+              @click="onOpenQuadrant(id, $event)"
+              @keydown.enter.prevent="onOpenQuadrant(id, $event)"
+              @keydown.space.prevent="onOpenQuadrant(id, $event)"
+            >
               <h2
                 class="wsz-badge"
                 :style="{
@@ -185,7 +216,8 @@ const order: WorkStateZonesBlockId[] = ['a', 'b', 'c', 'd']
   margin: 0;
   min-height: 0;
   height: 100%;
-  padding: 48px 64px 52px 72px;
+  /* 轴标签留白：双行轴字仍可读，贴 time-matrix 撑满感 */
+  padding: 40px 56px 44px 60px;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -196,7 +228,7 @@ const order: WorkStateZonesBlockId[] = ['a', 'b', 'c', 'd']
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: 3px;
   user-select: none;
   pointer-events: none;
   z-index: 4;
@@ -204,19 +236,20 @@ const order: WorkStateZonesBlockId[] = ['a', 'b', 'c', 'd']
     sans-serif;
 }
 
+/* 轴标签层级对齐 time-matrix 主字：加粗 + 字距；副标题弱化 */
 .wsz-axis-main {
-  font-size: clamp(15px, 1.7vw, 22px);
+  font-size: clamp(16px, 1.85vw, 24px);
   font-weight: 800;
   color: #111111;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.12em;
   line-height: 1.15;
 }
 
 .wsz-axis-sub {
-  font-size: clamp(11px, 1.1vw, 13px);
+  font-size: clamp(11px, 1.05vw, 13px);
   font-weight: 500;
   color: #9aa0a6;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.04em;
   line-height: 1.2;
   white-space: nowrap;
 }
@@ -272,7 +305,8 @@ const order: WorkStateZonesBlockId[] = ['a', 'b', 'c', 'd']
   display: grid;
   grid-template-columns: 1fr 1fr;
   grid-template-rows: 1fr 1fr;
-  gap: clamp(16px, 2.2vh, 28px) clamp(16px, 2.2vw, 28px);
+  /* 与 time-matrix / star-quadrant 一致：四格贴满象限、边到边 */
+  gap: 0;
   box-sizing: border-box;
 }
 
@@ -284,11 +318,13 @@ const order: WorkStateZonesBlockId[] = ['a', 'b', 'c', 'd']
   justify-content: flex-start;
   min-width: 0;
   min-height: 0;
+  width: 100%;
   height: 100%;
   border-radius: 0;
-  padding: clamp(12px, 1.8vh, 20px) clamp(10px, 1.4vw, 18px) 10px;
+  /* 贴 time-matrix：面板本体占满格子，内边距仅保标题可读 */
+  padding: 8px 10px 8px;
   box-sizing: border-box;
-  gap: 8px;
+  gap: 6px;
   border: none;
   box-shadow: none;
   overflow: hidden;
@@ -300,8 +336,20 @@ const order: WorkStateZonesBlockId[] = ['a', 'b', 'c', 'd']
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding-top: clamp(4px, 1vh, 12px);
+  gap: 4px;
+  padding-top: 0;
+  cursor: pointer;
+  border-radius: 10px;
+  outline: none;
+  transition: background-color 0.15s ease;
+}
+
+.wsz-header:hover {
+  background-color: rgba(184, 86, 84, 0.04);
+}
+
+.wsz-header:focus-visible {
+  box-shadow: inset 0 0 0 2px rgba(184, 86, 84, 0.45);
 }
 
 .wsz-badge {
@@ -309,45 +357,59 @@ const order: WorkStateZonesBlockId[] = ['a', 'b', 'c', 'd']
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 6px 18px;
+  padding: 5px 16px;
   border-radius: 8px;
-  font-size: clamp(15px, 1.8vw, 22px);
+  font-size: clamp(15px, 1.85vw, 22px);
   font-weight: 800;
   color: #ffffff;
   letter-spacing: 0.06em;
   line-height: 1.3;
   font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui,
     sans-serif;
-  box-shadow: none;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.06);
   border: none;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.14);
+  pointer-events: none;
 }
 
 .wsz-desc {
   margin: 0;
   text-align: center;
-  font-size: clamp(13px, 1.35vw, 16px);
-  font-weight: 600;
+  font-size: clamp(13px, 1.4vw, 17px);
+  font-weight: 700;
   letter-spacing: 0.04em;
   line-height: 1.35;
   font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui,
     sans-serif;
+  /* 浅色描述字在白底上更易辨：轻描边 */
+  -webkit-text-stroke: 0.2px currentColor;
+  paint-order: stroke fill;
+  pointer-events: none;
 }
 
 .wsz-body {
-  flex: 1;
+  flex: 1 1 auto;
   min-height: 0;
   min-width: 0;
+  width: 100%;
+  height: 100%;
   display: flex;
   flex-direction: column;
+  align-items: stretch;
   background: transparent;
   border-radius: 0;
   overflow: hidden;
 }
 
+/* 与 TimeMatrixCanvas 同构：撑满格子的 RTE 链 */
 .wsz-body :deep(.ym-block) {
   position: relative;
-  flex: 1;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  align-self: stretch;
   min-height: 0;
+  width: 100%;
   height: 100%;
   background: transparent !important;
   border: none !important;
@@ -355,11 +417,19 @@ const order: WorkStateZonesBlockId[] = ['a', 'b', 'c', 'd']
   overflow: hidden;
 }
 
+.wsz-body :deep(.ym-rte),
+.wsz-body :deep(.rte-root) {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+}
+
 .wsz-body :deep(.ym-block-toolbar) {
   position: absolute;
   top: 2px;
   right: 2px;
   z-index: 4;
+  padding: 0;
   opacity: 0;
   transition: opacity 0.15s ease;
 }
@@ -373,6 +443,19 @@ const order: WorkStateZonesBlockId[] = ['a', 'b', 'c', 'd']
   flex: 1;
   min-height: 0;
   overflow: auto;
+  /* 收紧 RTE 链边距，避免格内大块空白 */
+  padding: 2px 4px 4px;
+  scrollbar-gutter: auto;
+}
+
+
+.wsz-body :deep(.ym-block.empty:not(.compact)),
+.wsz-body :deep(.ym-block.compact.empty) {
+  min-height: 0;
+}
+
+.wsz-body :deep(.ym-block-empty) {
+  padding: 4px 2px;
 }
 
 .wsz-body :deep(.ym-block-body),
@@ -396,11 +479,11 @@ const order: WorkStateZonesBlockId[] = ['a', 'b', 'c', 'd']
 
 @media (max-width: 720px) {
   .wsz-canvas {
-    overflow: auto;
+    overflow: auto; /* 窄屏允许画布内滚动，仍避免撑破外层页面 */
   }
 
   .wsz-frame {
-    padding: 56px 10px 64px;
+    padding: 44px 10px 48px;
     min-height: 0;
     height: auto;
   }

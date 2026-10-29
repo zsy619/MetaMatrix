@@ -246,6 +246,42 @@ export const IconTableCols: Component = {
   },
 }
 
+export const IconForm = svgIconNodes([
+  h('rect', { x: 3.5, y: 3.5, width: 17, height: 17, rx: 2 }),
+  h('path', { d: 'M7 8.5h10' }),
+  h('circle', { cx: 7.5, cy: 12.5, r: 1.2 }),
+  h('path', { d: 'M10.5 12.5h6.5' }),
+  h('rect', { x: 6.3, y: 15.3, width: 2.4, height: 2.4, rx: 0.4 }),
+  h('path', { d: 'M10.5 16.5h6.5' }),
+])
+export const IconFormRadio = svgIconNodes([
+  h('circle', { cx: 7, cy: 8, r: 2.2 }),
+  h('circle', { cx: 7, cy: 8, r: 0.9, fill: 'currentColor', stroke: 'none' }),
+  h('path', { d: 'M11.5 8h7' }),
+  h('circle', { cx: 7, cy: 16, r: 2.2 }),
+  h('path', { d: 'M11.5 16h7' }),
+])
+export const IconFormCheckbox = svgIconNodes([
+  h('rect', { x: 4.5, y: 5.5, width: 5, height: 5, rx: 1 }),
+  h('path', { d: 'M5.7 8l1.2 1.2 2.1-2.4' }),
+  h('path', { d: 'M12 8h7' }),
+  h('rect', { x: 4.5, y: 13.5, width: 5, height: 5, rx: 1 }),
+  h('path', { d: 'M12 16h7' }),
+])
+export const IconFormText = svgIconNodes([
+  h('rect', { x: 3.5, y: 7, width: 17, height: 10, rx: 2 }),
+  h('path', { d: 'M7 12h8' }),
+  h('path', { d: 'M7 15h5' }),
+])
+
+/** 文档模板：纸张 + 横线 */
+export const IconTemplate = svgIconNodes([
+  h('path', { d: 'M7 3.5h7.5L19.5 8v12.5a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4.5a1 1 0 0 1 1-1z' }),
+  h('path', { d: 'M14.5 3.5V8h4.5' }),
+  h('path', { d: 'M9 12h6' }),
+  h('path', { d: 'M9 15.5h6' }),
+])
+
 export const toolbarIconMap: Record<string, Component> = {
   undo: IconUndo,
   redo: IconRedo,
@@ -274,6 +310,11 @@ export const toolbarIconMap: Record<string, Component> = {
   more: IconMore,
   importDoc: IconDocument,
   importLink: IconConnection,
+  form: IconForm,
+  formRadio: IconFormRadio,
+  formCheckbox: IconFormCheckbox,
+  formText: IconFormText,
+  template: IconTemplate,
 }
 
 export { IconDocument as Document, IconConnection as Connection, IconLink as LinkIcon }

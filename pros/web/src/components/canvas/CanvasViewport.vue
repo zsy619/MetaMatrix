@@ -13,6 +13,7 @@ import {
   isFiveStepBasicDoc,
   isFiveStepAdvancedDoc,
   isFiveStepProDoc,
+  isFiveStepChallengeDoc,
   isIndustryAnalysisDoc,
   isIndustryForecastDoc,
   isKeyResistanceDoc,
@@ -24,6 +25,7 @@ import {
   isIpoDoc,
   isIncidentReviewDoc,
   isAnnualSummaryDoc,
+  isPeriodSummaryDoc,
   isDeepReviewDoc,
   isPmRetroValueDoc,
   isRoiTradeoffDoc,
@@ -54,6 +56,7 @@ import FiveStepDivisionCanvas from './FiveStepDivisionCanvas.vue'
 import FiveStepBasicCanvas from './FiveStepBasicCanvas.vue'
 import FiveStepAdvancedCanvas from './FiveStepAdvancedCanvas.vue'
 import FiveStepProCanvas from './FiveStepProCanvas.vue'
+import FiveStepChallengeCanvas from './FiveStepChallengeCanvas.vue'
 import AiTradeoffCanvas from './AiTradeoffCanvas.vue'
 import ProductContentCanvas from './ProductContentCanvas.vue'
 import OscarCanvas from './OscarCanvas.vue'
@@ -65,6 +68,7 @@ import ScientificMeetingCanvas from './ScientificMeetingCanvas.vue'
 import IpoCanvas from './IpoCanvas.vue'
 import IncidentReviewCanvas from './IncidentReviewCanvas.vue'
 import AnnualSummaryCanvas from './AnnualSummaryCanvas.vue'
+import PeriodSummaryCanvas from './PeriodSummaryCanvas.vue'
 import DeepReviewCanvas from './DeepReviewCanvas.vue'
 import PmRetroValueCanvas from './PmRetroValueCanvas.vue'
 import RoiTradeoffCanvas from './RoiTradeoffCanvas.vue'
@@ -113,6 +117,9 @@ const fiveStepAdvancedDoc = computed(() =>
 const fiveStepProDoc = computed(() =>
   isFiveStepProDoc(current_data.value) ? current_data.value : null,
 )
+const fiveStepChallengeDoc = computed(() =>
+  isFiveStepChallengeDoc(current_data.value) ? current_data.value : null,
+)
 const aiTradeoffDoc = computed(() =>
   isAiTradeoffDoc(current_data.value) ? current_data.value : null,
 )
@@ -145,6 +152,9 @@ const incidentReviewDoc = computed(() =>
 )
 const annualSummaryDoc = computed(() =>
   isAnnualSummaryDoc(current_data.value) ? current_data.value : null,
+)
+const periodSummaryDoc = computed(() =>
+  isPeriodSummaryDoc(current_data.value) ? current_data.value : null,
 )
 const deepReviewDoc = computed(() =>
   isDeepReviewDoc(current_data.value) ? current_data.value : null,
@@ -232,6 +242,9 @@ const quadrantDoc = computed(() =>
         <template v-else-if="fiveStepProDoc">
           <FiveStepProCanvas :doc="fiveStepProDoc" />
         </template>
+        <template v-else-if="fiveStepChallengeDoc">
+          <FiveStepChallengeCanvas :doc="fiveStepChallengeDoc" />
+        </template>
         <template v-else-if="aiTradeoffDoc">
           <AiTradeoffCanvas :doc="aiTradeoffDoc" />
         </template>
@@ -264,6 +277,9 @@ const quadrantDoc = computed(() =>
         </template>
         <template v-else-if="annualSummaryDoc">
           <AnnualSummaryCanvas :doc="annualSummaryDoc" />
+        </template>
+        <template v-else-if="periodSummaryDoc">
+          <PeriodSummaryCanvas :doc="periodSummaryDoc" />
         </template>
         <template v-else-if="deepReviewDoc">
           <DeepReviewCanvas :doc="deepReviewDoc" />
