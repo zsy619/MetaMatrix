@@ -26,7 +26,7 @@ export type RteSlashFormKind =
   | 'switch'
 
 export type RteSlashAction =
-  | { type: 'heading'; level: 1 | 2 | 3 | 4 }
+  | { type: 'heading'; level: 1 | 2 | 3 | 4 | 5 | 6 }
   | { type: 'paragraph' }
   | { type: 'bulletList' }
   | { type: 'orderedList' }
@@ -41,6 +41,7 @@ export type RteSlashAction =
   | { type: 'formula' }
   | { type: 'attach' }
   | { type: 'note' }
+  | { type: 'callout'; variant: 'info' | 'warn' | 'success' | 'error' }
   | { type: 'form'; kind: RteSlashFormKind }
   | { type: 'template'; id: string }
 
@@ -94,6 +95,22 @@ const BLOCK_ITEMS: RteSlashItem[] = [
     group: 'block',
     keywords: ['h4', '标题', 'heading'],
     action: { type: 'heading', level: 4 },
+  },
+  {
+    id: 'heading-5',
+    label: '标题 5',
+    description: '五级标题',
+    group: 'block',
+    keywords: ['h5', '标题', 'heading'],
+    action: { type: 'heading', level: 5 },
+  },
+  {
+    id: 'heading-6',
+    label: '标题 6',
+    description: '六级标题',
+    group: 'block',
+    keywords: ['h6', '标题', 'heading'],
+    action: { type: 'heading', level: 6 },
   },
   {
     id: 'bullet-list',
@@ -150,6 +167,38 @@ const BLOCK_ITEMS: RteSlashItem[] = [
     group: 'block',
     keywords: ['table', '表格', 'grid'],
     action: { type: 'table' },
+  },
+  {
+    id: 'callout-info',
+    label: '告示框 · 提示',
+    description: '信息提示块',
+    group: 'block',
+    keywords: ['callout', '告示', '提示', 'info', 'tip', '注意'],
+    action: { type: 'callout', variant: 'info' },
+  },
+  {
+    id: 'callout-warn',
+    label: '告示框 · 警告',
+    description: '警告提示块',
+    group: 'block',
+    keywords: ['callout', '告示', '警告', 'warn', 'warning'],
+    action: { type: 'callout', variant: 'warn' },
+  },
+  {
+    id: 'callout-success',
+    label: '告示框 · 成功',
+    description: '成功提示块',
+    group: 'block',
+    keywords: ['callout', '告示', '成功', 'success'],
+    action: { type: 'callout', variant: 'success' },
+  },
+  {
+    id: 'callout-error',
+    label: '告示框 · 错误',
+    description: '错误/危险提示块',
+    group: 'block',
+    keywords: ['callout', '告示', '错误', 'error', '危险'],
+    action: { type: 'callout', variant: 'error' },
   },
 ]
 

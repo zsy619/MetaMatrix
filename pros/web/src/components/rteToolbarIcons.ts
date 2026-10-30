@@ -416,6 +416,23 @@ export const IconWordStats = svgIcon([
   'M8 16h5',
 ])
 
+export const IconCallout = svgIconNodes([
+  h('rect', { x: '3', y: '4', width: '18', height: '16', rx: '2' }),
+  h('path', { d: 'M12 8v5', 'stroke-linecap': 'round' }),
+  h('circle', { cx: '12', cy: '16', r: '0.8', fill: 'currentColor', stroke: 'none' }),
+])
+export const IconShortcuts = svgIcon([
+  'M4 6h16',
+  'M4 12h10',
+  'M4 18h16',
+  'M16 10l4 2-4 2',
+])
+export const IconOutline = svgIcon([
+  'M4 6h12',
+  'M4 12h16',
+  'M4 18h10',
+  'M18 5v4',
+])
 export const IconFind = svgIcon([
   'M10.5 17a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13z',
   'M15.5 15.5L21 21',
@@ -439,6 +456,9 @@ export const toolbarIconMap: Record<string, Component> = {
   pageBreak: IconPageBreak,
   spacing: IconSpacing,
   wordStats: IconWordStats,
+  callout: IconCallout,
+  shortcuts: IconShortcuts,
+  outline: IconOutline,
   heading: IconHeading,
   bold: IconBold,
   italic: IconItalic,
