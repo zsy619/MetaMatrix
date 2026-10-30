@@ -86,7 +86,8 @@ import { PageBreak } from '../extensions/pageBreak'
 import { Columns, Column } from '../extensions/columns'
 import { buildDocxBlob } from '../utils/rteExportDocx'
 import { buildPdfFromElement } from '../utils/rteExportPdf'
-import { RTE_EMOJI_LIST } from '../utils/rteEmojiList'
+import { RTE_EMOJI_CATEGORIES } from '../utils/rteEmojiList'
+import { RTE_SPECIAL_CHAR_CATEGORIES } from '../utils/rteSpecialChars'
 
 const props = withDefaults(
   defineProps<{
@@ -205,18 +206,40 @@ const mentionMenuEl = ref<HTMLElement | null>(null)
 
 /** 粘贴为纯文本（工具栏开关；影响后续粘贴） */
 const pastePlainTextMode = ref(false)
-/** 格式刷：复制当前选区 marks，应用到下一次选区；sticky 可连续刷 */
+/** 格式刷：复制选区 marks + 块级缩进/段距；sticky 可连续刷 */
+type FormatPainterBlock = {
+  indent?: number
+  marginTop?: string | null
+  marginBottom?: string | null
+}
 const formatPainter = ref<{
   marks: Array<{ type: string; attrs: Record<string, unknown> }>
+  block: FormatPainterBlock | null
   sticky: boolean
 } | null>(null)
 const formatPainterArmed = computed(() => !!formatPainter.value)
 let formatPainterSkipSelection = false
 
 const emojiOpen = ref(false)
+const emojiTabId = ref(RTE_EMOJI_CATEGORIES[0]?.id ?? 'frequent')
+const specialCharsOpen = ref(false)
+const specialCharTabId = ref(RTE_SPECIAL_CHAR_CATEGORIES[0]?.id ?? 'punct')
 const columnsOpen = ref(false)
 const spacingOpen = ref(false)
 const wordStatsOpen = ref(false)
+
+const activeEmojiCategory = computed(() => {
+  return RTE_EMOJI_CATEGORIES.find((c) => c.id === emojiTabId.value) ?? RTE_EMOJI_CATEGORIES[0]
+})
+const activeEmojiList = computed(() => {
+  return activeEmojiCategory.value?.emojis ?? []
+})
+const isLargeEmojiTab = computed(() => !!activeEmojiCategory.value?.large)
+const isKaomojiTab = computed(() => !!activeEmojiCategory.value?.kaomoji)
+const activeSpecialCharList = computed(() => {
+  const cat = RTE_SPECIAL_CHAR_CATEGORIES.find((c) => c.id === specialCharTabId.value)
+  return cat?.chars ?? RTE_SPECIAL_CHAR_CATEGORIES[0]?.chars ?? []
+})
 
 function placeSlashMenuFromRect(rect: DOMRect | null) {
   const el = slashMenuEl.value
@@ -601,6 +624,9 @@ const editor = useEditor({
       placeholder: props.placeholder,
       emptyEditorClass: 'is-editor-empty',
       emptyNodeClass: 'is-empty',
+      // 分栏等嵌套空段落也要挂 is-empty；否则 depth>1 时默认路径不装饰
+      includeChildren: true,
+      showOnlyCurrent: false,
     }),
     Annotation,
     MathInline,
@@ -648,12 +674,22 @@ const editor = useEditor({
       event.preventDefault()
       const ed = editor.value
       if (!ed) return true
-      const lines = plain.replace(/\r\n/g, '\n').split('\n')
+      const normalized = plain.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+      // 单行：直接插入文本（替换选区）；多行：按段落下，先删选区再插
+      const chainCmd = ed.chain().focus()
+      if (!ed.state.selection.empty) {
+        chainCmd.deleteSelection()
+      }
+      if (!normalized.includes('\n')) {
+        chainCmd.insertContent(normalized).run()
+        return true
+      }
+      const lines = normalized.split('\n')
       const nodes = lines.map((line) => ({
         type: 'paragraph',
         content: line ? [{ type: 'text', text: line }] : [],
       }))
-      ed.chain().focus().insertContent(nodes).run()
+      chainCmd.insertContent(nodes).run()
       return true
     },
     handleClick(_view, _pos, event) {
@@ -689,17 +725,23 @@ const editor = useEditor({
       if (!mod) return false
       const ed = editor.value
       if (!ed) return false
-      if (event.key.toLowerCase() === 'u') {
+      const key = event.key.toLowerCase()
+      if (key === 'u') {
         event.preventDefault()
         ed.chain().focus().toggleUnderline().run()
         return true
       }
-      if (event.key.toLowerCase() === 'e' && event.shiftKey) {
+      if (key === 'k') {
+        event.preventDefault()
+        openLinkDialog()
+        return true
+      }
+      if (key === 'e' && event.shiftKey) {
         event.preventDefault()
         ed.chain().focus().toggleCodeBlock().run()
         return true
       }
-      if (event.key.toLowerCase() === 'f') {
+      if (key === 'f') {
         event.preventDefault()
         openFindDialog()
         return true
@@ -1012,11 +1054,28 @@ function activateFormatPainter(sticky = false) {
     if (idx >= 0) marks[idx] = { type: 'textStyle', attrs: { ...ts } }
     else marks.push({ type: 'textStyle', attrs: { ...ts } })
   }
-  if (!marks.length) {
+  // 块级：缩进 + 段前/段后
+  let block: FormatPainterBlock | null = null
+  for (const type of ['paragraph', 'heading'] as const) {
+    if (!ed.isActive(type)) continue
+    const attrs = ed.getAttributes(type) || {}
+    const indent = Number(attrs.indent || 0)
+    const marginTop = (attrs.marginTop as string | null | undefined) ?? null
+    const marginBottom = (attrs.marginBottom as string | null | undefined) ?? null
+    if (indent || marginTop || marginBottom) {
+      block = {
+        indent: indent || 0,
+        marginTop: marginTop || null,
+        marginBottom: marginBottom || null,
+      }
+    }
+    break
+  }
+  if (!marks.length && !block) {
     ElMessage.warning('选区无明显格式可复制')
     return
   }
-  formatPainter.value = { marks, sticky }
+  formatPainter.value = { marks, block, sticky }
   formatPainterSkipSelection = true
   ElMessage.success(sticky ? '格式刷已锁定（再点取消）' : '格式刷已启用：请选择目标文字')
 }
@@ -1058,7 +1117,12 @@ function onFormatPainterDblClick() {
   activateFormatPainter(true)
 }
 
-function applyFormatPainterIfNeeded(ed: { state: { selection: { empty: boolean } }; chain: () => any }) {
+function applyFormatPainterIfNeeded(ed: {
+  state: { selection: { empty: boolean } }
+  chain: () => any
+  isActive: (name: string) => boolean
+  getAttributes: (name: string) => Record<string, unknown>
+}) {
   if (!formatPainter.value) return
   if (formatPainterSkipSelection) {
     formatPainterSkipSelection = false
@@ -1066,9 +1130,20 @@ function applyFormatPainterIfNeeded(ed: { state: { selection: { empty: boolean }
   }
   if (ed.state.selection.empty) return
   const marks = formatPainter.value.marks
+  const block = formatPainter.value.block
   let c = ed.chain().focus()
   for (const m of marks) {
     c = c.setMark(m.type, m.attrs)
+  }
+  if (block) {
+    const patch: Record<string, unknown> = {}
+    if (typeof block.indent === 'number') patch.indent = block.indent
+    if ('marginTop' in block) patch.marginTop = block.marginTop
+    if ('marginBottom' in block) patch.marginBottom = block.marginBottom
+    if (Object.keys(patch).length) {
+      if (ed.isActive('heading')) c = c.updateAttributes('heading', patch)
+      else c = c.updateAttributes('paragraph', patch)
+    }
   }
   c.run()
   if (!formatPainter.value.sticky) {
@@ -1089,12 +1164,47 @@ function insertEmoji(emoji: string) {
   moreOpen.value = false
 }
 
+function insertSpecialChar(ch: string) {
+  chain()?.insertContent(ch).run()
+  specialCharsOpen.value = false
+  moreOpen.value = false
+}
+
 function insertPageBreak() {
   chain()?.setPageBreak().run()
 }
 
-function insertColumns(cols: 2 | 3) {
-  chain()?.setColumns(cols).run()
+type ColumnCount = 2 | 3 | 4 | 5 | 6
+
+/** 分栏菜单：等宽 + 常用比例预设 */
+const COLUMN_MENU_ITEMS: Array<
+  | { type: 'label'; text: string }
+  | { type: 'sep' }
+  | { type: 'item'; label: string; cols: ColumnCount; ratios?: number[] }
+> = [
+  { type: 'label', text: '两栏' },
+  { type: 'item', label: '均分（1:1）', cols: 2 },
+  { type: 'item', label: '左窄右宽（1:2）', cols: 2, ratios: [1, 2] },
+  { type: 'item', label: '左宽右窄（2:1）', cols: 2, ratios: [2, 1] },
+  { type: 'sep' },
+  { type: 'label', text: '三栏' },
+  { type: 'item', label: '均分（1:1:1）', cols: 3 },
+  { type: 'item', label: '中宽（1:2:1）', cols: 3, ratios: [1, 2, 1] },
+  { type: 'sep' },
+  { type: 'label', text: '更多分栏' },
+  { type: 'item', label: '四栏', cols: 4 },
+  { type: 'item', label: '五栏', cols: 5 },
+  { type: 'item', label: '六栏', cols: 6 },
+]
+
+function insertColumns(cols: ColumnCount, ratios?: number[]) {
+  const ed = editor.value
+  if (!ed) return
+  // 工具栏菜单用了 @mousedown.prevent，需显式 focus 后再插
+  const ok = ed.chain().focus().setColumns(cols, ratios).run()
+  if (!ok) {
+    console.warn('[RTE] setColumns failed', { cols, ratios })
+  }
   columnsOpen.value = false
   moreOpen.value = false
 }
@@ -1371,6 +1481,25 @@ function setCodeLanguage(lang: string) {
 function onCodeLangChange(event: Event) {
   const v = (event.target as HTMLSelectElement).value
   setCodeLanguage(v)
+}
+
+async function copyActiveCodeBlock() {
+  const ed = editor.value
+  if (!ed || !ed.isActive('codeBlock')) {
+    ElMessage.warning('请先将光标放在代码块内')
+    return
+  }
+  const { $from } = ed.state.selection
+  let depth = $from.depth
+  while (depth > 0 && $from.node(depth).type.name !== 'codeBlock') depth -= 1
+  const node = depth > 0 ? $from.node(depth) : null
+  const text = node?.textContent ?? ''
+  try {
+    await navigator.clipboard.writeText(text)
+    ElMessage.success('已复制代码')
+  } catch {
+    ElMessage.error('复制失败，请检查剪贴板权限')
+  }
 }
 
 /** —— 插入表单控件 —— */
@@ -1712,14 +1841,20 @@ function syncEditorEditableForMode(mode: RteViewMode) {
 
 /** BubbleMenu 常驻挂载（仅 editor 就绪），非编辑态不展示，避免 v-if 拆装触发 Vue emitsOptions null */
 function bubbleShouldShow(payload: {
-  editor: { isDestroyed?: boolean; isEditable?: boolean }
+  editor: {
+    isDestroyed?: boolean
+    isEditable?: boolean
+    isActive?: (name: string) => boolean
+  }
   from: number
   to: number
 }): boolean {
   if (viewMode.value !== 'edit') return false
   const ed = payload?.editor
   if (!ed || ed.isDestroyed || ed.isEditable === false) return false
-  return payload.from !== payload.to
+  // 有选区，或光标落在链接内（便于编辑/取消链接）
+  if (payload.from !== payload.to) return true
+  return !!ed.isActive?.('link')
 }
 
 function setViewMode(next: RteViewMode) {
@@ -1989,10 +2124,13 @@ const findStatusText = computed(() => {
 const linkDialogOpen = ref(false)
 const linkText = ref('')
 const linkHref = ref('')
+/** 当前是否在编辑已有链接（影响标题与「取消链接」按钮） */
+const linkDialogEditing = ref(false)
 
 function resetLinkDialog() {
   linkText.value = ''
   linkHref.value = ''
+  linkDialogEditing.value = false
 }
 
 function openLinkDialog() {
@@ -2000,11 +2138,23 @@ function openLinkDialog() {
   resetLinkDialog()
   if (ed) {
     const { from, to, empty } = ed.state.selection
-    if (!empty) {
+    const prev = ed.getAttributes('link').href as string | undefined
+    const inLink = ed.isActive('link') && !!prev
+    linkDialogEditing.value = inLink
+    if (inLink) {
+      // 扩展到整段链接文本，便于编辑显示文字
+      const attrs = ed.getAttributes('link')
+      try {
+        ed.chain().focus().extendMarkRange('link').run()
+      } catch {
+        /* ignore */
+      }
+      const sel = ed.state.selection
+      linkText.value = ed.state.doc.textBetween(sel.from, sel.to, ' ')
+      linkHref.value = (attrs.href as string) || prev || ''
+    } else if (!empty) {
       linkText.value = ed.state.doc.textBetween(from, to, ' ')
     }
-    const prev = ed.getAttributes('link').href as string | undefined
-    if (prev) linkHref.value = prev
   }
   linkDialogOpen.value = true
   moreOpen.value = false
@@ -2017,6 +2167,30 @@ function closeLinkDialog() {
 
 function insertLink() {
   openLinkDialog()
+}
+
+function unlinkSelection() {
+  const ed = editor.value
+  if (!ed) return
+  ed.chain().focus().extendMarkRange('link').unsetLink().run()
+  closeLinkDialog()
+}
+
+function openCurrentLink() {
+  const ed = editor.value
+  const href =
+    (linkDialogOpen.value ? linkHref.value.trim() : '') ||
+    (ed?.getAttributes('link').href as string | undefined) ||
+    ''
+  if (!href) {
+    ElMessage.warning('没有可打开的链接')
+    return
+  }
+  if (/^(https?:|mailto:|\/|#)/i.test(href)) {
+    window.open(href, '_blank', 'noopener,noreferrer')
+  } else {
+    ElMessage.warning('链接协议不受支持')
+  }
 }
 
 function confirmInsertLink() {
@@ -2744,10 +2918,33 @@ function confirmInsertFormula() {
 const tableDialogOpen = ref(false)
 const tableRows = ref(3)
 const tableCols = ref(3)
+/** 尺寸网格悬停预览（Word 风格） */
+const tableGridHover = ref({ rows: 0, cols: 0 })
+const TABLE_GRID_MAX_ROWS = 8
+const TABLE_GRID_MAX_COLS = 20
 
 function resetTableDialog() {
   tableRows.value = 3
   tableCols.value = 3
+  tableGridHover.value = { rows: 0, cols: 0 }
+}
+
+function onTableGridHover(r: number, c: number) {
+  tableGridHover.value = { rows: r, cols: c }
+  // 悬停即同步行/列数字输入（选择后更改对应数字）
+  tableRows.value = clampInt(r, 1, 100)
+  tableCols.value = clampInt(c, 1, TABLE_GRID_MAX_COLS)
+}
+
+function onTableGridLeave() {
+  tableGridHover.value = { rows: 0, cols: 0 }
+}
+
+function pickTableGridSize(r: number, c: number) {
+  tableRows.value = clampInt(r, 1, 100)
+  tableCols.value = clampInt(c, 1, TABLE_GRID_MAX_COLS)
+  tableGridHover.value = { rows: r, cols: c }
+  confirmInsertTable()
 }
 
 function openTableDialog() {
@@ -2778,7 +2975,7 @@ function onTableRowsInput(event: Event) {
 function onTableColsInput(event: Event) {
   const raw = (event.target as HTMLInputElement).value
   const n = parseInt(raw, 10)
-  tableCols.value = clampInt(Number.isNaN(n) ? 1 : n, 1, 8)
+  tableCols.value = clampInt(Number.isNaN(n) ? 1 : n, 1, TABLE_GRID_MAX_COLS)
 }
 
 function stepTableRows(delta: number) {
@@ -2786,14 +2983,14 @@ function stepTableRows(delta: number) {
 }
 
 function stepTableCols(delta: number) {
-  tableCols.value = clampInt(tableCols.value + delta, 1, 8)
+  tableCols.value = clampInt(tableCols.value + delta, 1, TABLE_GRID_MAX_COLS)
 }
 
 function confirmInsertTable() {
   const ed = editor.value
   if (!ed) return
   const rows = clampInt(tableRows.value, 1, 100)
-  const cols = clampInt(tableCols.value, 1, 8)
+  const cols = clampInt(tableCols.value, 1, TABLE_GRID_MAX_COLS)
   tableRows.value = rows
   tableCols.value = cols
   closeAllTableUi()
@@ -3490,8 +3687,9 @@ async function exportAsDocx() {
   exportBusy.value = true
   try {
     const title = (localTitle.value || '').trim() || '未命名文档'
+    const bodyHtml = ed.getHTML() || ''
     const bodyText = ed.getText({ blockSeparator: '\n' }) || ''
-    const blob = await buildDocxBlob({ title, bodyText })
+    const blob = await buildDocxBlob({ title, bodyHtml, bodyText })
     triggerDownloadBlob(blob, `${exportFileBasename()}.docx`)
     ElMessage.success('已导出 Word')
   } catch (err) {
@@ -3590,6 +3788,19 @@ function placeFloatMenuEl(menuEl: HTMLElement, key: string) {
     if (found instanceof HTMLElement) {
       anchor = found
       floatAnchors.set(key, found)
+    }
+  }
+  // 非最大化从「更多」打开时，emoji/特殊字符/段距/字数按钮不在顶栏：回退锚到「更多」
+  if (
+    (!anchor || !anchor.isConnected) &&
+    (key === 'emoji' || key === 'specialChars' || key === 'spacing' || key === 'wordStats')
+  ) {
+    const more =
+      floatAnchors.get('more') ||
+      (document.querySelector('[data-rte-anchor="more"]') as HTMLElement | null)
+    if (more instanceof HTMLElement) {
+      anchor = more
+      floatAnchors.set(key, more)
     }
   }
   if (!anchor || !menuEl.isConnected) {
@@ -3727,6 +3938,11 @@ function closeAllToolbarMenus() {
   tableMenuOpen.value = false
   importMenuOpen.value = false
   exportMenuOpen.value = false
+  emojiOpen.value = false
+  specialCharsOpen.value = false
+  columnsOpen.value = false
+  spacingOpen.value = false
+  wordStatsOpen.value = false
   closeFontMenus()
   closeColorMenus()
   closeHighlightMenus()
@@ -3739,7 +3955,7 @@ function onDocPointerDownForMenus(e: PointerEvent) {
   if (!t) return
   if (
     t.closest(
-      '.rte-tool-wrap, .rte-tool, .rte-float-menu, .rte-more-menu, .rte-more-flyout, .rte-slash-menu, .rte-mention-menu, .el-overlay, .el-dialog, .el-message-box, .rte-table-dialog, .rte-attach-dialog',
+      '.rte-tool-wrap, .rte-tool, .rte-float-menu, .rte-more-menu, .rte-more-flyout, .rte-emoji-panel, .rte-specialchars-panel, .rte-spacing-panel, .rte-wordstats-panel, .rte-slash-menu, .rte-mention-menu, .el-overlay, .el-dialog, .el-message-box, .rte-table-dialog, .rte-attach-dialog',
     )
   ) {
     return
@@ -4219,24 +4435,37 @@ function onMoreToolClick(t: ToolItem) {
     moreLineHeightOpen.value = !moreLineHeightOpen.value
     return
   }
-  if (t.kind === 'emoji') {
+  if (t.kind === 'emoji' || t.kind === 'specialChars' || t.kind === 'spacing' || t.kind === 'wordStats') {
+    // 紧凑模式工具不在顶栏：把浮层锚到「更多」按钮，避免无 anchor 飞到视口角落
+    const moreBtn =
+      floatAnchors.get('more') ||
+      (document.querySelector('[data-rte-anchor="more"]') as HTMLElement | null)
+    const panelKey =
+      t.kind === 'emoji'
+        ? 'emoji'
+        : t.kind === 'specialChars'
+          ? 'specialChars'
+          : t.kind === 'spacing'
+            ? 'spacing'
+            : 'wordStats'
+    if (moreBtn instanceof HTMLElement) floatAnchors.set(panelKey, moreBtn)
     moreOpen.value = false
-    emojiOpen.value = true
+    markToolbarMenuOpening()
+    nextTick(() => {
+      if (panelKey === 'emoji') {
+        specialCharsOpen.value = false
+        emojiOpen.value = true
+      } else if (panelKey === 'specialChars') {
+        emojiOpen.value = false
+        specialCharsOpen.value = true
+      } else if (panelKey === 'spacing') spacingOpen.value = true
+      else wordStatsOpen.value = true
+    })
     return
   }
   if (t.kind === 'columns') {
     moreOpen.value = false
     insertColumns(2)
-    return
-  }
-  if (t.kind === 'spacing') {
-    moreOpen.value = false
-    spacingOpen.value = true
-    return
-  }
-  if (t.kind === 'wordStats') {
-    moreOpen.value = false
-    wordStatsOpen.value = true
     return
   }
   moreColorOpen.value = false
@@ -4260,7 +4489,7 @@ type ToolItem = {
   title?: string
   icon: string
   iconComp?: Component
-  kind?: 'heading' | 'list' | 'more' | 'btn' | 'color' | 'highlight' | 'align' | 'fontSize' | 'fontFamily' | 'lineHeight' | 'import' | 'export' | 'table' | 'attach' | 'form' | 'template' | 'code' | 'divider' | 'emoji' | 'columns' | 'spacing' | 'wordStats'
+  kind?: 'heading' | 'list' | 'more' | 'btn' | 'color' | 'highlight' | 'align' | 'fontSize' | 'fontFamily' | 'lineHeight' | 'import' | 'export' | 'table' | 'attach' | 'form' | 'template' | 'code' | 'divider' | 'emoji' | 'specialChars' | 'columns' | 'spacing' | 'wordStats'
   active?: () => boolean
   run?: () => void
 }
@@ -4273,15 +4502,15 @@ const allTools = computed((): ToolItem[] => {
   void editor.value?.state // reactive tick
   const ic = (key: string) => toolIcon(key)
   /**
-   * 最大化工具栏分组（Route C 打磨）：
-   * 操作（含格式刷/纯文本粘贴）| 文字（含缩进/段距）| 段落高级（分页/分栏）|
-   * 插入（含表情）| 其他（打印/字数/导入导出）
-   * 目录已按产品要求移除，勿恢复。换行靠 flex-wrap，过密可用「更多」。
+   * 最大化工具栏分组（企业级）：
+   * 操作（撤销/查找/格式刷/纯文本）| 文字（标题→段距）| 段落（引用/分页/分栏）|
+   * 插入（媒体/表单/模板/表情）| 其他（打印/字数/导入导出）
+   * 目录已按产品要求移除，勿恢复。分组靠发丝竖线；换行靠 flex-wrap。
    */
   return [
     // —— 操作 ——
-    { key: 'undo', label: '撤销', icon: '↶', iconComp: ic('undo'), run: undo },
-    { key: 'redo', label: '重做', icon: '↷', iconComp: ic('redo'), run: redo },
+    { key: 'undo', label: '撤销', title: '撤销 (Ctrl/⌘+Z)', icon: '↶', iconComp: ic('undo'), run: undo },
+    { key: 'redo', label: '重做', title: '重做 (Ctrl/⌘+Shift+Z)', icon: '↷', iconComp: ic('redo'), run: redo },
     {
       key: 'clear',
       label: '清除格式',
@@ -4310,8 +4539,8 @@ const allTools = computed((): ToolItem[] => {
     },
     {
       key: 'pastePlain',
-      label: '纯文本粘贴',
-      title: '粘贴为纯文本',
+      label: '纯文本',
+      title: '粘贴为纯文本（开关）',
       icon: 'TXT',
       iconComp: ic('pastePlain'),
       active: () => pastePlainTextMode.value,
@@ -4323,6 +4552,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'bold',
       label: '加粗',
+      title: '加粗 (Ctrl/⌘+B)',
       icon: 'B',
       iconComp: ic('bold'),
       active: () => isActive('bold'),
@@ -4331,6 +4561,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'italic',
       label: '斜体',
+      title: '斜体 (Ctrl/⌘+I)',
       icon: 'I',
       iconComp: ic('italic'),
       active: () => isActive('italic'),
@@ -4339,6 +4570,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'underline',
       label: '下划线',
+      title: '下划线 (Ctrl/⌘+U)',
       icon: 'U',
       iconComp: ic('underline'),
       active: () => isActive('underline'),
@@ -4371,7 +4603,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'codeInline',
       label: '行内码',
-      title: '行内代码',
+      title: '行内代码 (Ctrl/⌘+E)',
       icon: '`',
       iconComp: ic('codeInline'),
       active: () => isActive('code'),
@@ -4393,7 +4625,7 @@ const allTools = computed((): ToolItem[] => {
     { key: 'list', label: '列表', icon: '☰▾', iconComp: ic('list'), kind: 'list' },
     {
       key: 'indent',
-      label: '增加缩进',
+      label: '缩进',
       title: '增加缩进',
       icon: '→',
       iconComp: ic('indent'),
@@ -4401,7 +4633,7 @@ const allTools = computed((): ToolItem[] => {
     },
     {
       key: 'outdent',
-      label: '减少缩进',
+      label: '减少',
       title: '减少缩进',
       icon: '←',
       iconComp: ic('outdent'),
@@ -4422,7 +4654,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'code',
       label: '代码块',
-      title: '代码块',
+      title: '代码块 (Ctrl/⌘+Shift+E)',
       icon: '</>',
       iconComp: ic('code'),
       kind: 'code',
@@ -4445,6 +4677,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'link',
       label: '链接',
+      title: '插入/编辑链接 (Ctrl/⌘+K)',
       icon: '🔗',
       iconComp: ic('link'),
       active: () => isActive('link'),
@@ -4479,6 +4712,7 @@ const allTools = computed((): ToolItem[] => {
     { key: 'attach', label: '附件', icon: '☁▾', iconComp: ic('attach'), kind: 'attach', run: onAttachment },
     { key: 'note', label: '注释', icon: '[1]', iconComp: ic('note'), run: insertNote },
     { key: 'emoji', label: '表情', title: '插入表情', icon: '☺', iconComp: ic('emoji'), kind: 'emoji' },
+    { key: 'specialChars', label: '字符', title: '插入字符', icon: 'Ω', iconComp: ic('specialChars'), kind: 'specialChars' },
     { key: 'div-insert', label: '', icon: '', kind: 'divider' },
     // —— 其他 ——
     {
@@ -4542,10 +4776,7 @@ function closeMore() {
   moreFontFamilyOpen.value = false
   moreLineHeightOpen.value = false
   customColorOpen.value = false
-  emojiOpen.value = false
-  columnsOpen.value = false
-  spacingOpen.value = false
-  wordStatsOpen.value = false
+  // 表情/特殊字符/段距/字数/分栏是独立浮层：可能刚从「更多」接力打开，勿连带关掉
 }
 
 function onRootMouseDown(event: MouseEvent) {
@@ -5426,6 +5657,17 @@ defineExpose({ focusEditor, editor, onDraftBackup })
               {{ opt.label }}
             </option>
           </select>
+          <button
+            v-if="isActive('codeBlock')"
+            type="button"
+            class="rte-code-copy-btn"
+            title="复制代码块"
+            aria-label="复制代码块"
+            @mousedown.prevent
+            @click="copyActiveCodeBlock"
+          >
+            复制
+          </button>
         </div>
         <div
           v-else-if="t.kind === 'emoji'"
@@ -5440,7 +5682,7 @@ defineExpose({ focusEditor, editor, onDraftBackup })
             data-rte-anchor="emoji"
             :class="{ active: emojiOpen }"
             title="表情"
-            @click.stop="markToolbarMenuOpening(); closeColorMenus(); closeHighlightMenus(); closeFontMenus(); emojiOpen = !emojiOpen"
+            @click.stop="markToolbarMenuOpening(); closeColorMenus(); closeHighlightMenus(); closeFontMenus(); specialCharsOpen = false; emojiOpen = !emojiOpen"
           >
             <span class="rte-tool-icon">
               <component :is="toolIcon('emoji')" class="rte-ep-icon" />
@@ -5456,13 +5698,87 @@ defineExpose({ focusEditor, editor, onDraftBackup })
               @mouseenter="onToolMenuEnter('emoji')"
               @mouseleave="onToolMenuLeave($event, 'emoji', () => (emojiOpen = false))"
             >
-              <button
-                v-for="em in RTE_EMOJI_LIST"
-                :key="'em-' + em"
-                type="button"
-                class="rte-emoji-btn"
-                @click="insertEmoji(em)"
-              >{{ em }}</button>
+              <div class="rte-picker-tabs" role="tablist" aria-label="表情分类">
+                <button
+                  v-for="cat in RTE_EMOJI_CATEGORIES"
+                  :key="'em-tab-' + cat.id"
+                  type="button"
+                  role="tab"
+                  class="rte-picker-tab"
+                  :class="{ active: emojiTabId === cat.id }"
+                  :aria-selected="emojiTabId === cat.id"
+                  @click.stop="emojiTabId = cat.id"
+                >{{ cat.label }}</button>
+              </div>
+              <div
+                class="rte-picker-grid rte-emoji-grid"
+                :class="{ 'rte-emoji-grid--large': isLargeEmojiTab, 'rte-emoji-grid--kaomoji': isKaomojiTab }"
+                role="tabpanel"
+              >
+                <button
+                  v-for="em in activeEmojiList"
+                  :key="'em-' + emojiTabId + '-' + em"
+                  type="button"
+                  class="rte-emoji-btn"
+                  :class="{ 'rte-emoji-btn--kaomoji': isKaomojiTab || em.includes('(') || em.includes('¯') || em.includes('∠') }"
+                  :title="em"
+                  @click="insertEmoji(em)"
+                >{{ em }}</button>
+              </div>
+            </div>
+          </Teleport>
+        </div>
+        <div
+          v-else-if="t.kind === 'specialChars'"
+          class="rte-tool-wrap"
+          @mouseenter="onToolMenuEnter('specialChars')"
+          @mouseleave="onToolMenuLeave($event, 'specialChars', () => (specialCharsOpen = false))"
+        >
+          <button
+            type="button"
+            class="rte-tool"
+            :ref="(el) => setFloatAnchor('specialChars', el)"
+            data-rte-anchor="specialChars"
+            :class="{ active: specialCharsOpen }"
+            title="字符"
+            @click.stop="markToolbarMenuOpening(); closeColorMenus(); closeHighlightMenus(); closeFontMenus(); emojiOpen = false; specialCharsOpen = !specialCharsOpen"
+          >
+            <span class="rte-tool-icon">
+              <component :is="toolIcon('specialChars')" class="rte-ep-icon" />
+            </span>
+            <span class="rte-tool-label">字符<span class="rte-caret" aria-hidden="true"></span></span>
+          </button>
+          <Teleport to="body">
+            <div
+              v-if="specialCharsOpen"
+              class="rte-specialchars-panel"
+              v-rte-float="'specialChars'"
+              @mousedown.prevent
+              @mouseenter="onToolMenuEnter('specialChars')"
+              @mouseleave="onToolMenuLeave($event, 'specialChars', () => (specialCharsOpen = false))"
+            >
+              <div class="rte-picker-tabs" role="tablist" aria-label="字符分类">
+                <button
+                  v-for="cat in RTE_SPECIAL_CHAR_CATEGORIES"
+                  :key="'sc-tab-' + cat.id"
+                  type="button"
+                  role="tab"
+                  class="rte-picker-tab"
+                  :class="{ active: specialCharTabId === cat.id }"
+                  :aria-selected="specialCharTabId === cat.id"
+                  @click.stop="specialCharTabId = cat.id"
+                >{{ cat.label }}</button>
+              </div>
+              <div class="rte-picker-grid rte-specialchars-grid" role="tabpanel">
+                <button
+                  v-for="ch in activeSpecialCharList"
+                  :key="'sc-' + specialCharTabId + '-' + ch"
+                  type="button"
+                  class="rte-specialchars-btn"
+                  :title="ch"
+                  @click="insertSpecialChar(ch)"
+                >{{ ch }}</button>
+              </div>
             </div>
           </Teleport>
         </div>
@@ -5478,7 +5794,7 @@ defineExpose({ focusEditor, editor, onDraftBackup })
             :ref="(el) => setFloatAnchor('columns', el)"
             data-rte-anchor="columns"
             :class="{ active: columnsOpen || isActive('columns') }"
-            title="多栏"
+            title="多栏布局（2–6 栏）"
             @click.stop="markToolbarMenuOpening(); columnsOpen = !columnsOpen"
           >
             <span class="rte-tool-icon">
@@ -5489,14 +5805,23 @@ defineExpose({ focusEditor, editor, onDraftBackup })
           <Teleport to="body">
             <div
               v-if="columnsOpen"
-              class="rte-menu"
+              class="rte-menu rte-columns-menu"
               v-rte-float="'columns'"
               @mousedown.prevent
               @mouseenter="onToolMenuEnter('columns')"
               @mouseleave="onToolMenuLeave($event, 'columns', () => (columnsOpen = false))"
             >
-              <button type="button" @click="insertColumns(2)">两栏</button>
-              <button type="button" @click="insertColumns(3)">三栏</button>
+              <template v-for="(it, idx) in COLUMN_MENU_ITEMS" :key="idx">
+                <div v-if="it.type === 'label'" class="rte-menu-section-label">{{ it.text }}</div>
+                <div v-else-if="it.type === 'sep'" class="rte-menu-sep" aria-hidden="true" />
+                <button
+                  v-else
+                  type="button"
+                  @click="insertColumns(it.cols, it.ratios)"
+                >
+                  {{ it.label }}
+                </button>
+              </template>
             </div>
           </Teleport>
         </div>
@@ -5945,6 +6270,162 @@ defineExpose({ focusEditor, editor, onDraftBackup })
           </div>
         </Teleport>
       </div>
+
+      <!-- 紧凑「更多」打开的浮层面板（顶栏无对应按钮时，锚到「更多」） -->
+      <Teleport to="body">
+        <div
+          v-if="!expanded && emojiOpen"
+          class="rte-emoji-panel"
+          v-rte-float="'emoji'"
+          @mousedown.prevent
+          @mouseenter="onToolMenuEnter('emoji')"
+          @mouseleave="onToolMenuLeave($event, 'emoji', () => (emojiOpen = false))"
+        >
+          <div class="rte-picker-tabs" role="tablist" aria-label="表情分类">
+            <button
+              v-for="cat in RTE_EMOJI_CATEGORIES"
+              :key="'c-em-tab-' + cat.id"
+              type="button"
+              role="tab"
+              class="rte-picker-tab"
+              :class="{ active: emojiTabId === cat.id }"
+              :aria-selected="emojiTabId === cat.id"
+              @click.stop="emojiTabId = cat.id"
+            >{{ cat.label }}</button>
+          </div>
+          <div
+            class="rte-picker-grid rte-emoji-grid"
+            :class="{ 'rte-emoji-grid--large': isLargeEmojiTab, 'rte-emoji-grid--kaomoji': isKaomojiTab }"
+            role="tabpanel"
+          >
+            <button
+              v-for="em in activeEmojiList"
+              :key="'c-em-' + emojiTabId + '-' + em"
+              type="button"
+              class="rte-emoji-btn"
+              :class="{ 'rte-emoji-btn--kaomoji': isKaomojiTab || em.includes('(') || em.includes('¯') || em.includes('∠') }"
+              :title="em"
+              @click="insertEmoji(em)"
+            >{{ em }}</button>
+          </div>
+        </div>
+      </Teleport>
+      <Teleport to="body">
+        <div
+          v-if="!expanded && specialCharsOpen"
+          class="rte-specialchars-panel"
+          v-rte-float="'specialChars'"
+          @mousedown.prevent
+          @mouseenter="onToolMenuEnter('specialChars')"
+          @mouseleave="onToolMenuLeave($event, 'specialChars', () => (specialCharsOpen = false))"
+        >
+          <div class="rte-picker-tabs" role="tablist" aria-label="字符分类">
+            <button
+              v-for="cat in RTE_SPECIAL_CHAR_CATEGORIES"
+              :key="'c-sc-tab-' + cat.id"
+              type="button"
+              role="tab"
+              class="rte-picker-tab"
+              :class="{ active: specialCharTabId === cat.id }"
+              :aria-selected="specialCharTabId === cat.id"
+              @click.stop="specialCharTabId = cat.id"
+            >{{ cat.label }}</button>
+          </div>
+          <div class="rte-picker-grid rte-specialchars-grid" role="tabpanel">
+            <button
+              v-for="ch in activeSpecialCharList"
+              :key="'c-sc-' + specialCharTabId + '-' + ch"
+              type="button"
+              class="rte-specialchars-btn"
+              :title="ch"
+              @click="insertSpecialChar(ch)"
+            >{{ ch }}</button>
+          </div>
+        </div>
+      </Teleport>
+      <Teleport to="body">
+        <div
+          v-if="!expanded && spacingOpen"
+          class="rte-spacing-panel"
+          v-rte-float="'spacing'"
+          @mousedown.prevent
+          @mouseenter="onToolMenuEnter('spacing')"
+          @mouseleave="onToolMenuLeave($event, 'spacing', () => (spacingOpen = false))"
+        >
+          <div class="rte-spacing-row">
+            <span class="rte-spacing-label">段前</span>
+            <select
+              class="rte-spacing-select"
+              :value="currentMarginTop()"
+              @change="applyMarginTop(($event.target as HTMLSelectElement).value)"
+            >
+              <option value="">默认</option>
+              <option value="0">0</option>
+              <option value="0.5em">0.5em</option>
+              <option value="1em">1em</option>
+              <option value="1.5em">1.5em</option>
+              <option value="2em">2em</option>
+              <option value="3em">3em</option>
+            </select>
+          </div>
+          <div class="rte-spacing-row">
+            <span class="rte-spacing-label">段后</span>
+            <select
+              class="rte-spacing-select"
+              :value="currentMarginBottom()"
+              @change="applyMarginBottom(($event.target as HTMLSelectElement).value)"
+            >
+              <option value="">默认</option>
+              <option value="0">0</option>
+              <option value="0.5em">0.5em</option>
+              <option value="1em">1em</option>
+              <option value="1.5em">1.5em</option>
+              <option value="2em">2em</option>
+              <option value="3em">3em</option>
+            </select>
+          </div>
+          <div class="rte-spacing-row">
+            <span class="rte-spacing-label">字间距</span>
+            <select
+              class="rte-spacing-select"
+              :value="currentLetterSpacing()"
+              @change="applyLetterSpacing(($event.target as HTMLSelectElement).value)"
+            >
+              <option value="">默认</option>
+              <option value="0">0</option>
+              <option value="0.05em">0.05em</option>
+              <option value="0.1em">0.1em</option>
+              <option value="0.15em">0.15em</option>
+              <option value="0.2em">0.2em</option>
+              <option value="0.3em">0.3em</option>
+            </select>
+          </div>
+        </div>
+      </Teleport>
+      <Teleport to="body">
+        <div
+          v-if="!expanded && wordStatsOpen"
+          class="rte-wordstats-panel"
+          v-rte-float="'wordStats'"
+          @mousedown.prevent
+          @mouseenter="onToolMenuEnter('wordStats')"
+          @mouseleave="onToolMenuLeave($event, 'wordStats', () => (wordStatsOpen = false))"
+        >
+          <div class="rte-wordstats-title">字数统计</div>
+          <div class="rte-wordstats-row"><span>全文（去空白）</span><strong>{{ charCount }}</strong></div>
+          <div class="rte-wordstats-row"><span>词数（估）</span><strong>{{ wordCount }}</strong></div>
+          <div class="rte-wordstats-row"><span>阅读约</span><strong>{{ readingMinutes }} 分钟</strong></div>
+          <div class="rte-wordstats-divider" />
+          <div class="rte-wordstats-row">
+            <span>选区字符</span>
+            <strong>{{ selectionStats.hasSelection ? selectionStats.chars : '—' }}</strong>
+          </div>
+          <div class="rte-wordstats-row">
+            <span>选区词数</span>
+            <strong>{{ selectionStats.hasSelection ? selectionStats.words : '—' }}</strong>
+          </div>
+        </div>
+      </Teleport>
       </div>
     </div>
 
@@ -5959,7 +6440,8 @@ defineExpose({ focusEditor, editor, onDraftBackup })
         type="button"
         class="rte-bubble-btn"
         :class="{ active: isActive('bold') }"
-        title="加粗"
+        title="加粗 (Ctrl/⌘+B)"
+        aria-label="加粗"
         @mousedown.prevent
         @click="toggleBold"
       >
@@ -5969,7 +6451,8 @@ defineExpose({ focusEditor, editor, onDraftBackup })
         type="button"
         class="rte-bubble-btn"
         :class="{ active: isActive('italic') }"
-        title="斜体"
+        title="斜体 (Ctrl/⌘+I)"
+        aria-label="斜体"
         @mousedown.prevent
         @click="toggleItalic"
       >
@@ -5979,7 +6462,8 @@ defineExpose({ focusEditor, editor, onDraftBackup })
         type="button"
         class="rte-bubble-btn"
         :class="{ active: isActive('underline') }"
-        title="下划线"
+        title="下划线 (Ctrl/⌘+U)"
+        aria-label="下划线"
         @mousedown.prevent
         @click="toggleUnderline"
       >
@@ -5990,6 +6474,7 @@ defineExpose({ focusEditor, editor, onDraftBackup })
         class="rte-bubble-btn"
         :class="{ active: isActive('strike') }"
         title="删除线"
+        aria-label="删除线"
         @mousedown.prevent
         @click="toggleStrike"
       >
@@ -6000,6 +6485,7 @@ defineExpose({ focusEditor, editor, onDraftBackup })
         class="rte-bubble-btn"
         :class="{ active: isActive('highlight') }"
         title="高亮"
+        aria-label="高亮"
         @mousedown.prevent
         @click="toggleHighlight"
       >
@@ -6009,11 +6495,34 @@ defineExpose({ focusEditor, editor, onDraftBackup })
         type="button"
         class="rte-bubble-btn"
         :class="{ active: isActive('link') }"
-        title="链接"
+        :title="isActive('link') ? '编辑链接 (Ctrl/⌘+K)' : '插入链接 (Ctrl/⌘+K)'"
+        :aria-label="isActive('link') ? '编辑链接' : '插入链接'"
         @mousedown.prevent
         @click="insertLink"
       >
         🔗
+      </button>
+      <button
+        v-if="isActive('link')"
+        type="button"
+        class="rte-bubble-btn"
+        title="打开链接"
+        aria-label="打开链接"
+        @mousedown.prevent
+        @click="openCurrentLink"
+      >
+        ↗
+      </button>
+      <button
+        v-if="isActive('link')"
+        type="button"
+        class="rte-bubble-btn rte-bubble-btn-danger"
+        title="取消链接"
+        aria-label="取消链接"
+        @mousedown.prevent
+        @click="unlinkSelection"
+      >
+        ✕
       </button>
     </BubbleMenu>
 
@@ -6472,6 +6981,45 @@ defineExpose({ focusEditor, editor, onDraftBackup })
         >
           <h3 class="rte-table-title">插入表格</h3>
 
+          <div
+            class="rte-table-grid-picker"
+            role="grid"
+            aria-label="选择表格尺寸"
+            @mouseleave="onTableGridLeave"
+          >
+            <div
+              v-for="r in TABLE_GRID_MAX_ROWS"
+              :key="'tg-r-' + r"
+              class="rte-table-grid-row"
+              role="row"
+              :style="{ gridTemplateColumns: `repeat(${TABLE_GRID_MAX_COLS}, minmax(0, 1fr))` }"
+            >
+              <button
+                v-for="c in TABLE_GRID_MAX_COLS"
+                :key="'tg-' + r + '-' + c"
+                type="button"
+                class="rte-table-grid-cell"
+                role="gridcell"
+                :class="{
+                  hot:
+                    (tableGridHover.rows || tableRows) >= r &&
+                    (tableGridHover.cols || tableCols) >= c,
+                }"
+                :title="r + ' × ' + c"
+                :aria-label="r + ' 行 ' + c + ' 列'"
+                @mouseenter="onTableGridHover(r, c)"
+                @click="pickTableGridSize(r, c)"
+              />
+            </div>
+            <div class="rte-table-grid-label" aria-live="polite">
+              {{
+                tableGridHover.rows
+                  ? tableGridHover.rows + ' × ' + tableGridHover.cols
+                  : tableRows + ' × ' + tableCols
+              }}
+            </div>
+          </div>
+
           <div class="rte-table-field">
             <span class="rte-table-field-icon" aria-hidden="true">
               <component :is="IconTableRows" class="rte-table-field-svg" />
@@ -6499,9 +7047,9 @@ defineExpose({ focusEditor, editor, onDraftBackup })
               class="rte-table-input"
               type="number"
               min="1"
-              max="8"
+              :max="TABLE_GRID_MAX_COLS"
               :value="tableCols"
-              placeholder="输入表格列数（最大 8 列）"
+              placeholder="输入表格列数（最大 16 列）"
               @input="onTableColsInput"
             />
             <div class="rte-table-stepper">
@@ -6633,10 +7181,10 @@ defineExpose({ focusEditor, editor, onDraftBackup })
           class="rte-link-dialog"
           role="dialog"
           aria-modal="true"
-          aria-label="插入链接"
+          :aria-label="linkDialogEditing ? '编辑链接' : '插入链接'"
           @mousedown.stop
         >
-          <h3 class="rte-table-title">插入链接</h3>
+          <h3 class="rte-table-title">{{ linkDialogEditing ? '编辑链接' : '插入链接' }}</h3>
           <div class="rte-note-field rte-note-text-field" style="width: 100%; margin-bottom: 12px">
             <span class="rte-note-field-icon" aria-hidden="true">T</span>
             <input
@@ -6654,17 +7202,34 @@ defineExpose({ focusEditor, editor, onDraftBackup })
               v-model="linkHref"
               type="url"
               class="rte-note-input"
-              placeholder="输入链接地址"
+              placeholder="输入链接地址（http/https）"
               maxlength="2000"
               @keydown.enter.prevent="confirmInsertLink"
             />
           </div>
-          <div class="rte-modal-actions">
+          <div class="rte-modal-actions rte-link-actions">
+            <button
+              v-if="linkDialogEditing"
+              type="button"
+              class="rte-modal-cancel rte-link-unlink"
+              @click="unlinkSelection"
+            >
+              取消链接
+            </button>
+            <button
+              v-if="linkDialogEditing && linkHref.trim()"
+              type="button"
+              class="rte-modal-cancel"
+              @click="openCurrentLink"
+            >
+              打开
+            </button>
+            <span class="rte-modal-actions-spacer" aria-hidden="true" />
             <button type="button" class="rte-modal-cancel" @click="closeLinkDialog">
-              取消
+              关闭
             </button>
             <button type="button" class="rte-modal-confirm" @click="confirmInsertLink">
-              确认
+              {{ linkDialogEditing ? '更新' : '确认' }}
             </button>
           </div>
         </div>
@@ -8315,17 +8880,19 @@ defineExpose({ focusEditor, editor, onDraftBackup })
   position: relative;
 }
 .rte-more-menu.has-flyout {
-  overflow: visible;
-  max-height: none;
+  overflow-x: hidden;
+  overflow-y: auto;
+  max-height: min(420px, 70vh);
 }
 .rte-more-flyout {
-  position: relative;
+  position: sticky;
+  top: 0;
   left: 0;
   right: auto;
-  top: auto;
   margin: 4px 0 8px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
   z-index: 40;
+  background: #fff;
 }
 .rte-root.expanded .rte-color-menu {
   /* 颜色面板较宽：优先左对齐；若贴右可由工具条 overflow:visible + bridge 兜底 */
@@ -8469,6 +9036,8 @@ defineExpose({ focusEditor, editor, onDraftBackup })
   flex: 1 1 auto;
   min-width: 0;
   overflow: visible;
+  column-gap: 0;
+  row-gap: 6px;
 }
 
 /* 模式按钮：与普通工具同排同距，不贴右 */
@@ -8727,14 +9296,14 @@ defineExpose({ focusEditor, editor, onDraftBackup })
   transform: translate(-50%, -35%);
 }
 
-/* 分组发丝竖线 1×20 #EBECED；线后 16px 再接下组 */
+/* 分组发丝竖线 1×22 #EBECED；左右各 10px，企业工具栏更紧凑整齐 */
 .rte-root.expanded .rte-tool-divider {
   width: 1px;
-  height: 20px;
-  min-height: 20px;
+  height: 22px;
+  min-height: 22px;
   align-self: center;
   flex: 0 0 auto;
-  margin: 0 16px 0 0;
+  margin: 0 10px;
   background: #ebeced;
   border-radius: 0;
   pointer-events: none;
@@ -9722,15 +10291,15 @@ defineExpose({ focusEditor, editor, onDraftBackup })
 .rte-code-lang-select:focus {
   border-color: #5b8cff;
 }
-.rte-root :deep(.tiptap pre code.hljs),
-.rte-root :deep(.ProseMirror pre code.hljs),
-.rte-root :deep(.tiptap pre .hljs),
-.rte-root :deep(.ProseMirror pre .hljs) {
+.rte-root .tiptap pre code.hljs,
+.rte-root .ProseMirror pre code.hljs,
+.rte-root .tiptap pre .hljs,
+.rte-root .ProseMirror pre .hljs {
   background: transparent;
   padding: 0;
 }
-.rte-root :deep(sub),
-.rte-root :deep(sup) {
+.rte-root sub,
+.rte-root sup {
   font-size: 0.75em;
   line-height: 0;
 }
@@ -9742,6 +10311,93 @@ defineExpose({ focusEditor, editor, onDraftBackup })
   box-shadow: 0 16px 48px rgba(15, 23, 42, 0.16);
   padding: 22px 24px 20px;
   box-sizing: border-box;
+}
+.rte-link-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+.rte-modal-actions-spacer {
+  flex: 1 1 auto;
+  min-width: 8px;
+}
+.rte-link-unlink {
+  color: #c62828 !important;
+  border-color: #f5c6cb !important;
+}
+.rte-bubble-btn-danger:hover,
+.rte-bubble-btn-danger.active {
+  background: rgba(255, 80, 80, 0.28);
+}
+.rte-code-copy-btn {
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid #e5e6eb;
+  border-radius: 6px;
+  background: #fff;
+  color: #4e5969;
+  font-size: 12px;
+  cursor: pointer;
+  line-height: 1;
+  white-space: nowrap;
+}
+.rte-code-copy-btn:hover {
+  background: #f2f3f5;
+  color: #1d2129;
+  border-color: #c9cdd4;
+}
+.rte-table-dialog {
+  width: min(460px, 100%);
+}
+.rte-table-grid-picker {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  margin: 0 0 14px;
+  /* equal L/R padding — no leftover empty strip on the right */
+  padding: 10px;
+  border: 1px solid #eef0f3;
+  border-radius: 8px;
+  background: #fafbfc;
+  box-sizing: border-box;
+  width: 100%;
+}
+.rte-table-grid-row {
+  display: grid;
+  /* columns set via inline style from TABLE_GRID_MAX_COLS (1fr each) */
+  gap: 3px;
+  width: 100%;
+}
+.rte-table-grid-cell {
+  width: 100%;
+  min-width: 0;
+  aspect-ratio: 1 / 1;
+  height: auto;
+  padding: 0;
+  margin: 0;
+  border: 1px solid #c9cdd4;
+  border-radius: 2px;
+  background: #fff;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+.rte-table-grid-cell.hot {
+  background: #e8f3ff;
+  border-color: #94bfff;
+}
+.rte-table-grid-cell:hover {
+  outline: 1px solid #165dff;
+  outline-offset: 0;
+}
+.rte-table-grid-label {
+  font-size: 12px;
+  color: #4e5969;
+  font-variant-numeric: tabular-nums;
+  min-height: 18px;
+  user-select: none;
 }
 
 /* 插入图片 — 固定宽高，避免空/满库时跳动 */
@@ -10203,7 +10859,7 @@ defineExpose({ focusEditor, editor, onDraftBackup })
   color: #86909c;
   text-align: center;
 }
-.rte-root :deep(.rte-slash-decoration) {
+.rte-root .rte-slash-decoration {
   background: rgba(22, 93, 255, 0.12);
   border-radius: 3px;
   box-decoration-break: clone;
@@ -10302,7 +10958,7 @@ defineExpose({ focusEditor, editor, onDraftBackup })
   color: #86909c;
   text-align: center;
 }
-.rte-root :deep(.rte-mention) {
+.rte-root .rte-mention {
   display: inline-flex;
   align-items: baseline;
   padding: 0 5px;
@@ -10315,14 +10971,14 @@ defineExpose({ focusEditor, editor, onDraftBackup })
   white-space: nowrap;
   cursor: default;
 }
-.rte-root :deep(.rte-mention-decoration) {
+.rte-root .rte-mention-decoration {
   background: rgba(22, 93, 255, 0.12);
   border-radius: 3px;
   box-decoration-break: clone;
 }
 
 /* —— 表单条件显示 —— */
-.rte-root :deep(.rte-form-showif-badge) {
+.rte-root .rte-form-showif-badge {
   display: inline-flex;
   align-items: center;
   max-width: 100%;
@@ -10341,27 +10997,27 @@ defineExpose({ focusEditor, editor, onDraftBackup })
   pointer-events: none;
   user-select: none;
 }
-.rte-root :deep(.rte-form-showif-badge[hidden]) {
+.rte-root .rte-form-showif-badge[hidden] {
   display: none !important;
 }
-.rte-root :deep(.rte-form.has-show-if) {
+.rte-root .rte-form.has-show-if {
   position: relative;
 }
-.rte-root :deep(.rte-form.rte-form-showif-would-hide) {
+.rte-root .rte-form.rte-form-showif-would-hide {
   opacity: 0.55;
   outline: 1px dashed #ffb65c;
   outline-offset: 2px;
 }
-.rte-root :deep(.rte-form.rte-form-showif-hidden),
-.rte-root :deep(.rte-form[hidden]) {
+.rte-root .rte-form.rte-form-showif-hidden,
+.rte-root .rte-form[hidden] {
   display: none !important;
 }
-.rte-root.mode-preview :deep(.rte-form-showif-badge) {
+.rte-root.mode-preview .rte-form-showif-badge {
   display: none !important;
 }
 
-/* —— Route C: 分页 / 分栏 / 表情 / 段距 / 字数 / 打印 —— */
-.rte-root :deep(.rte-page-break) {
+/* —— Route C: 分页 / 分栏 / 表情 / 特殊字符 / 段距 / 字数 / 打印 —— */
+.rte-root .rte-page-break {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -10379,49 +11035,180 @@ defineExpose({ focusEditor, editor, onDraftBackup })
   position: relative;
   user-select: none;
 }
-.rte-root :deep(.rte-page-break-label) {
+.rte-root .rte-page-break-label {
   background: #fff;
   color: #86909c;
   font-size: 12px;
   padding: 0 10px;
   letter-spacing: 0.08em;
 }
-.rte-root :deep(.rte-columns) {
-  display: grid;
-  gap: 16px;
+.rte-root .rte-columns,
+.rte-root .ProseMirror .rte-columns,
+.rte-root .tiptap .rte-columns,
+.rte-root div[data-type='columns'] {
+  display: grid !important;
+  gap: 16px !important;
+  column-gap: 16px !important;
+  row-gap: 16px !important;
   margin: 12px 0;
-  padding: 8px;
-  border: 1px dashed #e5e6eb;
+  padding: 10px;
+  border: 1px dashed #c9cdd4 !important;
   border-radius: 8px;
-  min-height: 48px;
+  min-height: 88px !important;
+  background: #fafbfc !important;
+  box-sizing: border-box;
 }
-.rte-root :deep(.rte-columns-2) {
-  grid-template-columns: 1fr 1fr;
+.rte-root .rte-columns-2,
+.rte-root div[data-type='columns'][data-cols='2']:not([data-ratios]) {
+  grid-template-columns: 1fr 1fr !important;
 }
-.rte-root :deep(.rte-columns-3) {
-  grid-template-columns: 1fr 1fr 1fr;
+.rte-root .rte-columns-3,
+.rte-root div[data-type='columns'][data-cols='3']:not([data-ratios]) {
+  grid-template-columns: 1fr 1fr 1fr !important;
 }
-.rte-root :deep(.rte-column) {
+.rte-root .rte-columns-4,
+.rte-root div[data-type='columns'][data-cols='4']:not([data-ratios]) {
+  grid-template-columns: repeat(4, 1fr) !important;
+}
+.rte-root .rte-columns-5,
+.rte-root div[data-type='columns'][data-cols='5']:not([data-ratios]) {
+  grid-template-columns: repeat(5, 1fr) !important;
+}
+.rte-root .rte-columns-6,
+.rte-root div[data-type='columns'][data-cols='6']:not([data-ratios]) {
+  grid-template-columns: repeat(6, 1fr) !important;
+}
+.rte-columns-menu {
+  min-width: 168px;
+}
+.rte-root .rte-column,
+.rte-root .ProseMirror .rte-column,
+.rte-root .tiptap .rte-column,
+.rte-root div[data-type='column'] {
   min-width: 0;
-  padding: 4px 8px;
+  min-height: 72px !important;
+  padding: 10px 12px;
+  border: 1px dashed #91b3fa !important;
   border-radius: 6px;
-  background: rgba(23, 114, 246, 0.03);
+  background: #f0f5ff !important;
+  box-sizing: border-box;
+  position: relative;
 }
-.rte-emoji-panel {
-  display: grid;
-  grid-template-columns: repeat(10, 28px);
-  gap: 2px;
-  padding: 8px;
-  max-width: 320px;
+/* 空栏内段落也保留可见高度，便于点击落焦 */
+.rte-root .rte-column > p,
+.rte-root div[data-type='column'] > p {
+  min-height: 1.65em;
+  position: relative;
+}
+/* Placeholder 装饰 class + ProseMirror 空段（仅 trailingBreak）双通道占位 */
+.rte-root .rte-column > p.is-empty::before,
+.rte-root .rte-column > p.is-editor-empty::before,
+.rte-root .rte-column > p[data-placeholder]::before,
+.rte-root div[data-type='column'] > p.is-empty::before,
+.rte-root div[data-type='column'] > p.is-editor-empty::before,
+.rte-root .rte-column > p:has(> br.ProseMirror-trailingBreak:only-child)::before,
+.rte-root div[data-type='column'] > p:has(> br.ProseMirror-trailingBreak:only-child)::before {
+  color: #c0c4cc !important;
+  content: '在此输入…' !important;
+  float: left;
+  height: 0;
+  pointer-events: none;
+  font-size: 13px;
+  line-height: 1.65;
+}
+.rte-emoji-panel,
+.rte-specialchars-panel {
+  display: flex;
+  flex-direction: column;
+  /* 两者固定同高同宽，切换标签/面板时高度不变 */
+  width: 380px;
+  max-width: min(380px, calc(100vw - 24px));
+  height: 340px;
+  max-height: 340px;
+  min-height: 340px;
+  padding: 0;
   background: #fff;
   border: 1px solid #e5e6eb;
   border-radius: 10px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
   z-index: 6000;
+  overflow: hidden;
+  box-sizing: border-box;
 }
-.rte-emoji-btn {
-  width: 28px;
-  height: 28px;
+.rte-picker-tabs {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 2px;
+  padding: 6px 8px 4px;
+  border-bottom: 1px solid #e5e6eb;
+  background: #fafafa;
+  flex: 0 0 auto;
+  height: 40px;
+  min-height: 40px;
+  max-height: 40px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  align-items: center;
+  scrollbar-width: thin;
+  box-sizing: border-box;
+}
+.rte-picker-tab {
+  border: none;
+  background: transparent;
+  color: #4e5969;
+  font-size: 12px;
+  line-height: 1;
+  padding: 5px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.rte-picker-tab:hover {
+  background: #f2f3f5;
+  color: #1d2129;
+}
+.rte-picker-tab.active {
+  background: #e8f3ff;
+  color: #1772f6;
+  font-weight: 600;
+}
+.rte-picker-grid {
+  display: grid;
+  gap: 2px;
+  padding: 8px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex: 1 1 auto;
+  min-height: 0; /* 固定面板高度下允许网格滚动 */
+  height: auto;
+  scrollbar-width: thin;
+  align-content: start;
+  box-sizing: border-box;
+}
+.rte-emoji-grid {
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+}
+.rte-emoji-grid--large {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 4px;
+}
+.rte-emoji-grid--kaomoji {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+}
+.rte-emoji-grid--kaomoji .rte-emoji-btn--kaomoji {
+  grid-column: span 1;
+  min-height: 40px;
+  font-size: 14px !important;
+}
+.rte-specialchars-grid {
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+}
+.rte-emoji-btn,
+.rte-specialchars-btn {
+  width: 100%;
+  aspect-ratio: 1;
+  min-height: 28px;
   border: none;
   background: transparent;
   border-radius: 6px;
@@ -10429,8 +11216,31 @@ defineExpose({ focusEditor, editor, onDraftBackup })
   font-size: 18px;
   line-height: 1;
   padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #1d2129;
 }
-.rte-emoji-btn:hover {
+.rte-emoji-grid--large .rte-emoji-btn {
+  font-size: 28px;
+  min-height: 40px;
+}
+.rte-emoji-btn--kaomoji {
+  aspect-ratio: auto;
+  min-height: 36px;
+  grid-column: span 2;
+  font-size: 13px !important;
+  padding: 4px 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rte-specialchars-btn {
+  font-size: 15px;
+  font-family: "PingFang SC", "Helvetica Neue", Arial, "Segoe UI Symbol", "Noto Sans Symbols", sans-serif;
+}
+.rte-emoji-btn:hover,
+.rte-specialchars-btn:hover {
   background: #f2f3f5;
 }
 .rte-spacing-panel {
@@ -10526,21 +11336,21 @@ defineExpose({ focusEditor, editor, onDraftBackup })
   .rte-root.rte-printing [class*='inspector'] {
     display: none !important;
   }
-  .rte-root.rte-printing :deep(.rte-page-break) {
+  .rte-root.rte-printing .rte-page-break {
     break-after: page;
     page-break-after: always;
     height: 0;
     margin: 0;
     background: none;
   }
-  .rte-root.rte-printing :deep(.rte-page-break-label) {
+  .rte-root.rte-printing .rte-page-break-label {
     display: none;
   }
-  .rte-root.rte-printing :deep(.rte-columns) {
+  .rte-root.rte-printing .rte-columns {
     border: none;
     padding: 0;
   }
-  .rte-root.rte-printing :deep(.rte-column) {
+  .rte-root.rte-printing .rte-column {
     background: transparent;
   }
 }

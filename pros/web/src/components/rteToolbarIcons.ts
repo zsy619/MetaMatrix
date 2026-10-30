@@ -363,6 +363,11 @@ export const IconEmoji = svgIconNodes([
   h('path', { d: 'M15.5 10h.01' }),
   h('path', { d: 'M8.2 14.5c1.2 1.4 2.5 2 3.8 2s2.6-.6 3.8-2' }),
 ])
+export const IconSpecialChars = svgIconNodes([
+  h('rect', { x: 3.5, y: 3.5, width: 17, height: 17, rx: 2.5 }),
+  h('path', { d: 'M8 9.5h3.2M9.6 9.5V15' }),
+  h('path', { d: 'M13.2 15V9.5h2.2a1.6 1.6 0 0 1 0 3.2H13.2' }),
+])
 export const IconPrint = svgIcon([
   'M7 8V3.5h10V8',
   'M7 17H5.5A2.5 2.5 0 0 1 3 14.5v-4A2.5 2.5 0 0 1 5.5 8h13A2.5 2.5 0 0 1 21 10.5v4a2.5 2.5 0 0 1-2.5 2.5H17',
@@ -425,6 +430,7 @@ export const toolbarIconMap: Record<string, Component> = {
   indent: IconIndent,
   outdent: IconOutdent,
   emoji: IconEmoji,
+  specialChars: IconSpecialChars,
   print: IconPrint,
   exportPdf: IconExportPdf,
   exportDocx: IconExportDocx,
