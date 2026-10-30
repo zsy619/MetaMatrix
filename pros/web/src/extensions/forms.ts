@@ -1,4 +1,4 @@
-import { Node, mergeAttributes } from '@tiptap/core'
+import { Node, Extension, mergeAttributes, type Editor } from '@tiptap/core'
 
 /** 选项用 | 分隔，便于落在 HTML data-* 上且旧内容可读 */
 export function splitFormOptions(raw: unknown): string[] {
@@ -96,6 +96,44 @@ function validateRequiredEmpty(root: HTMLElement, required: boolean, value: unkn
   return invalid
 }
 
+/** 编译用户填写的 pattern；非法正则视为不校验 */
+export function compileFormPattern(raw: unknown): RegExp | null {
+  const s = String(raw ?? '').trim()
+  if (!s) return null
+  try {
+    return new RegExp(`^(?:${s})$`)
+  } catch {
+    return null
+  }
+}
+
+/**
+ * 文本类字段校验：必填 → pattern（空值且非必填时跳过 pattern）。
+ * 返回 true 表示通过。
+ */
+export function validateTextField(
+  root: HTMLElement,
+  attrs: { required?: boolean; pattern?: string },
+  value: unknown,
+): boolean {
+  if (isRequired(attrs) && isEmptyValue(value)) {
+    setInvalidState(root, true)
+    return false
+  }
+  if (isEmptyValue(value)) {
+    setInvalidState(root, false)
+    return true
+  }
+  const re = compileFormPattern(attrs.pattern)
+  if (!re) {
+    setInvalidState(root, false)
+    return true
+  }
+  const ok = re.test(String(value))
+  setInvalidState(root, !ok)
+  return ok
+}
+
 const requiredAttrSpec = {
   required: {
     default: false,
@@ -161,11 +199,143 @@ const lengthAttrSpec = {
   },
 }
 
+/** 正则校验（HTML pattern 语义：整串匹配 ^(?:pattern)$） */
+const patternAttrSpec = {
+  pattern: {
+    default: '',
+    parseHTML: (el: HTMLElement) => parseAttr(el, 'data-pattern'),
+    renderHTML: (attrs: { pattern?: string }) => ({
+      'data-pattern': attrs.pattern || '',
+    }),
+  },
+}
+
+
+/** —— 条件显示（show-if）：依赖另一字段名 + 运算符 + 比较值 —— */
+export type FormShowIfOp = 'eq' | 'neq' | 'empty' | 'nonempty'
+
+export function normalizeShowIfOp(raw: unknown): FormShowIfOp {
+  const v = String(raw ?? '').trim().toLowerCase()
+  if (v === 'neq' || v === '!=' || v === 'notEquals') return 'neq'
+  if (v === 'empty') return 'empty'
+  if (v === 'nonempty' || v === 'notempty') return 'nonempty'
+  return 'eq'
+}
+
+export const SHOW_IF_OP_LABELS: Record<FormShowIfOp, string> = {
+  eq: '等于',
+  neq: '不等于',
+  empty: '为空',
+  nonempty: '非空',
+}
+
+export type ShowIfAttrsLike = {
+  showIfField?: string
+  showIfOp?: string
+  showIfValue?: string
+}
+
+/** 将表单节点 value 规范成可比较的字符串（开关 → true/false） */
+export function formValueToCompareString(value: unknown): string {
+  if (typeof value === 'boolean') return value ? 'true' : 'false'
+  if (value == null) return ''
+  return String(value).trim()
+}
+
+/**
+ * 评估条件显示。
+ * - 未配置 showIfField → 始终显示
+ * - eq / neq：与 showIfValue 字符串比较（忽略首尾空白）
+ * - empty / nonempty：看依赖字段当前值是否为空
+ */
+export function evalShowIf(
+  attrs: ShowIfAttrsLike,
+  valuesByName: Record<string, string>,
+): boolean {
+  const field = String(attrs.showIfField ?? '').trim()
+  if (!field) return true
+  const op = normalizeShowIfOp(attrs.showIfOp)
+  const actual = valuesByName[field] ?? ''
+  if (op === 'empty') return actual === ''
+  if (op === 'nonempty') return actual !== ''
+  const expect = String(attrs.showIfValue ?? '').trim()
+  if (op === 'neq') return actual !== expect
+  return actual === expect
+}
+
+export function formatShowIfBadgeText(attrs: ShowIfAttrsLike): string {
+  const field = String(attrs.showIfField ?? '').trim()
+  if (!field) return ''
+  const op = normalizeShowIfOp(attrs.showIfOp)
+  const opLabel = SHOW_IF_OP_LABELS[op]
+  if (op === 'empty' || op === 'nonempty') return `若 ${field} ${opLabel}`
+  const val = String(attrs.showIfValue ?? '').trim()
+  return `若 ${field} ${opLabel} ${val || '…'}`
+}
+
+function ensureShowIfBadge(root: HTMLElement): HTMLElement {
+  let badge = root.querySelector(':scope > .rte-form-showif-badge') as HTMLElement | null
+  if (!badge) {
+    badge = document.createElement('span')
+    badge.className = 'rte-form-showif-badge'
+    badge.setAttribute('aria-hidden', 'true')
+    // 放在根节点最前，编辑态一眼可见
+    root.insertBefore(badge, root.firstChild)
+  }
+  return badge
+}
+
+/** 同步 data-* / 角标；隐藏逻辑由 FormShowIf 插件按预览态处理 */
+export function syncShowIfUi(root: HTMLElement, attrs: ShowIfAttrsLike) {
+  const field = String(attrs.showIfField ?? '').trim()
+  const op = normalizeShowIfOp(attrs.showIfOp)
+  const value = String(attrs.showIfValue ?? '')
+  root.setAttribute('data-show-if-field', field)
+  root.setAttribute('data-show-if-op', field ? op : '')
+  root.setAttribute('data-show-if-value', field ? value : '')
+  root.classList.toggle('has-show-if', Boolean(field))
+  const badge = ensureShowIfBadge(root)
+  if (field) {
+    badge.hidden = false
+    badge.textContent = formatShowIfBadgeText(attrs)
+    badge.title = `条件显示：${badge.textContent}`
+  } else {
+    badge.hidden = true
+    badge.textContent = ''
+    badge.removeAttribute('title')
+  }
+}
+
+const showIfAttrSpec = {
+  showIfField: {
+    default: '',
+    parseHTML: (el: HTMLElement) => parseAttr(el, 'data-show-if-field'),
+    renderHTML: (attrs: ShowIfAttrsLike) => ({
+      'data-show-if-field': attrs.showIfField || '',
+    }),
+  },
+  showIfOp: {
+    default: 'eq',
+    parseHTML: (el: HTMLElement) => normalizeShowIfOp(parseAttr(el, 'data-show-if-op', 'eq')),
+    renderHTML: (attrs: ShowIfAttrsLike) => ({
+      'data-show-if-op': normalizeShowIfOp(attrs.showIfOp),
+    }),
+  },
+  showIfValue: {
+    default: '',
+    parseHTML: (el: HTMLElement) => parseAttr(el, 'data-show-if-value'),
+    renderHTML: (attrs: ShowIfAttrsLike) => ({
+      'data-show-if-value': attrs.showIfValue || '',
+    }),
+  },
+}
+
 /** 企业表单通用：只读 / 禁用 / 帮助文案 */
 const enterpriseFieldAttrSpec = {
   ...readonlyAttrSpec,
   ...disabledAttrSpec,
   ...helpTextAttrSpec,
+  ...showIfAttrSpec,
 }
 
 function isReadonly(attrs: { readonly?: boolean }) {
@@ -189,13 +359,21 @@ function applyHelpText(helpEl: HTMLElement, helpText: unknown) {
 
 function syncRootEnterpriseFlags(
   root: HTMLElement,
-  attrs: { readonly?: boolean; disabled?: boolean; helpText?: string },
+  attrs: {
+    readonly?: boolean
+    disabled?: boolean
+    helpText?: string
+    showIfField?: string
+    showIfOp?: string
+    showIfValue?: string
+  },
 ) {
   root.setAttribute('data-readonly', attrs.readonly ? 'true' : 'false')
   root.setAttribute('data-disabled', attrs.disabled ? 'true' : 'false')
   root.setAttribute('data-help', String(attrs.helpText ?? ''))
   root.classList.toggle('is-readonly', Boolean(attrs.readonly))
   root.classList.toggle('is-disabled', Boolean(attrs.disabled))
+  syncShowIfUi(root, attrs)
 }
 
 function parseLengthAttr(raw: unknown): string {
@@ -213,8 +391,9 @@ function applyTextControlState(
     disabled?: boolean
     minLength?: string
     maxLength?: string
+    pattern?: string
   },
-  opts?: { supportLength?: boolean },
+  opts?: { supportLength?: boolean; supportPattern?: boolean },
 ) {
   const disabled = isDisabled(attrs)
   const readonly = isReadonly(attrs)
@@ -228,6 +407,11 @@ function applyTextControlState(
     else el.removeAttribute('minLength')
     if (maxL !== '') el.maxLength = Number(maxL)
     else el.removeAttribute('maxLength')
+  }
+  if (opts?.supportPattern) {
+    const p = String(attrs.pattern ?? '').trim()
+    if (p) el.setAttribute('pattern', p)
+    else el.removeAttribute('pattern')
   }
 }
 
@@ -349,6 +533,15 @@ export interface FormTextAttrs {
   helpText: string
   minLength: string
   maxLength: string
+  /** 正则字符串（HTML pattern 语义） */
+  pattern: string
+
+  /** 条件显示：依赖的字段名（空=不启用） */
+  showIfField: string
+  /** eq | neq | empty | nonempty */
+  showIfOp: string
+  /** 比较值（empty/nonempty 时忽略） */
+  showIfValue: string
 }
 
 export interface FormChoiceAttrs {
@@ -365,6 +558,13 @@ export interface FormChoiceAttrs {
   layout: 'row' | 'column' | 'grid'
   /** grid 列数，默认 2 */
   layoutColumns: number
+
+  /** 条件显示：依赖的字段名（空=不启用） */
+  showIfField: string
+  /** eq | neq | empty | nonempty */
+  showIfOp: string
+  /** 比较值（empty/nonempty 时忽略） */
+  showIfValue: string
 }
 
 export interface FormSelectAttrs {
@@ -378,6 +578,13 @@ export interface FormSelectAttrs {
   readonly: boolean
   disabled: boolean
   helpText: string
+
+  /** 条件显示：依赖的字段名（空=不启用） */
+  showIfField: string
+  /** eq | neq | empty | nonempty */
+  showIfOp: string
+  /** 比较值（empty/nonempty 时忽略） */
+  showIfValue: string
 }
 
 export interface FormTextareaAttrs {
@@ -393,6 +600,15 @@ export interface FormTextareaAttrs {
   helpText: string
   minLength: string
   maxLength: string
+  /** 正则字符串（HTML pattern 语义） */
+  pattern: string
+
+  /** 条件显示：依赖的字段名（空=不启用） */
+  showIfField: string
+  /** eq | neq | empty | nonempty */
+  showIfOp: string
+  /** 比较值（empty/nonempty 时忽略） */
+  showIfValue: string
 }
 
 export interface FormNumberAttrs {
@@ -408,6 +624,13 @@ export interface FormNumberAttrs {
   readonly: boolean
   disabled: boolean
   helpText: string
+
+  /** 条件显示：依赖的字段名（空=不启用） */
+  showIfField: string
+  /** eq | neq | empty | nonempty */
+  showIfOp: string
+  /** 比较值（empty/nonempty 时忽略） */
+  showIfValue: string
 }
 
 export interface FormDateAttrs {
@@ -423,6 +646,13 @@ export interface FormDateAttrs {
   readonly: boolean
   disabled: boolean
   helpText: string
+
+  /** 条件显示：依赖的字段名（空=不启用） */
+  showIfField: string
+  /** eq | neq | empty | nonempty */
+  showIfOp: string
+  /** 比较值（empty/nonempty 时忽略） */
+  showIfValue: string
 }
 
 export interface FormSwitchAttrs {
@@ -434,6 +664,13 @@ export interface FormSwitchAttrs {
   readonly: boolean
   disabled: boolean
   helpText: string
+
+  /** 条件显示：依赖的字段名（空=不启用） */
+  showIfField: string
+  /** eq | neq | empty | nonempty */
+  showIfOp: string
+  /** 比较值（empty/nonempty 时忽略） */
+  showIfValue: string
 }
 
 type PosGetter = (() => number | undefined) | boolean
@@ -482,6 +719,7 @@ export const FormTextInput = Node.create({
       ...requiredAttrSpec,
       ...enterpriseFieldAttrSpec,
       ...lengthAttrSpec,
+      ...patternAttrSpec,
     }
   },
 
@@ -523,6 +761,7 @@ export const FormTextInput = Node.create({
                 helpText: attrs.helpText ?? '',
                 minLength: attrs.minLength ?? '',
                 maxLength: attrs.maxLength ?? '',
+                pattern: attrs.pattern ?? '',
               },
             })
             .run(),
@@ -553,16 +792,17 @@ export const FormTextInput = Node.create({
         root.setAttribute('data-required', node.attrs.required ? 'true' : 'false')
         root.setAttribute('data-minlength', node.attrs.minLength || '')
         root.setAttribute('data-maxlength', node.attrs.maxLength || '')
+        root.setAttribute('data-pattern', node.attrs.pattern || '')
         syncRootEnterpriseFlags(root, node.attrs)
         applyRequiredMark(labelEl, node.attrs.label || '文本输入', isRequired(node.attrs))
         applyHelpText(helpEl, node.attrs.helpText)
         input.placeholder = node.attrs.placeholder || '请输入…'
         input.name = node.attrs.name || ''
         input.required = isRequired(node.attrs)
-        applyTextControlState(input, node.attrs, { supportLength: true })
+        applyTextControlState(input, node.attrs, { supportLength: true, supportPattern: true })
         if (document.activeElement !== input) {
           input.value = node.attrs.value || ''
-          validateRequiredEmpty(root, isRequired(node.attrs), node.attrs.value)
+          validateTextField(root, node.attrs, node.attrs.value)
         }
       }
 
@@ -581,7 +821,7 @@ export const FormTextInput = Node.create({
           })
           .run()
         if (opts?.validate !== false) {
-          validateRequiredEmpty(root, isRequired(node.attrs), nextValue)
+          validateTextField(root, node.attrs, nextValue)
         }
       }
 
@@ -590,8 +830,8 @@ export const FormTextInput = Node.create({
       input.addEventListener('keydown', stopNodeViewEvent)
       input.addEventListener('input', () => {
         root.setAttribute('data-value', input.value)
-        if (isRequired(node.attrs) && !isEmptyValue(input.value)) {
-          setInvalidState(root, false)
+        if (!isEmptyValue(input.value)) {
+          if (isRequired(node.attrs)) setInvalidState(root, false)
         }
       })
       input.addEventListener('change', () => commit())
@@ -1207,6 +1447,7 @@ export const FormTextarea = Node.create({
       ...requiredAttrSpec,
       ...enterpriseFieldAttrSpec,
       ...lengthAttrSpec,
+      ...patternAttrSpec,
     }
   },
 
@@ -1249,6 +1490,7 @@ export const FormTextarea = Node.create({
                 helpText: attrs.helpText ?? '',
                 minLength: attrs.minLength ?? '',
                 maxLength: attrs.maxLength ?? '',
+                pattern: attrs.pattern ?? '',
               },
             })
             .run(),
@@ -1285,7 +1527,7 @@ export const FormTextarea = Node.create({
             return true
           })
           .run()
-        if (validate) validateRequiredEmpty(root, isRequired(node.attrs), nextValue)
+        if (validate) validateTextField(root, node.attrs, nextValue)
       }
 
       const paint = () => {
@@ -1296,6 +1538,7 @@ export const FormTextarea = Node.create({
         root.setAttribute('data-required', node.attrs.required ? 'true' : 'false')
         root.setAttribute('data-minlength', node.attrs.minLength || '')
         root.setAttribute('data-maxlength', node.attrs.maxLength || '')
+        root.setAttribute('data-pattern', node.attrs.pattern || '')
         syncRootEnterpriseFlags(root, node.attrs)
         applyRequiredMark(labelEl, node.attrs.label || '多行文本', isRequired(node.attrs))
         applyHelpText(helpEl, node.attrs.helpText)
@@ -1303,9 +1546,10 @@ export const FormTextarea = Node.create({
         ta.name = node.attrs.name || ''
         ta.rows = Number(node.attrs.rows) || 4
         ta.required = isRequired(node.attrs)
-        applyTextControlState(ta, node.attrs, { supportLength: true })
+        applyTextControlState(ta, node.attrs, { supportLength: true, supportPattern: true })
         if (document.activeElement !== ta) {
           ta.value = node.attrs.value || ''
+          validateTextField(root, node.attrs, node.attrs.value)
         }
       }
 
@@ -1956,6 +2200,11 @@ export function formNodeSupportsLength(name: string): boolean {
   return name === 'formTextInput' || name === 'formTextarea'
 }
 
+/** 是否支持正则 pattern（单行 / 多行文本） */
+export function formNodeSupportsPattern(name: string): boolean {
+  return name === 'formTextInput' || name === 'formTextarea'
+}
+
 /** 是否支持行数（多行文本） */
 export function formNodeSupportsRows(name: string): boolean {
   return name === 'formTextarea'
@@ -1975,6 +2224,69 @@ export function formNodeSupportsDateFormat(name: string): boolean {
 export function formNodeSupportsChoiceLayout(name: string): boolean {
   return name === 'formRadioGroup' || name === 'formCheckboxGroup'
 }
+
+
+/** 从文档收集字段名 → 当前值（用于条件显示） */
+export function collectFormValuesByName(doc: { descendants: (f: (node: any, pos: number) => boolean | void) => void }): Record<string, string> {
+  const map: Record<string, string> = {}
+  doc.descendants((node) => {
+    if (!isFormNodeName(node.type.name)) return
+    const name = String(node.attrs?.name ?? '').trim()
+    if (!name) return
+    map[name] = formValueToCompareString(node.attrs?.value)
+  })
+  return map
+}
+
+/**
+ * 按编辑/预览态刷新所有表单节点的条件显示。
+ * - 编辑态：始终显示；若条件当前不成立则加淡化 class
+ * - 预览/填写态：条件不成立则 hidden
+ */
+export function applyFormShowIfVisibility(editor: Editor) {
+  if (!editor || editor.isDestroyed) return
+  const values = collectFormValuesByName(editor.state.doc)
+  const editable = editor.isEditable
+  editor.state.doc.descendants((node, pos) => {
+    if (!isFormNodeName(node.type.name)) return
+    const dom = editor.view.nodeDOM(pos) as HTMLElement | null
+    if (!dom || !(dom instanceof HTMLElement)) return
+    const field = String(node.attrs?.showIfField ?? '').trim()
+    if (!field) {
+      dom.classList.remove('rte-form-showif-hidden', 'rte-form-showif-would-hide')
+      dom.removeAttribute('hidden')
+      return
+    }
+    const visible = evalShowIf(node.attrs, values)
+    if (editable) {
+      dom.classList.remove('rte-form-showif-hidden')
+      dom.removeAttribute('hidden')
+      dom.classList.toggle('rte-form-showif-would-hide', !visible)
+    } else {
+      dom.classList.remove('rte-form-showif-would-hide')
+      dom.classList.toggle('rte-form-showif-hidden', !visible)
+      if (!visible) dom.setAttribute('hidden', '')
+      else dom.removeAttribute('hidden')
+    }
+  })
+}
+
+/**
+ * 条件显示插件：文档变更或强制 meta 时刷新可见性。
+ * 预览切换时宿主应 dispatch meta `{ formShowIfForce: true }` 或直接调用 applyFormShowIfVisibility。
+ */
+export const FormShowIf = Extension.create({
+  name: 'formShowIf',
+
+  onCreate() {
+    requestAnimationFrame(() => applyFormShowIfVisibility(this.editor))
+  },
+
+  onTransaction({ transaction }) {
+    if (!transaction.docChanged && !transaction.getMeta('formShowIfForce')) return
+    requestAnimationFrame(() => applyFormShowIfVisibility(this.editor))
+  },
+})
 
 export const FormExtensions = [
   FormTextInput,

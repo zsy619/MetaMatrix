@@ -149,6 +149,27 @@ export const IconImport = svgIcon([
   'M7.5 9l4.5 4.5L16.5 9',
   'M4.5 17.5v2a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-2',
 ])
+export const IconExport = svgIcon([
+  'M12 13.5V2.5',
+  'M7.5 7l4.5-4.5L16.5 7',
+  'M4.5 17.5v2a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-2',
+])
+export const IconExportHtml = svgIconNodes([
+  h('path', { d: 'M6 2.5h8l5 5V21a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1z' }),
+  h('path', { d: 'M14 2.5V8h5.5' }),
+  h('path', { d: 'M9.2 17.2L8 13h1.6l.7 2.6.7-2.6H12L10.8 17.2z' }),
+])
+export const IconExportText = svgIconNodes([
+  h('path', { d: 'M6 2.5h8l5 5V21a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1z' }),
+  h('path', { d: 'M14 2.5V8h5.5' }),
+  h('path', { d: 'M8 13h8' }),
+  h('path', { d: 'M8 17h5.5' }),
+])
+export const IconExportPng = svgIconNodes([
+  h('rect', { x: 3, y: 5, width: 18, height: 14, rx: 2 }),
+  h('circle', { cx: 9, cy: 10, r: 1.6 }),
+  h('path', { d: 'M21 16l-5-5-4 4-2-2-5 5' }),
+])
 export const IconMore: Component = {
   name: 'IconMore',
   inheritAttrs: false,
@@ -282,19 +303,150 @@ export const IconTemplate = svgIconNodes([
   h('path', { d: 'M9 15.5h6' }),
 ])
 
+export const IconFontSize = svgIcon([
+  'M4 20h6',
+  'M7 20V8',
+  'M4.5 8h5',
+  'M13 20h7',
+  'M16.5 20V11',
+  'M13.5 11h6',
+])
+export const IconFontFamily = svgIcon([
+  'M5 19h4',
+  'M7 19V6',
+  'M4 6h6',
+  'M13 19l3.2-10L19.5 19',
+  'M14.1 15.5h4.2',
+])
+export const IconLineHeight = svgIcon([
+  'M4 6h16',
+  'M4 12h10',
+  'M4 18h16',
+  'M18 9l2 3-2 3',
+])
+
+export const IconSubscript = svgIcon([
+  'M4 5l7 7',
+  'M11 5L4 12',
+  'M14 16h6',
+  'M17 16v5',
+  'M14.5 21h5',
+])
+export const IconSuperscript = svgIcon([
+  'M4 14l7 7',
+  'M11 14L4 21',
+  'M14 4h6',
+  'M17 4v5',
+  'M14.5 9h5',
+])
+
+export const IconFormatPainter = svgIcon([
+  'M8 3h6l2 6H8z',
+  'M9 9v8a2 2 0 0 0 4 0v-2',
+  'M5 21h6',
+])
+export const IconIndent = svgIcon([
+  'M4 6h16',
+  'M10 12h10',
+  'M4 18h16',
+  'M4 9l3 3-3 3',
+])
+export const IconOutdent = svgIcon([
+  'M4 6h16',
+  'M10 12h10',
+  'M4 18h16',
+  'M7 9L4 12l3 3',
+])
+export const IconEmoji = svgIconNodes([
+  h('circle', { cx: 12, cy: 12, r: 9 }),
+  h('path', { d: 'M8.5 10h.01' }),
+  h('path', { d: 'M15.5 10h.01' }),
+  h('path', { d: 'M8.2 14.5c1.2 1.4 2.5 2 3.8 2s2.6-.6 3.8-2' }),
+])
+export const IconPrint = svgIcon([
+  'M7 8V3.5h10V8',
+  'M7 17H5.5A2.5 2.5 0 0 1 3 14.5v-4A2.5 2.5 0 0 1 5.5 8h13A2.5 2.5 0 0 1 21 10.5v4a2.5 2.5 0 0 1-2.5 2.5H17',
+  'M7 14.5h10V21H7z',
+])
+export const IconExportPdf = svgIconNodes([
+  h('path', { d: 'M7 3.5h7.5L19.5 8v12.5a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4.5a1 1 0 0 1 1-1z' }),
+  h('path', { d: 'M14.5 3.5V8h4.5' }),
+  h('path', { d: 'M8.5 13h7' }),
+  h('path', { d: 'M8.5 16.5h5' }),
+])
+export const IconExportDocx = svgIconNodes([
+  h('path', { d: 'M7 3.5h7.5L19.5 8v12.5a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4.5a1 1 0 0 1 1-1z' }),
+  h('path', { d: 'M14.5 3.5V8h4.5' }),
+  h('path', { d: 'M9 14l1.5 4L12 14l1.5 4L15 14' }),
+])
+export const IconColumns = svgIcon([
+  'M4 4h6v16H4z',
+  'M14 4h6v16h-6z',
+])
+export const IconPastePlain = svgIcon([
+  'M9 4h6v3H9z',
+  'M7 7h10v14H7z',
+  'M10 12h4',
+  'M10 15h4',
+])
+export const IconPageBreak = svgIcon([
+  'M4 8h16',
+  'M4 16h16',
+  'M8 11h2',
+  'M12 11h2',
+  'M16 11h2',
+])
+export const IconSpacing = svgIcon([
+  'M4 7h16',
+  'M4 17h16',
+  'M8 10v4',
+  'M16 10v4',
+  'M6 12h4',
+  'M14 12h4',
+])
+export const IconWordStats = svgIcon([
+  'M5 4h14v16H5z',
+  'M8 8h8',
+  'M8 12h8',
+  'M8 16h5',
+])
+
+export const IconFind = svgIcon([
+  'M10.5 17a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13z',
+  'M15.5 15.5L21 21',
+])
+
 export const toolbarIconMap: Record<string, Component> = {
   undo: IconUndo,
   redo: IconRedo,
   clear: IconClear,
+  find: IconFind,
+  formatPainter: IconFormatPainter,
+  indent: IconIndent,
+  outdent: IconOutdent,
+  emoji: IconEmoji,
+  print: IconPrint,
+  exportPdf: IconExportPdf,
+  exportDocx: IconExportDocx,
+  columns: IconColumns,
+  pastePlain: IconPastePlain,
+  pageBreak: IconPageBreak,
+  spacing: IconSpacing,
+  wordStats: IconWordStats,
   heading: IconHeading,
   bold: IconBold,
   italic: IconItalic,
   underline: IconUnderline,
   strike: IconStrike,
+  subscript: IconSubscript,
+  superscript: IconSuperscript,
   codeInline: IconCodeInline,
   highlight: IconHighlight,
   color: IconColorText,
   align: IconAlign,
+  fontSize: IconFontSize,
+  fontFamily: IconFontFamily,
+  lineHeight: IconLineHeight,
   list: IconList,
   quote: IconQuote,
   hr: IconHr,
@@ -307,6 +459,10 @@ export const toolbarIconMap: Record<string, Component> = {
   table: IconTable,
   attach: IconAttach,
   import: IconImport,
+  export: IconExport,
+  exportHtml: IconExportHtml,
+  exportText: IconExportText,
+  exportPng: IconExportPng,
   more: IconMore,
   importDoc: IconDocument,
   importLink: IconConnection,

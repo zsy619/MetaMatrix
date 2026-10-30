@@ -2,14 +2,22 @@
  * TipTap 内置文档模板：工具栏「模板 ▾」插入。
  * content 为函数，每次插入时重新生成表单 name，避免字段冲突。
  */
+import { RTE_FORM_DOC_TEMPLATES, RTE_FORM_TEMPLATE_GROUPS } from './rteFormDocTemplates'
+
 export type RteDocTemplateGroup =
   | 'office'
-  | 'forms'
   | 'product'
   | 'project'
   | 'sales'
   | 'hr'
   | 'notes'
+  | 'formHr'
+  | 'formSales'
+  | 'formFinance'
+  | 'formProject'
+  | 'formOffice'
+  | 'formSurvey'
+  | 'formApproval'
 
 export type RteJsonNode = {
   type: string
@@ -104,6 +112,33 @@ function ordered(...items: string[]): RteJsonNode {
       type: 'listItem',
       content: [p(item)],
     })),
+  }
+}
+
+/** 可勾选任务列表（TaskList / TaskItem）；checked 项用 ✓ 前缀或显式 true */
+function tasks(
+  ...items: Array<string | { text: string; checked?: boolean }>
+): RteJsonNode {
+  return {
+    type: 'taskList',
+    content: items.map((item) => {
+      const raw = typeof item === 'string' ? item : item.text
+      let checked =
+        typeof item === 'string' ? false : !!item.checked
+      let label = raw
+      if (/^[□☐]\s*/.test(label)) {
+        label = label.replace(/^[□☐]\s*/, '')
+        checked = false
+      } else if (/^[✓✔☑]\s*/.test(label)) {
+        label = label.replace(/^[✓✔☑]\s*/, '')
+        checked = true
+      }
+      return {
+        type: 'taskItem',
+        attrs: { checked },
+        content: [p(label)],
+      }
+    }),
   }
 }
 
@@ -332,34 +367,7 @@ function retroChecklist(): RteJsonNode[] {
   ]
 }
 
-function registrationForm(): RteJsonNode[] {
-  return [
-    h(1, '登记表'),
-    p('请填写以下信息完成登记。标 * 为必填项。'),
-    formText('姓名', { placeholder: '请输入真实姓名' }),
-    formText('手机号', { placeholder: '11 位手机号' }),
-    formText('邮箱', { placeholder: 'name@example.com', required: false }),
-    formSelect('部门', ['产品', '研发', '设计', '运营', '市场', '其他']),
-    formDate('登记日期'),
-    formNumber('同行人数', { min: '0', max: '20', step: '1', required: false }),
-    formTextarea('备注', { placeholder: '其他需要说明的信息', required: false }),
-    formSwitch('同意接收后续通知'),
-  ]
-}
 
-function simpleSurvey(): RteJsonNode[] {
-  return [
-    h(1, '简易问卷'),
-    p('感谢填写。预计 1–2 分钟完成。'),
-    formText('您的称呼', { placeholder: '怎么称呼您' }),
-    formRadio('整体满意度', ['非常满意', '满意', '一般', '不满意', '非常不满意']),
-    formCheckbox('您使用过哪些功能', ['文档编辑', '画布协作', '表单收集', '导入导出', '其他']),
-    formSelect('使用频率', ['每天', '每周数次', '每月数次', '偶尔', '首次使用']),
-    formNumber('推荐意愿（0–10）', { min: '0', max: '10', step: '1' }),
-    formTextarea('建议与反馈', { placeholder: '欢迎写下您的想法', required: false }),
-    formDate('填写日期', { required: false }),
-  ]
-}
 
 
 function interviewNotes(): RteJsonNode[] {
@@ -401,36 +409,7 @@ function projectKickoff(): RteJsonNode[] {
   ]
 }
 
-function issueFeedback(): RteJsonNode[] {
-  return [
-    h(1, '问题反馈'),
-    p('请描述您遇到的问题，我们会尽快跟进。'),
-    formText('反馈人', { placeholder: '姓名或花名' }),
-    formText('联系方式', { placeholder: '手机 / 邮箱', required: false }),
-    formSelect('问题类型', ['功能异常', '体验问题', '数据错误', '性能卡顿', '需求建议', '其他']),
-    formSelect('影响程度', ['阻断工作', '严重', '一般', '轻微']),
-    formText('相关页面 / 模块', { placeholder: '如：画布 / 富文本 / 导入导出' }),
-    formDate('发现日期'),
-    formTextarea('问题描述', { placeholder: '现象、复现步骤、期望结果', rows: 5 }),
-    formTextarea('附件说明', { placeholder: '截图 / 录屏链接等', required: false, rows: 3 }),
-  ]
-}
 
-function leaveRequest(): RteJsonNode[] {
-  return [
-    h(1, '请假申请'),
-    p('请填写以下信息提交请假。标 * 为必填项。'),
-    formText('申请人', { placeholder: '姓名' }),
-    formSelect('部门', ['产品', '研发', '设计', '运营', '市场', '综合', '其他']),
-    formSelect('请假类型', ['年假', '事假', '病假', '调休', '婚假', '产假 / 陪产假', '其他']),
-    formDate('开始日期'),
-    formDate('结束日期'),
-    formNumber('请假天数', { min: '0.5', max: '30', step: '0.5' }),
-    formTextarea('事由说明', { placeholder: '简要说明请假原因', rows: 4 }),
-    formText('工作交接人', { placeholder: '姓名', required: false }),
-    formSwitch('已完成工作交接'),
-  ]
-}
 
 function customerFollowup(): RteJsonNode[] {
   return [
@@ -596,93 +575,24 @@ function todoChecklist(): RteJsonNode[] {
     h(1, '任务清单'),
     p('主题：　　　　　负责人：　　　　　截止日期：'),
     h(2, '待办'),
-    bullet('□ 任务一　　优先级：高 / 中 / 低　　截止：', '□ 任务二　　优先级：高 / 中 / 低　　截止：', '□ 任务三　　优先级：高 / 中 / 低　　截止：'),
+    tasks(
+      '任务一　　优先级：高 / 中 / 低　　截止：',
+      '任务二　　优先级：高 / 中 / 低　　截止：',
+      '任务三　　优先级：高 / 中 / 低　　截止：',
+    ),
     h(2, '进行中'),
-    bullet('□ 任务：　　进度：'),
+    tasks('任务：　　进度：'),
     h(2, '已完成'),
-    bullet('✓ '),
+    tasks({ text: '已完成示例', checked: true }),
     h(2, '备注'),
     p(''),
   ]
 }
 
-function expenseClaim(): RteJsonNode[] {
-  return [
-    h(1, '报销申请'),
-    p('请填写报销信息。标 * 为必填项。'),
-    formText('申请人', { placeholder: '姓名' }),
-    formSelect('部门', ['产品', '研发', '设计', '运营', '市场', '综合', '其他']),
-    formSelect('费用类型', ['差旅', '交通', '餐饮', '办公用品', '招待', '培训', '其他']),
-    formDate('费用发生日期'),
-    formNumber('报销金额（元）', { min: '0', step: '0.01' }),
-    formText('费用说明', { placeholder: '事由 / 明细摘要' }),
-    formTextarea('明细备注', { placeholder: '可列多笔明细', required: false, rows: 4 }),
-    formSwitch('已附发票 / 凭证'),
-  ]
-}
 
-function sealRequest(): RteJsonNode[] {
-  return [
-    h(1, '用章申请'),
-    p('请填写用章信息。标 * 为必填项。'),
-    formText('申请人', { placeholder: '姓名' }),
-    formSelect('部门', ['产品', '研发', '设计', '运营', '市场', '综合', '法务', '其他']),
-    formSelect('印章类型', ['公章', '合同章', '财务章', '法人章', '其他']),
-    formText('文件名称', { placeholder: '需盖章文件名称' }),
-    formNumber('份数', { min: '1', max: '99', step: '1' }),
-    formDate('需用日期'),
-    formTextarea('用途说明', { placeholder: '用途与对方单位等', rows: 4 }),
-    formSwitch('是否外带印章'),
-  ]
-}
 
-function visitorRegister(): RteJsonNode[] {
-  return [
-    h(1, '访客登记'),
-    p('欢迎来访，请填写以下信息。'),
-    formText('访客姓名', { placeholder: '姓名' }),
-    formText('所属单位', { placeholder: '公司 / 组织' }),
-    formText('联系电话', { placeholder: '手机号' }),
-    formText('拜访对象', { placeholder: '被访人姓名' }),
-    formSelect('来访事由', ['商务洽谈', '面试', '送货', '维修', '参观', '其他']),
-    formDate('来访日期'),
-    formText('预计停留', { placeholder: '如 1 小时', required: false }),
-    formTextarea('备注', { placeholder: '车牌号 / 随行人员等', required: false, rows: 3 }),
-  ]
-}
 
-function eventSignup(): RteJsonNode[] {
-  return [
-    h(1, '活动报名'),
-    p('请填写报名信息，我们会尽快确认名额。'),
-    formText('姓名', { placeholder: '真实姓名' }),
-    formText('手机号', { placeholder: '11 位手机号' }),
-    formText('邮箱', { placeholder: 'name@example.com', required: false }),
-    formSelect('参与身份', ['个人', '企业代表', '合作伙伴', '媒体', '其他']),
-    formSelect('期望场次', ['上午场', '下午场', '全天', '待定']),
-    formNumber('同行人数', { min: '0', max: '10', step: '1', required: false }),
-    formCheckbox('关注议题', ['产品发布', '行业趋势', '技术分享', '圆桌讨论', '其他']),
-    formTextarea('备注 / 特殊需求', { placeholder: '饮食禁忌、无障碍需求等', required: false, rows: 3 }),
-    formSwitch('同意接收活动通知'),
-  ]
-}
 
-function purchaseRequest(): RteJsonNode[] {
-  return [
-    h(1, '采购申请'),
-    p('请填写采购需求。标 * 为必填项。'),
-    formText('申请人', { placeholder: '姓名' }),
-    formSelect('部门', ['产品', '研发', '设计', '运营', '市场', '综合', '其他']),
-    formText('物品名称', { placeholder: '采购物品 / 服务' }),
-    formNumber('数量', { min: '1', step: '1' }),
-    formNumber('预估单价（元）', { min: '0', step: '0.01', required: false }),
-    formNumber('预估总价（元）', { min: '0', step: '0.01' }),
-    formSelect('紧急程度', ['紧急', '一般', '可延后']),
-    formDate('期望到货日期', { required: false }),
-    formTextarea('用途与规格说明', { placeholder: '型号、规格、供应商建议等', rows: 4 }),
-    formSwitch('已有预算批准'),
-  ]
-}
 
 
 
@@ -906,11 +816,11 @@ function onboardingChecklist(): RteJsonNode[] {
     h(1, '入职清单'),
     p('新人：　　　　　部门：　　　　　入职日：　　　　导师：'),
     h(2, '入职第 1 天'),
-    bullet('□ 账号与权限开通', '□ 设备与工位', '□ 制度与安全培训', '□ 团队介绍'),
+    tasks('账号与权限开通', '设备与工位', '制度与安全培训', '团队介绍'),
     h(2, '入职第 1 周'),
-    bullet('□ 业务背景阅读', '□ 熟悉工具与流程', '□ 认领首个小任务', '□ 1:1 沟通（导师）'),
+    tasks('业务背景阅读', '熟悉工具与流程', '认领首个小任务', '1:1 沟通（导师）'),
     h(2, '入职第 1 月'),
-    bullet('□ 独立完成一项交付', '□ 阶段反馈面谈', '□ 目标对齐（试用期）'),
+    tasks('独立完成一项交付', '阶段反馈面谈', '目标对齐（试用期）'),
     h(2, '备注'),
     p(''),
   ]
@@ -978,7 +888,7 @@ function meetingScratch(): RteJsonNode[] {
     p(''),
     p(''),
     h(2, '待办'),
-    bullet('□ ', '□ '),
+    tasks('待办一', '待办二'),
     h(2, '待确认'),
     bullet(''),
   ]
@@ -1029,7 +939,7 @@ export const RTE_DOC_TEMPLATE_GROUPS: Array<{
   { id: 'sales', label: '销售客户' },
   { id: 'hr', label: '人事行政' },
   { id: 'notes', label: '个人笔记' },
-  { id: 'forms', label: '表单模板' },
+  ...RTE_FORM_TEMPLATE_GROUPS,
 ]
 
 function wrapBuild(fn: () => RteJsonNode[]): () => RteJsonNode[] {
@@ -1084,16 +994,8 @@ export const RTE_DOC_TEMPLATES: RteDocTemplate[] = [
   { id: 'idea-memo', label: '灵感备忘', description: '灵感、验证与下一步', group: 'notes', build: wrapBuild(ideaMemo) },
   { id: 'study-plan', label: '学习计划', description: '目标、资源与周计划', group: 'notes', build: wrapBuild(studyPlan) },
 
-  // —— 表单模板 ——
-  { id: 'registration-form', label: '登记表', description: '姓名、联系方式与部门等', group: 'forms', build: wrapBuild(registrationForm) },
-  { id: 'visitor-register', label: '访客登记', description: '来访信息与事由', group: 'forms', build: wrapBuild(visitorRegister) },
-  { id: 'event-signup', label: '活动报名', description: '场次、议题与联系方式', group: 'forms', build: wrapBuild(eventSignup) },
-  { id: 'simple-survey', label: '简易问卷', description: '满意度与建议收集', group: 'forms', build: wrapBuild(simpleSurvey) },
-  { id: 'issue-feedback', label: '问题反馈', description: '类型、影响与复现描述', group: 'forms', build: wrapBuild(issueFeedback) },
-  { id: 'leave-request', label: '请假申请', description: '类型、日期与交接确认', group: 'forms', build: wrapBuild(leaveRequest) },
-  { id: 'expense-claim', label: '报销申请', description: '类型、金额与凭证', group: 'forms', build: wrapBuild(expenseClaim) },
-  { id: 'seal-request', label: '用章申请', description: '印章类型与用途', group: 'forms', build: wrapBuild(sealRequest) },
-  { id: 'purchase-request', label: '采购申请', description: '物品、数量与预算', group: 'forms', build: wrapBuild(purchaseRequest) },
+  // —— 常用表单（分类见 RTE_FORM_TEMPLATE_GROUPS）——
+  ...RTE_FORM_DOC_TEMPLATES,
 ]
 
 export function getRteDocTemplate(id: string): RteDocTemplate | undefined {

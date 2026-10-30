@@ -14,9 +14,12 @@ import { BubbleMenu } from '@tiptap/vue-3/menus'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import Underline from '@tiptap/extension-underline'
-import { TextStyle } from '@tiptap/extension-text-style'
+import { TextStyle, FontSize, FontFamily, LineHeight } from '@tiptap/extension-text-style'
+import { TaskList, TaskItem } from '@tiptap/extension-list'
 import { Color } from '@tiptap/extension-color'
 import Highlight from '@tiptap/extension-highlight'
+import Subscript from '@tiptap/extension-subscript'
+import Superscript from '@tiptap/extension-superscript'
 import TextAlign from '@tiptap/extension-text-align'
 import Link from '@tiptap/extension-link'
 import Image from '@tiptap/extension-image'
@@ -38,11 +41,30 @@ import {
   FormNumberInput,
   FormDateInput,
   FormSwitch,
+  FormShowIf,
+  applyFormShowIfVisibility,
   isFormNodeName,
   type FormNodeName,
 } from '../extensions/forms'
+import {
+  createRteMention,
+  mentionPluginKey,
+  type RteMentionRenderProps,
+  type RteMentionUiHandlers,
+} from '../extensions/mentionSuggestion'
+import { type RteMentionItem } from './rteMentionItems'
 import FormPropertyInspector from './FormPropertyInspector.vue'
 import { toolbarIconMap, IconTableRows, IconTableCols } from './rteToolbarIcons'
+import { RteCodeBlockLowlight, RTE_CODE_LANGUAGES } from '../extensions/codeHighlight'
+import {
+  collectFindMatches,
+  pickNextMatchIndex,
+  selectFindMatch,
+  replaceFindMatch,
+  replaceAllFindMatches,
+  type RteFindMatch,
+} from '../utils/rteFindReplace'
+import 'highlight.js/styles/github.css'
 import {
   RTE_DOC_TEMPLATES,
   RTE_DOC_TEMPLATE_GROUPS,
@@ -51,6 +73,20 @@ import {
 } from './rteDocTemplates'
 import type { Component } from 'vue'
 import JSZip from 'jszip'
+import html2canvas from 'html2canvas'
+import { SlashCommands, slashPluginKey, type RteSlashRenderProps, type RteSlashUiHandlers } from '../extensions/slashCommands'
+import { exitSuggestion } from '@tiptap/suggestion'
+import {
+  rteSlashSectionLabel,
+  type RteSlashItem,
+} from './rteSlashItems'
+import { LetterSpacing } from '../extensions/letterSpacing'
+import { ParagraphAttrs } from '../extensions/paragraphAttrs'
+import { PageBreak } from '../extensions/pageBreak'
+import { Columns, Column } from '../extensions/columns'
+import { buildDocxBlob } from '../utils/rteExportDocx'
+import { buildPdfFromElement } from '../utils/rteExportPdf'
+import { RTE_EMOJI_LIST } from '../utils/rteEmojiList'
 
 const props = withDefaults(
   defineProps<{
@@ -85,6 +121,7 @@ const emit = defineEmits<{
 }>()
 
 const localTitle = ref(props.title ?? '')
+const rteRootEl = ref<HTMLElement | null>(null)
 watch(
   () => props.title,
   (v) => {
@@ -134,13 +171,339 @@ function openTableContextMenu(event: MouseEvent) {
   tableOpsSheetOpen.value = false
 }
 
+/** —— Slash「/」命令菜单状态（须在 useEditor 前声明，供 Suggestion 闭包） —— */
+const slashOpen = ref(false)
+const slashItems = ref<RteSlashItem[]>([])
+const slashIndex = ref(0)
+const slashQuery = ref('')
+const slashMenuStyle = ref<Record<string, string>>({
+  position: 'fixed',
+  left: '0px',
+  top: '0px',
+  visibility: 'hidden',
+  zIndex: '5300',
+})
+let slashSelectItem: ((item: RteSlashItem) => void) | null = null
+let slashClientRectFn: (() => DOMRect | null) | null = null
+const slashMenuEl = ref<HTMLElement | null>(null)
+
+/** —— @提及建议菜单（与 Slash 同定位模式；候选见 rteMentionItems） —— */
+const mentionOpen = ref(false)
+const mentionItems = ref<RteMentionItem[]>([])
+const mentionIndex = ref(0)
+const mentionQuery = ref('')
+const mentionMenuStyle = ref<Record<string, string>>({
+  position: 'fixed',
+  top: '0px',
+  left: '0px',
+  visibility: 'hidden',
+  zIndex: '10050',
+})
+let mentionCommand: ((item: RteMentionItem) => void) | null = null
+let mentionClientRectFn: (() => DOMRect | null) | null = null
+const mentionMenuEl = ref<HTMLElement | null>(null)
+
+/** 粘贴为纯文本（工具栏开关；影响后续粘贴） */
+const pastePlainTextMode = ref(false)
+/** 格式刷：复制当前选区 marks，应用到下一次选区；sticky 可连续刷 */
+const formatPainter = ref<{
+  marks: Array<{ type: string; attrs: Record<string, unknown> }>
+  sticky: boolean
+} | null>(null)
+const formatPainterArmed = computed(() => !!formatPainter.value)
+let formatPainterSkipSelection = false
+
+const emojiOpen = ref(false)
+const columnsOpen = ref(false)
+const spacingOpen = ref(false)
+const wordStatsOpen = ref(false)
+
+function placeSlashMenuFromRect(rect: DOMRect | null) {
+  const el = slashMenuEl.value
+  if (!el || !rect) {
+    slashMenuStyle.value = {
+      ...slashMenuStyle.value,
+      visibility: 'hidden',
+    }
+    return
+  }
+  const vw = window.innerWidth
+  const vh = window.innerHeight
+  const pad = 8
+  const gap = 4
+  // 先显隐测量
+  el.style.visibility = 'hidden'
+  el.style.left = '0px'
+  el.style.top = '0px'
+  el.style.maxHeight = 'none'
+  const mw = Math.max(el.offsetWidth, 280)
+  const mh = Math.max(el.offsetHeight, 1)
+  const spaceBelow = vh - rect.bottom - pad
+  const spaceAbove = rect.top - pad
+  const preferBelow = spaceBelow >= Math.min(mh, 240) || spaceBelow >= spaceAbove
+  let maxH: number
+  let top: number
+  if (preferBelow) {
+    maxH = Math.max(140, spaceBelow - gap)
+    top = rect.bottom + gap
+  } else {
+    maxH = Math.max(140, spaceAbove - gap)
+    const usedH = Math.min(mh, maxH)
+    top = rect.top - gap - usedH
+  }
+  let left = rect.left
+  if (left + mw > vw - pad) left = vw - pad - mw
+  if (left < pad) left = pad
+  if (top < pad) top = pad
+  if (top + Math.min(mh, maxH) > vh - pad) {
+    top = Math.max(pad, vh - pad - Math.min(mh, maxH))
+  }
+  slashMenuStyle.value = {
+    position: 'fixed',
+    left: `${Math.round(left)}px`,
+    top: `${Math.round(top)}px`,
+    maxHeight: `${Math.round(maxH)}px`,
+    visibility: 'visible',
+    zIndex: '5300',
+  }
+}
+
+function syncSlashFromProps(props: RteSlashRenderProps) {
+  slashItems.value = props.items
+  slashQuery.value = props.query
+  slashSelectItem = props.command
+  slashClientRectFn = props.clientRect ?? null
+  if (slashIndex.value >= props.items.length) {
+    slashIndex.value = Math.max(0, props.items.length - 1)
+  }
+  const rect = props.clientRect?.() ?? null
+  nextTick(() => {
+    placeSlashMenuFromRect(rect)
+    // 选中项滚入视野
+    const active = slashMenuEl.value?.querySelector?.('.rte-slash-item.is-active') as HTMLElement | null
+    active?.scrollIntoView?.({ block: 'nearest' })
+  })
+}
+
+function closeSlashMenu() {
+  slashOpen.value = false
+  slashItems.value = []
+  slashIndex.value = 0
+  slashQuery.value = ''
+  slashSelectItem = null
+  slashClientRectFn = null
+  slashMenuStyle.value = {
+    ...slashMenuStyle.value,
+    visibility: 'hidden',
+  }
+}
+
+const slashUi: RteSlashUiHandlers = {
+  onStart(props) {
+    slashOpen.value = true
+    slashIndex.value = 0
+    syncSlashFromProps(props)
+  },
+  onUpdate(props) {
+    if (!slashOpen.value) slashOpen.value = true
+    syncSlashFromProps(props)
+  },
+  onExit() {
+    closeSlashMenu()
+  },
+  onKeyDown({ event }) {
+    if (!slashOpen.value) return false
+    if (event.key === 'ArrowDown') {
+      event.preventDefault()
+      if (!slashItems.value.length) return true
+      slashIndex.value = (slashIndex.value + 1) % slashItems.value.length
+      nextTick(() => {
+        const active = slashMenuEl.value?.querySelector?.('.rte-slash-item.is-active') as HTMLElement | null
+        active?.scrollIntoView?.({ block: 'nearest' })
+      })
+      return true
+    }
+    if (event.key === 'ArrowUp') {
+      event.preventDefault()
+      if (!slashItems.value.length) return true
+      slashIndex.value =
+        (slashIndex.value - 1 + slashItems.value.length) % slashItems.value.length
+      nextTick(() => {
+        const active = slashMenuEl.value?.querySelector?.('.rte-slash-item.is-active') as HTMLElement | null
+        active?.scrollIntoView?.({ block: 'nearest' })
+      })
+      return true
+    }
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      const item = slashItems.value[slashIndex.value]
+      if (item && slashSelectItem) slashSelectItem(item)
+      return true
+    }
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      const ed = editor.value
+      if (ed && !ed.isDestroyed) {
+        try {
+          exitSuggestion(ed.view, slashPluginKey)
+        } catch {
+          closeSlashMenu()
+        }
+      } else {
+        closeSlashMenu()
+      }
+      return true
+    }
+    return false
+  },
+  onCommand(item) {
+    applySlashCommandItem(item)
+  },
+}
+
+function pickSlashItem(item: RteSlashItem) {
+  if (slashSelectItem) slashSelectItem(item)
+  else applySlashCommandItem(item)
+}
+
+function placeMentionMenuFromRect(rect: DOMRect | null) {
+  const el = mentionMenuEl.value
+  if (!el || !rect) {
+    mentionMenuStyle.value = {
+      ...mentionMenuStyle.value,
+      visibility: 'hidden',
+    }
+    return
+  }
+  const gap = 4
+  const vw = window.innerWidth
+  const vh = window.innerHeight
+  const menuW = el.offsetWidth || 280
+  const menuH = el.offsetHeight || 200
+  let left = rect.left
+  if (left + menuW > vw - 8) left = Math.max(8, vw - menuW - 8)
+  if (left < 8) left = 8
+  const spaceBelow = vh - rect.bottom
+  const spaceAbove = rect.top
+  let top: number
+  let maxH: number
+  if (spaceBelow >= Math.min(menuH, 180) || spaceBelow >= spaceAbove) {
+    maxH = Math.max(140, spaceBelow - gap)
+    top = rect.bottom + gap
+  } else {
+    maxH = Math.max(140, spaceAbove - gap)
+    const usedH = Math.min(menuH, maxH)
+    top = rect.top - gap - usedH
+  }
+  mentionMenuStyle.value = {
+    position: 'fixed',
+    top: `${Math.max(8, top)}px`,
+    left: `${left}px`,
+    maxHeight: `${maxH}px`,
+    visibility: 'visible',
+    zIndex: '10050',
+  }
+}
+
+function syncMentionFromProps(props: RteMentionRenderProps) {
+  mentionItems.value = props.items
+  mentionQuery.value = props.query
+  mentionCommand = props.command
+  mentionClientRectFn = props.clientRect ?? null
+  if (mentionIndex.value >= props.items.length) {
+    mentionIndex.value = Math.max(0, props.items.length - 1)
+  }
+}
+
+function closeMentionMenu() {
+  mentionOpen.value = false
+  mentionItems.value = []
+  mentionIndex.value = 0
+  mentionQuery.value = ''
+  mentionCommand = null
+  mentionClientRectFn = null
+  mentionMenuStyle.value = {
+    ...mentionMenuStyle.value,
+    visibility: 'hidden',
+  }
+}
+
+const mentionUi: RteMentionUiHandlers = {
+  onStart(props) {
+    mentionOpen.value = true
+    mentionIndex.value = 0
+    syncMentionFromProps(props)
+    nextTick(() => placeMentionMenuFromRect(mentionClientRectFn?.() ?? null))
+  },
+  onUpdate(props) {
+    if (!mentionOpen.value) mentionOpen.value = true
+    syncMentionFromProps(props)
+    nextTick(() => placeMentionMenuFromRect(mentionClientRectFn?.() ?? null))
+  },
+  onExit() {
+    closeMentionMenu()
+  },
+  onKeyDown({ event }) {
+    if (!mentionOpen.value) return false
+    if (event.key === 'ArrowDown') {
+      if (!mentionItems.value.length) return true
+      mentionIndex.value = (mentionIndex.value + 1) % mentionItems.value.length
+      nextTick(() => {
+        const active = mentionMenuEl.value?.querySelector?.('.rte-mention-item.is-active') as HTMLElement | null
+        active?.scrollIntoView?.({ block: 'nearest' })
+      })
+      return true
+    }
+    if (event.key === 'ArrowUp') {
+      if (!mentionItems.value.length) return true
+      mentionIndex.value =
+        (mentionIndex.value - 1 + mentionItems.value.length) % mentionItems.value.length
+      nextTick(() => {
+        const active = mentionMenuEl.value?.querySelector?.('.rte-mention-item.is-active') as HTMLElement | null
+        active?.scrollIntoView?.({ block: 'nearest' })
+      })
+      return true
+    }
+    if (event.key === 'Enter') {
+      const item = mentionItems.value[mentionIndex.value]
+      if (item && mentionCommand) mentionCommand(item)
+      return true
+    }
+    if (event.key === 'Escape') {
+      const ed = editor.value
+      if (ed) {
+        try {
+          exitSuggestion(ed.view, mentionPluginKey)
+        } catch {
+          closeMentionMenu()
+        }
+      } else {
+        closeMentionMenu()
+      }
+      return true
+    }
+    return false
+  },
+}
+
+function pickMentionItem(item: RteMentionItem) {
+  if (mentionCommand) mentionCommand(item)
+}
+
+function repositionMentionMenu() {
+  if (!mentionOpen.value) return
+  placeMentionMenuFromRect(mentionClientRectFn?.() ?? null)
+}
+
+
 const editor = useEditor({
 
   content: toEditorContent(props.modelValue),
   extensions: [
     StarterKit.configure({
       heading: { levels: [1, 2, 3, 4] },
-      codeBlock: {},
+      // 使用 RteCodeBlockLowlight，避免与 StarterKit 自带 codeBlock 重复注册
+      codeBlock: false,
       blockquote: {},
       horizontalRule: {},
       bulletList: {},
@@ -155,7 +518,18 @@ const editor = useEditor({
       dropcursor: { color: '#5b8cff', width: 2 },
     }),
     Underline,
+    Subscript,
+    Superscript,
+    RteCodeBlockLowlight,
     TextStyle,
+    FontSize,
+    FontFamily,
+    LineHeight,
+    LetterSpacing,
+    ParagraphAttrs,
+    PageBreak,
+    Columns,
+    Column,
     Color,
     Highlight.configure({ multicolor: true }),
     TextAlign.configure({
@@ -217,7 +591,9 @@ const editor = useEditor({
         alwaysPreserveAspectRatio: true,
       },
     }),
-    Table.configure({ resizable: false }),
+    TaskList,
+    TaskItem.configure({ nested: true }),
+    Table.configure({ resizable: true }),
     TableRow,
     TableHeader,
     TableCell,
@@ -237,6 +613,11 @@ const editor = useEditor({
     FormNumberInput,
     FormDateInput,
     FormSwitch,
+    FormShowIf,
+    createRteMention({ ui: mentionUi }),
+    SlashCommands.configure({
+      ui: slashUi,
+    }),
   ],
   editorProps: {
     attributes: {
@@ -244,6 +625,12 @@ const editor = useEditor({
       spellcheck: 'false',
     },
     transformPastedHTML(html) {
+      if (pastePlainTextMode.value) {
+        const tmp = document.createElement('div')
+        tmp.innerHTML = html
+        const plain = tmp.textContent || tmp.innerText || ''
+        return escapeHtml(plain).replace(/\n/g, '<br>')
+      }
       // Paste cleanup: strip scripts/styles/event handlers & Microsoft junk wrappers
       return html
         .replace(/<script[\s\S]*?<\/script>/gi, '')
@@ -253,6 +640,21 @@ const editor = useEditor({
         .replace(/<\/(xml|o:p)>/gi, '')
         .replace(/class=("Mso[^"]*"|'Mso[^']*')/gi, '')
         .replace(/style="[^"]*mso-[^"]*"/gi, '')
+    },
+    handlePaste(_view, event) {
+      if (!pastePlainTextMode.value) return false
+      const plain = event.clipboardData?.getData('text/plain')
+      if (plain == null) return false
+      event.preventDefault()
+      const ed = editor.value
+      if (!ed) return true
+      const lines = plain.replace(/\r\n/g, '\n').split('\n')
+      const nodes = lines.map((line) => ({
+        type: 'paragraph',
+        content: line ? [{ type: 'text', text: line }] : [],
+      }))
+      ed.chain().focus().insertContent(nodes).run()
+      return true
     },
     handleClick(_view, _pos, event) {
       const target = event.target as HTMLElement | null
@@ -297,6 +699,11 @@ const editor = useEditor({
         ed.chain().focus().toggleCodeBlock().run()
         return true
       }
+      if (event.key.toLowerCase() === 'f') {
+        event.preventDefault()
+        openFindDialog()
+        return true
+      }
       return false
     },
   },
@@ -309,6 +716,7 @@ const editor = useEditor({
   onBlur: () => emit('blur'),
   onSelectionUpdate: ({ editor: ed }) => {
     syncSelectedFormFromEditor(ed)
+    applyFormatPainterIfNeeded(ed)
   },
   onTransaction: ({ editor: ed }) => {
     if (selectedFormPos.value != null) formSelectionTick.value += 1
@@ -527,6 +935,37 @@ const charCount = computed(() => {
   return Array.from(text.replace(/\s/g, '')).length
 })
 
+function countWords(raw: string): number {
+  const t = raw.trim()
+  if (!t) return 0
+  const cn = (t.match(/[\u4e00-\u9fff]/g) || []).length
+  const en = t
+    .replace(/[\u4e00-\u9fff]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean).length
+  return cn + en
+}
+
+const wordCount = computed(() => countWords(editor.value?.getText() ?? ''))
+
+const selectionStats = computed(() => {
+  void editor.value?.state.selection
+  const ed = editor.value
+  if (!ed) return { chars: 0, words: 0, hasSelection: false }
+  const { from, to, empty } = ed.state.selection
+  if (empty) return { chars: 0, words: 0, hasSelection: false }
+  const raw = ed.state.doc.textBetween(from, to, '\n', '\n')
+  const chars = Array.from(raw.replace(/\s/g, '')).length
+  return { chars, words: countWords(raw), hasSelection: true }
+})
+
+/** 中文阅读约 400 字/分钟 */
+const readingMinutes = computed(() => {
+  const n = charCount.value
+  if (n <= 0) return 0
+  return Math.max(1, Math.ceil(n / 400))
+})
+
 function chain() {
   return editor.value?.chain().focus()
 }
@@ -547,6 +986,179 @@ function redo() {
 function clearFormat() {
   chain()?.unsetAllMarks().clearNodes().run()
 }
+
+function activateFormatPainter(sticky = false) {
+  const ed = editor.value
+  if (!ed) return
+  const { from, to, empty } = ed.state.selection
+  if (empty) {
+    ElMessage.warning('请先选中要复制格式的文字')
+    return
+  }
+  const marks: Array<{ type: string; attrs: Record<string, unknown> }> = []
+  ed.state.doc.nodesBetween(from, to, (node) => {
+    if (!node.isText) return
+    for (const m of node.marks) {
+      const key = m.type.name
+      if (!marks.some((x) => x.type === key && JSON.stringify(x.attrs) === JSON.stringify(m.attrs))) {
+        marks.push({ type: key, attrs: { ...m.attrs } })
+      }
+    }
+  })
+  // 也抓 textStyle 属性
+  const ts = ed.getAttributes('textStyle') || {}
+  if (Object.values(ts).some((v) => v != null && v !== '')) {
+    const idx = marks.findIndex((x) => x.type === 'textStyle')
+    if (idx >= 0) marks[idx] = { type: 'textStyle', attrs: { ...ts } }
+    else marks.push({ type: 'textStyle', attrs: { ...ts } })
+  }
+  if (!marks.length) {
+    ElMessage.warning('选区无明显格式可复制')
+    return
+  }
+  formatPainter.value = { marks, sticky }
+  formatPainterSkipSelection = true
+  ElMessage.success(sticky ? '格式刷已锁定（再点取消）' : '格式刷已启用：请选择目标文字')
+}
+
+let formatPainterClickTimer: ReturnType<typeof setTimeout> | null = null
+
+function toggleFormatPainter() {
+  if (formatPainter.value) {
+    if (formatPainterClickTimer) {
+      clearTimeout(formatPainterClickTimer)
+      formatPainterClickTimer = null
+    }
+    formatPainter.value = null
+    ElMessage.info('已取消格式刷')
+    return
+  }
+  if (formatPainterClickTimer) {
+    clearTimeout(formatPainterClickTimer)
+    formatPainterClickTimer = null
+    activateFormatPainter(true)
+    return
+  }
+  formatPainterClickTimer = setTimeout(() => {
+    formatPainterClickTimer = null
+    activateFormatPainter(false)
+  }, 280)
+}
+
+function onFormatPainterDblClick() {
+  if (formatPainterClickTimer) {
+    clearTimeout(formatPainterClickTimer)
+    formatPainterClickTimer = null
+  }
+  if (formatPainter.value?.sticky) {
+    formatPainter.value = null
+    ElMessage.info('已取消格式刷')
+    return
+  }
+  activateFormatPainter(true)
+}
+
+function applyFormatPainterIfNeeded(ed: { state: { selection: { empty: boolean } }; chain: () => any }) {
+  if (!formatPainter.value) return
+  if (formatPainterSkipSelection) {
+    formatPainterSkipSelection = false
+    return
+  }
+  if (ed.state.selection.empty) return
+  const marks = formatPainter.value.marks
+  let c = ed.chain().focus()
+  for (const m of marks) {
+    c = c.setMark(m.type, m.attrs)
+  }
+  c.run()
+  if (!formatPainter.value.sticky) {
+    formatPainter.value = null
+  }
+}
+
+function indentBlock() {
+  chain()?.indent().run()
+}
+function outdentBlock() {
+  chain()?.outdent().run()
+}
+
+function insertEmoji(emoji: string) {
+  chain()?.insertContent(emoji).run()
+  emojiOpen.value = false
+  moreOpen.value = false
+}
+
+function insertPageBreak() {
+  chain()?.setPageBreak().run()
+}
+
+function insertColumns(cols: 2 | 3) {
+  chain()?.setColumns(cols).run()
+  columnsOpen.value = false
+  moreOpen.value = false
+}
+
+function togglePastePlain() {
+  pastePlainTextMode.value = !pastePlainTextMode.value
+  ElMessage.success(
+    pastePlainTextMode.value ? '已开启：粘贴为纯文本' : '已关闭：粘贴为纯文本',
+  )
+}
+
+function printEditor() {
+  const root = rteRootEl.value
+  if (!root) {
+    ElMessage.warning('编辑器未就绪')
+    return
+  }
+  root.classList.add('rte-printing')
+  const cleanup = () => {
+    root.classList.remove('rte-printing')
+    window.removeEventListener('afterprint', cleanup)
+  }
+  window.addEventListener('afterprint', cleanup)
+  window.print()
+  // 部分浏览器不触发 afterprint
+  setTimeout(cleanup, 1500)
+}
+
+function currentLetterSpacing(): string {
+  const v = editor.value?.getAttributes('textStyle')?.letterSpacing
+  return typeof v === 'string' ? v : ''
+}
+function currentMarginTop(): string {
+  const ed = editor.value
+  if (!ed) return ''
+  for (const type of ['paragraph', 'heading'] as const) {
+    if (ed.isActive(type)) {
+      const v = ed.getAttributes(type).marginTop
+      return typeof v === 'string' ? v : ''
+    }
+  }
+  return ''
+}
+function currentMarginBottom(): string {
+  const ed = editor.value
+  if (!ed) return ''
+  for (const type of ['paragraph', 'heading'] as const) {
+    if (ed.isActive(type)) {
+      const v = ed.getAttributes(type).marginBottom
+      return typeof v === 'string' ? v : ''
+    }
+  }
+  return ''
+}
+function applyLetterSpacing(v: string) {
+  if (!v) chain()?.unsetLetterSpacing().run()
+  else chain()?.setLetterSpacing(v).run()
+}
+function applyMarginTop(v: string) {
+  chain()?.setParagraphSpacing({ marginTop: v || null }).run()
+}
+function applyMarginBottom(v: string) {
+  chain()?.setParagraphSpacing({ marginBottom: v || null }).run()
+}
 function setHeading(level: 1 | 2 | 3 | 4 | 0) {
   if (level === 0) {
     chain()?.setParagraph().run()
@@ -565,6 +1177,12 @@ function toggleUnderline() {
 }
 function toggleStrike() {
   chain()?.toggleStrike().run()
+}
+function toggleSubscript() {
+  chain()?.toggleSubscript().run()
+}
+function toggleSuperscript() {
+  chain()?.toggleSuperscript().run()
 }
 function toggleCode() {
   chain()?.toggleCode().run()
@@ -625,6 +1243,89 @@ function toggleBulletList() {
 function toggleOrderedList() {
   chain()?.toggleOrderedList().run()
 }
+function toggleTaskList() {
+  chain()?.toggleTaskList().run()
+}
+
+/** 字号 / 字体 / 行距（依赖 TextStyle + FontSize/FontFamily/LineHeight） */
+const FONT_SIZE_OPTIONS: Array<{ label: string; value: string }> = [
+  { label: '默认', value: '' },
+  { label: '12px', value: '12px' },
+  { label: '13px', value: '13px' },
+  { label: '14px', value: '14px' },
+  { label: '15px', value: '15px' },
+  { label: '16px', value: '16px' },
+  { label: '18px', value: '18px' },
+  { label: '20px', value: '20px' },
+  { label: '24px', value: '24px' },
+  { label: '28px', value: '28px' },
+  { label: '32px', value: '32px' },
+  { label: '36px', value: '36px' },
+]
+const FONT_FAMILY_OPTIONS: Array<{ label: string; value: string }> = [
+  { label: '默认字体', value: '' },
+  { label: '系统默认', value: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
+  { label: '苹方 / 微软雅黑', value: '"PingFang SC", "Microsoft YaHei", sans-serif' },
+  { label: '宋体', value: '"Songti SC", SimSun, serif' },
+  { label: '黑体', value: '"Heiti SC", SimHei, sans-serif' },
+  { label: '楷体', value: '"Kaiti SC", KaiTi, serif' },
+  { label: '仿宋', value: '"STFangsong", FangSong, serif' },
+  { label: '等宽', value: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace' },
+  { label: '衬线', value: 'Georgia, "Times New Roman", serif' },
+  { label: 'Arial', value: 'Arial, Helvetica, sans-serif' },
+]
+const LINE_HEIGHT_OPTIONS: Array<{ label: string; value: string }> = [
+  { label: '默认', value: '' },
+  { label: '1.0', value: '1' },
+  { label: '1.15', value: '1.15' },
+  { label: '1.5', value: '1.5' },
+  { label: '1.75', value: '1.75' },
+  { label: '2.0', value: '2' },
+  { label: '2.5', value: '2.5' },
+  { label: '3.0', value: '3' },
+]
+
+function currentFontSize(): string {
+  const v = editor.value?.getAttributes('textStyle')?.fontSize
+  return typeof v === 'string' ? v : ''
+}
+function currentFontFamily(): string {
+  const v = editor.value?.getAttributes('textStyle')?.fontFamily
+  return typeof v === 'string' ? v : ''
+}
+function currentLineHeight(): string {
+  const v = editor.value?.getAttributes('textStyle')?.lineHeight
+  return typeof v === 'string' ? v : ''
+}
+function applyFontSize(size: string) {
+  if (!size) chain()?.unsetFontSize().run()
+  else chain()?.setFontSize(size).run()
+  fontSizeOpen.value = false
+  moreFontSizeOpen.value = false
+  moreOpen.value = false
+}
+function applyFontFamily(family: string) {
+  if (!family) chain()?.unsetFontFamily().run()
+  else chain()?.setFontFamily(family).run()
+  fontFamilyOpen.value = false
+  moreFontFamilyOpen.value = false
+  moreOpen.value = false
+}
+function applyLineHeight(lh: string) {
+  if (!lh) chain()?.unsetLineHeight().run()
+  else chain()?.setLineHeight(lh).run()
+  lineHeightOpen.value = false
+  moreLineHeightOpen.value = false
+  moreOpen.value = false
+}
+function closeFontMenus() {
+  fontSizeOpen.value = false
+  fontFamilyOpen.value = false
+  lineHeightOpen.value = false
+  moreFontSizeOpen.value = false
+  moreFontFamilyOpen.value = false
+  moreLineHeightOpen.value = false
+}
 function toggleBlockquote() {
   chain()?.toggleBlockquote().run()
 }
@@ -633,6 +1334,43 @@ function setHorizontalRule() {
 }
 function toggleCodeBlock() {
   chain()?.toggleCodeBlock().run()
+}
+
+/** 代码块语言（lowlight）；仅在 codeBlock 内有效 */
+const CODE_LANG_OPTIONS: Array<{ label: string; value: string }> = [
+  { label: '纯文本', value: 'plaintext' },
+  { label: 'JavaScript', value: 'javascript' },
+  { label: 'TypeScript', value: 'typescript' },
+  { label: 'JSON', value: 'json' },
+  { label: 'HTML', value: 'xml' },
+  { label: 'CSS', value: 'css' },
+  { label: 'Python', value: 'python' },
+  { label: 'Java', value: 'java' },
+  { label: 'Go', value: 'go' },
+  { label: 'Rust', value: 'rust' },
+  { label: 'SQL', value: 'sql' },
+  { label: 'Bash', value: 'bash' },
+  { label: 'Markdown', value: 'markdown' },
+  { label: 'C', value: 'c' },
+  { label: 'C++', value: 'cpp' },
+].filter((o) => o.value === 'plaintext' || RTE_CODE_LANGUAGES.includes(o.value))
+
+function currentCodeLanguage(): string {
+  const ed = editor.value
+  if (!ed || !ed.isActive('codeBlock')) return ''
+  const lang = ed.getAttributes('codeBlock')?.language
+  return typeof lang === 'string' && lang ? lang : 'plaintext'
+}
+
+function setCodeLanguage(lang: string) {
+  const ed = editor.value
+  if (!ed || !ed.isActive('codeBlock')) return
+  const next = lang || 'plaintext'
+  ed.chain().focus().updateAttributes('codeBlock', { language: next }).run()
+}
+function onCodeLangChange(event: Event) {
+  const v = (event.target as HTMLSelectElement).value
+  setCodeLanguage(v)
 }
 
 /** —— 插入表单控件 —— */
@@ -689,6 +1427,92 @@ function insertFormSwitch() {
   formOpen.value = false
   moreFormOpen.value = false
   moreOpen.value = false
+}
+
+/** Slash「/」选中后执行（range 已由 suggestion command 删除） */
+function applySlashCommandItem(item: RteSlashItem) {
+  const action = item.action
+  switch (action.type) {
+    case 'heading':
+      setHeading(action.level)
+      break
+    case 'paragraph':
+      setHeading(0)
+      break
+    case 'bulletList':
+      toggleBulletList()
+      break
+    case 'orderedList':
+      toggleOrderedList()
+      break
+    case 'taskList':
+      toggleTaskList()
+      break
+    case 'blockquote':
+      toggleBlockquote()
+      break
+    case 'codeBlock':
+      toggleCodeBlock()
+      break
+    case 'hr':
+      setHorizontalRule()
+      break
+    case 'table':
+      openTableDialog()
+      break
+    case 'image':
+      insertImage()
+      break
+    case 'video':
+      insertVideo()
+      break
+    case 'link':
+      insertLink()
+      break
+    case 'formula':
+      insertFormula()
+      break
+    case 'attach':
+      onAttachment()
+      break
+    case 'note':
+      insertNote()
+      break
+    case 'form':
+      switch (action.kind) {
+        case 'radio':
+          insertFormRadio()
+          break
+        case 'checkbox':
+          insertFormCheckbox()
+          break
+        case 'text':
+          insertFormText()
+          break
+        case 'textarea':
+          insertFormTextarea()
+          break
+        case 'number':
+          insertFormNumber()
+          break
+        case 'select':
+          insertFormSelect()
+          break
+        case 'date':
+          insertFormDate()
+          break
+        case 'datetime':
+          insertFormDateTime()
+          break
+        case 'switch':
+          insertFormSwitch()
+          break
+      }
+      break
+    case 'template':
+      insertDocTemplate(action.id)
+      break
+  }
 }
 
 function closeTemplateMenus() {
@@ -916,6 +1740,11 @@ function setViewMode(next: RteViewMode) {
 
   viewMode.value = next
   syncEditorEditableForMode(next)
+  // 预览↔编辑切换时强制刷新表单条件显示（setEditable 不一定触发 docChanged）
+  nextTick(() => {
+    const ed = editor.value
+    if (ed && !ed.isDestroyed) applyFormShowIfVisibility(ed)
+  })
 
   if (next !== 'edit') {
     // 预览/源码不展示表单属性面板
@@ -935,6 +1764,10 @@ function applySourceNow() {
 
 onBeforeUnmount(() => {
   document.removeEventListener('pointerdown', onDocPointerDownForMenus, true)
+  window.removeEventListener('resize', repositionSlashMenu)
+  window.removeEventListener('scroll', repositionSlashMenu, true)
+  window.removeEventListener('resize', repositionMentionMenu)
+  window.removeEventListener('scroll', repositionMentionMenu, true)
   for (const t of menuCloseTimers.values()) clearTimeout(t)
   menuCloseTimers.clear()
   floatMenuEls.clear()
@@ -1021,6 +1854,136 @@ function onFormInspectorMouseUp() {
 }
 
 
+
+/** —— 查找 / 替换 —— */
+const findDialogOpen = ref(false)
+const findQuery = ref('')
+const findReplaceText = ref('')
+const findCaseSensitive = ref(false)
+const findMatches = ref<RteFindMatch[]>([])
+const findMatchIndex = ref(-1)
+
+function refreshFindMatches(selectNext = false) {
+  const ed = editor.value
+  if (!ed) {
+    findMatches.value = []
+    findMatchIndex.value = -1
+    return
+  }
+  const matches = collectFindMatches(ed.state.doc, findQuery.value, {
+    caseSensitive: findCaseSensitive.value,
+  })
+  findMatches.value = matches
+  if (!matches.length) {
+    findMatchIndex.value = -1
+    return
+  }
+  if (selectNext || findMatchIndex.value < 0 || findMatchIndex.value >= matches.length) {
+    const fromPos = ed.state.selection.from
+    const idx = pickNextMatchIndex(matches, fromPos, 1)
+    findMatchIndex.value = idx
+    if (idx >= 0) selectFindMatch(ed, matches[idx])
+  } else {
+    selectFindMatch(ed, matches[findMatchIndex.value])
+  }
+}
+
+function openFindDialog() {
+  findDialogOpen.value = true
+  moreOpen.value = false
+  // 若有选区且选区较短，预填查找词
+  const ed = editor.value
+  if (ed) {
+    const { from, to, empty } = ed.state.selection
+    if (!empty && to - from <= 80) {
+      const t = ed.state.doc.textBetween(from, to, ' ')
+      if (t && !findQuery.value) findQuery.value = t
+    }
+  }
+  nextTick(() => {
+    const el = document.querySelector('.rte-find-query') as HTMLInputElement | null
+    el?.focus()
+    el?.select()
+    refreshFindMatches(true)
+  })
+}
+
+function closeFindDialog() {
+  findDialogOpen.value = false
+}
+
+function onFindQueryInput() {
+  refreshFindMatches(true)
+}
+
+function findGo(direction: 1 | -1) {
+  const ed = editor.value
+  const matches = findMatches.value
+  if (!ed || !matches.length) {
+    refreshFindMatches(true)
+    return
+  }
+  let idx = findMatchIndex.value
+  if (idx < 0) {
+    idx = pickNextMatchIndex(matches, ed.state.selection.from, direction)
+  } else {
+    idx = (idx + direction + matches.length) % matches.length
+  }
+  findMatchIndex.value = idx
+  selectFindMatch(ed, matches[idx])
+}
+
+function doReplaceOne() {
+  const ed = editor.value
+  const matches = findMatches.value
+  const idx = findMatchIndex.value
+  if (!ed || idx < 0 || !matches[idx]) {
+    ElMessage.info('没有可替换的匹配')
+    return
+  }
+  replaceFindMatch(ed, matches[idx], findReplaceText.value)
+  // 替换后重新收集，并跳到下一处
+  const nextFrom = matches[idx].from + findReplaceText.value.length
+  const nextMatches = collectFindMatches(ed.state.doc, findQuery.value, {
+    caseSensitive: findCaseSensitive.value,
+  })
+  findMatches.value = nextMatches
+  if (!nextMatches.length) {
+    findMatchIndex.value = -1
+    ElMessage.success('已替换，无更多匹配')
+    return
+  }
+  const ni = pickNextMatchIndex(nextMatches, nextFrom, 1)
+  findMatchIndex.value = ni
+  if (ni >= 0) selectFindMatch(ed, nextMatches[ni])
+}
+
+function doReplaceAll() {
+  const ed = editor.value
+  if (!ed) return
+  const matches = collectFindMatches(ed.state.doc, findQuery.value, {
+    caseSensitive: findCaseSensitive.value,
+  })
+  if (!matches.length) {
+    ElMessage.info('没有匹配项')
+    findMatches.value = []
+    findMatchIndex.value = -1
+    return
+  }
+  const n = replaceAllFindMatches(ed, matches, findReplaceText.value)
+  findMatches.value = []
+  findMatchIndex.value = -1
+  ElMessage.success(`已全部替换 ${n} 处`)
+}
+
+const findStatusText = computed(() => {
+  const q = findQuery.value
+  if (!q) return '输入要查找的内容'
+  const total = findMatches.value.length
+  if (!total) return '无匹配'
+  const cur = findMatchIndex.value >= 0 ? findMatchIndex.value + 1 : 0
+  return `${cur} / ${total}`
+})
 
 /** —— 插入链接 —— */
 const linkDialogOpen = ref(false)
@@ -1974,6 +2937,7 @@ const tableOpItems = computed((): TableOpItem[] => {
 function onTableToolClick() {
   moreOpen.value = false
   closeImportMenu()
+  closeExportMenu()
   if (isInTable()) {
     tableMenuOpen.value = false
     tableOpsSheetOpen.value = true
@@ -1994,6 +2958,7 @@ function onTableToolbarButtonClick() {
   colorOpen.value = false
   highlightOpen.value = false
   alignOpen.value = false
+  closeFontMenus()
   if (isInTable()) {
     tableMenuOpen.value = !tableMenuOpen.value
     closeTableCtx()
@@ -2374,6 +3339,169 @@ function closeImportMenu() {
   importMenuOpen.value = false
 }
 
+const exportMenuOpen = ref(false)
+const exportBusy = ref(false)
+
+function closeExportMenu() {
+  exportMenuOpen.value = false
+}
+
+function onExportMenu() {
+  exportMenuOpen.value = true
+  moreOpen.value = false
+}
+
+function exportFileBasename(): string {
+  const raw = (localTitle.value || '').trim() || '未命名文档'
+  return raw.replace(/[\\/:*?"<>|]+/g, '_').replace(/\s+/g, '_').slice(0, 80)
+}
+
+function triggerDownloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.rel = 'noopener'
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
+
+function exportAsHtml() {
+  closeExportMenu()
+  moreOpen.value = false
+  const ed = editor.value
+  if (!ed) {
+    ElMessage.warning('编辑器未就绪')
+    return
+  }
+  const title = (localTitle.value || '').trim() || '未命名文档'
+  const body = ed.getHTML()
+  const html = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>${escapeHtml(title)}</title>
+<style>
+body{font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;line-height:1.6;color:#1d2129;max-width:800px;margin:32px auto;padding:0 16px;}
+img,video{max-width:100%;height:auto;}
+table{border-collapse:collapse;width:100%;}
+th,td{border:1px solid #e5e6eb;padding:6px 8px;}
+</style>
+</head>
+<body>
+<h1>${escapeHtml(title)}</h1>
+${body}
+</body>
+</html>
+`
+  triggerDownloadBlob(new Blob([html], { type: 'text/html;charset=utf-8' }), `${exportFileBasename()}.html`)
+  ElMessage.success('已导出 HTML')
+}
+
+function exportAsPlainText() {
+  closeExportMenu()
+  moreOpen.value = false
+  const ed = editor.value
+  if (!ed) {
+    ElMessage.warning('编辑器未就绪')
+    return
+  }
+  const title = (localTitle.value || '').trim()
+  const textBody = ed.getText({ blockSeparator: '\n' }) || ''
+  const content = title ? `${title}\n\n${textBody}` : textBody
+  triggerDownloadBlob(
+    new Blob([content], { type: 'text/plain;charset=utf-8' }),
+    `${exportFileBasename()}.txt`,
+  )
+  ElMessage.success('已导出纯文本')
+}
+
+async function exportAsPng() {
+  closeExportMenu()
+  moreOpen.value = false
+  if (exportBusy.value) return
+  const root = rteRootEl.value
+  const el =
+    (root?.querySelector?.('.ProseMirror') as HTMLElement | null) ||
+    (root?.querySelector?.('.rte-body') as HTMLElement | null)
+  if (!el) {
+    ElMessage.warning('未找到可导出的正文区域')
+    return
+  }
+  exportBusy.value = true
+  try {
+    const canvas = await html2canvas(el, {
+      backgroundColor: '#ffffff',
+      scale: 2,
+      useCORS: true,
+      logging: false,
+    })
+    const link = document.createElement('a')
+    link.download = `${exportFileBasename()}.png`
+    link.href = canvas.toDataURL('image/png')
+    link.click()
+    ElMessage.success('已导出图片')
+  } catch (err) {
+    console.error(err)
+    ElMessage.error('导出图片失败')
+  } finally {
+    exportBusy.value = false
+  }
+}
+
+async function exportAsPdf() {
+  closeExportMenu()
+  moreOpen.value = false
+  if (exportBusy.value) return
+  const root = rteRootEl.value
+  const el =
+    (root?.querySelector?.('.ProseMirror') as HTMLElement | null) ||
+    (root?.querySelector?.('.rte-body') as HTMLElement | null)
+  if (!el) {
+    ElMessage.warning('未找到可导出的正文区域')
+    return
+  }
+  exportBusy.value = true
+  try {
+    const title = (localTitle.value || '').trim() || '未命名文档'
+    const blob = await buildPdfFromElement(el, { title })
+    triggerDownloadBlob(blob, `${exportFileBasename()}.pdf`)
+    ElMessage.success('已导出 PDF')
+  } catch (err) {
+    console.error(err)
+    ElMessage.error('导出 PDF 失败')
+  } finally {
+    exportBusy.value = false
+  }
+}
+
+async function exportAsDocx() {
+  closeExportMenu()
+  moreOpen.value = false
+  if (exportBusy.value) return
+  const ed = editor.value
+  if (!ed) {
+    ElMessage.warning('编辑器未就绪')
+    return
+  }
+  exportBusy.value = true
+  try {
+    const title = (localTitle.value || '').trim() || '未命名文档'
+    const bodyText = ed.getText({ blockSeparator: '\n' }) || ''
+    const blob = await buildDocxBlob({ title, bodyText })
+    triggerDownloadBlob(blob, `${exportFileBasename()}.docx`)
+    ElMessage.success('已导出 Word')
+  } catch (err) {
+    console.error(err)
+    ElMessage.error('导出 Word 失败')
+  } finally {
+    exportBusy.value = false
+  }
+}
+
 /** tool-wrap @mouseleave：仅当指针真正离开按钮+菜单时才关（避免点选项前被关掉） */
 /** 工具条下拉：fixed + Teleport 到 body，按按钮 rect 自动翻转/夹紧 */
 const FLOAT_VIEW_PAD = 8
@@ -2504,7 +3632,7 @@ function placeFloatMenuEl(menuEl: HTMLElement, key: string) {
   }
 
   const preferEnd =
-    key === 'import' || key === 'table' || key === 'more' || key.startsWith('more-')
+    key === 'import' || key === 'export' || key === 'table' || key === 'more' || key.startsWith('more-')
   let left = preferEnd ? rect.right - mw : rect.left
   const maxW = Math.max(160, vw - FLOAT_VIEW_PAD * 2)
   if (mw > maxW) {
@@ -2598,6 +3726,8 @@ function closeAllToolbarMenus() {
   alignOpen.value = false
   tableMenuOpen.value = false
   importMenuOpen.value = false
+  exportMenuOpen.value = false
+  closeFontMenus()
   closeColorMenus()
   closeHighlightMenus()
   closeMore()
@@ -2609,7 +3739,7 @@ function onDocPointerDownForMenus(e: PointerEvent) {
   if (!t) return
   if (
     t.closest(
-      '.rte-tool-wrap, .rte-tool, .rte-float-menu, .rte-more-menu, .rte-more-flyout, .el-overlay, .el-dialog, .el-message-box, .rte-table-dialog, .rte-attach-dialog',
+      '.rte-tool-wrap, .rte-tool, .rte-float-menu, .rte-more-menu, .rte-more-flyout, .rte-slash-menu, .rte-mention-menu, .el-overlay, .el-dialog, .el-message-box, .rte-table-dialog, .rte-attach-dialog',
     )
   ) {
     return
@@ -2617,8 +3747,17 @@ function onDocPointerDownForMenus(e: PointerEvent) {
   closeAllToolbarMenus()
 }
 
+function repositionSlashMenu() {
+  if (!slashOpen.value) return
+  placeSlashMenuFromRect(slashClientRectFn?.() ?? null)
+}
+
 onMounted(() => {
   document.addEventListener('pointerdown', onDocPointerDownForMenus, true)
+  window.addEventListener('resize', repositionSlashMenu)
+  window.addEventListener('scroll', repositionSlashMenu, true)
+  window.addEventListener('resize', repositionMentionMenu)
+  window.addEventListener('scroll', repositionMentionMenu, true)
 })
 
 function onImport() {
@@ -2884,6 +4023,12 @@ const highlightOpen = ref(false)
 const moreColorOpen = ref(false)
 const moreHighlightOpen = ref(false)
 const alignOpen = ref(false)
+const fontSizeOpen = ref(false)
+const fontFamilyOpen = ref(false)
+const lineHeightOpen = ref(false)
+const moreFontSizeOpen = ref(false)
+const moreFontFamilyOpen = ref(false)
+const moreLineHeightOpen = ref(false)
 const customColorOpen = ref(false)
 const customColorHex = ref('#165dff')
 
@@ -2960,6 +4105,7 @@ function closeHighlightMenus() {
 
 function toggleColorMenu() {
   closeHighlightMenus()
+  closeFontMenus()
   headingOpen.value = false
   listOpen.value = false
   formOpen.value = false
@@ -2971,6 +4117,7 @@ function toggleColorMenu() {
 
 function toggleHighlightMenu() {
   closeColorMenus()
+  closeFontMenus()
   headingOpen.value = false
   listOpen.value = false
   formOpen.value = false
@@ -2999,6 +4146,9 @@ function onMoreToolClick(t: ToolItem) {
     moreHighlightOpen.value = false
     moreFormOpen.value = false
     moreTemplateOpen.value = false
+    moreFontSizeOpen.value = false
+    moreFontFamilyOpen.value = false
+    moreLineHeightOpen.value = false
     moreColorOpen.value = !moreColorOpen.value
     customColorOpen.value = false
     return
@@ -3007,6 +4157,9 @@ function onMoreToolClick(t: ToolItem) {
     moreColorOpen.value = false
     moreFormOpen.value = false
     moreTemplateOpen.value = false
+    moreFontSizeOpen.value = false
+    moreFontFamilyOpen.value = false
+    moreLineHeightOpen.value = false
     customColorOpen.value = false
     moreHighlightOpen.value = !moreHighlightOpen.value
     return
@@ -3015,6 +4168,9 @@ function onMoreToolClick(t: ToolItem) {
     moreColorOpen.value = false
     moreHighlightOpen.value = false
     moreTemplateOpen.value = false
+    moreFontSizeOpen.value = false
+    moreFontFamilyOpen.value = false
+    moreLineHeightOpen.value = false
     customColorOpen.value = false
     moreFormOpen.value = !moreFormOpen.value
     return
@@ -3023,14 +4179,73 @@ function onMoreToolClick(t: ToolItem) {
     moreColorOpen.value = false
     moreHighlightOpen.value = false
     moreFormOpen.value = false
+    moreFontSizeOpen.value = false
+    moreFontFamilyOpen.value = false
+    moreLineHeightOpen.value = false
     customColorOpen.value = false
     moreTemplateOpen.value = !moreTemplateOpen.value
+    return
+  }
+  if (t.kind === 'fontSize') {
+    moreColorOpen.value = false
+    moreHighlightOpen.value = false
+    moreFormOpen.value = false
+    moreTemplateOpen.value = false
+    moreFontFamilyOpen.value = false
+    moreLineHeightOpen.value = false
+    customColorOpen.value = false
+    moreFontSizeOpen.value = !moreFontSizeOpen.value
+    return
+  }
+  if (t.kind === 'fontFamily') {
+    moreColorOpen.value = false
+    moreHighlightOpen.value = false
+    moreFormOpen.value = false
+    moreTemplateOpen.value = false
+    moreFontSizeOpen.value = false
+    moreLineHeightOpen.value = false
+    customColorOpen.value = false
+    moreFontFamilyOpen.value = !moreFontFamilyOpen.value
+    return
+  }
+  if (t.kind === 'lineHeight') {
+    moreColorOpen.value = false
+    moreHighlightOpen.value = false
+    moreFormOpen.value = false
+    moreTemplateOpen.value = false
+    moreFontSizeOpen.value = false
+    moreFontFamilyOpen.value = false
+    customColorOpen.value = false
+    moreLineHeightOpen.value = !moreLineHeightOpen.value
+    return
+  }
+  if (t.kind === 'emoji') {
+    moreOpen.value = false
+    emojiOpen.value = true
+    return
+  }
+  if (t.kind === 'columns') {
+    moreOpen.value = false
+    insertColumns(2)
+    return
+  }
+  if (t.kind === 'spacing') {
+    moreOpen.value = false
+    spacingOpen.value = true
+    return
+  }
+  if (t.kind === 'wordStats') {
+    moreOpen.value = false
+    wordStatsOpen.value = true
     return
   }
   moreColorOpen.value = false
   moreHighlightOpen.value = false
   moreFormOpen.value = false
   moreTemplateOpen.value = false
+  moreFontSizeOpen.value = false
+  moreFontFamilyOpen.value = false
+  moreLineHeightOpen.value = false
   customColorOpen.value = false
   moreOpen.value = false
   t.run?.()
@@ -3045,7 +4260,7 @@ type ToolItem = {
   title?: string
   icon: string
   iconComp?: Component
-  kind?: 'heading' | 'list' | 'more' | 'btn' | 'color' | 'highlight' | 'align' | 'import' | 'table' | 'attach' | 'form' | 'template' | 'divider'
+  kind?: 'heading' | 'list' | 'more' | 'btn' | 'color' | 'highlight' | 'align' | 'fontSize' | 'fontFamily' | 'lineHeight' | 'import' | 'export' | 'table' | 'attach' | 'form' | 'template' | 'code' | 'divider' | 'emoji' | 'columns' | 'spacing' | 'wordStats'
   active?: () => boolean
   run?: () => void
 }
@@ -3058,9 +4273,10 @@ const allTools = computed((): ToolItem[] => {
   void editor.value?.state // reactive tick
   const ic = (key: string) => toolIcon(key)
   /**
-   * 最大化工具栏分组（对齐知乎专栏写作页）：
-   * 操作 | 文字 | 段落高级 | 插入 | 其他
-   * 目录已按产品要求移除，勿恢复。
+   * 最大化工具栏分组（Route C 打磨）：
+   * 操作（含格式刷/纯文本粘贴）| 文字（含缩进/段距）| 段落高级（分页/分栏）|
+   * 插入（含表情）| 其他（打印/字数/导入导出）
+   * 目录已按产品要求移除，勿恢复。换行靠 flex-wrap，过密可用「更多」。
    */
   return [
     // —— 操作 ——
@@ -3073,6 +4289,33 @@ const allTools = computed((): ToolItem[] => {
       icon: '⌫',
       iconComp: ic('clear'),
       run: clearFormat,
+    },
+    {
+      key: 'find',
+      label: '查找',
+      title: '查找与替换 (Ctrl/⌘+F)',
+      icon: '🔍',
+      iconComp: ic('find'),
+      active: () => findDialogOpen.value,
+      run: openFindDialog,
+    },
+    {
+      key: 'formatPainter',
+      label: '格式刷',
+      title: '格式刷（单击一次，双击连续）',
+      icon: '🖌',
+      iconComp: ic('formatPainter'),
+      active: () => formatPainterArmed.value,
+      run: toggleFormatPainter,
+    },
+    {
+      key: 'pastePlain',
+      label: '纯文本粘贴',
+      title: '粘贴为纯文本',
+      icon: 'TXT',
+      iconComp: ic('pastePlain'),
+      active: () => pastePlainTextMode.value,
+      run: togglePastePlain,
     },
     { key: 'div-ops', label: '', icon: '', kind: 'divider' },
     // —— 文字 ——
@@ -3110,6 +4353,22 @@ const allTools = computed((): ToolItem[] => {
       run: toggleStrike,
     },
     {
+      key: 'subscript',
+      label: '下标',
+      icon: 'x₂',
+      iconComp: ic('subscript'),
+      active: () => isActive('subscript'),
+      run: toggleSubscript,
+    },
+    {
+      key: 'superscript',
+      label: '上标',
+      icon: 'x²',
+      iconComp: ic('superscript'),
+      active: () => isActive('superscript'),
+      run: toggleSuperscript,
+    },
+    {
       key: 'codeInline',
       label: '行内码',
       title: '行内代码',
@@ -3127,8 +4386,28 @@ const allTools = computed((): ToolItem[] => {
       active: () => isActive('highlight'),
     },
     { key: 'color', label: '颜色', icon: 'A', iconComp: ic('color'), kind: 'color' },
+    { key: 'fontSize', label: '字号', icon: 'Aa', iconComp: ic('fontSize'), kind: 'fontSize', active: () => !!currentFontSize() },
+    { key: 'fontFamily', label: '字体', icon: 'F', iconComp: ic('fontFamily'), kind: 'fontFamily', active: () => !!currentFontFamily() },
+    { key: 'lineHeight', label: '行距', icon: '↕', iconComp: ic('lineHeight'), kind: 'lineHeight', active: () => !!currentLineHeight() },
     { key: 'align', label: '对齐', icon: '≡', iconComp: ic('align'), kind: 'align' },
     { key: 'list', label: '列表', icon: '☰▾', iconComp: ic('list'), kind: 'list' },
+    {
+      key: 'indent',
+      label: '增加缩进',
+      title: '增加缩进',
+      icon: '→',
+      iconComp: ic('indent'),
+      run: indentBlock,
+    },
+    {
+      key: 'outdent',
+      label: '减少缩进',
+      title: '减少缩进',
+      icon: '←',
+      iconComp: ic('outdent'),
+      run: outdentBlock,
+    },
+    { key: 'spacing', label: '段距', title: '段前段后 / 字间距', icon: '↕', iconComp: ic('spacing'), kind: 'spacing', active: () => !!(currentLetterSpacing() || currentMarginTop() || currentMarginBottom()) },
     { key: 'div-text', label: '', icon: '', kind: 'divider' },
     // —— 高级（段落）——
     {
@@ -3143,11 +4422,22 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'code',
       label: '代码块',
+      title: '代码块',
       icon: '</>',
       iconComp: ic('code'),
+      kind: 'code',
       active: () => isActive('codeBlock'),
       run: toggleCodeBlock,
     },
+    {
+      key: 'pageBreak',
+      label: '分页符',
+      title: '插入分页符（打印/PDF）',
+      icon: '=======',
+      iconComp: ic('pageBreak'),
+      run: insertPageBreak,
+    },
+    { key: 'columns', label: '分栏', title: '多栏布局', icon: '▥', iconComp: ic('columns'), kind: 'columns' },
     { key: 'div-block', label: '', icon: '', kind: 'divider' },
     // —— 插入 ——
     { key: 'image', label: '图片', icon: '🖼', iconComp: ic('image'), run: insertImage },
@@ -3188,9 +4478,28 @@ const allTools = computed((): ToolItem[] => {
     { key: 'table', label: '表格', icon: '▦', iconComp: ic('table'), kind: 'table', active: () => isInTable(), run: onTableToolClick },
     { key: 'attach', label: '附件', icon: '☁▾', iconComp: ic('attach'), kind: 'attach', run: onAttachment },
     { key: 'note', label: '注释', icon: '[1]', iconComp: ic('note'), run: insertNote },
+    { key: 'emoji', label: '表情', title: '插入表情', icon: '☺', iconComp: ic('emoji'), kind: 'emoji' },
     { key: 'div-insert', label: '', icon: '', kind: 'divider' },
     // —— 其他 ——
+    {
+      key: 'print',
+      label: '打印',
+      title: '打印 / 打印预览',
+      icon: '🖨',
+      iconComp: ic('print'),
+      run: printEditor,
+    },
+    {
+      key: 'wordStats',
+      label: '字数',
+      title: '字数统计',
+      icon: '∑',
+      iconComp: ic('wordStats'),
+      kind: 'wordStats',
+      active: () => wordStatsOpen.value,
+    },
     { key: 'import', label: '导入', icon: '⇪▾', iconComp: ic('import'), kind: 'import', run: onImport },
+    { key: 'export', label: '导出', icon: '⇩▾', iconComp: ic('export'), kind: 'export', run: onExportMenu },
     // 草稿备份：按产品要求先隐藏入口（保留 onDraftBackup 逻辑）
     // { key: 'draft', label: '草稿备份', icon: '⏱', run: onDraftBackup },
   ]
@@ -3198,9 +4507,9 @@ const allTools = computed((): ToolItem[] => {
 
 /**
  * 仅最大化（expanded）时展示：不进紧凑顶栏，也不进「更多」。
- * 导入等同款；「更改」若后续加回工具条，请放入此集合。
+ * 导入 / 导出等同款；「更改」若后续加回工具条，请放入此集合。
  */
-const EXPANDED_ONLY_KEYS = new Set(['import'])
+const EXPANDED_ONLY_KEYS = new Set(['import', 'export'])
 
 /** 顶栏直接展示的工具 */
 const visibleTools = computed(() => {
@@ -3229,7 +4538,14 @@ function closeMore() {
   moreHighlightOpen.value = false
   moreFormOpen.value = false
   moreTemplateOpen.value = false
+  moreFontSizeOpen.value = false
+  moreFontFamilyOpen.value = false
+  moreLineHeightOpen.value = false
   customColorOpen.value = false
+  emojiOpen.value = false
+  columnsOpen.value = false
+  spacingOpen.value = false
+  wordStatsOpen.value = false
 }
 
 function onRootMouseDown(event: MouseEvent) {
@@ -3260,6 +4576,7 @@ defineExpose({ focusEditor, editor, onDraftBackup })
 
 <template>
   <div
+    ref="rteRootEl"
     class="rte-root"
     :class="{
       compact,
@@ -3291,7 +4608,7 @@ defineExpose({ focusEditor, editor, onDraftBackup })
             :ref="(el) => setFloatAnchor('heading', el)" data-rte-anchor="heading"
             :class="{ active: isActive('heading') }"
             title="标题"
-            @click.stop="markToolbarMenuOpening(); closeColorMenus(); closeHighlightMenus(); listOpen = false; formOpen = false; templateOpen = false; alignOpen = false; headingOpen = !headingOpen"
+            @click.stop="markToolbarMenuOpening(); closeColorMenus(); closeHighlightMenus(); closeFontMenus(); listOpen = false; formOpen = false; templateOpen = false; alignOpen = false; headingOpen = !headingOpen"
           >
             <span class="rte-tool-icon">
               <component :is="toolIcon('heading')" class="rte-ep-icon" />
@@ -3321,6 +4638,9 @@ defineExpose({ focusEditor, editor, onDraftBackup })
               <button type="button" @click="setHeading(3); headingOpen = false">
                 标题 3
               </button>
+              <button type="button" @click="setHeading(4); headingOpen = false">
+                标题 4
+              </button>
             </div>
           </Teleport>
         </div>
@@ -3335,10 +4655,13 @@ defineExpose({ focusEditor, editor, onDraftBackup })
             class="rte-tool"
             :ref="(el) => setFloatAnchor('list', el)" data-rte-anchor="list"
             :class="{
-              active: isActive('bulletList') || isActive('orderedList'),
+              active:
+                isActive('bulletList') ||
+                isActive('orderedList') ||
+                isActive('taskList'),
             }"
             title="列表"
-            @click.stop="markToolbarMenuOpening(); closeColorMenus(); closeHighlightMenus(); headingOpen = false; formOpen = false; templateOpen = false; alignOpen = false; listOpen = !listOpen"
+            @click.stop="markToolbarMenuOpening(); closeColorMenus(); closeHighlightMenus(); closeFontMenus(); headingOpen = false; formOpen = false; templateOpen = false; alignOpen = false; listOpen = !listOpen"
           >
             <span class="rte-tool-icon">
               <component :is="toolIcon('list')" class="rte-ep-icon" />
@@ -3358,15 +4681,24 @@ defineExpose({ focusEditor, editor, onDraftBackup })
             >
               <button
                 type="button"
+                :class="{ active: isActive('bulletList') }"
                 @click="toggleBulletList(); listOpen = false"
               >
                 无序列表
               </button>
               <button
                 type="button"
+                :class="{ active: isActive('orderedList') }"
                 @click="toggleOrderedList(); listOpen = false"
               >
                 有序列表
+              </button>
+              <button
+                type="button"
+                :class="{ active: isActive('taskList') }"
+                @click="toggleTaskList(); listOpen = false"
+              >
+                任务列表
               </button>
             </div>
           </Teleport>
@@ -3658,6 +4990,133 @@ defineExpose({ focusEditor, editor, onDraftBackup })
           </Teleport>
         </div>
         <div
+          v-else-if="t.kind === 'fontSize'"
+          class="rte-tool-wrap"
+          @mouseenter="onToolMenuEnter('fontSize')"
+          @mouseleave="onToolMenuLeave($event, 'fontSize', () => (fontSizeOpen = false))"
+        >
+          <button
+            type="button"
+            class="rte-tool"
+            :ref="(el) => setFloatAnchor('fontSize', el)" data-rte-anchor="fontSize"
+            :class="{ active: fontSizeOpen || !!currentFontSize() }"
+            title="字号"
+            @click.stop="markToolbarMenuOpening(); closeColorMenus(); closeHighlightMenus(); fontFamilyOpen = false; lineHeightOpen = false; moreFontSizeOpen = false; moreFontFamilyOpen = false; moreLineHeightOpen = false; headingOpen = false; listOpen = false; formOpen = false; templateOpen = false; alignOpen = false; fontSizeOpen = !fontSizeOpen"
+          >
+            <span class="rte-tool-icon">
+              <component :is="toolIcon('fontSize')" class="rte-ep-icon" />
+            </span>
+            <span class="rte-tool-label"
+              >字号<span class="rte-caret" aria-hidden="true"></span
+            ></span>
+          </button>
+          <Teleport to="body">
+            <div
+              v-if="fontSizeOpen"
+              class="rte-menu"
+              v-rte-float="'fontSize'"
+              @mousedown.prevent
+              @mouseenter="onToolMenuEnter('fontSize')"
+              @mouseleave="onToolMenuLeave($event, 'fontSize', () => (fontSizeOpen = false))"
+            >
+              <button
+                v-for="opt in FONT_SIZE_OPTIONS"
+                :key="'fs-' + (opt.value || 'default')"
+                type="button"
+                :class="{ active: (opt.value || '') === (currentFontSize() || '') }"
+                @click="applyFontSize(opt.value)"
+              >
+                {{ opt.label }}
+              </button>
+            </div>
+          </Teleport>
+        </div>
+        <div
+          v-else-if="t.kind === 'fontFamily'"
+          class="rte-tool-wrap"
+          @mouseenter="onToolMenuEnter('fontFamily')"
+          @mouseleave="onToolMenuLeave($event, 'fontFamily', () => (fontFamilyOpen = false))"
+        >
+          <button
+            type="button"
+            class="rte-tool"
+            :ref="(el) => setFloatAnchor('fontFamily', el)" data-rte-anchor="fontFamily"
+            :class="{ active: fontFamilyOpen || !!currentFontFamily() }"
+            title="字体"
+            @click.stop="markToolbarMenuOpening(); closeColorMenus(); closeHighlightMenus(); fontSizeOpen = false; lineHeightOpen = false; moreFontSizeOpen = false; moreFontFamilyOpen = false; moreLineHeightOpen = false; headingOpen = false; listOpen = false; formOpen = false; templateOpen = false; alignOpen = false; fontFamilyOpen = !fontFamilyOpen"
+          >
+            <span class="rte-tool-icon">
+              <component :is="toolIcon('fontFamily')" class="rte-ep-icon" />
+            </span>
+            <span class="rte-tool-label"
+              >字体<span class="rte-caret" aria-hidden="true"></span
+            ></span>
+          </button>
+          <Teleport to="body">
+            <div
+              v-if="fontFamilyOpen"
+              class="rte-menu rte-font-family-menu"
+              v-rte-float="'fontFamily'"
+              @mousedown.prevent
+              @mouseenter="onToolMenuEnter('fontFamily')"
+              @mouseleave="onToolMenuLeave($event, 'fontFamily', () => (fontFamilyOpen = false))"
+            >
+              <button
+                v-for="opt in FONT_FAMILY_OPTIONS"
+                :key="'ff-' + (opt.value || 'default')"
+                type="button"
+                :class="{ active: (opt.value || '') === (currentFontFamily() || '') }"
+                :style="opt.value ? { fontFamily: opt.value } : undefined"
+                @click="applyFontFamily(opt.value)"
+              >
+                {{ opt.label }}
+              </button>
+            </div>
+          </Teleport>
+        </div>
+        <div
+          v-else-if="t.kind === 'lineHeight'"
+          class="rte-tool-wrap"
+          @mouseenter="onToolMenuEnter('lineHeight')"
+          @mouseleave="onToolMenuLeave($event, 'lineHeight', () => (lineHeightOpen = false))"
+        >
+          <button
+            type="button"
+            class="rte-tool"
+            :ref="(el) => setFloatAnchor('lineHeight', el)" data-rte-anchor="lineHeight"
+            :class="{ active: lineHeightOpen || !!currentLineHeight() }"
+            title="行距"
+            @click.stop="markToolbarMenuOpening(); closeColorMenus(); closeHighlightMenus(); fontSizeOpen = false; fontFamilyOpen = false; moreFontSizeOpen = false; moreFontFamilyOpen = false; moreLineHeightOpen = false; headingOpen = false; listOpen = false; formOpen = false; templateOpen = false; alignOpen = false; lineHeightOpen = !lineHeightOpen"
+          >
+            <span class="rte-tool-icon">
+              <component :is="toolIcon('lineHeight')" class="rte-ep-icon" />
+            </span>
+            <span class="rte-tool-label"
+              >行距<span class="rte-caret" aria-hidden="true"></span
+            ></span>
+          </button>
+          <Teleport to="body">
+            <div
+              v-if="lineHeightOpen"
+              class="rte-menu"
+              v-rte-float="'lineHeight'"
+              @mousedown.prevent
+              @mouseenter="onToolMenuEnter('lineHeight')"
+              @mouseleave="onToolMenuLeave($event, 'lineHeight', () => (lineHeightOpen = false))"
+            >
+              <button
+                v-for="opt in LINE_HEIGHT_OPTIONS"
+                :key="'lh-' + (opt.value || 'default')"
+                type="button"
+                :class="{ active: (opt.value || '') === (currentLineHeight() || '') }"
+                @click="applyLineHeight(opt.value)"
+              >
+                {{ opt.label }}
+              </button>
+            </div>
+          </Teleport>
+        </div>
+        <div
           v-else-if="t.kind === 'align'"
           class="rte-tool-wrap"
           @mouseenter="onToolMenuEnter('align')"
@@ -3674,7 +5133,7 @@ defineExpose({ focusEditor, editor, onDraftBackup })
                 isActive({ textAlign: 'justify' }),
             }"
             title="对齐"
-            @click.stop="markToolbarMenuOpening(); closeColorMenus(); closeHighlightMenus(); headingOpen = false; listOpen = false; formOpen = false; templateOpen = false; alignOpen = !alignOpen"
+            @click.stop="markToolbarMenuOpening(); closeColorMenus(); closeHighlightMenus(); closeFontMenus(); headingOpen = false; listOpen = false; formOpen = false; templateOpen = false; alignOpen = !alignOpen"
           >
             <span class="rte-tool-icon">
               <component :is="toolIcon('align')" class="rte-ep-icon" />
@@ -3823,6 +5282,92 @@ defineExpose({ focusEditor, editor, onDraftBackup })
             </div>
           </Teleport>
         </div>
+        <div
+          v-else-if="t.kind === 'export'"
+          class="rte-tool-wrap"
+          @mouseenter="onToolMenuEnter('export')"
+          @mouseleave="onToolMenuLeave($event, 'export', closeExportMenu)"
+        >
+          <button
+            type="button"
+            class="rte-tool"
+            :ref="(el) => setFloatAnchor('export', el)" data-rte-anchor="export"
+            :class="{ active: exportMenuOpen }"
+            title="导出"
+            @click.stop="markToolbarMenuOpening(); exportMenuOpen = !exportMenuOpen"
+          >
+            <span class="rte-tool-icon">
+              <component
+                :is="t.iconComp || toolIcon('export')"
+                class="rte-ep-icon"
+              />
+            </span>
+            <span class="rte-tool-label"
+              >导出<span class="rte-caret" aria-hidden="true"></span
+            ></span>
+          </button>
+          <Teleport to="body">
+            <div
+              v-if="exportMenuOpen"
+              class="rte-import-menu"
+              v-rte-float="'export'"
+              @mousedown.prevent
+              @mouseenter="onToolMenuEnter('export')"
+              @mouseleave="onToolMenuLeave($event, 'export', closeExportMenu)"
+            >
+              <button type="button" class="rte-import-item" @click.stop="exportAsHtml">
+                <span class="rte-import-left">
+                  <component :is="toolIcon('exportHtml')" class="rte-ep-icon" />
+                  <span>导出 HTML</span>
+                </span>
+                <span class="rte-import-pill">.html</span>
+              </button>
+              <button type="button" class="rte-import-item" @click.stop="exportAsPlainText">
+                <span class="rte-import-left">
+                  <component :is="toolIcon('exportText')" class="rte-ep-icon" />
+                  <span>导出纯文本</span>
+                </span>
+                <span class="rte-import-pill">.txt</span>
+              </button>
+              <button
+                type="button"
+                class="rte-import-item"
+                :disabled="exportBusy"
+                @click.stop="exportAsPng"
+              >
+                <span class="rte-import-left">
+                  <component :is="toolIcon('exportPng')" class="rte-ep-icon" />
+                  <span>{{ exportBusy ? '导出中…' : '导出图片' }}</span>
+                </span>
+                <span class="rte-import-pill">PNG</span>
+              </button>
+              <button
+                type="button"
+                class="rte-import-item"
+                :disabled="exportBusy"
+                @click.stop="exportAsPdf"
+              >
+                <span class="rte-import-left">
+                  <component :is="toolIcon('exportPdf')" class="rte-ep-icon" />
+                  <span>{{ exportBusy ? '导出中…' : '导出 PDF' }}</span>
+                </span>
+                <span class="rte-import-pill">.pdf</span>
+              </button>
+              <button
+                type="button"
+                class="rte-import-item"
+                :disabled="exportBusy"
+                @click.stop="exportAsDocx"
+              >
+                <span class="rte-import-left">
+                  <component :is="toolIcon('exportDocx')" class="rte-ep-icon" />
+                  <span>{{ exportBusy ? '导出中…' : '导出 Word' }}</span>
+                </span>
+                <span class="rte-import-pill">.docx</span>
+              </button>
+            </div>
+          </Teleport>
+        </div>
         <button
           v-else-if="t.kind === 'attach'"
           type="button"
@@ -3842,6 +5387,244 @@ defineExpose({ focusEditor, editor, onDraftBackup })
           </span>
           <span class="rte-tool-label">附件</span>
         </button>
+        <div
+          v-else-if="t.kind === 'code'"
+          class="rte-tool-wrap rte-code-tool-wrap"
+        >
+          <button
+            type="button"
+            class="rte-tool"
+            :class="{ active: t.active?.() }"
+            :title="t.title || t.label"
+            :aria-label="t.title || t.label"
+            @click="t.run?.()"
+          >
+            <span class="rte-tool-icon">
+              <component
+                v-if="t.iconComp"
+                :is="t.iconComp"
+                class="rte-ep-icon"
+              />
+              <template v-else>{{ t.icon }}</template>
+            </span>
+            <span class="rte-tool-label">{{ t.label }}</span>
+          </button>
+          <select
+            v-if="isActive('codeBlock')"
+            class="rte-code-lang-select"
+            :value="currentCodeLanguage()"
+            title="代码语言"
+            aria-label="代码语言"
+            @mousedown.stop
+            @change="onCodeLangChange"
+          >
+            <option
+              v-for="opt in CODE_LANG_OPTIONS"
+              :key="opt.value"
+              :value="opt.value"
+            >
+              {{ opt.label }}
+            </option>
+          </select>
+        </div>
+        <div
+          v-else-if="t.kind === 'emoji'"
+          class="rte-tool-wrap"
+          @mouseenter="onToolMenuEnter('emoji')"
+          @mouseleave="onToolMenuLeave($event, 'emoji', () => (emojiOpen = false))"
+        >
+          <button
+            type="button"
+            class="rte-tool"
+            :ref="(el) => setFloatAnchor('emoji', el)"
+            data-rte-anchor="emoji"
+            :class="{ active: emojiOpen }"
+            title="表情"
+            @click.stop="markToolbarMenuOpening(); closeColorMenus(); closeHighlightMenus(); closeFontMenus(); emojiOpen = !emojiOpen"
+          >
+            <span class="rte-tool-icon">
+              <component :is="toolIcon('emoji')" class="rte-ep-icon" />
+            </span>
+            <span class="rte-tool-label">表情<span class="rte-caret" aria-hidden="true"></span></span>
+          </button>
+          <Teleport to="body">
+            <div
+              v-if="emojiOpen"
+              class="rte-emoji-panel"
+              v-rte-float="'emoji'"
+              @mousedown.prevent
+              @mouseenter="onToolMenuEnter('emoji')"
+              @mouseleave="onToolMenuLeave($event, 'emoji', () => (emojiOpen = false))"
+            >
+              <button
+                v-for="em in RTE_EMOJI_LIST"
+                :key="'em-' + em"
+                type="button"
+                class="rte-emoji-btn"
+                @click="insertEmoji(em)"
+              >{{ em }}</button>
+            </div>
+          </Teleport>
+        </div>
+        <div
+          v-else-if="t.kind === 'columns'"
+          class="rte-tool-wrap"
+          @mouseenter="onToolMenuEnter('columns')"
+          @mouseleave="onToolMenuLeave($event, 'columns', () => (columnsOpen = false))"
+        >
+          <button
+            type="button"
+            class="rte-tool"
+            :ref="(el) => setFloatAnchor('columns', el)"
+            data-rte-anchor="columns"
+            :class="{ active: columnsOpen || isActive('columns') }"
+            title="多栏"
+            @click.stop="markToolbarMenuOpening(); columnsOpen = !columnsOpen"
+          >
+            <span class="rte-tool-icon">
+              <component :is="toolIcon('columns')" class="rte-ep-icon" />
+            </span>
+            <span class="rte-tool-label">分栏<span class="rte-caret" aria-hidden="true"></span></span>
+          </button>
+          <Teleport to="body">
+            <div
+              v-if="columnsOpen"
+              class="rte-menu"
+              v-rte-float="'columns'"
+              @mousedown.prevent
+              @mouseenter="onToolMenuEnter('columns')"
+              @mouseleave="onToolMenuLeave($event, 'columns', () => (columnsOpen = false))"
+            >
+              <button type="button" @click="insertColumns(2)">两栏</button>
+              <button type="button" @click="insertColumns(3)">三栏</button>
+            </div>
+          </Teleport>
+        </div>
+        <div
+          v-else-if="t.kind === 'spacing'"
+          class="rte-tool-wrap"
+          @mouseenter="onToolMenuEnter('spacing')"
+          @mouseleave="onToolMenuLeave($event, 'spacing', () => (spacingOpen = false))"
+        >
+          <button
+            type="button"
+            class="rte-tool"
+            :ref="(el) => setFloatAnchor('spacing', el)"
+            data-rte-anchor="spacing"
+            :class="{ active: spacingOpen || !!(currentLetterSpacing() || currentMarginTop() || currentMarginBottom()) }"
+            title="段前段后 / 字间距"
+            @click.stop="markToolbarMenuOpening(); spacingOpen = !spacingOpen"
+          >
+            <span class="rte-tool-icon">
+              <component :is="toolIcon('spacing')" class="rte-ep-icon" />
+            </span>
+            <span class="rte-tool-label">段距<span class="rte-caret" aria-hidden="true"></span></span>
+          </button>
+          <Teleport to="body">
+            <div
+              v-if="spacingOpen"
+              class="rte-spacing-panel"
+              v-rte-float="'spacing'"
+              @mousedown.prevent
+              @mouseenter="onToolMenuEnter('spacing')"
+              @mouseleave="onToolMenuLeave($event, 'spacing', () => (spacingOpen = false))"
+            >
+              <div class="rte-spacing-row">
+                <span class="rte-spacing-label">段前</span>
+                <select
+                  class="rte-spacing-select"
+                  :value="currentMarginTop()"
+                  @change="applyMarginTop(($event.target as HTMLSelectElement).value)"
+                >
+                  <option value="">默认</option>
+                  <option value="0">0</option>
+                  <option value="0.5em">0.5em</option>
+                  <option value="1em">1em</option>
+                  <option value="1.5em">1.5em</option>
+                  <option value="2em">2em</option>
+                  <option value="3em">3em</option>
+                </select>
+              </div>
+              <div class="rte-spacing-row">
+                <span class="rte-spacing-label">段后</span>
+                <select
+                  class="rte-spacing-select"
+                  :value="currentMarginBottom()"
+                  @change="applyMarginBottom(($event.target as HTMLSelectElement).value)"
+                >
+                  <option value="">默认</option>
+                  <option value="0">0</option>
+                  <option value="0.5em">0.5em</option>
+                  <option value="1em">1em</option>
+                  <option value="1.5em">1.5em</option>
+                  <option value="2em">2em</option>
+                  <option value="3em">3em</option>
+                </select>
+              </div>
+              <div class="rte-spacing-row">
+                <span class="rte-spacing-label">字间距</span>
+                <select
+                  class="rte-spacing-select"
+                  :value="currentLetterSpacing()"
+                  @change="applyLetterSpacing(($event.target as HTMLSelectElement).value)"
+                >
+                  <option value="">默认</option>
+                  <option value="0">0</option>
+                  <option value="0.05em">0.05em</option>
+                  <option value="0.1em">0.1em</option>
+                  <option value="0.15em">0.15em</option>
+                  <option value="0.2em">0.2em</option>
+                  <option value="0.3em">0.3em</option>
+                </select>
+              </div>
+            </div>
+          </Teleport>
+        </div>
+        <div
+          v-else-if="t.kind === 'wordStats'"
+          class="rte-tool-wrap"
+          @mouseenter="onToolMenuEnter('wordStats')"
+          @mouseleave="onToolMenuLeave($event, 'wordStats', () => (wordStatsOpen = false))"
+        >
+          <button
+            type="button"
+            class="rte-tool"
+            :ref="(el) => setFloatAnchor('wordStats', el)"
+            data-rte-anchor="wordStats"
+            :class="{ active: wordStatsOpen }"
+            title="字数统计"
+            @click.stop="markToolbarMenuOpening(); wordStatsOpen = !wordStatsOpen"
+          >
+            <span class="rte-tool-icon">
+              <component :is="toolIcon('wordStats')" class="rte-ep-icon" />
+            </span>
+            <span class="rte-tool-label">字数<span class="rte-caret" aria-hidden="true"></span></span>
+          </button>
+          <Teleport to="body">
+            <div
+              v-if="wordStatsOpen"
+              class="rte-wordstats-panel"
+              v-rte-float="'wordStats'"
+              @mousedown.prevent
+              @mouseenter="onToolMenuEnter('wordStats')"
+              @mouseleave="onToolMenuLeave($event, 'wordStats', () => (wordStatsOpen = false))"
+            >
+              <div class="rte-wordstats-title">字数统计</div>
+              <div class="rte-wordstats-row"><span>全文（去空白）</span><strong>{{ charCount }}</strong></div>
+              <div class="rte-wordstats-row"><span>词数（估）</span><strong>{{ wordCount }}</strong></div>
+              <div class="rte-wordstats-row"><span>阅读约</span><strong>{{ readingMinutes }} 分钟</strong></div>
+              <div class="rte-wordstats-divider" />
+              <div class="rte-wordstats-row">
+                <span>选区字符</span>
+                <strong>{{ selectionStats.hasSelection ? selectionStats.chars : '—' }}</strong>
+              </div>
+              <div class="rte-wordstats-row">
+                <span>选区词数</span>
+                <strong>{{ selectionStats.hasSelection ? selectionStats.words : '—' }}</strong>
+              </div>
+            </div>
+          </Teleport>
+        </div>
         <button
           v-else
           type="button"
@@ -3850,6 +5633,7 @@ defineExpose({ focusEditor, editor, onDraftBackup })
           :title="t.title || t.label"
           :aria-label="t.title || t.label"
           @click="t.run?.()"
+          @dblclick.stop="t.key === 'formatPainter' && onFormatPainterDblClick()"
         >
           <span class="rte-tool-icon">
             <component
@@ -3863,7 +5647,7 @@ defineExpose({ focusEditor, editor, onDraftBackup })
         </button>
       </template>
 
-      <!-- 紧跟工具流末尾（导入之后）：编辑 / 预览 / 源码，不作右侧贴边 -->
+      <!-- 紧跟工具流末尾（导入/导出之后）：编辑 / 预览 / 源码，不作右侧贴边 -->
       <template v-if="expanded">
         <button
           v-for="opt in VIEW_MODE_OPTIONS"
@@ -3918,7 +5702,7 @@ defineExpose({ focusEditor, editor, onDraftBackup })
             v-if="moreOpen"
             class="rte-more-menu"
             v-rte-float="'more'"
-            :class="{ 'has-flyout': moreColorOpen || moreHighlightOpen || moreFormOpen || moreTemplateOpen }"
+            :class="{ 'has-flyout': moreColorOpen || moreHighlightOpen || moreFormOpen || moreTemplateOpen || moreFontSizeOpen || moreFontFamilyOpen || moreLineHeightOpen }"
             @mousedown.prevent
             @mouseenter="onToolMenuEnter('more')"
             @mouseleave="onToolMenuLeave($event, 'more', closeMore)"
@@ -3933,7 +5717,10 @@ defineExpose({ focusEditor, editor, onDraftBackup })
                   (mt.kind === 'color' && moreColorOpen) ||
                   (mt.key === 'highlight' && moreHighlightOpen) ||
                   (mt.kind === 'form' && moreFormOpen) ||
-                  (mt.kind === 'template' && moreTemplateOpen),
+                  (mt.kind === 'template' && moreTemplateOpen) ||
+                  (mt.kind === 'fontSize' && moreFontSizeOpen) ||
+                  (mt.kind === 'fontFamily' && moreFontFamilyOpen) ||
+                  (mt.kind === 'lineHeight' && moreLineHeightOpen),
               }"
               @click="onMoreToolClick(mt)"
             >
@@ -3947,10 +5734,56 @@ defineExpose({ focusEditor, editor, onDraftBackup })
               </span>
               <span>{{ mt.title || mt.label }}</span>
               <span
-                v-if="mt.kind === 'color' || mt.key === 'highlight' || mt.kind === 'attach' || mt.kind === 'form' || mt.kind === 'template'"
+                v-if="mt.kind === 'color' || mt.key === 'highlight' || mt.kind === 'attach' || mt.kind === 'form' || mt.kind === 'template' || mt.kind === 'fontSize' || mt.kind === 'fontFamily' || mt.kind === 'lineHeight'"
                 class="rte-more-caret"
               >{{ mt.kind === 'attach' || mt.kind === 'form' || mt.kind === 'template' ? '▾' : '▸' }}</span>
             </button>
+            <div
+              v-if="mt.kind === 'fontSize' && moreFontSizeOpen"
+              class="rte-menu rte-more-flyout"
+              @mousedown.prevent
+            >
+              <button
+                v-for="opt in FONT_SIZE_OPTIONS"
+                :key="'mfs-' + (opt.value || 'default')"
+                type="button"
+                :class="{ active: (opt.value || '') === (currentFontSize() || '') }"
+                @click="applyFontSize(opt.value)"
+              >
+                {{ opt.label }}
+              </button>
+            </div>
+            <div
+              v-if="mt.kind === 'fontFamily' && moreFontFamilyOpen"
+              class="rte-menu rte-more-flyout rte-font-family-menu"
+              @mousedown.prevent
+            >
+              <button
+                v-for="opt in FONT_FAMILY_OPTIONS"
+                :key="'mff-' + (opt.value || 'default')"
+                type="button"
+                :class="{ active: (opt.value || '') === (currentFontFamily() || '') }"
+                :style="opt.value ? { fontFamily: opt.value } : undefined"
+                @click="applyFontFamily(opt.value)"
+              >
+                {{ opt.label }}
+              </button>
+            </div>
+            <div
+              v-if="mt.kind === 'lineHeight' && moreLineHeightOpen"
+              class="rte-menu rte-more-flyout"
+              @mousedown.prevent
+            >
+              <button
+                v-for="opt in LINE_HEIGHT_OPTIONS"
+                :key="'mlh-' + (opt.value || 'default')"
+                type="button"
+                :class="{ active: (opt.value || '') === (currentLineHeight() || '') }"
+                @click="applyLineHeight(opt.value)"
+              >
+                {{ opt.label }}
+              </button>
+            </div>
             <div
               v-if="mt.kind === 'form' && moreFormOpen"
               class="rte-menu rte-more-flyout"
@@ -4254,7 +6087,13 @@ defineExpose({ focusEditor, editor, onDraftBackup })
         >
           发布设置 ▾
         </button>
-        <span class="rte-wordcount">字数: {{ charCount }}</span>
+        <span class="rte-wordcount" title="点击工具栏「字数」看详情">
+          字数: {{ charCount }}
+          <template v-if="selectionStats.hasSelection">
+            · 选中 {{ selectionStats.chars }}
+          </template>
+          · 约 {{ readingMinutes }} 分钟
+        </span>
         <span v-if="showMarkdownHint" class="rte-md-hint">
           Markdown 语法输入中
           <span class="rte-md-q" title="编辑器支持常见富文本与部分 Markdown 快捷输入">?</span>
@@ -4355,7 +6194,83 @@ defineExpose({ focusEditor, editor, onDraftBackup })
       </div>
     </Teleport>
 
+    <!-- Slash「/」命令菜单 -->
+    <Teleport to="body">
+      <div
+        v-if="slashOpen"
+        ref="slashMenuEl"
+        class="rte-slash-menu rte-float-menu"
+        data-rte-float-key="slash"
+        :style="slashMenuStyle"
+        @mousedown.prevent
+      >
+        <div class="rte-slash-head">
+          <span class="rte-slash-title">插入</span>
+          <span class="rte-slash-hint">/ 命令{{ slashQuery ? ` · ${slashQuery}` : '' }}</span>
+        </div>
+        <div v-if="!slashItems.length" class="rte-slash-empty">无匹配项</div>
+        <div v-else class="rte-slash-list">
+          <template v-for="(it, idx) in slashItems" :key="it.id">
+            <div
+              v-if="idx === 0 || rteSlashSectionLabel(it) !== rteSlashSectionLabel(slashItems[idx - 1])"
+              class="rte-slash-section"
+            >
+              {{ rteSlashSectionLabel(it) }}
+            </div>
+            <button
+              type="button"
+              class="rte-slash-item"
+              :class="{ 'is-active': idx === slashIndex }"
+              @mouseenter="slashIndex = idx"
+              @click="pickSlashItem(it)"
+            >
+              <span class="rte-slash-item-main">
+                <span class="rte-slash-item-label">{{ it.label }}</span>
+                <span v-if="it.description" class="rte-slash-item-desc">{{ it.description }}</span>
+              </span>
+            </button>
+          </template>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- @提及建议菜单 -->
+    <Teleport to="body">
+      <div
+        v-if="mentionOpen"
+        ref="mentionMenuEl"
+        class="rte-mention-menu rte-float-menu"
+        data-rte-float-key="mention"
+        :style="mentionMenuStyle"
+        @mousedown.prevent
+      >
+        <div class="rte-mention-head">
+          <span class="rte-mention-title">提及</span>
+          <span class="rte-mention-hint">@ 联系人{{ mentionQuery ? ` · ${mentionQuery}` : '' }}</span>
+        </div>
+        <div v-if="!mentionItems.length" class="rte-mention-empty">无匹配项</div>
+        <div v-else class="rte-mention-list">
+          <button
+            v-for="(it, idx) in mentionItems"
+            :key="it.id"
+            type="button"
+            class="rte-mention-item"
+            :class="{ 'is-active': idx === mentionIndex }"
+            @mouseenter="mentionIndex = idx"
+            @click="pickMentionItem(it)"
+          >
+            <span class="rte-mention-item-avatar" aria-hidden="true">@</span>
+            <span class="rte-mention-item-main">
+              <span class="rte-mention-item-label">{{ it.label }}</span>
+              <span v-if="it.role" class="rte-mention-item-role">{{ it.role }}</span>
+            </span>
+          </button>
+        </div>
+      </div>
+    </Teleport>
+
     <!-- 隐藏文件选择：导入文档 -->
+
     <input
       ref="importFileInputRef"
       type="file"
@@ -4648,6 +6563,60 @@ defineExpose({ focusEditor, editor, onDraftBackup })
             >
               {{ linkImportBusy ? '导入中…' : '导入' }}
             </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- 查找 / 替换 -->
+    <Teleport to="body">
+      <div
+        v-if="findDialogOpen"
+        class="rte-modal-overlay"
+        @mousedown.self="closeFindDialog"
+      >
+        <div
+          class="rte-link-dialog rte-find-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-label="查找与替换"
+          @mousedown.stop
+        >
+          <h3 class="rte-table-title">查找与替换</h3>
+          <div class="rte-note-field rte-note-text-field" style="width: 100%; margin-bottom: 10px">
+            <span class="rte-note-field-icon" aria-hidden="true">🔍</span>
+            <input
+              v-model="findQuery"
+              type="text"
+              class="rte-note-input rte-find-query"
+              placeholder="查找"
+              maxlength="200"
+              @input="onFindQueryInput"
+              @keydown.enter.prevent="findGo(1)"
+            />
+          </div>
+          <div class="rte-note-field rte-note-text-field" style="width: 100%; margin-bottom: 10px">
+            <span class="rte-note-field-icon" aria-hidden="true">⇄</span>
+            <input
+              v-model="findReplaceText"
+              type="text"
+              class="rte-note-input"
+              placeholder="替换为"
+              maxlength="200"
+              @keydown.enter.prevent="doReplaceOne"
+            />
+          </div>
+          <label class="rte-find-case">
+            <input v-model="findCaseSensitive" type="checkbox" @change="refreshFindMatches(true)" />
+            <span>区分大小写</span>
+            <span class="rte-find-status">{{ findStatusText }}</span>
+          </label>
+          <div class="rte-modal-actions rte-find-actions">
+            <button type="button" class="rte-modal-cancel" @click="findGo(-1)">上一个</button>
+            <button type="button" class="rte-modal-cancel" @click="findGo(1)">下一个</button>
+            <button type="button" class="rte-modal-cancel" @click="doReplaceOne">替换</button>
+            <button type="button" class="rte-modal-confirm" @click="doReplaceAll">全部替换</button>
+            <button type="button" class="rte-modal-cancel" @click="closeFindDialog">关闭</button>
           </div>
         </div>
       </div>
@@ -5422,7 +7391,7 @@ defineExpose({ focusEditor, editor, onDraftBackup })
   box-shadow: 0 8px 24px rgba(18, 18, 18, 0.12);
   border: 1px solid #ebebeb;
   background: #fff;
-  max-height: var(--rte-float-max-h, min(72vh, 640px));
+  max-height: var(--rte-float-max-h, min(70vh, 560px));
 }
 .rte-float-menu.rte-template-menu {
   display: flex;
@@ -5433,9 +7402,11 @@ defineExpose({ focusEditor, editor, onDraftBackup })
 .rte-float-menu.rte-template-menu .rte-template-menu-body {
   flex: 1 1 auto;
   min-height: 0;
-  max-height: none;
+  max-height: var(--rte-float-max-h, min(70vh, 560px));
   overflow-x: hidden;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 .rte-float-menu.rte-import-menu,
 .rte-float-menu.rte-more-menu {
@@ -5525,6 +7496,12 @@ defineExpose({ focusEditor, editor, onDraftBackup })
   font-size: 1.12em;
   margin: 0.35em 0 0.25em;
 }
+.rte-root :deep(.tiptap h4),
+.rte-root :deep(.ProseMirror h4) {
+  font-size: 1.02em;
+  margin: 0.3em 0 0.2em;
+  font-weight: 600;
+}
 
 .rte-root :deep(.tiptap ul),
 .rte-root :deep(.ProseMirror ul),
@@ -5532,6 +7509,45 @@ defineExpose({ focusEditor, editor, onDraftBackup })
 .rte-root :deep(.ProseMirror ol) {
   padding-left: 1.4em;
   margin: 0.3em 0 0.55em;
+}
+
+/* 任务列表：与编辑器风格一致的可勾选框 */
+.rte-root :deep(ul[data-type='taskList']) {
+  list-style: none;
+  padding-left: 0.15em;
+  margin: 0.3em 0 0.55em;
+}
+.rte-root :deep(ul[data-type='taskList'] li) {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45em;
+  margin: 0.15em 0;
+}
+.rte-root :deep(ul[data-type='taskList'] li > label) {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 0.2em;
+  user-select: none;
+}
+.rte-root :deep(ul[data-type='taskList'] li > label input[type='checkbox']) {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: #165dff;
+  cursor: pointer;
+}
+.rte-root :deep(ul[data-type='taskList'] li > div) {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.rte-root :deep(ul[data-type='taskList'] li[data-checked='true'] > div) {
+  color: #86909c;
+  text-decoration: line-through;
+}
+.rte-root :deep(ul[data-type='taskList'] ul[data-type='taskList']) {
+  margin: 0.15em 0 0.15em 0.2em;
 }
 
 .rte-root :deep(.tiptap blockquote),
@@ -5741,6 +7757,29 @@ defineExpose({ focusEditor, editor, onDraftBackup })
   z-index: 1;
 }
 
+/* 表格列宽拖拽（Table.configure resizable: true → colwidth / data-colwidth） */
+.rte-root :deep(.tableWrapper) {
+  overflow-x: auto;
+  margin: 0.5em 0;
+}
+.rte-root :deep(.tableWrapper table) {
+  margin: 0;
+}
+.rte-root :deep(.column-resize-handle) {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: -2px;
+  width: 4px;
+  background-color: #5b8cff;
+  pointer-events: none;
+  z-index: 20;
+}
+.rte-root :deep(.resize-cursor),
+.rte-root :deep(.resize-cursor *) {
+  cursor: col-resize !important;
+}
+
 .rte-menu-sep {
   height: 1px;
   margin: 4px 6px;
@@ -5757,8 +7796,8 @@ defineExpose({ focusEditor, editor, onDraftBackup })
 }
 
 .rte-template-menu {
-  min-width: 340px;
-  max-width: 420px;
+  min-width: 480px;
+  max-width: 560px;
   padding: 0;
   /* 外层不裁切，避免挡住移入路径；滚动在 .rte-template-menu-body */
   overflow: visible;
@@ -5766,14 +7805,16 @@ defineExpose({ focusEditor, editor, onDraftBackup })
 
 .rte-template-menu-body {
   padding: 6px;
-  max-height: min(72vh, 640px);
+  max-height: min(70vh, 560px);
   overflow-x: hidden;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .rte-template-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 4px;
   margin: 0 0 8px;
 }
@@ -6255,6 +8296,15 @@ defineExpose({ focusEditor, editor, onDraftBackup })
   text-decoration-thickness: 2px;
   text-underline-offset: 2px;
   text-decoration-color: #1d2129;
+}
+.rte-font-family-menu {
+  min-width: 168px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.rte-menu button.active {
+  background: #eef3ff;
+  color: #165dff;
 }
 .rte-more-caret {
   margin-left: auto;
@@ -7105,15 +9155,17 @@ defineExpose({ focusEditor, editor, onDraftBackup })
 }
 .rte-float-menu.rte-template-menu {
   padding: 0;
-  min-width: 340px;
-  max-width: 420px;
+  min-width: 480px;
+  max-width: 560px;
   overflow: hidden !important;
 }
 .rte-float-menu .rte-template-menu-body {
   padding: 6px;
   overflow-x: hidden;
   overflow-y: auto;
-  max-height: var(--rte-float-max-h, min(72vh, 640px));
+  max-height: var(--rte-float-max-h, min(70vh, 560px));
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 .rte-float-menu button {
   border: none;
@@ -7626,6 +9678,62 @@ defineExpose({ focusEditor, editor, onDraftBackup })
 
 
 /* 插入链接 */
+.rte-find-dialog {
+  min-width: 380px;
+  max-width: min(480px, 94vw);
+}
+.rte-find-case {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #4e5969;
+  margin: 0 0 14px;
+  user-select: none;
+}
+.rte-find-case input {
+  margin: 0;
+}
+.rte-find-status {
+  margin-left: auto;
+  color: #86909c;
+  font-variant-numeric: tabular-nums;
+}
+.rte-find-actions {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.rte-code-tool-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.rte-code-lang-select {
+  height: 28px;
+  max-width: 110px;
+  border: 1px solid #e5e6eb;
+  border-radius: 6px;
+  background: #fff;
+  color: #1d2129;
+  font-size: 12px;
+  padding: 0 6px;
+  outline: none;
+}
+.rte-code-lang-select:focus {
+  border-color: #5b8cff;
+}
+.rte-root :deep(.tiptap pre code.hljs),
+.rte-root :deep(.ProseMirror pre code.hljs),
+.rte-root :deep(.tiptap pre .hljs),
+.rte-root :deep(.ProseMirror pre .hljs) {
+  background: transparent;
+  padding: 0;
+}
+.rte-root :deep(sub),
+.rte-root :deep(sup) {
+  font-size: 0.75em;
+  line-height: 0;
+}
 .rte-link-dialog {
   width: min(420px, 100%);
   background: #fff;
@@ -8005,6 +10113,436 @@ defineExpose({ focusEditor, editor, onDraftBackup })
 .rte-image-actions {
   padding: 8px 20px 0;
   flex-shrink: 0;
+}
+
+
+/* —— Slash「/」命令菜单 —— */
+.rte-slash-menu {
+  min-width: 300px;
+  max-width: min(420px, calc(100vw - 16px));
+  padding: 0;
+  background: #fff;
+  border: 1px solid #e5e6eb;
+  border-radius: 10px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.14);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.rte-slash-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px 6px;
+  border-bottom: 1px solid #f2f3f5;
+  flex-shrink: 0;
+}
+.rte-slash-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1d2129;
+}
+.rte-slash-hint {
+  font-size: 11px;
+  color: #86909c;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rte-slash-list {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px 0 6px;
+  flex: 1 1 auto;
+}
+.rte-slash-section {
+  padding: 8px 12px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #86909c;
+  letter-spacing: 0.02em;
+}
+.rte-slash-item {
+  display: flex;
+  width: 100%;
+  border: none;
+  background: transparent;
+  text-align: left;
+  padding: 8px 12px;
+  cursor: pointer;
+  color: #4e5969;
+}
+.rte-slash-item:hover,
+.rte-slash-item.is-active {
+  background: #f2f3f5;
+  color: #1d2129;
+}
+.rte-slash-item-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.rte-slash-item-label {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.3;
+}
+.rte-slash-item-desc {
+  font-size: 11px;
+  color: #86909c;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rte-slash-empty {
+  padding: 16px 12px;
+  font-size: 13px;
+  color: #86909c;
+  text-align: center;
+}
+.rte-root :deep(.rte-slash-decoration) {
+  background: rgba(22, 93, 255, 0.12);
+  border-radius: 3px;
+  box-decoration-break: clone;
+}
+.rte-import-item:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+
+/* —— @提及 —— */
+.rte-mention-menu {
+  min-width: 260px;
+  max-width: min(360px, calc(100vw - 16px));
+  padding: 0;
+  background: #fff;
+  border: 1px solid #e5e6eb;
+  border-radius: 10px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.14);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.rte-mention-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px 6px;
+  border-bottom: 1px solid #f2f3f5;
+  flex-shrink: 0;
+}
+.rte-mention-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1d2129;
+}
+.rte-mention-hint {
+  font-size: 11px;
+  color: #86909c;
+}
+.rte-mention-list {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px 0 6px;
+  flex: 1 1 auto;
+}
+.rte-mention-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  border: none;
+  background: transparent;
+  text-align: left;
+  padding: 8px 12px;
+  cursor: pointer;
+  color: #4e5969;
+}
+.rte-mention-item:hover,
+.rte-mention-item.is-active {
+  background: #f2f3f5;
+  color: #1d2129;
+}
+.rte-mention-item-avatar {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #e8f3ff;
+  color: #165dff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+}
+.rte-mention-item-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.rte-mention-item-label {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.3;
+}
+.rte-mention-item-role {
+  font-size: 11px;
+  color: #86909c;
+}
+.rte-mention-empty {
+  padding: 16px 12px;
+  font-size: 13px;
+  color: #86909c;
+  text-align: center;
+}
+.rte-root :deep(.rte-mention) {
+  display: inline-flex;
+  align-items: baseline;
+  padding: 0 5px;
+  margin: 0 1px;
+  border-radius: 4px;
+  background: #e8f3ff;
+  color: #165dff;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: default;
+}
+.rte-root :deep(.rte-mention-decoration) {
+  background: rgba(22, 93, 255, 0.12);
+  border-radius: 3px;
+  box-decoration-break: clone;
+}
+
+/* —— 表单条件显示 —— */
+.rte-root :deep(.rte-form-showif-badge) {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  margin: 0 0 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #fff7e8;
+  border: 1px solid #ffe4b8;
+  color: #b26a00;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+  user-select: none;
+}
+.rte-root :deep(.rte-form-showif-badge[hidden]) {
+  display: none !important;
+}
+.rte-root :deep(.rte-form.has-show-if) {
+  position: relative;
+}
+.rte-root :deep(.rte-form.rte-form-showif-would-hide) {
+  opacity: 0.55;
+  outline: 1px dashed #ffb65c;
+  outline-offset: 2px;
+}
+.rte-root :deep(.rte-form.rte-form-showif-hidden),
+.rte-root :deep(.rte-form[hidden]) {
+  display: none !important;
+}
+.rte-root.mode-preview :deep(.rte-form-showif-badge) {
+  display: none !important;
+}
+
+/* —— Route C: 分页 / 分栏 / 表情 / 段距 / 字数 / 打印 —— */
+.rte-root :deep(.rte-page-break) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 16px 0;
+  border: none;
+  height: 28px;
+  background: repeating-linear-gradient(
+    90deg,
+    #c9cdd4 0 8px,
+    transparent 8px 14px
+  );
+  background-position: center;
+  background-size: 100% 2px;
+  background-repeat: no-repeat;
+  position: relative;
+  user-select: none;
+}
+.rte-root :deep(.rte-page-break-label) {
+  background: #fff;
+  color: #86909c;
+  font-size: 12px;
+  padding: 0 10px;
+  letter-spacing: 0.08em;
+}
+.rte-root :deep(.rte-columns) {
+  display: grid;
+  gap: 16px;
+  margin: 12px 0;
+  padding: 8px;
+  border: 1px dashed #e5e6eb;
+  border-radius: 8px;
+  min-height: 48px;
+}
+.rte-root :deep(.rte-columns-2) {
+  grid-template-columns: 1fr 1fr;
+}
+.rte-root :deep(.rte-columns-3) {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+.rte-root :deep(.rte-column) {
+  min-width: 0;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(23, 114, 246, 0.03);
+}
+.rte-emoji-panel {
+  display: grid;
+  grid-template-columns: repeat(10, 28px);
+  gap: 2px;
+  padding: 8px;
+  max-width: 320px;
+  background: #fff;
+  border: 1px solid #e5e6eb;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  z-index: 6000;
+}
+.rte-emoji-btn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  padding: 0;
+}
+.rte-emoji-btn:hover {
+  background: #f2f3f5;
+}
+.rte-spacing-panel {
+  min-width: 200px;
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px solid #e5e6eb;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  z-index: 6000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rte-spacing-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.rte-spacing-label {
+  font-size: 13px;
+  color: #4e5969;
+  white-space: nowrap;
+}
+.rte-spacing-select {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  border: 1px solid #e5e6eb;
+  border-radius: 6px;
+  padding: 0 8px;
+  font-size: 13px;
+  background: #fff;
+}
+.rte-wordstats-panel {
+  min-width: 220px;
+  padding: 12px 14px;
+  background: #fff;
+  border: 1px solid #e5e6eb;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  z-index: 6000;
+}
+.rte-wordstats-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1d2129;
+  margin-bottom: 8px;
+}
+.rte-wordstats-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 13px;
+  color: #4e5969;
+  padding: 4px 0;
+}
+.rte-wordstats-row strong {
+  color: #1d2129;
+  font-weight: 600;
+}
+.rte-wordstats-divider {
+  height: 1px;
+  background: #e5e6eb;
+  margin: 6px 0;
+}
+.rte-tool.format-painter-on,
+.rte-tool.active[title*='格式刷'] {
+  color: #1772f6;
+}
+
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+  .rte-root.rte-printing,
+  .rte-root.rte-printing * {
+    visibility: visible !important;
+  }
+  .rte-root.rte-printing {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    background: #fff !important;
+  }
+  .rte-root.rte-printing .rte-toolbar,
+  .rte-root.rte-printing .rte-bottom,
+  .rte-root.rte-printing .rte-title,
+  .rte-root.rte-printing .rte-view-mode-tool,
+  .rte-root.rte-printing .rte-form-inspector,
+  .rte-root.rte-printing [class*='inspector'] {
+    display: none !important;
+  }
+  .rte-root.rte-printing :deep(.rte-page-break) {
+    break-after: page;
+    page-break-after: always;
+    height: 0;
+    margin: 0;
+    background: none;
+  }
+  .rte-root.rte-printing :deep(.rte-page-break-label) {
+    display: none;
+  }
+  .rte-root.rte-printing :deep(.rte-columns) {
+    border: none;
+    padding: 0;
+  }
+  .rte-root.rte-printing :deep(.rte-column) {
+    background: transparent;
+  }
 }
 
 </style>

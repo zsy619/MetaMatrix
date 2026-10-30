@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -18,6 +18,7 @@ import {
   getAIContext,
   listRevisions,
   diffRevisions,
+  deleteDocument,
 } from '../api/documents'
 
 const route = useRoute()
@@ -44,10 +45,66 @@ const { canUndo, canRedo } = storeToRefs(history)
 
 const panelOpen = computed(() => configPanelOpen.value)
 const exporting = ref(false)
+const deletingId = ref<string | null>(null)
 const titleInputRef = ref<{ focus?: () => void } | null>(null)
 
 const storedDocs = ref<DocumentSummary[]>([])
 const storedLoading = ref(false)
+
+/** Accordion section keys — defaults + localStorage persistence */
+type SectionKey =
+  | 'document'
+  | 'files'
+  | 'stored'
+  | 'ai'
+  | 'edit'
+  | 'view'
+
+const SECTION_STORAGE_KEY = 'metamatrix:pageSettings:sections'
+
+const DEFAULT_OPEN: Record<SectionKey, boolean> = {
+  document: true,
+  files: true,
+  stored: false,
+  ai: false,
+  edit: false,
+  view: false,
+}
+
+function readPersistedSections(): Partial<Record<SectionKey, boolean>> | null {
+  try {
+    const raw = localStorage.getItem(SECTION_STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as Record<string, unknown>
+    if (!parsed || typeof parsed !== 'object') return null
+    const out: Partial<Record<SectionKey, boolean>> = {}
+    for (const key of Object.keys(DEFAULT_OPEN) as SectionKey[]) {
+      if (typeof parsed[key] === 'boolean') out[key] = parsed[key] as boolean
+    }
+    return out
+  } catch {
+    return null
+  }
+}
+
+function persistSections(state: Record<SectionKey, boolean>) {
+  try {
+    localStorage.setItem(SECTION_STORAGE_KEY, JSON.stringify(state))
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
+const saved = readPersistedSections()
+const sectionOpen = reactive<Record<SectionKey, boolean>>({
+  ...DEFAULT_OPEN,
+  ...(saved || {}),
+})
+
+function toggleSection(key: SectionKey) {
+  sectionOpen[key] = !sectionOpen[key]
+  persistSections({ ...sectionOpen })
+}
 
 const templateId = computed<TemplateId>(() => {
   if (activeTemplateId.value && isTemplateId(activeTemplateId.value)) {
@@ -128,6 +185,10 @@ async function onSave() {
     ElMessage.warning('请填写任务名称')
     await nextTick()
     titleInputRef.value?.focus?.()
+    if (!sectionOpen.document) {
+      sectionOpen.document = true
+      persistSections({ ...sectionOpen })
+    }
     return
   }
   snapshotCurrent()
@@ -177,6 +238,52 @@ async function onOpenStored(id: string) {
     ElMessage.success('已打开文档')
   } catch (e) {
     ElMessage.error(e instanceof Error ? e.message : '打开失败')
+  }
+}
+
+async function onDeleteStored(d: DocumentSummary) {
+  if (!auth.isAuthenticated) {
+    ElMessage.warning('请先登录')
+    return
+  }
+  const title = d.title || '未命名'
+  try {
+    await ElMessageBox.confirm(
+      `确定删除已存文档「${title}」？此操作不可恢复。`,
+      '删除文档',
+      {
+        confirmButtonText: '删除',
+        cancelButtonText: '取消',
+        type: 'warning',
+        confirmButtonClass: 'el-button--danger',
+      },
+    )
+  } catch {
+    return
+  }
+  deletingId.value = d.id
+  try {
+    await deleteDocument(d.id)
+    const wasCurrent = d.id === document_id.value
+    storedDocs.value = storedDocs.value.filter((x) => x.id !== d.id)
+    if (wasCurrent) {
+      documentStore.resetToTemplate(templateId.value)
+      documentStore.persistLocal(templateId.value)
+      history.clear()
+      lastPushedJson = current_data.value
+        ? JSON.stringify(current_data.value)
+        : ''
+      await router.replace({
+        name: 'canvas',
+        params: { templateId: templateId.value },
+        query: {},
+      })
+    }
+    ElMessage.success('已删除文档')
+  } catch (e) {
+    ElMessage.error(e instanceof Error ? e.message : '删除失败')
+  } finally {
+    deletingId.value = null
   }
 }
 
@@ -320,12 +427,13 @@ function onRedo() {
 async function onReset() {
   try {
     await ElMessageBox.confirm(
-      '将丢弃当前修改并重新加载模板，是否继续？',
+      '将丢弃当前未保存的修改，并重新加载空白模板。此操作不可撤销（已保存到云端的文档不受影响）。是否继续？',
       '重置模板',
       {
         confirmButtonText: '重置',
         cancelButtonText: '取消',
         type: 'warning',
+        confirmButtonClass: 'el-button--danger',
       },
     )
   } catch {
@@ -399,161 +507,307 @@ function goGuide() {
 <template>
   <aside v-if="panelOpen" class="page-settings-panel">
     <header class="panel-header">
-      <h3>页面设置</h3>
+      <div class="panel-header-top">
+        <h3>页面设置</h3>
+        <span
+          class="status-chip"
+          :class="dirty ? 'status-chip--dirty' : 'status-chip--clean'"
+          :title="dirty ? '有未保存更改' : '已与本地/云端同步'"
+        >
+          <span class="status-dot" aria-hidden="true" />
+          {{ syncLabel }}
+        </span>
+      </div>
       <p class="panel-sub">{{ meta.name }}</p>
     </header>
 
-    <section class="section">
-      <h4 class="section-title">当前文档</h4>
-      <div class="field">
-        <label class="field-label">任务名称 <span class="req">*</span></label>
-        <el-input
-          ref="titleInputRef"
-          v-model="doc_title"
-          size="small"
-          placeholder="必填，保存时作为任务名称"
-          maxlength="255"
-          clearable
-        />
-      </div>
-      <div class="field">
-        <label class="field-label">备注信息</label>
-        <el-input
-          v-model="doc_notes"
-          type="textarea"
-          :rows="3"
-          size="small"
-          placeholder="可选备注"
-          maxlength="2000"
-        />
-      </div>
-      <div class="info-row">
-        <span class="label">创建时间</span>
-        <span class="time">{{ fmtTime(created_at) }}</span>
-      </div>
-      <div class="info-row">
-        <span class="label">修订时间</span>
-        <span class="time">{{ fmtTime(updated_at) }}</span>
-      </div>
-      <div class="info-row">
-        <span class="label">模板</span>
-        <span class="badge">{{ meta.badge }}</span>
-      </div>
-      <div class="info-row">
-        <span class="label">状态</span>
-        <span :class="['status', dirty ? 'dirty' : 'clean']">{{
-          syncLabel
-        }}</span>
-      </div>
-      <div class="info-row">
-        <span class="label">修订</span>
-        <span class="mono">{{ head_revision_id ?? '—' }}</span>
-      </div>
-    </section>
-
-    <section class="section">
-      <h4 class="section-title">文件</h4>
-      <div class="btn-grid">
-        <el-button
-          type="primary"
-          size="small"
-          :loading="saving"
-          @click="onSave"
+    <div class="panel-body">
+      <!-- 当前文档 -->
+      <section class="acc-section" :class="{ 'is-open': sectionOpen.document }">
+        <button
+          type="button"
+          class="acc-header"
+          :aria-expanded="sectionOpen.document"
+          @click="toggleSection('document')"
         >
-          保存
-        </el-button>
-        <el-button size="small" @click="onExportJson">导出 JSON</el-button>
-        <el-button
-          size="small"
-          :loading="exporting"
-          @click="onExportPng"
-        >
-          导出图片
-        </el-button>
-        <el-button size="small" type="danger" plain @click="onReset">
-          重置模板
-        </el-button>
-      </div>
-    </section>
+          <span class="acc-chevron" aria-hidden="true">
+            <svg viewBox="0 0 16 16" width="14" height="14">
+              <path
+                fill="currentColor"
+                d="M6.22 3.22a.75.75 0 0 1 1.06 0l4 4a.75.75 0 0 1 0 1.06l-4 4a.75.75 0 1 1-1.06-1.06L9.44 8 6.22 4.78a.75.75 0 0 1 0-1.06z"
+              />
+            </svg>
+          </span>
+          <span class="acc-title">当前文档</span>
+          <span class="acc-meta-badge">{{ meta.badge }}</span>
+        </button>
+        <div v-show="sectionOpen.document" class="acc-body">
+          <div class="field">
+            <label class="field-label">任务名称 <span class="req">*</span></label>
+            <el-input
+              ref="titleInputRef"
+              v-model="doc_title"
+              size="small"
+              placeholder="必填，保存时作为任务名称"
+              maxlength="255"
+              clearable
+            />
+          </div>
+          <div class="field">
+            <label class="field-label">备注信息</label>
+            <el-input
+              v-model="doc_notes"
+              type="textarea"
+              :rows="3"
+              size="small"
+              placeholder="可选备注"
+              maxlength="2000"
+            />
+          </div>
+          <div class="meta-grid">
+            <div class="info-row">
+              <span class="label">创建时间</span>
+              <span class="time">{{ fmtTime(created_at) }}</span>
+            </div>
+            <div class="info-row">
+              <span class="label">修订时间</span>
+              <span class="time">{{ fmtTime(updated_at) }}</span>
+            </div>
+            <div class="info-row">
+              <span class="label">模板</span>
+              <span class="badge">{{ meta.badge }}</span>
+            </div>
+            <div class="info-row">
+              <span class="label">修订</span>
+              <span class="mono" :title="head_revision_id ?? undefined">{{
+                head_revision_id ?? '—'
+              }}</span>
+            </div>
+          </div>
+        </div>
+      </section>
 
-    <section class="section">
-      <div class="section-head">
-        <h4 class="section-title" style="margin: 0">本模板已存文档</h4>
-        <el-button size="small" type="primary" plain @click="onNewTask">
-          新建任务
-        </el-button>
-      </div>
-      <template v-if="auth.isAuthenticated">
-        <p v-if="storedLoading" class="hint">加载中…</p>
-        <ul v-else class="stored-list">
-          <li v-if="storedDocs.length === 0" class="hint">暂无已存文档</li>
-          <li
-            v-for="d in storedDocs"
-            :key="d.id"
-            class="stored-item"
-            :class="{ active: d.id === document_id }"
+      <!-- 文件 -->
+      <section class="acc-section" :class="{ 'is-open': sectionOpen.files }">
+        <button
+          type="button"
+          class="acc-header"
+          :aria-expanded="sectionOpen.files"
+          @click="toggleSection('files')"
+        >
+          <span class="acc-chevron" aria-hidden="true">
+            <svg viewBox="0 0 16 16" width="14" height="14">
+              <path
+                fill="currentColor"
+                d="M6.22 3.22a.75.75 0 0 1 1.06 0l4 4a.75.75 0 0 1 0 1.06l-4 4a.75.75 0 1 1-1.06-1.06L9.44 8 6.22 4.78a.75.75 0 0 1 0-1.06z"
+              />
+            </svg>
+          </span>
+          <span class="acc-title">文件</span>
+        </button>
+        <div v-show="sectionOpen.files" class="acc-body">
+          <el-button
+            class="btn-save"
+            type="primary"
+            size="small"
+            :loading="saving"
+            @click="onSave"
           >
-            <button type="button" @click="onOpenStored(d.id)">
-              <strong class="stored-title">{{ d.title || '未命名' }}</strong>
-              <span class="stored-time">修订 {{ fmtTime(d.updatedAt) }}</span>
-              <span class="stored-created">创建 {{ fmtTime(d.createdAt) }}</span>
-              <span v-if="d.notes" class="stored-notes">{{ d.notes }}</span>
-            </button>
-          </li>
-        </ul>
-      </template>
-      <p v-else class="hint">
-        登录后查看云端列表
-        <el-button size="small" text type="primary" @click="goLogin">
-          去登录
-        </el-button>
-      </p>
-    </section>
+            保存
+          </el-button>
+          <div class="btn-grid">
+            <el-button size="small" @click="onExportJson">导出 JSON</el-button>
+            <el-button
+              size="small"
+              :loading="exporting"
+              @click="onExportPng"
+            >
+              导出图片
+            </el-button>
+          </div>
+          <el-button
+            class="btn-danger-full"
+            size="small"
+            type="danger"
+            plain
+            @click="onReset"
+          >
+            重置模板
+          </el-button>
+        </div>
+      </section>
 
-    <section class="section">
-      <h4 class="section-title">检索 / AI</h4>
-      <div class="btn-grid">
-        <el-button size="small" @click="onCopyAIContext(false)">AI 上下文 JSON</el-button>
-        <el-button size="small" @click="onCopyAIContext(true)">复制纯文本</el-button>
-        <el-button size="small" @click="onDiffPrev">与上一版对比</el-button>
-      </div>
-    </section>
+      <!-- 本模板已存文档 -->
+      <section class="acc-section" :class="{ 'is-open': sectionOpen.stored }">
+        <button
+          type="button"
+          class="acc-header"
+          :aria-expanded="sectionOpen.stored"
+          @click="toggleSection('stored')"
+        >
+          <span class="acc-chevron" aria-hidden="true">
+            <svg viewBox="0 0 16 16" width="14" height="14">
+              <path
+                fill="currentColor"
+                d="M6.22 3.22a.75.75 0 0 1 1.06 0l4 4a.75.75 0 0 1 0 1.06l-4 4a.75.75 0 1 1-1.06-1.06L9.44 8 6.22 4.78a.75.75 0 0 1 0-1.06z"
+              />
+            </svg>
+          </span>
+          <span class="acc-title">本模板已存文档</span>
+          <span
+            v-if="auth.isAuthenticated && storedDocs.length"
+            class="acc-count"
+          >{{ storedDocs.length }}</span>
+        </button>
+        <div v-show="sectionOpen.stored" class="acc-body">
+          <div class="section-toolbar">
+            <el-button size="small" type="primary" plain @click="onNewTask">
+              新建任务
+            </el-button>
+          </div>
+          <template v-if="auth.isAuthenticated">
+            <p v-if="storedLoading" class="hint">加载中…</p>
+            <ul v-else class="stored-list">
+              <li v-if="storedDocs.length === 0" class="hint">暂无已存文档</li>
+              <li
+                v-for="d in storedDocs"
+                :key="d.id"
+                class="stored-item"
+                :class="{ active: d.id === document_id }"
+              >
+                <button
+                  type="button"
+                  class="stored-open"
+                  @click="onOpenStored(d.id)"
+                >
+                  <strong class="stored-title">{{ d.title || '未命名' }}</strong>
+                  <span class="stored-time">修订 {{ fmtTime(d.updatedAt) }}</span>
+                  <span class="stored-created">创建 {{ fmtTime(d.createdAt) }}</span>
+                  <span v-if="d.notes" class="stored-notes">{{ d.notes }}</span>
+                </button>
+                <el-button
+                  class="stored-delete"
+                  size="small"
+                  type="danger"
+                  text
+                  :loading="deletingId === d.id"
+                  title="删除文档"
+                  @click.stop="onDeleteStored(d)"
+                >
+                  删除
+                </el-button>
+              </li>
+            </ul>
+          </template>
+          <p v-else class="hint">
+            登录后查看云端列表
+            <el-button size="small" text type="primary" @click="goLogin">
+              去登录
+            </el-button>
+          </p>
+        </div>
+      </section>
 
-    <section class="section">
-      <h4 class="section-title">编辑</h4>
-      <div class="btn-row">
-        <el-button size="small" :disabled="!canUndo" @click="onUndo">
-          撤销
-        </el-button>
-        <el-button size="small" :disabled="!canRedo" @click="onRedo">
-          重做
-        </el-button>
-      </div>
-    </section>
+      <!-- 检索 / AI -->
+      <section class="acc-section" :class="{ 'is-open': sectionOpen.ai }">
+        <button
+          type="button"
+          class="acc-header"
+          :aria-expanded="sectionOpen.ai"
+          @click="toggleSection('ai')"
+        >
+          <span class="acc-chevron" aria-hidden="true">
+            <svg viewBox="0 0 16 16" width="14" height="14">
+              <path
+                fill="currentColor"
+                d="M6.22 3.22a.75.75 0 0 1 1.06 0l4 4a.75.75 0 0 1 0 1.06l-4 4a.75.75 0 1 1-1.06-1.06L9.44 8 6.22 4.78a.75.75 0 0 1 0-1.06z"
+              />
+            </svg>
+          </span>
+          <span class="acc-title">检索 · AI</span>
+        </button>
+        <div v-show="sectionOpen.ai" class="acc-body">
+          <div class="btn-grid">
+            <el-button size="small" @click="onCopyAIContext(false)">AI 上下文 JSON</el-button>
+            <el-button size="small" @click="onCopyAIContext(true)">复制纯文本</el-button>
+            <el-button size="small" class="btn-span-2" @click="onDiffPrev">与上一版对比</el-button>
+          </div>
+        </div>
+      </section>
 
-    <section class="section">
-      <h4 class="section-title">视图</h4>
-      <div class="info-row">
-        <span class="label">缩放</span>
-        <span class="mono">{{ zoomPercent }}%</span>
-      </div>
-      <div class="btn-row">
-        <el-button size="small" @click="ui.zoomOut">－</el-button>
-        <el-button size="small" @click="onZoomReset">100%</el-button>
-        <el-button size="small" @click="ui.zoomIn">＋</el-button>
-      </div>
-      <div class="btn-row" style="margin-top: 8px">
-        <el-button size="small" @click="ui.toggleSnap">
-          吸附 {{ snapEnabled ? '开' : '关' }}
-        </el-button>
-      </div>
-    </section>
+      <!-- 编辑 -->
+      <section class="acc-section" :class="{ 'is-open': sectionOpen.edit }">
+        <button
+          type="button"
+          class="acc-header"
+          :aria-expanded="sectionOpen.edit"
+          @click="toggleSection('edit')"
+        >
+          <span class="acc-chevron" aria-hidden="true">
+            <svg viewBox="0 0 16 16" width="14" height="14">
+              <path
+                fill="currentColor"
+                d="M6.22 3.22a.75.75 0 0 1 1.06 0l4 4a.75.75 0 0 1 0 1.06l-4 4a.75.75 0 1 1-1.06-1.06L9.44 8 6.22 4.78a.75.75 0 0 1 0-1.06z"
+              />
+            </svg>
+          </span>
+          <span class="acc-title">编辑</span>
+        </button>
+        <div v-show="sectionOpen.edit" class="acc-body">
+          <div class="btn-row">
+            <el-button size="small" :disabled="!canUndo" @click="onUndo">
+              撤销
+            </el-button>
+            <el-button size="small" :disabled="!canRedo" @click="onRedo">
+              重做
+            </el-button>
+          </div>
+        </div>
+      </section>
 
-    <section class="section section-foot">
+      <!-- 视图 -->
+      <section class="acc-section" :class="{ 'is-open': sectionOpen.view }">
+        <button
+          type="button"
+          class="acc-header"
+          :aria-expanded="sectionOpen.view"
+          @click="toggleSection('view')"
+        >
+          <span class="acc-chevron" aria-hidden="true">
+            <svg viewBox="0 0 16 16" width="14" height="14">
+              <path
+                fill="currentColor"
+                d="M6.22 3.22a.75.75 0 0 1 1.06 0l4 4a.75.75 0 0 1 0 1.06l-4 4a.75.75 0 1 1-1.06-1.06L9.44 8 6.22 4.78a.75.75 0 0 1 0-1.06z"
+              />
+            </svg>
+          </span>
+          <span class="acc-title">视图</span>
+          <span class="acc-meta-muted">{{ zoomPercent }}%</span>
+        </button>
+        <div v-show="sectionOpen.view" class="acc-body">
+          <div class="info-row">
+            <span class="label">缩放</span>
+            <span class="mono">{{ zoomPercent }}%</span>
+          </div>
+          <div class="btn-row">
+            <el-button size="small" @click="ui.zoomOut">－</el-button>
+            <el-button size="small" @click="onZoomReset">100%</el-button>
+            <el-button size="small" @click="ui.zoomIn">＋</el-button>
+          </div>
+          <div class="btn-row snap-row">
+            <el-button size="small" @click="ui.toggleSnap">
+              吸附 {{ snapEnabled ? '开' : '关' }}
+            </el-button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <footer class="panel-footer">
       <el-button size="small" text type="primary" @click="goGuide">
         ← 返回引导页
       </el-button>
-    </section>
+    </footer>
   </aside>
 </template>
 
@@ -566,51 +820,162 @@ function goGuide() {
   height: 100%;
   background: #fff;
   border-left: 1px solid #dadce0;
-  padding: 14px 16px;
   box-sizing: border-box;
-  overflow: auto;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  overflow: hidden;
 }
 
 .panel-header {
-  margin-bottom: 8px;
+  flex-shrink: 0;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid #e8eaed;
+  background: #fafbfc;
 }
 
-.panel-header h3 {
-  margin: 0 0 4px;
-  font-size: 15px;
-  font-weight: 650;
-  color: #202124;
-}
-
-.panel-sub {
-  margin: 0;
-  font-size: 12px;
-  color: #5f6368;
-}
-
-.section {
-  padding: 12px 0;
-  border-top: 1px solid #e8eaed;
-}
-
-.section-title {
-  margin: 0 0 10px;
-  font-size: 12px;
-  font-weight: 650;
-  color: #5f6368;
-  letter-spacing: 0.02em;
-  text-transform: none;
-}
-
-.section-head {
+.panel-header-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 10px;
+}
+
+.panel-header h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 650;
+  color: #202124;
+  letter-spacing: -0.01em;
+}
+
+.panel-sub {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: #5f6368;
+  line-height: 1.35;
+}
+
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.status-chip--dirty {
+  color: #b06000;
+  background: #fef7e0;
+}
+
+.status-chip--clean {
+  color: #137333;
+  background: #e6f4ea;
+}
+
+.panel-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 4px 0 8px;
+}
+
+.acc-section {
+  border-bottom: 1px solid #e8eaed;
+}
+
+.acc-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px 10px 12px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  color: #3c4043;
+  transition: background 0.12s ease;
+}
+
+.acc-header:hover {
+  background: #f1f3f4;
+}
+
+.acc-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: #80868b;
+  transition: transform 0.15s ease;
+  flex-shrink: 0;
+}
+
+.acc-section.is-open .acc-chevron {
+  transform: rotate(90deg);
+  color: #5f6368;
+}
+
+.acc-title {
+  font-size: 12px;
+  font-weight: 650;
+  color: #5f6368;
+  letter-spacing: 0.02em;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.acc-section.is-open .acc-title {
+  color: #202124;
+}
+
+.acc-meta-badge {
+  font-size: 10px;
+  color: #1a73e8;
+  background: #e8f0fe;
+  padding: 1px 7px;
+  border-radius: 999px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.acc-meta-muted {
+  font-size: 11px;
+  color: #80868b;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.acc-count {
+  font-size: 10px;
+  font-weight: 650;
+  color: #5f6368;
+  background: #e8eaed;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.acc-body {
+  padding: 0 14px 12px 34px;
 }
 
 .field {
@@ -628,17 +993,24 @@ function goGuide() {
   color: #d93025;
 }
 
+.meta-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 2px;
+}
+
 .info-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 8px;
-  font-size: 13px;
+  padding: 4px 0;
+  font-size: 12px;
 }
 
 .info-row .label {
-  color: #5f6368;
+  color: #80868b;
   flex-shrink: 0;
 }
 
@@ -657,24 +1029,24 @@ function goGuide() {
   white-space: nowrap;
 }
 
-.status.dirty {
-  color: #e37400;
-  font-weight: 600;
-}
-
-.status.clean {
-  color: #188038;
-  font-weight: 600;
-}
-
 .mono {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 12px;
+  font-size: 11px;
   color: #3c4043;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 160px;
+  max-width: 150px;
+}
+
+.btn-save {
+  width: 100%;
+  margin: 0 0 8px !important;
+}
+
+.btn-danger-full {
+  width: 100%;
+  margin: 8px 0 0 !important;
 }
 
 .btn-grid {
@@ -687,6 +1059,10 @@ function goGuide() {
   margin: 0;
 }
 
+.btn-span-2 {
+  grid-column: 1 / -1;
+}
+
 .btn-row {
   display: flex;
   flex-wrap: wrap;
@@ -697,10 +1073,21 @@ function goGuide() {
   margin: 0;
 }
 
+.snap-row {
+  margin-top: 8px;
+}
+
+.section-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+
 .hint {
   margin: 0;
   font-size: 12px;
   color: #5f6368;
+  line-height: 1.5;
 }
 
 .stored-list {
@@ -714,12 +1101,27 @@ function goGuide() {
   overflow: auto;
 }
 
-.stored-item button {
-  width: 100%;
-  text-align: left;
+.stored-item {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
   border: 1px solid #dadce0;
   border-radius: 8px;
   background: #fff;
+  overflow: hidden;
+}
+
+.stored-item.active {
+  border-color: #1a73e8;
+  background: #e8f0fe;
+}
+
+.stored-open {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: left;
+  border: none;
+  background: transparent;
   padding: 8px 10px;
   cursor: pointer;
   display: flex;
@@ -727,9 +1129,19 @@ function goGuide() {
   gap: 2px;
 }
 
-.stored-item.active button {
-  border-color: #1a73e8;
-  background: #e8f0fe;
+.stored-open:hover {
+  background: rgba(26, 115, 232, 0.04);
+}
+
+.stored-delete {
+  flex-shrink: 0;
+  align-self: center;
+  margin: 0 4px !important;
+  opacity: 0.7;
+}
+
+.stored-item:hover .stored-delete {
+  opacity: 1;
 }
 
 .stored-title {
@@ -758,9 +1170,10 @@ function goGuide() {
   white-space: nowrap;
 }
 
-.section-foot {
-  margin-top: auto;
+.panel-footer {
+  flex-shrink: 0;
+  padding: 8px 12px 10px;
   border-top: 1px solid #e8eaed;
-  padding-bottom: 4px;
+  background: #fafbfc;
 }
 </style>

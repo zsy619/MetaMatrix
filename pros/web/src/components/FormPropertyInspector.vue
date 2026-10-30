@@ -3,21 +3,25 @@ import { computed, ref, watch } from 'vue'
 import {
   DATE_FORMAT_PRESETS,
   FORM_NODE_TYPE_LABELS,
+  SHOW_IF_OP_LABELS,
   defaultDateFormat,
   formNodeSupportsChoiceLayout,
   formNodeSupportsLength,
   formNodeSupportsNumberRange,
   formNodeSupportsOptions,
+  formNodeSupportsPattern,
   formNodeSupportsPlaceholder,
   formNodeSupportsRows,
   joinFormOptions,
   joinFormValues,
   normalizeChoiceLayout,
   normalizeLayoutColumns,
+  normalizeShowIfOp,
   splitFormOptions,
   splitFormValues,
   type FormChoiceLayout,
   type FormNodeName,
+  type FormShowIfOp,
 } from '../extensions/forms'
 
 const props = defineProps<{
@@ -44,6 +48,7 @@ const isNumber = computed(() => formNodeSupportsNumberRange(props.type))
 const isText = computed(() => props.type === 'formTextInput')
 const isTextarea = computed(() => formNodeSupportsRows(props.type))
 const showLengthLimits = computed(() => formNodeSupportsLength(props.type))
+const showPattern = computed(() => formNodeSupportsPattern(props.type))
 
 const labelDraft = ref('')
 const nameDraft = ref('')
@@ -65,7 +70,16 @@ const disabledDraft = ref(false)
 const helpTextDraft = ref('')
 const minLengthDraft = ref('')
 const maxLengthDraft = ref('')
+const patternDraft = ref('')
 const rowsDraft = ref(4)
+const showIfEnabled = ref(false)
+const showIfFieldDraft = ref('')
+const showIfOpDraft = ref<FormShowIfOp>('eq')
+const showIfValueDraft = ref('')
+const showIfOpOptions = (Object.keys(SHOW_IF_OP_LABELS) as FormShowIfOp[]).map((op) => ({
+  value: op,
+  label: SHOW_IF_OP_LABELS[op],
+}))
 
 const dateFormatPresets = DATE_FORMAT_PRESETS
 
@@ -123,12 +137,22 @@ function syncFromAttrs() {
     minLengthDraft.value = ''
     maxLengthDraft.value = ''
   }
+  if (showPattern.value) {
+    patternDraft.value = String(a.pattern ?? '')
+  } else {
+    patternDraft.value = ''
+  }
   if (isTextarea.value) {
     const n = Number(a.rows)
     rowsDraft.value = Number.isFinite(n) && n > 0 ? Math.floor(n) : 4
   } else {
     rowsDraft.value = 4
   }
+  const sif = String(a.showIfField ?? '').trim()
+  showIfFieldDraft.value = sif
+  showIfEnabled.value = Boolean(sif)
+  showIfOpDraft.value = normalizeShowIfOp(a.showIfOp)
+  showIfValueDraft.value = String(a.showIfValue ?? '')
   syncing = false
 }
 
@@ -185,6 +209,10 @@ function onMinLengthInput() {
 
 function onMaxLengthInput() {
   emitPatch({ maxLength: maxLengthDraft.value.trim() })
+}
+
+function onPatternInput() {
+  emitPatch({ pattern: patternDraft.value.trim() })
 }
 
 function onRowsInput() {
@@ -306,6 +334,45 @@ function onLayoutColumnsInput(event: Event) {
   layoutColumnsDraft.value = cols
   emitPatch({ layoutColumns: cols })
 }
+
+function emitShowIfPatch() {
+  if (!showIfEnabled.value) {
+    emitPatch({ showIfField: '', showIfOp: 'eq', showIfValue: '' })
+    return
+  }
+  emitPatch({
+    showIfField: showIfFieldDraft.value.trim(),
+    showIfOp: normalizeShowIfOp(showIfOpDraft.value),
+    showIfValue: showIfValueDraft.value,
+  })
+}
+
+function onShowIfEnabledChange() {
+  if (!showIfEnabled.value) {
+    showIfFieldDraft.value = ''
+    showIfOpDraft.value = 'eq'
+    showIfValueDraft.value = ''
+  }
+  emitShowIfPatch()
+}
+
+function onShowIfFieldInput() {
+  showIfEnabled.value = Boolean(showIfFieldDraft.value.trim())
+  emitShowIfPatch()
+}
+
+function onShowIfOpChange() {
+  showIfOpDraft.value = normalizeShowIfOp(showIfOpDraft.value)
+  emitShowIfPatch()
+}
+
+function onShowIfValueInput() {
+  emitShowIfPatch()
+}
+
+const showIfNeedsValue = computed(
+  () => showIfOpDraft.value === 'eq' || showIfOpDraft.value === 'neq',
+)
 </script>
 
 <template>
@@ -433,7 +500,7 @@ function onLayoutColumnsInput(event: Event) {
         </label>
       </div>
 
-      <div v-if="showLengthLimits || isTextarea || isDate || isNumber || isChoiceGroup" class="fpi-section">
+      <div v-if="showLengthLimits || showPattern || isTextarea || isDate || isNumber || isChoiceGroup" class="fpi-section">
         <div class="fpi-section-title">类型设置</div>
 
         <label v-if="showLengthLimits" class="fpi-field">
@@ -460,6 +527,20 @@ function onLayoutColumnsInput(event: Event) {
             placeholder="可选"
             @input="onMaxLengthInput"
           />
+        </label>
+
+        <label v-if="showPattern" class="fpi-field">
+          <span class="fpi-label">正则</span>
+          <input
+            v-model="patternDraft"
+            class="fpi-input"
+            type="text"
+            maxlength="200"
+            placeholder="如 ^1\\d{10}$"
+            spellcheck="false"
+            @input="onPatternInput"
+          />
+          <p class="fpi-tip">按 HTML pattern 语义整串匹配（自动加 ^(?:…)$）。留空不校验。示例：邮箱 `.+@.+\\..+`、手机 `1\\d{10}`</p>
         </label>
 
         <label v-if="isTextarea" class="fpi-field">
@@ -684,6 +765,64 @@ function onLayoutColumnsInput(event: Event) {
             @input="onDefaultInput"
           />
         </label>
+      </div>
+
+      <div class="fpi-section">
+        <div class="fpi-section-title">条件显示</div>
+        <label class="fpi-field fpi-field-row">
+          <span class="fpi-label">启用</span>
+          <input
+            v-model="showIfEnabled"
+            class="fpi-check"
+            type="checkbox"
+            @change="onShowIfEnabledChange"
+          />
+          <span class="fpi-hint">{{ showIfEnabled ? '是' : '否' }}</span>
+        </label>
+        <template v-if="showIfEnabled">
+          <label class="fpi-field">
+            <span class="fpi-label">依赖字段名</span>
+            <input
+              v-model="showIfFieldDraft"
+              class="fpi-input"
+              type="text"
+              maxlength="80"
+              placeholder="另一字段的字段名，如 type"
+              spellcheck="false"
+              @input="onShowIfFieldInput"
+            />
+          </label>
+          <label class="fpi-field">
+            <span class="fpi-label">条件</span>
+            <select
+              v-model="showIfOpDraft"
+              class="fpi-input"
+              @change="onShowIfOpChange"
+            >
+              <option
+                v-for="opt in showIfOpOptions"
+                :key="opt.value"
+                :value="opt.value"
+              >
+                {{ opt.label }}
+              </option>
+            </select>
+          </label>
+          <label v-if="showIfNeedsValue" class="fpi-field">
+            <span class="fpi-label">比较值</span>
+            <input
+              v-model="showIfValueDraft"
+              class="fpi-input"
+              type="text"
+              maxlength="120"
+              placeholder="等于 / 不等于 时填写"
+              @input="onShowIfValueInput"
+            />
+          </label>
+        </template>
+        <p class="fpi-tip">
+          编辑态始终显示并标「条件」角标；预览态仅当条件成立时显示本字段。开关字段比较值用 true / false。
+        </p>
       </div>
     </div>
   </aside>
