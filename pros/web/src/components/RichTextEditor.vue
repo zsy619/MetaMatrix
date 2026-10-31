@@ -9,6 +9,7 @@ import {
   type Directive,
 } from 'vue'
 import { NodeSelection, TextSelection } from '@tiptap/pm/state'
+import { Fragment } from '@tiptap/pm/model'
 import { useEditor, EditorContent } from '@tiptap/vue-3'
 import { BubbleMenu } from '@tiptap/vue-3/menus'
 import StarterKit from '@tiptap/starter-kit'
@@ -22,11 +23,11 @@ import Subscript from '@tiptap/extension-subscript'
 import Superscript from '@tiptap/extension-superscript'
 import TextAlign from '@tiptap/extension-text-align'
 import Link from '@tiptap/extension-link'
-import Image from '@tiptap/extension-image'
 import { Table } from '@tiptap/extension-table'
 import { TableRow } from '@tiptap/extension-table-row'
-import { TableCell } from '@tiptap/extension-table-cell'
-import { TableHeader } from '@tiptap/extension-table-header'
+import { RteImage } from '../extensions/rteImage'
+import { RteTableCell, RteTableHeader, TABLE_CELL_BG_PRESETS, TABLE_BORDER_STYLE_PRESETS } from '../extensions/rteTableCells'
+import { RteHorizontalRule, HR_VARIANT_OPTIONS, type RteHrVariant } from '../extensions/rteHorizontalRule'
 import { ElMessage } from 'element-plus'
 import { looksLikeHtml, escapeHtml } from '../utils/itemsHtml'
 import { Annotation } from '../extensions/annotation'
@@ -85,8 +86,64 @@ import { ParagraphAttrs } from '../extensions/paragraphAttrs'
 import { PageBreak } from '../extensions/pageBreak'
 import { Columns, Column } from '../extensions/columns'
 import { Callout, type CalloutVariant } from '../extensions/callout'
+import { Bookmark } from '../extensions/bookmark'
+import { RteBlockquote, QUOTE_STYLE_OPTIONS, type QuoteStyle } from '../extensions/rteBlockquote'
+import { EmphasisDot } from '../extensions/emphasisDot'
+import { ToggleBlock } from '../extensions/toggleBlock'
+import { Audio } from '../extensions/audio'
+import { LinkCard } from '../extensions/linkCard'
+import { Footnote } from '../extensions/footnote'
+import { SensitiveHighlight } from '../extensions/sensitiveHighlight'
+import { RevisionHighlight } from '../extensions/revisionHighlight'
+import { Ruby } from '../extensions/ruby'
+import { StatusChip } from '../extensions/statusChip'
+import { ProgressBar } from '../extensions/progressBar'
+import { Timeline, TimelineItem } from '../extensions/timeline'
+import { TabsBlock, TabPane } from '../extensions/tabsBlock'
+import { MermaidBlock } from '../extensions/mermaidBlock'
+import { CrossRef, collectCrossRefTargets } from '../extensions/crossRef'
+import { ListStyleAttrs } from '../extensions/listStyleAttrs'
 import { buildDocxBlob } from '../utils/rteExportDocx'
 import { buildPdfFromElement } from '../utils/rteExportPdf'
+import { htmlToMarkdown } from '../utils/rteExportMd'
+import {
+  applyParagraphStyle,
+  PARA_STYLE_OPTIONS,
+  ORDERED_LIST_STYLE_OPTIONS,
+  checkHeadingHierarchy,
+  checkDocumentLinks,
+  estimateReadingMinutes,
+  copyTableAs,
+  applyTableRowFilter,
+  clearTableRowFilter,
+  compressImageFile,
+  loadSnippets,
+  saveSnippets,
+  DEFAULT_SNIPPETS,
+  STATUS_CHIP_TONES,
+  IMAGE_RADIUS_PRESETS,
+  IMAGE_SHADOW_PRESETS,
+  IMAGE_BORDER_PRESETS,
+  type RteSnippet,
+  type ParaStyleId,
+} from '../utils/rteWave21'
+import {
+  applyCaseToSelection,
+  copySelectionOrDocAsMarkdown,
+  makeQrDataUrl,
+  speakText,
+  stopSpeak,
+  collectFootnotes,
+  renumberFootnotes,
+  jumpToPos,
+  setCellVerticalAlign,
+  renumberCaptions,
+  sortTableByColumn,
+  upsertTableSumRow,
+  currentTableColIndex,
+  RTE_ZOOM_PRESETS,
+  type CaseMode,
+} from './rteWave20'
 import { RTE_EMOJI_CATEGORIES } from '../utils/rteEmojiList'
 import { RTE_SPECIAL_CHAR_CATEGORIES } from '../utils/rteSpecialChars'
 
@@ -207,11 +264,175 @@ const mentionMenuEl = ref<HTMLElement | null>(null)
 
 /** 粘贴为纯文本（工具栏开关；影响后续粘贴） */
 const pastePlainTextMode = ref(false)
+/** 浏览器拼写检查（默认关；可工具栏开启） */
+const spellcheckEnabled = ref(false)
+/** 打印预览浮层 */
+const printPreviewOpen = ref(false)
+const printPreviewHtml = ref('')
+
+/** 统一自定义询问弹层（替代 window.prompt / confirm） */
+type RteAskKind = 'prompt' | 'confirm'
+const askOpen = ref(false)
+const askKind = ref<RteAskKind>('prompt')
+const askTitle = ref('')
+const askMessage = ref('')
+const askPlaceholder = ref('')
+const askValue = ref('')
+const askConfirmLabel = ref('确认')
+const askCancelLabel = ref('取消')
+const askMaxlength = ref(500)
+const askInputRef = ref<HTMLInputElement | null>(null)
+let askResolvePrompt: ((v: string | null) => void) | null = null
+let askResolveConfirm: ((v: boolean) => void) | null = null
+
+function closeAskDialog(result: 'cancel' | 'ok' = 'cancel') {
+  if (askKind.value === 'prompt') {
+    const r = askResolvePrompt
+    askResolvePrompt = null
+    askOpen.value = false
+    if (r) r(result === 'ok' ? askValue.value : null)
+  } else {
+    const r = askResolveConfirm
+    askResolveConfirm = null
+    askOpen.value = false
+    if (r) r(result === 'ok')
+  }
+}
+
+function settleAskPendingAsCancel() {
+  if (askResolvePrompt) {
+    const r = askResolvePrompt
+    askResolvePrompt = null
+    r(null)
+  }
+  if (askResolveConfirm) {
+    const r = askResolveConfirm
+    askResolveConfirm = null
+    r(false)
+  }
+}
+
+function openRtePrompt(opts: {
+  title: string
+  message?: string
+  placeholder?: string
+  defaultValue?: string
+  confirmLabel?: string
+  cancelLabel?: string
+  maxlength?: number
+}): Promise<string | null> {
+  settleAskPendingAsCancel()
+  askKind.value = 'prompt'
+  askTitle.value = opts.title
+  askMessage.value = opts.message || ''
+  askPlaceholder.value = opts.placeholder || ''
+  askValue.value = opts.defaultValue ?? ''
+  askConfirmLabel.value = opts.confirmLabel || '确认'
+  askCancelLabel.value = opts.cancelLabel || '取消'
+  askMaxlength.value = opts.maxlength ?? 500
+  askOpen.value = true
+  moreOpen.value = false
+  nextTick(() => {
+    askInputRef.value?.focus()
+    askInputRef.value?.select()
+  })
+  return new Promise((resolve) => {
+    askResolvePrompt = resolve
+  })
+}
+
+function openRteConfirm(opts: {
+  title: string
+  message: string
+  confirmLabel?: string
+  cancelLabel?: string
+}): Promise<boolean> {
+  settleAskPendingAsCancel()
+  askKind.value = 'confirm'
+  askTitle.value = opts.title
+  askMessage.value = opts.message
+  askPlaceholder.value = ''
+  askValue.value = ''
+  askConfirmLabel.value = opts.confirmLabel || '确定'
+  askCancelLabel.value = opts.cancelLabel || '取消'
+  askOpen.value = true
+  moreOpen.value = false
+  return new Promise((resolve) => {
+    askResolveConfirm = resolve
+  })
+}
+
+/** 链接卡片专用弹层 */
+const linkCardDialogOpen = ref(false)
+const linkCardHref = ref('https://')
+const linkCardMode = ref<'card' | 'iframe'>('card')
+
+function openLinkCardDialog() {
+  linkCardHref.value = 'https://'
+  linkCardMode.value = 'card'
+  linkCardDialogOpen.value = true
+  moreOpen.value = false
+}
+
+function closeLinkCardDialog() {
+  linkCardDialogOpen.value = false
+}
+
+function confirmLinkCardDialog() {
+  const href = linkCardHref.value.trim()
+  if (!href) {
+    ElMessage.warning('请输入网页链接')
+    return
+  }
+  const mode = linkCardMode.value
+  const ok = editor.value?.chain().focus().insertLinkCard({ href, mode }).run()
+  if (!ok) ElMessage.warning('链接无效（仅支持 http/https）')
+  else ElMessage.success(mode === 'iframe' ? '已插入嵌入卡片' : '已插入链接卡片')
+  closeLinkCardDialog()
+}
+/** 视图：缩放 / 专注 / 暗色 / 纸张参考线 */
+const editorZoom = ref(1)
+const focusMode = ref(false)
+const darkEditor = ref(false)
+const paperGuide = ref(false)
+const tableHeaderSticky = ref(false)
+const sensitiveOn = ref(false)
+const revisionOn = ref(false)
+const footnotePanelOpen = ref(false)
+const caseMenuOpen = ref(false)
+const zoomMenuOpen = ref(false)
+const viewExtrasOpen = ref(false)
+/** Wave21 */
+const headingAutoNumber = ref(false)
+const immersiveFullscreen = ref(false)
+const paraStyleOpen = ref(false)
+const listStyleOpen = ref(false)
+const wave21ReportOpen = ref(false)
+const wave21ReportTitle = ref('')
+const wave21ReportLines = ref<Array<{ text: string; pos?: number }>>([])
+const snippetDialogOpen = ref(false)
+const snippetList = ref<RteSnippet[]>(loadSnippets())
+const snippetEditing = ref<RteSnippet | null>(null)
+const snippetTitle = ref('')
+const snippetBody = ref('')
+const xrefDialogOpen = ref(false)
+const xrefTargets = ref<ReturnType<typeof collectCrossRefTargets>>([])
+const readTimeDialogOpen = ref(false)
+const tableFilterQuery = ref('')
+const imageCompressOnInsert = ref(true)
+/** 本会话是否已提示过 Word 粘贴清理 */
+let wordPasteHinted = false
 /** 格式刷：复制选区 marks + 块级缩进/段距；sticky 可连续刷 */
 type FormatPainterBlock = {
   indent?: number
   marginTop?: string | null
   marginBottom?: string | null
+  textIndent?: string | null
+  dir?: 'ltr' | 'rtl' | null
+  textAlign?: string | null
+  lineHeight?: string | null
+  headingLevel?: number | null
+  nodeType?: 'paragraph' | 'heading' | null
 }
 const formatPainter = ref<{
   marks: Array<{ type: string; attrs: Record<string, unknown> }>
@@ -532,8 +753,9 @@ const editor = useEditor({
       heading: { levels: [1, 2, 3, 4, 5, 6] },
       // 使用 RteCodeBlockLowlight，避免与 StarterKit 自带 codeBlock 重复注册
       codeBlock: false,
-      blockquote: {},
-      horizontalRule: {},
+      blockquote: false,
+      // 使用 RteHorizontalRule（样式变体），关闭内置
+      horizontalRule: false,
       bulletList: {},
       orderedList: {},
       listItem: {},
@@ -559,6 +781,25 @@ const editor = useEditor({
     Columns,
     Column,
     Callout,
+    Bookmark,
+    RteBlockquote,
+    EmphasisDot,
+    ToggleBlock,
+    Audio,
+    LinkCard,
+    Footnote,
+    SensitiveHighlight,
+    RevisionHighlight,
+    Ruby,
+    StatusChip,
+    ProgressBar,
+    Timeline,
+    TimelineItem,
+    TabsBlock,
+    TabPane,
+    MermaidBlock,
+    CrossRef,
+    ListStyleAttrs,
     Color,
     Highlight.configure({ multicolor: true }),
     TextAlign.configure({
@@ -576,7 +817,7 @@ const editor = useEditor({
         return ctx.defaultValidate(url)
       },
     }),
-    Image.configure({
+    RteImage.configure({
       // inline：多张可落在同一段落内并排（飞书式同行）；仍可拖拽重排
       inline: true,
       allowBase64: true,
@@ -624,8 +865,9 @@ const editor = useEditor({
     TaskItem.configure({ nested: true }),
     Table.configure({ resizable: true }),
     TableRow,
-    TableHeader,
-    TableCell,
+    RteTableHeader,
+    RteTableCell,
+    RteHorizontalRule,
     Placeholder.configure({
       placeholder: props.placeholder,
       emptyEditorClass: 'is-editor-empty',
@@ -650,11 +892,11 @@ const editor = useEditor({
     SlashCommands.configure({
       ui: slashUi,
     }),
-  ],
+  ].filter((ext): ext is NonNullable<typeof ext> => ext != null),
   editorProps: {
     attributes: {
       class: 'rte-prose',
-      spellcheck: 'false',
+      spellcheck: 'false', // 运行时由 syncSpellcheckToDom 同步
     },
     transformPastedHTML(html) {
       if (pastePlainTextMode.value) {
@@ -663,21 +905,52 @@ const editor = useEditor({
         const plain = tmp.textContent || tmp.innerText || ''
         return escapeHtml(plain).replace(/\n/g, '<br>')
       }
-      // Paste cleanup: strip scripts/styles/event handlers & Microsoft junk wrappers
+      // Paste cleanup: scripts/styles/handlers + Word/Office 深度清理
+      const looksWord =
+        /class=("|'|)Mso/i.test(html) ||
+        /mso-/i.test(html) ||
+        /xmlns:w=/i.test(html) ||
+        /<!--\[if/i.test(html)
+      if (looksWord && !wordPasteHinted) {
+        wordPasteHinted = true
+        try {
+          ElMessage.info('已自动清理 Word 粘贴中的多余格式')
+        } catch {
+          /* ignore */
+        }
+      }
       return html
         .replace(/<script[\s\S]*?<\/script>/gi, '')
         .replace(/<style[\s\S]*?<\/style>/gi, '')
+        .replace(/<!--\[if[\s\S]*?<!\[endif\]-->/gi, '')
+        .replace(/<!--[\s\S]*?-->/g, '')
         .replace(/\son\w+=("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
-        .replace(/<(meta|link|xml|o:p)[^>]*>/gi, '')
-        .replace(/<\/(xml|o:p)>/gi, '')
-        .replace(/class=("Mso[^"]*"|'Mso[^']*')/gi, '')
+        .replace(/<(meta|link|xml|o:p|w:[^>\s]+)[^>]*>/gi, '')
+        .replace(/<\/(xml|o:p|w:[^>\s]+)>/gi, '')
+        .replace(/<\/?span[^>]*>/gi, '')
+        .replace(/<\/?font[^>]*>/gi, '')
+        .replace(/class=("Mso[^"]*"|'Mso[^']*'|"[^"]*Mso[^"]*"|'[^']*Mso[^']*')/gi, '')
         .replace(/style="[^"]*mso-[^"]*"/gi, '')
+        .replace(/style='[^']*mso-[^']*'/gi, '')
+        .replace(/\s(lang|face|size)=("[^"]*"|'[^']*')/gi, '')
+        .replace(/<p([^>]*)>\s*&nbsp;\s*<\/p>/gi, '')
+        .replace(/(<br\s*\/?>\s*){3,}/gi, '<br><br>')
     },
     handlePaste(_view, event) {
       const plain = event.clipboardData?.getData('text/plain')
       const html = event.clipboardData?.getData('text/html') || ''
+      // Markdown 强制模式：纯文本一律走 MD→HTML
+      if (pasteFormatMode.value === 'markdown' && plain) {
+        event.preventDefault()
+        const ed = editor.value
+        if (!ed) return true
+        const normalized = plain.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+        const mdHtml = markdownToHtml(normalized)
+        ed.chain().focus().insertContent(mdHtml).run()
+        return true
+      }
       // 纯文本模式：始终按纯文本插入
-      if (pastePlainTextMode.value) {
+      if (pastePlainTextMode.value || pasteFormatMode.value === 'plain') {
         if (plain == null) return false
         event.preventDefault()
         const ed = editor.value
@@ -778,6 +1051,51 @@ const editor = useEditor({
           return true
         }
       }
+      // 表格快捷：Ctrl/⌘+Alt+方向 — 在旁插入行/列
+      if (event.altKey && isInTable()) {
+        if (key === 'arrowup') {
+          event.preventDefault()
+          tableAddRowBefore()
+          return true
+        }
+        if (key === 'arrowdown') {
+          event.preventDefault()
+          tableAddRowAfter()
+          return true
+        }
+        if (key === 'arrowleft') {
+          event.preventDefault()
+          tableAddColBefore()
+          return true
+        }
+        if (key === 'arrowright') {
+          event.preventDefault()
+          tableAddColAfter()
+          return true
+        }
+      }
+      if (event.shiftKey) {
+        if (key === 'd') {
+          event.preventDefault()
+          duplicateCurrentBlock()
+          return true
+        }
+        if (key === 'arrowup') {
+          event.preventDefault()
+          moveCurrentBlock(-1)
+          return true
+        }
+        if (key === 'arrowdown') {
+          event.preventDefault()
+          moveCurrentBlock(1)
+          return true
+        }
+        if (key === '\\' || key === '|') {
+          event.preventDefault()
+          selectCurrentBlock()
+          return true
+        }
+      }
       return false
     },
   },
@@ -791,6 +1109,7 @@ const editor = useEditor({
   onSelectionUpdate: ({ editor: ed }) => {
     syncSelectedFormFromEditor(ed)
     applyFormatPainterIfNeeded(ed)
+    syncImageBubbleCaption()
   },
   onTransaction: ({ editor: ed }) => {
     if (selectedFormPos.value != null) formSelectionTick.value += 1
@@ -1081,7 +1400,35 @@ function redo() {
   chain()?.redo().run()
 }
 function clearFormat() {
-  chain()?.unsetAllMarks().clearNodes().run()
+  const ed = editor.value
+  if (!ed) return
+  // 强化：marks + 块类型回正文倾向 + 对齐 / 段距 / 字距 / 缩进
+  ed.chain()
+    .focus()
+    .unsetAllMarks()
+    .clearNodes()
+    .unsetTextAlign()
+    .unsetLetterSpacing()
+    .run()
+  try {
+    if (ed.isActive('paragraph') || ed.isActive('heading')) {
+      ed.chain()
+        .focus()
+        .updateAttributes(ed.isActive('heading') ? 'heading' : 'paragraph', {
+          indent: 0,
+          marginTop: null,
+          marginBottom: null,
+        })
+        .run()
+    }
+  } catch {
+    /* attrs 可能未注册 */
+  }
+  if (ed.isActive('highlight')) {
+    ed.chain().focus().unsetHighlight().run()
+  }
+  announceRte('已清除格式')
+  ElMessage.success('已清除所选格式')
 }
 
 function activateFormatPainter(sticky = false) {
@@ -1109,7 +1456,7 @@ function activateFormatPainter(sticky = false) {
     if (idx >= 0) marks[idx] = { type: 'textStyle', attrs: { ...ts } }
     else marks.push({ type: 'textStyle', attrs: { ...ts } })
   }
-  // 块级：缩进 + 段前/段后
+  // 块级：缩进 / 段距 / 首行缩进 / 方向 / 对齐 / 行高 / 标题级别（跨块刷）
   let block: FormatPainterBlock | null = null
   for (const type of ['paragraph', 'heading'] as const) {
     if (!ed.isActive(type)) continue
@@ -1117,11 +1464,51 @@ function activateFormatPainter(sticky = false) {
     const indent = Number(attrs.indent || 0)
     const marginTop = (attrs.marginTop as string | null | undefined) ?? null
     const marginBottom = (attrs.marginBottom as string | null | undefined) ?? null
-    if (indent || marginTop || marginBottom) {
+    const textIndent = (attrs.textIndent as string | null | undefined) ?? null
+    const dirRaw = attrs.dir
+    const dir =
+      dirRaw === 'rtl' || dirRaw === 'ltr' ? (dirRaw as 'ltr' | 'rtl') : null
+    const textAlign = (ed.getAttributes('paragraph')?.textAlign ||
+      ed.getAttributes('heading')?.textAlign ||
+      null) as string | null
+    // TextAlign 存在节点 attrs
+    const alignAttr =
+      (attrs.textAlign as string | null | undefined) ||
+      (ed.isActive({ textAlign: 'left' })
+        ? 'left'
+        : ed.isActive({ textAlign: 'center' })
+          ? 'center'
+          : ed.isActive({ textAlign: 'right' })
+            ? 'right'
+            : ed.isActive({ textAlign: 'justify' })
+              ? 'justify'
+              : null)
+    const lineHeight =
+      (typeof ed.getAttributes('textStyle')?.lineHeight === 'string'
+        ? (ed.getAttributes('textStyle').lineHeight as string)
+        : null) || null
+    const headingLevel =
+      type === 'heading' ? Number(attrs.level || 0) || null : null
+    if (
+      indent ||
+      marginTop ||
+      marginBottom ||
+      textIndent ||
+      dir ||
+      alignAttr ||
+      lineHeight ||
+      headingLevel
+    ) {
       block = {
         indent: indent || 0,
         marginTop: marginTop || null,
         marginBottom: marginBottom || null,
+        textIndent: textIndent || null,
+        dir,
+        textAlign: alignAttr || textAlign || null,
+        lineHeight,
+        headingLevel,
+        nodeType: type,
       }
     }
     break
@@ -1173,9 +1560,9 @@ function onFormatPainterDblClick() {
 }
 
 function applyFormatPainterIfNeeded(ed: {
-  state: { selection: { empty: boolean } }
+  state: { selection: { empty: boolean; from: number; to: number } }
   chain: () => any
-  isActive: (name: string) => boolean
+  isActive: (name: string | Record<string, unknown>) => boolean
   getAttributes: (name: string) => Record<string, unknown>
 }) {
   if (!formatPainter.value) return
@@ -1190,14 +1577,27 @@ function applyFormatPainterIfNeeded(ed: {
   for (const m of marks) {
     c = c.setMark(m.type, m.attrs)
   }
+  if (block?.lineHeight) {
+    c = c.setMark('textStyle', { lineHeight: block.lineHeight })
+  }
+  if (block?.textAlign) {
+    c = c.setTextAlign(block.textAlign)
+  }
+  // 跨块：对选区内每个 paragraph/heading 写入块属性
   if (block) {
     const patch: Record<string, unknown> = {}
     if (typeof block.indent === 'number') patch.indent = block.indent
     if ('marginTop' in block) patch.marginTop = block.marginTop
     if ('marginBottom' in block) patch.marginBottom = block.marginBottom
+    if ('textIndent' in block) patch.textIndent = block.textIndent
+    if ('dir' in block) patch.dir = block.dir
     if (Object.keys(patch).length) {
-      if (ed.isActive('heading')) c = c.updateAttributes('heading', patch)
-      else c = c.updateAttributes('paragraph', patch)
+      // updateAttributes 作用于选区内该类型全部节点 → 跨块刷段属性
+      c = c.updateAttributes('paragraph', patch)
+      c = c.updateAttributes('heading', patch)
+    }
+    if (block.nodeType === 'heading' && block.headingLevel && ed.isActive('heading')) {
+      c = c.setHeading({ level: block.headingLevel })
     }
   }
   c.run()
@@ -1291,6 +1691,9 @@ const SHORTCUT_GROUPS: { title: string; items: { keys: string; desc: string }[] 
       { keys: 'Ctrl/⌘ + Shift + Z', desc: '重做' },
       { keys: 'Ctrl/⌘ + F', desc: '查找替换' },
       { keys: 'Ctrl/⌘ + A', desc: '全选' },
+      { keys: 'Ctrl/⌘ + Shift + ↑/↓', desc: '块上移 / 下移' },
+      { keys: 'Ctrl/⌘ + Shift + D', desc: '复制当前块' },
+      { keys: "Ctrl/⌘ + Shift + \\（反斜杠）", desc: '全选当前块' },
     ],
   },
   {
@@ -1309,6 +1712,7 @@ const SHORTCUT_GROUPS: { title: string; items: { keys: string; desc: string }[] 
     title: '段落',
     items: [
       { keys: 'Ctrl/⌘ + Alt + 1…6', desc: '标题 1–6' },
+      { keys: 'Ctrl/⌘ + Alt + ↑↓←→', desc: '表格旁插入行/列' },
       { keys: 'Ctrl/⌘ + Shift + 8', desc: '无序列表' },
       { keys: 'Ctrl/⌘ + Shift + 7', desc: '有序列表' },
       { keys: 'Ctrl/⌘ + Shift + 9', desc: '引用' },
@@ -1363,9 +1767,805 @@ function insertColumns(cols: ColumnCount, ratios?: number[]) {
 
 function togglePastePlain() {
   pastePlainTextMode.value = !pastePlainTextMode.value
+  pasteFormatMode.value = pastePlainTextMode.value ? 'plain' : 'keep'
   ElMessage.success(
     pastePlainTextMode.value ? '已开启：粘贴为纯文本' : '已关闭：粘贴为纯文本',
   )
+}
+
+/** 粘贴后格式：保留 / 纯文本 / Markdown 智能（下一轮粘贴生效） */
+type PasteFormatMode = 'keep' | 'plain' | 'markdown'
+const pasteFormatMode = ref<PasteFormatMode>('keep')
+const pasteFormatOpen = ref(false)
+function setPasteFormatMode(mode: PasteFormatMode) {
+  pasteFormatMode.value = mode
+  pastePlainTextMode.value = mode === 'plain'
+  const labels: Record<PasteFormatMode, string> = {
+    keep: '保留原格式',
+    plain: '粘贴为纯文本',
+    markdown: 'Markdown 智能转换',
+  }
+  ElMessage.success(`粘贴格式：${labels[mode]}`)
+  moreOpen.value = false
+}
+
+function cyclePasteFormatMode() {
+  const order: PasteFormatMode[] = ['keep', 'plain', 'markdown']
+  const i = order.indexOf(pasteFormatMode.value)
+  setPasteFormatMode(order[(i + 1) % order.length]!)
+}
+
+function syncSpellcheckToDom() {
+  const ed = editor.value
+  if (!ed?.view?.dom) return
+  ed.view.dom.setAttribute('spellcheck', spellcheckEnabled.value ? 'true' : 'false')
+  ;(ed.view.dom as HTMLElement).spellcheck = spellcheckEnabled.value
+}
+
+function toggleSpellcheck() {
+  spellcheckEnabled.value = !spellcheckEnabled.value
+  syncSpellcheckToDom()
+  ElMessage.success(
+    spellcheckEnabled.value
+      ? '已开启拼写检查（依赖浏览器词典，中文支持因浏览器而异）'
+      : '已关闭拼写检查',
+  )
+  moreOpen.value = false
+}
+
+async function insertBookmark() {
+  const ed = editor.value
+  if (!ed) return
+  const { from, to, empty } = ed.state.selection
+  let label = ''
+  if (!empty) {
+    label = ed.state.doc.textBetween(from, to, ' ').trim().slice(0, 40)
+  }
+  if (!label) {
+    const raw = await openRtePrompt({
+      title: '插入书签',
+      message: '书签名称将作为跳转锚点显示',
+      placeholder: '书签名称',
+      defaultValue: '书签',
+      maxlength: 40,
+    })
+    if (raw == null) return
+    label = raw.trim().slice(0, 40) || '书签'
+  }
+  if (empty) {
+    const id = `bm-${Date.now().toString(36)}`
+    ed.chain()
+      .focus()
+      .insertContent({
+        type: 'text',
+        text: label,
+        marks: [{ type: 'bookmark', attrs: { id, label } }],
+      })
+      .run()
+  } else {
+    ed.chain().focus().setBookmark({ label }).run()
+  }
+  ElMessage.success(`已插入书签「${label}」`)
+  moreOpen.value = false
+}
+
+function listBookmarks(): Array<{ id: string; label: string; from: number }> {
+  const ed = editor.value
+  if (!ed) return []
+  const out: Array<{ id: string; label: string; from: number }> = []
+  ed.state.doc.descendants((node, pos) => {
+    if (!node.isText) return
+    for (const m of node.marks) {
+      if (m.type.name !== 'bookmark') continue
+      const id = String(m.attrs.id || '')
+      if (!id) continue
+      out.push({
+        id,
+        label: String(m.attrs.label || id),
+        from: pos,
+      })
+    }
+  })
+  return out
+}
+
+function jumpToBookmark(id: string) {
+  const ed = editor.value
+  if (!ed || !id) return
+  const found = listBookmarks().find((b) => b.id === id)
+  if (!found) {
+    ElMessage.warning('未找到该书签')
+    return
+  }
+  const $pos = ed.state.doc.resolve(found.from)
+  const tr = ed.state.tr.setSelection(TextSelection.near($pos)).scrollIntoView()
+  ed.view.dispatch(tr)
+  ed.view.focus()
+  // 高亮目标 DOM
+  nextTick(() => {
+    const el = ed.view.dom.querySelector(`#${CSS.escape(id)}`) as HTMLElement | null
+    el?.classList.add('rte-bookmark-flash')
+    setTimeout(() => el?.classList.remove('rte-bookmark-flash'), 1200)
+  })
+}
+
+const bookmarkPanelOpen = ref(false)
+function toggleBookmarkPanel() {
+  bookmarkPanelOpen.value = !bookmarkPanelOpen.value
+  moreOpen.value = false
+}
+
+function applyTextIndent(v: string) {
+  const ed = editor.value
+  if (!ed) return
+  ed.chain()
+    .focus()
+    .setTextIndent(v || null)
+    .run()
+}
+
+function applyTextDir(dir: 'ltr' | 'rtl' | '') {
+  const ed = editor.value
+  if (!ed) return
+  ed.chain()
+    .focus()
+    .setTextDir(dir || null)
+    .run()
+}
+
+function currentTextIndent(): string {
+  const ed = editor.value
+  if (!ed) return ''
+  for (const type of ['paragraph', 'heading'] as const) {
+    if (ed.isActive(type)) {
+      const v = ed.getAttributes(type).textIndent
+      return typeof v === 'string' ? v : ''
+    }
+  }
+  return ''
+}
+
+function currentTextDir(): string {
+  const ed = editor.value
+  if (!ed) return ''
+  for (const type of ['paragraph', 'heading'] as const) {
+    if (ed.isActive(type)) {
+      const v = ed.getAttributes(type).dir
+      return v === 'rtl' || v === 'ltr' ? v : ''
+    }
+  }
+  return ''
+}
+
+function currentQuoteStyle(): QuoteStyle {
+  const ed = editor.value
+  if (!ed || !ed.isActive('blockquote')) return 'default'
+  const v = ed.getAttributes('blockquote').quoteStyle
+  return v === 'emphasis' || v === 'verse' || v === 'default' ? v : 'default'
+}
+
+function applyQuoteStyle(style: QuoteStyle) {
+  const ed = editor.value
+  if (!ed) return
+  ed.chain().focus().setQuoteStyle(style).run()
+  moreOpen.value = false
+  calloutOpen.value = false
+}
+
+const IMAGE_WIDTH_PRESETS: Array<{ label: string; value: string }> = [
+  { label: '原始', value: '' },
+  { label: '25%', value: '25%' },
+  { label: '50%', value: '50%' },
+  { label: '75%', value: '75%' },
+  { label: '100%', value: '100%' },
+]
+
+function setImageDisplayWidth(w: string) {
+  const ed = editor.value
+  if (!ed || !isImageNodeSelected()) return
+  ed.chain()
+    .focus()
+    .updateAttributes('image', { displayWidth: w || null })
+    .run()
+}
+
+/* ========== Wave20 企业能力 ========== */
+function runCaseTransform(mode: CaseMode) {
+  const ed = editor.value
+  if (!ed) return
+  if (!applyCaseToSelection(ed, mode)) {
+    ElMessage.info('请先选中要转换的文字')
+    return
+  }
+  const labels = { upper: '全大写', lower: '全小写', title: '词首大写' }
+  ElMessage.success(`已转换：${labels[mode]}`)
+  caseMenuOpen.value = false
+  moreOpen.value = false
+}
+
+function toggleEmphasisDot() {
+  chain()?.toggleEmphasisDot().run()
+}
+
+async function copyAsMarkdown() {
+  const ed = editor.value
+  if (!ed) return
+  try {
+    const md = await copySelectionOrDocAsMarkdown(ed)
+    await navigator.clipboard.writeText(md)
+    ElMessage.success('已复制为 Markdown')
+  } catch (e) {
+    console.error(e)
+    ElMessage.error('复制失败（需剪贴板权限）')
+  }
+  moreOpen.value = false
+}
+
+async function insertToggleBlock() {
+  const summary = await openRtePrompt({
+    title: '插入折叠块',
+    message: '点击标题可展开 / 收起内容',
+    placeholder: '折叠标题',
+    defaultValue: '折叠标题',
+    maxlength: 80,
+  })
+  if (summary == null) return
+  chain()?.insertToggleBlock({ summary: summary.trim() || '折叠标题' }).run()
+  moreOpen.value = false
+}
+
+function insertAudioBlock() {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = 'audio/*'
+  input.onchange = () => {
+    const file = input.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      const src = String(reader.result || '')
+      if (!src) return
+      editor.value?.chain().focus().setAudio({ src, title: file.name }).run()
+      ElMessage.success('已插入音频')
+    }
+    reader.readAsDataURL(file)
+  }
+  input.click()
+  moreOpen.value = false
+}
+
+function insertLinkCardBlock() {
+  openLinkCardDialog()
+}
+
+async function insertFootnoteAtCursor() {
+  const ed = editor.value
+  if (!ed) return
+  const text = await openRtePrompt({
+    title: '插入脚注',
+    message: '脚注将显示为上标，并可在脚注区汇总',
+    placeholder: '脚注内容',
+    defaultValue: '',
+    maxlength: 500,
+  })
+  if (text == null || !text.trim()) return
+  const id = `fn-${Date.now().toString(36)}`
+  const n = collectFootnotes(ed).length + 1
+  if (ed.state.selection.empty) {
+    ed.chain()
+      .focus()
+      .insertContent({
+        type: 'text',
+        text: `[${n}]`,
+        marks: [{ type: 'footnote', attrs: { id, text: text.trim(), n } }],
+      })
+      .run()
+  } else {
+    ed.chain().focus().setFootnote({ id, text: text.trim() }).run()
+  }
+  renumberFootnotes(ed)
+  footnotePanelOpen.value = true
+  ElMessage.success('已插入脚注')
+  moreOpen.value = false
+}
+
+function openFootnotePanel() {
+  const ed = editor.value
+  if (ed) renumberFootnotes(ed)
+  footnotePanelOpen.value = !footnotePanelOpen.value
+  moreOpen.value = false
+}
+
+function doRenumberCaptions() {
+  const ed = editor.value
+  if (!ed) return
+  const r = renumberCaptions(ed)
+  ElMessage.success(`题注已编号：图 ${r.images} · 表 ${r.tables}`)
+  moreOpen.value = false
+}
+
+async function insertQrCode() {
+  const raw = await openRtePrompt({
+    title: '插入二维码',
+    message: '输入链接或任意文本，将生成二维码图片',
+    placeholder: 'https:// 或文本',
+    defaultValue: 'https://',
+    maxlength: 1000,
+  })
+  if (raw == null || !raw.trim()) return
+  try {
+    const dataUrl = await makeQrDataUrl(raw.trim())
+    editor.value
+      ?.chain()
+      .focus()
+      .setImage({ src: dataUrl, alt: 'QR' })
+      .updateAttributes('image', { caption: raw.trim().slice(0, 80) })
+      .run()
+    ElMessage.success('已插入二维码')
+  } catch (e) {
+    console.error(e)
+    ElMessage.error('二维码生成失败')
+  }
+  moreOpen.value = false
+}
+
+function applyCellValign(v: string) {
+  const ed = editor.value
+  if (!ed || !isInTable()) {
+    ElMessage.info('请在表格单元格内操作')
+    return
+  }
+  setCellVerticalAlign(ed, v || null)
+  moreOpen.value = false
+}
+
+function doSortTable(asc: boolean) {
+  const ed = editor.value
+  if (!ed || !isInTable()) {
+    ElMessage.info('请将光标放在表格中')
+    return
+  }
+  const col = currentTableColIndex(ed)
+  if (sortTableByColumn(ed, col, asc)) {
+    ElMessage.success(`已按第 ${col + 1} 列${asc ? '升序' : '降序'}排序`)
+  } else {
+    ElMessage.warning('排序失败（需至少 2 行）')
+  }
+  moreOpen.value = false
+}
+
+function doTableSumRow() {
+  const ed = editor.value
+  if (!ed || !isInTable()) {
+    ElMessage.info('请将光标放在表格中')
+    return
+  }
+  if (upsertTableSumRow(ed)) ElMessage.success('已更新合计行')
+  else ElMessage.warning('无法生成合计行')
+  moreOpen.value = false
+}
+
+function toggleTableStickyHeader() {
+  tableHeaderSticky.value = !tableHeaderSticky.value
+  ElMessage.success(tableHeaderSticky.value ? '已开启表头冻结' : '已关闭表头冻结')
+  moreOpen.value = false
+}
+
+function speakSelection() {
+  const ed = editor.value
+  if (!ed) return
+  const { from, to, empty } = ed.state.selection
+  const text = empty
+    ? ed.getText({ blockSeparator: '。' }).slice(0, 2000)
+    : ed.state.doc.textBetween(from, to, ' ')
+  if (!speakText(text)) ElMessage.warning('当前环境不支持朗读')
+  else ElMessage.success('开始朗读（再次可点停止）')
+  moreOpen.value = false
+}
+
+function stopSpeaking() {
+  stopSpeak()
+  ElMessage.info('已停止朗读')
+}
+
+function toggleSensitiveCheck() {
+  sensitiveOn.value = !sensitiveOn.value
+  editor.value?.commands.setSensitiveHighlight(sensitiveOn.value)
+  ElMessage.success(sensitiveOn.value ? '已开启敏感词/错别字提示' : '已关闭敏感词提示')
+  moreOpen.value = false
+}
+
+function toggleRevisionHighlight() {
+  const ed = editor.value
+  if (!ed) return
+  if (!revisionOn.value) {
+    ed.commands.captureRevisionBaseline()
+    ed.commands.setRevisionHighlight(true)
+    revisionOn.value = true
+    ElMessage.success('已开启单机修订高亮（相对当前基线）')
+  } else {
+    ed.commands.setRevisionHighlight(false)
+    revisionOn.value = false
+    ElMessage.info('已关闭修订高亮')
+  }
+  moreOpen.value = false
+}
+
+function resetRevisionBaseline() {
+  editor.value?.commands.captureRevisionBaseline()
+  ElMessage.success('已重新标记修订基线')
+}
+
+function setEditorZoom(z: number) {
+  editorZoom.value = z
+  zoomMenuOpen.value = false
+  moreOpen.value = false
+}
+
+function toggleFocusMode() {
+  focusMode.value = !focusMode.value
+  ElMessage.success(focusMode.value ? '专注模式' : '已退出专注模式')
+  moreOpen.value = false
+}
+
+function toggleDarkEditor() {
+  darkEditor.value = !darkEditor.value
+  moreOpen.value = false
+}
+
+function togglePaperGuide() {
+  paperGuide.value = !paperGuide.value
+  moreOpen.value = false
+}
+
+
+/** —— Wave21：标题自动编号 / 样式集 / 列表样式 / 注音 / 结构块 / 检查 / 全屏 / 片段 —— */
+function toggleHeadingAutoNumber() {
+  headingAutoNumber.value = !headingAutoNumber.value
+  moreOpen.value = false
+  ElMessage.success(headingAutoNumber.value ? '已开启标题自动编号' : '已关闭标题自动编号')
+}
+
+function applyParaStyleId(id: ParaStyleId) {
+  const ed = editor.value
+  if (!ed) return
+  applyParagraphStyle(ed, id)
+  paraStyleOpen.value = false
+  moreOpen.value = false
+  ElMessage.success('已应用段落样式')
+}
+
+function applyListStyle(style: string) {
+  const ed = editor.value
+  if (!ed) return
+  ed.chain().focus().setOrderedListStyle(style as any).run()
+  listStyleOpen.value = false
+  moreOpen.value = false
+}
+
+async function applyListStart() {
+  const raw = await openRtePrompt({
+    title: '列表起始序号',
+    message: '有序列表从几开始？',
+    defaultValue: '1',
+    placeholder: '1',
+    maxlength: 4,
+  })
+  if (raw == null) return
+  const n = parseInt(raw.trim(), 10)
+  if (!Number.isFinite(n) || n < 1) {
+    ElMessage.warning('请输入正整数')
+    return
+  }
+  editor.value?.chain().focus().setOrderedListStart(n).run()
+  listStyleOpen.value = false
+}
+
+async function insertRubyAnnotation() {
+  const ed = editor.value
+  if (!ed) return
+  const sel = ed.state.selection
+  if (sel.empty) {
+    ElMessage.info('请先选中要注音的文字')
+    return
+  }
+  const ann = await openRtePrompt({
+    title: '注音 / 拼音',
+    message: '为选中文字添加注音（显示在字上方）',
+    placeholder: '如：pin yin',
+    maxlength: 80,
+  })
+  if (ann == null) return
+  if (!ann.trim()) {
+    ed.chain().focus().unsetRuby().run()
+    ElMessage.success('已清除注音')
+    return
+  }
+  ed.chain().focus().setRuby(ann.trim()).run()
+  ElMessage.success('已添加注音')
+}
+
+function insertTimelineBlock() {
+  editor.value?.chain().focus().insertTimeline().run()
+  moreOpen.value = false
+  ElMessage.success('已插入时间线')
+}
+
+async function insertStatusChipBlock() {
+  const label = await openRtePrompt({
+    title: '状态徽章',
+    message: '输入徽章文字（如：进行中）',
+    defaultValue: '进行中',
+    maxlength: 20,
+  })
+  if (label == null) return
+  const toneRaw = await openRtePrompt({
+    title: '徽章颜色',
+    message: 'gray / blue / green / orange / red / purple',
+    defaultValue: 'blue',
+    maxlength: 12,
+  })
+  if (toneRaw == null) return
+  const tone = (STATUS_CHIP_TONES as readonly { value: string }[]).some(
+    (x) => x.value === toneRaw.trim(),
+  )
+    ? toneRaw.trim()
+    : 'blue'
+  editor.value
+    ?.chain()
+    .focus()
+    .insertStatusChip({ label: label.trim() || '状态', tone: tone as any })
+    .run()
+  ElMessage.success('已插入状态徽章')
+}
+
+async function insertProgressBarBlock() {
+  const raw = await openRtePrompt({
+    title: '进度条',
+    message: '进度 0–100',
+    defaultValue: '60',
+    maxlength: 3,
+  })
+  if (raw == null) return
+  const label = await openRtePrompt({
+    title: '进度说明',
+    message: '可选标签',
+    defaultValue: '完成度',
+    maxlength: 40,
+  })
+  if (label == null) return
+  editor.value
+    ?.chain()
+    .focus()
+    .insertProgressBar({ percent: parseFloat(raw) || 0, label: label.trim() })
+    .run()
+  ElMessage.success('已插入进度条')
+}
+
+async function insertTabsBlockAtCursor() {
+  const raw = await openRtePrompt({
+    title: '标签页',
+    message: '用逗号或顿号分隔标签名（至少 2 个）',
+    defaultValue: '概览,细节,附录',
+    maxlength: 80,
+  })
+  if (raw == null) return
+  const titles = raw
+    .split(/[,，、]/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+  if (titles.length < 2) {
+    ElMessage.warning('至少两个标签')
+    return
+  }
+  editor.value?.chain().focus().insertTabsBlock(titles).run()
+  ElMessage.success('已插入标签页')
+}
+
+function insertMermaidAtCursor() {
+  editor.value?.chain().focus().insertMermaidBlock().run()
+  moreOpen.value = false
+  ElMessage.success('已插入流程图（可点块内「编辑源码」）')
+}
+
+
+function openXrefDialog() {
+  const ed = editor.value
+  if (!ed) return
+  xrefTargets.value = collectCrossRefTargets(ed)
+  xrefDialogOpen.value = true
+  moreOpen.value = false
+}
+
+function confirmInsertXref(target: (typeof xrefTargets.value)[number]) {
+  editor.value
+    ?.chain()
+    .focus()
+    .insertCrossRef({
+      kind: target.kind,
+      targetId: target.id,
+      label: target.label,
+    })
+    .run()
+  xrefDialogOpen.value = false
+  ElMessage.success('已插入交叉引用')
+}
+
+function insertMentionFromToolbar() {
+  const ed = editor.value
+  if (!ed) return
+  ed.chain().focus().insertContent('@').run()
+  moreOpen.value = false
+  ElMessage.info('已插入 @，请继续选择提及对象')
+}
+
+async function copyCurrentTable(format: 'csv' | 'tsv') {
+  const ed = editor.value
+  if (!ed) return
+  const ok = await copyTableAs(ed, format)
+  if (!ok) ElMessage.info('请将光标放在表格中')
+  else ElMessage.success(format === 'csv' ? '已复制为 CSV' : '已复制为 TSV')
+  moreOpen.value = false
+}
+
+async function promptTableRowFilter() {
+  const ed = editor.value
+  if (!ed) return
+  const raw = await openRtePrompt({
+    title: '表格行筛选',
+    message: '输入关键词隐藏不含该词的数据行；留空则清除筛选（仅视图，不改文档）',
+    defaultValue: tableFilterQuery.value,
+    placeholder: '关键词',
+    maxlength: 80,
+  })
+  if (raw == null) return
+  tableFilterQuery.value = raw.trim()
+  const hidden = applyTableRowFilter(ed, tableFilterQuery.value)
+  if (hidden < 0) ElMessage.info('请将光标放在表格中')
+  else if (!tableFilterQuery.value) ElMessage.success('已清除行筛选')
+  else ElMessage.success(`已隐藏 ${hidden} 行`)
+}
+
+function runHeadingHierarchyCheck() {
+  const ed = editor.value
+  if (!ed) return
+  const issues = checkHeadingHierarchy(ed)
+  wave21ReportTitle.value = '标题层级检查'
+  if (!issues.length) {
+    wave21ReportLines.value = [{ text: '未发现问题：标题层级连续且非空。' }]
+  } else {
+    wave21ReportLines.value = issues.map((it) => ({
+      text: `H${it.level}「${it.text}」— ${it.message}`,
+      pos: it.pos,
+    }))
+  }
+  wave21ReportOpen.value = true
+  moreOpen.value = false
+}
+
+function runDeadLinkCheck() {
+  const ed = editor.value
+  if (!ed) return
+  const issues = checkDocumentLinks(ed)
+  wave21ReportTitle.value = '死链 / 空链检查'
+  if (!issues.length) {
+    wave21ReportLines.value = [{ text: '未发现空链接或不安全协议链接。' }]
+  } else {
+    wave21ReportLines.value = issues.map((it) => ({
+      text: `${it.message}｜「${it.text || '(无文本)'}」 ${it.href || ''}`.trim(),
+      pos: it.pos,
+    }))
+  }
+  wave21ReportOpen.value = true
+  moreOpen.value = false
+}
+
+function jumpWave21Report(pos?: number) {
+  if (pos == null || !editor.value) return
+  jumpToPos(editor.value, pos)
+  wave21ReportOpen.value = false
+}
+
+function openReadTimeDialog() {
+  readTimeDialogOpen.value = true
+  moreOpen.value = false
+}
+
+function toggleImmersiveFullscreen() {
+  immersiveFullscreen.value = !immersiveFullscreen.value
+  moreOpen.value = false
+  ElMessage.success(immersiveFullscreen.value ? '已进入全屏沉浸' : '已退出全屏')
+}
+
+function onImmersiveKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape' && immersiveFullscreen.value) {
+    immersiveFullscreen.value = false
+  }
+}
+
+function openSnippetDialog() {
+  snippetList.value = loadSnippets()
+  snippetEditing.value = null
+  snippetTitle.value = ''
+  snippetBody.value = ''
+  snippetDialogOpen.value = true
+  moreOpen.value = false
+}
+
+function insertSnippet(sn: RteSnippet) {
+  editor.value?.chain().focus().insertContent(sn.body).run()
+  snippetDialogOpen.value = false
+  ElMessage.success(`已插入「${sn.title}」`)
+}
+
+function startEditSnippet(sn: RteSnippet | null) {
+  snippetEditing.value = sn
+  snippetTitle.value = sn?.title || ''
+  snippetBody.value = sn?.body || ''
+}
+
+function saveSnippetForm() {
+  const title = snippetTitle.value.trim()
+  const body = snippetBody.value.trim()
+  if (!title || !body) {
+    ElMessage.warning('请填写标题与内容')
+    return
+  }
+  const list = [...snippetList.value]
+  if (snippetEditing.value) {
+    const i = list.findIndex((x) => x.id === snippetEditing.value!.id)
+    if (i >= 0) list[i] = { ...list[i]!, title, body }
+  } else {
+    list.push({ id: `s-${Date.now().toString(36)}`, title, body })
+  }
+  snippetList.value = list
+  saveSnippets(list)
+  snippetEditing.value = null
+  snippetTitle.value = ''
+  snippetBody.value = ''
+  ElMessage.success('片段已保存')
+}
+
+function deleteSnippet(sn: RteSnippet) {
+  const list = snippetList.value.filter((x) => x.id !== sn.id)
+  snippetList.value = list.length ? list : [...DEFAULT_SNIPPETS]
+  saveSnippets(snippetList.value)
+  ElMessage.success('已删除片段')
+}
+
+function setImageBorderRadius(v: string) {
+  editor.value?.chain().focus().updateAttributes('image', { borderRadius: v || null }).run()
+}
+function setImageBoxShadow(v: string) {
+  editor.value?.chain().focus().updateAttributes('image', { boxShadow: v || null }).run()
+}
+function setImageBorderStyle(v: string) {
+  editor.value?.chain().focus().updateAttributes('image', { borderStyle: v || null }).run()
+}
+
+function showCjkTypographyTip() {
+  ElMessage.info('已启用轻量中文禁则样式（避头尾/标点挤压）；完整排版引擎请用导出 PDF/打印校对')
+  moreOpen.value = false
+}
+
+function openPrintPreview() {
+  const ed = editor.value
+  if (!ed) {
+    ElMessage.warning('编辑器未就绪')
+    return
+  }
+  const title = (localTitle.value || '').trim()
+  const body = ed.getHTML() || '<p></p>'
+  printPreviewHtml.value = title
+    ? `<h1 class="rte-print-title">${escapeHtml(title)}</h1>${body}`
+    : body
+  printPreviewOpen.value = true
+  moreOpen.value = false
+}
+
+function closePrintPreview() {
+  printPreviewOpen.value = false
+  printPreviewHtml.value = ''
 }
 
 function printEditor() {
@@ -1383,6 +2583,11 @@ function printEditor() {
   window.print()
   // 部分浏览器不触发 afterprint
   setTimeout(cleanup, 1500)
+}
+
+function confirmPrintFromPreview() {
+  closePrintPreview()
+  nextTick(() => printEditor())
 }
 
 function currentLetterSpacing(): string {
@@ -1687,12 +2892,18 @@ function applyTextColor(color: string) {
   colorOpen.value = false
   moreColorOpen.value = false
   moreOpen.value = false
+  const name =
+    WORD_STANDARD_COLOR_ITEMS.find((x) => x.color.toLowerCase() === (color || '').toLowerCase())
+      ?.label || color || '自动'
+  announceRte(color ? `已应用文字颜色：${name}` : '已恢复自动文字颜色')
 }
 function applyHighlightColor(color: string) {
   setHighlightColor(color)
   highlightOpen.value = false
   moreHighlightOpen.value = false
   moreOpen.value = false
+  customHighlightOpen.value = false
+  announceRte(color ? `已应用高亮：${highlightColorLabel(color)}` : '已清除高亮')
 }
 function currentTextColor(): string {
   const ed = editor.value
@@ -1753,14 +2964,14 @@ const FONT_FAMILY_OPTIONS: Array<{ label: string; value: string }> = [
   { label: 'Arial', value: 'Arial, Helvetica, sans-serif' },
 ]
 const LINE_HEIGHT_OPTIONS: Array<{ label: string; value: string }> = [
-  { label: '默认', value: '' },
-  { label: '1.0', value: '1' },
-  { label: '1.15', value: '1.15' },
-  { label: '1.5', value: '1.5' },
-  { label: '1.75', value: '1.75' },
-  { label: '2.0', value: '2' },
-  { label: '2.5', value: '2.5' },
-  { label: '3.0', value: '3' },
+  { label: '默认行高', value: '' },
+  { label: '单倍行距', value: '1' },
+  { label: '1.15 倍', value: '1.15' },
+  { label: '1.5 倍', value: '1.5' },
+  { label: '1.75 倍', value: '1.75' },
+  { label: '双倍行距', value: '2' },
+  { label: '2.5 倍', value: '2.5' },
+  { label: '三倍行距', value: '3' },
 ]
 
 function currentFontSize(): string {
@@ -1807,9 +3018,228 @@ function closeFontMenus() {
 function toggleBlockquote() {
   chain()?.toggleBlockquote().run()
 }
-function setHorizontalRule() {
-  chain()?.setHorizontalRule().run()
+
+/** —— 块操作：全选当前块 / 复制块 / 上移下移 —— */
+function getTopLevelBlockRange(): { from: number; to: number; node: { type: { name: string }; nodeSize: number; copy: (c?: unknown) => unknown } } | null {
+  const ed = editor.value
+  if (!ed) return null
+  const { $from } = ed.state.selection
+  if ($from.depth < 1) return null
+  const depth = 1
+  const from = $from.before(depth)
+  const node = $from.node(depth)
+  return { from, to: from + node.nodeSize, node: node as any }
 }
+
+function selectCurrentBlock() {
+  const ed = editor.value
+  const range = getTopLevelBlockRange()
+  if (!ed || !range) {
+    ElMessage.warning('无法选中当前块')
+    return
+  }
+  try {
+    ed.view.dispatch(
+      ed.state.tr.setSelection(NodeSelection.create(ed.state.doc, range.from)),
+    )
+    ed.view.focus()
+  } catch {
+    ed.chain().focus().setTextSelection({ from: range.from, to: range.to }).run()
+  }
+}
+
+function duplicateCurrentBlock() {
+  const ed = editor.value
+  const range = getTopLevelBlockRange()
+  if (!ed || !range) {
+    ElMessage.warning('无法复制当前块')
+    return
+  }
+  const copy = range.node.copy((range.node as any).content)
+  const tr = ed.state.tr.insert(range.to, copy as any)
+  ed.view.dispatch(tr.scrollIntoView())
+  ed.view.focus()
+  ElMessage.success('已复制当前块')
+}
+
+function moveCurrentBlock(dir: -1 | 1) {
+  const ed = editor.value
+  if (!ed) return
+  const { $from } = ed.state.selection
+  if ($from.depth < 1) return
+  const depth = 1
+  const index = $from.index(0)
+  const doc = ed.state.doc
+  const targetIndex = index + dir
+  if (targetIndex < 0 || targetIndex >= doc.childCount) {
+    ElMessage.info(dir < 0 ? '已在最顶部' : '已在最底部')
+    return
+  }
+  const children: ReturnType<typeof doc.child>[] = []
+  doc.forEach((child) => {
+    children.push(child)
+  })
+  const [moved] = children.splice(index, 1)
+  children.splice(targetIndex, 0, moved)
+  const copies = children.map((c) => c.copy(c.content))
+  let tr = ed.state.tr
+  tr = tr.replaceWith(0, doc.content.size, Fragment.from(copies))
+  let selPos = 0
+  for (let i = 0; i < targetIndex; i += 1) selPos += children[i].nodeSize
+  try {
+    tr = tr.setSelection(NodeSelection.create(tr.doc, selPos)).scrollIntoView()
+  } catch {
+    /* ignore */
+  }
+  ed.view.dispatch(tr)
+  ed.view.focus()
+}
+
+/** 插入纯文本日期 / 日期时间 */
+function insertPlainDate() {
+  const s = new Date().toLocaleDateString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  })
+  chain()?.insertContent(s).run()
+}
+function insertPlainDateTime() {
+  const s = new Date().toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  })
+  chain()?.insertContent(s).run()
+}
+
+/** 列表嵌套层级（listItem / taskItem 层数） */
+function currentListDepth(): number {
+  const ed = editor.value
+  if (!ed) return 0
+  const { $from } = ed.state.selection
+  let d = 0
+  for (let i = $from.depth; i > 0; i -= 1) {
+    const name = $from.node(i).type.name
+    if (name === 'listItem' || name === 'taskItem') d += 1
+  }
+  return d
+}
+
+const listDepthLabel = computed(() => {
+  void editor.value?.state.selection
+  const d = currentListDepth()
+  return d > 0 ? `当前层级 ${d}` : ''
+})
+
+/** —— 图片对齐 / 题注 —— */
+const imageBubbleCaption = ref('')
+const IMAGE_ALIGN_OPTIONS: Array<{ label: string; value: '' | 'left' | 'center' | 'right' }> = [
+  { label: '默认', value: '' },
+  { label: '左浮', value: 'left' },
+  { label: '居中', value: 'center' },
+  { label: '右浮', value: 'right' },
+]
+
+function isImageNodeSelected(): boolean {
+  const ed = editor.value
+  if (!ed) return false
+  const sel = ed.state.selection
+  return sel instanceof NodeSelection && sel.node.type.name === 'image'
+}
+
+function syncImageBubbleCaption() {
+  const ed = editor.value
+  if (!ed || !isImageNodeSelected()) {
+    imageBubbleCaption.value = ''
+    return
+  }
+  const cap = ed.getAttributes('image')?.caption
+  imageBubbleCaption.value = typeof cap === 'string' ? cap : ''
+}
+
+function setImageAlign(align: '' | 'left' | 'center' | 'right') {
+  const ed = editor.value
+  if (!ed || !isImageNodeSelected()) return
+  ed.chain()
+    .focus()
+    .updateAttributes('image', { align: align || null })
+    .run()
+}
+
+function applyImageCaption() {
+  const ed = editor.value
+  if (!ed || !isImageNodeSelected()) return
+  const caption = imageBubbleCaption.value.trim()
+  ed.chain()
+    .focus()
+    .updateAttributes('image', { caption: caption || null })
+    .run()
+}
+
+function imageBubbleShouldShow(payload: {
+  editor: { isDestroyed?: boolean; isEditable?: boolean; state?: { selection: unknown } }
+}): boolean {
+  if (viewMode.value !== 'edit') return false
+  const ed = payload?.editor
+  if (!ed || ed.isDestroyed || ed.isEditable === false) return false
+  const sel = ed.state?.selection
+  return !!(sel instanceof NodeSelection && (sel as NodeSelection).node.type.name === 'image')
+}
+
+/** —— 分割线样式 —— */
+const hrOpen = ref(false)
+const blockOpsOpen = ref(false)
+const insertDateOpen = ref(false)
+function insertHrVariant(variant: RteHrVariant) {
+  const ed = editor.value
+  if (!ed) return
+  ed.chain().focus().insertContent({ type: 'horizontalRule', attrs: { variant } }).run()
+  hrOpen.value = false
+  moreOpen.value = false
+}
+function setHorizontalRule() {
+  insertHrVariant('solid')
+}
+
+/** —— 表格单元格背景 / 边框 —— */
+function setTableCellBg(color: string) {
+  const ed = editor.value
+  if (!ed || !isInTable()) return
+  const value = color || null
+  ed.chain().focus().setCellAttribute('backgroundColor', value).run()
+}
+function setTableCellBorderColor(color: string) {
+  const ed = editor.value
+  if (!ed || !isInTable()) return
+  ed.chain().focus().setCellAttribute('borderColor', color || null).run()
+}
+function setTableCellBorderStyle(style: string) {
+  const ed = editor.value
+  if (!ed || !isInTable()) return
+  ed.chain().focus().setCellAttribute('borderStyle', style || null).run()
+}
+
+async function copyCurrentLinkUrl() {
+  const ed = editor.value
+  if (!ed || !ed.isActive('link')) return
+  const href = (ed.getAttributes('link').href as string) || ''
+  if (!href) {
+    ElMessage.warning('当前链接无地址')
+    return
+  }
+  try {
+    await navigator.clipboard.writeText(href)
+    ElMessage.success('已复制链接地址')
+  } catch {
+    ElMessage.error('复制失败')
+  }
+}
+
 function toggleCodeBlock() {
   chain()?.toggleCodeBlock().run()
 }
@@ -1849,6 +3279,20 @@ function setCodeLanguage(lang: string) {
 function onCodeLangChange(event: Event) {
   const v = (event.target as HTMLSelectElement).value
   setCodeLanguage(v)
+  announceRte(`代码语言：${codeLanguageLabel(v)}`)
+}
+
+const codeLangOpen = ref(false)
+
+function codeLanguageLabel(lang: string): string {
+  const hit = CODE_LANG_OPTIONS.find((o) => o.value === lang)
+  return hit?.label || lang || '纯文本'
+}
+
+function applyCodeLanguage(lang: string) {
+  setCodeLanguage(lang)
+  codeLangOpen.value = false
+  announceRte(`代码语言：${codeLanguageLabel(lang)}`)
 }
 
 async function copyActiveCodeBlock() {
@@ -1952,7 +3396,13 @@ function applySlashCommandItem(item: RteSlashItem) {
       toggleCodeBlock()
       break
     case 'hr':
-      setHorizontalRule()
+      insertHrVariant('solid')
+      break
+    case 'plainDate':
+      insertPlainDate()
+      break
+    case 'plainDateTime':
+      insertPlainDateTime()
       break
     case 'table':
       openTableDialog()
@@ -1974,6 +3424,48 @@ function applySlashCommandItem(item: RteSlashItem) {
       break
     case 'note':
       insertNote()
+      break
+    case 'bookmark':
+      insertBookmark()
+      break
+    case 'toggleBlock':
+      insertToggleBlock()
+      break
+    case 'audio':
+      insertAudioBlock()
+      break
+    case 'linkCard':
+      insertLinkCardBlock()
+      break
+    case 'footnote':
+      insertFootnoteAtCursor()
+      break
+    case 'qrcode':
+      void insertQrCode()
+      break
+    case 'timeline':
+      insertTimelineBlock()
+      break
+    case 'statusChip':
+      void insertStatusChipBlock()
+      break
+    case 'progressBar':
+      void insertProgressBarBlock()
+      break
+    case 'tabsBlock':
+      void insertTabsBlockAtCursor()
+      break
+    case 'mermaid':
+      void insertMermaidAtCursor()
+      break
+    case 'ruby':
+      void insertRubyAnnotation()
+      break
+    case 'xref':
+      openXrefDialog()
+      break
+    case 'snippet':
+      openSnippetDialog()
       break
     case 'callout':
       insertCallout(action.variant)
@@ -2223,6 +3715,8 @@ function bubbleShouldShow(payload: {
   if (viewMode.value !== 'edit') return false
   const ed = payload?.editor
   if (!ed || ed.isDestroyed || ed.isEditable === false) return false
+  // 图片节点选中时改走图片气泡
+  if (isImageNodeSelected()) return false
   // 有选区，或光标落在链接内（便于编辑/取消链接）
   if (payload.from !== payload.to) return true
   return !!ed.isActive?.('link')
@@ -2366,8 +3860,16 @@ const findDialogOpen = ref(false)
 const findQuery = ref('')
 const findReplaceText = ref('')
 const findCaseSensitive = ref(false)
+const findWholeWord = ref(false)
 const findMatches = ref<RteFindMatch[]>([])
 const findMatchIndex = ref(-1)
+
+function findOpts() {
+  return {
+    caseSensitive: findCaseSensitive.value,
+    wholeWord: findWholeWord.value,
+  }
+}
 
 function refreshFindMatches(selectNext = false) {
   const ed = editor.value
@@ -2376,9 +3878,7 @@ function refreshFindMatches(selectNext = false) {
     findMatchIndex.value = -1
     return
   }
-  const matches = collectFindMatches(ed.state.doc, findQuery.value, {
-    caseSensitive: findCaseSensitive.value,
-  })
+  const matches = collectFindMatches(ed.state.doc, findQuery.value, findOpts())
   findMatches.value = matches
   if (!matches.length) {
     findMatchIndex.value = -1
@@ -2450,9 +3950,7 @@ function doReplaceOne() {
   replaceFindMatch(ed, matches[idx], findReplaceText.value)
   // 替换后重新收集，并跳到下一处
   const nextFrom = matches[idx].from + findReplaceText.value.length
-  const nextMatches = collectFindMatches(ed.state.doc, findQuery.value, {
-    caseSensitive: findCaseSensitive.value,
-  })
+  const nextMatches = collectFindMatches(ed.state.doc, findQuery.value, findOpts())
   findMatches.value = nextMatches
   if (!nextMatches.length) {
     findMatchIndex.value = -1
@@ -2467,9 +3965,7 @@ function doReplaceOne() {
 function doReplaceAll() {
   const ed = editor.value
   if (!ed) return
-  const matches = collectFindMatches(ed.state.doc, findQuery.value, {
-    caseSensitive: findCaseSensitive.value,
-  })
+  const matches = collectFindMatches(ed.state.doc, findQuery.value, findOpts())
   if (!matches.length) {
     ElMessage.info('没有匹配项')
     findMatches.value = []
@@ -2486,9 +3982,9 @@ const findStatusText = computed(() => {
   const q = findQuery.value
   if (!q) return '输入要查找的内容'
   const total = findMatches.value.length
-  if (!total) return '无匹配'
+  if (!total) return '共 0 处'
   const cur = findMatchIndex.value >= 0 ? findMatchIndex.value + 1 : 0
-  return `${cur} / ${total}`
+  return `共 ${total} 处 · 第 ${cur} 处`
 })
 
 /** —— 插入链接 —— */
@@ -2776,7 +4272,17 @@ async function onLocalImageFilesChange(event: Event) {
   const added: StoredImage[] = []
   for (const file of files) {
     try {
-      const src = await readFileAsDataURL(file)
+      let src: string
+      if (imageCompressOnInsert.value) {
+        try {
+          const compressed = await compressImageFile(file, { maxEdge: 1600, quality: 0.82 })
+          src = compressed.dataUrl
+        } catch {
+          src = await readFileAsDataURL(file)
+        }
+      } else {
+        src = await readFileAsDataURL(file)
+      }
       if (!src) continue
       added.push({
         id: uid(),
@@ -3457,6 +4963,18 @@ function tableToggleHeaderColumn() {
 function tableDeleteTable() {
   runTableCommand(() => editor.value!.chain().focus().deleteTable().run())
 }
+function tableClearCellFormat() {
+  const ed = editor.value
+  if (!ed || !isInTable()) return
+  ed.chain()
+    .focus()
+    .setCellAttribute('backgroundColor', null)
+    .setCellAttribute('borderColor', null)
+    .setCellAttribute('borderStyle', null)
+    .run()
+  closeAllTableUi()
+  announceRte('已清除单元格格式')
+}
 
 const tableOpItems = computed((): TableOpItem[] => {
   void editor.value?.state
@@ -3497,6 +5015,63 @@ const tableOpItems = computed((): TableOpItem[] => {
       run: tableToggleHeaderColumn,
     },
     {
+      key: 'clear-cell',
+      label: '清除单元格格式',
+      run: tableClearCellFormat,
+    },
+    {
+      key: 'valign-top',
+      label: '垂直对齐·顶',
+      run: () => applyCellValign('top'),
+    },
+    {
+      key: 'valign-middle',
+      label: '垂直对齐·中',
+      run: () => applyCellValign('middle'),
+    },
+    {
+      key: 'valign-bottom',
+      label: '垂直对齐·底',
+      run: () => applyCellValign('bottom'),
+    },
+    {
+      key: 'sort-asc',
+      label: '按当前列升序',
+      run: () => doSortTable(true),
+    },
+    {
+      key: 'sort-desc',
+      label: '按当前列降序',
+      run: () => doSortTable(false),
+    },
+    {
+      key: 'sum-row',
+      label: '简易合计行',
+      run: () => doTableSumRow(),
+    },
+    {
+      key: 'sticky-header',
+      label: '表头冻结开关',
+      run: () => toggleTableStickyHeader(),
+      sepBefore: true,
+    },
+    {
+      key: 'copy-csv',
+      label: '复制为 CSV',
+      run: () => { void copyCurrentTable('csv') },
+      sepBefore: true,
+    },
+    {
+      key: 'copy-tsv',
+      label: '复制为 TSV',
+      run: () => { void copyCurrentTable('tsv') },
+    },
+    {
+      key: 'row-filter',
+      label: '行筛选…',
+      run: () => { void promptTableRowFilter() },
+    },
+    {
       key: 'del-table',
       label: '删除表格',
       run: tableDeleteTable,
@@ -3505,6 +5080,7 @@ const tableOpItems = computed((): TableOpItem[] => {
     },
   ]
 })
+
 
 /**
  * 紧凑「更多」：表外直接开插入弹窗；表内开操作面板。
@@ -4079,6 +5655,24 @@ async function exportAsDocx() {
   }
 }
 
+function exportAsMarkdown() {
+  closeExportMenu()
+  moreOpen.value = false
+  const ed = editor.value
+  if (!ed) {
+    ElMessage.warning('编辑器未就绪')
+    return
+  }
+  const title = (localTitle.value || '').trim()
+  const mdBody = htmlToMarkdown(ed.getHTML() || '')
+  const md = title ? `# ${title}\n\n${mdBody}` : mdBody
+  triggerDownloadBlob(
+    new Blob([md], { type: 'text/markdown;charset=utf-8' }),
+    `${exportFileBasename()}.md`,
+  )
+  ElMessage.success('已导出 Markdown')
+}
+
 /** tool-wrap @mouseleave：仅当指针真正离开按钮+菜单时才关（避免点选项前被关掉） */
 /** 工具条下拉：fixed + Teleport 到 body，按按钮 rect 自动翻转/夹紧 */
 const FLOAT_VIEW_PAD = 8
@@ -4311,6 +5905,11 @@ function closeAllToolbarMenus() {
   tableMenuOpen.value = false
   importMenuOpen.value = false
   exportMenuOpen.value = false
+  pasteFormatOpen.value = false
+  bookmarkPanelOpen.value = false
+  caseMenuOpen.value = false
+  zoomMenuOpen.value = false
+  viewExtrasOpen.value = false
   emojiOpen.value = false
   specialCharsOpen.value = false
   columnsOpen.value = false
@@ -4319,6 +5918,10 @@ function closeAllToolbarMenus() {
   shortcutsOpen.value = false
   calloutOpen.value = false
   moreCalloutOpen.value = false
+  hrOpen.value = false
+  blockOpsOpen.value = false
+  insertDateOpen.value = false
+  codeLangOpen.value = false
   // outline 侧栏独立，不随工具条菜单一并关闭
   closeFontMenus()
   closeColorMenus()
@@ -4351,7 +5954,19 @@ onMounted(() => {
   window.addEventListener('scroll', repositionSlashMenu, true)
   window.addEventListener('resize', repositionMentionMenu)
   window.addEventListener('scroll', repositionMentionMenu, true)
+  nextTick(() => {
+    syncSpellcheckToDom()
+    editor.value?.commands.captureRevisionBaseline()
+  })
 })
+
+watch(spellcheckEnabled, () => syncSpellcheckToDom())
+watch(
+  () => editor.value,
+  (ed) => {
+    if (ed) nextTick(() => syncSpellcheckToDom())
+  },
+)
 
 function onImport() {
   // 紧凑「更多」菜单入口：打开同款双选项
@@ -4692,37 +6307,107 @@ const WORD_THEME_ROWS = (() => {
   return rows
 })()
 
-const WORD_STANDARD_COLORS = [
-  '#C00000',
-  '#FF0000',
-  '#FFC000',
-  '#FFFF00',
-  '#92D050',
-  '#00B050',
-  '#00B0F0',
-  '#0070C0',
-  '#002060',
-  '#7030A0',
+/** 办公常用高亮：柔和底色（主色板）+ 经典荧光笔 */
+const WORD_HIGHLIGHT_SOFT = [
+  { color: '#FFF3BF', label: '淡黄' },
+  { color: '#D8F5A2', label: '浅绿' },
+  { color: '#A5D8FF', label: '浅蓝' },
+  { color: '#FFC9C9', label: '浅粉' },
+  { color: '#E5DBFF', label: '浅紫' },
+  { color: '#FFE8CC', label: '浅橙' },
+  { color: '#C3FAE8', label: '薄荷绿' },
+  { color: '#D0EBFF', label: '天空蓝' },
+  { color: '#FFDEEB', label: '玫瑰粉' },
+  { color: '#E9ECEF', label: '浅灰' },
 ]
 
-/** Word 荧光笔常用色（无颜色单独按钮） */
-const WORD_HIGHLIGHT_COLORS = [
-  { color: '#FFFF00', label: '黄色' },
-  { color: '#00FF00', label: '鲜绿' },
+const WORD_HIGHLIGHT_VIVID = [
+  { color: '#FFFF00', label: '荧光黄' },
+  { color: '#00FF00', label: '荧光绿' },
   { color: '#00FFFF', label: '青绿' },
-  { color: '#FF00FF', label: '粉红' },
-  { color: '#0000FF', label: '蓝色' },
-  { color: '#FF0000', label: '红色' },
-  { color: '#000080', label: '深蓝' },
-  { color: '#008080', label: '青色' },
-  { color: '#008000', label: '绿色' },
-  { color: '#800080', label: '紫色' },
-  { color: '#800000', label: '深红' },
-  { color: '#808000', label: '深黄' },
-  { color: '#808080', label: '灰色 50%' },
-  { color: '#C0C0C0', label: '灰色 25%' },
-  { color: '#000000', label: '黑色' },
+  { color: '#FF00FF', label: '品红' },
+  { color: '#FF6B6B', label: '珊瑚红' },
+  { color: '#74C0FC', label: '亮蓝' },
+  { color: '#B197FC', label: '亮紫' },
+  { color: '#FFD43B', label: '金黄' },
+  { color: '#69DB7C', label: '草绿' },
+  { color: '#ADB5BD', label: '中灰' },
 ]
+
+/** 兼容旧引用：合并列表 */
+const WORD_HIGHLIGHT_COLORS = [...WORD_HIGHLIGHT_SOFT, ...WORD_HIGHLIGHT_VIVID]
+
+const WORD_STANDARD_COLOR_ITEMS = [
+  { color: '#C00000', label: '深红' },
+  { color: '#FF0000', label: '红色' },
+  { color: '#FFC000', label: '橙色' },
+  { color: '#FFFF00', label: '黄色' },
+  { color: '#92D050', label: '浅绿' },
+  { color: '#00B050', label: '绿色' },
+  { color: '#00B0F0', label: '青绿' },
+  { color: '#0070C0', label: '蓝色' },
+  { color: '#002060', label: '深蓝' },
+  { color: '#7030A0', label: '紫色' },
+]
+const WORD_STANDARD_COLORS = WORD_STANDARD_COLOR_ITEMS.map((x) => x.color)
+
+const customHighlightOpen = ref(false)
+const customHighlightHex = ref('#FFF3BF')
+const highlightHoverLabel = ref('')
+const colorHoverLabel = ref('')
+const rteAriaStatus = ref('')
+
+function announceRte(msg: string) {
+  rteAriaStatus.value = msg
+}
+
+function highlightColorLabel(color: string): string {
+  const c = (color || '').toLowerCase()
+  if (!c) return '无'
+  if (c === '__default__') return '默认高亮'
+  const hit = WORD_HIGHLIGHT_COLORS.find((h) => h.color.toLowerCase() === c)
+  return hit?.label || color
+}
+
+function isLightHighlight(color: string): boolean {
+  const c = (color || '').toLowerCase()
+  if (!c || c === '__default__') return true
+  const hex = c.startsWith('#') ? c.slice(1) : c
+  if (hex.length !== 3 && hex.length !== 6) return false
+  const full =
+    hex.length === 3
+      ? hex
+          .split('')
+          .map((ch) => ch + ch)
+          .join('')
+      : hex
+  const r = parseInt(full.slice(0, 2), 16)
+  const g = parseInt(full.slice(2, 4), 16)
+  const b = parseInt(full.slice(4, 6), 16)
+  // 相对亮度
+  return (r * 299 + g * 587 + b * 114) / 1000 > 180
+}
+
+function currentHighlightLabel(): string {
+  return highlightColorLabel(currentHighlightColor())
+}
+
+function applyCustomHighlight() {
+  let hex = customHighlightHex.value.trim()
+  if (!hex) return
+  if (!hex.startsWith('#')) hex = `#${hex}`
+  if (!/^#[0-9a-fA-F]{6}$/.test(hex) && !/^#[0-9a-fA-F]{3}$/.test(hex)) {
+    ElMessage.warning('请输入有效的十六进制颜色，如 #FFF3BF')
+    return
+  }
+  applyHighlightColor(hex)
+  customHighlightOpen.value = false
+}
+
+function onCustomHighlightNativeInput(event: Event) {
+  const el = event.target as HTMLInputElement | null
+  if (el?.value) customHighlightHex.value = el.value
+}
 
 function closeColorMenus() {
   colorOpen.value = false
@@ -4733,6 +6418,8 @@ function closeColorMenus() {
 function closeHighlightMenus() {
   highlightOpen.value = false
   moreHighlightOpen.value = false
+  customHighlightOpen.value = false
+  highlightHoverLabel.value = ''
 }
 
 function toggleColorMenu() {
@@ -4910,6 +6597,21 @@ function onMoreToolClick(t: ToolItem) {
     insertColumns(2)
     return
   }
+  if (t.kind === 'hr' || t.kind === 'blockOps' || t.kind === 'insertDate') {
+    const moreBtn =
+      floatAnchors.get('more') ||
+      (document.querySelector('[data-rte-anchor="more"]') as HTMLElement | null)
+    const panelKey = t.kind
+    if (moreBtn instanceof HTMLElement) floatAnchors.set(panelKey, moreBtn)
+    moreOpen.value = false
+    markToolbarMenuOpening()
+    nextTick(() => {
+      hrOpen.value = panelKey === 'hr'
+      blockOpsOpen.value = panelKey === 'blockOps'
+      insertDateOpen.value = panelKey === 'insertDate'
+    })
+    return
+  }
   moreColorOpen.value = false
   moreHighlightOpen.value = false
   moreFormOpen.value = false
@@ -4919,20 +6621,43 @@ function onMoreToolClick(t: ToolItem) {
   moreLineHeightOpen.value = false
   moreCalloutOpen.value = false
   customColorOpen.value = false
-  moreOpen.value = false
+    if (t.kind === 'caseTransform') {
+    caseMenuOpen.value = !caseMenuOpen.value
+    return
+  }
+  if (t.kind === 'zoom') {
+    zoomMenuOpen.value = !zoomMenuOpen.value
+    return
+  }
+  if (t.kind === 'viewExtras') {
+    viewExtrasOpen.value = !viewExtrasOpen.value
+    return
+  }
+  if (t.kind === 'paraStyle') {
+    paraStyleOpen.value = !paraStyleOpen.value
+    listStyleOpen.value = false
+    return
+  }
+  if (t.kind === 'listStyle') {
+    listStyleOpen.value = !listStyleOpen.value
+    paraStyleOpen.value = false
+    return
+  }
+moreOpen.value = false
   t.run?.()
 }
 
 const PRIMARY_KEYS = new Set(['heading', 'bold', 'italic', 'list'])
 
 type ToolItem = {
+  disabled?: () => boolean
   key: string
   label: string
   /** 悬停完整说明；缺省用 label */
   title?: string
   icon: string
   iconComp?: Component
-  kind?: 'heading' | 'list' | 'more' | 'btn' | 'color' | 'highlight' | 'align' | 'fontSize' | 'fontFamily' | 'lineHeight' | 'import' | 'export' | 'table' | 'attach' | 'form' | 'template' | 'code' | 'divider' | 'emoji' | 'specialChars' | 'columns' | 'spacing' | 'wordStats' | 'callout' | 'shortcuts'
+  kind?: 'heading' | 'list' | 'more' | 'btn' | 'color' | 'highlight' | 'align' | 'fontSize' | 'fontFamily' | 'lineHeight' | 'import' | 'export' | 'table' | 'attach' | 'form' | 'template' | 'code' | 'divider' | 'emoji' | 'specialChars' | 'columns' | 'spacing' | 'wordStats' | 'callout' | 'shortcuts' | 'hr' | 'blockOps' | 'insertDate' | 'pasteFormat' | 'caseTransform' | 'zoom' | 'viewExtras' | 'paraStyle' | 'listStyle'
   active?: () => boolean
   run?: () => void
 }
@@ -4952,8 +6677,24 @@ const allTools = computed((): ToolItem[] => {
    */
   return [
     // —— 操作 ——
-    { key: 'undo', label: '撤销', title: '撤销 (Ctrl/⌘+Z)', icon: '↶', iconComp: ic('undo'), run: undo },
-    { key: 'redo', label: '重做', title: '重做 (Ctrl/⌘+Shift+Z)', icon: '↷', iconComp: ic('redo'), run: redo },
+    {
+      key: 'undo',
+      label: '撤销',
+      title: '撤销 (Ctrl/⌘+Z)',
+      icon: '↶',
+      iconComp: ic('undo'),
+      run: undo,
+      disabled: () => !(editor.value?.can().undo() ?? false),
+    },
+    {
+      key: 'redo',
+      label: '重做',
+      title: '重做 (Ctrl/⌘+Shift+Z)',
+      icon: '↷',
+      iconComp: ic('redo'),
+      run: redo,
+      disabled: () => !(editor.value?.can().redo() ?? false),
+    },
     {
       key: 'clear',
       label: '清除格式',
@@ -5102,7 +6843,23 @@ const allTools = computed((): ToolItem[] => {
       kind: 'callout',
       active: () => isActive('callout'),
     },
-    { key: 'hr', label: '分割线', icon: '┄', iconComp: ic('hr'), run: setHorizontalRule },
+    { key: 'hr', label: '分割线', title: '分割线样式', icon: '┄', iconComp: ic('hr'), kind: 'hr' },
+    {
+      key: 'blockOps',
+      label: '块',
+      title: '块操作：全选 / 复制 / 上移 / 下移',
+      icon: '▣',
+      iconComp: ic('more'),
+      kind: 'blockOps',
+    },
+    {
+      key: 'insertDate',
+      label: '日期',
+      title: '插入今天日期',
+      icon: '📅',
+      iconComp: ic('note'),
+      kind: 'insertDate',
+    },
     {
       key: 'code',
       label: '代码块',
@@ -5170,10 +6927,338 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'print',
       label: '打印',
-      title: '打印 / 打印预览',
+      title: '打印预览',
       icon: '🖨',
       iconComp: ic('print'),
-      run: printEditor,
+      run: openPrintPreview,
+    },
+    {
+      key: 'bookmark',
+      label: '书签',
+      title: '书签 / 锚点（打开列表；可新建）',
+      icon: '⚓',
+      iconComp: ic('link'),
+      active: () => isActive('bookmark') || bookmarkPanelOpen.value,
+      run: toggleBookmarkPanel,
+    },
+    {
+      key: 'spellcheck',
+      label: '拼写',
+      title: '拼写检查开关（浏览器词典）',
+      icon: 'Abc',
+      iconComp: ic('note'),
+      active: () => spellcheckEnabled.value,
+      run: toggleSpellcheck,
+    },
+    {
+      key: 'pasteFormat',
+      label: '粘贴格式',
+      title: '粘贴格式：保留 / 纯文本 / Markdown（点击切换）',
+      icon: '📋',
+      iconComp: ic('import'),
+      active: () => pasteFormatMode.value !== 'keep',
+      run: cyclePasteFormatMode,
+    },
+    { key: 'div-wave20a', label: '', icon: '', kind: 'divider' },
+    // —— 书写 / 结构 / 审阅 / 视图（Wave20）——
+    {
+      key: 'caseTransform',
+      label: '大小写',
+      title: '大小写转换',
+      icon: 'Aa',
+      iconComp: ic('fontSize'),
+      kind: 'caseTransform',
+    },
+    {
+      key: 'emphasisDot',
+      label: '着重号',
+      title: '中文着重号',
+      icon: '••',
+      iconComp: ic('highlight'),
+      active: () => isActive('emphasisDot'),
+      run: toggleEmphasisDot,
+    },
+    {
+      key: 'copyMd',
+      label: '复制MD',
+      title: '复制为 Markdown',
+      icon: 'MD',
+      iconComp: ic('exportText'),
+      run: copyAsMarkdown,
+    },
+    {
+      key: 'cjkTip',
+      label: '禁则',
+      title: '中文禁则 / 避头尾（轻量）',
+      icon: '禁',
+      iconComp: ic('note'),
+      run: showCjkTypographyTip,
+    },
+    {
+      key: 'toggleBlock',
+      label: '折叠',
+      title: '插入折叠块',
+      icon: '▸',
+      iconComp: ic('outline'),
+      run: insertToggleBlock,
+    },
+    {
+      key: 'audio',
+      label: '音频',
+      title: '插入音频',
+      icon: '♪',
+      iconComp: ic('video'),
+      run: insertAudioBlock,
+    },
+    {
+      key: 'linkCard',
+      label: '网页卡',
+      title: '链接卡片 / 受控嵌入',
+      icon: '⧉',
+      iconComp: ic('link'),
+      run: insertLinkCardBlock,
+    },
+    {
+      key: 'footnote',
+      label: '脚注',
+      title: '插入脚注 / 打开脚注列表',
+      icon: '[n]',
+      iconComp: ic('note'),
+      active: () => footnotePanelOpen.value,
+      run: insertFootnoteAtCursor,
+    },
+    {
+      key: 'footnoteList',
+      label: '脚注区',
+      title: '脚注汇总',
+      icon: '脚',
+      iconComp: ic('outline'),
+      run: openFootnotePanel,
+    },
+    {
+      key: 'captionNum',
+      label: '题注号',
+      title: '题注自动编号（图/表）',
+      icon: '№',
+      iconComp: ic('note'),
+      run: doRenumberCaptions,
+    },
+    {
+      key: 'qrcode',
+      label: '二维码',
+      title: '插入二维码',
+      icon: '▦',
+      iconComp: ic('attach'),
+      run: insertQrCode,
+    },
+    {
+      key: 'speak',
+      label: '朗读',
+      title: '朗读选区（无选区则读全文开头）',
+      icon: '🔊',
+      iconComp: ic('note'),
+      run: speakSelection,
+    },
+    {
+      key: 'speakStop',
+      label: '停读',
+      title: '停止朗读',
+      icon: '⏹',
+      iconComp: ic('clear'),
+      run: stopSpeaking,
+    },
+    {
+      key: 'sensitive',
+      label: '敏感词',
+      title: '敏感词 / 错别字提示',
+      icon: '⚠',
+      iconComp: ic('highlight'),
+      active: () => sensitiveOn.value,
+      run: toggleSensitiveCheck,
+    },
+    {
+      key: 'revision',
+      label: '修订',
+      title: '单机修订高亮（相对基线）',
+      icon: '✎+',
+      iconComp: ic('highlight'),
+      active: () => revisionOn.value,
+      run: toggleRevisionHighlight,
+    },
+    {
+      key: 'revisionBase',
+      label: '基线',
+      title: '重新标记修订基线',
+      icon: '⚓',
+      iconComp: ic('note'),
+      run: resetRevisionBaseline,
+    },
+    {
+      key: 'zoom',
+      label: '缩放',
+      title: '编辑区缩放',
+      icon: '🔍',
+      iconComp: ic('wordStats'),
+      kind: 'zoom',
+      active: () => editorZoom.value !== 1,
+    },
+    {
+      key: 'viewExtras',
+      label: '视图',
+      title: '专注 / 暗色 / 纸张参考线',
+      icon: '👁',
+      iconComp: ic('outline'),
+      kind: 'viewExtras',
+      active: () => focusMode.value || darkEditor.value || paperGuide.value,
+    },
+    { key: 'div-wave21', label: '', icon: '', kind: 'divider' },
+    {
+      key: 'headingAutoNum',
+      label: '标题号',
+      title: '标题自动编号 1 / 1.1 / 1.1.1',
+      icon: '1.',
+      iconComp: ic('list'),
+      active: () => headingAutoNumber.value,
+      run: toggleHeadingAutoNumber,
+    },
+    {
+      key: 'paraStyle',
+      label: '段样式',
+      title: '段落样式集',
+      icon: '¶',
+      iconComp: ic('fontSize'),
+      kind: 'paraStyle',
+      active: () => paraStyleOpen.value,
+    },
+    {
+      key: 'listStyle',
+      label: '编号样式',
+      title: '有序列表编号样式 / 起始',
+      icon: 'a.',
+      iconComp: ic('list'),
+      kind: 'listStyle',
+      active: () => listStyleOpen.value,
+    },
+    {
+      key: 'ruby',
+      label: '注音',
+      title: '注音 / 拼音（ruby）',
+      icon: 'あ',
+      iconComp: ic('fontSize'),
+      run: () => { void insertRubyAnnotation() },
+    },
+    {
+      key: 'timeline',
+      label: '时间线',
+      title: '插入时间线',
+      icon: '⏱',
+      iconComp: ic('note'),
+      run: insertTimelineBlock,
+    },
+    {
+      key: 'statusChip',
+      label: '徽章',
+      title: '状态徽章 Chip',
+      icon: '●',
+      iconComp: ic('highlight'),
+      run: () => { void insertStatusChipBlock() },
+    },
+    {
+      key: 'progressBar',
+      label: '进度',
+      title: '进度条',
+      icon: '▮',
+      iconComp: ic('wordStats'),
+      run: () => { void insertProgressBarBlock() },
+    },
+    {
+      key: 'tabsBlock',
+      label: '标签页',
+      title: '插入 Tabs',
+      icon: '⧉',
+      iconComp: ic('columns'),
+      run: () => { void insertTabsBlockAtCursor() },
+    },
+    {
+      key: 'mermaid',
+      label: '流程图',
+      title: 'Mermaid 流程图',
+      icon: '⌥',
+      iconComp: ic('code'),
+      run: () => { void insertMermaidAtCursor() },
+    },
+    {
+      key: 'xref',
+      label: '交叉引用',
+      title: '引用标题 / 图 / 表',
+      icon: '※',
+      iconComp: ic('link'),
+      run: openXrefDialog,
+    },
+    {
+      key: 'mentionBtn',
+      label: '@提及',
+      title: '插入 @ 提及',
+      icon: '@',
+      iconComp: ic('note'),
+      run: insertMentionFromToolbar,
+    },
+    {
+      key: 'tableCsv',
+      label: '表CSV',
+      title: '复制当前表为 CSV',
+      icon: 'CSV',
+      iconComp: ic('table'),
+      run: () => { void copyCurrentTable('csv') },
+    },
+    {
+      key: 'tableFilter',
+      label: '表筛选',
+      title: '表格行筛选',
+      icon: '▽',
+      iconComp: ic('table'),
+      run: () => { void promptTableRowFilter() },
+    },
+    {
+      key: 'headingCheck',
+      label: '标题检',
+      title: '标题层级 / 空标题检查',
+      icon: 'H✓',
+      iconComp: ic('outline'),
+      run: runHeadingHierarchyCheck,
+    },
+    {
+      key: 'linkCheck',
+      label: '链检',
+      title: '死链 / 空链检查',
+      icon: '🔗✓',
+      iconComp: ic('link'),
+      run: runDeadLinkCheck,
+    },
+    {
+      key: 'readTime',
+      label: '时长',
+      title: '阅读时长估算',
+      icon: '⌛',
+      iconComp: ic('wordStats'),
+      run: openReadTimeDialog,
+    },
+    {
+      key: 'immersive',
+      label: '全屏',
+      title: '全屏沉浸编辑（Esc 退出）',
+      icon: '⛶',
+      iconComp: ic('outline'),
+      active: () => immersiveFullscreen.value,
+      run: toggleImmersiveFullscreen,
+    },
+    {
+      key: 'snippets',
+      label: '片段',
+      title: '文本片段 Snippets',
+      icon: '✂',
+      iconComp: ic('note'),
+      run: openSnippetDialog,
     },
     {
       key: 'wordStats',
@@ -5274,7 +7359,7 @@ function onCanvasClick(event: MouseEvent) {
   editor.value?.commands.focus('end')
 }
 
-defineExpose({ focusEditor, editor, onDraftBackup })
+defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm })
 </script>
 
 <template>
@@ -5289,14 +7374,25 @@ defineExpose({ focusEditor, editor, onDraftBackup })
       'mode-edit': viewMode === 'edit',
       'mode-preview': viewMode === 'preview',
       'mode-source': viewMode === 'source',
+      'is-focus-mode': focusMode,
+      'is-dark-editor': darkEditor,
+      'is-heading-auto-num': headingAutoNumber,
+      'is-immersive': immersiveFullscreen,
+      'is-paper-guide': paperGuide,
+      'is-table-sticky': tableHeaderSticky,
+      'is-cjk-typography': true,
     }"
     @mousedown="onRootMouseDown"
+    @keydown="onImmersiveKeydown"
   >
     <div
       class="rte-toolbar"
       role="toolbar"
       aria-label="编辑工具栏"
     >
+      <div class="rte-sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {{ rteAriaStatus }}
+      </div>
       <div class="rte-toolbar-tools">
       <template v-for="t in visibleTools" :key="t.key">
         <div
@@ -5375,6 +7471,20 @@ defineExpose({ focusEditor, editor, onDraftBackup })
                   <span v-if="it.shortcut" class="rte-para-shortcut">{{ it.shortcut }}</span>
                 </button>
               </template>
+              <div class="rte-menu-section-label">引用样式</div>
+              <button
+                v-for="qs in QUOTE_STYLE_OPTIONS"
+                :key="'qs-' + qs.value"
+                type="button"
+                role="menuitemradio"
+                :aria-checked="isActive('blockquote') && currentQuoteStyle() === qs.value"
+                :class="{ active: isActive('blockquote') && currentQuoteStyle() === qs.value }"
+                :title="qs.hint"
+                @click="applyQuoteStyle(qs.value)"
+              >
+                <span class="rte-para-preview" :class="'rte-quote-preview--' + qs.value">{{ qs.label }}</span>
+                <span class="rte-para-shortcut">{{ qs.hint }}</span>
+              </button>
             </div>
           </Teleport>
         </div>
@@ -5433,6 +7543,21 @@ defineExpose({ focusEditor, editor, onDraftBackup })
                 @click="toggleTaskList(); listOpen = false"
               >
                 任务列表
+              </button>
+              <div class="rte-menu-sep" aria-hidden="true" />
+              <div v-if="listDepthLabel" class="rte-menu-hint">{{ listDepthLabel }}</div>
+              <div class="rte-menu-hint">Tab / Shift+Tab 调整层级</div>
+              <button
+                type="button"
+                @click="indentBlock(); listOpen = false"
+              >
+                增加缩进
+              </button>
+              <button
+                type="button"
+                @click="outdentBlock(); listOpen = false"
+              >
+                减少缩进
               </button>
             </div>
           </Teleport>
@@ -5576,7 +7701,10 @@ defineExpose({ focusEditor, editor, onDraftBackup })
             class="rte-tool"
             :ref="(el) => setFloatAnchor('highlight', el)" data-rte-anchor="highlight"
             :class="{ active: isActive('highlight') || highlightOpen }"
-            title="突出显示"
+            title="高亮颜色"
+            aria-label="高亮颜色"
+            :aria-expanded="highlightOpen"
+            aria-haspopup="dialog"
             @click.stop="markToolbarMenuOpening(); toggleHighlightMenu()"
           >
             <span class="rte-tool-icon">
@@ -5588,34 +7716,113 @@ defineExpose({ focusEditor, editor, onDraftBackup })
             <div
               v-if="highlightOpen"
               class="rte-menu rte-color-menu rte-highlight-menu"
+              role="dialog"
+              aria-label="高亮颜色"
               v-rte-float="'highlight'"
               @mousedown.prevent
               @mouseenter="onToolMenuEnter('highlight')"
               @mouseleave="onToolMenuLeave($event, 'highlight', () => (highlightOpen = false))"
             >
+              <div class="rte-hl-current" aria-live="polite">
+                当前：{{ currentHighlightLabel() }}
+              </div>
               <button
                 type="button"
-                class="rte-color-action"
+                class="rte-color-action rte-hl-clear"
                 :class="{ selected: !isActive('highlight') }"
+                title="清除高亮"
+                aria-label="清除高亮"
                 @click="applyHighlightColor('')"
               >
-                无颜色
+                清除高亮
               </button>
-              <div class="rte-color-section-label">高亮颜色</div>
-              <div class="rte-highlight-swatches">
+              <div class="rte-color-section-label">常用底色</div>
+              <div
+                class="rte-highlight-swatches"
+                role="listbox"
+                aria-label="常用高亮底色"
+              >
                 <button
-                  v-for="h in WORD_HIGHLIGHT_COLORS"
-                  :key="h.color"
+                  v-for="h in WORD_HIGHLIGHT_SOFT"
+                  :key="'hl-s-' + h.color"
                   type="button"
-                  class="rte-swatch"
+                  role="option"
+                  class="rte-swatch rte-hl-swatch"
                   :class="{
                     selected: colorsEqual(currentHighlightColor(), h.color),
-                    'is-light': h.color === '#FFFF00' || h.color === '#00FF00' || h.color === '#00FFFF' || h.color === '#C0C0C0',
+                    'is-light': isLightHighlight(h.color),
                   }"
                   :style="{ background: h.color }"
                   :title="h.label"
+                  :aria-label="h.label"
+                  :aria-selected="colorsEqual(currentHighlightColor(), h.color)"
+                  @mouseenter="highlightHoverLabel = h.label"
+                  @mouseleave="highlightHoverLabel = ''"
                   @click="applyHighlightColor(h.color)"
                 />
+              </div>
+              <div class="rte-color-section-label">荧光笔</div>
+              <div
+                class="rte-highlight-swatches"
+                role="listbox"
+                aria-label="荧光笔颜色"
+              >
+                <button
+                  v-for="h in WORD_HIGHLIGHT_VIVID"
+                  :key="'hl-v-' + h.color"
+                  type="button"
+                  role="option"
+                  class="rte-swatch rte-hl-swatch"
+                  :class="{
+                    selected: colorsEqual(currentHighlightColor(), h.color),
+                    'is-light': isLightHighlight(h.color),
+                  }"
+                  :style="{ background: h.color }"
+                  :title="h.label"
+                  :aria-label="h.label"
+                  :aria-selected="colorsEqual(currentHighlightColor(), h.color)"
+                  @mouseenter="highlightHoverLabel = h.label"
+                  @mouseleave="highlightHoverLabel = ''"
+                  @click="applyHighlightColor(h.color)"
+                />
+              </div>
+              <div class="rte-color-sep" />
+              <button
+                type="button"
+                class="rte-color-action"
+                :aria-expanded="customHighlightOpen"
+                @click.stop="customHighlightOpen = !customHighlightOpen"
+              >
+                自定义颜色…
+              </button>
+              <div v-if="customHighlightOpen" class="rte-custom-color" @click.stop>
+                <input
+                  v-model="customHighlightHex"
+                  type="color"
+                  class="rte-custom-color-native"
+                  title="选取高亮色"
+                  aria-label="选取高亮色"
+                  @input="onCustomHighlightNativeInput"
+                />
+                <input
+                  v-model="customHighlightHex"
+                  type="text"
+                  class="rte-custom-color-hex"
+                  maxlength="7"
+                  placeholder="#FFF3BF"
+                  aria-label="高亮色十六进制"
+                  @keydown.enter.prevent="applyCustomHighlight"
+                />
+                <button
+                  type="button"
+                  class="rte-custom-color-ok"
+                  @click="applyCustomHighlight"
+                >
+                  确定
+                </button>
+              </div>
+              <div class="rte-hl-hover-hint" aria-hidden="true">
+                {{ highlightHoverLabel || '悬停色块可预览名称' }}
               </div>
             </div>
           </Teleport>
@@ -5631,7 +7838,10 @@ defineExpose({ focusEditor, editor, onDraftBackup })
             class="rte-tool"
             :ref="(el) => setFloatAnchor('color', el)" data-rte-anchor="color"
             :class="{ active: colorOpen }"
-            title="字体颜色"
+            title="文字颜色"
+            aria-label="文字颜色"
+            :aria-expanded="colorOpen"
+            aria-haspopup="dialog"
             @click.stop="markToolbarMenuOpening(); toggleColorMenu()"
           >
             <span
@@ -5676,17 +7886,28 @@ defineExpose({ focusEditor, editor, onDraftBackup })
               />
             </div>
             <div class="rte-color-section-label">标准颜色</div>
-            <div class="rte-standard-row">
+            <div class="rte-standard-row" role="listbox" aria-label="标准文字颜色">
               <button
-                v-for="c in WORD_STANDARD_COLORS"
-                :key="'st-' + c"
+                v-for="item in WORD_STANDARD_COLOR_ITEMS"
+                :key="'st-' + item.color"
                 type="button"
+                role="option"
                 class="rte-swatch"
-                :class="{ selected: colorsEqual(currentTextColor(), c) }"
-                :style="{ background: c }"
-                :title="c"
-                @click="applyTextColor(c)"
+                :class="{
+                  selected: colorsEqual(currentTextColor(), item.color),
+                  'is-light': isLightHighlight(item.color),
+                }"
+                :style="{ background: item.color }"
+                :title="item.label"
+                :aria-label="item.label"
+                :aria-selected="colorsEqual(currentTextColor(), item.color)"
+                @mouseenter="colorHoverLabel = item.label"
+                @mouseleave="colorHoverLabel = ''"
+                @click="applyTextColor(item.color)"
               />
+            </div>
+            <div class="rte-hl-hover-hint" aria-hidden="true">
+              {{ colorHoverLabel || '悬停色块可预览名称' }}
             </div>
             <div class="rte-color-sep" />
             <button
@@ -6063,6 +8284,13 @@ defineExpose({ focusEditor, editor, onDraftBackup })
                 </span>
                 <span class="rte-import-pill">.txt</span>
               </button>
+              <button type="button" class="rte-import-item" @click.stop="exportAsMarkdown">
+                <span class="rte-import-left">
+                  <component :is="toolIcon('exportText')" class="rte-ep-icon" />
+                  <span>导出 Markdown</span>
+                </span>
+                <span class="rte-import-pill">.md</span>
+              </button>
               <button
                 type="button"
                 class="rte-import-item"
@@ -6143,23 +8371,53 @@ defineExpose({ focusEditor, editor, onDraftBackup })
             </span>
             <span class="rte-tool-label">{{ t.label }}</span>
           </button>
-          <select
+          <div
             v-if="isActive('codeBlock')"
-            class="rte-code-lang-select"
-            :value="currentCodeLanguage()"
-            title="代码语言"
-            aria-label="代码语言"
-            @mousedown.stop
-            @change="onCodeLangChange"
+            class="rte-code-lang-wrap"
+            @mouseenter="onToolMenuEnter('codeLang')"
+            @mouseleave="onToolMenuLeave($event, 'codeLang', () => (codeLangOpen = false))"
           >
-            <option
-              v-for="opt in CODE_LANG_OPTIONS"
-              :key="opt.value"
-              :value="opt.value"
+            <button
+              type="button"
+              class="rte-code-lang-btn"
+              :ref="(el) => setFloatAnchor('codeLang', el)"
+              data-rte-anchor="codeLang"
+              :class="{ active: codeLangOpen }"
+              title="代码语言"
+              aria-label="代码语言"
+              :aria-expanded="codeLangOpen"
+              aria-haspopup="listbox"
+              @mousedown.prevent
+              @click.stop="markToolbarMenuOpening(); codeLangOpen = !codeLangOpen"
             >
-              {{ opt.label }}
-            </option>
-          </select>
+              {{ codeLanguageLabel(currentCodeLanguage()) }}
+              <span class="rte-caret" aria-hidden="true"></span>
+            </button>
+            <Teleport to="body">
+              <div
+                v-if="codeLangOpen"
+                class="rte-menu rte-code-lang-menu"
+                role="listbox"
+                aria-label="代码语言"
+                v-rte-float="'codeLang'"
+                @mousedown.prevent
+                @mouseenter="onToolMenuEnter('codeLang')"
+                @mouseleave="onToolMenuLeave($event, 'codeLang', () => (codeLangOpen = false))"
+              >
+                <button
+                  v-for="opt in CODE_LANG_OPTIONS"
+                  :key="'cl-' + opt.value"
+                  type="button"
+                  role="option"
+                  :class="{ active: currentCodeLanguage() === opt.value }"
+                  :aria-selected="currentCodeLanguage() === opt.value"
+                  @click="applyCodeLanguage(opt.value)"
+                >
+                  {{ opt.label }}
+                </button>
+              </div>
+            </Teleport>
+          </div>
           <button
             v-if="isActive('codeBlock')"
             type="button"
@@ -6405,6 +8663,110 @@ defineExpose({ focusEditor, editor, onDraftBackup })
                   <option value="0.3em">0.3em</option>
                 </select>
               </div>
+              <div class="rte-spacing-row">
+                <span class="rte-spacing-label">首行缩进</span>
+                <select
+                  class="rte-spacing-select"
+                  :value="currentTextIndent()"
+                  @change="applyTextIndent(($event.target as HTMLSelectElement).value)"
+                >
+                  <option value="">无</option>
+                  <option value="2em">2 字符</option>
+                  <option value="3em">3 字符</option>
+                  <option value="4em">4 字符</option>
+                </select>
+              </div>
+              <div class="rte-spacing-row">
+                <span class="rte-spacing-label">文字方向</span>
+                <select
+                  class="rte-spacing-select"
+                  :value="currentTextDir()"
+                  @change="applyTextDir(($event.target as HTMLSelectElement).value as '' | 'ltr' | 'rtl')"
+                >
+                  <option value="">默认</option>
+                  <option value="ltr">从左到右</option>
+                  <option value="rtl">从右到左</option>
+                </select>
+              </div>
+            </div>
+          </Teleport>
+        </div>
+        <div
+          v-else-if="t.kind === 'paraStyle'"
+          class="rte-tool-wrap"
+          @mouseenter="onToolMenuEnter('paraStyle')"
+          @mouseleave="onToolMenuLeave($event, 'paraStyle', () => (paraStyleOpen = false))"
+        >
+          <button
+            type="button"
+            class="rte-tool"
+            :ref="(el) => setFloatAnchor('paraStyle', el)"
+            data-rte-anchor="paraStyle"
+            :class="{ active: paraStyleOpen }"
+            title="段落样式集"
+            @click.stop="markToolbarMenuOpening(); paraStyleOpen = !paraStyleOpen"
+          >
+            <span class="rte-tool-icon">
+              <component :is="t.iconComp || toolIcon('fontSize')" class="rte-ep-icon" />
+            </span>
+            <span class="rte-tool-label">段样式</span>
+          </button>
+          <Teleport to="body">
+            <div
+              v-if="paraStyleOpen"
+              class="rte-menu rte-float-menu"
+              v-rte-float="'paraStyle'"
+              @mousedown.prevent
+            >
+              <button
+                v-for="opt in PARA_STYLE_OPTIONS"
+                :key="'ps-' + opt.id"
+                type="button"
+                @click="applyParaStyleId(opt.id)"
+              >
+                {{ opt.label }}
+                <span class="rte-menu-desc">{{ opt.desc }}</span>
+              </button>
+            </div>
+          </Teleport>
+        </div>
+        <div
+          v-else-if="t.kind === 'listStyle'"
+          class="rte-tool-wrap"
+          @mouseenter="onToolMenuEnter('listStyle')"
+          @mouseleave="onToolMenuLeave($event, 'listStyle', () => (listStyleOpen = false))"
+        >
+          <button
+            type="button"
+            class="rte-tool"
+            :ref="(el) => setFloatAnchor('listStyle', el)"
+            data-rte-anchor="listStyle"
+            :class="{ active: listStyleOpen }"
+            title="列表编号样式"
+            @click.stop="markToolbarMenuOpening(); listStyleOpen = !listStyleOpen"
+          >
+            <span class="rte-tool-icon">
+              <component :is="t.iconComp || toolIcon('list')" class="rte-ep-icon" />
+            </span>
+            <span class="rte-tool-label">编号样式</span>
+          </button>
+          <Teleport to="body">
+            <div
+              v-if="listStyleOpen"
+              class="rte-menu rte-float-menu"
+              v-rte-float="'listStyle'"
+              @mousedown.prevent
+            >
+              <button
+                v-for="opt in ORDERED_LIST_STYLE_OPTIONS"
+                :key="'ls-' + opt.value"
+                type="button"
+                @click="applyListStyle(opt.value)"
+              >
+                {{ opt.label }}
+              </button>
+              <div class="rte-menu-sep" />
+              <button type="button" @click="applyListStart()">自定义起始…</button>
             </div>
           </Teleport>
         </div>
@@ -6561,13 +8923,189 @@ defineExpose({ focusEditor, editor, onDraftBackup })
             </div>
           </Teleport>
         </div>
+        <div
+          v-else-if="t.kind === 'hr'"
+          class="rte-tool-wrap"
+          @mouseenter="onToolMenuEnter('hr')"
+          @mouseleave="onToolMenuLeave($event, 'hr', () => (hrOpen = false))"
+        >
+          <button
+            type="button"
+            class="rte-tool"
+            :ref="(el) => setFloatAnchor('hr', el)"
+            data-rte-anchor="hr"
+            :class="{ active: hrOpen || isActive('horizontalRule') }"
+            title="分割线"
+            @click.stop="markToolbarMenuOpening(); hrOpen = !hrOpen"
+          >
+            <span class="rte-tool-icon">
+              <component :is="t.iconComp || toolIcon('hr')" class="rte-ep-icon" />
+            </span>
+            <span class="rte-tool-label">分割线<span class="rte-caret" aria-hidden="true"></span></span>
+          </button>
+        </div>
+        <div
+          v-else-if="t.kind === 'blockOps'"
+          class="rte-tool-wrap"
+          @mouseenter="onToolMenuEnter('blockOps')"
+          @mouseleave="onToolMenuLeave($event, 'blockOps', () => (blockOpsOpen = false))"
+        >
+          <button
+            type="button"
+            class="rte-tool"
+            :ref="(el) => setFloatAnchor('blockOps', el)"
+            data-rte-anchor="blockOps"
+            :class="{ active: blockOpsOpen }"
+            title="块操作"
+            @click.stop="markToolbarMenuOpening(); blockOpsOpen = !blockOpsOpen"
+          >
+            <span class="rte-tool-icon">
+              <component :is="t.iconComp || toolIcon('more')" class="rte-ep-icon" />
+            </span>
+            <span class="rte-tool-label">块<span class="rte-caret" aria-hidden="true"></span></span>
+          </button>
+        </div>
+        <div
+          v-else-if="t.kind === 'insertDate'"
+          class="rte-tool-wrap"
+          @mouseenter="onToolMenuEnter('insertDate')"
+          @mouseleave="onToolMenuLeave($event, 'insertDate', () => (insertDateOpen = false))"
+        >
+          <button
+            type="button"
+            class="rte-tool"
+            :ref="(el) => setFloatAnchor('insertDate', el)"
+            data-rte-anchor="insertDate"
+            :class="{ active: insertDateOpen }"
+            title="插入日期"
+            @click.stop="markToolbarMenuOpening(); insertDateOpen = !insertDateOpen"
+          >
+            <span class="rte-tool-icon">
+              <component :is="t.iconComp || toolIcon('note')" class="rte-ep-icon" />
+            </span>
+            <span class="rte-tool-label">日期<span class="rte-caret" aria-hidden="true"></span></span>
+          </button>
+        </div>
+        <div
+          v-else-if="t.kind === 'caseTransform'"
+          class="rte-tool-wrap"
+          @mouseenter="onToolMenuEnter('caseTransform')"
+          @mouseleave="onToolMenuLeave($event, 'caseTransform', () => (caseMenuOpen = false))"
+        >
+          <button
+            type="button"
+            class="rte-tool"
+            :ref="(el) => setFloatAnchor('caseTransform', el)"
+            data-rte-anchor="caseTransform"
+            :class="{ active: caseMenuOpen }"
+            title="大小写转换"
+            @click.stop="markToolbarMenuOpening(); caseMenuOpen = !caseMenuOpen"
+          >
+            <span class="rte-tool-icon">
+              <component :is="t.iconComp || toolIcon('fontSize')" class="rte-ep-icon" />
+            </span>
+            <span class="rte-tool-label">大小写<span class="rte-caret" aria-hidden="true"></span></span>
+          </button>
+          <Teleport to="body">
+            <div
+              v-if="caseMenuOpen"
+              class="rte-menu"
+              v-rte-float="'caseTransform'"
+              @mousedown.prevent
+              @mouseenter="onToolMenuEnter('caseTransform')"
+              @mouseleave="onToolMenuLeave($event, 'caseTransform', () => (caseMenuOpen = false))"
+            >
+              <button type="button" @click="runCaseTransform('upper')">全大写</button>
+              <button type="button" @click="runCaseTransform('lower')">全小写</button>
+              <button type="button" @click="runCaseTransform('title')">词首大写</button>
+            </div>
+          </Teleport>
+        </div>
+        <div
+          v-else-if="t.kind === 'zoom'"
+          class="rte-tool-wrap"
+          @mouseenter="onToolMenuEnter('zoom')"
+          @mouseleave="onToolMenuLeave($event, 'zoom', () => (zoomMenuOpen = false))"
+        >
+          <button
+            type="button"
+            class="rte-tool"
+            :ref="(el) => setFloatAnchor('zoom', el)"
+            data-rte-anchor="zoom"
+            :class="{ active: zoomMenuOpen || editorZoom !== 1 }"
+            title="编辑区缩放"
+            @click.stop="markToolbarMenuOpening(); zoomMenuOpen = !zoomMenuOpen"
+          >
+            <span class="rte-tool-icon">
+              <component :is="t.iconComp || toolIcon('wordStats')" class="rte-ep-icon" />
+            </span>
+            <span class="rte-tool-label">{{ Math.round(editorZoom * 100) }}%<span class="rte-caret" aria-hidden="true"></span></span>
+          </button>
+          <Teleport to="body">
+            <div
+              v-if="zoomMenuOpen"
+              class="rte-menu"
+              v-rte-float="'zoom'"
+              @mousedown.prevent
+              @mouseenter="onToolMenuEnter('zoom')"
+              @mouseleave="onToolMenuLeave($event, 'zoom', () => (zoomMenuOpen = false))"
+            >
+              <button
+                v-for="z in RTE_ZOOM_PRESETS"
+                :key="'z-' + z.value"
+                type="button"
+                :class="{ active: editorZoom === z.value }"
+                @click="setEditorZoom(z.value)"
+              >
+                {{ z.label }}
+              </button>
+            </div>
+          </Teleport>
+        </div>
+        <div
+          v-else-if="t.kind === 'viewExtras'"
+          class="rte-tool-wrap"
+          @mouseenter="onToolMenuEnter('viewExtras')"
+          @mouseleave="onToolMenuLeave($event, 'viewExtras', () => (viewExtrasOpen = false))"
+        >
+          <button
+            type="button"
+            class="rte-tool"
+            :ref="(el) => setFloatAnchor('viewExtras', el)"
+            data-rte-anchor="viewExtras"
+            :class="{ active: viewExtrasOpen || focusMode || darkEditor || paperGuide }"
+            title="专注 / 暗色 / 纸张参考线"
+            @click.stop="markToolbarMenuOpening(); viewExtrasOpen = !viewExtrasOpen"
+          >
+            <span class="rte-tool-icon">
+              <component :is="t.iconComp || toolIcon('outline')" class="rte-ep-icon" />
+            </span>
+            <span class="rte-tool-label">视图<span class="rte-caret" aria-hidden="true"></span></span>
+          </button>
+          <Teleport to="body">
+            <div
+              v-if="viewExtrasOpen"
+              class="rte-menu"
+              v-rte-float="'viewExtras'"
+              @mousedown.prevent
+              @mouseenter="onToolMenuEnter('viewExtras')"
+              @mouseleave="onToolMenuLeave($event, 'viewExtras', () => (viewExtrasOpen = false))"
+            >
+              <button type="button" :class="{ active: focusMode }" @click="toggleFocusMode">专注模式</button>
+              <button type="button" :class="{ active: darkEditor }" @click="toggleDarkEditor">暗色编辑区</button>
+              <button type="button" :class="{ active: paperGuide }" @click="togglePaperGuide">纸张参考线</button>
+            </div>
+          </Teleport>
+        </div>
         <button
           v-else
           type="button"
           class="rte-tool"
-          :class="{ active: t.active?.() }"
+          :class="{ active: t.active?.(), 'is-disabled': t.disabled?.() }"
           :title="t.title || t.label"
           :aria-label="t.title || t.label"
+          :aria-pressed="t.active ? !!t.active() : undefined"
+          :disabled="t.disabled?.() || undefined"
           @click="t.run?.()"
           @dblclick.stop="t.key === 'formatPainter' && onFormatPainterDblClick()"
         >
@@ -6671,7 +9209,7 @@ defineExpose({ focusEditor, editor, onDraftBackup })
               </span>
               <span>{{ mt.title || mt.label }}</span>
               <span
-                v-if="mt.kind === 'color' || mt.key === 'highlight' || mt.kind === 'attach' || mt.kind === 'form' || mt.kind === 'template' || mt.kind === 'fontSize' || mt.kind === 'fontFamily' || mt.kind === 'lineHeight' || mt.kind === 'callout'"
+                v-if="mt.kind === 'color' || mt.key === 'highlight' || mt.kind === 'attach' || mt.kind === 'form' || mt.kind === 'template' || mt.kind === 'fontSize' || mt.kind === 'fontFamily' || mt.kind === 'lineHeight' || mt.kind === 'callout' || mt.kind === 'caseTransform' || mt.kind === 'zoom' || mt.kind === 'viewExtras'"
                 class="rte-more-caret"
               >{{ mt.kind === 'attach' || mt.kind === 'form' || mt.kind === 'template' ? '▾' : '▸' }}</span>
             </button>
@@ -6720,6 +9258,39 @@ defineExpose({ focusEditor, editor, onDraftBackup })
               >
                 {{ opt.label }}
               </button>
+            </div>
+            <div
+              v-if="mt.kind === 'caseTransform' && caseMenuOpen"
+              class="rte-menu rte-more-flyout"
+              @mousedown.prevent
+            >
+              <button type="button" @click="runCaseTransform('upper')">全大写</button>
+              <button type="button" @click="runCaseTransform('lower')">全小写</button>
+              <button type="button" @click="runCaseTransform('title')">词首大写</button>
+            </div>
+            <div
+              v-if="mt.kind === 'zoom' && zoomMenuOpen"
+              class="rte-menu rte-more-flyout"
+              @mousedown.prevent
+            >
+              <button
+                v-for="z in RTE_ZOOM_PRESETS"
+                :key="'mz-' + z.value"
+                type="button"
+                :class="{ active: editorZoom === z.value }"
+                @click="setEditorZoom(z.value)"
+              >
+                {{ z.label }}
+              </button>
+            </div>
+            <div
+              v-if="mt.kind === 'viewExtras' && viewExtrasOpen"
+              class="rte-menu rte-more-flyout"
+              @mousedown.prevent
+            >
+              <button type="button" :class="{ active: focusMode }" @click="toggleFocusMode">专注模式</button>
+              <button type="button" :class="{ active: darkEditor }" @click="toggleDarkEditor">暗色编辑区</button>
+              <button type="button" :class="{ active: paperGuide }" @click="togglePaperGuide">纸张参考线</button>
             </div>
             <div
               v-if="mt.kind === 'form' && moreFormOpen"
@@ -6799,17 +9370,28 @@ defineExpose({ focusEditor, editor, onDraftBackup })
                 />
               </div>
               <div class="rte-color-section-label">标准颜色</div>
-              <div class="rte-standard-row">
+              <div class="rte-standard-row" role="listbox" aria-label="标准文字颜色">
                 <button
-                  v-for="c in WORD_STANDARD_COLORS"
-                  :key="'mst-' + c"
+                  v-for="item in WORD_STANDARD_COLOR_ITEMS"
+                  :key="'mst-' + item.color"
                   type="button"
+                  role="option"
                   class="rte-swatch"
-                  :class="{ selected: colorsEqual(currentTextColor(), c) }"
-                  :style="{ background: c }"
-                  :title="c"
-                  @click="applyTextColor(c)"
+                  :class="{
+                    selected: colorsEqual(currentTextColor(), item.color),
+                    'is-light': isLightHighlight(item.color),
+                  }"
+                  :style="{ background: item.color }"
+                  :title="item.label"
+                  :aria-label="item.label"
+                  :aria-selected="colorsEqual(currentTextColor(), item.color)"
+                  @mouseenter="colorHoverLabel = item.label"
+                  @mouseleave="colorHoverLabel = ''"
+                  @click="applyTextColor(item.color)"
                 />
+              </div>
+              <div class="rte-hl-hover-hint" aria-hidden="true">
+                {{ colorHoverLabel || '悬停色块可预览名称' }}
               </div>
               <div class="rte-color-sep" />
               <button
@@ -6865,35 +9447,98 @@ defineExpose({ focusEditor, editor, onDraftBackup })
             <div
               v-if="mt.key === 'highlight' && moreHighlightOpen"
               class="rte-menu rte-color-menu rte-highlight-menu rte-more-flyout"
+              role="dialog"
+              aria-label="高亮颜色"
               @mousedown.prevent
             >
+              <div class="rte-hl-current" aria-live="polite">
+                当前：{{ currentHighlightLabel() }}
+              </div>
               <button
                 type="button"
-                class="rte-color-action"
+                class="rte-color-action rte-hl-clear"
                 :class="{ selected: !isActive('highlight') }"
+                title="清除高亮"
+                aria-label="清除高亮"
                 @click="applyHighlightColor('')"
               >
-                无颜色
+                清除高亮
               </button>
-              <div class="rte-color-section-label">高亮颜色</div>
-              <div class="rte-highlight-swatches">
+              <div class="rte-color-section-label">常用底色</div>
+              <div class="rte-highlight-swatches" role="listbox" aria-label="常用高亮底色">
                 <button
-                  v-for="h in WORD_HIGHLIGHT_COLORS"
-                  :key="'mh-' + h.color"
+                  v-for="h in WORD_HIGHLIGHT_SOFT"
+                  :key="'mhl-s-' + h.color"
                   type="button"
-                  class="rte-swatch"
+                  role="option"
+                  class="rte-swatch rte-hl-swatch"
                   :class="{
                     selected: colorsEqual(currentHighlightColor(), h.color),
-                    'is-light':
-                      h.color === '#FFFF00' ||
-                      h.color === '#00FF00' ||
-                      h.color === '#00FFFF' ||
-                      h.color === '#C0C0C0',
+                    'is-light': isLightHighlight(h.color),
                   }"
                   :style="{ background: h.color }"
                   :title="h.label"
+                  :aria-label="h.label"
+                  :aria-selected="colorsEqual(currentHighlightColor(), h.color)"
+                  @mouseenter="highlightHoverLabel = h.label"
+                  @mouseleave="highlightHoverLabel = ''"
                   @click="applyHighlightColor(h.color)"
                 />
+              </div>
+              <div class="rte-color-section-label">荧光笔</div>
+              <div class="rte-highlight-swatches" role="listbox" aria-label="荧光笔颜色">
+                <button
+                  v-for="h in WORD_HIGHLIGHT_VIVID"
+                  :key="'mhl-v-' + h.color"
+                  type="button"
+                  role="option"
+                  class="rte-swatch rte-hl-swatch"
+                  :class="{
+                    selected: colorsEqual(currentHighlightColor(), h.color),
+                    'is-light': isLightHighlight(h.color),
+                  }"
+                  :style="{ background: h.color }"
+                  :title="h.label"
+                  :aria-label="h.label"
+                  :aria-selected="colorsEqual(currentHighlightColor(), h.color)"
+                  @mouseenter="highlightHoverLabel = h.label"
+                  @mouseleave="highlightHoverLabel = ''"
+                  @click="applyHighlightColor(h.color)"
+                />
+              </div>
+              <div class="rte-color-sep" />
+              <button
+                type="button"
+                class="rte-color-action"
+                :aria-expanded="customHighlightOpen"
+                @click.stop="customHighlightOpen = !customHighlightOpen"
+              >
+                自定义颜色…
+              </button>
+              <div v-if="customHighlightOpen" class="rte-custom-color" @click.stop>
+                <input
+                  v-model="customHighlightHex"
+                  type="color"
+                  class="rte-custom-color-native"
+                  title="选取高亮色"
+                  aria-label="选取高亮色"
+                  @input="onCustomHighlightNativeInput"
+                />
+                <input
+                  v-model="customHighlightHex"
+                  type="text"
+                  class="rte-custom-color-hex"
+                  maxlength="7"
+                  placeholder="#FFF3BF"
+                  aria-label="高亮色十六进制"
+                  @keydown.enter.prevent="applyCustomHighlight"
+                />
+                <button type="button" class="rte-custom-color-ok" @click="applyCustomHighlight">
+                  确定
+                </button>
+              </div>
+              <div class="rte-hl-hover-hint" aria-hidden="true">
+                {{ highlightHoverLabel || '悬停色块可预览名称' }}
               </div>
             </div>
           </template>
@@ -7028,6 +9673,31 @@ defineExpose({ focusEditor, editor, onDraftBackup })
               <option value="0.15em">0.15em</option>
               <option value="0.2em">0.2em</option>
               <option value="0.3em">0.3em</option>
+            </select>
+          </div>
+          <div class="rte-spacing-row">
+            <span class="rte-spacing-label">首行缩进</span>
+            <select
+              class="rte-spacing-select"
+              :value="currentTextIndent()"
+              @change="applyTextIndent(($event.target as HTMLSelectElement).value)"
+            >
+              <option value="">无</option>
+              <option value="2em">2 字符</option>
+              <option value="3em">3 字符</option>
+              <option value="4em">4 字符</option>
+            </select>
+          </div>
+          <div class="rte-spacing-row">
+            <span class="rte-spacing-label">文字方向</span>
+            <select
+              class="rte-spacing-select"
+              :value="currentTextDir()"
+              @change="applyTextDir(($event.target as HTMLSelectElement).value as '' | 'ltr' | 'rtl')"
+            >
+              <option value="">默认</option>
+              <option value="ltr">从左到右</option>
+              <option value="rtl">从右到左</option>
             </select>
           </div>
         </div>
@@ -7180,6 +9850,17 @@ defineExpose({ focusEditor, editor, onDraftBackup })
       <button
         v-if="isActive('link')"
         type="button"
+        class="rte-bubble-btn"
+        title="复制链接地址"
+        aria-label="复制链接地址"
+        @mousedown.prevent
+        @click="copyCurrentLinkUrl"
+      >
+        ⧉
+      </button>
+      <button
+        v-if="isActive('link')"
+        type="button"
         class="rte-bubble-btn rte-bubble-btn-danger"
         title="取消链接"
         aria-label="取消链接"
@@ -7190,6 +9871,170 @@ defineExpose({ focusEditor, editor, onDraftBackup })
       </button>
     </BubbleMenu>
 
+
+    <!-- 紧凑模式也可开：分割线 / 块操作 / 日期（锚点由 onMoreToolClick 或工具按钮设置） -->
+    <Teleport to="body">
+      <div
+        v-if="hrOpen"
+        class="rte-menu rte-float-menu"
+        v-rte-float="'hr'"
+        @mousedown.prevent
+        @mouseenter="onToolMenuEnter('hr')"
+        @mouseleave="onToolMenuLeave($event, 'hr', () => (hrOpen = false))"
+      >
+        <button
+          v-for="opt in HR_VARIANT_OPTIONS"
+          :key="'hr2-' + opt.value"
+          type="button"
+          @click="insertHrVariant(opt.value)"
+        >
+          {{ opt.label }}
+        </button>
+      </div>
+    </Teleport>
+    <Teleport to="body">
+      <div
+        v-if="blockOpsOpen"
+        class="rte-menu rte-float-menu"
+        v-rte-float="'blockOps'"
+        @mousedown.prevent
+        @mouseenter="onToolMenuEnter('blockOps')"
+        @mouseleave="onToolMenuLeave($event, 'blockOps', () => (blockOpsOpen = false))"
+      >
+        <button type="button" @click="selectCurrentBlock(); blockOpsOpen = false">全选当前块</button>
+        <button type="button" @click="duplicateCurrentBlock(); blockOpsOpen = false">复制当前块</button>
+        <div class="rte-menu-sep" aria-hidden="true" />
+        <button type="button" @click="moveCurrentBlock(-1); blockOpsOpen = false">上移一块</button>
+        <button type="button" @click="moveCurrentBlock(1); blockOpsOpen = false">下移一块</button>
+      </div>
+    </Teleport>
+    <Teleport to="body">
+      <div
+        v-if="insertDateOpen"
+        class="rte-menu rte-float-menu"
+        v-rte-float="'insertDate'"
+        @mousedown.prevent
+        @mouseenter="onToolMenuEnter('insertDate')"
+        @mouseleave="onToolMenuLeave($event, 'insertDate', () => (insertDateOpen = false))"
+      >
+        <button type="button" @click="insertPlainDate(); insertDateOpen = false">今天日期</button>
+        <button type="button" @click="insertPlainDateTime(); insertDateOpen = false">现在时间</button>
+      </div>
+    </Teleport>
+
+    <!-- 图片选中：对齐 + 题注 -->
+    <BubbleMenu
+      v-if="editor"
+      :editor="editor"
+      :should-show="imageBubbleShouldShow"
+      :options="{ placement: 'bottom', offset: 10 }"
+      class="rte-bubble rte-image-bubble"
+    >
+      <div class="rte-image-bubble-row">
+        <button
+          v-for="opt in IMAGE_ALIGN_OPTIONS"
+          :key="'img-al-' + opt.value"
+          type="button"
+          class="rte-bubble-btn"
+          :class="{ active: (editor?.getAttributes('image')?.align || '') === opt.value }"
+          :title="'对齐：' + opt.label"
+          @mousedown.prevent
+          @click="setImageAlign(opt.value)"
+        >
+          {{ opt.label }}
+        </button>
+      </div>
+      <div class="rte-image-bubble-row">
+        <span class="rte-image-width-label">宽</span>
+        <button
+          v-for="opt in IMAGE_WIDTH_PRESETS"
+          :key="'img-w-' + (opt.value || 'auto')"
+          type="button"
+          class="rte-bubble-btn"
+          :class="{ active: (editor?.getAttributes('image')?.displayWidth || '') === opt.value }"
+          :title="'宽度：' + opt.label"
+          @mousedown.prevent
+          @click="setImageDisplayWidth(opt.value)"
+        >
+          {{ opt.label }}
+        </button>
+      </div>
+      <div class="rte-image-bubble-row rte-image-caption-row">
+        <input
+          v-model="imageBubbleCaption"
+          class="rte-image-caption-input"
+          type="text"
+          maxlength="120"
+          placeholder="题注（写入图片标题）"
+          @mousedown.stop
+          @keydown.enter.prevent="applyImageCaption"
+        />
+        <button
+          type="button"
+          class="rte-bubble-btn"
+          title="应用题注"
+          @mousedown.prevent
+          @click="applyImageCaption"
+        >
+          题注
+        </button>
+      </div>
+      <div class="rte-image-bubble-row">
+        <span class="rte-image-width-label">圆角</span>
+        <button
+          v-for="opt in IMAGE_RADIUS_PRESETS"
+          :key="'img-r-' + (opt.value || 'none')"
+          type="button"
+          class="rte-bubble-btn"
+          :class="{ active: (editor?.getAttributes('image')?.borderRadius || '') === opt.value }"
+          @mousedown.prevent
+          @click="setImageBorderRadius(opt.value)"
+        >
+          {{ opt.label }}
+        </button>
+      </div>
+      <div class="rte-image-bubble-row">
+        <span class="rte-image-width-label">阴影</span>
+        <button
+          v-for="opt in IMAGE_SHADOW_PRESETS"
+          :key="'img-s-' + (opt.value || 'none')"
+          type="button"
+          class="rte-bubble-btn"
+          :class="{ active: (editor?.getAttributes('image')?.boxShadow || '') === opt.value }"
+          @mousedown.prevent
+          @click="setImageBoxShadow(opt.value)"
+        >
+          {{ opt.label }}
+        </button>
+      </div>
+      <div class="rte-image-bubble-row">
+        <span class="rte-image-width-label">边框</span>
+        <button
+          v-for="opt in IMAGE_BORDER_PRESETS"
+          :key="'img-b-' + (opt.value || 'none')"
+          type="button"
+          class="rte-bubble-btn"
+          :class="{ active: (editor?.getAttributes('image')?.borderStyle || '') === opt.value }"
+          @mousedown.prevent
+          @click="setImageBorderStyle(opt.value)"
+        >
+          {{ opt.label }}
+        </button>
+      </div>
+      <div class="rte-image-bubble-row">
+        <button
+          type="button"
+          class="rte-bubble-btn"
+          :class="{ active: imageCompressOnInsert }"
+          title="本地上传时压缩图片"
+          @mousedown.prevent
+          @click="imageCompressOnInsert = !imageCompressOnInsert"
+        >
+          {{ imageCompressOnInsert ? '插入压缩：开' : '插入压缩：关' }}
+        </button>
+      </div>
+    </BubbleMenu>
+
     <div
       class="rte-workspace"
       :class="{
@@ -7198,9 +10043,22 @@ defineExpose({ focusEditor, editor, onDraftBackup })
       }"
     >
       <div
+        v-if="viewMode === 'preview'"
+        class="rte-preview-banner"
+        role="status"
+      >
+        <span>只读预览中</span>
+        <button type="button" class="rte-preview-back" @click="setViewMode('edit')">
+          返回编辑
+        </button>
+      </div>
+      <div
         v-show="viewMode !== 'source'"
         class="rte-canvas"
-        :class="{ 'is-preview': viewMode === 'preview' }"
+        :class="{
+          'is-preview': viewMode === 'preview',
+          'is-paper-guide': paperGuide,
+        }"
         @click="onCanvasClick"
       >
         <input
@@ -7227,7 +10085,11 @@ defineExpose({ focusEditor, editor, onDraftBackup })
           v-if="showTitle && viewMode === 'preview' && localTitle"
           class="rte-title-sep"
         />
-        <EditorContent :editor="editor" class="rte-body" />
+        <EditorContent
+          :editor="editor"
+          class="rte-body"
+          :style="{ zoom: editorZoom }"
+        />
       </div>
 
       <div v-if="viewMode === 'source'" class="rte-source-pane">
@@ -7618,6 +10480,19 @@ defineExpose({ focusEditor, editor, onDraftBackup })
               {{ op.label }}
             </button>
           </template>
+          <div class="rte-menu-sep" aria-hidden="true" />
+          <div class="rte-table-cell-style-title" style="padding: 4px 10px">单元格背景</div>
+          <div class="rte-table-swatches" style="padding: 0 10px 8px">
+            <button
+              v-for="p in TABLE_CELL_BG_PRESETS"
+              :key="'ctx-bg-' + p.value"
+              type="button"
+              class="rte-table-swatch"
+              :title="p.label"
+              :style="p.value ? { background: p.value } : undefined"
+              @click="setTableCellBg(p.value); closeTableCtx()"
+            >{{ p.value ? '' : '无' }}</button>
+          </div>
         </div>
       </div>
     </Teleport>
@@ -7649,6 +10524,53 @@ defineExpose({ focusEditor, editor, onDraftBackup })
                 {{ op.label }}
               </button>
             </template>
+            <div class="rte-menu-sep" aria-hidden="true" />
+            <div class="rte-table-cell-style">
+              <div class="rte-table-cell-style-title">单元格背景</div>
+              <div class="rte-table-swatches">
+                <button
+                  v-for="p in TABLE_CELL_BG_PRESETS"
+                  :key="'tbg-' + p.value"
+                  type="button"
+                  class="rte-table-swatch"
+                  :title="p.label"
+                  :style="p.value ? { background: p.value } : { background: 'transparent' }"
+                  @click="setTableCellBg(p.value)"
+                >
+                  <span v-if="!p.value">无</span>
+                </button>
+              </div>
+              <div class="rte-table-cell-style-title">边框样式</div>
+              <div class="rte-table-border-styles">
+                <button
+                  v-for="p in TABLE_BORDER_STYLE_PRESETS"
+                  :key="'tbs-' + p.value"
+                  type="button"
+                  class="rte-table-ops-item rte-table-border-btn"
+                  @click="setTableCellBorderStyle(p.value)"
+                >
+                  {{ p.label }}
+                </button>
+              </div>
+              <div class="rte-table-cell-style-title">边框颜色</div>
+              <div class="rte-table-swatches">
+                <button
+                  type="button"
+                  class="rte-table-swatch"
+                  title="默认"
+                  @click="setTableCellBorderColor('')"
+                >无</button>
+                <button
+                  v-for="c in ['#d1d5db', '#9ca3af', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#111827']"
+                  :key="'tbc-' + c"
+                  type="button"
+                  class="rte-table-swatch"
+                  :style="{ background: c }"
+                  :title="c"
+                  @click="setTableCellBorderColor(c)"
+                />
+              </div>
+            </div>
             <div class="rte-menu-sep" aria-hidden="true" />
             <button
               type="button"
@@ -7856,17 +10778,351 @@ defineExpose({ focusEditor, editor, onDraftBackup })
               @keydown.enter.prevent="doReplaceOne"
             />
           </div>
-          <label class="rte-find-case">
-            <input v-model="findCaseSensitive" type="checkbox" @change="refreshFindMatches(true)" />
-            <span>区分大小写</span>
-            <span class="rte-find-status">{{ findStatusText }}</span>
-          </label>
+          <div class="rte-find-opts">
+            <label class="rte-find-case">
+              <input v-model="findCaseSensitive" type="checkbox" @change="refreshFindMatches(true)" />
+              <span>区分大小写</span>
+            </label>
+            <label class="rte-find-case">
+              <input v-model="findWholeWord" type="checkbox" @change="refreshFindMatches(true)" />
+              <span>全词匹配</span>
+            </label>
+            <span class="rte-find-status" role="status" aria-live="polite">{{ findStatusText }}</span>
+          </div>
           <div class="rte-modal-actions rte-find-actions">
             <button type="button" class="rte-modal-cancel" @click="findGo(-1)">上一个</button>
             <button type="button" class="rte-modal-cancel" @click="findGo(1)">下一个</button>
             <button type="button" class="rte-modal-cancel" @click="doReplaceOne">替换</button>
             <button type="button" class="rte-modal-confirm" @click="doReplaceAll">全部替换</button>
             <button type="button" class="rte-modal-cancel" @click="closeFindDialog">关闭</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- 打印预览 -->
+    <Teleport to="body">
+      <div
+        v-if="printPreviewOpen"
+        class="rte-modal-overlay rte-print-preview-overlay"
+        @mousedown.self="closePrintPreview"
+      >
+        <div
+          class="rte-print-preview-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-label="打印预览"
+          @mousedown.stop
+        >
+          <div class="rte-print-preview-bar">
+            <h3 class="rte-table-title">打印预览</h3>
+            <div class="rte-print-preview-actions">
+              <button type="button" class="rte-modal-cancel" @click="closePrintPreview">取消</button>
+              <button type="button" class="rte-modal-confirm" @click="confirmPrintFromPreview">打印</button>
+            </div>
+          </div>
+          <div class="rte-print-preview-paper" v-html="printPreviewHtml"></div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- 书签列表（工具栏书签可双击打开；此处随 bookmarkPanelOpen） -->
+    <Teleport to="body">
+      <div
+        v-if="bookmarkPanelOpen"
+        class="rte-modal-overlay"
+        @mousedown.self="bookmarkPanelOpen = false"
+      >
+        <div class="rte-link-dialog" role="dialog" aria-modal="true" aria-label="书签" @mousedown.stop>
+          <h3 class="rte-table-title">文档书签</h3>
+          <div v-if="!listBookmarks().length" class="rte-find-status">暂无书签，选中文字后点「书签」插入</div>
+          <button
+            v-for="b in listBookmarks()"
+            :key="b.id"
+            type="button"
+            class="rte-import-item"
+            style="width: 100%; margin-bottom: 6px"
+            @click="jumpToBookmark(b.id); bookmarkPanelOpen = false"
+          >
+            <span>{{ b.label }}</span>
+            <span class="rte-import-pill">#{{ b.id.slice(0, 10) }}</span>
+          </button>
+          <div class="rte-modal-actions">
+            <button type="button" class="rte-modal-cancel" @click="insertBookmark">新建书签</button>
+            <button type="button" class="rte-modal-confirm" @click="bookmarkPanelOpen = false">关闭</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- 脚注汇总 -->
+    <Teleport to="body">
+      <div
+        v-if="footnotePanelOpen"
+        class="rte-modal-overlay"
+        @mousedown.self="footnotePanelOpen = false"
+      >
+        <div class="rte-link-dialog" role="dialog" aria-modal="true" aria-label="脚注" @mousedown.stop>
+          <h3 class="rte-table-title">脚注</h3>
+          <div v-if="!(editor && collectFootnotes(editor).length)" class="rte-find-status">
+            暂无脚注
+          </div>
+          <button
+            v-for="fn in editor ? collectFootnotes(editor) : []"
+            :key="fn.id"
+            type="button"
+            class="rte-import-item"
+            style="width: 100%; margin-bottom: 6px; text-align: left"
+            @click="jumpToPos(editor!, fn.from)"
+          >
+            <span>[{{ fn.n }}] {{ fn.text }}</span>
+          </button>
+          <div class="rte-modal-actions">
+            <button type="button" class="rte-modal-cancel" @click="insertFootnoteAtCursor">新建</button>
+            <button
+              type="button"
+              class="rte-modal-cancel"
+              @click="editor && renumberFootnotes(editor)"
+            >
+              重编号
+            </button>
+            <button type="button" class="rte-modal-confirm" @click="footnotePanelOpen = false">关闭</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- Wave21 检查报告 -->
+    <Teleport to="body">
+      <div
+        v-if="wave21ReportOpen"
+        class="rte-modal-overlay"
+        @mousedown.self="wave21ReportOpen = false"
+      >
+        <div class="rte-link-dialog" role="dialog" aria-modal="true" @mousedown.stop>
+          <h3 class="rte-table-title">{{ wave21ReportTitle }}</h3>
+          <div class="rte-wave21-report-list">
+            <button
+              v-for="(line, idx) in wave21ReportLines"
+              :key="'w21r-' + idx"
+              type="button"
+              class="rte-import-item"
+              style="width: 100%; margin-bottom: 6px; text-align: left"
+              @click="jumpWave21Report(line.pos)"
+            >
+              {{ line.text }}
+            </button>
+          </div>
+          <div class="rte-modal-actions">
+            <button type="button" class="rte-modal-confirm" @click="wave21ReportOpen = false">关闭</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- 交叉引用 -->
+    <Teleport to="body">
+      <div
+        v-if="xrefDialogOpen"
+        class="rte-modal-overlay"
+        @mousedown.self="xrefDialogOpen = false"
+      >
+        <div class="rte-link-dialog" role="dialog" aria-modal="true" aria-label="交叉引用" @mousedown.stop>
+          <h3 class="rte-table-title">插入交叉引用</h3>
+          <p class="rte-ask-message">选择标题、图或表作为引用目标</p>
+          <div v-if="!xrefTargets.length" class="rte-ask-message">暂无可用目标，请先添加标题或带题注的图/表。</div>
+          <button
+            v-for="tg in xrefTargets"
+            :key="tg.id + '-' + tg.pos"
+            type="button"
+            class="rte-import-item"
+            style="width: 100%; margin-bottom: 6px; text-align: left"
+            @click="confirmInsertXref(tg)"
+          >
+            <span>{{ tg.kind === 'heading' ? '标题' : tg.kind === 'figure' ? '图' : '表' }} · {{ tg.label }}</span>
+          </button>
+          <div class="rte-modal-actions">
+            <button type="button" class="rte-modal-cancel" @click="xrefDialogOpen = false">取消</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- 阅读时长 -->
+    <Teleport to="body">
+      <div
+        v-if="readTimeDialogOpen"
+        class="rte-modal-overlay"
+        @mousedown.self="readTimeDialogOpen = false"
+      >
+        <div class="rte-link-dialog" role="dialog" aria-modal="true" aria-label="阅读时长" @mousedown.stop>
+          <h3 class="rte-table-title">阅读时长估算</h3>
+          <p class="rte-ask-message">基于全文去空白字数 {{ charCount }}</p>
+          <div class="rte-wordstats-row"><span>慢读（约 250 字/分）</span><strong>{{ estimateReadingMinutes(charCount, 250) }} 分钟</strong></div>
+          <div class="rte-wordstats-row"><span>常速（约 400 字/分）</span><strong>{{ estimateReadingMinutes(charCount, 400) }} 分钟</strong></div>
+          <div class="rte-wordstats-row"><span>快读（约 600 字/分）</span><strong>{{ estimateReadingMinutes(charCount, 600) }} 分钟</strong></div>
+          <div class="rte-modal-actions">
+            <button type="button" class="rte-modal-confirm" @click="readTimeDialogOpen = false">关闭</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- 文本片段 Snippets -->
+    <Teleport to="body">
+      <div
+        v-if="snippetDialogOpen"
+        class="rte-modal-overlay"
+        @mousedown.self="snippetDialogOpen = false"
+      >
+        <div class="rte-link-dialog rte-snippet-dialog" role="dialog" aria-modal="true" aria-label="文本片段" @mousedown.stop>
+          <h3 class="rte-table-title">文本片段</h3>
+          <button
+            v-for="sn in snippetList"
+            :key="sn.id"
+            type="button"
+            class="rte-import-item"
+            style="width: 100%; margin-bottom: 6px; text-align: left"
+            @click="insertSnippet(sn)"
+          >
+            <strong>{{ sn.title }}</strong>
+            <div class="rte-ask-message" style="margin: 4px 0 0">{{ sn.body.slice(0, 80) }}{{ sn.body.length > 80 ? '…' : '' }}</div>
+          </button>
+          <div class="rte-menu-sep" style="margin: 10px 0" />
+          <p class="rte-ask-message">{{ snippetEditing ? '编辑片段' : '新建片段' }}</p>
+          <div class="rte-note-field" style="width: 100%; margin-bottom: 8px">
+            <input v-model="snippetTitle" class="rte-note-input" type="text" maxlength="40" placeholder="片段标题" />
+          </div>
+          <textarea
+            v-model="snippetBody"
+            class="rte-note-input"
+            rows="4"
+            maxlength="2000"
+            placeholder="片段正文"
+            style="width: 100%; margin-bottom: 8px; resize: vertical"
+          />
+          <div class="rte-modal-actions">
+            <button type="button" class="rte-modal-cancel" @click="snippetDialogOpen = false">关闭</button>
+            <button
+              v-if="snippetEditing"
+              type="button"
+              class="rte-modal-cancel"
+              @click="deleteSnippet(snippetEditing)"
+            >
+              删除
+            </button>
+            <button type="button" class="rte-modal-cancel" @click="startEditSnippet(null)">新建</button>
+            <button type="button" class="rte-modal-confirm" @click="saveSnippetForm">保存</button>
+          </div>
+          <div style="margin-top: 8px">
+            <button
+              v-for="sn in snippetList"
+              :key="'ed-' + sn.id"
+              type="button"
+              class="rte-bubble-btn"
+              style="margin: 2px"
+              @click="startEditSnippet(sn)"
+            >
+              编辑·{{ sn.title }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- 统一询问：输入 / 确认（替代原生 prompt/confirm） -->
+    <Teleport to="body">
+      <div
+        v-if="askOpen"
+        class="rte-modal-overlay"
+        @mousedown.self="closeAskDialog('cancel')"
+      >
+        <div
+          class="rte-link-dialog"
+          role="dialog"
+          aria-modal="true"
+          :aria-label="askTitle"
+          @mousedown.stop
+        >
+          <h3 class="rte-table-title">{{ askTitle }}</h3>
+          <p v-if="askMessage" class="rte-ask-message">{{ askMessage }}</p>
+          <div
+            v-if="askKind === 'prompt'"
+            class="rte-note-field rte-note-text-field"
+            style="width: 100%; margin-bottom: 12px"
+          >
+            <span class="rte-note-field-icon" aria-hidden="true">✎</span>
+            <input
+              ref="askInputRef"
+              v-model="askValue"
+              type="text"
+              class="rte-note-input"
+              :placeholder="askPlaceholder"
+              :maxlength="askMaxlength"
+              @keydown.enter.prevent="closeAskDialog('ok')"
+              @keydown.esc.prevent="closeAskDialog('cancel')"
+            />
+          </div>
+          <div class="rte-modal-actions">
+            <button type="button" class="rte-modal-cancel" @click="closeAskDialog('cancel')">
+              {{ askCancelLabel }}
+            </button>
+            <button type="button" class="rte-modal-confirm" @click="closeAskDialog('ok')">
+              {{ askConfirmLabel }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- 网页卡片插入 -->
+    <Teleport to="body">
+      <div
+        v-if="linkCardDialogOpen"
+        class="rte-modal-overlay"
+        @mousedown.self="closeLinkCardDialog"
+      >
+        <div
+          class="rte-link-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-label="插入网页卡片"
+          @mousedown.stop
+        >
+          <h3 class="rte-table-title">插入网页卡片</h3>
+          <p class="rte-ask-message">仅支持 http/https；iframe 为 sandbox 受控嵌入，部分站点可能拒绝。</p>
+          <div class="rte-note-field rte-note-link-field" style="width: 100%; margin-bottom: 12px">
+            <span class="rte-note-field-icon rte-note-link-icon" aria-hidden="true">🔗</span>
+            <input
+              v-model="linkCardHref"
+              type="url"
+              class="rte-note-input"
+              placeholder="https://"
+              maxlength="2000"
+              @keydown.enter.prevent="confirmLinkCardDialog"
+            />
+          </div>
+          <div class="rte-ask-mode-row" role="radiogroup" aria-label="展示方式">
+            <button
+              type="button"
+              class="rte-bubble-btn"
+              :class="{ active: linkCardMode === 'card' }"
+              @click="linkCardMode = 'card'"
+            >
+              链接卡片（推荐）
+            </button>
+            <button
+              type="button"
+              class="rte-bubble-btn"
+              :class="{ active: linkCardMode === 'iframe' }"
+              @click="linkCardMode = 'iframe'"
+            >
+              受控 iframe
+            </button>
+          </div>
+          <div class="rte-modal-actions">
+            <button type="button" class="rte-modal-cancel" @click="closeLinkCardDialog">取消</button>
+            <button type="button" class="rte-modal-confirm" @click="confirmLinkCardDialog">插入</button>
           </div>
         </div>
       </div>
@@ -11284,6 +14540,13 @@ defineExpose({ focusEditor, editor, onDraftBackup })
 .rte-find-case input {
   margin: 0;
 }
+.rte-find-opts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  margin-bottom: 8px;
+}
 .rte-find-status {
   margin-left: auto;
   color: #86909c;
@@ -11323,6 +14586,19 @@ defineExpose({ focusEditor, editor, onDraftBackup })
 .rte-root sup {
   font-size: 0.75em;
   line-height: 0;
+}
+.rte-ask-message {
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #86909c;
+  white-space: pre-wrap;
+}
+.rte-ask-mode-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
 }
 .rte-link-dialog {
   width: min(420px, 100%);
@@ -12334,6 +15610,476 @@ defineExpose({ focusEditor, editor, onDraftBackup })
   color: #1772f6;
 }
 
+.rte-bookmark {
+  border-bottom: 1px dashed #5b8cff;
+  background: rgba(91, 140, 255, 0.08);
+  border-radius: 2px;
+  padding: 0 2px;
+  scroll-margin-top: 80px;
+}
+.rte-bookmark-flash {
+  outline: 2px solid #5b8cff;
+  background: rgba(91, 140, 255, 0.2) !important;
+  transition: background 0.3s ease;
+}
+.rte-quote--default {
+  border-left: 3px solid #c9cdd4;
+  padding-left: 12px;
+  color: #4e5969;
+}
+.rte-quote--emphasis {
+  border-left: 4px solid #5b8cff;
+  background: rgba(91, 140, 255, 0.06);
+  padding: 10px 14px;
+  border-radius: 0 6px 6px 0;
+}
+.rte-quote--verse {
+  border: none;
+  text-align: center;
+  font-style: italic;
+  color: #4e5969;
+  padding: 8px 24px;
+}
+.rte-quote-preview--default { border-left: 3px solid #c9cdd4; padding-left: 8px; }
+.rte-quote-preview--emphasis { background: rgba(91, 140, 255, 0.1); padding: 2px 8px; border-radius: 4px; }
+.rte-quote-preview--verse { font-style: italic; opacity: 0.85; }
+.rte-image-width-label {
+  font-size: 12px;
+  color: #86909c;
+  margin-right: 4px;
+  align-self: center;
+}
+.rte-print-preview-overlay {
+  z-index: 11000;
+}
+.rte-print-preview-dialog {
+  width: min(860px, 94vw);
+  max-height: 90vh;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.rte-print-preview-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #e5e6eb;
+}
+.rte-print-preview-actions {
+  display: flex;
+  gap: 8px;
+}
+.rte-print-preview-paper {
+  padding: 28px 36px;
+  overflow: auto;
+  max-height: calc(90vh - 64px);
+  font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  line-height: 1.7;
+  color: #1d2129;
+}
+.rte-print-preview-paper .rte-print-title {
+  font-size: 1.6em;
+  margin: 0 0 16px;
+}
+.rte-print-preview-paper img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* —— Wave20 —— */
+.rte-emphasis-dot {
+  text-emphasis-style: filled dot;
+  text-emphasis-position: under;
+  -webkit-text-emphasis-style: filled dot;
+  -webkit-text-emphasis-position: under;
+}
+.rte-toggle-block {
+  border: 1px solid #e5e6eb;
+  border-radius: 8px;
+  margin: 8px 0;
+  background: #fafbfc;
+}
+.rte-toggle-summary {
+  cursor: pointer;
+  padding: 8px 12px;
+  font-weight: 600;
+  user-select: none;
+}
+.rte-toggle-summary::before {
+  content: '▸';
+  display: inline-block;
+  margin-right: 6px;
+  transition: transform 0.15s;
+}
+.rte-toggle-block.is-open .rte-toggle-summary::before {
+  transform: rotate(90deg);
+}
+.rte-toggle-body {
+  padding: 0 12px 10px;
+}
+.rte-audio {
+  width: 100%;
+  max-width: 480px;
+  margin: 8px 0;
+}
+.rte-link-card {
+  border: 1px solid #e5e6eb;
+  border-radius: 10px;
+  margin: 10px 0;
+  overflow: hidden;
+  background: #fff;
+}
+.rte-link-card-anchor {
+  display: block;
+  padding: 12px 14px;
+  text-decoration: none;
+  color: inherit;
+}
+.rte-link-card-title {
+  display: block;
+  font-weight: 600;
+  color: #1d2129;
+}
+.rte-link-card-url {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: #86909c;
+  word-break: break-all;
+}
+.rte-link-card-bar {
+  padding: 8px 12px;
+  border-bottom: 1px solid #e5e6eb;
+  background: #f7f8fa;
+}
+.rte-link-card-frame {
+  width: 100%;
+  height: 320px;
+  border: 0;
+  background: #f2f3f5;
+}
+.rte-footnote {
+  color: #5b8cff;
+  cursor: help;
+  font-size: 0.75em;
+}
+.rte-sensitive-hit {
+  background: rgba(255, 77, 79, 0.18);
+  border-bottom: 2px wavy #ff4d4f;
+}
+.rte-rev-changed {
+  background: rgba(250, 173, 20, 0.12);
+  box-shadow: inset 3px 0 0 #faad14;
+}
+.rte-rev-added {
+  background: rgba(82, 196, 26, 0.1);
+  box-shadow: inset 3px 0 0 #52c41a;
+}
+/* —— Wave21 —— */
+.rte-root.is-heading-auto-num :deep(.ProseMirror) {
+  counter-reset: h1;
+}
+.rte-root.is-heading-auto-num :deep(.ProseMirror h1) {
+  counter-reset: h2;
+  counter-increment: h1;
+}
+.rte-root.is-heading-auto-num :deep(.ProseMirror h1)::before {
+  content: counter(h1) '. ';
+  color: #86909c;
+  font-weight: 600;
+}
+.rte-root.is-heading-auto-num :deep(.ProseMirror h2) {
+  counter-reset: h3;
+  counter-increment: h2;
+}
+.rte-root.is-heading-auto-num :deep(.ProseMirror h2)::before {
+  content: counter(h1) '.' counter(h2) ' ';
+  color: #86909c;
+  font-weight: 600;
+}
+.rte-root.is-heading-auto-num :deep(.ProseMirror h3) {
+  counter-reset: h4;
+  counter-increment: h3;
+}
+.rte-root.is-heading-auto-num :deep(.ProseMirror h3)::before {
+  content: counter(h1) '.' counter(h2) '.' counter(h3) ' ';
+  color: #86909c;
+  font-weight: 600;
+}
+.rte-root.is-heading-auto-num :deep(.ProseMirror h4) {
+  counter-increment: h4;
+}
+.rte-root.is-heading-auto-num :deep(.ProseMirror h4)::before {
+  content: counter(h1) '.' counter(h2) '.' counter(h3) '.' counter(h4) ' ';
+  color: #86909c;
+}
+.rte-root.is-immersive {
+  position: fixed !important;
+  inset: 0;
+  z-index: 4000;
+  background: var(--rte-bg, #fff);
+  border-radius: 0 !important;
+  max-width: none !important;
+}
+.rte-root.is-immersive .rte-toolbar {
+  border-radius: 0;
+}
+.rte-ruby {
+  position: relative;
+  display: inline-block;
+  padding-top: 0.85em;
+  line-height: 1.2;
+}
+.rte-ruby::before {
+  content: attr(data-ruby);
+  position: absolute;
+  left: 50%;
+  top: 0;
+  transform: translateX(-50%);
+  font-size: 0.62em;
+  line-height: 1;
+  color: #86909c;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.rte-status-chip {
+  display: inline-block;
+  padding: 1px 8px;
+  margin: 0 2px;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1.6;
+  vertical-align: middle;
+  font-weight: 500;
+}
+.rte-status-chip--gray { background: #f2f3f5; color: #4e5969; }
+.rte-status-chip--blue { background: #e8f3ff; color: #165dff; }
+.rte-status-chip--green { background: #e8ffea; color: #00b42a; }
+.rte-status-chip--orange { background: #fff7e8; color: #ff7d00; }
+.rte-status-chip--red { background: #ffece8; color: #f53f3f; }
+.rte-status-chip--purple { background: #f5e8ff; color: #722ed1; }
+.rte-progress-bar {
+  margin: 10px 0;
+  padding: 10px 12px;
+  border: 1px solid #e5e6eb;
+  border-radius: 8px;
+  background: #fafbfc;
+}
+.rte-progress-bar-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  margin-bottom: 6px;
+  color: #4e5969;
+}
+.rte-progress-bar-track {
+  height: 8px;
+  border-radius: 999px;
+  background: #e5e6eb;
+  overflow: hidden;
+}
+.rte-progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #5b8cff, #165dff);
+  border-radius: 999px;
+}
+.rte-timeline {
+  margin: 12px 0;
+  padding-left: 14px;
+  border-left: 2px solid #bedaff;
+}
+.rte-timeline-item {
+  position: relative;
+  margin: 0 0 14px 10px;
+}
+.rte-timeline-item::before {
+  content: '';
+  position: absolute;
+  left: -21px;
+  top: 6px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #165dff;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px #bedaff;
+}
+.rte-timeline-item-head {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  margin-bottom: 4px;
+}
+.rte-timeline-time {
+  font-size: 12px;
+  color: #86909c;
+  min-width: 72px;
+}
+.rte-timeline-title {
+  font-weight: 600;
+  color: #1d2129;
+}
+.rte-tabs-block {
+  margin: 12px 0;
+  border: 1px solid #e5e6eb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.rte-tabs-bar {
+  display: flex;
+  gap: 0;
+  background: #f7f8fa;
+  border-bottom: 1px solid #e5e6eb;
+}
+.rte-tabs-tab {
+  border: 0;
+  background: transparent;
+  padding: 8px 14px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #4e5969;
+}
+.rte-tabs-tab.is-active {
+  background: #fff;
+  color: #165dff;
+  font-weight: 600;
+  box-shadow: inset 0 -2px 0 #165dff;
+}
+.rte-tabs-body {
+  padding: 12px;
+  min-height: 48px;
+}
+.rte-mermaid-block {
+  margin: 12px 0;
+  border: 1px solid #e5e6eb;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+}
+.rte-mermaid-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  background: #f7f8fa;
+  border-bottom: 1px solid #e5e6eb;
+  font-size: 12px;
+  color: #4e5969;
+}
+.rte-mermaid-toolbar button {
+  border: 1px solid #e5e6eb;
+  background: #fff;
+  border-radius: 4px;
+  padding: 2px 8px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.rte-mermaid-preview {
+  padding: 12px;
+  overflow-x: auto;
+  text-align: center;
+}
+.rte-mermaid-source {
+  width: 100%;
+  min-height: 120px;
+  border: 0;
+  padding: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  box-sizing: border-box;
+}
+.rte-mermaid-error {
+  color: #f53f3f;
+  text-align: left;
+  white-space: pre-wrap;
+  font-size: 12px;
+}
+.rte-root :deep(img[data-radius='4px']) { border-radius: 4px; }
+.rte-root :deep(img[data-radius='8px']) { border-radius: 8px; }
+.rte-root :deep(img[data-radius='16px']) { border-radius: 16px; }
+.rte-root :deep(img[data-radius='9999px']) { border-radius: 9999px; }
+.rte-root :deep(img[data-shadow='0 2px 8px rgba(0,0,0,.12)']) {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+.rte-root :deep(img[data-shadow='0 8px 24px rgba(0,0,0,.18)']) {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+.rte-root :deep(img[data-border='1px solid #e5e6eb']) {
+  border: 1px solid #e5e6eb;
+}
+.rte-root :deep(img[data-border='2px solid #5b8cff']) {
+  border: 2px solid #5b8cff;
+}
+.rte-cross-ref {
+  color: #165dff;
+  cursor: default;
+  border-bottom: 1px dashed #94bfff;
+  padding: 0 2px;
+}
+.rte-menu-desc {
+  display: block;
+  font-size: 11px;
+  color: #86909c;
+  font-weight: 400;
+}
+.rte-snippet-dialog {
+  max-width: 520px;
+  max-height: 80vh;
+  overflow: auto;
+}
+.rte-root.is-focus-mode .rte-toolbar {
+  display: none;
+}
+.rte-root.is-focus-mode .rte-workspace {
+  max-width: 720px;
+  margin: 0 auto;
+}
+.rte-root.is-dark-editor .rte-canvas,
+.rte-root.is-dark-editor .rte-body,
+.rte-root.is-dark-editor .ProseMirror {
+  background: #1d2129 !important;
+  color: #e5e6eb !important;
+}
+.rte-root.is-dark-editor .ProseMirror a {
+  color: #7eb6ff;
+}
+.rte-canvas.is-paper-guide .rte-body,
+.rte-canvas.is-paper-guide .ProseMirror {
+  max-width: 794px; /* ~A4 @ 96dpi */
+  margin-left: auto;
+  margin-right: auto;
+  box-shadow: 0 0 0 1px #e5e6eb, 0 8px 24px rgba(0, 0, 0, 0.06);
+  padding: 48px 56px;
+  min-height: 1123px;
+  background: #fff;
+}
+.rte-root.is-table-sticky .tableWrapper {
+  max-height: 420px;
+  overflow: auto;
+}
+.rte-root.is-table-sticky .tableWrapper table thead th,
+.rte-root.is-table-sticky .tableWrapper tr:first-child th,
+.rte-root.is-table-sticky .tableWrapper tr:first-child td {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #f7f8fa;
+}
+/* 轻量中文禁则 */
+.rte-root.is-cjk-typography .ProseMirror {
+  line-break: strict;
+  word-break: break-word;
+  hanging-punctuation: allow-end;
+}
+.rte-root.is-cjk-typography .ProseMirror p {
+  text-spacing-trim: space-all;
+}
+
 @media print {
   body * {
     visibility: hidden !important;
@@ -12384,6 +16130,270 @@ defineExpose({ focusEditor, editor, onDraftBackup })
 .rte-callout-menu.rte-float-menu,
 .rte-menu.rte-callout-menu {
   min-width: 180px;
+}
+
+
+/* —— 本轮：分割线变体 / 图片对齐 / 列表层级 / 预览条 / 表格色板 / 图片气泡 —— */
+.rte-root :deep(hr.rte-hr),
+.rte-root :deep(hr[data-variant]) {
+  border: none;
+  border-top: 1px solid #d1d5db;
+  margin: 1.1em 0;
+}
+.rte-root :deep(hr.rte-hr--dashed),
+.rte-root :deep(hr[data-variant='dashed']) {
+  border-top-style: dashed;
+}
+.rte-root :deep(hr.rte-hr--double),
+.rte-root :deep(hr[data-variant='double']) {
+  border-top-width: 3px;
+  border-top-style: double;
+  border-top-color: #9ca3af;
+}
+.rte-root :deep(hr.rte-hr--thick),
+.rte-root :deep(hr[data-variant='thick']) {
+  border-top-width: 3px;
+  border-top-color: #6b7280;
+}
+
+.rte-root :deep(img.rte-image[data-align='left']) {
+  float: left;
+  margin: 0.25em 1em 0.6em 0;
+  display: block;
+}
+.rte-root :deep(img.rte-image[data-align='right']) {
+  float: right;
+  margin: 0.25em 0 0.6em 1em;
+  display: block;
+}
+.rte-root :deep(img.rte-image[data-align='center']) {
+  float: none;
+  display: block;
+  margin: 0.6em auto;
+}
+.rte-root :deep(img.rte-image[data-caption]:not([data-caption=''])) {
+  outline: 1px solid transparent;
+}
+.rte-image-bubble {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 8px 10px;
+  min-width: 220px;
+}
+.rte-image-bubble-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+.rte-image-caption-input {
+  flex: 1;
+  min-width: 120px;
+  height: 28px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+.rte-root :deep(ul),
+.rte-root :deep(ol) {
+  border-left: 2px solid transparent;
+  padding-left: 1.25em;
+  margin-left: 0.15em;
+}
+.rte-root :deep(ul ul),
+.rte-root :deep(ol ol),
+.rte-root :deep(ul ol),
+.rte-root :deep(ol ul) {
+  border-left-color: #e5e7eb;
+  margin-left: 0.15em;
+}
+.rte-root :deep(ul ul ul),
+.rte-root :deep(ol ol ol),
+.rte-root :deep(ul ul ol),
+.rte-root :deep(ol ol ul) {
+  border-left-color: #bfdbfe;
+}
+.rte-root :deep(ul ul ul ul),
+.rte-root :deep(ol ol ol ol) {
+  border-left-color: #93c5fd;
+}
+.rte-menu-hint {
+  padding: 4px 12px;
+  font-size: 11px;
+  color: #9ca3af;
+  line-height: 1.4;
+}
+
+.rte-preview-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 14px;
+  margin: 0 0 8px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  color: #1e40af;
+  font-size: 13px;
+}
+.rte-preview-back {
+  border: 1px solid #93c5fd;
+  background: #fff;
+  color: #1d4ed8;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.rte-preview-back:hover {
+  background: #dbeafe;
+}
+
+.rte-table-cell-style {
+  padding: 4px 4px 8px;
+}
+.rte-table-cell-style-title {
+  font-size: 12px;
+  color: #6b7280;
+  margin: 8px 0 6px;
+}
+.rte-table-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.rte-table-swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  border: 1px solid #d1d5db;
+  padding: 0;
+  font-size: 10px;
+  cursor: pointer;
+  line-height: 20px;
+  text-align: center;
+  color: #6b7280;
+  background: #fff;
+}
+.rte-table-border-styles {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.rte-table-border-btn {
+  text-align: left;
+}
+
+.rte-root :deep(td[data-border-style='none']),
+.rte-root :deep(th[data-border-style='none']) {
+  border-style: none !important;
+}
+.rte-root :deep(td[data-border-style='dashed']),
+.rte-root :deep(th[data-border-style='dashed']) {
+  border-style: dashed !important;
+}
+.rte-root :deep(td[data-border-style='dotted']),
+.rte-root :deep(th[data-border-style='dotted']) {
+  border-style: dotted !important;
+}
+.rte-root :deep(td[data-border-style='double']),
+.rte-root :deep(th[data-border-style='double']) {
+  border-style: double !important;
+}
+
+
+/* —— 高亮色板企业级打磨 —— */
+.rte-float-menu.rte-highlight-menu,
+.rte-highlight-menu {
+  min-width: 232px;
+  max-width: 280px;
+  padding: 10px 12px 8px;
+  overflow: visible;
+  z-index: 4000;
+}
+.rte-hl-current {
+  font-size: 12px;
+  color: #4e5969;
+  margin: 0 2px 8px;
+  padding: 4px 8px;
+  background: #f7f8fa;
+  border-radius: 4px;
+  line-height: 1.4;
+}
+.rte-hl-clear {
+  font-weight: 500;
+}
+.rte-highlight-swatches {
+  display: grid !important;
+  grid-template-columns: repeat(5, 28px) !important;
+  grid-auto-rows: 28px;
+  gap: 6px !important;
+  margin: 0 2px 8px !important;
+  justify-content: start;
+}
+.rte-color-menu .rte-hl-swatch,
+.rte-hl-swatch {
+  width: 28px !important;
+  height: 28px !important;
+  min-width: 28px !important;
+  border-radius: 4px !important;
+}
+.rte-hl-hover-hint {
+  margin: 6px 2px 2px;
+  min-height: 18px;
+  font-size: 11px;
+  color: #86909c;
+  line-height: 18px;
+}
+.rte-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.rte-code-lang-wrap {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 2px;
+}
+.rte-code-lang-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid #e5e6eb;
+  border-radius: 4px;
+  background: #fff;
+  font-size: 12px;
+  color: #1d2129;
+  cursor: pointer;
+  max-width: 120px;
+  white-space: nowrap;
+}
+.rte-code-lang-btn:hover,
+.rte-code-lang-btn.active {
+  border-color: #94bfff;
+  color: #165dff;
+}
+.rte-code-lang-menu {
+  max-height: 280px;
+  overflow: auto;
+  min-width: 140px;
+}
+.rte-tool.is-disabled,
+.rte-tool:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 </style>

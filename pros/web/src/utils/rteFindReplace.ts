@@ -7,24 +7,41 @@ export type RteFindMatch = { from: number; to: number }
 /**
  * 在文档文本节点内收集查询串的全部匹配（按节点内字面量搜索，不跨节点）。
  */
+function isWordChar(ch: string | undefined): boolean {
+  if (!ch) return false
+  return /[0-9A-Za-z\u00C0-\u024F\u4e00-\u9fff]/.test(ch)
+}
+
 export function collectFindMatches(
   doc: PmNode,
   query: string,
-  opts?: { caseSensitive?: boolean },
+  opts?: { caseSensitive?: boolean; wholeWord?: boolean },
 ): RteFindMatch[] {
   const qRaw = String(query ?? '')
   if (!qRaw) return []
   const caseSensitive = Boolean(opts?.caseSensitive)
+  const wholeWord = Boolean(opts?.wholeWord)
   const q = caseSensitive ? qRaw : qRaw.toLowerCase()
   const matches: RteFindMatch[] = []
   doc.descendants((node, pos) => {
     if (!node.isText || !node.text) return
-    const text = caseSensitive ? node.text : node.text.toLowerCase()
+    const rawText = node.text
+    const text = caseSensitive ? rawText : rawText.toLowerCase()
     let idx = 0
     while (idx < text.length) {
       const found = text.indexOf(q, idx)
       if (found < 0) break
-      matches.push({ from: pos + found, to: pos + found + qRaw.length })
+      const from = pos + found
+      const to = pos + found + qRaw.length
+      if (wholeWord) {
+        const before = found > 0 ? rawText[found - 1] : ''
+        const after = found + qRaw.length < rawText.length ? rawText[found + qRaw.length] : ''
+        if (isWordChar(before) || isWordChar(after)) {
+          idx = found + Math.max(1, qRaw.length)
+          continue
+        }
+      }
+      matches.push({ from, to })
       idx = found + Math.max(1, qRaw.length)
     }
   })

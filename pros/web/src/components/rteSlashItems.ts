@@ -34,6 +34,8 @@ export type RteSlashAction =
   | { type: 'blockquote' }
   | { type: 'codeBlock' }
   | { type: 'hr' }
+  | { type: 'plainDate' }
+  | { type: 'plainDateTime' }
   | { type: 'table' }
   | { type: 'image' }
   | { type: 'video' }
@@ -41,6 +43,12 @@ export type RteSlashAction =
   | { type: 'formula' }
   | { type: 'attach' }
   | { type: 'note' }
+  | { type: 'bookmark' }
+  | { type: 'toggleBlock' }
+  | { type: 'audio' }
+  | { type: 'linkCard' }
+  | { type: 'footnote' }
+  | { type: 'qrcode' }
   | { type: 'callout'; variant: 'info' | 'warn' | 'success' | 'error' }
   | { type: 'form'; kind: RteSlashFormKind }
   | { type: 'template'; id: string }
@@ -161,6 +169,22 @@ const BLOCK_ITEMS: RteSlashItem[] = [
     action: { type: 'hr' },
   },
   {
+    id: 'plain-date',
+    label: '今天日期',
+    description: '插入当前日期文本',
+    group: 'block',
+    keywords: ['date', '日期', 'today', '今天'],
+    action: { type: 'plainDate' },
+  },
+  {
+    id: 'plain-datetime',
+    label: '现在时间',
+    description: '插入当前日期时间文本',
+    group: 'block',
+    keywords: ['datetime', '时间', 'now', '此刻'],
+    action: { type: 'plainDateTime' },
+  },
+  {
     id: 'table',
     label: '表格',
     description: '插入表格',
@@ -250,6 +274,118 @@ const MEDIA_ITEMS: RteSlashItem[] = [
     group: 'media',
     keywords: ['note', 'annotation', '注释', '脚注'],
     action: { type: 'note' },
+  },
+  {
+    id: 'bookmark',
+    label: '书签',
+    description: '插入可跳转锚点',
+    group: 'media',
+    keywords: ['bookmark', '书签', '锚点', 'anchor'],
+    action: { type: 'bookmark' },
+  },
+  {
+    id: 'toggle-block',
+    label: '折叠块',
+    description: '可展开收起的内容块',
+    group: 'block',
+    keywords: ['toggle', 'fold', '折叠', 'details'],
+    action: { type: 'toggleBlock' },
+  },
+  {
+    id: 'audio',
+    label: '音频',
+    description: '插入音频',
+    group: 'media',
+    keywords: ['audio', '音频', 'music', 'mp3'],
+    action: { type: 'audio' },
+  },
+  {
+    id: 'link-card',
+    label: '网页卡片',
+    description: '链接卡片或受控嵌入',
+    group: 'media',
+    keywords: ['embed', 'iframe', '卡片', '网页'],
+    action: { type: 'linkCard' },
+  },
+  {
+    id: 'footnote',
+    label: '脚注',
+    description: '插入脚注标记',
+    group: 'media',
+    keywords: ['footnote', '脚注', 'fn'],
+    action: { type: 'footnote' },
+  },
+  {
+    id: 'qrcode',
+    label: '二维码',
+    description: '插入二维码图片',
+    group: 'media',
+    keywords: ['qr', '二维码', 'qrcode'],
+    action: { type: 'qrcode' },
+  },
+  {
+    id: 'timeline',
+    label: '时间线',
+    description: '里程碑时间线',
+    group: 'block',
+    keywords: ['timeline', '时间线', '里程碑'],
+    action: { type: 'timeline' },
+  },
+  {
+    id: 'status-chip',
+    label: '状态徽章',
+    description: '彩色状态 Chip',
+    group: 'block',
+    keywords: ['chip', '徽章', '状态', 'tag'],
+    action: { type: 'statusChip' },
+  },
+  {
+    id: 'progress-bar',
+    label: '进度条',
+    description: '0–100% 进度',
+    group: 'block',
+    keywords: ['progress', '进度'],
+    action: { type: 'progressBar' },
+  },
+  {
+    id: 'tabs-block',
+    label: '标签页',
+    description: '多页签内容块',
+    group: 'block',
+    keywords: ['tabs', '标签页', '页签'],
+    action: { type: 'tabsBlock' },
+  },
+  {
+    id: 'mermaid',
+    label: '流程图',
+    description: 'Mermaid 流程图',
+    group: 'block',
+    keywords: ['mermaid', 'flowchart', '流程图', '时序'],
+    action: { type: 'mermaid' },
+  },
+  {
+    id: 'ruby',
+    label: '注音',
+    description: '为选中字加拼音/注音',
+    group: 'block',
+    keywords: ['ruby', '注音', '拼音'],
+    action: { type: 'ruby' },
+  },
+  {
+    id: 'xref',
+    label: '交叉引用',
+    description: '引用标题/图/表',
+    group: 'block',
+    keywords: ['xref', '交叉引用', '见图'],
+    action: { type: 'xref' },
+  },
+  {
+    id: 'snippet',
+    label: '文本片段',
+    description: '常用语 Snippets',
+    group: 'block',
+    keywords: ['snippet', '片段', '常用语'],
+    action: { type: 'snippet' },
   },
 ]
 

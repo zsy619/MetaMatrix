@@ -15,6 +15,8 @@ declare module '@tiptap/core' {
         marginBottom?: string | null
       }) => ReturnType
       unsetParagraphSpacing: () => ReturnType
+      setTextIndent: (textIndent: string | null) => ReturnType
+      setTextDir: (dir: 'ltr' | 'rtl' | null) => ReturnType
     }
   }
 }
@@ -86,6 +88,31 @@ export const ParagraphAttrs = Extension.create<ParagraphAttrsOptions>({
                 'data-mb': attributes.marginBottom,
                 style: `margin-bottom: ${attributes.marginBottom}`,
               }
+            },
+          },
+          textIndent: {
+            default: null,
+            parseHTML: (element: HTMLElement) =>
+              element.style.textIndent ||
+              element.getAttribute('data-text-indent') ||
+              null,
+            renderHTML: (attributes: { textIndent?: string | null }) => {
+              if (!attributes.textIndent) return {}
+              return {
+                'data-text-indent': attributes.textIndent,
+                style: `text-indent: ${attributes.textIndent}`,
+              }
+            },
+          },
+          dir: {
+            default: null,
+            parseHTML: (element: HTMLElement) => {
+              const d = element.getAttribute('dir') || element.getAttribute('data-dir')
+              return d === 'rtl' || d === 'ltr' ? d : null
+            },
+            renderHTML: (attributes: { dir?: string | null }) => {
+              if (!attributes.dir) return {}
+              return { dir: attributes.dir, 'data-dir': attributes.dir }
             },
           },
         },
@@ -162,6 +189,31 @@ export const ParagraphAttrs = Extension.create<ParagraphAttrsOptions>({
             marginTop: null,
             marginBottom: null,
           }),
+      setTextIndent:
+        (textIndent) =>
+        ({ editor, commands }) => {
+          const types = this.options.types
+          let ok = false
+          for (const type of types) {
+            if (!editor.isActive(type) && type !== 'paragraph') continue
+            ok =
+              commands.updateAttributes(type, { textIndent }) || ok
+          }
+          if (ok) return true
+          return commands.updateAttributes('paragraph', { textIndent })
+        },
+      setTextDir:
+        (dir) =>
+        ({ editor, commands }) => {
+          const types = this.options.types
+          let ok = false
+          for (const type of types) {
+            if (!editor.isActive(type) && type !== 'paragraph') continue
+            ok = commands.updateAttributes(type, { dir }) || ok
+          }
+          if (ok) return true
+          return commands.updateAttributes('paragraph', { dir })
+        },
     }
   },
 })

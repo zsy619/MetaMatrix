@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>Reset demand-triangle draft</title>
+</head>
+<body>
+<script>
+(function () {
+  var keys = [];
+  for (var i = 0; i < localStorage.length; i++) {
+    var k = localStorage.key(i);
+    if (!k) continue;
+    if (
+      k === 'metamatrix:doc:demand-triangle' ||
+      k === 'metamatrix:doc-meta:demand-triangle' ||
+      k.indexOf('demand-triangle') !== -1 ||
+      k.indexOf('demand_triangle') !== -1
+    ) {
+      keys.push(k);
+    }
+  }
+  keys.forEach(function (k) { localStorage.removeItem(k); });
+  document.title = 'cleared:' + keys.join(',');
+  location.replace('/canvas/demand-triangle?_reset=' + Date.now());
+})();
+</script>
+<p>Clearing demand-triangle local drafts…</p>
+</body>
+</html>
