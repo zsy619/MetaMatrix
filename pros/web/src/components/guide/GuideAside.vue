@@ -278,18 +278,33 @@ const panelTitle = computed(() => '最近文档')
       @pointerdown="onResizePointerDown"
     />
 
-    <button
-      v-if="collapsed"
-      type="button"
-      class="rail-toggle"
-      :aria-expanded="false"
-      :aria-label="`展开${panelTitle}`"
-      :title="panelTitle"
-      @click="expandFromRail"
-    >
-      <span class="chev" aria-hidden="true">‹</span>
-      <span class="rail-label">最近</span>
-    </button>
+    <div v-if="collapsed" class="rail">
+      <button
+        type="button"
+        class="rail-toggle"
+        :aria-expanded="false"
+        :aria-label="`展开${panelTitle}`"
+        :title="panelTitle"
+        @click="expandFromRail"
+      >
+        <span class="chev" aria-hidden="true">‹</span>
+        <span class="rail-label">最近</span>
+      </button>
+      <router-link
+        class="rail-link"
+        :to="{ name: 'workspace' }"
+        title="工作面板"
+        aria-label="打开工作面板"
+      >
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+          <rect x="1.5" y="1.5" width="5.5" height="5.5" rx="1.2" fill="currentColor" />
+          <rect x="9" y="1.5" width="5.5" height="5.5" rx="1.2" fill="currentColor" opacity="0.75" />
+          <rect x="1.5" y="9" width="5.5" height="5.5" rx="1.2" fill="currentColor" opacity="0.75" />
+          <rect x="9" y="9" width="5.5" height="5.5" rx="1.2" fill="currentColor" opacity="0.45" />
+        </svg>
+        <span class="rail-label">工作台</span>
+      </router-link>
+    </div>
 
     <div v-show="!collapsed" class="aside-inner">
       <div class="aside-toolbar">
@@ -323,6 +338,22 @@ const panelTitle = computed(() => '最近文档')
       </div>
 
       <div class="aside-body">
+        <router-link class="workspace-entry" :to="{ name: 'workspace' }">
+          <span class="ws-icon" aria-hidden="true">
+            <svg viewBox="0 0 16 16" width="15" height="15">
+              <rect x="1.5" y="1.5" width="5.5" height="5.5" rx="1.2" fill="currentColor" />
+              <rect x="9" y="1.5" width="5.5" height="5.5" rx="1.2" fill="currentColor" opacity="0.75" />
+              <rect x="1.5" y="9" width="5.5" height="5.5" rx="1.2" fill="currentColor" opacity="0.75" />
+              <rect x="9" y="9" width="5.5" height="5.5" rx="1.2" fill="currentColor" opacity="0.45" />
+            </svg>
+          </span>
+          <span class="ws-text">
+            <span class="ws-title">工作面板</span>
+            <span class="ws-sub">最近画布、用量、搜索与备注</span>
+          </span>
+          <span class="ws-go" aria-hidden="true">→</span>
+        </router-link>
+
         <p v-if="!authenticated" class="empty">登录后查看最近文档</p>
         <p v-else-if="!recent.length" class="empty">暂无文档，从左侧选模板开始</p>
         <template v-else>
@@ -661,9 +692,17 @@ const panelTitle = computed(() => '最近文档')
   padding: 2px 0 4px;
 }
 
+.rail {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
 .rail-toggle {
   width: 100%;
-  height: 100%;
+  flex: 1;
   border: 0;
   background: transparent;
   cursor: pointer;
@@ -673,6 +712,91 @@ const panelTitle = computed(() => '最近文档')
   gap: 10px;
   padding: 14px 0;
   color: #5f6368;
+}
+
+.rail-link {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 0 16px;
+  margin-top: auto;
+  color: #1a73e8;
+  text-decoration: none;
+}
+
+.rail-link:hover,
+.rail-link:focus-visible {
+  background: #e8f0fe;
+  outline: none;
+}
+
+.workspace-entry {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 14px;
+  padding: 10px 10px;
+  border-radius: 12px;
+  text-decoration: none;
+  color: #174ea6;
+  background: #e8f0fe;
+  box-shadow: inset 0 0 0 1px rgba(26, 115, 232, 0.18);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.workspace-entry:hover,
+.workspace-entry:focus-visible {
+  background: #d2e3fc;
+  outline: none;
+}
+
+.ws-icon {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  color: #1a73e8;
+}
+
+.ws-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.ws-title {
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.ws-sub {
+  font-size: 11px;
+  font-weight: 450;
+  color: #5f6368;
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ws-go {
+  flex-shrink: 0;
+  font-size: 14px;
+  color: #1a73e8;
 }
 
 .rail-toggle:hover {

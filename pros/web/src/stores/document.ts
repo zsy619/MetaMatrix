@@ -250,6 +250,11 @@ function cloneDoc<T>(value: T): T {
   return JSON.parse(JSON.stringify(toRaw(value as object))) as T
 }
 
+/** Blank canvas JSON for a template, without touching the open document. */
+export function cloneTemplate(templateId: TemplateId): CanvasDocumentJSON {
+  return cloneDoc(TEMPLATES[templateId]) as CanvasDocumentJSON
+}
+
 
 export type TemplateCategory = 'method' | 'growth' | 'industry' | 'org' | 'review'
 

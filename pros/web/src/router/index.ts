@@ -22,6 +22,12 @@ const router = createRouter({
       meta: { scrollable: true },
     },
     {
+      path: '/workspace',
+      name: 'workspace',
+      component: () => import('../views/WorkspaceView.vue'),
+      meta: { scrollable: true },
+    },
+    {
       path: '/canvas/:templateId',
       name: 'canvas',
       component: () => import('../views/HomeView.vue'),
