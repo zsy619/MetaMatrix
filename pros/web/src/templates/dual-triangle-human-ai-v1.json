@@ -188,9 +188,9 @@
         },
         {
           "id": "item_hai_basics_2",
-          "text": "2. Agent多轮打磨",
+          "text": "<p><span style=\"color: #1a73e8\">2. Agent多轮打磨</span></p>",
           "style": {
-            "color": "#2f5e59",
+            "color": "#1a73e8",
             "fontSize": 13,
             "fontWeight": "500"
           }

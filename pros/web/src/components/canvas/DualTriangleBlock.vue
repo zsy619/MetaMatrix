@@ -19,9 +19,16 @@ const props = withDefaults(
      * 使用 RichTextEditor 时应为 false（默认）。
      */
     showAdd?: boolean
+    /**
+     * card：双三角几何画布上的色条卡片。
+     * table：人类/AI 表格式画布的浅边框单元格（标题置顶，默认收起工具条）。
+     */
+    variant?: 'card' | 'table'
   }>(),
-  { showAdd: false },
+  { showAdd: false, variant: 'card' },
 )
+
+const isTable = computed(() => props.variant === 'table')
 
 const selection = useSelectionStore()
 const documentStore = useDocumentStore()
@@ -85,11 +92,25 @@ function onCloseMaximize(event?: Event) {
 <template>
   <div
     class="dt-block"
-    :class="[`side-${block.side}`, { selected, 'is-source-max': isMaximized }]"
-    :style="{ '--accent': headerColor, backgroundColor: block.backgroundColor }"
+    :class="[
+      `side-${block.side}`,
+      {
+        selected,
+        'is-source-max': isMaximized,
+        'dt-block--table': isTable,
+      },
+    ]"
+    :style="
+      isTable
+        ? undefined
+        : { '--accent': headerColor, backgroundColor: block.backgroundColor }
+    "
     @click.stop="onSelectBlock"
   >
-    <div class="dt-block-header" :style="{ backgroundColor: headerColor }">
+    <div
+      class="dt-block-header"
+      :style="isTable ? undefined : { backgroundColor: headerColor }"
+    >
       <h3 class="dt-block-title">{{ block.title }}</h3>
       <div class="dt-block-actions">
         <button
@@ -103,7 +124,8 @@ function onCloseMaximize(event?: Event) {
         </button>
         <button
           type="button"
-          class="pm-max-btn pm-on-dark"
+          class="pm-max-btn"
+          :class="{ 'pm-on-dark': !isTable }"
           title="最大化"
           aria-label="最大化"
           @click="onToggleMaximize"
@@ -124,7 +146,7 @@ function onCloseMaximize(event?: Event) {
       </div>
     </div>
 
-    <p class="dt-block-subtitle">{{ block.subtitle }}</p>
+    <p v-if="!isTable" class="dt-block-subtitle">{{ block.subtitle }}</p>
 
     <div v-if="!isMaximized" class="dt-block-body">
       <RichTextEditor
@@ -132,8 +154,9 @@ function onCloseMaximize(event?: Event) {
         compact
         :expanded="false"
         :show-title="false"
-        :show-bottom-bar="true"
+        :show-bottom-bar="!isTable"
         :show-publish-actions="false"
+        :show-markdown-hint="!isTable"
         placeholder="请输入正文"
         :model-value="editorHtml"
         @update:model-value="onEditorHtml"
@@ -148,7 +171,7 @@ function onCloseMaximize(event?: Event) {
       compact
     />
 
-    <div class="dt-watermark" aria-hidden="true">
+    <div v-if="!isTable" class="dt-watermark" aria-hidden="true">
       <svg
         v-if="block.watermarkIcon === 'human'"
         class="wm-icon"
@@ -475,6 +498,72 @@ function onCloseMaximize(event?: Event) {
 .pm-rte {
   flex: 1;
   min-height: 280px;
+}
+
+/* 表格式单元格：浅边框由外层表格负责，标题居中，静止时收起工具条 */
+.dt-block--table {
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  background: #fff;
+}
+
+.dt-block--table.selected,
+.dt-block--table.is-source-max {
+  box-shadow: inset 0 0 0 2px rgba(26, 115, 232, 0.45);
+}
+
+.dt-block--table .dt-block-header {
+  position: relative;
+  justify-content: center;
+  padding: 16px 36px 4px;
+  background: transparent;
+  color: #202124;
+}
+
+.dt-block--table .dt-block-title {
+  flex: none;
+  max-width: 100%;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #202124;
+}
+
+.dt-block--table .dt-block-actions {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+
+.dt-block--table .dt-block-body {
+  padding: 2px 16px 8px;
+}
+
+.dt-block--table :deep(.rte-root) {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+.dt-block--table:not(:focus-within) :deep(.rte-toolbar) {
+  display: none;
+}
+
+.dt-block--table :deep(.rte-canvas) {
+  padding: 4px 2px 8px;
+}
+
+.dt-block--table :deep(.tiptap),
+.dt-block--table :deep(.ProseMirror) {
+  font-size: 14px;
+  line-height: 1.7;
+  color: #202124;
+}
+
+.dt-block--table :deep(.ProseMirror p) {
+  margin: 0.15em 0;
 }
 </style>
 
