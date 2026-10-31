@@ -41,24 +41,38 @@ withDefaults(
         <circle cx="130" cy="88" r="4" fill="#fff" opacity="0.85" />
       </svg>
 
-      <!-- 人类三角 × AI 三角：同构图，六维标注 -->
+      <!-- 人类三角 × AI 三角：两行三列表格 -->
       <svg
         v-else-if="templateId === 'dual-triangle-human-ai'"
         class="thumb-svg"
         viewBox="0 0 200 140"
         xmlns="http://www.w3.org/2000/svg"
       >
-        <rect width="200" height="140" rx="10" fill="#f5f5f4" />
-        <polygon points="78,36 46,96 110,96" fill="#C4A574" opacity="0.92" />
-        <polygon points="122,36 154,96 90,96" fill="#5BA8A0" opacity="0.92" />
-        <text x="78" y="78" text-anchor="middle" font-size="8" font-weight="800" fill="#fff">人类</text>
-        <text x="122" y="78" text-anchor="middle" font-size="8" font-weight="800" fill="#fff">AI</text>
-        <text x="28" y="22" font-size="7" font-weight="700" fill="#B8956A">创造力</text>
-        <text x="146" y="22" font-size="7" font-weight="700" fill="#4A9B94">场景</text>
-        <text x="18" y="128" font-size="7" font-weight="700" fill="#B8956A">审美❤</text>
-        <text x="62" y="132" font-size="7" font-weight="700" fill="#B8956A">体系❤</text>
-        <text x="108" y="132" font-size="7" font-weight="700" fill="#4A9B94">基本功</text>
-        <text x="152" y="128" font-size="7" font-weight="700" fill="#4A9B94">数据❤</text>
+        <rect width="200" height="140" rx="10" fill="#ffffff" />
+        <rect x="10" y="12" width="22" height="56" fill="#fff6d4" stroke="#e4e4e4" stroke-width="0.8" />
+        <rect x="10" y="68" width="22" height="56" fill="#fff6d4" stroke="#e4e4e4" stroke-width="0.8" />
+        <text x="21" y="32" text-anchor="middle" font-size="6.5" font-weight="700" fill="#202124">人</text>
+        <text x="21" y="44" text-anchor="middle" font-size="6.5" font-weight="700" fill="#202124">类</text>
+        <text x="21" y="56" text-anchor="middle" font-size="6.5" font-weight="700" fill="#202124">角</text>
+        <text x="21" y="96" text-anchor="middle" font-size="6.5" font-weight="700" fill="#202124">AI</text>
+        <rect x="32" y="12" width="52" height="56" fill="#fff" stroke="#e4e4e4" stroke-width="0.8" />
+        <rect x="84" y="12" width="52" height="56" fill="#fff" stroke="#e4e4e4" stroke-width="0.8" />
+        <rect x="136" y="12" width="54" height="56" fill="#fff" stroke="#e4e4e4" stroke-width="0.8" />
+        <rect x="32" y="68" width="52" height="56" fill="#fff" stroke="#e4e4e4" stroke-width="0.8" />
+        <rect x="84" y="68" width="52" height="56" fill="#fff" stroke="#e4e4e4" stroke-width="0.8" />
+        <rect x="136" y="68" width="54" height="56" fill="#fff" stroke="#e4e4e4" stroke-width="0.8" />
+        <text x="58" y="28" text-anchor="middle" font-size="7" font-weight="700" fill="#202124">审美❤</text>
+        <text x="110" y="28" text-anchor="middle" font-size="7" font-weight="700" fill="#202124">体系❤</text>
+        <text x="163" y="28" text-anchor="middle" font-size="7" font-weight="700" fill="#202124">创造力</text>
+        <text x="58" y="84" text-anchor="middle" font-size="7" font-weight="700" fill="#202124">场景</text>
+        <text x="110" y="84" text-anchor="middle" font-size="7" font-weight="700" fill="#202124">数据❤</text>
+        <text x="163" y="84" text-anchor="middle" font-size="7" font-weight="700" fill="#202124">基本功</text>
+        <text x="38" y="44" font-size="6" fill="#d93025">1. Truman</text>
+        <text x="90" y="44" font-size="6" fill="#d93025">1. 工作流</text>
+        <text x="142" y="44" font-size="6" fill="#202124">1. AI先理解</text>
+        <text x="38" y="100" font-size="6" fill="#202124">1. 个人场景</text>
+        <text x="90" y="100" font-size="6" fill="#d93025">1. 理想案例</text>
+        <text x="142" y="100" font-size="6" fill="#1a73e8">2. Agent</text>
       </svg>
 
       <!-- STAR 四象限 -->

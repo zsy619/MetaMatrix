@@ -277,9 +277,9 @@ export const TEMPLATE_META: Record<
   },
   'dual-triangle-human-ai': {
     name: '人类三角 × AI 三角',
-    badge: '双三角 · 实例',
+    badge: '双三角 · 表格',
     description:
-      '审美、体系、创造力与场景、数据、基本功：一份可编辑的双三角默认案例。',
+      '两行三列表格：人类三角（审美、体系、创造力）与 AI 三角（场景、数据、基本功）。',
     category: 'method',
   },
   'star-quadrant': {

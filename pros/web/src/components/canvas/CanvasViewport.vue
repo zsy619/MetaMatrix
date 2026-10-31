@@ -48,6 +48,7 @@ import QuadrantGrid from './QuadrantGrid.vue'
 import AxesLayer from './AxesLayer.vue'
 import MarkersLayer from './MarkersLayer.vue'
 import DualTriangleCanvas from './DualTriangleCanvas.vue'
+import DualTriangleHumanAiCanvas from './DualTriangleHumanAiCanvas.vue'
 import YModelCanvas from './YModelCanvas.vue'
 import DeliberatePracticeCanvas from './DeliberatePracticeCanvas.vue'
 import DemandTriangleCanvas from './DemandTriangleCanvas.vue'
@@ -87,11 +88,14 @@ import BusinessFormulaCanvas from './BusinessFormulaCanvas.vue'
 
 const documentStore = useDocumentStore()
 const ui = useUiStore()
-const { current_data } = storeToRefs(documentStore)
+const { current_data, activeTemplateId } = storeToRefs(documentStore)
 const { zoom } = storeToRefs(ui)
 
 const dualDoc = computed(() =>
   isDualTriangleDoc(current_data.value) ? current_data.value : null,
+)
+const humanAiDoc = computed(() =>
+  activeTemplateId.value === 'dual-triangle-human-ai' ? dualDoc.value : null,
 )
 const yModelDoc = computed(() =>
   isYModelDoc(current_data.value) ? current_data.value : null,
@@ -215,7 +219,10 @@ const quadrantDoc = computed(() =>
         data-export-root
         :style="{ transform: `scale(${zoom})` }"
       >
-        <template v-if="dualDoc">
+        <template v-if="humanAiDoc">
+          <DualTriangleHumanAiCanvas :doc="humanAiDoc" />
+        </template>
+        <template v-else-if="dualDoc">
           <DualTriangleCanvas :doc="dualDoc" />
         </template>
         <template v-else-if="yModelDoc">
