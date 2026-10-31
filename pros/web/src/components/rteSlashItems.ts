@@ -49,6 +49,14 @@ export type RteSlashAction =
   | { type: 'linkCard' }
   | { type: 'footnote' }
   | { type: 'qrcode' }
+  | { type: 'timeline' }
+  | { type: 'statusChip' }
+  | { type: 'progressBar' }
+  | { type: 'tabsBlock' }
+  | { type: 'mermaid' }
+  | { type: 'ruby' }
+  | { type: 'xref' }
+  | { type: 'snippet' }
   | { type: 'callout'; variant: 'info' | 'warn' | 'success' | 'error' }
   | { type: 'form'; kind: RteSlashFormKind }
   | { type: 'template'; id: string }
