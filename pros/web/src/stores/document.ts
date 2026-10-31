@@ -114,6 +114,7 @@ import {
   normalizeYModelDoc,
 } from '../types/canvas'
 import dualTriangleTemplate from '../templates/dual-triangle-v1.json'
+import dualTriangleHumanAiTemplate from '../templates/dual-triangle-human-ai-v1.json'
 import starQuadrantTemplate from '../templates/star-quadrant-v1.json'
 import yModelTemplate from '../templates/y-model-v1.json'
 import deliberatePracticeTemplate from '../templates/deliberate-practice-v1.json'
@@ -156,6 +157,7 @@ import businessFormulaTemplate from '../templates/business-formula-v1.json'
 
 export type TemplateId =
   | 'dual-triangle'
+  | 'dual-triangle-human-ai'
   | 'star-quadrant'
   | 'y-model'
   | 'deliberate-practice'
@@ -198,6 +200,8 @@ export type TemplateId =
 
 const TEMPLATES: Record<TemplateId, CanvasDocumentJSON> = {
   'dual-triangle': dualTriangleTemplate as DualTriangleDocumentJSON,
+  'dual-triangle-human-ai':
+    dualTriangleHumanAiTemplate as DualTriangleDocumentJSON,
   'star-quadrant': starQuadrantTemplate as QuadrantDocumentJSON,
   'y-model': yModelTemplate as YModelDocumentJSON,
   'deliberate-practice':
@@ -269,6 +273,13 @@ export const TEMPLATE_META: Record<
     name: '双三角构建梳理',
     badge: '双三角 · MVP',
     description: '人类三角 × AI 三角，梳理创造力、场景与系统能力闭环。',
+    category: 'method',
+  },
+  'dual-triangle-human-ai': {
+    name: '人类三角 × AI 三角',
+    badge: '双三角 · 实例',
+    description:
+      '审美、体系、创造力与场景、数据、基本功：一份可编辑的双三角默认案例。',
     category: 'method',
   },
   'star-quadrant': {

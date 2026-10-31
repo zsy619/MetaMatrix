@@ -4251,12 +4251,6 @@ function placeFloatMenuEl(menuEl: HTMLElement, key: string) {
   }
 }
 
-function repositionAllFloatMenus() {
-  for (const [key, el] of floatMenuEls) {
-    placeFloatMenuEl(el, key)
-  }
-}
-
 type FloatMenuEl = HTMLElement & { __rteFloatCleanup?: () => void }
 
 const vRteFloat: Directive<HTMLElement, string> = {

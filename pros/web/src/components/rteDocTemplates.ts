@@ -37,12 +37,6 @@ export type RteDocTemplate = {
   build: () => RteJsonNode[]
 }
 
-const ENTERPRISE_DEFAULTS = {
-  readonly: false,
-  disabled: false,
-  helpText: '',
-} as const
-
 /** 递归去掉空 text（ProseMirror 禁止），并去掉因此变空的无意义包装 */
 export function sanitizeRteJsonNodes(nodes: RteJsonNode[]): RteJsonNode[] {
   const out: RteJsonNode[] = []
@@ -61,10 +55,6 @@ export function sanitizeRteJsonNodes(nodes: RteJsonNode[]): RteJsonNode[] {
     out.push(next)
   }
   return out
-}
-
-function uid(prefix: string) {
-  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`
 }
 
 function text(s: string, marks?: RteJsonNode['marks']): RteJsonNode | null {
@@ -139,160 +129,6 @@ function tasks(
         content: [p(label)],
       }
     }),
-  }
-}
-
-function formText(
-  label: string,
-  opts?: { placeholder?: string; required?: boolean; name?: string },
-): RteJsonNode {
-  return {
-    type: 'formTextInput',
-    attrs: {
-      ...ENTERPRISE_DEFAULTS,
-      name: opts?.name || uid('text'),
-      bindExpr: '',
-      label,
-      placeholder: opts?.placeholder ?? '请输入',
-      value: '',
-      required: opts?.required ?? true,
-      minLength: '',
-      maxLength: '',
-    },
-  }
-}
-
-function formTextarea(
-  label: string,
-  opts?: { placeholder?: string; required?: boolean; rows?: number },
-): RteJsonNode {
-  return {
-    type: 'formTextarea',
-    attrs: {
-      ...ENTERPRISE_DEFAULTS,
-      name: uid('textarea'),
-      bindExpr: '',
-      label,
-      placeholder: opts?.placeholder ?? '请输入',
-      value: '',
-      rows: opts?.rows ?? 4,
-      required: opts?.required ?? true,
-      minLength: '',
-      maxLength: '',
-    },
-  }
-}
-
-function formNumber(
-  label: string,
-  opts?: { min?: string; max?: string; step?: string; required?: boolean },
-): RteJsonNode {
-  return {
-    type: 'formNumberInput',
-    attrs: {
-      ...ENTERPRISE_DEFAULTS,
-      name: uid('number'),
-      bindExpr: '',
-      label,
-      placeholder: '请输入数字',
-      value: '',
-      min: opts?.min ?? '',
-      max: opts?.max ?? '',
-      step: opts?.step ?? '1',
-      required: opts?.required ?? true,
-    },
-  }
-}
-
-function formSelect(
-  label: string,
-  options: string[],
-  opts?: { required?: boolean },
-): RteJsonNode {
-  return {
-    type: 'formSelect',
-    attrs: {
-      ...ENTERPRISE_DEFAULTS,
-      name: uid('select'),
-      bindExpr: '',
-      label,
-      options: options.join('|'),
-      value: '',
-      placeholder: '请选择',
-      required: opts?.required ?? true,
-    },
-  }
-}
-
-function formRadio(
-  label: string,
-  options: string[],
-  opts?: { required?: boolean },
-): RteJsonNode {
-  return {
-    type: 'formRadioGroup',
-    attrs: {
-      ...ENTERPRISE_DEFAULTS,
-      name: uid('radio'),
-      bindExpr: '',
-      label,
-      options: options.join('|'),
-      value: '',
-      required: opts?.required ?? true,
-      layout: 'column',
-      layoutColumns: 2,
-    },
-  }
-}
-
-function formCheckbox(
-  label: string,
-  options: string[],
-  opts?: { required?: boolean },
-): RteJsonNode {
-  return {
-    type: 'formCheckboxGroup',
-    attrs: {
-      ...ENTERPRISE_DEFAULTS,
-      name: uid('check'),
-      bindExpr: '',
-      label,
-      options: options.join('|'),
-      value: '',
-      required: opts?.required ?? false,
-      layout: 'column',
-      layoutColumns: 2,
-    },
-  }
-}
-
-function formDate(label: string, opts?: { required?: boolean }): RteJsonNode {
-  return {
-    type: 'formDateInput',
-    attrs: {
-      ...ENTERPRISE_DEFAULTS,
-      name: uid('date'),
-      bindExpr: '',
-      label,
-      kind: 'date',
-      dateFormat: 'YYYY-MM-DD',
-      value: '',
-      required: opts?.required ?? true,
-    },
-  }
-}
-
-function formSwitch(label: string): RteJsonNode {
-  return {
-    type: 'formSwitch',
-    attrs: {
-      ...ENTERPRISE_DEFAULTS,
-      name: uid('switch'),
-      bindExpr: '',
-      label,
-      value: false,
-      required: false,
-    },
   }
 }
 
