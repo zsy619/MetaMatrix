@@ -157,6 +157,63 @@ export function restoreDocument(
   })
 }
 
+export type StatsRange = '7d' | '30d' | '90d' | 'year'
+export type StatsGranularity = 'day' | 'week' | 'month'
+
+export type StatsCompare = { current: number; previous: number }
+
+export type StatsBucket = {
+  start: string
+  created: number
+  edited: number
+  revisions: number
+}
+
+export type TemplateStat = {
+  templateId: string
+  canvasType: string
+  total: number
+  created: number
+  edited: number
+  series: number[]
+}
+
+export type HeatCell = { date: string; count: number }
+
+export type DocumentStats = {
+  range: StatsRange | string
+  granularity: StatsGranularity | string
+  timezone: string
+  from: string
+  to: string
+  previousFrom: string
+  previousTo: string
+  documents: StatsCompare
+  weekCreated: StatsCompare
+  monthCreated: StatsCompare
+  weekEdited: StatsCompare
+  monthEdited: StatsCompare
+  revisions: StatsCompare
+  activeTemplates: StatsCompare
+  rangeCreated: StatsCompare
+  rangeEdited: StatsCompare
+  totals: { revisions: number; templates: number }
+  series: StatsBucket[]
+  templates: TemplateStat[]
+  heatmap: HeatCell[]
+}
+
+export function getDocumentStats(params?: {
+  range?: StatsRange
+  granularity?: StatsGranularity
+}) {
+  const q = new URLSearchParams()
+  if (params?.range) q.set('range', params.range)
+  if (params?.granularity) q.set('granularity', params.granularity)
+  const qs = q.toString()
+  return apiRequest<DocumentStats>(`/documents/stats${qs ? `?${qs}` : ''}`)
+}
+
 export function searchDocuments(params: {
   q?: string
   templateId?: string

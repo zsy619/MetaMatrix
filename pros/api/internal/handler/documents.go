@@ -311,6 +311,18 @@ func (h *DocumentsHandler) Restore(ctx context.Context, c *app.RequestContext) {
 	c.JSON(http.StatusOK, doc)
 }
 
+func (h *DocumentsHandler) Stats(ctx context.Context, c *app.RequestContext) {
+	uid, ok := h.owner(c)
+	if !ok {
+		return
+	}
+	out, err := h.svc.Stats(uid, string(c.Query("range")), string(c.Query("granularity")))
+	if handleDocErr(c, err, nil) {
+		return
+	}
+	c.JSON(http.StatusOK, out)
+}
+
 func (h *DocumentsHandler) Search(ctx context.Context, c *app.RequestContext) {
 	uid, ok := h.owner(c)
 	if !ok {
