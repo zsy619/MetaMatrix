@@ -31,8 +31,6 @@ const TONE = {
   orange: { fill: '#f89048', title: '#e06a28' },
   teal: { fill: '#30c8a8', title: '#1aa88c' },
 } as const
-
-const order: DecisionTriangleBlockId[] = ['width', 'height', 'depth']
 </script>
 
 <template>
