@@ -1503,6 +1503,27 @@ export interface BusinessFormulaDocumentJSON {
   savedFormulas: BusinessFormulaSavedItem[]
 }
 
+/** 科学决策三角形（宽度 / 高度 / 深度） */
+export type DecisionTriangleBlockId = 'width' | 'height' | 'depth'
+
+export type DecisionTriangleTone = 'yellow' | 'orange' | 'teal'
+
+export interface DecisionTriangleBlock {
+  id: DecisionTriangleBlockId
+  title: string
+  tone: DecisionTriangleTone
+  hints: string[]
+  items: QuadrantItem[]
+}
+
+export interface DecisionTriangleDocumentJSON {
+  id: string
+  type: 'decision_triangle'
+  schemaVersion: number
+  theme: CanvasTheme
+  blocks: DecisionTriangleBlock[]
+}
+
 export type CanvasDocumentJSON = (
   | QuadrantDocumentJSON
   | DualTriangleDocumentJSON

@@ -41,6 +41,26 @@ withDefaults(
         <circle cx="130" cy="88" r="4" fill="#fff" opacity="0.85" />
       </svg>
 
+      <!-- 人类三角 × AI 三角：同构图，六维标注 -->
+      <svg
+        v-else-if="templateId === 'dual-triangle-human-ai'"
+        class="thumb-svg"
+        viewBox="0 0 200 140"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <rect width="200" height="140" rx="10" fill="#f5f5f4" />
+        <polygon points="78,36 46,96 110,96" fill="#C4A574" opacity="0.92" />
+        <polygon points="122,36 154,96 90,96" fill="#5BA8A0" opacity="0.92" />
+        <text x="78" y="78" text-anchor="middle" font-size="8" font-weight="800" fill="#fff">人类</text>
+        <text x="122" y="78" text-anchor="middle" font-size="8" font-weight="800" fill="#fff">AI</text>
+        <text x="28" y="22" font-size="7" font-weight="700" fill="#B8956A">创造力</text>
+        <text x="146" y="22" font-size="7" font-weight="700" fill="#4A9B94">场景</text>
+        <text x="18" y="128" font-size="7" font-weight="700" fill="#B8956A">审美❤</text>
+        <text x="62" y="132" font-size="7" font-weight="700" fill="#B8956A">体系❤</text>
+        <text x="108" y="132" font-size="7" font-weight="700" fill="#4A9B94">基本功</text>
+        <text x="152" y="128" font-size="7" font-weight="700" fill="#4A9B94">数据❤</text>
+      </svg>
+
       <!-- STAR 四象限 -->
       <svg
         v-else-if="templateId === 'star-quadrant'"

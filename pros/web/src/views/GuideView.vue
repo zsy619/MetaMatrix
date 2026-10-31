@@ -443,6 +443,11 @@ onMounted(async () => {
   border-color: #c4a574;
 }
 
+.card--dual-triangle-human-ai:hover,
+.card--dual-triangle-human-ai:focus-visible {
+  border-color: #5ba8a0;
+}
+
 .card--star-quadrant:hover,
 .card--star-quadrant:focus-visible {
   border-color: #e57373;

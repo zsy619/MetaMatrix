@@ -61,6 +61,7 @@ MetaMatrix/
 | --- | --- |
 | `star-quadrant` | 探索–变革–提速–落地（STAR 四象限） |
 | `dual-triangle` | 双三角 |
+| `dual-triangle-human-ai` | 人类三角 × AI 三角（双三角实例，与 `dual-triangle` 并存） |
 | `y-model` | Y 模型 |
 | `demand-triangle` | 需求三角 |
 | `deliberate-practice` | 刻意练习 |
