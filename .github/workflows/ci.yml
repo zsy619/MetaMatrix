@@ -40,6 +40,7 @@ jobs:
       - run: node --experimental-strip-types src/utils/rteRound6.test.ts
       - run: node --experimental-strip-types src/utils/rteRound7.test.ts
       - run: node --experimental-strip-types src/utils/rtePageSize.test.ts
+      - run: node --experimental-strip-types src/utils/rteToolbarGroups.test.ts
       - run: node --experimental-strip-types src/utils/rteRound8.test.ts
       - run: node scripts/smoke-flow.mjs
 

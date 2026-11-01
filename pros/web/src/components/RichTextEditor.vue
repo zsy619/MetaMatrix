@@ -115,6 +115,15 @@ import {
   type RtePageSizeId,
 } from '../utils/rtePageSize'
 import {
+  buildToolbarGroups,
+  bumpToolbarUndoEpoch,
+  currentToolbarUndoEpoch,
+  moveToolbarGroup,
+  readToolbarGroupOrder,
+  toolbarGroupLabels,
+  toolbarOrdersEqual,
+} from '../utils/rteToolbarGroups'
+import {
   RTE_OVERLAY_CLOSE_ORDER,
   docChromeDelay,
   focusDialogRoot,
@@ -1304,6 +1313,10 @@ const editor = useEditor({
         event.preventDefault()
         return true
       }
+      if (key === 'z' && !event.shiftKey && !event.altKey && undoToolbarGroupOrder()) {
+        event.preventDefault()
+        return true
+      }
       if (key === '/' && !event.altKey && !event.shiftKey) {
         event.preventDefault()
         const willOpen = !shortcutsOpen.value
@@ -1457,6 +1470,7 @@ const editor = useEditor({
   onUpdate: ({ editor: ed }) => {
     scheduleHtmlEmit(ed)
     scheduleDocChrome()
+    noteToolbarOrderEdited()
   },
   onFocus: () => emit('focus'),
   onBlur: ({ editor: ed }) => {
@@ -4661,6 +4675,11 @@ onBeforeUnmount(() => {
     docChromeTimer = null
   }
   document.removeEventListener('pointerdown', onDocPointerDownForMenus, true)
+  window.removeEventListener('pointermove', onWindowToolbarPointerMove)
+  window.removeEventListener('pointerup', onWindowToolbarPointerUp)
+  window.removeEventListener('dragover', onWindowToolbarDragOver)
+  window.removeEventListener('drop', onWindowToolbarDrop)
+  window.removeEventListener('keydown', onWindowToolbarUndo, true)
   window.removeEventListener('keydown', onWindowEscape)
   window.removeEventListener('resize', repositionSlashMenu)
   window.removeEventListener('scroll', repositionSlashMenu, true)
@@ -7211,6 +7230,11 @@ function repositionSlashMenu() {
 
 onMounted(() => {
   document.addEventListener('pointerdown', onDocPointerDownForMenus, true)
+  window.addEventListener('pointermove', onWindowToolbarPointerMove)
+  window.addEventListener('pointerup', onWindowToolbarPointerUp)
+  window.addEventListener('dragover', onWindowToolbarDragOver)
+  window.addEventListener('drop', onWindowToolbarDrop)
+  window.addEventListener('keydown', onWindowToolbarUndo, true)
   window.addEventListener('keydown', onWindowEscape)
   window.addEventListener('resize', repositionSlashMenu)
   window.addEventListener('scroll', repositionSlashMenu, true)
@@ -7938,21 +7962,6 @@ const PRIMARY_KEYS = new Set<string>(
   FEISHU_PRIMARY_ORDER.filter((key) => key !== '__div'),
 )
 
-function collapseToolbarDividers(items: ToolItem[]): ToolItem[] {
-  const out: ToolItem[] = []
-  for (const item of items) {
-    if (item.kind === 'divider') {
-      if (!out.length || out[out.length - 1]?.kind === 'divider') continue
-      out.push(item)
-      continue
-    }
-    out.push(item)
-  }
-  while (out[0]?.kind === 'divider') out.shift()
-  while (out[out.length - 1]?.kind === 'divider') out.pop()
-  return out
-}
-
 type ToolItem = {
   disabled?: () => boolean
   key: string
@@ -8608,36 +8617,201 @@ const allTools = computed((): ToolItem[] => {
 const EXPANDED_ONLY_KEYS = new Set(['import', 'export'])
 
 /** 顶栏：飞书式主栏；最大化时主栏后换行接高级工具 */
-const visibleTools = computed((): ToolItem[] => {
-  const all = allTools.value
-  const byKey = new Map(all.map((tool) => [tool.key, tool]))
-  const primary: ToolItem[] = []
-  let divN = 0
-  for (const key of FEISHU_PRIMARY_ORDER) {
-    if (key === '__div') {
-      divN += 1
-      primary.push({
-        key: `div-primary-${divN}`,
-        label: '',
-        icon: '',
-        kind: 'divider',
-      })
-      continue
-    }
-    const tool = byKey.get(key)
-    if (tool) primary.push(tool)
+const localToolbarOrder = ref<string[] | null>(null)
+const toolbarOrderUndo = ref<string[][]>([])
+let toolbarUndoArmed = false
+let toolbarUndoStamp = 0
+const toolbarDropIndex = ref<number | null>(null)
+const toolbarDragSource = ref('')
+let toolbarDragId = ''
+
+const toolbarOrder = computed(() => {
+  if (props.panelId) {
+    return readToolbarGroupOrder(current_data.value?.toolbarGroupOrderByPanelId, props.panelId)
   }
-  if (!props.expanded) return primary
-  const advanced = collapseToolbarDividers(
-    all.filter((tool) => !PRIMARY_KEYS.has(tool.key)),
+  return readToolbarGroupOrder(
+    localToolbarOrder.value ? { local: localToolbarOrder.value } : undefined,
+    localToolbarOrder.value ? 'local' : '',
   )
-  if (!advanced.length) return primary
-  return [
-    ...primary,
-    { key: 'div-tier', label: '', icon: '', kind: 'divider' },
-    ...advanced,
-  ] as ToolItem[]
 })
+
+const toolbarGroups = computed(() => {
+  const tools = props.expanded
+    ? allTools.value.filter((tool) => tool.kind !== 'divider')
+    : allTools.value.filter((tool) => tool.kind !== 'divider' && PRIMARY_KEYS.has(tool.key))
+  return buildToolbarGroups(tools, toolbarOrder.value)
+})
+
+function applyToolbarOrder(next: readonly string[], recordUndo: boolean) {
+  const prev = toolbarOrder.value
+  if (toolbarOrdersEqual(prev, next)) return
+  if (recordUndo) {
+    toolbarOrderUndo.value = [...toolbarOrderUndo.value, prev].slice(-20)
+    toolbarUndoStamp = bumpToolbarUndoEpoch()
+  }
+  toolbarUndoArmed = recordUndo || toolbarOrderUndo.value.length > 0
+  if (props.panelId) documentStore.setPanelToolbarOrder(props.panelId, next)
+  else localToolbarOrder.value = [...next]
+  announceRte('工具栏分组顺序：' + toolbarGroupLabels(next))
+}
+
+function undoToolbarGroupOrder(): boolean {
+  if (!toolbarUndoArmed || !toolbarOrderUndo.value.length) return false
+  const prev = toolbarOrderUndo.value[toolbarOrderUndo.value.length - 1]!
+  toolbarOrderUndo.value = toolbarOrderUndo.value.slice(0, -1)
+  toolbarUndoArmed = toolbarOrderUndo.value.length > 0
+  if (props.panelId) documentStore.setPanelToolbarOrder(props.panelId, prev)
+  else localToolbarOrder.value = [...prev]
+  announceRte('工具栏分组顺序：' + toolbarGroupLabels(prev))
+  return true
+}
+
+function noteToolbarOrderEdited() {
+  toolbarUndoArmed = false
+}
+
+let toolbarPointerId = ''
+let toolbarPointerStartX = 0
+
+function finishToolbarPointer(clientX: number) {
+  const id = toolbarPointerId
+  const moved = Math.abs(clientX - toolbarPointerStartX) > 6
+  const index = toolbarDropIndex.value
+  toolbarPointerId = ''
+  toolbarDragSource.value = ''
+  toolbarDropIndex.value = null
+  if (!id || !moved || index == null || viewMode.value !== 'edit') return
+  const next = moveToolbarGroup(toolbarOrder.value, id, index)
+  if (next) applyToolbarOrder(next, true)
+}
+
+function onWindowToolbarPointerMove(event: PointerEvent) {
+  if (!toolbarPointerId) return
+  toolbarDropIndex.value = toolbarGroupDropIndexAt(event.clientX)
+}
+
+function onWindowToolbarPointerUp(event: PointerEvent) {
+  if (!toolbarPointerId) return
+  finishToolbarPointer(event.clientX)
+}
+
+function onToolbarHandlePointerDown(id: string, event: PointerEvent) {
+  if (viewMode.value !== 'edit' || event.button !== 0) return
+  toolbarPointerId = id
+  toolbarDragSource.value = id
+  toolbarPointerStartX = event.clientX
+  toolbarDropIndex.value = toolbarGroupDropIndexAt(event.clientX)
+  const handle = event.currentTarget as HTMLElement
+  handle.focus()
+  try {
+    handle.setPointerCapture?.(event.pointerId)
+  } catch {
+    /* 合成指针事件没有有效 pointerId */
+  }
+  event.preventDefault()
+}
+
+function onToolbarHandlePointerMove(event: PointerEvent) {
+  if (!toolbarPointerId) return
+  toolbarDropIndex.value = toolbarGroupDropIndexAt(event.clientX)
+}
+
+function onToolbarHandlePointerUp(event: PointerEvent) {
+  if (!toolbarPointerId) return
+  finishToolbarPointer(event.clientX)
+}
+
+function onToolbarGroupDragStart(id: string, event: DragEvent) {
+  if (viewMode.value !== 'edit') {
+    event.preventDefault()
+    return
+  }
+  toolbarDragId = id
+  toolbarDragSource.value = id
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', id)
+  }
+}
+
+function toolbarGroupDropIndexAt(clientX: number): number | null {
+  const host = rteRootEl.value?.querySelector('.rte-toolbar-tools')
+  if (!host) return null
+  const groups = Array.from(host.querySelectorAll<HTMLElement>('.rte-tool-group'))
+  let index = groups.length
+  for (let i = 0; i < groups.length; i += 1) {
+    const rect = groups[i]!.getBoundingClientRect()
+    if (clientX < rect.left + rect.width / 2) {
+      index = i
+      break
+    }
+  }
+  return index
+}
+
+function onToolbarGroupDragOver(event: DragEvent) {
+  if (!toolbarDragId || viewMode.value !== 'edit') return
+  toolbarDropIndex.value = toolbarGroupDropIndexAt(event.clientX)
+}
+
+function onWindowToolbarDragOver(event: DragEvent) {
+  if (!toolbarDragId || viewMode.value !== 'edit') return
+  event.preventDefault()
+  toolbarDropIndex.value = toolbarGroupDropIndexAt(event.clientX)
+}
+
+function onToolbarGroupDrop() {
+  if (!toolbarDragId || toolbarDropIndex.value == null) return
+  const next = moveToolbarGroup(toolbarOrder.value, toolbarDragId, toolbarDropIndex.value)
+  if (next) applyToolbarOrder(next, true)
+  toolbarDragId = ''
+  toolbarDragSource.value = ''
+  toolbarDropIndex.value = null
+}
+
+function onWindowToolbarDrop(event: DragEvent) {
+  if (!toolbarDragId) return
+  event.preventDefault()
+  onToolbarGroupDrop()
+}
+
+function onWindowToolbarUndo(event: KeyboardEvent) {
+  if (!toolbarUndoArmed) return
+  if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return
+  if (event.key.toLowerCase() !== 'z') return
+  const target = event.target
+  const root = rteRootEl.value
+  if (target instanceof Element && target.closest('input, textarea') && !root?.contains(target)) return
+  const inThis = target instanceof Node && !!root?.contains(target)
+  if (target instanceof Element) {
+    const host = target.closest('.rte-root')
+    if (host && host !== root) return
+  }
+  if (!inThis && toolbarUndoStamp !== currentToolbarUndoEpoch()) return
+  if (!undoToolbarGroupOrder()) return
+  event.preventDefault()
+  event.stopPropagation()
+}
+
+function onToolbarGroupDragEnd() {
+  window.setTimeout(() => {
+    toolbarDragId = ''
+    toolbarDragSource.value = ''
+    toolbarDropIndex.value = null
+  }, 50)
+}
+
+function onToolbarGroupKeydown(id: string, event: KeyboardEvent) {
+  if (viewMode.value !== 'edit' || !event.altKey) return
+  const dir = event.key === 'ArrowLeft' ? -1 : event.key === 'ArrowRight' ? 1 : 0
+  if (!dir) return
+  event.preventDefault()
+  const order = toolbarOrder.value
+  const index = order.indexOf(id)
+  if (index < 0) return
+  const next = moveToolbarGroup(order, id, dir < 0 ? index - 1 : index + 2)
+  if (next) applyToolbarOrder(next, true)
+}
 
 /** 收起模式下「更多」下拉内容 */
 const moreTools = computed(() => {
@@ -8727,8 +8901,47 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
       <div class="rte-sr-only" role="status" aria-live="polite" aria-atomic="true">
         {{ rteAriaStatus }}
       </div>
-      <div class="rte-toolbar-tools">
-      <template v-for="t in visibleTools" :key="t.key">
+      <div
+        class="rte-toolbar-tools"
+        :class="{ 'is-drop-end': toolbarDropIndex === toolbarGroups.length }"
+        @dragover.prevent="onToolbarGroupDragOver"
+        @drop.prevent="onToolbarGroupDrop"
+      >
+      <div
+        v-for="(group, groupIndex) in toolbarGroups"
+        :key="group.id"
+        class="rte-tool-group"
+        :class="{
+          'is-drop-target': toolbarDropIndex === groupIndex,
+          'is-dragging': toolbarDragSource === group.id,
+        }"
+        :data-group-id="group.id"
+      >
+        <button
+          v-if="viewMode === 'edit'"
+          type="button"
+          class="rte-group-handle"
+          draggable="true"
+          :aria-label="'拖动' + group.label + '分组'"
+          title="拖动整组。Alt+左/右也可移动"
+          @pointerdown="onToolbarHandlePointerDown(group.id, $event)"
+          @pointermove="onToolbarHandlePointerMove"
+          @pointerup="onToolbarHandlePointerUp"
+          @pointercancel="onToolbarHandlePointerUp"
+          @dragstart="onToolbarGroupDragStart(group.id, $event)"
+          @dragend="onToolbarGroupDragEnd"
+          @keydown="onToolbarGroupKeydown(group.id, $event)"
+        >
+          ⠿
+        </button>
+        <span
+          class="rte-group-label"
+          @pointerdown="onToolbarHandlePointerDown(group.id, $event)"
+          @pointermove="onToolbarHandlePointerMove"
+          @pointerup="onToolbarHandlePointerUp"
+          @pointercancel="onToolbarHandlePointerUp"
+        >{{ group.label }}</span>
+      <template v-for="t in group.tools" :key="t.key">
         <div
           v-if="t.kind === 'heading'"
           class="rte-tool-wrap"
@@ -10545,6 +10758,7 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
           <span class="rte-tool-label">{{ t.label }}</span>
         </button>
       </template>
+      </div>
 
       <!-- 紧跟工具流末尾（导入/导出之后）：编辑 / 预览 / 源码，不作右侧贴边 -->
       <template v-if="expanded">
@@ -13590,9 +13804,88 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
-  gap: 2px 4px;
+  gap: 6px 8px;
   flex: 1 1 auto;
   min-width: 0;
+}
+.rte-root.compact .rte-toolbar-tools {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+}
+.rte-tool-group {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 10px 3px 4px;
+  border: 1px solid #d5d8de;
+  border-radius: 999px;
+  background: #f4f6f8;
+}
+.rte-tool-group[data-group-id='history'] { background: #eef3ff; border-color: #c5d4f5; }
+.rte-tool-group[data-group-id='text'] { background: #f1f7ef; border-color: #c9dfc4; }
+.rte-tool-group[data-group-id='color'] { background: #fff6e8; border-color: #f0d7b0; }
+.rte-tool-group[data-group-id='paragraph'] { background: #f4f0fa; border-color: #d9ceea; }
+.rte-tool-group[data-group-id='insert'] { background: #eef8f8; border-color: #c5e4e4; }
+.rte-tool-group[data-group-id='more'] { background: #f7f7f8; border-color: #d9dbe0; }
+.rte-tool-group.is-dragging {
+  opacity: 0.45;
+}
+.rte-tool-group.is-drop-target::before,
+.rte-toolbar-tools.is-drop-end::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  width: 4px;
+  border-radius: 2px;
+  background: #3370ff;
+  pointer-events: none;
+}
+.rte-tool-group.is-drop-target::before {
+  left: -7px;
+}
+.rte-toolbar-tools.is-drop-end {
+  position: relative;
+}
+.rte-toolbar-tools.is-drop-end::after {
+  right: 0;
+}
+.rte-group-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #1d2129;
+  padding: 0 6px 0 2px;
+  white-space: nowrap;
+}
+.rte-group-handle {
+  border: 0;
+  background: #fff;
+  color: #3370ff;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  cursor: grab;
+  line-height: 22px;
+  padding: 0;
+  font-size: 14px;
+}
+.rte-group-label {
+  cursor: grab;
+  user-select: none;
+}
+.rte-group-handle:focus-visible {
+  outline: 2px solid var(--mm-focus, #3370ff);
+  outline-offset: 1px;
+}
+.rte-root.mode-preview .rte-group-handle,
+.rte-root.mode-source .rte-group-handle {
+  display: none;
+}
+.rte-root.is-dark-editor .rte-tool-group .rte-tool,
+.rte-root.is-dark-editor .rte-tool-group .rte-tool-label,
+.rte-root.is-dark-editor .rte-group-label {
+  color: #1d2129;
 }
 
 /* 预览/源码：隐藏编辑工具，保留「编辑/预览/源码」模式按钮 */
