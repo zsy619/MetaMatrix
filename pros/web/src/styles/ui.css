@@ -38,6 +38,37 @@ html[data-density='compact'] .topbar {
   padding-bottom: 6px;
 }
 
+@media (max-width: 720px) {
+  .topbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .actions,
+  .doc-tools,
+  .doc-pager,
+  .search-row {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  .doc-item button,
+  .search-row input,
+  .search-row button {
+    width: 100%;
+  }
+}
+
+.import-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--mm-muted);
+}
+
+.import-label input {
+  max-width: 180px;
+}
+
 .mm-inline-error {
   margin: 8px 0 0;
   color: var(--mm-red);

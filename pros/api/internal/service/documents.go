@@ -239,6 +239,11 @@ func (s *DocumentsService) Create(ownerID uuid.UUID, in CreateDocumentInput) (*m
 	if err := validatePayload(data); err != nil {
 		return nil, err
 	}
+	if len(in.Data) > 0 && string(in.Data) != "null" {
+		if err := ValidateCanvasImport(in.Data); err != nil {
+			return nil, err
+		}
+	}
 	var meta map[string]interface{}
 	_ = json.Unmarshal(data, &meta)
 

@@ -75,6 +75,7 @@ func (h *AuthHandler) Login(ctx context.Context, c *app.RequestContext) {
 	now := time.Now()
 	if ok, wait := h.limit.Allow(ip, email, now); !ok {
 		middleware.ObserveLoginThrottled()
+		middleware.Audit(c, "login_throttled", "", "rate_limited")
 		tooManyLogins(c, wait)
 		return
 	}
@@ -83,6 +84,7 @@ func (h *AuthHandler) Login(ctx context.Context, c *app.RequestContext) {
 		if errors.Is(err, service.ErrInvalidCreds) {
 			h.limit.RecordFailure(ip, email, time.Now())
 			middleware.ObserveLoginFailure()
+			middleware.Audit(c, "login_failure", "", "invalid_credentials")
 			if ok, wait := h.limit.Allow(ip, email, time.Now()); !ok {
 				middleware.ObserveLoginThrottled()
 				tooManyLogins(c, wait)
@@ -178,6 +180,7 @@ func (h *AuthHandler) ChangePassword(ctx context.Context, c *app.RequestContext)
 		}
 		return
 	}
+	middleware.Audit(c, "password_change", uid.String(), "ok")
 	c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 }
 

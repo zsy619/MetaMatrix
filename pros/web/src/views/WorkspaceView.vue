@@ -7,6 +7,7 @@ import KpiGrid, { type Kpi } from '../components/workspace/KpiGrid.vue'
 import RecentEdits from '../components/workspace/RecentEdits.vue'
 import TrendChart from '../components/workspace/TrendChart.vue'
 import TypeBreakdown from '../components/workspace/TypeBreakdown.vue'
+import RecentOpens from '../components/workspace/RecentOpens.vue'
 import WorkspaceSecondary from '../components/workspace/WorkspaceSecondary.vue'
 import WorkspaceSkeleton from '../components/workspace/WorkspaceSkeleton.vue'
 import { useWorkspaceStats } from '../components/workspace/useWorkspaceStats'
@@ -362,6 +363,7 @@ onUnmounted(() => {
         </div>
       </template>
 
+      <RecentOpens />
       <WorkspaceSecondary />
     </div>
   </div>

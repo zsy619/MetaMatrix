@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed, toRaw } from 'vue'
 import { ApiError } from '../api/http'
 import * as documentsApi from '../api/documents'
+import { rememberRecentOpen } from '../utils/canvasTransfer'
 import { getToken } from '../api/http'
 import type {
   BlockCanvasDocumentJSON,
@@ -1660,6 +1661,11 @@ export const useDocumentStore = defineStore('document', () => {
       dirty.value = false
       persistLocal(activeTemplateId.value)
       hydrateConflict(doc.id)
+      rememberRecentOpen({
+        id: doc.id,
+        title: doc.title || '未命名文档',
+        templateId: doc.templateId || activeTemplateId.value || 'dual-triangle',
+      })
     } finally {
       loading.value = false
     }
