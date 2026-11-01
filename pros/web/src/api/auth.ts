@@ -36,6 +36,13 @@ export function me() {
   return apiRequest<User>('/auth/me')
 }
 
+export function changePassword(input: { currentPassword: string; newPassword: string }) {
+  return apiRequest<{ status: string }>('/auth/password', {
+    method: 'POST',
+    body: input,
+  })
+}
+
 export function refresh() {
   return apiRequest<AuthResponse & { expiresAt?: string }>('/auth/refresh', {
     method: 'POST',

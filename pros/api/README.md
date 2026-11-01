@@ -45,7 +45,13 @@ go run ./cmd/server
 - `migrations/001_init.sql`
 - `migrations/002_search_ai.sql`
 
-默认 `http://localhost:3000`。健康检查：`GET /health`。
+默认 `http://localhost:3000`。
+
+### 健康检查与指标
+
+`GET /health` 会探测数据库并返回 `status`（`ok` 或 `degraded`）、进程运行秒数，以及自启动以来的请求分档和登录失败计数。数据库不可用时 HTTP 状态为 503，适合作为存活/就绪探针。
+
+`GET /metrics` 返回 Prometheus 文本（`metamatrix_http_requests_total`、`metamatrix_login_failures_total`、`metamatrix_process_uptime_seconds` 等）。这些计数只在进程内存里，重启后归零，不写入业务表。抓取示例：`curl -s http://localhost:3000/metrics`。
 
 ## 测试账号（可选）
 

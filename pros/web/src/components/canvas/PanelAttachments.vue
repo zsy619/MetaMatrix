@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import type { PanelAttachment } from '../../types/canvas'
 import { useDocumentStore } from '../../stores/document'
+import { attachmentRejectReason } from '../../utils/attachmentPolicy'
 import AttachmentPreviewModal from './AttachmentPreviewModal.vue'
 
 const props = defineProps<{
@@ -13,14 +14,14 @@ const props = defineProps<{
 
 const documentStore = useDocumentStore()
 
-const MAX_FILE_BYTES = 3 * 1024 * 1024
-
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const showUrlForm = ref(false)
 const urlDraft = ref('')
 const nameDraft = ref('')
 const errorMsg = ref('')
 const previewTarget = ref<PanelAttachment | null>(null)
+const uploadProgress = ref<number | null>(null)
+const pendingDeleteId = ref<string | null>(null)
 
 const list = computed(() => documentStore.getPanelAttachments(props.panelId))
 
@@ -51,12 +52,18 @@ function onFileChange(event: Event) {
   input.value = ''
   if (!file) return
 
-  if (file.size > MAX_FILE_BYTES) {
-    errorMsg.value = `文件超过 3MB（当前 ${(file.size / 1024 / 1024).toFixed(1)}MB），请压缩后重试或改用链接`
+  const reject = attachmentRejectReason(file.name, file.type || '', file.size)
+  if (reject) {
+    errorMsg.value = reject
     return
   }
 
   const reader = new FileReader()
+  uploadProgress.value = 0
+  reader.onprogress = (ev) => {
+    if (!ev.lengthComputable || ev.total <= 0) return
+    uploadProgress.value = Math.min(100, Math.round((ev.loaded / ev.total) * 100))
+  }
   reader.onload = () => {
     const dataUrl = String(reader.result || '')
     const att = documentStore.addPanelAttachment(props.panelId, {
@@ -66,12 +73,14 @@ function onFileChange(event: Event) {
       size: file.size,
       dataUrl,
     })
+    uploadProgress.value = null
     if (!att) {
-      errorMsg.value = '添加失败：文档未加载'
+      errorMsg.value = '添加失败：画布尚未打开。'
     }
   }
   reader.onerror = () => {
-    errorMsg.value = '读取文件失败'
+    uploadProgress.value = null
+    errorMsg.value = '读取文件失败，请重试。'
   }
   reader.readAsDataURL(file)
 }
@@ -119,7 +128,7 @@ function onSubmitUrl(event: Event) {
     // eslint-disable-next-line no-new
     new URL(normalized)
   } catch {
-    errorMsg.value = 'URL 格式无效'
+    errorMsg.value = '链接格式无效，请以 https:// 开头。'
     return
   }
   const name =
@@ -140,7 +149,7 @@ function onSubmitUrl(event: Event) {
     mimeType: 'text/uri-list',
   })
   if (!att) {
-    errorMsg.value = '添加失败：文档未加载'
+    errorMsg.value = '添加失败：画布尚未打开。'
     return
   }
   urlDraft.value = ''
@@ -155,7 +164,18 @@ function onPreview(event: MouseEvent, att: PanelAttachment) {
 
 function onRemove(event: MouseEvent, id: string) {
   event.stopPropagation()
+  pendingDeleteId.value = id
+}
+
+function cancelRemove(event: MouseEvent) {
+  event.stopPropagation()
+  pendingDeleteId.value = null
+}
+
+function confirmRemove(event: MouseEvent, id: string) {
+  event.stopPropagation()
   documentStore.removePanelAttachment(props.panelId, id)
+  pendingDeleteId.value = null
 }
 
 function closePreview() {
@@ -223,7 +243,11 @@ function closePreview() {
       <button type="button" class="pa-btn" @click="onToggleUrl">取消</button>
     </form>
 
-    <p v-if="errorMsg" class="pa-error">{{ errorMsg }}</p>
+    <p v-if="uploadProgress != null" class="pa-progress" role="status">
+      正在读取文件 {{ uploadProgress }}%
+      <span class="pa-bar"><span :style="{ width: `${uploadProgress}%` }" /></span>
+    </p>
+    <p v-if="errorMsg" class="pa-error" role="alert">{{ errorMsg }}</p>
 
     <ul v-if="list.length" class="pa-list">
       <li v-for="att in list" :key="att.id" class="pa-item">
@@ -237,7 +261,13 @@ function closePreview() {
         >
           预览
         </button>
+        <template v-if="pendingDeleteId === att.id">
+          <span class="pa-confirm">删除这份资料？</span>
+          <button type="button" class="pa-link-btn pa-danger" @click="confirmRemove($event, att.id)">确认</button>
+          <button type="button" class="pa-link-btn" @click="cancelRemove">取消</button>
+        </template>
         <button
+          v-else
           type="button"
           class="pa-link-btn pa-danger"
           title="删除"
@@ -349,6 +379,32 @@ function closePreview() {
 
 .pa-input:focus {
   border-color: #1a73e8;
+}
+
+.pa-progress {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: #5f6368;
+}
+
+.pa-bar {
+  display: block;
+  height: 4px;
+  margin-top: 4px;
+  border-radius: 999px;
+  background: #f1f3f4;
+  overflow: hidden;
+}
+
+.pa-bar span {
+  display: block;
+  height: 100%;
+  background: #1a73e8;
+}
+
+.pa-confirm {
+  font-size: 12px;
+  color: #b06000;
 }
 
 .pa-error {

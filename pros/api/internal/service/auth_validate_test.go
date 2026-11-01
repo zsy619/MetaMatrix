@@ -1,6 +1,10 @@
 package service
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/google/uuid"
+)
 
 func TestNormalizeAndValidateEmail(t *testing.T) {
 	if got := NormalizeEmail("  Demo@MetaMatrix.Local "); got != "demo@metamatrix.local" {
@@ -47,6 +51,16 @@ func TestValidatePassword(t *testing.T) {
 	}
 	if err := ValidatePassword(string(exact)); err != nil {
 		t.Fatalf("72 bytes = %v", err)
+	}
+}
+
+func TestChangePasswordRejectsWeakBeforeDB(t *testing.T) {
+	svc := NewAuthService(nil, "secret")
+	if err := svc.ChangePassword(uuid.Nil, "current-pass", "123"); err != ErrWeakPassword {
+		t.Fatalf("short = %v", err)
+	}
+	if err := svc.ChangePassword(uuid.Nil, "same-pass", "same-pass"); err != ErrSamePassword {
+		t.Fatalf("same = %v", err)
 	}
 }
 

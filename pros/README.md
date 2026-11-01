@@ -31,4 +31,6 @@ npm run dev                   # http://localhost:5173 （/api 代理到 :3000）
 - 注册: http://localhost:5173/register
 - API: http://localhost:3000
 
+健康检查是 `GET http://localhost:3000/health`（含数据库探测；失败为 503）。指标是 `GET http://localhost:3000/metrics`（Prometheus 文本，仅进程内计数）。细节见 `api/README.md`。
+
 产品文档在上级 `docs/`。

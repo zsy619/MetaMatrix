@@ -91,6 +91,7 @@ func main() {
 	h.POST("/auth/login", authH.Login)
 	h.GET("/auth/me", middleware.AuthRequired(cfg.JWTSecret), authH.Me)
 	h.POST("/auth/refresh", middleware.AuthRequired(cfg.JWTSecret), authH.Refresh)
+	h.POST("/auth/password", middleware.AuthRequired(cfg.JWTSecret), authH.ChangePassword)
 
 	docs := h.Group("/documents", middleware.AuthRequired(cfg.JWTSecret))
 	{

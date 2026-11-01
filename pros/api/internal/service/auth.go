@@ -19,6 +19,7 @@ var (
 	ErrWeakPassword    = errors.New("password must be at least 6 characters")
 	ErrPasswordTooLong = errors.New("password exceeds 72 bytes")
 	ErrInvalidEmail    = errors.New("invalid email")
+	ErrSamePassword    = errors.New("new password must differ")
 )
 
 // dummyPasswordHash keeps the missing-user login path on the same bcrypt cost
@@ -130,6 +131,32 @@ func (s *AuthService) Refresh(userID uuid.UUID) (*model.User, string, error) {
 		return nil, "", err
 	}
 	return u, token, nil
+}
+
+// ChangePassword checks the current secret before replacing the hash.
+// A short new password is rejected before any database read.
+func (s *AuthService) ChangePassword(userID uuid.UUID, current, next string) error {
+	if err := ValidatePassword(next); err != nil {
+		return err
+	}
+	if current == next {
+		return ErrSamePassword
+	}
+	u, err := s.Me(userID)
+	if err != nil {
+		return err
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(current)); err != nil {
+		return ErrInvalidCreds
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(next), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+	return s.db.Model(&model.User{}).Where("id = ?", u.ID).Updates(map[string]interface{}{
+		"password_hash": string(hash),
+		"updated_at":    time.Now().UTC(),
+	}).Error
 }
 
 func (s *AuthService) Me(userID uuid.UUID) (*model.User, error) {
