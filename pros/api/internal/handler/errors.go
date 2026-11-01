@@ -3,11 +3,13 @@ package handler
 import (
 	"net/http"
 
+	"metamatrix/api/internal/middleware"
+
 	"github.com/cloudwego/hertz/pkg/app"
 )
 
 func Fail(c *app.RequestContext, status int, message, code string) {
-	c.JSON(status, map[string]string{"message": message, "code": code})
+	middleware.ErrorJSON(c, status, message, code, nil)
 }
 
 func BadRequest(c *app.RequestContext, message string) {
@@ -27,11 +29,7 @@ func NotFound(c *app.RequestContext, message string) {
 }
 
 func Conflict(c *app.RequestContext, message string, extra map[string]interface{}) {
-	body := map[string]interface{}{"message": message, "code": "conflict"}
-	for k, v := range extra {
-		body[k] = v
-	}
-	c.JSON(http.StatusConflict, body)
+	middleware.ErrorJSON(c, http.StatusConflict, message, "conflict", extra)
 }
 
 func Internal(c *app.RequestContext, message string) {

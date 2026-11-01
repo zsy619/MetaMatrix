@@ -41,6 +41,11 @@ function goRegister() {
   router.push({ name: 'register', query: { redirect: '/' } })
 }
 
+function goAccount() {
+  menuOpen.value = false
+  router.push({ name: 'account' })
+}
+
 function onLogout() {
   menuOpen.value = false
   auth.logout()
@@ -99,6 +104,9 @@ onUnmounted(() => {
       </button>
       <div v-if="menuOpen" class="menu" role="menu">
         <template v-if="auth.isAuthenticated">
+          <button type="button" class="menu-item" role="menuitem" @click="goAccount">
+            账户设置
+          </button>
           <button type="button" class="menu-item" role="menuitem" @click="onLogout">
             退出登录
           </button>

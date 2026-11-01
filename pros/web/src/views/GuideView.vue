@@ -5,8 +5,11 @@ import type { TemplateCategory, TemplateId } from '../stores/document'
 import { CATEGORY_LABELS, TEMPLATE_META } from '../stores/document'
 import { useAuthStore } from '../stores/auth'
 import type { DocumentSummary, SearchHit } from '../api/documents'
+import HighlightText from '../components/ui/HighlightText.vue'
 import { listDocuments, searchDocuments } from '../api/documents'
+import { friendlyApiMessage } from '../utils/apiMessage'
 import GuideThumb from '../components/guide/GuideThumb.vue'
+import RecentOpens from '../components/workspace/RecentOpens.vue'
 import GuideAside from '../components/guide/GuideAside.vue'
 
 interface GuideCard {
@@ -20,11 +23,14 @@ interface GuideCard {
 const router = useRouter()
 const auth = useAuthStore()
 const recent = ref<DocumentSummary[]>([])
+const recentLoading = ref(false)
+const recentError = ref('')
 const searchQ = ref('')
 const searchHits = ref<SearchHit[]>([])
 const searching = ref(false)
 const searchErr = ref('')
 let searchTimer: ReturnType<typeof setTimeout> | null = null
+let searchAbort: AbortController | null = null
 
 const activeCategory = ref<'all' | TemplateCategory>('all')
 const templateFilter = ref('')
@@ -95,6 +101,7 @@ function openCanvas(id: TemplateId) {
 
 function onLogout() {
   recent.value = []
+  recentError.value = ''
   searchHits.value = []
   searchQ.value = ''
   searchErr.value = ''
@@ -103,12 +110,18 @@ function onLogout() {
 async function refreshRecent() {
   if (!auth.isAuthenticated) {
     recent.value = []
+    recentError.value = ''
     return
   }
+  recentLoading.value = true
+  recentError.value = ''
   try {
-    recent.value = (await listDocuments()).slice(0, 12)
-  } catch {
+    recent.value = await listDocuments({ limit: 12 })
+  } catch (e) {
     recent.value = []
+    recentError.value = friendlyApiMessage(e, '最近文档暂时不可用')
+  } finally {
+    recentLoading.value = false
   }
 }
 
@@ -123,8 +136,10 @@ function openDoc(d: DocumentSummary) {
 
 async function runSearch() {
   searchErr.value = ''
+  searchAbort?.abort()
   if (!auth.isAuthenticated) {
     searchHits.value = []
+    searchErr.value = '登录后只能搜索你自己的画布。'
     return
   }
   const q = searchQ.value.trim()
@@ -132,14 +147,17 @@ async function runSearch() {
     searchHits.value = []
     return
   }
+  const ctrl = new AbortController()
+  searchAbort = ctrl
   searching.value = true
   try {
-    searchHits.value = await searchDocuments({ q, limit: 12 })
+    searchHits.value = await searchDocuments({ q, limit: 12 }, { signal: ctrl.signal })
   } catch (e) {
-    searchErr.value = e instanceof Error ? e.message : '搜索失败'
+    if (e instanceof DOMException && e.name === 'AbortError') return
+    searchErr.value = friendlyApiMessage(e, '搜索失败')
     searchHits.value = []
   } finally {
-    searching.value = false
+    if (searchAbort === ctrl) searching.value = false
   }
 }
 
@@ -155,7 +173,11 @@ function openHit(d: SearchHit) {
   router.push({
     name: 'canvas',
     params: { templateId: tid },
-    query: { documentId: d.id },
+    query: {
+      documentId: d.id,
+      ...(d.panelId ? { panel: d.panelId } : {}),
+      ...(searchQ.value.trim() ? { q: searchQ.value.trim() } : {}),
+    },
   })
 }
 
@@ -186,24 +208,31 @@ onMounted(async () => {
               @input="onSearchInput"
               @keydown.enter.prevent="runSearch"
             />
-            <button type="button" class="primaryish" :disabled="searching" @click="runSearch">
+            <button type="button" class="primaryish" :disabled="searching" :aria-busy="searching" @click="runSearch">
               {{ searching ? '搜索中…' : '搜索' }}
             </button>
           </div>
-          <p v-if="searchErr" class="search-err">{{ searchErr }}</p>
+          <p v-if="searchErr" class="search-err" role="alert">
+            {{ searchErr }}
+            <button type="button" class="mm-btn mm-btn--ghost" @click="runSearch">重试</button>
+          </p>
           <ul v-if="searchHits.length" class="search-hits">
             <li v-for="h in searchHits" :key="h.id">
               <button type="button" @click="openHit(h)">
                 <strong>{{ h.title }}</strong>
                 <span>{{ h.templateId || h.canvasType }} · {{ new Date(h.updatedAt).toLocaleString() }}</span>
-                <em v-if="h.snippet">{{ h.snippet }}</em>
+                <em v-if="h.snippet"><HighlightText :text="h.snippet" /></em>
+                <span v-if="h.panelTitle">匹配：{{ h.panelTitle }}</span>
               </button>
             </li>
           </ul>
-          <p v-else-if="searchQ.trim() && !searching" class="search-empty">无匹配文档</p>
+          <p v-else-if="searchQ.trim() && !searching" class="search-empty" role="status">
+            没有找到包含「{{ searchQ.trim() }}」的画布。结果只来自当前账号。
+          </p>
         </section>
       </header>
 
+      <RecentOpens class="recent-opens" />
       <section class="templates" aria-label="画布模板">
         <div class="templates-toolbar">
           <div class="chips" role="tablist" aria-label="模板分类">
@@ -260,8 +289,11 @@ onMounted(async () => {
     <GuideAside
       :recent="recent"
       :authenticated="auth.isAuthenticated"
+      :loading="recentLoading"
+      :error="recentError"
       @open="openDoc"
       @logout="onLogout"
+      @retry="refreshRecent"
       @update:collapsed="asideCollapsed = $event"
     />
   </div>

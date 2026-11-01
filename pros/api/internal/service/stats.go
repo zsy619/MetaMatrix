@@ -2,6 +2,7 @@ package service
 
 import (
 	"sort"
+	"strings"
 	"time"
 
 	"metamatrix/api/internal/model"
@@ -11,7 +12,7 @@ import (
 
 const statsTimezone = "Asia/Shanghai"
 
-// StatsDoc is one canvas document reduced to the fields personal stats need.
+// StatsDoc is one canvas document reduced to the timestamps stats needs.
 type StatsDoc struct {
 	ID         uuid.UUID
 	Title      string
@@ -57,72 +58,60 @@ type HeatCell struct {
 	Count int    `json:"count"`
 }
 
-// ActivityStats counts distinct active days for the signed-in user.
-// A day is active when it has a revision, a substantive edit with no revision
-// that day, or a create that has no revisions at all.
-type ActivityStats struct {
-	ActiveDays     int `json:"activeDays"`
-	ActiveDaysPrev int `json:"activeDaysPrev"`
-	Streak         int `json:"streak"`
-	LongestStreak  int `json:"longestStreak"`
-}
-
-// CanvasTypeStat is one canvas_type bucket. Totals are all-time; created and
-// edited are limited to the selected range.
-type CanvasTypeStat struct {
-	CanvasType string `json:"canvasType"`
-	Total      int    `json:"total"`
-	Created    int    `json:"created"`
-	Edited     int    `json:"edited"`
-}
-
-// RecentCanvas is a still-existing canvas, newest update first.
-type RecentCanvas struct {
-	ID         uuid.UUID `json:"id"`
-	Title      string    `json:"title"`
-	TemplateID string    `json:"templateId"`
-	CanvasType string    `json:"canvasType"`
-	CreatedAt  time.Time `json:"createdAt"`
-	UpdatedAt  time.Time `json:"updatedAt"`
-}
-
-// DocumentStats is the personal workspace payload.
-// Scope is always "me": documents are those owned by the JWT user, and
-// revisions are those authored by that user (null author counts as theirs).
+// DocumentStats is the workspace analytics payload.
 // Edited counts use each document's latest updated_at, not every historical save.
-// Revision counts include every matching snapshot row.
+// Revision counts include every snapshot row.
 type DocumentStats struct {
-	Range           string           `json:"range"`
-	Granularity     string           `json:"granularity"`
-	Timezone        string           `json:"timezone"`
-	From            string           `json:"from"`
-	To              string           `json:"to"`
-	PreviousFrom    string           `json:"previousFrom"`
-	PreviousTo      string           `json:"previousTo"`
-	Documents       Compare          `json:"documents"`
-	WeekCreated     Compare          `json:"weekCreated"`
-	MonthCreated    Compare          `json:"monthCreated"`
-	WeekEdited      Compare          `json:"weekEdited"`
-	MonthEdited     Compare          `json:"monthEdited"`
-	Revisions       Compare          `json:"revisions"`
-	ActiveTemplates Compare          `json:"activeTemplates"`
-	RangeCreated    Compare          `json:"rangeCreated"`
-	RangeEdited     Compare          `json:"rangeEdited"`
-	Totals          StatsTotals      `json:"totals"`
-	Series          []StatsBucket    `json:"series"`
-	Templates       []TemplateStat   `json:"templates"`
-	Heatmap         []HeatCell       `json:"heatmap"`
-	Scope           string           `json:"scope"`
-	UserID          string           `json:"userId"`
-	Activity        ActivityStats    `json:"activity"`
-	CanvasTypes     []CanvasTypeStat `json:"canvasTypes"`
-	Recent          []RecentCanvas   `json:"recent"`
+	Range           string         `json:"range"`
+	Granularity     string         `json:"granularity"`
+	Timezone        string         `json:"timezone"`
+	From            string         `json:"from"`
+	To              string         `json:"to"`
+	PreviousFrom    string         `json:"previousFrom"`
+	PreviousTo      string         `json:"previousTo"`
+	Documents       Compare        `json:"documents"`
+	WeekCreated     Compare        `json:"weekCreated"`
+	MonthCreated    Compare        `json:"monthCreated"`
+	WeekEdited      Compare        `json:"weekEdited"`
+	MonthEdited     Compare        `json:"monthEdited"`
+	Revisions       Compare        `json:"revisions"`
+	ActiveTemplates Compare        `json:"activeTemplates"`
+	RangeCreated    Compare        `json:"rangeCreated"`
+	RangeEdited     Compare        `json:"rangeEdited"`
+	Totals          StatsTotals    `json:"totals"`
+	Activity        ActivityStats  `json:"activity"`
+	Series          []StatsBucket  `json:"series"`
+	Templates       []TemplateStat `json:"templates"`
+	Heatmap         []HeatCell     `json:"heatmap"`
+	Recent          []RecentEdit   `json:"recent"`
 }
 
 // StatsTotals are all-time figures, independent of the selected range.
 type StatsTotals struct {
 	Revisions int `json:"revisions"`
 	Templates int `json:"templates"`
+}
+
+// ActivityStats is derived from the same daily activity map as the heatmap.
+// ActiveDays counts days inside the selected window. Streak is the current run
+// ending today, or yesterday when today has no activity yet. Longest is the
+// longest run on or before today across all loaded history.
+type ActivityStats struct {
+	ActiveDays         int `json:"activeDays"`
+	PreviousActiveDays int `json:"previousActiveDays"`
+	Streak             int `json:"streak"`
+	Longest            int `json:"longest"`
+}
+
+// RecentEdit is one of the caller's canvases, newest update first.
+// It comes from the same document read as the aggregates (no extra query).
+type RecentEdit struct {
+	ID         string  `json:"id"`
+	Title      string  `json:"title"`
+	TemplateID *string `json:"templateId"`
+	CanvasType string  `json:"canvasType"`
+	CreatedAt  string  `json:"createdAt"`
+	UpdatedAt  string  `json:"updatedAt"`
 }
 
 func statsLocation() *time.Location {
@@ -265,70 +254,6 @@ func bucketStarts(from, to time.Time, granularity string, loc *time.Location) []
 	return starts
 }
 
-func countHeatDays(heat map[string]int, from, to time.Time, loc *time.Location) int {
-	n := 0
-	for cur := startOfDay(from, loc); cur.Before(to); cur = cur.AddDate(0, 0, 1) {
-		if heat[ymd(cur, loc)] > 0 {
-			n++
-		}
-	}
-	return n
-}
-
-// currentStreak walks backward from today. When today has no activity yet,
-// the run starts yesterday so an unfinished day does not wipe the streak.
-func currentStreak(heat map[string]int, today time.Time, loc *time.Location) int {
-	day := startOfDay(today, loc)
-	if heat[ymd(day, loc)] == 0 {
-		day = day.AddDate(0, 0, -1)
-	}
-	n := 0
-	for heat[ymd(day, loc)] > 0 {
-		n++
-		day = day.AddDate(0, 0, -1)
-		if n > 20000 {
-			break
-		}
-	}
-	return n
-}
-
-func longestStreak(heat map[string]int, loc *time.Location) int {
-	var minD, maxD time.Time
-	found := false
-	for day, n := range heat {
-		if n <= 0 {
-			continue
-		}
-		t, err := time.ParseInLocation("2006-01-02", day, loc)
-		if err != nil {
-			continue
-		}
-		if !found || t.Before(minD) {
-			minD = t
-		}
-		if !found || t.After(maxD) {
-			maxD = t
-		}
-		found = true
-	}
-	if !found {
-		return 0
-	}
-	best, run := 0, 0
-	for cur := minD; !cur.After(maxD); cur = cur.AddDate(0, 0, 1) {
-		if heat[ymd(cur, loc)] > 0 {
-			run++
-			if run > best {
-				best = run
-			}
-		} else {
-			run = 0
-		}
-	}
-	return best
-}
-
 func bucketIndex(starts []time.Time, t time.Time) int {
 	if len(starts) == 0 || t.Before(starts[0]) {
 		return -1
@@ -424,14 +349,6 @@ func AggregateDocumentStats(docs []StatsDoc, revs []StatsRev, now time.Time, loc
 	byTpl := map[string]*acc{}
 	order := make([]string, 0)
 
-	type typeAcc struct {
-		canvas          string
-		total           int
-		created, edited int
-	}
-	byType := map[string]*typeAcc{}
-	typeOrder := make([]string, 0)
-
 	bumpSeries := func(series []int, t time.Time, from, to time.Time) int {
 		if !inWindow(t, from, to) {
 			return -1
@@ -456,23 +373,6 @@ func AggregateDocumentStats(docs []StatsDoc, revs []StatsRev, now time.Time, loc
 			a.canvas = canvas
 		}
 		a.total++
-		typeKey := d.CanvasType
-		if typeKey == "" {
-			typeKey = "unknown"
-		}
-		ta := byType[typeKey]
-		if ta == nil {
-			ta = &typeAcc{canvas: typeKey}
-			byType[typeKey] = ta
-			typeOrder = append(typeOrder, typeKey)
-		}
-		ta.total++
-		if inWindow(d.CreatedAt, from, to) {
-			ta.created++
-		}
-		if isSubstantiveEdit(d.CreatedAt, d.UpdatedAt) && inWindow(d.UpdatedAt, from, to) {
-			ta.edited++
-		}
 		marked := map[int]struct{}{}
 		if i := bumpSeries(createdSeries, d.CreatedAt, from, to); i >= 0 {
 			a.created++
@@ -522,53 +422,6 @@ func AggregateDocumentStats(docs []StatsDoc, revs []StatsRev, now time.Time, loc
 		return templates[i].TemplateID < templates[j].TemplateID
 	})
 
-	canvasTypes := make([]CanvasTypeStat, 0, len(typeOrder))
-	for _, id := range typeOrder {
-		ta := byType[id]
-		canvasTypes = append(canvasTypes, CanvasTypeStat{
-			CanvasType: ta.canvas,
-			Total:      ta.total,
-			Created:    ta.created,
-			Edited:     ta.edited,
-		})
-	}
-	sort.Slice(canvasTypes, func(i, j int) bool {
-		if canvasTypes[i].Total != canvasTypes[j].Total {
-			return canvasTypes[i].Total > canvasTypes[j].Total
-		}
-		return canvasTypes[i].CanvasType < canvasTypes[j].CanvasType
-	})
-
-	recentSrc := append([]StatsDoc(nil), docs...)
-	sort.Slice(recentSrc, func(i, j int) bool {
-		if !recentSrc[i].UpdatedAt.Equal(recentSrc[j].UpdatedAt) {
-			return recentSrc[i].UpdatedAt.After(recentSrc[j].UpdatedAt)
-		}
-		return recentSrc[i].ID.String() < recentSrc[j].ID.String()
-	})
-	if len(recentSrc) > 8 {
-		recentSrc = recentSrc[:8]
-	}
-	recent := make([]RecentCanvas, 0, len(recentSrc))
-	for _, d := range recentSrc {
-		tpl := ""
-		if d.TemplateID != nil {
-			tpl = *d.TemplateID
-		}
-		ctype := d.CanvasType
-		if ctype == "" {
-			ctype = "unknown"
-		}
-		recent = append(recent, RecentCanvas{
-			ID:         d.ID,
-			Title:      d.Title,
-			TemplateID: tpl,
-			CanvasType: ctype,
-			CreatedAt:  d.CreatedAt,
-			UpdatedAt:  d.UpdatedAt,
-		})
-	}
-
 	heat := map[string]int{}
 	revDays := map[uuid.UUID]map[string]int{}
 	for _, r := range revs {
@@ -600,10 +453,10 @@ func AggregateDocumentStats(docs []StatsDoc, revs []StatsRev, now time.Time, loc
 	}
 
 	activity := ActivityStats{
-		ActiveDays:     countHeatDays(heat, from, to, loc),
-		ActiveDaysPrev: countHeatDays(heat, prevFrom, prevTo, loc),
-		Streak:         currentStreak(heat, today, loc),
-		LongestStreak:  longestStreak(heat, loc),
+		ActiveDays:         countActiveDays(heat, from, to, loc),
+		PreviousActiveDays: countActiveDays(heat, prevFrom, prevTo, loc),
+		Streak:             currentStreak(heat, today, loc),
+		Longest:            longestStreak(heat, today, loc),
 	}
 
 	return DocumentStats{
@@ -654,14 +507,125 @@ func AggregateDocumentStats(docs []StatsDoc, revs []StatsRev, now time.Time, loc
 			Revisions: len(revs),
 			Templates: len(allTemplates),
 		},
-		Series:      buckets,
-		Templates:   templates,
-		Heatmap:     heatmap,
-		Scope:       "me",
-		Activity:    activity,
-		CanvasTypes: canvasTypes,
-		Recent:      recent,
+		Activity:  activity,
+		Series:    buckets,
+		Templates: templates,
+		Heatmap:   heatmap,
+		Recent:    recentEdits(docs, loc, 8),
 	}
+}
+
+func countActiveDays(heat map[string]int, from, to time.Time, loc *time.Location) int {
+	n := 0
+	for cur := startOfDay(from, loc); cur.Before(to); cur = cur.AddDate(0, 0, 1) {
+		if heat[ymd(cur, loc)] > 0 {
+			n++
+		}
+	}
+	return n
+}
+
+func currentStreak(heat map[string]int, today time.Time, loc *time.Location) int {
+	day := startOfDay(today, loc)
+	if heat[ymd(day, loc)] == 0 {
+		day = day.AddDate(0, 0, -1)
+		if heat[ymd(day, loc)] == 0 {
+			return 0
+		}
+	}
+	n := 0
+	for heat[ymd(day, loc)] > 0 {
+		n++
+		day = day.AddDate(0, 0, -1)
+		if n > 3660 {
+			break
+		}
+	}
+	return n
+}
+
+func longestStreak(heat map[string]int, today time.Time, loc *time.Location) int {
+	today = startOfDay(today, loc)
+	days := make([]time.Time, 0, len(heat))
+	for key, count := range heat {
+		if count <= 0 {
+			continue
+		}
+		t, err := time.ParseInLocation("2006-01-02", key, loc)
+		if err != nil || t.After(today) {
+			continue
+		}
+		days = append(days, t)
+	}
+	sort.Slice(days, func(i, j int) bool { return days[i].Before(days[j]) })
+	best, run := 0, 0
+	var prev time.Time
+	for i, d := range days {
+		if i == 0 || !d.Equal(prev.AddDate(0, 0, 1)) {
+			run = 1
+		} else {
+			run++
+		}
+		if run > best {
+			best = run
+		}
+		prev = d
+	}
+	return best
+}
+
+func recentEdits(docs []StatsDoc, loc *time.Location, limit int) []RecentEdit {
+	if limit <= 0 {
+		limit = 8
+	}
+	cp := append([]StatsDoc(nil), docs...)
+	sort.Slice(cp, func(i, j int) bool {
+		if !cp[i].UpdatedAt.Equal(cp[j].UpdatedAt) {
+			return cp[i].UpdatedAt.After(cp[j].UpdatedAt)
+		}
+		return cp[i].ID.String() < cp[j].ID.String()
+	})
+	if len(cp) > limit {
+		cp = cp[:limit]
+	}
+	out := make([]RecentEdit, 0, len(cp))
+	for _, d := range cp {
+		var tpl *string
+		if d.TemplateID != nil {
+			v := strings.TrimSpace(*d.TemplateID)
+			if v != "" {
+				tpl = &v
+			}
+		}
+		canvas := d.CanvasType
+		if canvas == "" {
+			canvas = "unknown"
+		}
+		out = append(out, RecentEdit{
+			ID:         d.ID.String(),
+			Title:      strings.TrimSpace(d.Title),
+			TemplateID: tpl,
+			CanvasType: canvas,
+			CreatedAt:  d.CreatedAt.In(loc).Format(time.RFC3339),
+			UpdatedAt:  d.UpdatedAt.In(loc).Format(time.RFC3339),
+		})
+	}
+	return out
+}
+
+// statsRevisionQuery ignores archived documents and snapshots by another account.
+// GORM list queries also exclude soft-deleted rows.
+const statsRevisionQuery = `
+SELECT r.document_id, r.created_at
+FROM canvas_revisions r
+INNER JOIN canvas_documents d ON d.id = r.document_id
+WHERE d.owner_user_id = ? AND d.deleted_at IS NULL
+  AND (r.author_user_id IS NULL OR r.author_user_id = ?)
+`
+
+// ResolveStatsOwner forces personal scope. Callers cannot widen stats with a scope query.
+func ResolveStatsOwner(authenticated uuid.UUID, _ string) uuid.UUID {
+	return authenticated
 }
 
 func (s *DocumentsService) Stats(ownerID uuid.UUID, rangeKey, granularity string) (*DocumentStats, error) {
@@ -674,20 +638,10 @@ func (s *DocumentsService) Stats(ownerID uuid.UUID, rangeKey, granularity string
 		return nil, err
 	}
 	var revs []StatsRev
-	// Revisions stay on the owner's documents. A non-null author must be the
-	// same user so another account's snapshot cannot land in this total.
-	err = s.db.Raw(`
-SELECT r.document_id, r.created_at
-FROM canvas_revisions r
-INNER JOIN canvas_documents d ON d.id = r.document_id
-WHERE d.owner_user_id = ?
-  AND (r.author_user_id IS NULL OR r.author_user_id = ?)
-`, ownerID, ownerID).Scan(&revs).Error
+	err = s.db.Raw(statsRevisionQuery, ownerID, ownerID).Scan(&revs).Error
 	if err != nil {
 		return nil, err
 	}
 	out := AggregateDocumentStats(docs, revs, time.Now(), statsLocation(), rangeKey, granularity)
-	out.Scope = "me"
-	out.UserID = ownerID.String()
 	return &out, nil
 }
