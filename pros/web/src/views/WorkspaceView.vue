@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import {
   getDocumentStats,
   type DocumentStats,
+  type RecentCanvas,
   type StatsGranularity,
   type StatsRange,
 } from '../api/documents'
@@ -14,7 +15,6 @@ import TrendChart from '../components/workspace/TrendChart.vue'
 import WorkspaceSecondary from '../components/workspace/WorkspaceSecondary.vue'
 import { useAuthStore } from '../stores/auth'
 import {
-  CATEGORY_LABELS,
   TEMPLATE_META,
   isTemplateId,
   type TemplateCategory,
@@ -40,8 +40,6 @@ const CATEGORY_ACCENT: Record<TemplateCategory, string> = {
   org: '#a142f4',
   review: '#ea4335',
 }
-
-const TREND_COLORS = ['#1a73e8', '#34a853', '#a142f4', '#f9a825', '#ea4335', '#00897b']
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -100,18 +98,71 @@ const mainSeries = computed(() => {
   ]
 })
 
-const categorySegments = computed(() => {
-  const counts: Record<string, { key: string; label: string; count: number; color: string }> = {}
-  for (const id of Object.keys(CATEGORY_LABELS) as TemplateCategory[]) {
-    counts[id] = { key: id, label: CATEGORY_LABELS[id], count: 0, color: CATEGORY_ACCENT[id] }
+function templateIdFromCanvasType(canvasType: string): string {
+  if (canvasType === 'quadrant') return 'star-quadrant'
+  if (isTemplateId(canvasType)) return canvasType
+  const hyphenated = canvasType.replace(/_/g, '-')
+  if (isTemplateId(hyphenated)) return hyphenated
+  return hyphenated
+}
+
+function canvasTypeLabel(canvasType: string): string {
+  const id = templateIdFromCanvasType(canvasType)
+  if (isTemplateId(id)) return TEMPLATE_META[id].name
+  if (!canvasType || canvasType === 'unknown' || canvasType === 'canvas') return '未归档'
+  return canvasType
+}
+
+const TYPE_SHADE = [0, 0.34, -0.22, 0.52, -0.4]
+
+function tint(hex: string, amount: number): string {
+  if (!hex.startsWith('#') || hex.length !== 7 || amount === 0) return hex
+  const n = Number.parseInt(hex.slice(1), 16)
+  if (Number.isNaN(n)) return hex
+  const mix = (c: number) => {
+    const target = amount > 0 ? 255 : 0
+    return Math.round(c + (target - c) * Math.abs(amount))
   }
-  counts.other = { key: 'other', label: '未归档', count: 0, color: '#5f6368' }
-  for (const t of view.value?.templates || []) {
-    const key = isTemplateId(t.templateId) ? TEMPLATE_META[t.templateId].category : 'other'
-    const row = counts[key]
-    if (row) row.count += t.total
+  const r = mix((n >> 16) & 255)
+  const g = mix((n >> 8) & 255)
+  const b = mix(n & 255)
+  return `#${[r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('')}`
+}
+
+const typeSegments = computed(() => {
+  const rows = view.value?.canvasTypes || []
+  const used = new Map<string, number>()
+  const top = rows.slice(0, 8).map((t) => {
+    const base = accentOf(templateIdFromCanvasType(t.canvasType))
+    const i = used.get(base) || 0
+    used.set(base, i + 1)
+    return {
+      key: t.canvasType,
+      label: canvasTypeLabel(t.canvasType),
+      count: t.total,
+      color: tint(base, TYPE_SHADE[i % TYPE_SHADE.length] || 0),
+    }
+  })
+  const extra = rows.slice(8).reduce((n, t) => n + t.total, 0)
+  if (extra > 0) top.push({ key: 'rest', label: '其他类型', count: extra, color: '#5f6368' })
+  return top.filter((s) => s.count > 0)
+})
+
+const favorite = computed(() => {
+  const top = view.value?.templates?.[0]
+  const totalDocs = view.value?.documents.current || 0
+  if (!top || totalDocs === 0) return { name: '还没有', total: 0, pct: 0 }
+  return {
+    name: templateName(top.templateId),
+    total: top.total,
+    pct: Math.round((top.total / totalDocs) * 100),
   }
-  return Object.values(counts).filter((s) => s.count > 0)
+})
+
+const identityMismatch = computed(() => {
+  const uid = view.value?.userId
+  const me = auth.user?.id
+  return Boolean(uid && me && uid !== me)
 })
 
 const templateRows = computed(() => {
@@ -123,18 +174,6 @@ const templateRows = computed(() => {
     color: accentOf(t.templateId),
     width: `${Math.max(6, Math.round((t.total / max) * 100))}%`,
     spark: sparkPoints(t.series),
-  }))
-})
-
-const templateTrend = computed(() => {
-  const rows = (view.value?.templates || [])
-    .map((t) => ({ t, sum: t.series.reduce((n, v) => n + v, 0) }))
-    .filter((x) => x.sum > 0)
-    .slice(0, 5)
-  return rows.map((x, i) => ({
-    name: templateName(x.t.templateId),
-    color: TREND_COLORS[i % TREND_COLORS.length] || '#1a73e8',
-    values: x.t.series,
   }))
 })
 
@@ -155,6 +194,52 @@ function sparkPoints(values: number[]): string {
       return `${x.toFixed(1)},${y.toFixed(1)}`
     })
     .join(' ')
+}
+
+function formatWhen(iso: string): string {
+  const t = new Date(iso)
+  if (Number.isNaN(t.getTime())) return ''
+  const min = Math.round((Date.now() - t.getTime()) / 60_000)
+  if (min < 1) return '刚刚'
+  if (min < 60) return `${min} 分钟前`
+  const hr = Math.round(min / 60)
+  if (hr < 24) return `${hr} 小时前`
+  const day = Math.round(hr / 24)
+  if (day < 7) return `${day} 天前`
+  return t.toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })
+}
+
+function recentTitle(item: RecentCanvas): string {
+  const name = templateName(item.templateId || templateIdFromCanvasType(item.canvasType))
+  return item.title.trim() || name
+}
+
+function recentSubtitle(item: RecentCanvas): string {
+  const name = templateName(item.templateId || templateIdFromCanvasType(item.canvasType))
+  const typeLabel = canvasTypeLabel(item.canvasType)
+  const title = item.title.trim()
+  if (title && title !== name) return name
+  if (typeLabel && typeLabel !== (title || name)) return typeLabel
+  return ''
+}
+
+function resolveTemplateId(item: RecentCanvas): string {
+  if (item.templateId && isTemplateId(item.templateId)) return item.templateId
+  const fromType = templateIdFromCanvasType(item.canvasType)
+  if (isTemplateId(fromType)) return fromType
+  return 'dual-triangle'
+}
+
+function openRecent(item: RecentCanvas) {
+  if (showingSample.value || item.id.startsWith('sample-')) {
+    goLogin()
+    return
+  }
+  router.push({
+    name: 'canvas',
+    params: { templateId: resolveTemplateId(item) },
+    query: { documentId: item.id },
+  })
 }
 
 function goLogin() {
@@ -207,10 +292,15 @@ onUnmounted(() => {
       <header class="top">
         <div>
           <router-link class="back" :to="{ name: 'guide' }">← 模板库</router-link>
-          <p class="eyebrow">MetaMatrix</p>
-          <h1>工作面板</h1>
+          <p class="eyebrow">MetaMatrix · 个人</p>
+          <h1>{{ auth.isAuthenticated ? `${nickname} 的工作面板` : '工作面板' }}</h1>
           <p class="lead">
-            看画布怎么被反复使用：新建、编辑和修订的时间趋势，模板占比，以及一整年的活跃度。
+            以当前登录账号为统计单位：我的画布、画布类型、创建和编辑趋势、活跃天数和连续天数。
+          </p>
+          <p class="scope-line">
+            <span class="scope-pill">仅本人</span>
+            <span v-if="auth.isAuthenticated">只汇总 {{ nickname }} 名下仍在的画布与本人修订，北京时间。</span>
+            <span v-else>未登录时下面是示例。登录后按 JWT 身份只看你自己的数据。</span>
           </p>
         </div>
         <div class="top-actions">
@@ -229,14 +319,18 @@ onUnmounted(() => {
 
       <section v-if="showingSample" class="guest" aria-label="登录引导">
         <div>
-          <h2>下面是示例统计，不是你的画布</h2>
-          <p>登录后改为你账号下的文档与修订。时间按北京时间切日、切周、切月。</p>
+          <h2>下面是示例，不是你的画布</h2>
+          <p>登录后改为当前账号。其他用户的文档不会进入这份统计。</p>
         </div>
         <div class="top-actions">
           <button type="button" class="btn-primary" @click="goLogin">登录后看我的统计</button>
           <button type="button" class="btn-ghost" @click="goRegister">注册账号</button>
         </div>
       </section>
+
+      <p v-if="identityMismatch" class="banner-error" role="alert">
+        统计身份和当前登录用户不一致，已停止展示。请刷新后再看。
+      </p>
 
       <p v-if="statsError" class="banner-error" role="alert">
         {{ statsError }}
@@ -282,66 +376,94 @@ onUnmounted(() => {
 
       <p v-if="auth.isAuthenticated && statsLoading && !view" class="muted pad">正在汇总文档与修订…</p>
 
-      <template v-if="view">
-        <section class="metrics" aria-label="核心指标">
+      <template v-if="view && !identityMismatch">
+        <section class="metrics" aria-label="我的指标">
           <article class="metric">
-            <span class="metric-k">文档总数</span>
+            <span class="metric-k">我的画布</span>
             <strong>{{ view.documents.current }}</strong>
             <span class="delta" :class="formatDelta(view.documents.current, view.documents.previous).tone">
-              {{ formatDelta(view.documents.current, view.documents.previous).text }} 较上月末
+              {{ formatDelta(view.documents.current, view.documents.previous).text }} 较本月初
             </span>
           </article>
           <article class="metric">
-            <span class="metric-k">新建</span>
-            <strong>{{ view.weekCreated.current }} <small>本周</small></strong>
-            <span class="delta" :class="formatDelta(view.weekCreated.current, view.weekCreated.previous).tone">
-              {{ formatDelta(view.weekCreated.current, view.weekCreated.previous).text }} 较上周同期
+            <span class="metric-k">活跃天数 · {{ rangeLabel }}</span>
+            <strong>{{ view.activity.activeDays }}</strong>
+            <span class="delta" :class="formatDelta(view.activity.activeDays, view.activity.activeDaysPrev).tone">
+              {{ formatDelta(view.activity.activeDays, view.activity.activeDaysPrev).text }} 较上一区间
+            </span>
+          </article>
+          <article class="metric">
+            <span class="metric-k">连续天数</span>
+            <strong>{{ view.activity.streak }}</strong>
+            <span class="metric-sub">最长 {{ view.activity.longestStreak }} 天</span>
+          </article>
+          <article class="metric">
+            <span class="metric-k">最常用模板</span>
+            <strong class="metric-name">{{ favorite.name }}</strong>
+            <span class="metric-sub">{{ favorite.total }} 份 · 占 {{ favorite.pct }}%</span>
+          </article>
+          <article class="metric">
+            <span class="metric-k">新建 · {{ rangeLabel }}</span>
+            <strong>{{ view.rangeCreated.current }}</strong>
+            <span class="delta" :class="formatDelta(view.rangeCreated.current, view.rangeCreated.previous).tone">
+              {{ formatDelta(view.rangeCreated.current, view.rangeCreated.previous).text }} 较上一区间
             </span>
             <span class="metric-sub">
-              本月 {{ view.monthCreated.current }}
-              · {{ formatDelta(view.monthCreated.current, view.monthCreated.previous).text }}
+              编辑 {{ view.rangeEdited.current }}
+              · {{ formatDelta(view.rangeEdited.current, view.rangeEdited.previous).text }}
             </span>
-          </article>
-          <article class="metric">
-            <span class="metric-k">编辑</span>
-            <strong>{{ view.weekEdited.current }} <small>本周</small></strong>
-            <span class="delta" :class="formatDelta(view.weekEdited.current, view.weekEdited.previous).tone">
-              {{ formatDelta(view.weekEdited.current, view.weekEdited.previous).text }} 较上周同期
-            </span>
-            <span class="metric-sub">
-              本月 {{ view.monthEdited.current }}
-              · {{ formatDelta(view.monthEdited.current, view.monthEdited.previous).text }}
-            </span>
-          </article>
-          <article class="metric">
-            <span class="metric-k">修订 · {{ rangeLabel }}</span>
-            <strong>{{ view.revisions.current }}</strong>
-            <span class="delta" :class="formatDelta(view.revisions.current, view.revisions.previous).tone">
-              {{ formatDelta(view.revisions.current, view.revisions.previous).text }} 较上一区间
-            </span>
-            <span class="metric-sub">累计 {{ view.totals.revisions }} 次存档</span>
-          </article>
-          <article class="metric">
-            <span class="metric-k">活跃模板 · {{ rangeLabel }}</span>
-            <strong>{{ view.activeTemplates.current }}</strong>
-            <span class="delta" :class="formatDelta(view.activeTemplates.current, view.activeTemplates.previous).tone">
-              {{ formatDelta(view.activeTemplates.current, view.activeTemplates.previous).text }} 较上一区间
-            </span>
-            <span class="metric-sub">累计 {{ view.totals.templates }} 种</span>
           </article>
         </section>
 
         <p v-if="auth.isAuthenticated && view.documents.current === 0" class="muted pad">
-          还没有云端画布。从模板库新建一份之后，趋势和热力图会按保存与修订累积。
+          还没有云端画布。从模板库新建一份之后，这里只累计你自己的保存和修订。
         </p>
+
+        <div class="split">
+          <section class="panel" aria-labelledby="mix-h">
+            <header class="panel-head">
+              <div>
+                <h2 id="mix-h">画布类型</h2>
+                <p>按你名下画布的 canvas 类型计数。颜色沿用模板类别：方法蓝、增长绿、行业黄、组织紫、复盘红。</p>
+              </div>
+            </header>
+            <CategoryDonut :segments="typeSegments" label="画布类型占比" />
+            <p v-if="!typeSegments.length" class="muted">还没有可分组的画布。</p>
+          </section>
+
+          <section class="panel" aria-labelledby="fav-h">
+            <header class="panel-head">
+              <div>
+                <h2 id="fav-h">最常用模板</h2>
+                <p>按仍在的画布份数排序。区间数字是这段时间里新建或最近一次实质编辑的份数。</p>
+              </div>
+            </header>
+            <p v-if="!templateRows.length" class="muted">还没有模板记录。</p>
+            <ul v-else class="tpl-list">
+              <li v-for="t in templateRows" :key="t.templateId">
+                <div class="tpl-top">
+                  <span class="tpl-name">{{ t.name }}</span>
+                  <span class="tpl-num">{{ t.total }} 份 · 区间 {{ t.created + t.edited }}</span>
+                </div>
+                <div class="tpl-top">
+                  <div class="meter"><span :style="{ width: t.width, background: t.color }" /></div>
+                  <svg viewBox="0 0 72 22" class="spark" aria-hidden="true">
+                    <polyline fill="none" :stroke="t.color" stroke-width="1.6" :points="t.spark" />
+                  </svg>
+                </div>
+              </li>
+            </ul>
+          </section>
+        </div>
 
         <section class="panel" aria-labelledby="trend-h">
           <header class="panel-head">
             <div>
-              <h2 id="trend-h">时间趋势</h2>
+              <h2 id="trend-h">我的创建 / 编辑趋势</h2>
               <p>
                 {{ rangeLabel }}新建 {{ view.rangeCreated.current }}、编辑 {{ view.rangeEdited.current }}、修订 {{ view.revisions.current }}。
-                编辑按每份画布最近一次更新计入；修订按每次存档计数。
+                本周新建 {{ view.weekCreated.current }}、编辑 {{ view.weekEdited.current }}；本月新建 {{ view.monthCreated.current }}、编辑 {{ view.monthEdited.current }}。
+                可按日、按周、按月切换。编辑只计每份画布最近一次更新。
               </p>
             </div>
           </header>
@@ -355,54 +477,36 @@ onUnmounted(() => {
           <TrendChart :labels="labels" :series="mainSeries" :mode="chartMode" />
         </section>
 
-        <div class="split">
-          <section class="panel" aria-labelledby="mix-h">
-            <header class="panel-head">
-              <div>
-                <h2 id="mix-h">模板分布</h2>
-                <p>按全部画布的模板类别占比。类别在前端映射，接口只返回模板 id。</p>
-              </div>
-            </header>
-            <CategoryDonut :segments="categorySegments" />
-            <ul class="tpl-list">
-              <li v-for="t in templateRows" :key="t.templateId">
-                <div class="tpl-top">
-                  <span class="tpl-name">{{ t.name }}</span>
-                  <span class="tpl-num">{{ t.total }} 份 · 区间 {{ t.created + t.edited }}</span>
-                </div>
-                <div class="meter"><span :style="{ width: t.width, background: t.color }" /></div>
-              </li>
-            </ul>
-          </section>
-
-          <section class="panel" aria-labelledby="tpl-trend-h">
-            <header class="panel-head">
-              <div>
-                <h2 id="tpl-trend-h">模板使用变化</h2>
-                <p>本区间里被新建或最近更新过的模板，最多五条。每条只在对应时间桶计一次。</p>
-              </div>
-            </header>
-            <div v-if="templateTrend.length" class="legend-row">
-              <span v-for="s in templateTrend" :key="s.name"><i class="dot" :style="{ background: s.color }" />{{ s.name }}</span>
+        <section class="panel" aria-labelledby="recent-h">
+          <header class="panel-head">
+            <div>
+              <h2 id="recent-h">最近编辑</h2>
+              <p>按最近一次保存时间，最多 8 份，只含当前账号的画布。</p>
             </div>
-            <p v-if="!templateTrend.length" class="muted">这个区间没有模板被新建或更新。</p>
-            <TrendChart v-else :labels="labels" :series="templateTrend" :mode="chartMode" />
-            <ul v-if="templateRows.length" class="sparks">
-              <li v-for="t in templateRows.slice(0, 5)" :key="`s-${t.templateId}`">
-                <span>{{ t.name }}</span>
-                <svg viewBox="0 0 72 22" class="spark" aria-hidden="true">
-                  <polyline fill="none" :stroke="t.color" stroke-width="1.6" :points="t.spark" />
-                </svg>
-              </li>
-            </ul>
-          </section>
-        </div>
+          </header>
+          <p v-if="!view.recent.length" class="muted">还没有可打开的画布。</p>
+          <ul v-else class="recent">
+            <li v-for="item in view.recent" :key="item.id">
+              <button type="button" class="recent-btn" @click="openRecent(item)">
+                <span class="rail" :style="{ '--accent': accentOf(item.templateId || templateIdFromCanvasType(item.canvasType)) }" />
+                <span class="recent-copy">
+                  <strong>{{ recentTitle(item) }}</strong>
+                  <em v-if="recentSubtitle(item)">{{ recentSubtitle(item) }}</em>
+                </span>
+                <time>{{ formatWhen(item.updatedAt) }}</time>
+              </button>
+            </li>
+          </ul>
+        </section>
 
         <section class="panel" aria-labelledby="heat-h">
           <header class="panel-head">
             <div>
-              <h2 id="heat-h">活跃度</h2>
-              <p>近 53 周，周一为一列的起点。当天有修订就计入；没有修订、但有一次实质更新的编辑，记在最近更新那天。</p>
+              <h2 id="heat-h">我的活跃日历</h2>
+              <p>
+                近 53 周，周一为起点。当天有你的修订，或一次实质编辑，就记为活跃。
+                连续天数从今天往回数；今天还没有活动时从昨天接着数，中间断开即停止。当前 {{ view.activity.streak }} 天，最长 {{ view.activity.longestStreak }} 天。
+              </p>
             </div>
           </header>
           <ActivityHeatmap :cells="view.heatmap" />
@@ -738,6 +842,101 @@ h1 {
   display: block;
   height: 100%;
   border-radius: inherit;
+}
+
+.tpl-top .meter {
+  flex: 1;
+  margin-top: 0;
+}
+
+.scope-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0 0;
+  color: #5f6368;
+  font-size: 13px;
+}
+
+.scope-pill {
+  font-size: 12px;
+  font-weight: 700;
+  color: #174ea6;
+  background: #e8f0fe;
+  border-radius: 999px;
+  padding: 3px 8px;
+}
+
+.metric strong.metric-name {
+  font-size: 16px;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.recent-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  border-radius: 10px;
+  padding: 8px;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.recent-btn:hover {
+  background: #f8f9fa;
+}
+
+.rail {
+  width: 4px;
+  align-self: stretch;
+  border-radius: 999px;
+  background: var(--accent, #1a73e8);
+  min-height: 28px;
+  flex-shrink: 0;
+}
+
+.recent-copy {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.recent-copy strong,
+.recent-copy em {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-copy strong {
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.recent-copy em,
+.recent time {
+  font-size: 12px;
+  color: #5f6368;
+  font-style: normal;
 }
 
 .spark {
