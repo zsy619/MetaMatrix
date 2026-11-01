@@ -36,6 +36,9 @@ export type RteSlashAction =
   | { type: 'hr' }
   | { type: 'plainDate' }
   | { type: 'plainDateTime' }
+  | { type: 'dateChip' }
+  | { type: 'dateRemind' }
+  | { type: 'columns'; cols: 2 | 3 }
   | { type: 'table' }
   | { type: 'image' }
   | { type: 'video' }
@@ -191,6 +194,38 @@ const BLOCK_ITEMS: RteSlashItem[] = [
     group: 'block',
     keywords: ['datetime', '时间', 'now', '此刻'],
     action: { type: 'plainDateTime' },
+  },
+  {
+    id: 'date-chip',
+    label: '日期',
+    description: '行内日期',
+    group: 'block',
+    keywords: ['date', '日期', 'chip', '今天'],
+    action: { type: 'dateChip' },
+  },
+  {
+    id: 'date-remind',
+    label: '提醒',
+    description: '带说明的日期',
+    group: 'block',
+    keywords: ['remind', '提醒', 'todo', '日期'],
+    action: { type: 'dateRemind' },
+  },
+  {
+    id: 'columns-2',
+    label: '双栏',
+    description: '左右两栏',
+    group: 'block',
+    keywords: ['column', '分栏', '双栏', '两栏'],
+    action: { type: 'columns', cols: 2 },
+  },
+  {
+    id: 'columns-3',
+    label: '三栏',
+    description: '三等分栏',
+    group: 'block',
+    keywords: ['column', '分栏', '三栏'],
+    action: { type: 'columns', cols: 3 },
   },
   {
     id: 'table',

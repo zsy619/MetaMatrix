@@ -64,7 +64,7 @@ export const Column = Node.create({
         class: 'rte-column',
         // 内联保底：即使 scoped/:deep 失效，空栏仍可见浅蓝虚线框
         style:
-          'min-width:0;min-height:72px;padding:10px 12px;border:1px dashed #91b3fa;border-radius:6px;background:#f0f5ff;box-sizing:border-box;',
+          'min-width:0;min-height:64px;padding:8px 10px;border:1px solid #e8eaed;border-radius:6px;background:#fff;box-sizing:border-box;',
       }),
       0,
     ]

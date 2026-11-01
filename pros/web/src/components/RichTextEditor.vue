@@ -35,6 +35,7 @@ import { ElMessage } from 'element-plus'
 import { looksLikeHtml, escapeHtml } from '../utils/itemsHtml'
 import { Annotation } from '../extensions/annotation'
 import { MathInline, MathDisplay, renderKatex } from '../extensions/math'
+import { DateChip } from '../extensions/dateChip'
 import { Video } from '../extensions/video'
 import {
   FormTextInput,
@@ -102,6 +103,7 @@ import {
   isBareHttpUrl,
   sanitizePastedHtml,
 } from '../utils/rtePasteClean'
+import { canRunFindReplace, imageReplaceSide, todayIso } from '../utils/rteRound5'
 import { LetterSpacing } from '../extensions/letterSpacing'
 import { ParagraphAttrs } from '../extensions/paragraphAttrs'
 import { PageBreak } from '../extensions/pageBreak'
@@ -982,6 +984,7 @@ const editor = useEditor({
     Annotation,
     MathInline,
     MathDisplay,
+    DateChip,
     FormTextInput,
     FormRadioGroup,
     FormCheckboxGroup,
@@ -1100,11 +1103,19 @@ const editor = useEditor({
       if (!files.length) return false
       event.preventDefault()
       const coords = view.posAtCoords({ left: event.clientX, top: event.clientY })
-      void insertUserImages(files, coords?.pos)
+      void replaceOrInsertDroppedImages(view, files, coords?.pos)
       return true
     },
     handleClick(_view, _pos, event) {
       const target = event.target as HTMLElement | null
+      const math = target?.closest?.(
+        '[data-type="math-inline"], [data-type="math-display"], .rte-math',
+      ) as HTMLElement | null
+      if (math) {
+        event.preventDefault()
+        openFormulaFromChip(math)
+        return true
+      }
       const xref = target?.closest?.('[data-type="cross-ref"]') as HTMLElement | null
       if (xref) {
         const ed = editor.value
@@ -1162,6 +1173,18 @@ const editor = useEditor({
       const ed = editor.value
       if (!ed) return false
       const key = event.key.toLowerCase()
+      if (key === '/' && !event.altKey && !event.shiftKey) {
+        event.preventDefault()
+        const willOpen = !shortcutsOpen.value
+        toggleShortcutsPanel()
+        if (willOpen) {
+          void nextTick(() => {
+            const panel = document.querySelector('.rte-shortcuts-panel') as HTMLElement | null
+            panel?.focus()
+          })
+        }
+        return true
+      }
       if (key === 'u') {
         event.preventDefault()
         ed.chain().focus().toggleUnderline().run()
@@ -1959,6 +1982,7 @@ const SHORTCUT_GROUPS: { title: string; items: { keys: string; desc: string }[] 
       { keys: 'Ctrl/⌘ + Shift + E', desc: '代码块' },
       { keys: '/', desc: '斜杠命令，快速插入段落类型' },
       { keys: 'Tab / Shift + Tab', desc: '列表增加 / 减少缩进' },
+      { keys: 'Ctrl/⌘ + /', desc: '打开快捷键说明' },
       ...FEISHU_BATCH3_SHORTCUTS,
       { keys: 'Ctrl/⌘ + Alt + H', desc: '高亮 / 取消高亮' },
       { keys: 'Ctrl/⌘ + Alt + Enter', desc: '打开当前块的操作菜单' },
@@ -3984,6 +4008,15 @@ function applySlashCommandItem(item: RteSlashItem) {
     case 'plainDateTime':
       insertPlainDateTime()
       break
+    case 'dateChip':
+      void insertDateChip('date')
+      break
+    case 'dateRemind':
+      void insertDateChip('remind')
+      break
+    case 'columns':
+      insertColumns(action.cols)
+      break
     case 'table':
       openTableDialog()
       break
@@ -4579,6 +4612,10 @@ const findStatusText = computed(() => {
   return `共 ${total} 处 · 第 ${cur} 处`
 })
 
+const canReplaceFind = computed(() =>
+  canRunFindReplace(findQuery.value, findMatches.value.length),
+)
+
 /** —— 插入链接 —— */
 const linkDialogOpen = ref(false)
 const linkText = ref('')
@@ -4932,6 +4969,46 @@ async function imageSrcWithinPolicy(file: File): Promise<string | null> {
     return null
   }
   return src
+}
+
+async function replaceOrInsertDroppedImages(
+  view: {
+    state: {
+      doc: {
+        resolve: (pos: number) => {
+          pos: number
+          nodeBefore: { type: { name: string }; nodeSize: number } | null
+          nodeAfter: { type: { name: string } } | null
+        }
+        nodeAt: (pos: number) => { attrs: Record<string, unknown> } | null
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      tr: { setNodeMarkup: (pos: number, type: null, attrs: Record<string, unknown>) => any }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    dispatch: (tr: any) => void
+  },
+  files: File[],
+  at?: number,
+) {
+  if (at != null && files[0]) {
+    const $pos = view.state.doc.resolve(at)
+    const side = imageReplaceSide($pos.nodeBefore?.type.name, $pos.nodeAfter?.type.name)
+    if (side) {
+      const src = await imageSrcWithinPolicy(files[0])
+      if (!src) return
+      const imagePos =
+        side === 'after' ? $pos.pos : $pos.pos - ($pos.nodeBefore?.nodeSize || 0)
+      const node = view.state.doc.nodeAt(imagePos)
+      if (node) {
+        view.dispatch(
+          view.state.tr.setNodeMarkup(imagePos, null, { ...node.attrs, src }),
+        )
+        return
+      }
+    }
+  }
+  await insertUserImages(files, at)
 }
 
 async function insertUserImages(files: File[], at?: number) {
@@ -5455,6 +5532,46 @@ function insertFormula() {
   openFormulaDialog()
 }
 
+function openFormulaFromChip(el: HTMLElement) {
+  const ed = editor.value
+  if (!ed) return
+  const display =
+    el.getAttribute('data-type') === 'math-display' || el.classList.contains('rte-math-display')
+  const tex = el.getAttribute('data-tex') || ''
+  try {
+    const pos = ed.view.posAtDOM(el, 0)
+    const node = ed.state.doc.nodeAt(pos)
+    if (node && (node.type.name === 'mathInline' || node.type.name === 'mathDisplay')) {
+      ed.view.dispatch(ed.state.tr.setSelection(NodeSelection.create(ed.state.doc, pos)))
+    }
+  } catch {
+    /* 点在公式渲染节点内部时仍打开编辑 */
+  }
+  formulaMode.value = display ? 'display' : 'inline'
+  formulaTex.value = tex
+  formulaPreviewExpanded.value = false
+  formulaDialogOpen.value = true
+}
+
+async function insertDateChip(kind: 'date' | 'remind' = 'date') {
+  const ed = editor.value
+  if (!ed) return
+  const iso = todayIso()
+  if (kind === 'remind') {
+    const label = await openRtePrompt({
+      title: '提醒',
+      message: '写一句说明，留空则只插入日期。',
+      placeholder: '例如：评审',
+      confirmLabel: '插入',
+      maxlength: 40,
+    })
+    if (label == null) return
+    ed.chain().focus().insertDateChip({ iso, kind: 'remind', label }).run()
+    return
+  }
+  ed.chain().focus().insertDateChip({ iso, kind: 'date', label: '' }).run()
+}
+
 function confirmInsertFormula() {
   const ed = editor.value
   if (!ed) return
@@ -5651,6 +5768,13 @@ function tableSplitCell() {
   if (!canSplitCell()) return
   runTableCommand(() => editor.value!.chain().focus().splitCell().run())
 }
+function applyCellTextAlign(align: 'left' | 'center' | 'right') {
+  const ed = editor.value
+  if (!ed || !isInTable()) return
+  ed.chain().focus().setTextAlign(align).run()
+  announceRte(align === 'center' ? '单元格已居中' : align === 'right' ? '单元格已右对齐' : '单元格已左对齐')
+}
+
 function tableToggleHeaderRow() {
   runTableCommand(() => editor.value!.chain().focus().toggleHeaderRow().run())
 }
@@ -5730,6 +5854,21 @@ const tableOpItems = computed((): TableOpItem[] => {
       key: 'valign-bottom',
       label: '垂直对齐·底',
       run: () => applyCellValign('bottom'),
+    },
+    {
+      key: 'align-left',
+      label: '单元格左对齐',
+      run: () => applyCellTextAlign('left'),
+    },
+    {
+      key: 'align-center',
+      label: '单元格居中',
+      run: () => applyCellTextAlign('center'),
+    },
+    {
+      key: 'align-right',
+      label: '单元格右对齐',
+      run: () => applyCellTextAlign('right'),
     },
     {
       key: 'sort-asc',
@@ -9718,6 +9857,9 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
               v-if="shortcutsOpen && expanded"
               class="rte-shortcuts-panel"
               v-rte-float="'shortcuts'"
+              role="dialog"
+              aria-label="快捷键说明"
+              tabindex="-1"
               @mousedown.prevent
               @mouseenter="onToolMenuEnter('shortcuts')"
               @mouseleave="onToolMenuLeave($event, 'shortcuts', () => (shortcutsOpen = false))"
@@ -10561,6 +10703,9 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
           v-if="!expanded && shortcutsOpen"
           class="rte-shortcuts-panel"
           v-rte-float="'shortcuts'"
+          role="dialog"
+          aria-label="快捷键说明"
+          tabindex="-1"
           @mousedown.prevent
           @mouseenter="onToolMenuEnter('shortcuts')"
           @mouseleave="onToolMenuLeave($event, 'shortcuts', () => (shortcutsOpen = false))"
@@ -10866,6 +11011,7 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
           class="rte-bubble-btn"
           :class="{ active: (editor?.getAttributes('image')?.align || '') === opt.value }"
           :title="'对齐：' + opt.label"
+          :aria-label="'图片' + opt.label"
           @mousedown.prevent
           @click="setImageAlign(opt.value)"
         >
@@ -10901,11 +11047,13 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
           type="button"
           class="rte-bubble-btn"
           title="应用题注"
+          aria-label="应用图片说明"
           @mousedown.prevent
           @click="applyImageCaption"
         >
           题注
         </button>
+        <span class="rte-image-replace-hint">拖一张图到图片上可替换</span>
       </div>
       <div class="rte-image-bubble-row">
         <span class="rte-image-width-label">圆角</span>
@@ -11116,6 +11264,8 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
           <button type="button" @click="toggleCodeBlock">代码</button>
           <button type="button" @click="insertFormula">公式</button>
           <button type="button" @click="openTableDialog">表格</button>
+          <button type="button" @click="insertColumns(2)">双栏</button>
+          <button type="button" @click="insertDateChip('date')">日期</button>
           <span class="rte-empty-guide-hint">或输入 / 插入</span>
         </div>
       </div>
@@ -11866,10 +12016,10 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
             <span class="rte-find-status" role="status" aria-live="polite">{{ findStatusText }}</span>
           </div>
           <div class="rte-modal-actions rte-find-actions">
-            <button type="button" class="rte-modal-cancel" @click="findGo(-1)">上一个</button>
-            <button type="button" class="rte-modal-cancel" @click="findGo(1)">下一个</button>
-            <button type="button" class="rte-modal-cancel" @click="doReplaceOne">替换</button>
-            <button type="button" class="rte-modal-confirm" @click="doReplaceAll">全部替换</button>
+            <button type="button" class="rte-modal-cancel" :disabled="!canReplaceFind" @click="findGo(-1)">上一个</button>
+            <button type="button" class="rte-modal-cancel" :disabled="!canReplaceFind" @click="findGo(1)">下一个</button>
+            <button type="button" class="rte-modal-cancel" :disabled="!canReplaceFind" @click="doReplaceOne">替换当前</button>
+            <button type="button" class="rte-modal-confirm" :disabled="!canReplaceFind" @click="doReplaceAll">全部替换</button>
             <button type="button" class="rte-modal-cancel" @click="closeFindDialog">关闭</button>
           </div>
         </div>
@@ -16171,6 +16321,39 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
   margin-left: auto;
   color: #86909c;
   font-variant-numeric: tabular-nums;
+}
+.rte-find-actions button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.rte-find-query:focus-visible,
+.rte-shortcuts-panel:focus-visible,
+.rte-block-handle:focus-visible,
+.rte-tool:focus-visible {
+  outline: 2px solid var(--mm-blue, #1a73e8);
+  outline-offset: 1px;
+}
+.rte-root :deep(.rte-date-chip) {
+  display: inline-flex;
+  align-items: center;
+  margin: 0 2px;
+  padding: 0 6px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--mm-blue-soft, #e8f0fe);
+  color: var(--mm-blue-deep, #174ea6);
+  font-size: 12px;
+  line-height: 22px;
+  user-select: none;
+}
+.rte-root :deep(.rte-date-chip--remind) {
+  background: #fef7e0;
+  color: #8a5a00;
+}
+.rte-image-replace-hint {
+  flex: 1 1 100%;
+  font-size: 11px;
+  color: var(--mm-faint, #9aa0a6);
 }
 .rte-find-actions {
   flex-wrap: wrap;
