@@ -115,7 +115,6 @@ import {
   estimateReadingMinutes,
   copyTableAs,
   applyTableRowFilter,
-  clearTableRowFilter,
   compressImageFile,
   loadSnippets,
   saveSnippets,
@@ -125,7 +124,7 @@ import {
   IMAGE_SHADOW_PRESETS,
   IMAGE_BORDER_PRESETS,
   type RteSnippet,
-  type ParaStyleId,
+  type ParaStyleId as WaveParaStyleId,
 } from '../utils/rteWave21'
 import {
   applyCaseToSelection,
@@ -2226,7 +2225,7 @@ function toggleHeadingAutoNumber() {
   ElMessage.success(headingAutoNumber.value ? '已开启标题自动编号' : '已关闭标题自动编号')
 }
 
-function applyParaStyleId(id: ParaStyleId) {
+function applyParaStyleId(id: WaveParaStyleId) {
   const ed = editor.value
   if (!ed) return
   applyParagraphStyle(ed, id)
@@ -3067,7 +3066,6 @@ function moveCurrentBlock(dir: -1 | 1) {
   if (!ed) return
   const { $from } = ed.state.selection
   if ($from.depth < 1) return
-  const depth = 1
   const index = $from.index(0)
   const doc = ed.state.doc
   const targetIndex = index + dir
@@ -3202,9 +3200,6 @@ function insertHrVariant(variant: RteHrVariant) {
   hrOpen.value = false
   moreOpen.value = false
 }
-function setHorizontalRule() {
-  insertHrVariant('solid')
-}
 
 /** —— 表格单元格背景 / 边框 —— */
 function setTableCellBg(color: string) {
@@ -3275,11 +3270,6 @@ function setCodeLanguage(lang: string) {
   if (!ed || !ed.isActive('codeBlock')) return
   const next = lang || 'plaintext'
   ed.chain().focus().updateAttributes('codeBlock', { language: next }).run()
-}
-function onCodeLangChange(event: Event) {
-  const v = (event.target as HTMLSelectElement).value
-  setCodeLanguage(v)
-  announceRte(`代码语言：${codeLanguageLabel(v)}`)
 }
 
 const codeLangOpen = ref(false)
@@ -6349,7 +6339,6 @@ const WORD_STANDARD_COLOR_ITEMS = [
   { color: '#002060', label: '深蓝' },
   { color: '#7030A0', label: '紫色' },
 ]
-const WORD_STANDARD_COLORS = WORD_STANDARD_COLOR_ITEMS.map((x) => x.color)
 
 const customHighlightOpen = ref(false)
 const customHighlightHex = ref('#FFF3BF')
