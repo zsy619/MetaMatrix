@@ -149,7 +149,7 @@ function onRemoveRow(rowId: string) {
   font-weight: 800;
   color: #fff;
   background: var(--tbl-header, #2A649F);
-  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.14);
+  text-shadow: var(--cv-header-shadow, 0 1px 1px rgba(0, 0, 0, 0.34), 0 0 1px rgba(0, 0, 0, 0.28));
   border-right: 1px solid var(--cv-frame, #ececec);
   letter-spacing: 0.04em;
   line-height: 1.3;
@@ -272,9 +272,9 @@ function onRemoveRow(rowId: string) {
 }
 
 .ga-add-btn:hover {
-  border-color: #1a73e8;
-  color: #1a73e8;
-  background: #e8f0fe;
+  border-color: var(--cv-focus, #1c4c7c);
+  color: var(--cv-focus, #1c4c7c);
+  background: var(--cv-hover-wash, #e8f1fa);
 }
 
 @media (max-width: 900px) {

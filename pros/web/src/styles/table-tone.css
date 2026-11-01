@@ -27,8 +27,9 @@
   box-shadow: none !important;
 }
 
-.tbl-tone .ym-block.selected {
-  box-shadow: inset 0 0 0 2px rgba(26, 115, 232, 0.45) !important;
+.tbl-tone .ym-block.selected,
+.tbl-tone .ym-block.is-source-max {
+  box-shadow: inset 0 0 0 2px var(--cv-select, rgba(28, 76, 124, 0.72)) !important;
 }
 
 .tbl-tone .ProseMirror,

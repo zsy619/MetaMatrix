@@ -353,7 +353,7 @@ function onOpenQuadrant(id: WorkStateZonesBlockId, event?: Event) {
     sans-serif;
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.06);
   border: none;
-  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.14);
+  text-shadow: var(--cv-header-shadow, 0 1px 1px rgba(0, 0, 0, 0.34), 0 0 1px rgba(0, 0, 0, 0.28));
   pointer-events: none;
 }
 

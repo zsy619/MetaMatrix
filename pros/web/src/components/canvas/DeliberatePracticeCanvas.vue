@@ -771,7 +771,7 @@ onBeforeUnmount(() => {
 }
 
 .dp-d-hit:focus-visible .dp-hit-pad {
-  stroke: #00a685;
+  stroke: var(--cv-focus, #1c4c7c);
   stroke-width: 2;
   fill: rgba(255, 255, 255, 0.55);
 }

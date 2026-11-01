@@ -6,7 +6,10 @@
     "background": {
       "pattern": "none",
       "color": "#f7f7f7"
-    }
+    },
+    "page": "#f7f7f7",
+    "frame": "#ececec",
+    "hairline": "rgba(60, 50, 20, 0.08)"
   },
   "footer": {
     "lead": "五步法原版：五列里把定性判断和定量证据放在一起看。",

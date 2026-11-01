@@ -772,9 +772,9 @@ onUnmounted(() => {
 
 .bf-search:focus {
   outline: none;
-  border-color: #1a73e8;
+  border-color: var(--cv-focus, #1c4c7c);
   background: #ffffff;
-  box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.15);
+  box-shadow: 0 0 0 2px var(--cv-select-soft, rgba(28, 76, 124, 0.34));
 }
 
 .bf-search-clear {
@@ -825,9 +825,9 @@ onUnmounted(() => {
 }
 
 .bf-chip.active {
-  background: #e8f0fe;
-  border-color: #1a73e8;
-  color: #174ea6;
+  background: var(--cv-hover-wash, #e8f1fa);
+  border-color: var(--cv-focus, #1c4c7c);
+  color: var(--cv-focus, #1c4c7c);
   font-weight: 600;
 }
 
@@ -868,10 +868,10 @@ onUnmounted(() => {
 }
 
 .bf-template-btn.active {
-  background: #e8f0fe;
-  border-color: #1a73e8;
-  color: #174ea6;
-  box-shadow: inset 0 0 0 1px rgba(26, 115, 232, 0.25);
+  background: var(--cv-hover-wash, #e8f1fa);
+  border-color: var(--cv-focus, #1c4c7c);
+  color: var(--cv-focus, #1c4c7c);
+  box-shadow: inset 0 0 0 1px var(--cv-select-soft, rgba(28, 76, 124, 0.34));
 }
 
 .bf-emoji {
@@ -903,9 +903,9 @@ onUnmounted(() => {
 
 .bf-textarea:focus {
   outline: none;
-  border-color: #1a73e8;
+  border-color: var(--cv-focus, #1c4c7c);
   background: #ffffff;
-  box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.15);
+  box-shadow: 0 0 0 2px var(--cv-select-soft, rgba(28, 76, 124, 0.34));
 }
 
 .bf-textarea.maximized {
@@ -984,13 +984,13 @@ onUnmounted(() => {
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
-  background: #1a73e8;
+  background: var(--cv-focus, #1c4c7c);
   color: #ffffff;
-  box-shadow: 0 1px 2px rgba(26, 115, 232, 0.28);
+  box-shadow: 0 1px 2px var(--cv-select-soft, rgba(28, 76, 124, 0.34));
 }
 
 .bf-primary:hover {
-  background: #1765cc;
+  background: #163e62;
 }
 
 .bf-secondary {
@@ -1049,9 +1049,9 @@ onUnmounted(() => {
 
 .bf-tool-btn:hover,
 .bf-tool-btn.active {
-  background: #e8f0fe;
-  border-color: #1a73e8;
-  color: #174ea6;
+  background: var(--cv-hover-wash, #e8f1fa);
+  border-color: var(--cv-focus, #1c4c7c);
+  color: var(--cv-focus, #1c4c7c);
 }
 
 .bf-select {
@@ -1116,8 +1116,8 @@ onUnmounted(() => {
 }
 
 .bf-op-circle.op-divide {
-  fill: #e8f0fe;
-  stroke: #1a73e8;
+  fill: var(--cv-hover-wash, #e8f1fa);
+  stroke: var(--cv-focus, #1c4c7c);
 }
 
 .bf-op-circle.op-default {

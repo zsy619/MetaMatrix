@@ -397,13 +397,13 @@ onBeforeUnmount(() => {
 }
 
 .ipo-node--clickable:hover .ipo-box {
-  border-color: #1a73e8;
-  box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.18);
+  border-color: var(--cv-focus, #1c4c7c);
+  box-shadow: 0 0 0 2px var(--cv-select-soft, rgba(28, 76, 124, 0.34));
 }
 
 .ipo-node--clickable:focus-visible .ipo-box {
-  border-color: #1a73e8;
-  box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.28);
+  border-color: var(--cv-focus, #1c4c7c);
+  box-shadow: 0 0 0 2px var(--cv-select-soft, rgba(28, 76, 124, 0.34));
 }
 
 .ipo-node--clickable:hover .ipo-cn {

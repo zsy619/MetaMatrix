@@ -33,5 +33,6 @@ const notes = computed(() =>
     :reminders="notes.reminders"
     negate="warm"
     min-height="820px"
+    :theme="doc.theme"
   />
 </template>

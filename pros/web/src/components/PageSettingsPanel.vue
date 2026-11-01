@@ -543,26 +543,30 @@ function goGuide() {
         </button>
         <div v-show="sectionOpen.document" class="acc-body">
           <div class="field">
-            <label class="field-label">任务名称 <span class="req">*</span></label>
-            <el-input
-              ref="titleInputRef"
-              v-model="doc_title"
-              size="small"
-              placeholder="必填，保存时作为任务名称"
-              maxlength="255"
-              clearable
-            />
+            <label class="field-label">
+              <span class="field-label-text">任务名称 <span class="req">*</span></span>
+              <el-input
+                ref="titleInputRef"
+                v-model="doc_title"
+                size="small"
+                placeholder="必填，保存时作为任务名称"
+                maxlength="255"
+                clearable
+              />
+            </label>
           </div>
           <div class="field">
-            <label class="field-label">备注信息</label>
-            <el-input
-              v-model="doc_notes"
-              type="textarea"
-              :rows="3"
-              size="small"
-              placeholder="可选备注"
-              maxlength="2000"
-            />
+            <label class="field-label">
+              <span class="field-label-text">备注信息</span>
+              <el-input
+                v-model="doc_notes"
+                type="textarea"
+                :rows="3"
+                size="small"
+                placeholder="可选备注"
+                maxlength="2000"
+              />
+            </label>
           </div>
           <div class="meta-grid">
             <div class="info-row">
@@ -983,10 +987,15 @@ function goGuide() {
 }
 
 .field-label {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
   font-size: 12px;
   color: #5f6368;
-  margin-bottom: 4px;
+}
+
+.field-label-text {
+  line-height: 1.4;
 }
 
 .req {

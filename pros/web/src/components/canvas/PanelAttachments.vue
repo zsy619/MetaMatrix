@@ -293,7 +293,7 @@ function closePreview() {
 }
 
 .pa-btn {
-  border: 1px dashed #9aa0a6;
+  border: 1px solid var(--cv-frame, #ececec);
   border-radius: 4px;
   background: #fff;
   color: #5f6368;
@@ -306,20 +306,20 @@ function closePreview() {
 }
 
 .pa-btn:hover {
-  border-color: #1a73e8;
-  color: #1a73e8;
-  background: #e8f0fe;
+  border-color: var(--cv-focus, #1c4c7c);
+  color: var(--cv-focus, #1c4c7c);
+  background: var(--cv-hover-wash, #e8f1fa);
 }
 
 .pa-btn-primary {
   border-style: solid;
-  border-color: #1a73e8;
-  background: #1a73e8;
+  border-color: var(--cv-focus, #1c4c7c);
+  background: var(--cv-focus, #1c4c7c);
   color: #fff;
 }
 
 .pa-btn-primary:hover {
-  background: #1765cc;
+  background: #163e62;
   color: #fff;
 }
 
@@ -348,7 +348,7 @@ function closePreview() {
 }
 
 .pa-input:focus {
-  border-color: #1a73e8;
+  border-color: var(--cv-focus, #1c4c7c);
 }
 
 .pa-error {
@@ -401,7 +401,7 @@ function closePreview() {
   flex-shrink: 0;
   border: none;
   background: transparent;
-  color: #1a73e8;
+  color: var(--cv-focus, #1c4c7c);
   font-size: 11px;
   font-weight: 600;
   cursor: pointer;
@@ -411,7 +411,7 @@ function closePreview() {
 }
 
 .pa-link-btn:hover {
-  background: #e8f0fe;
+  background: var(--cv-hover-wash, #e8f1fa);
 }
 
 .pa-danger {

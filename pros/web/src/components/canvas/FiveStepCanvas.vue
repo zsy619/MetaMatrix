@@ -8,6 +8,7 @@ import type {
 import originalTemplate from '../../templates/five-step-v1.json'
 import FiveStepPanel from './FiveStepPanel.vue'
 import FiveStepNotes from './FiveStepNotes.vue'
+import { canvasChromeStyle } from './canvasChrome'
 import { fiveStepPalette, resolveMethodFooter } from './fiveStepPalette'
 import './five-step-shell.css'
 
@@ -25,6 +26,8 @@ function block(id: FiveStepBlockId): FiveStepBlock | undefined {
   return byId.value.get(id)
 }
 
+const chrome = computed(() => canvasChromeStyle(props.doc.theme))
+
 const notes = computed(() =>
   resolveMethodFooter(
     props.doc.footer,
@@ -34,7 +37,7 @@ const notes = computed(() =>
 </script>
 
 <template>
-  <div class="fsx-canvas" aria-label="五步法（原版）">
+  <div class="fsx-canvas" :style="chrome" aria-label="五步法（原版）">
     <div
       class="fsx-grid"
       role="table"

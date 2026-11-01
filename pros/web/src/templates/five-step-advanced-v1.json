@@ -6,7 +6,10 @@
     "background": {
       "pattern": "none",
       "color": "#f7f7f7"
-    }
+    },
+    "page": "#f7f7f7",
+    "frame": "#ececec",
+    "hairline": "rgba(60, 50, 20, 0.08)"
   },
   "footer": {
     "lead": "五步法提高版：每一列先写「是什么」，再用红色「非*」划清边界。",

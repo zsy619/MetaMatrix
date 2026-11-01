@@ -423,7 +423,7 @@ const labels = computed(() => {
 }
 
 .hub-blank:focus {
-  border-bottom-color: #1a73e8;
+  border-bottom-color: var(--cv-focus, #1c4c7c);
 }
 
 .hub-blank::placeholder {

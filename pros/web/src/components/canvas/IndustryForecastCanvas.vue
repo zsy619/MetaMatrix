@@ -102,7 +102,7 @@ const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 }
 
 .industry-forecast-canvas::-webkit-scrollbar-thumb {
-  background: rgba(93, 64, 55, 0.35);
+  background: rgba(60, 50, 20, 0.28);
   border-radius: 999px;
 }
 
@@ -111,17 +111,16 @@ const chrome = computed(() => canvasChromeStyle(props.doc.theme))
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 12px 16px;
-  background: #c4a574;
-  border-bottom: 2px solid #8d6e4a;
+  padding: 2px 4px 10px;
+  background: transparent;
 }
 
 .if-header h1 {
   margin: 0;
-  font-size: clamp(18px, 2vw, 24px);
-  font-weight: 800;
-  color: #3e2723;
-  letter-spacing: 0.06em;
+  font-size: clamp(18px, 2vw, 22px);
+  font-weight: 750;
+  color: var(--cv-ink-strong, #202124);
+  letter-spacing: 0.04em;
   line-height: 1.25;
 }
 
@@ -132,8 +131,7 @@ const chrome = computed(() => canvasChromeStyle(props.doc.theme))
   min-height: min-content;
   display: flex;
   flex-direction: column;
-  border: 2px solid #5d4037;
-  border-top: none;
+  border: 1px solid var(--cv-frame, #ececec);
   overflow: visible;
   background: #fff;
 }
@@ -143,7 +141,7 @@ const chrome = computed(() => canvasChromeStyle(props.doc.theme))
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   min-height: 400px;
-  border-bottom: 2px solid #5d4037;
+  box-shadow: inset 0 -1px 0 var(--cv-hairline, rgba(60, 50, 20, 0.08));
 }
 
 .if-cell {
@@ -154,23 +152,22 @@ const chrome = computed(() => canvasChromeStyle(props.doc.theme))
   padding: 0;
   box-sizing: border-box;
   background: var(--tbl-body, #fff);
-  border-right: 2px solid #5d4037;
+  box-shadow: inset -1px 0 0 var(--cv-hairline, rgba(60, 50, 20, 0.08));
   gap: 0;
 }
 
 .if-row--top .if-cell:last-child {
-  border-right: none;
+  box-shadow: none;
 }
 
 .if-cell--full {
   flex: 0.85 0 400px;
   min-height: 400px;
-  border-right: none;
-  border-bottom: 2px solid #5d4037;
+  box-shadow: inset 0 -1px 0 var(--cv-hairline, rgba(60, 50, 20, 0.08));
 }
 
 .if-cell--full:last-child {
-  border-bottom: none;
+  box-shadow: none;
 }
 
 .if-meta {
@@ -189,7 +186,7 @@ const chrome = computed(() => canvasChromeStyle(props.doc.theme))
   font-size: clamp(15px, 1.55vw, 19px);
   font-weight: 800;
   color: #fff;
-  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.14);
+  text-shadow: var(--cv-header-shadow, 0 1px 1px rgba(0, 0, 0, 0.34), 0 0 1px rgba(0, 0, 0, 0.28));
   letter-spacing: 0.02em;
   line-height: 1.3;
 }
@@ -203,7 +200,8 @@ const chrome = computed(() => canvasChromeStyle(props.doc.theme))
   margin: 0;
   font-size: clamp(12px, 1.15vw, 14px);
   font-weight: 400;
-  color: rgba(255, 255, 255, 0.9);
+  color: #fff;
+  text-shadow: var(--cv-header-shadow, 0 1px 1px rgba(0, 0, 0, 0.34), 0 0 1px rgba(0, 0, 0, 0.28));
   line-height: 1.4;
 }
 
@@ -220,7 +218,7 @@ const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 .if-body :deep(.ym-block) {
   flex: 1;
   min-height: 0;
-  background: rgba(248, 249, 250, 0.55);
+  background: transparent;
 }
 
 @media (max-width: 720px) {
@@ -231,8 +229,7 @@ const chrome = computed(() => canvasChromeStyle(props.doc.theme))
   }
 
   .if-cell {
-    border-right: none;
-    border-bottom: 2px solid #5d4037;
+    box-shadow: inset 0 -1px 0 var(--cv-hairline, rgba(60, 50, 20, 0.08));
     min-height: 400px;
   }
 
@@ -241,8 +238,9 @@ const chrome = computed(() => canvasChromeStyle(props.doc.theme))
     min-height: 400px;
   }
 
+  .if-cell:last-child,
   .if-cell--full:last-child {
-    border-bottom: none;
+    box-shadow: none;
   }
 }
 </style>

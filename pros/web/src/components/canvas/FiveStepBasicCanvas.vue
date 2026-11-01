@@ -8,6 +8,7 @@ import type {
 import basicTemplate from '../../templates/five-step-basic-v1.json'
 import FiveStepPanel from './FiveStepPanel.vue'
 import FiveStepNotes from './FiveStepNotes.vue'
+import { canvasChromeStyle } from './canvasChrome'
 import { fiveStepPalette, resolveMethodFooter } from './fiveStepPalette'
 
 const props = defineProps<{
@@ -24,6 +25,8 @@ function block(id: FiveStepBasicBlockId): FiveStepBasicBlock | undefined {
   return byId.value.get(id)
 }
 
+const chrome = computed(() => canvasChromeStyle(props.doc.theme))
+
 const notes = computed(() =>
   resolveMethodFooter(
     props.doc.footer,
@@ -33,7 +36,7 @@ const notes = computed(() =>
 </script>
 
 <template>
-  <div class="fsb-canvas" aria-label="五步法（基础版）">
+  <div class="fsb-canvas" :style="chrome" aria-label="五步法（基础版）">
     <div class="fsb-table" role="table" aria-label="五步法（基础版）">
       <section
         v-for="col in doc.columns"
@@ -77,8 +80,9 @@ const notes = computed(() =>
   display: flex;
   flex-direction: column;
   padding: 14px 16px 12px;
-  background: #f7f7f7;
+  background: var(--cv-page, #f7f7f7);
   overflow: auto;
+  overscroll-behavior: contain;
 }
 
 .fsb-table {
@@ -89,16 +93,16 @@ const notes = computed(() =>
   grid-template-columns: repeat(5, minmax(0, 1fr));
   grid-template-rows: minmax(360px, 1fr) auto;
   background: #fff;
-  border: 1px solid #ececec;
+  border: 1px solid var(--cv-frame, #ececec);
   box-sizing: border-box;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .fsb-cell,
 .fsb-foot {
   min-width: 0;
   min-height: 0;
-  box-shadow: inset -1px 0 0 rgba(60, 50, 20, 0.08);
+  box-shadow: inset -1px 0 0 var(--cv-hairline, rgba(60, 50, 20, 0.08));
 }
 
 .fsb-cell:nth-child(5),
@@ -117,7 +121,7 @@ const notes = computed(() =>
   min-height: 38px;
   padding: 8px 6px;
   box-sizing: border-box;
-  border-top: 1px solid rgba(60, 50, 20, 0.08);
+  border-top: 1px solid var(--cv-hairline, rgba(60, 50, 20, 0.08));
   font-size: clamp(12px, 1.2vw, 14px);
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -131,7 +135,7 @@ const notes = computed(() =>
   }
 
   .fsb-table {
-    min-width: 880px;
+    min-width: 760px;
   }
 }
 </style>

@@ -188,7 +188,7 @@ function onRemoveRow(rowId: string) {
 }
 
 .kr-rate-input:focus {
-  border-bottom-color: #1a73e8;
+  border-bottom-color: var(--cv-focus, #1c4c7c);
 }
 
 .kr-table {
@@ -214,7 +214,7 @@ function onRemoveRow(rowId: string) {
   font-weight: 700;
   color: #fff;
   background: var(--tbl-header, #2A649F);
-  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.14);
+  text-shadow: var(--cv-header-shadow, 0 1px 1px rgba(0, 0, 0, 0.34), 0 0 1px rgba(0, 0, 0, 0.28));
   border-right: 1px solid var(--cv-frame, #ececec);
   letter-spacing: 0.02em;
 }
@@ -322,9 +322,9 @@ function onRemoveRow(rowId: string) {
 }
 
 .kr-add-btn:hover {
-  background: #e8f0fe;
-  border-color: #1a73e8;
-  color: #1a73e8;
+  background: var(--cv-hover-wash, #e8f1fa);
+  border-color: var(--cv-focus, #1c4c7c);
+  color: var(--cv-focus, #1c4c7c);
 }
 
 .kr-footer {

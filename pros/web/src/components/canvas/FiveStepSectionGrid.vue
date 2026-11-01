@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { QuadrantItem } from '../../types/canvas'
+import type { CanvasTheme, QuadrantItem } from '../../types/canvas'
 import FiveStepPanel from './FiveStepPanel.vue'
 import FiveStepNotes from './FiveStepNotes.vue'
+import { canvasChromeStyle } from './canvasChrome'
 import { fiveStepPalette, sectionPalette } from './fiveStepPalette'
 import './five-step-shell.css'
 
@@ -35,12 +36,16 @@ const props = withDefaults(
     reminders: string[]
     negate?: 'red' | 'warm'
     minHeight?: string
+    theme?: Partial<CanvasTheme> | null
   }>(),
   {
     negate: 'red',
     minHeight: '560px',
+    theme: null,
   },
 )
+
+const chrome = computed(() => canvasChromeStyle(props.theme))
 
 const byId = computed(() => {
   const map = new Map<string, FiveStepSectionBlock>()
@@ -60,7 +65,7 @@ function panelHeader(section: FiveStepSectionLike, current?: FiveStepSectionBloc
 </script>
 
 <template>
-  <div class="fsx-canvas" :aria-label="label">
+  <div class="fsx-canvas" :style="chrome" :aria-label="label">
     <div
       class="fsx-grid"
       role="table"

@@ -164,7 +164,7 @@ function onOrganizer(event: Event) {
   font-size: clamp(16px, 1.6vw, 20px);
   font-weight: 800;
   color: #fff;
-  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.14);
+  text-shadow: var(--cv-header-shadow, 0 1px 1px rgba(0, 0, 0, 0.34), 0 0 1px rgba(0, 0, 0, 0.28));
   letter-spacing: 0.01em;
   line-height: 1.3;
 }
@@ -242,7 +242,7 @@ function onOrganizer(event: Event) {
 }
 
 .sm-meta-input:focus {
-  border-bottom-color: #1a73e8;
+  border-bottom-color: var(--cv-focus, #1c4c7c);
 }
 
 @media (max-width: 720px) {
