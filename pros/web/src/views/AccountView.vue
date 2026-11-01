@@ -12,6 +12,14 @@ const newPassword = ref('')
 const message = ref('')
 const tone = ref<'error' | 'ok'>('error')
 const busy = ref(false)
+function readDensity(): 'comfortable' | 'compact' {
+  try {
+    return localStorage.getItem('metamatrix:density') === 'compact' ? 'compact' : 'comfortable'
+  } catch {
+    return 'comfortable'
+  }
+}
+const density = ref(readDensity())
 
 const expiryLabel = computed(() => {
   const raw = auth.token
@@ -68,6 +76,11 @@ async function submit() {
   }
 }
 
+function setDensity(mode: 'comfortable' | 'compact') {
+  density.value = mode
+  window.dispatchEvent(new CustomEvent('metamatrix:density', { detail: mode }))
+}
+
 function logout() {
   auth.logout()
   router.replace({ name: 'login' })
@@ -94,6 +107,12 @@ function logout() {
           <dd>{{ expiryLabel }}</dd>
         </div>
       </dl>
+      <h2>界面密度</h2>
+      <p class="hint">只收紧间距。画布分色保持不变，不跟随系统深色模式改色。</p>
+      <div class="actions">
+        <button type="button" class="mm-btn" :class="{ 'mm-btn--primary': density === 'comfortable' }" @click="setDensity('comfortable')">标准</button>
+        <button type="button" class="mm-btn" :class="{ 'mm-btn--primary': density === 'compact' }" @click="setDensity('compact')">紧凑</button>
+      </div>
       <h2>修改密码</h2>
       <label for="cur-pass">
         当前密码
@@ -163,6 +182,7 @@ input {
   font: inherit;
 }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.hint { margin: 0; color: var(--mm-muted); font-size: 13px; }
 .err { color: var(--mm-red); margin: 0; font-size: 13px; }
 .ok { color: var(--mm-green); margin: 0; font-size: 13px; }
 </style>

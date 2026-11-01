@@ -632,7 +632,7 @@ func (s *DocumentsService) Stats(ownerID uuid.UUID, rangeKey, granularity string
 SELECT r.document_id, r.created_at
 FROM canvas_revisions r
 INNER JOIN canvas_documents d ON d.id = r.document_id
-WHERE d.owner_user_id = ?
+WHERE d.owner_user_id = ? AND d.deleted_at IS NULL
 `, ownerID).Scan(&revs).Error
 	if err != nil {
 		return nil, err

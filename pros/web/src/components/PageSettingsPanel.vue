@@ -13,6 +13,7 @@ import {
 import { useHistoryStore } from '../stores/history'
 import { useUiStore } from '../stores/ui'
 import { useAuthStore } from '../stores/auth'
+import { friendlyApiMessage } from '../utils/apiMessage'
 import type { DocumentSummary } from '../api/documents'
 import {
   getAIContext,
@@ -218,7 +219,7 @@ async function onSave() {
     ElMessage.success('已保存')
     await refreshStoredList()
   } catch (e) {
-    ElMessage.error(e instanceof Error ? e.message : '保存失败')
+    ElMessage.error(friendlyApiMessage(e, '保存失败'))
   }
 }
 
@@ -237,7 +238,7 @@ async function onOpenStored(id: string) {
       : ''
     ElMessage.success('已打开文档')
   } catch (e) {
-    ElMessage.error(e instanceof Error ? e.message : '打开失败')
+    ElMessage.error(friendlyApiMessage(e, '打开失败'))
   }
 }
 
@@ -281,7 +282,7 @@ async function onDeleteStored(d: DocumentSummary) {
     }
     ElMessage.success('已删除文档')
   } catch (e) {
-    ElMessage.error(e instanceof Error ? e.message : '删除失败')
+    ElMessage.error(friendlyApiMessage(e, '删除失败'))
   } finally {
     deletingId.value = null
   }
@@ -346,7 +347,7 @@ async function onNewTask() {
     ElMessage.success('已新建任务')
     await refreshStoredList()
   } catch (e) {
-    ElMessage.error(e instanceof Error ? e.message : '新建失败')
+    ElMessage.error(friendlyApiMessage(e, '新建失败'))
   }
 }
 

@@ -29,9 +29,14 @@ export function friendlyApiMessage(error: unknown, fallback: string): string {
     if (error.status === 404) return CODE_COPY.not_found
     if (error.status === 409) return CODE_COPY.conflict
     if (error.status === 413) return CODE_COPY.payload_too_large
-    if (error.status >= 500) return '服务暂时不可用，请稍后重试。'
+    if (error.status >= 500) {
+      const id = error.requestId ? `（编号 ${error.requestId.slice(0, 8)}）` : ''
+      return `服务暂时不可用，请稍后重试。${id}`
+    }
+    if (error.status === 408) return '请求超时，请重试。'
     return fallback
   }
+  if (error instanceof DOMException && error.name === 'TimeoutError') return '请求超时，请重试。'
   if (error instanceof TypeError) return '网络中断，请检查连接后重试。'
   if (error instanceof Error && error.message && !/request failed|failed to fetch/i.test(error.message)) {
     return error.message

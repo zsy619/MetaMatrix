@@ -60,20 +60,20 @@ func AuthRequired(secret string) app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
 		h := string(c.GetHeader("Authorization"))
 		if h == "" || !strings.HasPrefix(h, "Bearer ") {
-			c.JSON(http.StatusUnauthorized, map[string]string{"message": "missing bearer token", "code": "unauthorized"})
+			ErrorJSON(c, http.StatusUnauthorized, "missing bearer token", "unauthorized", nil)
 			c.Abort()
 			return
 		}
 		tokenStr := strings.TrimPrefix(h, "Bearer ")
 		claims, err := ParseToken(secret, tokenStr)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, map[string]string{"message": "invalid or expired token", "code": "unauthorized"})
+			ErrorJSON(c, http.StatusUnauthorized, "invalid or expired token", "unauthorized", nil)
 			c.Abort()
 			return
 		}
 		uid, err := uuid.Parse(claims.UserID)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, map[string]string{"message": "invalid token subject", "code": "unauthorized"})
+			ErrorJSON(c, http.StatusUnauthorized, "invalid token subject", "unauthorized", nil)
 			c.Abort()
 			return
 		}

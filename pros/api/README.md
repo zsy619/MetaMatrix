@@ -53,6 +53,8 @@ go run ./cmd/server
 
 `GET /metrics` 返回 Prometheus 文本（`metamatrix_http_requests_total`、`metamatrix_login_failures_total`、`metamatrix_process_uptime_seconds` 等）。这些计数只在进程内存里，重启后归零，不写入业务表。抓取示例：`curl -s http://localhost:3000/metrics`。
 
+生产环境的 `JWT_SECRET`、`CORS_ORIGINS` 和登录限流变量见仓库 `docs/生产配置.md`。错误响应带 `requestId`，与访问日志中的 `request_id` 对应。
+
 ## 测试账号（可选）
 
 ```bash

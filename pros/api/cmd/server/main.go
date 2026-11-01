@@ -32,7 +32,7 @@ func main() {
 
 	authSvc := service.NewAuthService(gdb, cfg.JWTSecret)
 	docSvc := service.NewDocumentsService(gdb)
-	authH := handler.NewAuthHandler(authSvc)
+	authH := handler.NewAuthHandler(authSvc, service.NewAttemptLimiter(cfg.LoginWindow, cfg.LoginPairLimit, cfg.LoginIPLimit))
 	docH := handler.NewDocumentsHandler(docSvc)
 
 	h := server.Default(
@@ -97,6 +97,7 @@ func main() {
 	{
 		docs.POST("", docH.Create)
 		docs.GET("", docH.List)
+		docs.POST("/batch", docH.Batch)
 		// Static paths before :id
 		docs.GET("/search", docH.Search)
 		docs.GET("/stats", docH.Stats)

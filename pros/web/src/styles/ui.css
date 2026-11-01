@@ -26,6 +26,18 @@
   background: var(--mm-surface);
 }
 
+html[data-density='compact'] .guide-main,
+html[data-density='compact'] .inner,
+html[data-density='compact'] .account {
+  padding-top: 16px;
+  padding-bottom: 36px;
+}
+
+html[data-density='compact'] .topbar {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
 .mm-inline-error {
   margin: 8px 0 0;
   color: var(--mm-red);

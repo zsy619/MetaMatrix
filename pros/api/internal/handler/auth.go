@@ -18,11 +18,11 @@ type AuthHandler struct {
 	limit *service.AttemptLimiter
 }
 
-func NewAuthHandler(svc *service.AuthService) *AuthHandler {
-	return &AuthHandler{
-		svc:   svc,
-		limit: service.NewAttemptLimiter(15*time.Minute, 8, 30),
+func NewAuthHandler(svc *service.AuthService, limit *service.AttemptLimiter) *AuthHandler {
+	if limit == nil {
+		limit = service.NewAttemptLimiter(15*time.Minute, 8, 30)
 	}
+	return &AuthHandler{svc: svc, limit: limit}
 }
 
 type registerBody struct {
