@@ -5,7 +5,7 @@
   "theme": {
     "background": {
       "pattern": "none",
-      "color": "#f5f5f4"
+      "color": "#ffffff"
     }
   },
   "center": {
@@ -13,26 +13,26 @@
     "humanSubtitle": "持续让自己变强",
     "aiTitle": "AI三角",
     "aiSubtitle": "持续使用AI更强",
-    "topArrowText": "人变强了，调教更强 AI",
+    "topArrowText": "人变强了，调教更强AI",
     "bottomArrowText": "有了强AI，辅助人变得更强",
-    "humanColor": "#C4A574",
-    "aiColor": "#5BA8A0",
-    "arrowColor": "#C75B5B"
+    "humanColor": "#F2D27A",
+    "aiColor": "#7DCFC4",
+    "arrowColor": "#E25B52"
   },
   "blocks": [
     {
       "id": "innovation",
       "side": "human",
       "title": "创新：创造力",
-      "subtitle": "创造性的新想法和新设想、跳出同行/历史经验的新思路和创新点",
+      "subtitle": "创造性的新想法和新设想，跳出同行/历史经验的新思路和创新点",
       "keyword": "创造力",
-      "accentColor": "#C4A574",
+      "accentColor": "#C9A14A",
       "backgroundColor": "#ffffff",
       "watermarkIcon": "human",
       "items": [
         {
           "id": "item_innovation_1",
-          "text": "在此填写创新思路…",
+          "text": "",
           "style": {
             "color": "#5c4a32",
             "fontSize": 13,
@@ -47,13 +47,13 @@
       "title": "起点：场景",
       "subtitle": "选定的细分场景、核心问题和边界分别是什么",
       "keyword": "场景",
-      "accentColor": "#5BA8A0",
+      "accentColor": "#3A9E96",
       "backgroundColor": "#ffffff",
       "watermarkIcon": "ai",
       "items": [
         {
           "id": "item_scenario_1",
-          "text": "在此填写场景边界…",
+          "text": "",
           "style": {
             "color": "#2f5e59",
             "fontSize": 13,
@@ -68,13 +68,13 @@
       "title": "终点：审美",
       "subtitle": "哪些方法和维度可以建立对更高水平交付的审美",
       "keyword": "审美",
-      "accentColor": "#C4A574",
+      "accentColor": "#C9A14A",
       "backgroundColor": "#ffffff",
       "watermarkIcon": "human",
       "items": [
         {
           "id": "item_aesthetics_1",
-          "text": "在此填写审美标准…",
+          "text": "",
           "style": {
             "color": "#5c4a32",
             "fontSize": 13,
@@ -89,13 +89,13 @@
       "title": "过程：体系",
       "subtitle": "从全局到局部，有哪些确定性的流程、模型和框架",
       "keyword": "体系",
-      "accentColor": "#B8956A",
+      "accentColor": "#C9A14A",
       "backgroundColor": "#ffffff",
       "watermarkIcon": "human",
       "items": [
         {
           "id": "item_system_1",
-          "text": "在此填写流程体系…",
+          "text": "",
           "style": {
             "color": "#5c4a32",
             "fontSize": 13,
@@ -110,13 +110,13 @@
       "title": "能力：基本功",
       "subtitle": "需要用到什么样的AI工具、技术特性、AI高阶框架",
       "keyword": "基本功",
-      "accentColor": "#4A9B94",
+      "accentColor": "#3A9E96",
       "backgroundColor": "#ffffff",
       "watermarkIcon": "ai",
       "items": [
         {
           "id": "item_basics_1",
-          "text": "在此填写 AI 能力…",
+          "text": "",
           "style": {
             "color": "#2f5e59",
             "fontSize": 13,
@@ -131,13 +131,13 @@
       "title": "资产：数据",
       "subtitle": "有哪些数据资产和数据包能有效提升最终交付质量",
       "keyword": "数据",
-      "accentColor": "#5BA8A0",
+      "accentColor": "#3A9E96",
       "backgroundColor": "#ffffff",
       "watermarkIcon": "ai",
       "items": [
         {
           "id": "item_data_1",
-          "text": "在此填写数据资产…",
+          "text": "",
           "style": {
             "color": "#2f5e59",
             "fontSize": 13,

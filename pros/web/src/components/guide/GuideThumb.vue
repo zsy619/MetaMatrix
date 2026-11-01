@@ -20,25 +20,24 @@ withDefaults(
         viewBox="0 0 200 140"
         xmlns="http://www.w3.org/2000/svg"
       >
-        <rect width="200" height="140" rx="10" fill="#f5f5f4" />
-        <polygon points="70,28 38,88 102,88" fill="#C4A574" opacity="0.9" />
-        <polygon points="130,52 98,112 162,112" fill="#5BA8A0" opacity="0.9" />
-        <path
-          d="M88 58 C100 48, 112 68, 124 58"
-          fill="none"
-          stroke="#C75B5B"
-          stroke-width="2.5"
-          stroke-linecap="round"
-        />
-        <path
-          d="M84 78 C98 92, 114 72, 128 86"
-          fill="none"
-          stroke="#C75B5B"
-          stroke-width="2.5"
-          stroke-linecap="round"
-        />
-        <circle cx="70" cy="68" r="4" fill="#fff" opacity="0.85" />
-        <circle cx="130" cy="88" r="4" fill="#fff" opacity="0.85" />
+        <rect width="200" height="140" rx="8" fill="#ffffff" />
+        <rect x="8" y="8" width="40" height="48" fill="#fff" stroke="#C9A14A" stroke-width="1.3" />
+        <rect x="8" y="8" width="40" height="11" fill="#C9A14A" />
+        <rect x="152" y="8" width="40" height="48" fill="#fff" stroke="#3A9E96" stroke-width="1.3" />
+        <rect x="152" y="8" width="40" height="11" fill="#3A9E96" />
+        <polygon points="100,26 64,96 100,96" fill="#F2D27A" />
+        <polygon points="100,26 100,96 136,96" fill="#7DCFC4" />
+        <polygon points="100,26 64,96 136,96" fill="none" stroke="#d5d5d5" stroke-width="1" />
+        <path d="M82 58 C92 50, 108 50, 118 58" fill="none" stroke="#E25B52" stroke-width="1.4" />
+        <path d="M118 74 C108 82, 92 82, 82 74" fill="none" stroke="#E25B52" stroke-width="1.4" />
+        <rect x="8" y="78" width="40" height="54" fill="#fff" stroke="#C9A14A" stroke-width="1.3" />
+        <rect x="8" y="78" width="40" height="10" fill="#C9A14A" />
+        <rect x="56" y="98" width="40" height="34" fill="#fff" stroke="#C9A14A" stroke-width="1.3" />
+        <rect x="56" y="98" width="40" height="9" fill="#C9A14A" />
+        <rect x="104" y="98" width="40" height="34" fill="#fff" stroke="#3A9E96" stroke-width="1.3" />
+        <rect x="104" y="98" width="40" height="9" fill="#3A9E96" />
+        <rect x="152" y="78" width="40" height="54" fill="#fff" stroke="#3A9E96" stroke-width="1.3" />
+        <rect x="152" y="78" width="40" height="10" fill="#3A9E96" />
       </svg>
 
       <!-- 一堂 AI 双三角：3×2，A 青绿 / H 米黄 -->
