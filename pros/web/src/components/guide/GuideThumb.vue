@@ -40,7 +40,7 @@ withDefaults(
         <rect x="152" y="78" width="40" height="10" fill="#3A9E96" />
       </svg>
 
-      <!-- 一堂 AI 双三角：3×2，六格各一色 -->
+      <!-- 一堂 AI 双三角：左栏分组 + 3×2 六色 -->
       <svg
         v-else-if="templateId === 'dual-triangle-human-ai'"
         class="thumb-svg"
@@ -48,30 +48,40 @@ withDefaults(
         xmlns="http://www.w3.org/2000/svg"
       >
         <rect width="200" height="140" rx="10" fill="#f7f7f7" />
-        <rect x="8" y="8" width="60" height="16" fill="#0E8A84" />
-        <rect x="70" y="8" width="60" height="16" fill="#A67C00" />
-        <rect x="132" y="8" width="60" height="16" fill="#B85A38" />
-        <rect x="8" y="24" width="60" height="40" fill="#E5F6F5" />
-        <rect x="70" y="24" width="60" height="40" fill="#FBF6E4" />
-        <rect x="132" y="24" width="60" height="40" fill="#FBF1EB" />
-        <rect x="8" y="66" width="60" height="16" fill="#2A649F" />
-        <rect x="70" y="66" width="60" height="16" fill="#187A4E" />
-        <rect x="132" y="66" width="60" height="16" fill="#A84562" />
-        <rect x="8" y="82" width="60" height="28" fill="#E8F1FA" />
-        <rect x="70" y="82" width="60" height="28" fill="#E7F6EF" />
-        <rect x="132" y="82" width="60" height="28" fill="#FBEFF2" />
-        <text x="38" y="19" text-anchor="middle" font-size="6.5" font-weight="700" fill="#fff">A. 场景</text>
-        <text x="100" y="19" text-anchor="middle" font-size="6.5" font-weight="700" fill="#fff">H. 审美</text>
-        <text x="162" y="19" text-anchor="middle" font-size="6.5" font-weight="700" fill="#fff">H. 体系</text>
-        <text x="38" y="77" text-anchor="middle" font-size="6.5" font-weight="700" fill="#fff">A. 数据</text>
-        <text x="100" y="77" text-anchor="middle" font-size="6" font-weight="700" fill="#fff">A. 基本功</text>
-        <text x="162" y="77" text-anchor="middle" font-size="6" font-weight="700" fill="#fff">H. 创造力</text>
-        <text x="12" y="38" font-size="7" font-weight="650" fill="#0B6B66">起点</text>
-        <text x="74" y="38" font-size="7" font-weight="650" fill="#7A5C00">终点</text>
-        <text x="136" y="38" font-size="7" font-weight="650" fill="#8A4024">过程</text>
-        <text x="12" y="96" font-size="7" font-weight="650" fill="#1C4C7C">资产</text>
-        <text x="74" y="96" font-size="7" font-weight="650" fill="#125C3B">能力</text>
-        <text x="136" y="96" font-size="7" font-weight="650" fill="#84344C">创新</text>
+        <rect x="8" y="8" width="16" height="52" fill="#F6EBD4" />
+        <rect x="8" y="62" width="16" height="48" fill="#E5EEF3" />
+        <text x="16" y="20" text-anchor="middle" font-size="6" font-weight="700" fill="#3c3424">人</text>
+        <text x="16" y="30" text-anchor="middle" font-size="6" font-weight="700" fill="#3c3424">类</text>
+        <text x="16" y="40" text-anchor="middle" font-size="6" font-weight="700" fill="#3c3424">三</text>
+        <text x="16" y="50" text-anchor="middle" font-size="6" font-weight="700" fill="#3c3424">角</text>
+        <text x="16" y="76" text-anchor="middle" font-size="6" font-weight="700" fill="#24343c">A</text>
+        <text x="16" y="86" text-anchor="middle" font-size="6" font-weight="700" fill="#24343c">I</text>
+        <text x="16" y="96" text-anchor="middle" font-size="6" font-weight="700" fill="#24343c">三</text>
+        <text x="16" y="106" text-anchor="middle" font-size="6" font-weight="700" fill="#24343c">角</text>
+        <rect x="26" y="8" width="54" height="14" fill="#A67C00" />
+        <rect x="82" y="8" width="54" height="14" fill="#B85A38" />
+        <rect x="138" y="8" width="54" height="14" fill="#A84562" />
+        <rect x="26" y="22" width="54" height="38" fill="#FBF6E4" />
+        <rect x="82" y="22" width="54" height="38" fill="#FBF1EB" />
+        <rect x="138" y="22" width="54" height="38" fill="#FBEFF2" />
+        <rect x="26" y="62" width="54" height="14" fill="#0E8A84" />
+        <rect x="82" y="62" width="54" height="14" fill="#2A649F" />
+        <rect x="138" y="62" width="54" height="14" fill="#187A4E" />
+        <rect x="26" y="76" width="54" height="34" fill="#E5F6F5" />
+        <rect x="82" y="76" width="54" height="34" fill="#E8F1FA" />
+        <rect x="138" y="76" width="54" height="34" fill="#E7F6EF" />
+        <text x="53" y="18" text-anchor="middle" font-size="6" font-weight="700" fill="#fff">H. 审美</text>
+        <text x="109" y="18" text-anchor="middle" font-size="6" font-weight="700" fill="#fff">H. 体系</text>
+        <text x="165" y="18" text-anchor="middle" font-size="5.5" font-weight="700" fill="#fff">H. 创造力</text>
+        <text x="53" y="72" text-anchor="middle" font-size="6" font-weight="700" fill="#fff">A. 场景</text>
+        <text x="109" y="72" text-anchor="middle" font-size="6" font-weight="700" fill="#fff">A. 数据</text>
+        <text x="165" y="72" text-anchor="middle" font-size="5.5" font-weight="700" fill="#fff">A. 基本功</text>
+        <text x="30" y="36" font-size="6.5" font-weight="650" fill="#7A5C00">终点</text>
+        <text x="86" y="36" font-size="6.5" font-weight="650" fill="#8A4024">过程</text>
+        <text x="142" y="36" font-size="6.5" font-weight="650" fill="#84344C">创新</text>
+        <text x="30" y="90" font-size="6.5" font-weight="650" fill="#0B6B66">起点</text>
+        <text x="86" y="90" font-size="6.5" font-weight="650" fill="#1C4C7C">资产</text>
+        <text x="142" y="90" font-size="6.5" font-weight="650" fill="#125C3B">能力</text>
         <text x="10" y="122" font-size="5" fill="#5f6368">一堂 AI 双三角 · 梳理与预判</text>
         <text x="10" y="131" font-size="4.5" fill="#80868b">做加法 · 排优先级 · 先验证最高项</text>
       </svg>
