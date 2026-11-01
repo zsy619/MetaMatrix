@@ -9,7 +9,6 @@ import HighlightText from '../components/ui/HighlightText.vue'
 import { listDocuments, searchDocuments } from '../api/documents'
 import { friendlyApiMessage } from '../utils/apiMessage'
 import GuideThumb from '../components/guide/GuideThumb.vue'
-import RecentOpens from '../components/workspace/RecentOpens.vue'
 import GuideAside from '../components/guide/GuideAside.vue'
 
 interface GuideCard {
@@ -262,7 +261,6 @@ onMounted(async () => {
         </section>
       </header>
 
-      <RecentOpens class="recent-opens" />
       <section class="templates" aria-label="画布模板">
         <div class="templates-toolbar">
           <div class="chips" role="tablist" aria-label="模板分类">
