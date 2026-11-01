@@ -4,6 +4,7 @@ import type { DocumentSummary } from '../../api/documents'
 import { TEMPLATE_META, type TemplateCategory, type TemplateId } from '../../stores/document'
 import GuideUserCard from './GuideUserCard.vue'
 import GuideThumb from './GuideThumb.vue'
+import LineSkeleton from '../ui/LineSkeleton.vue'
 
 const ASIDE_COLLAPSE_KEY = 'metamatrix:guide:asideCollapsed'
 const ASIDE_WIDTH_KEY = 'metamatrix:guide:asideWidth'
@@ -365,7 +366,7 @@ const panelTitle = computed(() => '最近文档')
           {{ error }}
           <button type="button" class="mm-btn mm-btn--ghost" @click="emit('retry')">重试</button>
         </p>
-        <p v-else-if="loading" class="empty">正在读取最近文档…</p>
+        <LineSkeleton v-else-if="loading" />
         <p v-else-if="!recent.length" class="empty">暂无文档，从左侧选模板开始</p>
         <template v-else>
           <section

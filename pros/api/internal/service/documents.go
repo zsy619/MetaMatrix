@@ -475,6 +475,27 @@ func (s *DocumentsService) RestoreArchived(ownerID uuid.UUID, ids []uuid.UUID) (
 	return res.RowsAffected, res.Error
 }
 
+// Rename updates only the title of an active document owned by the caller.
+func (s *DocumentsService) Rename(ownerID, docID uuid.UUID, title string) error {
+	title = strings.TrimSpace(title)
+	if title == "" || utf8.RuneCountInString(title) > maxTitleRunes {
+		return ErrValidation
+	}
+	res := s.db.Model(&model.CanvasDocument{}).
+		Where("id = ? AND owner_user_id = ?", docID, ownerID).
+		Updates(map[string]interface{}{
+			"title":      title,
+			"updated_at": time.Now().UTC(),
+		})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return ErrDocumentNotFound
+	}
+	return nil
+}
+
 func (s *DocumentsService) Delete(ownerID, docID uuid.UUID) error {
 	res := s.db.Where("id = ? AND owner_user_id = ?", docID, ownerID).Delete(&model.CanvasDocument{})
 	if res.Error != nil {

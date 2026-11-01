@@ -1,6 +1,7 @@
 package service
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -267,6 +268,12 @@ func TestTemplateFallbackSortAndYearBuckets(t *testing.T) {
 	}
 	if stats.ActiveTemplates.Current != 2 {
 		t.Fatalf("active templates = %d", stats.ActiveTemplates.Current)
+	}
+}
+
+func TestStatsRevisionQueryExcludesArchived(t *testing.T) {
+	if !strings.Contains(statsRevisionQuery, "d.deleted_at IS NULL") {
+		t.Fatal("archived documents must not contribute revisions to stats")
 	}
 }
 

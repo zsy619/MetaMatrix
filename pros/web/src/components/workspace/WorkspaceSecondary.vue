@@ -18,6 +18,7 @@ import {
 } from '../../stores/document'
 import { accentOf } from './palette'
 import { friendlyApiMessage } from '../../utils/apiMessage'
+import LineSkeleton from '../ui/LineSkeleton.vue'
 
 const STARTERS: TemplateId[] = [
   'time-matrix',
@@ -233,7 +234,7 @@ function onSearchInput() {
         <div class="cols">
           <section>
             <h3>最近编辑</h3>
-            <p v-if="loading" class="muted">读取中…</p>
+            <LineSkeleton v-if="loading" />
             <p v-else-if="!recentDocs.length" class="muted">还没有云端画布。</p>
             <ul v-else class="rows">
               <li v-for="d in recentDocs" :key="d.id">
@@ -283,7 +284,7 @@ function onSearchInput() {
           </section>
           <section>
             <h3>备注与待办</h3>
-            <p v-if="loading" class="muted">整理中…</p>
+            <LineSkeleton v-if="loading" />
             <p v-else-if="!noteDigest.todos.length && !noteDigest.notes.length && !mentions.length" class="muted">
               在页面设置里写备注，或以「待办：」开头。
             </p>
@@ -394,10 +395,6 @@ h3 {
   margin: 0 0 8px;
   font-size: 13px;
   color: #5f6368;
-}
-
-h3.sub {
-  margin-top: 14px;
 }
 
 .rows {

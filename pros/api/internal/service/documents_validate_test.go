@@ -51,6 +51,16 @@ func TestValidateMetaAndPayload(t *testing.T) {
 	}
 }
 
+func TestRenameRejectsBlank(t *testing.T) {
+	svc := NewDocumentsService(nil)
+	if err := svc.Rename(uuid.New(), uuid.New(), "   "); err != ErrValidation {
+		t.Fatalf("blank = %v", err)
+	}
+	if err := svc.Rename(uuid.New(), uuid.New(), strings.Repeat("题", maxTitleRunes+1)); err != ErrValidation {
+		t.Fatalf("long = %v", err)
+	}
+}
+
 func TestNormalizeBatchIDs(t *testing.T) {
 	id := uuid.New().String()
 	got, err := NormalizeBatchIDs([]string{id, id, "  " + id})

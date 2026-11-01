@@ -613,6 +613,14 @@ func recentEdits(docs []StatsDoc, loc *time.Location, limit int) []RecentEdit {
 	return out
 }
 
+// statsRevisionQuery ignores archived documents. GORM list queries do the same via deleted_at.
+const statsRevisionQuery = `
+SELECT r.document_id, r.created_at
+FROM canvas_revisions r
+INNER JOIN canvas_documents d ON d.id = r.document_id
+WHERE d.owner_user_id = ? AND d.deleted_at IS NULL
+`
+
 // ResolveStatsOwner forces personal scope. Callers cannot widen stats with a scope query.
 func ResolveStatsOwner(authenticated uuid.UUID, _ string) uuid.UUID {
 	return authenticated
@@ -628,12 +636,7 @@ func (s *DocumentsService) Stats(ownerID uuid.UUID, rangeKey, granularity string
 		return nil, err
 	}
 	var revs []StatsRev
-	err = s.db.Raw(`
-SELECT r.document_id, r.created_at
-FROM canvas_revisions r
-INNER JOIN canvas_documents d ON d.id = r.document_id
-WHERE d.owner_user_id = ? AND d.deleted_at IS NULL
-`, ownerID).Scan(&revs).Error
+	err = s.db.Raw(statsRevisionQuery, ownerID).Scan(&revs).Error
 	if err != nil {
 		return nil, err
 	}
