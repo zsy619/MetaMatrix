@@ -5,8 +5,11 @@
   "theme": {
     "background": {
       "pattern": "diagonal-lines",
-      "color": "#fcfcfc"
-    }
+      "color": "#f7f7f7"
+    },
+    "page": "#f7f7f7",
+    "frame": "#ececec",
+    "hairline": "rgba(60, 50, 20, 0.08)"
   },
   "axes": {
     "x": {
@@ -24,14 +27,14 @@
       "title": "探索场景",
       "tag": {
         "text": "兴奋突破",
-        "bgColor": "#fce8e6",
-        "color": "#d93025"
+        "bgColor": "#FBEFF2",
+        "color": "#84344C"
       },
-      "backgroundColor": "rgba(252, 232, 230, 0.45)",
+      "backgroundColor": "#FBEFF2",
       "watermark": {
         "letter": "S",
         "text": "Seek",
-        "color": "#e57373",
+        "color": "#A84562",
         "position": "bottom-right"
       },
       "items": [
@@ -39,7 +42,7 @@
           "id": "item_seek_opportunity",
           "text": "发现新机会",
           "style": {
-            "color": "#d93025",
+            "color": "#84344C",
             "fontSize": 12,
             "fontWeight": "600"
           }
@@ -51,14 +54,14 @@
       "title": "变革场景",
       "tag": {
         "text": "终局预判",
-        "bgColor": "#e8f0fe",
-        "color": "#1a73e8"
+        "bgColor": "#E8F1FA",
+        "color": "#1C4C7C"
       },
-      "backgroundColor": "rgba(232, 240, 254, 0.45)",
+      "backgroundColor": "#E8F1FA",
       "watermark": {
         "letter": "T",
         "text": "Transform",
-        "color": "#64b5f6",
+        "color": "#2A649F",
         "position": "bottom-left"
       },
       "items": [
@@ -66,7 +69,7 @@
           "id": "item_transform_example",
           "text": "终局预判示例",
           "style": {
-            "color": "#1a73e8",
+            "color": "#1C4C7C",
             "fontSize": 14,
             "fontWeight": "500"
           }
@@ -78,14 +81,14 @@
       "title": "提速场景",
       "tag": {
         "text": "痛苦优化",
-        "bgColor": "#e6f4ea",
-        "color": "#137333"
+        "bgColor": "#E7F6EF",
+        "color": "#125C3B"
       },
-      "backgroundColor": "rgba(230, 244, 234, 0.45)",
+      "backgroundColor": "#E7F6EF",
       "watermark": {
         "letter": "A",
         "text": "Accelerate",
-        "color": "#81c784",
+        "color": "#187A4E",
         "position": "top-right"
       },
       "items": []
@@ -95,14 +98,14 @@
       "title": "落地场景",
       "tag": {
         "text": "降本增效",
-        "bgColor": "#f3e8fd",
-        "color": "#7b1fa2"
+        "bgColor": "#F3EEF8",
+        "color": "#4E3574"
       },
-      "backgroundColor": "rgba(243, 232, 253, 0.45)",
+      "backgroundColor": "#F3EEF8",
       "watermark": {
         "letter": "R",
         "text": "ROI",
-        "color": "#ba68c8",
+        "color": "#6B4C9A",
         "position": "top-left"
       },
       "items": []
@@ -114,7 +117,7 @@
       "type": "dot",
       "x": "15%",
       "y": "10%",
-      "color": "#e53935",
+      "color": "#A84562",
       "label": "人生红点",
       "labelPosition": "top"
     },
@@ -124,7 +127,7 @@
       "iconName": "star-outline",
       "x": "85%",
       "y": "15%",
-      "color": "#1e88e5",
+      "color": "#2A649F",
       "label": "使命愿景",
       "labelPosition": "top"
     },
@@ -134,7 +137,7 @@
       "iconName": "hourglass",
       "x": "15%",
       "y": "88%",
-      "color": "#43a047",
+      "color": "#187A4E",
       "label": "时间倍增",
       "labelPosition": "bottom"
     },
@@ -144,7 +147,7 @@
       "iconName": "money-bag",
       "x": "85%",
       "y": "88%",
-      "color": "#8e24aa",
+      "color": "#6B4C9A",
       "label": "提升利润",
       "labelPosition": "bottom"
     }

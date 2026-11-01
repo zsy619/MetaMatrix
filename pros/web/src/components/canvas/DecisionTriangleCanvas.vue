@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { canvasChromeStyle } from './canvasChrome'
 import type {
   DecisionTriangleBlock,
   DecisionTriangleBlockId,
@@ -22,9 +23,7 @@ function block(id: DecisionTriangleBlockId): DecisionTriangleBlock | undefined {
   return byId.value.get(id)
 }
 
-const bgColor = computed(
-  () => props.doc.theme.background.color || '#f3f3f3',
-)
+const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 
 /** 宽度金 / 高度铜 / 深度青，与 fiveStepPalette 同色相 */
 const WIDTH_TONE = 1
@@ -35,7 +34,7 @@ const DEPTH_TONE = 0
 <template>
   <div
     class="dec-canvas"
-    :style="{ backgroundColor: bgColor }"
+    :style="chrome"
     aria-label="科学决策三角形"
   >
     <div class="dec-stage">

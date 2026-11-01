@@ -5,8 +5,11 @@
   "theme": {
     "background": {
       "pattern": "none",
-      "color": "#F2F2F2"
-    }
+      "color": "#f7f7f7"
+    },
+    "page": "#f7f7f7",
+    "frame": "#ececec",
+    "hairline": "rgba(60, 50, 20, 0.08)"
   },
   "labels": {
     "premiseTitle": "前提：长期追求",
@@ -18,19 +21,19 @@
   "nodes": {
     "a": {
       "title": "A.固定套路",
-      "color": "#2B7DE9"
+      "color": "#2A649F"
     },
     "b": {
       "title": "B.非舒适区",
-      "color": "#00A685"
+      "color": "#0E8A84"
     },
     "c": {
       "title": "C.及时反馈",
-      "color": "#F99D1C"
+      "color": "#A67C00"
     },
     "d": {
       "title": "D.大量重复",
-      "color": "#00A685",
+      "color": "#187A4E",
       "subtitle": "10倍重复=10倍进步"
     }
   },

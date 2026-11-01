@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { canvasChromeStyle, paintForTone } from './canvasChrome'
 import type {
   OnlineOfflineCommBlock,
   OnlineOfflineCommBlockId,
@@ -24,16 +25,11 @@ function block(id: OnlineOfflineCommBlockId): OnlineOfflineCommBlock | undefined
 }
 
 const axes = computed(() => props.doc.axes)
-const bgColor = computed(
-  () => props.doc.theme.background.color || '#ffffff',
-)
+const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 
-/** 附图色值取样：蓝 / 绿 / 紫 / 粉 */
-const TONE_CHIP: Record<string, string> = {
-  blue: '#a4c4fc',
-  green: '#b8fcb8',
-  purple: '#e4a4fc',
-  pink: '#fcb8b8',
+function cellPaint(id: OnlineOfflineCommBlockId) {
+  const item = block(id)
+  return paintForTone(item?.tone, item)
 }
 
 const order: OnlineOfflineCommBlockId[] = ['a', 'b', 'c', 'd']
@@ -42,7 +38,7 @@ const order: OnlineOfflineCommBlockId[] = ['a', 'b', 'c', 'd']
 <template>
   <div
     class="ooc-canvas"
-    :style="{ backgroundColor: bgColor }"
+    :style="chrome"
     aria-label="线上线下沟通"
   >
     <div class="ooc-frame">
@@ -76,7 +72,7 @@ const order: OnlineOfflineCommBlockId[] = ['a', 'b', 'c', 'd']
               markerHeight="7"
               orient="auto"
             >
-              <path d="M 0 1 L 11 6 L 0 11 z" fill="#111111" />
+              <path d="M 0 1 L 11 6 L 0 11 z" fill="#3c3424" />
             </marker>
             <marker
               id="ooc-arrow-h"
@@ -87,7 +83,7 @@ const order: OnlineOfflineCommBlockId[] = ['a', 'b', 'c', 'd']
               markerHeight="7"
               orient="auto"
             >
-              <path d="M 0 1 L 11 6 L 0 11 z" fill="#111111" />
+              <path d="M 0 1 L 11 6 L 0 11 z" fill="#3c3424" />
             </marker>
           </defs>
           <!-- 竖轴：底 → 顶（箭头朝「线上」） -->
@@ -96,7 +92,7 @@ const order: OnlineOfflineCommBlockId[] = ['a', 'b', 'c', 'd']
             y1="99.2"
             x2="50"
             y2="1.2"
-            stroke="#111111"
+            stroke="#3c3424"
             stroke-width="1.6"
             vector-effect="non-scaling-stroke"
             marker-end="url(#ooc-arrow-v)"
@@ -107,7 +103,7 @@ const order: OnlineOfflineCommBlockId[] = ['a', 'b', 'c', 'd']
             y1="50"
             x2="98.8"
             y2="50"
-            stroke="#111111"
+            stroke="#3c3424"
             stroke-width="1.6"
             vector-effect="non-scaling-stroke"
             marker-end="url(#ooc-arrow-h)"
@@ -121,7 +117,11 @@ const order: OnlineOfflineCommBlockId[] = ['a', 'b', 'c', 'd']
             v-show="block(id)"
             class="ooc-cell"
             :data-tone="block(id)!.tone"
-            :style="{ '--ooc-chip': TONE_CHIP[block(id)!.tone] || '#eee' }"
+            :style="{
+              '--ooc-chip': cellPaint(id).fill,
+              '--ooc-ink': cellPaint(id).topic,
+              '--ooc-accent': cellPaint(id).accent,
+            }"
           >
             <div class="ooc-body">
               <YModelBlockCard :block="block(id)!" hide-title />
@@ -167,7 +167,7 @@ const order: OnlineOfflineCommBlockId[] = ['a', 'b', 'c', 'd']
   position: absolute;
   font-size: clamp(16px, 1.8vw, 24px);
   font-weight: 800;
-  color: #111111;
+  color: #3c3424;
   letter-spacing: 0.12em;
   line-height: 1.15;
   user-select: none;
@@ -329,9 +329,10 @@ const order: OnlineOfflineCommBlockId[] = ['a', 'b', 'c', 'd']
   margin: 0.15em 0.2em;
   font-weight: 700;
   font-size: clamp(14px, 1.5vw, 20px);
-  color: #111111 !important;
+  color: var(--ooc-ink, #1C4C7C) !important;
+  background-color: var(--ooc-chip, #E8F1FA) !important;
   letter-spacing: 0.04em;
-  border: 1.5px solid transparent;
+  border: 1px solid transparent;
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
   font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui,
@@ -341,7 +342,7 @@ const order: OnlineOfflineCommBlockId[] = ['a', 'b', 'c', 'd']
 .ooc-body :deep(strong mark),
 .ooc-body :deep(mark strong),
 .ooc-body :deep(strong > mark) {
-  border: 3px solid #111111;
+  border: 1.5px solid var(--ooc-accent, #2A649F);
   font-weight: 800;
 }
 

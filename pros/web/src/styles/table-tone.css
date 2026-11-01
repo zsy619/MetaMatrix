@@ -18,6 +18,20 @@
   box-shadow: none !important;
 }
 
+.tbl-tone .ym-block,
+.tbl-tone .ym-block.compact,
+.tbl-tone .ym-block.is-source-max {
+  border-color: transparent !important;
+  border-style: solid !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
 .tbl-tone .ym-block.selected {
-  box-shadow: inset 0 0 0 2px rgba(26, 115, 232, 0.45);
+  box-shadow: inset 0 0 0 2px rgba(26, 115, 232, 0.45) !important;
+}
+
+.tbl-tone .ProseMirror,
+.tbl-tone .tiptap {
+  color: #202124;
 }

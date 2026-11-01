@@ -20,6 +20,15 @@ export interface ThemeBackground {
 
 export interface CanvasTheme {
   background: ThemeBackground
+  /**
+   * Soft page wash behind the worksheet.
+   * Optional. Missing, or a legacy near-white background.color, falls back to #f7f7f7.
+   */
+  page?: string
+  /** Worksheet frame stroke. Optional. Falls back to #ececec. */
+  frame?: string
+  /** Inset divider between cells. Optional. Falls back to a warm hairline. */
+  hairline?: string
 }
 
 export interface AxisX {
@@ -1188,6 +1197,10 @@ export interface TimeMatrixBlock {
   id: TimeMatrixBlockId
   title: string
   tone: TimeMatrixTone
+  /** Optional cell wash. Falls back to the shared tone palette. */
+  fill?: string
+  /** Optional title accent. Falls back to the shared tone palette. */
+  accent?: string
   items: QuadrantItem[]
 }
 
@@ -1221,6 +1234,10 @@ export interface WorkStateZonesBlock {
   title: string
   description: string
   tone: WorkStateZonesTone
+  /** Optional cell wash. Falls back to the shared tone palette. */
+  fill?: string
+  /** Optional badge accent. Falls back to the shared tone palette. */
+  accent?: string
   items: QuadrantItem[]
 }
 
@@ -1256,6 +1273,10 @@ export interface OnlineOfflineCommBlock {
   id: OnlineOfflineCommBlockId
   title: string
   tone: OnlineOfflineCommTone
+  /** Optional chip wash. Falls back to the shared tone palette. */
+  fill?: string
+  /** Optional chip ink. Falls back to the shared tone palette. */
+  accent?: string
   items: QuadrantItem[]
 }
 
@@ -1286,6 +1307,10 @@ export interface UnitModelQuadrantBlock {
   id: UnitModelQuadrantBlockId
   title: string
   tone: UnitModelQuadrantTone
+  /** Optional cell wash. Falls back to the shared tone palette. */
+  fill?: string
+  /** Optional title accent. Falls back to the shared tone palette. */
+  accent?: string
   items: QuadrantItem[]
 }
 
@@ -1706,10 +1731,14 @@ export function normalizeYModelDoc(doc: YModelDocumentJSON): YModelDocumentJSON 
   const theme = (doc.theme ?? {}) as CanvasTheme
   const background = (theme.background ?? {}) as ThemeBackground
   doc.theme = {
+    ...theme,
     background: {
       pattern: background.pattern || 'none',
-      color: background.color || '#ffffff',
+      color: background.color || '#f7f7f7',
     },
+    page: theme.page,
+    frame: theme.frame,
+    hairline: theme.hairline,
   }
 
   const center = doc.center ?? ({} as YModelCenter)

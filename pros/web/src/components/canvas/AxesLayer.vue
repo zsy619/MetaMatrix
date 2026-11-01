@@ -41,7 +41,7 @@ defineProps<{
 <style scoped>
 .axes-layer {
   position: absolute;
-  inset: 0;
+  inset: 14px 16px 12px;
   z-index: 20;
   width: 100%;
   height: 100%;

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { canvasChromeStyle, paintForTone } from './canvasChrome'
 import type {
   TimeMatrixBlock,
   TimeMatrixBlockId,
@@ -24,16 +25,11 @@ function block(id: TimeMatrixBlockId): TimeMatrixBlock | undefined {
 }
 
 const axes = computed(() => props.doc.axes)
-const bgColor = computed(
-  () => props.doc.theme.background.color || '#ffffff',
-)
+const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 
-/** 附图色值取样：A 粉 / B 浅橙黄 / C 浅黄 / D 浅绿 */
-const TONE_BG: Record<string, string> = {
-  pink: '#ffd1d2',
-  yellow: '#fbe297',
-  cream: '#fcf29c',
-  green: '#e4ff8e',
+function cellPaint(id: TimeMatrixBlockId) {
+  const item = block(id)
+  return paintForTone(item?.tone, item)
 }
 
 const order: TimeMatrixBlockId[] = ['a', 'b', 'c', 'd']
@@ -42,7 +38,7 @@ const order: TimeMatrixBlockId[] = ['a', 'b', 'c', 'd']
 <template>
   <div
     class="tm-canvas"
-    :style="{ backgroundColor: bgColor }"
+    :style="chrome"
     aria-label="时间管理矩阵"
   >
     <div class="tm-frame">
@@ -76,7 +72,7 @@ const order: TimeMatrixBlockId[] = ['a', 'b', 'c', 'd']
               markerHeight="7"
               orient="auto"
             >
-              <path d="M 0 1 L 11 6 L 0 11 z" fill="#111111" />
+              <path d="M 0 1 L 11 6 L 0 11 z" fill="#3c3424" />
             </marker>
             <marker
               id="tm-arrow-h"
@@ -87,7 +83,7 @@ const order: TimeMatrixBlockId[] = ['a', 'b', 'c', 'd']
               markerHeight="7"
               orient="auto"
             >
-              <path d="M 0 1 L 11 6 L 0 11 z" fill="#111111" />
+              <path d="M 0 1 L 11 6 L 0 11 z" fill="#3c3424" />
             </marker>
           </defs>
           <!-- 竖轴：底 → 顶（箭头朝「重要」） -->
@@ -96,7 +92,7 @@ const order: TimeMatrixBlockId[] = ['a', 'b', 'c', 'd']
             y1="99.2"
             x2="50"
             y2="1.2"
-            stroke="#111111"
+            stroke="#3c3424"
             stroke-width="2.4"
             vector-effect="non-scaling-stroke"
             marker-end="url(#tm-arrow-v)"
@@ -107,7 +103,7 @@ const order: TimeMatrixBlockId[] = ['a', 'b', 'c', 'd']
             y1="50"
             x2="98.8"
             y2="50"
-            stroke="#111111"
+            stroke="#3c3424"
             stroke-width="2.4"
             vector-effect="non-scaling-stroke"
             marker-end="url(#tm-arrow-h)"
@@ -120,9 +116,9 @@ const order: TimeMatrixBlockId[] = ['a', 'b', 'c', 'd']
             :key="id"
             v-show="block(id)"
             class="tm-cell"
-            :style="{ backgroundColor: TONE_BG[block(id)!.tone] || '#eee' }"
+            :style="{ backgroundColor: cellPaint(id).fill }"
           >
-            <h2 class="tm-title">{{ block(id)!.title }}</h2>
+            <h2 class="tm-title" :style="{ color: cellPaint(id).topic }">{{ block(id)!.title }}</h2>
             <div class="tm-body">
               <YModelBlockCard :block="block(id)!" hide-title />
             </div>
@@ -167,7 +163,7 @@ const order: TimeMatrixBlockId[] = ['a', 'b', 'c', 'd']
   position: absolute;
   font-size: clamp(16px, 1.8vw, 24px);
   font-weight: 800;
-  color: #111111;
+  color: #3c3424;
   letter-spacing: 0.12em;
   line-height: 1.15;
   user-select: none;
@@ -259,7 +255,7 @@ const order: TimeMatrixBlockId[] = ['a', 'b', 'c', 'd']
   text-align: center;
   font-size: clamp(16px, 2vw, 26px);
   font-weight: 800;
-  color: #111111;
+  color: #3c3424;
   letter-spacing: 0.04em;
   line-height: 1.35;
   font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui,

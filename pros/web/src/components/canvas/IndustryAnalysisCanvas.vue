@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { canvasChromeStyle } from './canvasChrome'
 import type {
   IndustryAnalysisBlock,
   IndustryAnalysisBlockId,
@@ -27,13 +28,11 @@ function block(id: IndustryAnalysisBlockId): IndustryAnalysisBlock | undefined {
 const topIds: IndustryAnalysisBlockId[] = ['chain', 'changes', 'steady_b']
 const fullIds: IndustryAnalysisBlockId[] = ['cycle', 'ceiling', 'concentration']
 
-const bgColor = computed(
-  () => props.doc.theme.background.color || '#ffffff',
-)
+const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 </script>
 
 <template>
-  <div class="industry-analysis-canvas" :style="{ backgroundColor: bgColor }">
+  <div class="industry-analysis-canvas" :style="chrome">
     <div class="ia-grid" role="table" aria-label="行业分析画布">
       <div class="ia-row ia-row--top">
         <section
@@ -81,7 +80,7 @@ const bgColor = computed(
   overflow-x: hidden;
   overflow-y: auto;
   box-sizing: border-box;
-  padding: 0;
+  padding: 14px 16px 12px;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -104,7 +103,7 @@ const bgColor = computed(
   min-height: min-content;
   display: flex;
   flex-direction: column;
-  border: 2px solid #202124;
+  border: 1px solid var(--cv-frame, #ececec);
   border-radius: 2px;
   overflow: visible;
   background: #fff;
@@ -115,7 +114,7 @@ const bgColor = computed(
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   min-height: 400px;
-  border-bottom: 2px solid #202124;
+  border-bottom: 1px solid var(--cv-frame, #ececec);
 }
 
 .ia-cell {
@@ -126,7 +125,7 @@ const bgColor = computed(
   padding: 0;
   box-sizing: border-box;
   background: var(--tbl-body, #fff);
-  border-right: 2px solid #202124;
+  border-right: 1px solid var(--cv-frame, #ececec);
   gap: 0;
 }
 
@@ -138,7 +137,7 @@ const bgColor = computed(
   flex: 0.85 0 400px;
   min-height: 400px;
   border-right: none;
-  border-bottom: 2px solid #202124;
+  border-bottom: 1px solid var(--cv-frame, #ececec);
 }
 
 .ia-cell--full:last-child {
@@ -199,7 +198,7 @@ const bgColor = computed(
 
   .ia-cell {
     border-right: none;
-    border-bottom: 2px solid #202124;
+    border-bottom: 1px solid var(--cv-frame, #ececec);
     min-height: 400px;
   }
 

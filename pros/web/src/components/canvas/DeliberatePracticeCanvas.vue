@@ -7,6 +7,7 @@ import {
   ref,
   watch,
 } from 'vue'
+import { canvasChromeStyle } from './canvasChrome'
 import type {
   DeliberatePracticeBlock,
   DeliberatePracticeBlockId,
@@ -63,14 +64,12 @@ const hostBlocks = computed(() =>
   })),
 )
 
-const bgColor = computed(
-  () => props.doc.theme.background.color || '#F2F2F2',
-)
+const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 
-const colorA = computed(() => props.doc.nodes.a.color || '#2B7DE9')
-const colorB = computed(() => props.doc.nodes.b.color || '#00A685')
-const colorC = computed(() => props.doc.nodes.c.color || '#F99D1C')
-const colorD = computed(() => props.doc.nodes.d.color || '#00A685')
+const colorA = computed(() => props.doc.nodes.a.color || '#2A649F')
+const colorB = computed(() => props.doc.nodes.b.color || '#0E8A84')
+const colorC = computed(() => props.doc.nodes.c.color || '#A67C00')
+const colorD = computed(() => props.doc.nodes.d.color || '#187A4E')
 
 /* ---- 三角几何（对齐 pm-solution-triangle 的极坐标思路） ---- */
 const VB_W = 1000
@@ -283,7 +282,7 @@ onBeforeUnmount(() => {
 <template>
   <div
     class="dp-canvas"
-    :style="{ backgroundColor: bgColor, '--dp-bg': bgColor }"
+    :style="chrome"
     aria-label="刻意练习画布"
   >
     <!-- 顶部前提条 -->

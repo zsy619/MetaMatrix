@@ -20,7 +20,7 @@ withDefaults(
         viewBox="0 0 200 140"
         xmlns="http://www.w3.org/2000/svg"
       >
-        <rect width="200" height="140" rx="8" fill="#ffffff" />
+        <rect width="200" height="140" rx="8" fill="#f7f7f7" />
         <rect x="8" y="8" width="40" height="48" fill="#fff" stroke="#C9A14A" stroke-width="1.3" />
         <rect x="8" y="8" width="40" height="11" fill="#C9A14A" />
         <rect x="152" y="8" width="40" height="48" fill="#fff" stroke="#3A9E96" stroke-width="1.3" />
@@ -93,15 +93,15 @@ withDefaults(
         viewBox="0 0 200 140"
         xmlns="http://www.w3.org/2000/svg"
       >
-        <rect width="200" height="140" rx="10" fill="#fcfcfc" />
-        <rect x="16" y="14" width="80" height="52" rx="6" fill="#fce8e6" />
-        <rect x="104" y="14" width="80" height="52" rx="6" fill="#e6f4ea" />
-        <rect x="16" y="74" width="80" height="52" rx="6" fill="#e8f0fe" />
-        <rect x="104" y="74" width="80" height="52" rx="6" fill="#fef7e0" />
-        <text x="28" y="46" font-size="22" font-weight="700" fill="#e57373">S</text>
-        <text x="116" y="46" font-size="22" font-weight="700" fill="#81c784">T</text>
-        <text x="28" y="106" font-size="22" font-weight="700" fill="#64b5f6">A</text>
-        <text x="116" y="106" font-size="22" font-weight="700" fill="#ffb74d">R</text>
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <rect x="16" y="14" width="80" height="52" rx="6" fill="#FBEFF2" />
+        <rect x="104" y="14" width="80" height="52" rx="6" fill="#E8F1FA" />
+        <rect x="16" y="74" width="80" height="52" rx="6" fill="#E7F6EF" />
+        <rect x="104" y="74" width="80" height="52" rx="6" fill="#F3EEF8" />
+        <text x="28" y="46" font-size="22" font-weight="700" fill="#A84562">S</text>
+        <text x="116" y="46" font-size="22" font-weight="700" fill="#2A649F">T</text>
+        <text x="28" y="106" font-size="22" font-weight="700" fill="#187A4E">A</text>
+        <text x="116" y="106" font-size="22" font-weight="700" fill="#6B4C9A">R</text>
         <line x1="100" y1="14" x2="100" y2="126" stroke="#dadce0" stroke-width="1.5" />
         <line x1="16" y1="70" x2="184" y2="70" stroke="#dadce0" stroke-width="1.5" />
       </svg>
@@ -113,17 +113,17 @@ withDefaults(
         viewBox="0 0 200 140"
         xmlns="http://www.w3.org/2000/svg"
       >
-        <rect width="200" height="140" rx="10" fill="#ffffff" />
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
         <!-- Y arms -->
-        <line x1="100" y1="72" x2="48" y2="28" stroke="#5f6368" stroke-width="2.2" />
-        <line x1="100" y1="72" x2="152" y2="28" stroke="#5f6368" stroke-width="2.2" />
-        <line x1="100" y1="72" x2="100" y2="108" stroke="#5f6368" stroke-width="2.2" />
+        <line x1="100" y1="72" x2="48" y2="28" stroke="#ececec" stroke-width="2.2" />
+        <line x1="100" y1="72" x2="152" y2="28" stroke="#ececec" stroke-width="2.2" />
+        <line x1="100" y1="72" x2="100" y2="108" stroke="#ececec" stroke-width="2.2" />
         <!-- boxes -->
-        <rect x="18" y="14" width="40" height="22" rx="3" fill="none" stroke="#9aa0a6" stroke-dasharray="3 2" />
-        <rect x="142" y="14" width="40" height="22" rx="3" fill="none" stroke="#9aa0a6" stroke-dasharray="3 2" />
+        <rect x="18" y="14" width="40" height="22" rx="3" fill="none" stroke="#e4e6e8" stroke-dasharray="0" />
+        <rect x="142" y="14" width="40" height="22" rx="3" fill="none" stroke="#e4e6e8" stroke-dasharray="0" />
         <rect x="70" y="58" width="60" height="28" rx="4" fill="#fff" stroke="#e53935" stroke-width="1.6" />
         <text x="100" y="76" text-anchor="middle" font-size="11" font-weight="700" fill="#202124">认知</text>
-        <rect x="72" y="108" width="56" height="18" rx="3" fill="none" stroke="#9aa0a6" stroke-dasharray="3 2" />
+        <rect x="72" y="108" width="56" height="18" rx="3" fill="none" stroke="#e4e6e8" stroke-dasharray="0" />
         <rect x="24" y="128" width="152" height="8" rx="2" fill="#eceff1" />
         <text x="36" y="28" font-size="8" fill="#5f6368">理论</text>
         <text x="154" y="28" font-size="8" fill="#5f6368">事实</text>
@@ -137,7 +137,7 @@ withDefaults(
         xmlns="http://www.w3.org/2000/svg"
       >
         <rect width="200" height="140" rx="10" fill="#f3f4f6" />
-        <text x="100" y="22" text-anchor="middle" font-size="11" font-weight="800" fill="#F99D1C">前提：长期追求</text>
+        <text x="100" y="22" text-anchor="middle" font-size="11" font-weight="800" fill="#A67C00">前提：长期追求</text>
         <polygon
           points="100,38 168,118 32,118"
           fill="none"
@@ -146,22 +146,22 @@ withDefaults(
           stroke-linejoin="round"
           opacity="0.7"
         />
-        <circle cx="100" cy="44" r="10" fill="#2B7DE9" />
-        <circle cx="160" cy="112" r="10" fill="#00A685" />
-        <circle cx="40" cy="112" r="10" fill="#F99D1C" />
+        <circle cx="100" cy="44" r="10" fill="#2A649F" />
+        <circle cx="160" cy="112" r="10" fill="#0E8A84" />
+        <circle cx="40" cy="112" r="10" fill="#A67C00" />
         <circle
           cx="100"
           cy="88"
           r="16"
           fill="none"
-          stroke="#00A685"
+          stroke="#0E8A84"
           stroke-width="1.5"
-          stroke-dasharray="3 2"
+          stroke-dasharray="0"
         />
-        <text x="100" y="91" text-anchor="middle" font-size="8" font-weight="700" fill="#00A685">重复</text>
-        <text x="100" y="36" text-anchor="middle" font-size="7" font-weight="700" fill="#2B7DE9">A</text>
-        <text x="160" y="128" text-anchor="middle" font-size="7" font-weight="700" fill="#00A685">B</text>
-        <text x="40" y="128" text-anchor="middle" font-size="7" font-weight="700" fill="#F99D1C">C</text>
+        <text x="100" y="91" text-anchor="middle" font-size="8" font-weight="700" fill="#0E8A84">重复</text>
+        <text x="100" y="36" text-anchor="middle" font-size="7" font-weight="700" fill="#2A649F">A</text>
+        <text x="160" y="128" text-anchor="middle" font-size="7" font-weight="700" fill="#0E8A84">B</text>
+        <text x="40" y="128" text-anchor="middle" font-size="7" font-weight="700" fill="#A67C00">C</text>
       </svg>
 
       <!-- 需求评估三角形：雷达缩略图 -->
@@ -172,13 +172,13 @@ withDefaults(
         xmlns="http://www.w3.org/2000/svg"
       >
         <rect width="200" height="140" rx="10" fill="#f4f5f7" />
-        <polygon points="100,22 168,118 32,118" fill="none" stroke="#9aa0a6" stroke-width="1.6" />
+        <polygon points="100,22 168,118 32,118" fill="none" stroke="#e4e6e8" stroke-width="1.6" />
         <polygon points="100,40 148,108 52,108" fill="none" stroke="#c5c9ce" stroke-width="1.1" />
         <polygon points="100,58 128,98 72,98" fill="none" stroke="#c5c9ce" stroke-width="1.1" />
-        <polygon points="100,34 158,112 42,112" fill="rgba(212,175,55,0.35)" stroke="#c9a227" stroke-width="1.2" />
+        <polygon points="100,34 158,112 42,112" fill="rgba(212,175,55,0.35)" stroke="#A67C00" stroke-width="1.2" />
         <polygon points="100,52 138,104 62,104" fill="rgba(129,199,132,0.4)" stroke="#66bb6a" stroke-width="1.2" />
         <polygon points="100,70 120,96 80,96" fill="rgba(77,182,172,0.45)" stroke="#26a69a" stroke-width="1.2" />
-        <circle cx="18" cy="28" r="4" fill="#c9a227" />
+        <circle cx="18" cy="28" r="4" fill="#A67C00" />
         <circle cx="18" cy="44" r="4" fill="#66bb6a" />
         <circle cx="18" cy="60" r="4" fill="#26a69a" />
         <text x="100" y="16" text-anchor="middle" font-size="8" font-weight="700" fill="#5f6368">普遍性</text>
@@ -523,7 +523,7 @@ withDefaults(
         viewBox="0 0 200 140"
         xmlns="http://www.w3.org/2000/svg"
       >
-        <rect width="200" height="140" rx="10" fill="#ffffff" />
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
         <text x="100" y="16" text-anchor="middle" font-size="9" font-weight="800" fill="#202124">AI场景取舍评估</text>
         <rect x="12" y="24" width="86" height="14" fill="#e8eaed" stroke="#dadce0" stroke-width="0.6" />
         <rect x="102" y="24" width="86" height="14" fill="#e8eaed" stroke="#dadce0" stroke-width="0.6" />
@@ -557,22 +557,22 @@ withDefaults(
         viewBox="0 0 200 140"
         xmlns="http://www.w3.org/2000/svg"
       >
-        <rect width="200" height="140" rx="10" fill="#ffffff" />
-        <rect x="10" y="10" width="88" height="14" fill="#ffff00" stroke="#9aa0a6" stroke-width="0.7" />
-        <rect x="102" y="10" width="88" height="14" fill="#ffff00" stroke="#9aa0a6" stroke-width="0.7" />
-        <text x="54" y="20" text-anchor="middle" font-size="7" font-weight="800" fill="#202124">用户</text>
-        <text x="146" y="20" text-anchor="middle" font-size="7" font-weight="800" fill="#202124">核心指标</text>
-        <rect x="10" y="24" width="88" height="28" fill="#fff" stroke="#9aa0a6" stroke-width="0.6" />
-        <rect x="102" y="24" width="88" height="28" fill="#fff" stroke="#9aa0a6" stroke-width="0.6" />
-        <rect x="10" y="58" width="58" height="14" fill="#ffff00" stroke="#9aa0a6" stroke-width="0.7" />
-        <rect x="71" y="58" width="58" height="14" fill="#ffff00" stroke="#9aa0a6" stroke-width="0.7" />
-        <rect x="132" y="58" width="58" height="14" fill="#ffff00" stroke="#9aa0a6" stroke-width="0.7" />
-        <text x="39" y="68" text-anchor="middle" font-size="5.5" font-weight="800" fill="#202124">加法</text>
-        <text x="100" y="68" text-anchor="middle" font-size="5.5" font-weight="800" fill="#202124">减法</text>
-        <text x="161" y="68" text-anchor="middle" font-size="5.5" font-weight="800" fill="#202124">验证</text>
-        <rect x="10" y="72" width="58" height="56" fill="#fff" stroke="#9aa0a6" stroke-width="0.6" />
-        <rect x="71" y="72" width="58" height="56" fill="#fff" stroke="#9aa0a6" stroke-width="0.6" />
-        <rect x="132" y="72" width="58" height="56" fill="#fff" stroke="#9aa0a6" stroke-width="0.6" />
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <rect x="10" y="10" width="88" height="14" fill="#0E8A84" />
+        <rect x="102" y="10" width="88" height="14" fill="#A67C00" />
+        <text x="54" y="20" text-anchor="middle" font-size="7" font-weight="800" fill="#fff">用户</text>
+        <text x="146" y="20" text-anchor="middle" font-size="7" font-weight="800" fill="#fff">核心指标</text>
+        <rect x="10" y="24" width="88" height="28" fill="#E5F6F5" />
+        <rect x="102" y="24" width="88" height="28" fill="#FBF6E4" />
+        <rect x="10" y="58" width="58" height="14" fill="#B85A38" />
+        <rect x="71" y="58" width="58" height="14" fill="#2A649F" />
+        <rect x="132" y="58" width="58" height="14" fill="#187A4E" />
+        <text x="39" y="68" text-anchor="middle" font-size="5.5" font-weight="800" fill="#fff">加法</text>
+        <text x="100" y="68" text-anchor="middle" font-size="5.5" font-weight="800" fill="#fff">减法</text>
+        <text x="161" y="68" text-anchor="middle" font-size="5.5" font-weight="800" fill="#fff">验证</text>
+        <rect x="10" y="72" width="58" height="56" fill="#FBF1EB" />
+        <rect x="71" y="72" width="58" height="56" fill="#E8F1FA" />
+        <rect x="132" y="72" width="58" height="56" fill="#E7F6EF" />
       </svg>
 
       <!-- OSCAR调研：3+2 网格示意 -->
@@ -582,18 +582,18 @@ withDefaults(
         viewBox="0 0 200 140"
         xmlns="http://www.w3.org/2000/svg"
       >
-        <rect width="200" height="140" rx="10" fill="#f5f0e8" />
-        <rect x="10" y="12" width="58" height="52" fill="#f5f0e8" stroke="#202124" stroke-width="1.2" />
-        <rect x="71" y="12" width="58" height="52" fill="#f5f0e8" stroke="#202124" stroke-width="1.2" />
-        <rect x="132" y="12" width="58" height="52" fill="#f5f0e8" stroke="#202124" stroke-width="1.2" />
+        <rect width="200" height="140" rx="10" fill="#FBF6E4" />
+        <rect x="10" y="12" width="58" height="52" fill="#FBF6E4" stroke="#ececec" stroke-width="1.2" />
+        <rect x="71" y="12" width="58" height="52" fill="#FBF6E4" stroke="#ececec" stroke-width="1.2" />
+        <rect x="132" y="12" width="58" height="52" fill="#FBF6E4" stroke="#ececec" stroke-width="1.2" />
         <text x="18" y="28" font-size="8" font-weight="800" fill="#202124">O 目标</text>
         <text x="79" y="28" font-size="8" font-weight="800" fill="#202124">S 范围</text>
         <text x="140" y="28" font-size="8" font-weight="800" fill="#202124">C 清单</text>
         <text x="14" y="58" font-size="22" font-weight="800" fill="rgba(100,149,237,0.28)">O</text>
         <text x="75" y="58" font-size="22" font-weight="800" fill="rgba(100,149,237,0.28)">S</text>
         <text x="136" y="58" font-size="22" font-weight="800" fill="rgba(100,149,237,0.28)">C</text>
-        <rect x="10" y="70" width="88" height="58" fill="#f5f0e8" stroke="#202124" stroke-width="1.2" />
-        <rect x="102" y="70" width="88" height="58" fill="#f5f0e8" stroke="#202124" stroke-width="1.2" />
+        <rect x="10" y="70" width="88" height="58" fill="#FBF6E4" stroke="#ececec" stroke-width="1.2" />
+        <rect x="102" y="70" width="88" height="58" fill="#FBF6E4" stroke="#ececec" stroke-width="1.2" />
         <text x="18" y="88" font-size="8" font-weight="800" fill="#202124">A 获取</text>
         <text x="110" y="88" font-size="8" font-weight="800" fill="#202124">R 用好</text>
         <text x="14" y="122" font-size="22" font-weight="800" fill="rgba(100,149,237,0.28)">A</text>
@@ -607,18 +607,18 @@ withDefaults(
         viewBox="0 0 200 140"
         xmlns="http://www.w3.org/2000/svg"
       >
-        <rect width="200" height="140" rx="10" fill="#ffffff" />
-        <rect x="10" y="10" width="58" height="36" fill="#fff" stroke="#202124" stroke-width="1.1" />
-        <rect x="71" y="10" width="58" height="36" fill="#fff" stroke="#202124" stroke-width="1.1" />
-        <rect x="132" y="10" width="58" height="36" fill="#fff" stroke="#202124" stroke-width="1.1" />
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <rect x="10" y="10" width="58" height="36" fill="#fff" stroke="#ececec" stroke-width="1.1" />
+        <rect x="71" y="10" width="58" height="36" fill="#fff" stroke="#ececec" stroke-width="1.1" />
+        <rect x="132" y="10" width="58" height="36" fill="#fff" stroke="#ececec" stroke-width="1.1" />
         <text x="14" y="24" font-size="6.5" font-weight="800" fill="#202124">拆解产业链</text>
         <text x="75" y="24" font-size="6.5" font-weight="800" fill="#202124">洞察变化</text>
         <text x="136" y="24" font-size="6.5" font-weight="800" fill="#202124">稳态B点</text>
-        <rect x="10" y="52" width="180" height="24" fill="#fff" stroke="#202124" stroke-width="1.1" />
+        <rect x="10" y="52" width="180" height="24" fill="#fff" stroke="#ececec" stroke-width="1.1" />
         <text x="16" y="67" font-size="7" font-weight="800" fill="#202124">判断行业周期</text>
-        <rect x="10" y="82" width="180" height="24" fill="#fff" stroke="#202124" stroke-width="1.1" />
+        <rect x="10" y="82" width="180" height="24" fill="#fff" stroke="#ececec" stroke-width="1.1" />
         <text x="16" y="97" font-size="7" font-weight="800" fill="#202124">行业天花板大小</text>
-        <rect x="10" y="112" width="180" height="20" fill="#fff" stroke="#202124" stroke-width="1.1" />
+        <rect x="10" y="112" width="180" height="20" fill="#fff" stroke="#ececec" stroke-width="1.1" />
         <text x="16" y="125" font-size="7" font-weight="800" fill="#202124">行业集中度</text>
       </svg>
 
@@ -629,8 +629,8 @@ withDefaults(
         viewBox="0 0 200 140"
         xmlns="http://www.w3.org/2000/svg"
       >
-        <rect width="200" height="140" rx="10" fill="#ffffff" />
-        <rect x="10" y="8" width="180" height="18" fill="#fff9c4" stroke="#e0e0e0" stroke-width="0.6" />
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <rect x="10" y="8" width="180" height="18" fill="#FBF6E4" stroke="#e0e0e0" stroke-width="0.6" />
         <text x="100" y="20" text-anchor="middle" font-size="7" font-weight="700" fill="#202124">关键阻力分析画布：____率</text>
         <rect x="10" y="28" width="58" height="12" fill="#f5f0e6" stroke="#dadce0" stroke-width="0.5" />
         <rect x="71" y="28" width="58" height="12" fill="#f5f0e6" stroke="#dadce0" stroke-width="0.5" />
@@ -658,13 +658,13 @@ withDefaults(
         viewBox="0 0 200 140"
         xmlns="http://www.w3.org/2000/svg"
       >
-        <rect width="200" height="140" rx="10" fill="#ffffff" />
-        <rect x="10" y="8" width="180" height="18" fill="#fff8e1" stroke="#e0e0e0" stroke-width="0.6" />
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <rect x="10" y="8" width="180" height="18" fill="#FBF6E4" stroke="#e0e0e0" stroke-width="0.6" />
         <text x="100" y="20" text-anchor="middle" font-size="6.5" font-weight="800" fill="#202124">一堂最佳转化率分析画布·取舍版</text>
-        <rect x="10" y="28" width="36" height="12" fill="#fff8e1" stroke="#dadce0" stroke-width="0.5" />
-        <rect x="48" y="28" width="46" height="12" fill="#fff8e1" stroke="#dadce0" stroke-width="0.5" />
-        <rect x="96" y="28" width="46" height="12" fill="#fff8e1" stroke="#dadce0" stroke-width="0.5" />
-        <rect x="144" y="28" width="46" height="12" fill="#fff8e1" stroke="#dadce0" stroke-width="0.5" />
+        <rect x="10" y="28" width="36" height="12" fill="#FBF6E4" stroke="#dadce0" stroke-width="0.5" />
+        <rect x="48" y="28" width="46" height="12" fill="#FBF6E4" stroke="#dadce0" stroke-width="0.5" />
+        <rect x="96" y="28" width="46" height="12" fill="#FBF6E4" stroke="#dadce0" stroke-width="0.5" />
+        <rect x="144" y="28" width="46" height="12" fill="#FBF6E4" stroke="#dadce0" stroke-width="0.5" />
         <text x="28" y="36.5" text-anchor="middle" font-size="5.5" font-weight="700" fill="#202124">优先级</text>
         <text x="71" y="36.5" text-anchor="middle" font-size="5.5" font-weight="700" fill="#202124">动力</text>
         <text x="119" y="36.5" text-anchor="middle" font-size="5.5" font-weight="700" fill="#202124">阻力</text>
@@ -689,20 +689,20 @@ withDefaults(
         viewBox="0 0 200 140"
         xmlns="http://www.w3.org/2000/svg"
       >
-        <rect width="200" height="140" rx="10" fill="#ffffff" />
-        <rect x="10" y="8" width="180" height="16" fill="#c4a574" stroke="#8d6e4a" stroke-width="0.7" />
-        <text x="100" y="19" text-anchor="middle" font-size="7" font-weight="800" fill="#3e2723">行业预判分析框架</text>
-        <rect x="10" y="28" width="58" height="28" fill="#fff" stroke="#5d4037" stroke-width="1" />
-        <rect x="71" y="28" width="58" height="28" fill="#fff" stroke="#5d4037" stroke-width="1" />
-        <rect x="132" y="28" width="58" height="28" fill="#fff" stroke="#5d4037" stroke-width="1" />
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <rect x="10" y="8" width="180" height="16" fill="#A67C00" stroke="#A67C00" stroke-width="0.7" />
+        <text x="100" y="19" text-anchor="middle" font-size="7" font-weight="800" fill="#fff">行业预判分析框架</text>
+        <rect x="10" y="28" width="58" height="28" fill="#fff" stroke="#ececec" stroke-width="1" />
+        <rect x="71" y="28" width="58" height="28" fill="#fff" stroke="#ececec" stroke-width="1" />
+        <rect x="132" y="28" width="58" height="28" fill="#fff" stroke="#ececec" stroke-width="1" />
         <text x="14" y="40" font-size="5.5" font-weight="800" fill="#202124">1.拆解产业链</text>
         <text x="75" y="40" font-size="5.5" font-weight="800" fill="#202124">2.洞察变化</text>
         <text x="136" y="40" font-size="5.5" font-weight="800" fill="#202124">3.稳态B点</text>
-        <rect x="10" y="60" width="180" height="20" fill="#fff" stroke="#5d4037" stroke-width="1" />
+        <rect x="10" y="60" width="180" height="20" fill="#fff" stroke="#ececec" stroke-width="1" />
         <text x="16" y="73" font-size="6.5" font-weight="800" fill="#202124">4.判断行业周期</text>
-        <rect x="10" y="84" width="180" height="20" fill="#fff" stroke="#5d4037" stroke-width="1" />
+        <rect x="10" y="84" width="180" height="20" fill="#fff" stroke="#ececec" stroke-width="1" />
         <text x="16" y="97" font-size="6.5" font-weight="800" fill="#202124">5.行业天花板大小</text>
-        <rect x="10" y="108" width="180" height="20" fill="#fff" stroke="#5d4037" stroke-width="1" />
+        <rect x="10" y="108" width="180" height="20" fill="#fff" stroke="#ececec" stroke-width="1" />
         <text x="16" y="121" font-size="6.5" font-weight="800" fill="#202124">6.行业集中度</text>
       </svg>
 
@@ -713,12 +713,12 @@ withDefaults(
         viewBox="0 0 200 140"
         xmlns="http://www.w3.org/2000/svg"
       >
-        <rect width="200" height="140" rx="10" fill="#f8f2d4" />
+        <rect width="200" height="140" rx="10" fill="#FBF6E4" />
         <!-- 三列 + 底栏，黑线浅黄，贴近附图 -->
-        <rect x="8" y="8" width="184" height="124" fill="#f8f2d4" stroke="#1a1a1a" stroke-width="1.2" />
-        <line x1="69.3" y1="8" x2="69.3" y2="112" stroke="#1a1a1a" stroke-width="1" />
-        <line x1="130.7" y1="8" x2="130.7" y2="112" stroke="#1a1a1a" stroke-width="1" />
-        <line x1="8" y1="112" x2="192" y2="112" stroke="#1a1a1a" stroke-width="1" />
+        <rect x="8" y="8" width="184" height="124" fill="#FBF6E4" stroke="#ececec" stroke-width="1.2" />
+        <line x1="69.3" y1="8" x2="69.3" y2="112" stroke="#ececec" stroke-width="1" />
+        <line x1="130.7" y1="8" x2="130.7" y2="112" stroke="#ececec" stroke-width="1" />
+        <line x1="8" y1="112" x2="192" y2="112" stroke="#ececec" stroke-width="1" />
         <text x="14" y="24" font-size="7" font-weight="800" fill="#1a1a1a">Step1. 目标</text>
         <text x="75" y="24" font-size="7" font-weight="800" fill="#1a1a1a">Step2. 原则</text>
         <text x="136" y="24" font-size="7" font-weight="800" fill="#1a1a1a">Step3. 流程</text>
@@ -738,38 +738,38 @@ withDefaults(
         viewBox="0 0 200 140"
         xmlns="http://www.w3.org/2000/svg"
       >
-        <rect width="200" height="140" rx="10" fill="#f7f5f0" />
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
         <!-- Goal -->
-        <rect x="118" y="8" width="42" height="16" fill="none" stroke="#9aa0a6" stroke-width="0.9" stroke-dasharray="2 1.5" />
+        <rect x="118" y="8" width="42" height="16" fill="none" stroke="#e4e6e8" stroke-width="0.9" stroke-dasharray="0" />
         <text x="164" y="19" font-size="7" font-weight="800" fill="#202124">目标</text>
-        <line x1="148" y1="26" x2="148" y2="34" stroke="#202124" stroke-width="1" marker-end="url(#ipo-t-b)" />
+        <line x1="148" y1="26" x2="148" y2="34" stroke="#ececec" stroke-width="1" marker-end="url(#ipo-t-b)" />
         <!-- I P O boxes -->
-        <rect x="18" y="42" width="40" height="36" fill="#fff" stroke="#9aa0a6" stroke-width="1" stroke-dasharray="2.5 1.5" />
-        <rect x="80" y="42" width="40" height="36" fill="#fff" stroke="#9aa0a6" stroke-width="1" stroke-dasharray="2.5 1.5" />
-        <rect x="142" y="42" width="40" height="36" fill="#fff" stroke="#9aa0a6" stroke-width="1" stroke-dasharray="2.5 1.5" />
-        <text x="22" y="38" font-size="7.5" font-weight="800" fill="#d32f2f">输入</text>
-        <text x="84" y="38" font-size="7.5" font-weight="800" fill="#d32f2f">处理</text>
-        <text x="146" y="38" font-size="7.5" font-weight="800" fill="#d32f2f">输出</text>
+        <rect x="18" y="42" width="40" height="36" fill="#fff" stroke="#e4e6e8" stroke-width="1" stroke-dasharray="0" />
+        <rect x="80" y="42" width="40" height="36" fill="#fff" stroke="#e4e6e8" stroke-width="1" stroke-dasharray="0" />
+        <rect x="142" y="42" width="40" height="36" fill="#fff" stroke="#e4e6e8" stroke-width="1" stroke-dasharray="0" />
+        <text x="22" y="38" font-size="7.5" font-weight="800" fill="#A84562">输入</text>
+        <text x="84" y="38" font-size="7.5" font-weight="800" fill="#A84562">处理</text>
+        <text x="146" y="38" font-size="7.5" font-weight="800" fill="#A84562">输出</text>
         <!-- red arrows I→P→O -->
         <defs>
           <marker id="ipo-t-r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto">
-            <path d="M0 1.5 L9 5 L0 8.5 z" fill="#d32f2f" />
+            <path d="M0 1.5 L9 5 L0 8.5 z" fill="#A84562" />
           </marker>
           <marker id="ipo-t-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="4" markerHeight="4" orient="auto">
             <path d="M0 1.5 L9 5 L0 8.5 z" fill="#202124" />
           </marker>
         </defs>
-        <line x1="60" y1="60" x2="76" y2="60" stroke="#d32f2f" stroke-width="1.6" marker-end="url(#ipo-t-r)" />
-        <line x1="122" y1="60" x2="138" y2="60" stroke="#d32f2f" stroke-width="1.6" marker-end="url(#ipo-t-r)" />
+        <line x1="60" y1="60" x2="76" y2="60" stroke="#A84562" stroke-width="1.6" marker-end="url(#ipo-t-r)" />
+        <line x1="122" y1="60" x2="138" y2="60" stroke="#A84562" stroke-width="1.6" marker-end="url(#ipo-t-r)" />
         <!-- Pattern -->
-        <line x1="100" y1="80" x2="100" y2="90" stroke="#202124" stroke-width="1" />
+        <line x1="100" y1="80" x2="100" y2="90" stroke="#ececec" stroke-width="1" />
         <text x="88" y="100" font-size="6.5" font-weight="800" fill="#202124">模型</text>
-        <rect x="80" y="104" width="40" height="14" fill="#fff" stroke="#9aa0a6" stroke-width="0.9" stroke-dasharray="2 1.5" />
+        <rect x="80" y="104" width="40" height="14" fill="#fff" stroke="#e4e6e8" stroke-width="0.9" stroke-dasharray="0" />
         <!-- Feedback -->
         <text x="48" y="130" font-size="6.5" font-weight="800" fill="#202124">反馈</text>
-        <rect x="68" y="121" width="70" height="12" fill="#fff" stroke="#9aa0a6" stroke-width="0.9" stroke-dasharray="2 1.5" />
+        <rect x="68" y="121" width="70" height="12" fill="#fff" stroke="#e4e6e8" stroke-width="0.9" stroke-dasharray="0" />
         <!-- feedback loop -->
-        <path d="M162 80 L162 134 L28 134 L28 80" fill="none" stroke="#d32f2f" stroke-width="2.2" stroke-linejoin="round" marker-end="url(#ipo-t-r)" />
+        <path d="M162 80 L162 134 L28 134 L28 80" fill="none" stroke="#A84562" stroke-width="2.2" stroke-linejoin="round" marker-end="url(#ipo-t-r)" />
       </svg>
 
       <!-- 故障复盘：纵向七段文档 -->
@@ -779,7 +779,7 @@ withDefaults(
         viewBox="0 0 200 140"
         xmlns="http://www.w3.org/2000/svg"
       >
-        <rect width="200" height="140" rx="10" fill="#ffffff" />
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
         <text x="12" y="16" font-size="7.5" font-weight="800" fill="#202124">Case Study: 故障复盘</text>
         <line x1="12" y1="20" x2="188" y2="20" stroke="#e8eaed" stroke-width="0.8" />
         <text x="12" y="32" font-size="5.5" font-weight="700" fill="#202124">1.详细描述</text>
@@ -790,9 +790,9 @@ withDefaults(
         <text x="16" y="70" font-size="4.5" fill="#5f6368">时间</text>
         <text x="68" y="70" font-size="4.5" fill="#5f6368">行为</text>
         <text x="12" y="90" font-size="5.5" font-weight="700" fill="#202124">3.原因 · 4.方案</text>
-        <rect x="12" y="93" width="176" height="8" fill="#fff8e1" stroke="#ffe082" stroke-width="0.5" />
+        <rect x="12" y="93" width="176" height="8" fill="#FBF6E4" stroke="#ffe082" stroke-width="0.5" />
         <text x="12" y="112" font-size="5.5" font-weight="700" fill="#202124">5.影响 · 6.需求 · 7.反思</text>
-        <rect x="12" y="115" width="176" height="14" fill="#fce8e6" stroke="#f5c6c2" stroke-width="0.5" />
+        <rect x="12" y="115" width="176" height="14" fill="#FBEFF2" stroke="#f5c6c2" stroke-width="0.5" />
       </svg>
 
 
@@ -806,21 +806,21 @@ withDefaults(
         viewBox="0 0 200 140"
         xmlns="http://www.w3.org/2000/svg"
       >
-        <rect width="200" height="140" rx="10" fill="#ffffff" />
-        <rect x="18" y="28" width="164" height="90" fill="#ffffff" stroke="#111111" stroke-width="2" />
-        <rect x="18" y="28" width="164" height="18" fill="#90949c" stroke="#111111" stroke-width="2" />
-        <line x1="55" y1="28" x2="55" y2="118" stroke="#111111" stroke-width="1.2" />
-        <line x1="85" y1="28" x2="85" y2="118" stroke="#111111" stroke-width="1.2" />
-        <line x1="115" y1="28" x2="115" y2="118" stroke="#111111" stroke-width="1.2" />
-        <line x1="148" y1="28" x2="148" y2="118" stroke="#111111" stroke-width="1.2" />
-        <line x1="18" y1="64" x2="182" y2="64" stroke="#111111" stroke-width="1.2" />
-        <line x1="18" y1="82" x2="182" y2="82" stroke="#111111" stroke-width="1.2" />
-        <line x1="18" y1="100" x2="182" y2="100" stroke="#111111" stroke-width="1.2" />
-        <text x="36" y="41" text-anchor="middle" font-size="6" font-weight="800" fill="#111">假设</text>
-        <text x="70" y="41" text-anchor="middle" font-size="6" font-weight="800" fill="#111">提出者</text>
-        <text x="100" y="41" text-anchor="middle" font-size="6" font-weight="800" fill="#111">时间</text>
-        <text x="131" y="41" text-anchor="middle" font-size="6" font-weight="800" fill="#111">负责人</text>
-        <text x="165" y="41" text-anchor="middle" font-size="6" font-weight="800" fill="#111">结果</text>
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <rect x="18" y="28" width="164" height="90" fill="#ffffff" stroke="#ececec" stroke-width="2" />
+        <rect x="18" y="28" width="164" height="18" fill="#2A649F" stroke="#ececec" stroke-width="2" />
+        <line x1="55" y1="28" x2="55" y2="118" stroke="#ececec" stroke-width="1.2" />
+        <line x1="85" y1="28" x2="85" y2="118" stroke="#ececec" stroke-width="1.2" />
+        <line x1="115" y1="28" x2="115" y2="118" stroke="#ececec" stroke-width="1.2" />
+        <line x1="148" y1="28" x2="148" y2="118" stroke="#ececec" stroke-width="1.2" />
+        <line x1="18" y1="64" x2="182" y2="64" stroke="#ececec" stroke-width="1.2" />
+        <line x1="18" y1="82" x2="182" y2="82" stroke="#ececec" stroke-width="1.2" />
+        <line x1="18" y1="100" x2="182" y2="100" stroke="#ececec" stroke-width="1.2" />
+        <text x="36" y="41" text-anchor="middle" font-size="6" font-weight="800" fill="#fff">假设</text>
+        <text x="70" y="41" text-anchor="middle" font-size="6" font-weight="800" fill="#fff">提出者</text>
+        <text x="100" y="41" text-anchor="middle" font-size="6" font-weight="800" fill="#fff">时间</text>
+        <text x="131" y="41" text-anchor="middle" font-size="6" font-weight="800" fill="#fff">负责人</text>
+        <text x="165" y="41" text-anchor="middle" font-size="6" font-weight="800" fill="#fff">结果</text>
       </svg>
 
       <!-- 时间管理矩阵：艾森豪威尔四象限 -->
@@ -830,15 +830,15 @@ withDefaults(
         viewBox="0 0 200 140"
         xmlns="http://www.w3.org/2000/svg"
       >
-        <rect width="200" height="140" rx="10" fill="#ffffff" />
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
         <text x="100" y="14" text-anchor="middle" font-size="8" font-weight="800" fill="#202124">重要</text>
         <text x="14" y="76" text-anchor="middle" font-size="7.5" font-weight="800" fill="#202124">不紧急</text>
         <text x="186" y="76" text-anchor="middle" font-size="7.5" font-weight="800" fill="#202124">紧急</text>
         <text x="100" y="134" text-anchor="middle" font-size="8" font-weight="800" fill="#202124">不重要</text>
-        <rect x="28" y="22" width="68" height="44" fill="#ffd1d2" />
-        <rect x="104" y="22" width="68" height="44" fill="#fbe297" />
-        <rect x="28" y="74" width="68" height="44" fill="#fcf29c" />
-        <rect x="104" y="74" width="68" height="44" fill="#e4ff8e" />
+        <rect x="28" y="22" width="68" height="44" fill="#FBEFF2" />
+        <rect x="104" y="22" width="68" height="44" fill="#FBF6E4" />
+        <rect x="28" y="74" width="68" height="44" fill="#FBF1EB" />
+        <rect x="104" y="74" width="68" height="44" fill="#E7F6EF" />
         <text x="62" y="48" text-anchor="middle" font-size="7" font-weight="800" fill="#202124">A</text>
         <text x="138" y="48" text-anchor="middle" font-size="7" font-weight="800" fill="#202124">B</text>
         <text x="62" y="100" text-anchor="middle" font-size="7" font-weight="800" fill="#202124">C</text>
@@ -848,8 +848,8 @@ withDefaults(
             <path d="M0 1.5 L9 5 L0 8.5 z" fill="#202124" />
           </marker>
         </defs>
-        <line x1="100" y1="118" x2="100" y2="20" stroke="#202124" stroke-width="1.4" marker-end="url(#tm-t-arr)" />
-        <line x1="28" y1="68" x2="172" y2="68" stroke="#202124" stroke-width="1.4" marker-end="url(#tm-t-arr)" />
+        <line x1="100" y1="118" x2="100" y2="20" stroke="#ececec" stroke-width="1.4" marker-end="url(#tm-t-arr)" />
+        <line x1="28" y1="68" x2="172" y2="68" stroke="#ececec" stroke-width="1.4" marker-end="url(#tm-t-arr)" />
       </svg>
 
 
@@ -860,31 +860,31 @@ withDefaults(
         viewBox="0 0 200 140"
         xmlns="http://www.w3.org/2000/svg"
       >
-        <rect width="200" height="140" rx="10" fill="#ffffff" />
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
         <text x="100" y="12" text-anchor="middle" font-size="7" font-weight="800" fill="#202124">自治</text>
         <text x="100" y="21" text-anchor="middle" font-size="4.5" fill="#9aa0a6">短期/长期统一</text>
         <text x="14" y="72" text-anchor="middle" font-size="6.5" font-weight="800" fill="#202124">舒适区</text>
         <text x="186" y="72" text-anchor="middle" font-size="6.5" font-weight="800" fill="#202124">非舒适区</text>
         <text x="100" y="132" text-anchor="middle" font-size="7" font-weight="800" fill="#202124">不自治</text>
-        <rect x="42" y="32" width="46" height="14" rx="3" fill="#9ad751" />
+        <rect x="42" y="32" width="46" height="14" rx="3" fill="#187A4E" />
         <text x="65" y="42" text-anchor="middle" font-size="5.5" font-weight="700" fill="#fff">幸福做事区</text>
-        <text x="65" y="54" text-anchor="middle" font-size="4.5" fill="#98d84e">持续享受成果</text>
-        <rect x="112" y="32" width="46" height="14" rx="3" fill="#fae254" />
+        <text x="65" y="54" text-anchor="middle" font-size="4.5" fill="#125C3B">持续享受成果</text>
+        <rect x="112" y="32" width="46" height="14" rx="3" fill="#A67C00" />
         <text x="135" y="42" text-anchor="middle" font-size="5.5" font-weight="700" fill="#fff">无限进步区</text>
-        <text x="135" y="54" text-anchor="middle" font-size="4.5" fill="#fde153">持续挑战进步</text>
-        <rect x="42" y="86" width="46" height="14" rx="3" fill="#ff898e" />
+        <text x="135" y="54" text-anchor="middle" font-size="4.5" fill="#7A5C00">持续挑战进步</text>
+        <rect x="42" y="86" width="46" height="14" rx="3" fill="#A84562" />
         <text x="65" y="96" text-anchor="middle" font-size="5.5" font-weight="700" fill="#fff">低头做事区</text>
-        <text x="65" y="108" text-anchor="middle" font-size="4.5" fill="#fc8b8d">容易陷入工作</text>
-        <rect x="112" y="86" width="46" height="14" rx="3" fill="#8e8e8e" />
+        <text x="65" y="108" text-anchor="middle" font-size="4.5" fill="#84344C">容易陷入工作</text>
+        <rect x="112" y="86" width="46" height="14" rx="3" fill="#3E5A78" />
         <text x="135" y="96" text-anchor="middle" font-size="5.5" font-weight="700" fill="#fff">自我怀疑区</text>
-        <text x="135" y="108" text-anchor="middle" font-size="4.5" fill="#8e8e8e">容易迷茫失控</text>
+        <text x="135" y="108" text-anchor="middle" font-size="4.5" fill="#3E5A78">容易迷茫失控</text>
         <defs>
           <marker id="wsz-t-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="4" markerHeight="4" orient="auto">
-            <path d="M0 1.5 L9 5 L0 8.5 z" fill="#b85654" />
+            <path d="M0 1.5 L9 5 L0 8.5 z" fill="#A84562" />
           </marker>
         </defs>
-        <line x1="100" y1="118" x2="100" y2="24" stroke="#b85654" stroke-width="1.2" marker-end="url(#wsz-t-arr)" />
-        <line x1="28" y1="68" x2="172" y2="68" stroke="#b85654" stroke-width="1.2" marker-end="url(#wsz-t-arr)" />
+        <line x1="100" y1="118" x2="100" y2="24" stroke="#A84562" stroke-width="1.2" marker-end="url(#wsz-t-arr)" />
+        <line x1="28" y1="68" x2="172" y2="68" stroke="#A84562" stroke-width="1.2" marker-end="url(#wsz-t-arr)" />
       </svg>
 
 
@@ -895,40 +895,40 @@ withDefaults(
         viewBox="0 0 200 140"
         xmlns="http://www.w3.org/2000/svg"
       >
-        <rect width="200" height="140" rx="10" fill="#ffffff" />
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
         <text x="100" y="14" text-anchor="middle" font-size="8" font-weight="800" fill="#202124">线上</text>
         <text x="14" y="76" text-anchor="middle" font-size="6.5" font-weight="800" fill="#202124">异步</text>
         <text x="186" y="76" text-anchor="middle" font-size="6.5" font-weight="800" fill="#202124">同步</text>
         <text x="100" y="134" text-anchor="middle" font-size="8" font-weight="800" fill="#202124">线下</text>
         <!-- TL blue -->
-        <ellipse cx="55" cy="36" rx="28" ry="10" fill="#a4c4fc" stroke="#111" stroke-width="2" />
+        <ellipse cx="55" cy="36" rx="28" ry="10" fill="#E8F1FA" stroke="#c5c9ce" stroke-width="2" />
         <text x="55" y="39" text-anchor="middle" font-size="5.5" font-weight="700" fill="#111">顶层文档</text>
-        <ellipse cx="78" cy="54" rx="18" ry="8" fill="#a4c4fc" stroke="#111" stroke-width="2" />
+        <ellipse cx="78" cy="54" rx="18" ry="8" fill="#E8F1FA" stroke="#c5c9ce" stroke-width="2" />
         <text x="78" y="56.5" text-anchor="middle" font-size="4.5" font-weight="700" fill="#111">电子看板</text>
-        <ellipse cx="48" cy="58" rx="16" ry="7" fill="#a4c4fc" />
+        <ellipse cx="48" cy="58" rx="16" ry="7" fill="#E8F1FA" />
         <text x="48" y="60" text-anchor="middle" font-size="4.5" fill="#111">项目群</text>
         <!-- TR green -->
-        <ellipse cx="138" cy="38" rx="22" ry="9" fill="#b8fcb8" />
+        <ellipse cx="138" cy="38" rx="22" ry="9" fill="#E7F6EF" />
         <text x="138" y="41" text-anchor="middle" font-size="5" fill="#111">1v1发消息</text>
-        <ellipse cx="155" cy="54" rx="16" ry="7" fill="#b8fcb8" />
+        <ellipse cx="155" cy="54" rx="16" ry="7" fill="#E7F6EF" />
         <text x="155" y="56.5" text-anchor="middle" font-size="4.5" fill="#111">群聊</text>
         <!-- BL purple -->
-        <ellipse cx="62" cy="100" rx="24" ry="10" fill="#e4a4fc" stroke="#111" stroke-width="2" />
+        <ellipse cx="62" cy="100" rx="24" ry="10" fill="#F3EEF8" stroke="#c5c9ce" stroke-width="2" />
         <text x="62" y="103" text-anchor="middle" font-size="5.5" font-weight="700" fill="#111">墙面看板</text>
         <!-- BR pink -->
-        <ellipse cx="130" cy="88" rx="18" ry="8" fill="#fcb8b8" stroke="#111" stroke-width="2" />
+        <ellipse cx="130" cy="88" rx="18" ry="8" fill="#FBEFF2" stroke="#c5c9ce" stroke-width="2" />
         <text x="130" y="90.5" text-anchor="middle" font-size="4.5" font-weight="700" fill="#111">攻坚小组</text>
-        <ellipse cx="155" cy="102" rx="20" ry="8" fill="#fcb8b8" stroke="#111" stroke-width="2" />
+        <ellipse cx="155" cy="102" rx="20" ry="8" fill="#FBEFF2" stroke="#c5c9ce" stroke-width="2" />
         <text x="155" y="104.5" text-anchor="middle" font-size="4.5" font-weight="700" fill="#111">坐你旁边</text>
-        <ellipse cx="138" cy="116" rx="26" ry="9" fill="#fcb8b8" />
+        <ellipse cx="138" cy="116" rx="26" ry="9" fill="#FBEFF2" />
         <text x="138" y="119" text-anchor="middle" font-size="5" fill="#111">团队例会</text>
         <defs>
           <marker id="ooc-t-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="4" markerHeight="4" orient="auto">
             <path d="M0 1.5 L9 5 L0 8.5 z" fill="#202124" />
           </marker>
         </defs>
-        <line x1="100" y1="118" x2="100" y2="20" stroke="#202124" stroke-width="1.2" marker-end="url(#ooc-t-arr)" />
-        <line x1="28" y1="68" x2="172" y2="68" stroke="#202124" stroke-width="1.2" marker-end="url(#ooc-t-arr)" />
+        <line x1="100" y1="118" x2="100" y2="20" stroke="#ececec" stroke-width="1.2" marker-end="url(#ooc-t-arr)" />
+        <line x1="28" y1="68" x2="172" y2="68" stroke="#ececec" stroke-width="1.2" marker-end="url(#ooc-t-arr)" />
       </svg>
 
       <!-- 项目管理6维敏感度：六边形雷达 -->
@@ -938,7 +938,7 @@ withDefaults(
         viewBox="0 0 200 140"
         xmlns="http://www.w3.org/2000/svg"
       >
-        <rect width="200" height="140" rx="10" fill="#ffffff" />
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
         <!-- bands -->
         <polygon points="100.0,24.0 141.6,48.0 141.6,96.0 100.0,120.0 58.4,96.0 58.4,48.0" fill="#f0f1f3" />
         <polygon points="100.0,36.0 131.2,54.0 131.2,90.0 100.0,108.0 68.8,90.0 68.8,54.0" fill="#ffffff" />
@@ -954,13 +954,13 @@ withDefaults(
         <line x1="100" y1="72" x2="58.4" y2="96" stroke="#c5c9ce" stroke-width="0.8" />
         <line x1="100" y1="72" x2="58.4" y2="48" stroke="#c5c9ce" stroke-width="0.8" />
         <!-- data poly: budget4 boss1 risk2 collab1 manpower2 time4 -->
-        <polygon points="100.0,24.0 110.4,66.0 120.8,84.0 100.0,84.0 79.2,84.0 58.4,48.0" fill="rgba(79,195,247,0.4)" stroke="#29b6f6" stroke-width="1.3" />
-        <rect x="97" y="21" width="6" height="6" rx="1" fill="#1e88e5" />
-        <rect x="107.4" y="63" width="6" height="6" rx="1" fill="#1e88e5" />
-        <rect x="117.8" y="81" width="6" height="6" rx="1" fill="#1e88e5" />
-        <rect x="97" y="81" width="6" height="6" rx="1" fill="#1e88e5" />
-        <rect x="76.2" y="81" width="6" height="6" rx="1" fill="#1e88e5" />
-        <rect x="55.4" y="45" width="6" height="6" rx="1" fill="#1e88e5" />
+        <polygon points="100.0,24.0 110.4,66.0 120.8,84.0 100.0,84.0 79.2,84.0 58.4,48.0" fill="rgba(42,100,159,0.28)" stroke="#2A649F" stroke-width="1.3" />
+        <rect x="97" y="21" width="6" height="6" rx="1" fill="#2A649F" />
+        <rect x="107.4" y="63" width="6" height="6" rx="1" fill="#2A649F" />
+        <rect x="117.8" y="81" width="6" height="6" rx="1" fill="#2A649F" />
+        <rect x="97" y="81" width="6" height="6" rx="1" fill="#2A649F" />
+        <rect x="76.2" y="81" width="6" height="6" rx="1" fill="#2A649F" />
+        <rect x="55.4" y="45" width="6" height="6" rx="1" fill="#2A649F" />
         <text x="100" y="14" text-anchor="middle" font-size="6.5" font-weight="700" fill="#3c4043">预算敏感</text>
         <text x="168" y="42" text-anchor="middle" font-size="5.5" font-weight="700" fill="#3c4043">老板敏感</text>
         <text x="168" y="108" text-anchor="middle" font-size="5.5" font-weight="700" fill="#3c4043">风险敏感</text>
@@ -977,7 +977,7 @@ withDefaults(
         viewBox="0 0 200 140"
         xmlns="http://www.w3.org/2000/svg"
       >
-        <rect width="200" height="140" rx="10" fill="#ffffff" />
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
         <polygon points="100.0,24.0 145.7,57.2 128.2,110.8 71.8,110.8 54.3,57.2" fill="none" stroke="#d0d4d9" stroke-width="1" />
         <polygon points="100.0,36.0 134.2,60.9 121.2,101.1 78.8,101.1 65.8,60.9" fill="none" stroke="#d0d4d9" stroke-width="0.8" />
         <polygon points="100.0,48.0 122.8,64.6 114.1,91.4 85.9,91.4 77.2,64.6" fill="none" stroke="#d0d4d9" stroke-width="0.8" />
@@ -987,12 +987,12 @@ withDefaults(
         <line x1="100.0" y1="72.0" x2="128.2" y2="110.8" stroke="#c5c9ce" stroke-width="0.8" />
         <line x1="100.0" y1="72.0" x2="71.8" y2="110.8" stroke="#c5c9ce" stroke-width="0.8" />
         <line x1="100.0" y1="72.0" x2="54.3" y2="57.2" stroke="#c5c9ce" stroke-width="0.8" />
-        <polygon points="100.0,24.0 134.2,60.9 107.1,81.7 78.8,101.1 54.3,57.2" fill="rgba(100,181,246,0.35)" stroke="#42a5f5" stroke-width="1.3" />
-        <rect x="97.0" y="21.0" width="6" height="6" rx="1" fill="#64b5f6" />
-        <rect x="131.2" y="57.9" width="6" height="6" rx="1" fill="#64b5f6" />
-        <rect x="104.1" y="78.7" width="6" height="6" rx="1" fill="#64b5f6" />
-        <rect x="75.8" y="98.1" width="6" height="6" rx="1" fill="#64b5f6" />
-        <rect x="51.3" y="54.2" width="6" height="6" rx="1" fill="#64b5f6" />
+        <polygon points="100.0,24.0 134.2,60.9 107.1,81.7 78.8,101.1 54.3,57.2" fill="rgba(42,100,159,0.28)" stroke="#42a5f5" stroke-width="1.3" />
+        <rect x="97.0" y="21.0" width="6" height="6" rx="1" fill="#2A649F" />
+        <rect x="131.2" y="57.9" width="6" height="6" rx="1" fill="#2A649F" />
+        <rect x="104.1" y="78.7" width="6" height="6" rx="1" fill="#2A649F" />
+        <rect x="75.8" y="98.1" width="6" height="6" rx="1" fill="#2A649F" />
+        <rect x="51.3" y="54.2" width="6" height="6" rx="1" fill="#2A649F" />
         <text x="100.0" y="8.0" text-anchor="middle" font-size="5.5" font-weight="700" fill="#3c4043">项目管理意识</text>
         <text x="159.0" y="52.8" text-anchor="start" font-size="5.5" font-weight="700" fill="#3c4043">做复盘</text>
         <text x="136.4" y="122.2" text-anchor="start" font-size="5.5" font-weight="700" fill="#3c4043">管执行</text>
@@ -1008,7 +1008,7 @@ withDefaults(
         viewBox="0 0 200 140"
         xmlns="http://www.w3.org/2000/svg"
       >
-        <rect width="200" height="140" rx="10" fill="#ffffff" />
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
         <polygon points="100.0,24.0 145.7,57.2 128.2,110.8 71.8,110.8 54.3,57.2" fill="none" stroke="#d0d4d9" stroke-width="1" />
         <polygon points="100.0,33.6 136.5,60.1 122.6,103.1 77.4,103.1 63.5,60.1" fill="none" stroke="#d0d4d9" stroke-width="0.8" />
         <polygon points="100.0,43.2 127.4,63.1 116.9,95.3 83.1,95.3 72.6,63.1" fill="none" stroke="#d0d4d9" stroke-width="0.8" />
@@ -1019,12 +1019,12 @@ withDefaults(
         <line x1="100.0" y1="72.0" x2="128.2" y2="110.8" stroke="#c5c9ce" stroke-width="0.8" />
         <line x1="100.0" y1="72.0" x2="71.8" y2="110.8" stroke="#c5c9ce" stroke-width="0.8" />
         <line x1="100.0" y1="72.0" x2="54.3" y2="57.2" stroke="#c5c9ce" stroke-width="0.8" />
-        <polygon points="100.0,24.0 127.4,63.1 111.3,87.5 85.9,91.4 54.3,57.2" fill="rgba(79,195,247,0.35)" stroke="#29b6f6" stroke-width="1.3" />
-        <rect x="97.0" y="21.0" width="6" height="6" rx="1" fill="#4fc3f7" />
-        <rect x="124.4" y="60.1" width="6" height="6" rx="1" fill="#4fc3f7" />
-        <rect x="108.3" y="84.5" width="6" height="6" rx="1" fill="#4fc3f7" />
-        <rect x="82.9" y="88.4" width="6" height="6" rx="1" fill="#4fc3f7" />
-        <rect x="51.3" y="54.2" width="6" height="6" rx="1" fill="#4fc3f7" />
+        <polygon points="100.0,24.0 127.4,63.1 111.3,87.5 85.9,91.4 54.3,57.2" fill="rgba(42,100,159,0.28)" stroke="#2A649F" stroke-width="1.3" />
+        <rect x="97.0" y="21.0" width="6" height="6" rx="1" fill="#2A649F" />
+        <rect x="124.4" y="60.1" width="6" height="6" rx="1" fill="#2A649F" />
+        <rect x="108.3" y="84.5" width="6" height="6" rx="1" fill="#2A649F" />
+        <rect x="82.9" y="88.4" width="6" height="6" rx="1" fill="#2A649F" />
+        <rect x="51.3" y="54.2" width="6" height="6" rx="1" fill="#2A649F" />
         <text x="100.0" y="14.0" text-anchor="middle" font-size="5.5" font-weight="700" fill="#3c4043">开放性</text>
         <text x="162.0" y="52.0" text-anchor="start" font-size="5.5" font-weight="700" fill="#3c4043">投入性</text>
         <text x="148.0" y="124.0" text-anchor="start" font-size="5.5" font-weight="700" fill="#3c4043">易错性</text>
@@ -1039,7 +1039,7 @@ withDefaults(
         viewBox="0 0 200 140"
         xmlns="http://www.w3.org/2000/svg"
       >
-        <rect width="200" height="140" rx="10" fill="#ffffff" />
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
         <polygon points="100.0,28.0 143.3,103.0 56.7,103.0" fill="#f0f1f3" />
         <polygon points="100.0,40.5 132.5,96.8 67.5,96.8" fill="#ffffff" />
         <polygon points="100.0,53.0 121.7,90.5 78.3,90.5" fill="#f0f1f3" />
@@ -1051,10 +1051,10 @@ withDefaults(
         <line x1="100.0" y1="78.0" x2="100.0" y2="28.0" stroke="#c5c9ce" stroke-width="0.8" />
         <line x1="100.0" y1="78.0" x2="143.3" y2="103.0" stroke="#c5c9ce" stroke-width="0.8" />
         <line x1="100.0" y1="78.0" x2="56.7" y2="103.0" stroke="#c5c9ce" stroke-width="0.8" />
-        <polygon points="100.0,43.0 121.7,90.5 61.0,100.5" fill="rgba(79,195,247,0.4)" stroke="#29b6f6" stroke-width="1.3" />
-        <rect x="97.0" y="40.0" width="6" height="6" rx="1" fill="#1e88e5" />
-        <rect x="118.7" y="87.5" width="6" height="6" rx="1" fill="#1e88e5" />
-        <rect x="58.0" y="97.5" width="6" height="6" rx="1" fill="#1e88e5" />
+        <polygon points="100.0,43.0 121.7,90.5 61.0,100.5" fill="rgba(42,100,159,0.28)" stroke="#2A649F" stroke-width="1.3" />
+        <rect x="97.0" y="40.0" width="6" height="6" rx="1" fill="#2A649F" />
+        <rect x="118.7" y="87.5" width="6" height="6" rx="1" fill="#2A649F" />
+        <rect x="58.0" y="97.5" width="6" height="6" rx="1" fill="#2A649F" />
         <text x="100" y="16" text-anchor="middle" font-size="6" font-weight="700" fill="#3c4043">投入产出比ROI</text>
         <text x="36" y="122" text-anchor="middle" font-size="6" font-weight="700" fill="#3c4043">机会成本</text>
         <text x="164" y="122" text-anchor="middle" font-size="6" font-weight="700" fill="#3c4043">机会窗口</text>
@@ -1071,7 +1071,7 @@ withDefaults(
         viewBox="0 0 200 140"
         xmlns="http://www.w3.org/2000/svg"
       >
-        <rect width="200" height="140" rx="10" fill="#ffffff" />
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
         <text x="12" y="16" font-size="7" font-weight="800" fill="#202124">个人年工作总结模板</text>
         <text x="12" y="34" font-size="6.5" font-weight="800" fill="#202124">重点业务进展</text>
         <line x1="12" y1="40" x2="12" y2="52" stroke="#dadce0" stroke-width="1.5" />
@@ -1091,7 +1091,7 @@ withDefaults(
         viewBox="0 0 200 140"
         xmlns="http://www.w3.org/2000/svg"
       >
-        <rect width="200" height="140" rx="10" fill="#ffffff" />
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
         <text x="12" y="16" font-size="7" font-weight="800" fill="#202124">个人周工作总结模板</text>
         <text x="12" y="34" font-size="6.5" font-weight="800" fill="#202124">本周关键执行</text>
         <line x1="12" y1="40" x2="12" y2="52" stroke="#dadce0" stroke-width="1.5" />
@@ -1111,7 +1111,7 @@ withDefaults(
         viewBox="0 0 200 140"
         xmlns="http://www.w3.org/2000/svg"
       >
-        <rect width="200" height="140" rx="10" fill="#ffffff" />
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
         <text x="12" y="16" font-size="7" font-weight="800" fill="#202124">个人月工作总结模板</text>
         <text x="12" y="34" font-size="6.5" font-weight="800" fill="#202124">目标完成情况</text>
         <line x1="12" y1="40" x2="12" y2="52" stroke="#dadce0" stroke-width="1.5" />
@@ -1131,7 +1131,7 @@ withDefaults(
         viewBox="0 0 200 140"
         xmlns="http://www.w3.org/2000/svg"
       >
-        <rect width="200" height="140" rx="10" fill="#ffffff" />
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
         <text x="12" y="16" font-size="7" font-weight="800" fill="#202124">个人季工作总结模板</text>
         <text x="12" y="34" font-size="6.5" font-weight="800" fill="#202124">阶段性成果</text>
         <line x1="12" y1="40" x2="12" y2="52" stroke="#dadce0" stroke-width="1.5" />
@@ -1151,22 +1151,22 @@ withDefaults(
         viewBox="0 0 200 140"
         xmlns="http://www.w3.org/2000/svg"
       >
-        <rect width="200" height="140" rx="10" fill="#ffffff" />
-        <rect x="8" y="8" width="184" height="16" fill="#fff8e1" stroke="#202124" stroke-width="1" />
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <rect x="8" y="8" width="184" height="16" fill="#FBF6E4" stroke="#ececec" stroke-width="1" />
         <text x="14" y="19" font-size="5.5" font-weight="700" fill="#202124">项目名称：____　复盘时间：____</text>
-        <rect x="8" y="24" width="184" height="22" fill="#fff" stroke="#202124" stroke-width="1" />
+        <rect x="8" y="24" width="184" height="22" fill="#fff" stroke="#ececec" stroke-width="1" />
         <text x="14" y="34" font-size="6" font-weight="800" fill="#202124">整体评价</text>
-        <rect x="8" y="46" width="92" height="28" fill="#fff" stroke="#202124" stroke-width="1" />
-        <rect x="100" y="46" width="92" height="28" fill="#fff" stroke="#202124" stroke-width="1" />
+        <rect x="8" y="46" width="92" height="28" fill="#fff" stroke="#ececec" stroke-width="1" />
+        <rect x="100" y="46" width="92" height="28" fill="#fff" stroke="#ececec" stroke-width="1" />
         <text x="14" y="58" font-size="6" font-weight="800" fill="#202124">亮点共识</text>
         <text x="106" y="58" font-size="6" font-weight="800" fill="#202124">问题共识</text>
-        <rect x="8" y="74" width="61" height="28" fill="#fff" stroke="#202124" stroke-width="1" />
-        <rect x="69" y="74" width="61" height="28" fill="#fff" stroke="#202124" stroke-width="1" />
-        <rect x="130" y="74" width="62" height="28" fill="#fff" stroke="#202124" stroke-width="1" />
+        <rect x="8" y="74" width="61" height="28" fill="#fff" stroke="#ececec" stroke-width="1" />
+        <rect x="69" y="74" width="61" height="28" fill="#fff" stroke="#ececec" stroke-width="1" />
+        <rect x="130" y="74" width="62" height="28" fill="#fff" stroke="#ececec" stroke-width="1" />
         <text x="14" y="86" font-size="5.5" font-weight="800" fill="#202124">坚持做</text>
         <text x="75" y="86" font-size="5.5" font-weight="800" fill="#202124">放弃做</text>
         <text x="136" y="86" font-size="5.5" font-weight="800" fill="#202124">新任务</text>
-        <rect x="8" y="102" width="184" height="28" fill="#fff" stroke="#202124" stroke-width="1" />
+        <rect x="8" y="102" width="184" height="28" fill="#fff" stroke="#ececec" stroke-width="1" />
         <text x="14" y="114" font-size="6" font-weight="800" fill="#202124">过程资产</text>
       </svg>
 
@@ -1179,22 +1179,22 @@ withDefaults(
         viewBox="0 0 200 140"
         xmlns="http://www.w3.org/2000/svg"
       >
-        <rect width="200" height="140" rx="10" fill="#f7f1cc" />
+        <rect width="200" height="140" rx="10" fill="#FBF6E4" />
         <rect x="8" y="8" width="184" height="18" fill="#1f1f1f" />
         <text x="100" y="20" text-anchor="middle" font-size="6.5" font-weight="700" fill="#ffffff">复盘挖掘价值4：过程资产</text>
-        <rect x="8" y="26" width="90" height="16" fill="#faf358" />
-        <rect x="102" y="26" width="90" height="16" fill="#faf358" />
-        <text x="53" y="37" text-anchor="middle" font-size="5.5" font-weight="800" fill="#d65a46">Before: LEO不挖</text>
-        <text x="147" y="37" text-anchor="middle" font-size="5.5" font-weight="800" fill="#d65a46">After: LEO认真挖</text>
-        <rect x="8" y="42" width="90" height="90" fill="#f7f1cc" stroke="#ffffff" stroke-width="1.5" />
-        <rect x="102" y="42" width="90" height="90" fill="#f7f1cc" stroke="#ffffff" stroke-width="1.5" />
+        <rect x="8" y="26" width="90" height="16" fill="#0E8A84" />
+        <rect x="102" y="26" width="90" height="16" fill="#A67C00" />
+        <text x="53" y="37" text-anchor="middle" font-size="5.5" font-weight="800" fill="#fff">Before: LEO不挖</text>
+        <text x="147" y="37" text-anchor="middle" font-size="5.5" font-weight="800" fill="#fff">After: LEO认真挖</text>
+        <rect x="8" y="42" width="90" height="90" fill="#FBF6E4" stroke="#ffffff" stroke-width="1.5" />
+        <rect x="102" y="42" width="90" height="90" fill="#FBF6E4" stroke="#ffffff" stroke-width="1.5" />
         <text x="53" y="90" text-anchor="middle" font-size="5" fill="#202124">"下次我就有经验了"</text>
-        <text x="110" y="58" font-size="5" font-weight="700" fill="#d65a46">关键的方法：</text>
+        <text x="110" y="58" font-size="5" font-weight="700" fill="#A84562">关键的方法：</text>
         <text x="110" y="70" font-size="4.5" fill="#202124">1. 评价工具质量…</text>
         <text x="110" y="82" font-size="4.5" fill="#202124">2. 二维码卖点…</text>
-        <text x="110" y="96" font-size="5" font-weight="700" fill="#d65a46">关键的清单：</text>
+        <text x="110" y="96" font-size="5" font-weight="700" fill="#A84562">关键的清单：</text>
         <text x="110" y="108" font-size="4.5" fill="#202124">1. VI规范清单</text>
-        <text x="110" y="120" font-size="5" font-weight="700" fill="#d65a46">关键执行SOP</text>
+        <text x="110" y="120" font-size="5" font-weight="700" fill="#A84562">关键执行SOP</text>
       </svg>
 
       <!-- 单元模型象限：米色底十字轴四色标题 -->
@@ -1204,22 +1204,22 @@ withDefaults(
         viewBox="0 0 200 140"
         xmlns="http://www.w3.org/2000/svg"
       >
-        <rect width="200" height="140" rx="10" fill="#f5efe6" />
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
         <text x="100" y="14" text-anchor="middle" font-size="6.5" font-weight="800" fill="#202124">单元模型长期成立</text>
         <text x="18" y="76" text-anchor="middle" font-size="5.5" font-weight="800" fill="#202124">公司账不成立</text>
         <text x="182" y="76" text-anchor="middle" font-size="5.5" font-weight="800" fill="#202124">公司账长期成立</text>
         <text x="100" y="134" text-anchor="middle" font-size="6.5" font-weight="800" fill="#202124">单元模型不成立</text>
-        <line x1="100" y1="126" x2="100" y2="20" stroke="#111" stroke-width="1.6" marker-end="url(#umq-thumb-arrow)" />
-        <line x1="28" y1="72" x2="172" y2="72" stroke="#111" stroke-width="1.6" marker-end="url(#umq-thumb-arrow)" />
+        <line x1="100" y1="126" x2="100" y2="20" stroke="#c5c9ce" stroke-width="1.6" marker-end="url(#umq-thumb-arrow)" />
+        <line x1="28" y1="72" x2="172" y2="72" stroke="#c5c9ce" stroke-width="1.6" marker-end="url(#umq-thumb-arrow)" />
         <defs>
           <marker id="umq-thumb-arrow" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="6" markerHeight="6" orient="auto">
             <path d="M 0 1 L 11 6 L 0 11 z" fill="#111" />
           </marker>
         </defs>
-        <text x="55" y="48" text-anchor="middle" font-size="6" font-weight="800" fill="#c9a227">总部成本过高</text>
-        <text x="145" y="48" text-anchor="middle" font-size="7" font-weight="800" fill="#2d9b8a">健康模型</text>
-        <text x="55" y="100" text-anchor="middle" font-size="6" font-weight="800" fill="#c94c4c">放弃 or 调整</text>
-        <text x="145" y="100" text-anchor="middle" font-size="7" font-weight="800" fill="#e0a85c">不存在</text>
+        <text x="55" y="48" text-anchor="middle" font-size="6" font-weight="800" fill="#A67C00">总部成本过高</text>
+        <text x="145" y="48" text-anchor="middle" font-size="7" font-weight="800" fill="#0E8A84">健康模型</text>
+        <text x="55" y="100" text-anchor="middle" font-size="6" font-weight="800" fill="#A84562">放弃 or 调整</text>
+        <text x="145" y="100" text-anchor="middle" font-size="7" font-weight="800" fill="#B85A38">不存在</text>
       </svg>
 
 
@@ -1230,13 +1230,13 @@ withDefaults(
         viewBox="0 0 200 140"
         xmlns="http://www.w3.org/2000/svg"
       >
-        <rect width="200" height="140" rx="10" fill="#FDF5E6" />
-        <rect x="8" y="10" width="90" height="18" fill="#FFEB3B" />
-        <rect x="102" y="10" width="90" height="18" fill="#FFEB3B" />
-        <text x="18" y="22" font-size="7" font-weight="800" fill="#202124">关键收益</text>
-        <text x="112" y="22" font-size="7" font-weight="800" fill="#202124">关键成本</text>
-        <rect x="8" y="28" width="90" height="102" fill="#FDF5E6" stroke="#ffffff" stroke-width="1" />
-        <rect x="102" y="28" width="90" height="102" fill="#FDF5E6" stroke="#ffffff" stroke-width="1" />
+        <rect width="200" height="140" rx="10" fill="#FBF6E4" />
+        <rect x="8" y="10" width="90" height="18" fill="#187A4E" />
+        <rect x="102" y="10" width="90" height="18" fill="#A84562" />
+        <text x="18" y="22" font-size="7" font-weight="800" fill="#fff">关键收益</text>
+        <text x="112" y="22" font-size="7" font-weight="800" fill="#fff">关键成本</text>
+        <rect x="8" y="28" width="90" height="102" fill="#E7F6EF" />
+        <rect x="102" y="28" width="90" height="102" fill="#FBEFF2" />
         <text x="16" y="46" font-size="5.5" fill="#202124">1.</text>
         <text x="16" y="60" font-size="5.5" fill="#202124">2.</text>
         <text x="16" y="74" font-size="5.5" fill="#202124">3.</text>
@@ -1259,36 +1259,36 @@ withDefaults(
         viewBox="0 0 200 140"
         xmlns="http://www.w3.org/2000/svg"
       >
-        <rect width="200" height="140" rx="10" fill="#E6F7FF" />
+        <rect width="200" height="140" rx="10" fill="#E8F1FA" />
         <!-- top headers -->
-        <rect x="8" y="8" width="40" height="14" fill="#00BFFF" stroke="#5f6368" stroke-width="0.6" />
-        <rect x="48" y="8" width="68" height="14" fill="#00BFFF" stroke="#5f6368" stroke-width="0.6" />
-        <rect x="116" y="8" width="68" height="14" fill="#00BFFF" stroke="#5f6368" stroke-width="0.6" />
-        <text x="28" y="18" text-anchor="middle" font-size="6" font-weight="800" fill="#111">维度</text>
-        <text x="82" y="18" text-anchor="middle" font-size="6" font-weight="800" fill="#111">收益项</text>
-        <text x="150" y="18" text-anchor="middle" font-size="6" font-weight="800" fill="#111">成本项</text>
+        <rect x="8" y="8" width="40" height="14" fill="#2A649F" stroke="#ececec" stroke-width="0.6" />
+        <rect x="48" y="8" width="68" height="14" fill="#2A649F" stroke="#ececec" stroke-width="0.6" />
+        <rect x="116" y="8" width="68" height="14" fill="#2A649F" stroke="#ececec" stroke-width="0.6" />
+        <text x="28" y="18" text-anchor="middle" font-size="6" font-weight="800" fill="#fff">维度</text>
+        <text x="82" y="18" text-anchor="middle" font-size="6" font-weight="800" fill="#fff">收益项</text>
+        <text x="150" y="18" text-anchor="middle" font-size="6" font-weight="800" fill="#fff">成本项</text>
         <!-- rows -->
-        <rect x="8" y="22" width="40" height="28" fill="#E6F7FF" stroke="#5f6368" stroke-width="0.6" />
-        <rect x="48" y="22" width="68" height="28" fill="#E6F7FF" stroke="#5f6368" stroke-width="0.6" />
-        <rect x="116" y="22" width="68" height="28" fill="#E6F7FF" stroke="#5f6368" stroke-width="0.6" />
+        <rect x="8" y="22" width="40" height="28" fill="#E8F1FA" stroke="#ececec" stroke-width="0.6" />
+        <rect x="48" y="22" width="68" height="28" fill="#E8F1FA" stroke="#ececec" stroke-width="0.6" />
+        <rect x="116" y="22" width="68" height="28" fill="#E8F1FA" stroke="#ececec" stroke-width="0.6" />
         <text x="28" y="38" text-anchor="middle" font-size="5.5" font-weight="700" fill="#111">基础ROI</text>
-        <rect x="8" y="50" width="40" height="14" fill="#E6F7FF" stroke="#5f6368" stroke-width="0.6" />
-        <rect x="48" y="50" width="68" height="14" fill="#E6F7FF" stroke="#5f6368" stroke-width="0.6" />
-        <rect x="116" y="50" width="68" height="14" fill="#E6F7FF" stroke="#5f6368" stroke-width="0.6" />
+        <rect x="8" y="50" width="40" height="14" fill="#E8F1FA" stroke="#ececec" stroke-width="0.6" />
+        <rect x="48" y="50" width="68" height="14" fill="#E8F1FA" stroke="#ececec" stroke-width="0.6" />
+        <rect x="116" y="50" width="68" height="14" fill="#E8F1FA" stroke="#ececec" stroke-width="0.6" />
         <text x="28" y="60" text-anchor="middle" font-size="5" font-weight="700" fill="#111">长期视角</text>
-        <rect x="8" y="64" width="40" height="14" fill="#E6F7FF" stroke="#5f6368" stroke-width="0.6" />
-        <rect x="48" y="64" width="68" height="14" fill="#E6F7FF" stroke="#5f6368" stroke-width="0.6" />
-        <rect x="116" y="64" width="68" height="14" fill="#E6F7FF" stroke="#5f6368" stroke-width="0.6" />
+        <rect x="8" y="64" width="40" height="14" fill="#E8F1FA" stroke="#ececec" stroke-width="0.6" />
+        <rect x="48" y="64" width="68" height="14" fill="#E8F1FA" stroke="#ececec" stroke-width="0.6" />
+        <rect x="116" y="64" width="68" height="14" fill="#E8F1FA" stroke="#ececec" stroke-width="0.6" />
         <text x="28" y="74" text-anchor="middle" font-size="5" font-weight="700" fill="#111">公司视角</text>
         <!-- middle -->
-        <rect x="8" y="82" width="88" height="12" fill="#00BFFF" stroke="#5f6368" stroke-width="0.6" />
-        <rect x="96" y="82" width="88" height="12" fill="#00BFFF" stroke="#5f6368" stroke-width="0.6" />
-        <text x="52" y="91" text-anchor="middle" font-size="5.5" font-weight="800" fill="#111">机会成本</text>
-        <text x="140" y="91" text-anchor="middle" font-size="5.5" font-weight="800" fill="#111">时间窗口</text>
-        <rect x="8" y="94" width="88" height="16" fill="#E6F7FF" stroke="#5f6368" stroke-width="0.6" />
-        <rect x="96" y="94" width="88" height="16" fill="#E6F7FF" stroke="#5f6368" stroke-width="0.6" />
+        <rect x="8" y="82" width="88" height="12" fill="#B85A38" />
+        <rect x="96" y="82" width="88" height="12" fill="#187A4E" />
+        <text x="52" y="91" text-anchor="middle" font-size="5.5" font-weight="800" fill="#fff">机会成本</text>
+        <text x="140" y="91" text-anchor="middle" font-size="5.5" font-weight="800" fill="#fff">时间窗口</text>
+        <rect x="8" y="94" width="88" height="16" fill="#E8F1FA" stroke="#ececec" stroke-width="0.6" />
+        <rect x="96" y="94" width="88" height="16" fill="#E8F1FA" stroke="#ececec" stroke-width="0.6" />
         <!-- conclusion -->
-        <rect x="8" y="114" width="176" height="18" fill="#E6F7FF" stroke="#5f6368" stroke-width="0.6" />
+        <rect x="8" y="114" width="176" height="18" fill="#E8F1FA" stroke="#ececec" stroke-width="0.6" />
         <text x="16" y="126" font-size="5.5" font-weight="800" fill="#111">最终结论</text>
       </svg>
 
@@ -1305,20 +1305,20 @@ withDefaults(
             <line x1="0" y1="0" x2="0" y2="6" stroke="#d8d8d8" stroke-width="0.8" opacity="0.6" />
           </pattern>
         </defs>
-        <rect width="200" height="140" rx="10" fill="#ffffff" />
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
         <rect width="200" height="140" rx="10" fill="url(#sm10p-t-stripes)" />
         <!-- simplified petals (fixed mid scores) -->
         <g transform="translate(100,72)">
-          <path d="M0,0 L-8,-8 Q-22,-48 0,-52 Q22,-48 8,-8 Z" fill="#43A047" opacity="0.95" />
-          <path d="M0,0 L6,-10 Q40,-38 48,-28 Q36,-12 10,-4 Z" fill="#C0CA33" opacity="0.95" />
-          <path d="M0,0 L10,-4 Q48,-10 50,2 Q38,14 8,8 Z" fill="#FB8C00" opacity="0.95" />
-          <path d="M0,0 L8,8 Q36,28 28,42 Q10,36 -2,10 Z" fill="#E53935" opacity="0.95" />
-          <path d="M0,0 L-2,10 Q8,42 -8,48 Q-22,34 -10,8 Z" fill="#D81B60" opacity="0.95" />
-          <path d="M0,0 L-10,8 Q-30,34 -42,22 Q-36,6 -8,-2 Z" fill="#B39DDB" opacity="0.95" />
-          <path d="M0,0 L-8,-2 Q-48,-2 -48,-14 Q-34,-24 -6,-10 Z" fill="#5E35B1" opacity="0.95" />
-          <path d="M0,0 L-6,-10 Q-34,-34 -22,-46 Q-6,-38 2,-10 Z" fill="#1E88E5" opacity="0.95" />
-          <path d="M0,0 L2,-10 Q18,-42 32,-36 Q28,-18 8,-6 Z" fill="#00ACC1" opacity="0.9" />
-          <path d="M0,0 L8,-6 Q28,-22 36,-8 Q24,4 6,2 Z" fill="#8BC34A" opacity="0.9" />
+          <path d="M0,0 L-8,-8 Q-22,-48 0,-52 Q22,-48 8,-8 Z" fill="#187A4E" opacity="0.95" />
+          <path d="M0,0 L6,-10 Q40,-38 48,-28 Q36,-12 10,-4 Z" fill="#6A7818" opacity="0.95" />
+          <path d="M0,0 L10,-4 Q48,-10 50,2 Q38,14 8,8 Z" fill="#A67C00" opacity="0.95" />
+          <path d="M0,0 L8,8 Q36,28 28,42 Q10,36 -2,10 Z" fill="#A84562" opacity="0.95" />
+          <path d="M0,0 L-2,10 Q8,42 -8,48 Q-22,34 -10,8 Z" fill="#7A3E86" opacity="0.95" />
+          <path d="M0,0 L-10,8 Q-30,34 -42,22 Q-36,6 -8,-2 Z" fill="#6B4C9A" opacity="0.95" />
+          <path d="M0,0 L-8,-2 Q-48,-2 -48,-14 Q-34,-24 -6,-10 Z" fill="#3E5A78" opacity="0.95" />
+          <path d="M0,0 L-6,-10 Q-34,-34 -22,-46 Q-6,-38 2,-10 Z" fill="#2A649F" opacity="0.95" />
+          <path d="M0,0 L2,-10 Q18,-42 32,-36 Q28,-18 8,-6 Z" fill="#0E8A84" opacity="0.9" />
+          <path d="M0,0 L8,-6 Q28,-22 36,-8 Q24,4 6,2 Z" fill="#1A7088" opacity="0.9" />
           <circle cx="0" cy="0" r="6" fill="#ffffff" stroke="#e0e0e0" stroke-width="0.8" />
         </g>
         <text x="100" y="18" text-anchor="middle" font-size="7" font-weight="800" fill="#3c4043">十大原则</text>
@@ -1331,17 +1331,17 @@ withDefaults(
         viewBox="0 0 200 140"
         xmlns="http://www.w3.org/2000/svg"
       >
-        <rect width="200" height="140" rx="10" fill="#f5f5f4" />
-        <rect x="18" y="52" width="48" height="22" rx="6" fill="#ffffff" stroke="#ef4444" stroke-width="1.4" />
-        <rect x="92" y="28" width="48" height="22" rx="6" fill="#ffffff" stroke="#f97316" stroke-width="1.2" />
-        <rect x="92" y="60" width="48" height="22" rx="6" fill="#ffffff" stroke="#22c55e" stroke-width="1.2" />
-        <rect x="92" y="92" width="48" height="22" rx="6" fill="#ffffff" stroke="#3b82f6" stroke-width="1.2" />
-        <path d="M66 63 C78 63, 82 39, 92 39" fill="none" stroke="#f97316" stroke-width="1.4" opacity="0.85" />
-        <path d="M66 63 C78 63, 82 71, 92 71" fill="none" stroke="#22c55e" stroke-width="1.4" opacity="0.85" />
-        <path d="M66 63 C78 63, 82 103, 92 103" fill="none" stroke="#3b82f6" stroke-width="1.4" opacity="0.85" />
-        <circle cx="79" cy="48" r="5" fill="#a855f7" />
-        <circle cx="79" cy="67" r="5" fill="#22c55e" />
-        <circle cx="79" cy="90" r="5" fill="#38bdf8" />
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <rect x="18" y="52" width="48" height="22" rx="6" fill="#ffffff" stroke="#A84562" stroke-width="1.4" />
+        <rect x="92" y="28" width="48" height="22" rx="6" fill="#ffffff" stroke="#B85A38" stroke-width="1.2" />
+        <rect x="92" y="60" width="48" height="22" rx="6" fill="#ffffff" stroke="#187A4E" stroke-width="1.2" />
+        <rect x="92" y="92" width="48" height="22" rx="6" fill="#ffffff" stroke="#2A649F" stroke-width="1.2" />
+        <path d="M66 63 C78 63, 82 39, 92 39" fill="none" stroke="#B85A38" stroke-width="1.4" opacity="0.85" />
+        <path d="M66 63 C78 63, 82 71, 92 71" fill="none" stroke="#187A4E" stroke-width="1.4" opacity="0.85" />
+        <path d="M66 63 C78 63, 82 103, 92 103" fill="none" stroke="#2A649F" stroke-width="1.4" opacity="0.85" />
+        <circle cx="79" cy="48" r="5" fill="#6B4C9A" />
+        <circle cx="79" cy="67" r="5" fill="#187A4E" />
+        <circle cx="79" cy="90" r="5" fill="#1A7088" />
         <text x="42" y="67" text-anchor="middle" font-size="7" font-weight="700" fill="#202124">收入</text>
         <text x="116" y="43" text-anchor="middle" font-size="6.5" fill="#202124">流量</text>
         <text x="116" y="75" text-anchor="middle" font-size="6.5" fill="#202124">转化</text>

@@ -5,8 +5,11 @@
   "theme": {
     "background": {
       "pattern": "none",
-      "color": "#f5efe6"
-    }
+      "color": "#f7f7f7"
+    },
+    "page": "#f7f7f7",
+    "frame": "#ececec",
+    "hairline": "rgba(60, 50, 20, 0.08)"
   },
   "axes": {
     "unitModelLongTerm": "单元模型长期成立",

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { canvasChromeStyle } from './canvasChrome'
 import type {
   DeepReviewBlock,
   DeepReviewBlockId,
@@ -15,9 +16,7 @@ const props = defineProps<{
 
 const documentStore = useDocumentStore()
 
-const bgColor = computed(
-  () => props.doc.theme.background.color || '#ffffff',
-)
+const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 
 const byId = computed(() => {
   const map = new Map<DeepReviewBlockId, DeepReviewBlock>()
@@ -43,7 +42,7 @@ function onReviewTime(event: Event) {
 </script>
 
 <template>
-  <div class="dr-canvas" :style="{ backgroundColor: bgColor }">
+  <div class="dr-canvas" :style="chrome">
     <header class="dr-meta">
       <label class="dr-meta-field">
         <span class="dr-meta-label">项目名称：</span>
@@ -135,7 +134,7 @@ function onReviewTime(event: Event) {
 <style scoped>
 .dr-canvas {
   position: absolute;
-  inset: 0;
+  inset: 14px 16px 12px;
   z-index: 10;
   /* Page scrolls when stacked panels (each ≥400px) exceed the viewport */
   overflow-x: hidden;
@@ -145,7 +144,7 @@ function onReviewTime(event: Event) {
   flex-direction: column;
   min-height: 0;
   background: #ffffff;
-  border: 1.5px solid #202124;
+  border: 1px solid var(--cv-frame, #ececec);
   border-radius: 2px;
   scrollbar-gutter: stable;
 }
@@ -163,8 +162,8 @@ function onReviewTime(event: Event) {
   flex-shrink: 0;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  background: #fff8e1;
-  border-bottom: 1.5px solid #202124;
+  background: #FBF6E4;
+  border-bottom: 1px solid var(--cv-frame, #ececec);
 }
 
 .dr-meta-field {
@@ -177,7 +176,7 @@ function onReviewTime(event: Event) {
 }
 
 .dr-meta-field + .dr-meta-field {
-  border-left: 1.5px solid #202124;
+  border-left: 1px solid var(--cv-frame, #ececec);
 }
 
 .dr-meta-label {
@@ -224,8 +223,8 @@ function onReviewTime(event: Event) {
   min-height: 400px;
   padding: 0 0 8px;
   box-sizing: border-box;
-  border-right: 1.5px solid #202124;
-  border-bottom: 1.5px solid #202124;
+  border-right: 1px solid var(--cv-frame, #ececec);
+  border-bottom: 1px solid var(--cv-frame, #ececec);
   gap: 4px;
   background: var(--tbl-body, #fff);
   /* default: 2 cols of 6 = half width for row 2 */

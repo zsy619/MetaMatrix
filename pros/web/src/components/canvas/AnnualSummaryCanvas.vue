@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { canvasChromeStyle } from './canvasChrome'
 import type {
   AnnualSummaryBlock,
   AnnualSummaryBlockId,
@@ -12,9 +13,7 @@ const props = defineProps<{
   doc: AnnualSummaryDocumentJSON
 }>()
 
-const bgColor = computed(
-  () => props.doc.theme.background.color || '#ffffff',
-)
+const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 
 const byId = computed(() => {
   const map = new Map<AnnualSummaryBlockId, AnnualSummaryBlock>()
@@ -37,7 +36,7 @@ const SECTIONS: {
 </script>
 
 <template>
-  <div class="as-canvas" :style="{ backgroundColor: bgColor }">
+  <div class="as-canvas" :style="chrome">
     <div class="as-scroll">
       <header class="as-header">
         <h1 class="as-title">{{ doc.title || '个人年工作总结模板' }}</h1>
@@ -65,7 +64,7 @@ const SECTIONS: {
 <style scoped>
 .as-canvas {
   position: absolute;
-  inset: 0;
+  inset: 14px 16px 12px;
   z-index: 10;
   overflow: hidden;
   box-sizing: border-box;
@@ -73,7 +72,7 @@ const SECTIONS: {
   flex-direction: column;
   min-height: 0;
   background: #ffffff;
-  border: 1px solid #dadce0;
+  border: 1px solid var(--cv-frame, #ececec);
   border-radius: 2px;
 }
 

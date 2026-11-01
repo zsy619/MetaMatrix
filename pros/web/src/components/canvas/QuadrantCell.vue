@@ -258,7 +258,10 @@ function onCloseMaximize(event?: Event) {
   padding: 12px 14px 14px;
   overflow: hidden;
   cursor: pointer;
-  border: 1px solid transparent;
+  border: none;
+  box-shadow:
+    inset -1px 0 0 rgba(60, 50, 20, 0.08),
+    inset 0 -1px 0 rgba(60, 50, 20, 0.08);
   transition: box-shadow 0.15s ease;
   display: flex;
   flex-direction: column;
@@ -317,7 +320,7 @@ function onCloseMaximize(event?: Event) {
   flex-shrink: 0;
   width: 22px;
   height: 22px;
-  border: 1px dashed #9aa0a6;
+  border: 1px solid #e4e6e8;
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.92);
   color: #5f6368;

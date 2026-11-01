@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { canvasChromeStyle } from './canvasChrome'
 import type {
   DemandTriangleAxisId,
   DemandTriangleDirection,
@@ -32,9 +33,7 @@ const maximizeKey = computed(() => panelMaximizeKey('demand', 'legend'))
 const { isMaximized, toggleMaximize, closeMaximize } =
   usePanelMaximize(maximizeKey)
 
-const bgColor = computed(
-  () => props.doc.theme.background.color || '#f4f5f7',
-)
+const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 
 const legendBlock = computed(() =>
   props.doc.blocks.find((b) => b.id === 'legend'),
@@ -288,7 +287,7 @@ const vertexPanels = computed(() => {
 </script>
 
 <template>
-  <div class="dt-canvas" :style="{ backgroundColor: bgColor }">
+  <div class="dt-canvas" :style="chrome">
     <!-- 左上图例（可编辑面板） -->
     <aside
       class="dt-legend"
@@ -586,7 +585,7 @@ const vertexPanels = computed(() => {
             :key="`ring-${idx}`"
             :points="pts"
             fill="none"
-            :stroke="idx === 0 ? '#9aa0a6' : '#c5c9ce'"
+            :stroke="idx === 0 ? '#c5c9ce' : '#e4e6e8'"
             :stroke-width="idx === 0 ? 2.2 : 1.4"
             opacity="0.85"
           />
@@ -690,7 +689,7 @@ const vertexPanels = computed(() => {
   gap: 6px;
   padding: 8px 10px;
   background: rgba(255, 255, 255, 0.55);
-  border: 1.5px dashed #c5c9ce;
+  border: 1px solid #e4e6e8;
   border-radius: 10px;
   box-shadow: none;
   max-width: 100%;
@@ -801,7 +800,7 @@ const vertexPanels = computed(() => {
 .legend-notes-btn {
   height: 22px;
   padding: 0 7px;
-  border: 1px solid #dadce0;
+  border: 1px solid var(--cv-frame, #ececec);
   border-radius: 5px;
   background: rgba(255, 255, 255, 0.92);
   color: #5f6368;
@@ -863,7 +862,7 @@ const vertexPanels = computed(() => {
   align-self: flex-start;
   width: 24px;
   height: 24px;
-  border: 1px dashed #9aa0a6;
+  border: 1px solid #e4e6e8;
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.8);
   color: #5f6368;
@@ -943,7 +942,7 @@ const vertexPanels = computed(() => {
   gap: 0;
   font-size: 12.5px;
   line-height: 1.45;
-  color: #9aa0a6;
+  color: #8a8175;
   white-space: nowrap;
 }
 
@@ -953,7 +952,7 @@ const vertexPanels = computed(() => {
 }
 
 .axis-level-sep {
-  color: #9aa0a6;
+  color: #8a8175;
   font-weight: 500;
 }
 
@@ -973,14 +972,14 @@ const vertexPanels = computed(() => {
 .axis-deco-line {
   flex: 1;
   height: 1px;
-  background: #9aa0a6;
+  background: #c5c9ce;
 }
 
 .axis-deco-dot {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  border: 1.2px solid #9aa0a6;
+  border: 1px solid var(--cv-frame, #ececec);
   box-sizing: border-box;
   flex-shrink: 0;
   background: transparent;

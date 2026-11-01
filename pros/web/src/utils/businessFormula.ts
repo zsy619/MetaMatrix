@@ -464,11 +464,11 @@ export const DEFAULT_TEMPLATE_KEY = 'ecommerce'
 export const DEFAULT_FORMULA_TEXT = FORMULA_TEMPLATES[DEFAULT_TEMPLATE_KEY]
 
 export const PALETTES: Record<PaletteName, string[]> = {
-  rainbow: ['#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4', '#3b82f6', '#a855f7'],
-  classic: ['#3b82f6', '#a855f7', '#10b981', '#f59e0b', '#ec4899', '#6366f1', '#14b8a6'],
-  business: ['#334155', '#475569', '#64748b', '#94a3b8', '#0f172a', '#1e293b', '#3b82f6'],
-  warm: ['#f87171', '#fb923c', '#fbbf24', '#facc15', '#e879f9', '#f472b6', '#fb7185'],
-  cool: ['#22d3ee', '#38bdf8', '#60a5fa', '#818cf8', '#a78bfa', '#c084fc', '#e879f9'],
+  rainbow: ['#A84562', '#B85A38', '#A67C00', '#187A4E', '#0E8A84', '#2A649F', '#6B4C9A'],
+  classic: ['#2A649F', '#6B4C9A', '#187A4E', '#A67C00', '#A84562', '#3E5A78', '#0E8A84'],
+  business: ['#3E5A78', '#2A649F', '#0E8A84', '#187A4E', '#8A5A2A', '#1A7088', '#6B4C9A'],
+  warm: ['#A84562', '#B85A38', '#A67C00', '#8A5A2A', '#7A3E86', '#C45C26', '#84344C'],
+  cool: ['#0E8A84', '#1A7088', '#2A649F', '#3E5A78', '#6B4C9A', '#187A4E', '#125C3B'],
 }
 
 export const PALETTE_OPTIONS: { id: PaletteName; label: string }[] = [

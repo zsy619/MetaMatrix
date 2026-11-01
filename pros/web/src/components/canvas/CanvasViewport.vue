@@ -354,7 +354,7 @@ const quadrantDoc = computed(() =>
   height: 100%;
   min-height: 0;
   overflow: hidden;
-  background: #e8eaed;
+  background: #efecec;
   padding: 12px;
   box-sizing: border-box;
   display: flex;
@@ -380,9 +380,9 @@ const quadrantDoc = computed(() =>
   min-height: min(var(--canvas-min-height, 480px), 100%);
   border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 8px 24px rgba(60, 50, 20, 0.08);
   transform-origin: center center;
-  background: #fcfcfc;
+  background: #f7f7f7;
 }
 
 .empty {

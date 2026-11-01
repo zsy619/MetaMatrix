@@ -7,6 +7,7 @@ import {
   ref,
   watch,
 } from 'vue'
+import { canvasChromeStyle } from './canvasChrome'
 import type {
   PmSolutionTriangleAxisId,
   PmSolutionTriangleBlock,
@@ -28,9 +29,7 @@ const documentStore = useDocumentStore()
 // Sync before first render so axisBlocks are defined (v-if hosts).
 documentStore.ensurePmSolutionTriangleBlocks()
 
-const bgColor = computed(
-  () => props.doc.theme.background.color || '#ffffff',
-)
+const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 
 /**
  * 顺时针自顶：投入产出比ROI → 机会窗口 → 机会成本
@@ -61,9 +60,9 @@ const AXIS_SHORT: Record<PmSolutionTriangleAxisId, string> = {
  * ROI蓝 / 机会成本红 / 机会窗口绿
  */
 const AXIS_COLOR: Record<PmSolutionTriangleAxisId, string> = {
-  roi: '#1565C0',
-  opportunity_cost: '#C62828',
-  opportunity_window: '#137333',
+  roi: '#2A649F',
+  opportunity_cost: '#A84562',
+  opportunity_window: '#187A4E',
 }
 
 function axisColor(axis: PmSolutionTriangleAxisId): string {
@@ -329,7 +328,7 @@ onBeforeUnmount(() => {
 <template>
   <div
     class="pmst-canvas"
-    :style="{ backgroundColor: bgColor }"
+    :style="chrome"
     aria-label="项目管理方案评估三角形"
   >
     <header class="pmst-title-bar">

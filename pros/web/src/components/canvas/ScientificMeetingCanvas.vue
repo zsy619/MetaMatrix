@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { canvasChromeStyle } from './canvasChrome'
 import type {
   ScientificMeetingBlock,
   ScientificMeetingBlockId,
@@ -36,9 +37,7 @@ function block(id: ScientificMeetingBlockId): ScientificMeetingBlock | undefined
   return byId.value.get(id)
 }
 
-const bgColor = computed(
-  () => props.doc.theme.background.color || '#f8f2d4',
-)
+const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 
 function onMeetingType(event: Event) {
   documentStore.updateScientificMeetingMeta({
@@ -56,7 +55,7 @@ function onOrganizer(event: Event) {
 <template>
   <div
     class="scientific-meeting-canvas"
-    :style="{ backgroundColor: bgColor }"
+    :style="chrome"
     aria-label="科学开会思考"
   >
     <div class="sm-grid" role="group">
@@ -113,7 +112,7 @@ function onOrganizer(event: Event) {
 /* 附图取样：背景 #f8f2d4，黑线/黑字，灰斜体副标题 */
 .scientific-meeting-canvas {
   position: absolute;
-  inset: 0;
+  inset: 14px 16px 12px;
   z-index: 10;
   overflow: hidden;
   box-sizing: border-box;
@@ -121,9 +120,9 @@ function onOrganizer(event: Event) {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  border: 1px solid #1a1a1a;
+  border: 1px solid var(--cv-frame, #ececec);
   border-radius: 2px;
-  background: #f8f2d4;
+  background: var(--tbl-body, #fff);
 }
 
 .sm-grid {
@@ -141,7 +140,7 @@ function onOrganizer(event: Event) {
   min-height: 0;
   padding: 0;
   box-sizing: border-box;
-  border-right: 1.5px solid #1a1a1a;
+  border-right: 1px solid var(--cv-frame, #ececec);
   gap: 0;
   background: var(--tbl-body, #f8f2d4);
 }
@@ -211,8 +210,8 @@ function onOrganizer(event: Event) {
   align-items: center;
   gap: 24px 48px;
   padding: 10px 18px 12px;
-  border-top: 1.5px solid #1a1a1a;
-  background: #f8f2d4;
+  border-top: 1px solid var(--cv-frame, #ececec);
+  background: var(--tbl-body, #fff);
 }
 
 .sm-meta {
@@ -228,7 +227,7 @@ function onOrganizer(event: Event) {
   min-width: 8em;
   max-width: 16em;
   border: none;
-  border-bottom: 1.5px solid #1a1a1a;
+  border-bottom: 1px solid var(--cv-frame, #ececec);
   background: transparent;
   font: inherit;
   font-weight: 500;
@@ -257,7 +256,7 @@ function onOrganizer(event: Event) {
 
   .sm-col {
     border-right: none;
-    border-bottom: 1.5px solid #1a1a1a;
+    border-bottom: 1px solid var(--cv-frame, #ececec);
     min-height: 280px;
   }
 

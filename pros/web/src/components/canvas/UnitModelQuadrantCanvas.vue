@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { canvasChromeStyle, paintForTone } from './canvasChrome'
 import type {
   UnitModelQuadrantBlock,
   UnitModelQuadrantBlockId,
@@ -24,22 +25,11 @@ function block(id: UnitModelQuadrantBlockId): UnitModelQuadrantBlock | undefined
 }
 
 const axes = computed(() => props.doc.axes)
-const bgColor = computed(
-  () => props.doc.theme.background.color || '#f5efe6',
-)
+const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 
-/**
- * 附图色值：
- * A 健康模型 青绿
- * B 总部成本过高 芥末黄
- * C 放弃/调整 红
- * D 不存在 浅橙黄
- */
-const TONE_COLOR: Record<string, string> = {
-  teal: '#2d9b8a',
-  mustard: '#c9a227',
-  red: '#c94c4c',
-  amber: '#e0a85c',
+function cellPaint(id: UnitModelQuadrantBlockId) {
+  const item = block(id)
+  return paintForTone(item?.tone, item)
 }
 
 /** CSS 网格顺序：TL b · TR a · BL c · BR d（与附图 id 位置一致） */
@@ -49,7 +39,7 @@ const order: UnitModelQuadrantBlockId[] = ['b', 'a', 'c', 'd']
 <template>
   <div
     class="umq-canvas"
-    :style="{ backgroundColor: bgColor }"
+    :style="chrome"
     aria-label="单元模型象限"
   >
     <div class="umq-frame">
@@ -83,7 +73,7 @@ const order: UnitModelQuadrantBlockId[] = ['b', 'a', 'c', 'd']
               markerHeight="7"
               orient="auto"
             >
-              <path d="M 0 1 L 11 6 L 0 11 z" fill="#111111" />
+              <path d="M 0 1 L 11 6 L 0 11 z" fill="#3c3424" />
             </marker>
             <marker
               id="umq-arrow-h"
@@ -94,7 +84,7 @@ const order: UnitModelQuadrantBlockId[] = ['b', 'a', 'c', 'd']
               markerHeight="7"
               orient="auto"
             >
-              <path d="M 0 1 L 11 6 L 0 11 z" fill="#111111" />
+              <path d="M 0 1 L 11 6 L 0 11 z" fill="#3c3424" />
             </marker>
           </defs>
           <!-- 竖轴：底 → 顶（箭头朝「单元模型长期成立」） -->
@@ -103,7 +93,7 @@ const order: UnitModelQuadrantBlockId[] = ['b', 'a', 'c', 'd']
             y1="99.2"
             x2="50"
             y2="1.2"
-            stroke="#111111"
+            stroke="#3c3424"
             stroke-width="1.8"
             vector-effect="non-scaling-stroke"
             marker-end="url(#umq-arrow-v)"
@@ -114,7 +104,7 @@ const order: UnitModelQuadrantBlockId[] = ['b', 'a', 'c', 'd']
             y1="50"
             x2="98.8"
             y2="50"
-            stroke="#111111"
+            stroke="#3c3424"
             stroke-width="1.8"
             vector-effect="non-scaling-stroke"
             marker-end="url(#umq-arrow-h)"
@@ -128,10 +118,11 @@ const order: UnitModelQuadrantBlockId[] = ['b', 'a', 'c', 'd']
               class="umq-cell"
               :data-id="id"
               :data-tone="block(id)!.tone"
+              :style="{ backgroundColor: cellPaint(id).fill }"
             >
               <h2
                 class="umq-title"
-                :style="{ color: TONE_COLOR[block(id)!.tone] || '#111111' }"
+                :style="{ color: cellPaint(id).topic }"
               >
                 {{ block(id)!.title }}
               </h2>
@@ -180,7 +171,7 @@ const order: UnitModelQuadrantBlockId[] = ['b', 'a', 'c', 'd']
   position: absolute;
   font-size: clamp(14px, 1.55vw, 22px);
   font-weight: 800;
-  color: #111111;
+  color: #3c3424;
   letter-spacing: 0.06em;
   line-height: 1.2;
   user-select: none;
