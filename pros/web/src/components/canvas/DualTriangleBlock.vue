@@ -95,6 +95,24 @@ const selected = computed(
 )
 
 const headerColor = computed(() => props.block.accentColor)
+
+/**
+ * 表格式六格各自一色：AI 侧偏冷（青绿 / 蓝 / 绿），人类侧偏暖（金 / 铜 / 玫红）。
+ * 抬头用 header，内容区用 body，主题词用 topic。
+ */
+const TABLE_PALETTE: Record<
+  DualTriangleBlockId,
+  { header: string; body: string; topic: string }
+> = {
+  scenario: { header: '#0E8A84', body: '#E5F6F5', topic: '#0B6B66' },
+  aesthetics: { header: '#A67C00', body: '#FBF6E4', topic: '#7A5C00' },
+  system: { header: '#B85A38', body: '#FBF1EB', topic: '#8A4024' },
+  data: { header: '#2A649F', body: '#E8F1FA', topic: '#1C4C7C' },
+  basics: { header: '#187A4E', body: '#E7F6EF', topic: '#125C3B' },
+  innovation: { header: '#A84562', body: '#FBEFF2', topic: '#84344C' },
+}
+
+const tablePalette = computed(() => TABLE_PALETTE[props.block.id])
 const editorHtml = computed(() => itemsToHtml(props.block.items))
 
 function onEditorHtml(html: string) {
@@ -171,7 +189,11 @@ function onCloseMaximize(event?: Event) {
     ]"
     :style="
       isTable
-        ? undefined
+        ? {
+            '--hai-header': tablePalette.header,
+            '--hai-body': tablePalette.body,
+            '--hai-topic': tablePalette.topic,
+          }
         : { '--accent': headerColor, backgroundColor: block.backgroundColor }
     "
     @click.stop="onSelectBlock"
@@ -220,7 +242,7 @@ function onCloseMaximize(event?: Event) {
       <input
         v-if="isTable"
         class="dt-content-topic"
-        :class="block.side === 'ai' ? 'side-ai' : 'side-human'"
+        :style="{ color: tablePalette.topic }"
         :value="topicShown"
         :placeholder="topicPlaceholder"
         maxlength="32"
@@ -338,7 +360,7 @@ function onCloseMaximize(event?: Event) {
           <input
             v-if="isTable"
             class="dt-content-topic dt-content-topic--max"
-            :class="block.side === 'ai' ? 'side-ai' : 'side-human'"
+            :style="{ color: tablePalette.topic }"
             :value="topicShown"
             :placeholder="topicPlaceholder"
             maxlength="32"
@@ -598,27 +620,15 @@ function onCloseMaximize(event?: Event) {
   min-height: 280px;
 }
 
-/* 表格式单元格：A/H 色条抬头，内容区第一行是可编辑主题词，其下为空白正文 */
+/* 表格式单元格：每格独立配色（变量由 TABLE_PALETTE 写入） */
 .dt-block--table {
-  --hai-header: #5ecfc4;
-  --hai-body: #e7f8f6;
-  --hai-badge: #2f9d94;
+  --hai-header: #0e8a84;
+  --hai-body: #e5f6f5;
+  --hai-topic: #0b6b66;
   border: none;
   border-radius: 0;
   box-shadow: none;
   background: var(--hai-body);
-}
-
-.dt-block--table.side-ai {
-  --hai-header: #5ecfc4;
-  --hai-body: #e7f8f6;
-  --hai-badge: #2f9d94;
-}
-
-.dt-block--table.side-human {
-  --hai-header: #f0d35e;
-  --hai-body: #fff8e6;
-  --hai-badge: #a88420;
 }
 
 .dt-block--table.selected,
@@ -677,14 +687,6 @@ function onCloseMaximize(event?: Event) {
   outline: none;
   box-sizing: border-box;
   cursor: text;
-}
-
-.dt-content-topic.side-ai {
-  color: #2f9d94;
-}
-
-.dt-content-topic.side-human {
-  color: #a88420;
 }
 
 .dt-content-topic::placeholder {

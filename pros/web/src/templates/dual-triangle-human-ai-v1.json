@@ -15,8 +15,8 @@
     "aiSubtitle": "场景 · 数据 · 基本功",
     "topArrowText": "人变强了，调教更强 AI",
     "bottomArrowText": "有了强AI，辅助人变得更强",
-    "humanColor": "#F0D35E",
-    "aiColor": "#5ECFC4",
+    "humanColor": "#B85A38",
+    "aiColor": "#0E8A84",
     "arrowColor": "#C75B5B"
   },
   "footer": {
@@ -34,8 +34,8 @@
       "title": "场景",
       "subtitle": "落地的起点：个人、业务与公司场景",
       "keyword": "起点",
-      "accentColor": "#5ECFC4",
-      "backgroundColor": "#E7F8F6",
+      "accentColor": "#0E8A84",
+      "backgroundColor": "#E5F6F5",
       "watermarkIcon": "ai",
       "items": []
     },
@@ -45,8 +45,8 @@
       "title": "审美",
       "subtitle": "对更高水平交付的审美，作为终点",
       "keyword": "终点",
-      "accentColor": "#F0D35E",
-      "backgroundColor": "#FFF8E6",
+      "accentColor": "#A67C00",
+      "backgroundColor": "#FBF6E4",
       "watermarkIcon": "human",
       "items": []
     },
@@ -56,8 +56,8 @@
       "title": "体系",
       "subtitle": "从全局到局部的流程、模型与决策框架",
       "keyword": "过程",
-      "accentColor": "#F0D35E",
-      "backgroundColor": "#FFF8E6",
+      "accentColor": "#B85A38",
+      "backgroundColor": "#FBF1EB",
       "watermarkIcon": "human",
       "items": []
     },
@@ -67,8 +67,8 @@
       "title": "数据",
       "subtitle": "案例、方法论与话术等可复用资产",
       "keyword": "资产",
-      "accentColor": "#5ECFC4",
-      "backgroundColor": "#E7F8F6",
+      "accentColor": "#2A649F",
+      "backgroundColor": "#E8F1FA",
       "watermarkIcon": "ai",
       "items": []
     },
@@ -78,8 +78,8 @@
       "title": "基本功",
       "subtitle": "提示词与多轮打磨",
       "keyword": "能力",
-      "accentColor": "#5ECFC4",
-      "backgroundColor": "#E7F8F6",
+      "accentColor": "#187A4E",
+      "backgroundColor": "#E7F6EF",
       "watermarkIcon": "ai",
       "items": []
     },
@@ -89,8 +89,8 @@
       "title": "创造力",
       "subtitle": "创造性的新想法：先理解，再提问",
       "keyword": "创新",
-      "accentColor": "#F0D35E",
-      "backgroundColor": "#FFF8E6",
+      "accentColor": "#A84562",
+      "backgroundColor": "#FBEFF2",
       "watermarkIcon": "human",
       "items": []
     }
