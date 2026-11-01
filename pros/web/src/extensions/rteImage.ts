@@ -1,4 +1,6 @@
 import Image from '@tiptap/extension-image'
+import { createImageDragPlugin } from './rteImageDrag'
+import { normalizeImageAlign, normalizeImageLayout } from '../utils/rteImageLayout'
 
 export type RteImageAlign = 'left' | 'center' | 'right' | null
 
@@ -13,18 +15,19 @@ export const RteImage = Image.extend({
     return {
       ...this.parent?.(),
       align: {
-        default: null as RteImageAlign,
-        parseHTML: (el: HTMLElement) => {
-          const a = el.getAttribute('data-align')
-          if (a === 'left' || a === 'center' || a === 'right') return a
-          const fl = (el.style?.float || '').toLowerCase()
-          if (fl === 'left' || fl === 'right') return fl
-          return null
-        },
-        renderHTML: (attrs: { align?: RteImageAlign }) => {
-          if (!attrs.align) return {}
-          return { 'data-align': attrs.align }
-        },
+        default: 'center' as RteImageAlign,
+        parseHTML: (el: HTMLElement) => normalizeImageAlign(el.getAttribute('data-align')),
+        renderHTML: (attrs: { align?: RteImageAlign }) => ({
+          'data-align': normalizeImageAlign(attrs.align),
+        }),
+      },
+      layout: {
+        default: 'block',
+        parseHTML: (el: HTMLElement) =>
+          normalizeImageLayout(el.getAttribute('data-layout'), el.style?.float),
+        renderHTML: (attrs: { layout?: string | null }) => ({
+          'data-layout': normalizeImageLayout(attrs.layout),
+        }),
       },
       caption: {
         default: null as string | null,
@@ -86,5 +89,9 @@ export const RteImage = Image.extend({
         },
       },
     }
+  },
+
+  addProseMirrorPlugins() {
+    return [...(this.parent?.() || []), createImageDragPlugin()]
   },
 })
