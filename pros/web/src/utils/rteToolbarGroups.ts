@@ -7,20 +7,48 @@ export type ToolbarGroupDef = {
 }
 
 export const TOOLBAR_GROUPS: readonly ToolbarGroupDef[] = [
-  { id: 'history', label: '操作', keys: ['undo', 'redo', 'find', 'formatPainter', 'pastePlain'] },
+  { id: 'history', label: '操作', keys: ['undo', 'redo', 'find', 'formatPainter', 'pastePlain', 'clear', 'pasteFormat'] },
   {
     id: 'text',
     label: '文字',
-    keys: ['heading', 'bold', 'italic', 'underline', 'strike', 'fontSize', 'fontFamily', 'lineHeight', 'indent', 'outdent', 'spacing'],
+    keys: [
+      'heading', 'bold', 'italic', 'underline', 'strike', 'subscript', 'superscript', 'codeInline',
+      'fontSize', 'fontFamily', 'lineHeight', 'indent', 'outdent', 'spacing',
+      'caseTransform', 'emphasisDot', 'ruby', 'paraStyle', 'headingAutoNum',
+    ],
   },
   { id: 'color', label: '颜色', keys: ['color', 'highlight'] },
-  { id: 'paragraph', label: '段落', keys: ['list', 'quote', 'code', 'align', 'pageBreak', 'columns'] },
+  { id: 'paragraph', label: '段落', keys: ['list', 'listStyle', 'quote', 'align', 'code'] },
   {
     id: 'insert',
-    label: '插入',
-    keys: ['link', 'image', 'table', 'attach', 'hr', 'formula', 'emoji', 'specialChars', 'note'],
+    label: '链接',
+    keys: ['link', 'image', 'video', 'audio', 'attach', 'linkCard', 'qrcode', 'emoji', 'specialChars', 'formula'],
   },
-  { id: 'more', label: '更多', keys: [] },
+  { id: 'table', label: '表格', keys: ['table', 'tableCsv', 'tableFilter'] },
+  {
+    id: 'blocks',
+    label: '块级',
+    keys: [
+      'callout', 'hr', 'columns', 'pageBreak', 'toggleBlock', 'blockOps', 'insertDate',
+      'form', 'template', 'timeline', 'statusChip', 'progressBar', 'tabsBlock', 'mermaid', 'snippets',
+    ],
+  },
+  {
+    id: 'notes',
+    label: '批注',
+    keys: ['note', 'footnote', 'footnoteList', 'captionNum', 'bookmark', 'mentionBtn', 'xref'],
+  },
+  {
+    id: 'review',
+    label: '审阅',
+    keys: ['spellcheck', 'sensitive', 'revision', 'revisionBase', 'speak', 'speakStop', 'headingCheck', 'linkCheck', 'cjkTip'],
+  },
+  {
+    id: 'view',
+    label: '导出',
+    keys: ['print', 'import', 'export', 'copyMd', 'viewExtras', 'zoom', 'immersive', 'outline', 'shortcuts', 'wordStats', 'readTime'],
+  },
+  { id: 'other', label: '其他', keys: [] },
 ]
 
 export const DEFAULT_TOOLBAR_GROUP_ORDER: readonly string[] = TOOLBAR_GROUPS.map((group) => group.id)
@@ -114,7 +142,7 @@ export function buildToolbarGroups<T extends { key: string }>(
     return { id, label: def.label, tools: picked }
   })
   const rest = tools.filter((tool) => !used.has(tool.key))
-  const more = groups.find((group) => group.id === 'more')
-  if (more) more.tools.push(...rest)
+  const other = groups.find((group) => group.id === 'other')
+  if (other) other.tools.push(...rest)
   return groups.filter((group) => group.tools.length > 0)
 }

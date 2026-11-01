@@ -40,7 +40,7 @@ function normalizeHtml(html: string): string {
 export function isEmptyHtml(html: string): boolean {
   // <img>/<video> 无文本节点，剥离标签后为空，但属于有效内容
   if (/<(img|video)\b/i.test(html)) return false
-  if (/data-type=["'](columns|column|link-card|date-chip|doc-title|callout|math-display)["']/i.test(html)) return false
+  if (/data-type=["'](columns|column|image-group|link-card|date-chip|doc-title|callout|math-display)["']/i.test(html)) return false
   if (/data-annotation\b/i.test(html)) return false
   if (/data-type=["']form-(text-input|radio-group|checkbox-group|select|textarea|number-input|date-input|switch)["']/i.test(html)) return false
   if (/class=["'][^"']*rte-form/i.test(html)) return false
@@ -69,7 +69,7 @@ function shouldKeepBlock(html: string, tagName: string): boolean {
   if (/<(img|video)\b/i.test(html)) return true
   // 块级公式：文本可能仅在 data-tex，仍需保留
   if (/data-type=["']math-display["']/i.test(html)) return true
-  if (/data-type=["'](columns|column|link-card|date-chip|doc-title|callout)["']/i.test(html)) return true
+  if (/data-type=["'](columns|column|image-group|link-card|date-chip|doc-title|callout)["']/i.test(html)) return true
   if (/data-annotation\b/i.test(html)) return true
   // 表单控件：选项/值在 data-*，可能无可见文本
   if (/data-type=["']form-(text-input|radio-group|checkbox-group|select|textarea|number-input|date-input|switch)["']/i.test(html)) return true

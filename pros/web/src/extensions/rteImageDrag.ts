@@ -1,6 +1,11 @@
-import type { Node as PMNode } from '@tiptap/pm/model'
 import { NodeSelection, Plugin } from '@tiptap/pm/state'
 import type { EditorView } from '@tiptap/pm/view'
+import {
+  extractOrMoveImage,
+  moveImageGroup,
+  placeBeside,
+  reorderInGroup,
+} from './imageGroupOps'
 import {
   containerCanHoldImage,
   imageDropKind,
@@ -10,8 +15,40 @@ import {
 } from '../utils/rteImageLayout'
 
 let dragFrom: number | null = null
+let dragKind: 'image' | 'group' = 'image'
 let dropLine: HTMLElement | null = null
+let dropPreview: HTMLElement | null = null
 let sizeTip: HTMLElement | null = null
+
+type PointerDrag = {
+  view: EditorView
+  from: number
+  kind: 'image' | 'group'
+  startX: number
+  startY: number
+  moved: boolean
+}
+
+let pointerDrag: PointerDrag | null = null
+
+export function armImageDrag(
+  view: EditorView,
+  pos: number,
+  kind: 'image' | 'group',
+  event: PointerEvent,
+) {
+  if (!view.editable || event.button !== 0) return
+  pointerDrag = {
+    view,
+    from: pos,
+    kind,
+    startX: event.clientX,
+    startY: event.clientY,
+    moved: false,
+  }
+  dragFrom = pos
+  dragKind = kind
+}
 
 function ensureLine(): HTMLElement {
   if (!dropLine) {
@@ -26,6 +63,18 @@ function ensureLine(): HTMLElement {
 function hideLine() {
   dropLine?.remove()
   dropLine = null
+  dropPreview?.remove()
+  dropPreview = null
+}
+
+function ensurePreview(): HTMLElement {
+  if (!dropPreview) {
+    dropPreview = document.createElement('div')
+    dropPreview.className = 'rte-image-drop-preview'
+    dropPreview.setAttribute('aria-hidden', 'true')
+    document.body.appendChild(dropPreview)
+  }
+  return dropPreview
 }
 
 function ensureTip(): HTMLElement {
@@ -84,19 +133,29 @@ function imagePosFromDOM(view: EditorView, dom: HTMLElement): number | null {
 
 function placeLine(kind: RteImageDropKind, rect: DOMRect) {
   const line = ensureLine()
+  const preview = ensurePreview()
   if (kind === 'left' || kind === 'right') {
     const x = kind === 'left' ? rect.left : rect.right
-    line.style.left = `${x - 1}px`
+    line.style.left = `${x - 2}px`
     line.style.top = `${rect.top}px`
-    line.style.width = '3px'
+    line.style.width = '4px'
     line.style.height = `${Math.max(12, rect.height)}px`
+    const width = Math.max(36, Math.min(120, rect.width * 0.34))
+    preview.style.left = `${kind === 'left' ? rect.left : rect.right - width}px`
+    preview.style.top = `${rect.top}px`
+    preview.style.width = `${width}px`
+    preview.style.height = `${Math.max(12, rect.height)}px`
     return
   }
   const y = kind === 'before' ? rect.top : rect.bottom
   line.style.left = `${rect.left}px`
-  line.style.top = `${y - 1}px`
+  line.style.top = `${y - 2}px`
   line.style.width = `${Math.max(24, rect.width)}px`
-  line.style.height = '3px'
+  line.style.height = '4px'
+  preview.style.left = `${rect.left}px`
+  preview.style.top = `${y - 10}px`
+  preview.style.width = `${Math.max(24, rect.width)}px`
+  preview.style.height = '18px'
 }
 
 function blockBoundary(view: EditorView, pos: number, bias: 'before' | 'after'): number {
@@ -151,50 +210,6 @@ function moveImage(view: EditorView, from: number, insertAt: number): boolean {
   }
 }
 
-function pairImages(view: EditorView, from: number, target: number, side: 'left' | 'right'): boolean {
-  const { state } = view
-  const moving = state.doc.nodeAt(from)
-  const host = state.doc.nodeAt(target)
-  if (!moving || !host || host.type.name !== 'image' || moving.type.name !== 'image') return false
-  if (from === target) return false
-  const columnType = state.schema.nodes.column
-  const columnsType = state.schema.nodes.columns
-  if (!columnType || !columnsType) {
-    const at = side === 'left' ? target : target + host.nodeSize
-    return moveImage(view, from, at)
-  }
-  const left = side === 'left' ? moving : host
-  const right = side === 'left' ? host : moving
-  const columns = columnsType.create({ cols: 2 }, [
-    columnType.create(null, left.copy(left.content)),
-    columnType.create(null, right.copy(right.content)),
-  ])
-  const higher = Math.max(from, target)
-  const lower = Math.min(from, target)
-  const higherNode = state.doc.nodeAt(higher) as PMNode
-  const lowerNode = state.doc.nodeAt(lower) as PMNode
-  let tr = state.tr.delete(higher, higher + higherNode.nodeSize)
-  const lowerMapped = tr.mapping.map(lower, -1)
-  tr = tr.delete(lowerMapped, lowerMapped + lowerNode.nodeSize)
-  let dest = tr.mapping.map(target, -1)
-  if (dest < 0) dest = 0
-  if (dest > tr.doc.content.size) dest = tr.doc.content.size
-  tr = tr.insert(dest, columns)
-  try {
-    tr = tr.setSelection(NodeSelection.create(tr.doc, dest)).scrollIntoView()
-  } catch {
-    tr = tr.scrollIntoView()
-  }
-  try {
-    tr.doc.check()
-  } catch {
-    return moveImage(view, from, side === 'left' ? target : target + host.nodeSize)
-  }
-  view.dispatch(tr)
-  view.focus()
-  return true
-}
-
 function nudgeImage(view: EditorView, dir: -1 | 1): boolean {
   const sel = view.state.selection
   if (!(sel instanceof NodeSelection) || sel.node.type.name !== 'image') return false
@@ -216,6 +231,15 @@ function nudgeImage(view: EditorView, dir: -1 | 1): boolean {
     sizes.push(child.nodeSize)
     cursor += child.nodeSize
   })
+  if (parent.type.name === 'imageGroup') {
+    const next = index + dir
+    const groupPos = $pos.before($pos.depth)
+    if (next >= 0 && next < parent.childCount) {
+      return reorderInGroup(view, groupPos, index, next, dir < 0 ? 'left' : 'right')
+    }
+    const dest = dir < 0 ? groupPos : groupPos + parent.nodeSize
+    return extractOrMoveImage(view, sel.from, dest)
+  }
   const sibling = siblingInsertPos(starts, sizes, index, dir)
   if (sibling != null) return moveImage(view, sel.from, sibling)
   if ($pos.depth < 1) return false
@@ -226,7 +250,7 @@ function nudgeImage(view: EditorView, dir: -1 | 1): boolean {
   return moveImage(view, sel.from, dest)
 }
 
-function readDrop(view: EditorView, event: DragEvent): {
+function readDrop(view: EditorView, event: { clientX: number; clientY: number }): {
   kind: RteImageDropKind
   imagePos: number | null
   boundary: number
@@ -243,7 +267,8 @@ function readDrop(view: EditorView, event: DragEvent): {
     const xRatio = rect.width ? (event.clientX - rect.left) / rect.width : 0.5
     const yRatio = rect.height ? (event.clientY - rect.top) / rect.height : 0.5
     const kind = imageDropKind(xRatio, yRatio, true)
-    const stamped = Number(frame.dataset.rtePos)
+    const rawPos = frame.dataset.rtePos
+    const stamped = rawPos ? Number(rawPos) : NaN
     let imagePos = Number.isInteger(stamped) ? stamped : imagePosFromDOM(view, frame)
     if (imagePos == null) {
       let found: number | null = null
@@ -275,20 +300,45 @@ function readDrop(view: EditorView, event: DragEvent): {
   return { kind, imagePos: null, boundary, rect }
 }
 
-function commitDrop(view: EditorView, event: DragEvent, from: number) {
+function dropInsertPos(
+  view: EditorView,
+  plan: { kind: RteImageDropKind; imagePos: number | null; boundary: number },
+): number {
+  if (plan.imagePos == null) return plan.boundary
+  const $pos = view.state.doc.resolve(plan.imagePos)
+  if ($pos.parent.type.name === 'imageGroup') {
+    const groupPos = $pos.before($pos.depth)
+    if (plan.kind === 'left' || plan.kind === 'before') return groupPos
+    return groupPos + $pos.parent.nodeSize
+  }
+  const node = view.state.doc.nodeAt(plan.imagePos)
+  const size = node?.nodeSize || 0
+  if (plan.kind === 'left' || plan.kind === 'before') return plan.imagePos
+  return plan.imagePos + size
+}
+
+function visualKind(dragKind: 'image' | 'group', kind: RteImageDropKind): RteImageDropKind {
+  if (dragKind === 'group' && (kind === 'left' || kind === 'right')) return kind === 'left' ? 'before' : 'after'
+  return kind
+}
+
+function commitDrop(
+  view: EditorView,
+  event: { clientX: number; clientY: number },
+  from: number,
+  dragKind: 'image' | 'group' = 'image',
+) {
   const plan = readDrop(view, event)
   if (!plan) return
-  if ((plan.kind === 'left' || plan.kind === 'right') && plan.imagePos != null) {
-    pairImages(view, from, plan.imagePos, plan.kind)
+  if (dragKind === 'group') {
+    moveImageGroup(view, from, dropInsertPos(view, plan))
     return
   }
-  const target =
-    plan.imagePos != null
-      ? plan.kind === 'before'
-        ? plan.imagePos
-        : plan.imagePos + (view.state.doc.nodeAt(plan.imagePos)?.nodeSize || 0)
-      : plan.boundary
-  moveImage(view, from, target)
+  if ((plan.kind === 'left' || plan.kind === 'right') && plan.imagePos != null) {
+    placeBeside(view, from, plan.imagePos, plan.kind)
+    return
+  }
+  extractOrMoveImage(view, from, dropInsertPos(view, plan))
 }
 
 let resizingFrame: HTMLElement | null = null
@@ -347,19 +397,41 @@ export function createImageDragPlugin(): Plugin {
         })
       }, 80)
       const onDragOver = (event: DragEvent) => {
-        if (dragFrom == null || !editorView.editable) return
+        if (dragFrom == null || !editorView.editable || pointerDrag) return
         event.preventDefault()
         const plan = readDrop(editorView, event)
-        if (plan) placeLine(plan.kind, plan.rect)
+        if (plan) placeLine(visualKind(dragKind, plan.kind), plan.rect)
       }
       const onDrop = (event: DragEvent) => {
-        if (dragFrom == null || !editorView.editable) return
+        if (dragFrom == null || !editorView.editable || pointerDrag) return
         event.preventDefault()
         event.stopPropagation()
         const from = dragFrom
+        const kind = dragKind
         dragFrom = null
         hideLine()
-        commitDrop(editorView, event, from)
+        commitDrop(editorView, event, from, kind)
+      }
+      const onPointerMove = (event: PointerEvent) => {
+        if (!pointerDrag || pointerDrag.view !== editorView || !editorView.editable) return
+        const dx = event.clientX - pointerDrag.startX
+        const dy = event.clientY - pointerDrag.startY
+        if (!pointerDrag.moved && Math.hypot(dx, dy) < 6) return
+        pointerDrag.moved = true
+        event.preventDefault()
+        dragFrom = pointerDrag.from
+        dragKind = pointerDrag.kind
+        const plan = readDrop(editorView, event)
+        if (plan) placeLine(visualKind(pointerDrag.kind, plan.kind), plan.rect)
+      }
+      const onPointerUp = (event: PointerEvent) => {
+        if (!pointerDrag || pointerDrag.view !== editorView) return
+        const current = pointerDrag
+        pointerDrag = null
+        dragFrom = null
+        hideLine()
+        if (!current.moved || !editorView.editable) return
+        commitDrop(editorView, event, current.from, current.kind)
       }
       const armResize = (event: Event) => {
         const target = event.target
@@ -368,30 +440,59 @@ export function createImageDragPlugin(): Plugin {
         const frame = target.closest('[data-resize-container][data-node="image"]')
         resizingFrame = handle && frame instanceof HTMLElement ? frame : null
       }
-      const onMove = (_event: MouseEvent) => {
+      const onMove = (event: MouseEvent) => {
+        if (pointerDrag?.view === editorView) onPointerMove(event as PointerEvent)
         const live = document.querySelector('[data-resize-container][data-resize-state="true"]')
         if (live instanceof HTMLElement) resizingFrame = live
         if (!resizingFrame) return
         showResizeTip()
       }
-      const onUp = () => {
+      const onUp = (event: MouseEvent) => {
+        if (pointerDrag?.view === editorView) onPointerUp(event as PointerEvent)
         resizingFrame = null
         hideTip()
       }
-      document.addEventListener('mousedown', armResize, true)
+      const onPointerDown = (event: PointerEvent) => {
+        if (!editorView.editable || event.button !== 0) return
+        if (!(event.target instanceof Node) || !editorView.dom.contains(event.target)) return
+        if (!(event.target instanceof Element)) return
+        if (event.target.closest('[data-resize-handle], .rte-image-group-bar, .rte-image-group-divider')) return
+        const frame = imageFrame(event.target)
+        if (!frame) return
+        const rawPos = frame.dataset.rtePos
+        const stamped = rawPos ? Number(rawPos) : NaN
+        const pos = Number.isInteger(stamped) ? stamped : imagePosFromDOM(editorView, frame)
+        if (pos == null) return
+        frame.draggable = false
+        const image = frame.querySelector('img')
+        if (image) image.draggable = false
+        armImageDrag(editorView, pos, 'image', event)
+        event.preventDefault()
+      }
+      const onMouseDown = (event: MouseEvent) => {
+        armResize(event)
+        if (!pointerDrag) onPointerDown(event as PointerEvent)
+      }
+      document.addEventListener('pointerdown', onPointerDown, true)
+      document.addEventListener('mousedown', onMouseDown, true)
       document.addEventListener('mousemove', onMove)
       document.addEventListener('mouseup', onUp)
       document.addEventListener('dragover', onDragOver, true)
       document.addEventListener('drop', onDrop, true)
+      window.addEventListener('pointermove', onPointerMove)
+      window.addEventListener('pointerup', onPointerUp)
       return {
         update: stamp,
         destroy() {
           window.clearInterval(sizeTimer)
-          document.removeEventListener('mousedown', armResize, true)
+          document.removeEventListener('pointerdown', onPointerDown, true)
+          document.removeEventListener('mousedown', onMouseDown, true)
           document.removeEventListener('mousemove', onMove)
           document.removeEventListener('mouseup', onUp)
           document.removeEventListener('dragover', onDragOver, true)
           document.removeEventListener('drop', onDrop, true)
+          window.removeEventListener('pointermove', onPointerMove)
+          window.removeEventListener('pointerup', onPointerUp)
           resizingFrame = null
           hideTip()
           hideLine()
@@ -410,30 +511,41 @@ export function createImageDragPlugin(): Plugin {
           event.preventDefault()
           return nudgeImage(view, 1)
         }
+        if (
+          (event.key === 'ArrowLeft' || event.key === 'ArrowRight') &&
+          view.state.selection instanceof NodeSelection &&
+          view.state.selection.node.type.name === 'image' &&
+          view.state.selection.$from.parent.type.name === 'imageGroup'
+        ) {
+          event.preventDefault()
+          return nudgeImage(view, event.key === 'ArrowLeft' ? -1 : 1)
+        }
         return false
       },
       handleDOMEvents: {
-        mousedown(view, event) {
+        mousedown(_view, event) {
           const frame = imageFrame(event.target)
           if (!frame) return false
-          const onHandle = event.target instanceof Element && !!event.target.closest('[data-resize-handle]')
-          frame.draggable = view.editable && !onHandle
+          frame.draggable = false
           return false
         },
-        dragstart(view, event) {
-          const frame = imageFrame(event.target)
+        pointerdown(view, event) {
+          if (!view.editable || event.button !== 0) return false
+          const target = event.target
+          if (!(target instanceof Element)) return false
+          if (target.closest('[data-resize-handle], .rte-image-group-bar, .rte-image-group-divider')) return false
+          const frame = imageFrame(target)
           if (!frame) return false
-          if (!view.editable || event.target instanceof Element && event.target.closest('[data-resize-handle]')) {
-            if (!view.editable) event.preventDefault()
-            return !view.editable
-          }
-          const stamped = Number(frame.dataset.rtePos)
+          const rawPos = frame.dataset.rtePos
+          const stamped = rawPos ? Number(rawPos) : NaN
           const pos = Number.isInteger(stamped) ? stamped : imagePosFromDOM(view, frame)
           if (pos == null) return false
-          dragFrom = pos
-          event.dataTransfer?.setData('text/plain', 'rte-image')
-          if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move'
+          armImageDrag(view, pos, 'image', event)
           return false
+        },
+        dragstart(_view, event) {
+          event.preventDefault()
+          return true
         },
         dragover(view, event) {
           if (dragFrom == null) return false
@@ -443,17 +555,18 @@ export function createImageDragPlugin(): Plugin {
           }
           event.preventDefault()
           const plan = readDrop(view, event)
-          if (plan) placeLine(plan.kind, plan.rect)
+          if (plan) placeLine(visualKind(dragKind, plan.kind), plan.rect)
           return true
         },
         drop(view, event) {
-          if (dragFrom == null) return false
+          if (dragFrom == null || pointerDrag) return false
           event.preventDefault()
           const from = dragFrom
+          const kind = dragKind
           dragFrom = null
           hideLine()
           if (!view.editable) return true
-          commitDrop(view, event, from)
+          commitDrop(view, event, from, kind)
           return true
         },
         dragend() {
