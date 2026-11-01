@@ -155,6 +155,7 @@ import { LetterSpacing } from '../extensions/letterSpacing'
 import { ParagraphAttrs } from '../extensions/paragraphAttrs'
 import { PageBreak } from '../extensions/pageBreak'
 import { Columns, Column } from '../extensions/columns'
+import { ImageGroup } from '../extensions/imageGroup'
 import { Callout, type CalloutVariant } from '../extensions/callout'
 import { Bookmark } from '../extensions/bookmark'
 import { RteBlockquote, QUOTE_STYLE_OPTIONS, type QuoteStyle } from '../extensions/rteBlockquote'
@@ -988,6 +989,7 @@ const editor = useEditor({
     PageBreak,
     Columns,
     Column,
+    ImageGroup,
     Callout,
     Bookmark,
     RteBlockquote,
@@ -1026,7 +1028,7 @@ const editor = useEditor({
       },
     }),
     RteImage.configure({
-      // 块级图片才能在段落、分栏、提示和折叠块之间拖动；并排由拖到左右侧生成分栏
+      // 块级图片才能在段落之间拖动；拖到另一张图的左右边缘会收成图片组
       inline: false,
       allowBase64: true,
       HTMLAttributes: { class: 'rte-image' },
@@ -4088,7 +4090,8 @@ function imageBubbleShouldShow(payload: {
   const ed = payload?.editor
   if (!ed || ed.isDestroyed || ed.isEditable === false) return false
   const sel = ed.state?.selection
-  return !!(sel instanceof NodeSelection && (sel as NodeSelection).node.type.name === 'image')
+  if (!(sel instanceof NodeSelection) || (sel as NodeSelection).node.type.name !== 'image') return false
+  return (sel as NodeSelection).$from.parent.type.name !== 'imageGroup'
 }
 
 /** —— 分割线样式 —— */
@@ -6883,6 +6886,7 @@ async function exportAsPng() {
     return
   }
   exportBusy.value = true
+  root?.classList.add('rte-printing')
   try {
     const canvas = await html2canvas(el, {
       backgroundColor: '#ffffff',
@@ -6899,6 +6903,7 @@ async function exportAsPng() {
     console.error(err)
     ElMessage.error('导出图片失败')
   } finally {
+    root?.classList.remove('rte-printing')
     exportBusy.value = false
   }
 }
@@ -6916,6 +6921,7 @@ async function exportAsPdf() {
     return
   }
   exportBusy.value = true
+  root?.classList.add('rte-printing')
   try {
     const title = (localTitle.value || '').trim() || '未命名文档'
     const blob = await buildPdfFromElement(el, { title, pageSize: pageSize.value })
@@ -6925,6 +6931,7 @@ async function exportAsPdf() {
     console.error(err)
     ElMessage.error('导出 PDF 失败')
   } finally {
+    root?.classList.remove('rte-printing')
     exportBusy.value = false
   }
 }
@@ -13854,7 +13861,12 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
 .rte-tool-group[data-group-id='color'] { background: #fff6e8; border-color: #f0d7b0; }
 .rte-tool-group[data-group-id='paragraph'] { background: #f4f0fa; border-color: #d9ceea; }
 .rte-tool-group[data-group-id='insert'] { background: #eef8f8; border-color: #c5e4e4; }
-.rte-tool-group[data-group-id='more'] { background: #f7f7f8; border-color: #d9dbe0; }
+.rte-tool-group[data-group-id='table'] { background: #eef6ff; border-color: #c5daf5; }
+.rte-tool-group[data-group-id='blocks'] { background: #f8f1f4; border-color: #e7d0da; }
+.rte-tool-group[data-group-id='notes'] { background: #fff8e8; border-color: #f0e0b0; }
+.rte-tool-group[data-group-id='review'] { background: #fdeeee; border-color: #f0c9c9; }
+.rte-tool-group[data-group-id='view'] { background: #eef3f8; border-color: #c9d7e6; }
+.rte-tool-group[data-group-id='other'] { background: #f7f7f8; border-color: #d9dbe0; }
 .rte-tool-group.is-dragging {
   opacity: 0.45;
 }
@@ -19155,7 +19167,10 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
   }
   .rte-root.rte-printing [data-resize-handle],
   .rte-root.rte-printing .rte-image-drop-line,
-  .rte-root.rte-printing .rte-image-size-tip {
+  .rte-root.rte-printing .rte-image-drop-preview,
+  .rte-root.rte-printing .rte-image-size-tip,
+  .rte-root.rte-printing .rte-image-group-bar,
+  .rte-root.rte-printing .rte-image-group-dividers {
     display: none !important;
   }
   .rte-root.rte-printing [data-resize-container][data-node='image'],
@@ -19237,6 +19252,128 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
 .rte-root.mode-source :deep([data-resize-handle]) {
   display: none !important;
   pointer-events: none !important;
+}
+.rte-root :deep(.rte-image-group) {
+  position: relative;
+  width: min(100%, 880px);
+  max-width: 100%;
+  margin: 12px auto;
+  box-sizing: border-box;
+}
+.rte-root :deep(.rte-image-group[data-align='left']) {
+  margin-left: 0;
+  margin-right: auto;
+}
+.rte-root :deep(.rte-image-group[data-align='right']) {
+  margin-left: auto;
+  margin-right: 0;
+}
+.rte-root :deep(.rte-image-group-bar) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.rte-root :deep(.rte-image-group-bar button) {
+  border: 1px solid #d6e4ff;
+  background: #fff;
+  color: #1d2129;
+  border-radius: 999px;
+  height: 26px;
+  padding: 0 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.rte-root :deep(.rte-image-group-handle) {
+  width: 26px;
+  padding: 0;
+  color: #3370ff;
+  cursor: grab;
+}
+.rte-root :deep(.rte-image-group-align.is-active) {
+  background: #e8f3ff;
+  border-color: #3370ff;
+  color: #3370ff;
+}
+.rte-root :deep(.rte-image-group-row) {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  width: 100%;
+  max-width: 100%;
+  height: clamp(150px, 28vw, 320px);
+}
+.rte-root :deep(.rte-image-group-row > *:nth-child(1)) { flex: var(--g0, 1) 1 0 !important; }
+.rte-root :deep(.rte-image-group-row > *:nth-child(2)) { flex: var(--g1, 1) 1 0 !important; }
+.rte-root :deep(.rte-image-group-row > *:nth-child(3)) { flex: var(--g2, 1) 1 0 !important; }
+.rte-root :deep(.rte-image-group-row > *:nth-child(4)) { flex: var(--g3, 1) 1 0 !important; }
+.rte-root :deep(.rte-image-group-row > *:nth-child(5)) { flex: var(--g4, 1) 1 0 !important; }
+.rte-root :deep(.rte-image-group-row > *:nth-child(6)) { flex: var(--g5, 1) 1 0 !important; }
+.rte-root :deep(.rte-image-group-row > *:nth-child(7)) { flex: var(--g6, 1) 1 0 !important; }
+.rte-root :deep(.rte-image-group-row > *:nth-child(8)) { flex: var(--g7, 1) 1 0 !important; }
+.rte-root :deep(.rte-image-group-row [data-resize-container][data-node='image']) {
+  position: relative;
+  min-width: 48px;
+  height: 100%;
+  max-width: 100%;
+  float: none !important;
+  margin: 0 !important;
+  overflow: hidden;
+  border-radius: 6px;
+}
+.rte-root :deep(.rte-image-group-row img) {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  object-fit: cover;
+}
+.rte-root :deep(.rte-image-group-row [data-resize-handle]),
+.rte-root :deep(.rte-image-group [data-resize-container].ProseMirror-selectednode)::before {
+  display: none !important;
+}
+.rte-root :deep(.rte-image-group-dividers) {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: clamp(150px, 28vw, 320px);
+  pointer-events: none;
+}
+.rte-root :deep(.rte-image-group-divider) {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 14px;
+  transform: translateX(-50%);
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: col-resize;
+  pointer-events: auto;
+}
+.rte-root :deep(.rte-image-group-divider::after) {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 8px;
+  bottom: 8px;
+  width: 4px;
+  border-radius: 2px;
+  background: #3370ff;
+  opacity: 0;
+}
+.rte-root :deep(.rte-image-group-divider:hover::after),
+.rte-root :deep(.rte-image-group-divider.is-active::after) {
+  opacity: 1;
+}
+.rte-root.mode-preview :deep(.rte-image-group-bar),
+.rte-root.mode-preview :deep(.rte-image-group-dividers),
+.rte-root.mode-source :deep(.rte-image-group-bar),
+.rte-root.mode-source :deep(.rte-image-group-dividers),
+.rte-root.rte-printing :deep(.rte-image-group-bar),
+.rte-root.rte-printing :deep(.rte-image-group-dividers) {
+  display: none !important;
 }
 .rte-root :deep([data-resize-container][data-node='image'].ProseMirror-selectednode)::before {
   content: '⠿';
@@ -19480,6 +19617,14 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
   border-radius: 2px;
   pointer-events: none;
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.8);
+}
+.rte-image-drop-preview {
+  position: fixed;
+  z-index: 10059;
+  border: 2px dashed #3370ff;
+  background: rgba(51, 112, 255, 0.16);
+  border-radius: 6px;
+  pointer-events: none;
 }
 .rte-image-size-tip {
   position: fixed;

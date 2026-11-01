@@ -12,22 +12,30 @@ import {
 } from './rteToolbarGroups.ts'
 
 assert.deepEqual(normalizeToolbarGroupOrder(undefined), [...DEFAULT_TOOLBAR_GROUP_ORDER])
-assert.deepEqual(normalizeToolbarGroupOrder(['nope', 'color', 'color', 'text']), [
+assert.deepEqual(normalizeToolbarGroupOrder(['nope', 'color', 'color', 'text', 'more']), [
   'color',
   'text',
   'history',
   'paragraph',
   'insert',
-  'more',
+  'table',
+  'blocks',
+  'notes',
+  'review',
+  'view',
+  'other',
 ])
 assert.deepEqual(readToolbarGroupOrder(undefined, 'p1'), [...DEFAULT_TOOLBAR_GROUP_ORDER])
 assert.equal(writeToolbarGroupOrder(undefined, 'p1', DEFAULT_TOOLBAR_GROUP_ORDER), undefined)
-assert.deepEqual(writeToolbarGroupOrder(undefined, 'p1', ['color', 'history', 'text', 'paragraph', 'insert', 'more']), {
-  p1: ['color', 'history', 'text', 'paragraph', 'insert', 'more'],
-})
+assert.deepEqual(
+  writeToolbarGroupOrder(undefined, 'p1', ['table', 'color', 'history', 'text', 'paragraph', 'insert', 'blocks', 'notes', 'review', 'view', 'other']),
+  {
+    p1: ['table', 'color', 'history', 'text', 'paragraph', 'insert', 'blocks', 'notes', 'review', 'view', 'other'],
+  },
+)
 assert.equal(
   writeToolbarGroupOrder(
-    { p1: ['color', 'history', 'text', 'paragraph', 'insert', 'more'] },
+    { p1: ['table', 'color', 'history', 'text', 'paragraph', 'insert', 'blocks', 'notes', 'review', 'view', 'other'] },
     'p1',
     DEFAULT_TOOLBAR_GROUP_ORDER,
   ),
@@ -40,8 +48,16 @@ assert.deepEqual(moveToolbarGroup(['history', 'text', 'color'], 'color', 0), ['c
 assert.equal(moveToolbarGroup(['history', 'text'], 'missing', 0), null)
 
 const groups = buildToolbarGroups(
-  [{ key: 'undo' }, { key: 'bold' }, { key: 'mystery' }, { key: 'color' }],
-  ['color', 'history', 'text', 'paragraph', 'insert', 'more'],
+  [
+    { key: 'undo' },
+    { key: 'bold' },
+    { key: 'mystery' },
+    { key: 'color' },
+    { key: 'table' },
+    { key: 'export' },
+    { key: 'note' },
+  ],
+  ['color', 'history', 'text', 'paragraph', 'insert', 'table', 'blocks', 'notes', 'review', 'view', 'other'],
 )
 assert.deepEqual(
   groups.map((group) => [group.id, group.tools.map((tool) => tool.key)]),
@@ -49,7 +65,10 @@ assert.deepEqual(
     ['color', ['color']],
     ['history', ['undo']],
     ['text', ['bold']],
-    ['more', ['mystery']],
+    ['table', ['table']],
+    ['notes', ['note']],
+    ['view', ['export']],
+    ['other', ['mystery']],
   ],
 )
 
