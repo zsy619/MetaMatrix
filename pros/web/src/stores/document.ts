@@ -3,6 +3,7 @@ import { ref, computed, toRaw } from 'vue'
 import { normalizeCanvasTheme } from '../components/canvas/canvasChrome'
 import { ApiError } from '../api/http'
 import * as documentsApi from '../api/documents'
+import { rememberRecentOpen } from '../utils/canvasTransfer'
 import { getToken } from '../api/http'
 import type {
   BlockCanvasDocumentJSON,
@@ -642,6 +643,39 @@ export const useDocumentStore = defineStore('document', () => {
   const activeTemplateId = ref<TemplateId | null>(null)
   const loading = ref(false)
   const saving = ref(false)
+  /** Local draft kept when a 409 replaces the editor with the server copy. */
+  const conflict = ref<{ draft: CanvasDocumentJSON } | null>(null)
+  const conflictKey = 'metamatrix:save-conflict'
+
+  function rememberConflict(id: string, draft: CanvasDocumentJSON) {
+    conflict.value = { draft }
+    try {
+      sessionStorage.setItem(conflictKey, JSON.stringify({ id, draft }))
+    } catch {
+      /* private mode or quota */
+    }
+  }
+
+  function discardConflict() {
+    conflict.value = null
+    try {
+      sessionStorage.removeItem(conflictKey)
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function hydrateConflict(id: string) {
+    try {
+      const raw = sessionStorage.getItem(conflictKey)
+      if (!raw) return
+      const parsed = JSON.parse(raw) as { id?: string; draft?: CanvasDocumentJSON }
+      if (parsed.id === id && parsed.draft) conflict.value = { draft: parsed.draft }
+      else if (parsed.id && parsed.id !== id) conflict.value = null
+    } catch {
+      conflict.value = null
+    }
+  }
   /** 任务名称（文档 title，与画布模板 id 解耦） */
   const doc_title = ref('')
   /** 备注信息 */
@@ -1530,8 +1564,8 @@ export const useDocumentStore = defineStore('document', () => {
       }
       localStorage.setItem(localMetaKey(templateId), JSON.stringify(meta))
       return true
-    } catch (err) {
-      console.warn('[documentStore.persistLocalMeta]', err)
+    } catch {
+      console.warn('[documentStore.persistLocalMeta] failed')
       return false
     }
   }
@@ -1541,8 +1575,8 @@ export const useDocumentStore = defineStore('document', () => {
       const raw = localStorage.getItem(localMetaKey(templateId))
       if (!raw) return null
       return JSON.parse(raw) as LocalDocMeta
-    } catch (err) {
-      console.warn('[documentStore.loadLocalMeta]', err)
+    } catch {
+      console.warn('[documentStore.loadLocalMeta] failed')
       return null
     }
   }
@@ -1573,8 +1607,8 @@ export const useDocumentStore = defineStore('document', () => {
       localStorage.setItem(key, JSON.stringify(current_data.value))
       persistLocalMeta(templateId)
       return true
-    } catch (err) {
-      console.warn('[documentStore.persistLocal]', err)
+    } catch {
+      console.warn('[documentStore.persistLocal] failed')
       return false
     }
   }
@@ -1585,8 +1619,8 @@ export const useDocumentStore = defineStore('document', () => {
       const raw = localStorage.getItem(key)
       if (!raw) return null
       return JSON.parse(raw) as CanvasDocumentJSON
-    } catch (err) {
-      console.warn('[documentStore.loadLocal]', err)
+    } catch {
+      console.warn('[documentStore.loadLocal] failed')
       return null
     }
   }
@@ -1630,6 +1664,12 @@ export const useDocumentStore = defineStore('document', () => {
       })
       dirty.value = false
       persistLocal(activeTemplateId.value)
+      hydrateConflict(doc.id)
+      rememberRecentOpen({
+        id: doc.id,
+        title: doc.title || '未命名文档',
+        templateId: doc.templateId || activeTemplateId.value || 'dual-triangle',
+      })
     } finally {
       loading.value = false
     }
@@ -1752,12 +1792,14 @@ export const useDocumentStore = defineStore('document', () => {
         dirty.value = false
       } catch (e) {
         if (e instanceof ApiError && e.status === 409) {
-          const body = e.body as { headRevisionId?: string } | undefined
-          // reload latest and surface conflict
-          await load(id)
-          throw new Error(
-            `保存冲突（服务端 head=${body?.headRevisionId ?? '?'}），已拉取最新版本`,
-          )
+          const draft = current_data.value ? cloneDoc(current_data.value) : null
+          try {
+            await load(id)
+          } catch {
+            throw new Error('保存冲突，但拉取云端版本失败。本地修改还在，请稍后重试。')
+          }
+          if (draft) rememberConflict(id, draft)
+          throw new Error('内容已在其他地方更新，已载入云端版本。')
         }
         throw e
       }
@@ -1783,15 +1825,66 @@ export const useDocumentStore = defineStore('document', () => {
       document_id.value = res.document.id
       head_revision_id.value = res.document.headRevisionId
       dirty.value = false
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 409 && document_id.value) {
+        await load(document_id.value)
+        throw new Error('存版时云端已有更新，已重新载入最新版本。请再存一次。')
+      }
+      throw e
     } finally {
       saving.value = false
     }
   }
 
-  async function listMyDocuments(templateId?: string) {
-    return documentsApi.listDocuments(
-      templateId ? { templateId } : undefined,
-    )
+  async function restoreRevision(revisionId: string): Promise<void> {
+    if (!document_id.value) throw new Error('尚未建档')
+    saving.value = true
+    try {
+      const doc = await documentsApi.restoreDocument(document_id.value, {
+        revisionId,
+        expectedHeadRevisionId: head_revision_id.value,
+      })
+      await load(doc.id)
+      dirty.value = false
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 409 && document_id.value) {
+        await load(document_id.value)
+        throw new Error('恢复时云端已有更新，已重新载入最新版本。请再试一次。')
+      }
+      throw e
+    } finally {
+      saving.value = false
+    }
+  }
+
+  async function restoreConflictDraft(): Promise<void> {
+    const draft = conflict.value?.draft
+    const id = document_id.value
+    if (!draft || !id) {
+      throw new Error('没有可恢复的本地修改')
+    }
+    current_data.value = cloneDoc(draft)
+    dirty.value = true
+    try {
+      await save()
+      discardConflict()
+    } catch (e) {
+      rememberConflict(id, draft)
+      if (e instanceof ApiError && e.status === 409) {
+        throw new Error('云端又更新了一次。你的修改还在，可以再试一次覆盖保存。')
+      }
+      if (e instanceof Error && /其他地方更新/.test(e.message)) {
+        throw new Error('云端又更新了一次。你的修改还在，可以再试一次覆盖保存。')
+      }
+      throw e
+    }
+  }
+
+  async function listMyDocuments(templateId?: string, limit?: number) {
+    return documentsApi.listDocuments({
+      ...(templateId ? { templateId } : {}),
+      ...(limit != null ? { limit } : {}),
+    })
   }
 
   function markDirty() {
@@ -3195,6 +3288,10 @@ export const useDocumentStore = defineStore('document', () => {
     activeTemplateId,
     loading,
     saving,
+    conflict,
+    discardConflict,
+    restoreConflictDraft,
+    restoreRevision,
     doc_title,
     doc_notes,
     created_at,

@@ -3,6 +3,8 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { canvasChromeStyle } from './canvasChrome'
 import type { BusinessFormulaDocumentJSON } from '../../types/canvas'
 import { useDocumentStore } from '../../stores/document'
+import { usePanelMaximize } from '../../composables/usePanelMaximize'
+import PanelAttachments from './PanelAttachments.vue'
 import {
   DEFAULT_FORMULA_TEXT,
   FORMULA_TEMPLATES,
@@ -38,7 +40,8 @@ const industryFilter = ref('all')
 const formulaTypeFilter = ref('all')
 const activeTemplateKey = ref('')
 const savedQuery = ref('')
-const isMaximized = ref(false)
+const formulaPanelId = 'formula:definition'
+const { isMaximized, toggleMaximize, closeMaximize } = usePanelMaximize(formulaPanelId)
 const scale = ref(0.8)
 const translate = ref({ x: 50, y: 100 })
 const isDragging = ref(false)
@@ -133,14 +136,14 @@ function setPalette(name: PaletteName) {
   persist()
 }
 
-function toggleMaximize() {
-  isMaximized.value = !isMaximized.value
+function onToggleMaximize(event: MouseEvent) {
+  event.stopPropagation()
+  toggleMaximize()
 }
 
-function onKeydown(e: KeyboardEvent) {
-  if (e.key === 'Escape' && isMaximized.value) {
-    isMaximized.value = false
-  }
+function onCloseMaximize(event?: Event) {
+  event?.stopPropagation()
+  closeMaximize()
 }
 
 function saveCurrentFormula() {
@@ -330,7 +333,6 @@ function exportSvgImage() {
 onMounted(() => {
   window.addEventListener('mousemove', onMouseMove)
   window.addEventListener('mouseup', onMouseUp)
-  window.addEventListener('keydown', onKeydown)
   measureCenter()
   if (!formulaText.value.trim()) {
     formulaText.value = formatFormulaText(DEFAULT_FORMULA_TEXT)
@@ -347,7 +349,6 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('mousemove', onMouseMove)
   window.removeEventListener('mouseup', onMouseUp)
-  window.removeEventListener('keydown', onKeydown)
 })
 </script>
 
@@ -438,22 +439,27 @@ onUnmounted(() => {
               </button>
               <button
                 type="button"
-                class="bf-mini-btn"
-                :title="isMaximized ? '还原编辑框' : '最大化编辑框'"
-                @click="toggleMaximize"
+                class="pm-max-btn"
+                title="最大化"
+                aria-label="最大化"
+                @click="onToggleMaximize"
               >
-                {{ isMaximized ? '还原' : '最大化' }}
+                <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">
+                  <rect x="2.5" y="2.5" width="11" height="11" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.5" />
+                </svg>
               </button>
             </div>
           </div>
           <textarea
+            v-if="!isMaximized"
             v-model="formulaText"
             class="bf-textarea"
-            :class="{ maximized: isMaximized }"
             spellcheck="false"
             placeholder="输入业务公式，例如：收入 = 流量 * 转化 * 客单价"
             @input="onFormulaInput"
           />
+          <p v-else class="bf-max-hint">正在放大编辑…</p>
+          <PanelAttachments v-if="!isMaximized" :panel-id="formulaPanelId" compact />
         </div>
 
         <div class="bf-group">
@@ -620,6 +626,31 @@ onUnmounted(() => {
       </div>
     </section>
   </div>
+  <Teleport to="body">
+    <div
+      v-if="isMaximized"
+      class="pm-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-label="公式定义"
+      @click.self="onCloseMaximize"
+    >
+      <div class="pm-card" @click.stop>
+        <div class="pm-header">
+          <h3 class="pm-title">公式定义</h3>
+          <button type="button" class="bf-restore" title="还原" @click="onCloseMaximize">还原</button>
+        </div>
+        <textarea
+          v-model="formulaText"
+          class="bf-textarea bf-textarea-overlay"
+          spellcheck="false"
+          placeholder="输入业务公式，例如：收入 = 流量 * 转化 * 客单价"
+          @input="onFormulaInput"
+        />
+        <PanelAttachments :panel-id="formulaPanelId" />
+      </div>
+    </div>
+  </Teleport>
 </template>
 
 <style scoped>
@@ -908,14 +939,27 @@ onUnmounted(() => {
   box-shadow: 0 0 0 2px var(--cv-select-soft, rgba(28, 76, 124, 0.34));
 }
 
-.bf-textarea.maximized {
-  position: fixed;
-  inset: 48px 24px 24px 24px;
-  z-index: 80;
-  min-height: unset;
-  height: auto;
-  background: #ffffff;
-  box-shadow: 0 8px 28px rgba(32, 33, 36, 0.18);
+.bf-max-hint {
+  margin: 0 0 8px;
+  color: #5f6368;
+  font-size: 12px;
+}
+
+.bf-textarea-overlay {
+  flex: 1;
+  min-height: 0;
+  margin: 12px 16px;
+  width: auto;
+}
+
+.bf-restore {
+  border: 1px solid #dadce0;
+  background: #fff;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
 }
 
 .bf-saved-list {

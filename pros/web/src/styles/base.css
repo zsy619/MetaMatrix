@@ -12,6 +12,25 @@
   -moz-osx-font-smoothing: grayscale;
   --canvas-min-width: 640px;
   --canvas-min-height: 480px;
+  --mm-text: #202124;
+  --mm-muted: #5f6368;
+  --mm-faint: #9aa0a6;
+  --mm-line: #e8eaed;
+  --mm-line-strong: #dadce0;
+  --mm-bg: #fafafa;
+  --mm-surface: #ffffff;
+  --mm-blue: #1a73e8;
+  --mm-blue-deep: #174ea6;
+  --mm-blue-soft: #e8f0fe;
+  --mm-green: #188038;
+  --mm-green-solid: #34a853;
+  --mm-amber: #f9a825;
+  --mm-purple: #a142f4;
+  --mm-red: #d93025;
+  --mm-red-soft: #fce8e6;
+  --mm-radius: 16px;
+  --mm-gap: 14px;
+  --mm-focus: 0 0 0 3px rgba(26, 115, 232, 0.35);
 }
 
 *,
@@ -44,4 +63,26 @@ body,
 
 button {
   font: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--mm-blue);
+  outline-offset: 2px;
+}
+
+.mm-search-hit {
+  outline: 2px solid #f9ab00;
+  outline-offset: 3px;
+  border-radius: 8px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

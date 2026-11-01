@@ -1,0 +1,76 @@
+.mm-btn {
+  font: inherit;
+  cursor: pointer;
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 650;
+  border: 1px solid var(--mm-line-strong);
+  background: var(--mm-surface);
+  color: var(--mm-text);
+  text-decoration: none;
+}
+
+.mm-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.mm-btn--primary {
+  border-color: transparent;
+  background: var(--mm-blue);
+  color: #fff;
+}
+
+.mm-btn--ghost {
+  background: var(--mm-surface);
+}
+
+html[data-density='compact'] .guide-main,
+html[data-density='compact'] .inner,
+html[data-density='compact'] .account {
+  padding-top: 16px;
+  padding-bottom: 36px;
+}
+
+html[data-density='compact'] .topbar {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+@media (max-width: 720px) {
+  .topbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .actions,
+  .doc-tools,
+  .doc-pager,
+  .search-row {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  .doc-item button,
+  .search-row input,
+  .search-row button {
+    width: 100%;
+  }
+}
+
+.import-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--mm-muted);
+}
+
+.import-label input {
+  max-width: 180px;
+}
+
+.mm-inline-error {
+  margin: 8px 0 0;
+  color: var(--mm-red);
+  font-size: 13px;
+}

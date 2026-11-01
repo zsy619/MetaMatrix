@@ -4,6 +4,7 @@ import type { DocumentSummary } from '../../api/documents'
 import { TEMPLATE_META, type TemplateCategory, type TemplateId } from '../../stores/document'
 import GuideUserCard from './GuideUserCard.vue'
 import GuideThumb from './GuideThumb.vue'
+import LineSkeleton from '../ui/LineSkeleton.vue'
 
 const ASIDE_COLLAPSE_KEY = 'metamatrix:guide:asideCollapsed'
 const ASIDE_WIDTH_KEY = 'metamatrix:guide:asideWidth'
@@ -12,14 +13,20 @@ const DEFAULT_WIDTH = 300
 const MIN_WIDTH = 220
 const MAX_WIDTH_ABS = 480
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   recent: DocumentSummary[]
   authenticated: boolean
-}>()
+  loading?: boolean
+  error?: string
+}>(), {
+  loading: false,
+  error: '',
+})
 
 const emit = defineEmits<{
   open: [doc: DocumentSummary]
   logout: []
+  retry: []
   'update:collapsed': [value: boolean]
 }>()
 
@@ -349,12 +356,17 @@ const panelTitle = computed(() => '最近文档')
           </span>
           <span class="ws-text">
             <span class="ws-title">工作面板</span>
-            <span class="ws-sub">最近画布、用量、搜索与备注</span>
+            <span class="ws-sub">个人统计、趋势与最近画布</span>
           </span>
           <span class="ws-go" aria-hidden="true">→</span>
         </router-link>
 
         <p v-if="!authenticated" class="empty">登录后查看最近文档</p>
+        <p v-else-if="error" class="empty" role="alert">
+          {{ error }}
+          <button type="button" class="mm-btn mm-btn--ghost" @click="emit('retry')">重试</button>
+        </p>
+        <LineSkeleton v-else-if="loading" />
         <p v-else-if="!recent.length" class="empty">暂无文档，从左侧选模板开始</p>
         <template v-else>
           <section

@@ -4,10 +4,8 @@ import { useRouter } from 'vue-router'
 import GuideThumb from '../guide/GuideThumb.vue'
 import {
   listDocuments,
-  listRevisions,
   searchDocuments,
   type DocumentSummary,
-  type RevisionSummary,
   type SearchHit,
 } from '../../api/documents'
 import { useAuthStore } from '../../stores/auth'
@@ -16,9 +14,12 @@ import {
   cloneTemplate,
   isTemplateId,
   useDocumentStore,
-  type TemplateCategory,
   type TemplateId,
 } from '../../stores/document'
+import { accentOf } from './palette'
+import { friendlyApiMessage } from '../../utils/apiMessage'
+import LineSkeleton from '../ui/LineSkeleton.vue'
+import HighlightText from '../ui/HighlightText.vue'
 
 const STARTERS: TemplateId[] = [
   'time-matrix',
@@ -26,14 +27,6 @@ const STARTERS: TemplateId[] = [
   'y-model',
   'five-step-basic',
 ]
-
-const CATEGORY_ACCENT: Record<TemplateCategory, string> = {
-  method: '#1a73e8',
-  growth: '#34a853',
-  industry: '#f9a825',
-  org: '#a142f4',
-  review: '#ea4335',
-}
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -44,9 +37,6 @@ const loaded = ref(false)
 const loading = ref(false)
 const docs = ref<DocumentSummary[]>([])
 const mentions = ref<SearchHit[]>([])
-const activities = ref<
-  { id: string; documentId: string; title: string; templateId: string | null; canvasType: string; label: string; createdAt: string }[]
->([])
 const searchQ = ref('')
 const searchHits = ref<SearchHit[]>([])
 const searching = ref(false)
@@ -55,14 +45,19 @@ const searched = ref(false)
 const creatingId = ref<TemplateId | null>(null)
 const createError = ref('')
 let searchTimer: ReturnType<typeof setTimeout> | null = null
+let searchAbort: AbortController | null = null
 
-function accentOf(id: string | null | undefined): string {
-  if (id && isTemplateId(id)) return CATEGORY_ACCENT[TEMPLATE_META[id].category]
-  return '#7c4dff'
+function templateName(id: string | null | undefined): string {
+  if (id && isTemplateId(id)) return TEMPLATE_META[id].name
+  return id || '画布'
 }
 
 function knownTemplate(id: string | null | undefined): TemplateId | null {
   return id && isTemplateId(id) ? id : null
+}
+
+function thumbId(d: { templateId: string | null; canvasType?: string }): TemplateId {
+  return knownTemplate(d.templateId || d.canvasType) ?? 'dual-triangle'
 }
 
 function formatWhen(iso: string): string {
@@ -78,14 +73,6 @@ function formatWhen(iso: string): string {
   return t.toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })
 }
 
-function revisionLabel(r: RevisionSummary): string {
-  const raw = (r.label || '').trim()
-  if (raw === 'manual-snapshot') return '手动存档'
-  if (raw === 'auto-checkpoint') return '自动存档'
-  if (raw === 'initial') return '初始版本'
-  return raw || '修订'
-}
-
 function parseTodoLine(line: string): { text: string; done: boolean } | null {
   const checkbox = line.match(/^\s*[-*]\s*\[([ xX])\]\s*(.+)$/)
   if (checkbox?.[2]) return { done: checkbox[1]?.toLowerCase() === 'x', text: checkbox[2].trim() }
@@ -98,6 +85,8 @@ function parseTodoLine(line: string): { text: string; done: boolean } | null {
   if (labeled?.[1]) return { done: false, text: labeled[1].trim() }
   return null
 }
+
+const recentDocs = computed(() => docs.value.slice(0, 6))
 
 const noteDigest = computed(() => {
   const todos: { key: string; doc: DocumentSummary; text: string; done: boolean }[] = []
@@ -124,9 +113,18 @@ const noteDigest = computed(() => {
   return { todos: todos.slice(0, 6), notes: notes.slice(0, 4) }
 })
 
-function openDoc(d: { id: string; templateId: string | null; canvasType?: string }) {
+function openDoc(d: { id: string; templateId: string | null; canvasType?: string; panelId?: string }) {
   const tid = knownTemplate(d.templateId) || knownTemplate(d.canvasType) || 'dual-triangle'
-  router.push({ name: 'canvas', params: { templateId: tid }, query: { documentId: d.id } })
+  const q = searchQ.value.trim()
+  router.push({
+    name: 'canvas',
+    params: { templateId: tid },
+    query: {
+      documentId: d.id,
+      ...(d.panelId ? { panel: d.panelId } : {}),
+      ...(q ? { q } : {}),
+    },
+  })
 }
 
 function freshTitle(id: TemplateId): string {
@@ -151,35 +149,10 @@ async function quickCreate(id: TemplateId) {
     })
     router.push({ name: 'canvas', params: { templateId: id }, query: { documentId: docId } })
   } catch (e) {
-    createError.value = e instanceof Error ? e.message : '新建失败'
+    createError.value = friendlyApiMessage(e, '新建失败')
   } finally {
     creatingId.value = null
   }
-}
-
-async function loadRevisions(list: DocumentSummary[]) {
-  const batches = await Promise.all(
-    list.slice(0, 6).map(async (d) => {
-      try {
-        const revs = await listRevisions(d.id)
-        return revs.slice(0, 2).map((r) => ({
-          id: r.id,
-          documentId: d.id,
-          title: d.title || '未命名文档',
-          templateId: d.templateId,
-          canvasType: d.canvasType,
-          label: revisionLabel(r),
-          createdAt: r.createdAt,
-        }))
-      } catch {
-        return []
-      }
-    }),
-  )
-  activities.value = batches
-    .flat()
-    .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
-    .slice(0, 6)
 }
 
 async function ensureLoaded() {
@@ -187,7 +160,7 @@ async function ensureLoaded() {
   loading.value = true
   try {
     const [rows, hits] = await Promise.all([
-      listDocuments(),
+      listDocuments({ limit: 40 }),
       searchDocuments({ q: '待办', limit: 5 }).catch(() => [] as SearchHit[]),
     ])
     const list = Array.isArray(rows) ? rows : []
@@ -195,7 +168,6 @@ async function ensureLoaded() {
     docs.value = list
     mentions.value = Array.isArray(hits) ? hits : []
     loaded.value = true
-    void loadRevisions(list)
   } catch {
     docs.value = []
   } finally {
@@ -211,22 +183,29 @@ function onToggle(e: Event) {
 
 async function runSearch() {
   searchErr.value = ''
-  if (!auth.isAuthenticated) return
+  searchAbort?.abort()
+  if (!auth.isAuthenticated) {
+    searchErr.value = '登录后只能搜索你自己的画布。'
+    return
+  }
   const q = searchQ.value.trim()
   if (!q) {
     searchHits.value = []
     searched.value = false
     return
   }
+  const ctrl = new AbortController()
+  searchAbort = ctrl
   searching.value = true
   searched.value = true
   try {
-    searchHits.value = await searchDocuments({ q, limit: 8 })
+    searchHits.value = await searchDocuments({ q, limit: 8 }, { signal: ctrl.signal })
   } catch (e) {
-    searchErr.value = e instanceof Error ? e.message : '搜索失败'
+    if (e instanceof DOMException && e.name === 'AbortError') return
+    searchErr.value = friendlyApiMessage(e, '搜索失败')
     searchHits.value = []
   } finally {
-    searching.value = false
+    if (searchAbort === ctrl) searching.value = false
   }
 }
 
@@ -240,7 +219,7 @@ function onSearchInput() {
   <details class="secondary" @toggle="onToggle">
     <summary>
       <span>搜索、备注与快速新建</span>
-      <span class="hint">最近编辑在上面，这里是正文入口</span>
+      <span class="hint">次要入口，需要时再展开</span>
     </summary>
     <div v-if="open" class="body">
       <p v-if="!auth.isAuthenticated" class="muted">登录后可以接着写、搜索正文，并查看备注里的待办。</p>
@@ -264,47 +243,59 @@ function onSearchInput() {
 
         <div class="cols">
           <section>
+            <h3>最近编辑</h3>
+            <LineSkeleton v-if="loading" />
+            <p v-else-if="!recentDocs.length" class="muted">还没有云端画布。</p>
+            <ul v-else class="rows">
+              <li v-for="d in recentDocs" :key="d.id">
+                <button type="button" class="row" @click="openDoc(d)">
+                  <span class="mark" :style="{ '--accent': accentOf(d.templateId || d.canvasType) }">
+                    <GuideThumb v-if="knownTemplate(d.templateId || d.canvasType)" :template-id="thumbId(d)" size="sm" />
+                  </span>
+                  <span class="copy">
+                    <strong>{{ d.title || '未命名文档' }}</strong>
+                    <em>{{ templateName(d.templateId || d.canvasType) }}</em>
+                  </span>
+                  <time>{{ formatWhen(d.updatedAt) }}</time>
+                </button>
+              </li>
+            </ul>
+          </section>
+          <section>
             <h3>全文搜索</h3>
             <div class="search">
               <input
                 v-model="searchQ"
                 type="search"
+                aria-label="搜索标题或正文"
                 placeholder="标题或正文关键词"
                 @input="onSearchInput"
                 @keydown.enter.prevent="runSearch"
               />
               <button type="button" class="go" :disabled="searching" @click="runSearch">搜索</button>
             </div>
-            <p v-if="searchErr" class="err">{{ searchErr }}</p>
-            <p v-else-if="searched && !searching && !searchHits.length" class="muted">没有匹配。</p>
+            <p v-if="searchErr" class="err" role="alert">
+              {{ searchErr }}
+              <button type="button" class="mm-btn mm-btn--ghost" @click="runSearch">重试</button>
+            </p>
+            <p v-else-if="searched && !searching && !searchHits.length" class="muted" role="status">
+              没有匹配。只搜索当前账号的画布。
+            </p>
             <ul v-if="searchHits.length" class="rows">
               <li v-for="h in searchHits" :key="h.id">
                 <button type="button" class="row stack" @click="openDoc(h)">
                   <span class="copy">
                     <strong>{{ h.title || '未命名文档' }}</strong>
-                    <em>{{ h.snippet }}</em>
+                    <em><HighlightText :text="h.snippet" /></em>
+                    <span v-if="h.panelTitle">匹配：{{ h.panelTitle }}</span>
                   </span>
-                </button>
-              </li>
-            </ul>
-            <h3 class="sub">最近修订</h3>
-            <p v-if="loading" class="muted">读取中…</p>
-            <p v-else-if="!activities.length" class="muted">展开后会汇总最近几份画布的修订。</p>
-            <ul v-else class="rows">
-              <li v-for="a in activities" :key="a.id">
-                <button type="button" class="row" @click="openDoc(a)">
-                  <span class="copy">
-                    <strong>{{ a.label }}</strong>
-                    <em>{{ a.title }}</em>
-                  </span>
-                  <time>{{ formatWhen(a.createdAt) }}</time>
                 </button>
               </li>
             </ul>
           </section>
           <section>
             <h3>备注与待办</h3>
-            <p v-if="loading" class="muted">整理中…</p>
+            <LineSkeleton v-if="loading" />
             <p v-else-if="!noteDigest.todos.length && !noteDigest.notes.length && !mentions.length" class="muted">
               在页面设置里写备注，或以「待办：」开头。
             </p>
@@ -348,10 +339,10 @@ function onSearchInput() {
 
 <style scoped>
 .secondary {
-  background: #fff;
-  border: 1px solid #e8eaed;
+  background: transparent;
+  border: 1px dashed var(--mm-line-strong);
   border-radius: 16px;
-  padding: 4px 16px 8px;
+  padding: 2px 16px 8px;
 }
 
 summary {
@@ -362,7 +353,8 @@ summary {
   gap: 12px;
   align-items: baseline;
   padding: 12px 0;
-  font-weight: 700;
+  font-weight: 650;
+  color: var(--mm-muted);
 }
 
 summary::-webkit-details-marker {
@@ -406,7 +398,7 @@ summary::-webkit-details-marker {
 
 .cols {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
 }
 
@@ -414,10 +406,6 @@ h3 {
   margin: 0 0 8px;
   font-size: 13px;
   color: #5f6368;
-}
-
-h3.sub {
-  margin-top: 14px;
 }
 
 .rows {

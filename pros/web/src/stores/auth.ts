@@ -3,6 +3,8 @@ import { computed, ref } from 'vue'
 import * as authApi from '../api/auth'
 import type { User } from '../api/auth'
 import { getToken, setToken } from '../api/http'
+import { friendlyApiMessage } from '../utils/apiMessage'
+import { clearRecentOpens } from '../utils/canvasTransfer'
 
 const USER_KEY = 'metamatrix:auth:user'
 
@@ -46,6 +48,7 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = null
     setToken(null)
     writeCachedUser(null)
+    clearRecentOpens()
   }
 
   async function register(email: string, password: string, displayName?: string) {
@@ -56,7 +59,7 @@ export const useAuthStore = defineStore('auth', () => {
       applySession(res.token, res.user)
       return res.user
     } catch (e: unknown) {
-      error.value = e instanceof Error ? e.message : '注册失败'
+      error.value = friendlyApiMessage(e, '注册失败')
       throw e
     } finally {
       loading.value = false
@@ -71,11 +74,38 @@ export const useAuthStore = defineStore('auth', () => {
       applySession(res.token, res.user)
       return res.user
     } catch (e: unknown) {
-      error.value = e instanceof Error ? e.message : '登录失败'
+      error.value = friendlyApiMessage(e, '登录失败')
       throw e
     } finally {
       loading.value = false
     }
+  }
+
+  function tokenExpiryMs(raw: string): number | null {
+    const part = raw.split('.')[1]
+    if (!part) return null
+    try {
+      const padded = part.replace(/-/g, '+').replace(/_/g, '/')
+      const json = JSON.parse(atob(padded)) as { exp?: number }
+      return typeof json.exp === 'number' ? json.exp * 1000 : null
+    } catch {
+      return null
+    }
+  }
+
+  async function refreshIfNeeded() {
+    const raw = token.value
+    if (!raw) return
+    const exp = tokenExpiryMs(raw)
+    if (exp == null) return
+    const left = exp - Date.now()
+    if (left <= 0) {
+      clearSession()
+      return
+    }
+    if (left > 24 * 60 * 60 * 1000) return
+    const res = await authApi.refresh()
+    applySession(res.token, res.user)
   }
 
   async function fetchMe() {
@@ -85,6 +115,8 @@ export const useAuthStore = defineStore('auth', () => {
     }
     loading.value = true
     try {
+      await refreshIfNeeded()
+      if (!token.value) return null
       const u = await authApi.me()
       user.value = u
       writeCachedUser(u)
@@ -92,6 +124,19 @@ export const useAuthStore = defineStore('auth', () => {
     } catch {
       clearSession()
       return null
+    } finally {
+      loading.value = false
+    }
+  }
+
+  async function changePassword(currentPassword: string, newPassword: string) {
+    loading.value = true
+    error.value = null
+    try {
+      await authApi.changePassword({ currentPassword, newPassword })
+    } catch (e: unknown) {
+      error.value = friendlyApiMessage(e, '修改密码失败')
+      throw e
     } finally {
       loading.value = false
     }
@@ -114,6 +159,7 @@ export const useAuthStore = defineStore('auth', () => {
     register,
     login,
     fetchMe,
+    changePassword,
     logout,
   }
 })

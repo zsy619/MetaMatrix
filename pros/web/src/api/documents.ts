@@ -1,4 +1,4 @@
-import { apiRequest } from './http'
+import { apiRequest, apiRequestResult } from './http'
 import type { CanvasDocumentJSON } from '../types/canvas'
 
 export type DocumentSummary = {
@@ -40,6 +40,8 @@ export type SearchHit = {
   updatedAt: string
   snippet: string
   rank?: number
+  panelId?: string
+  panelTitle?: string
 }
 
 export type TextDiffOp = { op: 'equal' | 'insert' | 'delete' | string; text: string }
@@ -72,19 +74,108 @@ export type AIContext = {
   }>
 }
 
-export function listDocuments(params?: {
+export type DocumentPage = {
+  items: DocumentSummary[]
+  total: number
+  limit: number
+  offset: number
+  hasMore: boolean
+}
+
+function documentQuery(params?: {
   templateId?: string
   canvasType?: string
+  limit?: number
+  offset?: number
+  archived?: boolean
 }) {
   const q = new URLSearchParams()
   if (params?.templateId) q.set('templateId', params.templateId)
   if (params?.canvasType) q.set('canvasType', params.canvasType)
+  if (params?.limit != null) q.set('limit', String(params.limit))
+  if (params?.offset != null) q.set('offset', String(params.offset))
+  if (params?.archived) q.set('archived', '1')
   const qs = q.toString()
-  return apiRequest<DocumentSummary[]>(`/documents${qs ? `?${qs}` : ''}`)
+  return `/documents${qs ? `?${qs}` : ''}`
+}
+
+export function listDocuments(params?: {
+  templateId?: string
+  canvasType?: string
+  limit?: number
+  offset?: number
+  archived?: boolean
+}) {
+  return apiRequest<DocumentSummary[]>(documentQuery(params), { cache: 'no-store' })
+}
+
+export function batchDocuments(action: 'archive' | 'restore', ids: string[]) {
+  return apiRequest<{ affected: number }>('/documents/batch', {
+    method: 'POST',
+    body: { action, ids },
+    retry: 0,
+  })
+}
+
+export async function listDocumentsPage(params?: {
+  templateId?: string
+  canvasType?: string
+  limit?: number
+  offset?: number
+  archived?: boolean
+}): Promise<DocumentPage> {
+  const limit = params?.limit ?? 20
+  const offset = params?.offset ?? 0
+  const res = await apiRequestResult<DocumentSummary[]>(
+    documentQuery({ ...params, limit, offset }),
+    { cache: 'no-store' },
+  )
+  const items = Array.isArray(res.data) ? res.data : []
+  const totalHeader = Number(res.headers.get('X-Total-Count'))
+  const total = Number.isFinite(totalHeader) ? totalHeader : items.length
+  const hasMoreHeader = res.headers.get('X-Has-More')
+  const hasMore = hasMoreHeader == null ? offset + items.length < total : hasMoreHeader === 'true'
+  return { items, total, limit, offset, hasMore }
+}
+
+export function exportDocument(id: string, format: 'json' | 'markdown') {
+  return apiRequest<{ filename: string; format: string; content: CanvasDocumentJSON | string }>(
+    `/documents/${id}/export?format=${format}`,
+  )
 }
 
 export function getDocument(id: string) {
-  return apiRequest<DocumentFull>(`/documents/${id}`)
+  return apiRequest<DocumentFull>(`/documents/${id}`, { cache: 'no-store' })
+}
+
+export type BackupDocument = {
+  title: string
+  notes?: string
+  templateId?: string | null
+  canvasType: string
+  schemaVersion?: number
+  updatedAt?: string
+  currentData: CanvasDocumentJSON
+}
+
+export type BackupBundle = {
+  version: number
+  exportedAt: string
+  count: number
+  truncated: boolean
+  documents: BackupDocument[]
+}
+
+export function downloadBackup() {
+  return apiRequest<BackupBundle>('/documents/backup', { cache: 'no-store' })
+}
+
+export function restoreBackup(bundle: BackupBundle) {
+  return apiRequest<{ imported: number; skipped: number }>('/documents/backup', {
+    method: 'POST',
+    body: bundle,
+    retry: 0,
+  })
 }
 
 export function createDocument(input: {
@@ -113,6 +204,14 @@ export function updateDocument(
   return apiRequest<DocumentFull>(`/documents/${id}`, {
     method: 'PUT',
     body: input,
+  })
+}
+
+export function renameDocument(id: string, title: string) {
+  return apiRequest<{ title: string }>(`/documents/${id}/title`, {
+    method: 'PATCH',
+    body: { title },
+    retry: 0,
   })
 }
 
@@ -182,22 +281,15 @@ export type HeatCell = { date: string; count: number }
 
 export type ActivityStats = {
   activeDays: number
-  activeDaysPrev: number
+  previousActiveDays: number
   streak: number
-  longestStreak: number
+  longest: number
 }
 
-export type CanvasTypeStat = {
-  canvasType: string
-  total: number
-  created: number
-  edited: number
-}
-
-export type RecentCanvas = {
+export type RecentEdit = {
   id: string
   title: string
-  templateId: string
+  templateId: string | null
   canvasType: string
   createdAt: string
   updatedAt: string
@@ -221,39 +313,47 @@ export type DocumentStats = {
   rangeCreated: StatsCompare
   rangeEdited: StatsCompare
   totals: { revisions: number; templates: number }
+  activity: ActivityStats
   series: StatsBucket[]
   templates: TemplateStat[]
   heatmap: HeatCell[]
-  scope: 'me' | string
-  userId: string
-  activity: ActivityStats
-  canvasTypes: CanvasTypeStat[]
-  recent: RecentCanvas[]
+  recent: RecentEdit[]
 }
 
-export function getDocumentStats(params?: {
-  range?: StatsRange
-  granularity?: StatsGranularity
-}) {
+export function getDocumentStats(
+  params?: {
+    range?: StatsRange
+    granularity?: StatsGranularity
+  },
+  opts?: { fresh?: boolean; signal?: AbortSignal },
+) {
   const q = new URLSearchParams()
-  q.set('scope', 'me')
   if (params?.range) q.set('range', params.range)
   if (params?.granularity) q.set('granularity', params.granularity)
   const qs = q.toString()
-  return apiRequest<DocumentStats>(`/documents/stats${qs ? `?${qs}` : ''}`)
+  return apiRequest<DocumentStats>(`/documents/stats${qs ? `?${qs}` : ''}`, {
+    signal: opts?.signal,
+    cache: opts?.fresh ? 'reload' : 'default',
+  })
 }
 
-export function searchDocuments(params: {
-  q?: string
-  templateId?: string
-  limit?: number
-}) {
+export function searchDocuments(
+  params: {
+    q?: string
+    templateId?: string
+    limit?: number
+  },
+  opts?: { signal?: AbortSignal },
+) {
   const q = new URLSearchParams()
   if (params.q) q.set('q', params.q)
   if (params.templateId) q.set('templateId', params.templateId)
   if (params.limit != null) q.set('limit', String(params.limit))
   const qs = q.toString()
-  return apiRequest<SearchHit[]>(`/documents/search${qs ? `?${qs}` : ''}`)
+  return apiRequest<SearchHit[]>(`/documents/search${qs ? `?${qs}` : ''}`, {
+    signal: opts?.signal,
+    cache: 'no-store',
+  })
 }
 
 export function diffRevisions(

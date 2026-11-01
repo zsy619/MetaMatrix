@@ -33,6 +33,9 @@ func AutoMigrate(gdb *gorm.DB) error {
 	if err := ensureSearchSchema(gdb); err != nil {
 		log.Printf("ensureSearchSchema warning: %v", err)
 	}
+	if err := ensureQueryIndexes(gdb); err != nil {
+		log.Printf("ensureQueryIndexes warning: %v", err)
+	}
 	log.Println("AutoMigrate OK: users, canvas_documents, canvas_revisions, canvas_content_blocks")
 	return nil
 }
@@ -74,6 +77,23 @@ ALTER TABLE canvas_documents
 	for _, s := range indexStmts {
 		if err := gdb.Exec(s).Error; err != nil {
 			log.Printf("index step skip/warn: %v", err)
+		}
+	}
+	return nil
+}
+
+// ensureQueryIndexes covers owner lists and revision history.
+// Partial indexes keep archived rows out of the common updated_at ordering.
+func ensureQueryIndexes(gdb *gorm.DB) error {
+	stmts := []string{
+		`CREATE INDEX IF NOT EXISTS idx_docs_owner_updated ON canvas_documents (owner_user_id, updated_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_docs_owner_active_updated ON canvas_documents (owner_user_id, updated_at DESC) WHERE deleted_at IS NULL`,
+		`CREATE INDEX IF NOT EXISTS idx_docs_owner_archived ON canvas_documents (owner_user_id, updated_at DESC) WHERE deleted_at IS NOT NULL`,
+		`CREATE INDEX IF NOT EXISTS idx_revisions_doc_created ON canvas_revisions (document_id, created_at DESC)`,
+	}
+	for _, stmt := range stmts {
+		if err := gdb.Exec(stmt).Error; err != nil {
+			return err
 		}
 	}
 	return nil
