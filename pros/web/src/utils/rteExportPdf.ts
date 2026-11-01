@@ -45,7 +45,7 @@ function findSoftBreakY(
  */
 export async function buildPdfFromElement(
   el: HTMLElement,
-  opts?: { title?: string; pageSize?: RtePageSizeId },
+  opts?: { title?: string; pageSize?: RtePageSizeId; marginMm?: { top: number; right: number; bottom: number; left: number } },
 ): Promise<Blob> {
   const scale = Math.min(3, Math.max(2, (window.devicePixelRatio || 1) * 1.5))
   const canvas = await html2canvas(el, {
@@ -70,9 +70,12 @@ export async function buildPdfFromElement(
   }
   const pageWidth = pdf.internal.pageSize.getWidth()
   const pageHeight = pdf.internal.pageSize.getHeight()
-  const margin = 10
-  const usableW = pageWidth - margin * 2
-  const usableH = pageHeight - margin * 2
+  const marginTop = opts?.marginMm?.top ?? 10
+  const marginRight = opts?.marginMm?.right ?? 10
+  const marginBottom = opts?.marginMm?.bottom ?? 10
+  const marginLeft = opts?.marginMm?.left ?? 10
+  const usableW = pageWidth - marginLeft - marginRight
+  const usableH = pageHeight - marginTop - marginBottom
 
   const imgWmm = usableW
   // canvas px corresponding to one PDF page height
@@ -108,7 +111,7 @@ export async function buildPdfFromElement(
     const imgData = pageCanvas.toDataURL('image/jpeg', 0.93)
     const sliceHmm = (sliceH * imgWmm) / canvas.width
     if (pageIndex > 0) pdf.addPage()
-    pdf.addImage(imgData, 'JPEG', margin, margin, imgWmm, sliceHmm)
+    pdf.addImage(imgData, 'JPEG', marginLeft, marginTop, imgWmm, sliceHmm)
     y += sliceH
     pageIndex += 1
     // safety
@@ -117,7 +120,7 @@ export async function buildPdfFromElement(
 
   if (pageIndex === 0) {
     // empty doc
-    pdf.text(opts?.title || '', margin, margin + 6)
+    pdf.text(opts?.title || '', marginLeft, marginTop + 6)
   }
 
   return pdf.output('blob')
