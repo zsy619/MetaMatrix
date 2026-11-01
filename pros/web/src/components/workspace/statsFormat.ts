@@ -30,18 +30,22 @@ export const GRAINS: { id: StatsGranularity; label: string }[] = [
 export type DeltaTone = 'up' | 'down' | 'flat'
 
 export function formatDelta(current: number, previous: number): { text: string; tone: DeltaTone } {
-  const diff = current - previous
+  const safeCurrent = Number.isFinite(current) ? current : 0
+  const safePrevious = Number.isFinite(previous) ? previous : 0
+  const diff = safeCurrent - safePrevious
   if (diff === 0) return { text: '持平', tone: 'flat' }
-  if (previous === 0) return { text: `+${diff} 新增`, tone: 'up' }
-  const pct = Math.round((diff / previous) * 100)
+  if (safePrevious === 0) return { text: `+${diff} 新增`, tone: 'up' }
+  const pct = Math.round((diff / safePrevious) * 100)
   const sign = diff > 0 ? '+' : ''
   const pctSign = pct > 0 ? '+' : ''
   return { text: `${sign}${diff}（${pctSign}${pct}%）`, tone: diff > 0 ? 'up' : 'down' }
 }
 
 export function bucketLabel(start: string, granularity: string): string {
+  if (!start || start.length < 10) return '—'
   const month = Number(start.slice(5, 7))
   const day = Number(start.slice(8, 10))
+  if (!Number.isFinite(month) || !Number.isFinite(day)) return '—'
   if (granularity === 'month') return `${month}月`
   return `${month}/${day}`
 }

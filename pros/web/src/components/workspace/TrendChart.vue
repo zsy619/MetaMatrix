@@ -29,7 +29,8 @@ function xAt(i: number): number {
 }
 
 function yAt(v: number): number {
-  return pad.t + plotH - (v / maxY.value) * plotH
+  const value = Number.isFinite(v) ? v : 0
+  return pad.t + plotH - (value / maxY.value) * plotH
 }
 
 const yTicks = computed(() => {
