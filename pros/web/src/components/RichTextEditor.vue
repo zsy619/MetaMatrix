@@ -4,6 +4,7 @@ import {
   nextTick,
   onBeforeUnmount,
   onMounted,
+  provide,
   ref,
   watch,
   type Directive,
@@ -227,6 +228,7 @@ import {
   type CaseMode,
 } from './rteWave20'
 import { countWords, normalizeHtml, rtePlaceholderText, toEditorContent } from '../utils/rteContent'
+import { RTE_CTX, type RteEditorEmit, type RteEditorProps } from './rte/context'
 import { RTE_EMOJI_CATEGORIES } from '../utils/rteEmojiList'
 import { RTE_SPECIAL_CHAR_CATEGORIES } from '../utils/rteSpecialChars'
 
@@ -9018,6 +9020,13 @@ function onCanvasClick(event: MouseEvent) {
   if (target.closest('.ProseMirror, .tiptap, .rte-body')) return
   editor.value?.commands.focus('end')
 }
+
+provide(RTE_CTX, {
+  editor,
+  props: props as RteEditorProps,
+  emit: emit as RteEditorEmit,
+  ui: { rootEl: rteRootEl },
+})
 
 defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm })
 </script>

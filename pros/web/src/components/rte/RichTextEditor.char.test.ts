@@ -5,6 +5,7 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it } from 'vitest'
 import RichTextEditor from '../RichTextEditor.vue'
+import { RTE_CTX } from './context'
 import { useDocumentStore } from '../../stores/document'
 import type { CanvasDocumentJSON } from '../../types/canvas'
 
@@ -18,7 +19,7 @@ async function mountEditor(props: Record<string, unknown> = {}) {
     schemaVersion: 1,
     templateId: 'y-model',
     title: 'fixture',
-  } as CanvasDocumentJSON
+  } as unknown as CanvasDocumentJSON
   store.dirty = false
   let marks = 0
   const note = () => {
@@ -62,6 +63,11 @@ describe('RichTextEditor 特征', () => {
     for (const key of ['focusEditor', 'editor', 'onDraftBackup', 'openRtePrompt', 'openRteConfirm']) {
       expect(exposed[key], key).toBeTruthy()
     }
+    const ctx = (compact.wrapper.vm.$ as unknown as {
+      provides: Record<symbol, { props: { panelId: string }; editor: unknown }>
+    }).provides[RTE_CTX]
+    expect(ctx?.props.panelId).toBe('panel-a')
+    expect(ctx?.editor).toBeTruthy()
     compact.wrapper.unmount()
 
     const expanded = await mountEditor({ compact: false, expanded: true })
