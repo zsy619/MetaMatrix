@@ -10,6 +10,7 @@ import {
   normalizeGroupRatios,
   ratiosToAttr,
   removeRatio,
+  rowCanAccept,
   type MiniNode,
 } from '../utils/rteImageGroup'
 
@@ -167,6 +168,18 @@ export function buildImageGroupMigration(state: EditorState): Transaction | null
   return tr
 }
 
+export function clearGroupRatios(view: EditorView, groupPos: number): boolean {
+  if (!view.editable) return false
+  const node = view.state.doc.nodeAt(groupPos)
+  if (!node || node.type.name !== 'imageGroup') return false
+  const tr = view.state.tr.setNodeMarkup(groupPos, undefined, {
+    ...node.attrs,
+    ratios: null,
+    ratioMode: null,
+  })
+  return dispatchChecked(view, tr, groupPos)
+}
+
 export function placeBeside(view: EditorView, from: number, target: number, side: 'left' | 'right'): boolean {
   if (!view.editable) return false
   const { state } = view
@@ -180,6 +193,8 @@ export function placeBeside(view: EditorView, from: number, target: number, side
   if (src && dst && src.groupPos === dst.groupPos) {
     return reorderInGroup(view, src.groupPos, src.index, dst.index, side)
   }
+  const destCount = dst ? state.doc.nodeAt(dst.groupPos)?.childCount || 1 : 1
+  if (!rowCanAccept(destCount, 1)) return false
 
   const movingCopy = imageForGroup(moving)
   let tr = state.tr.delete(from, from + moving.nodeSize)
@@ -286,4 +301,41 @@ export function moveImageGroup(view: EditorView, from: number, insertAt: number)
   const copy = node.copy(node.content)
   tr = tr.insert(dest, copy)
   return dispatchChecked(view, tr, dest)
+}
+
+export function insertImagesBeside(
+  view: EditorView,
+  target: number,
+  side: 'left' | 'right',
+  images: PMNode[],
+): boolean {
+  if (!view.editable || !images.length) return false
+  const host = view.state.doc.nodeAt(target)
+  if (!host || host.type.name !== 'image') return false
+  const groupType = view.state.schema.nodes.imageGroup
+  if (!groupType) return false
+  const prepared = images.map((image) => imageForGroup(image)).filter((image) => image.type.name === 'image')
+  if (!prepared.length) return false
+  const dst = groupInfo(view.state.doc, target)
+  const destCount = dst ? view.state.doc.nodeAt(dst.groupPos)?.childCount || 1 : 1
+  if (!rowCanAccept(destCount, prepared.length)) return false
+  if (dst) {
+    const group = view.state.doc.nodeAt(dst.groupPos)
+    if (!group || group.type.name !== 'imageGroup') return false
+    const kids: PMNode[] = []
+    group.forEach((child) => kids.push(imageForGroup(child)))
+    const index = side === 'left' ? dst.index : dst.index + 1
+    kids.splice(index, 0, ...prepared)
+    const next = group.type.create(
+      groupUsesAspect(group.attrs.ratioMode)
+        ? { ...group.attrs, ratios: null, ratioMode: null }
+        : { ...group.attrs, ratioMode: 'custom' },
+      kids,
+    )
+    return dispatchChecked(view, view.state.tr.replaceWith(dst.groupPos, dst.groupPos + group.nodeSize, next), dst.groupPos)
+  }
+  const hostCopy = imageForGroup(host)
+  const content = side === 'left' ? [...prepared, hostCopy] : [hostCopy, ...prepared]
+  const group = groupType.create({ align: 'center' }, content)
+  return dispatchChecked(view, view.state.tr.replaceWith(target, target + host.nodeSize, group), target)
 }

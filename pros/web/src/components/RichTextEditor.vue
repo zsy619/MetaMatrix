@@ -166,6 +166,8 @@ import { ParagraphAttrs } from '../extensions/paragraphAttrs'
 import { PageBreak } from '../extensions/pageBreak'
 import { Columns, Column } from '../extensions/columns'
 import { ImageGroup } from '../extensions/imageGroup'
+import { insertImagesBeside } from '../extensions/imageGroupOps'
+import { imageEdgeAtPoint } from '../extensions/rteImageDrag'
 import { Callout, type CalloutVariant } from '../extensions/callout'
 import { Bookmark } from '../extensions/bookmark'
 import { RteBlockquote, QUOTE_STYLE_OPTIONS, type QuoteStyle } from '../extensions/rteBlockquote'
@@ -1331,6 +1333,12 @@ const editor = useEditor({
       const files = imageFilesFromClipboard(event.dataTransfer)
       if (!files.length) return false
       event.preventDefault()
+      const edge = imageEdgeAtPoint(view, event.clientX, event.clientY)
+      if (edge) {
+        event.preventDefault()
+        void insertDroppedBeside(edge.imagePos, edge.side, files)
+        return true
+      }
       const coords = view.posAtCoords({ left: event.clientX, top: event.clientY })
       const onImage = (event.target as HTMLElement | null)?.closest?.(
         '[data-resize-container][data-node="image"], img.rte-image',
@@ -4167,6 +4175,32 @@ function setImagePlacement(option: (typeof IMAGE_LAYOUT_OPTIONS)[number]) {
     .run()
 }
 
+const imageLightboxSrc = ref('')
+
+function deleteSelectedImage() {
+  const ed = editor.value
+  if (!ed || !isImageNodeSelected()) return
+  ed.chain().focus().deleteSelection().run()
+}
+
+function downloadSelectedImage() {
+  const ed = editor.value
+  if (!ed || !isImageNodeSelected()) return
+  const attrs = ed.getAttributes('image')
+  const src = String(attrs?.src || '')
+  if (!src) return
+  const link = document.createElement('a')
+  link.href = src
+  link.download = String(attrs?.alt || 'image')
+  link.click()
+}
+
+function openSelectedImage() {
+  const ed = editor.value
+  if (!ed || !isImageNodeSelected()) return
+  imageLightboxSrc.value = String(ed.getAttributes('image')?.src || '')
+}
+
 function applyImageCaption() {
   const ed = editor.value
   if (!ed || !isImageNodeSelected()) return
@@ -4185,7 +4219,7 @@ function imageBubbleShouldShow(payload: {
   if (!ed || ed.isDestroyed || ed.isEditable === false) return false
   const sel = ed.state?.selection
   if (!(sel instanceof NodeSelection) || (sel as NodeSelection).node.type.name !== 'image') return false
-  return (sel as NodeSelection).$from.parent.type.name !== 'imageGroup'
+  return true
 }
 
 /** —— 分割线样式 —— */
@@ -5410,6 +5444,19 @@ async function replaceOrInsertDroppedImages(
     }
   }
   await insertUserImages(files, at)
+}
+
+async function insertDroppedBeside(imagePos: number, side: 'left' | 'right', files: File[]) {
+  const ed = editor.value
+  if (!ed || ed.isDestroyed) return
+  const nodes = []
+  for (const file of files) {
+    const src = await imageSrcWithinPolicy(file)
+    if (!src) continue
+    nodes.push(ed.schema.nodes.image!.create({ src, align: 'center', layout: 'block', alt: file.name || '图片' }))
+  }
+  if (!nodes.length) return
+  if (!insertImagesBeside(ed.view, imagePos, side, nodes)) rteToast('warning', '一行最多 10 张图片')
 }
 
 async function insertUserImages(files: File[], at?: number) {
@@ -11922,7 +11969,16 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
         >
           题注
         </button>
-        <span class="rte-image-replace-hint">拖一张图到图片上可替换</span>
+        <button type="button" class="rte-bubble-btn" title="删除图片" aria-label="删除图片" @mousedown.prevent @click="deleteSelectedImage">
+          删除
+        </button>
+        <button type="button" class="rte-bubble-btn" title="下载原图" aria-label="下载图片" @mousedown.prevent @click="downloadSelectedImage">
+          下载
+        </button>
+        <button type="button" class="rte-bubble-btn" title="查看大图" aria-label="查看大图" @mousedown.prevent @click="openSelectedImage">
+          大图
+        </button>
+        <span class="rte-image-replace-hint">拖到左右边缘插入该行，拖到图片中间替换</span>
       </div>
       <div class="rte-image-bubble-row">
         <span class="rte-image-width-label">圆角</span>
@@ -11979,6 +12035,9 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
         </button>
       </div>
     </BubbleMenu>
+    <div v-if="imageLightboxSrc" class="rte-image-lightbox" role="dialog" aria-label="查看大图" @click="imageLightboxSrc = ''">
+      <img :src="imageLightboxSrc" alt="" />
+    </div>
 
     <div
       class="rte-workspace"
@@ -19676,6 +19735,29 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
   gap: 6px;
   padding: 8px 10px;
   min-width: 220px;
+  pointer-events: none;
+}
+.rte-image-bubble button,
+.rte-image-bubble input,
+.rte-image-bubble a {
+  pointer-events: auto;
+}
+.rte-image-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 8000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 18, 24, 0.72);
+  cursor: zoom-out;
+}
+.rte-image-lightbox img {
+  max-width: min(92vw, 1200px);
+  max-height: 88vh;
+  object-fit: contain;
+  border-radius: 8px;
+  background: #fff;
 }
 .rte-image-bubble-row {
   display: flex;

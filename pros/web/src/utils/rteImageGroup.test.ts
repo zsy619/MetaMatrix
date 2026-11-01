@@ -4,15 +4,19 @@ import {
   groupCssVars,
   groupInsertIndex,
   groupUsesAspect,
+  IMAGE_ROW_LIMIT_TIP,
   imageGroupLayoutCss,
   imagesFromColumns,
   insertRatio,
+  MAX_IMAGES_PER_ROW,
   moveItem,
+  nextImageSelection,
   normalizeGroupRatios,
   ratioPercents,
   ratiosToAttr,
   removeRatio,
   resizePair,
+  rowCanAccept,
   rowLayout,
   shouldDissolveGroup,
 } from './rteImageGroup.ts'
@@ -71,7 +75,19 @@ assert.equal(blockHtmlIsKept('<div data-type="image-group"><img src="x"></div>')
 
 assert.equal(groupCssVars(2, '1:2'), '--g0:1;--g1:2')
 assert.equal(groupCssVars(3, null), '--g0:1;--g1:1;--g2:1')
-assert.equal(groupUsesAspect(null), true)
+assert.equal(rowCanAccept(9, 1), true)
+assert.equal(rowCanAccept(10, 1), false)
+assert.equal(MAX_IMAGES_PER_ROW, 10)
+assert.equal(IMAGE_ROW_LIMIT_TIP.includes('10'), true)
+const spots = [
+  { pos: 1, row: 1 },
+  { pos: 2, row: 1 },
+  { pos: 8, row: 8 },
+]
+assert.equal(nextImageSelection(spots, 1, 'ArrowRight'), 2)
+assert.equal(nextImageSelection(spots, 2, 'ArrowDown'), 8)
+assert.equal(nextImageSelection(spots, 8, 'ArrowUp'), 1)
+assert.equal(nextImageSelection(spots, 1, 'ArrowLeft'), null)
 assert.equal(groupUsesAspect('custom'), false)
 const laid = rowLayout(808, [2, 1], 8)
 assert.equal(laid.widths[0]! + laid.widths[1]!, 800)

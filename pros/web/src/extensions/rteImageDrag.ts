@@ -5,10 +5,10 @@ import {
   moveImageGroup,
   placeBeside,
   reorderInGroup,
+  setGroupRatios,
 } from './imageGroupOps'
-import { installImageGroupLayout } from '../utils/rteImageGroup'
+import { installImageGroupLayout, nextImageSelection, rowCanAccept, IMAGE_ROW_LIMIT_TIP, type ImageSpot } from '../utils/rteImageGroup'
 import {
-  containerCanHoldImage,
   imageDropKind,
   sameImageDrop,
   siblingInsertPos,
@@ -19,7 +19,60 @@ let dragFrom: number | null = null
 let dragKind: 'image' | 'group' = 'image'
 let dropLine: HTMLElement | null = null
 let dropPreview: HTMLElement | null = null
+let dragThumb: HTMLElement | null = null
 let sizeTip: HTMLElement | null = null
+
+function ensureThumb(): HTMLElement {
+  if (!dragThumb) {
+    dragThumb = document.createElement('div')
+    dragThumb.className = 'rte-image-drag-thumb'
+    dragThumb.setAttribute('aria-hidden', 'true')
+    document.body.appendChild(dragThumb)
+  }
+  return dragThumb
+}
+
+function hideThumb() {
+  dragThumb?.remove()
+  dragThumb = null
+}
+
+function showThumb(src: string, x: number, y: number) {
+  if (!src) {
+    hideThumb()
+    return
+  }
+  const el = ensureThumb()
+  el.style.backgroundImage = `url("${src.replace(/"/g, '')}")`
+  el.style.left = `${x + 16}px`
+  el.style.top = `${y + 16}px`
+}
+
+function sourceFrame(view: EditorView, pos: number): HTMLElement | null {
+  const el = view.nodeDOM(pos)
+  if (!(el instanceof HTMLElement)) return null
+  const box = el.closest('[data-resize-container]')
+  return box instanceof HTMLElement ? box : el
+}
+
+function setSourceGhost(view: EditorView, pos: number, on: boolean) {
+  sourceFrame(view, pos)?.classList.toggle('rte-image-drag-source', on)
+}
+
+function autoScrollCanvas(view: EditorView, y: number) {
+  const canvas = view.dom.closest('.rte-canvas')
+  if (!(canvas instanceof HTMLElement)) return
+  const rect = canvas.getBoundingClientRect()
+  if (y < rect.top + 36) canvas.scrollTop -= 12
+  else if (y > rect.bottom - 36) canvas.scrollTop += 12
+}
+
+function showLimitTip(x: number, y: number) {
+  const tip = ensureTip()
+  tip.textContent = IMAGE_ROW_LIMIT_TIP
+  tip.style.left = `${x + 12}px`
+  tip.style.top = `${y - 36}px`
+}
 
 type PointerDrag = {
   view: EditorView
@@ -66,6 +119,7 @@ function hideLine() {
   dropLine = null
   dropPreview?.remove()
   dropPreview = null
+  hideThumb()
 }
 
 function ensurePreview(): HTMLElement {
@@ -169,26 +223,6 @@ function placeLine(kind: RteImageDropKind, rect: DOMRect) {
   preview.style.height = '18px'
 }
 
-function blockBoundary(view: EditorView, pos: number, bias: 'before' | 'after'): number {
-  const doc = view.state.doc
-  const safe = Math.max(0, Math.min(pos, doc.content.size))
-  const $pos = doc.resolve(safe)
-  for (let depth = $pos.depth; depth >= 1; depth -= 1) {
-    const parent = $pos.node(depth - 1)
-    if (parent.type.name !== 'doc' && !containerCanHoldImage(parent.type.name)) continue
-    const start = $pos.before(depth)
-    const child = $pos.node(depth)
-    return bias === 'before' ? start : start + child.nodeSize
-  }
-  if (doc.childCount === 0) return 0
-  const index = $pos.index(0)
-  if (index >= doc.childCount) return doc.content.size
-  let start = 0
-  for (let i = 0; i < index; i += 1) start += doc.child(i).nodeSize
-  const child = doc.child(index)
-  return bias === 'before' ? start : start + child.nodeSize
-}
-
 function moveImage(view: EditorView, from: number, insertAt: number): boolean {
   const { state } = view
   const node = state.doc.nodeAt(from)
@@ -267,7 +301,9 @@ function readDrop(view: EditorView, event: { clientX: number; clientY: number })
   boundary: number
   rect: DOMRect
 } | null {
-  const stack = document.elementsFromPoint(event.clientX, event.clientY)
+  const stack = document.elementsFromPoint(event.clientX, event.clientY).filter(
+    (el) => !el.closest('.rte-bubble, .rte-toolbar, .rte-image-group-bar, .rte-image-drag-thumb'),
+  )
   const frames = stack
     .map((el) => el.closest('[data-resize-container][data-node="image"]'))
     .filter((el): el is HTMLElement => el instanceof HTMLElement)
@@ -302,12 +338,17 @@ function readDrop(view: EditorView, event: { clientX: number; clientY: number })
   }
   const coords = view.posAtCoords({ left: event.clientX, top: event.clientY })
   if (!coords) return null
-  const kind = imageDropKind(0.5, event.clientY, false)
-  const bias = kind === 'before' ? 'before' : 'after'
-  const boundary = blockBoundary(view, coords.pos, bias)
-  const prose = view.dom.getBoundingClientRect()
-  const y = kind === 'before' ? event.clientY : event.clientY
-  const rect = new DOMRect(prose.left + 24, y, Math.max(40, prose.width - 48), 0)
+  const $pos = view.state.doc.resolve(Math.min(coords.pos, view.state.doc.content.size))
+  const depth = $pos.depth >= 1 ? 1 : 0
+  const blockPos = depth ? $pos.before(depth) : 0
+  const blockNode = depth ? $pos.node(depth) : view.state.doc
+  const el = depth ? view.nodeDOM(blockPos) : view.dom
+  const blockRect = el instanceof HTMLElement ? el.getBoundingClientRect() : view.dom.getBoundingClientRect()
+  const yRatio = blockRect.height ? (event.clientY - blockRect.top) / blockRect.height : 1
+  const kind = yRatio < 0.5 ? 'before' : 'after'
+  const boundary = kind === 'before' ? blockPos : blockPos + blockNode.nodeSize
+  const y = kind === 'before' ? blockRect.top : blockRect.bottom
+  const rect = new DOMRect(blockRect.left, y, Math.max(40, blockRect.width), 0)
   return { kind, imagePos: null, boundary, rect }
 }
 
@@ -333,6 +374,19 @@ function visualKind(dragKind: 'image' | 'group', kind: RteImageDropKind): RteIma
   return kind
 }
 
+function rowCountAt(view: EditorView, imagePos: number): number {
+  const $pos = view.state.doc.resolve(imagePos)
+  if ($pos.parent.type.name === 'imageGroup') return $pos.parent.childCount
+  return 1
+}
+
+function sameRow(view: EditorView, from: number, target: number): boolean {
+  const $from = view.state.doc.resolve(from)
+  const $target = view.state.doc.resolve(target)
+  if ($from.parent.type.name !== 'imageGroup' || $target.parent.type.name !== 'imageGroup') return false
+  return $from.before($from.depth) === $target.before($target.depth)
+}
+
 function commitDrop(
   view: EditorView,
   event: { clientX: number; clientY: number },
@@ -346,10 +400,37 @@ function commitDrop(
     return
   }
   if ((plan.kind === 'left' || plan.kind === 'right') && plan.imagePos != null) {
+    const exceed = !sameRow(view, from, plan.imagePos) && !rowCanAccept(rowCountAt(view, plan.imagePos), 1)
+    if (exceed) {
+      showLimitTip(event.clientX, event.clientY)
+      window.setTimeout(() => hideTip(), 1600)
+      return
+    }
     placeBeside(view, from, plan.imagePos, plan.kind)
     return
   }
   extractOrMoveImage(view, from, dropInsertPos(view, plan))
+}
+
+export function imageEdgeAtPoint(
+  view: EditorView,
+  x: number,
+  y: number,
+): { imagePos: number; side: 'left' | 'right' } | null {
+  const stack = document.elementsFromPoint(x, y).filter(
+    (el) => !el.closest('.rte-bubble, .rte-toolbar, .rte-image-group-bar'),
+  )
+  const hit = stack[0]
+  const frame = hit instanceof Element ? hit.closest('[data-resize-container][data-node="image"]') : null
+  if (!(frame instanceof HTMLElement)) return null
+  const rect = imageVisualRect(frame)
+  const xRatio = rect.width ? (x - rect.left) / rect.width : 0.5
+  const yRatio = rect.height ? (y - rect.top) / rect.height : 0.5
+  const kind = imageDropKind(xRatio, yRatio, true)
+  if (kind !== 'left' && kind !== 'right') return null
+  const pos = Number(frame.dataset.rtePos)
+  if (!Number.isInteger(pos) || view.state.doc.nodeAt(pos)?.type.name !== 'image') return null
+  return { imagePos: pos, side: kind }
 }
 
 let resizingFrame: HTMLElement | null = null
@@ -368,6 +449,36 @@ function showResizeTip() {
   tip.textContent = `${box.clientWidth} × ${box.clientHeight}`
   tip.style.cssText =
     'position:fixed;top:72px;left:50%;transform:translateX(-50%);z-index:100000;background:#111;color:#fff;padding:8px 14px;font:600 16px/1.3 sans-serif;border-radius:8px;pointer-events:none;'
+}
+
+function syncGroupResize(view: EditorView, event: Event) {
+  const target = event.target
+  if (!(target instanceof Element) || !target.closest('[data-resize-handle]')) return
+  const group = target.closest('[data-type="image-group"]')
+  if (!(group instanceof HTMLElement)) return
+  const pos = Number(group.dataset.rtePos)
+  if (!Number.isInteger(pos) || view.state.doc.nodeAt(pos)?.type.name !== 'imageGroup') return
+  const kids = [...group.querySelectorAll('.rte-image-group-row > [data-resize-container]')]
+  if (kids.length < 2) return
+  const resized = kids.some((el) => {
+    const wrap = el.querySelector('[data-resize-wrapper]')
+    return wrap instanceof HTMLElement && wrap.style.width.trim() !== ''
+  })
+  if (!resized) return
+  const widths = kids.map((el) => Math.max(1, el.getBoundingClientRect().width))
+  setGroupRatios(view, pos, widths)
+}
+
+function imageSpots(view: EditorView): ImageSpot[] {
+  const spots: ImageSpot[] = []
+  view.state.doc.descendants((node, pos) => {
+    if (node.type.name !== 'image') return true
+    const $pos = view.state.doc.resolve(pos)
+    const row = $pos.parent.type.name === 'imageGroup' ? $pos.before($pos.depth) : pos
+    spots.push({ pos, row })
+    return false
+  })
+  return spots
 }
 
 export function createImageDragPlugin(): Plugin {
@@ -444,6 +555,14 @@ export function createImageDragPlugin(): Plugin {
         event.preventDefault()
         dragFrom = pointerDrag.from
         dragKind = pointerDrag.kind
+        setSourceGhost(editorView, pointerDrag.from, true)
+        const moving = editorView.state.doc.nodeAt(pointerDrag.from)
+        const thumbSrc =
+          pointerDrag.kind === 'image'
+            ? String(moving?.attrs?.src || '')
+            : String(moving?.firstChild?.attrs?.src || '')
+        showThumb(thumbSrc, event.clientX, event.clientY)
+        autoScrollCanvas(editorView, event.clientY)
         const plan = readDrop(editorView, event)
         if (plan) placeLine(visualKind(pointerDrag.kind, plan.kind), plan.rect)
       }
@@ -452,6 +571,7 @@ export function createImageDragPlugin(): Plugin {
         const current = pointerDrag
         pointerDrag = null
         dragFrom = null
+        setSourceGhost(editorView, current.from, false)
         hideLine()
         clearDragging()
         if (!current.moved || !editorView.editable) return
@@ -473,6 +593,7 @@ export function createImageDragPlugin(): Plugin {
       }
       const onUp = (event: MouseEvent) => {
         if (pointerDrag?.view === editorView) onPointerUp(event as PointerEvent)
+        else syncGroupResize(editorView, event)
         resizingFrame = null
         hideTip()
       }
@@ -538,6 +659,43 @@ export function createImageDragPlugin(): Plugin {
     props: {
       handleKeyDown(view, event) {
         if (!view.editable) return false
+        const sel = view.state.selection
+        const nodeKey = sel instanceof NodeSelection && (sel.node.type.name === 'image' || sel.node.type.name === 'imageGroup')
+        if (
+          nodeKey &&
+          (event.key === 'Delete' || event.key === 'Backspace') &&
+          !event.altKey &&
+          !event.metaKey &&
+          !event.ctrlKey &&
+          !event.shiftKey
+        ) {
+          event.preventDefault()
+          view.dispatch(view.state.tr.deleteSelection().scrollIntoView())
+          return true
+        }
+        if (
+          nodeKey &&
+          !event.altKey &&
+          !event.shiftKey &&
+          !event.metaKey &&
+          !event.ctrlKey &&
+          (event.key === 'ArrowLeft' || event.key === 'ArrowRight' || event.key === 'ArrowUp' || event.key === 'ArrowDown')
+        ) {
+          let current = -1
+          if (sel instanceof NodeSelection && sel.node.type.name === 'image') current = sel.from
+          else if (sel instanceof NodeSelection && sel.node.type.name === 'imageGroup') {
+            current = imageSpots(view).find((spot) => spot.row === sel.from)?.pos ?? -1
+          }
+          const next = nextImageSelection(imageSpots(view), current, event.key)
+          event.preventDefault()
+          if (next == null) return true
+          try {
+            view.dispatch(view.state.tr.setSelection(NodeSelection.create(view.state.doc, next)).scrollIntoView())
+          } catch {
+            return true
+          }
+          return true
+        }
         if (!event.altKey || event.shiftKey || event.metaKey || event.ctrlKey) return false
         if (event.key === 'ArrowUp') {
           event.preventDefault()

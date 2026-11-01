@@ -5,6 +5,7 @@ import { normalizeImageAlign } from '../utils/rteImageLayout'
 import { groupCssVars, groupUsesAspect, installImageGroupLayout, normalizeGroupRatios, ratioPercents, resizePair, rowLayout } from '../utils/rteImageGroup'
 import {
   buildImageGroupMigration,
+  clearGroupRatios,
   setGroupAlign,
   setGroupRatios,
   splitImageGroup,
@@ -88,6 +89,10 @@ export function layoutImageGroupChrome(view: EditorView) {
         event.stopPropagation()
         const groupPos = groupPosFromDom(view, dom)
         if (groupPos == null) return
+        if (event.detail >= 2) {
+          clearGroupRatios(view, groupPos)
+          return
+        }
         const pairLeft = left.left
         const pairWidth = right.right - left.left
         const current = view.state.doc.nodeAt(groupPos)
