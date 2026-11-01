@@ -135,6 +135,12 @@ export async function listDocumentsPage(params?: {
   return { items, total, limit, offset, hasMore }
 }
 
+export function exportDocument(id: string, format: 'json' | 'markdown') {
+  return apiRequest<{ filename: string; format: string; content: CanvasDocumentJSON | string }>(
+    `/documents/${id}/export?format=${format}`,
+  )
+}
+
 export function getDocument(id: string) {
   return apiRequest<DocumentFull>(`/documents/${id}`)
 }

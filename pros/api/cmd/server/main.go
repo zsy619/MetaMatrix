@@ -103,6 +103,7 @@ func main() {
 		docs.GET("/stats", docH.Stats)
 		docs.GET("/ai-corpus", docH.AICorpus)
 		docs.GET("/:id", docH.Get)
+		docs.GET("/:id/export", docH.Export)
 		docs.PUT("/:id", docH.Update)
 		docs.DELETE("/:id", docH.Delete)
 		docs.GET("/:id/ai-context", docH.AIContext)

@@ -247,7 +247,45 @@ func (h *DocumentsHandler) Batch(ctx context.Context, c *app.RequestContext) {
 	if handleDocErr(c, err, nil) {
 		return
 	}
+	middleware.Audit(c, body.Action, uid.String(), "affected="+strconv.FormatInt(n, 10))
 	c.JSON(http.StatusOK, map[string]interface{}{"affected": n})
+}
+
+func (h *DocumentsHandler) Export(ctx context.Context, c *app.RequestContext) {
+	uid, ok := h.owner(c)
+	if !ok {
+		return
+	}
+	id, ok := parseID(c, "id")
+	if !ok {
+		return
+	}
+	doc, err := h.svc.GetOwned(uid, id)
+	if handleDocErr(c, err, nil) {
+		return
+	}
+	format := string(c.Query("format"))
+	name := doc.Title
+	if name == "" {
+		name = "canvas"
+	}
+	if format == "markdown" || format == "md" {
+		md, err := service.CanvasMarkdown(doc.Title, doc.CurrentData)
+		if handleDocErr(c, err, nil) {
+			return
+		}
+		c.JSON(http.StatusOK, map[string]string{
+			"filename": name + ".md",
+			"format":   "markdown",
+			"content":  md,
+		})
+		return
+	}
+	c.JSON(http.StatusOK, map[string]interface{}{
+		"filename": name + ".json",
+		"format":   "json",
+		"content":  json.RawMessage(doc.CurrentData),
+	})
 }
 
 func (h *DocumentsHandler) Delete(ctx context.Context, c *app.RequestContext) {
@@ -262,6 +300,7 @@ func (h *DocumentsHandler) Delete(ctx context.Context, c *app.RequestContext) {
 	if handleDocErr(c, h.svc.Delete(uid, id), nil) {
 		return
 	}
+	middleware.Audit(c, "archive", uid.String(), "id="+id.String())
 	c.Status(http.StatusNoContent)
 }
 

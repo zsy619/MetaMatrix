@@ -4,6 +4,7 @@ import * as authApi from '../api/auth'
 import type { User } from '../api/auth'
 import { getToken, setToken } from '../api/http'
 import { friendlyApiMessage } from '../utils/apiMessage'
+import { clearRecentOpens } from '../utils/canvasTransfer'
 
 const USER_KEY = 'metamatrix:auth:user'
 
@@ -47,6 +48,7 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = null
     setToken(null)
     writeCachedUser(null)
+    clearRecentOpens()
   }
 
   async function register(email: string, password: string, displayName?: string) {

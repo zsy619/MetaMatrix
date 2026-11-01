@@ -20,7 +20,9 @@ import {
   listRevisions,
   diffRevisions,
   deleteDocument,
+  exportDocument,
 } from '../api/documents'
+import { downloadText, parseCanvasImport } from '../utils/canvasTransfer'
 
 const route = useRoute()
 const router = useRouter()
@@ -360,9 +362,60 @@ function goLogin() {
 
 function onExportJson() {
   snapshotCurrent()
-  const ok = documentStore.exportJson()
-  if (ok) ElMessage.success('已导出 JSON')
-  else ElMessage.warning('当前没有可导出的文档')
+  void exportOwned('json')
+}
+
+async function exportOwned(format: 'json' | 'markdown') {
+  if (!auth.isAuthenticated || !document_id.value) {
+    if (format === 'json' && documentStore.exportJson()) {
+      ElMessage.success('已导出本机 JSON')
+      return
+    }
+    ElMessage.warning('登录并打开自己的云端画布后才能导出')
+    return
+  }
+  try {
+    const res = await exportDocument(document_id.value, format)
+    const body = format === 'json' ? JSON.stringify(res.content, null, 2) : String(res.content)
+    const mime = format === 'json' ? 'application/json' : 'text/markdown'
+    downloadText(res.filename || (format === 'json' ? 'canvas.json' : 'canvas.md'), body, mime)
+    ElMessage.success(format === 'json' ? '已导出 JSON' : '已导出 Markdown')
+  } catch (e) {
+    ElMessage.error(friendlyApiMessage(e, '导出失败'))
+  }
+}
+
+async function onExportMarkdown() {
+  snapshotCurrent()
+  await exportOwned('markdown')
+}
+
+async function onImportJson(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+  if (!auth.isAuthenticated) {
+    ElMessage.warning('登录后才能把 JSON 导入为你的云端画布')
+    return
+  }
+  try {
+    const parsed = parseCanvasImport(await file.text())
+    const tid = parsed.templateId && isTemplateId(parsed.templateId) ? parsed.templateId : templateId.value
+    const id = await documentStore.createOnServer({
+      templateId: tid,
+      title: parsed.title,
+      data: parsed.data,
+    })
+    await router.replace({
+      name: 'canvas',
+      params: { templateId: tid },
+      query: { documentId: id },
+    })
+    ElMessage.success('已从 JSON 创建画布')
+  } catch (e) {
+    ElMessage.error(e instanceof Error ? e.message : friendlyApiMessage(e, '导入失败'))
+  }
 }
 
 async function onExportPng() {
@@ -617,6 +670,11 @@ function goGuide() {
           </el-button>
           <div class="btn-grid">
             <el-button size="small" @click="onExportJson">导出 JSON</el-button>
+            <el-button size="small" @click="onExportMarkdown">导出 Markdown</el-button>
+            <label class="import-label">
+              导入 JSON
+              <input type="file" accept="application/json,.json" @change="onImportJson" />
+            </label>
             <el-button
               size="small"
               :loading="exporting"
