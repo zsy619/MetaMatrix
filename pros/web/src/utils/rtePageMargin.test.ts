@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import {
   clampMarginMm,
   cssPageMargin,
@@ -37,5 +38,21 @@ assert.deepEqual(screenMargin({ preset: 'normal', top: 25.4, right: 31.8, bottom
 })
 assert.equal(cssPageMargin({ top: 1, right: 2, bottom: 3, left: 4 }), '1mm 2mm 3mm 4mm')
 assert.equal(cssPageMargin({ top: 999, right: -1, bottom: 0, left: 12.74 }), '80mm 0mm 0mm 12.7mm')
+
+const editorCss = readFileSync(new URL('../components/RichTextEditor.vue', import.meta.url), 'utf8')
+assert.match(
+  editorCss,
+  /\.rte-root\.expanded:not\(\[data-page-size='full'\]\):not\(\.is-page-sheet\) :deep\(\.ProseMirror\)/,
+)
+assert.match(editorCss, /\.rte-root\.is-page-sheet \.rte-body \{[^}]*display:\s*flex;/)
+assert.match(
+  editorCss,
+  /\.rte-root\.is-page-sheet \.rte-body > \.ProseMirror[\s\S]*?max-width:\s*none !important;[\s\S]*?padding:\s*0 !important;/,
+)
+assert.match(editorCss, /\.rte-root\[data-page-size='full'\]\.expanded :deep\(\.ProseMirror\) \{[^}]*max-width:\s*none;/)
+assert.doesNotMatch(
+  editorCss,
+  /\.rte-root\.is-page-sheet \.rte-body > \.ProseMirror[\s\S]{0,400}max-width:\s*760px/,
+)
 
 console.log('page margin ok')
