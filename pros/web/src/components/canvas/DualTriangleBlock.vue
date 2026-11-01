@@ -239,12 +239,31 @@ function onCloseMaximize(event?: Event) {
         :show-title="false"
         :show-bottom-bar="!isTable"
         :show-publish-actions="false"
-        :show-markdown-hint="!isTable"
-        :placeholder="isTable ? '' : '请输入正文'"
+        :show-markdown-hint="false"
+        :placeholder="isTable ? '' : '点击填写…'"
         :model-value="editorHtml"
         @update:model-value="onEditorHtml"
         @focus="onEditorFocus"
       />
+      <div v-if="!isTable" class="dt-watermark" aria-hidden="true">
+        <svg
+          v-if="block.watermarkIcon === 'human'"
+          class="wm-icon"
+          viewBox="0 0 80 80"
+          fill="currentColor"
+        >
+          <circle cx="40" cy="24" r="13" />
+          <path d="M14 70.5c1.8-17.5 11-24.5 26-24.5s24.2 7 26 24.5H14z" />
+        </svg>
+        <svg v-else class="wm-icon" viewBox="0 0 80 80" fill="currentColor">
+          <circle cx="40" cy="9" r="3.4" />
+          <rect x="38.1" y="11.2" width="3.8" height="8" rx="1.4" />
+          <rect x="14" y="19" width="52" height="38" rx="11" />
+          <circle cx="29" cy="36" r="4.2" fill="#fff" />
+          <circle cx="51" cy="36" r="4.2" fill="#fff" />
+          <rect x="26" y="59" width="28" height="11" rx="4.5" />
+        </svg>
+      </div>
     </div>
     <p v-else class="dt-empty dt-max-hint">正在放大编辑…</p>
 
@@ -253,24 +272,6 @@ function onCloseMaximize(event?: Event) {
       :panel-id="maximizeKey"
       compact
     />
-
-    <div v-if="!isTable" class="dt-watermark" aria-hidden="true">
-      <svg
-        v-if="block.watermarkIcon === 'human'"
-        class="wm-icon"
-        viewBox="0 0 24 24"
-        fill="currentColor"
-      >
-        <path
-          d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"
-        />
-      </svg>
-      <svg v-else class="wm-icon" viewBox="0 0 24 24" fill="currentColor">
-        <path
-          d="M12 2a2 2 0 0 1 2 2v1h2a3 3 0 0 1 3 3v2h1a1 1 0 1 1 0 2h-1v2a3 3 0 0 1-3 3h-2v1a2 2 0 1 1-4 0v-1H8a3 3 0 0 1-3-3v-2H4a1 1 0 1 1 0-2h1V8a3 3 0 0 1 3-3h2V4a2 2 0 0 1 2-2zm-3 8a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm6 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3z"
-        />
-      </svg>
-    </div>
   </div>
 
   <Teleport to="body">
@@ -350,6 +351,9 @@ function onCloseMaximize(event?: Event) {
             @blur="commitTopic"
             @keydown.enter.prevent="onTopicEnter"
           />
+          <p v-if="!isTable && block.subtitle" class="pm-subtitle">
+            {{ block.subtitle }}
+          </p>
           <RichTextEditor
             class="pm-rte"
             :expanded="true"
@@ -467,7 +471,7 @@ function onCloseMaximize(event?: Event) {
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 6px 10px 12px;
+  padding: 4px 8px 6px;
   position: relative;
   z-index: 2;
   scrollbar-gutter: stable;
@@ -552,25 +556,18 @@ function onCloseMaximize(event?: Event) {
 
 .dt-watermark {
   position: absolute;
-  right: 10px;
-  bottom: 6px;
-  opacity: 0.12;
+  right: 4px;
+  bottom: 0;
+  opacity: 0.14;
   pointer-events: none;
   z-index: 0;
-  color: var(--accent, #999);
+  color: var(--accent, #c9a14a);
 }
 
 .wm-icon {
-  width: 56px;
-  height: 56px;
-}
-
-.side-human .dt-watermark {
-  color: #c4a574;
-}
-
-.side-ai .dt-watermark {
-  color: #5ba8a0;
+  width: 78px;
+  height: 78px;
+  display: block;
 }
 
 .dt-block-body {
@@ -759,6 +756,68 @@ function onCloseMaximize(event?: Event) {
   display: none;
 }
 
+/* 经典双三角卡片：暖金 / 青绿描边，白底编辑区，工具条聚焦后出现 */
+.dt-block:not(.dt-block--table) {
+  border-radius: 2px;
+  border: 1.5px solid var(--accent, #c9a14a);
+  box-shadow: none;
+  background: #fff;
+}
+
+.dt-block:not(.dt-block--table).selected,
+.dt-block:not(.dt-block--table).is-source-max {
+  box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.42);
+}
+
+.dt-block:not(.dt-block--table) .dt-block-header {
+  padding: 8px 10px 7px;
+}
+
+.dt-block:not(.dt-block--table) .dt-block-title {
+  font-size: clamp(13px, 1.15vw, 16px);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.dt-block:not(.dt-block--table) .dt-block-subtitle {
+  padding: 8px 12px 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #8b9096;
+  -webkit-line-clamp: 3;
+}
+
+.dt-block:not(.dt-block--table) :deep(.rte-root) {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.dt-block:not(.dt-block--table):not(:focus-within) :deep(.rte-toolbar),
+.dt-block:not(.dt-block--table):not(:focus-within) :deep(.rte-bottom) {
+  display: none;
+}
+
+.dt-block:not(.dt-block--table) :deep(.rte-canvas) {
+  padding: 2px 8px 4px;
+  background: transparent;
+}
+
+.dt-block:not(.dt-block--table) :deep(.pa-root.compact) {
+  background: transparent;
+  border-top: 1px solid color-mix(in srgb, var(--accent) 32%, #e4e6e8);
+  padding: 4px 8px 5px;
+}
+
+.dt-block:not(.dt-block--table) .dt-watermark {
+  opacity: 0.13;
+}
+
+.dt-block:not(.dt-block--table) .wm-icon {
+  width: 84px;
+  height: 84px;
+}
 </style>
 
 <style>

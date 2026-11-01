@@ -1,125 +1,189 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, useId } from 'vue'
 import type { DualTriangleBlock, DualTriangleCenter } from '../../types/canvas'
+import { useSelectionStore } from '../../stores/selection'
 
 const props = defineProps<{
   center: DualTriangleCenter
   blocks: DualTriangleBlock[]
 }>()
 
-const humanColor = computed(() => props.center.humanColor || '#C4A574')
-const aiColor = computed(() => props.center.aiColor || '#5BA8A0')
-const arrowColor = computed(() => props.center.arrowColor || '#C75B5B')
+const emit = defineEmits<{
+  hover: [id: string | null]
+}>()
+
+const selection = useSelectionStore()
+
+const humanColor = computed(() => props.center.humanColor || '#F2D27A')
+const aiColor = computed(() => props.center.aiColor || '#7DCFC4')
+const arrowColor = computed(() => props.center.arrowColor || '#E25B52')
+
+const markerId = `dt-arrow-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`
+
+const HUMAN_ACCENT = '#C9A14A'
+const AI_ACCENT = '#3A9E96'
 
 function keywordOf(id: string): string {
   return props.blocks.find((b) => b.id === id)?.keyword ?? ''
+}
+
+function accentOf(id: string, fallback: string): string {
+  return props.blocks.find((b) => b.id === id)?.accentColor || fallback
+}
+
+const keywords = computed(() => [
+  {
+    id: 'innovation',
+    label: keywordOf('innovation') || '创造力',
+    cls: 'kw-creativity',
+    color: accentOf('innovation', HUMAN_ACCENT),
+  },
+  {
+    id: 'scenario',
+    label: keywordOf('scenario') || '场景',
+    cls: 'kw-scenario',
+    color: accentOf('scenario', AI_ACCENT),
+  },
+  {
+    id: 'aesthetics',
+    label: keywordOf('aesthetics') || '审美',
+    cls: 'kw-aesthetics',
+    color: accentOf('aesthetics', HUMAN_ACCENT),
+  },
+  {
+    id: 'system',
+    label: keywordOf('system') || '体系',
+    cls: 'kw-system',
+    color: accentOf('system', HUMAN_ACCENT),
+  },
+  {
+    id: 'basics',
+    label: keywordOf('basics') || '基本功',
+    cls: 'kw-basics',
+    color: accentOf('basics', AI_ACCENT),
+  },
+  {
+    id: 'data',
+    label: keywordOf('data') || '数据',
+    cls: 'kw-data',
+    color: accentOf('data', AI_ACCENT),
+  },
+])
+
+function isActive(id: string): boolean {
+  return selection.blockId === id
+}
+
+function onKeyword(id: string) {
+  selection.selectBlock(id)
+  emit('hover', id)
+  requestAnimationFrame(() => {
+    const el = document.querySelector(
+      `[data-dt-card="${id}"] .ProseMirror`,
+    ) as HTMLElement | null
+    el?.focus()
+  })
 }
 </script>
 
 <template>
   <div class="dt-center">
-    <div class="keyword kw-creativity">{{ keywordOf('innovation') }}</div>
-    <div class="keyword kw-scenario">{{ keywordOf('scenario') }}</div>
-    <div class="keyword kw-aesthetics">{{ keywordOf('aesthetics') }}</div>
-    <div class="keyword kw-system">{{ keywordOf('system') }}</div>
-    <div class="keyword kw-basics">{{ keywordOf('basics') }}</div>
-    <div class="keyword kw-data">{{ keywordOf('data') }}</div>
-
-    <div class="triangle-wrap">
+    <div class="tri-stage">
       <svg
-        class="triangle-svg"
-        viewBox="0 0 320 280"
-        xmlns="http://www.w3.org/2000/svg"
+        class="tri-svg"
+        viewBox="0 0 600 520"
+        preserveAspectRatio="xMidYMid meet"
         aria-hidden="true"
       >
-        <!-- left human half -->
-        <polygon
-          points="160,28 40,248 160,248"
-          :fill="humanColor"
-          opacity="0.92"
-        />
-        <!-- right AI half -->
-        <polygon
-          points="160,28 160,248 280,248"
-          :fill="aiColor"
-          opacity="0.92"
-        />
-        <!-- center divider -->
+        <polygon points="300,10 18,506 300,506" :fill="humanColor" />
+        <polygon points="300,10 300,506 582,506" :fill="aiColor" />
         <line
-          x1="160"
-          y1="28"
-          x2="160"
-          y2="248"
+          x1="300"
+          y1="10"
+          x2="300"
+          y2="506"
           stroke="rgba(255,255,255,0.55)"
-          stroke-width="2"
+          stroke-width="1.25"
         />
-
-        <!-- dotted connectors to keywords -->
-        <g
-          stroke="#9aa0a6"
-          stroke-width="1.2"
-          stroke-dasharray="3 3"
+        <polygon
+          points="300,10 18,506 582,506"
           fill="none"
-          opacity="0.7"
-        >
-          <line x1="100" y1="90" x2="48" y2="52" />
-          <line x1="220" y1="90" x2="272" y2="52" />
-          <line x1="70" y1="220" x2="36" y2="250" />
-          <line x1="120" y1="248" x2="100" y2="268" />
-          <line x1="200" y1="248" x2="220" y2="268" />
-          <line x1="250" y1="220" x2="284" y2="250" />
-        </g>
-
-        <!-- top curved arrow: human -> AI -->
-        <path
-          d="M 95 55 C 120 18, 200 18, 225 55"
-          :stroke="arrowColor"
-          stroke-width="2.4"
-          fill="none"
-          marker-end="url(#arrowHead)"
+          stroke="#d5d5d5"
+          stroke-width="1.6"
+          stroke-linejoin="round"
         />
-        <!-- bottom curved arrow: AI -> human -->
-        <path
-          d="M 225 255 C 200 292, 120 292, 95 255"
-          :stroke="arrowColor"
-          stroke-width="2.4"
-          fill="none"
-          marker-end="url(#arrowHead)"
-        />
-
-        <defs>
-          <marker
-            id="arrowHead"
-            markerWidth="8"
-            markerHeight="8"
-            refX="6"
-            refY="3"
-            orient="auto"
-          >
-            <path d="M0,0 L6,3 L0,6 Z" :fill="arrowColor" />
-          </marker>
-        </defs>
       </svg>
 
-      <div class="labels">
-        <div class="label-human">
-          <div class="label-title">{{ center.humanTitle }}</div>
-          <div class="label-sub">{{ center.humanSubtitle }}</div>
-        </div>
-        <div class="label-x">×</div>
-        <div class="label-ai">
-          <div class="label-title">{{ center.aiTitle }}</div>
-          <div class="label-sub">{{ center.aiSubtitle }}</div>
-        </div>
-      </div>
+      <div class="tri-copy">
+        <p class="cap">{{ center.topArrowText }}</p>
+        <svg class="arc" viewBox="0 0 240 26" aria-hidden="true">
+          <defs>
+            <marker
+              :id="markerId"
+              markerUnits="userSpaceOnUse"
+              markerWidth="11"
+              markerHeight="11"
+              refX="9.5"
+              refY="5.5"
+              orient="auto"
+            >
+              <path d="M0,0.6 L10.5,5.5 L0,10.4 Z" :fill="arrowColor" />
+            </marker>
+          </defs>
+          <path
+            d="M6 18 C 62 3, 178 3, 226 13"
+            fill="none"
+            :stroke="arrowColor"
+            stroke-width="2.2"
+            stroke-linecap="round"
+            :marker-end="`url(#${markerId})`"
+          />
+        </svg>
 
-      <div class="arrow-text top-arrow" :style="{ color: arrowColor }">
-        {{ center.topArrowText }}
-      </div>
-      <div class="arrow-text bottom-arrow" :style="{ color: arrowColor }">
-        {{ center.bottomArrowText }}
+        <div class="title-row">
+          <div class="side">
+            <div class="main">{{ center.humanTitle }}</div>
+            <div class="sub">{{ center.humanSubtitle }}</div>
+          </div>
+          <div class="times" aria-hidden="true">×</div>
+          <div class="side">
+            <div class="main">{{ center.aiTitle }}</div>
+            <div class="sub">{{ center.aiSubtitle }}</div>
+          </div>
+        </div>
+
+        <svg class="arc" viewBox="0 0 240 26" aria-hidden="true">
+          <path
+            d="M226 8 C 178 23, 62 23, 6 13"
+            fill="none"
+            :stroke="arrowColor"
+            stroke-width="2.2"
+            stroke-linecap="round"
+            :marker-end="`url(#${markerId})`"
+          />
+        </svg>
+        <p class="cap">{{ center.bottomArrowText }}</p>
       </div>
     </div>
+
+    <button
+      v-for="kw in keywords"
+      :key="kw.id"
+      type="button"
+      class="kw"
+      :class="[kw.cls, { 'is-active': isActive(kw.id) }]"
+      :style="{ color: kw.color }"
+      :data-dt-kw="kw.id"
+      :aria-pressed="isActive(kw.id)"
+      :title="`编辑「${kw.label}」`"
+      @click="onKeyword(kw.id)"
+      @mouseenter="emit('hover', kw.id)"
+      @mouseleave="emit('hover', null)"
+      @focus="emit('hover', kw.id)"
+      @blur="emit('hover', null)"
+    >
+      {{ kw.label }}
+    </button>
   </div>
 </template>
 
@@ -129,128 +193,149 @@ function keywordOf(id: string): string {
   width: 100%;
   height: 100%;
   min-height: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
+  container-type: size;
 }
 
-.triangle-wrap {
-  position: relative;
-  width: min(100%, 360px);
-  aspect-ratio: 320 / 280;
-  max-height: 100%;
+.tri-stage {
+  position: absolute;
+  left: 11%;
+  right: 11%;
+  top: 0;
+  bottom: 18%;
+  container-type: size;
 }
 
-.triangle-svg {
+.tri-svg {
   width: 100%;
   height: 100%;
   display: block;
+  overflow: visible;
 }
 
-.labels {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  pointer-events: none;
-  padding: 18% 14% 22%;
-  box-sizing: border-box;
-}
-
-.label-human,
-.label-ai {
-  text-align: center;
-  color: #fff;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
-}
-
-.label-title {
-  font-size: clamp(13px, 2.2vw, 18px);
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  line-height: 1.2;
-}
-
-.label-sub {
-  margin-top: 4px;
-  font-size: clamp(10px, 1.4vw, 12px);
-  font-weight: 500;
-  opacity: 0.95;
-  line-height: 1.3;
-}
-
-.label-x {
-  font-size: 14px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.9);
-  padding: 0 2px;
-  align-self: center;
-}
-
-.arrow-text {
+.tri-copy {
   position: absolute;
   left: 50%;
-  transform: translateX(-50%);
-  font-size: clamp(10px, 1.3vw, 12px);
-  font-weight: 650;
-  white-space: nowrap;
+  top: 62%;
+  transform: translate(-50%, -50%);
+  width: min(86%, 440px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   pointer-events: none;
-  text-shadow: 0 0 4px rgba(255, 255, 255, 0.85);
+  text-align: center;
 }
 
-.top-arrow {
-  top: 2%;
+.cap {
+  margin: 0;
+  color: v-bind(arrowColor);
+  font-size: clamp(10px, 3.15cqw, 13px);
+  font-weight: 650;
+  line-height: 1.3;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
 }
 
-.bottom-arrow {
-  bottom: 1%;
+.arc {
+  width: min(92%, 250px);
+  height: 18px;
+  display: block;
+  overflow: visible;
+  margin: 1px 0;
 }
 
-.keyword {
+.title-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: start;
+  column-gap: clamp(6px, 1.6cqw, 14px);
+  width: 100%;
+  margin: 2px 0 1px;
+  color: #1a1a1a;
+}
+
+.side {
+  min-width: 0;
+  text-align: center;
+}
+
+.main {
+  font-size: clamp(14px, 5.4cqw, 22px);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1.15;
+  color: #161616;
+}
+
+.sub {
+  margin-top: 3px;
+  font-size: clamp(10px, 3cqw, 13px);
+  font-weight: 500;
+  line-height: 1.3;
+  color: #5e646a;
+  white-space: nowrap;
+}
+
+.times {
+  font-size: clamp(15px, 5cqw, 22px);
+  font-weight: 700;
+  line-height: 1.15;
+  color: #1a1a1a;
+  padding-top: 0;
+}
+
+.kw {
   position: absolute;
-  font-size: clamp(11px, 1.5vw, 13px);
-  font-weight: 650;
-  color: #5f6368;
-  pointer-events: none;
   z-index: 2;
+  margin: 0;
+  padding: 2px 4px;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: clamp(13px, 8cqh, 16px);
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+  cursor: pointer;
   white-space: nowrap;
+  border-radius: 4px;
+}
+
+.kw:hover,
+.kw.is-active,
+.kw:focus-visible {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  outline: none;
 }
 
 .kw-creativity {
-  top: 6%;
-  left: 4%;
-  color: #B8956A;
+  top: 7%;
+  left: 0;
 }
 
 .kw-scenario {
-  top: 6%;
-  right: 4%;
-  color: #4A9B94;
+  top: 7%;
+  right: 0;
 }
 
 .kw-aesthetics {
-  bottom: 14%;
-  left: 2%;
-  color: #B8956A;
-}
-
-.kw-system {
-  bottom: 2%;
-  left: 28%;
-  color: #B8956A;
-}
-
-.kw-basics {
-  bottom: 2%;
-  right: 28%;
-  color: #4A9B94;
+  left: 0;
+  bottom: 20%;
 }
 
 .kw-data {
-  bottom: 14%;
-  right: 2%;
-  color: #4A9B94;
+  right: 0;
+  bottom: 20%;
+}
+
+.kw-system {
+  left: 25%;
+  bottom: 12%;
+  transform: translateX(-50%);
+}
+
+.kw-basics {
+  left: 75%;
+  bottom: 12%;
+  transform: translateX(-50%);
 }
 </style>
