@@ -51,6 +51,16 @@ func TestValidateMetaAndPayload(t *testing.T) {
 	}
 }
 
+func TestHighlightSnippet(t *testing.T) {
+	got := highlightSnippet("先看目标再看路径", "目标")
+	if got != "先看«目标»再看路径" {
+		t.Fatal(got)
+	}
+	if highlightSnippet("abc", "") != "abc" {
+		t.Fatal("empty query")
+	}
+}
+
 func TestRenameRejectsBlank(t *testing.T) {
 	svc := NewDocumentsService(nil)
 	if err := svc.Rename(uuid.New(), uuid.New(), "   "); err != ErrValidation {

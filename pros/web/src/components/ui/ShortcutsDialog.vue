@@ -1,6 +1,10 @@
 <script setup lang="ts">
-defineProps<{ open: boolean }>()
+import { nextTick, ref, watch } from 'vue'
+import { trapTab } from '../../utils/focusTrap'
+
+const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{ close: [] }>()
+const card = ref<HTMLElement | null>(null)
 
 const rows = [
   ['Ctrl/⌘ + S', '保存当前画布'],
@@ -9,12 +13,37 @@ const rows = [
   ['Alt + 2', '打开工作面板'],
   ['?', '打开或关闭这份快捷键说明'],
 ]
+
+function onKey(event: KeyboardEvent) {
+  trapTab(event, card.value)
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    emit('close')
+  }
+}
+
+watch(
+  () => props.open,
+  async (open) => {
+    if (!open) return
+    await nextTick()
+    card.value?.focus()
+  },
+)
 </script>
 
 <template>
   <Teleport to="body">
     <div v-if="open" class="overlay" @click.self="emit('close')">
-      <div class="card" role="dialog" aria-modal="true" aria-labelledby="keys-title" tabindex="-1">
+      <div
+        ref="card"
+        class="card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="keys-title"
+        tabindex="-1"
+        @keydown="onKey"
+      >
         <header>
           <h2 id="keys-title">快捷键</h2>
           <button type="button" class="mm-btn mm-btn--ghost" @click="emit('close')">关闭</button>

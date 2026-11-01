@@ -40,6 +40,8 @@ export type SearchHit = {
   updatedAt: string
   snippet: string
   rank?: number
+  panelId?: string
+  panelTitle?: string
 }
 
 export type TextDiffOp = { op: 'equal' | 'insert' | 'delete' | string; text: string }

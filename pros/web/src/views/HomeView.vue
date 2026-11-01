@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import {
@@ -22,6 +22,8 @@ import {
 } from '../api/documents'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { friendlyApiMessage } from '../utils/apiMessage'
+import { focusSearchMatch } from '../utils/highlight'
+import { trapTab } from '../utils/focusTrap'
 
 const route = useRoute()
 const router = useRouter()
@@ -45,6 +47,7 @@ const docsConfirm = ref(false)
 const historyOpen = ref(false)
 const saveFailed = ref(false)
 const openError = ref('')
+const conflictBox = ref<HTMLElement | null>(null)
 const offline = ref(typeof navigator !== 'undefined' ? !navigator.onLine : false)
 
 const templateId = computed<TemplateId>(() => {
@@ -122,6 +125,21 @@ watch(
   },
 )
 
+async function revealSearchMatch() {
+  const q = typeof route.query.q === 'string' ? route.query.q : ''
+  const panel = typeof route.query.panel === 'string' ? route.query.panel : ''
+  if (!q && !panel) return
+  await nextTick()
+  window.setTimeout(() => {
+    focusSearchMatch(document.querySelector('.main'), q, panel)
+  }, 80)
+}
+
+function onConflictKey(event: KeyboardEvent) {
+  trapTab(event, conflictBox.value)
+  if (event.key === 'Escape') keepServerVersion()
+}
+
 async function bootstrap() {
   statusMsg.value = ''
   openError.value = ''
@@ -129,6 +147,7 @@ async function bootstrap() {
   if (qid && auth.isAuthenticated) {
     try {
       await documentStore.load(qid)
+      await revealSearchMatch()
       return
     } catch (e) {
       openError.value = friendlyApiMessage(e, '打开文档失败')
@@ -157,6 +176,12 @@ async function bootstrap() {
     }
   }
 }
+
+watch(conflict, async (value) => {
+  if (!value) return
+  await nextTick()
+  conflictBox.value?.querySelector<HTMLElement>('button')?.focus()
+})
 
 watch(
   templateId,
@@ -468,6 +493,7 @@ async function openDoc(id: string) {
   docsOpen.value = false
   try {
     await documentStore.load(id)
+    await revealSearchMatch()
     router.replace({
       name: 'canvas',
       params: { templateId: templateId.value },
@@ -556,8 +582,17 @@ async function manualCheckpoint() {
       </button>
     </p>
     <Teleport to="body">
-    <div v-if="conflict" class="conflict conflict-float" role="alert">
-      <p>这份画布刚在其他地方保存过。编辑区已换成云端最新内容，你刚才未同步的修改还留着。</p>
+    <div
+      v-if="conflict"
+      ref="conflictBox"
+      class="conflict conflict-float"
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="conflict-title"
+      tabindex="-1"
+      @keydown="onConflictKey"
+    >
+      <p id="conflict-title">云端已有更新。编辑区换成了最新内容，你未同步的修改还留着，可以再保存回去。</p>
       <div class="conflict-actions">
         <button type="button" class="conflict-primary" @click="restoreMine">恢复我的修改并保存</button>
         <button type="button" class="conflict-ghost" @click="keepServerVersion">保留云端版本</button>

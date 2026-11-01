@@ -111,4 +111,6 @@ type SearchHit struct {
 	UpdatedAt  time.Time `json:"updatedAt"`
 	Snippet    string    `json:"snippet"`
 	Rank       float64   `json:"rank,omitempty"`
+	PanelID    string    `json:"panelId,omitempty"`
+	PanelTitle string    `json:"panelTitle,omitempty"`
 }

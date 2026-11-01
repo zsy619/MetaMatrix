@@ -5,6 +5,7 @@ import type { TemplateCategory, TemplateId } from '../stores/document'
 import { CATEGORY_LABELS, TEMPLATE_META } from '../stores/document'
 import { useAuthStore } from '../stores/auth'
 import type { DocumentSummary, SearchHit } from '../api/documents'
+import HighlightText from '../components/ui/HighlightText.vue'
 import { listDocuments, searchDocuments } from '../api/documents'
 import { friendlyApiMessage } from '../utils/apiMessage'
 import GuideThumb from '../components/guide/GuideThumb.vue'
@@ -172,7 +173,11 @@ function openHit(d: SearchHit) {
   router.push({
     name: 'canvas',
     params: { templateId: tid },
-    query: { documentId: d.id },
+    query: {
+      documentId: d.id,
+      ...(d.panelId ? { panel: d.panelId } : {}),
+      ...(searchQ.value.trim() ? { q: searchQ.value.trim() } : {}),
+    },
   })
 }
 
@@ -216,7 +221,8 @@ onMounted(async () => {
               <button type="button" @click="openHit(h)">
                 <strong>{{ h.title }}</strong>
                 <span>{{ h.templateId || h.canvasType }} · {{ new Date(h.updatedAt).toLocaleString() }}</span>
-                <em v-if="h.snippet">{{ h.snippet }}</em>
+                <em v-if="h.snippet"><HighlightText :text="h.snippet" /></em>
+                <span v-if="h.panelTitle">匹配：{{ h.panelTitle }}</span>
               </button>
             </li>
           </ul>

@@ -1855,14 +1855,25 @@ export const useDocumentStore = defineStore('document', () => {
 
   async function restoreConflictDraft(): Promise<void> {
     const draft = conflict.value?.draft
-    if (!draft) {
-      discardConflict()
-      return
+    const id = document_id.value
+    if (!draft || !id) {
+      throw new Error('没有可恢复的本地修改')
     }
     current_data.value = cloneDoc(draft)
     dirty.value = true
-    discardConflict()
-    await save()
+    try {
+      await save()
+      discardConflict()
+    } catch (e) {
+      rememberConflict(id, draft)
+      if (e instanceof ApiError && e.status === 409) {
+        throw new Error('云端又更新了一次。你的修改还在，可以再试一次覆盖保存。')
+      }
+      if (e instanceof Error && /其他地方更新/.test(e.message)) {
+        throw new Error('云端又更新了一次。你的修改还在，可以再试一次覆盖保存。')
+      }
+      throw e
+    }
   }
 
   async function listMyDocuments(templateId?: string, limit?: number) {

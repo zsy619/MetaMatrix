@@ -7,6 +7,7 @@ import {
 } from '../../api/documents'
 import { useDocumentStore } from '../../stores/document'
 import { friendlyApiMessage } from '../../utils/apiMessage'
+import { trapTab } from '../../utils/focusTrap'
 
 const props = defineProps<{
   open: boolean
@@ -109,6 +110,7 @@ function close() {
 }
 
 function onKey(event: KeyboardEvent) {
+  trapTab(event, panel.value)
   if (event.key === 'Escape') {
     event.preventDefault()
     if (pendingRestore.value) pendingRestore.value = null
@@ -180,7 +182,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
         </ul>
         <p v-if="rows.length >= 40" class="rev-note">只显示最近 40 个版本。</p>
         <pre v-if="diffText || diffLoading" class="rev-diff" tabindex="0">{{ diffLoading ? '正在对比…' : diffTitle + '\n\n' + diffText }}</pre>
-        <div v-if="pendingRestore" class="rev-confirm" role="alertdialog" aria-labelledby="rev-confirm-title">
+        <div
+          v-if="pendingRestore"
+          class="rev-confirm"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="rev-confirm-title"
+        >
           <h3 id="rev-confirm-title">恢复「{{ labelOf(pendingRestore) }}」？</h3>
           <p>当前画布会被这个版本替换，并生成一条新的恢复记录。</p>
           <div class="rev-actions">

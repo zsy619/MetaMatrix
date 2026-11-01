@@ -70,6 +70,12 @@ button {
   outline-offset: 2px;
 }
 
+.mm-search-hit {
+  outline: 2px solid #f9ab00;
+  outline-offset: 3px;
+  border-radius: 8px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
