@@ -8,6 +8,7 @@ import type {
 } from '../../types/canvas'
 import { useDocumentStore } from '../../stores/document'
 import YModelBlockCard from './YModelBlock.vue'
+import { toneVars } from './fiveStepPalette'
 
 const props = defineProps<{
   doc: GrowthAssumptionsDocumentJSON
@@ -57,10 +58,11 @@ function onRemoveRow(rowId: string) {
     <div class="ga-table" role="table" aria-label="增长假设清单">
       <div class="ga-col-headers" role="row">
         <div
-          v-for="col in COLUMNS"
+          v-for="(col, colIndex) in COLUMNS"
           :key="col.key"
           class="ga-col-header"
           role="columnheader"
+          :style="toneVars(colIndex)"
         >
           {{ col.label }}
         </div>
@@ -75,10 +77,11 @@ function onRemoveRow(rowId: string) {
           role="row"
         >
           <section
-            v-for="col in COLUMNS"
+            v-for="(col, colIndex) in COLUMNS"
             :key="col.key"
-            class="ga-cell"
+            class="ga-cell tbl-tone"
             role="cell"
+            :style="toneVars(colIndex)"
           >
             <YModelBlockCard
               :block="cellAsBlock(row, col.key)"
@@ -136,7 +139,7 @@ function onRemoveRow(rowId: string) {
   flex-shrink: 0;
   display: grid;
   grid-template-columns: 1.4fr 0.85fr 0.85fr 0.95fr 1.1fr 36px;
-  background: #90949c;
+  background: transparent;
   border-bottom: 2px solid #111111;
 }
 
@@ -145,7 +148,9 @@ function onRemoveRow(rowId: string) {
   text-align: center;
   font-size: clamp(14px, 1.4vw, 17px);
   font-weight: 800;
-  color: #111111;
+  color: #fff;
+  background: var(--tbl-header, #90949c);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.14);
   border-right: 2px solid #111111;
   letter-spacing: 0.04em;
   line-height: 1.3;
@@ -156,7 +161,8 @@ function onRemoveRow(rowId: string) {
 .ga-col-header--actions {
   border-right: none;
   padding: 0;
-  background: #90949c;
+  background: #e8eaed;
+  text-shadow: none;
 }
 
 .ga-body {
@@ -181,7 +187,7 @@ function onRemoveRow(rowId: string) {
   grid-template-columns: 1.4fr 0.85fr 0.85fr 0.95fr 1.1fr 36px;
   min-height: 400px;
   border-bottom: 2px solid #111111;
-  background: #ffffff;
+  background: #fff;
 }
 
 .ga-row:last-child {
@@ -196,7 +202,7 @@ function onRemoveRow(rowId: string) {
   border-right: 2px solid #111111;
   display: flex;
   flex-direction: column;
-  background: #ffffff;
+  background: var(--tbl-body, #ffffff);
 }
 
 .ga-cell :deep(.ym-block) {

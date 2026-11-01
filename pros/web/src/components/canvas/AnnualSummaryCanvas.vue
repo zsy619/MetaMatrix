@@ -6,6 +6,7 @@ import type {
   AnnualSummaryDocumentJSON,
 } from '../../types/canvas'
 import YModelBlockCard from './YModelBlock.vue'
+import { toneVars } from './fiveStepPalette'
 
 const props = defineProps<{
   doc: AnnualSummaryDocumentJSON
@@ -43,9 +44,10 @@ const SECTIONS: {
       </header>
 
       <section
-        v-for="sec in SECTIONS"
+        v-for="(sec, index) in SECTIONS"
         :key="sec.id"
-        class="as-section"
+        class="as-section tbl-tone"
+        :style="toneVars(index)"
         v-show="block(sec.id)"
       >
         <h2 class="as-section-title">{{ block(sec.id)!.title }}</h2>
@@ -98,32 +100,39 @@ const SECTIONS: {
 }
 
 .as-section {
-  margin-bottom: 48px;
+  margin-bottom: 28px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--tbl-body, #fafafa);
 }
 
 .as-section-title {
-  margin: 0 0 10px;
+  margin: 0;
+  padding: 10px 16px;
   font-size: clamp(18px, 1.8vw, 22px);
   font-weight: 800;
-  color: #202124;
+  color: #fff;
   line-height: 1.35;
+  background: var(--tbl-header, #0e8a84);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.14);
 }
 
 .as-hint {
-  margin: 0 0 14px;
+  margin: 12px 16px;
   padding-left: 12px;
-  border-left: 2px solid #dadce0;
+  border-left: 2px solid var(--tbl-topic, #dadce0);
   font-size: 13px;
   font-style: italic;
   line-height: 1.55;
-  color: #9aa0a6;
+  color: var(--tbl-topic, #5f6368);
 }
 
 .as-panel {
   min-height: 400px;
-  border: 1px solid #e8eaed;
+  margin: 0 12px 12px;
+  border: 1px solid color-mix(in srgb, var(--tbl-topic, #e8eaed) 28%, transparent);
   border-radius: 4px;
-  background: #fafafa;
+  background: transparent;
   padding: 4px;
   box-sizing: border-box;
   display: flex;

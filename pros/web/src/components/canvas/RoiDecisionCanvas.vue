@@ -7,6 +7,7 @@ import type {
 } from '../../types/canvas'
 import { useDocumentStore } from '../../stores/document'
 import YModelBlockCard from './YModelBlock.vue'
+import { toneVars } from './fiveStepPalette'
 
 const props = defineProps<{
   doc: RoiDecisionDocumentJSON
@@ -64,9 +65,9 @@ onMounted(() => {
     <!-- Top matrix: 维度 | 收益项 | 成本项 -->
     <div class="rd-matrix" role="table" aria-label="维度收益成本矩阵">
       <div class="rd-matrix-headers" role="row">
-        <div class="rd-col-header rd-col-header--dim" role="columnheader">维度</div>
-        <div class="rd-col-header" role="columnheader">收益项</div>
-        <div class="rd-col-header" role="columnheader">成本项</div>
+        <div class="rd-col-header rd-col-header--dim" role="columnheader" :style="toneVars(0)">维度</div>
+        <div class="rd-col-header" role="columnheader" :style="toneVars(1)">收益项</div>
+        <div class="rd-col-header" role="columnheader" :style="toneVars(2)">成本项</div>
         <div class="rd-col-header rd-col-header--actions" aria-hidden="true" />
       </div>
 
@@ -78,7 +79,7 @@ onMounted(() => {
           :class="{ 'rd-row--tall': isTallRow(row, index) }"
           role="row"
         >
-          <div class="rd-dim" role="cell">
+          <div class="rd-dim tbl-tone" role="cell" :style="toneVars(0)">
             <input
               class="rd-dim-input"
               type="text"
@@ -92,8 +93,9 @@ onMounted(() => {
           </div>
           <section
             v-if="block(row.benefitBlockId)"
-            class="rd-cell"
+            class="rd-cell tbl-tone"
             role="cell"
+            :style="toneVars(1)"
           >
             <YModelBlockCard
               :block="block(row.benefitBlockId)!"
@@ -102,13 +104,15 @@ onMounted(() => {
           </section>
           <section
             v-else
-            class="rd-cell rd-cell--empty"
+            class="rd-cell rd-cell--empty tbl-tone"
             role="cell"
+            :style="toneVars(1)"
           />
           <section
             v-if="block(row.costBlockId)"
-            class="rd-cell"
+            class="rd-cell tbl-tone"
             role="cell"
+            :style="toneVars(2)"
           >
             <YModelBlockCard
               :block="block(row.costBlockId)!"
@@ -117,8 +121,9 @@ onMounted(() => {
           </section>
           <section
             v-else
-            class="rd-cell rd-cell--empty"
+            class="rd-cell rd-cell--empty tbl-tone"
             role="cell"
+            :style="toneVars(2)"
           />
           <div class="rd-row-actions">
             <button
@@ -143,7 +148,7 @@ onMounted(() => {
 
     <!-- Middle: 机会成本 | 时间窗口 -->
     <div class="rd-middle" role="group" aria-label="机会成本与时间窗口">
-      <section class="rd-mid-col" v-if="block('opportunityCost')">
+      <section class="rd-mid-col tbl-tone" :style="toneVars(3)" v-if="block('opportunityCost')">
         <header class="rd-mid-head">
           <h2 class="rd-mid-title">机会成本</h2>
         </header>
@@ -151,7 +156,7 @@ onMounted(() => {
           <YModelBlockCard :block="block('opportunityCost')!" hide-title />
         </div>
       </section>
-      <section class="rd-mid-col" v-if="block('timeWindow')">
+      <section class="rd-mid-col tbl-tone" :style="toneVars(4)" v-if="block('timeWindow')">
         <header class="rd-mid-head">
           <h2 class="rd-mid-title">时间窗口</h2>
         </header>
@@ -162,7 +167,7 @@ onMounted(() => {
     </div>
 
     <!-- Bottom: 最终结论 -->
-    <section class="rd-conclusion" v-if="block('conclusion')" aria-label="最终结论">
+    <section class="rd-conclusion tbl-tone" :style="toneVars(5)" v-if="block('conclusion')" aria-label="最终结论">
       <div class="rd-conclusion-label">最终结论</div>
       <div class="rd-panel rd-panel--conclusion">
         <YModelBlockCard :block="block('conclusion')!" hide-title />
@@ -216,7 +221,7 @@ onMounted(() => {
   flex-shrink: 0;
   display: grid;
   grid-template-columns: minmax(96px, 0.7fr) minmax(0, 1.4fr) minmax(0, 1.4fr) 36px;
-  background: #00bfff;
+  background: transparent;
   border-bottom: 1px solid #5f6368;
 }
 
@@ -225,7 +230,9 @@ onMounted(() => {
   text-align: center;
   font-size: clamp(14px, 1.5vw, 18px);
   font-weight: 800;
-  color: #111111;
+  color: #fff;
+  background: var(--tbl-header, #2a649f);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.14);
   border-right: 1px solid #5f6368;
   letter-spacing: 0.04em;
   line-height: 1.3;
@@ -238,7 +245,8 @@ onMounted(() => {
 .rd-col-header--actions {
   border-right: none;
   padding: 0;
-  background: #00bfff;
+  background: #e8eaed;
+  text-shadow: none;
 }
 
 .rd-matrix-body {
@@ -253,7 +261,7 @@ onMounted(() => {
   /* Align with global panel min-height (≥400px), including newly added rows */
   min-height: 400px;
   border-bottom: 1px solid #5f6368;
-  background: #e6f7ff;
+  background: transparent;
 }
 
 .rd-row--tall {
@@ -271,7 +279,7 @@ onMounted(() => {
   padding: 12px 10px;
   box-sizing: border-box;
   border-right: 1px solid #5f6368;
-  background: #e6f7ff;
+  background: var(--tbl-body, #e6f7ff);
 }
 
 .rd-dim-input {
@@ -283,7 +291,7 @@ onMounted(() => {
   text-align: center;
   font-size: clamp(13px, 1.35vw, 16px);
   font-weight: 700;
-  color: #111111;
+  color: var(--tbl-topic, #111111);
   padding: 2px 2px;
   outline: none;
   box-sizing: border-box;
@@ -311,11 +319,11 @@ onMounted(() => {
   border-right: 1px solid #5f6368;
   display: flex;
   flex-direction: column;
-  background: #e6f7ff;
+  background: var(--tbl-body, #e6f7ff);
 }
 
 .rd-cell--empty {
-  background: #e6f7ff;
+  background: var(--tbl-body, #e6f7ff);
 }
 
 .rd-cell :deep(.ym-block) {
@@ -349,7 +357,7 @@ onMounted(() => {
   align-items: flex-start;
   justify-content: center;
   padding-top: 10px;
-  background: #e6f7ff;
+  background: #f4f5f6;
 }
 
 .rd-row-delete {
@@ -419,7 +427,7 @@ onMounted(() => {
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  background: #e6f7ff;
+  background: var(--tbl-body, #e6f7ff);
   border-right: 1px solid #5f6368;
 }
 
@@ -435,15 +443,17 @@ onMounted(() => {
   min-height: 44px;
   padding: 8px 14px;
   box-sizing: border-box;
-  background: #00bfff;
+  background: var(--tbl-header, #2a649f);
   border-bottom: 1px solid #5f6368;
+  color: #fff;
 }
 
 .rd-mid-title {
   margin: 0;
   font-size: clamp(14px, 1.5vw, 18px);
   font-weight: 800;
-  color: #111111;
+  color: #fff;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.14);
   letter-spacing: 0.04em;
   line-height: 1.3;
   text-align: center;
@@ -454,7 +464,7 @@ onMounted(() => {
   min-height: 400px;
   display: flex;
   flex-direction: column;
-  background: #e6f7ff;
+  background: transparent;
   padding: 10px 12px 8px;
   box-sizing: border-box;
   overflow: auto;
@@ -485,15 +495,17 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  background: #e6f7ff;
+  background: var(--tbl-body, #e6f7ff);
 }
 
 .rd-conclusion-label {
   flex-shrink: 0;
-  padding: 10px 14px 4px;
+  padding: 10px 14px;
   font-size: clamp(14px, 1.5vw, 18px);
   font-weight: 800;
-  color: #111111;
+  color: #fff;
+  background: var(--tbl-header, #a84562);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.14);
   letter-spacing: 0.04em;
   line-height: 1.3;
   text-align: left;

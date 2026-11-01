@@ -5,6 +5,7 @@ import 'element-plus/dist/index.css'
 import 'katex/dist/katex.min.css'
 import './styles/base.css'
 import './styles/panel-maximize.css'
+import './styles/table-tone.css'
 import App from './App.vue'
 import router from './router'
 

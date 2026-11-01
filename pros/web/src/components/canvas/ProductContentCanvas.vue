@@ -6,6 +6,7 @@ import type {
   ProductContentDocumentJSON,
 } from '../../types/canvas'
 import YModelBlockCard from './YModelBlock.vue'
+import { toneVars } from './fiveStepPalette'
 
 const props = defineProps<{
   doc: ProductContentDocumentJSON
@@ -40,10 +41,11 @@ const bgColor = computed(
     <div class="pc-grid" role="table" aria-label="产品内核画布">
       <div class="pc-row pc-row--top">
         <section
-          v-for="id in topIds"
+          v-for="(id, index) in topIds"
           :key="id"
           v-show="block(id)"
-          class="pc-cell"
+          class="pc-cell tbl-tone"
+          :style="toneVars(index)"
         >
           <header class="pc-header">
             <h2>{{ block(id)!.title }}</h2>
@@ -59,10 +61,11 @@ const bgColor = computed(
 
       <div class="pc-row pc-row--bottom">
         <section
-          v-for="id in bottomIds"
+          v-for="(id, index) in bottomIds"
           :key="id"
           v-show="block(id)"
-          class="pc-cell"
+          class="pc-cell tbl-tone"
+          :style="toneVars(index + topIds.length)"
         >
           <header class="pc-header">
             <h2>{{ block(id)!.title }}</h2>
@@ -126,7 +129,7 @@ const bgColor = computed(
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  background: #fff;
+  background: var(--tbl-body, #fff);
   border-right: 1px solid #9aa0a6;
 }
 
@@ -140,8 +143,9 @@ const bgColor = computed(
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #ffff00;
+  background: var(--tbl-header, #0e8a84);
   border-bottom: 1px solid #9aa0a6;
+  color: #fff;
   padding: 10px 10px;
   min-height: 42px;
   box-sizing: border-box;
@@ -151,7 +155,8 @@ const bgColor = computed(
   margin: 0;
   font-size: clamp(14px, 1.55vw, 18px);
   font-weight: 800;
-  color: #202124;
+  color: #fff;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.14);
   letter-spacing: 0.04em;
   line-height: 1.25;
   text-align: center;
@@ -174,7 +179,7 @@ const bgColor = computed(
   font-size: clamp(11px, 1.15vw, 13px);
   font-style: italic;
   font-weight: 400;
-  color: #80868b;
+  color: var(--tbl-topic, #80868b);
   line-height: 1.45;
 }
 

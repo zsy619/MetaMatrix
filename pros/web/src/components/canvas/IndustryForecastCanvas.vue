@@ -6,6 +6,7 @@ import type {
   IndustryForecastDocumentJSON,
 } from '../../types/canvas'
 import YModelBlockCard from './YModelBlock.vue'
+import { toneVars } from './fiveStepPalette'
 
 const props = defineProps<{
   doc: IndustryForecastDocumentJSON
@@ -40,10 +41,11 @@ const bgColor = computed(
     <div class="if-grid" role="table" aria-label="行业预判分析框架">
       <div class="if-row if-row--top">
         <section
-          v-for="id in topIds"
+          v-for="(id, index) in topIds"
           :key="id"
           v-show="block(id)"
-          class="if-cell"
+          class="if-cell tbl-tone"
+          :style="toneVars(index)"
         >
           <div class="if-meta">
             <h2 class="if-title">
@@ -59,10 +61,11 @@ const bgColor = computed(
       </div>
 
       <section
-        v-for="id in fullIds"
+        v-for="(id, index) in fullIds"
         :key="id"
         v-show="block(id)"
-        class="if-cell if-cell--full"
+        class="if-cell if-cell--full tbl-tone"
+        :style="toneVars(index + topIds.length)"
       >
         <div class="if-meta">
           <h2 class="if-title">
@@ -149,11 +152,11 @@ const bgColor = computed(
   flex-direction: column;
   min-width: 0;
   min-height: 400px;
-  padding: 12px 14px 14px;
+  padding: 0;
   box-sizing: border-box;
-  background: #fff;
+  background: var(--tbl-body, #fff);
   border-right: 2px solid #5d4037;
-  gap: 6px;
+  gap: 0;
 }
 
 .if-row--top .if-cell:last-child {
@@ -177,19 +180,23 @@ const bgColor = computed(
   flex-direction: column;
   gap: 3px;
   min-width: 0;
+  padding: 10px 14px 8px;
+  background: var(--tbl-header, #0e8a84);
+  color: #fff;
 }
 
 .if-title {
   margin: 0;
   font-size: clamp(15px, 1.55vw, 19px);
   font-weight: 800;
-  color: #202124;
+  color: #fff;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.14);
   letter-spacing: 0.02em;
   line-height: 1.3;
 }
 
 .if-num {
-  color: #5d4037;
+  color: #fff;
   margin-right: 2px;
 }
 
@@ -197,7 +204,7 @@ const bgColor = computed(
   margin: 0;
   font-size: clamp(12px, 1.15vw, 14px);
   font-weight: 400;
-  color: #80868b;
+  color: rgba(255, 255, 255, 0.9);
   line-height: 1.4;
 }
 
@@ -207,6 +214,8 @@ const bgColor = computed(
   min-width: 0;
   display: flex;
   flex-direction: column;
+  padding: 8px 12px 12px;
+  background: var(--tbl-body, #fff);
 }
 
 .if-body :deep(.ym-block) {

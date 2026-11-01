@@ -6,6 +6,7 @@ import type {
   RoiTradeoffDocumentJSON,
 } from '../../types/canvas'
 import YModelBlockCard from './YModelBlock.vue'
+import { toneVars } from './fiveStepPalette'
 
 const props = defineProps<{
   doc: RoiTradeoffDocumentJSON
@@ -28,7 +29,7 @@ function block(id: RoiTradeoffBlockId): RoiTradeoffBlock | undefined {
 
 <template>
   <div class="roi-canvas" :style="{ backgroundColor: bgColor }" role="grid" aria-label="综合决策ROI权衡">
-    <section class="roi-col" v-show="block('benefits')">
+    <section class="roi-col tbl-tone" v-show="block('benefits')" :style="toneVars(0)">
       <header class="roi-col-head">
         <h2 class="roi-col-title">{{ block('benefits')!.title }}</h2>
       </header>
@@ -37,7 +38,7 @@ function block(id: RoiTradeoffBlockId): RoiTradeoffBlock | undefined {
       </div>
     </section>
 
-    <section class="roi-col" v-show="block('costs')">
+    <section class="roi-col tbl-tone" v-show="block('costs')" :style="toneVars(1)">
       <header class="roi-col-head">
         <h2 class="roi-col-title">{{ block('costs')!.title }}</h2>
       </header>
@@ -68,7 +69,7 @@ function block(id: RoiTradeoffBlockId): RoiTradeoffBlock | undefined {
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  background: #FDF5E6;
+  background: var(--tbl-body, #fdf5e6);
   border-right: 1px solid #ffffff;
 }
 
@@ -84,15 +85,17 @@ function block(id: RoiTradeoffBlockId): RoiTradeoffBlock | undefined {
   min-height: 48px;
   padding: 10px 16px;
   box-sizing: border-box;
-  background: #FFEB3B;
+  background: var(--tbl-header, #a67c00);
   border-bottom: 1px solid #ffffff;
+  color: #fff;
 }
 
 .roi-col-title {
   margin: 0;
   font-size: clamp(16px, 1.7vw, 20px);
   font-weight: 800;
-  color: #202124;
+  color: #fff;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.14);
   letter-spacing: 0.02em;
   line-height: 1.3;
   text-align: left;
@@ -103,7 +106,7 @@ function block(id: RoiTradeoffBlockId): RoiTradeoffBlock | undefined {
   min-height: 400px;
   display: flex;
   flex-direction: column;
-  background: #FDF5E6;
+  background: transparent;
   padding: 10px 12px 8px;
   box-sizing: border-box;
   overflow: auto;
