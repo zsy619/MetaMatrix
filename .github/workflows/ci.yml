@@ -33,3 +33,45 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: node --experimental-strip-types src/components/workspace/statsNormalize.test.ts
+      - run: node scripts/smoke-flow.mjs
+
+  flow:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: metamatrix
+          POSTGRES_PASSWORD: metamatrix
+          POSTGRES_DB: metamatrix
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U metamatrix -d metamatrix"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: pros/api/go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: start api
+        working-directory: pros/api
+        env:
+          DATABASE_URL: postgresql://metamatrix:metamatrix@127.0.0.1:5432/metamatrix
+          JWT_SECRET: ci-smoke-secret
+          PORT: "3000"
+        run: |
+          go build -o /tmp/metamatrix-api ./cmd/server
+          /tmp/metamatrix-api > /tmp/api.log 2>&1 &
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            curl -sf http://127.0.0.1:3000/health && exit 0
+            sleep 2
+          done
+          cat /tmp/api.log
+          exit 1
+      - run: SMOKE_API=http://127.0.0.1:3000 node pros/web/scripts/smoke-flow.mjs

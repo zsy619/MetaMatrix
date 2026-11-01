@@ -26,9 +26,13 @@ JWT_SECRET=change-me-in-production-metamatrix-jwt-secret
 
 ## 2. 启动数据库
 
+只起 Postgres：
+
 ```bash
 docker compose up -d
 ```
+
+仓库根目录的 `docker compose up --build` 会同时启动 Postgres、API 和网页。说明见 `docs/生产配置.md`。
 
 > 若提示无法连接 Docker daemon，请先打开 Docker Desktop。  
 > 宿主机 5432 可能被其它 Postgres 占用，本 compose 映射 **5433→5432**。

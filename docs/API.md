@@ -24,10 +24,12 @@
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
 | POST | `/documents` | 新建。正文在 `currentData` |
-| GET | `/documents` | 本人列表。`templateId`、`archived=1`、`limit`、`offset` |
+| GET | `/documents` | 本人列表。`templateId`、`archived=1`、`limit`、`offset`。`Cache-Control: private, no-store` |
 | POST | `/documents/batch` | `{ action: archive\|restore, ids }` |
 | GET | `/documents/search` | `q`、`templateId`、`limit`。命中块带 `panelId`，摘要用 `«»` 标出关键词 |
-| GET | `/documents/stats` | 只统计当前用户未归档画布 |
+| GET | `/documents/stats` | 只统计当前用户未归档画布。`Cache-Control: private, max-age=20` |
+| GET | `/documents/backup` | 本人未归档画布 JSON 包，最多 200 份。`private, no-store` |
+| POST | `/documents/backup` | 把备份导入为新画布，单次最多 50 份，不覆盖原件 |
 | GET | `/documents/ai-corpus` | 本人语料摘要 |
 | GET | `/documents/:id` | 单份画布 |
 | GET | `/documents/:id/export` | `format=json` 或 `md` |

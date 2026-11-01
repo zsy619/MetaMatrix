@@ -155,6 +155,7 @@ func (h *DocumentsHandler) List(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 	hasMore := paged && int64(offset+len(rows)) < total
+	c.Header("Cache-Control", "private, no-store")
 	c.Header("X-Total-Count", strconv.FormatInt(total, 10))
 	c.Header("X-Has-More", strconv.FormatBool(hasMore))
 	if paged {
@@ -177,7 +178,39 @@ func (h *DocumentsHandler) Get(ctx context.Context, c *app.RequestContext) {
 	if handleDocErr(c, err, nil) {
 		return
 	}
+	c.Header("Cache-Control", "private, no-store")
 	c.JSON(http.StatusOK, doc)
+}
+
+func (h *DocumentsHandler) Backup(ctx context.Context, c *app.RequestContext) {
+	uid, ok := h.owner(c)
+	if !ok {
+		return
+	}
+	bundle, err := h.svc.ExportBackup(uid)
+	if handleDocErr(c, err, nil) {
+		return
+	}
+	c.Header("Cache-Control", "private, no-store")
+	c.JSON(http.StatusOK, bundle)
+}
+
+func (h *DocumentsHandler) RestoreBackup(ctx context.Context, c *app.RequestContext) {
+	uid, ok := h.owner(c)
+	if !ok {
+		return
+	}
+	var bundle service.BackupBundle
+	if err := c.BindAndValidate(&bundle); err != nil {
+		Fail(c, http.StatusBadRequest, "invalid body", "validation_error")
+		return
+	}
+	result, err := h.svc.RestoreBackup(uid, bundle)
+	if handleDocErr(c, err, nil) {
+		return
+	}
+	middleware.Audit(c, "restore-backup", uid.String(), "imported="+strconv.Itoa(result.Imported))
+	c.JSON(http.StatusOK, result)
 }
 
 func (h *DocumentsHandler) Update(ctx context.Context, c *app.RequestContext) {
