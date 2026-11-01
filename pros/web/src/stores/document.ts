@@ -5,6 +5,7 @@ import { ApiError } from '../api/http'
 import * as documentsApi from '../api/documents'
 import { rememberRecentOpen } from '../utils/canvasTransfer'
 import { normalizePageSize, readPageSize, writePageSizeMap } from '../utils/rtePageSize'
+import { writeToolbarGroupOrder } from '../utils/rteToolbarGroups'
 import { getToken } from '../api/http'
 import type {
   BlockCanvasDocumentJSON,
@@ -1466,6 +1467,16 @@ export const useDocumentStore = defineStore('document', () => {
       doc.attachmentsByPanelId = {}
     }
     return doc.attachmentsByPanelId
+  }
+
+  function setPanelToolbarOrder(panelId: string, order: readonly string[]) {
+    const doc = current_data.value
+    if (!doc || !panelId) return
+    const prev = JSON.stringify(doc.toolbarGroupOrderByPanelId ?? null)
+    const next = writeToolbarGroupOrder(doc.toolbarGroupOrderByPanelId, panelId, order)
+    if (next) doc.toolbarGroupOrderByPanelId = next
+    else delete doc.toolbarGroupOrderByPanelId
+    if (JSON.stringify(doc.toolbarGroupOrderByPanelId ?? null) !== prev) markDirty()
   }
 
   function getPanelPageSize(panelId: string) {
@@ -3401,6 +3412,7 @@ export const useDocumentStore = defineStore('document', () => {
     removeIncidentReviewTimelineRow,
     updateScientificMeetingMeta,
     updateDeepReviewMeta,
+    setPanelToolbarOrder,
     getPanelPageSize,
     setPanelPageSize,
     getPanelAttachments,

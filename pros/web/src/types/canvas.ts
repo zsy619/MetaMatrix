@@ -99,6 +99,8 @@ export type WithPanelAttachments = {
    * 键与面板 id / 最大化 key 对齐。
    */
   pageSizeByPanelId?: Record<string, string>
+  /** 富文本工具栏分组顺序。缺省用默认分组。键与面板 id 对齐。 */
+  toolbarGroupOrderByPanelId?: Record<string, string[]>
 }
 
 
