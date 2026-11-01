@@ -31,21 +31,9 @@ jobs:
           cache: npm
           cache-dependency-path: pros/web/package-lock.json
       - run: npm ci
+      - run: npm run type-check
       - run: npm run build
-      - run: node --experimental-strip-types src/components/workspace/statsNormalize.test.ts
-      - run: node --experimental-strip-types src/utils/rteFeishuDepth.test.ts
-      - run: node --experimental-strip-types src/utils/rteBatch3.test.ts
-      - run: node --experimental-strip-types src/utils/rtePasteClean.test.ts
-      - run: node --experimental-strip-types src/utils/rteRound5.test.ts
-      - run: node --experimental-strip-types src/utils/rteImageLayout.test.ts
-      - run: node --experimental-strip-types src/utils/rteImageGroup.test.ts
-      - run: node --experimental-strip-types src/utils/rteTableGrid.test.ts
-      - run: node --experimental-strip-types src/utils/rteRound6.test.ts
-      - run: node --experimental-strip-types src/utils/rteRound7.test.ts
-      - run: node --experimental-strip-types src/utils/rtePageSize.test.ts
-      - run: node --experimental-strip-types src/utils/rtePageMargin.test.ts
-      - run: node --experimental-strip-types src/utils/rteToolbarGroups.test.ts
-      - run: node --experimental-strip-types src/utils/rteRound8.test.ts
+      - run: npm test
       - run: node scripts/smoke-flow.mjs
 
   flow:
