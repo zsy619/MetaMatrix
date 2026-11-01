@@ -91,6 +91,11 @@ import {
   attachmentRejectReason,
   dataUrlExceedsAttachmentLimit,
 } from '../utils/attachmentPolicy'
+import {
+  FEISHU_BATCH3_SHORTCUTS,
+  activeOutlineIndex as outlineIndexForCursor,
+  reorderIndexes,
+} from '../utils/rteBatch3'
 import { LetterSpacing } from '../extensions/letterSpacing'
 import { ParagraphAttrs } from '../extensions/paragraphAttrs'
 import { PageBreak } from '../extensions/pageBreak'
@@ -1172,6 +1177,26 @@ const editor = useEditor({
       }
       // 段落样式：Ctrl/⌘+Alt+1…6 → 标题；Ctrl/⌘+Alt+0 → 正文
       if (event.altKey && !event.shiftKey) {
+        if (key === 'o') {
+          event.preventDefault()
+          toggleOutlinePanel()
+          return true
+        }
+        if (key === 'm') {
+          event.preventDefault()
+          insertFormula()
+          return true
+        }
+        if (key === 'e') {
+          event.preventDefault()
+          exportAsMarkdown()
+          return true
+        }
+        if (key === 'p') {
+          event.preventDefault()
+          openPrintPreview()
+          return true
+        }
         if (key === '0') {
           event.preventDefault()
           setHeading(0)
@@ -1825,9 +1850,18 @@ function insertCallout(variant: CalloutVariant = 'info') {
   moreOpen.value = false
 }
 
+const outlineUserClosed = ref(false)
+
 function toggleOutlinePanel() {
-  outlineOpen.value = !outlineOpen.value
+  const next = !outlineOpen.value
+  outlineOpen.value = next
+  outlineUserClosed.value = !next
   closeAllToolbarMenus()
+}
+
+function closeOutlinePanel() {
+  outlineOpen.value = false
+  outlineUserClosed.value = true
 }
 
 type OutlineHeading = { id: string; level: number; text: string; pos: number }
@@ -1845,6 +1879,33 @@ const outlineHeadings = computed((): OutlineHeading[] => {
   })
   return out
 })
+
+const activeOutlineIndex = computed(() => {
+  void editor.value?.state.selection
+  const positions = outlineHeadings.value.map((item) => item.pos)
+  const cursor = editor.value?.state.selection.from ?? 0
+  return outlineIndexForCursor(positions, cursor)
+})
+
+const showEmptyGuide = computed(
+  () =>
+    props.expanded &&
+    viewMode.value === 'edit' &&
+    editorReady.value &&
+    charCount.value === 0,
+)
+
+watch(
+  () => [props.expanded, outlineHeadings.value.length] as const,
+  () => {
+    if (!props.expanded || viewMode.value !== 'edit') {
+      if (!props.expanded) outlineOpen.value = false
+      return
+    }
+    if (outlineUserClosed.value) return
+    outlineOpen.value = outlineHeadings.value.length > 0
+  },
+)
 
 function jumpToOutlineHeading(item: OutlineHeading) {
   const ed = editor.value
@@ -1880,6 +1941,7 @@ const SHORTCUT_GROUPS: { title: string; items: { keys: string; desc: string }[] 
       { keys: 'Ctrl/⌘ + Shift + E', desc: '代码块' },
       { keys: '/', desc: '斜杠命令，快速插入段落类型' },
       { keys: 'Tab / Shift + Tab', desc: '列表增加 / 减少缩进' },
+      ...FEISHU_BATCH3_SHORTCUTS,
     ],
   },
   {
@@ -3292,6 +3354,156 @@ function moveCurrentBlock(dir: -1 | 1) {
   ed.view.focus()
 }
 
+function moveTopLevelBlock(from: number, toGap: number) {
+  const ed = editor.value
+  if (!ed) return
+  const doc = ed.state.doc
+  const order = reorderIndexes(doc.childCount, from, toGap)
+  if (!order) return
+  const children: Array<ReturnType<typeof doc.child>> = []
+  doc.forEach((child) => {
+    children.push(child)
+  })
+  const copies = order.map((index) => {
+    const node = children[index]!
+    return node.copy(node.content)
+  })
+  let tr = ed.state.tr.replaceWith(0, doc.content.size, Fragment.from(copies))
+  let selPos = 0
+  const dest = toGap > from ? toGap - 1 : toGap
+  for (let i = 0; i < dest; i += 1) selPos += copies[i]!.nodeSize
+  try {
+    tr = tr.setSelection(NodeSelection.create(tr.doc, selPos)).scrollIntoView()
+  } catch {
+    /* 选区落在原子块上失败时仍保留新顺序 */
+  }
+  ed.view.dispatch(tr)
+  ed.view.focus()
+}
+
+const blockHandle = ref({ visible: false, top: 0, left: 0, index: -1 })
+const blockDropLine = ref<number | null>(null)
+let blockDragFrom = -1
+let blockDropGap = 0
+
+function topLevelBlockElements(canvas: HTMLElement): HTMLElement[] {
+  const prose = canvas.querySelector('.ProseMirror')
+  if (!prose) return []
+  return Array.from(prose.children).filter((el): el is HTMLElement => el instanceof HTMLElement)
+}
+
+function blockGapAt(canvas: HTMLElement, clientY: number) {
+  const blocks = topLevelBlockElements(canvas)
+  const canvasRect = canvas.getBoundingClientRect()
+  let gap = blocks.length
+  for (let i = 0; i < blocks.length; i += 1) {
+    const rect = blocks[i]!.getBoundingClientRect()
+    if (clientY < rect.top + rect.height / 2) {
+      gap = i
+      break
+    }
+  }
+  const edge =
+    gap >= blocks.length
+      ? (blocks.at(-1)?.getBoundingClientRect().bottom ?? canvasRect.top)
+      : blocks[gap]!.getBoundingClientRect().top
+  return { gap, line: edge - canvasRect.top + canvas.scrollTop }
+}
+
+function onCanvasBlockHover(event: MouseEvent) {
+  if (!props.expanded || viewMode.value !== 'edit' || blockDragFrom >= 0) return
+  const canvas = event.currentTarget as HTMLElement
+  const blocks = topLevelBlockElements(canvas)
+  const canvasRect = canvas.getBoundingClientRect()
+  let index = -1
+  for (let i = 0; i < blocks.length; i += 1) {
+    const rect = blocks[i]!.getBoundingClientRect()
+    if (event.clientY >= rect.top && event.clientY <= rect.bottom) {
+      index = i
+      const left = Math.max(4, rect.left - canvasRect.left - 28)
+      blockHandle.value = {
+        visible: true,
+        top: rect.top - canvasRect.top + canvas.scrollTop,
+        left,
+        index,
+      }
+      return
+    }
+  }
+  blockHandle.value = { ...blockHandle.value, visible: false, index: -1 }
+}
+
+function hideBlockHandle() {
+  if (blockDragFrom >= 0) return
+  blockHandle.value = { ...blockHandle.value, visible: false, index: -1 }
+}
+
+function onBlockDragStart(event: DragEvent) {
+  blockDragFrom = blockHandle.value.index
+  event.dataTransfer?.setData('application/x-rte-block', String(blockDragFrom))
+  if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move'
+}
+
+function onBlockDragEnd() {
+  blockDragFrom = -1
+  blockDropLine.value = null
+}
+
+function onCanvasBlockDragOver(event: DragEvent) {
+  if (blockDragFrom < 0) return
+  event.preventDefault()
+  if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'
+  const metrics = blockGapAt(event.currentTarget as HTMLElement, event.clientY)
+  blockDropGap = metrics.gap
+  blockDropLine.value = metrics.line
+}
+
+function onCanvasBlockDrop(event: DragEvent) {
+  if (blockDragFrom < 0) return
+  event.preventDefault()
+  event.stopPropagation()
+  const from = blockDragFrom
+  const gap = blockDropGap
+  blockDragFrom = -1
+  blockDropLine.value = null
+  blockHandle.value = { ...blockHandle.value, visible: false, index: -1 }
+  moveTopLevelBlock(from, gap)
+}
+
+const codeChrome = ref<{ top: number; left: number } | null>(null)
+
+function syncCodeChrome() {
+  const ed = editor.value
+  const canvas = rteRootEl.value?.querySelector('.rte-canvas') as HTMLElement | null
+  if (!ed || ed.isDestroyed || !canvas || viewMode.value !== 'edit' || !ed.isActive('codeBlock')) {
+    codeChrome.value = null
+    return
+  }
+  const { $from } = ed.state.selection
+  let depth = $from.depth
+  while (depth > 0 && $from.node(depth).type.name !== 'codeBlock') depth -= 1
+  if (depth <= 0) {
+    codeChrome.value = null
+    return
+  }
+  let dom: HTMLElement | null = null
+  try {
+    dom = ed.view.nodeDOM($from.before(depth)) as HTMLElement | null
+  } catch {
+    dom = null
+  }
+  if (!dom || typeof dom.getBoundingClientRect !== 'function') {
+    codeChrome.value = null
+    return
+  }
+  const canvasRect = canvas.getBoundingClientRect()
+  const rect = dom.getBoundingClientRect()
+  codeChrome.value = {
+    top: rect.top - canvasRect.top + canvas.scrollTop + 6,
+    left: Math.max(8, rect.right - canvasRect.left - 168),
+  }
+}
+
 /** 插入纯文本日期 / 日期时间 */
 function insertPlainDate() {
   const s = new Date().toLocaleDateString('zh-CN', {
@@ -3848,6 +4060,13 @@ const VIEW_MODE_OPTIONS: { id: RteViewMode; label: string; icon: string }[] = [
   { id: 'source', label: '源码', icon: '</>' },
 ]
 const viewMode = ref<RteViewMode>('edit')
+
+watch(
+  () => editor.value?.state.selection,
+  () => {
+    syncCodeChrome()
+  },
+)
 const sourceHtml = ref('')
 const sourceDirty = ref(false)
 
@@ -10548,6 +10767,11 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
           'is-paper-guide': paperGuide,
         }"
         @click="onCanvasClick"
+        @mousemove="onCanvasBlockHover"
+        @mouseleave="hideBlockHandle"
+        @dragover="onCanvasBlockDragOver"
+        @drop="onCanvasBlockDrop"
+        @scroll="syncCodeChrome"
       >
         <input
           v-if="showTitle && viewMode === 'edit'"
@@ -10578,6 +10802,54 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
           class="rte-body"
           :style="{ zoom: editorZoom }"
         />
+        <button
+          v-if="blockHandle.visible"
+          type="button"
+          class="rte-block-handle"
+          draggable="true"
+          :style="{ top: blockHandle.top + 'px', left: blockHandle.left + 'px' }"
+          title="拖动调整块顺序"
+          aria-label="拖动调整块顺序"
+          @mousedown.stop
+          @dragstart="onBlockDragStart"
+          @dragend="onBlockDragEnd"
+        >
+          ⠿
+        </button>
+        <div
+          v-if="blockDropLine != null"
+          class="rte-block-drop"
+          :style="{ top: blockDropLine + 'px' }"
+        />
+        <div
+          v-if="codeChrome"
+          class="rte-code-chrome"
+          :style="{ top: codeChrome.top + 'px', left: codeChrome.left + 'px' }"
+          @mousedown.stop
+        >
+          <label class="rte-code-chrome-lang">
+            <span class="rte-sr-only">代码语言</span>
+            <select
+              :value="currentCodeLanguage()"
+              aria-label="代码语言"
+              @change="setCodeLanguage(($event.target as HTMLSelectElement).value)"
+            >
+              <option v-for="opt in CODE_LANG_OPTIONS" :key="'chrome-' + opt.value" :value="opt.value">
+                {{ opt.label }}
+              </option>
+            </select>
+          </label>
+          <button type="button" @click="copyActiveCodeBlock">复制</button>
+        </div>
+        <div v-if="showEmptyGuide" class="rte-empty-guide" @mousedown.stop>
+          <span>空文档</span>
+          <button type="button" @click="setHeading(1)">标题</button>
+          <button type="button" @click="toggleBulletList">列表</button>
+          <button type="button" @click="toggleCodeBlock">代码</button>
+          <button type="button" @click="insertFormula">公式</button>
+          <button type="button" @click="openTableDialog">表格</button>
+          <span class="rte-empty-guide-hint">或输入 / 插入</span>
+        </div>
       </div>
 
       <div v-if="viewMode === 'source'" class="rte-source-pane">
@@ -10614,7 +10886,7 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
             class="rte-outline-close"
             title="关闭大纲"
             aria-label="关闭大纲"
-            @click="outlineOpen = false"
+            @click="closeOutlinePanel"
           >
             ×
           </button>
@@ -10628,8 +10900,10 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
             :key="h.id"
             type="button"
             class="rte-outline-item"
+            :class="{ 'is-current': activeOutlineIndex === outlineHeadings.indexOf(h) }"
             :data-level="h.level"
             :title="h.text"
+            :aria-current="activeOutlineIndex === outlineHeadings.indexOf(h) ? 'location' : undefined"
             @click="jumpToOutlineHeading(h)"
           >
             {{ h.text }}
@@ -10683,6 +10957,24 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
         </span>
       </div>
       <div class="rte-bottom-right">
+        <button
+          v-if="expanded"
+          type="button"
+          class="rte-bottom-link"
+          title="导出当前面板 Markdown (Ctrl/⌘+Alt+E)"
+          @click="exportAsMarkdown"
+        >
+          导出 Markdown
+        </button>
+        <button
+          v-if="expanded"
+          type="button"
+          class="rte-bottom-link"
+          title="打印预览 (Ctrl/⌘+Alt+P)"
+          @click="openPrintPreview"
+        >
+          打印
+        </button>
         <span class="rte-draft" :class="syncTone" role="status" :title="syncHint">{{ syncLabel }}</span>
         <template v-if="showPublishActions">
           <button type="button" class="rte-preview" @click="onPreview">
@@ -12516,6 +12808,87 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
   overflow: auto;
   padding: 10px 14px 12px;
   background: #fff;
+  position: relative;
+}
+.rte-block-handle {
+  position: absolute;
+  z-index: 4;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--mm-line, #e8eaed);
+  border-radius: 4px;
+  background: var(--mm-surface, #fff);
+  color: var(--mm-muted, #5f6368);
+  cursor: grab;
+  line-height: 20px;
+  padding: 0;
+}
+.rte-block-handle:active {
+  cursor: grabbing;
+}
+.rte-block-drop {
+  position: absolute;
+  left: 28px;
+  right: 16px;
+  height: 2px;
+  background: var(--mm-blue, #1a73e8);
+  z-index: 4;
+  pointer-events: none;
+}
+.rte-code-chrome {
+  position: absolute;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px;
+  border: 1px solid var(--mm-line, #e8eaed);
+  border-radius: 6px;
+  background: var(--mm-surface, #fff);
+  box-shadow: 0 4px 14px rgba(32, 33, 36, 0.08);
+}
+.rte-code-chrome select,
+.rte-code-chrome button {
+  height: 26px;
+  border: none;
+  background: transparent;
+  color: var(--mm-text, #202124);
+  font-size: 12px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.rte-code-chrome button {
+  padding: 0 8px;
+}
+.rte-code-chrome select:hover,
+.rte-code-chrome button:hover {
+  background: var(--mm-blue-soft, #e8f0fe);
+}
+.rte-empty-guide {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 16px;
+  color: var(--mm-faint, #9aa0a6);
+  font-size: 12px;
+}
+.rte-empty-guide button {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--mm-line-strong, #dadce0);
+  border-radius: 999px;
+  background: var(--mm-surface, #fff);
+  color: var(--mm-text, #202124);
+  cursor: pointer;
+}
+.rte-empty-guide button:hover {
+  border-color: var(--mm-blue, #1a73e8);
+  color: var(--mm-blue, #1a73e8);
+}
+.rte-outline-item.is-current {
+  background: var(--mm-blue-soft, #e8f0fe);
+  color: var(--mm-blue, #1a73e8);
 }
 
 .rte-title {
