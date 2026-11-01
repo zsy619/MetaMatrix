@@ -1,4 +1,4 @@
-import { apiRequest } from './http'
+import { apiRequest, apiRequestResult } from './http'
 import type { CanvasDocumentJSON } from '../types/canvas'
 
 export type DocumentSummary = {
@@ -72,7 +72,15 @@ export type AIContext = {
   }>
 }
 
-export function listDocuments(params?: {
+export type DocumentPage = {
+  items: DocumentSummary[]
+  total: number
+  limit: number
+  offset: number
+  hasMore: boolean
+}
+
+function documentQuery(params?: {
   templateId?: string
   canvasType?: string
   limit?: number
@@ -84,7 +92,35 @@ export function listDocuments(params?: {
   if (params?.limit != null) q.set('limit', String(params.limit))
   if (params?.offset != null) q.set('offset', String(params.offset))
   const qs = q.toString()
-  return apiRequest<DocumentSummary[]>(`/documents${qs ? `?${qs}` : ''}`)
+  return `/documents${qs ? `?${qs}` : ''}`
+}
+
+export function listDocuments(params?: {
+  templateId?: string
+  canvasType?: string
+  limit?: number
+  offset?: number
+}) {
+  return apiRequest<DocumentSummary[]>(documentQuery(params))
+}
+
+export async function listDocumentsPage(params?: {
+  templateId?: string
+  canvasType?: string
+  limit?: number
+  offset?: number
+}): Promise<DocumentPage> {
+  const limit = params?.limit ?? 20
+  const offset = params?.offset ?? 0
+  const res = await apiRequestResult<DocumentSummary[]>(
+    documentQuery({ ...params, limit, offset }),
+  )
+  const items = Array.isArray(res.data) ? res.data : []
+  const totalHeader = Number(res.headers.get('X-Total-Count'))
+  const total = Number.isFinite(totalHeader) ? totalHeader : items.length
+  const hasMoreHeader = res.headers.get('X-Has-More')
+  const hasMore = hasMoreHeader == null ? offset + items.length < total : hasMoreHeader === 'true'
+  return { items, total, limit, offset, hasMore }
 }
 
 export function getDocument(id: string) {

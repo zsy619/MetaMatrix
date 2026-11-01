@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strconv"
+	"time"
 
 	"metamatrix/api/internal/middleware"
 	"metamatrix/api/internal/service"
@@ -12,11 +14,15 @@ import (
 )
 
 type AuthHandler struct {
-	svc *service.AuthService
+	svc   *service.AuthService
+	limit *service.AttemptLimiter
 }
 
 func NewAuthHandler(svc *service.AuthService) *AuthHandler {
-	return &AuthHandler{svc: svc}
+	return &AuthHandler{
+		svc:   svc,
+		limit: service.NewAttemptLimiter(15*time.Minute, 8, 30),
+	}
 }
 
 type registerBody struct {
@@ -64,18 +70,55 @@ func (h *AuthHandler) Login(ctx context.Context, c *app.RequestContext) {
 		BadRequest(c, "invalid body")
 		return
 	}
+	ip := clientIP(c)
+	email := service.NormalizeEmail(body.Email)
+	now := time.Now()
+	if ok, wait := h.limit.Allow(ip, email, now); !ok {
+		middleware.ObserveLoginThrottled()
+		tooManyLogins(c, wait)
+		return
+	}
 	u, token, err := h.svc.Login(body.Email, body.Password)
 	if err != nil {
 		if errors.Is(err, service.ErrInvalidCreds) {
+			h.limit.RecordFailure(ip, email, time.Now())
+			middleware.ObserveLoginFailure()
+			if ok, wait := h.limit.Allow(ip, email, time.Now()); !ok {
+				middleware.ObserveLoginThrottled()
+				tooManyLogins(c, wait)
+				return
+			}
 			Fail(c, http.StatusUnauthorized, "invalid email or password", "invalid_credentials")
 			return
 		}
 		Internal(c, "login failed")
 		return
 	}
+	h.limit.Reset(ip, email)
 	c.JSON(http.StatusOK, map[string]interface{}{
 		"token": token,
 		"user":  service.UserPublic(u),
+	})
+}
+
+func clientIP(c *app.RequestContext) string {
+	ip := c.ClientIP()
+	if ip == "" {
+		return "unknown"
+	}
+	return ip
+}
+
+func tooManyLogins(c *app.RequestContext, wait time.Duration) {
+	sec := int(wait.Seconds())
+	if sec < 1 {
+		sec = 1
+	}
+	c.Header("Retry-After", strconv.Itoa(sec))
+	c.JSON(http.StatusTooManyRequests, map[string]interface{}{
+		"message":           "too many login attempts",
+		"code":              "rate_limited",
+		"retryAfterSeconds": sec,
 	})
 }
 

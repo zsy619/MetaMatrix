@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
 	"time"
 
 	"metamatrix/api/internal/config"
@@ -50,13 +51,38 @@ func main() {
 			"X-Limit",
 			"X-Offset",
 			"Cache-Control",
+			"Retry-After",
 		},
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 	}))
 
 	h.GET("/health", func(ctx context.Context, c *app.RequestContext) {
-		c.JSON(200, map[string]string{"status": "ok"})
+		status := "ok"
+		code := http.StatusOK
+		if sqlDB, err := gdb.DB(); err != nil {
+			status = "degraded"
+			code = http.StatusServiceUnavailable
+		} else {
+			pingCtx, cancel := context.WithTimeout(ctx, 300*time.Millisecond)
+			err = sqlDB.PingContext(pingCtx)
+			cancel()
+			if err != nil {
+				status = "degraded"
+				code = http.StatusServiceUnavailable
+			}
+		}
+		snap := middleware.Snapshot()
+		c.JSON(code, map[string]interface{}{
+			"status":        status,
+			"uptimeSeconds": snap.UptimeSeconds,
+			"requests":      snap.Requests,
+			"auth":          snap.Auth,
+		})
+	})
+	h.GET("/metrics", func(ctx context.Context, c *app.RequestContext) {
+		c.SetContentType("text/plain; version=0.0.4; charset=utf-8")
+		c.String(http.StatusOK, middleware.PrometheusText())
 	})
 
 	h.POST("/auth/register", authH.Register)
