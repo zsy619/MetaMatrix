@@ -5,6 +5,7 @@ import (
 
 	"github.com/google/uuid"
 	"gorm.io/datatypes"
+	"gorm.io/gorm"
 )
 
 type User struct {
@@ -31,6 +32,7 @@ type CanvasDocument struct {
 	TemplateID     *string        `gorm:"type:varchar(64);index:idx_docs_owner_template,priority:2" json:"templateId"`
 	CreatedAt      time.Time      `gorm:"type:timestamptz;not null" json:"createdAt"`
 	UpdatedAt      time.Time      `gorm:"type:timestamptz;not null;index:idx_docs_owner_updated,priority:2,sort:desc" json:"updatedAt"`
+	DeletedAt      gorm.DeletedAt `gorm:"index" json:"-"`
 
 	Owner     User                 `gorm:"foreignKey:OwnerUserID;constraint:OnDelete:CASCADE" json:"-"`
 	Revisions []CanvasRevision     `gorm:"foreignKey:DocumentID;constraint:OnDelete:CASCADE" json:"-"`
@@ -92,7 +94,7 @@ type RevisionSummary struct {
 	ParentID       *uuid.UUID `json:"parentId"`
 	RevisionType   string     `json:"revisionType"`
 	BaseSnapshotID *uuid.UUID `json:"baseSnapshotId"`
-	AuthorUserID   *uuid.UUID  `json:"authorUserId"`
+	AuthorUserID   *uuid.UUID `json:"authorUserId"`
 	Label          *string    `json:"label"`
 	ContentHash    *string    `json:"contentHash"`
 	CreatedAt      time.Time  `json:"createdAt"`
@@ -109,4 +111,6 @@ type SearchHit struct {
 	UpdatedAt  time.Time `json:"updatedAt"`
 	Snippet    string    `json:"snippet"`
 	Rank       float64   `json:"rank,omitempty"`
+	PanelID    string    `json:"panelId,omitempty"`
+	PanelTitle string    `json:"panelTitle,omitempty"`
 }

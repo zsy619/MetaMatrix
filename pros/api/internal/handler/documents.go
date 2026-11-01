@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -78,13 +79,18 @@ func handleDocErr(c *app.RequestContext, err error, doc interface{}) bool {
 	case errors.Is(err, service.ErrRevisionNotFound):
 		NotFound(c, "revision not found")
 	case errors.Is(err, service.ErrHeadConflict):
-		Conflict(c, "head_revision_id conflict", map[string]interface{}{
+		middleware.ErrorJSON(c, http.StatusConflict, "document was updated elsewhere", "head_conflict", map[string]interface{}{
 			"headRevisionId": extractHead(doc),
 		})
 	case errors.Is(err, service.ErrNotSnapshot):
 		Conflict(c, err.Error(), nil)
+	case errors.Is(err, service.ErrValidation), errors.Is(err, service.ErrInvalidHead):
+		Fail(c, http.StatusBadRequest, "validation failed", "validation_error")
+	case errors.Is(err, service.ErrPayloadTooLarge):
+		Fail(c, http.StatusRequestEntityTooLarge, "payload too large", "payload_too_large")
 	default:
-		Internal(c, err.Error())
+		log.Printf("document error: %v", err)
+		Internal(c, "request failed")
 	}
 	return true
 }
@@ -132,9 +138,28 @@ func (h *DocumentsHandler) List(ctx context.Context, c *app.RequestContext) {
 	}
 	templateID := string(c.Query("templateId"))
 	canvasType := string(c.Query("canvasType"))
-	rows, err := h.svc.List(uid, templateID, canvasType)
+	limit, offset, paged, err := service.NormalizeListPage(string(c.Query("limit")), string(c.Query("offset")))
+	if err != nil {
+		Fail(c, http.StatusBadRequest, "invalid limit or offset", "validation_error")
+		return
+	}
+	rows, total, err := h.svc.List(uid, service.ListFilter{
+		TemplateID: templateID,
+		CanvasType: canvasType,
+		Limit:      limit,
+		Offset:     offset,
+		Paged:      paged,
+		Archived:   string(c.Query("archived")) == "1",
+	})
 	if handleDocErr(c, err, nil) {
 		return
+	}
+	hasMore := paged && int64(offset+len(rows)) < total
+	c.Header("X-Total-Count", strconv.FormatInt(total, 10))
+	c.Header("X-Has-More", strconv.FormatBool(hasMore))
+	if paged {
+		c.Header("X-Limit", strconv.Itoa(limit))
+		c.Header("X-Offset", strconv.Itoa(offset))
 	}
 	c.JSON(http.StatusOK, rows)
 }
@@ -190,6 +215,105 @@ func (h *DocumentsHandler) Update(ctx context.Context, c *app.RequestContext) {
 	c.JSON(http.StatusOK, doc)
 }
 
+type batchBody struct {
+	IDs    []string `json:"ids"`
+	Action string   `json:"action"`
+}
+
+func (h *DocumentsHandler) Batch(ctx context.Context, c *app.RequestContext) {
+	uid, ok := h.owner(c)
+	if !ok {
+		return
+	}
+	var body batchBody
+	if err := c.BindAndValidate(&body); err != nil {
+		Fail(c, http.StatusBadRequest, "invalid body", "validation_error")
+		return
+	}
+	ids, err := service.NormalizeBatchIDs(body.IDs)
+	if err != nil {
+		Fail(c, http.StatusBadRequest, "invalid ids", "validation_error")
+		return
+	}
+	var n int64
+	switch body.Action {
+	case "archive":
+		n, err = h.svc.Archive(uid, ids)
+	case "restore":
+		n, err = h.svc.RestoreArchived(uid, ids)
+	default:
+		Fail(c, http.StatusBadRequest, "action must be archive or restore", "validation_error")
+		return
+	}
+	if handleDocErr(c, err, nil) {
+		return
+	}
+	middleware.Audit(c, body.Action, uid.String(), "affected="+strconv.FormatInt(n, 10))
+	c.JSON(http.StatusOK, map[string]interface{}{"affected": n})
+}
+
+func (h *DocumentsHandler) Export(ctx context.Context, c *app.RequestContext) {
+	uid, ok := h.owner(c)
+	if !ok {
+		return
+	}
+	id, ok := parseID(c, "id")
+	if !ok {
+		return
+	}
+	doc, err := h.svc.GetOwned(uid, id)
+	if handleDocErr(c, err, nil) {
+		return
+	}
+	format := string(c.Query("format"))
+	name := doc.Title
+	if name == "" {
+		name = "canvas"
+	}
+	if format == "markdown" || format == "md" {
+		md, err := service.CanvasMarkdown(doc.Title, doc.CurrentData)
+		if handleDocErr(c, err, nil) {
+			return
+		}
+		c.JSON(http.StatusOK, map[string]string{
+			"filename": name + ".md",
+			"format":   "markdown",
+			"content":  md,
+		})
+		return
+	}
+	c.JSON(http.StatusOK, map[string]interface{}{
+		"filename": name + ".json",
+		"format":   "json",
+		"content":  json.RawMessage(doc.CurrentData),
+	})
+}
+
+type renameBody struct {
+	Title string `json:"title"`
+}
+
+func (h *DocumentsHandler) Rename(ctx context.Context, c *app.RequestContext) {
+	uid, ok := h.owner(c)
+	if !ok {
+		return
+	}
+	id, ok := parseID(c, "id")
+	if !ok {
+		return
+	}
+	var body renameBody
+	if err := c.BindAndValidate(&body); err != nil {
+		Fail(c, http.StatusBadRequest, "invalid body", "validation_error")
+		return
+	}
+	if handleDocErr(c, h.svc.Rename(uid, id, body.Title), nil) {
+		return
+	}
+	middleware.Audit(c, "rename", uid.String(), "id="+id.String())
+	c.JSON(http.StatusOK, map[string]string{"title": strings.TrimSpace(body.Title)})
+}
+
 func (h *DocumentsHandler) Delete(ctx context.Context, c *app.RequestContext) {
 	uid, ok := h.owner(c)
 	if !ok {
@@ -202,6 +326,7 @@ func (h *DocumentsHandler) Delete(ctx context.Context, c *app.RequestContext) {
 	if handleDocErr(c, h.svc.Delete(uid, id), nil) {
 		return
 	}
+	middleware.Audit(c, "archive", uid.String(), "id="+id.String())
 	c.Status(http.StatusNoContent)
 }
 
@@ -317,20 +442,13 @@ func (h *DocumentsHandler) Stats(ctx context.Context, c *app.RequestContext) {
 	if !ok {
 		return
 	}
-	// Personal by default. There is no role on users, so a cross-user scope is refused
-	// instead of aggregating every account.
-	scope := strings.ToLower(strings.TrimSpace(string(c.Query("scope"))))
-	if scope == "" {
-		scope = "me"
-	}
-	if scope != "me" {
-		Forbidden(c, "统计只包含当前登录用户")
-		return
-	}
+	uid = service.ResolveStatsOwner(uid, string(c.Query("scope")))
 	out, err := h.svc.Stats(uid, string(c.Query("range")), string(c.Query("granularity")))
 	if handleDocErr(c, err, nil) {
 		return
 	}
+	c.Header("Cache-Control", "private, max-age=20")
+	c.Header("Vary", "Authorization")
 	c.JSON(http.StatusOK, out)
 }
 

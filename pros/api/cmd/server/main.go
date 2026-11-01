@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
+	"os"
 	"time"
 
 	"metamatrix/api/internal/config"
@@ -30,40 +32,80 @@ func main() {
 
 	authSvc := service.NewAuthService(gdb, cfg.JWTSecret)
 	docSvc := service.NewDocumentsService(gdb)
-	authH := handler.NewAuthHandler(authSvc)
+	authH := handler.NewAuthHandler(authSvc, service.NewAttemptLimiter(cfg.LoginWindow, cfg.LoginPairLimit, cfg.LoginIPLimit))
 	docH := handler.NewDocumentsHandler(docSvc)
 
 	h := server.Default(
 		server.WithHostPorts(fmt.Sprintf(":%d", cfg.Port)),
 	)
 
+	h.Use(middleware.SecurityHeaders())
+	h.Use(middleware.AccessLog())
 	h.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:5173", "http://127.0.0.1:5173"},
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "Accept"},
-		ExposeHeaders:    []string{"Content-Length"},
+		AllowOrigins: middleware.ParseCORSOrigins(os.Getenv("CORS_ORIGINS")),
+		AllowMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
+		AllowHeaders: []string{"Origin", "Content-Type", "Authorization", "Accept", "X-Request-Id"},
+		ExposeHeaders: []string{
+			"Content-Length",
+			"X-Request-Id",
+			"X-Total-Count",
+			"X-Has-More",
+			"X-Limit",
+			"X-Offset",
+			"Cache-Control",
+			"Retry-After",
+		},
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 	}))
 
 	h.GET("/health", func(ctx context.Context, c *app.RequestContext) {
-		c.JSON(200, map[string]string{"status": "ok"})
+		status := "ok"
+		code := http.StatusOK
+		if sqlDB, err := gdb.DB(); err != nil {
+			status = "degraded"
+			code = http.StatusServiceUnavailable
+		} else {
+			pingCtx, cancel := context.WithTimeout(ctx, 300*time.Millisecond)
+			err = sqlDB.PingContext(pingCtx)
+			cancel()
+			if err != nil {
+				status = "degraded"
+				code = http.StatusServiceUnavailable
+			}
+		}
+		snap := middleware.Snapshot()
+		c.JSON(code, map[string]interface{}{
+			"status":        status,
+			"uptimeSeconds": snap.UptimeSeconds,
+			"requests":      snap.Requests,
+			"auth":          snap.Auth,
+		})
+	})
+	h.GET("/metrics", func(ctx context.Context, c *app.RequestContext) {
+		c.SetContentType("text/plain; version=0.0.4; charset=utf-8")
+		c.String(http.StatusOK, middleware.PrometheusText())
 	})
 
 	h.POST("/auth/register", authH.Register)
 	h.POST("/auth/login", authH.Login)
 	h.GET("/auth/me", middleware.AuthRequired(cfg.JWTSecret), authH.Me)
+	h.POST("/auth/refresh", middleware.AuthRequired(cfg.JWTSecret), authH.Refresh)
+	h.POST("/auth/password", middleware.AuthRequired(cfg.JWTSecret), authH.ChangePassword)
 
 	docs := h.Group("/documents", middleware.AuthRequired(cfg.JWTSecret))
 	{
 		docs.POST("", docH.Create)
 		docs.GET("", docH.List)
+		docs.POST("/batch", docH.Batch)
 		// Static paths before :id
 		docs.GET("/search", docH.Search)
 		docs.GET("/stats", docH.Stats)
 		docs.GET("/ai-corpus", docH.AICorpus)
 		docs.GET("/:id", docH.Get)
+		docs.GET("/:id/export", docH.Export)
 		docs.PUT("/:id", docH.Update)
+		docs.PATCH("/:id/title", docH.Rename)
 		docs.DELETE("/:id", docH.Delete)
 		docs.GET("/:id/ai-context", docH.AIContext)
 		docs.POST("/:id/revisions", docH.CreateRevision)
