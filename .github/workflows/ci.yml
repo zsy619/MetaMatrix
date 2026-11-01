@@ -37,6 +37,7 @@ jobs:
       - run: node --experimental-strip-types src/utils/rteBatch3.test.ts
       - run: node --experimental-strip-types src/utils/rtePasteClean.test.ts
       - run: node --experimental-strip-types src/utils/rteRound5.test.ts
+      - run: node --experimental-strip-types src/utils/rteRound6.test.ts
       - run: node scripts/smoke-flow.mjs
 
   flow:

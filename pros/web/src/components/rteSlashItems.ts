@@ -39,6 +39,7 @@ export type RteSlashAction =
   | { type: 'dateChip' }
   | { type: 'dateRemind' }
   | { type: 'columns'; cols: 2 | 3 }
+  | { type: 'docTitle' }
   | { type: 'table' }
   | { type: 'image' }
   | { type: 'video' }
@@ -73,6 +74,8 @@ export type RteSlashItem = {
   templateGroup?: RteDocTemplateGroup
   keywords: string[]
   action: RteSlashAction
+  /** 菜单临时分组，例如「最近使用」 */
+  sectionLabel?: string
 }
 
 export const RTE_SLASH_GROUP_LABELS: Record<RteSlashGroup, string> = {
@@ -210,6 +213,14 @@ const BLOCK_ITEMS: RteSlashItem[] = [
     group: 'block',
     keywords: ['remind', '提醒', 'todo', '日期'],
     action: { type: 'dateRemind' },
+  },
+  {
+    id: 'doc-title',
+    label: '标题块',
+    description: '正文内标题，不改面板名',
+    group: 'block',
+    keywords: ['title', '标题', '封面', '文档标题'],
+    action: { type: 'docTitle' },
   },
   {
     id: 'columns-2',
@@ -562,6 +573,7 @@ export function filterRteSlashItems(query: string, limit = 80): RteSlashItem[] {
 export { rteSlashGlyph } from '../utils/rteSlashGlyph'
 
 export function rteSlashSectionLabel(item: RteSlashItem): string {
+  if (item.sectionLabel) return item.sectionLabel
   if (item.group !== 'template' || !item.templateGroup) {
     return RTE_SLASH_GROUP_LABELS[item.group]
   }

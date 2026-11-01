@@ -36,6 +36,7 @@ import { looksLikeHtml, escapeHtml } from '../utils/itemsHtml'
 import { Annotation } from '../extensions/annotation'
 import { MathInline, MathDisplay, renderKatex } from '../extensions/math'
 import { DateChip } from '../extensions/dateChip'
+import { DocTitle } from '../extensions/docTitle'
 import { Video } from '../extensions/video'
 import {
   FormTextInput,
@@ -104,6 +105,13 @@ import {
   sanitizePastedHtml,
 } from '../utils/rtePasteClean'
 import { canRunFindReplace, imageReplaceSide, todayIso } from '../utils/rteRound5'
+import {
+  orderSlashForMenu,
+  embedIframeSrc,
+  pushRecentSlash,
+  shouldTakeSnapshot,
+  type NoteRow,
+} from '../utils/rteRound6'
 import { LetterSpacing } from '../extensions/letterSpacing'
 import { ParagraphAttrs } from '../extensions/paragraphAttrs'
 import { PageBreak } from '../extensions/pageBreak'
@@ -409,10 +417,14 @@ function confirmLinkCardDialog() {
     ElMessage.warning('请输入网页链接')
     return
   }
-  const mode = linkCardMode.value
+  let mode = linkCardMode.value
+  if (mode === 'iframe' && !embedIframeSrc(href)) {
+    ElMessage.warning('该地址不在嵌入白名单，已改为链接卡片')
+    mode = 'card'
+  }
   const ok = editor.value?.chain().focus().insertLinkCard({ href, mode }).run()
   if (!ok) ElMessage.warning('链接无效（仅支持 http/https）')
-  else ElMessage.success(mode === 'iframe' ? '已插入嵌入卡片' : '已插入链接卡片')
+  else ElMessage.success(mode === 'iframe' ? '已插入嵌入' : '已插入链接卡片')
   closeLinkCardDialog()
 }
 /** 视图：缩放 / 专注 / 暗色 / 纸张参考线 */
@@ -547,8 +559,27 @@ function placeSlashMenuFromRect(rect: DOMRect | null) {
   }
 }
 
+const SLASH_RECENT_KEY = 'metamatrix-rte-slash-recent'
+
+function loadRecentSlash(): string[] {
+  try {
+    const raw = JSON.parse(localStorage.getItem(SLASH_RECENT_KEY) || '[]') as unknown
+    return Array.isArray(raw) ? raw.filter((id) => typeof id === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+function rememberSlash(id: string) {
+  try {
+    localStorage.setItem(SLASH_RECENT_KEY, JSON.stringify(pushRecentSlash(loadRecentSlash(), id)))
+  } catch {
+    /* 隐私模式忽略 */
+  }
+}
+
 function syncSlashFromProps(props: RteSlashRenderProps) {
-  slashItems.value = props.items
+  slashItems.value = orderSlashForMenu(props.items, props.query, loadRecentSlash())
   slashQuery.value = props.query
   slashSelectItem = props.command
   slashClientRectFn = props.clientRect ?? null
@@ -641,6 +672,7 @@ const slashUi: RteSlashUiHandlers = {
 }
 
 function pickSlashItem(item: RteSlashItem) {
+  rememberSlash(item.id)
   if (slashSelectItem) slashSelectItem(item)
   else applySlashCommandItem(item)
 }
@@ -985,6 +1017,7 @@ const editor = useEditor({
     MathInline,
     MathDisplay,
     DateChip,
+    DocTitle,
     FormTextInput,
     FormRadioGroup,
     FormCheckboxGroup,
@@ -1320,6 +1353,7 @@ const editor = useEditor({
   },
   onUpdate: ({ editor: ed }) => {
     scheduleHtmlEmit(ed)
+    scheduleDocChrome()
   },
   onFocus: () => emit('focus'),
   onBlur: ({ editor: ed }) => {
@@ -1907,19 +1941,98 @@ function closeOutlinePanel() {
 
 type OutlineHeading = { id: string; level: number; text: string; pos: number }
 
-const outlineHeadings = computed((): OutlineHeading[] => {
-  void editor.value?.state
+const outlineHeadings = ref<OutlineHeading[]>([])
+const noteRows = ref<NoteRow[]>([])
+const notesOpen = ref(false)
+const historyOpen = ref(false)
+const sessionSnaps = ref<Array<{ at: number; html: string }>>([])
+let docChromeTimer: ReturnType<typeof setTimeout> | null = null
+let lastSnapHtml = ''
+let lastSnapAt = 0
+
+function refreshDocChrome() {
   const ed = editor.value
-  if (!ed) return []
-  const out: OutlineHeading[] = []
+  if (!ed || ed.isDestroyed) {
+    outlineHeadings.value = []
+    noteRows.value = []
+    return
+  }
+  const headings: OutlineHeading[] = []
+  const notes: NoteRow[] = []
   ed.state.doc.descendants((node, pos) => {
-    if (node.type.name !== 'heading') return
-    const level = Number(node.attrs.level) || 1
-    const text = node.textContent.trim() || `（空标题 ${level}）`
-    out.push({ id: `h-${pos}`, level, text, pos })
+    if (node.type.name === 'heading') {
+      const level = Number(node.attrs.level) || 1
+      const text = node.textContent.trim() || `（空标题 ${level}）`
+      headings.push({ id: `h-${pos}`, level, text, pos })
+    }
+    if (!node.isText) return
+    for (const mark of node.marks) {
+      if (mark.type.name !== 'annotation') continue
+      notes.push({
+        from: pos,
+        to: pos + node.nodeSize,
+        text: node.text || '',
+        note: String(mark.attrs.note || ''),
+        type: String(mark.attrs.type || '新注释'),
+      })
+    }
   })
-  return out
+  outlineHeadings.value = headings
+  noteRows.value = notes
+  const html = ed.getHTML()
+  const now = Date.now()
+  if (shouldTakeSnapshot(lastSnapHtml, html, now - lastSnapAt)) {
+    lastSnapHtml = html
+    lastSnapAt = now
+    sessionSnaps.value = [...sessionSnaps.value, { at: now, html }].slice(-12)
+  }
+}
+
+/** 长文档不在每次击键时重扫标题和批注。 */
+function scheduleDocChrome() {
+  if (docChromeTimer != null) return
+  docChromeTimer = setTimeout(() => {
+    docChromeTimer = null
+    refreshDocChrome()
+  }, 280)
+}
+
+watch(editorReady, (ready) => {
+  if (ready) refreshDocChrome()
 })
+
+function jumpNote(row: NoteRow) {
+  const ed = editor.value
+  if (!ed) return
+  jumpToPos(ed, row.from)
+}
+
+function removeNote(row: NoteRow) {
+  const ed = editor.value
+  if (!ed) return
+  ed.chain().focus().setTextSelection({ from: row.from, to: row.to }).unsetAnnotation().run()
+  scheduleDocChrome()
+}
+
+function restoreSessionSnap(html: string) {
+  const ed = editor.value
+  if (!ed) return
+  ed.commands.setContent(html, { emitUpdate: true })
+  historyOpen.value = false
+  ElMessage.success('已恢复本次会话中的一版。这与云端版本无关。')
+}
+
+async function insertDocTitleBlock() {
+  const text = await openRtePrompt({
+    title: '文档标题',
+    message: '这是正文里的标题块，不会改画布面板标题。',
+    placeholder: '标题',
+    confirmLabel: '插入',
+    maxlength: 80,
+  })
+  if (!text?.trim()) return
+  editor.value?.chain().focus().insertDocTitle(text.trim()).run()
+}
 
 const activeOutlineIndex = computed(() => {
   void editor.value?.state.selection
@@ -4017,6 +4130,9 @@ function applySlashCommandItem(item: RteSlashItem) {
     case 'columns':
       insertColumns(action.cols)
       break
+    case 'docTitle':
+      void insertDocTitleBlock()
+      break
     case 'table':
       openTableDialog()
       break
@@ -4391,6 +4507,10 @@ onBeforeUnmount(() => {
   if (htmlEmitTimer != null) {
     clearTimeout(htmlEmitTimer)
     htmlEmitTimer = null
+  }
+  if (docChromeTimer != null) {
+    clearTimeout(docChromeTimer)
+    docChromeTimer = null
   }
   document.removeEventListener('pointerdown', onDocPointerDownForMenus, true)
   window.removeEventListener('resize', repositionSlashMenu)
@@ -4851,7 +4971,7 @@ function rteToast(
 }
 
 const VIDEO_EXT_RE = /\.(mp4|webm|mov|m4v|ogg|ogv|mkv)$/i
-const ATTACH_MAX_BYTES = 8 * 1024 * 1024
+const ATTACH_MAX_BYTES = MAX_ATTACHMENT_BYTES
 const VIDEO_MAX_BYTES = 50 * 1024 * 1024
 
 function isVideoFile(file: File): boolean {
@@ -6233,7 +6353,7 @@ async function onLocalAttachFilesChange(event: Event) {
   const added: StoredAttach[] = []
   for (const file of files) {
     if (file.size > ATTACH_MAX_BYTES) {
-      rteToast('warning', `${file.name} 超过 8MB，已跳过（本地预览限制）`)
+      rteToast('warning', `${file.name} 超过 3MB，已跳过`)
       continue
     }
     try {
@@ -11293,6 +11413,49 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
       />
 
       <aside
+        v-if="notesOpen && viewMode === 'edit'"
+        class="rte-outline-panel"
+        aria-label="批注"
+      >
+        <div class="rte-outline-head">
+          <span class="rte-outline-title">批注</span>
+          <button type="button" class="rte-outline-close" aria-label="关闭批注" @click="notesOpen = false">×</button>
+        </div>
+        <p v-if="!noteRows.length" class="rte-outline-empty">还没有批注。选中文字后用工具栏「注释」添加，内容会留在正文里。</p>
+        <nav v-else class="rte-outline-list">
+          <div v-for="(row, idx) in noteRows" :key="row.from + '-' + idx" class="rte-note-row">
+            <button type="button" class="rte-outline-item" @click="jumpNote(row)">
+              <span class="rte-note-type">{{ row.type }}</span>
+              {{ row.text || row.note || '空批注' }}
+            </button>
+            <button type="button" class="rte-note-remove" aria-label="删除批注" @click="removeNote(row)">删除</button>
+          </div>
+        </nav>
+      </aside>
+      <aside
+        v-if="historyOpen && viewMode === 'edit'"
+        class="rte-outline-panel"
+        aria-label="本次会话记录"
+      >
+        <div class="rte-outline-head">
+          <span class="rte-outline-title">本地记录</span>
+          <button type="button" class="rte-outline-close" aria-label="关闭本地记录" @click="historyOpen = false">×</button>
+        </div>
+        <p class="rte-outline-empty">只保留这次打开编辑器后的若干步，用来撤销大段改动。云端版本仍走原来的保存。</p>
+        <p v-if="!sessionSnaps.length" class="rte-outline-empty">还没有可恢复的记录。继续编辑一会儿会自动记下。</p>
+        <nav v-else class="rte-outline-list">
+          <button
+            v-for="(snap, idx) in [...sessionSnaps].reverse()"
+            :key="snap.at"
+            type="button"
+            class="rte-outline-item"
+            @click="restoreSessionSnap(snap.html)"
+          >
+            第 {{ sessionSnaps.length - idx }} 步
+          </button>
+        </nav>
+      </aside>
+      <aside
         v-if="outlineOpen && viewMode === 'edit'"
         class="rte-outline-panel"
         aria-label="标题大纲"
@@ -11375,6 +11538,25 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
         </span>
       </div>
       <div class="rte-bottom-right">
+        <button
+          v-if="expanded"
+          type="button"
+          class="rte-bottom-link"
+          :aria-pressed="notesOpen"
+          @click="notesOpen = !notesOpen"
+        >
+          批注
+        </button>
+        <button
+          v-if="expanded"
+          type="button"
+          class="rte-bottom-link"
+          :aria-pressed="historyOpen"
+          title="本次编辑会话里的本地记录，不是云端版本"
+          @click="historyOpen = !historyOpen"
+        >
+          本地记录
+        </button>
         <button
           v-if="expanded"
           type="button"
@@ -17964,6 +18146,53 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
 }
 .rte-root.is-dark-editor .ProseMirror a {
   color: #7eb6ff;
+}
+.rte-root.is-dark-editor {
+  background: #171a1f;
+  border-color: #3a3f47;
+}
+.rte-root.is-dark-editor .rte-toolbar,
+.rte-root.is-dark-editor .rte-bottom,
+.rte-root.is-dark-editor .rte-outline-panel {
+  background: #171a1f;
+  color: #e5e6eb;
+  border-color: #3a3f47;
+}
+.rte-root.is-dark-editor .rte-tool,
+.rte-root.is-dark-editor .rte-tool-label,
+.rte-root.is-dark-editor .rte-outline-item {
+  color: #e5e6eb;
+}
+.rte-root :deep(.ProseMirror ::selection) {
+  background: rgba(51, 112, 255, 0.28);
+}
+.rte-root.is-dark-editor :deep(.ProseMirror ::selection) {
+  background: rgba(51, 112, 255, 0.45);
+}
+.rte-root :deep(.rte-doc-title) {
+  margin: 0.2em 0 0.6em;
+  font-size: 28px;
+  line-height: 1.3;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+.rte-note-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+}
+.rte-note-type {
+  display: block;
+  font-size: 11px;
+  color: var(--mm-muted, #5f6368);
+}
+.rte-note-remove {
+  border: none;
+  background: transparent;
+  color: var(--mm-red, #d93025);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 6px;
 }
 .rte-canvas.is-paper-guide .rte-body,
 .rte-canvas.is-paper-guide .ProseMirror {

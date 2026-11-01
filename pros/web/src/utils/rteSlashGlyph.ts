@@ -32,6 +32,8 @@ export function rteSlashGlyph(item: {
       return '日'
     case 'formula':
       return 'Σ'
+    case 'docTitle':
+      return '题'
     case 'image':
       return '图'
     case 'link':
