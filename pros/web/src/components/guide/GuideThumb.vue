@@ -67,12 +67,12 @@ withDefaults(
         <text x="38" y="77" text-anchor="middle" font-size="6.5" font-weight="700" fill="#fff">A. 数据</text>
         <text x="100" y="77" text-anchor="middle" font-size="6" font-weight="700" fill="#fff">A. 基本功</text>
         <text x="162" y="77" text-anchor="middle" font-size="6" font-weight="700" fill="#fff">H. 创造力</text>
-        <text x="12" y="36" font-size="5.5" fill="#2F9D94">起点</text>
-        <text x="74" y="36" font-size="5.5" fill="#A88420">终点</text>
-        <text x="136" y="36" font-size="5.5" fill="#A88420">过程</text>
-        <text x="12" y="94" font-size="5.5" fill="#2F9D94">资产</text>
-        <text x="74" y="94" font-size="5.5" fill="#2F9D94">能力</text>
-        <text x="136" y="94" font-size="5.5" fill="#A88420">创新</text>
+        <text x="12" y="38" font-size="7" font-weight="650" fill="#2F9D94">起点</text>
+        <text x="74" y="38" font-size="7" font-weight="650" fill="#A88420">终点</text>
+        <text x="136" y="38" font-size="7" font-weight="650" fill="#A88420">过程</text>
+        <text x="12" y="96" font-size="7" font-weight="650" fill="#2F9D94">资产</text>
+        <text x="74" y="96" font-size="7" font-weight="650" fill="#2F9D94">能力</text>
+        <text x="136" y="96" font-size="7" font-weight="650" fill="#A88420">创新</text>
         <text x="10" y="122" font-size="5" fill="#5f6368">一堂 AI 双三角 · 梳理与预判</text>
         <text x="10" y="131" font-size="4.5" fill="#80868b">做加法 · 排优先级 · 先验证最高项</text>
       </svg>

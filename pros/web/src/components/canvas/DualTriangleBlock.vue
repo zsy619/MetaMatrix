@@ -30,8 +30,8 @@ const props = withDefaults(
 
 const isTable = computed(() => props.variant === 'table')
 
-/** 表格式画布的固定角标（keyword 不是这六个词时回退，兼容旧文档） */
-const TABLE_BADGE: Record<DualTriangleBlockId, string> = {
+/** 内容区主题词的默认引导（可被 keyword 覆盖） */
+const TOPIC_PLACEHOLDER: Record<DualTriangleBlockId, string> = {
   scenario: '起点',
   aesthetics: '终点',
   system: '过程',
@@ -49,8 +49,6 @@ const TABLE_TOPIC: Record<DualTriangleBlockId, string> = {
   innovation: '创造力',
 }
 
-const CANONICAL_BADGES = new Set(Object.values(TABLE_BADGE))
-
 function topicFromTitle(title: string): string {
   return title
     .replace(/❤|❤️/g, '')
@@ -59,11 +57,15 @@ function topicFromTitle(title: string): string {
     .trim()
 }
 
-const tableBadge = computed(() => {
-  const kw = (props.block.keyword || '').replace(/❤|❤️/g, '').trim()
-  if (CANONICAL_BADGES.has(kw)) return kw
-  return TABLE_BADGE[props.block.id] || kw
-})
+/** 格子正文里的主题词（起点 / 终点等），存在 keyword，可编辑 */
+const contentTopic = computed(() =>
+  (props.block.keyword || '').replace(/❤|❤️/g, '').trim(),
+)
+const topicPlaceholder = computed(
+  () => TOPIC_PLACEHOLDER[props.block.id] || '内容主题',
+)
+const topicDraft = ref<string | null>(null)
+const topicShown = computed(() => topicDraft.value ?? contentTopic.value)
 
 const tableTitle = computed(() => {
   const topic =
@@ -77,8 +79,6 @@ const tableTitle = computed(() => {
 const headerTitle = computed(() =>
   isTable.value ? tableTitle.value : props.block.title,
 )
-
-const inlineRteRef = ref<{ focusEditor: () => void } | null>(null)
 
 const selection = useSelectionStore()
 const documentStore = useDocumentStore()
@@ -117,10 +117,23 @@ function onSelectBlock() {
   selection.selectBlock(props.block.id)
 }
 
-function onBadgeActivate(event: MouseEvent) {
-  event.stopPropagation()
+function onTopicFocus() {
+  topicDraft.value = contentTopic.value
   selection.selectBlock(props.block.id)
-  inlineRteRef.value?.focusEditor()
+}
+
+function onTopicInput(event: Event) {
+  topicDraft.value = (event.target as HTMLInputElement).value
+}
+
+function commitTopic() {
+  if (topicDraft.value == null) return
+  documentStore.updateBlockKeyword(props.block.id, topicDraft.value)
+  topicDraft.value = null
+}
+
+function onTopicEnter(event: KeyboardEvent) {
+  ;(event.target as HTMLInputElement | null)?.blur()
 }
 
 function onAddItem(event: MouseEvent) {
@@ -204,16 +217,22 @@ function onCloseMaximize(event?: Event) {
     <p v-if="!isTable" class="dt-block-subtitle">{{ block.subtitle }}</p>
 
     <div v-if="!isMaximized" class="dt-block-body">
-      <button
-        v-if="isTable && tableBadge"
-        type="button"
-        class="dt-table-badge"
-        @click="onBadgeActivate"
-      >
-        {{ tableBadge }}
-      </button>
+      <input
+        v-if="isTable"
+        class="dt-content-topic"
+        :class="block.side === 'ai' ? 'side-ai' : 'side-human'"
+        :value="topicShown"
+        :placeholder="topicPlaceholder"
+        maxlength="32"
+        aria-label="内容主题"
+        @click.stop
+        @mousedown.stop
+        @focus="onTopicFocus"
+        @input="onTopicInput"
+        @blur="commitTopic"
+        @keydown.enter.prevent="onTopicEnter"
+      />
       <RichTextEditor
-        ref="inlineRteRef"
         class="dt-rte"
         compact
         :expanded="false"
@@ -265,12 +284,7 @@ function onCloseMaximize(event?: Event) {
     >
       <div class="pm-card" @click.stop>
         <div class="pm-header">
-          <h3 class="pm-title">
-            {{ headerTitle || '编辑面板' }}
-            <span v-if="isTable && tableBadge" class="pm-title-badge">{{
-              tableBadge
-            }}</span>
-          </h3>
+          <h3 class="pm-title">{{ headerTitle || '编辑面板' }}</h3>
           <div class="pm-actions">
             <button
               v-if="showAdd"
@@ -321,6 +335,21 @@ function onCloseMaximize(event?: Event) {
         </div>
 
         <div class="pm-body">
+          <input
+            v-if="isTable"
+            class="dt-content-topic dt-content-topic--max"
+            :class="block.side === 'ai' ? 'side-ai' : 'side-human'"
+            :value="topicShown"
+            :placeholder="topicPlaceholder"
+            maxlength="32"
+            aria-label="内容主题"
+            @click.stop
+            @mousedown.stop
+            @focus="onTopicFocus"
+            @input="onTopicInput"
+            @blur="commitTopic"
+            @keydown.enter.prevent="onTopicEnter"
+          />
           <RichTextEditor
             class="pm-rte"
             :expanded="true"
@@ -569,7 +598,7 @@ function onCloseMaximize(event?: Event) {
   min-height: 280px;
 }
 
-/* 表格式单元格：A 青绿 / H 米黄色条抬头，角标在内容区左上，正文为可编辑空白 */
+/* 表格式单元格：A/H 色条抬头，内容区第一行是可编辑主题词，其下为空白正文 */
 .dt-block--table {
   --hai-header: #5ecfc4;
   --hai-body: #e7f8f6;
@@ -630,24 +659,49 @@ function onCloseMaximize(event?: Event) {
   background: transparent;
 }
 
-.dt-table-badge {
+.dt-content-topic {
   flex-shrink: 0;
-  align-self: flex-start;
-  margin: 10px 14px 0;
-  padding: 0;
+  width: calc(100% - 28px);
+  margin: 14px 14px 0;
+  padding: 0 0 6px;
   border: none;
+  border-bottom: 1px solid transparent;
+  border-radius: 0;
   background: transparent;
-  color: var(--hai-badge);
   font: inherit;
-  font-size: 13px;
-  font-weight: 500;
-  letter-spacing: 0.06em;
-  line-height: 1.3;
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  line-height: 1.4;
+  text-align: left;
+  outline: none;
+  box-sizing: border-box;
   cursor: text;
 }
 
-.dt-table-badge:hover {
-  color: var(--hai-badge);
+.dt-content-topic.side-ai {
+  color: #2f9d94;
+}
+
+.dt-content-topic.side-human {
+  color: #a88420;
+}
+
+.dt-content-topic::placeholder {
+  color: inherit;
+  opacity: 0.45;
+  font-weight: 600;
+}
+
+.dt-content-topic:hover,
+.dt-content-topic:focus {
+  border-bottom-color: currentColor;
+}
+
+.dt-content-topic--max {
+  width: auto;
+  margin: 12px 16px 8px;
+  padding: 2px 2px 6px;
 }
 
 .dt-block--table :deep(.rte-root) {
@@ -705,19 +759,6 @@ function onCloseMaximize(event?: Event) {
   display: none;
 }
 
-.pm-title-badge {
-  display: inline-block;
-  margin-left: 8px;
-  padding: 1px 8px;
-  border-radius: 999px;
-  background: #f1f3f4;
-  color: #5f6368;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  vertical-align: 1px;
-  text-shadow: none;
-}
 </style>
 
 <style>

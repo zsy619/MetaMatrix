@@ -296,8 +296,33 @@ function isLegacyHumanAiSeed(item: QuadrantItem): boolean {
   )
 }
 
+/** 旧模板把主题名写在 keyword 上；这些值升级为内容主题词，用户改过的词保留。 */
+const LEGACY_HAI_KEYWORDS = new Set([
+  '创造力',
+  '场景',
+  '审美',
+  '体系',
+  '基本功',
+  '数据',
+  '审美❤️',
+  '体系❤️',
+  '数据❤️',
+])
+
+function humanAiContentKeyword(
+  existing: string | undefined,
+  fallback: string,
+): string {
+  const raw = (existing ?? '').trim()
+  const plain = raw.replace(/❤|❤️/g, '').trim()
+  if (!plain || LEGACY_HAI_KEYWORDS.has(raw) || LEGACY_HAI_KEYWORDS.has(plain)) {
+    return fallback
+  }
+  return raw
+}
+
 /**
- * 人类-AI 表格式画布：抬头/角标/配色跟模板走，用户已改过的正文保留。
+ * 人类-AI 表格式画布：抬头与配色跟模板走，内容主题词和正文保留用户修改。
  * 几何双三角（另一份模板）不走这里。
  */
 function normalizeHumanAiDualTriangleDoc(
@@ -316,7 +341,7 @@ function normalizeHumanAiDualTriangleDoc(
       side: tb.side,
       title: tb.title,
       subtitle: tb.subtitle,
-      keyword: tb.keyword,
+      keyword: humanAiContentKeyword(existing.keyword, tb.keyword),
       accentColor: tb.accentColor,
       backgroundColor: tb.backgroundColor,
       watermarkIcon: tb.watermarkIcon,
@@ -1849,6 +1874,19 @@ export const useDocumentStore = defineStore('document', () => {
     return item
   }
 
+  /** 人类-AI 格子的内容主题词（起点 / 终点等），写在 keyword 上。 */
+  function updateBlockKeyword(blockId: string, keyword: string): boolean {
+    const doc = current_data.value
+    if (!isDualTriangleDoc(doc)) return false
+    const block = doc.blocks.find((b) => b.id === blockId)
+    if (!block) return false
+    const next = keyword.trim()
+    if (block.keyword === next) return true
+    block.keyword = next
+    markDirty()
+    return true
+  }
+
   function updateBlockItem(
     blockId: DualTriangleBlockId | string,
     id: string,
@@ -3132,6 +3170,7 @@ export const useDocumentStore = defineStore('document', () => {
     updateItem,
     removeItem,
     addBlockItem,
+    updateBlockKeyword,
     updateBlockItem,
     removeBlockItem,
     updateItemByContainer,
