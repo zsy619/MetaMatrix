@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { canvasChromeStyle } from './canvasChrome'
 import type {
   YModelBlock,
   YModelBlockId,
@@ -29,9 +30,7 @@ function block(id: YModelBlockId): YModelBlock | undefined {
   return byId.value.get(id)
 }
 
-const bgColor = computed(
-  () => props.doc.theme?.background?.color || '#ffffff',
-)
+const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 
 /** Step2：我的 ____ 认知 */
 const centerPrefix = computed(() => props.doc.center.prefix || '我的')
@@ -60,7 +59,7 @@ const labels = computed(() => {
 </script>
 
 <template>
-  <div class="y-model-canvas" :style="{ backgroundColor: bgColor }">
+  <div class="y-model-canvas" :style="chrome">
     <div class="ym-layout">
       <div class="ym-main">
         <!-- 左外：使用现成模型/规律（近理论臂） -->
@@ -90,7 +89,7 @@ const labels = computed(() => {
                 orient="auto"
                 markerUnits="strokeWidth"
               >
-                <path d="M0,0.8 L6.5,3.5 L0,6.2 Z" fill="#9aa0a6" />
+                <path d="M0,0.8 L6.5,3.5 L0,6.2 Z" fill="#6b645c" />
               </marker>
               <marker
                 id="ymArrowRev"
@@ -101,7 +100,7 @@ const labels = computed(() => {
                 orient="auto"
                 markerUnits="strokeWidth"
               >
-                <path d="M6.5,0.8 L0,3.5 L6.5,6.2 Z" fill="#9aa0a6" />
+                <path d="M6.5,0.8 L0,3.5 L6.5,6.2 Z" fill="#6b645c" />
               </marker>
             </defs>
             <!-- 左臂 -->
@@ -110,7 +109,7 @@ const labels = computed(() => {
               y1="72"
               x2="160"
               y2="220"
-              stroke="#9aa0a6"
+              stroke="#6b645c"
               stroke-width="2.4"
               stroke-linecap="round"
               marker-start="url(#ymArrowRev)"
@@ -122,7 +121,7 @@ const labels = computed(() => {
               y1="72"
               x2="160"
               y2="220"
-              stroke="#9aa0a6"
+              stroke="#6b645c"
               stroke-width="2.4"
               stroke-linecap="round"
               marker-start="url(#ymArrowRev)"
@@ -134,7 +133,7 @@ const labels = computed(() => {
               y1="220"
               x2="160"
               y2="470"
-              stroke="#9aa0a6"
+              stroke="#6b645c"
               stroke-width="2.4"
               stroke-linecap="round"
               marker-start="url(#ymArrowRev)"
@@ -411,7 +410,7 @@ const labels = computed(() => {
   width: clamp(64px, 9vw, 110px);
   min-width: 56px;
   border: none;
-  border-bottom: 2px solid #202124;
+  border-bottom: 1px solid #8a8175;
   background: transparent;
   text-align: center;
   font-size: clamp(18px, 2.4vw, 28px);

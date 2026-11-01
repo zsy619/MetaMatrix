@@ -7,6 +7,7 @@ import {
   ref,
   watch,
 } from 'vue'
+import { canvasChromeStyle } from './canvasChrome'
 import type {
   DualTriangleBlock,
   DualTriangleBlockId,
@@ -34,9 +35,7 @@ function block(id: DualTriangleBlockId): DualTriangleBlock | undefined {
   return byId.value.get(id)
 }
 
-const bgColor = computed(
-  () => props.doc.theme.background.color || '#ffffff',
-)
+const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 
 type LinkMode = 'to-right' | 'to-left' | 'to-down'
 
@@ -136,7 +135,7 @@ function measure() {
     if (!cardEl || !kwEl) continue
     const card = boxOf(cardEl, rootRect, sx, sy)
     const kw = boxOf(kwEl, rootRect, sx, sy)
-    const color = block(spec.id)?.accentColor || '#9aa0a6'
+    const color = block(spec.id)?.accentColor || '#c5c9ce'
     let x1 = 0
     let y1 = 0
     let x2 = 0
@@ -191,7 +190,7 @@ watch(
   <div
     ref="rootRef"
     class="dual-triangle-canvas"
-    :style="{ backgroundColor: bgColor }"
+    :style="chrome"
     aria-label="双三角构建梳理"
   >
     <div class="dt-grid">

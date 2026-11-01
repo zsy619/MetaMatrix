@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { canvasChromeStyle } from './canvasChrome'
 import type {
   PmRetroValueBlock,
   PmRetroValueBlockId,
@@ -15,9 +16,7 @@ const props = defineProps<{
 
 const documentStore = useDocumentStore()
 
-const bgColor = computed(
-  () => props.doc.theme.background.color || '#f7f1cc',
-)
+const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 
 const byId = computed(() => {
   const map = new Map<PmRetroValueBlockId, PmRetroValueBlock>()
@@ -37,7 +36,7 @@ function onTitleInput(event: Event) {
 </script>
 
 <template>
-  <div class="prv-canvas" :style="{ backgroundColor: bgColor }">
+  <div class="prv-canvas" :style="chrome">
     <header class="prv-top">
       <input
         class="prv-top-title"
@@ -75,15 +74,15 @@ function onTitleInput(event: Event) {
 <style scoped>
 .prv-canvas {
   position: absolute;
-  inset: 0;
+  inset: 14px 16px 12px;
   z-index: 10;
   overflow: hidden;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
   min-height: 0;
-  background: #f7f1cc;
-  border: 1px solid #1f1f1f;
+  background: var(--tbl-body, #fff);
+  border: 1px solid var(--cv-frame, #ececec);
   border-radius: 2px;
 }
 
@@ -95,7 +94,7 @@ function onTitleInput(event: Event) {
   min-height: 44px;
   padding: 8px 16px;
   box-sizing: border-box;
-  background: #1f1f1f;
+  background: #3c3424;
 }
 
 .prv-top-title {
@@ -133,7 +132,7 @@ function onTitleInput(event: Event) {
   min-width: 0;
   min-height: 0;
   background: var(--tbl-body, #f7f1cc);
-  border-right: 2px solid #ffffff;
+  border-right: 1px solid var(--cv-hairline, rgba(60, 50, 20, 0.08));
 }
 
 .prv-col:last-child {
@@ -149,7 +148,7 @@ function onTitleInput(event: Event) {
   padding: 10px 14px;
   box-sizing: border-box;
   background: var(--tbl-header, #0e8a84);
-  border-bottom: 2px solid #ffffff;
+  border-bottom: 1px solid var(--cv-hairline, rgba(60, 50, 20, 0.08));
   color: #fff;
 }
 

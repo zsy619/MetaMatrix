@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { canvasChromeStyle } from './canvasChrome'
 import type {
   ProductContentBlock,
   ProductContentBlockId,
@@ -31,13 +32,11 @@ const bottomIds: ProductContentBlockId[] = [
   'validation',
 ]
 
-const bgColor = computed(
-  () => props.doc.theme.background.color || '#ffffff',
-)
+const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 </script>
 
 <template>
-  <div class="product-content-canvas" :style="{ backgroundColor: bgColor }">
+  <div class="product-content-canvas" :style="chrome">
     <div class="pc-grid" role="table" aria-label="产品内核画布">
       <div class="pc-row pc-row--top">
         <section
@@ -89,7 +88,7 @@ const bgColor = computed(
   z-index: 10;
   overflow: hidden;
   box-sizing: border-box;
-  padding: 0;
+  padding: 14px 16px 12px;
   display: flex;
   flex-direction: column;
 }
@@ -101,7 +100,7 @@ const bgColor = computed(
   height: 100%;
   display: flex;
   flex-direction: column;
-  border: 1px solid #9aa0a6;
+  border: 1px solid var(--cv-frame, #ececec);
   border-radius: 2px;
   overflow: hidden;
   background: #fff;
@@ -116,7 +115,7 @@ const bgColor = computed(
 .pc-row--top {
   flex: 0 0 32%;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  border-bottom: 1px solid #9aa0a6;
+  border-bottom: 1px solid var(--cv-frame, #ececec);
 }
 
 .pc-row--bottom {
@@ -130,7 +129,7 @@ const bgColor = computed(
   min-width: 0;
   min-height: 0;
   background: var(--tbl-body, #fff);
-  border-right: 1px solid #9aa0a6;
+  border-right: 1px solid var(--cv-frame, #ececec);
 }
 
 .pc-row--top .pc-cell:last-child,
@@ -144,7 +143,7 @@ const bgColor = computed(
   align-items: center;
   justify-content: center;
   background: var(--tbl-header, #0e8a84);
-  border-bottom: 1px solid #9aa0a6;
+  border-bottom: 1px solid var(--cv-frame, #ececec);
   color: #fff;
   padding: 10px 10px;
   min-height: 42px;
@@ -215,7 +214,7 @@ const bgColor = computed(
 
   .pc-cell {
     border-right: none;
-    border-bottom: 1px solid #9aa0a6;
+    border-bottom: 1px solid var(--cv-frame, #ececec);
     min-height: 160px;
   }
 

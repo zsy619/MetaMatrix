@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { canvasChromeStyle } from './canvasChrome'
 import type {
   RoiTradeoffBlock,
   RoiTradeoffBlockId,
@@ -12,9 +13,7 @@ const props = defineProps<{
   doc: RoiTradeoffDocumentJSON
 }>()
 
-const bgColor = computed(
-  () => props.doc.theme.background.color || '#FDF5E6',
-)
+const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 
 const byId = computed(() => {
   const map = new Map<RoiTradeoffBlockId, RoiTradeoffBlock>()
@@ -28,7 +27,7 @@ function block(id: RoiTradeoffBlockId): RoiTradeoffBlock | undefined {
 </script>
 
 <template>
-  <div class="roi-canvas" :style="{ backgroundColor: bgColor }" role="grid" aria-label="综合决策ROI权衡">
+  <div class="roi-canvas" :style="chrome" role="grid" aria-label="综合决策ROI权衡">
     <section class="roi-col tbl-tone" v-show="block('benefits')" :style="toneVars(0)">
       <header class="roi-col-head">
         <h2 class="roi-col-title">{{ block('benefits')!.title }}</h2>
@@ -52,7 +51,7 @@ function block(id: RoiTradeoffBlockId): RoiTradeoffBlock | undefined {
 <style scoped>
 .roi-canvas {
   position: absolute;
-  inset: 0;
+  inset: 14px 16px 12px;
   z-index: 10;
   overflow: hidden;
   box-sizing: border-box;
@@ -70,7 +69,7 @@ function block(id: RoiTradeoffBlockId): RoiTradeoffBlock | undefined {
   min-width: 0;
   min-height: 0;
   background: var(--tbl-body, #fdf5e6);
-  border-right: 1px solid #ffffff;
+  border-right: 1px solid var(--cv-hairline, rgba(60, 50, 20, 0.08));
 }
 
 .roi-col:last-child {
@@ -86,7 +85,7 @@ function block(id: RoiTradeoffBlockId): RoiTradeoffBlock | undefined {
   padding: 10px 16px;
   box-sizing: border-box;
   background: var(--tbl-header, #a67c00);
-  border-bottom: 1px solid #ffffff;
+  border-bottom: 1px solid var(--cv-hairline, rgba(60, 50, 20, 0.08));
   color: #fff;
 }
 

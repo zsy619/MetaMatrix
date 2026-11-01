@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { canvasChromeStyle } from './canvasChrome'
 import type {
   GrowthAssumptionsCellKey,
   GrowthAssumptionsDocumentJSON,
@@ -16,9 +17,7 @@ const props = defineProps<{
 
 const documentStore = useDocumentStore()
 
-const bgColor = computed(
-  () => props.doc.theme.background.color || '#ffffff',
-)
+const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 
 const COLUMNS: { key: GrowthAssumptionsCellKey; label: string }[] = [
   { key: 'assumption', label: '关键假设' },
@@ -52,7 +51,7 @@ function onRemoveRow(rowId: string) {
 <template>
   <div
     class="ga-canvas"
-    :style="{ backgroundColor: bgColor }"
+    :style="chrome"
     aria-label="增长假设清单"
   >
     <div class="ga-table" role="table" aria-label="增长假设清单">
@@ -131,7 +130,7 @@ function onRemoveRow(rowId: string) {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border: 2px solid #111111;
+  border: 1px solid var(--cv-frame, #ececec);
   background: #ffffff;
 }
 
@@ -140,7 +139,7 @@ function onRemoveRow(rowId: string) {
   display: grid;
   grid-template-columns: 1.4fr 0.85fr 0.85fr 0.95fr 1.1fr 36px;
   background: transparent;
-  border-bottom: 2px solid #111111;
+  border-bottom: 1px solid var(--cv-frame, #ececec);
 }
 
 .ga-col-header {
@@ -149,9 +148,9 @@ function onRemoveRow(rowId: string) {
   font-size: clamp(14px, 1.4vw, 17px);
   font-weight: 800;
   color: #fff;
-  background: var(--tbl-header, #90949c);
+  background: var(--tbl-header, #2A649F);
   text-shadow: 0 1px 0 rgba(0, 0, 0, 0.14);
-  border-right: 2px solid #111111;
+  border-right: 1px solid var(--cv-frame, #ececec);
   letter-spacing: 0.04em;
   line-height: 1.3;
   font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui,
@@ -161,7 +160,7 @@ function onRemoveRow(rowId: string) {
 .ga-col-header--actions {
   border-right: none;
   padding: 0;
-  background: #e8eaed;
+  background: #fafafa;
   text-shadow: none;
 }
 
@@ -186,7 +185,7 @@ function onRemoveRow(rowId: string) {
   display: grid;
   grid-template-columns: 1.4fr 0.85fr 0.85fr 0.95fr 1.1fr 36px;
   min-height: 400px;
-  border-bottom: 2px solid #111111;
+  border-bottom: 1px solid var(--cv-frame, #ececec);
   background: #fff;
 }
 
@@ -199,7 +198,7 @@ function onRemoveRow(rowId: string) {
   min-height: 400px;
   padding: 6px;
   box-sizing: border-box;
-  border-right: 2px solid #111111;
+  border-right: 1px solid var(--cv-frame, #ececec);
   display: flex;
   flex-direction: column;
   background: var(--tbl-body, #ffffff);
@@ -262,7 +261,7 @@ function onRemoveRow(rowId: string) {
 }
 
 .ga-add-btn {
-  border: 1px dashed #9aa0a6;
+  border: 1px solid #e4e6e8;
   background: #fff;
   color: #5f6368;
   border-radius: 8px;

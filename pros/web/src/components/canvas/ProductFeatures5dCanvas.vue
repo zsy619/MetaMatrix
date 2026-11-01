@@ -7,6 +7,7 @@ import {
   ref,
   watch,
 } from 'vue'
+import { canvasChromeStyle } from './canvasChrome'
 import type {
   ProductFeatures5dAxisId,
   ProductFeatures5dBlock,
@@ -28,9 +29,7 @@ const documentStore = useDocumentStore()
 // Sync before first render so axisBlocks are defined (v-if hosts).
 documentStore.ensureProductFeatures5dBlocks()
 
-const bgColor = computed(
-  () => props.doc.theme.background.color || '#ffffff',
-)
+const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 
 /**
  * 顺时针自顶：开放性 → 投入性 → 易错性 → 迭代性 → 创新性
@@ -67,11 +66,11 @@ const AXIS_SHORT: Record<ProductFeatures5dAxisId, string> = {
  * 开放性蓝 / 投入性琥珀 / 易错性红 / 迭代性绿 / 创新性紫
  */
 const AXIS_COLOR: Record<ProductFeatures5dAxisId, string> = {
-  openness: '#1565C0',
-  engagement: '#9A5700',
-  error_prone: '#C62828',
-  iterativity: '#137333',
-  innovation: '#6A1B9A',
+  openness: '#2A649F',
+  engagement: '#A67C00',
+  error_prone: '#A84562',
+  iterativity: '#187A4E',
+  innovation: '#6B4C9A',
 }
 
 function axisColor(axis: ProductFeatures5dAxisId): string {
@@ -337,7 +336,7 @@ onBeforeUnmount(() => {
 <template>
   <div
     class="pf5d-canvas"
-    :style="{ backgroundColor: bgColor }"
+    :style="chrome"
     aria-label="产品内容5维特征"
   >
     <header class="pf5d-title-bar">

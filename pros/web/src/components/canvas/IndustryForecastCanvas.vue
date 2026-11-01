@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { canvasChromeStyle } from './canvasChrome'
 import type {
   IndustryForecastBlock,
   IndustryForecastBlockId,
@@ -27,13 +28,11 @@ function block(id: IndustryForecastBlockId): IndustryForecastBlock | undefined {
 const topIds: IndustryForecastBlockId[] = ['chain', 'changes', 'steady_b']
 const fullIds: IndustryForecastBlockId[] = ['cycle', 'ceiling', 'concentration']
 
-const bgColor = computed(
-  () => props.doc.theme.background.color || '#ffffff',
-)
+const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 </script>
 
 <template>
-  <div class="industry-forecast-canvas" :style="{ backgroundColor: bgColor }">
+  <div class="industry-forecast-canvas" :style="chrome">
     <header class="if-header">
       <h1>{{ doc.title }}</h1>
     </header>
@@ -91,7 +90,7 @@ const bgColor = computed(
   overflow-x: hidden;
   overflow-y: auto;
   box-sizing: border-box;
-  padding: 0;
+  padding: 14px 16px 12px;
   display: flex;
   flex-direction: column;
   min-height: 0;

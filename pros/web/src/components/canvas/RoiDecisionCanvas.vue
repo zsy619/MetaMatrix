@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
+import { canvasChromeStyle } from './canvasChrome'
 import type {
   RoiDecisionBlock,
   RoiDecisionDocumentJSON,
@@ -18,9 +19,7 @@ const documentStore = useDocumentStore()
 /** Sync before first render so YModelBlock hosts have real ids (v-if). */
 documentStore.ensureRoiDecisionBlocks()
 
-const bgColor = computed(
-  () => props.doc.theme.background.color || '#E6F7FF',
-)
+const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 
 const byId = computed(() => {
   const map = new Map<string, RoiDecisionBlock>()
@@ -59,7 +58,7 @@ onMounted(() => {
 <template>
   <div
     class="rd-canvas"
-    :style="{ backgroundColor: bgColor }"
+    :style="chrome"
     aria-label="ROI决策评估"
   >
     <!-- Top matrix: 维度 | 收益项 | 成本项 -->
@@ -179,7 +178,7 @@ onMounted(() => {
 <style scoped>
 .rd-canvas {
   position: absolute;
-  inset: 0;
+  inset: 14px 16px 12px;
   z-index: 10;
   /* Page scrolls when matrix rows (≥400px) + panels exceed the viewport */
   overflow-x: hidden;
@@ -189,8 +188,8 @@ onMounted(() => {
   flex-direction: column;
   min-height: 0;
   gap: 0;
-  background: #e6f7ff;
-  border: 1px solid #5f6368;
+  background: var(--tbl-body, #E8F1FA);
+  border: 1px solid var(--cv-frame, #ececec);
   border-radius: 2px;
   font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui,
     sans-serif;
@@ -213,7 +212,7 @@ onMounted(() => {
   min-height: min-content;
   display: flex;
   flex-direction: column;
-  border-bottom: 1px solid #5f6368;
+  border-bottom: 1px solid var(--cv-frame, #ececec);
   overflow: visible;
 }
 
@@ -222,7 +221,7 @@ onMounted(() => {
   display: grid;
   grid-template-columns: minmax(96px, 0.7fr) minmax(0, 1.4fr) minmax(0, 1.4fr) 36px;
   background: transparent;
-  border-bottom: 1px solid #5f6368;
+  border-bottom: 1px solid var(--cv-frame, #ececec);
 }
 
 .rd-col-header {
@@ -233,7 +232,7 @@ onMounted(() => {
   color: #fff;
   background: var(--tbl-header, #2a649f);
   text-shadow: 0 1px 0 rgba(0, 0, 0, 0.14);
-  border-right: 1px solid #5f6368;
+  border-right: 1px solid var(--cv-frame, #ececec);
   letter-spacing: 0.04em;
   line-height: 1.3;
 }
@@ -245,7 +244,7 @@ onMounted(() => {
 .rd-col-header--actions {
   border-right: none;
   padding: 0;
-  background: #e8eaed;
+  background: #fafafa;
   text-shadow: none;
 }
 
@@ -260,7 +259,7 @@ onMounted(() => {
   grid-template-columns: minmax(96px, 0.7fr) minmax(0, 1.4fr) minmax(0, 1.4fr) 36px;
   /* Align with global panel min-height (≥400px), including newly added rows */
   min-height: 400px;
-  border-bottom: 1px solid #5f6368;
+  border-bottom: 1px solid var(--cv-frame, #ececec);
   background: transparent;
 }
 
@@ -278,7 +277,7 @@ onMounted(() => {
   justify-content: center;
   padding: 12px 10px;
   box-sizing: border-box;
-  border-right: 1px solid #5f6368;
+  border-right: 1px solid var(--cv-frame, #ececec);
   background: var(--tbl-body, #e6f7ff);
 }
 
@@ -316,7 +315,7 @@ onMounted(() => {
   min-height: inherit;
   padding: 6px 8px;
   box-sizing: border-box;
-  border-right: 1px solid #5f6368;
+  border-right: 1px solid var(--cv-frame, #ececec);
   display: flex;
   flex-direction: column;
   background: var(--tbl-body, #e6f7ff);
@@ -419,7 +418,7 @@ onMounted(() => {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   min-height: 0;
-  border-bottom: 1px solid #5f6368;
+  border-bottom: 1px solid var(--cv-frame, #ececec);
 }
 
 .rd-mid-col {
@@ -428,7 +427,7 @@ onMounted(() => {
   min-width: 0;
   min-height: 0;
   background: var(--tbl-body, #e6f7ff);
-  border-right: 1px solid #5f6368;
+  border-right: 1px solid var(--cv-frame, #ececec);
 }
 
 .rd-mid-col:last-child {
@@ -444,7 +443,7 @@ onMounted(() => {
   padding: 8px 14px;
   box-sizing: border-box;
   background: var(--tbl-header, #2a649f);
-  border-bottom: 1px solid #5f6368;
+  border-bottom: 1px solid var(--cv-frame, #ececec);
   color: #fff;
 }
 
@@ -554,7 +553,7 @@ onMounted(() => {
 
   .rd-mid-col {
     border-right: none;
-    border-bottom: 1px solid #5f6368;
+    border-bottom: 1px solid var(--cv-frame, #ececec);
   }
 }
 </style>

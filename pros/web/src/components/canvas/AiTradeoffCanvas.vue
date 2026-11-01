@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { canvasChromeStyle } from './canvasChrome'
 import type {
   AiTradeoffBlock,
   AiTradeoffCellId,
@@ -32,13 +33,11 @@ const rows: [AiTradeoffCellId, AiTradeoffCellId][] = [
   ['a4', 'b4'],
 ]
 
-const bgColor = computed(
-  () => props.doc.theme.background.color || '#ffffff',
-)
+const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 </script>
 
 <template>
-  <div class="ai-tradeoff-canvas" :style="{ backgroundColor: bgColor }">
+  <div class="ai-tradeoff-canvas" :style="chrome">
     <header class="at-title">
       <h1>{{ doc.title }}</h1>
     </header>
@@ -141,7 +140,7 @@ const bgColor = computed(
   grid-template-rows:
     auto
     repeat(4, minmax(400px, auto));
-  border: 1px solid #dadce0;
+  border: 1px solid var(--cv-frame, #ececec);
   border-radius: 4px;
   overflow: visible;
   background: #fff;
@@ -155,8 +154,8 @@ const bgColor = computed(
   padding: 10px 12px;
   min-height: 40px;
   box-sizing: border-box;
-  background: var(--tbl-header, #e8eaed);
-  border-bottom: 1px solid #dadce0;
+  background: var(--tbl-header, #2A649F);
+  border-bottom: 1px solid var(--cv-frame, #ececec);
   font-size: clamp(13px, 1.35vw, 16px);
   font-weight: 700;
   color: #fff;
@@ -167,7 +166,7 @@ const bgColor = computed(
 }
 
 .at-col-header.value {
-  border-right: 1px solid #dadce0;
+  border-right: 1px solid var(--cv-frame, #ececec);
 }
 
 .at-cell {
@@ -178,8 +177,8 @@ const bgColor = computed(
   padding: 0;
   box-sizing: border-box;
   background: var(--tbl-body, #fff);
-  border-right: 1px solid #dadce0;
-  border-bottom: 1px solid #dadce0;
+  border-right: 1px solid var(--cv-frame, #ececec);
+  border-bottom: 1px solid var(--cv-frame, #ececec);
   gap: 0;
 }
 
@@ -198,7 +197,7 @@ const bgColor = computed(
   gap: 3px;
   min-width: 0;
   padding: 8px 12px;
-  background: var(--tbl-header, #e8eaed);
+  background: var(--tbl-header, #2A649F);
   color: #fff;
 }
 
@@ -258,7 +257,7 @@ const bgColor = computed(
   }
 
   .at-col-header.cost {
-    border-top: 1px solid #dadce0;
+    border-top: 1px solid var(--cv-frame, #ececec);
   }
 
   .at-col-header.value {
@@ -271,7 +270,7 @@ const bgColor = computed(
   }
 
   .at-cell--last-row {
-    border-bottom: 1px solid #dadce0;
+    border-bottom: 1px solid var(--cv-frame, #ececec);
   }
 
   /* Keep visual order: value header, a1-a4, cost header, b1-b4

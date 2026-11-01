@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { canvasChromeStyle } from './canvasChrome'
 import type {
   ConversionTradeoffCellKey,
   ConversionTradeoffDocumentJSON,
@@ -16,9 +17,7 @@ const props = defineProps<{
 
 const documentStore = useDocumentStore()
 
-const bgColor = computed(
-  () => props.doc.theme.background.color || '#ffffff',
-)
+const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 
 const COLUMNS: { key: ConversionTradeoffCellKey; labelKey: 'drive' | 'resistance' | 'touchpoint' }[] = [
   { key: 'drive', labelKey: 'drive' },
@@ -53,7 +52,7 @@ function onRemoveRow(rowId: string) {
 </script>
 
 <template>
-  <div class="ct-canvas" :style="{ backgroundColor: bgColor }">
+  <div class="ct-canvas" :style="chrome">
     <div class="ct-table" role="table" aria-label="转化率取舍画布">
       <div class="ct-col-headers" role="row">
         <div
@@ -132,7 +131,7 @@ function onRemoveRow(rowId: string) {
 <style scoped>
 .ct-canvas {
   position: absolute;
-  inset: 0;
+  inset: 14px 16px 12px;
   z-index: 10;
   overflow: hidden;
   box-sizing: border-box;
@@ -142,7 +141,7 @@ function onRemoveRow(rowId: string) {
   min-height: 0;
   background: #fff;
   border-radius: 2px;
-  border: 1px solid #dadce0;
+  border: 1px solid var(--cv-frame, #ececec);
 }
 
 
@@ -160,7 +159,7 @@ function onRemoveRow(rowId: string) {
   display: grid;
   grid-template-columns: minmax(88px, 0.55fr) repeat(3, minmax(0, 1.15fr)) 36px;
   background: transparent;
-  border-bottom: 1px solid #dadce0;
+  border-bottom: 1px solid var(--cv-frame, #ececec);
 }
 
 .ct-col-header {
@@ -169,9 +168,9 @@ function onRemoveRow(rowId: string) {
   font-size: clamp(13px, 1.35vw, 16px);
   font-weight: 700;
   color: #fff;
-  background: var(--tbl-header, #5f6368);
+  background: var(--tbl-header, #2A649F);
   text-shadow: 0 1px 0 rgba(0, 0, 0, 0.14);
-  border-right: 1px solid #dadce0;
+  border-right: 1px solid var(--cv-frame, #ececec);
   letter-spacing: 0.04em;
 }
 
@@ -182,7 +181,7 @@ function onRemoveRow(rowId: string) {
 .ct-col-header--actions {
   border-right: none;
   padding: 0;
-  background: #e8eaed;
+  background: #fafafa;
   text-shadow: none;
 }
 
@@ -207,7 +206,7 @@ function onRemoveRow(rowId: string) {
   display: grid;
   grid-template-columns: minmax(88px, 0.55fr) repeat(3, minmax(0, 1.15fr)) 36px;
   min-height: 400px;
-  border-bottom: 1px solid #dadce0;
+  border-bottom: 1px solid var(--cv-frame, #ececec);
 }
 
 .ct-priority {
@@ -216,7 +215,7 @@ function onRemoveRow(rowId: string) {
   justify-content: center;
   padding: 10px 8px;
   box-sizing: border-box;
-  border-right: 1px solid #dadce0;
+  border-right: 1px solid var(--cv-frame, #ececec);
   background: var(--tbl-body, #fff);
 }
 
@@ -253,7 +252,7 @@ function onRemoveRow(rowId: string) {
   min-height: 400px;
   padding: 8px;
   box-sizing: border-box;
-  border-right: 1px solid #dadce0;
+  border-right: 1px solid var(--cv-frame, #ececec);
   display: flex;
   flex-direction: column;
   background: var(--tbl-body, #fff);
@@ -300,12 +299,12 @@ function onRemoveRow(rowId: string) {
   display: flex;
   justify-content: center;
   padding: 8px 12px;
-  border-top: 1px dashed #dadce0;
+  border-top: 1px solid #e4e6e8;
   background: #fafafa;
 }
 
 .ct-add-btn {
-  border: 1px dashed #9aa0a6;
+  border: 1px solid #e4e6e8;
   border-radius: 6px;
   background: #fff;
   color: #5f6368;

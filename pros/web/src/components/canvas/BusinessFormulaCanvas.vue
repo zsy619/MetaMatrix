@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { canvasChromeStyle } from './canvasChrome'
 import type { BusinessFormulaDocumentJSON } from '../../types/canvas'
 import { useDocumentStore } from '../../stores/document'
 import {
@@ -25,6 +26,8 @@ const props = defineProps<{
 }>()
 
 const documentStore = useDocumentStore()
+
+const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 
 const formulaText = ref(props.doc.formulaText || DEFAULT_FORMULA_TEXT)
 const layout = ref<LayoutDirection>(props.doc.layout || 'horizontal')
@@ -349,7 +352,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="bf-canvas" aria-label="业务公式">
+  <div class="bf-canvas" :style="chrome" aria-label="业务公式">
     <aside class="bf-sidebar">
       <div class="bf-sidebar-header">
         <div class="bf-logo">
@@ -622,14 +625,14 @@ onUnmounted(() => {
 <style scoped>
 .bf-canvas {
   position: absolute;
-  inset: 0;
+  inset: 14px 16px 12px;
   z-index: 10;
   display: flex;
   min-height: 0;
   background: #ffffff;
   color: #202124;
   font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif;
-  border: 1px solid #dadce0;
+  border: 1px solid var(--cv-frame, #ececec);
   box-sizing: border-box;
 }
 
@@ -640,7 +643,7 @@ onUnmounted(() => {
   flex-direction: column;
   min-height: 0;
   background: #ffffff;
-  border-right: 1px solid #dadce0;
+  border-right: 1px solid var(--cv-frame, #ececec);
 }
 
 .bf-sidebar-header {
@@ -719,7 +722,7 @@ onUnmounted(() => {
 }
 
 .bf-mini-btn {
-  border: 1px solid #dadce0;
+  border: 1px solid var(--cv-frame, #ececec);
   background: #ffffff;
   color: #202124;
   border-radius: 4px;
@@ -759,7 +762,7 @@ onUnmounted(() => {
   min-width: 0;
   height: 30px;
   box-sizing: border-box;
-  border: 1px solid #dadce0;
+  border: 1px solid var(--cv-frame, #ececec);
   border-radius: 4px;
   background: #fafafa;
   color: #202124;
@@ -776,7 +779,7 @@ onUnmounted(() => {
 
 .bf-search-clear {
   flex-shrink: 0;
-  border: 1px solid #dadce0;
+  border: 1px solid var(--cv-frame, #ececec);
   background: #ffffff;
   color: #5f6368;
   border-radius: 4px;
@@ -888,7 +891,7 @@ onUnmounted(() => {
   min-height: 140px;
   box-sizing: border-box;
   resize: vertical;
-  border: 1px solid #dadce0;
+  border: 1px solid var(--cv-frame, #ececec);
   border-radius: 4px;
   background: #fafafa;
   color: #202124;
@@ -961,7 +964,7 @@ onUnmounted(() => {
   padding: 16px 8px;
   text-align: center;
   background: #fafafa;
-  border: 1px dashed #e8eaed;
+  border: 1px solid #e4e6e8;
   border-radius: 4px;
 }
 
@@ -991,7 +994,7 @@ onUnmounted(() => {
 }
 
 .bf-secondary {
-  border: 1px solid #dadce0;
+  border: 1px solid var(--cv-frame, #ececec);
   border-radius: 4px;
   padding: 8px 12px;
   font-size: 12px;
@@ -1031,7 +1034,7 @@ onUnmounted(() => {
 }
 
 .bf-tool-btn {
-  border: 1px solid #dadce0;
+  border: 1px solid var(--cv-frame, #ececec);
   background: #ffffff;
   color: #5f6368;
   border-radius: 4px;
@@ -1052,7 +1055,7 @@ onUnmounted(() => {
 }
 
 .bf-select {
-  border: 1px solid #dadce0;
+  border: 1px solid var(--cv-frame, #ececec);
   background: #ffffff;
   color: #202124;
   border-radius: 4px;
@@ -1146,7 +1149,7 @@ onUnmounted(() => {
     width: 100%;
     max-height: 42vh;
     border-right: none;
-    border-bottom: 1px solid #dadce0;
+    border-bottom: 1px solid var(--cv-frame, #ececec);
   }
 }
 </style>

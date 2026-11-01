@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { canvasChromeStyle } from './canvasChrome'
 import type {
   IncidentReviewBlock,
   IncidentReviewBlockId,
@@ -17,9 +18,7 @@ const props = defineProps<{
 
 const documentStore = useDocumentStore()
 
-const bgColor = computed(
-  () => props.doc.theme.background.color || '#ffffff',
-)
+const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 
 const byId = computed(() => {
   const map = new Map<IncidentReviewBlockId, IncidentReviewBlock>()
@@ -60,7 +59,7 @@ function onRemoveRow(rowId: string) {
 </script>
 
 <template>
-  <div class="ir-canvas" :style="{ backgroundColor: bgColor }">
+  <div class="ir-canvas" :style="chrome">
     <div class="ir-scroll">
       <header class="ir-header">
         <h1 class="ir-title">{{ doc.title || 'Case Study: 故障复盘' }}</h1>
@@ -243,7 +242,7 @@ function onRemoveRow(rowId: string) {
 <style scoped>
 .ir-canvas {
   position: absolute;
-  inset: 0;
+  inset: 14px 16px 12px;
   z-index: 10;
   overflow: hidden;
   box-sizing: border-box;
@@ -251,7 +250,7 @@ function onRemoveRow(rowId: string) {
   flex-direction: column;
   min-height: 0;
   background: #ffffff;
-  border: 1px solid #dadce0;
+  border: 1px solid var(--cv-frame, #ececec);
   border-radius: 2px;
 }
 
@@ -388,7 +387,7 @@ function onRemoveRow(rowId: string) {
 }
 
 .ir-tip--yellow {
-  background: #fff8e1;
+  background: #FBF6E4;
   border-color: #ffe082;
 }
 
@@ -415,7 +414,7 @@ function onRemoveRow(rowId: string) {
 /* Timeline table */
 .ir-timeline {
   margin: 0 12px;
-  border: 1px solid #dadce0;
+  border: 1px solid var(--cv-frame, #ececec);
   border-radius: 4px;
   overflow: hidden;
   background: #fff;
@@ -425,7 +424,7 @@ function onRemoveRow(rowId: string) {
   display: grid;
   grid-template-columns: 180px minmax(0, 1fr) 40px;
   background: transparent;
-  border-bottom: 1px solid #dadce0;
+  border-bottom: 1px solid var(--cv-frame, #ececec);
 }
 
 .ir-tl-col {
@@ -433,12 +432,12 @@ function onRemoveRow(rowId: string) {
   font-size: 13px;
   font-weight: 700;
   color: #fff;
-  background: var(--tbl-header, #5f6368);
+  background: var(--tbl-header, #2A649F);
   text-shadow: 0 1px 0 rgba(0, 0, 0, 0.14);
 }
 
 .ir-tl-col--actions {
-  background: #e8eaed;
+  background: #fafafa;
   text-shadow: none;
 }
 
@@ -536,7 +535,7 @@ function onRemoveRow(rowId: string) {
 }
 
 .ir-add-btn {
-  border: 1px dashed #dadce0;
+  border: 1px solid #e4e6e8;
   border-radius: 4px;
   background: #fafafa;
   color: #1a73e8;

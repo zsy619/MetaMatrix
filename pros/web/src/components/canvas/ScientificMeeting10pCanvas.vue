@@ -7,6 +7,7 @@ import {
   ref,
   watch,
 } from 'vue'
+import { canvasChromeStyle } from './canvasChrome'
 import type {
   ScientificMeeting10pAxisId,
   ScientificMeeting10pBlock,
@@ -28,9 +29,7 @@ const documentStore = useDocumentStore()
 // Sync before first render so axisBlocks are defined (v-if hosts).
 documentStore.ensureScientificMeeting10pBlocks()
 
-const bgColor = computed(
-  () => props.doc.theme.background.color || '#ffffff',
-)
+const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 
 /**
  * 顺时针自顶（12 点）：民主 → … → 良性
@@ -83,16 +82,16 @@ const AXIS_EN: Record<ScientificMeeting10pAxisId, string> = {
  * 花瓣填充、标签、底栏滑块共用同一色值。
  */
 const AXIS_COLOR: Record<ScientificMeeting10pAxisId, string> = {
-  democratic: '#43A047',
-  implementable: '#C0CA33',
-  motivating: '#FB8C00',
-  inspiring: '#E53935',
-  devoting: '#D81B60',
-  efficient: '#B39DDB',
-  learning: '#5E35B1',
-  responsible: '#1E88E5',
-  pragmatic: '#00ACC1',
-  friendly: '#8BC34A',
+  democratic: '#187A4E',
+  implementable: '#6A7818',
+  motivating: '#A67C00',
+  inspiring: '#A84562',
+  devoting: '#7A3E86',
+  efficient: '#6B4C9A',
+  learning: '#3E5A78',
+  responsible: '#2A649F',
+  pragmatic: '#0E8A84',
+  friendly: '#1A7088',
 }
 
 function axisColor(axis: ScientificMeeting10pAxisId): string {
@@ -285,7 +284,7 @@ onBeforeUnmount(() => {
 <template>
   <div
     class="sm10p-canvas"
-    :style="{ backgroundColor: bgColor }"
+    :style="chrome"
     aria-label="科学开会十大原则"
   >
     <header class="sm10p-title-bar">

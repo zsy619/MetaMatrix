@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { canvasChromeStyle } from './canvasChrome'
 import type {
   OscarBlock,
   OscarBlockId,
@@ -27,13 +28,11 @@ function block(id: OscarBlockId): OscarBlock | undefined {
 const topIds: OscarBlockId[] = ['objective', 'scope', 'checklist']
 const bottomIds: OscarBlockId[] = ['acquire', 'utilize']
 
-const bgColor = computed(
-  () => props.doc.theme.background.color || '#f5f0e8',
-)
+const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 </script>
 
 <template>
-  <div class="oscar-canvas" :style="{ backgroundColor: bgColor }">
+  <div class="oscar-canvas" :style="chrome">
     <div class="os-grid" role="table" aria-label="OSCAR调研画布">
       <div class="os-row os-row--top">
         <section
@@ -96,7 +95,7 @@ const bgColor = computed(
   display: flex;
   flex-direction: column;
   gap: 0;
-  border: 2px solid #202124;
+  border: 1px solid var(--cv-frame, #ececec);
   border-radius: 2px;
   overflow: hidden;
   background: #f5f0e8;
@@ -111,7 +110,7 @@ const bgColor = computed(
 .os-row--top {
   flex: 1 1 50%;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  border-bottom: 2px solid #202124;
+  border-bottom: 1px solid var(--cv-frame, #ececec);
 }
 
 .os-row--bottom {
@@ -128,7 +127,7 @@ const bgColor = computed(
   padding: 0;
   box-sizing: border-box;
   background: var(--tbl-body, #f5f0e8);
-  border-right: 2px solid #202124;
+  border-right: 1px solid var(--cv-frame, #ececec);
   gap: 0;
   overflow: hidden;
 }
@@ -216,7 +215,7 @@ const bgColor = computed(
 
   .os-cell {
     border-right: none;
-    border-bottom: 2px solid #202124;
+    border-bottom: 1px solid var(--cv-frame, #ececec);
     min-height: 180px;
   }
 

@@ -288,9 +288,9 @@ function onCloseMaximize(event?: Event) {
   flex-direction: column;
   min-height: 0;
   height: 100%;
-  border-radius: 8px;
-  border: 1.5px dashed #9aa0a6;
-  background: rgba(248, 249, 250, 0.72);
+  border-radius: 2px;
+  border: 1px solid #e4e6e8;
+  background: rgba(255, 255, 255, 0.72);
   overflow: hidden;
   cursor: pointer;
   box-sizing: border-box;
@@ -315,8 +315,8 @@ function onCloseMaximize(event?: Event) {
 
 .ym-block.compact {
   background: transparent;
-  border-color: #b0b4b8;
-  border-radius: 6px;
+  border-color: #e4e6e8;
+  border-radius: 2px;
 }
 
 .ym-block.compact.selected {
@@ -373,7 +373,7 @@ function onCloseMaximize(event?: Event) {
   flex-shrink: 0;
   width: 20px;
   height: 20px;
-  border: 1px dashed #9aa0a6;
+  border: 1px solid #e4e6e8;
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.75);
   color: #5f6368;

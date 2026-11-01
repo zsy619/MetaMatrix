@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { canvasChromeStyle, paintForTone } from './canvasChrome'
 import type {
   WorkStateZonesBlock,
   WorkStateZonesBlockId,
@@ -31,26 +32,11 @@ function block(id: WorkStateZonesBlockId): WorkStateZonesBlock | undefined {
 }
 
 const axes = computed(() => props.doc.axes)
-const bgColor = computed(
-  () => props.doc.theme.background.color || '#ffffff',
-)
+const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 
-/**
- * 附图色值取样：
- * 轴红 #b85654
- * A 绿徽章 #9ad751 / 描述 #98d84e
- * B 黄徽章 #fae254 / 描述 #fde153
- * C 粉徽章 #ff898e / 描述 #fc8b8d
- * D 灰徽章 #8e8e8e / 描述 #8e8e8e
- */
-const TONE: Record<
-  string,
-  { badge: string; desc: string }
-> = {
-  green: { badge: '#9ad751', desc: '#98d84e' },
-  yellow: { badge: '#fae254', desc: '#fde153' },
-  pink: { badge: '#ff898e', desc: '#fc8b8d' },
-  grey: { badge: '#8e8e8e', desc: '#8e8e8e' },
+function cellPaint(id: WorkStateZonesBlockId) {
+  const item = block(id)
+  return paintForTone(item?.tone, item)
 }
 
 const order: WorkStateZonesBlockId[] = ['a', 'b', 'c', 'd']
@@ -75,7 +61,7 @@ function onOpenQuadrant(id: WorkStateZonesBlockId, event?: Event) {
 <template>
   <div
     class="wsz-canvas"
-    :style="{ backgroundColor: bgColor }"
+    :style="chrome"
     aria-label="人生红点工作状态区间"
   >
     <div class="wsz-frame">
@@ -113,7 +99,7 @@ function onOpenQuadrant(id: WorkStateZonesBlockId, event?: Event) {
               markerHeight="9"
               orient="auto"
             >
-              <path d="M 0 1 L 11 6 L 0 11 z" fill="#b85654" />
+              <path d="M 0 1 L 11 6 L 0 11 z" fill="#A84562" />
             </marker>
             <marker
               id="wsz-arrow-h"
@@ -124,7 +110,7 @@ function onOpenQuadrant(id: WorkStateZonesBlockId, event?: Event) {
               markerHeight="9"
               orient="auto"
             >
-              <path d="M 0 1 L 11 6 L 0 11 z" fill="#b85654" />
+              <path d="M 0 1 L 11 6 L 0 11 z" fill="#A84562" />
             </marker>
           </defs>
           <!-- 竖轴：底 → 顶（箭头朝「自治」） -->
@@ -133,7 +119,7 @@ function onOpenQuadrant(id: WorkStateZonesBlockId, event?: Event) {
             y1="99.2"
             x2="50"
             y2="1.2"
-            stroke="#b85654"
+            stroke="#A84562"
             stroke-width="2.6"
             vector-effect="non-scaling-stroke"
             marker-end="url(#wsz-arrow-v)"
@@ -144,7 +130,7 @@ function onOpenQuadrant(id: WorkStateZonesBlockId, event?: Event) {
             y1="50"
             x2="98.8"
             y2="50"
-            stroke="#b85654"
+            stroke="#A84562"
             stroke-width="2.6"
             vector-effect="non-scaling-stroke"
             marker-end="url(#wsz-arrow-h)"
@@ -157,6 +143,7 @@ function onOpenQuadrant(id: WorkStateZonesBlockId, event?: Event) {
             :key="id"
             v-show="block(id)"
             class="wsz-cell"
+            :style="{ backgroundColor: cellPaint(id).fill }"
           >
             <div
               class="wsz-header"
@@ -169,15 +156,13 @@ function onOpenQuadrant(id: WorkStateZonesBlockId, event?: Event) {
             >
               <h2
                 class="wsz-badge"
-                :style="{
-                  backgroundColor: TONE[block(id)!.tone]?.badge || '#ccc',
-                }"
+                :style="{ backgroundColor: cellPaint(id).accent }"
               >
                 {{ block(id)!.title }}
               </h2>
               <p
                 class="wsz-desc"
-                :style="{ color: TONE[block(id)!.tone]?.desc || '#666' }"
+                :style="{ color: cellPaint(id).topic }"
               >
                 {{ block(id)!.description }}
               </p>
@@ -240,7 +225,7 @@ function onOpenQuadrant(id: WorkStateZonesBlockId, event?: Event) {
 .wsz-axis-main {
   font-size: clamp(16px, 1.85vw, 24px);
   font-weight: 800;
-  color: #111111;
+  color: #3c3424;
   letter-spacing: 0.12em;
   line-height: 1.15;
 }
@@ -248,7 +233,7 @@ function onOpenQuadrant(id: WorkStateZonesBlockId, event?: Event) {
 .wsz-axis-sub {
   font-size: clamp(11px, 1.05vw, 13px);
   font-weight: 500;
-  color: #9aa0a6;
+  color: #80868b;
   letter-spacing: 0.04em;
   line-height: 1.2;
   white-space: nowrap;
@@ -381,9 +366,6 @@ function onOpenQuadrant(id: WorkStateZonesBlockId, event?: Event) {
   line-height: 1.35;
   font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui,
     sans-serif;
-  /* 浅色描述字在白底上更易辨：轻描边 */
-  -webkit-text-stroke: 0.2px currentColor;
-  paint-order: stroke fill;
   pointer-events: none;
 }
 

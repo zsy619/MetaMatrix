@@ -7,6 +7,7 @@ import {
   ref,
   watch,
 } from 'vue'
+import { canvasChromeStyle } from './canvasChrome'
 import type { IpoBlock, IpoBlockId, IpoDocumentJSON } from '../../types/canvas'
 import { useDocumentStore } from '../../stores/document'
 import {
@@ -74,9 +75,7 @@ const hostBlocks = computed(() =>
   })),
 )
 
-const bgColor = computed(
-  () => props.doc.theme.background.color || '#f7f5f0',
-)
+const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 
 /* ---- 节点点击 → 全局 panel-maximize 全屏富文本 ---- */
 const activeEditorId = ref<IpoBlockId | null>(null)
@@ -128,7 +127,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="ipo-canvas" :style="{ backgroundColor: bgColor }" aria-label="IPO梳理画布">
+  <div class="ipo-canvas" :style="chrome" aria-label="IPO梳理画布">
     <div class="ipo-grid">
       <!-- Feedback loop tracks the compact diagram bounds (Output → down → left → up into Input) -->
       <svg
@@ -147,13 +146,13 @@ onBeforeUnmount(() => {
             markerHeight="6"
             orient="auto"
           >
-            <path d="M 0 1.2 L 9 5 L 0 8.8 z" fill="#d32f2f" />
+            <path d="M 0 1.2 L 9 5 L 0 8.8 z" fill="#A84562" />
           </marker>
         </defs>
         <path
           d="M 870 250 L 870 500 L 130 500 L 130 250"
           fill="none"
-          stroke="#d32f2f"
+          stroke="#A84562"
           stroke-width="4"
           stroke-linejoin="round"
           stroke-linecap="round"
@@ -484,7 +483,7 @@ onBeforeUnmount(() => {
 }
 
 .ipo-label--accent .ipo-cn {
-  color: #c62828;
+  color: #A84562;
 }
 
 .ipo-label--dark .ipo-cn {
@@ -502,7 +501,7 @@ onBeforeUnmount(() => {
   min-width: 0;
   box-sizing: border-box;
   display: block;
-  border: 1.5px solid #c4c7c5;
+  border: 1px solid var(--cv-frame, #ececec);
   border-radius: 6px;
   background: #ffffff;
   box-shadow: 0 1px 2px rgba(32, 33, 36, 0.06);
@@ -524,7 +523,7 @@ onBeforeUnmount(() => {
   max-width: 200px;
   height: 56px;
   max-height: 56px;
-  background: #fffefb;
+  background: #fff;
   border-color: #b0b4b8;
 }
 
@@ -534,7 +533,7 @@ onBeforeUnmount(() => {
   max-width: 420px;
   height: 56px;
   max-height: 56px;
-  background: #fffefb;
+  background: #fff;
   border-color: #b0b4b8;
   box-shadow: 0 1px 3px rgba(32, 33, 36, 0.08);
 }
@@ -543,14 +542,14 @@ onBeforeUnmount(() => {
 .ipo-node--process .ipo-box,
 .ipo-node--output .ipo-box,
 .ipo-node--pattern .ipo-box {
-  border-color: #9aa0a6;
+  border-color: var(--cv-frame, #ececec);
   box-shadow: 0 1px 3px rgba(32, 33, 36, 0.07);
 }
 
 .ipo-node--process .ipo-box {
-  border-color: #d32f2f;
+  border-color: #A84562;
   border-width: 1.5px;
-  background: #fffbfb;
+  background: #FBEFF2;
 }
 
 /* Horizontal red arrows — sit mid of the box (offset past CN/EN label) */
@@ -559,7 +558,7 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   gap: 0;
-  color: #d32f2f;
+  color: #A84562;
   align-self: start;
   height: 120px;
   margin-top: 28px; /* ~label stack so shaft hits box center */
@@ -579,7 +578,7 @@ onBeforeUnmount(() => {
   display: block;
   flex: 1;
   height: 3px;
-  background: #d32f2f;
+  background: #A84562;
   border-radius: 2px;
   min-width: 8px;
 }

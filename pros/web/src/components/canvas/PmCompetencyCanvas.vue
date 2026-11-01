@@ -7,6 +7,7 @@ import {
   ref,
   watch,
 } from 'vue'
+import { canvasChromeStyle } from './canvasChrome'
 import type {
   PmCompetencyAxisId,
   PmCompetencyBlock,
@@ -28,9 +29,7 @@ const documentStore = useDocumentStore()
 // Sync before first render so axisBlocks are defined (v-if hosts).
 documentStore.ensurePmCompetencyBlocks()
 
-const bgColor = computed(
-  () => props.doc.theme.background.color || '#ffffff',
-)
+const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 
 /**
  * 顺时针自顶：意识 → 做复盘 → 管执行 → 拆计划 → 定方案
@@ -67,11 +66,11 @@ const AXIS_SHORT: Record<PmCompetencyAxisId, string> = {
  * 意识蓝 / 定方案琥珀 / 拆计划红 / 管执行绿 / 做复盘紫
  */
 const AXIS_COLOR: Record<PmCompetencyAxisId, string> = {
-  awareness: '#1565C0',
-  proposal: '#9A5700',
-  plan: '#C62828',
-  execution: '#137333',
-  review: '#6A1B9A',
+  awareness: '#2A649F',
+  proposal: '#A67C00',
+  plan: '#A84562',
+  execution: '#187A4E',
+  review: '#6B4C9A',
 }
 
 function axisColor(axis: PmCompetencyAxisId): string {
@@ -337,7 +336,7 @@ onBeforeUnmount(() => {
 <template>
   <div
     class="pmc-canvas"
-    :style="{ backgroundColor: bgColor }"
+    :style="chrome"
     aria-label="项目管理竞争力测评"
   >
     <header class="pmc-title-bar">

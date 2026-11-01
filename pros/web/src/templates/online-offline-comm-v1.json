@@ -5,8 +5,11 @@
   "theme": {
     "background": {
       "pattern": "none",
-      "color": "#ffffff"
-    }
+      "color": "#f7f7f7"
+    },
+    "page": "#f7f7f7",
+    "frame": "#ececec",
+    "hairline": "rgba(60, 50, 20, 0.08)"
   },
   "axes": {
     "online": "线上",
@@ -22,19 +25,19 @@
       "items": [
         {
           "id": "item_ooc_a_1",
-          "text": "<p style=\"text-align: center\"><strong><mark data-color=\"#a4c4fc\" style=\"background-color: #a4c4fc; color: inherit\">顶层文档</mark></strong></p>"
+          "text": "<p style=\"text-align: center\"><strong><mark data-color=\"#E8F1FA\" style=\"background-color: #E8F1FA; color: inherit\">顶层文档</mark></strong></p>"
         },
         {
           "id": "item_ooc_a_2",
-          "text": "<p style=\"text-align: center\"><strong><mark data-color=\"#a4c4fc\" style=\"background-color: #a4c4fc; color: inherit\">电子看板</mark></strong></p>"
+          "text": "<p style=\"text-align: center\"><strong><mark data-color=\"#E8F1FA\" style=\"background-color: #E8F1FA; color: inherit\">电子看板</mark></strong></p>"
         },
         {
           "id": "item_ooc_a_3",
-          "text": "<p style=\"text-align: center\"><mark data-color=\"#a4c4fc\" style=\"background-color: #a4c4fc; color: inherit\">项目群</mark></p>"
+          "text": "<p style=\"text-align: center\"><mark data-color=\"#E8F1FA\" style=\"background-color: #E8F1FA; color: inherit\">项目群</mark></p>"
         },
         {
           "id": "item_ooc_a_4",
-          "text": "<p style=\"text-align: center\"><mark data-color=\"#a4c4fc\" style=\"background-color: #a4c4fc; color: inherit\">邮件</mark></p>"
+          "text": "<p style=\"text-align: center\"><mark data-color=\"#E8F1FA\" style=\"background-color: #E8F1FA; color: inherit\">邮件</mark></p>"
         }
       ]
     },
@@ -45,15 +48,15 @@
       "items": [
         {
           "id": "item_ooc_b_1",
-          "text": "<p style=\"text-align: center\"><mark data-color=\"#b8fcb8\" style=\"background-color: #b8fcb8; color: inherit\">1v1发消息</mark></p>"
+          "text": "<p style=\"text-align: center\"><mark data-color=\"#E7F6EF\" style=\"background-color: #E7F6EF; color: inherit\">1v1发消息</mark></p>"
         },
         {
           "id": "item_ooc_b_2",
-          "text": "<p style=\"text-align: center\"><mark data-color=\"#b8fcb8\" style=\"background-color: #b8fcb8; color: inherit\">1v1电话</mark></p>"
+          "text": "<p style=\"text-align: center\"><mark data-color=\"#E7F6EF\" style=\"background-color: #E7F6EF; color: inherit\">1v1电话</mark></p>"
         },
         {
           "id": "item_ooc_b_3",
-          "text": "<p style=\"text-align: center\"><mark data-color=\"#b8fcb8\" style=\"background-color: #b8fcb8; color: inherit\">群聊消息</mark></p>"
+          "text": "<p style=\"text-align: center\"><mark data-color=\"#E7F6EF\" style=\"background-color: #E7F6EF; color: inherit\">群聊消息</mark></p>"
         }
       ]
     },
@@ -64,7 +67,7 @@
       "items": [
         {
           "id": "item_ooc_c_1",
-          "text": "<p style=\"text-align: center\"><strong><mark data-color=\"#e4a4fc\" style=\"background-color: #e4a4fc; color: inherit\">墙面看板</mark></strong></p>"
+          "text": "<p style=\"text-align: center\"><strong><mark data-color=\"#F3EEF8\" style=\"background-color: #F3EEF8; color: inherit\">墙面看板</mark></strong></p>"
         }
       ]
     },
@@ -75,23 +78,23 @@
       "items": [
         {
           "id": "item_ooc_d_1",
-          "text": "<p style=\"text-align: center\"><strong><mark data-color=\"#fcb8b8\" style=\"background-color: #fcb8b8; color: inherit\">封闭研发</mark></strong></p>"
+          "text": "<p style=\"text-align: center\"><strong><mark data-color=\"#FBEFF2\" style=\"background-color: #FBEFF2; color: inherit\">封闭研发</mark></strong></p>"
         },
         {
           "id": "item_ooc_d_2",
-          "text": "<p style=\"text-align: center\"><strong><mark data-color=\"#fcb8b8\" style=\"background-color: #fcb8b8; color: inherit\">攻坚小组</mark></strong></p>"
+          "text": "<p style=\"text-align: center\"><strong><mark data-color=\"#FBEFF2\" style=\"background-color: #FBEFF2; color: inherit\">攻坚小组</mark></strong></p>"
         },
         {
           "id": "item_ooc_d_3",
-          "text": "<p style=\"text-align: center\"><strong><mark data-color=\"#fcb8b8\" style=\"background-color: #fcb8b8; color: inherit\">坐你旁边</mark></strong></p>"
+          "text": "<p style=\"text-align: center\"><strong><mark data-color=\"#FBEFF2\" style=\"background-color: #FBEFF2; color: inherit\">坐你旁边</mark></strong></p>"
         },
         {
           "id": "item_ooc_d_4",
-          "text": "<p style=\"text-align: center\"><mark data-color=\"#fcb8b8\" style=\"background-color: #fcb8b8; color: inherit\">1v1当面</mark></p>"
+          "text": "<p style=\"text-align: center\"><mark data-color=\"#FBEFF2\" style=\"background-color: #FBEFF2; color: inherit\">1v1当面</mark></p>"
         },
         {
           "id": "item_ooc_d_5",
-          "text": "<p style=\"text-align: center\"><mark data-color=\"#fcb8b8\" style=\"background-color: #fcb8b8; color: inherit\">团队例会</mark></p>"
+          "text": "<p style=\"text-align: center\"><mark data-color=\"#FBEFF2\" style=\"background-color: #FBEFF2; color: inherit\">团队例会</mark></p>"
         }
       ]
     }

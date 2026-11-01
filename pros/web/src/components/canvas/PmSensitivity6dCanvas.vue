@@ -7,6 +7,7 @@ import {
   ref,
   watch,
 } from 'vue'
+import { canvasChromeStyle } from './canvasChrome'
 import type {
   PmSensitivity6dAxisId,
   PmSensitivity6dBlock,
@@ -28,9 +29,7 @@ const documentStore = useDocumentStore()
 // Sync before first render so axisBlocks are defined (v-if hosts).
 documentStore.ensurePmSensitivity6dBlocks()
 
-const bgColor = computed(
-  () => props.doc.theme.background.color || '#ffffff',
-)
+const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 
 /**
  * 顺时针自顶：预算 → 老板 → 风险 → 协作 → 人力 → 时间
@@ -69,12 +68,12 @@ const AXIS_SHORT: Record<PmSensitivity6dAxisId, string> = {
  * 预算蓝 / 老板琥珀 / 风险红 / 协作绿 / 人力紫 / 时间青
  */
 const AXIS_COLOR: Record<PmSensitivity6dAxisId, string> = {
-  budget: '#1565C0',
-  boss: '#9A5700',
-  risk: '#C62828',
-  collaboration: '#137333',
-  manpower: '#6A1B9A',
-  time: '#00838F',
+  budget: '#2A649F',
+  boss: '#A67C00',
+  risk: '#A84562',
+  collaboration: '#187A4E',
+  manpower: '#6B4C9A',
+  time: '#0E8A84',
 }
 
 function axisColor(axis: PmSensitivity6dAxisId): string {
@@ -343,7 +342,7 @@ onBeforeUnmount(() => {
 <template>
   <div
     class="pm6d-canvas"
-    :style="{ backgroundColor: bgColor }"
+    :style="chrome"
     aria-label="项目管理6维敏感度模型"
   >
     <header class="pm6d-title-bar">

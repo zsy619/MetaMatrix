@@ -5,8 +5,11 @@
   "theme": {
     "background": {
       "pattern": "none",
-      "color": "#ffffff"
-    }
+      "color": "#f7f7f7"
+    },
+    "page": "#f7f7f7",
+    "frame": "#ececec",
+    "hairline": "rgba(60, 50, 20, 0.08)"
   },
   "formulaText": "女装店收入 = 流量指标 * 转化指标 * 客单价指标\n流量指标 = 进店人数 + 站外引流\n进店人数 = 站内流量 + 站外流量\n付费转化率 = 详情页转化 * 支付转化\n转化指标 = 付费转化率 + 详情页转化\n客单价指标 = 平均件单价 * 人均购买件数\n平均件单价 = 基础价 * 折扣率",
   "layout": "horizontal",

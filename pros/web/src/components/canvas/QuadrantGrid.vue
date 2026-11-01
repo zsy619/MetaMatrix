@@ -27,11 +27,15 @@ function byPosition(list: QuadrantCellType[], pos: string) {
 <style scoped>
 .quadrant-grid {
   position: absolute;
-  inset: 0;
+  inset: 14px 16px 12px;
   z-index: 10;
   display: grid;
   grid-template-columns: 1fr 1fr;
   grid-template-rows: 1fr 1fr;
   gap: 0;
+  border: 1px solid #ececec;
+  background: #fff;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 </style>
