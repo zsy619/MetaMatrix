@@ -114,6 +114,7 @@ import {
   sheetBox,
   type RtePageSizeId,
 } from '../utils/rtePageSize'
+import { moveTableGridHover, TABLE_QUICK_COLS, TABLE_QUICK_ROWS } from '../utils/rteTableGrid'
 import {
   buildToolbarGroups,
   bumpToolbarUndoEpoch,
@@ -6015,8 +6016,6 @@ function confirmInsertFormula() {
 const tableDialogOpen = ref(false)
 const tableQuickOpen = ref(false)
 const tableQuickHover = ref({ rows: 0, cols: 0 })
-const TABLE_QUICK_ROWS = 6
-const TABLE_QUICK_COLS = 8
 const tableQuickCells = Array.from({ length: TABLE_QUICK_ROWS * TABLE_QUICK_COLS }, (_, index) => ({
   r: Math.floor(index / TABLE_QUICK_COLS) + 1,
   c: (index % TABLE_QUICK_COLS) + 1,
@@ -6140,12 +6139,39 @@ function closeTableMenu() {
   tableQuickOpen.value = false
 }
 
+watch(tableQuickOpen, (open) => {
+  if (!open) return
+  nextTick(() => {
+    const el = document.querySelector('.rte-table-quick')
+    if (el instanceof HTMLElement) el.focus()
+  })
+})
+
 function insertQuickTable(rows: number, cols: number) {
+  if (viewMode.value !== 'edit') return
   tableRows.value = rows
   tableCols.value = cols
   tableQuickHover.value = { rows, cols }
   tableQuickOpen.value = false
   confirmInsertTable()
+}
+
+function onTableQuickKeydown(event: KeyboardEvent) {
+  const next = moveTableGridHover(tableQuickHover.value, event.key)
+  if (next == null) return
+  event.preventDefault()
+  event.stopPropagation()
+  if (next === 'close') {
+    closeTableMenu()
+    return
+  }
+  if (next === 'insert') {
+    const rows = tableQuickHover.value.rows || 1
+    const cols = tableQuickHover.value.cols || 1
+    insertQuickTable(rows, cols)
+    return
+  }
+  tableQuickHover.value = next
 }
 
 function closeTableOpsSheet() {
@@ -6347,6 +6373,7 @@ const tableOpItems = computed((): TableOpItem[] => {
  * 最大化工具条请用 onTableToolbarButtonClick（表内下拉、表外弹窗）。
  */
 function onTableToolClick() {
+  if (viewMode.value !== 'edit') return
   moreOpen.value = false
   closeImportMenu()
   closeExportMenu()
@@ -6358,11 +6385,13 @@ function onTableToolClick() {
   }
   const nextQuick = !tableQuickOpen.value
   closeTableMenu()
+  if (nextQuick) tableQuickHover.value = { rows: 0, cols: 0 }
   tableQuickOpen.value = nextQuick
 }
 
 /** 最大化工具栏「表格」按钮：表外网格插入；表内切换操作下拉 */
 function onTableToolbarButtonClick() {
+  if (viewMode.value !== 'edit') return
   moreOpen.value = false
   closeImportMenu()
   headingOpen.value = false
@@ -6380,6 +6409,7 @@ function onTableToolbarButtonClick() {
   }
   const nextQuick = !tableQuickOpen.value
   closeTableMenu()
+  if (nextQuick) tableQuickHover.value = { rows: 0, cols: 0 }
   tableQuickOpen.value = nextQuick
 }
 
@@ -9747,12 +9777,15 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
           </button>
           <Teleport to="body">
             <div
-              v-if="tableQuickOpen && !isInTable()"
+              v-if="tableQuickOpen && !isInTable() && viewMode === 'edit'"
               class="rte-menu rte-table-quick"
+              :class="{ 'is-dark': darkEditor }"
               v-rte-float="'table'"
               role="dialog"
               aria-label="插入表格"
+              tabindex="0"
               @mousedown.prevent
+              @keydown="onTableQuickKeydown"
               @mouseenter="onToolMenuEnter('table')"
               @mouseleave="onToolMenuLeave($event, 'table', closeTableMenu)"
             >
@@ -16528,43 +16561,86 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
   font-weight: 600;
   color: var(--mm-faint, #9aa0a6);
 }
-.rte-table-quick {
-  padding: 8px;
+.rte-float-menu.rte-table-quick {
   width: max-content;
+  min-width: 0;
+  padding: 10px 12px 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
 }
-.rte-table-quick-label {
-  font-size: 12px;
-  color: var(--mm-muted, #5f6368);
-  padding: 2px 4px 8px;
+.rte-float-menu.rte-table-quick .rte-table-quick-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1d2129;
+  padding: 0 2px 8px;
+  line-height: 1.3;
 }
-.rte-table-quick-grid {
-  display: grid;
-  grid-template-columns: repeat(8, 16px);
-  gap: 3px;
+.rte-float-menu.rte-table-quick .rte-table-quick-grid {
+  display: grid !important;
+  grid-template-columns: repeat(10, 18px) !important;
+  grid-template-rows: repeat(8, 18px);
+  gap: 4px;
+  width: calc(10 * 18px + 9 * 4px);
+  height: calc(8 * 18px + 7 * 4px);
+  justify-content: start;
+  align-content: start;
 }
-.rte-table-quick-cell {
-  width: 16px;
-  height: 16px;
-  padding: 0;
-  border: 1px solid var(--mm-line-strong, #dadce0);
+.rte-float-menu.rte-table-quick .rte-table-quick-cell {
+  width: 18px !important;
+  height: 18px !important;
+  min-width: 18px;
+  min-height: 18px;
+  max-width: 18px;
+  max-height: 18px;
+  padding: 0 !important;
+  margin: 0;
+  border: 1px solid #d5d8de !important;
   border-radius: 2px;
-  background: var(--mm-surface, #fff);
+  background: #fff !important;
+  box-sizing: border-box;
+  display: block;
+  flex: none;
   cursor: pointer;
 }
-.rte-table-quick-cell.is-on {
-  background: var(--mm-blue-soft, #e8f0fe);
-  border-color: var(--mm-blue, #1a73e8);
+.rte-float-menu.rte-table-quick .rte-table-quick-cell.is-on {
+  background: #e8f3ff !important;
+  border-color: #3370ff !important;
 }
-.rte-table-quick-more {
+.rte-float-menu.rte-table-quick .rte-table-quick-cell:hover {
+  background: #e8f3ff !important;
+}
+.rte-float-menu.rte-table-quick .rte-table-quick-more {
   margin-top: 8px;
   width: 100%;
   border: none;
   background: transparent;
-  color: var(--mm-blue, #1a73e8);
-  font-size: 12px;
+  color: #3370ff;
+  font-size: 13px;
   text-align: left;
   cursor: pointer;
-  padding: 4px;
+  padding: 6px 2px !important;
+}
+.rte-float-menu.rte-table-quick.is-dark {
+  background: #1d2129;
+  border-color: #3a3f47;
+  color: #e5e6eb;
+}
+.rte-float-menu.rte-table-quick.is-dark .rte-table-quick-label {
+  color: #e5e6eb;
+}
+.rte-float-menu.rte-table-quick.is-dark .rte-table-quick-cell {
+  background: #2a2e36 !important;
+  border-color: #4e5969 !important;
+}
+.rte-float-menu.rte-table-quick.is-dark .rte-table-quick-cell.is-on,
+.rte-float-menu.rte-table-quick.is-dark .rte-table-quick-cell:hover {
+  background: #1d4ed8 !important;
+  border-color: #7eb6ff !important;
+}
+.rte-float-menu.rte-table-quick.is-dark .rte-table-quick-more {
+  color: #7eb6ff;
 }
 .rte-hr-option {
   display: flex;
@@ -16639,13 +16715,41 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
 .rte-root.expanded .rte-canvas {
   background: var(--mm-bg, #fafafa);
 }
-.rte-root.expanded :deep(.ProseMirror) {
+.rte-root.expanded:not([data-page-size='full']) :deep(.ProseMirror) {
   max-width: 760px;
   margin: 12px auto 24px;
   background: var(--mm-surface, #fff);
   padding: 28px 40px 72px;
   box-shadow: 0 1px 2px rgba(32, 33, 36, 0.06);
   box-sizing: border-box;
+}
+.rte-root[data-page-size='full'] .rte-canvas {
+  padding: 4px 6px 8px;
+}
+.rte-root[data-page-size='full'].expanded .rte-canvas {
+  padding: 4px 6px 8px;
+  background: var(--mm-surface, #fff);
+}
+.rte-root[data-page-size='full'].expanded :deep(.ProseMirror) {
+  max-width: none;
+  width: 100%;
+  margin: 0;
+  padding: 4px 2px 16px;
+  background: transparent;
+  box-shadow: none;
+  box-sizing: border-box;
+}
+.rte-root[data-page-size='full'] :deep(.rte-image-group) {
+  width: 100%;
+  max-width: 100%;
+  margin-left: 0;
+  margin-right: 0;
+}
+.rte-root[data-page-size='full'] :deep(.tableWrapper) {
+  max-width: 100%;
+}
+.rte-root[data-page-size='full'] :deep(.tableWrapper table) {
+  width: 100%;
 }
 @media (max-width: 720px) {
   .rte-root.expanded .rte-toolbar {
@@ -19266,6 +19370,15 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
 }
 .rte-root :deep(.rte-image-group[data-align='right']) {
   margin-left: auto;
+  margin-right: 0;
+}
+.rte-root[data-page-size='full'] :deep(.rte-image-group),
+.rte-root[data-page-size='full'] :deep(.rte-image-group[data-align='left']),
+.rte-root[data-page-size='full'] :deep(.rte-image-group[data-align='center']),
+.rte-root[data-page-size='full'] :deep(.rte-image-group[data-align='right']) {
+  width: 100%;
+  max-width: 100%;
+  margin-left: 0;
   margin-right: 0;
 }
 .rte-root :deep(.rte-image-group-bar) {
