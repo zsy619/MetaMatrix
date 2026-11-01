@@ -16835,7 +16835,7 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
 .rte-root.expanded .rte-canvas {
   background: var(--mm-bg, #fafafa);
 }
-.rte-root.expanded:not([data-page-size='full']) :deep(.ProseMirror) {
+.rte-root.expanded:not([data-page-size='full']):not(.is-page-sheet) :deep(.ProseMirror) {
   max-width: 760px;
   margin: 12px auto 24px;
   background: var(--mm-surface, #fff);
@@ -16903,7 +16903,7 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
   .rte-root.expanded .rte-tool-divider.is-tier {
     display: none;
   }
-  .rte-root.expanded :deep(.ProseMirror) {
+  .rte-root.expanded:not(.is-page-sheet) :deep(.ProseMirror) {
     max-width: none;
     margin: 0;
     padding: 16px 14px 48px;
@@ -19214,8 +19214,8 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
   cursor: pointer;
   padding: 6px;
 }
-.rte-canvas.is-paper-guide .rte-body,
-.rte-canvas.is-paper-guide .ProseMirror {
+.rte-root:not(.is-page-sheet) .rte-canvas.is-paper-guide .rte-body,
+.rte-root:not(.is-page-sheet) .rte-canvas.is-paper-guide .ProseMirror {
   max-width: 794px; /* ~A4 @ 96dpi */
   margin-left: auto;
   margin-right: auto;
@@ -19267,7 +19267,10 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
 }
 .rte-root.is-page-sheet .rte-body {
   position: relative;
+  display: flex;
+  flex-direction: column;
   width: min(100%, var(--rte-sheet-width, 794px));
+  max-width: none;
   min-height: var(--rte-sheet-min-height, 1123px);
   margin: 16px auto 28px;
   padding: var(--rte-margin-top, 25.4mm) var(--rte-margin-right, 31.8mm) var(--rte-margin-bottom, 25.4mm) var(--rte-margin-left, 31.8mm);
@@ -19299,6 +19302,22 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
 .rte-root.mode-preview.is-page-sheet .rte-body,
 .rte-root.mode-preview.is-page-sheet .ProseMirror {
   caret-color: transparent;
+}
+/* 纸张正文必须铺满虚线框：页边距只留在 .rte-body 的 padding 上。 */
+.rte-root.is-page-sheet .rte-body > .ProseMirror,
+.rte-root.is-page-sheet .rte-body > .tiptap {
+  flex: 1 1 auto;
+  align-self: stretch;
+  width: 100% !important;
+  max-width: none !important;
+  height: auto;
+  min-height: 0;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  box-sizing: border-box;
 }
 .rte-root.is-table-sticky .tableWrapper {
   max-height: 420px;
@@ -19513,7 +19532,11 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
 .rte-root[data-page-size='full'] :deep(.rte-image-group),
 .rte-root[data-page-size='full'] :deep(.rte-image-group[data-align='left']),
 .rte-root[data-page-size='full'] :deep(.rte-image-group[data-align='center']),
-.rte-root[data-page-size='full'] :deep(.rte-image-group[data-align='right']) {
+.rte-root[data-page-size='full'] :deep(.rte-image-group[data-align='right']),
+.rte-root.is-page-sheet .rte-image-group,
+.rte-root.is-page-sheet .rte-image-group[data-align='left'],
+.rte-root.is-page-sheet .rte-image-group[data-align='center'],
+.rte-root.is-page-sheet .rte-image-group[data-align='right'] {
   width: 100%;
   max-width: 100%;
   margin-left: 0;
