@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict'
 import { blockHtmlIsKept } from './itemsHtml.ts'
 import {
+  groupCssVars,
   groupInsertIndex,
+  groupUsesAspect,
+  imageGroupLayoutCss,
   imagesFromColumns,
   insertRatio,
   moveItem,
@@ -10,6 +13,7 @@ import {
   ratiosToAttr,
   removeRatio,
   resizePair,
+  rowLayout,
   shouldDissolveGroup,
 } from './rteImageGroup.ts'
 
@@ -64,5 +68,21 @@ assert.equal(
 )
 
 assert.equal(blockHtmlIsKept('<div data-type="image-group"><img src="x"></div>'), true)
+
+assert.equal(groupCssVars(2, '1:2'), '--g0:1;--g1:2')
+assert.equal(groupCssVars(3, null), '--g0:1;--g1:1;--g2:1')
+assert.equal(groupUsesAspect(null), true)
+assert.equal(groupUsesAspect('custom'), false)
+const laid = rowLayout(808, [2, 1], 8)
+assert.equal(laid.widths[0]! + laid.widths[1]!, 800)
+assert.equal(laid.height, 267)
+assert.ok(laid.widths[0]! > laid.widths[1]!)
+assert.match(imageGroupLayoutCss, /\.rte-image-drag-handle\{/)
+assert.match(imageGroupLayoutCss, /\.rte-image-group-divider\{/)
+assert.match(imageGroupLayoutCss, /gap:8px/)
+assert.match(imageGroupLayoutCss, /data-resize-wrapper/)
+assert.match(imageGroupLayoutCss, /left:36px;top:8px/)
+assert.doesNotMatch(imageGroupLayoutCss, /:deep/)
+assert.match(imageGroupLayoutCss, /mode-preview[\s\S]*rte-image-drag-handle/)
 
 console.log('image group ok')

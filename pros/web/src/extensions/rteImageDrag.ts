@@ -6,6 +6,7 @@ import {
   placeBeside,
   reorderInGroup,
 } from './imageGroupOps'
+import { installImageGroupLayout } from '../utils/rteImageGroup'
 import {
   containerCanHoldImage,
   imageDropKind,
@@ -131,9 +132,19 @@ function imagePosFromDOM(view: EditorView, dom: HTMLElement): number | null {
   return found
 }
 
+function imageVisualRect(frame: HTMLElement): DOMRect {
+  const img = frame.querySelector('img')
+  if (img instanceof HTMLElement) {
+    const rect = img.getBoundingClientRect()
+    if (rect.width > 8 && rect.height > 8) return rect
+  }
+  return frame.getBoundingClientRect()
+}
+
 function placeLine(kind: RteImageDropKind, rect: DOMRect) {
   const line = ensureLine()
   const preview = ensurePreview()
+  line.dataset.kind = kind
   if (kind === 'left' || kind === 'right') {
     const x = kind === 'left' ? rect.left : rect.right
     line.style.left = `${x - 2}px`
@@ -263,7 +274,7 @@ function readDrop(view: EditorView, event: { clientX: number; clientY: number })
   const frame =
     frames.find((el) => Number(el.dataset.rtePos) !== dragFrom) || frames[0] || null
   if (frame instanceof HTMLElement) {
-    const rect = frame.getBoundingClientRect()
+    const rect = imageVisualRect(frame)
     const xRatio = rect.width ? (event.clientX - rect.left) / rect.width : 0.5
     const yRatio = rect.height ? (event.clientY - rect.top) / rect.height : 0.5
     const kind = imageDropKind(xRatio, yRatio, true)
@@ -362,6 +373,7 @@ function showResizeTip() {
 export function createImageDragPlugin(): Plugin {
   return new Plugin({
     view(editorView) {
+      installImageGroupLayout()
       const stamp = () => {
         editorView.state.doc.descendants((node, pos) => {
           if (node.type.name !== 'image') return true
@@ -369,7 +381,18 @@ export function createImageDragPlugin(): Plugin {
           if (el instanceof HTMLElement) {
             el.dataset.rtePos = String(pos)
             const box = el.closest('[data-resize-container]')
-            if (box instanceof HTMLElement) box.dataset.rtePos = String(pos)
+            const frame = box instanceof HTMLElement ? box : el
+            frame.dataset.rtePos = String(pos)
+            if (frame.querySelector(':scope > .rte-image-drag-handle')) return false
+            const handle = document.createElement('button')
+            handle.type = 'button'
+            handle.className = 'rte-image-drag-handle'
+            handle.textContent = '⠿'
+            handle.tabIndex = -1
+            handle.setAttribute('contenteditable', 'false')
+            handle.setAttribute('aria-label', '拖动图片')
+            handle.title = '拖动图片'
+            frame.appendChild(handle)
           }
           return false
         })
@@ -430,6 +453,7 @@ export function createImageDragPlugin(): Plugin {
         pointerDrag = null
         dragFrom = null
         hideLine()
+        clearDragging()
         if (!current.moved || !editorView.editable) return
         commitDrop(editorView, event, current.from, current.kind)
       }
@@ -452,22 +476,34 @@ export function createImageDragPlugin(): Plugin {
         resizingFrame = null
         hideTip()
       }
+      const clearDragging = () => {
+        editorView.dom.querySelectorAll('.rte-image-drag-handle.is-dragging').forEach((node) => {
+          node.classList.remove('is-dragging')
+        })
+      }
       const onPointerDown = (event: PointerEvent) => {
         if (!editorView.editable || event.button !== 0) return
-        if (!(event.target instanceof Node) || !editorView.dom.contains(event.target)) return
-        if (!(event.target instanceof Element)) return
-        if (event.target.closest('[data-resize-handle], .rte-image-group-bar, .rte-image-group-divider')) return
-        const frame = imageFrame(event.target)
+        if (!(event.target instanceof Element) || !editorView.dom.contains(event.target)) return
+        const grip = event.target.closest('.rte-image-drag-handle')
+        if (!(grip instanceof HTMLElement)) return
+        const frame = imageFrame(grip)
         if (!frame) return
         const rawPos = frame.dataset.rtePos
         const stamped = rawPos ? Number(rawPos) : NaN
         const pos = Number.isInteger(stamped) ? stamped : imagePosFromDOM(editorView, frame)
         if (pos == null) return
+        event.preventDefault()
+        event.stopPropagation()
         frame.draggable = false
         const image = frame.querySelector('img')
         if (image) image.draggable = false
+        grip.classList.add('is-dragging')
+        try {
+          grip.setPointerCapture(event.pointerId)
+        } catch {
+          /* 合成 pointerId 不能 capture */
+        }
         armImageDrag(editorView, pos, 'image', event)
-        event.preventDefault()
       }
       const onMouseDown = (event: MouseEvent) => {
         armResize(event)
@@ -529,18 +565,13 @@ export function createImageDragPlugin(): Plugin {
           frame.draggable = false
           return false
         },
-        pointerdown(view, event) {
-          if (!view.editable || event.button !== 0) return false
+        pointerdown(_view, event) {
           const target = event.target
           if (!(target instanceof Element)) return false
-          if (target.closest('[data-resize-handle], .rte-image-group-bar, .rte-image-group-divider')) return false
-          const frame = imageFrame(target)
-          if (!frame) return false
-          const rawPos = frame.dataset.rtePos
-          const stamped = rawPos ? Number(rawPos) : NaN
-          const pos = Number.isInteger(stamped) ? stamped : imagePosFromDOM(view, frame)
-          if (pos == null) return false
-          armImageDrag(view, pos, 'image', event)
+          if (target.closest('.rte-image-drag-handle, .rte-image-group-handle, .rte-image-group-divider')) {
+            event.preventDefault()
+            return true
+          }
           return false
         },
         dragstart(_view, event) {

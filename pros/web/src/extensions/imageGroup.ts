@@ -2,7 +2,7 @@ import { Node, mergeAttributes } from '@tiptap/core'
 import { Plugin } from '@tiptap/pm/state'
 import type { EditorView } from '@tiptap/pm/view'
 import { normalizeImageAlign } from '../utils/rteImageLayout'
-import { normalizeGroupRatios, ratioPercents, resizePair } from '../utils/rteImageGroup'
+import { groupCssVars, groupUsesAspect, installImageGroupLayout, normalizeGroupRatios, ratioPercents, resizePair, rowLayout } from '../utils/rteImageGroup'
 import {
   buildImageGroupMigration,
   setGroupAlign,
@@ -27,40 +27,44 @@ function groupPosFromDom(view: EditorView, dom: Element | null): number | null {
 }
 
 function ensureImageGroupStyle() {
-  if (document.getElementById('rte-image-group-layout')) return
-  const style = document.createElement('style')
-  style.id = 'rte-image-group-layout'
-  style.textContent = [
-    '.rte-image-group-row > *{min-width:48px;height:100%;max-width:100%;float:none !important;margin:0 !important;}',
-    '.rte-image-group-row > *:nth-child(1){flex:var(--g0,1) 1 0 !important;}',
-    '.rte-image-group-row > *:nth-child(2){flex:var(--g1,1) 1 0 !important;}',
-    '.rte-image-group-row > *:nth-child(3){flex:var(--g2,1) 1 0 !important;}',
-    '.rte-image-group-row > *:nth-child(4){flex:var(--g3,1) 1 0 !important;}',
-    '.rte-image-group-row > *:nth-child(5){flex:var(--g4,1) 1 0 !important;}',
-    '.rte-image-group-row > *:nth-child(6){flex:var(--g5,1) 1 0 !important;}',
-    '.rte-image-group-row > *:nth-child(7){flex:var(--g6,1) 1 0 !important;}',
-    '.rte-image-group-row > *:nth-child(8){flex:var(--g7,1) 1 0 !important;}',
-    '.rte-image-group-row img{width:100% !important;height:100% !important;object-fit:cover;max-width:100% !important;}',
-    '.rte-image-group-row [data-resize-handle]{display:none !important;}',
-    '.rte-root.mode-preview .rte-image-group-bar,.rte-root.mode-preview .rte-image-group-dividers,.rte-root.mode-source .rte-image-group-bar,.rte-root.mode-source .rte-image-group-dividers,.rte-root.rte-printing .rte-image-group-bar,.rte-root.rte-printing .rte-image-group-dividers{display:none !important;}',
-  ].join('')
-  document.head.appendChild(style)
+  installImageGroupLayout()
+}
+
+function imageAspect(frame: HTMLElement): number {
+  const img = frame.querySelector('img')
+  if (img instanceof HTMLImageElement && img.naturalWidth > 0 && img.naturalHeight > 0) {
+    return img.naturalWidth / img.naturalHeight
+  }
+  return 1
 }
 
 export function layoutImageGroupChrome(view: EditorView) {
+  const selection = view.state.selection
   view.state.doc.descendants((node, pos) => {
     if (node.type.name !== 'imageGroup') return true
     const dom = view.nodeDOM(pos)
     if (!(dom instanceof HTMLElement)) return false
     dom.dataset.rtePos = String(pos)
+    dom.classList.toggle('is-selected', selection.from >= pos && selection.to <= pos + node.nodeSize)
     const row = dom.querySelector('.rte-image-group-row')
     const dividers = dom.querySelector('.rte-image-group-dividers')
     if (!(row instanceof HTMLElement) || !(dividers instanceof HTMLElement)) return false
-    const ratios = normalizeGroupRatios(node.childCount, node.attrs.ratios)
     const kids = Array.from(row.children).filter((child): child is HTMLElement => child instanceof HTMLElement)
+    const aspects = kids.map(imageAspect)
+    const ratios = groupUsesAspect(node.attrs.ratioMode)
+      ? aspects
+      : normalizeGroupRatios(kids.length, node.attrs.ratios)
     if (dom.dataset.ratioDrag !== '1') {
       ratios.forEach((grow, index) => dom.style.setProperty(`--g${index}`, String(grow)))
+      const laid = rowLayout(row.clientWidth || dom.clientWidth, ratios, 8)
+      row.style.height = `${laid.height}px`
     }
+    kids.forEach((frame) => {
+      const img = frame.querySelector('img')
+      if (!(img instanceof HTMLImageElement) || img.dataset.rteAspectWait === '1' || img.naturalWidth > 0) return
+      img.dataset.rteAspectWait = '1'
+      img.addEventListener('load', () => layoutImageGroupChrome(view), { once: true })
+    })
     if (dom.dataset.ratioDrag === '1') return false
     dividers.replaceChildren()
     const domRect = dom.getBoundingClientRect()
@@ -73,8 +77,11 @@ export function layoutImageGroupChrome(view: EditorView) {
       handle.dataset.index = String(index)
       handle.setAttribute('aria-label', '调整图片宽度比例')
       handle.title = '拖动调整两侧宽度'
+      const mark = document.createElement('i')
+      mark.setAttribute('aria-hidden', 'true')
+      handle.appendChild(mark)
       const x = (left.right + right.left) / 2 - domRect.left
-      handle.style.left = `${x}px`
+      handle.style.cssText = `position:absolute;left:${x}px;top:${left.top - domRect.top}px;height:${Math.max(left.height, right.height)}px;width:16px;transform:translateX(-50%);border:0;padding:0;background:transparent;cursor:col-resize;pointer-events:auto;`
       handle.addEventListener('pointerdown', (event) => {
         if (!view.editable || event.button !== 0) return
         event.preventDefault()
@@ -83,7 +90,10 @@ export function layoutImageGroupChrome(view: EditorView) {
         if (groupPos == null) return
         const pairLeft = left.left
         const pairWidth = right.right - left.left
-        const base = normalizeGroupRatios(node.childCount, view.state.doc.nodeAt(groupPos)?.attrs.ratios)
+        const current = view.state.doc.nodeAt(groupPos)
+        const base = groupUsesAspect(current?.attrs.ratioMode)
+          ? kids.map(imageAspect)
+          : normalizeGroupRatios(kids.length, current?.attrs.ratios)
         dom.dataset.ratioDrag = '1'
         handle.classList.add('is-active')
         const tip = document.createElement('div')
@@ -146,21 +156,34 @@ export const ImageGroup = Node.create({
           return { 'data-ratios': String(attrs.ratios) }
         },
       },
+      ratioMode: {
+        default: null as string | null,
+        parseHTML: (element: HTMLElement) => (element.getAttribute('data-ratio-mode') === 'custom' ? 'custom' : null),
+        renderHTML: (attrs: { ratioMode?: string | null }) =>
+          attrs.ratioMode === 'custom' ? { 'data-ratio-mode': 'custom' } : {},
+      },
     }
   },
 
   parseHTML() {
-    return [{ tag: 'div[data-type="image-group"]' }]
+    return [
+      {
+        tag: 'div[data-type="image-group"]',
+        contentElement: (node: HTMLElement) =>
+          (node.querySelector(':scope > .rte-image-group-row') as HTMLElement | null) || node,
+      },
+    ]
   },
 
-  renderHTML({ HTMLAttributes }) {
+  renderHTML({ HTMLAttributes, node }) {
     return [
       'div',
       mergeAttributes(HTMLAttributes, {
         'data-type': 'image-group',
         class: 'rte-image-group',
+        style: groupCssVars(node.childCount, node.attrs.ratios),
       }),
-      0,
+      ['div', { class: 'rte-image-group-row' }, 0],
     ]
   },
 
@@ -177,26 +200,37 @@ export const ImageGroup = Node.create({
       bar.className = 'rte-image-group-bar'
       bar.setAttribute('contenteditable', 'false')
 
-      const handle = document.createElement('button')
-      handle.type = 'button'
-      handle.className = 'rte-image-group-handle'
-      handle.textContent = '⠿'
-      handle.setAttribute('aria-label', '拖动图片组')
-      handle.title = '拖动整组到其他段落之间'
+      const icon = (path: string) =>
+        `<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="${path}"/></svg>`
+      const addIconButton = (className: string, label: string, path: string) => {
+        const button = document.createElement('button')
+        button.type = 'button'
+        button.className = className
+        button.innerHTML = icon(path)
+        button.setAttribute('aria-label', label)
+        button.title = label
+        return button
+      }
+
+      const handle = addIconButton('rte-image-group-handle', '拖动图片组', 'M4 2h2v2H4zm6 0h2v2h-2zM4 7h2v2H4zm6 0h2v2h-2zM4 12h2v2H4zm6 0h2v2h-2z')
       handle.addEventListener('pointerdown', (event) => {
         const pos = getPos()
         if (typeof pos !== 'number') return
+        event.preventDefault()
+        event.stopPropagation()
         armImageDrag(editor.view, pos, 'group', event)
       })
       bar.appendChild(handle)
 
+      const alignIcons = {
+        left: 'M2 3h12v2H2zm0 4h8v2H2zm0 4h10v2H2z',
+        center: 'M2 3h12v2H2zm2 4h8v2H4zm1 4h6v2H5z',
+        right: 'M2 3h12v2H2zm4 4h8v2H6zm2 4h6v2H8z',
+      } as const
       for (const align of ['left', 'center', 'right'] as const) {
-        const button = document.createElement('button')
-        button.type = 'button'
-        button.className = 'rte-image-group-align'
+        const label = align === 'left' ? '居左' : align === 'center' ? '居中' : '居右'
+        const button = addIconButton('rte-image-group-align', `图片组${label}`, alignIcons[align])
         button.dataset.align = align
-        button.textContent = align === 'left' ? '居左' : align === 'center' ? '居中' : '居右'
-        button.setAttribute('aria-label', `图片组${button.textContent}`)
         button.addEventListener('click', (event) => {
           event.preventDefault()
           event.stopPropagation()
@@ -207,11 +241,7 @@ export const ImageGroup = Node.create({
         bar.appendChild(button)
       }
 
-      const split = document.createElement('button')
-      split.type = 'button'
-      split.className = 'rte-image-group-split'
-      split.textContent = '拆分为单图'
-      split.setAttribute('aria-label', '拆分为单图')
+      const split = addIconButton('rte-image-group-split', '拆分为单图', 'M2 3h5v10H2zm7 0h5v10H9z')
       split.addEventListener('click', (event) => {
         event.preventDefault()
         event.stopPropagation()
@@ -224,14 +254,15 @@ export const ImageGroup = Node.create({
 
       const contentDOM = document.createElement('div')
       contentDOM.className = 'rte-image-group-row'
-      contentDOM.style.cssText =
-        'display:flex;flex-direction:row;align-items:stretch;gap:10px;width:100%;max-width:100%;height:180px;box-sizing:border-box;'
+      contentDOM.style.cssText = 'display:flex;flex-direction:row;align-items:stretch;gap:8px;width:100%;max-width:100%;box-sizing:border-box;'
       dom.appendChild(contentDOM)
       ensureImageGroupStyle()
 
       const dividers = document.createElement('div')
       dividers.className = 'rte-image-group-dividers'
       dividers.setAttribute('contenteditable', 'false')
+      dividers.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:4;'
+      dom.style.position = 'relative'
       dom.appendChild(dividers)
 
       const paint = () => {
