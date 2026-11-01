@@ -36,7 +36,8 @@ export function nextImageSelection(
 
 /** 注入到 document.head。不能写在无 scoped 的 :deep 规则里，浏览器会整段丢掉。 */
 export const imageGroupLayoutCss = [
-  '.rte-root [data-resize-container][data-node="image"]{width:fit-content;max-width:100%;}',
+  '.rte-root [data-resize-container][data-node="image"]{position:relative;width:fit-content;max-width:100%;}',
+  '[data-resize-container][data-node="image"],[data-resize-container][data-node="image"] img{-webkit-user-drag:none;}',
   '.rte-root [data-resize-container][data-node="image"].ProseMirror-selectednode{outline:2px solid #3370ff;outline-offset:2px;border-radius:4px;}',
   '.rte-image-group{position:relative;max-width:100%;margin:8px 0;}',
   '.rte-image-group-row{display:flex;flex-direction:row;align-items:stretch;gap:8px;width:100%;max-width:100%;box-sizing:border-box;}',
@@ -57,7 +58,7 @@ export const imageGroupLayoutCss = [
   '.rte-image-drag-source{opacity:.35;}',
   '.rte-image-drag-thumb{position:fixed;z-index:10061;width:72px;height:48px;border-radius:4px;background:#fff center/cover no-repeat;box-shadow:0 8px 24px rgba(29,33,41,.28);pointer-events:none;}',
   'body:has(.rte-image-drag-thumb) .rte-image-group-bar,body:has(.rte-image-drag-thumb) .rte-bubble{display:none !important;}',
-  '.rte-image-drag-handle{position:absolute;z-index:8;left:4px;top:8px;width:22px;height:26px;padding:0;border:1px solid #d6e4ff;border-radius:6px;background:#fff;color:#3370ff;font-size:14px;line-height:24px;text-align:center;cursor:grab;opacity:0;box-shadow:0 1px 4px rgba(29,33,41,.12);}',
+  '.rte-image-drag-handle{position:absolute;z-index:8;left:4px;top:8px;width:22px;height:26px;padding:0;border:1px solid #d6e4ff;border-radius:6px;background:#fff;color:#3370ff;font-size:14px;line-height:24px;text-align:center;cursor:grab;opacity:0;pointer-events:auto;box-shadow:0 1px 4px rgba(29,33,41,.12);}',
   '[data-resize-container][data-node="image"]:hover>.rte-image-drag-handle,[data-resize-container][data-node="image"].ProseMirror-selectednode>.rte-image-drag-handle,.rte-image-drag-handle.is-dragging{opacity:1;}',
   '.rte-image-group-bar{position:absolute;left:36px;top:8px;z-index:7;display:none;align-items:center;gap:2px;padding:4px;background:#fff;border-radius:8px;box-shadow:0 8px 24px rgba(29,33,41,.12),0 0 0 1px rgba(29,33,41,.06);}',
   '.rte-image-group:hover>.rte-image-group-bar,.rte-image-group.is-selected>.rte-image-group-bar{display:flex;}',

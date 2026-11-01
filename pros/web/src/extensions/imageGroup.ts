@@ -220,10 +220,13 @@ export const ImageGroup = Node.create({
       const handle = addIconButton('rte-image-group-handle', '拖动图片组', 'M4 2h2v2H4zm6 0h2v2h-2zM4 7h2v2H4zm6 0h2v2h-2zM4 12h2v2H4zm6 0h2v2h-2z')
       handle.addEventListener('pointerdown', (event) => {
         const pos = getPos()
-        if (typeof pos !== 'number') return
-        event.preventDefault()
+        if (typeof pos !== 'number' || event.button !== 0) return
         event.stopPropagation()
         armImageDrag(editor.view, pos, 'group', event)
+      })
+      handle.addEventListener('mousedown', (event) => {
+        // 取消 mousedown 才能阻止 Safari/Chrome 进入原生拖拽；不要取消 pointerdown。
+        event.preventDefault()
       })
       bar.appendChild(handle)
 
