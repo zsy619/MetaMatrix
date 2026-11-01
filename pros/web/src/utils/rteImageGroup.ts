@@ -1,4 +1,38 @@
-/** 图片组：同一行等高并排，比例写在 data-ratios。旧文档的纯图片分栏可以迁过来。 */
+/** 飞书桌面/网页：同一行最多 10 张图。 */
+export const MAX_IMAGES_PER_ROW = 10
+export const IMAGE_ROW_LIMIT_TIP = '一行最多 10 张图片'
+
+export function rowCanAccept(current: number, incoming = 1): boolean {
+  const count = Number.isFinite(current) ? current : 0
+  const add = Number.isFinite(incoming) ? incoming : 0
+  return count >= 0 && add > 0 && count + add <= MAX_IMAGES_PER_ROW
+}
+
+export type ImageSpot = { pos: number; row: number }
+
+/** 方向键只移动选区：左右沿文档顺序，上下跳到相邻一行的首图。 */
+export function nextImageSelection(
+  spots: readonly ImageSpot[],
+  currentPos: number,
+  key: 'ArrowLeft' | 'ArrowRight' | 'ArrowUp' | 'ArrowDown',
+): number | null {
+  if (!spots.length) return null
+  const index = spots.findIndex((spot) => spot.pos === currentPos)
+  const start = index >= 0 ? index : 0
+  if (key === 'ArrowLeft') return start > 0 ? spots[start - 1]!.pos : null
+  if (key === 'ArrowRight') return start < spots.length - 1 ? spots[start + 1]!.pos : null
+  const row = spots[start]!.row
+  if (key === 'ArrowDown') return spots.find((spot, i) => i > start && spot.row !== row)?.pos ?? null
+  let prevRow: number | null = null
+  for (let i = start - 1; i >= 0; i -= 1) {
+    if (spots[i]!.row !== row) {
+      prevRow = spots[i]!.row
+      break
+    }
+  }
+  if (prevRow == null) return null
+  return spots.find((spot) => spot.row === prevRow)?.pos ?? null
+}
 
 /** 注入到 document.head。不能写在无 scoped 的 :deep 规则里，浏览器会整段丢掉。 */
 export const imageGroupLayoutCss = [
@@ -8,7 +42,7 @@ export const imageGroupLayoutCss = [
   '.rte-image-group-row{display:flex;flex-direction:row;align-items:stretch;gap:8px;width:100%;max-width:100%;box-sizing:border-box;}',
   '.rte-image-group-row>*{min-width:48px;height:100%;max-width:100%;float:none !important;margin:0 !important;}',
   '.rte-image-group-row>[data-resize-container][data-node="image"]{display:flex !important;width:auto !important;height:100% !important;max-width:100%;overflow:hidden;border-radius:4px;}',
-  '.rte-image-group-row [data-resize-wrapper]{width:100% !important;height:100% !important;max-width:100% !important;}',
+  '.rte-image-group-row [data-resize-wrapper]{width:100%;height:100%;max-width:100%;}',
   '.rte-image-group-row>*:nth-child(1){flex:var(--g0,1) 1 0 !important;}',
   '.rte-image-group-row>*:nth-child(2){flex:var(--g1,1) 1 0 !important;}',
   '.rte-image-group-row>*:nth-child(3){flex:var(--g2,1) 1 0 !important;}',
@@ -17,8 +51,12 @@ export const imageGroupLayoutCss = [
   '.rte-image-group-row>*:nth-child(6){flex:var(--g5,1) 1 0 !important;}',
   '.rte-image-group-row>*:nth-child(7){flex:var(--g6,1) 1 0 !important;}',
   '.rte-image-group-row>*:nth-child(8){flex:var(--g7,1) 1 0 !important;}',
+  '.rte-image-group-row>*:nth-child(9){flex:var(--g8,1) 1 0 !important;}',
+  '.rte-image-group-row>*:nth-child(10){flex:var(--g9,1) 1 0 !important;}',
   '.rte-image-group-row img{width:100% !important;height:100% !important;object-fit:cover !important;max-width:none !important;display:block;}',
-  '.rte-image-group-row [data-resize-handle]{display:none !important;}',
+  '.rte-image-drag-source{opacity:.35;}',
+  '.rte-image-drag-thumb{position:fixed;z-index:10061;width:72px;height:48px;border-radius:4px;background:#fff center/cover no-repeat;box-shadow:0 8px 24px rgba(29,33,41,.28);pointer-events:none;}',
+  'body:has(.rte-image-drag-thumb) .rte-image-group-bar,body:has(.rte-image-drag-thumb) .rte-bubble{display:none !important;}',
   '.rte-image-drag-handle{position:absolute;z-index:8;left:4px;top:8px;width:22px;height:26px;padding:0;border:1px solid #d6e4ff;border-radius:6px;background:#fff;color:#3370ff;font-size:14px;line-height:24px;text-align:center;cursor:grab;opacity:0;box-shadow:0 1px 4px rgba(29,33,41,.12);}',
   '[data-resize-container][data-node="image"]:hover>.rte-image-drag-handle,[data-resize-container][data-node="image"].ProseMirror-selectednode>.rte-image-drag-handle,.rte-image-drag-handle.is-dragging{opacity:1;}',
   '.rte-image-group-bar{position:absolute;left:36px;top:8px;z-index:7;display:none;align-items:center;gap:2px;padding:4px;background:#fff;border-radius:8px;box-shadow:0 8px 24px rgba(29,33,41,.12),0 0 0 1px rgba(29,33,41,.06);}',
