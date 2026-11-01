@@ -7,11 +7,22 @@
  * - 过滤为本地子串匹配（id / label / 角色）。
  */
 
+export type RteMentionKind = 'person' | 'block'
+
 export type RteMentionItem = {
   id: string
   label: string
   /** 可选角色/部门，展示在副标题 */
   role?: string
+  kind?: RteMentionKind
+  blockKind?: 'heading' | 'figure' | 'table'
+  targetId?: string
+}
+
+export type RteBlockCandidate = {
+  id: string
+  label: string
+  kind: 'heading' | 'figure' | 'table'
 }
 
 /**
@@ -46,4 +57,39 @@ export function filterRteMentionItems(
         return hay.includes(q)
       })
   return list.slice(0, Math.max(1, limit))
+}
+
+/** 人员在前，本文标题 / 图 / 表以提及样式接在后面。 */
+export function mergeMentionCandidates(
+  query: string,
+  blocks: RteBlockCandidate[] = [],
+  limit = 12,
+  people: RteMentionItem[] = DEFAULT_MENTION_ITEMS,
+): RteMentionItem[] {
+  const cap = Math.max(1, limit)
+  const persons = filterRteMentionItems(query, cap, people).map((item) => ({
+    ...item,
+    kind: 'person' as const,
+  }))
+  const q = query.trim().toLowerCase()
+  const blockItems: RteMentionItem[] = blocks
+    .filter((block) => {
+      if (!q) return true
+      return `${block.label} ${block.kind} ${block.id}`.toLowerCase().includes(q)
+    })
+    .map((block) => ({
+      id: `block:${block.kind}:${block.id}`,
+      label: block.label.replace(/^§\s*/, ''),
+      role: block.kind === 'heading' ? '标题' : block.kind === 'figure' ? '图片' : '表格',
+      kind: 'block' as const,
+      blockKind: block.kind,
+      targetId: block.id,
+    }))
+  const peopleShown = persons.slice(0, Math.min(8, cap))
+  const blockRoom = Math.max(0, cap - peopleShown.length)
+  return [...peopleShown, ...blockItems.slice(0, blockRoom)]
+}
+
+export function mentionSectionLabel(item: RteMentionItem): string {
+  return item.kind === 'block' ? '本文' : '人员'
 }
