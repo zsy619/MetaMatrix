@@ -79,6 +79,33 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  function tokenExpiryMs(raw: string): number | null {
+    const part = raw.split('.')[1]
+    if (!part) return null
+    try {
+      const padded = part.replace(/-/g, '+').replace(/_/g, '/')
+      const json = JSON.parse(atob(padded)) as { exp?: number }
+      return typeof json.exp === 'number' ? json.exp * 1000 : null
+    } catch {
+      return null
+    }
+  }
+
+  async function refreshIfNeeded() {
+    const raw = token.value
+    if (!raw) return
+    const exp = tokenExpiryMs(raw)
+    if (exp == null) return
+    const left = exp - Date.now()
+    if (left <= 0) {
+      clearSession()
+      return
+    }
+    if (left > 24 * 60 * 60 * 1000) return
+    const res = await authApi.refresh()
+    applySession(res.token, res.user)
+  }
+
   async function fetchMe() {
     if (!token.value) {
       clearSession()
@@ -86,6 +113,8 @@ export const useAuthStore = defineStore('auth', () => {
     }
     loading.value = true
     try {
+      await refreshIfNeeded()
+      if (!token.value) return null
       const u = await authApi.me()
       user.value = u
       writeCachedUser(u)

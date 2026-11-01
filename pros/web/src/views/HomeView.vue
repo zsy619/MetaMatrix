@@ -11,6 +11,7 @@ import {
 import { useUiStore } from '../stores/ui'
 import { useAuthStore } from '../stores/auth'
 import CanvasViewport from '../components/canvas/CanvasViewport.vue'
+import RevisionHistory from '../components/canvas/RevisionHistory.vue'
 import PageSettingsPanel from '../components/PageSettingsPanel.vue'
 import { listDocumentsPage, type DocumentSummary } from '../api/documents'
 import {
@@ -37,6 +38,7 @@ const docsPage = ref(0)
 const docsTotal = ref(0)
 const docsHasMore = ref(false)
 const docsPageSize = 20
+const historyOpen = ref(false)
 
 const templateId = computed<TemplateId>(() => {
   const raw = String(route.params.templateId ?? 'dual-triangle')
@@ -373,6 +375,7 @@ async function manualCheckpoint() {
           <el-button size="small" @click="openDocsPanel">我的文档</el-button>
           <el-button size="small" @click="newDocument">新建</el-button>
           <el-button size="small" @click="manualCheckpoint">存版</el-button>
+          <el-button size="small" @click="historyOpen = true">版本</el-button>
           <el-button size="small" @click="copyAIContext(false)">AI 上下文</el-button>
           <el-button size="small" @click="diffPrevRevision">与上一版对比</el-button>
         </template>
@@ -407,9 +410,18 @@ async function manualCheckpoint() {
       <PageSettingsPanel />
     </div>
 
+    <RevisionHistory
+      :open="historyOpen"
+      :document-id="document_id"
+      @close="historyOpen = false"
+    />
+
     <el-drawer v-model="docsOpen" title="我的文档" size="360px">
       <p v-if="docsLoading">正在读取这个模板下的文档…</p>
-      <p v-else-if="docsError" class="empty">{{ docsError }}</p>
+      <p v-else-if="docsError" class="empty" role="alert">
+        {{ docsError }}
+        <button type="button" class="mm-btn mm-btn--ghost" @click="loadDocsPage">重试</button>
+      </p>
       <p v-else-if="docsTotal === 0" class="empty">这个模板下还没有云端画布。填写任务名称后保存即可建档。</p>
       <p v-else class="empty">
         第 {{ docsPage * docsPageSize + 1 }}–{{ docsPage * docsPageSize + myDocs.length }} 份，共 {{ docsTotal }} 份
@@ -430,9 +442,9 @@ async function manualCheckpoint() {
         </li>
       </ul>
       <div v-if="!docsError && docsTotal > docsPageSize" class="doc-pager">
-        <button type="button" :disabled="docsPage === 0 || docsLoading" @click="docsPrev">上一页</button>
+        <button type="button" class="mm-btn mm-btn--ghost" :disabled="docsPage === 0 || docsLoading" @click="docsPrev">上一页</button>
         <span>第 {{ docsPage + 1 }} 页</span>
-        <button type="button" :disabled="!docsHasMore || docsLoading" @click="docsNext">下一页</button>
+        <button type="button" class="mm-btn mm-btn--ghost" :disabled="!docsHasMore || docsLoading" @click="docsNext">下一页</button>
       </div>
     </el-drawer>
   </div>

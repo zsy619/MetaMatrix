@@ -1559,8 +1559,8 @@ export const useDocumentStore = defineStore('document', () => {
       }
       localStorage.setItem(localMetaKey(templateId), JSON.stringify(meta))
       return true
-    } catch (err) {
-      console.warn('[documentStore.persistLocalMeta]', err)
+    } catch {
+      console.warn('[documentStore.persistLocalMeta] failed')
       return false
     }
   }
@@ -1570,8 +1570,8 @@ export const useDocumentStore = defineStore('document', () => {
       const raw = localStorage.getItem(localMetaKey(templateId))
       if (!raw) return null
       return JSON.parse(raw) as LocalDocMeta
-    } catch (err) {
-      console.warn('[documentStore.loadLocalMeta]', err)
+    } catch {
+      console.warn('[documentStore.loadLocalMeta] failed')
       return null
     }
   }
@@ -1602,8 +1602,8 @@ export const useDocumentStore = defineStore('document', () => {
       localStorage.setItem(key, JSON.stringify(current_data.value))
       persistLocalMeta(templateId)
       return true
-    } catch (err) {
-      console.warn('[documentStore.persistLocal]', err)
+    } catch {
+      console.warn('[documentStore.persistLocal] failed')
       return false
     }
   }
@@ -1614,8 +1614,8 @@ export const useDocumentStore = defineStore('document', () => {
       const raw = localStorage.getItem(key)
       if (!raw) return null
       return JSON.parse(raw) as CanvasDocumentJSON
-    } catch (err) {
-      console.warn('[documentStore.loadLocal]', err)
+    } catch {
+      console.warn('[documentStore.loadLocal] failed')
       return null
     }
   }
@@ -1819,6 +1819,27 @@ export const useDocumentStore = defineStore('document', () => {
       if (e instanceof ApiError && e.status === 409 && document_id.value) {
         await load(document_id.value)
         throw new Error('存版时云端已有更新，已重新载入最新版本。请再存一次。')
+      }
+      throw e
+    } finally {
+      saving.value = false
+    }
+  }
+
+  async function restoreRevision(revisionId: string): Promise<void> {
+    if (!document_id.value) throw new Error('尚未建档')
+    saving.value = true
+    try {
+      const doc = await documentsApi.restoreDocument(document_id.value, {
+        revisionId,
+        expectedHeadRevisionId: head_revision_id.value,
+      })
+      await load(doc.id)
+      dirty.value = false
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 409 && document_id.value) {
+        await load(document_id.value)
+        throw new Error('恢复时云端已有更新，已重新载入最新版本。请再试一次。')
       }
       throw e
     } finally {
@@ -3249,6 +3270,7 @@ export const useDocumentStore = defineStore('document', () => {
     conflict,
     discardConflict,
     restoreConflictDraft,
+    restoreRevision,
     doc_title,
     doc_notes,
     created_at,

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"metamatrix/api/internal/config"
@@ -38,9 +39,10 @@ func main() {
 		server.WithHostPorts(fmt.Sprintf(":%d", cfg.Port)),
 	)
 
+	h.Use(middleware.SecurityHeaders())
 	h.Use(middleware.AccessLog())
 	h.Use(cors.New(cors.Config{
-		AllowOrigins: []string{"http://localhost:5173", "http://127.0.0.1:5173"},
+		AllowOrigins: middleware.ParseCORSOrigins(os.Getenv("CORS_ORIGINS")),
 		AllowMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
 		AllowHeaders: []string{"Origin", "Content-Type", "Authorization", "Accept", "X-Request-Id"},
 		ExposeHeaders: []string{
@@ -88,6 +90,7 @@ func main() {
 	h.POST("/auth/register", authH.Register)
 	h.POST("/auth/login", authH.Login)
 	h.GET("/auth/me", middleware.AuthRequired(cfg.JWTSecret), authH.Me)
+	h.POST("/auth/refresh", middleware.AuthRequired(cfg.JWTSecret), authH.Refresh)
 
 	docs := h.Group("/documents", middleware.AuthRequired(cfg.JWTSecret))
 	{

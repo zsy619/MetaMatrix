@@ -164,8 +164,8 @@ async function refreshStoredList() {
   storedLoading.value = true
   try {
     storedDocs.value = await documentStore.listMyDocuments(templateId.value)
-  } catch (e) {
-    console.warn('[PageSettingsPanel.refreshStoredList]', e)
+  } catch {
+    console.warn('[PageSettingsPanel.refreshStoredList] failed')
   } finally {
     storedLoading.value = false
   }
@@ -393,8 +393,7 @@ async function onExportPng() {
     link.href = canvas.toDataURL('image/png')
     link.click()
     ElMessage.success('已导出图片')
-  } catch (err) {
-    console.error(err)
+  } catch {
     ElMessage.error('导出图片失败')
   } finally {
     ui.setZoom(prevZoom)

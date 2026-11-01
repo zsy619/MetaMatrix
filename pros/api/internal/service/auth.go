@@ -119,6 +119,19 @@ func (s *AuthService) Login(email, password string) (*model.User, string, error)
 	return &u, token, nil
 }
 
+// Refresh issues a new token for an already authenticated user. Expired tokens never reach here.
+func (s *AuthService) Refresh(userID uuid.UUID) (*model.User, string, error) {
+	u, err := s.Me(userID)
+	if err != nil {
+		return nil, "", err
+	}
+	token, err := middleware.SignToken(s.jwtSecret, u.ID, u.Email, 7*24*time.Hour)
+	if err != nil {
+		return nil, "", err
+	}
+	return u, token, nil
+}
+
 func (s *AuthService) Me(userID uuid.UUID) (*model.User, error) {
 	var u model.User
 	if err := s.db.First(&u, "id = ?", userID).Error; err != nil {

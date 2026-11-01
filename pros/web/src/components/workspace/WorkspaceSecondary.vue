@@ -43,6 +43,7 @@ const searched = ref(false)
 const creatingId = ref<TemplateId | null>(null)
 const createError = ref('')
 let searchTimer: ReturnType<typeof setTimeout> | null = null
+let searchAbort: AbortController | null = null
 
 function templateName(id: string | null | undefined): string {
   if (id && isTemplateId(id)) return TEMPLATE_META[id].name
@@ -171,22 +172,29 @@ function onToggle(e: Event) {
 
 async function runSearch() {
   searchErr.value = ''
-  if (!auth.isAuthenticated) return
+  searchAbort?.abort()
+  if (!auth.isAuthenticated) {
+    searchErr.value = '登录后只能搜索你自己的画布。'
+    return
+  }
   const q = searchQ.value.trim()
   if (!q) {
     searchHits.value = []
     searched.value = false
     return
   }
+  const ctrl = new AbortController()
+  searchAbort = ctrl
   searching.value = true
   searched.value = true
   try {
-    searchHits.value = await searchDocuments({ q, limit: 8 })
+    searchHits.value = await searchDocuments({ q, limit: 8 }, { signal: ctrl.signal })
   } catch (e) {
+    if (e instanceof DOMException && e.name === 'AbortError') return
     searchErr.value = friendlyApiMessage(e, '搜索失败')
     searchHits.value = []
   } finally {
-    searching.value = false
+    if (searchAbort === ctrl) searching.value = false
   }
 }
 
@@ -255,8 +263,13 @@ function onSearchInput() {
               />
               <button type="button" class="go" :disabled="searching" @click="runSearch">搜索</button>
             </div>
-            <p v-if="searchErr" class="err" role="alert">{{ searchErr }}</p>
-            <p v-else-if="searched && !searching && !searchHits.length" class="muted">没有匹配。</p>
+            <p v-if="searchErr" class="err" role="alert">
+              {{ searchErr }}
+              <button type="button" class="mm-btn mm-btn--ghost" @click="runSearch">重试</button>
+            </p>
+            <p v-else-if="searched && !searching && !searchHits.length" class="muted" role="status">
+              没有匹配。只搜索当前账号的画布。
+            </p>
             <ul v-if="searchHits.length" class="rows">
               <li v-for="h in searchHits" :key="h.id">
                 <button type="button" class="row stack" @click="openDoc(h)">

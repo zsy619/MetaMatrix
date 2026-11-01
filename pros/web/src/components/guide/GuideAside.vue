@@ -25,6 +25,7 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{
   open: [doc: DocumentSummary]
   logout: []
+  retry: []
   'update:collapsed': [value: boolean]
 }>()
 
@@ -360,7 +361,10 @@ const panelTitle = computed(() => '最近文档')
         </router-link>
 
         <p v-if="!authenticated" class="empty">登录后查看最近文档</p>
-        <p v-else-if="error" class="empty">{{ error }}</p>
+        <p v-else-if="error" class="empty" role="alert">
+          {{ error }}
+          <button type="button" class="mm-btn mm-btn--ghost" @click="emit('retry')">重试</button>
+        </p>
         <p v-else-if="loading" class="empty">正在读取最近文档…</p>
         <p v-else-if="!recent.length" class="empty">暂无文档，从左侧选模板开始</p>
         <template v-else>
