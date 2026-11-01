@@ -112,6 +112,18 @@ import {
   shouldTakeSnapshot,
   type NoteRow,
 } from '../utils/rteRound6'
+import {
+  feishuClipboardDocument,
+  filterLabeledTargets,
+  htmlHasTable,
+  looksLikeTsvTable,
+  mentionEmptyHint,
+  shortcutSearchText,
+  stepMenuIndex,
+  textMatchesQuery,
+  togglePreviewMode,
+  tsvToTableHtml,
+} from '../utils/rteRound7'
 import { LetterSpacing } from '../extensions/letterSpacing'
 import { ParagraphAttrs } from '../extensions/paragraphAttrs'
 import { PageBreak } from '../extensions/pageBreak'
@@ -454,6 +466,12 @@ const snippetTitle = ref('')
 const snippetBody = ref('')
 const xrefDialogOpen = ref(false)
 const xrefTargets = ref<ReturnType<typeof collectCrossRefTargets>>([])
+const xrefQuery = ref('')
+const xrefIndex = ref(0)
+const filteredXrefTargets = computed(() => filterLabeledTargets(xrefTargets.value, xrefQuery.value))
+watch(xrefQuery, () => {
+  xrefIndex.value = 0
+})
 const readTimeDialogOpen = ref(false)
 const tableFilterQuery = ref('')
 const imageCompressOnInsert = ref(true)
@@ -623,21 +641,10 @@ const slashUi: RteSlashUiHandlers = {
   },
   onKeyDown({ event }) {
     if (!slashOpen.value) return false
-    if (event.key === 'ArrowDown') {
+    const slashNext = stepMenuIndex(slashIndex.value, slashItems.value.length, event.key)
+    if (slashNext != null || event.key === 'Home' || event.key === 'End' || event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault()
-      if (!slashItems.value.length) return true
-      slashIndex.value = (slashIndex.value + 1) % slashItems.value.length
-      nextTick(() => {
-        const active = slashMenuEl.value?.querySelector?.('.rte-slash-item.is-active') as HTMLElement | null
-        active?.scrollIntoView?.({ block: 'nearest' })
-      })
-      return true
-    }
-    if (event.key === 'ArrowUp') {
-      event.preventDefault()
-      if (!slashItems.value.length) return true
-      slashIndex.value =
-        (slashIndex.value - 1 + slashItems.value.length) % slashItems.value.length
+      if (slashNext != null) slashIndex.value = slashNext
       nextTick(() => {
         const active = slashMenuEl.value?.querySelector?.('.rte-slash-item.is-active') as HTMLElement | null
         active?.scrollIntoView?.({ block: 'nearest' })
@@ -756,19 +763,16 @@ const mentionUi: RteMentionUiHandlers = {
   },
   onKeyDown({ event }) {
     if (!mentionOpen.value) return false
-    if (event.key === 'ArrowDown') {
-      if (!mentionItems.value.length) return true
-      mentionIndex.value = (mentionIndex.value + 1) % mentionItems.value.length
-      nextTick(() => {
-        const active = mentionMenuEl.value?.querySelector?.('.rte-mention-item.is-active') as HTMLElement | null
-        active?.scrollIntoView?.({ block: 'nearest' })
-      })
-      return true
-    }
-    if (event.key === 'ArrowUp') {
-      if (!mentionItems.value.length) return true
-      mentionIndex.value =
-        (mentionIndex.value - 1 + mentionItems.value.length) % mentionItems.value.length
+    const mentionNext = stepMenuIndex(mentionIndex.value, mentionItems.value.length, event.key)
+    if (
+      mentionNext != null ||
+      event.key === 'Home' ||
+      event.key === 'End' ||
+      event.key === 'ArrowDown' ||
+      event.key === 'ArrowUp'
+    ) {
+      event.preventDefault()
+      if (mentionNext != null) mentionIndex.value = mentionNext
       nextTick(() => {
         const active = mentionMenuEl.value?.querySelector?.('.rte-mention-item.is-active') as HTMLElement | null
         active?.scrollIntoView?.({ block: 'nearest' })
@@ -776,6 +780,7 @@ const mentionUi: RteMentionUiHandlers = {
       return true
     }
     if (event.key === 'Enter') {
+      event.preventDefault()
       const item = mentionItems.value[mentionIndex.value]
       if (item && mentionCommand) mentionCommand(item)
       return true
@@ -1069,6 +1074,18 @@ const editor = useEditor({
         void insertUserImages(pastedImages)
         return true
       }
+      if (
+        plain &&
+        pasteFormatMode.value === 'keep' &&
+        looksLikeTsvTable(plain) &&
+        !htmlHasTable(html)
+      ) {
+        event.preventDefault()
+        const ed = editor.value
+        if (!ed) return true
+        ed.chain().focus().insertContent(tsvToTableHtml(plain)).run()
+        return true
+      }
       if (plain && isBareHttpUrl(plain) && !html.trim()) {
         event.preventDefault()
         const ed = editor.value
@@ -1258,6 +1275,11 @@ const editor = useEditor({
         if (key === 'p') {
           event.preventDefault()
           openPrintPreview()
+          return true
+        }
+        if (key === '\\' || key === '|') {
+          event.preventDefault()
+          setViewMode(togglePreviewMode(viewMode.value))
           return true
         }
         if (key === 'h') {
@@ -2094,7 +2116,9 @@ const SHORTCUT_GROUPS: { title: string; items: { keys: string; desc: string }[] 
       { keys: 'Ctrl/⌘ + E', desc: '行内代码' },
       { keys: 'Ctrl/⌘ + Shift + E', desc: '代码块' },
       { keys: '/', desc: '斜杠命令，快速插入段落类型' },
-      { keys: 'Tab / Shift + Tab', desc: '列表增加 / 减少缩进' },
+      { keys: 'Tab / Shift + Tab', desc: '段落、引用与列表缩进；表格内切换单元格' },
+      { keys: 'Ctrl/⌘ + Enter', desc: '折叠块展开或收起' },
+      { keys: 'Ctrl/⌘ + Alt + \\', desc: '只读预览与编辑切换' },
       { keys: 'Ctrl/⌘ + /', desc: '打开快捷键说明' },
       ...FEISHU_BATCH3_SHORTCUTS,
       { keys: 'Ctrl/⌘ + Alt + H', desc: '高亮 / 取消高亮' },
@@ -2141,10 +2165,22 @@ const SHORTCUT_GROUPS: { title: string; items: { keys: string; desc: string }[] 
   },
 ]
 
+const shortcutQuery = ref('')
+const filteredShortcutGroups = computed(() => {
+  const q = shortcutQuery.value
+  return SHORTCUT_GROUPS.map((group) => ({
+    title: group.title,
+    items: group.items.filter((item) =>
+      textMatchesQuery(shortcutSearchText(item.keys, item.desc), q),
+    ),
+  })).filter((group) => group.items.length > 0)
+})
+
 function toggleShortcutsPanel() {
   markToolbarMenuOpening()
   const next = !shortcutsOpen.value
   closeAllToolbarMenus()
+  shortcutQuery.value = ''
   shortcutsOpen.value = next
 }
 
@@ -2791,8 +2827,31 @@ function openXrefDialog() {
   const ed = editor.value
   if (!ed) return
   xrefTargets.value = collectCrossRefTargets(ed)
+  xrefQuery.value = ''
+  xrefIndex.value = 0
   xrefDialogOpen.value = true
   moreOpen.value = false
+}
+
+function onXrefDialogKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    xrefDialogOpen.value = false
+    return
+  }
+  const items = filteredXrefTargets.value
+  const next = stepMenuIndex(xrefIndex.value, items.length, event.key)
+  if (next != null) {
+    event.preventDefault()
+    xrefIndex.value = next
+    return
+  }
+  if (event.key === 'Enter') {
+    const target = items[xrefIndex.value]
+    if (!target) return
+    event.preventDefault()
+    confirmInsertXref(target)
+  }
 }
 
 function confirmInsertXref(target: (typeof xrefTargets.value)[number]) {
@@ -4381,10 +4440,10 @@ const selectedFormAttrs = computed(() => {
 
 /** 最大化浮层三种视图：编辑 / 预览 / 源码 */
 type RteViewMode = 'edit' | 'preview' | 'source'
-const VIEW_MODE_OPTIONS: { id: RteViewMode; label: string; icon: string }[] = [
-  { id: 'edit', label: '编辑', icon: '✎' },
-  { id: 'preview', label: '预览', icon: '◎' },
-  { id: 'source', label: '源码', icon: '</>' },
+const VIEW_MODE_OPTIONS: { id: RteViewMode; label: string; icon: string; title: string }[] = [
+  { id: 'edit', label: '编辑', icon: '✎', title: '编辑' },
+  { id: 'preview', label: '预览', icon: '◎', title: '只读预览（Ctrl/⌘+Alt+\\）' },
+  { id: 'source', label: '源码', icon: '</>', title: '查看 HTML 源码' },
 ]
 const viewMode = ref<RteViewMode>('edit')
 
@@ -6477,6 +6536,43 @@ function triggerDownloadBlob(blob: Blob, filename: string) {
   a.click()
   a.remove()
   URL.revokeObjectURL(url)
+}
+
+async function copyAsFeishuHtml() {
+  closeExportMenu()
+  moreOpen.value = false
+  const ed = editor.value
+  if (!ed) {
+    ElMessage.warning('编辑器未就绪')
+    return
+  }
+  const title = (localTitle.value || '').trim()
+  const html = feishuClipboardDocument(ed.getHTML() || '', title)
+  const textBody = ed.getText({ blockSeparator: '\n' }) || ''
+  const plain = title ? `${title}\n\n${textBody}` : textBody
+  try {
+    if (typeof ClipboardItem !== 'undefined' && navigator.clipboard?.write) {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          'text/html': new Blob([html], { type: 'text/html' }),
+          'text/plain': new Blob([plain], { type: 'text/plain' }),
+        }),
+      ])
+    } else if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(html)
+    } else {
+      throw new Error('clipboard unavailable')
+    }
+    ElMessage.success('已复制为可粘贴的 HTML')
+  } catch (err) {
+    console.error(err)
+    try {
+      await navigator.clipboard.writeText(html)
+      ElMessage.success('已复制 HTML 源码')
+    } catch {
+      ElMessage.error('复制失败，请检查浏览器剪贴板权限')
+    }
+  }
 }
 
 function exportAsHtml() {
@@ -9254,6 +9350,7 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
                 </button>
               </template>
               <div class="rte-menu-sep" aria-hidden="true" />
+              <div class="rte-menu-hint-line">拖拽列边缘调整列宽。多选单元格后可合并。</div>
               <button
                 type="button"
                 role="menuitem"
@@ -9347,6 +9444,13 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
               @mouseenter="onToolMenuEnter('export')"
               @mouseleave="onToolMenuLeave($event, 'export', closeExportMenu)"
             >
+              <button type="button" class="rte-import-item" @click.stop="copyAsFeishuHtml">
+                <span class="rte-import-left">
+                  <component :is="toolIcon('exportHtml')" class="rte-ep-icon" />
+                  <span>复制为 HTML</span>
+                </span>
+                <span class="rte-import-pill">飞书</span>
+              </button>
               <button type="button" class="rte-import-item" @click.stop="exportAsHtml">
                 <span class="rte-import-left">
                   <component :is="toolIcon('exportHtml')" class="rte-ep-icon" />
@@ -9985,8 +10089,18 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
               @mouseleave="onToolMenuLeave($event, 'shortcuts', () => (shortcutsOpen = false))"
             >
               <div class="rte-shortcuts-title">快捷键速查</div>
+              <input
+                v-model="shortcutQuery"
+                class="rte-shortcuts-search"
+                type="search"
+                placeholder="搜索，例如 bold、引用、tab"
+                aria-label="搜索快捷键"
+                @mousedown.stop
+                @keydown.stop
+              />
+              <div v-if="!filteredShortcutGroups.length" class="rte-shortcuts-empty">没有匹配的快捷键</div>
               <div
-                v-for="g in SHORTCUT_GROUPS"
+                v-for="g in filteredShortcutGroups"
                 :key="'scg-' + g.title"
                 class="rte-shortcuts-group"
               >
@@ -10213,7 +10327,7 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
           role="tab"
           class="rte-tool rte-view-mode-tool"
           :class="{ active: viewMode === opt.id }"
-          :title="opt.label"
+          :title="opt.title"
           :aria-selected="viewMode === opt.id"
           @click="setViewMode(opt.id)"
         >
@@ -10831,8 +10945,18 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
           @mouseleave="onToolMenuLeave($event, 'shortcuts', () => (shortcutsOpen = false))"
         >
           <div class="rte-shortcuts-title">快捷键速查</div>
+          <input
+            v-model="shortcutQuery"
+            class="rte-shortcuts-search"
+            type="search"
+            placeholder="搜索，例如 bold、引用、tab"
+            aria-label="搜索快捷键"
+            @mousedown.stop
+            @keydown.stop
+          />
+          <div v-if="!filteredShortcutGroups.length" class="rte-shortcuts-empty">没有匹配的快捷键</div>
           <div
-            v-for="g in SHORTCUT_GROUPS"
+            v-for="g in filteredShortcutGroups"
             :key="'c-scg-' + g.title"
             class="rte-shortcuts-group"
           >
@@ -11561,6 +11685,24 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
           v-if="expanded"
           type="button"
           class="rte-bottom-link"
+          :title="viewMode === 'preview' ? '返回编辑（Ctrl/⌘+Alt+\\）' : '只读预览（Ctrl/⌘+Alt+\\）'"
+          @click="setViewMode(togglePreviewMode(viewMode))"
+        >
+          {{ viewMode === 'preview' ? '返回编辑' : '预览' }}
+        </button>
+        <button
+          v-if="expanded"
+          type="button"
+          class="rte-bottom-link"
+          title="复制为可粘贴到飞书的 HTML"
+          @click="copyAsFeishuHtml"
+        >
+          复制 HTML
+        </button>
+        <button
+          v-if="expanded"
+          type="button"
+          class="rte-bottom-link"
           title="导出当前面板 Markdown (Ctrl/⌘+Alt+E)"
           @click="exportAsMarkdown"
         >
@@ -11680,7 +11822,7 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
           <span class="rte-slash-title">插入</span>
           <span class="rte-slash-hint">/ 命令{{ slashQuery ? ` · ${slashQuery}` : '' }}</span>
         </div>
-        <div v-if="!slashItems.length" class="rte-slash-empty">没有匹配的段落类型</div>
+        <div v-if="!slashItems.length" class="rte-slash-empty">没有匹配。可试 heading、quote、toggle、表格</div>
         <div v-else class="rte-slash-list" role="listbox" aria-label="斜杠命令">
           <template v-for="(it, idx) in slashItems" :key="it.id">
             <div
@@ -11724,7 +11866,7 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
           <span class="rte-mention-title">提及</span>
           <span class="rte-mention-hint">@ 人员或本文块{{ mentionQuery ? ` · ${mentionQuery}` : '' }}</span>
         </div>
-        <div v-if="!mentionItems.length" class="rte-mention-empty">没有匹配的人或块</div>
+        <div v-if="!mentionItems.length" class="rte-mention-empty">{{ mentionEmptyHint(mentionQuery) }}</div>
         <div v-else class="rte-mention-list">
           <template v-for="(it, idx) in mentionItems" :key="it.id">
           <div
@@ -12335,16 +12477,33 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
         class="rte-modal-overlay"
         @mousedown.self="xrefDialogOpen = false"
       >
-        <div class="rte-link-dialog" role="dialog" aria-modal="true" aria-label="交叉引用" @mousedown.stop>
+        <div
+          class="rte-link-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-label="交叉引用"
+          @mousedown.stop
+          @keydown="onXrefDialogKeydown"
+        >
           <h3 class="rte-table-title">插入交叉引用</h3>
-          <p class="rte-ask-message">选择标题、图或表作为引用目标</p>
+          <p class="rte-ask-message">选择标题、图或表。↑↓ 选择，Enter 插入，Esc 关闭</p>
+          <input
+            v-model="xrefQuery"
+            class="rte-shortcuts-search"
+            type="search"
+            placeholder="搜索标题或图表，中英文均可"
+            aria-label="搜索交叉引用"
+          />
           <div v-if="!xrefTargets.length" class="rte-ask-message">暂无可用目标，请先添加标题或带题注的图/表。</div>
+          <div v-else-if="!filteredXrefTargets.length" class="rte-ask-message">没有匹配的引用</div>
           <button
-            v-for="tg in xrefTargets"
+            v-for="(tg, idx) in filteredXrefTargets"
             :key="tg.id + '-' + tg.pos"
             type="button"
             class="rte-import-item"
+            :class="{ 'is-active': idx === xrefIndex }"
             style="width: 100%; margin-bottom: 6px; text-align: left"
+            @mouseenter="xrefIndex = idx"
             @click="confirmInsertXref(tg)"
           >
             <span>{{ tg.kind === 'heading' ? '标题' : tg.kind === 'figure' ? '图' : '表' }} · {{ tg.label }}</span>
@@ -13893,10 +14052,10 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
 }
 .rte-root :deep(.column-resize-handle) {
   position: absolute;
-  right: -2px;
+  right: -3px;
   top: 0;
   bottom: -2px;
-  width: 4px;
+  width: 6px;
   background-color: #5b8cff;
   pointer-events: none;
   z-index: 20;
@@ -15242,7 +15401,8 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
   color: #4e5969;
   font-size: 13px;
 }
-.rte-import-item:hover {
+.rte-import-item:hover,
+.rte-import-item.is-active {
   background: #f2f3f5;
   color: #1d2129;
 }
@@ -15625,6 +15785,28 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
   font-weight: 600;
   color: #1d2129;
   margin-bottom: 8px;
+}
+.rte-shortcuts-search {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 0 10px;
+  padding: 6px 8px;
+  border: 1px solid var(--mm-line, #e5e6eb);
+  border-radius: 6px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--mm-text, #1d2129);
+  background: #fff;
+}
+.rte-shortcuts-search:focus {
+  outline: 2px solid var(--mm-focus, rgba(91, 140, 255, 0.45));
+  border-color: var(--mm-blue, #5b8cff);
+}
+.rte-shortcuts-empty,
+.rte-menu-hint-line {
+  font-size: 12px;
+  color: var(--mm-muted, #86909c);
+  padding: 4px 8px 8px;
 }
 .rte-shortcuts-group {
   margin-bottom: 10px;
@@ -17350,6 +17532,7 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
 .rte-mention-empty {
   padding: 16px 12px;
   font-size: 13px;
+  line-height: 1.5;
   color: #86909c;
   text-align: center;
 }
@@ -17738,6 +17921,9 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
   color: #4e5969;
   padding: 8px 24px;
 }
+.rte-root blockquote blockquote {
+  margin: 0.4em 0 0.4em 0.85em;
+}
 .rte-quote-preview--default { border-left: 3px solid #c9cdd4; padding-left: 8px; }
 .rte-quote-preview--emphasis { background: rgba(91, 140, 255, 0.1); padding: 2px 8px; border-radius: 4px; }
 .rte-quote-preview--verse { font-style: italic; opacity: 0.85; }
@@ -17803,19 +17989,37 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
   background: #fafbfc;
 }
 .rte-toggle-summary {
-  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
   padding: 8px 12px;
   font-weight: 600;
-  user-select: none;
 }
-.rte-toggle-summary::before {
+.rte-toggle-caret {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 0 4px 0 0;
+  font: inherit;
+  line-height: 1;
+}
+.rte-toggle-caret::before {
   content: '▸';
   display: inline-block;
-  margin-right: 6px;
   transition: transform 0.15s;
 }
-.rte-toggle-block.is-open .rte-toggle-summary::before {
+.rte-toggle-block.is-open .rte-toggle-caret::before {
   transform: rotate(90deg);
+}
+.rte-toggle-label {
+  flex: 1;
+  min-width: 2em;
+  outline: none;
+  border-radius: 4px;
+}
+.rte-toggle-label:focus {
+  background: rgba(91, 140, 255, 0.1);
 }
 .rte-toggle-body {
   padding: 0 12px 10px;
@@ -18246,8 +18450,37 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
   .rte-root.rte-printing .rte-title,
   .rte-root.rte-printing .rte-view-mode-tool,
   .rte-root.rte-printing .rte-form-inspector,
+  .rte-root.rte-printing .rte-outline-panel,
+  .rte-root.rte-printing .rte-block-tools,
+  .rte-root.rte-printing .rte-block-menu,
+  .rte-root.rte-printing .rte-preview-banner,
+  .rte-root.rte-printing .rte-word-dock,
+  .rte-root.rte-printing .column-resize-handle,
   .rte-root.rte-printing [class*='inspector'] {
     display: none !important;
+  }
+  .rte-root.rte-printing .ProseMirror,
+  .rte-root.is-dark-editor.rte-printing .rte-canvas,
+  .rte-root.is-dark-editor.rte-printing .rte-body,
+  .rte-root.is-dark-editor.rte-printing .ProseMirror {
+    color: #1d2129 !important;
+    background: #fff !important;
+  }
+  .rte-root.rte-printing .ProseMirror a {
+    color: #1d4ed8 !important;
+  }
+  .rte-root.rte-printing .ProseMirror table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+  .rte-root.rte-printing .ProseMirror td,
+  .rte-root.rte-printing .ProseMirror th {
+    border: 1px solid #c9cdd4 !important;
+    background: #fff !important;
+  }
+  .rte-root.rte-printing .ProseMirror blockquote {
+    border-left: 3px solid #c9cdd4 !important;
+    color: #1d2129 !important;
   }
   .rte-root.rte-printing .rte-page-break {
     break-after: page;

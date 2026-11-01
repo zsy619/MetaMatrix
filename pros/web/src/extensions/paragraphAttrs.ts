@@ -1,4 +1,5 @@
 import { Extension } from '@tiptap/core'
+import { countNodeName, nextIndentLevel, tabAction } from '../utils/rteRound7'
 
 export type ParagraphAttrsOptions = {
   types: string[]
@@ -135,14 +136,14 @@ export const ParagraphAttrs = Extension.create<ParagraphAttrsOptions>({
           for (const type of types) {
             if (!editor.isActive(type)) continue
             const cur = Number(editor.getAttributes(type).indent || 0)
-            const next = Math.min(8, cur + 1)
+            const next = nextIndentLevel(cur, 1)
             changed = commands.updateAttributes(type, { indent: next }) || changed
           }
           if (changed) return true
           // 默认对当前段落试一次
           const cur = Number(editor.getAttributes('paragraph').indent || 0)
           return commands.updateAttributes('paragraph', {
-            indent: Math.min(8, cur + 1),
+            indent: nextIndentLevel(cur, 1),
           })
         },
       outdent:
@@ -158,13 +159,13 @@ export const ParagraphAttrs = Extension.create<ParagraphAttrsOptions>({
           for (const type of types) {
             if (!editor.isActive(type)) continue
             const cur = Number(editor.getAttributes(type).indent || 0)
-            const next = Math.max(0, cur - 1)
+            const next = nextIndentLevel(cur, -1)
             changed = commands.updateAttributes(type, { indent: next }) || changed
           }
           if (changed) return true
           const cur = Number(editor.getAttributes('paragraph').indent || 0)
           return commands.updateAttributes('paragraph', {
-            indent: Math.max(0, cur - 1),
+            indent: nextIndentLevel(cur, -1),
           })
         },
       setParagraphSpacing:
@@ -214,6 +215,58 @@ export const ParagraphAttrs = Extension.create<ParagraphAttrsOptions>({
           if (ok) return true
           return commands.updateAttributes('paragraph', { dir })
         },
+    }
+  },
+
+  addKeyboardShortcuts() {
+    const run = (shift: boolean) => () => {
+      const editor = this.editor
+      if (!editor.isEditable) return false
+      const names: string[] = []
+      const $from = editor.state.selection.$from
+      for (let depth = $from.depth; depth > 0; depth -= 1) {
+        names.push($from.node(depth).type.name)
+      }
+      const inHeading = editor.isActive('heading')
+      const paragraphIndent = Number(
+        (inHeading ? editor.getAttributes('heading') : editor.getAttributes('paragraph')).indent ||
+          0,
+      )
+      const action = tabAction({
+        inTable: editor.isActive('table'),
+        inCode: editor.isActive('codeBlock'),
+        inList: editor.isActive('listItem') || editor.isActive('taskItem'),
+        inQuote: editor.isActive('blockquote'),
+        quoteDepth: countNodeName(names, 'blockquote'),
+        paragraphIndent,
+        shift,
+      })
+      if (action === 'pass') return false
+      if (action === 'list-sink') {
+        return (
+          editor.commands.sinkListItem('taskItem') ||
+          editor.commands.sinkListItem('listItem') ||
+          editor.commands.indent()
+        )
+      }
+      if (action === 'list-lift') {
+        return (
+          editor.commands.liftListItem('taskItem') ||
+          editor.commands.liftListItem('listItem') ||
+          editor.commands.outdent()
+        )
+      }
+      if (action === 'quote-nest') {
+        return editor.commands.wrapIn('blockquote') || editor.commands.indent()
+      }
+      if (action === 'quote-lift') {
+        return editor.commands.lift('blockquote') || editor.commands.outdent()
+      }
+      return shift ? editor.commands.outdent() : editor.commands.indent()
+    }
+    return {
+      Tab: run(false),
+      'Shift-Tab': run(true),
     }
   },
 })

@@ -77,6 +77,16 @@ export const ToggleBlock = Node.create({
     }
   },
 
+  addKeyboardShortcuts() {
+    return {
+      'Mod-Enter': () => {
+        if (!this.editor.isActive(this.name)) return false
+        const open = this.editor.getAttributes(this.name).open !== false
+        return this.editor.commands.setToggleOpen(!open)
+      },
+    }
+  },
+
   addNodeView() {
     return ({ node, getPos, editor }) => {
       let current = node
@@ -88,11 +98,28 @@ export const ToggleBlock = Node.create({
 
       const summary = document.createElement('div')
       summary.className = 'rte-toggle-summary'
-      summary.contentEditable = 'false'
-      summary.textContent = current.attrs.summary || '折叠标题'
-      summary.addEventListener('click', (e) => {
-        e.preventDefault()
-        e.stopPropagation()
+
+      const caret = document.createElement('button')
+      caret.type = 'button'
+      caret.className = 'rte-toggle-caret'
+      caret.tabIndex = 0
+
+      const label = document.createElement('span')
+      label.className = 'rte-toggle-label'
+      label.contentEditable = 'true'
+      label.spellcheck = false
+      label.setAttribute('role', 'textbox')
+      label.setAttribute('aria-label', '折叠标题')
+      label.textContent = current.attrs.summary || '折叠标题'
+
+      const syncCaret = () => {
+        const open = current.attrs.open !== false
+        caret.setAttribute('aria-expanded', open ? 'true' : 'false')
+        caret.setAttribute('aria-label', open ? '折叠' : '展开')
+      }
+      syncCaret()
+
+      const toggle = () => {
         const pos = typeof getPos === 'function' ? getPos() : null
         if (pos == null) return
         const open = current.attrs.open === false
@@ -100,7 +127,48 @@ export const ToggleBlock = Node.create({
           tr.setNodeMarkup(pos, undefined, { ...current.attrs, open })
           return true
         })
+      }
+
+      caret.addEventListener('mousedown', (event) => {
+        event.preventDefault()
+        event.stopPropagation()
       })
+      caret.addEventListener('click', (event) => {
+        event.preventDefault()
+        event.stopPropagation()
+        toggle()
+      })
+      caret.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return
+        event.preventDefault()
+        event.stopPropagation()
+        toggle()
+      })
+
+      const commitLabel = () => {
+        const text = (label.textContent || '').trim() || '折叠标题'
+        if (text === (current.attrs.summary || '折叠标题')) {
+          label.textContent = text
+          return
+        }
+        const pos = typeof getPos === 'function' ? getPos() : null
+        if (pos == null) return
+        editor.commands.command(({ tr }) => {
+          tr.setNodeMarkup(pos, undefined, { ...current.attrs, summary: text })
+          return true
+        })
+      }
+      label.addEventListener('mousedown', (event) => event.stopPropagation())
+      label.addEventListener('keydown', (event) => {
+        event.stopPropagation()
+        if (event.key === 'Enter') {
+          event.preventDefault()
+          label.blur()
+        }
+      })
+      label.addEventListener('blur', commitLabel)
+
+      summary.append(caret, label)
 
       const body = document.createElement('div')
       body.className = 'rte-toggle-body'
@@ -112,15 +180,23 @@ export const ToggleBlock = Node.create({
       return {
         dom,
         contentDOM: body,
+        stopEvent: (event) => {
+          const target = event.target
+          return target instanceof globalThis.Node && summary.contains(target)
+        },
+        ignoreMutation: (mutation) => summary.contains(mutation.target as globalThis.Node),
         update: (updated) => {
           if (updated.type.name !== 'toggleBlock') return false
           current = updated
-          summary.textContent = updated.attrs.summary || '折叠标题'
           dom.dataset.summary = updated.attrs.summary || '折叠标题'
           const open = updated.attrs.open !== false
           dom.classList.toggle('is-open', open)
           dom.dataset.open = open ? 'true' : 'false'
           body.style.display = open ? '' : 'none'
+          syncCaret()
+          if (document.activeElement !== label) {
+            label.textContent = updated.attrs.summary || '折叠标题'
+          }
           return true
         },
       }

@@ -7,6 +7,7 @@ import {
   RTE_DOC_TEMPLATE_GROUPS,
   type RteDocTemplateGroup,
 } from './rteDocTemplates'
+import { slashItemSearchText, textMatchesQuery } from '../utils/rteRound7'
 
 export type RteSlashGroup =
   | 'block'
@@ -163,7 +164,7 @@ const BLOCK_ITEMS: RteSlashItem[] = [
     label: '引用',
     description: '引用段落',
     group: 'block',
-    keywords: ['quote', '引用', 'blockquote'],
+    keywords: ['quote', '引用', 'blockquote', 'nested', '嵌套'],
     action: { type: 'blockquote' },
   },
   {
@@ -179,7 +180,7 @@ const BLOCK_ITEMS: RteSlashItem[] = [
     label: '分割线',
     description: '水平分隔',
     group: 'block',
-    keywords: ['hr', '分割', 'divider', 'line'],
+    keywords: ['hr', '分割', 'divider', 'line', 'horizontal', 'rule', 'separator'],
     action: { type: 'hr' },
   },
   {
@@ -342,7 +343,7 @@ const MEDIA_ITEMS: RteSlashItem[] = [
     label: '折叠块',
     description: '可展开收起的内容块',
     group: 'block',
-    keywords: ['toggle', 'fold', '折叠', 'details'],
+    keywords: ['toggle', 'fold', 'collapse', 'accordion', '折叠', '折叠标题', 'details'],
     action: { type: 'toggleBlock' },
   },
   {
@@ -538,15 +539,7 @@ export const RTE_SLASH_ITEMS: RteSlashItem[] = [
 const GROUP_ORDER: RteSlashGroup[] = ['block', 'media', 'form', 'template']
 
 function matchQuery(item: RteSlashItem, q: string): boolean {
-  if (!q) return true
-  const hay = [item.label, item.description || '', item.id, ...item.keywords]
-    .join(' ')
-    .toLowerCase()
-  return q
-    .toLowerCase()
-    .split(/\s+/)
-    .filter(Boolean)
-    .every((part) => hay.includes(part))
+  return textMatchesQuery(slashItemSearchText(item), q)
 }
 
 /** 过滤并按分组顺序返回（模板组内再按办公/产品…） */
