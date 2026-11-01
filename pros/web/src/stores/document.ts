@@ -4,6 +4,7 @@ import { normalizeCanvasTheme } from '../components/canvas/canvasChrome'
 import { ApiError } from '../api/http'
 import * as documentsApi from '../api/documents'
 import { rememberRecentOpen } from '../utils/canvasTransfer'
+import { normalizePageSize, readPageSize, writePageSizeMap } from '../utils/rtePageSize'
 import { getToken } from '../api/http'
 import type {
   BlockCanvasDocumentJSON,
@@ -1465,6 +1466,20 @@ export const useDocumentStore = defineStore('document', () => {
       doc.attachmentsByPanelId = {}
     }
     return doc.attachmentsByPanelId
+  }
+
+  function getPanelPageSize(panelId: string) {
+    return readPageSize(current_data.value?.pageSizeByPanelId, panelId)
+  }
+
+  function setPanelPageSize(panelId: string, size: string) {
+    const doc = current_data.value
+    if (!doc || !panelId) return
+    const next = writePageSizeMap(doc.pageSizeByPanelId, panelId, normalizePageSize(size))
+    const prev = JSON.stringify(doc.pageSizeByPanelId ?? null)
+    if (next) doc.pageSizeByPanelId = next
+    else delete doc.pageSizeByPanelId
+    if (JSON.stringify(doc.pageSizeByPanelId ?? null) !== prev) markDirty()
   }
 
   function getPanelAttachments(panelId: string): PanelAttachment[] {
@@ -3386,6 +3401,8 @@ export const useDocumentStore = defineStore('document', () => {
     removeIncidentReviewTimelineRow,
     updateScientificMeetingMeta,
     updateDeepReviewMeta,
+    getPanelPageSize,
+    setPanelPageSize,
     getPanelAttachments,
     addPanelAttachment,
     removePanelAttachment,

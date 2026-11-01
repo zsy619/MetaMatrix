@@ -1,5 +1,6 @@
 import html2canvas from 'html2canvas'
 import { jsPDF } from 'jspdf'
+import { pdfPageFormat, type RtePageSizeId } from './rtePageSize'
 
 /** 在接近分页处向上寻找「偏白」行，避免切到文字中间 */
 function findSoftBreakY(
@@ -44,7 +45,7 @@ function findSoftBreakY(
  */
 export async function buildPdfFromElement(
   el: HTMLElement,
-  opts?: { title?: string },
+  opts?: { title?: string; pageSize?: RtePageSizeId },
 ): Promise<Blob> {
   const scale = Math.min(3, Math.max(2, (window.devicePixelRatio || 1) * 1.5))
   const canvas = await html2canvas(el, {
@@ -58,7 +59,7 @@ export async function buildPdfFromElement(
   const pdf = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
-    format: 'a4',
+    format: pdfPageFormat(opts?.pageSize || 'a4'),
   })
   if (opts?.title) {
     try {
