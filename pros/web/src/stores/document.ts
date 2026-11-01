@@ -25,6 +25,7 @@ import type {
   FiveStepAdvancedDocumentJSON,
   FiveStepProDocumentJSON,
   FiveStepChallengeDocumentJSON,
+  FiveStepFamilyDocumentJSON,
   AiTradeoffDocumentJSON,
   ProductContentDocumentJSON,
   OscarDocumentJSON,
@@ -95,6 +96,7 @@ import {
   isFiveStepAdvancedDoc,
   isFiveStepProDoc,
   isFiveStepChallengeDoc,
+  isFiveStepFamilyDoc,
   isIndustryAnalysisDoc,
   isIndustryForecastDoc,
   isKeyResistanceDoc,
@@ -1282,6 +1284,9 @@ export const useDocumentStore = defineStore('document', () => {
     if (isFiveStepProDoc(next)) {
       next = normalizeFiveStepProDoc(next)
     }
+    if (isFiveStepFamilyDoc(next)) {
+      next = applyFiveStepChrome(next)
+    }
     if (
       isDualTriangleDoc(next) &&
       (tid === 'dual-triangle-human-ai' ||
@@ -1338,14 +1343,21 @@ export const useDocumentStore = defineStore('document', () => {
         return {
           id: tb.id,
           title: existing.title || tb.title,
+          keyword: existing.keyword != null ? existing.keyword : tb.keyword,
           items: Array.isArray(existing.items) ? existing.items : [],
         }
       }
-      return { id: tb.id, title: tb.title, items: [] as typeof tb.items }
+      return {
+        id: tb.id,
+        title: tb.title,
+        keyword: tb.keyword,
+        items: [] as typeof tb.items,
+      }
     })
 
     return {
       ...doc,
+      footer: doc.footer ?? template.footer,
       columns: template.columns.map((c) => ({
         id: c.id,
         header: c.header,
@@ -1358,6 +1370,54 @@ export const useDocumentStore = defineStore('document', () => {
       })),
       blocks: nextBlocks,
     }
+  }
+
+  function fiveStepFamilyTemplate(
+    doc: FiveStepFamilyDocumentJSON,
+  ): FiveStepFamilyDocumentJSON {
+    switch (doc.type) {
+      case 'five_step':
+        return fiveStepTemplate as FiveStepDocumentJSON
+      case 'five_step_division':
+        return fiveStepDivisionTemplate as FiveStepDivisionDocumentJSON
+      case 'five_step_basic':
+        return fiveStepBasicTemplate as FiveStepBasicDocumentJSON
+      case 'five_step_advanced':
+        return fiveStepAdvancedTemplate as FiveStepAdvancedDocumentJSON
+      case 'five_step_pro':
+        return fiveStepProTemplate as FiveStepProDocumentJSON
+      case 'five_step_challenge':
+        return fiveStepChallengeTemplate as FiveStepChallengeDocumentJSON
+    }
+  }
+
+  /**
+   * 旧五步法文档没有主题词和页脚时，用模板补上。
+   * 用户已经写过的 keyword / footer 保留。仍写在 current_data 里。
+   */
+  function applyFiveStepChrome(
+    doc: FiveStepFamilyDocumentJSON,
+  ): FiveStepFamilyDocumentJSON {
+    const template = fiveStepFamilyTemplate(doc)
+    const templateKeywords = new Map(
+      template.blocks.map((block) => [block.id, block.keyword]),
+    )
+    let changed = false
+    const blocks = doc.blocks.map((block) => {
+      const fallback = templateKeywords.get(block.id)
+      if (block.keyword != null || !fallback) return block
+      changed = true
+      return { ...block, keyword: fallback }
+    })
+    const hasFooter =
+      !!doc.footer?.lead?.trim() &&
+      !!doc.footer.reminders?.some((line) => line.trim())
+    if (!changed && (hasFooter || !template.footer)) return doc
+    return {
+      ...doc,
+      blocks: (changed ? blocks : doc.blocks) as typeof doc.blocks,
+      footer: hasFooter ? doc.footer : template.footer,
+    } as FiveStepFamilyDocumentJSON
   }
 
   function ensureAttachmentsMap(): AttachmentsByPanelId | null {
@@ -1874,10 +1934,15 @@ export const useDocumentStore = defineStore('document', () => {
     return item
   }
 
-  /** 人类-AI 格子的内容主题词（起点 / 终点等），写在 keyword 上。 */
+  /**
+   * 内容主题词，写在 block.keyword 上（current_data，不另建表）。
+   * 人类-AI 双三角与五步法系列共用。
+   */
   function updateBlockKeyword(blockId: string, keyword: string): boolean {
     const doc = current_data.value
-    if (!isDualTriangleDoc(doc)) return false
+    if (!doc || (!isDualTriangleDoc(doc) && !isFiveStepFamilyDoc(doc))) {
+      return false
+    }
     const block = doc.blocks.find((b) => b.id === blockId)
     if (!block) return false
     const next = keyword.trim()
@@ -2831,12 +2896,14 @@ export const useDocumentStore = defineStore('document', () => {
         return {
           id: tb.id,
           title: existing.title || tb.title,
+          keyword: existing.keyword != null ? existing.keyword : tb.keyword,
           items: Array.isArray(existing.items) ? existing.items : [],
         }
       }
       return {
         id: tb.id,
         title: tb.title,
+        keyword: tb.keyword,
         items: [],
       }
     })
@@ -2851,6 +2918,7 @@ export const useDocumentStore = defineStore('document', () => {
         tone: s.tone,
       })),
     }))
+    if (!d.footer && template.footer) d.footer = template.footer
     d.blocks = nextBlocks
     markDirty()
     return true
@@ -2911,6 +2979,7 @@ export const useDocumentStore = defineStore('document', () => {
         return {
           id: tb.id,
           title: existing.title || tb.title,
+          keyword: existing.keyword != null ? existing.keyword : tb.keyword,
           items: Array.isArray(existing.items)
             ? existing.items
             : JSON.parse(JSON.stringify(tb.items)),
@@ -2919,6 +2988,7 @@ export const useDocumentStore = defineStore('document', () => {
       return {
         id: tb.id,
         title: tb.title,
+        keyword: tb.keyword,
         items: JSON.parse(JSON.stringify(tb.items)),
       }
     })
@@ -2933,6 +3003,7 @@ export const useDocumentStore = defineStore('document', () => {
         tone: s.tone,
       })),
     }))
+    if (!d.footer && template.footer) d.footer = template.footer
     d.blocks = nextBlocks
     markDirty()
     return true

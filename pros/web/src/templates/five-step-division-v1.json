@@ -5,8 +5,16 @@
   "theme": {
     "background": {
       "pattern": "none",
-      "color": "#ffffff"
+      "color": "#f7f7f7"
     }
+  },
+  "footer": {
+    "lead": "五步法分工版：五列步骤 × 定性取舍、定量测量、团队分工。",
+    "reminders": [
+      "提醒1：左侧分类栏是工作维度，上表头是五步。",
+      "提醒2：同一列从上到下是一条链：先取舍，再测量，再落到人。",
+      "提醒3：十五格都可以放大，并在底部挂上相关资料。"
+    ]
   },
   "columns": [
     {
@@ -53,6 +61,7 @@
     {
       "id": "demand_qualitative",
       "title": "定性取舍",
+      "keyword": "取舍",
       "items": [
         {
           "id": "fsd_dq_h1",
@@ -167,6 +176,7 @@
     {
       "id": "demand_quantitative",
       "title": "定量测量",
+      "keyword": "测量",
       "items": [
         {
           "id": "fsd_dqt_1",
@@ -200,6 +210,7 @@
     {
       "id": "demand_team",
       "title": "团队分工",
+      "keyword": "分工",
       "items": [
         {
           "id": "fsd_dt_1",
@@ -224,6 +235,7 @@
     {
       "id": "solution_qualitative",
       "title": "定性取舍",
+      "keyword": "取舍",
       "items": [
         {
           "id": "fsd_sq_h1",
@@ -320,6 +332,7 @@
     {
       "id": "solution_quantitative",
       "title": "定量测量",
+      "keyword": "测量",
       "items": [
         {
           "id": "fsd_sqt_h1",
@@ -362,6 +375,7 @@
     {
       "id": "solution_team",
       "title": "团队分工",
+      "keyword": "分工",
       "items": [
         {
           "id": "fsd_st_1",
@@ -413,6 +427,7 @@
     {
       "id": "business_qualitative",
       "title": "定性取舍",
+      "keyword": "取舍",
       "items": [
         {
           "id": "fsd_bq_h1",
@@ -509,6 +524,7 @@
     {
       "id": "business_quantitative",
       "title": "定量测量",
+      "keyword": "测量",
       "items": [
         {
           "id": "fsd_bqt_1",
@@ -560,6 +576,7 @@
     {
       "id": "business_team",
       "title": "团队分工",
+      "keyword": "分工",
       "items": [
         {
           "id": "fsd_bt_1",
@@ -584,6 +601,7 @@
     {
       "id": "growth_qualitative",
       "title": "定性取舍",
+      "keyword": "取舍",
       "items": [
         {
           "id": "fsd_gq_h1",
@@ -680,6 +698,7 @@
     {
       "id": "growth_quantitative",
       "title": "定量测量",
+      "keyword": "测量",
       "items": [
         {
           "id": "fsd_gqt_1",
@@ -740,6 +759,7 @@
     {
       "id": "growth_team",
       "title": "团队分工",
+      "keyword": "分工",
       "items": [
         {
           "id": "fsd_gt_h1",
@@ -836,6 +856,7 @@
     {
       "id": "moat_qualitative",
       "title": "定性取舍",
+      "keyword": "取舍",
       "items": [
         {
           "id": "fsd_mq_h1",
@@ -914,6 +935,7 @@
     {
       "id": "moat_quantitative",
       "title": "定量测量",
+      "keyword": "测量",
       "items": [
         {
           "id": "fsd_mqt_0",
@@ -965,6 +987,7 @@
     {
       "id": "moat_team",
       "title": "团队分工",
+      "keyword": "分工",
       "items": [
         {
           "id": "fsd_mt_h1",

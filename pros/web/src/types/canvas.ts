@@ -379,6 +379,12 @@ export interface DemandTriangleDocumentJSON {
 }
 
 
+/** 方法论画布页脚：说明 + 提醒。随 current_data 保存，不单独建表。 */
+export interface MethodFooterNote {
+  lead?: string
+  reminders?: string[]
+}
+
 /** 五步法画布 · 列 id */
 export type FiveStepColumnId =
   | 'demand'
@@ -406,6 +412,8 @@ export type FiveStepBlockId =
 export interface FiveStepBlock {
   id: FiveStepBlockId
   title: string
+  /** 内容主题词，可编辑 */
+  keyword?: string
   items: QuadrantItem[]
 }
 
@@ -425,6 +433,8 @@ export interface FiveStepDocumentJSON {
   type: 'five_step'
   schemaVersion: number
   theme: CanvasTheme
+  /** 页脚说明 / 提醒 */
+  footer?: MethodFooterNote
   columns: FiveStepColumn[]
   blocks: FiveStepBlock[]
 }
@@ -451,6 +461,8 @@ export type FiveStepDivisionBlockId =
 export interface FiveStepDivisionBlock {
   id: FiveStepDivisionBlockId
   title: string
+  /** 内容主题词，可编辑 */
+  keyword?: string
   items: QuadrantItem[]
 }
 
@@ -474,6 +486,8 @@ export interface FiveStepDivisionDocumentJSON {
   type: 'five_step_division'
   schemaVersion: number
   theme: CanvasTheme
+  /** 页脚说明 / 提醒 */
+  footer?: MethodFooterNote
   columns: FiveStepDivisionColumn[]
   rows: FiveStepDivisionRow[]
   blocks: FiveStepDivisionBlock[]
@@ -492,6 +506,8 @@ export type FiveStepBasicBlockId = FiveStepBasicColumnId
 export interface FiveStepBasicBlock {
   id: FiveStepBasicBlockId
   title: string
+  /** 内容主题词，可编辑 */
+  keyword?: string
   items: QuadrantItem[]
 }
 
@@ -509,6 +525,8 @@ export interface FiveStepBasicDocumentJSON {
   type: 'five_step_basic'
   schemaVersion: number
   theme: CanvasTheme
+  /** 页脚说明 / 提醒 */
+  footer?: MethodFooterNote
   columns: FiveStepBasicColumn[]
   blocks: FiveStepBasicBlock[]
 }
@@ -538,6 +556,8 @@ export type FiveStepAdvancedBlockId =
 export interface FiveStepAdvancedBlock {
   id: FiveStepAdvancedBlockId
   title: string
+  /** 内容主题词，可编辑 */
+  keyword?: string
   items: QuadrantItem[]
 }
 
@@ -563,6 +583,8 @@ export interface FiveStepAdvancedDocumentJSON {
   type: 'five_step_advanced'
   schemaVersion: number
   theme: CanvasTheme
+  /** 页脚说明 / 提醒 */
+  footer?: MethodFooterNote
   columns: FiveStepAdvancedColumn[]
   blocks: FiveStepAdvancedBlock[]
 }
@@ -595,6 +617,8 @@ export type FiveStepProBlockId =
 export interface FiveStepProBlock {
   id: FiveStepProBlockId
   title: string
+  /** 内容主题词，可编辑 */
+  keyword?: string
   items: QuadrantItem[]
 }
 
@@ -620,6 +644,8 @@ export interface FiveStepProDocumentJSON {
   type: 'five_step_pro'
   schemaVersion: number
   theme: CanvasTheme
+  /** 页脚说明 / 提醒 */
+  footer?: MethodFooterNote
   columns: FiveStepProColumn[]
   blocks: FiveStepProBlock[]
 }
@@ -663,6 +689,8 @@ export type FiveStepChallengeBlockId =
 export interface FiveStepChallengeBlock {
   id: FiveStepChallengeBlockId
   title: string
+  /** 内容主题词，可编辑 */
+  keyword?: string
   items: QuadrantItem[]
 }
 
@@ -688,6 +716,8 @@ export interface FiveStepChallengeDocumentJSON {
   type: 'five_step_challenge'
   schemaVersion: number
   theme: CanvasTheme
+  /** 页脚说明 / 提醒 */
+  footer?: MethodFooterNote
   columns: FiveStepChallengeColumn[]
   blocks: FiveStepChallengeBlock[]
 }
@@ -1866,6 +1896,27 @@ export function isFiveStepChallengeDoc(
   doc: CanvasDocumentJSON | null | undefined,
 ): doc is FiveStepChallengeDocumentJSON {
   return !!doc && doc.type === 'five_step_challenge'
+}
+
+export type FiveStepFamilyDocumentJSON =
+  | FiveStepDocumentJSON
+  | FiveStepDivisionDocumentJSON
+  | FiveStepBasicDocumentJSON
+  | FiveStepAdvancedDocumentJSON
+  | FiveStepProDocumentJSON
+  | FiveStepChallengeDocumentJSON
+
+export function isFiveStepFamilyDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is FiveStepFamilyDocumentJSON {
+  return (
+    isFiveStepDoc(doc) ||
+    isFiveStepDivisionDoc(doc) ||
+    isFiveStepBasicDoc(doc) ||
+    isFiveStepAdvancedDoc(doc) ||
+    isFiveStepProDoc(doc) ||
+    isFiveStepChallengeDoc(doc)
+  )
 }
 
 

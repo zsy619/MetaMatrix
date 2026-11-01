@@ -5,8 +5,16 @@
   "theme": {
     "background": {
       "pattern": "none",
-      "color": "#ffffff"
+      "color": "#f7f7f7"
     }
+  },
+  "footer": {
+    "lead": "五步法进阶版：每个提示独立成格，固定标签在抬头，正文只写判断。",
+    "reminders": [
+      "提醒1：细分用户、场景问题、核心卖点分开写。",
+      "提醒2：红色「非*」用来划边界。",
+      "提醒3：壁垒上区可以留白，先写非壁垒也算推进。"
+    ]
   },
   "columns": [
     {
@@ -109,61 +117,73 @@
     {
       "id": "demand_users",
       "title": "细分用户",
+      "keyword": "谁",
       "items": []
     },
     {
       "id": "demand_scene",
       "title": "场景问题",
+      "keyword": "场景",
       "items": []
     },
     {
       "id": "demand_non_user",
       "title": "非用户",
+      "keyword": "排除",
       "items": []
     },
     {
       "id": "solution_selling",
       "title": "核心卖点",
+      "keyword": "卖点",
       "items": []
     },
     {
       "id": "solution_plan",
       "title": "解决方案",
+      "keyword": "怎么做",
       "items": []
     },
     {
       "id": "solution_non_core",
       "title": "非内核",
+      "keyword": "优化项",
       "items": []
     },
     {
       "id": "business_revenue",
       "title": "收入",
+      "keyword": "收入",
       "items": []
     },
     {
       "id": "business_cost",
       "title": "成本",
+      "keyword": "成本",
       "items": []
     },
     {
       "id": "growth_metric",
       "title": "核心指标",
+      "keyword": "指标",
       "items": []
     },
     {
       "id": "growth_channel",
       "title": "获客渠道",
+      "keyword": "渠道",
       "items": []
     },
     {
       "id": "moat_upper",
       "title": "壁垒",
+      "keyword": "护城河",
       "items": []
     },
     {
       "id": "moat_non_barrier",
       "title": "非壁垒",
+      "keyword": "可替代",
       "items": []
     }
   ]

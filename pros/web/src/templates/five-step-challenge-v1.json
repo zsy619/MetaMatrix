@@ -5,8 +5,16 @@
   "theme": {
     "background": {
       "pattern": "none",
-      "color": "#ffffff"
+      "color": "#f7f7f7"
     }
+  },
+  "footer": {
+    "lead": "五步法挑战版：先写假设，再沿五步把方法落到可验证的判断。",
+    "reminders": [
+      "提醒1：紫色方法名是提示，橙色「非*」是排除项。",
+      "提醒2：假设列用来卡住阶段和边界，避免五步写飘。",
+      "提醒3：预填内容可以改，改完仍要能回到方法本身。"
+    ]
   },
   "columns": [
     {
@@ -156,6 +164,7 @@
     {
       "id": "hypothesis_global",
       "title": "全局描述",
+      "keyword": "业务",
       "items": [
         {
           "id": "hg_m1",
@@ -180,6 +189,7 @@
     {
       "id": "hypothesis_stage",
       "title": "阶段｜边界",
+      "keyword": "边界",
       "items": [
         {
           "id": "hs_1",
@@ -195,6 +205,7 @@
     {
       "id": "hypothesis_self",
       "title": "自身",
+      "keyword": "自身",
       "items": [
         {
           "id": "hf_m1",
@@ -255,6 +266,7 @@
     {
       "id": "demand_split",
       "title": "拆",
+      "keyword": "细分",
       "items": [
         {
           "id": "ds_m1",
@@ -279,6 +291,7 @@
     {
       "id": "demand_push",
       "title": "推",
+      "keyword": "推动",
       "items": [
         {
           "id": "dp_1",
@@ -303,6 +316,7 @@
     {
       "id": "demand_eval",
       "title": "评",
+      "keyword": "评估",
       "items": [
         {
           "id": "de_q",
@@ -345,6 +359,7 @@
     {
       "id": "demand_calc",
       "title": "算",
+      "keyword": "测算",
       "items": [
         {
           "id": "dc_1",
@@ -378,6 +393,7 @@
     {
       "id": "demand_non_user",
       "title": "非用户",
+      "keyword": "排除",
       "items": [
         {
           "id": "dn_1",
@@ -393,6 +409,7 @@
     {
       "id": "solution_core",
       "title": "产品内核",
+      "keyword": "内核",
       "items": [
         {
           "id": "sc_m1",
@@ -435,6 +452,7 @@
     {
       "id": "solution_quant",
       "title": "定量",
+      "keyword": "证据",
       "items": [
         {
           "id": "sq_1",
@@ -450,6 +468,7 @@
     {
       "id": "solution_non_core",
       "title": "非内核",
+      "keyword": "优化",
       "items": [
         {
           "id": "sn_1",
@@ -465,6 +484,7 @@
     {
       "id": "business_unit_io",
       "title": "单元模型（收入支出）",
+      "keyword": "收支",
       "items": [
         {
           "id": "bio_m1",
@@ -516,6 +536,7 @@
     {
       "id": "business_roi",
       "title": "单元模型（ROI）",
+      "keyword": "回报",
       "items": [
         {
           "id": "broi_m1",
@@ -558,6 +579,7 @@
     {
       "id": "growth_metric",
       "title": "指标",
+      "keyword": "指标",
       "items": [
         {
           "id": "gm_m1",
@@ -609,6 +631,7 @@
     {
       "id": "growth_channel",
       "title": "渠道",
+      "keyword": "渠道",
       "items": [
         {
           "id": "gch_m1",
@@ -642,6 +665,7 @@
     {
       "id": "growth_five_forces",
       "title": "五力模型",
+      "keyword": "五力",
       "items": [
         {
           "id": "gf_1",
@@ -702,6 +726,7 @@
     {
       "id": "moat_barrier",
       "title": "壁垒",
+      "keyword": "强度",
       "items": [
         {
           "id": "mb_m1",
@@ -780,6 +805,7 @@
     {
       "id": "moat_competitors",
       "title": "竞品",
+      "keyword": "竞品",
       "items": [
         {
           "id": "mc_1",
@@ -795,6 +821,7 @@
     {
       "id": "moat_crn",
       "title": "CRN",
+      "keyword": "网络",
       "items": [
         {
           "id": "mcr_1",
@@ -810,6 +837,7 @@
     {
       "id": "moat_non_barrier",
       "title": "非壁垒",
+      "keyword": "排除",
       "items": [
         {
           "id": "mn_1",
