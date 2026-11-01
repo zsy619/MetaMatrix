@@ -1,0 +1,51 @@
+# One command from the repository root: Postgres, API, and the web app.
+# Local Go development can still use pros/api/docker-compose.yml for Postgres only.
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: metamatrix-postgres
+    restart: unless-stopped
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: metamatrix
+      POSTGRES_PASSWORD: metamatrix
+      POSTGRES_DB: metamatrix
+    volumes:
+      - metamatrix_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U metamatrix -d metamatrix"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ./pros/api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://metamatrix:metamatrix@postgres:5432/metamatrix
+      PORT: "3000"
+      JWT_SECRET: ${JWT_SECRET:-dev-only-change-me-metamatrix-jwt-secret}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080}
+      LOGIN_WINDOW: ${LOGIN_WINDOW:-15m}
+      LOGIN_PAIR_LIMIT: ${LOGIN_PAIR_LIMIT:-8}
+      LOGIN_IP_LIMIT: ${LOGIN_IP_LIMIT:-30}
+    ports:
+      - "3000:3000"
+
+  web:
+    build:
+      context: ./pros/web
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "8080:80"
+
+volumes:
+  metamatrix_pgdata:

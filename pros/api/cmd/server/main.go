@@ -101,6 +101,8 @@ func main() {
 		// Static paths before :id
 		docs.GET("/search", docH.Search)
 		docs.GET("/stats", docH.Stats)
+		docs.GET("/backup", docH.Backup)
+		docs.POST("/backup", docH.RestoreBackup)
 		docs.GET("/ai-corpus", docH.AICorpus)
 		docs.GET("/:id", docH.Get)
 		docs.GET("/:id/export", docH.Export)

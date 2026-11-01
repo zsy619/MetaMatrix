@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { friendlyApiMessage } from '../utils/apiMessage'
+import { downloadBackup, restoreBackup, type BackupBundle } from '../api/documents'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -81,6 +82,50 @@ function setDensity(mode: 'comfortable' | 'compact') {
   window.dispatchEvent(new CustomEvent('metamatrix:density', { detail: mode }))
 }
 
+const backupMsg = ref('')
+const backupBusy = ref(false)
+
+async function exportBackup() {
+  backupMsg.value = ''
+  backupBusy.value = true
+  try {
+    const bundle = await downloadBackup()
+    const blob = new Blob([JSON.stringify(bundle)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'metamatrix-backup.json'
+    link.click()
+    URL.revokeObjectURL(url)
+    backupMsg.value = bundle.truncated
+      ? `已下载最近 ${bundle.count} 份。更早的画布请用数据库备份。`
+      : `已下载 ${bundle.count} 份画布。`
+  } catch (e) {
+    backupMsg.value = friendlyApiMessage(e, '导出失败')
+  } finally {
+    backupBusy.value = false
+  }
+}
+
+async function importBackup(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+  backupMsg.value = ''
+  backupBusy.value = true
+  try {
+    const text = await file.text()
+    const bundle = JSON.parse(text) as BackupBundle
+    const result = await restoreBackup(bundle)
+    backupMsg.value = `已作为新画布导入 ${result.imported} 份，跳过 ${result.skipped} 份。`
+  } catch (e) {
+    backupMsg.value = friendlyApiMessage(e, '导入失败')
+  } finally {
+    backupBusy.value = false
+  }
+}
+
 function logout() {
   auth.logout()
   router.replace({ name: 'login' })
@@ -113,6 +158,16 @@ function logout() {
         <button type="button" class="mm-btn" :class="{ 'mm-btn--primary': density === 'comfortable' }" @click="setDensity('comfortable')">标准</button>
         <button type="button" class="mm-btn" :class="{ 'mm-btn--primary': density === 'compact' }" @click="setDensity('compact')">紧凑</button>
       </div>
+      <h2>画布备份</h2>
+      <p class="hint">只包含当前账号未归档的画布，最多 200 份。导入会新建画布，不会覆盖原件。整库恢复仍用数据库备份。</p>
+      <div class="actions">
+        <button type="button" class="mm-btn mm-btn--primary" :disabled="backupBusy" @click="exportBackup">下载备份</button>
+        <label class="mm-btn">
+          从备份导入
+          <input class="file-input" type="file" accept="application/json,.json" :disabled="backupBusy" @change="importBackup" />
+        </label>
+      </div>
+      <p v-if="backupMsg" role="status">{{ backupMsg }}</p>
       <h2>修改密码</h2>
       <label for="cur-pass">
         当前密码
@@ -183,6 +238,16 @@ input {
 }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .hint { margin: 0; color: var(--mm-muted); font-size: 13px; }
+.file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
 .err { color: var(--mm-red); margin: 0; font-size: 13px; }
 .ok { color: var(--mm-green); margin: 0; font-size: 13px; }
 </style>

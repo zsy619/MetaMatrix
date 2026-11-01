@@ -32,7 +32,17 @@ const searchErr = ref('')
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 let searchAbort: AbortController | null = null
 
-const activeCategory = ref<'all' | TemplateCategory>('all')
+function readStoredCategory(): 'all' | TemplateCategory {
+  try {
+    const raw = sessionStorage.getItem('metamatrix:guide-category')
+    if (raw === 'all' || (raw && raw in CATEGORY_LABELS)) return raw as 'all' | TemplateCategory
+  } catch {
+    /* ignore */
+  }
+  return 'all'
+}
+
+const activeCategory = ref<'all' | TemplateCategory>(readStoredCategory())
 const templateFilter = ref('')
 const asideCollapsed = ref(false)
 
@@ -79,6 +89,12 @@ const allCards: GuideCard[] = (() => {
   }))
 })()
 
+const categoryCounts = computed(() => {
+  const counts: Record<string, number> = { all: allCards.length }
+  for (const card of allCards) counts[card.category] = (counts[card.category] || 0) + 1
+  return counts
+})
+
 const filteredCards = computed(() => {
   const q = templateFilter.value.trim().toLowerCase()
   return allCards.filter((card) => {
@@ -94,6 +110,20 @@ const filteredCards = computed(() => {
     )
   })
 })
+
+function chooseCategory(id: 'all' | TemplateCategory) {
+  activeCategory.value = id
+  try {
+    sessionStorage.setItem('metamatrix:guide-category', id)
+  } catch {
+    /* ignore */
+  }
+}
+
+function resetTemplateFilter() {
+  templateFilter.value = ''
+  chooseCategory('all')
+}
 
 function openCanvas(id: TemplateId) {
   router.push({ name: 'canvas', params: { templateId: id } })
@@ -244,9 +274,10 @@ onMounted(async () => {
               class="chip"
               :class="{ 'chip--active': activeCategory === chip.id }"
               :aria-selected="activeCategory === chip.id"
-              @click="activeCategory = chip.id"
+              @click="chooseCategory(chip.id)"
             >
               {{ chip.label }}
+              <span class="chip-count">{{ categoryCounts[chip.id] || 0 }}</span>
             </button>
           </div>
           <div class="tpl-search">
@@ -261,7 +292,11 @@ onMounted(async () => {
           </div>
         </div>
 
-        <p v-if="!filteredCards.length" class="tpl-empty">没有匹配的模板</p>
+        <p class="tpl-count" role="status">{{ filteredCards.length }} 个模板</p>
+        <p v-if="!filteredCards.length" class="tpl-empty">
+          没有匹配的模板。
+          <button type="button" class="mm-btn mm-btn--ghost" @click="resetTemplateFilter">清除筛选</button>
+        </p>
 
         <div class="grid">
           <button
@@ -369,6 +404,18 @@ onMounted(async () => {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.chip-count {
+  margin-left: 6px;
+  color: #5f6368;
+  font-weight: 500;
+}
+
+.tpl-count {
+  margin: 0 0 12px;
+  color: #5f6368;
+  font-size: 13px;
 }
 
 .chip {

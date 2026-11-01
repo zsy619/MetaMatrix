@@ -106,7 +106,7 @@ export function listDocuments(params?: {
   offset?: number
   archived?: boolean
 }) {
-  return apiRequest<DocumentSummary[]>(documentQuery(params))
+  return apiRequest<DocumentSummary[]>(documentQuery(params), { cache: 'no-store' })
 }
 
 export function batchDocuments(action: 'archive' | 'restore', ids: string[]) {
@@ -128,6 +128,7 @@ export async function listDocumentsPage(params?: {
   const offset = params?.offset ?? 0
   const res = await apiRequestResult<DocumentSummary[]>(
     documentQuery({ ...params, limit, offset }),
+    { cache: 'no-store' },
   )
   const items = Array.isArray(res.data) ? res.data : []
   const totalHeader = Number(res.headers.get('X-Total-Count'))
@@ -144,7 +145,37 @@ export function exportDocument(id: string, format: 'json' | 'markdown') {
 }
 
 export function getDocument(id: string) {
-  return apiRequest<DocumentFull>(`/documents/${id}`)
+  return apiRequest<DocumentFull>(`/documents/${id}`, { cache: 'no-store' })
+}
+
+export type BackupDocument = {
+  title: string
+  notes?: string
+  templateId?: string | null
+  canvasType: string
+  schemaVersion?: number
+  updatedAt?: string
+  currentData: CanvasDocumentJSON
+}
+
+export type BackupBundle = {
+  version: number
+  exportedAt: string
+  count: number
+  truncated: boolean
+  documents: BackupDocument[]
+}
+
+export function downloadBackup() {
+  return apiRequest<BackupBundle>('/documents/backup', { cache: 'no-store' })
+}
+
+export function restoreBackup(bundle: BackupBundle) {
+  return apiRequest<{ imported: number; skipped: number }>('/documents/backup', {
+    method: 'POST',
+    body: bundle,
+    retry: 0,
+  })
 }
 
 export function createDocument(input: {
@@ -321,6 +352,7 @@ export function searchDocuments(
   const qs = q.toString()
   return apiRequest<SearchHit[]>(`/documents/search${qs ? `?${qs}` : ''}`, {
     signal: opts?.signal,
+    cache: 'no-store',
   })
 }
 
