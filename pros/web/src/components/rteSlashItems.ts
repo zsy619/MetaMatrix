@@ -524,6 +524,8 @@ export function filterRteSlashItems(query: string, limit = 80): RteSlashItem[] {
   return out.slice(0, limit)
 }
 
+export { rteSlashGlyph } from '../utils/rteSlashGlyph'
+
 export function rteSlashSectionLabel(item: RteSlashItem): string {
   if (item.group !== 'template' || !item.templateGroup) {
     return RTE_SLASH_GROUP_LABELS[item.group]
