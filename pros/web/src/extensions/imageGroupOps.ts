@@ -3,6 +3,7 @@ import { NodeSelection, type EditorState, type Transaction } from '@tiptap/pm/st
 import type { EditorView } from '@tiptap/pm/view'
 import {
   groupInsertIndex,
+  groupUsesAspect,
   imagesFromColumns,
   insertRatio,
   moveItem,
@@ -59,6 +60,7 @@ export function setGroupRatios(view: EditorView, groupPos: number, ratios: numbe
   const tr = view.state.tr.setNodeMarkup(groupPos, undefined, {
     ...node.attrs,
     ratios: ratiosToAttr(ratios),
+    ratioMode: 'custom',
   })
   return dispatchChecked(view, tr)
 }
@@ -91,7 +93,9 @@ export function reorderInGroup(
   const nextRatios = moveItem(ratios, fromIndex, dest)
   if (!nextImages || !nextRatios) return false
   const next = group.type.create(
-    { ...group.attrs, ratios: ratiosToAttr(nextRatios) },
+    groupUsesAspect(group.attrs.ratioMode)
+      ? { ...group.attrs, ratios: null, ratioMode: null }
+      : { ...group.attrs, ratios: ratiosToAttr(nextRatios), ratioMode: 'custom' },
     nextImages.map((child) => child.type.create(child.attrs, child.content, child.marks)),
   )
   const tr = view.state.tr.replaceWith(groupPos, groupPos + group.nodeSize, next)
@@ -187,9 +191,13 @@ export function placeBeside(view: EditorView, from: number, target: number, side
       if (group.childCount <= 1) {
         if (group.childCount === 1) tr = tr.replaceWith(mappedGroup, mappedGroup + group.nodeSize, group.child(0)!)
         else tr = tr.delete(mappedGroup, mappedGroup + group.nodeSize)
-      } else {
+      } else if (!groupUsesAspect(original.attrs.ratioMode)) {
         const ratios = removeRatio(normalizeGroupRatios(original.childCount, original.attrs.ratios), src.index)
-        tr = tr.setNodeMarkup(mappedGroup, undefined, { ...group.attrs, ratios: ratiosToAttr(ratios) })
+        tr = tr.setNodeMarkup(mappedGroup, undefined, {
+          ...group.attrs,
+          ratios: ratiosToAttr(ratios),
+          ratioMode: 'custom',
+        })
       }
     }
   }
@@ -206,14 +214,20 @@ export function placeBeside(view: EditorView, from: number, target: number, side
     group.forEach((child) => images.push(imageForGroup(child)))
     const index = side === 'left' ? dstNow.index : dstNow.index + 1
     images.splice(index, 0, movingCopy)
-    const ratios = insertRatio(normalizeGroupRatios(group.childCount, group.attrs.ratios), index)
-    const next = group.type.create({ ...group.attrs, ratios: ratiosToAttr(ratios) }, images)
+    const attrs = groupUsesAspect(group.attrs.ratioMode)
+      ? { ...group.attrs, ratios: null, ratioMode: null }
+      : {
+          ...group.attrs,
+          ratios: ratiosToAttr(insertRatio(normalizeGroupRatios(group.childCount, group.attrs.ratios), index)),
+          ratioMode: 'custom',
+        }
+    const next = group.type.create(attrs, images)
     tr = tr.replaceWith(dstNow.groupPos, dstNow.groupPos + group.nodeSize, next)
     selectAt = dstNow.groupPos
   } else {
     const left = side === 'left' ? movingCopy : imageForGroup(hostNow)
     const right = side === 'left' ? imageForGroup(hostNow) : movingCopy
-    const group = groupType.create({ align: 'center', ratios: '1:1' }, [left, right])
+    const group = groupType.create({ align: 'center' }, [left, right])
     tr = tr.replaceWith(mappedTarget, mappedTarget + hostNow.nodeSize, group)
     selectAt = mappedTarget
   }
@@ -243,9 +257,13 @@ export function extractOrMoveImage(view: EditorView, from: number, insertAt: num
       if (group.childCount <= 1) {
         if (group.childCount === 1) tr = tr.replaceWith(mappedGroup, mappedGroup + group.nodeSize, group.child(0)!)
         else tr = tr.delete(mappedGroup, mappedGroup + group.nodeSize)
-      } else {
+      } else if (!groupUsesAspect(original.attrs.ratioMode)) {
         const ratios = removeRatio(normalizeGroupRatios(original.childCount, original.attrs.ratios), src.index)
-        tr = tr.setNodeMarkup(mappedGroup, undefined, { ...group.attrs, ratios: ratiosToAttr(ratios) })
+        tr = tr.setNodeMarkup(mappedGroup, undefined, {
+          ...group.attrs,
+          ratios: ratiosToAttr(ratios),
+          ratioMode: 'custom',
+        })
       }
     }
   }

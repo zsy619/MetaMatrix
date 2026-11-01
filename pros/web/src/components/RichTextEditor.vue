@@ -4726,6 +4726,8 @@ function bubbleShouldShow(payload: {
   if (!ed || ed.isDestroyed || ed.isEditable === false) return false
   // 图片节点选中时改走图片气泡
   if (isImageNodeSelected()) return false
+  const groupSel = editor.value?.state.selection
+  if (groupSel instanceof NodeSelection && groupSel.node.type.name === 'imageGroup') return false
   // 有选区，或光标落在链接内（便于编辑/取消链接）
   if (payload.from !== payload.to) return true
   return !!ed.isActive?.('link')
