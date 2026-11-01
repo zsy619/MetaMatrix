@@ -341,7 +341,7 @@ onMounted(async () => {
   height: 100%;
   max-height: 100%;
   overflow: hidden;
-  background: #fafafa;
+  background: var(--cv-page, #f7f7f7);
 }
 
 .guide-main {
@@ -352,8 +352,8 @@ onMounted(async () => {
   overflow-y: auto;
   padding: 40px 28px 56px;
   background:
-    radial-gradient(ellipse 80% 50% at 50% -10%, #e8f0fe 0%, transparent 55%),
-    #fafafa;
+    radial-gradient(ellipse 80% 50% at 50% -10%, var(--cv-hover-wash, #e8f1fa) 0%, transparent 55%),
+    var(--cv-page, #f7f7f7);
 }
 
 .hero {
@@ -367,7 +367,7 @@ onMounted(async () => {
   font-size: 13px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #1a73e8;
+  color: var(--cv-focus, #163044);
   font-weight: 600;
 }
 
@@ -382,7 +382,7 @@ onMounted(async () => {
 .lead {
   margin: 0;
   font-size: 16px;
-  color: #9aa0a6;
+  color: var(--cv-muted, #5f6368);
   line-height: 1.6;
 }
 
@@ -440,10 +440,10 @@ onMounted(async () => {
 }
 
 .chip--active {
-  background: #e8f0fe;
-  border-color: #1a73e8;
-  color: #1a73e8;
-  box-shadow: 0 0 0 1px rgba(26, 115, 232, 0.12);
+  background: var(--cv-hover-wash, #e8f1fa);
+  border-color: var(--cv-focus, #163044);
+  color: var(--cv-focus, #163044);
+  box-shadow: 0 0 0 1px rgba(22, 48, 68, 0.16);
 }
 
 .tpl-search input {
@@ -454,22 +454,21 @@ onMounted(async () => {
   font-size: 13.5px;
   background: #ffffff;
   color: #202124;
-  outline: none;
 }
 
 .tpl-search input:focus {
-  border-color: #1a73e8;
-  box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.15);
+  border-color: var(--cv-focus, #163044);
+  box-shadow: 0 0 0 3px rgba(22, 48, 68, 0.18);
 }
 
 .tpl-search input::placeholder {
-  color: #9aa0a6;
+  color: var(--cv-muted, #5f6368);
 }
 
 .tpl-empty {
   margin: 0 0 16px;
   font-size: 14px;
-  color: #9aa0a6;
+  color: var(--cv-muted, #5f6368);
   text-align: center;
 }
 
@@ -509,12 +508,18 @@ onMounted(async () => {
   color: inherit;
 }
 
-.card:hover,
-.card:focus-visible {
+.card:hover {
   transform: translateY(-3px);
   border-color: #bdc1c6;
   box-shadow: 0 10px 28px rgba(32, 33, 36, 0.1);
-  outline: none;
+}
+
+.card:focus-visible {
+  transform: translateY(-3px);
+  border-color: var(--cv-focus, #163044);
+  box-shadow: 0 10px 28px rgba(32, 33, 36, 0.1);
+  outline: 2px solid var(--cv-focus, #163044);
+  outline-offset: 2px;
 }
 
 .card--dual-triangle:hover,
@@ -574,7 +579,7 @@ onMounted(async () => {
 
 .card--product-features-5d:hover,
 .card--product-features-5d:focus-visible {
-  border-color: #29b6f6;
+  border-color: #2a649f;
 }
 
 
@@ -653,7 +658,7 @@ onMounted(async () => {
 
 .card--roi-decision:hover,
 .card--roi-decision:focus-visible {
-  border-color: #00BFFF;
+  border-color: #2a649f;
 }
 
 .card--time-matrix:hover,
@@ -679,7 +684,7 @@ onMounted(async () => {
 
 .card--business-formula:hover,
 .card--business-formula:focus-visible {
-  border-color: #38bdf8;
+  border-color: #2a649f;
 }
 
 .body {
@@ -723,19 +728,19 @@ onMounted(async () => {
   flex: 1;
   font-size: 13.5px;
   line-height: 1.55;
-  color: #9aa0a6;
+  color: var(--cv-muted, #5f6368);
 }
 
 .cta {
   margin-top: 6px;
   font-size: 13px;
   font-weight: 600;
-  color: #1a73e8;
+  color: var(--cv-focus, #163044);
 }
 
 .primaryish {
-  border: 1px solid #1a73e8;
-  background: #1a73e8;
+  border: 1px solid var(--cv-focus, #163044);
+  background: var(--cv-focus, #163044);
   border-radius: 999px;
   padding: 6px 12px;
   font-size: 13px;
@@ -774,14 +779,13 @@ onMounted(async () => {
   border-radius: 999px;
   padding: 10px 16px;
   font-size: 14px;
-  outline: none;
   background: #ffffff;
   color: #202124;
 }
 
 .search-row input:focus {
-  border-color: #1a73e8;
-  box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.15);
+  border-color: var(--cv-focus, #163044);
+  box-shadow: 0 0 0 3px rgba(22, 48, 68, 0.18);
 }
 
 .search-err {
@@ -791,7 +795,7 @@ onMounted(async () => {
 }
 
 .search-empty {
-  color: #9aa0a6;
+  color: var(--cv-muted, #5f6368);
   font-size: 13px;
   margin: 8px 0 0;
 }
@@ -821,13 +825,13 @@ onMounted(async () => {
 
 .search-hits span {
   font-size: 12px;
-  color: #9aa0a6;
+  color: var(--cv-muted, #5f6368);
 }
 
 .search-hits em {
   font-style: normal;
   font-size: 12px;
-  color: #9aa0a6;
+  color: var(--cv-muted, #5f6368);
   line-height: 1.4;
   max-height: 3.2em;
   overflow: hidden;

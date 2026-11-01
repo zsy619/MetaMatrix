@@ -246,7 +246,7 @@ onUnmounted(() => {
 }
 
 .menu-item--primary {
-  color: #1a73e8;
+  color: var(--cv-focus, #163044);
   font-weight: 600;
 }
 </style>

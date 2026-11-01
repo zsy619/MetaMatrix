@@ -39,10 +39,13 @@ function onTitleInput(event: Event) {
   <div class="prv-canvas" :style="chrome">
     <header class="prv-top">
       <input
+        id="prv-canvas-title"
         class="prv-top-title"
         type="text"
+        name="prvCanvasTitle"
         :value="doc.title || '复盘挖掘价值4：过程资产'"
         maxlength="80"
+        autocomplete="off"
         aria-label="画布标题"
         @input="onTitleInput"
         @click.stop

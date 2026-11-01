@@ -430,7 +430,9 @@ onBeforeUnmount(() => {
       >
         <span class="sm10p-slider-name">{{ s.title }}</span>
         <input
+          :id="`sm10p-score-${s.axis}`"
           type="range"
+          :name="`sm10p-score-${s.axis}`"
           min="0"
           max="100"
           step="1"

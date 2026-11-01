@@ -795,9 +795,9 @@ withDefaults(
         <text x="16" y="70" font-size="4.5" fill="#5f6368">时间</text>
         <text x="68" y="70" font-size="4.5" fill="#5f6368">行为</text>
         <text x="12" y="90" font-size="5.5" font-weight="700" fill="#202124">3.原因 · 4.方案</text>
-        <rect x="12" y="93" width="176" height="8" fill="#FBF6E4" stroke="#ffe082" stroke-width="0.5" />
+        <rect x="12" y="93" width="176" height="8" fill="#FBF6E4" stroke="#ececec" stroke-width="0.5" />
         <text x="12" y="112" font-size="5.5" font-weight="700" fill="#202124">5.影响 · 6.需求 · 7.反思</text>
-        <rect x="12" y="115" width="176" height="14" fill="#FBEFF2" stroke="#f5c6c2" stroke-width="0.5" />
+        <rect x="12" y="115" width="176" height="14" fill="#FBEFF2" stroke="#ececec" stroke-width="0.5" />
       </svg>
 
 
@@ -906,9 +906,9 @@ withDefaults(
         <text x="186" y="76" text-anchor="middle" font-size="6.5" font-weight="800" fill="#202124">同步</text>
         <text x="100" y="134" text-anchor="middle" font-size="8" font-weight="800" fill="#202124">线下</text>
         <!-- TL blue -->
-        <ellipse cx="55" cy="36" rx="28" ry="10" fill="#E8F1FA" stroke="#c5c9ce" stroke-width="2" />
+        <ellipse cx="55" cy="36" rx="28" ry="10" fill="#E8F1FA" stroke="#ececec" stroke-width="1" />
         <text x="55" y="39" text-anchor="middle" font-size="5.5" font-weight="700" fill="#111">顶层文档</text>
-        <ellipse cx="78" cy="54" rx="18" ry="8" fill="#E8F1FA" stroke="#c5c9ce" stroke-width="2" />
+        <ellipse cx="78" cy="54" rx="18" ry="8" fill="#E8F1FA" stroke="#ececec" stroke-width="1" />
         <text x="78" y="56.5" text-anchor="middle" font-size="4.5" font-weight="700" fill="#111">电子看板</text>
         <ellipse cx="48" cy="58" rx="16" ry="7" fill="#E8F1FA" />
         <text x="48" y="60" text-anchor="middle" font-size="4.5" fill="#111">项目群</text>
@@ -918,12 +918,12 @@ withDefaults(
         <ellipse cx="155" cy="54" rx="16" ry="7" fill="#E7F6EF" />
         <text x="155" y="56.5" text-anchor="middle" font-size="4.5" fill="#111">群聊</text>
         <!-- BL purple -->
-        <ellipse cx="62" cy="100" rx="24" ry="10" fill="#F3EEF8" stroke="#c5c9ce" stroke-width="2" />
+        <ellipse cx="62" cy="100" rx="24" ry="10" fill="#F3EEF8" stroke="#ececec" stroke-width="1" />
         <text x="62" y="103" text-anchor="middle" font-size="5.5" font-weight="700" fill="#111">墙面看板</text>
         <!-- BR pink -->
-        <ellipse cx="130" cy="88" rx="18" ry="8" fill="#FBEFF2" stroke="#c5c9ce" stroke-width="2" />
+        <ellipse cx="130" cy="88" rx="18" ry="8" fill="#FBEFF2" stroke="#ececec" stroke-width="1" />
         <text x="130" y="90.5" text-anchor="middle" font-size="4.5" font-weight="700" fill="#111">攻坚小组</text>
-        <ellipse cx="155" cy="102" rx="20" ry="8" fill="#FBEFF2" stroke="#c5c9ce" stroke-width="2" />
+        <ellipse cx="155" cy="102" rx="20" ry="8" fill="#FBEFF2" stroke="#ececec" stroke-width="1" />
         <text x="155" y="104.5" text-anchor="middle" font-size="4.5" font-weight="700" fill="#111">坐你旁边</text>
         <ellipse cx="138" cy="116" rx="26" ry="9" fill="#FBEFF2" />
         <text x="138" y="119" text-anchor="middle" font-size="5" fill="#111">团队例会</text>
@@ -992,7 +992,7 @@ withDefaults(
         <line x1="100.0" y1="72.0" x2="128.2" y2="110.8" stroke="#c5c9ce" stroke-width="0.8" />
         <line x1="100.0" y1="72.0" x2="71.8" y2="110.8" stroke="#c5c9ce" stroke-width="0.8" />
         <line x1="100.0" y1="72.0" x2="54.3" y2="57.2" stroke="#c5c9ce" stroke-width="0.8" />
-        <polygon points="100.0,24.0 134.2,60.9 107.1,81.7 78.8,101.1 54.3,57.2" fill="rgba(42,100,159,0.28)" stroke="#42a5f5" stroke-width="1.3" />
+        <polygon points="100.0,24.0 134.2,60.9 107.1,81.7 78.8,101.1 54.3,57.2" fill="rgba(42,100,159,0.28)" stroke="#2A649F" stroke-width="1.3" />
         <rect x="97.0" y="21.0" width="6" height="6" rx="1" fill="#2A649F" />
         <rect x="131.2" y="57.9" width="6" height="6" rx="1" fill="#2A649F" />
         <rect x="104.1" y="78.7" width="6" height="6" rx="1" fill="#2A649F" />

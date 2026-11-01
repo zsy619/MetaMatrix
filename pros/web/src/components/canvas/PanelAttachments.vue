@@ -399,7 +399,7 @@ function closePreview() {
 .pa-bar span {
   display: block;
   height: 100%;
-  background: #1a73e8;
+  background: var(--cv-focus, #163044);
 }
 
 .pa-confirm {
@@ -481,7 +481,7 @@ function closePreview() {
 .pa-empty {
   margin: 2px 0 0;
   font-size: 11px;
-  color: #b0b4b8;
+  color: var(--cv-muted, #5f6368);
   line-height: 1.4;
 }
 </style>

@@ -56,11 +56,14 @@ function onRemoveRow(rowId: string) {
     <header class="kr-header">
       <span class="kr-header-fixed">关键阻力分析画布：</span>
       <input
+        id="kr-rate-label"
         class="kr-rate-input"
         type="text"
+        name="krRateLabel"
         :value="doc.rateLabel"
         placeholder="______"
         maxlength="24"
+        autocomplete="off"
         aria-label="率指标，如转化"
         @input="onRateInput"
       />
@@ -103,7 +106,7 @@ function onRemoveRow(rowId: string) {
           <div class="kr-row-actions">
             <button
               type="button"
-              class="kr-row-delete"
+              class="cv-row-delete"
               title="删除本行"
               :disabled="doc.rows.length <= 1"
               @click="onRemoveRow(row.id)"
@@ -115,8 +118,8 @@ function onRemoveRow(rowId: string) {
       </div>
     </div>
 
-    <div class="kr-add-row">
-      <button type="button" class="kr-add-btn" @click="onAddRow">
+    <div class="cv-add-row">
+      <button type="button" class="cv-add-btn" @click="onAddRow">
         + 添加行
       </button>
     </div>
@@ -272,59 +275,6 @@ function onRemoveRow(rowId: string) {
   align-items: flex-start;
   justify-content: center;
   padding-top: 10px;
-}
-
-.kr-row-delete {
-  width: 22px;
-  height: 22px;
-  border: none;
-  border-radius: 4px;
-  background: transparent;
-  color: #9aa0a6;
-  font-size: 16px;
-  line-height: 1;
-  cursor: pointer;
-  padding: 0;
-}
-
-.kr-row-delete:hover:not(:disabled) {
-  background: #fce8e6;
-  color: #d93025;
-}
-
-.kr-row-delete:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-}
-
-.kr-add-row {
-  flex-shrink: 0;
-  display: flex;
-  justify-content: center;
-  padding: 8px 12px;
-  border-top: 1px solid #e4e6e8;
-  background: #fafafa;
-}
-
-.kr-add-btn {
-  border: 1px solid #e4e6e8;
-  border-radius: 6px;
-  background: #fff;
-  color: #5f6368;
-  font-size: 13px;
-  font-weight: 600;
-  padding: 6px 16px;
-  cursor: pointer;
-  transition:
-    background 0.12s ease,
-    border-color 0.12s ease,
-    color 0.12s ease;
-}
-
-.kr-add-btn:hover {
-  background: var(--cv-hover-wash, #e8f1fa);
-  border-color: var(--cv-focus, #1c4c7c);
-  color: var(--cv-focus, #1c4c7c);
 }
 
 .kr-footer {

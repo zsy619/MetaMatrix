@@ -25,7 +25,89 @@
 .pm-overlay button:focus-visible,
 .pm-overlay input:focus-visible,
 .pm-overlay textarea:focus-visible,
-.pm-overlay select:focus-visible {
+.pm-overlay select:focus-visible,
+.guide-shell :focus-visible,
+.home .topbar :focus-visible,
+.page-settings-panel :focus-visible {
   outline: 2px solid var(--cv-focus);
   outline-offset: 2px;
+}
+
+/* Editor and guide chrome follow the worksheet ink. RTE keeps its own controls. */
+.home,
+.guide-shell {
+  --el-color-primary: var(--cv-focus);
+  --el-color-primary-light-3: #4a6a84;
+  --el-color-primary-light-5: #7b95ab;
+  --el-color-primary-light-7: #b3c4d2;
+  --el-color-primary-light-8: #cdd8e2;
+  --el-color-primary-light-9: var(--cv-hover-wash);
+  --el-color-primary-dark-2: #0f2434;
+}
+
+/* Quiet add / delete row, shared by the row-based sheets. */
+.cv-add-row {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: center;
+  padding: 8px 12px;
+  border-top: 1px solid var(--cv-frame);
+  background: var(--cv-page);
+}
+
+.cv-add-btn {
+  border: 1px solid var(--cv-frame);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--cv-ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 16px;
+  cursor: pointer;
+}
+
+.cv-add-btn:hover {
+  background: var(--cv-hover-wash);
+  border-color: var(--cv-focus);
+  color: var(--cv-focus);
+}
+
+.cv-row-delete {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--cv-muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+
+.cv-row-delete:hover:not(:disabled) {
+  background: #fce8e6;
+  color: #d93025;
+}
+
+.cv-row-delete:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/*
+ * Section and column heads that live in a page scroller.
+ * Parents must not set overflow: hidden, or sticky never reaches the scrollport.
+ */
+.rd-matrix-headers,
+.at-col-header,
+.as-section-title,
+.ir-section-title,
+.if-meta,
+.ia-meta,
+.dr-title {
+  position: sticky;
+  top: 0;
+  z-index: 4;
 }

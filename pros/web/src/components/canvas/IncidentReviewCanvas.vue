@@ -126,11 +126,14 @@ function onRemoveRow(rowId: string) {
           >
             <div class="ir-tl-cell ir-tl-cell--time tbl-tone" role="cell" :style="toneVars(4)">
               <input
+                :id="`ir-time-${row.id}`"
                 class="ir-time-input"
                 type="text"
+                name="irTime"
                 :value="row.time"
                 placeholder="例如 2022/03/01 10:05"
                 maxlength="48"
+                autocomplete="off"
                 :aria-label="`时间：${row.time || '未填写'}`"
                 @input="onTimeInput(row.id, $event)"
                 @click.stop
@@ -142,7 +145,7 @@ function onRemoveRow(rowId: string) {
             <div class="ir-tl-cell ir-tl-cell--actions">
               <button
                 type="button"
-                class="ir-row-delete"
+                class="cv-row-delete"
                 title="删除本行"
                 :disabled="doc.timelineRows.length <= 1"
                 @click="onRemoveRow(row.id)"
@@ -153,8 +156,8 @@ function onRemoveRow(rowId: string) {
           </div>
         </div>
 
-        <div class="ir-add-row">
-          <button type="button" class="ir-add-btn" @click="onAddRow">
+        <div class="cv-add-row">
+          <button type="button" class="cv-add-btn" @click="onAddRow">
             + 添加行
           </button>
         </div>
@@ -281,7 +284,7 @@ function onRemoveRow(rowId: string) {
 .ir-section {
   margin-bottom: 28px;
   border-radius: 8px;
-  overflow: hidden;
+  overflow: visible;
   background: var(--tbl-body, #fafafa);
   padding-bottom: 12px;
 }
@@ -508,46 +511,4 @@ function onRemoveRow(rowId: string) {
   background: #fff;
 }
 
-.ir-row-delete {
-  width: 28px;
-  height: 28px;
-  border: none;
-  border-radius: 4px;
-  background: transparent;
-  color: #9aa0a6;
-  font-size: 18px;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.ir-row-delete:hover:not(:disabled) {
-  background: #fce8e6;
-  color: #d93025;
-}
-
-.ir-row-delete:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-}
-
-.ir-add-row {
-  margin: 10px 12px 0;
-}
-
-.ir-add-btn {
-  border: 1px solid #e4e6e8;
-  border-radius: 4px;
-  background: #fafafa;
-  color: var(--cv-focus, #1c4c7c);
-  font-size: 13px;
-  font-weight: 600;
-  padding: 8px 14px;
-  cursor: pointer;
-  font-family: inherit;
-}
-
-.ir-add-btn:hover {
-  background: var(--cv-hover-wash, #e8f1fa);
-  border-color: var(--cv-focus, #1c4c7c);
-}
 </style>

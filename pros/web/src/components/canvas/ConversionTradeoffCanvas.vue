@@ -83,11 +83,14 @@ function onRemoveRow(rowId: string) {
         >
           <div class="ct-priority tbl-tone" role="cell" :style="toneVars(0)">
             <input
+              :id="`ct-priority-${row.id}`"
               class="ct-priority-input"
               type="text"
+              name="ctPriority"
               :value="row.priorityLabel"
               placeholder="优先级…"
               maxlength="32"
+              autocomplete="off"
               :aria-label="`优先级：${row.priorityLabel || '未命名'}`"
               @input="onPriorityInput(row.id, $event)"
               @click.stop
@@ -108,7 +111,7 @@ function onRemoveRow(rowId: string) {
           <div class="ct-row-actions">
             <button
               type="button"
-              class="ct-row-delete"
+              class="cv-row-delete"
               title="删除本行"
               :disabled="doc.rows.length <= 1"
               @click="onRemoveRow(row.id)"
@@ -120,8 +123,8 @@ function onRemoveRow(rowId: string) {
       </div>
     </div>
 
-    <div class="ct-add-row">
-      <button type="button" class="ct-add-btn" @click="onAddRow">
+    <div class="cv-add-row">
+      <button type="button" class="cv-add-btn" @click="onAddRow">
         + 添加行
       </button>
     </div>
@@ -269,59 +272,6 @@ function onRemoveRow(rowId: string) {
   align-items: flex-start;
   justify-content: center;
   padding-top: 12px;
-}
-
-.ct-row-delete {
-  width: 22px;
-  height: 22px;
-  border: none;
-  border-radius: 4px;
-  background: transparent;
-  color: #9aa0a6;
-  font-size: 16px;
-  line-height: 1;
-  cursor: pointer;
-  padding: 0;
-}
-
-.ct-row-delete:hover:not(:disabled) {
-  background: #fce8e6;
-  color: #d93025;
-}
-
-.ct-row-delete:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-}
-
-.ct-add-row {
-  flex-shrink: 0;
-  display: flex;
-  justify-content: center;
-  padding: 8px 12px;
-  border-top: 1px solid #e4e6e8;
-  background: #fafafa;
-}
-
-.ct-add-btn {
-  border: 1px solid #e4e6e8;
-  border-radius: 6px;
-  background: #fff;
-  color: #5f6368;
-  font-size: 13px;
-  font-weight: 600;
-  padding: 6px 16px;
-  cursor: pointer;
-  transition:
-    background 0.12s ease,
-    border-color 0.12s ease,
-    color 0.12s ease;
-}
-
-.ct-add-btn:hover {
-  background: var(--cv-hover-wash, #e8f1fa);
-  border-color: var(--cv-focus, #1c4c7c);
-  color: var(--cv-focus, #1c4c7c);
 }
 
 @media (max-width: 720px) {

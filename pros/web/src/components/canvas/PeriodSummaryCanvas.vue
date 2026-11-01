@@ -88,7 +88,7 @@ const fallbackTitle = computed(() => {
 .as-section {
   margin-bottom: 28px;
   border-radius: 8px;
-  overflow: hidden;
+  overflow: visible;
   background: var(--tbl-body, #fafafa);
 }
 

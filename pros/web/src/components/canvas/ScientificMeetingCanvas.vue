@@ -81,11 +81,14 @@ function onOrganizer(event: Event) {
       <label class="sm-meta">
         <span>会议类型：</span>
         <input
+          id="sm-meeting-type"
           type="text"
           class="sm-meta-input"
+          name="smMeetingType"
           :value="doc.meetingType"
           placeholder="________"
           maxlength="48"
+          autocomplete="off"
           aria-label="会议类型"
           @input="onMeetingType"
           @click.stop
@@ -94,11 +97,14 @@ function onOrganizer(event: Event) {
       <label class="sm-meta">
         <span>梳理人：</span>
         <input
+          id="sm-organizer"
           type="text"
           class="sm-meta-input"
+          name="smOrganizer"
           :value="doc.organizer"
           placeholder="________"
           maxlength="48"
+          autocomplete="off"
           aria-label="梳理人"
           @input="onOrganizer"
           @click.stop
