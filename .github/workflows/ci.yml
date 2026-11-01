@@ -34,6 +34,7 @@ jobs:
       - run: npm run build
       - run: node --experimental-strip-types src/components/workspace/statsNormalize.test.ts
       - run: node --experimental-strip-types src/utils/rteFeishuDepth.test.ts
+      - run: node --experimental-strip-types src/utils/rteBatch3.test.ts
       - run: node scripts/smoke-flow.mjs
 
   flow:
