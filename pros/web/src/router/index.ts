@@ -22,6 +22,12 @@ const router = createRouter({
       meta: { scrollable: true },
     },
     {
+      path: '/account',
+      name: 'account',
+      component: () => import('../views/AccountView.vue'),
+      meta: { scrollable: true },
+    },
+    {
       path: '/workspace',
       name: 'workspace',
       component: () => import('../views/WorkspaceView.vue'),

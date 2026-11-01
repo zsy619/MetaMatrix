@@ -464,8 +464,8 @@ async function onCopyAIContext(asPlain: boolean) {
       : JSON.stringify(ctx, null, 2)
     await navigator.clipboard.writeText(text)
     ElMessage.success(asPlain ? '已复制纯文本' : '已复制 AI 上下文 JSON')
-  } catch (e) {
-    ElMessage.error(e instanceof Error ? e.message : '获取失败')
+  } catch {
+    ElMessage.error('暂时无法复制 AI 上下文')
   }
 }
 
@@ -493,8 +493,8 @@ async function onDiffPrev() {
       '与上一版对比',
       { dangerouslyUseHTMLString: true, confirmButtonText: '关闭' },
     )
-  } catch (e) {
-    ElMessage.error(e instanceof Error ? e.message : '对比失败')
+  } catch {
+    ElMessage.error('暂时无法对比上一版')
   }
 }
 

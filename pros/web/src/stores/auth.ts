@@ -127,6 +127,19 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  async function changePassword(currentPassword: string, newPassword: string) {
+    loading.value = true
+    error.value = null
+    try {
+      await authApi.changePassword({ currentPassword, newPassword })
+    } catch (e: unknown) {
+      error.value = friendlyApiMessage(e, '修改密码失败')
+      throw e
+    } finally {
+      loading.value = false
+    }
+  }
+
   function logout() {
     clearSession()
   }
@@ -144,6 +157,7 @@ export const useAuthStore = defineStore('auth', () => {
     register,
     login,
     fetchMe,
+    changePassword,
     logout,
   }
 })

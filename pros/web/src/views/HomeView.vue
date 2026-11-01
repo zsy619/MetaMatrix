@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import {
   useDocumentStore,
@@ -39,6 +39,8 @@ const docsTotal = ref(0)
 const docsHasMore = ref(false)
 const docsPageSize = 20
 const historyOpen = ref(false)
+const saveFailed = ref(false)
+const offline = ref(typeof navigator !== 'undefined' ? !navigator.onLine : false)
 
 const templateId = computed<TemplateId>(() => {
   const raw = String(route.params.templateId ?? 'dual-triangle')
@@ -48,6 +50,8 @@ const templateId = computed<TemplateId>(() => {
 const badge = computed(() => TEMPLATE_META[templateId.value].badge)
 const syncLabel = computed(() => {
   if (saving.value) return '同步中…'
+  if (offline.value && dirty.value) return '网络已断开，修改留在本机'
+  if (saveFailed.value) return '同步失败，可重试'
   if (statusMsg.value) return statusMsg.value
   if (!auth.isAuthenticated) return dirty.value ? '本地未保存' : '仅本地'
   if (dirty.value) return '未同步'
@@ -56,12 +60,50 @@ const syncLabel = computed(() => {
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 
+function autosaveDelay(): number {
+  try {
+    const size = JSON.stringify(documentStore.current_data ?? '').length
+    if (size > 400_000) return 3000
+    if (size > 120_000) return 2000
+  } catch {
+    /* 体积未知时用默认间隔 */
+  }
+  return 1200
+}
+
 function scheduleAutoSave() {
   if (saveTimer) clearTimeout(saveTimer)
   saveTimer = setTimeout(() => {
     void doSave(false)
-  }, 1200)
+  }, autosaveDelay())
 }
+
+function onBeforeUnload(event: BeforeUnloadEvent) {
+  if (!documentStore.dirty) return
+  event.preventDefault()
+  event.returnValue = ''
+}
+
+function onNetworkOnline() {
+  offline.value = false
+}
+
+function onNetworkOffline() {
+  offline.value = true
+  saveFailed.value = true
+  statusMsg.value = '网络已断开，修改留在本机。恢复后可重试同步。'
+}
+
+onMounted(() => {
+  window.addEventListener('beforeunload', onBeforeUnload)
+  window.addEventListener('online', onNetworkOnline)
+  window.addEventListener('offline', onNetworkOffline)
+})
+
+onBeforeRouteLeave(() => {
+  if (!documentStore.dirty) return true
+  return window.confirm('画布还有未同步的修改。离开后本机仍保留草稿，云端可能不是最新。确定离开？')
+})
 
 watch(
   () => dirty.value,
@@ -121,6 +163,9 @@ watch(
 
 onBeforeUnmount(() => {
   if (saveTimer) clearTimeout(saveTimer)
+  window.removeEventListener('beforeunload', onBeforeUnload)
+  window.removeEventListener('online', onNetworkOnline)
+  window.removeEventListener('offline', onNetworkOffline)
 })
 
 
@@ -138,7 +183,7 @@ async function copyAIContext(asPlain: boolean) {
     await navigator.clipboard.writeText(text)
     ElMessage.success(asPlain ? '已复制纯文本' : '已复制 AI 上下文 JSON')
   } catch (e) {
-    statusMsg.value = e instanceof Error ? e.message : 'AI 上下文失败'
+    statusMsg.value = friendlyApiMessage(e, '暂时无法复制 AI 上下文')
   }
 }
 
@@ -173,7 +218,7 @@ async function diffPrevRevision() {
       { dangerouslyUseHTMLString: true, confirmButtonText: '关闭' },
     )
   } catch (e) {
-    statusMsg.value = e instanceof Error ? e.message : '对比失败'
+    statusMsg.value = friendlyApiMessage(e, '暂时无法对比上一版')
   }
 }
 
@@ -198,6 +243,10 @@ function requireLogin(): boolean {
 }
 
 async function doSave(checkpoint: boolean) {
+  if (saving.value) {
+    scheduleAutoSave()
+    return
+  }
   statusMsg.value = ''
   documentStore.persistLocal(templateId.value)
   if (!auth.isAuthenticated) {
@@ -230,11 +279,15 @@ async function doSave(checkpoint: boolean) {
         query: { documentId: documentStore.document_id },
       })
     }
+    saveFailed.value = false
     statusMsg.value = checkpoint ? '已存版' : '已同步'
   } catch (e) {
+    saveFailed.value = true
     statusMsg.value = conflict.value
       ? '检测到编辑冲突。可以选择保留云端，或恢复刚才的修改再保存。'
-      : friendlyApiMessage(e, '保存失败')
+      : offline.value
+        ? '网络已断开，修改留在本机。恢复后可重试同步。'
+        : friendlyApiMessage(e, '同步失败，修改仍在本机。')
   }
 }
 
@@ -371,7 +424,7 @@ async function manualCheckpoint() {
       <div class="actions">
         <span class="meta">{{ syncLabel }}</span>
         <template v-if="auth.isAuthenticated">
-          <span class="user">{{ auth.user?.displayName || auth.user?.email }}</span>
+          <router-link class="user" :to="{ name: 'account' }">{{ auth.user?.displayName || auth.user?.email }}</router-link>
           <el-button size="small" @click="openDocsPanel">我的文档</el-button>
           <el-button size="small" @click="newDocument">新建</el-button>
           <el-button size="small" @click="manualCheckpoint">存版</el-button>
@@ -394,6 +447,12 @@ async function manualCheckpoint() {
         </el-button>
       </div>
     </header>
+    <p v-if="saveFailed || offline" class="save-retry" role="status">
+      {{ offline ? '网络已断开，修改留在本机。' : '同步没有成功，修改仍在本机。' }}
+      <button type="button" class="mm-btn mm-btn--primary" :disabled="saving || offline" @click="doSave(false)">
+        重试同步
+      </button>
+    </p>
     <Teleport to="body">
     <div v-if="conflict" class="conflict conflict-float" role="alert">
       <p>这份画布刚在其他地方保存过。编辑区已换成云端最新内容，你刚才未同步的修改还留着。</p>
@@ -559,7 +618,20 @@ async function manualCheckpoint() {
 
 .user {
   font-size: 12px;
-  color: #3c4043;
+  color: #1a73e8;
+  text-decoration: none;
+}
+
+.save-retry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  padding: 8px 16px;
+  background: #fef7e0;
+  color: #202124;
+  font-size: 13px;
 }
 
 .workspace {

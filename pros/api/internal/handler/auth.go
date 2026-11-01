@@ -144,6 +144,43 @@ func (h *AuthHandler) Refresh(ctx context.Context, c *app.RequestContext) {
 	})
 }
 
+type passwordBody struct {
+	CurrentPassword string `json:"currentPassword"`
+	NewPassword     string `json:"newPassword"`
+}
+
+func (h *AuthHandler) ChangePassword(ctx context.Context, c *app.RequestContext) {
+	uid, ok := middleware.UserIDFromCtx(c)
+	if !ok {
+		Unauthorized(c, "unauthorized")
+		return
+	}
+	var body passwordBody
+	if err := c.BindAndValidate(&body); err != nil {
+		BadRequest(c, "invalid body")
+		return
+	}
+	err := h.svc.ChangePassword(uid, body.CurrentPassword, body.NewPassword)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrWeakPassword):
+			Fail(c, http.StatusBadRequest, "password must be at least 6 characters", "weak_password")
+		case errors.Is(err, service.ErrPasswordTooLong):
+			Fail(c, http.StatusBadRequest, "password exceeds 72 bytes", "password_too_long")
+		case errors.Is(err, service.ErrSamePassword):
+			Fail(c, http.StatusBadRequest, "new password must differ", "password_unchanged")
+		case errors.Is(err, service.ErrInvalidCreds):
+			Fail(c, http.StatusBadRequest, "current password is incorrect", "wrong_password")
+		case errors.Is(err, service.ErrUserNotFound):
+			Fail(c, http.StatusUnauthorized, "unauthorized", "unauthorized")
+		default:
+			Internal(c, "password change failed")
+		}
+		return
+	}
+	c.JSON(http.StatusOK, map[string]string{"status": "ok"})
+}
+
 func (h *AuthHandler) Me(ctx context.Context, c *app.RequestContext) {
 	uid, ok := middleware.UserIDFromCtx(c)
 	if !ok {

@@ -14,6 +14,7 @@ const textContent = ref<string | null>(null)
 const textLoading = ref(false)
 const textError = ref('')
 const iframeFailed = ref(false)
+const imageFailed = ref(false)
 
 const open = computed(() => !!props.attachment)
 
@@ -91,8 +92,7 @@ async function loadText() {
       textError.value = '无可预览内容'
     }
   } catch (err) {
-    textError.value =
-      err instanceof Error ? err.message : '无法加载文本（可能被跨域限制）'
+      textError.value = '无法读取文本。可能是跨域限制，可以改用新窗口打开。'
   } finally {
     textLoading.value = false
   }
@@ -109,6 +109,7 @@ watch(
   () => props.attachment,
   (att) => {
     iframeFailed.value = false
+    imageFailed.value = false
     if (att && previewKind.value === 'text') {
       void loadText()
     } else {
@@ -183,11 +184,16 @@ function onIframeError() {
 
         <div class="ap-body">
           <img
-            v-if="previewKind === 'image' && src"
+            v-if="previewKind === 'image' && src && !imageFailed"
             class="ap-img"
             :src="src"
             :alt="attachment.name"
+            @error="imageFailed = true"
           />
+          <div v-else-if="previewKind === 'image'" class="ap-hint ap-err">
+            <p>图片无法预览。</p>
+            <button v-if="src" type="button" class="ap-btn" @click="onOpenExternal">新窗口打开</button>
+          </div>
 
           <embed
             v-else-if="previewKind === 'pdf' && src"

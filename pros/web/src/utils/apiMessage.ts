@@ -3,6 +3,8 @@ import { ApiError } from '../api/http'
 const CODE_COPY: Record<string, string> = {
   invalid_email: '请输入有效的邮箱地址。',
   weak_password: '密码至少 6 位。',
+  wrong_password: '当前密码不正确。',
+  password_unchanged: '新密码需要和当前密码不同。',
   password_too_long: '密码过长。请控制在 72 个字节以内。',
   email_taken: '这个邮箱已经注册，请直接登录。',
   invalid_credentials: '邮箱或密码不正确。',
