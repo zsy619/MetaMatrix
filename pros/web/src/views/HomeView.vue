@@ -13,7 +13,7 @@ import { useAuthStore } from '../stores/auth'
 import CanvasViewport from '../components/canvas/CanvasViewport.vue'
 import RevisionHistory from '../components/canvas/RevisionHistory.vue'
 import PageSettingsPanel from '../components/PageSettingsPanel.vue'
-import { listDocumentsPage, type DocumentSummary } from '../api/documents'
+import { batchDocuments, listDocumentsPage, type DocumentSummary } from '../api/documents'
 import {
   getAIContext,
   listRevisions,
@@ -38,6 +38,9 @@ const docsPage = ref(0)
 const docsTotal = ref(0)
 const docsHasMore = ref(false)
 const docsPageSize = 20
+const docsArchived = ref(false)
+const docsSelected = ref<string[]>([])
+const docsConfirm = ref(false)
 const historyOpen = ref(false)
 const saveFailed = ref(false)
 const offline = ref(typeof navigator !== 'undefined' ? !navigator.onLine : false)
@@ -94,10 +97,15 @@ function onNetworkOffline() {
   statusMsg.value = '网络已断开，修改留在本机。恢复后可重试同步。'
 }
 
+function onSaveHotkey() {
+  void doSave(false)
+}
+
 onMounted(() => {
   window.addEventListener('beforeunload', onBeforeUnload)
   window.addEventListener('online', onNetworkOnline)
   window.addEventListener('offline', onNetworkOffline)
+  window.addEventListener('metamatrix:save', onSaveHotkey)
 })
 
 onBeforeRouteLeave(() => {
@@ -166,6 +174,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('beforeunload', onBeforeUnload)
   window.removeEventListener('online', onNetworkOnline)
   window.removeEventListener('offline', onNetworkOffline)
+  window.removeEventListener('metamatrix:save', onSaveHotkey)
 })
 
 
@@ -341,6 +350,7 @@ async function loadDocsPage() {
       templateId: templateId.value,
       limit: docsPageSize,
       offset: docsPage.value * docsPageSize,
+      archived: docsArchived.value,
     })
     myDocs.value = page.items
     docsTotal.value = page.total
@@ -359,7 +369,46 @@ async function openDocsPanel() {
   if (!requireLogin()) return
   docsOpen.value = true
   docsPage.value = 0
+  docsSelected.value = []
+  docsConfirm.value = false
   await loadDocsPage()
+}
+
+function toggleDocsArchived() {
+  docsArchived.value = !docsArchived.value
+  docsPage.value = 0
+  docsSelected.value = []
+  docsConfirm.value = false
+  void loadDocsPage()
+}
+
+function toggleDocSelected(id: string) {
+  docsSelected.value = docsSelected.value.includes(id)
+    ? docsSelected.value.filter((item) => item !== id)
+    : [...docsSelected.value, id]
+}
+
+async function applyDocBatch() {
+  if (!docsSelected.value.length) return
+  const action = docsArchived.value ? 'restore' : 'archive'
+  const ids = [...docsSelected.value]
+  try {
+    await batchDocuments(action, ids)
+    if (action === 'archive' && document_id.value && ids.includes(document_id.value)) {
+      documentStore.resetToTemplate(templateId.value)
+      await router.replace({
+        name: 'canvas',
+        params: { templateId: templateId.value },
+        query: {},
+      })
+    }
+    docsSelected.value = []
+    docsConfirm.value = false
+    statusMsg.value = action === 'archive' ? `已归档 ${ids.length} 份画布` : `已恢复 ${ids.length} 份画布`
+    await loadDocsPage()
+  } catch (e) {
+    docsError.value = friendlyApiMessage(e, action === 'archive' ? '归档失败' : '恢复失败')
+  }
 }
 
 function docsPrev() {
@@ -476,12 +525,34 @@ async function manualCheckpoint() {
     />
 
     <el-drawer v-model="docsOpen" title="我的文档" size="360px">
+      <div class="doc-tools">
+        <button type="button" class="mm-btn mm-btn--ghost" @click="toggleDocsArchived">
+          {{ docsArchived ? '查看在用画布' : '查看已归档' }}
+        </button>
+        <button
+          type="button"
+          class="mm-btn mm-btn--ghost"
+          :disabled="!docsSelected.length"
+          @click="docsConfirm = true"
+        >
+          {{ docsArchived ? '恢复所选' : '归档所选' }}（{{ docsSelected.length }}）
+        </button>
+      </div>
+      <p v-if="docsConfirm && docsSelected.length" class="save-retry" role="alert">
+        {{ docsArchived ? `确认恢复 ${docsSelected.length} 份画布？` : `确认归档 ${docsSelected.length} 份画布？它们会从在用列表消失，可再恢复。` }}
+        <span>
+          <button type="button" class="mm-btn mm-btn--primary" @click="applyDocBatch">再次确认</button>
+          <button type="button" class="mm-btn mm-btn--ghost" @click="docsConfirm = false">取消</button>
+        </span>
+      </p>
       <p v-if="docsLoading">正在读取这个模板下的文档…</p>
       <p v-else-if="docsError" class="empty" role="alert">
         {{ docsError }}
         <button type="button" class="mm-btn mm-btn--ghost" @click="loadDocsPage">重试</button>
       </p>
-      <p v-else-if="docsTotal === 0" class="empty">这个模板下还没有云端画布。填写任务名称后保存即可建档。</p>
+      <p v-else-if="docsTotal === 0" class="empty">
+        {{ docsArchived ? '没有已归档的画布。' : '这个模板下还没有云端画布。填写任务名称后保存即可建档。' }}
+      </p>
       <p v-else class="empty">
         第 {{ docsPage * docsPageSize + 1 }}–{{ docsPage * docsPageSize + myDocs.length }} 份，共 {{ docsTotal }} 份
       </p>
@@ -492,6 +563,14 @@ async function manualCheckpoint() {
           class="doc-item"
           :class="{ active: d.id === document_id }"
         >
+          <label class="doc-check">
+            <input
+              type="checkbox"
+              :checked="docsSelected.includes(d.id)"
+              :aria-label="`选择 ${d.title || '未命名'}`"
+              @change="toggleDocSelected(d.id)"
+            />
+          </label>
           <button type="button" @click="openDoc(d.id)">
             <strong>{{ d.title || '未命名' }}</strong>
             <span>修订 {{ new Date(d.updatedAt).toLocaleString('zh-CN', { hour12: false }) }}</span>
@@ -659,6 +738,23 @@ async function manualCheckpoint() {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.doc-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.doc-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.doc-check {
+  padding-top: 12px;
 }
 
 .doc-item button {

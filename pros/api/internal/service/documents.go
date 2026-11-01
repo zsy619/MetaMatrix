@@ -177,6 +177,7 @@ type ListFilter struct {
 	Limit      int
 	Offset     int
 	Paged      bool
+	Archived   bool
 }
 
 // NormalizeListPage parses limit/offset. Empty inputs mean "not paged".
@@ -322,6 +323,9 @@ func (s *DocumentsService) Create(ownerID uuid.UUID, in CreateDocumentInput) (*m
 func (s *DocumentsService) List(ownerID uuid.UUID, f ListFilter) ([]model.DocumentSummary, int64, error) {
 	scope := func() *gorm.DB {
 		q := s.db.Model(&model.CanvasDocument{}).Where("owner_user_id = ?", ownerID)
+		if f.Archived {
+			q = q.Unscoped().Where("deleted_at IS NOT NULL")
+		}
 		if f.TemplateID != "" {
 			q = q.Where("template_id = ?", f.TemplateID)
 		}
@@ -424,6 +428,46 @@ func (s *DocumentsService) Update(ownerID, docID uuid.UUID, in UpdateDocumentInp
 		return tx.Where("id = ?", docID).First(doc).Error
 	})
 	return doc, err
+}
+
+const maxBatchIDs = 50
+
+// NormalizeBatchIDs parses a batch payload. Empty or oversized lists are rejected.
+func NormalizeBatchIDs(raw []string) ([]uuid.UUID, error) {
+	if len(raw) == 0 || len(raw) > maxBatchIDs {
+		return nil, ErrValidation
+	}
+	seen := map[uuid.UUID]struct{}{}
+	out := make([]uuid.UUID, 0, len(raw))
+	for _, item := range raw {
+		id, err := uuid.Parse(strings.TrimSpace(item))
+		if err != nil {
+			return nil, ErrValidation
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		out = append(out, id)
+	}
+	if len(out) == 0 {
+		return nil, ErrValidation
+	}
+	return out, nil
+}
+
+// Archive soft-deletes the caller's documents. Rows stay in canvas_documents.
+func (s *DocumentsService) Archive(ownerID uuid.UUID, ids []uuid.UUID) (int64, error) {
+	res := s.db.Where("owner_user_id = ? AND id IN ?", ownerID, ids).Delete(&model.CanvasDocument{})
+	return res.RowsAffected, res.Error
+}
+
+// RestoreArchived clears deleted_at for the caller's archived documents.
+func (s *DocumentsService) RestoreArchived(ownerID uuid.UUID, ids []uuid.UUID) (int64, error) {
+	res := s.db.Unscoped().Model(&model.CanvasDocument{}).
+		Where("owner_user_id = ? AND id IN ? AND deleted_at IS NOT NULL", ownerID, ids).
+		Update("deleted_at", nil)
+	return res.RowsAffected, res.Error
 }
 
 func (s *DocumentsService) Delete(ownerID, docID uuid.UUID) error {
@@ -617,7 +661,7 @@ SELECT id, title, notes, template_id, canvas_type, created_at, updated_at,
     ELSE 0
   END AS rank
 FROM canvas_documents
-WHERE owner_user_id = ?
+WHERE owner_user_id = ? AND deleted_at IS NULL
   AND (
     content_tsv @@ plainto_tsquery('simple', ?)
     OR title ILIKE ?

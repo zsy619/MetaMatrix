@@ -78,9 +78,7 @@ func handleDocErr(c *app.RequestContext, err error, doc interface{}) bool {
 	case errors.Is(err, service.ErrRevisionNotFound):
 		NotFound(c, "revision not found")
 	case errors.Is(err, service.ErrHeadConflict):
-		c.JSON(http.StatusConflict, map[string]interface{}{
-			"message":        "document was updated elsewhere",
-			"code":           "head_conflict",
+		middleware.ErrorJSON(c, http.StatusConflict, "document was updated elsewhere", "head_conflict", map[string]interface{}{
 			"headRevisionId": extractHead(doc),
 		})
 	case errors.Is(err, service.ErrNotSnapshot):
@@ -150,6 +148,7 @@ func (h *DocumentsHandler) List(ctx context.Context, c *app.RequestContext) {
 		Limit:      limit,
 		Offset:     offset,
 		Paged:      paged,
+		Archived:   string(c.Query("archived")) == "1",
 	})
 	if handleDocErr(c, err, nil) {
 		return
@@ -213,6 +212,42 @@ func (h *DocumentsHandler) Update(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 	c.JSON(http.StatusOK, doc)
+}
+
+type batchBody struct {
+	IDs    []string `json:"ids"`
+	Action string   `json:"action"`
+}
+
+func (h *DocumentsHandler) Batch(ctx context.Context, c *app.RequestContext) {
+	uid, ok := h.owner(c)
+	if !ok {
+		return
+	}
+	var body batchBody
+	if err := c.BindAndValidate(&body); err != nil {
+		Fail(c, http.StatusBadRequest, "invalid body", "validation_error")
+		return
+	}
+	ids, err := service.NormalizeBatchIDs(body.IDs)
+	if err != nil {
+		Fail(c, http.StatusBadRequest, "invalid ids", "validation_error")
+		return
+	}
+	var n int64
+	switch body.Action {
+	case "archive":
+		n, err = h.svc.Archive(uid, ids)
+	case "restore":
+		n, err = h.svc.RestoreArchived(uid, ids)
+	default:
+		Fail(c, http.StatusBadRequest, "action must be archive or restore", "validation_error")
+		return
+	}
+	if handleDocErr(c, err, nil) {
+		return
+	}
+	c.JSON(http.StatusOK, map[string]interface{}{"affected": n})
 }
 
 func (h *DocumentsHandler) Delete(ctx context.Context, c *app.RequestContext) {

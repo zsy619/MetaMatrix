@@ -85,12 +85,14 @@ function documentQuery(params?: {
   canvasType?: string
   limit?: number
   offset?: number
+  archived?: boolean
 }) {
   const q = new URLSearchParams()
   if (params?.templateId) q.set('templateId', params.templateId)
   if (params?.canvasType) q.set('canvasType', params.canvasType)
   if (params?.limit != null) q.set('limit', String(params.limit))
   if (params?.offset != null) q.set('offset', String(params.offset))
+  if (params?.archived) q.set('archived', '1')
   const qs = q.toString()
   return `/documents${qs ? `?${qs}` : ''}`
 }
@@ -100,8 +102,17 @@ export function listDocuments(params?: {
   canvasType?: string
   limit?: number
   offset?: number
+  archived?: boolean
 }) {
   return apiRequest<DocumentSummary[]>(documentQuery(params))
+}
+
+export function batchDocuments(action: 'archive' | 'restore', ids: string[]) {
+  return apiRequest<{ affected: number }>('/documents/batch', {
+    method: 'POST',
+    body: { action, ids },
+    retry: 0,
+  })
 }
 
 export async function listDocumentsPage(params?: {
@@ -109,6 +120,7 @@ export async function listDocumentsPage(params?: {
   canvasType?: string
   limit?: number
   offset?: number
+  archived?: boolean
 }): Promise<DocumentPage> {
   const limit = params?.limit ?? 20
   const offset = params?.offset ?? 0

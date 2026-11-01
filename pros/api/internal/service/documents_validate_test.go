@@ -51,6 +51,27 @@ func TestValidateMetaAndPayload(t *testing.T) {
 	}
 }
 
+func TestNormalizeBatchIDs(t *testing.T) {
+	id := uuid.New().String()
+	got, err := NormalizeBatchIDs([]string{id, id, "  " + id})
+	if err != nil || len(got) != 1 {
+		t.Fatalf("dedupe = %v %v", got, err)
+	}
+	if _, err = NormalizeBatchIDs(nil); err != ErrValidation {
+		t.Fatalf("empty = %v", err)
+	}
+	if _, err = NormalizeBatchIDs([]string{"nope"}); err != ErrValidation {
+		t.Fatalf("bad = %v", err)
+	}
+	many := make([]string, 51)
+	for i := range many {
+		many[i] = uuid.New().String()
+	}
+	if _, err = NormalizeBatchIDs(many); err != ErrValidation {
+		t.Fatalf("oversize = %v", err)
+	}
+}
+
 func TestNormalizeListPage(t *testing.T) {
 	limit, offset, paged, err := NormalizeListPage("", "")
 	if err != nil || paged || limit != 0 || offset != 0 {
