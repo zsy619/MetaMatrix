@@ -1026,8 +1026,8 @@ const editor = useEditor({
       },
     }),
     RteImage.configure({
-      // inline：多张可落在同一段落内并排（飞书式同行）；仍可拖拽重排
-      inline: true,
+      // 块级图片才能在段落、分栏、提示和折叠块之间拖动；并排由拖到左右侧生成分栏
+      inline: false,
       allowBase64: true,
       HTMLAttributes: { class: 'rte-image' },
       // TipTap 内置 ResizableNodeView：悬停/选中显示锚点，拖拽缩放并写入 width/height
@@ -1228,7 +1228,7 @@ const editor = useEditor({
       return false
     },
     handleDrop(view, event) {
-      if (viewMode.value !== 'edit') {
+      if (!view.editable || viewMode.value !== 'edit') {
         event.preventDefault()
         return true
       }
@@ -1236,7 +1236,14 @@ const editor = useEditor({
       if (!files.length) return false
       event.preventDefault()
       const coords = view.posAtCoords({ left: event.clientX, top: event.clientY })
-      void replaceOrInsertDroppedImages(view, files, coords?.pos)
+      const onImage = (event.target as HTMLElement | null)?.closest?.(
+        '[data-resize-container][data-node="image"], img.rte-image',
+      )
+      if (onImage && files.length === 1) {
+        void replaceOrInsertDroppedImages(view, files, coords?.pos)
+      } else {
+        void insertUserImages(files, coords?.pos)
+      }
       return true
     },
     handleClick(_view, _pos, event) {
@@ -2235,6 +2242,7 @@ const SHORTCUT_GROUPS: { title: string; items: { keys: string; desc: string }[] 
       { keys: 'Ctrl/⌘ + F', desc: '查找替换' },
       { keys: 'Ctrl/⌘ + A', desc: '全选' },
       { keys: 'Ctrl/⌘ + Shift + ↑/↓', desc: '块上移 / 下移' },
+      { keys: 'Alt + ↑/↓', desc: '选中图片后上移 / 下移，可移入或移出分栏' },
       { keys: 'Ctrl/⌘ + Shift + D', desc: '复制当前块' },
       { keys: "Ctrl/⌘ + Shift + \\（反斜杠）", desc: '全选当前块' },
     ],
@@ -4024,11 +4032,17 @@ const listDepthLabel = computed(() => {
 
 /** —— 图片对齐 / 题注 —— */
 const imageBubbleCaption = ref('')
-const IMAGE_ALIGN_OPTIONS: Array<{ label: string; value: '' | 'left' | 'center' | 'right' }> = [
-  { label: '默认', value: '' },
-  { label: '左浮', value: 'left' },
-  { label: '居中', value: 'center' },
-  { label: '右浮', value: 'right' },
+const IMAGE_LAYOUT_OPTIONS: Array<{
+  id: string
+  label: string
+  align: 'left' | 'center' | 'right'
+  layout: 'block' | 'wrap-left' | 'wrap-right'
+}> = [
+  { id: 'center', label: '居中', align: 'center', layout: 'block' },
+  { id: 'left', label: '居左', align: 'left', layout: 'block' },
+  { id: 'right', label: '居右', align: 'right', layout: 'block' },
+  { id: 'wrap-left', label: '左环绕', align: 'left', layout: 'wrap-left' },
+  { id: 'wrap-right', label: '右环绕', align: 'right', layout: 'wrap-right' },
 ]
 
 function isImageNodeSelected(): boolean {
@@ -4048,12 +4062,12 @@ function syncImageBubbleCaption() {
   imageBubbleCaption.value = typeof cap === 'string' ? cap : ''
 }
 
-function setImageAlign(align: '' | 'left' | 'center' | 'right') {
+function setImagePlacement(option: (typeof IMAGE_LAYOUT_OPTIONS)[number]) {
   const ed = editor.value
   if (!ed || !isImageNodeSelected()) return
   ed.chain()
     .focus()
-    .updateAttributes('image', { align: align || null })
+    .updateAttributes('image', { align: option.align, layout: option.layout })
     .run()
 }
 
@@ -5308,9 +5322,14 @@ async function insertUserImages(files: File[], at?: number) {
   if (!srcs.length) return
   const ed = editor.value
   if (!ed || ed.isDestroyed) return
-  const nodes = srcs.map((src) => ({ type: 'image' as const, attrs: { src } }))
+  const nodes = srcs.map((src) => ({
+    type: 'image' as const,
+    attrs: { src, align: 'center', layout: 'block' },
+  }))
   const chain = ed.chain().focus()
-  if (at != null) chain.insertContentAt(at, nodes)
+  let atPos = at
+  if (atPos == null && ed.state.selection instanceof NodeSelection) atPos = ed.state.selection.to
+  if (atPos != null) chain.insertContentAt(atPos, nodes)
   else chain.insertContent(nodes)
   chain.run()
 }
@@ -11706,15 +11725,23 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
     >
       <div class="rte-image-bubble-row">
         <button
-          v-for="opt in IMAGE_ALIGN_OPTIONS"
-          :key="'img-al-' + opt.value"
+          v-for="opt in IMAGE_LAYOUT_OPTIONS"
+          :key="'img-al-' + opt.id"
           type="button"
           class="rte-bubble-btn"
-          :class="{ active: (editor?.getAttributes('image')?.align || '') === opt.value }"
-          :title="'对齐：' + opt.label"
+          :class="{
+            active:
+              (editor?.getAttributes('image')?.align || 'center') === opt.align &&
+              (editor?.getAttributes('image')?.layout || 'block') === opt.layout,
+          }"
+          :title="'排版：' + opt.label"
           :aria-label="'图片' + opt.label"
+          :aria-pressed="
+            (editor?.getAttributes('image')?.align || 'center') === opt.align &&
+            (editor?.getAttributes('image')?.layout || 'block') === opt.layout
+          "
           @mousedown.prevent
-          @click="setImageAlign(opt.value)"
+          @click="setImagePlacement(opt)"
         >
           {{ opt.label }}
         </button>
@@ -19126,6 +19153,15 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
     min-height: 0 !important;
     margin: 0 !important;
   }
+  .rte-root.rte-printing [data-resize-handle],
+  .rte-root.rte-printing .rte-image-drop-line,
+  .rte-root.rte-printing .rte-image-size-tip {
+    display: none !important;
+  }
+  .rte-root.rte-printing [data-resize-container][data-node='image'],
+  .rte-root.rte-printing img.rte-image {
+    max-width: 100% !important;
+  }
 }
 
 
@@ -19162,20 +19198,61 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
   border-top-color: #6b7280;
 }
 
-.rte-root :deep(img.rte-image[data-align='left']) {
-  float: left;
-  margin: 0.25em 1em 0.6em 0;
-  display: block;
+.rte-root :deep(img.rte-image) {
+  max-width: 100%;
+  height: auto;
 }
-.rte-root :deep(img.rte-image[data-align='right']) {
-  float: right;
-  margin: 0.25em 0 0.6em 1em;
-  display: block;
+.rte-root :deep([data-resize-container][data-node='image']) {
+  position: relative;
+  max-width: 100%;
+  clear: none;
 }
-.rte-root :deep(img.rte-image[data-align='center']) {
+.rte-root :deep([data-resize-container][data-node='image']:has(img[data-layout='block'][data-align='center'])),
+.rte-root :deep([data-resize-container][data-node='image']:has(img:not([data-layout]))) {
   float: none;
-  display: block;
-  margin: 0.6em auto;
+  margin-left: auto;
+  margin-right: auto;
+}
+.rte-root :deep([data-resize-container][data-node='image']:has(img[data-layout='block'][data-align='left'])) {
+  float: none;
+  margin-left: 0;
+  margin-right: auto;
+}
+.rte-root :deep([data-resize-container][data-node='image']:has(img[data-layout='block'][data-align='right'])) {
+  float: none;
+  margin-left: auto;
+  margin-right: 0;
+}
+.rte-root :deep([data-resize-container][data-node='image']:has(img[data-layout='wrap-left'])) {
+  float: left;
+  margin: 0.35em 1em 0.5em 0;
+  max-width: min(70%, 100%);
+}
+.rte-root :deep([data-resize-container][data-node='image']:has(img[data-layout='wrap-right'])) {
+  float: right;
+  margin: 0.35em 0 0.5em 1em;
+  max-width: min(70%, 100%);
+}
+.rte-root.mode-preview :deep([data-resize-handle]),
+.rte-root.mode-source :deep([data-resize-handle]) {
+  display: none !important;
+  pointer-events: none !important;
+}
+.rte-root :deep([data-resize-container][data-node='image'].ProseMirror-selectednode)::before {
+  content: '⠿';
+  position: absolute;
+  left: -22px;
+  top: 4px;
+  width: 18px;
+  height: 18px;
+  line-height: 18px;
+  text-align: center;
+  font-size: 14px;
+  color: #5b8cff;
+  background: #fff;
+  border: 1px solid #d6e4ff;
+  border-radius: 4px;
+  cursor: grab;
 }
 .rte-root :deep(img.rte-image[data-caption]:not([data-caption=''])) {
   outline: 1px solid transparent;
@@ -19395,6 +19472,27 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
   max-height: 280px;
   overflow: auto;
   min-width: 140px;
+}
+.rte-image-drop-line {
+  position: fixed;
+  z-index: 10060;
+  background: #3370ff;
+  border-radius: 2px;
+  pointer-events: none;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.8);
+}
+.rte-image-size-tip {
+  position: fixed;
+  z-index: 10060;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: #1d2129;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
 }
 .rte-tool.is-disabled,
 .rte-tool:disabled {
