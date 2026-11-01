@@ -81,9 +81,16 @@ import html2canvas from 'html2canvas'
 import { SlashCommands, slashPluginKey, type RteSlashRenderProps, type RteSlashUiHandlers } from '../extensions/slashCommands'
 import { exitSuggestion } from '@tiptap/suggestion'
 import {
+  rteSlashGlyph,
   rteSlashSectionLabel,
   type RteSlashItem,
 } from './rteSlashItems'
+import { mentionSectionLabel } from './rteMentionItems'
+import {
+  MAX_ATTACHMENT_BYTES,
+  attachmentRejectReason,
+  dataUrlExceedsAttachmentLimit,
+} from '../utils/attachmentPolicy'
 import { LetterSpacing } from '../extensions/letterSpacing'
 import { ParagraphAttrs } from '../extensions/paragraphAttrs'
 import { PageBreak } from '../extensions/pageBreak'
@@ -104,7 +111,7 @@ import { ProgressBar } from '../extensions/progressBar'
 import { Timeline, TimelineItem } from '../extensions/timeline'
 import { TabsBlock, TabPane } from '../extensions/tabsBlock'
 import { MermaidBlock } from '../extensions/mermaidBlock'
-import { CrossRef, collectCrossRefTargets } from '../extensions/crossRef'
+import { CrossRef, collectCrossRefTargets, findCrossRefPos } from '../extensions/crossRef'
 import { ListStyleAttrs } from '../extensions/listStyleAttrs'
 import { buildDocxBlob } from '../utils/rteExportDocx'
 import { buildPdfFromElement } from '../utils/rteExportPdf'
@@ -454,6 +461,11 @@ const specialCharTabId = ref(RTE_SPECIAL_CHAR_CATEGORIES[0]?.id ?? 'punct')
 const columnsOpen = ref(false)
 const spacingOpen = ref(false)
 const wordStatsOpen = ref(false)
+const wordCountDockOpen = ref(false)
+
+function toggleWordCountDock() {
+  wordCountDockOpen.value = !wordCountDockOpen.value
+}
 const shortcutsOpen = ref(false)
 const calloutOpen = ref(false)
 const moreCalloutOpen = ref(false)
@@ -1023,8 +1035,14 @@ const editor = useEditor({
       return sanitizePastedHtml(html)
     },
     handlePaste(_view, event) {
+      const pastedImages = imageFilesFromClipboard(event.clipboardData)
       const plain = event.clipboardData?.getData('text/plain')
       const html = event.clipboardData?.getData('text/html') || ''
+      if (pastedImages.length && !html.trim()) {
+        event.preventDefault()
+        void insertUserImages(pastedImages)
+        return true
+      }
       // Markdown 强制模式：纯文本一律走 MD→HTML
       if (pasteFormatMode.value === 'markdown' && plain) {
         event.preventDefault()
@@ -1070,8 +1088,31 @@ const editor = useEditor({
       }
       return false
     },
+    handleDrop(view, event) {
+      const files = imageFilesFromClipboard(event.dataTransfer)
+      if (!files.length) return false
+      event.preventDefault()
+      const coords = view.posAtCoords({ left: event.clientX, top: event.clientY })
+      void insertUserImages(files, coords?.pos)
+      return true
+    },
     handleClick(_view, _pos, event) {
       const target = event.target as HTMLElement | null
+      const xref = target?.closest?.('[data-type="cross-ref"]') as HTMLElement | null
+      if (xref) {
+        const ed = editor.value
+        if (!ed) return true
+        const pos = findCrossRefPos(
+          ed.state.doc,
+          xref.getAttribute('data-target') || '',
+          xref.getAttribute('data-label') || xref.textContent || '',
+        )
+        if (pos != null) {
+          event.preventDefault()
+          jumpToPos(ed, pos)
+        }
+        return true
+      }
       const ann = target?.closest?.('[data-annotation]') as HTMLElement | null
       if (!ann) return false
       const href = ann.getAttribute('data-href')?.trim()
@@ -1091,13 +1132,18 @@ const editor = useEditor({
       mousedown: (_view, event) => {
         // 左键点编辑区时收起表格菜单；右键留给 contextmenu
         if (event.button === 2) return false
-        if (tableMenuOpen.value) tableMenuOpen.value = false
+        if (tableMenuOpen.value || tableQuickOpen.value) closeTableMenu()
         if (tableOpsSheetOpen.value) tableOpsSheetOpen.value = false
         if (tableCtx.value.open) closeTableCtx()
         return false
       },
     },
     handleKeyDown(_view, event) {
+      if (event.key === 'Escape' && findDialogOpen.value) {
+        event.preventDefault()
+        closeFindDialog()
+        return true
+      }
       // Extra shortcuts (StarterKit already covers Mod-b/i etc.)
       const mod = event.metaKey || event.ctrlKey
       if (!mod) return false
@@ -4441,6 +4487,72 @@ function readFileAsDataURL(file: File): Promise<string> {
   })
 }
 
+function imageFilesFromClipboard(
+  data: DataTransfer | null | undefined,
+): File[] {
+  if (!data) return []
+  const out: File[] = []
+  const files = Array.from(data.files || [])
+  for (const file of files) {
+    if (file.type.startsWith('image/')) out.push(file)
+  }
+  if (out.length) return out
+  const items = Array.from(data.items || [])
+  for (const item of items) {
+    if (item.kind !== 'file' || !item.type.startsWith('image/')) continue
+    const file = item.getAsFile()
+    if (file) out.push(file)
+  }
+  return out
+}
+
+/** 图片遵守面板附件同一条 3MB DataURL 上限；过大时先尝试压缩。 */
+async function imageSrcWithinPolicy(file: File): Promise<string | null> {
+  const name = file.name || 'image.png'
+  const mime = file.type || 'image/png'
+  const typeReason = attachmentRejectReason(name, mime, 1)
+  if (typeReason) {
+    rteToast('warning', typeReason)
+    return null
+  }
+  const oversized = file.size > MAX_ATTACHMENT_BYTES
+  let src = ''
+  if (oversized || imageCompressOnInsert.value) {
+    try {
+      src = (await compressImageFile(file, { maxEdge: 1600, quality: 0.82 })).dataUrl
+    } catch {
+      if (oversized) {
+        rteToast('warning', attachmentRejectReason(name, mime, file.size) || '图片超过 3MB')
+        return null
+      }
+      src = await readFileAsDataURL(file)
+    }
+  } else {
+    src = await readFileAsDataURL(file)
+  }
+  if (!src || dataUrlExceedsAttachmentLimit(src)) {
+    rteToast('warning', '图片超过 3MB，未插入。可先压缩，或改用链接。')
+    return null
+  }
+  return src
+}
+
+async function insertUserImages(files: File[], at?: number) {
+  const srcs: string[] = []
+  for (const file of files) {
+    const src = await imageSrcWithinPolicy(file)
+    if (src) srcs.push(src)
+  }
+  if (!srcs.length) return
+  const ed = editor.value
+  if (!ed || ed.isDestroyed) return
+  const nodes = srcs.map((src) => ({ type: 'image' as const, attrs: { src } }))
+  const chain = ed.chain().focus()
+  if (at != null) chain.insertContentAt(at, nodes)
+  else chain.insertContent(nodes)
+  chain.run()
+}
+
 async function onLocalImageFilesChange(event: Event) {
   const input = event.target as HTMLInputElement
   const files = Array.from(input.files || []).filter((f) => f.type.startsWith('image/'))
@@ -4453,17 +4565,7 @@ async function onLocalImageFilesChange(event: Event) {
   const added: StoredImage[] = []
   for (const file of files) {
     try {
-      let src: string
-      if (imageCompressOnInsert.value) {
-        try {
-          const compressed = await compressImageFile(file, { maxEdge: 1600, quality: 0.82 })
-          src = compressed.dataUrl
-        } catch {
-          src = await readFileAsDataURL(file)
-        }
-      } else {
-        src = await readFileAsDataURL(file)
-      }
+      const src = await imageSrcWithinPolicy(file)
       if (!src) continue
       added.push({
         id: uid(),
@@ -4974,6 +5076,14 @@ function confirmInsertFormula() {
 
 /** —— 插入表格 —— */
 const tableDialogOpen = ref(false)
+const tableQuickOpen = ref(false)
+const tableQuickHover = ref({ rows: 0, cols: 0 })
+const TABLE_QUICK_ROWS = 6
+const TABLE_QUICK_COLS = 8
+const tableQuickCells = Array.from({ length: TABLE_QUICK_ROWS * TABLE_QUICK_COLS }, (_, index) => ({
+  r: Math.floor(index / TABLE_QUICK_COLS) + 1,
+  c: (index % TABLE_QUICK_COLS) + 1,
+}))
 const tableRows = ref(3)
 const tableCols = ref(3)
 /** 尺寸网格悬停预览（Word 风格） */
@@ -5089,6 +5199,15 @@ function canSplitCell() {
 
 function closeTableMenu() {
   tableMenuOpen.value = false
+  tableQuickOpen.value = false
+}
+
+function insertQuickTable(rows: number, cols: number) {
+  tableRows.value = rows
+  tableCols.value = cols
+  tableQuickHover.value = { rows, cols }
+  tableQuickOpen.value = false
+  confirmInsertTable()
 }
 
 function closeTableOpsSheet() {
@@ -5277,11 +5396,12 @@ function onTableToolClick() {
     closeTableCtx()
     return
   }
+  const nextQuick = !tableQuickOpen.value
   closeTableMenu()
-  openTableDialog()
+  tableQuickOpen.value = nextQuick
 }
 
-/** 最大化工具栏「表格」按钮：表外一键插入弹窗；表内切换操作下拉 */
+/** 最大化工具栏「表格」按钮：表外网格插入；表内切换操作下拉 */
 function onTableToolbarButtonClick() {
   moreOpen.value = false
   closeImportMenu()
@@ -5294,11 +5414,13 @@ function onTableToolbarButtonClick() {
   closeFontMenus()
   if (isInTable()) {
     tableMenuOpen.value = !tableMenuOpen.value
+    tableQuickOpen.value = false
     closeTableCtx()
     return
   }
+  const nextQuick = !tableQuickOpen.value
   closeTableMenu()
-  openTableDialog()
+  tableQuickOpen.value = nextQuick
 }
 
 const NOTE_TYPES = [
@@ -8400,10 +8522,11 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
             type="button"
             class="rte-tool"
             :ref="(el) => setFloatAnchor('table', el)" data-rte-anchor="table"
-            :class="{ active: tableMenuOpen || tableDialogOpen || isInTable() }"
+            :class="{ active: tableMenuOpen || tableQuickOpen || tableDialogOpen || isInTable() }"
             :title="isInTable() ? '表格操作' : '插入表格'"
-            :aria-haspopup="isInTable() ? 'menu' : 'dialog'"
-            :aria-expanded="isInTable() ? tableMenuOpen : undefined"
+            aria-label="表格"
+            aria-haspopup="menu"
+            :aria-expanded="isInTable() ? tableMenuOpen : tableQuickOpen"
             @click.stop="markToolbarMenuOpening(); onTableToolbarButtonClick()"
           >
             <span class="rte-tool-icon">
@@ -8421,6 +8544,38 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
             ></span>
           </button>
           <Teleport to="body">
+            <div
+              v-if="tableQuickOpen && !isInTable()"
+              class="rte-menu rte-table-quick"
+              v-rte-float="'table'"
+              role="dialog"
+              aria-label="插入表格"
+              @mousedown.prevent
+              @mouseenter="onToolMenuEnter('table')"
+              @mouseleave="onToolMenuLeave($event, 'table', closeTableMenu)"
+            >
+              <div class="rte-table-quick-label">
+                {{ tableQuickHover.rows || 0 }} × {{ tableQuickHover.cols || 0 }} 表格
+              </div>
+              <div
+                class="rte-table-quick-grid"
+                @mouseleave="tableQuickHover = { rows: 0, cols: 0 }"
+              >
+                <button
+                  v-for="cell in tableQuickCells"
+                  :key="'tq-' + cell.r + '-' + cell.c"
+                  type="button"
+                  class="rte-table-quick-cell"
+                  :class="{ 'is-on': cell.r <= tableQuickHover.rows && cell.c <= tableQuickHover.cols }"
+                  :aria-label="cell.r + ' 行 ' + cell.c + ' 列'"
+                  @mouseenter="tableQuickHover = { rows: cell.r, cols: cell.c }"
+                  @click="insertQuickTable(cell.r, cell.c)"
+                />
+              </div>
+              <button type="button" class="rte-table-quick-more" @click="tableQuickOpen = false; openTableDialog()">
+                自定义尺寸…
+              </button>
+            </div>
             <div
               v-if="tableMenuOpen && isInTable()"
               class="rte-menu rte-table-menu"
@@ -9201,7 +9356,10 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
             :ref="(el) => setFloatAnchor('hr', el)"
             data-rte-anchor="hr"
             :class="{ active: hrOpen || isActive('horizontalRule') }"
-            title="分割线"
+            title="分割线（也可输入 ---）"
+            aria-label="分割线"
+            aria-haspopup="menu"
+            :aria-expanded="hrOpen"
             @click.stop="markToolbarMenuOpening(); hrOpen = !hrOpen"
           >
             <span class="rte-tool-icon">
@@ -10209,13 +10367,16 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
         @mouseenter="onToolMenuEnter('hr')"
         @mouseleave="onToolMenuLeave($event, 'hr', () => (hrOpen = false))"
       >
+        <div class="rte-menu-section-label">分割线 · 也可输入 ---</div>
         <button
           v-for="opt in HR_VARIANT_OPTIONS"
           :key="'hr2-' + opt.value"
           type="button"
+          class="rte-hr-option"
           @click="insertHrVariant(opt.value)"
         >
-          {{ opt.label }}
+          <span class="rte-hr-preview" :data-variant="opt.value" aria-hidden="true" />
+          <span>{{ opt.label }}</span>
         </button>
       </div>
     </Teleport>
@@ -10477,6 +10638,19 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
       </aside>
     </div>
 
+    <div v-if="wordCountDockOpen" class="rte-word-dock" role="dialog" aria-label="字数统计">
+      <div class="rte-word-dock-row"><span>字符</span><strong>{{ charCount }}</strong></div>
+      <div class="rte-word-dock-row"><span>词数</span><strong>{{ wordCount }}</strong></div>
+      <div class="rte-word-dock-row"><span>阅读</span><strong>约 {{ readingMinutes }} 分钟</strong></div>
+      <div class="rte-word-dock-row"><span>段落</span><strong>{{ docExtraStats.paragraphs }}</strong></div>
+      <div class="rte-word-dock-row"><span>标题</span><strong>{{ docExtraStats.headings }}</strong></div>
+      <div class="rte-word-dock-row">
+        <span>选区</span>
+        <strong>{{ selectionStats.hasSelection ? selectionStats.chars : '—' }}</strong>
+      </div>
+      <button type="button" class="rte-word-dock-close" @click="wordCountDockOpen = false">关闭</button>
+    </div>
+
     <div v-if="showBottomBar" class="rte-bottom">
       <div class="rte-bottom-left">
         <button
@@ -10487,13 +10661,19 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
         >
           发布设置 ▾
         </button>
-        <span class="rte-wordcount" title="点击工具栏「字数」看详情">
-          字数: {{ charCount }}
+        <button
+          type="button"
+          class="rte-wordcount"
+          :aria-expanded="wordCountDockOpen"
+          title="字数统计"
+          @click="toggleWordCountDock"
+        >
+          字数 {{ charCount }}
           <template v-if="selectionStats.hasSelection">
             · 选中 {{ selectionStats.chars }}
           </template>
           · 约 {{ readingMinutes }} 分钟
-        </span>
+        </button>
         <span
           v-if="showMarkdownHint"
           class="rte-md-hint"
@@ -10608,8 +10788,8 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
           <span class="rte-slash-title">插入</span>
           <span class="rte-slash-hint">/ 命令{{ slashQuery ? ` · ${slashQuery}` : '' }}</span>
         </div>
-        <div v-if="!slashItems.length" class="rte-slash-empty">无匹配项</div>
-        <div v-else class="rte-slash-list">
+        <div v-if="!slashItems.length" class="rte-slash-empty">没有匹配的段落类型</div>
+        <div v-else class="rte-slash-list" role="listbox" aria-label="斜杠命令">
           <template v-for="(it, idx) in slashItems" :key="it.id">
             <div
               v-if="idx === 0 || rteSlashSectionLabel(it) !== rteSlashSectionLabel(slashItems[idx - 1])"
@@ -10620,10 +10800,13 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
             <button
               type="button"
               class="rte-slash-item"
+              role="option"
+              :aria-selected="idx === slashIndex"
               :class="{ 'is-active': idx === slashIndex }"
               @mouseenter="slashIndex = idx"
               @click="pickSlashItem(it)"
             >
+              <span class="rte-slash-glyph" aria-hidden="true">{{ rteSlashGlyph(it) }}</span>
               <span class="rte-slash-item-main">
                 <span class="rte-slash-item-label">{{ it.label }}</span>
                 <span v-if="it.description" class="rte-slash-item-desc">{{ it.description }}</span>
@@ -10631,6 +10814,7 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
             </button>
           </template>
         </div>
+        <div class="rte-slash-foot">↑↓ 选择 · Enter 插入 · Esc 关闭</div>
       </div>
     </Teleport>
 
@@ -10646,25 +10830,31 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
       >
         <div class="rte-mention-head">
           <span class="rte-mention-title">提及</span>
-          <span class="rte-mention-hint">@ 联系人{{ mentionQuery ? ` · ${mentionQuery}` : '' }}</span>
+          <span class="rte-mention-hint">@ 人员或本文块{{ mentionQuery ? ` · ${mentionQuery}` : '' }}</span>
         </div>
-        <div v-if="!mentionItems.length" class="rte-mention-empty">无匹配项</div>
+        <div v-if="!mentionItems.length" class="rte-mention-empty">没有匹配的人或块</div>
         <div v-else class="rte-mention-list">
+          <template v-for="(it, idx) in mentionItems" :key="it.id">
+          <div
+            v-if="idx === 0 || mentionSectionLabel(it) !== mentionSectionLabel(mentionItems[idx - 1]!)"
+            class="rte-mention-section"
+          >
+            {{ mentionSectionLabel(it) }}
+          </div>
           <button
-            v-for="(it, idx) in mentionItems"
-            :key="it.id"
             type="button"
             class="rte-mention-item"
             :class="{ 'is-active': idx === mentionIndex }"
             @mouseenter="mentionIndex = idx"
             @click="pickMentionItem(it)"
           >
-            <span class="rte-mention-item-avatar" aria-hidden="true">@</span>
+            <span class="rte-mention-item-avatar" aria-hidden="true">{{ it.kind === 'block' ? '§' : '@' }}</span>
             <span class="rte-mention-item-main">
               <span class="rte-mention-item-label">{{ it.label }}</span>
               <span v-if="it.role" class="rte-mention-item-role">{{ it.role }}</span>
             </span>
           </button>
+          </template>
         </div>
       </div>
     </Teleport>
@@ -11067,19 +11257,18 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
       </div>
     </Teleport>
 
-    <!-- 查找 / 替换 -->
+    <!-- 查找 / 替换：贴在视口右上，不挡住正文 -->
     <Teleport to="body">
       <div
         v-if="findDialogOpen"
-        class="rte-modal-overlay"
-        @mousedown.self="closeFindDialog"
+        class="rte-find-layer"
       >
         <div
-          class="rte-link-dialog rte-find-dialog"
+          class="rte-link-dialog rte-find-dialog rte-find-bar"
           role="dialog"
-          aria-modal="true"
           aria-label="查找与替换"
           @mousedown.stop
+          @keydown.esc.prevent="closeFindDialog"
         >
           <h3 class="rte-table-title">查找与替换</h3>
           <div class="rte-note-field rte-note-text-field" style="width: 100%; margin-bottom: 10px">
@@ -14487,6 +14676,175 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
   box-shadow: inset 0 -0.5px 0 rgba(235, 235, 235), 0 1px 0 rgba(0, 0, 0, 0.02);
 }
 
+.rte-mention-section {
+  padding: 8px 12px 2px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--mm-faint, #9aa0a6);
+}
+.rte-table-quick {
+  padding: 8px;
+  width: max-content;
+}
+.rte-table-quick-label {
+  font-size: 12px;
+  color: var(--mm-muted, #5f6368);
+  padding: 2px 4px 8px;
+}
+.rte-table-quick-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 16px);
+  gap: 3px;
+}
+.rte-table-quick-cell {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 1px solid var(--mm-line-strong, #dadce0);
+  border-radius: 2px;
+  background: var(--mm-surface, #fff);
+  cursor: pointer;
+}
+.rte-table-quick-cell.is-on {
+  background: var(--mm-blue-soft, #e8f0fe);
+  border-color: var(--mm-blue, #1a73e8);
+}
+.rte-table-quick-more {
+  margin-top: 8px;
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: var(--mm-blue, #1a73e8);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  padding: 4px;
+}
+.rte-hr-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.rte-hr-preview {
+  width: 72px;
+  border-top: 1px solid var(--mm-text, #202124);
+}
+.rte-hr-preview[data-variant='dashed'] { border-top-style: dashed; }
+.rte-hr-preview[data-variant='double'] { border-top-style: double; border-top-width: 3px; }
+.rte-hr-preview[data-variant='thick'] { border-top-width: 3px; }
+.rte-find-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 4200;
+  pointer-events: none;
+}
+.rte-find-bar {
+  pointer-events: auto;
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  width: min(420px, calc(100vw - 24px));
+  padding: 14px 14px 12px;
+  box-shadow: 0 8px 28px rgba(32, 33, 36, 0.14);
+}
+.rte-wordcount {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+.rte-wordcount:hover,
+.rte-wordcount[aria-expanded='true'] {
+  background: var(--mm-blue-soft, #e8f0fe);
+  color: var(--mm-blue, #1a73e8);
+}
+.rte-word-dock {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px 12px;
+  margin: 0;
+  padding: 8px 12px;
+  border-top: 1px solid var(--mm-line, #e8eaed);
+  background: var(--mm-surface, #fff);
+  font-size: 12px;
+  color: var(--mm-muted, #5f6368);
+}
+.rte-word-dock-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.rte-word-dock-row strong {
+  color: var(--mm-text, #202124);
+  font-weight: 600;
+}
+.rte-word-dock-close {
+  justify-self: end;
+  grid-column: 1 / -1;
+  border: none;
+  background: transparent;
+  color: var(--mm-blue, #1a73e8);
+  cursor: pointer;
+  font-size: 12px;
+}
+.rte-root.expanded .rte-canvas {
+  background: var(--mm-bg, #fafafa);
+}
+.rte-root.expanded :deep(.ProseMirror) {
+  max-width: 760px;
+  margin: 12px auto 24px;
+  background: var(--mm-surface, #fff);
+  padding: 28px 40px 72px;
+  box-shadow: 0 1px 2px rgba(32, 33, 36, 0.06);
+  box-sizing: border-box;
+}
+@media (max-width: 720px) {
+  .rte-root.expanded .rte-toolbar {
+    padding: 4px 6px;
+  }
+  .rte-root.expanded .rte-toolbar-tools {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+  .rte-root.expanded .rte-toolbar-tools .rte-tool,
+  .rte-root:not(.expanded) .rte-tool {
+    min-width: 36px;
+    height: 36px;
+    min-height: 36px;
+  }
+  .rte-root.expanded .rte-tool-divider.is-tier ~ .rte-tool .rte-tool-label,
+  .rte-root.expanded .rte-tool-divider.is-tier ~ .rte-tool-wrap .rte-tool-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+  }
+  .rte-root.expanded .rte-tool-divider.is-tier {
+    display: none;
+  }
+  .rte-root.expanded :deep(.ProseMirror) {
+    max-width: none;
+    margin: 0;
+    padding: 16px 14px 48px;
+    box-shadow: none;
+  }
+  .rte-find-bar {
+    top: 8px;
+    right: 8px;
+    left: 8px;
+    width: auto;
+  }
+  .rte-bottom {
+    font-size: 11px;
+  }
+}
+
 
 </style>
 
@@ -15662,13 +16020,30 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
   min-width: 300px;
   max-width: min(420px, calc(100vw - 16px));
   padding: 0;
-  background: #fff;
-  border: 1px solid #e5e6eb;
+  background: var(--mm-surface, #fff);
+  border: 1px solid var(--mm-line, #e8eaed);
   border-radius: 10px;
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.14);
+  box-shadow: 0 12px 36px rgba(32, 33, 36, 0.12);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  transform-origin: top left;
+  animation: rte-slash-in 140ms ease-out;
+}
+@keyframes rte-slash-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rte-slash-menu {
+    animation: none;
+  }
 }
 .rte-slash-head {
   display: flex;
@@ -15706,18 +16081,43 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
 }
 .rte-slash-item {
   display: flex;
+  align-items: center;
+  gap: 10px;
   width: 100%;
   border: none;
   background: transparent;
   text-align: left;
-  padding: 8px 12px;
+  padding: 7px 12px;
   cursor: pointer;
-  color: #4e5969;
+  color: var(--mm-text, #202124);
+}
+.rte-slash-glyph {
+  flex: 0 0 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: var(--mm-bg, #fafafa);
+  color: var(--mm-muted, #5f6368);
+  font-size: 11px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.rte-slash-item.is-active .rte-slash-glyph {
+  background: var(--mm-blue-soft, #e8f0fe);
+  color: var(--mm-blue, #1a73e8);
 }
 .rte-slash-item:hover,
 .rte-slash-item.is-active {
-  background: #f2f3f5;
-  color: #1d2129;
+  background: var(--mm-blue-soft, #e8f0fe);
+  color: var(--mm-text, #202124);
+}
+.rte-slash-foot {
+  flex-shrink: 0;
+  padding: 6px 12px 8px;
+  border-top: 1px solid var(--mm-line, #e8eaed);
+  font-size: 11px;
+  color: var(--mm-faint, #9aa0a6);
 }
 .rte-slash-item-main {
   display: flex;
@@ -16604,10 +17004,11 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
   border: 2px solid #5b8cff;
 }
 .rte-cross-ref {
-  color: #165dff;
-  cursor: default;
-  border-bottom: 1px dashed #94bfff;
-  padding: 0 2px;
+  color: var(--mm-blue, #1a73e8);
+  cursor: pointer;
+  background: var(--mm-blue-soft, #e8f0fe);
+  border-radius: 4px;
+  padding: 0 4px;
 }
 .rte-menu-desc {
   display: block;

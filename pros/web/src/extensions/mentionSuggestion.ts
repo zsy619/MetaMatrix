@@ -11,9 +11,10 @@ import type {
   SuggestionProps,
 } from '@tiptap/suggestion'
 import {
-  filterRteMentionItems,
+  mergeMentionCandidates,
   type RteMentionItem,
 } from '../components/rteMentionItems'
+import { collectCrossRefTargets } from './crossRef'
 
 export const mentionPluginKey = new PluginKey('rteMentionSuggestion')
 
@@ -60,9 +61,34 @@ export function createRteMention(options: RteMentionOptions) {
         }
         return true
       },
-      items: ({ query }) => filterRteMentionItems(query, 12),
+      items: ({ query, editor }) => {
+        const blocks = collectCrossRefTargets(editor).map((target) => ({
+          id: target.id,
+          label: target.label,
+          kind: target.kind,
+        }))
+        return mergeMentionCandidates(query, blocks, 12)
+      },
       command: ({ editor, range, props }) => {
-        // 插入 mention 节点并在其后补空格，便于继续输入
+        const item = props as RteMentionItem
+        if (item.kind === 'block' && item.blockKind && item.targetId) {
+          editor
+            .chain()
+            .focus()
+            .insertContentAt(range, [
+              {
+                type: 'crossRef',
+                attrs: {
+                  kind: item.blockKind,
+                  targetId: item.targetId,
+                  label: item.blockKind === 'heading' ? `§ ${item.label}` : item.label,
+                },
+              },
+              { type: 'text', text: ' ' },
+            ])
+            .run()
+          return
+        }
         editor
           .chain()
           .focus()
@@ -70,8 +96,8 @@ export function createRteMention(options: RteMentionOptions) {
             {
               type: 'mention',
               attrs: {
-                id: props.id,
-                label: props.label,
+                id: item.id,
+                label: item.label,
               },
             },
             { type: 'text', text: ' ' },

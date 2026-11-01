@@ -41,3 +41,8 @@ export function attachmentRejectReason(name: string, mime: string, size: number)
   }
   return null
 }
+
+/** DataURL 字符串本身不超过 3MB（与面板附件策略一致）。 */
+export function dataUrlExceedsAttachmentLimit(dataUrl: string): boolean {
+  return dataUrl.length > MAX_ATTACHMENT_BYTES
+}

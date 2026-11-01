@@ -1,5 +1,8 @@
 import { Node, mergeAttributes } from '@tiptap/core'
 import type { Editor } from '@tiptap/core'
+import { findCrossRefPos } from '../utils/rteBlockRef'
+
+export { findCrossRefPos }
 
 export type CrossRefKind = 'heading' | 'figure' | 'table'
 
