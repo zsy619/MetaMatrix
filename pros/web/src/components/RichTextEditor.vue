@@ -96,6 +96,12 @@ import {
   activeOutlineIndex as outlineIndexForCursor,
   reorderIndexes,
 } from '../utils/rteBatch3'
+import {
+  FEISHU_HIGHLIGHT_COLORS,
+  FEISHU_TEXT_COLORS,
+  isBareHttpUrl,
+  sanitizePastedHtml,
+} from '../utils/rtePasteClean'
 import { LetterSpacing } from '../extensions/letterSpacing'
 import { ParagraphAttrs } from '../extensions/paragraphAttrs'
 import { PageBreak } from '../extensions/pageBreak'
@@ -771,27 +777,6 @@ const editorReady = ref(false)
 const editorBootError = ref('')
 
 /** 粘贴清洗：去掉脚本、Office 垃圾和危险协议，保留段落/列表/标题/链接/表格等结构。 */
-function sanitizePastedHtml(html: string): string {
-  return html
-    .replace(/<script[\s\S]*?<\/script>/gi, '')
-    .replace(/<style[\s\S]*?<\/style>/gi, '')
-    .replace(/<!--\[if[\s\S]*?<!\[endif\]-->/gi, '')
-    .replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/<(iframe|object|embed|form|meta|link|xml|o:p)\b[^>]*>[\s\S]*?<\/\1>/gi, '')
-    .replace(/<(iframe|object|embed|form|meta|link|xml|o:p|w:[^>\s]+)[^>]*\/?>/gi, '')
-    .replace(/<\/(xml|o:p|w:[^>\s]+)>/gi, '')
-    .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
-    .replace(/\s(href|src)\s*=\s*(['"])\s*javascript:[^'"]*\2/gi, ' $1="#"')
-    .replace(/\s(href|src)\s*=\s*javascript:[^\s>]+/gi, ' $1="#"')
-    .replace(/<\/?span[^>]*>/gi, '')
-    .replace(/<\/?font[^>]*>/gi, '')
-    .replace(/class\s*=\s*("Mso[^"]*"|'Mso[^']*'|"[^"]*Mso[^"]*"|'[^']*Mso[^']*')/gi, '')
-    .replace(/style\s*=\s*"[^"]*mso-[^"]*"/gi, '')
-    .replace(/style\s*=\s*'[^']*mso-[^']*'/gi, '')
-    .replace(/\s(lang|face|size)\s*=\s*("[^"]*"|'[^']*')/gi, '')
-    .replace(/<p([^>]*)>\s*&nbsp;\s*<\/p>/gi, '')
-    .replace(/(<br\s*\/?>\s*){3,}/gi, '<br><br>')
-}
 
 function rtePlaceholderText(args: {
   editor: { isEmpty: boolean; state: { doc: { resolve: (pos: number) => { parent: { type: { name: string } } } } } }
@@ -1048,6 +1033,23 @@ const editor = useEditor({
         void insertUserImages(pastedImages)
         return true
       }
+      if (plain && isBareHttpUrl(plain) && !html.trim()) {
+        event.preventDefault()
+        const ed = editor.value
+        if (!ed) return true
+        const href = plain.trim()
+        if (!ed.state.selection.empty) {
+          ed.chain().focus().setLink({ href }).run()
+        } else {
+          ed.chain()
+            .focus()
+            .insertContent(
+              `<a href="${href.replace(/"/g, '&quot;')}" class="rte-link">${escapeHtml(href)}</a>`,
+            )
+            .run()
+        }
+        return true
+      }
       // Markdown 强制模式：纯文本一律走 MD→HTML
       if (pasteFormatMode.value === 'markdown' && plain) {
         event.preventDefault()
@@ -1144,6 +1146,11 @@ const editor = useEditor({
       },
     },
     handleKeyDown(_view, event) {
+      if (event.key === 'Escape' && blockMenuOpen.value) {
+        event.preventDefault()
+        blockMenuOpen.value = false
+        return true
+      }
       if (event.key === 'Escape' && findDialogOpen.value) {
         event.preventDefault()
         closeFindDialog()
@@ -1195,6 +1202,17 @@ const editor = useEditor({
         if (key === 'p') {
           event.preventDefault()
           openPrintPreview()
+          return true
+        }
+        if (key === 'h') {
+          event.preventDefault()
+          if (ed.isActive('highlight')) ed.chain().focus().unsetHighlight().run()
+          else ed.chain().focus().setHighlight({ color: FEISHU_HIGHLIGHT_COLORS[0] }).run()
+          return true
+        }
+        if (key === '.' || key === 'enter') {
+          event.preventDefault()
+          openBlockMenuForSelection()
           return true
         }
         if (key === '0') {
@@ -1942,6 +1960,9 @@ const SHORTCUT_GROUPS: { title: string; items: { keys: string; desc: string }[] 
       { keys: '/', desc: '斜杠命令，快速插入段落类型' },
       { keys: 'Tab / Shift + Tab', desc: '列表增加 / 减少缩进' },
       ...FEISHU_BATCH3_SHORTCUTS,
+      { keys: 'Ctrl/⌘ + Alt + H', desc: '高亮 / 取消高亮' },
+      { keys: 'Ctrl/⌘ + Alt + Enter', desc: '打开当前块的操作菜单' },
+      { keys: '悬停块 · ⋮', desc: '转成标题、列表、提示块，或复制、删除、上下移' },
     ],
   },
   {
@@ -3130,9 +3151,6 @@ function toggleSuperscript() {
 function toggleCode() {
   chain()?.toggleCode().run()
 }
-function toggleHighlight() {
-  chain()?.toggleHighlight().run()
-}
 function setHighlightColor(color: string) {
   if (!color) {
     chain()?.unsetHighlight().run()
@@ -3410,8 +3428,14 @@ function blockGapAt(canvas: HTMLElement, clientY: number) {
   return { gap, line: edge - canvasRect.top + canvas.scrollTop }
 }
 
+const blockMenuOpen = ref(false)
+const blockMenuIndex = ref(-1)
+const bubbleSwatch = ref<'text' | 'highlight' | null>(null)
+
 function onCanvasBlockHover(event: MouseEvent) {
-  if (!props.expanded || viewMode.value !== 'edit' || blockDragFrom >= 0) return
+  if (viewMode.value !== 'edit' || blockDragFrom >= 0) return
+  const target = event.target as HTMLElement | null
+  if (target?.closest?.('.rte-block-menu, .rte-block-tools')) return
   const canvas = event.currentTarget as HTMLElement
   const blocks = topLevelBlockElements(canvas)
   const canvasRect = canvas.getBoundingClientRect()
@@ -3436,6 +3460,155 @@ function onCanvasBlockHover(event: MouseEvent) {
 function hideBlockHandle() {
   if (blockDragFrom >= 0) return
   blockHandle.value = { ...blockHandle.value, visible: false, index: -1 }
+  blockMenuOpen.value = false
+}
+
+function toggleBlockMenu() {
+  if (blockMenuOpen.value && blockMenuIndex.value === blockHandle.value.index) {
+    blockMenuOpen.value = false
+    return
+  }
+  blockMenuIndex.value = blockHandle.value.index
+  blockMenuOpen.value = blockMenuIndex.value >= 0
+  if (blockMenuOpen.value) focusBlockMenuSoon()
+}
+
+function placeBlockToolsAtIndex(index: number) {
+  const canvas = rteRootEl.value?.querySelector('.rte-canvas') as HTMLElement | null
+  if (!canvas) return
+  const el = topLevelBlockElements(canvas)[index]
+  if (!el) return
+  const canvasRect = canvas.getBoundingClientRect()
+  const rect = el.getBoundingClientRect()
+  blockHandle.value = {
+    visible: true,
+    top: rect.top - canvasRect.top + canvas.scrollTop,
+    left: Math.max(4, rect.left - canvasRect.left - 52),
+    index,
+  }
+}
+
+function focusBlockMenuSoon() {
+  void nextTick(() => {
+    const btn = rteRootEl.value?.querySelector(
+      '.rte-block-menu [role="menuitem"]',
+    ) as HTMLButtonElement | null
+    btn?.focus()
+  })
+}
+
+function openBlockMenuForSelection() {
+  const ed = editor.value
+  if (!ed || viewMode.value !== 'edit') return
+  const index = ed.state.selection.$from.index(0)
+  placeBlockToolsAtIndex(index)
+  blockMenuIndex.value = index
+  blockMenuOpen.value = true
+  focusBlockMenuSoon()
+}
+
+function onBlockMenuKeydown(event: KeyboardEvent) {
+  const menu = event.currentTarget as HTMLElement
+  const items = Array.from(menu.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'))
+  const current = items.indexOf(document.activeElement as HTMLButtonElement)
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    blockMenuOpen.value = false
+    editor.value?.commands.focus()
+    return
+  }
+  if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+  event.preventDefault()
+  if (!items.length) return
+  const next =
+    event.key === 'ArrowDown'
+      ? (current + 1) % items.length
+      : (current - 1 + items.length) % items.length
+  items[next]?.focus()
+}
+
+function focusTopLevelBlock(index: number): boolean {
+  const ed = editor.value
+  if (!ed) return false
+  if (index < 0 || index >= ed.state.doc.childCount) return false
+  let pos = 0
+  ed.state.doc.forEach((_node, offset, i) => {
+    if (i === index) pos = offset
+  })
+  const node = ed.state.doc.child(index)
+  const inside = Math.min(pos + 1, Math.max(pos, pos + node.nodeSize - 1))
+  try {
+    ed.chain().focus().setTextSelection(inside).run()
+    return true
+  } catch {
+    return false
+  }
+}
+
+type BlockTurn =
+  | 'paragraph'
+  | 'h1'
+  | 'h2'
+  | 'h3'
+  | 'bullet'
+  | 'ordered'
+  | 'task'
+  | 'quote'
+  | 'info'
+  | 'warn'
+  | 'success'
+  | 'error'
+
+function turnHoveredBlock(kind: BlockTurn) {
+  const index = blockMenuIndex.value
+  if (!focusTopLevelBlock(index)) return
+  const ed = editor.value
+  if (!ed) return
+  const chain = ed.chain().focus()
+  if (kind === 'paragraph') chain.setParagraph()
+  else if (kind === 'h1') chain.setHeading({ level: 1 })
+  else if (kind === 'h2') chain.setHeading({ level: 2 })
+  else if (kind === 'h3') chain.setHeading({ level: 3 })
+  else if (kind === 'bullet' && !ed.isActive('bulletList')) chain.toggleBulletList()
+  else if (kind === 'ordered' && !ed.isActive('orderedList')) chain.toggleOrderedList()
+  else if (kind === 'task' && !ed.isActive('taskList')) chain.toggleTaskList()
+  else if (kind === 'quote' && !ed.isActive('blockquote')) chain.toggleBlockquote()
+  else if (kind === 'info' || kind === 'warn' || kind === 'success' || kind === 'error') {
+    chain.setCallout(kind)
+  }
+  chain.run()
+  blockMenuOpen.value = false
+}
+
+function copyHoveredBlock() {
+  if (!focusTopLevelBlock(blockMenuIndex.value)) return
+  duplicateCurrentBlock()
+  blockMenuOpen.value = false
+}
+
+function deleteHoveredBlock() {
+  const ed = editor.value
+  const index = blockMenuIndex.value
+  if (!ed || index < 0 || index >= ed.state.doc.childCount) return
+  let pos = 0
+  ed.state.doc.forEach((_node, offset, i) => {
+    if (i === index) pos = offset
+  })
+  const node = ed.state.doc.child(index)
+  if (ed.state.doc.childCount <= 1) {
+    ed.chain().focus().setContent('<p></p>').run()
+  } else {
+    ed.view.dispatch(ed.state.tr.delete(pos, pos + node.nodeSize))
+    ed.view.focus()
+  }
+  blockMenuOpen.value = false
+  blockHandle.value = { ...blockHandle.value, visible: false, index: -1 }
+}
+
+function moveHoveredBlock(dir: -1 | 1) {
+  if (!focusTopLevelBlock(blockMenuIndex.value)) return
+  moveCurrentBlock(dir)
+  blockMenuOpen.value = false
 }
 
 function onBlockDragStart(event: DragEvent) {
@@ -3502,6 +3675,11 @@ function syncCodeChrome() {
     top: rect.top - canvasRect.top + canvas.scrollTop + 6,
     left: Math.max(8, rect.right - canvasRect.left - 168),
   }
+}
+
+function onCanvasScroll() {
+  syncCodeChrome()
+  blockMenuOpen.value = false
 }
 
 /** 插入纯文本日期 / 日期时间 */
@@ -10516,18 +10694,61 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
         <component :is="toolIcon('quote')" class="rte-ep-icon" />
       </button>
       <span class="rte-bubble-sep" aria-hidden="true" />
-      <button
-        type="button"
-        class="rte-bubble-btn"
-        :class="{ active: isActive('highlight') }"
-        title="高亮"
-        aria-label="高亮"
-        :aria-pressed="isActive('highlight')"
-        @mousedown.prevent
-        @click="toggleHighlight"
-      >
-        <component :is="toolIcon('highlight')" class="rte-ep-icon" />
-      </button>
+      <span class="rte-bubble-slot">
+        <button
+          type="button"
+          class="rte-bubble-btn"
+          :class="{ active: bubbleSwatch === 'text' || !!currentTextColor() }"
+          title="文字颜色"
+          aria-label="文字颜色"
+          :aria-expanded="bubbleSwatch === 'text'"
+          @mousedown.prevent
+          @click="bubbleSwatch = bubbleSwatch === 'text' ? null : 'text'"
+        >
+          <span class="rte-bubble-a" :style="{ borderBottomColor: currentTextColor() || 'currentColor' }">A</span>
+        </button>
+        <div v-if="bubbleSwatch === 'text'" class="rte-bubble-swatches" role="listbox" aria-label="文字颜色" @mousedown.prevent>
+          <button type="button" class="rte-bubble-swatch is-clear" title="默认" aria-label="默认文字颜色" @click="applyTextColor(''); bubbleSwatch = null">A</button>
+          <button
+            v-for="color in FEISHU_TEXT_COLORS"
+            :key="'bt-' + color"
+            type="button"
+            class="rte-bubble-swatch"
+            :style="{ background: color }"
+            :aria-label="color"
+            :class="{ 'is-on': currentTextColor() === color }"
+            @click="applyTextColor(color); bubbleSwatch = null"
+          />
+        </div>
+      </span>
+      <span class="rte-bubble-slot">
+        <button
+          type="button"
+          class="rte-bubble-btn"
+          :class="{ active: bubbleSwatch === 'highlight' || isActive('highlight') }"
+          title="高亮颜色"
+          aria-label="高亮颜色"
+          :aria-pressed="isActive('highlight')"
+          :aria-expanded="bubbleSwatch === 'highlight'"
+          @mousedown.prevent
+          @click="bubbleSwatch = bubbleSwatch === 'highlight' ? null : 'highlight'"
+        >
+          <component :is="toolIcon('highlight')" class="rte-ep-icon" />
+        </button>
+        <div v-if="bubbleSwatch === 'highlight'" class="rte-bubble-swatches" role="listbox" aria-label="高亮颜色" @mousedown.prevent>
+          <button type="button" class="rte-bubble-swatch is-clear" title="清除高亮" aria-label="清除高亮" @click="applyHighlightColor(''); bubbleSwatch = null">×</button>
+          <button
+            v-for="color in FEISHU_HIGHLIGHT_COLORS"
+            :key="'bh-' + color"
+            type="button"
+            class="rte-bubble-swatch"
+            :style="{ background: color }"
+            :aria-label="color"
+            :class="{ 'is-on': currentHighlightColor() === color }"
+            @click="applyHighlightColor(color); bubbleSwatch = null"
+          />
+        </div>
+      </span>
       <button
         type="button"
         class="rte-bubble-btn"
@@ -10771,7 +10992,7 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
         @mouseleave="hideBlockHandle"
         @dragover="onCanvasBlockDragOver"
         @drop="onCanvasBlockDrop"
-        @scroll="syncCodeChrome"
+        @scroll="onCanvasScroll"
       >
         <input
           v-if="showTitle && viewMode === 'edit'"
@@ -10802,20 +11023,65 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
           class="rte-body"
           :style="{ zoom: editorZoom }"
         />
-        <button
+        <div
           v-if="blockHandle.visible"
-          type="button"
-          class="rte-block-handle"
-          draggable="true"
+          class="rte-block-tools"
           :style="{ top: blockHandle.top + 'px', left: blockHandle.left + 'px' }"
-          title="拖动调整块顺序"
-          aria-label="拖动调整块顺序"
           @mousedown.stop
-          @dragstart="onBlockDragStart"
-          @dragend="onBlockDragEnd"
         >
-          ⠿
-        </button>
+          <button
+            v-if="expanded"
+            type="button"
+            class="rte-block-handle"
+            draggable="true"
+            title="拖动调整块顺序"
+            aria-label="拖动调整块顺序"
+            @dragstart="onBlockDragStart"
+            @dragend="onBlockDragEnd"
+          >
+            ⠿
+          </button>
+          <button
+            type="button"
+            class="rte-block-handle"
+            title="块操作"
+            aria-label="块操作"
+            aria-haspopup="menu"
+            :aria-expanded="blockMenuOpen"
+            @click.stop="toggleBlockMenu"
+          >
+            ⋮
+          </button>
+        </div>
+        <div
+          v-if="blockMenuOpen"
+          class="rte-block-menu"
+          role="menu"
+          aria-label="块操作"
+          :style="{ top: blockHandle.top + 26 + 'px', left: blockHandle.left + 'px' }"
+          @mousedown.stop
+          @keydown="onBlockMenuKeydown"
+        >
+          <button type="button" role="menuitem" @click="turnHoveredBlock('paragraph')">正文</button>
+          <button type="button" role="menuitem" @click="turnHoveredBlock('h1')">标题 1</button>
+          <button type="button" role="menuitem" @click="turnHoveredBlock('h2')">标题 2</button>
+          <button type="button" role="menuitem" @click="turnHoveredBlock('h3')">标题 3</button>
+          <div class="rte-menu-sep" aria-hidden="true" />
+          <button type="button" role="menuitem" @click="turnHoveredBlock('bullet')">无序列表</button>
+          <button type="button" role="menuitem" @click="turnHoveredBlock('ordered')">有序列表</button>
+          <button type="button" role="menuitem" @click="turnHoveredBlock('task')">任务列表</button>
+          <button type="button" role="menuitem" @click="turnHoveredBlock('quote')">引用</button>
+          <div class="rte-menu-sep" aria-hidden="true" />
+          <button type="button" role="menuitem" @click="turnHoveredBlock('info')">提示</button>
+          <button type="button" role="menuitem" @click="turnHoveredBlock('warn')">警告</button>
+          <button type="button" role="menuitem" @click="turnHoveredBlock('success')">成功</button>
+          <button type="button" role="menuitem" @click="turnHoveredBlock('error')">错误</button>
+          <div class="rte-menu-sep" aria-hidden="true" />
+          <button type="button" role="menuitem" @click="copyHoveredBlock">复制块</button>
+          <button type="button" role="menuitem" @click="moveHoveredBlock(-1)">上移</button>
+          <button type="button" role="menuitem" @click="moveHoveredBlock(1)">下移</button>
+          <button type="button" role="menuitem" class="is-danger" @click="deleteHoveredBlock">删除</button>
+        </div>
         <div
           v-if="blockDropLine != null"
           class="rte-block-drop"
@@ -10839,12 +11105,14 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
               </option>
             </select>
           </label>
-          <button type="button" @click="copyActiveCodeBlock">复制</button>
+          <button type="button" aria-label="复制代码" @click="copyActiveCodeBlock">复制</button>
         </div>
         <div v-if="showEmptyGuide" class="rte-empty-guide" @mousedown.stop>
           <span>空文档</span>
           <button type="button" @click="setHeading(1)">标题</button>
           <button type="button" @click="toggleBulletList">列表</button>
+          <button type="button" @click="toggleTaskList">待办</button>
+          <button type="button" @click="insertCallout('info')">提示</button>
           <button type="button" @click="toggleCodeBlock">代码</button>
           <button type="button" @click="insertFormula">公式</button>
           <button type="button" @click="openTableDialog">表格</button>
@@ -12810,8 +13078,14 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
   background: #fff;
   position: relative;
 }
-.rte-block-handle {
+.rte-block-tools {
   position: absolute;
+  z-index: 5;
+  display: flex;
+  gap: 2px;
+}
+.rte-block-handle {
+  position: static;
   z-index: 4;
   width: 22px;
   height: 22px;
@@ -12819,9 +13093,44 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
   border-radius: 4px;
   background: var(--mm-surface, #fff);
   color: var(--mm-muted, #5f6368);
-  cursor: grab;
+  cursor: pointer;
   line-height: 20px;
   padding: 0;
+}
+.rte-block-handle[draggable='true'] {
+  cursor: grab;
+}
+.rte-block-menu {
+  position: absolute;
+  z-index: 6;
+  min-width: 148px;
+  max-height: min(320px, 60vh);
+  overflow: auto;
+  padding: 4px;
+  background: var(--mm-surface, #fff);
+  border: 1px solid var(--mm-line, #e8eaed);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(32, 33, 36, 0.12);
+  display: flex;
+  flex-direction: column;
+}
+.rte-block-menu button {
+  text-align: left;
+  border: none;
+  background: transparent;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 13px;
+  color: var(--mm-text, #202124);
+  cursor: pointer;
+}
+.rte-block-menu button:hover,
+.rte-block-menu button:focus-visible {
+  background: var(--mm-blue-soft, #e8f0fe);
+  outline: none;
+}
+.rte-block-menu button.is-danger {
+  color: var(--mm-red, #d93025);
 }
 .rte-block-handle:active {
   cursor: grabbing;
@@ -12968,6 +13277,20 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
   color: #4e5969;
 }
 
+.rte-root :deep(code) {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.92em;
+  background: #f1f3f4;
+  border-radius: 4px;
+  padding: 0.05em 0.35em;
+}
+.rte-root :deep(pre code) {
+  background: transparent;
+  padding: 0;
+  font-size: inherit;
+  border-radius: 0;
+}
+
 .rte-root :deep(.tiptap ul),
 .rte-root :deep(.ProseMirror ul),
 .rte-root :deep(.tiptap ol),
@@ -12993,15 +13316,21 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin-top: 0.2em;
+  width: 22px;
+  height: 22px;
+  margin-top: 0.15em;
   user-select: none;
 }
 .rte-root :deep(ul[data-type='taskList'] li > label input[type='checkbox']) {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   margin: 0;
-  accent-color: #165dff;
+  accent-color: var(--mm-blue, #1a73e8);
   cursor: pointer;
+}
+.rte-root :deep(ul[data-type='taskList'] li > label input[type='checkbox']:focus-visible) {
+  outline: 2px solid var(--mm-blue, #1a73e8);
+  outline-offset: 2px;
 }
 .rte-root :deep(ul[data-type='taskList'] li > div) {
   flex: 1 1 auto;
@@ -13892,6 +14221,49 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
   border-radius: 8px;
   box-shadow: 0 8px 24px rgba(32, 33, 36, 0.12);
   z-index: 50;
+  overflow: visible;
+}
+.rte-bubble-slot {
+  position: relative;
+  display: inline-flex;
+}
+.rte-bubble-a {
+  font-weight: 700;
+  line-height: 1;
+  border-bottom: 2px solid currentColor;
+  padding-bottom: 1px;
+}
+.rte-bubble-swatches {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 3;
+  display: grid;
+  grid-template-columns: repeat(4, 18px);
+  gap: 6px;
+  padding: 8px;
+  background: var(--mm-surface, #fff);
+  border: 1px solid var(--mm-line, #e8eaed);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(32, 33, 36, 0.12);
+}
+.rte-bubble-swatch {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border-radius: 4px;
+  border: 1px solid rgba(32, 33, 36, 0.16);
+  cursor: pointer;
+}
+.rte-bubble-swatch.is-clear {
+  background: #fff;
+  color: var(--mm-muted, #5f6368);
+  font-size: 12px;
+}
+.rte-bubble-swatch.is-on,
+.rte-bubble-swatch:focus-visible {
+  outline: 2px solid var(--mm-blue, #1a73e8);
+  outline-offset: 1px;
 }
 .rte-bubble-sep {
   width: 1px;
