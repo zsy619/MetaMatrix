@@ -114,6 +114,15 @@ import {
   sheetBox,
   type RtePageSizeId,
 } from '../utils/rtePageSize'
+import {
+  PAGE_MARGIN_PRESETS,
+  cssPageMargin,
+  defaultPageMargin,
+  marginsEqual,
+  readPageMargin,
+  screenMargin,
+  type PageMargin,
+} from '../utils/rtePageMargin'
 import { moveTableGridHover, TABLE_QUICK_COLS, TABLE_QUICK_ROWS } from '../utils/rteTableGrid'
 import {
   buildToolbarGroups,
@@ -876,29 +885,113 @@ const auth = useAuthStore()
 const documentStore = useDocumentStore()
 const { saving, dirty, conflict, document_id, current_data } = storeToRefs(documentStore)
 const localPageSize = ref<RtePageSizeId>('full')
+const localPageMargin = ref<PageMargin | null>(null)
+const pageMarginUndo = ref<PageMargin[]>([])
+let pageMarginUndoArmed = false
+let pageMarginUndoStamp = 0
 const pageSize = computed(() => {
   if (props.panelId) return readPageSize(current_data.value?.pageSizeByPanelId, props.panelId)
   return localPageSize.value
 })
 const pageSizeMeta = computed(() => pageSizeOption(pageSize.value))
+const pageMargin = computed(() => {
+  if (props.panelId) {
+    return readPageMargin(current_data.value?.pageMarginByPanelId, props.panelId, pageSizeMeta.value.paper)
+  }
+  return localPageMargin.value || defaultPageMargin(pageSizeMeta.value.paper)
+})
+const pageScreenMargin = computed(() => screenMargin(pageMargin.value, !pageSizeMeta.value.paper))
 const pageSheetStyle = computed(() => {
   const box = sheetBox(pageSize.value)
-  if (!box) return undefined
+  const margin = pageScreenMargin.value
+  const style: Record<string, string> = {
+    '--rte-margin-top': `${margin.top}mm`,
+    '--rte-margin-right': `${margin.right}mm`,
+    '--rte-margin-bottom': `${margin.bottom}mm`,
+    '--rte-margin-left': `${margin.left}mm`,
+  }
+  if (box) {
+    style['--rte-sheet-width'] = `${box.widthPx}px`
+    style['--rte-sheet-min-height'] = `${box.heightPx}px`
+  }
+  return style
+})
+const printPreviewMarginStyle = computed(() => {
+  const box = pageSizeMeta.value.paper ? pageMargin.value : pageScreenMargin.value
   return {
-    '--rte-sheet-width': `${box.widthPx}px`,
-    '--rte-sheet-min-height': `${box.heightPx}px`,
+    padding: cssPageMargin(box),
+    width: pageSizeMeta.value.paper ? 'min(100%, var(--rte-sheet-width, 210mm))' : '100%',
+    margin: '0 auto',
+    boxSizing: 'border-box' as const,
   }
 })
 
 function applyPrintPageStyle(id: RtePageSizeId) {
   const size = cssPageSize(id)
+  const paper = pageSizeOption(id).paper
+  const margin = screenMargin(pageMargin.value, !paper)
   let el = document.getElementById('rte-print-page-size')
   if (!el) {
     el = document.createElement('style')
     el.id = 'rte-print-page-size'
     document.head.appendChild(el)
   }
-  el.textContent = `@media print { @page { size: ${size}; margin: 12mm; } }`
+  el.textContent = `@media print { @page { size: ${size}; margin: ${cssPageMargin(margin)}; } }`
+}
+
+function applyPageMargin(next: PageMargin, recordUndo: boolean) {
+  if (viewMode.value !== 'edit') return
+  const prev = pageMargin.value
+  if (marginsEqual(prev, next)) return
+  if (recordUndo) {
+    pageMarginUndo.value = [...pageMarginUndo.value, prev].slice(-20)
+    pageMarginUndoStamp = bumpToolbarUndoEpoch()
+    pageMarginUndoArmed = true
+    toolbarUndoArmed = false
+  }
+  if (props.panelId) documentStore.setPanelPageMargin(props.panelId, next, pageSizeMeta.value.paper)
+  else localPageMargin.value = next
+  announceRte(`页边距：${next.preset === 'custom' ? '自定义' : next.preset}`)
+  applyPrintPageStyle(pageSize.value)
+}
+
+function undoPageMargin(): boolean {
+  if (!pageMarginUndoArmed || !pageMarginUndo.value.length) return false
+  if (toolbarUndoArmed && toolbarUndoStamp > pageMarginUndoStamp) return false
+  const prev = pageMarginUndo.value[pageMarginUndo.value.length - 1]!
+  pageMarginUndo.value = pageMarginUndo.value.slice(0, -1)
+  pageMarginUndoArmed = pageMarginUndo.value.length > 0
+  if (props.panelId) documentStore.setPanelPageMargin(props.panelId, prev, pageSizeMeta.value.paper)
+  else localPageMargin.value = prev
+  announceRte('已撤销页边距')
+  applyPrintPageStyle(pageSize.value)
+  return true
+}
+
+function setMarginPreset(id: string) {
+  const preset = PAGE_MARGIN_PRESETS.find((item) => item.id === id)
+  if (preset) {
+    applyPageMargin({ preset: preset.id, ...preset.box }, true)
+    return
+  }
+  if (id === 'custom') {
+    applyPageMargin({ ...pageMargin.value, preset: 'custom' }, true)
+  }
+}
+
+function setMarginSide(side: 'top' | 'right' | 'bottom' | 'left', value: string) {
+  const current = pageMargin.value
+  applyPageMargin(
+    {
+      preset: 'custom',
+      top: current.top,
+      right: current.right,
+      bottom: current.bottom,
+      left: current.left,
+      [side]: Number(value),
+    },
+    true,
+  )
 }
 
 function setPageSize(id: string) {
@@ -910,7 +1003,7 @@ function setPageSize(id: string) {
   applyPrintPageStyle(next)
 }
 
-watch(pageSize, (id) => applyPrintPageStyle(id), { immediate: true })
+watch([pageSize, pageMargin], () => applyPrintPageStyle(pageSize.value), { immediate: true })
 
 function initialEditorContent(): string {
   try {
@@ -1323,7 +1416,7 @@ const editor = useEditor({
         event.preventDefault()
         return true
       }
-      if (key === 'z' && !event.shiftKey && !event.altKey && undoToolbarGroupOrder()) {
+      if (key === 'z' && !event.shiftKey && !event.altKey && (undoPageMargin() || undoToolbarGroupOrder())) {
         event.preventDefault()
         return true
       }
@@ -6954,7 +7047,8 @@ async function exportAsPdf() {
   root?.classList.add('rte-printing')
   try {
     const title = (localTitle.value || '').trim() || '未命名文档'
-    const blob = await buildPdfFromElement(el, { title, pageSize: pageSize.value })
+    const marginMm = pageSizeMeta.value.paper ? pageMargin.value : pageScreenMargin.value
+    const blob = await buildPdfFromElement(el, { title, pageSize: pageSize.value, marginMm })
     triggerDownloadBlob(blob, `${exportFileBasename()}.pdf`)
     ElMessage.success('已导出 PDF')
   } catch (err) {
@@ -8704,6 +8798,7 @@ function applyToolbarOrder(next: readonly string[], recordUndo: boolean) {
   if (recordUndo) {
     toolbarOrderUndo.value = [...toolbarOrderUndo.value, prev].slice(-20)
     toolbarUndoStamp = bumpToolbarUndoEpoch()
+    pageMarginUndoArmed = false
   }
   toolbarUndoArmed = recordUndo || toolbarOrderUndo.value.length > 0
   if (props.panelId) documentStore.setPanelToolbarOrder(props.panelId, next)
@@ -8724,6 +8819,7 @@ function undoToolbarGroupOrder(): boolean {
 
 function noteToolbarOrderEdited() {
   toolbarUndoArmed = false
+  pageMarginUndoArmed = false
 }
 
 let toolbarPointerId = ''
@@ -8832,7 +8928,7 @@ function onWindowToolbarDrop(event: DragEvent) {
 }
 
 function onWindowToolbarUndo(event: KeyboardEvent) {
-  if (!toolbarUndoArmed) return
+  if (!toolbarUndoArmed && !pageMarginUndoArmed) return
   if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return
   if (event.key.toLowerCase() !== 'z') return
   const target = event.target
@@ -8843,8 +8939,10 @@ function onWindowToolbarUndo(event: KeyboardEvent) {
     const host = target.closest('.rte-root')
     if (host && host !== root) return
   }
-  if (!inThis && toolbarUndoStamp !== currentToolbarUndoEpoch()) return
-  if (!undoToolbarGroupOrder()) return
+  const stamp = pageMarginUndoArmed ? pageMarginUndoStamp : toolbarUndoStamp
+  if (!inThis && stamp !== currentToolbarUndoEpoch()) return
+  const undone = pageMarginUndoArmed ? undoPageMargin() : undoToolbarGroupOrder()
+  if (!undone) return
   event.preventDefault()
   event.stopPropagation()
 }
@@ -8925,6 +9023,7 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
     ref="rteRootEl"
     class="rte-root"
     :data-page-size="pageSize"
+    :data-margin="pageMargin.preset"
     :style="pageSheetStyle"
     :class="{
       compact,
@@ -12191,6 +12290,7 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
           <select
             :value="pageSize"
             aria-label="页面大小"
+            :disabled="viewMode !== 'edit'"
             @change="setPageSize(($event.target as HTMLSelectElement).value)"
           >
             <option v-for="opt in RTE_PAGE_SIZES" :key="'bb-' + opt.id" :value="opt.id">
@@ -12198,6 +12298,26 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
             </option>
           </select>
         </label>
+        <label class="rte-page-size-field">
+          页边距
+          <select
+            :value="pageMargin.preset"
+            aria-label="页边距"
+            :disabled="viewMode !== 'edit'"
+            @change="setMarginPreset(($event.target as HTMLSelectElement).value)"
+          >
+            <option v-for="opt in PAGE_MARGIN_PRESETS" :key="'mg-' + opt.id" :value="opt.id">
+              {{ opt.label }}
+            </option>
+            <option value="custom">自定义</option>
+          </select>
+        </label>
+        <span v-if="pageMargin.preset === 'custom'" class="rte-margin-custom">
+          <label>上<input :value="pageMargin.top" type="number" min="0" max="80" step="0.1" aria-label="上边距毫米" :disabled="viewMode !== 'edit'" @change="setMarginSide('top', ($event.target as HTMLInputElement).value)" /></label>
+          <label>下<input :value="pageMargin.bottom" type="number" min="0" max="80" step="0.1" aria-label="下边距毫米" :disabled="viewMode !== 'edit'" @change="setMarginSide('bottom', ($event.target as HTMLInputElement).value)" /></label>
+          <label>左<input :value="pageMargin.left" type="number" min="0" max="80" step="0.1" aria-label="左边距毫米" :disabled="viewMode !== 'edit'" @change="setMarginSide('left', ($event.target as HTMLInputElement).value)" /></label>
+          <label>右<input :value="pageMargin.right" type="number" min="0" max="80" step="0.1" aria-label="右边距毫米" :disabled="viewMode !== 'edit'" @change="setMarginSide('right', ($event.target as HTMLInputElement).value)" /></label>
+        </span>
         <button
           v-if="expanded && viewMode === 'edit'"
           type="button"
@@ -12907,7 +13027,7 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
               <button type="button" class="rte-modal-confirm" @click="confirmPrintFromPreview">打印</button>
             </div>
           </div>
-          <div class="rte-print-preview-paper" v-html="printPreviewHtml"></div>
+          <div class="rte-print-preview-paper" :style="printPreviewMarginStyle" v-html="printPreviewHtml"></div>
         </div>
       </div>
     </Teleport>
@@ -16739,6 +16859,11 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
   box-shadow: none;
   box-sizing: border-box;
 }
+.rte-root[data-page-size='full']:not([data-margin='none']) .rte-body,
+.rte-root[data-page-size='feishu']:not([data-margin='none']) .rte-body {
+  padding-left: var(--rte-margin-left, 0mm) !important;
+  padding-right: var(--rte-margin-right, 0mm) !important;
+}
 .rte-root[data-page-size='full'] :deep(.rte-image-group) {
   width: 100%;
   max-width: 100%;
@@ -19141,15 +19266,24 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
   background: #e8eaed;
 }
 .rte-root.is-page-sheet .rte-body {
+  position: relative;
   width: min(100%, var(--rte-sheet-width, 794px));
   min-height: var(--rte-sheet-min-height, 1123px);
   margin: 16px auto 28px;
-  padding: 16mm 14mm;
+  padding: var(--rte-margin-top, 25.4mm) var(--rte-margin-right, 31.8mm) var(--rte-margin-bottom, 25.4mm) var(--rte-margin-left, 31.8mm);
   box-sizing: border-box;
   background: #fff;
   box-shadow:
     0 0 0 1px rgba(29, 33, 41, 0.06),
     0 12px 32px rgba(29, 33, 41, 0.12);
+}
+.rte-root.is-page-sheet .rte-body::before {
+  content: '';
+  position: absolute;
+  inset: var(--rte-margin-top, 25.4mm) var(--rte-margin-right, 31.8mm) var(--rte-margin-bottom, 25.4mm) var(--rte-margin-left, 31.8mm);
+  border: 1px dashed rgba(51, 112, 255, 0.35);
+  pointer-events: none;
+  z-index: 2;
 }
 .rte-root.is-dark-editor.is-page-sheet .rte-canvas {
   background: #2a2e36 !important;
@@ -19268,6 +19402,10 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
     max-width: none !important;
     min-height: 0 !important;
     margin: 0 !important;
+    padding: 0 !important;
+  }
+  .rte-root.rte-printing .rte-body::before {
+    display: none !important;
   }
   .rte-root.rte-printing [data-resize-handle],
   .rte-root.rte-printing .rte-image-drop-line,

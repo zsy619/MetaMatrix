@@ -99,6 +99,11 @@ export type WithPanelAttachments = {
    * 键与面板 id / 最大化 key 对齐。
    */
   pageSizeByPanelId?: Record<string, string>
+  /**
+   * 富文本面板页边距。缺省时纸张用常规，宽度 100% 和飞书样式无边距。
+   * 键与面板 id 对齐。
+   */
+  pageMarginByPanelId?: Record<string, { preset: string; top: number; right: number; bottom: number; left: number }>
   /** 富文本工具栏分组顺序。缺省用默认分组。键与面板 id 对齐。 */
   toolbarGroupOrderByPanelId?: Record<string, string[]>
 }

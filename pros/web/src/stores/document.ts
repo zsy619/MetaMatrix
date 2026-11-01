@@ -5,6 +5,7 @@ import { ApiError } from '../api/http'
 import * as documentsApi from '../api/documents'
 import { rememberRecentOpen } from '../utils/canvasTransfer'
 import { normalizePageSize, readPageSize, writePageSizeMap } from '../utils/rtePageSize'
+import { normalizePageMargin, writePageMargin, type PageMargin } from '../utils/rtePageMargin'
 import { writeToolbarGroupOrder } from '../utils/rteToolbarGroups'
 import { getToken } from '../api/http'
 import type {
@@ -1491,6 +1492,18 @@ export const useDocumentStore = defineStore('document', () => {
     if (next) doc.pageSizeByPanelId = next
     else delete doc.pageSizeByPanelId
     if (JSON.stringify(doc.pageSizeByPanelId ?? null) !== prev) markDirty()
+  }
+
+  function setPanelPageMargin(panelId: string, margin: PageMargin, pageIsPaper: boolean) {
+    const doc = current_data.value
+    if (!doc || !panelId) return
+    const normalized = normalizePageMargin(margin)
+    if (!normalized) return
+    const prev = JSON.stringify(doc.pageMarginByPanelId ?? null)
+    const next = writePageMargin(doc.pageMarginByPanelId, panelId, normalized, pageIsPaper)
+    if (next) doc.pageMarginByPanelId = next
+    else delete doc.pageMarginByPanelId
+    if (JSON.stringify(doc.pageMarginByPanelId ?? null) !== prev) markDirty()
   }
 
   function getPanelAttachments(panelId: string): PanelAttachment[] {
@@ -3415,6 +3428,7 @@ export const useDocumentStore = defineStore('document', () => {
     setPanelToolbarOrder,
     getPanelPageSize,
     setPanelPageSize,
+    setPanelPageMargin,
     getPanelAttachments,
     addPanelAttachment,
     removePanelAttachment,
