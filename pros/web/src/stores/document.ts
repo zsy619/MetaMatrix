@@ -259,6 +259,80 @@ export function cloneTemplate(templateId: TemplateId): CanvasDocumentJSON {
   return cloneDoc(TEMPLATES[templateId]) as CanvasDocumentJSON
 }
 
+/** 旧「人类-AI 双三角」模板里的示例条目。原文未改时清掉，让格子回到参考图的空白可填区。 */
+const LEGACY_HAI_SEED_TEXTS = new Set([
+  '1. AI先理解，后提问',
+  '1. 个人场景',
+  '2. 业务场景',
+  '3. 公司场景',
+  '1. Truman美好想象',
+  '2. 优秀的教练辅导过程',
+  '3. 课上的ROI最佳实践案例',
+  '1. 工作流：辅导工作流 #难',
+  '2. ROI模型：投入产出分析',
+  '3. 科学决策三角形：深度高度宽度',
+  '4. 决策深度：简单定性，区间定量，定量公式',
+  '1. 提示词',
+  '2. Agent多轮打磨',
+  '1. 理想案例推演（流程具体化）',
+  '2. 课程方法论Datapack',
+  '3. 沟通话术Datapack',
+  '4. 停车场模型Datapack',
+  '5. todolist+Not todolisst',
+])
+
+function plainItemText(text: string): string {
+  return text
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function isLegacyHumanAiSeed(item: QuadrantItem): boolean {
+  return (
+    item.id.startsWith('item_hai_') &&
+    LEGACY_HAI_SEED_TEXTS.has(plainItemText(item.text))
+  )
+}
+
+/**
+ * 人类-AI 表格式画布：抬头/角标/配色跟模板走，用户已改过的正文保留。
+ * 几何双三角（另一份模板）不走这里。
+ */
+function normalizeHumanAiDualTriangleDoc(
+  doc: DualTriangleDocumentJSON,
+): DualTriangleDocumentJSON {
+  const template = dualTriangleHumanAiTemplate as DualTriangleDocumentJSON
+  const byId = new Map(doc.blocks.map((b) => [b.id, b]))
+  const blocks = template.blocks.map((tb) => {
+    const existing = byId.get(tb.id)
+    if (!existing) return cloneDoc(tb)
+    const items = (Array.isArray(existing.items) ? existing.items : []).filter(
+      (it) => !isLegacyHumanAiSeed(it),
+    )
+    return {
+      ...existing,
+      side: tb.side,
+      title: tb.title,
+      subtitle: tb.subtitle,
+      keyword: tb.keyword,
+      accentColor: tb.accentColor,
+      backgroundColor: tb.backgroundColor,
+      watermarkIcon: tb.watermarkIcon,
+      items,
+    }
+  })
+  const hasFooter =
+    !!doc.footer?.lead?.trim() &&
+    !!doc.footer.reminders?.some((line) => line.trim())
+  return {
+    ...doc,
+    footer: hasFooter ? doc.footer : template.footer,
+    blocks,
+  }
+}
+
 
 export type TemplateCategory = 'method' | 'growth' | 'industry' | 'org' | 'review'
 
@@ -281,10 +355,10 @@ export const TEMPLATE_META: Record<
     category: 'method',
   },
   'dual-triangle-human-ai': {
-    name: '人类三角 × AI 三角',
-    badge: '双三角 · 表格',
+    name: '一堂 AI 双三角',
+    badge: '双三角 · 预判',
     description:
-      '两行三列表格：人类三角（审美、体系、创造力）与 AI 三角（场景、数据、基本功）。',
+      '3×2 梳理与预判画布：AI 侧（场景、数据、基本功）与人类侧（审美、体系、创造力），用于判断 AI 场景落地的潜力。',
     category: 'method',
   },
   'star-quadrant': {
@@ -1182,6 +1256,13 @@ export const useDocumentStore = defineStore('document', () => {
     }
     if (isFiveStepProDoc(next)) {
       next = normalizeFiveStepProDoc(next)
+    }
+    if (
+      isDualTriangleDoc(next) &&
+      (tid === 'dual-triangle-human-ai' ||
+        next.id === 'canvas_dual_triangle_human_ai')
+    ) {
+      next = normalizeHumanAiDualTriangleDoc(next)
     }
     if (!next.attachmentsByPanelId) {
       next = { ...next, attachmentsByPanelId: {} }

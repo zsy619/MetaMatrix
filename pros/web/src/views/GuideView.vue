@@ -445,7 +445,7 @@ onMounted(async () => {
 
 .card--dual-triangle-human-ai:hover,
 .card--dual-triangle-human-ai:focus-visible {
-  border-color: #5ba8a0;
+  border-color: #3aada3;
 }
 
 .card--star-quadrant:hover,

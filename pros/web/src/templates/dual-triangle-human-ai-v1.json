@@ -5,254 +5,94 @@
   "theme": {
     "background": {
       "pattern": "none",
-      "color": "#f5f5f4"
+      "color": "#f6f6f6"
     }
   },
   "center": {
-    "humanTitle": "人类三角",
+    "humanTitle": "人类侧",
     "humanSubtitle": "审美 · 体系 · 创造力",
-    "aiTitle": "AI三角",
+    "aiTitle": "AI 侧",
     "aiSubtitle": "场景 · 数据 · 基本功",
     "topArrowText": "人变强了，调教更强 AI",
     "bottomArrowText": "有了强AI，辅助人变得更强",
-    "humanColor": "#C4A574",
-    "aiColor": "#5BA8A0",
+    "humanColor": "#F0D35E",
+    "aiColor": "#5ECFC4",
     "arrowColor": "#C75B5B"
   },
+  "footer": {
+    "lead": "这是一个一堂AI双三角的梳理和预判画布，用于AI场景落地的潜力梳理准备和预判。",
+    "reminders": [
+      "提醒1：建议充分做加法/灵感闪现，多多填写。",
+      "提醒2：排优先级，加法越多，越需要抓重点和主要矛盾。",
+      "提醒3：初期执行从里面挑优先级最高的来执行和测试。"
+    ]
+  },
   "blocks": [
-    {
-      "id": "innovation",
-      "side": "human",
-      "title": "创造力",
-      "subtitle": "创造性的新想法：先理解，再提问",
-      "keyword": "创造力",
-      "accentColor": "#C4A574",
-      "backgroundColor": "#ffffff",
-      "watermarkIcon": "human",
-      "items": [
-        {
-          "id": "item_hai_innovation_1",
-          "text": "1. AI先理解，后提问",
-          "style": {
-            "color": "#5c4a32",
-            "fontSize": 13,
-            "fontWeight": "500"
-          }
-        }
-      ]
-    },
     {
       "id": "scenario",
       "side": "ai",
       "title": "场景",
-      "subtitle": "个人、业务与公司三类使用场景",
-      "keyword": "场景",
-      "accentColor": "#5BA8A0",
-      "backgroundColor": "#ffffff",
+      "subtitle": "落地的起点：个人、业务与公司场景",
+      "keyword": "起点",
+      "accentColor": "#5ECFC4",
+      "backgroundColor": "#E7F8F6",
       "watermarkIcon": "ai",
-      "items": [
-        {
-          "id": "item_hai_scenario_1",
-          "text": "1. 个人场景",
-          "style": {
-            "color": "#2f5e59",
-            "fontSize": 13,
-            "fontWeight": "500"
-          }
-        },
-        {
-          "id": "item_hai_scenario_2",
-          "text": "2. 业务场景",
-          "style": {
-            "color": "#2f5e59",
-            "fontSize": 13,
-            "fontWeight": "500"
-          }
-        },
-        {
-          "id": "item_hai_scenario_3",
-          "text": "3. 公司场景",
-          "style": {
-            "color": "#2f5e59",
-            "fontSize": 13,
-            "fontWeight": "500"
-          }
-        }
-      ]
+      "items": []
     },
     {
       "id": "aesthetics",
       "side": "human",
-      "title": "审美❤️",
-      "subtitle": "对更高水平交付建立审美的方法与案例",
-      "keyword": "审美❤️",
-      "accentColor": "#C4A574",
-      "backgroundColor": "#ffffff",
+      "title": "审美",
+      "subtitle": "对更高水平交付的审美，作为终点",
+      "keyword": "终点",
+      "accentColor": "#F0D35E",
+      "backgroundColor": "#FFF8E6",
       "watermarkIcon": "human",
-      "items": [
-        {
-          "id": "item_hai_aesthetics_1",
-          "text": "<p><span style=\"color: #d93025\">1. Truman美好想象</span></p>",
-          "style": {
-            "color": "#d93025",
-            "fontSize": 13,
-            "fontWeight": "650"
-          }
-        },
-        {
-          "id": "item_hai_aesthetics_2",
-          "text": "<p><span style=\"color: #d93025\">2. 优秀的教练辅导过程</span></p>",
-          "style": {
-            "color": "#d93025",
-            "fontSize": 13,
-            "fontWeight": "650"
-          }
-        },
-        {
-          "id": "item_hai_aesthetics_3",
-          "text": "3. 课上的ROI最佳实践案例",
-          "style": {
-            "color": "#5c4a32",
-            "fontSize": 13,
-            "fontWeight": "500"
-          }
-        }
-      ]
+      "items": []
     },
     {
       "id": "system",
       "side": "human",
-      "title": "体系❤️",
+      "title": "体系",
       "subtitle": "从全局到局部的流程、模型与决策框架",
-      "keyword": "体系❤️",
-      "accentColor": "#B8956A",
-      "backgroundColor": "#ffffff",
+      "keyword": "过程",
+      "accentColor": "#F0D35E",
+      "backgroundColor": "#FFF8E6",
       "watermarkIcon": "human",
-      "items": [
-        {
-          "id": "item_hai_system_1",
-          "text": "<p><span style=\"color: #d93025\">1. 工作流：辅导工作流 #难</span></p>",
-          "style": {
-            "color": "#d93025",
-            "fontSize": 13,
-            "fontWeight": "650"
-          }
-        },
-        {
-          "id": "item_hai_system_2",
-          "text": "2. ROI模型：投入产出分析",
-          "style": {
-            "color": "#5c4a32",
-            "fontSize": 13,
-            "fontWeight": "500"
-          }
-        },
-        {
-          "id": "item_hai_system_3",
-          "text": "3. 科学决策三角形：深度高度宽度",
-          "style": {
-            "color": "#5c4a32",
-            "fontSize": 13,
-            "fontWeight": "500"
-          }
-        },
-        {
-          "id": "item_hai_system_4",
-          "text": "4. 决策深度：简单定性，区间定量，定量公式",
-          "style": {
-            "color": "#5c4a32",
-            "fontSize": 13,
-            "fontWeight": "500"
-          }
-        }
-      ]
+      "items": []
+    },
+    {
+      "id": "data",
+      "side": "ai",
+      "title": "数据",
+      "subtitle": "案例、方法论与话术等可复用资产",
+      "keyword": "资产",
+      "accentColor": "#5ECFC4",
+      "backgroundColor": "#E7F8F6",
+      "watermarkIcon": "ai",
+      "items": []
     },
     {
       "id": "basics",
       "side": "ai",
       "title": "基本功",
-      "subtitle": "提示词与 Agent 多轮打磨",
-      "keyword": "基本功",
-      "accentColor": "#4A9B94",
-      "backgroundColor": "#ffffff",
+      "subtitle": "提示词与多轮打磨",
+      "keyword": "能力",
+      "accentColor": "#5ECFC4",
+      "backgroundColor": "#E7F8F6",
       "watermarkIcon": "ai",
-      "items": [
-        {
-          "id": "item_hai_basics_1",
-          "text": "1. 提示词",
-          "style": {
-            "color": "#2f5e59",
-            "fontSize": 13,
-            "fontWeight": "500"
-          }
-        },
-        {
-          "id": "item_hai_basics_2",
-          "text": "<p><span style=\"color: #1a73e8\">2. Agent多轮打磨</span></p>",
-          "style": {
-            "color": "#1a73e8",
-            "fontSize": 13,
-            "fontWeight": "500"
-          }
-        }
-      ]
+      "items": []
     },
     {
-      "id": "data",
-      "side": "ai",
-      "title": "数据❤️",
-      "subtitle": "案例推演、方法论与话术数据包",
-      "keyword": "数据❤️",
-      "accentColor": "#5BA8A0",
-      "backgroundColor": "#ffffff",
-      "watermarkIcon": "ai",
-      "items": [
-        {
-          "id": "item_hai_data_1",
-          "text": "<p><span style=\"color: #d93025\">1. 理想案例推演（流程具体化）</span></p>",
-          "style": {
-            "color": "#d93025",
-            "fontSize": 13,
-            "fontWeight": "650"
-          }
-        },
-        {
-          "id": "item_hai_data_2",
-          "text": "2. 课程方法论Datapack",
-          "style": {
-            "color": "#2f5e59",
-            "fontSize": 13,
-            "fontWeight": "500"
-          }
-        },
-        {
-          "id": "item_hai_data_3",
-          "text": "3. 沟通话术Datapack",
-          "style": {
-            "color": "#2f5e59",
-            "fontSize": 13,
-            "fontWeight": "500"
-          }
-        },
-        {
-          "id": "item_hai_data_4",
-          "text": "4. 停车场模型Datapack",
-          "style": {
-            "color": "#2f5e59",
-            "fontSize": 13,
-            "fontWeight": "500"
-          }
-        },
-        {
-          "id": "item_hai_data_5",
-          "text": "5. todolist+Not todolisst",
-          "style": {
-            "color": "#2f5e59",
-            "fontSize": 13,
-            "fontWeight": "500"
-          }
-        }
-      ]
+      "id": "innovation",
+      "side": "human",
+      "title": "创造力",
+      "subtitle": "创造性的新想法：先理解，再提问",
+      "keyword": "创新",
+      "accentColor": "#F0D35E",
+      "backgroundColor": "#FFF8E6",
+      "watermarkIcon": "human",
+      "items": []
     }
   ]
 }
