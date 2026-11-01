@@ -5,8 +5,16 @@
   "theme": {
     "background": {
       "pattern": "none",
-      "color": "#ffffff"
+      "color": "#f7f7f7"
     }
+  },
+  "footer": {
+    "lead": "五步法提高版：每一列先写「是什么」，再用红色「非*」划清边界。",
+    "reminders": [
+      "提醒1：需求、内核、壁垒写完，立刻对照非用户、非内核、非壁垒。",
+      "提醒2：红色抬头是排除项，不是补充卖点。",
+      "提醒3：单元模型与指标保持单区，写到可以判断为止。"
+    ]
   },
   "columns": [
     {
@@ -89,41 +97,49 @@
     {
       "id": "demand_req",
       "title": "需求",
+      "keyword": "用户",
       "items": []
     },
     {
       "id": "demand_non_user",
       "title": "非用户",
+      "keyword": "排除",
       "items": []
     },
     {
       "id": "solution_core",
       "title": "内核",
+      "keyword": "决定性",
       "items": []
     },
     {
       "id": "solution_non_core",
       "title": "非内核",
+      "keyword": "优化项",
       "items": []
     },
     {
       "id": "business_unit",
       "title": "单元模型",
+      "keyword": "一笔账",
       "items": []
     },
     {
       "id": "growth_metric",
       "title": "指标",
+      "keyword": "第一指标",
       "items": []
     },
     {
       "id": "moat_barrier",
       "title": "壁垒",
+      "keyword": "难复制",
       "items": []
     },
     {
       "id": "moat_non_barrier",
       "title": "非壁垒",
+      "keyword": "可替代",
       "items": []
     }
   ]
