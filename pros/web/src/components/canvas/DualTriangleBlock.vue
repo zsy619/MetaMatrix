@@ -101,7 +101,7 @@ const headerColor = computed(() => props.block.accentColor)
  * 表格式六格各自一色：AI 侧偏冷（青绿 / 蓝 / 绿），人类侧偏暖（金 / 铜 / 玫红）。
  * 抬头用 header，内容区用 body，主题词用 topic。
  */
-/** 与 fiveStepPalette 前 6 色一一对应，色值不在这里另写一份。 */
+/** 与 CANVAS_TABLE_TONES 前 6 色一一对应，色值不在这里另写一份。 */
 const TABLE_PALETTE: Record<DualTriangleBlockId, TableTone> = {
   scenario: toneAt(0),
   aesthetics: toneAt(1),

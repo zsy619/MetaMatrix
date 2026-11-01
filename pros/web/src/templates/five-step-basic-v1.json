@@ -5,8 +5,16 @@
   "theme": {
     "background": {
       "pattern": "none",
-      "color": "#ffffff"
+      "color": "#f7f7f7"
     }
+  },
+  "footer": {
+    "lead": "五步法基础版：按需求、解决方案、商业模式、增长、壁垒五列，先写主题词，再填正文。",
+    "reminders": [
+      "提醒1：每列独立成色，抬头是步骤，主题词用来抓住这一列的重点。",
+      "提醒2：底部方法标签（逐级拆解、全局预判等）是这一列的做法。",
+      "提醒3：格子右上角可放大编辑，相关资料挂在格子底部。"
+    ]
   },
   "columns": [
     {
@@ -39,26 +47,31 @@
     {
       "id": "demand",
       "title": "需求",
+      "keyword": "用户",
       "items": []
     },
     {
       "id": "solution",
       "title": "解决方案",
+      "keyword": "内核",
       "items": []
     },
     {
       "id": "business",
       "title": "商业模式",
+      "keyword": "单元",
       "items": []
     },
     {
       "id": "growth",
       "title": "增长",
+      "keyword": "指标",
       "items": []
     },
     {
       "id": "moat",
       "title": "壁垒",
+      "keyword": "护城河",
       "items": []
     }
   ]

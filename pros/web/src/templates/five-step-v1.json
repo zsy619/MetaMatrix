@@ -5,8 +5,16 @@
   "theme": {
     "background": {
       "pattern": "none",
-      "color": "#ffffff"
+      "color": "#f7f7f7"
     }
+  },
+  "footer": {
+    "lead": "五步法原版：五列里把定性判断和定量证据放在一起看。",
+    "reminders": [
+      "提醒1：定性写判断，定量写证据。",
+      "提醒2：每格主题词用来抓住这一格的重点。",
+      "提醒3：底部方法标签提醒这一列怎么做。"
+    ]
   },
   "columns": [
     {
@@ -62,6 +70,7 @@
     {
       "id": "demand_persona",
       "title": "画像",
+      "keyword": "谁",
       "items": [
         {
           "id": "fs_demand_persona_1",
@@ -95,6 +104,7 @@
     {
       "id": "demand_problems",
       "title": "问题",
+      "keyword": "痛点",
       "items": [
         {
           "id": "fs_demand_problems_1",
@@ -128,6 +138,7 @@
     {
       "id": "demand_quant",
       "title": "定量",
+      "keyword": "规模",
       "items": [
         {
           "id": "fs_demand_quant_1",
@@ -152,6 +163,7 @@
     {
       "id": "solution_core",
       "title": "产品内核",
+      "keyword": "内核",
       "items": [
         {
           "id": "fs_solution_core_1",
@@ -194,6 +206,7 @@
     {
       "id": "solution_quant",
       "title": "定量",
+      "keyword": "证据",
       "items": [
         {
           "id": "fs_solution_quant_1",
@@ -227,6 +240,7 @@
     {
       "id": "business_model",
       "title": "商业模型",
+      "keyword": "怎么赚",
       "items": [
         {
           "id": "fs_business_model_1",
@@ -269,6 +283,7 @@
     {
       "id": "business_unit",
       "title": "关键单元模型",
+      "keyword": "单元",
       "items": [
         {
           "id": "fs_business_unit_1",
@@ -293,6 +308,7 @@
     {
       "id": "business_quant",
       "title": "定量",
+      "keyword": "账",
       "items": [
         {
           "id": "fs_business_quant_1",
@@ -317,6 +333,7 @@
     {
       "id": "growth_metric",
       "title": "第一指标",
+      "keyword": "指标",
       "items": [
         {
           "id": "fs_growth_metric_1",
@@ -332,6 +349,7 @@
     {
       "id": "growth_channels",
       "title": "获客渠道",
+      "keyword": "渠道",
       "items": [
         {
           "id": "fs_growth_channels_1",
@@ -365,6 +383,7 @@
     {
       "id": "growth_quant",
       "title": "定量",
+      "keyword": "速率",
       "items": [
         {
           "id": "fs_growth_quant_1",
@@ -389,6 +408,7 @@
     {
       "id": "moat_qual",
       "title": "壁垒",
+      "keyword": "难复制",
       "items": [
         {
           "id": "fs_moat_qual_1",
@@ -422,6 +442,7 @@
     {
       "id": "moat_quant",
       "title": "定量",
+      "keyword": "强度",
       "items": [
         {
           "id": "fs_moat_quant_1",

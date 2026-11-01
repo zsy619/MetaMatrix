@@ -1,0 +1,127 @@
+/* 五步法列式画布外壳：浅底、分列色头、方法标签行。由各五步法画布引入。 */
+.fsx-canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 14px 16px 12px;
+  background: #f7f7f7;
+  overflow: auto;
+}
+
+.fsx-grid {
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: var(--fsx-min, 560px);
+  display: grid;
+  grid-template-columns: repeat(var(--fsx-cols, 5), minmax(0, 1fr));
+  gap: 0;
+  background: #fff;
+  border: 1px solid #ececec;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.fsx-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: #fff;
+  box-shadow: inset -1px 0 0 rgba(60, 50, 20, 0.08);
+}
+
+.fsx-col:last-child {
+  box-shadow: none;
+}
+
+.fsx-head {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 8px 10px;
+  box-sizing: border-box;
+}
+
+.fsx-head h2 {
+  margin: 0;
+  font-size: clamp(13px, 1.35vw, 16px);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.25;
+  text-align: center;
+  color: #fff;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.14);
+}
+
+.fsx-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  box-sizing: border-box;
+  background: #fff;
+}
+
+.fsx-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+}
+
+.fsx-stack--qual {
+  flex: 1.45 1 0;
+}
+
+.fsx-stack--quant {
+  flex: 0.8 1 0;
+}
+
+.fsx-group {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  line-height: 1.2;
+}
+
+.fsx-panel {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+}
+
+.fsx-foot {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 8px 6px;
+  box-sizing: border-box;
+  background: #fafafa;
+  border-top: 1px solid rgba(60, 50, 20, 0.08);
+  font-size: clamp(12px, 1.15vw, 14px);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-align: center;
+  line-height: 1.25;
+}
+
+@media (max-width: 900px) {
+  .fsx-canvas {
+    padding: 8px;
+  }
+
+  .fsx-grid {
+    min-width: calc(var(--fsx-cols, 5) * 168px);
+  }
+}
