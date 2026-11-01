@@ -19,6 +19,7 @@ import {
 import { accentOf } from './palette'
 import { friendlyApiMessage } from '../../utils/apiMessage'
 import LineSkeleton from '../ui/LineSkeleton.vue'
+import HighlightText from '../ui/HighlightText.vue'
 
 const STARTERS: TemplateId[] = [
   'time-matrix',
@@ -112,9 +113,18 @@ const noteDigest = computed(() => {
   return { todos: todos.slice(0, 6), notes: notes.slice(0, 4) }
 })
 
-function openDoc(d: { id: string; templateId: string | null; canvasType?: string }) {
+function openDoc(d: { id: string; templateId: string | null; canvasType?: string; panelId?: string }) {
   const tid = knownTemplate(d.templateId) || knownTemplate(d.canvasType) || 'dual-triangle'
-  router.push({ name: 'canvas', params: { templateId: tid }, query: { documentId: d.id } })
+  const q = searchQ.value.trim()
+  router.push({
+    name: 'canvas',
+    params: { templateId: tid },
+    query: {
+      documentId: d.id,
+      ...(d.panelId ? { panel: d.panelId } : {}),
+      ...(q ? { q } : {}),
+    },
+  })
 }
 
 function freshTitle(id: TemplateId): string {
@@ -276,7 +286,8 @@ function onSearchInput() {
                 <button type="button" class="row stack" @click="openDoc(h)">
                   <span class="copy">
                     <strong>{{ h.title || '未命名文档' }}</strong>
-                    <em>{{ h.snippet }}</em>
+                    <em><HighlightText :text="h.snippet" /></em>
+                    <span v-if="h.panelTitle">匹配：{{ h.panelTitle }}</span>
                   </span>
                 </button>
               </li>

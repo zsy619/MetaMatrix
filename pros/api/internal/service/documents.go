@@ -712,12 +712,64 @@ WHERE owner_user_id = ? AND deleted_at IS NULL
 		}
 		err2 := fq.Select("id, title, notes, template_id, canvas_type, created_at, updated_at, left(content_text, 160) AS snippet").
 			Order("updated_at DESC").Limit(limit).Find(&fb).Error
-		return fb, err2
+		if err2 != nil {
+			return nil, err2
+		}
+		for i := range fb {
+			fb[i].Snippet = highlightSnippet(fb[i].Snippet, q)
+		}
+		s.attachBlockMatches(fb, q)
+		return fb, nil
 	}
 	for i := range rows {
 		rows[i].Snippet = highlightSnippet(rows[i].Snippet, q)
 	}
+	s.attachBlockMatches(rows, q)
 	return rows, nil
+}
+
+type blockMatch struct {
+	DocumentID  uuid.UUID
+	PanelID     string
+	PanelTitle  string
+	TextContent string
+}
+
+// attachBlockMatches fills the first content block that contains the query.
+// The block table is shared by every canvas type; this does not add a table.
+func (s *DocumentsService) attachBlockMatches(rows []model.SearchHit, q string) {
+	if s.db == nil || len(rows) == 0 || strings.TrimSpace(q) == "" {
+		return
+	}
+	ids := make([]uuid.UUID, 0, len(rows))
+	for _, row := range rows {
+		ids = append(ids, row.ID)
+	}
+	var matches []blockMatch
+	err := s.db.Raw(`
+SELECT DISTINCT ON (document_id) document_id, panel_id, panel_title, left(text_content, 180) AS text_content
+FROM canvas_content_blocks
+WHERE document_id IN ? AND text_content ILIKE ? ESCAPE '\'
+ORDER BY document_id, sort_order
+`, ids, "%"+escapeLike(q)+"%").Scan(&matches).Error
+	if err != nil {
+		return
+	}
+	byID := make(map[uuid.UUID]blockMatch, len(matches))
+	for _, match := range matches {
+		byID[match.DocumentID] = match
+	}
+	for i := range rows {
+		match, ok := byID[rows[i].ID]
+		if !ok {
+			continue
+		}
+		rows[i].PanelID = match.PanelID
+		rows[i].PanelTitle = match.PanelTitle
+		if match.TextContent != "" {
+			rows[i].Snippet = highlightSnippet(match.TextContent, q)
+		}
+	}
 }
 
 func escapeLike(s string) string {
