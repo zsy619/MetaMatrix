@@ -174,6 +174,14 @@ export function updateDocument(
   })
 }
 
+export function renameDocument(id: string, title: string) {
+  return apiRequest<{ title: string }>(`/documents/${id}/title`, {
+    method: 'PATCH',
+    body: { title },
+    retry: 0,
+  })
+}
+
 export function deleteDocument(id: string) {
   return apiRequest<void>(`/documents/${id}`, { method: 'DELETE' })
 }

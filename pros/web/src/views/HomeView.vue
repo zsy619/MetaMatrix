@@ -13,7 +13,8 @@ import { useAuthStore } from '../stores/auth'
 import CanvasViewport from '../components/canvas/CanvasViewport.vue'
 import RevisionHistory from '../components/canvas/RevisionHistory.vue'
 import PageSettingsPanel from '../components/PageSettingsPanel.vue'
-import { batchDocuments, listDocumentsPage, type DocumentSummary } from '../api/documents'
+import { batchDocuments, listDocumentsPage, renameDocument, type DocumentSummary } from '../api/documents'
+import LineSkeleton from '../components/ui/LineSkeleton.vue'
 import {
   getAIContext,
   listRevisions,
@@ -43,6 +44,7 @@ const docsSelected = ref<string[]>([])
 const docsConfirm = ref(false)
 const historyOpen = ref(false)
 const saveFailed = ref(false)
+const openError = ref('')
 const offline = ref(typeof navigator !== 'undefined' ? !navigator.onLine : false)
 
 const templateId = computed<TemplateId>(() => {
@@ -122,13 +124,15 @@ watch(
 
 async function bootstrap() {
   statusMsg.value = ''
+  openError.value = ''
   const qid = typeof route.query.documentId === 'string' ? route.query.documentId : ''
   if (qid && auth.isAuthenticated) {
     try {
       await documentStore.load(qid)
       return
     } catch (e) {
-      statusMsg.value = friendlyApiMessage(e, '打开文档失败')
+      openError.value = friendlyApiMessage(e, '打开文档失败')
+      statusMsg.value = openError.value
     }
   }
   documentStore.loadFromTemplate(templateId.value)
@@ -423,6 +427,43 @@ function docsNext() {
   void loadDocsPage()
 }
 
+async function commitTitle(event: Event) {
+  const input = event.target as HTMLInputElement
+  const next = input.value.trim()
+  const prev = documentStore.doc_title
+  if (!document_id.value || !next || next === prev) {
+    input.value = prev
+    return
+  }
+  documentStore.doc_title = next
+  try {
+    await renameDocument(document_id.value, next)
+    statusMsg.value = '标题已更新'
+  } catch (e) {
+    documentStore.doc_title = prev
+    input.value = prev
+    statusMsg.value = friendlyApiMessage(e, '标题没有保存，已恢复原名')
+  }
+}
+
+async function renameListed(d: DocumentSummary) {
+  const next = window.prompt('画布标题', d.title || '未命名')
+  if (next == null) return
+  const title = next.trim()
+  if (!title || title === d.title) return
+  const prev = d.title
+  d.title = title
+  if (d.id === document_id.value) documentStore.doc_title = title
+  try {
+    await renameDocument(d.id, title)
+    statusMsg.value = '标题已更新'
+  } catch (e) {
+    d.title = prev
+    if (d.id === document_id.value) documentStore.doc_title = prev
+    docsError.value = friendlyApiMessage(e, '标题没有保存，已恢复原名')
+  }
+}
+
 async function openDoc(id: string) {
   docsOpen.value = false
   try {
@@ -468,6 +509,14 @@ async function manualCheckpoint() {
       <div class="brand">
         <el-button size="small" text @click="goGuide">← 返回引导</el-button>
         <strong>元矩阵 MetaMatrix</strong>
+        <input
+          v-if="auth.isAuthenticated && document_id"
+          class="title-input"
+          :value="documentStore.doc_title"
+          maxlength="255"
+          aria-label="画布标题"
+          @change="commitTitle"
+        />
         <span class="badge">{{ badge }}</span>
       </div>
       <div class="actions">
@@ -496,6 +545,10 @@ async function manualCheckpoint() {
         </el-button>
       </div>
     </header>
+    <p v-if="openError" class="save-retry" role="alert">
+      {{ openError }}
+      <button type="button" class="mm-btn mm-btn--primary" @click="bootstrap">重试打开</button>
+    </p>
     <p v-if="saveFailed || offline" class="save-retry" role="status">
       {{ offline ? '网络已断开，修改留在本机。' : '同步没有成功，修改仍在本机。' }}
       <button type="button" class="mm-btn mm-btn--primary" :disabled="saving || offline" @click="doSave(false)">
@@ -545,7 +598,7 @@ async function manualCheckpoint() {
           <button type="button" class="mm-btn mm-btn--ghost" @click="docsConfirm = false">取消</button>
         </span>
       </p>
-      <p v-if="docsLoading">正在读取这个模板下的文档…</p>
+      <LineSkeleton v-if="docsLoading" />
       <p v-else-if="docsError" class="empty" role="alert">
         {{ docsError }}
         <button type="button" class="mm-btn mm-btn--ghost" @click="loadDocsPage">重试</button>
@@ -577,6 +630,7 @@ async function manualCheckpoint() {
             <span class="sub">创建 {{ new Date(d.createdAt).toLocaleString('zh-CN', { hour12: false }) }}</span>
             <span v-if="d.notes" class="notes">{{ d.notes }}</span>
           </button>
+          <button type="button" class="mm-btn mm-btn--ghost" @click="renameListed(d)">改名</button>
         </li>
       </ul>
       <div v-if="!docsError && docsTotal > docsPageSize" class="doc-pager">
@@ -613,6 +667,22 @@ async function manualCheckpoint() {
   align-items: center;
   gap: 10px;
   min-width: 0;
+}
+
+.title-input {
+  border: 1px solid transparent;
+  background: transparent;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 650;
+  max-width: 240px;
+  min-width: 0;
+  padding: 4px 8px;
+  border-radius: 8px;
+}
+.title-input:focus {
+  border-color: #dadce0;
+  background: #fff;
 }
 
 .badge {

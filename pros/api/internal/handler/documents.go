@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"metamatrix/api/internal/middleware"
 	"metamatrix/api/internal/service"
@@ -286,6 +287,31 @@ func (h *DocumentsHandler) Export(ctx context.Context, c *app.RequestContext) {
 		"format":   "json",
 		"content":  json.RawMessage(doc.CurrentData),
 	})
+}
+
+type renameBody struct {
+	Title string `json:"title"`
+}
+
+func (h *DocumentsHandler) Rename(ctx context.Context, c *app.RequestContext) {
+	uid, ok := h.owner(c)
+	if !ok {
+		return
+	}
+	id, ok := parseID(c, "id")
+	if !ok {
+		return
+	}
+	var body renameBody
+	if err := c.BindAndValidate(&body); err != nil {
+		Fail(c, http.StatusBadRequest, "invalid body", "validation_error")
+		return
+	}
+	if handleDocErr(c, h.svc.Rename(uid, id, body.Title), nil) {
+		return
+	}
+	middleware.Audit(c, "rename", uid.String(), "id="+id.String())
+	c.JSON(http.StatusOK, map[string]string{"title": strings.TrimSpace(body.Title)})
 }
 
 func (h *DocumentsHandler) Delete(ctx context.Context, c *app.RequestContext) {

@@ -105,6 +105,7 @@ func main() {
 		docs.GET("/:id", docH.Get)
 		docs.GET("/:id/export", docH.Export)
 		docs.PUT("/:id", docH.Update)
+		docs.PATCH("/:id/title", docH.Rename)
 		docs.DELETE("/:id", docH.Delete)
 		docs.GET("/:id/ai-context", docH.AIContext)
 		docs.POST("/:id/revisions", docH.CreateRevision)
