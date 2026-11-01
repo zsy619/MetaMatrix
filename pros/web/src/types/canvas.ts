@@ -94,6 +94,11 @@ export type AttachmentsByPanelId = Record<string, PanelAttachment[]>
 /** 文档根级资料映射（所有画布通用，缺省 normalize 为 {}） */
 export type WithPanelAttachments = {
   attachmentsByPanelId?: AttachmentsByPanelId
+  /**
+   * 富文本面板页面大小。缺省或不认识的值按宽度 100%。
+   * 键与面板 id / 最大化 key 对齐。
+   */
+  pageSizeByPanelId?: Record<string, string>
 }
 
 

@@ -193,6 +193,7 @@ function onCloseMaximize(event?: Event) {
       <RichTextEditor
         class="fsp-rte"
         compact
+        :panel-id="maximizeKey"
         :expanded="false"
         :show-title="false"
         :show-bottom-bar="false"
@@ -282,6 +283,7 @@ function onCloseMaximize(event?: Event) {
           />
           <RichTextEditor
             class="pm-rte"
+            :panel-id="maximizeKey"
             :expanded="true"
             :show-title="false"
             :show-bottom-bar="true"

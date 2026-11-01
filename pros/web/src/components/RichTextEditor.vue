@@ -106,6 +106,24 @@ import {
 } from '../utils/rtePasteClean'
 import { canRunFindReplace, imageReplaceSide, todayIso } from '../utils/rteRound5'
 import {
+  RTE_PAGE_SIZES,
+  cssPageSize,
+  normalizePageSize,
+  pageSizeOption,
+  readPageSize,
+  sheetBox,
+  type RtePageSizeId,
+} from '../utils/rtePageSize'
+import {
+  RTE_OVERLAY_CLOSE_ORDER,
+  docChromeDelay,
+  focusDialogRoot,
+  pasteVolume,
+  previewShortcutAllowed,
+  snapshotDue,
+  topOpenModal,
+} from '../utils/rteRound8'
+import {
   orderSlashForMenu,
   embedIframeSrc,
   pushRecentSlash,
@@ -204,6 +222,8 @@ const props = withDefaults(
     showBottomBar?: boolean
     showPublishActions?: boolean
     showMarkdownHint?: boolean
+    /** 与最大化 key / 相关资料 panelId 对齐，页面大小写入画布 JSON。 */
+    panelId?: string
   }>(),
   {
     title: '',
@@ -214,6 +234,7 @@ const props = withDefaults(
     showBottomBar: true,
     showPublishActions: false,
     showMarkdownHint: true,
+    panelId: '',
   },
 )
 
@@ -842,7 +863,43 @@ function rtePlaceholderText(args: {
 }
 const auth = useAuthStore()
 const documentStore = useDocumentStore()
-const { saving, dirty, conflict, document_id } = storeToRefs(documentStore)
+const { saving, dirty, conflict, document_id, current_data } = storeToRefs(documentStore)
+const localPageSize = ref<RtePageSizeId>('full')
+const pageSize = computed(() => {
+  if (props.panelId) return readPageSize(current_data.value?.pageSizeByPanelId, props.panelId)
+  return localPageSize.value
+})
+const pageSizeMeta = computed(() => pageSizeOption(pageSize.value))
+const pageSheetStyle = computed(() => {
+  const box = sheetBox(pageSize.value)
+  if (!box) return undefined
+  return {
+    '--rte-sheet-width': `${box.widthPx}px`,
+    '--rte-sheet-min-height': `${box.heightPx}px`,
+  }
+})
+
+function applyPrintPageStyle(id: RtePageSizeId) {
+  const size = cssPageSize(id)
+  let el = document.getElementById('rte-print-page-size')
+  if (!el) {
+    el = document.createElement('style')
+    el.id = 'rte-print-page-size'
+    document.head.appendChild(el)
+  }
+  el.textContent = `@media print { @page { size: ${size}; margin: 12mm; } }`
+}
+
+function setPageSize(id: string) {
+  const next = normalizePageSize(id)
+  if (props.panelId) documentStore.setPanelPageSize(props.panelId, next)
+  else localPageSize.value = next
+  viewExtrasOpen.value = false
+  moreOpen.value = false
+  applyPrintPageStyle(next)
+}
+
+watch(pageSize, (id) => applyPrintPageStyle(id), { immediate: true })
 
 function initialEditorContent(): string {
   try {
@@ -1066,9 +1123,22 @@ const editor = useEditor({
       return sanitizePastedHtml(html)
     },
     handlePaste(_view, event) {
+      if (viewMode.value !== 'edit') {
+        event.preventDefault()
+        return true
+      }
       const pastedImages = imageFilesFromClipboard(event.clipboardData)
       const plain = event.clipboardData?.getData('text/plain')
       const html = event.clipboardData?.getData('text/html') || ''
+      const volume = pasteVolume(Math.max(plain?.length || 0, html.length))
+      if (volume === 'reject') {
+        event.preventDefault()
+        ElMessage.error('粘贴内容过大，请分段粘贴（约 120 万字符以内）')
+        return true
+      }
+      if (volume === 'warn') {
+        ElMessage.info('正在粘贴较大内容，编辑器可能短暂无响应')
+      }
       if (pastedImages.length && !html.trim()) {
         event.preventDefault()
         void insertUserImages(pastedImages)
@@ -1149,6 +1219,10 @@ const editor = useEditor({
       return false
     },
     handleDrop(view, event) {
+      if (viewMode.value !== 'edit') {
+        event.preventDefault()
+        return true
+      }
       const files = imageFilesFromClipboard(event.dataTransfer)
       if (!files.length) return false
       event.preventDefault()
@@ -1223,6 +1297,13 @@ const editor = useEditor({
       const ed = editor.value
       if (!ed) return false
       const key = event.key.toLowerCase()
+      if (
+        viewMode.value !== 'edit' &&
+        !previewShortcutAllowed({ key, alt: event.altKey, shift: event.shiftKey })
+      ) {
+        event.preventDefault()
+        return true
+      }
       if (key === '/' && !event.altKey && !event.shiftKey) {
         event.preventDefault()
         const willOpen = !shortcutsOpen.value
@@ -1971,6 +2052,7 @@ const sessionSnaps = ref<Array<{ at: number; html: string }>>([])
 let docChromeTimer: ReturnType<typeof setTimeout> | null = null
 let lastSnapHtml = ''
 let lastSnapAt = 0
+let lastSnapNodeSize = 0
 
 function refreshDocChrome() {
   const ed = editor.value
@@ -2001,22 +2083,27 @@ function refreshDocChrome() {
   })
   outlineHeadings.value = headings
   noteRows.value = notes
-  const html = ed.getHTML()
   const now = Date.now()
-  if (shouldTakeSnapshot(lastSnapHtml, html, now - lastSnapAt)) {
-    lastSnapHtml = html
-    lastSnapAt = now
-    sessionSnaps.value = [...sessionSnaps.value, { at: now, html }].slice(-12)
+  const nodeSize = ed.state.doc.nodeSize
+  if (snapshotDue(lastSnapNodeSize, nodeSize, now - lastSnapAt)) {
+    lastSnapNodeSize = nodeSize
+    const html = ed.getHTML()
+    if (shouldTakeSnapshot(lastSnapHtml, html, now - lastSnapAt)) {
+      lastSnapHtml = html
+      lastSnapAt = now
+      sessionSnaps.value = [...sessionSnaps.value, { at: now, html }].slice(-12)
+    }
   }
 }
 
 /** 长文档不在每次击键时重扫标题和批注。 */
 function scheduleDocChrome() {
   if (docChromeTimer != null) return
+  const size = editor.value?.state.doc.nodeSize ?? 0
   docChromeTimer = setTimeout(() => {
     docChromeTimer = null
     refreshDocChrome()
-  }, 280)
+  }, docChromeDelay(size))
 }
 
 watch(editorReady, (ready) => {
@@ -2831,6 +2918,7 @@ function openXrefDialog() {
   xrefIndex.value = 0
   xrefDialogOpen.value = true
   moreOpen.value = false
+  focusOpenDialog()
 }
 
 function onXrefDialogKeydown(event: KeyboardEvent) {
@@ -3051,6 +3139,7 @@ function printEditor() {
     ElMessage.warning('编辑器未就绪')
     return
   }
+  applyPrintPageStyle(pageSize.value)
   root.classList.add('rte-printing')
   const cleanup = () => {
     root.classList.remove('rte-printing')
@@ -4572,6 +4661,7 @@ onBeforeUnmount(() => {
     docChromeTimer = null
   }
   document.removeEventListener('pointerdown', onDocPointerDownForMenus, true)
+  window.removeEventListener('keydown', onWindowEscape)
   window.removeEventListener('resize', repositionSlashMenu)
   window.removeEventListener('scroll', repositionSlashMenu, true)
   window.removeEventListener('resize', repositionMentionMenu)
@@ -5668,10 +5758,123 @@ function resetFormulaDialog() {
   formulaPreviewExpanded.value = false
 }
 
+function focusOpenDialog() {
+  nextTick(() => {
+    const nodes = document.querySelectorAll('[role="dialog"][aria-modal="true"]')
+    const last = nodes[nodes.length - 1]
+    if (last instanceof HTMLElement) focusDialogRoot(last)
+  })
+}
+
+function closeTopOverlay(): boolean {
+  const id = topOpenModal(
+    {
+      ask: askOpen.value,
+      linkImport: linkImportOpen.value,
+      image: imageDialogOpen.value,
+      video: videoDialogOpen.value,
+      formula: formulaDialogOpen.value,
+      table: tableDialogOpen.value,
+      note: noteDialogOpen.value,
+      attach: attachDialogOpen.value,
+      snippet: snippetDialogOpen.value,
+      xref: xrefDialogOpen.value,
+      readTime: readTimeDialogOpen.value,
+      linkCard: linkCardDialogOpen.value,
+      wave21: wave21ReportOpen.value,
+      find: findDialogOpen.value,
+      link: linkDialogOpen.value,
+      print: printPreviewOpen.value,
+      wordCount: wordCountDockOpen.value,
+      shortcuts: shortcutsOpen.value,
+      blockMenu: blockMenuOpen.value,
+      notes: notesOpen.value,
+      history: historyOpen.value,
+    },
+    RTE_OVERLAY_CLOSE_ORDER,
+  )
+  if (!id) return false
+  switch (id) {
+    case 'ask':
+      closeAskDialog('cancel')
+      break
+    case 'linkImport':
+      closeImportLinkDialog()
+      break
+    case 'image':
+      closeImageDialog()
+      break
+    case 'video':
+      closeVideoDialog()
+      break
+    case 'formula':
+      closeFormulaDialog()
+      break
+    case 'table':
+      closeTableDialog()
+      break
+    case 'note':
+      closeNoteDialog()
+      break
+    case 'attach':
+      closeAttachDialog()
+      break
+    case 'snippet':
+      snippetDialogOpen.value = false
+      break
+    case 'xref':
+      xrefDialogOpen.value = false
+      break
+    case 'readTime':
+      readTimeDialogOpen.value = false
+      break
+    case 'linkCard':
+      closeLinkCardDialog()
+      break
+    case 'wave21':
+      wave21ReportOpen.value = false
+      break
+    case 'find':
+      closeFindDialog()
+      break
+    case 'link':
+      closeLinkDialog()
+      break
+    case 'print':
+      closePrintPreview()
+      break
+    case 'wordCount':
+      wordCountDockOpen.value = false
+      break
+    case 'shortcuts':
+      shortcutsOpen.value = false
+      break
+    case 'blockMenu':
+      blockMenuOpen.value = false
+      break
+    case 'notes':
+      notesOpen.value = false
+      break
+    case 'history':
+      historyOpen.value = false
+      break
+    default:
+      return false
+  }
+  return true
+}
+
+function onWindowEscape(event: KeyboardEvent) {
+  if (event.key !== 'Escape' || event.defaultPrevented) return
+  if (!closeTopOverlay()) return
+  event.preventDefault()
+}
+
 function openFormulaDialog() {
   resetFormulaDialog()
   formulaDialogOpen.value = true
   moreOpen.value = false
+  focusOpenDialog()
 }
 
 function closeFormulaDialog() {
@@ -5812,6 +6015,7 @@ function openTableDialog() {
   resetTableDialog()
   tableDialogOpen.value = true
   moreOpen.value = false
+  focusOpenDialog()
   tableMenuOpen.value = false
   tableOpsSheetOpen.value = false
   closeTableCtx()
@@ -6181,6 +6385,7 @@ function openNoteDialog() {
   }
   noteDialogOpen.value = true
   moreOpen.value = false
+  focusOpenDialog()
 }
 
 function closeNoteDialog() {
@@ -6316,6 +6521,7 @@ function openAttachDialog() {
   resetAttachDialog()
   attachDialogOpen.value = true
   moreOpen.value = false
+  focusOpenDialog()
 }
 
 function closeAttachDialog() {
@@ -6674,7 +6880,7 @@ async function exportAsPdf() {
   exportBusy.value = true
   try {
     const title = (localTitle.value || '').trim() || '未命名文档'
-    const blob = await buildPdfFromElement(el, { title })
+    const blob = await buildPdfFromElement(el, { title, pageSize: pageSize.value })
     triggerDownloadBlob(blob, `${exportFileBasename()}.pdf`)
     ElMessage.success('已导出 PDF')
   } catch (err) {
@@ -7005,6 +7211,7 @@ function repositionSlashMenu() {
 
 onMounted(() => {
   document.addEventListener('pointerdown', onDocPointerDownForMenus, true)
+  window.addEventListener('keydown', onWindowEscape)
   window.addEventListener('resize', repositionSlashMenu)
   window.addEventListener('scroll', repositionSlashMenu, true)
   window.addEventListener('resize', repositionMentionMenu)
@@ -8487,6 +8694,8 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
   <div
     ref="rteRootEl"
     class="rte-root"
+    :data-page-size="pageSize"
+    :style="pageSheetStyle"
     :class="{
       compact,
       expanded,
@@ -8500,6 +8709,8 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
       'is-heading-auto-num': headingAutoNumber,
       'is-immersive': immersiveFullscreen,
       'is-paper-guide': paperGuide,
+      'is-page-sheet': pageSizeMeta.paper,
+      'is-page-feishu': pageSize === 'feishu',
       'is-table-sticky': tableHeaderSticky,
       'is-cjk-typography': true,
     }"
@@ -10270,8 +10481,10 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
             class="rte-tool"
             :ref="(el) => setFloatAnchor('viewExtras', el)"
             data-rte-anchor="viewExtras"
-            :class="{ active: viewExtrasOpen || focusMode || darkEditor || paperGuide }"
-            title="专注 / 暗色 / 纸张参考线"
+            :class="{ active: viewExtrasOpen || focusMode || darkEditor || paperGuide || pageSize !== 'full' }"
+            :title="`视图 · ${pageSizeMeta.label}`"
+            aria-haspopup="menu"
+            :aria-expanded="viewExtrasOpen"
             @click.stop="markToolbarMenuOpening(); viewExtrasOpen = !viewExtrasOpen"
           >
             <span class="rte-tool-icon">
@@ -10291,6 +10504,21 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
               <button type="button" :class="{ active: focusMode }" @click="toggleFocusMode">专注模式</button>
               <button type="button" :class="{ active: darkEditor }" @click="toggleDarkEditor">暗色编辑区</button>
               <button type="button" :class="{ active: paperGuide }" @click="togglePaperGuide">纸张参考线</button>
+              <div class="rte-menu-sep" aria-hidden="true" />
+              <div class="rte-page-size-label">页面大小</div>
+              <button
+                v-for="opt in RTE_PAGE_SIZES"
+                :key="'ps-' + opt.id"
+                type="button"
+                role="menuitemradio"
+                :aria-checked="pageSize === opt.id"
+                :class="{ active: pageSize === opt.id }"
+                :title="opt.hint"
+                @click="setPageSize(opt.id)"
+              >
+                {{ opt.label }}
+                <span class="rte-menu-hint">{{ opt.hint }}</span>
+              </button>
             </div>
           </Teleport>
         </div>
@@ -10491,6 +10719,21 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
               <button type="button" :class="{ active: focusMode }" @click="toggleFocusMode">专注模式</button>
               <button type="button" :class="{ active: darkEditor }" @click="toggleDarkEditor">暗色编辑区</button>
               <button type="button" :class="{ active: paperGuide }" @click="togglePaperGuide">纸张参考线</button>
+              <div class="rte-menu-sep" aria-hidden="true" />
+              <div class="rte-page-size-label">页面大小</div>
+              <button
+                v-for="opt in RTE_PAGE_SIZES"
+                :key="'mps-' + opt.id"
+                type="button"
+                role="menuitemradio"
+                :aria-checked="pageSize === opt.id"
+                :class="{ active: pageSize === opt.id }"
+                :title="opt.hint"
+                @click="setPageSize(opt.id)"
+              >
+                {{ opt.label }}
+                <span class="rte-menu-hint">{{ opt.hint }}</span>
+              </button>
             </div>
             <div
               v-if="mt.kind === 'form' && moreFormOpen"
@@ -11367,7 +11610,7 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
         class="rte-preview-banner"
         role="status"
       >
-        <span>只读预览中</span>
+        <span>{{ charCount === 0 ? '只读预览 · 这篇文档还没有正文' : '只读预览中' }}</span>
         <button type="button" class="rte-preview-back" @click="setViewMode('edit')">
           返回编辑
         </button>
@@ -11662,8 +11905,20 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
         </span>
       </div>
       <div class="rte-bottom-right">
+        <label class="rte-page-size-field">
+          页面
+          <select
+            :value="pageSize"
+            aria-label="页面大小"
+            @change="setPageSize(($event.target as HTMLSelectElement).value)"
+          >
+            <option v-for="opt in RTE_PAGE_SIZES" :key="'bb-' + opt.id" :value="opt.id">
+              {{ opt.label }}
+            </option>
+          </select>
+        </label>
         <button
-          v-if="expanded"
+          v-if="expanded && viewMode === 'edit'"
           type="button"
           class="rte-bottom-link"
           :aria-pressed="notesOpen"
@@ -11672,7 +11927,7 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
           批注
         </button>
         <button
-          v-if="expanded"
+          v-if="expanded && viewMode === 'edit'"
           type="button"
           class="rte-bottom-link"
           :aria-pressed="historyOpen"
@@ -18408,6 +18663,73 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
   min-height: 1123px;
   background: #fff;
 }
+.rte-page-size-label {
+  padding: 6px 10px 2px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--mm-muted, #86909c);
+}
+.rte-page-size-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--mm-muted, #86909c);
+}
+.rte-page-size-field select {
+  font: inherit;
+  font-size: 12px;
+  color: var(--mm-text, #1d2129);
+  background: #fff;
+  border: 1px solid var(--mm-line, #e5e6eb);
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+.rte-root.is-dark-editor .rte-page-size-field,
+.rte-root.is-dark-editor .rte-page-size-field select {
+  color: #e5e6eb;
+  background: #171a1f;
+  border-color: #3a3f47;
+}
+.rte-menu button .rte-menu-hint {
+  float: right;
+  margin-left: 12px;
+  color: var(--mm-muted, #86909c);
+}
+.rte-root.is-page-feishu .rte-body {
+  max-width: 760px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.rte-root.is-page-sheet .rte-canvas {
+  background: #e8eaed;
+}
+.rte-root.is-page-sheet .rte-body {
+  width: min(100%, var(--rte-sheet-width, 794px));
+  min-height: var(--rte-sheet-min-height, 1123px);
+  margin: 16px auto 28px;
+  padding: 16mm 14mm;
+  box-sizing: border-box;
+  background: #fff;
+  box-shadow:
+    0 0 0 1px rgba(29, 33, 41, 0.06),
+    0 12px 32px rgba(29, 33, 41, 0.12);
+}
+.rte-root.is-dark-editor.is-page-sheet .rte-canvas {
+  background: #2a2e36 !important;
+}
+.rte-root.is-dark-editor.is-page-sheet .rte-body,
+.rte-root.is-dark-editor.is-page-sheet .ProseMirror {
+  background: #fff !important;
+  color: #1d2129 !important;
+}
+.rte-root.is-dark-editor.is-page-sheet .ProseMirror a {
+  color: #1d4ed8 !important;
+}
+.rte-root.mode-preview.is-page-sheet .rte-body,
+.rte-root.mode-preview.is-page-sheet .ProseMirror {
+  caret-color: transparent;
+}
 .rte-root.is-table-sticky .tableWrapper {
   max-height: 420px;
   overflow: auto;
@@ -18498,6 +18820,18 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
   }
   .rte-root.rte-printing .rte-column {
     background: transparent;
+  }
+  .rte-root.rte-printing.is-page-sheet .rte-canvas,
+  .rte-root.rte-printing.is-page-sheet .rte-body,
+  .rte-root.rte-printing.is-page-sheet .ProseMirror,
+  .rte-root.rte-printing.is-page-feishu .rte-body {
+    background: #fff !important;
+    color: #1d2129 !important;
+    box-shadow: none !important;
+    width: auto !important;
+    max-width: none !important;
+    min-height: 0 !important;
+    margin: 0 !important;
   }
 }
 
