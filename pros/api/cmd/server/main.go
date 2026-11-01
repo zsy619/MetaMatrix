@@ -37,11 +37,20 @@ func main() {
 		server.WithHostPorts(fmt.Sprintf(":%d", cfg.Port)),
 	)
 
+	h.Use(middleware.AccessLog())
 	h.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:5173", "http://127.0.0.1:5173"},
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "Accept"},
-		ExposeHeaders:    []string{"Content-Length"},
+		AllowOrigins: []string{"http://localhost:5173", "http://127.0.0.1:5173"},
+		AllowMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
+		AllowHeaders: []string{"Origin", "Content-Type", "Authorization", "Accept", "X-Request-Id"},
+		ExposeHeaders: []string{
+			"Content-Length",
+			"X-Request-Id",
+			"X-Total-Count",
+			"X-Has-More",
+			"X-Limit",
+			"X-Offset",
+			"Cache-Control",
+		},
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 	}))

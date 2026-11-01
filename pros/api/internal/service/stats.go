@@ -2,6 +2,7 @@ package service
 
 import (
 	"sort"
+	"strings"
 	"time"
 
 	"metamatrix/api/internal/model"
@@ -14,6 +15,7 @@ const statsTimezone = "Asia/Shanghai"
 // StatsDoc is one canvas document reduced to the timestamps stats needs.
 type StatsDoc struct {
 	ID         uuid.UUID
+	Title      string
 	TemplateID *string
 	CanvasType string
 	CreatedAt  time.Time
@@ -77,15 +79,39 @@ type DocumentStats struct {
 	RangeCreated    Compare        `json:"rangeCreated"`
 	RangeEdited     Compare        `json:"rangeEdited"`
 	Totals          StatsTotals    `json:"totals"`
+	Activity        ActivityStats  `json:"activity"`
 	Series          []StatsBucket  `json:"series"`
 	Templates       []TemplateStat `json:"templates"`
 	Heatmap         []HeatCell     `json:"heatmap"`
+	Recent          []RecentEdit   `json:"recent"`
 }
 
 // StatsTotals are all-time figures, independent of the selected range.
 type StatsTotals struct {
 	Revisions int `json:"revisions"`
 	Templates int `json:"templates"`
+}
+
+// ActivityStats is derived from the same daily activity map as the heatmap.
+// ActiveDays counts days inside the selected window. Streak is the current run
+// ending today, or yesterday when today has no activity yet. Longest is the
+// longest run on or before today across all loaded history.
+type ActivityStats struct {
+	ActiveDays         int `json:"activeDays"`
+	PreviousActiveDays int `json:"previousActiveDays"`
+	Streak             int `json:"streak"`
+	Longest            int `json:"longest"`
+}
+
+// RecentEdit is one of the caller's canvases, newest update first.
+// It comes from the same document read as the aggregates (no extra query).
+type RecentEdit struct {
+	ID         string  `json:"id"`
+	Title      string  `json:"title"`
+	TemplateID *string `json:"templateId"`
+	CanvasType string  `json:"canvasType"`
+	CreatedAt  string  `json:"createdAt"`
+	UpdatedAt  string  `json:"updatedAt"`
 }
 
 func statsLocation() *time.Location {
@@ -426,6 +452,13 @@ func AggregateDocumentStats(docs []StatsDoc, revs []StatsRev, now time.Time, loc
 		heatmap = append(heatmap, HeatCell{Date: key, Count: heat[key]})
 	}
 
+	activity := ActivityStats{
+		ActiveDays:         countActiveDays(heat, from, to, loc),
+		PreviousActiveDays: countActiveDays(heat, prevFrom, prevTo, loc),
+		Streak:             currentStreak(heat, today, loc),
+		Longest:            longestStreak(heat, today, loc),
+	}
+
 	return DocumentStats{
 		Range:        rangeKey,
 		Granularity:  granularity,
@@ -474,16 +507,121 @@ func AggregateDocumentStats(docs []StatsDoc, revs []StatsRev, now time.Time, loc
 			Revisions: len(revs),
 			Templates: len(allTemplates),
 		},
+		Activity:  activity,
 		Series:    buckets,
 		Templates: templates,
 		Heatmap:   heatmap,
+		Recent:    recentEdits(docs, loc, 8),
 	}
+}
+
+func countActiveDays(heat map[string]int, from, to time.Time, loc *time.Location) int {
+	n := 0
+	for cur := startOfDay(from, loc); cur.Before(to); cur = cur.AddDate(0, 0, 1) {
+		if heat[ymd(cur, loc)] > 0 {
+			n++
+		}
+	}
+	return n
+}
+
+func currentStreak(heat map[string]int, today time.Time, loc *time.Location) int {
+	day := startOfDay(today, loc)
+	if heat[ymd(day, loc)] == 0 {
+		day = day.AddDate(0, 0, -1)
+		if heat[ymd(day, loc)] == 0 {
+			return 0
+		}
+	}
+	n := 0
+	for heat[ymd(day, loc)] > 0 {
+		n++
+		day = day.AddDate(0, 0, -1)
+		if n > 3660 {
+			break
+		}
+	}
+	return n
+}
+
+func longestStreak(heat map[string]int, today time.Time, loc *time.Location) int {
+	today = startOfDay(today, loc)
+	days := make([]time.Time, 0, len(heat))
+	for key, count := range heat {
+		if count <= 0 {
+			continue
+		}
+		t, err := time.ParseInLocation("2006-01-02", key, loc)
+		if err != nil || t.After(today) {
+			continue
+		}
+		days = append(days, t)
+	}
+	sort.Slice(days, func(i, j int) bool { return days[i].Before(days[j]) })
+	best, run := 0, 0
+	var prev time.Time
+	for i, d := range days {
+		if i == 0 || !d.Equal(prev.AddDate(0, 0, 1)) {
+			run = 1
+		} else {
+			run++
+		}
+		if run > best {
+			best = run
+		}
+		prev = d
+	}
+	return best
+}
+
+func recentEdits(docs []StatsDoc, loc *time.Location, limit int) []RecentEdit {
+	if limit <= 0 {
+		limit = 8
+	}
+	cp := append([]StatsDoc(nil), docs...)
+	sort.Slice(cp, func(i, j int) bool {
+		if !cp[i].UpdatedAt.Equal(cp[j].UpdatedAt) {
+			return cp[i].UpdatedAt.After(cp[j].UpdatedAt)
+		}
+		return cp[i].ID.String() < cp[j].ID.String()
+	})
+	if len(cp) > limit {
+		cp = cp[:limit]
+	}
+	out := make([]RecentEdit, 0, len(cp))
+	for _, d := range cp {
+		var tpl *string
+		if d.TemplateID != nil {
+			v := strings.TrimSpace(*d.TemplateID)
+			if v != "" {
+				tpl = &v
+			}
+		}
+		canvas := d.CanvasType
+		if canvas == "" {
+			canvas = "unknown"
+		}
+		out = append(out, RecentEdit{
+			ID:         d.ID.String(),
+			Title:      strings.TrimSpace(d.Title),
+			TemplateID: tpl,
+			CanvasType: canvas,
+			CreatedAt:  d.CreatedAt.In(loc).Format(time.RFC3339),
+			UpdatedAt:  d.UpdatedAt.In(loc).Format(time.RFC3339),
+		})
+	}
+	return out
+}
+
+// ResolveStatsOwner forces personal scope. Callers cannot widen stats with a scope query.
+func ResolveStatsOwner(authenticated uuid.UUID, _ string) uuid.UUID {
+	return authenticated
 }
 
 func (s *DocumentsService) Stats(ownerID uuid.UUID, rangeKey, granularity string) (*DocumentStats, error) {
 	var docs []StatsDoc
 	err := s.db.Model(&model.CanvasDocument{}).
-		Select("id", "template_id", "canvas_type", "created_at", "updated_at").
+		Select("id", "title", "template_id", "canvas_type", "created_at", "updated_at").
 		Where("owner_user_id = ?", ownerID).
 		Find(&docs).Error
 	if err != nil {

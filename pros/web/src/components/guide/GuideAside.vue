@@ -12,10 +12,15 @@ const DEFAULT_WIDTH = 300
 const MIN_WIDTH = 220
 const MAX_WIDTH_ABS = 480
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   recent: DocumentSummary[]
   authenticated: boolean
-}>()
+  loading?: boolean
+  error?: string
+}>(), {
+  loading: false,
+  error: '',
+})
 
 const emit = defineEmits<{
   open: [doc: DocumentSummary]
@@ -349,12 +354,14 @@ const panelTitle = computed(() => '最近文档')
           </span>
           <span class="ws-text">
             <span class="ws-title">工作面板</span>
-            <span class="ws-sub">最近画布、用量、搜索与备注</span>
+            <span class="ws-sub">个人统计、趋势与最近画布</span>
           </span>
           <span class="ws-go" aria-hidden="true">→</span>
         </router-link>
 
         <p v-if="!authenticated" class="empty">登录后查看最近文档</p>
+        <p v-else-if="error" class="empty">{{ error }}</p>
+        <p v-else-if="loading" class="empty">正在读取最近文档…</p>
         <p v-else-if="!recent.length" class="empty">暂无文档，从左侧选模板开始</p>
         <template v-else>
           <section

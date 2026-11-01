@@ -75,10 +75,14 @@ export type AIContext = {
 export function listDocuments(params?: {
   templateId?: string
   canvasType?: string
+  limit?: number
+  offset?: number
 }) {
   const q = new URLSearchParams()
   if (params?.templateId) q.set('templateId', params.templateId)
   if (params?.canvasType) q.set('canvasType', params.canvasType)
+  if (params?.limit != null) q.set('limit', String(params.limit))
+  if (params?.offset != null) q.set('offset', String(params.offset))
   const qs = q.toString()
   return apiRequest<DocumentSummary[]>(`/documents${qs ? `?${qs}` : ''}`)
 }
@@ -180,6 +184,22 @@ export type TemplateStat = {
 
 export type HeatCell = { date: string; count: number }
 
+export type ActivityStats = {
+  activeDays: number
+  previousActiveDays: number
+  streak: number
+  longest: number
+}
+
+export type RecentEdit = {
+  id: string
+  title: string
+  templateId: string | null
+  canvasType: string
+  createdAt: string
+  updatedAt: string
+}
+
 export type DocumentStats = {
   range: StatsRange | string
   granularity: StatsGranularity | string
@@ -198,20 +218,28 @@ export type DocumentStats = {
   rangeCreated: StatsCompare
   rangeEdited: StatsCompare
   totals: { revisions: number; templates: number }
+  activity: ActivityStats
   series: StatsBucket[]
   templates: TemplateStat[]
   heatmap: HeatCell[]
+  recent: RecentEdit[]
 }
 
-export function getDocumentStats(params?: {
-  range?: StatsRange
-  granularity?: StatsGranularity
-}) {
+export function getDocumentStats(
+  params?: {
+    range?: StatsRange
+    granularity?: StatsGranularity
+  },
+  opts?: { fresh?: boolean; signal?: AbortSignal },
+) {
   const q = new URLSearchParams()
   if (params?.range) q.set('range', params.range)
   if (params?.granularity) q.set('granularity', params.granularity)
   const qs = q.toString()
-  return apiRequest<DocumentStats>(`/documents/stats${qs ? `?${qs}` : ''}`)
+  return apiRequest<DocumentStats>(`/documents/stats${qs ? `?${qs}` : ''}`, {
+    signal: opts?.signal,
+    cache: opts?.fresh ? 'reload' : 'default',
+  })
 }
 
 export function searchDocuments(params: {

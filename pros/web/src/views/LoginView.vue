@@ -2,13 +2,15 @@
 import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import { friendlyApiMessage } from '../utils/apiMessage'
+import { safeRedirect } from '../utils/safeRedirect'
 
 const auth = useAuthStore()
 const router = useRouter()
 const route = useRoute()
 
-const email = ref('demo@metamatrix.local')
-const password = ref('demo123456')
+const email = ref('')
+const password = ref('')
 const busy = ref(false)
 const message = ref('')
 
@@ -17,10 +19,9 @@ async function submit() {
   message.value = ''
   try {
     await auth.login(email.value.trim(), password.value)
-    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/'
-    router.replace(redirect || '/')
+    router.replace(safeRedirect(route.query.redirect, '/'))
   } catch (e: unknown) {
-    message.value = e instanceof Error ? e.message : '登录失败'
+    message.value = friendlyApiMessage(e, '登录失败')
   } finally {
     busy.value = false
   }
@@ -30,17 +31,33 @@ async function submit() {
 <template>
   <div class="auth-page">
     <form class="card" @submit.prevent="submit">
-      <h1>登录 MetaMatrix</h1>
-      <p class="hint">使用邮箱登录后，画布会同步到服务端（多用户隔离）。</p>
-      <label>
+      <p class="eyebrow">MetaMatrix</p>
+      <h1>登录</h1>
+      <p class="hint">登录后只同步你自己的画布。会话保存在本机，离开账号后不会继续看到别人的文档。</p>
+      <label for="login-email">
         邮箱
-        <input v-model="email" type="email" required autocomplete="username" />
+        <input
+          id="login-email"
+          v-model="email"
+          type="email"
+          required
+          autocomplete="username"
+          placeholder="name@example.com"
+          :aria-invalid="Boolean(message)"
+        />
       </label>
-      <label>
+      <label for="login-password">
         密码
-        <input v-model="password" type="password" required autocomplete="current-password" />
+        <input
+          id="login-password"
+          v-model="password"
+          type="password"
+          required
+          autocomplete="current-password"
+          :aria-invalid="Boolean(message)"
+        />
       </label>
-      <p v-if="message" class="error">{{ message }}</p>
+      <p v-if="message" class="error" role="alert">{{ message }}</p>
       <button type="submit" :disabled="busy">{{ busy ? '登录中…' : '登录' }}</button>
       <p class="footer">
         还没有账号？
@@ -56,26 +73,38 @@ async function submit() {
   display: grid;
   place-items: center;
   padding: 32px 16px;
-  background: #f8f9fa;
+  background:
+    radial-gradient(ellipse 70% 40% at 50% -10%, var(--mm-blue-soft) 0%, transparent 60%),
+    var(--mm-bg);
 }
 .card {
   width: min(420px, 100%);
-  background: #fff;
-  border: 1px solid #dadce0;
-  border-radius: 12px;
+  background: var(--mm-surface);
+  border: 1px solid var(--mm-line);
+  border-radius: var(--mm-radius);
   padding: 28px 24px;
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
+.eyebrow {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--mm-blue);
+  font-weight: 700;
+}
 h1 {
   margin: 0;
-  font-size: 22px;
+  font-size: 28px;
+  letter-spacing: -0.03em;
 }
 .hint {
   margin: 0 0 8px;
-  color: #5f6368;
+  color: var(--mm-muted);
   font-size: 13px;
+  line-height: 1.55;
 }
 label {
   display: flex;
@@ -85,19 +114,19 @@ label {
   color: #3c4043;
 }
 input {
-  border: 1px solid #dadce0;
-  border-radius: 8px;
+  border: 1px solid var(--mm-line-strong);
+  border-radius: 10px;
   padding: 10px 12px;
   font-size: 14px;
 }
 button {
   margin-top: 8px;
   border: none;
-  border-radius: 8px;
+  border-radius: 999px;
   padding: 10px 14px;
-  background: #1a73e8;
+  background: var(--mm-blue);
   color: #fff;
-  font-weight: 600;
+  font-weight: 650;
   cursor: pointer;
 }
 button:disabled {
@@ -105,13 +134,16 @@ button:disabled {
   cursor: default;
 }
 .error {
-  color: #d93025;
+  color: var(--mm-red);
   font-size: 13px;
   margin: 0;
 }
 .footer {
   font-size: 13px;
-  color: #5f6368;
+  color: var(--mm-muted);
   margin: 4px 0 0;
+}
+.footer a {
+  color: var(--mm-blue);
 }
 </style>

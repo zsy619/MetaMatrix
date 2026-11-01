@@ -24,6 +24,17 @@ var (
 	ErrRevisionNotFound = errors.New("revision not found")
 	ErrHeadConflict     = errors.New("head_revision_id conflict")
 	ErrNotSnapshot      = errors.New("MVP only materializes snapshot revisions")
+	ErrValidation       = errors.New("validation")
+	ErrPayloadTooLarge  = errors.New("payload too large")
+	ErrInvalidHead      = errors.New("invalid expectedHeadRevisionId")
+)
+
+const (
+	maxTitleRunes  = 255
+	maxNotesRunes  = 8000
+	maxTypeRunes   = 64
+	maxCanvasBytes = 2 << 20
+	maxListLimit   = 100
 )
 
 type DocumentsService struct {
@@ -77,7 +88,7 @@ func assertHead(actual *uuid.UUID, expected *string, hasExpected bool) error {
 	if expected != nil && *expected != "" {
 		id, err := uuid.Parse(*expected)
 		if err != nil {
-			return fmt.Errorf("invalid expectedHeadRevisionId")
+			return ErrInvalidHead
 		}
 		exp = &id
 	}
@@ -135,10 +146,97 @@ func truncateStr(s string, n int) string {
 	return string(r[:n])
 }
 
+func validateMeta(title, notes, canvasType, templateID *string) error {
+	if title != nil && utf8.RuneCountInString(*title) > maxTitleRunes {
+		return ErrValidation
+	}
+	if notes != nil && utf8.RuneCountInString(*notes) > maxNotesRunes {
+		return ErrValidation
+	}
+	if canvasType != nil && utf8.RuneCountInString(strings.TrimSpace(*canvasType)) > maxTypeRunes {
+		return ErrValidation
+	}
+	if templateID != nil && utf8.RuneCountInString(strings.TrimSpace(*templateID)) > maxTypeRunes {
+		return ErrValidation
+	}
+	return nil
+}
+
+func validatePayload(data []byte) error {
+	if len(data) > maxCanvasBytes {
+		return ErrPayloadTooLarge
+	}
+	return nil
+}
+
+// ListFilter selects one owner's documents. Paged is false when the client
+// omitted limit and offset, which preserves the historical full-list response.
+type ListFilter struct {
+	TemplateID string
+	CanvasType string
+	Limit      int
+	Offset     int
+	Paged      bool
+}
+
+// NormalizeListPage parses limit/offset. Empty inputs mean "not paged".
+func NormalizeListPage(limitRaw, offsetRaw string) (limit, offset int, paged bool, err error) {
+	limitRaw = strings.TrimSpace(limitRaw)
+	offsetRaw = strings.TrimSpace(offsetRaw)
+	if limitRaw == "" && offsetRaw == "" {
+		return 0, 0, false, nil
+	}
+	limit = 50
+	if limitRaw != "" {
+		n, conv := atoiNonNeg(limitRaw)
+		if conv != nil || n < 1 {
+			return 0, 0, false, ErrValidation
+		}
+		if n > maxListLimit {
+			n = maxListLimit
+		}
+		limit = n
+	}
+	if offsetRaw != "" {
+		n, conv := atoiNonNeg(offsetRaw)
+		if conv != nil || n < 0 {
+			return 0, 0, false, ErrValidation
+		}
+		if n > 10000 {
+			return 0, 0, false, ErrValidation
+		}
+		offset = n
+	}
+	return limit, offset, true, nil
+}
+
+func atoiNonNeg(s string) (int, error) {
+	n := 0
+	if s == "" {
+		return 0, ErrValidation
+	}
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return 0, ErrValidation
+		}
+		n = n*10 + int(r-'0')
+		if n > 100000 {
+			return 0, ErrValidation
+		}
+	}
+	return n, nil
+}
+
 func (s *DocumentsService) Create(ownerID uuid.UUID, in CreateDocumentInput) (*model.CanvasDocument, error) {
+	if err := validateMeta(in.Title, in.Notes, in.CanvasType, in.TemplateID); err != nil {
+		return nil, err
+	}
 	data := in.Data
 	if len(data) == 0 || string(data) == "null" {
 		data = []byte(`{}`)
+	}
+	if err := validatePayload(data); err != nil {
+		return nil, err
 	}
 	var meta map[string]interface{}
 	_ = json.Unmarshal(data, &meta)
@@ -221,19 +319,36 @@ func (s *DocumentsService) Create(ownerID uuid.UUID, in CreateDocumentInput) (*m
 	return doc, nil
 }
 
-func (s *DocumentsService) List(ownerID uuid.UUID, templateID, canvasType string) ([]model.DocumentSummary, error) {
-	q := s.db.Model(&model.CanvasDocument{}).Where("owner_user_id = ?", ownerID)
-	if templateID != "" {
-		q = q.Where("template_id = ?", templateID)
+func (s *DocumentsService) List(ownerID uuid.UUID, f ListFilter) ([]model.DocumentSummary, int64, error) {
+	scope := func() *gorm.DB {
+		q := s.db.Model(&model.CanvasDocument{}).Where("owner_user_id = ?", ownerID)
+		if f.TemplateID != "" {
+			q = q.Where("template_id = ?", f.TemplateID)
+		}
+		if f.CanvasType != "" {
+			q = q.Where("canvas_type = ?", f.CanvasType)
+		}
+		return q
 	}
-	if canvasType != "" {
-		q = q.Where("canvas_type = ?", canvasType)
+	var total int64
+	if err := scope().Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	q := scope().
+		Select("id, title, notes, template_id, canvas_type, schema_version, head_revision_id, created_at, updated_at").
+		Order("updated_at DESC").
+		Order("id ASC")
+	if f.Paged {
+		q = q.Limit(f.Limit).Offset(f.Offset)
 	}
 	var rows []model.DocumentSummary
-	err := q.Select("id, title, notes, template_id, canvas_type, schema_version, head_revision_id, created_at, updated_at").
-		Order("updated_at DESC").
-		Find(&rows).Error
-	return rows, err
+	if err := q.Find(&rows).Error; err != nil {
+		return nil, 0, err
+	}
+	if rows == nil {
+		rows = []model.DocumentSummary{}
+	}
+	return rows, total, nil
 }
 
 func (s *DocumentsService) GetOwned(ownerID, docID uuid.UUID) (*model.CanvasDocument, error) {
@@ -253,11 +368,17 @@ func (s *DocumentsService) Update(ownerID, docID uuid.UUID, in UpdateDocumentInp
 	if err != nil {
 		return nil, err
 	}
+	if err := validateMeta(in.Title, in.Notes, nil, nil); err != nil {
+		return nil, err
+	}
 	if err := assertHead(doc.HeadRevisionID, in.ExpectedHeadRevisionID, in.HasExpected); err != nil {
 		return doc, err
 	}
 	if len(in.CurrentData) == 0 || string(in.CurrentData) == "null" {
-		return nil, fmt.Errorf("currentData is required")
+		return nil, ErrValidation
+	}
+	if err := validatePayload(in.CurrentData); err != nil {
+		return nil, err
 	}
 
 	now := time.Now().UTC()
@@ -645,17 +766,17 @@ func (s *DocumentsService) loadRevisionOrCurrent(doc *model.CanvasDocument, revI
 }
 
 type AIContext struct {
-	DocumentID      uuid.UUID                 `json:"documentId"`
-	Title           string                    `json:"title"`
-	Notes           string                    `json:"notes"`
-	TemplateID      *string                   `json:"templateId"`
-	CanvasType      string                    `json:"canvasType"`
-	CreatedAt       time.Time                 `json:"createdAt"`
-	UpdatedAt       time.Time                 `json:"updatedAt"`
-	Summary         string                    `json:"summary"`
-	Panels          []map[string]string       `json:"panels"`
-	PlainText       string                    `json:"plainText"`
-	AttachmentsMeta []content.AttachmentMeta  `json:"attachmentsMeta"`
+	DocumentID      uuid.UUID                `json:"documentId"`
+	Title           string                   `json:"title"`
+	Notes           string                   `json:"notes"`
+	TemplateID      *string                  `json:"templateId"`
+	CanvasType      string                   `json:"canvasType"`
+	CreatedAt       time.Time                `json:"createdAt"`
+	UpdatedAt       time.Time                `json:"updatedAt"`
+	Summary         string                   `json:"summary"`
+	Panels          []map[string]string      `json:"panels"`
+	PlainText       string                   `json:"plainText"`
+	AttachmentsMeta []content.AttachmentMeta `json:"attachmentsMeta"`
 }
 
 func (s *DocumentsService) AIContext(ownerID, docID uuid.UUID) (*AIContext, error) {

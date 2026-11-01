@@ -19,18 +19,21 @@ import {
   diffRevisions,
 } from '../api/documents'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { friendlyApiMessage } from '../utils/apiMessage'
 
 const route = useRoute()
 const router = useRouter()
 const documentStore = useDocumentStore()
 const ui = useUiStore()
 const auth = useAuthStore()
-const { dirty, saving, document_id } = storeToRefs(documentStore)
+const { dirty, saving, document_id, conflict } = storeToRefs(documentStore)
 
 const statusMsg = ref('')
 const docsOpen = ref(false)
 const myDocs = ref<DocumentSummary[]>([])
 const docsLoading = ref(false)
+const docsError = ref('')
+const docsTruncated = ref(false)
 
 const templateId = computed<TemplateId>(() => {
   const raw = String(route.params.templateId ?? 'dual-triangle')
@@ -70,7 +73,7 @@ async function bootstrap() {
       await documentStore.load(qid)
       return
     } catch (e) {
-      statusMsg.value = e instanceof Error ? e.message : '打开文档失败'
+      statusMsg.value = friendlyApiMessage(e, '打开文档失败')
     }
   }
   documentStore.loadFromTemplate(templateId.value)
@@ -224,7 +227,9 @@ async function doSave(checkpoint: boolean) {
     }
     statusMsg.value = checkpoint ? '已存版' : '已同步'
   } catch (e) {
-    statusMsg.value = e instanceof Error ? e.message : '保存失败'
+    statusMsg.value = conflict.value
+      ? '检测到编辑冲突。可以选择保留云端，或恢复刚才的修改再保存。'
+      : friendlyApiMessage(e, '保存失败')
   }
 }
 
@@ -266,7 +271,7 @@ async function newDocument() {
     })
     statusMsg.value = '已新建'
   } catch (e) {
-    statusMsg.value = e instanceof Error ? e.message : '新建失败'
+    statusMsg.value = friendlyApiMessage(e, '新建失败')
   }
 }
 
@@ -274,10 +279,14 @@ async function openDocsPanel() {
   if (!requireLogin()) return
   docsOpen.value = true
   docsLoading.value = true
+  docsError.value = ''
   try {
-    myDocs.value = await documentStore.listMyDocuments(templateId.value)
+    myDocs.value = await documentStore.listMyDocuments(templateId.value, 50)
+    docsTruncated.value = myDocs.value.length >= 50
   } catch (e) {
-    statusMsg.value = e instanceof Error ? e.message : '列表失败'
+    docsError.value = friendlyApiMessage(e, '文档列表暂时不可用')
+    myDocs.value = []
+    docsTruncated.value = false
   } finally {
     docsLoading.value = false
   }
@@ -285,12 +294,30 @@ async function openDocsPanel() {
 
 async function openDoc(id: string) {
   docsOpen.value = false
-  await documentStore.load(id)
-  router.replace({
-    name: 'canvas',
-    params: { templateId: templateId.value },
-    query: { documentId: id },
-  })
+  try {
+    await documentStore.load(id)
+    router.replace({
+      name: 'canvas',
+      params: { templateId: templateId.value },
+      query: { documentId: id },
+    })
+  } catch (e) {
+    statusMsg.value = friendlyApiMessage(e, '打开文档失败')
+  }
+}
+
+function keepServerVersion() {
+  documentStore.discardConflict()
+  statusMsg.value = '已保留云端版本'
+}
+
+async function restoreMine() {
+  try {
+    await documentStore.restoreConflictDraft()
+    statusMsg.value = '已用你的修改覆盖并保存'
+  } catch (e) {
+    statusMsg.value = friendlyApiMessage(e, '恢复修改失败')
+  }
 }
 
 async function manualCheckpoint() {
@@ -299,7 +326,7 @@ async function manualCheckpoint() {
     await documentStore.checkpoint('manual-snapshot')
     statusMsg.value = '已手动存版'
   } catch (e) {
-    statusMsg.value = e instanceof Error ? e.message : '存版失败'
+    statusMsg.value = friendlyApiMessage(e, '存版失败')
   }
 }
 </script>
@@ -337,6 +364,13 @@ async function manualCheckpoint() {
         </el-button>
       </div>
     </header>
+    <div v-if="conflict" class="conflict" role="alert">
+      <p>这份画布刚在其他地方保存过。编辑区已换成云端最新内容，你刚才未同步的修改还留着。</p>
+      <div class="conflict-actions">
+        <button type="button" class="conflict-primary" @click="restoreMine">恢复我的修改并保存</button>
+        <button type="button" class="conflict-ghost" @click="keepServerVersion">保留云端版本</button>
+      </div>
+    </div>
     <div class="workspace">
       <main class="main">
         <CanvasViewport />
@@ -345,9 +379,11 @@ async function manualCheckpoint() {
     </div>
 
     <el-drawer v-model="docsOpen" title="我的文档" size="360px">
-      <p v-if="docsLoading">加载中…</p>
-      <ul v-else class="doc-list">
-        <li v-if="myDocs.length === 0" class="empty">暂无该模板下的文档</li>
+      <p v-if="docsLoading">正在读取这个模板下的文档…</p>
+      <p v-else-if="docsError" class="empty">{{ docsError }}</p>
+      <p v-else-if="docsTruncated" class="empty">只显示最近 50 份。更早的画布可以在工作面板里按更新时间查看。</p>
+      <ul v-if="!docsLoading && !docsError" class="doc-list">
+        <li v-if="myDocs.length === 0" class="empty">这个模板下还没有云端画布。填写任务名称后保存即可建档。</li>
         <li
           v-for="d in myDocs"
           :key="d.id"
@@ -409,9 +445,56 @@ async function manualCheckpoint() {
   flex-wrap: wrap;
 }
 
+.conflict {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 16px;
+  background: #fef7e0;
+  border-bottom: 1px solid #f9e2ae;
+}
+
+.conflict p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.conflict-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.conflict-primary,
+.conflict-ghost {
+  font: inherit;
+  cursor: pointer;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.conflict-primary {
+  border: 0;
+  background: #1a73e8;
+  color: #fff;
+}
+
+.conflict-ghost {
+  border: 1px solid #dadce0;
+  background: #fff;
+}
+
 .meta {
   font-size: 12px;
   color: #5f6368;
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .user {
@@ -484,6 +567,16 @@ async function manualCheckpoint() {
 
 .empty {
   color: #5f6368;
-  font-size: 13px;
+}
+
+@media (max-width: 800px) {
+  .conflict {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .topbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }
 </style>

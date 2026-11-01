@@ -35,6 +35,7 @@ type RequestOpts = {
   body?: unknown
   auth?: boolean
   signal?: AbortSignal
+  cache?: RequestCache
 }
 
 const BASE = (import.meta.env.VITE_API_BASE as string | undefined) || '/api'
@@ -60,6 +61,7 @@ export async function apiRequest<T = unknown>(
     headers,
     body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
     signal: opts.signal,
+    cache: opts.cache,
   })
 
   if (res.status === 204) {

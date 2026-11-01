@@ -641,6 +641,39 @@ export const useDocumentStore = defineStore('document', () => {
   const activeTemplateId = ref<TemplateId | null>(null)
   const loading = ref(false)
   const saving = ref(false)
+  /** Local draft kept when a 409 replaces the editor with the server copy. */
+  const conflict = ref<{ draft: CanvasDocumentJSON } | null>(null)
+  const conflictKey = 'metamatrix:save-conflict'
+
+  function rememberConflict(id: string, draft: CanvasDocumentJSON) {
+    conflict.value = { draft }
+    try {
+      sessionStorage.setItem(conflictKey, JSON.stringify({ id, draft }))
+    } catch {
+      /* private mode or quota */
+    }
+  }
+
+  function discardConflict() {
+    conflict.value = null
+    try {
+      sessionStorage.removeItem(conflictKey)
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function hydrateConflict(id: string) {
+    try {
+      const raw = sessionStorage.getItem(conflictKey)
+      if (!raw) return
+      const parsed = JSON.parse(raw) as { id?: string; draft?: CanvasDocumentJSON }
+      if (parsed.id === id && parsed.draft) conflict.value = { draft: parsed.draft }
+      else if (parsed.id && parsed.id !== id) conflict.value = null
+    } catch {
+      conflict.value = null
+    }
+  }
   /** 任务名称（文档 title，与画布模板 id 解耦） */
   const doc_title = ref('')
   /** 备注信息 */
@@ -1626,6 +1659,7 @@ export const useDocumentStore = defineStore('document', () => {
       })
       dirty.value = false
       persistLocal(activeTemplateId.value)
+      hydrateConflict(doc.id)
     } finally {
       loading.value = false
     }
@@ -1748,12 +1782,14 @@ export const useDocumentStore = defineStore('document', () => {
         dirty.value = false
       } catch (e) {
         if (e instanceof ApiError && e.status === 409) {
-          const body = e.body as { headRevisionId?: string } | undefined
-          // reload latest and surface conflict
-          await load(id)
-          throw new Error(
-            `保存冲突（服务端 head=${body?.headRevisionId ?? '?'}），已拉取最新版本`,
-          )
+          const draft = current_data.value ? cloneDoc(current_data.value) : null
+          try {
+            await load(id)
+          } catch {
+            throw new Error('保存冲突，但拉取云端版本失败。本地修改还在，请稍后重试。')
+          }
+          if (draft) rememberConflict(id, draft)
+          throw new Error('内容已在其他地方更新，已载入云端版本。')
         }
         throw e
       }
@@ -1779,15 +1815,34 @@ export const useDocumentStore = defineStore('document', () => {
       document_id.value = res.document.id
       head_revision_id.value = res.document.headRevisionId
       dirty.value = false
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 409 && document_id.value) {
+        await load(document_id.value)
+        throw new Error('存版时云端已有更新，已重新载入最新版本。请再存一次。')
+      }
+      throw e
     } finally {
       saving.value = false
     }
   }
 
-  async function listMyDocuments(templateId?: string) {
-    return documentsApi.listDocuments(
-      templateId ? { templateId } : undefined,
-    )
+  async function restoreConflictDraft(): Promise<void> {
+    const draft = conflict.value?.draft
+    if (!draft) {
+      discardConflict()
+      return
+    }
+    current_data.value = cloneDoc(draft)
+    dirty.value = true
+    discardConflict()
+    await save()
+  }
+
+  async function listMyDocuments(templateId?: string, limit?: number) {
+    return documentsApi.listDocuments({
+      ...(templateId ? { templateId } : {}),
+      ...(limit != null ? { limit } : {}),
+    })
   }
 
   function markDirty() {
@@ -3191,6 +3246,9 @@ export const useDocumentStore = defineStore('document', () => {
     activeTemplateId,
     loading,
     saving,
+    conflict,
+    discardConflict,
+    restoreConflictDraft,
     doc_title,
     doc_notes,
     created_at,

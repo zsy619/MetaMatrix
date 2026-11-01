@@ -1,11 +1,14 @@
 import type {
+  ActivityStats,
   DocumentStats,
   HeatCell,
+  RecentEdit,
   StatsBucket,
   StatsGranularity,
   StatsRange,
   TemplateStat,
 } from '../../api/documents'
+import { isTemplateId, TEMPLATE_META } from '../../stores/document'
 
 type SampleDoc = {
   templateId: string
@@ -279,6 +282,19 @@ export function buildSampleStats(range: StatsRange, granularity: StatsGranularit
   let allRevs = 0
   for (const d of docs) allRevs += d.revs.length
 
+  const activity = summarizeActivity(heat, from, end, prevFrom, prevTo, today)
+  const recent = [...docs]
+    .sort((a, b) => (a.updated < b.updated ? 1 : a.updated > b.updated ? -1 : a.templateId.localeCompare(b.templateId)))
+    .slice(0, 8)
+    .map((d, index): RecentEdit => ({
+      id: `sample-${index}-${d.templateId}`,
+      title: isTemplateId(d.templateId) ? TEMPLATE_META[d.templateId].name : d.templateId,
+      templateId: d.templateId,
+      canvasType: d.canvasType,
+      createdAt: `${d.created}T09:00:00+08:00`,
+      updatedAt: `${d.updated}T09:00:00+08:00`,
+    }))
+
   return {
     range,
     granularity,
@@ -324,8 +340,55 @@ export function buildSampleStats(range: StatsRange, granularity: StatsGranularit
       previous: countEdited(docs, prevFrom, prevTo),
     },
     totals: { revisions: allRevs, templates: new Set(docs.map((d) => d.templateId)).size },
+    activity,
     series,
     templates,
     heatmap,
+    recent,
+  }
+}
+
+function countActive(heat: Map<string, number>, from: string, toExclusive: string): number {
+  let n = 0
+  for (let cur = from; cur < toExclusive; cur = addDays(cur, 1)) {
+    if ((heat.get(cur) || 0) > 0) n++
+  }
+  return n
+}
+
+function summarizeActivity(
+  heat: Map<string, number>,
+  from: string,
+  toExclusive: string,
+  prevFrom: string,
+  prevTo: string,
+  today: string,
+): ActivityStats {
+  let day = today
+  let streak = 0
+  if ((heat.get(day) || 0) === 0) day = addDays(today, -1)
+  if ((heat.get(day) || 0) > 0) {
+    while ((heat.get(day) || 0) > 0 && streak < 800) {
+      streak++
+      day = addDays(day, -1)
+    }
+  }
+  const days = [...heat.entries()]
+    .filter(([date, count]) => count > 0 && date <= today)
+    .map(([date]) => date)
+    .sort()
+  let longest = 0
+  let run = 0
+  let prev = ''
+  for (const date of days) {
+    run = prev && date === addDays(prev, 1) ? run + 1 : 1
+    if (run > longest) longest = run
+    prev = date
+  }
+  return {
+    activeDays: countActive(heat, from, toExclusive),
+    previousActiveDays: countActive(heat, prevFrom, prevTo),
+    streak,
+    longest,
   }
 }

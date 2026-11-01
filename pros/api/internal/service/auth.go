@@ -2,7 +2,6 @@ package service
 
 import (
 	"errors"
-	"strings"
 	"time"
 
 	"metamatrix/api/internal/middleware"
@@ -18,8 +17,21 @@ var (
 	ErrInvalidCreds    = errors.New("invalid email or password")
 	ErrUserNotFound    = errors.New("user not found")
 	ErrWeakPassword    = errors.New("password must be at least 6 characters")
+	ErrPasswordTooLong = errors.New("password exceeds 72 bytes")
 	ErrInvalidEmail    = errors.New("invalid email")
 )
+
+// dummyPasswordHash keeps the missing-user login path on the same bcrypt cost
+// as a real password check, so failure timing does not reveal whether the email exists.
+var dummyPasswordHash []byte
+
+func init() {
+	hash, err := bcrypt.GenerateFromPassword([]byte("metamatrix-timing-pad"), bcrypt.DefaultCost)
+	if err != nil {
+		panic(err)
+	}
+	dummyPasswordHash = hash
+}
 
 type AuthService struct {
 	db        *gorm.DB
@@ -47,12 +59,12 @@ func toUserDTO(u *model.User) UserDTO {
 }
 
 func (s *AuthService) Register(email, password, displayName string) (*model.User, string, error) {
-	email = strings.TrimSpace(strings.ToLower(email))
-	if email == "" || !strings.Contains(email, "@") {
-		return nil, "", ErrInvalidEmail
+	email = NormalizeEmail(email)
+	if err := ValidateEmail(email); err != nil {
+		return nil, "", err
 	}
-	if len(password) < 6 {
-		return nil, "", ErrWeakPassword
+	if err := ValidatePassword(password); err != nil {
+		return nil, "", err
 	}
 	var count int64
 	if err := s.db.Model(&model.User{}).Where("email = ?", email).Count(&count).Error; err != nil {
@@ -69,15 +81,15 @@ func (s *AuthService) Register(email, password, displayName string) (*model.User
 	u := &model.User{
 		ID:           uuid.New(),
 		Email:        email,
-		DisplayName:  strings.TrimSpace(displayName),
+		DisplayName:  NormalizeDisplayName(displayName, email),
 		PasswordHash: string(hash),
 		CreatedAt:    now,
 		UpdatedAt:    now,
 	}
-	if u.DisplayName == "" {
-		u.DisplayName = strings.Split(email, "@")[0]
-	}
 	if err := s.db.Create(u).Error; err != nil {
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return nil, "", ErrEmailTaken
+		}
 		return nil, "", err
 	}
 	token, err := middleware.SignToken(s.jwtSecret, u.ID, u.Email, 7*24*time.Hour)
@@ -88,10 +100,11 @@ func (s *AuthService) Register(email, password, displayName string) (*model.User
 }
 
 func (s *AuthService) Login(email, password string) (*model.User, string, error) {
-	email = strings.TrimSpace(strings.ToLower(email))
+	email = NormalizeEmail(email)
 	var u model.User
 	if err := s.db.Where("email = ?", email).First(&u).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
+			_ = bcrypt.CompareHashAndPassword(dummyPasswordHash, []byte(password))
 			return nil, "", ErrInvalidCreds
 		}
 		return nil, "", err

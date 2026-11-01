@@ -142,6 +142,18 @@ const showDots = computed(() => props.mode === 'line' && props.labels.length <= 
       </template>
     </template>
 
+    <rect
+      v-for="(label, i) in labels"
+      :key="`hit-${label}-${i}`"
+      :x="pad.l + (i * plotW) / n"
+      y="0"
+      :width="plotW / n"
+      :height="H"
+      fill="transparent"
+    >
+      <title>{{ tip(i) }}</title>
+    </rect>
+
     <text
       v-for="i in xTicks"
       :key="`x-${i}`"

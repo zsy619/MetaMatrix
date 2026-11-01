@@ -6,6 +6,7 @@ import { CATEGORY_LABELS, TEMPLATE_META } from '../stores/document'
 import { useAuthStore } from '../stores/auth'
 import type { DocumentSummary, SearchHit } from '../api/documents'
 import { listDocuments, searchDocuments } from '../api/documents'
+import { friendlyApiMessage } from '../utils/apiMessage'
 import GuideThumb from '../components/guide/GuideThumb.vue'
 import GuideAside from '../components/guide/GuideAside.vue'
 
@@ -20,6 +21,8 @@ interface GuideCard {
 const router = useRouter()
 const auth = useAuthStore()
 const recent = ref<DocumentSummary[]>([])
+const recentLoading = ref(false)
+const recentError = ref('')
 const searchQ = ref('')
 const searchHits = ref<SearchHit[]>([])
 const searching = ref(false)
@@ -95,6 +98,7 @@ function openCanvas(id: TemplateId) {
 
 function onLogout() {
   recent.value = []
+  recentError.value = ''
   searchHits.value = []
   searchQ.value = ''
   searchErr.value = ''
@@ -103,12 +107,18 @@ function onLogout() {
 async function refreshRecent() {
   if (!auth.isAuthenticated) {
     recent.value = []
+    recentError.value = ''
     return
   }
+  recentLoading.value = true
+  recentError.value = ''
   try {
-    recent.value = (await listDocuments()).slice(0, 12)
-  } catch {
+    recent.value = await listDocuments({ limit: 12 })
+  } catch (e) {
     recent.value = []
+    recentError.value = friendlyApiMessage(e, '最近文档暂时不可用')
+  } finally {
+    recentLoading.value = false
   }
 }
 
@@ -136,7 +146,7 @@ async function runSearch() {
   try {
     searchHits.value = await searchDocuments({ q, limit: 12 })
   } catch (e) {
-    searchErr.value = e instanceof Error ? e.message : '搜索失败'
+    searchErr.value = friendlyApiMessage(e, '搜索失败')
     searchHits.value = []
   } finally {
     searching.value = false
@@ -186,11 +196,11 @@ onMounted(async () => {
               @input="onSearchInput"
               @keydown.enter.prevent="runSearch"
             />
-            <button type="button" class="primaryish" :disabled="searching" @click="runSearch">
+            <button type="button" class="primaryish" :disabled="searching" :aria-busy="searching" @click="runSearch">
               {{ searching ? '搜索中…' : '搜索' }}
             </button>
           </div>
-          <p v-if="searchErr" class="search-err">{{ searchErr }}</p>
+          <p v-if="searchErr" class="search-err" role="alert">{{ searchErr }}</p>
           <ul v-if="searchHits.length" class="search-hits">
             <li v-for="h in searchHits" :key="h.id">
               <button type="button" @click="openHit(h)">
@@ -260,6 +270,8 @@ onMounted(async () => {
     <GuideAside
       :recent="recent"
       :authenticated="auth.isAuthenticated"
+      :loading="recentLoading"
+      :error="recentError"
       @open="openDoc"
       @logout="onLogout"
       @update:collapsed="asideCollapsed = $event"

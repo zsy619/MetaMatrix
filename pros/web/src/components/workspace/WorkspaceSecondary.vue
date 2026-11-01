@@ -4,10 +4,8 @@ import { useRouter } from 'vue-router'
 import GuideThumb from '../guide/GuideThumb.vue'
 import {
   listDocuments,
-  listRevisions,
   searchDocuments,
   type DocumentSummary,
-  type RevisionSummary,
   type SearchHit,
 } from '../../api/documents'
 import { useAuthStore } from '../../stores/auth'
@@ -16,9 +14,10 @@ import {
   cloneTemplate,
   isTemplateId,
   useDocumentStore,
-  type TemplateCategory,
   type TemplateId,
 } from '../../stores/document'
+import { accentOf } from './palette'
+import { friendlyApiMessage } from '../../utils/apiMessage'
 
 const STARTERS: TemplateId[] = [
   'time-matrix',
@@ -26,14 +25,6 @@ const STARTERS: TemplateId[] = [
   'y-model',
   'five-step-basic',
 ]
-
-const CATEGORY_ACCENT: Record<TemplateCategory, string> = {
-  method: '#1a73e8',
-  growth: '#34a853',
-  industry: '#f9a825',
-  org: '#a142f4',
-  review: '#ea4335',
-}
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -44,9 +35,6 @@ const loaded = ref(false)
 const loading = ref(false)
 const docs = ref<DocumentSummary[]>([])
 const mentions = ref<SearchHit[]>([])
-const activities = ref<
-  { id: string; documentId: string; title: string; templateId: string | null; canvasType: string; label: string; createdAt: string }[]
->([])
 const searchQ = ref('')
 const searchHits = ref<SearchHit[]>([])
 const searching = ref(false)
@@ -59,11 +47,6 @@ let searchTimer: ReturnType<typeof setTimeout> | null = null
 function templateName(id: string | null | undefined): string {
   if (id && isTemplateId(id)) return TEMPLATE_META[id].name
   return id || '画布'
-}
-
-function accentOf(id: string | null | undefined): string {
-  if (id && isTemplateId(id)) return CATEGORY_ACCENT[TEMPLATE_META[id].category]
-  return '#7c4dff'
 }
 
 function knownTemplate(id: string | null | undefined): TemplateId | null {
@@ -85,14 +68,6 @@ function formatWhen(iso: string): string {
   const day = Math.round(hr / 24)
   if (day < 7) return `${day} 天前`
   return t.toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })
-}
-
-function revisionLabel(r: RevisionSummary): string {
-  const raw = (r.label || '').trim()
-  if (raw === 'manual-snapshot') return '手动存档'
-  if (raw === 'auto-checkpoint') return '自动存档'
-  if (raw === 'initial') return '初始版本'
-  return raw || '修订'
 }
 
 function parseTodoLine(line: string): { text: string; done: boolean } | null {
@@ -162,35 +137,10 @@ async function quickCreate(id: TemplateId) {
     })
     router.push({ name: 'canvas', params: { templateId: id }, query: { documentId: docId } })
   } catch (e) {
-    createError.value = e instanceof Error ? e.message : '新建失败'
+    createError.value = friendlyApiMessage(e, '新建失败')
   } finally {
     creatingId.value = null
   }
-}
-
-async function loadRevisions(list: DocumentSummary[]) {
-  const batches = await Promise.all(
-    list.slice(0, 6).map(async (d) => {
-      try {
-        const revs = await listRevisions(d.id)
-        return revs.slice(0, 2).map((r) => ({
-          id: r.id,
-          documentId: d.id,
-          title: d.title || '未命名文档',
-          templateId: d.templateId,
-          canvasType: d.canvasType,
-          label: revisionLabel(r),
-          createdAt: r.createdAt,
-        }))
-      } catch {
-        return []
-      }
-    }),
-  )
-  activities.value = batches
-    .flat()
-    .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
-    .slice(0, 6)
 }
 
 async function ensureLoaded() {
@@ -198,7 +148,7 @@ async function ensureLoaded() {
   loading.value = true
   try {
     const [rows, hits] = await Promise.all([
-      listDocuments(),
+      listDocuments({ limit: 40 }),
       searchDocuments({ q: '待办', limit: 5 }).catch(() => [] as SearchHit[]),
     ])
     const list = Array.isArray(rows) ? rows : []
@@ -206,7 +156,6 @@ async function ensureLoaded() {
     docs.value = list
     mentions.value = Array.isArray(hits) ? hits : []
     loaded.value = true
-    void loadRevisions(list)
   } catch {
     docs.value = []
   } finally {
@@ -234,7 +183,7 @@ async function runSearch() {
   try {
     searchHits.value = await searchDocuments({ q, limit: 8 })
   } catch (e) {
-    searchErr.value = e instanceof Error ? e.message : '搜索失败'
+    searchErr.value = friendlyApiMessage(e, '搜索失败')
     searchHits.value = []
   } finally {
     searching.value = false
@@ -250,8 +199,8 @@ function onSearchInput() {
 <template>
   <details class="secondary" @toggle="onToggle">
     <summary>
-      <span>最近编辑、搜索与备注</span>
-      <span class="hint">统计之外的入口，需要时再展开</span>
+      <span>搜索、备注与快速新建</span>
+      <span class="hint">次要入口，需要时再展开</span>
     </summary>
     <div v-if="open" class="body">
       <p v-if="!auth.isAuthenticated" class="muted">登录后可以接着写、搜索正文，并查看备注里的待办。</p>
@@ -299,13 +248,14 @@ function onSearchInput() {
               <input
                 v-model="searchQ"
                 type="search"
+                aria-label="搜索标题或正文"
                 placeholder="标题或正文关键词"
                 @input="onSearchInput"
                 @keydown.enter.prevent="runSearch"
               />
               <button type="button" class="go" :disabled="searching" @click="runSearch">搜索</button>
             </div>
-            <p v-if="searchErr" class="err">{{ searchErr }}</p>
+            <p v-if="searchErr" class="err" role="alert">{{ searchErr }}</p>
             <p v-else-if="searched && !searching && !searchHits.length" class="muted">没有匹配。</p>
             <ul v-if="searchHits.length" class="rows">
               <li v-for="h in searchHits" :key="h.id">
@@ -314,20 +264,6 @@ function onSearchInput() {
                     <strong>{{ h.title || '未命名文档' }}</strong>
                     <em>{{ h.snippet }}</em>
                   </span>
-                </button>
-              </li>
-            </ul>
-            <h3 class="sub">最近修订</h3>
-            <p v-if="loading" class="muted">读取中…</p>
-            <p v-else-if="!activities.length" class="muted">展开后会汇总最近几份画布的修订。</p>
-            <ul v-else class="rows">
-              <li v-for="a in activities" :key="a.id">
-                <button type="button" class="row" @click="openDoc(a)">
-                  <span class="copy">
-                    <strong>{{ a.label }}</strong>
-                    <em>{{ a.title }}</em>
-                  </span>
-                  <time>{{ formatWhen(a.createdAt) }}</time>
                 </button>
               </li>
             </ul>
@@ -378,10 +314,10 @@ function onSearchInput() {
 
 <style scoped>
 .secondary {
-  background: #fff;
-  border: 1px solid #e8eaed;
+  background: transparent;
+  border: 1px dashed var(--mm-line-strong);
   border-radius: 16px;
-  padding: 4px 16px 8px;
+  padding: 2px 16px 8px;
 }
 
 summary {
@@ -392,7 +328,8 @@ summary {
   gap: 12px;
   align-items: baseline;
   padding: 12px 0;
-  font-weight: 700;
+  font-weight: 650;
+  color: var(--mm-muted);
 }
 
 summary::-webkit-details-marker {

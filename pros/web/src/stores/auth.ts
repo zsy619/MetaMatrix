@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import * as authApi from '../api/auth'
 import type { User } from '../api/auth'
 import { getToken, setToken } from '../api/http'
+import { friendlyApiMessage } from '../utils/apiMessage'
 
 const USER_KEY = 'metamatrix:auth:user'
 
@@ -56,7 +57,7 @@ export const useAuthStore = defineStore('auth', () => {
       applySession(res.token, res.user)
       return res.user
     } catch (e: unknown) {
-      error.value = e instanceof Error ? e.message : '注册失败'
+      error.value = friendlyApiMessage(e, '注册失败')
       throw e
     } finally {
       loading.value = false
@@ -71,7 +72,7 @@ export const useAuthStore = defineStore('auth', () => {
       applySession(res.token, res.user)
       return res.user
     } catch (e: unknown) {
-      error.value = e instanceof Error ? e.message : '登录失败'
+      error.value = friendlyApiMessage(e, '登录失败')
       throw e
     } finally {
       loading.value = false

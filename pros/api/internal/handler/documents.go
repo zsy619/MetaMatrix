@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -77,13 +78,20 @@ func handleDocErr(c *app.RequestContext, err error, doc interface{}) bool {
 	case errors.Is(err, service.ErrRevisionNotFound):
 		NotFound(c, "revision not found")
 	case errors.Is(err, service.ErrHeadConflict):
-		Conflict(c, "head_revision_id conflict", map[string]interface{}{
+		c.JSON(http.StatusConflict, map[string]interface{}{
+			"message":        "document was updated elsewhere",
+			"code":           "head_conflict",
 			"headRevisionId": extractHead(doc),
 		})
 	case errors.Is(err, service.ErrNotSnapshot):
 		Conflict(c, err.Error(), nil)
+	case errors.Is(err, service.ErrValidation), errors.Is(err, service.ErrInvalidHead):
+		Fail(c, http.StatusBadRequest, "validation failed", "validation_error")
+	case errors.Is(err, service.ErrPayloadTooLarge):
+		Fail(c, http.StatusRequestEntityTooLarge, "payload too large", "payload_too_large")
 	default:
-		Internal(c, err.Error())
+		log.Printf("document error: %v", err)
+		Internal(c, "request failed")
 	}
 	return true
 }
@@ -131,9 +139,27 @@ func (h *DocumentsHandler) List(ctx context.Context, c *app.RequestContext) {
 	}
 	templateID := string(c.Query("templateId"))
 	canvasType := string(c.Query("canvasType"))
-	rows, err := h.svc.List(uid, templateID, canvasType)
+	limit, offset, paged, err := service.NormalizeListPage(string(c.Query("limit")), string(c.Query("offset")))
+	if err != nil {
+		Fail(c, http.StatusBadRequest, "invalid limit or offset", "validation_error")
+		return
+	}
+	rows, total, err := h.svc.List(uid, service.ListFilter{
+		TemplateID: templateID,
+		CanvasType: canvasType,
+		Limit:      limit,
+		Offset:     offset,
+		Paged:      paged,
+	})
 	if handleDocErr(c, err, nil) {
 		return
+	}
+	hasMore := paged && int64(offset+len(rows)) < total
+	c.Header("X-Total-Count", strconv.FormatInt(total, 10))
+	c.Header("X-Has-More", strconv.FormatBool(hasMore))
+	if paged {
+		c.Header("X-Limit", strconv.Itoa(limit))
+		c.Header("X-Offset", strconv.Itoa(offset))
 	}
 	c.JSON(http.StatusOK, rows)
 }
@@ -316,10 +342,13 @@ func (h *DocumentsHandler) Stats(ctx context.Context, c *app.RequestContext) {
 	if !ok {
 		return
 	}
+	uid = service.ResolveStatsOwner(uid, string(c.Query("scope")))
 	out, err := h.svc.Stats(uid, string(c.Query("range")), string(c.Query("granularity")))
 	if handleDocErr(c, err, nil) {
 		return
 	}
+	c.Header("Cache-Control", "private, max-age=20")
+	c.Header("Vary", "Authorization")
 	c.JSON(http.StatusOK, out)
 }
 

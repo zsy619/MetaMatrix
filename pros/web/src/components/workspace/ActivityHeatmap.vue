@@ -38,10 +38,15 @@ function monthLabel(index: number): string {
 }
 
 const weekdayLabels = ['一', '', '三', '', '五', '', '']
+
+const activeDays = computed(
+  () => props.cells.filter((c) => c.count > 0 && c.date <= today.value).length,
+)
 </script>
 
 <template>
-  <div class="heat">
+  <div class="heat" role="img" :aria-label="`近 53 周活动，${activeDays} 天有记录`">
+    <p class="sr">近 53 周共 {{ activeDays }} 天有活动。颜色越深表示当天修订或实质编辑越多。</p>
     <div class="heat-scroll">
       <div class="months" :style="{ gridTemplateColumns: `repeat(${weeks.length}, 12px)` }">
         <span v-for="(_, i) in weeks" :key="i">{{ monthLabel(i) }}</span>
@@ -76,6 +81,22 @@ const weekdayLabels = ['一', '', '三', '', '五', '', '']
 </template>
 
 <style scoped>
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.heat {
+  position: relative;
+}
+
 .heat-scroll {
   overflow-x: auto;
   padding-bottom: 4px;

@@ -133,7 +133,164 @@ func TestAggregateEmpty(t *testing.T) {
 	if stats.Series[0].Created != 0 || stats.Documents.Current != 0 {
 		t.Fatalf("empty stats not zero")
 	}
-	if stats.Templates == nil || stats.Heatmap == nil {
+	if stats.Templates == nil || stats.Heatmap == nil || stats.Recent == nil {
 		t.Fatal("nil slices")
+	}
+	if stats.Activity.ActiveDays != 0 || stats.Activity.Streak != 0 || stats.Activity.Longest != 0 {
+		t.Fatalf("empty activity = %+v", stats.Activity)
+	}
+}
+
+func TestActivityStreakAndRecent(t *testing.T) {
+	loc := time.FixedZone("Asia/Shanghai", 8*3600)
+	now := time.Date(2026, 10, 31, 12, 0, 0, 0, loc)
+	idA := uuid.MustParse("00000000-0000-0000-0000-00000000000a")
+	idB := uuid.MustParse("00000000-0000-0000-0000-00000000000b")
+	tpl := "time-matrix"
+	docs := []StatsDoc{
+		{
+			ID: idA, Title: "较新", TemplateID: &tpl, CanvasType: "time_matrix",
+			CreatedAt: time.Date(2026, 10, 30, 9, 0, 0, 0, loc),
+			UpdatedAt: time.Date(2026, 10, 30, 9, 0, 0, 0, loc),
+		},
+		{
+			ID: idB, Title: " 较早 ", TemplateID: &tpl, CanvasType: "time_matrix",
+			CreatedAt: time.Date(2026, 10, 28, 9, 0, 0, 0, loc),
+			UpdatedAt: time.Date(2026, 10, 29, 9, 0, 0, 0, loc),
+		},
+	}
+	revs := []StatsRev{
+		{DocumentID: idA, CreatedAt: docs[0].CreatedAt},
+		{DocumentID: idB, CreatedAt: docs[1].CreatedAt},
+	}
+	stats := AggregateDocumentStats(docs, revs, now, loc, "7d", "day")
+	if stats.Activity.ActiveDays != 3 || stats.Activity.Streak != 3 || stats.Activity.Longest != 3 {
+		t.Fatalf("activity = %+v, want active 3 streak 3 longest 3", stats.Activity)
+	}
+	if len(stats.Recent) != 2 || stats.Recent[0].ID != idA.String() || stats.Recent[0].Title != "较新" {
+		t.Fatalf("recent = %+v", stats.Recent)
+	}
+	if stats.Recent[1].Title != "较早" {
+		t.Fatalf("title trim = %q", stats.Recent[1].Title)
+	}
+}
+
+func TestEditThresholdAndShanghaiDay(t *testing.T) {
+	loc := time.FixedZone("Asia/Shanghai", 8*3600)
+	now := time.Date(2026, 11, 1, 10, 0, 0, 0, loc)
+	base := time.Date(2026, 11, 1, 9, 0, 0, 0, loc)
+	utcNight := time.Date(2026, 10, 31, 16, 30, 0, 0, time.UTC) // 2026-11-01 00:30 CST
+	docs := []StatsDoc{
+		{ID: uuid.New(), CreatedAt: base, UpdatedAt: base.Add(59 * time.Second)},
+		{ID: uuid.New(), CreatedAt: base, UpdatedAt: base.Add(time.Minute), CanvasType: "time_matrix"},
+		{ID: uuid.New(), CreatedAt: utcNight, UpdatedAt: utcNight, CanvasType: "time_matrix"},
+	}
+	stats := AggregateDocumentStats(docs, nil, now, loc, "7d", "day")
+	if stats.RangeEdited.Current != 1 {
+		t.Fatalf("substantive edits = %d, want 1", stats.RangeEdited.Current)
+	}
+	if stats.RangeCreated.Current != 3 {
+		t.Fatalf("created = %d, want 3 (utc instant belongs to Nov 1)", stats.RangeCreated.Current)
+	}
+	heat := map[string]int{}
+	for _, c := range stats.Heatmap {
+		heat[c.Date] = c.Count
+	}
+	if heat["2026-11-01"] == 0 {
+		t.Fatal("shanghai day bucket missing utc night create")
+	}
+}
+
+func TestMonthAndWeekBoundaries(t *testing.T) {
+	loc := time.FixedZone("Asia/Shanghai", 8*3600)
+
+	march := time.Date(2026, 3, 31, 12, 0, 0, 0, loc)
+	docs := []StatsDoc{
+		{ID: uuid.New(), CreatedAt: time.Date(2026, 2, 28, 9, 0, 0, 0, loc), UpdatedAt: time.Date(2026, 2, 28, 9, 0, 0, 0, loc)},
+		{ID: uuid.New(), CreatedAt: time.Date(2026, 1, 30, 9, 0, 0, 0, loc), UpdatedAt: time.Date(2026, 1, 30, 9, 0, 0, 0, loc)},
+	}
+	stats := AggregateDocumentStats(docs, nil, march, loc, "30d", "day")
+	if stats.MonthCreated.Previous != 1 {
+		t.Fatalf("march 31 previous month created = %d, want 1 (all of february)", stats.MonthCreated.Previous)
+	}
+
+	leap := time.Date(2024, 2, 29, 8, 0, 0, 0, loc)
+	leapDocs := []StatsDoc{
+		{ID: uuid.New(), CreatedAt: time.Date(2024, 1, 29, 8, 0, 0, 0, loc), UpdatedAt: time.Date(2024, 1, 29, 8, 0, 0, 0, loc)},
+		{ID: uuid.New(), CreatedAt: time.Date(2024, 1, 30, 8, 0, 0, 0, loc), UpdatedAt: time.Date(2024, 1, 30, 8, 0, 0, 0, loc)},
+	}
+	leapStats := AggregateDocumentStats(leapDocs, nil, leap, loc, "7d", "day")
+	if leapStats.MonthCreated.Previous != 1 {
+		t.Fatalf("feb 29 previous month created = %d, want 1 (jan 29 only)", leapStats.MonthCreated.Previous)
+	}
+
+	sunday := time.Date(2026, 11, 1, 12, 0, 0, 0, loc)
+	weekDocs := []StatsDoc{
+		{ID: uuid.New(), CreatedAt: time.Date(2026, 10, 26, 9, 0, 0, 0, loc), UpdatedAt: time.Date(2026, 10, 26, 9, 0, 0, 0, loc)},
+		{ID: uuid.New(), CreatedAt: time.Date(2026, 11, 1, 9, 0, 0, 0, loc), UpdatedAt: time.Date(2026, 11, 1, 9, 0, 0, 0, loc)},
+		{ID: uuid.New(), CreatedAt: time.Date(2026, 10, 25, 9, 0, 0, 0, loc), UpdatedAt: time.Date(2026, 10, 25, 9, 0, 0, 0, loc)},
+	}
+	week := AggregateDocumentStats(weekDocs, nil, sunday, loc, "7d", "week")
+	if week.WeekCreated.Current != 2 || week.WeekCreated.Previous != 1 {
+		t.Fatalf("sunday week created = %d/%d, want 2/1", week.WeekCreated.Current, week.WeekCreated.Previous)
+	}
+}
+
+func TestTemplateFallbackSortAndYearBuckets(t *testing.T) {
+	loc := time.FixedZone("Asia/Shanghai", 8*3600)
+	now := time.Date(2026, 1, 1, 8, 0, 0, 0, loc)
+	empty := ""
+	custom := "custom"
+	docs := []StatsDoc{
+		{ID: uuid.New(), TemplateID: &empty, CanvasType: "", CreatedAt: now, UpdatedAt: now},
+		{ID: uuid.New(), TemplateID: nil, CanvasType: "custom", CreatedAt: now, UpdatedAt: now},
+		{ID: uuid.New(), TemplateID: &custom, CanvasType: "custom", CreatedAt: now, UpdatedAt: now.Add(time.Minute)},
+	}
+	stats := AggregateDocumentStats(docs, nil, now, loc, "year", "month")
+	if stats.Range != "year" || len(stats.Series) != 1 || stats.From != "2026-01-01" || stats.PreviousFrom != "2025-01-01" {
+		t.Fatalf("year window %+v series %d", stats.From, len(stats.Series))
+	}
+	if stats.Templates[0].TemplateID != "custom" || stats.Templates[0].Total != 2 {
+		t.Fatalf("template group = %+v", stats.Templates)
+	}
+	foundUnknown := false
+	for _, tplt := range stats.Templates {
+		if tplt.TemplateID == "unknown" && tplt.Total == 1 {
+			foundUnknown = true
+		}
+		if tplt.TemplateID == "custom" && len(tplt.Series) == 1 && tplt.Series[0] != 2 {
+			t.Fatalf("same bucket should count each canvas once, series=%v", tplt.Series)
+		}
+	}
+	if !foundUnknown {
+		t.Fatalf("missing unknown bucket: %+v", stats.Templates)
+	}
+	if stats.ActiveTemplates.Current != 2 {
+		t.Fatalf("active templates = %d", stats.ActiveTemplates.Current)
+	}
+}
+
+func TestResolveStatsOwnerIgnoresScope(t *testing.T) {
+	me := uuid.New()
+	other := uuid.New()
+	if got := ResolveStatsOwner(me, "all"); got != me {
+		t.Fatalf("scope all = %s", got)
+	}
+	if got := ResolveStatsOwner(me, other.String()); got != me {
+		t.Fatalf("scope other = %s", got)
+	}
+	if got := ResolveStatsOwner(me, ""); got != me {
+		t.Fatalf("scope empty = %s", got)
+	}
+}
+
+func TestNilLocationDefaults(t *testing.T) {
+	now := time.Date(2026, 6, 15, 0, 0, 0, 0, time.UTC)
+	stats := AggregateDocumentStats(nil, nil, now, nil, "90d", "week")
+	if stats.Timezone != "Asia/Shanghai" || stats.Granularity != "week" || stats.Range != "90d" {
+		t.Fatalf("defaults %+v %s", stats.Range, stats.Granularity)
+	}
+	if len(stats.Series) < 13 || len(stats.Series) > 15 {
+		t.Fatalf("90d weeks = %d", len(stats.Series))
 	}
 }

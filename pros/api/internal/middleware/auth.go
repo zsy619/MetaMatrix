@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -36,7 +37,13 @@ func SignToken(secret string, userID uuid.UUID, email string, ttl time.Duration)
 }
 
 func ParseToken(secret, tokenStr string) (*Claims, error) {
+	if strings.TrimSpace(tokenStr) == "" {
+		return nil, jwt.ErrTokenMalformed
+	}
 	tok, err := jwt.ParseWithClaims(tokenStr, &Claims{}, func(t *jwt.Token) (interface{}, error) {
+		if t.Method == nil || t.Method.Alg() != jwt.SigningMethodHS256.Alg() {
+			return nil, fmt.Errorf("unexpected signing method")
+		}
 		return []byte(secret), nil
 	})
 	if err != nil {
