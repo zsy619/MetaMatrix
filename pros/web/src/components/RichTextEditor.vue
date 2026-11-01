@@ -4,6 +4,7 @@ import {
   nextTick,
   onBeforeUnmount,
   onMounted,
+  provide,
   ref,
   watch,
   type Directive,
@@ -226,6 +227,8 @@ import {
   RTE_ZOOM_PRESETS,
   type CaseMode,
 } from './rteWave20'
+import { countWords, normalizeHtml, rtePlaceholderText, toEditorContent } from '../utils/rteContent'
+import { RTE_CTX, type RteEditorEmit, type RteEditorProps } from './rte/context'
 import { RTE_EMOJI_CATEGORIES } from '../utils/rteEmojiList'
 import { RTE_SPECIAL_CHAR_CATEGORIES } from '../utils/rteSpecialChars'
 
@@ -280,18 +283,6 @@ function onTitleInput(event: Event) {
   const v = (event.target as HTMLInputElement).value.slice(0, 100)
   localTitle.value = v
   emit('update:title', v)
-}
-
-function toEditorContent(value: string | undefined | null): string {
-  const raw = value ?? ''
-  if (!raw.trim()) return '<p></p>'
-  if (looksLikeHtml(raw)) return raw
-  return `<p>${escapeHtml(raw)}</p>`
-}
-
-function normalizeHtml(html: string): string {
-  // 去掉标签间空白，避免 itemsToHtml 往返与 getHTML 仅差换行时误触发 setContent
-  return html.replace(/>\s+</g, '><').replace(/\s+/g, ' ').trim()
 }
 
 /** 表格菜单状态（须在 useEditor 之前声明，供 contextmenu 回调闭包使用） */
@@ -860,29 +851,6 @@ const editorBootError = ref('')
 
 /** 粘贴清洗：去掉脚本、Office 垃圾和危险协议，保留段落/列表/标题/链接/表格等结构。 */
 
-function rtePlaceholderText(args: {
-  editor: { isEmpty: boolean; state: { doc: { resolve: (pos: number) => { parent: { type: { name: string } } } } } }
-  node: { type: { name: string }; textContent: string }
-  pos: number
-}): string {
-  const custom = props.placeholder ?? ''
-  if (!custom.trim()) return ''
-  const feishu =
-    custom === '请输入正文' || custom === '输入正文，或按 / 快速插入'
-  const nodeEmpty = !args.node.textContent
-  if (args.node.type.name === 'heading' && nodeEmpty) return '标题'
-  if (args.editor.isEmpty) {
-    return feishu ? '输入正文，或按 / 快速插入' : custom
-  }
-  if (!feishu || !nodeEmpty || args.node.type.name !== 'paragraph') return ''
-  try {
-    const parent = args.editor.state.doc.resolve(args.pos).parent
-    if (parent.type.name === 'listItem' || parent.type.name === 'taskItem') return ''
-  } catch {
-    /* 位置失效时不展示 */
-  }
-  return '按 / 插入'
-}
 const auth = useAuthStore()
 const documentStore = useDocumentStore()
 const { saving, dirty, conflict, document_id, current_data } = storeToRefs(documentStore)
@@ -1175,7 +1143,7 @@ const editor = useEditor({
     RteTableCell,
     RteHorizontalRule,
     Placeholder.configure({
-      placeholder: (args) => rtePlaceholderText(args),
+      placeholder: (args) => rtePlaceholderText(props.placeholder ?? '', args),
       emptyEditorClass: 'is-editor-empty',
       emptyNodeClass: 'is-empty',
       includeChildren: true,
@@ -1835,17 +1803,6 @@ const charCount = computed(() => {
   const text = editor.value?.getText() ?? ''
   return Array.from(text.replace(/\s/g, '')).length
 })
-
-function countWords(raw: string): number {
-  const t = raw.trim()
-  if (!t) return 0
-  const cn = (t.match(/[\u4e00-\u9fff]/g) || []).length
-  const en = t
-    .replace(/[\u4e00-\u9fff]/g, ' ')
-    .split(/\s+/)
-    .filter(Boolean).length
-  return cn + en
-}
 
 const wordCount = computed(() => countWords(editor.value?.getText() ?? ''))
 
@@ -9063,6 +9020,13 @@ function onCanvasClick(event: MouseEvent) {
   if (target.closest('.ProseMirror, .tiptap, .rte-body')) return
   editor.value?.commands.focus('end')
 }
+
+provide(RTE_CTX, {
+  editor,
+  props: props as RteEditorProps,
+  emit: emit as RteEditorEmit,
+  ui: { rootEl: rteRootEl },
+})
 
 defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm })
 </script>
