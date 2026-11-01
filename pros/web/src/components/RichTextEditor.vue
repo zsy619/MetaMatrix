@@ -8,6 +8,9 @@ import {
   watch,
   type Directive,
 } from 'vue'
+import { storeToRefs } from 'pinia'
+import { useAuthStore } from '../stores/auth'
+import { useDocumentStore } from '../stores/document'
 import { NodeSelection, TextSelection } from '@tiptap/pm/state'
 import { Fragment } from '@tiptap/pm/model'
 import { useEditor, EditorContent } from '@tiptap/vue-3'
@@ -744,9 +747,24 @@ function repositionMentionMenu() {
 }
 
 
+const editorReady = ref(false)
+const editorBootError = ref('')
+const auth = useAuthStore()
+const documentStore = useDocumentStore()
+const { saving, dirty, conflict, document_id } = storeToRefs(documentStore)
+
+function initialEditorContent(): string {
+  try {
+    return toEditorContent(props.modelValue)
+  } catch {
+    editorBootError.value = '正文无法解析，已从空白文档继续。'
+    return '<p></p>'
+  }
+}
+
 const editor = useEditor({
 
-  content: toEditorContent(props.modelValue),
+  content: initialEditorContent(),
   extensions: [
     StarterKit.configure({
       heading: { levels: [1, 2, 3, 4, 5, 6] },
@@ -1098,6 +1116,9 @@ const editor = useEditor({
       return false
     },
   },
+  onCreate: () => {
+    editorReady.value = true
+  },
   onUpdate: ({ editor: ed }) => {
     const html = ed.getHTML()
     lastEmittedHtmlNorm = normalizeHtml(html)
@@ -1320,6 +1341,23 @@ watch(
   },
 )
 
+
+const syncLabel = computed(() => {
+  if (editorBootError.value) return editorBootError.value
+  if (!editorReady.value) return '编辑器加载中…'
+  if (conflict.value) return '云端已更新，请选择保留或恢复'
+  if (saving.value) return '正在同步…'
+  if (dirty.value) return '已写入画布，等待同步'
+  if (!auth.isAuthenticated) return '仅保存在本机'
+  if (document_id.value) return '已与云端一致'
+  return '尚未建档'
+})
+
+const syncTone = computed(() => {
+  if (editorBootError.value || conflict.value) return 'is-alert'
+  if (saving.value || dirty.value) return 'is-pending'
+  return 'is-ok'
+})
 
 /** 纯文字符数（去空白更贴近中文「字数」） */
 const charCount = computed(() => {
@@ -7374,6 +7412,9 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
     @mousedown="onRootMouseDown"
     @keydown="onImmersiveKeydown"
   >
+    <p v-if="!editorReady" class="rte-boot" role="status">正在加载编辑器…</p>
+    <p v-else-if="editorBootError" class="rte-boot is-error" role="alert">{{ editorBootError }}</p>
+    <p v-else-if="charCount === 0" class="rte-boot">正文为空。直接输入，或按 / 插入内容。</p>
     <div
       class="rte-toolbar"
       role="toolbar"
@@ -10162,10 +10203,7 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
         </span>
       </div>
       <div class="rte-bottom-right">
-        <span class="rte-draft">
-          刚刚 · 草稿
-          <span class="rte-check" aria-hidden="true">✓</span>
-        </span>
+        <span class="rte-draft" :class="syncTone" role="status">{{ syncLabel }}</span>
         <template v-if="showPublishActions">
           <button type="button" class="rte-preview" @click="onPreview">
             预览
@@ -11705,6 +11743,32 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
 </template>
 
 <style scoped>
+.rte-boot {
+  margin: 0;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: #5f6368;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e8eaed;
+}
+
+.rte-boot.is-error {
+  color: #d93025;
+  background: #fce8e6;
+}
+
+.rte-draft.is-alert {
+  color: #b06000;
+}
+
+.rte-draft.is-pending {
+  color: #174ea6;
+}
+
+.rte-draft.is-ok {
+  color: #188038;
+}
+
 .rte-root {
   display: flex;
   flex-direction: column;

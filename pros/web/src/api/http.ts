@@ -40,10 +40,13 @@ type RequestOpts = {
 
 const BASE = (import.meta.env.VITE_API_BASE as string | undefined) || '/api'
 
-export async function apiRequest<T = unknown>(
-  path: string,
-  opts: RequestOpts = {},
-): Promise<T> {
+export type ApiResult<T> = {
+  data: T
+  headers: Headers
+  status: number
+}
+
+async function performRequest(path: string, opts: RequestOpts = {}): Promise<ApiResult<unknown>> {
   const headers: Record<string, string> = {
     Accept: 'application/json',
   }
@@ -65,7 +68,7 @@ export async function apiRequest<T = unknown>(
   })
 
   if (res.status === 204) {
-    return undefined as T
+    return { data: undefined, headers: res.headers, status: res.status }
   }
 
   const text = await res.text()
@@ -93,5 +96,21 @@ export async function apiRequest<T = unknown>(
     )
   }
 
-  return data as T
+  return { data, headers: res.headers, status: res.status }
+}
+
+export async function apiRequest<T = unknown>(
+  path: string,
+  opts: RequestOpts = {},
+): Promise<T> {
+  const res = await performRequest(path, opts)
+  return res.data as T
+}
+
+export async function apiRequestResult<T = unknown>(
+  path: string,
+  opts: RequestOpts = {},
+): Promise<ApiResult<T>> {
+  const res = await performRequest(path, opts)
+  return { data: res.data as T, headers: res.headers, status: res.status }
 }

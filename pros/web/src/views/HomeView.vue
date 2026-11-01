@@ -12,7 +12,7 @@ import { useUiStore } from '../stores/ui'
 import { useAuthStore } from '../stores/auth'
 import CanvasViewport from '../components/canvas/CanvasViewport.vue'
 import PageSettingsPanel from '../components/PageSettingsPanel.vue'
-import type { DocumentSummary } from '../api/documents'
+import { listDocumentsPage, type DocumentSummary } from '../api/documents'
 import {
   getAIContext,
   listRevisions,
@@ -33,7 +33,10 @@ const docsOpen = ref(false)
 const myDocs = ref<DocumentSummary[]>([])
 const docsLoading = ref(false)
 const docsError = ref('')
-const docsTruncated = ref(false)
+const docsPage = ref(0)
+const docsTotal = ref(0)
+const docsHasMore = ref(false)
+const docsPageSize = 20
 
 const templateId = computed<TemplateId>(() => {
   const raw = String(route.params.templateId ?? 'dual-triangle')
@@ -275,21 +278,45 @@ async function newDocument() {
   }
 }
 
-async function openDocsPanel() {
-  if (!requireLogin()) return
-  docsOpen.value = true
+async function loadDocsPage() {
   docsLoading.value = true
   docsError.value = ''
   try {
-    myDocs.value = await documentStore.listMyDocuments(templateId.value, 50)
-    docsTruncated.value = myDocs.value.length >= 50
+    const page = await listDocumentsPage({
+      templateId: templateId.value,
+      limit: docsPageSize,
+      offset: docsPage.value * docsPageSize,
+    })
+    myDocs.value = page.items
+    docsTotal.value = page.total
+    docsHasMore.value = page.hasMore
   } catch (e) {
     docsError.value = friendlyApiMessage(e, '文档列表暂时不可用')
     myDocs.value = []
-    docsTruncated.value = false
+    docsTotal.value = 0
+    docsHasMore.value = false
   } finally {
     docsLoading.value = false
   }
+}
+
+async function openDocsPanel() {
+  if (!requireLogin()) return
+  docsOpen.value = true
+  docsPage.value = 0
+  await loadDocsPage()
+}
+
+function docsPrev() {
+  if (docsPage.value <= 0 || docsLoading.value) return
+  docsPage.value -= 1
+  void loadDocsPage()
+}
+
+function docsNext() {
+  if (!docsHasMore.value || docsLoading.value) return
+  docsPage.value += 1
+  void loadDocsPage()
 }
 
 async function openDoc(id: string) {
@@ -364,13 +391,15 @@ async function manualCheckpoint() {
         </el-button>
       </div>
     </header>
-    <div v-if="conflict" class="conflict" role="alert">
+    <Teleport to="body">
+    <div v-if="conflict" class="conflict conflict-float" role="alert">
       <p>这份画布刚在其他地方保存过。编辑区已换成云端最新内容，你刚才未同步的修改还留着。</p>
       <div class="conflict-actions">
         <button type="button" class="conflict-primary" @click="restoreMine">恢复我的修改并保存</button>
         <button type="button" class="conflict-ghost" @click="keepServerVersion">保留云端版本</button>
       </div>
     </div>
+    </Teleport>
     <div class="workspace">
       <main class="main">
         <CanvasViewport />
@@ -381,9 +410,11 @@ async function manualCheckpoint() {
     <el-drawer v-model="docsOpen" title="我的文档" size="360px">
       <p v-if="docsLoading">正在读取这个模板下的文档…</p>
       <p v-else-if="docsError" class="empty">{{ docsError }}</p>
-      <p v-else-if="docsTruncated" class="empty">只显示最近 50 份。更早的画布可以在工作面板里按更新时间查看。</p>
-      <ul v-if="!docsLoading && !docsError" class="doc-list">
-        <li v-if="myDocs.length === 0" class="empty">这个模板下还没有云端画布。填写任务名称后保存即可建档。</li>
+      <p v-else-if="docsTotal === 0" class="empty">这个模板下还没有云端画布。填写任务名称后保存即可建档。</p>
+      <p v-else class="empty">
+        第 {{ docsPage * docsPageSize + 1 }}–{{ docsPage * docsPageSize + myDocs.length }} 份，共 {{ docsTotal }} 份
+      </p>
+      <ul v-if="!docsLoading && !docsError && myDocs.length" class="doc-list">
         <li
           v-for="d in myDocs"
           :key="d.id"
@@ -398,6 +429,11 @@ async function manualCheckpoint() {
           </button>
         </li>
       </ul>
+      <div v-if="!docsError && docsTotal > docsPageSize" class="doc-pager">
+        <button type="button" :disabled="docsPage === 0 || docsLoading" @click="docsPrev">上一页</button>
+        <span>第 {{ docsPage + 1 }} 页</span>
+        <button type="button" :disabled="!docsHasMore || docsLoading" @click="docsNext">下一页</button>
+      </div>
     </el-drawer>
   </div>
 </template>
@@ -453,6 +489,18 @@ async function manualCheckpoint() {
   padding: 10px 16px;
   background: #fef7e0;
   border-bottom: 1px solid #f9e2ae;
+}
+
+.conflict-float {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(720px, calc(100vw - 24px));
+  z-index: 5000;
+  border: 1px solid #f9e2ae;
+  border-radius: 12px;
+  box-shadow: 0 8px 28px rgba(32, 33, 36, 0.18);
 }
 
 .conflict p {
@@ -567,6 +615,30 @@ async function manualCheckpoint() {
 
 .empty {
   color: #5f6368;
+  font-size: 13px;
+}
+
+.doc-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 13px;
+}
+
+.doc-pager button {
+  font: inherit;
+  border: 1px solid #dadce0;
+  background: #fff;
+  border-radius: 999px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.doc-pager button:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 @media (max-width: 800px) {

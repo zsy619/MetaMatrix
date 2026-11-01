@@ -23,6 +23,7 @@ func AccessLog() app.HandlerFunc {
 		if status == 0 {
 			status = 200
 		}
+		ObserveStatus(status)
 		log.Printf("access request_id=%s method=%s path=%s status=%d duration_ms=%d",
 			id,
 			string(c.Method()),

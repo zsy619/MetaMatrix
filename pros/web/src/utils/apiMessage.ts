@@ -7,6 +7,7 @@ const CODE_COPY: Record<string, string> = {
   email_taken: '这个邮箱已经注册，请直接登录。',
   invalid_credentials: '邮箱或密码不正确。',
   unauthorized: '登录已失效，请重新登录。',
+  rate_limited: '登录尝试过于频繁，请稍后再试。',
   forbidden: '没有权限执行这个操作。',
   not_found: '没有找到对应内容，或它不属于当前账号。',
   conflict: '内容已在其他地方更新。',
@@ -21,6 +22,7 @@ export function friendlyApiMessage(error: unknown, fallback: string): string {
   if (error instanceof ApiError) {
     if (error.code && CODE_COPY[error.code]) return CODE_COPY[error.code]
     if (error.status === 401) return CODE_COPY.unauthorized
+    if (error.status === 429) return CODE_COPY.rate_limited
     if (error.status === 403) return CODE_COPY.forbidden
     if (error.status === 404) return CODE_COPY.not_found
     if (error.status === 409) return CODE_COPY.conflict
