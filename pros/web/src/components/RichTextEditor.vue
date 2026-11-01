@@ -156,7 +156,10 @@ const props = withDefaults(
     showTitle?: boolean
     placeholder?: string
     compact?: boolean
-    /** 最大化时为 true：展示完整工具条；false 时仅标题/粗/斜/列表 + 更多 */
+    /**
+     * 最大化时为 true：主栏 + 高级工具第二行。
+     * false：飞书式主栏（可横向滚动）+「更多」，避免撑高画布面板。
+     */
     expanded?: boolean
     showBottomBar?: boolean
     showPublishActions?: boolean
@@ -165,7 +168,7 @@ const props = withDefaults(
   {
     title: '',
     showTitle: false,
-    placeholder: '请输入正文',
+    placeholder: '输入正文，或按 / 快速插入',
     compact: false,
     expanded: false,
     showBottomBar: true,
@@ -749,6 +752,53 @@ function repositionMentionMenu() {
 
 const editorReady = ref(false)
 const editorBootError = ref('')
+
+/** 粘贴清洗：去掉脚本、Office 垃圾和危险协议，保留段落/列表/标题/链接/表格等结构。 */
+function sanitizePastedHtml(html: string): string {
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<!--\[if[\s\S]*?<!\[endif\]-->/gi, '')
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<(iframe|object|embed|form|meta|link|xml|o:p)\b[^>]*>[\s\S]*?<\/\1>/gi, '')
+    .replace(/<(iframe|object|embed|form|meta|link|xml|o:p|w:[^>\s]+)[^>]*\/?>/gi, '')
+    .replace(/<\/(xml|o:p|w:[^>\s]+)>/gi, '')
+    .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+    .replace(/\s(href|src)\s*=\s*(['"])\s*javascript:[^'"]*\2/gi, ' $1="#"')
+    .replace(/\s(href|src)\s*=\s*javascript:[^\s>]+/gi, ' $1="#"')
+    .replace(/<\/?span[^>]*>/gi, '')
+    .replace(/<\/?font[^>]*>/gi, '')
+    .replace(/class\s*=\s*("Mso[^"]*"|'Mso[^']*'|"[^"]*Mso[^"]*"|'[^']*Mso[^']*')/gi, '')
+    .replace(/style\s*=\s*"[^"]*mso-[^"]*"/gi, '')
+    .replace(/style\s*=\s*'[^']*mso-[^']*'/gi, '')
+    .replace(/\s(lang|face|size)\s*=\s*("[^"]*"|'[^']*')/gi, '')
+    .replace(/<p([^>]*)>\s*&nbsp;\s*<\/p>/gi, '')
+    .replace(/(<br\s*\/?>\s*){3,}/gi, '<br><br>')
+}
+
+function rtePlaceholderText(args: {
+  editor: { isEmpty: boolean; state: { doc: { resolve: (pos: number) => { parent: { type: { name: string } } } } } }
+  node: { type: { name: string }; textContent: string }
+  pos: number
+}): string {
+  const custom = props.placeholder ?? ''
+  if (!custom.trim()) return ''
+  const feishu =
+    custom === '请输入正文' || custom === '输入正文，或按 / 快速插入'
+  const nodeEmpty = !args.node.textContent
+  if (args.node.type.name === 'heading' && nodeEmpty) return '标题'
+  if (args.editor.isEmpty) {
+    return feishu ? '输入正文，或按 / 快速插入' : custom
+  }
+  if (!feishu || !nodeEmpty || args.node.type.name !== 'paragraph') return ''
+  try {
+    const parent = args.editor.state.doc.resolve(args.pos).parent
+    if (parent.type.name === 'listItem' || parent.type.name === 'taskItem') return ''
+  } catch {
+    /* 位置失效时不展示 */
+  }
+  return '按 / 插入'
+}
 const auth = useAuthStore()
 const documentStore = useDocumentStore()
 const { saving, dirty, conflict, document_id } = storeToRefs(documentStore)
@@ -760,6 +810,40 @@ function initialEditorContent(): string {
     editorBootError.value = '正文无法解析，已从空白文档继续。'
     return '<p></p>'
   }
+}
+
+/** 最近一次已交给父级的 HTML。大文档节流期间用它挡住回声 setContent。 */
+let lastEmittedHtmlNorm = ''
+let htmlEmitTimer: ReturnType<typeof setTimeout> | null = null
+
+function scheduleHtmlEmit(
+  ed: { isDestroyed?: boolean; getHTML: () => string } | null | undefined,
+  immediate = false,
+) {
+  const flush = () => {
+    htmlEmitTimer = null
+    if (!ed || ed.isDestroyed) return
+    let html = ''
+    try {
+      html = ed.getHTML()
+    } catch {
+      return
+    }
+    const norm = normalizeHtml(html)
+    if (norm === lastEmittedHtmlNorm) return
+    lastEmittedHtmlNorm = norm
+    emit('update:modelValue', html)
+  }
+  if (immediate) {
+    if (htmlEmitTimer != null) {
+      clearTimeout(htmlEmitTimer)
+      htmlEmitTimer = null
+    }
+    flush()
+    return
+  }
+  if (htmlEmitTimer != null) return
+  htmlEmitTimer = setTimeout(flush, 160)
 }
 
 const editor = useEditor({
@@ -886,12 +970,12 @@ const editor = useEditor({
     RteTableCell,
     RteHorizontalRule,
     Placeholder.configure({
-      placeholder: props.placeholder,
+      placeholder: (args) => rtePlaceholderText(args),
       emptyEditorClass: 'is-editor-empty',
       emptyNodeClass: 'is-empty',
-      // 分栏等嵌套空段落也要挂 is-empty；否则 depth>1 时默认路径不装饰
       includeChildren: true,
-      showOnlyCurrent: false,
+      showOnlyCurrent: true,
+      showOnlyWhenEditable: true,
     }),
     Annotation,
     MathInline,
@@ -936,22 +1020,7 @@ const editor = useEditor({
           /* ignore */
         }
       }
-      return html
-        .replace(/<script[\s\S]*?<\/script>/gi, '')
-        .replace(/<style[\s\S]*?<\/style>/gi, '')
-        .replace(/<!--\[if[\s\S]*?<!\[endif\]-->/gi, '')
-        .replace(/<!--[\s\S]*?-->/g, '')
-        .replace(/\son\w+=("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
-        .replace(/<(meta|link|xml|o:p|w:[^>\s]+)[^>]*>/gi, '')
-        .replace(/<\/(xml|o:p|w:[^>\s]+)>/gi, '')
-        .replace(/<\/?span[^>]*>/gi, '')
-        .replace(/<\/?font[^>]*>/gi, '')
-        .replace(/class=("Mso[^"]*"|'Mso[^']*'|"[^"]*Mso[^"]*"|'[^']*Mso[^']*')/gi, '')
-        .replace(/style="[^"]*mso-[^"]*"/gi, '')
-        .replace(/style='[^']*mso-[^']*'/gi, '')
-        .replace(/\s(lang|face|size)=("[^"]*"|'[^']*')/gi, '')
-        .replace(/<p([^>]*)>\s*&nbsp;\s*<\/p>/gi, '')
-        .replace(/(<br\s*\/?>\s*){3,}/gi, '<br><br>')
+      return sanitizePastedHtml(html)
     },
     handlePaste(_view, event) {
       const plain = event.clipboardData?.getData('text/plain')
@@ -1091,6 +1160,24 @@ const editor = useEditor({
           return true
         }
       }
+      if (event.shiftKey && !event.altKey) {
+        // 与飞书文档接近：Shift+X 删除线，Shift+9 引用（Shift+S 仍由 StarterKit 处理）
+        if (key === 'x') {
+          event.preventDefault()
+          ed.chain().focus().toggleStrike().run()
+          return true
+        }
+        if (key === '9') {
+          event.preventDefault()
+          ed.chain().focus().toggleBlockquote().run()
+          return true
+        }
+      }
+      if (event.altKey && !event.shiftKey && key === '9') {
+        event.preventDefault()
+        ed.chain().focus().toggleTaskList().run()
+        return true
+      }
       if (event.shiftKey) {
         if (key === 'd') {
           event.preventDefault()
@@ -1120,12 +1207,13 @@ const editor = useEditor({
     editorReady.value = true
   },
   onUpdate: ({ editor: ed }) => {
-    const html = ed.getHTML()
-    lastEmittedHtmlNorm = normalizeHtml(html)
-    emit('update:modelValue', html)
+    scheduleHtmlEmit(ed)
   },
   onFocus: () => emit('focus'),
-  onBlur: () => emit('blur'),
+  onBlur: ({ editor: ed }) => {
+    scheduleHtmlEmit(ed, true)
+    emit('blur')
+  },
   onSelectionUpdate: ({ editor: ed }) => {
     syncSelectedFormFromEditor(ed)
     applyFormatPainterIfNeeded(ed)
@@ -1137,8 +1225,6 @@ const editor = useEditor({
   },
 })
 
-/** 最近一次由本编辑器 emit 出的 HTML（规范化后），用于忽略父级 items 往返回写 */
-let lastEmittedHtmlNorm = ''
 
 type CapturedFormSel = {
   type: FormNodeName
@@ -1357,6 +1443,17 @@ const syncTone = computed(() => {
   if (editorBootError.value || conflict.value) return 'is-alert'
   if (saving.value || dirty.value) return 'is-pending'
   return 'is-ok'
+})
+
+const syncHint = computed(() => {
+  if (conflict.value) {
+    return '保存返回 409：云端有更新。请在文档冲突条选择保留本机或恢复云端，编辑器内容不会被静默覆盖。'
+  }
+  if (saving.value) return '正在把画布写入云端'
+  if (dirty.value) return '改动已写入画布，自动保存会继续同步'
+  if (!auth.isAuthenticated) return '未登录，内容只留在本机'
+  if (document_id.value) return '与云端一致'
+  return '尚未建档'
 })
 
 /** 纯文字符数（去空白更贴近中文「字数」） */
@@ -1721,6 +1818,24 @@ function jumpToOutlineHeading(item: OutlineHeading) {
 }
 
 const SHORTCUT_GROUPS: { title: string; items: { keys: string; desc: string }[] }[] = [
+  {
+    title: '与飞书文档接近',
+    items: [
+      { keys: 'Ctrl/⌘ + B / I / U', desc: '加粗 / 斜体 / 下划线' },
+      { keys: 'Ctrl/⌘ + Shift + X', desc: '删除线（Shift + S 同样有效）' },
+      { keys: 'Ctrl/⌘ + K', desc: '插入或编辑链接' },
+      { keys: 'Ctrl/⌘ + Alt + 1 / 2 / 3', desc: '标题 1–3（4–6 同样可用）' },
+      { keys: 'Ctrl/⌘ + Alt + 0', desc: '回到正文' },
+      { keys: 'Ctrl/⌘ + Shift + 8', desc: '无序列表' },
+      { keys: 'Ctrl/⌘ + Shift + 7', desc: '有序列表' },
+      { keys: 'Ctrl/⌘ + Alt + 9', desc: '任务列表' },
+      { keys: 'Ctrl/⌘ + Shift + 9', desc: '引用' },
+      { keys: 'Ctrl/⌘ + E', desc: '行内代码' },
+      { keys: 'Ctrl/⌘ + Shift + E', desc: '代码块' },
+      { keys: '/', desc: '斜杠命令，快速插入段落类型' },
+      { keys: 'Tab / Shift + Tab', desc: '列表增加 / 减少缩进' },
+    ],
+  },
   {
     title: '编辑',
     items: [
@@ -3259,8 +3374,9 @@ function setTableCellBorderStyle(style: string) {
 
 async function copyCurrentLinkUrl() {
   const ed = editor.value
-  if (!ed || !ed.isActive('link')) return
-  const href = (ed.getAttributes('link').href as string) || ''
+  const hrefFromDialog = linkDialogOpen.value ? linkHref.value.trim() : ''
+  if (!hrefFromDialog && (!ed || !ed.isActive('link'))) return
+  const href = hrefFromDialog || ((ed?.getAttributes('link').href as string) || '')
   if (!href) {
     ElMessage.warning('当前链接无地址')
     return
@@ -3791,6 +3907,15 @@ function applySourceNow() {
 }
 
 onBeforeUnmount(() => {
+  if (viewMode.value === 'source') {
+    applySourceHtmlToEditor(sourceHtml.value, { focus: false })
+  } else if (editor.value && !editor.value.isDestroyed) {
+    scheduleHtmlEmit(editor.value, true)
+  }
+  if (htmlEmitTimer != null) {
+    clearTimeout(htmlEmitTimer)
+    htmlEmitTimer = null
+  }
   document.removeEventListener('pointerdown', onDocPointerDownForMenus, true)
   window.removeEventListener('resize', repositionSlashMenu)
   window.removeEventListener('scroll', repositionSlashMenu, true)
@@ -3800,10 +3925,6 @@ onBeforeUnmount(() => {
   menuCloseTimers.clear()
   floatMenuEls.clear()
   floatAnchors.clear()
-  // 最大化关闭时若停在源码态，先写回再销毁
-  if (viewMode.value === 'source') {
-    applySourceHtmlToEditor(sourceHtml.value, { focus: false })
-  }
   if (editor.value && !editor.value.isDestroyed) editor.value.destroy()
 })
 
@@ -4019,8 +4140,35 @@ const findStatusText = computed(() => {
 const linkDialogOpen = ref(false)
 const linkText = ref('')
 const linkHref = ref('')
+const linkHrefInputRef = ref<HTMLInputElement | null>(null)
+const linkPopoverStyle = ref<Record<string, string>>({})
 /** 当前是否在编辑已有链接（影响标题与「取消链接」按钮） */
 const linkDialogEditing = ref(false)
+
+function positionLinkPopover() {
+  const ed = editor.value
+  const margin = 8
+  const width = 360
+  const height = 210
+  let left = 24
+  let top = 72
+  if (ed && !ed.isDestroyed) {
+    try {
+      const coords = ed.view.coordsAtPos(ed.state.selection.from)
+      left = coords.left
+      top = coords.bottom + margin
+    } catch {
+      /* 选区失效时用默认位置 */
+    }
+  }
+  const maxLeft = Math.max(margin, window.innerWidth - width - margin)
+  const maxTop = Math.max(margin, window.innerHeight - height - margin)
+  if (top > maxTop) top = Math.max(margin, top - height - 28)
+  linkPopoverStyle.value = {
+    top: `${Math.min(Math.max(margin, top), maxTop)}px`,
+    left: `${Math.min(Math.max(margin, left), maxLeft)}px`,
+  }
+}
 
 function resetLinkDialog() {
   linkText.value = ''
@@ -4053,6 +4201,11 @@ function openLinkDialog() {
   }
   linkDialogOpen.value = true
   moreOpen.value = false
+  void nextTick(() => {
+    positionLinkPopover()
+    linkHrefInputRef.value?.focus()
+    if (linkDialogEditing.value) linkHrefInputRef.value?.select()
+  })
 }
 
 function closeLinkDialog() {
@@ -6674,7 +6827,50 @@ moreOpen.value = false
   t.run?.()
 }
 
-const PRIMARY_KEYS = new Set(['heading', 'bold', 'italic', 'list'])
+/**
+ * 飞书式主栏顺序。分隔用 __div。
+ * 紧凑画布只放这一行（可横滑）；最大化时其余工具落到第二行。
+ */
+const FEISHU_PRIMARY_ORDER = [
+  'undo',
+  'redo',
+  '__div',
+  'heading',
+  'bold',
+  'italic',
+  'underline',
+  'strike',
+  '__div',
+  'color',
+  'highlight',
+  '__div',
+  'list',
+  'quote',
+  'code',
+  '__div',
+  'link',
+  'image',
+  'align',
+] as const
+
+const PRIMARY_KEYS = new Set<string>(
+  FEISHU_PRIMARY_ORDER.filter((key) => key !== '__div'),
+)
+
+function collapseToolbarDividers(items: ToolItem[]): ToolItem[] {
+  const out: ToolItem[] = []
+  for (const item of items) {
+    if (item.kind === 'divider') {
+      if (!out.length || out[out.length - 1]?.kind === 'divider') continue
+      out.push(item)
+      continue
+    }
+    out.push(item)
+  }
+  while (out[0]?.kind === 'divider') out.shift()
+  while (out[out.length - 1]?.kind === 'divider') out.pop()
+  return out
+}
 
 type ToolItem = {
   disabled?: () => boolean
@@ -6790,6 +6986,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'strike',
       label: '删除线',
+      title: '删除线 (Ctrl/⌘+Shift+X)',
       icon: 'S̶',
       iconComp: ic('strike'),
       active: () => isActive('strike'),
@@ -6856,6 +7053,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'quote',
       label: '引用',
+      title: '引用 (Ctrl/⌘+Shift+9)',
       icon: '❝',
       iconComp: ic('quote'),
       active: () => isActive('blockquote'),
@@ -7328,14 +7526,36 @@ const allTools = computed((): ToolItem[] => {
  */
 const EXPANDED_ONLY_KEYS = new Set(['import', 'export'])
 
-/** 顶栏直接展示的工具 */
-const visibleTools = computed(() => {
+/** 顶栏：飞书式主栏；最大化时主栏后换行接高级工具 */
+const visibleTools = computed((): ToolItem[] => {
   const all = allTools.value
-  if (props.expanded) return all
-  // 非最大化：仅 标题/加粗/斜体/列表；其余进「更多」；隐藏导入/更改；无分隔线
-  return all.filter(
-    (t) => t.kind !== 'divider' && !EXPANDED_ONLY_KEYS.has(t.key) && PRIMARY_KEYS.has(t.key),
+  const byKey = new Map(all.map((tool) => [tool.key, tool]))
+  const primary: ToolItem[] = []
+  let divN = 0
+  for (const key of FEISHU_PRIMARY_ORDER) {
+    if (key === '__div') {
+      divN += 1
+      primary.push({
+        key: `div-primary-${divN}`,
+        label: '',
+        icon: '',
+        kind: 'divider',
+      })
+      continue
+    }
+    const tool = byKey.get(key)
+    if (tool) primary.push(tool)
+  }
+  if (!props.expanded) return primary
+  const advanced = collapseToolbarDividers(
+    all.filter((tool) => !PRIMARY_KEYS.has(tool.key)),
   )
+  if (!advanced.length) return primary
+  return [
+    ...primary,
+    { key: 'div-tier', label: '', icon: '', kind: 'divider' },
+    ...advanced,
+  ] as ToolItem[]
 })
 
 /** 收起模式下「更多」下拉内容 */
@@ -7414,7 +7634,6 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
   >
     <p v-if="!editorReady" class="rte-boot" role="status">正在加载编辑器…</p>
     <p v-else-if="editorBootError" class="rte-boot is-error" role="alert">{{ editorBootError }}</p>
-    <p v-else-if="charCount === 0" class="rte-boot">正文为空。直接输入，或按 / 插入内容。</p>
     <div
       class="rte-toolbar"
       role="toolbar"
@@ -7433,7 +7652,7 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
         >
           <button
             type="button"
-            class="rte-tool"
+            class="rte-tool is-labeled"
             :ref="(el) => setFloatAnchor('heading', el)"
             data-rte-anchor="heading"
             :class="{ active: headingOpen || isActive('heading') || isActive('blockquote') }"
@@ -7534,11 +7753,18 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
                 isActive('orderedList') ||
                 isActive('taskList'),
             }"
-            title="列表"
+            :title="isActive('taskList') ? '任务列表' : isActive('orderedList') ? '有序列表' : isActive('bulletList') ? '无序列表' : '列表（无序 / 有序 / 任务）'"
+            :aria-label="isActive('taskList') ? '任务列表' : isActive('orderedList') ? '有序列表' : isActive('bulletList') ? '无序列表' : '列表'"
+            aria-haspopup="menu"
+            :aria-expanded="listOpen"
+            :aria-pressed="isActive('bulletList') || isActive('orderedList') || isActive('taskList')"
             @click.stop="markToolbarMenuOpening(); closeColorMenus(); closeHighlightMenus(); closeFontMenus(); headingOpen = false; formOpen = false; templateOpen = false; alignOpen = false; listOpen = !listOpen"
           >
             <span class="rte-tool-icon">
-              <component :is="toolIcon('list')" class="rte-ep-icon" />
+              <component
+                :is="isActive('taskList') ? toolIcon('listTask') : isActive('orderedList') ? toolIcon('listOrdered') : toolIcon('list')"
+                class="rte-ep-icon"
+              />
             </span>
             <span class="rte-tool-label"
               >列表<span class="rte-caret" aria-hidden="true"></span
@@ -7615,6 +7841,9 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
                 isActive('formSwitch'),
             }"
             title="表单"
+            aria-label="插入表单控件"
+            aria-haspopup="menu"
+            :aria-expanded="formOpen"
             @click.stop="markToolbarMenuOpening(); closeColorMenus(); closeHighlightMenus(); headingOpen = false; listOpen = false; templateOpen = false; alignOpen = false; formOpen = !formOpen"
           >
             <span class="rte-tool-icon">
@@ -7679,6 +7908,9 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
             :ref="(el) => setFloatAnchor('template', el)" data-rte-anchor="template"
             :class="{ active: templateOpen }"
             title="插入模板"
+            aria-label="插入模板"
+            aria-haspopup="menu"
+            :aria-expanded="templateOpen"
             @click.stop="markToolbarMenuOpening(); closeColorMenus(); closeHighlightMenus(); headingOpen = false; listOpen = false; formOpen = false; alignOpen = false; templateOpen = !templateOpen"
           >
             <span class="rte-tool-icon">
@@ -8118,6 +8350,9 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
                 isActive({ textAlign: 'justify' }),
             }"
             title="对齐"
+            aria-label="对齐"
+            aria-haspopup="menu"
+            :aria-expanded="alignOpen"
             @click.stop="markToolbarMenuOpening(); closeColorMenus(); closeHighlightMenus(); closeFontMenus(); headingOpen = false; listOpen = false; formOpen = false; templateOpen = false; alignOpen = !alignOpen"
           >
             <span class="rte-tool-icon">
@@ -8152,6 +8387,7 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
         <div
           v-else-if="t.kind === 'divider'"
           class="rte-tool-divider"
+          :class="{ 'is-tier': t.key === 'div-tier' }"
           aria-hidden="true"
         />
         <div
@@ -9190,10 +9426,13 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
       >
         <button
           type="button"
-          class="rte-tool"
+          class="rte-tool is-labeled"
           :ref="(el) => setFloatAnchor('more', el)" data-rte-anchor="more"
           :class="{ active: moreOpen }"
-          title="更多"
+          title="更多格式与插入"
+          aria-label="更多格式与插入"
+          aria-haspopup="menu"
+          :aria-expanded="moreOpen"
           @click.stop="markToolbarMenuOpening(); moreOpen = !moreOpen"
         >
           <span class="rte-tool-icon">
@@ -9799,6 +10038,8 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
       :should-show="bubbleShouldShow"
       :options="{ placement: 'top', offset: 8 }"
       class="rte-bubble"
+      role="toolbar"
+      aria-label="选区格式"
     >
       <button
         type="button"
@@ -9806,10 +10047,11 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
         :class="{ active: isActive('bold') }"
         title="加粗 (Ctrl/⌘+B)"
         aria-label="加粗"
+        :aria-pressed="isActive('bold')"
         @mousedown.prevent
         @click="toggleBold"
       >
-        B
+        <component :is="toolIcon('bold')" class="rte-ep-icon" />
       </button>
       <button
         type="button"
@@ -9817,10 +10059,11 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
         :class="{ active: isActive('italic') }"
         title="斜体 (Ctrl/⌘+I)"
         aria-label="斜体"
+        :aria-pressed="isActive('italic')"
         @mousedown.prevent
         @click="toggleItalic"
       >
-        I
+        <component :is="toolIcon('italic')" class="rte-ep-icon" />
       </button>
       <button
         type="button"
@@ -9828,32 +10071,85 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
         :class="{ active: isActive('underline') }"
         title="下划线 (Ctrl/⌘+U)"
         aria-label="下划线"
+        :aria-pressed="isActive('underline')"
         @mousedown.prevent
         @click="toggleUnderline"
       >
-        U
+        <component :is="toolIcon('underline')" class="rte-ep-icon" />
       </button>
       <button
         type="button"
         class="rte-bubble-btn"
         :class="{ active: isActive('strike') }"
-        title="删除线"
+        title="删除线 (Ctrl/⌘+Shift+X)"
         aria-label="删除线"
+        :aria-pressed="isActive('strike')"
         @mousedown.prevent
         @click="toggleStrike"
       >
-        S
+        <component :is="toolIcon('strike')" class="rte-ep-icon" />
       </button>
+      <span class="rte-bubble-sep" aria-hidden="true" />
+      <button
+        type="button"
+        class="rte-bubble-btn"
+        :class="{ active: isActive('bulletList') }"
+        title="无序列表"
+        aria-label="无序列表"
+        :aria-pressed="isActive('bulletList')"
+        @mousedown.prevent
+        @click="toggleBulletList"
+      >
+        <component :is="toolIcon('list')" class="rte-ep-icon" />
+      </button>
+      <button
+        type="button"
+        class="rte-bubble-btn"
+        :class="{ active: isActive('orderedList') }"
+        title="有序列表"
+        aria-label="有序列表"
+        :aria-pressed="isActive('orderedList')"
+        @mousedown.prevent
+        @click="toggleOrderedList"
+      >
+        <component :is="toolIcon('listOrdered')" class="rte-ep-icon" />
+      </button>
+      <button
+        type="button"
+        class="rte-bubble-btn"
+        :class="{ active: isActive('taskList') }"
+        title="任务列表"
+        aria-label="任务列表"
+        :aria-pressed="isActive('taskList')"
+        @mousedown.prevent
+        @click="toggleTaskList"
+      >
+        <component :is="toolIcon('listTask')" class="rte-ep-icon" />
+      </button>
+      <button
+        type="button"
+        class="rte-bubble-btn"
+        :class="{ active: isActive('blockquote') }"
+        title="引用 (Ctrl/⌘+Shift+9)"
+        aria-label="引用"
+        :aria-pressed="isActive('blockquote')"
+        @mousedown.prevent
+        @click="toggleBlockquote"
+      >
+        <component :is="toolIcon('quote')" class="rte-ep-icon" />
+      </button>
+      <span class="rte-bubble-sep" aria-hidden="true" />
       <button
         type="button"
         class="rte-bubble-btn"
         :class="{ active: isActive('highlight') }"
         title="高亮"
         aria-label="高亮"
+        :aria-pressed="isActive('highlight')"
         @mousedown.prevent
         @click="toggleHighlight"
       >
-        🖍
+        <component :is="toolIcon('highlight')" class="rte-ep-icon" />
       </button>
       <button
         type="button"
@@ -9861,10 +10157,11 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
         :class="{ active: isActive('link') }"
         :title="isActive('link') ? '编辑链接 (Ctrl/⌘+K)' : '插入链接 (Ctrl/⌘+K)'"
         :aria-label="isActive('link') ? '编辑链接' : '插入链接'"
+        :aria-pressed="isActive('link')"
         @mousedown.prevent
         @click="insertLink"
       >
-        🔗
+        <component :is="toolIcon('link')" class="rte-ep-icon" />
       </button>
       <button
         v-if="isActive('link')"
@@ -10197,13 +10494,16 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
           </template>
           · 约 {{ readingMinutes }} 分钟
         </span>
-        <span v-if="showMarkdownHint" class="rte-md-hint">
-          Markdown 语法输入中
-          <span class="rte-md-q" title="编辑器支持常见富文本与部分 Markdown 快捷输入">?</span>
+        <span
+          v-if="showMarkdownHint"
+          class="rte-md-hint"
+          title="Ctrl/⌘+B 加粗，Ctrl/⌘+K 链接，/ 插入段落。完整列表见工具栏「快捷键」。"
+        >
+          / 插入 · ⌘/Ctrl+K 链接
         </span>
       </div>
       <div class="rte-bottom-right">
-        <span class="rte-draft" :class="syncTone" role="status">{{ syncLabel }}</span>
+        <span class="rte-draft" :class="syncTone" role="status" :title="syncHint">{{ syncLabel }}</span>
         <template v-if="showPublishActions">
           <button type="button" class="rte-preview" @click="onPreview">
             预览
@@ -11155,65 +11455,73 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
       </div>
     </Teleport>
 
-    <!-- 插入链接 -->
+    <!-- 链接编辑弹层：贴在选区附近，点空白处关闭 -->
     <Teleport to="body">
       <div
         v-if="linkDialogOpen"
-        class="rte-modal-overlay"
+        class="rte-link-popover-layer"
         @mousedown.self="closeLinkDialog"
       >
         <div
-          class="rte-link-dialog"
+          class="rte-link-dialog rte-link-popover"
           role="dialog"
-          aria-modal="true"
+          :style="linkPopoverStyle"
           :aria-label="linkDialogEditing ? '编辑链接' : '插入链接'"
           @mousedown.stop
+          @keydown.esc.prevent="closeLinkDialog"
         >
-          <h3 class="rte-table-title">{{ linkDialogEditing ? '编辑链接' : '插入链接' }}</h3>
-          <div class="rte-note-field rte-note-text-field" style="width: 100%; margin-bottom: 12px">
-            <span class="rte-note-field-icon" aria-hidden="true">T</span>
+          <h3 class="rte-link-popover-title">{{ linkDialogEditing ? '编辑链接' : '插入链接' }}</h3>
+          <label class="rte-link-field">
+            <span>文本</span>
             <input
               v-model="linkText"
               type="text"
-              class="rte-note-input"
-              placeholder="输入链接文本"
+              placeholder="显示文字"
               maxlength="500"
               @keydown.enter.prevent="confirmInsertLink"
             />
-          </div>
-          <div class="rte-note-field rte-note-link-field">
-            <span class="rte-note-field-icon rte-note-link-icon" aria-hidden="true">🔗</span>
+          </label>
+          <label class="rte-link-field">
+            <span>地址</span>
             <input
+              ref="linkHrefInputRef"
               v-model="linkHref"
               type="url"
-              class="rte-note-input"
-              placeholder="输入链接地址（http/https）"
+              placeholder="https://"
               maxlength="2000"
               @keydown.enter.prevent="confirmInsertLink"
             />
-          </div>
-          <div class="rte-modal-actions rte-link-actions">
+          </label>
+          <div class="rte-link-actions">
             <button
               v-if="linkDialogEditing"
               type="button"
-              class="rte-modal-cancel rte-link-unlink"
+              class="rte-link-text-btn is-danger"
               @click="unlinkSelection"
             >
               取消链接
             </button>
             <button
-              v-if="linkDialogEditing && linkHref.trim()"
+              v-if="linkHref.trim()"
               type="button"
-              class="rte-modal-cancel"
+              class="rte-link-text-btn"
               @click="openCurrentLink"
             >
               打开
             </button>
+            <button
+              v-if="linkHref.trim()"
+              type="button"
+              class="rte-link-text-btn"
+              @click="copyCurrentLinkUrl"
+            >
+              复制
+            </button>
             <span class="rte-modal-actions-spacer" aria-hidden="true" />
-            <button type="button" class="rte-modal-cancel" @click="closeLinkDialog">
+            <button type="button" class="rte-link-text-btn" @click="closeLinkDialog">
               关闭
             </button>
-            <button type="button" class="rte-modal-confirm" @click="confirmInsertLink">
+            <button type="button" class="rte-link-primary" @click="confirmInsertLink">
               {{ linkDialogEditing ? '更新' : '确认' }}
             </button>
           </div>
@@ -11775,9 +12083,9 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
   min-height: 0;
   height: 100%;
   width: 100%;
-  background: #fff;
-  border: 1px solid #e4e7ed;
-  border-radius: 6px;
+  background: var(--mm-surface, #fff);
+  border: 1px solid var(--mm-line, #e8eaed);
+  border-radius: 8px;
   overflow: hidden;
   box-sizing: border-box;
   cursor: text;
@@ -11871,13 +12179,15 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
 .rte-toolbar {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
+  align-items: center;
   gap: 2px 4px;
-  padding: 6px 8px 4px;
-  border-bottom: 1px solid #eef0f3;
-  background: #fff;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--mm-line, #e8eaed);
+  background: var(--mm-surface, #fff);
   flex-shrink: 0;
   z-index: 2;
+  position: sticky;
+  top: 0;
 }
 
 .rte-tool-wrap {
@@ -11910,10 +12220,13 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
   line-height: 1.1;
 }
 
-.rte-tool:hover,
+.rte-tool:hover {
+  background: #f1f3f4;
+  color: var(--mm-text, #202124);
+}
 .rte-tool.active {
-  background: #f2f3f5;
-  color: #1d2129;
+  background: var(--mm-blue-soft, #e8f0fe);
+  color: var(--mm-blue, #1a73e8);
 }
 
 .rte-tool:focus-visible {
@@ -12546,10 +12859,10 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
 }
 
 .rte-root :deep(.tiptap p.is-editor-empty:first-child::before),
-.rte-root :deep(.tiptap p.is-empty:first-child::before),
+.rte-root :deep(.tiptap .is-empty::before),
 .rte-root :deep(.ProseMirror p.is-editor-empty:first-child::before),
-.rte-root :deep(.ProseMirror.is-editor-empty p:first-child::before) {
-  color: #c0c4cc;
+.rte-root :deep(.ProseMirror .is-empty::before) {
+  color: var(--mm-faint, #9aa0a6);
   content: attr(data-placeholder);
   float: left;
   height: 0;
@@ -12563,11 +12876,11 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
   gap: 8px;
   flex-wrap: wrap;
   padding: 6px 10px;
-  border-top: 1px solid #eef0f3;
-  background: #fafbfc;
+  border-top: 1px solid var(--mm-line, #e8eaed);
+  background: var(--mm-bg, #fafafa);
   flex-shrink: 0;
   font-size: 12px;
-  color: #86909c;
+  color: var(--mm-muted, #5f6368);
 }
 
 .rte-bottom-left,
@@ -13011,26 +13324,45 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
   align-items: center;
   gap: 2px;
   padding: 4px;
-  background: #1d2129;
+  background: var(--mm-surface, #fff);
+  color: var(--mm-text, #202124);
+  border: 1px solid var(--mm-line, #e8eaed);
   border-radius: 8px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 8px 24px rgba(32, 33, 36, 0.12);
   z-index: 50;
+}
+.rte-bubble-sep {
+  width: 1px;
+  height: 16px;
+  margin: 0 2px;
+  background: var(--mm-line-strong, #dadce0);
+  flex: 0 0 auto;
 }
 .rte-bubble-btn {
   min-width: 28px;
   height: 28px;
   border: none;
-  border-radius: 5px;
+  border-radius: 6px;
   background: transparent;
-  color: #fff;
+  color: var(--mm-text, #202124);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.rte-bubble-btn :deep(svg) {
+  width: 16px;
+  height: 16px;
+  display: block;
 }
 .rte-bubble-btn:hover,
 .rte-bubble-btn.active {
-  background: rgba(255, 255, 255, 0.16);
+  background: var(--mm-blue-soft, #e8f0fe);
+  color: var(--mm-blue, #1a73e8);
 }
 .rte-root :deep(.rte-prose mark),
 .rte-root :deep(mark) {
@@ -13408,6 +13740,99 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
   pointer-events: none;
 }
 
+/* 飞书式主栏：图标成组、当前格式用浅底高亮；高级能力换行后仍保留短标签 */
+.rte-root.expanded .rte-toolbar {
+  min-height: 0;
+  padding: 6px 10px;
+  row-gap: 4px;
+  border-bottom: 1px solid var(--mm-line, #e8eaed);
+  box-shadow: none;
+  position: sticky;
+  top: 0;
+  background: var(--mm-surface, #fff);
+}
+
+.rte-root.expanded .rte-toolbar-tools .rte-tool-wrap {
+  margin-right: 2px;
+}
+
+.rte-root.expanded .rte-toolbar-tools .rte-tool {
+  flex-direction: row;
+  height: 30px;
+  min-height: 30px;
+  margin-right: 2px;
+  padding: 0 6px;
+  gap: 4px;
+  border-radius: 6px;
+}
+
+.rte-root.expanded .rte-toolbar-tools .rte-tool-wrap > .rte-tool,
+.rte-root.expanded .rte-toolbar-tools .rte-tool:has(.rte-caret) {
+  min-width: 30px;
+}
+
+.rte-root.expanded .rte-toolbar-tools > .rte-tool:not(.is-labeled) .rte-tool-label,
+.rte-root.expanded .rte-toolbar-tools > .rte-tool-wrap .rte-tool:not(.is-labeled) .rte-tool-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.rte-root.expanded .rte-toolbar-tools > .rte-tool.is-labeled .rte-tool-label,
+.rte-root.expanded .rte-toolbar-tools > .rte-tool-divider.is-tier ~ .rte-tool .rte-tool-label,
+.rte-root.expanded .rte-toolbar-tools > .rte-tool-divider.is-tier ~ .rte-tool-wrap .rte-tool-label {
+  position: static;
+  width: auto;
+  height: auto;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  clip: auto;
+  max-width: 72px;
+  text-overflow: ellipsis;
+  font-size: 11px;
+  line-height: 14px;
+  color: inherit;
+}
+
+.rte-root.expanded .rte-tool-divider.is-tier ~ .rte-tool,
+.rte-root.expanded .rte-tool-divider.is-tier ~ .rte-tool-wrap .rte-tool {
+  flex-direction: column;
+  height: auto;
+  min-height: 36px;
+  padding: 2px 6px 3px;
+}
+
+.rte-root.expanded .rte-tool-divider.is-tier {
+  flex: 1 0 100%;
+  width: 100%;
+  height: 1px;
+  min-height: 1px;
+  margin: 4px 0 2px;
+  background: var(--mm-line, #e8eaed);
+}
+
+.rte-root.expanded .rte-tool:hover {
+  background: #f1f3f4;
+  color: var(--mm-text, #202124);
+}
+
+.rte-root.expanded .rte-tool.active {
+  background: var(--mm-blue-soft, #e8f0fe);
+  color: var(--mm-blue, #1a73e8);
+}
+
+.rte-root.expanded .rte-tool.active :deep(.rte-ep-icon),
+.rte-root.expanded .rte-tool.active .rte-tool-label {
+  color: var(--mm-blue, #1a73e8);
+}
+
 /* 下拉已 Teleport 为 .rte-float-menu，不再依赖 absolute/右对齐兜底 */
 .rte-root.expanded .rte-menu button {
   padding: 8px 12px;
@@ -13431,23 +13856,39 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
   min-height: 160px;
 }
 
-/* 非最大化：紧凑小按钮（标题/加粗/斜体/列表 + 更多），不做知乎式大图标 */
+/* 非最大化：单行图标主栏，横滑，不撑高画布面板 */
 .rte-root:not(.expanded) .rte-toolbar {
-  gap: 2px 2px;
-  padding: 4px 6px 3px;
-  background: #fff;
+  gap: 0;
+  padding: 4px 6px;
+  background: var(--mm-surface, #fff);
   overflow: visible;
 }
 
+.rte-root:not(.expanded) .rte-toolbar-tools {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  align-items: center;
+}
+
+.rte-root:not(.expanded) .rte-more-wrap {
+  position: sticky;
+  right: 0;
+  background: var(--mm-surface, #fff);
+  box-shadow: -8px 0 8px var(--mm-surface, #fff);
+}
+
 .rte-root:not(.expanded) .rte-tool {
-  min-width: 34px;
-  max-width: 48px;
+  flex-direction: row;
+  min-width: 28px;
+  max-width: none;
   width: auto;
-  min-height: 0;
-  height: auto;
-  padding: 3px 5px 2px;
-  gap: 1px;
-  border-radius: 4px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0 5px;
+  gap: 4px;
+  border-radius: 6px;
 }
 
 .rte-root:not(.expanded) .rte-tool-icon {
@@ -13456,13 +13897,30 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
   min-height: 16px;
 }
 
-.rte-root:not(.expanded) .rte-tool-label {
-  font-size: 10px;
-  color: #86909c;
-  transform: scale(0.95);
+.rte-root:not(.expanded) .rte-tool:not(.is-labeled) .rte-tool-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
   overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.rte-root:not(.expanded) .rte-tool.is-labeled .rte-tool-label {
+  position: static;
+  width: auto;
+  height: auto;
+  margin: 0;
+  clip: auto;
+  overflow: hidden;
+  font-size: 12px;
+  color: inherit;
+  transform: none;
+  max-width: 72px;
   text-overflow: ellipsis;
-  max-width: 100%;
 }
 
 .rte-root:not(.expanded) :deep(.rte-ep-icon),
@@ -13481,7 +13939,13 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
 }
 
 .rte-root:not(.expanded) .rte-tool-divider {
-  display: none;
+  display: block;
+  width: 1px;
+  height: 16px;
+  min-height: 16px;
+  align-self: center;
+  margin: 0 4px;
+  background: var(--mm-line-strong, #dadce0);
 }
 
 .rte-import-menu {
@@ -14655,12 +15119,82 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
 }
 .rte-link-dialog {
   width: min(420px, 100%);
-  background: #fff;
-  border: 1px solid #e5e6eb;
+  background: var(--mm-surface, #fff);
+  border: 1px solid var(--mm-line, #e8eaed);
   border-radius: 10px;
   box-shadow: 0 16px 48px rgba(15, 23, 42, 0.16);
   padding: 22px 24px 20px;
   box-sizing: border-box;
+}
+.rte-link-popover-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 4100;
+  background: transparent;
+}
+.rte-link-popover {
+  position: fixed;
+  width: min(360px, calc(100vw - 16px));
+  padding: 12px;
+  border-radius: 8px;
+  box-shadow: 0 8px 28px rgba(32, 33, 36, 0.14);
+}
+.rte-link-popover-title {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--mm-text, #202124);
+}
+.rte-link-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: var(--mm-muted, #5f6368);
+}
+.rte-link-field span {
+  flex: 0 0 28px;
+}
+.rte-link-field input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 32px;
+  border: 1px solid var(--mm-line-strong, #dadce0);
+  border-radius: 6px;
+  padding: 0 8px;
+  font-size: 13px;
+  color: var(--mm-text, #202124);
+  background: var(--mm-surface, #fff);
+}
+.rte-link-field input:focus {
+  outline: none;
+  border-color: var(--mm-blue, #1a73e8);
+  box-shadow: var(--mm-focus, 0 0 0 3px rgba(26, 115, 232, 0.35));
+}
+.rte-link-text-btn,
+.rte-link-primary {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--mm-text, #202124);
+  font-size: 12px;
+  cursor: pointer;
+}
+.rte-link-text-btn:hover {
+  background: #f1f3f4;
+}
+.rte-link-text-btn.is-danger {
+  color: var(--mm-red, #d93025);
+}
+.rte-link-primary {
+  background: var(--mm-blue, #1a73e8);
+  color: #fff;
+}
+.rte-link-primary:hover {
+  background: var(--mm-blue-deep, #174ea6);
 }
 .rte-link-actions {
   display: flex;
@@ -14679,7 +15213,8 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
 }
 .rte-bubble-btn-danger:hover,
 .rte-bubble-btn-danger.active {
-  background: rgba(255, 80, 80, 0.28);
+  background: var(--mm-red-soft, #fce8e6);
+  color: var(--mm-red, #d93025);
 }
 .rte-code-copy-btn {
   height: 28px;

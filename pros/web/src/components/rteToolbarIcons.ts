@@ -116,6 +116,23 @@ export const IconList = svgIcon([
   'M3.5 12h.01',
   'M3.5 19h.01',
 ])
+export const IconListOrdered = svgIcon([
+  'M10 6h11',
+  'M10 12h11',
+  'M10 18h11',
+  'M3.2 7.4V4.4H5.2',
+  'M3.2 10.2h2.4L3.2 13h2.6',
+  'M3.2 16h2.5c.8 0 1.3.5 1.3 1.1S6.5 18.2 5.6 18.2H3.4',
+  'M4.6 18.2l1.6 2',
+])
+export const IconListTask = svgIcon([
+  'M10 6h11',
+  'M10 12h11',
+  'M10 18h11',
+  'M3.2 4.8h3.4v3.4H3.2z',
+  'M3.5 12.1l1.3 1.3 2.3-2.6',
+  'M3.2 16.2h3.4v3.4H3.2z',
+])
 export const IconHighlight = svgIcon([
   'M8 19l-2.5 2.5',
   'M14.5 3.5l6 6',
@@ -474,6 +491,8 @@ export const toolbarIconMap: Record<string, Component> = {
   fontFamily: IconFontFamily,
   lineHeight: IconLineHeight,
   list: IconList,
+  listOrdered: IconListOrdered,
+  listTask: IconListTask,
   quote: IconQuote,
   hr: IconHr,
   code: IconCode,
