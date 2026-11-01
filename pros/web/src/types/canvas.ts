@@ -155,6 +155,14 @@ export interface DualTriangleCenter {
   arrowColor: string
 }
 
+/** 人类-AI 表格式画布页脚（几何双三角不使用） */
+export interface DualTriangleFooter {
+  /** 页脚首句 */
+  lead: string
+  /** 提醒条文，不含项目符号 */
+  reminders: string[]
+}
+
 /** 双三角构建梳理画布文档 */
 export interface DualTriangleDocumentJSON {
   id: string
@@ -163,6 +171,8 @@ export interface DualTriangleDocumentJSON {
   theme: CanvasTheme
   center: DualTriangleCenter
   blocks: DualTriangleBlock[]
+  /** 人类-AI 3×2 画布的页脚说明 */
+  footer?: DualTriangleFooter
 }
 
 /** Y 模型可编辑方块 id */

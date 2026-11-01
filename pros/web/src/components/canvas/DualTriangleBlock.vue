@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import type { DualTriangleBlock } from '../../types/canvas'
+import { computed, ref } from 'vue'
+import type { DualTriangleBlock, DualTriangleBlockId } from '../../types/canvas'
 import { useSelectionStore } from '../../stores/selection'
 import { useDocumentStore } from '../../stores/document'
 import {
@@ -21,7 +21,7 @@ const props = withDefaults(
     showAdd?: boolean
     /**
      * card：双三角几何画布上的色条卡片。
-     * table：人类/AI 表格式画布的浅边框单元格（标题置顶，默认收起工具条）。
+     * table：人类-AI 3×2 画布单元格（A/H 色条抬头、角标、默认可编辑空白区）。
      */
     variant?: 'card' | 'table'
   }>(),
@@ -29,6 +29,56 @@ const props = withDefaults(
 )
 
 const isTable = computed(() => props.variant === 'table')
+
+/** 表格式画布的固定角标（keyword 不是这六个词时回退，兼容旧文档） */
+const TABLE_BADGE: Record<DualTriangleBlockId, string> = {
+  scenario: '起点',
+  aesthetics: '终点',
+  system: '过程',
+  data: '资产',
+  basics: '能力',
+  innovation: '创新',
+}
+
+const TABLE_TOPIC: Record<DualTriangleBlockId, string> = {
+  scenario: '场景',
+  aesthetics: '审美',
+  system: '体系',
+  data: '数据',
+  basics: '基本功',
+  innovation: '创造力',
+}
+
+const CANONICAL_BADGES = new Set(Object.values(TABLE_BADGE))
+
+function topicFromTitle(title: string): string {
+  return title
+    .replace(/❤|❤️/g, '')
+    .replace(/^[AHＡＨ]\s*[.．]\s*/i, '')
+    .replace(/^(起点|终点|过程|资产|能力|创新)\s*[：:]\s*/, '')
+    .trim()
+}
+
+const tableBadge = computed(() => {
+  const kw = (props.block.keyword || '').replace(/❤|❤️/g, '').trim()
+  if (CANONICAL_BADGES.has(kw)) return kw
+  return TABLE_BADGE[props.block.id] || kw
+})
+
+const tableTitle = computed(() => {
+  const topic =
+    topicFromTitle(props.block.title) ||
+    TABLE_TOPIC[props.block.id] ||
+    props.block.title
+  const prefix = props.block.side === 'ai' ? 'A.' : 'H.'
+  return `${prefix} ${topic}`
+})
+
+const headerTitle = computed(() =>
+  isTable.value ? tableTitle.value : props.block.title,
+)
+
+const inlineRteRef = ref<{ focusEditor: () => void } | null>(null)
 
 const selection = useSelectionStore()
 const documentStore = useDocumentStore()
@@ -65,6 +115,12 @@ function onEditorFocus() {
 
 function onSelectBlock() {
   selection.selectBlock(props.block.id)
+}
+
+function onBadgeActivate(event: MouseEvent) {
+  event.stopPropagation()
+  selection.selectBlock(props.block.id)
+  inlineRteRef.value?.focusEditor()
 }
 
 function onAddItem(event: MouseEvent) {
@@ -111,7 +167,7 @@ function onCloseMaximize(event?: Event) {
       class="dt-block-header"
       :style="isTable ? undefined : { backgroundColor: headerColor }"
     >
-      <h3 class="dt-block-title">{{ block.title }}</h3>
+      <h3 class="dt-block-title">{{ headerTitle }}</h3>
       <div class="dt-block-actions">
         <button
           v-if="showAdd"
@@ -124,8 +180,7 @@ function onCloseMaximize(event?: Event) {
         </button>
         <button
           type="button"
-          class="pm-max-btn"
-          :class="{ 'pm-on-dark': !isTable }"
+          class="pm-max-btn pm-on-dark"
           title="最大化"
           aria-label="最大化"
           @click="onToggleMaximize"
@@ -149,7 +204,16 @@ function onCloseMaximize(event?: Event) {
     <p v-if="!isTable" class="dt-block-subtitle">{{ block.subtitle }}</p>
 
     <div v-if="!isMaximized" class="dt-block-body">
+      <button
+        v-if="isTable && tableBadge"
+        type="button"
+        class="dt-table-badge"
+        @click="onBadgeActivate"
+      >
+        {{ tableBadge }}
+      </button>
       <RichTextEditor
+        ref="inlineRteRef"
         class="dt-rte"
         compact
         :expanded="false"
@@ -157,7 +221,7 @@ function onCloseMaximize(event?: Event) {
         :show-bottom-bar="!isTable"
         :show-publish-actions="false"
         :show-markdown-hint="!isTable"
-        placeholder="请输入正文"
+        :placeholder="isTable ? '' : '请输入正文'"
         :model-value="editorHtml"
         @update:model-value="onEditorHtml"
         @focus="onEditorFocus"
@@ -196,12 +260,17 @@ function onCloseMaximize(event?: Event) {
       class="pm-overlay"
       role="dialog"
       aria-modal="true"
-      :aria-label="block.title || '面板放大编辑'"
+      :aria-label="headerTitle || '面板放大编辑'"
       @click.self="onCloseMaximize"
     >
       <div class="pm-card" @click.stop>
         <div class="pm-header">
-          <h3 class="pm-title">{{ block.title || '编辑面板' }}</h3>
+          <h3 class="pm-title">
+            {{ headerTitle || '编辑面板' }}
+            <span v-if="isTable && tableBadge" class="pm-title-badge">{{
+              tableBadge
+            }}</span>
+          </h3>
           <div class="pm-actions">
             <button
               v-if="showAdd"
@@ -500,12 +569,27 @@ function onCloseMaximize(event?: Event) {
   min-height: 280px;
 }
 
-/* 表格式单元格：浅边框由外层表格负责，标题居中，静止时收起工具条 */
+/* 表格式单元格：A 青绿 / H 米黄色条抬头，角标在内容区左上，正文为可编辑空白 */
 .dt-block--table {
+  --hai-header: #5ecfc4;
+  --hai-body: #e7f8f6;
+  --hai-badge: #2f9d94;
   border: none;
   border-radius: 0;
   box-shadow: none;
-  background: #fff;
+  background: var(--hai-body);
+}
+
+.dt-block--table.side-ai {
+  --hai-header: #5ecfc4;
+  --hai-body: #e7f8f6;
+  --hai-badge: #2f9d94;
+}
+
+.dt-block--table.side-human {
+  --hai-header: #f0d35e;
+  --hai-body: #fff8e6;
+  --hai-badge: #a88420;
 }
 
 .dt-block--table.selected,
@@ -516,29 +600,54 @@ function onCloseMaximize(event?: Event) {
 .dt-block--table .dt-block-header {
   position: relative;
   justify-content: center;
-  padding: 16px 36px 4px;
-  background: transparent;
-  color: #202124;
+  min-height: 46px;
+  padding: 10px 40px;
+  background: var(--hai-header);
+  color: #fff;
 }
 
 .dt-block--table .dt-block-title {
   flex: none;
   max-width: 100%;
   text-align: center;
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 700;
   letter-spacing: 0.04em;
-  color: #202124;
+  color: #fff;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.14);
 }
 
 .dt-block--table .dt-block-actions {
   position: absolute;
-  top: 8px;
+  top: 50%;
   right: 8px;
+  transform: translateY(-50%);
 }
 
 .dt-block--table .dt-block-body {
-  padding: 2px 16px 8px;
+  position: relative;
+  padding: 0;
+  background: transparent;
+}
+
+.dt-table-badge {
+  flex-shrink: 0;
+  align-self: flex-start;
+  margin: 10px 14px 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--hai-badge);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  line-height: 1.3;
+  cursor: text;
+}
+
+.dt-table-badge:hover {
+  color: var(--hai-badge);
 }
 
 .dt-block--table :deep(.rte-root) {
@@ -547,23 +656,67 @@ function onCloseMaximize(event?: Event) {
   background: transparent;
 }
 
-.dt-block--table:not(:focus-within) :deep(.rte-toolbar) {
+.dt-block--table .dt-rte:not(:focus-within) :deep(.rte-toolbar) {
   display: none;
 }
 
-.dt-block--table :deep(.rte-canvas) {
-  padding: 4px 2px 8px;
+.dt-block--table .dt-rte :deep(.rte-canvas) {
+  padding: 6px 14px 10px;
+  background: transparent;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
-.dt-block--table :deep(.tiptap),
-.dt-block--table :deep(.ProseMirror) {
+.dt-block--table .dt-rte :deep(.rte-body) {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.dt-block--table .dt-rte :deep(.tiptap),
+.dt-block--table .dt-rte :deep(.ProseMirror) {
   font-size: 14px;
   line-height: 1.7;
   color: #202124;
+  flex: 1 1 auto;
+  min-height: 120px;
+  height: 100%;
 }
 
 .dt-block--table :deep(.ProseMirror p) {
   margin: 0.15em 0;
+}
+
+.dt-block--table :deep(.pa-root) {
+  background: transparent;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  padding-top: 3px;
+  padding-bottom: 4px;
+}
+
+.dt-block--table :deep(.pa-head) {
+  margin-bottom: 0;
+}
+
+/* 空态只留「相关资料」和添加入口，把格子留给参考图里的空白填写区 */
+.dt-block--table :deep(.pa-empty) {
+  display: none;
+}
+
+.pm-title-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #f1f3f4;
+  color: #5f6368;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  vertical-align: 1px;
+  text-shadow: none;
 }
 </style>
 
