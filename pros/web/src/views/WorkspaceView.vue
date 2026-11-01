@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { downloadText } from '../utils/canvasTransfer'
+import { statsSeriesCsv } from '../components/workspace/statsNormalize'
 import ActivityHeatmap from '../components/workspace/ActivityHeatmap.vue'
 import CategoryDonut from '../components/workspace/CategoryDonut.vue'
 import KpiGrid, { type Kpi } from '../components/workspace/KpiGrid.vue'
@@ -154,6 +156,12 @@ function goRegister() {
   router.push({ name: 'register', query: { redirect: '/workspace' } })
 }
 
+function exportCsv() {
+  if (!view.value) return
+  const name = showingSample.value ? 'workspace-sample.csv' : 'workspace-stats.csv'
+  downloadText(name, statsSeriesCsv(view.value), 'text/csv')
+}
+
 onMounted(async () => {
   document.title = '工作面板 · 元矩阵 MetaMatrix'
   if (auth.token) await auth.fetchMe()
@@ -271,7 +279,7 @@ onUnmounted(() => {
           </StateMessage>
 
           <section class="panel" aria-labelledby="trend-h">
-            <header class="panel-head">
+            <header class="panel-head panel-head-row">
               <div>
                 <h2 id="trend-h">时间趋势</h2>
                 <p>
@@ -279,6 +287,7 @@ onUnmounted(() => {
                   编辑按每份画布最近一次实质更新计入；修订按每次存档计数。
                 </p>
               </div>
+              <button type="button" class="btn-ghost" @click="exportCsv">导出 CSV</button>
             </header>
             <div class="legend-row">
               <span><i class="dot" style="background:#1a73e8" />新建</span>
@@ -565,6 +574,12 @@ h1 {
 }
 
 .panel-head { margin-bottom: 12px; }
+.panel-head-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
 
 .legend-row {
   display: flex;

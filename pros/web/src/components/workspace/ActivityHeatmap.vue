@@ -3,24 +3,29 @@ import { computed } from 'vue'
 import type { HeatCell } from '../../api/documents'
 import { shanghaiToday } from './sampleStats'
 
-const props = defineProps<{
-  cells: HeatCell[]
-}>()
+const props = withDefaults(
+  defineProps<{
+    cells?: HeatCell[] | null
+  }>(),
+  { cells: () => [] },
+)
 
 const today = computed(() => shanghaiToday())
 
+const safeCells = computed(() => (Array.isArray(props.cells) ? props.cells : []))
+
 const weeks = computed(() => {
   const cols: HeatCell[][] = []
-  for (let i = 0; i < props.cells.length; i += 7) {
-    cols.push(props.cells.slice(i, i + 7))
+  for (let i = 0; i < safeCells.value.length; i += 7) {
+    cols.push(safeCells.value.slice(i, i + 7))
   }
   return cols
 })
 
-const max = computed(() => props.cells.reduce((m, c) => Math.max(m, c.count), 0))
+const max = computed(() => safeCells.value.reduce((m, c) => Math.max(m, Number(c?.count) || 0), 0))
 
 function level(count: number): number {
-  if (count <= 0 || max.value <= 0) return 0
+  if (!Number.isFinite(count) || count <= 0 || max.value <= 0) return 0
   const r = count / max.value
   if (r > 0.75) return 4
   if (r > 0.5) return 3
@@ -40,7 +45,7 @@ function monthLabel(index: number): string {
 const weekdayLabels = ['一', '', '三', '', '五', '', '']
 
 const activeDays = computed(
-  () => props.cells.filter((c) => c.count > 0 && c.date <= today.value).length,
+  () => safeCells.value.filter((c) => c.count > 0 && c.date <= today.value).length,
 )
 </script>
 
@@ -59,7 +64,7 @@ const activeDays = computed(
           <div v-for="(col, ci) in weeks" :key="ci" class="col">
             <span
               v-for="cell in col"
-              :key="cell.date"
+              :key="`${cell.date}-${ci}`"
               class="cell"
               :class="[`lv-${level(cell.count)}`, { future: cell.date > today }]"
               :title="`${cell.date} · ${cell.count} 次活跃`"

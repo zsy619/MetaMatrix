@@ -3,12 +3,9 @@ import { getDocumentStats, type DocumentStats, type StatsGranularity, type Stats
 import { useAuthStore } from '../../stores/auth'
 import { buildSampleStats } from './sampleStats'
 import { describeStatsError, type StatsNotice } from './statsFormat'
+import { normalizeDocumentStats, statsCacheKey } from './statsNormalize'
 
 const cache = new Map<string, DocumentStats>()
-
-function cacheKey(range: StatsRange, granularity: StatsGranularity): string {
-  return `${range}:${granularity}`
-}
 
 export function useWorkspaceStats() {
   const auth = useAuthStore()
@@ -27,6 +24,10 @@ export function useWorkspaceStats() {
   const showingSample = computed(() => !auth.isAuthenticated)
   const view = computed(() => (showingSample.value ? sample.value : stats.value))
 
+  function userKey(): string {
+    return auth.user?.id || 'anonymous'
+  }
+
   async function load(fresh = false) {
     if (!auth.isAuthenticated) {
       stats.value = null
@@ -35,7 +36,7 @@ export function useWorkspaceStats() {
       refreshing.value = false
       return
     }
-    const key = cacheKey(range.value, granularity.value)
+    const key = statsCacheKey(userKey(), range.value, granularity.value)
     if (!fresh) {
       const cached = cache.get(key)
       if (cached) stats.value = cached
@@ -55,9 +56,10 @@ export function useWorkspaceStats() {
         { range: range.value, granularity: granularity.value },
         { fresh, signal: next.signal },
       )
-      if (!alive || gen !== generation) return
-      cache.set(key, res)
-      stats.value = res
+      if (!alive || gen !== generation || !auth.isAuthenticated) return
+      const safe = normalizeDocumentStats(res)
+      cache.set(key, safe)
+      stats.value = safe
     } catch (e) {
       if (!alive || gen !== generation) return
       if (e instanceof DOMException && e.name === 'AbortError') return
@@ -73,6 +75,24 @@ export function useWorkspaceStats() {
   watch([range, granularity], () => {
     if (auth.isAuthenticated) void load(false)
   })
+
+  watch(
+    () => auth.isAuthenticated,
+    (ok) => {
+      generation += 1
+      controller?.abort()
+      cache.clear()
+      stats.value = null
+      loading.value = false
+      refreshing.value = false
+      if (!ok) {
+        if (error.value?.kind !== 'auth') error.value = null
+        return
+      }
+      error.value = null
+      void load(true)
+    },
+  )
 
   onUnmounted(() => {
     alive = false
