@@ -6,6 +6,7 @@ import type {
   DecisionTriangleDocumentJSON,
 } from '../../types/canvas'
 import YModelBlockCard from './YModelBlock.vue'
+import { toneAt, toneVars } from './fiveStepPalette'
 
 const props = defineProps<{
   doc: DecisionTriangleDocumentJSON
@@ -25,12 +26,10 @@ const bgColor = computed(
   () => props.doc.theme.background.color || '#f3f3f3',
 )
 
-/** 附图取样色 */
-const TONE = {
-  yellow: { fill: '#f0a810', title: '#d48900' },
-  orange: { fill: '#f89048', title: '#e06a28' },
-  teal: { fill: '#30c8a8', title: '#1aa88c' },
-} as const
+/** 宽度金 / 高度铜 / 深度青，与 fiveStepPalette 同色相 */
+const WIDTH_TONE = 1
+const HEIGHT_TONE = 2
+const DEPTH_TONE = 0
 </script>
 
 <template>
@@ -62,19 +61,19 @@ const TONE = {
         <!-- 左：宽度（黄）梯形 -->
         <polygon
           points="80,120 420,120 360,280 200,520 80,520"
-          :fill="TONE.yellow.fill"
+          :fill="toneAt(WIDTH_TONE).header"
           filter="url(#dec-shadow)"
         />
         <!-- 右：高度（橙） -->
         <polygon
           points="580,120 920,120 920,520 800,520 640,280"
-          :fill="TONE.orange.fill"
+          :fill="toneAt(HEIGHT_TONE).header"
           filter="url(#dec-shadow)"
         />
         <!-- 底：深度（青） -->
         <polygon
           points="200,580 800,580 700,780 300,780"
-          :fill="TONE.teal.fill"
+          :fill="toneAt(DEPTH_TONE).header"
           filter="url(#dec-shadow)"
         />
       </svg>
@@ -82,8 +81,8 @@ const TONE = {
       <!-- 左面板 -->
       <section
         v-if="block('width')"
-        class="dec-panel dec-panel--width"
-        :style="{ '--title-color': TONE.yellow.title }"
+        class="dec-panel dec-panel--width tbl-tone"
+        :style="toneVars(WIDTH_TONE)"
       >
         <div class="dec-head">
           <h2 class="dec-title">{{ block('width')!.title }}</h2>
@@ -100,8 +99,8 @@ const TONE = {
       <!-- 右面板 -->
       <section
         v-if="block('height')"
-        class="dec-panel dec-panel--height"
-        :style="{ '--title-color': TONE.orange.title }"
+        class="dec-panel dec-panel--height tbl-tone"
+        :style="toneVars(HEIGHT_TONE)"
       >
         <div class="dec-head">
           <h2 class="dec-title">{{ block('height')!.title }}</h2>
@@ -118,8 +117,8 @@ const TONE = {
       <!-- 底面板 -->
       <section
         v-if="block('depth')"
-        class="dec-panel dec-panel--depth"
-        :style="{ '--title-color': TONE.teal.title }"
+        class="dec-panel dec-panel--depth tbl-tone"
+        :style="toneVars(DEPTH_TONE)"
       >
         <div class="dec-head">
           <h2 class="dec-title">{{ block('depth')!.title }}</h2>
@@ -181,11 +180,15 @@ const TONE = {
   z-index: 2;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 0;
   min-width: 0;
   min-height: 0;
   box-sizing: border-box;
-  padding: 10px 12px;
+  padding: 0;
+  background: var(--tbl-body, #fbf6e4);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
 }
 
 .dec-panel--width {
@@ -215,6 +218,9 @@ const TONE = {
   align-items: flex-start;
   gap: 10px;
   flex-shrink: 0;
+  padding: 8px 10px;
+  background: var(--tbl-header, #a67c00);
+  color: #fff;
 }
 
 .dec-title {
@@ -222,7 +228,8 @@ const TONE = {
   flex-shrink: 0;
   font-size: clamp(22px, 2.6vw, 36px);
   font-weight: 900;
-  color: var(--title-color);
+  color: #fff;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.14);
   letter-spacing: 0.08em;
   line-height: 1.15;
   font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui,
@@ -235,7 +242,7 @@ const TONE = {
   width: 2px;
   align-self: stretch;
   min-height: 2.4em;
-  background: rgba(32, 33, 36, 0.35);
+  background: rgba(255, 255, 255, 0.55);
   border-radius: 1px;
 }
 
@@ -252,7 +259,7 @@ const TONE = {
 .dec-hints li {
   font-size: clamp(12px, 1.2vw, 15px);
   font-weight: 700;
-  color: #202124;
+  color: rgba(255, 255, 255, 0.94);
   line-height: 1.35;
   letter-spacing: 0.02em;
 }
@@ -268,7 +275,8 @@ const TONE = {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  background: rgba(255, 255, 255, 0.55);
+  margin: 6px;
+  background: transparent;
   border-radius: 6px;
   overflow: hidden;
 }

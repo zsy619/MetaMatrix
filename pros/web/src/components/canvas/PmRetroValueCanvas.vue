@@ -7,6 +7,7 @@ import type {
 } from '../../types/canvas'
 import { useDocumentStore } from '../../stores/document'
 import YModelBlockCard from './YModelBlock.vue'
+import { toneVars } from './fiveStepPalette'
 
 const props = defineProps<{
   doc: PmRetroValueDocumentJSON
@@ -50,7 +51,7 @@ function onTitleInput(event: Event) {
     </header>
 
     <div class="prv-grid" role="grid" aria-label="项目管理复盘挖掘价值">
-      <section class="prv-col" v-show="block('before')">
+      <section class="prv-col tbl-tone" :style="toneVars(0)" v-show="block('before')">
         <header class="prv-col-head">
           <h2 class="prv-col-title">{{ block('before')!.title }}</h2>
         </header>
@@ -59,7 +60,7 @@ function onTitleInput(event: Event) {
         </div>
       </section>
 
-      <section class="prv-col" v-show="block('after')">
+      <section class="prv-col tbl-tone" :style="toneVars(1)" v-show="block('after')">
         <header class="prv-col-head">
           <h2 class="prv-col-title">{{ block('after')!.title }}</h2>
         </header>
@@ -131,7 +132,7 @@ function onTitleInput(event: Event) {
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  background: #f7f1cc;
+  background: var(--tbl-body, #f7f1cc);
   border-right: 2px solid #ffffff;
 }
 
@@ -147,15 +148,17 @@ function onTitleInput(event: Event) {
   min-height: 48px;
   padding: 10px 14px;
   box-sizing: border-box;
-  background: #faf358;
+  background: var(--tbl-header, #0e8a84);
   border-bottom: 2px solid #ffffff;
+  color: #fff;
 }
 
 .prv-col-title {
   margin: 0;
   font-size: clamp(16px, 1.7vw, 20px);
   font-weight: 800;
-  color: #d65a46;
+  color: #fff;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.14);
   letter-spacing: 0.01em;
   line-height: 1.3;
   text-align: center;
@@ -166,7 +169,7 @@ function onTitleInput(event: Event) {
   min-height: 400px;
   display: flex;
   flex-direction: column;
-  background: #f7f1cc;
+  background: transparent;
   padding: 10px 12px 8px;
   box-sizing: border-box;
   overflow: auto;

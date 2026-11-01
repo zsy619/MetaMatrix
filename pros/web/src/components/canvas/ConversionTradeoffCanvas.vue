@@ -8,6 +8,7 @@ import type {
 } from '../../types/canvas'
 import { useDocumentStore } from '../../stores/document'
 import YModelBlockCard from './YModelBlock.vue'
+import { toneVars } from './fiveStepPalette'
 
 const props = defineProps<{
   doc: ConversionTradeoffDocumentJSON
@@ -55,14 +56,19 @@ function onRemoveRow(rowId: string) {
   <div class="ct-canvas" :style="{ backgroundColor: bgColor }">
     <div class="ct-table" role="table" aria-label="转化率取舍画布">
       <div class="ct-col-headers" role="row">
-        <div class="ct-col-header ct-col-priority" role="columnheader">
+        <div
+          class="ct-col-header ct-col-priority"
+          role="columnheader"
+          :style="toneVars(0)"
+        >
           {{ doc.columnLabels.priority }}
         </div>
         <div
-          v-for="col in COLUMNS"
+          v-for="(col, colIndex) in COLUMNS"
           :key="col.key"
           class="ct-col-header"
           role="columnheader"
+          :style="toneVars(colIndex + 1)"
         >
           {{ doc.columnLabels[col.labelKey] }}
         </div>
@@ -76,7 +82,7 @@ function onRemoveRow(rowId: string) {
           class="ct-row"
           role="row"
         >
-          <div class="ct-priority" role="cell">
+          <div class="ct-priority tbl-tone" role="cell" :style="toneVars(0)">
             <input
               class="ct-priority-input"
               type="text"
@@ -89,10 +95,11 @@ function onRemoveRow(rowId: string) {
             />
           </div>
           <section
-            v-for="col in COLUMNS"
+            v-for="(col, colIndex) in COLUMNS"
             :key="col.key"
-            class="ct-cell"
+            class="ct-cell tbl-tone"
             role="cell"
+            :style="toneVars(colIndex + 1)"
           >
             <YModelBlockCard
               :block="cellAsBlock(row, col.key)"
@@ -152,7 +159,7 @@ function onRemoveRow(rowId: string) {
   flex-shrink: 0;
   display: grid;
   grid-template-columns: minmax(88px, 0.55fr) repeat(3, minmax(0, 1.15fr)) 36px;
-  background: #fff8e1;
+  background: transparent;
   border-bottom: 1px solid #dadce0;
 }
 
@@ -161,7 +168,9 @@ function onRemoveRow(rowId: string) {
   text-align: center;
   font-size: clamp(13px, 1.35vw, 16px);
   font-weight: 700;
-  color: #202124;
+  color: #fff;
+  background: var(--tbl-header, #5f6368);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.14);
   border-right: 1px solid #dadce0;
   letter-spacing: 0.04em;
 }
@@ -173,6 +182,8 @@ function onRemoveRow(rowId: string) {
 .ct-col-header--actions {
   border-right: none;
   padding: 0;
+  background: #e8eaed;
+  text-shadow: none;
 }
 
 .ct-body {
@@ -206,7 +217,7 @@ function onRemoveRow(rowId: string) {
   padding: 10px 8px;
   box-sizing: border-box;
   border-right: 1px solid #dadce0;
-  background: #fff;
+  background: var(--tbl-body, #fff);
 }
 
 .ct-priority-input {
@@ -218,7 +229,7 @@ function onRemoveRow(rowId: string) {
   text-align: center;
   font-size: clamp(14px, 1.5vw, 18px);
   font-weight: 800;
-  color: #202124;
+  color: var(--tbl-topic, #202124);
   padding: 4px 2px;
   outline: none;
   box-sizing: border-box;
@@ -245,6 +256,7 @@ function onRemoveRow(rowId: string) {
   border-right: 1px solid #dadce0;
   display: flex;
   flex-direction: column;
+  background: var(--tbl-body, #fff);
 }
 
 .ct-cell :deep(.ym-block) {

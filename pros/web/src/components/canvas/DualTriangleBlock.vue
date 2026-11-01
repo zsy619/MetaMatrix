@@ -10,6 +10,7 @@ import {
 import RichTextEditor from '../RichTextEditor.vue'
 import PanelAttachments from './PanelAttachments.vue'
 import { itemsToHtml, syncItemsFromHtml } from '../../utils/itemsHtml'
+import { toneAt, type TableTone } from './fiveStepPalette'
 
 const props = withDefaults(
   defineProps<{
@@ -100,16 +101,14 @@ const headerColor = computed(() => props.block.accentColor)
  * 表格式六格各自一色：AI 侧偏冷（青绿 / 蓝 / 绿），人类侧偏暖（金 / 铜 / 玫红）。
  * 抬头用 header，内容区用 body，主题词用 topic。
  */
-const TABLE_PALETTE: Record<
-  DualTriangleBlockId,
-  { header: string; body: string; topic: string }
-> = {
-  scenario: { header: '#0E8A84', body: '#E5F6F5', topic: '#0B6B66' },
-  aesthetics: { header: '#A67C00', body: '#FBF6E4', topic: '#7A5C00' },
-  system: { header: '#B85A38', body: '#FBF1EB', topic: '#8A4024' },
-  data: { header: '#2A649F', body: '#E8F1FA', topic: '#1C4C7C' },
-  basics: { header: '#187A4E', body: '#E7F6EF', topic: '#125C3B' },
-  innovation: { header: '#A84562', body: '#FBEFF2', topic: '#84344C' },
+/** 与 fiveStepPalette 前 6 色一一对应，色值不在这里另写一份。 */
+const TABLE_PALETTE: Record<DualTriangleBlockId, TableTone> = {
+  scenario: toneAt(0),
+  aesthetics: toneAt(1),
+  system: toneAt(2),
+  data: toneAt(3),
+  basics: toneAt(4),
+  innovation: toneAt(5),
 }
 
 const tablePalette = computed(() => TABLE_PALETTE[props.block.id])

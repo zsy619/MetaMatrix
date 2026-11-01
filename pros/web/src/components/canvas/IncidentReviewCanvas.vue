@@ -9,6 +9,7 @@ import type {
 } from '../../types/canvas'
 import { useDocumentStore } from '../../stores/document'
 import YModelBlockCard from './YModelBlock.vue'
+import { toneVars } from './fiveStepPalette'
 
 const props = defineProps<{
   doc: IncidentReviewDocumentJSON
@@ -66,7 +67,7 @@ function onRemoveRow(rowId: string) {
       </header>
 
       <!-- 1. 详细描述 -->
-      <section class="ir-section" v-show="block('description')">
+      <section class="ir-section tbl-tone" :style="toneVars(0)" v-show="block('description')">
         <h2 class="ir-section-title">
           <span class="ir-num">1.</span>
           详细描述
@@ -77,7 +78,7 @@ function onRemoveRow(rowId: string) {
           <YModelBlockCard :block="block('description')!" hide-title />
         </div>
 
-        <div class="ir-sub" v-show="block('evidence')">
+        <div class="ir-sub tbl-tone" :style="toneVars(1)" v-show="block('evidence')">
           <h3 class="ir-sub-title">
             {{ doc.labels.evidenceTitle }}
             <span v-if="block('evidence')!.required" class="ir-req-bracket">【必填】</span>
@@ -87,7 +88,7 @@ function onRemoveRow(rowId: string) {
           </div>
         </div>
 
-        <div class="ir-sub" v-show="block('probability')">
+        <div class="ir-sub tbl-tone" :style="toneVars(2)" v-show="block('probability')">
           <h3 class="ir-sub-title">
             {{ doc.labels.probabilityTitle }}
             <span v-if="block('probability')!.required" class="ir-req-bracket">【必填】</span>
@@ -100,7 +101,7 @@ function onRemoveRow(rowId: string) {
       </section>
 
       <!-- 2. 发生过程 · 时间线 -->
-      <section class="ir-section">
+      <section class="ir-section tbl-tone" :style="toneVars(3)">
         <h2 class="ir-section-title">
           <span class="ir-num">2.</span>
           发生过程
@@ -109,10 +110,10 @@ function onRemoveRow(rowId: string) {
 
         <div class="ir-timeline" role="table" aria-label="发生过程时间线">
           <div class="ir-tl-head" role="row">
-            <div class="ir-tl-col ir-tl-col--time" role="columnheader">
+            <div class="ir-tl-col ir-tl-col--time" role="columnheader" :style="toneVars(4)">
               {{ doc.labels.timeCol }}
             </div>
-            <div class="ir-tl-col ir-tl-col--behavior" role="columnheader">
+            <div class="ir-tl-col ir-tl-col--behavior" role="columnheader" :style="toneVars(5)">
               {{ doc.labels.behaviorCol }}
             </div>
             <div class="ir-tl-col ir-tl-col--actions" aria-hidden="true" />
@@ -124,7 +125,7 @@ function onRemoveRow(rowId: string) {
             class="ir-tl-row"
             role="row"
           >
-            <div class="ir-tl-cell ir-tl-cell--time" role="cell">
+            <div class="ir-tl-cell ir-tl-cell--time tbl-tone" role="cell" :style="toneVars(4)">
               <input
                 class="ir-time-input"
                 type="text"
@@ -136,7 +137,7 @@ function onRemoveRow(rowId: string) {
                 @click.stop
               />
             </div>
-            <div class="ir-tl-cell ir-tl-cell--behavior" role="cell">
+            <div class="ir-tl-cell ir-tl-cell--behavior tbl-tone" role="cell" :style="toneVars(5)">
               <YModelBlockCard :block="behaviorAsBlock(row)" hide-title />
             </div>
             <div class="ir-tl-cell ir-tl-cell--actions">
@@ -161,7 +162,7 @@ function onRemoveRow(rowId: string) {
       </section>
 
       <!-- 3. 原因分析 -->
-      <section class="ir-section" v-show="block('root_cause')">
+      <section class="ir-section tbl-tone" :style="toneVars(6)" v-show="block('root_cause')">
         <h2 class="ir-section-title">
           <span class="ir-num">3.</span>
           原因分析
@@ -174,7 +175,7 @@ function onRemoveRow(rowId: string) {
       </section>
 
       <!-- 4. 解决方案 -->
-      <section class="ir-section" v-show="block('solution')">
+      <section class="ir-section tbl-tone" :style="toneVars(7)" v-show="block('solution')">
         <h2 class="ir-section-title">
           <span class="ir-num">4.</span>
           解决方案
@@ -190,7 +191,7 @@ function onRemoveRow(rowId: string) {
       </section>
 
       <!-- 5. 影响范围 -->
-      <section class="ir-section" v-show="block('impact')">
+      <section class="ir-section tbl-tone" :style="toneVars(8)" v-show="block('impact')">
         <h2 class="ir-section-title">
           <span class="ir-num">5.</span>
           影响范围
@@ -210,7 +211,7 @@ function onRemoveRow(rowId: string) {
       </section>
 
       <!-- 6. 关联需求 -->
-      <section class="ir-section" v-show="block('related_req')">
+      <section class="ir-section tbl-tone" :style="toneVars(9)" v-show="block('related_req')">
         <h2 class="ir-section-title">
           <span class="ir-num">6.</span>
           关联需求
@@ -224,7 +225,7 @@ function onRemoveRow(rowId: string) {
       </section>
 
       <!-- 7. 反思总结 -->
-      <section class="ir-section" v-show="block('reflection')">
+      <section class="ir-section tbl-tone" :style="toneVars(10)" v-show="block('reflection')">
         <h2 class="ir-section-title">
           <span class="ir-num">7.</span>
           反思总结
@@ -279,19 +280,31 @@ function onRemoveRow(rowId: string) {
 }
 
 .ir-section {
-  margin-bottom: 36px;
+  margin-bottom: 28px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--tbl-body, #fafafa);
+  padding-bottom: 12px;
 }
 
 .ir-section-title {
-  margin: 0 0 8px;
+  margin: 0 0 10px;
+  padding: 10px 14px;
   font-size: clamp(16px, 1.6vw, 18px);
   font-weight: 800;
-  color: #202124;
+  color: #fff;
   line-height: 1.4;
+  background: var(--tbl-header, #0e8a84);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.14);
 }
 
 .ir-num {
   margin-right: 2px;
+}
+
+.ir-section-title .ir-req,
+.ir-sub-title .ir-req-bracket {
+  color: #ffe4e6;
 }
 
 .ir-req {
@@ -307,10 +320,10 @@ function onRemoveRow(rowId: string) {
 }
 
 .ir-hint {
-  margin: 0 0 10px;
+  margin: 0 14px 10px;
   font-size: 13px;
   line-height: 1.55;
-  color: #80868b;
+  color: var(--tbl-topic, #80868b);
   white-space: pre-wrap;
 }
 
@@ -319,21 +332,29 @@ function onRemoveRow(rowId: string) {
 }
 
 .ir-sub {
-  margin-top: 18px;
+  margin: 14px 12px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--tbl-body, #fff);
+  padding-bottom: 8px;
 }
 
 .ir-sub-title {
   margin: 0 0 8px;
+  padding: 8px 12px;
   font-size: 14px;
   font-weight: 700;
-  color: #202124;
+  color: #fff;
+  background: var(--tbl-header, #a67c00);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.12);
 }
 
 .ir-panel {
   min-height: 400px;
-  border: 1px solid #e0e0e0;
+  margin: 0 12px;
+  border: 1px solid color-mix(in srgb, var(--tbl-topic, #e0e0e0) 28%, transparent);
   border-radius: 4px;
-  background: #fafafa;
+  background: transparent;
   padding: 4px;
   box-sizing: border-box;
   display: flex;
@@ -357,7 +378,7 @@ function onRemoveRow(rowId: string) {
 }
 
 .ir-tip {
-  margin: 0 0 12px;
+  margin: 0 14px 12px;
   padding: 10px 12px;
   font-size: 12.5px;
   line-height: 1.55;
@@ -377,7 +398,7 @@ function onRemoveRow(rowId: string) {
 }
 
 .ir-impact-guide {
-  margin: 0 0 12px;
+  margin: 0 14px 12px;
   padding-left: 20px;
   font-size: 13px;
   line-height: 1.7;
@@ -393,6 +414,7 @@ function onRemoveRow(rowId: string) {
 
 /* Timeline table */
 .ir-timeline {
+  margin: 0 12px;
   border: 1px solid #dadce0;
   border-radius: 4px;
   overflow: hidden;
@@ -402,7 +424,7 @@ function onRemoveRow(rowId: string) {
 .ir-tl-head {
   display: grid;
   grid-template-columns: 180px minmax(0, 1fr) 40px;
-  background: #f1f3f4;
+  background: transparent;
   border-bottom: 1px solid #dadce0;
 }
 
@@ -410,7 +432,14 @@ function onRemoveRow(rowId: string) {
   padding: 8px 12px;
   font-size: 13px;
   font-weight: 700;
-  color: #202124;
+  color: #fff;
+  background: var(--tbl-header, #5f6368);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.14);
+}
+
+.ir-tl-col--actions {
+  background: #e8eaed;
+  text-shadow: none;
 }
 
 .ir-tl-row {
@@ -435,10 +464,12 @@ function onRemoveRow(rowId: string) {
   padding: 8px 10px;
   border-right: 1px solid #e8eaed;
   align-items: center;
+  background: var(--tbl-body, #fff);
 }
 
 .ir-tl-cell--behavior {
   padding: 4px 6px;
+  background: var(--tbl-body, #fff);
 }
 
 .ir-tl-cell--behavior :deep(.ym-block) {
@@ -501,7 +532,7 @@ function onRemoveRow(rowId: string) {
 }
 
 .ir-add-row {
-  margin-top: 10px;
+  margin: 10px 12px 0;
 }
 
 .ir-add-btn {

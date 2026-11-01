@@ -6,6 +6,7 @@ import type {
   OscarDocumentJSON,
 } from '../../types/canvas'
 import YModelBlockCard from './YModelBlock.vue'
+import { toneVars } from './fiveStepPalette'
 
 const props = defineProps<{
   doc: OscarDocumentJSON
@@ -36,10 +37,11 @@ const bgColor = computed(
     <div class="os-grid" role="table" aria-label="OSCAR调研画布">
       <div class="os-row os-row--top">
         <section
-          v-for="id in topIds"
+          v-for="(id, index) in topIds"
           :key="id"
           v-show="block(id)"
-          class="os-cell"
+          class="os-cell tbl-tone"
+          :style="toneVars(index)"
         >
           <div class="os-meta">
             <h2 class="os-title">{{ block(id)!.title }}</h2>
@@ -54,10 +56,11 @@ const bgColor = computed(
 
       <div class="os-row os-row--bottom">
         <section
-          v-for="id in bottomIds"
+          v-for="(id, index) in bottomIds"
           :key="id"
           v-show="block(id)"
-          class="os-cell"
+          class="os-cell tbl-tone"
+          :style="toneVars(index + topIds.length)"
         >
           <div class="os-meta">
             <h2 class="os-title">{{ block(id)!.title }}</h2>
@@ -122,11 +125,11 @@ const bgColor = computed(
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  padding: 14px 14px 16px;
+  padding: 0;
   box-sizing: border-box;
-  background: #f5f0e8;
+  background: var(--tbl-body, #f5f0e8);
   border-right: 2px solid #202124;
-  gap: 8px;
+  gap: 0;
   overflow: hidden;
 }
 
@@ -143,13 +146,17 @@ const bgColor = computed(
   flex-direction: column;
   gap: 4px;
   min-width: 0;
+  padding: 10px 14px 8px;
+  background: var(--tbl-header, #0e8a84);
+  color: #fff;
 }
 
 .os-title {
   margin: 0;
   font-size: clamp(15px, 1.6vw, 20px);
   font-weight: 800;
-  color: #202124;
+  color: #fff;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.14);
   letter-spacing: 0.02em;
   line-height: 1.3;
 }
@@ -159,7 +166,7 @@ const bgColor = computed(
   font-size: clamp(12px, 1.2vw, 14px);
   font-style: italic;
   font-weight: 400;
-  color: #5f6368;
+  color: rgba(255, 255, 255, 0.9);
   line-height: 1.45;
 }
 
@@ -171,6 +178,8 @@ const bgColor = computed(
   min-width: 0;
   display: flex;
   flex-direction: column;
+  padding: 8px 12px 14px;
+  background: var(--tbl-body, #f5f0e8);
 }
 
 .os-body :deep(.ym-block) {
@@ -187,7 +196,7 @@ const bgColor = computed(
   font-size: clamp(72px, 12vw, 120px);
   font-weight: 800;
   line-height: 0.85;
-  color: rgba(100, 149, 237, 0.18);
+  color: color-mix(in srgb, var(--tbl-topic, #6495ed) 28%, transparent);
   pointer-events: none;
   user-select: none;
   letter-spacing: -0.04em;

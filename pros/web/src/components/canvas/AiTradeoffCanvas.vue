@@ -6,6 +6,7 @@ import type {
   AiTradeoffDocumentJSON,
 } from '../../types/canvas'
 import YModelBlockCard from './YModelBlock.vue'
+import { toneVars } from './fiveStepPalette'
 
 const props = defineProps<{
   doc: AiTradeoffDocumentJSON
@@ -43,18 +44,19 @@ const bgColor = computed(
     </header>
 
     <div class="at-grid" role="table" aria-label="AI场景取舍评估">
-      <div class="at-col-header value" role="columnheader">
+      <div class="at-col-header value" role="columnheader" :style="toneVars(0)">
         {{ doc.columns.value.header }}
       </div>
-      <div class="at-col-header cost" role="columnheader">
+      <div class="at-col-header cost" role="columnheader" :style="toneVars(1)">
         {{ doc.columns.cost.header }}
       </div>
 
       <template v-for="([leftId, rightId], rowIdx) in rows" :key="rowIdx">
         <section
           v-if="block(leftId)"
-          class="at-cell"
+          class="at-cell tbl-tone"
           :class="{ 'at-cell--last-row': rowIdx === rows.length - 1 }"
+          :style="toneVars(2 + rowIdx * 2)"
         >
           <div class="at-cell-meta">
             <h2 class="at-cell-title">{{ block(leftId)!.title }}</h2>
@@ -67,8 +69,9 @@ const bgColor = computed(
 
         <section
           v-if="block(rightId)"
-          class="at-cell"
+          class="at-cell tbl-tone"
           :class="{ 'at-cell--last-row': rowIdx === rows.length - 1 }"
+          :style="toneVars(2 + rowIdx * 2 + 1)"
         >
           <div class="at-cell-meta">
             <h2 class="at-cell-title">{{ block(rightId)!.title }}</h2>
@@ -152,11 +155,12 @@ const bgColor = computed(
   padding: 10px 12px;
   min-height: 40px;
   box-sizing: border-box;
-  background: #e8eaed;
+  background: var(--tbl-header, #e8eaed);
   border-bottom: 1px solid #dadce0;
   font-size: clamp(13px, 1.35vw, 16px);
   font-weight: 700;
-  color: #3c4043;
+  color: #fff;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.14);
   letter-spacing: 0.04em;
   text-align: center;
   line-height: 1.35;
@@ -171,12 +175,12 @@ const bgColor = computed(
   flex-direction: column;
   min-width: 0;
   min-height: 400px;
-  padding: 10px 12px 12px;
+  padding: 0;
   box-sizing: border-box;
-  background: #fff;
+  background: var(--tbl-body, #fff);
   border-right: 1px solid #dadce0;
   border-bottom: 1px solid #dadce0;
-  gap: 6px;
+  gap: 0;
 }
 
 .at-cell:nth-child(even) {
@@ -193,15 +197,19 @@ const bgColor = computed(
   flex-direction: column;
   gap: 3px;
   min-width: 0;
+  padding: 8px 12px;
+  background: var(--tbl-header, #e8eaed);
+  color: #fff;
 }
 
 .at-cell-title {
   margin: 0;
   font-size: clamp(13px, 1.3vw, 15px);
   font-weight: 800;
-  color: #d93025;
+  color: #fff;
   letter-spacing: 0.02em;
   line-height: 1.3;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.14);
 }
 
 .at-cell-prompt {
@@ -209,7 +217,7 @@ const bgColor = computed(
   font-size: clamp(11px, 1.1vw, 13px);
   font-style: italic;
   font-weight: 400;
-  color: #80868b;
+  color: rgba(255, 255, 255, 0.9);
   line-height: 1.4;
 }
 
@@ -219,6 +227,8 @@ const bgColor = computed(
   min-width: 0;
   display: flex;
   flex-direction: column;
+  padding: 8px 10px 10px;
+  background: var(--tbl-body, #fff);
 }
 
 .at-cell-body :deep(.ym-block) {

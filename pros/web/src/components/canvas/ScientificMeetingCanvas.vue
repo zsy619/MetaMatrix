@@ -7,6 +7,7 @@ import type {
 } from '../../types/canvas'
 import { useDocumentStore } from '../../stores/document'
 import YModelBlockCard from './YModelBlock.vue'
+import { toneVars } from './fiveStepPalette'
 
 const props = defineProps<{
   doc: ScientificMeetingDocumentJSON
@@ -62,8 +63,9 @@ function onOrganizer(event: Event) {
       <section
         v-for="(id, idx) in COLUMNS"
         :key="id"
-        class="sm-col"
+        class="sm-col tbl-tone"
         :class="{ 'sm-col--last': idx === COLUMNS.length - 1 }"
+        :style="toneVars(idx)"
         v-show="block(id)"
       >
         <header class="sm-col-head">
@@ -137,11 +139,11 @@ function onOrganizer(event: Event) {
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  padding: 14px 14px 10px;
+  padding: 0;
   box-sizing: border-box;
   border-right: 1.5px solid #1a1a1a;
-  gap: 8px;
-  background: #f8f2d4;
+  gap: 0;
+  background: var(--tbl-body, #f8f2d4);
 }
 
 .sm-col--last {
@@ -153,13 +155,17 @@ function onOrganizer(event: Event) {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  padding: 12px 14px 10px;
+  background: var(--tbl-header, #0e8a84);
+  color: #fff;
 }
 
 .sm-step {
   margin: 0;
   font-size: clamp(16px, 1.6vw, 20px);
   font-weight: 800;
-  color: #1a1a1a;
+  color: #fff;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.14);
   letter-spacing: 0.01em;
   line-height: 1.3;
 }
@@ -169,7 +175,7 @@ function onOrganizer(event: Event) {
   font-size: clamp(12px, 1.15vw, 14px);
   font-weight: 400;
   font-style: italic;
-  color: #8e8a7a;
+  color: rgba(255, 255, 255, 0.9);
   line-height: 1.5;
 }
 
@@ -180,6 +186,8 @@ function onOrganizer(event: Event) {
   flex-direction: column;
   overflow: auto;
   box-sizing: border-box;
+  padding: 10px 12px 12px;
+  background: transparent;
 }
 
 .sm-panel :deep(.ym-block) {

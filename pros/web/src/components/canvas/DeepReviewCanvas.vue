@@ -7,6 +7,7 @@ import type {
 } from '../../types/canvas'
 import { useDocumentStore } from '../../stores/document'
 import YModelBlockCard from './YModelBlock.vue'
+import { toneVars } from './fiveStepPalette'
 
 const props = defineProps<{
   doc: DeepReviewDocumentJSON
@@ -72,7 +73,7 @@ function onReviewTime(event: Event) {
 
     <div class="dr-grid" role="grid" aria-label="深度复盘关键成果">
       <!-- Row 1 · 整体评价 -->
-      <section class="dr-cell dr-cell--full" v-show="block('overall')">
+      <section class="dr-cell dr-cell--full tbl-tone" :style="toneVars(0)" v-show="block('overall')">
         <h2 class="dr-title">{{ block('overall')!.title }}</h2>
         <p class="dr-hint">{{ block('overall')!.prompt }}</p>
         <div class="dr-panel">
@@ -81,14 +82,14 @@ function onReviewTime(event: Event) {
       </section>
 
       <!-- Row 2 · 亮点 | 问题 -->
-      <section class="dr-cell" v-show="block('highlights')">
+      <section class="dr-cell tbl-tone" :style="toneVars(1)" v-show="block('highlights')">
         <h2 class="dr-title">{{ block('highlights')!.title }}</h2>
         <p class="dr-hint">{{ block('highlights')!.prompt }}</p>
         <div class="dr-panel">
           <YModelBlockCard :block="block('highlights')!" hide-title />
         </div>
       </section>
-      <section class="dr-cell" v-show="block('problems')">
+      <section class="dr-cell tbl-tone" :style="toneVars(2)" v-show="block('problems')">
         <h2 class="dr-title">{{ block('problems')!.title }}</h2>
         <p class="dr-hint">{{ block('problems')!.prompt }}</p>
         <div class="dr-panel">
@@ -97,21 +98,21 @@ function onReviewTime(event: Event) {
       </section>
 
       <!-- Row 3 · 坚持 | 放弃 | 新任务 -->
-      <section class="dr-cell" v-show="block('keep')">
+      <section class="dr-cell tbl-tone" :style="toneVars(3)" v-show="block('keep')">
         <h2 class="dr-title">{{ block('keep')!.title }}</h2>
         <p class="dr-hint">{{ block('keep')!.prompt }}</p>
         <div class="dr-panel">
           <YModelBlockCard :block="block('keep')!" hide-title />
         </div>
       </section>
-      <section class="dr-cell" v-show="block('stop')">
+      <section class="dr-cell tbl-tone" :style="toneVars(4)" v-show="block('stop')">
         <h2 class="dr-title">{{ block('stop')!.title }}</h2>
         <p class="dr-hint">{{ block('stop')!.prompt }}</p>
         <div class="dr-panel">
           <YModelBlockCard :block="block('stop')!" hide-title />
         </div>
       </section>
-      <section class="dr-cell" v-show="block('new_tasks')">
+      <section class="dr-cell tbl-tone" :style="toneVars(5)" v-show="block('new_tasks')">
         <h2 class="dr-title">{{ block('new_tasks')!.title }}</h2>
         <p class="dr-hint">{{ block('new_tasks')!.prompt }}</p>
         <div class="dr-panel">
@@ -120,7 +121,7 @@ function onReviewTime(event: Event) {
       </section>
 
       <!-- Row 4 · 过程资产 -->
-      <section class="dr-cell dr-cell--full" v-show="block('assets')">
+      <section class="dr-cell dr-cell--full tbl-tone" :style="toneVars(6)" v-show="block('assets')">
         <h2 class="dr-title">{{ block('assets')!.title }}</h2>
         <p class="dr-hint">{{ block('assets')!.prompt }}</p>
         <div class="dr-panel">
@@ -221,12 +222,12 @@ function onReviewTime(event: Event) {
   flex-direction: column;
   min-width: 0;
   min-height: 400px;
-  padding: 10px 12px 8px;
+  padding: 0 0 8px;
   box-sizing: border-box;
   border-right: 1.5px solid #202124;
   border-bottom: 1.5px solid #202124;
   gap: 4px;
-  background: #fff;
+  background: var(--tbl-body, #fff);
   /* default: 2 cols of 6 = half width for row 2 */
   grid-column: span 3;
 }
@@ -253,19 +254,23 @@ function onReviewTime(event: Event) {
 .dr-title {
   margin: 0;
   flex-shrink: 0;
+  padding: 10px 12px;
   font-size: clamp(14px, 1.4vw, 16px);
   font-weight: 800;
-  color: #202124;
+  color: #fff;
   line-height: 1.3;
+  background: var(--tbl-header, #0e8a84);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.14);
 }
 
 .dr-hint {
   margin: 0;
   flex-shrink: 0;
+  padding: 0 12px;
   font-size: clamp(11px, 1.05vw, 12.5px);
   font-style: italic;
   line-height: 1.45;
-  color: #9aa0a6;
+  color: var(--tbl-topic, #5f6368);
   white-space: pre-wrap;
 }
 
@@ -274,9 +279,10 @@ function onReviewTime(event: Event) {
   min-height: 400px;
   display: flex;
   flex-direction: column;
-  border: 1px dashed #dadce0;
+  border: 1px dashed color-mix(in srgb, var(--tbl-topic, #dadce0) 35%, transparent);
   border-radius: 4px;
-  background: #fafafa;
+  background: transparent;
+  margin: 0 8px;
   padding: 2px;
   box-sizing: border-box;
 }

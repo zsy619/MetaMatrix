@@ -6,6 +6,7 @@ import type {
   IndustryAnalysisDocumentJSON,
 } from '../../types/canvas'
 import YModelBlockCard from './YModelBlock.vue'
+import { toneVars } from './fiveStepPalette'
 
 const props = defineProps<{
   doc: IndustryAnalysisDocumentJSON
@@ -36,10 +37,11 @@ const bgColor = computed(
     <div class="ia-grid" role="table" aria-label="行业分析画布">
       <div class="ia-row ia-row--top">
         <section
-          v-for="id in topIds"
+          v-for="(id, index) in topIds"
           :key="id"
           v-show="block(id)"
-          class="ia-cell"
+          class="ia-cell tbl-tone"
+          :style="toneVars(index)"
         >
           <div class="ia-meta">
             <h2 class="ia-title">{{ block(id)!.title }}</h2>
@@ -52,10 +54,11 @@ const bgColor = computed(
       </div>
 
       <section
-        v-for="id in fullIds"
+        v-for="(id, index) in fullIds"
         :key="id"
         v-show="block(id)"
-        class="ia-cell ia-cell--full"
+        class="ia-cell ia-cell--full tbl-tone"
+        :style="toneVars(index + topIds.length)"
       >
         <div class="ia-meta">
           <h2 class="ia-title">{{ block(id)!.title }}</h2>
@@ -120,11 +123,11 @@ const bgColor = computed(
   flex-direction: column;
   min-width: 0;
   min-height: 400px;
-  padding: 12px 14px 14px;
+  padding: 0;
   box-sizing: border-box;
-  background: #fff;
+  background: var(--tbl-body, #fff);
   border-right: 2px solid #202124;
-  gap: 6px;
+  gap: 0;
 }
 
 .ia-row--top .ia-cell:last-child {
@@ -148,13 +151,17 @@ const bgColor = computed(
   flex-direction: column;
   gap: 3px;
   min-width: 0;
+  padding: 10px 14px 8px;
+  background: var(--tbl-header, #0e8a84);
+  color: #fff;
 }
 
 .ia-title {
   margin: 0;
   font-size: clamp(15px, 1.55vw, 19px);
   font-weight: 800;
-  color: #202124;
+  color: #fff;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.14);
   letter-spacing: 0.02em;
   line-height: 1.3;
 }
@@ -163,7 +170,7 @@ const bgColor = computed(
   margin: 0;
   font-size: clamp(12px, 1.15vw, 14px);
   font-weight: 400;
-  color: #80868b;
+  color: rgba(255, 255, 255, 0.9);
   line-height: 1.4;
 }
 
@@ -173,6 +180,8 @@ const bgColor = computed(
   min-width: 0;
   display: flex;
   flex-direction: column;
+  padding: 8px 12px 12px;
+  background: var(--tbl-body, #fff);
 }
 
 .ia-body :deep(.ym-block) {

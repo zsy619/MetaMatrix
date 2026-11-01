@@ -8,6 +8,7 @@ import type {
 } from '../../types/canvas'
 import { useDocumentStore } from '../../stores/document'
 import YModelBlockCard from './YModelBlock.vue'
+import { toneVars } from './fiveStepPalette'
 
 const props = defineProps<{
   doc: KeyResistanceDocumentJSON
@@ -70,10 +71,11 @@ function onRemoveRow(rowId: string) {
     <div class="kr-table" role="table" aria-label="关键阻力分析画布">
       <div class="kr-col-headers" role="row">
         <div
-          v-for="col in COLUMNS"
+          v-for="(col, colIndex) in COLUMNS"
           :key="col.key"
           class="kr-col-header"
           role="columnheader"
+          :style="toneVars(colIndex)"
         >
           {{ col.label }}
         </div>
@@ -88,10 +90,11 @@ function onRemoveRow(rowId: string) {
           role="row"
         >
           <section
-            v-for="col in COLUMNS"
+            v-for="(col, colIndex) in COLUMNS"
             :key="col.key"
-            class="kr-cell"
+            class="kr-cell tbl-tone"
             role="cell"
+            :style="toneVars(colIndex)"
           >
             <YModelBlockCard
               :block="cellAsBlock(row, col.key)"
@@ -201,7 +204,7 @@ function onRemoveRow(rowId: string) {
   flex-shrink: 0;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr)) 36px;
-  background: #f5f0e6;
+  background: transparent;
   border-bottom: 1px solid #dadce0;
 }
 
@@ -210,7 +213,9 @@ function onRemoveRow(rowId: string) {
   text-align: center;
   font-size: clamp(13px, 1.3vw, 15px);
   font-weight: 700;
-  color: #3c4043;
+  color: #fff;
+  background: var(--tbl-header, #5f6368);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.14);
   border-right: 1px solid #dadce0;
   letter-spacing: 0.02em;
 }
@@ -218,6 +223,8 @@ function onRemoveRow(rowId: string) {
 .kr-col-header--actions {
   border-right: none;
   padding: 0;
+  background: #e8eaed;
+  text-shadow: none;
 }
 
 .kr-body {
@@ -252,6 +259,7 @@ function onRemoveRow(rowId: string) {
   border-right: 1px solid #dadce0;
   display: flex;
   flex-direction: column;
+  background: var(--tbl-body, #fff);
 }
 
 .kr-cell :deep(.ym-block) {
