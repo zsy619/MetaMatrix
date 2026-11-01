@@ -278,17 +278,22 @@ export function getDocumentStats(
   })
 }
 
-export function searchDocuments(params: {
-  q?: string
-  templateId?: string
-  limit?: number
-}) {
+export function searchDocuments(
+  params: {
+    q?: string
+    templateId?: string
+    limit?: number
+  },
+  opts?: { signal?: AbortSignal },
+) {
   const q = new URLSearchParams()
   if (params.q) q.set('q', params.q)
   if (params.templateId) q.set('templateId', params.templateId)
   if (params.limit != null) q.set('limit', String(params.limit))
   const qs = q.toString()
-  return apiRequest<SearchHit[]>(`/documents/search${qs ? `?${qs}` : ''}`)
+  return apiRequest<SearchHit[]>(`/documents/search${qs ? `?${qs}` : ''}`, {
+    signal: opts?.signal,
+  })
 }
 
 export function diffRevisions(

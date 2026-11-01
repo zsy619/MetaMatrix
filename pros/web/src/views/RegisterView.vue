@@ -77,7 +77,7 @@ async function submit() {
         />
       </label>
       <p v-if="message" class="error" role="alert">{{ message }}</p>
-      <button type="submit" :disabled="busy">{{ busy ? '注册中…' : '注册' }}</button>
+      <button type="submit" class="mm-btn mm-btn--primary" :disabled="busy">{{ busy ? '注册中…' : '注册' }}</button>
       <p class="footer">
         已有账号？
         <router-link :to="{ name: 'login', query: route.query }">登录</router-link>

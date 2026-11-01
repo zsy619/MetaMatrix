@@ -35,3 +35,10 @@ export function login(input: { email: string; password: string }) {
 export function me() {
   return apiRequest<User>('/auth/me')
 }
+
+export function refresh() {
+  return apiRequest<AuthResponse & { expiresAt?: string }>('/auth/refresh', {
+    method: 'POST',
+    body: {},
+  })
+}

@@ -28,6 +28,7 @@ const searchHits = ref<SearchHit[]>([])
 const searching = ref(false)
 const searchErr = ref('')
 let searchTimer: ReturnType<typeof setTimeout> | null = null
+let searchAbort: AbortController | null = null
 
 const activeCategory = ref<'all' | TemplateCategory>('all')
 const templateFilter = ref('')
@@ -133,8 +134,10 @@ function openDoc(d: DocumentSummary) {
 
 async function runSearch() {
   searchErr.value = ''
+  searchAbort?.abort()
   if (!auth.isAuthenticated) {
     searchHits.value = []
+    searchErr.value = '登录后只能搜索你自己的画布。'
     return
   }
   const q = searchQ.value.trim()
@@ -142,14 +145,17 @@ async function runSearch() {
     searchHits.value = []
     return
   }
+  const ctrl = new AbortController()
+  searchAbort = ctrl
   searching.value = true
   try {
-    searchHits.value = await searchDocuments({ q, limit: 12 })
+    searchHits.value = await searchDocuments({ q, limit: 12 }, { signal: ctrl.signal })
   } catch (e) {
+    if (e instanceof DOMException && e.name === 'AbortError') return
     searchErr.value = friendlyApiMessage(e, '搜索失败')
     searchHits.value = []
   } finally {
-    searching.value = false
+    if (searchAbort === ctrl) searching.value = false
   }
 }
 
@@ -200,7 +206,10 @@ onMounted(async () => {
               {{ searching ? '搜索中…' : '搜索' }}
             </button>
           </div>
-          <p v-if="searchErr" class="search-err" role="alert">{{ searchErr }}</p>
+          <p v-if="searchErr" class="search-err" role="alert">
+            {{ searchErr }}
+            <button type="button" class="mm-btn mm-btn--ghost" @click="runSearch">重试</button>
+          </p>
           <ul v-if="searchHits.length" class="search-hits">
             <li v-for="h in searchHits" :key="h.id">
               <button type="button" @click="openHit(h)">
@@ -210,7 +219,9 @@ onMounted(async () => {
               </button>
             </li>
           </ul>
-          <p v-else-if="searchQ.trim() && !searching" class="search-empty">无匹配文档</p>
+          <p v-else-if="searchQ.trim() && !searching" class="search-empty" role="status">
+            没有找到包含「{{ searchQ.trim() }}」的画布。结果只来自当前账号。
+          </p>
         </section>
       </header>
 
@@ -274,6 +285,7 @@ onMounted(async () => {
       :error="recentError"
       @open="openDoc"
       @logout="onLogout"
+      @retry="refreshRecent"
       @update:collapsed="asideCollapsed = $event"
     />
   </div>

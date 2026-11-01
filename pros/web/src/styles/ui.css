@@ -1,0 +1,33 @@
+.mm-btn {
+  font: inherit;
+  cursor: pointer;
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 650;
+  border: 1px solid var(--mm-line-strong);
+  background: var(--mm-surface);
+  color: var(--mm-text);
+  text-decoration: none;
+}
+
+.mm-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.mm-btn--primary {
+  border-color: transparent;
+  background: var(--mm-blue);
+  color: #fff;
+}
+
+.mm-btn--ghost {
+  background: var(--mm-surface);
+}
+
+.mm-inline-error {
+  margin: 8px 0 0;
+  color: var(--mm-red);
+  font-size: 13px;
+}

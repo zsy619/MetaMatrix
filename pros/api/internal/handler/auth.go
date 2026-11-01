@@ -122,6 +122,28 @@ func tooManyLogins(c *app.RequestContext, wait time.Duration) {
 	})
 }
 
+func (h *AuthHandler) Refresh(ctx context.Context, c *app.RequestContext) {
+	uid, ok := middleware.UserIDFromCtx(c)
+	if !ok {
+		Unauthorized(c, "unauthorized")
+		return
+	}
+	u, token, err := h.svc.Refresh(uid)
+	if err != nil {
+		if errors.Is(err, service.ErrUserNotFound) {
+			Fail(c, http.StatusUnauthorized, "unauthorized", "unauthorized")
+			return
+		}
+		Internal(c, "refresh failed")
+		return
+	}
+	c.JSON(http.StatusOK, map[string]interface{}{
+		"token":     token,
+		"user":      service.UserPublic(u),
+		"expiresAt": time.Now().UTC().Add(7 * 24 * time.Hour).Format(time.RFC3339),
+	})
+}
+
 func (h *AuthHandler) Me(ctx context.Context, c *app.RequestContext) {
 	uid, ok := middleware.UserIDFromCtx(c)
 	if !ok {
