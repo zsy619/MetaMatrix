@@ -9,6 +9,7 @@ import type {
 import divisionTemplate from '../../templates/five-step-division-v1.json'
 import FiveStepPanel from './FiveStepPanel.vue'
 import FiveStepNotes from './FiveStepNotes.vue'
+import { canvasChromeStyle } from './canvasChrome'
 import {
   DIVISION_RAIL,
   fiveStepPalette,
@@ -51,6 +52,8 @@ function railStyle(rowId: string): { background: string; color: string } {
   )
 }
 
+const chrome = computed(() => canvasChromeStyle(props.doc.theme))
+
 const notes = computed(() =>
   resolveMethodFooter(
     props.doc.footer,
@@ -60,7 +63,7 @@ const notes = computed(() =>
 </script>
 
 <template>
-  <div class="fsd-canvas" aria-label="五步法（分工版）">
+  <div class="fsd-canvas" :style="chrome" aria-label="五步法（分工版）">
     <div class="fsd-table" role="table" aria-label="五步法（分工版）">
       <div class="fsd-corner" aria-hidden="true" />
       <header
@@ -126,8 +129,9 @@ const notes = computed(() =>
   display: flex;
   flex-direction: column;
   padding: 14px 16px 12px;
-  background: #f7f7f7;
+  background: var(--cv-page, #f7f7f7);
   overflow: auto;
+  overscroll-behavior: contain;
 }
 
 .fsd-table {
@@ -138,9 +142,9 @@ const notes = computed(() =>
   grid-template-columns: 68px repeat(5, minmax(0, 1fr));
   grid-template-rows: auto repeat(3, minmax(140px, 1fr)) auto;
   background: #fff;
-  border: 1px solid #ececec;
+  border: 1px solid var(--cv-frame, #ececec);
   box-sizing: border-box;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .fsd-corner,
@@ -153,19 +157,19 @@ const notes = computed(() =>
   min-height: 0;
   box-sizing: border-box;
   box-shadow:
-    inset -1px 0 0 rgba(60, 50, 20, 0.08),
-    inset 0 -1px 0 rgba(60, 50, 20, 0.08);
+    inset -1px 0 0 var(--cv-hairline, rgba(60, 50, 20, 0.08)),
+    inset 0 -1px 0 var(--cv-hairline, rgba(60, 50, 20, 0.08));
 }
 
 .fsd-head:nth-child(6),
 .fsd-cell:nth-child(6n),
 .fsd-foot:nth-child(6n) {
-  box-shadow: inset 0 -1px 0 rgba(60, 50, 20, 0.08);
+  box-shadow: inset 0 -1px 0 var(--cv-hairline, rgba(60, 50, 20, 0.08));
 }
 
 .fsd-foot,
 .fsd-foot-corner {
-  box-shadow: inset -1px 0 0 rgba(60, 50, 20, 0.08);
+  box-shadow: inset -1px 0 0 var(--cv-hairline, rgba(60, 50, 20, 0.08));
 }
 
 .fsd-foot:last-child {
@@ -173,10 +177,16 @@ const notes = computed(() =>
 }
 
 .fsd-corner {
-  background: #f7f7f7;
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  background: var(--cv-page, #f7f7f7);
 }
 
 .fsd-head {
+  position: sticky;
+  top: 0;
+  z-index: 4;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -192,7 +202,7 @@ const notes = computed(() =>
   line-height: 1.25;
   text-align: center;
   color: #fff;
-  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.14);
+  text-shadow: var(--cv-header-shadow, 0 1px 1px rgba(0, 0, 0, 0.34), 0 0 1px rgba(0, 0, 0, 0.28));
 }
 
 .fsd-rail {
@@ -237,7 +247,7 @@ const notes = computed(() =>
   }
 
   .fsd-table {
-    min-width: 920px;
+    min-width: 820px;
     grid-template-columns: 44px repeat(5, minmax(0, 1fr));
   }
 

@@ -228,7 +228,7 @@ const DEPTH_TONE = 0
   font-size: clamp(22px, 2.6vw, 36px);
   font-weight: 900;
   color: #fff;
-  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.14);
+  text-shadow: var(--cv-header-shadow, 0 1px 1px rgba(0, 0, 0, 0.34), 0 0 1px rgba(0, 0, 0, 0.28));
   letter-spacing: 0.08em;
   line-height: 1.15;
   font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui,

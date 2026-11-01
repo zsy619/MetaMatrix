@@ -316,7 +316,7 @@ function onCloseMaximize(event?: Event) {
 
 .fsp.selected,
 .fsp.is-source-max {
-  box-shadow: inset 0 0 0 2px rgba(26, 115, 232, 0.45);
+  box-shadow: inset 0 0 0 2px var(--cv-select, rgba(28, 76, 124, 0.72));
 }
 
 .fsp-header {
@@ -346,7 +346,7 @@ function onCloseMaximize(event?: Event) {
   line-height: 1.3;
   text-align: center;
   color: #fff;
-  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.14);
+  text-shadow: var(--cv-header-shadow, 0 1px 1px rgba(0, 0, 0, 0.34), 0 0 1px rgba(0, 0, 0, 0.28));
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -522,7 +522,7 @@ function onCloseMaximize(event?: Event) {
   align-items: center;
   margin: 0;
   padding: 8px 12px;
-  color: #1a73e8;
+  color: var(--cv-muted, #5f6368);
   font-size: 12px;
   font-weight: 550;
 }

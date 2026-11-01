@@ -343,7 +343,10 @@ const quadrantDoc = computed(() =>
           <MarkersLayer :markers="quadrantDoc.markers" />
         </template>
       </div>
-      <div v-else class="empty">尚未加载画布文档</div>
+      <div v-else class="empty" role="status">
+        <p class="empty-title">画布还没有打开</p>
+        <p class="empty-hint">选择一份工作表后，内容会显示在这里。</p>
+      </div>
     </div>
   </div>
 </template>
@@ -387,7 +390,26 @@ const quadrantDoc = computed(() =>
 
 .empty {
   margin: auto;
-  color: #5f6368;
-  font-size: 14px;
+  max-width: 280px;
+  padding: 28px 24px;
+  text-align: center;
+  color: var(--cv-muted, #5f6368);
+  background: var(--cv-page, #f7f7f7);
+  border: 1px solid var(--cv-frame, #ececec);
+  border-radius: 12px;
+}
+
+.empty-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--cv-ink-strong, #202124);
+  letter-spacing: 0.02em;
+}
+
+.empty-hint {
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 1.6;
 }
 </style>

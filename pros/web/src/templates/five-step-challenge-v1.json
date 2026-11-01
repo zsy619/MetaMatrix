@@ -6,7 +6,10 @@
     "background": {
       "pattern": "none",
       "color": "#f7f7f7"
-    }
+    },
+    "page": "#f7f7f7",
+    "frame": "#ececec",
+    "hairline": "rgba(60, 50, 20, 0.08)"
   },
   "footer": {
     "lead": "五步法挑战版：先写假设，再沿五步把方法落到可验证的判断。",

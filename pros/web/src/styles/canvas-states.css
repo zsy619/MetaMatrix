@@ -1,0 +1,31 @@
+/*
+ * Worksheet interaction chrome. Tokens are also written per canvas by
+ * canvasChromeStyle(); these defaults cover shells that have not bound a theme yet.
+ */
+:root {
+  --cv-page: #f7f7f7;
+  --cv-frame: #ececec;
+  --cv-hairline: rgba(60, 50, 20, 0.08);
+  --cv-ink: #3c4043;
+  --cv-ink-strong: #202124;
+  --cv-muted: #5f6368;
+  --cv-select: rgba(22, 40, 64, 0.9);
+  --cv-select-soft: rgba(22, 40, 64, 0.42);
+  --cv-focus: #163044;
+  --cv-hover-wash: #e8f1fa;
+  --cv-header-shadow: 0 1px 1px rgba(0, 0, 0, 0.34), 0 0 1px rgba(0, 0, 0, 0.28);
+}
+
+/* Keyboard focus for worksheet controls. Mouse focus on the rich-text surface stays quiet. */
+.canvas-viewport button:focus-visible,
+.canvas-viewport [role='button']:focus-visible,
+.canvas-viewport input:focus-visible,
+.canvas-viewport textarea:focus-visible,
+.canvas-viewport select:focus-visible,
+.pm-overlay button:focus-visible,
+.pm-overlay input:focus-visible,
+.pm-overlay textarea:focus-visible,
+.pm-overlay select:focus-visible {
+  outline: 2px solid var(--cv-focus);
+  outline-offset: 2px;
+}

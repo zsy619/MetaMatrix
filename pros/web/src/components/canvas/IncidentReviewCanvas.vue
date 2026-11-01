@@ -294,7 +294,7 @@ function onRemoveRow(rowId: string) {
   color: #fff;
   line-height: 1.4;
   background: var(--tbl-header, #0e8a84);
-  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.14);
+  text-shadow: var(--cv-header-shadow, 0 1px 1px rgba(0, 0, 0, 0.34), 0 0 1px rgba(0, 0, 0, 0.28));
 }
 
 .ir-num {
@@ -345,7 +345,7 @@ function onRemoveRow(rowId: string) {
   font-weight: 700;
   color: #fff;
   background: var(--tbl-header, #a67c00);
-  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.12);
+  text-shadow: var(--cv-header-shadow, 0 1px 1px rgba(0, 0, 0, 0.34), 0 0 1px rgba(0, 0, 0, 0.28));
 }
 
 .ir-panel {
@@ -388,7 +388,7 @@ function onRemoveRow(rowId: string) {
 
 .ir-tip--yellow {
   background: #FBF6E4;
-  border-color: #ffe082;
+  border-color: color-mix(in srgb, #a67c00 32%, var(--cv-frame, #ececec));
 }
 
 .ir-tip--pink {
@@ -433,7 +433,7 @@ function onRemoveRow(rowId: string) {
   font-weight: 700;
   color: #fff;
   background: var(--tbl-header, #2A649F);
-  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.14);
+  text-shadow: var(--cv-header-shadow, 0 1px 1px rgba(0, 0, 0, 0.34), 0 0 1px rgba(0, 0, 0, 0.28));
 }
 
 .ir-tl-col--actions {
@@ -504,7 +504,7 @@ function onRemoveRow(rowId: string) {
 }
 
 .ir-time-input:focus {
-  border-color: #1a73e8;
+  border-color: var(--cv-focus, #1c4c7c);
   background: #fff;
 }
 
@@ -538,7 +538,7 @@ function onRemoveRow(rowId: string) {
   border: 1px solid #e4e6e8;
   border-radius: 4px;
   background: #fafafa;
-  color: #1a73e8;
+  color: var(--cv-focus, #1c4c7c);
   font-size: 13px;
   font-weight: 600;
   padding: 8px 14px;
@@ -547,7 +547,7 @@ function onRemoveRow(rowId: string) {
 }
 
 .ir-add-btn:hover {
-  background: #e8f0fe;
-  border-color: #1a73e8;
+  background: var(--cv-hover-wash, #e8f1fa);
+  border-color: var(--cv-focus, #1c4c7c);
 }
 </style>

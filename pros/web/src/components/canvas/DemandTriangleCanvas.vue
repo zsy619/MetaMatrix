@@ -698,8 +698,8 @@ const vertexPanels = computed(() => {
 }
 
 .dt-legend.is-source-max {
-  border-color: rgba(26, 115, 232, 0.45);
-  background: rgba(232, 240, 254, 0.45);
+  border-color: var(--cv-select, rgba(28, 76, 124, 0.72));
+  background: var(--cv-hover-wash, #e8f1fa);
 }
 
 .legend-toolbar {
@@ -729,7 +729,7 @@ const vertexPanels = computed(() => {
   margin: 0;
   padding: 10px 2px;
   font-size: 12px;
-  color: #1a73e8;
+  color: var(--cv-muted, #5f6368);
   font-weight: 550;
   line-height: 1.45;
 }
@@ -765,8 +765,8 @@ const vertexPanels = computed(() => {
 }
 
 .legend-row.selected {
-  border-color: rgba(26, 115, 232, 0.55);
-  background: rgba(232, 240, 254, 0.65);
+  border-color: var(--cv-select, rgba(28, 76, 124, 0.72));
+  background: var(--cv-hover-wash, #e8f1fa);
 }
 
 .legend-dot {
@@ -813,9 +813,9 @@ const vertexPanels = computed(() => {
 }
 
 .legend-notes-btn:hover {
-  border-color: #1a73e8;
-  color: #1a73e8;
-  background: #e8f0fe;
+  border-color: var(--cv-focus, #1c4c7c);
+  color: var(--cv-focus, #1c4c7c);
+  background: var(--cv-hover-wash, #e8f1fa);
 }
 
 .legend-scores {
@@ -872,9 +872,9 @@ const vertexPanels = computed(() => {
 }
 
 .legend-add:hover {
-  border-color: #1a73e8;
-  color: #1a73e8;
-  background: #e8f0fe;
+  border-color: var(--cv-focus, #1c4c7c);
+  color: var(--cv-focus, #1c4c7c);
+  background: var(--cv-hover-wash, #e8f1fa);
 }
 
 .dt-stage {

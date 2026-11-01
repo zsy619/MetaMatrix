@@ -259,7 +259,7 @@ function onReviewTime(event: Event) {
   color: #fff;
   line-height: 1.3;
   background: var(--tbl-header, #0e8a84);
-  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.14);
+  text-shadow: var(--cv-header-shadow, 0 1px 1px rgba(0, 0, 0, 0.34), 0 0 1px rgba(0, 0, 0, 0.28));
 }
 
 .dr-hint {

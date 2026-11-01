@@ -1,3 +1,5 @@
+import { normalizeCanvasTheme } from '../components/canvas/canvasChrome'
+
 export type QuadrantPosition =
   | 'top-left'
   | 'top-right'
@@ -1727,19 +1729,8 @@ export function normalizeYModelDoc(doc: YModelDocumentJSON): YModelDocumentJSON 
     },
   }
 
-  // Persisted drafts may omit theme; YModelCanvas reads theme.background.color.
-  const theme = (doc.theme ?? {}) as CanvasTheme
-  const background = (theme.background ?? {}) as ThemeBackground
-  doc.theme = {
-    ...theme,
-    background: {
-      pattern: background.pattern || 'none',
-      color: background.color || '#f7f7f7',
-    },
-    page: theme.page,
-    frame: theme.frame,
-    hairline: theme.hairline,
-  }
+  // Persisted drafts may omit theme; fill page / frame / hairline from the shared chrome.
+  doc.theme = normalizeCanvasTheme(doc.theme)
 
   const center = doc.center ?? ({} as YModelCenter)
   if (!center.title) {

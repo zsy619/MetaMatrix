@@ -12230,7 +12230,7 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
 }
 
 .rte-tool:focus-visible {
-  outline: 2px solid rgba(26, 115, 232, 0.45);
+  outline: 2px solid var(--cv-focus, #163044);
   outline-offset: 1px;
 }
 
@@ -13594,7 +13594,7 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
 }
 
 .rte-root.expanded .rte-tool:focus-visible {
-  outline: 2px solid rgba(23, 114, 246, 0.35);
+  outline: 2px solid var(--cv-focus, #163044);
   outline-offset: 1px;
 }
 

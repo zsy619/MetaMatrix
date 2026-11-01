@@ -67,7 +67,7 @@ function onSelect() {
 }
 
 .marker-node.selected .marker-body {
-  outline: 2px solid #1a73e8;
+  outline: 2px solid var(--cv-focus, #1c4c7c);
   outline-offset: 2px;
 }
 

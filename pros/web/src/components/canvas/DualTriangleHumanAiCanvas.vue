@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { canvasChromeStyle } from './canvasChrome'
 import type {
   DualTriangleBlock,
   DualTriangleBlockId,
@@ -57,6 +58,8 @@ const footerReminders = computed(() => {
   return lines && lines.length > 0 ? lines : DEFAULT_REMINDERS
 })
 
+const chrome = computed(() => canvasChromeStyle(props.doc.theme))
+
 const humanRail = computed(() =>
   groupLabel(props.doc.center.humanTitle, '人类三角', ['人类侧', '人类三角']),
 )
@@ -66,7 +69,7 @@ const aiRail = computed(() =>
 </script>
 
 <template>
-  <div class="hai-canvas">
+  <div class="hai-canvas" :style="chrome">
     <div class="hai-table" role="table" aria-label="人类三角与 AI 三角">
       <div class="hai-rail hai-rail--human" role="rowheader">
         <span class="hai-rail-label">{{ humanRail }}</span>
@@ -110,8 +113,9 @@ const aiRail = computed(() =>
   flex-direction: column;
   gap: 0;
   padding: 14px 16px 12px;
-  background: #f7f7f7;
+  background: var(--cv-page, #f7f7f7);
   overflow: auto;
+  overscroll-behavior: contain;
 }
 
 .hai-table {
@@ -123,7 +127,7 @@ const aiRail = computed(() =>
   grid-template-rows: minmax(180px, 1fr) minmax(180px, 1fr);
   gap: 0;
   background: #fff;
-  border: 1px solid #ececec;
+  border: 1px solid var(--cv-frame, #ececec);
   box-sizing: border-box;
   overflow: hidden;
 }
@@ -134,16 +138,16 @@ const aiRail = computed(() =>
   min-height: 0;
   box-sizing: border-box;
   box-shadow:
-    inset -1px 0 0 rgba(60, 50, 20, 0.08),
-    inset 0 -1px 0 rgba(60, 50, 20, 0.08);
+    inset -1px 0 0 var(--cv-hairline, rgba(60, 50, 20, 0.08)),
+    inset 0 -1px 0 var(--cv-hairline, rgba(60, 50, 20, 0.08));
 }
 
 .hai-table > :nth-child(4) {
-  box-shadow: inset 0 -1px 0 rgba(60, 50, 20, 0.08);
+  box-shadow: inset 0 -1px 0 var(--cv-hairline, rgba(60, 50, 20, 0.08));
 }
 
 .hai-table > :nth-child(n + 5) {
-  box-shadow: inset -1px 0 0 rgba(60, 50, 20, 0.08);
+  box-shadow: inset -1px 0 0 var(--cv-hairline, rgba(60, 50, 20, 0.08));
 }
 
 .hai-table > :nth-child(8) {

@@ -411,12 +411,12 @@ function onCloseMaximize(event?: Event) {
 }
 
 .dt-block.selected {
-  box-shadow: inset 0 0 0 2px rgba(26, 115, 232, 0.55),
+  box-shadow: inset 0 0 0 2px var(--cv-select, rgba(28, 76, 124, 0.72)),
     0 2px 10px rgba(0, 0, 0, 0.06);
 }
 
 .dt-block.is-source-max {
-  box-shadow: inset 0 0 0 2px rgba(26, 115, 232, 0.35),
+  box-shadow: inset 0 0 0 2px var(--cv-select-soft, rgba(28, 76, 124, 0.34)),
     0 2px 10px rgba(0, 0, 0, 0.06);
 }
 
@@ -452,7 +452,7 @@ function onCloseMaximize(event?: Event) {
   flex-shrink: 0;
   width: 22px;
   height: 22px;
-  border: 1px dashed rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.72);
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.18);
   color: #fff;
@@ -531,9 +531,9 @@ function onCloseMaximize(event?: Event) {
 }
 
 .dt-block-item.item-selected {
-  border-color: rgba(26, 115, 232, 0.65);
-  background: rgba(232, 240, 254, 0.75);
-  box-shadow: 0 0 0 1px rgba(26, 115, 232, 0.2);
+  border-color: var(--cv-focus, #1c4c7c);
+  background: var(--cv-hover-wash, #e8f1fa);
+  box-shadow: 0 0 0 1px var(--cv-select-soft, rgba(28, 76, 124, 0.34));
 }
 
 .remove-item-btn {
@@ -561,7 +561,7 @@ function onCloseMaximize(event?: Event) {
   margin: 0;
   padding: 8px 2px;
   font-size: 12px;
-  color: #b0b4b8;
+  color: var(--cv-muted, #5f6368);
   line-height: 1.45;
 }
 
@@ -570,7 +570,7 @@ function onCloseMaximize(event?: Event) {
   display: flex;
   align-items: center;
   padding: 8px 12px;
-  color: #1a73e8;
+  color: var(--cv-muted, #5f6368);
   font-weight: 550;
   z-index: 2;
 }
@@ -629,7 +629,7 @@ function onCloseMaximize(event?: Event) {
 
 .dt-block--table.selected,
 .dt-block--table.is-source-max {
-  box-shadow: inset 0 0 0 2px rgba(26, 115, 232, 0.45);
+  box-shadow: inset 0 0 0 2px var(--cv-select, rgba(28, 76, 124, 0.72));
 }
 
 .dt-block--table .dt-block-header {
@@ -649,7 +649,7 @@ function onCloseMaximize(event?: Event) {
   font-weight: 700;
   letter-spacing: 0.04em;
   color: #fff;
-  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.14);
+  text-shadow: var(--cv-header-shadow, 0 1px 1px rgba(0, 0, 0, 0.34), 0 0 1px rgba(0, 0, 0, 0.28));
 }
 
 .dt-block--table .dt-block-actions {
@@ -767,7 +767,7 @@ function onCloseMaximize(event?: Event) {
 
 .dt-block:not(.dt-block--table).selected,
 .dt-block:not(.dt-block--table).is-source-max {
-  box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.42);
+  box-shadow: 0 0 0 2px var(--cv-select, rgba(28, 76, 124, 0.72));
 }
 
 .dt-block:not(.dt-block--table) .dt-block-header {

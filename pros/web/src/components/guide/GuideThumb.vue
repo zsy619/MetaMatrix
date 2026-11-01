@@ -102,8 +102,8 @@ withDefaults(
         <text x="116" y="46" font-size="22" font-weight="700" fill="#2A649F">T</text>
         <text x="28" y="106" font-size="22" font-weight="700" fill="#187A4E">A</text>
         <text x="116" y="106" font-size="22" font-weight="700" fill="#6B4C9A">R</text>
-        <line x1="100" y1="14" x2="100" y2="126" stroke="#dadce0" stroke-width="1.5" />
-        <line x1="16" y1="70" x2="184" y2="70" stroke="#dadce0" stroke-width="1.5" />
+        <line x1="100" y1="14" x2="100" y2="126" stroke="#ececec" stroke-width="1.2" />
+        <line x1="16" y1="70" x2="184" y2="70" stroke="#ececec" stroke-width="1.2" />
       </svg>
 
       <!-- Y 模型：Y 形示意图 -->
@@ -119,11 +119,11 @@ withDefaults(
         <line x1="100" y1="72" x2="152" y2="28" stroke="#ececec" stroke-width="2.2" />
         <line x1="100" y1="72" x2="100" y2="108" stroke="#ececec" stroke-width="2.2" />
         <!-- boxes -->
-        <rect x="18" y="14" width="40" height="22" rx="3" fill="none" stroke="#e4e6e8" stroke-dasharray="0" />
-        <rect x="142" y="14" width="40" height="22" rx="3" fill="none" stroke="#e4e6e8" stroke-dasharray="0" />
-        <rect x="70" y="58" width="60" height="28" rx="4" fill="#fff" stroke="#e53935" stroke-width="1.6" />
+        <rect x="18" y="14" width="40" height="22" rx="3" fill="none" stroke="#ececec" stroke-dasharray="0" />
+        <rect x="142" y="14" width="40" height="22" rx="3" fill="none" stroke="#ececec" stroke-dasharray="0" />
+        <rect x="70" y="58" width="60" height="28" rx="4" fill="#fff" stroke="#ececec" stroke-width="1.4" />
         <text x="100" y="76" text-anchor="middle" font-size="11" font-weight="700" fill="#202124">认知</text>
-        <rect x="72" y="108" width="56" height="18" rx="3" fill="none" stroke="#e4e6e8" stroke-dasharray="0" />
+        <rect x="72" y="108" width="56" height="18" rx="3" fill="none" stroke="#ececec" stroke-dasharray="0" />
         <rect x="24" y="128" width="152" height="8" rx="2" fill="#eceff1" />
         <text x="36" y="28" font-size="8" fill="#5f6368">理论</text>
         <text x="154" y="28" font-size="8" fill="#5f6368">事实</text>
@@ -172,7 +172,7 @@ withDefaults(
         xmlns="http://www.w3.org/2000/svg"
       >
         <rect width="200" height="140" rx="10" fill="#f4f5f7" />
-        <polygon points="100,22 168,118 32,118" fill="none" stroke="#e4e6e8" stroke-width="1.6" />
+        <polygon points="100,22 168,118 32,118" fill="none" stroke="#ececec" stroke-width="1.6" />
         <polygon points="100,40 148,108 52,108" fill="none" stroke="#c5c9ce" stroke-width="1.1" />
         <polygon points="100,58 128,98 72,98" fill="none" stroke="#c5c9ce" stroke-width="1.1" />
         <polygon points="100,34 158,112 42,112" fill="rgba(212,175,55,0.35)" stroke="#A67C00" stroke-width="1.2" />
@@ -525,27 +525,27 @@ withDefaults(
       >
         <rect width="200" height="140" rx="10" fill="#f7f7f7" />
         <text x="100" y="16" text-anchor="middle" font-size="9" font-weight="800" fill="#202124">AI场景取舍评估</text>
-        <rect x="12" y="24" width="86" height="14" fill="#e8eaed" stroke="#dadce0" stroke-width="0.6" />
-        <rect x="102" y="24" width="86" height="14" fill="#e8eaed" stroke="#dadce0" stroke-width="0.6" />
-        <text x="55" y="34" text-anchor="middle" font-size="6.5" font-weight="700" fill="#3c4043">价值侧</text>
-        <text x="145" y="34" text-anchor="middle" font-size="6.5" font-weight="700" fill="#3c4043">成本侧</text>
-        <g font-size="6" font-weight="800" fill="#d93025">
-          <rect x="12" y="38" width="86" height="22" fill="#fff" stroke="#dadce0" stroke-width="0.6" />
-          <text x="18" y="50">A1.价值差异</text>
-          <rect x="102" y="38" width="86" height="22" fill="#fff" stroke="#dadce0" stroke-width="0.6" />
-          <text x="108" y="50">B1.容错高低</text>
-          <rect x="12" y="60" width="86" height="22" fill="#fff" stroke="#dadce0" stroke-width="0.6" />
-          <text x="18" y="72">A2.复现频率</text>
-          <rect x="102" y="60" width="86" height="22" fill="#fff" stroke="#dadce0" stroke-width="0.6" />
-          <text x="108" y="72">B2.流程清晰</text>
-          <rect x="12" y="82" width="86" height="22" fill="#fff" stroke="#dadce0" stroke-width="0.6" />
-          <text x="18" y="94">A3.规模卡点</text>
-          <rect x="102" y="82" width="86" height="22" fill="#fff" stroke="#dadce0" stroke-width="0.6" />
-          <text x="108" y="94">B3.决策明确</text>
-          <rect x="12" y="104" width="86" height="22" fill="#fff" stroke="#dadce0" stroke-width="0.6" />
-          <text x="18" y="116">A4.核心能力</text>
-          <rect x="102" y="104" width="86" height="22" fill="#fff" stroke="#dadce0" stroke-width="0.6" />
-          <text x="108" y="116">B4.数据可行</text>
+        <rect x="12" y="24" width="86" height="14" fill="#0E8A84" />
+        <rect x="102" y="24" width="86" height="14" fill="#A67C00" />
+        <text x="55" y="34" text-anchor="middle" font-size="6.5" font-weight="700" fill="#fff">价值侧</text>
+        <text x="145" y="34" text-anchor="middle" font-size="6.5" font-weight="700" fill="#fff">成本侧</text>
+        <g font-size="6" font-weight="800">
+          <rect x="12" y="38" width="86" height="22" fill="#FBF1EB" />
+          <text x="18" y="52" fill="#8A4024">A1.价值差异</text>
+          <rect x="102" y="38" width="86" height="22" fill="#E8F1FA" />
+          <text x="108" y="52" fill="#1C4C7C">B1.容错高低</text>
+          <rect x="12" y="60" width="86" height="22" fill="#E7F6EF" />
+          <text x="18" y="74" fill="#125C3B">A2.复现频率</text>
+          <rect x="102" y="60" width="86" height="22" fill="#FBEFF2" />
+          <text x="108" y="74" fill="#84344C">B2.流程清晰</text>
+          <rect x="12" y="82" width="86" height="22" fill="#F3EEF8" />
+          <text x="18" y="96" fill="#4E3574">A3.规模卡点</text>
+          <rect x="102" y="82" width="86" height="22" fill="#F4F6E6" />
+          <text x="108" y="96" fill="#4E5A10">B3.决策明确</text>
+          <rect x="12" y="104" width="86" height="22" fill="#F6EEF8" />
+          <text x="18" y="118" fill="#5C2C66">A4.核心能力</text>
+          <rect x="102" y="104" width="86" height="22" fill="#E6F3F6" />
+          <text x="108" y="118" fill="#125468">B4.数据可行</text>
         </g>
         <text x="188" y="134" text-anchor="end" font-size="5.5" fill="#80868b">1-10分 · 事实论证</text>
       </svg>
@@ -632,21 +632,21 @@ withDefaults(
         <rect width="200" height="140" rx="10" fill="#f7f7f7" />
         <rect x="10" y="8" width="180" height="18" fill="#FBF6E4" stroke="#e0e0e0" stroke-width="0.6" />
         <text x="100" y="20" text-anchor="middle" font-size="7" font-weight="700" fill="#202124">关键阻力分析画布：____率</text>
-        <rect x="10" y="28" width="58" height="12" fill="#f5f0e6" stroke="#dadce0" stroke-width="0.5" />
-        <rect x="71" y="28" width="58" height="12" fill="#f5f0e6" stroke="#dadce0" stroke-width="0.5" />
-        <rect x="132" y="28" width="58" height="12" fill="#f5f0e6" stroke="#dadce0" stroke-width="0.5" />
+        <rect x="10" y="28" width="58" height="12" fill="#f5f0e6" stroke="#ececec" stroke-width="0.5" />
+        <rect x="71" y="28" width="58" height="12" fill="#f5f0e6" stroke="#ececec" stroke-width="0.5" />
+        <rect x="132" y="28" width="58" height="12" fill="#f5f0e6" stroke="#ececec" stroke-width="0.5" />
         <text x="39" y="36.5" text-anchor="middle" font-size="5.5" font-weight="700" fill="#3c4043">阻力假设</text>
         <text x="100" y="36.5" text-anchor="middle" font-size="5.5" font-weight="700" fill="#3c4043">消除假设</text>
         <text x="161" y="36.5" text-anchor="middle" font-size="5" font-weight="700" fill="#3c4043">备注/策略</text>
-        <rect x="10" y="40" width="58" height="22" fill="#fff" stroke="#dadce0" stroke-width="0.5" />
-        <rect x="71" y="40" width="58" height="22" fill="#fff" stroke="#dadce0" stroke-width="0.5" />
-        <rect x="132" y="40" width="58" height="22" fill="#fff" stroke="#dadce0" stroke-width="0.5" />
-        <rect x="10" y="62" width="58" height="22" fill="#fff" stroke="#dadce0" stroke-width="0.5" />
-        <rect x="71" y="62" width="58" height="22" fill="#fff" stroke="#dadce0" stroke-width="0.5" />
-        <rect x="132" y="62" width="58" height="22" fill="#fff" stroke="#dadce0" stroke-width="0.5" />
-        <rect x="10" y="84" width="58" height="22" fill="#fff" stroke="#dadce0" stroke-width="0.5" />
-        <rect x="71" y="84" width="58" height="22" fill="#fff" stroke="#dadce0" stroke-width="0.5" />
-        <rect x="132" y="84" width="58" height="22" fill="#fff" stroke="#dadce0" stroke-width="0.5" />
+        <rect x="10" y="40" width="58" height="22" fill="#fff" stroke="#ececec" stroke-width="0.5" />
+        <rect x="71" y="40" width="58" height="22" fill="#fff" stroke="#ececec" stroke-width="0.5" />
+        <rect x="132" y="40" width="58" height="22" fill="#fff" stroke="#ececec" stroke-width="0.5" />
+        <rect x="10" y="62" width="58" height="22" fill="#fff" stroke="#ececec" stroke-width="0.5" />
+        <rect x="71" y="62" width="58" height="22" fill="#fff" stroke="#ececec" stroke-width="0.5" />
+        <rect x="132" y="62" width="58" height="22" fill="#fff" stroke="#ececec" stroke-width="0.5" />
+        <rect x="10" y="84" width="58" height="22" fill="#fff" stroke="#ececec" stroke-width="0.5" />
+        <rect x="71" y="84" width="58" height="22" fill="#fff" stroke="#ececec" stroke-width="0.5" />
+        <rect x="132" y="84" width="58" height="22" fill="#fff" stroke="#ececec" stroke-width="0.5" />
         <text x="16" y="122" font-size="5.5" fill="#c75b3a">消除深度：降低 &lt; 消除 &lt; 逆转</text>
         <text x="16" y="132" font-size="5.5" fill="#c75b3a">消除成本：动嘴 &lt; 动手 &lt; 动钱</text>
       </svg>
@@ -661,23 +661,23 @@ withDefaults(
         <rect width="200" height="140" rx="10" fill="#f7f7f7" />
         <rect x="10" y="8" width="180" height="18" fill="#FBF6E4" stroke="#e0e0e0" stroke-width="0.6" />
         <text x="100" y="20" text-anchor="middle" font-size="6.5" font-weight="800" fill="#202124">一堂最佳转化率分析画布·取舍版</text>
-        <rect x="10" y="28" width="36" height="12" fill="#FBF6E4" stroke="#dadce0" stroke-width="0.5" />
-        <rect x="48" y="28" width="46" height="12" fill="#FBF6E4" stroke="#dadce0" stroke-width="0.5" />
-        <rect x="96" y="28" width="46" height="12" fill="#FBF6E4" stroke="#dadce0" stroke-width="0.5" />
-        <rect x="144" y="28" width="46" height="12" fill="#FBF6E4" stroke="#dadce0" stroke-width="0.5" />
+        <rect x="10" y="28" width="36" height="12" fill="#FBF6E4" stroke="#ececec" stroke-width="0.5" />
+        <rect x="48" y="28" width="46" height="12" fill="#FBF6E4" stroke="#ececec" stroke-width="0.5" />
+        <rect x="96" y="28" width="46" height="12" fill="#FBF6E4" stroke="#ececec" stroke-width="0.5" />
+        <rect x="144" y="28" width="46" height="12" fill="#FBF6E4" stroke="#ececec" stroke-width="0.5" />
         <text x="28" y="36.5" text-anchor="middle" font-size="5.5" font-weight="700" fill="#202124">优先级</text>
         <text x="71" y="36.5" text-anchor="middle" font-size="5.5" font-weight="700" fill="#202124">动力</text>
         <text x="119" y="36.5" text-anchor="middle" font-size="5.5" font-weight="700" fill="#202124">阻力</text>
         <text x="167" y="36.5" text-anchor="middle" font-size="5.5" font-weight="700" fill="#202124">触点</text>
-        <rect x="10" y="40" width="36" height="28" fill="#fff" stroke="#dadce0" stroke-width="0.5" />
-        <rect x="48" y="40" width="46" height="28" fill="#fff" stroke="#dadce0" stroke-width="0.5" />
-        <rect x="96" y="40" width="46" height="28" fill="#fff" stroke="#dadce0" stroke-width="0.5" />
-        <rect x="144" y="40" width="46" height="28" fill="#fff" stroke="#dadce0" stroke-width="0.5" />
+        <rect x="10" y="40" width="36" height="28" fill="#fff" stroke="#ececec" stroke-width="0.5" />
+        <rect x="48" y="40" width="46" height="28" fill="#fff" stroke="#ececec" stroke-width="0.5" />
+        <rect x="96" y="40" width="46" height="28" fill="#fff" stroke="#ececec" stroke-width="0.5" />
+        <rect x="144" y="40" width="46" height="28" fill="#fff" stroke="#ececec" stroke-width="0.5" />
         <text x="28" y="57" text-anchor="middle" font-size="6" font-weight="800" fill="#202124">Top3</text>
-        <rect x="10" y="68" width="36" height="28" fill="#fff" stroke="#dadce0" stroke-width="0.5" />
-        <rect x="48" y="68" width="46" height="28" fill="#fff" stroke="#dadce0" stroke-width="0.5" />
-        <rect x="96" y="68" width="46" height="28" fill="#fff" stroke="#dadce0" stroke-width="0.5" />
-        <rect x="144" y="68" width="46" height="28" fill="#fff" stroke="#dadce0" stroke-width="0.5" />
+        <rect x="10" y="68" width="36" height="28" fill="#fff" stroke="#ececec" stroke-width="0.5" />
+        <rect x="48" y="68" width="46" height="28" fill="#fff" stroke="#ececec" stroke-width="0.5" />
+        <rect x="96" y="68" width="46" height="28" fill="#fff" stroke="#ececec" stroke-width="0.5" />
+        <rect x="144" y="68" width="46" height="28" fill="#fff" stroke="#ececec" stroke-width="0.5" />
         <text x="28" y="85" text-anchor="middle" font-size="5.5" font-weight="700" fill="#202124">其他备选</text>
         <text x="100" y="122" text-anchor="middle" font-size="6" fill="#9aa0a6">+ 添加行</text>
       </svg>
@@ -690,20 +690,25 @@ withDefaults(
         xmlns="http://www.w3.org/2000/svg"
       >
         <rect width="200" height="140" rx="10" fill="#f7f7f7" />
-        <rect x="10" y="8" width="180" height="16" fill="#A67C00" stroke="#A67C00" stroke-width="0.7" />
-        <text x="100" y="19" text-anchor="middle" font-size="7" font-weight="800" fill="#fff">行业预判分析框架</text>
-        <rect x="10" y="28" width="58" height="28" fill="#fff" stroke="#ececec" stroke-width="1" />
-        <rect x="71" y="28" width="58" height="28" fill="#fff" stroke="#ececec" stroke-width="1" />
-        <rect x="132" y="28" width="58" height="28" fill="#fff" stroke="#ececec" stroke-width="1" />
-        <text x="14" y="40" font-size="5.5" font-weight="800" fill="#202124">1.拆解产业链</text>
-        <text x="75" y="40" font-size="5.5" font-weight="800" fill="#202124">2.洞察变化</text>
-        <text x="136" y="40" font-size="5.5" font-weight="800" fill="#202124">3.稳态B点</text>
-        <rect x="10" y="60" width="180" height="20" fill="#fff" stroke="#ececec" stroke-width="1" />
-        <text x="16" y="73" font-size="6.5" font-weight="800" fill="#202124">4.判断行业周期</text>
-        <rect x="10" y="84" width="180" height="20" fill="#fff" stroke="#ececec" stroke-width="1" />
-        <text x="16" y="97" font-size="6.5" font-weight="800" fill="#202124">5.行业天花板大小</text>
-        <rect x="10" y="108" width="180" height="20" fill="#fff" stroke="#ececec" stroke-width="1" />
-        <text x="16" y="121" font-size="6.5" font-weight="800" fill="#202124">6.行业集中度</text>
+        <text x="100" y="16" text-anchor="middle" font-size="7" font-weight="800" fill="#202124">行业预判分析框架</text>
+        <rect x="10" y="22" width="58" height="8" fill="#0E8A84" />
+        <rect x="71" y="22" width="58" height="8" fill="#A67C00" />
+        <rect x="132" y="22" width="58" height="8" fill="#B85A38" />
+        <rect x="10" y="30" width="58" height="26" fill="#E5F6F5" />
+        <rect x="71" y="30" width="58" height="26" fill="#FBF6E4" />
+        <rect x="132" y="30" width="58" height="26" fill="#FBF1EB" />
+        <text x="14" y="44" font-size="5" font-weight="800" fill="#0B6B66">1.拆解产业链</text>
+        <text x="75" y="44" font-size="5" font-weight="800" fill="#7A5C00">2.洞察变化</text>
+        <text x="136" y="44" font-size="5" font-weight="800" fill="#8A4024">3.稳态B点</text>
+        <rect x="10" y="60" width="180" height="6" fill="#2A649F" />
+        <rect x="10" y="66" width="180" height="16" fill="#E8F1FA" />
+        <text x="16" y="77" font-size="6" font-weight="800" fill="#1C4C7C">4.判断行业周期</text>
+        <rect x="10" y="86" width="180" height="6" fill="#187A4E" />
+        <rect x="10" y="92" width="180" height="16" fill="#E7F6EF" />
+        <text x="16" y="103" font-size="6" font-weight="800" fill="#125C3B">5.行业天花板大小</text>
+        <rect x="10" y="112" width="180" height="6" fill="#A84562" />
+        <rect x="10" y="118" width="180" height="16" fill="#FBEFF2" />
+        <text x="16" y="129" font-size="6" font-weight="800" fill="#84344C">6.行业集中度</text>
       </svg>
 
       <!-- 科学开会：三栏浅黄 -->
@@ -740,13 +745,13 @@ withDefaults(
       >
         <rect width="200" height="140" rx="10" fill="#f7f7f7" />
         <!-- Goal -->
-        <rect x="118" y="8" width="42" height="16" fill="none" stroke="#e4e6e8" stroke-width="0.9" stroke-dasharray="0" />
+        <rect x="118" y="8" width="42" height="16" fill="none" stroke="#ececec" stroke-width="0.9" stroke-dasharray="0" />
         <text x="164" y="19" font-size="7" font-weight="800" fill="#202124">目标</text>
         <line x1="148" y1="26" x2="148" y2="34" stroke="#ececec" stroke-width="1" marker-end="url(#ipo-t-b)" />
         <!-- I P O boxes -->
-        <rect x="18" y="42" width="40" height="36" fill="#fff" stroke="#e4e6e8" stroke-width="1" stroke-dasharray="0" />
-        <rect x="80" y="42" width="40" height="36" fill="#fff" stroke="#e4e6e8" stroke-width="1" stroke-dasharray="0" />
-        <rect x="142" y="42" width="40" height="36" fill="#fff" stroke="#e4e6e8" stroke-width="1" stroke-dasharray="0" />
+        <rect x="18" y="42" width="40" height="36" fill="#fff" stroke="#ececec" stroke-width="1" stroke-dasharray="0" />
+        <rect x="80" y="42" width="40" height="36" fill="#fff" stroke="#ececec" stroke-width="1" stroke-dasharray="0" />
+        <rect x="142" y="42" width="40" height="36" fill="#fff" stroke="#ececec" stroke-width="1" stroke-dasharray="0" />
         <text x="22" y="38" font-size="7.5" font-weight="800" fill="#A84562">输入</text>
         <text x="84" y="38" font-size="7.5" font-weight="800" fill="#A84562">处理</text>
         <text x="146" y="38" font-size="7.5" font-weight="800" fill="#A84562">输出</text>
@@ -764,10 +769,10 @@ withDefaults(
         <!-- Pattern -->
         <line x1="100" y1="80" x2="100" y2="90" stroke="#ececec" stroke-width="1" />
         <text x="88" y="100" font-size="6.5" font-weight="800" fill="#202124">模型</text>
-        <rect x="80" y="104" width="40" height="14" fill="#fff" stroke="#e4e6e8" stroke-width="0.9" stroke-dasharray="0" />
+        <rect x="80" y="104" width="40" height="14" fill="#fff" stroke="#ececec" stroke-width="0.9" stroke-dasharray="0" />
         <!-- Feedback -->
         <text x="48" y="130" font-size="6.5" font-weight="800" fill="#202124">反馈</text>
-        <rect x="68" y="121" width="70" height="12" fill="#fff" stroke="#e4e6e8" stroke-width="0.9" stroke-dasharray="0" />
+        <rect x="68" y="121" width="70" height="12" fill="#fff" stroke="#ececec" stroke-width="0.9" stroke-dasharray="0" />
         <!-- feedback loop -->
         <path d="M162 80 L162 134 L28 134 L28 80" fill="none" stroke="#A84562" stroke-width="2.2" stroke-linejoin="round" marker-end="url(#ipo-t-r)" />
       </svg>
@@ -781,12 +786,12 @@ withDefaults(
       >
         <rect width="200" height="140" rx="10" fill="#f7f7f7" />
         <text x="12" y="16" font-size="7.5" font-weight="800" fill="#202124">Case Study: 故障复盘</text>
-        <line x1="12" y1="20" x2="188" y2="20" stroke="#e8eaed" stroke-width="0.8" />
+        <line x1="12" y1="20" x2="188" y2="20" stroke="#ececec" stroke-width="0.8" />
         <text x="12" y="32" font-size="5.5" font-weight="700" fill="#202124">1.详细描述</text>
-        <rect x="12" y="35" width="176" height="10" fill="#fafafa" stroke="#dadce0" stroke-width="0.5" />
+        <rect x="12" y="35" width="176" height="10" fill="#fafafa" stroke="#ececec" stroke-width="0.5" />
         <text x="12" y="54" font-size="5.5" font-weight="700" fill="#202124">2.发生过程</text>
-        <rect x="12" y="57" width="50" height="22" fill="#f1f3f4" stroke="#dadce0" stroke-width="0.5" />
-        <rect x="62" y="57" width="126" height="22" fill="#fff" stroke="#dadce0" stroke-width="0.5" />
+        <rect x="12" y="57" width="50" height="22" fill="#f1f3f4" stroke="#ececec" stroke-width="0.5" />
+        <rect x="62" y="57" width="126" height="22" fill="#fff" stroke="#ececec" stroke-width="0.5" />
         <text x="16" y="70" font-size="4.5" fill="#5f6368">时间</text>
         <text x="68" y="70" font-size="4.5" fill="#5f6368">行为</text>
         <text x="12" y="90" font-size="5.5" font-weight="700" fill="#202124">3.原因 · 4.方案</text>
@@ -807,8 +812,8 @@ withDefaults(
         xmlns="http://www.w3.org/2000/svg"
       >
         <rect width="200" height="140" rx="10" fill="#f7f7f7" />
-        <rect x="18" y="28" width="164" height="90" fill="#ffffff" stroke="#ececec" stroke-width="2" />
-        <rect x="18" y="28" width="164" height="18" fill="#2A649F" stroke="#ececec" stroke-width="2" />
+        <rect x="18" y="28" width="164" height="90" fill="#ffffff" stroke="#ececec" stroke-width="1.1" />
+        <rect x="18" y="28" width="164" height="18" fill="#2A649F" />
         <line x1="55" y1="28" x2="55" y2="118" stroke="#ececec" stroke-width="1.2" />
         <line x1="85" y1="28" x2="85" y2="118" stroke="#ececec" stroke-width="1.2" />
         <line x1="115" y1="28" x2="115" y2="118" stroke="#ececec" stroke-width="1.2" />
@@ -1073,15 +1078,16 @@ withDefaults(
       >
         <rect width="200" height="140" rx="10" fill="#f7f7f7" />
         <text x="12" y="16" font-size="7" font-weight="800" fill="#202124">个人年工作总结模板</text>
-        <text x="12" y="34" font-size="6.5" font-weight="800" fill="#202124">重点业务进展</text>
-        <line x1="12" y1="40" x2="12" y2="52" stroke="#dadce0" stroke-width="1.5" />
-        <text x="18" y="48" font-size="5" font-style="italic" fill="#9aa0a6">TOP3 关键进展…</text>
-        <rect x="12" y="54" width="176" height="14" fill="#fafafa" stroke="#e8eaed" stroke-width="0.6" />
-        <text x="12" y="82" font-size="6.5" font-weight="800" fill="#202124">个人成长进步</text>
-        <line x1="12" y1="88" x2="12" y2="98" stroke="#dadce0" stroke-width="1.5" />
-        <rect x="12" y="100" width="176" height="10" fill="#fafafa" stroke="#e8eaed" stroke-width="0.6" />
-        <text x="12" y="124" font-size="6.5" font-weight="800" fill="#202124">不足与改进计划</text>
-        <rect x="12" y="128" width="176" height="6" fill="#fafafa" stroke="#e8eaed" stroke-width="0.6" />
+        <rect x="12" y="24" width="176" height="8" fill="#0E8A84" />
+        <text x="16" y="30" font-size="5.2" font-weight="800" fill="#fff">重点业务进展</text>
+        <rect x="12" y="32" width="176" height="28" fill="#E5F6F5" />
+        <text x="18" y="50" font-size="5" font-style="italic" fill="#0B6B66">TOP3 关键进展…</text>
+        <rect x="12" y="66" width="176" height="8" fill="#A67C00" />
+        <text x="16" y="72" font-size="5.2" font-weight="800" fill="#fff">个人成长进步</text>
+        <rect x="12" y="74" width="176" height="22" fill="#FBF6E4" />
+        <rect x="12" y="102" width="176" height="8" fill="#B85A38" />
+        <text x="16" y="108" font-size="5.2" font-weight="800" fill="#fff">不足与改进计划</text>
+        <rect x="12" y="110" width="176" height="20" fill="#FBF1EB" />
       </svg>
 
       <!-- 个人周工作总结：三节纵向 -->
@@ -1093,15 +1099,16 @@ withDefaults(
       >
         <rect width="200" height="140" rx="10" fill="#f7f7f7" />
         <text x="12" y="16" font-size="7" font-weight="800" fill="#202124">个人周工作总结模板</text>
-        <text x="12" y="34" font-size="6.5" font-weight="800" fill="#202124">本周关键执行</text>
-        <line x1="12" y1="40" x2="12" y2="52" stroke="#dadce0" stroke-width="1.5" />
-        <text x="18" y="48" font-size="5" font-style="italic" fill="#9aa0a6">关键事项 TOP3…</text>
-        <rect x="12" y="54" width="176" height="14" fill="#fafafa" stroke="#e8eaed" stroke-width="0.6" />
-        <text x="12" y="82" font-size="6.5" font-weight="800" fill="#202124">卡点与应对</text>
-        <line x1="12" y1="88" x2="12" y2="98" stroke="#dadce0" stroke-width="1.5" />
-        <rect x="12" y="100" width="176" height="10" fill="#fafafa" stroke="#e8eaed" stroke-width="0.6" />
-        <text x="12" y="124" font-size="6.5" font-weight="800" fill="#202124">下周优先事项</text>
-        <rect x="12" y="128" width="176" height="6" fill="#fafafa" stroke="#e8eaed" stroke-width="0.6" />
+        <rect x="12" y="24" width="176" height="8" fill="#0E8A84" />
+        <text x="16" y="30" font-size="5.2" font-weight="800" fill="#fff">本周关键执行</text>
+        <rect x="12" y="32" width="176" height="28" fill="#E5F6F5" />
+        <text x="18" y="50" font-size="5" font-style="italic" fill="#0B6B66">关键事项 TOP3…</text>
+        <rect x="12" y="66" width="176" height="8" fill="#A67C00" />
+        <text x="16" y="72" font-size="5.2" font-weight="800" fill="#fff">卡点与应对</text>
+        <rect x="12" y="74" width="176" height="22" fill="#FBF6E4" />
+        <rect x="12" y="102" width="176" height="8" fill="#B85A38" />
+        <text x="16" y="108" font-size="5.2" font-weight="800" fill="#fff">下周优先事项</text>
+        <rect x="12" y="110" width="176" height="20" fill="#FBF1EB" />
       </svg>
 
       <!-- 个人月工作总结：三节纵向 -->
@@ -1113,15 +1120,16 @@ withDefaults(
       >
         <rect width="200" height="140" rx="10" fill="#f7f7f7" />
         <text x="12" y="16" font-size="7" font-weight="800" fill="#202124">个人月工作总结模板</text>
-        <text x="12" y="34" font-size="6.5" font-weight="800" fill="#202124">目标完成情况</text>
-        <line x1="12" y1="40" x2="12" y2="52" stroke="#dadce0" stroke-width="1.5" />
-        <text x="18" y="48" font-size="5" font-style="italic" fill="#9aa0a6">对照目标 TOP3…</text>
-        <rect x="12" y="54" width="176" height="14" fill="#fafafa" stroke="#e8eaed" stroke-width="0.6" />
-        <text x="12" y="82" font-size="6.5" font-weight="800" fill="#202124">关键进展与贡献</text>
-        <line x1="12" y1="88" x2="12" y2="98" stroke="#dadce0" stroke-width="1.5" />
-        <rect x="12" y="100" width="176" height="10" fill="#fafafa" stroke="#e8eaed" stroke-width="0.6" />
-        <text x="12" y="124" font-size="6.5" font-weight="800" fill="#202124">差距与下月计划</text>
-        <rect x="12" y="128" width="176" height="6" fill="#fafafa" stroke="#e8eaed" stroke-width="0.6" />
+        <rect x="12" y="24" width="176" height="8" fill="#0E8A84" />
+        <text x="16" y="30" font-size="5.2" font-weight="800" fill="#fff">目标完成情况</text>
+        <rect x="12" y="32" width="176" height="28" fill="#E5F6F5" />
+        <text x="18" y="50" font-size="5" font-style="italic" fill="#0B6B66">对照目标 TOP3…</text>
+        <rect x="12" y="66" width="176" height="8" fill="#A67C00" />
+        <text x="16" y="72" font-size="5.2" font-weight="800" fill="#fff">关键进展与贡献</text>
+        <rect x="12" y="74" width="176" height="22" fill="#FBF6E4" />
+        <rect x="12" y="102" width="176" height="8" fill="#B85A38" />
+        <text x="16" y="108" font-size="5.2" font-weight="800" fill="#fff">差距与下月计划</text>
+        <rect x="12" y="110" width="176" height="20" fill="#FBF1EB" />
       </svg>
 
       <!-- 个人季工作总结：三节纵向 -->
@@ -1133,15 +1141,16 @@ withDefaults(
       >
         <rect width="200" height="140" rx="10" fill="#f7f7f7" />
         <text x="12" y="16" font-size="7" font-weight="800" fill="#202124">个人季工作总结模板</text>
-        <text x="12" y="34" font-size="6.5" font-weight="800" fill="#202124">阶段性成果</text>
-        <line x1="12" y1="40" x2="12" y2="52" stroke="#dadce0" stroke-width="1.5" />
-        <text x="18" y="48" font-size="5" font-style="italic" fill="#9aa0a6">可量化成果 TOP3…</text>
-        <rect x="12" y="54" width="176" height="14" fill="#fafafa" stroke="#e8eaed" stroke-width="0.6" />
-        <text x="12" y="82" font-size="6.5" font-weight="800" fill="#202124">能力与方法沉淀</text>
-        <line x1="12" y1="88" x2="12" y2="98" stroke="#dadce0" stroke-width="1.5" />
-        <rect x="12" y="100" width="176" height="10" fill="#fafafa" stroke="#e8eaed" stroke-width="0.6" />
-        <text x="12" y="124" font-size="6.5" font-weight="800" fill="#202124">下季度方向</text>
-        <rect x="12" y="128" width="176" height="6" fill="#fafafa" stroke="#e8eaed" stroke-width="0.6" />
+        <rect x="12" y="24" width="176" height="8" fill="#0E8A84" />
+        <text x="16" y="30" font-size="5.2" font-weight="800" fill="#fff">阶段性成果</text>
+        <rect x="12" y="32" width="176" height="28" fill="#E5F6F5" />
+        <text x="18" y="50" font-size="5" font-style="italic" fill="#0B6B66">可量化成果 TOP3…</text>
+        <rect x="12" y="66" width="176" height="8" fill="#A67C00" />
+        <text x="16" y="72" font-size="5.2" font-weight="800" fill="#fff">能力与方法沉淀</text>
+        <rect x="12" y="74" width="176" height="22" fill="#FBF6E4" />
+        <rect x="12" y="102" width="176" height="8" fill="#B85A38" />
+        <text x="16" y="108" font-size="5.2" font-weight="800" fill="#fff">下季度方向</text>
+        <rect x="12" y="110" width="176" height="20" fill="#FBF1EB" />
       </svg>
 
       <!-- 深度复盘关键成果：网格 -->
@@ -1154,20 +1163,20 @@ withDefaults(
         <rect width="200" height="140" rx="10" fill="#f7f7f7" />
         <rect x="8" y="8" width="184" height="16" fill="#FBF6E4" stroke="#ececec" stroke-width="1" />
         <text x="14" y="19" font-size="5.5" font-weight="700" fill="#202124">项目名称：____　复盘时间：____</text>
-        <rect x="8" y="24" width="184" height="22" fill="#fff" stroke="#ececec" stroke-width="1" />
-        <text x="14" y="34" font-size="6" font-weight="800" fill="#202124">整体评价</text>
-        <rect x="8" y="46" width="92" height="28" fill="#fff" stroke="#ececec" stroke-width="1" />
-        <rect x="100" y="46" width="92" height="28" fill="#fff" stroke="#ececec" stroke-width="1" />
-        <text x="14" y="58" font-size="6" font-weight="800" fill="#202124">亮点共识</text>
-        <text x="106" y="58" font-size="6" font-weight="800" fill="#202124">问题共识</text>
-        <rect x="8" y="74" width="61" height="28" fill="#fff" stroke="#ececec" stroke-width="1" />
-        <rect x="69" y="74" width="61" height="28" fill="#fff" stroke="#ececec" stroke-width="1" />
-        <rect x="130" y="74" width="62" height="28" fill="#fff" stroke="#ececec" stroke-width="1" />
-        <text x="14" y="86" font-size="5.5" font-weight="800" fill="#202124">坚持做</text>
-        <text x="75" y="86" font-size="5.5" font-weight="800" fill="#202124">放弃做</text>
-        <text x="136" y="86" font-size="5.5" font-weight="800" fill="#202124">新任务</text>
-        <rect x="8" y="102" width="184" height="28" fill="#fff" stroke="#ececec" stroke-width="1" />
-        <text x="14" y="114" font-size="6" font-weight="800" fill="#202124">过程资产</text>
+        <rect x="8" y="24" width="184" height="22" fill="#E5F6F5" />
+        <text x="14" y="38" font-size="6" font-weight="800" fill="#0B6B66">整体评价</text>
+        <rect x="8" y="46" width="92" height="28" fill="#FBF6E4" />
+        <rect x="100" y="46" width="92" height="28" fill="#FBF1EB" />
+        <text x="14" y="62" font-size="6" font-weight="800" fill="#7A5C00">亮点共识</text>
+        <text x="106" y="62" font-size="6" font-weight="800" fill="#8A4024">问题共识</text>
+        <rect x="8" y="74" width="61" height="28" fill="#E8F1FA" />
+        <rect x="69" y="74" width="61" height="28" fill="#E7F6EF" />
+        <rect x="130" y="74" width="62" height="28" fill="#FBEFF2" />
+        <text x="14" y="90" font-size="5.5" font-weight="800" fill="#1C4C7C">坚持做</text>
+        <text x="75" y="90" font-size="5.5" font-weight="800" fill="#125C3B">放弃做</text>
+        <text x="136" y="90" font-size="5.5" font-weight="800" fill="#84344C">新任务</text>
+        <rect x="8" y="102" width="184" height="28" fill="#F3EEF8" />
+        <text x="14" y="118" font-size="6" font-weight="800" fill="#4E3574">过程资产</text>
       </svg>
 
 
@@ -1354,8 +1363,8 @@ withDefaults(
 <style scoped>
 .thumb {
   aspect-ratio: 200 / 140;
-  background: #f1f3f4;
-  border-bottom: 1px solid #e8eaed;
+  background: #f7f7f7;
+  border-bottom: 1px solid #ececec;
 }
 
 .thumb-svg {

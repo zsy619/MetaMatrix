@@ -289,7 +289,7 @@ function onCloseMaximize(event?: Event) {
   min-height: 0;
   height: 100%;
   border-radius: 2px;
-  border: 1px solid #e4e6e8;
+  border: 1px solid var(--cv-frame, #ececec);
   background: rgba(255, 255, 255, 0.72);
   overflow: hidden;
   cursor: pointer;
@@ -301,21 +301,21 @@ function onCloseMaximize(event?: Event) {
 }
 
 .ym-block.selected {
-  border-color: rgba(26, 115, 232, 0.75);
+  border-color: var(--cv-focus, #1c4c7c);
   border-style: solid;
-  box-shadow: inset 0 0 0 1px rgba(26, 115, 232, 0.35);
+  box-shadow: inset 0 0 0 1px var(--cv-select-soft, rgba(28, 76, 124, 0.34));
   background: #fff;
 }
 
 .ym-block.is-source-max {
-  border-color: rgba(26, 115, 232, 0.45);
-  border-style: dashed;
-  background: rgba(232, 240, 254, 0.45);
+  border-color: var(--cv-focus, #1c4c7c);
+  border-style: solid;
+  background: var(--cv-hover-wash, #e8f1fa);
 }
 
 .ym-block.compact {
   background: transparent;
-  border-color: #e4e6e8;
+  border-color: var(--cv-frame, #ececec);
   border-radius: 2px;
 }
 
@@ -373,7 +373,7 @@ function onCloseMaximize(event?: Event) {
   flex-shrink: 0;
   width: 20px;
   height: 20px;
-  border: 1px solid #e4e6e8;
+  border: 1px solid var(--cv-frame, #ececec);
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.75);
   color: #5f6368;
@@ -399,9 +399,9 @@ function onCloseMaximize(event?: Event) {
 
 .add-item-btn:hover,
 .add-item-btn.muted:hover {
-  background: #e8f0fe;
-  border-color: #1a73e8;
-  color: #1a73e8;
+  background: var(--cv-hover-wash, #e8f1fa);
+  border-color: var(--cv-focus, #1c4c7c);
+  color: var(--cv-focus, #1c4c7c);
 }
 
 .ym-block-body {
@@ -452,9 +452,9 @@ function onCloseMaximize(event?: Event) {
 }
 
 .ym-block-item.item-selected {
-  border-color: rgba(26, 115, 232, 0.65);
-  background: rgba(232, 240, 254, 0.75);
-  box-shadow: 0 0 0 1px rgba(26, 115, 232, 0.2);
+  border-color: var(--cv-focus, #1c4c7c);
+  background: var(--cv-hover-wash, #e8f1fa);
+  box-shadow: 0 0 0 1px var(--cv-select-soft, rgba(28, 76, 124, 0.34));
 }
 
 .remove-item-btn {
@@ -482,7 +482,7 @@ function onCloseMaximize(event?: Event) {
   margin: 0;
   padding: 10px 4px 8px;
   font-size: 12px;
-  color: #b0b4b8;
+  color: var(--cv-muted, #5f6368);
   line-height: 1.45;
   text-align: left;
 }
@@ -491,7 +491,7 @@ function onCloseMaximize(event?: Event) {
   flex: 1;
   display: flex;
   align-items: center;
-  color: #1a73e8;
+  color: var(--cv-muted, #5f6368);
   font-weight: 550;
 }
 

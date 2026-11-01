@@ -313,19 +313,19 @@ function onIframeError() {
 }
 
 .ap-btn:hover {
-  border-color: #1a73e8;
-  color: #1a73e8;
-  background: #e8f0fe;
+  border-color: var(--cv-focus, #1c4c7c);
+  color: var(--cv-focus, #1c4c7c);
+  background: var(--cv-hover-wash, #e8f1fa);
 }
 
 .ap-btn-primary {
-  border-color: #1a73e8;
-  background: #1a73e8;
+  border-color: var(--cv-focus, #1c4c7c);
+  background: var(--cv-focus, #1c4c7c);
   color: #fff;
 }
 
 .ap-btn-primary:hover {
-  background: #1765cc;
+  background: #163e62;
   color: #fff;
 }
 

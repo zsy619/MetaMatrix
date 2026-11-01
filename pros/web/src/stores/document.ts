@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed, toRaw } from 'vue'
+import { normalizeCanvasTheme } from '../components/canvas/canvasChrome'
 import { ApiError } from '../api/http'
 import * as documentsApi from '../api/documents'
 import { rememberRecentOpen } from '../utils/canvasTransfer'
@@ -1331,7 +1332,10 @@ export const useDocumentStore = defineStore('document', () => {
     if (!next.attachmentsByPanelId) {
       next = { ...next, attachmentsByPanelId: {} }
     }
-    return next
+    return {
+      ...next,
+      theme: normalizeCanvasTheme(next.theme),
+    }
   }
 
   /** 温和升级进阶版：旧 upper 合并块 → 每提示独立 RTE */
