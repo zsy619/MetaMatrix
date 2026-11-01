@@ -39,6 +39,7 @@ jobs:
       - run: node --experimental-strip-types src/utils/rteRound5.test.ts
       - run: node --experimental-strip-types src/utils/rteImageLayout.test.ts
       - run: node --experimental-strip-types src/utils/rteImageGroup.test.ts
+      - run: node --experimental-strip-types src/utils/rteTableGrid.test.ts
       - run: node --experimental-strip-types src/utils/rteRound6.test.ts
       - run: node --experimental-strip-types src/utils/rteRound7.test.ts
       - run: node --experimental-strip-types src/utils/rtePageSize.test.ts
