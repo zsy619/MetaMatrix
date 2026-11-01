@@ -6,6 +6,7 @@ import type {
   FiveStepDocumentJSON,
 } from '../../types/canvas'
 import YModelBlockCard from './YModelBlock.vue'
+import { fiveStepCanvasStyle, fiveStepColumnStyle } from '../../utils/fiveStepTheme'
 
 const props = defineProps<{
   doc: FiveStepDocumentJSON
@@ -23,18 +24,21 @@ function block(id: FiveStepBlockId): FiveStepBlock | undefined {
   return byId.value.get(id)
 }
 
-const bgColor = computed(
-  () => props.doc.theme.background.color || '#ffffff',
-)
+const canvasStyle = computed(() => fiveStepCanvasStyle(props.doc.theme))
+
+function columnStyle(col: FiveStepDocumentJSON['columns'][number]) {
+  return fiveStepColumnStyle(props.doc.theme, col)
+}
 </script>
 
 <template>
-  <div class="five-step-canvas" :style="{ backgroundColor: bgColor }">
+  <div class="five-step-canvas" :style="canvasStyle">
     <div class="fs-grid">
       <section
         v-for="col in doc.columns"
         :key="col.id"
         class="fs-col"
+        :style="columnStyle(col)"
       >
         <header class="fs-header">
           <h2>{{ col.header }}</h2>
@@ -76,9 +80,10 @@ const bgColor = computed(
   z-index: 10;
   overflow: hidden;
   box-sizing: border-box;
-  padding: 0;
+  padding: 14px 16px 12px;
   display: flex;
   flex-direction: column;
+  background: #f7f7f7;
 }
 
 .fs-grid {
@@ -89,10 +94,10 @@ const bgColor = computed(
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   align-content: stretch;
-  border: 1px solid #9aa0a6;
-  border-radius: 2px;
+  border: 1px solid var(--fs-border, #ececec);
+  border-radius: 8px;
   overflow: hidden;
-  background: #fff;
+  background: var(--fs-surface, #fff);
   gap: 0;
 }
 
@@ -105,12 +110,12 @@ const bgColor = computed(
     auto;
   min-width: 0;
   min-height: 0;
-  background: #fff;
-  border-right: 1px solid #9aa0a6;
+  background: var(--fs-col-body, #fffcf6);
+  box-shadow: inset -1px 0 0 var(--fs-divider, rgba(60, 50, 20, 0.1));
 }
 
 .fs-col:last-child {
-  border-right: none;
+  box-shadow: none;
 }
 
 .fs-header {
@@ -118,19 +123,21 @@ const bgColor = computed(
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #ffff00;
-  border-bottom: 1px solid #9aa0a6;
-  padding: 10px 10px;
-  min-height: 42px;
+  background: var(--fs-col-header, #fbf6e4);
+  box-shadow:
+    inset 3px 0 0 var(--fs-col-accent, #a67c00),
+    inset 0 -1px 0 var(--fs-divider, rgba(60, 50, 20, 0.1));
+  padding: 12px 12px 11px;
+  min-height: 46px;
   box-sizing: border-box;
 }
 
 .fs-header h2 {
   margin: 0;
   font-size: clamp(14px, 1.55vw, 18px);
-  font-weight: 800;
-  color: #202124;
-  letter-spacing: 0.04em;
+  font-weight: 700;
+  color: var(--fs-col-header-text, #7a5c00);
+  letter-spacing: 0.06em;
   line-height: 1.25;
   text-align: center;
 }
@@ -147,15 +154,21 @@ const bgColor = computed(
 }
 
 .fs-qual {
-  border-bottom: 1px solid #9aa0a6;
+  background: transparent;
+  box-shadow: inset 0 -1px 0 var(--fs-divider, rgba(60, 50, 20, 0.1));
+}
+
+.fs-quant {
+  background: var(--fs-quant, #f4f7f8);
 }
 
 .fs-section-label {
   flex-shrink: 0;
   font-size: 11px;
-  font-weight: 700;
-  color: #9aa0a6;
-  letter-spacing: 0.06em;
+  font-weight: 650;
+  color: var(--fs-section, #3c3424);
+  opacity: 0.62;
+  letter-spacing: 0.08em;
   line-height: 1.2;
 }
 
@@ -172,10 +185,15 @@ const bgColor = computed(
   min-height: 0;
 }
 
+.fs-qual-blocks :deep(.ym-block),
+.fs-quant :deep(.ym-block) {
+  border-color: rgba(60, 50, 20, 0.16);
+  background: rgba(255, 255, 255, 0.62);
+}
+
 .fs-quant :deep(.ym-block) {
   flex: 1;
   min-height: 0;
-  background: rgba(248, 249, 250, 0.55);
 }
 
 .fs-footer {
@@ -183,26 +201,27 @@ const bgColor = computed(
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 9px 6px;
-  min-height: 38px;
+  padding: 10px 8px;
+  min-height: 40px;
   box-sizing: border-box;
-  background: #f1f3f4;
-  border-top: 1px solid #9aa0a6;
+  background: var(--fs-footer, #f6f4ef);
+  box-shadow: inset 0 1px 0 var(--fs-divider, rgba(60, 50, 20, 0.1));
 }
 
 .fs-footer span {
-  font-size: clamp(12px, 1.25vw, 15px);
-  font-weight: 700;
-  color: #202124;
-  letter-spacing: 0.04em;
+  font-size: clamp(12px, 1.15vw, 13px);
+  font-weight: 600;
+  color: var(--fs-footer-text, #6b6458);
+  letter-spacing: 0.08em;
   text-align: center;
-  line-height: 1.25;
+  line-height: 1.35;
 }
 
 @media (max-width: 900px) {
   .five-step-canvas {
     overflow-x: auto;
     overflow-y: hidden;
+    padding: 8px;
   }
 
   .fs-grid {

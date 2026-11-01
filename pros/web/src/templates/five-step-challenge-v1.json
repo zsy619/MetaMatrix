@@ -5,7 +5,57 @@
   "theme": {
     "background": {
       "pattern": "none",
-      "color": "#ffffff"
+      "color": "#f7f7f7"
+    },
+    "table": {
+      "page": "#f7f7f7",
+      "border": "#ececec",
+      "divider": "rgba(60, 50, 20, 0.10)",
+      "surface": "#ffffff",
+      "footer": "#f6f4ef",
+      "footerText": "#6b6458",
+      "section": "#3c3424",
+      "negate": "#C47A2A",
+      "quantitative": "#f4f7f8",
+      "bodyText": "#3c4043",
+      "columns": {
+        "hypothesis": {
+          "header": "#E5EEF3",
+          "headerText": "#2C4456",
+          "accent": "#3D5A73",
+          "body": "#F7FAFC"
+        },
+        "demand": {
+          "header": "#FBF6E4",
+          "headerText": "#7A5C00",
+          "accent": "#A67C00",
+          "body": "#FFFCF6"
+        },
+        "solution": {
+          "header": "#FBF1EB",
+          "headerText": "#8A4024",
+          "accent": "#B85A38",
+          "body": "#FFF8F5"
+        },
+        "business": {
+          "header": "#E8F1FA",
+          "headerText": "#1C4C7C",
+          "accent": "#2A649F",
+          "body": "#F7FAFD"
+        },
+        "growth": {
+          "header": "#E7F6EF",
+          "headerText": "#125C3B",
+          "accent": "#187A4E",
+          "body": "#F6FCF9"
+        },
+        "moat": {
+          "header": "#FBEFF2",
+          "headerText": "#84344C",
+          "accent": "#A84562",
+          "body": "#FDF7F9"
+        }
+      }
     }
   },
   "columns": [
@@ -13,6 +63,10 @@
       "id": "hypothesis",
       "header": "假设",
       "footerLabel": "机会预判",
+      "headerColor": "#E5EEF3",
+      "headerTextColor": "#2C4456",
+      "accentColor": "#3D5A73",
+      "bodyColor": "#F7FAFC",
       "sections": [
         {
           "blockId": "hypothesis_global",
@@ -35,6 +89,10 @@
       "id": "demand",
       "header": "需求",
       "footerLabel": "逐级拆解",
+      "headerColor": "#FBF6E4",
+      "headerTextColor": "#7A5C00",
+      "accentColor": "#A67C00",
+      "bodyColor": "#FFFCF6",
       "sections": [
         {
           "blockId": "demand_split",
@@ -67,6 +125,10 @@
       "id": "solution",
       "header": "解决方案",
       "footerLabel": "全局预判",
+      "headerColor": "#FBF1EB",
+      "headerTextColor": "#8A4024",
+      "accentColor": "#B85A38",
+      "bodyColor": "#FFF8F5",
       "sections": [
         {
           "blockId": "solution_core",
@@ -89,6 +151,10 @@
       "id": "business",
       "header": "商业模式",
       "footerLabel": "专业选项",
+      "headerColor": "#E8F1FA",
+      "headerTextColor": "#1C4C7C",
+      "accentColor": "#2A649F",
+      "bodyColor": "#F7FAFD",
       "sections": [
         {
           "blockId": "business_unit_io",
@@ -106,6 +172,10 @@
       "id": "growth",
       "header": "增长",
       "footerLabel": "努力定量",
+      "headerColor": "#E7F6EF",
+      "headerTextColor": "#125C3B",
+      "accentColor": "#187A4E",
+      "bodyColor": "#F6FCF9",
       "sections": [
         {
           "blockId": "growth_metric",
@@ -128,6 +198,10 @@
       "id": "moat",
       "header": "壁垒",
       "footerLabel": "动态更新",
+      "headerColor": "#FBEFF2",
+      "headerTextColor": "#84344C",
+      "accentColor": "#A84562",
+      "bodyColor": "#FDF7F9",
       "sections": [
         {
           "blockId": "moat_barrier",

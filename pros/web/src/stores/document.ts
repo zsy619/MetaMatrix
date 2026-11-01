@@ -113,6 +113,7 @@ import {
   coerceYModelDoc,
   normalizeYModelDoc,
 } from '../types/canvas'
+import { fiveStepColumnChromeFields } from '../utils/fiveStepTheme'
 import dualTriangleTemplate from '../templates/dual-triangle-v1.json'
 import dualTriangleHumanAiTemplate from '../templates/dual-triangle-human-ai-v1.json'
 import starQuadrantTemplate from '../templates/star-quadrant-v1.json'
@@ -1350,6 +1351,7 @@ export const useDocumentStore = defineStore('document', () => {
         id: c.id,
         header: c.header,
         footerLabel: c.footerLabel,
+        ...fiveStepColumnChromeFields(c),
         sections: c.sections.map((s) => ({
           blockId: s.blockId,
           label: s.label,
@@ -2845,6 +2847,7 @@ export const useDocumentStore = defineStore('document', () => {
       id: c.id,
       header: c.header,
       footerLabel: c.footerLabel,
+      ...fiveStepColumnChromeFields(c),
       sections: c.sections.map((s) => ({
         blockId: s.blockId,
         label: s.label,
@@ -2927,6 +2930,7 @@ export const useDocumentStore = defineStore('document', () => {
       id: c.id,
       header: c.header,
       footerLabel: c.footerLabel,
+      ...fiveStepColumnChromeFields(c),
       sections: c.sections.map((s) => ({
         blockId: s.blockId,
         label: s.label,

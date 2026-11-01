@@ -5,48 +5,138 @@
   "theme": {
     "background": {
       "pattern": "none",
-      "color": "#ffffff"
+      "color": "#f7f7f7"
+    },
+    "table": {
+      "page": "#f7f7f7",
+      "border": "#ececec",
+      "divider": "rgba(60, 50, 20, 0.10)",
+      "surface": "#ffffff",
+      "footer": "#f6f4ef",
+      "footerText": "#6b6458",
+      "section": "#3c3424",
+      "negate": "#C4473A",
+      "quantitative": "#f4f7f8",
+      "bodyText": "#3c4043",
+      "columns": {
+        "demand": {
+          "header": "#FBF6E4",
+          "headerText": "#7A5C00",
+          "accent": "#A67C00",
+          "body": "#FFFCF6"
+        },
+        "solution": {
+          "header": "#FBF1EB",
+          "headerText": "#8A4024",
+          "accent": "#B85A38",
+          "body": "#FFF8F5"
+        },
+        "business": {
+          "header": "#E8F1FA",
+          "headerText": "#1C4C7C",
+          "accent": "#2A649F",
+          "body": "#F7FAFD"
+        },
+        "growth": {
+          "header": "#E7F6EF",
+          "headerText": "#125C3B",
+          "accent": "#187A4E",
+          "body": "#F6FCF9"
+        },
+        "moat": {
+          "header": "#FBEFF2",
+          "headerText": "#84344C",
+          "accent": "#A84562",
+          "body": "#FDF7F9"
+        }
+      },
+      "rows": {
+        "qualitative": {
+          "rail": "#F6EBD4",
+          "railText": "#3c3424",
+          "body": "#FFFCF6"
+        },
+        "quantitative": {
+          "rail": "#E5EEF3",
+          "railText": "#24343c",
+          "body": "#F5F9FC"
+        },
+        "team": {
+          "rail": "#EFE8DF",
+          "railText": "#3c3424",
+          "body": "#FBF8F4"
+        }
+      }
     }
   },
   "columns": [
     {
       "id": "demand",
       "header": "需求",
-      "footerLabel": "逐级拆解"
+      "footerLabel": "逐级拆解",
+      "headerColor": "#FBF6E4",
+      "headerTextColor": "#7A5C00",
+      "accentColor": "#A67C00",
+      "bodyColor": "#FFFCF6"
     },
     {
       "id": "solution",
       "header": "解决方案",
-      "footerLabel": "全局预判"
+      "footerLabel": "全局预判",
+      "headerColor": "#FBF1EB",
+      "headerTextColor": "#8A4024",
+      "accentColor": "#B85A38",
+      "bodyColor": "#FFF8F5"
     },
     {
       "id": "business",
       "header": "商业模式",
-      "footerLabel": "专业选项"
+      "footerLabel": "专业选项",
+      "headerColor": "#E8F1FA",
+      "headerTextColor": "#1C4C7C",
+      "accentColor": "#2A649F",
+      "bodyColor": "#F7FAFD"
     },
     {
       "id": "growth",
       "header": "增长",
-      "footerLabel": "努力定量"
+      "footerLabel": "努力定量",
+      "headerColor": "#E7F6EF",
+      "headerTextColor": "#125C3B",
+      "accentColor": "#187A4E",
+      "bodyColor": "#F6FCF9"
     },
     {
       "id": "moat",
       "header": "壁垒",
-      "footerLabel": "动态更新"
+      "footerLabel": "动态更新",
+      "headerColor": "#FBEFF2",
+      "headerTextColor": "#84344C",
+      "accentColor": "#A84562",
+      "bodyColor": "#FDF7F9"
     }
   ],
   "rows": [
     {
       "id": "qualitative",
-      "label": "定性取舍"
+      "label": "定性取舍",
+      "railColor": "#F6EBD4",
+      "railTextColor": "#3c3424",
+      "bodyColor": "#FFFCF6"
     },
     {
       "id": "quantitative",
-      "label": "定量测量"
+      "label": "定量测量",
+      "railColor": "#E5EEF3",
+      "railTextColor": "#24343c",
+      "bodyColor": "#F5F9FC"
     },
     {
       "id": "team",
-      "label": "团队分工"
+      "label": "团队分工",
+      "railColor": "#EFE8DF",
+      "railTextColor": "#3c3424",
+      "bodyColor": "#FBF8F4"
     }
   ],
   "blocks": [

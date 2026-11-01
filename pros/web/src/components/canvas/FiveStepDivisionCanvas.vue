@@ -7,6 +7,11 @@ import type {
   FiveStepDivisionRowId,
 } from '../../types/canvas'
 import YModelBlockCard from './YModelBlock.vue'
+import {
+  fiveStepCanvasStyle,
+  fiveStepColumnStyle,
+  fiveStepRowStyle,
+} from '../../utils/fiveStepTheme'
 
 const props = defineProps<{
   doc: FiveStepDivisionDocumentJSON
@@ -34,33 +39,41 @@ function block(
   return byId.value.get(blockId(colId, rowId))
 }
 
-const bgColor = computed(
-  () => props.doc.theme.background.color || '#ffffff',
-)
+const canvasStyle = computed(() => fiveStepCanvasStyle(props.doc.theme))
+
+function columnStyle(col: FiveStepDivisionDocumentJSON['columns'][number]) {
+  return fiveStepColumnStyle(props.doc.theme, col)
+}
+
+function rowStyle(row: FiveStepDivisionDocumentJSON['rows'][number]) {
+  return fiveStepRowStyle(props.doc.theme, row)
+}
 </script>
 
 <template>
-  <div class="fsd-canvas" :style="{ backgroundColor: bgColor }">
+  <div class="fsd-canvas" :style="canvasStyle">
     <div class="fsd-grid">
-      <!-- 表头：空角 + 五步黄头 -->
+      <!-- 表头：空角 + 五步语义浅色表头 -->
       <div class="fsd-corner" aria-hidden="true" />
       <header
         v-for="col in doc.columns"
         :key="`h-${col.id}`"
         class="fsd-header"
+        :style="columnStyle(col)"
       >
         <h2>{{ col.header }}</h2>
       </header>
 
       <!-- 三行：左侧维度标签 + 五列单元格 -->
       <template v-for="row in doc.rows" :key="row.id">
-        <div class="fsd-row-label">
+        <div class="fsd-row-label" :style="rowStyle(row)">
           <span>{{ row.label }}</span>
         </div>
         <div
           v-for="col in doc.columns"
           :key="`${col.id}_${row.id}`"
           class="fsd-cell"
+          :style="rowStyle(row)"
         >
           <YModelBlockCard
             v-if="block(col.id, row.id)"
@@ -90,9 +103,10 @@ const bgColor = computed(
   z-index: 10;
   overflow: auto;
   box-sizing: border-box;
-  padding: 0;
+  padding: 14px 16px 12px;
   display: flex;
   flex-direction: column;
+  background: #f7f7f7;
 }
 
 .fsd-grid {
@@ -100,45 +114,50 @@ const bgColor = computed(
   min-height: min(100%, 720px);
   width: 100%;
   display: grid;
-  grid-template-columns: 44px repeat(5, minmax(0, 1fr));
+  grid-template-columns: 52px repeat(5, minmax(0, 1fr));
   grid-template-rows: auto repeat(3, minmax(0, 1fr)) auto;
   align-content: stretch;
-  border: 1px solid #9aa0a6;
-  border-radius: 2px;
+  border: 1px solid var(--fs-border, #ececec);
+  border-radius: 8px;
   overflow: hidden;
-  background: #fff;
+  background: var(--fs-surface, #fff);
   gap: 0;
 }
 
 .fsd-corner {
-  background: #ffff00;
-  border-right: 1px solid #9aa0a6;
-  border-bottom: 1px solid #9aa0a6;
-  min-height: 42px;
+  background: var(--fs-footer, #f6f4ef);
+  box-shadow:
+    inset -1px 0 0 var(--fs-divider, rgba(60, 50, 20, 0.1)),
+    inset 0 -1px 0 var(--fs-divider, rgba(60, 50, 20, 0.1));
+  min-height: 46px;
 }
 
 .fsd-header {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #ffff00;
-  border-right: 1px solid #9aa0a6;
-  border-bottom: 1px solid #9aa0a6;
-  padding: 10px 10px;
-  min-height: 42px;
+  background: var(--fs-col-header, #fbf6e4);
+  box-shadow:
+    inset 3px 0 0 var(--fs-col-accent, #a67c00),
+    inset -1px 0 0 var(--fs-divider, rgba(60, 50, 20, 0.1)),
+    inset 0 -1px 0 var(--fs-divider, rgba(60, 50, 20, 0.1));
+  padding: 12px 10px 11px;
+  min-height: 46px;
   box-sizing: border-box;
 }
 
 .fsd-header:nth-child(6) {
-  border-right: none;
+  box-shadow:
+    inset 3px 0 0 var(--fs-col-accent, #a67c00),
+    inset 0 -1px 0 var(--fs-divider, rgba(60, 50, 20, 0.1));
 }
 
 .fsd-header h2 {
   margin: 0;
   font-size: clamp(14px, 1.55vw, 18px);
-  font-weight: 800;
-  color: #202124;
-  letter-spacing: 0.04em;
+  font-weight: 700;
+  color: var(--fs-col-header-text, #7a5c00);
+  letter-spacing: 0.06em;
   line-height: 1.25;
   text-align: center;
 }
@@ -147,9 +166,10 @@ const bgColor = computed(
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #fff;
-  border-right: 1px solid #9aa0a6;
-  border-bottom: 1px solid #9aa0a6;
+  background: var(--fs-rail, #f6ebd4);
+  box-shadow:
+    inset -1px 0 0 var(--fs-divider, rgba(60, 50, 20, 0.1)),
+    inset 0 -1px 0 var(--fs-divider, rgba(60, 50, 20, 0.1));
   padding: 8px 4px;
   box-sizing: border-box;
   min-width: 0;
@@ -161,7 +181,7 @@ const bgColor = computed(
   transform: rotate(180deg);
   font-size: 13px;
   font-weight: 700;
-  color: #202124;
+  color: var(--fs-rail-text, #3c3424);
   letter-spacing: 0.18em;
   line-height: 1.2;
   white-space: nowrap;
@@ -172,25 +192,16 @@ const bgColor = computed(
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  background: #fff;
-  border-right: 1px solid #9aa0a6;
-  border-bottom: 1px solid #9aa0a6;
+  background: var(--fs-row-body, #fff);
+  box-shadow:
+    inset -1px 0 0 var(--fs-divider, rgba(60, 50, 20, 0.1)),
+    inset 0 -1px 0 var(--fs-divider, rgba(60, 50, 20, 0.1));
   padding: 8px 10px 10px;
   box-sizing: border-box;
 }
 
 .fsd-cell:nth-child(6n) {
-  border-right: none;
-}
-
-/* 页脚贴外框底边：去掉页脚底边；数据行保留底边与页脚分隔 */
-.fsd-footer-corner,
-.fsd-footer {
-  border-bottom: none;
-}
-
-.fsd-footer:nth-child(6n) {
-  border-right: none;
+  box-shadow: inset 0 -1px 0 var(--fs-divider, rgba(60, 50, 20, 0.1));
 }
 
 .fsd-cell :deep(.ym-block) {
@@ -212,8 +223,8 @@ const bgColor = computed(
 .fsd-cell :deep(.ym-rte),
 .fsd-cell :deep(.ProseMirror) {
   font-size: 13px;
-  line-height: 1.35;
-  color: #3c4043;
+  line-height: 1.45;
+  color: var(--fs-body-text, #3c4043);
 }
 
 .fsd-cell :deep(.ProseMirror p) {
@@ -221,9 +232,9 @@ const bgColor = computed(
 }
 
 .fsd-footer-corner {
-  background: #f1f3f4;
-  border-right: 1px solid #9aa0a6;
-  min-height: 38px;
+  background: var(--fs-footer, #f6f4ef);
+  box-shadow: inset -1px 0 0 var(--fs-divider, rgba(60, 50, 20, 0.1));
+  min-height: 40px;
   box-sizing: border-box;
 }
 
@@ -231,25 +242,30 @@ const bgColor = computed(
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 9px 6px;
-  min-height: 38px;
+  padding: 10px 6px;
+  min-height: 40px;
   box-sizing: border-box;
-  background: #f1f3f4;
-  border-right: 1px solid #9aa0a6;
+  background: var(--fs-footer, #f6f4ef);
+  box-shadow: inset -1px 0 0 var(--fs-divider, rgba(60, 50, 20, 0.1));
+}
+
+.fsd-footer:nth-child(6n) {
+  box-shadow: none;
 }
 
 .fsd-footer span {
-  font-size: clamp(12px, 1.25vw, 15px);
-  font-weight: 700;
-  color: #202124;
-  letter-spacing: 0.04em;
+  font-size: clamp(12px, 1.15vw, 13px);
+  font-weight: 600;
+  color: var(--fs-footer-text, #6b6458);
+  letter-spacing: 0.08em;
   text-align: center;
-  line-height: 1.25;
+  line-height: 1.35;
 }
 
 @media (max-width: 900px) {
   .fsd-canvas {
     overflow: auto;
+    padding: 8px;
   }
 
   .fsd-grid {

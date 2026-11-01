@@ -8,6 +8,7 @@ import type {
 } from '../../types/canvas'
 import { useDocumentStore } from '../../stores/document'
 import YModelBlockCard from './YModelBlock.vue'
+import { fiveStepCanvasStyle, fiveStepColumnStyle } from '../../utils/fiveStepTheme'
 
 const props = defineProps<{
   doc: FiveStepProDocumentJSON
@@ -39,15 +40,17 @@ function hasLabel(section: FiveStepProSection): boolean {
   return !!(section.label && section.label.trim())
 }
 
-const bgColor = computed(
-  () => props.doc.theme.background.color || '#ffffff',
-)
+const canvasStyle = computed(() => fiveStepCanvasStyle(props.doc.theme))
+
+function columnStyle(col: FiveStepProDocumentJSON['columns'][number]) {
+  return fiveStepColumnStyle(props.doc.theme, col)
+}
 </script>
 
 <template>
   <div
     class="fsp-canvas"
-    :style="{ backgroundColor: bgColor }"
+    :style="canvasStyle"
     aria-label="五步法（进阶版）"
   >
     <div class="fsp-grid" role="table" aria-label="五步法（进阶版）">
@@ -56,6 +59,7 @@ const bgColor = computed(
         :key="col.id"
         class="fsp-col"
         :class="{ 'is-split': col.sections.length > 1 }"
+        :style="columnStyle(col)"
         role="cell"
       >
         <header class="fsp-header" role="columnheader">
@@ -105,11 +109,11 @@ const bgColor = computed(
   z-index: 10;
   overflow: auto;
   box-sizing: border-box;
-  padding: 0;
+  padding: 14px 16px 12px;
   display: flex;
   flex-direction: column;
   min-height: 0;
-  background: #fff;
+  background: #f7f7f7;
 }
 
 .fsp-grid {
@@ -119,10 +123,10 @@ const bgColor = computed(
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   align-content: stretch;
-  border: 1px solid #9aa0a6;
-  border-radius: 2px;
+  border: 1px solid var(--fs-border, #ececec);
+  border-radius: 8px;
   overflow: hidden;
-  background: #fff;
+  background: var(--fs-surface, #fff);
   gap: 0;
   box-sizing: border-box;
 }
@@ -132,12 +136,12 @@ const bgColor = computed(
   grid-template-rows: auto minmax(420px, 1fr) auto;
   min-width: 0;
   min-height: 0;
-  background: #fff;
-  border-right: 1px solid #9aa0a6;
+  background: var(--fs-col-body, #fffcf6);
+  box-shadow: inset -1px 0 0 var(--fs-divider, rgba(60, 50, 20, 0.1));
 }
 
 .fsp-col:last-child {
-  border-right: none;
+  box-shadow: none;
 }
 
 .fsp-header {
@@ -145,19 +149,21 @@ const bgColor = computed(
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #ffff00;
-  border-bottom: 1px solid #9aa0a6;
-  padding: 10px 10px;
-  min-height: 42px;
+  background: var(--fs-col-header, #fbf6e4);
+  box-shadow:
+    inset 3px 0 0 var(--fs-col-accent, #a67c00),
+    inset 0 -1px 0 var(--fs-divider, rgba(60, 50, 20, 0.1));
+  padding: 12px 12px 11px;
+  min-height: 46px;
   box-sizing: border-box;
 }
 
 .fsp-header h2 {
   margin: 0;
   font-size: clamp(14px, 1.55vw, 18px);
-  font-weight: 800;
-  color: #202124;
-  letter-spacing: 0.04em;
+  font-weight: 700;
+  color: var(--fs-col-header-text, #7a5c00);
+  letter-spacing: 0.06em;
   line-height: 1.25;
   text-align: center;
   font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui,
@@ -169,7 +175,7 @@ const bgColor = computed(
   flex-direction: column;
   min-height: 0;
   min-width: 0;
-  background: #fff;
+  background: transparent;
 }
 
 .fsp-col.is-split .fsp-section {
@@ -193,7 +199,17 @@ const bgColor = computed(
 }
 
 .fsp-section.has-divider {
-  border-bottom: 1px solid #9aa0a6;
+  box-shadow: inset 0 -1px 0 var(--fs-divider, rgba(60, 50, 20, 0.1));
+}
+
+.fsp-section.is-negate {
+  box-shadow: inset 3px 0 0 var(--fs-negate, #c4473a);
+}
+
+.fsp-section.is-negate.has-divider {
+  box-shadow:
+    inset 3px 0 0 var(--fs-negate, #c4473a),
+    inset 0 -1px 0 var(--fs-divider, rgba(60, 50, 20, 0.1));
 }
 
 .fsp-section-label {
@@ -207,11 +223,11 @@ const bgColor = computed(
 }
 
 .fsp-section-label.is-normal {
-  color: #202124;
+  color: var(--fs-section, #3c3424);
 }
 
 .fsp-section-label.is-negate {
-  color: #d93025;
+  color: var(--fs-negate, #c4473a);
 }
 
 .fsp-section-rte {
@@ -271,7 +287,7 @@ const bgColor = computed(
   min-height: 100%;
   font-size: 14px;
   line-height: 1.55;
-  color: #202124;
+  color: var(--fs-body-text, #3c4043);
 }
 
 .fsp-section-rte :deep(.rte-toolbar) {
@@ -283,20 +299,20 @@ const bgColor = computed(
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 9px 6px;
-  min-height: 38px;
+  padding: 10px 8px;
+  min-height: 40px;
   box-sizing: border-box;
-  background: #f1f3f4;
-  border-top: 1px solid #9aa0a6;
+  background: var(--fs-footer, #f6f4ef);
+  box-shadow: inset 0 1px 0 var(--fs-divider, rgba(60, 50, 20, 0.1));
 }
 
 .fsp-footer span {
-  font-size: clamp(12px, 1.25vw, 15px);
-  font-weight: 700;
-  color: #202124;
-  letter-spacing: 0.04em;
+  font-size: clamp(12px, 1.15vw, 13px);
+  font-weight: 600;
+  color: var(--fs-footer-text, #6b6458);
+  letter-spacing: 0.08em;
   text-align: center;
-  line-height: 1.25;
+  line-height: 1.35;
   font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui,
     sans-serif;
 }
@@ -304,6 +320,7 @@ const bgColor = computed(
 @media (max-width: 900px) {
   .fsp-canvas {
     overflow: auto;
+    padding: 8px;
   }
 
   .fsp-grid {

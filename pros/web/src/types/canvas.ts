@@ -18,8 +18,56 @@ export interface ThemeBackground {
   color: string
 }
 
+/** 五步法某一列的语义色。缺省时画布按列 id 回落。 */
+export interface FiveStepColumnTone {
+  header?: string
+  headerText?: string
+  accent?: string
+  body?: string
+}
+
+/** 五步法（分工版）某一行的竖栏 / 正文浅底。 */
+export interface FiveStepRowTone {
+  rail?: string
+  railText?: string
+  body?: string
+}
+
+/**
+ * 五步法系列表色（基础 / 分工 / 原版 / 提高 / 进阶 / 挑战）。
+ * 挂在 theme.table 上，其它画布忽略。缺省字段由画布回落到平静语义色。
+ */
+export interface FiveStepTableTheme {
+  /** 页面底。缺省且 background 仍是旧版纯白时，画布用 #f7f7f7。 */
+  page?: string
+  border?: string
+  divider?: string
+  surface?: string
+  footer?: string
+  footerText?: string
+  /** 分区标题（normal） */
+  section?: string
+  /** 否定分区（非用户 / 非内核 / 非壁垒）。挑战版模板用更暖的琥珀。 */
+  negate?: string
+  /** 定量区浅底（原版五步） */
+  quantitative?: string
+  bodyText?: string
+  columns?: Partial<Record<string, FiveStepColumnTone>>
+  rows?: Partial<Record<string, FiveStepRowTone>>
+}
+
 export interface CanvasTheme {
   background: ThemeBackground
+  /** 五步法系列可选表色；其它画布忽略 */
+  table?: FiveStepTableTheme
+}
+
+/** 列上可覆盖 theme.table.columns 的表色，写入文档后可随模板编辑保留。 */
+export interface FiveStepColumnChrome {
+  headerColor?: string
+  headerTextColor?: string
+  accentColor?: string
+  bodyColor?: string
 }
 
 export interface AxisX {
@@ -409,9 +457,9 @@ export interface FiveStepBlock {
   items: QuadrantItem[]
 }
 
-export interface FiveStepColumn {
+export interface FiveStepColumn extends FiveStepColumnChrome {
   id: FiveStepColumnId
-  /** 黄底表头文案 */
+  /** 表头文案（列语义浅色，非霓虹黄） */
   header: string
   /** 底部固定方法论标签 */
   footerLabel: string
@@ -454,9 +502,9 @@ export interface FiveStepDivisionBlock {
   items: QuadrantItem[]
 }
 
-export interface FiveStepDivisionColumn {
+export interface FiveStepDivisionColumn extends FiveStepColumnChrome {
   id: FiveStepDivisionColumnId
-  /** 黄底表头文案 */
+  /** 表头文案（列语义浅色，非霓虹黄） */
   header: string
   /** 底部固定方法论标签 */
   footerLabel: string
@@ -466,6 +514,12 @@ export interface FiveStepDivisionRow {
   id: FiveStepDivisionRowId
   /** 左侧竖排维度标签 */
   label: string
+  /** 左侧竖栏底色 */
+  railColor?: string
+  /** 左侧竖栏文字色 */
+  railTextColor?: string
+  /** 该行单元格浅底 */
+  bodyColor?: string
 }
 
 /** 五步法（分工版）画布文档 */
@@ -495,9 +549,9 @@ export interface FiveStepBasicBlock {
   items: QuadrantItem[]
 }
 
-export interface FiveStepBasicColumn {
+export interface FiveStepBasicColumn extends FiveStepColumnChrome {
   id: FiveStepBasicColumnId
-  /** 浅灰表头文案 */
+  /** 表头文案（列语义浅色，与五步系列一致，非浅灰也非霓虹黄） */
   header: string
   /** 底部固定方法论标签 */
   footerLabel: string
@@ -548,16 +602,16 @@ export interface FiveStepAdvancedSection {
   tone: FiveStepAdvancedSectionTone
 }
 
-export interface FiveStepAdvancedColumn {
+export interface FiveStepAdvancedColumn extends FiveStepColumnChrome {
   id: FiveStepAdvancedColumnId
-  /** 亮黄表头文案 */
+  /** 表头文案（列语义浅色，非霓虹黄） */
   header: string
   /** 底部固定方法论标签 */
   footerLabel: string
   sections: FiveStepAdvancedSection[]
 }
 
-/** 五步法（提高版）画布：黄头五列 + 分区固定标题 + 每区一块可最大化 RTE */
+/** 五步法（提高版）画布：语义浅色表头五列 + 分区固定标题 + 每区一块可最大化 RTE */
 export interface FiveStepAdvancedDocumentJSON {
   id: string
   type: 'five_step_advanced'
@@ -605,16 +659,16 @@ export interface FiveStepProSection {
   tone: FiveStepProSectionTone
 }
 
-export interface FiveStepProColumn {
+export interface FiveStepProColumn extends FiveStepColumnChrome {
   id: FiveStepProColumnId
-  /** 亮黄表头文案 */
+  /** 表头文案（列语义浅色，非霓虹黄） */
   header: string
   /** 底部固定方法论标签 */
   footerLabel: string
   sections: FiveStepProSection[]
 }
 
-/** 五步法（进阶版）画布：黄头五列 + 每 ● 提示独立可最大化 RTE（黑字固定标签）+ 红固定「非*」 */
+/** 五步法（进阶版）画布：语义浅色表头五列 + 每 ● 提示独立可最大化 RTE + 否定色「非*」 */
 export interface FiveStepProDocumentJSON {
   id: string
   type: 'five_step_pro'
@@ -673,16 +727,16 @@ export interface FiveStepChallengeSection {
   tone: FiveStepChallengeSectionTone
 }
 
-export interface FiveStepChallengeColumn {
+export interface FiveStepChallengeColumn extends FiveStepColumnChrome {
   id: FiveStepChallengeColumnId
-  /** 亮黄表头文案 */
+  /** 表头文案（列语义浅色，非霓虹黄） */
   header: string
   /** 底部固定方法论标签 */
   footerLabel: string
   sections: FiveStepChallengeSection[]
 }
 
-/** 五步法（挑战版）画布：黄头六列（假设+五步）+ 每要点独立可最大化 RTE（附图预填） */
+/** 五步法（挑战版）画布：语义浅色表头六列（假设+五步）+ 每要点独立可最大化 RTE（附图预填） */
 export interface FiveStepChallengeDocumentJSON {
   id: string
   type: 'five_step_challenge'

@@ -186,279 +186,339 @@ withDefaults(
         <text x="172" y="132" text-anchor="middle" font-size="7" font-weight="700" fill="#5f6368">刚性</text>
       </svg>
 
-      <!-- 五步法（基础版）：黄头 + 五列空白（系列入门） -->
+      <!-- 五步法（基础版）：语义浅色表头 + 五列正文 + 安静页脚 -->
       <svg
         v-else-if="templateId === 'five-step-basic'"
         class="thumb-svg"
         viewBox="0 0 200 140"
         xmlns="http://www.w3.org/2000/svg"
       >
-        <rect width="200" height="140" rx="10" fill="#ffffff" />
-        <g font-size="6.5" font-weight="800" text-anchor="middle" fill="#202124">
-          <rect x="8" y="12" width="36" height="16" fill="#ffff00" stroke="#9aa0a6" stroke-width="0.7" />
-          <text x="26" y="23">需求</text>
-          <rect x="44" y="12" width="36" height="16" fill="#ffff00" stroke="#9aa0a6" stroke-width="0.7" />
-          <text x="62" y="23" font-size="5.5">解决方案</text>
-          <rect x="80" y="12" width="36" height="16" fill="#ffff00" stroke="#9aa0a6" stroke-width="0.7" />
-          <text x="98" y="23" font-size="5.5">商业模式</text>
-          <rect x="116" y="12" width="36" height="16" fill="#ffff00" stroke="#9aa0a6" stroke-width="0.7" />
-          <text x="134" y="23">增长</text>
-          <rect x="152" y="12" width="40" height="16" fill="#ffff00" stroke="#9aa0a6" stroke-width="0.7" />
-          <text x="172" y="23">壁垒</text>
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <g font-weight="700" text-anchor="middle">
+          <rect x="8" y="12" width="36" height="16" fill="#FBF6E4" />
+          <rect x="8" y="12" width="2.2" height="16" fill="#A67C00" />
+          <text x="26" y="23" font-size="6.5" fill="#7A5C00">需求</text>
+          <rect x="44" y="12" width="36" height="16" fill="#FBF1EB" />
+          <rect x="44" y="12" width="2.2" height="16" fill="#B85A38" />
+          <text x="62" y="23" font-size="5.5" fill="#8A4024">解决方案</text>
+          <rect x="80" y="12" width="36" height="16" fill="#E8F1FA" />
+          <rect x="80" y="12" width="2.2" height="16" fill="#2A649F" />
+          <text x="98" y="23" font-size="5.5" fill="#1C4C7C">商业模式</text>
+          <rect x="116" y="12" width="36" height="16" fill="#E7F6EF" />
+          <rect x="116" y="12" width="2.2" height="16" fill="#187A4E" />
+          <text x="134" y="23" font-size="6.5" fill="#125C3B">增长</text>
+          <rect x="152" y="12" width="40" height="16" fill="#FBEFF2" />
+          <rect x="152" y="12" width="2.2" height="16" fill="#A84562" />
+          <text x="172" y="23" font-size="6.5" fill="#84344C">壁垒</text>
         </g>
-        <rect x="8" y="28" width="36" height="100" fill="#fff" stroke="#9aa0a6" stroke-width="0.6" />
-        <rect x="44" y="28" width="36" height="100" fill="#fff" stroke="#9aa0a6" stroke-width="0.6" />
-        <rect x="80" y="28" width="36" height="100" fill="#fff" stroke="#9aa0a6" stroke-width="0.6" />
-        <rect x="116" y="28" width="36" height="100" fill="#fff" stroke="#9aa0a6" stroke-width="0.6" />
-        <rect x="152" y="28" width="40" height="100" fill="#fff" stroke="#9aa0a6" stroke-width="0.6" />
+        <rect x="8" y="28" width="36" height="84" fill="#FFFCF6" />
+        <rect x="44" y="28" width="36" height="84" fill="#FFF8F5" />
+        <rect x="80" y="28" width="36" height="84" fill="#F7FAFD" />
+        <rect x="116" y="28" width="36" height="84" fill="#F6FCF9" />
+        <rect x="152" y="28" width="40" height="84" fill="#FDF7F9" />
+        <g font-size="5" font-weight="600" text-anchor="middle" fill="#6b6458">
+          <rect x="8" y="112" width="36" height="16" fill="#f6f4ef" />
+          <text x="26" y="122">逐级拆解</text>
+          <rect x="44" y="112" width="36" height="16" fill="#f6f4ef" />
+          <text x="62" y="122">全局预判</text>
+          <rect x="80" y="112" width="36" height="16" fill="#f6f4ef" />
+          <text x="98" y="122">专业选项</text>
+          <rect x="116" y="112" width="36" height="16" fill="#f6f4ef" />
+          <text x="134" y="122">努力定量</text>
+          <rect x="152" y="112" width="40" height="16" fill="#f6f4ef" />
+          <text x="172" y="122">动态更新</text>
+        </g>
       </svg>
 
-      <!-- 五步法（分工版）：左标签 + 五列黄头示意 -->
+      <!-- 五步法（分工版）：暖/冷/石竖栏 + 五列语义浅色表头 -->
       <svg
         v-else-if="templateId === 'five-step-division'"
         class="thumb-svg"
         viewBox="0 0 200 140"
         xmlns="http://www.w3.org/2000/svg"
       >
-        <rect width="200" height="140" rx="10" fill="#ffffff" />
-        <rect x="8" y="10" width="22" height="16" fill="#ffff00" stroke="#9aa0a6" stroke-width="0.7" />
-        <g font-size="6.5" font-weight="800" text-anchor="middle">
-          <rect x="30" y="10" width="30" height="16" fill="#ffff00" stroke="#9aa0a6" stroke-width="0.7" />
-          <text x="45" y="21" fill="#202124">需求</text>
-          <rect x="60" y="10" width="30" height="16" fill="#ffff00" stroke="#9aa0a6" stroke-width="0.7" />
-          <text x="75" y="21" fill="#202124">方案</text>
-          <rect x="90" y="10" width="30" height="16" fill="#ffff00" stroke="#9aa0a6" stroke-width="0.7" />
-          <text x="105" y="21" fill="#202124">模式</text>
-          <rect x="120" y="10" width="30" height="16" fill="#ffff00" stroke="#9aa0a6" stroke-width="0.7" />
-          <text x="135" y="21" fill="#202124">增长</text>
-          <rect x="150" y="10" width="42" height="16" fill="#ffff00" stroke="#9aa0a6" stroke-width="0.7" />
-          <text x="171" y="21" fill="#202124">壁垒</text>
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <rect x="8" y="10" width="22" height="16" fill="#f6f4ef" />
+        <g font-size="6.5" font-weight="700" text-anchor="middle">
+          <rect x="30" y="10" width="30" height="16" fill="#FBF6E4" />
+          <rect x="30" y="10" width="2" height="16" fill="#A67C00" />
+          <text x="45" y="21" fill="#7A5C00">需求</text>
+          <rect x="60" y="10" width="30" height="16" fill="#FBF1EB" />
+          <rect x="60" y="10" width="2" height="16" fill="#B85A38" />
+          <text x="75" y="21" fill="#8A4024">方案</text>
+          <rect x="90" y="10" width="30" height="16" fill="#E8F1FA" />
+          <rect x="90" y="10" width="2" height="16" fill="#2A649F" />
+          <text x="105" y="21" fill="#1C4C7C">模式</text>
+          <rect x="120" y="10" width="30" height="16" fill="#E7F6EF" />
+          <rect x="120" y="10" width="2" height="16" fill="#187A4E" />
+          <text x="135" y="21" fill="#125C3B">增长</text>
+          <rect x="150" y="10" width="42" height="16" fill="#FBEFF2" />
+          <rect x="150" y="10" width="2" height="16" fill="#A84562" />
+          <text x="171" y="21" fill="#84344C">壁垒</text>
         </g>
-        <g font-size="5" font-weight="700" fill="#202124">
-          <rect x="8" y="26" width="22" height="34" fill="#fff8e1" stroke="#9aa0a6" stroke-width="0.6" />
-          <text x="19" y="46" text-anchor="middle" transform="rotate(-90 19 46)">定性取舍</text>
-          <rect x="8" y="60" width="22" height="34" fill="#fff8e1" stroke="#9aa0a6" stroke-width="0.6" />
-          <text x="19" y="80" text-anchor="middle" transform="rotate(-90 19 80)">定量测量</text>
-          <rect x="8" y="94" width="22" height="34" fill="#fff8e1" stroke="#9aa0a6" stroke-width="0.6" />
-          <text x="19" y="114" text-anchor="middle" transform="rotate(-90 19 114)">团队分工</text>
+        <g font-size="5" font-weight="700">
+          <rect x="8" y="26" width="22" height="28" fill="#F6EBD4" />
+          <text x="19" y="42" text-anchor="middle" fill="#3c3424" transform="rotate(-90 19 42)">定性取舍</text>
+          <rect x="8" y="54" width="22" height="28" fill="#E5EEF3" />
+          <text x="19" y="70" text-anchor="middle" fill="#24343c" transform="rotate(-90 19 70)">定量测量</text>
+          <rect x="8" y="82" width="22" height="28" fill="#EFE8DF" />
+          <text x="19" y="98" text-anchor="middle" fill="#3c3424" transform="rotate(-90 19 98)">团队分工</text>
         </g>
-        <rect x="30" y="26" width="30" height="34" fill="#fff" stroke="#9aa0a6" stroke-width="0.55" />
-        <rect x="60" y="26" width="30" height="34" fill="#fff" stroke="#9aa0a6" stroke-width="0.55" />
-        <rect x="90" y="26" width="30" height="34" fill="#fff" stroke="#9aa0a6" stroke-width="0.55" />
-        <rect x="120" y="26" width="30" height="34" fill="#fff" stroke="#9aa0a6" stroke-width="0.55" />
-        <rect x="150" y="26" width="42" height="34" fill="#fff" stroke="#9aa0a6" stroke-width="0.55" />
-        <rect x="30" y="60" width="30" height="34" fill="#fff" stroke="#9aa0a6" stroke-width="0.55" />
-        <rect x="60" y="60" width="30" height="34" fill="#fff" stroke="#9aa0a6" stroke-width="0.55" />
-        <rect x="90" y="60" width="30" height="34" fill="#fff" stroke="#9aa0a6" stroke-width="0.55" />
-        <rect x="120" y="60" width="30" height="34" fill="#fff" stroke="#9aa0a6" stroke-width="0.55" />
-        <rect x="150" y="60" width="42" height="34" fill="#fff" stroke="#9aa0a6" stroke-width="0.55" />
-        <rect x="30" y="94" width="30" height="34" fill="#fff" stroke="#9aa0a6" stroke-width="0.55" />
-        <rect x="60" y="94" width="30" height="34" fill="#fff" stroke="#9aa0a6" stroke-width="0.55" />
-        <rect x="90" y="94" width="30" height="34" fill="#fff" stroke="#9aa0a6" stroke-width="0.55" />
-        <rect x="120" y="94" width="30" height="34" fill="#fff" stroke="#9aa0a6" stroke-width="0.55" />
-        <rect x="150" y="94" width="42" height="34" fill="#fff" stroke="#9aa0a6" stroke-width="0.55" />
+        <rect x="30" y="26" width="30" height="28" fill="#FFFCF6" />
+        <rect x="60" y="26" width="30" height="28" fill="#FFFCF6" />
+        <rect x="90" y="26" width="30" height="28" fill="#FFFCF6" />
+        <rect x="120" y="26" width="30" height="28" fill="#FFFCF6" />
+        <rect x="150" y="26" width="42" height="28" fill="#FFFCF6" />
+        <rect x="30" y="54" width="30" height="28" fill="#F5F9FC" />
+        <rect x="60" y="54" width="30" height="28" fill="#F5F9FC" />
+        <rect x="90" y="54" width="30" height="28" fill="#F5F9FC" />
+        <rect x="120" y="54" width="30" height="28" fill="#F5F9FC" />
+        <rect x="150" y="54" width="42" height="28" fill="#F5F9FC" />
+        <rect x="30" y="82" width="30" height="28" fill="#FBF8F4" />
+        <rect x="60" y="82" width="30" height="28" fill="#FBF8F4" />
+        <rect x="90" y="82" width="30" height="28" fill="#FBF8F4" />
+        <rect x="120" y="82" width="30" height="28" fill="#FBF8F4" />
+        <rect x="150" y="82" width="42" height="28" fill="#FBF8F4" />
+        <g font-size="4.4" font-weight="600" text-anchor="middle" fill="#6b6458">
+          <rect x="8" y="112" width="22" height="16" fill="#f6f4ef" />
+          <rect x="30" y="112" width="30" height="16" fill="#f6f4ef" />
+          <text x="45" y="122">拆解</text>
+          <rect x="60" y="112" width="30" height="16" fill="#f6f4ef" />
+          <text x="75" y="122">预判</text>
+          <rect x="90" y="112" width="30" height="16" fill="#f6f4ef" />
+          <text x="105" y="122">选项</text>
+          <rect x="120" y="112" width="30" height="16" fill="#f6f4ef" />
+          <text x="135" y="122">定量</text>
+          <rect x="150" y="112" width="42" height="16" fill="#f6f4ef" />
+          <text x="171" y="122">更新</text>
+        </g>
       </svg>
 
-      <!-- 五步法（提高版）：黄头 + 分区红标示意 -->
+      <!-- 五步法（提高版）：语义浅色表头 + 分区标题 + 砖红否定色 -->
       <svg
         v-else-if="templateId === 'five-step-advanced'"
         class="thumb-svg"
         viewBox="0 0 200 140"
         xmlns="http://www.w3.org/2000/svg"
       >
-        <rect width="200" height="140" rx="10" fill="#ffffff" />
-        <g font-size="6.5" font-weight="800" text-anchor="middle" fill="#202124">
-          <rect x="8" y="10" width="34" height="16" fill="#ffff00" stroke="#9aa0a6" stroke-width="0.7" />
-          <text x="25" y="21">需求</text>
-          <rect x="44" y="10" width="34" height="16" fill="#ffff00" stroke="#9aa0a6" stroke-width="0.7" />
-          <text x="61" y="21">方案</text>
-          <rect x="80" y="10" width="34" height="16" fill="#ffff00" stroke="#9aa0a6" stroke-width="0.7" />
-          <text x="97" y="21">模式</text>
-          <rect x="116" y="10" width="34" height="16" fill="#ffff00" stroke="#9aa0a6" stroke-width="0.7" />
-          <text x="133" y="21">增长</text>
-          <rect x="152" y="10" width="40" height="16" fill="#ffff00" stroke="#9aa0a6" stroke-width="0.7" />
-          <text x="172" y="21">壁垒</text>
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <g font-size="6.5" font-weight="700" text-anchor="middle">
+          <rect x="8" y="10" width="34" height="16" fill="#FBF6E4" />
+          <rect x="8" y="10" width="2" height="16" fill="#A67C00" />
+          <text x="25" y="21" fill="#7A5C00">需求</text>
+          <rect x="44" y="10" width="34" height="16" fill="#FBF1EB" />
+          <rect x="44" y="10" width="2" height="16" fill="#B85A38" />
+          <text x="61" y="21" fill="#8A4024">方案</text>
+          <rect x="80" y="10" width="34" height="16" fill="#E8F1FA" />
+          <rect x="80" y="10" width="2" height="16" fill="#2A649F" />
+          <text x="97" y="21" fill="#1C4C7C">模式</text>
+          <rect x="116" y="10" width="34" height="16" fill="#E7F6EF" />
+          <rect x="116" y="10" width="2" height="16" fill="#187A4E" />
+          <text x="133" y="21" fill="#125C3B">增长</text>
+          <rect x="152" y="10" width="40" height="16" fill="#FBEFF2" />
+          <rect x="152" y="10" width="2" height="16" fill="#A84562" />
+          <text x="172" y="21" fill="#84344C">壁垒</text>
         </g>
-        <rect x="8" y="26" width="34" height="72" fill="#fff" stroke="#9aa0a6" stroke-width="0.6" />
-        <line x1="8" y1="62" x2="42" y2="62" stroke="#9aa0a6" stroke-width="0.55" />
-        <text x="10" y="38" font-size="5" font-weight="700" fill="#202124">需求：</text>
-        <text x="10" y="74" font-size="5" font-weight="700" fill="#d93025">非用户：</text>
-        <rect x="44" y="26" width="34" height="72" fill="#fff" stroke="#9aa0a6" stroke-width="0.6" />
-        <line x1="44" y1="62" x2="78" y2="62" stroke="#9aa0a6" stroke-width="0.55" />
-        <text x="46" y="38" font-size="5" font-weight="700" fill="#202124">内核：</text>
-        <text x="46" y="74" font-size="5" font-weight="700" fill="#d93025">非内核：</text>
-        <rect x="80" y="26" width="34" height="72" fill="#fff" stroke="#9aa0a6" stroke-width="0.6" />
-        <text x="82" y="38" font-size="5" font-weight="700" fill="#202124">单元模型：</text>
-        <rect x="116" y="26" width="34" height="72" fill="#fff" stroke="#9aa0a6" stroke-width="0.6" />
-        <text x="118" y="38" font-size="5" font-weight="700" fill="#202124">指标：</text>
-        <rect x="152" y="26" width="40" height="72" fill="#fff" stroke="#9aa0a6" stroke-width="0.6" />
-        <line x1="152" y1="62" x2="192" y2="62" stroke="#9aa0a6" stroke-width="0.55" />
-        <text x="154" y="38" font-size="5" font-weight="700" fill="#202124">壁垒：</text>
-        <text x="154" y="74" font-size="5" font-weight="700" fill="#d93025">非壁垒：</text>
-        <g font-size="5.5" font-weight="700" text-anchor="middle" fill="#5f6368">
-          <rect x="8" y="100" width="34" height="18" fill="#f5f6f8" stroke="#9aa0a6" stroke-width="0.6" />
+        <rect x="8" y="26" width="34" height="74" fill="#FFFCF6" />
+        <line x1="8" y1="62" x2="42" y2="62" stroke="rgba(60,50,20,0.12)" stroke-width="0.6" />
+        <text x="12" y="38" font-size="5" font-weight="700" fill="#3c3424">需求：</text>
+        <text x="12" y="74" font-size="5" font-weight="700" fill="#C4473A">非用户：</text>
+        <rect x="44" y="26" width="34" height="74" fill="#FFF8F5" />
+        <line x1="44" y1="62" x2="78" y2="62" stroke="rgba(60,50,20,0.12)" stroke-width="0.6" />
+        <text x="48" y="38" font-size="5" font-weight="700" fill="#3c3424">内核：</text>
+        <text x="48" y="74" font-size="5" font-weight="700" fill="#C4473A">非内核：</text>
+        <rect x="80" y="26" width="34" height="74" fill="#F7FAFD" />
+        <text x="84" y="38" font-size="5" font-weight="700" fill="#3c3424">单元模型：</text>
+        <rect x="116" y="26" width="34" height="74" fill="#F6FCF9" />
+        <text x="120" y="38" font-size="5" font-weight="700" fill="#3c3424">指标：</text>
+        <rect x="152" y="26" width="40" height="74" fill="#FDF7F9" />
+        <line x1="152" y1="62" x2="192" y2="62" stroke="rgba(60,50,20,0.12)" stroke-width="0.6" />
+        <text x="156" y="38" font-size="5" font-weight="700" fill="#3c3424">壁垒：</text>
+        <text x="156" y="74" font-size="5" font-weight="700" fill="#C4473A">非壁垒：</text>
+        <g font-size="5" font-weight="600" text-anchor="middle" fill="#6b6458">
+          <rect x="8" y="100" width="34" height="18" fill="#f6f4ef" />
           <text x="25" y="111">逐级拆解</text>
-          <rect x="44" y="100" width="34" height="18" fill="#f5f6f8" stroke="#9aa0a6" stroke-width="0.6" />
+          <rect x="44" y="100" width="34" height="18" fill="#f6f4ef" />
           <text x="61" y="111">全局预判</text>
-          <rect x="80" y="100" width="34" height="18" fill="#f5f6f8" stroke="#9aa0a6" stroke-width="0.6" />
+          <rect x="80" y="100" width="34" height="18" fill="#f6f4ef" />
           <text x="97" y="111">专业选项</text>
-          <rect x="116" y="100" width="34" height="18" fill="#f5f6f8" stroke="#9aa0a6" stroke-width="0.6" />
+          <rect x="116" y="100" width="34" height="18" fill="#f6f4ef" />
           <text x="133" y="111">努力定量</text>
-          <rect x="152" y="100" width="40" height="18" fill="#f5f6f8" stroke="#9aa0a6" stroke-width="0.6" />
+          <rect x="152" y="100" width="40" height="18" fill="#f6f4ef" />
           <text x="172" y="111">动态更新</text>
         </g>
       </svg>
 
-            <!-- 五步法（进阶版）：黄头 + 每提示独立 RTE 标签 + 红标 -->
+      <!-- 五步法（进阶版）：语义浅色表头 + 每提示独立标签 + 砖红否定色 -->
       <svg
         v-else-if="templateId === 'five-step-pro'"
         class="thumb-svg"
         viewBox="0 0 200 140"
         xmlns="http://www.w3.org/2000/svg"
       >
-        <rect width="200" height="140" rx="10" fill="#ffffff" />
-        <g font-size="6.5" font-weight="800" text-anchor="middle" fill="#202124">
-          <rect x="8" y="10" width="34" height="16" fill="#ffff00" stroke="#9aa0a6" stroke-width="0.7" />
-          <text x="25" y="21">需求</text>
-          <rect x="44" y="10" width="34" height="16" fill="#ffff00" stroke="#9aa0a6" stroke-width="0.7" />
-          <text x="61" y="21">方案</text>
-          <rect x="80" y="10" width="34" height="16" fill="#ffff00" stroke="#9aa0a6" stroke-width="0.7" />
-          <text x="97" y="21">模式</text>
-          <rect x="116" y="10" width="34" height="16" fill="#ffff00" stroke="#9aa0a6" stroke-width="0.7" />
-          <text x="133" y="21">增长</text>
-          <rect x="152" y="10" width="40" height="16" fill="#ffff00" stroke="#9aa0a6" stroke-width="0.7" />
-          <text x="172" y="21">壁垒</text>
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <g font-size="6.5" font-weight="700" text-anchor="middle">
+          <rect x="8" y="10" width="34" height="16" fill="#FBF6E4" />
+          <rect x="8" y="10" width="2" height="16" fill="#A67C00" />
+          <text x="25" y="21" fill="#7A5C00">需求</text>
+          <rect x="44" y="10" width="34" height="16" fill="#FBF1EB" />
+          <rect x="44" y="10" width="2" height="16" fill="#B85A38" />
+          <text x="61" y="21" fill="#8A4024">方案</text>
+          <rect x="80" y="10" width="34" height="16" fill="#E8F1FA" />
+          <rect x="80" y="10" width="2" height="16" fill="#2A649F" />
+          <text x="97" y="21" fill="#1C4C7C">模式</text>
+          <rect x="116" y="10" width="34" height="16" fill="#E7F6EF" />
+          <rect x="116" y="10" width="2" height="16" fill="#187A4E" />
+          <text x="133" y="21" fill="#125C3B">增长</text>
+          <rect x="152" y="10" width="40" height="16" fill="#FBEFF2" />
+          <rect x="152" y="10" width="2" height="16" fill="#A84562" />
+          <text x="172" y="21" fill="#84344C">壁垒</text>
         </g>
-        <rect x="8" y="26" width="34" height="72" fill="#fff" stroke="#9aa0a6" stroke-width="0.6" />
-        <line x1="8" y1="50" x2="42" y2="50" stroke="#9aa0a6" stroke-width="0.5" />
-        <line x1="8" y1="74" x2="42" y2="74" stroke="#9aa0a6" stroke-width="0.55" />
-        <text x="10" y="36" font-size="4.2" font-weight="700" fill="#202124">细分用户：</text>
-        <text x="10" y="60" font-size="3.8" font-weight="700" fill="#202124">场景问题？</text>
-        <text x="10" y="86" font-size="5" font-weight="700" fill="#d93025">非用户：</text>
-        <rect x="44" y="26" width="34" height="72" fill="#fff" stroke="#9aa0a6" stroke-width="0.6" />
-        <line x1="44" y1="50" x2="78" y2="50" stroke="#9aa0a6" stroke-width="0.5" />
-        <line x1="44" y1="74" x2="78" y2="74" stroke="#9aa0a6" stroke-width="0.55" />
-        <text x="46" y="36" font-size="4.2" font-weight="700" fill="#202124">核心卖点：</text>
-        <text x="46" y="60" font-size="4.2" font-weight="700" fill="#202124">解决方案：</text>
-        <text x="46" y="86" font-size="5" font-weight="700" fill="#d93025">非内核：</text>
-        <rect x="80" y="26" width="34" height="72" fill="#fff" stroke="#9aa0a6" stroke-width="0.6" />
-        <line x1="80" y1="62" x2="114" y2="62" stroke="#9aa0a6" stroke-width="0.55" />
-        <text x="82" y="36" font-size="4.2" font-weight="700" fill="#202124">收入：</text>
-        <text x="82" y="72" font-size="4.2" font-weight="700" fill="#202124">成本：</text>
-        <rect x="116" y="26" width="34" height="72" fill="#fff" stroke="#9aa0a6" stroke-width="0.6" />
-        <line x1="116" y1="62" x2="150" y2="62" stroke="#9aa0a6" stroke-width="0.55" />
-        <text x="118" y="36" font-size="4.2" font-weight="700" fill="#202124">核心指标：</text>
-        <text x="118" y="72" font-size="4.2" font-weight="700" fill="#202124">获客渠道：</text>
-        <rect x="152" y="26" width="40" height="72" fill="#fff" stroke="#9aa0a6" stroke-width="0.6" />
-        <line x1="152" y1="62" x2="192" y2="62" stroke="#9aa0a6" stroke-width="0.55" />
-        <text x="154" y="86" font-size="5" font-weight="700" fill="#d93025">非壁垒：</text>
-        <g font-size="5.5" font-weight="700" text-anchor="middle" fill="#5f6368">
-          <rect x="8" y="100" width="34" height="18" fill="#f5f6f8" stroke="#9aa0a6" stroke-width="0.6" />
+        <rect x="8" y="26" width="34" height="74" fill="#FFFCF6" />
+        <line x1="8" y1="50" x2="42" y2="50" stroke="rgba(60,50,20,0.12)" stroke-width="0.5" />
+        <line x1="8" y1="74" x2="42" y2="74" stroke="rgba(60,50,20,0.12)" stroke-width="0.6" />
+        <text x="12" y="36" font-size="4.2" font-weight="700" fill="#3c3424">细分用户：</text>
+        <text x="12" y="60" font-size="3.8" font-weight="700" fill="#3c3424">场景问题？</text>
+        <text x="12" y="86" font-size="5" font-weight="700" fill="#C4473A">非用户：</text>
+        <rect x="44" y="26" width="34" height="74" fill="#FFF8F5" />
+        <line x1="44" y1="50" x2="78" y2="50" stroke="rgba(60,50,20,0.12)" stroke-width="0.5" />
+        <line x1="44" y1="74" x2="78" y2="74" stroke="rgba(60,50,20,0.12)" stroke-width="0.6" />
+        <text x="48" y="36" font-size="4.2" font-weight="700" fill="#3c3424">核心卖点：</text>
+        <text x="48" y="60" font-size="4.2" font-weight="700" fill="#3c3424">解决方案：</text>
+        <text x="48" y="86" font-size="5" font-weight="700" fill="#C4473A">非内核：</text>
+        <rect x="80" y="26" width="34" height="74" fill="#F7FAFD" />
+        <line x1="80" y1="62" x2="114" y2="62" stroke="rgba(60,50,20,0.12)" stroke-width="0.6" />
+        <text x="84" y="36" font-size="4.2" font-weight="700" fill="#3c3424">收入：</text>
+        <text x="84" y="72" font-size="4.2" font-weight="700" fill="#3c3424">成本：</text>
+        <rect x="116" y="26" width="34" height="74" fill="#F6FCF9" />
+        <line x1="116" y1="62" x2="150" y2="62" stroke="rgba(60,50,20,0.12)" stroke-width="0.6" />
+        <text x="120" y="36" font-size="4.2" font-weight="700" fill="#3c3424">核心指标：</text>
+        <text x="120" y="72" font-size="4.2" font-weight="700" fill="#3c3424">获客渠道：</text>
+        <rect x="152" y="26" width="40" height="74" fill="#FDF7F9" />
+        <line x1="152" y1="62" x2="192" y2="62" stroke="rgba(60,50,20,0.12)" stroke-width="0.6" />
+        <text x="156" y="86" font-size="5" font-weight="700" fill="#C4473A">非壁垒：</text>
+        <g font-size="5" font-weight="600" text-anchor="middle" fill="#6b6458">
+          <rect x="8" y="100" width="34" height="18" fill="#f6f4ef" />
           <text x="25" y="111">逐级拆解</text>
-          <rect x="44" y="100" width="34" height="18" fill="#f5f6f8" stroke="#9aa0a6" stroke-width="0.6" />
+          <rect x="44" y="100" width="34" height="18" fill="#f6f4ef" />
           <text x="61" y="111">全局预判</text>
-          <rect x="80" y="100" width="34" height="18" fill="#f5f6f8" stroke="#9aa0a6" stroke-width="0.6" />
+          <rect x="80" y="100" width="34" height="18" fill="#f6f4ef" />
           <text x="97" y="111">专业选项</text>
-          <rect x="116" y="100" width="34" height="18" fill="#f5f6f8" stroke="#9aa0a6" stroke-width="0.6" />
+          <rect x="116" y="100" width="34" height="18" fill="#f6f4ef" />
           <text x="133" y="111">努力定量</text>
-          <rect x="152" y="100" width="40" height="18" fill="#f5f6f8" stroke="#9aa0a6" stroke-width="0.6" />
+          <rect x="152" y="100" width="40" height="18" fill="#f6f4ef" />
           <text x="172" y="111">动态更新</text>
         </g>
       </svg>
 
 
-      <!-- 五步法（挑战版）：六列黄头（假设+五步）+ 紫方法示意 + 橙非* -->
+      <!-- 五步法（挑战版）：六列语义浅色表头（假设+五步）+ 琥珀否定色 -->
       <svg
         v-else-if="templateId === 'five-step-challenge'"
         class="thumb-svg"
         viewBox="0 0 200 140"
         xmlns="http://www.w3.org/2000/svg"
       >
-        <rect width="200" height="140" rx="10" fill="#ffffff" />
-        <g font-size="5.2" font-weight="800" text-anchor="middle" fill="#202124">
-          <rect x="4" y="10" width="30" height="16" fill="#ffff00" stroke="#9aa0a6" stroke-width="0.7" />
-          <text x="19" y="21">假设</text>
-          <rect x="36" y="10" width="30" height="16" fill="#ffff00" stroke="#9aa0a6" stroke-width="0.7" />
-          <text x="51" y="21">需求</text>
-          <rect x="68" y="10" width="30" height="16" fill="#ffff00" stroke="#9aa0a6" stroke-width="0.7" />
-          <text x="83" y="21">方案</text>
-          <rect x="100" y="10" width="30" height="16" fill="#ffff00" stroke="#9aa0a6" stroke-width="0.7" />
-          <text x="115" y="21">模式</text>
-          <rect x="132" y="10" width="30" height="16" fill="#ffff00" stroke="#9aa0a6" stroke-width="0.7" />
-          <text x="147" y="21">增长</text>
-          <rect x="164" y="10" width="32" height="16" fill="#ffff00" stroke="#9aa0a6" stroke-width="0.7" />
-          <text x="180" y="21">壁垒</text>
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <g font-size="5.2" font-weight="700" text-anchor="middle">
+          <rect x="4" y="10" width="30" height="16" fill="#E5EEF3" />
+          <rect x="4" y="10" width="2" height="16" fill="#3D5A73" />
+          <text x="19" y="21" fill="#2C4456">假设</text>
+          <rect x="36" y="10" width="30" height="16" fill="#FBF6E4" />
+          <rect x="36" y="10" width="2" height="16" fill="#A67C00" />
+          <text x="51" y="21" fill="#7A5C00">需求</text>
+          <rect x="68" y="10" width="30" height="16" fill="#FBF1EB" />
+          <rect x="68" y="10" width="2" height="16" fill="#B85A38" />
+          <text x="83" y="21" fill="#8A4024">方案</text>
+          <rect x="100" y="10" width="30" height="16" fill="#E8F1FA" />
+          <rect x="100" y="10" width="2" height="16" fill="#2A649F" />
+          <text x="115" y="21" fill="#1C4C7C">模式</text>
+          <rect x="132" y="10" width="30" height="16" fill="#E7F6EF" />
+          <rect x="132" y="10" width="2" height="16" fill="#187A4E" />
+          <text x="147" y="21" fill="#125C3B">增长</text>
+          <rect x="164" y="10" width="32" height="16" fill="#FBEFF2" />
+          <rect x="164" y="10" width="2" height="16" fill="#A84562" />
+          <text x="180" y="21" fill="#84344C">壁垒</text>
         </g>
-        <rect x="4" y="26" width="30" height="72" fill="#fff" stroke="#9aa0a6" stroke-width="0.55" />
-        <text x="6" y="38" font-size="3.6" font-weight="700" fill="#7B1FA2">《预判…》</text>
-        <text x="6" y="50" font-size="3.4" fill="#1565C0">• 初心</text>
-        <rect x="36" y="26" width="30" height="72" fill="#fff" stroke="#9aa0a6" stroke-width="0.55" />
-        <text x="38" y="38" font-size="3.6" font-weight="700" fill="#7B1FA2">《需求…》</text>
-        <text x="38" y="90" font-size="3.8" font-weight="700" fill="#EF6C00">非用户</text>
-        <rect x="68" y="26" width="30" height="72" fill="#fff" stroke="#9aa0a6" stroke-width="0.55" />
-        <text x="70" y="38" font-size="3.6" font-weight="700" fill="#7B1FA2">《产品…》</text>
-        <text x="70" y="90" font-size="3.8" font-weight="700" fill="#EF6C00">非内核</text>
-        <rect x="100" y="26" width="30" height="72" fill="#fff" stroke="#9aa0a6" stroke-width="0.55" />
-        <text x="102" y="38" font-size="3.6" font-weight="700" fill="#7B1FA2">《单元…》</text>
-        <text x="102" y="52" font-size="3.4" fill="#1565C0">• ROI</text>
-        <rect x="132" y="26" width="30" height="72" fill="#fff" stroke="#9aa0a6" stroke-width="0.55" />
-        <text x="134" y="38" font-size="3.6" font-weight="700" fill="#7B1FA2">《增长…》</text>
-        <text x="134" y="90" font-size="3.4" font-weight="700" fill="#7B1FA2">飞轮</text>
-        <rect x="164" y="26" width="32" height="72" fill="#fff" stroke="#9aa0a6" stroke-width="0.55" />
-        <text x="166" y="38" font-size="3.6" font-weight="700" fill="#7B1FA2">《壁垒…》</text>
-        <text x="166" y="90" font-size="3.8" font-weight="700" fill="#EF6C00">非壁垒</text>
-        <g font-size="4.2" font-weight="700" text-anchor="middle" fill="#5f6368">
-          <rect x="4" y="100" width="30" height="18" fill="#f5f6f8" stroke="#9aa0a6" stroke-width="0.55" />
+        <rect x="4" y="26" width="30" height="74" fill="#F7FAFC" />
+        <text x="7" y="38" font-size="3.6" font-weight="700" fill="#5b3d86">《预判…》</text>
+        <text x="7" y="50" font-size="3.4" fill="#2A649F">• 初心</text>
+        <rect x="36" y="26" width="30" height="74" fill="#FFFCF6" />
+        <text x="39" y="38" font-size="3.6" font-weight="700" fill="#5b3d86">《需求…》</text>
+        <text x="39" y="90" font-size="3.8" font-weight="700" fill="#C47A2A">非用户</text>
+        <rect x="68" y="26" width="30" height="74" fill="#FFF8F5" />
+        <text x="71" y="38" font-size="3.6" font-weight="700" fill="#5b3d86">《产品…》</text>
+        <text x="71" y="90" font-size="3.8" font-weight="700" fill="#C47A2A">非内核</text>
+        <rect x="100" y="26" width="30" height="74" fill="#F7FAFD" />
+        <text x="103" y="38" font-size="3.6" font-weight="700" fill="#5b3d86">《单元…》</text>
+        <text x="103" y="52" font-size="3.4" fill="#2A649F">• ROI</text>
+        <rect x="132" y="26" width="30" height="74" fill="#F6FCF9" />
+        <text x="135" y="38" font-size="3.6" font-weight="700" fill="#5b3d86">《增长…》</text>
+        <text x="135" y="90" font-size="3.4" font-weight="700" fill="#5b3d86">飞轮</text>
+        <rect x="164" y="26" width="32" height="74" fill="#FDF7F9" />
+        <text x="167" y="38" font-size="3.6" font-weight="700" fill="#5b3d86">《壁垒…》</text>
+        <text x="167" y="90" font-size="3.8" font-weight="700" fill="#C47A2A">非壁垒</text>
+        <g font-size="4.2" font-weight="600" text-anchor="middle" fill="#6b6458">
+          <rect x="4" y="100" width="30" height="18" fill="#f6f4ef" />
           <text x="19" y="111">机会预判</text>
-          <rect x="36" y="100" width="30" height="18" fill="#f5f6f8" stroke="#9aa0a6" stroke-width="0.55" />
+          <rect x="36" y="100" width="30" height="18" fill="#f6f4ef" />
           <text x="51" y="111">逐级拆解</text>
-          <rect x="68" y="100" width="30" height="18" fill="#f5f6f8" stroke="#9aa0a6" stroke-width="0.55" />
+          <rect x="68" y="100" width="30" height="18" fill="#f6f4ef" />
           <text x="83" y="111">全局预判</text>
-          <rect x="100" y="100" width="30" height="18" fill="#f5f6f8" stroke="#9aa0a6" stroke-width="0.55" />
+          <rect x="100" y="100" width="30" height="18" fill="#f6f4ef" />
           <text x="115" y="111">专业选项</text>
-          <rect x="132" y="100" width="30" height="18" fill="#f5f6f8" stroke="#9aa0a6" stroke-width="0.55" />
+          <rect x="132" y="100" width="30" height="18" fill="#f6f4ef" />
           <text x="147" y="111">努力定量</text>
-          <rect x="164" y="100" width="32" height="18" fill="#f5f6f8" stroke="#9aa0a6" stroke-width="0.55" />
+          <rect x="164" y="100" width="32" height="18" fill="#f6f4ef" />
           <text x="180" y="111">动态更新</text>
         </g>
       </svg>
 
-      <!-- 五步法（原版）：五列黄头 + 底栏方法行 -->
+      <!-- 五步法（原版）：语义浅色表头 + 定性/定量分隔 + 安静方法行 -->
       <svg
         v-else-if="templateId === 'five-step'"
         class="thumb-svg"
         viewBox="0 0 200 140"
         xmlns="http://www.w3.org/2000/svg"
       >
-        <rect width="200" height="140" rx="10" fill="#ffffff" />
-        <g font-size="7" font-weight="800" text-anchor="middle">
-          <rect x="8" y="10" width="34" height="16" fill="#ffff00" stroke="#9aa0a6" stroke-width="0.7" />
-          <text x="25" y="21" fill="#202124">需求</text>
-          <rect x="44" y="10" width="34" height="16" fill="#ffff00" stroke="#9aa0a6" stroke-width="0.7" />
-          <text x="61" y="21" fill="#202124">方案</text>
-          <rect x="80" y="10" width="34" height="16" fill="#ffff00" stroke="#9aa0a6" stroke-width="0.7" />
-          <text x="97" y="21" fill="#202124">模式</text>
-          <rect x="116" y="10" width="34" height="16" fill="#ffff00" stroke="#9aa0a6" stroke-width="0.7" />
-          <text x="133" y="21" fill="#202124">增长</text>
-          <rect x="152" y="10" width="40" height="16" fill="#ffff00" stroke="#9aa0a6" stroke-width="0.7" />
-          <text x="172" y="21" fill="#202124">壁垒</text>
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <g font-size="7" font-weight="700" text-anchor="middle">
+          <rect x="8" y="10" width="34" height="16" fill="#FBF6E4" />
+          <rect x="8" y="10" width="2" height="16" fill="#A67C00" />
+          <text x="25" y="21" fill="#7A5C00">需求</text>
+          <rect x="44" y="10" width="34" height="16" fill="#FBF1EB" />
+          <rect x="44" y="10" width="2" height="16" fill="#B85A38" />
+          <text x="61" y="21" fill="#8A4024">方案</text>
+          <rect x="80" y="10" width="34" height="16" fill="#E8F1FA" />
+          <rect x="80" y="10" width="2" height="16" fill="#2A649F" />
+          <text x="97" y="21" fill="#1C4C7C">模式</text>
+          <rect x="116" y="10" width="34" height="16" fill="#E7F6EF" />
+          <rect x="116" y="10" width="2" height="16" fill="#187A4E" />
+          <text x="133" y="21" fill="#125C3B">增长</text>
+          <rect x="152" y="10" width="40" height="16" fill="#FBEFF2" />
+          <rect x="152" y="10" width="2" height="16" fill="#A84562" />
+          <text x="172" y="21" fill="#84344C">壁垒</text>
         </g>
-        <rect x="8" y="26" width="34" height="72" fill="#fff" stroke="#9aa0a6" stroke-width="0.6" />
-        <rect x="44" y="26" width="34" height="72" fill="#fff" stroke="#9aa0a6" stroke-width="0.6" />
-        <rect x="80" y="26" width="34" height="72" fill="#fff" stroke="#9aa0a6" stroke-width="0.6" />
-        <rect x="116" y="26" width="34" height="72" fill="#fff" stroke="#9aa0a6" stroke-width="0.6" />
-        <rect x="152" y="26" width="40" height="72" fill="#fff" stroke="#9aa0a6" stroke-width="0.6" />
-        <line x1="8" y1="74" x2="192" y2="74" stroke="#9aa0a6" stroke-width="0.5" opacity="0.7" />
-        <g font-size="5.5" font-weight="700" text-anchor="middle" fill="#5f6368">
-          <rect x="8" y="100" width="34" height="18" fill="#f5f6f8" stroke="#9aa0a6" stroke-width="0.6" />
+        <rect x="8" y="26" width="34" height="48" fill="#FFFCF6" />
+        <rect x="44" y="26" width="34" height="48" fill="#FFF8F5" />
+        <rect x="80" y="26" width="34" height="48" fill="#F7FAFD" />
+        <rect x="116" y="26" width="34" height="48" fill="#F6FCF9" />
+        <rect x="152" y="26" width="40" height="48" fill="#FDF7F9" />
+        <rect x="8" y="74" width="34" height="26" fill="#f4f7f8" />
+        <rect x="44" y="74" width="34" height="26" fill="#f4f7f8" />
+        <rect x="80" y="74" width="34" height="26" fill="#f4f7f8" />
+        <rect x="116" y="74" width="34" height="26" fill="#f4f7f8" />
+        <rect x="152" y="74" width="40" height="26" fill="#f4f7f8" />
+        <g font-size="5" font-weight="600" text-anchor="middle" fill="#6b6458">
+          <rect x="8" y="100" width="34" height="18" fill="#f6f4ef" />
           <text x="25" y="111">逐级拆解</text>
-          <rect x="44" y="100" width="34" height="18" fill="#f5f6f8" stroke="#9aa0a6" stroke-width="0.6" />
+          <rect x="44" y="100" width="34" height="18" fill="#f6f4ef" />
           <text x="61" y="111">全局预判</text>
-          <rect x="80" y="100" width="34" height="18" fill="#f5f6f8" stroke="#9aa0a6" stroke-width="0.6" />
+          <rect x="80" y="100" width="34" height="18" fill="#f6f4ef" />
           <text x="97" y="111">专业选项</text>
-          <rect x="116" y="100" width="34" height="18" fill="#f5f6f8" stroke="#9aa0a6" stroke-width="0.6" />
+          <rect x="116" y="100" width="34" height="18" fill="#f6f4ef" />
           <text x="133" y="111">努力定量</text>
-          <rect x="152" y="100" width="40" height="18" fill="#f5f6f8" stroke="#9aa0a6" stroke-width="0.6" />
+          <rect x="152" y="100" width="40" height="18" fill="#f6f4ef" />
           <text x="172" y="111">动态更新</text>
         </g>
       </svg>
