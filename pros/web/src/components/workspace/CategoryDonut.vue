@@ -1,9 +1,13 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-const props = defineProps<{
-  segments: { key: string; label: string; count: number; color: string }[]
-}>()
+const props = withDefaults(
+  defineProps<{
+    segments: { key: string; label: string; count: number; color: string }[]
+    label?: string
+  }>(),
+  { label: '分类占比' },
+)
 
 const total = computed(() => props.segments.reduce((n, s) => n + s.count, 0))
 
@@ -25,7 +29,7 @@ const arcs = computed(() => {
 
 <template>
   <div class="donut-wrap">
-    <svg viewBox="0 0 120 120" class="donut" role="img" aria-label="分类占比">
+    <svg viewBox="0 0 120 120" class="donut" role="img" :aria-label="label">
       <circle cx="60" cy="60" r="42" fill="none" stroke="#f1f3f4" stroke-width="16" />
       <circle
         v-for="arc in arcs"

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"metamatrix/api/internal/middleware"
 	"metamatrix/api/internal/service"
@@ -314,6 +315,16 @@ func (h *DocumentsHandler) Restore(ctx context.Context, c *app.RequestContext) {
 func (h *DocumentsHandler) Stats(ctx context.Context, c *app.RequestContext) {
 	uid, ok := h.owner(c)
 	if !ok {
+		return
+	}
+	// Personal by default. There is no role on users, so a cross-user scope is refused
+	// instead of aggregating every account.
+	scope := strings.ToLower(strings.TrimSpace(string(c.Query("scope"))))
+	if scope == "" {
+		scope = "me"
+	}
+	if scope != "me" {
+		Forbidden(c, "统计只包含当前登录用户")
 		return
 	}
 	out, err := h.svc.Stats(uid, string(c.Query("range")), string(c.Query("granularity")))

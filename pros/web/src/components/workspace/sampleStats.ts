@@ -1,6 +1,8 @@
 import type {
+  CanvasTypeStat,
   DocumentStats,
   HeatCell,
+  RecentCanvas,
   StatsBucket,
   StatsGranularity,
   StatsRange,
@@ -17,7 +19,7 @@ type SampleDoc = {
 
 const TEMPLATES: Array<[string, string]> = [
   ['time-matrix', 'time_matrix'],
-  ['weekly-summary', 'period_summary'],
+  ['weekly-summary', 'weekly_summary'],
   ['y-model', 'y_model'],
   ['five-step-basic', 'five_step_basic'],
   ['incident-review', 'incident_review'],
@@ -279,6 +281,58 @@ export function buildSampleStats(range: StatsRange, granularity: StatsGranularit
   let allRevs = 0
   for (const d of docs) allRevs += d.revs.length
 
+  const countActive = (winFrom: string, winTo: string) => {
+    let n = 0
+    for (let cur = winFrom; cur < winTo; cur = addDays(cur, 1)) {
+      if ((heat.get(cur) || 0) > 0) n++
+    }
+    return n
+  }
+  let streakDay = (heat.get(today) || 0) > 0 ? today : addDays(today, -1)
+  let streak = 0
+  while ((heat.get(streakDay) || 0) > 0 && streak < 4000) {
+    streak++
+    streakDay = addDays(streakDay, -1)
+  }
+  const activeDates = [...heat.entries()]
+    .filter(([, n]) => n > 0)
+    .map(([d]) => d)
+    .sort()
+  let longest = 0
+  let run = 0
+  for (let i = 0; i < activeDates.length; i++) {
+    if (i > 0 && addDays(activeDates[i - 1]!, 1) === activeDates[i]) run++
+    else run = 1
+    if (run > longest) longest = run
+  }
+
+  const byType = new Map<string, CanvasTypeStat>()
+  for (const d of docs) {
+    const key = d.canvasType || 'unknown'
+    let row = byType.get(key)
+    if (!row) {
+      row = { canvasType: key, total: 0, created: 0, edited: 0 }
+      byType.set(key, row)
+    }
+    row.total++
+    if (inWindow(d.created, from, end)) row.created++
+    if (isEdit(d.created, d.updated) && inWindow(d.updated, from, end)) row.edited++
+  }
+  const canvasTypes = [...byType.values()].sort(
+    (a, b) => b.total - a.total || a.canvasType.localeCompare(b.canvasType),
+  )
+  const recent: RecentCanvas[] = [...docs]
+    .sort((a, b) => (a.updated < b.updated ? 1 : a.updated > b.updated ? -1 : a.templateId.localeCompare(b.templateId)))
+    .slice(0, 8)
+    .map((d, i) => ({
+      id: `sample-${i}`,
+      title: '',
+      templateId: d.templateId,
+      canvasType: d.canvasType,
+      createdAt: `${d.created}T09:00:00+08:00`,
+      updatedAt: `${d.updated}T09:00:00+08:00`,
+    }))
+
   return {
     range,
     granularity,
@@ -327,5 +381,15 @@ export function buildSampleStats(range: StatsRange, granularity: StatsGranularit
     series,
     templates,
     heatmap,
+    scope: 'me',
+    userId: '',
+    activity: {
+      activeDays: countActive(from, end),
+      activeDaysPrev: countActive(prevFrom, prevTo),
+      streak,
+      longestStreak: longest,
+    },
+    canvasTypes,
+    recent,
   }
 }

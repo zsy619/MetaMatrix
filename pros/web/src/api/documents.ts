@@ -180,6 +180,29 @@ export type TemplateStat = {
 
 export type HeatCell = { date: string; count: number }
 
+export type ActivityStats = {
+  activeDays: number
+  activeDaysPrev: number
+  streak: number
+  longestStreak: number
+}
+
+export type CanvasTypeStat = {
+  canvasType: string
+  total: number
+  created: number
+  edited: number
+}
+
+export type RecentCanvas = {
+  id: string
+  title: string
+  templateId: string
+  canvasType: string
+  createdAt: string
+  updatedAt: string
+}
+
 export type DocumentStats = {
   range: StatsRange | string
   granularity: StatsGranularity | string
@@ -201,6 +224,11 @@ export type DocumentStats = {
   series: StatsBucket[]
   templates: TemplateStat[]
   heatmap: HeatCell[]
+  scope: 'me' | string
+  userId: string
+  activity: ActivityStats
+  canvasTypes: CanvasTypeStat[]
+  recent: RecentCanvas[]
 }
 
 export function getDocumentStats(params?: {
@@ -208,6 +236,7 @@ export function getDocumentStats(params?: {
   granularity?: StatsGranularity
 }) {
   const q = new URLSearchParams()
+  q.set('scope', 'me')
   if (params?.range) q.set('range', params.range)
   if (params?.granularity) q.set('granularity', params.granularity)
   const qs = q.toString()

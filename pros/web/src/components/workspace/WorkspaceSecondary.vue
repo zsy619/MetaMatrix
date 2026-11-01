@@ -56,11 +56,6 @@ const creatingId = ref<TemplateId | null>(null)
 const createError = ref('')
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
-function templateName(id: string | null | undefined): string {
-  if (id && isTemplateId(id)) return TEMPLATE_META[id].name
-  return id || '画布'
-}
-
 function accentOf(id: string | null | undefined): string {
   if (id && isTemplateId(id)) return CATEGORY_ACCENT[TEMPLATE_META[id].category]
   return '#7c4dff'
@@ -68,10 +63,6 @@ function accentOf(id: string | null | undefined): string {
 
 function knownTemplate(id: string | null | undefined): TemplateId | null {
   return id && isTemplateId(id) ? id : null
-}
-
-function thumbId(d: { templateId: string | null; canvasType?: string }): TemplateId {
-  return knownTemplate(d.templateId || d.canvasType) ?? 'dual-triangle'
 }
 
 function formatWhen(iso: string): string {
@@ -107,8 +98,6 @@ function parseTodoLine(line: string): { text: string; done: boolean } | null {
   if (labeled?.[1]) return { done: false, text: labeled[1].trim() }
   return null
 }
-
-const recentDocs = computed(() => docs.value.slice(0, 6))
 
 const noteDigest = computed(() => {
   const todos: { key: string; doc: DocumentSummary; text: string; done: boolean }[] = []
@@ -250,8 +239,8 @@ function onSearchInput() {
 <template>
   <details class="secondary" @toggle="onToggle">
     <summary>
-      <span>最近编辑、搜索与备注</span>
-      <span class="hint">统计之外的入口，需要时再展开</span>
+      <span>搜索、备注与快速新建</span>
+      <span class="hint">最近编辑在上面，这里是正文入口</span>
     </summary>
     <div v-if="open" class="body">
       <p v-if="!auth.isAuthenticated" class="muted">登录后可以接着写、搜索正文，并查看备注里的待办。</p>
@@ -274,25 +263,6 @@ function onSearchInput() {
         <p v-if="createError" class="err">{{ createError }}</p>
 
         <div class="cols">
-          <section>
-            <h3>最近编辑</h3>
-            <p v-if="loading" class="muted">读取中…</p>
-            <p v-else-if="!recentDocs.length" class="muted">还没有云端画布。</p>
-            <ul v-else class="rows">
-              <li v-for="d in recentDocs" :key="d.id">
-                <button type="button" class="row" @click="openDoc(d)">
-                  <span class="mark" :style="{ '--accent': accentOf(d.templateId || d.canvasType) }">
-                    <GuideThumb v-if="knownTemplate(d.templateId || d.canvasType)" :template-id="thumbId(d)" size="sm" />
-                  </span>
-                  <span class="copy">
-                    <strong>{{ d.title || '未命名文档' }}</strong>
-                    <em>{{ templateName(d.templateId || d.canvasType) }}</em>
-                  </span>
-                  <time>{{ formatWhen(d.updatedAt) }}</time>
-                </button>
-              </li>
-            </ul>
-          </section>
           <section>
             <h3>全文搜索</h3>
             <div class="search">
@@ -436,7 +406,7 @@ summary::-webkit-details-marker {
 
 .cols {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
 }
 

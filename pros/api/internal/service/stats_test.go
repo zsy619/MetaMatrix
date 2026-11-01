@@ -118,6 +118,72 @@ func TestAggregateDocumentStatsWindows(t *testing.T) {
 	if len(stats.Templates[0].Series) != len(stats.Series) {
 		t.Fatalf("template series len mismatch")
 	}
+	if stats.Scope != "me" || stats.UserID != "" {
+		t.Fatalf("scope/user = %s %s", stats.Scope, stats.UserID)
+	}
+	if stats.Activity.ActiveDays != 2 || stats.Activity.ActiveDaysPrev != 1 {
+		t.Fatalf("active days = %d/%d, want 2/1", stats.Activity.ActiveDays, stats.Activity.ActiveDaysPrev)
+	}
+	if stats.Activity.Streak != 1 || stats.Activity.LongestStreak != 1 {
+		t.Fatalf("streak/longest = %d/%d, want 1/1", stats.Activity.Streak, stats.Activity.LongestStreak)
+	}
+	if len(stats.CanvasTypes) != 2 || stats.CanvasTypes[0].CanvasType != "time_matrix" || stats.CanvasTypes[0].Total != 2 {
+		t.Fatalf("canvas types = %+v", stats.CanvasTypes)
+	}
+	if stats.CanvasTypes[0].Created != 1 || stats.CanvasTypes[0].Edited != 0 {
+		t.Fatalf("time_matrix range created/edited = %d/%d", stats.CanvasTypes[0].Created, stats.CanvasTypes[0].Edited)
+	}
+	if stats.CanvasTypes[1].CanvasType != "y_model" || stats.CanvasTypes[1].Edited != 1 {
+		t.Fatalf("y_model = %+v", stats.CanvasTypes[1])
+	}
+	if len(stats.Recent) != 4 || stats.Recent[0].ID != idA || stats.Recent[0].TemplateID != "time-matrix" {
+		t.Fatalf("recent = %+v", stats.Recent)
+	}
+}
+
+func TestActivityStreakIncludesToday(t *testing.T) {
+	loc := time.FixedZone("Asia/Shanghai", 8*3600)
+	now := time.Date(2026, 11, 1, 18, 0, 0, 0, loc)
+	mk := func(month time.Month, day, hour int) time.Time {
+		return time.Date(2026, month, day, hour, 0, 0, 0, loc)
+	}
+	var docs []StatsDoc
+	var revs []StatsRev
+	for _, day := range []int{20, 28, 29, 30, 31} {
+		id := uuid.New()
+		created := mk(time.October, day, 9)
+		title := "矩阵"
+		docs = append(docs, StatsDoc{
+			ID: id, Title: title, CanvasType: "time_matrix",
+			CreatedAt: created, UpdatedAt: created,
+		})
+		revs = append(revs, StatsRev{DocumentID: id, CreatedAt: created})
+	}
+	idToday := uuid.New()
+	tpl := "y-model"
+	docs = append(docs, StatsDoc{
+		ID: idToday, Title: "今天改过", TemplateID: &tpl, CanvasType: "y_model",
+		CreatedAt: mk(time.October, 1, 9),
+		UpdatedAt: mk(time.November, 1, 10),
+	})
+	revs = append(revs, StatsRev{DocumentID: idToday, CreatedAt: mk(time.November, 1, 10)})
+
+	stats := AggregateDocumentStats(docs, revs, now, loc, "30d", "day")
+	if stats.Activity.Streak != 5 {
+		t.Fatalf("streak = %d, want 5 (Oct 28–Nov 1)", stats.Activity.Streak)
+	}
+	if stats.Activity.LongestStreak != 5 {
+		t.Fatalf("longest = %d, want 5", stats.Activity.LongestStreak)
+	}
+	if stats.Activity.ActiveDays != 6 {
+		t.Fatalf("active days = %d, want 6", stats.Activity.ActiveDays)
+	}
+	if len(stats.Recent) != 6 || stats.Recent[0].ID != idToday || stats.Recent[0].Title != "今天改过" {
+		t.Fatalf("recent head = %+v", stats.Recent)
+	}
+	if stats.CanvasTypes[0].CanvasType != "time_matrix" || stats.CanvasTypes[0].Total != 5 {
+		t.Fatalf("types = %+v", stats.CanvasTypes)
+	}
 }
 
 func TestAggregateEmpty(t *testing.T) {
@@ -133,7 +199,10 @@ func TestAggregateEmpty(t *testing.T) {
 	if stats.Series[0].Created != 0 || stats.Documents.Current != 0 {
 		t.Fatalf("empty stats not zero")
 	}
-	if stats.Templates == nil || stats.Heatmap == nil {
+	if stats.Templates == nil || stats.Heatmap == nil || stats.CanvasTypes == nil || stats.Recent == nil {
 		t.Fatal("nil slices")
+	}
+	if stats.Activity.Streak != 0 || stats.Activity.ActiveDays != 0 || stats.Scope != "me" {
+		t.Fatalf("empty activity = %+v scope %s", stats.Activity, stats.Scope)
 	}
 }
