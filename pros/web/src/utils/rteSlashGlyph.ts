@@ -23,6 +23,15 @@ export function rteSlashGlyph(item: {
       return '—'
     case 'table':
       return '表'
+    case 'columns':
+      return '栏'
+    case 'dateChip':
+    case 'dateRemind':
+    case 'plainDate':
+    case 'plainDateTime':
+      return '日'
+    case 'formula':
+      return 'Σ'
     case 'image':
       return '图'
     case 'link':
