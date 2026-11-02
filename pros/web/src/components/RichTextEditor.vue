@@ -63,14 +63,6 @@ import { type RteMentionItem } from './rteMentionItems'
 import FormPropertyInspector from './FormPropertyInspector.vue'
 import { toolbarIconMap, IconTableRows, IconTableCols } from './rteToolbarIcons'
 import { RteCodeBlockLowlight, RTE_CODE_LANGUAGES } from '../extensions/codeHighlight'
-import {
-  collectFindMatches,
-  pickNextMatchIndex,
-  selectFindMatch,
-  replaceFindMatch,
-  replaceAllFindMatches,
-  type RteFindMatch,
-} from '../utils/rteFindReplace'
 import 'highlight.js/styles/github.css'
 import {
   RTE_DOC_TEMPLATES,
@@ -105,7 +97,7 @@ import {
   isBareHttpUrl,
   sanitizePastedHtml,
 } from '../utils/rtePasteClean'
-import { canRunFindReplace, imageReplaceSide, todayIso } from '../utils/rteRound5'
+import { imageReplaceSide, todayIso } from '../utils/rteRound5'
 import { RTE_PAGE_SIZES } from '../utils/rtePageSize'
 import { PAGE_MARGIN_PRESETS } from '../utils/rtePageMargin'
 import { moveTableGridHover, TABLE_QUICK_COLS, TABLE_QUICK_ROWS } from '../utils/rteTableGrid'
@@ -207,6 +199,7 @@ import { RTE_CTX, type RteEditorEmit, type RteEditorProps } from './rte/context'
 import { bindAskMore, useAskDialog } from './rte/composables/useAskDialog'
 import { useRtePageLayout } from './rte/composables/useRtePageLayout'
 import { useToolbarGroups } from './rte/composables/useToolbarGroups'
+import { useFindReplace } from './rte/composables/useFindReplace'
 import { RTE_EMOJI_CATEGORIES } from '../utils/rteEmojiList'
 import { RTE_SPECIAL_CHAR_CATEGORIES } from '../utils/rteSpecialChars'
 
@@ -4689,140 +4682,27 @@ function onFormInspectorMouseUp() {
 
 
 /** —— 查找 / 替换 —— */
-const findDialogOpen = ref(false)
-const findQuery = ref('')
-const findReplaceText = ref('')
-const findCaseSensitive = ref(false)
-const findWholeWord = ref(false)
-const findMatches = ref<RteFindMatch[]>([])
-const findMatchIndex = ref(-1)
-
-function findOpts() {
-  return {
-    caseSensitive: findCaseSensitive.value,
-    wholeWord: findWholeWord.value,
-  }
-}
-
-function refreshFindMatches(selectNext = false) {
-  const ed = editor.value
-  if (!ed) {
-    findMatches.value = []
-    findMatchIndex.value = -1
-    return
-  }
-  const matches = collectFindMatches(ed.state.doc, findQuery.value, findOpts())
-  findMatches.value = matches
-  if (!matches.length) {
-    findMatchIndex.value = -1
-    return
-  }
-  if (selectNext || findMatchIndex.value < 0 || findMatchIndex.value >= matches.length) {
-    const fromPos = ed.state.selection.from
-    const idx = pickNextMatchIndex(matches, fromPos, 1)
-    findMatchIndex.value = idx
-    if (idx >= 0) selectFindMatch(ed, matches[idx])
-  } else {
-    selectFindMatch(ed, matches[findMatchIndex.value])
-  }
-}
-
-function openFindDialog() {
-  findDialogOpen.value = true
-  moreOpen.value = false
-  // 若有选区且选区较短，预填查找词
-  const ed = editor.value
-  if (ed) {
-    const { from, to, empty } = ed.state.selection
-    if (!empty && to - from <= 80) {
-      const t = ed.state.doc.textBetween(from, to, ' ')
-      if (t && !findQuery.value) findQuery.value = t
-    }
-  }
-  nextTick(() => {
-    const el = document.querySelector('.rte-find-query') as HTMLInputElement | null
-    el?.focus()
-    el?.select()
-    refreshFindMatches(true)
-  })
-}
-
-function closeFindDialog() {
-  findDialogOpen.value = false
-}
-
-function onFindQueryInput() {
-  refreshFindMatches(true)
-}
-
-function findGo(direction: 1 | -1) {
-  const ed = editor.value
-  const matches = findMatches.value
-  if (!ed || !matches.length) {
-    refreshFindMatches(true)
-    return
-  }
-  let idx = findMatchIndex.value
-  if (idx < 0) {
-    idx = pickNextMatchIndex(matches, ed.state.selection.from, direction)
-  } else {
-    idx = (idx + direction + matches.length) % matches.length
-  }
-  findMatchIndex.value = idx
-  selectFindMatch(ed, matches[idx])
-}
-
-function doReplaceOne() {
-  const ed = editor.value
-  const matches = findMatches.value
-  const idx = findMatchIndex.value
-  if (!ed || idx < 0 || !matches[idx]) {
-    ElMessage.info('没有可替换的匹配')
-    return
-  }
-  replaceFindMatch(ed, matches[idx], findReplaceText.value)
-  // 替换后重新收集，并跳到下一处
-  const nextFrom = matches[idx].from + findReplaceText.value.length
-  const nextMatches = collectFindMatches(ed.state.doc, findQuery.value, findOpts())
-  findMatches.value = nextMatches
-  if (!nextMatches.length) {
-    findMatchIndex.value = -1
-    ElMessage.success('已替换，无更多匹配')
-    return
-  }
-  const ni = pickNextMatchIndex(nextMatches, nextFrom, 1)
-  findMatchIndex.value = ni
-  if (ni >= 0) selectFindMatch(ed, nextMatches[ni])
-}
-
-function doReplaceAll() {
-  const ed = editor.value
-  if (!ed) return
-  const matches = collectFindMatches(ed.state.doc, findQuery.value, findOpts())
-  if (!matches.length) {
-    ElMessage.info('没有匹配项')
-    findMatches.value = []
-    findMatchIndex.value = -1
-    return
-  }
-  const n = replaceAllFindMatches(ed, matches, findReplaceText.value)
-  findMatches.value = []
-  findMatchIndex.value = -1
-  ElMessage.success(`已全部替换 ${n} 处`)
-}
-
-const findStatusText = computed(() => {
-  const q = findQuery.value
-  if (!q) return '输入要查找的内容'
-  const total = findMatches.value.length
-  if (!total) return '共 0 处'
-  const cur = findMatchIndex.value >= 0 ? findMatchIndex.value + 1 : 0
-  return `共 ${total} 处 · 第 ${cur} 处`
+const {
+  findDialogOpen,
+  findQuery,
+  findReplaceText,
+  findCaseSensitive,
+  findWholeWord,
+  refreshFindMatches,
+  openFindDialog,
+  closeFindDialog,
+  onFindQueryInput,
+  findGo,
+  doReplaceOne,
+  doReplaceAll,
+  findStatusText,
+  canReplaceFind,
+} = useFindReplace({
+  editor,
+  closeMore: () => {
+    moreOpen.value = false
+  },
 })
-
-const canReplaceFind = computed(() =>
-  canRunFindReplace(findQuery.value, findMatches.value.length),
-)
 
 /** —— 插入链接 —— */
 const linkDialogOpen = ref(false)
