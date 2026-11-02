@@ -35,6 +35,7 @@
 | GET | `/documents/:id/export` | `format=json` 或 `md` |
 | PUT | `/documents/:id` | 保存。`expectedHeadRevisionId` 不一致时 409，响应带云端最新正文 |
 | PATCH | `/documents/:id/title` | `{ title }`，只改标题 |
+| POST | `/documents/:id/clone` | 克隆画布。正文不变、新 id、新建一条 `canvas_documents` 行；标题默认加「（副本）」，可传 `{ title, notes }` 覆盖 |
 | DELETE | `/documents/:id` | 软删除（归档） |
 | GET | `/documents/:id/ai-context` | 面板文本上下文 |
 | POST | `/documents/:id/revisions` | 手动存版 |
