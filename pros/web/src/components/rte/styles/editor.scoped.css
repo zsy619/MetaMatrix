@@ -575,6 +575,29 @@
 .rte-root :deep(.ProseMirror h6) {
   scroll-margin-top: 72px;
 }
+.rte-root :deep(.ProseMirror .rte-heading-foldable) {
+  position: relative;
+}
+.rte-root :deep(.ProseMirror .rte-heading-foldable[data-collapsed='true'])::before {
+  content: '▸';
+  position: absolute;
+  left: -14px;
+  top: 0.2em;
+  width: 14px;
+  color: #86909c;
+  font-size: 12px;
+  line-height: 1;
+  pointer-events: none;
+}
+.rte-root :deep(.ProseMirror .rte-fold-hidden) {
+  display: none !important;
+}
+.rte-root.rte-printing :deep(.rte-fold-hidden) {
+  display: block !important;
+}
+.rte-root.rte-printing :deep(.rte-heading-foldable)::before {
+  content: none !important;
+}
 
 .rte-root :deep(code) {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;

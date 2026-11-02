@@ -11,6 +11,7 @@ import {
   nextHeadingAnchorId,
   usedHeadingIds,
 } from '../../../utils/rteHeadingAnchor'
+import { applyHeadingFoldToggle, headingFoldBody } from '../../../utils/rteHeadingFold'
 
 /** 块手柄、块菜单与块拖拽。模板绑定名与原先一致。 */
 export function useBlockHandle(deps: {
@@ -54,8 +55,12 @@ function duplicateCurrentBlock() {
     ElMessage.warning('无法复制当前块')
     return
   }
-  const copy = range.node.copy((range.node as any).content)
-  const tr = ed.state.tr.insert(range.to, copy as any)
+  const source = range.node as any
+  let copy = source.copy(source.content)
+  if (source.type?.name === 'heading' && source.attrs?.collapsed) {
+    copy = source.type.create({ ...source.attrs, collapsed: false }, source.content, source.marks)
+  }
+  const tr = ed.state.tr.insert(range.to, copy)
   ed.view.dispatch(tr.scrollIntoView())
   ed.view.focus()
   ElMessage.success('已复制当前块')
@@ -307,12 +312,64 @@ function copyHoveredBlock() {
   blockMenuOpen.value = false
 }
 
-const blockMenuIsHeading = computed(() => {
+const foldTick = ref(0)
+
+function headingAtIndex(index: number) {
   const ed = deps.editor.value
-  const index = blockMenuIndex.value
-  if (!ed || index < 0 || index >= ed.state.doc.childCount) return false
-  return ed.state.doc.child(index).type.name === 'heading'
+  if (!ed || index < 0 || index >= ed.state.doc.childCount) return null
+  let pos = 0
+  ed.state.doc.forEach((_child, offset, i) => {
+    if (i === index) pos = offset
+  })
+  const node = ed.state.doc.child(index)
+  if (node.type.name !== 'heading') return null
+  return { node, pos }
+}
+
+function canFoldIndex(index: number) {
+  void foldTick.value
+  const ed = deps.editor.value
+  const found = headingAtIndex(index)
+  if (!ed || !found) return false
+  if (found.node.attrs.collapsed) return true
+  return !!headingFoldBody(ed.state.doc, found.pos)
+}
+
+const blockMenuIsHeading = computed(() => headingAtIndex(blockMenuIndex.value) != null)
+const blockMenuHeadingCollapsed = computed(() => {
+  void foldTick.value
+  return !!headingAtIndex(blockMenuIndex.value)?.node.attrs.collapsed
 })
+const blockMenuCanFold = computed(() => canFoldIndex(blockMenuIndex.value))
+const blockHandleCanFold = computed(() => blockHandle.value.visible && canFoldIndex(blockHandle.value.index))
+const blockHandleHeadingCollapsed = computed(() => {
+  void foldTick.value
+  return !!headingAtIndex(blockHandle.value.index)?.node.attrs.collapsed
+})
+
+function toggleHeadingFoldAt(index: number) {
+  const ed = deps.editor.value
+  const found = headingAtIndex(index)
+  if (!ed || !found) return false
+  const tr = ed.state.tr
+  if (!applyHeadingFoldToggle(tr, found.pos)) {
+    ElMessage.info('这个标题下面没有可折叠的内容')
+    return false
+  }
+  ed.view.dispatch(tr.scrollIntoView())
+  ed.view.focus()
+  foldTick.value += 1
+  return true
+}
+
+function toggleHoveredHeadingFold() {
+  toggleHeadingFoldAt(blockMenuIndex.value)
+  blockMenuOpen.value = false
+}
+
+function toggleHandleHeadingFold() {
+  toggleHeadingFoldAt(blockHandle.value.index)
+}
 
 async function copyHeadingAnchor() {
   const ed = deps.editor.value
@@ -444,6 +501,12 @@ function onCanvasBlockDrop(event: DragEvent) {
     turnHoveredBlock,
     copyHoveredBlock,
     blockMenuIsHeading,
+    blockMenuHeadingCollapsed,
+    blockMenuCanFold,
+    blockHandleCanFold,
+    blockHandleHeadingCollapsed,
+    toggleHoveredHeadingFold,
+    toggleHandleHeadingFold,
     copyHeadingAnchor,
     deleteHoveredBlock,
     moveHoveredBlock,

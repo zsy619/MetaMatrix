@@ -76,6 +76,7 @@ import { MermaidBlock } from '../../../extensions/mermaidBlock'
 import { CrossRef, findCrossRefPos } from '../../../extensions/crossRef'
 import { ListStyleAttrs } from '../../../extensions/listStyleAttrs'
 import { HeadingAnchor } from '../../../extensions/headingAnchor'
+import { HeadingFold } from '../../../extensions/headingFold'
 import { parseHeadingAnchorHref } from '../../../utils/rteHeadingAnchor'
 
 type LateFn = (...args: any[]) => any
@@ -272,6 +273,7 @@ const editor = useEditor({
     HeadingAnchor.configure({
       onMissing: () => ElMessage.warning('这篇文档里没有对应标题'),
     }),
+    HeadingFold,
     Color,
     Highlight.configure({ multicolor: true }),
     TextAlign.configure({

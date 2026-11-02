@@ -515,6 +515,16 @@ useParentScopeStamp()
           @mousedown.stop
         >
           <button data-rte-own
+            v-if="rte.blockHandleCanFold"
+            type="button"
+            class="rte-block-handle"
+            :aria-label="rte.blockHandleHeadingCollapsed ? '展开下方内容' : '折叠下方内容'"
+            :title="rte.blockHandleHeadingCollapsed ? '展开下方内容' : '折叠下方内容'"
+            @click.stop="rte.toggleHandleHeadingFold"
+          >
+            {{ rte.blockHandleHeadingCollapsed ? '▸' : '▾' }}
+          </button>
+          <button data-rte-own
             v-if="rte.expanded"
             type="button"
             class="rte-block-handle"
@@ -564,6 +574,7 @@ useParentScopeStamp()
           <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
           <button data-rte-own type="button" role="menuitem" @click="rte.copyHoveredBlock">复制块</button>
           <button data-rte-own v-if="rte.blockMenuIsHeading" type="button" role="menuitem" @click="rte.copyHeadingAnchor">复制标题链接</button>
+          <button data-rte-own v-if="rte.blockMenuCanFold" type="button" role="menuitem" @click="rte.toggleHoveredHeadingFold">{{ rte.blockMenuHeadingCollapsed ? '展开下方内容' : '折叠下方内容' }}</button>
           <button data-rte-own type="button" role="menuitem" @click="rte.moveHoveredBlock(-1)">上移</button>
           <button data-rte-own type="button" role="menuitem" @click="rte.moveHoveredBlock(1)">下移</button>
           <button data-rte-own type="button" role="menuitem" class="is-danger" @click="rte.deleteHoveredBlock">删除</button>
