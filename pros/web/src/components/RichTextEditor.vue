@@ -10683,6 +10683,11 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
   background: #fff;
   position: relative;
 }
+/* 画布面板普通展示：正文区最高 600px，多出来的在内容区里滚。最大化另写，不套这层上限。 */
+.rte-root:not(.expanded) .rte-canvas,
+.rte-root:not(.expanded) .rte-source-pane {
+  max-height: 600px;
+}
 .rte-block-tools {
   position: absolute;
   z-index: 5;
@@ -12441,6 +12446,10 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
 }
 
 /* 最大化编辑区略增字号与留白 */
+.rte-root.expanded .rte-canvas,
+.rte-root.expanded .rte-source-pane {
+  max-height: none;
+}
 .rte-root.expanded .rte-canvas {
   padding: 20px 32px 28px;
   background: #fff;
@@ -15776,6 +15785,15 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
 }
 .rte-root.is-cjk-typography .ProseMirror p {
   text-spacing-trim: space-all;
+}
+
+/* 打印和 PDF 截图时拿掉 600px，避免整页被内容区裁切。 */
+.rte-root.rte-printing .rte-canvas,
+.rte-root.rte-printing .rte-source-pane,
+.rte-root.rte-printing .rte-body,
+.rte-root.rte-printing .ProseMirror {
+  max-height: none !important;
+  overflow: visible !important;
 }
 
 @media print {
