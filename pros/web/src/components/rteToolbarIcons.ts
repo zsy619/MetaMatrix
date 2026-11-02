@@ -148,6 +148,16 @@ export const IconVideo = svgIconNodes([
   h('rect', { x: 2.5, y: 5, width: 14, height: 14, rx: 2 }),
   h('path', { d: 'M16.5 9.5l5-3v11l-5-3z' }),
 ])
+export const IconLinkButton = svgIconNodes([
+  h('rect', { x: 3, y: 7, width: 18, height: 10, rx: 5 }),
+  h('path', { d: 'M8 12h5.5' }),
+  h('path', { d: 'M12 9.5L15 12l-3 2.5' }),
+])
+export const IconFirstIndent = svgIcon([
+  'M9 6h11',
+  'M4 12h16',
+  'M4 18h16',
+])
 export const IconLink = svgIcon([
   'M9.5 13.5a5.5 5.5 0 0 0 7.78 0l1.55-1.55a5.5 5.5 0 0 0-7.78-7.78L9.5 5.72',
   'M14.5 10.5a5.5 5.5 0 0 0-7.78 0L5.17 12.05a5.5 5.5 0 0 0 7.78 7.78L14.5 18.28',
@@ -500,6 +510,8 @@ export const toolbarIconMap: Record<string, Component> = {
   image: IconImage,
   video: IconVideo,
   link: IconLink,
+  linkButton: IconLinkButton,
+  firstIndent: IconFirstIndent,
   formula: IconFormula,
   table: IconTable,
   attach: IconAttach,

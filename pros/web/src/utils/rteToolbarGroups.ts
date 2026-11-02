@@ -18,13 +18,13 @@ export const TOOLBAR_GROUPS: readonly ToolbarGroupDef[] = [
     keys: ['bold', 'italic', 'underline', 'strike', 'subscript', 'superscript', 'codeInline', 'emphasisDot', 'caseTransform', 'ruby'],
   },
   { id: 'color', label: '颜色', keys: ['color', 'highlight'] },
-  { id: 'align', label: '对齐', keys: ['align', 'lineHeight', 'spacing', 'indent', 'outdent'] },
+  { id: 'align', label: '对齐', keys: ['align', 'lineHeight', 'spacing', 'indent', 'outdent', 'firstIndent'] },
   { id: 'list', label: '列表', keys: ['list', 'listStyle'] },
   { id: 'paragraph', label: '段落', keys: ['quote', 'code'] },
   {
     id: 'insert',
     label: '链接',
-    keys: ['link', 'image', 'video', 'audio', 'attach', 'linkCard', 'qrcode', 'emoji', 'specialChars', 'formula'],
+    keys: ['link', 'linkButton', 'image', 'video', 'audio', 'attach', 'linkCard', 'qrcode', 'emoji', 'specialChars', 'formula'],
   },
   { id: 'table', label: '表格', keys: ['table', 'tableCsv', 'tableFilter'] },
   {

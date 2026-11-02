@@ -75,6 +75,7 @@ import { TabsBlock, TabPane } from '../../../extensions/tabsBlock'
 import { MermaidBlock } from '../../../extensions/mermaidBlock'
 import { CrossRef, findCrossRefPos } from '../../../extensions/crossRef'
 import { ListStyleAttrs } from '../../../extensions/listStyleAttrs'
+import { LinkButton } from '../../../extensions/linkButton'
 
 type LateFn = (...args: any[]) => any
 
@@ -267,6 +268,7 @@ const editor = useEditor({
     MermaidBlock,
     CrossRef,
     ListStyleAttrs,
+    LinkButton,
     Color,
     Highlight.configure({ multicolor: true }),
     TextAlign.configure({
