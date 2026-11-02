@@ -110,15 +110,6 @@ import { RTE_PAGE_SIZES } from '../utils/rtePageSize'
 import { PAGE_MARGIN_PRESETS } from '../utils/rtePageMargin'
 import { moveTableGridHover, TABLE_QUICK_COLS, TABLE_QUICK_ROWS } from '../utils/rteTableGrid'
 import {
-  buildToolbarGroups,
-  bumpToolbarUndoEpoch,
-  currentToolbarUndoEpoch,
-  moveToolbarGroup,
-  readToolbarGroupOrder,
-  toolbarGroupLabels,
-  toolbarOrdersEqual,
-} from '../utils/rteToolbarGroups'
-import {
   RTE_OVERLAY_CLOSE_ORDER,
   docChromeDelay,
   focusDialogRoot,
@@ -215,6 +206,7 @@ import { countWords, normalizeHtml, rtePlaceholderText, toEditorContent } from '
 import { RTE_CTX, type RteEditorEmit, type RteEditorProps } from './rte/context'
 import { bindAskMore, useAskDialog } from './rte/composables/useAskDialog'
 import { useRtePageLayout } from './rte/composables/useRtePageLayout'
+import { useToolbarGroups } from './rte/composables/useToolbarGroups'
 import { RTE_EMOJI_CATEGORIES } from '../utils/rteEmojiList'
 import { RTE_SPECIAL_CHAR_CATEGORIES } from '../utils/rteSpecialChars'
 
@@ -767,6 +759,12 @@ const editorBootError = ref('')
 const auth = useAuthStore()
 const documentStore = useDocumentStore()
 const { saving, dirty, conflict, document_id, current_data } = storeToRefs(documentStore)
+const toolbarUndoBridge = {
+  disarm() {},
+  isNewer(_stamp: number) {
+    return false
+  },
+}
 const {
   pageSize,
   pageSizeMeta,
@@ -794,10 +792,8 @@ const {
     moreOpen.value = false
   },
   announce: (message) => announceRte(message),
-  disarmToolbarUndo: () => {
-    toolbarUndoArmed = false
-  },
-  toolbarUndoIsNewer: (stamp) => toolbarUndoArmed && toolbarUndoStamp > stamp,
+  disarmToolbarUndo: () => toolbarUndoBridge.disarm(),
+  toolbarUndoIsNewer: (stamp) => toolbarUndoBridge.isNewer(stamp),
 })
 
 function initialEditorContent(): string {
@@ -4604,11 +4600,6 @@ onBeforeUnmount(() => {
     docChromeTimer = null
   }
   document.removeEventListener('pointerdown', onDocPointerDownForMenus, true)
-  window.removeEventListener('pointermove', onWindowToolbarPointerMove)
-  window.removeEventListener('pointerup', onWindowToolbarPointerUp)
-  window.removeEventListener('dragover', onWindowToolbarDragOver)
-  window.removeEventListener('drop', onWindowToolbarDrop)
-  window.removeEventListener('keydown', onWindowToolbarUndo, true)
   window.removeEventListener('keydown', onWindowEscape)
   window.removeEventListener('resize', repositionSlashMenu)
   window.removeEventListener('scroll', repositionSlashMenu, true)
@@ -7211,11 +7202,6 @@ function repositionSlashMenu() {
 
 onMounted(() => {
   document.addEventListener('pointerdown', onDocPointerDownForMenus, true)
-  window.addEventListener('pointermove', onWindowToolbarPointerMove)
-  window.addEventListener('pointerup', onWindowToolbarPointerUp)
-  window.addEventListener('dragover', onWindowToolbarDragOver)
-  window.addEventListener('drop', onWindowToolbarDrop)
-  window.addEventListener('keydown', onWindowToolbarUndo, true)
   window.addEventListener('keydown', onWindowEscape)
   window.addEventListener('resize', repositionSlashMenu)
   window.addEventListener('scroll', repositionSlashMenu, true)
@@ -8599,205 +8585,39 @@ const allTools = computed((): ToolItem[] => {
 const EXPANDED_ONLY_KEYS = new Set(['import', 'export'])
 
 /** 顶栏：飞书式主栏；最大化时主栏后换行接高级工具 */
-const localToolbarOrder = ref<string[] | null>(null)
-const toolbarOrderUndo = ref<string[][]>([])
-let toolbarUndoArmed = false
-let toolbarUndoStamp = 0
-const toolbarDropIndex = ref<number | null>(null)
-const toolbarDragSource = ref('')
-let toolbarDragId = ''
-
-const toolbarOrder = computed(() => {
-  if (props.panelId) {
-    return readToolbarGroupOrder(current_data.value?.toolbarGroupOrderByPanelId, props.panelId)
-  }
-  return readToolbarGroupOrder(
-    localToolbarOrder.value ? { local: localToolbarOrder.value } : undefined,
-    localToolbarOrder.value ? 'local' : '',
-  )
+const {
+  toolbarGroups,
+  toolbarDropIndex,
+  toolbarDragSource,
+  undoToolbarGroupOrder,
+  noteToolbarOrderEdited,
+  disarmToolbarUndo,
+  toolbarUndoIsNewer,
+  onToolbarHandlePointerDown,
+  onToolbarHandlePointerMove,
+  onToolbarHandlePointerUp,
+  onToolbarGroupDragStart,
+  onToolbarGroupDragOver,
+  onToolbarGroupDrop,
+  onToolbarGroupDragEnd,
+  onToolbarGroupKeydown,
+} = useToolbarGroups({
+  panelId: () => props.panelId,
+  expanded: () => props.expanded,
+  orderMap: () => current_data.value?.toolbarGroupOrderByPanelId,
+  setPanelToolbarOrder: (panelId, order) => documentStore.setPanelToolbarOrder(panelId, order),
+  tools: () => allTools.value,
+  primaryKeys: PRIMARY_KEYS,
+  viewMode: () => viewMode.value,
+  announce: (message) => announceRte(message),
+  rootEl: rteRootEl,
+  marginUndoArmed,
+  marginUndoStamp,
+  undoPageMargin,
+  disarmMarginUndo,
 })
-
-const toolbarGroups = computed(() => {
-  const tools = props.expanded
-    ? allTools.value.filter((tool) => tool.kind !== 'divider')
-    : allTools.value.filter((tool) => tool.kind !== 'divider' && PRIMARY_KEYS.has(tool.key))
-  return buildToolbarGroups(tools, toolbarOrder.value)
-})
-
-function applyToolbarOrder(next: readonly string[], recordUndo: boolean) {
-  const prev = toolbarOrder.value
-  if (toolbarOrdersEqual(prev, next)) return
-  if (recordUndo) {
-    toolbarOrderUndo.value = [...toolbarOrderUndo.value, prev].slice(-20)
-    toolbarUndoStamp = bumpToolbarUndoEpoch()
-    disarmMarginUndo()
-  }
-  toolbarUndoArmed = recordUndo || toolbarOrderUndo.value.length > 0
-  if (props.panelId) documentStore.setPanelToolbarOrder(props.panelId, next)
-  else localToolbarOrder.value = [...next]
-  announceRte('工具栏分组顺序：' + toolbarGroupLabels(next))
-}
-
-function undoToolbarGroupOrder(): boolean {
-  if (!toolbarUndoArmed || !toolbarOrderUndo.value.length) return false
-  const prev = toolbarOrderUndo.value[toolbarOrderUndo.value.length - 1]!
-  toolbarOrderUndo.value = toolbarOrderUndo.value.slice(0, -1)
-  toolbarUndoArmed = toolbarOrderUndo.value.length > 0
-  if (props.panelId) documentStore.setPanelToolbarOrder(props.panelId, prev)
-  else localToolbarOrder.value = [...prev]
-  announceRte('工具栏分组顺序：' + toolbarGroupLabels(prev))
-  return true
-}
-
-function noteToolbarOrderEdited() {
-  toolbarUndoArmed = false
-  disarmMarginUndo()
-}
-
-let toolbarPointerId = ''
-let toolbarPointerStartX = 0
-
-function finishToolbarPointer(clientX: number) {
-  const id = toolbarPointerId
-  const moved = Math.abs(clientX - toolbarPointerStartX) > 6
-  const index = toolbarDropIndex.value
-  toolbarPointerId = ''
-  toolbarDragSource.value = ''
-  toolbarDropIndex.value = null
-  if (!id || !moved || index == null || viewMode.value !== 'edit') return
-  const next = moveToolbarGroup(toolbarOrder.value, id, index)
-  if (next) applyToolbarOrder(next, true)
-}
-
-function onWindowToolbarPointerMove(event: PointerEvent) {
-  if (!toolbarPointerId) return
-  toolbarDropIndex.value = toolbarGroupDropIndexAt(event.clientX)
-}
-
-function onWindowToolbarPointerUp(event: PointerEvent) {
-  if (!toolbarPointerId) return
-  finishToolbarPointer(event.clientX)
-}
-
-function onToolbarHandlePointerDown(id: string, event: PointerEvent) {
-  if (viewMode.value !== 'edit' || event.button !== 0) return
-  toolbarPointerId = id
-  toolbarDragSource.value = id
-  toolbarPointerStartX = event.clientX
-  toolbarDropIndex.value = toolbarGroupDropIndexAt(event.clientX)
-  const handle = event.currentTarget as HTMLElement
-  handle.focus()
-  try {
-    handle.setPointerCapture?.(event.pointerId)
-  } catch {
-    /* 合成指针事件没有有效 pointerId */
-  }
-  event.preventDefault()
-}
-
-function onToolbarHandlePointerMove(event: PointerEvent) {
-  if (!toolbarPointerId) return
-  toolbarDropIndex.value = toolbarGroupDropIndexAt(event.clientX)
-}
-
-function onToolbarHandlePointerUp(event: PointerEvent) {
-  if (!toolbarPointerId) return
-  finishToolbarPointer(event.clientX)
-}
-
-function onToolbarGroupDragStart(id: string, event: DragEvent) {
-  if (viewMode.value !== 'edit') {
-    event.preventDefault()
-    return
-  }
-  toolbarDragId = id
-  toolbarDragSource.value = id
-  if (event.dataTransfer) {
-    event.dataTransfer.effectAllowed = 'move'
-    event.dataTransfer.setData('text/plain', id)
-  }
-}
-
-function toolbarGroupDropIndexAt(clientX: number): number | null {
-  const host = rteRootEl.value?.querySelector('.rte-toolbar-tools')
-  if (!host) return null
-  const groups = Array.from(host.querySelectorAll<HTMLElement>('.rte-tool-group'))
-  let index = groups.length
-  for (let i = 0; i < groups.length; i += 1) {
-    const rect = groups[i]!.getBoundingClientRect()
-    if (clientX < rect.left + rect.width / 2) {
-      index = i
-      break
-    }
-  }
-  return index
-}
-
-function onToolbarGroupDragOver(event: DragEvent) {
-  if (!toolbarDragId || viewMode.value !== 'edit') return
-  toolbarDropIndex.value = toolbarGroupDropIndexAt(event.clientX)
-}
-
-function onWindowToolbarDragOver(event: DragEvent) {
-  if (!toolbarDragId || viewMode.value !== 'edit') return
-  event.preventDefault()
-  toolbarDropIndex.value = toolbarGroupDropIndexAt(event.clientX)
-}
-
-function onToolbarGroupDrop() {
-  if (!toolbarDragId || toolbarDropIndex.value == null) return
-  const next = moveToolbarGroup(toolbarOrder.value, toolbarDragId, toolbarDropIndex.value)
-  if (next) applyToolbarOrder(next, true)
-  toolbarDragId = ''
-  toolbarDragSource.value = ''
-  toolbarDropIndex.value = null
-}
-
-function onWindowToolbarDrop(event: DragEvent) {
-  if (!toolbarDragId) return
-  event.preventDefault()
-  onToolbarGroupDrop()
-}
-
-function onWindowToolbarUndo(event: KeyboardEvent) {
-  if (!toolbarUndoArmed && !marginUndoArmed()) return
-  if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return
-  if (event.key.toLowerCase() !== 'z') return
-  const target = event.target
-  const root = rteRootEl.value
-  if (target instanceof Element && target.closest('input, textarea') && !root?.contains(target)) return
-  const inThis = target instanceof Node && !!root?.contains(target)
-  if (target instanceof Element) {
-    const host = target.closest('.rte-root')
-    if (host && host !== root) return
-  }
-  const stamp = marginUndoArmed() ? marginUndoStamp() : toolbarUndoStamp
-  if (!inThis && stamp !== currentToolbarUndoEpoch()) return
-  const undone = marginUndoArmed() ? undoPageMargin() : undoToolbarGroupOrder()
-  if (!undone) return
-  event.preventDefault()
-  event.stopPropagation()
-}
-
-function onToolbarGroupDragEnd() {
-  window.setTimeout(() => {
-    toolbarDragId = ''
-    toolbarDragSource.value = ''
-    toolbarDropIndex.value = null
-  }, 50)
-}
-
-function onToolbarGroupKeydown(id: string, event: KeyboardEvent) {
-  if (viewMode.value !== 'edit' || !event.altKey) return
-  const dir = event.key === 'ArrowLeft' ? -1 : event.key === 'ArrowRight' ? 1 : 0
-  if (!dir) return
-  event.preventDefault()
-  const order = toolbarOrder.value
-  const index = order.indexOf(id)
-  if (index < 0) return
-  const next = moveToolbarGroup(order, id, dir < 0 ? index - 1 : index + 2)
-  if (next) applyToolbarOrder(next, true)
-}
+toolbarUndoBridge.disarm = disarmToolbarUndo
+toolbarUndoBridge.isNewer = toolbarUndoIsNewer
 
 /** 收起模式下「更多」下拉内容 */
 const moreTools = computed(() => {
