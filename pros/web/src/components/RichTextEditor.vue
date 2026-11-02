@@ -7,13 +7,11 @@ import {
   provide,
   ref,
   watch,
-  type Directive,
 } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAuthStore } from '../stores/auth'
 import { useDocumentStore } from '../stores/document'
 import { NodeSelection, TextSelection } from '@tiptap/pm/state'
-import { Fragment } from '@tiptap/pm/model'
 import { useEditor, EditorContent } from '@tiptap/vue-3'
 import { BubbleMenu } from '@tiptap/vue-3/menus'
 import StarterKit from '@tiptap/starter-kit'
@@ -49,17 +47,10 @@ import {
   FormDateInput,
   FormSwitch,
   FormShowIf,
-  applyFormShowIfVisibility,
   isFormNodeName,
   type FormNodeName,
 } from '../extensions/forms'
-import {
-  createRteMention,
-  mentionPluginKey,
-  type RteMentionRenderProps,
-  type RteMentionUiHandlers,
-} from '../extensions/mentionSuggestion'
-import { type RteMentionItem } from './rteMentionItems'
+import { createRteMention } from '../extensions/mentionSuggestion'
 import FormPropertyInspector from './FormPropertyInspector.vue'
 import { toolbarIconMap, IconTableRows, IconTableCols } from './rteToolbarIcons'
 import { RteCodeBlockLowlight, RTE_CODE_LANGUAGES } from '../extensions/codeHighlight'
@@ -71,10 +62,7 @@ import {
   sanitizeRteJsonNodes,
 } from './rteDocTemplates'
 import type { Component } from 'vue'
-import JSZip from 'jszip'
-import html2canvas from 'html2canvas'
-import { SlashCommands, slashPluginKey, type RteSlashRenderProps, type RteSlashUiHandlers } from '../extensions/slashCommands'
-import { exitSuggestion } from '@tiptap/suggestion'
+import { SlashCommands } from '../extensions/slashCommands'
 import {
   rteSlashGlyph,
   rteSlashSectionLabel,
@@ -82,14 +70,8 @@ import {
 } from './rteSlashItems'
 import { mentionSectionLabel } from './rteMentionItems'
 import {
-  MAX_ATTACHMENT_BYTES,
-  attachmentRejectReason,
-  dataUrlExceedsAttachmentLimit,
-} from '../utils/attachmentPolicy'
-import {
   FEISHU_BATCH3_SHORTCUTS,
   activeOutlineIndex as outlineIndexForCursor,
-  reorderIndexes,
 } from '../utils/rteBatch3'
 import {
   FEISHU_HIGHLIGHT_COLORS,
@@ -97,28 +79,22 @@ import {
   isBareHttpUrl,
   sanitizePastedHtml,
 } from '../utils/rtePasteClean'
-import { imageReplaceSide, todayIso } from '../utils/rteRound5'
+import { todayIso } from '../utils/rteRound5'
 import { RTE_PAGE_SIZES } from '../utils/rtePageSize'
 import { PAGE_MARGIN_PRESETS } from '../utils/rtePageMargin'
-import { moveTableGridHover, TABLE_QUICK_COLS, TABLE_QUICK_ROWS } from '../utils/rteTableGrid'
 import {
-  RTE_OVERLAY_CLOSE_ORDER,
   docChromeDelay,
   focusDialogRoot,
   pasteVolume,
   previewShortcutAllowed,
   snapshotDue,
-  topOpenModal,
 } from '../utils/rteRound8'
 import {
-  orderSlashForMenu,
   embedIframeSrc,
-  pushRecentSlash,
   shouldTakeSnapshot,
   type NoteRow,
 } from '../utils/rteRound6'
 import {
-  feishuClipboardDocument,
   filterLabeledTargets,
   htmlHasTable,
   looksLikeTsvTable,
@@ -134,7 +110,6 @@ import { ParagraphAttrs } from '../extensions/paragraphAttrs'
 import { PageBreak } from '../extensions/pageBreak'
 import { Columns, Column } from '../extensions/columns'
 import { ImageGroup } from '../extensions/imageGroup'
-import { insertImagesBeside } from '../extensions/imageGroupOps'
 import { imageEdgeAtPoint } from '../extensions/rteImageDrag'
 import { Callout, type CalloutVariant } from '../extensions/callout'
 import { Bookmark } from '../extensions/bookmark'
@@ -154,9 +129,6 @@ import { TabsBlock, TabPane } from '../extensions/tabsBlock'
 import { MermaidBlock } from '../extensions/mermaidBlock'
 import { CrossRef, collectCrossRefTargets, findCrossRefPos } from '../extensions/crossRef'
 import { ListStyleAttrs } from '../extensions/listStyleAttrs'
-import { buildDocxBlob } from '../utils/rteExportDocx'
-import { buildPdfFromElement } from '../utils/rteExportPdf'
-import { htmlToMarkdown } from '../utils/rteExportMd'
 import {
   applyParagraphStyle,
   PARA_STYLE_OPTIONS,
@@ -164,10 +136,7 @@ import {
   checkHeadingHierarchy,
   checkDocumentLinks,
   estimateReadingMinutes,
-  copyTableAs,
-  applyTableRowFilter,
-  compressImageFile,
-  loadSnippets,
+    loadSnippets,
   saveSnippets,
   DEFAULT_SNIPPETS,
   STATUS_CHIP_TONES,
@@ -186,11 +155,7 @@ import {
   collectFootnotes,
   renumberFootnotes,
   jumpToPos,
-  setCellVerticalAlign,
   renumberCaptions,
-  sortTableByColumn,
-  upsertTableSumRow,
-  currentTableColIndex,
   RTE_ZOOM_PRESETS,
   type CaseMode,
 } from './rteWave20'
@@ -200,6 +165,17 @@ import { bindAskMore, useAskDialog } from './rte/composables/useAskDialog'
 import { useRtePageLayout } from './rte/composables/useRtePageLayout'
 import { useToolbarGroups } from './rte/composables/useToolbarGroups'
 import { useFindReplace } from './rte/composables/useFindReplace'
+import { useExport } from './rte/composables/useExport'
+import { useImport } from './rte/composables/useImport'
+import { useMediaLibrary } from './rte/composables/useMediaLibrary'
+import { useTableOps } from './rte/composables/useTableOps'
+import { useSlashMenu } from './rte/composables/useSlashMenu'
+import { useMentionMenu } from './rte/composables/useMentionMenu'
+import { useFloatMenus } from './rte/composables/useFloatMenus'
+import { useOverlayStack } from './rte/composables/useOverlayStack'
+import { useViewMode } from './rte/composables/useViewMode'
+import { useBlockHandle } from './rte/composables/useBlockHandle'
+import { useImageTools } from './rte/composables/useImageTools'
 import { RTE_EMOJI_CATEGORIES } from '../utils/rteEmojiList'
 import { RTE_SPECIAL_CHAR_CATEGORIES } from '../utils/rteSpecialChars'
 
@@ -257,60 +233,110 @@ function onTitleInput(event: Event) {
 }
 
 /** 表格菜单状态（须在 useEditor 之前声明，供 contextmenu 回调闭包使用） */
-const tableMenuOpen = ref(false)
-const tableOpsSheetOpen = ref(false)
-const tableCtx = ref<{ open: boolean; x: number; y: number }>({
-  open: false,
-  x: 0,
-  y: 0,
+const {
+  tableMenuOpen,
+  tableOpsSheetOpen,
+  tableCtx,
+  closeTableCtx,
+  openTableContextMenu,
+  tableHeaderSticky,
+  copyCurrentTable,
+  promptTableRowFilter,
+  setTableCellBg,
+  setTableCellBorderColor,
+  setTableCellBorderStyle,
+  tableDialogOpen,
+  tableQuickOpen,
+  tableQuickHover,
+  tableQuickCells,
+  tableRows,
+  tableCols,
+  tableGridHover,
+  TABLE_GRID_MAX_ROWS,
+  TABLE_GRID_MAX_COLS,
+  onTableGridHover,
+  onTableGridLeave,
+  pickTableGridSize,
+  openTableDialog,
+  closeTableDialog,
+  onTableRowsInput,
+  onTableColsInput,
+  stepTableRows,
+  stepTableCols,
+  confirmInsertTable,
+  isInTable,
+  closeTableMenu,
+  insertQuickTable,
+  onTableQuickKeydown,
+  closeTableOpsSheet,
+  tableAddRowBefore,
+  tableAddRowAfter,
+  tableAddColBefore,
+  tableAddColAfter,
+  tableOpItems,
+  onTableToolClick,
+  onTableToolbarButtonClick,
+} = useTableOps({
+  editor: () => editor,
+  viewMode: () => viewMode,
+  moreOpen: () => moreOpen,
+  headingOpen: () => headingOpen,
+  listOpen: () => listOpen,
+  formOpen: () => formOpen,
+  colorOpen: () => colorOpen,
+  highlightOpen: () => highlightOpen,
+  alignOpen: () => alignOpen,
+  closeImportMenu: () => {
+    closeImportMenu()
+  },
+  closeExportMenu: () => {
+    closeExportMenu()
+  },
+  closeFontMenus: () => {
+    closeFontMenus()
+  },
+  focusOpenDialog: () => {
+    focusOpenDialog()
+  },
+  announceRte: (msg) => {
+    announceRte(msg)
+  },
+  rteToast: (type, message) => {
+    rteToast(type, message)
+  },
+  openRtePrompt: (opts) => openRtePrompt(opts),
 })
-
-function closeTableCtx() {
-  if (!tableCtx.value.open) return
-  tableCtx.value = { ...tableCtx.value, open: false }
-}
-
-function openTableContextMenu(event: MouseEvent) {
-  tableCtx.value = {
-    open: true,
-    x: event.clientX,
-    y: event.clientY,
-  }
-  tableMenuOpen.value = false
-  tableOpsSheetOpen.value = false
-}
 
 /** —— Slash「/」命令菜单状态（须在 useEditor 前声明，供 Suggestion 闭包） —— */
-const slashOpen = ref(false)
-const slashItems = ref<RteSlashItem[]>([])
-const slashIndex = ref(0)
-const slashQuery = ref('')
-const slashMenuStyle = ref<Record<string, string>>({
-  position: 'fixed',
-  left: '0px',
-  top: '0px',
-  visibility: 'hidden',
-  zIndex: '5300',
+const {
+  slashOpen,
+  slashItems,
+  slashIndex,
+  slashQuery,
+  slashMenuStyle,
+  slashMenuEl,
+  slashUi,
+  pickSlashItem,
+} = useSlashMenu({
+  editor: () => editor,
+  applySlashCommandItem,
 })
-let slashSelectItem: ((item: RteSlashItem) => void) | null = null
-let slashClientRectFn: (() => DOMRect | null) | null = null
-const slashMenuEl = ref<HTMLElement | null>(null)
+void slashMenuEl
 
 /** —— @提及建议菜单（与 Slash 同定位模式；候选见 rteMentionItems） —— */
-const mentionOpen = ref(false)
-const mentionItems = ref<RteMentionItem[]>([])
-const mentionIndex = ref(0)
-const mentionQuery = ref('')
-const mentionMenuStyle = ref<Record<string, string>>({
-  position: 'fixed',
-  top: '0px',
-  left: '0px',
-  visibility: 'hidden',
-  zIndex: '10050',
+const {
+  mentionOpen,
+  mentionItems,
+  mentionIndex,
+  mentionQuery,
+  mentionMenuStyle,
+  mentionMenuEl,
+  mentionUi,
+  pickMentionItem,
+} = useMentionMenu({
+  editor: () => editor,
 })
-let mentionCommand: ((item: RteMentionItem) => void) | null = null
-let mentionClientRectFn: (() => DOMRect | null) | null = null
-const mentionMenuEl = ref<HTMLElement | null>(null)
+void mentionMenuEl
 
 /** 粘贴为纯文本（工具栏开关；影响后续粘贴） */
 const pastePlainTextMode = ref(false)
@@ -376,7 +402,6 @@ const editorZoom = ref(1)
 const focusMode = ref(false)
 const darkEditor = ref(false)
 const paperGuide = ref(false)
-const tableHeaderSticky = ref(false)
 const sensitiveOn = ref(false)
 const revisionOn = ref(false)
 const footnotePanelOpen = ref(false)
@@ -405,7 +430,6 @@ watch(xrefQuery, () => {
   xrefIndex.value = 0
 })
 const readTimeDialogOpen = ref(false)
-const tableFilterQuery = ref('')
 const imageCompressOnInsert = ref(true)
 /** 本会话是否已提示过 Word 粘贴清理 */
 let wordPasteHinted = false
@@ -458,291 +482,6 @@ const activeSpecialCharList = computed(() => {
   const cat = RTE_SPECIAL_CHAR_CATEGORIES.find((c) => c.id === specialCharTabId.value)
   return cat?.chars ?? RTE_SPECIAL_CHAR_CATEGORIES[0]?.chars ?? []
 })
-
-function placeSlashMenuFromRect(rect: DOMRect | null) {
-  const el = slashMenuEl.value
-  if (!el || !rect) {
-    slashMenuStyle.value = {
-      ...slashMenuStyle.value,
-      visibility: 'hidden',
-    }
-    return
-  }
-  const vw = window.innerWidth
-  const vh = window.innerHeight
-  const pad = 8
-  const gap = 4
-  // 先显隐测量
-  el.style.visibility = 'hidden'
-  el.style.left = '0px'
-  el.style.top = '0px'
-  el.style.maxHeight = 'none'
-  const mw = Math.max(el.offsetWidth, 280)
-  const mh = Math.max(el.offsetHeight, 1)
-  const spaceBelow = vh - rect.bottom - pad
-  const spaceAbove = rect.top - pad
-  const preferBelow = spaceBelow >= Math.min(mh, 240) || spaceBelow >= spaceAbove
-  let maxH: number
-  let top: number
-  if (preferBelow) {
-    maxH = Math.max(140, spaceBelow - gap)
-    top = rect.bottom + gap
-  } else {
-    maxH = Math.max(140, spaceAbove - gap)
-    const usedH = Math.min(mh, maxH)
-    top = rect.top - gap - usedH
-  }
-  let left = rect.left
-  if (left + mw > vw - pad) left = vw - pad - mw
-  if (left < pad) left = pad
-  if (top < pad) top = pad
-  if (top + Math.min(mh, maxH) > vh - pad) {
-    top = Math.max(pad, vh - pad - Math.min(mh, maxH))
-  }
-  slashMenuStyle.value = {
-    position: 'fixed',
-    left: `${Math.round(left)}px`,
-    top: `${Math.round(top)}px`,
-    maxHeight: `${Math.round(maxH)}px`,
-    visibility: 'visible',
-    zIndex: '5300',
-  }
-}
-
-const SLASH_RECENT_KEY = 'metamatrix-rte-slash-recent'
-
-function loadRecentSlash(): string[] {
-  try {
-    const raw = JSON.parse(localStorage.getItem(SLASH_RECENT_KEY) || '[]') as unknown
-    return Array.isArray(raw) ? raw.filter((id) => typeof id === 'string') : []
-  } catch {
-    return []
-  }
-}
-
-function rememberSlash(id: string) {
-  try {
-    localStorage.setItem(SLASH_RECENT_KEY, JSON.stringify(pushRecentSlash(loadRecentSlash(), id)))
-  } catch {
-    /* 隐私模式忽略 */
-  }
-}
-
-function syncSlashFromProps(props: RteSlashRenderProps) {
-  slashItems.value = orderSlashForMenu(props.items, props.query, loadRecentSlash())
-  slashQuery.value = props.query
-  slashSelectItem = props.command
-  slashClientRectFn = props.clientRect ?? null
-  if (slashIndex.value >= props.items.length) {
-    slashIndex.value = Math.max(0, props.items.length - 1)
-  }
-  const rect = props.clientRect?.() ?? null
-  nextTick(() => {
-    placeSlashMenuFromRect(rect)
-    // 选中项滚入视野
-    const active = slashMenuEl.value?.querySelector?.('.rte-slash-item.is-active') as HTMLElement | null
-    active?.scrollIntoView?.({ block: 'nearest' })
-  })
-}
-
-function closeSlashMenu() {
-  slashOpen.value = false
-  slashItems.value = []
-  slashIndex.value = 0
-  slashQuery.value = ''
-  slashSelectItem = null
-  slashClientRectFn = null
-  slashMenuStyle.value = {
-    ...slashMenuStyle.value,
-    visibility: 'hidden',
-  }
-}
-
-const slashUi: RteSlashUiHandlers = {
-  onStart(props) {
-    slashOpen.value = true
-    slashIndex.value = 0
-    syncSlashFromProps(props)
-  },
-  onUpdate(props) {
-    if (!slashOpen.value) slashOpen.value = true
-    syncSlashFromProps(props)
-  },
-  onExit() {
-    closeSlashMenu()
-  },
-  onKeyDown({ event }) {
-    if (!slashOpen.value) return false
-    const slashNext = stepMenuIndex(slashIndex.value, slashItems.value.length, event.key)
-    if (slashNext != null || event.key === 'Home' || event.key === 'End' || event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-      event.preventDefault()
-      if (slashNext != null) slashIndex.value = slashNext
-      nextTick(() => {
-        const active = slashMenuEl.value?.querySelector?.('.rte-slash-item.is-active') as HTMLElement | null
-        active?.scrollIntoView?.({ block: 'nearest' })
-      })
-      return true
-    }
-    if (event.key === 'Enter') {
-      event.preventDefault()
-      const item = slashItems.value[slashIndex.value]
-      if (item && slashSelectItem) slashSelectItem(item)
-      return true
-    }
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      const ed = editor.value
-      if (ed && !ed.isDestroyed) {
-        try {
-          exitSuggestion(ed.view, slashPluginKey)
-        } catch {
-          closeSlashMenu()
-        }
-      } else {
-        closeSlashMenu()
-      }
-      return true
-    }
-    return false
-  },
-  onCommand(item) {
-    applySlashCommandItem(item)
-  },
-}
-
-function pickSlashItem(item: RteSlashItem) {
-  rememberSlash(item.id)
-  if (slashSelectItem) slashSelectItem(item)
-  else applySlashCommandItem(item)
-}
-
-function placeMentionMenuFromRect(rect: DOMRect | null) {
-  const el = mentionMenuEl.value
-  if (!el || !rect) {
-    mentionMenuStyle.value = {
-      ...mentionMenuStyle.value,
-      visibility: 'hidden',
-    }
-    return
-  }
-  const gap = 4
-  const vw = window.innerWidth
-  const vh = window.innerHeight
-  const menuW = el.offsetWidth || 280
-  const menuH = el.offsetHeight || 200
-  let left = rect.left
-  if (left + menuW > vw - 8) left = Math.max(8, vw - menuW - 8)
-  if (left < 8) left = 8
-  const spaceBelow = vh - rect.bottom
-  const spaceAbove = rect.top
-  let top: number
-  let maxH: number
-  if (spaceBelow >= Math.min(menuH, 180) || spaceBelow >= spaceAbove) {
-    maxH = Math.max(140, spaceBelow - gap)
-    top = rect.bottom + gap
-  } else {
-    maxH = Math.max(140, spaceAbove - gap)
-    const usedH = Math.min(menuH, maxH)
-    top = rect.top - gap - usedH
-  }
-  mentionMenuStyle.value = {
-    position: 'fixed',
-    top: `${Math.max(8, top)}px`,
-    left: `${left}px`,
-    maxHeight: `${maxH}px`,
-    visibility: 'visible',
-    zIndex: '10050',
-  }
-}
-
-function syncMentionFromProps(props: RteMentionRenderProps) {
-  mentionItems.value = props.items
-  mentionQuery.value = props.query
-  mentionCommand = props.command
-  mentionClientRectFn = props.clientRect ?? null
-  if (mentionIndex.value >= props.items.length) {
-    mentionIndex.value = Math.max(0, props.items.length - 1)
-  }
-}
-
-function closeMentionMenu() {
-  mentionOpen.value = false
-  mentionItems.value = []
-  mentionIndex.value = 0
-  mentionQuery.value = ''
-  mentionCommand = null
-  mentionClientRectFn = null
-  mentionMenuStyle.value = {
-    ...mentionMenuStyle.value,
-    visibility: 'hidden',
-  }
-}
-
-const mentionUi: RteMentionUiHandlers = {
-  onStart(props) {
-    mentionOpen.value = true
-    mentionIndex.value = 0
-    syncMentionFromProps(props)
-    nextTick(() => placeMentionMenuFromRect(mentionClientRectFn?.() ?? null))
-  },
-  onUpdate(props) {
-    if (!mentionOpen.value) mentionOpen.value = true
-    syncMentionFromProps(props)
-    nextTick(() => placeMentionMenuFromRect(mentionClientRectFn?.() ?? null))
-  },
-  onExit() {
-    closeMentionMenu()
-  },
-  onKeyDown({ event }) {
-    if (!mentionOpen.value) return false
-    const mentionNext = stepMenuIndex(mentionIndex.value, mentionItems.value.length, event.key)
-    if (
-      mentionNext != null ||
-      event.key === 'Home' ||
-      event.key === 'End' ||
-      event.key === 'ArrowDown' ||
-      event.key === 'ArrowUp'
-    ) {
-      event.preventDefault()
-      if (mentionNext != null) mentionIndex.value = mentionNext
-      nextTick(() => {
-        const active = mentionMenuEl.value?.querySelector?.('.rte-mention-item.is-active') as HTMLElement | null
-        active?.scrollIntoView?.({ block: 'nearest' })
-      })
-      return true
-    }
-    if (event.key === 'Enter') {
-      event.preventDefault()
-      const item = mentionItems.value[mentionIndex.value]
-      if (item && mentionCommand) mentionCommand(item)
-      return true
-    }
-    if (event.key === 'Escape') {
-      const ed = editor.value
-      if (ed) {
-        try {
-          exitSuggestion(ed.view, mentionPluginKey)
-        } catch {
-          closeMentionMenu()
-        }
-      } else {
-        closeMentionMenu()
-      }
-      return true
-    }
-    return false
-  },
-}
-
-function pickMentionItem(item: RteMentionItem) {
-  if (mentionCommand) mentionCommand(item)
-}
-
-function repositionMentionMenu() {
-  if (!mentionOpen.value) return
-  placeMentionMenuFromRect(mentionClientRectFn?.() ?? null)
-}
-
 
 const editorReady = ref(false)
 const editorBootError = ref('')
@@ -2547,48 +2286,6 @@ async function insertQrCode() {
   moreOpen.value = false
 }
 
-function applyCellValign(v: string) {
-  const ed = editor.value
-  if (!ed || !isInTable()) {
-    ElMessage.info('请在表格单元格内操作')
-    return
-  }
-  setCellVerticalAlign(ed, v || null)
-  moreOpen.value = false
-}
-
-function doSortTable(asc: boolean) {
-  const ed = editor.value
-  if (!ed || !isInTable()) {
-    ElMessage.info('请将光标放在表格中')
-    return
-  }
-  const col = currentTableColIndex(ed)
-  if (sortTableByColumn(ed, col, asc)) {
-    ElMessage.success(`已按第 ${col + 1} 列${asc ? '升序' : '降序'}排序`)
-  } else {
-    ElMessage.warning('排序失败（需至少 2 行）')
-  }
-  moreOpen.value = false
-}
-
-function doTableSumRow() {
-  const ed = editor.value
-  if (!ed || !isInTable()) {
-    ElMessage.info('请将光标放在表格中')
-    return
-  }
-  if (upsertTableSumRow(ed)) ElMessage.success('已更新合计行')
-  else ElMessage.warning('无法生成合计行')
-  moreOpen.value = false
-}
-
-function toggleTableStickyHeader() {
-  tableHeaderSticky.value = !tableHeaderSticky.value
-  ElMessage.success(tableHeaderSticky.value ? '已开启表头冻结' : '已关闭表头冻结')
-  moreOpen.value = false
-}
-
 function speakSelection() {
   const ed = editor.value
   if (!ed) return
@@ -2859,33 +2556,6 @@ function insertMentionFromToolbar() {
   ed.chain().focus().insertContent('@').run()
   moreOpen.value = false
   ElMessage.info('已插入 @，请继续选择提及对象')
-}
-
-async function copyCurrentTable(format: 'csv' | 'tsv') {
-  const ed = editor.value
-  if (!ed) return
-  const ok = await copyTableAs(ed, format)
-  if (!ok) ElMessage.info('请将光标放在表格中')
-  else ElMessage.success(format === 'csv' ? '已复制为 CSV' : '已复制为 TSV')
-  moreOpen.value = false
-}
-
-async function promptTableRowFilter() {
-  const ed = editor.value
-  if (!ed) return
-  const raw = await openRtePrompt({
-    title: '表格行筛选',
-    message: '输入关键词隐藏不含该词的数据行；留空则清除筛选（仅视图，不改文档）',
-    defaultValue: tableFilterQuery.value,
-    placeholder: '关键词',
-    maxlength: 80,
-  })
-  if (raw == null) return
-  tableFilterQuery.value = raw.trim()
-  const hidden = applyTableRowFilter(ed, tableFilterQuery.value)
-  if (hidden < 0) ElMessage.info('请将光标放在表格中')
-  else if (!tableFilterQuery.value) ElMessage.success('已清除行筛选')
-  else ElMessage.success(`已隐藏 ${hidden} 行`)
 }
 
 function runHeadingHierarchyCheck() {
@@ -3479,351 +3149,32 @@ function toggleBlockquote() {
   chain()?.toggleBlockquote().run()
 }
 
-/** —— 块操作：全选当前块 / 复制块 / 上移下移 —— */
-function getTopLevelBlockRange(): { from: number; to: number; node: { type: { name: string }; nodeSize: number; copy: (c?: unknown) => unknown } } | null {
-  const ed = editor.value
-  if (!ed) return null
-  const { $from } = ed.state.selection
-  if ($from.depth < 1) return null
-  const depth = 1
-  const from = $from.before(depth)
-  const node = $from.node(depth)
-  return { from, to: from + node.nodeSize, node: node as any }
-}
-
-function selectCurrentBlock() {
-  const ed = editor.value
-  const range = getTopLevelBlockRange()
-  if (!ed || !range) {
-    ElMessage.warning('无法选中当前块')
-    return
-  }
-  try {
-    ed.view.dispatch(
-      ed.state.tr.setSelection(NodeSelection.create(ed.state.doc, range.from)),
-    )
-    ed.view.focus()
-  } catch {
-    ed.chain().focus().setTextSelection({ from: range.from, to: range.to }).run()
-  }
-}
-
-function duplicateCurrentBlock() {
-  const ed = editor.value
-  const range = getTopLevelBlockRange()
-  if (!ed || !range) {
-    ElMessage.warning('无法复制当前块')
-    return
-  }
-  const copy = range.node.copy((range.node as any).content)
-  const tr = ed.state.tr.insert(range.to, copy as any)
-  ed.view.dispatch(tr.scrollIntoView())
-  ed.view.focus()
-  ElMessage.success('已复制当前块')
-}
-
-function moveCurrentBlock(dir: -1 | 1) {
-  const ed = editor.value
-  if (!ed) return
-  const { $from } = ed.state.selection
-  if ($from.depth < 1) return
-  const index = $from.index(0)
-  const doc = ed.state.doc
-  const targetIndex = index + dir
-  if (targetIndex < 0 || targetIndex >= doc.childCount) {
-    ElMessage.info(dir < 0 ? '已在最顶部' : '已在最底部')
-    return
-  }
-  const children: ReturnType<typeof doc.child>[] = []
-  doc.forEach((child) => {
-    children.push(child)
-  })
-  const [moved] = children.splice(index, 1)
-  children.splice(targetIndex, 0, moved)
-  const copies = children.map((c) => c.copy(c.content))
-  let tr = ed.state.tr
-  tr = tr.replaceWith(0, doc.content.size, Fragment.from(copies))
-  let selPos = 0
-  for (let i = 0; i < targetIndex; i += 1) selPos += children[i].nodeSize
-  try {
-    tr = tr.setSelection(NodeSelection.create(tr.doc, selPos)).scrollIntoView()
-  } catch {
-    /* ignore */
-  }
-  ed.view.dispatch(tr)
-  ed.view.focus()
-}
-
-function moveTopLevelBlock(from: number, toGap: number) {
-  const ed = editor.value
-  if (!ed) return
-  const doc = ed.state.doc
-  const order = reorderIndexes(doc.childCount, from, toGap)
-  if (!order) return
-  const children: Array<ReturnType<typeof doc.child>> = []
-  doc.forEach((child) => {
-    children.push(child)
-  })
-  const copies = order.map((index) => {
-    const node = children[index]!
-    return node.copy(node.content)
-  })
-  let tr = ed.state.tr.replaceWith(0, doc.content.size, Fragment.from(copies))
-  let selPos = 0
-  const dest = toGap > from ? toGap - 1 : toGap
-  for (let i = 0; i < dest; i += 1) selPos += copies[i]!.nodeSize
-  try {
-    tr = tr.setSelection(NodeSelection.create(tr.doc, selPos)).scrollIntoView()
-  } catch {
-    /* 选区落在原子块上失败时仍保留新顺序 */
-  }
-  ed.view.dispatch(tr)
-  ed.view.focus()
-}
-
-const blockHandle = ref({ visible: false, top: 0, left: 0, index: -1 })
-const blockDropLine = ref<number | null>(null)
-let blockDragFrom = -1
-let blockDropGap = 0
-
-function topLevelBlockElements(canvas: HTMLElement): HTMLElement[] {
-  const prose = canvas.querySelector('.ProseMirror')
-  if (!prose) return []
-  return Array.from(prose.children).filter((el): el is HTMLElement => el instanceof HTMLElement)
-}
-
-function blockGapAt(canvas: HTMLElement, clientY: number) {
-  const blocks = topLevelBlockElements(canvas)
-  const canvasRect = canvas.getBoundingClientRect()
-  let gap = blocks.length
-  for (let i = 0; i < blocks.length; i += 1) {
-    const rect = blocks[i]!.getBoundingClientRect()
-    if (clientY < rect.top + rect.height / 2) {
-      gap = i
-      break
-    }
-  }
-  const edge =
-    gap >= blocks.length
-      ? (blocks.at(-1)?.getBoundingClientRect().bottom ?? canvasRect.top)
-      : blocks[gap]!.getBoundingClientRect().top
-  return { gap, line: edge - canvasRect.top + canvas.scrollTop }
-}
-
-const blockMenuOpen = ref(false)
-const blockMenuIndex = ref(-1)
-const bubbleSwatch = ref<'text' | 'highlight' | null>(null)
-
-function onCanvasBlockHover(event: MouseEvent) {
-  if (viewMode.value !== 'edit' || blockDragFrom >= 0) return
-  const target = event.target as HTMLElement | null
-  if (target?.closest?.('.rte-block-menu, .rte-block-tools')) return
-  const canvas = event.currentTarget as HTMLElement
-  const blocks = topLevelBlockElements(canvas)
-  const canvasRect = canvas.getBoundingClientRect()
-  let index = -1
-  for (let i = 0; i < blocks.length; i += 1) {
-    const rect = blocks[i]!.getBoundingClientRect()
-    if (event.clientY >= rect.top && event.clientY <= rect.bottom) {
-      index = i
-      const left = Math.max(4, rect.left - canvasRect.left - 28)
-      blockHandle.value = {
-        visible: true,
-        top: rect.top - canvasRect.top + canvas.scrollTop,
-        left,
-        index,
-      }
-      return
-    }
-  }
-  blockHandle.value = { ...blockHandle.value, visible: false, index: -1 }
-}
-
-function hideBlockHandle() {
-  if (blockDragFrom >= 0) return
-  blockHandle.value = { ...blockHandle.value, visible: false, index: -1 }
-  blockMenuOpen.value = false
-}
-
-function toggleBlockMenu() {
-  if (blockMenuOpen.value && blockMenuIndex.value === blockHandle.value.index) {
-    blockMenuOpen.value = false
-    return
-  }
-  blockMenuIndex.value = blockHandle.value.index
-  blockMenuOpen.value = blockMenuIndex.value >= 0
-  if (blockMenuOpen.value) focusBlockMenuSoon()
-}
-
-function placeBlockToolsAtIndex(index: number) {
-  const canvas = rteRootEl.value?.querySelector('.rte-canvas') as HTMLElement | null
-  if (!canvas) return
-  const el = topLevelBlockElements(canvas)[index]
-  if (!el) return
-  const canvasRect = canvas.getBoundingClientRect()
-  const rect = el.getBoundingClientRect()
-  blockHandle.value = {
-    visible: true,
-    top: rect.top - canvasRect.top + canvas.scrollTop,
-    left: Math.max(4, rect.left - canvasRect.left - 52),
-    index,
-  }
-}
-
-function focusBlockMenuSoon() {
-  void nextTick(() => {
-    const btn = rteRootEl.value?.querySelector(
-      '.rte-block-menu [role="menuitem"]',
-    ) as HTMLButtonElement | null
-    btn?.focus()
-  })
-}
-
-function openBlockMenuForSelection() {
-  const ed = editor.value
-  if (!ed || viewMode.value !== 'edit') return
-  const index = ed.state.selection.$from.index(0)
-  placeBlockToolsAtIndex(index)
-  blockMenuIndex.value = index
-  blockMenuOpen.value = true
-  focusBlockMenuSoon()
-}
-
-function onBlockMenuKeydown(event: KeyboardEvent) {
-  const menu = event.currentTarget as HTMLElement
-  const items = Array.from(menu.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'))
-  const current = items.indexOf(document.activeElement as HTMLButtonElement)
-  if (event.key === 'Escape') {
-    event.preventDefault()
-    blockMenuOpen.value = false
-    editor.value?.commands.focus()
-    return
-  }
-  if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
-  event.preventDefault()
-  if (!items.length) return
-  const next =
-    event.key === 'ArrowDown'
-      ? (current + 1) % items.length
-      : (current - 1 + items.length) % items.length
-  items[next]?.focus()
-}
-
-function focusTopLevelBlock(index: number): boolean {
-  const ed = editor.value
-  if (!ed) return false
-  if (index < 0 || index >= ed.state.doc.childCount) return false
-  let pos = 0
-  ed.state.doc.forEach((_node, offset, i) => {
-    if (i === index) pos = offset
-  })
-  const node = ed.state.doc.child(index)
-  const inside = Math.min(pos + 1, Math.max(pos, pos + node.nodeSize - 1))
-  try {
-    ed.chain().focus().setTextSelection(inside).run()
-    return true
-  } catch {
-    return false
-  }
-}
-
-type BlockTurn =
-  | 'paragraph'
-  | 'h1'
-  | 'h2'
-  | 'h3'
-  | 'bullet'
-  | 'ordered'
-  | 'task'
-  | 'quote'
-  | 'info'
-  | 'warn'
-  | 'success'
-  | 'error'
-
-function turnHoveredBlock(kind: BlockTurn) {
-  const index = blockMenuIndex.value
-  if (!focusTopLevelBlock(index)) return
-  const ed = editor.value
-  if (!ed) return
-  const chain = ed.chain().focus()
-  if (kind === 'paragraph') chain.setParagraph()
-  else if (kind === 'h1') chain.setHeading({ level: 1 })
-  else if (kind === 'h2') chain.setHeading({ level: 2 })
-  else if (kind === 'h3') chain.setHeading({ level: 3 })
-  else if (kind === 'bullet' && !ed.isActive('bulletList')) chain.toggleBulletList()
-  else if (kind === 'ordered' && !ed.isActive('orderedList')) chain.toggleOrderedList()
-  else if (kind === 'task' && !ed.isActive('taskList')) chain.toggleTaskList()
-  else if (kind === 'quote' && !ed.isActive('blockquote')) chain.toggleBlockquote()
-  else if (kind === 'info' || kind === 'warn' || kind === 'success' || kind === 'error') {
-    chain.setCallout(kind)
-  }
-  chain.run()
-  blockMenuOpen.value = false
-}
-
-function copyHoveredBlock() {
-  if (!focusTopLevelBlock(blockMenuIndex.value)) return
-  duplicateCurrentBlock()
-  blockMenuOpen.value = false
-}
-
-function deleteHoveredBlock() {
-  const ed = editor.value
-  const index = blockMenuIndex.value
-  if (!ed || index < 0 || index >= ed.state.doc.childCount) return
-  let pos = 0
-  ed.state.doc.forEach((_node, offset, i) => {
-    if (i === index) pos = offset
-  })
-  const node = ed.state.doc.child(index)
-  if (ed.state.doc.childCount <= 1) {
-    ed.chain().focus().setContent('<p></p>').run()
-  } else {
-    ed.view.dispatch(ed.state.tr.delete(pos, pos + node.nodeSize))
-    ed.view.focus()
-  }
-  blockMenuOpen.value = false
-  blockHandle.value = { ...blockHandle.value, visible: false, index: -1 }
-}
-
-function moveHoveredBlock(dir: -1 | 1) {
-  if (!focusTopLevelBlock(blockMenuIndex.value)) return
-  moveCurrentBlock(dir)
-  blockMenuOpen.value = false
-}
-
-function onBlockDragStart(event: DragEvent) {
-  blockDragFrom = blockHandle.value.index
-  event.dataTransfer?.setData('application/x-rte-block', String(blockDragFrom))
-  if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move'
-}
-
-function onBlockDragEnd() {
-  blockDragFrom = -1
-  blockDropLine.value = null
-}
-
-function onCanvasBlockDragOver(event: DragEvent) {
-  if (blockDragFrom < 0) return
-  event.preventDefault()
-  if (event.dataTransfer) event.dataTransfer.dropEffect = 'move'
-  const metrics = blockGapAt(event.currentTarget as HTMLElement, event.clientY)
-  blockDropGap = metrics.gap
-  blockDropLine.value = metrics.line
-}
-
-function onCanvasBlockDrop(event: DragEvent) {
-  if (blockDragFrom < 0) return
-  event.preventDefault()
-  event.stopPropagation()
-  const from = blockDragFrom
-  const gap = blockDropGap
-  blockDragFrom = -1
-  blockDropLine.value = null
-  blockHandle.value = { ...blockHandle.value, visible: false, index: -1 }
-  moveTopLevelBlock(from, gap)
-}
+const {
+  selectCurrentBlock,
+  duplicateCurrentBlock,
+  moveCurrentBlock,
+  blockHandle,
+  blockDropLine,
+  blockMenuOpen,
+  bubbleSwatch,
+  onCanvasBlockHover,
+  hideBlockHandle,
+  toggleBlockMenu,
+  openBlockMenuForSelection,
+  onBlockMenuKeydown,
+  turnHoveredBlock,
+  copyHoveredBlock,
+  deleteHoveredBlock,
+  moveHoveredBlock,
+  onBlockDragStart,
+  onBlockDragEnd,
+  onCanvasBlockDragOver,
+  onCanvasBlockDrop,
+} = useBlockHandle({
+  editor,
+  viewMode: () => viewMode,
+  rteRootEl,
+})
 
 const codeChrome = ref<{ top: number; left: number } | null>(null)
 
@@ -3905,93 +3256,22 @@ const listDepthLabel = computed(() => {
   return d > 0 ? `当前层级 ${d}` : ''
 })
 
-/** —— 图片对齐 / 题注 —— */
-const imageBubbleCaption = ref('')
-const IMAGE_LAYOUT_OPTIONS: Array<{
-  id: string
-  label: string
-  align: 'left' | 'center' | 'right'
-  layout: 'block' | 'wrap-left' | 'wrap-right'
-}> = [
-  { id: 'center', label: '居中', align: 'center', layout: 'block' },
-  { id: 'left', label: '居左', align: 'left', layout: 'block' },
-  { id: 'right', label: '居右', align: 'right', layout: 'block' },
-  { id: 'wrap-left', label: '左环绕', align: 'left', layout: 'wrap-left' },
-  { id: 'wrap-right', label: '右环绕', align: 'right', layout: 'wrap-right' },
-]
-
-function isImageNodeSelected(): boolean {
-  const ed = editor.value
-  if (!ed) return false
-  const sel = ed.state.selection
-  return sel instanceof NodeSelection && sel.node.type.name === 'image'
-}
-
-function syncImageBubbleCaption() {
-  const ed = editor.value
-  if (!ed || !isImageNodeSelected()) {
-    imageBubbleCaption.value = ''
-    return
-  }
-  const cap = ed.getAttributes('image')?.caption
-  imageBubbleCaption.value = typeof cap === 'string' ? cap : ''
-}
-
-function setImagePlacement(option: (typeof IMAGE_LAYOUT_OPTIONS)[number]) {
-  const ed = editor.value
-  if (!ed || !isImageNodeSelected()) return
-  ed.chain()
-    .focus()
-    .updateAttributes('image', { align: option.align, layout: option.layout })
-    .run()
-}
-
-const imageLightboxSrc = ref('')
-
-function deleteSelectedImage() {
-  const ed = editor.value
-  if (!ed || !isImageNodeSelected()) return
-  ed.chain().focus().deleteSelection().run()
-}
-
-function downloadSelectedImage() {
-  const ed = editor.value
-  if (!ed || !isImageNodeSelected()) return
-  const attrs = ed.getAttributes('image')
-  const src = String(attrs?.src || '')
-  if (!src) return
-  const link = document.createElement('a')
-  link.href = src
-  link.download = String(attrs?.alt || 'image')
-  link.click()
-}
-
-function openSelectedImage() {
-  const ed = editor.value
-  if (!ed || !isImageNodeSelected()) return
-  imageLightboxSrc.value = String(ed.getAttributes('image')?.src || '')
-}
-
-function applyImageCaption() {
-  const ed = editor.value
-  if (!ed || !isImageNodeSelected()) return
-  const caption = imageBubbleCaption.value.trim()
-  ed.chain()
-    .focus()
-    .updateAttributes('image', { caption: caption || null })
-    .run()
-}
-
-function imageBubbleShouldShow(payload: {
-  editor: { isDestroyed?: boolean; isEditable?: boolean; state?: { selection: unknown } }
-}): boolean {
-  if (viewMode.value !== 'edit') return false
-  const ed = payload?.editor
-  if (!ed || ed.isDestroyed || ed.isEditable === false) return false
-  const sel = ed.state?.selection
-  if (!(sel instanceof NodeSelection) || (sel as NodeSelection).node.type.name !== 'image') return false
-  return true
-}
+const {
+  imageBubbleCaption,
+  IMAGE_LAYOUT_OPTIONS,
+  isImageNodeSelected,
+  syncImageBubbleCaption,
+  setImagePlacement,
+  imageLightboxSrc,
+  deleteSelectedImage,
+  downloadSelectedImage,
+  openSelectedImage,
+  applyImageCaption,
+  imageBubbleShouldShow,
+} = useImageTools({
+  editor,
+  viewMode: () => viewMode,
+})
 
 /** —— 分割线样式 —— */
 const hrOpen = ref(false)
@@ -4003,24 +3283,6 @@ function insertHrVariant(variant: RteHrVariant) {
   ed.chain().focus().insertContent({ type: 'horizontalRule', attrs: { variant } }).run()
   hrOpen.value = false
   moreOpen.value = false
-}
-
-/** —— 表格单元格背景 / 边框 —— */
-function setTableCellBg(color: string) {
-  const ed = editor.value
-  if (!ed || !isInTable()) return
-  const value = color || null
-  ed.chain().focus().setCellAttribute('backgroundColor', value).run()
-}
-function setTableCellBorderColor(color: string) {
-  const ed = editor.value
-  if (!ed || !isInTable()) return
-  ed.chain().focus().setCellAttribute('borderColor', color || null).run()
-}
-function setTableCellBorderStyle(style: string) {
-  const ed = editor.value
-  if (!ed || !isInTable()) return
-  ed.chain().focus().setCellAttribute('borderStyle', style || null).run()
 }
 
 async function copyCurrentLinkUrl() {
@@ -4457,126 +3719,27 @@ const selectedFormAttrs = computed(() => {
   return { ...node.attrs } as Record<string, unknown>
 })
 
-/** 最大化浮层三种视图：编辑 / 预览 / 源码 */
-type RteViewMode = 'edit' | 'preview' | 'source'
-const VIEW_MODE_OPTIONS: { id: RteViewMode; label: string; icon: string; title: string }[] = [
-  { id: 'edit', label: '编辑', icon: '✎', title: '编辑' },
-  { id: 'preview', label: '预览', icon: '◎', title: '只读预览（Ctrl/⌘+Alt+\\）' },
-  { id: 'source', label: '源码', icon: '</>', title: '查看 HTML 源码' },
-]
-const viewMode = ref<RteViewMode>('edit')
-
-watch(
-  () => editor.value?.state.selection,
-  () => {
-    syncCodeChrome()
+const {
+  VIEW_MODE_OPTIONS,
+  viewMode,
+  sourceHtml,
+  sourceDirty,
+  applySourceHtmlToEditor,
+  bubbleShouldShow,
+  setViewMode,
+  onSourceInput,
+  applySourceNow,
+} = useViewMode({
+  editor,
+  props,
+  emit,
+  isImageNodeSelected,
+  syncCodeChrome,
+  formInspectorPinned,
+  setLastEmitted: (norm: string) => {
+    lastEmittedHtmlNorm = norm
   },
-)
-const sourceHtml = ref('')
-const sourceDirty = ref(false)
-
-function getLiveEditorHtml(): string {
-  const ed = editor.value
-  if (!ed) return props.modelValue || '<p></p>'
-  return ed.getHTML()
-}
-
-/** 将源码写回 TipTap，并同步父级 modelValue（与 onUpdate 对齐） */
-function applySourceHtmlToEditor(raw: string, opts?: { focus?: boolean }) {
-  const ed = editor.value
-  if (!ed || ed.isDestroyed) return false
-  const next = toEditorContent(raw)
-  try {
-    ed.commands.setContent(next, { emitUpdate: false })
-  } catch (err) {
-    console.warn('[RTE] applySourceHtmlToEditor setContent failed', err)
-    return false
-  }
-  const html = ed.getHTML()
-  lastEmittedHtmlNorm = normalizeHtml(html)
-  emit('update:modelValue', html)
-  sourceDirty.value = false
-  if (opts?.focus !== false && viewMode.value === 'edit') {
-    try {
-      ed.commands.focus('end')
-    } catch {
-      /* ignore */
-    }
-  }
-  return true
-}
-
-function syncEditorEditableForMode(mode: RteViewMode) {
-  const ed = editor.value
-  if (!ed || ed.isDestroyed) return
-  try {
-    ed.setEditable(mode === 'edit')
-  } catch {
-    /* editor view 可能尚未就绪 */
-  }
-}
-
-/** BubbleMenu 常驻挂载（仅 editor 就绪），非编辑态不展示，避免 v-if 拆装触发 Vue emitsOptions null */
-function bubbleShouldShow(payload: {
-  editor: {
-    isDestroyed?: boolean
-    isEditable?: boolean
-    isActive?: (name: string) => boolean
-  }
-  from: number
-  to: number
-}): boolean {
-  if (viewMode.value !== 'edit') return false
-  const ed = payload?.editor
-  if (!ed || ed.isDestroyed || ed.isEditable === false) return false
-  // 图片节点选中时改走图片气泡
-  if (isImageNodeSelected()) return false
-  const groupSel = editor.value?.state.selection
-  if (groupSel instanceof NodeSelection && groupSel.node.type.name === 'imageGroup') return false
-  // 有选区，或光标落在链接内（便于编辑/取消链接）
-  if (payload.from !== payload.to) return true
-  return !!ed.isActive?.('link')
-}
-
-function setViewMode(next: RteViewMode) {
-  if (next === viewMode.value) return
-  const prev = viewMode.value
-
-  // 离开源码：先把 textarea 写回编辑器，再切模式
-  if (prev === 'source' && next !== 'source') {
-    applySourceHtmlToEditor(sourceHtml.value, { focus: next === 'edit' })
-  }
-
-  if (next === 'source') {
-    const raw = getLiveEditorHtml()
-    // 轻量换行，便于阅读；写回时 normalizeHtml / TipTap parse 不受影响
-    sourceHtml.value = raw.replace(/></g, '>\n<')
-    sourceDirty.value = false
-  }
-
-  viewMode.value = next
-  syncEditorEditableForMode(next)
-  // 预览↔编辑切换时强制刷新表单条件显示（setEditable 不一定触发 docChanged）
-  nextTick(() => {
-    const ed = editor.value
-    if (ed && !ed.isDestroyed) applyFormShowIfVisibility(ed)
-  })
-
-  if (next !== 'edit') {
-    // 预览/源码不展示表单属性面板
-    formInspectorPinned.value = false
-  }
-}
-
-function onSourceInput(event: Event) {
-  sourceHtml.value = (event.target as HTMLTextAreaElement).value
-  sourceDirty.value = true
-}
-
-function applySourceNow() {
-  applySourceHtmlToEditor(sourceHtml.value, { focus: false })
-  sourceHtml.value = getLiveEditorHtml()
-}
+})
 
 onBeforeUnmount(() => {
   if (viewMode.value === 'source') {
@@ -4592,16 +3755,6 @@ onBeforeUnmount(() => {
     clearTimeout(docChromeTimer)
     docChromeTimer = null
   }
-  document.removeEventListener('pointerdown', onDocPointerDownForMenus, true)
-  window.removeEventListener('keydown', onWindowEscape)
-  window.removeEventListener('resize', repositionSlashMenu)
-  window.removeEventListener('scroll', repositionSlashMenu, true)
-  window.removeEventListener('resize', repositionMentionMenu)
-  window.removeEventListener('scroll', repositionMentionMenu, true)
-  for (const t of menuCloseTimers.values()) clearTimeout(t)
-  menuCloseTimers.clear()
-  floatMenuEls.clear()
-  floatAnchors.clear()
   if (editor.value && !editor.value.isDestroyed) editor.value.destroy()
 })
 
@@ -4845,660 +3998,64 @@ function confirmInsertLink() {
 }
 
 /** —— 插入图片 —— */
-type ImageDialogTab = 'personal' | 'external'
-type ImageCategory = { id: string; name: string }
-type StoredImage = {
-  id: string
-  src: string
-  name: string
-  categoryId: string
-  createdAt: number
-}
-
-const IMAGE_CAT_LS = 'metamatrix-rte-image-categories'
-const IMAGE_ASSET_LS = 'metamatrix-rte-image-assets'
-
-const imageDialogOpen = ref(false)
-const imageDialogTab = ref<ImageDialogTab>('personal')
-const imageSidebarKey = ref<'all' | 'uncategorized' | string>('all')
-const imageCategories = ref<ImageCategory[]>([])
-const imageAssets = ref<StoredImage[]>([])
-const imageSelectedIds = ref<Set<string>>(new Set())
-const imageSelectAll = ref(false)
-const imageExternalUrls = ref('')
-const imageFileInputRef = ref<HTMLInputElement | null>(null)
-const addingCategory = ref(false)
-const newCategoryName = ref('')
-
-function loadImageStore() {
-  try {
-    const cats = JSON.parse(localStorage.getItem(IMAGE_CAT_LS) || '[]') as ImageCategory[]
-    const assets = JSON.parse(localStorage.getItem(IMAGE_ASSET_LS) || '[]') as StoredImage[]
-    imageCategories.value = Array.isArray(cats) ? cats : []
-    imageAssets.value = Array.isArray(assets) ? assets : []
-  } catch {
-    imageCategories.value = []
-    imageAssets.value = []
-  }
-}
-
-function saveImageStore() {
-  try {
-    localStorage.setItem(IMAGE_CAT_LS, JSON.stringify(imageCategories.value))
-    localStorage.setItem(IMAGE_ASSET_LS, JSON.stringify(imageAssets.value))
-  } catch {
-    /* quota / private mode */
-  }
-}
-
-const filteredImageAssets = computed(() => {
-  const key = imageSidebarKey.value
-  if (key === 'all') return imageAssets.value
-  if (key === 'uncategorized') {
-    return imageAssets.value.filter((a) => !a.categoryId || a.categoryId === 'uncategorized')
-  }
-  return imageAssets.value.filter((a) => a.categoryId === key)
-})
-
-function resetImageDialog() {
-  imageDialogTab.value = 'personal'
-  imageSidebarKey.value = 'all'
-  imageSelectedIds.value = new Set()
-  imageSelectAll.value = false
-  imageExternalUrls.value = ''
-  addingCategory.value = false
-  newCategoryName.value = ''
-}
-
-function openImageDialog() {
-  loadImageStore()
-  resetImageDialog()
-  imageDialogOpen.value = true
-  moreOpen.value = false
-}
-
-function closeImageDialog() {
-  imageDialogOpen.value = false
-  resetImageDialog()
-}
-
-function insertImage() {
-  openImageDialog()
-}
-
-function uid() {
-  return `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 9)}`
-}
-
-/** 弹层 z-index 4100+，默认 ElMessage(~3000) 会被挡住，导致「点确定没反应」 */
-function rteToast(
-  type: 'success' | 'warning' | 'error' | 'info',
-  message: string,
-) {
-  ElMessage({ type, message, zIndex: 5000, duration: 2800 })
-}
-
-const VIDEO_EXT_RE = /\.(mp4|webm|mov|m4v|ogg|ogv|mkv)$/i
-const ATTACH_MAX_BYTES = MAX_ATTACHMENT_BYTES
-const VIDEO_MAX_BYTES = 50 * 1024 * 1024
-
-function isVideoFile(file: File): boolean {
-  if (file.type && file.type.startsWith('video/')) return true
-  return VIDEO_EXT_RE.test(file.name || '')
-}
-
-function currentCategoryIdForUpload() {
-  const key = imageSidebarKey.value
-  if (key === 'all' || key === 'uncategorized') return 'uncategorized'
-  return key
-}
-
-function toggleImageSelect(id: string) {
-  const next = new Set(imageSelectedIds.value)
-  if (next.has(id)) next.delete(id)
-  else next.add(id)
-  imageSelectedIds.value = next
-  imageSelectAll.value =
-    filteredImageAssets.value.length > 0 &&
-    filteredImageAssets.value.every((a) => next.has(a.id))
-}
-
-function onImageSelectAllChange() {
-  const checked = !imageSelectAll.value
-  imageSelectAll.value = checked
-  if (checked) {
-    imageSelectedIds.value = new Set(filteredImageAssets.value.map((a) => a.id))
-  } else {
-    imageSelectedIds.value = new Set()
-  }
-}
-
-function startAddCategory() {
-  addingCategory.value = true
-  newCategoryName.value = ''
-}
-
-function confirmAddCategory() {
-  const name = newCategoryName.value.trim()
-  if (!name) {
-    addingCategory.value = false
-    return
-  }
-  if (imageCategories.value.some((c) => c.name === name)) {
-    rteToast('warning', '分类已存在')
-    return
-  }
-  const cat: ImageCategory = { id: uid(), name }
-  imageCategories.value = [...imageCategories.value, cat]
-  saveImageStore()
-  imageSidebarKey.value = cat.id
-  addingCategory.value = false
-  newCategoryName.value = ''
-}
-
-function triggerLocalImagePick() {
-  imageFileInputRef.value?.click()
-}
-
-function readFileAsDataURL(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(String(reader.result || ''))
-    reader.onerror = () => reject(reader.error)
-    reader.readAsDataURL(file)
-  })
-}
-
-function imageFilesFromClipboard(
-  data: DataTransfer | null | undefined,
-): File[] {
-  if (!data) return []
-  const out: File[] = []
-  const files = Array.from(data.files || [])
-  for (const file of files) {
-    if (file.type.startsWith('image/')) out.push(file)
-  }
-  if (out.length) return out
-  const items = Array.from(data.items || [])
-  for (const item of items) {
-    if (item.kind !== 'file' || !item.type.startsWith('image/')) continue
-    const file = item.getAsFile()
-    if (file) out.push(file)
-  }
-  return out
-}
-
-/** 图片遵守面板附件同一条 3MB DataURL 上限；过大时先尝试压缩。 */
-async function imageSrcWithinPolicy(file: File): Promise<string | null> {
-  const name = file.name || 'image.png'
-  const mime = file.type || 'image/png'
-  const typeReason = attachmentRejectReason(name, mime, 1)
-  if (typeReason) {
-    rteToast('warning', typeReason)
-    return null
-  }
-  const oversized = file.size > MAX_ATTACHMENT_BYTES
-  let src = ''
-  if (oversized || imageCompressOnInsert.value) {
-    try {
-      src = (await compressImageFile(file, { maxEdge: 1600, quality: 0.82 })).dataUrl
-    } catch {
-      if (oversized) {
-        rteToast('warning', attachmentRejectReason(name, mime, file.size) || '图片超过 3MB')
-        return null
-      }
-      src = await readFileAsDataURL(file)
-    }
-  } else {
-    src = await readFileAsDataURL(file)
-  }
-  if (!src || dataUrlExceedsAttachmentLimit(src)) {
-    rteToast('warning', '图片超过 3MB，未插入。可先压缩，或改用链接。')
-    return null
-  }
-  return src
-}
-
-async function replaceOrInsertDroppedImages(
-  view: {
-    state: {
-      doc: {
-        resolve: (pos: number) => {
-          pos: number
-          nodeBefore: { type: { name: string }; nodeSize: number } | null
-          nodeAfter: { type: { name: string } } | null
-        }
-        nodeAt: (pos: number) => { attrs: Record<string, unknown> } | null
-      }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      tr: { setNodeMarkup: (pos: number, type: null, attrs: Record<string, unknown>) => any }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    dispatch: (tr: any) => void
+const {
+  imageDialogOpen,
+  imageDialogTab,
+  imageSidebarKey,
+  imageCategories,
+  imageSelectedIds,
+  imageSelectAll,
+  imageExternalUrls,
+  imageFileInputRef,
+  addingCategory,
+  newCategoryName,
+  filteredImageAssets,
+  closeImageDialog,
+  insertImage,
+  uid,
+  rteToast,
+  ATTACH_MAX_BYTES,
+  toggleImageSelect,
+  onImageSelectAllChange,
+  startAddCategory,
+  confirmAddCategory,
+  triggerLocalImagePick,
+  readFileAsDataURL,
+  imageFilesFromClipboard,
+  replaceOrInsertDroppedImages,
+  insertDroppedBeside,
+  insertUserImages,
+  onLocalImageFilesChange,
+  confirmInsertImages,
+  videoDialogOpen,
+  videoDialogTab,
+  videoSidebarKey,
+  videoCategories,
+  videoSelectedIds,
+  videoSelectAll,
+  videoExternalUrls,
+  videoFileInputRef,
+  videoAddingCategory,
+  videoNewCategoryName,
+  filteredVideoAssets,
+  closeVideoDialog,
+  insertVideo,
+  toggleVideoSelect,
+  onVideoSelectAllChange,
+  startAddVideoCategory,
+  confirmAddVideoCategory,
+  triggerLocalVideoPick,
+  onLocalVideoFilesChange,
+  confirmInsertVideos,
+} = useMediaLibrary({
+  editor,
+  closeMore: () => {
+    moreOpen.value = false
   },
-  files: File[],
-  at?: number,
-) {
-  if (at != null && files[0]) {
-    const $pos = view.state.doc.resolve(at)
-    const side = imageReplaceSide($pos.nodeBefore?.type.name, $pos.nodeAfter?.type.name)
-    if (side) {
-      const src = await imageSrcWithinPolicy(files[0])
-      if (!src) return
-      const imagePos =
-        side === 'after' ? $pos.pos : $pos.pos - ($pos.nodeBefore?.nodeSize || 0)
-      const node = view.state.doc.nodeAt(imagePos)
-      if (node) {
-        view.dispatch(
-          view.state.tr.setNodeMarkup(imagePos, null, { ...node.attrs, src }),
-        )
-        return
-      }
-    }
-  }
-  await insertUserImages(files, at)
-}
-
-async function insertDroppedBeside(imagePos: number, side: 'left' | 'right', files: File[]) {
-  const ed = editor.value
-  if (!ed || ed.isDestroyed) return
-  const nodes = []
-  for (const file of files) {
-    const src = await imageSrcWithinPolicy(file)
-    if (!src) continue
-    nodes.push(ed.schema.nodes.image!.create({ src, align: 'center', layout: 'block', alt: file.name || '图片' }))
-  }
-  if (!nodes.length) return
-  if (!insertImagesBeside(ed.view, imagePos, side, nodes)) rteToast('warning', '一行最多 10 张图片')
-}
-
-async function insertUserImages(files: File[], at?: number) {
-  const srcs: string[] = []
-  for (const file of files) {
-    const src = await imageSrcWithinPolicy(file)
-    if (src) srcs.push(src)
-  }
-  if (!srcs.length) return
-  const ed = editor.value
-  if (!ed || ed.isDestroyed) return
-  const nodes = srcs.map((src) => ({
-    type: 'image' as const,
-    attrs: { src, align: 'center', layout: 'block' },
-  }))
-  const chain = ed.chain().focus()
-  let atPos = at
-  if (atPos == null && ed.state.selection instanceof NodeSelection) atPos = ed.state.selection.to
-  if (atPos != null) chain.insertContentAt(atPos, nodes)
-  else chain.insertContent(nodes)
-  chain.run()
-}
-
-async function onLocalImageFilesChange(event: Event) {
-  const input = event.target as HTMLInputElement
-  const files = Array.from(input.files || []).filter((f) => f.type.startsWith('image/'))
-  input.value = ''
-  if (!files.length) {
-    rteToast('warning', '请选择图片文件')
-    return
-  }
-  const catId = currentCategoryIdForUpload()
-  const added: StoredImage[] = []
-  for (const file of files) {
-    try {
-      const src = await imageSrcWithinPolicy(file)
-      if (!src) continue
-      added.push({
-        id: uid(),
-        src,
-        name: file.name,
-        categoryId: catId,
-        createdAt: Date.now(),
-      })
-    } catch {
-      /* skip broken file */
-    }
-  }
-  if (!added.length) {
-    rteToast('error', '图片读取失败')
-    return
-  }
-  imageAssets.value = [...added, ...imageAssets.value]
-  saveImageStore()
-  const next = new Set(imageSelectedIds.value)
-  added.forEach((a) => next.add(a.id))
-  imageSelectedIds.value = next
-  // MVP：本地上传后直接插入编辑器
-  insertImageSrcs(added.map((a) => a.src))
-  closeImageDialog()
-  rteToast('success', `已插入 ${added.length} 张图片`)
-}
-
-function parseExternalImageUrls(raw: string): string[] {
-  const lines = raw
-    .split(/[\n\r]+/)
-    .map((s) => s.trim())
-    .filter(Boolean)
-  const urls: string[] = []
-  const seen = new Set<string>()
-  for (const line of lines) {
-    // also allow space/comma separated on one line
-    const parts = line.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean)
-    for (const part of parts) {
-      if (!/^https?:\/\//i.test(part)) continue
-      if (seen.has(part)) continue
-      seen.add(part)
-      urls.push(part)
-    }
-  }
-  return urls
-}
-
-function insertImageSrcs(srcs: string[]) {
-  const ed = editor.value
-  if (!ed || !srcs.length) return
-  // 多张一次插入：同一段落内并排；默认宽度便于同行展示（仍可拖拽锚点缩放）
-  const multi = srcs.length > 1
-  const defaultWidth = multi ? Math.max(140, Math.floor(560 / Math.min(srcs.length, 4))) : null
-  const nodes = srcs.map((src) => ({
-    type: 'image' as const,
-    attrs: defaultWidth ? { src, width: defaultWidth } : { src },
-  }))
-  ed.chain().focus().insertContent(nodes).run()
-}
-
-function confirmInsertImages() {
-  if (imageDialogTab.value === 'external') {
-    const urls = parseExternalImageUrls(imageExternalUrls.value)
-    if (!urls.length) {
-      rteToast('warning', '请输入至少一个有效的图片 URL（http/https，每行一个）')
-      return
-    }
-    insertImageSrcs(urls)
-    closeImageDialog()
-    rteToast('success', `已插入 ${urls.length} 张图片`)
-    return
-  }
-  const selected = imageAssets.value.filter((a) => imageSelectedIds.value.has(a.id))
-  if (!selected.length) {
-    rteToast('warning', '请选择图片，或使用「本地图片上传」')
-    return
-  }
-  insertImageSrcs(selected.map((a) => a.src))
-  closeImageDialog()
-  rteToast('success', `已插入 ${selected.length} 张图片`)
-}
-
-/** —— 插入视频（与图片弹窗同构） —— */
-type VideoDialogTab = 'personal' | 'external'
-type VideoCategory = { id: string; name: string }
-type StoredVideo = {
-  id: string
-  src: string
-  name: string
-  categoryId: string
-  createdAt: number
-}
-
-const VIDEO_CAT_LS = 'metamatrix-rte-video-categories'
-const VIDEO_ASSET_LS = 'metamatrix-rte-video-assets'
-
-const videoDialogOpen = ref(false)
-const videoDialogTab = ref<VideoDialogTab>('personal')
-const videoSidebarKey = ref<'all' | 'uncategorized' | string>('all')
-const videoCategories = ref<VideoCategory[]>([])
-const videoAssets = ref<StoredVideo[]>([])
-const videoSelectedIds = ref<Set<string>>(new Set())
-const videoSelectAll = ref(false)
-const videoExternalUrls = ref('')
-const videoFileInputRef = ref<HTMLInputElement | null>(null)
-const videoAddingCategory = ref(false)
-const videoNewCategoryName = ref('')
-
-function loadVideoStore() {
-  try {
-    const cats = JSON.parse(localStorage.getItem(VIDEO_CAT_LS) || '[]') as VideoCategory[]
-    const assets = JSON.parse(localStorage.getItem(VIDEO_ASSET_LS) || '[]') as StoredVideo[]
-    videoCategories.value = Array.isArray(cats) ? cats : []
-    videoAssets.value = Array.isArray(assets) ? assets.filter((a) => !!a.src) : []
-  } catch {
-    videoCategories.value = []
-    videoAssets.value = []
-  }
-}
-
-function saveVideoStore() {
-  try {
-    localStorage.setItem(VIDEO_CAT_LS, JSON.stringify(videoCategories.value))
-    // blob: 仅会话有效，不落库；http(s) 可持久。DataURL 过大则丢弃 src 以免撑爆配额
-    const persistable = videoAssets.value
-      .filter((a) => a.src && !a.src.startsWith('blob:'))
-      .map((a) =>
-        a.src.startsWith('data:') && a.src.length > 400_000
-          ? { ...a, src: '' }
-          : a,
-      )
-      .filter((a) => !!a.src)
-      .slice(0, 40)
-    localStorage.setItem(VIDEO_ASSET_LS, JSON.stringify(persistable))
-  } catch {
-    try {
-      localStorage.setItem(VIDEO_CAT_LS, JSON.stringify(videoCategories.value))
-      const light = videoAssets.value
-        .filter((a) => /^https?:\/\//i.test(a.src))
-        .slice(0, 30)
-      localStorage.setItem(VIDEO_ASSET_LS, JSON.stringify(light))
-    } catch {
-      /* private mode */
-    }
-  }
-}
-
-const filteredVideoAssets = computed(() => {
-  const key = videoSidebarKey.value
-  if (key === 'all') return videoAssets.value
-  if (key === 'uncategorized') {
-    return videoAssets.value.filter((a) => !a.categoryId || a.categoryId === 'uncategorized')
-  }
-  return videoAssets.value.filter((a) => a.categoryId === key)
+  imageCompressOnInsert,
 })
-
-function resetVideoDialog() {
-  videoDialogTab.value = 'personal'
-  videoSidebarKey.value = 'all'
-  videoSelectedIds.value = new Set()
-  videoSelectAll.value = false
-  videoExternalUrls.value = ''
-  videoAddingCategory.value = false
-  videoNewCategoryName.value = ''
-}
-
-function openVideoDialog() {
-  loadVideoStore()
-  resetVideoDialog()
-  videoDialogOpen.value = true
-  moreOpen.value = false
-}
-
-function closeVideoDialog() {
-  videoDialogOpen.value = false
-  resetVideoDialog()
-}
-
-function insertVideo() {
-  openVideoDialog()
-}
-
-function currentVideoCategoryIdForUpload() {
-  const key = videoSidebarKey.value
-  if (key === 'all' || key === 'uncategorized') return 'uncategorized'
-  return key
-}
-
-function toggleVideoSelect(id: string) {
-  const next = new Set(videoSelectedIds.value)
-  if (next.has(id)) next.delete(id)
-  else next.add(id)
-  videoSelectedIds.value = next
-  videoSelectAll.value =
-    filteredVideoAssets.value.length > 0 &&
-    filteredVideoAssets.value.every((a) => next.has(a.id))
-}
-
-function onVideoSelectAllChange() {
-  const checked = !videoSelectAll.value
-  videoSelectAll.value = checked
-  if (checked) {
-    videoSelectedIds.value = new Set(filteredVideoAssets.value.map((a) => a.id))
-  } else {
-    videoSelectedIds.value = new Set()
-  }
-}
-
-function startAddVideoCategory() {
-  videoAddingCategory.value = true
-  videoNewCategoryName.value = ''
-}
-
-function confirmAddVideoCategory() {
-  const name = videoNewCategoryName.value.trim()
-  if (!name) {
-    videoAddingCategory.value = false
-    return
-  }
-  if (videoCategories.value.some((c) => c.name === name)) {
-    rteToast('warning', '分类已存在')
-    return
-  }
-  const cat: VideoCategory = { id: uid(), name }
-  videoCategories.value = [...videoCategories.value, cat]
-  saveVideoStore()
-  videoSidebarKey.value = cat.id
-  videoAddingCategory.value = false
-  videoNewCategoryName.value = ''
-}
-
-function triggerLocalVideoPick() {
-  videoFileInputRef.value?.click()
-}
-
-async function onLocalVideoFilesChange(event: Event) {
-  const input = event.target as HTMLInputElement
-  const rawFiles = Array.from(input.files || [])
-  input.value = ''
-  const files = rawFiles.filter(isVideoFile)
-  if (!files.length) {
-    rteToast('warning', '请选择视频文件（mp4 / webm / mov 等）')
-    return
-  }
-  const catId = currentVideoCategoryIdForUpload()
-  const added: StoredVideo[] = []
-  let skippedSize = 0
-  for (const file of files) {
-    if (file.size > VIDEO_MAX_BYTES) {
-      skippedSize += 1
-      rteToast(
-        'warning',
-        `${file.name} 超过 ${Math.round(VIDEO_MAX_BYTES / (1024 * 1024))}MB，已跳过`,
-      )
-      continue
-    }
-    try {
-      // 视频用 blob URL：避免 DataURL 撑爆内存 / localStorage，插入仍可用
-      const src = URL.createObjectURL(file)
-      if (!src) continue
-      added.push({
-        id: uid(),
-        src,
-        name: file.name,
-        categoryId: catId,
-        createdAt: Date.now(),
-      })
-    } catch {
-      /* skip */
-    }
-  }
-  if (!added.length) {
-    rteToast(
-      'error',
-      skippedSize ? '所选视频均超出大小限制' : '视频读取失败，请换 mp4/webm/mov 再试',
-    )
-    return
-  }
-  videoAssets.value = [...added, ...videoAssets.value]
-  saveVideoStore()
-  const next = new Set(videoSelectedIds.value)
-  added.forEach((a) => next.add(a.id))
-  videoSelectedIds.value = next
-  // 与图片一致：本地上传后直接插入并关闭；库保存失败也不影响本次插入
-  insertVideoSrcs(added.map((a) => a.src))
-  closeVideoDialog()
-  rteToast('success', `已插入 ${added.length} 个视频`)
-}
-
-function parseExternalVideoUrls(raw: string): string[] {
-  const lines = raw
-    .split(/[\n\r]+/)
-    .map((s) => s.trim())
-    .filter(Boolean)
-  const urls: string[] = []
-  const seen = new Set<string>()
-  for (const line of lines) {
-    const parts = line.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean)
-    for (const part of parts) {
-      if (!/^https?:\/\//i.test(part)) continue
-      if (seen.has(part)) continue
-      seen.add(part)
-      urls.push(part)
-    }
-  }
-  return urls
-}
-
-function insertVideoSrcs(srcs: string[]) {
-  const ed = editor.value
-  const valid = (srcs || []).map((s) => (s || '').trim()).filter(Boolean)
-  if (!ed || !valid.length) return
-  // 与 insertImageSrcs 同构：一次 insertContent 多个 inline video 节点
-  const multi = valid.length > 1
-  const defaultWidth = multi ? Math.max(140, Math.floor(560 / Math.min(valid.length, 4))) : null
-  const nodes = valid.map((src) => ({
-    type: 'video' as const,
-    attrs: defaultWidth
-      ? { src, controls: true, width: defaultWidth }
-      : { src, controls: true },
-  }))
-  ed.chain().focus().insertContent(nodes).run()
-}
-
-function confirmInsertVideos() {
-  if (videoDialogTab.value === 'external') {
-    const urls = parseExternalVideoUrls(videoExternalUrls.value)
-    if (!urls.length) {
-      rteToast('warning', '请输入至少一个有效的视频 URL（http/https，每行一个）')
-      return
-    }
-    insertVideoSrcs(urls)
-    closeVideoDialog()
-    rteToast('success', `已插入 ${urls.length} 个视频`)
-    return
-  }
-  const selected = videoAssets.value.filter((a) => videoSelectedIds.value.has(a.id))
-  if (!selected.length) {
-    rteToast('warning', '请选择视频，或使用「本地视频上传」')
-    return
-  }
-  const usable = selected.map((a) => a.src).filter((s) => !!s && String(s).trim())
-  if (!usable.length) {
-    rteToast('warning', '所选视频缺少文件数据，请重新上传')
-    return
-  }
-  insertVideoSrcs(usable)
-  closeVideoDialog()
-  rteToast('success', `已插入 ${usable.length} 个视频`)
-}
-
-/** —— 公式编辑器 —— */
-type FormulaMode = 'inline' | 'display'
+void imageFileInputRef
+void videoFileInputRef
 
 const FORMULA_SYMBOL_GROUPS: { title: string; items: { label: string; tex: string }[] }[] = [
   {
@@ -5577,6 +4134,7 @@ const FORMULA_SYMBOL_GROUPS: { title: string; items: { label: string; tex: strin
   },
 ]
 
+type FormulaMode = 'inline' | 'display'
 const formulaDialogOpen = ref(false)
 const formulaMode = ref<FormulaMode>('inline')
 const formulaTex = ref('')
@@ -5603,109 +4161,41 @@ function focusOpenDialog() {
   })
 }
 
-function closeTopOverlay(): boolean {
-  const id = topOpenModal(
-    {
-      ask: askOpen.value,
-      linkImport: linkImportOpen.value,
-      image: imageDialogOpen.value,
-      video: videoDialogOpen.value,
-      formula: formulaDialogOpen.value,
-      table: tableDialogOpen.value,
-      note: noteDialogOpen.value,
-      attach: attachDialogOpen.value,
-      snippet: snippetDialogOpen.value,
-      xref: xrefDialogOpen.value,
-      readTime: readTimeDialogOpen.value,
-      linkCard: linkCardDialogOpen.value,
-      wave21: wave21ReportOpen.value,
-      find: findDialogOpen.value,
-      link: linkDialogOpen.value,
-      print: printPreviewOpen.value,
-      wordCount: wordCountDockOpen.value,
-      shortcuts: shortcutsOpen.value,
-      blockMenu: blockMenuOpen.value,
-      notes: notesOpen.value,
-      history: historyOpen.value,
-    },
-    RTE_OVERLAY_CLOSE_ORDER,
-  )
-  if (!id) return false
-  switch (id) {
-    case 'ask':
-      closeAskDialog('cancel')
-      break
-    case 'linkImport':
-      closeImportLinkDialog()
-      break
-    case 'image':
-      closeImageDialog()
-      break
-    case 'video':
-      closeVideoDialog()
-      break
-    case 'formula':
-      closeFormulaDialog()
-      break
-    case 'table':
-      closeTableDialog()
-      break
-    case 'note':
-      closeNoteDialog()
-      break
-    case 'attach':
-      closeAttachDialog()
-      break
-    case 'snippet':
-      snippetDialogOpen.value = false
-      break
-    case 'xref':
-      xrefDialogOpen.value = false
-      break
-    case 'readTime':
-      readTimeDialogOpen.value = false
-      break
-    case 'linkCard':
-      closeLinkCardDialog()
-      break
-    case 'wave21':
-      wave21ReportOpen.value = false
-      break
-    case 'find':
-      closeFindDialog()
-      break
-    case 'link':
-      closeLinkDialog()
-      break
-    case 'print':
-      closePrintPreview()
-      break
-    case 'wordCount':
-      wordCountDockOpen.value = false
-      break
-    case 'shortcuts':
-      shortcutsOpen.value = false
-      break
-    case 'blockMenu':
-      blockMenuOpen.value = false
-      break
-    case 'notes':
-      notesOpen.value = false
-      break
-    case 'history':
-      historyOpen.value = false
-      break
-    default:
-      return false
-  }
-  return true
-}
-
-function onWindowEscape(event: KeyboardEvent) {
-  if (event.key !== 'Escape' || event.defaultPrevented) return
-  if (!closeTopOverlay()) return
-  event.preventDefault()
-}
+useOverlayStack({
+  askOpen: () => askOpen,
+  linkImportOpen: () => linkImportOpen,
+  imageDialogOpen: () => imageDialogOpen,
+  videoDialogOpen: () => videoDialogOpen,
+  formulaDialogOpen: () => formulaDialogOpen,
+  tableDialogOpen: () => tableDialogOpen,
+  noteDialogOpen: () => noteDialogOpen,
+  attachDialogOpen: () => attachDialogOpen,
+  snippetDialogOpen: () => snippetDialogOpen,
+  xrefDialogOpen: () => xrefDialogOpen,
+  readTimeDialogOpen: () => readTimeDialogOpen,
+  linkCardDialogOpen: () => linkCardDialogOpen,
+  wave21ReportOpen: () => wave21ReportOpen,
+  findDialogOpen: () => findDialogOpen,
+  linkDialogOpen: () => linkDialogOpen,
+  printPreviewOpen: () => printPreviewOpen,
+  wordCountDockOpen: () => wordCountDockOpen,
+  shortcutsOpen: () => shortcutsOpen,
+  blockMenuOpen: () => blockMenuOpen,
+  notesOpen: () => notesOpen,
+  historyOpen: () => historyOpen,
+  closeAskDialog: (...args) => closeAskDialog(...args),
+  closeImportLinkDialog: (...args) => closeImportLinkDialog(...args),
+  closeImageDialog: (...args) => closeImageDialog(...args),
+  closeVideoDialog: (...args) => closeVideoDialog(...args),
+  closeFormulaDialog: (...args) => closeFormulaDialog(...args),
+  closeTableDialog: (...args) => closeTableDialog(...args),
+  closeNoteDialog: (...args) => closeNoteDialog(...args),
+  closeAttachDialog: (...args) => closeAttachDialog(...args),
+  closeLinkCardDialog: (...args) => closeLinkCardDialog(...args),
+  closeFindDialog: (...args) => closeFindDialog(...args),
+  closeLinkDialog: (...args) => closeLinkDialog(...args),
+  closePrintPreview: (...args) => closePrintPreview(...args),
+})
 
 function openFormulaDialog() {
   resetFormulaDialog()
@@ -5805,407 +4295,6 @@ function confirmInsertFormula() {
     ed.chain().focus().insertMathInline({ tex }).run()
   }
   closeFormulaDialog()
-}
-
-/** —— 插入表格 —— */
-const tableDialogOpen = ref(false)
-const tableQuickOpen = ref(false)
-const tableQuickHover = ref({ rows: 0, cols: 0 })
-const tableQuickCells = Array.from({ length: TABLE_QUICK_ROWS * TABLE_QUICK_COLS }, (_, index) => ({
-  r: Math.floor(index / TABLE_QUICK_COLS) + 1,
-  c: (index % TABLE_QUICK_COLS) + 1,
-}))
-const tableRows = ref(3)
-const tableCols = ref(3)
-/** 尺寸网格悬停预览（Word 风格） */
-const tableGridHover = ref({ rows: 0, cols: 0 })
-const TABLE_GRID_MAX_ROWS = 8
-const TABLE_GRID_MAX_COLS = 20
-
-function resetTableDialog() {
-  tableRows.value = 3
-  tableCols.value = 3
-  tableGridHover.value = { rows: 0, cols: 0 }
-}
-
-function onTableGridHover(r: number, c: number) {
-  tableGridHover.value = { rows: r, cols: c }
-  // 悬停即同步行/列数字输入（选择后更改对应数字）
-  tableRows.value = clampInt(r, 1, 100)
-  tableCols.value = clampInt(c, 1, TABLE_GRID_MAX_COLS)
-}
-
-function onTableGridLeave() {
-  tableGridHover.value = { rows: 0, cols: 0 }
-}
-
-function pickTableGridSize(r: number, c: number) {
-  tableRows.value = clampInt(r, 1, 100)
-  tableCols.value = clampInt(c, 1, TABLE_GRID_MAX_COLS)
-  tableGridHover.value = { rows: r, cols: c }
-  confirmInsertTable()
-}
-
-function openTableDialog() {
-  resetTableDialog()
-  tableDialogOpen.value = true
-  moreOpen.value = false
-  focusOpenDialog()
-  tableMenuOpen.value = false
-  tableOpsSheetOpen.value = false
-  closeTableCtx()
-}
-
-function closeTableDialog() {
-  tableDialogOpen.value = false
-  resetTableDialog()
-}
-
-function clampInt(v: number, min: number, max: number) {
-  if (Number.isNaN(v)) return min
-  return Math.min(max, Math.max(min, Math.trunc(v)))
-}
-
-function onTableRowsInput(event: Event) {
-  const raw = (event.target as HTMLInputElement).value
-  const n = parseInt(raw, 10)
-  tableRows.value = clampInt(Number.isNaN(n) ? 1 : n, 1, 100)
-}
-
-function onTableColsInput(event: Event) {
-  const raw = (event.target as HTMLInputElement).value
-  const n = parseInt(raw, 10)
-  tableCols.value = clampInt(Number.isNaN(n) ? 1 : n, 1, TABLE_GRID_MAX_COLS)
-}
-
-function stepTableRows(delta: number) {
-  tableRows.value = clampInt(tableRows.value + delta, 1, 100)
-}
-
-function stepTableCols(delta: number) {
-  tableCols.value = clampInt(tableCols.value + delta, 1, TABLE_GRID_MAX_COLS)
-}
-
-function confirmInsertTable() {
-  const ed = editor.value
-  if (!ed) return
-  const rows = clampInt(tableRows.value, 1, 100)
-  const cols = clampInt(tableCols.value, 1, TABLE_GRID_MAX_COLS)
-  tableRows.value = rows
-  tableCols.value = cols
-  closeAllTableUi()
-  // 优先在当前光标插入；失败时落到文末再试（嵌套块/异常选区）
-  const opts = { rows, cols, withHeaderRow: true }
-  let ok = ed.chain().focus().insertTable(opts).run()
-  if (!ok) {
-    ok = ed.chain().focus('end').insertTable(opts).run()
-  }
-  if (!ok) {
-    rteToast('warning', '无法插入表格，请将光标放到正文段落后再试')
-    return
-  }
-  closeTableDialog()
-}
-
-/** —— 表格内常用操作（合并/拆分/插删行列） —— */
-type TableOpItem = {
-  key: string
-  label: string
-  run: () => void
-  disabled?: () => boolean
-  danger?: boolean
-  sepBefore?: boolean
-}
-
-function isInTable() {
-  return editor.value?.isActive('table') ?? false
-}
-
-function canMergeCells() {
-  return editor.value?.can().mergeCells() ?? false
-}
-
-function canSplitCell() {
-  return editor.value?.can().splitCell() ?? false
-}
-
-function closeTableMenu() {
-  tableMenuOpen.value = false
-  tableQuickOpen.value = false
-}
-
-watch(tableQuickOpen, (open) => {
-  if (!open) return
-  nextTick(() => {
-    const el = document.querySelector('.rte-table-quick')
-    if (el instanceof HTMLElement) el.focus()
-  })
-})
-
-function insertQuickTable(rows: number, cols: number) {
-  if (viewMode.value !== 'edit') return
-  tableRows.value = rows
-  tableCols.value = cols
-  tableQuickHover.value = { rows, cols }
-  tableQuickOpen.value = false
-  confirmInsertTable()
-}
-
-function onTableQuickKeydown(event: KeyboardEvent) {
-  const next = moveTableGridHover(tableQuickHover.value, event.key)
-  if (next == null) return
-  event.preventDefault()
-  event.stopPropagation()
-  if (next === 'close') {
-    closeTableMenu()
-    return
-  }
-  if (next === 'insert') {
-    const rows = tableQuickHover.value.rows || 1
-    const cols = tableQuickHover.value.cols || 1
-    insertQuickTable(rows, cols)
-    return
-  }
-  tableQuickHover.value = next
-}
-
-function closeTableOpsSheet() {
-  tableOpsSheetOpen.value = false
-}
-
-function closeAllTableUi() {
-  closeTableMenu()
-  closeTableOpsSheet()
-  closeTableCtx()
-}
-
-function runTableCommand(command: () => boolean) {
-  const ed = editor.value
-  if (!ed) return
-  // 保持 CellSelection：菜单已 @mousedown.prevent，勿额外打乱选区
-  command()
-  closeAllTableUi()
-}
-
-function tableAddRowBefore() {
-  runTableCommand(() => editor.value!.chain().focus().addRowBefore().run())
-}
-function tableAddRowAfter() {
-  runTableCommand(() => editor.value!.chain().focus().addRowAfter().run())
-}
-function tableAddColBefore() {
-  runTableCommand(() => editor.value!.chain().focus().addColumnBefore().run())
-}
-function tableAddColAfter() {
-  runTableCommand(() => editor.value!.chain().focus().addColumnAfter().run())
-}
-function tableDeleteRow() {
-  runTableCommand(() => editor.value!.chain().focus().deleteRow().run())
-}
-function tableDeleteCol() {
-  runTableCommand(() => editor.value!.chain().focus().deleteColumn().run())
-}
-function tableMergeCells() {
-  if (!canMergeCells()) return
-  runTableCommand(() => editor.value!.chain().focus().mergeCells().run())
-}
-function tableSplitCell() {
-  if (!canSplitCell()) return
-  runTableCommand(() => editor.value!.chain().focus().splitCell().run())
-}
-function applyCellTextAlign(align: 'left' | 'center' | 'right') {
-  const ed = editor.value
-  if (!ed || !isInTable()) return
-  ed.chain().focus().setTextAlign(align).run()
-  announceRte(align === 'center' ? '单元格已居中' : align === 'right' ? '单元格已右对齐' : '单元格已左对齐')
-}
-
-function tableToggleHeaderRow() {
-  runTableCommand(() => editor.value!.chain().focus().toggleHeaderRow().run())
-}
-function tableToggleHeaderColumn() {
-  runTableCommand(() => editor.value!.chain().focus().toggleHeaderColumn().run())
-}
-function tableDeleteTable() {
-  runTableCommand(() => editor.value!.chain().focus().deleteTable().run())
-}
-function tableClearCellFormat() {
-  const ed = editor.value
-  if (!ed || !isInTable()) return
-  ed.chain()
-    .focus()
-    .setCellAttribute('backgroundColor', null)
-    .setCellAttribute('borderColor', null)
-    .setCellAttribute('borderStyle', null)
-    .run()
-  closeAllTableUi()
-  announceRte('已清除单元格格式')
-}
-
-const tableOpItems = computed((): TableOpItem[] => {
-  void editor.value?.state
-  return [
-    { key: 'row-before', label: '向上插入行', run: tableAddRowBefore },
-    { key: 'row-after', label: '向下插入行', run: tableAddRowAfter },
-    { key: 'col-before', label: '向左插入列', run: tableAddColBefore },
-    { key: 'col-after', label: '向右插入列', run: tableAddColAfter },
-    {
-      key: 'del-row',
-      label: '删除行',
-      run: tableDeleteRow,
-      sepBefore: true,
-    },
-    { key: 'del-col', label: '删除列', run: tableDeleteCol },
-    {
-      key: 'merge',
-      label: '合并单元格',
-      run: tableMergeCells,
-      disabled: () => !canMergeCells(),
-      sepBefore: true,
-    },
-    {
-      key: 'split',
-      label: '拆分单元格',
-      run: tableSplitCell,
-      disabled: () => !canSplitCell(),
-    },
-    {
-      key: 'header',
-      label: '切换表头行',
-      run: tableToggleHeaderRow,
-      sepBefore: true,
-    },
-    {
-      key: 'header-col',
-      label: '切换表头列',
-      run: tableToggleHeaderColumn,
-    },
-    {
-      key: 'clear-cell',
-      label: '清除单元格格式',
-      run: tableClearCellFormat,
-    },
-    {
-      key: 'valign-top',
-      label: '垂直对齐·顶',
-      run: () => applyCellValign('top'),
-    },
-    {
-      key: 'valign-middle',
-      label: '垂直对齐·中',
-      run: () => applyCellValign('middle'),
-    },
-    {
-      key: 'valign-bottom',
-      label: '垂直对齐·底',
-      run: () => applyCellValign('bottom'),
-    },
-    {
-      key: 'align-left',
-      label: '单元格左对齐',
-      run: () => applyCellTextAlign('left'),
-    },
-    {
-      key: 'align-center',
-      label: '单元格居中',
-      run: () => applyCellTextAlign('center'),
-    },
-    {
-      key: 'align-right',
-      label: '单元格右对齐',
-      run: () => applyCellTextAlign('right'),
-    },
-    {
-      key: 'sort-asc',
-      label: '按当前列升序',
-      run: () => doSortTable(true),
-    },
-    {
-      key: 'sort-desc',
-      label: '按当前列降序',
-      run: () => doSortTable(false),
-    },
-    {
-      key: 'sum-row',
-      label: '简易合计行',
-      run: () => doTableSumRow(),
-    },
-    {
-      key: 'sticky-header',
-      label: '表头冻结开关',
-      run: () => toggleTableStickyHeader(),
-      sepBefore: true,
-    },
-    {
-      key: 'copy-csv',
-      label: '复制为 CSV',
-      run: () => { void copyCurrentTable('csv') },
-      sepBefore: true,
-    },
-    {
-      key: 'copy-tsv',
-      label: '复制为 TSV',
-      run: () => { void copyCurrentTable('tsv') },
-    },
-    {
-      key: 'row-filter',
-      label: '行筛选…',
-      run: () => { void promptTableRowFilter() },
-    },
-    {
-      key: 'del-table',
-      label: '删除表格',
-      run: tableDeleteTable,
-      danger: true,
-      sepBefore: true,
-    },
-  ]
-})
-
-
-/**
- * 紧凑「更多」：表外直接开插入弹窗；表内开操作面板。
- * 最大化工具条请用 onTableToolbarButtonClick（表内下拉、表外弹窗）。
- */
-function onTableToolClick() {
-  if (viewMode.value !== 'edit') return
-  moreOpen.value = false
-  closeImportMenu()
-  closeExportMenu()
-  if (isInTable()) {
-    tableMenuOpen.value = false
-    tableOpsSheetOpen.value = true
-    closeTableCtx()
-    return
-  }
-  const nextQuick = !tableQuickOpen.value
-  closeTableMenu()
-  if (nextQuick) tableQuickHover.value = { rows: 0, cols: 0 }
-  tableQuickOpen.value = nextQuick
-}
-
-/** 最大化工具栏「表格」按钮：表外网格插入；表内切换操作下拉 */
-function onTableToolbarButtonClick() {
-  if (viewMode.value !== 'edit') return
-  moreOpen.value = false
-  closeImportMenu()
-  headingOpen.value = false
-  listOpen.value = false
-  formOpen.value = false
-  colorOpen.value = false
-  highlightOpen.value = false
-  alignOpen.value = false
-  closeFontMenus()
-  if (isInTable()) {
-    tableMenuOpen.value = !tableMenuOpen.value
-    tableQuickOpen.value = false
-    closeTableCtx()
-    return
-  }
-  const nextQuick = !tableQuickOpen.value
-  closeTableMenu()
-  if (nextQuick) tableQuickHover.value = { rows: 0, cols: 0 }
-  tableQuickOpen.value = nextQuick
 }
 
 const NOTE_TYPES = [
@@ -6571,522 +4660,103 @@ function confirmInsertAttaches() {
   rteToast('success', `已插入 ${usable.length} 个附件`)
 }
 
-const importMenuOpen = ref(false)
-const importFileInputRef = ref<HTMLInputElement | null>(null)
-const linkImportOpen = ref(false)
-const linkImportUrl = ref('')
-const linkImportBusy = ref(false)
-
-function closeImportMenu() {
-  importMenuOpen.value = false
-}
-
-const exportMenuOpen = ref(false)
-const exportBusy = ref(false)
-
-function closeExportMenu() {
-  exportMenuOpen.value = false
-}
-
-function onExportMenu() {
-  exportMenuOpen.value = true
-  moreOpen.value = false
-}
-
-function exportFileBasename(): string {
-  const raw = (localTitle.value || '').trim() || '未命名文档'
-  return raw.replace(/[\\/:*?"<>|]+/g, '_').replace(/\s+/g, '_').slice(0, 80)
-}
-
-function triggerDownloadBlob(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  a.rel = 'noopener'
-  document.body.appendChild(a)
-  a.click()
-  a.remove()
-  URL.revokeObjectURL(url)
-}
-
-async function copyAsFeishuHtml() {
-  closeExportMenu()
-  moreOpen.value = false
-  const ed = editor.value
-  if (!ed) {
-    ElMessage.warning('编辑器未就绪')
-    return
-  }
-  const title = (localTitle.value || '').trim()
-  const html = feishuClipboardDocument(ed.getHTML() || '', title)
-  const textBody = ed.getText({ blockSeparator: '\n' }) || ''
-  const plain = title ? `${title}\n\n${textBody}` : textBody
-  try {
-    if (typeof ClipboardItem !== 'undefined' && navigator.clipboard?.write) {
-      await navigator.clipboard.write([
-        new ClipboardItem({
-          'text/html': new Blob([html], { type: 'text/html' }),
-          'text/plain': new Blob([plain], { type: 'text/plain' }),
-        }),
-      ])
-    } else if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(html)
-    } else {
-      throw new Error('clipboard unavailable')
-    }
-    ElMessage.success('已复制为可粘贴的 HTML')
-  } catch (err) {
-    console.error(err)
-    try {
-      await navigator.clipboard.writeText(html)
-      ElMessage.success('已复制 HTML 源码')
-    } catch {
-      ElMessage.error('复制失败，请检查浏览器剪贴板权限')
-    }
-  }
-}
-
-function exportAsHtml() {
-  closeExportMenu()
-  moreOpen.value = false
-  const ed = editor.value
-  if (!ed) {
-    ElMessage.warning('编辑器未就绪')
-    return
-  }
-  const title = (localTitle.value || '').trim() || '未命名文档'
-  const body = ed.getHTML()
-  const html = `<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>${escapeHtml(title)}</title>
-<style>
-body{font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;line-height:1.6;color:#1d2129;max-width:800px;margin:32px auto;padding:0 16px;}
-img,video{max-width:100%;height:auto;}
-table{border-collapse:collapse;width:100%;}
-th,td{border:1px solid #e5e6eb;padding:6px 8px;}
-</style>
-</head>
-<body>
-<h1>${escapeHtml(title)}</h1>
-${body}
-</body>
-</html>
-`
-  triggerDownloadBlob(new Blob([html], { type: 'text/html;charset=utf-8' }), `${exportFileBasename()}.html`)
-  ElMessage.success('已导出 HTML')
-}
-
-function exportAsPlainText() {
-  closeExportMenu()
-  moreOpen.value = false
-  const ed = editor.value
-  if (!ed) {
-    ElMessage.warning('编辑器未就绪')
-    return
-  }
-  const title = (localTitle.value || '').trim()
-  const textBody = ed.getText({ blockSeparator: '\n' }) || ''
-  const content = title ? `${title}\n\n${textBody}` : textBody
-  triggerDownloadBlob(
-    new Blob([content], { type: 'text/plain;charset=utf-8' }),
-    `${exportFileBasename()}.txt`,
-  )
-  ElMessage.success('已导出纯文本')
-}
-
-async function exportAsPng() {
-  closeExportMenu()
-  moreOpen.value = false
-  if (exportBusy.value) return
-  const root = rteRootEl.value
-  const el =
-    (root?.querySelector?.('.ProseMirror') as HTMLElement | null) ||
-    (root?.querySelector?.('.rte-body') as HTMLElement | null)
-  if (!el) {
-    ElMessage.warning('未找到可导出的正文区域')
-    return
-  }
-  exportBusy.value = true
-  root?.classList.add('rte-printing')
-  try {
-    const canvas = await html2canvas(el, {
-      backgroundColor: '#ffffff',
-      scale: 2,
-      useCORS: true,
-      logging: false,
-    })
-    const link = document.createElement('a')
-    link.download = `${exportFileBasename()}.png`
-    link.href = canvas.toDataURL('image/png')
-    link.click()
-    ElMessage.success('已导出图片')
-  } catch (err) {
-    console.error(err)
-    ElMessage.error('导出图片失败')
-  } finally {
-    root?.classList.remove('rte-printing')
-    exportBusy.value = false
-  }
-}
-
-async function exportAsPdf() {
-  closeExportMenu()
-  moreOpen.value = false
-  if (exportBusy.value) return
-  const root = rteRootEl.value
-  const el =
-    (root?.querySelector?.('.ProseMirror') as HTMLElement | null) ||
-    (root?.querySelector?.('.rte-body') as HTMLElement | null)
-  if (!el) {
-    ElMessage.warning('未找到可导出的正文区域')
-    return
-  }
-  exportBusy.value = true
-  root?.classList.add('rte-printing')
-  try {
-    const title = (localTitle.value || '').trim() || '未命名文档'
-    const marginMm = pageSizeMeta.value.paper ? pageMargin.value : pageScreenMargin.value
-    const blob = await buildPdfFromElement(el, { title, pageSize: pageSize.value, marginMm })
-    triggerDownloadBlob(blob, `${exportFileBasename()}.pdf`)
-    ElMessage.success('已导出 PDF')
-  } catch (err) {
-    console.error(err)
-    ElMessage.error('导出 PDF 失败')
-  } finally {
-    root?.classList.remove('rte-printing')
-    exportBusy.value = false
-  }
-}
-
-async function exportAsDocx() {
-  closeExportMenu()
-  moreOpen.value = false
-  if (exportBusy.value) return
-  const ed = editor.value
-  if (!ed) {
-    ElMessage.warning('编辑器未就绪')
-    return
-  }
-  exportBusy.value = true
-  try {
-    const title = (localTitle.value || '').trim() || '未命名文档'
-    const bodyHtml = ed.getHTML() || ''
-    const bodyText = ed.getText({ blockSeparator: '\n' }) || ''
-    const blob = await buildDocxBlob({ title, bodyHtml, bodyText })
-    triggerDownloadBlob(blob, `${exportFileBasename()}.docx`)
-    ElMessage.success('已导出 Word')
-  } catch (err) {
-    console.error(err)
-    ElMessage.error('导出 Word 失败')
-  } finally {
-    exportBusy.value = false
-  }
-}
-
-function exportAsMarkdown() {
-  closeExportMenu()
-  moreOpen.value = false
-  const ed = editor.value
-  if (!ed) {
-    ElMessage.warning('编辑器未就绪')
-    return
-  }
-  const title = (localTitle.value || '').trim()
-  const mdBody = htmlToMarkdown(ed.getHTML() || '')
-  const md = title ? `# ${title}\n\n${mdBody}` : mdBody
-  triggerDownloadBlob(
-    new Blob([md], { type: 'text/markdown;charset=utf-8' }),
-    `${exportFileBasename()}.md`,
-  )
-  ElMessage.success('已导出 Markdown')
-}
-
-/** tool-wrap @mouseleave：仅当指针真正离开按钮+菜单时才关（避免点选项前被关掉） */
-/** 工具条下拉：fixed + Teleport 到 body，按按钮 rect 自动翻转/夹紧 */
-const FLOAT_VIEW_PAD = 8
-const FLOAT_GAP = 2
-const floatAnchors = new Map<string, HTMLElement>()
-const menuCloseTimers = new Map<string, ReturnType<typeof setTimeout>>()
-const floatMenuEls = new Map<string, HTMLElement>()
-/** 打开瞬间抑制 mouseleave / document pointerdown 误关 */
-let ignoreDocMenuCloseUntil = 0
-function markToolbarMenuOpening() {
-  ignoreDocMenuCloseUntil = Date.now() + 500
-  // 取消所有待关闭定时器
-  for (const [k, t] of menuCloseTimers) {
-    clearTimeout(t)
-    menuCloseTimers.delete(k)
-  }
-}
-
-function setFloatAnchor(key: string, el: unknown) {
-  if (el && el instanceof HTMLElement) floatAnchors.set(key, el)
-  else floatAnchors.delete(key)
-}
-
-function cancelMenuClose(key: string) {
-  const t = menuCloseTimers.get(key)
-  if (t != null) {
-    clearTimeout(t)
-    menuCloseTimers.delete(key)
-  }
-}
-
-function scheduleMenuClose(key: string, close: () => void) {
-  cancelMenuClose(key)
-  menuCloseTimers.set(
-    key,
-    setTimeout(() => {
-      menuCloseTimers.delete(key)
-      close()
-    }, 200),
-  )
-}
-
-function onToolMenuEnter(key: string) {
-  cancelMenuClose(key)
-}
-
-function onToolMenuLeave(
-  event: MouseEvent,
-  key: string,
-  close: () => void,
-) {
-  // Teleport 挂载/重排时浏览器常对 wrap 甩一次 relatedTarget=null 的 mouseleave
-  if (Date.now() < ignoreDocMenuCloseUntil) return
-  const wrap = event.currentTarget as HTMLElement | null
-  const next = event.relatedTarget as Node | null
-  if (wrap && next && wrap.contains(next)) return
-  const menu = floatMenuEls.get(key) || document.querySelector(`[data-rte-float-key="${key}"]`)
-  if (menu && next && menu.contains(next)) return
-  // 指针仍在菜单上（elementFromPoint）也不关
-  if (typeof document !== 'undefined' && document.elementFromPoint) {
-    const x = (event as MouseEvent).clientX
-    const y = (event as MouseEvent).clientY
-    if (Number.isFinite(x) && Number.isFinite(y)) {
-      const under = document.elementFromPoint(x, y)
-      if (under && (under.closest?.(`[data-rte-float-key="${key}"]`) || under.closest?.('.rte-float-menu'))) {
-        return
-      }
-    }
-  }
-  scheduleMenuClose(key, close)
-}
-
-function setFloatStyle(
-  el: HTMLElement,
-  prop: string,
-  value: string,
-) {
-  // 必须 important：若 CSS 带 !important，普通 inline 会被盖掉，菜单落在 body 流末尾
-  el.style.setProperty(prop, value, 'important')
-}
-
-function placeFloatMenuEl(menuEl: HTMLElement, key: string) {
-  let anchor = floatAnchors.get(key)
-  if (!anchor || !anchor.isConnected) {
-    const found = document.querySelector(`[data-rte-anchor="${key}"]`)
-    if (found instanceof HTMLElement) {
-      anchor = found
-      floatAnchors.set(key, found)
-    }
-  }
-  // 非最大化从「更多」打开时，emoji/特殊字符/段距/字数按钮不在顶栏：回退锚到「更多」
-  if (
-    (!anchor || !anchor.isConnected) &&
-    (key === 'emoji' || key === 'specialChars' || key === 'spacing' || key === 'wordStats')
-  ) {
-    const more =
-      floatAnchors.get('more') ||
-      (document.querySelector('[data-rte-anchor="more"]') as HTMLElement | null)
-    if (more instanceof HTMLElement) {
-      anchor = more
-      floatAnchors.set(key, more)
-    }
-  }
-  if (!anchor || !menuEl.isConnected) {
-    menuEl.style.setProperty('visibility', 'visible', 'important')
-    return
-  }
-
-  const rect = anchor.getBoundingClientRect()
-  const vw = window.innerWidth
-  const vh = window.innerHeight
-
-  setFloatStyle(menuEl, 'position', 'fixed')
-  setFloatStyle(menuEl, 'right', 'auto')
-  setFloatStyle(menuEl, 'bottom', 'auto')
-  setFloatStyle(menuEl, 'margin', '0')
-  setFloatStyle(menuEl, 'z-index', '5200')
-  // 先放到视口内可测，避免 top/left:auto 落在文档流末尾
-  setFloatStyle(menuEl, 'left', '0px')
-  setFloatStyle(menuEl, 'top', '0px')
-  setFloatStyle(menuEl, 'max-height', 'none')
-  menuEl.style.width = ''
-  setFloatStyle(menuEl, 'visibility', 'hidden')
-
-  const mw = Math.max(menuEl.offsetWidth, 1)
-  const mh = Math.max(menuEl.offsetHeight, 1)
-  const spaceBelow = vh - rect.bottom - FLOAT_VIEW_PAD
-  const spaceAbove = rect.top - FLOAT_VIEW_PAD
-  const preferBelow =
-    spaceBelow >= Math.min(mh, 220) || spaceBelow >= spaceAbove
-
-  let maxH: number
-  let top: number
-  if (preferBelow) {
-    maxH = Math.max(120, spaceBelow - FLOAT_GAP)
-    top = rect.bottom - FLOAT_GAP
-  } else {
-    maxH = Math.max(120, spaceAbove - FLOAT_GAP)
-    const usedH = Math.min(mh, maxH)
-    top = rect.top + FLOAT_GAP - usedH
-  }
-
-  const preferEnd =
-    key === 'import' || key === 'export' || key === 'table' || key === 'more' || key.startsWith('more-')
-  let left = preferEnd ? rect.right - mw : rect.left
-  const maxW = Math.max(160, vw - FLOAT_VIEW_PAD * 2)
-  if (mw > maxW) {
-    menuEl.style.width = `${Math.floor(maxW)}px`
-    left = FLOAT_VIEW_PAD
-  } else {
-    if (left + mw > vw - FLOAT_VIEW_PAD) left = vw - FLOAT_VIEW_PAD - mw
-    if (left < FLOAT_VIEW_PAD) left = FLOAT_VIEW_PAD
-  }
-
-  if (top < FLOAT_VIEW_PAD) top = FLOAT_VIEW_PAD
-  if (top + Math.min(mh, maxH) > vh - FLOAT_VIEW_PAD) {
-    top = Math.max(FLOAT_VIEW_PAD, vh - FLOAT_VIEW_PAD - Math.min(mh, maxH))
-  }
-
-  setFloatStyle(menuEl, 'left', `${Math.round(left)}px`)
-  setFloatStyle(menuEl, 'top', `${Math.round(top)}px`)
-  setFloatStyle(menuEl, 'max-height', `${Math.round(maxH)}px`)
-  setFloatStyle(menuEl, 'visibility', 'visible')
-  menuEl.style.setProperty('--rte-float-max-h', `${Math.round(maxH)}px`)
-  if (menuEl.classList.contains('rte-template-menu')) {
-    setFloatStyle(menuEl, 'overflow', 'hidden')
-  } else {
-    setFloatStyle(menuEl, 'overflow-x', 'hidden')
-    setFloatStyle(menuEl, 'overflow-y', 'auto')
-  }
-}
-
-type FloatMenuEl = HTMLElement & { __rteFloatCleanup?: () => void }
-
-const vRteFloat: Directive<HTMLElement, string> = {
-  mounted(el, binding) {
-    const key = String(binding.value || '')
-    if (!key) return
-    const node = el as FloatMenuEl
-    node.classList.add('rte-float-menu')
-    node.dataset.rteFloatKey = key
-    floatMenuEls.set(key, node)
-    markToolbarMenuOpening()
-    let tries = 0
-    const place = () => {
-      placeFloatMenuEl(node, key)
-      // 回调 ref 有时晚于 Teleport mount：短重试
-      if (!floatAnchors.get(key) && tries < 10) {
-        tries += 1
-        requestAnimationFrame(place)
-      }
-    }
-    nextTick(() => {
-      place()
-      requestAnimationFrame(place)
-    })
-    const ro = new ResizeObserver(() => placeFloatMenuEl(node, key))
-    ro.observe(node)
-    const onWin = () => placeFloatMenuEl(node, key)
-    window.addEventListener('resize', onWin)
-    window.addEventListener('scroll', onWin, true)
-    node.__rteFloatCleanup = () => {
-      ro.disconnect()
-      window.removeEventListener('resize', onWin)
-      window.removeEventListener('scroll', onWin, true)
-      if (floatMenuEls.get(key) === node) floatMenuEls.delete(key)
-    }
+const {
+  importMenuOpen,
+  importFileInputRef,
+  linkImportOpen,
+  linkImportUrl,
+  linkImportBusy,
+  closeImportMenu,
+  onImport,
+  pickImportDocument,
+  openImportLinkDialog,
+  closeImportLinkDialog,
+  onImportFileChange,
+  confirmImportLink,
+  markdownToHtml,
+} = useImport({
+  editor,
+  closeMore: () => {
+    moreOpen.value = false
   },
-  updated(el, binding) {
-    const key = String(binding.value || '')
-    if (!key) return
-    floatMenuEls.set(key, el)
-    nextTick(() => placeFloatMenuEl(el, key))
+})
+void importFileInputRef
+
+const {
+  exportMenuOpen,
+  exportBusy,
+  closeExportMenu,
+  onExportMenu,
+  copyAsFeishuHtml,
+  exportAsHtml,
+  exportAsPlainText,
+  exportAsMarkdown,
+  exportAsPng,
+  exportAsPdf,
+  exportAsDocx,
+} = useExport({
+  editor,
+  title: localTitle,
+  rootEl: rteRootEl,
+  pageSize,
+  pageSizeMeta,
+  pageMargin,
+  pageScreenMargin,
+  closeMore: () => {
+    moreOpen.value = false
   },
-  unmounted(el) {
-    const node = el as FloatMenuEl
-    const key = node.dataset.rteFloatKey
-    node.__rteFloatCleanup?.()
-    delete node.__rteFloatCleanup
-    if (key && floatMenuEls.get(key) === node) floatMenuEls.delete(key)
+})
+
+const {
+  floatAnchors,
+  floatMenuEls,
+  markToolbarMenuOpening,
+  setFloatAnchor,
+  onToolMenuEnter,
+  onToolMenuLeave,
+  closeAllToolbarMenus,
+  vRteFloat,
+} = useFloatMenus({
+  headingOpen: () => headingOpen,
+  listOpen: () => listOpen,
+  formOpen: () => formOpen,
+  templateOpen: () => templateOpen,
+  alignOpen: () => alignOpen,
+  tableMenuOpen: () => tableMenuOpen,
+  importMenuOpen: () => importMenuOpen,
+  exportMenuOpen: () => exportMenuOpen,
+  pasteFormatOpen: () => pasteFormatOpen,
+  bookmarkPanelOpen: () => bookmarkPanelOpen,
+  caseMenuOpen: () => caseMenuOpen,
+  zoomMenuOpen: () => zoomMenuOpen,
+  viewExtrasOpen: () => viewExtrasOpen,
+  emojiOpen: () => emojiOpen,
+  specialCharsOpen: () => specialCharsOpen,
+  columnsOpen: () => columnsOpen,
+  spacingOpen: () => spacingOpen,
+  wordStatsOpen: () => wordStatsOpen,
+  shortcutsOpen: () => shortcutsOpen,
+  calloutOpen: () => calloutOpen,
+  moreCalloutOpen: () => moreCalloutOpen,
+  hrOpen: () => hrOpen,
+  blockOpsOpen: () => blockOpsOpen,
+  insertDateOpen: () => insertDateOpen,
+  codeLangOpen: () => codeLangOpen,
+  closeFontMenus: () => {
+    closeFontMenus()
   },
-}
-
-function closeAllToolbarMenus() {
-  headingOpen.value = false
-  listOpen.value = false
-  formOpen.value = false
-  templateOpen.value = false
-  alignOpen.value = false
-  tableMenuOpen.value = false
-  importMenuOpen.value = false
-  exportMenuOpen.value = false
-  pasteFormatOpen.value = false
-  bookmarkPanelOpen.value = false
-  caseMenuOpen.value = false
-  zoomMenuOpen.value = false
-  viewExtrasOpen.value = false
-  emojiOpen.value = false
-  specialCharsOpen.value = false
-  columnsOpen.value = false
-  spacingOpen.value = false
-  wordStatsOpen.value = false
-  shortcutsOpen.value = false
-  calloutOpen.value = false
-  moreCalloutOpen.value = false
-  hrOpen.value = false
-  blockOpsOpen.value = false
-  insertDateOpen.value = false
-  codeLangOpen.value = false
-  // outline 侧栏独立，不随工具条菜单一并关闭
-  closeFontMenus()
-  closeColorMenus()
-  closeHighlightMenus()
-  closeMore()
-}
-
-function onDocPointerDownForMenus(e: PointerEvent) {
-  if (Date.now() < ignoreDocMenuCloseUntil) return
-  const t = e.target as HTMLElement | null
-  if (!t) return
-  if (
-    t.closest(
-      '.rte-tool-wrap, .rte-tool, .rte-float-menu, .rte-more-menu, .rte-more-flyout, .rte-emoji-panel, .rte-specialchars-panel, .rte-spacing-panel, .rte-wordstats-panel, .rte-shortcuts-panel, .rte-callout-menu, .rte-outline-panel, .rte-slash-menu, .rte-mention-menu, .el-overlay, .el-dialog, .el-message-box, .rte-table-dialog, .rte-attach-dialog',
-    )
-  ) {
-    return
-  }
-  closeAllToolbarMenus()
-}
-
-function repositionSlashMenu() {
-  if (!slashOpen.value) return
-  placeSlashMenuFromRect(slashClientRectFn?.() ?? null)
-}
+  closeColorMenus: () => {
+    closeColorMenus()
+  },
+  closeHighlightMenus: () => {
+    closeHighlightMenus()
+  },
+  closeMore: () => {
+    closeMore()
+  },
+})
 
 onMounted(() => {
-  document.addEventListener('pointerdown', onDocPointerDownForMenus, true)
-  window.addEventListener('keydown', onWindowEscape)
-  window.addEventListener('resize', repositionSlashMenu)
-  window.addEventListener('scroll', repositionSlashMenu, true)
-  window.addEventListener('resize', repositionMentionMenu)
-  window.addEventListener('scroll', repositionMentionMenu, true)
   nextTick(() => {
     syncSpellcheckToDom()
     editor.value?.commands.captureRevisionBaseline()
@@ -7100,31 +4770,6 @@ watch(
     if (ed) nextTick(() => syncSpellcheckToDom())
   },
 )
-
-function onImport() {
-  // 紧凑「更多」菜单入口：打开同款双选项
-  importMenuOpen.value = true
-  moreOpen.value = false
-}
-
-function pickImportDocument() {
-  closeImportMenu()
-  moreOpen.value = false
-  importFileInputRef.value?.click()
-}
-
-function openImportLinkDialog() {
-  closeImportMenu()
-  moreOpen.value = false
-  linkImportUrl.value = ''
-  linkImportOpen.value = true
-}
-
-function closeImportLinkDialog() {
-  linkImportOpen.value = false
-  linkImportUrl.value = ''
-  linkImportBusy.value = false
-}
 
 function looksLikeRichHtml(html: string): boolean {
   const h = (html || '').trim()
@@ -7165,215 +4810,6 @@ function looksLikeMarkdown(text: string): boolean {
   return hits >= 2
 }
 
-function markdownToHtml(md: string): string {
-  const lines = md.replace(/\r\n/g, '\n').split('\n')
-  const out: string[] = []
-  let inUl = false
-  let inOl = false
-  const closeLists = () => {
-    if (inUl) {
-      out.push('</ul>')
-      inUl = false
-    }
-    if (inOl) {
-      out.push('</ol>')
-      inOl = false
-    }
-  }
-  const inlineFormat = (s: string) =>
-    escapeHtml(s)
-      .replace(/`([^`]+)`/g, '<code>$1</code>')
-      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*([^*]+)\*/g, '<em>$1</em>')
-      .replace(
-        /\[([^\]]+)\]\((https?:[^)\s]+)\)/g,
-        '<a href="$2" class="rte-link">$1</a>',
-      )
-
-  for (const raw of lines) {
-    const line = raw
-    const heading = /^(#{1,6})\s+(.+)$/.exec(line)
-    if (heading) {
-      closeLists()
-      const level = heading[1]!.length
-      out.push(`<h${level}>${inlineFormat(heading[2]!.trim())}</h${level}>`)
-      continue
-    }
-    const ul = /^[-*+]\s+(.+)$/.exec(line)
-    if (ul) {
-      if (inOl) {
-        out.push('</ol>')
-        inOl = false
-      }
-      if (!inUl) {
-        out.push('<ul>')
-        inUl = true
-      }
-      out.push(`<li>${inlineFormat(ul[1]!.trim())}</li>`)
-      continue
-    }
-    const ol = /^\d+\.\s+(.+)$/.exec(line)
-    if (ol) {
-      if (inUl) {
-        out.push('</ul>')
-        inUl = false
-      }
-      if (!inOl) {
-        out.push('<ol>')
-        inOl = true
-      }
-      out.push(`<li>${inlineFormat(ol[1]!.trim())}</li>`)
-      continue
-    }
-    if (!line.trim()) {
-      closeLists()
-      continue
-    }
-    closeLists()
-    out.push(`<p>${inlineFormat(line.trim())}</p>`)
-  }
-  closeLists()
-  return out.join('') || '<p></p>'
-}
-
-async function extractDocxText(buf: ArrayBuffer): Promise<string> {
-  // 轻量解析：docx 是 zip，读 word/document.xml 抽文本
-  const zip = await JSZip.loadAsync(buf)
-  const xmlFile = zip.file('word/document.xml')
-  if (!xmlFile) throw new Error('NO_DOCUMENT_XML')
-  const xml = await xmlFile.async('string')
-  const texts: string[] = []
-  const re = /<w:t[^>]*>([^<]*)<\/w:t>/g
-  let m: RegExpExecArray | null
-  while ((m = re.exec(xml))) {
-    texts.push(m[1]!)
-  }
-  // 粗略按段落：遇 </w:p> 换行
-  const paras = xml
-    .split(/<\/w:p>/)
-    .map((chunk) => {
-      const parts: string[] = []
-      const r = /<w:t[^>]*>([^<]*)<\/w:t>/g
-      let mm: RegExpExecArray | null
-      while ((mm = r.exec(chunk))) parts.push(mm[1]!)
-      return parts.join('')
-    })
-    .map((s) => s.trim())
-    .filter(Boolean)
-  return paras.join('\n\n') || texts.join('')
-}
-
-async function onImportFileChange(event: Event) {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  input.value = ''
-  if (!file) return
-  const name = file.name.toLowerCase()
-  const ed = editor.value
-  if (!ed) return
-
-  try {
-    if (name.endsWith('.md') || name.endsWith('.markdown') || name.endsWith('.txt')) {
-      const textContent = await file.text()
-      const html = name.endsWith('.txt')
-        ? textContent
-            .split(/\n{2,}/)
-            .map((p) => `<p>${escapeHtml(p.trim())}</p>`)
-            .join('') || `<p>${escapeHtml(textContent)}</p>`
-        : markdownToHtml(textContent)
-      ed.chain().focus().insertContent(html).run()
-      ElMessage.success(`已导入文档：${file.name}`)
-      return
-    }
-
-    if (name.endsWith('.docx')) {
-      const buf = await file.arrayBuffer()
-      try {
-        const plain = await extractDocxText(buf)
-        const html = plain
-          .split(/\n{2,}/)
-          .map((p) => `<p>${escapeHtml(p.trim())}</p>`)
-          .join('')
-        ed.chain().focus().insertContent(html || `<p></p>`).run()
-        ElMessage.success(`已导入文档：${file.name}`)
-      } catch {
-        ElMessage.warning('无法解析该 .docx，请另存为 Markdown (.md) 后再导入')
-      }
-      return
-    }
-
-    if (name.endsWith('.doc')) {
-      ElMessage.warning('暂不支持旧版 .doc，请另存为 .docx 或 .md 后导入')
-      return
-    }
-
-    ElMessage.warning('请选择 .md / .docx 文档')
-  } catch (err) {
-    console.error(err)
-    ElMessage.error('导入失败，请重试')
-  }
-}
-
-async function confirmImportLink() {
-  const ed = editor.value
-  if (!ed) return
-  const url = linkImportUrl.value.trim()
-  if (!url) {
-    ElMessage.warning('请输入公众号文章链接')
-    return
-  }
-  let href = url
-  if (!/^https?:\/\//i.test(href)) href = `https://${href}`
-
-  linkImportBusy.value = true
-  let title = ''
-  let excerpt = ''
-  try {
-    // 浏览器侧常被 CORS 拦截；失败则走占位插入
-    const ctrl = new AbortController()
-    const timer = window.setTimeout(() => ctrl.abort(), 6000)
-    const res = await fetch(href, { signal: ctrl.signal, mode: 'cors' })
-    window.clearTimeout(timer)
-    if (res.ok) {
-      const html = await res.text()
-      const t = /<title[^>]*>([^<]*)<\/title>/i.exec(html)
-      title = (t?.[1] || '').trim()
-      const desc =
-        /<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)/i.exec(
-          html,
-        ) ||
-        /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:title["']/i.exec(
-          html,
-        )
-      if (desc?.[1]) title = desc[1].trim()
-      const d2 =
-        /<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)/i.exec(
-          html,
-        ) ||
-        /<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)/i.exec(
-          html,
-        )
-      if (d2?.[1]) excerpt = d2[1].trim()
-    }
-  } catch {
-    // CORS / network — expected for 公众号
-  } finally {
-    linkImportBusy.value = false
-  }
-
-  const label = title || '公众号文章'
-  const safeHref = escapeHtml(href)
-  const safeLabel = escapeHtml(label)
-  const safeExcerpt = excerpt ? `<p>${escapeHtml(excerpt)}</p>` : ''
-  const block = `<p><a href="${safeHref}" class="rte-link" target="_blank" rel="noopener">🔗 ${safeLabel}</a></p>${safeExcerpt}<p><code>来源：${safeHref}</code></p>`
-  ed.chain().focus().insertContent(block).run()
-  if (title) {
-    ElMessage.success('已导入链接并写入标题')
-  } else {
-    ElMessage.info('无法抓取正文（公众号常限制跨域），已插入可点击链接占位')
-  }
-  closeImportLinkDialog()
-}
 function onDraftBackup() {
   ElMessage.success('草稿已保存在本地编辑状态')
 }
