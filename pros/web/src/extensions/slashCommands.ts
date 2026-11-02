@@ -57,7 +57,8 @@ export const SlashCommands = Extension.create<SlashCommandsOptions>({
         startOfLine: false,
         allowedPrefixes: [' ', '\u00A0', '(', '（', '「', '『', '【', '\n'],
         decorationClass: 'rte-slash-decoration',
-        allow: ({ state, range }) => {
+        allow: ({ editor, state, range }) => {
+          if (!editor.isEditable) return false
           const $from = state.doc.resolve(range.from)
           for (let d = $from.depth; d > 0; d -= 1) {
             const name = $from.node(d).type.name
