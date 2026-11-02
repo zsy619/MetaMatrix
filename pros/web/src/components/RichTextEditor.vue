@@ -99,6 +99,8 @@ import { countWords, normalizeHtml, toEditorContent } from '../utils/rteContent'
 import { RTE_CTX, type RteEditorEmit, type RteEditorProps } from './rte/context'
 import { bindAskMore, useAskDialog } from './rte/composables/useAskDialog'
 import { useRtePageLayout } from './rte/composables/useRtePageLayout'
+import { usePageChrome } from './rte/composables/usePageChrome'
+import { EMPTY_PAGE_CHROME, PAGE_NUMBER_OPTIONS, type PanelPageChrome } from '../utils/rtePageChrome'
 import { useToolbarGroups } from './rte/composables/useToolbarGroups'
 import { buildToolbarGroups } from '../utils/rteToolbarGroups'
 import { useFindReplace } from './rte/composables/useFindReplace'
@@ -434,6 +436,37 @@ const toolbarUndoBridge = {
     return false
   },
 }
+const pageChrome = ref<PanelPageChrome>({ ...EMPTY_PAGE_CHROME })
+const {
+  pageChromeActive,
+  screenPageLabel,
+  previewPageLabel,
+  setPageHeader,
+  setPageFooter,
+  setPageNumber,
+  scheduleMeasure,
+  presentOpen,
+  presentUnit,
+  presentIndex,
+  presentSlides,
+  presentRoot,
+  openPresent,
+  closePresent,
+  stepPresent,
+  setPresentUnit,
+  onPresentStageClick,
+} = usePageChrome({
+  pageChrome,
+  panelId: () => props.panelId,
+  chromeMap: () => current_data.value?.pageChromeByPanelId,
+  setPanelPageChrome: (panelId, chrome) => documentStore.setPanelPageChrome(panelId, chrome),
+  viewMode: () => viewMode.value,
+  editor: () => editor.value,
+  rootEl: rteRootEl,
+  pageSize: () => pageSize.value,
+  margin: () => pageScreenMargin.value,
+  announce: (message) => announceRte(message),
+})
 const {
   pageSize,
   pageSizeMeta,
@@ -463,6 +496,7 @@ const {
   announce: (message) => announceRte(message),
   disarmToolbarUndo: () => toolbarUndoBridge.disarm(),
   toolbarUndoIsNewer: (stamp) => toolbarUndoBridge.isNewer(stamp),
+  chrome: () => pageChrome.value,
 })
 
 function initialEditorContent(): string {
@@ -2038,6 +2072,7 @@ function openPrintPreview() {
   printPreviewHtml.value = title
     ? `<h1 class="rte-print-title">${escapeHtml(title)}</h1>${body}`
     : body
+  scheduleMeasure()
   printPreviewOpen.value = true
   moreOpen.value = false
 }
@@ -4024,6 +4059,7 @@ const {
   },
 })
 void importFileInputRef
+void presentRoot
 
 const {
   exportMenuOpen,
@@ -4045,6 +4081,7 @@ const {
   pageSizeMeta,
   pageMargin,
   pageScreenMargin,
+  pageChrome,
   closeMore: () => {
     moreOpen.value = false
   },
@@ -5364,6 +5401,7 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
       'is-immersive': immersiveFullscreen,
       'is-paper-guide': paperGuide,
       'is-page-sheet': pageSizeMeta.paper,
+      'has-page-chrome': pageChromeActive,
       'is-page-feishu': pageSize === 'feishu',
       'is-table-sticky': tableHeaderSticky,
       'is-cjk-typography': true,
@@ -8403,11 +8441,27 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
           v-if="showTitle && viewMode === 'preview' && localTitle"
           class="rte-title-sep"
         />
+        <div v-if="pageChrome.header" class="rte-page-header">{{ pageChrome.header }}</div>
         <EditorContent
           :editor="editor"
           class="rte-body"
           :style="{ zoom: editorZoom }"
         />
+        <div
+          v-if="pageChrome.footer || screenPageLabel"
+          class="rte-page-footer"
+          :class="{ 'is-num-only': !pageChrome.footer && screenPageLabel }"
+        >
+          <span class="rte-page-footer-text">{{ pageChrome.footer }}</span>
+          <span v-if="screenPageLabel" class="rte-page-footer-num">{{ screenPageLabel }}</span>
+        </div>
+        <div v-if="pageChrome.header || pageChrome.footer || screenPageLabel" class="rte-running-chrome" aria-hidden="true">
+          <div class="rte-running-header">{{ pageChrome.header }}</div>
+          <div class="rte-running-footer">
+            <span>{{ pageChrome.footer }}</span>
+            <span class="rte-running-num" :data-style="pageChrome.pageNumber"></span>
+          </div>
+        </div>
         <div
           v-if="blockHandle.visible"
           class="rte-block-tools"
@@ -8682,6 +8736,42 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
             <option value="custom">自定义</option>
           </select>
         </label>
+        <label class="rte-page-size-field">
+          页眉
+          <input
+            class="rte-page-chrome-input"
+            :value="pageChrome.header"
+            maxlength="80"
+            aria-label="页眉"
+            :disabled="viewMode !== 'edit'"
+            @change="setPageHeader(($event.target as HTMLInputElement).value)"
+          />
+        </label>
+        <label class="rte-page-size-field">
+          页脚
+          <input
+            class="rte-page-chrome-input"
+            :value="pageChrome.footer"
+            maxlength="80"
+            aria-label="页脚"
+            :disabled="viewMode !== 'edit'"
+            @change="setPageFooter(($event.target as HTMLInputElement).value)"
+          />
+        </label>
+        <label class="rte-page-size-field">
+          页码
+          <select
+            :value="pageChrome.pageNumber"
+            aria-label="页码"
+            :disabled="viewMode !== 'edit'"
+            @change="setPageNumber(($event.target as HTMLSelectElement).value)"
+          >
+            <option v-for="opt in PAGE_NUMBER_OPTIONS" :key="'pn-' + opt.id" :value="opt.id">
+              {{ opt.label }}
+            </option>
+          </select>
+        </label>
+        <button type="button" class="rte-bottom-link" @click="openPresent">演示</button>
         <span v-if="pageMargin.preset === 'custom'" class="rte-margin-custom">
           <label>上<input :value="pageMargin.top" type="number" min="0" max="80" step="0.1" aria-label="上边距毫米" :disabled="viewMode !== 'edit'" @change="setMarginSide('top', ($event.target as HTMLInputElement).value)" /></label>
           <label>下<input :value="pageMargin.bottom" type="number" min="0" max="80" step="0.1" aria-label="下边距毫米" :disabled="viewMode !== 'edit'" @change="setMarginSide('bottom', ($event.target as HTMLInputElement).value)" /></label>
@@ -9376,6 +9466,31 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
       </div>
     </Teleport>
 
+    <Teleport to="body">
+      <div
+        v-if="presentOpen"
+        ref="presentRoot"
+        class="rte-present"
+        role="dialog"
+        aria-modal="true"
+        aria-label="演示"
+        tabindex="-1"
+      >
+        <div class="rte-present-top">
+          <div class="rte-present-units" role="tablist" aria-label="翻页方式">
+            <button type="button" :class="{ active: presentUnit === 'block' }" @click="setPresentUnit('block')">按块</button>
+            <button type="button" :class="{ active: presentUnit === 'screen' }" @click="setPresentUnit('screen')">按屏</button>
+          </div>
+          <span class="rte-present-progress">{{ presentIndex + 1 }} / {{ presentSlides.length }}</span>
+          <button type="button" class="rte-present-exit" @click="closePresent">退出</button>
+        </div>
+        <button type="button" class="rte-present-nav is-prev" aria-label="上一屏" :disabled="presentIndex === 0" @click="stepPresent(-1)">‹</button>
+        <div class="rte-present-stage" @click="onPresentStageClick" v-html="presentSlides[presentIndex]"></div>
+        <button type="button" class="rte-present-nav is-next" aria-label="下一屏" :disabled="presentIndex >= presentSlides.length - 1" @click="stepPresent(1)">›</button>
+        <p class="rte-present-hint">方向键或空格翻页，Esc 退出。演示中不能编辑。</p>
+      </div>
+    </Teleport>
+
     <!-- 打印预览 -->
     <Teleport to="body">
       <div
@@ -9397,7 +9512,14 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
               <button type="button" class="rte-modal-confirm" @click="confirmPrintFromPreview">打印</button>
             </div>
           </div>
-          <div class="rte-print-preview-paper" :style="printPreviewMarginStyle" v-html="printPreviewHtml"></div>
+          <div class="rte-print-preview-paper" :style="printPreviewMarginStyle">
+            <div v-if="pageChrome.header" class="rte-preview-header">{{ pageChrome.header }}</div>
+            <div v-html="printPreviewHtml"></div>
+            <div v-if="pageChrome.footer || previewPageLabel" class="rte-preview-footer">
+              <span>{{ pageChrome.footer }}</span>
+              <span>{{ previewPageLabel }}</span>
+            </div>
+          </div>
         </div>
       </div>
     </Teleport>
@@ -15795,6 +15917,156 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
   max-height: none !important;
   overflow: visible !important;
 }
+.rte-page-chrome-input {
+  width: 96px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--mm-text, #1d2129);
+  background: #fff;
+  border: 1px solid var(--mm-line, #e5e6eb);
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+.rte-page-header,
+.rte-page-footer {
+  position: absolute;
+  z-index: 4;
+  pointer-events: none;
+  box-sizing: border-box;
+  color: #4e5969;
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: center;
+}
+.rte-page-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+}
+.rte-page-footer.is-num-only {
+  justify-content: center;
+}
+.rte-page-footer-num {
+  margin-left: auto;
+  white-space: nowrap;
+}
+.rte-page-footer.is-num-only .rte-page-footer-num {
+  margin-left: 0;
+}
+.rte-root.has-page-chrome:not(.is-page-sheet) .rte-body {
+  position: relative;
+  padding-top: var(--rte-margin-top, 10mm) !important;
+  padding-bottom: var(--rte-margin-bottom, 10mm) !important;
+}
+.rte-running-chrome {
+  display: none;
+}
+.rte-preview-header,
+.rte-preview-footer {
+  color: #4e5969;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.rte-preview-header {
+  text-align: center;
+  margin-bottom: 12px;
+}
+.rte-preview-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 18px;
+}
+.rte-present {
+  position: fixed;
+  inset: 0;
+  z-index: 8000;
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) 72px;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  background: #14161a;
+  color: #f5f6f7;
+}
+.rte-present-top {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+}
+.rte-present-units {
+  display: inline-flex;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.rte-present-units button,
+.rte-present-exit,
+.rte-present-nav {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.rte-present-units button {
+  padding: 6px 14px;
+  font-size: 13px;
+}
+.rte-present-units button.active {
+  background: #3370ff;
+}
+.rte-present-progress {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+.rte-present-exit {
+  border-radius: 999px;
+  background: #fff;
+  color: #1d2129;
+  padding: 6px 14px;
+  font-weight: 700;
+}
+.rte-present-nav {
+  font-size: 40px;
+  line-height: 1;
+}
+.rte-present-nav:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+.rte-present-stage {
+  overflow: auto;
+  margin: 8px 0;
+  padding: 48px 56px;
+  border-radius: 16px;
+  background: #fff;
+  color: #1d2129;
+  font-size: 22px;
+  line-height: 1.7;
+}
+.rte-present-stage img,
+.rte-present-stage video {
+  max-width: 100%;
+  height: auto;
+}
+.rte-present-stage h1,
+.rte-present-stage h2,
+.rte-present-stage h3 {
+  line-height: 1.3;
+  margin: 0 0 0.6em;
+}
+.rte-present-empty {
+  color: #86909c;
+}
+.rte-present-hint {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 10px 20px 16px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 12px;
+}
 
 @media print {
   body * {
@@ -15819,6 +16091,8 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
   .rte-root.rte-printing .rte-outline-panel,
   .rte-root.rte-printing .rte-block-tools,
   .rte-root.rte-printing .rte-block-menu,
+  .rte-root.rte-printing .rte-page-header,
+  .rte-root.rte-printing .rte-page-footer,
   .rte-root.rte-printing .rte-preview-banner,
   .rte-root.rte-printing .rte-word-dock,
   .rte-root.rte-printing .column-resize-handle,
@@ -15881,6 +16155,35 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
   .rte-root.rte-printing .rte-body::before {
     display: none !important;
   }
+  .rte-root.rte-printing .rte-running-chrome {
+    display: block;
+  }
+  .rte-root.rte-printing .rte-running-header,
+  .rte-root.rte-printing .rte-running-footer {
+    position: fixed;
+    left: 0;
+    right: 0;
+    color: #4e5969;
+    font-size: 10.5pt;
+    line-height: 1.4;
+    z-index: 2;
+  }
+  .rte-root.rte-printing .rte-running-header {
+    top: 3mm;
+    text-align: center;
+  }
+  .rte-root.rte-printing .rte-running-footer {
+    bottom: 3mm;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 0 12mm;
+    box-sizing: border-box;
+  }
+  .rte-root.rte-printing .rte-running-num[data-style='n']::after { content: counter(page); }
+  .rte-root.rte-printing .rte-running-num[data-style='page-n']::after { content: '第 ' counter(page) ' 页'; }
+  .rte-root.rte-printing .rte-running-num[data-style='page-n-of-m']::after { content: '第 ' counter(page) ' 页 共 ' counter(pages) ' 页'; }
+  .rte-root.rte-printing .rte-running-num[data-style='dash']::after { content: '- ' counter(page) ' -'; }
   .rte-root.rte-printing [data-resize-handle],
   .rte-root.rte-printing .rte-image-drop-line,
   .rte-root.rte-printing .rte-image-drop-preview,

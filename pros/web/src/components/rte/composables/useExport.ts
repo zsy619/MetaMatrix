@@ -8,6 +8,7 @@ import { buildPdfFromElement } from '../../../utils/rteExportPdf'
 import { htmlToMarkdown } from '../../../utils/rteExportMd'
 import { escapeHtml } from '../../../utils/itemsHtml'
 import type { PageMargin, PageMarginBox } from '../../../utils/rtePageMargin'
+import type { PanelPageChrome } from '../../../utils/rtePageChrome'
 import type { RtePageSizeId } from '../../../utils/rtePageSize'
 
 /** 导出菜单与 HTML / 文本 / Markdown / PNG / PDF / Word。 */
@@ -19,6 +20,7 @@ export function useExport(deps: {
   pageSizeMeta: { value: { paper: boolean } }
   pageMargin: { value: PageMargin }
   pageScreenMargin: { value: PageMarginBox }
+  pageChrome: { value: PanelPageChrome }
   closeMore: () => void
 }) {
 const exportMenuOpen = ref(false)
@@ -189,8 +191,13 @@ async function exportAsPdf() {
   root?.classList.add('rte-printing')
   try {
     const title = (deps.title.value || '').trim() || '未命名文档'
-    const marginMm = deps.pageSizeMeta.value.paper ? deps.pageMargin.value : deps.pageScreenMargin.value
-    const blob = await buildPdfFromElement(el, { title, pageSize: deps.pageSize.value, marginMm })
+    const marginMm = deps.pageScreenMargin.value
+    const blob = await buildPdfFromElement(el, {
+      title,
+      pageSize: deps.pageSize.value,
+      marginMm,
+      chrome: deps.pageChrome.value,
+    })
     triggerDownloadBlob(blob, `${exportFileBasename()}.pdf`)
     ElMessage.success('已导出 PDF')
   } catch (err) {

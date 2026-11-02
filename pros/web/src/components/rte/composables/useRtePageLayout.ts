@@ -17,6 +17,7 @@ import {
   type PageMargin,
 } from '../../../utils/rtePageMargin'
 import { bumpToolbarUndoEpoch } from '../../../utils/rteToolbarGroups'
+import { applyChromeReserve, EMPTY_PAGE_CHROME, type PanelPageChrome } from '../../../utils/rtePageChrome'
 
 /** 页面大小、页边距和打印 @page。与工具栏分组共用一次 Ctrl+Z。 */
 export function useRtePageLayout(deps: {
@@ -30,6 +31,7 @@ export function useRtePageLayout(deps: {
   announce: (message: string) => void
   disarmToolbarUndo: () => void
   toolbarUndoIsNewer: (marginStamp: number) => boolean
+  chrome?: () => PanelPageChrome
 }) {
   const localPageSize = ref<RtePageSizeId>('full')
   const localPageMargin = ref<PageMargin | null>(null)
@@ -48,7 +50,12 @@ export function useRtePageLayout(deps: {
     if (panelId) return readPageMargin(deps.pageMarginMap(), panelId, pageSizeMeta.value.paper)
     return localPageMargin.value || defaultPageMargin(pageSizeMeta.value.paper)
   })
-  const pageScreenMargin = computed(() => screenMargin(pageMargin.value, !pageSizeMeta.value.paper))
+  const pageScreenMargin = computed(() =>
+    applyChromeReserve(
+      screenMargin(pageMargin.value, !pageSizeMeta.value.paper),
+      deps.chrome?.() || EMPTY_PAGE_CHROME,
+    ),
+  )
   const pageSheetStyle = computed(() => {
     const box = sheetBox(pageSize.value)
     const margin = pageScreenMargin.value
@@ -65,7 +72,7 @@ export function useRtePageLayout(deps: {
     return style
   })
   const printPreviewMarginStyle = computed(() => {
-    const box = pageSizeMeta.value.paper ? pageMargin.value : pageScreenMargin.value
+    const box = pageScreenMargin.value
     return {
       padding: cssPageMargin(box),
       width: pageSizeMeta.value.paper ? 'min(100%, var(--rte-sheet-width, 210mm))' : '100%',
@@ -76,8 +83,7 @@ export function useRtePageLayout(deps: {
 
   function applyPrintPageStyle(id: RtePageSizeId) {
     const size = cssPageSize(id)
-    const paper = pageSizeOption(id).paper
-    const margin = screenMargin(pageMargin.value, !paper)
+    const margin = pageScreenMargin.value
     let el = document.getElementById('rte-print-page-size')
     if (!el) {
       el = document.createElement('style')
@@ -153,7 +159,7 @@ export function useRtePageLayout(deps: {
     applyPrintPageStyle(next)
   }
 
-  watch([pageSize, pageMargin], () => applyPrintPageStyle(pageSize.value), { immediate: true })
+  watch([pageSize, pageScreenMargin], () => applyPrintPageStyle(pageSize.value), { immediate: true })
 
   return {
     pageSize,

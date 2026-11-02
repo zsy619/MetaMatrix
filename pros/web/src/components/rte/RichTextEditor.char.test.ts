@@ -107,6 +107,20 @@ describe('RichTextEditor 特征', () => {
     wrapper.unmount()
   })
 
+  it('页眉页脚和页码按面板写入画布 JSON，空值不落库', async () => {
+    const { wrapper, store, marks, note } = await mountEditor({ expanded: true })
+    store.setPanelPageChrome('panel-a', { header: ' 机密 ', footer: '内部', pageNumber: 'page-n-of-m' })
+    note()
+    expect(store.current_data?.pageChromeByPanelId).toEqual({
+      'panel-a': { header: '机密', footer: '内部', pageNumber: 'page-n-of-m' },
+    })
+    store.setPanelPageChrome('panel-a', { header: '', footer: '', pageNumber: 'none' })
+    note()
+    expect(store.current_data?.pageChromeByPanelId).toBeUndefined()
+    expect(marks()).toBeGreaterThanOrEqual(2)
+    wrapper.unmount()
+  })
+
   it('最大化时可以同时挂两个实例', async () => {
     const pinia = createPinia()
     setActivePinia(pinia)

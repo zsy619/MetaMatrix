@@ -1,5 +1,6 @@
 import html2canvas from 'html2canvas'
 import { jsPDF } from 'jspdf'
+import { formatPageNumber, pageChromeIsEmpty, type PanelPageChrome } from './rtePageChrome'
 import { pdfPageFormat, type RtePageSizeId } from './rtePageSize'
 
 /** 在接近分页处向上寻找「偏白」行，避免切到文字中间 */
@@ -43,9 +44,55 @@ function findSoftBreakY(
  * 将编辑器 DOM 栅格化后写入多页 A4 PDF。
  * 按页切片 + 软分页（避开文字行），提升清晰度与翻页观感。
  */
+async function rasterLine(text: string, widthPx: number): Promise<HTMLCanvasElement | null> {
+  const line = text.trim()
+  if (!line || widthPx < 8) return null
+  const host = document.createElement('div')
+  host.textContent = line
+  host.style.cssText = [
+    'position:fixed',
+    'left:-10000px',
+    'top:0',
+    `width:${Math.round(widthPx)}px`,
+    'padding:0',
+    'margin:0',
+    'background:#fff',
+    'color:#4e5969',
+    'font:12px/1.4 system-ui,-apple-system,"PingFang SC","Noto Sans CJK SC","Microsoft YaHei",sans-serif',
+    'text-align:center',
+    'white-space:nowrap',
+    'overflow:hidden',
+  ].join(';')
+  document.body.appendChild(host)
+  try {
+    return await html2canvas(host, { backgroundColor: '#ffffff', scale: 2, logging: false })
+  } catch {
+    return null
+  } finally {
+    host.remove()
+  }
+}
+
+function drawStrip(
+  pdf: jsPDF,
+  img: HTMLCanvasElement | null,
+  xMm: number,
+  yMm: number,
+  wMm: number,
+) {
+  if (!img || !img.width || !img.height) return
+  const hMm = (img.height / img.width) * wMm
+  pdf.addImage(img.toDataURL('image/png'), 'PNG', xMm, yMm, wMm, Math.max(3, hMm))
+}
+
 export async function buildPdfFromElement(
   el: HTMLElement,
-  opts?: { title?: string; pageSize?: RtePageSizeId; marginMm?: { top: number; right: number; bottom: number; left: number } },
+  opts?: {
+    title?: string
+    pageSize?: RtePageSizeId
+    marginMm?: { top: number; right: number; bottom: number; left: number }
+    chrome?: PanelPageChrome
+  },
 ): Promise<Blob> {
   const scale = Math.min(3, Math.max(2, (window.devicePixelRatio || 1) * 1.5))
   const canvas = await html2canvas(el, {
@@ -82,46 +129,57 @@ export async function buildPdfFromElement(
   const pagePx = Math.max(1, Math.floor((usableH * canvas.width) / imgWmm))
 
   const ctx = canvas.getContext('2d', { willReadFrequently: true })
+  const slices: number[] = []
   let y = 0
-  let pageIndex = 0
-  while (y < canvas.height - 2) {
+  while (y < canvas.height - 2 && slices.length < 200) {
     let sliceH = Math.min(pagePx, canvas.height - y)
     if (ctx && sliceH >= pagePx && y + sliceH < canvas.height) {
       const soft = findSoftBreakY(ctx, canvas.width, y, y + sliceH, y + sliceH)
       sliceH = Math.max(40, soft - y)
     }
+    slices.push(sliceH)
+    y += sliceH
+  }
+
+  const chrome = opts?.chrome && !pageChromeIsEmpty(opts.chrome) ? opts.chrome : null
+  const total = Math.max(1, slices.length)
+  const headerImg = chrome?.header ? await rasterLine(chrome.header, canvas.width / scale) : null
+  const footerImgs: Array<HTMLCanvasElement | null> = []
+  if (chrome && (chrome.footer || chrome.pageNumber !== 'none')) {
+    for (let i = 0; i < total; i += 1) {
+      const line = [chrome.footer, formatPageNumber(chrome.pageNumber, i + 1, total)].filter(Boolean).join('    ')
+      footerImgs.push(await rasterLine(line, canvas.width / scale))
+    }
+  }
+
+  if (!slices.length) {
+    pdf.text(opts?.title || '', marginLeft, marginTop + 6)
+    drawStrip(pdf, headerImg, marginLeft, 2, usableW)
+    return pdf.output('blob')
+  }
+
+  let offset = 0
+  slices.forEach((sliceH, pageIndex) => {
     const pageCanvas = document.createElement('canvas')
     pageCanvas.width = canvas.width
     pageCanvas.height = sliceH
     const pctx = pageCanvas.getContext('2d')
-    if (!pctx) break
+    if (!pctx) return
     pctx.fillStyle = '#ffffff'
     pctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height)
-    pctx.drawImage(
-      canvas,
-      0,
-      y,
-      canvas.width,
-      sliceH,
-      0,
-      0,
-      canvas.width,
-      sliceH,
-    )
+    pctx.drawImage(canvas, 0, offset, canvas.width, sliceH, 0, 0, canvas.width, sliceH)
     const imgData = pageCanvas.toDataURL('image/jpeg', 0.93)
     const sliceHmm = (sliceH * imgWmm) / canvas.width
     if (pageIndex > 0) pdf.addPage()
     pdf.addImage(imgData, 'JPEG', marginLeft, marginTop, imgWmm, sliceHmm)
-    y += sliceH
-    pageIndex += 1
-    // safety
-    if (pageIndex > 200) break
-  }
-
-  if (pageIndex === 0) {
-    // empty doc
-    pdf.text(opts?.title || '', marginLeft, marginTop + 6)
-  }
+    drawStrip(pdf, headerImg, marginLeft, Math.max(1, (marginTop - 6) / 2), usableW)
+    const footer = footerImgs[pageIndex]
+    if (footer) {
+      const footerHmm = (footer.height / footer.width) * usableW
+      drawStrip(pdf, footer, marginLeft, pageHeight - marginBottom + Math.max(1, (marginBottom - footerHmm) / 2), usableW)
+    }
+    offset += sliceH
+  })
 
   return pdf.output('blob')
 }
