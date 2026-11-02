@@ -4,6 +4,12 @@ import type { Editor } from '@tiptap/core'
 import { activeOutlineIndex as outlineIndexForCursor } from '../../../utils/rteBatch3'
 import { docChromeDelay, snapshotDue } from '../../../utils/rteRound8'
 import { shouldTakeSnapshot, type NoteRow } from '../../../utils/rteRound6'
+import {
+  formatRevisionTime,
+  rememberRevision,
+  normalizeRevisions,
+  type PanelRevision,
+} from '../../../utils/rteRevisions'
 import { jumpToPos } from '../../rteWave20'
 
 /** 大纲、批注、本地会话快照。模板绑定名与原先一致。 */
@@ -22,6 +28,15 @@ export function useDocChrome(deps: {
     confirmLabel?: string
     maxlength?: number
   }) => Promise<string | null>
+  openRteConfirm: (opts: {
+    title: string
+    message: string
+    confirmLabel?: string
+    cancelLabel?: string
+  }) => Promise<boolean>
+  panelId: () => string
+  readRevisions: () => unknown
+  setRevisions: (panelId: string, revisions: PanelRevision[]) => void
 }) {
 const outlineUserClosed = ref(false)
 
@@ -43,11 +58,33 @@ const outlineHeadings = ref<OutlineHeading[]>([])
 const noteRows = ref<NoteRow[]>([])
 const notesOpen = ref(false)
 const historyOpen = ref(false)
-const sessionSnaps = ref<Array<{ at: number; html: string }>>([])
+const revisions = ref<PanelRevision[]>([])
+const revisionNote = ref('')
 let docChromeTimer: ReturnType<typeof setTimeout> | null = null
 let lastSnapHtml = ''
 let lastSnapAt = 0
 let lastSnapNodeSize = 0
+let loadedPanelId = ''
+
+function loadRevisions() {
+  const panelId = deps.panelId()
+  if (panelId !== loadedPanelId) {
+    loadedPanelId = panelId
+    lastSnapHtml = ''
+    lastSnapAt = 0
+    lastSnapNodeSize = 0
+    revisionNote.value = ''
+  }
+  revisions.value = normalizeRevisions(deps.readRevisions())
+}
+
+watch(() => [deps.panelId(), deps.readRevisions()] as const, loadRevisions, { immediate: true })
+
+function persistRevisions(list: PanelRevision[]) {
+  revisions.value = list
+  const panelId = deps.panelId()
+  if (panelId) deps.setRevisions(panelId, list)
+}
 
 function refreshDocChrome() {
   const ed = deps.editor.value
@@ -84,9 +121,15 @@ function refreshDocChrome() {
     lastSnapNodeSize = nodeSize
     const html = ed.getHTML()
     if (shouldTakeSnapshot(lastSnapHtml, html, now - lastSnapAt)) {
+      const remembered = rememberRevision(revisions.value, html, now)
       lastSnapHtml = html
       lastSnapAt = now
-      sessionSnaps.value = [...sessionSnaps.value, { at: now, html }].slice(-12)
+      if (remembered.stored) {
+        revisionNote.value = ''
+        persistRevisions(remembered.list)
+      } else if (remembered.reason === 'too-large') {
+        revisionNote.value = '这一版正文太长，没有写入版本记录。编辑不受影响。'
+      }
     }
   }
 }
@@ -118,12 +161,60 @@ function removeNote(row: NoteRow) {
   scheduleDocChrome()
 }
 
-function restoreSessionSnap(html: string) {
+async function nameCurrentRevision() {
   const ed = deps.editor.value
   if (!ed) return
-  ed.commands.setContent(html, { emitUpdate: true })
+  const label = await deps.openRtePrompt({
+    title: '命名当前版本',
+    message: '给现在的正文起个名字，例如「送审前」。命名版本会优先保留。',
+    placeholder: '版本名称',
+    confirmLabel: '保存',
+    maxlength: 40,
+  })
+  if (!label?.trim()) return
+  const html = ed.getHTML()
+  const remembered = rememberRevision(revisions.value, html, Date.now(), { label: label.trim() })
+  if (remembered.reason === 'too-large') {
+    ElMessage.warning('正文太长，这一版没有写入版本记录。')
+    return
+  }
+  if (remembered.reason === 'empty') {
+    ElMessage.info('正文还是空的，没有可命名的版本。')
+    return
+  }
+  if (!remembered.stored && remembered.reason === 'same') {
+    ElMessage.info('当前正文已经是这个名称。')
+    return
+  }
+  persistRevisions(remembered.list)
+  lastSnapHtml = html
+  lastSnapAt = Date.now()
+  revisionNote.value = ''
+  ElMessage.success('已记下这一版')
+}
+
+async function restoreRevision(id: string) {
+  const ed = deps.editor.value
+  const target = revisions.value.find((item) => item.id === id)
+  if (!ed || !target) return
+  const ok = await deps.openRteConfirm({
+    title: '恢复这一版',
+    message: '当前正文会先记成一版，再换成所选版本。',
+    confirmLabel: '恢复',
+  })
+  if (!ok) return
+  const current = ed.getHTML()
+  const saved = rememberRevision(revisions.value, current, Date.now())
+  if (saved.reason === 'too-large') {
+    ElMessage.warning('当前正文太长，没法先留下一版，因此没有恢复。')
+    return
+  }
+  if (saved.stored) persistRevisions(saved.list)
+  ed.commands.setContent(target.html, { emitUpdate: true })
+  lastSnapHtml = target.html
+  lastSnapAt = Date.now()
   historyOpen.value = false
-  ElMessage.success('已恢复本次会话中的一版。这与云端版本无关。')
+  ElMessage.success('已恢复所选版本')
 }
 
 async function insertDocTitleBlock() {
@@ -197,12 +288,15 @@ function jumpToOutlineHeading(item: OutlineHeading) {
     noteRows,
     notesOpen,
     historyOpen,
-    sessionSnaps,
+    revisions,
+    revisionNote,
+    formatRevisionTime,
     refreshDocChrome,
     scheduleDocChrome,
     jumpNote,
     removeNote,
-    restoreSessionSnap,
+    nameCurrentRevision,
+    restoreRevision,
     insertDocTitleBlock,
     activeOutlineIndex,
     showEmptyGuide,
