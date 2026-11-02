@@ -93,10 +93,11 @@ export function useToolbarGroups<T extends ToolLike>(deps: {
 
   let toolbarPointerId = ''
   let toolbarPointerStartX = 0
+  let toolbarPointerStartY = 0
 
-  function finishToolbarPointer(clientX: number) {
+  function finishToolbarPointer(clientX: number, clientY: number) {
     const id = toolbarPointerId
-    const moved = Math.abs(clientX - toolbarPointerStartX) > 6
+    const moved = Math.hypot(clientX - toolbarPointerStartX, clientY - toolbarPointerStartY) > 6
     const index = toolbarDropIndex.value
     toolbarPointerId = ''
     toolbarDragSource.value = ''
@@ -108,12 +109,12 @@ export function useToolbarGroups<T extends ToolLike>(deps: {
 
   function onWindowToolbarPointerMove(event: PointerEvent) {
     if (!toolbarPointerId) return
-    toolbarDropIndex.value = toolbarGroupDropIndexAt(event.clientX)
+    toolbarDropIndex.value = toolbarGroupDropIndexAt(event.clientX, event.clientY)
   }
 
   function onWindowToolbarPointerUp(event: PointerEvent) {
     if (!toolbarPointerId) return
-    finishToolbarPointer(event.clientX)
+    finishToolbarPointer(event.clientX, event.clientY)
   }
 
   function onToolbarHandlePointerDown(id: string, event: PointerEvent) {
@@ -121,7 +122,8 @@ export function useToolbarGroups<T extends ToolLike>(deps: {
     toolbarPointerId = id
     toolbarDragSource.value = id
     toolbarPointerStartX = event.clientX
-    toolbarDropIndex.value = toolbarGroupDropIndexAt(event.clientX)
+    toolbarPointerStartY = event.clientY
+    toolbarDropIndex.value = toolbarGroupDropIndexAt(event.clientX, event.clientY)
     const handle = event.currentTarget as HTMLElement
     handle.focus()
     try {
@@ -134,12 +136,12 @@ export function useToolbarGroups<T extends ToolLike>(deps: {
 
   function onToolbarHandlePointerMove(event: PointerEvent) {
     if (!toolbarPointerId) return
-    toolbarDropIndex.value = toolbarGroupDropIndexAt(event.clientX)
+    toolbarDropIndex.value = toolbarGroupDropIndexAt(event.clientX, event.clientY)
   }
 
   function onToolbarHandlePointerUp(event: PointerEvent) {
     if (!toolbarPointerId) return
-    finishToolbarPointer(event.clientX)
+    finishToolbarPointer(event.clientX, event.clientY)
   }
 
   function onToolbarGroupDragStart(id: string, event: DragEvent) {
@@ -155,30 +157,49 @@ export function useToolbarGroups<T extends ToolLike>(deps: {
     }
   }
 
-  function toolbarGroupDropIndexAt(clientX: number): number | null {
+  function orderIndexOf(id: string | undefined, fallback: number): number {
+    if (!id) return fallback
+    const at = toolbarOrder.value.indexOf(id)
+    return at < 0 ? fallback : at
+  }
+
+  function toolbarGroupDropIndexAt(clientX: number, clientY: number): number | null {
+    const more = document.querySelector('.rte-more-menu')
+    if (more instanceof HTMLElement) {
+      const menu = more.getBoundingClientRect()
+      const inside = clientX >= menu.left && clientX <= menu.right && clientY >= menu.top && clientY <= menu.bottom
+      if (inside) {
+        const groups = Array.from(more.querySelectorAll<HTMLElement>('.rte-more-group'))
+        for (let i = 0; i < groups.length; i += 1) {
+          const rect = groups[i]!.getBoundingClientRect()
+          if (clientY < rect.top + rect.height / 2) return orderIndexOf(groups[i]!.dataset.groupId, i)
+        }
+        const last = groups[groups.length - 1]
+        const at = orderIndexOf(last?.dataset.groupId, toolbarOrder.value.length - 1)
+        return Math.min(toolbarOrder.value.length, at + 1)
+      }
+    }
     const host = deps.rootEl.value?.querySelector('.rte-toolbar-tools')
     if (!host) return null
     const groups = Array.from(host.querySelectorAll<HTMLElement>('.rte-tool-group'))
-    let index = groups.length
     for (let i = 0; i < groups.length; i += 1) {
       const rect = groups[i]!.getBoundingClientRect()
-      if (clientX < rect.left + rect.width / 2) {
-        index = i
-        break
-      }
+      if (clientX < rect.left + rect.width / 2) return orderIndexOf(groups[i]!.dataset.groupId, i)
     }
-    return index
+    const last = groups[groups.length - 1]
+    const at = orderIndexOf(last?.dataset.groupId, groups.length - 1)
+    return Math.min(toolbarOrder.value.length, at + 1)
   }
 
   function onToolbarGroupDragOver(event: DragEvent) {
     if (!toolbarDragId || deps.viewMode() !== 'edit') return
-    toolbarDropIndex.value = toolbarGroupDropIndexAt(event.clientX)
+    toolbarDropIndex.value = toolbarGroupDropIndexAt(event.clientX, event.clientY)
   }
 
   function onWindowToolbarDragOver(event: DragEvent) {
     if (!toolbarDragId || deps.viewMode() !== 'edit') return
     event.preventDefault()
-    toolbarDropIndex.value = toolbarGroupDropIndexAt(event.clientX)
+    toolbarDropIndex.value = toolbarGroupDropIndexAt(event.clientX, event.clientY)
   }
 
   function onToolbarGroupDrop() {
