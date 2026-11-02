@@ -109,6 +109,89 @@ function toggleSection(key: SectionKey) {
   persistSections({ ...sectionOpen })
 }
 
+/** Resizable rail. 240 is the narrowest width the controls are designed to fit. */
+const PANEL_WIDTH_KEY = 'metamatrix:pageSettings:width'
+const PANEL_WIDTH_DEFAULT = 320
+const PANEL_WIDTH_MIN = 240
+const PANEL_WIDTH_MAX = 400
+
+function clampPanelWidth(value: number) {
+  return Math.min(PANEL_WIDTH_MAX, Math.max(PANEL_WIDTH_MIN, Math.round(value)))
+}
+
+function readPanelWidth() {
+  try {
+    const raw = localStorage.getItem(PANEL_WIDTH_KEY)
+    if (!raw) return PANEL_WIDTH_DEFAULT
+    const parsed = Number(raw)
+    if (!Number.isFinite(parsed)) return PANEL_WIDTH_DEFAULT
+    return clampPanelWidth(parsed)
+  } catch {
+    return PANEL_WIDTH_DEFAULT
+  }
+}
+
+const panelWidth = ref(readPanelWidth())
+const resizing = ref(false)
+const importFileName = ref('')
+let removeResizeListeners: (() => void) | null = null
+
+function persistPanelWidth(width: number) {
+  try {
+    localStorage.setItem(PANEL_WIDTH_KEY, String(width))
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
+function setPanelWidth(next: number) {
+  panelWidth.value = clampPanelWidth(next)
+  persistPanelWidth(panelWidth.value)
+}
+
+function onPanelResizeDown(event: PointerEvent) {
+  if (event.button !== 0) return
+  event.preventDefault()
+  const handle = event.currentTarget
+  if (handle instanceof HTMLElement) handle.setPointerCapture(event.pointerId)
+  resizing.value = true
+  const startX = event.clientX
+  const startW = panelWidth.value
+
+  const onMove = (ev: PointerEvent) => {
+    panelWidth.value = clampPanelWidth(startW + (startX - ev.clientX))
+  }
+  const onUp = () => {
+    resizing.value = false
+    persistPanelWidth(panelWidth.value)
+    window.removeEventListener('pointermove', onMove)
+    window.removeEventListener('pointerup', onUp)
+    window.removeEventListener('pointercancel', onUp)
+    removeResizeListeners = null
+  }
+  removeResizeListeners = onUp
+  window.addEventListener('pointermove', onMove)
+  window.addEventListener('pointerup', onUp)
+  window.addEventListener('pointercancel', onUp)
+}
+
+function onPanelResizeKey(event: KeyboardEvent) {
+  const step = event.shiftKey ? 24 : 8
+  if (event.key === 'ArrowLeft') {
+    event.preventDefault()
+    setPanelWidth(panelWidth.value + step)
+  } else if (event.key === 'ArrowRight') {
+    event.preventDefault()
+    setPanelWidth(panelWidth.value - step)
+  } else if (event.key === 'Home') {
+    event.preventDefault()
+    setPanelWidth(PANEL_WIDTH_MIN)
+  } else if (event.key === 'End') {
+    event.preventDefault()
+    setPanelWidth(PANEL_WIDTH_MAX)
+  }
+}
+
 const templateId = computed<TemplateId>(() => {
   if (activeTemplateId.value && isTemplateId(activeTemplateId.value)) {
     return activeTemplateId.value
@@ -157,6 +240,7 @@ watch(
 
 onBeforeUnmount(() => {
   if (debounceTimer) clearTimeout(debounceTimer)
+  removeResizeListeners?.()
 })
 
 async function refreshStoredList() {
@@ -395,6 +479,7 @@ async function onImportJson(event: Event) {
   const file = input.files?.[0]
   input.value = ''
   if (!file) return
+  importFileName.value = file.name
   if (!auth.isAuthenticated) {
     ElMessage.warning('登录后才能把 JSON 导入为你的云端画布')
     return
@@ -558,7 +643,24 @@ function goGuide() {
 </script>
 
 <template>
-  <aside v-if="panelOpen" class="page-settings-panel">
+  <aside
+    v-if="panelOpen"
+    class="page-settings-panel"
+    :class="{ 'is-resizing': resizing }"
+    :style="{ '--psp-width': panelWidth + 'px' }"
+  >
+    <div
+      class="panel-resize"
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="调整页面设置宽度"
+      :aria-valuenow="panelWidth"
+      :aria-valuemin="PANEL_WIDTH_MIN"
+      :aria-valuemax="PANEL_WIDTH_MAX"
+      tabindex="0"
+      @pointerdown="onPanelResizeDown"
+      @keydown="onPanelResizeKey"
+    />
     <header class="panel-header">
       <div class="panel-header-top">
         <h3>页面设置</h3>
@@ -624,19 +726,19 @@ function goGuide() {
           <div class="meta-grid">
             <div class="info-row">
               <span class="label">创建时间</span>
-              <span class="time">{{ fmtTime(created_at) }}</span>
+              <span class="time" :title="fmtTime(created_at)">{{ fmtTime(created_at) }}</span>
             </div>
             <div class="info-row">
               <span class="label">修订时间</span>
-              <span class="time">{{ fmtTime(updated_at) }}</span>
+              <span class="time" :title="fmtTime(updated_at)">{{ fmtTime(updated_at) }}</span>
             </div>
             <div class="info-row">
               <span class="label">模板</span>
-              <span class="badge">{{ meta.badge }}</span>
+              <span class="badge" :title="meta.badge">{{ meta.badge }}</span>
             </div>
             <div class="info-row">
               <span class="label">修订</span>
-              <span class="mono" :title="head_revision_id ?? undefined">{{
+              <span class="mono" :title="head_revision_id || '尚无修订'">{{
                 head_revision_id ?? '—'
               }}</span>
             </div>
@@ -664,7 +766,7 @@ function goGuide() {
         </button>
         <div v-show="sectionOpen.files" class="acc-body">
           <el-button
-            class="btn-save"
+            class="btn-block"
             type="primary"
             size="small"
             :loading="saving"
@@ -675,10 +777,6 @@ function goGuide() {
           <div class="btn-grid">
             <el-button size="small" @click="onExportJson">导出 JSON</el-button>
             <el-button size="small" @click="onExportMarkdown">导出 Markdown</el-button>
-            <label class="import-label">
-              导入 JSON
-              <input type="file" accept="application/json,.json" @change="onImportJson" />
-            </label>
             <el-button
               size="small"
               :loading="exporting"
@@ -687,8 +785,27 @@ function goGuide() {
               导出图片
             </el-button>
           </div>
+          <div class="file-field">
+            <span class="field-label-text" id="page-settings-import-label">导入 JSON</span>
+            <label class="file-picker" :title="importFileName || '未选择文件'">
+              <span class="file-picker-btn">选择文件</span>
+              <span
+                class="file-picker-name"
+                :class="{ 'is-set': !!importFileName }"
+              >
+                {{ importFileName || '未选择文件' }}
+              </span>
+              <input
+                class="file-picker-input"
+                type="file"
+                accept="application/json,.json"
+                aria-labelledby="page-settings-import-label"
+                @change="onImportJson"
+              />
+            </label>
+          </div>
           <el-button
-            class="btn-danger-full"
+            class="btn-block"
             size="small"
             type="danger"
             plain
@@ -761,8 +878,8 @@ function goGuide() {
               </li>
             </ul>
           </template>
-          <p v-else class="hint">
-            登录后查看云端列表
+          <p v-else class="hint hint-inline">
+            <span>登录后查看云端列表</span>
             <el-button size="small" text type="primary" @click="goLogin">
               去登录
             </el-button>
@@ -875,24 +992,76 @@ function goGuide() {
 
 <style scoped>
 .page-settings-panel {
-  width: 320px;
-  flex-shrink: 0;
+  --psp-min: 240px;
+  --psp-width: 320px;
+  --psp-ink: #1f2329;
+  --psp-secondary: #646a73;
+  --psp-tertiary: #8f959e;
+  --psp-line: #dee0e3;
+  --psp-line-soft: #eff0f1;
+  --psp-hover: #f5f6f7;
+  --psp-bg: #f8f9fa;
+  --psp-blue: #3370ff;
+  --psp-blue-soft: #e1eaff;
+  position: relative;
+  width: min(var(--psp-width), 100%);
+  flex: 0 0 min(var(--psp-width), 100%);
+  max-width: 100%;
+  min-width: 0;
   align-self: stretch;
   min-height: 0;
   height: 100%;
   background: #fff;
-  border-left: 1px solid #dadce0;
+  border-left: 1px solid var(--psp-line);
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  container-type: inline-size;
+  container-name: page-settings;
+}
+
+.page-settings-panel.is-resizing {
+  user-select: none;
+}
+
+.panel-resize {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  transform: translateX(-50%);
+  z-index: 2;
+  cursor: col-resize;
+  touch-action: none;
+  background: transparent;
+}
+
+.panel-resize::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  border-radius: 1px;
+  background: transparent;
+}
+
+.panel-resize:hover::after,
+.panel-resize:focus-visible::after,
+.page-settings-panel.is-resizing .panel-resize::after {
+  background: var(--psp-blue);
 }
 
 .panel-header {
   flex-shrink: 0;
-  padding: 14px 16px 10px;
-  border-bottom: 1px solid #e8eaed;
-  background: #fafbfc;
+  min-width: 0;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--psp-line-soft);
+  background: var(--psp-bg);
 }
 
 .panel-header-top {
@@ -900,21 +1069,27 @@ function goGuide() {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  min-width: 0;
 }
 
 .panel-header h3 {
   margin: 0;
-  font-size: 15px;
-  font-weight: 650;
-  color: #202124;
-  letter-spacing: -0.01em;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--psp-ink);
+  letter-spacing: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .panel-sub {
   margin: 4px 0 0;
   font-size: 12px;
-  color: #5f6368;
-  line-height: 1.35;
+  color: var(--psp-secondary);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
 .status-chip {
@@ -948,31 +1123,35 @@ function goGuide() {
 
 .panel-body {
   flex: 1 1 auto;
+  min-width: 0;
   min-height: 0;
-  overflow: auto;
-  padding: 4px 0 8px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 0 0 8px;
 }
 
 .acc-section {
-  border-bottom: 1px solid #e8eaed;
+  min-width: 0;
+  border-bottom: 1px solid var(--psp-line-soft);
 }
 
 .acc-header {
   width: 100%;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 10px 14px 10px 12px;
+  padding: 10px 16px;
   border: none;
   background: transparent;
   cursor: pointer;
   text-align: left;
-  color: #3c4043;
-  transition: background 0.12s ease;
+  color: var(--psp-secondary);
+  box-sizing: border-box;
 }
 
 .acc-header:hover {
-  background: #f1f3f4;
+  background: var(--psp-hover);
 }
 
 .acc-chevron {
@@ -992,26 +1171,33 @@ function goGuide() {
 }
 
 .acc-title {
-  font-size: 12px;
-  font-weight: 650;
-  color: #5f6368;
-  letter-spacing: 0.02em;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--psp-secondary);
+  letter-spacing: 0;
   flex: 1 1 auto;
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .acc-section.is-open .acc-title {
-  color: #202124;
+  color: var(--psp-ink);
 }
 
 .acc-meta-badge {
   font-size: 10px;
-  color: #1a73e8;
-  background: #e8f0fe;
+  color: var(--psp-blue);
+  background: var(--psp-blue-soft);
   padding: 1px 7px;
   border-radius: 999px;
   white-space: nowrap;
-  flex-shrink: 0;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 46%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .acc-meta-muted {
@@ -1037,23 +1223,42 @@ function goGuide() {
 }
 
 .acc-body {
-  padding: 0 14px 12px 34px;
-}
-
-.field {
-  margin-bottom: 10px;
-}
-
-.field-label {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 10px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 2px 16px 14px;
+  box-sizing: border-box;
+}
+
+.field,
+.field-label,
+.file-field,
+.meta-grid,
+.btn-grid,
+.btn-row,
+.section-toolbar,
+.hint,
+.stored-list,
+.stored-item {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.field-label,
+.file-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
   font-size: 12px;
-  color: #5f6368;
+  color: var(--psp-secondary);
 }
 
 .field-label-text {
   line-height: 1.4;
+  font-weight: 500;
 }
 
 .req {
@@ -1064,7 +1269,10 @@ function goGuide() {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  margin-top: 2px;
+  padding: 8px 10px;
+  border: 1px solid var(--psp-line-soft);
+  border-radius: 8px;
+  background: var(--psp-bg);
 }
 
 .info-row {
@@ -1072,58 +1280,62 @@ function goGuide() {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 4px 0;
+  min-width: 0;
+  min-height: 24px;
+  padding: 2px 0;
   font-size: 12px;
 }
 
 .info-row .label {
-  color: #80868b;
-  flex-shrink: 0;
+  color: var(--psp-tertiary);
+  flex: 0 0 auto;
+}
+
+.time,
+.badge,
+.mono {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
 }
 
 .time {
   font-size: 12px;
-  color: #3c4043;
-  text-align: right;
+  color: var(--psp-ink);
 }
 
 .badge {
+  flex: 0 1 auto;
   font-size: 11px;
-  color: #1a73e8;
-  background: #e8f0fe;
-  padding: 2px 8px;
+  color: var(--psp-blue);
+  background: var(--psp-blue-soft);
+  padding: 1px 8px;
   border-radius: 999px;
-  white-space: nowrap;
 }
 
 .mono {
+  flex: 1 1 auto;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 11px;
-  color: #3c4043;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 150px;
+  color: var(--psp-ink);
 }
 
-.btn-save {
+.btn-block {
   width: 100%;
-  margin: 0 0 8px !important;
-}
-
-.btn-danger-full {
-  width: 100%;
-  margin: 8px 0 0 !important;
+  margin: 0 !important;
 }
 
 .btn-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 8px;
+  width: 100%;
 }
 
-.btn-grid .el-button {
-  margin: 0;
+.btn-grid > :nth-child(3) {
+  grid-column: 1 / -1;
 }
 
 .btn-span-2 {
@@ -1134,27 +1346,173 @@ function goGuide() {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-}
-
-.btn-row .el-button {
-  margin: 0;
-}
-
-.snap-row {
-  margin-top: 8px;
+  width: 100%;
 }
 
 .section-toolbar {
   display: flex;
   justify-content: flex-end;
-  margin-bottom: 8px;
+  width: 100%;
 }
 
 .hint {
   margin: 0;
   font-size: 12px;
-  color: #5f6368;
+  color: var(--psp-secondary);
   line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.hint-inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 4px;
+}
+
+.file-picker {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  min-width: 0;
+  min-height: 32px;
+  border: 1px solid var(--psp-line);
+  border-radius: 6px;
+  background: #fff;
+  overflow: hidden;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.file-picker:hover {
+  border-color: #c4c7cc;
+  background: #fff;
+}
+
+.file-picker:focus-within {
+  border-color: var(--psp-blue);
+  box-shadow: 0 0 0 2px rgba(51, 112, 255, 0.16);
+}
+
+.file-picker-btn {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
+  background: var(--psp-hover);
+  border-right: 1px solid var(--psp-line);
+  color: var(--psp-ink);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.file-picker-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: block;
+  padding: 6px 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--psp-tertiary);
+}
+
+.file-picker-name.is-set {
+  color: var(--psp-ink);
+}
+
+.file-picker-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.page-settings-panel :deep(.el-button) {
+  max-width: 100%;
+  min-width: 0;
+  margin: 0;
+  white-space: normal;
+  height: auto;
+  min-height: 32px;
+  line-height: 1.35;
+  box-sizing: border-box;
+}
+
+.page-settings-panel :deep(.el-button + .el-button) {
+  margin-left: 0;
+}
+
+.page-settings-panel :deep(.el-button.is-text) {
+  min-height: 24px;
+  height: auto;
+}
+
+.btn-grid :deep(.el-button) {
+  width: 100%;
+}
+
+.btn-row :deep(.el-button) {
+  flex: 1 1 0;
+  width: auto;
+}
+
+.section-toolbar :deep(.el-button) {
+  width: auto;
+  max-width: 100%;
+}
+
+.page-settings-panel :deep(.el-input),
+.page-settings-panel :deep(.el-textarea),
+.page-settings-panel :deep(.el-input-number),
+.page-settings-panel :deep(.el-select),
+.page-settings-panel :deep(.el-upload) {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.page-settings-panel :deep(.el-input__wrapper),
+.page-settings-panel :deep(.el-textarea__inner),
+.page-settings-panel :deep(.el-select__wrapper),
+.page-settings-panel :deep(.el-input-number .el-input__wrapper) {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.page-settings-panel :deep(.el-input--small .el-input__wrapper) {
+  min-height: 32px;
+}
+
+@container page-settings (max-width: 280px) {
+  .btn-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .btn-grid > :nth-child(3),
+  .btn-span-2 {
+    grid-column: auto;
+  }
+
+  .acc-body,
+  .panel-header,
+  .acc-header,
+  .panel-footer {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
 }
 
 .stored-list {
@@ -1165,7 +1523,8 @@ function goGuide() {
   flex-direction: column;
   gap: 8px;
   max-height: 280px;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .stored-item {
@@ -1179,8 +1538,8 @@ function goGuide() {
 }
 
 .stored-item.active {
-  border-color: #1a73e8;
-  background: #e8f0fe;
+  border-color: var(--psp-blue);
+  background: var(--psp-blue-soft);
 }
 
 .stored-open {
@@ -1197,7 +1556,7 @@ function goGuide() {
 }
 
 .stored-open:hover {
-  background: rgba(26, 115, 232, 0.04);
+  background: rgba(51, 112, 255, 0.05);
 }
 
 .stored-delete {
@@ -1213,7 +1572,15 @@ function goGuide() {
 
 .stored-title {
   font-size: 13px;
-  color: #202124;
+  color: var(--psp-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stored-time,
+.stored-created,
+.stored-notes {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1221,26 +1588,26 @@ function goGuide() {
 
 .stored-time {
   font-size: 11px;
-  color: #5f6368;
+  color: var(--psp-secondary);
 }
 
-.stored-created {
-  font-size: 11px;
-  color: #80868b;
-}
-
+.stored-created,
 .stored-notes {
   font-size: 11px;
-  color: #5f6368;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  color: var(--psp-tertiary);
 }
 
 .panel-footer {
   flex-shrink: 0;
+  min-width: 0;
   padding: 8px 12px 10px;
-  border-top: 1px solid #e8eaed;
-  background: #fafbfc;
+  border-top: 1px solid var(--psp-line-soft);
+  background: var(--psp-bg);
+}
+
+.panel-footer :deep(.el-button) {
+  max-width: 100%;
+  justify-content: flex-start;
+  white-space: normal;
 }
 </style>

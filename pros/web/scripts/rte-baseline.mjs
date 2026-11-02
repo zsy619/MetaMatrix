@@ -28,6 +28,57 @@ await page.fill('#login-password', 'demo123456')
 await page.click('button[type="submit"]')
 await page.waitForTimeout(800)
 
+/** 页面设置面板在默认宽度、最窄宽度、窗口最大化时都不得出现横向溢出。 */
+async function assertPageSettingsFits() {
+  const cases = [
+    { label: '默认宽度', width: null, viewport: { width: 1440, height: 900 } },
+    { label: '最窄宽度', width: 240, viewport: { width: 1440, height: 900 } },
+    { label: '窗口最大化', width: null, viewport: { width: 1920, height: 1080 } },
+  ]
+  for (const item of cases) {
+    await page.setViewportSize(item.viewport)
+    await page.evaluate((width) => {
+      if (width) localStorage.setItem('metamatrix:pageSettings:width', String(width))
+      else localStorage.removeItem('metamatrix:pageSettings:width')
+      localStorage.setItem(
+        'metamatrix:pageSettings:sections',
+        JSON.stringify({
+          document: true,
+          files: true,
+          stored: true,
+          ai: true,
+          edit: true,
+          view: true,
+        }),
+      )
+    }, item.width)
+    await page.goto('http://127.0.0.1:5173/canvas/dual-triangle', { waitUntil: 'domcontentloaded' })
+    await page.waitForSelector('.page-settings-panel', { timeout: 8000 })
+    await page.waitForTimeout(250)
+    const metrics = await page.evaluate(() => {
+      const panel = document.querySelector('.page-settings-panel')
+      const body = panel?.querySelector('.panel-body')
+      if (!(panel instanceof HTMLElement) || !(body instanceof HTMLElement)) {
+        return { ok: false, reason: 'missing' }
+      }
+      return {
+        ok: panel.scrollWidth <= panel.clientWidth && body.scrollWidth <= body.clientWidth,
+        width: Math.round(panel.getBoundingClientRect().width),
+        panel: { scrollWidth: panel.scrollWidth, clientWidth: panel.clientWidth },
+        body: { scrollWidth: body.scrollWidth, clientWidth: body.clientWidth },
+      }
+    })
+    const narrowOk = item.width == null || (metrics.width != null && metrics.width <= item.width + 1)
+    log(
+      `页面设置 ${item.label} scrollWidth<=clientWidth`,
+      !!metrics.ok && narrowOk,
+      JSON.stringify(metrics),
+    )
+  }
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.evaluate(() => localStorage.removeItem('metamatrix:pageSettings:width'))
+}
+
 async function openTemplate(path, shot) {
   await page.goto(`http://127.0.0.1:5173${path}`, { waitUntil: 'domcontentloaded' })
   await page.waitForTimeout(2000)
@@ -61,12 +112,18 @@ const block = page.locator('.ym-block', { has: page.locator('h3', { hasText: '�
 await block.locator('button[aria-label="最大化"]').click()
 await page.waitForSelector('.pm-overlay .ProseMirror')
 const paragraph = page.locator('.pm-overlay .ProseMirror p').filter({ hasText: '第一段' }).first()
-if (await paragraph.count()) await paragraph.click()
-else await page.locator('.pm-overlay .ProseMirror').click({ position: { x: 80, y: 120 }, force: true })
-await page.keyboard.press('End')
-await page.keyboard.press('Enter')
+if (await paragraph.count()) {
+  await paragraph.click()
+  await page.keyboard.press('End')
+  await page.keyboard.press('Enter')
+} else {
+  // 没有云端样例文档时，坐标点击落不到空段落，斜杠菜单不会打开。
+  await page.locator('.pm-overlay .ProseMirror p').first().click()
+  await page.keyboard.press('Control+a')
+  await page.keyboard.press('Backspace')
+}
 await page.keyboard.type('/')
-await page.waitForTimeout(500)
+await page.locator('.rte-slash-list').waitFor({ state: 'visible', timeout: 4000 }).catch(() => {})
 const slash = await page.locator('.rte-slash-menu').count()
 log('slash 菜单', slash > 0, String(slash))
 if (slash) {
@@ -118,6 +175,8 @@ if (await print.count()) {
 }
 log('Esc 后打印预览关闭', (await page.locator('.rte-print-preview-paper').count()) === 0)
 await page.screenshot({ path: `${out}/baseline_y_model.png` })
+
+await assertPageSettingsFits()
 
 console.log(JSON.stringify(notes, null, 2))
 await browser.close()
