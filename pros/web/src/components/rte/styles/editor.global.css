@@ -2428,6 +2428,156 @@
   max-height: none !important;
   overflow: visible !important;
 }
+.rte-page-chrome-input {
+  width: 96px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--mm-text, #1d2129);
+  background: #fff;
+  border: 1px solid var(--mm-line, #e5e6eb);
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+.rte-page-header,
+.rte-page-footer {
+  position: absolute;
+  z-index: 4;
+  pointer-events: none;
+  box-sizing: border-box;
+  color: #4e5969;
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: center;
+}
+.rte-page-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+}
+.rte-page-footer.is-num-only {
+  justify-content: center;
+}
+.rte-page-footer-num {
+  margin-left: auto;
+  white-space: nowrap;
+}
+.rte-page-footer.is-num-only .rte-page-footer-num {
+  margin-left: 0;
+}
+.rte-root.has-page-chrome:not(.is-page-sheet) .rte-body {
+  position: relative;
+  padding-top: var(--rte-margin-top, 10mm) !important;
+  padding-bottom: var(--rte-margin-bottom, 10mm) !important;
+}
+.rte-running-chrome {
+  display: none;
+}
+.rte-preview-header,
+.rte-preview-footer {
+  color: #4e5969;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.rte-preview-header {
+  text-align: center;
+  margin-bottom: 12px;
+}
+.rte-preview-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 18px;
+}
+.rte-present {
+  position: fixed;
+  inset: 0;
+  z-index: 8000;
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) 72px;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  background: #14161a;
+  color: #f5f6f7;
+}
+.rte-present-top {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+}
+.rte-present-units {
+  display: inline-flex;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.rte-present-units button,
+.rte-present-exit,
+.rte-present-nav {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.rte-present-units button {
+  padding: 6px 14px;
+  font-size: 13px;
+}
+.rte-present-units button.active {
+  background: #3370ff;
+}
+.rte-present-progress {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+.rte-present-exit {
+  border-radius: 999px;
+  background: #fff;
+  color: #1d2129;
+  padding: 6px 14px;
+  font-weight: 700;
+}
+.rte-present-nav {
+  font-size: 40px;
+  line-height: 1;
+}
+.rte-present-nav:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+.rte-present-stage {
+  overflow: auto;
+  margin: 8px 0;
+  padding: 48px 56px;
+  border-radius: 16px;
+  background: #fff;
+  color: #1d2129;
+  font-size: 22px;
+  line-height: 1.7;
+}
+.rte-present-stage img,
+.rte-present-stage video {
+  max-width: 100%;
+  height: auto;
+}
+.rte-present-stage h1,
+.rte-present-stage h2,
+.rte-present-stage h3 {
+  line-height: 1.3;
+  margin: 0 0 0.6em;
+}
+.rte-present-empty {
+  color: #86909c;
+}
+.rte-present-hint {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 10px 20px 16px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 12px;
+}
 
 @media print {
   body * {
@@ -2452,6 +2602,8 @@
   .rte-root.rte-printing .rte-outline-panel,
   .rte-root.rte-printing .rte-block-tools,
   .rte-root.rte-printing .rte-block-menu,
+  .rte-root.rte-printing .rte-page-header,
+  .rte-root.rte-printing .rte-page-footer,
   .rte-root.rte-printing .rte-preview-banner,
   .rte-root.rte-printing .rte-word-dock,
   .rte-root.rte-printing .column-resize-handle,
@@ -2514,6 +2666,35 @@
   .rte-root.rte-printing .rte-body::before {
     display: none !important;
   }
+  .rte-root.rte-printing .rte-running-chrome {
+    display: block;
+  }
+  .rte-root.rte-printing .rte-running-header,
+  .rte-root.rte-printing .rte-running-footer {
+    position: fixed;
+    left: 0;
+    right: 0;
+    color: #4e5969;
+    font-size: 10.5pt;
+    line-height: 1.4;
+    z-index: 2;
+  }
+  .rte-root.rte-printing .rte-running-header {
+    top: 3mm;
+    text-align: center;
+  }
+  .rte-root.rte-printing .rte-running-footer {
+    bottom: 3mm;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 0 12mm;
+    box-sizing: border-box;
+  }
+  .rte-root.rte-printing .rte-running-num[data-style='n']::after { content: counter(page); }
+  .rte-root.rte-printing .rte-running-num[data-style='page-n']::after { content: '第 ' counter(page) ' 页'; }
+  .rte-root.rte-printing .rte-running-num[data-style='page-n-of-m']::after { content: '第 ' counter(page) ' 页 共 ' counter(pages) ' 页'; }
+  .rte-root.rte-printing .rte-running-num[data-style='dash']::after { content: '- ' counter(page) ' -'; }
   .rte-root.rte-printing [data-resize-handle],
   .rte-root.rte-printing .rte-image-drop-line,
   .rte-root.rte-printing .rte-image-drop-preview,

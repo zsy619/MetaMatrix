@@ -619,6 +619,31 @@ useParentScopeStamp()
       </div>
     </Teleport>
 
+    <Teleport to="body">
+      <div data-rte-own
+        v-if="rte.presentOpen"
+        :ref="(el) => (rte.presentRoot = el)"
+        class="rte-present"
+        role="dialog"
+        aria-modal="true"
+        aria-label="演示"
+        tabindex="-1"
+      >
+        <div data-rte-own class="rte-present-top">
+          <div data-rte-own class="rte-present-units" role="tablist" aria-label="翻页方式">
+            <button data-rte-own type="button" :class="{ active: rte.presentUnit === 'block' }" @click="rte.setPresentUnit('block')">按块</button>
+            <button data-rte-own type="button" :class="{ active: rte.presentUnit === 'screen' }" @click="rte.setPresentUnit('screen')">按屏</button>
+          </div>
+          <span data-rte-own class="rte-present-progress">{{ rte.presentIndex + 1 }} / {{ rte.presentSlides.length }}</span>
+          <button data-rte-own type="button" class="rte-present-exit" @click="rte.closePresent">退出</button>
+        </div>
+        <button data-rte-own type="button" class="rte-present-nav is-prev" aria-label="上一屏" :disabled="rte.presentIndex === 0" @click="rte.stepPresent(-1)">‹</button>
+        <div data-rte-own class="rte-present-stage" @click="rte.onPresentStageClick" v-html="rte.presentSlides[rte.presentIndex]"></div>
+        <button data-rte-own type="button" class="rte-present-nav is-next" aria-label="下一屏" :disabled="rte.presentIndex >= rte.presentSlides.length - 1" @click="rte.stepPresent(1)">›</button>
+        <p data-rte-own class="rte-present-hint">方向键或空格翻页，Esc 退出。演示中不能编辑。</p>
+      </div>
+    </Teleport>
+
     <!-- 打印预览 -->
     <Teleport to="body">
       <div data-rte-own
@@ -640,7 +665,14 @@ useParentScopeStamp()
               <button data-rte-own type="button" class="rte-modal-confirm" @click="rte.confirmPrintFromPreview">打印</button>
             </div>
           </div>
-          <div data-rte-own class="rte-print-preview-paper" :style="rte.printPreviewMarginStyle" v-html="rte.printPreviewHtml"></div>
+          <div data-rte-own class="rte-print-preview-paper" :style="rte.printPreviewMarginStyle">
+            <div data-rte-own v-if="rte.pageChrome.header" class="rte-preview-header">{{ rte.pageChrome.header }}</div>
+            <div data-rte-own v-html="rte.printPreviewHtml"></div>
+            <div data-rte-own v-if="rte.pageChrome.footer || rte.previewPageLabel" class="rte-preview-footer">
+              <span data-rte-own>{{ rte.pageChrome.footer }}</span>
+              <span data-rte-own>{{ rte.previewPageLabel }}</span>
+            </div>
+          </div>
         </div>
       </div>
     </Teleport>

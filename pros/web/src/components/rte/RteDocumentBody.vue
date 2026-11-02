@@ -467,11 +467,27 @@ useParentScopeStamp()
           v-if="rte.showTitle && rte.viewMode === 'preview' && rte.localTitle"
           class="rte-title-sep"
         />
+        <div data-rte-own v-if="rte.pageChrome.header" class="rte-page-header">{{ rte.pageChrome.header }}</div>
         <EditorContent data-rte-own
           :editor="rte.editor"
           class="rte-body"
           :style="{ zoom: rte.editorZoom }"
         />
+        <div data-rte-own
+          v-if="rte.pageChrome.footer || rte.screenPageLabel"
+          class="rte-page-footer"
+          :class="{ 'is-num-only': !rte.pageChrome.footer && rte.screenPageLabel }"
+        >
+          <span data-rte-own class="rte-page-footer-text">{{ rte.pageChrome.footer }}</span>
+          <span data-rte-own v-if="rte.screenPageLabel" class="rte-page-footer-num">{{ rte.screenPageLabel }}</span>
+        </div>
+        <div data-rte-own v-if="rte.pageChrome.header || rte.pageChrome.footer || rte.screenPageLabel" class="rte-running-chrome" aria-hidden="true">
+          <div data-rte-own class="rte-running-header">{{ rte.pageChrome.header }}</div>
+          <div data-rte-own class="rte-running-footer">
+            <span data-rte-own>{{ rte.pageChrome.footer }}</span>
+            <span data-rte-own class="rte-running-num" :data-style="rte.pageChrome.pageNumber"></span>
+          </div>
+        </div>
         <div data-rte-own
           v-if="rte.blockHandle.visible"
           class="rte-block-tools"
@@ -746,6 +762,42 @@ useParentScopeStamp()
             <option data-rte-own value="custom">自定义</option>
           </select>
         </label>
+        <label data-rte-own class="rte-page-size-field">
+          页眉
+          <input data-rte-own
+            class="rte-page-chrome-input"
+            :value="rte.pageChrome.header"
+            maxlength="80"
+            aria-label="页眉"
+            :disabled="rte.viewMode !== 'edit'"
+            @change="rte.setPageHeader(($event.target as HTMLInputElement).value)"
+          />
+        </label>
+        <label data-rte-own class="rte-page-size-field">
+          页脚
+          <input data-rte-own
+            class="rte-page-chrome-input"
+            :value="rte.pageChrome.footer"
+            maxlength="80"
+            aria-label="页脚"
+            :disabled="rte.viewMode !== 'edit'"
+            @change="rte.setPageFooter(($event.target as HTMLInputElement).value)"
+          />
+        </label>
+        <label data-rte-own class="rte-page-size-field">
+          页码
+          <select data-rte-own
+            :value="rte.pageChrome.pageNumber"
+            aria-label="页码"
+            :disabled="rte.viewMode !== 'edit'"
+            @change="rte.setPageNumber(($event.target as HTMLSelectElement).value)"
+          >
+            <option data-rte-own v-for="opt in rte.PAGE_NUMBER_OPTIONS" :key="'pn-' + opt.id" :value="opt.id">
+              {{ opt.label }}
+            </option>
+          </select>
+        </label>
+        <button data-rte-own type="button" class="rte-bottom-link" @click="rte.openPresent">演示</button>
         <span data-rte-own v-if="rte.pageMargin.preset === 'custom'" class="rte-margin-custom">
           <label data-rte-own>上<input data-rte-own :value="rte.pageMargin.top" type="number" min="0" max="80" step="0.1" aria-label="上边距毫米" :disabled="rte.viewMode !== 'edit'" @change="rte.setMarginSide('top', ($event.target as HTMLInputElement).value)" /></label>
           <label data-rte-own>下<input data-rte-own :value="rte.pageMargin.bottom" type="number" min="0" max="80" step="0.1" aria-label="下边距毫米" :disabled="rte.viewMode !== 'edit'" @change="rte.setMarginSide('bottom', ($event.target as HTMLInputElement).value)" /></label>

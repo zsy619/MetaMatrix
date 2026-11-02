@@ -106,6 +106,11 @@ export type WithPanelAttachments = {
   pageMarginByPanelId?: Record<string, { preset: string; top: number; right: number; bottom: number; left: number }>
   /** 富文本工具栏分组顺序。缺省用默认分组。键与面板 id 对齐。 */
   toolbarGroupOrderByPanelId?: Record<string, string[]>
+  /**
+   * 富文本页眉、页脚和页码样式。缺省为空：不占版心。
+   * 键与面板 id 对齐。
+   */
+  pageChromeByPanelId?: Record<string, { header: string; footer: string; pageNumber: string }>
 }
 
 

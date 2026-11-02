@@ -100,6 +100,8 @@ import RteDocumentBody from './rte/RteDocumentBody.vue'
 import RtePortals from './rte/RtePortals.vue'
 import { bindAskMore, useAskDialog } from './rte/composables/useAskDialog'
 import { useRtePageLayout } from './rte/composables/useRtePageLayout'
+import { usePageChrome } from './rte/composables/usePageChrome'
+import { EMPTY_PAGE_CHROME, PAGE_NUMBER_OPTIONS, type PanelPageChrome } from '../utils/rtePageChrome'
 import { useToolbarGroups } from './rte/composables/useToolbarGroups'
 import { buildToolbarGroups } from '../utils/rteToolbarGroups'
 import { useFindReplace } from './rte/composables/useFindReplace'
@@ -435,6 +437,37 @@ const toolbarUndoBridge = {
     return false
   },
 }
+const pageChrome = ref<PanelPageChrome>({ ...EMPTY_PAGE_CHROME })
+const {
+  pageChromeActive,
+  screenPageLabel,
+  previewPageLabel,
+  setPageHeader,
+  setPageFooter,
+  setPageNumber,
+  scheduleMeasure,
+  presentOpen,
+  presentUnit,
+  presentIndex,
+  presentSlides,
+  presentRoot,
+  openPresent,
+  closePresent,
+  stepPresent,
+  setPresentUnit,
+  onPresentStageClick,
+} = usePageChrome({
+  pageChrome,
+  panelId: () => props.panelId,
+  chromeMap: () => current_data.value?.pageChromeByPanelId,
+  setPanelPageChrome: (panelId, chrome) => documentStore.setPanelPageChrome(panelId, chrome),
+  viewMode: () => viewMode.value,
+  editor: () => editor.value,
+  rootEl: rteRootEl,
+  pageSize: () => pageSize.value,
+  margin: () => pageScreenMargin.value,
+  announce: (message) => announceRte(message),
+})
 const {
   pageSize,
   pageSizeMeta,
@@ -464,6 +497,7 @@ const {
   announce: (message) => announceRte(message),
   disarmToolbarUndo: () => toolbarUndoBridge.disarm(),
   toolbarUndoIsNewer: (stamp) => toolbarUndoBridge.isNewer(stamp),
+  chrome: () => pageChrome.value,
 })
 
 function initialEditorContent(): string {
@@ -2039,6 +2073,7 @@ function openPrintPreview() {
   printPreviewHtml.value = title
     ? `<h1 class="rte-print-title">${escapeHtml(title)}</h1>${body}`
     : body
+  scheduleMeasure()
   printPreviewOpen.value = true
   moreOpen.value = false
 }
@@ -4025,6 +4060,7 @@ const {
   },
 })
 void importFileInputRef
+void presentRoot
 
 const {
   exportMenuOpen,
@@ -4046,6 +4082,7 @@ const {
   pageSizeMeta,
   pageMargin,
   pageScreenMargin,
+  pageChrome,
   closeMore: () => {
     moreOpen.value = false
   },
@@ -5851,6 +5888,23 @@ provideRteBindings({
   xrefQuery,
   xrefTargets,
   zoomMenuOpen,
+  PAGE_NUMBER_OPTIONS,
+  closePresent,
+  onPresentStageClick,
+  openPresent,
+  pageChrome,
+  presentIndex,
+  presentOpen,
+  presentRoot,
+  presentSlides,
+  presentUnit,
+  previewPageLabel,
+  screenPageLabel,
+  setPageFooter,
+  setPageHeader,
+  setPageNumber,
+  setPresentUnit,
+  stepPresent,
 })
 
 defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm })
@@ -5877,6 +5931,7 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
       'is-immersive': immersiveFullscreen,
       'is-paper-guide': paperGuide,
       'is-page-sheet': pageSizeMeta.paper,
+      'has-page-chrome': pageChromeActive,
       'is-page-feishu': pageSize === 'feishu',
       'is-table-sticky': tableHeaderSticky,
       'is-cjk-typography': true,
