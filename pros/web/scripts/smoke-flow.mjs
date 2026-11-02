@@ -45,16 +45,35 @@ async function call(path, { method = 'GET', token, body } = {}) {
   return data
 }
 
+/**
+ * 取一张图形验证码。答案需要人读图，自动化只能靠 API 把明文答案带出来：
+ * - CAPTCHA_DEBUG=true：任何调用方都能读到（只在本机用）
+ * - CAPTCHA_DEBUG_LOOPBACK=true：只有回环地址能读到（CI 用，CI 里自动打开）
+ * 生产环境两个开关都不开，接口不返回答案。
+ */
+async function takeCaptcha() {
+  const challenge = await call('/auth/captcha')
+  if (!challenge?.captchaId || !challenge?.debugAnswer) {
+    throw new Error(
+      'captcha challenge has no answer; run the API with CAPTCHA_DEBUG=true, ' +
+        'or CAPTCHA_DEBUG_LOOPBACK=true when the smoke test talks to it over 127.0.0.1',
+    )
+  }
+  return { captchaId: challenge.captchaId, captchaCode: challenge.debugAnswer }
+}
+
+const registerCaptcha = await takeCaptcha()
 const registered = await call('/auth/register', {
   method: 'POST',
-  body: { email, password, displayName: 'Smoke' },
+  body: { email, password, displayName: 'Smoke', ...registerCaptcha },
 })
 const token = registered.token
 if (!token) {
   console.error('register did not return a token')
   process.exit(1)
 }
-await call('/auth/login', { method: 'POST', body: { email, password } })
+const loginCaptcha = await takeCaptcha()
+await call('/auth/login', { method: 'POST', body: { email, password, ...loginCaptcha } })
 const stats = await call('/documents/stats', { token })
 if (stats.scope && stats.scope !== 'me' && stats.documents == null) {
   console.error('workspace stats payload was empty')

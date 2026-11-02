@@ -55,7 +55,7 @@ func TestValidatePassword(t *testing.T) {
 }
 
 func TestChangePasswordRejectsWeakBeforeDB(t *testing.T) {
-	svc := NewAuthService(nil, "secret")
+	svc := NewAuthService(nil, "secret", nil)
 	if err := svc.ChangePassword(uuid.Nil, "current-pass", "123"); err != ErrWeakPassword {
 		t.Fatalf("short = %v", err)
 	}

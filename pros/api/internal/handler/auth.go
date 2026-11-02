@@ -3,43 +3,146 @@ package handler
 import (
 	"context"
 	"errors"
+	"net"
 	"net/http"
 	"strconv"
 	"time"
 
 	"metamatrix/api/internal/middleware"
+	"metamatrix/api/internal/model"
 	"metamatrix/api/internal/service"
 
 	"github.com/cloudwego/hertz/pkg/app"
+	"github.com/google/uuid"
 )
 
-type AuthHandler struct {
-	svc   *service.AuthService
-	limit *service.AttemptLimiter
+// AuthBackend is the part of the auth service the HTTP layer depends on.
+// The interface keeps the handler testable without a database.
+type AuthBackend interface {
+	Register(email, password, displayName string) (*model.User, string, error)
+	Login(email, password string) (*model.User, string, error)
+	Refresh(userID uuid.UUID) (*model.User, string, error)
+	ChangePassword(userID uuid.UUID, current, next string) error
+	Me(userID uuid.UUID) (*model.User, error)
+	VerifyCaptcha(captchaID, captchaAnswer string) error
+	NewCaptcha(clientKey string, wantAnswer bool) (service.CaptchaChallenge, error)
 }
 
-func NewAuthHandler(svc *service.AuthService, limit *service.AttemptLimiter) *AuthHandler {
+type AuthHandler struct {
+	svc   AuthBackend
+	limit *service.AttemptLimiter
+	// captchaDebugAll hands the readable answer to every caller. It is only
+	// safe on a developer machine.
+	captchaDebugAll bool
+	// captchaDebugLoopback hands the readable answer to loopback callers only.
+	// CI turns it on so the smoke test can read the answer out of the band.
+	captchaDebugLoopback bool
+}
+
+// AuthOptions carries the captcha debug switches for the auth handler.
+type AuthOptions struct {
+	// DebugAll returns the readable captcha answer to every caller.
+	DebugAll bool
+	// DebugLoopback returns the readable captcha answer to loopback callers.
+	DebugLoopback bool
+}
+
+func NewAuthHandler(svc AuthBackend, limit *service.AttemptLimiter, opts ...AuthOptions) *AuthHandler {
 	if limit == nil {
 		limit = service.NewAttemptLimiter(15*time.Minute, 8, 30)
 	}
-	return &AuthHandler{svc: svc, limit: limit}
+	var opt AuthOptions
+	if len(opts) > 0 {
+		opt = opts[0]
+	}
+	return &AuthHandler{
+		svc:                  svc,
+		limit:                limit,
+		captchaDebugAll:      opt.DebugAll,
+		captchaDebugLoopback: opt.DebugLoopback,
+	}
 }
 
 type registerBody struct {
 	Email       string `json:"email"`
 	Password    string `json:"password"`
 	DisplayName string `json:"displayName"`
+	CaptchaID   string `json:"captchaId"`
+	CaptchaCode string `json:"captchaCode"`
 }
 
 type loginBody struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Email       string `json:"email"`
+	Password    string `json:"password"`
+	CaptchaID   string `json:"captchaId"`
+	CaptchaCode string `json:"captchaCode"`
+}
+
+// Captcha issues a fresh image challenge. It is public because the login and
+// register pages need a challenge before the user is authenticated.
+func (h *AuthHandler) Captcha(ctx context.Context, c *app.RequestContext) {
+	challenge, err := h.svc.NewCaptcha(remoteIP(c), h.wantsCaptchaAnswer(c))
+	if err != nil {
+		if errors.Is(err, service.ErrCaptchaTooMany) {
+			c.Header("Retry-After", "60")
+			Fail(c, http.StatusTooManyRequests, "too many captcha requests", "rate_limited")
+			return
+		}
+		Internal(c, "captcha issue failed")
+		return
+	}
+	c.JSON(http.StatusOK, challenge)
+}
+
+// wantsCaptchaAnswer decides whether the caller may read the plain answer.
+// Debug mode exposes it to everyone, which is only safe on a developer
+// machine. The loopback switch is what CI uses: the smoke test runs on the
+// same host as the API, so nobody outside the machine can read the answer.
+func (h *AuthHandler) wantsCaptchaAnswer(c *app.RequestContext) bool {
+	if h.captchaDebugAll {
+		return true
+	}
+	if !h.captchaDebugLoopback {
+		return false
+	}
+	addr := c.RemoteAddr()
+	if addr == nil {
+		return false
+	}
+	return isLoopbackIP(addr.String())
+}
+
+// isLoopbackIP reports whether the address points back at this machine.
+func isLoopbackIP(addr string) bool {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		host = addr
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
+}
+
+// captchaFailure maps a captcha error onto the HTTP response. The message
+// never reveals whether the id existed or the answer was wrong.
+func captchaFailure(c *app.RequestContext, err error) {
+	switch {
+	case errors.Is(err, service.ErrCaptchaRequired):
+		Fail(c, http.StatusBadRequest, "captcha required", "captcha_required")
+	case errors.Is(err, service.ErrCaptchaExpired):
+		Fail(c, http.StatusBadRequest, "captcha expired", "captcha_expired")
+	default:
+		Fail(c, http.StatusBadRequest, "captcha answer does not match", "captcha_invalid")
+	}
 }
 
 func (h *AuthHandler) Register(ctx context.Context, c *app.RequestContext) {
 	var body registerBody
 	if err := c.BindAndValidate(&body); err != nil {
 		BadRequest(c, "invalid body")
+		return
+	}
+	if err := h.svc.VerifyCaptcha(body.CaptchaID, body.CaptchaCode); err != nil {
+		captchaFailure(c, err)
 		return
 	}
 	u, token, err := h.svc.Register(body.Email, body.Password, body.DisplayName)
@@ -79,6 +182,12 @@ func (h *AuthHandler) Login(ctx context.Context, c *app.RequestContext) {
 		tooManyLogins(c, wait)
 		return
 	}
+	// The captcha is checked before the credentials so a bot cannot use the
+	// login endpoint to probe passwords one attempt at a time.
+	if err := h.svc.VerifyCaptcha(body.CaptchaID, body.CaptchaCode); err != nil {
+		captchaFailure(c, err)
+		return
+	}
 	u, token, err := h.svc.Login(body.Email, body.Password)
 	if err != nil {
 		if errors.Is(err, service.ErrInvalidCreds) {
@@ -109,6 +218,20 @@ func clientIP(c *app.RequestContext) string {
 		return "unknown"
 	}
 	return ip
+}
+
+// remoteIP is the peer address of the socket. Unlike ClientIP it cannot be
+// spoofed with X-Forwarded-For, so it is what the captcha rate limit uses.
+func remoteIP(c *app.RequestContext) string {
+	addr := c.RemoteAddr()
+	if addr == nil {
+		return "unknown"
+	}
+	host, _, err := net.SplitHostPort(addr.String())
+	if err != nil {
+		return addr.String()
+	}
+	return host
 }
 
 func tooManyLogins(c *app.RequestContext, wait time.Duration) {

@@ -12,10 +12,28 @@ export type AuthResponse = {
   user: User
 }
 
+/** A server issued image challenge. The image is a data URI. */
+export type CaptchaChallenge = {
+  captchaId: string
+  image: string
+  expiresAt: string
+  /**
+   * Only present when the API runs with CAPTCHA_DEBUG=true, which is a
+   * local/CI automation aid. It never appears in production.
+   */
+  debugAnswer?: string
+}
+
+export function fetchCaptcha(): Promise<CaptchaChallenge> {
+  return apiRequest<CaptchaChallenge>('/auth/captcha', { auth: false })
+}
+
 export function register(input: {
   email: string
   password: string
   displayName?: string
+  captchaId: string
+  captchaCode: string
 }) {
   return apiRequest<AuthResponse>('/auth/register', {
     method: 'POST',
@@ -24,7 +42,12 @@ export function register(input: {
   })
 }
 
-export function login(input: { email: string; password: string }) {
+export function login(input: {
+  email: string
+  password: string
+  captchaId: string
+  captchaCode: string
+}) {
   return apiRequest<AuthResponse>('/auth/login', {
     method: 'POST',
     body: input,

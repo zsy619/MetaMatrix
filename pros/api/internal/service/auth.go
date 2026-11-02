@@ -37,10 +37,34 @@ func init() {
 type AuthService struct {
 	db        *gorm.DB
 	jwtSecret string
+	captcha   *CaptchaService
 }
 
-func NewAuthService(db *gorm.DB, jwtSecret string) *AuthService {
-	return &AuthService{db: db, jwtSecret: jwtSecret}
+// NewAuthService builds the auth service. The captcha service may be nil,
+// in which case captcha checks are skipped (only used by unit tests that do
+// not exercise the captcha path).
+func NewAuthService(db *gorm.DB, jwtSecret string, captcha *CaptchaService) *AuthService {
+	return &AuthService{db: db, jwtSecret: jwtSecret, captcha: captcha}
+}
+
+// VerifyCaptcha checks a login or registration challenge. It runs before any
+// credential work so an invalid captcha never reaches the password check.
+func (s *AuthService) VerifyCaptcha(captchaID, captchaAnswer string) error {
+	if s.captcha == nil {
+		return nil
+	}
+	return s.captcha.Verify(captchaID, captchaAnswer)
+}
+
+// NewCaptcha issues a fresh image challenge for the login and register pages.
+// clientKey identifies the caller so the service can rate limit how many
+// challenges one client may pull. wantAnswer asks for the readable answer,
+// which the HTTP layer only does for trusted callers.
+func (s *AuthService) NewCaptcha(clientKey string, wantAnswer bool) (CaptchaChallenge, error) {
+	if s.captcha == nil {
+		return CaptchaChallenge{}, ErrCaptchaRequired
+	}
+	return s.captcha.IssueWithAnswer(clientKey, wantAnswer)
 }
 
 type UserDTO struct {

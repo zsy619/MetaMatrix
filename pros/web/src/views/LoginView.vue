@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { friendlyApiMessage } from '../utils/apiMessage'
 import { safeRedirect } from '../utils/safeRedirect'
+import { isCaptchaBlank } from '../utils/captcha'
+import CaptchaField from '../components/ui/CaptchaField.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -11,17 +13,35 @@ const route = useRoute()
 
 const email = ref('')
 const password = ref('')
+const captchaCode = ref('')
 const busy = ref(false)
 const message = ref('')
+const captchaRef = ref<InstanceType<typeof CaptchaField> | null>(null)
+
+onMounted(() => {
+  document.title = '登录 · 元矩阵 MetaMatrix'
+})
 
 async function submit() {
   busy.value = true
   message.value = ''
   try {
-    await auth.login(email.value.trim(), password.value)
+    if (isCaptchaBlank(captchaCode.value)) {
+      message.value = '请输入图形验证码。'
+      captchaRef.value?.refresh()
+      return
+    }
+    await auth.login(email.value.trim(), password.value, {
+      captchaId: captchaRef.value?.getCaptchaId() ?? '',
+      captchaCode: captchaRef.value?.getCaptchaCode() ?? '',
+    })
     router.replace(safeRedirect(route.query.redirect, '/'))
   } catch (e: unknown) {
     message.value = friendlyApiMessage(e, '登录失败')
+    // 验证码是一次性的：服务端在校验通过后就把这张图作废，不管密码对不对。
+    // 所以只要这次提交失败就得换一张，否则用户会拿着已经作废的图重试，
+    // 然后收到一句莫名其妙的「图形验证码不正确」。
+    captchaRef.value?.refresh()
   } finally {
     busy.value = false
   }
@@ -30,120 +50,66 @@ async function submit() {
 
 <template>
   <div class="auth-page">
-    <form class="card" @submit.prevent="submit">
-      <p class="eyebrow">MetaMatrix</p>
-      <h1>登录</h1>
-      <p class="hint">登录后只同步你自己的画布。会话保存在本机，离开账号后不会继续看到别人的文档。</p>
-      <label for="login-email">
-        邮箱
-        <input
-          id="login-email"
-          v-model="email"
-          type="email"
-          required
-          autocomplete="username"
-          placeholder="name@example.com"
-          :aria-invalid="Boolean(message)"
-        />
-      </label>
-      <label for="login-password">
-        密码
-        <input
-          id="login-password"
-          v-model="password"
-          type="password"
-          required
-          autocomplete="current-password"
-          :aria-invalid="Boolean(message)"
-        />
-      </label>
-      <p v-if="message" class="error" role="alert">{{ message }}</p>
-      <button type="submit" class="mm-btn mm-btn--primary" :disabled="busy">{{ busy ? '登录中…' : '登录' }}</button>
-      <p class="footer">
+    <form class="auth-card" novalidate @submit.prevent="submit">
+      <div class="auth-brand">
+        <span class="auth-brand__mark" aria-hidden="true">M</span>
+        <span>
+          <span class="auth-brand__name">MetaMatrix</span>
+          <span class="auth-brand__sub">元矩阵 · 画布工作台</span>
+        </span>
+      </div>
+
+      <div class="auth-heading">
+        <p class="auth-eyebrow">账号登录</p>
+        <h1 class="auth-title">欢迎回来</h1>
+        <p class="auth-hint">登录后只同步你自己的画布。会话保存在本机，离开账号后不会继续看到别人的文档。</p>
+      </div>
+
+      <div class="auth-fields">
+        <label class="auth-field" for="login-email">
+          <span class="auth-field__label">邮箱</span>
+          <input
+            id="login-email"
+            v-model="email"
+            class="auth-input"
+            type="email"
+            required
+            autocomplete="username"
+            placeholder="name@example.com"
+            :aria-invalid="Boolean(message)"
+          />
+        </label>
+
+        <label class="auth-field" for="login-password">
+          <span class="auth-field__label">密码</span>
+          <input
+            id="login-password"
+            v-model="password"
+            class="auth-input"
+            type="password"
+            required
+            autocomplete="current-password"
+            placeholder="请输入密码"
+            :aria-invalid="Boolean(message)"
+          />
+        </label>
+
+        <CaptchaField ref="captchaRef" v-model="captchaCode" />
+      </div>
+
+      <p v-if="message" class="auth-alert" role="alert">
+        <span class="auth-alert__icon" aria-hidden="true">!</span>
+        <span>{{ message }}</span>
+      </p>
+
+      <button type="submit" class="auth-submit" :disabled="busy">
+        {{ busy ? '登录中…' : '登录' }}
+      </button>
+
+      <p class="auth-footer">
         还没有账号？
         <router-link :to="{ name: 'register', query: route.query }">注册</router-link>
       </p>
     </form>
   </div>
 </template>
-
-<style scoped>
-.auth-page {
-  min-height: 100%;
-  display: grid;
-  place-items: center;
-  padding: 32px 16px;
-  background:
-    radial-gradient(ellipse 70% 40% at 50% -10%, var(--mm-blue-soft) 0%, transparent 60%),
-    var(--mm-bg);
-}
-.card {
-  width: min(420px, 100%);
-  background: var(--mm-surface);
-  border: 1px solid var(--mm-line);
-  border-radius: var(--mm-radius);
-  padding: 28px 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.eyebrow {
-  margin: 0;
-  font-size: 12px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--mm-blue);
-  font-weight: 700;
-}
-h1 {
-  margin: 0;
-  font-size: 28px;
-  letter-spacing: -0.03em;
-}
-.hint {
-  margin: 0 0 8px;
-  color: var(--mm-muted);
-  font-size: 13px;
-  line-height: 1.55;
-}
-label {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 13px;
-  color: #3c4043;
-}
-input {
-  border: 1px solid var(--mm-line-strong);
-  border-radius: 10px;
-  padding: 10px 12px;
-  font-size: 14px;
-}
-button {
-  margin-top: 8px;
-  border: none;
-  border-radius: 999px;
-  padding: 10px 14px;
-  background: var(--mm-blue);
-  color: #fff;
-  font-weight: 650;
-  cursor: pointer;
-}
-button:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-.error {
-  color: var(--mm-red);
-  font-size: 13px;
-  margin: 0;
-}
-.footer {
-  font-size: 13px;
-  color: var(--mm-muted);
-  margin: 4px 0 0;
-}
-.footer a {
-  color: var(--mm-blue);
-}
-</style>

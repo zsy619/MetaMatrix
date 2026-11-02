@@ -30,9 +30,12 @@ func main() {
 		log.Fatalf("migrate: %v", err)
 	}
 
-	authSvc := service.NewAuthService(gdb, cfg.JWTSecret)
+	authSvc := service.NewAuthService(gdb, cfg.JWTSecret, service.NewCaptchaService(cfg.CaptchaTTL, cfg.CaptchaDebug))
 	docSvc := service.NewDocumentsService(gdb)
-	authH := handler.NewAuthHandler(authSvc, service.NewAttemptLimiter(cfg.LoginWindow, cfg.LoginPairLimit, cfg.LoginIPLimit))
+	authH := handler.NewAuthHandler(authSvc, service.NewAttemptLimiter(cfg.LoginWindow, cfg.LoginPairLimit, cfg.LoginIPLimit), handler.AuthOptions{
+		DebugAll:      cfg.CaptchaDebug,
+		DebugLoopback: cfg.CaptchaDebugLoopback,
+	})
 	docH := handler.NewDocumentsHandler(docSvc)
 
 	h := server.Default(
@@ -89,6 +92,7 @@ func main() {
 
 	h.POST("/auth/register", authH.Register)
 	h.POST("/auth/login", authH.Login)
+	h.GET("/auth/captcha", authH.Captcha)
 	h.GET("/auth/me", middleware.AuthRequired(cfg.JWTSecret), authH.Me)
 	h.POST("/auth/refresh", middleware.AuthRequired(cfg.JWTSecret), authH.Refresh)
 	h.POST("/auth/password", middleware.AuthRequired(cfg.JWTSecret), authH.ChangePassword)
