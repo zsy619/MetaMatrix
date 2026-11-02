@@ -15767,6 +15767,15 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
   .rte-root.rte-printing img.rte-image {
     max-width: 100% !important;
   }
+  .rte-root.rte-printing .rte-image-group,
+  .rte-root.rte-printing .rte-image-group-row {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  .rte-root.rte-printing .rte-image-group-row {
+    height: auto !important;
+    aspect-ratio: var(--rte-row-aspect, auto);
+  }
 }
 
 
@@ -15845,9 +15854,9 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
 }
 .rte-root :deep(.rte-image-group) {
   position: relative;
-  width: min(100%, 880px);
+  width: 100%;
   max-width: 100%;
-  margin: 12px auto;
+  margin: 8px 0;
   box-sizing: border-box;
 }
 .rte-root :deep(.rte-image-group[data-align='left']) {
@@ -15872,20 +15881,35 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
   margin-right: 0;
 }
 .rte-root :deep(.rte-image-group-bar) {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
+  position: absolute;
+  left: 36px;
+  top: 8px;
+  z-index: 7;
+  display: none;
   align-items: center;
-  margin-bottom: 6px;
+  gap: 2px;
+  margin: 0;
+  padding: 4px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(29, 33, 41, 0.12), 0 0 0 1px rgba(29, 33, 41, 0.06);
+}
+.rte-root :deep(.rte-image-group:hover > .rte-image-group-bar),
+.rte-root :deep(.rte-image-group.is-selected > .rte-image-group-bar) {
+  display: flex;
 }
 .rte-root :deep(.rte-image-group-bar button) {
-  border: 1px solid #d6e4ff;
-  background: #fff;
+  appearance: none;
+  border: 0;
+  background: transparent;
   color: #1d2129;
-  border-radius: 999px;
-  height: 26px;
-  padding: 0 8px;
-  font-size: 12px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
 }
 .rte-root :deep(.rte-image-group-handle) {
@@ -15902,10 +15926,13 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
 .rte-root :deep(.rte-image-group-row) {
   display: flex;
   align-items: stretch;
-  gap: 10px;
+  gap: 8px;
   width: 100%;
   max-width: 100%;
-  height: clamp(150px, 28vw, 320px);
+  height: auto;
+  min-height: 0;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 .rte-root :deep(.rte-image-group-row > *:nth-child(1)) { flex: var(--g0, 1) 1 0 !important; }
 .rte-root :deep(.rte-image-group-row > *:nth-child(2)) { flex: var(--g1, 1) 1 0 !important; }
@@ -15917,19 +15944,27 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
 .rte-root :deep(.rte-image-group-row > *:nth-child(8)) { flex: var(--g7, 1) 1 0 !important; }
 .rte-root :deep(.rte-image-group-row [data-resize-container][data-node='image']) {
   position: relative;
-  min-width: 48px;
-  height: 100%;
+  display: flex !important;
+  width: auto !important;
+  min-width: 0;
+  height: 100% !important;
   max-width: 100%;
+  max-height: 100%;
   float: none !important;
   margin: 0 !important;
   overflow: hidden;
   border-radius: 6px;
 }
-.rte-root :deep(.rte-image-group-row img) {
+.rte-root :deep(.rte-image-group-row [data-resize-wrapper]) {
   width: 100% !important;
   height: 100% !important;
   max-width: 100% !important;
-  object-fit: cover;
+}
+.rte-root :deep(.rte-image-group-row img) {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  object-fit: contain;
 }
 .rte-root :deep(.rte-image-group-row [data-resize-handle]),
 .rte-root :deep(.rte-image-group [data-resize-container].ProseMirror-selectednode)::before {
@@ -15937,11 +15972,10 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
 }
 .rte-root :deep(.rte-image-group-dividers) {
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: clamp(150px, 28vw, 320px);
+  inset: 0;
+  height: auto;
   pointer-events: none;
+  z-index: 40;
 }
 .rte-root :deep(.rte-image-group-divider) {
   position: absolute;

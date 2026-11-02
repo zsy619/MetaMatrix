@@ -39,11 +39,11 @@ export const imageGroupLayoutCss = [
   '.rte-root [data-resize-container][data-node="image"]{position:relative;width:fit-content;max-width:100%;}',
   '[data-resize-container][data-node="image"],[data-resize-container][data-node="image"] img{-webkit-user-drag:none;}',
   '.rte-root [data-resize-container][data-node="image"].ProseMirror-selectednode{outline:2px solid #3370ff;outline-offset:2px;border-radius:4px;}',
-  '.rte-image-group{position:relative;max-width:100%;margin:8px 0;}',
-  '.rte-image-group-row{display:flex;flex-direction:row;align-items:stretch;gap:8px;width:100%;max-width:100%;box-sizing:border-box;}',
-  '.rte-image-group-row>*{min-width:48px;height:100%;max-width:100%;float:none !important;margin:0 !important;}',
-  '.rte-image-group-row>[data-resize-container][data-node="image"]{display:flex !important;width:auto !important;height:100% !important;max-width:100%;overflow:hidden;border-radius:4px;}',
-  '.rte-image-group-row [data-resize-wrapper]{width:100%;height:100%;max-width:100%;}',
+  '.rte-image-group{position:relative;width:100%;max-width:100%;margin:8px 0;box-sizing:border-box;}',
+  '.rte-image-group-row{display:flex;flex-direction:row;align-items:stretch;gap:8px;width:100%;max-width:100%;height:auto;min-height:0;box-sizing:border-box;overflow:hidden;}',
+  '.rte-image-group-row>*{min-width:0;height:100%;max-width:100%;float:none !important;margin:0 !important;}',
+  '.rte-image-group-row>[data-resize-container][data-node="image"]{display:flex !important;width:auto !important;height:100% !important;max-width:100%;max-height:100%;margin:0 !important;overflow:hidden;border-radius:4px;}',
+  '.rte-image-group-row [data-resize-wrapper]{width:100% !important;height:100% !important;max-width:100% !important;}',
   '.rte-image-group-row>*:nth-child(1){flex:var(--g0,1) 1 0 !important;}',
   '.rte-image-group-row>*:nth-child(2){flex:var(--g1,1) 1 0 !important;}',
   '.rte-image-group-row>*:nth-child(3){flex:var(--g2,1) 1 0 !important;}',
@@ -54,7 +54,8 @@ export const imageGroupLayoutCss = [
   '.rte-image-group-row>*:nth-child(8){flex:var(--g7,1) 1 0 !important;}',
   '.rte-image-group-row>*:nth-child(9){flex:var(--g8,1) 1 0 !important;}',
   '.rte-image-group-row>*:nth-child(10){flex:var(--g9,1) 1 0 !important;}',
-  '.rte-image-group-row img{width:100% !important;height:100% !important;object-fit:cover !important;max-width:none !important;display:block;}',
+  '.rte-image-group-row img{width:100% !important;height:100% !important;object-fit:contain !important;max-width:none !important;display:block;}',
+  '.rte-root.rte-printing .rte-image-group-row{height:auto !important;aspect-ratio:var(--rte-row-aspect, auto);}',
   '.rte-image-drag-source{opacity:.35;}',
   '.rte-image-drag-thumb{position:fixed;z-index:10061;width:72px;height:48px;border-radius:4px;background:#fff center/cover no-repeat;box-shadow:0 8px 24px rgba(29,33,41,.28);pointer-events:none;}',
   'body:has(.rte-image-drag-thumb) .rte-image-group-bar,body:has(.rte-image-drag-thumb) .rte-bubble{display:none !important;}',
@@ -92,14 +93,17 @@ export function groupUsesAspect(ratioMode: unknown): boolean {
   return ratioMode !== 'custom'
 }
 
-/** 按权重把一行铺满。权重是宽高比时，各图等高且格子本身就是这个比例。 */
+/** 按权重把一行铺满。权重是宽高比时，行高 = 可用宽度 / 权重和，不按视口或固定上限裁切。 */
 export function rowLayout(rowWidth: number, weights: readonly number[], gap = 8): { height: number; widths: number[] } {
   const clean = weights.map((n) => (Number.isFinite(n) && n > 0 ? n : 1))
   const sum = clean.reduce((total, n) => total + n, 0) || 1
-  const inner = Math.max(48, rowWidth - gap * Math.max(0, clean.length - 1))
-  const height = Math.max(72, Math.min(480, inner / sum))
-  const widths = clean.map((n) => Math.round((inner * n) / sum))
-  return { height: Math.round(height), widths }
+  const inner = Math.max(1, rowWidth - gap * Math.max(0, clean.length - 1))
+  const height = inner / sum
+  const widths = clean.map((n) => (inner * n) / sum)
+  const rounded = widths.map((n) => Math.round(n))
+  const drift = Math.round(inner) - rounded.reduce((total, n) => total + n, 0)
+  if (rounded.length) rounded[rounded.length - 1] = (rounded[rounded.length - 1] ?? 0) + drift
+  return { height: Math.max(1, Math.round(height)), widths: rounded }
 }
 
 export type MiniNode = {
