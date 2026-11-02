@@ -14,7 +14,10 @@ import {
 assert.deepEqual(normalizeToolbarGroupOrder(undefined), [...DEFAULT_TOOLBAR_GROUP_ORDER])
 assert.deepEqual(normalizeToolbarGroupOrder(['nope', 'color', 'color', 'text', 'more']), [
   'color',
-  'text',
+  'type',
+  'marks',
+  'align',
+  'list',
   'history',
   'paragraph',
   'insert',
@@ -25,17 +28,33 @@ assert.deepEqual(normalizeToolbarGroupOrder(['nope', 'color', 'color', 'text', '
   'view',
   'other',
 ])
+assert.deepEqual(normalizeToolbarGroupOrder(['text']).slice(0, 4), ['type', 'marks', 'align', 'list'])
 assert.deepEqual(readToolbarGroupOrder(undefined, 'p1'), [...DEFAULT_TOOLBAR_GROUP_ORDER])
 assert.equal(writeToolbarGroupOrder(undefined, 'p1', DEFAULT_TOOLBAR_GROUP_ORDER), undefined)
 assert.deepEqual(
   writeToolbarGroupOrder(undefined, 'p1', ['table', 'color', 'history', 'text', 'paragraph', 'insert', 'blocks', 'notes', 'review', 'view', 'other']),
   {
-    p1: ['table', 'color', 'history', 'text', 'paragraph', 'insert', 'blocks', 'notes', 'review', 'view', 'other'],
+    p1: [
+      'table',
+      'color',
+      'history',
+      'type',
+      'marks',
+      'align',
+      'list',
+      'paragraph',
+      'insert',
+      'blocks',
+      'notes',
+      'review',
+      'view',
+      'other',
+    ],
   },
 )
 assert.equal(
   writeToolbarGroupOrder(
-    { p1: ['table', 'color', 'history', 'text', 'paragraph', 'insert', 'blocks', 'notes', 'review', 'view', 'other'] },
+    { p1: ['table', 'color'] },
     'p1',
     DEFAULT_TOOLBAR_GROUP_ORDER,
   ),
@@ -64,7 +83,7 @@ assert.deepEqual(
   [
     ['color', ['color']],
     ['history', ['undo']],
-    ['text', ['bold']],
+    ['marks', ['bold']],
     ['table', ['table']],
     ['notes', ['note']],
     ['view', ['export']],
