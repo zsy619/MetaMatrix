@@ -18,6 +18,10 @@ import { RteImage } from '../../../extensions/rteImage'
 import { RteTableCell, RteTableHeader } from '../../../extensions/rteTableCells'
 import { RteHorizontalRule } from '../../../extensions/rteHorizontalRule'
 import { Annotation } from '../../../extensions/annotation'
+import { CommentAnchor } from '../../../extensions/commentAnchor'
+import { SuggestionInsert, SuggestionDelete } from '../../../extensions/suggestionMarks'
+import { SuggestionMode } from '../../../extensions/suggestionMode'
+import { syncCaretWhenEndIsNoop } from '../../../utils/rteCaret'
 import { MathInline, MathDisplay } from '../../../extensions/math'
 import { DateChip } from '../../../extensions/dateChip'
 import { DocTitle } from '../../../extensions/docTitle'
@@ -143,6 +147,9 @@ export function useRteExtensions(deps: {
   syncImageBubbleCaption: LateFn
   toggleOutlinePanel: LateFn
   undoToolbarGroupOrder: LateFn
+  suggestingEnabled: () => boolean
+  suggestionAuthor: () => { id: string; name: string }
+  bumpSuggestions: LateFn
 }) {
   const {
     closeTableCtx,
@@ -337,6 +344,13 @@ const editor = useEditor({
       showOnlyWhenEditable: true,
     }),
     Annotation,
+    CommentAnchor,
+    SuggestionInsert,
+    SuggestionDelete,
+    SuggestionMode.configure({
+      enabled: deps.suggestingEnabled,
+      author: deps.suggestionAuthor,
+    }),
     MathInline,
     MathDisplay,
     DateChip,
@@ -554,7 +568,18 @@ const editor = useEditor({
         return false
       },
     },
-    handleKeyDown(_view, event) {
+    handleKeyDown(view, event) {
+      if (
+        event.key === 'End' &&
+        !event.shiftKey &&
+        !event.altKey &&
+        !event.metaKey &&
+        !event.ctrlKey &&
+        syncCaretWhenEndIsNoop(view)
+      ) {
+        event.preventDefault()
+        return true
+      }
       if (event.key === 'Escape' && blockMenuOpen.value) {
         event.preventDefault()
         blockMenuOpen.value = false
@@ -736,6 +761,7 @@ const editor = useEditor({
     scheduleHtmlEmit(ed)
     scheduleDocChrome()
     noteToolbarOrderEdited()
+    deps.bumpSuggestions()
   },
   onFocus: () => emit('focus'),
   onBlur: ({ editor: ed }) => {
@@ -746,6 +772,7 @@ const editor = useEditor({
     syncSelectedFormFromEditor(ed)
     applyFormatPainterIfNeeded(ed)
     syncImageBubbleCaption()
+    deps.bumpSuggestions()
   },
   onTransaction: ({ editor: ed }) => {
     if (selectedFormPos.value != null) formSelectionTick.value += 1

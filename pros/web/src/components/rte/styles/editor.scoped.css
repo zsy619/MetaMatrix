@@ -2304,6 +2304,54 @@
   border-radius: 6px;
   overflow-x: auto;
 }
+.rte-root :deep(.rte-comment-anchor) {
+  background: #fff3bf;
+  border-bottom: 2px solid #f7ba1e;
+  border-radius: 2px;
+}
+.rte-root.mode-preview :deep(.rte-suggestion-delete),
+.rte-root.rte-printing :deep(.rte-suggestion-delete),
+.rte-root.is-preview :deep(.rte-suggestion-delete) {
+  display: none !important;
+}
+.rte-root.mode-preview :deep(.rte-suggestion-insert),
+.rte-root.rte-printing :deep(.rte-suggestion-insert),
+.rte-root.is-preview :deep(.rte-suggestion-insert) {
+  color: inherit !important;
+  background: none !important;
+  border: none !important;
+  text-decoration: none !important;
+}
+.rte-suggest-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 6px 12px;
+  background: #f2f7ff;
+  border-bottom: 1px solid #d6e4ff;
+  color: #1d2129;
+  font-size: 12px;
+}
+.rte-suggest-bar button {
+  border: 1px solid #c9cdd4;
+  background: #fff;
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.rte-suggest-bar button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.rte-suggest-author {
+  font-weight: 650;
+}
+.rte-suggest-count {
+  color: #86909c;
+  margin-right: auto;
+}
 /* —— 行内注释标记 —— */
 .rte-root :deep(.rte-annotation),
 .rte-root :deep(span[data-annotation]) {

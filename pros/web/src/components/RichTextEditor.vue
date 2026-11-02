@@ -93,6 +93,9 @@ import {
   type CaseMode,
 } from './rteWave20'
 import { countWords, normalizeHtml, toEditorContent } from '../utils/rteContent'
+import { htmlWithSuggestionsAccepted } from '../utils/rteSuggestions'
+import { useCommentThreads } from './rte/composables/useCommentThreads'
+import { useSuggestionMode } from './rte/composables/useSuggestionMode'
 import { RTE_CTX, type RteEditorEmit, type RteEditorProps } from './rte/context'
 import { provideRteBindings } from './rte/bindings'
 import RteToolbar from './rte/RteToolbar.vue'
@@ -543,6 +546,30 @@ function scheduleHtmlEmit(
   htmlEmitTimer = setTimeout(flush, 160)
 }
 
+function rteAuthor() {
+  return {
+    id: auth.user?.id || 'local',
+    name: auth.user?.displayName || auth.user?.email || '我',
+  }
+}
+
+const {
+  suggesting,
+  suggestionAuthor,
+  suggestionColor,
+  toggleSuggesting,
+  bumpSuggestions,
+  suggestionRanges,
+  activeSuggestionId,
+  acceptAllSuggestions,
+  rejectAllSuggestions,
+  acceptActiveSuggestion,
+  rejectActiveSuggestion,
+} = useSuggestionMode({
+  editor: () => editor,
+  author: rteAuthor,
+})
+
 const editor = useRteExtensions({
   closeTableCtx,
   closeTableMenu,
@@ -630,6 +657,33 @@ const editor = useRteExtensions({
     toggleOutlinePanel()
   },
   undoToolbarGroupOrder: () => undoToolbarGroupOrder(),
+  suggestingEnabled: () => suggesting.value,
+  suggestionAuthor,
+  bumpSuggestions: () => bumpSuggestions(),
+})
+
+const {
+  commentsOpen,
+  showResolved,
+  draft: commentDraft,
+  replyDrafts,
+  activeThreadId,
+  shownThreads,
+  unresolvedCount,
+  beginComment,
+  cancelDraft,
+  submitDraft,
+  submitReply,
+  toggleResolved,
+  removeMessage,
+  jumpToThread,
+} = useCommentThreads({
+  editor: () => editor,
+  panelId: () => props.panelId || '',
+  getMap: () => current_data.value?.commentThreadsByPanelId,
+  setThreads: (panelId, threads) => documentStore.setPanelCommentThreads(panelId, threads),
+  author: rteAuthor,
+  isEditable: () => viewMode.value === 'edit',
 })
 
 
@@ -2069,7 +2123,7 @@ function openPrintPreview() {
     return
   }
   const title = (localTitle.value || '').trim()
-  const body = ed.getHTML() || '<p></p>'
+  const body = htmlWithSuggestionsAccepted(ed.getHTML() || '<p></p>')
   printPreviewHtml.value = title
     ? `<h1 class="rte-print-title">${escapeHtml(title)}</h1>${body}`
     : body
@@ -4900,6 +4954,15 @@ const allTools = computed((): ToolItem[] => {
     { key: 'table', label: '表格', icon: '▦', iconComp: ic('table'), kind: 'table', active: () => isInTable(), run: onTableToolClick },
     { key: 'attach', label: '附件', icon: '☁▾', iconComp: ic('attach'), kind: 'attach', run: onAttachment },
     { key: 'note', label: '注释', icon: '[1]', iconComp: ic('note'), run: insertNote },
+    {
+      key: 'comment',
+      label: '评论',
+      title: '对选区添加评论',
+      icon: '💬',
+      iconComp: ic('note'),
+      active: () => commentsOpen.value,
+      run: beginComment,
+    },
     { key: 'emoji', label: '表情', title: '插入表情', icon: '☺', iconComp: ic('emoji'), kind: 'emoji' },
     { key: 'specialChars', label: '字符', title: '插入字符', icon: 'Ω', iconComp: ic('specialChars'), kind: 'specialChars' },
     { key: 'div-insert', label: '', icon: '', kind: 'divider' },
@@ -5072,6 +5135,33 @@ const allTools = computed((): ToolItem[] => {
       icon: '⚓',
       iconComp: ic('note'),
       run: resetRevisionBaseline,
+    },
+    {
+      key: 'suggest',
+      label: '建议',
+      title: '建议模式：插入和删除记成修订',
+      icon: '改',
+      iconComp: ic('highlight'),
+      active: () => suggesting.value,
+      run: toggleSuggesting,
+    },
+    {
+      key: 'suggestAccept',
+      label: '接受',
+      title: '接受全部修订',
+      icon: '✓',
+      iconComp: ic('note'),
+      disabled: () => suggestionRanges.value.length === 0,
+      run: acceptAllSuggestions,
+    },
+    {
+      key: 'suggestReject',
+      label: '拒绝',
+      title: '拒绝全部修订',
+      icon: '✕',
+      iconComp: ic('clear'),
+      disabled: () => suggestionRanges.value.length === 0,
+      run: rejectAllSuggestions,
     },
     {
       key: 'zoom',
@@ -5905,6 +5995,29 @@ provideRteBindings({
   setPageNumber,
   setPresentUnit,
   stepPresent,
+  suggesting,
+  suggestionColor,
+  suggestionRanges,
+  activeSuggestionId,
+  acceptAllSuggestions,
+  rejectAllSuggestions,
+  acceptActiveSuggestion,
+  rejectActiveSuggestion,
+  rteAuthor,
+  commentsOpen,
+  showResolved,
+  commentDraft,
+  replyDrafts,
+  activeThreadId,
+  shownThreads,
+  unresolvedCount,
+  beginComment,
+  cancelDraft,
+  submitDraft,
+  submitReply,
+  toggleResolved,
+  removeMessage,
+  jumpToThread,
 })
 
 defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm })

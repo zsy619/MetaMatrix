@@ -3,6 +3,7 @@ import { inject } from 'vue'
 import { EditorContent } from '@tiptap/vue-3'
 import { BubbleMenu } from '@tiptap/vue-3/menus'
 import FormPropertyInspector from '../FormPropertyInspector.vue'
+import CommentThreadPanel from './CommentThreadPanel.vue'
 import { RTE_BINDINGS } from './bindings'
 import { useParentScopeStamp } from './inheritScope'
 
@@ -175,6 +176,16 @@ useParentScopeStamp()
           />
         </div>
       </span>
+      <button data-rte-own
+        type="button"
+        class="rte-bubble-btn"
+        title="评论"
+        aria-label="评论"
+        @mousedown.prevent
+        @click="rte.beginComment"
+      >
+        评
+      </button>
       <button data-rte-own
         type="button"
         class="rte-bubble-btn"
@@ -412,6 +423,15 @@ useParentScopeStamp()
       <img data-rte-own :src="rte.imageLightboxSrc" alt="" />
     </div>
 
+    <div data-rte-own v-if="rte.suggesting && rte.viewMode === 'edit'" class="rte-suggest-bar" role="status">
+      <span data-rte-own>建议模式</span>
+      <span data-rte-own class="rte-suggest-author" :style="{ color: rte.suggestionColor(rte.rteAuthor().id) }">{{ rte.rteAuthor().name }}</span>
+      <span data-rte-own class="rte-suggest-count">{{ rte.suggestionRanges.length }} 条修订</span>
+      <button data-rte-own type="button" :disabled="!rte.activeSuggestionId" @click="rte.acceptActiveSuggestion">接受</button>
+      <button data-rte-own type="button" :disabled="!rte.activeSuggestionId" @click="rte.rejectActiveSuggestion">拒绝</button>
+      <button data-rte-own type="button" :disabled="!rte.suggestionRanges.length" @click="rte.acceptAllSuggestions">全部接受</button>
+      <button data-rte-own type="button" :disabled="!rte.suggestionRanges.length" @click="rte.rejectAllSuggestions">全部拒绝</button>
+    </div>
     <div data-rte-own
       class="rte-workspace"
       :class="{
@@ -609,6 +629,27 @@ useParentScopeStamp()
         @mouseleave="rte.onFormInspectorMouseUp"
       />
 
+      <CommentThreadPanel
+        v-if="rte.commentsOpen && rte.viewMode === 'edit'"
+        :threads="rte.shownThreads"
+        :unresolved-count="rte.unresolvedCount"
+        :show-resolved="rte.showResolved"
+        :draft="rte.commentDraft"
+        :reply-drafts="rte.replyDrafts"
+        :active-thread-id="rte.activeThreadId"
+        :author="rte.rteAuthor()"
+        :editable="true"
+        @close="rte.commentsOpen = false"
+        @update:show-resolved="rte.showResolved = $event"
+        @update:draft-body="rte.commentDraft && (rte.commentDraft.body = $event)"
+        @update:reply="(id, value) => (rte.replyDrafts[id] = value)"
+        @cancel-draft="rte.cancelDraft"
+        @submit-draft="rte.submitDraft"
+        @submit-reply="rte.submitReply"
+        @toggle-resolved="rte.toggleResolved"
+        @remove-message="rte.removeMessage"
+        @jump="rte.jumpToThread"
+      />
       <aside data-rte-own
         v-if="rte.notesOpen && rte.viewMode === 'edit'"
         class="rte-outline-panel"
@@ -812,6 +853,15 @@ useParentScopeStamp()
           @click="rte.notesOpen = !rte.notesOpen"
         >
           批注
+        </button>
+        <button data-rte-own
+          v-if="rte.expanded && rte.viewMode === 'edit'"
+          type="button"
+          class="rte-bottom-link"
+          :aria-pressed="rte.commentsOpen"
+          @click="rte.commentsOpen = !rte.commentsOpen"
+        >
+          评论<span data-rte-own v-if="rte.unresolvedCount"> {{ rte.unresolvedCount }}</span>
         </button>
         <button data-rte-own
           v-if="rte.expanded && rte.viewMode === 'edit'"

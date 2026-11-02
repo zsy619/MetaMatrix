@@ -13,6 +13,7 @@ import {
   type SlideSource,
 } from '../../../utils/rtePageChrome'
 import { mmToPx, sheetBox, type RtePageSizeId } from '../../../utils/rtePageSize'
+import { htmlWithSuggestionsAccepted } from '../../../utils/rteSuggestions'
 
 /** 页眉页脚页码，以及只读演示（按块 / 按屏）。 */
 export function usePageChrome(deps: {
@@ -132,7 +133,7 @@ export function usePageChrome(deps: {
     clone.querySelectorAll(
       '.rte-image-drag-handle, .rte-image-group-bar, .rte-image-group-dividers, .rte-image-drop-line, .rte-image-drop-preview, .rte-image-size-tip, .rte-block-tools, [data-resize-handle], .column-resize-handle',
     ).forEach((el) => el.remove())
-    return clone.outerHTML
+    return htmlWithSuggestionsAccepted(clone.outerHTML)
   }
 
   function slideSources(editor: Editor): SlideSource[] {
