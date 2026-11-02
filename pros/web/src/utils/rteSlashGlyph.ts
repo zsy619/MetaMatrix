@@ -38,6 +38,8 @@ export function rteSlashGlyph(item: {
       return '图'
     case 'link':
       return '链'
+    case 'linkButton':
+      return '钮'
     case 'callout':
       return '!'
     default:
