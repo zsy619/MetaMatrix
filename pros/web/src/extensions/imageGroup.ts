@@ -39,6 +39,37 @@ function imageAspect(frame: HTMLElement): number {
   return 1
 }
 
+/** 用当前行宽和比例重算行高，清掉图片节点上残留的固定宽高。 */
+function paintGroupMetrics(dom: HTMLElement, row: HTMLElement, ratios: readonly number[]) {
+  const width = row.clientWidth || dom.clientWidth
+  if (width < 8) return
+  const sum = ratios.reduce((total, n) => total + (Number.isFinite(n) && n > 0 ? n : 0), 0) || 1
+  dom.style.setProperty('--rte-row-aspect', String(Math.round(sum * 1000) / 1000))
+  ratios.forEach((grow, index) => dom.style.setProperty(`--g${index}`, String(grow)))
+  const laid = rowLayout(width, ratios, 8)
+  row.style.height = `${laid.height}px`
+  row.style.minHeight = '0'
+  const kids = Array.from(row.children).filter((child): child is HTMLElement => child instanceof HTMLElement)
+  kids.forEach((frame) => {
+    frame.style.margin = '0'
+    frame.style.float = 'none'
+    frame.style.maxHeight = '100%'
+    const wrap = frame.querySelector('[data-resize-wrapper]')
+    if (wrap instanceof HTMLElement) {
+      wrap.style.width = '100%'
+      wrap.style.height = '100%'
+      wrap.style.maxWidth = '100%'
+    }
+    const img = frame.querySelector('img')
+    if (img instanceof HTMLImageElement) {
+      img.style.setProperty('width', '100%', 'important')
+      img.style.setProperty('height', '100%', 'important')
+      img.style.setProperty('object-fit', 'contain', 'important')
+      img.style.setProperty('max-width', 'none', 'important')
+    }
+  })
+}
+
 export function layoutImageGroupChrome(view: EditorView) {
   const selection = view.state.selection
   view.state.doc.descendants((node, pos) => {
@@ -55,11 +86,17 @@ export function layoutImageGroupChrome(view: EditorView) {
     const ratios = groupUsesAspect(node.attrs.ratioMode)
       ? aspects
       : normalizeGroupRatios(kids.length, node.attrs.ratios)
-    if (dom.dataset.ratioDrag !== '1') {
-      ratios.forEach((grow, index) => dom.style.setProperty(`--g${index}`, String(grow)))
-      const laid = rowLayout(row.clientWidth || dom.clientWidth, ratios, 8)
-      row.style.height = `${laid.height}px`
+    if (dom.dataset.ratioDrag !== '1') paintGroupMetrics(dom, row, ratios)
+    if (!dom.dataset.rteObserved && typeof ResizeObserver !== 'undefined') {
+      dom.dataset.rteObserved = '1'
+      const ro = new ResizeObserver(() => {
+        const next = Math.round(row.clientWidth)
+        if (!next || dom.dataset.rteLaidW === String(next) || dom.dataset.ratioDrag === '1') return
+        layoutImageGroupChrome(view)
+      })
+      ro.observe(row)
     }
+    dom.dataset.rteLaidW = String(Math.round(row.clientWidth || 0))
     kids.forEach((frame) => {
       const img = frame.querySelector('img')
       if (!(img instanceof HTMLImageElement) || img.dataset.rteAspectWait === '1' || img.naturalWidth > 0) return
@@ -122,6 +159,7 @@ export function layoutImageGroupChrome(view: EditorView) {
           const next = resizePair(base, index, share)
           dom.style.setProperty(`--g${index}`, String(next[index]))
           dom.style.setProperty(`--g${index + 1}`, String(next[index + 1]))
+          paintGroupMetrics(dom, row, next)
           const percents = ratioPercents(next)
           tip.textContent = next.map((_, i) => `${percents[i]}%`).join(' · ')
           tip.style.left = `${ev.clientX}px`

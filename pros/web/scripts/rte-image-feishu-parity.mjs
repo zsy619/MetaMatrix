@@ -183,6 +183,7 @@ async function info(alt) {
       widths: rects.map((r) => Math.round(r.width)),
       gaps,
       rowWidth: Math.round(row?.width || 0),
+      rowHeight: Math.round(row?.height || 0),
       mode: group.getAttribute('data-ratio-mode') || '',
       ratios: group.getAttribute('data-ratios') || '',
       count: imgs.length,
@@ -386,8 +387,10 @@ const aspect = await info(`${id}方`)
 const heights = aspect.heights || []
 const equal = heights.length >= 2 && Math.max(...heights) - Math.min(...heights) <= 2
 const gapOk = (aspect.gaps || []).every((gap) => Math.abs(gap - 8) <= 2)
-const wideFirst = (aspect.widths?.[0] || 0) > 0
-log('10 并排等高、间距 8px', aspect.grouped && equal && gapOk, JSON.stringify({ heights, gaps: aspect.gaps, widths: aspect.widths, rowWidth: aspect.rowWidth }))
+const widthSum = (aspect.widths || []).reduce((sum, n) => sum + n, 0) + (aspect.gaps || []).reduce((sum, n) => sum + n, 0)
+const filled = aspect.rowWidth > 0 && Math.abs(widthSum - aspect.rowWidth) <= 8
+const noBlank = aspect.rowHeight > 0 && heights.length > 0 && Math.abs(aspect.rowHeight - heights[0]) <= 4
+log('10 并排等高、间距 8px', aspect.grouped && equal && gapOk && filled && noBlank, JSON.stringify({ heights, gaps: aspect.gaps, widths: aspect.widths, rowWidth: aspect.rowWidth, rowHeight: aspect.rowHeight }))
 await page.screenshot({ path: `${out}/parity_${kind}_10_row.png` })
 
 await showAlts([`${id}方`])
