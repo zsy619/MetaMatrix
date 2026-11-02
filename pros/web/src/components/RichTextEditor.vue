@@ -175,6 +175,7 @@ import { useFloatMenus } from './rte/composables/useFloatMenus'
 import { useOverlayStack } from './rte/composables/useOverlayStack'
 import { useViewMode } from './rte/composables/useViewMode'
 import { useBlockHandle } from './rte/composables/useBlockHandle'
+import { useImageTools } from './rte/composables/useImageTools'
 import { RTE_EMOJI_CATEGORIES } from '../utils/rteEmojiList'
 import { RTE_SPECIAL_CHAR_CATEGORIES } from '../utils/rteSpecialChars'
 
@@ -3255,93 +3256,22 @@ const listDepthLabel = computed(() => {
   return d > 0 ? `当前层级 ${d}` : ''
 })
 
-/** —— 图片对齐 / 题注 —— */
-const imageBubbleCaption = ref('')
-const IMAGE_LAYOUT_OPTIONS: Array<{
-  id: string
-  label: string
-  align: 'left' | 'center' | 'right'
-  layout: 'block' | 'wrap-left' | 'wrap-right'
-}> = [
-  { id: 'center', label: '居中', align: 'center', layout: 'block' },
-  { id: 'left', label: '居左', align: 'left', layout: 'block' },
-  { id: 'right', label: '居右', align: 'right', layout: 'block' },
-  { id: 'wrap-left', label: '左环绕', align: 'left', layout: 'wrap-left' },
-  { id: 'wrap-right', label: '右环绕', align: 'right', layout: 'wrap-right' },
-]
-
-function isImageNodeSelected(): boolean {
-  const ed = editor.value
-  if (!ed) return false
-  const sel = ed.state.selection
-  return sel instanceof NodeSelection && sel.node.type.name === 'image'
-}
-
-function syncImageBubbleCaption() {
-  const ed = editor.value
-  if (!ed || !isImageNodeSelected()) {
-    imageBubbleCaption.value = ''
-    return
-  }
-  const cap = ed.getAttributes('image')?.caption
-  imageBubbleCaption.value = typeof cap === 'string' ? cap : ''
-}
-
-function setImagePlacement(option: (typeof IMAGE_LAYOUT_OPTIONS)[number]) {
-  const ed = editor.value
-  if (!ed || !isImageNodeSelected()) return
-  ed.chain()
-    .focus()
-    .updateAttributes('image', { align: option.align, layout: option.layout })
-    .run()
-}
-
-const imageLightboxSrc = ref('')
-
-function deleteSelectedImage() {
-  const ed = editor.value
-  if (!ed || !isImageNodeSelected()) return
-  ed.chain().focus().deleteSelection().run()
-}
-
-function downloadSelectedImage() {
-  const ed = editor.value
-  if (!ed || !isImageNodeSelected()) return
-  const attrs = ed.getAttributes('image')
-  const src = String(attrs?.src || '')
-  if (!src) return
-  const link = document.createElement('a')
-  link.href = src
-  link.download = String(attrs?.alt || 'image')
-  link.click()
-}
-
-function openSelectedImage() {
-  const ed = editor.value
-  if (!ed || !isImageNodeSelected()) return
-  imageLightboxSrc.value = String(ed.getAttributes('image')?.src || '')
-}
-
-function applyImageCaption() {
-  const ed = editor.value
-  if (!ed || !isImageNodeSelected()) return
-  const caption = imageBubbleCaption.value.trim()
-  ed.chain()
-    .focus()
-    .updateAttributes('image', { caption: caption || null })
-    .run()
-}
-
-function imageBubbleShouldShow(payload: {
-  editor: { isDestroyed?: boolean; isEditable?: boolean; state?: { selection: unknown } }
-}): boolean {
-  if (viewMode.value !== 'edit') return false
-  const ed = payload?.editor
-  if (!ed || ed.isDestroyed || ed.isEditable === false) return false
-  const sel = ed.state?.selection
-  if (!(sel instanceof NodeSelection) || (sel as NodeSelection).node.type.name !== 'image') return false
-  return true
-}
+const {
+  imageBubbleCaption,
+  IMAGE_LAYOUT_OPTIONS,
+  isImageNodeSelected,
+  syncImageBubbleCaption,
+  setImagePlacement,
+  imageLightboxSrc,
+  deleteSelectedImage,
+  downloadSelectedImage,
+  openSelectedImage,
+  applyImageCaption,
+  imageBubbleShouldShow,
+} = useImageTools({
+  editor,
+  viewMode: () => viewMode,
+})
 
 /** —— 分割线样式 —— */
 const hrOpen = ref(false)
