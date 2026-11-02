@@ -563,6 +563,7 @@ useParentScopeStamp()
           <button data-rte-own type="button" role="menuitem" @click="rte.turnHoveredBlock('error')">错误</button>
           <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
           <button data-rte-own type="button" role="menuitem" @click="rte.copyHoveredBlock">复制块</button>
+          <button data-rte-own v-if="rte.blockMenuIsHeading" type="button" role="menuitem" @click="rte.copyHeadingAnchor">复制标题链接</button>
           <button data-rte-own type="button" role="menuitem" @click="rte.moveHoveredBlock(-1)">上移</button>
           <button data-rte-own type="button" role="menuitem" @click="rte.moveHoveredBlock(1)">下移</button>
           <button data-rte-own type="button" role="menuitem" class="is-danger" @click="rte.deleteHoveredBlock">删除</button>

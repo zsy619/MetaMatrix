@@ -567,6 +567,14 @@
   font-weight: 600;
   color: #4e5969;
 }
+.rte-root :deep(.ProseMirror h1),
+.rte-root :deep(.ProseMirror h2),
+.rte-root :deep(.ProseMirror h3),
+.rte-root :deep(.ProseMirror h4),
+.rte-root :deep(.ProseMirror h5),
+.rte-root :deep(.ProseMirror h6) {
+  scroll-margin-top: 72px;
+}
 
 .rte-root :deep(code) {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;

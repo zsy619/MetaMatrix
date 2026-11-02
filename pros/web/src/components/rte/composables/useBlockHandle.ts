@@ -1,9 +1,16 @@
-import { nextTick, ref, type Ref, type ShallowRef } from 'vue'
+import { computed, nextTick, ref, type Ref, type ShallowRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { Editor } from '@tiptap/core'
 import { NodeSelection } from '@tiptap/pm/state'
 import { Fragment } from '@tiptap/pm/model'
 import { reorderIndexes } from '../../../utils/rteBatch3'
+import { escapeHtml } from '../../../utils/itemsHtml'
+import {
+  headingAnchorHref,
+  isStableHeadingId,
+  nextHeadingAnchorId,
+  usedHeadingIds,
+} from '../../../utils/rteHeadingAnchor'
 
 /** 块手柄、块菜单与块拖拽。模板绑定名与原先一致。 */
 export function useBlockHandle(deps: {
@@ -300,6 +307,59 @@ function copyHoveredBlock() {
   blockMenuOpen.value = false
 }
 
+const blockMenuIsHeading = computed(() => {
+  const ed = deps.editor.value
+  const index = blockMenuIndex.value
+  if (!ed || index < 0 || index >= ed.state.doc.childCount) return false
+  return ed.state.doc.child(index).type.name === 'heading'
+})
+
+async function copyHeadingAnchor() {
+  const ed = deps.editor.value
+  const index = blockMenuIndex.value
+  if (!ed || index < 0 || index >= ed.state.doc.childCount) return
+  const node = ed.state.doc.child(index)
+  if (node.type.name !== 'heading') {
+    ElMessage.info('请在标题上复制标题链接')
+    blockMenuOpen.value = false
+    return
+  }
+  let pos = 0
+  ed.state.doc.forEach((_child, offset, i) => {
+    if (i === index) pos = offset
+  })
+  let id = String(node.attrs.id || '')
+  if (!isStableHeadingId(id)) {
+    id = nextHeadingAnchorId(usedHeadingIds(ed.state.doc), `${pos}\0${node.textContent}`)
+    const tr = ed.state.tr.setNodeMarkup(pos, undefined, { ...node.attrs, id })
+    tr.setMeta('headingAnchor', true)
+    ed.view.dispatch(tr)
+  }
+  const label = node.textContent.trim() || '标题'
+  const here = typeof window !== 'undefined' ? window.location.href.split('#')[0] : ''
+  const href = here ? `${here}#${id}` : headingAnchorHref(id)
+  const html = `<a href="${href}">${escapeHtml(label)}</a>`
+  try {
+    if (typeof ClipboardItem !== 'undefined' && navigator.clipboard?.write) {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          'text/html': new Blob([html], { type: 'text/html' }),
+          'text/plain': new Blob([label], { type: 'text/plain' }),
+        }),
+      ])
+    } else if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(html)
+    } else {
+      throw new Error('clipboard unavailable')
+    }
+    ElMessage.success('已复制标题链接，粘贴到本文后点击即可跳转')
+  } catch (err) {
+    console.error(err)
+    ElMessage.warning('无法写入剪贴板')
+  }
+  blockMenuOpen.value = false
+}
+
 function deleteHoveredBlock() {
   const ed = deps.editor.value
   const index = blockMenuIndex.value
@@ -383,6 +443,8 @@ function onCanvasBlockDrop(event: DragEvent) {
     focusTopLevelBlock,
     turnHoveredBlock,
     copyHoveredBlock,
+    blockMenuIsHeading,
+    copyHeadingAnchor,
     deleteHoveredBlock,
     moveHoveredBlock,
     onBlockDragStart,

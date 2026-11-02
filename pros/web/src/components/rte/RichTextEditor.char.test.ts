@@ -86,7 +86,7 @@ describe('RichTextEditor 特征', () => {
     const html = editor.getHTML()
     expect(html).toContain('标题')
     expect(html).toContain('<strong>加粗</strong>')
-    expect(html).toContain('<h2>')
+    expect(html).toMatch(/<h2 id="h-[A-Za-z0-9]+">标题<\/h2>/)
     wrapper.unmount()
   })
 

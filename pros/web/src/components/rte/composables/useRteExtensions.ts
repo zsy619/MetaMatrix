@@ -75,6 +75,8 @@ import { TabsBlock, TabPane } from '../../../extensions/tabsBlock'
 import { MermaidBlock } from '../../../extensions/mermaidBlock'
 import { CrossRef, findCrossRefPos } from '../../../extensions/crossRef'
 import { ListStyleAttrs } from '../../../extensions/listStyleAttrs'
+import { HeadingAnchor } from '../../../extensions/headingAnchor'
+import { parseHeadingAnchorHref } from '../../../utils/rteHeadingAnchor'
 
 type LateFn = (...args: any[]) => any
 
@@ -267,6 +269,9 @@ const editor = useEditor({
     MermaidBlock,
     CrossRef,
     ListStyleAttrs,
+    HeadingAnchor.configure({
+      onMissing: () => ElMessage.warning('这篇文档里没有对应标题'),
+    }),
     Color,
     Highlight.configure({ multicolor: true }),
     TextAlign.configure({
@@ -280,6 +285,7 @@ const editor = useEditor({
       HTMLAttributes: { class: 'rte-link' },
       isAllowedUri: (url, ctx) => {
         if (!url) return false
+        if (parseHeadingAnchorHref(url)) return true
         if (/^(data|blob):/i.test(url)) return true
         return ctx.defaultValidate(url)
       },
