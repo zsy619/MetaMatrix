@@ -59,6 +59,10 @@ describe('RichTextEditor 特征', () => {
     const compact = await mountEditor({ compact: true, expanded: false })
     expect(compact.wrapper.classes()).toContain('compact')
     expect(compact.wrapper.classes()).not.toContain('expanded')
+    const scopeName = [...compact.wrapper.element.attributes].map((attr) => attr.name).find((name) => name.startsWith('data-v-'))
+    expect(scopeName).toBeTruthy()
+    const tool = compact.wrapper.get('.rte-tool')
+    expect(tool.attributes(scopeName!)).toBe('')
     const exposed = compact.wrapper.vm as unknown as Record<string, unknown>
     for (const key of ['focusEditor', 'editor', 'onDraftBackup', 'openRtePrompt', 'openRteConfirm']) {
       expect(exposed[key], key).toBeTruthy()
