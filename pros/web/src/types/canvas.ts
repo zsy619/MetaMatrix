@@ -116,6 +116,11 @@ export type WithPanelAttachments = {
    * 旧文档没有这个字段。
    */
   commentThreadsByPanelId?: import('../utils/rteCommentThreads').CommentThreadsByPanelId
+  /**
+   * 富文本面板的正文版本。自动记录和命名版本按面板存在这里，随文档保存。
+   * 旧文档没有这个字段。不是独立的版本服务。
+   */
+  editorRevisionsByPanelId?: import('../utils/rteRevisions').RevisionsByPanelId
 }
 
 

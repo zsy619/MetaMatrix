@@ -672,25 +672,29 @@ useParentScopeStamp()
       </aside>
       <aside data-rte-own
         v-if="rte.historyOpen && rte.viewMode === 'edit'"
-        class="rte-outline-panel"
-        aria-label="本次会话记录"
+        class="rte-outline-panel rte-revision-panel"
+        aria-label="正文版本"
       >
         <div data-rte-own class="rte-outline-head">
-          <span data-rte-own class="rte-outline-title">本地记录</span>
-          <button data-rte-own type="button" class="rte-outline-close" aria-label="关闭本地记录" @click="rte.historyOpen = false">×</button>
+          <span data-rte-own class="rte-outline-title">版本</span>
+          <button data-rte-own type="button" class="rte-outline-close" aria-label="关闭版本" @click="rte.historyOpen = false">×</button>
         </div>
-        <p data-rte-own class="rte-outline-empty">只保留这次打开编辑器后的若干步，用来撤销大段改动。云端版本仍走原来的保存。</p>
-        <p data-rte-own v-if="!rte.sessionSnaps.length" class="rte-outline-empty">还没有可恢复的记录。继续编辑一会儿会自动记下。</p>
+        <p data-rte-own class="rte-outline-empty">记在这篇画布里，刷新后还在。自动记录保留最近 15 次，命名版本保留 8 个。不是多人协作的历史。</p>
+        <button data-rte-own type="button" class="rte-revision-name" @click="rte.nameCurrentRevision()">命名当前版本</button>
+        <p data-rte-own v-if="rte.revisionNote" class="rte-outline-empty">{{ rte.revisionNote }}</p>
+        <p data-rte-own v-if="!rte.revisions.length" class="rte-outline-empty">还没有版本。继续编辑一会儿会自动记下，也可以现在命名。</p>
         <nav data-rte-own v-else class="rte-outline-list">
-          <button data-rte-own
-            v-for="(snap, idx) in [...rte.sessionSnaps].reverse()"
-            :key="snap.at"
-            type="button"
-            class="rte-outline-item"
-            @click="rte.restoreSessionSnap(snap.html)"
+          <div data-rte-own
+            v-for="rev in [...rte.revisions].reverse()"
+            :key="rev.id"
+            class="rte-revision-row"
           >
-            第 {{ rte.sessionSnaps.length - idx }} 步
-          </button>
+            <div data-rte-own class="rte-revision-main">
+              <span data-rte-own class="rte-revision-label">{{ rev.label || '自动记录' }}</span>
+              <span data-rte-own class="rte-revision-time">{{ rte.formatRevisionTime(rev.at) }}</span>
+            </div>
+            <button data-rte-own type="button" class="rte-revision-restore" @click="rte.restoreRevision(rev.id)">恢复</button>
+          </div>
         </nav>
       </aside>
       <aside data-rte-own
@@ -868,10 +872,10 @@ useParentScopeStamp()
           type="button"
           class="rte-bottom-link"
           :aria-pressed="rte.historyOpen"
-          title="本次编辑会话里的本地记录，不是云端版本"
+          title="正文版本记在这篇画布里，刷新后还在"
           @click="rte.historyOpen = !rte.historyOpen"
         >
-          本地记录
+          版本
         </button>
         <button data-rte-own
           v-if="rte.expanded"

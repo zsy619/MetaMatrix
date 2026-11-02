@@ -1243,11 +1243,14 @@ const {
   noteRows,
   notesOpen,
   historyOpen,
-  sessionSnaps,
+  revisions,
+  revisionNote,
+  formatRevisionTime,
   scheduleDocChrome,
   jumpNote,
   removeNote,
-  restoreSessionSnap,
+  nameCurrentRevision,
+  restoreRevision,
   insertDocTitleBlock,
   activeOutlineIndex,
   showEmptyGuide,
@@ -1263,6 +1266,14 @@ const {
     closeAllToolbarMenus()
   },
   openRtePrompt,
+  openRteConfirm,
+  panelId: () => props.panelId || '',
+  readRevisions: () => {
+    const id = props.panelId
+    if (!id) return []
+    return current_data.value?.editorRevisionsByPanelId?.[id]
+  },
+  setRevisions: (panelId, revisions) => documentStore.setPanelRevisions(panelId, revisions),
 })
 
 const SHORTCUT_GROUPS: { title: string; items: { keys: string; desc: string }[] }[] = [
@@ -5989,7 +6000,10 @@ provideRteBindings({
   refreshFindMatches,
   removeNote,
   renumberFootnotes,
-  restoreSessionSnap,
+  restoreRevision,
+  nameCurrentRevision,
+  revisionNote,
+  formatRevisionTime,
   rteAriaStatus,
   rteSlashGlyph,
   rteSlashSectionLabel,
@@ -6000,7 +6014,7 @@ provideRteBindings({
   selectedFormAttrs,
   selectedFormType,
   selectionStats,
-  sessionSnaps,
+  revisions,
   setAlign,
   setCodeLanguage,
   setEditorZoom,

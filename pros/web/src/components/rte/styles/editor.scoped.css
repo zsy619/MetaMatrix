@@ -2802,6 +2802,62 @@
   color: #86909c;
   line-height: 1.5;
 }
+.rte-revision-panel {
+  flex-basis: 260px;
+  width: 260px;
+  max-width: 280px;
+}
+.rte-revision-name {
+  margin: 0 12px 8px;
+  border: 1px solid #bedaff;
+  background: #e8f3ff;
+  color: #165dff;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 28px;
+  cursor: pointer;
+}
+.rte-revision-name:hover {
+  background: #d6e8ff;
+}
+.rte-revision-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+}
+.rte-revision-row:hover {
+  background: #e8f3ff;
+}
+.rte-revision-main {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+}
+.rte-revision-label,
+.rte-revision-time {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rte-revision-label {
+  font-size: 12px;
+  color: #1d2129;
+}
+.rte-revision-time {
+  font-size: 11px;
+  color: #86909c;
+}
+.rte-revision-restore {
+  flex: 0 0 auto;
+  border: none;
+  background: transparent;
+  color: #165dff;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 2px 4px;
+}
 .rte-outline-list {
   overflow-y: auto;
   overscroll-behavior: contain;
