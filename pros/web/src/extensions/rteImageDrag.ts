@@ -595,7 +595,17 @@ export function createImageDragPlugin(): Plugin {
         showThumb(thumbSrc, event.clientX, event.clientY)
         autoScrollCanvas(editorView, event.clientY)
         const plan = readDrop(editorView, event)
-        if (plan) placeLine(visualKind(pointerDrag.kind, plan.kind), plan.rect)
+        if (plan) {
+          placeLine(visualKind(pointerDrag.kind, plan.kind), plan.rect)
+          const full =
+            pointerDrag.kind === 'image' &&
+            (plan.kind === 'left' || plan.kind === 'right') &&
+            plan.imagePos != null &&
+            !sameRow(editorView, pointerDrag.from, plan.imagePos) &&
+            !rowCanAccept(rowCountAt(editorView, plan.imagePos), 1)
+          if (full) showLimitTip(event.clientX, event.clientY)
+          else if (!resizingFrame) hideTip()
+        }
       }
       const finishPointer = (event: PointerEvent, commit: boolean) => {
         if (!pointerDrag || pointerDrag.view !== editorView) return
@@ -695,10 +705,11 @@ export function createImageDragPlugin(): Plugin {
         armResize(event)
         if (event.button !== 0) return
         if (!(event.target instanceof Element) || !editorView.dom.contains(event.target)) return
-        if (!imageDragSurface(event.target)) return
-        // 必须取消 mousedown。真实 Chrome/Safari 会在 draggable 节点上发起 HTML5 拖拽，
-        // 随后不再派发 pointermove；Playwright 的 mouse.move 经常不会进入原生拖拽。
-        event.preventDefault()
+        const surface = imageDragSurface(event.target)
+        if (!surface) return
+        // 图片本体必须取消 mousedown，否则真实浏览器进入 HTML5 拖拽后不再派发 pointermove。
+        // 整组手柄是按钮，取消 mousedown 会让 WebKit 丢掉后续 mousemove。
+        if (surface !== 'group') event.preventDefault()
         const target = event.target
         releaseNativeDrag(target)
         window.setTimeout(() => releaseNativeDrag(target), 0)

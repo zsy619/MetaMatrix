@@ -14,17 +14,17 @@ import { armImageDrag } from './rteImageDrag'
 
 function groupPosFromDom(view: EditorView, dom: Element | null): number | null {
   if (!(dom instanceof HTMLElement)) return null
-  const stamped = Number(dom.dataset.rtePos)
-  if (Number.isInteger(stamped) && view.state.doc.nodeAt(stamped)?.type.name === 'imageGroup') return stamped
   let found: number | null = null
   view.state.doc.descendants((node, pos) => {
     if (found != null) return false
     if (node.type.name !== 'imageGroup') return true
-    const el = view.nodeDOM(pos)
-    if (el === dom) found = pos
+    if (view.nodeDOM(pos) === dom) found = pos
     return false
   })
-  return found
+  if (found != null) return found
+  const stamped = Number(dom.dataset.rtePos)
+  if (Number.isInteger(stamped) && stamped > 0 && view.state.doc.nodeAt(stamped)?.type.name === 'imageGroup') return stamped
+  return null
 }
 
 function ensureImageGroupStyle() {
@@ -76,18 +76,28 @@ export function layoutImageGroupChrome(view: EditorView) {
       handle.type = 'button'
       handle.className = 'rte-image-group-divider'
       handle.dataset.index = String(index)
+      handle.dataset.groupPos = String(pos)
       handle.setAttribute('aria-label', '调整图片宽度比例')
       handle.title = '拖动调整两侧宽度'
       const mark = document.createElement('i')
       mark.setAttribute('aria-hidden', 'true')
       handle.appendChild(mark)
       const x = (left.right + right.left) / 2 - domRect.left
-      handle.style.cssText = `position:absolute;left:${x}px;top:${left.top - domRect.top}px;height:${Math.max(left.height, right.height)}px;width:16px;transform:translateX(-50%);border:0;padding:0;background:transparent;cursor:col-resize;pointer-events:auto;`
+      handle.style.cssText = `position:absolute;left:${x}px;top:${left.top - domRect.top}px;height:${Math.max(left.height, right.height)}px;width:16px;transform:translateX(-50%);border:0;padding:0;background:transparent;cursor:col-resize;pointer-events:auto;z-index:20;`
       handle.addEventListener('pointerdown', (event) => {
         if (!view.editable || event.button !== 0) return
         event.preventDefault()
         event.stopPropagation()
-        const groupPos = groupPosFromDom(view, dom)
+        try {
+          handle.setPointerCapture(event.pointerId)
+        } catch {
+          /* 合成指针 */
+        }
+        const stamped = Number(handle.dataset.groupPos)
+        const groupPos =
+          Number.isInteger(stamped) && view.state.doc.nodeAt(stamped)?.type.name === 'imageGroup'
+            ? stamped
+            : groupPosFromDom(view, dom)
         if (groupPos == null) return
         if (event.detail >= 2) {
           clearGroupRatios(view, groupPos)
@@ -104,7 +114,10 @@ export function layoutImageGroupChrome(view: EditorView) {
         const tip = document.createElement('div')
         tip.className = 'rte-image-size-tip'
         document.body.appendChild(tip)
+        const originX = event.clientX
+        let moved = false
         const move = (ev: PointerEvent) => {
+          if (Math.abs(ev.clientX - originX) > 3) moved = true
           const share = pairWidth ? (ev.clientX - pairLeft) / pairWidth : 0.5
           const next = resizePair(base, index, share)
           dom.style.setProperty(`--g${index}`, String(next[index]))
@@ -123,13 +136,25 @@ export function layoutImageGroupChrome(view: EditorView) {
           tip.remove()
           handle.classList.remove('is-active')
           delete dom.dataset.ratioDrag
+          if (!moved || ev.detail >= 2) return
           const share = pairWidth ? (ev.clientX - pairLeft) / pairWidth : 0.5
           const next = resizePair(base, index, share)
           const latest = groupPosFromDom(view, dom)
-          if (latest != null) setGroupRatios(view, latest, next)
+          const at = latest ?? groupPos
+          if (view.state.doc.nodeAt(at)?.type.name === 'imageGroup') setGroupRatios(view, at, next)
         }
         window.addEventListener('pointermove', move)
         window.addEventListener('pointerup', up)
+      })
+      handle.addEventListener('dblclick', (event) => {
+        event.preventDefault()
+        event.stopPropagation()
+        const stamped = Number(handle.dataset.groupPos)
+        const groupPos =
+          Number.isInteger(stamped) && view.state.doc.nodeAt(stamped)?.type.name === 'imageGroup'
+            ? stamped
+            : groupPosFromDom(view, dom)
+        if (groupPos != null) clearGroupRatios(view, groupPos)
       })
       dividers.appendChild(handle)
     }
@@ -225,8 +250,10 @@ export const ImageGroup = Node.create({
         armImageDrag(editor.view, pos, 'group', event)
       })
       handle.addEventListener('mousedown', (event) => {
-        // 取消 mousedown 才能阻止 Safari/Chrome 进入原生拖拽；不要取消 pointerdown。
-        event.preventDefault()
+        if (event.button !== 0) return
+        const pos = getPos()
+        if (typeof pos !== 'number') return
+        armImageDrag(editor.view, pos, 'group', event as PointerEvent)
       })
       bar.appendChild(handle)
 
@@ -269,7 +296,7 @@ export const ImageGroup = Node.create({
       const dividers = document.createElement('div')
       dividers.className = 'rte-image-group-dividers'
       dividers.setAttribute('contenteditable', 'false')
-      dividers.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:4;'
+      dividers.style.cssText = 'position:absolute;inset:0;pointer-events:none;z-index:40;'
       dom.style.position = 'relative'
       dom.appendChild(dividers)
 
@@ -277,6 +304,8 @@ export const ImageGroup = Node.create({
         dom.setAttribute('data-align', normalizeImageAlign(current.attrs.align))
         if (current.attrs.ratios) dom.setAttribute('data-ratios', String(current.attrs.ratios))
         else dom.removeAttribute('data-ratios')
+        if (current.attrs.ratioMode === 'custom') dom.setAttribute('data-ratio-mode', 'custom')
+        else dom.removeAttribute('data-ratio-mode')
         bar.querySelectorAll<HTMLButtonElement>('.rte-image-group-align').forEach((button) => {
           button.classList.toggle('is-active', button.dataset.align === normalizeImageAlign(current.attrs.align))
           button.setAttribute('aria-pressed', button.classList.contains('is-active') ? 'true' : 'false')
