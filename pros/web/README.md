@@ -24,6 +24,15 @@ npm run build
 npm run preview
 ```
 
+## 端到端脚本
+
+| 脚本 | 说明 | 依赖 |
+| --- | --- | --- |
+| `npm run test:smoke` | 接口层冒烟：登录 → 工作台 → 建画布 → 保存 → 克隆（含面板条目、附件、`label=clone` 版本） | API 已启动，`SMOKE_API=http://127.0.0.1:3000` |
+| `npm run test:e2e:clone` | 浏览器端到端：页面设置面板点「克隆画布」→ URL 的 `documentId` 变化 → 副本渲染与源一致 | API + 前端已启动，`CLONE_E2E_API` / `CLONE_E2E_WEB`；浏览器可用 `CHROME_PATH` 指定 |
+
+克隆相关的单测：`pros/api/internal/service/documents_clone_test.go`、`pros/web/src/stores/document.clone.test.ts`。
+
 ## 目录要点
 
 - `src/templates/star-quadrant-v1.json` — STAR 四象限模板（对齐 docs 技术选型 §6.1）

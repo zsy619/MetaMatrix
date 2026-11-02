@@ -90,6 +90,45 @@ func TestBuildCloneRowsGivesNewIdAndSameContent(t *testing.T) {
 	}
 }
 
+// TestBuildCloneRowsKeepsPanelAttachments 覆盖「面板素材随克隆一起带走」：
+// 面板条目、附件（DataURL / 外链）都在 current_data 里，克隆必须逐字节保留。
+func TestBuildCloneRowsKeepsPanelAttachments(t *testing.T) {
+	owner := uuid.New()
+	payload := []byte(`{"id":"canvas_dual_triangle","type":"dual_triangle","schemaVersion":1,` +
+		`"blocks":[{"id":"innovation","items":[{"id":"item_1","text":"保留我"}]}],` +
+		`"attachmentsByPanelId":{"innovation":[{"id":"att_1","name":"probe.png","kind":"file",` +
+		`"mimeType":"image/png","size":68,"dataUrl":"data:image/png;base64,iVBORw0KGgo="}]}}`)
+	src := &model.CanvasDocument{
+		ID:            uuid.New(),
+		OwnerUserID:   owner,
+		CanvasType:    "dual-triangle",
+		Title:         "带素材的画布",
+		SchemaVersion: 1,
+		CurrentData:   payload,
+	}
+	rows, err := buildCloneRows(owner, src, CloneDocumentInput{}, time.Now().UTC())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(rows.doc.CurrentData, payload) {
+		t.Fatalf("clone payload changed:\n%s\n%s", payload, rows.doc.CurrentData)
+	}
+	if !bytes.Equal(rows.rev.Payload, payload) {
+		t.Fatalf("clone revision payload changed:\n%s\n%s", payload, rows.rev.Payload)
+	}
+	// 内容哈希与源一致，说明抽取与检索看到的是同一份正文。
+	if rows.rev.ContentHash == nil || *rows.rev.ContentHash != hashPayload(payload) {
+		t.Fatalf("content hash = %v", rows.rev.ContentHash)
+	}
+	// 附件名与 DataURL 仍然可用。
+	if !bytes.Contains(rows.doc.CurrentData, []byte("probe.png")) {
+		t.Fatal("attachment name lost")
+	}
+	if !bytes.Contains(rows.doc.CurrentData, []byte("data:image/png;base64,")) {
+		t.Fatal("attachment data url lost")
+	}
+}
+
 func TestBuildCloneRowsHonorsOverrides(t *testing.T) {
 	owner := uuid.New()
 	src := &model.CanvasDocument{

@@ -337,8 +337,14 @@ type CloneDocumentInput struct {
 // clonePayload returns a deep copy of a canvas payload.
 //
 // The copy owns its own backing array, so the clone row and the source row
-// never share mutable state. The bytes are copied verbatim (no re-encoding)
-// so key order and numeric precision survive the copy.
+// never share mutable state. The bytes are copied verbatim (no re-encoding),
+// so the clone stores exactly the payload the source has in the database.
+//
+// Note: canvas_documents.current_data is a JSONB column, so Postgres
+// normalises the key order of whatever is written. The clone therefore has
+// the same stored representation as its source (byte for byte), while the
+// key order may differ from the very first client request that created the
+// source document.
 func clonePayload(src []byte) ([]byte, error) {
 	if len(src) == 0 {
 		return nil, ErrValidation

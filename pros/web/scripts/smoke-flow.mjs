@@ -135,3 +135,83 @@ if (sourceAfter.title !== '烟雾画布') {
   process.exit(1)
 }
 console.log('smoke-flow ok: login → workspace → canvas → save → clone')
+
+/**
+ * 克隆（带面板素材）：面板条目、附件 DataURL 都在 current_data 里，
+ * 克隆必须与「库里存着的源文档」完全一致（current_data 是 JSONB，
+ * 写入时由 Postgres 规范化键序，所以这里比的是落库后的源文档）；
+ * 同时副本要有一条 label=clone 的初始版本。
+ */
+const richData = {
+  id: 'dual-triangle',
+  type: 'dual-triangle',
+  schemaVersion: 1,
+  blocks: [
+    {
+      id: 'innovation',
+      side: 'human',
+      title: '创新',
+      subtitle: '子标题',
+      keyword: '创造力',
+      items: [{ id: 'item_1', text: '保留我' }],
+    },
+  ],
+  attachmentsByPanelId: {
+    innovation: [
+      {
+        id: 'att_1',
+        name: 'probe.png',
+        kind: 'file',
+        mimeType: 'image/png',
+        size: 68,
+        dataUrl: 'data:image/png;base64,iVBORw0KGgo=',
+      },
+    ],
+  },
+}
+const rich = await call('/documents', {
+  method: 'POST',
+  token,
+  body: {
+    title: '带素材的画布',
+    templateId: 'dual-triangle',
+    canvasType: 'dual-triangle',
+    data: richData,
+  },
+})
+const richClone = await call(`/documents/${rich.id}/clone`, { method: 'POST', token, body: {} })
+if (richClone.id === rich.id) {
+  console.error('rich clone reused the source id')
+  process.exit(1)
+}
+// 两侧都重新从库里读一次：POST 的响应体是内存里的原始字节，
+// GET 才是落库（JSONB 规范化键序）后的样子。
+const richSourceBody = await call(`/documents/${rich.id}`, { token })
+const richCloneBody = await call(`/documents/${richClone.id}`, { token })
+if (JSON.stringify(richCloneBody.currentData) !== JSON.stringify(richSourceBody.currentData)) {
+  console.error('rich clone payload differs from the stored source')
+  process.exit(1)
+}
+if (richCloneBody.currentData?.attachmentsByPanelId?.innovation?.[0]?.name !== 'probe.png') {
+  console.error('rich clone lost the panel attachment')
+  process.exit(1)
+}
+const richCloneRevisions = await call(`/documents/${richClone.id}/revisions`, { token })
+if (!Array.isArray(richCloneRevisions) || richCloneRevisions.length !== 1) {
+  console.error(`rich clone revisions = ${JSON.stringify(richCloneRevisions)}`)
+  process.exit(1)
+}
+if (richCloneRevisions[0].label !== 'clone') {
+  console.error(`rich clone revision label = ${richCloneRevisions[0].label}`)
+  process.exit(1)
+}
+const richSourceAfter = await call(`/documents/${rich.id}`, { token })
+if (JSON.stringify(richSourceAfter.currentData) !== JSON.stringify(richSourceBody.currentData)) {
+  console.error('clone modified the rich source document')
+  process.exit(1)
+}
+if (richSourceAfter.title !== '带素材的画布') {
+  console.error(`clone changed the rich source title = ${richSourceAfter.title}`)
+  process.exit(1)
+}
+console.log('smoke-flow ok: clone keeps panel items, attachments and writes a clone revision')
