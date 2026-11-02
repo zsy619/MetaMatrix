@@ -80,11 +80,14 @@ onMounted(() => {
         >
           <div class="rd-dim tbl-tone" role="cell" :style="toneVars(0)">
             <input
+              :id="`roi-dimension-${row.id}`"
               class="rd-dim-input"
               type="text"
+              name="roiDimension"
               :value="row.dimension"
               placeholder="维度…"
               maxlength="32"
+              autocomplete="off"
               :aria-label="`维度：${row.dimension || '未命名'}`"
               @input="onDimensionInput(row.id, $event)"
               @click.stop
@@ -127,7 +130,7 @@ onMounted(() => {
           <div class="rd-row-actions">
             <button
               type="button"
-              class="rd-row-delete"
+              class="cv-row-delete"
               title="删除本行"
               :disabled="doc.rows.length <= 1"
               @click="onRemoveRow(row.id)"
@@ -138,8 +141,8 @@ onMounted(() => {
         </div>
       </div>
 
-      <div class="rd-add-row">
-        <button type="button" class="rd-add-btn" @click="onAddRow">
+      <div class="cv-add-row">
+        <button type="button" class="cv-add-btn" @click="onAddRow">
           + 添加行
         </button>
       </div>
@@ -357,59 +360,6 @@ onMounted(() => {
   justify-content: center;
   padding-top: 10px;
   background: #f4f5f6;
-}
-
-.rd-row-delete {
-  width: 22px;
-  height: 22px;
-  border: none;
-  border-radius: 4px;
-  background: transparent;
-  color: #9aa0a6;
-  font-size: 16px;
-  line-height: 1;
-  cursor: pointer;
-  padding: 0;
-}
-
-.rd-row-delete:hover:not(:disabled) {
-  background: #fce8e6;
-  color: #d93025;
-}
-
-.rd-row-delete:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-}
-
-.rd-add-row {
-  flex-shrink: 0;
-  display: flex;
-  justify-content: center;
-  padding: 8px 12px;
-  border-top: 1px solid var(--cv-frame, #ececec);
-  background: var(--cv-page, #f7f7f7);
-}
-
-.rd-add-btn {
-  border: 1px solid var(--cv-frame, #ececec);
-  border-radius: 6px;
-  background: #fff;
-  color: var(--cv-ink, #3c4043);
-  font-size: 13px;
-  font-weight: 600;
-  padding: 6px 16px;
-  cursor: pointer;
-  transition:
-    background 0.12s ease,
-    border-color 0.12s ease,
-    color 0.12s ease;
-}
-
-.rd-add-btn:hover {
-  background: var(--cv-hover-wash, #e8f1fa);
-  border-color: var(--cv-focus, #1c4c7c);
-  color: var(--cv-focus, #1c4c7c);
 }
 
 /* ---- Middle section ---- */

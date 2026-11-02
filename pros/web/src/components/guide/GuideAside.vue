@@ -528,7 +528,7 @@ const panelTitle = computed(() => '最近文档')
 .aside-resize-handle:hover::after,
 .aside-resize-handle:focus-visible::after,
 .guide-aside--dragging .aside-resize-handle::after {
-  background: #1a73e8;
+  background: var(--cv-focus, #163044);
 }
 
 .aside-inner {
@@ -660,7 +660,11 @@ const panelTitle = computed(() => '最近文档')
 .doc-item:hover,
 .doc-item:focus-visible {
   background: rgba(32, 33, 36, 0.06);
-  outline: none;
+}
+
+.doc-item:focus-visible {
+  outline: 2px solid var(--cv-focus, #163044);
+  outline-offset: 2px;
 }
 
 .doc-icon {
@@ -737,14 +741,18 @@ const panelTitle = computed(() => '最近文档')
   gap: 8px;
   padding: 12px 0 16px;
   margin-top: auto;
-  color: #1a73e8;
+  color: var(--cv-focus, #163044);
   text-decoration: none;
 }
 
-.rail-link:hover,
+.rail-link:hover {
+  background: var(--cv-hover-wash, #e8f1fa);
+}
+
 .rail-link:focus-visible {
-  background: #e8f0fe;
-  outline: none;
+  background: var(--cv-hover-wash, #e8f1fa);
+  outline: 2px solid var(--cv-focus, #163044);
+  outline-offset: -2px;
 }
 
 .workspace-entry {
@@ -755,18 +763,22 @@ const panelTitle = computed(() => '最近文档')
   padding: 10px 10px;
   border-radius: 12px;
   text-decoration: none;
-  color: #174ea6;
-  background: #e8f0fe;
-  box-shadow: inset 0 0 0 1px rgba(26, 115, 232, 0.18);
+  color: var(--cv-focus, #163044);
+  background: var(--cv-hover-wash, #e8f1fa);
+  box-shadow: inset 0 0 0 1px rgba(22, 48, 68, 0.18);
   position: sticky;
   top: 0;
   z-index: 1;
 }
 
-.workspace-entry:hover,
+.workspace-entry:hover {
+  background: #d5e6f6;
+}
+
 .workspace-entry:focus-visible {
-  background: #d2e3fc;
-  outline: none;
+  background: #d5e6f6;
+  outline: 2px solid var(--cv-focus, #163044);
+  outline-offset: 2px;
 }
 
 .ws-icon {
@@ -778,7 +790,7 @@ const panelTitle = computed(() => '最近文档')
   align-items: center;
   justify-content: center;
   background: #ffffff;
-  color: #1a73e8;
+  color: var(--cv-focus, #163044);
 }
 
 .ws-text {
@@ -808,12 +820,12 @@ const panelTitle = computed(() => '最近文档')
 .ws-go {
   flex-shrink: 0;
   font-size: 14px;
-  color: #1a73e8;
+  color: var(--cv-focus, #163044);
 }
 
 .rail-toggle:hover {
-  background: #f1f3f4;
-  color: #1a73e8;
+  background: var(--cv-hover-wash, #e8f1fa);
+  color: var(--cv-focus, #163044);
 }
 
 .chev {

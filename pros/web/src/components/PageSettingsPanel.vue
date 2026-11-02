@@ -599,11 +599,14 @@ function goGuide() {
             <label class="field-label">
               <span class="field-label-text">任务名称 <span class="req">*</span></span>
               <el-input
+                id="canvas-doc-title"
                 ref="titleInputRef"
                 v-model="doc_title"
+                name="canvasDocTitle"
                 size="small"
                 placeholder="必填，保存时作为任务名称"
                 maxlength="255"
+                autocomplete="off"
                 clearable
               />
             </label>
@@ -612,12 +615,15 @@ function goGuide() {
             <label class="field-label">
               <span class="field-label-text">备注信息</span>
               <el-input
+                id="canvas-doc-notes"
                 v-model="doc_notes"
+                name="canvasDocNotes"
                 type="textarea"
                 :rows="3"
                 size="small"
                 placeholder="可选备注"
                 maxlength="2000"
+                autocomplete="off"
               />
             </label>
           </div>
@@ -677,7 +683,13 @@ function goGuide() {
             <el-button size="small" @click="onExportMarkdown">导出 Markdown</el-button>
             <label class="import-label">
               导入 JSON
-              <input type="file" accept="application/json,.json" @change="onImportJson" />
+              <input
+                id="canvas-import-json"
+                name="canvasImportJson"
+                type="file"
+                accept="application/json,.json"
+                @change="onImportJson"
+              />
             </label>
             <el-button
               size="small"
@@ -881,7 +893,7 @@ function goGuide() {
   min-height: 0;
   height: 100%;
   background: #fff;
-  border-left: 1px solid #dadce0;
+  border-left: 1px solid var(--cv-frame, #ececec);
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -891,8 +903,8 @@ function goGuide() {
 .panel-header {
   flex-shrink: 0;
   padding: 14px 16px 10px;
-  border-bottom: 1px solid #e8eaed;
-  background: #fafbfc;
+  border-bottom: 1px solid var(--cv-frame, #ececec);
+  background: var(--cv-page, #f7f7f7);
 }
 
 .panel-header-top {
@@ -1006,8 +1018,8 @@ function goGuide() {
 
 .acc-meta-badge {
   font-size: 10px;
-  color: #1a73e8;
-  background: #e8f0fe;
+  color: var(--cv-focus, #163044);
+  background: var(--cv-hover-wash, #e8f1fa);
   padding: 1px 7px;
   border-radius: 999px;
   white-space: nowrap;
@@ -1089,8 +1101,8 @@ function goGuide() {
 
 .badge {
   font-size: 11px;
-  color: #1a73e8;
-  background: #e8f0fe;
+  color: var(--cv-focus, #163044);
+  background: var(--cv-hover-wash, #e8f1fa);
   padding: 2px 8px;
   border-radius: 999px;
   white-space: nowrap;
@@ -1179,8 +1191,8 @@ function goGuide() {
 }
 
 .stored-item.active {
-  border-color: #1a73e8;
-  background: #e8f0fe;
+  border-color: var(--cv-focus, #163044);
+  background: var(--cv-hover-wash, #e8f1fa);
 }
 
 .stored-open {
@@ -1197,7 +1209,7 @@ function goGuide() {
 }
 
 .stored-open:hover {
-  background: rgba(26, 115, 232, 0.04);
+  background: rgba(22, 48, 68, 0.04);
 }
 
 .stored-delete {
@@ -1240,7 +1252,19 @@ function goGuide() {
 .panel-footer {
   flex-shrink: 0;
   padding: 8px 12px 10px;
-  border-top: 1px solid #e8eaed;
-  background: #fafbfc;
+  border-top: 1px solid var(--cv-frame, #ececec);
+  background: var(--cv-page, #f7f7f7);
+}
+
+@media (max-width: 820px) {
+  .page-settings-panel {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 30;
+    width: min(320px, 100%);
+    box-shadow: -12px 0 28px rgba(32, 28, 22, 0.16);
+  }
 }
 </style>

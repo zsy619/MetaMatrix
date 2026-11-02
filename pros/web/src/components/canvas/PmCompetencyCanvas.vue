@@ -384,8 +384,8 @@ onBeforeUnmount(() => {
         />
         <polygon
           :points="scorePolygon"
-          fill="rgba(100, 181, 246, 0.32)"
-          stroke="#42a5f5"
+          fill="rgba(42, 100, 159, 0.28)"
+          stroke="#2A649F"
           stroke-width="2.2"
           stroke-linejoin="round"
         />
@@ -458,7 +458,9 @@ onBeforeUnmount(() => {
       >
         <span class="pmc-slider-name">{{ s.title }}</span>
         <input
+          :id="`pmc-score-${s.axis}`"
           type="range"
+          :name="`pmc-score-${s.axis}`"
           min="0"
           max="100"
           step="1"
@@ -538,7 +540,7 @@ onBeforeUnmount(() => {
 }
 
 .pmc-axis-label {
-  fill: var(--axis, #1565c0);
+  fill: var(--axis, #2A649F);
   font-size: 15px;
   font-weight: 750;
   letter-spacing: 0.02em;
@@ -552,11 +554,11 @@ onBeforeUnmount(() => {
 
 .pmc-vertex-label:hover rect {
   fill: #ffffff;
-  stroke: var(--axis, #1565c0);
+  stroke: var(--axis, #2A649F);
 }
 
 .pmc-vertex-label:focus-visible rect {
-  stroke: var(--axis, #1565c0);
+  stroke: var(--axis, #2A649F);
   stroke-width: 2;
 }
 
@@ -598,7 +600,7 @@ onBeforeUnmount(() => {
   max-width: 48%;
   font-size: 11px;
   font-weight: 700;
-  color: var(--axis, #1565c0);
+  color: var(--axis, #2A649F);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -608,7 +610,7 @@ onBeforeUnmount(() => {
   flex: 1 1 auto;
   min-width: 0;
   height: 4px;
-  accent-color: var(--axis, #1565c0);
+  accent-color: var(--axis, #2A649F);
   cursor: pointer;
 }
 
@@ -618,7 +620,7 @@ onBeforeUnmount(() => {
   font-variant-numeric: tabular-nums;
   font-size: 12px;
   font-weight: 800;
-  color: var(--axis, #1565c0);
+  color: var(--axis, #2A649F);
   text-align: right;
 }
 

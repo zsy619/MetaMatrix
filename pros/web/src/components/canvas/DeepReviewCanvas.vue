@@ -47,11 +47,14 @@ function onReviewTime(event: Event) {
       <label class="dr-meta-field">
         <span class="dr-meta-label">项目名称：</span>
         <input
+          id="dr-project-name"
           class="dr-meta-input"
           type="text"
+          name="drProjectName"
           :value="doc.projectName"
           placeholder="填写项目名称"
           maxlength="80"
+          autocomplete="off"
           @input="onProjectName"
           @click.stop
         />
@@ -59,11 +62,14 @@ function onReviewTime(event: Event) {
       <label class="dr-meta-field">
         <span class="dr-meta-label">复盘时间：</span>
         <input
+          id="dr-review-time"
           class="dr-meta-input"
           type="text"
+          name="drReviewTime"
           :value="doc.reviewTime"
           placeholder="例如 2026-10"
           maxlength="40"
+          autocomplete="off"
           @input="onReviewTime"
           @click.stop
         />
@@ -278,7 +284,7 @@ function onReviewTime(event: Event) {
   min-height: 400px;
   display: flex;
   flex-direction: column;
-  border: 1px dashed color-mix(in srgb, var(--tbl-topic, #dadce0) 35%, transparent);
+  border: 1px solid var(--cv-hairline, rgba(60, 50, 20, 0.08));
   border-radius: 4px;
   background: transparent;
   margin: 0 8px;

@@ -30,6 +30,9 @@ const router = useRouter()
 const documentStore = useDocumentStore()
 const ui = useUiStore()
 const auth = useAuthStore()
+if (window.matchMedia('(max-width: 820px)').matches) {
+  ui.configPanelOpen = false
+}
 const { dirty, saving, document_id, conflict } = storeToRefs(documentStore)
 
 const statusMsg = ref('')
@@ -694,7 +697,7 @@ async function manualCheckpoint() {
   gap: 16px;
   padding: 10px 16px;
   background: #fff;
-  border-bottom: 1px solid #dadce0;
+  border-bottom: 1px solid var(--cv-frame, #ececec);
 }
 
 .brand {
@@ -716,14 +719,14 @@ async function manualCheckpoint() {
   border-radius: 8px;
 }
 .title-input:focus {
-  border-color: #dadce0;
+  border-color: var(--cv-focus, #163044);
   background: #fff;
 }
 
 .badge {
   font-size: 12px;
-  color: #1a73e8;
-  background: #e8f0fe;
+  color: var(--cv-focus, #163044);
+  background: var(--cv-hover-wash, #e8f1fa);
   padding: 2px 8px;
   border-radius: 999px;
   white-space: nowrap;
@@ -782,7 +785,7 @@ async function manualCheckpoint() {
 
 .conflict-primary {
   border: 0;
-  background: #1a73e8;
+  background: var(--cv-focus, #163044);
   color: #fff;
 }
 
@@ -802,7 +805,7 @@ async function manualCheckpoint() {
 
 .user {
   font-size: 12px;
-  color: #1a73e8;
+  color: var(--cv-focus, #163044);
   text-decoration: none;
 }
 
@@ -819,6 +822,7 @@ async function manualCheckpoint() {
 }
 
 .workspace {
+  position: relative;
   flex: 1;
   min-height: 0;
   min-width: 0;
@@ -876,8 +880,8 @@ async function manualCheckpoint() {
 }
 
 .doc-item.active button {
-  border-color: #1a73e8;
-  background: #e8f0fe;
+  border-color: var(--cv-focus, #163044);
+  background: var(--cv-hover-wash, #e8f1fa);
 }
 
 .doc-item span {

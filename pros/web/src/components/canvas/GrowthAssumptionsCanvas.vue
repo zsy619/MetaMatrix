@@ -90,7 +90,7 @@ function onRemoveRow(rowId: string) {
           <div class="ga-row-actions">
             <button
               type="button"
-              class="ga-row-delete"
+              class="cv-row-delete"
               title="删除本行"
               :disabled="doc.rows.length <= 1"
               @click="onRemoveRow(row.id)"
@@ -102,8 +102,8 @@ function onRemoveRow(rowId: string) {
       </div>
     </div>
 
-    <div class="ga-add-row">
-      <button type="button" class="ga-add-btn" @click="onAddRow">
+    <div class="cv-add-row">
+      <button type="button" class="cv-add-btn" @click="onAddRow">
         + 添加行
       </button>
     </div>
@@ -228,53 +228,6 @@ function onRemoveRow(rowId: string) {
   justify-content: center;
   padding-top: 10px;
   background: #ffffff;
-}
-
-.ga-row-delete {
-  width: 22px;
-  height: 22px;
-  border: none;
-  border-radius: 4px;
-  background: transparent;
-  color: #9aa0a6;
-  font-size: 16px;
-  line-height: 1;
-  cursor: pointer;
-  padding: 0;
-}
-
-.ga-row-delete:hover:not(:disabled) {
-  background: #fce8e6;
-  color: #d93025;
-}
-
-.ga-row-delete:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-}
-
-.ga-add-row {
-  flex-shrink: 0;
-  display: flex;
-  justify-content: center;
-  padding: 10px 0 0;
-}
-
-.ga-add-btn {
-  border: 1px solid #e4e6e8;
-  background: #fff;
-  color: #5f6368;
-  border-radius: 8px;
-  padding: 8px 16px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.ga-add-btn:hover {
-  border-color: var(--cv-focus, #1c4c7c);
-  color: var(--cv-focus, #1c4c7c);
-  background: var(--cv-hover-wash, #e8f1fa);
 }
 
 @media (max-width: 900px) {
