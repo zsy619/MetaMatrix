@@ -25,6 +25,14 @@ const log = (step, ok, detail) => {
 await page.goto('http://127.0.0.1:5173/login', { waitUntil: 'domcontentloaded' })
 await page.fill('#login-email', 'demo@metamatrix.local')
 await page.fill('#login-password', 'demo123456')
+/**
+ * 登录页带图形验证码。自动化读不到图片里的字符，
+ * 只能依赖 API 的 CAPTCHA_DEBUG=true（本地/CI 用）把答案放进 data-debug-answer。
+ */
+const debugAnswer = await page.getAttribute('.captcha__image', 'data-debug-answer')
+if (debugAnswer) {
+  await page.fill('#captcha-code', debugAnswer)
+}
 await page.click('button[type="submit"]')
 await page.waitForTimeout(800)
 

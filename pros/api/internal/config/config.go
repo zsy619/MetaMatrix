@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -15,6 +16,8 @@ type Config struct {
 	LoginWindow    time.Duration
 	LoginPairLimit int
 	LoginIPLimit   int
+	CaptchaTTL     time.Duration
+	CaptchaDebug   bool
 }
 
 func Load() Config {
@@ -40,7 +43,38 @@ func Load() Config {
 		LoginWindow:    durationEnv("LOGIN_WINDOW", 15*time.Minute),
 		LoginPairLimit: intEnv("LOGIN_PAIR_LIMIT", 8),
 		LoginIPLimit:   intEnv("LOGIN_IP_LIMIT", 30),
+		CaptchaTTL:     captchaTTLDEnv(),
+		CaptchaDebug:   boolEnv("CAPTCHA_DEBUG", false),
 	}
+}
+
+// captchaTTLDEnv reads CAPTCHA_TTL. Unlike the login window it accepts short
+// values, because a captcha only has to survive one form submission.
+func captchaTTLDEnv() time.Duration {
+	raw := os.Getenv("CAPTCHA_TTL")
+	if raw == "" {
+		return 5 * time.Minute
+	}
+	d, err := time.ParseDuration(raw)
+	if err != nil || d < 30*time.Second || d > time.Hour {
+		return 5 * time.Minute
+	}
+	return d
+}
+
+// boolEnv reads a truthy flag from the environment.
+func boolEnv(key string, fallback bool) bool {
+	raw := strings.ToLower(strings.TrimSpace(os.Getenv(key)))
+	if raw == "" {
+		return fallback
+	}
+	switch raw {
+	case "1", "true", "yes", "on":
+		return true
+	case "0", "false", "no", "off":
+		return false
+	}
+	return fallback
 }
 
 func intEnv(key string, fallback int) int {

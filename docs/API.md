@@ -13,11 +13,21 @@
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| POST | `/auth/register` | `{ email, password, displayName }` |
+| POST | `/auth/register` | `{ email, password, displayName, captchaId, captchaCode }` |
 | POST | `/auth/login` | 同注册字段中的邮箱和密码。超限返回 429 和 `Retry-After` |
+| GET | `/auth/captcha` | 取一张图形验证码 → `{ captchaId, image, expiresAt }` |
 | GET | `/auth/me` | 当前用户 |
 | POST | `/auth/refresh` | 换新 token |
 | POST | `/auth/password` | `{ currentPassword, newPassword }` |
+
+### 图形验证码
+
+登录和注册都必须带 `captchaId` 与 `captchaCode`。先 `GET /auth/captcha` 取图，
+`image` 是可直接放进 `<img src>` 的 SVG data URI。验证码由服务端生成并校验，
+一次性使用，答案错误返回 400 `captcha_invalid`，缺失返回 400 `captcha_required`，
+过期返回 400 `captcha_expired`。
+
+有效期默认 5 分钟（`CAPTCHA_TTL`）。同一张验证码连续答错 5 次即作废。
 
 ## 文档
 

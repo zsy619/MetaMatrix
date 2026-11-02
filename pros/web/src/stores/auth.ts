@@ -8,6 +8,12 @@ import { clearRecentOpens } from '../utils/canvasTransfer'
 
 const USER_KEY = 'metamatrix:auth:user'
 
+/** The captcha challenge that must accompany a login or register request. */
+export type CaptchaInput = {
+  captchaId: string
+  captchaCode: string
+}
+
 function readCachedUser(): User | null {
   try {
     const raw = localStorage.getItem(USER_KEY)
@@ -51,11 +57,17 @@ export const useAuthStore = defineStore('auth', () => {
     clearRecentOpens()
   }
 
-  async function register(email: string, password: string, displayName?: string) {
+  async function register(email: string, password: string, displayName?: string, captcha?: CaptchaInput) {
     loading.value = true
     error.value = null
     try {
-      const res = await authApi.register({ email, password, displayName })
+      const res = await authApi.register({
+        email,
+        password,
+        displayName,
+        captchaId: captcha?.captchaId ?? '',
+        captchaCode: captcha?.captchaCode ?? '',
+      })
       applySession(res.token, res.user)
       return res.user
     } catch (e: unknown) {
@@ -66,11 +78,16 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  async function login(email: string, password: string) {
+  async function login(email: string, password: string, captcha?: CaptchaInput) {
     loading.value = true
     error.value = null
     try {
-      const res = await authApi.login({ email, password })
+      const res = await authApi.login({
+        email,
+        password,
+        captchaId: captcha?.captchaId ?? '',
+        captchaCode: captcha?.captchaCode ?? '',
+      })
       applySession(res.token, res.user)
       return res.user
     } catch (e: unknown) {

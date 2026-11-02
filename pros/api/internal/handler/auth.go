@@ -8,17 +8,31 @@ import (
 	"time"
 
 	"metamatrix/api/internal/middleware"
+	"metamatrix/api/internal/model"
 	"metamatrix/api/internal/service"
 
 	"github.com/cloudwego/hertz/pkg/app"
+	"github.com/google/uuid"
 )
 
+// AuthBackend is the part of the auth service the HTTP layer depends on.
+// The interface keeps the handler testable without a database.
+type AuthBackend interface {
+	Register(email, password, displayName string) (*model.User, string, error)
+	Login(email, password string) (*model.User, string, error)
+	Refresh(userID uuid.UUID) (*model.User, string, error)
+	ChangePassword(userID uuid.UUID, current, next string) error
+	Me(userID uuid.UUID) (*model.User, error)
+	VerifyCaptcha(captchaID, captchaAnswer string) error
+	NewCaptcha() (service.CaptchaChallenge, error)
+}
+
 type AuthHandler struct {
-	svc   *service.AuthService
+	svc   AuthBackend
 	limit *service.AttemptLimiter
 }
 
-func NewAuthHandler(svc *service.AuthService, limit *service.AttemptLimiter) *AuthHandler {
+func NewAuthHandler(svc AuthBackend, limit *service.AttemptLimiter) *AuthHandler {
 	if limit == nil {
 		limit = service.NewAttemptLimiter(15*time.Minute, 8, 30)
 	}
@@ -29,17 +43,49 @@ type registerBody struct {
 	Email       string `json:"email"`
 	Password    string `json:"password"`
 	DisplayName string `json:"displayName"`
+	CaptchaID   string `json:"captchaId"`
+	CaptchaCode string `json:"captchaCode"`
 }
 
 type loginBody struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Email       string `json:"email"`
+	Password    string `json:"password"`
+	CaptchaID   string `json:"captchaId"`
+	CaptchaCode string `json:"captchaCode"`
+}
+
+// Captcha issues a fresh image challenge. It is public because the login and
+// register pages need a challenge before the user is authenticated.
+func (h *AuthHandler) Captcha(ctx context.Context, c *app.RequestContext) {
+	challenge, err := h.svc.NewCaptcha()
+	if err != nil {
+		Internal(c, "captcha issue failed")
+		return
+	}
+	c.JSON(http.StatusOK, challenge)
+}
+
+// captchaFailure maps a captcha error onto the HTTP response. The message
+// never reveals whether the id existed or the answer was wrong.
+func captchaFailure(c *app.RequestContext, err error) {
+	switch {
+	case errors.Is(err, service.ErrCaptchaRequired):
+		Fail(c, http.StatusBadRequest, "captcha required", "captcha_required")
+	case errors.Is(err, service.ErrCaptchaExpired):
+		Fail(c, http.StatusBadRequest, "captcha expired", "captcha_expired")
+	default:
+		Fail(c, http.StatusBadRequest, "captcha answer does not match", "captcha_invalid")
+	}
 }
 
 func (h *AuthHandler) Register(ctx context.Context, c *app.RequestContext) {
 	var body registerBody
 	if err := c.BindAndValidate(&body); err != nil {
 		BadRequest(c, "invalid body")
+		return
+	}
+	if err := h.svc.VerifyCaptcha(body.CaptchaID, body.CaptchaCode); err != nil {
+		captchaFailure(c, err)
 		return
 	}
 	u, token, err := h.svc.Register(body.Email, body.Password, body.DisplayName)
@@ -77,6 +123,12 @@ func (h *AuthHandler) Login(ctx context.Context, c *app.RequestContext) {
 		middleware.ObserveLoginThrottled()
 		middleware.Audit(c, "login_throttled", "", "rate_limited")
 		tooManyLogins(c, wait)
+		return
+	}
+	// The captcha is checked before the credentials so a bot cannot use the
+	// login endpoint to probe passwords one attempt at a time.
+	if err := h.svc.VerifyCaptcha(body.CaptchaID, body.CaptchaCode); err != nil {
+		captchaFailure(c, err)
 		return
 	}
 	u, token, err := h.svc.Login(body.Email, body.Password)

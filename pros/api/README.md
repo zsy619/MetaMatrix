@@ -61,18 +61,28 @@ go run ./cmd/server
 
 ## 测试账号（可选）
 
+登录和注册都要带图形验证码。先取图，再把 `captchaId` 和 `captchaCode` 一起提交：
+
 ```bash
+CAPTCHA=$(curl -s http://localhost:3000/auth/captcha)
+CAPTCHA_ID=$(echo "$CAPTCHA" | jq -r .captchaId)
+CAPTCHA_CODE=$(echo "$CAPTCHA" | jq -r .debugAnswer)  # 仅 CAPTCHA_DEBUG=true 时有值
+
 curl -s -X POST http://localhost:3000/auth/register \
   -H 'Content-Type: application/json' \
-  -d '{"email":"demo@metamatrix.local","password":"demo123456","displayName":"Demo"}'
+  -d "{\"email\":\"demo@metamatrix.local\",\"password\":\"demo123456\",\"displayName\":\"Demo\",\"captchaId\":\"$CAPTCHA_ID\",\"captchaCode\":\"$CAPTCHA_CODE\"}"
 ```
+
+本地自动化可以把 API 跑在 `CAPTCHA_DEBUG=true` 下，接口会直接带上答案；
+生产环境不要开这个开关，详见 `docs/生产配置.md`。
 
 ## API 一览
 
 | 方法 | 路径 | 鉴权 | 说明 |
 | --- | --- | --- | --- |
-| POST | `/auth/register` | 否 | 注册 → `{token,user}` |
-| POST | `/auth/login` | 否 | 登录 → `{token,user}` |
+| POST | `/auth/register` | 否 | 注册 → `{token,user}`，需带 `captchaId` + `captchaCode` |
+| POST | `/auth/login` | 否 | 登录 → `{token,user}`，需带 `captchaId` + `captchaCode` |
+| GET | `/auth/captcha` | 否 | 取图形验证码 → `{captchaId,image,expiresAt}` |
 | GET | `/auth/me` | Bearer | 当前用户 |
 | POST | `/documents` | Bearer | 创建 + 首条 snapshot；同步抽取层 |
 | GET | `/documents` | Bearer | 列表（摘要；`?templateId=&canvasType=`） |
