@@ -10,6 +10,9 @@ export type RteImageAlign = 'left' | 'center' | 'right' | null
  */
 export const RteImage = Image.extend({
   name: 'image',
+  // 关闭 ProseMirror 的原生节点拖拽。真实浏览器会把 draggable 容器变成 HTML5 drag，
+  // dragstart 一旦开始就不再派发 pointermove；Playwright 的合成鼠标往往不会进入这条路径。
+  draggable: false,
 
   addAttributes() {
     return {

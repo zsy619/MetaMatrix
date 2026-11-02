@@ -85,11 +85,18 @@ type PointerDrag = {
 
 let pointerDrag: PointerDrag | null = null
 
+function captureHost(event: PointerEvent, fallback: HTMLElement | null): HTMLElement | null {
+  const current = event.currentTarget
+  if (current instanceof HTMLElement && current !== document.documentElement && current !== document.body) return current
+  return fallback
+}
+
 export function armImageDrag(
   view: EditorView,
   pos: number,
   kind: 'image' | 'group',
   event: PointerEvent,
+  captureEl?: HTMLElement | null,
 ) {
   if (!view.editable || event.button !== 0) return
   pointerDrag = {
@@ -102,6 +109,24 @@ export function armImageDrag(
   }
   dragFrom = pos
   dragKind = kind
+  const host = captureEl ?? captureHost(event, null)
+  if (host) {
+    host.draggable = false
+    try {
+      host.setPointerCapture(event.pointerId)
+    } catch {
+      /* 合成 pointerId 或未进 pointerdown 时不能 capture */
+    }
+  }
+}
+
+/** 缩放锚点、分隔条、气泡按钮不开始移动。图片本体和拖动手柄可以。 */
+function imageDragSurface(target: Element): HTMLElement | 'group' | null {
+  if (target.closest('[data-resize-handle], .rte-image-group-divider, .rte-bubble, .rte-toolbar')) return null
+  if (target.closest('.rte-image-group-bar') && !target.closest('.rte-image-group-handle')) return null
+  if (target.closest('.rte-image-group-handle')) return 'group'
+  if (target.closest('button, a, input, textarea, label') && !target.closest('.rte-image-drag-handle')) return null
+  return imageFrame(target)
 }
 
 function ensureLine(): HTMLElement {
@@ -494,6 +519,12 @@ export function createImageDragPlugin(): Plugin {
             const box = el.closest('[data-resize-container]')
             const frame = box instanceof HTMLElement ? box : el
             frame.dataset.rtePos = String(pos)
+            frame.draggable = false
+            const image = frame.querySelector('img')
+            if (image instanceof HTMLImageElement) {
+              image.draggable = false
+              image.setAttribute('draggable', 'false')
+            }
             if (frame.querySelector(':scope > .rte-image-drag-handle')) return false
             const handle = document.createElement('button')
             handle.type = 'button'
@@ -566,7 +597,7 @@ export function createImageDragPlugin(): Plugin {
         const plan = readDrop(editorView, event)
         if (plan) placeLine(visualKind(pointerDrag.kind, plan.kind), plan.rect)
       }
-      const onPointerUp = (event: PointerEvent) => {
+      const finishPointer = (event: PointerEvent, commit: boolean) => {
         if (!pointerDrag || pointerDrag.view !== editorView) return
         const current = pointerDrag
         pointerDrag = null
@@ -574,8 +605,28 @@ export function createImageDragPlugin(): Plugin {
         setSourceGhost(editorView, current.from, false)
         hideLine()
         clearDragging()
-        if (!current.moved || !editorView.editable) return
+        if (!editorView.editable) return
+        if (!current.moved || !commit) {
+          const expected = current.kind === 'group' ? 'imageGroup' : 'image'
+          if (editorView.state.doc.nodeAt(current.from)?.type.name === expected) {
+            try {
+              editorView.dispatch(
+                editorView.state.tr.setSelection(NodeSelection.create(editorView.state.doc, current.from)),
+              )
+              editorView.focus()
+            } catch {
+              /* 位置已失效 */
+            }
+          }
+          return
+        }
         commitDrop(editorView, event, current.from, current.kind)
+      }
+      const onPointerUp = (event: PointerEvent) => {
+        finishPointer(event, true)
+      }
+      const onPointerCancel = (event: PointerEvent) => {
+        finishPointer(event, false)
       }
       const armResize = (event: Event) => {
         const target = event.target
@@ -602,32 +653,55 @@ export function createImageDragPlugin(): Plugin {
           node.classList.remove('is-dragging')
         })
       }
+      const releaseNativeDrag = (target: Element) => {
+        const frame = imageFrame(target)
+        const group = target.closest('[data-type="image-group"]')
+        for (const el of [frame, group]) {
+          if (!(el instanceof HTMLElement)) continue
+          el.draggable = false
+          el.querySelectorAll('img').forEach((img) => {
+            img.draggable = false
+          })
+        }
+      }
       const onPointerDown = (event: PointerEvent) => {
         if (!editorView.editable || event.button !== 0) return
+        if (pointerDrag?.view === editorView) return
         if (!(event.target instanceof Element) || !editorView.dom.contains(event.target)) return
-        const grip = event.target.closest('.rte-image-drag-handle')
-        if (!(grip instanceof HTMLElement)) return
-        const frame = imageFrame(grip)
-        if (!frame) return
-        const rawPos = frame.dataset.rtePos
-        const stamped = rawPos ? Number(rawPos) : NaN
-        const pos = Number.isInteger(stamped) ? stamped : imagePosFromDOM(editorView, frame)
-        if (pos == null) return
-        event.preventDefault()
-        event.stopPropagation()
-        frame.draggable = false
-        const image = frame.querySelector('img')
-        if (image) image.draggable = false
-        grip.classList.add('is-dragging')
-        try {
-          grip.setPointerCapture(event.pointerId)
-        } catch {
-          /* 合成 pointerId 不能 capture */
+        const surface = imageDragSurface(event.target)
+        if (!surface) return
+        if (surface === 'group') {
+          const group = event.target.closest('[data-type="image-group"]')
+          if (!(group instanceof HTMLElement)) return
+          const raw = group.dataset.rtePos
+          const stamped = raw ? Number(raw) : NaN
+          if (!Number.isInteger(stamped)) return
+          const grip = event.target.closest('.rte-image-group-handle')
+          armImageDrag(editorView, stamped, 'group', event, grip instanceof HTMLElement ? grip : group)
+          return
         }
-        armImageDrag(editorView, pos, 'image', event)
+        const rawPos = surface.dataset.rtePos
+        const stamped = rawPos ? Number(rawPos) : NaN
+        const pos = Number.isInteger(stamped) ? stamped : imagePosFromDOM(editorView, surface)
+        if (pos == null) return
+        surface.draggable = false
+        const image = surface.querySelector('img')
+        if (image) image.draggable = false
+        surface.querySelector('.rte-image-drag-handle')?.classList.add('is-dragging')
+        const grip = event.target.closest('.rte-image-drag-handle')
+        armImageDrag(editorView, pos, 'image', event, grip instanceof HTMLElement ? grip : surface)
       }
       const onMouseDown = (event: MouseEvent) => {
         armResize(event)
+        if (event.button !== 0) return
+        if (!(event.target instanceof Element) || !editorView.dom.contains(event.target)) return
+        if (!imageDragSurface(event.target)) return
+        // 必须取消 mousedown。真实 Chrome/Safari 会在 draggable 节点上发起 HTML5 拖拽，
+        // 随后不再派发 pointermove；Playwright 的 mouse.move 经常不会进入原生拖拽。
+        event.preventDefault()
+        const target = event.target
+        releaseNativeDrag(target)
+        window.setTimeout(() => releaseNativeDrag(target), 0)
         if (!pointerDrag) onPointerDown(event as PointerEvent)
       }
       document.addEventListener('pointerdown', onPointerDown, true)
@@ -638,6 +712,7 @@ export function createImageDragPlugin(): Plugin {
       document.addEventListener('drop', onDrop, true)
       window.addEventListener('pointermove', onPointerMove)
       window.addEventListener('pointerup', onPointerUp)
+      window.addEventListener('pointercancel', onPointerCancel)
       return {
         update: stamp,
         destroy() {
@@ -650,6 +725,7 @@ export function createImageDragPlugin(): Plugin {
           document.removeEventListener('drop', onDrop, true)
           window.removeEventListener('pointermove', onPointerMove)
           window.removeEventListener('pointerup', onPointerUp)
+          window.removeEventListener('pointercancel', onPointerCancel)
           resizingFrame = null
           hideTip()
           hideLine()
@@ -726,8 +802,8 @@ export function createImageDragPlugin(): Plugin {
         pointerdown(_view, event) {
           const target = event.target
           if (!(target instanceof Element)) return false
-          if (target.closest('.rte-image-drag-handle, .rte-image-group-handle, .rte-image-group-divider')) {
-            event.preventDefault()
+          // 只声明已处理，不 preventDefault。取消 pointerdown 会让 Safari 丢掉后续 pointermove。
+          if (target.closest('.rte-image-drag-handle, .rte-image-group-handle, .rte-image-group-divider, [data-resize-container][data-node="image"] img')) {
             return true
           }
           return false
