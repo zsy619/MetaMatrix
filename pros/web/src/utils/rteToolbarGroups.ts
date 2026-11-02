@@ -6,19 +6,21 @@ export type ToolbarGroupDef = {
   keys: readonly string[]
 }
 
+/** 旧文档把标题、字形、对齐、列表都存在 id `text` 里。读出来时按这个顺序展开。 */
+export const LEGACY_TEXT_GROUP_IDS = ['type', 'marks', 'align', 'list'] as const
+
 export const TOOLBAR_GROUPS: readonly ToolbarGroupDef[] = [
   { id: 'history', label: '操作', keys: ['undo', 'redo', 'find', 'formatPainter', 'pastePlain', 'clear', 'pasteFormat'] },
+  { id: 'type', label: '标题', keys: ['heading', 'paraStyle', 'fontSize', 'fontFamily', 'headingAutoNum'] },
   {
-    id: 'text',
-    label: '文字',
-    keys: [
-      'heading', 'bold', 'italic', 'underline', 'strike', 'subscript', 'superscript', 'codeInline',
-      'fontSize', 'fontFamily', 'lineHeight', 'indent', 'outdent', 'spacing',
-      'caseTransform', 'emphasisDot', 'ruby', 'paraStyle', 'headingAutoNum',
-    ],
+    id: 'marks',
+    label: '字形',
+    keys: ['bold', 'italic', 'underline', 'strike', 'subscript', 'superscript', 'codeInline', 'emphasisDot', 'caseTransform', 'ruby'],
   },
   { id: 'color', label: '颜色', keys: ['color', 'highlight'] },
-  { id: 'paragraph', label: '段落', keys: ['list', 'listStyle', 'quote', 'align', 'code'] },
+  { id: 'align', label: '对齐', keys: ['align', 'lineHeight', 'spacing', 'indent', 'outdent'] },
+  { id: 'list', label: '列表', keys: ['list', 'listStyle'] },
+  { id: 'paragraph', label: '段落', keys: ['quote', 'code'] },
   {
     id: 'insert',
     label: '链接',
@@ -58,14 +60,19 @@ const GROUP_BY_ID = new Map(TOOLBAR_GROUPS.map((group) => [group.id, group]))
 export function normalizeToolbarGroupOrder(saved: unknown): string[] {
   const known = new Set(DEFAULT_TOOLBAR_GROUP_ORDER)
   const out: string[] = []
+  const push = (id: string) => {
+    if (known.has(id) && !out.includes(id)) out.push(id)
+  }
   if (Array.isArray(saved)) {
     for (const id of saved) {
-      if (typeof id === 'string' && known.has(id) && !out.includes(id)) out.push(id)
+      if (id === 'text') {
+        for (const next of LEGACY_TEXT_GROUP_IDS) push(next)
+        continue
+      }
+      if (typeof id === 'string') push(id)
     }
   }
-  for (const id of DEFAULT_TOOLBAR_GROUP_ORDER) {
-    if (!out.includes(id)) out.push(id)
-  }
+  for (const id of DEFAULT_TOOLBAR_GROUP_ORDER) push(id)
   return out
 }
 

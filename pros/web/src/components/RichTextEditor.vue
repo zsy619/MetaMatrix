@@ -100,6 +100,7 @@ import { RTE_CTX, type RteEditorEmit, type RteEditorProps } from './rte/context'
 import { bindAskMore, useAskDialog } from './rte/composables/useAskDialog'
 import { useRtePageLayout } from './rte/composables/useRtePageLayout'
 import { useToolbarGroups } from './rte/composables/useToolbarGroups'
+import { buildToolbarGroups } from '../utils/rteToolbarGroups'
 import { useFindReplace } from './rte/composables/useFindReplace'
 import { useExport } from './rte/composables/useExport'
 import { useImport } from './rte/composables/useImport'
@@ -4610,8 +4611,8 @@ const allTools = computed((): ToolItem[] => {
   const ic = (key: string) => toolIcon(key)
   /**
    * 最大化工具栏分组（企业级）：
-   * 操作（撤销/查找/格式刷/纯文本）| 文字（标题→段距）| 段落（引用/分页/分栏）|
-   * 插入（媒体/表单/模板/表情）| 其他（打印/字数/导入导出）
+   * 操作 | 标题（字号/段落样式）| 字形（加粗斜体下划线删除线）| 颜色 |
+   * 对齐（对齐/行距/段距）| 列表 | 段落（引用/代码）| 链接 | 表格 | 块级 | 批注 | 导出
    * 目录已按产品要求移除，勿恢复。分组靠发丝竖线；换行靠 flex-wrap。
    */
   return [
@@ -4670,7 +4671,7 @@ const allTools = computed((): ToolItem[] => {
       run: togglePastePlain,
     },
     { key: 'div-ops', label: '', icon: '', kind: 'divider' },
-    // —— 文字 ——
+    // —— 标题 / 字形 / 颜色 / 对齐 / 列表 / 段落 ——
     { key: 'heading', label: '段落', title: '段落样式（正文 / 标题 / 引用）', icon: 'H▾', iconComp: ic('heading'), kind: 'heading', active: () => isActive('heading') || isActive('blockquote') },
     {
       key: 'bold',
@@ -5244,6 +5245,7 @@ const EXPANDED_ONLY_KEYS = new Set(['import', 'export'])
 
 /** 顶栏：飞书式主栏；最大化时主栏后换行接高级工具 */
 const {
+  toolbarOrder,
   toolbarGroups,
   toolbarDropIndex,
   toolbarDragSource,
@@ -5286,6 +5288,12 @@ const moreTools = computed(() => {
       !PRIMARY_KEYS.has(t.key) &&
       !EXPANDED_ONLY_KEYS.has(t.key),
   )
+})
+
+/** 「更多」按工具栏同一套分组展示，每组胶囊可单独排序。 */
+const moreGroups = computed(() => {
+  if (props.expanded) return []
+  return buildToolbarGroups(moreTools.value, toolbarOrder.value)
 })
 
 function closeMore() {
@@ -5375,16 +5383,21 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
       </div>
       <div
         class="rte-toolbar-tools"
-        :class="{ 'is-drop-end': toolbarDropIndex === toolbarGroups.length }"
+        :class="{
+          'is-drop-end':
+            toolbarDropIndex != null &&
+            toolbarGroups.length > 0 &&
+            toolbarDropIndex === toolbarOrder.indexOf(toolbarGroups[toolbarGroups.length - 1].id) + 1,
+        }"
         @dragover.prevent="onToolbarGroupDragOver"
         @drop.prevent="onToolbarGroupDrop"
       >
       <div
-        v-for="(group, groupIndex) in toolbarGroups"
+        v-for="group in toolbarGroups"
         :key="group.id"
         class="rte-tool-group"
         :class="{
-          'is-drop-target': toolbarDropIndex === groupIndex,
+          'is-drop-target': toolbarDropIndex === toolbarOrder.indexOf(group.id),
           'is-dragging': toolbarDragSource === group.id,
         }"
         :data-group-id="group.id"
@@ -7298,7 +7311,34 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
             @mouseenter="onToolMenuEnter('more')"
             @mouseleave="onToolMenuLeave($event, 'more', closeMore)"
           >
-          <template v-for="mt in moreTools" :key="mt.key">
+          <div
+            v-for="group in moreGroups"
+            :key="group.id"
+            class="rte-more-group"
+            :data-group-id="group.id"
+            :class="{
+              'is-dragging': toolbarDragSource === group.id,
+              'is-drop-target': toolbarDropIndex === toolbarOrder.indexOf(group.id),
+            }"
+          >
+            <button
+              v-if="viewMode === 'edit'"
+              type="button"
+              class="rte-more-capsule"
+              draggable="true"
+              :aria-label="'拖动' + group.label + '分组'"
+              title="拖动整组"
+              @pointerdown="onToolbarHandlePointerDown(group.id, $event)"
+              @pointermove="onToolbarHandlePointerMove"
+              @pointerup="onToolbarHandlePointerUp"
+              @pointercancel="onToolbarHandlePointerUp"
+              @dragstart="onToolbarGroupDragStart(group.id, $event)"
+              @dragend="onToolbarGroupDragEnd"
+              @keydown="onToolbarGroupKeydown(group.id, $event)"
+            >
+              ⠿ {{ group.label }}
+            </button>
+            <template v-for="mt in group.tools" :key="mt.key">
             <button
               type="button"
               class="rte-more-item"
@@ -7673,7 +7713,8 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
                 {{ highlightHoverLabel || '悬停色块可预览名称' }}
               </div>
             </div>
-          </template>
+            </template>
+          </div>
           </div>
         </Teleport>
       </div>
@@ -10339,8 +10380,12 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
   background: #f4f6f8;
 }
 .rte-tool-group[data-group-id='history'] { background: #eef3ff; border-color: #c5d4f5; }
-.rte-tool-group[data-group-id='text'] { background: #f1f7ef; border-color: #c9dfc4; }
+.rte-tool-group[data-group-id='text'],
+.rte-tool-group[data-group-id='type'] { background: #f1f7ef; border-color: #c9dfc4; }
+.rte-tool-group[data-group-id='marks'] { background: #e7f4ee; border-color: #b7d9c8; }
 .rte-tool-group[data-group-id='color'] { background: #fff6e8; border-color: #f0d7b0; }
+.rte-tool-group[data-group-id='align'] { background: #e8f1fb; border-color: #c3d7ef; }
+.rte-tool-group[data-group-id='list'] { background: #f7f0ea; border-color: #e6d3c4; }
 .rte-tool-group[data-group-id='paragraph'] { background: #f4f0fa; border-color: #d9ceea; }
 .rte-tool-group[data-group-id='insert'] { background: #eef8f8; border-color: #c5e4e4; }
 .rte-tool-group[data-group-id='table'] { background: #eef6ff; border-color: #c5daf5; }
@@ -11451,16 +11496,74 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
   right: 0;
   left: auto;
   z-index: 200;
-  min-width: 148px;
-  max-height: min(320px, 50vh);
+  min-width: 168px;
+  max-height: min(420px, 62vh);
   overflow: auto;
-  padding: 4px;
+  padding: 6px;
   background: #fff;
   border: 1px solid #e5e6eb;
-  border-radius: 6px;
+  border-radius: 8px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
   display: flex;
   flex-direction: column;
+  gap: 6px;
+}
+
+.rte-more-group {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid #d5d8de;
+  border-radius: 12px;
+  background: #f4f6f8;
+}
+.rte-more-group[data-group-id='history'] { background: #eef3ff; border-color: #c5d4f5; }
+.rte-more-group[data-group-id='type'] { background: #f1f7ef; border-color: #c9dfc4; }
+.rte-more-group[data-group-id='marks'] { background: #e7f4ee; border-color: #b7d9c8; }
+.rte-more-group[data-group-id='color'] { background: #fff6e8; border-color: #f0d7b0; }
+.rte-more-group[data-group-id='align'] { background: #e8f1fb; border-color: #c3d7ef; }
+.rte-more-group[data-group-id='list'] { background: #f7f0ea; border-color: #e6d3c4; }
+.rte-more-group[data-group-id='paragraph'] { background: #f4f0fa; border-color: #d9ceea; }
+.rte-more-group[data-group-id='insert'] { background: #eef8f8; border-color: #c5e4e4; }
+.rte-more-group[data-group-id='table'] { background: #eef6ff; border-color: #c5daf5; }
+.rte-more-group[data-group-id='blocks'] { background: #f8f1f4; border-color: #e7d0da; }
+.rte-more-group[data-group-id='notes'] { background: #fff8e8; border-color: #f0e0b0; }
+.rte-more-group[data-group-id='review'] { background: #fdeeee; border-color: #f0c9c9; }
+.rte-more-group[data-group-id='view'] { background: #eef3f8; border-color: #c9d7e6; }
+.rte-more-group[data-group-id='other'] { background: #f7f7f8; border-color: #d9dbe0; }
+.rte-more-group.is-dragging { opacity: 0.45; }
+.rte-more-group.is-drop-target::before {
+  content: '';
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  top: -5px;
+  height: 3px;
+  border-radius: 2px;
+  background: #3370ff;
+  pointer-events: none;
+}
+.rte-more-capsule {
+  align-self: flex-start;
+  border: 0;
+  background: #fff;
+  color: #3370ff;
+  border-radius: 999px;
+  cursor: grab;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 22px;
+  padding: 0 10px;
+}
+.rte-more-capsule:focus-visible {
+  outline: 2px solid var(--mm-focus, #3370ff);
+  outline-offset: 1px;
+}
+.rte-root.mode-preview .rte-more-capsule,
+.rte-root.mode-source .rte-more-capsule {
+  display: none;
 }
 
 .rte-more-item {
