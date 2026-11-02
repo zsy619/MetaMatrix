@@ -6,6 +6,7 @@ import * as documentsApi from '../api/documents'
 import { rememberRecentOpen } from '../utils/canvasTransfer'
 import { normalizePageSize, readPageSize, writePageSizeMap } from '../utils/rtePageSize'
 import { normalizePageMargin, writePageMargin, type PageMargin } from '../utils/rtePageMargin'
+import { normalizePageChrome, writePageChrome, type PanelPageChrome } from '../utils/rtePageChrome'
 import { writeToolbarGroupOrder } from '../utils/rteToolbarGroups'
 import { getToken } from '../api/http'
 import type {
@@ -1504,6 +1505,17 @@ export const useDocumentStore = defineStore('document', () => {
     if (next) doc.pageMarginByPanelId = next
     else delete doc.pageMarginByPanelId
     if (JSON.stringify(doc.pageMarginByPanelId ?? null) !== prev) markDirty()
+  }
+
+  function setPanelPageChrome(panelId: string, chrome: PanelPageChrome) {
+    const doc = current_data.value
+    if (!doc || !panelId) return
+    const normalized = normalizePageChrome(chrome)
+    const prev = JSON.stringify(doc.pageChromeByPanelId ?? null)
+    const next = writePageChrome(doc.pageChromeByPanelId, panelId, normalized)
+    if (next) doc.pageChromeByPanelId = next
+    else delete doc.pageChromeByPanelId
+    if (JSON.stringify(doc.pageChromeByPanelId ?? null) !== prev) markDirty()
   }
 
   function getPanelAttachments(panelId: string): PanelAttachment[] {
@@ -3429,6 +3441,7 @@ export const useDocumentStore = defineStore('document', () => {
     getPanelPageSize,
     setPanelPageSize,
     setPanelPageMargin,
+    setPanelPageChrome,
     getPanelAttachments,
     addPanelAttachment,
     removePanelAttachment,
