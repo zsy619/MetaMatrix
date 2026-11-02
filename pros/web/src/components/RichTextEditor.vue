@@ -106,24 +106,8 @@ import {
   sanitizePastedHtml,
 } from '../utils/rtePasteClean'
 import { canRunFindReplace, imageReplaceSide, todayIso } from '../utils/rteRound5'
-import {
-  RTE_PAGE_SIZES,
-  cssPageSize,
-  normalizePageSize,
-  pageSizeOption,
-  readPageSize,
-  sheetBox,
-  type RtePageSizeId,
-} from '../utils/rtePageSize'
-import {
-  PAGE_MARGIN_PRESETS,
-  cssPageMargin,
-  defaultPageMargin,
-  marginsEqual,
-  readPageMargin,
-  screenMargin,
-  type PageMargin,
-} from '../utils/rtePageMargin'
+import { RTE_PAGE_SIZES } from '../utils/rtePageSize'
+import { PAGE_MARGIN_PRESETS } from '../utils/rtePageMargin'
 import { moveTableGridHover, TABLE_QUICK_COLS, TABLE_QUICK_ROWS } from '../utils/rteTableGrid'
 import {
   buildToolbarGroups,
@@ -230,6 +214,7 @@ import {
 import { countWords, normalizeHtml, rtePlaceholderText, toEditorContent } from '../utils/rteContent'
 import { RTE_CTX, type RteEditorEmit, type RteEditorProps } from './rte/context'
 import { bindAskMore, useAskDialog } from './rte/composables/useAskDialog'
+import { useRtePageLayout } from './rte/composables/useRtePageLayout'
 import { RTE_EMOJI_CATEGORIES } from '../utils/rteEmojiList'
 import { RTE_SPECIAL_CHAR_CATEGORIES } from '../utils/rteSpecialChars'
 
@@ -782,126 +767,38 @@ const editorBootError = ref('')
 const auth = useAuthStore()
 const documentStore = useDocumentStore()
 const { saving, dirty, conflict, document_id, current_data } = storeToRefs(documentStore)
-const localPageSize = ref<RtePageSizeId>('full')
-const localPageMargin = ref<PageMargin | null>(null)
-const pageMarginUndo = ref<PageMargin[]>([])
-let pageMarginUndoArmed = false
-let pageMarginUndoStamp = 0
-const pageSize = computed(() => {
-  if (props.panelId) return readPageSize(current_data.value?.pageSizeByPanelId, props.panelId)
-  return localPageSize.value
-})
-const pageSizeMeta = computed(() => pageSizeOption(pageSize.value))
-const pageMargin = computed(() => {
-  if (props.panelId) {
-    return readPageMargin(current_data.value?.pageMarginByPanelId, props.panelId, pageSizeMeta.value.paper)
-  }
-  return localPageMargin.value || defaultPageMargin(pageSizeMeta.value.paper)
-})
-const pageScreenMargin = computed(() => screenMargin(pageMargin.value, !pageSizeMeta.value.paper))
-const pageSheetStyle = computed(() => {
-  const box = sheetBox(pageSize.value)
-  const margin = pageScreenMargin.value
-  const style: Record<string, string> = {
-    '--rte-margin-top': `${margin.top}mm`,
-    '--rte-margin-right': `${margin.right}mm`,
-    '--rte-margin-bottom': `${margin.bottom}mm`,
-    '--rte-margin-left': `${margin.left}mm`,
-  }
-  if (box) {
-    style['--rte-sheet-width'] = `${box.widthPx}px`
-    style['--rte-sheet-min-height'] = `${box.heightPx}px`
-  }
-  return style
-})
-const printPreviewMarginStyle = computed(() => {
-  const box = pageSizeMeta.value.paper ? pageMargin.value : pageScreenMargin.value
-  return {
-    padding: cssPageMargin(box),
-    width: pageSizeMeta.value.paper ? 'min(100%, var(--rte-sheet-width, 210mm))' : '100%',
-    margin: '0 auto',
-    boxSizing: 'border-box' as const,
-  }
-})
-
-function applyPrintPageStyle(id: RtePageSizeId) {
-  const size = cssPageSize(id)
-  const paper = pageSizeOption(id).paper
-  const margin = screenMargin(pageMargin.value, !paper)
-  let el = document.getElementById('rte-print-page-size')
-  if (!el) {
-    el = document.createElement('style')
-    el.id = 'rte-print-page-size'
-    document.head.appendChild(el)
-  }
-  el.textContent = `@media print { @page { size: ${size}; margin: ${cssPageMargin(margin)}; } }`
-}
-
-function applyPageMargin(next: PageMargin, recordUndo: boolean) {
-  if (viewMode.value !== 'edit') return
-  const prev = pageMargin.value
-  if (marginsEqual(prev, next)) return
-  if (recordUndo) {
-    pageMarginUndo.value = [...pageMarginUndo.value, prev].slice(-20)
-    pageMarginUndoStamp = bumpToolbarUndoEpoch()
-    pageMarginUndoArmed = true
+const {
+  pageSize,
+  pageSizeMeta,
+  pageMargin,
+  pageScreenMargin,
+  pageSheetStyle,
+  printPreviewMarginStyle,
+  applyPrintPageStyle,
+  undoPageMargin,
+  setMarginPreset,
+  setMarginSide,
+  setPageSize,
+  marginUndoArmed,
+  marginUndoStamp,
+  disarmMarginUndo,
+} = useRtePageLayout({
+  panelId: () => props.panelId,
+  pageSizeMap: () => current_data.value?.pageSizeByPanelId,
+  pageMarginMap: () => current_data.value?.pageMarginByPanelId,
+  setPanelPageSize: (panelId, size) => documentStore.setPanelPageSize(panelId, size),
+  setPanelPageMargin: (panelId, margin, paper) => documentStore.setPanelPageMargin(panelId, margin, paper),
+  viewMode: () => viewMode.value,
+  closePageMenus: () => {
+    viewExtrasOpen.value = false
+    moreOpen.value = false
+  },
+  announce: (message) => announceRte(message),
+  disarmToolbarUndo: () => {
     toolbarUndoArmed = false
-  }
-  if (props.panelId) documentStore.setPanelPageMargin(props.panelId, next, pageSizeMeta.value.paper)
-  else localPageMargin.value = next
-  announceRte(`页边距：${next.preset === 'custom' ? '自定义' : next.preset}`)
-  applyPrintPageStyle(pageSize.value)
-}
-
-function undoPageMargin(): boolean {
-  if (!pageMarginUndoArmed || !pageMarginUndo.value.length) return false
-  if (toolbarUndoArmed && toolbarUndoStamp > pageMarginUndoStamp) return false
-  const prev = pageMarginUndo.value[pageMarginUndo.value.length - 1]!
-  pageMarginUndo.value = pageMarginUndo.value.slice(0, -1)
-  pageMarginUndoArmed = pageMarginUndo.value.length > 0
-  if (props.panelId) documentStore.setPanelPageMargin(props.panelId, prev, pageSizeMeta.value.paper)
-  else localPageMargin.value = prev
-  announceRte('已撤销页边距')
-  applyPrintPageStyle(pageSize.value)
-  return true
-}
-
-function setMarginPreset(id: string) {
-  const preset = PAGE_MARGIN_PRESETS.find((item) => item.id === id)
-  if (preset) {
-    applyPageMargin({ preset: preset.id, ...preset.box }, true)
-    return
-  }
-  if (id === 'custom') {
-    applyPageMargin({ ...pageMargin.value, preset: 'custom' }, true)
-  }
-}
-
-function setMarginSide(side: 'top' | 'right' | 'bottom' | 'left', value: string) {
-  const current = pageMargin.value
-  applyPageMargin(
-    {
-      preset: 'custom',
-      top: current.top,
-      right: current.right,
-      bottom: current.bottom,
-      left: current.left,
-      [side]: Number(value),
-    },
-    true,
-  )
-}
-
-function setPageSize(id: string) {
-  const next = normalizePageSize(id)
-  if (props.panelId) documentStore.setPanelPageSize(props.panelId, next)
-  else localPageSize.value = next
-  viewExtrasOpen.value = false
-  moreOpen.value = false
-  applyPrintPageStyle(next)
-}
-
-watch([pageSize, pageMargin], () => applyPrintPageStyle(pageSize.value), { immediate: true })
+  },
+  toolbarUndoIsNewer: (stamp) => toolbarUndoArmed && toolbarUndoStamp > stamp,
+})
 
 function initialEditorContent(): string {
   try {
@@ -8733,7 +8630,7 @@ function applyToolbarOrder(next: readonly string[], recordUndo: boolean) {
   if (recordUndo) {
     toolbarOrderUndo.value = [...toolbarOrderUndo.value, prev].slice(-20)
     toolbarUndoStamp = bumpToolbarUndoEpoch()
-    pageMarginUndoArmed = false
+    disarmMarginUndo()
   }
   toolbarUndoArmed = recordUndo || toolbarOrderUndo.value.length > 0
   if (props.panelId) documentStore.setPanelToolbarOrder(props.panelId, next)
@@ -8754,7 +8651,7 @@ function undoToolbarGroupOrder(): boolean {
 
 function noteToolbarOrderEdited() {
   toolbarUndoArmed = false
-  pageMarginUndoArmed = false
+  disarmMarginUndo()
 }
 
 let toolbarPointerId = ''
@@ -8863,7 +8760,7 @@ function onWindowToolbarDrop(event: DragEvent) {
 }
 
 function onWindowToolbarUndo(event: KeyboardEvent) {
-  if (!toolbarUndoArmed && !pageMarginUndoArmed) return
+  if (!toolbarUndoArmed && !marginUndoArmed()) return
   if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return
   if (event.key.toLowerCase() !== 'z') return
   const target = event.target
@@ -8874,9 +8771,9 @@ function onWindowToolbarUndo(event: KeyboardEvent) {
     const host = target.closest('.rte-root')
     if (host && host !== root) return
   }
-  const stamp = pageMarginUndoArmed ? pageMarginUndoStamp : toolbarUndoStamp
+  const stamp = marginUndoArmed() ? marginUndoStamp() : toolbarUndoStamp
   if (!inThis && stamp !== currentToolbarUndoEpoch()) return
-  const undone = pageMarginUndoArmed ? undoPageMargin() : undoToolbarGroupOrder()
+  const undone = marginUndoArmed() ? undoPageMargin() : undoToolbarGroupOrder()
   if (!undone) return
   event.preventDefault()
   event.stopPropagation()
