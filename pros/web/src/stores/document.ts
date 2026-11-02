@@ -8,6 +8,7 @@ import { normalizePageSize, readPageSize, writePageSizeMap } from '../utils/rteP
 import { normalizePageMargin, writePageMargin, type PageMargin } from '../utils/rtePageMargin'
 import { normalizePageChrome, writePageChrome, type PanelPageChrome } from '../utils/rtePageChrome'
 import { writeToolbarGroupOrder } from '../utils/rteToolbarGroups'
+import { writeCommentThreads, type CommentThread } from '../utils/rteCommentThreads'
 import { getToken } from '../api/http'
 import type {
   BlockCanvasDocumentJSON,
@@ -1516,6 +1517,16 @@ export const useDocumentStore = defineStore('document', () => {
     if (next) doc.pageChromeByPanelId = next
     else delete doc.pageChromeByPanelId
     if (JSON.stringify(doc.pageChromeByPanelId ?? null) !== prev) markDirty()
+  }
+
+  function setPanelCommentThreads(panelId: string, threads: CommentThread[]) {
+    const doc = current_data.value
+    if (!doc || !panelId) return
+    const prev = JSON.stringify(doc.commentThreadsByPanelId ?? null)
+    const next = writeCommentThreads(doc.commentThreadsByPanelId, panelId, threads)
+    if (next) doc.commentThreadsByPanelId = next
+    else delete doc.commentThreadsByPanelId
+    if (JSON.stringify(doc.commentThreadsByPanelId ?? null) !== prev) markDirty()
   }
 
   function getPanelAttachments(panelId: string): PanelAttachment[] {
@@ -3442,6 +3453,7 @@ export const useDocumentStore = defineStore('document', () => {
     setPanelPageSize,
     setPanelPageMargin,
     setPanelPageChrome,
+    setPanelCommentThreads,
     getPanelAttachments,
     addPanelAttachment,
     removePanelAttachment,

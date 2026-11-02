@@ -111,6 +111,11 @@ export type WithPanelAttachments = {
    * 键与面板 id 对齐。
    */
   pageChromeByPanelId?: Record<string, { header: string; footer: string; pageNumber: string }>
+  /**
+   * 富文本评论线程。锚点在正文 HTML，讨论、解决状态按面板存在这里。
+   * 旧文档没有这个字段。
+   */
+  commentThreadsByPanelId?: import('../utils/rteCommentThreads').CommentThreadsByPanelId
 }
 
 

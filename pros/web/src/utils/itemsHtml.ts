@@ -174,13 +174,7 @@ export function htmlToBlockTexts(html: string): string[] {
     // 空元素写法 <p />
     if (s[openEnd - 1] === '/') {
       const block = s.slice(i, openEnd + 1)
-      if (shouldKeepBlock(block, tagLower)) {
-        parts.push(block)
-      } else if (
-        tagLower === 'p' &&
-        parts.length > 0 &&
-        isEmptyHtml(block)
-      ) {
+      if (shouldKeepBlock(block, tagLower) || (tagLower === 'p' && isEmptyHtml(block))) {
         parts.push(block)
       }
       i = openEnd + 1
@@ -195,23 +189,22 @@ export function htmlToBlockTexts(html: string): string[] {
     }
 
     const block = s.slice(i, end)
-    if (shouldKeepBlock(block, tagLower)) {
-      parts.push(block)
-    } else if (
-      tagLower === 'p' &&
-      parts.length > 0 &&
-      isEmptyHtml(block)
-    ) {
-      // 保留「已有内容之后」的空段落：表单原子后的可编辑落点。
-      // 若丢掉尾段，items 回写后文末落在 form* 上 → NodeSelection / 误开属性面板。
+    if (shouldKeepBlock(block, tagLower) || (tagLower === 'p' && isEmptyHtml(block))) {
+      // 空段落一律先留下，包括文首。只在最后发现整篇都是空段时才丢掉。
+      // 文首空段被丢掉时，End 没能把光标移出占位行、Enter 后又在段首敲下的「/」
+      // 会和占位文字合成一段。setContent 把光标映射到段尾，斜杠查询变成整段文字，菜单没有列表。
       parts.push(block)
     }
     i = end
   }
 
-  // 整份只有空段落时视为无条目
-  if (parts.length === 0) return []
+  if (parts.length === 0 || parts.every(isBlankParagraph)) return []
   return parts
+}
+
+function isBlankParagraph(html: string): boolean {
+  const tag = /^<([a-z0-9]+)/i.exec(html.trim())?.[1] || ''
+  return /^p$/i.test(tag) && isEmptyHtml(html)
 }
 
 export function normalizeHtmlForCompare(html: string): string {

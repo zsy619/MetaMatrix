@@ -96,6 +96,10 @@ import {
   type CaseMode,
 } from './rteWave20'
 import { countWords, normalizeHtml, toEditorContent } from '../utils/rteContent'
+import { htmlWithSuggestionsAccepted } from '../utils/rteSuggestions'
+import { useCommentThreads } from './rte/composables/useCommentThreads'
+import { useSuggestionMode } from './rte/composables/useSuggestionMode'
+import CommentThreadPanel from './rte/CommentThreadPanel.vue'
 import { RTE_CTX, type RteEditorEmit, type RteEditorProps } from './rte/context'
 import { bindAskMore, useAskDialog } from './rte/composables/useAskDialog'
 import { useRtePageLayout } from './rte/composables/useRtePageLayout'
@@ -542,6 +546,30 @@ function scheduleHtmlEmit(
   htmlEmitTimer = setTimeout(flush, 160)
 }
 
+function rteAuthor() {
+  return {
+    id: auth.user?.id || 'local',
+    name: auth.user?.displayName || auth.user?.email || '我',
+  }
+}
+
+const {
+  suggesting,
+  suggestionAuthor,
+  suggestionColor,
+  toggleSuggesting,
+  bumpSuggestions,
+  suggestionRanges,
+  activeSuggestionId,
+  acceptAllSuggestions,
+  rejectAllSuggestions,
+  acceptActiveSuggestion,
+  rejectActiveSuggestion,
+} = useSuggestionMode({
+  editor: () => editor,
+  author: rteAuthor,
+})
+
 const editor = useRteExtensions({
   closeTableCtx,
   closeTableMenu,
@@ -629,6 +657,33 @@ const editor = useRteExtensions({
     toggleOutlinePanel()
   },
   undoToolbarGroupOrder: () => undoToolbarGroupOrder(),
+  suggestingEnabled: () => suggesting.value,
+  suggestionAuthor,
+  bumpSuggestions: () => bumpSuggestions(),
+})
+
+const {
+  commentsOpen,
+  showResolved,
+  draft: commentDraft,
+  replyDrafts,
+  activeThreadId,
+  shownThreads,
+  unresolvedCount,
+  beginComment,
+  cancelDraft,
+  submitDraft,
+  submitReply,
+  toggleResolved,
+  removeMessage,
+  jumpToThread,
+} = useCommentThreads({
+  editor: () => editor,
+  panelId: () => props.panelId || '',
+  getMap: () => current_data.value?.commentThreadsByPanelId,
+  setThreads: (panelId, threads) => documentStore.setPanelCommentThreads(panelId, threads),
+  author: rteAuthor,
+  isEditable: () => viewMode.value === 'edit',
 })
 
 
@@ -2068,7 +2123,7 @@ function openPrintPreview() {
     return
   }
   const title = (localTitle.value || '').trim()
-  const body = ed.getHTML() || '<p></p>'
+  const body = htmlWithSuggestionsAccepted(ed.getHTML() || '<p></p>')
   printPreviewHtml.value = title
     ? `<h1 class="rte-print-title">${escapeHtml(title)}</h1>${body}`
     : body
@@ -4899,6 +4954,15 @@ const allTools = computed((): ToolItem[] => {
     { key: 'table', label: '表格', icon: '▦', iconComp: ic('table'), kind: 'table', active: () => isInTable(), run: onTableToolClick },
     { key: 'attach', label: '附件', icon: '☁▾', iconComp: ic('attach'), kind: 'attach', run: onAttachment },
     { key: 'note', label: '注释', icon: '[1]', iconComp: ic('note'), run: insertNote },
+    {
+      key: 'comment',
+      label: '评论',
+      title: '对选区添加评论',
+      icon: '💬',
+      iconComp: ic('note'),
+      active: () => commentsOpen.value,
+      run: beginComment,
+    },
     { key: 'emoji', label: '表情', title: '插入表情', icon: '☺', iconComp: ic('emoji'), kind: 'emoji' },
     { key: 'specialChars', label: '字符', title: '插入字符', icon: 'Ω', iconComp: ic('specialChars'), kind: 'specialChars' },
     { key: 'div-insert', label: '', icon: '', kind: 'divider' },
@@ -5071,6 +5135,33 @@ const allTools = computed((): ToolItem[] => {
       icon: '⚓',
       iconComp: ic('note'),
       run: resetRevisionBaseline,
+    },
+    {
+      key: 'suggest',
+      label: '建议',
+      title: '建议模式：插入和删除记成修订',
+      icon: '改',
+      iconComp: ic('highlight'),
+      active: () => suggesting.value,
+      run: toggleSuggesting,
+    },
+    {
+      key: 'suggestAccept',
+      label: '接受',
+      title: '接受全部修订',
+      icon: '✓',
+      iconComp: ic('note'),
+      disabled: () => suggestionRanges.value.length === 0,
+      run: acceptAllSuggestions,
+    },
+    {
+      key: 'suggestReject',
+      label: '拒绝',
+      title: '拒绝全部修订',
+      icon: '✕',
+      iconComp: ic('clear'),
+      disabled: () => suggestionRanges.value.length === 0,
+      run: rejectAllSuggestions,
     },
     {
       key: 'zoom',
@@ -8152,6 +8243,16 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
       <button
         type="button"
         class="rte-bubble-btn"
+        title="评论"
+        aria-label="评论"
+        @mousedown.prevent
+        @click="beginComment"
+      >
+        评
+      </button>
+      <button
+        type="button"
+        class="rte-bubble-btn"
         :class="{ active: isActive('link') }"
         :title="isActive('link') ? '编辑链接 (Ctrl/⌘+K)' : '插入链接 (Ctrl/⌘+K)'"
         :aria-label="isActive('link') ? '编辑链接' : '插入链接'"
@@ -8386,6 +8487,15 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
       <img :src="imageLightboxSrc" alt="" />
     </div>
 
+    <div v-if="suggesting && viewMode === 'edit'" class="rte-suggest-bar" role="status">
+      <span>建议模式</span>
+      <span class="rte-suggest-author" :style="{ color: suggestionColor(rteAuthor().id) }">{{ rteAuthor().name }}</span>
+      <span class="rte-suggest-count">{{ suggestionRanges.length }} 条修订</span>
+      <button type="button" :disabled="!activeSuggestionId" @click="acceptActiveSuggestion">接受</button>
+      <button type="button" :disabled="!activeSuggestionId" @click="rejectActiveSuggestion">拒绝</button>
+      <button type="button" :disabled="!suggestionRanges.length" @click="acceptAllSuggestions">全部接受</button>
+      <button type="button" :disabled="!suggestionRanges.length" @click="rejectAllSuggestions">全部拒绝</button>
+    </div>
     <div
       class="rte-workspace"
       :class="{
@@ -8583,6 +8693,27 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
         @mouseleave="onFormInspectorMouseUp"
       />
 
+      <CommentThreadPanel
+        v-if="commentsOpen && viewMode === 'edit'"
+        :threads="shownThreads"
+        :unresolved-count="unresolvedCount"
+        :show-resolved="showResolved"
+        :draft="commentDraft"
+        :reply-drafts="replyDrafts"
+        :active-thread-id="activeThreadId"
+        :author="rteAuthor()"
+        :editable="true"
+        @close="commentsOpen = false"
+        @update:show-resolved="showResolved = $event"
+        @update:draft-body="commentDraft && (commentDraft.body = $event)"
+        @update:reply="(id, value) => (replyDrafts[id] = value)"
+        @cancel-draft="cancelDraft"
+        @submit-draft="submitDraft"
+        @submit-reply="submitReply"
+        @toggle-resolved="toggleResolved"
+        @remove-message="removeMessage"
+        @jump="jumpToThread"
+      />
       <aside
         v-if="notesOpen && viewMode === 'edit'"
         class="rte-outline-panel"
@@ -8786,6 +8917,15 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
           @click="notesOpen = !notesOpen"
         >
           批注
+        </button>
+        <button
+          v-if="expanded && viewMode === 'edit'"
+          type="button"
+          class="rte-bottom-link"
+          :aria-pressed="commentsOpen"
+          @click="commentsOpen = !commentsOpen"
+        >
+          评论<span v-if="unresolvedCount"> {{ unresolvedCount }}</span>
         </button>
         <button
           v-if="expanded && viewMode === 'edit'"
@@ -12746,6 +12886,54 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
   overflow-x: auto;
 }
 /* —— 行内注释标记 —— */
+.rte-root :deep(.rte-comment-anchor) {
+  background: #fff3bf;
+  border-bottom: 2px solid #f7ba1e;
+  border-radius: 2px;
+}
+.rte-root.mode-preview :deep(.rte-suggestion-delete),
+.rte-root.rte-printing :deep(.rte-suggestion-delete),
+.rte-root.is-preview :deep(.rte-suggestion-delete) {
+  display: none !important;
+}
+.rte-root.mode-preview :deep(.rte-suggestion-insert),
+.rte-root.rte-printing :deep(.rte-suggestion-insert),
+.rte-root.is-preview :deep(.rte-suggestion-insert) {
+  color: inherit !important;
+  background: none !important;
+  border: none !important;
+  text-decoration: none !important;
+}
+.rte-suggest-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 6px 12px;
+  background: #f2f7ff;
+  border-bottom: 1px solid #d6e4ff;
+  color: #1d2129;
+  font-size: 12px;
+}
+.rte-suggest-bar button {
+  border: 1px solid #c9cdd4;
+  background: #fff;
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.rte-suggest-bar button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.rte-suggest-author {
+  font-weight: 650;
+}
+.rte-suggest-count {
+  color: #86909c;
+  margin-right: auto;
+}
 .rte-root :deep(.rte-annotation),
 .rte-root :deep(span[data-annotation]) {
   background: linear-gradient(

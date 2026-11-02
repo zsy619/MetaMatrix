@@ -38,12 +38,12 @@ export const TOOLBAR_GROUPS: readonly ToolbarGroupDef[] = [
   {
     id: 'notes',
     label: '批注',
-    keys: ['note', 'footnote', 'footnoteList', 'captionNum', 'bookmark', 'mentionBtn', 'xref'],
+    keys: ['note', 'comment', 'footnote', 'footnoteList', 'captionNum', 'bookmark', 'mentionBtn', 'xref'],
   },
   {
     id: 'review',
     label: '审阅',
-    keys: ['spellcheck', 'sensitive', 'revision', 'revisionBase', 'speak', 'speakStop', 'headingCheck', 'linkCheck', 'cjkTip'],
+    keys: ['spellcheck', 'sensitive', 'revision', 'revisionBase', 'suggest', 'suggestAccept', 'suggestReject', 'speak', 'speakStop', 'headingCheck', 'linkCheck', 'cjkTip'],
   },
   {
     id: 'view',
