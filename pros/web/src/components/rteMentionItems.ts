@@ -4,8 +4,9 @@
  * 来源说明（无后端时的本地占位）：
  * - 默认内置一组常见角色 / 示例人名，便于本地演示与联调。
  * - 后续可改为：从当前文档已有 mention 节点收集、或对接组织通讯录 API。
- * - 过滤为本地子串匹配（id / label / 角色）。
+ * - 过滤为本地子串匹配（id / label / 角色），并支持拼音首字母。
  */
+import { matchesPinyin } from '../utils/rtePinyin'
 
 export type RteMentionKind = 'person' | 'block'
 
@@ -53,8 +54,10 @@ export function filterRteMentionItems(
   const list = !q
     ? source
     : source.filter((it) => {
-        const hay = `${it.id} ${it.label} ${it.role || ''}`.toLowerCase()
-        return hay.includes(q)
+        const hay = `${it.id} ${it.label} ${it.role || ''}`
+        if (hay.toLowerCase().includes(q)) return true
+        // 拼音首字母：「fzr」命中「负责人」
+        return matchesPinyin(hay, q)
       })
   return list.slice(0, Math.max(1, limit))
 }
@@ -75,7 +78,9 @@ export function mergeMentionCandidates(
   const blockItems: RteMentionItem[] = blocks
     .filter((block) => {
       if (!q) return true
-      return `${block.label} ${block.kind} ${block.id}`.toLowerCase().includes(q)
+      const hay = `${block.label} ${block.kind} ${block.id}`
+      if (hay.toLowerCase().includes(q)) return true
+      return matchesPinyin(hay, q)
     })
     .map((block) => ({
       id: `block:${block.kind}:${block.id}`,

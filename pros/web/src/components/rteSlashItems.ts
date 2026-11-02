@@ -8,6 +8,7 @@ import {
   type RteDocTemplateGroup,
 } from './rteDocTemplates'
 import { slashItemSearchText, textMatchesQuery } from '../utils/rteRound7'
+import { matchesPinyin, pinyinSearchScore } from '../utils/rtePinyin'
 
 export type RteSlashGroup =
   | 'block'
@@ -548,14 +549,30 @@ export const RTE_SLASH_ITEMS: RteSlashItem[] = [
 const GROUP_ORDER: RteSlashGroup[] = ['block', 'media', 'form', 'template']
 
 function matchQuery(item: RteSlashItem, q: string): boolean {
-  return textMatchesQuery(slashItemSearchText(item), q)
+  if (!q) return true
+  // 先按原来的字面量匹配，再按拼音首字母/全拼匹配（「bt」命中「标题」）
+  if (textMatchesQuery(slashItemSearchText(item), q)) return true
+  return matchesPinyin(`${item.label} ${item.description || ''}`, q)
 }
 
-/** 过滤并按分组顺序返回（模板组内再按办公/产品…） */
+/**
+ * 过滤并按分组顺序返回（模板组内再按办公/产品…）。
+ * 有查询词时按匹配分排序，命中越直接的排越前。
+ */
 export function filterRteSlashItems(query: string, limit = 80): RteSlashItem[] {
   const q = (query || '').trim()
   const matched = RTE_SLASH_ITEMS.filter((it) => matchQuery(it, q))
+  if (q) {
+    matched.sort((a, b) => {
+      const sa = pinyinSearchScore(`${a.label} ${a.description || ''}`, q)
+      const sb = pinyinSearchScore(`${b.label} ${b.description || ''}`, q)
+      if (sb !== sa) return sb - sa
+      return a.label.localeCompare(b.label, 'zh')
+    })
+  }
   const tplGroupOrder = RTE_DOC_TEMPLATE_GROUPS.map((g) => g.id)
+  const scoreOf = (item: RteSlashItem) =>
+    q ? pinyinSearchScore(`${item.label} ${item.description || ''}`, q) : 0
   const out: RteSlashItem[] = []
   for (const g of GROUP_ORDER) {
     const bucket = matched.filter((it) => it.group === g)
@@ -564,6 +581,14 @@ export function filterRteSlashItems(query: string, limit = 80): RteSlashItem[] {
         const ai = tplGroupOrder.indexOf(a.templateGroup!)
         const bi = tplGroupOrder.indexOf(b.templateGroup!)
         if (ai !== bi) return ai - bi
+        return a.label.localeCompare(b.label, 'zh')
+      })
+    } else if (q) {
+      // 有查询词时，分组内按匹配分排序，命中越直接的排越前
+      bucket.sort((a, b) => {
+        const sa = scoreOf(a)
+        const sb = scoreOf(b)
+        if (sb !== sa) return sb - sa
         return a.label.localeCompare(b.label, 'zh')
       })
     }
