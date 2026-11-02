@@ -50,8 +50,8 @@ func (s *stubAuth) VerifyCaptcha(captchaID, captchaAnswer string) error {
 	return s.captcha.Verify(captchaID, captchaAnswer)
 }
 
-func (s *stubAuth) NewCaptcha() (service.CaptchaChallenge, error) {
-	return s.captcha.Issue()
+func (s *stubAuth) NewCaptcha(clientKey string, wantAnswer bool) (service.CaptchaChallenge, error) {
+	return s.captcha.IssueWithAnswer(clientKey, wantAnswer)
 }
 
 func newAuthEngine(stub *stubAuth) *route.Engine {
@@ -198,6 +198,46 @@ func TestRegisterAcceptsCorrectCaptcha(t *testing.T) {
 	}
 	if stub.registerCalls != 1 {
 		t.Fatalf("register ran %d times, want 1", stub.registerCalls)
+	}
+}
+
+func TestCaptchaEndpointIsRateLimited(t *testing.T) {
+	stub := &stubAuth{captcha: service.NewCaptchaService(5*time.Minute, false)}
+	engine := route.NewEngine(config.NewOptions(nil))
+	h := NewAuthHandler(stub, nil)
+	engine.GET("/auth/captcha", h.Captcha)
+
+	for i := 0; i < 60; i++ {
+		rec := ut.PerformRequest(engine, "GET", "/auth/captcha", nil)
+		if rec.Code != 200 {
+			t.Fatalf("request %d code = %d, body = %s", i, rec.Code, rec.Body.String())
+		}
+	}
+	rec := ut.PerformRequest(engine, "GET", "/auth/captcha", nil)
+	if rec.Code != 429 {
+		t.Fatalf("over limit code = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	if code := decodeBody(t, rec)["code"]; code != "rate_limited" {
+		t.Fatalf("code = %v, want rate_limited", code)
+	}
+}
+
+func TestIsLoopbackIP(t *testing.T) {
+	cases := map[string]bool{
+		"127.0.0.1:3000":  true,
+		"127.0.0.1":       true,
+		"[::1]:3000":      true,
+		"::1":             true,
+		"10.0.0.5:3000":   false,
+		"203.0.113.7:80":  false,
+		"":                false,
+		"not-an-address":  false,
+		"127.0.0.1:65535": true,
+	}
+	for addr, want := range cases {
+		if got := isLoopbackIP(addr); got != want {
+			t.Fatalf("isLoopbackIP(%q) = %v, want %v", addr, got, want)
+		}
 	}
 }
 

@@ -3,7 +3,7 @@
  * 图形验证码输入区：左边输入答案，右边显示服务端下发的图片。
  * 点击图片即可刷新。验证码由服务端校验，前端只负责取图和提交。
  */
-import { onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { fetchCaptcha } from '../../api/auth'
 import { normalizeCaptchaCode } from '../../utils/captcha'
 
@@ -14,6 +14,16 @@ const captchaId = ref('')
 const debugAnswer = ref('')
 const loading = ref(false)
 const failed = ref('')
+const expiresAt = ref('')
+const now = ref(Date.now())
+let ticker: ReturnType<typeof setInterval> | undefined
+
+/** 距离这张验证码过期的秒数，用于倒计时提示。 */
+const remainSeconds = computed(() => {
+  if (!expiresAt.value) return 0
+  const left = Math.floor((new Date(expiresAt.value).getTime() - now.value) / 1000)
+  return left > 0 ? left : 0
+})
 
 async function load() {
   loading.value = true
@@ -22,11 +32,14 @@ async function load() {
     const challenge = await fetchCaptcha()
     image.value = challenge.image
     captchaId.value = challenge.captchaId
+    expiresAt.value = challenge.expiresAt ?? ''
+    now.value = Date.now()
     // 只有 API 开了 CAPTCHA_DEBUG 才会有这个值，供本地/CI 自动化脚本读取。
     debugAnswer.value = challenge.debugAnswer ?? ''
   } catch {
     image.value = ''
     captchaId.value = ''
+    expiresAt.value = ''
     debugAnswer.value = ''
     failed.value = '验证码加载失败，点击图片重试。'
   } finally {
@@ -39,7 +52,16 @@ function refresh() {
   void load()
 }
 
-onMounted(load)
+onMounted(() => {
+  void load()
+  ticker = setInterval(() => {
+    now.value = Date.now()
+  }, 1000)
+})
+
+onBeforeUnmount(() => {
+  if (ticker) clearInterval(ticker)
+})
 
 defineExpose({
   refresh,
@@ -81,7 +103,8 @@ defineExpose({
     </div>
     <p id="captcha-hint" class="auth-field__hint">
       <span v-if="failed" class="auth-field__error">{{ failed }}</span>
-      <span v-else>看不清？点击图片换一张，5 分钟内有效。</span>
+      <span v-else-if="remainSeconds > 0">看不清？点击图片换一张，{{ remainSeconds }} 秒后过期。</span>
+      <span v-else>看不清？点击图片换一张。</span>
     </p>
   </div>
 </template>
@@ -100,8 +123,8 @@ defineExpose({
 }
 .captcha__image {
   flex: 0 0 auto;
-  width: 132px;
-  height: 43px;
+  width: 140px;
+  height: 45px;
   padding: 0;
   border: 1px solid var(--mm-line-strong);
   border-radius: 10px;
@@ -126,7 +149,8 @@ defineExpose({
   display: block;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  /* 服务端下发的图是 200x64 的 PNG，等比缩放，别把字符裁掉。 */
+  object-fit: contain;
 }
 .captcha__placeholder {
   font-size: 12px;

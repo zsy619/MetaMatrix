@@ -57,11 +57,14 @@ func (s *AuthService) VerifyCaptcha(captchaID, captchaAnswer string) error {
 }
 
 // NewCaptcha issues a fresh image challenge for the login and register pages.
-func (s *AuthService) NewCaptcha() (CaptchaChallenge, error) {
+// clientKey identifies the caller so the service can rate limit how many
+// challenges one client may pull. wantAnswer asks for the readable answer,
+// which the HTTP layer only does for trusted callers.
+func (s *AuthService) NewCaptcha(clientKey string, wantAnswer bool) (CaptchaChallenge, error) {
 	if s.captcha == nil {
 		return CaptchaChallenge{}, ErrCaptchaRequired
 	}
-	return s.captcha.Issue()
+	return s.captcha.IssueWithAnswer(clientKey, wantAnswer)
 }
 
 type UserDTO struct {

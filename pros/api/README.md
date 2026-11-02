@@ -66,7 +66,7 @@ go run ./cmd/server
 ```bash
 CAPTCHA=$(curl -s http://localhost:3000/auth/captcha)
 CAPTCHA_ID=$(echo "$CAPTCHA" | jq -r .captchaId)
-CAPTCHA_CODE=$(echo "$CAPTCHA" | jq -r .debugAnswer)  # 仅 CAPTCHA_DEBUG=true 时有值
+CAPTCHA_CODE=$(echo "$CAPTCHA" | jq -r .debugAnswer)  # 仅调试开关打开时有值
 
 curl -s -X POST http://localhost:3000/auth/register \
   -H 'Content-Type: application/json' \
@@ -74,7 +74,11 @@ curl -s -X POST http://localhost:3000/auth/register \
 ```
 
 本地自动化可以把 API 跑在 `CAPTCHA_DEBUG=true` 下，接口会直接带上答案；
-生产环境不要开这个开关，详见 `docs/生产配置.md`。
+也可以用 `CAPTCHA_DEBUG_LOOPBACK=true`，这样只有回环地址能读到答案
+（CI 里检测到 `CI=true` 会自动打开）。生产环境两个开关都别开，
+详见 `docs/生产配置.md`。
+
+`image` 是 200x64 的 PNG data URI，服务端用自带的点阵字库渲染，图里没有明文答案。
 
 ## API 一览
 

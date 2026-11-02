@@ -32,7 +32,10 @@ func main() {
 
 	authSvc := service.NewAuthService(gdb, cfg.JWTSecret, service.NewCaptchaService(cfg.CaptchaTTL, cfg.CaptchaDebug))
 	docSvc := service.NewDocumentsService(gdb)
-	authH := handler.NewAuthHandler(authSvc, service.NewAttemptLimiter(cfg.LoginWindow, cfg.LoginPairLimit, cfg.LoginIPLimit))
+	authH := handler.NewAuthHandler(authSvc, service.NewAttemptLimiter(cfg.LoginWindow, cfg.LoginPairLimit, cfg.LoginIPLimit), handler.AuthOptions{
+		DebugAll:      cfg.CaptchaDebug,
+		DebugLoopback: cfg.CaptchaDebugLoopback,
+	})
 	docH := handler.NewDocumentsHandler(docSvc)
 
 	h := server.Default(

@@ -1,7 +1,10 @@
 package service
 
 import (
+	"bytes"
 	"encoding/base64"
+	"fmt"
+	"image/png"
 	"strings"
 	"testing"
 	"time"
@@ -114,7 +117,7 @@ func TestCaptchaWrongAnswersAreCapped(t *testing.T) {
 	}
 }
 
-func TestCaptchaImageIsRenderableSVG(t *testing.T) {
+func TestCaptchaImageIsRenderablePNG(t *testing.T) {
 	svc := NewCaptchaService(5*time.Minute, false)
 	challenge, err := svc.Issue()
 	if err != nil {
@@ -123,20 +126,85 @@ func TestCaptchaImageIsRenderableSVG(t *testing.T) {
 	if challenge.DebugAnswer != "" {
 		t.Fatalf("debug answer leaked in production mode: %q", challenge.DebugAnswer)
 	}
-	const prefix = "data:image/svg+xml;base64,"
+	const prefix = "data:image/png;base64,"
 	if !strings.HasPrefix(challenge.Image, prefix) {
-		t.Fatalf("image = %.40q, want svg data uri", challenge.Image)
+		t.Fatalf("image = %.40q, want png data uri", challenge.Image)
 	}
 	raw, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(challenge.Image, prefix))
 	if err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	svg := string(raw)
-	if !strings.HasPrefix(svg, "<svg") || !strings.Contains(svg, "</svg>") {
-		t.Fatalf("not an svg document")
+	if !bytes.HasPrefix(raw, []byte("\x89PNG\r\n\x1a\n")) {
+		t.Fatalf("not a png file")
 	}
-	if !strings.Contains(svg, "<text") {
-		t.Fatalf("svg has no text element")
+	img, err := png.Decode(bytes.NewReader(raw))
+	if err != nil {
+		t.Fatalf("png decode: %v", err)
+	}
+	if img.Bounds().Dx() != captchaWidth || img.Bounds().Dy() != captchaHeight {
+		t.Fatalf("size = %v, want %dx%d", img.Bounds(), captchaWidth, captchaHeight)
+	}
+}
+
+// The old SVG rendering put the answer in a <text> element, so any script
+// could decode the data URI and read the captcha. The PNG must not carry the
+// answer in a readable form.
+func TestCaptchaImageDoesNotLeakAnswer(t *testing.T) {
+	svc := NewCaptchaService(5*time.Minute, true)
+	challenge, err := svc.Issue()
+	if err != nil {
+		t.Fatalf("issue: %v", err)
+	}
+	raw, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(challenge.Image, "data:image/png;base64,"))
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if bytes.Contains(raw, []byte(challenge.DebugAnswer)) {
+		t.Fatalf("png payload contains the plain answer")
+	}
+	if bytes.Contains(raw, []byte("<text")) || bytes.Contains(raw, []byte("<svg")) {
+		t.Fatalf("png payload contains markup")
+	}
+}
+
+func TestCaptchaIssueIsRateLimitedPerClient(t *testing.T) {
+	svc := NewCaptchaService(5*time.Minute, true)
+	for i := 0; i < captchaIssueLimit; i++ {
+		if _, err := svc.IssueFor("1.2.3.4"); err != nil {
+			t.Fatalf("issue %d: %v", i, err)
+		}
+	}
+	if _, err := svc.IssueFor("1.2.3.4"); err != ErrCaptchaTooMany {
+		t.Fatalf("over limit = %v, want %v", err, ErrCaptchaTooMany)
+	}
+	// A different client is not affected by the first client's usage.
+	if _, err := svc.IssueFor("5.6.7.8"); err != nil {
+		t.Fatalf("other client: %v", err)
+	}
+}
+
+func TestCaptchaEntryCapKeepsMemoryBounded(t *testing.T) {
+	svc := NewCaptchaService(5*time.Minute, true)
+	for i := 0; i < captchaMaxEntries+50; i++ {
+		// A fresh key per call, so the per client rate limit does not stop
+		// the flood before the entry cap is reached.
+		if _, err := svc.IssueFor(fmt.Sprintf("flooder-%d", i)); err != nil {
+			t.Fatalf("issue %d: %v", i, err)
+		}
+	}
+	if svc.Len() > captchaMaxEntries {
+		t.Fatalf("entries = %d, want <= %d", svc.Len(), captchaMaxEntries)
+	}
+}
+
+// A caller without an identified peer address is not rate limited, otherwise
+// every unidentified caller would share one bucket and lock each other out.
+func TestCaptchaWithoutClientKeyIsNotRateLimited(t *testing.T) {
+	svc := NewCaptchaService(5*time.Minute, true)
+	for i := 0; i < captchaIssueLimit+10; i++ {
+		if _, err := svc.Issue(); err != nil {
+			t.Fatalf("issue %d: %v", i, err)
+		}
 	}
 }
 

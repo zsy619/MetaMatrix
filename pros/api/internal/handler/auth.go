@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"errors"
+	"net"
 	"net/http"
 	"strconv"
 	"time"
@@ -24,19 +25,42 @@ type AuthBackend interface {
 	ChangePassword(userID uuid.UUID, current, next string) error
 	Me(userID uuid.UUID) (*model.User, error)
 	VerifyCaptcha(captchaID, captchaAnswer string) error
-	NewCaptcha() (service.CaptchaChallenge, error)
+	NewCaptcha(clientKey string, wantAnswer bool) (service.CaptchaChallenge, error)
 }
 
 type AuthHandler struct {
 	svc   AuthBackend
 	limit *service.AttemptLimiter
+	// captchaDebugAll hands the readable answer to every caller. It is only
+	// safe on a developer machine.
+	captchaDebugAll bool
+	// captchaDebugLoopback hands the readable answer to loopback callers only.
+	// CI turns it on so the smoke test can read the answer out of the band.
+	captchaDebugLoopback bool
 }
 
-func NewAuthHandler(svc AuthBackend, limit *service.AttemptLimiter) *AuthHandler {
+// AuthOptions carries the captcha debug switches for the auth handler.
+type AuthOptions struct {
+	// DebugAll returns the readable captcha answer to every caller.
+	DebugAll bool
+	// DebugLoopback returns the readable captcha answer to loopback callers.
+	DebugLoopback bool
+}
+
+func NewAuthHandler(svc AuthBackend, limit *service.AttemptLimiter, opts ...AuthOptions) *AuthHandler {
 	if limit == nil {
 		limit = service.NewAttemptLimiter(15*time.Minute, 8, 30)
 	}
-	return &AuthHandler{svc: svc, limit: limit}
+	var opt AuthOptions
+	if len(opts) > 0 {
+		opt = opts[0]
+	}
+	return &AuthHandler{
+		svc:                  svc,
+		limit:                limit,
+		captchaDebugAll:      opt.DebugAll,
+		captchaDebugLoopback: opt.DebugLoopback,
+	}
 }
 
 type registerBody struct {
@@ -57,12 +81,45 @@ type loginBody struct {
 // Captcha issues a fresh image challenge. It is public because the login and
 // register pages need a challenge before the user is authenticated.
 func (h *AuthHandler) Captcha(ctx context.Context, c *app.RequestContext) {
-	challenge, err := h.svc.NewCaptcha()
+	challenge, err := h.svc.NewCaptcha(remoteIP(c), h.wantsCaptchaAnswer(c))
 	if err != nil {
+		if errors.Is(err, service.ErrCaptchaTooMany) {
+			c.Header("Retry-After", "60")
+			Fail(c, http.StatusTooManyRequests, "too many captcha requests", "rate_limited")
+			return
+		}
 		Internal(c, "captcha issue failed")
 		return
 	}
 	c.JSON(http.StatusOK, challenge)
+}
+
+// wantsCaptchaAnswer decides whether the caller may read the plain answer.
+// Debug mode exposes it to everyone, which is only safe on a developer
+// machine. The loopback switch is what CI uses: the smoke test runs on the
+// same host as the API, so nobody outside the machine can read the answer.
+func (h *AuthHandler) wantsCaptchaAnswer(c *app.RequestContext) bool {
+	if h.captchaDebugAll {
+		return true
+	}
+	if !h.captchaDebugLoopback {
+		return false
+	}
+	addr := c.RemoteAddr()
+	if addr == nil {
+		return false
+	}
+	return isLoopbackIP(addr.String())
+}
+
+// isLoopbackIP reports whether the address points back at this machine.
+func isLoopbackIP(addr string) bool {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		host = addr
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
 
 // captchaFailure maps a captcha error onto the HTTP response. The message
@@ -161,6 +218,20 @@ func clientIP(c *app.RequestContext) string {
 		return "unknown"
 	}
 	return ip
+}
+
+// remoteIP is the peer address of the socket. Unlike ClientIP it cannot be
+// spoofed with X-Forwarded-For, so it is what the captcha rate limit uses.
+func remoteIP(c *app.RequestContext) string {
+	addr := c.RemoteAddr()
+	if addr == nil {
+		return "unknown"
+	}
+	host, _, err := net.SplitHostPort(addr.String())
+	if err != nil {
+		return addr.String()
+	}
+	return host
 }
 
 func tooManyLogins(c *app.RequestContext, wait time.Duration) {

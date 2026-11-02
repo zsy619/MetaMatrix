@@ -23,11 +23,13 @@
 ### 图形验证码
 
 登录和注册都必须带 `captchaId` 与 `captchaCode`。先 `GET /auth/captcha` 取图，
-`image` 是可直接放进 `<img src>` 的 SVG data URI。验证码由服务端生成并校验，
+`image` 是可直接放进 `<img src>` 的 PNG data URI（服务端用自带的 5x7 点阵字库渲染，
+图里没有能直接读出的明文答案）。验证码由服务端生成并校验，
 一次性使用，答案错误返回 400 `captcha_invalid`，缺失返回 400 `captcha_required`，
 过期返回 400 `captcha_expired`。
 
 有效期默认 5 分钟（`CAPTCHA_TTL`）。同一张验证码连续答错 5 次即作废。
+同一来源 1 分钟内最多取 60 张，超了返回 429 `rate_limited`（带 `Retry-After`）。
 
 ## 文档
 

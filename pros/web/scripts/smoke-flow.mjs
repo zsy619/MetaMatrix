@@ -46,14 +46,17 @@ async function call(path, { method = 'GET', token, body } = {}) {
 }
 
 /**
- * 取一张图形验证码。答案需要人读图，自动化只能靠 API 的
- * CAPTCHA_DEBUG=true（本地/CI 用），生产环境不返回答案。
+ * 取一张图形验证码。答案需要人读图，自动化只能靠 API 把明文答案带出来：
+ * - CAPTCHA_DEBUG=true：任何调用方都能读到（只在本机用）
+ * - CAPTCHA_DEBUG_LOOPBACK=true：只有回环地址能读到（CI 用，CI 里自动打开）
+ * 生产环境两个开关都不开，接口不返回答案。
  */
 async function takeCaptcha() {
   const challenge = await call('/auth/captcha')
   if (!challenge?.captchaId || !challenge?.debugAnswer) {
     throw new Error(
-      'captcha challenge has no answer; start the API with CAPTCHA_DEBUG=true to run this smoke flow',
+      'captcha challenge has no answer; run the API with CAPTCHA_DEBUG=true, ' +
+        'or CAPTCHA_DEBUG_LOOPBACK=true when the smoke test talks to it over 127.0.0.1',
     )
   }
   return { captchaId: challenge.captchaId, captchaCode: challenge.debugAnswer }

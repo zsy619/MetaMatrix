@@ -4,8 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { friendlyApiMessage } from '../utils/apiMessage'
 import { safeRedirect } from '../utils/safeRedirect'
-import { isCaptchaBlank, isCaptchaErrorCode } from '../utils/captcha'
-import { ApiError } from '../api/http'
+import { isCaptchaBlank } from '../utils/captcha'
 import CaptchaField from '../components/ui/CaptchaField.vue'
 
 const auth = useAuthStore()
@@ -68,10 +67,9 @@ async function submit() {
     router.replace(safeRedirect(route.query.redirect, '/'))
   } catch (e: unknown) {
     message.value = friendlyApiMessage(e, '注册失败')
-    // 验证码提交一次就作废，失败时自动换一张，避免用户反复提交同一张。
-    if (e instanceof ApiError && isCaptchaErrorCode(e.code)) {
-      captchaRef.value?.refresh()
-    }
+    // 验证码是一次性的：服务端在校验通过后就把这张图作废，不管账号能不能注册。
+    // 只要这次提交失败就换一张，避免用户拿着作废的图重试。
+    captchaRef.value?.refresh()
   } finally {
     busy.value = false
   }

@@ -1,12 +1,15 @@
 package service
 
 import (
+	"bytes"
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/base64"
 	"errors"
-	"fmt"
+	"image"
+	"image/color"
+	"image/png"
 	"math/big"
 	"strings"
 	"sync"
@@ -20,17 +23,27 @@ var (
 	ErrCaptchaInvalid = errors.New("captcha answer does not match")
 	// ErrCaptchaExpired is returned when the challenge is past its TTL.
 	ErrCaptchaExpired = errors.New("captcha expired")
+	// ErrCaptchaTooMany is returned when one client asks for too many challenges.
+	ErrCaptchaTooMany = errors.New("too many captcha requests")
 )
 
 const (
 	captchaLength      = 4
 	captchaAlphabet    = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789" // no I/O/0/1 look-alikes
-	captchaWidth       = 160
-	captchaHeight      = 56
+	captchaWidth       = 200
+	captchaHeight      = 64
 	captchaMaxAttempts = 5
 	// captchaExpiryGrace keeps an expired entry around briefly so the API can
 	// answer "expired" instead of "invalid" for a late submission.
 	captchaExpiryGrace = 10 * time.Minute
+	// captchaMaxEntries caps how many challenges stay in memory. The endpoint is
+	// public, so without a cap a bot could grow the map until the process dies.
+	captchaMaxEntries = 5000
+	// captchaIssueWindow and captchaIssueLimit rate limit how often one client
+	// may pull a new challenge. The limit is per peer address, so a whole
+	// office behind one NAT still has room for everyone to load a page.
+	captchaIssueWindow = time.Minute
+	captchaIssueLimit  = 60
 )
 
 // CaptchaService issues image challenges and verifies their answers.
@@ -46,12 +59,14 @@ type CaptchaService struct {
 	now      func() time.Time
 	attempts int
 	entries  map[string]*captchaEntry
+	issued   map[string][]time.Time
 }
 
 type captchaEntry struct {
 	digest    [sha256.Size]byte
 	expiresAt time.Time
 	attempts  int
+	createdAt time.Time
 }
 
 // CaptchaChallenge is the payload handed to the browser. Image is a ready to
@@ -78,11 +93,29 @@ func NewCaptchaService(ttl time.Duration, debug bool) *CaptchaService {
 		now:      time.Now,
 		attempts: captchaMaxAttempts,
 		entries:  map[string]*captchaEntry{},
+		issued:   map[string][]time.Time{},
 	}
 }
 
 // Issue creates a new challenge and returns the rendered image.
 func (s *CaptchaService) Issue() (CaptchaChallenge, error) {
+	return s.IssueFor("")
+}
+
+// IssueFor creates a new challenge for a client. The client key rate limits
+// how often one visitor may pull a challenge; an empty key shares one bucket,
+// which is what the unit tests use.
+func (s *CaptchaService) IssueFor(clientKey string) (CaptchaChallenge, error) {
+	return s.issue(clientKey, false)
+}
+
+// IssueWithAnswer issues a challenge and returns the readable answer when the
+// service runs in debug mode or when the caller explicitly asks for it.
+func (s *CaptchaService) IssueWithAnswer(clientKey string, wantAnswer bool) (CaptchaChallenge, error) {
+	return s.issue(clientKey, wantAnswer)
+}
+
+func (s *CaptchaService) issue(clientKey string, wantAnswer bool) (CaptchaChallenge, error) {
 	answer, err := randomCaptchaAnswer()
 	if err != nil {
 		return CaptchaChallenge{}, err
@@ -96,15 +129,25 @@ func (s *CaptchaService) Issue() (CaptchaChallenge, error) {
 
 	s.mu.Lock()
 	s.pruneLocked(now)
-	s.entries[id] = &captchaEntry{digest: sha256.Sum256([]byte(answer)), expiresAt: expires}
+	if !s.allowIssueLocked(clientKey, now) {
+		s.mu.Unlock()
+		return CaptchaChallenge{}, ErrCaptchaTooMany
+	}
+	s.enforceEntryCapLocked(now)
+	entry := &captchaEntry{
+		digest:    sha256.Sum256([]byte(answer)),
+		expiresAt: expires,
+		createdAt: now,
+	}
+	s.entries[id] = entry
 	s.mu.Unlock()
 
 	challenge := CaptchaChallenge{
 		ID:        id,
-		Image:     renderCaptchaSVG(answer),
+		Image:     renderCaptchaPNG(answer),
 		ExpiresAt: expires.UTC(),
 	}
-	if s.debug {
+	if s.debug || wantAnswer {
 		challenge.DebugAnswer = answer
 	}
 	return challenge, nil
@@ -170,6 +213,58 @@ func (s *CaptchaService) pruneLocked(now time.Time) {
 			delete(s.entries, id)
 		}
 	}
+	for key, times := range s.issued {
+		kept := times[:0]
+		for _, t := range times {
+			if now.Before(t.Add(captchaIssueWindow)) {
+				kept = append(kept, t)
+			}
+		}
+		if len(kept) == 0 {
+			delete(s.issued, key)
+			continue
+		}
+		s.issued[key] = kept
+	}
+}
+
+// allowIssueLocked reports whether the client may pull one more challenge.
+// An empty client key means "no caller identified", so the call is not
+// rate limited; the HTTP layer always passes the peer address.
+func (s *CaptchaService) allowIssueLocked(clientKey string, now time.Time) bool {
+	if clientKey == "" {
+		return true
+	}
+	times := s.issued[clientKey]
+	if len(times) >= captchaIssueLimit {
+		return false
+	}
+	s.issued[clientKey] = append(times, now)
+	return true
+}
+
+// enforceEntryCapLocked keeps the challenge map bounded. Expired entries go
+// first; if that is not enough the oldest live challenge is dropped, which
+// only costs the user one retype.
+func (s *CaptchaService) enforceEntryCapLocked(now time.Time) {
+	if len(s.entries) < captchaMaxEntries {
+		return
+	}
+	s.pruneLocked(now)
+	for len(s.entries) >= captchaMaxEntries {
+		oldestID := ""
+		var oldest time.Time
+		for id, entry := range s.entries {
+			if oldestID == "" || entry.createdAt.Before(oldest) {
+				oldestID = id
+				oldest = entry.createdAt
+			}
+		}
+		if oldestID == "" {
+			return
+		}
+		delete(s.entries, oldestID)
+	}
 }
 
 func randomCaptchaAnswer() (string, error) {
@@ -193,65 +288,111 @@ func randomCaptchaID() (string, error) {
 	return base64.RawURLEncoding.EncodeToString(buf), nil
 }
 
-// renderCaptchaSVG draws the answer as distorted text on a noisy background.
-// SVG keeps the API dependency free: no font binaries, no image library.
-func renderCaptchaSVG(answer string) string {
-	width, height := captchaWidth, captchaHeight
-	var sb strings.Builder
-	sb.WriteString(`<svg xmlns="http://www.w3.org/2000/svg" width="`)
-	sb.WriteString(fmt.Sprint(width))
-	sb.WriteString(`" height="`)
-	sb.WriteString(fmt.Sprint(height))
-	sb.WriteString(`" viewBox="0 0 `)
-	sb.WriteString(fmt.Sprint(width))
-	sb.WriteString(` `)
-	sb.WriteString(fmt.Sprint(height))
-	sb.WriteString(`" role="img" aria-label="图形验证码">`)
-	sb.WriteString(`<rect width="100%" height="100%" rx="10" fill="#f1f5fb"/>`)
+// renderCaptchaPNG draws the answer with a built-in 5x7 bitmap font and
+// returns it as a PNG data URI.
+//
+// Why PNG and not SVG: an SVG <text> element carries the answer in clear
+// text, so any script can decode the data URI and read the captcha without
+// solving it. Rendering glyphs from a bitmap font leaves no machine readable
+// answer in the payload, and PNG keeps the API dependency free.
+func renderCaptchaPNG(answer string) string {
+	const (
+		scale   = 5
+		charGap = 12
+		startX  = 12
+		baseY   = 14
+	)
+	img := image.NewRGBA(image.Rect(0, 0, captchaWidth, captchaHeight))
+
+	// Background: light wash with a subtle vertical gradient.
+	for y := 0; y < captchaHeight; y++ {
+		t := y / captchaHeight
+		for x := 0; x < captchaWidth; x++ {
+			img.Set(x, y, color.RGBA{
+				R: uint8(241 - t*6),
+				G: uint8(245 - t*4),
+				B: uint8(251 - t*2),
+				A: 255,
+			})
+		}
+	}
 
 	// Background speckles.
-	for i := 0; i < 26; i++ {
-		cx := randInt(0, width)
-		cy := randInt(0, height)
-		r := randInt(2, 6)
-		color := randomInk()
-		sb.WriteString(fmt.Sprintf(`<circle cx="%d" cy="%d" r="%d" fill="%s" fill-opacity="0.16"/>`, cx, cy, r, color))
-	}
-	// Crossing strokes.
-	for i := 0; i < 5; i++ {
-		x1 := randInt(0, width)
-		y1 := randInt(0, height)
-		x2 := randInt(0, width)
-		y2 := randInt(0, height)
-		sb.WriteString(fmt.Sprintf(
-			`<path d="M%d %d Q%d %d %d %d" stroke="%s" stroke-width="1.6" fill="none" stroke-opacity="0.5"/>`,
-			x1, y1, randInt(0, width), randInt(0, height), x2, y2, randomInk(),
-		))
+	for i := 0; i < 90; i++ {
+		x, y := randInt(0, captchaWidth), randInt(0, captchaHeight)
+		img.Set(x, y, color.RGBA{R: 205, G: 214, B: 228, A: 255})
 	}
 
-	// The characters themselves.
-	step := (width - 40) / captchaLength
+	// Crossing strokes, drawn as dotted lines so the glyphs stay readable.
+	for i := 0; i < 4; i++ {
+		x1, y1 := randInt(0, captchaWidth), randInt(0, captchaHeight)
+		x2, y2 := randInt(0, captchaWidth), randInt(0, captchaHeight)
+		ink := randomInk()
+		steps := captchaWidth + captchaHeight
+		for s := 0; s < steps; s++ {
+			x := x1 + (x2-x1)*s/steps
+			y := y1 + (y2-y1)*s/steps
+			if x < 0 || y < 0 || x >= captchaWidth || y >= captchaHeight {
+				continue
+			}
+			img.Set(x, y, color.RGBA{R: ink.R / 2, G: ink.G / 2, B: ink.B / 2, A: 255})
+		}
+	}
+
+	// The characters themselves, each with its own ink, offset and shear.
 	for i, ch := range answer {
-		x := 22 + i*step + randInt(-3, 4)
-		y := randInt(30, 42)
-		rot := randInt(-22, 23)
-		size := randInt(26, 33)
-		sb.WriteString(fmt.Sprintf(
-			`<text x="%d" y="%d" font-family="Georgia, 'Times New Roman', serif" font-size="%d" font-weight="700" fill="%s" transform="rotate(%d %d %d)">%s</text>`,
-			x, y, size, randomInk(), rot, x, y, svgEscape(string(ch)),
-		))
+		glyph, ok := captchaGlyphs[ch]
+		if !ok {
+			continue
+		}
+		ink := randomInk()
+		originX := startX + i*(glyphWidth*scale+charGap) + randInt(-3, 4)
+		originY := baseY + randInt(-3, 4)
+		// Shear makes the glyph lean, which is what makes OCR harder while a
+		// human still reads it instantly.
+		shear := randInt(-2, 3)
+		for row := 0; row < glyphHeight; row++ {
+			bits := glyph[row]
+			rowShift := randInt(-1, 2)
+			for col := 0; col < glyphWidth; col++ {
+				if bits&(1<<uint(glyphWidth-1-col)) == 0 {
+					continue
+				}
+				px := originX + col*scale + rowShift + row*shear/2
+				py := originY + row*scale
+				for dy := 0; dy < scale; dy++ {
+					for dx := 0; dx < scale; dx++ {
+						x, y := px+dx, py+dy
+						if x < 0 || y < 0 || x >= captchaWidth || y >= captchaHeight {
+							continue
+						}
+						img.Set(x, y, ink)
+					}
+				}
+			}
+		}
 	}
-	sb.WriteString(`</svg>`)
-	return "data:image/svg+xml;base64," + base64.StdEncoding.EncodeToString([]byte(sb.String()))
+
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		// PNG encoding of a plain RGBA buffer cannot fail in practice; fall
+		// back to an empty image rather than leaking the answer.
+		return "data:image/png;base64,"
+	}
+	return "data:image/png;base64," + base64.StdEncoding.EncodeToString(buf.Bytes())
 }
 
-func svgEscape(s string) string {
-	replacer := strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;", `"`, "&quot;", "'", "&apos;")
-	return replacer.Replace(s)
-}
-
-func randomInk() string {
-	palette := []string{"#1a73e8", "#174ea6", "#188038", "#a142f4", "#d93025", "#202124", "#0b8043"}
+// randomInk picks a dark, high contrast colour for a glyph.
+func randomInk() color.RGBA {
+	palette := []color.RGBA{
+		{R: 26, G: 115, B: 232, A: 255},
+		{R: 23, G: 78, B: 166, A: 255},
+		{R: 24, G: 128, B: 56, A: 255},
+		{R: 161, G: 66, B: 244, A: 255},
+		{R: 217, G: 48, B: 37, A: 255},
+		{R: 32, G: 33, B: 36, A: 255},
+		{R: 11, G: 128, B: 67, A: 255},
+	}
 	return palette[randInt(0, len(palette))]
 }
 

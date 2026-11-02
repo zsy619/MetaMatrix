@@ -18,6 +18,9 @@ type Config struct {
 	LoginIPLimit   int
 	CaptchaTTL     time.Duration
 	CaptchaDebug   bool
+	// CaptchaDebugLoopback returns the plain captcha answer to loopback
+	// callers only. CI uses it so the smoke test can read the answer.
+	CaptchaDebugLoopback bool
 }
 
 func Load() Config {
@@ -37,15 +40,36 @@ func Load() Config {
 		dbURL = "postgresql://metamatrix:metamatrix@localhost:5433/metamatrix"
 	}
 	return Config{
-		DatabaseURL:    dbURL,
-		Port:           port,
-		JWTSecret:      secret,
-		LoginWindow:    durationEnv("LOGIN_WINDOW", 15*time.Minute),
-		LoginPairLimit: intEnv("LOGIN_PAIR_LIMIT", 8),
-		LoginIPLimit:   intEnv("LOGIN_IP_LIMIT", 30),
-		CaptchaTTL:     captchaTTLDEnv(),
-		CaptchaDebug:   boolEnv("CAPTCHA_DEBUG", false),
+		DatabaseURL:          dbURL,
+		Port:                 port,
+		JWTSecret:            secret,
+		LoginWindow:          durationEnv("LOGIN_WINDOW", 15*time.Minute),
+		LoginPairLimit:       intEnv("LOGIN_PAIR_LIMIT", 8),
+		LoginIPLimit:         intEnv("LOGIN_IP_LIMIT", 30),
+		CaptchaTTL:           captchaTTLDEnv(),
+		CaptchaDebug:         boolEnv("CAPTCHA_DEBUG", false),
+		CaptchaDebugLoopback: boolEnv("CAPTCHA_DEBUG_LOOPBACK", runningInCI()),
 	}
+}
+
+// runningInCI reports whether the process runs inside a CI runner.
+//
+// GitHub Actions exports CI=true and GITHUB_ACTIONS=true. The CI smoke test
+// has to finish a real captcha round trip (take a challenge, then submit it),
+// which needs the plain answer. The smoke test runs on the same host as the
+// API, so the loopback switch is enough: only a caller on the machine itself
+// can read the answer, nobody outside can.
+//
+// The switch can still be forced on or off with CAPTCHA_DEBUG_LOOPBACK.
+func runningInCI() bool {
+	if strings.EqualFold(strings.TrimSpace(os.Getenv("GITHUB_ACTIONS")), "true") {
+		return true
+	}
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("CI"))) {
+	case "1", "true", "yes", "on":
+		return true
+	}
+	return false
 }
 
 // captchaTTLDEnv reads CAPTCHA_TTL. Unlike the login window it accepts short

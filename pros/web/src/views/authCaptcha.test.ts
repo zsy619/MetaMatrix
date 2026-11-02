@@ -18,7 +18,7 @@ const routerStub = {
 
 const challenge = {
   captchaId: 'cap-1',
-  image: 'data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=',
+  image: 'data:image/png;base64,iVBORw0KGgo=',
   expiresAt: '2026-11-02T10:00:00Z',
 }
 
@@ -111,6 +111,15 @@ describe('登录页图形验证码', () => {
     await wrapper.find('.captcha__image').trigger('click')
     await flushPromises()
     expect(fetchCaptcha).toHaveBeenCalledTimes(2)
+  })
+
+  it('提示里显示这张验证码还剩多少秒', async () => {
+    fetchCaptcha.mockResolvedValue({
+      ...challenge,
+      expiresAt: new Date(Date.now() + 90_000).toISOString(),
+    })
+    const wrapper = await mountView(LoginView)
+    expect(wrapper.find('#captcha-hint').text()).toMatch(/秒后过期/)
   })
 })
 
