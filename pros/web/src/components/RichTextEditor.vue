@@ -63,14 +63,6 @@ import { type RteMentionItem } from './rteMentionItems'
 import FormPropertyInspector from './FormPropertyInspector.vue'
 import { toolbarIconMap, IconTableRows, IconTableCols } from './rteToolbarIcons'
 import { RteCodeBlockLowlight, RTE_CODE_LANGUAGES } from '../extensions/codeHighlight'
-import {
-  collectFindMatches,
-  pickNextMatchIndex,
-  selectFindMatch,
-  replaceFindMatch,
-  replaceAllFindMatches,
-  type RteFindMatch,
-} from '../utils/rteFindReplace'
 import 'highlight.js/styles/github.css'
 import {
   RTE_DOC_TEMPLATES,
@@ -105,35 +97,10 @@ import {
   isBareHttpUrl,
   sanitizePastedHtml,
 } from '../utils/rtePasteClean'
-import { canRunFindReplace, imageReplaceSide, todayIso } from '../utils/rteRound5'
-import {
-  RTE_PAGE_SIZES,
-  cssPageSize,
-  normalizePageSize,
-  pageSizeOption,
-  readPageSize,
-  sheetBox,
-  type RtePageSizeId,
-} from '../utils/rtePageSize'
-import {
-  PAGE_MARGIN_PRESETS,
-  cssPageMargin,
-  defaultPageMargin,
-  marginsEqual,
-  readPageMargin,
-  screenMargin,
-  type PageMargin,
-} from '../utils/rtePageMargin'
+import { imageReplaceSide, todayIso } from '../utils/rteRound5'
+import { RTE_PAGE_SIZES } from '../utils/rtePageSize'
+import { PAGE_MARGIN_PRESETS } from '../utils/rtePageMargin'
 import { moveTableGridHover, TABLE_QUICK_COLS, TABLE_QUICK_ROWS } from '../utils/rteTableGrid'
-import {
-  buildToolbarGroups,
-  bumpToolbarUndoEpoch,
-  currentToolbarUndoEpoch,
-  moveToolbarGroup,
-  readToolbarGroupOrder,
-  toolbarGroupLabels,
-  toolbarOrdersEqual,
-} from '../utils/rteToolbarGroups'
 import {
   RTE_OVERLAY_CLOSE_ORDER,
   docChromeDelay,
@@ -229,6 +196,10 @@ import {
 } from './rteWave20'
 import { countWords, normalizeHtml, rtePlaceholderText, toEditorContent } from '../utils/rteContent'
 import { RTE_CTX, type RteEditorEmit, type RteEditorProps } from './rte/context'
+import { bindAskMore, useAskDialog } from './rte/composables/useAskDialog'
+import { useRtePageLayout } from './rte/composables/useRtePageLayout'
+import { useToolbarGroups } from './rte/composables/useToolbarGroups'
+import { useFindReplace } from './rte/composables/useFindReplace'
 import { RTE_EMOJI_CATEGORIES } from '../utils/rteEmojiList'
 import { RTE_SPECIAL_CHAR_CATEGORIES } from '../utils/rteSpecialChars'
 
@@ -349,97 +320,24 @@ const spellcheckEnabled = ref(false)
 const printPreviewOpen = ref(false)
 const printPreviewHtml = ref('')
 
-/** 统一自定义询问弹层（替代 window.prompt / confirm） */
-type RteAskKind = 'prompt' | 'confirm'
-const askOpen = ref(false)
-const askKind = ref<RteAskKind>('prompt')
-const askTitle = ref('')
-const askMessage = ref('')
-const askPlaceholder = ref('')
-const askValue = ref('')
-const askConfirmLabel = ref('确认')
-const askCancelLabel = ref('取消')
-const askMaxlength = ref(500)
-const askInputRef = ref<HTMLInputElement | null>(null)
-let askResolvePrompt: ((v: string | null) => void) | null = null
-let askResolveConfirm: ((v: boolean) => void) | null = null
-
-function closeAskDialog(result: 'cancel' | 'ok' = 'cancel') {
-  if (askKind.value === 'prompt') {
-    const r = askResolvePrompt
-    askResolvePrompt = null
-    askOpen.value = false
-    if (r) r(result === 'ok' ? askValue.value : null)
-  } else {
-    const r = askResolveConfirm
-    askResolveConfirm = null
-    askOpen.value = false
-    if (r) r(result === 'ok')
-  }
-}
-
-function settleAskPendingAsCancel() {
-  if (askResolvePrompt) {
-    const r = askResolvePrompt
-    askResolvePrompt = null
-    r(null)
-  }
-  if (askResolveConfirm) {
-    const r = askResolveConfirm
-    askResolveConfirm = null
-    r(false)
-  }
-}
-
-function openRtePrompt(opts: {
-  title: string
-  message?: string
-  placeholder?: string
-  defaultValue?: string
-  confirmLabel?: string
-  cancelLabel?: string
-  maxlength?: number
-}): Promise<string | null> {
-  settleAskPendingAsCancel()
-  askKind.value = 'prompt'
-  askTitle.value = opts.title
-  askMessage.value = opts.message || ''
-  askPlaceholder.value = opts.placeholder || ''
-  askValue.value = opts.defaultValue ?? ''
-  askConfirmLabel.value = opts.confirmLabel || '确认'
-  askCancelLabel.value = opts.cancelLabel || '取消'
-  askMaxlength.value = opts.maxlength ?? 500
-  askOpen.value = true
-  moreOpen.value = false
-  nextTick(() => {
-    askInputRef.value?.focus()
-    askInputRef.value?.select()
-  })
-  return new Promise((resolve) => {
-    askResolvePrompt = resolve
-  })
-}
-
-function openRteConfirm(opts: {
-  title: string
-  message: string
-  confirmLabel?: string
-  cancelLabel?: string
-}): Promise<boolean> {
-  settleAskPendingAsCancel()
-  askKind.value = 'confirm'
-  askTitle.value = opts.title
-  askMessage.value = opts.message
-  askPlaceholder.value = ''
-  askValue.value = ''
-  askConfirmLabel.value = opts.confirmLabel || '确定'
-  askCancelLabel.value = opts.cancelLabel || '取消'
-  askOpen.value = true
-  moreOpen.value = false
-  return new Promise((resolve) => {
-    askResolveConfirm = resolve
-  })
-}
+/** 统一自定义询问弹层（替代 window.prompt / confirm）。moreOpen 在工具栏状态处声明，这里先留钩子。 */
+const askMoreCloser = { close: () => {} }
+const {
+  askOpen,
+  askKind,
+  askTitle,
+  askMessage,
+  askPlaceholder,
+  askValue,
+  askConfirmLabel,
+  askCancelLabel,
+  askMaxlength,
+  askInputRef,
+  closeAskDialog,
+  openRtePrompt,
+  openRteConfirm,
+} = useAskDialog({ closeMore: () => askMoreCloser.close() })
+void askInputRef
 
 /** 链接卡片专用弹层 */
 const linkCardDialogOpen = ref(false)
@@ -854,126 +752,42 @@ const editorBootError = ref('')
 const auth = useAuthStore()
 const documentStore = useDocumentStore()
 const { saving, dirty, conflict, document_id, current_data } = storeToRefs(documentStore)
-const localPageSize = ref<RtePageSizeId>('full')
-const localPageMargin = ref<PageMargin | null>(null)
-const pageMarginUndo = ref<PageMargin[]>([])
-let pageMarginUndoArmed = false
-let pageMarginUndoStamp = 0
-const pageSize = computed(() => {
-  if (props.panelId) return readPageSize(current_data.value?.pageSizeByPanelId, props.panelId)
-  return localPageSize.value
+const toolbarUndoBridge = {
+  disarm() {},
+  isNewer(_stamp: number) {
+    return false
+  },
+}
+const {
+  pageSize,
+  pageSizeMeta,
+  pageMargin,
+  pageScreenMargin,
+  pageSheetStyle,
+  printPreviewMarginStyle,
+  applyPrintPageStyle,
+  undoPageMargin,
+  setMarginPreset,
+  setMarginSide,
+  setPageSize,
+  marginUndoArmed,
+  marginUndoStamp,
+  disarmMarginUndo,
+} = useRtePageLayout({
+  panelId: () => props.panelId,
+  pageSizeMap: () => current_data.value?.pageSizeByPanelId,
+  pageMarginMap: () => current_data.value?.pageMarginByPanelId,
+  setPanelPageSize: (panelId, size) => documentStore.setPanelPageSize(panelId, size),
+  setPanelPageMargin: (panelId, margin, paper) => documentStore.setPanelPageMargin(panelId, margin, paper),
+  viewMode: () => viewMode.value,
+  closePageMenus: () => {
+    viewExtrasOpen.value = false
+    moreOpen.value = false
+  },
+  announce: (message) => announceRte(message),
+  disarmToolbarUndo: () => toolbarUndoBridge.disarm(),
+  toolbarUndoIsNewer: (stamp) => toolbarUndoBridge.isNewer(stamp),
 })
-const pageSizeMeta = computed(() => pageSizeOption(pageSize.value))
-const pageMargin = computed(() => {
-  if (props.panelId) {
-    return readPageMargin(current_data.value?.pageMarginByPanelId, props.panelId, pageSizeMeta.value.paper)
-  }
-  return localPageMargin.value || defaultPageMargin(pageSizeMeta.value.paper)
-})
-const pageScreenMargin = computed(() => screenMargin(pageMargin.value, !pageSizeMeta.value.paper))
-const pageSheetStyle = computed(() => {
-  const box = sheetBox(pageSize.value)
-  const margin = pageScreenMargin.value
-  const style: Record<string, string> = {
-    '--rte-margin-top': `${margin.top}mm`,
-    '--rte-margin-right': `${margin.right}mm`,
-    '--rte-margin-bottom': `${margin.bottom}mm`,
-    '--rte-margin-left': `${margin.left}mm`,
-  }
-  if (box) {
-    style['--rte-sheet-width'] = `${box.widthPx}px`
-    style['--rte-sheet-min-height'] = `${box.heightPx}px`
-  }
-  return style
-})
-const printPreviewMarginStyle = computed(() => {
-  const box = pageSizeMeta.value.paper ? pageMargin.value : pageScreenMargin.value
-  return {
-    padding: cssPageMargin(box),
-    width: pageSizeMeta.value.paper ? 'min(100%, var(--rte-sheet-width, 210mm))' : '100%',
-    margin: '0 auto',
-    boxSizing: 'border-box' as const,
-  }
-})
-
-function applyPrintPageStyle(id: RtePageSizeId) {
-  const size = cssPageSize(id)
-  const paper = pageSizeOption(id).paper
-  const margin = screenMargin(pageMargin.value, !paper)
-  let el = document.getElementById('rte-print-page-size')
-  if (!el) {
-    el = document.createElement('style')
-    el.id = 'rte-print-page-size'
-    document.head.appendChild(el)
-  }
-  el.textContent = `@media print { @page { size: ${size}; margin: ${cssPageMargin(margin)}; } }`
-}
-
-function applyPageMargin(next: PageMargin, recordUndo: boolean) {
-  if (viewMode.value !== 'edit') return
-  const prev = pageMargin.value
-  if (marginsEqual(prev, next)) return
-  if (recordUndo) {
-    pageMarginUndo.value = [...pageMarginUndo.value, prev].slice(-20)
-    pageMarginUndoStamp = bumpToolbarUndoEpoch()
-    pageMarginUndoArmed = true
-    toolbarUndoArmed = false
-  }
-  if (props.panelId) documentStore.setPanelPageMargin(props.panelId, next, pageSizeMeta.value.paper)
-  else localPageMargin.value = next
-  announceRte(`页边距：${next.preset === 'custom' ? '自定义' : next.preset}`)
-  applyPrintPageStyle(pageSize.value)
-}
-
-function undoPageMargin(): boolean {
-  if (!pageMarginUndoArmed || !pageMarginUndo.value.length) return false
-  if (toolbarUndoArmed && toolbarUndoStamp > pageMarginUndoStamp) return false
-  const prev = pageMarginUndo.value[pageMarginUndo.value.length - 1]!
-  pageMarginUndo.value = pageMarginUndo.value.slice(0, -1)
-  pageMarginUndoArmed = pageMarginUndo.value.length > 0
-  if (props.panelId) documentStore.setPanelPageMargin(props.panelId, prev, pageSizeMeta.value.paper)
-  else localPageMargin.value = prev
-  announceRte('已撤销页边距')
-  applyPrintPageStyle(pageSize.value)
-  return true
-}
-
-function setMarginPreset(id: string) {
-  const preset = PAGE_MARGIN_PRESETS.find((item) => item.id === id)
-  if (preset) {
-    applyPageMargin({ preset: preset.id, ...preset.box }, true)
-    return
-  }
-  if (id === 'custom') {
-    applyPageMargin({ ...pageMargin.value, preset: 'custom' }, true)
-  }
-}
-
-function setMarginSide(side: 'top' | 'right' | 'bottom' | 'left', value: string) {
-  const current = pageMargin.value
-  applyPageMargin(
-    {
-      preset: 'custom',
-      top: current.top,
-      right: current.right,
-      bottom: current.bottom,
-      left: current.left,
-      [side]: Number(value),
-    },
-    true,
-  )
-}
-
-function setPageSize(id: string) {
-  const next = normalizePageSize(id)
-  if (props.panelId) documentStore.setPanelPageSize(props.panelId, next)
-  else localPageSize.value = next
-  viewExtrasOpen.value = false
-  moreOpen.value = false
-  applyPrintPageStyle(next)
-}
-
-watch([pageSize, pageMargin], () => applyPrintPageStyle(pageSize.value), { immediate: true })
 
 function initialEditorContent(): string {
   try {
@@ -4779,11 +4593,6 @@ onBeforeUnmount(() => {
     docChromeTimer = null
   }
   document.removeEventListener('pointerdown', onDocPointerDownForMenus, true)
-  window.removeEventListener('pointermove', onWindowToolbarPointerMove)
-  window.removeEventListener('pointerup', onWindowToolbarPointerUp)
-  window.removeEventListener('dragover', onWindowToolbarDragOver)
-  window.removeEventListener('drop', onWindowToolbarDrop)
-  window.removeEventListener('keydown', onWindowToolbarUndo, true)
   window.removeEventListener('keydown', onWindowEscape)
   window.removeEventListener('resize', repositionSlashMenu)
   window.removeEventListener('scroll', repositionSlashMenu, true)
@@ -4873,140 +4682,27 @@ function onFormInspectorMouseUp() {
 
 
 /** —— 查找 / 替换 —— */
-const findDialogOpen = ref(false)
-const findQuery = ref('')
-const findReplaceText = ref('')
-const findCaseSensitive = ref(false)
-const findWholeWord = ref(false)
-const findMatches = ref<RteFindMatch[]>([])
-const findMatchIndex = ref(-1)
-
-function findOpts() {
-  return {
-    caseSensitive: findCaseSensitive.value,
-    wholeWord: findWholeWord.value,
-  }
-}
-
-function refreshFindMatches(selectNext = false) {
-  const ed = editor.value
-  if (!ed) {
-    findMatches.value = []
-    findMatchIndex.value = -1
-    return
-  }
-  const matches = collectFindMatches(ed.state.doc, findQuery.value, findOpts())
-  findMatches.value = matches
-  if (!matches.length) {
-    findMatchIndex.value = -1
-    return
-  }
-  if (selectNext || findMatchIndex.value < 0 || findMatchIndex.value >= matches.length) {
-    const fromPos = ed.state.selection.from
-    const idx = pickNextMatchIndex(matches, fromPos, 1)
-    findMatchIndex.value = idx
-    if (idx >= 0) selectFindMatch(ed, matches[idx])
-  } else {
-    selectFindMatch(ed, matches[findMatchIndex.value])
-  }
-}
-
-function openFindDialog() {
-  findDialogOpen.value = true
-  moreOpen.value = false
-  // 若有选区且选区较短，预填查找词
-  const ed = editor.value
-  if (ed) {
-    const { from, to, empty } = ed.state.selection
-    if (!empty && to - from <= 80) {
-      const t = ed.state.doc.textBetween(from, to, ' ')
-      if (t && !findQuery.value) findQuery.value = t
-    }
-  }
-  nextTick(() => {
-    const el = document.querySelector('.rte-find-query') as HTMLInputElement | null
-    el?.focus()
-    el?.select()
-    refreshFindMatches(true)
-  })
-}
-
-function closeFindDialog() {
-  findDialogOpen.value = false
-}
-
-function onFindQueryInput() {
-  refreshFindMatches(true)
-}
-
-function findGo(direction: 1 | -1) {
-  const ed = editor.value
-  const matches = findMatches.value
-  if (!ed || !matches.length) {
-    refreshFindMatches(true)
-    return
-  }
-  let idx = findMatchIndex.value
-  if (idx < 0) {
-    idx = pickNextMatchIndex(matches, ed.state.selection.from, direction)
-  } else {
-    idx = (idx + direction + matches.length) % matches.length
-  }
-  findMatchIndex.value = idx
-  selectFindMatch(ed, matches[idx])
-}
-
-function doReplaceOne() {
-  const ed = editor.value
-  const matches = findMatches.value
-  const idx = findMatchIndex.value
-  if (!ed || idx < 0 || !matches[idx]) {
-    ElMessage.info('没有可替换的匹配')
-    return
-  }
-  replaceFindMatch(ed, matches[idx], findReplaceText.value)
-  // 替换后重新收集，并跳到下一处
-  const nextFrom = matches[idx].from + findReplaceText.value.length
-  const nextMatches = collectFindMatches(ed.state.doc, findQuery.value, findOpts())
-  findMatches.value = nextMatches
-  if (!nextMatches.length) {
-    findMatchIndex.value = -1
-    ElMessage.success('已替换，无更多匹配')
-    return
-  }
-  const ni = pickNextMatchIndex(nextMatches, nextFrom, 1)
-  findMatchIndex.value = ni
-  if (ni >= 0) selectFindMatch(ed, nextMatches[ni])
-}
-
-function doReplaceAll() {
-  const ed = editor.value
-  if (!ed) return
-  const matches = collectFindMatches(ed.state.doc, findQuery.value, findOpts())
-  if (!matches.length) {
-    ElMessage.info('没有匹配项')
-    findMatches.value = []
-    findMatchIndex.value = -1
-    return
-  }
-  const n = replaceAllFindMatches(ed, matches, findReplaceText.value)
-  findMatches.value = []
-  findMatchIndex.value = -1
-  ElMessage.success(`已全部替换 ${n} 处`)
-}
-
-const findStatusText = computed(() => {
-  const q = findQuery.value
-  if (!q) return '输入要查找的内容'
-  const total = findMatches.value.length
-  if (!total) return '共 0 处'
-  const cur = findMatchIndex.value >= 0 ? findMatchIndex.value + 1 : 0
-  return `共 ${total} 处 · 第 ${cur} 处`
+const {
+  findDialogOpen,
+  findQuery,
+  findReplaceText,
+  findCaseSensitive,
+  findWholeWord,
+  refreshFindMatches,
+  openFindDialog,
+  closeFindDialog,
+  onFindQueryInput,
+  findGo,
+  doReplaceOne,
+  doReplaceAll,
+  findStatusText,
+  canReplaceFind,
+} = useFindReplace({
+  editor,
+  closeMore: () => {
+    moreOpen.value = false
+  },
 })
-
-const canReplaceFind = computed(() =>
-  canRunFindReplace(findQuery.value, findMatches.value.length),
-)
 
 /** —— 插入链接 —— */
 const linkDialogOpen = ref(false)
@@ -7386,11 +7082,6 @@ function repositionSlashMenu() {
 
 onMounted(() => {
   document.addEventListener('pointerdown', onDocPointerDownForMenus, true)
-  window.addEventListener('pointermove', onWindowToolbarPointerMove)
-  window.addEventListener('pointerup', onWindowToolbarPointerUp)
-  window.addEventListener('dragover', onWindowToolbarDragOver)
-  window.addEventListener('drop', onWindowToolbarDrop)
-  window.addEventListener('keydown', onWindowToolbarUndo, true)
   window.addEventListener('keydown', onWindowEscape)
   window.addEventListener('resize', repositionSlashMenu)
   window.addEventListener('scroll', repositionSlashMenu, true)
@@ -7707,6 +7398,7 @@ const templateOpen = ref(false)
 const moreFormOpen = ref(false)
 const moreTemplateOpen = ref(false)
 const moreOpen = ref(false)
+bindAskMore(askMoreCloser, moreOpen)
 const colorOpen = ref(false)
 const highlightOpen = ref(false)
 const moreColorOpen = ref(false)
@@ -8773,205 +8465,39 @@ const allTools = computed((): ToolItem[] => {
 const EXPANDED_ONLY_KEYS = new Set(['import', 'export'])
 
 /** 顶栏：飞书式主栏；最大化时主栏后换行接高级工具 */
-const localToolbarOrder = ref<string[] | null>(null)
-const toolbarOrderUndo = ref<string[][]>([])
-let toolbarUndoArmed = false
-let toolbarUndoStamp = 0
-const toolbarDropIndex = ref<number | null>(null)
-const toolbarDragSource = ref('')
-let toolbarDragId = ''
-
-const toolbarOrder = computed(() => {
-  if (props.panelId) {
-    return readToolbarGroupOrder(current_data.value?.toolbarGroupOrderByPanelId, props.panelId)
-  }
-  return readToolbarGroupOrder(
-    localToolbarOrder.value ? { local: localToolbarOrder.value } : undefined,
-    localToolbarOrder.value ? 'local' : '',
-  )
+const {
+  toolbarGroups,
+  toolbarDropIndex,
+  toolbarDragSource,
+  undoToolbarGroupOrder,
+  noteToolbarOrderEdited,
+  disarmToolbarUndo,
+  toolbarUndoIsNewer,
+  onToolbarHandlePointerDown,
+  onToolbarHandlePointerMove,
+  onToolbarHandlePointerUp,
+  onToolbarGroupDragStart,
+  onToolbarGroupDragOver,
+  onToolbarGroupDrop,
+  onToolbarGroupDragEnd,
+  onToolbarGroupKeydown,
+} = useToolbarGroups({
+  panelId: () => props.panelId,
+  expanded: () => props.expanded,
+  orderMap: () => current_data.value?.toolbarGroupOrderByPanelId,
+  setPanelToolbarOrder: (panelId, order) => documentStore.setPanelToolbarOrder(panelId, order),
+  tools: () => allTools.value,
+  primaryKeys: PRIMARY_KEYS,
+  viewMode: () => viewMode.value,
+  announce: (message) => announceRte(message),
+  rootEl: rteRootEl,
+  marginUndoArmed,
+  marginUndoStamp,
+  undoPageMargin,
+  disarmMarginUndo,
 })
-
-const toolbarGroups = computed(() => {
-  const tools = props.expanded
-    ? allTools.value.filter((tool) => tool.kind !== 'divider')
-    : allTools.value.filter((tool) => tool.kind !== 'divider' && PRIMARY_KEYS.has(tool.key))
-  return buildToolbarGroups(tools, toolbarOrder.value)
-})
-
-function applyToolbarOrder(next: readonly string[], recordUndo: boolean) {
-  const prev = toolbarOrder.value
-  if (toolbarOrdersEqual(prev, next)) return
-  if (recordUndo) {
-    toolbarOrderUndo.value = [...toolbarOrderUndo.value, prev].slice(-20)
-    toolbarUndoStamp = bumpToolbarUndoEpoch()
-    pageMarginUndoArmed = false
-  }
-  toolbarUndoArmed = recordUndo || toolbarOrderUndo.value.length > 0
-  if (props.panelId) documentStore.setPanelToolbarOrder(props.panelId, next)
-  else localToolbarOrder.value = [...next]
-  announceRte('工具栏分组顺序：' + toolbarGroupLabels(next))
-}
-
-function undoToolbarGroupOrder(): boolean {
-  if (!toolbarUndoArmed || !toolbarOrderUndo.value.length) return false
-  const prev = toolbarOrderUndo.value[toolbarOrderUndo.value.length - 1]!
-  toolbarOrderUndo.value = toolbarOrderUndo.value.slice(0, -1)
-  toolbarUndoArmed = toolbarOrderUndo.value.length > 0
-  if (props.panelId) documentStore.setPanelToolbarOrder(props.panelId, prev)
-  else localToolbarOrder.value = [...prev]
-  announceRte('工具栏分组顺序：' + toolbarGroupLabels(prev))
-  return true
-}
-
-function noteToolbarOrderEdited() {
-  toolbarUndoArmed = false
-  pageMarginUndoArmed = false
-}
-
-let toolbarPointerId = ''
-let toolbarPointerStartX = 0
-
-function finishToolbarPointer(clientX: number) {
-  const id = toolbarPointerId
-  const moved = Math.abs(clientX - toolbarPointerStartX) > 6
-  const index = toolbarDropIndex.value
-  toolbarPointerId = ''
-  toolbarDragSource.value = ''
-  toolbarDropIndex.value = null
-  if (!id || !moved || index == null || viewMode.value !== 'edit') return
-  const next = moveToolbarGroup(toolbarOrder.value, id, index)
-  if (next) applyToolbarOrder(next, true)
-}
-
-function onWindowToolbarPointerMove(event: PointerEvent) {
-  if (!toolbarPointerId) return
-  toolbarDropIndex.value = toolbarGroupDropIndexAt(event.clientX)
-}
-
-function onWindowToolbarPointerUp(event: PointerEvent) {
-  if (!toolbarPointerId) return
-  finishToolbarPointer(event.clientX)
-}
-
-function onToolbarHandlePointerDown(id: string, event: PointerEvent) {
-  if (viewMode.value !== 'edit' || event.button !== 0) return
-  toolbarPointerId = id
-  toolbarDragSource.value = id
-  toolbarPointerStartX = event.clientX
-  toolbarDropIndex.value = toolbarGroupDropIndexAt(event.clientX)
-  const handle = event.currentTarget as HTMLElement
-  handle.focus()
-  try {
-    handle.setPointerCapture?.(event.pointerId)
-  } catch {
-    /* 合成指针事件没有有效 pointerId */
-  }
-  event.preventDefault()
-}
-
-function onToolbarHandlePointerMove(event: PointerEvent) {
-  if (!toolbarPointerId) return
-  toolbarDropIndex.value = toolbarGroupDropIndexAt(event.clientX)
-}
-
-function onToolbarHandlePointerUp(event: PointerEvent) {
-  if (!toolbarPointerId) return
-  finishToolbarPointer(event.clientX)
-}
-
-function onToolbarGroupDragStart(id: string, event: DragEvent) {
-  if (viewMode.value !== 'edit') {
-    event.preventDefault()
-    return
-  }
-  toolbarDragId = id
-  toolbarDragSource.value = id
-  if (event.dataTransfer) {
-    event.dataTransfer.effectAllowed = 'move'
-    event.dataTransfer.setData('text/plain', id)
-  }
-}
-
-function toolbarGroupDropIndexAt(clientX: number): number | null {
-  const host = rteRootEl.value?.querySelector('.rte-toolbar-tools')
-  if (!host) return null
-  const groups = Array.from(host.querySelectorAll<HTMLElement>('.rte-tool-group'))
-  let index = groups.length
-  for (let i = 0; i < groups.length; i += 1) {
-    const rect = groups[i]!.getBoundingClientRect()
-    if (clientX < rect.left + rect.width / 2) {
-      index = i
-      break
-    }
-  }
-  return index
-}
-
-function onToolbarGroupDragOver(event: DragEvent) {
-  if (!toolbarDragId || viewMode.value !== 'edit') return
-  toolbarDropIndex.value = toolbarGroupDropIndexAt(event.clientX)
-}
-
-function onWindowToolbarDragOver(event: DragEvent) {
-  if (!toolbarDragId || viewMode.value !== 'edit') return
-  event.preventDefault()
-  toolbarDropIndex.value = toolbarGroupDropIndexAt(event.clientX)
-}
-
-function onToolbarGroupDrop() {
-  if (!toolbarDragId || toolbarDropIndex.value == null) return
-  const next = moveToolbarGroup(toolbarOrder.value, toolbarDragId, toolbarDropIndex.value)
-  if (next) applyToolbarOrder(next, true)
-  toolbarDragId = ''
-  toolbarDragSource.value = ''
-  toolbarDropIndex.value = null
-}
-
-function onWindowToolbarDrop(event: DragEvent) {
-  if (!toolbarDragId) return
-  event.preventDefault()
-  onToolbarGroupDrop()
-}
-
-function onWindowToolbarUndo(event: KeyboardEvent) {
-  if (!toolbarUndoArmed && !pageMarginUndoArmed) return
-  if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return
-  if (event.key.toLowerCase() !== 'z') return
-  const target = event.target
-  const root = rteRootEl.value
-  if (target instanceof Element && target.closest('input, textarea') && !root?.contains(target)) return
-  const inThis = target instanceof Node && !!root?.contains(target)
-  if (target instanceof Element) {
-    const host = target.closest('.rte-root')
-    if (host && host !== root) return
-  }
-  const stamp = pageMarginUndoArmed ? pageMarginUndoStamp : toolbarUndoStamp
-  if (!inThis && stamp !== currentToolbarUndoEpoch()) return
-  const undone = pageMarginUndoArmed ? undoPageMargin() : undoToolbarGroupOrder()
-  if (!undone) return
-  event.preventDefault()
-  event.stopPropagation()
-}
-
-function onToolbarGroupDragEnd() {
-  window.setTimeout(() => {
-    toolbarDragId = ''
-    toolbarDragSource.value = ''
-    toolbarDropIndex.value = null
-  }, 50)
-}
-
-function onToolbarGroupKeydown(id: string, event: KeyboardEvent) {
-  if (viewMode.value !== 'edit' || !event.altKey) return
-  const dir = event.key === 'ArrowLeft' ? -1 : event.key === 'ArrowRight' ? 1 : 0
-  if (!dir) return
-  event.preventDefault()
-  const order = toolbarOrder.value
-  const index = order.indexOf(id)
-  if (index < 0) return
-  const next = moveToolbarGroup(order, id, dir < 0 ? index - 1 : index + 2)
-  if (next) applyToolbarOrder(next, true)
-}
+toolbarUndoBridge.disarm = disarmToolbarUndo
+toolbarUndoBridge.isNewer = toolbarUndoIsNewer
 
 /** 收起模式下「更多」下拉内容 */
 const moreTools = computed(() => {
