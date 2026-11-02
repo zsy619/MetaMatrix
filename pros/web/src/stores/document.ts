@@ -1799,6 +1799,45 @@ export const useDocumentStore = defineStore('document', () => {
     }
   }
 
+  /**
+   * Clone the current server document.
+   *
+   * The server inserts a new canvas_documents row (new UUID) whose current_data
+   * is a deep copy of the source, including attachments / panel materials.
+   * The clone is then loaded into the editor and its id returned.
+   */
+  async function cloneCurrent(opts?: {
+    title?: string
+    notes?: string
+  }): Promise<string> {
+    const id = document_id.value
+    if (!id) throw new Error('当前画布尚未同步到云端，无法克隆')
+    saving.value = true
+    try {
+      const doc = await documentsApi.cloneDocument(id, {
+        ...(opts?.title != null ? { title: opts.title } : {}),
+        ...(opts?.notes != null ? { notes: opts.notes } : {}),
+      })
+      current_data.value = normalizeLoadedDoc(doc.currentData)
+      document_id.value = doc.id
+      head_revision_id.value = doc.headRevisionId
+      if (doc.templateId && isTemplateId(doc.templateId)) {
+        activeTemplateId.value = doc.templateId
+      }
+      applyMeta({
+        title: doc.title,
+        notes: doc.notes ?? '',
+        createdAt: doc.createdAt,
+        updatedAt: doc.updatedAt,
+      })
+      dirty.value = false
+      persistLocal(activeTemplateId.value)
+      return doc.id
+    } finally {
+      saving.value = false
+    }
+  }
+
   /** Ensure logged-in user has a server doc; create if needed. */
   async function ensureServerDocument(): Promise<string | null> {
     if (!getToken()) return null
@@ -3399,6 +3438,7 @@ export const useDocumentStore = defineStore('document', () => {
     load,
     save,
     createOnServer,
+    cloneCurrent,
     ensureServerDocument,
     checkpoint,
     listMyDocuments,

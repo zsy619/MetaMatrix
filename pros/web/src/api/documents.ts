@@ -215,6 +215,21 @@ export function renameDocument(id: string, title: string) {
   })
 }
 
+/**
+ * Clone a document server-side. The server inserts a new canvas_documents row
+ * with a fresh id and a deep copy of the source payload.
+ */
+export function cloneDocument(
+  id: string,
+  input?: { title?: string; notes?: string },
+) {
+  return apiRequest<DocumentFull>(`/documents/${id}/clone`, {
+    method: 'POST',
+    body: input ?? {},
+    retry: 0,
+  })
+}
+
 export function deleteDocument(id: string) {
   return apiRequest<void>(`/documents/${id}`, { method: 'DELETE' })
 }

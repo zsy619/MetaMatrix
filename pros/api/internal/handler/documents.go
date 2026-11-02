@@ -131,6 +131,34 @@ func (h *DocumentsHandler) Create(ctx context.Context, c *app.RequestContext) {
 	c.JSON(http.StatusCreated, doc)
 }
 
+type cloneDocBody struct {
+	Title *string `json:"title"`
+	Notes *string `json:"notes"`
+}
+
+// Clone creates a new document that is a deep copy of the source document.
+func (h *DocumentsHandler) Clone(ctx context.Context, c *app.RequestContext) {
+	uid, ok := h.owner(c)
+	if !ok {
+		return
+	}
+	id, ok := parseID(c, "id")
+	if !ok {
+		return
+	}
+	var body cloneDocBody
+	_ = c.BindAndValidate(&body)
+	doc, err := h.svc.Clone(uid, id, service.CloneDocumentInput{
+		Title: body.Title,
+		Notes: body.Notes,
+	})
+	if handleDocErr(c, err, nil) {
+		return
+	}
+	middleware.Audit(c, "clone", uid.String(), "source="+id.String()+" id="+doc.ID.String())
+	c.JSON(http.StatusCreated, doc)
+}
+
 func (h *DocumentsHandler) List(ctx context.Context, c *app.RequestContext) {
 	uid, ok := h.owner(c)
 	if !ok {
