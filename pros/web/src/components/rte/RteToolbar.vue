@@ -33,11 +33,13 @@ useParentScopeStamp()
         v-for="group in rte.toolbarGroups"
         :key="group.id"
         class="rte-tool-group"
+        :title="'右键可设置组内按钮的显隐与顺序'"
         :class="{
           'is-drop-target': rte.toolbarDropIndex === rte.toolbarOrder.indexOf(group.id),
           'is-dragging': rte.toolbarDragSource === group.id,
         }"
         :data-group-id="group.id"
+        @contextmenu.prevent="rte.onToolbarGroupContextMenu(group.id, $event)"
       >
         <button data-rte-own
           v-if="rte.viewMode === 'edit'"
@@ -224,6 +226,7 @@ useParentScopeStamp()
               <button data-rte-own type="button" @click="rte.continueOrderedNumbering()">继续之前的编号</button>
               <button data-rte-own type="button" @click="rte.restartOrderedNumbering()">开始新列表</button>
               <button data-rte-own type="button" @click="rte.applyListStart()">修改编号值…</button>
+              <button data-rte-own type="button" @click="rte.renumberListFromHere()">从此处重编号</button>
               <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
               <button data-rte-own type="button" @click="rte.applyListStyle('decimal')">数字 1. 2. 3.</button>
               <button data-rte-own type="button" @click="rte.applyListStyle('lower-alpha')">字母 a. b. c.</button>
@@ -2652,6 +2655,58 @@ useParentScopeStamp()
               <span data-rte-own>{{ it.desc }}</span>
             </div>
           </div>
+        </div>
+      </Teleport>
+
+      <!-- 分组内的按钮显隐与顺序（右键分组打开） -->
+      <Teleport to="body">
+        <div data-rte-own
+          v-if="rte.toolbarGroupButtonsOpen"
+          class="rte-menu rte-float-menu rte-group-buttons-menu"
+          v-rte-float="'toolbarGroupButtons'"
+          role="menu"
+          aria-label="组内按钮"
+          @mousedown.prevent
+        >
+          <div data-rte-own class="rte-menu-section-label">组内按钮 · 勾选显示，箭头调顺序</div>
+          <div data-rte-own
+            v-for="entry in rte.toolbarGroupButtonEntries(rte.toolbarGroupButtonsGroupId)"
+            :key="'gb-' + entry.key"
+            class="rte-group-button-row"
+          >
+            <label data-rte-own class="rte-group-button-check">
+              <input
+                data-rte-own
+                type="checkbox"
+                :checked="!entry.hidden"
+                :aria-label="'显示' + entry.label"
+                @change="rte.toggleToolbarGroupButton(rte.toolbarGroupButtonsGroupId, entry.key)"
+              />
+              <span data-rte-own>{{ entry.label }}</span>
+            </label>
+            <button
+              data-rte-own
+              type="button"
+              class="rte-group-button-move"
+              :aria-label="'上移' + entry.label"
+              title="上移"
+              @click="rte.moveToolbarGroupButton(rte.toolbarGroupButtonsGroupId, entry.key, -1)"
+            >
+              ↑
+            </button>
+            <button
+              data-rte-own
+              type="button"
+              class="rte-group-button-move"
+              :aria-label="'下移' + entry.label"
+              title="下移"
+              @click="rte.moveToolbarGroupButton(rte.toolbarGroupButtonsGroupId, entry.key, 1)"
+            >
+              ↓
+            </button>
+          </div>
+          <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
+          <button data-rte-own type="button" @click="rte.closeToolbarGroupButtons()">完成</button>
         </div>
       </Teleport>
 

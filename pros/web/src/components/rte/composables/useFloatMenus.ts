@@ -31,6 +31,8 @@ export function useFloatMenus(deps: {
   closeColorMenus: () => void
   closeHighlightMenus: () => void
   closeMore: () => void
+  /** 关闭工具栏分组内的按钮配置菜单 */
+  closeToolbarGroupButtons?: () => void
 }) {
 /** tool-wrap @mouseleave：仅当指针真正离开按钮+菜单时才关（避免点选项前被关掉） */
 /** 工具条下拉：fixed + Teleport 到 body，按按钮 rect 自动翻转/夹紧 */
@@ -286,6 +288,7 @@ function closeAllToolbarMenus() {
   deps.closeColorMenus()
   deps.closeHighlightMenus()
   deps.closeMore()
+  deps.closeToolbarGroupButtons?.()
 }
 
 function onDocPointerDownForMenus(e: PointerEvent) {

@@ -81,3 +81,44 @@ export function searchDirectoryUsers(
       )
   return matched.slice(0, Math.max(1, limit))
 }
+
+/** 面板 id -> 通讯录权限。键与画布面板 id 对齐。 */
+export type MentionPermissionByPanelId = Record<string, DirectoryPermission>
+
+/** 读某个面板的通讯录权限。缺省等于不限制。 */
+export function readMentionPermission(
+  map: MentionPermissionByPanelId | undefined,
+  panelId: string | null | undefined,
+): DirectoryPermission | null {
+  if (!map || !panelId) return null
+  const entry = map[panelId]
+  if (!entry) return null
+  return {
+    allowedUserIds: entry.allowedUserIds ? [...entry.allowedUserIds] : undefined,
+    deniedUserIds: entry.deniedUserIds ? [...entry.deniedUserIds] : undefined,
+    allowedDepartments: entry.allowedDepartments ? [...entry.allowedDepartments] : undefined,
+    allowedRoles: entry.allowedRoles ? [...entry.allowedRoles] : undefined,
+  }
+}
+
+/** 写某个面板的通讯录权限。权限为空时删掉该面板的键。 */
+export function writeMentionPermission(
+  map: MentionPermissionByPanelId | undefined,
+  panelId: string,
+  permission: DirectoryPermission | null | undefined,
+): MentionPermissionByPanelId | undefined {
+  const next: MentionPermissionByPanelId = { ...(map || {}) }
+  const id = panelId.trim()
+  if (!id) return Object.keys(next).length ? next : undefined
+  if (!permission) {
+    delete next[id]
+  } else {
+    next[id] = {
+      allowedUserIds: permission.allowedUserIds ? [...permission.allowedUserIds] : undefined,
+      deniedUserIds: permission.deniedUserIds ? [...permission.deniedUserIds] : undefined,
+      allowedDepartments: permission.allowedDepartments ? [...permission.allowedDepartments] : undefined,
+      allowedRoles: permission.allowedRoles ? [...permission.allowedRoles] : undefined,
+    }
+  }
+  return Object.keys(next).length ? next : undefined
+}

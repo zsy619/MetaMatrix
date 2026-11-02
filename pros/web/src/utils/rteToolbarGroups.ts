@@ -1,5 +1,10 @@
 /** 工具栏分组。旧文档没有保存顺序时用默认顺序。 */
 
+import {
+  visibleGroupButtonKeys,
+  type ToolbarGroupButtonConfig,
+} from './rteToolbarGroupButtons'
+
 export type ToolbarGroupDef = {
   id: string
   label: string
@@ -33,12 +38,13 @@ export const TOOLBAR_GROUPS: readonly ToolbarGroupDef[] = [
     keys: [
       'callout', 'hr', 'columns', 'pageBreak', 'toggleBlock', 'blockOps', 'insertDate',
       'form', 'template', 'timeline', 'statusChip', 'progressBar', 'tabsBlock', 'mermaid', 'snippets',
+      'crossDoc',
     ],
   },
   {
     id: 'notes',
     label: '批注',
-    keys: ['note', 'comment', 'footnote', 'footnoteList', 'captionNum', 'bookmark', 'mentionBtn', 'xref'],
+    keys: ['note', 'comment', 'footnote', 'footnoteList', 'captionNum', 'bookmark', 'mentionBtn', 'mentionPerm', 'xref'],
   },
   {
     id: 'review',
@@ -134,6 +140,7 @@ export function readToolbarGroupOrder(
 export function buildToolbarGroups<T extends { key: string }>(
   tools: readonly T[],
   order: readonly string[],
+  buttonConfigs?: Record<string, ToolbarGroupButtonConfig> | null,
 ): Array<{ id: string; label: string; tools: T[] }> {
   const byKey = new Map(tools.map((tool) => [tool.key, tool]))
   const used = new Set<string>()
@@ -146,7 +153,13 @@ export function buildToolbarGroups<T extends { key: string }>(
       picked.push(tool)
       used.add(key)
     }
-    return { id, label: def.label, tools: picked }
+    // 组内按钮的显隐与顺序：按面板保存的配置来
+    const config = buttonConfigs?.[id]
+    const keys = visibleGroupButtonKeys(config, def.keys)
+    const ordered = keys
+      .map((key) => picked.find((tool) => tool.key === key))
+      .filter((tool): tool is T => !!tool)
+    return { id, label: def.label, tools: ordered }
   })
   const rest = tools.filter((tool) => !used.has(tool.key))
   const other = groups.find((group) => group.id === 'other')

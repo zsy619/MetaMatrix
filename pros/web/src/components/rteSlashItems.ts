@@ -64,6 +64,7 @@ export type RteSlashAction =
   | { type: 'ruby' }
   | { type: 'xref' }
   | { type: 'snippet' }
+  | { type: 'mention' }
   | { type: 'callout'; variant: 'info' | 'warn' | 'success' | 'error' }
   | { type: 'form'; kind: RteSlashFormKind }
   | { type: 'template'; id: string }
@@ -451,6 +452,14 @@ const MEDIA_ITEMS: RteSlashItem[] = [
     group: 'block',
     keywords: ['snippet', '片段', '常用语'],
     action: { type: 'snippet' },
+  },
+  {
+    id: 'mention',
+    label: '提及某人',
+    description: '从组织通讯录里挑一个人',
+    group: 'media',
+    keywords: ['mention', '@', '提及', 'at', '人员', '通讯录'],
+    action: { type: 'mention' },
   },
 ]
 

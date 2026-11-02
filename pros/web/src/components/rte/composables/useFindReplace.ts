@@ -21,6 +21,10 @@ export function useFindReplace(deps: {
   const findReplaceText = ref('')
   const findCaseSensitive = ref(false)
   const findWholeWord = ref(false)
+  /** 正则查找：按正则表达式匹配（不支持跨文本节点） */
+  const findRegex = ref(false)
+  /** 多行正则：^ $ 匹配行首行尾 */
+  const findMultiline = ref(false)
   const findMatches = ref<RteFindMatch[]>([])
   const findMatchIndex = ref(-1)
 
@@ -28,6 +32,8 @@ export function useFindReplace(deps: {
     return {
       caseSensitive: findCaseSensitive.value,
       wholeWord: findWholeWord.value,
+      regex: findRegex.value,
+      multiline: findMultiline.value,
     }
   }
 
@@ -153,6 +159,8 @@ export function useFindReplace(deps: {
     findReplaceText,
     findCaseSensitive,
     findWholeWord,
+    findRegex,
+    findMultiline,
     findMatches,
     findMatchIndex,
     refreshFindMatches,

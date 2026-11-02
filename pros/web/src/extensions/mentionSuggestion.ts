@@ -11,6 +11,7 @@ import type {
   SuggestionProps,
 } from '@tiptap/suggestion'
 import {
+  DEFAULT_MENTION_ITEMS,
   mergeMentionCandidates,
   type RteMentionItem,
 } from '../components/rteMentionItems'
@@ -29,6 +30,11 @@ export type RteMentionUiHandlers = {
 
 export type RteMentionOptions = {
   ui: RteMentionUiHandlers
+  /**
+   * 组织通讯录里的真人。返回 Promise，宿主从通讯录接口取人并按文档权限过滤。
+   * 没提供时退回本地示例候选人。
+   */
+  people?: () => Promise<RteMentionItem[]>
 }
 
 /**
@@ -37,6 +43,7 @@ export type RteMentionOptions = {
  */
 export function createRteMention(options: RteMentionOptions) {
   const ui = options.ui
+  const people = options.people
   return Mention.configure({
     HTMLAttributes: {
       class: 'rte-mention',
@@ -61,13 +68,23 @@ export function createRteMention(options: RteMentionOptions) {
         }
         return true
       },
-      items: ({ query, editor }) => {
+      items: async ({ query, editor }) => {
         const blocks = collectCrossRefTargets(editor).map((target) => ({
           id: target.id,
           label: target.label,
           kind: target.kind,
         }))
-        return mergeMentionCandidates(query, blocks, 12)
+        // 通讯录优先；接口不可用时退回本地示例候选人。
+        let candidates: RteMentionItem[] = []
+        if (people) {
+          try {
+            candidates = await people()
+          } catch {
+            candidates = []
+          }
+        }
+        if (!candidates.length) candidates = DEFAULT_MENTION_ITEMS
+        return mergeMentionCandidates(query, blocks, 12, candidates)
       },
       command: ({ editor, range, props }) => {
         const item = props as RteMentionItem

@@ -7,9 +7,18 @@ import {
   readToolbarGroupOrder,
   toolbarGroupLabels,
   toolbarOrdersEqual,
+  TOOLBAR_GROUPS,
 } from '../../../utils/rteToolbarGroups'
+import {
+  isDefaultToolbarGroupConfig,
+  moveGroupButton,
+  readToolbarGroupButtons,
+  toggleGroupButtonHidden,
+  type ToolbarGroupButtonConfig,
+  type ToolbarGroupButtonsByPanelId,
+} from '../../../utils/rteToolbarGroupButtons'
 
-type ToolLike = { key: string; kind?: string }
+type ToolLike = { key: string; kind?: string; label?: string }
 
 /** 顶栏分组顺序、拖拽排序，以及和页边距共用的 Ctrl+Z。监听在挂载时注册、卸载时移除。 */
 export function useToolbarGroups<T extends ToolLike>(deps: {
@@ -17,6 +26,13 @@ export function useToolbarGroups<T extends ToolLike>(deps: {
   expanded: () => boolean
   orderMap: () => Parameters<typeof readToolbarGroupOrder>[0]
   setPanelToolbarOrder: (panelId: string, order: readonly string[]) => void
+  /** 组内按钮显隐与顺序的持久化入口（按面板）。 */
+  buttonConfigMap: () => ToolbarGroupButtonsByPanelId | undefined
+  setPanelGroupButtons: (
+    panelId: string,
+    groupId: string,
+    config: ToolbarGroupButtonConfig | null,
+  ) => void
   tools: () => readonly T[]
   primaryKeys: ReadonlySet<string>
   viewMode: () => string
@@ -48,8 +64,70 @@ export function useToolbarGroups<T extends ToolLike>(deps: {
     const tools = deps.expanded()
       ? deps.tools().filter((tool) => tool.kind !== 'divider')
       : deps.tools().filter((tool) => tool.kind !== 'divider' && deps.primaryKeys.has(tool.key))
-    return buildToolbarGroups(tools, toolbarOrder.value)
+    return buildToolbarGroups(tools, toolbarOrder.value, toolbarGroupButtonConfigs.value)
   })
+
+  /** 每个分组当前生效的组内按钮配置（已归一化）。 */
+  const toolbarGroupButtonConfigs = computed(() => {
+    const map = deps.buttonConfigMap()
+    const panelId = deps.panelId()
+    const out: Record<string, Required<ToolbarGroupButtonConfig>> = {}
+    for (const group of TOOLBAR_GROUPS) {
+      out[group.id] = readToolbarGroupButtons(map, panelId, group.id, group.keys)
+    }
+    return out
+  })
+
+  /** 某个分组里可配置的全部按钮（含被隐藏的），用于配置面板。 */
+  function toolbarGroupButtonEntries(groupId: string) {
+    const def = TOOLBAR_GROUPS.find((group) => group.id === groupId)
+    if (!def) return []
+    const config = toolbarGroupButtonConfigs.value[groupId]
+    const labels = new Map(deps.tools().map((tool) => [tool.key, tool.label || tool.key]))
+    return def.keys.map((key, index) => ({
+      key,
+      label: labels.get(key) || key,
+      hidden: config.hidden.includes(key),
+      order: config.order.indexOf(key),
+      defaultIndex: index,
+    }))
+  }
+
+  function persistGroupButtonConfig(groupId: string, config: ToolbarGroupButtonConfig | null) {
+    const def = TOOLBAR_GROUPS.find((group) => group.id === groupId)
+    if (!def) return
+    const normalized =
+      config && !isDefaultToolbarGroupConfig(config, def.keys) ? config : null
+    const panelId = deps.panelId()
+    if (!panelId) return
+    deps.setPanelGroupButtons(panelId, groupId, normalized)
+  }
+
+  /** 显示 / 隐藏某个组内按钮。 */
+  function toggleToolbarGroupButton(groupId: string, key: string) {
+    const def = TOOLBAR_GROUPS.find((group) => group.id === groupId)
+    if (!def) return
+    const current = toolbarGroupButtonConfigs.value[groupId]
+    const next = toggleGroupButtonHidden(current, def.keys, key)
+    if (!next) return
+    persistGroupButtonConfig(groupId, next)
+    deps.announce(`${def.label}分组：${key} ${(next.hidden ?? []).includes(key) ? '已隐藏' : '已显示'}`)
+  }
+
+  /** 组内按钮前后移动。dir: -1 上移，1 下移。 */
+  function moveToolbarGroupButton(groupId: string, key: string, dir: -1 | 1) {
+    const def = TOOLBAR_GROUPS.find((group) => group.id === groupId)
+    if (!def) return
+    const current = toolbarGroupButtonConfigs.value[groupId]
+    const from = current.order.indexOf(key)
+    if (from < 0) return
+    const to = from + dir
+    if (to < 0 || to >= current.order.length) return
+    const next = moveGroupButton(current, def.keys, key, to)
+    if (!next) return
+    persistGroupButtonConfig(groupId, next)
+    deps.announce(`${def.label}分组：按钮顺序已调整`)
+  }
 
   function applyToolbarOrder(next: readonly string[], recordUndo: boolean) {
     const prev = toolbarOrder.value
@@ -275,6 +353,10 @@ export function useToolbarGroups<T extends ToolLike>(deps: {
   return {
     toolbarOrder,
     toolbarGroups,
+    toolbarGroupButtonConfigs,
+    toolbarGroupButtonEntries,
+    toggleToolbarGroupButton,
+    moveToolbarGroupButton,
     toolbarDropIndex,
     toolbarDragSource,
     undoToolbarGroupOrder,

@@ -76,6 +76,7 @@ import { MermaidBlock } from '../../../extensions/mermaidBlock'
 import { CrossRef, findCrossRefPos } from '../../../extensions/crossRef'
 import { ListStyleAttrs } from '../../../extensions/listStyleAttrs'
 import { LinkButton } from '../../../extensions/linkButton'
+import { SyncBlock } from '../../../extensions/syncBlock'
 
 type LateFn = (...args: any[]) => any
 
@@ -97,6 +98,8 @@ export function useRteExtensions(deps: {
   editorReady: { value: boolean }
   isInTable: LateFn
   mentionUi: any
+  /** 组织通讯录真人候选。宿主从通讯录接口取人并按文档权限过滤。 */
+  mentionPeople?: () => Promise<any[]>
   openTableContextMenu: LateFn
   pastePlainTextMode: { value: boolean }
   shortcutsOpen: { value: boolean }
@@ -146,6 +149,8 @@ export function useRteExtensions(deps: {
   selectCurrentBlock: LateFn
   setViewMode: LateFn
   syncImageBubbleCaption: LateFn
+  /** 同步图片气泡里的裁剪比例与 alt。 */
+  syncImageCropState?: LateFn
   toggleOutlinePanel: LateFn
   undoToolbarGroupOrder: LateFn
   suggestingEnabled: () => boolean
@@ -210,6 +215,7 @@ export function useRteExtensions(deps: {
   const syncImageBubbleCaption = (...args: any[]) => deps.syncImageBubbleCaption(...args)
   const toggleOutlinePanel = (...args: any[]) => deps.toggleOutlinePanel(...args)
   const undoToolbarGroupOrder = (...args: any[]) => deps.undoToolbarGroupOrder(...args)
+  const mentionPeople = deps.mentionPeople
   let wordPasteHinted = false
 
 const editor = useEditor({
@@ -366,7 +372,11 @@ const editor = useEditor({
     FormDateInput,
     FormSwitch,
     FormShowIf,
-    createRteMention({ ui: mentionUi }),
+    SyncBlock,
+    createRteMention({
+      ui: mentionUi,
+      people: mentionPeople,
+    }),
     SlashCommands.configure({
       ui: slashUi,
     }),
@@ -774,6 +784,7 @@ const editor = useEditor({
     syncSelectedFormFromEditor(ed)
     applyFormatPainterIfNeeded(ed)
     syncImageBubbleCaption()
+    deps.syncImageCropState?.()
     deps.bumpSuggestions()
   },
   onTransaction: ({ editor: ed }) => {

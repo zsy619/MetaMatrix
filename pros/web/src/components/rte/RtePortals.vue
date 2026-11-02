@@ -172,6 +172,203 @@ useParentScopeStamp()
         </div>
       </div>
     </Teleport>
+
+    <!-- 页面设置：页面大小 / 页边距 / 页眉 / 页脚 / 页码 -->
+    <Teleport to="body">
+      <div data-rte-own
+        v-if="rte.pageSetupOpen"
+        class="rte-modal-overlay"
+        @mousedown.self="rte.pageSetupOpen = false"
+      >
+        <div data-rte-own class="rte-modal rte-pagesetup-modal" role="dialog" aria-label="页面设置">
+          <h3 data-rte-own class="rte-modal-title">页面设置</h3>
+          <label data-rte-own class="rte-pagesetup-field">
+            <span data-rte-own>页面大小</span>
+            <select
+              data-rte-own
+              class="rte-note-input"
+              :value="rte.pageSize"
+              :disabled="rte.viewMode !== 'edit'"
+              @change="rte.setPageSize(($event.target as HTMLSelectElement).value)"
+            >
+              <option data-rte-own v-for="opt in rte.RTE_PAGE_SIZES" :key="'ps-setup-' + opt.id" :value="opt.id">
+                {{ opt.label }}
+              </option>
+            </select>
+          </label>
+          <label data-rte-own class="rte-pagesetup-field">
+            <span data-rte-own>页边距</span>
+            <select
+              data-rte-own
+              class="rte-note-input"
+              :value="rte.pageMargin.preset"
+              :disabled="rte.viewMode !== 'edit'"
+              @change="rte.setMarginPreset(($event.target as HTMLSelectElement).value)"
+            >
+              <option data-rte-own v-for="opt in rte.PAGE_MARGIN_PRESETS" :key="'mg-setup-' + opt.id" :value="opt.id">
+                {{ opt.label }}
+              </option>
+              <option data-rte-own value="custom">自定义</option>
+            </select>
+          </label>
+          <label data-rte-own class="rte-pagesetup-field">
+            <span data-rte-own>页眉</span>
+            <input
+              data-rte-own
+              class="rte-note-input"
+              type="text"
+              maxlength="80"
+              placeholder="每页顶部的内容"
+              :value="rte.pageChrome.header"
+              :disabled="rte.viewMode !== 'edit'"
+              @change="rte.setPageHeader(($event.target as HTMLInputElement).value)"
+            />
+          </label>
+          <label data-rte-own class="rte-pagesetup-field">
+            <span data-rte-own>页脚</span>
+            <input
+              data-rte-own
+              class="rte-note-input"
+              type="text"
+              maxlength="80"
+              placeholder="每页底部的内容"
+              :value="rte.pageChrome.footer"
+              :disabled="rte.viewMode !== 'edit'"
+              @change="rte.setPageFooter(($event.target as HTMLInputElement).value)"
+            />
+          </label>
+          <label data-rte-own class="rte-pagesetup-field">
+            <span data-rte-own>页码</span>
+            <select
+              data-rte-own
+              class="rte-note-input"
+              :value="rte.pageChrome.pageNumber"
+              :disabled="rte.viewMode !== 'edit'"
+              @change="rte.setPageNumber(($event.target as HTMLSelectElement).value)"
+            >
+              <option data-rte-own v-for="opt in rte.PAGE_NUMBER_OPTIONS" :key="'pn-setup-' + opt.id" :value="opt.id">
+                {{ opt.label }}
+              </option>
+            </select>
+          </label>
+          <div data-rte-own class="rte-modal-actions">
+            <button data-rte-own type="button" class="rte-btn" @click="rte.pageSetupOpen = false">关闭</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- 跨文档：搜索其它文档，可插入同步块 -->
+    <Teleport to="body">
+      <div data-rte-own
+        v-if="rte.crossDocOpen"
+        class="rte-modal-overlay"
+        @mousedown.self="rte.closeCrossDoc()"
+      >
+        <div data-rte-own class="rte-modal rte-crossdoc-modal" role="dialog" aria-label="跨文档">
+          <h3 data-rte-own class="rte-modal-title">跨文档</h3>
+          <p data-rte-own class="rte-modal-desc">
+            搜索本账号可见的其它文档。点标题跳过去，点「插入同步块」把来源内容同步到本文。
+          </p>
+          <div data-rte-own class="rte-note-field rte-note-text-field" style="width: 100%; margin-bottom: 10px">
+            <span data-rte-own class="rte-note-field-icon" aria-hidden="true">🔍</span>
+            <input
+              data-rte-own
+              v-model="rte.crossDocQuery"
+              type="text"
+              class="rte-note-input"
+              placeholder="按标题或正文搜索"
+              maxlength="100"
+              @keydown.enter.prevent="rte.searchCrossDoc()"
+            />
+          </div>
+          <div data-rte-own class="rte-crossdoc-actions">
+            <button data-rte-own type="button" class="rte-btn" :disabled="rte.crossDocBusy" @click="rte.searchCrossDoc()">
+              {{ rte.crossDocBusy ? '搜索中…' : '搜索' }}
+            </button>
+            <button data-rte-own type="button" class="rte-btn" @click="rte.closeCrossDoc()">关闭</button>
+          </div>
+          <p data-rte-own v-if="rte.crossDocError" class="rte-modal-desc is-error">{{ rte.crossDocError }}</p>
+          <div data-rte-own v-if="rte.crossDocHits.length" class="rte-crossdoc-list">
+            <div data-rte-own v-for="hit in rte.crossDocHits" :key="hit.documentId + '-' + (hit.panelId || '')" class="rte-crossdoc-item">
+              <button
+                data-rte-own
+                type="button"
+                class="rte-crossdoc-link"
+                :title="'跳转到：' + hit.title"
+                @click="rte.jumpToCrossDoc(hit)"
+              >
+                {{ hit.title }}
+                <span v-if="hit.panelTitle" class="rte-crossdoc-panel">{{ hit.panelTitle }}</span>
+              </button>
+              <div data-rte-own v-if="hit.snippet" class="rte-crossdoc-snippet">{{ rte.syncBlockPreview(hit.snippet) }}</div>
+              <button
+                data-rte-own
+                type="button"
+                class="rte-bubble-btn"
+                :disabled="rte.crossDocSyncing"
+                :title="'把「' + hit.title + '」同步成块插到本文'"
+                @click="rte.insertSyncBlock(hit)"
+              >
+                插入同步块
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- @ 提及权限：决定本文能提到哪些人 -->
+    <Teleport to="body">
+      <div data-rte-own
+        v-if="rte.mentionPermOpen"
+        class="rte-modal-overlay"
+        @mousedown.self="rte.mentionPermOpen = false"
+      >
+        <div data-rte-own class="rte-modal rte-mention-perm-modal" role="dialog" aria-label="@ 提及权限">
+          <h3 data-rte-own class="rte-modal-title">@ 提及权限</h3>
+          <p data-rte-own class="rte-modal-desc">
+            通讯录里的真人只在本文可见时才会出现在 @ 菜单里。不勾任何项表示不额外限制。
+          </p>
+          <div data-rte-own class="rte-mention-perm-body">
+            <div data-rte-own class="rte-mention-perm-section">
+              <div data-rte-own class="rte-mention-perm-label">可提及部门</div>
+              <p data-rte-own v-if="!rte.directoryDepartments.length" class="rte-modal-desc">
+                {{ rte.directoryLoading ? '正在读取通讯录…' : '通讯录里还没有部门信息' }}
+              </p>
+              <label data-rte-own v-for="dept in rte.directoryDepartments" :key="'perm-dept-' + dept" class="rte-mention-perm-item">
+                <input
+                  data-rte-own
+                  type="checkbox"
+                  :checked="rte.mentionPermDepartments.includes(dept)"
+                  @change="rte.toggleMentionPermValue(rte.mentionPermDepartments, dept)"
+                />
+                <span data-rte-own>{{ dept }}</span>
+              </label>
+            </div>
+            <div data-rte-own class="rte-mention-perm-section">
+              <div data-rte-own class="rte-mention-perm-label">可提及角色</div>
+              <p data-rte-own v-if="!rte.directoryRoles.length" class="rte-modal-desc">通讯录里还没有角色信息</p>
+              <label data-rte-own v-for="role in rte.directoryRoles" :key="'perm-role-' + role" class="rte-mention-perm-item">
+                <input
+                  data-rte-own
+                  type="checkbox"
+                  :checked="rte.mentionPermRoles.includes(role)"
+                  @change="rte.toggleMentionPermValue(rte.mentionPermRoles, role)"
+                />
+                <span data-rte-own>{{ role }}</span>
+              </label>
+            </div>
+          </div>
+          <p data-rte-own v-if="rte.directoryError" class="rte-modal-desc is-error">{{ rte.directoryError }}</p>
+          <div data-rte-own class="rte-modal-actions is-row">
+            <button data-rte-own type="button" class="rte-btn" @click="rte.resetMentionPermission()">清空</button>
+            <button data-rte-own type="button" class="rte-btn" @click="rte.mentionPermOpen = false">取消</button>
+            <button data-rte-own type="button" class="rte-btn is-primary" @click="rte.saveMentionPermission()">保存</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
     <!-- 公式编辑器 -->
     <Teleport to="body">
       <div data-rte-own
@@ -605,6 +802,14 @@ useParentScopeStamp()
             <label data-rte-own class="rte-find-case">
               <input data-rte-own v-model="rte.findWholeWord" type="checkbox" @change="rte.refreshFindMatches(true)" />
               <span data-rte-own>全词匹配</span>
+            </label>
+            <label data-rte-own class="rte-find-case">
+              <input data-rte-own v-model="rte.findRegex" type="checkbox" @change="rte.refreshFindMatches(true)" />
+              <span data-rte-own>正则</span>
+            </label>
+            <label data-rte-own v-if="rte.findRegex" class="rte-find-case">
+              <input data-rte-own v-model="rte.findMultiline" type="checkbox" @change="rte.refreshFindMatches(true)" />
+              <span data-rte-own>多行</span>
             </label>
             <span data-rte-own class="rte-find-status" role="status" aria-live="polite">{{ rte.findStatusText }}</span>
           </div>
