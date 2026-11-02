@@ -60,6 +60,13 @@ import {
   togglePreviewMode,
 } from '../utils/rteRound7'
 import { type CalloutVariant } from '../extensions/callout'
+import { orderedListContinuation } from '../utils/rteListContinue'
+import {
+  FIRST_LINE_INDENT,
+  LINK_BUTTON_TONES,
+  safeLinkButtonHref,
+  type LinkButtonTone,
+} from '../utils/rtePracticalToolbar'
 import { QUOTE_STYLE_OPTIONS, type QuoteStyle } from '../extensions/rteBlockquote'
 import { collectCrossRefTargets } from '../extensions/crossRef'
 import {
@@ -1811,7 +1818,34 @@ function applyListStyle(style: string) {
   if (!ed) return
   ed.chain().focus().setOrderedListStyle(style as any).run()
   listStyleOpen.value = false
+  listOpen.value = false
   moreOpen.value = false
+}
+
+function ensureOrderedList(): boolean {
+  const ed = editor.value
+  if (!ed) return false
+  if (ed.isActive('orderedList')) return true
+  return ed.chain().focus().toggleOrderedList().run() && ed.isActive('orderedList')
+}
+
+function continueOrderedNumbering() {
+  const ed = editor.value
+  if (!ed || !ensureOrderedList()) return
+  const found = orderedListContinuation(ed.state.doc, ed.state.selection.from)
+  listOpen.value = false
+  if (!found) {
+    ElMessage.info('前面没有可延续的有序列表')
+    return
+  }
+  ed.chain().focus().setOrderedListStart(found.next).run()
+}
+
+function restartOrderedNumbering() {
+  const ed = editor.value
+  if (!ed || !ensureOrderedList()) return
+  ed.chain().focus().setOrderedListStart(1).run()
+  listOpen.value = false
 }
 
 async function applyListStart() {
@@ -1828,8 +1862,87 @@ async function applyListStart() {
     ElMessage.warning('请输入正整数')
     return
   }
+  if (!ensureOrderedList()) return
   editor.value?.chain().focus().setOrderedListStart(n).run()
   listStyleOpen.value = false
+  listOpen.value = false
+}
+
+function toggleFirstLineIndent() {
+  applyTextIndent(currentTextIndent() ? '' : FIRST_LINE_INDENT)
+}
+
+function setFirstLineIndent(on: boolean) {
+  applyTextIndent(on ? FIRST_LINE_INDENT : '')
+}
+
+const linkButtonOpen = ref(false)
+
+function paintLinkButton(tone: LinkButtonTone) {
+  const ed = editor.value
+  if (!ed) return
+  linkButtonOpen.value = false
+  if (!ed.isActive('linkButton')) {
+    void insertLinkButton(tone)
+    return
+  }
+  ed.chain().focus().updateAttributes('linkButton', { tone }).run()
+}
+
+async function insertLinkButton(tone: LinkButtonTone = 'blue') {
+  const ed = editor.value
+  if (!ed) return
+  linkButtonOpen.value = false
+  moreOpen.value = false
+  const editing = ed.isActive('linkButton')
+  const current = editing ? ed.getAttributes('linkButton') : {}
+  const label = await openRtePrompt({
+    title: '按钮文字',
+    message: '按钮会打开你填的网页。编辑时用 Ctrl 或 ⌘ 点击打开。',
+    defaultValue: String(current.label || '打开链接'),
+    maxlength: 40,
+  })
+  if (label == null) return
+  const hrefRaw = await openRtePrompt({
+    title: '打开的链接',
+    placeholder: 'https://',
+    defaultValue: String(current.href || ''),
+    maxlength: 500,
+  })
+  if (hrefRaw == null) return
+  const href = safeLinkButtonHref(hrefRaw)
+  if (!href) {
+    ElMessage.warning('请输入 http 或 https 链接')
+    return
+  }
+  const attrs = { label: label.trim() || '打开链接', href, tone }
+  if (editing) ed.chain().focus().updateAttributes('linkButton', attrs).run()
+  else ed.chain().focus().insertLinkButton(attrs).run()
+}
+
+async function editLinkButton() {
+  const ed = editor.value
+  if (!ed || !ed.isActive('linkButton')) return
+  linkButtonOpen.value = false
+  const attrs = ed.getAttributes('linkButton')
+  const label = await openRtePrompt({
+    title: '按钮文字',
+    defaultValue: String(attrs.label || '打开链接'),
+    maxlength: 40,
+  })
+  if (label == null) return
+  const hrefRaw = await openRtePrompt({
+    title: '打开的链接',
+    defaultValue: String(attrs.href || ''),
+    maxlength: 500,
+  })
+  if (hrefRaw == null) return
+  const href = safeLinkButtonHref(hrefRaw)
+  if (!href) {
+    ElMessage.warning('请输入 http 或 https 链接')
+    return
+  }
+  ed.chain().focus().updateAttributes('linkButton', { label: label.trim() || '打开链接', href }).run()
 }
 
 async function insertRubyAnnotation() {
@@ -2921,6 +3034,9 @@ function applySlashCommandItem(item: RteSlashItem) {
       break
     case 'link':
       insertLink()
+      break
+    case 'linkButton':
+      void insertLinkButton('blue')
       break
     case 'formula':
       insertFormula()
@@ -4689,7 +4805,7 @@ type ToolItem = {
   title?: string
   icon: string
   iconComp?: Component
-  kind?: 'heading' | 'list' | 'more' | 'btn' | 'color' | 'highlight' | 'align' | 'fontSize' | 'fontFamily' | 'lineHeight' | 'import' | 'export' | 'table' | 'attach' | 'form' | 'template' | 'code' | 'divider' | 'emoji' | 'specialChars' | 'columns' | 'spacing' | 'wordStats' | 'callout' | 'shortcuts' | 'hr' | 'blockOps' | 'insertDate' | 'pasteFormat' | 'caseTransform' | 'zoom' | 'viewExtras' | 'paraStyle' | 'listStyle'
+  kind?: 'heading' | 'list' | 'more' | 'btn' | 'color' | 'highlight' | 'align' | 'fontSize' | 'fontFamily' | 'lineHeight' | 'import' | 'export' | 'table' | 'attach' | 'form' | 'template' | 'code' | 'divider' | 'emoji' | 'specialChars' | 'columns' | 'spacing' | 'wordStats' | 'callout' | 'shortcuts' | 'hr' | 'blockOps' | 'insertDate' | 'pasteFormat' | 'caseTransform' | 'zoom' | 'viewExtras' | 'paraStyle' | 'listStyle' | 'linkButton'
   active?: () => boolean
   run?: () => void
 }
@@ -4856,6 +4972,15 @@ const allTools = computed((): ToolItem[] => {
       iconComp: ic('outdent'),
       run: outdentBlock,
     },
+    {
+      key: 'firstIndent',
+      label: '首行',
+      title: '首行缩进 2 字',
+      icon: '⇨',
+      iconComp: ic('firstIndent'),
+      active: () => !!currentTextIndent(),
+      run: toggleFirstLineIndent,
+    },
     { key: 'spacing', label: '段距', title: '段前段后 / 字间距', icon: '↕', iconComp: ic('spacing'), kind: 'spacing', active: () => !!(currentLetterSpacing() || currentMarginTop() || currentMarginBottom()) },
     { key: 'div-text', label: '', icon: '', kind: 'divider' },
     // —— 高级（段落）——
@@ -4925,6 +5050,16 @@ const allTools = computed((): ToolItem[] => {
       iconComp: ic('link'),
       active: () => isActive('link'),
       run: insertLink,
+    },
+    {
+      key: 'linkButton',
+      label: '按钮',
+      title: '插入打开链接的按钮',
+      icon: '钮',
+      iconComp: ic('linkButton'),
+      kind: 'linkButton',
+      active: () => linkButtonOpen.value || isActive('linkButton'),
+      run: () => { void insertLinkButton('blue') },
     },
     { key: 'formula', label: '公式', icon: 'Σ', iconComp: ic('formula'), run: insertFormula },
     {
@@ -5717,6 +5852,11 @@ provideRteBindings({
   insertFormulaSymbol,
   insertHrVariant,
   insertLink,
+  insertLinkButton,
+  paintLinkButton,
+  editLinkButton,
+  LINK_BUTTON_TONES,
+  linkButtonOpen,
   insertPlainDate,
   insertPlainDateTime,
   insertQuickTable,
@@ -5937,6 +6077,10 @@ provideRteBindings({
   toggleImageSelect,
   toggleItalic,
   toggleOrderedList,
+  continueOrderedNumbering,
+  restartOrderedNumbering,
+  toggleFirstLineIndent,
+  setFirstLineIndent,
   togglePaperGuide,
   togglePreviewMode,
   toggleShortcutsPanel,

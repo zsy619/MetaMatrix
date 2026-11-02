@@ -221,6 +221,14 @@ useParentScopeStamp()
                 任务列表
               </button>
               <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
+              <button data-rte-own type="button" @click="rte.continueOrderedNumbering()">继续之前的编号</button>
+              <button data-rte-own type="button" @click="rte.restartOrderedNumbering()">开始新列表</button>
+              <button data-rte-own type="button" @click="rte.applyListStart()">修改编号值…</button>
+              <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
+              <button data-rte-own type="button" @click="rte.applyListStyle('decimal')">数字 1. 2. 3.</button>
+              <button data-rte-own type="button" @click="rte.applyListStyle('lower-alpha')">字母 a. b. c.</button>
+              <button data-rte-own type="button" @click="rte.applyListStyle('lower-roman')">罗马 i. ii. iii.</button>
+              <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
               <div data-rte-own v-if="rte.listDepthLabel" class="rte-menu-hint">{{ rte.listDepthLabel }}</div>
               <div data-rte-own class="rte-menu-hint">Tab / Shift+Tab 调整层级</div>
               <button data-rte-own
@@ -754,6 +762,53 @@ useParentScopeStamp()
           </Teleport>
         </div>
         <div data-rte-own
+          v-else-if="t.kind === 'linkButton'"
+          class="rte-tool-wrap"
+          @mouseenter="rte.onToolMenuEnter('linkButton')"
+          @mouseleave="rte.onToolMenuLeave($event, 'linkButton', () => (rte.linkButtonOpen = false))"
+        >
+          <button data-rte-own
+            type="button"
+            class="rte-tool"
+            :ref="(el) => rte.setFloatAnchor('linkButton', el)"
+            data-rte-anchor="linkButton"
+            :class="{ active: rte.linkButtonOpen || rte.isActive('linkButton') }"
+            title="插入打开链接的按钮"
+            aria-label="按钮"
+            aria-haspopup="menu"
+            :aria-expanded="rte.linkButtonOpen"
+            @click.stop="rte.markToolbarMenuOpening(); rte.listOpen = false; rte.alignOpen = false; rte.linkButtonOpen = !rte.linkButtonOpen"
+          >
+            <span data-rte-own class="rte-tool-icon">
+              <component data-rte-own :is="t.iconComp || rte.toolIcon('linkButton')" class="rte-ep-icon" />
+            </span>
+            <span data-rte-own class="rte-tool-label">按钮<span data-rte-own class="rte-caret" aria-hidden="true"></span></span>
+          </button>
+          <Teleport to="body">
+            <div data-rte-own
+              v-if="rte.linkButtonOpen"
+              class="rte-menu"
+              v-rte-float="'linkButton'"
+              @mousedown.prevent
+              @mouseenter="rte.onToolMenuEnter('linkButton')"
+              @mouseleave="rte.onToolMenuLeave($event, 'linkButton', () => (rte.linkButtonOpen = false))"
+            >
+              <button data-rte-own
+                v-for="tone in rte.LINK_BUTTON_TONES"
+                :key="'lb-' + tone.id"
+                type="button"
+                @click="rte.paintLinkButton(tone.id)"
+              >
+                {{ tone.label }}按钮
+              </button>
+              <div data-rte-own v-if="rte.isActive('linkButton')" class="rte-menu-sep" aria-hidden="true" />
+              <button data-rte-own v-if="rte.isActive('linkButton')" type="button" @click="rte.editLinkButton()">
+                修改文字和链接
+              </button>
+            </div>
+          </Teleport>
+        </div>
+        <div data-rte-own
           v-else-if="t.kind === 'align'"
           class="rte-tool-wrap"
           @mouseenter="rte.onToolMenuEnter('align')"
@@ -800,6 +855,23 @@ useParentScopeStamp()
               </button>
               <button data-rte-own type="button" @click="rte.setAlign('justify'); rte.alignOpen = false">
                 两端对齐
+              </button>
+              <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
+              <button data-rte-own type="button" @click="rte.indentBlock(); rte.alignOpen = false">增加缩进</button>
+              <button data-rte-own type="button" @click="rte.outdentBlock(); rte.alignOpen = false">减少缩进</button>
+              <button data-rte-own
+                type="button"
+                :class="{ active: rte.currentTextIndent() === '2em' }"
+                @click="rte.setFirstLineIndent(true); rte.alignOpen = false"
+              >
+                首行缩进 2 字
+              </button>
+              <button data-rte-own
+                type="button"
+                :disabled="!rte.currentTextIndent()"
+                @click="rte.setFirstLineIndent(false); rte.alignOpen = false"
+              >
+                取消首行缩进
               </button>
             </div>
           </Teleport>

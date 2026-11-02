@@ -45,6 +45,7 @@ export type RteSlashAction =
   | { type: 'image' }
   | { type: 'video' }
   | { type: 'link' }
+  | { type: 'linkButton' }
   | { type: 'formula' }
   | { type: 'attach' }
   | { type: 'note' }
@@ -305,6 +306,14 @@ const MEDIA_ITEMS: RteSlashItem[] = [
     group: 'media',
     keywords: ['link', 'url', '链接', '超链接'],
     action: { type: 'link' },
+  },
+  {
+    id: 'link-button',
+    label: '按钮',
+    description: '打开超链接的按钮',
+    group: 'media',
+    keywords: ['button', '按钮', 'an', '打开链接'],
+    action: { type: 'linkButton' },
   },
   {
     id: 'formula',
