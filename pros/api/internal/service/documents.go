@@ -325,6 +325,123 @@ func (s *DocumentsService) Create(ownerID uuid.UUID, in CreateDocumentInput) (*m
 	return doc, nil
 }
 
+// CloneTitleSuffix is appended to the source title when cloning a canvas.
+const CloneTitleSuffix = "（副本）"
+
+// CloneDocumentInput optionally overrides the metadata of the clone.
+type CloneDocumentInput struct {
+	Title *string
+	Notes *string
+}
+
+// clonePayload returns a deep copy of a canvas payload.
+//
+// The copy owns its own backing array, so the clone row and the source row
+// never share mutable state. The bytes are copied verbatim (no re-encoding)
+// so key order and numeric precision survive the copy.
+func clonePayload(src []byte) ([]byte, error) {
+	if len(src) == 0 {
+		return nil, ErrValidation
+	}
+	if !json.Valid(src) {
+		return nil, ErrValidation
+	}
+	data := make([]byte, len(src))
+	copy(data, src)
+	if err := validatePayload(data); err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
+// cloneTitle derives the title of a clone: an explicit non-blank override
+// wins, otherwise the source title gets the "（副本）" suffix.
+func cloneTitle(srcTitle string, override *string) string {
+	title := srcTitle
+	if override != nil && strings.TrimSpace(*override) != "" {
+		title = strings.TrimSpace(*override)
+	} else {
+		title = strings.TrimSpace(srcTitle) + CloneTitleSuffix
+	}
+	return truncateStr(title, maxTitleRunes)
+}
+
+// Clone copies an owned document into a brand new row.
+//
+// The clone gets a fresh UUID, a deep copy of current_data (attachments and
+// panel materials live inside current_data, so they are copied as well) and its
+// own initial revision. The source document is never modified.
+func (s *DocumentsService) Clone(ownerID, docID uuid.UUID, in CloneDocumentInput) (*model.CanvasDocument, error) {
+	src, err := s.GetOwned(ownerID, docID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := validateMeta(in.Title, in.Notes, nil, nil); err != nil {
+		return nil, err
+	}
+
+	data, err := clonePayload(src.CurrentData)
+	if err != nil {
+		return nil, err
+	}
+
+	title := cloneTitle(src.Title, in.Title)
+
+	notes := src.Notes
+	if in.Notes != nil {
+		notes = *in.Notes
+	}
+
+	now := time.Now().UTC()
+	newID := uuid.New()
+	revID := uuid.New()
+	label := "clone"
+	hash := hashPayload(data)
+	ext := content.Extract(data)
+
+	doc := &model.CanvasDocument{
+		ID:             newID,
+		OwnerUserID:    ownerID,
+		CanvasType:     src.CanvasType,
+		Title:          title,
+		Notes:          notes,
+		SchemaVersion:  src.SchemaVersion,
+		CurrentData:    datatypes.JSON(data),
+		ContentText:    ext.PlainText,
+		HeadRevisionID: &revID,
+		TemplateID:     src.TemplateID,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}
+	rev := &model.CanvasRevision{
+		ID:           revID,
+		DocumentID:   newID,
+		ParentID:     nil,
+		RevisionType: "snapshot",
+		Payload:      datatypes.JSON(data),
+		AuthorUserID: &ownerID,
+		Label:        &label,
+		ContentHash:  &hash,
+		CreatedAt:    now,
+	}
+
+	err = s.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(doc).Error; err != nil {
+			return err
+		}
+		if err := tx.Create(rev).Error; err != nil {
+			return err
+		}
+		_, err := syncExtract(tx, newID, data, now)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	return doc, nil
+}
+
 func (s *DocumentsService) List(ownerID uuid.UUID, f ListFilter) ([]model.DocumentSummary, int64, error) {
 	scope := func() *gorm.DB {
 		q := s.db.Model(&model.CanvasDocument{}).Where("owner_user_id = ?", ownerID)

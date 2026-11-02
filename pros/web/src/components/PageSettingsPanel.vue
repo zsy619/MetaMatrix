@@ -49,6 +49,7 @@ const { canUndo, canRedo } = storeToRefs(history)
 const panelOpen = computed(() => configPanelOpen.value)
 const exporting = ref(false)
 const deletingId = ref<string | null>(null)
+const cloning = ref(false)
 const titleInputRef = ref<{ focus?: () => void } | null>(null)
 
 const storedDocs = ref<DocumentSummary[]>([])
@@ -371,6 +372,43 @@ async function onDeleteStored(d: DocumentSummary) {
     ElMessage.error(friendlyApiMessage(e, '删除失败'))
   } finally {
     deletingId.value = null
+  }
+}
+
+async function onClone() {
+  if (!auth.isAuthenticated) {
+    ElMessage.warning('请先登录后再克隆画布')
+    return
+  }
+  cloning.value = true
+  try {
+    // 未保存的改动先落库，保证副本内容与画布一致；
+    // 若尚未建档，save() 会先在云端创建当前画布。
+    if (dirty.value || !document_id.value) {
+      snapshotCurrent()
+      await documentStore.save({
+        title: doc_title.value.trim() || undefined,
+        notes: doc_notes.value,
+      })
+    }
+    const sourceId = document_id.value
+    const newId = await documentStore.cloneCurrent()
+    if (sourceId && sourceId === newId) {
+      throw new Error('克隆未生成新的画布')
+    }
+    await router.replace({
+      name: 'canvas',
+      params: { templateId: templateId.value },
+      query: { documentId: newId },
+    })
+    history.clear()
+    lastPushedJson = current_data.value ? JSON.stringify(current_data.value) : ''
+    ElMessage.success('已克隆画布')
+    await refreshStoredList()
+  } catch (e) {
+    ElMessage.error(friendlyApiMessage(e, '克隆失败'))
+  } finally {
+    cloning.value = false
   }
 }
 
@@ -743,6 +781,17 @@ function goGuide() {
               }}</span>
             </div>
           </div>
+          <el-button
+            class="btn-block"
+            size="small"
+            type="primary"
+            plain
+            :loading="cloning"
+            title="复制当前画布，生成一份独立副本"
+            @click="onClone"
+          >
+            克隆画布
+          </el-button>
         </div>
       </section>
 

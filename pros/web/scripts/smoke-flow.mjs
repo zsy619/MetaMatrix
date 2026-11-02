@@ -83,4 +83,36 @@ if (!saved.id || saved.title !== '烟雾画布') {
   console.error('save did not return the canvas')
   process.exit(1)
 }
-console.log('smoke-flow ok: login → workspace → canvas → save')
+
+/** 克隆画布：服务端新建 canvas_documents 行（新 UUID），正文是源文档的深拷贝。 */
+const cloned = await call(`/documents/${saved.id}/clone`, {
+  method: 'POST',
+  token,
+  body: {},
+})
+if (!cloned.id || cloned.id === saved.id) {
+  console.error(`clone did not create a new document: ${cloned.id}`)
+  process.exit(1)
+}
+if (cloned.title !== '烟雾画布（副本）') {
+  console.error(`clone title = ${cloned.title}`)
+  process.exit(1)
+}
+if (
+  JSON.stringify(cloned.currentData) !==
+  JSON.stringify(saved.currentData)
+) {
+  console.error('clone payload differs from the source')
+  process.exit(1)
+}
+const cloneBody = await call(`/documents/${cloned.id}`, { token })
+if (JSON.stringify(cloneBody.currentData) !== JSON.stringify(saved.currentData)) {
+  console.error('reloaded clone payload differs from the source')
+  process.exit(1)
+}
+const sourceAfter = await call(`/documents/${saved.id}`, { token })
+if (sourceAfter.title !== '烟雾画布') {
+  console.error('clone modified the source document')
+  process.exit(1)
+}
+console.log('smoke-flow ok: login → workspace → canvas → save → clone')
