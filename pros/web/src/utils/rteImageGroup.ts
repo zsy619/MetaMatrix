@@ -65,7 +65,7 @@ export const imageGroupLayoutCss = [
   '.rte-image-group-bar button{appearance:none;border:0;background:transparent;color:#1d2129;width:28px;height:28px;padding:0;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;}',
   '.rte-image-group-bar button:hover,.rte-image-group-bar button.is-active{background:#e8f3ff;color:#3370ff;}',
   '.rte-image-group-bar svg{width:16px;height:16px;display:block;}',
-  '.rte-image-group-dividers{position:absolute;inset:0;pointer-events:none;z-index:4;}',
+  '.rte-image-group-dividers{position:absolute;inset:0;pointer-events:none;z-index:30;}',
   '.rte-image-group-divider{position:absolute;width:16px;transform:translateX(-50%);border:0;padding:0;background:transparent;cursor:col-resize;pointer-events:auto;}',
   '.rte-image-group-divider i{position:absolute;left:6px;top:8px;bottom:8px;width:3px;border-radius:2px;background:#3370ff;opacity:0;pointer-events:none;}',
   '.rte-image-group:hover .rte-image-group-divider i,.rte-image-group-divider:hover i,.rte-image-group-divider.is-active i{opacity:1;}',
