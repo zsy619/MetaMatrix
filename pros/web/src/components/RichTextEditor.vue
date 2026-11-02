@@ -71,7 +71,6 @@ import {
 import { mentionSectionLabel } from './rteMentionItems'
 import {
   FEISHU_BATCH3_SHORTCUTS,
-  activeOutlineIndex as outlineIndexForCursor,
 } from '../utils/rteBatch3'
 import {
   FEISHU_HIGHLIGHT_COLORS,
@@ -83,16 +82,12 @@ import { todayIso } from '../utils/rteRound5'
 import { RTE_PAGE_SIZES } from '../utils/rtePageSize'
 import { PAGE_MARGIN_PRESETS } from '../utils/rtePageMargin'
 import {
-  docChromeDelay,
   focusDialogRoot,
   pasteVolume,
   previewShortcutAllowed,
-  snapshotDue,
 } from '../utils/rteRound8'
 import {
   embedIframeSrc,
-  shouldTakeSnapshot,
-  type NoteRow,
 } from '../utils/rteRound6'
 import {
   filterLabeledTargets,
@@ -176,6 +171,7 @@ import { useOverlayStack } from './rte/composables/useOverlayStack'
 import { useViewMode } from './rte/composables/useViewMode'
 import { useBlockHandle } from './rte/composables/useBlockHandle'
 import { useImageTools } from './rte/composables/useImageTools'
+import { useDocChrome } from './rte/composables/useDocChrome'
 import { RTE_EMOJI_CATEGORIES } from '../utils/rteEmojiList'
 import { RTE_SPECIAL_CHAR_CATEGORIES } from '../utils/rteSpecialChars'
 
@@ -1663,164 +1659,34 @@ function insertCallout(variant: CalloutVariant = 'info') {
   moreOpen.value = false
 }
 
-const outlineUserClosed = ref(false)
-
-function toggleOutlinePanel() {
-  const next = !outlineOpen.value
-  outlineOpen.value = next
-  outlineUserClosed.value = !next
-  closeAllToolbarMenus()
-}
-
-function closeOutlinePanel() {
-  outlineOpen.value = false
-  outlineUserClosed.value = true
-}
-
-type OutlineHeading = { id: string; level: number; text: string; pos: number }
-
-const outlineHeadings = ref<OutlineHeading[]>([])
-const noteRows = ref<NoteRow[]>([])
-const notesOpen = ref(false)
-const historyOpen = ref(false)
-const sessionSnaps = ref<Array<{ at: number; html: string }>>([])
-let docChromeTimer: ReturnType<typeof setTimeout> | null = null
-let lastSnapHtml = ''
-let lastSnapAt = 0
-let lastSnapNodeSize = 0
-
-function refreshDocChrome() {
-  const ed = editor.value
-  if (!ed || ed.isDestroyed) {
-    outlineHeadings.value = []
-    noteRows.value = []
-    return
-  }
-  const headings: OutlineHeading[] = []
-  const notes: NoteRow[] = []
-  ed.state.doc.descendants((node, pos) => {
-    if (node.type.name === 'heading') {
-      const level = Number(node.attrs.level) || 1
-      const text = node.textContent.trim() || `（空标题 ${level}）`
-      headings.push({ id: `h-${pos}`, level, text, pos })
-    }
-    if (!node.isText) return
-    for (const mark of node.marks) {
-      if (mark.type.name !== 'annotation') continue
-      notes.push({
-        from: pos,
-        to: pos + node.nodeSize,
-        text: node.text || '',
-        note: String(mark.attrs.note || ''),
-        type: String(mark.attrs.type || '新注释'),
-      })
-    }
-  })
-  outlineHeadings.value = headings
-  noteRows.value = notes
-  const now = Date.now()
-  const nodeSize = ed.state.doc.nodeSize
-  if (snapshotDue(lastSnapNodeSize, nodeSize, now - lastSnapAt)) {
-    lastSnapNodeSize = nodeSize
-    const html = ed.getHTML()
-    if (shouldTakeSnapshot(lastSnapHtml, html, now - lastSnapAt)) {
-      lastSnapHtml = html
-      lastSnapAt = now
-      sessionSnaps.value = [...sessionSnaps.value, { at: now, html }].slice(-12)
-    }
-  }
-}
-
-/** 长文档不在每次击键时重扫标题和批注。 */
-function scheduleDocChrome() {
-  if (docChromeTimer != null) return
-  const size = editor.value?.state.doc.nodeSize ?? 0
-  docChromeTimer = setTimeout(() => {
-    docChromeTimer = null
-    refreshDocChrome()
-  }, docChromeDelay(size))
-}
-
-watch(editorReady, (ready) => {
-  if (ready) refreshDocChrome()
-})
-
-function jumpNote(row: NoteRow) {
-  const ed = editor.value
-  if (!ed) return
-  jumpToPos(ed, row.from)
-}
-
-function removeNote(row: NoteRow) {
-  const ed = editor.value
-  if (!ed) return
-  ed.chain().focus().setTextSelection({ from: row.from, to: row.to }).unsetAnnotation().run()
-  scheduleDocChrome()
-}
-
-function restoreSessionSnap(html: string) {
-  const ed = editor.value
-  if (!ed) return
-  ed.commands.setContent(html, { emitUpdate: true })
-  historyOpen.value = false
-  ElMessage.success('已恢复本次会话中的一版。这与云端版本无关。')
-}
-
-async function insertDocTitleBlock() {
-  const text = await openRtePrompt({
-    title: '文档标题',
-    message: '这是正文里的标题块，不会改画布面板标题。',
-    placeholder: '标题',
-    confirmLabel: '插入',
-    maxlength: 80,
-  })
-  if (!text?.trim()) return
-  editor.value?.chain().focus().insertDocTitle(text.trim()).run()
-}
-
-const activeOutlineIndex = computed(() => {
-  void editor.value?.state.selection
-  const positions = outlineHeadings.value.map((item) => item.pos)
-  const cursor = editor.value?.state.selection.from ?? 0
-  return outlineIndexForCursor(positions, cursor)
-})
-
-const showEmptyGuide = computed(
-  () =>
-    props.expanded &&
-    viewMode.value === 'edit' &&
-    editorReady.value &&
-    charCount.value === 0,
-)
-
-watch(
-  () => [props.expanded, outlineHeadings.value.length] as const,
-  () => {
-    if (!props.expanded || viewMode.value !== 'edit') {
-      if (!props.expanded) outlineOpen.value = false
-      return
-    }
-    if (outlineUserClosed.value) return
-    outlineOpen.value = outlineHeadings.value.length > 0
+const {
+  toggleOutlinePanel,
+  closeOutlinePanel,
+  outlineHeadings,
+  noteRows,
+  notesOpen,
+  historyOpen,
+  sessionSnaps,
+  scheduleDocChrome,
+  jumpNote,
+  removeNote,
+  restoreSessionSnap,
+  insertDocTitleBlock,
+  activeOutlineIndex,
+  showEmptyGuide,
+  jumpToOutlineHeading,
+} = useDocChrome({
+  editor,
+  outlineOpen,
+  editorReady,
+  charCount,
+  props,
+  viewMode: () => viewMode,
+  closeAllToolbarMenus: () => {
+    closeAllToolbarMenus()
   },
-)
-
-function jumpToOutlineHeading(item: OutlineHeading) {
-  const ed = editor.value
-  if (!ed) return
-  const target = Math.min(item.pos + 1, ed.state.doc.content.size)
-  ed.chain()
-    .focus()
-    .setTextSelection(target)
-    .run()
-  // 滚动到可见
-  try {
-    const dom = ed.view.nodeDOM(item.pos) as HTMLElement | null
-    dom?.scrollIntoView?.({ behavior: 'smooth', block: 'center' })
-  } catch {
-    /* ignore */
-  }
-}
+  openRtePrompt,
+})
 
 const SHORTCUT_GROUPS: { title: string; items: { keys: string; desc: string }[] }[] = [
   {
@@ -3750,10 +3616,6 @@ onBeforeUnmount(() => {
   if (htmlEmitTimer != null) {
     clearTimeout(htmlEmitTimer)
     htmlEmitTimer = null
-  }
-  if (docChromeTimer != null) {
-    clearTimeout(docChromeTimer)
-    docChromeTimer = null
   }
   if (editor.value && !editor.value.isDestroyed) editor.value.destroy()
 })
