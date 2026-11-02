@@ -9,6 +9,8 @@
     "type-check": "vue-tsc -b --pretty false",
     "test": "vitest run",
     "test:e2e": "node scripts/rte-baseline.mjs",
+    "test:smoke": "node scripts/smoke-flow.mjs",
+    "test:e2e:clone": "node scripts/clone-canvas-e2e.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
