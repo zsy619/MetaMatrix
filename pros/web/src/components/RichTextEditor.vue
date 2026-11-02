@@ -86,13 +86,11 @@ import { todayIso } from '../utils/rteRound5'
 import { RTE_PAGE_SIZES } from '../utils/rtePageSize'
 import { PAGE_MARGIN_PRESETS } from '../utils/rtePageMargin'
 import {
-  RTE_OVERLAY_CLOSE_ORDER,
   docChromeDelay,
   focusDialogRoot,
   pasteVolume,
   previewShortcutAllowed,
   snapshotDue,
-  topOpenModal,
 } from '../utils/rteRound8'
 import {
   embedIframeSrc,
@@ -177,6 +175,7 @@ import { useTableOps } from './rte/composables/useTableOps'
 import { useSlashMenu } from './rte/composables/useSlashMenu'
 import { useMentionMenu } from './rte/composables/useMentionMenu'
 import { useFloatMenus } from './rte/composables/useFloatMenus'
+import { useOverlayStack } from './rte/composables/useOverlayStack'
 import { RTE_EMOJI_CATEGORIES } from '../utils/rteEmojiList'
 import { RTE_SPECIAL_CHAR_CATEGORIES } from '../utils/rteSpecialChars'
 
@@ -4245,7 +4244,6 @@ onBeforeUnmount(() => {
     clearTimeout(docChromeTimer)
     docChromeTimer = null
   }
-  window.removeEventListener('keydown', onWindowEscape)
   if (editor.value && !editor.value.isDestroyed) editor.value.destroy()
 })
 
@@ -4652,109 +4650,41 @@ function focusOpenDialog() {
   })
 }
 
-function closeTopOverlay(): boolean {
-  const id = topOpenModal(
-    {
-      ask: askOpen.value,
-      linkImport: linkImportOpen.value,
-      image: imageDialogOpen.value,
-      video: videoDialogOpen.value,
-      formula: formulaDialogOpen.value,
-      table: tableDialogOpen.value,
-      note: noteDialogOpen.value,
-      attach: attachDialogOpen.value,
-      snippet: snippetDialogOpen.value,
-      xref: xrefDialogOpen.value,
-      readTime: readTimeDialogOpen.value,
-      linkCard: linkCardDialogOpen.value,
-      wave21: wave21ReportOpen.value,
-      find: findDialogOpen.value,
-      link: linkDialogOpen.value,
-      print: printPreviewOpen.value,
-      wordCount: wordCountDockOpen.value,
-      shortcuts: shortcutsOpen.value,
-      blockMenu: blockMenuOpen.value,
-      notes: notesOpen.value,
-      history: historyOpen.value,
-    },
-    RTE_OVERLAY_CLOSE_ORDER,
-  )
-  if (!id) return false
-  switch (id) {
-    case 'ask':
-      closeAskDialog('cancel')
-      break
-    case 'linkImport':
-      closeImportLinkDialog()
-      break
-    case 'image':
-      closeImageDialog()
-      break
-    case 'video':
-      closeVideoDialog()
-      break
-    case 'formula':
-      closeFormulaDialog()
-      break
-    case 'table':
-      closeTableDialog()
-      break
-    case 'note':
-      closeNoteDialog()
-      break
-    case 'attach':
-      closeAttachDialog()
-      break
-    case 'snippet':
-      snippetDialogOpen.value = false
-      break
-    case 'xref':
-      xrefDialogOpen.value = false
-      break
-    case 'readTime':
-      readTimeDialogOpen.value = false
-      break
-    case 'linkCard':
-      closeLinkCardDialog()
-      break
-    case 'wave21':
-      wave21ReportOpen.value = false
-      break
-    case 'find':
-      closeFindDialog()
-      break
-    case 'link':
-      closeLinkDialog()
-      break
-    case 'print':
-      closePrintPreview()
-      break
-    case 'wordCount':
-      wordCountDockOpen.value = false
-      break
-    case 'shortcuts':
-      shortcutsOpen.value = false
-      break
-    case 'blockMenu':
-      blockMenuOpen.value = false
-      break
-    case 'notes':
-      notesOpen.value = false
-      break
-    case 'history':
-      historyOpen.value = false
-      break
-    default:
-      return false
-  }
-  return true
-}
-
-function onWindowEscape(event: KeyboardEvent) {
-  if (event.key !== 'Escape' || event.defaultPrevented) return
-  if (!closeTopOverlay()) return
-  event.preventDefault()
-}
+useOverlayStack({
+  askOpen: () => askOpen,
+  linkImportOpen: () => linkImportOpen,
+  imageDialogOpen: () => imageDialogOpen,
+  videoDialogOpen: () => videoDialogOpen,
+  formulaDialogOpen: () => formulaDialogOpen,
+  tableDialogOpen: () => tableDialogOpen,
+  noteDialogOpen: () => noteDialogOpen,
+  attachDialogOpen: () => attachDialogOpen,
+  snippetDialogOpen: () => snippetDialogOpen,
+  xrefDialogOpen: () => xrefDialogOpen,
+  readTimeDialogOpen: () => readTimeDialogOpen,
+  linkCardDialogOpen: () => linkCardDialogOpen,
+  wave21ReportOpen: () => wave21ReportOpen,
+  findDialogOpen: () => findDialogOpen,
+  linkDialogOpen: () => linkDialogOpen,
+  printPreviewOpen: () => printPreviewOpen,
+  wordCountDockOpen: () => wordCountDockOpen,
+  shortcutsOpen: () => shortcutsOpen,
+  blockMenuOpen: () => blockMenuOpen,
+  notesOpen: () => notesOpen,
+  historyOpen: () => historyOpen,
+  closeAskDialog: (...args) => closeAskDialog(...args),
+  closeImportLinkDialog: (...args) => closeImportLinkDialog(...args),
+  closeImageDialog: (...args) => closeImageDialog(...args),
+  closeVideoDialog: (...args) => closeVideoDialog(...args),
+  closeFormulaDialog: (...args) => closeFormulaDialog(...args),
+  closeTableDialog: (...args) => closeTableDialog(...args),
+  closeNoteDialog: (...args) => closeNoteDialog(...args),
+  closeAttachDialog: (...args) => closeAttachDialog(...args),
+  closeLinkCardDialog: (...args) => closeLinkCardDialog(...args),
+  closeFindDialog: (...args) => closeFindDialog(...args),
+  closeLinkDialog: (...args) => closeLinkDialog(...args),
+  closePrintPreview: (...args) => closePrintPreview(...args),
+})
 
 function openFormulaDialog() {
   resetFormulaDialog()
@@ -5316,7 +5246,6 @@ const {
 })
 
 onMounted(() => {
-  window.addEventListener('keydown', onWindowEscape)
   nextTick(() => {
     syncSpellcheckToDom()
     editor.value?.commands.captureRevisionBaseline()
