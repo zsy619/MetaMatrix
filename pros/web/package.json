@@ -44,6 +44,7 @@
     "lowlight": "^3.3.0",
     "mermaid": "^11.17.2",
     "pinia": "^4.1.0",
+    "pinyin-pro": "^3.29.5",
     "qrcode": "^1.5.4",
     "vue": "^3.5.44",
     "vue-draggable-plus": "^0.6.1",
