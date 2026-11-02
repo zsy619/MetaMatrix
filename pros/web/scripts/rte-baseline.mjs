@@ -69,6 +69,23 @@ await page.keyboard.type('/')
 await page.waitForTimeout(500)
 const slash = await page.locator('.rte-slash-menu').count()
 log('slash 菜单', slash > 0, String(slash))
+if (slash) {
+  const scrolled = await page.evaluate(() => {
+    const list = document.querySelector('.rte-slash-list')
+    if (!(list instanceof HTMLElement)) return { ok: false, reason: 'no-list' }
+    const overflowY = getComputedStyle(list).overflowY
+    const before = list.scrollTop
+    list.scrollTop = before + 240
+    return {
+      ok: (overflowY === 'auto' || overflowY === 'scroll') && list.scrollHeight > list.clientHeight && list.scrollTop > before,
+      overflowY,
+      scrollHeight: list.scrollHeight,
+      clientHeight: list.clientHeight,
+      scrollTop: list.scrollTop,
+    }
+  })
+  log('slash 列表可滚动', !!scrolled.ok, JSON.stringify(scrolled))
+}
 await page.screenshot({ path: `${out}/baseline_slash.png` })
 if (slash) await page.keyboard.press('Escape')
 await page.waitForTimeout(200)

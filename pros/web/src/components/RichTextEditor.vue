@@ -14504,10 +14504,15 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
   white-space: nowrap;
 }
 .rte-slash-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: min(360px, 56vh);
+  overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
   padding: 4px 0 6px;
-  flex: 1 1 auto;
 }
 .rte-slash-section {
   padding: 8px 12px 4px;
