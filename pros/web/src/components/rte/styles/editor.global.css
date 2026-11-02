@@ -261,6 +261,60 @@
   gap: 12px;
   margin-top: 4px;
 }
+.rte-modal-actions.is-row {
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+}
+.rte-modal {
+  width: min(520px, 92vw);
+  max-height: 88vh;
+  overflow: auto;
+  padding: 20px;
+  background: #fff;
+  border: 1px solid #e5e6eb;
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(29, 33, 41, 0.16);
+  box-sizing: border-box;
+}
+.rte-modal-title {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1d2129;
+}
+.rte-modal-desc {
+  margin: 0 0 10px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #4e5969;
+}
+.rte-modal-desc.is-error {
+  color: #f53f3f;
+}
+.rte-btn {
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid #e5e6eb;
+  border-radius: 6px;
+  background: #fff;
+  color: #1d2129;
+  font-size: 13px;
+  cursor: pointer;
+}
+.rte-btn:hover {
+  background: #f7f8fa;
+}
+.rte-btn.is-primary {
+  border: none;
+  background: #8da5ff;
+  color: #fff;
+}
+.rte-btn.is-primary:hover {
+  background: #7390f5;
+}
+.rte-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
 .rte-modal-cancel,
 .rte-modal-confirm {
   height: 40px;

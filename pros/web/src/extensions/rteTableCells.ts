@@ -48,6 +48,12 @@ const extraCellAttrs = {
       el.getAttribute('data-valign') || el.style?.verticalAlign || null,
     renderHTML: () => ({}),
   },
+  /** 单元格公式原文。算完后单元格显示结果，公式存在这里，可再次计算。 */
+  formula: {
+    default: null as string | null,
+    parseHTML: (el: HTMLElement) => el.getAttribute('data-formula') || null,
+    renderHTML: () => ({}),
+  },
 }
 
 function renderCellHTML(
@@ -59,11 +65,13 @@ function renderCellHTML(
   const borderColor = (HTMLAttributes.borderColor as string) || null
   const borderStyle = (HTMLAttributes.borderStyle as string) || null
   const verticalAlign = (HTMLAttributes.verticalAlign as string) || null
+  const formula = (HTMLAttributes.formula as string) || null
   const {
     backgroundColor: _bg,
     borderColor: _bc,
     borderStyle: _bs,
     verticalAlign: _va,
+    formula: _formula,
     style: prevStyle,
     ...rest
   } = HTMLAttributes as Record<string, unknown> & {
@@ -71,6 +79,7 @@ function renderCellHTML(
     borderColor?: string
     borderStyle?: string
     verticalAlign?: string
+    formula?: string
     style?: string
   }
   const style = buildCellStyle({ backgroundColor, borderColor, borderStyle, verticalAlign })
@@ -79,6 +88,7 @@ function renderCellHTML(
   if (borderColor) attrs['data-border-color'] = borderColor
   if (borderStyle) attrs['data-border-style'] = borderStyle
   if (verticalAlign) attrs['data-valign'] = verticalAlign
+  if (formula) attrs['data-formula'] = formula
   const mergedStyle = [prevStyle, style].filter(Boolean).join('; ')
   if (mergedStyle) attrs.style = mergedStyle
   return [tag, mergeAttributes(optionsHTMLAttributes, attrs), 0] as const

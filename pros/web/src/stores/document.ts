@@ -10,6 +10,15 @@ import { normalizePageChrome, writePageChrome, type PanelPageChrome } from '../u
 import { writeToolbarGroupOrder } from '../utils/rteToolbarGroups'
 import { writeCommentThreads, type CommentThread } from '../utils/rteCommentThreads'
 import { writeRevisions, type PanelRevision } from '../utils/rteRevisions'
+import {
+  readMentionPermission,
+  writeMentionPermission,
+  type DirectoryPermission,
+} from '../utils/rteDirectory'
+import {
+  writeToolbarGroupButtons,
+  type ToolbarGroupButtonConfig,
+} from '../utils/rteToolbarGroupButtons'
 import { getToken } from '../api/http'
 import type {
   BlockCanvasDocumentJSON,
@@ -1528,6 +1537,35 @@ export const useDocumentStore = defineStore('document', () => {
     if (next) doc.editorRevisionsByPanelId = next
     else delete doc.editorRevisionsByPanelId
     if (JSON.stringify(doc.editorRevisionsByPanelId ?? null) !== prev) markDirty()
+  }
+
+  function setPanelMentionPermission(panelId: string, permission: DirectoryPermission | null) {
+    const doc = current_data.value
+    if (!doc || !panelId) return
+    const prev = JSON.stringify(doc.mentionPermissionByPanelId ?? null)
+    const next = writeMentionPermission(doc.mentionPermissionByPanelId, panelId, permission)
+    if (next) doc.mentionPermissionByPanelId = next
+    else delete doc.mentionPermissionByPanelId
+    if (JSON.stringify(doc.mentionPermissionByPanelId ?? null) !== prev) markDirty()
+  }
+
+  function getPanelMentionPermission(panelId: string): DirectoryPermission | null {
+    return readMentionPermission(current_data.value?.mentionPermissionByPanelId, panelId)
+  }
+
+  /** 写入某个面板某个分组的按钮显隐与顺序。传 null 恢复默认。 */
+  function setPanelToolbarGroupButtons(
+    panelId: string,
+    groupId: string,
+    config: ToolbarGroupButtonConfig | null,
+  ) {
+    const doc = current_data.value
+    if (!doc || !panelId || !groupId) return
+    const prev = JSON.stringify(doc.toolbarGroupButtonsByPanelId ?? null)
+    const next = writeToolbarGroupButtons(doc.toolbarGroupButtonsByPanelId, panelId, groupId, config)
+    if (next) doc.toolbarGroupButtonsByPanelId = next
+    else delete doc.toolbarGroupButtonsByPanelId
+    if (JSON.stringify(doc.toolbarGroupButtonsByPanelId ?? null) !== prev) markDirty()
   }
 
   function setPanelCommentThreads(panelId: string, threads: CommentThread[]) {
@@ -3506,6 +3544,9 @@ export const useDocumentStore = defineStore('document', () => {
     setPanelPageChrome,
     setPanelCommentThreads,
     setPanelRevisions,
+    setPanelMentionPermission,
+    getPanelMentionPermission,
+    setPanelToolbarGroupButtons,
     getPanelAttachments,
     addPanelAttachment,
     removePanelAttachment,

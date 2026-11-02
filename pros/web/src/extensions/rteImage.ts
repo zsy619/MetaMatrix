@@ -1,6 +1,8 @@
 import Image from '@tiptap/extension-image'
+import { mergeAttributes } from '@tiptap/core'
 import { createImageDragPlugin } from './rteImageDrag'
 import { normalizeImageAlign, normalizeImageLayout } from '../utils/rteImageLayout'
+import { cropAttrsStyle } from '../utils/rteImageCropAttrs'
 
 export type RteImageAlign = 'left' | 'center' | 'right' | null
 
@@ -91,7 +93,69 @@ export const RteImage = Image.extend({
           return { 'data-border': v, style: `border: ${v}` }
         },
       },
+      cropAspect: {
+        default: null as string | null,
+        parseHTML: (el: HTMLElement) => el.getAttribute('data-crop-aspect') || null,
+        renderHTML: (attrs: { cropAspect?: string | null }) => {
+          const v = (attrs.cropAspect || '').trim()
+          if (!v) return {}
+          return { 'data-crop-aspect': v }
+        },
+      },
+      cropFocusX: {
+        default: null as number | null,
+        parseHTML: (el: HTMLElement) => {
+          const raw = el.getAttribute('data-crop-focus-x')
+          if (raw == null) return null
+          const n = Number(raw)
+          return Number.isFinite(n) ? n : null
+        },
+        renderHTML: (attrs: { cropFocusX?: number | null }) => {
+          if (attrs.cropFocusX == null) return {}
+          return { 'data-crop-focus-x': String(attrs.cropFocusX) }
+        },
+      },
+      cropFocusY: {
+        default: null as number | null,
+        parseHTML: (el: HTMLElement) => {
+          const raw = el.getAttribute('data-crop-focus-y')
+          if (raw == null) return null
+          const n = Number(raw)
+          return Number.isFinite(n) ? n : null
+        },
+        renderHTML: (attrs: { cropFocusY?: number | null }) => {
+          if (attrs.cropFocusY == null) return {}
+          return { 'data-crop-focus-y': String(attrs.cropFocusY) }
+        },
+      },
+      cropZoom: {
+        default: null as number | null,
+        parseHTML: (el: HTMLElement) => {
+          const raw = el.getAttribute('data-crop-zoom')
+          if (raw == null) return null
+          const n = Number(raw)
+          return Number.isFinite(n) ? n : null
+        },
+        renderHTML: (attrs: { cropZoom?: number | null }) => {
+          if (attrs.cropZoom == null) return {}
+          return { 'data-crop-zoom': String(attrs.cropZoom) }
+        },
+      },
     }
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    // 裁剪效果落到 style 上：object-fit / object-position / scale。
+    // 已有 style（宽度等）要保留，所以合并而不是覆盖。
+    const crop = cropAttrsStyle(HTMLAttributes as Record<string, unknown>)
+    const attrs = HTMLAttributes as Record<string, unknown>
+    if (crop['object-fit']) {
+      const prev = typeof attrs.style === 'string' ? attrs.style : ''
+      attrs.style = [prev, `object-fit: ${crop['object-fit']}`].filter(Boolean).join('; ')
+      if (crop['object-position']) attrs.style += `; object-position: ${crop['object-position']}`
+      if (crop.transform) attrs.style += `; ${crop.transform}`
+    }
+    return ['img', mergeAttributes(this.options.HTMLAttributes, attrs)]
   },
 
   addProseMirrorPlugins() {

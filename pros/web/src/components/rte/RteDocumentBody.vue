@@ -231,6 +231,62 @@ useParentScopeStamp()
       >
         ✕
       </button>
+      <span data-rte-own class="rte-bubble-sep" aria-hidden="true" />
+      <button data-rte-own
+        type="button"
+        class="rte-bubble-btn"
+        title="复制选中文字"
+        aria-label="复制选中文字"
+        @mousedown.prevent
+        @click="rte.copySelectedText"
+      >
+        复
+      </button>
+      <button data-rte-own
+        type="button"
+        class="rte-bubble-btn"
+        title="把选中文字变成链接"
+        aria-label="转链接"
+        @mousedown.prevent
+        @click="rte.selectionToLink"
+      >
+        链
+      </button>
+      <button data-rte-own
+        type="button"
+        class="rte-bubble-btn"
+        title="把选中文字转成表格"
+        aria-label="转表格"
+        @mousedown.prevent
+        @click="rte.selectionToTable"
+      >
+        表
+      </button>
+      <span data-rte-own class="rte-bubble-slot">
+        <button data-rte-own
+          type="button"
+          class="rte-bubble-btn"
+          :class="{ active: rte.bubbleRewrite === 'rewrite' }"
+          title="改写选区（本地规则，AI 服务未接入）"
+          aria-label="改写选区"
+          :aria-expanded="rte.bubbleRewrite === 'rewrite'"
+          @mousedown.prevent
+          @click="rte.bubbleRewrite = rte.bubbleRewrite === 'rewrite' ? null : 'rewrite'"
+        >
+          改
+        </button>
+        <div data-rte-own
+          v-if="rte.bubbleRewrite === 'rewrite'"
+          class="rte-bubble-swatches rte-bubble-rewrite"
+          role="menu"
+          aria-label="改写选区"
+          @mousedown.prevent
+        >
+          <button data-rte-own type="button" role="menuitem" title="清理多余空格与空行" @click="rte.rewriteSelection('trim')">清理空格</button>
+          <button data-rte-own type="button" role="menuitem" title="中英文之间补空格" @click="rte.rewriteSelection('space')">中英文空格</button>
+          <button data-rte-own type="button" role="menuitem" title="把连续短行合并成一段" @click="rte.rewriteSelection('merge')">合并短行</button>
+        </div>
+      </span>
     </BubbleMenu>
 
 
@@ -362,7 +418,47 @@ useParentScopeStamp()
         <button data-rte-own type="button" class="rte-bubble-btn" title="查看大图" aria-label="查看大图" @mousedown.prevent @click="rte.openSelectedImage">
           大图
         </button>
+        <button data-rte-own type="button" class="rte-bubble-btn" title="换图（保留裁剪与题注）" aria-label="换图" @mousedown.prevent @click="rte.replaceImageByUrl()">
+          换图
+        </button>
         <span data-rte-own class="rte-image-replace-hint">拖到左右边缘插入该行，拖到图片中间替换</span>
+      </div>
+      <div data-rte-own class="rte-image-bubble-row">
+        <span data-rte-own class="rte-image-width-label">裁剪</span>
+        <button data-rte-own
+          v-for="preset in rte.CROP_PRESETS"
+          :key="'img-crop-' + preset.id"
+          type="button"
+          class="rte-bubble-btn"
+          :class="{ active: rte.imageCropPreset === preset.id }"
+          :title="'裁剪比例：' + preset.label"
+          :aria-pressed="rte.imageCropPreset === preset.id"
+          @mousedown.prevent
+          @click="rte.applyCropPreset(preset)"
+        >
+          {{ preset.label }}
+        </button>
+      </div>
+      <div data-rte-own class="rte-image-bubble-row rte-image-caption-row">
+        <input data-rte-own
+          v-model="rte.imageAlt"
+          class="rte-image-caption-input"
+          type="text"
+          maxlength="120"
+          placeholder="替代文字（读屏与图片检索用）"
+          @mousedown.stop
+          @keydown.enter.prevent="rte.setImageAlt(rte.imageAlt)"
+        />
+        <button data-rte-own
+          type="button"
+          class="rte-bubble-btn"
+          title="应用替代文字"
+          aria-label="应用图片替代文字"
+          @mousedown.prevent
+          @click="rte.setImageAlt(rte.imageAlt)"
+        >
+          alt
+        </button>
       </div>
       <div data-rte-own class="rte-image-bubble-row">
         <span data-rte-own class="rte-image-width-label">圆角</span>
@@ -719,15 +815,16 @@ useParentScopeStamp()
         </div>
         <nav data-rte-own v-else class="rte-outline-list">
           <button data-rte-own
-            v-for="h in rte.outlineHeadings"
+            v-for="(h, hidx) in rte.outlineHeadings"
             :key="h.id"
             type="button"
             class="rte-outline-item"
             :class="{ 'is-current': rte.activeOutlineIndex === rte.outlineHeadings.indexOf(h) }"
             :data-level="h.level"
-            :title="h.text"
+            :title="h.text + '（右键更多操作）'"
             :aria-current="rte.activeOutlineIndex === rte.outlineHeadings.indexOf(h) ? 'location' : undefined"
             @click="rte.jumpToOutlineHeading(h)"
+            @contextmenu.prevent="rte.openOutlineMenu(hidx, $event)"
           >
             {{ h.text }}
           </button>
@@ -780,6 +877,15 @@ useParentScopeStamp()
         </span>
       </div>
       <div data-rte-own class="rte-bottom-right">
+        <button
+          data-rte-own
+          type="button"
+          class="rte-bottom-link"
+          title="页面大小、页边距、页眉页脚与页码"
+          @click="rte.openPageSetup()"
+        >
+          页面设置
+        </button>
         <label data-rte-own class="rte-page-size-field">
           页面
           <select data-rte-own
@@ -923,5 +1029,130 @@ useParentScopeStamp()
           </button>
         </template>
       </div>
+    </div>
+
+    <!-- 只读预览里的评论浮层：跟随内容，列出未解决的讨论 -->
+    <aside
+      data-rte-own
+      v-if="rte.viewMode === 'preview' && rte.shownThreads.length"
+      class="rte-comment-float"
+      aria-label="评论"
+    >
+      <div data-rte-own class="rte-comment-float-title">评论 · {{ rte.shownThreads.length }}</div>
+      <button
+        data-rte-own
+        v-for="t in rte.shownThreads"
+        :key="t.id"
+        type="button"
+        class="rte-comment-float-item"
+        :title="t.quote || '评论'"
+        @click="rte.jumpToThread(t.id)"
+      >
+        <span data-rte-own class="rte-comment-float-quote">{{ t.quote || '（没有摘录原文）' }}</span>
+        <span data-rte-own class="rte-comment-float-meta">{{ t.messages.length }} 条</span>
+      </button>
+    </aside>
+
+    <!-- 大纲右键菜单 -->
+    <Teleport to="body">
+      <div
+        data-rte-own
+        v-if="rte.outlineMenuOpen"
+        class="rte-menu rte-float-menu rte-outline-menu"
+        :style="rte.outlineMenuStyle"
+        role="menu"
+        aria-label="标题操作"
+        @mousedown.prevent
+        @contextmenu.prevent
+      >
+        <button data-rte-own type="button" role="menuitem" @click="rte.outlineMenuJump()">跳到这一节</button>
+        <button data-rte-own type="button" role="menuitem" @click="rte.outlineMenuCopyTitle()">复制标题</button>
+        <button data-rte-own type="button" role="menuitem" @click="rte.outlineMenuCopyLink()">复制标题链接</button>
+      </div>
+    </Teleport>
+
+    <!-- 窄屏浮动条：手机上把常用操作放到屏幕底部，避免工具栏挤在一起 -->
+    <div data-rte-own v-if="rte.viewMode === 'edit'" class="rte-mobile-bar" role="toolbar" aria-label="快捷操作">
+      <button
+        data-rte-own
+        type="button"
+        class="rte-mobile-btn"
+        :class="{ active: rte.isActive('bold') }"
+        aria-label="加粗"
+        title="加粗"
+        @mousedown.prevent
+        @click="rte.toggleBold"
+      >
+        B
+      </button>
+      <button
+        data-rte-own
+        type="button"
+        class="rte-mobile-btn"
+        :class="{ active: rte.isActive('italic') }"
+        aria-label="斜体"
+        title="斜体"
+        @mousedown.prevent
+        @click="rte.toggleItalic"
+      >
+        <i>I</i>
+      </button>
+      <button
+        data-rte-own
+        type="button"
+        class="rte-mobile-btn"
+        :class="{ active: rte.isActive('bulletList') }"
+        aria-label="列表"
+        title="列表"
+        @mousedown.prevent
+        @click="rte.toggleBulletList"
+      >
+        ☰
+      </button>
+      <button
+        data-rte-own
+        type="button"
+        class="rte-mobile-btn"
+        :class="{ active: rte.isActive('link') }"
+        aria-label="链接"
+        title="链接"
+        @mousedown.prevent
+        @click="rte.insertLink"
+      >
+        🔗
+      </button>
+      <button
+        data-rte-own
+        type="button"
+        class="rte-mobile-btn"
+        aria-label="提及"
+        title="提及"
+        @mousedown.prevent
+        @click="rte.insertMentionFromToolbar"
+      >
+        @
+      </button>
+      <button
+        data-rte-own
+        type="button"
+        class="rte-mobile-btn"
+        aria-label="评论"
+        title="评论"
+        @mousedown.prevent
+        @click="rte.beginComment"
+      >
+        评
+      </button>
+      <button
+        data-rte-own
+        type="button"
+        class="rte-mobile-btn"
+        aria-label="更多工具"
+        title="更多工具"
+        @mousedown.prevent
+        @click="rte.openMoreMenu"
+      >
+        ⋯
+      </button>
     </div>
 </template>

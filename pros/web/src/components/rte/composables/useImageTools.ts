@@ -1,6 +1,14 @@
 import { ref, type ShallowRef } from 'vue'
 import type { Editor } from '@tiptap/core'
 import { NodeSelection } from '@tiptap/pm/state'
+import { keepCropOnReplace } from '../../../utils/rteImageCrop'
+import {
+  CROP_PRESETS,
+  cropFromPreset,
+  readCropFromAttrs,
+  writeCropToAttrs,
+  type CropPreset,
+} from '../../../utils/rteImageCropAttrs'
 
 /** 图片气泡：对齐、题注、下载与预览。模板绑定名与原先一致。 */
 export function useImageTools(deps: {
@@ -95,6 +103,65 @@ function imageBubbleShouldShow(payload: {
   return true
 }
 
+/** —— 裁剪 / 替换 / alt —— */
+const imageCropPreset = ref<string>('')
+const imageAlt = ref('')
+
+/** 当前选中图片的裁剪状态，供气泡显示。 */
+function imageCropState() {
+  const ed = deps.editor.value
+  if (!ed || !isImageNodeSelected()) return null
+  const attrs = ed.getAttributes('image') as Record<string, unknown>
+  return readCropFromAttrs(attrs)
+}
+
+/** 写回裁剪属性。 */
+function setImageCrop(crop: Parameters<typeof writeCropToAttrs>[1]) {
+  const ed = deps.editor.value
+  if (!ed || !isImageNodeSelected()) return
+  const attrs = ed.getAttributes('image') as Record<string, unknown>
+  const next = writeCropToAttrs(attrs, crop)
+  ed.chain().focus().updateAttributes('image', next).run()
+  imageCropPreset.value = ''
+}
+
+/** 应用一个裁剪比例预设。 */
+function applyCropPreset(preset: CropPreset) {
+  setImageCrop(cropFromPreset(preset))
+  imageCropPreset.value = preset.id
+}
+
+/** 换图：保留裁剪、题注等其它属性。 */
+function replaceImageSource(src: string) {
+  const ed = deps.editor.value
+  if (!ed || !isImageNodeSelected() || !src) return
+  const attrs = ed.getAttributes('image') as Record<string, unknown>
+  const next = keepCropOnReplace(attrs, src)
+  ed.chain().focus().updateAttributes('image', next).run()
+}
+
+/** 改图片替代文字。 */
+function setImageAlt(alt: string) {
+  const ed = deps.editor.value
+  if (!ed || !isImageNodeSelected()) return
+  ed.chain().focus().updateAttributes('image', { alt: alt.trim() }).run()
+}
+
+/** 打开图片气泡时同步裁剪与 alt。 */
+function syncImageCropState() {
+  const ed = deps.editor.value
+  if (!ed || !isImageNodeSelected()) {
+    imageCropPreset.value = ''
+    imageAlt.value = ''
+    return
+  }
+  const attrs = ed.getAttributes('image') as Record<string, unknown>
+  const crop = readCropFromAttrs(attrs)
+  const preset = CROP_PRESETS.find((p) => p.aspect === crop.aspect) ?? null
+  imageCropPreset.value = preset?.id ?? ''
+  imageAlt.value = typeof attrs.alt === 'string' ? attrs.alt : ''
+}
+
 
   return {
     imageBubbleCaption,
@@ -108,5 +175,14 @@ function imageBubbleShouldShow(payload: {
     openSelectedImage,
     applyImageCaption,
     imageBubbleShouldShow,
+    CROP_PRESETS,
+    imageAlt,
+    imageCropPreset,
+    imageCropState,
+    applyCropPreset,
+    replaceImageSource,
+    setImageAlt,
+    setImageCrop,
+    syncImageCropState,
   }
 }

@@ -61,6 +61,7 @@ import {
 } from '../utils/rteRound7'
 import { type CalloutVariant } from '../extensions/callout'
 import { orderedListContinuation } from '../utils/rteListContinue'
+import { planListRenumber } from '../utils/rteListRenumber'
 import {
   FIRST_LINE_INDENT,
   LINK_BUTTON_TONES,
@@ -128,6 +129,9 @@ import { useBlockHandle } from './rte/composables/useBlockHandle'
 import { useImageTools } from './rte/composables/useImageTools'
 import { useDocChrome } from './rte/composables/useDocChrome'
 import { useRteExtensions } from './rte/composables/useRteExtensions'
+import { useDirectoryPeople } from './rte/composables/useDirectoryPeople'
+import { useCrossDoc } from './rte/composables/useCrossDoc'
+import type { DirectoryPermission } from '../utils/rteDirectory'
 import { RTE_EMOJI_CATEGORIES } from '../utils/rteEmojiList'
 import { RTE_SPECIAL_CHAR_CATEGORIES } from '../utils/rteSpecialChars'
 
@@ -289,6 +293,162 @@ const {
   editor: () => editor,
 })
 void mentionMenuEl
+
+/**
+ * 组织通讯录里的真人。
+ * - 数据来自 api/directory.listDirectoryUsers，后端没实现时回退到本地示例。
+ * - 权限钩子：画布 JSON 的 mentionPermissionByPanelId，按面板决定谁能被 @。
+ */
+const mentionPermission = computed<DirectoryPermission | null>(() =>
+  props.panelId ? documentStore.getPanelMentionPermission(props.panelId) : null,
+)
+const directoryPeople = useDirectoryPeople({
+  editor: () => editor,
+  permission: () => mentionPermission.value,
+})
+
+/** —— 大纲右键菜单 —— */
+const outlineMenuOpen = ref(false)
+const outlineMenuIndex = ref(-1)
+const outlineMenuStyle = ref<Record<string, string>>({ position: 'fixed', left: '0px', top: '0px' })
+
+/** 点别处时收起大纲右键菜单 */
+function onDocPointerDownOutlineMenu(event: PointerEvent) {
+  if (!outlineMenuOpen.value) return
+  const t = event.target as HTMLElement | null
+  if (t?.closest?.('.rte-outline-item')) return
+  if (t?.closest?.('.rte-outline-menu')) return
+  closeOutlineMenu()
+}
+
+function openOutlineMenu(index: number, event: MouseEvent) {
+  outlineMenuIndex.value = index
+  outlineMenuOpen.value = true
+  outlineMenuStyle.value = {
+    position: 'fixed',
+    left: `${Math.max(8, event.clientX)}px`,
+    top: `${Math.max(8, event.clientY)}px`,
+  }
+}
+
+function closeOutlineMenu() {
+  outlineMenuOpen.value = false
+  outlineMenuIndex.value = -1
+}
+
+/** 大纲里当前右键的那一项 */
+function outlineMenuItem() {
+  const idx = outlineMenuIndex.value
+  if (idx < 0) return null
+  return outlineHeadings.value[idx] || null
+}
+
+function outlineMenuJump() {
+  const item = outlineMenuItem()
+  closeOutlineMenu()
+  if (item) jumpToOutlineHeading(item)
+}
+
+async function outlineMenuCopyTitle() {
+  const item = outlineMenuItem()
+  closeOutlineMenu()
+  if (!item) return
+  try {
+    await navigator.clipboard.writeText(item.text)
+    ElMessage.success('已复制标题')
+  } catch {
+    ElMessage.error('复制失败，请手动复制')
+  }
+}
+
+async function outlineMenuCopyLink() {
+  const item = outlineMenuItem()
+  closeOutlineMenu()
+  if (!item) return
+  const docId = document_id.value || ''
+  const panel = props.panelId || ''
+  const href = `#/canvas/${encodeURIComponent(docId)}${
+    panel ? `?panel=${encodeURIComponent(panel)}` : ''
+  }#${encodeURIComponent(item.text)}`
+  try {
+    await navigator.clipboard.writeText(href)
+    ElMessage.success('已复制标题链接')
+  } catch {
+    ElMessage.error('复制失败，请手动复制')
+  }
+}
+
+/** —— 页面设置面板（页面大小 / 页边距 / 页眉 / 页脚 / 页码） —— */
+const pageSetupOpen = ref(false)
+
+function openPageSetup() {
+  pageSetupOpen.value = true
+}
+
+/** —— @ 提及权限面板 —— */
+const directoryLoading = computed(() => directoryPeople.directoryLoading.value)
+const directoryError = computed(() => directoryPeople.directoryError.value)
+const mentionPermOpen = ref(false)
+const mentionPermDepartments = ref<string[]>([])
+const mentionPermRoles = ref<string[]>([])
+
+/** 通讯录里出现过的部门 / 角色，作为勾选清单。 */
+const directoryDepartments = computed(() => {
+  const set = new Set<string>()
+  for (const u of directoryPeople.directoryUsers.value) {
+    const dept = String(u.department || '').trim()
+    if (dept) set.add(dept)
+  }
+  return Array.from(set).sort((a, b) => a.localeCompare(b, 'zh'))
+})
+const directoryRoles = computed(() => {
+  const set = new Set<string>()
+  for (const u of directoryPeople.directoryUsers.value) {
+    const role = String(u.role || '').trim()
+    if (role) set.add(role)
+  }
+  return Array.from(set).sort((a, b) => a.localeCompare(b, 'zh'))
+})
+
+function openMentionPermission() {
+  const perm = mentionPermission.value
+  mentionPermDepartments.value = [...(perm?.allowedDepartments || [])]
+  mentionPermRoles.value = [...(perm?.allowedRoles || [])]
+  mentionPermOpen.value = true
+  void directoryPeople.loadDirectoryUsers()
+}
+
+function toggleMentionPermValue(list: string[], value: string) {
+  const at = list.indexOf(value)
+  if (at < 0) list.push(value)
+  else list.splice(at, 1)
+}
+
+function saveMentionPermission() {
+  const panelId = props.panelId
+  if (!panelId) {
+    ElMessage.warning('当前面板没有 id，无法保存 @ 权限')
+    mentionPermOpen.value = false
+    return
+  }
+  const departments = mentionPermDepartments.value.filter(Boolean)
+  const roles = mentionPermRoles.value.filter(Boolean)
+  const permission: DirectoryPermission | null =
+    departments.length || roles.length
+      ? {
+          allowedDepartments: departments.length ? departments : undefined,
+          allowedRoles: roles.length ? roles : undefined,
+        }
+      : null
+  documentStore.setPanelMentionPermission(panelId, permission)
+  mentionPermOpen.value = false
+  ElMessage.success(permission ? '已保存 @ 提及权限' : '已恢复默认可提及所有人')
+}
+
+function resetMentionPermission() {
+  mentionPermDepartments.value = []
+  mentionPermRoles.value = []
+}
 
 /** 粘贴为纯文本（工具栏开关；影响后续粘贴） */
 const pastePlainTextMode = ref(false)
@@ -660,6 +820,9 @@ const editor = useRteExtensions({
   syncImageBubbleCaption: () => {
     syncImageBubbleCaption()
   },
+  syncImageCropState: () => {
+    syncImageCropState()
+  },
   toggleOutlinePanel: () => {
     toggleOutlinePanel()
   },
@@ -667,6 +830,7 @@ const editor = useRteExtensions({
   suggestingEnabled: () => suggesting.value,
   suggestionAuthor,
   bumpSuggestions: () => bumpSuggestions(),
+  mentionPeople: () => directoryPeople.mentionPeople(),
 })
 
 const {
@@ -1879,6 +2043,35 @@ async function applyListStart() {
   listOpen.value = false
 }
 
+/**
+ * 「列表从此处重编号」：把有序列表在当前项处切成两段，
+ * 当前项及之后从 1 重新编号，前半段保持原编号。
+ */
+function renumberListFromHere() {
+  const ed = editor.value
+  if (!ed) return
+  const plan = planListRenumber(ed.state.doc, ed.state.selection.from)
+  listOpen.value = false
+  if (!plan) {
+    ElMessage.info('这里已经是列表的第一项，且从 1 开始')
+    return
+  }
+  const list = ed.state.doc.nodeAt(plan.listPos)
+  if (!list) return
+  const items: any[] = []
+  list.forEach((item: any) => items.push(item))
+  const tr = ed.state.tr
+  if (plan.itemIndex <= 0) {
+    tr.setNodeMarkup(plan.listPos, undefined, { ...list.attrs, start: 1 })
+  } else {
+    const head = list.type.create(list.attrs, items.slice(0, plan.itemIndex))
+    const tail = list.type.create({ ...list.attrs, start: 1 }, items.slice(plan.itemIndex))
+    tr.replaceWith(plan.listPos, plan.listPos + list.nodeSize, [head, tail])
+  }
+  ed.view.dispatch(tr)
+  ElMessage.success('已从这一项重新编号')
+}
+
 function toggleFirstLineIndent() {
   applyTextIndent(currentTextIndent() ? '' : FIRST_LINE_INDENT)
 }
@@ -2113,10 +2306,139 @@ function confirmInsertXref(target: (typeof xrefTargets.value)[number]) {
 function insertMentionFromToolbar() {
   const ed = editor.value
   if (!ed) return
+  // 提前把通讯录拉回来，@ 菜单打开时直接是真人
+  void directoryPeople.loadDirectoryUsers()
   ed.chain().focus().insertContent('@').run()
   moreOpen.value = false
   ElMessage.info('已插入 @，请继续选择提及对象')
 }
+
+/** —— 选区气泡：复制 / 转链接 / 转表格 / 改写 —— */
+/** 选区气泡里展开的二级菜单（颜色、改写等）。 */
+const bubbleRewrite = ref<string | null>(null)
+
+function selectionRange(): { from: number; to: number; text: string } | null {
+  const ed = editor.value
+  if (!ed) return null
+  const { from, to } = ed.state.selection
+  if (from === to) return null
+  const text = ed.state.doc.textBetween(from, to, '\n')
+  return { from, to, text }
+}
+
+/** 复制选中的文字。 */
+async function copySelectedText() {
+  const range = selectionRange()
+  if (!range) {
+    ElMessage.info('先选中一段文字')
+    return
+  }
+  if (!range.text.trim()) {
+    ElMessage.info('选区里没有文字')
+    return
+  }
+  try {
+    await navigator.clipboard.writeText(range.text)
+    ElMessage.success('已复制选中文字')
+  } catch {
+    ElMessage.error('复制失败，请手动复制')
+  }
+}
+
+/** 把选中的文字变成链接。 */
+async function selectionToLink() {
+  const range = selectionRange()
+  if (!range) {
+    ElMessage.info('先选中要加链接的文字')
+    return
+  }
+  const href = await openRtePrompt({
+    title: '把选中文字变成链接',
+    message: '填一个 http(s) 地址。留空则取消。',
+    placeholder: 'https://',
+    confirmLabel: '设为链接',
+  })
+  const url = (href || '').trim()
+  if (!url) return
+  if (!/^https?:\/\//i.test(url)) {
+    ElMessage.warning('链接需要以 http:// 或 https:// 开头')
+    return
+  }
+  editor.value?.chain().focus().setLink({ href: url }).run()
+  ElMessage.success('已设为链接')
+}
+
+/** 把选中的文字转成表格：按行拆行，按制表符拆列。 */
+function selectionToTable() {
+  const ed = editor.value
+  const range = selectionRange()
+  if (!ed || !range) {
+    ElMessage.info('先选中要转成表格的文字')
+    return
+  }
+  const lines = range.text
+    .split(/\r?\n/)
+    .map((line) => line.replace(/\s+$/g, ''))
+    .filter((line) => line.trim().length > 0)
+  if (!lines.length) {
+    ElMessage.info('选区里没有可转换的文字')
+    return
+  }
+  const rows = lines.map((line) => line.split('\t').map((cell) => cell.trim()))
+  const cols = Math.max(...rows.map((row) => row.length))
+  const body = rows
+    .map((row) => {
+      const cells = Array.from({ length: cols }, (_, i) => row[i] ?? '')
+      return `<tr>${cells.map((cell) => `<td>${escapeHtml(cell)}</td>`).join('')}</tr>`
+    })
+    .join('')
+  const html = `<table><tbody>${body}</tbody></table>`
+  ed.chain().focus().insertContentAt({ from: range.from, to: range.to }, html).run()
+  ElMessage.success('已转成表格')
+}
+
+/**
+ * 改写选区。当前是本地规则（stub），不调用外部 AI 服务。
+ * - trim：清理多余空格与空行
+ * - space：中英文之间补空格
+ * - merge：把连续短行合并成一段
+ */
+function rewriteSelection(mode: 'trim' | 'space' | 'merge') {
+  const ed = editor.value
+  const range = selectionRange()
+  if (!ed || !range) {
+    ElMessage.info('先选中要改写的文字')
+    return
+  }
+  let next = range.text
+  if (mode === 'trim') {
+    next = next
+      .split(/\r?\n/)
+      .map((line) => line.replace(/[ \t]+/g, ' ').trim())
+      .filter((line) => line.length > 0)
+      .join('\n')
+  } else if (mode === 'space') {
+    next = next.replace(/([\u4e00-\u9fff])([A-Za-z0-9])/g, '$1 $2').replace(/([A-Za-z0-9])([\u4e00-\u9fff])/g, '$1 $2')
+  } else {
+    const parts = range.text
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0)
+    next = parts.join('')
+  }
+  if (next === range.text) {
+    ElMessage.info('没有需要改写的内容')
+    bubbleRewrite.value = null
+    return
+  }
+  ed.chain()
+    .focus()
+    .insertContentAt({ from: range.from, to: range.to }, next)
+    .run()
+  bubbleRewrite.value = null
+  ElMessage.success('已改写选区')
+}
+
 
 function runHeadingHierarchyCheck() {
   const ed = editor.value
@@ -2829,9 +3151,55 @@ const {
   openSelectedImage,
   applyImageCaption,
   imageBubbleShouldShow,
+  CROP_PRESETS,
+  imageAlt,
+  imageCropPreset,
+  imageCropState,
+  applyCropPreset,
+  replaceImageSource,
+  setImageAlt,
+  setImageCrop,
+  syncImageCropState,
 } = useImageTools({
   editor,
   viewMode: () => viewMode,
+})
+
+/** 图片气泡：换图（保留裁剪与题注）。 */
+async function replaceImageByUrl() {
+  const raw = await openRtePrompt({
+    title: '换图',
+    message: '填一个图片地址。裁剪比例与题注会一起带过去。',
+    placeholder: 'https://',
+    confirmLabel: '替换',
+  })
+  const url = (raw || '').trim()
+  if (!url) return
+  if (!/^https?:\/\//i.test(url) && !url.startsWith('data:image')) {
+    ElMessage.warning('图片地址需要以 http:// 或 https:// 开头')
+    return
+  }
+  replaceImageSource(url)
+  ElMessage.success('已替换图片')
+}
+
+/** —— 跨文档：搜索跳转 + 同步块 —— */
+const {
+  crossDocOpen,
+  crossDocQuery,
+  crossDocHits,
+  crossDocBusy,
+  crossDocError,
+  crossDocSyncing,
+  openCrossDoc,
+  closeCrossDoc,
+  searchCrossDoc,
+  jumpToCrossDoc,
+  insertSyncBlock,
+  syncBlockPreview,
+} = useCrossDoc({
+  editor: () => editor,
+  announce: (message) => announceRte(message),
 })
 
 /** —— 分割线样式 —— */
@@ -3036,6 +3404,9 @@ function applySlashCommandItem(item: RteSlashItem) {
       break
     case 'table':
       openTableDialog()
+      break
+    case 'mention':
+      insertMentionFromToolbar()
       break
     case 'image':
       insertImage()
@@ -3401,6 +3772,8 @@ const {
   findReplaceText,
   findCaseSensitive,
   findWholeWord,
+  findRegex,
+  findMultiline,
   refreshFindMatches,
   openFindDialog,
   closeFindDialog,
@@ -4269,6 +4642,21 @@ const {
   },
 })
 
+/** 工具栏分组内的按钮配置菜单（右键分组打开） */
+const toolbarGroupButtonsOpen = ref(false)
+const toolbarGroupButtonsGroupId = ref('')
+
+function closeToolbarGroupButtons() {
+  toolbarGroupButtonsOpen.value = false
+}
+
+function onToolbarGroupContextMenu(groupId: string, event: MouseEvent) {
+  const el = event.currentTarget as HTMLElement | null
+  if (el) setFloatAnchor('toolbarGroupButtons', el)
+  toolbarGroupButtonsGroupId.value = groupId
+  toolbarGroupButtonsOpen.value = true
+}
+
 const {
   floatAnchors,
   floatMenuEls,
@@ -4279,6 +4667,9 @@ const {
   closeAllToolbarMenus,
   vRteFloat,
 } = useFloatMenus({
+  closeToolbarGroupButtons: () => {
+    closeToolbarGroupButtons()
+  },
   headingOpen: () => headingOpen,
   listOpen: () => listOpen,
   formOpen: () => formOpen,
@@ -4323,6 +4714,11 @@ onMounted(() => {
     syncSpellcheckToDom()
     editor.value?.commands.captureRevisionBaseline()
   })
+  document.addEventListener('pointerdown', onDocPointerDownOutlineMenu, true)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('pointerdown', onDocPointerDownOutlineMenu, true)
 })
 
 watch(spellcheckEnabled, () => syncSpellcheckToDom())
@@ -5420,6 +5816,22 @@ const allTools = computed((): ToolItem[] => {
       run: insertMentionFromToolbar,
     },
     {
+      key: 'crossDoc',
+      label: '跨文档',
+      title: '搜索其它文档，可插入同步块',
+      icon: '⇄',
+      iconComp: ic('link'),
+      run: openCrossDoc,
+    },
+    {
+      key: 'mentionPerm',
+      label: '@权限',
+      title: '设置本文能 @ 到哪些人',
+      icon: '@',
+      iconComp: ic('note'),
+      run: openMentionPermission,
+    },
+    {
       key: 'tableCsv',
       label: '表CSV',
       title: '复制当前表为 CSV',
@@ -5521,6 +5933,10 @@ const EXPANDED_ONLY_KEYS = new Set(['import', 'export'])
 const {
   toolbarOrder,
   toolbarGroups,
+  toolbarGroupButtonConfigs,
+  toolbarGroupButtonEntries,
+  toggleToolbarGroupButton,
+  moveToolbarGroupButton,
   toolbarDropIndex,
   toolbarDragSource,
   undoToolbarGroupOrder,
@@ -5540,6 +5956,9 @@ const {
   expanded: () => props.expanded,
   orderMap: () => current_data.value?.toolbarGroupOrderByPanelId,
   setPanelToolbarOrder: (panelId, order) => documentStore.setPanelToolbarOrder(panelId, order),
+  buttonConfigMap: () => current_data.value?.toolbarGroupButtonsByPanelId,
+  setPanelGroupButtons: (panelId, groupId, config) =>
+    documentStore.setPanelToolbarGroupButtons(panelId, groupId, config),
   tools: () => allTools.value,
   primaryKeys: PRIMARY_KEYS,
   viewMode: () => viewMode.value,
@@ -5567,8 +5986,12 @@ const moreTools = computed(() => {
 /** 「更多」按工具栏同一套分组展示，每组胶囊可单独排序。 */
 const moreGroups = computed(() => {
   if (props.expanded) return []
-  return buildToolbarGroups(moreTools.value, toolbarOrder.value)
+  return buildToolbarGroups(moreTools.value, toolbarOrder.value, toolbarGroupButtonConfigs.value)
 })
+
+function openMoreMenu() {
+  moreOpen.value = true
+}
 
 function closeMore() {
   moreOpen.value = false
@@ -5704,6 +6127,23 @@ provideRteBindings({
   bookmarkPanelOpen,
   bubbleShouldShow,
   bubbleSwatch,
+  crossDocOpen,
+  crossDocQuery,
+  crossDocHits,
+  crossDocBusy,
+  crossDocError,
+  crossDocSyncing,
+  openCrossDoc,
+  closeCrossDoc,
+  searchCrossDoc,
+  jumpToCrossDoc,
+  insertSyncBlock,
+  syncBlockPreview,
+  bubbleRewrite,
+  copySelectedText,
+  selectionToLink,
+  selectionToTable,
+  rewriteSelection,
   calloutOpen,
   canReplaceFind,
   caseMenuOpen,
@@ -5808,6 +6248,8 @@ provideRteBindings({
   findGo,
   findQuery,
   findReplaceText,
+  findRegex,
+  findMultiline,
   findStatusText,
   findWholeWord,
   focusMode,
@@ -5831,6 +6273,16 @@ provideRteBindings({
   hrOpen,
   imageBubbleCaption,
   imageBubbleShouldShow,
+  CROP_PRESETS,
+  imageAlt,
+  imageCropPreset,
+  imageCropState,
+  applyCropPreset,
+  replaceImageSource,
+  setImageAlt,
+  setImageCrop,
+  syncImageCropState,
+  replaceImageByUrl,
   imageCategories,
   imageCompressOnInsert,
   imageDialogOpen,
@@ -5903,14 +6355,36 @@ provideRteBindings({
   listStyleOpen,
   localTitle,
   markToolbarMenuOpening,
+  pageSetupOpen,
+  openPageSetup,
+  outlineMenuOpen,
+  outlineMenuIndex,
+  outlineMenuStyle,
+  openOutlineMenu,
+  closeOutlineMenu,
+  outlineMenuJump,
+  outlineMenuCopyTitle,
+  outlineMenuCopyLink,
   mentionEmptyHint,
   mentionIndex,
   mentionItems,
   mentionMenuEl,
   mentionMenuStyle,
   mentionOpen,
+  mentionPermDepartments,
+  mentionPermOpen,
+  mentionPermRoles,
+  mentionPermission,
   mentionQuery,
   mentionSectionLabel,
+  directoryDepartments,
+  directoryError,
+  directoryLoading,
+  directoryRoles,
+  openMentionPermission,
+  resetMentionPermission,
+  saveMentionPermission,
+  toggleMentionPermValue,
   moreCalloutOpen,
   moreColorOpen,
   moreFontFamilyOpen,
@@ -5920,6 +6394,8 @@ provideRteBindings({
   moreHighlightOpen,
   moreLineHeightOpen,
   moreOpen,
+  openMoreMenu,
+  insertMentionFromToolbar,
   moreTemplateOpen,
   moreTools,
   moveCurrentBlock,
@@ -6093,6 +6569,7 @@ provideRteBindings({
   toggleOrderedList,
   continueOrderedNumbering,
   restartOrderedNumbering,
+  renumberListFromHere,
   toggleFirstLineIndent,
   setFirstLineIndent,
   togglePaperGuide,
@@ -6107,6 +6584,13 @@ provideRteBindings({
   toolbarDragSource,
   toolbarDropIndex,
   toolbarGroups,
+  toolbarGroupButtonEntries,
+  toolbarGroupButtonsGroupId,
+  toolbarGroupButtonsOpen,
+  toggleToolbarGroupButton,
+  moveToolbarGroupButton,
+  closeToolbarGroupButtons,
+  onToolbarGroupContextMenu,
   toolbarOrder,
   triggerLocalAttachPick,
   triggerLocalImagePick,

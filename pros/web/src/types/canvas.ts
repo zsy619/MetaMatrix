@@ -121,6 +121,16 @@ export type WithPanelAttachments = {
    * 旧文档没有这个字段。不是独立的版本服务。
    */
   editorRevisionsByPanelId?: import('../utils/rteRevisions').RevisionsByPanelId
+  /**
+   * 富文本面板的通讯录权限钩子。决定本文能 @ 到哪些人。
+   * 键与面板 id 对齐。旧文档没有这个字段，等于不额外限制。
+   */
+  mentionPermissionByPanelId?: import('../utils/rteDirectory').MentionPermissionByPanelId
+  /**
+   * 富文本工具栏分组内按钮的显隐与顺序。键与面板 id 对齐，内层键是分组 id。
+   * 旧文档没有这个字段，等于用分组默认顺序、全部显示。
+   */
+  toolbarGroupButtonsByPanelId?: import('../utils/rteToolbarGroupButtons').ToolbarGroupButtonsByPanelId
 }
 
 

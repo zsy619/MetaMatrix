@@ -9,6 +9,7 @@ import {
   upsertTableSumRow,
   currentTableColIndex,
 } from '../../rteWave20'
+import { recalculateTable } from '../../../utils/rteTableFormula'
 
 /** 表格插入、单元格操作与表格菜单。模板绑定名与原先一致。 */
 export function useTableOps(deps: {
@@ -386,10 +387,111 @@ function tableClearCellFormat() {
   deps.announceRte('已清除单元格格式')
 }
 
+/** —— 单元格公式 —— */
+/** 找到光标所在的表格节点。 */
+function findCurrentTable(): { pos: number; node: any } | null {
+  const ed = deps.editor().value
+  if (!ed) return null
+  const { $head } = ed.state.selection
+  for (let d = $head.depth; d > 0; d -= 1) {
+    if ($head.node(d).type.name === 'table') {
+      return { pos: $head.before(d), node: $head.node(d) }
+    }
+  }
+  return null
+}
+
+/**
+ * 计算当前表格里的公式。
+ * 单元格文本以 = 开头视为公式；算完后把结果写回单元格，
+ * 公式本身存进单元格的 data-formula 属性，下次还能重算。
+ */
+function calcTableFormulas() {
+  const ed = deps.editor().value
+  const found = findCurrentTable()
+  if (!ed || !found) {
+    ElMessage.info('请在表格里操作')
+    return
+  }
+  const table = found.node
+  const cells: Array<{ row: number; col: number; formula: string; value: string }> = []
+  const grid: string[][] = []
+  table.forEach((row: any, rowIndex: number) => {
+    const rowGrid: string[] = []
+    row.forEach((cell: any, colIndex: number) => {
+      const stored = typeof cell.attrs?.formula === 'string' ? cell.attrs.formula : ''
+      const text = (cell.textContent || '').trim()
+      const formula = text.startsWith('=') ? text : stored
+      rowGrid.push(formula || text)
+      cells.push({ row: rowIndex, col: colIndex, formula, value: text })
+    })
+    grid.push(rowGrid)
+  })
+  const results = recalculateTable(grid)
+  let changed = 0
+  cells.forEach((cell) => {
+    if (!cell.formula) return
+    const next = results[cell.row]?.[cell.col] ?? ''
+    if (next !== cell.value) changed += 1
+  })
+  if (!changed) {
+    ElMessage.info('表里没有需要计算的公式')
+    closeAllTableUi()
+    return
+  }
+  // 从后往前改，避免前面的替换影响后面的位置
+  const tr = ed.state.tr
+  const schema = ed.state.schema
+  const rowNodes: any[] = []
+  table.forEach((row: any) => rowNodes.push(row))
+  for (let rowIndex = rowNodes.length - 1; rowIndex >= 0; rowIndex -= 1) {
+    const rowNode = rowNodes[rowIndex]
+    const cellNodes: any[] = []
+    rowNode.forEach((cell: any) => cellNodes.push(cell))
+    for (let colIndex = cellNodes.length - 1; colIndex >= 0; colIndex -= 1) {
+      const cellNode = cellNodes[colIndex]
+      const cell = cells.find((c) => c.row === rowIndex && c.col === colIndex)
+      if (!cell || !cell.formula) continue
+      const value = results[rowIndex]?.[colIndex] ?? ''
+      // 单元格位置：表内容起点 + 前面各行 + 行内容起点 + 前面各单元格
+      let cellPos = found.pos + 1
+      for (let r = 0; r < rowIndex; r += 1) cellPos += rowNodes[r].nodeSize
+      cellPos += 1
+      for (let c = 0; c < colIndex; c += 1) cellPos += cellNodes[c].nodeSize
+      const first = cellNode.firstChild
+      if (!first) continue
+      const from = cellPos + 2
+      const to = cellPos + first.nodeSize
+      if (to < from) continue
+      tr.setNodeMarkup(cellPos, undefined, {
+        ...cellNode.attrs,
+        formula: cell.formula,
+      })
+      if (value) tr.replaceWith(from, to, schema.text(value))
+      else tr.delete(from, to)
+    }
+  }
+  ed.view.dispatch(tr)
+  closeAllTableUi()
+  deps.announceRte('表格公式已计算')
+  ElMessage.success(`已计算 ${changed} 个公式单元格`)
+}
+
+/** 在当前单元格插入公式模板。 */
+function insertCellFormula() {
+  const ed = deps.editor().value
+  if (!ed || !isInTable()) {
+    ElMessage.info('请在表格单元格内操作')
+    return
+  }
+  ed.chain().focus().insertContent('=SUM(ABOVE)').run()
+  closeAllTableUi()
+  deps.announceRte('已插入公式模板，可在表格菜单里计算')
+}
+
 const tableOpItems = computed((): TableOpItem[] => {
   void deps.editor().value?.state
-  return [
-    { key: 'row-before', label: '向上插入行', run: tableAddRowBefore },
+  return [    { key: 'row-before', label: '向上插入行', run: tableAddRowBefore },
     { key: 'row-after', label: '向下插入行', run: tableAddRowAfter },
     { key: 'col-before', label: '向左插入列', run: tableAddColBefore },
     { key: 'col-after', label: '向右插入列', run: tableAddColAfter },
@@ -428,6 +530,17 @@ const tableOpItems = computed((): TableOpItem[] => {
       key: 'clear-cell',
       label: '清除单元格格式',
       run: tableClearCellFormat,
+    },
+    {
+      key: 'cell-formula',
+      label: '插入公式',
+      run: insertCellFormula,
+      sepBefore: true,
+    },
+    {
+      key: 'calc-formula',
+      label: '计算公式',
+      run: calcTableFormulas,
     },
     {
       key: 'valign-top',
@@ -613,6 +726,8 @@ function onTableToolbarButtonClick() {
     tableToggleHeaderColumn,
     tableDeleteTable,
     tableClearCellFormat,
+    insertCellFormula,
+    calcTableFormulas,
     tableOpItems,
     onTableToolClick,
     onTableToolbarButtonClick,
