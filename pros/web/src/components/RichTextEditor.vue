@@ -71,7 +71,7 @@ import {
   sanitizeRteJsonNodes,
 } from './rteDocTemplates'
 import type { Component } from 'vue'
-import { SlashCommands, slashPluginKey, type RteSlashRenderProps, type RteSlashUiHandlers } from '../extensions/slashCommands'
+import { SlashCommands } from '../extensions/slashCommands'
 import { exitSuggestion } from '@tiptap/suggestion'
 import {
   rteSlashGlyph,
@@ -103,9 +103,7 @@ import {
   topOpenModal,
 } from '../utils/rteRound8'
 import {
-  orderSlashForMenu,
   embedIframeSrc,
-  pushRecentSlash,
   shouldTakeSnapshot,
   type NoteRow,
 } from '../utils/rteRound6'
@@ -184,6 +182,7 @@ import { useExport } from './rte/composables/useExport'
 import { useImport } from './rte/composables/useImport'
 import { useMediaLibrary } from './rte/composables/useMediaLibrary'
 import { useTableOps } from './rte/composables/useTableOps'
+import { useSlashMenu } from './rte/composables/useSlashMenu'
 import { RTE_EMOJI_CATEGORIES } from '../utils/rteEmojiList'
 import { RTE_SPECIAL_CHAR_CATEGORIES } from '../utils/rteSpecialChars'
 
@@ -316,20 +315,20 @@ const {
 })
 
 /** —— Slash「/」命令菜单状态（须在 useEditor 前声明，供 Suggestion 闭包） —— */
-const slashOpen = ref(false)
-const slashItems = ref<RteSlashItem[]>([])
-const slashIndex = ref(0)
-const slashQuery = ref('')
-const slashMenuStyle = ref<Record<string, string>>({
-  position: 'fixed',
-  left: '0px',
-  top: '0px',
-  visibility: 'hidden',
-  zIndex: '5300',
+const {
+  slashOpen,
+  slashItems,
+  slashIndex,
+  slashQuery,
+  slashMenuStyle,
+  slashMenuEl,
+  slashUi,
+  pickSlashItem,
+} = useSlashMenu({
+  editor: () => editor,
+  applySlashCommandItem,
 })
-let slashSelectItem: ((item: RteSlashItem) => void) | null = null
-let slashClientRectFn: (() => DOMRect | null) | null = null
-const slashMenuEl = ref<HTMLElement | null>(null)
+void slashMenuEl
 
 /** —— @提及建议菜单（与 Slash 同定位模式；候选见 rteMentionItems） —— */
 const mentionOpen = ref(false)
@@ -491,163 +490,6 @@ const activeSpecialCharList = computed(() => {
   const cat = RTE_SPECIAL_CHAR_CATEGORIES.find((c) => c.id === specialCharTabId.value)
   return cat?.chars ?? RTE_SPECIAL_CHAR_CATEGORIES[0]?.chars ?? []
 })
-
-function placeSlashMenuFromRect(rect: DOMRect | null) {
-  const el = slashMenuEl.value
-  if (!el || !rect) {
-    slashMenuStyle.value = {
-      ...slashMenuStyle.value,
-      visibility: 'hidden',
-    }
-    return
-  }
-  const vw = window.innerWidth
-  const vh = window.innerHeight
-  const pad = 8
-  const gap = 4
-  // 先显隐测量
-  el.style.visibility = 'hidden'
-  el.style.left = '0px'
-  el.style.top = '0px'
-  el.style.maxHeight = 'none'
-  const mw = Math.max(el.offsetWidth, 280)
-  const mh = Math.max(el.offsetHeight, 1)
-  const spaceBelow = vh - rect.bottom - pad
-  const spaceAbove = rect.top - pad
-  const preferBelow = spaceBelow >= Math.min(mh, 240) || spaceBelow >= spaceAbove
-  let maxH: number
-  let top: number
-  if (preferBelow) {
-    maxH = Math.max(140, spaceBelow - gap)
-    top = rect.bottom + gap
-  } else {
-    maxH = Math.max(140, spaceAbove - gap)
-    const usedH = Math.min(mh, maxH)
-    top = rect.top - gap - usedH
-  }
-  let left = rect.left
-  if (left + mw > vw - pad) left = vw - pad - mw
-  if (left < pad) left = pad
-  if (top < pad) top = pad
-  if (top + Math.min(mh, maxH) > vh - pad) {
-    top = Math.max(pad, vh - pad - Math.min(mh, maxH))
-  }
-  slashMenuStyle.value = {
-    position: 'fixed',
-    left: `${Math.round(left)}px`,
-    top: `${Math.round(top)}px`,
-    maxHeight: `${Math.round(maxH)}px`,
-    visibility: 'visible',
-    zIndex: '5300',
-  }
-}
-
-const SLASH_RECENT_KEY = 'metamatrix-rte-slash-recent'
-
-function loadRecentSlash(): string[] {
-  try {
-    const raw = JSON.parse(localStorage.getItem(SLASH_RECENT_KEY) || '[]') as unknown
-    return Array.isArray(raw) ? raw.filter((id) => typeof id === 'string') : []
-  } catch {
-    return []
-  }
-}
-
-function rememberSlash(id: string) {
-  try {
-    localStorage.setItem(SLASH_RECENT_KEY, JSON.stringify(pushRecentSlash(loadRecentSlash(), id)))
-  } catch {
-    /* 隐私模式忽略 */
-  }
-}
-
-function syncSlashFromProps(props: RteSlashRenderProps) {
-  slashItems.value = orderSlashForMenu(props.items, props.query, loadRecentSlash())
-  slashQuery.value = props.query
-  slashSelectItem = props.command
-  slashClientRectFn = props.clientRect ?? null
-  if (slashIndex.value >= props.items.length) {
-    slashIndex.value = Math.max(0, props.items.length - 1)
-  }
-  const rect = props.clientRect?.() ?? null
-  nextTick(() => {
-    placeSlashMenuFromRect(rect)
-    // 选中项滚入视野
-    const active = slashMenuEl.value?.querySelector?.('.rte-slash-item.is-active') as HTMLElement | null
-    active?.scrollIntoView?.({ block: 'nearest' })
-  })
-}
-
-function closeSlashMenu() {
-  slashOpen.value = false
-  slashItems.value = []
-  slashIndex.value = 0
-  slashQuery.value = ''
-  slashSelectItem = null
-  slashClientRectFn = null
-  slashMenuStyle.value = {
-    ...slashMenuStyle.value,
-    visibility: 'hidden',
-  }
-}
-
-const slashUi: RteSlashUiHandlers = {
-  onStart(props) {
-    slashOpen.value = true
-    slashIndex.value = 0
-    syncSlashFromProps(props)
-  },
-  onUpdate(props) {
-    if (!slashOpen.value) slashOpen.value = true
-    syncSlashFromProps(props)
-  },
-  onExit() {
-    closeSlashMenu()
-  },
-  onKeyDown({ event }) {
-    if (!slashOpen.value) return false
-    const slashNext = stepMenuIndex(slashIndex.value, slashItems.value.length, event.key)
-    if (slashNext != null || event.key === 'Home' || event.key === 'End' || event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-      event.preventDefault()
-      if (slashNext != null) slashIndex.value = slashNext
-      nextTick(() => {
-        const active = slashMenuEl.value?.querySelector?.('.rte-slash-item.is-active') as HTMLElement | null
-        active?.scrollIntoView?.({ block: 'nearest' })
-      })
-      return true
-    }
-    if (event.key === 'Enter') {
-      event.preventDefault()
-      const item = slashItems.value[slashIndex.value]
-      if (item && slashSelectItem) slashSelectItem(item)
-      return true
-    }
-    if (event.key === 'Escape') {
-      event.preventDefault()
-      const ed = editor.value
-      if (ed && !ed.isDestroyed) {
-        try {
-          exitSuggestion(ed.view, slashPluginKey)
-        } catch {
-          closeSlashMenu()
-        }
-      } else {
-        closeSlashMenu()
-      }
-      return true
-    }
-    return false
-  },
-  onCommand(item) {
-    applySlashCommandItem(item)
-  },
-}
-
-function pickSlashItem(item: RteSlashItem) {
-  rememberSlash(item.id)
-  if (slashSelectItem) slashSelectItem(item)
-  else applySlashCommandItem(item)
-}
 
 function placeMentionMenuFromRect(rect: DOMRect | null) {
   const el = mentionMenuEl.value
@@ -4540,8 +4382,6 @@ onBeforeUnmount(() => {
   }
   document.removeEventListener('pointerdown', onDocPointerDownForMenus, true)
   window.removeEventListener('keydown', onWindowEscape)
-  window.removeEventListener('resize', repositionSlashMenu)
-  window.removeEventListener('scroll', repositionSlashMenu, true)
   window.removeEventListener('resize', repositionMentionMenu)
   window.removeEventListener('scroll', repositionMentionMenu, true)
   for (const t of menuCloseTimers.values()) clearTimeout(t)
@@ -5838,16 +5678,9 @@ function onDocPointerDownForMenus(e: PointerEvent) {
   closeAllToolbarMenus()
 }
 
-function repositionSlashMenu() {
-  if (!slashOpen.value) return
-  placeSlashMenuFromRect(slashClientRectFn?.() ?? null)
-}
-
 onMounted(() => {
   document.addEventListener('pointerdown', onDocPointerDownForMenus, true)
   window.addEventListener('keydown', onWindowEscape)
-  window.addEventListener('resize', repositionSlashMenu)
-  window.addEventListener('scroll', repositionSlashMenu, true)
   window.addEventListener('resize', repositionMentionMenu)
   window.addEventListener('scroll', repositionMentionMenu, true)
   nextTick(() => {
