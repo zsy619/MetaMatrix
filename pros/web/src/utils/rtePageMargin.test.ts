@@ -39,7 +39,10 @@ assert.deepEqual(screenMargin({ preset: 'normal', top: 25.4, right: 31.8, bottom
 assert.equal(cssPageMargin({ top: 1, right: 2, bottom: 3, left: 4 }), '1mm 2mm 3mm 4mm')
 assert.equal(cssPageMargin({ top: 999, right: -1, bottom: 0, left: 12.74 }), '80mm 0mm 0mm 12.7mm')
 
-const editorCss = readFileSync(new URL('../components/RichTextEditor.vue', import.meta.url), 'utf8')
+const editorCss = [
+  readFileSync(new URL('../components/rte/styles/editor.scoped.css', import.meta.url), 'utf8'),
+  readFileSync(new URL('../components/rte/styles/editor.global.css', import.meta.url), 'utf8'),
+].join('\n')
 assert.match(
   editorCss,
   /\.rte-root\.expanded:not\(\[data-page-size='full'\]\):not\(\.is-page-sheet\) :deep\(\.ProseMirror\)/,
