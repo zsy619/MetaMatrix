@@ -1,0 +1,70 @@
+{
+  "_comment": "最早一代带图表的画布：图表还没有独立分组，旧图表总入口（按钮 key = echarts）混在「链接」组里。用户把它隐藏了，也隐藏了二维码。",
+  "id": "legacy-echarts-in-insert",
+  "type": "quadrant",
+  "schemaVersion": 1,
+  "theme": {
+    "accentColor": "#2f6feb",
+    "backgroundColor": "#ffffff",
+    "borderColor": "#e5e6eb",
+    "fontFamily": "system",
+    "position": "bottom-right",
+    "textColor": "#1f2329",
+    "watermarkOpacity": 0.08,
+    "watermarkPosition": "bottom-right",
+    "watermarkText": "内部资料"
+  },
+  "axes": {
+    "x": { "label": "投入", "max": 100, "min": 0 },
+    "y": { "label": "产出", "max": 100, "min": 0 }
+  },
+  "quadrants": [
+    {
+      "position": "q1",
+      "title": "重点投入",
+      "tone": "yellow",
+      "hints": ["产品化"],
+      "items": [{ "id": "item-1", "text": "季度复盘", "style": {} }]
+    }
+  ],
+  "markers": [],
+  "toolbarGroupOrderByPanelId": {
+    "panel-1": [
+      "history",
+      "type",
+      "marks",
+      "color",
+      "align",
+      "list",
+      "paragraph",
+      "insert",
+      "table",
+      "blocks",
+      "notes",
+      "review",
+      "view",
+      "other"
+    ]
+  },
+  "toolbarGroupButtonsByPanelId": {
+    "panel-1": {
+      "insert": {
+        "order": [
+          "link",
+          "linkButton",
+          "image",
+          "video",
+          "audio",
+          "attach",
+          "linkCard",
+          "qrcode",
+          "emoji",
+          "specialChars",
+          "formula",
+          "echarts"
+        ],
+        "hidden": ["echarts", "qrcode"]
+      }
+    }
+  }
+}
