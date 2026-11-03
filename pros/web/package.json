@@ -11,6 +11,7 @@
     "test:e2e": "node scripts/rte-baseline.mjs",
     "test:e2e:echarts": "node scripts/rte-echarts-e2e.mjs",
     "test:e2e:echarts:render": "node scripts/rte-echarts-render-e2e.mjs",
+    "test:e2e:chart-export": "node scripts/rte-chart-export-e2e.mjs",
     "test:smoke": "node scripts/smoke-flow.mjs",
     "test:e2e:clone": "node scripts/clone-canvas-e2e.mjs",
     "preview": "vite preview"

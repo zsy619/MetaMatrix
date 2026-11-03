@@ -22,6 +22,12 @@ type Block =
   | { kind: 'p'; style?: string; runs: Run[]; indent?: number }
   | { kind: 'listItem'; ordered: boolean; level: number; runs: Run[] }
   | { kind: 'table'; rows: Run[][][] }
+  | { kind: 'image'; src: string; alt: string; width: number; height: number }
+
+/** Word 正文可用宽度（px，96dpi）：A4 去掉左右页边距。 */
+const MAX_IMAGE_WIDTH_PX = 600
+/** 1px = 9525 EMU。 */
+const EMU_PER_PX = 9525
 
 function mergeMarks(a: InlineMark, b: InlineMark): InlineMark {
   return { ...a, ...b }
@@ -109,6 +115,33 @@ function parseIndent(el: HTMLElement): number {
   return 0
 }
 
+/** 从 style 里取 px 尺寸（导出快照图带的是 `width:640px;height:320px`）。 */
+function stylePx(el: HTMLElement, prop: 'width' | 'height'): number {
+  const style = el.getAttribute('style') || ''
+  const match = new RegExp(`(?:^|;)\\s*${prop}\\s*:\\s*([0-9.]+)px`, 'i').exec(style)
+  if (!match) return 0
+  const value = Number(match[1])
+  return Number.isFinite(value) && value > 0 ? value : 0
+}
+
+/** 造一个图片块（宽度超出版心时等比缩放）。 */
+function imageBlockFrom(el: HTMLElement): Block {
+  const src = el.getAttribute('src') || ''
+  const alt = el.getAttribute('alt') || '图片'
+  const attrNum = (name: string) => {
+    const raw = Number(el.getAttribute(name) || '')
+    return Number.isFinite(raw) && raw > 0 ? raw : 0
+  }
+  let width = attrNum('data-width') || stylePx(el, 'width') || MAX_IMAGE_WIDTH_PX
+  let height = attrNum('data-height') || stylePx(el, 'height') || Math.round((width / MAX_IMAGE_WIDTH_PX) * 320)
+  if (width > MAX_IMAGE_WIDTH_PX) {
+    const ratio = MAX_IMAGE_WIDTH_PX / width
+    width = MAX_IMAGE_WIDTH_PX
+    height = Math.max(1, Math.round(height * ratio))
+  }
+  return { kind: 'image', src, alt, width: Math.round(width), height: Math.round(height) }
+}
+
 function parseBlocks(root: HTMLElement): Block[] {
   const blocks: Block[] = []
 
@@ -186,6 +219,20 @@ function parseBlocks(root: HTMLElement): Block[] {
       if (/^h[1-6]$/.test(tag)) {
         pushPara(node, headingStyle(parseInt(tag[1], 10)))
       } else if (tag === 'p' || tag === 'div' || tag === 'blockquote') {
+        // 段里直接放图片（图表快照）：按图片块处理，不丢图
+        const images = Array.from(node.querySelectorAll('img'))
+        if (images.length) {
+          for (const img of images) blocks.push(imageBlockFrom(img as HTMLElement))
+          if (tag === 'p') {
+            // 图已经单独成块；段里还有文字才再补一个文字段
+            const text = collectRuns(node)
+              .map((r) => r.text)
+              .join('')
+              .trim()
+            if (text) pushPara(node)
+            continue
+          }
+        }
         // if div only wraps block children, descend
         const hasBlock = Array.from(node.children).some((c) =>
           /^(P|DIV|H[1-6]|UL|OL|TABLE|BLOCKQUOTE|PRE)$/.test(c.tagName),
@@ -198,6 +245,9 @@ function parseBlocks(root: HTMLElement): Block[] {
         walkList(node, true, 0)
       } else if (tag === 'table') {
         walkTable(node)
+      } else if (tag === 'img') {
+        // 图片（图表快照就是图片）：走 media 关系内嵌，不落成占位文案
+        blocks.push(imageBlockFrom(node))
       } else if (tag === 'pre' || tag === 'code') {
         const runs = collectRuns(node, { code: true })
         blocks.push({ kind: 'p', runs: runs.length ? runs : [{ text: '', marks: {} }] })
@@ -247,12 +297,94 @@ function tableToXml(rows: Run[][][]): string {
   )
 }
 
-function blocksToBodyXml(blocks: Block[]): string {
+/** data URL → 二进制（图片内嵌进 docx 用）。 */
+type MediaData = { bytes: Uint8Array; ext: string; mime: string }
+
+function extForMime(mime: string): string {
+  if (mime === 'image/jpeg' || mime === 'image/jpg') return 'jpeg'
+  if (mime === 'image/gif') return 'gif'
+  if (mime === 'image/webp') return 'webp'
+  if (mime === 'image/svg+xml') return 'svg'
+  if (mime === 'image/bmp') return 'bmp'
+  return 'png'
+}
+
+/** 文件后缀 → [Content_Types].xml 里的 MIME。 */
+function mimeForExt(ext: string): string {
+  if (ext === 'jpeg') return 'image/jpeg'
+  if (ext === 'gif') return 'image/gif'
+  if (ext === 'webp') return 'image/webp'
+  if (ext === 'svg') return 'image/svg+xml'
+  if (ext === 'bmp') return 'image/bmp'
+  return 'image/png'
+}
+
+function dataUrlToMedia(src: string): MediaData | null {
+  const match = /^data:([^;,]+)?((?:;[^,]*)*),(.*)$/s.exec(src || '')
+  if (!match) return null
+  const mime = (match[1] || 'image/png').toLowerCase()
+  const params = match[2] || ''
+  const payload = match[3] || ''
+  const ext = extForMime(mime)
+  if (!/;base64/i.test(params)) {
+    let text = payload
+    try {
+      text = decodeURIComponent(payload)
+    } catch {
+      text = payload
+    }
+    return { bytes: new TextEncoder().encode(text), ext, mime }
+  }
+  try {
+    const binary = atob(payload)
+    const bytes = new Uint8Array(binary.length)
+    for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i)
+    return { bytes, ext, mime }
+  } catch {
+    return null
+  }
+}
+
+/** 内嵌图片的 OOXML（w:drawing → a:blip r:embed）。 */
+function imageXml(opts: {
+  rid: string
+  id: number
+  name: string
+  descr: string
+  width: number
+  height: number
+}): string {
+  const cx = Math.max(1, Math.round(opts.width * EMU_PER_PX))
+  const cy = Math.max(1, Math.round(opts.height * EMU_PER_PX))
+  const name = xmlEscape(opts.name)
+  const descr = xmlEscape(opts.descr)
+  return (
+    `<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:drawing>` +
+    `<wp:inline distT="0" distB="0" distL="0" distR="0">` +
+    `<wp:extent cx="${cx}" cy="${cy}"/>` +
+    `<wp:effectExtent l="0" t="0" r="0" b="0"/>` +
+    `<wp:docPr id="${opts.id}" name="${name}" descr="${descr}"/>` +
+    `<wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr>` +
+    `<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">` +
+    `<pic:pic><pic:nvPicPr><pic:cNvPr id="${opts.id}" name="${name}" descr="${descr}"/>` +
+    `<pic:cNvPicPr/></pic:nvPicPr>` +
+    `<pic:blipFill><a:blip r:embed="${opts.rid}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>` +
+    `<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm>` +
+    `<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr>` +
+    `</pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>`
+  )
+}
+
+function blocksToBodyXml(
+  blocks: Block[],
+  resolveImage?: (block: Extract<Block, { kind: 'image' }>) => { rid: string } | null,
+): string {
   const parts: string[] = []
   let needNumbering = false
   for (const b of blocks) {
     if (b.kind === 'listItem') needNumbering = true
   }
+  let imageIndex = 0
   for (const b of blocks) {
     if (b.kind === 'p') {
       parts.push(paraXml(b.runs, { style: b.style, indent: b.indent }))
@@ -261,6 +393,24 @@ function blocksToBodyXml(blocks: Block[]): string {
       parts.push(paraXml(b.runs, { numId, ilvl: Math.min(8, b.level) }))
     } else if (b.kind === 'table') {
       parts.push(tableToXml(b.rows))
+    } else if (b.kind === 'image') {
+      const resolved = resolveImage?.(b) ?? null
+      if (resolved) {
+        imageIndex += 1
+        parts.push(
+          imageXml({
+            rid: resolved.rid,
+            id: imageIndex,
+            name: `Picture ${imageIndex}`,
+            descr: b.alt,
+            width: b.width,
+            height: b.height,
+          }),
+        )
+      } else {
+        // 不是 data URL（外链图）就没法内嵌，退化成一行说明文字
+        parts.push(paraXml([{ text: b.alt || '图片', marks: {} }]))
+      }
     }
   }
   void needNumbering
@@ -311,6 +461,9 @@ export async function buildDocxBlob(opts: {
 }): Promise<Blob> {
   const title = (opts.title || '').trim() || '未命名文档'
   let bodyXml = ''
+  /** 内嵌图片：zip 内文件名 + 二进制。 */
+  const mediaFiles: { name: string; bytes: Uint8Array; ext: string }[] = []
+  const mediaRels: { id: string; target: string }[] = []
 
   if (opts.bodyHtml && typeof DOMParser !== 'undefined') {
     try {
@@ -320,7 +473,19 @@ export async function buildDocxBlob(opts: {
       )
       const root = doc.getElementById('rte-docx-root') || doc.body
       const blocks = parseBlocks(root as HTMLElement)
-      bodyXml = blocksToBodyXml(blocks)
+      // 图片块 → media 关系（rId3 起，避开 styles / numbering）
+      let mediaSeq = 0
+      const resolveImage = (block: Extract<Block, { kind: 'image' }>) => {
+        const data = dataUrlToMedia(block.src)
+        if (!data) return null
+        mediaSeq += 1
+        const rid = `rId${2 + mediaSeq}`
+        const fileName = `image${mediaSeq}.${data.ext}`
+        mediaFiles.push({ name: fileName, bytes: data.bytes, ext: data.ext })
+        mediaRels.push({ id: rid, target: `media/${fileName}` })
+        return { rid }
+      }
+      bodyXml = blocksToBodyXml(blocks, resolveImage)
     } catch {
       bodyXml = ''
     }
@@ -341,7 +506,10 @@ export async function buildDocxBlob(opts: {
 
   const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
-  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+  xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
+  xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+  xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
   <w:body>
     ${paragraphs}
     <w:sectPr>
@@ -351,10 +519,15 @@ export async function buildDocxBlob(opts: {
   </w:body>
 </w:document>`
 
+  const mediaDefaults = Array.from(new Set(mediaFiles.map((item) => item.ext)))
+    .map((ext) => `<Default Extension="${ext}" ContentType="${mimeForExt(ext)}"/>`)
+    .join('')
+
   const contentTypes = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
   <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
   <Default Extension="xml" ContentType="application/xml"/>
+  ${mediaDefaults}
   <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
   <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
   <Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/>
@@ -365,10 +538,18 @@ export async function buildDocxBlob(opts: {
   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
 </Relationships>`
 
+  const mediaRelXml = mediaRels
+    .map(
+      (item) =>
+        `<Relationship Id="${item.id}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="${item.target}"/>`,
+    )
+    .join('')
+
   const docRels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
   <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>
+  ${mediaRelXml}
 </Relationships>`
 
   const zip = new JSZip()
@@ -379,6 +560,9 @@ export async function buildDocxBlob(opts: {
   word?.file('styles.xml', stylesXml())
   word?.file('numbering.xml', numberingXml())
   word?.folder('_rels')?.file('document.xml.rels', docRels)
+  for (const media of mediaFiles) {
+    word?.folder('media')?.file(media.name, media.bytes)
+  }
 
   return zip.generateAsync({
     type: 'blob',

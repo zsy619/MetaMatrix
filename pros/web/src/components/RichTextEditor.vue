@@ -102,6 +102,7 @@ import {
 } from './rteWave20'
 import { countWords, normalizeHtml, toEditorContent } from '../utils/rteContent'
 import { htmlWithSuggestionsAccepted } from '../utils/rteSuggestions'
+import { buildExportHtmlWithCharts } from '../utils/rteExportChartSnapshots'
 import { useCommentThreads } from './rte/composables/useCommentThreads'
 import { useSuggestionMode } from './rte/composables/useSuggestionMode'
 import { RTE_CTX, type RteEditorEmit, type RteEditorProps } from './rte/context'
@@ -2742,14 +2743,19 @@ function showCjkTypographyTip() {
   moreOpen.value = false
 }
 
-function openPrintPreview() {
+async function openPrintPreview() {
   const ed = editor.value
   if (!ed) {
     ElMessage.warning('编辑器未就绪')
     return
   }
   const title = (localTitle.value || '').trim()
-  const body = htmlWithSuggestionsAccepted(ed.getHTML() || '<p></p>')
+  const accepted = htmlWithSuggestionsAccepted(ed.getHTML() || '<p></p>')
+  // 打印预览里图表要是真图：复用导出用的白底快照（预览纸面里不是空白块）
+  const body = await buildExportHtmlWithCharts({
+    editorHtml: accepted,
+    root: rteRootEl.value,
+  })
   printPreviewHtml.value = title
     ? `<h1 class="rte-print-title">${escapeHtml(title)}</h1>${body}`
     : body
