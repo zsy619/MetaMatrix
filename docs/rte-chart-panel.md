@@ -19,11 +19,11 @@
 | 7 | 未覆盖字段用「高级 JSON」编辑（CodeMirror）+ 校验 | 已对齐 | `ChartAdvancedJsonSection.vue` + `codemirror/jsonEditor.ts` | e2e 截图 10、e2e 断言「非法 JSON 被拦下」 |
 | 8 | 数据编辑：表格增删改行列 + JSON 双向同步 | 已对齐 | `ChartDataSection.vue` + `utils/echarts/chartDataTable.ts` | vitest `chartDataTable.test.ts`、`ChartPanel.persist.test.ts` |
 | 9 | 删除按钮（二次确认） | 已对齐 | `ChartPanel.vue` + `useChartPanelHost.remove()` | vitest `ChartPanel.test.ts`、e2e 截图 08 |
-| 10 | 数据接口：地址 / 方法 / 请求体 / 参数 / 刷新间隔 / 字段映射 | 已对齐 | `utils/echarts/chartDataSource.ts` + `chartDataRuntime.ts` + `ChartDataSourceSection.vue` | vitest `chartDataSource.test.ts`、`chartDataRuntime.test.ts` |
-| 11 | 鉴权：无 / 自定义（Header + Bearer）/ 读取本系统登录态 | 已对齐 | `chartDataSource.buildDataSourceRequest` + `chartSecret.ts` | vitest `chartDataRuntime.test.ts` |
+| 10 | 数据接口：地址 / 方法 / 请求体 / 参数 / 刷新间隔 / 字段映射 | 已对齐 | `utils/echarts/chartDataSource.ts` + `chartDataRequest.ts` + `chartDataMapping.ts` + `chartDataRuntime.ts` + `ChartDataSourceSection.vue` | vitest `chartDataSource.test.ts`、`chartDataRequest.test.ts`、`chartDataMapping.test.ts`、`chartDataRuntime.test.ts` |
+| 11 | 鉴权：无 / 自定义（Header + Bearer）/ 读取本系统登录态 | 已对齐 | `chartDataRequest.buildDataSourceRequest` + `chartSecret.ts` | vitest `chartDataRequest.test.ts`、`chartDataRuntime.test.ts` |
 | 12 | 配置随图表块属性持久化 | 已对齐 | `echartsBlock` 的 `dataSource` 属性 | vitest `ChartPanel.persist.test.ts` |
 | 13 | token 不写入导出 HTML 明文（自定义 token 提示风险） | 已对齐 | 密钥只进 localStorage（`chartSecret.ts`），文档只存布尔开关 | vitest「数据接口配置持久化（不含明文密钥）」 |
-| 14 | 不堆积：按区块拆分文件，单文件 < 300 行 | 已对齐 | `components/rte/chart-panel/`（7 个区块组件 + 3 个 composable） | 见第 4 节行数表 |
+| 14 | 不堆积：按区块拆分文件，单文件 < 300 行 | 已对齐 | `components/rte/chart-panel/`（7 个区块组件 + 4 个 composable） | vitest `chartPanelModuleSize.test.ts`（守卫测试：超 300 行直接红） |
 | 15 | 不得回归：39 类 / 81 模板插入与渲染、HTML 预览、导出 | 已对齐 | 未改模板与净化器；渲染 e2e 81/81 通过 | e2e `rte-echarts-render-e2e.mjs` |
 
 ---
@@ -52,7 +52,7 @@ schema 目录 `src/utils/echarts/panelSchemas/`：39 个类别各一个文件（
 
 | 能力 | 实现 | 说明 |
 |---|---|---|
-| 请求构造 | `chartDataSource.buildDataSourceRequest` | GET 把 `params`（JSON）转 query；POST 带 `body` 并补 `Content-Type` |
+| 请求构造 | `chartDataRequest.buildDataSourceRequest` | GET 把 `params`（JSON）转 query；POST 带 `body` 并补 `Content-Type` |
 | 鉴权 | 同上 + `chartSecret.ts` | `none` / `custom`（本机保存的 Header、Bearer Token）/ `session`（复用 `api/http.ts` 的 `getToken()`，不另存） |
 | 拉取 | `chartDataRuntime.fetchChartData` | 非 2xx 抛「接口请求失败：HTTP xxx」；非 JSON 抛「接口响应不是合法 JSON」 |
 | 字段映射 | `chartDataRuntime.mergeChartDataIntoOption` | 有 `dataset` → 写 `dataset[0].source`；否则 → `xAxis.data` + `series[].data`；`seriesField` 有值时按它拆多系列 |
@@ -66,31 +66,52 @@ schema 目录 `src/utils/echarts/panelSchemas/`：39 个类别各一个文件（
 
 ## 4. 文件与行数（不堆积）
 
+面板区块（`src/components/rte/chart-panel/`）：
+
 | 文件 | 行数 |
 |---|---|
-| `chart-panel/ChartPanel.vue` | 190 |
-| `chart-panel/useChartPanel.ts` | 355 |
-| `chart-panel/useChartPanelHost.ts` | 220 |
-| `chart-panel/useChartPanelBridge.ts` | 102 |
-| `chart-panel/ChartDataSourceSection.vue` | 266 |
-| `chart-panel/ChartAdvancedJsonSection.vue` | 98 |
-| `chart-panel/ChartDataSection.vue` | 103 |
-| `chart-panel/ChartFieldRow.vue` | 97 |
-| `chart-panel/ChartSeriesSection.vue` | 39 |
-| `chart-panel/ChartAxisSection.vue` | 40 |
-| `chart-panel/ChartGeneralSection.vue` | 27 |
-| `chart-panel/ChartStyleSection.vue` | 27 |
+| `ChartDataSourceSection.vue` | 266 |
+| `useChartPanel.ts` | 261 |
+| `useChartPanelHost.ts` | 220 |
+| `ChartPanel.vue` | 190 |
+| `useChartPanelData.ts` | 159 |
+| `ChartDataSection.vue` | 103 |
+| `useChartPanelBridge.ts` | 102 |
+| `ChartAdvancedJsonSection.vue` | 98 |
+| `ChartFieldRow.vue` | 97 |
+| `ChartAxisSection.vue` | 40 |
+| `ChartSeriesSection.vue` | 39 |
+| `ChartGeneralSection.vue` | 27 |
+| `ChartStyleSection.vue` | 27 |
 
-`useChartPanel.ts` 是唯一超过 300 行的文件（面板状态中枢：草稿 / 字段读写 / 数据模型 / 高级 JSON），
-其余区块组件与 schema 文件均远小于 300 行。
+工具层（`src/utils/echarts/`）：
 
-新增工具层：
+| 文件 | 行数 | 作用 |
+|---|---|---|
+| `chartDataTable.ts` | 204 | 表格 ⇄ JSON 的数据模型 |
+| `chartDataRuntime.ts` | 190 | 拉取 / 轮询 / 合并进 option |
+| `chartDataSource.ts` | 136 | 数据接口配置的类型与读写（归一化 / 序列化 / 解析） |
+| `chartOptionPath.ts` | 130 | 按点号路径读写 option + `isSameEchartsOption`（比较两份 option 是否等价） |
+| `chartGroups.ts` | 128 | 工具栏 9 个子分组 |
+| `chartDataMapping.ts` | 119 | 接口响应 → 图表数据的映射（纯函数） |
+| `panelSchemas/index.ts` | 105 | 39 类 schema 汇总与兜底 |
+| `chartDataRequest.ts` | 73 | 请求构造 + query 拼装（纯函数） |
+| `chartSecret.ts` | 78 | 自定义密钥的本机存储 |
+
+> **拆分的由来**：`useChartPanel.ts`（355 行）与 `chartDataSource.ts`（310 行）原本超出 300 行上限。
+> 本轮把「数据编辑」拆到 `useChartPanelData.ts`、把「请求构造」「响应映射」拆到
+> `chartDataRequest.ts` / `chartDataMapping.ts`，现在**全部源文件都 < 300 行**。
+> 并新增守卫测试 `chartPanelModuleSize.test.ts`：一旦有人把文件撑大，测试直接红。
+
+新增工具层（合并视图）：
 
 | 文件 | 作用 |
 |---|---|
 | `src/utils/echarts/chartOptionPath.ts` | 按点号路径读写 option + `isSameEchartsOption`（比较两份 option 是否等价） |
 | `src/utils/echarts/chartDataTable.ts` | 表格 ⇄ JSON 的数据模型 |
-| `src/utils/echarts/chartDataSource.ts` | 数据接口配置 + 请求构造 + 响应映射（纯函数） |
+| `src/utils/echarts/chartDataSource.ts` | 数据接口配置的类型与读写 |
+| `src/utils/echarts/chartDataRequest.ts` | 数据接口的请求构造（纯函数） |
+| `src/utils/echarts/chartDataMapping.ts` | 数据接口的响应映射（纯函数） |
 | `src/utils/echarts/chartDataRuntime.ts` | 拉取 / 轮询 / 合并进 option |
 | `src/utils/echarts/chartSecret.ts` | 自定义密钥的本机存储 |
 | `src/utils/echarts/chartGroups.ts` | 工具栏 9 个子分组 |
@@ -124,6 +145,10 @@ schema 目录 `src/utils/echarts/panelSchemas/`：39 个类别各一个文件（
 4. **数据模型把数值变成字符串**
    `optionToDataModel` / `jsonToDataModel` 现在保留数值类型（`itemToValue`），
    JSON 视图里数值不再被引号包住，ECharts 数值轴行为正确。
+5. **两个文件超出 300 行上限**
+   `useChartPanel.ts`（355 行）与 `chartDataSource.ts`（310 行）违反「单文件 < 300 行」。
+   本轮拆成 `useChartPanelData.ts` / `chartDataRequest.ts` / `chartDataMapping.ts`，
+   并加守卫测试 `chartPanelModuleSize.test.ts`，防止回退。
 
 回归测试：`src/components/rte/chart-panel/ChartPanel.persist.test.ts`
 （改字段 → option → HTML → 重新加载回读；回声覆盖后仍保留；表格 ⇄ JSON；数据源配置持久化）。
@@ -134,11 +159,14 @@ schema 目录 `src/utils/echarts/panelSchemas/`：39 个类别各一个文件（
 
 | 项目 | 命令 | 结果 |
 |---|---|---|
-| vitest（全量） | `npx vitest run` | **49 个文件 / 365 个用例全过** |
+| vitest（全量） | `npx vitest run` | **52 个文件 / 369 个用例全过** |
 | 类型检查 | `npx vue-tsc -b --pretty false` | 通过（0 error） |
 | 构建 | `npx vite build` | 通过 |
 | 模板渲染回归 | `node scripts/rte-echarts-render-e2e.mjs` | 81 个模板全部渲染成功（其中 Canvas/3D·GL 12 个，失败 0） |
-| 面板截图 e2e | `node scripts/rte-chart-panel-e2e.mjs` | 8 项断言全过，退出码 0 |
+| 面板截图 e2e | `node scripts/rte-chart-panel-e2e.mjs` | 9 项断言全过，退出码 0 |
+
+> e2e 两个脚本都需要先起前端：`npx vite --host 127.0.0.1 --port 5173`；
+> 渲染脚本还需要可写的截图目录：`RTE_BASELINE_DIR=/workspace/outputs/metamatrix/shots/chart-panel`。
 
 新增/更新的测试：
 
@@ -146,10 +174,13 @@ schema 目录 `src/utils/echarts/panelSchemas/`：39 个类别各一个文件（
 |---|---|
 | `utils/echarts/panelSchemas/panelSchemas.test.ts` | 39 类都有 schema；每份含通用/系列/样式三段；字段路径、kind、下拉选项合法；未知类型回落 |
 | `utils/echarts/chartDataTable.test.ts` | option ⇄ 模型 ⇄ 表格 ⇄ JSON 全链路；数值类型保持 |
-| `utils/echarts/chartDataSource.test.ts` | 配置归一化 / 序列化 / 请求构造 / query 拼装 / 响应映射 |
+| `utils/echarts/chartDataSource.test.ts` | 配置归一化 / 序列化 / 解析往返；非法鉴权与方法回落 |
+| `utils/echarts/chartDataRequest.test.ts` | 请求构造（GET/POST）、三种鉴权头、query 拼装 |
+| `utils/echarts/chartDataMapping.test.ts` | 按路径取数组、单/多系列映射、非数值归零、写回 option |
 | `utils/echarts/chartDataRuntime.test.ts` | GET/POST 请求、鉴权头（自定义 / 登录态）、响应映射（类目+数值 / 多系列 / dataset）、刷新间隔轮询、失败处理 |
 | `components/rte/chart-panel/ChartPanel.test.ts` | 选中弹出面板、改字段写回 option、删除二次确认 |
 | `components/rte/chart-panel/ChartPanel.persist.test.ts` | 落盘链路、回声守护、表格 ⇄ JSON、数据源配置持久化 |
+| `components/rte/chart-panel/chartPanelModuleSize.test.ts` | 文件规模守卫：面板与图表工具层每个源文件 < 300 行 |
 
 截图（`/workspace/outputs/metamatrix/shots/chart-panel/`）：
 
@@ -177,6 +208,8 @@ schema 目录 `src/utils/echarts/panelSchemas/`：39 个类别各一个文件（
 | `visualMap` / `dataZoom` 不是所有类别都有独立区块 | 它们按类别落在「通用 / 系列」段的字段里（如 `heatmap` 的 `visualMap`、组件类的 `dataZoom`），schema 驱动，没有单列区块。 |
 | 自定义密钥只有「本机浏览器」一种存放位置 | 不做服务端密钥库；面板已提示「共享文档的其他人拿不到该密钥，存在泄露风险」。 |
 | 面板未做「移动 / 折叠为图标条」 | 只提供关闭按钮；侧栏固定 360px 宽（窄屏 ≤ 92vw）。 |
+| 未套用 `docs/GLOBAL_RULES/panel-maximize.md`（面板最大化） | 该规则的对象是**画布面板**（Y 模型块、象限 cell、需求三角图例区），落点是 `usePanelMaximize`；图表属性面板是富文本编辑器内的侧边栏、且本身就是「选中即弹出」，最大化无实际意义，故未接入。 |
+| 未套用 `docs/GLOBAL_RULES/panel-attachments.md`（相关资料区） | 同上：该规则要求每个**可编辑画布面板**底部挂「相关资料」，数据落点是文档根级 `attachmentsByPanelId`；图表属性面板是图表配置表单，不承载附件语义（其「数据接口」区块已提供 URL / 请求体入口）。 |
 
 ## 8. 未验证
 

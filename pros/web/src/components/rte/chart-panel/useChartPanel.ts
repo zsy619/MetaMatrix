@@ -4,8 +4,8 @@
  * 面板本身只做「展示 + 收集意图」，真正的 option 改动都在这里落地：
  * - 字段改动按路径写入草稿（chartOptionPath）；
  * - 草稿每次改动都过一遍净化器（rteEchartsOption），保证写回文档的 option 合法；
- * - 数据表格与 JSON 双向同步（chartDataTable）；
- * - 数据接口请求构造（chartDataSource）不在这里做，只暴露配置。
+ * - 数据表格与 JSON 双向同步（chartDataTable，逻辑在 useChartPanelData.ts）；
+ * - 数据接口请求构造（chartDataRequest）不在这里做，只暴露配置。
  */
 import { computed, reactive, ref, shallowRef, watch } from 'vue'
 import {
@@ -14,12 +14,8 @@ import {
 } from '../../../utils/echarts/chartOptionPath'
 import {
   dataModelToJson,
-  dataModelToOption,
   dataModelToRows,
-  jsonToDataModel,
   optionToDataModel,
-  rowsToDataModel,
-  textToValue,
   type ChartDataModel,
   type ChartDataRow,
 } from '../../../utils/echarts/chartDataTable'
@@ -30,6 +26,7 @@ import {
 } from '../../../utils/rteEchartsOption'
 import { getChartPanelSchema } from '../../../utils/echarts/panelSchemas'
 import type { ChartPanelSchema, PanelField } from '../../../utils/echarts/panelSchemas'
+import { useChartPanelData } from './useChartPanelData'
 
 /** 面板目标：一个图表块。 */
 export type ChartPanelTarget = {
@@ -195,113 +192,6 @@ export function useChartPanel() {
     bump()
   }
 
-  /** 表格里改类目（第一列）。 */
-  function setDataCategory(rowIndex: number, text: string) {
-    const rows = dataRows.value.map((row) => ({
-      category: row.category,
-      values: [...row.values],
-    }))
-    const row = rows[rowIndex]
-    if (!row) return
-    row.category = text
-    const model = rowsToDataModel(rows, seriesNames.value, dataModel.value)
-    draft.value = dataModelToOption(draft.value, model)
-    dataJson.value = dataModelToJson(model)
-    bump()
-  }
-
-  /** 表格单元格改动：写回模型，再写回 option。 */
-  function setDataCell(rowIndex: number, colIndex: number, text: string) {
-    const rows = dataRows.value.map((row) => ({
-      category: row.category,
-      values: [...row.values],
-    }))
-    const row = rows[rowIndex]
-    if (!row) return
-    row.values[colIndex] = textToValue(text)
-    const model = rowsToDataModel(rows, seriesNames.value, dataModel.value)
-    draft.value = dataModelToOption(draft.value, model)
-    dataJson.value = dataModelToJson(model)
-    bump()
-  }
-
-  /** 表格里新增一行。 */
-  function addDataRow() {
-    const rows = dataRows.value.map((row) => ({ category: row.category, values: [...row.values] }))
-    rows.push({
-      category: `类目${rows.length + 1}`,
-      values: rows.length ? [] : seriesNames.value.map(() => 0),
-    })
-    const model = rowsToDataModel(rows, seriesNames.value, dataModel.value)
-    draft.value = dataModelToOption(draft.value, model)
-    dataJson.value = dataModelToJson(model)
-    bump()
-  }
-
-  /** 表格里删除一行。 */
-  function removeDataRow(index: number) {
-    const rows = dataRows.value
-      .map((row) => ({ category: row.category, values: [...row.values] }))
-      .filter((_, i) => i !== index)
-    const model = rowsToDataModel(rows, seriesNames.value, dataModel.value)
-    draft.value = dataModelToOption(draft.value, model)
-    dataJson.value = dataModelToJson(model)
-    bump()
-  }
-
-  /** 表格里新增一个系列（列）。 */
-  function addDataSeries() {
-    const rows = dataRows.value.map((row) => ({ category: row.category, values: [...row.values] }))
-    const names = [...seriesNames.value, `系列${seriesNames.value.length + 1}`]
-    const model = rowsToDataModel(rows, names, dataModel.value)
-    const series = Array.isArray(draft.value.series)
-      ? [...(draft.value.series as Array<Record<string, unknown>>)]
-      : []
-    const first = series[0]
-    const newSeries = {
-      name: names[names.length - 1],
-      type: typeof first?.type === 'string' ? first.type : 'bar',
-      data: rows.map(() => 0),
-    }
-    series.push(newSeries)
-    draft.value = { ...draft.value, series }
-    draft.value = dataModelToOption(draft.value, model)
-    dataJson.value = dataModelToJson(model)
-    bump()
-  }
-
-  /** 表格里删除一个系列（列）。 */
-  function removeDataSeries(index: number) {
-    if (seriesList.value.length <= 1) return
-    const series = seriesList.value.filter((_, i) => i !== index)
-    const names = series.map((item, i) =>
-      typeof item.name === 'string' && item.name ? item.name : `系列${i + 1}`,
-    )
-    const rows = dataRows.value.map((row) => ({
-      category: row.category,
-      values: row.values.filter((_, i) => i !== index),
-    }))
-    const model = rowsToDataModel(rows, names, dataModel.value)
-    draft.value = { ...draft.value, series }
-    draft.value = dataModelToOption(draft.value, model)
-    dataJson.value = dataModelToJson(model)
-    if (seriesIndex.value >= series.length) seriesIndex.value = 0
-    bump()
-  }
-
-  /** JSON 视图里应用文本。 */
-  function applyDataJson(text: string) {
-    const model = jsonToDataModel(text)
-    if (!model) {
-      error.value = 'JSON 数据格式错误'
-      return
-    }
-    error.value = ''
-    draft.value = dataModelToOption(draft.value, model)
-    dataJson.value = dataModelToJson(model)
-    bump()
-  }
-
   /** 用整个 option JSON 覆盖草稿。 */
   function applyFullJson(text: string): boolean {
     const parsed = safeParseEchartsOption(text)
@@ -315,6 +205,28 @@ export function useChartPanel() {
     bump()
     return true
   }
+
+  /** 数据编辑（表格 ⇄ JSON）相关方法。 */
+  const data = useChartPanelData({
+    getDraft: () => draft.value,
+    setDraft: (next) => {
+      draft.value = next
+    },
+    getDataModel: () => dataModel.value,
+    getRows: () => dataRows.value,
+    getSeriesNames: () => seriesNames.value,
+    setDataJson: (text) => {
+      dataJson.value = text
+    },
+    setError: (text) => {
+      error.value = text
+    },
+    getSeriesIndex: () => seriesIndex.value,
+    setSeriesIndex: (index) => {
+      seriesIndex.value = index
+    },
+    bump,
+  })
 
   watch(
     () => target.value?.chartId,
@@ -343,13 +255,7 @@ export function useChartPanel() {
     serializeDraft,
     fieldValue,
     setFieldValue,
-    setDataCategory,
-    setDataCell,
-    addDataRow,
-    removeDataRow,
-    addDataSeries,
-    removeDataSeries,
-    applyDataJson,
+    ...data,
     applyFullJson,
   })
 }

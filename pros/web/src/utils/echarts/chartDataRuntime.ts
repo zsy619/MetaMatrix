@@ -12,13 +12,11 @@
  * - session：复用系统登录态的 token（api/http.ts 的 getToken），不另存一份。
  */
 import {
-  applyMappedDataToOption,
-  buildDataSourceRequest,
-  mapResponseToChartData,
   parseDataSourceConfig,
   type ChartDataSourceConfig,
-  type ChartDataSourceRequest,
 } from './chartDataSource'
+import { buildDataSourceRequest, type ChartDataSourceRequest } from './chartDataRequest'
+import { applyMappedDataToOption, mapResponseToChartData } from './chartDataMapping'
 import { readChartSecret } from './chartSecret'
 import { getToken } from '../../api/http'
 

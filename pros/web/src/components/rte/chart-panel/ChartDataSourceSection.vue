@@ -10,13 +10,13 @@
 import { computed, ref, watch } from 'vue'
 import type { useChartPanel } from './useChartPanel'
 import {
-  buildDataSourceRequest,
   createEmptyDataSourceConfig,
   normalizeDataSourceConfig,
   parseDataSourceConfig,
   type ChartDataSourceAuth,
   type ChartDataSourceMethod,
 } from '../../../utils/echarts/chartDataSource'
+import { buildDataSourceRequest } from '../../../utils/echarts/chartDataRequest'
 import { getToken } from '../../../api/http'
 
 const props = defineProps<{ panel: ReturnType<typeof useChartPanel> }>()
