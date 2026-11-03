@@ -73,6 +73,7 @@ import { ProgressBar } from '../../../extensions/progressBar'
 import { Timeline, TimelineItem } from '../../../extensions/timeline'
 import { TabsBlock, TabPane } from '../../../extensions/tabsBlock'
 import { MermaidBlock } from '../../../extensions/mermaidBlock'
+import { EchartsBlock } from '../../../extensions/echartsBlock'
 import { CrossRef, findCrossRefPos } from '../../../extensions/crossRef'
 import { ListStyleAttrs } from '../../../extensions/listStyleAttrs'
 import { LinkButton } from '../../../extensions/linkButton'
@@ -272,6 +273,7 @@ const editor = useEditor({
     TabsBlock,
     TabPane,
     MermaidBlock,
+    EchartsBlock,
     CrossRef,
     ListStyleAttrs,
     LinkButton,

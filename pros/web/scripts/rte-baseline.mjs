@@ -8,6 +8,8 @@ import { mkdirSync } from 'node:fs'
 const { chromium } = pw
 const chrome = process.env.CHROME_PATH || '/usr/bin/google-chrome'
 const out = process.env.RTE_BASELINE_DIR || '/opt/cursor/artifacts'
+/** 前端地址：默认 5173，可用 RTE_WEB_URL 指到别的端口（避免和别的 worktree 抢端口）。 */
+const web = process.env.RTE_WEB_URL || 'http://127.0.0.1:5173'
 mkdirSync(out, { recursive: true })
 
 const browser = await chromium.launch({
@@ -22,7 +24,7 @@ const log = (step, ok, detail) => {
   console.log(`${ok ? 'PASS' : 'FAIL'} ${step}`, detail ?? '')
 }
 
-await page.goto('http://127.0.0.1:5173/login', { waitUntil: 'domcontentloaded' })
+await page.goto(`${web}/login`, { waitUntil: 'domcontentloaded' })
 await page.fill('#login-email', 'demo@metamatrix.local')
 await page.fill('#login-password', 'demo123456')
 /**
@@ -60,7 +62,7 @@ async function assertPageSettingsFits() {
         }),
       )
     }, item.width)
-    await page.goto('http://127.0.0.1:5173/canvas/dual-triangle', { waitUntil: 'domcontentloaded' })
+    await page.goto(`${web}/canvas/dual-triangle`, { waitUntil: 'domcontentloaded' })
     await page.waitForSelector('.page-settings-panel', { timeout: 8000 })
     await page.waitForTimeout(250)
     const metrics = await page.evaluate(() => {
@@ -88,7 +90,7 @@ async function assertPageSettingsFits() {
 }
 
 async function openTemplate(path, shot) {
-  await page.goto(`http://127.0.0.1:5173${path}`, { waitUntil: 'domcontentloaded' })
+  await page.goto(`${web}${path}`, { waitUntil: 'domcontentloaded' })
   await page.waitForTimeout(2000)
   const max = page.locator('button[aria-label="最大化"]').first()
   const count = await max.count()
@@ -112,7 +114,7 @@ async function openTemplate(path, shot) {
 await openTemplate('/canvas/dual-triangle', 'baseline_dual_triangle')
 await openTemplate('/canvas/star-quadrant', 'baseline_star_quadrant')
 await openTemplate('/canvas/five-step-basic', 'baseline_five_step')
-await page.goto('http://127.0.0.1:5173/canvas/y-model?documentId=4d5f428c-a6e7-45a7-b29e-304120fccbb5', {
+await page.goto(`${web}/canvas/y-model?documentId=4d5f428c-a6e7-45a7-b29e-304120fccbb5`, {
   waitUntil: 'domcontentloaded',
 })
 await page.waitForTimeout(1500)

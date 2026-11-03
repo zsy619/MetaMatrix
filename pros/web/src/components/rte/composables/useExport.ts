@@ -10,6 +10,10 @@ import { escapeHtml } from '../../../utils/itemsHtml'
 import type { PageMargin, PageMarginBox } from '../../../utils/rtePageMargin'
 import type { PanelPageChrome } from '../../../utils/rtePageChrome'
 import type { RtePageSizeId } from '../../../utils/rtePageSize'
+import {
+  RTE_AFTER_EXPORT_EVENT,
+  RTE_BEFORE_EXPORT_EVENT,
+} from '../../../extensions/echartsBlock'
 
 /** 导出菜单与 HTML / 文本 / Markdown / PNG / PDF / Word。 */
 export function useExport(deps: {
@@ -154,6 +158,8 @@ async function exportAsPng() {
   }
   exportBusy.value = true
   root?.classList.add('rte-printing')
+  // 图表块在这里换成白底静态快照，导出结束后还原
+  window.dispatchEvent(new CustomEvent(RTE_BEFORE_EXPORT_EVENT))
   try {
     const canvas = await html2canvas(el, {
       backgroundColor: '#ffffff',
@@ -170,6 +176,7 @@ async function exportAsPng() {
     console.error(err)
     ElMessage.error('导出图片失败')
   } finally {
+    window.dispatchEvent(new CustomEvent(RTE_AFTER_EXPORT_EVENT))
     root?.classList.remove('rte-printing')
     exportBusy.value = false
   }
@@ -189,6 +196,7 @@ async function exportAsPdf() {
   }
   exportBusy.value = true
   root?.classList.add('rte-printing')
+  window.dispatchEvent(new CustomEvent(RTE_BEFORE_EXPORT_EVENT))
   try {
     const title = (deps.title.value || '').trim() || '未命名文档'
     const marginMm = deps.pageScreenMargin.value
@@ -204,6 +212,7 @@ async function exportAsPdf() {
     console.error(err)
     ElMessage.error('导出 PDF 失败')
   } finally {
+    window.dispatchEvent(new CustomEvent(RTE_AFTER_EXPORT_EVENT))
     root?.classList.remove('rte-printing')
     exportBusy.value = false
   }

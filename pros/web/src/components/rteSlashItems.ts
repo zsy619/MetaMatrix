@@ -61,6 +61,7 @@ export type RteSlashAction =
   | { type: 'progressBar' }
   | { type: 'tabsBlock' }
   | { type: 'mermaid' }
+  | { type: 'echarts' }
   | { type: 'ruby' }
   | { type: 'xref' }
   | { type: 'snippet' }
@@ -428,6 +429,25 @@ const MEDIA_ITEMS: RteSlashItem[] = [
     group: 'block',
     keywords: ['mermaid', 'flowchart', '流程图', '时序'],
     action: { type: 'mermaid' },
+  },
+  {
+    id: 'echarts',
+    label: '图表',
+    description: 'ECharts 图表（一键生成柱状/折线/饼/散点/雷达图）',
+    group: 'block',
+    keywords: [
+      'echarts',
+      '图表',
+      'tubiao',
+      'tb',
+      '柱状图',
+      '折线图',
+      '饼图',
+      '散点图',
+      '雷达图',
+      'chart',
+    ],
+    action: { type: 'echarts' },
   },
   {
     id: 'ruby',
