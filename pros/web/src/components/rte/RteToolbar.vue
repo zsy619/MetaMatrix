@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { inject } from 'vue'
+import { computed, inject, ref } from 'vue'
 import { RTE_BINDINGS } from './bindings'
 import { useParentScopeStamp } from './inheritScope'
+import { buildChartGroups } from '../../utils/echarts/chartGroups'
 
 const rte = inject(RTE_BINDINGS)
 if (!rte) throw new Error('RteToolbar 必须放在 RichTextEditor 里')
@@ -9,11 +10,43 @@ const rteBindings = rte
 const vRteFloat = rteBindings.vRteFloat
 useParentScopeStamp()
 
-/** 3D / GL 分区的分隔线：只在该分区的第一个类别前显示。 */
-function isFirstGlCategory(index: string | number): boolean {
-  const list = rteBindings.ECHARTS_CATEGORIES as Array<{ section?: string }>
-  const first = list.findIndex((item) => item.section === 'gl')
-  return first >= 0 && first === Number(index)
+/** 图表下拉按子分组分区（基础 / 统计 / 关系 / 层级 / 地理 / 金融 / 坐标系 / 组件 / 3D·GL）。 */
+const echartsGroups = buildChartGroups()
+/** 当前聚焦的子分组；'all' 表示全部展开显示。 */
+const echartsGroupFilter = ref<string>('all')
+/** 折叠起来的子分组（再次点组头可展开）。 */
+const echartsCollapsedGroups = ref<string[]>([])
+
+/** 可见的分组：'all' 时全部显示，否则只显示选中的那一组。 */
+const visibleEchartsGroups = computed(() =>
+  echartsGroupFilter.value === 'all'
+    ? echartsGroups
+    : echartsGroups.filter((item) => item.group.id === echartsGroupFilter.value),
+)
+
+/** 3D / GL 独立一组：它前面的分组与它之间加分隔线。 */
+function isFirstGlGroup(index: number): boolean {
+  const list = visibleEchartsGroups.value
+  const first = list.findIndex((item) => item.group.id === 'gl')
+  return first >= 0 && first === index
+}
+
+/** 切换子分组筛选。 */
+function selectEchartsGroup(id: string) {
+  echartsGroupFilter.value = echartsGroupFilter.value === id ? 'all' : id
+  if (rteBindings.echartsOpenCategory !== undefined) rteBindings.echartsOpenCategory = null
+}
+
+/** 折叠 / 展开某个子分组。 */
+function toggleEchartsGroup(id: string) {
+  const list = echartsCollapsedGroups.value
+  echartsCollapsedGroups.value = list.includes(id)
+    ? list.filter((item) => item !== id)
+    : [...list, id]
+}
+
+function isEchartsGroupCollapsed(id: string): boolean {
+  return echartsCollapsedGroups.value.includes(id)
 }
 </script>
 
@@ -1852,37 +1885,75 @@ function isFirstGlCategory(index: string | number): boolean {
               @mouseenter="rte.onToolMenuEnter('echarts')"
               @mouseleave="rte.onToolMenuLeave($event, 'echarts', () => (rte.echartsMenuOpen = false))"
             >
-              <template v-for="(cat, catIndex) in rte.ECHARTS_CATEGORIES" :key="'cat-' + cat.id">
+              <!-- 子分组按钮栏：9 个子分组，3D·GL 独立一组 -->
+              <div data-rte-own class="rte-menu-echarts-groups">
+                <button
+                  v-for="item in echartsGroups"
+                  :key="'grp-' + item.group.id"
+                  data-rte-own
+                  type="button"
+                  class="rte-menu-group-chip"
+                  :class="{
+                    'is-active': echartsGroupFilter === item.group.id,
+                    'is-gl': item.group.id === 'gl',
+                  }"
+                  :title="item.group.hint"
+                  @click="selectEchartsGroup(item.group.id)"
+                >
+                  {{ item.group.label }}
+                </button>
+              </div>
+              <template v-for="(grp, grpIndex) in visibleEchartsGroups" :key="'g-' + grp.group.id">
                 <div
-                  v-if="cat.section === 'gl' && isFirstGlCategory(catIndex)"
+                  v-if="isFirstGlGroup(grpIndex)"
                   data-rte-own
                   class="rte-menu-section"
                 >3D / GL</div>
                 <button
                   data-rte-own
                   type="button"
-                  class="rte-menu-cat"
-                  :class="{ 'is-open': rte.echartsOpenCategory === cat.id }"
-                  @click="rte.toggleEchartsCategory(cat.id)"
+                  class="rte-menu-group-head"
+                  :class="{ 'is-open': !isEchartsGroupCollapsed(grp.group.id) }"
+                  @click="toggleEchartsGroup(grp.group.id)"
                 >
-                  <strong data-rte-own>{{ cat.label }}</strong>
-                  <span data-rte-own class="rte-menu-hint">{{ cat.templates.length }} 种</span>
+                  <strong data-rte-own>{{ grp.group.label }}</strong>
+                  <span data-rte-own class="rte-menu-hint">
+                    {{ grp.categories.length }} 类 / {{ grp.group.hint }}
+                  </span>
                 </button>
                 <div
-                  v-if="rte.echartsOpenCategory === cat.id"
+                  v-if="!isEchartsGroupCollapsed(grp.group.id)"
                   data-rte-own
-                  class="rte-menu-sub"
+                  class="rte-menu-group-body"
                 >
-                  <button
-                    v-for="tpl in cat.templates"
-                    :key="'tpl-' + tpl.id"
-                    data-rte-own
-                    type="button"
-                    @click="rte.insertEchartsTemplateById(tpl.id)"
-                  >
-                    {{ tpl.label }}
-                    <span data-rte-own class="rte-menu-hint">{{ tpl.hint }}</span>
-                  </button>
+                  <template v-for="cat in grp.categories" :key="'cat-' + cat.id">
+                    <button
+                      data-rte-own
+                      type="button"
+                      class="rte-menu-cat"
+                      :class="{ 'is-open': rte.echartsOpenCategory === cat.id }"
+                      @click="rte.toggleEchartsCategory(cat.id)"
+                    >
+                      <strong data-rte-own>{{ cat.label }}</strong>
+                      <span data-rte-own class="rte-menu-hint">{{ cat.templates.length }} 种</span>
+                    </button>
+                    <div
+                      v-if="rte.echartsOpenCategory === cat.id"
+                      data-rte-own
+                      class="rte-menu-sub"
+                    >
+                      <button
+                        v-for="tpl in cat.templates"
+                        :key="'tpl-' + tpl.id"
+                        data-rte-own
+                        type="button"
+                        @click="rte.insertEchartsTemplateById(tpl.id)"
+                      >
+                        {{ tpl.label }}
+                        <span data-rte-own class="rte-menu-hint">{{ tpl.hint }}</span>
+                      </button>
+                    </div>
+                  </template>
                 </div>
               </template>
               <div data-rte-own class="rte-menu-sep" aria-hidden="true"></div>

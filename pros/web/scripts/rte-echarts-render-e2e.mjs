@@ -33,9 +33,21 @@ const browser = await chromium.launch({
 })
 const page = await browser.newPage({ viewport: { width: 900, height: 700 } })
 const pageErrors = []
-page.on('pageerror', (err) => pageErrors.push(String(err)))
+/**
+ * 预览页没有 favicon，浏览器自己发的那次请求会报 404，与渲染无关。
+ * 真正的资源 404 由下面的 response 监听单独记录（带 URL）。
+ */
+const isIgnorable = (text) => /favicon/i.test(text) || /Failed to load resource/i.test(text)
+page.on('pageerror', (err) => {
+  if (!isIgnorable(String(err))) pageErrors.push(String(err))
+})
 page.on('console', (msg) => {
-  if (msg.type() === 'error') pageErrors.push(msg.text())
+  if (msg.type() === 'error' && !isIgnorable(msg.text())) pageErrors.push(msg.text())
+})
+page.on('response', (res) => {
+  if (res.status() >= 400 && !isIgnorable(res.url())) {
+    pageErrors.push(`HTTP ${res.status()} ${res.url()}`)
+  }
 })
 
 await page.goto(`${web}/echarts-preview.html`, { waitUntil: 'domcontentloaded' })
