@@ -21,6 +21,7 @@ assert.deepEqual(normalizeToolbarGroupOrder(['nope', 'color', 'color', 'text', '
   'history',
   'paragraph',
   'insert',
+  'charts',
   'table',
   'blocks',
   'notes',
@@ -49,6 +50,7 @@ assert.deepEqual(
       'review',
       'view',
       'other',
+      'charts',
     ],
   },
 )

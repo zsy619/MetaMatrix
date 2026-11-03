@@ -433,7 +433,7 @@ const MEDIA_ITEMS: RteSlashItem[] = [
   {
     id: 'echarts',
     label: '图表',
-    description: 'ECharts 图表（一键生成柱状/折线/饼/散点/雷达图）',
+    description: 'ECharts 图表（官方示例 39 类：折线/柱状/饼/散点/雷达/K线/热力/地图/桑基/3D 等）',
     group: 'block',
     keywords: [
       'echarts',
@@ -445,6 +445,14 @@ const MEDIA_ITEMS: RteSlashItem[] = [
       '饼图',
       '散点图',
       '雷达图',
+      'K线',
+      '热力图',
+      '地图',
+      '桑基图',
+      '漏斗图',
+      '仪表盘',
+      '关系图',
+      '3D',
       'chart',
     ],
     action: { type: 'echarts' },

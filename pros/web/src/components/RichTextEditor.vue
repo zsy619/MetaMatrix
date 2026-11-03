@@ -137,11 +137,17 @@ import { RTE_SPECIAL_CHAR_CATEGORIES } from '../utils/rteSpecialChars'
 import {
   ECHARTS_CHART_TYPES,
   ECHARTS_MAX_PER_DOCUMENT,
+  buildEchartsTemplateOption,
   buildTemplateOption,
   serializeEchartsOption,
   type EchartsChartType,
   type EchartsTableData,
 } from '../utils/rteEchartsOption'
+import {
+  ECHARTS_CATEGORIES,
+  ECHARTS_TEMPLATES,
+  findEchartsTemplate,
+} from '../utils/echarts/templates'
 import {
   RTE_AFTER_EXPORT_EVENT,
   RTE_BEFORE_EXPORT_EVENT,
@@ -2305,8 +2311,11 @@ const echartsMenuOpen = ref(false)
 const echartsDialogOpen = ref(false)
 const echartsDialogTable = ref<EchartsTableData | null>(null)
 const echartsDialogType = ref<EchartsChartType>('bar')
+const echartsDialogTemplateId = ref('')
 const echartsDialogTitle = ref('')
 const echartsDialogUseTable = ref(false)
+/** 工具栏下拉里展开的类别（null 表示全折叠）。 */
+const echartsOpenCategory = ref<string | null>(null)
 
 function echartsTypeLabel(type: EchartsChartType): string {
   return ECHARTS_CHART_TYPES.find((item) => item.value === type)?.label || '图表'
@@ -2343,10 +2352,51 @@ function insertEchartsBlockAtCursor(
   ElMessage.success(`已插入${echartsTypeLabel(type)}（可点块内「编辑数据」改 JSON）`)
 }
 
+/** 按模板 id 插入（工具栏下拉 / 对话框共用）。 */
+function insertEchartsTemplateById(
+  templateId: string,
+  opts: { title?: string; table?: EchartsTableData | null } = {},
+) {
+  const ed = editor.value
+  if (!ed) return
+  const template = findEchartsTemplate(templateId)
+  if (!template) return
+  const count = countEchartsBlocks()
+  if (count >= ECHARTS_MAX_PER_DOCUMENT) {
+    ElMessage.warning(
+      `单文档图表已达 ${ECHARTS_MAX_PER_DOCUMENT} 个，继续插入会拖慢页面（建议拆分文档）`,
+    )
+  }
+  const option = buildEchartsTemplateOption(templateId, {
+    title: opts.title || '',
+    table: opts.table ?? null,
+  })
+  if (!option) return
+  ed.chain()
+    .focus()
+    .insertEchartsBlock({
+      option: serializeEchartsOption(option),
+      chartType: template.categoryId,
+      theme: 'light',
+      renderer: template.renderer,
+    })
+    .run()
+  echartsMenuOpen.value = false
+  echartsOpenCategory.value = null
+  moreOpen.value = false
+  ElMessage.success(`已插入${template.label}（可点块内「编辑数据」改 JSON）`)
+}
+
+/** 下拉里展开 / 收起某个类别。 */
+function toggleEchartsCategory(categoryId: string) {
+  echartsOpenCategory.value = echartsOpenCategory.value === categoryId ? null : categoryId
+}
+
 /** 一键生成面板：选类型 + 可选标题 + 可选用表格数据。 */
 function openEchartsDialog() {
   echartsDialogTable.value = currentEchartsTableData()
   echartsDialogType.value = 'bar'
+  echartsDialogTemplateId.value = 'bar-basic'
   echartsDialogTitle.value = ''
   echartsDialogUseTable.value = !!echartsDialogTable.value
   echartsDialogOpen.value = true
@@ -2354,15 +2404,28 @@ function openEchartsDialog() {
   moreOpen.value = false
 }
 
+/** 对话框里切换类别（同步选中该类别的第一个子类型）。 */
+function selectEchartsDialogCategory(categoryId: string) {
+  echartsDialogType.value = categoryId
+  const category = ECHARTS_CATEGORIES.find((item) => item.id === categoryId)
+  if (category?.templates[0]) echartsDialogTemplateId.value = category.templates[0].id
+}
+
 function applyEchartsDialog(payload: {
   type: EchartsChartType
+  templateId: string
   title: string
   useTable: boolean
 }) {
   const table = payload.useTable
     ? echartsDialogTable.value || currentEchartsTableData()
     : null
-  insertEchartsBlockAtCursor(payload.type, { title: payload.title, table })
+  const templateId = payload.templateId || ''
+  if (templateId) {
+    insertEchartsTemplateById(templateId, { title: payload.title, table })
+  } else {
+    insertEchartsBlockAtCursor(payload.type, { title: payload.title, table })
+  }
   echartsDialogOpen.value = false
 }
 
@@ -6165,6 +6228,8 @@ provide(RTE_CTX, {
 provideRteBindings({
   CALLOUT_MENU_ITEMS,
   ECHARTS_CHART_TYPES,
+  ECHARTS_CATEGORIES,
+  ECHARTS_TEMPLATES,
   CODE_LANG_OPTIONS,
   COLUMN_MENU_ITEMS,
   FEISHU_HIGHLIGHT_COLORS,
@@ -6280,12 +6345,17 @@ provideRteBindings({
   closeExportMenu,
   echartsDialogOpen,
   echartsDialogTable,
+  echartsDialogTemplateId,
   echartsDialogTitle,
   echartsDialogType,
   echartsDialogUseTable,
   echartsMenuOpen,
+  echartsOpenCategory,
   applyEchartsDialog,
   insertEchartsBlockAtCursor,
+  insertEchartsTemplateById,
+  toggleEchartsCategory,
+  selectEchartsDialogCategory,
   openEchartsDialog,
   closeFindDialog,
   closeFontMenus,

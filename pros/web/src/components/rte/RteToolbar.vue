@@ -5,8 +5,16 @@ import { useParentScopeStamp } from './inheritScope'
 
 const rte = inject(RTE_BINDINGS)
 if (!rte) throw new Error('RteToolbar 必须放在 RichTextEditor 里')
-const vRteFloat = rte.vRteFloat
+const rteBindings = rte
+const vRteFloat = rteBindings.vRteFloat
 useParentScopeStamp()
+
+/** 3D / GL 分区的分隔线：只在该分区的第一个类别前显示。 */
+function isFirstGlCategory(index: string | number): boolean {
+  const list = rteBindings.ECHARTS_CATEGORIES as Array<{ section?: string }>
+  const first = list.findIndex((item) => item.section === 'gl')
+  return first >= 0 && first === Number(index)
+}
 </script>
 
 <template>
@@ -1838,22 +1846,45 @@ useParentScopeStamp()
           <Teleport to="body">
             <div data-rte-own
               v-if="rte.echartsMenuOpen"
-              class="rte-menu"
+              class="rte-menu rte-menu-echarts"
               v-rte-float="'echarts'"
               @mousedown.prevent
               @mouseenter="rte.onToolMenuEnter('echarts')"
               @mouseleave="rte.onToolMenuLeave($event, 'echarts', () => (rte.echartsMenuOpen = false))"
             >
-              <button
-                v-for="opt in rte.ECHARTS_CHART_TYPES"
-                :key="'ec-' + opt.value"
-                data-rte-own
-                type="button"
-                @click="rte.insertEchartsBlockAtCursor(opt.value)"
-              >
-                {{ opt.label }}
-                <span data-rte-own class="rte-menu-hint">{{ opt.hint }}</span>
-              </button>
+              <template v-for="(cat, catIndex) in rte.ECHARTS_CATEGORIES" :key="'cat-' + cat.id">
+                <div
+                  v-if="cat.section === 'gl' && isFirstGlCategory(catIndex)"
+                  data-rte-own
+                  class="rte-menu-section"
+                >3D / GL</div>
+                <button
+                  data-rte-own
+                  type="button"
+                  class="rte-menu-cat"
+                  :class="{ 'is-open': rte.echartsOpenCategory === cat.id }"
+                  @click="rte.toggleEchartsCategory(cat.id)"
+                >
+                  <strong data-rte-own>{{ cat.label }}</strong>
+                  <span data-rte-own class="rte-menu-hint">{{ cat.templates.length }} 种</span>
+                </button>
+                <div
+                  v-if="rte.echartsOpenCategory === cat.id"
+                  data-rte-own
+                  class="rte-menu-sub"
+                >
+                  <button
+                    v-for="tpl in cat.templates"
+                    :key="'tpl-' + tpl.id"
+                    data-rte-own
+                    type="button"
+                    @click="rte.insertEchartsTemplateById(tpl.id)"
+                  >
+                    {{ tpl.label }}
+                    <span data-rte-own class="rte-menu-hint">{{ tpl.hint }}</span>
+                  </button>
+                </div>
+              </template>
               <div data-rte-own class="rte-menu-sep" aria-hidden="true"></div>
               <button data-rte-own type="button" @click="rte.openEchartsDialog()">一键生成…</button>
             </div>

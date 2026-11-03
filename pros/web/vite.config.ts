@@ -25,6 +25,11 @@ export default defineConfig({
   plugins: [vue()],
   resolve: {
     dedupe: [...PROSEMIRROR_DEDUPE, '@tiptap/pm', '@tiptap/core'],
+    alias: [
+      // echarts-gl 内部 import 'echarts/lib/echarts'，必须与应用侧的 'echarts/core'
+      // 指向同一个模块实例，否则会拿到两套 core（地图注册、扩展注册互不可见）。
+      { find: /^echarts\/lib\/echarts(\.js)?$/, replacement: 'echarts/core' },
+    ],
   },
   optimizeDeps: {
     include: [
