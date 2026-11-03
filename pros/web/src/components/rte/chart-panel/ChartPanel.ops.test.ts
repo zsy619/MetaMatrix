@@ -161,6 +161,31 @@ describe('图表操作落点', () => {
     wrapper.unmount()
   })
 
+  it('删除确认弹窗挂在 body 上，并带「不被编辑器遮挡」的标记 class', async () => {
+    const wrapper = await mountEditor()
+    const editor = (wrapper.vm as unknown as { editor: any }).editor
+    await openPanelOnChart(editor)
+
+    const delBtn = document.querySelector('.rte-cp-btn-danger') as HTMLElement | null
+    expect(delBtn).toBeTruthy()
+    delBtn!.click()
+    await flushPromises()
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    await nextTick()
+
+    // 遮罩挂在 body 上（不在编辑器 DOM 里）→ 不会被编辑器的 overflow / 层级裁掉
+    const overlay = document.querySelector(
+      '.el-overlay.is-message-box.rte-chart-delete-confirm',
+    ) as HTMLElement | null
+    expect(overlay).toBeTruthy()
+    expect(document.body.contains(overlay!)).toBe(true)
+    expect(overlay!.closest('.rte-root')).toBeNull()
+    // 标记 class 由 editor.global.css 的 z-index 规则接手（盖过编辑器层级）
+    const box = document.querySelector('.el-message-box') as HTMLElement | null
+    expect((box?.textContent || '').includes('删除图表')).toBe(true)
+    wrapper.unmount()
+  })
+
   it('删除后宿主整篇回写旧 HTML：图表块不复活', async () => {
     const wrapper = await mountEditor()
     const editor = (wrapper.vm as unknown as { editor: any }).editor

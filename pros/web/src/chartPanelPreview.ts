@@ -11,6 +11,9 @@
  */
 import { createApp, h, onMounted, ref } from 'vue'
 import { createPinia } from 'pinia'
+// 与生产入口（src/main.ts）保持一致：预览页也要带 Element Plus 的样式，
+// 否则 ElMessageBox / ElMessage 退化成无样式的普通 DOM，e2e 截不到弹窗。
+import 'element-plus/dist/index.css'
 import { NodeSelection } from '@tiptap/pm/state'
 import RichTextEditor from './components/RichTextEditor.vue'
 import { useDocumentStore } from './stores/document'
