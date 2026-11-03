@@ -4,7 +4,7 @@
  * 约束（见 docs/rte-feishu-gap.md 与可行性报告）：
  * - option 只能是纯 JSON，不能带函数；
  * - 入库（parseHTML）与渲染（setOption）两处都要过净化器，粘贴路径同样受管；
- * - 禁掉会带出交互出口或富文本的字段（toolbox / graphic / markPoint / rich 等）；
+ * - 白名单覆盖官方示例 39 个类目用到的 series 类型与组件；
  * - 单图 option 体积上限 64KB，数据点上限 5000。
  *
  * 上限语义（与单测一一对应，勿随手改）：
@@ -13,24 +13,59 @@
  * - 任何「被截断」的情况（数组超长、字符串超长、层级过深、系列数超限）
  *   一律按错误返回，绝不静默截断后当成功——用户拿到的图表必须和自己写的一致。
  */
+import { ECHARTS_CATEGORIES, ECHARTS_TEMPLATES, findEchartsTemplate } from './echarts/templates'
+import type { EchartsTemplateDef } from './echarts/types'
+import { CUSTOM_RENDER_ITEM_IDS } from './echarts/customRenderItems'
 
-/** 支持的图表类型（与 echartsRuntime 注册的图表一一对应）。 */
-export type EchartsChartType = 'bar' | 'line' | 'pie' | 'scatter' | 'radar'
+/** 图表类型（官方类别 id，例如 'bar' / 'candlestick' / 'globe'）。 */
+export type EchartsChartType = string
 
+/** 工具栏 / 对话框里的类别列表（来自模板目录，39 类）。 */
 export const ECHARTS_CHART_TYPES: ReadonlyArray<{
   value: EchartsChartType
   label: string
   hint: string
-}> = [
-  { value: 'bar', label: '柱状图', hint: '分类对比' },
-  { value: 'line', label: '折线图', hint: '趋势变化' },
-  { value: 'pie', label: '饼图', hint: '占比构成' },
-  { value: 'scatter', label: '散点图', hint: '相关性' },
-  { value: 'radar', label: '雷达图', hint: '多维评分' },
-]
+}> = ECHARTS_CATEGORIES.map((item) => ({ value: item.id, label: item.label, hint: item.hint }))
 
-export const ECHARTS_CHART_TYPE_VALUES: readonly EchartsChartType[] = ECHARTS_CHART_TYPES.map(
-  (item) => item.value,
+/** 允许的 series 类型（净化器据此丢弃未知类型）。 */
+export const ECHARTS_SERIES_TYPES: readonly string[] = Array.from(
+  new Set<string>([
+    ...ECHARTS_TEMPLATES.map((item) => item.chartType),
+    'bar',
+    'line',
+    'pie',
+    'scatter',
+    'radar',
+    'effectScatter',
+    'candlestick',
+    'boxplot',
+    'heatmap',
+    'graph',
+    'lines',
+    'tree',
+    'treemap',
+    'sunburst',
+    'parallel',
+    'sankey',
+    'funnel',
+    'gauge',
+    'pictorialBar',
+    'themeRiver',
+    'custom',
+    'map',
+    'chord',
+    // 3D / GL（echarts-gl）
+    'bar3D',
+    'scatter3D',
+    'line3D',
+    'lines3D',
+    'surface',
+    'map3D',
+    'scatterGL',
+    'linesGL',
+    'flowGL',
+    'graphGL',
+  ]),
 )
 
 /** 单个图表 option 的最大字节数（UTF-8）。 */
@@ -48,36 +83,8 @@ export const ECHARTS_MAX_DEPTH = 12
 /** 单个文档建议的图表数量上限。 */
 export const ECHARTS_MAX_PER_DOCUMENT = 20
 
-/** 一律丢弃的字段：交互出口、富文本、可执行内容。 */
-const BANNED_KEYS = new Set([
-  'toolbox',
-  'graphic',
-  'markPoint',
-  'markArea',
-  'rich',
-  'dataset',
-  'dataZoom',
-  'brush',
-  'visualMap',
-  'polar',
-  'singleAxis',
-  'calendar',
-  'themeRiver',
-  'parallel',
-  'gantt',
-  'funnel',
-  'sunburst',
-  'treemap',
-  'boxplot',
-  'candlestick',
-  'heatmap',
-  'graph',
-  'sankey',
-  'gauge',
-  'pictorialBar',
-  'themeRiver',
-  'markPoint',
-])
+/** 一律丢弃的字段：交互出口与无障碍播报（不进白名单）。 */
+const BANNED_KEYS = new Set(['brush', 'aria'])
 
 const TOP_LEVEL_KEYS: readonly string[] = [
   'title',
@@ -94,7 +101,33 @@ const TOP_LEVEL_KEYS: readonly string[] = [
   'animation',
   'animationDuration',
   'animationDurationUpdate',
+  'animationEasing',
+  'animationDelay',
+  'animationDelayUpdate',
   'textStyle',
+  // —— ECharts 6 扩展组件 ——
+  'dataset',
+  'dataZoom',
+  'visualMap',
+  'polar',
+  'angleAxis',
+  'radiusAxis',
+  'singleAxis',
+  'calendar',
+  'parallel',
+  'graphic',
+  'geo',
+  'matrix',
+  'toolbox',
+  'axisPointer',
+  'parallelAxis',
+  // —— 3D / GL（echarts-gl）——
+  'grid3D',
+  'geo3D',
+  'globe',
+  'xAxis3D',
+  'yAxis3D',
+  'zAxis3D',
 ]
 
 const STYLE_KEYS: readonly string[] = [
@@ -142,6 +175,235 @@ const STYLE_KEYS: readonly string[] = [
   'shadowOffsetX',
   'shadowOffsetY',
   'decoration',
+  'rich',
+  'textBorderColor',
+  'textBorderWidth',
+  'textShadowColor',
+  'textShadowBlur',
+  'textShadowOffsetX',
+  'textShadowOffsetY',
+  'overflow',
+  'lineOverflow',
+]
+
+/** label.rich 里每个富文本样式的白名单。 */
+const RICH_KEYS: readonly string[] = [
+  'color',
+  'fontSize',
+  'fontStyle',
+  'fontWeight',
+  'fontFamily',
+  'backgroundColor',
+  'backgroundColor',
+  'padding',
+  'borderColor',
+  'borderWidth',
+  'borderRadius',
+  'width',
+  'height',
+  'align',
+  'verticalAlign',
+  'shadowBlur',
+  'shadowColor',
+  'shadowOffsetX',
+  'shadowOffsetY',
+  'lineHeight',
+  'opacity',
+  'textBorderColor',
+  'textBorderWidth',
+  'textShadowColor',
+  'textShadowBlur',
+]
+
+/** series 顶层允许的字段（覆盖 39 类用到的所有 series 差异）。 */
+const SERIES_KEYS: readonly string[] = [
+  // 通用
+  'type',
+  'name',
+  'data',
+  'stack',
+  'xAxisIndex',
+  'yAxisIndex',
+  'z',
+  'zlevel',
+  'silent',
+  'showSymbol',
+  'symbol',
+  'symbolSize',
+  'symbolRotate',
+  'symbolOffset',
+  'symbolPosition',
+  'symbolKeepAspect',
+  'symbolRepeat',
+  'symbolMargin',
+  'smooth',
+  'step',
+  'coordinateSystem',
+  'coordinateSystemIndex',
+  'geoIndex',
+  'calendarIndex',
+  'parallelIndex',
+  'singleAxisIndex',
+  'polarIndex',
+  'gridIndex',
+  'radius',
+  'center',
+  'roseType',
+  'label',
+  'labelLayout',
+  'itemStyle',
+  'lineStyle',
+  'areaStyle',
+  'barWidth',
+  'barMaxWidth',
+  'barMinWidth',
+  'barGap',
+  'barCategoryGap',
+  'clip',
+  'clipPath',
+  'encode',
+  'emphasis',
+  'blur',
+  'select',
+  'animation',
+  'animationDuration',
+  'animationEasing',
+  'animationDelay',
+  'universalTransition',
+  'markLine',
+  'markPoint',
+  'markArea',
+  'cursor',
+  'tooltip',
+  'min',
+  'max',
+  'splitNumber',
+  'axisLine',
+  'axisTick',
+  'splitLine',
+  'axisLabel',
+  'progress',
+  'pointer',
+  'detail',
+  'title',
+  'valueAnimation',
+  'showBackground',
+  'autoRotate',
+  'rotateLabel',
+  'alignTo',
+  // 关系图 / 树 / 桑基 / 旭日
+  'levels',
+  'nodes',
+  'links',
+  'categories',
+  'force',
+  'layout',
+  'roam',
+  'draggable',
+  'edgeSymbol',
+  'edgeLabel',
+  'initialTreeDepth',
+  'orient',
+  'expandAndCollapse',
+  'expandable',
+  'leafDepth',
+  'upperLabel',
+  'breadcrumb',
+  'nodeGap',
+  'nodeAlign',
+  'nodeWidth',
+  'nodeClick',
+  'sort',
+  'gap',
+  'funnelAlign',
+  // 日历 / 平行坐标系 / 主题河流
+  'filterMode',
+  'cellSize',
+  'yearLabel',
+  'monthLabel',
+  'dayLabel',
+  'range',
+  'singleAxis',
+  'calendar',
+  'polygon',
+  'diff',
+  'transition',
+  'boxWidth',
+  // 各类图表的专属字段
+  'roundCap',
+  'map',
+  'minSize',
+  'rippleEffect',
+  'pointSize',
+  'blurSize',
+  'minOpacity',
+  'maxOpacity',
+  'polyline',
+  'leaves',
+  'datasetIndex',
+  // custom
+  'renderItem',
+  'dimensions',
+  // 3D / GL
+  'dimension3D',
+  'grid3D',
+  'globe',
+  'geo3D',
+  'shading',
+  'realisticMaterial',
+  'light',
+  'postEffect',
+  'environment',
+  'groundPlane',
+  'temporalSuperSampling',
+  'blendMode',
+  'supersampling',
+  'progressive',
+  'effect',
+  'trailLength',
+  'lineWidth',
+  'barSize',
+  'shading',
+  'wireframe',
+  'viewControl',
+  'environment',
+  'baseColor',
+  'globeRadius',
+  'showGraticule',
+  'regionHeight',
+  'particleType',
+  'supersampling',
+  'progressive',
+  'postEffect',
+  'light',
+  'realisticMaterial',
+  'temporalSuperSampling',
+  'groundPlane',
+  'dimension3D',
+  'minHeight',
+  'maxHeight',
+  'boxDepth',
+]
+
+/** series.data 里每个数据项允许的字段。 */
+const DATA_ITEM_KEYS: readonly string[] = [
+  'name',
+  'value',
+  'symbolSize',
+  'symbol',
+  'itemStyle',
+  'label',
+  'lineStyle',
+  'emphasis',
+  'xAxis',
+  'yAxis',
+  'coord',
+  'category',
+  'tooltip',
+  'id',
+  'children',
+  'links',
+  'coords',
 ]
 
 const CHILD_KEYS: Record<string, readonly string[]> = {
@@ -159,6 +421,8 @@ const CHILD_KEYS: Record<string, readonly string[]> = {
     'itemWidth',
     'itemHeight',
     'padding',
+    'link',
+    'target',
   ],
   subtitle: [
     'text',
@@ -192,8 +456,25 @@ const CHILD_KEYS: Record<string, readonly string[]> = {
     'selected',
     'padding',
     'selectedMode',
+    'pageIconColor',
+    'pageTextStyle',
+    'pageButtonItemGap',
+    'scroll',
+    'title',
   ],
-  grid: ['left', 'right', 'top', 'bottom', 'width', 'height', 'containLabel', 'show'],
+  grid: [
+    'left',
+    'right',
+    'top',
+    'bottom',
+    'width',
+    'height',
+    'containLabel',
+    'show',
+    'borderColor',
+    'borderWidth',
+    'backgroundColor',
+  ],
   tooltip: [
     'trigger',
     'axis',
@@ -208,6 +489,11 @@ const CHILD_KEYS: Record<string, readonly string[]> = {
     'position',
     'transitionDuration',
     'axisPointer',
+    'triggerOn',
+    'alwaysShowContent',
+    'extraCssText',
+    'padding',
+    'appendTo',
   ],
   xAxis: [
     'type',
@@ -215,6 +501,7 @@ const CHILD_KEYS: Record<string, readonly string[]> = {
     'nameLocation',
     'nameGap',
     'nameTextStyle',
+    'nameRotate',
     'data',
     'axisLabel',
     'axisLine',
@@ -225,9 +512,16 @@ const CHILD_KEYS: Record<string, readonly string[]> = {
     'min',
     'max',
     'interval',
+    'log',
     'inverse',
     'show',
     'position',
+    'offset',
+    'axisPointer',
+    'realtime',
+    'valueType',
+    'color',
+    'hideOverlap',
   ],
   yAxis: [
     'type',
@@ -235,6 +529,7 @@ const CHILD_KEYS: Record<string, readonly string[]> = {
     'nameLocation',
     'nameGap',
     'nameTextStyle',
+    'nameRotate',
     'data',
     'axisLabel',
     'axisLine',
@@ -245,9 +540,16 @@ const CHILD_KEYS: Record<string, readonly string[]> = {
     'min',
     'max',
     'interval',
+    'log',
     'inverse',
     'show',
     'position',
+    'offset',
+    'axisPointer',
+    'realtime',
+    'valueType',
+    'color',
+    'hideOverlap',
   ],
   radar: [
     'indicator',
@@ -261,35 +563,10 @@ const CHILD_KEYS: Record<string, readonly string[]> = {
     'axisLine',
     'splitLine',
     'startAngle',
+    'nameGap',
+    'axisNameGap',
   ],
-  series: [
-    'type',
-    'name',
-    'data',
-    'stack',
-    'yAxisIndex',
-    'xAxisIndex',
-    'smooth',
-    'showSymbol',
-    'symbol',
-    'symbolSize',
-    'radius',
-    'center',
-    'roseType',
-    'coordinateSystem',
-    'areaStyle',
-    'lineStyle',
-    'barStyle',
-    'itemStyle',
-    'label',
-    'emphasis',
-    'animation',
-    'animationDuration',
-    'encode',
-    'markLine',
-    'z',
-    'silent',
-  ],
+  series: SERIES_KEYS,
   label: STYLE_KEYS,
   subtextStyle: STYLE_KEYS,
   textStyle: STYLE_KEYS,
@@ -306,8 +583,438 @@ const CHILD_KEYS: Record<string, readonly string[]> = {
   axisTick: STYLE_KEYS,
   splitLine: STYLE_KEYS,
   splitArea: STYLE_KEYS,
-  axisPointer: ['type', 'show', 'label', 'lineStyle', 'shadowStyle', 'snap', 'triggerOn'],
-  markLine: ['symbol', 'symbolSize', 'lineStyle', 'label', 'data', 'animation', 'animationDuration'],
+  axisPointer: ['type', 'show', 'label', 'lineStyle', 'shadowStyle', 'snap', 'triggerOn', 'status', 'z'],
+  markLine: [
+    'symbol',
+    'symbolSize',
+    'lineStyle',
+    'label',
+    'data',
+    'animation',
+    'animationDuration',
+    'itemStyle',
+    'emphasis',
+    'silent',
+    'precision',
+    'z',
+  ],
+  markPoint: [
+    'symbol',
+    'symbolSize',
+    'symbolRotate',
+    'label',
+    'data',
+    'animation',
+    'animationDuration',
+    'itemStyle',
+    'emphasis',
+    'silent',
+    'z',
+  ],
+  markArea: [
+    'itemStyle',
+    'label',
+    'data',
+    'animation',
+    'animationDuration',
+    'emphasis',
+    'silent',
+    'z',
+  ],
+  rich: RICH_KEYS,
+  // —— 组件 ——
+  dataset: ['source', 'dimensions', 'sourceHeader', 'seriesLayout', 'transformations', 'encode', 'fields'],
+  transformations: ['type', 'filter', 'map', 'sort', 'reduce', 'options', 'dimension', 'order', 'by', 'as', 'index'],
+  dataZoom: [
+    'type',
+    'start',
+    'end',
+    'startValue',
+    'endValue',
+    'xAxisIndex',
+    'yAxisIndex',
+    'dataZoomIndex',
+    'filterMode',
+    'show',
+    'showDetail',
+    'labelFormatter',
+    'realtime',
+    'rangeMode',
+    'handleStyle',
+    'moveOnMouseMove',
+    'moveOnMouseWheel',
+    'zoomOnMouseWheel',
+    'preventDefaultMouseMove',
+    'dimension',
+    'minValueSpan',
+    'maxValueSpan',
+  ],
+  visualMap: [
+    'type',
+    'min',
+    'max',
+    'dimension',
+    'seriesIndex',
+    'calculable',
+    'orient',
+    'left',
+    'top',
+    'right',
+    'bottom',
+    'itemWidth',
+    'itemHeight',
+    'text',
+    'textStyle',
+    'inRange',
+    'outOfRange',
+    'pieces',
+    'show',
+    'precision',
+    'indicator',
+    'realtime',
+    'handleStyle',
+    'formatter',
+    'alignLabel',
+  ],
+  polar: [
+    'center',
+    'radius',
+    'startAngle',
+    'endAngle',
+    'axisLine',
+    'splitLine',
+    'splitArea',
+    'itemStyle',
+    'label',
+    'emphasis',
+    'angleAxis',
+    'radiusAxis',
+    'show',
+  ],
+  angleAxis: [
+    'type',
+    'name',
+    'nameLocation',
+    'nameGap',
+    'nameTextStyle',
+    'data',
+    'axisLabel',
+    'axisLine',
+    'axisTick',
+    'splitLine',
+    'splitArea',
+    'boundaryGap',
+    'min',
+    'max',
+    'interval',
+    'startAngle',
+    'endAngle',
+    'inverse',
+    'show',
+    'position',
+  ],
+  radiusAxis: [
+    'type',
+    'name',
+    'nameLocation',
+    'nameGap',
+    'nameTextStyle',
+    'data',
+    'axisLabel',
+    'axisLine',
+    'axisTick',
+    'splitLine',
+    'splitArea',
+    'boundaryGap',
+    'min',
+    'max',
+    'interval',
+    'inverse',
+    'show',
+    'position',
+  ],
+  singleAxis: [
+    'type',
+    'name',
+    'nameLocation',
+    'nameGap',
+    'nameTextStyle',
+    'data',
+    'axisLabel',
+    'axisLine',
+    'axisTick',
+    'splitLine',
+    'splitArea',
+    'boundaryGap',
+    'min',
+    'max',
+    'interval',
+    'inverse',
+    'show',
+    'position',
+    'offset',
+  ],
+  calendar: [
+    'range',
+    'cellSize',
+    'splitLine',
+    'itemStyle',
+    'orientation',
+    'top',
+    'left',
+    'right',
+    'bottom',
+    'width',
+    'height',
+    'yearLabel',
+    'monthLabel',
+    'dayLabel',
+    'show',
+  ],
+  parallel: [
+    'axis',
+    'parallelAxis',
+    'left',
+    'top',
+    'right',
+    'bottom',
+    'width',
+    'height',
+    'layout',
+    'gridSize',
+    'merge',
+    'axisLabel',
+    'name',
+    'nameTextStyle',
+    'show',
+  ],
+  graphic: [
+    'type',
+    'style',
+    'left',
+    'top',
+    'right',
+    'bottom',
+    'position',
+    'width',
+    'height',
+    'shape',
+    'x',
+    'y',
+    'cx',
+    'cy',
+    'r',
+    'z',
+    'zlevel',
+    'invisible',
+    'silent',
+    'keyframeAnimation',
+    'children',
+    'extra',
+    'info',
+    'id',
+  ],
+  geo: [
+    'map',
+    'roam',
+    'zoom',
+    'center',
+    'layoutCenter',
+    'layoutSize',
+    'aspectScale',
+    'itemStyle',
+    'label',
+    'emphasis',
+    'select',
+    'regions',
+    'z',
+    'zlevel',
+    'show',
+    'name',
+    'boundingCoords',
+  ],
+  matrix: [
+    'x',
+    'y',
+    'body',
+    'corner',
+    'backgroundStyle',
+    'left',
+    'top',
+    'right',
+    'bottom',
+    'width',
+    'height',
+    'z',
+    'triggerEvent',
+    'show',
+  ],
+  toolbox: [
+    'show',
+    'orient',
+    'itemSize',
+    'itemGap',
+    'itemWidth',
+    'itemHeight',
+    'left',
+    'top',
+    'right',
+    'bottom',
+    'feature',
+    'padding',
+  ],
+  parallelAxis: [
+    'dim',
+    'name',
+    'nameGap',
+    'nameTextStyle',
+    'type',
+    'data',
+    'axisLabel',
+    'axisLine',
+    'axisTick',
+    'splitLine',
+    'splitArea',
+    'min',
+    'max',
+    'interval',
+    'inverse',
+    'show',
+    'position',
+  ],
+  // —— 3D / GL 组件 ——
+  grid3D: [
+    'boxWidth',
+    'boxDepth',
+    'boxHeight',
+    'axisLine',
+    'axisLabel',
+    'axisTick',
+    'splitLine',
+    'splitArea',
+    'grid3DIndex',
+    'viewControl',
+    'postEffect',
+    'light',
+    'groundPlane',
+    'environment',
+    'zlevel',
+    'show',
+    'left',
+    'top',
+    'right',
+    'bottom',
+    'width',
+    'height',
+  ],
+  geo3D: [
+    'map',
+    'roam',
+    'zoom',
+    'center',
+    'boxWidth',
+    'boxDepth',
+    'boxHeight',
+    'regionHeight',
+    'shading',
+    'itemStyle',
+    'label',
+    'emphasis',
+    'select',
+    'regions',
+    'zlevel',
+    'show',
+    'left',
+    'top',
+    'right',
+    'bottom',
+    'viewControl',
+    'postEffect',
+    'light',
+    'groundPlane',
+    'environment',
+  ],
+  globe: [
+    'environment',
+    'baseColor',
+    'baseAmbient',
+    'globeRadius',
+    'globeRotation',
+    'showGraticule',
+    'showGroundAtmosphere',
+    'atmosphereColor',
+    'atmosphereAlpha',
+    'viewControl',
+    'light',
+    'postEffect',
+    'temporalSuperSampling',
+    'shading',
+    'label',
+    'itemStyle',
+    'zlevel',
+    'show',
+    'left',
+    'top',
+    'right',
+    'bottom',
+  ],
+  xAxis3D: [
+    'type',
+    'name',
+    'nameLocation',
+    'nameGap',
+    'nameTextStyle',
+    'data',
+    'axisLabel',
+    'axisLine',
+    'axisTick',
+    'splitLine',
+    'splitArea',
+    'min',
+    'max',
+    'interval',
+    'inverse',
+    'show',
+    'position',
+  ],
+  yAxis3D: [
+    'type',
+    'name',
+    'nameLocation',
+    'nameGap',
+    'nameTextStyle',
+    'data',
+    'axisLabel',
+    'axisLine',
+    'axisTick',
+    'splitLine',
+    'splitArea',
+    'min',
+    'max',
+    'interval',
+    'inverse',
+    'show',
+    'position',
+  ],
+  zAxis3D: [
+    'type',
+    'name',
+    'nameLocation',
+    'nameGap',
+    'nameTextStyle',
+    'data',
+    'axisLabel',
+    'axisLine',
+    'axisTick',
+    'splitLine',
+    'splitArea',
+    'min',
+    'max',
+    'interval',
+    'inverse',
+    'show',
+    'position',
+  ],
 }
 
 export type EchartsSanitizeResult =
@@ -351,6 +1058,58 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value)
 }
 
+/** 数据项里的对象字段（symbolSize 等）走通用白名单。 */
+function sanitizeDataItemObject(item: Record<string, unknown>, state: SanitizeState): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  for (const key of Object.keys(item)) {
+    if (!DATA_ITEM_KEYS.includes(key)) {
+      warn(state, `已移除不支持的数据字段：${key}`)
+      continue
+    }
+    if (key === 'value') {
+      out.value = sanitizeDataValue(item.value, state)
+      continue
+    }
+    if (key === 'children' || key === 'links') {
+      out[key] = sanitizeSeriesData(item[key], state)
+      continue
+    }
+    const childAllowed = CHILD_KEYS[key] ?? null
+    const sanitized = sanitizeNode(item[key], childAllowed, state, 1)
+    if (sanitized === null && item[key] !== null) continue
+    out[key] = sanitized
+  }
+  return out
+}
+
+/** 数据项里的 value：数字 / 数组 / 字符串。 */
+function sanitizeDataValue(raw: unknown, state: SanitizeState): unknown {
+  if (typeof raw === 'number') {
+    state.points += 1
+    return Number.isFinite(raw) ? raw : 0
+  }
+  if (typeof raw === 'string') {
+    state.points += 1
+    return sanitizeString(raw, state)
+  }
+  if (Array.isArray(raw)) {
+    const arr: unknown[] = []
+    for (const cell of raw.slice(0, 32)) {
+      if (typeof cell === 'number') {
+        state.points += 1
+        arr.push(Number.isFinite(cell) ? cell : 0)
+      } else if (typeof cell === 'string') {
+        state.points += 1
+        arr.push(sanitizeString(cell, state))
+      } else {
+        arr.push(null)
+      }
+    }
+    return arr
+  }
+  return null
+}
+
 function sanitizeSeriesData(raw: unknown, state: SanitizeState): unknown[] {
   if (!Array.isArray(raw)) return []
   const out: unknown[] = []
@@ -389,28 +1148,7 @@ function sanitizeSeriesData(raw: unknown, state: SanitizeState): unknown[] {
       continue
     }
     if (isPlainObject(item)) {
-      const obj: Record<string, unknown> = {}
-      if (typeof item.name === 'string') obj.name = sanitizeString(item.name, state)
-      const value = item.value
-      if (Array.isArray(value)) {
-        const arr: unknown[] = []
-        for (const cell of value.slice(0, 32)) {
-          if (typeof cell === 'number') {
-            state.points += 1
-            arr.push(Number.isFinite(cell) ? cell : 0)
-          } else if (typeof cell === 'string') {
-            state.points += 1
-            arr.push(sanitizeString(cell, state))
-          } else {
-            arr.push(null)
-          }
-        }
-        obj.value = arr
-      } else if (typeof value === 'number') {
-        state.points += 1
-        obj.value = Number.isFinite(value) ? value : 0
-      }
-      out.push(obj)
+      out.push(sanitizeDataItemObject(item, state))
       continue
     }
     // 其他类型直接丢弃
@@ -428,14 +1166,27 @@ function sanitizeSeriesList(raw: unknown, state: SanitizeState): unknown[] {
   for (const item of raw.slice(0, len)) {
     if (!isPlainObject(item)) continue
     const type = typeof item.type === 'string' ? item.type : ''
-    if (!ECHARTS_CHART_TYPE_VALUES.includes(type as EchartsChartType)) {
+    if (!ECHARTS_SERIES_TYPES.includes(type)) {
       warn(state, `已移除不支持的图表类型：${type || '未知'}`)
       continue
     }
-    const sanitized = sanitizeNode(item, CHILD_KEYS.series, state, 1)
+    const sanitized = sanitizeNode(item, SERIES_KEYS, state, 1)
     if (isPlainObject(sanitized)) out.push(sanitized)
   }
   return out
+}
+
+/** custom 系列的 renderItem 只允许内置白名单预设名。 */
+function sanitizeRenderItem(raw: unknown, state: SanitizeState): string | null {
+  if (typeof raw !== 'string') {
+    warn(state, '已移除不支持的 renderItem（只允许内置预设）')
+    return null
+  }
+  if (!CUSTOM_RENDER_ITEM_IDS.includes(raw as (typeof CUSTOM_RENDER_ITEM_IDS)[number])) {
+    warn(state, '已移除不支持的 renderItem（只允许内置预设）')
+    return null
+  }
+  return raw
 }
 
 function sanitizeNode(
@@ -474,7 +1225,7 @@ function sanitizeNode(
       warn(state, `已移除不支持的配置：${key}`)
       continue
     }
-    if (key === 'data' && allowed === CHILD_KEYS.series) {
+    if (key === 'data' && allowed === SERIES_KEYS) {
       out[key] = sanitizeSeriesData(value[key], state)
       continue
     }
@@ -482,10 +1233,34 @@ function sanitizeNode(
       out[key] = sanitizeSeriesList(value[key], state)
       continue
     }
+    if (key === 'renderItem') {
+      const preset = sanitizeRenderItem(value[key], state)
+      if (preset) out[key] = preset
+      continue
+    }
+    if (key === 'rich') {
+      out[key] = sanitizeRich(value[key], state, depth)
+      continue
+    }
     const childAllowed = CHILD_KEYS[key] ?? null
     const sanitized = sanitizeNode(value[key], childAllowed, state, depth + 1)
     if (sanitized === null && value[key] !== null) continue
     out[key] = sanitized
+  }
+  return out
+}
+
+/** label.rich：{ 名称: { 样式 } } */
+function sanitizeRich(raw: unknown, state: SanitizeState, depth: number): Record<string, unknown> {
+  if (!isPlainObject(raw)) return {}
+  const out: Record<string, unknown> = {}
+  for (const key of Object.keys(raw)) {
+    const name = sanitizeString(key, state)
+    if (!name) continue
+    const style = raw[key]
+    if (!isPlainObject(style)) continue
+    const sanitized = sanitizeNode(style, RICH_KEYS, state, depth + 1)
+    if (isPlainObject(sanitized)) out[name] = sanitized
   }
   return out
 }
@@ -513,7 +1288,7 @@ export function sanitizeEchartsOption(raw: unknown): EchartsSanitizeResult {
     const kept = series.filter((item) => {
       if (!isPlainObject(item)) return false
       const type = typeof item.type === 'string' ? item.type : ''
-      if (!ECHARTS_CHART_TYPE_VALUES.includes(type as EchartsChartType)) {
+      if (!ECHARTS_SERIES_TYPES.includes(type)) {
         warn(state, `已移除不支持的图表类型：${type || '未知'}`)
         return false
       }
@@ -623,6 +1398,9 @@ function buildCartesianOption(
 
 /**
  * 生成带示例数据的可用 option。
+ *
+ * type 可以是官方类别 id（'bar' / 'candlestick' …），
+ * 也可以是模板 id（'candlestick-volume' …）。
  */
 export function buildTemplateOption(
   type: EchartsChartType,
@@ -633,6 +1411,8 @@ export function buildTemplateOption(
     const fromTable = buildOptionFromTable(type, opts.table, title)
     if (fromTable) return fromTable
   }
+  const template = findEchartsTemplate(type) || findCategoryFirstTemplate(type)
+  if (template) return template.build({ title })
   switch (type) {
     case 'bar':
       return buildCartesianOption('bar', title || '季度销售额', SAMPLE_LABELS.slice(0, 4), [
@@ -644,85 +1424,36 @@ export function buildTemplateOption(
         { name: '新增用户', data: [820, 932, 901, 934, 1290, 1330] },
         { name: '活跃用户', data: [620, 682, 741, 790, 850, 920] },
       ])
-    case 'pie':
-      return {
-        title: { text: title || '渠道占比', left: 'center' },
-        tooltip: { trigger: 'item' },
-        legend: { bottom: 0 },
-        series: [
-          {
-            name: '渠道占比',
-            type: 'pie',
-            radius: ['38%', '64%'],
-            center: ['50%', '46%'],
-            label: { formatter: '{b} {d}%' },
-            data: [
-              { name: '直接访问', value: 1048 },
-              { name: '搜索引擎', value: 735 },
-              { name: '邮件营销', value: 580 },
-              { name: '联盟广告', value: 484 },
-              { name: '视频广告', value: 300 },
-            ],
-          },
-        ],
-      }
-    case 'scatter':
-      return {
-        title: { text: title || '相关性分析', left: 'center' },
-        tooltip: { trigger: 'item' },
-        grid: { left: 56, right: 24, top: 48, bottom: 48, containLabel: true },
-        xAxis: { type: 'value', name: 'X' },
-        yAxis: { type: 'value', name: 'Y' },
-        series: [
-          {
-            name: '样本',
-            type: 'scatter',
-            symbolSize: 12,
-            data: [
-              [10, 8],
-              [18, 15],
-              [26, 22],
-              [35, 28],
-              [42, 36],
-              [50, 41],
-              [58, 49],
-            ],
-          },
-        ],
-      }
-    case 'radar':
-      return {
-        title: { text: title || '能力雷达', left: 'center' },
-        tooltip: {},
-        radar: {
-          indicator: [
-            { name: '性能', max: 100 },
-            { name: '稳定', max: 100 },
-            { name: '易用', max: 100 },
-            { name: '安全', max: 100 },
-            { name: '成本', max: 100 },
-          ],
-          center: ['50%', '54%'],
-          radius: '62%',
-        },
-        series: [
-          {
-            name: '本期',
-            type: 'radar',
-            data: [{ value: [82, 74, 68, 90, 76] }],
-          },
-          {
-            name: '上期',
-            type: 'radar',
-            data: [{ value: [70, 66, 72, 80, 84] }],
-          },
-        ],
-      }
     default:
       return buildCartesianOption('bar', title || '示例图表', SAMPLE_LABELS.slice(0, 4), [
         { name: '系列一', data: [120, 200, 150, 80] },
       ])
   }
+}
+
+/** 按类别 id 取该类别的第一个模板。 */
+export function findCategoryFirstTemplate(categoryId: string): EchartsTemplateDef | null {
+  const category = ECHARTS_CATEGORIES.find((item) => item.id === categoryId)
+  return category?.templates[0] || null
+}
+
+/**
+ * 按模板 id 生成 option（带示例数据）。
+ *
+ * 表格优先：有光标所在表格时用表格数据生成，否则用模板自带的示例数据。
+ */
+export function buildEchartsTemplateOption(
+  templateId: string,
+  opts: { title?: string; table?: EchartsTableData | null } = {},
+): Record<string, unknown> | null {
+  const template = findEchartsTemplate(templateId)
+  if (!template) return null
+  const title = (opts.title ?? '').trim()
+  if (opts.table && opts.table.rows.length) {
+    const fromTable = buildOptionFromTable(template.categoryId, opts.table, title)
+    if (fromTable) return fromTable
+  }
+  return template.build({ title })
 }
 
 /**

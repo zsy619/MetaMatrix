@@ -105,7 +105,7 @@ describe('RichTextEditor 特征', () => {
       'panel-a': { preset: 'narrow', top: 12.7, right: 12.7, bottom: 12.7, left: 12.7 },
     })
     expect(store.current_data?.toolbarGroupOrderByPanelId).toEqual({
-      'panel-a': ['type', 'marks', 'align', 'list', 'insert', 'history', 'color', 'paragraph', 'table', 'blocks', 'notes', 'review', 'view', 'other'],
+      'panel-a': ['type', 'marks', 'align', 'list', 'insert', 'history', 'color', 'paragraph', 'charts', 'table', 'blocks', 'notes', 'review', 'view', 'other'],
     })
     expect(marks()).toBeGreaterThanOrEqual(3)
     wrapper.unmount()

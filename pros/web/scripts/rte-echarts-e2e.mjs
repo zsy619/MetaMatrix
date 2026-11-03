@@ -1,5 +1,10 @@
 /**
- * 图表块（ECharts）端到端：斜杠/对话框插入 → 真实渲染 → data-option 往返 → 导出快照。
+ * 图表块（ECharts）端到端：工具栏「图表」分组 → 按官方类别逐类插入 → 真实渲染 → 导出快照。
+ *
+ * 覆盖：
+ * - 工具栏独立「图表」分组（39 类，下拉按类别分区展开）；
+ * - 每个类别抽一个子类型插入，并验证真的渲染出图（SVG / WebGL Canvas）；
+ * - data-option 往返、导出快照。
  *
  * 前置：API 与前端已启动。
  *   RTE_WEB_URL       前端地址，默认 http://127.0.0.1:5173
@@ -18,7 +23,13 @@ mkdirSync(out, { recursive: true })
 const browser = await chromium.launch({
   executablePath: chrome,
   headless: true,
-  args: ['--no-sandbox', '--disable-dev-shm-usage'],
+  args: [
+    '--no-sandbox',
+    '--disable-dev-shm-usage',
+    // 无显卡环境用 SwiftShader 跑 WebGL（3D / GL 图要靠它）
+    '--use-gl=swiftshader',
+    '--enable-unsafe-swiftshader',
+  ],
 })
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
 page.on('pageerror', (err) => console.log('PAGEERROR', String(err)))
@@ -61,31 +72,67 @@ if (await slashItem.count()) {
   const dialog = await page.locator('.rte-echarts-dialog').count()
   log('一键生成对话框打开', dialog > 0)
   if (dialog) {
+    // 类别栏 + 子类型栏
+    const cats = await page.locator('.rte-echarts-dialog .rte-echarts-cats button').count()
+    log('对话框列出官方类别', cats >= 39, `类别数=${cats}`)
     await page.locator('.rte-echarts-dialog button', { hasText: '折线图' }).first().click()
+    await page.waitForTimeout(200)
+    const subtypes = await page.locator('.rte-echarts-dialog .rte-echarts-subtypes button').count()
+    log('对话框列出该类子类型', subtypes > 0, `子类型数=${subtypes}`)
+    await page.locator('.rte-echarts-dialog .rte-echarts-subtypes button').first().click()
     await page.locator('.rte-echarts-dialog button', { hasText: '插入' }).first().click()
     await page.waitForTimeout(1200)
   }
 }
 log('斜杠路径插入一块图表', (await page.locator('.pm-overlay .rte-echarts-block').count()) >= 1)
 
-/** 二、工具栏「图表」下拉 → 柱状图 */
+/** 二、工具栏独立「图表」分组：下拉里 39 类，按类别分区展开 */
 const toolbarBtn = page.locator('.pm-overlay button[title="插入 ECharts 图表"]')
 log('工具栏有图表按钮', (await toolbarBtn.count()) > 0)
 await toolbarBtn.first().click({ force: true })
-await page.waitForTimeout(300)
-const menuItem = page.locator('body > .rte-menu button', { hasText: '柱状图' }).first()
-log('图表下拉菜单有五类图', (await menuItem.count()) > 0)
-if (await menuItem.count()) {
-  await menuItem.click()
-  await page.waitForTimeout(1200)
-}
-const blockCounts = {
-  overlay: await page.locator('.pm-overlay .rte-echarts-block').count(),
-  page: await page.locator('.rte-echarts-block').count(),
-}
-log('工具栏路径插入第二块图表', blockCounts.overlay >= 2, JSON.stringify(blockCounts))
+await page.waitForTimeout(400)
+const categoryButtons = page.locator('body > .rte-menu-echarts .rte-menu-cat')
+const categoryCount = await categoryButtons.count()
+log('图表下拉按官方类别分区', categoryCount >= 39, `类别数=${categoryCount}`)
+const glSection = await page.locator('body > .rte-menu-echarts .rte-menu-section').count()
+log('3D / GL 单独分区', glSection >= 1, `分区数=${glSection}`)
 
-/** 三、真实渲染：懒加载 echarts 后块内出现 SVG */
+/** 三、每个类别抽一个子类型插入，并验证真的渲染出来 */
+const labels = await categoryButtons.allTextContents()
+const inserted = []
+for (let i = 0; i < categoryButtons.count(); i += 1) {
+  const cat = categoryButtons.nth(i)
+  const label = (labels[i] || '').trim()
+  await cat.click({ force: true })
+  await page.waitForTimeout(120)
+  const sub = page.locator('body > .rte-menu-echarts .rte-menu-sub button').first()
+  if ((await sub.count()) === 0) {
+    log(`类别 ${label} 没有子类型`, false)
+    continue
+  }
+  const before = await page.locator('.pm-overlay .rte-echarts-block').count()
+  await sub.click({ force: true })
+  await page.waitForTimeout(600)
+  const after = await page.locator('.pm-overlay .rte-echarts-block').count()
+  if (after <= before) {
+    log(`类别 ${label} 插入失败`, false)
+    continue
+  }
+  const last = page.locator('.pm-overlay .rte-echarts-block').last()
+  const rendered = await last.evaluate((node) => {
+    const preview = node.querySelector('.rte-echarts-preview')
+    return {
+      svg: !!preview?.querySelector('svg'),
+      canvas: !!preview?.querySelector('canvas'),
+      error: preview?.querySelector('.rte-echarts-error')?.textContent || '',
+    }
+  })
+  const ok = (rendered.svg || rendered.canvas) && !rendered.error
+  log(`类别 ${label} 插入并渲染`, ok, JSON.stringify(rendered))
+  inserted.push({ label, ok })
+}
+
+/** 四、真实渲染：懒加载 echarts 后块内出现 SVG */
 await page.waitForSelector('.pm-overlay .rte-echarts-block svg', { timeout: 15000 })
 const rendered = await page.evaluate(() => {
   const block = document.querySelector('.pm-overlay .rte-echarts-block')
@@ -100,7 +147,7 @@ const rendered = await page.evaluate(() => {
 })
 log('图表真实渲染出 SVG', !!rendered.ok, JSON.stringify(rendered))
 
-/** 四、data-option 往返：属性是合法 JSON，且带 series */
+/** 五、data-option 往返：属性是合法 JSON，且带 series */
 const attr = await page.evaluate(() => {
   const block = document.querySelector('.pm-overlay .rte-echarts-block')
   const raw = block?.getAttribute('data-option') || ''
@@ -113,7 +160,7 @@ const attr = await page.evaluate(() => {
 })
 log('data-option 可解析且带 series', !!attr.ok && !!attr.type, JSON.stringify(attr))
 
-/** 五、导出快照：导出前事件 → 白底快照；导出后事件 → 还原 */
+/** 六、导出快照：导出前事件 → 白底快照；导出后事件 → 还原 */
 const snapshot = await page.evaluate(() => {
   window.dispatchEvent(new CustomEvent('rte:before-export'))
   const img = document.querySelector('.pm-overlay .rte-echarts-snapshot-img')
@@ -133,12 +180,12 @@ const dropped = await page.evaluate(() => {
 })
 log('导出后快照已移除', dropped === 0, String(dropped))
 
-/** 六、序列化往返：编辑器 getHTML 里的 data-option 仍可解析 */
+/** 七、序列化往返：编辑器 getHTML 里的 data-option 仍可解析 */
 const serialized = await page.evaluate(() => {
   const html = document.querySelector('.pm-overlay .ProseMirror')?.innerHTML || ''
   const match = html.match(/data-option="([^"]*)"/)
   if (!match) return { ok: false }
-  const text = match[1].replace(/&quot;/g, '"').replace(/&amp;/g, '&')
+  const text = match[1].replace(/"/g, '"').replace(/&/g, '&')
   try {
     const parsed = JSON.parse(text)
     return { ok: true, type: parsed?.series?.[0]?.type }
@@ -149,7 +196,9 @@ const serialized = await page.evaluate(() => {
 log('序列化 HTML 里 data-option 可还原', !!serialized.ok, JSON.stringify(serialized))
 
 await page.screenshot({ path: `${out}/echarts_blocks.png` })
+await page.screenshot({ path: `${out}/echarts_blocks_full.png`, fullPage: true })
 
+console.log(JSON.stringify({ inserted: inserted.length, failed: inserted.filter((i) => !i.ok) }, null, 2))
 console.log(JSON.stringify(notes, null, 2))
 await browser.close()
 if (notes.some((item) => !item.ok)) process.exitCode = 1

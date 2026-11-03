@@ -51,6 +51,62 @@
   background: #f2f3f5;
 }
 
+/* 图表下拉：官方示例 39 类，按类别分区展开 */
+.rte-float-menu.rte-menu-echarts {
+  min-width: 240px;
+  max-height: var(--rte-float-max-h, min(70vh, 560px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.rte-float-menu.rte-menu-echarts .rte-menu-section {
+  padding: 6px 12px 2px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #86909c;
+  letter-spacing: 0.02em;
+  user-select: none;
+}
+.rte-float-menu.rte-menu-echarts .rte-menu-cat {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-weight: 600;
+}
+.rte-float-menu.rte-menu-echarts .rte-menu-cat.is-open {
+  background: #f2f3f5;
+}
+.rte-float-menu.rte-menu-echarts .rte-menu-sub {
+  display: flex;
+  flex-direction: column;
+  padding: 0 0 4px 12px;
+  border-left: 2px solid #eef0f3;
+  margin: 0 0 4px 12px;
+}
+.rte-float-menu.rte-menu-echarts .rte-menu-sub button {
+  font-size: 12px;
+  padding: 5px 10px;
+}
+/* 一键生成对话框：类别 + 子类型两栏 */
+.rte-echarts-type-list {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  max-height: 320px;
+  margin-bottom: 8px;
+}
+.rte-echarts-cats {
+  flex: 1 1 45%;
+  overflow-y: auto;
+  padding-right: 6px;
+  border-right: 1px solid #eef0f3;
+}
+.rte-echarts-subtypes {
+  flex: 1 1 55%;
+  overflow-y: auto;
+  padding-left: 6px;
+}
+
 /* 盖过 .rte-modal-overlay(4100)，避免弹窗内 toast 被挡住变成「没反应」 */
 .el-message {
   z-index: 5000 !important;

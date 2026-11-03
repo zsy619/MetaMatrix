@@ -13,38 +13,53 @@ import {
 } from './rteEchartsOption.ts'
 
 describe('ECharts option 净化', () => {
-  it('剥离 toolbox / graphic / markPoint 等危险字段', () => {
+  it('已放行的组件（toolbox / graphic / markPoint）能保留', () => {
     const result = sanitizeEchartsOption({
       title: { text: '示例' },
-      toolbox: { feature: { dataView: true } },
+      toolbox: { feature: { saveAsImage: {}, restore: {} } },
       graphic: [{ type: 'text', style: { text: 'x' } }],
       series: [{ type: 'bar', data: [1, 2], markPoint: { data: [] } }],
     })
     expect(result.ok).toBe(true)
     if (!result.ok) return
-    expect(result.option.toolbox).toBeUndefined()
-    expect(result.option.graphic).toBeUndefined()
+    expect(result.option.toolbox).toBeTruthy()
+    expect(result.option.graphic).toBeTruthy()
     const series = result.option.series as Array<Record<string, unknown>>
-    expect(series[0].markPoint).toBeUndefined()
-    expect(result.warnings.join('，')).toContain('toolbox')
+    expect(series[0].markPoint).toBeTruthy()
+  })
+
+  it('剥离未登记的字段（含危险的 brush / aria）', () => {
+    const result = sanitizeEchartsOption({
+      title: { text: '示例' },
+      brush: { toolbox: [] },
+      aria: { enabled: true },
+      totallyUnknown: { a: 1 },
+      series: [{ type: 'bar', data: [1, 2] }],
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.option.brush).toBeUndefined()
+    expect(result.option.aria).toBeUndefined()
+    expect(result.option.totallyUnknown).toBeUndefined()
+    expect(result.warnings.join('，')).toContain('totallyUnknown')
   })
 
   it('丢弃未登记的顶层字段', () => {
     const result = sanitizeEchartsOption({
       title: { text: '示例' },
-      polar: { center: ['50%', '50%'] },
+      unknownRoot: { center: ['50%', '50%'] },
       series: [{ type: 'line', data: [1, 2, 3] }],
     })
     expect(result.ok).toBe(true)
     if (!result.ok) return
-    expect(result.option.polar).toBeUndefined()
+    expect(result.option.unknownRoot).toBeUndefined()
   })
 
   it('丢弃未支持的图表类型', () => {
     const result = sanitizeEchartsOption({
       series: [
         { type: 'bar', data: [1, 2] },
-        { type: 'gauge', data: [1] },
+        { type: 'notAChartType', data: [1] },
       ],
     })
     expect(result.ok).toBe(true)
@@ -153,12 +168,12 @@ describe('ECharts option 解析', () => {
 })
 
 describe('ECharts 模板与表格生成', () => {
-  it('五种图表类型都能生成可用 option', () => {
+  it('每个类别都能生成可用 option（39 类）', () => {
+    expect(ECHARTS_CHART_TYPES.length).toBe(39)
     for (const item of ECHARTS_CHART_TYPES) {
       const option = buildTemplateOption(item.value as EchartsChartType)
       const series = option.series as Array<Record<string, unknown>>
       expect(series.length).toBeGreaterThan(0)
-      expect(series[0].type).toBe(item.value)
       const result = sanitizeEchartsOption(option)
       expect(result.ok).toBe(true)
     }

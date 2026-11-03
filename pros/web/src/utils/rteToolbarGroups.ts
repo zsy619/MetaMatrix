@@ -29,8 +29,10 @@ export const TOOLBAR_GROUPS: readonly ToolbarGroupDef[] = [
   {
     id: 'insert',
     label: '链接',
-    keys: ['link', 'linkButton', 'image', 'video', 'audio', 'attach', 'linkCard', 'qrcode', 'emoji', 'specialChars', 'formula', 'echarts'],
+    keys: ['link', 'linkButton', 'image', 'video', 'audio', 'attach', 'linkCard', 'qrcode', 'emoji', 'specialChars', 'formula'],
   },
+  // 图表独立分组：下拉按官方示例类别分区（39 类，见 utils/echarts/templates）
+  { id: 'charts', label: '图表', keys: ['echarts'] },
   { id: 'table', label: '表格', keys: ['table', 'tableCsv', 'tableFilter'] },
   {
     id: 'blocks',

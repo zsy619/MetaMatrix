@@ -7,6 +7,9 @@ import {
   serializeEchartsOption,
   type EchartsChartType,
 } from '../utils/rteEchartsOption'
+import { ECHARTS_CATEGORIES } from '../utils/echarts/templates'
+import { echartsRendererFor, needsEchartsGl, resolveEchartsRenderItems } from '../utils/echarts/prepare'
+import { loadEchartsGl } from '../utils/echartsGlRuntime'
 
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
@@ -37,7 +40,7 @@ function loadEcharts() {
 }
 
 function isChartType(value: unknown): value is EchartsChartType {
-  return ECHARTS_CHART_TYPES.some((item) => item.value === value)
+  return ECHARTS_CATEGORIES.some((item) => item.id === value)
 }
 
 function defaultOption(type: EchartsChartType): string {
@@ -133,6 +136,7 @@ export const EchartsBlock = Node.create({
     return ({ node, getPos, editor }) => {
       let current = node
       let chart: import('../utils/echartsRuntime').EChartsInstance | null = null
+      let chartRenderer: 'svg' | 'canvas' = 'svg'
       let resizeObserver: ResizeObserver | null = null
       let snapshotEl: HTMLDivElement | null = null
       let editing = false
@@ -260,7 +264,8 @@ export const EchartsBlock = Node.create({
           chart?.dispose()
           chart = null
           previewEl.innerHTML = ''
-          const box = document.createElement('pre')
+          // 用 ownerDocument：测试环境销毁后全局 document 可能已不存在
+          const box = previewEl.ownerDocument.createElement('pre')
           box.className = 'rte-echarts-error'
           box.textContent = parsed.error || 'option 无法解析'
           previewEl.appendChild(box)
@@ -268,26 +273,42 @@ export const EchartsBlock = Node.create({
         }
         try {
           const mod = await loadEcharts()
+          // 3D / GL 图表：先按需加载 echarts-gl（不进主包，也不进普通图表 chunk）
+          if (needsEchartsGl(parsed.option)) {
+            await loadEchartsGl()
+          }
           // 加载期间可能又改了 option，旧的渲染结果直接丢掉
           if (destroyed || !previewEl || seq !== renderSeq) return
+          const renderer = echartsRendererFor(parsed.option)
+          if (chart && chartRenderer !== renderer) {
+            // 渲染器不能热切换（SVG ↔ Canvas），重建实例
+            try {
+              chart.dispose()
+            } catch {
+              /* 忽略销毁异常 */
+            }
+            chart = null
+          }
           if (!chart) {
             // 面板折叠时容器宽度是 0，这时初始化会得到一张空图。
             // 先不初始化，等容器有宽度了（ResizeObserver 回调里再 render）再画。
             if (!previewEl.clientWidth) return
             previewEl.innerHTML = ''
+            chartRenderer = renderer
             chart = mod.echarts.init(previewEl, undefined, {
-              renderer: 'svg',
+              renderer,
               width: previewEl.clientWidth,
               height: DEFAULT_HEIGHT,
             })
           }
-          chart.setOption(renderOption(parsed.option), { notMerge: true })
+          // custom 系列的 renderItem 在文档里只存预设名，这里换成内置函数
+          chart.setOption(renderOption(resolveEchartsRenderItems(parsed.option)), { notMerge: true })
           chart.resize()
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err)
           if (previewEl && seq === renderSeq) {
             previewEl.innerHTML = ''
-            const box = document.createElement('pre')
+            const box = previewEl.ownerDocument.createElement('pre')
             box.className = 'rte-echarts-error'
             box.textContent = `图表渲染失败：${message}`
             previewEl.appendChild(box)

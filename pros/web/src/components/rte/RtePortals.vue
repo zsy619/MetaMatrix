@@ -1,11 +1,21 @@
 <script setup lang="ts">
-import { inject } from 'vue'
+import { computed, inject } from 'vue'
 import { RTE_BINDINGS } from './bindings'
 import { useParentScopeStamp } from './inheritScope'
 
 const rte = inject(RTE_BINDINGS)
 if (!rte) throw new Error('RtePortals 必须放在 RichTextEditor 里')
 useParentScopeStamp()
+
+/** 当前选中的类别下的子类型模板（与工具栏下拉共用同一份目录）。 */
+const echartsDialogTemplates = computed(() => {
+  const list = rte.ECHARTS_CATEGORIES as Array<{
+    id: string
+    templates: Array<{ id: string; label: string; hint: string }>
+  }>
+  const current = rte.echartsDialogType as string
+  return list.find((item) => item.id === current)?.templates || []
+})
 </script>
 
 <template>
@@ -1038,19 +1048,36 @@ useParentScopeStamp()
           <h3 data-rte-own class="rte-table-title">一键生成图表</h3>
           <p data-rte-own class="rte-ask-message">选择图表类型，插入后带示例数据；可继续在块内「编辑数据」改 option JSON。</p>
           <div data-rte-own class="rte-echarts-type-list">
-            <button
-              v-for="opt in rte.ECHARTS_CHART_TYPES"
-              :key="'ect-' + opt.value"
-              data-rte-own
-              type="button"
-              class="rte-import-item"
-              :class="{ 'is-active': rte.echartsDialogType === opt.value }"
-              style="width: 100%; margin-bottom: 6px; text-align: left"
-              @click="rte.echartsDialogType = opt.value"
-            >
-              <strong data-rte-own>{{ opt.label }}</strong>
-              <span data-rte-own class="rte-menu-hint">{{ opt.hint }}</span>
-            </button>
+            <div data-rte-own class="rte-echarts-cats">
+              <button
+                v-for="cat in rte.ECHARTS_CATEGORIES"
+                :key="'ect-' + cat.id"
+                data-rte-own
+                type="button"
+                class="rte-import-item"
+                :class="{ 'is-active': rte.echartsDialogType === cat.id }"
+                style="width: 100%; margin-bottom: 6px; text-align: left"
+                @click="rte.selectEchartsDialogCategory(cat.id)"
+              >
+                <strong data-rte-own>{{ cat.label }}</strong>
+                <span data-rte-own class="rte-menu-hint">{{ cat.templates.length }} 种</span>
+              </button>
+            </div>
+            <div data-rte-own class="rte-echarts-subtypes">
+              <button
+                v-for="tpl in echartsDialogTemplates"
+                :key="'ectpl-' + tpl.id"
+                data-rte-own
+                type="button"
+                class="rte-import-item"
+                :class="{ 'is-active': rte.echartsDialogTemplateId === tpl.id }"
+                style="width: 100%; margin-bottom: 6px; text-align: left"
+                @click="rte.echartsDialogTemplateId = tpl.id"
+              >
+                <span data-rte-own>{{ tpl.label }}</span>
+                <span data-rte-own class="rte-menu-hint">{{ tpl.hint }}</span>
+              </button>
+            </div>
           </div>
           <div data-rte-own class="rte-note-field" style="width: 100%; margin-bottom: 8px">
             <input
@@ -1081,7 +1108,7 @@ useParentScopeStamp()
               data-rte-own
               type="button"
               class="rte-modal-confirm"
-              @click="rte.applyEchartsDialog({ type: rte.echartsDialogType, title: rte.echartsDialogTitle, useTable: rte.echartsDialogUseTable })"
+              @click="rte.applyEchartsDialog({ type: rte.echartsDialogType, templateId: rte.echartsDialogTemplateId, title: rte.echartsDialogTitle, useTable: rte.echartsDialogUseTable })"
             >插入</button>
           </div>
         </div>
