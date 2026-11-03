@@ -19,7 +19,12 @@ const dirty = ref(false)
 let view: EditorView | null = null
 
 async function load() {
-  if (!host.value) return
+  // 宿主 div 一直在模板里（不随 loading 切换），所以这里拿得到
+  if (!host.value) {
+    loading.value = false
+    failed.value = true
+    return
+  }
   try {
     const mod = await import('../codemirror/jsonEditor')
     view = mod.createJsonEditor({
@@ -81,7 +86,8 @@ function apply() {
       :value="text"
       @input="(e) => { text = (e.target as HTMLTextAreaElement).value; dirty = true }"
     ></textarea>
-    <div v-else ref="host" class="rte-cp-cm"></div>
+    <!-- 宿主容器始终存在，CodeMirror 挂载后才有内容 -->
+    <div ref="host" class="rte-cp-cm" :class="{ 'is-hidden': loading || failed }"></div>
     <div class="rte-cp-row-actions">
       <button type="button" class="rte-cp-mini rte-cp-mini-primary" @click="apply">
         应用 JSON

@@ -63,9 +63,14 @@ export function useChartPanel() {
   const seriesIndex = ref(0)
   /** 改动计数：宿主据此把草稿写回文档（避免深比较整个 option）。 */
   const revision = ref(0)
+  /** 载入时的改动计数：用来判断面板里有没有未写回的本地改动。 */
+  const loadedRevision = ref(0)
   function bump() {
     revision.value += 1
   }
+
+  /** 面板里是否有未写回文档的本地改动。 */
+  const isDirty = computed(() => revision.value !== loadedRevision.value)
 
   const schema = computed<ChartPanelSchema>(() =>
     getChartPanelSchema(target.value?.chartType),
@@ -99,6 +104,7 @@ export function useChartPanel() {
     hint.value = ''
     dataView.value = 'table'
     seriesIndex.value = 0
+    loadedRevision.value = revision.value
     dataJson.value = dataModelToJson(optionToDataModel(draft.value))
   }
 
@@ -331,6 +337,7 @@ export function useChartPanel() {
     dataJson,
     seriesIndex,
     revision,
+    isDirty,
     load,
     close,
     serializeDraft,

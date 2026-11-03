@@ -43,13 +43,14 @@ describe('option ⇄ 数据模型', () => {
     expect(model.categories).toEqual(['一月', '二月'])
     expect(model.series).toHaveLength(2)
     expect(model.series[0]!.name).toBe('新增')
-    expect(model.series[0]!.data).toEqual(['10', '20'])
+    // 数值保持数值形态（ECharts 数值轴需要数字）
+    expect(model.series[0]!.data).toEqual([10, 20])
   })
 
   it('饼图（{name,value} 形态）能读出类目与数值', () => {
     const model = optionToDataModel(PIE)
     expect(model.categories).toEqual(['A', 'B'])
-    expect(model.series[0]!.data).toEqual(['30', '70'])
+    expect(model.series[0]!.data).toEqual([30, 70])
   })
 
   it('写回 option 时类目进 xAxis.data、数值进 series.data', () => {
@@ -58,15 +59,15 @@ describe('option ⇄ 数据模型', () => {
     const xAxis = next.xAxis as { data: string[] }
     expect(xAxis.data).toEqual(['一月', '二月'])
     const series = next.series as Array<{ data: unknown[] }>
-    expect(series[0]!.data).toEqual(['10', '20'])
-    expect(series[1]!.data).toEqual(['5', '15'])
+    expect(series[0]!.data).toEqual([10, 20])
+    expect(series[1]!.data).toEqual([5, 15])
   })
 
   it('饼图写回时保留 {name,value} 形态', () => {
     const model = optionToDataModel(PIE)
     const next = dataModelToOption(PIE, model)
     const series = next.series as Array<{ data: Array<{ name: string; value: unknown }> }>
-    expect(series[0]!.data[0]).toEqual({ name: 'A', value: '30' })
+    expect(series[0]!.data[0]).toEqual({ name: 'A', value: 30 })
   })
 })
 
@@ -75,7 +76,7 @@ describe('表格 ⇄ 数据模型', () => {
     const model = optionToDataModel(CARTESIAN)
     const rows = dataModelToRows(model)
     expect(rows).toHaveLength(2)
-    expect(rows[0]).toEqual({ category: '一月', values: ['10', '5'] })
+    expect(rows[0]).toEqual({ category: '一月', values: [10, 5] })
   })
 
   it('表格转模型：文本数字被解析成数值', () => {
@@ -118,12 +119,12 @@ describe('数据 JSON 视图', () => {
   it('JSON 视图改数据 → option 同步', () => {
     const model = optionToDataModel(CARTESIAN)
     const json = dataModelToJson(model)
-    const edited = json.replace('"10"', '"66"')
+    const edited = json.replace('10', '66')
     const back = jsonToDataModel(edited)
     expect(back).toBeTruthy()
     const next = dataModelToOption(CARTESIAN, back!)
     const series = next.series as Array<{ data: unknown[] }>
-    expect(series[0]!.data).toEqual(['66', '20'])
+    expect(series[0]!.data).toEqual([66, 20])
   })
 
   it('非法 JSON 返回 null', () => {

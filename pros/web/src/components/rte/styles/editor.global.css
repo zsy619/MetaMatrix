@@ -2401,6 +2401,13 @@
   font-size: 12px;
   margin: 6px 0;
 }
+.rte-echarts-datasource-error {
+  color: #d25f00;
+  text-align: left;
+  white-space: pre-wrap;
+  font-size: 12px;
+  margin: 4px 0;
+}
 .rte-echarts-hint {
   padding: 6px 10px;
   font-size: 11px;
@@ -3722,6 +3729,9 @@
   border: 1px solid #3c3c3c;
   border-radius: 4px;
   overflow: hidden;
+}
+.rte-cp-cm.is-hidden {
+  display: none;
 }
 .rte-cp-foot {
   display: flex;

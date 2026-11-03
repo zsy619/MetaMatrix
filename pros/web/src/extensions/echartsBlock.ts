@@ -10,6 +10,11 @@ import {
 import { ECHARTS_CATEGORIES } from '../utils/echarts/templates'
 import { echartsRendererFor, needsEchartsGl, resolveEchartsRenderItems } from '../utils/echarts/prepare'
 import { loadEchartsGl } from '../utils/echartsGlRuntime'
+import {
+  resolveDataSourceConfig,
+  startChartDataPolling,
+  type ChartDataPoller,
+} from '../utils/echarts/chartDataRuntime'
 
 /** 生成图表块 id（用于把自定义密钥绑定到具体图表）。 */
 export function createChartId(): string {
@@ -243,6 +248,11 @@ export const EchartsBlock = Node.create({
       const errorEl = document.createElement('div')
       errorEl.className = 'rte-echarts-error'
 
+      /** 数据接口拉取失败时的提示（与 JSON 编辑错误分开显示）。 */
+      const dataErrorEl = document.createElement('div')
+      dataErrorEl.className = 'rte-echarts-datasource-error'
+      dataErrorEl.style.display = 'none'
+
       const applyBtn = document.createElement('button')
       applyBtn.type = 'button'
       applyBtn.className = 'rte-echarts-apply'
@@ -265,11 +275,43 @@ export const EchartsBlock = Node.create({
       dom.appendChild(toolbar)
       dom.appendChild(previewEl)
       dom.appendChild(editorBox)
+      dom.appendChild(dataErrorEl)
       dom.appendChild(hint)
 
       const currentOption = (): Record<string, unknown> => {
         const parsed = safeParseEchartsOption(current.attrs.option || '')
         return parsed.ok ? parsed.option : {}
+      }
+
+      /** 接口拉到的数据（只影响显示，不写回文档）。 */
+      let remoteOption: Record<string, unknown> | null = null
+      let dataPoller: ChartDataPoller | null = null
+      let dataSourceKey = ''
+
+      /** 数据接口配置变了就重开轮询。 */
+      const syncDataSource = () => {
+        const config = resolveDataSourceConfig(current.attrs.dataSource)
+        const key = JSON.stringify(config)
+        if (key === dataSourceKey) return
+        dataSourceKey = key
+        dataPoller?.stop()
+        dataPoller = null
+        remoteOption = null
+        dataErrorEl.style.display = 'none'
+        if (!config.enabled || !config.url) return
+        dataPoller = startChartDataPolling({
+          option: currentOption,
+          config,
+          chartId: String(current.attrs.chartId || ''),
+          onOption: (next) => {
+            remoteOption = next
+            void render()
+          },
+          onError: (message) => {
+            dataErrorEl.textContent = `数据接口：${message}`
+            dataErrorEl.style.display = 'block'
+          },
+        })
       }
 
       const setAttrs = (patch: Record<string, unknown>) => {
@@ -311,15 +353,17 @@ export const EchartsBlock = Node.create({
           previewEl.appendChild(box)
           return
         }
+        // 接口拉到的数据优先（只影响显示，不写回文档）
+        const effective = remoteOption || parsed.option
         try {
           const mod = await loadEcharts()
           // 3D / GL 图表：先按需加载 echarts-gl（不进主包，也不进普通图表 chunk）
-          if (needsEchartsGl(parsed.option)) {
+          if (needsEchartsGl(effective)) {
             await loadEchartsGl()
           }
           // 加载期间可能又改了 option，旧的渲染结果直接丢掉
           if (destroyed || !previewEl || seq !== renderSeq) return
-          const renderer = echartsRendererFor(parsed.option)
+          const renderer = echartsRendererFor(effective)
           if (chart && chartRenderer !== renderer) {
             // 渲染器不能热切换（SVG ↔ Canvas），重建实例
             try {
@@ -342,7 +386,7 @@ export const EchartsBlock = Node.create({
             })
           }
           // custom 系列的 renderItem 在文档里只存预设名，这里换成内置函数
-          chart.setOption(renderOption(resolveEchartsRenderItems(parsed.option)), { notMerge: true })
+          chart.setOption(renderOption(resolveEchartsRenderItems(effective)), { notMerge: true })
           chart.resize()
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err)
@@ -523,6 +567,8 @@ export const EchartsBlock = Node.create({
         ? current.attrs.chartType
         : 'bar'
       applyEditableState()
+      // 数据接口：配置在图表块属性里，启用后按间隔拉取
+      syncDataSource()
       // 观察容器尺寸：折叠→展开、窗口缩放都能触发重画
       resizeObserver = new ResizeObserver(onResize)
       resizeObserver.observe(previewEl)
@@ -532,7 +578,13 @@ export const EchartsBlock = Node.create({
         dom,
         update(updated) {
           if (updated.type.name !== 'echartsBlock') return false
+          const optionChanged = updated.attrs.option !== current.attrs.option
           current = updated
+          if (optionChanged) {
+            // 文档里的数据被改了：接口数据先让位，等下一次拉取再覆盖显示
+            remoteOption = null
+          }
+          syncDataSource()
           dom.dataset.option = updated.attrs.option || ''
           dom.dataset.chartType = isChartType(updated.attrs.chartType)
             ? updated.attrs.chartType
@@ -547,6 +599,8 @@ export const EchartsBlock = Node.create({
         ignoreMutation: () => true,
         destroy() {
           destroyed = true
+          dataPoller?.stop()
+          dataPoller = null
           window.removeEventListener(RTE_BEFORE_EXPORT_EVENT, onBeforeExport)
           window.removeEventListener(RTE_AFTER_EXPORT_EVENT, onAfterExport)
           resizeObserver?.disconnect()

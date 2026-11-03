@@ -66,7 +66,7 @@ export function optionToDataModel(option: unknown): ChartDataModel {
     if (dataRaw.length && isPlainObject(dataRaw[0])) {
       // { name, value } 形态：类目来自数据项自身
       const values = dataRaw.map((entry) =>
-        isPlainObject(entry) && 'value' in entry ? itemToText(entry.value) : itemToText(entry),
+        isPlainObject(entry) && 'value' in entry ? itemToValue(entry.value) : itemToValue(entry),
       )
       const names = dataRaw.map((entry) =>
         isPlainObject(entry) && 'name' in entry ? itemToText(entry.name) : '',
@@ -75,7 +75,7 @@ export function optionToDataModel(option: unknown): ChartDataModel {
       series.push({ name, data: values })
       continue
     }
-    const values = dataRaw.map((entry) => itemToText(entry))
+    const values = dataRaw.map((entry) => itemToValue(entry))
     if (!categories.length && values.length) {
       categories = values.map((_, index) => String(index + 1))
     }
@@ -175,6 +175,12 @@ export function dataModelToJson(model: ChartDataModel): string {
   return JSON.stringify(model, null, 2)
 }
 
+/** 把一个数据项转成「数值保持数值、其余转文本」。 */
+function itemToValue(raw: unknown): number | string {
+  if (typeof raw === 'number' && Number.isFinite(raw)) return raw
+  return itemToText(raw)
+}
+
 /** JSON 文本 → 模型。解析失败返回 null。 */
 export function jsonToDataModel(text: string): ChartDataModel | null {
   try {
@@ -188,7 +194,7 @@ export function jsonToDataModel(text: string): ChartDataModel | null {
       .filter((item): item is Record<string, unknown> => isPlainObject(item))
       .map((item, index) => ({
         name: typeof item.name === 'string' ? item.name : `系列${index + 1}`,
-        data: Array.isArray(item.data) ? item.data.map((entry) => itemToText(entry)) : [],
+        data: Array.isArray(item.data) ? item.data.map((entry) => itemToValue(entry)) : [],
       }))
     if (!series.length) return null
     return { categories, series }

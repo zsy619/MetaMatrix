@@ -102,3 +102,29 @@ export function deleteOptionPath(root: unknown, path: string): boolean {
   delete current[last]
   return true
 }
+
+/** 稳定序列化（键排序）：用来比较两份 option 是不是同一份。 */
+function stableStringify(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`
+  if (isPlainObject(value)) {
+    const keys = Object.keys(value).sort()
+    return `{${keys.map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(',')}}`
+  }
+  return JSON.stringify(value ?? null)
+}
+
+/**
+ * 两份 option 文本是不是同一份（忽略键顺序与空白）。
+ *
+ * 面板写回后要确认「文档里是不是真的就是我写的那份」：
+ * 父组件回写 HTML 时属性会被重新序列化，键顺序可能变。
+ */
+export function isSameEchartsOption(a: string, b: string): boolean {
+  if (a === b) return true
+  if (!a || !b) return false
+  try {
+    return stableStringify(JSON.parse(a)) === stableStringify(JSON.parse(b))
+  } catch {
+    return false
+  }
+}
