@@ -111,6 +111,16 @@
 .el-message {
   z-index: 5000 !important;
 }
+/*
+ * 图表删除的二次确认弹窗（ElMessageBox + modalClass="rte-chart-delete-confirm"）。
+ * Element Plus 给遮罩的 z-index 只有 2000 段，会被编辑器自身的层级盖住：
+ * 沉浸全屏 .rte-root.is-immersive(4000) / 图表属性面板(5300) / 浮层(6000) /
+ * 图片拖拽(10060) / 打印遮罩(11000) —— 表现就是「确认提示被编辑器遮挡」。
+ * 这里把遮罩抬到编辑器所有层级之上（inline style 需要 !important 才能压住）。
+ */
+.el-overlay.is-message-box.rte-chart-delete-confirm {
+  z-index: 12000 !important;
+}
 .rte-note-overlay {
   position: fixed;
   inset: 0;

@@ -47,6 +47,19 @@ const log = (step, ok, detail) => {
   notes.push({ step, ok })
   console.log(`${ok ? 'PASS' : 'FAIL'} ${step}`, detail ?? '')
 }
+/**
+ * 点击（被遮挡 / 不可点时只记失败，不让脚本崩掉）。
+ * 修复前确认弹窗被编辑器整层盖住，「取消 / 确认删除」就是点不动的那种情况。
+ */
+const tryClick = async (locator, label) => {
+  try {
+    await locator.click({ timeout: 5000 })
+    return true
+  } catch (err) {
+    log(`点击「${label}」`, false, String(err).split('\n')[0].slice(0, 120))
+    return false
+  }
+}
 
 await page.goto(`${web}/chart-panel-preview.html`, { waitUntil: 'domcontentloaded' })
 await page.waitForFunction(() => window.__RTE_PREVIEW_READY__ === true, null, { timeout: 60000 })
@@ -267,18 +280,81 @@ const countCharts = () =>
     })
     return n
   })
+/** 确认弹窗是否挂在 body 上、并且盖在编辑器之上（不被编辑器遮挡）。 */
+const inspectConfirm = () =>
+  page.evaluate(() => {
+    const overlay = document.querySelector('.el-overlay.is-message-box')
+    const box = document.querySelector('.el-message-box')
+    if (!overlay || !box) return { ok: false, why: '没有弹出确认框' }
+    const rect = box.getBoundingClientRect()
+    const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2)
+    const overlayZ = Number(getComputedStyle(overlay).zIndex) || 0
+    const root = document.querySelector('.rte-root')
+    const rootZ = root ? Number(getComputedStyle(root).zIndex) || 0 : 0
+    const panel = document.querySelector('.rte-chart-panel')
+    const panelZ = panel ? Number(getComputedStyle(panel).zIndex) || 0 : 0
+    return {
+      ok: overlay.parentElement === document.body && !!hit && box.contains(hit) && overlayZ > rootZ && overlayZ > panelZ,
+      inBody: overlay.parentElement === document.body,
+      hitInsideBox: !!(hit && box.contains(hit)),
+      overlayZ,
+      rootZ,
+      panelZ,
+      boxRect: { x: Math.round(rect.x), y: Math.round(rect.y), w: Math.round(rect.width), h: Math.round(rect.height) },
+    }
+  })
+
+/**
+ * 5. 沉浸全屏下：编辑器整层是 fixed + z-index 4000，
+ * 确认弹窗必须仍然盖在它上面（修复前会被整层编辑器盖住，看不见）。
+ */
 const beforeDelete = await countCharts()
+const immersiveBtn = page.locator('.rte-toolbar button[title="全屏沉浸编辑（Esc 退出）"]').first()
+if (await immersiveBtn.count()) {
+  await immersiveBtn.click()
+  await page.waitForTimeout(700)
+  await page.evaluate(() => window.__selectChart(0))
+  await page.waitForTimeout(700)
+  const delBtnImmersive = page.locator('.rte-chart-panel .rte-cp-btn-danger').first()
+  if (await delBtnImmersive.count()) {
+    await tryClick(delBtnImmersive, '删除图表（沉浸全屏）')
+    await page.waitForTimeout(700)
+    const immersiveConfirm = await inspectConfirm()
+    log('沉浸全屏下确认弹窗不被编辑器遮挡', immersiveConfirm.ok, JSON.stringify(immersiveConfirm))
+    await page.screenshot({ path: `${out}/12-delete-confirm-immersive.png` })
+    const cancel3 = page.locator('.el-message-box button', { hasText: '取消' }).last()
+    if (await cancel3.count()) {
+      await tryClick(cancel3, '取消（沉浸全屏）')
+      await page.waitForTimeout(400)
+    }
+    const afterImmersiveCancel = await countCharts()
+    log('沉浸全屏下取消不删', afterImmersiveCancel === beforeDelete, `${beforeDelete} -> ${afterImmersiveCancel}`)
+  } else {
+    log('沉浸全屏下确认弹窗不被编辑器遮挡', false, '沉浸模式下没找到删除按钮')
+  }
+  // 退出沉浸全屏，回到常规布局
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(600)
+} else {
+  log('沉浸全屏下确认弹窗不被编辑器遮挡', false, '没找到「全屏沉浸编辑」按钮')
+}
+
+/** 6. 常规布局下的删除二次确认（取消不删，确认才删）。 */
+await page.evaluate(() => window.__selectChart(0))
+await page.waitForTimeout(500)
 const delBtn = page.locator('.rte-chart-panel .rte-cp-btn-danger').first()
 if (await delBtn.count()) {
-  await delBtn.click()
+  await tryClick(delBtn, '删除图表')
   await page.waitForTimeout(600)
   const box = page.locator('.el-message-box').last()
   const text = (await box.textContent()) || ''
   log('删除二次确认', text.includes('删除'), text.replace(/\s+/g, ' ').slice(0, 60))
+  const confirmVisible = await inspectConfirm()
+  log('确认弹窗挂在 body 且不被编辑器遮挡', confirmVisible.ok, JSON.stringify(confirmVisible))
   await page.screenshot({ path: `${out}/08-delete-confirm.png` })
   const cancel = box.locator('button', { hasText: '取消' }).first()
   if (await cancel.count()) {
-    await cancel.click()
+    await tryClick(cancel, '取消')
     await page.waitForTimeout(400)
   }
   const afterCancel = await countCharts()
@@ -287,12 +363,12 @@ if (await delBtn.count()) {
   // 再删一次并确认：图表块应真的从文档里消失
   const delBtn2 = page.locator('.rte-chart-panel .rte-cp-btn-danger').first()
   if (await delBtn2.count()) {
-    await delBtn2.click()
+    await tryClick(delBtn2, '删除图表（再次）')
     await page.waitForTimeout(600)
     const box2 = page.locator('.el-message-box').last()
     const ok = box2.locator('button', { hasText: '确认删除' }).first()
     if (await ok.count()) {
-      await ok.click()
+      await tryClick(ok, '确认删除')
       await page.waitForTimeout(800)
     }
     const afterConfirm = await countCharts()

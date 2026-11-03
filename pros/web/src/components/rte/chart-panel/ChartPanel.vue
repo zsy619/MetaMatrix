@@ -161,6 +161,13 @@ async function onDelete() {
       confirmButtonText: '确认删除',
       cancelButtonText: '取消',
       type: 'warning',
+      // 确认弹窗默认挂在 body 上，但 Element Plus 的遮罩 z-index 只有 2000 段，
+      // 会被编辑器自身的层级盖住（沉浸全屏 4000 / 属性面板 5300 / 浮层 6000 /
+      // 图片拖拽 10060 / 打印遮罩 11000）—— 表现就是「确认提示被编辑器遮挡」，
+      // 点了删除看不见弹窗。这里给遮罩挂一个专属 class，由样式抬到编辑器之上
+      // （见 editor.global.css 的 .rte-chart-delete-confirm）。
+      appendTo: 'body',
+      modalClass: 'rte-chart-delete-confirm',
     })
   } catch {
     return
