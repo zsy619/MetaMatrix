@@ -5411,13 +5411,13 @@ const allTools = computed((): ToolItem[] => {
   void editor.value?.state // reactive tick
   const ic = (key: string) => toolIcon(key)
   /**
-   * 最大化工具栏分组（企业级）：
-   * 操作 | 标题（字号/段落样式）| 字形（加粗斜体下划线删除线）| 颜色 |
-   * 对齐（对齐/行距/段距）| 列表 | 段落（引用/代码）| 链接 | 表格 | 块级 | 批注 | 导出
+   * 最大化工具栏分组（企业级，方案 A）：
+   * 编辑 | 字体与颜色 | 段落与列表 | 插入 | 图表 | 表格 | 块与结构 | 注释与引用 | 审阅 | 视图 | 文件与导出
+   * （分组定义见 utils/rteToolbarGroups.ts 的 TOOLBAR_GROUPS）
    * 目录已按产品要求移除，勿恢复。分组靠发丝竖线；换行靠 flex-wrap。
    */
   return [
-    // —— 操作 ——
+    // —— 编辑 ——
     {
       key: 'undo',
       label: '撤销',
@@ -5472,7 +5472,7 @@ const allTools = computed((): ToolItem[] => {
       run: togglePastePlain,
     },
     { key: 'div-ops', label: '', icon: '', kind: 'divider' },
-    // —— 标题 / 字形 / 颜色 / 对齐 / 列表 / 段落 ——
+    // —— 字体与颜色 / 段落与列表 ——
     { key: 'heading', label: '段落', title: '段落样式（正文 / 标题 / 引用）', icon: 'H▾', iconComp: ic('heading'), kind: 'heading', active: () => isActive('heading') || isActive('blockquote') },
     {
       key: 'bold',

@@ -9,6 +9,7 @@ import {
   writeToolbarGroupButtons,
   type ToolbarGroupButtonsByPanelId,
 } from './rteToolbarGroupButtons.ts'
+import { migrateToolbarGroupButtons } from './rteToolbarGroups.ts'
 
 const keys = ['bold', 'italic', 'underline']
 
@@ -65,5 +66,33 @@ assert.deepEqual(hidden!.hidden, ['italic'])
 const shown = toggleGroupButtonHidden(hidden, keys, 'italic')
 assert.ok(shown)
 assert.deepEqual(shown!.hidden, [])
+
+// —— 旧分组配置迁移到新分组（方案 A）——
+// 旧 `view`「导出」拆成 `view`「视图」+ `file`「文件与导出」：隐藏的 print 必须落到 file
+const migrated = migrateToolbarGroupButtons({
+  p1: {
+    view: { order: ['print', 'viewExtras', 'zoom'], hidden: ['print'] },
+  },
+})
+assert.ok(migrated)
+assert.deepEqual(Object.keys(migrated!.p1!).sort(), ['file'])
+assert.deepEqual(migrated!.p1!.file!.hidden, ['print'])
+// file 组里 print 不再可见，其余按默认顺序
+assert.deepEqual(
+  visibleGroupButtonKeys(migrated!.p1!.file, ['print', 'import', 'export', 'copyMd']),
+  ['import', 'export', 'copyMd'],
+)
+
+// 旧 `marks`「字形」隐藏的 ruby 迁到新 `style`「字体与颜色」
+const migratedStyle = migrateToolbarGroupButtons({
+  p2: { marks: { order: ['bold', 'ruby'], hidden: ['ruby'] } },
+})
+assert.ok(migratedStyle)
+assert.deepEqual(Object.keys(migratedStyle!.p2!), ['style'])
+assert.deepEqual(migratedStyle!.p2!.style!.hidden, ['ruby'])
+
+// 迁移幂等；等于默认的配置不保留
+assert.deepEqual(migrateToolbarGroupButtons(migrated), migrated)
+assert.equal(migrateToolbarGroupButtons({ p1: { table: { order: [], hidden: [] } } }), undefined)
 
 console.log('rteToolbarGroupButtons ok')

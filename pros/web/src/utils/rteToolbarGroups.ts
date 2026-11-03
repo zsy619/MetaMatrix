@@ -1,8 +1,11 @@
 /** 工具栏分组。旧文档没有保存顺序时用默认顺序。 */
 
 import {
+  isDefaultToolbarGroupConfig,
+  normalizeGroupButtonConfig,
   visibleGroupButtonKeys,
   type ToolbarGroupButtonConfig,
+  type ToolbarGroupButtonsByPanelId,
 } from './rteToolbarGroupButtons'
 import { CHART_GROUPS } from './echarts/chartGroups'
 
@@ -15,52 +18,111 @@ export type ToolbarGroupDef = {
   keys: readonly string[]
 }
 
-/** 旧文档把标题、字形、对齐、列表都存在 id `text` 里。读出来时按这个顺序展开。 */
-export const LEGACY_TEXT_GROUP_IDS = ['type', 'marks', 'align', 'list'] as const
+/**
+ * 旧分组 id → 新分组 id（一个旧组可能拆成多个新组）。
+ *
+ * 旧文档把标题、字形、对齐、列表存在 id `text` 里；旧 `view`「导出」拆成
+ * `view`「视图」+ `file`「文件与导出」；旧 `history`「操作」改名 `edit`「编辑」。
+ */
+export const LEGACY_GROUP_ALIASES: Record<string, readonly string[]> = {
+  text: ['style', 'paragraph'],
+  type: ['style', 'paragraph'],
+  marks: ['style'],
+  color: ['style'],
+  align: ['paragraph'],
+  list: ['paragraph'],
+  paragraph: ['paragraph'],
+  history: ['edit'],
+  insert: ['insert'],
+  charts: ['charts'],
+  table: ['table'],
+  blocks: ['blocks'],
+  notes: ['notes'],
+  review: ['review'],
+  view: ['view', 'file'],
+  other: ['other'],
+}
+
+/**
+ * 旧文档把标题、字形、对齐、列表都存在 id `text` 里。
+ * 读出来时按别名表展开成新分组（`text` → 字体与颜色 + 段落与列表）。
+ */
+export const LEGACY_TEXT_GROUP_IDS: readonly string[] = LEGACY_GROUP_ALIASES.text || []
 
 export const TOOLBAR_GROUPS: readonly ToolbarGroupDef[] = [
-  { id: 'history', label: '操作', keys: ['undo', 'redo', 'find', 'formatPainter', 'pastePlain', 'clear', 'pasteFormat'] },
-  { id: 'type', label: '标题', keys: ['heading', 'paraStyle', 'fontSize', 'fontFamily', 'headingAutoNum'] },
   {
-    id: 'marks',
-    label: '字形',
-    keys: ['bold', 'italic', 'underline', 'strike', 'subscript', 'superscript', 'codeInline', 'emphasisDot', 'caseTransform', 'ruby'],
+    id: 'edit',
+    label: '编辑',
+    keys: ['undo', 'redo', 'find', 'formatPainter', 'pastePlain', 'pasteFormat', 'clear'],
   },
-  { id: 'color', label: '颜色', keys: ['color', 'highlight'] },
-  { id: 'align', label: '对齐', keys: ['align', 'lineHeight', 'spacing', 'indent', 'outdent', 'firstIndent'] },
-  { id: 'list', label: '列表', keys: ['list', 'listStyle'] },
-  { id: 'paragraph', label: '段落', keys: ['quote', 'code'] },
+  {
+    id: 'style',
+    label: '字体与颜色',
+    keys: [
+      'fontSize', 'fontFamily', 'color', 'highlight',
+      'bold', 'italic', 'underline', 'strike', 'subscript', 'superscript',
+      'codeInline', 'emphasisDot', 'caseTransform', 'ruby',
+    ],
+  },
+  {
+    id: 'paragraph',
+    label: '段落与列表',
+    keys: [
+      'heading', 'paraStyle', 'headingAutoNum',
+      'list', 'listStyle',
+      'align', 'lineHeight', 'spacing', 'indent', 'outdent', 'firstIndent',
+      'quote', 'code',
+    ],
+  },
   {
     id: 'insert',
-    label: '链接',
-    keys: ['link', 'linkButton', 'image', 'video', 'audio', 'attach', 'linkCard', 'qrcode', 'emoji', 'specialChars', 'formula'],
+    label: '插入',
+    keys: [
+      'link', 'linkButton', 'linkCard',
+      'image', 'video', 'audio', 'attach',
+      'qrcode', 'emoji', 'specialChars', 'formula',
+    ],
   },
   // 图表独立分组：下拉里按子分组分区（基础 / 统计 / 关系 / 层级 / 地理 / 金融 / 坐标系 / 组件 / 3D·GL）
   { id: 'charts', label: '图表', keys: ['echarts'] },
   { id: 'table', label: '表格', keys: ['table', 'tableCsv', 'tableFilter'] },
   {
     id: 'blocks',
-    label: '块级',
+    label: '块与结构',
     keys: [
-      'callout', 'hr', 'columns', 'pageBreak', 'toggleBlock', 'blockOps', 'insertDate',
-      'form', 'template', 'timeline', 'statusChip', 'progressBar', 'tabsBlock', 'mermaid', 'snippets',
-      'crossDoc',
+      'callout', 'hr', 'columns', 'pageBreak', 'toggleBlock', 'tabsBlock',
+      'blockOps', 'insertDate',
+      'form', 'template', 'timeline', 'statusChip', 'progressBar',
+      'mermaid', 'snippets', 'crossDoc',
     ],
   },
   {
     id: 'notes',
-    label: '批注',
-    keys: ['note', 'comment', 'footnote', 'footnoteList', 'captionNum', 'bookmark', 'mentionBtn', 'mentionPerm', 'xref'],
+    label: '注释与引用',
+    keys: [
+      'comment', 'note', 'footnote', 'footnoteList',
+      'captionNum', 'bookmark', 'xref',
+      'mentionBtn', 'mentionPerm',
+    ],
   },
   {
     id: 'review',
     label: '审阅',
-    keys: ['spellcheck', 'sensitive', 'revision', 'revisionBase', 'suggest', 'suggestAccept', 'suggestReject', 'speak', 'speakStop', 'headingCheck', 'linkCheck', 'cjkTip'],
+    keys: [
+      'spellcheck', 'sensitive', 'headingCheck', 'linkCheck', 'cjkTip',
+      'revision', 'revisionBase', 'suggest', 'suggestAccept', 'suggestReject',
+      'speak', 'speakStop',
+    ],
   },
   {
     id: 'view',
-    label: '导出',
-    keys: ['print', 'import', 'export', 'copyMd', 'viewExtras', 'zoom', 'immersive', 'outline', 'shortcuts', 'wordStats', 'readTime'],
+    label: '视图',
+    keys: ['viewExtras', 'zoom', 'immersive', 'outline', 'wordStats', 'readTime', 'shortcuts'],
+  },
+  {
+    id: 'file',
+    label: '文件与导出',
+    keys: ['print', 'import', 'export', 'copyMd'],
   },
   { id: 'other', label: '其他', keys: [] },
 ]
@@ -69,6 +131,22 @@ export const DEFAULT_TOOLBAR_GROUP_ORDER: readonly string[] = TOOLBAR_GROUPS.map
 
 const GROUP_BY_ID = new Map(TOOLBAR_GROUPS.map((group) => [group.id, group]))
 
+/** 工具 key → 所属分组 id（一个 key 只属于一个分组）。 */
+const TOOL_GROUP_BY_KEY = new Map<string, string>()
+for (const group of TOOLBAR_GROUPS) {
+  for (const key of group.keys) {
+    if (!TOOL_GROUP_BY_KEY.has(key)) TOOL_GROUP_BY_KEY.set(key, group.id)
+  }
+}
+
+/** 迁移组内配置时旧分组配置的处理顺序（先旧组、后新组）。 */
+const MIGRATION_SOURCE_ORDER: readonly string[] = [
+  ...Object.keys(LEGACY_GROUP_ALIASES),
+  'style',
+  'edit',
+  'file',
+]
+
 export function normalizeToolbarGroupOrder(saved: unknown): string[] {
   const known = new Set(DEFAULT_TOOLBAR_GROUP_ORDER)
   const out: string[] = []
@@ -76,16 +154,69 @@ export function normalizeToolbarGroupOrder(saved: unknown): string[] {
     if (known.has(id) && !out.includes(id)) out.push(id)
   }
   if (Array.isArray(saved)) {
-    for (const id of saved) {
-      if (id === 'text') {
-        for (const next of LEGACY_TEXT_GROUP_IDS) push(next)
+    for (const raw of saved) {
+      if (typeof raw !== 'string') continue
+      const alias = LEGACY_GROUP_ALIASES[raw]
+      if (alias) {
+        for (const id of alias) push(id)
         continue
       }
-      if (typeof id === 'string') push(id)
+      push(raw)
     }
   }
   for (const id of DEFAULT_TOOLBAR_GROUP_ORDER) push(id)
   return out
+}
+
+/**
+ * 迁移旧文档的「组内按钮显隐与顺序」配置（面板 id → 分组 id → 配置）。
+ *
+ * 配置以分组 id 为键，分组改名 / 合并 / 拆分后旧配置若不迁移，用户隐藏的按钮
+ * 会复活、组内顺序也会被打回默认。这里按「按钮 key 落在哪个新分组」重新归位：
+ * 旧 `view` 隐藏的 `print` 会落到新 `file`，旧 `marks` 隐藏的 `ruby` 落到新 `style`。
+ * 迁移后等于默认配置的分组不保留（画布保持干净）。函数是幂等的。
+ */
+export function migrateToolbarGroupButtons(
+  map: ToolbarGroupButtonsByPanelId | null | undefined,
+): ToolbarGroupButtonsByPanelId | undefined {
+  if (!map || typeof map !== 'object') return undefined
+  const out: ToolbarGroupButtonsByPanelId = {}
+  for (const [panelId, panel] of Object.entries(map)) {
+    if (!panel || typeof panel !== 'object') continue
+    const merged: Record<string, { order: string[]; hidden: string[] }> = {}
+    const targetOf = (key: unknown): string | undefined => {
+      if (typeof key !== 'string') return undefined
+      return TOOL_GROUP_BY_KEY.get(key)
+    }
+    for (const sourceId of MIGRATION_SOURCE_ORDER) {
+      const config = panel[sourceId]
+      if (!config || typeof config !== 'object') continue
+      const order = Array.isArray(config.order) ? config.order : []
+      const hidden = Array.isArray(config.hidden) ? config.hidden : []
+      for (const key of order) {
+        const target = targetOf(key)
+        if (!target) continue
+        const bucket = merged[target] || (merged[target] = { order: [], hidden: [] })
+        if (!bucket.order.includes(key)) bucket.order.push(key)
+      }
+      for (const key of hidden) {
+        const target = targetOf(key)
+        if (!target) continue
+        const bucket = merged[target] || (merged[target] = { order: [], hidden: [] })
+        if (!bucket.hidden.includes(key)) bucket.hidden.push(key)
+      }
+    }
+    const next: Record<string, ToolbarGroupButtonConfig> = {}
+    for (const [groupId, bucket] of Object.entries(merged)) {
+      const def = GROUP_BY_ID.get(groupId)
+      if (!def) continue
+      const normalized = normalizeGroupButtonConfig(bucket, def.keys)
+      if (isDefaultToolbarGroupConfig(normalized, def.keys)) continue
+      next[groupId] = normalized
+    }
+    if (Object.keys(next).length) out[panelId] = next
+  }
+  return Object.keys(out).length ? out : undefined
 }
 
 export function toolbarOrdersEqual(a: readonly string[], b: readonly string[]): boolean {

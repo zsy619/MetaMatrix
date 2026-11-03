@@ -11,7 +11,7 @@ const tools = [
   { key: 'strike', label: '删除线' },
 ]
 
-const groups = buildToolbarGroups(tools, ['marks'])
+const groups = buildToolbarGroups(tools, ['style'])
 assert.equal(groups.length, 1)
 assert.deepEqual(
   groups[0]!.tools.map((t) => t.key),
@@ -19,8 +19,8 @@ assert.deepEqual(
 )
 
 // 隐藏一个按钮
-const hidden = buildToolbarGroups(tools, ['marks'], {
-  marks: { order: ['bold', 'italic', 'underline', 'strike'], hidden: ['italic'] },
+const hidden = buildToolbarGroups(tools, ['style'], {
+  style: { order: ['bold', 'italic', 'underline', 'strike'], hidden: ['italic'] },
 })
 assert.deepEqual(
   hidden[0]!.tools.map((t) => t.key),
@@ -28,8 +28,8 @@ assert.deepEqual(
 )
 
 // 调整组内顺序
-const reordered = buildToolbarGroups(tools, ['marks'], {
-  marks: { order: ['strike', 'underline', 'italic', 'bold'], hidden: [] },
+const reordered = buildToolbarGroups(tools, ['style'], {
+  style: { order: ['strike', 'underline', 'italic', 'bold'], hidden: [] },
 })
 assert.deepEqual(
   reordered[0]!.tools.map((t) => t.key),

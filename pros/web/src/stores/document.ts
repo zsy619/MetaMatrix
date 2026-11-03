@@ -7,7 +7,7 @@ import { rememberRecentOpen } from '../utils/canvasTransfer'
 import { normalizePageSize, readPageSize, writePageSizeMap } from '../utils/rtePageSize'
 import { normalizePageMargin, writePageMargin, type PageMargin } from '../utils/rtePageMargin'
 import { normalizePageChrome, writePageChrome, type PanelPageChrome } from '../utils/rtePageChrome'
-import { writeToolbarGroupOrder } from '../utils/rteToolbarGroups'
+import { migrateToolbarGroupButtons, writeToolbarGroupOrder } from '../utils/rteToolbarGroups'
 import { writeCommentThreads, type CommentThread } from '../utils/rteCommentThreads'
 import { writeRevisions, type PanelRevision } from '../utils/rteRevisions'
 import {
@@ -1562,7 +1562,9 @@ export const useDocumentStore = defineStore('document', () => {
     const doc = current_data.value
     if (!doc || !panelId || !groupId) return
     const prev = JSON.stringify(doc.toolbarGroupButtonsByPanelId ?? null)
-    const next = writeToolbarGroupButtons(doc.toolbarGroupButtonsByPanelId, panelId, groupId, config)
+    // 先把旧分组 id 的配置迁移到新分组，避免旧配置残留把已恢复显示的按钮再次隐藏
+    const base = migrateToolbarGroupButtons(doc.toolbarGroupButtonsByPanelId)
+    const next = writeToolbarGroupButtons(base, panelId, groupId, config)
     if (next) doc.toolbarGroupButtonsByPanelId = next
     else delete doc.toolbarGroupButtonsByPanelId
     if (JSON.stringify(doc.toolbarGroupButtonsByPanelId ?? null) !== prev) markDirty()

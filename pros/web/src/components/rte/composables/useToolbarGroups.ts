@@ -3,6 +3,7 @@ import {
   buildToolbarGroups,
   bumpToolbarUndoEpoch,
   currentToolbarUndoEpoch,
+  migrateToolbarGroupButtons,
   moveToolbarGroup,
   readToolbarGroupOrder,
   toolbarGroupLabels,
@@ -67,9 +68,9 @@ export function useToolbarGroups<T extends ToolLike>(deps: {
     return buildToolbarGroups(tools, toolbarOrder.value, toolbarGroupButtonConfigs.value)
   })
 
-  /** 每个分组当前生效的组内按钮配置（已归一化）。 */
+  /** 每个分组当前生效的组内按钮配置（已归一化）。旧分组 id 的配置先迁移到新分组。 */
   const toolbarGroupButtonConfigs = computed(() => {
-    const map = deps.buttonConfigMap()
+    const map = migrateToolbarGroupButtons(deps.buttonConfigMap())
     const panelId = deps.panelId()
     const out: Record<string, Required<ToolbarGroupButtonConfig>> = {}
     for (const group of TOOLBAR_GROUPS) {
