@@ -2354,7 +2354,7 @@ function insertEchartsBlockAtCursor(
     .run()
   echartsMenuOpen.value = false
   moreOpen.value = false
-  ElMessage.success(`已插入${echartsTypeLabel(type)}（可点块内「编辑数据」改 JSON）`)
+  ElMessage.success(`已插入${echartsTypeLabel(type)}（选中图表可在属性面板改类型 / 改数据）`)
 }
 
 /** 按模板 id 插入（工具栏下拉 / 对话框共用）。 */
@@ -2389,7 +2389,7 @@ function insertEchartsTemplateById(
   echartsMenuOpen.value = false
   echartsOpenCategory.value = null
   moreOpen.value = false
-  ElMessage.success(`已插入${template.label}（可点块内「编辑数据」改 JSON）`)
+  ElMessage.success(`已插入${template.label}（选中图表可在属性面板改类型 / 改数据）`)
 }
 
 /** 下拉里展开 / 收起某个类别。 */

@@ -1046,7 +1046,7 @@ const echartsDialogTemplates = computed(() => {
           @mousedown.stop
         >
           <h3 data-rte-own class="rte-table-title">一键生成图表</h3>
-          <p data-rte-own class="rte-ask-message">选择图表类型，插入后带示例数据；可继续在块内「编辑数据」改 option JSON。</p>
+          <p data-rte-own class="rte-ask-message">选择图表类型，插入后带示例数据；选中图表可在属性面板改类型 / 改数据。</p>
           <div data-rte-own class="rte-echarts-type-list">
             <div data-rte-own class="rte-echarts-cats">
               <button

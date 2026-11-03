@@ -220,3 +220,54 @@ schema 目录 `src/utils/echarts/panelSchemas/`：39 个类别各一个文件（
 | 完整应用里的属性面板（画布内 Y 模型块、放大态） | 需要登录 + API；验证在 `chart-panel-preview.html` 独立预览页完成（同一套组件与样式）。 |
 | 导出的 HTML 里图表数据接口配置的实际形态 | 只验证了「密钥不进文档属性」；导出文件的最终 HTML 未做逐字比对（导出链路本轮未改动）。 |
 | 旧文档里没有 `chartId` 的图表块首次打开面板 | 代码路径（`ensureChartId` 自动补 id）有分支覆盖，但没有针对「存量文档」的专门回归用例。 |
+
+---
+
+## 9. 本轮修订：移除块内操作条 + 修好属性面板删除（2026-11-04）
+
+基线：`main` @ `3015b3b`；分支：`cursor/dsh-rte-chart-ops-fix`。
+
+### 9.1 改了什么
+
+| 项 | 之前 | 现在 |
+|---|---|---|
+| 图表块内操作条 | 有：`ECharts 图表` 标签 + 类型下拉 + 「编辑数据」+「删除」 | **已移除**；块内只渲染图表（预览 / 数据接口报错 / 提示行） |
+| 块内 JSON 编辑框 | 有（操作条里的「编辑数据」展开的 textarea） | 已移除；改数据走属性面板「数据」区（表格 ⇄ JSON）与「高级 JSON」 |
+| 进属性面板的入口 | 只能点块内操作条附近的空白 | **点图表本身**即选中该块 → 面板弹出（NodeView 里 `setNodeSelection`） |
+| 换图表类型 | 块内类型下拉 | 属性面板头部「图表类型」下拉（39 类），改完 `chartType` 与 `option` 一起写回 |
+| 删除图表块 | 属性面板「删除图表」不生效 | 按 `chartId` 定位删除，确认期间选中态丢失也删得掉；宿主整篇回写旧 HTML 也不会复活 |
+
+### 9.2 「删除按钮不起作用」的两个真实原因
+
+1. **删除依赖面板的实时目标**。旧实现 `remove()` 读的是 `host.target`，
+   而确认弹窗是异步的：弹窗期间宿主回写内容 / 选区变化 → 选区不再是图表块 →
+   桥接把面板目标清空 → 确认后 `remove()` 拿不到 `chartId`，直接返回 false，
+   **界面上什么提示都没有**（旧代码里 `if (props.host.remove())` 没有 else 分支）。
+   修法：点按钮时先把 `chartId` 记下来，确认后调 `removeById(chartId)` 按 id 删。
+
+2. **宿主整篇回写旧 HTML 会把图表带回来**。富文本编辑器的宿主（画布面板）
+   把内容以 HTML 形式回写；删除后若宿主把**旧 HTML**整篇写回
+   （`setContent(..., { emitUpdate: false })`），刚删掉的图表块连同旧内容一起复活，
+   表现同样是「删除没反应」。
+   修法：新增 `chart-panel/chartDeleteGuard.ts` —— 记录刚删掉的 `chartId`，
+   在事务里发现「覆盖全文的替换步骤」（宿主整篇回写的特征）时再删一次；
+   普通编辑与撤销都不会触发（撤销是小范围步骤）。
+
+### 9.3 顺带修掉的
+
+- 属性面板写回时把 `chartType` 一起写回（此前只写 `option`，换类型后类型字段会留旧值）。
+- 写回后同步宿主的 `target`（类型徽标 / 数据接口配置不再显示旧值）。
+- 插入图表的成功提示从「可点块内「编辑数据」改 JSON」改成「选中图表可在属性面板改类型 / 改数据」。
+- e2e 脚本 `rte-echarts-e2e.mjs` 的一条断言本来恒失败（`innerHTML` 会把属性里的引号转义成
+  `&quot;`，脚本没还原就 `JSON.parse`）—— 属既有缺陷，本轮顺手修好。
+
+### 9.4 测试
+
+| 测试 | 覆盖 |
+|---|---|
+| `components/rte/chart-panel/ChartPanel.ops.test.ts`（新增） | 块内无操作条；面板改类型写回 `chartType`+`option`；确认期间选中态丢失仍删得掉；宿主整篇回写旧 HTML 图表不复活 |
+| `components/rte/chart-panel/ChartPanel.test.ts` | 选中弹出面板、改字段写回、删除二次确认 |
+| `components/rte/chart-panel/ChartPanel.persist.test.ts` | 落盘链路、回声守护、表格 ⇄ JSON、数据源配置持久化 |
+| e2e `scripts/rte-chart-panel-e2e.mjs` | 新增断言：块内无操作条 / 改类型写回 / 取消不删 / 确认后删掉 |
+| e2e `scripts/rte-echarts-e2e.mjs` | 工具栏插入、渲染、导出快照、序列化往返 |
+| e2e `scripts/rte-echarts-render-e2e.mjs` | 81 个模板渲染（39 类） |

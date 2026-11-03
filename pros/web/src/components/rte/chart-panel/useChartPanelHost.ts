@@ -13,6 +13,7 @@ import {
   serializeDataSourceConfig,
   type ChartDataSourceConfig,
 } from '../../../utils/echarts/chartDataSource'
+import { createChartDeleteGuard } from './chartDeleteGuard'
 
 /** 面板当前目标。 */
 export type ChartPanelHostTarget = {
@@ -44,6 +45,12 @@ export function useChartPanelHost(editorRef: Ref<Editor | undefined>) {
   const target = shallowRef<ChartPanelHostTarget | null>(null)
   const error = ref('')
 
+  /** 删除回声守护：宿主整篇回写旧 HTML 时，图表块不能复活。 */
+  const deleteGuard = createChartDeleteGuard({
+    editorRef,
+    findPos: findChartBlockPos,
+  })
+
   /** 当前图表类型（面板 schema 的依据）。 */
   const chartType = computed(() => target.value?.chartType || '')
 
@@ -62,21 +69,38 @@ export function useChartPanelHost(editorRef: Ref<Editor | undefined>) {
 
   /** 写回节点属性。 */
   function patchAttrs(patch: Record<string, unknown>): boolean {
-    const ed = editorRef.value
     const id = target.value?.chartId
-    if (!ed || !id) return false
-    const pos = findChartBlockPos(ed, id)
+    if (!id) return false
+    return applyAttrsById(id, patch)
+  }
+
+  /** 按 chartId 写回节点属性（面板被外部回写关掉后也能用）。 */
+  function applyAttrsById(chartId: string, patch: Record<string, unknown>): boolean {
+    const ed = editorRef.value
+    if (!ed || !chartId) return false
+    const pos = findChartBlockPos(ed, chartId)
     if (pos === null) {
       error.value = '图表块已被删除'
       return false
     }
+    const node = ed.state.doc.nodeAt(pos)
+    if (!node) return false
     const tr = ed.state.tr.setNodeMarkup(pos, undefined, {
-      ...(ed.state.doc.nodeAt(pos)?.attrs as Record<string, unknown>),
+      ...(node.attrs as Record<string, unknown>),
       ...patch,
     })
     // 属性面板的每次改动都要能撤销
     tr.setMeta('addToHistory', true)
     ed.view.dispatch(tr)
+    // 面板目标同步（类型徽标 / 回显），别让面板显示旧值
+    if (target.value && target.value.chartId === chartId) {
+      target.value = {
+        ...target.value,
+        ...(typeof patch.chartType === 'string' ? { chartType: patch.chartType } : {}),
+        ...(typeof patch.option === 'string' ? { option: patch.option } : {}),
+        ...(typeof patch.dataSource === 'string' ? { dataSource: patch.dataSource } : {}),
+      }
+    }
     return true
   }
 
@@ -102,20 +126,7 @@ export function useChartPanelHost(editorRef: Ref<Editor | undefined>) {
 
   /** 按 chartId 写回 option（面板被外部回写关掉后也能用）。 */
   function applyOptionById(chartId: string, option: unknown): boolean {
-    const ed = editorRef.value
-    if (!ed || !chartId) return false
-    const pos = findChartBlockPos(ed, chartId)
-    if (pos === null) {
-      error.value = '图表块已被删除'
-      return false
-    }
-    const tr = ed.state.tr.setNodeMarkup(pos, undefined, {
-      ...(ed.state.doc.nodeAt(pos)?.attrs as Record<string, unknown>),
-      option: serializeEchartsOption(option),
-    })
-    tr.setMeta('addToHistory', true)
-    ed.view.dispatch(tr)
-    return true
+    return applyAttrsById(chartId, { option: serializeEchartsOption(option) })
   }
 
   /** 重新选中图表块（写回后保持选中，面板不会因为选区变化而关闭）。 */
@@ -150,10 +161,13 @@ export function useChartPanelHost(editorRef: Ref<Editor | undefined>) {
   function bindEditor(next: Editor | undefined) {
     if (boundEditor) {
       for (const cb of txListeners) boundEditor.off('transaction', cb)
+      boundEditor.off('transaction', deleteGuard.handleTransaction)
     }
     boundEditor = next
     if (boundEditor) {
       for (const cb of txListeners) boundEditor.on('transaction', cb)
+      // 删除守护：整篇回写把刚删掉的图表带回来时再删一次
+      boundEditor.on('transaction', deleteGuard.handleTransaction)
     }
   }
 
@@ -182,21 +196,38 @@ export function useChartPanelHost(editorRef: Ref<Editor | undefined>) {
     return parseDataSourceConfig(target.value?.dataSource || '')
   }
 
-  /** 删除图表块。 */
-  function remove(): boolean {
+  /**
+   * 删除图表块（按 chartId 定位，不依赖面板当前的选中态）。
+   *
+   * 关键点：删除前先把 chartId 记下来 —— 确认弹窗期间宿主可能回写内容、
+   * 选区可能丢失，面板目标会被清空；只要 id 还在，删除照样生效。
+   */
+  function removeById(chartId: string): boolean {
     const ed = editorRef.value
-    const id = target.value?.chartId
-    if (!ed || !id) return false
-    const pos = findChartBlockPos(ed, id)
+    if (!ed || !chartId) return false
+    const pos = findChartBlockPos(ed, chartId)
     if (pos === null) {
       error.value = '图表块已被删除'
       return false
     }
-    const node = ed.state.doc.nodeAt(pos)
-    if (!node) return false
-    ed.view.dispatch(ed.state.tr.delete(pos, pos + node.nodeSize))
-    hide()
+    // 用扩展注册的命令删除：位置与节点类型校验都在一处。
+    const ok = ed.commands.deleteEchartsBlock(pos)
+    if (!ok) {
+      error.value = '图表块已被删除'
+      return false
+    }
+    // 回声守护：宿主整篇回写旧 HTML 时别让图表复活
+    deleteGuard.markDeleted(chartId)
     return true
+  }
+
+  /** 删除图表块（当前目标）。 */
+  function remove(): boolean {
+    const id = target.value?.chartId
+    if (!id) return false
+    const ok = removeById(id)
+    if (ok) hide()
+    return ok
   }
 
   return reactive({
@@ -207,6 +238,7 @@ export function useChartPanelHost(editorRef: Ref<Editor | undefined>) {
     show,
     hide,
     patchAttrs,
+    applyAttrsById,
     applyOption,
     readOption,
     readOptionById,
@@ -216,5 +248,6 @@ export function useChartPanelHost(editorRef: Ref<Editor | undefined>) {
     applyDataSource,
     currentDataSource,
     remove,
+    removeById,
   })
 }
