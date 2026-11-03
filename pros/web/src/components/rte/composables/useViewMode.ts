@@ -3,6 +3,7 @@ import type { Editor } from '@tiptap/core'
 import { NodeSelection } from '@tiptap/pm/state'
 import { applyFormShowIfVisibility } from '../../../extensions/forms'
 import { normalizeHtml, toEditorContent } from '../../../utils/rteContent'
+import { formatHtml } from '../../../utils/rteHtmlFormat'
 
 type RteProps = { modelValue: string }
 type RteEmit = (event: 'update:modelValue', html: string) => void
@@ -102,15 +103,19 @@ function setViewMode(next: RteViewMode) {
   if (next === viewMode.value) return
   const prev = viewMode.value
 
-  // 离开源码：先把 textarea 写回编辑器，再切模式
+  // 离开源码：只有用户改过源码才写回编辑器，避免仅查看就改动正文
   if (prev === 'source' && next !== 'source') {
-    applySourceHtmlToEditor(sourceHtml.value, { focus: next === 'edit' })
+    if (sourceDirty.value) {
+      applySourceHtmlToEditor(sourceHtml.value, { focus: next === 'edit' })
+    } else {
+      sourceHtml.value = getLiveEditorHtml()
+    }
   }
 
   if (next === 'source') {
     const raw = getLiveEditorHtml()
-    // 轻量换行，便于阅读；写回时 normalizeHtml / TipTap parse 不受影响
-    sourceHtml.value = raw.replace(/></g, '>\n<')
+    // 进入源码默认格式化（只影响展示；未编辑时离开不会写回正文）
+    sourceHtml.value = formatHtml(raw)
     sourceDirty.value = false
   }
 
@@ -133,6 +138,13 @@ function onSourceInput(event: Event) {
   sourceDirty.value = true
 }
 
+/** 代码编辑器（CodeMirror）回填源码。 */
+function setSourceHtml(value: string) {
+  if (value === sourceHtml.value) return
+  sourceHtml.value = value
+  sourceDirty.value = true
+}
+
 function applySourceNow() {
   applySourceHtmlToEditor(sourceHtml.value, { focus: false })
   sourceHtml.value = getLiveEditorHtml()
@@ -150,6 +162,7 @@ function applySourceNow() {
     bubbleShouldShow,
     setViewMode,
     onSourceInput,
+    setSourceHtml,
     applySourceNow,
   }
 }

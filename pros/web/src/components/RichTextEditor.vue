@@ -3663,6 +3663,7 @@ const {
   bubbleShouldShow,
   setViewMode,
   onSourceInput,
+  setSourceHtml,
   applySourceNow,
 } = useViewMode({
   editor,
@@ -3678,7 +3679,8 @@ const {
 
 onBeforeUnmount(() => {
   if (viewMode.value === 'source') {
-    applySourceHtmlToEditor(sourceHtml.value, { focus: false })
+    // 只有改过源码才写回正文；仅查看源码不改动画布内容
+    if (sourceDirty.value) applySourceHtmlToEditor(sourceHtml.value, { focus: false })
   } else if (editor.value && !editor.value.isDestroyed) {
     scheduleHtmlEmit(editor.value, true)
   }
@@ -6431,6 +6433,7 @@ provideRteBindings({
   onPublish,
   onPublishSettings,
   onSourceInput,
+  setSourceHtml,
   onTableColsInput,
   onTableGridHover,
   onTableGridLeave,

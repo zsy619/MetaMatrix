@@ -184,32 +184,7 @@
   background: #1e1e1e;
 }
 
-.rte-source-label {
-  font-size: 11px;
-  color: #9cdcfe;
-  margin-bottom: 6px;
-}
-
-.rte-source-editor {
-  flex: 1;
-  min-height: 180px;
-  width: 100%;
-  box-sizing: border-box;
-  resize: none;
-  border: 1px solid #3c3c3c;
-  border-radius: 4px;
-  padding: 10px 12px;
-  background: #1e1e1e;
-  color: #d4d4d4;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 12px;
-  line-height: 1.55;
-  outline: none;
-}
-
-.rte-source-editor:focus {
-  border-color: #1a73e8;
-}
+/* 源码面板内是 CodeMirror 编辑器（见 RteSourceCodeEditor.vue），样式随组件走。 */
 
 .rte-toolbar {
   display: flex;
