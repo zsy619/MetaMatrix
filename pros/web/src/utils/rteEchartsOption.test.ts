@@ -1,0 +1,206 @@
+import { describe, expect, it } from 'vitest'
+import {
+  ECHARTS_CHART_TYPES,
+  ECHARTS_MAX_DATA_POINTS,
+  ECHARTS_OPTION_MAX_BYTES,
+  buildOptionFromTable,
+  buildTemplateOption,
+  cloneEchartsOption,
+  safeParseEchartsOption,
+  sanitizeEchartsOption,
+  serializeEchartsOption,
+  type EchartsChartType,
+} from './rteEchartsOption.ts'
+
+describe('ECharts option 净化', () => {
+  it('剥离 toolbox / graphic / markPoint 等危险字段', () => {
+    const result = sanitizeEchartsOption({
+      title: { text: '示例' },
+      toolbox: { feature: { dataView: true } },
+      graphic: [{ type: 'text', style: { text: 'x' } }],
+      series: [{ type: 'bar', data: [1, 2], markPoint: { data: [] } }],
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.option.toolbox).toBeUndefined()
+    expect(result.option.graphic).toBeUndefined()
+    const series = result.option.series as Array<Record<string, unknown>>
+    expect(series[0].markPoint).toBeUndefined()
+    expect(result.warnings.join('，')).toContain('toolbox')
+  })
+
+  it('丢弃未登记的顶层字段', () => {
+    const result = sanitizeEchartsOption({
+      title: { text: '示例' },
+      polar: { center: ['50%', '50%'] },
+      series: [{ type: 'line', data: [1, 2, 3] }],
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.option.polar).toBeUndefined()
+  })
+
+  it('丢弃未支持的图表类型', () => {
+    const result = sanitizeEchartsOption({
+      series: [
+        { type: 'bar', data: [1, 2] },
+        { type: 'gauge', data: [1] },
+      ],
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    const series = result.option.series as unknown[]
+    expect(series).toHaveLength(1)
+  })
+
+  it('深拷贝：改结果不影响入参', () => {
+    const input = { title: { text: '示例' }, series: [{ type: 'bar', data: [1, 2] }] }
+    const result = sanitizeEchartsOption(input)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    ;(result.option.series as Array<Record<string, unknown>>)[0].data = [9]
+    expect((input.series[0].data as number[])[0]).toBe(1)
+  })
+
+  it('数据点超限直接报错', () => {
+    const data = new Array(ECHARTS_MAX_DATA_POINTS + 10).fill(1)
+    const result = sanitizeEchartsOption({ series: [{ type: 'bar', data }] })
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error).toContain('数据点过多')
+  })
+
+  it('数据点刚好到上限不报错', () => {
+    const data = new Array(ECHARTS_MAX_DATA_POINTS).fill(1)
+    const result = sanitizeEchartsOption({ series: [{ type: 'bar', data }] })
+    expect(result.ok).toBe(true)
+  })
+
+  it('option 体积超限直接报错', () => {
+    const many = new Array(2000).fill('y'.repeat(50))
+    const result = sanitizeEchartsOption({ xAxis: { type: 'category', data: many } })
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error).toContain('体积过大')
+    expect(result.error).toContain(String(ECHARTS_OPTION_MAX_BYTES))
+  })
+
+  it('数组超长不静默截断，直接报错', () => {
+    const many = new Array(2500).fill('分类')
+    const result = sanitizeEchartsOption({ xAxis: { type: 'category', data: many } })
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error).toContain('截断')
+  })
+
+  it('文本超长不静默截断，直接报错', () => {
+    const result = sanitizeEchartsOption({ title: { text: 'x'.repeat(2500) } })
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error).toContain('截断')
+  })
+
+  it('系列数超限不静默截断，直接报错', () => {
+    const series = new Array(60).fill(0).map(() => ({ type: 'bar', data: [1] }))
+    const result = sanitizeEchartsOption({ series })
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error).toContain('截断')
+  })
+
+  it('超限时不会把被截断的数据当成功返回', () => {
+    const many = new Array(2500).fill('分类')
+    const result = sanitizeEchartsOption({ xAxis: { type: 'category', data: many } })
+    expect(result.ok).toBe(false)
+    expect('option' in result).toBe(false)
+  })
+
+  it('非对象 option 报错', () => {
+    const result = sanitizeEchartsOption([1, 2, 3])
+    expect(result.ok).toBe(false)
+  })
+})
+
+describe('ECharts option 解析', () => {
+  it('非法 JSON 不抛异常，返回可读错误', () => {
+    const result = safeParseEchartsOption('{ 这不是 JSON')
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error).toContain('JSON 解析失败')
+  })
+
+  it('空文本报错', () => {
+    const result = safeParseEchartsOption('   ')
+    expect(result.ok).toBe(false)
+  })
+
+  it('合法 JSON 往返后保持一致', () => {
+    const option = buildTemplateOption('bar')
+    const text = serializeEchartsOption(option)
+    expect(text.includes('\n')).toBe(false)
+    const result = safeParseEchartsOption(text)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.option.series).toBeTruthy()
+  })
+
+  it('克隆是独立副本', () => {
+    const option = buildTemplateOption('line')
+    const copy = cloneEchartsOption(option) as Record<string, unknown>
+    ;(copy.title as Record<string, unknown>).text = '改了'
+    expect((option.title as Record<string, unknown>).text).not.toBe('改了')
+  })
+})
+
+describe('ECharts 模板与表格生成', () => {
+  it('五种图表类型都能生成可用 option', () => {
+    for (const item of ECHARTS_CHART_TYPES) {
+      const option = buildTemplateOption(item.value as EchartsChartType)
+      const series = option.series as Array<Record<string, unknown>>
+      expect(series.length).toBeGreaterThan(0)
+      expect(series[0].type).toBe(item.value)
+      const result = sanitizeEchartsOption(option)
+      expect(result.ok).toBe(true)
+    }
+  })
+
+  it('从表格生成柱状图：首列作分类轴，其余数值列作系列', () => {
+    const option = buildOptionFromTable('bar', {
+      headers: ['月份', '销量', '利润'],
+      rows: [
+        ['1月', '120', '30'],
+        ['2月', '150', '42'],
+      ],
+    })
+    expect(option).toBeTruthy()
+    if (!option) return
+    const xAxis = option.xAxis as Record<string, unknown>
+    expect(xAxis.data).toEqual(['1月', '2月'])
+    const series = option.series as Array<Record<string, unknown>>
+    expect(series).toHaveLength(2)
+    expect(series[0].data).toEqual([120, 150])
+  })
+
+  it('从表格生成饼图：首列作名称、次列作数值', () => {
+    const option = buildOptionFromTable('pie', {
+      headers: ['渠道', '占比'],
+      rows: [
+        ['直营', '60'],
+        ['分销', '40'],
+      ],
+    })
+    expect(option).toBeTruthy()
+    if (!option) return
+    const series = option.series as Array<Record<string, unknown>>
+    const data = series[0].data as Array<Record<string, unknown>>
+    expect(data[0]).toEqual({ name: '直营', value: 60 })
+  })
+
+  it('表格没有数值列时返回 null', () => {
+    const option = buildOptionFromTable('bar', {
+      headers: ['月份', '备注'],
+      rows: [['1月', '无数据']],
+    })
+    expect(option).toBe(null)
+  })
+})

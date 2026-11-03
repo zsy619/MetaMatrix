@@ -9,6 +9,7 @@
     "type-check": "vue-tsc -b --pretty false",
     "test": "vitest run",
     "test:e2e": "node scripts/rte-baseline.mjs",
+    "test:e2e:echarts": "node scripts/rte-echarts-e2e.mjs",
     "test:smoke": "node scripts/smoke-flow.mjs",
     "test:e2e:clone": "node scripts/clone-canvas-e2e.mjs",
     "preview": "vite preview"
@@ -37,6 +38,7 @@
     "@tiptap/suggestion": "^3.32.0",
     "@tiptap/vue-3": "^3.32.0",
     "@vueuse/core": "^15.0.0",
+    "echarts": "5.6.0",
     "element-plus": "^2.14.7",
     "highlight.js": "^11.12.0",
     "html2canvas": "^1.4.1",

@@ -1808,6 +1808,58 @@ useParentScopeStamp()
           </button>
         </div>
         <div data-rte-own
+          v-else-if="t.kind === 'echarts'"
+          class="rte-tool-wrap"
+          @mouseenter="rte.onToolMenuEnter('echarts')"
+          @mouseleave="rte.onToolMenuLeave($event, 'echarts', () => (rte.echartsMenuOpen = false))"
+        >
+          <button data-rte-own
+            type="button"
+            class="rte-tool"
+            :ref="(el) => rte.setFloatAnchor('echarts', el)"
+            data-rte-anchor="echarts"
+            :class="{ active: rte.echartsMenuOpen }"
+            title="插入 ECharts 图表"
+            aria-haspopup="menu"
+            :aria-expanded="rte.echartsMenuOpen"
+            @click.stop="rte.markToolbarMenuOpening(); rte.echartsMenuOpen = !rte.echartsMenuOpen"
+          >
+            <span data-rte-own class="rte-tool-icon">
+              <component
+                v-if="t.iconComp"
+                data-rte-own
+                :is="t.iconComp"
+                class="rte-ep-icon"
+              />
+              <template v-else>{{ t.icon }}</template>
+            </span>
+            <span data-rte-own class="rte-tool-label">图表<span data-rte-own class="rte-caret" aria-hidden="true"></span></span>
+          </button>
+          <Teleport to="body">
+            <div data-rte-own
+              v-if="rte.echartsMenuOpen"
+              class="rte-menu"
+              v-rte-float="'echarts'"
+              @mousedown.prevent
+              @mouseenter="rte.onToolMenuEnter('echarts')"
+              @mouseleave="rte.onToolMenuLeave($event, 'echarts', () => (rte.echartsMenuOpen = false))"
+            >
+              <button
+                v-for="opt in rte.ECHARTS_CHART_TYPES"
+                :key="'ec-' + opt.value"
+                data-rte-own
+                type="button"
+                @click="rte.insertEchartsBlockAtCursor(opt.value)"
+              >
+                {{ opt.label }}
+                <span data-rte-own class="rte-menu-hint">{{ opt.hint }}</span>
+              </button>
+              <div data-rte-own class="rte-menu-sep" aria-hidden="true"></div>
+              <button data-rte-own type="button" @click="rte.openEchartsDialog()">一键生成…</button>
+            </div>
+          </Teleport>
+        </div>
+        <div data-rte-own
           v-else-if="t.kind === 'caseTransform'"
           class="rte-tool-wrap"
           @mouseenter="rte.onToolMenuEnter('caseTransform')"

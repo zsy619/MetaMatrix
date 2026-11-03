@@ -29,7 +29,7 @@ export const TOOLBAR_GROUPS: readonly ToolbarGroupDef[] = [
   {
     id: 'insert',
     label: '链接',
-    keys: ['link', 'linkButton', 'image', 'video', 'audio', 'attach', 'linkCard', 'qrcode', 'emoji', 'specialChars', 'formula'],
+    keys: ['link', 'linkButton', 'image', 'video', 'audio', 'attach', 'linkCard', 'qrcode', 'emoji', 'specialChars', 'formula', 'echarts'],
   },
   { id: 'table', label: '表格', keys: ['table', 'tableCsv', 'tableFilter'] },
   {

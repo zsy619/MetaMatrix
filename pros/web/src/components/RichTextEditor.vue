@@ -134,6 +134,18 @@ import { useCrossDoc } from './rte/composables/useCrossDoc'
 import type { DirectoryPermission } from '../utils/rteDirectory'
 import { RTE_EMOJI_CATEGORIES } from '../utils/rteEmojiList'
 import { RTE_SPECIAL_CHAR_CATEGORIES } from '../utils/rteSpecialChars'
+import {
+  ECHARTS_CHART_TYPES,
+  ECHARTS_MAX_PER_DOCUMENT,
+  buildTemplateOption,
+  serializeEchartsOption,
+  type EchartsChartType,
+  type EchartsTableData,
+} from '../utils/rteEchartsOption'
+import {
+  RTE_AFTER_EXPORT_EVENT,
+  RTE_BEFORE_EXPORT_EVENT,
+} from '../extensions/echartsBlock'
 
 const props = withDefaults(
   defineProps<{
@@ -2256,6 +2268,104 @@ function insertMermaidAtCursor() {
   ElMessage.success('已插入流程图（可点块内「编辑源码」）')
 }
 
+/** 文档里的图表块数量（超过上限会提示）。 */
+function countEchartsBlocks(): number {
+  const ed = editor.value
+  if (!ed) return 0
+  let count = 0
+  ed.state.doc.descendants((node) => {
+    if (node.type.name === 'echartsBlock') count += 1
+  })
+  return count
+}
+
+/** 光标所在表格的数据（表头 + 数据行），不在表格里返回 null。 */
+function currentEchartsTableData(): EchartsTableData | null {
+  const ed = editor.value
+  if (!ed) return null
+  const { $from } = ed.state.selection
+  for (let depth = $from.depth; depth > 0; depth -= 1) {
+    const node = $from.node(depth)
+    if (node.type.name !== 'table') continue
+    const rows: string[][] = []
+    node.forEach((row) => {
+      const cells: string[] = []
+      row.forEach((cell) => {
+        cells.push(cell.textContent.trim())
+      })
+      rows.push(cells)
+    })
+    if (rows.length < 2) return null
+    return { headers: rows[0] || [], rows: rows.slice(1) }
+  }
+  return null
+}
+
+const echartsMenuOpen = ref(false)
+const echartsDialogOpen = ref(false)
+const echartsDialogTable = ref<EchartsTableData | null>(null)
+const echartsDialogType = ref<EchartsChartType>('bar')
+const echartsDialogTitle = ref('')
+const echartsDialogUseTable = ref(false)
+
+function echartsTypeLabel(type: EchartsChartType): string {
+  return ECHARTS_CHART_TYPES.find((item) => item.value === type)?.label || '图表'
+}
+
+/** 插入一个带示例数据的可用图表。 */
+function insertEchartsBlockAtCursor(
+  type: EchartsChartType,
+  opts: { title?: string; table?: EchartsTableData | null } = {},
+) {
+  const ed = editor.value
+  if (!ed) return
+  const count = countEchartsBlocks()
+  if (count >= ECHARTS_MAX_PER_DOCUMENT) {
+    ElMessage.warning(
+      `单文档图表已达 ${ECHARTS_MAX_PER_DOCUMENT} 个，继续插入会拖慢页面（建议拆分文档）`,
+    )
+  }
+  const option = buildTemplateOption(type, {
+    title: opts.title || '',
+    table: opts.table ?? null,
+  })
+  ed.chain()
+    .focus()
+    .insertEchartsBlock({
+      option: serializeEchartsOption(option),
+      chartType: type,
+      theme: 'light',
+      renderer: 'svg',
+    })
+    .run()
+  echartsMenuOpen.value = false
+  moreOpen.value = false
+  ElMessage.success(`已插入${echartsTypeLabel(type)}（可点块内「编辑数据」改 JSON）`)
+}
+
+/** 一键生成面板：选类型 + 可选标题 + 可选用表格数据。 */
+function openEchartsDialog() {
+  echartsDialogTable.value = currentEchartsTableData()
+  echartsDialogType.value = 'bar'
+  echartsDialogTitle.value = ''
+  echartsDialogUseTable.value = !!echartsDialogTable.value
+  echartsDialogOpen.value = true
+  echartsMenuOpen.value = false
+  moreOpen.value = false
+}
+
+function applyEchartsDialog(payload: {
+  type: EchartsChartType
+  title: string
+  useTable: boolean
+}) {
+  const table = payload.useTable
+    ? echartsDialogTable.value || currentEchartsTableData()
+    : null
+  insertEchartsBlockAtCursor(payload.type, { title: payload.title, table })
+  echartsDialogOpen.value = false
+}
+
 
 function openXrefDialog() {
   const ed = editor.value
@@ -2591,8 +2701,11 @@ function printEditor() {
   }
   applyPrintPageStyle(pageSize.value)
   root.classList.add('rte-printing')
+  // 打印前把图表换成白底静态快照，打印完还原
+  window.dispatchEvent(new CustomEvent(RTE_BEFORE_EXPORT_EVENT))
   const cleanup = () => {
     root.classList.remove('rte-printing')
+    window.dispatchEvent(new CustomEvent(RTE_AFTER_EXPORT_EVENT))
     window.removeEventListener('afterprint', cleanup)
   }
   window.addEventListener('afterprint', cleanup)
@@ -3461,6 +3574,9 @@ function applySlashCommandItem(item: RteSlashItem) {
       break
     case 'mermaid':
       void insertMermaidAtCursor()
+      break
+    case 'echarts':
+      openEchartsDialog()
       break
     case 'ruby':
       void insertRubyAnnotation()
@@ -5212,7 +5328,7 @@ type ToolItem = {
   title?: string
   icon: string
   iconComp?: Component
-  kind?: 'heading' | 'list' | 'more' | 'btn' | 'color' | 'highlight' | 'align' | 'fontSize' | 'fontFamily' | 'lineHeight' | 'import' | 'export' | 'table' | 'attach' | 'form' | 'template' | 'code' | 'divider' | 'emoji' | 'specialChars' | 'columns' | 'spacing' | 'wordStats' | 'callout' | 'shortcuts' | 'hr' | 'blockOps' | 'insertDate' | 'pasteFormat' | 'caseTransform' | 'zoom' | 'viewExtras' | 'paraStyle' | 'listStyle' | 'linkButton'
+  kind?: 'heading' | 'list' | 'more' | 'btn' | 'color' | 'highlight' | 'align' | 'fontSize' | 'fontFamily' | 'lineHeight' | 'import' | 'export' | 'table' | 'attach' | 'form' | 'template' | 'code' | 'divider' | 'emoji' | 'specialChars' | 'columns' | 'spacing' | 'wordStats' | 'callout' | 'shortcuts' | 'hr' | 'blockOps' | 'insertDate' | 'pasteFormat' | 'caseTransform' | 'zoom' | 'viewExtras' | 'paraStyle' | 'listStyle' | 'linkButton' | 'echarts'
   active?: () => boolean
   run?: () => void
 }
@@ -5469,6 +5585,13 @@ const allTools = computed((): ToolItem[] => {
       run: () => { void insertLinkButton('blue') },
     },
     { key: 'formula', label: '公式', icon: 'Σ', iconComp: ic('formula'), run: insertFormula },
+    {
+      key: 'echarts',
+      label: '图表',
+      title: '插入 ECharts 图表',
+      icon: '📊',
+      kind: 'echarts',
+    },
     {
       key: 'form',
       label: '表单',
@@ -6039,6 +6162,7 @@ provide(RTE_CTX, {
 
 provideRteBindings({
   CALLOUT_MENU_ITEMS,
+  ECHARTS_CHART_TYPES,
   CODE_LANG_OPTIONS,
   COLUMN_MENU_ITEMS,
   FEISHU_HIGHLIGHT_COLORS,
@@ -6152,6 +6276,15 @@ provideRteBindings({
   closeAttachDialog,
   closeColorMenus,
   closeExportMenu,
+  echartsDialogOpen,
+  echartsDialogTable,
+  echartsDialogTitle,
+  echartsDialogType,
+  echartsDialogUseTable,
+  echartsMenuOpen,
+  applyEchartsDialog,
+  insertEchartsBlockAtCursor,
+  openEchartsDialog,
   closeFindDialog,
   closeFontMenus,
   closeFormInspector,

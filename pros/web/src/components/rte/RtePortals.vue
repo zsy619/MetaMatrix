@@ -1021,6 +1021,73 @@ useParentScopeStamp()
       </div>
     </Teleport>
 
+    <!-- 一键生成 ECharts 图表 -->
+    <Teleport to="body">
+      <div data-rte-own
+        v-if="rte.echartsDialogOpen"
+        class="rte-modal-overlay"
+        @mousedown.self="rte.echartsDialogOpen = false"
+      >
+        <div data-rte-own
+          class="rte-link-dialog rte-echarts-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-label="插入图表"
+          @mousedown.stop
+        >
+          <h3 data-rte-own class="rte-table-title">一键生成图表</h3>
+          <p data-rte-own class="rte-ask-message">选择图表类型，插入后带示例数据；可继续在块内「编辑数据」改 option JSON。</p>
+          <div data-rte-own class="rte-echarts-type-list">
+            <button
+              v-for="opt in rte.ECHARTS_CHART_TYPES"
+              :key="'ect-' + opt.value"
+              data-rte-own
+              type="button"
+              class="rte-import-item"
+              :class="{ 'is-active': rte.echartsDialogType === opt.value }"
+              style="width: 100%; margin-bottom: 6px; text-align: left"
+              @click="rte.echartsDialogType = opt.value"
+            >
+              <strong data-rte-own>{{ opt.label }}</strong>
+              <span data-rte-own class="rte-menu-hint">{{ opt.hint }}</span>
+            </button>
+          </div>
+          <div data-rte-own class="rte-note-field" style="width: 100%; margin-bottom: 8px">
+            <input
+              data-rte-own
+              v-model="rte.echartsDialogTitle"
+              class="rte-note-input"
+              type="text"
+              maxlength="60"
+              placeholder="图表标题（可留空）"
+            />
+          </div>
+          <label data-rte-own class="rte-ask-message" style="display: flex; gap: 6px; align-items: center">
+            <input
+              data-rte-own
+              v-model="rte.echartsDialogUseTable"
+              type="checkbox"
+              :disabled="!rte.echartsDialogTable"
+            />
+            <span data-rte-own>
+              用光标所在表格的数据生成
+              <template v-if="!rte.echartsDialogTable">（当前光标不在表格里）</template>
+            </span>
+          </label>
+          <p data-rte-own class="rte-ask-message">提示：图表内容不参与逐条修订；单个文档图表超过 20 个会提示。</p>
+          <div data-rte-own class="rte-modal-actions">
+            <button data-rte-own type="button" class="rte-modal-cancel" @click="rte.echartsDialogOpen = false">取消</button>
+            <button
+              data-rte-own
+              type="button"
+              class="rte-modal-confirm"
+              @click="rte.applyEchartsDialog({ type: rte.echartsDialogType, title: rte.echartsDialogTitle, useTable: rte.echartsDialogUseTable })"
+            >插入</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
     <!-- 阅读时长 -->
     <Teleport to="body">
       <div data-rte-own
