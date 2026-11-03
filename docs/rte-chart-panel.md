@@ -10,9 +10,9 @@
 
 | # | 需求 | 状态 | 落点 | 验证方式 |
 |---|---|---|---|---|
-| 1 | 图表工具栏拆成多个子分组按钮栏（基础/统计/关系/层级/地理/金融/坐标系/组件/3D·GL） | 已对齐 | `src/utils/echarts/chartGroups.ts`、`RteToolbar.vue` | e2e 截图 01 / 02 |
-| 2 | 3D/GL 独立一组 | 已对齐 | 同上（`is-gl` 独立样式 + 分隔线） | e2e 截图 02 |
-| 3 | 超出可折叠 / 下拉 | 已对齐 | 组头点击折叠（`toggleEchartsGroup`）+ 分组 chip 筛选 | 手动 + e2e 截图 01 |
+| 1 | 图表一级分类各占工具栏一个独立下拉按钮（基础/统计/关系/层级/地理/金融/坐标系/组件/3D·GL，共 9 个） | 已对齐 | `src/utils/echarts/chartGroups.ts`、`src/utils/rteToolbarGroups.ts`（`chart:<id>` key）、`RteToolbar.vue`（kind `echartsGroup`） | vitest `RteToolbarCharts.test.ts`、e2e 截图 01 / 02 |
+| 2 | 3D/GL 独立一组 | 已对齐 | 同上（`chart:gl` 独立下拉按钮，11 类） | vitest「3D·GL 是独立下拉」、e2e 截图 02 |
+| 3 | 每个分类下拉里只列本分类的具体图表类型 | 已对齐 | `RteToolbar.vue` 的 `chartCategoriesOf()` + `toggleChartGroupMenu()` | vitest「点某个分类下拉只列该分类下的图表类型」+ e2e 截图 01 |
 | 4 | 选中图表块弹出属性面板（侧栏） | 已对齐 | `useChartPanelBridge.ts` + `ChartPanel.vue` | e2e 截图 03–10、vitest `ChartPanel.test.ts` |
 | 5 | 按图表类型显示不同面板（schema 驱动，每类一份） | 已对齐 | `src/utils/echarts/panelSchemas/`（39 类 + 兜底） | vitest `panelSchemas.test.ts` |
 | 6 | title / legend / tooltip / grid / xAxis / yAxis / series / visualMap / dataZoom / color 主题可配 | 已对齐 | 各 schema 的 general / axis / series / style 段 | vitest `panelSchemas.test.ts` + e2e 截图 |
@@ -92,7 +92,7 @@ schema 目录 `src/utils/echarts/panelSchemas/`：39 个类别各一个文件（
 | `chartDataRuntime.ts` | 190 | 拉取 / 轮询 / 合并进 option |
 | `chartDataSource.ts` | 136 | 数据接口配置的类型与读写（归一化 / 序列化 / 解析） |
 | `chartOptionPath.ts` | 130 | 按点号路径读写 option + `isSameEchartsOption`（比较两份 option 是否等价） |
-| `chartGroups.ts` | 128 | 工具栏 9 个子分组 |
+| `chartGroups.ts` | 139 | 工具栏 9 个一级分类（各一个下拉按钮） |
 | `chartDataMapping.ts` | 119 | 接口响应 → 图表数据的映射（纯函数） |
 | `panelSchemas/index.ts` | 105 | 39 类 schema 汇总与兜底 |
 | `chartDataRequest.ts` | 73 | 请求构造 + query 拼装（纯函数） |
@@ -114,7 +114,7 @@ schema 目录 `src/utils/echarts/panelSchemas/`：39 个类别各一个文件（
 | `src/utils/echarts/chartDataMapping.ts` | 数据接口的响应映射（纯函数） |
 | `src/utils/echarts/chartDataRuntime.ts` | 拉取 / 轮询 / 合并进 option |
 | `src/utils/echarts/chartSecret.ts` | 自定义密钥的本机存储 |
-| `src/utils/echarts/chartGroups.ts` | 工具栏 9 个子分组 |
+| `src/utils/echarts/chartGroups.ts` | 工具栏 9 个一级分类（各一个下拉按钮） |
 
 ---
 

@@ -148,6 +148,7 @@ import {
   ECHARTS_TEMPLATES,
   findEchartsTemplate,
 } from '../utils/echarts/templates'
+import { CHART_GROUPS } from '../utils/echarts/chartGroups'
 import {
   RTE_AFTER_EXPORT_EVENT,
   RTE_BEFORE_EXPORT_EVENT,
@@ -2312,7 +2313,8 @@ function currentEchartsTableData(): EchartsTableData | null {
   return null
 }
 
-const echartsMenuOpen = ref(false)
+/** 当前展开的图表分类下拉（工具栏上的 9 个一级分类各一个）。null 表示都收起。 */
+const echartsGroupMenuKey = ref<string | null>(null)
 const echartsDialogOpen = ref(false)
 const echartsDialogTable = ref<EchartsTableData | null>(null)
 const echartsDialogType = ref<EchartsChartType>('bar')
@@ -2352,7 +2354,7 @@ function insertEchartsBlockAtCursor(
       renderer: 'svg',
     })
     .run()
-  echartsMenuOpen.value = false
+  echartsGroupMenuKey.value = null
   moreOpen.value = false
   ElMessage.success(`已插入${echartsTypeLabel(type)}（选中图表可在属性面板改类型 / 改数据）`)
 }
@@ -2386,7 +2388,7 @@ function insertEchartsTemplateById(
       renderer: template.renderer,
     })
     .run()
-  echartsMenuOpen.value = false
+  echartsGroupMenuKey.value = null
   echartsOpenCategory.value = null
   moreOpen.value = false
   ElMessage.success(`已插入${template.label}（选中图表可在属性面板改类型 / 改数据）`)
@@ -2405,7 +2407,7 @@ function openEchartsDialog() {
   echartsDialogTitle.value = ''
   echartsDialogUseTable.value = !!echartsDialogTable.value
   echartsDialogOpen.value = true
-  echartsMenuOpen.value = false
+  echartsGroupMenuKey.value = null
   moreOpen.value = false
 }
 
@@ -5325,6 +5327,12 @@ function onMoreToolClick(t: ToolItem) {
     })
     return
   }
+  if (t.kind === 'echartsGroup') {
+    // 紧凑模式（未最大化）没有分类下拉：走「一键生成」面板
+    moreOpen.value = false
+    openEchartsDialog()
+    return
+  }
   moreColorOpen.value = false
   moreHighlightOpen.value = false
   moreFormOpen.value = false
@@ -5398,7 +5406,7 @@ type ToolItem = {
   title?: string
   icon: string
   iconComp?: Component
-  kind?: 'heading' | 'list' | 'more' | 'btn' | 'color' | 'highlight' | 'align' | 'fontSize' | 'fontFamily' | 'lineHeight' | 'import' | 'export' | 'table' | 'attach' | 'form' | 'template' | 'code' | 'divider' | 'emoji' | 'specialChars' | 'columns' | 'spacing' | 'wordStats' | 'callout' | 'shortcuts' | 'hr' | 'blockOps' | 'insertDate' | 'pasteFormat' | 'caseTransform' | 'zoom' | 'viewExtras' | 'paraStyle' | 'listStyle' | 'linkButton' | 'echarts'
+  kind?: 'heading' | 'list' | 'more' | 'btn' | 'color' | 'highlight' | 'align' | 'fontSize' | 'fontFamily' | 'lineHeight' | 'import' | 'export' | 'table' | 'attach' | 'form' | 'template' | 'code' | 'divider' | 'emoji' | 'specialChars' | 'columns' | 'spacing' | 'wordStats' | 'callout' | 'shortcuts' | 'hr' | 'blockOps' | 'insertDate' | 'pasteFormat' | 'caseTransform' | 'zoom' | 'viewExtras' | 'paraStyle' | 'listStyle' | 'linkButton' | 'echarts' | 'echartsGroup'
   active?: () => boolean
   run?: () => void
 }
@@ -5655,13 +5663,14 @@ const allTools = computed((): ToolItem[] => {
       run: () => { void insertLinkButton('blue') },
     },
     { key: 'formula', label: '公式', icon: 'Σ', iconComp: ic('formula'), run: insertFormula },
-    {
-      key: 'echarts',
-      label: '图表',
-      title: '插入 ECharts 图表',
-      icon: '📊',
-      kind: 'echarts',
-    },
+    // —— 图表：一级分类各一个下拉（基础 / 统计 / 关系 / 层级 / 地理 / 金融 / 坐标系 / 组件 / 3D·GL）——
+    ...CHART_GROUPS.map((group) => ({
+      key: `chart:${group.id}`,
+      label: group.label,
+      title: `插入${group.label}图表`,
+      icon: group.icon,
+      kind: 'echartsGroup' as const,
+    })),
     {
       key: 'form',
       label: '表单',
@@ -6354,7 +6363,7 @@ provideRteBindings({
   echartsDialogTitle,
   echartsDialogType,
   echartsDialogUseTable,
-  echartsMenuOpen,
+  echartsGroupMenuKey,
   echartsOpenCategory,
   applyEchartsDialog,
   insertEchartsBlockAtCursor,

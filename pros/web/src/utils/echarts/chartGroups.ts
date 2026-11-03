@@ -13,6 +13,8 @@ export type ChartGroupDef = {
   id: string
   label: string
   hint: string
+  /** 工具栏按钮图标（emoji）。 */
+  icon: string
   /** 该组包含的类别 id（顺序即展示顺序）。 */
   categoryIds: readonly string[]
 }
@@ -21,54 +23,63 @@ export type ChartGroupDef = {
 export const CHART_GROUPS: readonly ChartGroupDef[] = [
   {
     id: 'basic',
+    icon: '📈',
     label: '基础',
     hint: '折线 / 柱状 / 饼图 / 散点',
     categoryIds: ['line', 'bar', 'pie', 'scatter', 'pictorialBar'],
   },
   {
     id: 'stats',
+    icon: '📊',
     label: '统计',
     hint: '分布 / 指标 / 转化',
     categoryIds: ['boxplot', 'heatmap', 'themeRiver', 'gauge', 'funnel'],
   },
   {
     id: 'relation',
+    icon: '🕸️',
     label: '关系',
     hint: '节点连线与流量',
     categoryIds: ['graph', 'lines', 'sankey', 'chord'],
   },
   {
     id: 'hierarchy',
+    icon: '🌳',
     label: '层级',
     hint: '树状结构占比',
     categoryIds: ['tree', 'treemap', 'sunburst'],
   },
   {
     id: 'geo',
+    icon: '🗺️',
     label: '地理',
     hint: '区域分布',
     categoryIds: ['map'],
   },
   {
     id: 'finance',
+    icon: '💹',
     label: '金融',
     hint: '行情走势',
     categoryIds: ['candlestick'],
   },
   {
     id: 'coordinate',
+    icon: '🎯',
     label: '坐标系',
     hint: '多维与时间轴',
     categoryIds: ['radar', 'parallel', 'calendar', 'matrix'],
   },
   {
     id: 'component',
+    icon: '🧩',
     label: '组件',
     hint: '数据与叠加组件',
     categoryIds: ['dataset', 'dataZoom', 'graphic', 'rich', 'custom'],
   },
   {
     id: 'gl',
+    icon: '🧊',
     label: '3D·GL',
     hint: 'WebGL 三维图（独立渲染器）',
     categoryIds: [

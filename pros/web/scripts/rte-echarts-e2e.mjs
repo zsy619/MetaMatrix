@@ -2,7 +2,7 @@
  * 图表块（ECharts）端到端：工具栏「图表」分组 → 按官方类别逐类插入 → 真实渲染 → 导出快照。
  *
  * 覆盖：
- * - 工具栏独立「图表」分组（39 类，下拉按类别分区展开）；
+ * - 工具栏独立「图表」分组（一级分类 9 个下拉按钮，3D·GL 独立，合计 39 类）；
  * - 每个类别抽一个子类型插入，并验证真的渲染出图（SVG / WebGL Canvas）；
  * - data-option 往返、导出快照。
  *
@@ -86,50 +86,73 @@ if (await slashItem.count()) {
 }
 log('斜杠路径插入一块图表', (await page.locator('.pm-overlay .rte-echarts-block').count()) >= 1)
 
-/** 二、工具栏独立「图表」分组：下拉里 39 类，按类别分区展开 */
-const toolbarBtn = page.locator('.pm-overlay button[title="插入 ECharts 图表"]')
-log('工具栏有图表按钮', (await toolbarBtn.count()) > 0)
-await toolbarBtn.first().click({ force: true })
-await page.waitForTimeout(400)
-const categoryButtons = page.locator('body > .rte-menu-echarts .rte-menu-cat')
-const categoryCount = await categoryButtons.count()
-log('图表下拉按官方类别分区', categoryCount >= 39, `类别数=${categoryCount}`)
-const glSection = await page.locator('body > .rte-menu-echarts .rte-menu-section').count()
-log('3D / GL 单独分区', glSection >= 1, `分区数=${glSection}`)
+/** 二、工具栏独立「图表」分组：一级分类各一个下拉（9 个，3D·GL 独立） */
+const groupLabels = ['基础', '统计', '关系', '层级', '地理', '金融', '坐标系', '组件', '3D·GL']
+let groupCount = 0
+for (const label of groupLabels) {
+  groupCount += await page.locator(`.pm-overlay button[title="插入${label}图表"]`).count()
+}
+log('工具栏图表一级分类按钮', groupCount >= 9, `数量=${groupCount}`)
 
-/** 三、每个类别抽一个子类型插入，并验证真的渲染出来 */
-const labels = await categoryButtons.allTextContents()
+/** 三、每个分类下抽每个类别的一个子类型插入，并验证真的渲染出来 */
 const inserted = []
-for (let i = 0; i < categoryButtons.count(); i += 1) {
-  const cat = categoryButtons.nth(i)
-  const label = (labels[i] || '').trim()
-  await cat.click({ force: true })
-  await page.waitForTimeout(120)
-  const sub = page.locator('body > .rte-menu-echarts .rte-menu-sub button').first()
-  if ((await sub.count()) === 0) {
-    log(`类别 ${label} 没有子类型`, false)
+for (const groupLabel of groupLabels) {
+  const groupBtn = page.locator(`.pm-overlay button[title="插入${groupLabel}图表"]`).first()
+  if ((await groupBtn.count()) === 0) {
+    log(`分类 ${groupLabel} 没有下拉按钮`, false)
     continue
   }
-  const before = await page.locator('.pm-overlay .rte-echarts-block').count()
-  await sub.click({ force: true })
-  await page.waitForTimeout(600)
-  const after = await page.locator('.pm-overlay .rte-echarts-block').count()
-  if (after <= before) {
-    log(`类别 ${label} 插入失败`, false)
-    continue
-  }
-  const last = page.locator('.pm-overlay .rte-echarts-block').last()
-  const rendered = await last.evaluate((node) => {
-    const preview = node.querySelector('.rte-echarts-preview')
-    return {
-      svg: !!preview?.querySelector('svg'),
-      canvas: !!preview?.querySelector('canvas'),
-      error: preview?.querySelector('.rte-echarts-error')?.textContent || '',
+  let menuOpen = false
+  const openMenu = async () => {
+    if (menuOpen) {
+      await groupBtn.click({ force: true })
+      await page.waitForTimeout(200)
+      menuOpen = false
     }
-  })
-  const ok = (rendered.svg || rendered.canvas) && !rendered.error
-  log(`类别 ${label} 插入并渲染`, ok, JSON.stringify(rendered))
-  inserted.push({ label, ok })
+    await groupBtn.click({ force: true })
+    await page.waitForTimeout(350)
+    menuOpen = true
+  }
+  await openMenu()
+  const categoryButtons = page.locator('body > .rte-menu-echarts .rte-menu-cat')
+  const categoryCount = await categoryButtons.count()
+  log(`分类 ${groupLabel} 的类别数`, categoryCount > 0, `类别数=${categoryCount}`)
+  const labels = await categoryButtons.allTextContents()
+  for (let i = 0; i < categoryCount; i += 1) {
+    const label = (labels[i] || '').trim()
+    await openMenu()
+    const cat = page.locator('body > .rte-menu-echarts .rte-menu-cat').nth(i)
+    await cat.click({ force: true })
+    await page.waitForTimeout(150)
+    const sub = page.locator('body > .rte-menu-echarts .rte-menu-sub button').first()
+    if ((await sub.count()) === 0) {
+      log(`类别 ${label} 没有子类型`, false)
+      menuOpen = false
+      continue
+    }
+    const before = await page.locator('.pm-overlay .rte-echarts-block').count()
+    await sub.click({ force: true })
+    await page.waitForTimeout(600)
+    // 插入后菜单自动收起
+    menuOpen = false
+    const after = await page.locator('.pm-overlay .rte-echarts-block').count()
+    if (after <= before) {
+      log(`类别 ${label} 插入失败`, false)
+      continue
+    }
+    const last = page.locator('.pm-overlay .rte-echarts-block').last()
+    const rendered = await last.evaluate((node) => {
+      const preview = node.querySelector('.rte-echarts-preview')
+      return {
+        svg: !!preview?.querySelector('svg'),
+        canvas: !!preview?.querySelector('canvas'),
+        error: preview?.querySelector('.rte-echarts-error')?.textContent || '',
+      }
+    })
+    const ok = (rendered.svg || rendered.canvas) && !rendered.error
+    log(`类别 ${label} 插入并渲染`, ok, JSON.stringify(rendered))
+    inserted.push({ label, ok })
+  }
 }
 
 /** 四、真实渲染：懒加载 echarts 后块内出现 SVG */

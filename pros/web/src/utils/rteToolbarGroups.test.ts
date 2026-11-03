@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict'
 import {
+  CHART_TOOLBAR_KEYS,
   DEFAULT_TOOLBAR_GROUP_ORDER,
   LEGACY_GROUP_ALIASES,
   TOOLBAR_GROUPS,
   buildToolbarGroups,
   bumpToolbarUndoEpoch,
   currentToolbarUndoEpoch,
+  expandLegacyChartKey,
   migrateToolbarGroupButtons,
   moveToolbarGroup,
   normalizeToolbarGroupOrder,
@@ -30,10 +32,10 @@ assert.deepEqual(DEFAULT_TOOLBAR_GROUP_ORDER, [
   'other',
 ])
 
-// 97 个旧 key 全部仍挂在某一组，无丢失无重复
+// 105 个 key 全部仍挂在某一组，无丢失无重复（图表组由 1 个总入口变 9 个分类下拉）
 const allKeys = TOOLBAR_GROUPS.flatMap((group) => group.keys)
-assert.equal(allKeys.length, 97)
-assert.equal(new Set(allKeys).size, 97)
+assert.equal(allKeys.length, 105)
+assert.equal(new Set(allKeys).size, 105)
 
 // —— 旧分组顺序 id 迁移 ——
 assert.deepEqual(normalizeToolbarGroupOrder(undefined), [...DEFAULT_TOOLBAR_GROUP_ORDER])
@@ -152,6 +154,25 @@ assert.deepEqual(migrateToolbarGroupButtons(migrated), migrated)
 // 空配置迁移后不保留（画布保持干净）
 assert.equal(migrateToolbarGroupButtons({ p1: { other: { order: [], hidden: [] } } }), undefined)
 assert.equal(migrateToolbarGroupButtons(undefined), undefined)
+
+// —— 图表总入口迁移：旧 `echarts` 展开成 9 个分类下拉 ——
+const chartMigrated = migrateToolbarGroupButtons({
+  p1: { charts: { order: ['echarts'], hidden: [] } },
+})
+// 等于默认（9 个分类按钮全显示、默认顺序）→ 不写回画布
+assert.equal(chartMigrated, undefined)
+
+const chartHiddenMigrated = migrateToolbarGroupButtons({
+  p1: { charts: { order: ['echarts'], hidden: ['echarts'] } },
+})
+assert.ok(chartHiddenMigrated)
+// 旧隐藏总入口 → 9 个分类下拉全隐藏
+assert.deepEqual(chartHiddenMigrated!.p1!.charts!.hidden, [...CHART_TOOLBAR_KEYS])
+assert.deepEqual(chartHiddenMigrated!.p1!.charts!.order, [...CHART_TOOLBAR_KEYS])
+
+// 展开函数本身
+assert.deepEqual(expandLegacyChartKey('echarts'), [...CHART_TOOLBAR_KEYS])
+assert.deepEqual(expandLegacyChartKey('chart:basic'), ['chart:basic'])
 
 const first = bumpToolbarUndoEpoch()
 const second = bumpToolbarUndoEpoch()
