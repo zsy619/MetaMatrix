@@ -152,6 +152,8 @@ import {
   RTE_AFTER_EXPORT_EVENT,
   RTE_BEFORE_EXPORT_EVENT,
 } from '../extensions/echartsBlock'
+import { useChartPanelBridge } from './rte/chart-panel/useChartPanelBridge'
+import ChartPanel from './rte/chart-panel/ChartPanel.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -850,6 +852,9 @@ const editor = useRteExtensions({
   bumpSuggestions: () => bumpSuggestions(),
   mentionPeople: () => directoryPeople.mentionPeople(),
 })
+
+// 图表属性面板：选中图表块即弹出（侧栏）
+const chartPanelBridge = useChartPanelBridge(editor)
 
 const {
   commentsOpen,
@@ -6905,6 +6910,7 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
     <RteToolbar />
     <RteDocumentBody />
     <RtePortals />
+    <ChartPanel :host="chartPanelBridge.host" />
 
     <!-- 隐藏文件选择：导入文档 -->
     <input

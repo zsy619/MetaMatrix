@@ -11,6 +11,18 @@ import { ECHARTS_CATEGORIES } from '../utils/echarts/templates'
 import { echartsRendererFor, needsEchartsGl, resolveEchartsRenderItems } from '../utils/echarts/prepare'
 import { loadEchartsGl } from '../utils/echartsGlRuntime'
 
+/** 生成图表块 id（用于把自定义密钥绑定到具体图表）。 */
+export function createChartId(): string {
+  try {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID()
+    }
+  } catch {
+    /* ignore */
+  }
+  return `chart-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+}
+
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
     echartsBlock: {
@@ -19,7 +31,13 @@ declare module '@tiptap/core' {
         chartType?: EchartsChartType
         theme?: string
         renderer?: string
+        chartId?: string
+        dataSource?: string
       }) => ReturnType
+      /** 更新指定位置的图表块属性。 */
+      updateEchartsBlock: (pos: number, attrs: Record<string, unknown>) => ReturnType
+      /** 删除指定位置的图表块。 */
+      deleteEchartsBlock: (pos: number) => ReturnType
     }
   }
 }
@@ -101,6 +119,23 @@ export const EchartsBlock = Node.create({
           'data-renderer': attrs.renderer || 'svg',
         }),
       },
+      // 图表块稳定 id：属性面板定位图表块 + 自定义密钥绑定都用它。
+      // 不写进导出 HTML 的敏感信息，只是一个随机标识。
+      chartId: {
+        default: '',
+        parseHTML: (el: HTMLElement) => el.getAttribute('data-chart-id') || '',
+        renderHTML: (attrs: { chartId?: string }) => ({
+          'data-chart-id': attrs.chartId || '',
+        }),
+      },
+      // 数据接口配置（JSON 文本）。**不含明文密钥**，密钥存本地。
+      dataSource: {
+        default: '',
+        parseHTML: (el: HTMLElement) => el.getAttribute('data-datasource') || '',
+        renderHTML: (attrs: { dataSource?: string }) => ({
+          'data-datasource': attrs.dataSource || '',
+        }),
+      },
     }
   },
 
@@ -114,6 +149,8 @@ export const EchartsBlock = Node.create({
       chartType?: string
       theme?: string
       renderer?: string
+      chartId?: string
+      dataSource?: string
     }
     const chartType = isChartType(attrs.chartType) ? attrs.chartType : 'bar'
     const label = ECHARTS_CHART_TYPES.find((item) => item.value === chartType)?.label || '图表'
@@ -126,6 +163,9 @@ export const EchartsBlock = Node.create({
         'data-chart-type': chartType,
         'data-theme': attrs.theme || 'light',
         'data-renderer': attrs.renderer || 'svg',
+        // 数据接口配置随图表块持久化（不含明文密钥，密钥只存本地）
+        'data-chart-id': attrs.chartId || '',
+        'data-datasource': attrs.dataSource || '',
         style: `min-height:${DEFAULT_HEIGHT}px`,
       }),
       ['div', { class: 'rte-echarts-fallback' }, `ECharts 图表（${label}）`],
@@ -542,6 +582,8 @@ export const EchartsBlock = Node.create({
               chartType,
               theme: attrs?.theme || 'light',
               renderer: attrs?.renderer || 'svg',
+              chartId: attrs?.chartId || createChartId(),
+              dataSource: attrs?.dataSource || '',
             },
           }
           // 插完图表后，选区会落在图表这个原子节点上。再插一次时
@@ -555,6 +597,26 @@ export const EchartsBlock = Node.create({
             return commands.insertContentAt(pos, node)
           }
           return commands.insertContent(node)
+        },
+      /** 更新指定位置的图表块属性（属性面板写回用）。 */
+      updateEchartsBlock:
+        (pos, attrs) =>
+        ({ tr }) => {
+          if (!Number.isInteger(pos) || pos < 0) return false
+          const node = tr.doc.nodeAt(pos)
+          if (!node || node.type.name !== this.name) return false
+          tr.setNodeMarkup(pos, undefined, { ...node.attrs, ...attrs })
+          return true
+        },
+      /** 删除指定位置的图表块（属性面板删除用）。 */
+      deleteEchartsBlock:
+        (pos) =>
+        ({ tr }) => {
+          if (!Number.isInteger(pos) || pos < 0) return false
+          const node = tr.doc.nodeAt(pos)
+          if (!node || node.type.name !== this.name) return false
+          tr.delete(pos, pos + node.nodeSize)
+          return true
         },
     }
   },

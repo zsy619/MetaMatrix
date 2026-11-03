@@ -4,6 +4,10 @@ import {
   visibleGroupButtonKeys,
   type ToolbarGroupButtonConfig,
 } from './rteToolbarGroupButtons'
+import { CHART_GROUPS } from './echarts/chartGroups'
+
+/** 图表分组在工具栏里的按钮 key（与 CHART_GROUPS 一一对应）。 */
+export const CHART_TOOLBAR_KEYS: readonly string[] = CHART_GROUPS.map((group) => `chart:${group.id}`)
 
 export type ToolbarGroupDef = {
   id: string
@@ -31,7 +35,7 @@ export const TOOLBAR_GROUPS: readonly ToolbarGroupDef[] = [
     label: '链接',
     keys: ['link', 'linkButton', 'image', 'video', 'audio', 'attach', 'linkCard', 'qrcode', 'emoji', 'specialChars', 'formula'],
   },
-  // 图表独立分组：下拉按官方示例类别分区（39 类，见 utils/echarts/templates）
+  // 图表独立分组：下拉里按子分组分区（基础 / 统计 / 关系 / 层级 / 地理 / 金融 / 坐标系 / 组件 / 3D·GL）
   { id: 'charts', label: '图表', keys: ['echarts'] },
   { id: 'table', label: '表格', keys: ['table', 'tableCsv', 'tableFilter'] },
   {
