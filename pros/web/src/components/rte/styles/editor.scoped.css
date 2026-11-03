@@ -60,20 +60,17 @@
   border-radius: 999px;
   background: #f4f6f8;
 }
-.rte-tool-group[data-group-id='history'] { background: #eef3ff; border-color: #c5d4f5; }
-.rte-tool-group[data-group-id='text'],
-.rte-tool-group[data-group-id='type'] { background: #f1f7ef; border-color: #c9dfc4; }
-.rte-tool-group[data-group-id='marks'] { background: #e7f4ee; border-color: #b7d9c8; }
-.rte-tool-group[data-group-id='color'] { background: #fff6e8; border-color: #f0d7b0; }
-.rte-tool-group[data-group-id='align'] { background: #e8f1fb; border-color: #c3d7ef; }
-.rte-tool-group[data-group-id='list'] { background: #f7f0ea; border-color: #e6d3c4; }
-.rte-tool-group[data-group-id='paragraph'] { background: #f4f0fa; border-color: #d9ceea; }
+/* 分组配色跟随分组 id（方案 A：edit / style / paragraph / insert / charts / table / blocks / notes / review / view / file / other） */
+.rte-tool-group[data-group-id='edit'] { background: #eef3ff; border-color: #c5d4f5; }
+.rte-tool-group[data-group-id='style'] { background: #f1f7ef; border-color: #c9dfc4; }
+.rte-tool-group[data-group-id='paragraph'] { background: #e8f1fb; border-color: #c3d7ef; }
 .rte-tool-group[data-group-id='insert'] { background: #eef8f8; border-color: #c5e4e4; }
 .rte-tool-group[data-group-id='table'] { background: #eef6ff; border-color: #c5daf5; }
 .rte-tool-group[data-group-id='blocks'] { background: #f8f1f4; border-color: #e7d0da; }
 .rte-tool-group[data-group-id='notes'] { background: #fff8e8; border-color: #f0e0b0; }
 .rte-tool-group[data-group-id='review'] { background: #fdeeee; border-color: #f0c9c9; }
 .rte-tool-group[data-group-id='view'] { background: #eef3f8; border-color: #c9d7e6; }
+.rte-tool-group[data-group-id='file'] { background: #f7f3ec; border-color: #e4d6c2; }
 .rte-tool-group[data-group-id='other'] { background: #f7f7f8; border-color: #d9dbe0; }
 .rte-tool-group.is-dragging {
   opacity: 0.45;
@@ -1175,19 +1172,16 @@
   border-radius: 12px;
   background: #f4f6f8;
 }
-.rte-more-group[data-group-id='history'] { background: #eef3ff; border-color: #c5d4f5; }
-.rte-more-group[data-group-id='type'] { background: #f1f7ef; border-color: #c9dfc4; }
-.rte-more-group[data-group-id='marks'] { background: #e7f4ee; border-color: #b7d9c8; }
-.rte-more-group[data-group-id='color'] { background: #fff6e8; border-color: #f0d7b0; }
-.rte-more-group[data-group-id='align'] { background: #e8f1fb; border-color: #c3d7ef; }
-.rte-more-group[data-group-id='list'] { background: #f7f0ea; border-color: #e6d3c4; }
-.rte-more-group[data-group-id='paragraph'] { background: #f4f0fa; border-color: #d9ceea; }
+.rte-more-group[data-group-id='edit'] { background: #eef3ff; border-color: #c5d4f5; }
+.rte-more-group[data-group-id='style'] { background: #f1f7ef; border-color: #c9dfc4; }
+.rte-more-group[data-group-id='paragraph'] { background: #e8f1fb; border-color: #c3d7ef; }
 .rte-more-group[data-group-id='insert'] { background: #eef8f8; border-color: #c5e4e4; }
 .rte-more-group[data-group-id='table'] { background: #eef6ff; border-color: #c5daf5; }
 .rte-more-group[data-group-id='blocks'] { background: #f8f1f4; border-color: #e7d0da; }
 .rte-more-group[data-group-id='notes'] { background: #fff8e8; border-color: #f0e0b0; }
 .rte-more-group[data-group-id='review'] { background: #fdeeee; border-color: #f0c9c9; }
 .rte-more-group[data-group-id='view'] { background: #eef3f8; border-color: #c9d7e6; }
+.rte-more-group[data-group-id='file'] { background: #f7f3ec; border-color: #e4d6c2; }
 .rte-more-group[data-group-id='other'] { background: #f7f7f8; border-color: #d9dbe0; }
 .rte-more-group.is-dragging { opacity: 0.45; }
 .rte-more-group.is-drop-target::before {
