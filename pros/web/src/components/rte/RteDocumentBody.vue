@@ -4,6 +4,7 @@ import { EditorContent } from '@tiptap/vue-3'
 import { BubbleMenu } from '@tiptap/vue-3/menus'
 import FormPropertyInspector from '../FormPropertyInspector.vue'
 import CommentThreadPanel from './CommentThreadPanel.vue'
+import RteSourceCodeEditor from './RteSourceCodeEditor.vue'
 import { RTE_BINDINGS } from './bindings'
 import { useParentScopeStamp } from './inheritScope'
 
@@ -704,13 +705,10 @@ useParentScopeStamp()
       </div>
 
       <div data-rte-own v-if="rte.viewMode === 'source'" class="rte-source-pane">
-        <label data-rte-own class="rte-source-label" for="rte-source-editor">HTML 源码</label>
-        <textarea data-rte-own
-          id="rte-source-editor"
-          class="rte-source-editor"
-          spellcheck="false"
-          :value="rte.sourceHtml"
-          @input="rte.onSourceInput"
+        <RteSourceCodeEditor
+          data-rte-own
+          :model-value="rte.sourceHtml"
+          @update:model-value="rte.setSourceHtml"
         />
       </div>
 
