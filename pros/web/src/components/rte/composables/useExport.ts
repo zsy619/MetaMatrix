@@ -6,6 +6,7 @@ import { feishuClipboardDocument } from '../../../utils/rteRound7'
 import { buildDocxBlob } from '../../../utils/rteExportDocx'
 import { buildPdfFromElement } from '../../../utils/rteExportPdf'
 import { htmlToMarkdown } from '../../../utils/rteExportMd'
+import { buildExportHtmlWithCharts } from '../../../utils/rteExportChartSnapshots'
 import { escapeHtml } from '../../../utils/itemsHtml'
 import type { PageMargin, PageMarginBox } from '../../../utils/rtePageMargin'
 import type { PanelPageChrome } from '../../../utils/rtePageChrome'
@@ -93,7 +94,7 @@ async function copyAsFeishuHtml() {
   }
 }
 
-function exportAsHtml() {
+async function exportAsHtml() {
   closeExportMenu()
   deps.closeMore()
   const ed = deps.editor.value
@@ -102,7 +103,11 @@ function exportAsHtml() {
     return
   }
   const title = (deps.title.value || '').trim() || '未命名文档'
-  const body = ed.getHTML()
+  // 图表块先换成白底快照图，避免导出成占位文案。
+  const body = await buildExportHtmlWithCharts({
+    editorHtml: ed.getHTML(),
+    root: deps.rootEl.value,
+  })
   const html = `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -114,6 +119,7 @@ body{font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-se
 img,video{max-width:100%;height:auto;}
 table{border-collapse:collapse;width:100%;}
 th,td{border:1px solid #e5e6eb;padding:6px 8px;}
+.rte-export-chart{margin:16px 0;}
 </style>
 </head>
 <body>
@@ -230,7 +236,11 @@ async function exportAsDocx() {
   exportBusy.value = true
   try {
     const title = (deps.title.value || '').trim() || '未命名文档'
-    const bodyHtml = ed.getHTML() || ''
+    // 图表块先换成白底快照图，Word 里是内嵌图片，不是占位文案。
+    const bodyHtml = await buildExportHtmlWithCharts({
+      editorHtml: ed.getHTML() || '',
+      root: deps.rootEl.value,
+    })
     const bodyText = ed.getText({ blockSeparator: '\n' }) || ''
     const blob = await buildDocxBlob({ title, bodyHtml, bodyText })
     triggerDownloadBlob(blob, `${exportFileBasename()}.docx`)
@@ -243,7 +253,7 @@ async function exportAsDocx() {
   }
 }
 
-function exportAsMarkdown() {
+async function exportAsMarkdown() {
   closeExportMenu()
   deps.closeMore()
   const ed = deps.editor.value
@@ -252,7 +262,12 @@ function exportAsMarkdown() {
     return
   }
   const title = (deps.title.value || '').trim()
-  const mdBody = htmlToMarkdown(ed.getHTML() || '')
+  // 图表块先换成白底快照图，Markdown 里是 ![]() 图片，不是占位文案。
+  const html = await buildExportHtmlWithCharts({
+    editorHtml: ed.getHTML() || '',
+    root: deps.rootEl.value,
+  })
+  const mdBody = htmlToMarkdown(html)
   const md = title ? `# ${title}\n\n${mdBody}` : mdBody
   triggerDownloadBlob(
     new Blob([md], { type: 'text/markdown;charset=utf-8' }),

@@ -60,7 +60,9 @@ function nodeToMd(root: HTMLElement): string {
       } else if (tag === 'img') {
         const src = e.getAttribute('src') || ''
         const alt = e.getAttribute('alt') || e.getAttribute('title') || 'image'
-        parts.push(`![${alt}](${src})\n\n`)
+        // data URL 里可能有空格 / 括号（SVG 快照），用 <...> 包起来才不会截断链接
+        const safeSrc = /[\s()]/.test(src) ? `<${src}>` : src
+        parts.push(`![${alt}](${safeSrc})\n\n`)
       } else if (tag === 'br') {
         parts.push('  \n')
       } else {

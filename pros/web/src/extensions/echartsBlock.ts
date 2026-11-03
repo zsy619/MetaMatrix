@@ -195,6 +195,8 @@ export const EchartsBlock = Node.create({
       dom.dataset.chartType = isChartType(current.attrs.chartType)
         ? current.attrs.chartType
         : 'bar'
+      // chartId 跟着 DOM 走：导出时用它把快照对回文档里的图表块。
+      dom.dataset.chartId = current.attrs.chartId || ''
 
       // 块内不再挂任何操作控件（类型下拉 / 编辑数据 / 删除）：
       // 图表的所有操作都走「属性面板」，块内只负责渲染。
@@ -434,6 +436,7 @@ export const EchartsBlock = Node.create({
           dom.dataset.chartType = isChartType(updated.attrs.chartType)
             ? updated.attrs.chartType
             : 'bar'
+          dom.dataset.chartId = updated.attrs.chartId || ''
           applyEditableState()
           void render()
           return true
