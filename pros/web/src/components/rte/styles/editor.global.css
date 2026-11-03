@@ -2330,33 +2330,6 @@
   overflow: hidden;
   background: #fff;
 }
-.rte-echarts-toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  background: #f7f8fa;
-  border-bottom: 1px solid #e5e6eb;
-  font-size: 12px;
-  color: #4e5969;
-}
-.rte-echarts-toolbar button {
-  border: 1px solid #e5e6eb;
-  background: #fff;
-  border-radius: 4px;
-  padding: 2px 8px;
-  cursor: pointer;
-  font-size: 12px;
-}
-.rte-echarts-type {
-  border: 1px solid #e5e6eb;
-  background: #fff;
-  border-radius: 4px;
-  padding: 2px 4px;
-  font-size: 12px;
-  color: #1d2129;
-}
 .rte-echarts-preview {
   padding: 12px;
   overflow-x: auto;
@@ -2378,21 +2351,6 @@
   width: 100%;
   height: auto;
   background: #fff;
-}
-.rte-echarts-editor {
-  padding: 10px;
-  border-top: 1px solid #e5e6eb;
-  background: #fff;
-}
-.rte-echarts-source {
-  width: 100%;
-  min-height: 160px;
-  border: 1px solid #e5e6eb;
-  border-radius: 6px;
-  padding: 8px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 12px;
-  box-sizing: border-box;
 }
 .rte-echarts-error {
   color: #f53f3f;
@@ -2857,8 +2815,6 @@
     border-left: 3px solid #c9cdd4 !important;
     color: #1d2129 !important;
   }
-  .rte-root.rte-printing .rte-echarts-toolbar,
-  .rte-root.rte-printing .rte-echarts-editor,
   .rte-root.rte-printing .rte-echarts-hint {
     display: none !important;
   }
@@ -3523,6 +3479,29 @@
   border-radius: 8px;
   background: #eef1f6;
   color: #4e5969;
+}
+.rte-cp-type-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+.rte-cp-type-label {
+  flex: 0 0 auto;
+  font-size: 12px;
+  color: #4e5969;
+}
+.rte-cp-type-select {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 26px;
+  padding: 2px 6px;
+  border: 1px solid #d9dce1;
+  border-radius: 4px;
+  background: #fff;
+  font-size: 12px;
+  color: #1d2129;
+  cursor: pointer;
 }
 .rte-cp-close {
   position: absolute;

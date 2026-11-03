@@ -88,7 +88,7 @@ MarkArea/MarkLine/MarkPoint/Matrix/Parallel/Polar/SingleAxis/Toolbox/Transform/V
 - 走 URL 加载会依赖外部服务，离线/内网直接失效，且图表内容属于文档正文，不应该在渲染时请求第三方；
 - 因此**内置一份极小示例 GeoJSON**（`src/utils/echarts/demoMap.ts`，约 1KB，4 个示意区域，
   注册名 `meta-demo`），保证「地理坐标/地图」类目能真正跑通渲染；
-  真实业务地图请在块内「编辑数据」里替换。
+  真实业务地图请在属性面板的「数据」区里替换。
 
 ### 4. custom 系列的 renderItem
 

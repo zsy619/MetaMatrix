@@ -20,6 +20,7 @@ import { useChartPanel } from './useChartPanel'
 import type { useChartPanelHost } from './useChartPanelHost'
 import { isSameEchartsOption } from '../../../utils/echarts/chartOptionPath'
 import { writeChartSecret } from '../../../utils/echarts/chartSecret'
+import { ECHARTS_CHART_TYPES } from '../../../utils/rteEchartsOption'
 import type { ChartDataSourceConfig } from '../../../utils/echarts/chartDataSource'
 
 const props = defineProps<{ host: ReturnType<typeof useChartPanelHost> }>()
@@ -73,7 +74,12 @@ function persist() {
   previousOption = props.host.readOptionById(chartId)
   lastWritten = option
   lastChartId = chartId
-  props.host.applyOptionById(chartId, JSON.parse(option))
+  // 类型与 option 一起写回：换类型后类型字段不能还留在旧值。
+  lastWrittenAttrs = {
+    option,
+    chartType: panel.target?.chartType || props.host.chartType,
+  }
+  props.host.applyAttrsById(chartId, lastWrittenAttrs)
   armGuard()
 }
 
@@ -88,6 +94,7 @@ function persist() {
 let previousOption = ''
 let lastWritten = ''
 let lastChartId = ''
+let lastWrittenAttrs: Record<string, unknown> = {}
 let guardTimer: ReturnType<typeof setTimeout> | null = null
 
 function armGuard() {
@@ -104,7 +111,7 @@ function onEditorTransaction() {
   if (isSameEchartsOption(live, lastWritten)) return
   // 只有「退回到写回前的值」才当成被回声覆盖；外部的真实改动不碰
   if (!isSameEchartsOption(live, previousOption)) return
-  props.host.applyOptionById(lastChartId, JSON.parse(lastWritten))
+  props.host.applyAttrsById(lastChartId, lastWrittenAttrs)
 }
 
 let stopEditorUpdate: (() => void) | null = null
@@ -137,8 +144,18 @@ function onUpdateSecret(secret: { bearerToken: string; headers: Record<string, s
   ElMessage.success('密钥已保存到本机浏览器（不会写入文档）')
 }
 
-/** 删除图表块（需二次确认）。 */
+/**
+ * 删除图表块（需二次确认）。
+ *
+ * 确认弹窗期间宿主可能回写内容、选区可能丢失，面板目标会被清空。
+ * 所以先把 chartId 记下来，确认后按 id 删除 —— 目标丢了也照样删得掉。
+ */
 async function onDelete() {
+  const chartId = props.host.target?.chartId || ''
+  if (!chartId) {
+    ElMessage.warning('图表块已不在文档中')
+    return
+  }
   try {
     await ElMessageBox.confirm('删除后该图表块及其数据将无法恢复，确认删除？', '删除图表', {
       confirmButtonText: '确认删除',
@@ -148,8 +165,19 @@ async function onDelete() {
   } catch {
     return
   }
-  if (props.host.remove()) {
+  if (props.host.removeById(chartId)) {
+    props.host.hide()
     ElMessage.success('已删除图表块')
+  } else {
+    ElMessage.error('删除失败：图表块已不在文档中')
+  }
+}
+
+/** 换图表类型（写回 chartType + option）。 */
+function onChangeChartType(event: Event) {
+  const value = (event.target as HTMLSelectElement).value
+  if (!panel.setChartType(value)) {
+    ElMessage.warning('该图表类型不可用')
   }
 }
 </script>
@@ -162,6 +190,18 @@ async function onDelete() {
         {{ panel.schema.label }}
         <span class="rte-cp-type">{{ props.host.chartType }}</span>
       </div>
+      <label class="rte-cp-type-row">
+        <span class="rte-cp-type-label">图表类型</span>
+        <select
+          class="rte-cp-type-select"
+          :value="panel.target?.chartType || ''"
+          @change="onChangeChartType"
+        >
+          <option v-for="item in ECHARTS_CHART_TYPES" :key="item.value" :value="item.value">
+            {{ item.label }}
+          </option>
+        </select>
+      </label>
       <button type="button" class="rte-cp-close" title="关闭面板" @click="props.host.hide()">
         ×
       </button>

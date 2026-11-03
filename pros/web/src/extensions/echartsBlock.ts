@@ -2,7 +2,6 @@ import { Node, mergeAttributes } from '@tiptap/core'
 import {
   ECHARTS_CHART_TYPES,
   buildTemplateOption,
-  retypeEchartsOption,
   safeParseEchartsOption,
   serializeEchartsOption,
   type EchartsChartType,
@@ -184,7 +183,6 @@ export const EchartsBlock = Node.create({
       let chartRenderer: 'svg' | 'canvas' = 'svg'
       let resizeObserver: ResizeObserver | null = null
       let snapshotEl: HTMLDivElement | null = null
-      let editing = false
       let destroyed = false
       let renderSeq = 0
 
@@ -198,83 +196,23 @@ export const EchartsBlock = Node.create({
         ? current.attrs.chartType
         : 'bar'
 
-      const toolbar = document.createElement('div')
-      toolbar.className = 'rte-echarts-toolbar'
-      toolbar.contentEditable = 'false'
-
-      const label = document.createElement('span')
-      label.className = 'rte-echarts-label'
-      label.textContent = 'ECharts 图表'
-
-      const typeSelect = document.createElement('select')
-      typeSelect.className = 'rte-echarts-type'
-      typeSelect.title = '切换图表类型'
-      for (const item of ECHARTS_CHART_TYPES) {
-        const optionEl = document.createElement('option')
-        optionEl.value = item.value
-        optionEl.textContent = item.label
-        typeSelect.appendChild(optionEl)
-      }
-
-      const editBtn = document.createElement('button')
-      editBtn.type = 'button'
-      editBtn.className = 'rte-echarts-edit'
-      editBtn.textContent = '编辑数据'
-
-      const deleteBtn = document.createElement('button')
-      deleteBtn.type = 'button'
-      deleteBtn.className = 'rte-echarts-delete'
-      deleteBtn.textContent = '删除'
-
-      toolbar.appendChild(label)
-      toolbar.appendChild(typeSelect)
-      toolbar.appendChild(editBtn)
-      toolbar.appendChild(deleteBtn)
-
+      // 块内不再挂任何操作控件（类型下拉 / 编辑数据 / 删除）：
+      // 图表的所有操作都走「属性面板」，块内只负责渲染。
       const previewEl = document.createElement('div')
       previewEl.className = 'rte-echarts-preview'
       previewEl.contentEditable = 'false'
       previewEl.style.height = `${DEFAULT_HEIGHT}px`
 
-      const editorBox = document.createElement('div')
-      editorBox.className = 'rte-echarts-editor'
-      editorBox.style.display = 'none'
-
-      const source = document.createElement('textarea')
-      source.className = 'rte-echarts-source'
-      source.rows = 10
-      source.spellcheck = false
-
-      const errorEl = document.createElement('div')
-      errorEl.className = 'rte-echarts-error'
-
-      /** 数据接口拉取失败时的提示（与 JSON 编辑错误分开显示）。 */
+      /** 数据接口拉取失败时的提示。 */
       const dataErrorEl = document.createElement('div')
       dataErrorEl.className = 'rte-echarts-datasource-error'
       dataErrorEl.style.display = 'none'
-
-      const applyBtn = document.createElement('button')
-      applyBtn.type = 'button'
-      applyBtn.className = 'rte-echarts-apply'
-      applyBtn.textContent = '应用'
-
-      const cancelBtn = document.createElement('button')
-      cancelBtn.type = 'button'
-      cancelBtn.className = 'rte-echarts-cancel'
-      cancelBtn.textContent = '取消'
-
-      editorBox.appendChild(source)
-      editorBox.appendChild(errorEl)
-      editorBox.appendChild(applyBtn)
-      editorBox.appendChild(cancelBtn)
 
       const hint = document.createElement('div')
       hint.className = 'rte-echarts-hint'
       hint.textContent = '图表内容不参与逐条修订；导出与打印按当前显示呈现。'
 
-      dom.appendChild(toolbar)
       dom.appendChild(previewEl)
-      dom.appendChild(editorBox)
       dom.appendChild(dataErrorEl)
       dom.appendChild(hint)
 
@@ -314,27 +252,9 @@ export const EchartsBlock = Node.create({
         })
       }
 
-      const setAttrs = (patch: Record<string, unknown>) => {
-        const pos = typeof getPos === 'function' ? getPos() : null
-        if (pos == null || !editor) return
-        editor
-          .chain()
-          .command(({ tr }) => {
-            tr.setNodeMarkup(pos, undefined, { ...current.attrs, ...patch })
-            return true
-          })
-          .run()
-      }
-
-      const showError = (message: string) => {
-        errorEl.textContent = message
-        errorEl.style.display = message ? 'block' : 'none'
-      }
-
-      /** 只读态下收起编辑工具条（图表仍然正常渲染）。 */
+      /** 只读态下收起提示条（图表仍然正常渲染）。 */
       const applyEditableState = () => {
         const editable = editor?.isEditable !== false
-        toolbar.style.display = editable ? '' : 'none'
         hint.style.display = editable ? '' : 'none'
       }
 
@@ -465,107 +385,32 @@ export const EchartsBlock = Node.create({
       window.addEventListener(RTE_BEFORE_EXPORT_EVENT, onBeforeExport)
       window.addEventListener(RTE_AFTER_EXPORT_EVENT, onAfterExport)
 
-      const openEditor = () => {
-        editing = true
-        const currentType = isChartType(current.attrs.chartType)
-          ? current.attrs.chartType
-          : 'bar'
-        source.value = current.attrs.option || defaultOption(currentType)
-        showError('')
-        editorBox.style.display = 'block'
-        previewEl.style.display = 'none'
-        editBtn.textContent = '收起编辑'
-      }
-
-      const closeEditor = () => {
-        editing = false
-        editorBox.style.display = 'none'
-        previewEl.style.display = 'block'
-        editBtn.textContent = '编辑数据'
-      }
-
-      editBtn.addEventListener('mousedown', (e) => {
-        e.preventDefault()
-        e.stopPropagation()
-      })
-      editBtn.addEventListener('click', (e) => {
-        e.preventDefault()
-        e.stopPropagation()
-        if (editing) closeEditor()
-        else openEditor()
-      })
-
-      applyBtn.addEventListener('mousedown', (e) => {
-        e.preventDefault()
-        e.stopPropagation()
-      })
-      applyBtn.addEventListener('click', (e) => {
-        e.preventDefault()
-        e.stopPropagation()
-        const parsed = safeParseEchartsOption(source.value)
-        if (!parsed.ok) {
-          showError(parsed.error)
-          return
-        }
-        showError('')
-        setAttrs({ option: serializeEchartsOption(parsed.option) })
-        closeEditor()
-      })
-
-      cancelBtn.addEventListener('mousedown', (e) => {
-        e.preventDefault()
-        e.stopPropagation()
-      })
-      cancelBtn.addEventListener('click', (e) => {
-        e.preventDefault()
-        e.stopPropagation()
-        showError('')
-        closeEditor()
-      })
-
-      typeSelect.addEventListener('mousedown', (e) => {
-        e.preventDefault()
-        e.stopPropagation()
-      })
-      typeSelect.addEventListener('change', (e) => {
-        e.preventDefault()
-        e.stopPropagation()
-        const next = typeSelect.value
-        if (!isChartType(next)) return
-        const option = retypeEchartsOption(currentOption(), next)
-        setAttrs({
-          chartType: next,
-          option: serializeEchartsOption(option),
-        })
-      })
-
-      deleteBtn.addEventListener('mousedown', (e) => {
-        e.preventDefault()
-        e.stopPropagation()
-      })
-      deleteBtn.addEventListener('click', (e) => {
-        e.preventDefault()
-        e.stopPropagation()
+      /**
+       * 选中本图表块（属性面板随之弹出）。
+       *
+       * 块内不再有操作控件，「选中 → 属性面板」是唯一入口，
+       * 所以点图表本身就要把节点选中。
+       */
+      const selectSelf = () => {
         const pos = typeof getPos === 'function' ? getPos() : null
         if (pos == null || !editor) return
-        editor
-          .chain()
-          .command(({ tr }) => {
-            tr.delete(pos, pos + current.nodeSize)
-            return true
-          })
-          .run()
-      })
+        const selection = editor.state.selection as { from?: number; node?: { type?: { name?: string } } }
+        if (selection.node?.type?.name === 'echartsBlock' && selection.from === pos) return
+        try {
+          editor.commands.setNodeSelection(pos)
+        } catch {
+          /* 位置无效时忽略 */
+        }
+      }
 
-      // 图表内部交互（tooltip / legend）不抢编辑器光标
+      // 图表内部交互（tooltip / legend）不抢编辑器光标；
+      // 但要把图表块选中，属性面板才知道该操作哪一张图。
       previewEl.addEventListener('mousedown', (e) => {
         e.preventDefault()
         e.stopPropagation()
+        selectSelf()
       })
 
-      typeSelect.value = isChartType(current.attrs.chartType)
-        ? current.attrs.chartType
-        : 'bar'
       applyEditableState()
       // 数据接口：配置在图表块属性里，启用后按间隔拉取
       syncDataSource()
@@ -589,11 +434,8 @@ export const EchartsBlock = Node.create({
           dom.dataset.chartType = isChartType(updated.attrs.chartType)
             ? updated.attrs.chartType
             : 'bar'
-          typeSelect.value = isChartType(updated.attrs.chartType)
-            ? updated.attrs.chartType
-            : 'bar'
           applyEditableState()
-          if (!editing) void render()
+          void render()
           return true
         },
         ignoreMutation: () => true,

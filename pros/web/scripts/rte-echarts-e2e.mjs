@@ -185,7 +185,8 @@ const serialized = await page.evaluate(() => {
   const html = document.querySelector('.pm-overlay .ProseMirror')?.innerHTML || ''
   const match = html.match(/data-option="([^"]*)"/)
   if (!match) return { ok: false }
-  const text = match[1].replace(/"/g, '"').replace(/&/g, '&')
+  // innerHTML 会把属性里的引号转义成 &quot;，先还原再解析 JSON
+  const text = match[1].replace(/&quot;/g, '"').replace(/&amp;/g, '&')
   try {
     const parsed = JSON.parse(text)
     return { ok: true, type: parsed?.series?.[0]?.type }

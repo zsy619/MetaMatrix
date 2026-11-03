@@ -188,7 +188,67 @@ if (await cmContent.count()) {
   log('高级 JSON 非法输入被拦下', false, '没找到 CodeMirror 内容区')
 }
 
-/** 5. 删除二次确认。 */
+/** 4.6 图表块内不再有操作条（类型下拉 / 编辑数据 / 删除）。 */
+const noBlockBar = await page.evaluate(() => {
+  const block = document.querySelector('.rte-echarts-block')
+  if (!block) return { ok: false, why: '没找到图表块' }
+  const text = block.textContent || ''
+  return {
+    ok:
+      !block.querySelector('.rte-echarts-toolbar') &&
+      !block.querySelector('select') &&
+      !block.querySelector('button') &&
+      !text.includes('编辑数据') &&
+      !text.includes('ECharts 图表'),
+    text: text.replace(/\s+/g, ' ').slice(0, 60),
+  }
+})
+log('块内无操作条', noBlockBar.ok, JSON.stringify(noBlockBar))
+
+/** 4.7 属性面板有「图表类型」下拉，且改类型会写回文档。 */
+const typeSelect = page.locator('.rte-chart-panel .rte-cp-type-select').first()
+if (await typeSelect.count()) {
+  await typeSelect.selectOption('pie')
+  await page.waitForTimeout(600)
+  const liveType = await page.evaluate(() => {
+    const ed = window.__rte?.editor
+    let chartType = ''
+    let seriesType = ''
+    ed.state.doc.descendants((node) => {
+      if (node.type?.name === 'echartsBlock' && !chartType) {
+        chartType = node.attrs.chartType
+        try {
+          seriesType = JSON.parse(node.attrs.option || '{}').series?.[0]?.type || ''
+        } catch {
+          seriesType = ''
+        }
+      }
+      return true
+    })
+    return { chartType, seriesType }
+  })
+  log(
+    '面板改类型写回文档',
+    liveType.chartType === 'pie' && liveType.seriesType === 'pie',
+    JSON.stringify(liveType),
+  )
+  await page.screenshot({ path: `${out}/11-panel-type-switched.png` })
+} else {
+  log('面板改类型写回文档', false, '没找到图表类型下拉')
+}
+
+/** 5. 删除二次确认（取消不删，确认才删）。 */
+const countCharts = () =>
+  page.evaluate(() => {
+    const ed = window.__rte?.editor
+    let n = 0
+    ed.state.doc.descendants((node) => {
+      if (node.type?.name === 'echartsBlock') n += 1
+      return true
+    })
+    return n
+  })
+const beforeDelete = await countCharts()
 const delBtn = page.locator('.rte-chart-panel .rte-cp-btn-danger').first()
 if (await delBtn.count()) {
   await delBtn.click()
@@ -200,7 +260,24 @@ if (await delBtn.count()) {
   const cancel = box.locator('button', { hasText: '取消' }).first()
   if (await cancel.count()) {
     await cancel.click()
-    await page.waitForTimeout(300)
+    await page.waitForTimeout(400)
+  }
+  const afterCancel = await countCharts()
+  log('取消不删', afterCancel === beforeDelete, `${beforeDelete} -> ${afterCancel}`)
+
+  // 再删一次并确认：图表块应真的从文档里消失
+  const delBtn2 = page.locator('.rte-chart-panel .rte-cp-btn-danger').first()
+  if (await delBtn2.count()) {
+    await delBtn2.click()
+    await page.waitForTimeout(600)
+    const box2 = page.locator('.el-message-box').last()
+    const ok = box2.locator('button', { hasText: '确认删除' }).first()
+    if (await ok.count()) {
+      await ok.click()
+      await page.waitForTimeout(800)
+    }
+    const afterConfirm = await countCharts()
+    log('确认后图表被删掉', afterConfirm === beforeDelete - 1, `${beforeDelete} -> ${afterConfirm}`)
   }
 } else {
   log('删除二次确认', false, '没找到删除按钮')

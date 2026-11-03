@@ -20,6 +20,8 @@ import {
   type ChartDataRow,
 } from '../../../utils/echarts/chartDataTable'
 import {
+  ECHARTS_CHART_TYPES,
+  retypeEchartsOption,
   safeParseEchartsOption,
   sanitizeEchartsOption,
   serializeEchartsOption,
@@ -206,6 +208,28 @@ export function useChartPanel() {
     return true
   }
 
+  /**
+   * 换图表类型（属性面板里的「图表类型」下拉）。
+   *
+   * 类型变了，option 要按新类型重建（柱状 ↔ 折线会尽量保留原数据），
+   * 图表类型与 option 一起写回文档；草稿同步更新，面板立即显示新类型。
+   */
+  function setChartType(type: string): boolean {
+    if (!target.value) return false
+    if (!ECHARTS_CHART_TYPES.some((item) => item.value === type)) return false
+    const next = retypeEchartsOption(draft.value, type)
+    draft.value = next
+    target.value = {
+      ...target.value,
+      chartType: type,
+      option: serializeEchartsOption(next),
+    }
+    dataJson.value = dataModelToJson(optionToDataModel(next))
+    error.value = ''
+    bump()
+    return true
+  }
+
   /** 数据编辑（表格 ⇄ JSON）相关方法。 */
   const data = useChartPanelData({
     getDraft: () => draft.value,
@@ -257,5 +281,6 @@ export function useChartPanel() {
     setFieldValue,
     ...data,
     applyFullJson,
+    setChartType,
   })
 }
