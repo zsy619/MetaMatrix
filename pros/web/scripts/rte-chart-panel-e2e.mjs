@@ -52,25 +52,44 @@ await page.goto(`${web}/chart-panel-preview.html`, { waitUntil: 'domcontentloade
 await page.waitForFunction(() => window.__RTE_PREVIEW_READY__ === true, null, { timeout: 60000 })
 await page.waitForTimeout(1200)
 
-/** 1. 工具栏「图表」下拉（分组按钮栏）。 */
-const chartButton = page.locator('.rte-toolbar button[title="插入 ECharts 图表"]').first()
-if (await chartButton.count()) {
-  await chartButton.click()
+/** 1. 工具栏「图表」分组：一级分类各自一个下拉按钮（9 个，3D·GL 独立）。 */
+const groupLabels = ['基础', '统计', '关系', '层级', '地理', '金融', '坐标系', '组件', '3D·GL']
+const groupButtons = page.locator(
+  '.rte-toolbar button[title="插入基础图表"], .rte-toolbar button[title="插入统计图表"], ' +
+    '.rte-toolbar button[title="插入关系图表"], .rte-toolbar button[title="插入层级图表"], ' +
+    '.rte-toolbar button[title="插入地理图表"], .rte-toolbar button[title="插入金融图表"], ' +
+    '.rte-toolbar button[title="插入坐标系图表"], .rte-toolbar button[title="插入组件图表"], ' +
+    '.rte-toolbar button[title="插入3D·GL图表"]',
+)
+const groupCount = await groupButtons.count()
+log('工具栏图表一级分类按钮', groupCount >= 9, `${groupCount} 个`)
+
+// 点「基础」下拉：只列基础分类下的图表类型
+const basicButton = page.locator('.rte-toolbar button[title="插入基础图表"]').first()
+if (await basicButton.count()) {
+  await basicButton.click()
   await page.waitForTimeout(400)
-  const chips = await page.locator('.rte-menu-echarts-groups .rte-menu-group-chip').allTextContents()
-  log('工具栏图表分组按钮', chips.length >= 9, chips.join('/'))
+  const cats = await page.locator('.rte-menu-echarts .rte-menu-cat').allTextContents()
+  log('基础分类下拉里的类型', cats.length > 0 && cats.length < 39, cats.join('/'))
   await page.screenshot({ path: `${out}/01-toolbar-chart-groups.png` })
-  // 3D / GL 独立分组：点开它
-  const glChip = page.locator('.rte-menu-group-chip.is-gl').first()
-  if (await glChip.count()) {
-    await glChip.click()
-    await page.waitForTimeout(300)
-    await page.screenshot({ path: `${out}/02-toolbar-chart-groups-gl.png` })
-  }
   await page.keyboard.press('Escape')
   await page.waitForTimeout(300)
 } else {
-  log('工具栏图表分组按钮', false, '没找到「插入 ECharts 图表」按钮')
+  log('基础分类下拉里的类型', false, '没找到「插入基础图表」按钮')
+}
+
+// 3D / GL 独立下拉
+const glButton = page.locator('.rte-toolbar button[title="插入3D·GL图表"]').first()
+if (await glButton.count()) {
+  await glButton.click()
+  await page.waitForTimeout(400)
+  const glCats = await page.locator('.rte-menu-echarts .rte-menu-cat').allTextContents()
+  log('3D·GL 分类下拉里的类型', glCats.length === 11, glCats.join('/'))
+  await page.screenshot({ path: `${out}/02-toolbar-chart-groups-gl.png` })
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(300)
+} else {
+  log('3D·GL 分类下拉里的类型', false, '没找到「插入3D·GL图表」按钮')
 }
 
 /** 2. 三类图表的属性面板。 */

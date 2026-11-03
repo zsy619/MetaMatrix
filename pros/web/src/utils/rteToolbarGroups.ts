@@ -12,6 +12,14 @@ import { CHART_GROUPS } from './echarts/chartGroups'
 /** 图表分组在工具栏里的按钮 key（与 CHART_GROUPS 一一对应）。 */
 export const CHART_TOOLBAR_KEYS: readonly string[] = CHART_GROUPS.map((group) => `chart:${group.id}`)
 
+/** 旧版「图表」总入口的按钮 key：一个下拉里再分区，现在拆成 9 个分类下拉。 */
+export const LEGACY_CHART_ENTRY_KEY = 'echarts'
+
+/** 旧的总入口 key → 展开成 9 个分类下拉的 key。 */
+export function expandLegacyChartKey(key: string): string[] {
+  return key === LEGACY_CHART_ENTRY_KEY ? [...CHART_TOOLBAR_KEYS] : [key]
+}
+
 export type ToolbarGroupDef = {
   id: string
   label: string
@@ -83,8 +91,8 @@ export const TOOLBAR_GROUPS: readonly ToolbarGroupDef[] = [
       'qrcode', 'emoji', 'specialChars', 'formula',
     ],
   },
-  // 图表独立分组：下拉里按子分组分区（基础 / 统计 / 关系 / 层级 / 地理 / 金融 / 坐标系 / 组件 / 3D·GL）
-  { id: 'charts', label: '图表', keys: ['echarts'] },
+  // 图表独立分组：一级分类各占一个下拉按钮（基础 / 统计 / 关系 / 层级 / 地理 / 金融 / 坐标系 / 组件 / 3D·GL）
+  { id: 'charts', label: '图表', keys: CHART_TOOLBAR_KEYS },
   { id: 'table', label: '表格', keys: ['table', 'tableCsv', 'tableFilter'] },
   {
     id: 'blocks',
@@ -175,6 +183,9 @@ export function normalizeToolbarGroupOrder(saved: unknown): string[] {
  * 会复活、组内顺序也会被打回默认。这里按「按钮 key 落在哪个新分组」重新归位：
  * 旧 `view` 隐藏的 `print` 会落到新 `file`，旧 `marks` 隐藏的 `ruby` 落到新 `style`。
  * 迁移后等于默认配置的分组不保留（画布保持干净）。函数是幂等的。
+ *
+ * 图表组的旧总入口 `echarts`（一个下拉里再分区）会展开成 9 个分类下拉 key
+ * （`chart:<id>`）：旧顺序按默认展开，旧隐藏则 9 个全隐藏。
  */
 export function migrateToolbarGroupButtons(
   map: ToolbarGroupButtonsByPanelId | null | undefined,
@@ -193,17 +204,22 @@ export function migrateToolbarGroupButtons(
       if (!config || typeof config !== 'object') continue
       const order = Array.isArray(config.order) ? config.order : []
       const hidden = Array.isArray(config.hidden) ? config.hidden : []
-      for (const key of order) {
-        const target = targetOf(key)
-        if (!target) continue
-        const bucket = merged[target] || (merged[target] = { order: [], hidden: [] })
-        if (!bucket.order.includes(key)) bucket.order.push(key)
+      for (const rawKey of order) {
+        // 旧配置里的总入口 `echarts` 展开成 9 个分类下拉（顺序按默认）
+        for (const key of expandLegacyChartKey(rawKey)) {
+          const target = targetOf(key)
+          if (!target) continue
+          const bucket = merged[target] || (merged[target] = { order: [], hidden: [] })
+          if (!bucket.order.includes(key)) bucket.order.push(key)
+        }
       }
-      for (const key of hidden) {
-        const target = targetOf(key)
-        if (!target) continue
-        const bucket = merged[target] || (merged[target] = { order: [], hidden: [] })
-        if (!bucket.hidden.includes(key)) bucket.hidden.push(key)
+      for (const rawKey of hidden) {
+        for (const key of expandLegacyChartKey(rawKey)) {
+          const target = targetOf(key)
+          if (!target) continue
+          const bucket = merged[target] || (merged[target] = { order: [], hidden: [] })
+          if (!bucket.hidden.includes(key)) bucket.hidden.push(key)
+        }
       }
     }
     const next: Record<string, ToolbarGroupButtonConfig> = {}
