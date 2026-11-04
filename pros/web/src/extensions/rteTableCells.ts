@@ -52,7 +52,10 @@ const extraCellAttrs = {
   formula: {
     default: null as string | null,
     parseHTML: (el: HTMLElement) => el.getAttribute('data-formula') || null,
-    renderHTML: () => ({}),
+    // 注意：属性的 renderHTML 决定该属性是否进入 HTMLAttributes；
+    // 返回 {} 会让属性被丢弃（HTML 里就没有 data-formula 了）。
+    renderHTML: (attrs: Record<string, any>) =>
+      attrs.formula ? { 'data-formula': String(attrs.formula) } : {},
   },
 }
 

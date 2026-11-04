@@ -5,6 +5,7 @@ import { BubbleMenu } from '@tiptap/vue-3/menus'
 import FormPropertyInspector from '../FormPropertyInspector.vue'
 import CommentThreadPanel from './CommentThreadPanel.vue'
 import RteSourceCodeEditor from './RteSourceCodeEditor.vue'
+import RteTableFormulaBar from './RteTableFormulaBar.vue'
 import { RTE_BINDINGS } from './bindings'
 import { useParentScopeStamp } from './inheritScope'
 
@@ -585,6 +586,11 @@ useParentScopeStamp()
           class="rte-title-sep"
         />
         <div data-rte-own v-if="rte.pageChrome.header" class="rte-page-header">{{ rte.pageChrome.header }}</div>
+        <RteTableFormulaBar
+          data-rte-own
+          :editor="rte.editor"
+          :readonly="rte.viewMode !== 'edit'"
+        />
         <EditorContent data-rte-own
           :editor="rte.editor"
           class="rte-body"

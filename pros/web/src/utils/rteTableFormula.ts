@@ -1,17 +1,35 @@
 /**
- * 表格单元格公式。
+ * 表格单元格公式：解析、计算与错误语义。
  *
  * 单元格文本以 = 开头即视为公式。支持的写法：
  * - =SUM(ABOVE) / =AVERAGE(ABOVE) / =COUNT(ABOVE) / =MAX(ABOVE) / =MIN(ABOVE)
  * - =SUM(A1:B2)、=SUM(A1,A2)
- * - =B2*3、=B2+1、=B2-1、=B2/2
+ * - =B2*3、=B2+1、=B2-1、=B2/2、=50%+1
  * - =SUM(B1:B3)*2（函数结果参与运算）
+ * - 公式单元格可以引用其它公式单元格（递归求值）
  *
  * grid 是二维数组，grid[row][col]，row/col 从 0 开始；单元格地址 A1 是第 1 列第 1 行。
+ *
+ * 错误语义（写入单元格与公式栏都会显示这些错误码）：
+ * - #REF!   引用无效（越界、地址非法）或循环引用
+ * - #VALUE! 操作数不是数值 / 公式语法非法
+ * - #DIV/0! 除数为 0，或 AVERAGE 没有可参与计算的数字
+ * - #NAME?  未知函数名
  */
 
 /** 单元格地址。col / row 都是 1 基。 */
 export type CellAddress = { col: number; row: number }
+
+/** 公式错误码。 */
+export type FormulaErrorCode = '#REF!' | '#VALUE!' | '#DIV/0!' | '#NAME?'
+
+/** 全部错误码，供 UI 展示 / 校验用。 */
+export const FORMULA_ERROR_CODES: readonly FormulaErrorCode[] = [
+  '#REF!',
+  '#VALUE!',
+  '#DIV/0!',
+  '#NAME?',
+]
 
 const ADDRESS_RE = /^([A-Za-z]{1,3})(\d{1,7})$/
 
@@ -66,156 +84,409 @@ export function formatCellNumber(value: number): string {
   return String(Math.round(value * 10000) / 10000)
 }
 
-function gridCell(grid: readonly (readonly string[])[], addr: CellAddress): string {
-  const row = grid[addr.row - 1]
-  if (!row) return ''
-  return row[addr.col - 1] ?? ''
+/* ------------------------------------------------------------------ *
+ * 词法 / 语法
+ * ------------------------------------------------------------------ */
+
+type LexToken =
+  | { t: 'num'; v: number }
+  | { t: 'ident'; v: string }
+  | { t: 'op'; v: string }
+  | { t: 'lp' }
+  | { t: 'rp' }
+  | { t: 'comma' }
+  | { t: 'colon' }
+  | { t: 'pct' }
+
+class FormulaError extends Error {
+  code: FormulaErrorCode
+  constructor(code: FormulaErrorCode) {
+    super(`formula error ${code}`)
+    this.code = code
+  }
 }
 
-function numericAt(grid: readonly (readonly string[])[], addr: CellAddress): number | null {
-  return parseCellNumber(gridCell(grid, addr))
+function lex(src: string): LexToken[] {
+  const tokens: LexToken[] = []
+  let i = 0
+  while (i < src.length) {
+    const ch = src[i]!
+    if (/\s/.test(ch)) {
+      i += 1
+      continue
+    }
+    if (/[0-9]/.test(ch) || (ch === '.' && /[0-9]/.test(src[i + 1] ?? ''))) {
+      const m = /^[0-9]*\.?[0-9]+/.exec(src.slice(i))!
+      tokens.push({ t: 'num', v: Number(m[0]) })
+      i += m[0].length
+      continue
+    }
+    if (/[A-Za-z]/.test(ch)) {
+      const m = /^[A-Za-z][A-Za-z0-9]*/.exec(src.slice(i))!
+      tokens.push({ t: 'ident', v: m[0] })
+      i += m[0].length
+      continue
+    }
+    if (ch === '(') tokens.push({ t: 'lp' })
+    else if (ch === ')') tokens.push({ t: 'rp' })
+    else if (ch === ',') tokens.push({ t: 'comma' })
+    else if (ch === ':') tokens.push({ t: 'colon' })
+    else if (ch === '%') tokens.push({ t: 'pct' })
+    else if (ch === '+' || ch === '-' || ch === '*' || ch === '/') tokens.push({ t: 'op', v: ch })
+    else throw new FormulaError('#VALUE!')
+    i += 1
+  }
+  return tokens
 }
 
-/** 展开区域地址，如 'A1:B2'。 */
-function expandRange(rangeText: string): CellAddress[] {
-  const parts = rangeText.split(':')
-  const start = parseCellAddress(parts[0] ?? '')
-  if (!start) return []
-  if (parts.length === 1) return [start]
-  const end = parseCellAddress(parts[1] ?? '')
-  if (!end) return []
+type Node =
+  | { k: 'num'; v: number }
+  | { k: 'ref'; addr: CellAddress }
+  | { k: 'range'; from: CellAddress; to: CellAddress }
+  | { k: 'above' }
+  | { k: 'left' }
+  | { k: 'unary'; op: string; arg: Node }
+  | { k: 'pct'; arg: Node }
+  | { k: 'bin'; op: string; l: Node; r: Node }
+  | { k: 'call'; name: string; args: Node[] }
+
+const FUNC_NAMES = new Set(['SUM', 'AVERAGE', 'COUNT', 'MAX', 'MIN'])
+
+class Parser {
+  tokens: LexToken[]
+  pos = 0
+  constructor(tokens: LexToken[]) {
+    this.tokens = tokens
+  }
+  peek(): LexToken | undefined {
+    return this.tokens[this.pos]
+  }
+  next(): LexToken | undefined {
+    return this.tokens[this.pos++]
+  }
+  parseExpr(): Node {
+    let left = this.parseTerm()
+    for (;;) {
+      const t = this.peek()
+      if (!t || t.t !== 'op' || (t.v !== '+' && t.v !== '-')) break
+      this.next()
+      const right = this.parseTerm()
+      left = { k: 'bin', op: t.v, l: left, r: right }
+    }
+    return left
+  }
+  parseTerm(): Node {
+    let left = this.parseUnary()
+    for (;;) {
+      const t = this.peek()
+      if (!t || t.t !== 'op' || (t.v !== '*' && t.v !== '/')) break
+      this.next()
+      const right = this.parseUnary()
+      left = { k: 'bin', op: t.v, l: left, r: right }
+    }
+    return left
+  }
+  parseUnary(): Node {
+    const t = this.peek()
+    if (t && t.t === 'op' && (t.v === '+' || t.v === '-')) {
+      this.next()
+      const arg = this.parseUnary()
+      return t.v === '-' ? { k: 'unary', op: '-', arg } : arg
+    }
+    return this.parsePostfix()
+  }
+  parsePostfix(): Node {
+    let node = this.parsePrimary()
+    while (this.peek()?.t === 'pct') {
+      this.next()
+      node = { k: 'pct', arg: node }
+    }
+    return node
+  }
+  parsePrimary(): Node {
+    const t = this.next()
+    if (!t) throw new FormulaError('#VALUE!')
+    if (t.t === 'num') return { k: 'num', v: t.v }
+    if (t.t === 'lp') {
+      const inner = this.parseExpr()
+      const close = this.next()
+      if (!close || close.t !== 'rp') throw new FormulaError('#VALUE!')
+      return inner
+    }
+    if (t.t === 'ident') {
+      const upper = t.v.toUpperCase()
+      // 区域：A1:B3
+      if (this.peek()?.t === 'colon') {
+        this.next()
+        const endTok = this.next()
+        if (!endTok || endTok.t !== 'ident') throw new FormulaError('#REF!')
+        const from = parseCellAddress(t.v)
+        const to = parseCellAddress(endTok.v)
+        if (!from || !to) throw new FormulaError('#REF!')
+        return { k: 'range', from, to }
+      }
+      // 函数
+      if (this.peek()?.t === 'lp') {
+        this.next()
+        if (!FUNC_NAMES.has(upper)) throw new FormulaError('#NAME?')
+        const args: Node[] = []
+        if (this.peek()?.t !== 'rp') {
+          for (;;) {
+            // 参数只能是单元格 / 区域 / 数字 / 嵌套函数，不允许二元运算，
+            // 否则 '=SUM(A1:B2)*2' 里的 '*' 会被吞进参数里。
+            args.push(this.parsePostfix())
+            if (this.peek()?.t === 'comma') {
+              this.next()
+              continue
+            }
+            break
+          }
+        }
+        const close = this.next()
+        if (!close || close.t !== 'rp') throw new FormulaError('#VALUE!')
+        return { k: 'call', name: upper, args }
+      }
+      if (upper === 'ABOVE') return { k: 'above' }
+      if (upper === 'LEFT') return { k: 'left' }
+      const addr = parseCellAddress(t.v)
+      if (!addr) throw new FormulaError('#NAME?')
+      return { k: 'ref', addr }
+    }
+    throw new FormulaError('#VALUE!')
+  }
+}
+
+function parseFormula(body: string): Node {
+  const tokens = lex(body)
+  if (!tokens.length) throw new FormulaError('#VALUE!')
+  const parser = new Parser(tokens)
+  const node = parser.parseExpr()
+  if (parser.pos !== parser.tokens.length) throw new FormulaError('#VALUE!')
+  return node
+}
+
+/* ------------------------------------------------------------------ *
+ * 求值
+ * ------------------------------------------------------------------ */
+
+type Ctx = {
+  grid: readonly (readonly string[])[]
+  /** 正在求值的公式单元格（1 基），用于循环引用检测。 */
+  visiting: Set<string>
+}
+
+type CellValue =
+  | { kind: 'num'; v: number }
+  | { kind: 'text' }
+  | { kind: 'err'; error: FormulaErrorCode }
+
+function visitKey(row: number, col: number): string {
+  return `${row}:${col}`
+}
+
+function cellTextAt(ctx: Ctx, addr: CellAddress): string | null {
+  const row = ctx.grid[addr.row - 1]
+  if (!row) return null
+  const text = row[addr.col - 1]
+  if (text == null) return null
+  return String(text)
+}
+
+/** 求某个单元格的数值：常量取数字，公式单元格递归求值。 */
+function resolveCell(ctx: Ctx, addr: CellAddress): CellValue {
+  const text = cellTextAt(ctx, addr)
+  if (text == null) return { kind: 'err', error: '#REF!' }
+  const trimmed = text.trim()
+  if (!trimmed) return { kind: 'text' }
+  if (isFormulaCell(trimmed)) {
+    const key = visitKey(addr.row, addr.col)
+    if (ctx.visiting.has(key)) return { kind: 'err', error: '#REF!' }
+    ctx.visiting.add(key)
+    try {
+      const value = evalFormulaText(trimmed.slice(1), ctx, addr)
+      if (typeof value === 'object') return { kind: 'err', error: value.error }
+      return { kind: 'num', v: value }
+    } catch (err) {
+      if (err instanceof FormulaError) return { kind: 'err', error: err.code }
+      throw err
+    } finally {
+      ctx.visiting.delete(key)
+    }
+  }
+  const num = parseCellNumber(trimmed)
+  if (num == null) return { kind: 'text' }
+  return { kind: 'num', v: num }
+}
+
+/** 区域展开（1 基，含首尾）。 */
+function expandRange(from: CellAddress, to: CellAddress): CellAddress[] {
+  const rowFrom = Math.min(from.row, to.row)
+  const rowTo = Math.max(from.row, to.row)
+  const colFrom = Math.min(from.col, to.col)
+  const colTo = Math.max(from.col, to.col)
   const out: CellAddress[] = []
-  const rowFrom = Math.min(start.row, end.row)
-  const rowTo = Math.max(start.row, end.row)
-  const colFrom = Math.min(start.col, end.col)
-  const colTo = Math.max(start.col, end.col)
   for (let r = rowFrom; r <= rowTo; r += 1) {
     for (let c = colFrom; c <= colTo; c += 1) out.push({ col: c, row: r })
   }
   return out
 }
 
-type FuncKind = 'SUM' | 'AVERAGE' | 'COUNT' | 'MAX' | 'MIN'
-
-const FUNC_RE = /^(SUM|AVERAGE|COUNT|MAX|MIN)\(([^()]*)\)$/i
-
-/** 求值上下文：公式自己所在的行列，ABOVE 需要它。 */
-type EvalContext = {
-  grid: readonly (readonly string[])[]
-  /** 公式所在行（0 基） */
-  row: number
-  /** 公式所在列（0 基） */
-  col: number
+/** ABOVE / LEFT 展开成单元格列表。 */
+function expandRelative(kind: 'above' | 'left', at: CellAddress): CellAddress[] {
+  const out: CellAddress[] = []
+  if (kind === 'above') {
+    for (let r = 1; r < at.row; r += 1) out.push({ col: at.col, row: r })
+  } else {
+    for (let c = 1; c < at.col; c += 1) out.push({ col: c, row: at.row })
+  }
+  return out
 }
 
-/** 求值一个函数的参数集合。返回 null 表示参数非法。 */
-function evalFunction(
-  kind: FuncKind,
-  argText: string,
-  ctx: EvalContext,
-): number | null {
-  const arg = argText.trim()
-  if (!arg) return null
-  const addresses: CellAddress[] = []
-  if (/^above$/i.test(arg)) {
-    // ABOVE：同列上方的所有单元格
-    for (let r = 0; r < ctx.row; r += 1) {
-      addresses.push({ col: ctx.col + 1, row: r + 1 })
+type EvalError = { error: FormulaErrorCode }
+type EvalValue = number | EvalError
+
+function isError(v: EvalValue): v is EvalError {
+  return typeof v === 'object'
+}
+
+function toNumber(v: EvalValue): number | EvalError {
+  if (isError(v)) return v
+  return v
+}
+
+/** 节点对应的单元格集合（用于聚合函数）。 */
+function cellsOf(node: Node, at: CellAddress): CellAddress[] | null {
+  if (node.k === 'ref') return [node.addr]
+  if (node.k === 'range') return expandRange(node.from, node.to)
+  if (node.k === 'above') return expandRelative('above', at)
+  if (node.k === 'left') return expandRelative('left', at)
+  return null
+}
+
+function evalCall(name: string, args: Node[], ctx: Ctx, at: CellAddress): EvalValue {
+  const values: number[] = []
+  for (const arg of args) {
+    const cells = cellsOf(arg, at)
+    if (cells) {
+      for (const addr of cells) {
+        const cell = resolveCell(ctx, addr)
+        if (cell.kind === 'err') return cell
+        if (cell.kind === 'num') values.push(cell.v)
+        // 文本单元格在聚合函数里被忽略
+      }
+      continue
     }
-  } else if (/^left$/i.test(arg)) {
-    // LEFT：同一行左侧的所有单元格
-    for (let c = 0; c < ctx.col; c += 1) {
-      addresses.push({ col: c + 1, row: ctx.row + 1 })
+    const v = evalNode(arg, ctx, at)
+    if (isError(v)) return v
+    values.push(v)
+  }
+  if (name === 'COUNT') return values.length
+  if (name === 'SUM') return values.reduce((a, b) => a + b, 0)
+  if (name === 'AVERAGE') {
+    if (!values.length) return { error: '#DIV/0!' }
+    return values.reduce((a, b) => a + b, 0) / values.length
+  }
+  if (name === 'MAX') return values.length ? Math.max(...values) : 0
+  if (name === 'MIN') return values.length ? Math.min(...values) : 0
+  return { error: '#NAME?' }
+}
+
+function evalNode(node: Node, ctx: Ctx, at: CellAddress): EvalValue {
+  switch (node.k) {
+    case 'num':
+      return node.v
+    case 'unary': {
+      const v = evalNode(node.arg, ctx, at)
+      if (isError(v)) return v
+      return -v
     }
-  } else {
-    for (const piece of arg.split(',')) {
-      const part = piece.trim()
-      if (!part) continue
-      if (part.includes(':')) {
-        addresses.push(...expandRange(part))
-      } else {
-        const addr = parseCellAddress(part)
-        if (!addr) return null
-        addresses.push(addr)
+    case 'pct': {
+      const v = evalNode(node.arg, ctx, at)
+      if (isError(v)) return v
+      return v / 100
+    }
+    case 'bin': {
+      const l = evalNode(node.l, ctx, at)
+      if (isError(l)) return l
+      const r = evalNode(node.r, ctx, at)
+      if (isError(r)) return r
+      switch (node.op) {
+        case '+':
+          return l + r
+        case '-':
+          return l - r
+        case '*':
+          return l * r
+        case '/':
+          if (r === 0) return { error: '#DIV/0!' }
+          return l / r
+        default:
+          return { error: '#VALUE!' }
       }
     }
-  }
-  if (!addresses.length) {
-    // 没有可聚合的单元格：COUNT 为 0，其余无值
-    return kind === 'COUNT' ? 0 : null
-  }
-  const values: number[] = []
-  for (const addr of addresses) {
-    const n = numericAt(ctx.grid, addr)
-    if (n != null) values.push(n)
-  }
-  if (kind === 'COUNT') return values.length
-  if (!values.length) return null
-  if (kind === 'SUM') return values.reduce((a, b) => a + b, 0)
-  if (kind === 'AVERAGE') return values.reduce((a, b) => a + b, 0) / values.length
-  if (kind === 'MAX') return Math.max(...values)
-  return Math.min(...values)
-}
-
-/** 求值纯算术表达式（单元格地址替换成数值）。 */
-function evalArithmetic(text: string, ctx: EvalContext): number | null {
-  const expr = String(text ?? '').trim()
-  if (!expr) return null
-  // 百分号字面量：50% -> 0.5
-  const percentFixed = expr.replace(/(\d+(?:\.\d+)?)%/g, (_m, num: string) => String(Number(num) / 100))
-  const substituted = percentFixed.replace(/[A-Za-z]{1,3}\d{1,7}/g, (token) => {
-    const addr = parseCellAddress(token)
-    if (!addr) return token
-    const n = numericAt(ctx.grid, addr)
-    return n == null ? 'NaN' : String(n)
-  })
-  if (substituted.includes('NaN')) return null
-  if (!/^[0-9+\-*/().\s]+$/.test(substituted)) return null
-  try {
-    // eslint-disable-next-line no-new-func
-    const runner = new Function(`"use strict"; return (${substituted});`) as () => unknown
-    const value = runner()
-    if (typeof value !== 'number' || !Number.isFinite(value)) return null
-    return value
-  } catch {
-    return null
+    case 'call':
+      return evalCall(node.name, node.args, ctx, at)
+    case 'ref':
+    case 'range':
+    case 'above':
+    case 'left': {
+      const cells = cellsOf(node, at)!
+      if (!cells.length) return { error: '#REF!' }
+      // 区域/相对区域出现在标量位置时，只在恰好指向一格时取值
+      if (cells.length > 1) return { error: '#VALUE!' }
+      const cell = resolveCell(ctx, cells[0]!)
+      if (cell.kind === 'err') return cell
+      if (cell.kind === 'text') return { error: '#VALUE!' }
+      return cell.v
+    }
+    default:
+      return { error: '#VALUE!' }
   }
 }
 
-/**
- * 求值公式主体（不含前导 =）。函数可以嵌套在算术里。
- */
-function evalBody(body: string, ctx: EvalContext, depth = 0): number | null {
-  if (depth > 8) return null
-  const expr = String(body ?? '').trim()
-  if (!expr) return null
-
-  // 整体就是一个函数
-  const whole = FUNC_RE.exec(expr)
-  if (whole) {
-    return evalFunction(whole[1]!.toUpperCase() as FuncKind, whole[2]!, ctx)
-  }
-
-  // 表达式里含函数：先把函数替换成数值
-  if (/[A-Za-z]+\s*\(/.test(expr)) {
-    const replaced = expr.replace(
-      /(SUM|AVERAGE|COUNT|MAX|MIN)\(([^()]*)\)/gi,
-      (_m, name: string, args: string) => {
-        const value = evalFunction(name.toUpperCase() as FuncKind, args, ctx)
-        return value == null ? 'NaN' : String(value)
-      },
-    )
-    if (replaced.includes('NaN')) return null
-    return evalArithmetic(replaced, ctx)
-  }
-
-  return evalArithmetic(expr, ctx)
+/** 求公式主体（不含前导 =）。抛 FormulaError 表示公式非法。 */
+function evalFormulaText(body: string, ctx: Ctx, at: CellAddress): EvalValue {
+  const text = String(body ?? '').trim()
+  if (!text) throw new FormulaError('#VALUE!')
+  const node = parseFormula(text)
+  return evalNode(node, ctx, at)
 }
+
+/* ------------------------------------------------------------------ *
+ * 对外 API
+ * ------------------------------------------------------------------ */
+
+/** 公式求值结果。 */
+export type FormulaEvalResult =
+  | { ok: true; value: string; error: null }
+  | { ok: false; value: null; error: FormulaErrorCode }
 
 /**
  * 求值一个公式单元格。formula 是单元格文本（可以带前导 =）。
  * grid 为整个表格的二维文本；row / col 是公式自身的位置（0 基）。
- * 无法求值时返回 null。
+ */
+export function evaluateFormula(
+  formula: string,
+  grid: readonly (readonly string[])[],
+  row = 0,
+  col = 0,
+): FormulaEvalResult {
+  const raw = String(formula ?? '').trim()
+  if (!raw.startsWith('=')) return { ok: false, value: null, error: '#VALUE!' }
+  const ctx: Ctx = { grid, visiting: new Set() }
+  try {
+    const value = evalFormulaText(raw.slice(1), ctx, { row: row + 1, col: col + 1 })
+    if (isError(value)) return { ok: false, value: null, error: value.error }
+    if (!Number.isFinite(value)) return { ok: false, value: null, error: '#VALUE!' }
+    return { ok: true, value: formatCellNumber(value), error: null }
+  } catch (err) {
+    if (err instanceof FormulaError) return { ok: false, value: null, error: err.code }
+    return { ok: false, value: null, error: '#VALUE!' }
+  }
+}
+
+/**
+ * 求值一个公式单元格，只返回结果文本；出错返回 null（历史行为）。
  */
 export function evaluateCellFormula(
   formula: string,
@@ -223,28 +494,65 @@ export function evaluateCellFormula(
   row = 0,
   col = 0,
 ): string | null {
-  const raw = String(formula ?? '').trim()
-  if (!raw.startsWith('=')) return null
-  const body = raw.slice(1).trim()
-  if (!body) return null
-  const value = evalBody(body, { grid, row, col })
-  if (value == null) return null
-  return formatCellNumber(value)
+  const result = evaluateFormula(formula, grid, row, col)
+  return result.ok ? result.value : null
+}
+
+/** 单个单元格的重算结果。 */
+export type FormulaCellOutcome = {
+  row: number
+  col: number
+  /** 公式原文（单元格文本以 = 开头）。 */
+  formula: string
+  /** 计算结果文本；出错时是错误码。 */
+  result: string
+  /** 错误码；无错为 null。 */
+  error: FormulaErrorCode | null
 }
 
 /**
- * 重算整张表：公式单元格替换为计算结果。
- * 按行优先计算，公式可以引用其它公式单元格（引用时用已算出的值）。
+ * 重算整张表：公式单元格替换为计算结果（错误单元格写入错误码）。
+ * grid 的每个元素若是公式（以 = 开头），会被解析；否则视为常量。
+ */
+export function evaluateTableFormulas(grid: readonly (readonly string[])[]): {
+  grid: string[][]
+  cells: FormulaCellOutcome[]
+} {
+  const source = (grid || []).map((row) => (row || []).map((cell) => String(cell ?? '')))
+  const out = source.map((row) => [...row])
+  const cells: FormulaCellOutcome[] = []
+  for (let r = 0; r < source.length; r += 1) {
+    for (let c = 0; c < source[r]!.length; c += 1) {
+      const text = source[r]![c]!
+      if (!isFormulaCell(text)) continue
+      const result = evaluateFormula(text, source, r, c)
+      const value = result.ok ? result.value : result.error
+      out[r]![c] = value
+      cells.push({ row: r, col: c, formula: text, result: value, error: result.error })
+    }
+  }
+  return { grid: out, cells }
+}
+
+/**
+ * 重算整张表：公式单元格替换为计算结果（历史行为：出错写空串）。
  */
 export function recalculateTable(grid: readonly (readonly string[])[]): string[][] {
-  const out = (grid || []).map((row) => (row || []).map((cell) => String(cell ?? '')))
-  for (let r = 0; r < out.length; r += 1) {
-    for (let c = 0; c < out[r]!.length; c += 1) {
-      const text = out[r]![c]!
+  const source = (grid || []).map((row) => (row || []).map((cell) => String(cell ?? '')))
+  const out = source.map((row) => [...row])
+  for (let r = 0; r < source.length; r += 1) {
+    for (let c = 0; c < source[r]!.length; c += 1) {
+      const text = source[r]![c]!
       if (!isFormulaCell(text)) continue
-      const value = evaluateCellFormula(text, out, r, c)
-      out[r]![c] = value == null ? '' : value
+      const result = evaluateFormula(text, source, r, c)
+      out[r]![c] = result.ok ? result.value : ''
     }
   }
   return out
+}
+
+/** 文本是不是公式错误码。 */
+export function isErrorCode(text: string): boolean {
+  const value = String(text ?? '').trim()
+  return (FORMULA_ERROR_CODES as readonly string[]).includes(value)
 }
