@@ -1607,6 +1607,107 @@ export interface BusinessFormulaDocumentJSON {
   savedFormulas: BusinessFormulaSavedItem[]
 }
 
+/* ------------------------------------------------------------------ *
+ * 苦练基本功三环分析法
+ * ------------------------------------------------------------------ */
+
+/** 三环分析法的可编辑区域 id（三环 + 六边形六顶点 + 三处两两交叠 + 中心） */
+export type ThreeRingBasicsRegionId =
+  | 'ring_practical'
+  | 'ring_trainable'
+  | 'ring_value'
+  | 'hex_concreteness'
+  | 'hex_scenario'
+  | 'hex_independence'
+  | 'hex_verifiability'
+  | 'hex_compounding'
+  | 'hex_repeatability'
+  | 'overlap_value_low'
+  | 'overlap_not_trainable'
+  | 'overlap_too_vague'
+  | 'core'
+
+/** 区域固定标签（保留为标题，用户内容另存 blocks） */
+export interface ThreeRingBasicsRegionMeta {
+  title: string
+  color: string
+}
+
+/** 区域可编辑正文 */
+export interface ThreeRingBasicsBlock {
+  id: ThreeRingBasicsRegionId
+  title: string
+  items: QuadrantItem[]
+}
+
+export interface ThreeRingBasicsDocumentJSON {
+  id: string
+  type: 'three_ring_basics'
+  schemaVersion: number
+  theme: CanvasTheme
+  regions: Record<ThreeRingBasicsRegionId, ThreeRingBasicsRegionMeta>
+  blocks: ThreeRingBasicsBlock[]
+}
+
+/* ------------------------------------------------------------------ *
+ * 领导核心价值驱动三角
+ * ------------------------------------------------------------------ */
+
+/** 领导力三角的可编辑区域 id */
+export type LeadershipTriangleRegionId =
+  | 'top_exchange'
+  | 'apex'
+  | 'pyramid_1'
+  | 'pyramid_2'
+  | 'pyramid_3'
+  | 'pyramid_4'
+  | 'pyramid_5'
+  | 'challenge'
+  | 'stable'
+  | 'difficulty'
+  | 'management'
+  | 'power'
+
+export interface LeadershipTriangleRegionMeta {
+  title: string
+  color: string
+}
+
+export interface LeadershipTriangleBlock {
+  id: LeadershipTriangleRegionId
+  title: string
+  items: QuadrantItem[]
+}
+
+export interface LeadershipTriangleDocumentJSON {
+  id: string
+  type: 'leadership_triangle'
+  schemaVersion: number
+  theme: CanvasTheme
+  regions: Record<LeadershipTriangleRegionId, LeadershipTriangleRegionMeta>
+  blocks: LeadershipTriangleBlock[]
+}
+
+/* ------------------------------------------------------------------ *
+ * 上下文六要素（富文本编辑器画布）
+ * ------------------------------------------------------------------ */
+
+/** 唯一一块富文本正文：六段（二级标题 + 占位文字）都在这里 */
+export interface ContextSixElementsBlock {
+  id: string
+  title: string
+  items: QuadrantItem[]
+}
+
+export interface ContextSixElementsDocumentJSON {
+  id: string
+  type: 'context_six_elements'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  blocks: ContextSixElementsBlock[]
+}
+
 /** 科学决策三角形（宽度 / 高度 / 深度） */
 export type DecisionTriangleBlockId = 'width' | 'height' | 'depth'
 
@@ -1667,6 +1768,9 @@ export type CanvasDocumentJSON = (
   | PmSolutionTriangleDocumentJSON
   | GrowthAssumptionsDocumentJSON
   | BusinessFormulaDocumentJSON
+  | ThreeRingBasicsDocumentJSON
+  | LeadershipTriangleDocumentJSON
+  | ContextSixElementsDocumentJSON
 ) & WithPanelAttachments
 
 /** 带 blocks 的画布（双三角 / Y 模型 / 刻意练习） */
@@ -1704,6 +1808,9 @@ export type BlockCanvasDocumentJSON =
   | ScientificMeeting10pDocumentJSON
   | ProductFeatures5dDocumentJSON
   | PmSolutionTriangleDocumentJSON
+  | ThreeRingBasicsDocumentJSON
+  | LeadershipTriangleDocumentJSON
+  | ContextSixElementsDocumentJSON
 
 export function isDualTriangleDoc(
   doc: CanvasDocumentJSON | null | undefined,
@@ -2178,6 +2285,27 @@ export function isBusinessFormulaDoc(
   return !!doc && doc.type === 'business_formula'
 }
 
+/** 苦练基本功三环分析法 */
+export function isThreeRingBasicsDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is ThreeRingBasicsDocumentJSON {
+  return !!doc && doc.type === 'three_ring_basics'
+}
+
+/** 领导核心价值驱动三角 */
+export function isLeadershipTriangleDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is LeadershipTriangleDocumentJSON {
+  return !!doc && doc.type === 'leadership_triangle'
+}
+
+/** 上下文六要素（富文本编辑器画布） */
+export function isContextSixElementsDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is ContextSixElementsDocumentJSON {
+  return !!doc && doc.type === 'context_six_elements'
+}
+
 
 export function isBlockCanvasDoc(
   doc: CanvasDocumentJSON | null | undefined,
@@ -2215,7 +2343,10 @@ export function isBlockCanvasDoc(
     isPmCompetencyDoc(doc) ||
     isScientificMeeting10pDoc(doc) ||
     isProductFeatures5dDoc(doc) ||
-    isPmSolutionTriangleDoc(doc)
+    isPmSolutionTriangleDoc(doc) ||
+    isThreeRingBasicsDoc(doc) ||
+    isLeadershipTriangleDoc(doc) ||
+    isContextSixElementsDoc(doc)
   )
 }
 

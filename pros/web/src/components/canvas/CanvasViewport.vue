@@ -41,6 +41,9 @@ import {
   isPmSolutionTriangleDoc,
   isGrowthAssumptionsDoc,
   isBusinessFormulaDoc,
+  isThreeRingBasicsDoc,
+  isLeadershipTriangleDoc,
+  isContextSixElementsDoc,
   isYModelDoc,
 } from '../../types/canvas'
 import BackgroundLayer from './BackgroundLayer.vue'
@@ -85,6 +88,9 @@ import ProductFeatures5dCanvas from './ProductFeatures5dCanvas.vue'
 import PmSolutionTriangleCanvas from './PmSolutionTriangleCanvas.vue'
 import GrowthAssumptionsCanvas from './GrowthAssumptionsCanvas.vue'
 import BusinessFormulaCanvas from './BusinessFormulaCanvas.vue'
+import ThreeRingBasicsCanvas from './ThreeRingBasicsCanvas.vue'
+import LeadershipTriangleCanvas from './LeadershipTriangleCanvas.vue'
+import ContextSixElementsCanvas from './ContextSixElementsCanvas.vue'
 
 const documentStore = useDocumentStore()
 const ui = useUiStore()
@@ -204,6 +210,15 @@ const growthAssumptionsDoc = computed(() =>
 )
 const businessFormulaDoc = computed(() =>
   isBusinessFormulaDoc(current_data.value) ? current_data.value : null,
+)
+const threeRingBasicsDoc = computed(() =>
+  isThreeRingBasicsDoc(current_data.value) ? current_data.value : null,
+)
+const leadershipTriangleDoc = computed(() =>
+  isLeadershipTriangleDoc(current_data.value) ? current_data.value : null,
+)
+const contextSixElementsDoc = computed(() =>
+  isContextSixElementsDoc(current_data.value) ? current_data.value : null,
 )
 const quadrantDoc = computed(() =>
   isQuadrantDoc(current_data.value) ? current_data.value : null,
@@ -332,6 +347,15 @@ const quadrantDoc = computed(() =>
         </template>
         <template v-else-if="businessFormulaDoc">
           <BusinessFormulaCanvas :doc="businessFormulaDoc" />
+        </template>
+        <template v-else-if="threeRingBasicsDoc">
+          <ThreeRingBasicsCanvas :doc="threeRingBasicsDoc" />
+        </template>
+        <template v-else-if="leadershipTriangleDoc">
+          <LeadershipTriangleCanvas :doc="leadershipTriangleDoc" />
+        </template>
+        <template v-else-if="contextSixElementsDoc">
+          <ContextSixElementsCanvas :doc="contextSixElementsDoc" />
         </template>
         <template v-else-if="quadrantDoc">
           <BackgroundLayer

@@ -1,0 +1,246 @@
+{
+  "id": "canvas_leadership_triangle",
+  "type": "leadership_triangle",
+  "schemaVersion": 1,
+  "theme": {
+    "background": {
+      "pattern": "none",
+      "color": "#ffffff"
+    },
+    "page": "#ffffff",
+    "frame": "#ececec",
+    "hairline": "rgba(60, 50, 20, 0.08)"
+  },
+  "regions": {
+    "top_exchange": {
+      "title": "心甘情愿",
+      "color": "#E87722"
+    },
+    "apex": {
+      "title": "领导力 / 高水平影响力",
+      "color": "#202124"
+    },
+    "pyramid_1": {
+      "title": "第1层",
+      "color": "#5f6368"
+    },
+    "pyramid_2": {
+      "title": "第2层",
+      "color": "#5f6368"
+    },
+    "pyramid_3": {
+      "title": "难题",
+      "color": "#202124"
+    },
+    "pyramid_4": {
+      "title": "第4层",
+      "color": "#5f6368"
+    },
+    "pyramid_5": {
+      "title": "第5层",
+      "color": "#5f6368"
+    },
+    "challenge": {
+      "title": "挑战现状",
+      "color": "#202124"
+    },
+    "stable": {
+      "title": "稳定运营",
+      "color": "#202124"
+    },
+    "difficulty": {
+      "title": "难度越大",
+      "color": "#202124"
+    },
+    "management": {
+      "title": "管理 / 确定执行",
+      "color": "#202124"
+    },
+    "power": {
+      "title": "权力 / 强制执行",
+      "color": "#202124"
+    }
+  },
+  "blocks": [
+    {
+      "id": "top_exchange",
+      "title": "心甘情愿",
+      "items": [
+        {
+          "id": "item_top_exchange_1",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 12,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "apex",
+      "title": "领导力 / 高水平影响力",
+      "items": [
+        {
+          "id": "item_apex_1",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 12,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "pyramid_1",
+      "title": "第1层",
+      "items": [
+        {
+          "id": "item_pyramid_1_1",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 12,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "pyramid_2",
+      "title": "第2层",
+      "items": [
+        {
+          "id": "item_pyramid_2_1",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 12,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "pyramid_3",
+      "title": "难题",
+      "items": [
+        {
+          "id": "item_pyramid_3_1",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 12,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "pyramid_4",
+      "title": "第4层",
+      "items": [
+        {
+          "id": "item_pyramid_4_1",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 12,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "pyramid_5",
+      "title": "第5层",
+      "items": [
+        {
+          "id": "item_pyramid_5_1",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 12,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "challenge",
+      "title": "挑战现状",
+      "items": [
+        {
+          "id": "item_challenge_1",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 12,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "stable",
+      "title": "稳定运营",
+      "items": [
+        {
+          "id": "item_stable_1",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 12,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "difficulty",
+      "title": "难度越大",
+      "items": [
+        {
+          "id": "item_difficulty_1",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 12,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "management",
+      "title": "管理 / 确定执行",
+      "items": [
+        {
+          "id": "item_management_1",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 12,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "power",
+      "title": "权力 / 强制执行",
+      "items": [
+        {
+          "id": "item_power_1",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 12,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    }
+  ]
+}

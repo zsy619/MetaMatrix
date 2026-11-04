@@ -1357,6 +1357,101 @@ withDefaults(
         <text x="116" y="107" text-anchor="middle" font-size="6.5" fill="#202124">客单</text>
       </svg>
 
+      <!-- 苦练基本功三环分析法：三环交叠 + 六边形 -->
+      <svg
+        v-else-if="templateId === 'three-ring-basics'"
+        class="thumb-svg"
+        viewBox="0 0 200 140"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <rect width="200" height="140" rx="10" fill="#fdfcfb" />
+        <circle cx="100" cy="44" r="46" fill="rgba(64,164,223,0.30)" stroke="#7FC4EA" stroke-width="1.2" />
+        <circle cx="74" cy="88" r="46" fill="rgba(244,86,164,0.28)" stroke="#F1A0C6" stroke-width="1.2" />
+        <circle cx="126" cy="88" r="46" fill="rgba(245,200,60,0.30)" stroke="#F0D68A" stroke-width="1.2" />
+        <polygon
+          points="82,58 118,58 134,86 118,114 82,114 66,86"
+          fill="none"
+          stroke="#3a3a3a"
+          stroke-width="1.4"
+          stroke-linejoin="round"
+        />
+        <circle cx="82" cy="58" r="2.4" fill="#fff" stroke="#3a3a3a" stroke-width="1.1" />
+        <circle cx="118" cy="58" r="2.4" fill="#fff" stroke="#3a3a3a" stroke-width="1.1" />
+        <circle cx="134" cy="86" r="2.4" fill="#fff" stroke="#3a3a3a" stroke-width="1.1" />
+        <circle cx="118" cy="114" r="2.4" fill="#fff" stroke="#3a3a3a" stroke-width="1.1" />
+        <circle cx="82" cy="114" r="2.4" fill="#fff" stroke="#3a3a3a" stroke-width="1.1" />
+        <circle cx="66" cy="86" r="2.4" fill="#fff" stroke="#3a3a3a" stroke-width="1.1" />
+        <text x="100" y="26" text-anchor="middle" font-size="9" font-weight="800" fill="#2A9BD6">足够务实</text>
+        <text x="30" y="104" text-anchor="middle" font-size="8" font-weight="800" fill="#EE4C9A">足够可练</text>
+        <text x="170" y="104" text-anchor="middle" font-size="8" font-weight="800" fill="#F2A50C">足够价值</text>
+        <text x="100" y="88" text-anchor="middle" font-size="6" font-weight="700" fill="#3c4043">关键</text>
+        <text x="100" y="97" text-anchor="middle" font-size="6" font-weight="700" fill="#3c4043">基本功</text>
+      </svg>
+
+      <!-- 领导核心价值驱动三角：A⇄B + 金字塔 + 右侧箭头 -->
+      <svg
+        v-else-if="templateId === 'leadership-triangle'"
+        class="thumb-svg"
+        viewBox="0 0 200 140"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <rect width="200" height="140" rx="10" fill="#ffffff" />
+        <text x="100" y="16" text-anchor="middle" font-size="8" font-weight="800" fill="#E87722">心甘情愿</text>
+        <text x="44" y="32" text-anchor="middle" font-size="14" font-weight="900" font-style="italic" fill="#202124">A</text>
+        <text x="156" y="32" text-anchor="middle" font-size="14" font-weight="900" font-style="italic" fill="#202124">B</text>
+        <path d="M146 26 L54 26" fill="none" stroke="#202124" stroke-width="1.2" marker-end="url(#ltThumbL)" />
+        <path d="M54 32 L146 32" fill="none" stroke="#202124" stroke-width="1.2" marker-end="url(#ltThumbR)" />
+        <defs>
+          <marker id="ltThumbL" markerWidth="6" markerHeight="6" refX="5" refY="2.4" orient="auto">
+            <path d="M0,0 L5.4,2.4 L0,4.8 Z" fill="#202124" />
+          </marker>
+          <marker id="ltThumbR" markerWidth="6" markerHeight="6" refX="5" refY="2.4" orient="auto">
+            <path d="M0,0 L5.4,2.4 L0,4.8 Z" fill="#202124" />
+          </marker>
+        </defs>
+        <polygon points="100,46 111,59.6 89,59.6" fill="#2E4E6E" stroke="#fff" stroke-width="1" />
+        <polygon points="89,59.6 111,59.6 122,73.2 78,73.2" fill="#4A6E92" stroke="#fff" stroke-width="1" />
+        <polygon points="78,73.2 122,73.2 133,86.8 67,86.8" fill="#6E8CAC" stroke="#fff" stroke-width="1" />
+        <polygon points="67,86.8 133,86.8 144,100.4 56,100.4" fill="#93AAC8" stroke="#fff" stroke-width="1" />
+        <polygon points="56,100.4 144,100.4 155,114 45,114" fill="#B8C8DC" stroke="#fff" stroke-width="1" />
+        <text x="100" y="84" text-anchor="middle" font-size="7" font-weight="800" fill="#22303f" stroke="#fff" stroke-width="2" paint-order="stroke">难题</text>
+        <text x="100" y="42" text-anchor="middle" font-size="7" font-weight="800" fill="#202124">领导力</text>
+        <text x="170" y="64" text-anchor="middle" font-size="6" font-weight="700" fill="#202124">挑战</text>
+        <text x="170" y="102" text-anchor="middle" font-size="6" font-weight="700" fill="#202124">稳定</text>
+        <path d="M182 98 L182 58" fill="none" stroke="#202124" stroke-width="1.2" />
+        <path d="M178 62 L182 56 L186 62" fill="none" stroke="#202124" stroke-width="1.2" />
+        <text x="22" y="130" text-anchor="middle" font-size="7" font-weight="800" fill="#202124">管理</text>
+        <text x="178" y="130" text-anchor="middle" font-size="7" font-weight="800" fill="#202124">权力</text>
+      </svg>
+
+
+      <!-- 上下文六要素：一页富文本，六段「标题 + 占位行」 -->
+      <svg
+        v-else-if="templateId === 'context-six-elements'"
+        class="thumb-svg"
+        viewBox="0 0 200 140"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <rect x="58" y="6" width="84" height="128" rx="6" fill="#ffffff" stroke="#d9dde3" stroke-width="1.2" />
+        <rect x="66" y="14" width="42" height="6" rx="3" fill="#202124" />
+        <rect x="66" y="24" width="62" height="3" rx="1.5" fill="#d7dbe0" />
+        <g>
+          <rect x="66" y="34" width="26" height="4.5" rx="2.2" fill="#2a9bd6" />
+          <rect x="66" y="42" width="58" height="3" rx="1.5" fill="#d7dbe0" />
+          <rect x="66" y="52" width="26" height="4.5" rx="2.2" fill="#2a9bd6" />
+          <rect x="66" y="60" width="52" height="3" rx="1.5" fill="#d7dbe0" />
+          <rect x="66" y="70" width="26" height="4.5" rx="2.2" fill="#2a9bd6" />
+          <rect x="66" y="78" width="60" height="3" rx="1.5" fill="#d7dbe0" />
+          <rect x="66" y="88" width="26" height="4.5" rx="2.2" fill="#2a9bd6" />
+          <rect x="66" y="96" width="50" height="3" rx="1.5" fill="#d7dbe0" />
+          <rect x="66" y="106" width="26" height="4.5" rx="2.2" fill="#2a9bd6" />
+          <rect x="66" y="114" width="56" height="3" rx="1.5" fill="#d7dbe0" />
+          <rect x="66" y="124" width="26" height="4.5" rx="2.2" fill="#2a9bd6" />
+          <rect x="66" y="132" width="46" height="3" rx="1.5" fill="#d7dbe0" />
+        </g>
+      </svg>
+
   </div>
 </template>
 
