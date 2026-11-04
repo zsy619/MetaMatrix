@@ -93,14 +93,18 @@ describe('RichTextEditor 特征', () => {
   it('页面大小、页边距和工具栏顺序写入画布 JSON，并计 markDirty', async () => {
     const { wrapper, store, marks, note } = await mountEditor({ expanded: true })
     const size = wrapper.get('select[aria-label="页面大小"]')
-    await size.setValue('a4')
+    // 未单独保存过页面设置的面板缺省是 A4。
+    expect((size.element as HTMLSelectElement).value).toBe('a4')
+    expect(store.current_data?.pageSizeByPanelId).toBeUndefined()
+    // 显式选「宽度 100%」必须落库，不能再靠删除字段表示。
+    await size.setValue('full')
     note()
     const margin = wrapper.get('select[aria-label="页边距"]')
     await margin.setValue('narrow')
     note()
     store.setPanelToolbarOrder('panel-a', ['text', 'insert', 'more'])
     note()
-    expect(store.current_data?.pageSizeByPanelId).toEqual({ 'panel-a': 'a4' })
+    expect(store.current_data?.pageSizeByPanelId).toEqual({ 'panel-a': 'full' })
     expect(store.current_data?.pageMarginByPanelId).toEqual({
       'panel-a': { preset: 'narrow', top: 12.7, right: 12.7, bottom: 12.7, left: 12.7 },
     })

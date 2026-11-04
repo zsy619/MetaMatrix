@@ -90,6 +90,11 @@ import type {
   GrowthAssumptionsCellKey,
   GrowthAssumptionsRow,
   BusinessFormulaDocumentJSON,
+  ThreeRingBasicsDocumentJSON,
+  ThreeRingBasicsRegionId,
+  LeadershipTriangleDocumentJSON,
+  LeadershipTriangleRegionId,
+  ContextSixElementsDocumentJSON,
   PanelAttachment,
   AttachmentsByPanelId,
 } from '../types/canvas'
@@ -129,6 +134,9 @@ import {
   isPeriodSummaryDoc,
   isDeepReviewDoc,
   isGrowthAssumptionsDoc,
+  isThreeRingBasicsDoc,
+  isLeadershipTriangleDoc,
+  isContextSixElementsDoc,
   coerceYModelDoc,
   normalizeYModelDoc,
 } from '../types/canvas'
@@ -173,6 +181,12 @@ import productFeatures5dTemplate from '../templates/product-features-5d-v1.json'
 import pmSolutionTriangleTemplate from '../templates/pm-solution-triangle-v1.json'
 import growthAssumptionsTemplate from '../templates/growth-assumptions-v1.json'
 import businessFormulaTemplate from '../templates/business-formula-v1.json'
+import threeRingBasicsTemplate from '../templates/three-ring-basics-v1.json'
+import leadershipTriangleTemplate from '../templates/leadership-triangle-v1.json'
+import contextSixElementsTemplate, {
+  buildContextSixElementsItems,
+} from '../templates/context-six-elements-v1'
+import { CONTEXT_SIX_ELEMENTS_BLOCK_ID } from '../utils/contextSixElements'
 
 export type TemplateId =
   | 'dual-triangle'
@@ -216,6 +230,9 @@ export type TemplateId =
   | 'pm-solution-triangle'
   | 'growth-assumptions'
   | 'business-formula'
+  | 'three-ring-basics'
+  | 'leadership-triangle'
+  | 'context-six-elements'
 
 const TEMPLATES: Record<TemplateId, CanvasDocumentJSON> = {
   'dual-triangle': dualTriangleTemplate as DualTriangleDocumentJSON,
@@ -261,6 +278,12 @@ const TEMPLATES: Record<TemplateId, CanvasDocumentJSON> = {
   'pm-solution-triangle': pmSolutionTriangleTemplate as PmSolutionTriangleDocumentJSON,
   'growth-assumptions': growthAssumptionsTemplate as GrowthAssumptionsDocumentJSON,
   'business-formula': businessFormulaTemplate as BusinessFormulaDocumentJSON,
+  'three-ring-basics':
+    threeRingBasicsTemplate as ThreeRingBasicsDocumentJSON,
+  'leadership-triangle':
+    leadershipTriangleTemplate as LeadershipTriangleDocumentJSON,
+  'context-six-elements':
+    contextSixElementsTemplate as ContextSixElementsDocumentJSON,
 }
 
 export function isTemplateId(id: string): id is TemplateId {
@@ -639,6 +662,27 @@ export const TEMPLATE_META: Record<
     badge: '业务公式 · MVP',
     description: '深度解构业务逻辑，发现增长杠杆',
     category: 'growth',
+  },
+  'three-ring-basics': {
+    name: '苦练基本功三环分析法',
+    badge: '基本功 · 三环',
+    description:
+      '足够务实 × 足够可练 × 足够价值三环交叠，六边形六条判据对照三处反面区，圈出关键基本功。',
+    category: 'method',
+  },
+  'leadership-triangle': {
+    name: '领导核心价值驱动三角',
+    badge: '领导力 · 三角',
+    description:
+      'A⇄B 心甘情愿 → 领导力 / 高水平影响力 → 5 层金字塔难题，右侧挑战现状与稳定运营，左下管理、右下权力。',
+    category: 'org',
+  },
+  'context-six-elements': {
+    name: '上下文六要素',
+    badge: '上下文 · 六要素',
+    description:
+      '富文本画布：任务目标 / AI的角色 / 我的角色 / 关键信息 / 行为规则 / 交付格式，六段开箱即用，随写随存。',
+    category: 'method',
   },
 }
 
@@ -3097,6 +3141,202 @@ export const useDocumentStore = defineStore('document', () => {
     return false
   }
 
+  /* ---- 苦练基本功三环分析法 ---- */
+  const TRB_BLOCK_ORDER: ThreeRingBasicsRegionId[] = [
+    'ring_practical',
+    'ring_trainable',
+    'ring_value',
+    'hex_concreteness',
+    'hex_scenario',
+    'hex_independence',
+    'hex_verifiability',
+    'hex_compounding',
+    'hex_repeatability',
+    'overlap_value_low',
+    'overlap_not_trainable',
+    'overlap_too_vague',
+    'core',
+  ]
+
+  const TRB_DEFAULT_TITLE: Record<ThreeRingBasicsRegionId, string> = {
+    ring_practical: '足够务实',
+    ring_trainable: '足够可练',
+    ring_value: '足够价值',
+    hex_concreteness: '具体性',
+    hex_scenario: '场景性',
+    hex_independence: '独立性',
+    hex_verifiability: '检验性',
+    hex_compounding: '复利性',
+    hex_repeatability: '重复性',
+    overlap_value_low: '价值低',
+    overlap_not_trainable: '不可练',
+    overlap_too_vague: '太虚了',
+    core: '关键基本功',
+  }
+
+  function asThreeRingBasics(): ThreeRingBasicsDocumentJSON | null {
+    return isThreeRingBasicsDoc(current_data.value)
+      ? current_data.value
+      : null
+  }
+
+  /** 确保三环分析法的 13 个区域各有一块可编辑正文（缺块则补齐） */
+  function ensureThreeRingBasicsBlocks(): boolean {
+    const d = asThreeRingBasics()
+    if (!d) return false
+    if (!Array.isArray(d.blocks)) {
+      d.blocks = []
+    }
+    const byId = new Map(
+      d.blocks.map((b) => [b.id as ThreeRingBasicsRegionId, b]),
+    )
+    let changed = false
+    const next = TRB_BLOCK_ORDER.map((id) => {
+      const existing = byId.get(id)
+      if (existing) return existing
+      changed = true
+      return {
+        id,
+        title: TRB_DEFAULT_TITLE[id],
+        items: [
+          {
+            id: createItemId(),
+            text: '',
+            style: {
+              color: '#3c4043',
+              fontSize: 12,
+              fontWeight: '500' as const,
+            },
+          },
+        ],
+      }
+    })
+    if (
+      changed ||
+      d.blocks.length !== next.length ||
+      d.blocks.some((b, i) => b.id !== next[i].id)
+    ) {
+      d.blocks = next
+      markDirty()
+      return true
+    }
+    return false
+  }
+
+  /* ---- 上下文六要素 ---- */
+  function asContextSixElements(): ContextSixElementsDocumentJSON | null {
+    return isContextSixElementsDoc(current_data.value)
+      ? current_data.value
+      : null
+  }
+
+  /** 确保上下文六要素画布有一块富文本正文（缺块则按六段规格补齐） */
+  function ensureContextSixElementsBlocks(): boolean {
+    const d = asContextSixElements()
+    if (!d) return false
+    if (!Array.isArray(d.blocks)) {
+      d.blocks = []
+    }
+    const existing = d.blocks.find((b) => b.id === CONTEXT_SIX_ELEMENTS_BLOCK_ID)
+    if (existing) {
+      if (!Array.isArray(existing.items)) {
+        existing.items = []
+        markDirty()
+        return true
+      }
+      return false
+    }
+    d.blocks = [
+      {
+        id: CONTEXT_SIX_ELEMENTS_BLOCK_ID,
+        title: '上下文六要素',
+        items: buildContextSixElementsItems(),
+      },
+    ]
+    markDirty()
+    return true
+  }
+
+  /* ---- 领导核心价值驱动三角 ---- */
+  const LT_BLOCK_ORDER: LeadershipTriangleRegionId[] = [
+    'top_exchange',
+    'apex',
+    'pyramid_1',
+    'pyramid_2',
+    'pyramid_3',
+    'pyramid_4',
+    'pyramid_5',
+    'challenge',
+    'stable',
+    'difficulty',
+    'management',
+    'power',
+  ]
+
+  const LT_DEFAULT_TITLE: Record<LeadershipTriangleRegionId, string> = {
+    top_exchange: '心甘情愿',
+    apex: '领导力 / 高水平影响力',
+    pyramid_1: '第1层',
+    pyramid_2: '第2层',
+    pyramid_3: '难题',
+    pyramid_4: '第4层',
+    pyramid_5: '第5层',
+    challenge: '挑战现状',
+    stable: '稳定运营',
+    difficulty: '难度越大',
+    management: '管理 / 确定执行',
+    power: '权力 / 强制执行',
+  }
+
+  function asLeadershipTriangle(): LeadershipTriangleDocumentJSON | null {
+    return isLeadershipTriangleDoc(current_data.value)
+      ? current_data.value
+      : null
+  }
+
+  /** 确保领导力三角的 12 个区域各有一块可编辑正文（缺块则补齐） */
+  function ensureLeadershipTriangleBlocks(): boolean {
+    const d = asLeadershipTriangle()
+    if (!d) return false
+    if (!Array.isArray(d.blocks)) {
+      d.blocks = []
+    }
+    const byId = new Map(
+      d.blocks.map((b) => [b.id as LeadershipTriangleRegionId, b]),
+    )
+    let changed = false
+    const next = LT_BLOCK_ORDER.map((id) => {
+      const existing = byId.get(id)
+      if (existing) return existing
+      changed = true
+      return {
+        id,
+        title: LT_DEFAULT_TITLE[id],
+        items: [
+          {
+            id: createItemId(),
+            text: '',
+            style: {
+              color: '#3c4043',
+              fontSize: 12,
+              fontWeight: '500' as const,
+            },
+          },
+        ],
+      }
+    })
+    if (
+      changed ||
+      d.blocks.length !== next.length ||
+      d.blocks.some((b, i) => b.id !== next[i].id)
+    ) {
+      d.blocks = next
+      markDirty()
+      return true
+    }
+    return false
+  }
+
 
   /** 进阶版：每个 ● 提示独立 RTE；升级旧 demand_upper 等合并块 */
   function ensureFiveStepProBlocks(): boolean {
@@ -3520,6 +3760,9 @@ export const useDocumentStore = defineStore('document', () => {
     ensurePmSolutionTriangleBlocks,
     ensureIpoBlocks,
     ensureDeliberatePracticeBlocks,
+    ensureThreeRingBasicsBlocks,
+    ensureLeadershipTriangleBlocks,
+    ensureContextSixElementsBlocks,
     ensureFiveStepProBlocks,
     ensureFiveStepChallengeBlocks,
     updateKeyResistanceRateLabel,

@@ -9,21 +9,25 @@ import {
   writePageSizeMap,
 } from './rtePageSize.ts'
 
-assert.equal(normalizePageSize(undefined), 'full')
-assert.equal(normalizePageSize(''), 'full')
-assert.equal(normalizePageSize('nope'), 'full')
+assert.equal(normalizePageSize(undefined), 'a4')
+assert.equal(normalizePageSize(''), 'a4')
+assert.equal(normalizePageSize('nope'), 'a4')
 assert.equal(normalizePageSize('a4'), 'a4')
 assert.equal(normalizePageSize('8k'), '8k')
+assert.equal(normalizePageSize('full'), 'full')
 
-assert.equal(readPageSize(undefined, 'cell:top-left'), 'full')
-assert.equal(readPageSize({}, 'cell:top-left'), 'full')
+assert.equal(readPageSize(undefined, 'cell:top-left'), 'a4')
+assert.equal(readPageSize({}, 'cell:top-left'), 'a4')
 assert.equal(readPageSize({ 'cell:top-left': 'letter' }, 'cell:top-left'), 'letter')
-assert.equal(readPageSize({ 'cell:top-left': 'bogus' }, 'cell:top-left'), 'full')
+assert.equal(readPageSize({ 'cell:top-left': 'bogus' }, 'cell:top-left'), 'a4')
 
-assert.equal(writePageSizeMap(undefined, 'p1', 'full'), undefined)
-assert.deepEqual(writePageSizeMap(undefined, 'p1', 'a4'), { p1: 'a4' })
-assert.equal(writePageSizeMap({ p1: 'a4' }, 'p1', 'full'), undefined)
-assert.deepEqual(writePageSizeMap({ p1: 'a4', p2: 'b5' }, 'p1', 'full'), { p2: 'b5' })
+// 缺省是 A4：写 A4 等于不写；显式选「宽度 100%」必须落库。
+assert.equal(writePageSizeMap(undefined, 'p1', 'a4'), undefined)
+assert.deepEqual(writePageSizeMap(undefined, 'p1', 'full'), { p1: 'full' })
+assert.deepEqual(writePageSizeMap({ p1: 'a4' }, 'p1', 'full'), { p1: 'full' })
+assert.deepEqual(writePageSizeMap({ p1: 'a4', p2: 'b5' }, 'p1', 'a4'), { p2: 'b5' })
+assert.deepEqual(writePageSizeMap({ p1: 'full' }, 'p1', 'a4'), undefined)
+assert.deepEqual(writePageSizeMap({ p1: 'full' }, 'p1', 'feishu'), { p1: 'feishu' })
 
 const a4 = sheetBox('a4')
 assert.ok(a4)
