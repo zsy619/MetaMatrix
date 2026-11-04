@@ -130,6 +130,12 @@ import { useFloatMenus } from './rte/composables/useFloatMenus'
 import { useOverlayStack } from './rte/composables/useOverlayStack'
 import { useViewMode } from './rte/composables/useViewMode'
 import { useBlockHandle } from './rte/composables/useBlockHandle'
+import { useSelectionBubble } from './rte/composables/useSelectionBubble'
+import {
+  applyFontFamilyToSelection,
+  applyFontSizeToSelection,
+  applyTextAlignToSelection,
+} from './rte/selectionFormat'
 import { useImageTools } from './rte/composables/useImageTools'
 import { useDocChrome } from './rte/composables/useDocChrome'
 import { useRteExtensions } from './rte/composables/useRteExtensions'
@@ -3145,7 +3151,7 @@ function colorsEqual(a: string, b: string) {
   return (a || '').toLowerCase() === (b || '').toLowerCase()
 }
 function setAlign(align: 'left' | 'center' | 'right' | 'justify') {
-  chain()?.setTextAlign(align).run()
+  applyTextAlignToSelection(editor.value, align)
 }
 function toggleBulletList() {
   chain()?.toggleBulletList().run()
@@ -3208,15 +3214,14 @@ function currentLineHeight(): string {
   return typeof v === 'string' ? v : ''
 }
 function applyFontSize(size: string) {
-  if (!size) chain()?.unsetFontSize().run()
-  else chain()?.setFontSize(size).run()
+  // 复用选区格式封装：跨段落选区时选区内所有段落一起生效
+  applyFontSizeToSelection(editor.value, size)
   fontSizeOpen.value = false
   moreFontSizeOpen.value = false
   moreOpen.value = false
 }
 function applyFontFamily(family: string) {
-  if (!family) chain()?.unsetFontFamily().run()
-  else chain()?.setFontFamily(family).run()
+  applyFontFamilyToSelection(editor.value, family)
   fontFamilyOpen.value = false
   moreFontFamilyOpen.value = false
   moreOpen.value = false
@@ -3886,6 +3891,13 @@ const {
   setLastEmitted: (norm: string) => {
     lastEmittedHtmlNorm = norm
   },
+})
+
+/** 选区浮动工具条：空选区 / 代码块 / 图表块内不出现。 */
+const { selectionBubbleShouldShow } = useSelectionBubble({
+  editor,
+  viewMode: () => viewMode,
+  isImageNodeSelected,
 })
 
 onBeforeUnmount(() => {
@@ -6232,8 +6244,28 @@ function closeMore() {
   // 表情/特殊字符/段距/字数/分栏/快捷键是独立浮层：可能刚从「更多」接力打开，勿连带关掉
 }
 
+/**
+ * 正在用鼠标拖选正文（多行 / 跨块）。
+ * 这期间块手柄不接收指针事件，否则跨块拖选会被手柄 / 块菜单打断。
+ */
+const dragSelecting = ref(false)
+
+function beginDragSelect() {
+  if (dragSelecting.value) return
+  dragSelecting.value = true
+  const stop = () => {
+    dragSelecting.value = false
+    window.removeEventListener('pointerup', stop)
+    window.removeEventListener('pointercancel', stop)
+  }
+  window.addEventListener('pointerup', stop)
+  window.addEventListener('pointercancel', stop)
+}
+
 function onRootMouseDown(event: MouseEvent) {
   event.stopPropagation()
+  const target = event.target as HTMLElement | null
+  if (target?.closest?.('.ProseMirror')) beginDragSelect()
 }
 
 /**
@@ -6355,6 +6387,7 @@ provideRteBindings({
   bookmarkPanelOpen,
   bubbleShouldShow,
   bubbleSwatch,
+  selectionBubbleShouldShow,
   crossDocOpen,
   crossDocQuery,
   crossDocHits,
@@ -6420,6 +6453,7 @@ provideRteBindings({
   colorHoverLabel,
   colorOpen,
   colorsEqual,
+  clearFormat,
   columnsOpen,
   confirmAddAttachCategory,
   confirmAddCategory,
@@ -6935,6 +6969,7 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
       'is-page-feishu': pageSize === 'feishu',
       'is-table-sticky': tableHeaderSticky,
       'is-cjk-typography': true,
+      'is-drag-select': dragSelecting,
     }"
     @mousedown="onRootMouseDown"
     @keydown="onImmersiveKeydown"
