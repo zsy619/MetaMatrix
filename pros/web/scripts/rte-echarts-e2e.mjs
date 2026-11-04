@@ -8,6 +8,8 @@
  *
  * 前置：API 与前端已启动。
  *   RTE_WEB_URL       前端地址，默认 http://127.0.0.1:5173
+ *   RTE_DOCUMENT_ID   Y 模型样例文档 id，默认 4d5f428c-a6e7-45a7-b29e-304120fccbb5
+ *                     （用 scripts/seed-e2e-fixtures.mjs 播出来；见 e2e-backend-up.sh）
  *   RTE_BASELINE_DIR  截图输出目录
  *   CHROME_PATH       浏览器可执行文件，默认 /usr/bin/google-chrome
  */
@@ -18,6 +20,7 @@ const { chromium } = pw
 const chrome = process.env.CHROME_PATH || '/usr/bin/google-chrome'
 const out = process.env.RTE_BASELINE_DIR || '/opt/cursor/artifacts'
 const web = process.env.RTE_WEB_URL || 'http://127.0.0.1:5173'
+const documentId = process.env.RTE_DOCUMENT_ID || '4d5f428c-a6e7-45a7-b29e-304120fccbb5'
 mkdirSync(out, { recursive: true })
 
 const browser = await chromium.launch({
@@ -50,7 +53,7 @@ if (debugAnswer) await page.fill('#captcha-code', debugAnswer)
 await page.click('button[type="submit"]')
 await page.waitForTimeout(800)
 
-await page.goto(`${web}/canvas/y-model?documentId=4d5f428c-a6e7-45a7-b29e-304120fccbb5`, {
+await page.goto(`${web}/canvas/y-model?documentId=${documentId}`, {
   waitUntil: 'domcontentloaded',
 })
 await page.waitForTimeout(1500)

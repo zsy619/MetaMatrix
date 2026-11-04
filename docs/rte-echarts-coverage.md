@@ -171,7 +171,7 @@ MarkArea/MarkLine/MarkPoint/Matrix/Parallel/Polar/SingleAxis/Toolbox/Transform/V
 | 构建 | `npx vite build` | ✅ 通过（体积见上表） |
 | 39 类真实浏览器渲染（含 WebGL） | `node scripts/rte-echarts-render-e2e.mjs` | ✅ 81 个模板全部渲染成功（12 个 Canvas/GL 模板失败 0） |
 | 工具栏分组 + 逐类插入（组件级） | `npx vitest run src/components/rte/RteToolbarCharts.test.ts` | ✅ 4 用例全过（分组独立、下拉 39 类、3D/GL 分区、点子类型能插入图表块） |
-| 工具栏分组 + 逐类插入（浏览器级） | `node scripts/rte-echarts-e2e.mjs` | ⚠️ 未验证：脚本里写死的 documentId（4d5f428c-…）在本机库里不存在，本次未改动该脚本 |
+| 工具栏分组 + 逐类插入（浏览器级） | `node scripts/rte-echarts-e2e.mjs` | ✅ 已验证：39 类逐类插入并真实渲染（28 类 SVG / 11 类 Canvas·WebGL），斜杠「/tubiao」路径、data-option 往返、导出快照全过。夹具由 `node scripts/seed-e2e-fixtures.mjs` 播种（固定 id 的 Y 模型样例文档），一键复现见 `bash scripts/e2e-backend-up.sh` |
 | aria 白名单净化 | `npx vitest run src/utils/rteEchartsOption.test.ts` | ✅ 25 用例全过（含 aria 白名单保留 / 非白名单与危险字段丢弃） |
 | 图表数据摘要（折线/柱/饼 + 截断） | `npx vitest run src/utils/echarts/chartA11y.test.ts` | ✅ 7 用例全过（可读文本、类目/数值、截断说明、DOM 写入） |
 | 节点视图无障碍 DOM | `npx vitest run src/extensions/echartsBlock.a11y.test.ts` | ✅ 4 用例全过（`role="img"` + `aria-label`、隐藏数据表、导出 HTML 带摘要、option 变更后刷新） |
@@ -190,4 +190,11 @@ MarkArea/MarkLine/MarkPoint/Matrix/Parallel/Polar/SingleAxis/Toolbox/Transform/V
 cd pros/web
 npx vite --port 5180 &                      # 预览页只依赖前端
 RTE_WEB_URL=http://127.0.0.1:5180 node scripts/rte-echarts-render-e2e.mjs
+```
+
+需要后端（登录 + 样例文档）的浏览器级脚本，用一键脚本起齐环境：
+
+```bash
+cd pros/web
+bash scripts/e2e-backend-up.sh              # 起 PostgreSQL + API + 前端 → 播种 → 跑 e2e
 ```
