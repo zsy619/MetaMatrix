@@ -1,0 +1,42 @@
+{
+  "_comment": "旧图表总入口被用户整体隐藏的画布：charts 组只有旧的单个下拉入口 echarts，用户把它隐藏了。迁移后 9 个分类下拉应全部隐藏。",
+  "id": "legacy-echarts-entry-only",
+  "type": "quadrant",
+  "schemaVersion": 1,
+  "theme": {
+    "accentColor": "#2f6feb",
+    "backgroundColor": "#ffffff",
+    "borderColor": "#e5e6eb",
+    "fontFamily": "system",
+    "position": "bottom-right",
+    "textColor": "#1f2329",
+    "watermarkOpacity": 0.08,
+    "watermarkPosition": "bottom-right",
+    "watermarkText": "内部资料"
+  },
+  "axes": {
+    "x": { "label": "投入", "max": 100, "min": 0 },
+    "y": { "label": "产出", "max": 100, "min": 0 }
+  },
+  "quadrants": [
+    {
+      "position": "q1",
+      "title": "重点投入",
+      "tone": "yellow",
+      "hints": ["产品化"],
+      "items": [{ "id": "item-1", "text": "季度复盘", "style": {} }]
+    }
+  ],
+  "markers": [],
+  "toolbarGroupOrderByPanelId": {
+    "panel-1": ["history", "type", "marks", "color", "align", "list", "insert", "charts", "table", "view"]
+  },
+  "toolbarGroupButtonsByPanelId": {
+    "panel-1": {
+      "charts": {
+        "order": ["echarts"],
+        "hidden": ["echarts"]
+      }
+    }
+  }
+}
