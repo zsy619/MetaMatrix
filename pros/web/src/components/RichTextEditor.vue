@@ -115,7 +115,10 @@ import { useRtePageLayout } from './rte/composables/useRtePageLayout'
 import { usePageChrome } from './rte/composables/usePageChrome'
 import { EMPTY_PAGE_CHROME, PAGE_NUMBER_OPTIONS, type PanelPageChrome } from '../utils/rtePageChrome'
 import { useToolbarGroups } from './rte/composables/useToolbarGroups'
-import { buildToolbarGroups } from '../utils/rteToolbarGroups'
+import {
+  buildToolbarGroups,
+  COMPACT_PRIMARY_KEY_SET,
+} from '../utils/rteToolbarGroups'
 import { useFindReplace } from './rte/composables/useFindReplace'
 import { useExport } from './rte/composables/useExport'
 import { useImport } from './rte/composables/useImport'
@@ -2403,6 +2406,7 @@ function insertEchartsTemplateById(
   echartsGroupMenuKey.value = null
   echartsOpenCategory.value = null
   moreOpen.value = false
+  moreChartGroupKey.value = ''
   ElMessage.success(`已插入${template.label}（选中图表可在属性面板改类型 / 改数据）`)
 }
 
@@ -5001,6 +5005,11 @@ const templateOpen = ref(false)
 const moreFormOpen = ref(false)
 const moreTemplateOpen = ref(false)
 const moreOpen = ref(false)
+/**
+ * 紧凑态「更多」里展开的图表一级分类下拉（图表 9 分类入口）。
+ * 空串表示没展开；值是工具 key（chart:basic / chart:stats / …）。
+ */
+const moreChartGroupKey = ref('')
 bindAskMore(askMoreCloser, moreOpen)
 const colorOpen = ref(false)
 const highlightOpen = ref(false)
@@ -5349,9 +5358,20 @@ function onMoreToolClick(t: ToolItem) {
     return
   }
   if (t.kind === 'echartsGroup') {
-    // 紧凑模式（未最大化）没有分类下拉：走「一键生成」面板
-    moreOpen.value = false
-    openEchartsDialog()
+    // 紧凑模式（未最大化）：就地展开该一级分类的下拉（分类 → 具体图表类型），
+    // 保证窄屏下也能在「更多」里找到 9 个分类的图表入口（不再只能跳「一键生成」）。
+    moreChartGroupKey.value = moreChartGroupKey.value === t.key ? '' : t.key
+    if (moreChartGroupKey.value) {
+      moreColorOpen.value = false
+      moreHighlightOpen.value = false
+      moreFormOpen.value = false
+      moreTemplateOpen.value = false
+      moreFontSizeOpen.value = false
+      moreFontFamilyOpen.value = false
+      moreLineHeightOpen.value = false
+      moreCalloutOpen.value = false
+      customColorOpen.value = false
+    }
     return
   }
   moreColorOpen.value = false
@@ -5390,34 +5410,15 @@ moreOpen.value = false
 }
 
 /**
- * 飞书式主栏顺序。分隔用 __div。
- * 紧凑画布只放这一行（可横滑）；最大化时其余工具落到第二行。
+ * 紧凑态（未最大化）主栏的高频键。
+ *
+ * 口径（P0-5）：紧凑主栏不再单独维护一份扁平顺序表，而是从方案 A 的分组定义派生
+ * （见 utils/rteToolbarGroups.ts 的 COMPACT_PRIMARY_KEYS_BY_GROUP）：
+ * - 组内相对顺序 = 该组 TOOLBAR_GROUPS.keys 的顺序（与最大化工具栏一致）；
+ * - 组间顺序 = 用户可拖拽的分组顺序（拖完紧凑主栏自动同步）；
+ * - 图表 9 个一级分类不进主栏，统一收在「更多」里，窄屏也能找到入口。
  */
-const FEISHU_PRIMARY_ORDER = [
-  'undo',
-  'redo',
-  '__div',
-  'heading',
-  'bold',
-  'italic',
-  'underline',
-  'strike',
-  '__div',
-  'color',
-  'highlight',
-  '__div',
-  'list',
-  'quote',
-  'code',
-  '__div',
-  'link',
-  'image',
-  'align',
-] as const
-
-const PRIMARY_KEYS = new Set<string>(
-  FEISHU_PRIMARY_ORDER.filter((key) => key !== '__div'),
-)
+const PRIMARY_KEYS = COMPACT_PRIMARY_KEY_SET
 
 type ToolItem = {
   disabled?: () => boolean
@@ -6218,6 +6219,7 @@ function openMoreMenu() {
 
 function closeMore() {
   moreOpen.value = false
+  moreChartGroupKey.value = ''
   moreColorOpen.value = false
   moreHighlightOpen.value = false
   moreFormOpen.value = false
@@ -6626,6 +6628,7 @@ provideRteBindings({
   saveMentionPermission,
   toggleMentionPermValue,
   moreCalloutOpen,
+  moreChartGroupKey,
   moreColorOpen,
   moreFontFamilyOpen,
   moreFontSizeOpen,

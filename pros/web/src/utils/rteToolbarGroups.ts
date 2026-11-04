@@ -139,6 +139,73 @@ export const DEFAULT_TOOLBAR_GROUP_ORDER: readonly string[] = TOOLBAR_GROUPS.map
 
 const GROUP_BY_ID = new Map(TOOLBAR_GROUPS.map((group) => [group.id, group]))
 
+/**
+ * 紧凑态（未最大化）主栏要放的高频键：按分组声明。
+ *
+ * 口径（P0-5，紧凑栏与方案 A 对齐）：
+ * - 紧凑主栏不再单独维护一份扁平顺序表，而是从方案 A 的分组定义派生：
+ *   组内相对顺序 = 该组 `TOOLBAR_GROUPS.keys` 的顺序；组间顺序 = 用户可拖拽的分组顺序。
+ * - 因此用户拖拽分组顺序后，紧凑主栏的高频键会随之同步（同一套心智）。
+ * - 图表组（9 个一级分类下拉）不进紧凑主栏（按钮太多），统一收在「更多」里，
+ *   窄屏也能找到入口；图表分类顺序始终等于 `CHART_TOOLBAR_KEYS`（= CHART_GROUPS 顺序）。
+ */
+export const COMPACT_PRIMARY_KEYS_BY_GROUP: Record<string, readonly string[]> = {
+  edit: ['undo', 'redo'],
+  style: ['bold', 'italic', 'underline', 'strike', 'color', 'highlight'],
+  paragraph: ['heading', 'list', 'quote', 'code', 'align'],
+  insert: ['link', 'image'],
+}
+
+/**
+ * 紧凑主栏高频键（扁平顺序）。
+ *
+ * 组间顺序由 `groupOrder` 决定（用户拖拽后的分组顺序）；组内顺序固定取
+ * `TOOLBAR_GROUPS` 里该组的 keys 顺序 —— 与最大化工具栏完全一致。
+ */
+export function compactPrimaryKeys(
+  groupOrder: readonly string[] = DEFAULT_TOOLBAR_GROUP_ORDER,
+): string[] {
+  const out: string[] = []
+  for (const groupId of normalizeToolbarGroupOrder(groupOrder)) {
+    const def = GROUP_BY_ID.get(groupId)
+    if (!def) continue
+    const wanted = COMPACT_PRIMARY_KEYS_BY_GROUP[groupId]
+    if (!wanted || !wanted.length) continue
+    for (const key of def.keys) {
+      if (wanted.includes(key) && !out.includes(key)) out.push(key)
+    }
+  }
+  return out
+}
+
+/** 紧凑主栏高频键集合（按默认分组顺序展开）。 */
+export const COMPACT_PRIMARY_KEY_SET: ReadonlySet<string> = new Set(compactPrimaryKeys())
+
+/** 紧凑主栏每个分组的高频键（组内顺序同 TOOLBAR_GROUPS）。 */
+export function compactPrimaryKeysByGroup(
+  groupOrder: readonly string[] = DEFAULT_TOOLBAR_GROUP_ORDER,
+): Array<{ id: string; label: string; keys: string[] }> {
+  const out: Array<{ id: string; label: string; keys: string[] }> = []
+  for (const groupId of normalizeToolbarGroupOrder(groupOrder)) {
+    const def = GROUP_BY_ID.get(groupId)
+    if (!def) continue
+    const wanted = COMPACT_PRIMARY_KEYS_BY_GROUP[groupId]
+    if (!wanted || !wanted.length) continue
+    const keys = def.keys.filter((key) => wanted.includes(key))
+    if (!keys.length) continue
+    out.push({ id: def.id, label: def.label, keys })
+  }
+  return out
+}
+
+/** 「更多」里能看到的键 = 全部工具键 − 紧凑主栏高频键（图表 9 分类必然在内）。 */
+export function compactOverflowKeys(
+  allKeys: readonly string[],
+  primaryKeys: ReadonlySet<string> = COMPACT_PRIMARY_KEY_SET,
+): string[] {
+  return allKeys.filter((key) => !primaryKeys.has(key))
+}
+
 /** 工具 key → 所属分组 id（一个 key 只属于一个分组）。 */
 const TOOL_GROUP_BY_KEY = new Map<string, string>()
 for (const group of TOOLBAR_GROUPS) {

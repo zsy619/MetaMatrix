@@ -2180,10 +2180,45 @@ function toggleChartGroupMenu(key: string) {
               </span>
               <span data-rte-own>{{ mt.title || mt.label }}</span>
               <span data-rte-own
-                v-if="mt.kind === 'color' || mt.key === 'highlight' || mt.kind === 'attach' || mt.kind === 'form' || mt.kind === 'template' || mt.kind === 'fontSize' || mt.kind === 'fontFamily' || mt.kind === 'lineHeight' || mt.kind === 'callout' || mt.kind === 'caseTransform' || mt.kind === 'zoom' || mt.kind === 'viewExtras'"
+                v-if="mt.kind === 'color' || mt.key === 'highlight' || mt.kind === 'attach' || mt.kind === 'form' || mt.kind === 'template' || mt.kind === 'fontSize' || mt.kind === 'fontFamily' || mt.kind === 'lineHeight' || mt.kind === 'callout' || mt.kind === 'caseTransform' || mt.kind === 'zoom' || mt.kind === 'viewExtras' || mt.kind === 'echartsGroup'"
                 class="rte-more-caret"
               >{{ mt.kind === 'attach' || mt.kind === 'form' || mt.kind === 'template' ? '▾' : '▸' }}</span>
             </button>
+            <div data-rte-own
+              v-if="mt.kind === 'echartsGroup' && rte.moreChartGroupKey === mt.key"
+              class="rte-menu rte-chart-more-flyout"
+              @mousedown.prevent
+            >
+              <!-- 紧凑态「更多」里的一级分类下拉：窄屏也能找到 9 个图表分类 -->
+              <div data-rte-own class="rte-menu-section">{{ mt.title || mt.label }}</div>
+              <template v-for="cat in chartCategoriesOf(chartGroupIdOfTool(mt.key))" :key="'mcat-' + cat.id">
+                <button data-rte-own
+                  type="button"
+                  class="rte-menu-cat"
+                  :class="{ 'is-open': rte.echartsOpenCategory === cat.id }"
+                  @click="rte.toggleEchartsCategory(cat.id)"
+                >
+                  <strong data-rte-own>{{ cat.label }}</strong>
+                  <span data-rte-own class="rte-menu-hint">{{ cat.templates.length }} 种</span>
+                </button>
+                <div data-rte-own
+                  v-if="rte.echartsOpenCategory === cat.id"
+                  class="rte-menu-sub"
+                >
+                  <button data-rte-own
+                    v-for="tpl in cat.templates"
+                    :key="'mtpl-' + tpl.id"
+                    type="button"
+                    @click="rte.insertEchartsTemplateById(tpl.id)"
+                  >
+                    {{ tpl.label }}
+                    <span data-rte-own class="rte-menu-hint">{{ tpl.hint }}</span>
+                  </button>
+                </div>
+              </template>
+              <div data-rte-own class="rte-menu-sep" aria-hidden="true"></div>
+              <button data-rte-own type="button" @click="rte.openEchartsDialog()">一键生成…</button>
+            </div>
             <div data-rte-own
               v-if="mt.kind === 'fontSize' && rte.moreFontSizeOpen"
               class="rte-menu rte-more-flyout"
