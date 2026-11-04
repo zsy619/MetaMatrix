@@ -156,7 +156,7 @@ const echartsDialogTemplates = computed(() => {
           <span data-rte-own class="rte-mention-title">提及</span>
           <span data-rte-own class="rte-mention-hint">@ 人员或本文块{{ rte.mentionQuery ? ` · ${rte.mentionQuery}` : '' }}</span>
         </div>
-        <div data-rte-own v-if="!rte.mentionItems.length" class="rte-mention-empty">{{ rte.mentionEmptyHint(rte.mentionQuery) }}</div>
+        <div data-rte-own v-if="!rte.mentionItems.length" class="rte-mention-empty" :class="{ 'is-error': !!rte.directoryError }">{{ rte.directoryError || rte.mentionEmptyHint(rte.mentionQuery) }}</div>
         <div data-rte-own v-else class="rte-mention-list">
           <template v-for="(it, idx) in rte.mentionItems" :key="it.id">
           <div data-rte-own

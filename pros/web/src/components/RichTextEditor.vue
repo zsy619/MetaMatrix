@@ -318,7 +318,8 @@ void mentionMenuEl
 
 /**
  * 组织通讯录里的真人。
- * - 数据来自 api/directory.listDirectoryUsers，后端没实现时回退到本地示例。
+ * - 数据来自 api/directory.listDirectoryUsers（后端 /directory/users，真实用户）。
+ * - 接口失败时没有候选人，@ 菜单显示「通讯录加载失败，请稍后重试」。
  * - 权限钩子：画布 JSON 的 mentionPermissionByPanelId，按面板决定谁能被 @。
  */
 const mentionPermission = computed<DirectoryPermission | null>(() =>

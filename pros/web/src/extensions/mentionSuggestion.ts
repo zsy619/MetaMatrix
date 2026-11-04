@@ -2,7 +2,8 @@
  * TipTap @提及：基于 @tiptap/extension-mention + @tiptap/suggestion。
  * UI 由宿主 Vue 渲染（与 Slash「/」同一套定位/键盘模式）。
  *
- * 候选来源见 ../components/rteMentionItems.ts（本地占位列表，可换 API）。
+ * 人员候选来自组织通讯录接口（见 ../api/directory.ts），由宿主通过 people 注入；
+ * 本文块引用来自当前文档。接口不可用时不给写死的示例人员。
  */
 import Mention from '@tiptap/extension-mention'
 import { PluginKey } from '@tiptap/pm/state'
@@ -11,7 +12,6 @@ import type {
   SuggestionProps,
 } from '@tiptap/suggestion'
 import {
-  DEFAULT_MENTION_ITEMS,
   mergeMentionCandidates,
   type RteMentionItem,
 } from '../components/rteMentionItems'
@@ -32,7 +32,7 @@ export type RteMentionOptions = {
   ui: RteMentionUiHandlers
   /**
    * 组织通讯录里的真人。返回 Promise，宿主从通讯录接口取人并按文档权限过滤。
-   * 没提供时退回本地示例候选人。
+   * 没提供时 @ 菜单里没有真人候选（不再有写死的示例人员）。
    */
   people?: () => Promise<RteMentionItem[]>
 }
@@ -74,7 +74,7 @@ export function createRteMention(options: RteMentionOptions) {
           label: target.label,
           kind: target.kind,
         }))
-        // 通讯录优先；接口不可用时退回本地示例候选人。
+        // 通讯录优先；接口不可用时没有真人候选人，只留本文块引用。
         let candidates: RteMentionItem[] = []
         if (people) {
           try {
@@ -83,7 +83,6 @@ export function createRteMention(options: RteMentionOptions) {
             candidates = []
           }
         }
-        if (!candidates.length) candidates = DEFAULT_MENTION_ITEMS
         return mergeMentionCandidates(query, blocks, 12, candidates)
       },
       command: ({ editor, range, props }) => {
