@@ -2567,7 +2567,8 @@
   margin-left: auto;
   margin-right: auto;
   box-shadow: 0 0 0 1px #e5e6eb, 0 8px 24px rgba(0, 0, 0, 0.06);
-  padding: 48px 56px;
+  /* 左侧留白至少放得下一列手柄（gutter）。 */
+  padding: 48px max(56px, var(--rte-gutter-size, 26px));
   min-height: 1123px;
   background: #fff;
 }
@@ -2621,6 +2622,8 @@
   min-height: var(--rte-sheet-min-height, 1123px);
   margin: 16px auto 28px;
   padding: var(--rte-margin-top, 25.4mm) var(--rte-margin-right, 31.8mm) var(--rte-margin-bottom, 25.4mm) var(--rte-margin-left, 31.8mm);
+  /* 纸张左侧也要留出块手柄列（gutter），窄边距时以手柄列宽度为准。 */
+  padding-left: max(var(--rte-margin-left, 31.8mm), var(--rte-gutter-size, 26px));
   box-sizing: border-box;
   background: #fff;
   box-shadow:
@@ -2630,7 +2633,8 @@
 .rte-root.is-page-sheet .rte-body::before {
   content: '';
   position: absolute;
-  inset: var(--rte-margin-top, 25.4mm) var(--rte-margin-right, 31.8mm) var(--rte-margin-bottom, 25.4mm) var(--rte-margin-left, 31.8mm);
+  /* 虚线框与正文起始位置对齐（含手柄列留白）。 */
+  inset: var(--rte-margin-top, 25.4mm) var(--rte-margin-right, 31.8mm) var(--rte-margin-bottom, 25.4mm) max(var(--rte-margin-left, 31.8mm), var(--rte-gutter-size, 26px));
   border: 1px dashed rgba(51, 112, 255, 0.35);
   pointer-events: none;
   z-index: 2;
