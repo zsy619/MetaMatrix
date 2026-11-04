@@ -7,6 +7,9 @@ import {
   type EchartsChartType,
 } from '../utils/rteEchartsOption'
 import { ECHARTS_CATEGORIES } from '../utils/echarts/templates'
+import { applyChartA11y } from '../utils/echarts/chartA11yDom'
+import { applyChartAria } from '../utils/echarts/chartA11yOption'
+import { buildChartA11ySummary, type ChartA11ySummary } from '../utils/echarts/chartA11y'
 import { echartsRendererFor, needsEchartsGl, resolveEchartsRenderItems } from '../utils/echarts/prepare'
 import { loadEchartsGl } from '../utils/echartsGlRuntime'
 import {
@@ -158,6 +161,9 @@ export const EchartsBlock = Node.create({
     }
     const chartType = isChartType(attrs.chartType) ? attrs.chartType : 'bar'
     const label = ECHARTS_CHART_TYPES.find((item) => item.value === chartType)?.label || '图表'
+    // 导出的 HTML 同样带无障碍摘要（读屏能听到图里是什么）
+    const parsed = safeParseEchartsOption(attrs.option || '')
+    const ariaLabel = parsed.ok ? buildChartA11ySummary(parsed.option).ariaLabel : `ECharts 图表（${label}）`
     return [
       'div',
       mergeAttributes(HTMLAttributes, {
@@ -170,6 +176,8 @@ export const EchartsBlock = Node.create({
         // 数据接口配置随图表块持久化（不含明文密钥，密钥只存本地）
         'data-chart-id': attrs.chartId || '',
         'data-datasource': attrs.dataSource || '',
+        role: 'img',
+        'aria-label': ariaLabel,
         style: `min-height:${DEFAULT_HEIGHT}px`,
       }),
       ['div', { class: 'rte-echarts-fallback' }, `ECharts 图表（${label}）`],
@@ -185,6 +193,8 @@ export const EchartsBlock = Node.create({
       let snapshotEl: HTMLDivElement | null = null
       let destroyed = false
       let renderSeq = 0
+      /** 最近一次的无障碍摘要（导出快照的 alt 文本用它）。 */
+      let a11ySummary: ChartA11ySummary | null = null
 
       const dom = document.createElement('div')
       dom.className = 'rte-echarts-block'
@@ -214,7 +224,13 @@ export const EchartsBlock = Node.create({
       hint.className = 'rte-echarts-hint'
       hint.textContent = '图表内容不参与逐条修订；导出与打印按当前显示呈现。'
 
+      // 无障碍：图表容器打 role="img" + aria-label（数据摘要），
+      // 视觉隐藏的数据表放在**兄弟节点**里（role="img" 的后代会被读屏忽略）。
+      const a11yEl = document.createElement('div')
+      a11yEl.className = 'rte-sr-only rte-chart-a11y'
+
       dom.appendChild(previewEl)
+      dom.appendChild(a11yEl)
       dom.appendChild(dataErrorEl)
       dom.appendChild(hint)
 
@@ -264,6 +280,10 @@ export const EchartsBlock = Node.create({
         if (destroyed || !previewEl) return
         const seq = (renderSeq += 1)
         const parsed = safeParseEchartsOption(current.attrs.option || '')
+        // 接口拉到的数据优先（只影响显示，不写回文档）
+        const effective = remoteOption || (parsed.ok ? parsed.option : {})
+        // 无障碍摘要：先更新，option 解析失败时也要把摘要清空
+        a11ySummary = applyChartA11y(previewEl, a11yEl, effective)
         if (!parsed.ok) {
           chart?.dispose()
           chart = null
@@ -275,8 +295,6 @@ export const EchartsBlock = Node.create({
           previewEl.appendChild(box)
           return
         }
-        // 接口拉到的数据优先（只影响显示，不写回文档）
-        const effective = remoteOption || parsed.option
         try {
           const mod = await loadEcharts()
           // 3D / GL 图表：先按需加载 echarts-gl（不进主包，也不进普通图表 chunk）
@@ -308,7 +326,10 @@ export const EchartsBlock = Node.create({
             })
           }
           // custom 系列的 renderItem 在文档里只存预设名，这里换成内置函数
-          chart.setOption(renderOption(resolveEchartsRenderItems(effective)), { notMerge: true })
+          // 渲染前补 aria（默认开启 + 自动摘要），ECharts 自身才能把描述播报出来
+          chart.setOption(applyChartAria(renderOption(resolveEchartsRenderItems(effective))), {
+            notMerge: true,
+          })
           chart.resize()
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err)
@@ -365,7 +386,7 @@ export const EchartsBlock = Node.create({
           snapshotEl.className = 'rte-echarts-snapshot'
           const img = document.createElement('img')
           img.className = 'rte-echarts-snapshot-img'
-          img.alt = '图表快照'
+          img.alt = a11ySummary?.ariaLabel || '图表快照'
           img.src = url
           snapshotEl.appendChild(img)
           previewEl.appendChild(snapshotEl)

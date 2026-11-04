@@ -2386,6 +2386,18 @@
   background: #f7f8fa;
   border-top: 1px solid #e5e6eb;
 }
+/* 图表无障碍：视觉隐藏的数据摘要与数据表（读屏可读，视觉不可见） */
+.rte-chart-a11y {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
 .rte-echarts-fallback {
   padding: 12px;
   color: #86909c;

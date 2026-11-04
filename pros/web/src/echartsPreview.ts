@@ -9,6 +9,7 @@ import { ECHARTS_TEMPLATES } from './utils/echarts/templates'
 import { sanitizeEchartsOption } from './utils/rteEchartsOption'
 import { echarts } from './utils/echartsRuntime'
 import { echartsRendererFor, resolveEchartsRenderItems } from './utils/echarts/prepare'
+import { applyChartAria } from './utils/echarts/chartA11yOption'
 import { loadEchartsGl } from './utils/echartsGlRuntime'
 
 type PreviewResult = {
@@ -54,7 +55,7 @@ async function main() {
       item.error = `净化失败：${sanitized.error}`
       continue
     }
-    const option = resolveEchartsRenderItems(sanitized.option)
+    const option = applyChartAria(resolveEchartsRenderItems(sanitized.option))
     const renderer = echartsRendererFor(option)
     item.renderer = renderer
     try {
