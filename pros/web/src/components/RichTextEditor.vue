@@ -22,6 +22,7 @@ import {
   type FormNodeName,
 } from '../extensions/forms'
 import { toolbarIconMap, IconTableRows, IconTableCols } from './rteToolbarIcons'
+import { NARROW_LAYOUT_MEDIA_QUERY, resolveToolbarLayout } from '../utils/rteNarrowLayout'
 import { RTE_CODE_LANGUAGES } from '../extensions/codeHighlight'
 import 'highlight.js/styles/github.css'
 import {
@@ -4928,10 +4929,18 @@ onMounted(() => {
     editor.value?.commands.captureRevisionBaseline()
   })
   document.addEventListener('pointerdown', onDocPointerDownOutlineMenu, true)
+  // 窄屏判定：工具栏在窄视口自动切紧凑态（主栏 +「更多」），避免横向撑破视口。
+  if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+    narrowMediaQuery = window.matchMedia(NARROW_LAYOUT_MEDIA_QUERY)
+    narrowViewport.value = narrowMediaQuery.matches
+    narrowMediaQuery.addEventListener('change', onNarrowMediaChange)
+  }
 })
 
 onBeforeUnmount(() => {
   document.removeEventListener('pointerdown', onDocPointerDownOutlineMenu, true)
+  narrowMediaQuery?.removeEventListener('change', onNarrowMediaChange)
+  narrowMediaQuery = null
 })
 
 watch(spellcheckEnabled, () => syncSpellcheckToDom())
@@ -5419,6 +5428,23 @@ moreOpen.value = false
  * - 图表 9 个一级分类不进主栏，统一收在「更多」里，窄屏也能找到入口。
  */
 const PRIMARY_KEYS = COMPACT_PRIMARY_KEY_SET
+
+/**
+ * 窄屏（≤900px）时工具栏自动切紧凑态：
+ * 最大化工具栏 11 个分组在窄视口会横向撑破视口（整页出现横向滚动条），
+ * 窄屏改用飞书式主栏 +「更多」，其余工具收进「更多」下拉。
+ * 阈值与 CSS 断点见 utils/rteNarrowLayout.ts。
+ */
+const narrowViewport = ref(false)
+let narrowMediaQuery: MediaQueryList | null = null
+function onNarrowMediaChange(event: MediaQueryListEvent) {
+  narrowViewport.value = event.matches
+}
+
+/** 实际生效的工具栏形态：窄屏一律紧凑（compact），其余跟随 expanded。 */
+const effectiveExpanded = computed(
+  () => resolveToolbarLayout(props.expanded, narrowViewport.value) === 'expanded',
+)
 
 type ToolItem = {
   disabled?: () => boolean
@@ -6177,7 +6203,7 @@ const {
   onToolbarGroupKeydown,
 } = useToolbarGroups({
   panelId: () => props.panelId,
-  expanded: () => props.expanded,
+  expanded: () => effectiveExpanded.value,
   orderMap: () => current_data.value?.toolbarGroupOrderByPanelId,
   setPanelToolbarOrder: (panelId, order) => documentStore.setPanelToolbarOrder(panelId, order),
   buttonConfigMap: () => current_data.value?.toolbarGroupButtonsByPanelId,
@@ -6198,7 +6224,7 @@ toolbarUndoBridge.isNewer = toolbarUndoIsNewer
 
 /** 收起模式下「更多」下拉内容 */
 const moreTools = computed(() => {
-  if (props.expanded) return [] as ToolItem[]
+  if (effectiveExpanded.value) return [] as ToolItem[]
   return allTools.value.filter(
     (t) =>
       t.kind !== 'divider' &&
@@ -6209,7 +6235,7 @@ const moreTools = computed(() => {
 
 /** 「更多」按工具栏同一套分组展示，每组胶囊可单独排序。 */
 const moreGroups = computed(() => {
-  if (props.expanded) return []
+  if (effectiveExpanded.value) return []
   return buildToolbarGroups(moreTools.value, toolbarOrder.value, toolbarGroupButtonConfigs.value)
 })
 
@@ -6471,7 +6497,7 @@ provideRteBindings({
   emojiOpen,
   emojiTabId,
   estimateReadingMinutes,
-  get expanded() { return props.expanded },
+  get expanded() { return effectiveExpanded.value },
   exportAsDocx,
   exportAsHtml,
   exportAsMarkdown,
@@ -6919,7 +6945,7 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
     :style="pageSheetStyle"
     :class="{
       compact,
-      expanded,
+      expanded: effectiveExpanded,
       'has-title': showTitle,
       'has-form-inspector': showFormInspector,
       'mode-edit': viewMode === 'edit',

@@ -3425,3 +3425,60 @@
   }
 }
 
+/*
+ * ============ 窄屏（≤900px，覆盖 375 / 768 视口）============
+ * 目标：页面不出现整页横向滚动条（documentElement.scrollWidth <= innerWidth）。
+ * 1) 工具栏改为换行，不再用「nowrap + 横向滚动」——工具栏自身的横向滚动容器
+ *    会把整页撑出横向滚动条；
+ * 2) 分组内按钮允许换行，单个分组宽度不超过视口；
+ * 3) 表格 / 图表 / 代码块等宽内容走各自的横向滚动容器或自适应，
+ *    长链接 / 长单词允许断行。
+ * 断点阈值与 utils/rteNarrowLayout.ts 的 NARROW_LAYOUT_MAX_WIDTH 保持一致。
+ */
+@media (max-width: 900px) {
+  .rte-root .rte-toolbar,
+  .rte-root.expanded .rte-toolbar,
+  .rte-root:not(.expanded) .rte-toolbar {
+    flex-wrap: wrap;
+    max-width: 100%;
+  }
+  .rte-root .rte-toolbar-tools,
+  .rte-root.expanded .rte-toolbar-tools,
+  .rte-root:not(.expanded) .rte-toolbar-tools,
+  .rte-root.compact .rte-toolbar-tools {
+    flex-wrap: wrap;
+    overflow-x: visible;
+    overflow-y: visible;
+    max-width: 100%;
+    min-width: 0;
+  }
+  .rte-root .rte-tool-group {
+    flex-wrap: wrap;
+    max-width: 100%;
+    min-width: 0;
+    row-gap: 2px;
+  }
+  .rte-root .rte-tool-group .rte-tool-wrap {
+    max-width: 100%;
+  }
+  .rte-root .rte-group-label {
+    max-width: 88px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  /* 宽内容：自带横向滚动容器，不撑破正文区 */
+  .rte-root :deep(.tableWrapper),
+  .rte-root :deep(.rte-echarts-preview),
+  .rte-root :deep(.rte-mermaid-preview),
+  .rte-root :deep(.ProseMirror pre) {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+  /* 长链接 / 长单词断行 */
+  .rte-root :deep(.ProseMirror a),
+  .rte-root :deep(.tiptap a) {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+}
+
