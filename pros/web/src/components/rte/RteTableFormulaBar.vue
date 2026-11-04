@@ -15,6 +15,11 @@ import {
   tableGrid,
 } from '../../utils/rteTableFormulaOps'
 import { evaluateFormula, isFormulaCell } from '../../utils/rteTableFormula'
+import {
+  BAR_FALLBACK_HEIGHT,
+  placeFormulaBar,
+  resolveTableElement,
+} from '../../utils/rteFormulaBarPosition'
 
 const props = defineProps<{ editor?: Editor; readonly?: boolean }>()
 
@@ -123,7 +128,10 @@ function onEscape() {
   draft.value = source.value
 }
 
-/** 公式栏浮在表格上方；拿不到位置时退化为画布左上角。 */
+/** 公式栏根元素，用来量真实宽高。 */
+const barEl = ref<HTMLElement | null>(null)
+
+/** 公式栏浮在表格上方（或下方）；拿不到位置时退化为画布左上角。 */
 const barStyle = computed(() => {
   version.value
   const ed = rawEditor.value
@@ -131,24 +139,56 @@ const barStyle = computed(() => {
   if (!ed || !loc) return {}
   const canvas = ed.view.dom.closest?.('.rte-canvas') as HTMLElement | null
   if (!canvas) return {}
-  const table = ed.view.domAtPos(loc.tablePos).node
-  const tableEl = (table instanceof HTMLElement ? table : table?.parentElement)?.closest?.('table') as HTMLElement | null
+  const tableEl = resolveTableElement(ed, loc.tablePos)
   if (!tableEl) return {}
   const canvasRect = canvas.getBoundingClientRect()
   const tableRect = tableEl.getBoundingClientRect()
   if (!tableRect.width && !tableRect.height) return { top: '0px', left: '0px' }
-  const top = tableRect.top - canvasRect.top + canvas.scrollTop - 30
-  const left = tableRect.left - canvasRect.left + canvas.scrollLeft
-  return {
-    top: `${Math.max(0, Math.round(top))}px`,
-    left: `${Math.max(0, Math.round(left))}px`,
+  const toolbar = canvas.closest('.rte-root')?.querySelector('.rte-toolbar') as HTMLElement | null
+  const toolbarBottom = toolbar ? toolbar.getBoundingClientRect().bottom : 0
+  const safeTop = Math.max(0, toolbarBottom)
+  const bar = {
+    width: barEl.value?.offsetWidth || 0,
+    height: barEl.value?.offsetHeight || BAR_FALLBACK_HEIGHT,
   }
+  const pos = placeFormulaBar(
+    tableRect,
+    bar,
+    { width: window.innerWidth, height: window.innerHeight },
+    safeTop,
+  )
+  const top = pos.top - canvasRect.top - canvas.clientTop + canvas.scrollTop
+  const left = pos.left - canvasRect.left - canvas.clientLeft + canvas.scrollLeft
+  return {
+    top: `${Math.round(top)}px`,
+    left: `${Math.round(left)}px`,
+  }
+})
+
+/** 滚动 / 缩放时跟随表格。 */
+function onViewportChange() {
+  if (active.value) bump()
+}
+if (typeof window !== 'undefined') {
+  window.addEventListener('scroll', onViewportChange, true)
+  window.addEventListener('resize', onViewportChange)
+}
+onBeforeUnmount(() => {
+  if (typeof window === 'undefined') return
+  window.removeEventListener('scroll', onViewportChange, true)
+  window.removeEventListener('resize', onViewportChange)
+})
+
+/** 首次出现时量到真实尺寸后再算一次。 */
+watch(barEl, (el) => {
+  if (el) bump()
 })
 </script>
 
 <template>
   <div
     v-if="visible"
+    ref="barEl"
     class="rte-formula-bar"
     :style="barStyle"
     role="group"
