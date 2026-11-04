@@ -1,4 +1,4 @@
-/** 页边距。宽度 100% 和飞书样式缺省几乎无边距；纸张缺省为 Word 常规。 */
+/** 页边距。宽度 100% 和飞书样式缺省几乎无边距；纸张缺省为窄（四边 12.7mm）。 */
 
 export const PAGE_MARGIN_PRESET_IDS = ['none', 'narrow', 'moderate', 'normal', 'wide', 'custom'] as const
 
@@ -63,9 +63,9 @@ export function normalizePageMargin(raw: unknown): PageMargin | null {
   }
 }
 
-/** 没有保存过时：铺满和飞书样式无边距，纸张用常规。 */
+/** 没有保存过时：铺满和飞书样式无边距，纸张用窄（四边 12.7mm）。 */
 export function defaultPageMargin(pageIsPaper: boolean): PageMargin {
-  return pageIsPaper ? { preset: 'normal', ...marginBox('normal') } : { preset: 'none', ...marginBox('none') }
+  return pageIsPaper ? { preset: 'narrow', ...marginBox('narrow') } : { preset: 'none', ...marginBox('none') }
 }
 
 export function marginsEqual(a: PageMargin, b: PageMargin): boolean {

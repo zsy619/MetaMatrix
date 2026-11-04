@@ -1,6 +1,7 @@
 import { computed, ref, watch } from 'vue'
 import {
   cssPageSize,
+  DEFAULT_PAGE_SIZE,
   normalizePageSize,
   pageSizeOption,
   readPageSize,
@@ -33,7 +34,7 @@ export function useRtePageLayout(deps: {
   toolbarUndoIsNewer: (marginStamp: number) => boolean
   chrome?: () => PanelPageChrome
 }) {
-  const localPageSize = ref<RtePageSizeId>('full')
+  const localPageSize = ref<RtePageSizeId>(DEFAULT_PAGE_SIZE)
   const localPageMargin = ref<PageMargin | null>(null)
   const pageMarginUndo = ref<PageMargin[]>([])
   let pageMarginUndoArmed = false
