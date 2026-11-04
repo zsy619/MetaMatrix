@@ -8,6 +8,7 @@
     "build": "vue-tsc -b && vite build",
     "type-check": "vue-tsc -b --pretty false",
     "test": "vitest run",
+    "test:baseline": "bash scripts/baseline.sh",
     "test:e2e": "node scripts/rte-baseline.mjs",
     "test:e2e:echarts": "node scripts/rte-echarts-e2e.mjs",
     "test:e2e:echarts:render": "node scripts/rte-echarts-render-e2e.mjs",
