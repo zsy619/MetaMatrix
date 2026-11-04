@@ -1,13 +1,14 @@
 import { ref, type ShallowRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { Editor } from '@tiptap/core'
-import { getAIContext, searchDocuments } from '../../../api/documents'
+import { fetchDocumentTextSnapshot, searchDocuments } from '../../../api/documents'
 import {
   crossDocJumpHref,
   normalizeCrossDocHits,
   syncBlockSummary,
   type CrossDocHit,
 } from '../../../utils/rteCrossDoc'
+import { formatSyncTime } from '../../../utils/rteSyncBlock'
 
 /**
  * 跨文档：搜索跳转 + 同步块。
@@ -77,12 +78,11 @@ export function useCrossDoc(deps: {
   }
 
   /** 取来源文档的面板正文快照。 */
-  async function fetchSyncSnapshot(documentId: string): Promise<{ text: string; panelId?: string }> {
-    const ctx = await getAIContext(documentId)
-    const panels = Array.isArray(ctx?.panels) ? ctx.panels : []
-    const first = panels.find((p) => p && p.text && p.text.trim())
-    if (!first) return { text: '' }
-    return { text: first.text.slice(0, 4000), panelId: first.panelId }
+  async function fetchSyncSnapshot(
+    documentId: string,
+    panelId?: string,
+  ): Promise<{ text: string; panelId?: string }> {
+    return fetchDocumentTextSnapshot(documentId, panelId)
   }
 
   /** 插入一个同步块：存来源与快照。 */
@@ -91,8 +91,8 @@ export function useCrossDoc(deps: {
     if (!ed) return
     crossDocSyncing.value = true
     try {
-      const snapshot = await fetchSyncSnapshot(hit.documentId)
-      const syncedAt = new Date().toISOString().slice(0, 16).replace('T', ' ')
+      const snapshot = await fetchSyncSnapshot(hit.documentId, hit.panelId)
+      const syncedAt = formatSyncTime()
       ed.chain()
         .focus()
         .insertContent({
@@ -103,6 +103,8 @@ export function useCrossDoc(deps: {
             panelId: hit.panelId || snapshot.panelId || '',
             text: snapshot.text || hit.snippet || '',
             syncedAt,
+            status: 'synced',
+            errorMessage: '',
           },
         })
         .run()

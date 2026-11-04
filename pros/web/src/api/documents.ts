@@ -388,6 +388,24 @@ export function getAIContext(id: string) {
   return apiRequest<AIContext>(`/documents/${id}/ai-context`)
 }
 
+/**
+ * 抓取来源文档的正文快照，供跨文档同步块刷新使用。
+ * 指定面板时取该面板，否则取第一个有正文的面板。
+ */
+export async function fetchDocumentTextSnapshot(
+  id: string,
+  panelId?: string,
+): Promise<{ text: string; panelId?: string }> {
+  const ctx = await getAIContext(id)
+  const panels = Array.isArray(ctx?.panels) ? ctx.panels : []
+  const wanted = (panelId || '').trim()
+  const picked = wanted
+    ? panels.find((p) => p && p.panelId === wanted && p.text && p.text.trim())
+    : panels.find((p) => p && p.text && p.text.trim())
+  if (!picked) return { text: '' }
+  return { text: picked.text.slice(0, 4000), panelId: picked.panelId }
+}
+
 export function getAICorpus(params?: {
   templateId?: string
   q?: string
