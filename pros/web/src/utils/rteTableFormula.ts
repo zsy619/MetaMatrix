@@ -349,11 +349,6 @@ function isError(v: EvalValue): v is EvalError {
   return typeof v === 'object'
 }
 
-function toNumber(v: EvalValue): number | EvalError {
-  if (isError(v)) return v
-  return v
-}
-
 /** 节点对应的单元格集合（用于聚合函数）。 */
 function cellsOf(node: Node, at: CellAddress): CellAddress[] | null {
   if (node.k === 'ref') return [node.addr]

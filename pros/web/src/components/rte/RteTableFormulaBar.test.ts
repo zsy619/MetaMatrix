@@ -55,7 +55,7 @@ function focusCell(row: number, col: number) {
     if (cellPos >= 0) return
     const rowPos = tablePos + 1 + rowOffset
     let colIndex = 0
-    rowNode.forEach((cellNode, cellOffset) => {
+    rowNode.forEach((_cellNode, cellOffset) => {
       if (cellPos >= 0) return
       if (rowIndex === row && colIndex === col) cellPos = rowPos + 1 + cellOffset
       colIndex += 1

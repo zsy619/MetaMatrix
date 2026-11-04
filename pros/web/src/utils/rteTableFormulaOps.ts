@@ -33,7 +33,7 @@ export type TableCellLocation = {
 
 const CELL_TYPES = new Set(['tableCell', 'tableHeader'])
 
-function isCellNode(node: PmNode | undefined | null): boolean {
+function isCellNode(node: PmNode | undefined | null): node is PmNode {
   return !!node && CELL_TYPES.has(node.type.name)
 }
 
