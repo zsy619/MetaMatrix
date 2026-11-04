@@ -8,6 +8,8 @@
   按官方类别分区，39 类全部覆盖（原先「不做」的 13 类清零）。
 - 模板目录：`pros/web/src/utils/echarts/templates/*.ts`（一个类别一个文件）。
 - 净化器白名单：`pros/web/src/utils/rteEchartsOption.ts`（series 类型 / 组件 / label.rich）。
+- 追加（无障碍）：净化器保留 **aria 白名单**，图表 DOM 生成 `role="img"` + `aria-label` 数据摘要
+  与视觉隐藏数据表，见 §5.1。
 
 ## 对照表
 
@@ -103,8 +105,31 @@ MarkArea/MarkLine/MarkPoint/Matrix/Parallel/Polar/SingleAxis/Toolbox/Transform/V
 - 放行：39 类用到的 series 类型、组件（含 `dataset` / `dataZoom` / `visualMap` / `polar` /
   `singleAxis` / `calendar` / `parallel` / `graphic` / `geo` / `matrix` / `toolbox` /
   `markLine` / `markPoint` / `markArea` / `grid3D` / `geo3D` / `globe` / `xAxis3D`…）以及 `label.rich`。
-- 仍然丢弃：未登记的顶层 / series 字段、`brush`、`aria`、非白名单的 `renderItem`。
+- 仍然丢弃：未登记的顶层 / series 字段、`brush`、非白名单的 `renderItem`。
+- `aria` **不再整体丢弃**（无障碍要求），但只放行白名单字段，见下一节。
 - **上限不变**：单图 option 64KB、数据点 5000、每文档 20 个图表；超限一律报错，不静默截断。
+
+### 5.1 无障碍（aria 白名单 + 数据摘要）
+
+- **净化器保留 aria 白名单**（`src/utils/rteEchartsOption.ts`）：
+  - `aria.enabled`：是否开启 ECharts 内置播报；
+  - `aria.label.enabled` / `aria.label.description`：是否播报 / 自定义描述（只接受纯文本）；
+  - `aria.decal.show`：是否给数据图形加纹理（色觉障碍友好）。
+  - 其余 aria 字段（含 `aria.label.innerHTML`、`aria.domProps` 等）**一律丢弃**，
+    series 里也不允许出现 `aria`。
+- **数据摘要**（`src/utils/echarts/chartA11y.ts`）：把 option 里的数据变成可读文本，
+  覆盖折线 / 柱 / 饼（其余类型退化成「系列名 + 数值」）：
+  - 文本含图表类型、标题、系列名、类目、数值；
+  - 长数据截断（单系列最多 8 项、表格最多 50 行），并在文本里写明「共 N 项，已省略 M 项」；
+  - 摘要文本长度上限 600 字（超长时提示「全文见图表数据表」）。
+- **DOM 输出**（`src/utils/echarts/chartA11yDom.ts` + `src/extensions/echartsBlock.ts`）：
+  - 图表容器 `.rte-echarts-preview` 上写 `role="img"` + `aria-label="<摘要>"`；
+  - 同级的视觉隐藏节点 `.rte-chart-a11y`（`rte-sr-only`）里放摘要段落 + 一张
+    `<table>` 数据表（`<caption>` / `<thead>` / `<tbody>`）；
+  - 隐藏表刻意**不放在 `role="img"` 元素内部**：`role="img"` 的后代会被读屏当成纯装饰，
+    数据表必须作为兄弟节点才能被逐行朗读；
+  - 隐藏样式见 `src/components/rte/styles/editor.global.css` 的 `.rte-chart-a11y`。
+
 
 ### 6. 体积（vite build 实测，gzip）
 
@@ -135,12 +160,16 @@ MarkArea/MarkLine/MarkPoint/Matrix/Parallel/Polar/SingleAxis/Toolbox/Transform/V
 |---|---|---|
 | 模板净化 + setOption | `npx vitest run src/utils/echarts/templates.test.ts`（jsdom + SVG） | ✅ 165 用例全过（81 模板 × 净化 + 渲染；GL 只做净化） |
 | 白名单 fixture | `npx vitest run src/utils/echarts/fixtures.test.ts` | ✅ 56 用例全过（33 种 series + 21 个组件） |
-| 全量单测 | `npx vitest run` | ✅ 43 个文件 / 316 用例全过 |
+| 全量单测 | `npx vitest run` | ✅ 56 个文件 / 397 用例全过 |
 | 类型检查 | `npx vue-tsc -b` | ✅ 无错误 |
 | 构建 | `npx vite build` | ✅ 通过（体积见上表） |
 | 39 类真实浏览器渲染（含 WebGL） | `node scripts/rte-echarts-render-e2e.mjs` | ✅ 81 个模板全部渲染成功（12 个 Canvas/GL 模板失败 0） |
 | 工具栏分组 + 逐类插入（组件级） | `npx vitest run src/components/rte/RteToolbarCharts.test.ts` | ✅ 4 用例全过（分组独立、下拉 39 类、3D/GL 分区、点子类型能插入图表块） |
-| 工具栏分组 + 逐类插入（浏览器级） | `node scripts/rte-echarts-e2e.mjs` | ⚠️ 未验证：需要 API + Postgres 起服务（本次环境未起后端） |
+| 工具栏分组 + 逐类插入（浏览器级） | `node scripts/rte-echarts-e2e.mjs` | ⚠️ 未验证：脚本里写死的 documentId（4d5f428c-…）在本机库里不存在，本次未改动该脚本 |
+| aria 白名单净化 | `npx vitest run src/utils/rteEchartsOption.test.ts` | ✅ 25 用例全过（含 aria 白名单保留 / 非白名单与危险字段丢弃） |
+| 图表数据摘要（折线/柱/饼 + 截断） | `npx vitest run src/utils/echarts/chartA11y.test.ts` | ✅ 7 用例全过（可读文本、类目/数值、截断说明、DOM 写入） |
+| 节点视图无障碍 DOM | `npx vitest run src/extensions/echartsBlock.a11y.test.ts` | ✅ 4 用例全过（`role="img"` + `aria-label`、隐藏数据表、导出 HTML 带摘要、option 变更后刷新） |
+| 浏览器级无障碍校验（临时脚本，未入库） | playwright + vite dev + 本机 API/Postgres | ✅ 11 项全过：真实插入折线图后 `.rte-echarts-preview[role="img"]` 带 aria-label（含系列/类目/数值），`.rte-chart-a11y table` 有表头与 6 行数据 |
 
 截图产出路径（`RTE_BASELINE_DIR`，默认 `/opt/cursor/artifacts`）：
 

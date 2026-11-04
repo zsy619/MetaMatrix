@@ -28,20 +28,87 @@ describe('ECharts option 净化', () => {
     expect(series[0].markPoint).toBeTruthy()
   })
 
-  it('剥离未登记的字段（含危险的 brush / aria）', () => {
+  it('剥离未登记的字段（含危险的 brush）', () => {
     const result = sanitizeEchartsOption({
       title: { text: '示例' },
       brush: { toolbox: [] },
-      aria: { enabled: true },
       totallyUnknown: { a: 1 },
       series: [{ type: 'bar', data: [1, 2] }],
     })
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(result.option.brush).toBeUndefined()
-    expect(result.option.aria).toBeUndefined()
     expect(result.option.totallyUnknown).toBeUndefined()
     expect(result.warnings.join('，')).toContain('totallyUnknown')
+  })
+
+  it('保留 aria 白名单字段（enabled / label / decal）', () => {
+    const result = sanitizeEchartsOption({
+      title: { text: '示例' },
+      aria: {
+        enabled: true,
+        label: { enabled: true, description: '示例图表的数据摘要' },
+        decal: { show: true },
+      },
+      series: [{ type: 'bar', data: [1, 2] }],
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    const aria = result.option.aria as Record<string, unknown>
+    expect(aria.enabled).toBe(true)
+    const label = aria.label as Record<string, unknown>
+    expect(label.enabled).toBe(true)
+    expect(label.description).toBe('示例图表的数据摘要')
+    const decal = aria.decal as Record<string, unknown>
+    expect(decal.show).toBe(true)
+  })
+
+  it('丢弃 aria 非白名单 / 危险字段', () => {
+    const result = sanitizeEchartsOption({
+      title: { text: '示例' },
+      aria: {
+        enabled: true,
+        evil: 'xss',
+        label: { enabled: true, unknown: 1, innerHTML: '<img onerror=1>' },
+        decal: { show: true, extra: 'x' },
+        domProps: { innerHTML: '<script>alert(1)</script>' },
+      },
+      series: [{ type: 'bar', data: [1, 2] }],
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    const aria = result.option.aria as Record<string, unknown>
+    expect(aria.evil).toBeUndefined()
+    expect(aria.domProps).toBeUndefined()
+    const label = aria.label as Record<string, unknown>
+    expect(label.unknown).toBeUndefined()
+    expect(label.innerHTML).toBeUndefined()
+    const decal = aria.decal as Record<string, unknown>
+    expect(decal.extra).toBeUndefined()
+    expect(result.warnings.join('，')).toContain('aria.evil')
+  })
+
+  it('aria 里的非布尔 enabled / 非字符串 description 会被丢弃', () => {
+    const result = sanitizeEchartsOption({
+      title: { text: '示例' },
+      aria: { enabled: 'yes', label: { description: { evil: 1 } } },
+      series: [{ type: 'bar', data: [1, 2] }],
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    // 非法值全被丢弃后，aria 整体不再保留
+    expect(result.option.aria).toBeUndefined()
+    expect(result.warnings.join('，')).toContain('aria.enabled')
+  })
+
+  it('series 里不允许出现 aria', () => {
+    const result = sanitizeEchartsOption({
+      series: [{ type: 'bar', data: [1, 2], aria: { enabled: true } }],
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    const series = result.option.series as Array<Record<string, unknown>>
+    expect(series[0].aria).toBeUndefined()
   })
 
   it('丢弃未登记的顶层字段', () => {

@@ -83,8 +83,14 @@ export const ECHARTS_MAX_DEPTH = 12
 /** 单个文档建议的图表数量上限。 */
 export const ECHARTS_MAX_PER_DOCUMENT = 20
 
-/** 一律丢弃的字段：交互出口与无障碍播报（不进白名单）。 */
-const BANNED_KEYS = new Set(['brush', 'aria'])
+/**
+ * 一律丢弃的字段：交互出口（不进白名单）。
+ *
+ * 注意：`aria` 不再整体丢弃——无障碍播报是产品要求，
+ * 但只放行白名单里的几个字段（见 ARIA_KEYS / ARIA_LABEL_KEYS / ARIA_DECAL_KEYS），
+ * 其余 aria 字段（以及 aria 之外的等价字段）仍然丢弃。
+ */
+const BANNED_KEYS = new Set(['brush'])
 
 const TOP_LEVEL_KEYS: readonly string[] = [
   'title',
@@ -128,7 +134,16 @@ const TOP_LEVEL_KEYS: readonly string[] = [
   'xAxis3D',
   'yAxis3D',
   'zAxis3D',
+  // —— 无障碍播报（只放行白名单字段，见 sanitizeAria）——
+  'aria',
 ]
+
+/** aria 顶层白名单。 */
+const ARIA_KEYS: readonly string[] = ['enabled']
+/** aria.label 白名单。 */
+const ARIA_LABEL_KEYS: readonly string[] = ['enabled', 'description']
+/** aria.decal 白名单。 */
+const ARIA_DECAL_KEYS: readonly string[] = ['show']
 
 const STYLE_KEYS: readonly string[] = [
   'color',
@@ -1189,6 +1204,77 @@ function sanitizeRenderItem(raw: unknown, state: SanitizeState): string | null {
   return raw
 }
 
+/**
+ * aria（无障碍播报）净化：只保留白名单字段。
+ *
+ * - aria.enabled：是否开启内置播报；
+ * - aria.label.enabled / aria.label.description：是否播报 / 自定义描述；
+ * - aria.decal.show：是否给数据图形加纹理（色觉障碍友好）。
+ *
+ * 其它 aria 字段一律丢弃（aria 是用户可控的 JSON，不能放行任意结构）。
+ */
+function sanitizeAria(raw: unknown, state: SanitizeState): Record<string, unknown> {
+  if (!isPlainObject(raw)) return {}
+  const out: Record<string, unknown> = {}
+  for (const key of Object.keys(raw)) {
+    if (ARIA_KEYS.includes(key)) {
+      if (typeof raw[key] === 'boolean') out[key] = raw[key]
+      else warn(state, `已移除不支持的配置：aria.${key}`)
+      continue
+    }
+    if (key === 'label') {
+      const label = sanitizeAriaLabel(raw[key], state)
+      if (label) out.label = label
+      continue
+    }
+    if (key === 'decal') {
+      const decal = sanitizeAriaDecal(raw[key], state)
+      if (decal) out.decal = decal
+      continue
+    }
+    warn(state, `已移除不支持的配置：aria.${key}`)
+  }
+  return out
+}
+
+/** aria.label：enabled / description。 */
+function sanitizeAriaLabel(raw: unknown, state: SanitizeState): Record<string, unknown> | null {
+  if (!isPlainObject(raw)) return null
+  const out: Record<string, unknown> = {}
+  for (const key of Object.keys(raw)) {
+    if (!ARIA_LABEL_KEYS.includes(key)) {
+      warn(state, `已移除不支持的配置：aria.label.${key}`)
+      continue
+    }
+    if (key === 'enabled') {
+      if (typeof raw[key] === 'boolean') out[key] = raw[key]
+      continue
+    }
+    // description 只接受纯文本（对象 / 数组等一律丢弃，不做字符串化）
+    if (typeof raw[key] !== 'string') {
+      warn(state, `已移除不支持的配置：aria.label.${key}`)
+      continue
+    }
+    const text = sanitizeString(raw[key], state)
+    if (text) out[key] = text
+  }
+  return Object.keys(out).length ? out : null
+}
+
+/** aria.decal：show。 */
+function sanitizeAriaDecal(raw: unknown, state: SanitizeState): Record<string, unknown> | null {
+  if (!isPlainObject(raw)) return null
+  const out: Record<string, unknown> = {}
+  for (const key of Object.keys(raw)) {
+    if (!ARIA_DECAL_KEYS.includes(key)) {
+      warn(state, `已移除不支持的配置：aria.decal.${key}`)
+      continue
+    }
+    if (typeof raw[key] === 'boolean') out[key] = raw[key]
+  }
+  return Object.keys(out).length ? out : null
+}
+
 function sanitizeNode(
   value: unknown,
   allowed: readonly string[] | null,
@@ -1231,6 +1317,11 @@ function sanitizeNode(
     }
     if (key === 'series') {
       out[key] = sanitizeSeriesList(value[key], state)
+      continue
+    }
+    if (key === 'aria') {
+      const aria = sanitizeAria(value[key], state)
+      if (Object.keys(aria).length) out[key] = aria
       continue
     }
     if (key === 'renderItem') {
