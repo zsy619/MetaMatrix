@@ -690,6 +690,11 @@ onMounted(async () => {
   border-color: #e87722;
 }
 
+.card--context-six-elements:hover,
+.card--context-six-elements:focus-visible {
+  border-color: #2a9bd6;
+}
+
 .body {
   display: flex;
   flex-direction: column;

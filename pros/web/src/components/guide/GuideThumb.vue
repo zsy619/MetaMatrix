@@ -1424,6 +1424,34 @@ withDefaults(
         <text x="178" y="130" text-anchor="middle" font-size="7" font-weight="800" fill="#202124">权力</text>
       </svg>
 
+
+      <!-- 上下文六要素：一页富文本，六段「标题 + 占位行」 -->
+      <svg
+        v-else-if="templateId === 'context-six-elements'"
+        class="thumb-svg"
+        viewBox="0 0 200 140"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <rect x="58" y="6" width="84" height="128" rx="6" fill="#ffffff" stroke="#d9dde3" stroke-width="1.2" />
+        <rect x="66" y="14" width="42" height="6" rx="3" fill="#202124" />
+        <rect x="66" y="24" width="62" height="3" rx="1.5" fill="#d7dbe0" />
+        <g>
+          <rect x="66" y="34" width="26" height="4.5" rx="2.2" fill="#2a9bd6" />
+          <rect x="66" y="42" width="58" height="3" rx="1.5" fill="#d7dbe0" />
+          <rect x="66" y="52" width="26" height="4.5" rx="2.2" fill="#2a9bd6" />
+          <rect x="66" y="60" width="52" height="3" rx="1.5" fill="#d7dbe0" />
+          <rect x="66" y="70" width="26" height="4.5" rx="2.2" fill="#2a9bd6" />
+          <rect x="66" y="78" width="60" height="3" rx="1.5" fill="#d7dbe0" />
+          <rect x="66" y="88" width="26" height="4.5" rx="2.2" fill="#2a9bd6" />
+          <rect x="66" y="96" width="50" height="3" rx="1.5" fill="#d7dbe0" />
+          <rect x="66" y="106" width="26" height="4.5" rx="2.2" fill="#2a9bd6" />
+          <rect x="66" y="114" width="56" height="3" rx="1.5" fill="#d7dbe0" />
+          <rect x="66" y="124" width="26" height="4.5" rx="2.2" fill="#2a9bd6" />
+          <rect x="66" y="132" width="46" height="3" rx="1.5" fill="#d7dbe0" />
+        </g>
+      </svg>
+
   </div>
 </template>
 

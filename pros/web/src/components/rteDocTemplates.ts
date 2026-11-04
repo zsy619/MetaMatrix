@@ -3,6 +3,7 @@
  * content 为函数，每次插入时重新生成表单 name，避免字段冲突。
  */
 import { RTE_FORM_DOC_TEMPLATES, RTE_FORM_TEMPLATE_GROUPS } from './rteFormDocTemplates'
+import { CONTEXT_SIX_ELEMENTS_SECTIONS } from '../utils/contextSixElements'
 
 export type RteDocTemplateGroup =
   | 'office'
@@ -765,6 +766,19 @@ function studyPlan(): RteJsonNode[] {
 }
 
 
+/**
+ * 上下文六要素：六段（二级标题 + 占位文字）。
+ * 与画布模板「上下文六要素」共用同一份规格（src/utils/contextSixElements.ts）。
+ */
+function contextSixElements(): RteJsonNode[] {
+  const nodes: RteJsonNode[] = []
+  for (const section of CONTEXT_SIX_ELEMENTS_SECTIONS) {
+    nodes.push(h(2, section.title))
+    nodes.push(p(section.placeholder))
+  }
+  return nodes
+}
+
 export const RTE_DOC_TEMPLATE_GROUPS: Array<{
   id: RteDocTemplateGroup
   label: string
@@ -829,6 +843,7 @@ export const RTE_DOC_TEMPLATES: RteDocTemplate[] = [
   { id: 'meeting-scratch', label: '会议速记', description: '速记、待办与待确认', group: 'notes', build: wrapBuild(meetingScratch) },
   { id: 'idea-memo', label: '灵感备忘', description: '灵感、验证与下一步', group: 'notes', build: wrapBuild(ideaMemo) },
   { id: 'study-plan', label: '学习计划', description: '目标、资源与周计划', group: 'notes', build: wrapBuild(studyPlan) },
+  { id: 'context-six-elements', label: '上下文六要素', description: '目标 / 角色 / 信息 / 规则 / 交付', group: 'notes', build: wrapBuild(contextSixElements) },
 
   // —— 常用表单（分类见 RTE_FORM_TEMPLATE_GROUPS）——
   ...RTE_FORM_DOC_TEMPLATES,

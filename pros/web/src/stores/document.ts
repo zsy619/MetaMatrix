@@ -94,6 +94,7 @@ import type {
   ThreeRingBasicsRegionId,
   LeadershipTriangleDocumentJSON,
   LeadershipTriangleRegionId,
+  ContextSixElementsDocumentJSON,
   PanelAttachment,
   AttachmentsByPanelId,
 } from '../types/canvas'
@@ -135,6 +136,7 @@ import {
   isGrowthAssumptionsDoc,
   isThreeRingBasicsDoc,
   isLeadershipTriangleDoc,
+  isContextSixElementsDoc,
   coerceYModelDoc,
   normalizeYModelDoc,
 } from '../types/canvas'
@@ -181,6 +183,10 @@ import growthAssumptionsTemplate from '../templates/growth-assumptions-v1.json'
 import businessFormulaTemplate from '../templates/business-formula-v1.json'
 import threeRingBasicsTemplate from '../templates/three-ring-basics-v1.json'
 import leadershipTriangleTemplate from '../templates/leadership-triangle-v1.json'
+import contextSixElementsTemplate, {
+  buildContextSixElementsItems,
+} from '../templates/context-six-elements-v1'
+import { CONTEXT_SIX_ELEMENTS_BLOCK_ID } from '../utils/contextSixElements'
 
 export type TemplateId =
   | 'dual-triangle'
@@ -226,6 +232,7 @@ export type TemplateId =
   | 'business-formula'
   | 'three-ring-basics'
   | 'leadership-triangle'
+  | 'context-six-elements'
 
 const TEMPLATES: Record<TemplateId, CanvasDocumentJSON> = {
   'dual-triangle': dualTriangleTemplate as DualTriangleDocumentJSON,
@@ -275,6 +282,8 @@ const TEMPLATES: Record<TemplateId, CanvasDocumentJSON> = {
     threeRingBasicsTemplate as ThreeRingBasicsDocumentJSON,
   'leadership-triangle':
     leadershipTriangleTemplate as LeadershipTriangleDocumentJSON,
+  'context-six-elements':
+    contextSixElementsTemplate as ContextSixElementsDocumentJSON,
 }
 
 export function isTemplateId(id: string): id is TemplateId {
@@ -667,6 +676,13 @@ export const TEMPLATE_META: Record<
     description:
       'A⇄B 心甘情愿 → 领导力 / 高水平影响力 → 5 层金字塔难题，右侧挑战现状与稳定运营，左下管理、右下权力。',
     category: 'org',
+  },
+  'context-six-elements': {
+    name: '上下文六要素',
+    badge: '上下文 · 六要素',
+    description:
+      '富文本画布：任务目标 / AI的角色 / 我的角色 / 关键信息 / 行为规则 / 交付格式，六段开箱即用，随写随存。',
+    category: 'method',
   },
 }
 
@@ -3207,6 +3223,40 @@ export const useDocumentStore = defineStore('document', () => {
     return false
   }
 
+  /* ---- 上下文六要素 ---- */
+  function asContextSixElements(): ContextSixElementsDocumentJSON | null {
+    return isContextSixElementsDoc(current_data.value)
+      ? current_data.value
+      : null
+  }
+
+  /** 确保上下文六要素画布有一块富文本正文（缺块则按六段规格补齐） */
+  function ensureContextSixElementsBlocks(): boolean {
+    const d = asContextSixElements()
+    if (!d) return false
+    if (!Array.isArray(d.blocks)) {
+      d.blocks = []
+    }
+    const existing = d.blocks.find((b) => b.id === CONTEXT_SIX_ELEMENTS_BLOCK_ID)
+    if (existing) {
+      if (!Array.isArray(existing.items)) {
+        existing.items = []
+        markDirty()
+        return true
+      }
+      return false
+    }
+    d.blocks = [
+      {
+        id: CONTEXT_SIX_ELEMENTS_BLOCK_ID,
+        title: '上下文六要素',
+        items: buildContextSixElementsItems(),
+      },
+    ]
+    markDirty()
+    return true
+  }
+
   /* ---- 领导核心价值驱动三角 ---- */
   const LT_BLOCK_ORDER: LeadershipTriangleRegionId[] = [
     'top_exchange',
@@ -3712,6 +3762,7 @@ export const useDocumentStore = defineStore('document', () => {
     ensureDeliberatePracticeBlocks,
     ensureThreeRingBasicsBlocks,
     ensureLeadershipTriangleBlocks,
+    ensureContextSixElementsBlocks,
     ensureFiveStepProBlocks,
     ensureFiveStepChallengeBlocks,
     updateKeyResistanceRateLabel,

@@ -1688,6 +1688,26 @@ export interface LeadershipTriangleDocumentJSON {
   blocks: LeadershipTriangleBlock[]
 }
 
+/* ------------------------------------------------------------------ *
+ * 上下文六要素（富文本编辑器画布）
+ * ------------------------------------------------------------------ */
+
+/** 唯一一块富文本正文：六段（二级标题 + 占位文字）都在这里 */
+export interface ContextSixElementsBlock {
+  id: string
+  title: string
+  items: QuadrantItem[]
+}
+
+export interface ContextSixElementsDocumentJSON {
+  id: string
+  type: 'context_six_elements'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  blocks: ContextSixElementsBlock[]
+}
+
 /** 科学决策三角形（宽度 / 高度 / 深度） */
 export type DecisionTriangleBlockId = 'width' | 'height' | 'depth'
 
@@ -1750,6 +1770,7 @@ export type CanvasDocumentJSON = (
   | BusinessFormulaDocumentJSON
   | ThreeRingBasicsDocumentJSON
   | LeadershipTriangleDocumentJSON
+  | ContextSixElementsDocumentJSON
 ) & WithPanelAttachments
 
 /** 带 blocks 的画布（双三角 / Y 模型 / 刻意练习） */
@@ -1789,6 +1810,7 @@ export type BlockCanvasDocumentJSON =
   | PmSolutionTriangleDocumentJSON
   | ThreeRingBasicsDocumentJSON
   | LeadershipTriangleDocumentJSON
+  | ContextSixElementsDocumentJSON
 
 export function isDualTriangleDoc(
   doc: CanvasDocumentJSON | null | undefined,
@@ -2277,6 +2299,13 @@ export function isLeadershipTriangleDoc(
   return !!doc && doc.type === 'leadership_triangle'
 }
 
+/** 上下文六要素（富文本编辑器画布） */
+export function isContextSixElementsDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is ContextSixElementsDocumentJSON {
+  return !!doc && doc.type === 'context_six_elements'
+}
+
 
 export function isBlockCanvasDoc(
   doc: CanvasDocumentJSON | null | undefined,
@@ -2316,7 +2345,8 @@ export function isBlockCanvasDoc(
     isProductFeatures5dDoc(doc) ||
     isPmSolutionTriangleDoc(doc) ||
     isThreeRingBasicsDoc(doc) ||
-    isLeadershipTriangleDoc(doc)
+    isLeadershipTriangleDoc(doc) ||
+    isContextSixElementsDoc(doc)
   )
 }
 
