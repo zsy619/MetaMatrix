@@ -1,6 +1,10 @@
 /**
  * 富文本基线：登录后在四类画布里打开编辑器，并在 Y 模型最大化里走一遍主路径。
  * CHROME_PATH 默认 /usr/bin/google-chrome。
+ *
+ * 前置：API 与前端已启动，且库里有一份 Y 模型样例文档（默认 id
+ * 4d5f428c-a6e7-45a7-b29e-304120fccbb5，用 scripts/seed-e2e-fixtures.mjs 播）。
+ * RTE_DOCUMENT_ID 可以换文档 id，RTE_WEB_URL 可以换前端地址。
  */
 import pw from 'playwright-core'
 import { mkdirSync } from 'node:fs'
@@ -10,6 +14,7 @@ const chrome = process.env.CHROME_PATH || '/usr/bin/google-chrome'
 const out = process.env.RTE_BASELINE_DIR || '/opt/cursor/artifacts'
 /** 前端地址：默认 5173，可用 RTE_WEB_URL 指到别的端口（避免和别的 worktree 抢端口）。 */
 const web = process.env.RTE_WEB_URL || 'http://127.0.0.1:5173'
+const documentId = process.env.RTE_DOCUMENT_ID || '4d5f428c-a6e7-45a7-b29e-304120fccbb5'
 mkdirSync(out, { recursive: true })
 
 const browser = await chromium.launch({
@@ -114,7 +119,7 @@ async function openTemplate(path, shot) {
 await openTemplate('/canvas/dual-triangle', 'baseline_dual_triangle')
 await openTemplate('/canvas/star-quadrant', 'baseline_star_quadrant')
 await openTemplate('/canvas/five-step-basic', 'baseline_five_step')
-await page.goto(`${web}/canvas/y-model?documentId=4d5f428c-a6e7-45a7-b29e-304120fccbb5`, {
+await page.goto(`${web}/canvas/y-model?documentId=${documentId}`, {
   waitUntil: 'domcontentloaded',
 })
 await page.waitForTimeout(1500)

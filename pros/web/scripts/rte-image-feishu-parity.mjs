@@ -25,18 +25,20 @@ const context = await browser.newContext({
   acceptDownloads: true,
 })
 const page = await context.newPage()
+const documentId = process.env.RTE_DOCUMENT_ID || '4d5f428c-a6e7-45a7-b29e-304120fccbb5'
+const web = process.env.RTE_WEB_URL || 'http://127.0.0.1:5173'
 const notes = []
 const log = (step, ok, detail) => {
   notes.push({ step, ok, detail: detail ?? '' })
   console.log(`${ok ? 'PASS' : 'FAIL'} [${kind}] ${step}`, detail ?? '')
 }
 
-await page.goto('http://127.0.0.1:5173/login', { waitUntil: 'domcontentloaded' })
+await page.goto(`${web}/login`, { waitUntil: 'domcontentloaded' })
 await page.fill('#login-email', 'demo@metamatrix.local')
 await page.fill('#login-password', 'demo123456')
 await page.click('button[type="submit"]')
 await page.waitForTimeout(800)
-await page.goto('http://127.0.0.1:5173/canvas/y-model?documentId=4d5f428c-a6e7-45a7-b29e-304120fccbb5', {
+await page.goto(`${web}/canvas/y-model?documentId=${documentId}`, {
   waitUntil: 'domcontentloaded',
 })
 await page.waitForTimeout(1500)
