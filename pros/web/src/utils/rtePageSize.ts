@@ -1,4 +1,4 @@
-/** 富文本面板的页面大小。缺省与无法识别的值都是宽度 100%。 */
+/** 富文本面板的页面大小。缺省与无法识别的值都是 A4（210×297mm）。 */
 
 export const RTE_PAGE_SIZE_IDS = [
   'full',
@@ -12,6 +12,9 @@ export const RTE_PAGE_SIZE_IDS = [
 ] as const
 
 export type RtePageSizeId = (typeof RTE_PAGE_SIZE_IDS)[number]
+
+/** 没有单独保存过页面设置的画布富文本面板使用的缺省页面大小。 */
+export const DEFAULT_PAGE_SIZE: RtePageSizeId = 'a4'
 
 export type RtePageSizeOption = {
   id: RtePageSizeId
@@ -39,7 +42,7 @@ const BY_ID = new Map(RTE_PAGE_SIZES.map((item) => [item.id, item]))
 
 export function normalizePageSize(value: unknown): RtePageSizeId {
   if (typeof value === 'string' && BY_ID.has(value as RtePageSizeId)) return value as RtePageSizeId
-  return 'full'
+  return DEFAULT_PAGE_SIZE
 }
 
 export function pageSizeOption(id: RtePageSizeId): RtePageSizeOption {
@@ -50,11 +53,14 @@ export function readPageSize(
   map: Record<string, string> | null | undefined,
   panelId: string | null | undefined,
 ): RtePageSizeId {
-  if (!map || !panelId) return 'full'
+  if (!map || !panelId) return DEFAULT_PAGE_SIZE
   return normalizePageSize(map[panelId])
 }
 
-/** 选回宽度 100% 时删掉该面板的记录，让旧文档保持没有这个字段。 */
+/**
+ * 选回缺省尺寸（A4）时删掉该面板的记录，让旧文档保持没有这个字段；
+ * 显式选「宽度 100%」时必须写入 'full'，不能再靠删除字段表示。
+ */
 export function writePageSizeMap(
   map: Record<string, string> | null | undefined,
   panelId: string,
@@ -62,7 +68,7 @@ export function writePageSizeMap(
 ): Record<string, string> | undefined {
   const next = { ...(map || {}) }
   if (!panelId) return Object.keys(next).length ? next : undefined
-  if (size === 'full') delete next[panelId]
+  if (size === DEFAULT_PAGE_SIZE) delete next[panelId]
   else next[panelId] = size
   return Object.keys(next).length ? next : undefined
 }
