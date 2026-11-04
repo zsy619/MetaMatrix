@@ -1,0 +1,265 @@
+{
+  "id": "canvas_three_ring_basics",
+  "type": "three_ring_basics",
+  "schemaVersion": 1,
+  "theme": {
+    "background": {
+      "pattern": "none",
+      "color": "#fdfcfb"
+    },
+    "page": "#fdfcfb",
+    "frame": "#ececec",
+    "hairline": "rgba(60, 50, 20, 0.08)"
+  },
+  "regions": {
+    "ring_practical": {
+      "title": "足够务实",
+      "color": "#2A9BD6"
+    },
+    "ring_trainable": {
+      "title": "足够可练",
+      "color": "#EE4C9A"
+    },
+    "ring_value": {
+      "title": "足够价值",
+      "color": "#F2A50C"
+    },
+    "hex_concreteness": {
+      "title": "具体性",
+      "color": "#2b2b2b"
+    },
+    "hex_scenario": {
+      "title": "场景性",
+      "color": "#2b2b2b"
+    },
+    "hex_independence": {
+      "title": "独立性",
+      "color": "#2b2b2b"
+    },
+    "hex_verifiability": {
+      "title": "检验性",
+      "color": "#2b2b2b"
+    },
+    "hex_compounding": {
+      "title": "复利性",
+      "color": "#2b2b2b"
+    },
+    "hex_repeatability": {
+      "title": "重复性",
+      "color": "#2b2b2b"
+    },
+    "overlap_value_low": {
+      "title": "价值低",
+      "color": "#6b6b6b"
+    },
+    "overlap_not_trainable": {
+      "title": "不可练",
+      "color": "#6b6b6b"
+    },
+    "overlap_too_vague": {
+      "title": "太虚了",
+      "color": "#6b6b6b"
+    },
+    "core": {
+      "title": "关键基本功",
+      "color": "#2b2b2b"
+    }
+  },
+  "blocks": [
+    {
+      "id": "ring_practical",
+      "title": "足够务实",
+      "items": [
+        {
+          "id": "item_ring_practical_1",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 12,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ring_trainable",
+      "title": "足够可练",
+      "items": [
+        {
+          "id": "item_ring_trainable_1",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 12,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ring_value",
+      "title": "足够价值",
+      "items": [
+        {
+          "id": "item_ring_value_1",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 12,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "hex_concreteness",
+      "title": "具体性",
+      "items": [
+        {
+          "id": "item_hex_concreteness_1",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 12,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "hex_scenario",
+      "title": "场景性",
+      "items": [
+        {
+          "id": "item_hex_scenario_1",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 12,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "hex_independence",
+      "title": "独立性",
+      "items": [
+        {
+          "id": "item_hex_independence_1",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 12,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "hex_verifiability",
+      "title": "检验性",
+      "items": [
+        {
+          "id": "item_hex_verifiability_1",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 12,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "hex_compounding",
+      "title": "复利性",
+      "items": [
+        {
+          "id": "item_hex_compounding_1",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 12,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "hex_repeatability",
+      "title": "重复性",
+      "items": [
+        {
+          "id": "item_hex_repeatability_1",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 12,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "overlap_value_low",
+      "title": "价值低",
+      "items": [
+        {
+          "id": "item_overlap_value_low_1",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 12,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "overlap_not_trainable",
+      "title": "不可练",
+      "items": [
+        {
+          "id": "item_overlap_not_trainable_1",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 12,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "overlap_too_vague",
+      "title": "太虚了",
+      "items": [
+        {
+          "id": "item_overlap_too_vague_1",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 12,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    },
+    {
+      "id": "core",
+      "title": "关键基本功",
+      "items": [
+        {
+          "id": "item_core_1",
+          "text": "",
+          "style": {
+            "color": "#3c4043",
+            "fontSize": 12,
+            "fontWeight": "500"
+          }
+        }
+      ]
+    }
+  ]
+}

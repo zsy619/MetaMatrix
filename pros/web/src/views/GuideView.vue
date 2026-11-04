@@ -680,6 +680,16 @@ onMounted(async () => {
   border-color: #38bdf8;
 }
 
+.card--three-ring-basics:hover,
+.card--three-ring-basics:focus-visible {
+  border-color: #2a9bd6;
+}
+
+.card--leadership-triangle:hover,
+.card--leadership-triangle:focus-visible {
+  border-color: #e87722;
+}
+
 .body {
   display: flex;
   flex-direction: column;

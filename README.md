@@ -65,6 +65,8 @@ MetaMatrix/
 | `y-model` | Y 模型 |
 | `demand-triangle` | 需求三角 |
 | `deliberate-practice` | 刻意练习 |
+| `three-ring-basics` | 苦练基本功三环分析法（务实 / 可练 / 价值 三环交叠） |
+| `leadership-triangle` | 领导核心价值驱动三角（心甘情愿 → 领导力 → 5 层金字塔） |
 | `product-content` | 产品内核 |
 | `scientific-meeting` | 科学开会思考 |
 | `annual-summary` | 个人年度工作总结 |
