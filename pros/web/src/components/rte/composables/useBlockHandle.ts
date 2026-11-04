@@ -4,12 +4,14 @@ import type { Editor } from '@tiptap/core'
 import { NodeSelection } from '@tiptap/pm/state'
 import { Fragment } from '@tiptap/pm/model'
 import { reorderIndexes } from '../../../utils/rteBatch3'
+import { blockHandleLeft, blockToolsWidth, proseContentLeft } from '../../../utils/rteGutter'
 
 /** 块手柄、块菜单与块拖拽。模板绑定名与原先一致。 */
 export function useBlockHandle(deps: {
   editor: ShallowRef<Editor | undefined>
   viewMode: () => { value: string }
   rteRootEl: Ref<HTMLElement | null>
+  expanded: () => boolean
 }) {
 /** —— 块操作：全选当前块 / 复制块 / 上移下移 —— */
 function getTopLevelBlockRange(): { from: number; to: number; node: { type: { name: string }; nodeSize: number; copy: (c?: unknown) => unknown } } | null {
@@ -146,6 +148,23 @@ const blockMenuOpen = ref(false)
 const blockMenuIndex = ref(-1)
 const bubbleSwatch = ref<'text' | 'highlight' | null>(null)
 
+/**
+ * 手柄左边界（相对 canvas 左边界）。
+ *
+ * 手柄整体落在正文左侧的留白（gutter）里，右边缘始终在正文左边界之前，
+ * 因此不会盖住每行的第一个字，点击首字前也能正常放置光标。
+ */
+function handleLeftFor(canvas: HTMLElement, blockRect: { left: number }): number {
+  const canvasRect = canvas.getBoundingClientRect()
+  const prose = canvas.querySelector('.ProseMirror') as HTMLElement | null
+  // 正文内容左边界；找不到 ProseMirror 时退回块自身的左边界。
+  const contentLeft = prose ? proseContentLeft(prose) : blockRect.left
+  const toolsWidth = blockToolsWidth(deps.expanded())
+  const left = blockHandleLeft(contentLeft, canvasRect.left, toolsWidth)
+  // 留白被外部样式挤掉时也不要跑到 canvas 之外，避免手柄被裁掉。
+  return Math.max(0, Math.round(left))
+}
+
 function onCanvasBlockHover(event: MouseEvent) {
   if (deps.viewMode().value !== 'edit' || blockDragFrom >= 0) return
   const target = event.target as HTMLElement | null
@@ -158,7 +177,7 @@ function onCanvasBlockHover(event: MouseEvent) {
     const rect = blocks[i]!.getBoundingClientRect()
     if (event.clientY >= rect.top && event.clientY <= rect.bottom) {
       index = i
-      const left = Math.max(4, rect.left - canvasRect.left - 28)
+      const left = handleLeftFor(canvas, rect)
       blockHandle.value = {
         visible: true,
         top: rect.top - canvasRect.top + canvas.scrollTop,
@@ -197,7 +216,7 @@ function placeBlockToolsAtIndex(index: number) {
   blockHandle.value = {
     visible: true,
     top: rect.top - canvasRect.top + canvas.scrollTop,
-    left: Math.max(4, rect.left - canvasRect.left - 52),
+    left: handleLeftFor(canvas, rect),
     index,
   }
 }

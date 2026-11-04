@@ -3265,6 +3265,7 @@ const {
   editor,
   viewMode: () => viewMode,
   rteRootEl,
+  expanded: () => props.expanded,
 })
 
 const codeChrome = ref<{ top: number; left: number } | null>(null)
