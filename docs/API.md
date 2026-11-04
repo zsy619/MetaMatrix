@@ -56,6 +56,15 @@
 | GET | `/documents/:id/revisions/:rid/diff` | 与当前或 `against` 对比 |
 | POST | `/documents/:id/restore` | `{ revisionId, expectedHeadRevisionId }` |
 
+## 通讯录
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/directory/users` | 真人 @ 用的通讯录。`q`（模糊匹配用户名 / 昵称 / 邮箱，大小写不敏感）、`limit`（默认 50，上限 200）、`offset`（默认 0）。响应体是数组，元素为 `{ id, name, email, role?, department?, avatarUrl? }`，不含密码哈希等敏感字段 |
+
+`name` 取显示名，显示名为空时退回账号（邮箱）。`users` 表没有软删除与启用状态字段，
+所以当前不做状态过滤。
+
 ## 查询索引
 
 - `idx_docs_owner_updated`：`(owner_user_id, updated_at DESC)`

@@ -1,9 +1,10 @@
 /**
  * 通讯录（真人 @）。
  *
- * 来源说明：后端还没有 /directory/users 路由，listDirectoryUsers 会先试接口，
- * 失败时回退到本地示例数据，保证 @ 菜单始终可用。
+ * 数据来源：后端 `GET /directory/users`（需要登录态，返回真实用户）。
  * 权限过滤见 utils/rteDirectory.ts：谁能被提到由文档权限决定。
+ *
+ * 这里不再保留任何写死的示例通讯录：接口失败就抛错，由调用方给出友好提示。
  */
 import { apiRequestResult } from './http'
 
@@ -16,51 +17,47 @@ export type DirectoryUser = {
   avatarUrl?: string
 }
 
-/**
- * 本地示例通讯录。没有真实姓名，只有角色式示例，方便离线演示。
- * 后端接上后这段就不用了。
- */
-export const DIRECTORY_STUB_USERS: DirectoryUser[] = [
-  { id: 'u-product', name: '产品经理', role: '产品', department: '产品部' },
-  { id: 'u-dev', name: '开发工程师', role: '研发', department: '研发部' },
-  { id: 'u-qa', name: '测试工程师', role: '质量', department: '研发部' },
-  { id: 'u-design', name: '设计师', role: '设计', department: '设计部' },
-  { id: 'u-ops', name: '运营', role: '运营', department: '运营部' },
-  { id: 'u-owner', name: '负责人', role: '负责人', department: '项目管理部' },
-  { id: 'u-reviewer', name: '评审人', role: '评审', department: '项目管理部' },
-  { id: 'u-hr', name: 'HR', role: '人事', department: '人力资源部' },
-]
+/** 通讯录加载失败时给用户看的提示。 */
+export const DIRECTORY_LOAD_ERROR = '通讯录加载失败，请稍后重试'
 
-function stubSearch(q: string, limit: number): DirectoryUser[] {
-  const query = q.trim().toLowerCase()
-  const list = !query
-    ? DIRECTORY_STUB_USERS
-    : DIRECTORY_STUB_USERS.filter((u) =>
-        `${u.id} ${u.name} ${u.role || ''} ${u.department || ''} ${u.email || ''}`
-          .toLowerCase()
-          .includes(query),
-      )
-  return list.slice(0, Math.max(1, limit))
+/** 把后端返回的行整成 DirectoryUser，丢掉不合法或缺字段的项。 */
+function normalizeUsers(payload: unknown): DirectoryUser[] {
+  const raw = Array.isArray(payload)
+    ? payload
+    : payload && typeof payload === 'object' && Array.isArray((payload as { data?: unknown }).data)
+      ? (payload as { data: unknown[] }).data
+      : []
+  return raw
+    .filter((u): u is DirectoryUser => !!u && typeof u === 'object')
+    .filter((u) => typeof u.id === 'string' && u.id !== '' && typeof u.name === 'string' && u.name !== '')
 }
 
 /**
- * 拉取通讯录。接口不可用时回退到示例数据，不抛错。
+ * 拉取通讯录。
+ *
+ * @param opts.q      关键词，模糊匹配用户名 / 昵称 / 邮箱
+ * @param opts.limit  每页条数，后端默认 50、上限 200
+ * @param opts.offset 偏移量，用于分页
+ *
+ * 接口不可用时抛错（提示语固定为 DIRECTORY_LOAD_ERROR），不再回退到示例数据。
  */
-export async function listDirectoryUsers(opts?: { q?: string; limit?: number }): Promise<DirectoryUser[]> {
+export async function listDirectoryUsers(opts?: {
+  q?: string
+  limit?: number
+  offset?: number
+}): Promise<DirectoryUser[]> {
   const limit = opts?.limit ?? 50
-  const q = new URLSearchParams()
-  if (opts?.q) q.set('q', opts.q)
-  if (opts?.limit != null) q.set('limit', String(opts.limit))
-  const qs = q.toString()
+  const query = new URLSearchParams()
+  if (opts?.q) query.set('q', opts.q)
+  query.set('limit', String(limit))
+  if (opts?.offset != null) query.set('offset', String(opts.offset))
   try {
-    const res = await apiRequestResult<DirectoryUser[]>(`/directory/users${qs ? `?${qs}` : ''}`, {
+    const res = await apiRequestResult<DirectoryUser[]>(`/directory/users?${query.toString()}`, {
       cache: 'no-store',
       retry: 0,
     })
-    const list = Array.isArray(res.data) ? res.data : []
-    return list.filter((u) => !!u && typeof u.id === 'string' && typeof u.name === 'string')
+    return normalizeUsers(res.data)
   } catch {
-    // 后端未实现该路由时走示例数据
-    return stubSearch(opts?.q ?? '', limit)
+    throw new Error(DIRECTORY_LOAD_ERROR)
   }
 }

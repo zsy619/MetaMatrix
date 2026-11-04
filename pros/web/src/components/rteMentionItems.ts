@@ -27,8 +27,11 @@ export type RteBlockCandidate = {
 }
 
 /**
- * 本地占位候选。无后端时用于 @ 建议弹层。
- * 请勿把真实隐私名单写死进仓库；接 API 后替换 DEFAULT_MENTION_ITEMS 即可。
+ * 本地占位候选。
+ *
+ * 只作为纯函数（filterRteMentionItems / mergeMentionCandidates）的默认参数与单测夹具，
+ * 编辑器里的 @ 人员候选一律来自组织通讯录接口，不使用这份写死名单。
+ * 请勿把真实隐私名单写死进仓库。
  */
 export const DEFAULT_MENTION_ITEMS: RteMentionItem[] = [
   { id: 'owner', label: '负责人', role: '角色' },

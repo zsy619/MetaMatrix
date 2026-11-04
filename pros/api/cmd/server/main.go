@@ -32,11 +32,13 @@ func main() {
 
 	authSvc := service.NewAuthService(gdb, cfg.JWTSecret, service.NewCaptchaService(cfg.CaptchaTTL, cfg.CaptchaDebug))
 	docSvc := service.NewDocumentsService(gdb)
+	dirSvc := service.NewDirectoryService(gdb)
 	authH := handler.NewAuthHandler(authSvc, service.NewAttemptLimiter(cfg.LoginWindow, cfg.LoginPairLimit, cfg.LoginIPLimit), handler.AuthOptions{
 		DebugAll:      cfg.CaptchaDebug,
 		DebugLoopback: cfg.CaptchaDebugLoopback,
 	})
 	docH := handler.NewDocumentsHandler(docSvc)
+	dirH := handler.NewDirectoryHandler(dirSvc)
 
 	h := server.Default(
 		server.WithHostPorts(fmt.Sprintf(":%d", cfg.Port)),
@@ -120,6 +122,12 @@ func main() {
 		docs.GET("/:id/revisions/:rid/materialize", docH.Materialize)
 		docs.GET("/:id/revisions/:rid/diff", docH.Diff)
 		docs.POST("/:id/restore", docH.Restore)
+	}
+
+	// 通讯录（真人 @）。与其它已认证路由同组，必须带登录态。
+	directory := h.Group("/directory", middleware.AuthRequired(cfg.JWTSecret))
+	{
+		directory.GET("/users", dirH.List)
 	}
 
 	log.Printf("MetaMatrix API (Hertz+GORM) listening on http://localhost:%d", cfg.Port)

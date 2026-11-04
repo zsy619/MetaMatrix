@@ -1,6 +1,6 @@
 import { ref, type ShallowRef } from 'vue'
 import type { Editor } from '@tiptap/core'
-import { listDirectoryUsers, type DirectoryUser } from '../../../api/directory'
+import { listDirectoryUsers, DIRECTORY_LOAD_ERROR, type DirectoryUser } from '../../../api/directory'
 import {
   filterDirectoryUsers,
   type DirectoryPermission,
@@ -10,7 +10,8 @@ import type { RteMentionItem } from '../../rteMentionItems'
 /**
  * 组织通讯录里的真人。
  *
- * - 数据来源：api/directory.listDirectoryUsers。后端没实现该路由时回退到本地示例。
+ * - 数据来源：api/directory.listDirectoryUsers（后端 /directory/users，真实用户）。
+ * - 失败：接口挂了就不再有候选人，并给出友好提示（通讯录加载失败，请稍后重试）。
  * - 权限：文档侧的 DirectoryPermission 决定谁能被提到。权限钩子由宿主传入。
  * - 缓存在本组合式内，避免每次打开 @ 菜单都打一次接口。
  */
@@ -36,7 +37,8 @@ export function useDirectoryPeople(deps: {
         return users
       })
       .catch((err) => {
-        directoryError.value = err instanceof Error ? err.message : '通讯录加载失败'
+        directoryError.value =
+          err instanceof Error && err.message ? err.message : DIRECTORY_LOAD_ERROR
         directoryUsers.value = []
         return directoryUsers.value
       })

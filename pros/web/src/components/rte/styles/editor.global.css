@@ -1551,6 +1551,9 @@
   color: #86909c;
   text-align: center;
 }
+.rte-mention-empty.is-error {
+  color: #d03050;
+}
 .rte-root .rte-mention {
   display: inline-flex;
   align-items: baseline;
