@@ -33,6 +33,12 @@ export function useRtePageLayout(deps: {
   disarmToolbarUndo: () => void
   toolbarUndoIsNewer: (marginStamp: number) => boolean
   chrome?: () => PanelPageChrome
+  /**
+   * 是否按「纸张」排版（默认 true）。
+   * 画布里嵌入的紧凑区块传 false：正文按内容流式排版，不再撑出 A4 纸张高度。
+   * 该开关只影响渲染，不会把页面大小写回文档。
+   */
+  pageSheet?: () => boolean
 }) {
   const localPageSize = ref<RtePageSizeId>(DEFAULT_PAGE_SIZE)
   const localPageMargin = ref<PageMargin | null>(null)
@@ -46,6 +52,10 @@ export function useRtePageLayout(deps: {
     return localPageSize.value
   })
   const pageSizeMeta = computed(() => pageSizeOption(pageSize.value))
+  /** 画布里的紧凑区块按内容流式排版，不套纸张。 */
+  const pageSheetEnabled = computed(() => (deps.pageSheet?.() ?? true) !== false)
+  /** 只有「允许纸张 + 页面本身就是纸」时才套 A4 白纸样式。 */
+  const renderPaper = computed(() => pageSheetEnabled.value && pageSizeMeta.value.paper)
   const pageMargin = computed(() => {
     const panelId = deps.panelId()
     if (panelId) return readPageMargin(deps.pageMarginMap(), panelId, pageSizeMeta.value.paper)
@@ -96,6 +106,8 @@ export function useRtePageLayout(deps: {
 
   function applyPageMargin(next: PageMargin, recordUndo: boolean) {
     if (deps.viewMode() !== 'edit') return
+    // 嵌入区块不按纸张渲染：不写回文档里的页边距。
+    if (!pageSheetEnabled.value) return
     const prev = pageMargin.value
     if (marginsEqual(prev, next)) return
     if (recordUndo) {
@@ -113,6 +125,7 @@ export function useRtePageLayout(deps: {
 
   function undoPageMargin(): boolean {
     if (!pageMarginUndoArmed || !pageMarginUndo.value.length) return false
+    if (!pageSheetEnabled.value) return false
     if (deps.toolbarUndoIsNewer(pageMarginUndoStamp)) return false
     const prev = pageMarginUndo.value[pageMarginUndo.value.length - 1]!
     pageMarginUndo.value = pageMarginUndo.value.slice(0, -1)
@@ -152,6 +165,12 @@ export function useRtePageLayout(deps: {
   }
 
   function setPageSize(id: string) {
+    // 嵌入区块按内容流式排版：不改文档里的页面大小，也不写回。
+    if (!pageSheetEnabled.value) {
+      deps.closePageMenus()
+      deps.announce('嵌入区块按内容排版，页面大小请在独立文档或最大化后设置')
+      return
+    }
     const next = normalizePageSize(id)
     const panelId = deps.panelId()
     if (panelId) deps.setPanelPageSize(panelId, next)
@@ -165,6 +184,8 @@ export function useRtePageLayout(deps: {
   return {
     pageSize,
     pageSizeMeta,
+    pageSheetEnabled,
+    renderPaper,
     pageMargin,
     pageScreenMargin,
     pageSheetStyle,

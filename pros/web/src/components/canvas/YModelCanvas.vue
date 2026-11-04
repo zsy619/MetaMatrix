@@ -472,10 +472,11 @@ const labels = computed(() => {
 /* Step4 */
 .ym-tools {
   flex: 0 0 auto;
-  /* Step4 里是整块富文本（正文按 A4 纸张排版，自然高度很大）。
-     不封顶的话它会把上面的主区挤成 0 高度，六个方块互相重叠、点不到「最大化」。 */
-  max-height: 28%;
-  overflow: hidden;
+  /* Step4 里是整块富文本。正文已改成按内容流式排版（不再是 A4 纸张），
+     但内容仍可能很长：封顶并内部滚动，避免把上面的主区挤成 0 高度、
+     六个方块互相重叠、点不到「最大化」。 */
+  max-height: 38%;
+  overflow-y: auto;
   display: flex;
   align-items: stretch;
   gap: 12px;

@@ -2017,21 +2017,23 @@ function toggleChartGroupMenu(key: string) {
               <button data-rte-own type="button" :class="{ active: rte.focusMode }" @click="rte.toggleFocusMode">专注模式</button>
               <button data-rte-own type="button" :class="{ active: rte.darkEditor }" @click="rte.toggleDarkEditor">暗色编辑区</button>
               <button data-rte-own type="button" :class="{ active: rte.paperGuide }" @click="rte.togglePaperGuide">纸张参考线</button>
-              <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
-              <div data-rte-own class="rte-page-size-label">页面大小</div>
-              <button data-rte-own
-                v-for="opt in rte.RTE_PAGE_SIZES"
-                :key="'ps-' + opt.id"
-                type="button"
-                role="menuitemradio"
-                :aria-checked="rte.pageSize === opt.id"
-                :class="{ active: rte.pageSize === opt.id }"
-                :title="opt.hint"
-                @click="rte.setPageSize(opt.id)"
-              >
-                {{ opt.label }}
-                <span data-rte-own class="rte-menu-hint">{{ opt.hint }}</span>
-              </button>
+              <template data-rte-own v-if="rte.pageSheetEnabled">
+                <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
+                <div data-rte-own class="rte-page-size-label">页面大小</div>
+                <button data-rte-own
+                  v-for="opt in rte.RTE_PAGE_SIZES"
+                  :key="'ps-' + opt.id"
+                  type="button"
+                  role="menuitemradio"
+                  :aria-checked="rte.pageSize === opt.id"
+                  :class="{ active: rte.pageSize === opt.id }"
+                  :title="opt.hint"
+                  @click="rte.setPageSize(opt.id)"
+                >
+                  {{ opt.label }}
+                  <span data-rte-own class="rte-menu-hint">{{ opt.hint }}</span>
+                </button>
+              </template>
             </div>
           </Teleport>
         </div>
@@ -2260,21 +2262,23 @@ function toggleChartGroupMenu(key: string) {
               <button data-rte-own type="button" :class="{ active: rte.focusMode }" @click="rte.toggleFocusMode">专注模式</button>
               <button data-rte-own type="button" :class="{ active: rte.darkEditor }" @click="rte.toggleDarkEditor">暗色编辑区</button>
               <button data-rte-own type="button" :class="{ active: rte.paperGuide }" @click="rte.togglePaperGuide">纸张参考线</button>
-              <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
-              <div data-rte-own class="rte-page-size-label">页面大小</div>
-              <button data-rte-own
-                v-for="opt in rte.RTE_PAGE_SIZES"
-                :key="'mps-' + opt.id"
-                type="button"
-                role="menuitemradio"
-                :aria-checked="rte.pageSize === opt.id"
-                :class="{ active: rte.pageSize === opt.id }"
-                :title="opt.hint"
-                @click="rte.setPageSize(opt.id)"
-              >
-                {{ opt.label }}
-                <span data-rte-own class="rte-menu-hint">{{ opt.hint }}</span>
-              </button>
+              <template data-rte-own v-if="rte.pageSheetEnabled">
+                <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
+                <div data-rte-own class="rte-page-size-label">页面大小</div>
+                <button data-rte-own
+                  v-for="opt in rte.RTE_PAGE_SIZES"
+                  :key="'mps-' + opt.id"
+                  type="button"
+                  role="menuitemradio"
+                  :aria-checked="rte.pageSize === opt.id"
+                  :class="{ active: rte.pageSize === opt.id }"
+                  :title="opt.hint"
+                  @click="rte.setPageSize(opt.id)"
+                >
+                  {{ opt.label }}
+                  <span data-rte-own class="rte-menu-hint">{{ opt.hint }}</span>
+                </button>
+              </template>
             </div>
             <div data-rte-own
               v-if="mt.kind === 'form' && rte.moreFormOpen"

@@ -194,6 +194,7 @@ function onCloseMaximize(event?: Event) {
         class="fsp-rte"
         compact
         :panel-id="maximizeKey"
+        :page-sheet="false"
         :expanded="false"
         :show-title="false"
         :show-bottom-bar="false"

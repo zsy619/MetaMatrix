@@ -147,6 +147,7 @@ function onCloseMaximize(event?: Event) {
         class="cell-rte"
         compact
         :panel-id="maximizeKey"
+        :page-sheet="false"
         :expanded="false"
         :show-title="false"
         :show-bottom-bar="true"

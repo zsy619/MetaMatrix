@@ -1,7 +1,7 @@
 import type { InjectionKey, Ref, ShallowRef } from 'vue'
 import type { Editor } from '@tiptap/vue-3'
 
-/** 根组件冻结的 10 个 props。子组件只通过 RTE_CTX 读取。 */
+/** 根组件冻结的 11 个 props。子组件只通过 RTE_CTX 读取。 */
 export type RteEditorProps = {
   modelValue: string
   title: string
@@ -13,6 +13,8 @@ export type RteEditorProps = {
   showPublishActions: boolean
   showMarkdownHint: boolean
   panelId: string
+  /** 是否按纸张排版；画布里的紧凑区块为 false（正文按内容流式排版）。 */
+  pageSheet: boolean
 }
 
 /** 根组件冻结的 4 个 emit。 */
