@@ -124,3 +124,11 @@ func TestNormalizeDirectoryQuery(t *testing.T) {
 		t.Fatalf("got %q, want empty", got)
 	}
 }
+
+func TestDirectoryUserFromModelOrgFields(t *testing.T) {
+	u := &model.User{ID: uuid.New(), Email: "a@x.com", DisplayName: "A", Department: " 研发 ", Role: "工程师", AvatarURL: "https://x/a.png"}
+	got := DirectoryUserFromModel(u)
+	if got.Department != "研发" || got.Role != "工程师" || got.AvatarURL != "https://x/a.png" {
+		t.Fatalf("org fields not mapped: %+v", got)
+	}
+}

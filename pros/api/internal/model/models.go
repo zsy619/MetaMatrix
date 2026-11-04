@@ -9,9 +9,14 @@ import (
 )
 
 type User struct {
-	ID           uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
-	Email        string    `gorm:"type:varchar(255);uniqueIndex;not null" json:"email"`
-	DisplayName  string    `gorm:"type:varchar(128)" json:"displayName"`
+	ID          uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
+	Email       string    `gorm:"type:varchar(255);uniqueIndex;not null" json:"email"`
+	DisplayName string    `gorm:"type:varchar(128)" json:"displayName"`
+	// Department / Role / AvatarURL back the @ mention directory.
+	// They stay optional so existing rows remain valid.
+	Department   string    `gorm:"type:varchar(128);index" json:"department"`
+	Role         string    `gorm:"type:varchar(128)" json:"role"`
+	AvatarURL    string    `gorm:"type:varchar(512)" json:"avatarUrl"`
 	PasswordHash string    `gorm:"type:varchar(255);not null" json:"-"`
 	CreatedAt    time.Time `gorm:"type:timestamptz;not null" json:"createdAt"`
 	UpdatedAt    time.Time `gorm:"type:timestamptz;not null" json:"updatedAt"`
