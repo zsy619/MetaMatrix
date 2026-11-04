@@ -122,6 +122,12 @@ MarkArea/MarkLine/MarkPoint/Matrix/Parallel/Polar/SingleAxis/Toolbox/Transform/V
   - 文本含图表类型、标题、系列名、类目、数值；
   - 长数据截断（单系列最多 8 项、表格最多 50 行），并在文本里写明「共 N 项，已省略 M 项」；
   - 摘要文本长度上限 600 字（超长时提示「全文见图表数据表」）。
+- **option 级 aria 生成**（`src/utils/echarts/chartA11yOption.ts`，渲染前调用 `applyChartAria`）：
+  - 默认开启 `aria.enabled` 与 `aria.label.enabled`（用户显式给布尔值时按用户的来）；
+  - `aria.label.description`：**用户提供的优先**（纯文本净化：去控制字符 / 尖括号、限长 600 字），
+    没有则用上面「数据摘要」自动生成的文本（标题 / 类型 / 系列 / 类目 / 数值）；
+  - `aria.decal.show` 保留用户设置；非法 / 危险的 aria 子项（函数、对象型 description 等）一律不生效；
+  - 调用点：`src/extensions/echartsBlock.ts`（图表块渲染）与 `src/echartsPreview.ts`（模板预览页）。
 - **DOM 输出**（`src/utils/echarts/chartA11yDom.ts` + `src/extensions/echartsBlock.ts`）：
   - 图表容器 `.rte-echarts-preview` 上写 `role="img"` + `aria-label="<摘要>"`；
   - 同级的视觉隐藏节点 `.rte-chart-a11y`（`rte-sr-only`）里放摘要段落 + 一张
@@ -160,7 +166,7 @@ MarkArea/MarkLine/MarkPoint/Matrix/Parallel/Polar/SingleAxis/Toolbox/Transform/V
 |---|---|---|
 | 模板净化 + setOption | `npx vitest run src/utils/echarts/templates.test.ts`（jsdom + SVG） | ✅ 165 用例全过（81 模板 × 净化 + 渲染；GL 只做净化） |
 | 白名单 fixture | `npx vitest run src/utils/echarts/fixtures.test.ts` | ✅ 56 用例全过（33 种 series + 21 个组件） |
-| 全量单测 | `npx vitest run` | ✅ 56 个文件 / 397 用例全过 |
+| 全量单测 | `npx vitest run` | ✅ 62 个文件 / 436 用例全过 |
 | 类型检查 | `npx vue-tsc -b` | ✅ 无错误 |
 | 构建 | `npx vite build` | ✅ 通过（体积见上表） |
 | 39 类真实浏览器渲染（含 WebGL） | `node scripts/rte-echarts-render-e2e.mjs` | ✅ 81 个模板全部渲染成功（12 个 Canvas/GL 模板失败 0） |
@@ -170,6 +176,8 @@ MarkArea/MarkLine/MarkPoint/Matrix/Parallel/Polar/SingleAxis/Toolbox/Transform/V
 | 图表数据摘要（折线/柱/饼 + 截断） | `npx vitest run src/utils/echarts/chartA11y.test.ts` | ✅ 7 用例全过（可读文本、类目/数值、截断说明、DOM 写入） |
 | 节点视图无障碍 DOM | `npx vitest run src/extensions/echartsBlock.a11y.test.ts` | ✅ 4 用例全过（`role="img"` + `aria-label`、隐藏数据表、导出 HTML 带摘要、option 变更后刷新） |
 | 浏览器级无障碍校验（临时脚本，未入库） | playwright + vite dev + 本机 API/Postgres | ✅ 11 项全过：真实插入折线图后 `.rte-echarts-preview[role="img"]` 带 aria-label（含系列/类目/数值），`.rte-chart-a11y table` 有表头与 6 行数据 |
+| option 级 aria（默认开启 + 自动摘要 + 用户描述优先） | `npx vitest run src/utils/echarts/chartA11yOption.test.ts` | ✅ 11 用例全过（默认开启 aria、自动摘要含标题/类型/系列/数值、用户 description 优先、危险子项不生效、描述净化限长） |
+| ECharts 真的播报了 aria | `npx vitest run src/utils/echarts/chartA11yOption.echarts.test.ts`（jsdom + SVG） | ✅ 2 用例全过：图表根元素 `aria-label` = 自动摘要 / 用户自定义描述 |
 
 截图产出路径（`RTE_BASELINE_DIR`，默认 `/opt/cursor/artifacts`）：
 

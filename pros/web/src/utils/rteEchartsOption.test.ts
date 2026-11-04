@@ -101,6 +101,33 @@ describe('ECharts option 净化', () => {
     expect(result.warnings.join('，')).toContain('aria.enabled')
   })
 
+  it('丢弃 aria 里的函数 / 可执行内容', () => {
+    const result = sanitizeEchartsOption({
+      title: { text: '示例' },
+      aria: {
+        enabled: true,
+        evil: () => 'boom',
+        label: {
+          enabled: true,
+          description: () => 'boom',
+        },
+        decal: { show: true, danger: () => 'boom' },
+      },
+      series: [{ type: 'bar', data: [1, 2] }],
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    const aria = result.option.aria as Record<string, unknown>
+    expect(aria.enabled).toBe(true)
+    expect(aria.evil).toBeUndefined()
+    const label = aria.label as Record<string, unknown>
+    expect(label.description).toBeUndefined()
+    const decal = aria.decal as Record<string, unknown>
+    expect(decal.danger).toBeUndefined()
+    expect(decal.show).toBe(true)
+    expect(JSON.stringify(result.option)).not.toContain('boom')
+  })
+
   it('series 里不允许出现 aria', () => {
     const result = sanitizeEchartsOption({
       series: [{ type: 'bar', data: [1, 2], aria: { enabled: true } }],

@@ -8,6 +8,7 @@ import {
 } from '../utils/rteEchartsOption'
 import { ECHARTS_CATEGORIES } from '../utils/echarts/templates'
 import { applyChartA11y } from '../utils/echarts/chartA11yDom'
+import { applyChartAria } from '../utils/echarts/chartA11yOption'
 import { buildChartA11ySummary, type ChartA11ySummary } from '../utils/echarts/chartA11y'
 import { echartsRendererFor, needsEchartsGl, resolveEchartsRenderItems } from '../utils/echarts/prepare'
 import { loadEchartsGl } from '../utils/echartsGlRuntime'
@@ -325,7 +326,10 @@ export const EchartsBlock = Node.create({
             })
           }
           // custom 系列的 renderItem 在文档里只存预设名，这里换成内置函数
-          chart.setOption(renderOption(resolveEchartsRenderItems(effective)), { notMerge: true })
+          // 渲染前补 aria（默认开启 + 自动摘要），ECharts 自身才能把描述播报出来
+          chart.setOption(applyChartAria(renderOption(resolveEchartsRenderItems(effective))), {
+            notMerge: true,
+          })
           chart.resize()
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err)
