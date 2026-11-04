@@ -174,6 +174,12 @@ const props = withDefaults(
     showMarkdownHint?: boolean
     /** 与最大化 key / 相关资料 panelId 对齐，页面大小写入画布 JSON。 */
     panelId?: string
+    /**
+     * 是否按「纸张」排版（默认 true，A4 + 窄边距）。
+     * 画布里嵌入的紧凑区块传 false：正文按内容流式排版，不再撑出 A4 纸张高度，
+     * 也不会把页面大小写回文档。最大化/独立文档仍走默认的纸张视图。
+     */
+    pageSheet?: boolean
   }>(),
   {
     title: '',
@@ -185,6 +191,7 @@ const props = withDefaults(
     showPublishActions: false,
     showMarkdownHint: true,
     panelId: '',
+    pageSheet: true,
   },
 )
 
@@ -664,6 +671,8 @@ const {
 const {
   pageSize,
   pageSizeMeta,
+  pageSheetEnabled,
+  renderPaper,
   pageMargin,
   pageScreenMargin,
   pageSheetStyle,
@@ -691,6 +700,7 @@ const {
   disarmToolbarUndo: () => toolbarUndoBridge.disarm(),
   toolbarUndoIsNewer: (stamp) => toolbarUndoBridge.isNewer(stamp),
   chrome: () => pageChrome.value,
+  pageSheet: () => props.pageSheet,
 })
 
 function initialEditorContent(): string {
@@ -2778,10 +2788,14 @@ function printEditor() {
   }
   applyPrintPageStyle(pageSize.value)
   root.classList.add('rte-printing')
+  // 嵌入区块本身不套纸张，但打印仍按文档的页面设置（A4 + 窄边距）出纸。
+  const paperForPrint = !renderPaper.value && pageSizeMeta.value.paper
+  if (paperForPrint) root.classList.add('is-page-sheet')
   // 打印前把图表换成白底静态快照，打印完还原
   window.dispatchEvent(new CustomEvent(RTE_BEFORE_EXPORT_EVENT))
   const cleanup = () => {
     root.classList.remove('rte-printing')
+    if (paperForPrint) root.classList.remove('is-page-sheet')
     window.dispatchEvent(new CustomEvent(RTE_AFTER_EXPORT_EVENT))
     window.removeEventListener('afterprint', cleanup)
   }
@@ -6687,6 +6701,7 @@ provideRteBindings({
   outlineHeadings,
   outlineOpen,
   pageMargin,
+  pageSheetEnabled,
   pageSize,
   pageSizeMeta,
   paperGuide,
@@ -6912,7 +6927,7 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
       'is-heading-auto-num': headingAutoNumber,
       'is-immersive': immersiveFullscreen,
       'is-paper-guide': paperGuide,
-      'is-page-sheet': pageSizeMeta.paper,
+      'is-page-sheet': renderPaper,
       'has-page-chrome': pageChromeActive,
       'is-page-feishu': pageSize === 'feishu',
       'is-table-sticky': tableHeaderSticky,

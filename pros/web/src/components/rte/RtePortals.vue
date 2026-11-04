@@ -186,7 +186,7 @@ const echartsDialogTemplates = computed(() => {
     <!-- 页面设置：页面大小 / 页边距 / 页眉 / 页脚 / 页码 -->
     <Teleport to="body">
       <div data-rte-own
-        v-if="rte.pageSetupOpen"
+        v-if="rte.pageSetupOpen && rte.pageSheetEnabled"
         class="rte-modal-overlay"
         @mousedown.self="rte.pageSetupOpen = false"
       >

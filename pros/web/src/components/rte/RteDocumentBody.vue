@@ -876,6 +876,7 @@ useParentScopeStamp()
       </div>
       <div data-rte-own class="rte-bottom-right">
         <button
+          v-if="rte.pageSheetEnabled"
           data-rte-own
           type="button"
           class="rte-bottom-link"
@@ -884,7 +885,7 @@ useParentScopeStamp()
         >
           页面设置
         </button>
-        <label data-rte-own class="rte-page-size-field">
+        <label v-if="rte.pageSheetEnabled" data-rte-own class="rte-page-size-field">
           页面
           <select data-rte-own
             :value="rte.pageSize"
@@ -897,7 +898,7 @@ useParentScopeStamp()
             </option>
           </select>
         </label>
-        <label data-rte-own class="rte-page-size-field">
+        <label v-if="rte.pageSheetEnabled" data-rte-own class="rte-page-size-field">
           页边距
           <select data-rte-own
             :value="rte.pageMargin.preset"
@@ -911,7 +912,7 @@ useParentScopeStamp()
             <option data-rte-own value="custom">自定义</option>
           </select>
         </label>
-        <label data-rte-own class="rte-page-size-field">
+        <label v-if="rte.pageSheetEnabled" data-rte-own class="rte-page-size-field">
           页眉
           <input data-rte-own
             class="rte-page-chrome-input"
@@ -922,7 +923,7 @@ useParentScopeStamp()
             @change="rte.setPageHeader(($event.target as HTMLInputElement).value)"
           />
         </label>
-        <label data-rte-own class="rte-page-size-field">
+        <label v-if="rte.pageSheetEnabled" data-rte-own class="rte-page-size-field">
           页脚
           <input data-rte-own
             class="rte-page-chrome-input"
@@ -933,7 +934,7 @@ useParentScopeStamp()
             @change="rte.setPageFooter(($event.target as HTMLInputElement).value)"
           />
         </label>
-        <label data-rte-own class="rte-page-size-field">
+        <label v-if="rte.pageSheetEnabled" data-rte-own class="rte-page-size-field">
           页码
           <select data-rte-own
             :value="rte.pageChrome.pageNumber"
@@ -947,7 +948,7 @@ useParentScopeStamp()
           </select>
         </label>
         <button data-rte-own type="button" class="rte-bottom-link" @click="rte.openPresent">演示</button>
-        <span data-rte-own v-if="rte.pageMargin.preset === 'custom'" class="rte-margin-custom">
+        <span data-rte-own v-if="rte.pageSheetEnabled && rte.pageMargin.preset === 'custom'" class="rte-margin-custom">
           <label data-rte-own>上<input data-rte-own :value="rte.pageMargin.top" type="number" min="0" max="80" step="0.1" aria-label="上边距毫米" :disabled="rte.viewMode !== 'edit'" @change="rte.setMarginSide('top', ($event.target as HTMLInputElement).value)" /></label>
           <label data-rte-own>下<input data-rte-own :value="rte.pageMargin.bottom" type="number" min="0" max="80" step="0.1" aria-label="下边距毫米" :disabled="rte.viewMode !== 'edit'" @change="rte.setMarginSide('bottom', ($event.target as HTMLInputElement).value)" /></label>
           <label data-rte-own>左<input data-rte-own :value="rte.pageMargin.left" type="number" min="0" max="80" step="0.1" aria-label="左边距毫米" :disabled="rte.viewMode !== 'edit'" @change="rte.setMarginSide('left', ($event.target as HTMLInputElement).value)" /></label>
