@@ -24,7 +24,10 @@ import {
   textblockTypeInputRule,
   wrappingInputRule,
 } from '@tiptap/core'
-import type { NodeType } from '@tiptap/pm/model'
+import type { NodeType, ResolvedPos } from '@tiptap/pm/model'
+import { Plugin, PluginKey } from '@tiptap/pm/state'
+import { ReplaceStep } from '@tiptap/pm/transform'
+import { Slice } from '@tiptap/pm/model'
 
 export const MD_RULE_PATTERNS = {
   heading: /^(#{1,6})\s$/,
@@ -36,17 +39,103 @@ export const MD_RULE_PATTERNS = {
   horizontalRule: /^(?:---|\*\*\*\s)$/,
 } as const
 
-/** 仅当标记位于普通段落开头时才执行原 handler。 */
-function atParagraphStart(rule: InputRule): InputRule {
+export type MdRuleKind =
+  | 'heading'
+  | 'bulletList'
+  | 'orderedList'
+  | 'taskItem'
+  | 'blockquote'
+  | 'codeBlock'
+  | 'horizontalRule'
+
+export type MdRuleContext = 'top' | 'list' | 'blockquote' | 'tableCell' | 'other' | 'none'
+
+/**
+ * 各容器内允许的规则（参照飞书）：
+ * - 顶层段落：全部；
+ * - 列表项/待办项内：首段不转换（文字保留）；后续段落只允许嵌套列表与待办；
+ * - 引用内：标题、列表、待办；
+ * - 表格单元格内：列表、待办（不转标题/引用/代码块/分割线，避免撑破单元格）；
+ * - 其他容器（分栏、提示块、折叠块等）：标题、列表、待办、引用；
+ * - 标题等非段落文本块（none）：一律不转换。
+ */
+export const MD_RULE_POLICY: Record<MdRuleContext, ReadonlySet<MdRuleKind>> = {
+  top: new Set<MdRuleKind>(['heading', 'bulletList', 'orderedList', 'taskItem', 'blockquote', 'codeBlock', 'horizontalRule']),
+  list: new Set<MdRuleKind>(['bulletList', 'orderedList', 'taskItem']),
+  blockquote: new Set<MdRuleKind>(['heading', 'bulletList', 'orderedList', 'taskItem']),
+  tableCell: new Set<MdRuleKind>(['bulletList', 'orderedList', 'taskItem']),
+  other: new Set<MdRuleKind>(['heading', 'bulletList', 'orderedList', 'taskItem', 'blockquote']),
+  none: new Set<MdRuleKind>(),
+}
+
+const LIST_ITEM = new Set(['listItem', 'taskItem'])
+const TABLE_CELL = new Set(['tableCell', 'tableHeader'])
+
+/** 由标记所在位置判断容器语境（取最近的有意义祖先）。 */
+export function mdRuleContext($pos: ResolvedPos): MdRuleContext {
+  if ($pos.parent.type.name !== 'paragraph') return 'none'
+  for (let d = $pos.depth - 1; d > 0; d -= 1) {
+    const name = $pos.node(d).type.name
+    // 列表项首段本身就是列表行，不再嵌套/改型；后续段落才允许嵌套列表
+    if (LIST_ITEM.has(name)) return $pos.index(d) === 0 ? 'none' : 'list'
+    if (TABLE_CELL.has(name)) return 'tableCell'
+    if (name === 'blockquote') return 'blockquote'
+    return 'other'
+  }
+  return 'top'
+}
+
+function ruleAllowed(kind: MdRuleKind, from: number, doc: import('@tiptap/pm/model').Node) {
+  const $start = doc.resolve(from)
+  const ctx = $start.parentOffset === 0 ? mdRuleContext($start) : 'none'
+  return MD_RULE_POLICY[ctx].has(kind)
+}
+
+/** 允许时执行原 handler，否则让出（返回 null）。 */
+function allowedRule(kind: MdRuleKind, rule: InputRule): InputRule {
   return new InputRule({
     find: rule.find,
-    undoable: rule.undoable,
+    undoable: true,
+    handler: (props) => (ruleAllowed(kind, props.range.from, props.state.doc) ? rule.handler(props) : null),
+  })
+}
+
+/**
+ * 不允许时以一个空步骤「吃掉」这次匹配，防止各扩展自带的同类规则接着转换。
+ * 文字照常输入，不产生任何结构变化。
+ */
+function blockerRule(kind: MdRuleKind, rule: InputRule): InputRule {
+  return new InputRule({
+    find: rule.find,
+    undoable: false,
     handler: (props) => {
-      const $start = props.state.doc.resolve(props.range.from)
-      const parent = $start.parent
-      if (parent.type.name !== 'paragraph' || parent.type.spec.code) return null
-      if ($start.parentOffset !== 0) return null
-      return rule.handler(props)
+      if (ruleAllowed(kind, props.range.from, props.state.doc)) return null
+      const tr = props.state.tr
+      tr.step(new ReplaceStep(props.range.to, props.range.to, Slice.empty))
+      tr.setMeta(BLOCKED_META, true)
+    },
+  })
+}
+
+const BLOCKED_META = 'rteMdRuleBlocked'
+
+/**
+ * 记录「刚刚发生过输入规则转换」。紧随其后的追加事务（如 TrailingNode 在文末补空段落）
+ * 不清除该记录，让退格仍能撤回转换。
+ */
+export const mdRuleUndoKey = new PluginKey<boolean>('rteMdRuleUndo')
+
+function mdRuleUndoPlugin() {
+  return new Plugin<boolean>({
+    key: mdRuleUndoKey,
+    state: {
+      init: () => false,
+      apply(tr, prev) {
+        if (tr.getMeta(BLOCKED_META)) return false
+        if (tr.getMeta('inputRule')) return true
+        if (tr.getMeta('appendedTransaction')) return prev
+        return tr.docChanged || tr.selectionSet ? false : prev
+      },
     },
   })
 }
@@ -56,64 +145,67 @@ export const RteMarkdownInputRules = Extension.create({
   // 高于各节点扩展默认的 100，先于内置同类规则匹配
   priority: 1000,
 
+  addProseMirrorPlugins() {
+    return [mdRuleUndoPlugin()]
+  },
+
+  addKeyboardShortcuts() {
+    return {
+      // 退格优先撤回刚发生的输入规则；文末补空段落后 TipTap 自带记录已失效，改用历史撤回
+      Backspace: ({ editor }) => {
+        if (!mdRuleUndoKey.getState(editor.state)) return false
+        if (editor.commands.undoInputRule()) return true
+        return editor.commands.undo()
+      },
+    }
+  },
+
   addInputRules() {
     const nodes = this.editor.schema.nodes
     const t = (name: string): NodeType | undefined => nodes[name]
-    const rules: InputRule[] = []
+    const rules: Array<[MdRuleKind, InputRule]> = []
+    const add = (kind: MdRuleKind, make: (type: NodeType) => InputRule) => {
+      const type = t(kind)
+      if (type) rules.push([kind, make(type)])
+    }
 
-    const heading = t('heading')
-    if (heading) {
-      rules.push(
-        textblockTypeInputRule({
-          find: MD_RULE_PATTERNS.heading,
-          type: heading,
-          getAttributes: (m) => ({ level: m[1].length }),
-        }),
-      )
-    }
-    const codeBlock = t('codeBlock')
-    if (codeBlock) {
-      rules.push(
-        textblockTypeInputRule({
-          find: MD_RULE_PATTERNS.codeBlock,
-          type: codeBlock,
-          getAttributes: (m) => ({ language: m[1] || null }),
-        }),
-      )
-    }
-    const hr = t('horizontalRule')
-    if (hr) {
-      rules.push(nodeInputRule({ find: MD_RULE_PATTERNS.horizontalRule, type: hr }))
-    }
-    const taskItem = t('taskItem')
-    if (taskItem) {
-      rules.push(
-        wrappingInputRule({
-          find: MD_RULE_PATTERNS.taskItem,
-          type: taskItem,
-          getAttributes: (m) => ({ checked: (m[1] || '').toLowerCase() === 'x' }),
-        }),
-      )
-    }
-    const bulletList = t('bulletList')
-    if (bulletList) {
-      rules.push(wrappingInputRule({ find: MD_RULE_PATTERNS.bulletList, type: bulletList }))
-    }
-    const orderedList = t('orderedList')
-    if (orderedList) {
-      rules.push(
-        wrappingInputRule({
-          find: MD_RULE_PATTERNS.orderedList,
-          type: orderedList,
-          getAttributes: (m) => ({ start: Number(m[1]) }),
-          joinPredicate: (m, node) => node.childCount + node.attrs.start === Number(m[1]),
-        }),
-      )
-    }
-    const blockquote = t('blockquote')
-    if (blockquote) {
-      rules.push(wrappingInputRule({ find: MD_RULE_PATTERNS.blockquote, type: blockquote }))
-    }
-    return rules.map(atParagraphStart)
+    add('heading', (type) =>
+      textblockTypeInputRule({
+        find: MD_RULE_PATTERNS.heading,
+        type,
+        getAttributes: (m) => ({ level: m[1].length }),
+      }),
+    )
+    add('codeBlock', (type) =>
+      textblockTypeInputRule({
+        find: MD_RULE_PATTERNS.codeBlock,
+        type,
+        getAttributes: (m) => ({ language: m[1] || null }),
+      }),
+    )
+    add('horizontalRule', (type) => nodeInputRule({ find: MD_RULE_PATTERNS.horizontalRule, type }))
+    add('taskItem', (type) =>
+      wrappingInputRule({
+        find: MD_RULE_PATTERNS.taskItem,
+        type,
+        getAttributes: (m) => ({ checked: (m[1] || '').toLowerCase() === 'x' }),
+      }),
+    )
+    add('bulletList', (type) => wrappingInputRule({ find: MD_RULE_PATTERNS.bulletList, type }))
+    add('orderedList', (type) =>
+      wrappingInputRule({
+        find: MD_RULE_PATTERNS.orderedList,
+        type,
+        getAttributes: (m) => ({ start: Number(m[1]) }),
+        joinPredicate: (m, node) => node.childCount + node.attrs.start === Number(m[1]),
+      }),
+    )
+    add('blockquote', (type) => wrappingInputRule({ find: MD_RULE_PATTERNS.blockquote, type }))
+
+    // 先全部「允许则转换」，再全部「拒绝则吞掉」：拦截规则 undoable=false，不影响退格
+    return [
+      ...rules.map(([kind, rule]) => allowedRule(kind, rule)),
+      ...rules.map(([kind, rule]) => blockerRule(kind, rule)),
+    ]
   },
 })

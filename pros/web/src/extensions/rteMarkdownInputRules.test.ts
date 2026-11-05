@@ -8,6 +8,9 @@ import { RteCodeBlockLowlight } from './codeHighlight'
 import { RteHorizontalRule } from './rteHorizontalRule'
 import { RteBlockquote } from './rteBlockquote'
 import { RteMarkdownInputRules } from './rteMarkdownInputRules'
+import { Table } from '@tiptap/extension-table'
+import { TableRow } from '@tiptap/extension-table-row'
+import { RteTableCell, RteTableHeader } from './rteTableCells'
 
 let editor: Editor | undefined
 afterEach(() => {
@@ -27,6 +30,10 @@ function makeEditor(content = '<p></p>') {
       RteHorizontalRule,
       TaskList,
       TaskItem.configure({ nested: true }),
+      Table,
+      TableRow,
+      RteTableCell,
+      RteTableHeader,
       RteMarkdownInputRules,
     ],
     content,
@@ -163,5 +170,128 @@ describe('rteMarkdownInputRules', () => {
     expect(ed.commands.undoInputRule()).toBe(true)
     expect(first(ed).type.name).toBe('paragraph')
     expect(first(ed).textContent).toBe('## ')
+  })
+
+  function pressBackspace(ed: Editor) {
+    const ev = new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true })
+    const handled = ed.view.someProp('handleKeyDown', (f) => f(ed.view, ev))
+    if (!handled) ed.commands.deleteRange({ from: ed.state.selection.from - 1, to: ed.state.selection.from })
+  }
+
+  it.each(['## ', '- ', '> ', '[ ] ', '``` '])('文末输入 %s 后退格一次回到原文字（TrailingNode 不打断撤回）', (m) => {
+    const ed = makeEditor('<p>前段</p><p></p>')
+    ed.commands.focus('end')
+    type(ed, m)
+    expect(ed.state.doc.child(1).type.name).not.toBe('paragraph')
+    pressBackspace(ed)
+    expect(ed.state.doc.child(1).type.name).toBe('paragraph')
+    expect(ed.state.doc.child(1).textContent).toBe(m)
+  })
+
+  it('转换后继续输入文字，再退格只删字不撤回', () => {
+    const ed = makeEditor('<p></p>')
+    type(ed, '## 标')
+    pressBackspace(ed)
+    expect(first(ed).type.name).toBe('heading')
+    expect(first(ed).textContent).toBe('')
+  })
+
+  it('组字结束（compositionend）后符合规则则转换', async () => {
+    const ed = makeEditor('<p></p>')
+    ed.commands.focus('end')
+    ed.view.dispatch(ed.state.tr.insertText('## '))
+    expect(first(ed).type.name).toBe('paragraph')
+    ed.view.dom.dispatchEvent(new Event('compositionend', { bubbles: true }))
+    await new Promise((r) => setTimeout(r, 20))
+    expect(first(ed).type.name).toBe('heading')
+  })
+
+  it('全角 ＃／－／＞ 不转换（只认半角 Markdown 标记）', () => {
+    const ed = makeEditor('<p></p>')
+    type(ed, '＃ ')
+    type(ed, '－ ')
+    expect(first(ed).type.name).toBe('paragraph')
+  })
+
+  describe('容器内行为（飞书式）', () => {
+    const cell = '<table><tbody><tr><td><p></p></td></tr></tbody></table>'
+    const findPara = (ed: Editor, inside: string) => {
+      let pos = -1
+      ed.state.doc.descendants((n, p, parent) => {
+        if (n.type.name === 'paragraph' && parent?.type.name === inside && n.content.size === 0 && pos < 0) pos = p + 1
+      })
+      return pos
+    }
+    const has = (ed: Editor, name: string) => {
+      let f = false
+      ed.state.doc.descendants((n) => {
+        if (n.type.name === name) f = true
+      })
+      return f
+    }
+    const run = (html: string, inside: string, input: string) => {
+      const ed = makeEditor(html)
+      ed.commands.setTextSelection(findPara(ed, inside))
+      type(ed, input)
+      return ed
+    }
+
+    it.each([
+      ['- ', 'bulletList', true],
+      ['1. ', 'orderedList', true],
+      ['[ ] ', 'taskList', true],
+      ['## ', 'heading', false],
+      ['> ', 'blockquote', false],
+      ['``` ', 'codeBlock', false],
+      ['---', 'horizontalRule', false],
+    ])('表格单元格内 %s → %s 允许=%s', (input, node, ok) => {
+      const ed = run(cell, 'tableCell', input)
+      expect(has(ed, node)).toBe(ok)
+      expect(has(ed, 'table')).toBe(true)
+    })
+
+    it.each([
+      ['- ', 'bulletList', true],
+      ['[ ] ', 'taskList', true],
+      ['## ', 'heading', false],
+      ['> ', 'blockquote', false],
+      ['---', 'horizontalRule', false],
+    ])('列表项第二段内 %s 允许=%s', (input, node, ok) => {
+      const ed = run('<ol><li><p>首段</p><p></p></li></ol>', 'listItem', input)
+      expect(has(ed, node)).toBe(ok)
+    })
+
+    it.each(['- ', '1. ', '[ ] ', '## '])('列表项首段输入 %s 不转换、文字保留', (input) => {
+      const ed = run('<ul><li><p></p></li></ul>', 'listItem', input)
+      expect(ed.state.doc.firstChild!.type.name).toBe('bulletList')
+      expect(ed.state.doc.firstChild!.childCount).toBe(1)
+      expect(ed.state.doc.firstChild!.textContent).toBe(input)
+    })
+
+    it.each([
+      ['## ', 'heading', true],
+      ['- ', 'bulletList', true],
+      ['> ', 'blockquote', false],
+      ['``` ', 'codeBlock', false],
+      ['---', 'horizontalRule', false],
+    ])('引用内 %s 允许=%s', (input, node, ok) => {
+      const ed = run('<blockquote><p></p></blockquote>', 'blockquote', input)
+      if (node === 'blockquote') {
+        let depth = 0
+        ed.state.doc.descendants((n) => {
+          if (n.type.name === 'blockquote') depth += 1
+        })
+        expect(depth > 1).toBe(ok)
+      } else expect(has(ed, node)).toBe(ok)
+    })
+
+    it.each(['# ', '- ', '> ', '1. ', '[ ] ', '---'])('标题内输入 %s 不转换、文字保留', (input) => {
+      const ed = makeEditor('<h2></h2>')
+      ed.commands.setTextSelection(1)
+      type(ed, input)
+      expect(first(ed).type.name).toBe('heading')
+      expect(first(ed).attrs.level).toBe(2)
+      expect(first(ed).textContent).toBe(input)
+    })
   })
 })
