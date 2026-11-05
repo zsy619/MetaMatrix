@@ -11,6 +11,10 @@ import { RteMarkdownInputRules } from './rteMarkdownInputRules'
 import { Table } from '@tiptap/extension-table'
 import { TableRow } from '@tiptap/extension-table-row'
 import { RteTableCell, RteTableHeader } from './rteTableCells'
+import { Callout } from './callout'
+import { Columns, Column } from './columns'
+import { ToggleBlock } from './toggleBlock'
+import { TabsBlock, TabPane } from './tabsBlock'
 
 let editor: Editor | undefined
 afterEach(() => {
@@ -34,6 +38,12 @@ function makeEditor(content = '<p></p>') {
       TableRow,
       RteTableCell,
       RteTableHeader,
+      Callout,
+      Columns,
+      Column,
+      ToggleBlock,
+      TabsBlock,
+      TabPane,
       RteMarkdownInputRules,
     ],
     content,
@@ -261,7 +271,7 @@ describe('rteMarkdownInputRules', () => {
       expect(has(ed, node)).toBe(ok)
     })
 
-    it.each(['- ', '1. ', '[ ] ', '## '])('列表项首段输入 %s 不转换、文字保留', (input) => {
+    it.each(['- ', '* ', '## ', '> ', '---'])('无序列表项首段输入 %s 不转换、文字保留', (input) => {
       const ed = run('<ul><li><p></p></li></ul>', 'listItem', input)
       expect(ed.state.doc.firstChild!.type.name).toBe('bulletList')
       expect(ed.state.doc.firstChild!.childCount).toBe(1)
@@ -292,6 +302,154 @@ describe('rteMarkdownInputRules', () => {
       expect(first(ed).type.name).toBe('heading')
       expect(first(ed).attrs.level).toBe(2)
       expect(first(ed).textContent).toBe(input)
+    })
+  })
+
+  describe('列表项首段改型（飞书式）', () => {
+    const LISTS = {
+      bullet: '<ul><li><p>甲</p></li><li><p></p></li><li><p>丙</p></li></ul>',
+      ordered: '<ol><li><p>甲</p></li><li><p></p></li><li><p>丙</p></li></ol>',
+      task: '<ul data-type="taskList"><li data-type="taskItem" data-checked="true"><p>甲</p></li><li data-type="taskItem" data-checked="false"><p></p></li><li data-type="taskItem" data-checked="false"><p>丙</p></li></ul>',
+    }
+    const emptyPos = (ed: Editor) => {
+      let pos = -1
+      ed.state.doc.descendants((n, p) => {
+        if (pos < 0 && n.type.name === 'paragraph' && n.content.size === 0) pos = p + 1
+      })
+      return pos
+    }
+    const setup = (html: string, input: string) => {
+      const ed = makeEditor(html)
+      ed.commands.setTextSelection(emptyPos(ed))
+      type(ed, input)
+      return ed
+    }
+
+    it.each([
+      ['bullet', '1. ', 'orderedList', 'listItem'],
+      ['bullet', '[] ', 'taskList', 'taskItem'],
+      ['ordered', '- ', 'bulletList', 'listItem'],
+      ['ordered', '* ', 'bulletList', 'listItem'],
+      ['ordered', '[ ] ', 'taskList', 'taskItem'],
+      ['task', '- ', 'bulletList', 'listItem'],
+      ['task', '1. ', 'orderedList', 'listItem'],
+    ] as const)('%s 列表项首输入 %s → 整个列表转 %s，内容保留', (from, input, list, item) => {
+      const ed = setup(LISTS[from], input)
+      const l = first(ed)
+      expect(l.type.name).toBe(list)
+      expect(l.childCount).toBe(3)
+      l.forEach((c) => expect(c.type.name).toBe(item))
+      expect(l.textContent).toBe('甲丙')
+      expect(ed.state.selection.$from.parent.type.name).toBe('paragraph')
+    })
+
+    it('[x] 改为待办时该项勾选', () => {
+      const ed = setup(LISTS.bullet, '[x] ')
+      expect(first(ed).child(1).attrs.checked).toBe(true)
+      expect(first(ed).child(0).attrs.checked).toBe(false)
+    })
+
+    it('改型后继续输入落在原项', () => {
+      const ed = setup(LISTS.bullet, '1. 乙')
+      expect(first(ed).child(1).textContent).toBe('乙')
+    })
+
+    it.each(['1. ', '[] ', '- '])('改型后 Ctrl+Z 一次撤回为原列表 + 原文字：%s', (input) => {
+      const html = input === '- ' ? LISTS.ordered : LISTS.bullet
+      const ed = setup(html, input)
+      const orig = input === '- ' ? 'orderedList' : 'bulletList'
+      expect(first(ed).type.name).not.toBe(orig)
+      ed.commands.undo()
+      expect(first(ed).type.name).toBe(orig)
+      expect(first(ed).child(1).textContent).toBe(input)
+    })
+
+    it.each(['1. ', '[] '])('改型后退格一次撤回：%s', (input) => {
+      const ed = setup(LISTS.bullet, input)
+      pressBackspace(ed)
+      expect(first(ed).type.name).toBe('bulletList')
+      expect(first(ed).child(1).textContent).toBe(input)
+    })
+
+    it('文末改型后退格撤回', () => {
+      const ed = setup('<ul><li><p>甲</p></li><li><p></p></li></ul>', '1. ')
+      expect(first(ed).type.name).toBe('orderedList')
+      pressBackspace(ed)
+      expect(first(ed).type.name).toBe('bulletList')
+      expect(first(ed).child(1).textContent).toBe('1. ')
+    })
+  })
+
+  describe('版式容器内行为', () => {
+    const CONTAINERS = {
+      column: '<div data-type="columns"><div data-type="column"><p></p></div><div data-type="column"><p>右</p></div></div>',
+      toggleBlock: '<div data-type="toggle-block"><p></p></div>',
+      tabPane: '',
+      callout: '<div data-type="callout"><p></p></div>',
+    } as Record<string, string>
+    const ALL = [
+      ['## ', 'heading'],
+      ['- ', 'bulletList'],
+      ['[ ] ', 'taskList'],
+      ['> ', 'blockquote'],
+      ['``` ', 'codeBlock'],
+      ['---', 'horizontalRule'],
+    ] as const
+    const EXPECT: Record<string, string[]> = {
+      column: ['heading', 'bulletList', 'taskList', 'blockquote', 'codeBlock', 'horizontalRule'],
+      toggleBlock: ['heading', 'bulletList', 'taskList', 'blockquote', 'codeBlock', 'horizontalRule'],
+      tabPane: ['heading', 'bulletList', 'taskList', 'blockquote', 'codeBlock', 'horizontalRule'],
+      callout: ['heading', 'bulletList', 'taskList'],
+    }
+    const build = (name: string) => {
+      const ed = makeEditor('<p></p>')
+      if (name === 'tabPane') ed.commands.setContent({ type: 'doc', content: [{ type: 'tabsBlock', content: [{ type: 'tabPane', content: [{ type: 'paragraph' }] }, { type: 'tabPane', content: [{ type: 'paragraph', content: [{ type: 'text', text: '二' }] }] }] }] })
+      else ed.commands.setContent(CONTAINERS[name])
+      let pos = -1
+      ed.state.doc.descendants((n, p, parent) => {
+        if (pos < 0 && n.type.name === 'paragraph' && n.content.size === 0 && parent?.type.name === name) pos = p + 1
+      })
+      expect(pos).toBeGreaterThan(0)
+      ed.commands.setTextSelection(pos)
+      return ed
+    }
+    for (const name of Object.keys(EXPECT)) {
+      it.each(ALL)(`${name} 内 %s → %s`, (input, node) => {
+        const ed = build(name)
+        type(ed, input)
+        let inside = false
+        ed.state.doc.descendants((n, _p, parent) => {
+          if (n.type.name === node && parent?.type.name === name) inside = true
+        })
+        expect(inside).toBe(EXPECT[name].includes(node))
+        let container = false
+        ed.state.doc.descendants((n) => {
+          if (n.type.name === name) container = true
+        })
+        expect(container).toBe(true)
+      })
+    }
+  })
+
+  describe('callout ::: 规则', () => {
+    it('文末输入 ::: 空格 → 提示块；退格一次回到原文字', () => {
+      const ed = makeEditor('<p>前段</p><p></p>')
+      ed.commands.focus('end')
+      type(ed, '::: ')
+      expect(ed.state.doc.child(1).type.name).toBe('callout')
+      pressBackspace(ed)
+      expect(ed.state.doc.child(1).type.name).toBe('paragraph')
+      expect(ed.state.doc.child(1).textContent).toBe('::: ')
+    })
+
+    it('文末 :::warn 空格 → 警告提示块；Ctrl+Z 一次撤回', () => {
+      const ed = makeEditor('<p></p>')
+      type(ed, ':::warn ')
+      expect(first(ed).type.name).toBe('callout')
+      expect(first(ed).attrs.variant).toBe('warn')
+      ed.commands.undo()
+      expect(first(ed).type.name).toBe('paragraph')
+      expect(first(ed).textContent).toBe(':::warn ')
     })
   })
 })
