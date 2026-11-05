@@ -25,9 +25,10 @@ import {
   wrappingInputRule,
 } from '@tiptap/core'
 import type { NodeType, ResolvedPos } from '@tiptap/pm/model'
-import { Plugin, PluginKey } from '@tiptap/pm/state'
+import { Plugin, PluginKey, TextSelection } from '@tiptap/pm/state'
 import { ReplaceStep } from '@tiptap/pm/transform'
-import { Slice } from '@tiptap/pm/model'
+import { Fragment, Slice } from '@tiptap/pm/model'
+import type { Node as PMNode } from '@tiptap/pm/model'
 
 export const MD_RULE_PATTERNS = {
   heading: /^(#{1,6})\s$/,
@@ -48,20 +49,33 @@ export type MdRuleKind =
   | 'codeBlock'
   | 'horizontalRule'
 
-export type MdRuleContext = 'top' | 'list' | 'blockquote' | 'tableCell' | 'other' | 'none'
+export type MdRuleContext =
+  | 'top'
+  | 'list'
+  | 'listHead'
+  | 'blockquote'
+  | 'tableCell'
+  | 'callout'
+  | 'other'
+  | 'none'
 
 /**
  * 各容器内允许的规则（参照飞书）：
  * - 顶层段落：全部；
- * - 列表项/待办项内：首段不转换（文字保留）；后续段落只允许嵌套列表与待办；
+ * - 分栏、标签页、折叠块内：视同正文，全部允许（飞书分栏/折叠内可放代码块与分割线）；
+ * - 列表项/待办项首段（listHead）：列表类标记把「该项所在列表」改型（无序/有序/待办互转），
+ *   同类型不变、其余标记不转换；后续段落只允许嵌套列表与待办；
  * - 引用内：标题、列表、待办；
  * - 表格单元格内：列表、待办（不转标题/引用/代码块/分割线，避免撑破单元格）；
- * - 其他容器（分栏、提示块、折叠块等）：标题、列表、待办、引用；
+ * - 提示块（callout，飞书高亮块）内：标题、列表、待办（不嵌引用/代码块/分割线）；
+ * - 未知容器：标题、列表、待办、引用；
  * - 标题等非段落文本块（none）：一律不转换。
  */
 export const MD_RULE_POLICY: Record<MdRuleContext, ReadonlySet<MdRuleKind>> = {
   top: new Set<MdRuleKind>(['heading', 'bulletList', 'orderedList', 'taskItem', 'blockquote', 'codeBlock', 'horizontalRule']),
   list: new Set<MdRuleKind>(['bulletList', 'orderedList', 'taskItem']),
+  listHead: new Set<MdRuleKind>(['bulletList', 'orderedList', 'taskItem']),
+  callout: new Set<MdRuleKind>(['heading', 'bulletList', 'orderedList', 'taskItem']),
   blockquote: new Set<MdRuleKind>(['heading', 'bulletList', 'orderedList', 'taskItem']),
   tableCell: new Set<MdRuleKind>(['bulletList', 'orderedList', 'taskItem']),
   other: new Set<MdRuleKind>(['heading', 'bulletList', 'orderedList', 'taskItem', 'blockquote']),
@@ -70,6 +84,13 @@ export const MD_RULE_POLICY: Record<MdRuleContext, ReadonlySet<MdRuleKind>> = {
 
 const LIST_ITEM = new Set(['listItem', 'taskItem'])
 const TABLE_CELL = new Set(['tableCell', 'tableHeader'])
+/** 视同正文的版式容器 */
+const BODY_LIKE = new Set(['column', 'columns', 'tabPane', 'tabsBlock', 'toggleBlock'])
+const LIST_OF_KIND: Record<string, string> = {
+  bulletList: 'bulletList',
+  orderedList: 'orderedList',
+  taskItem: 'taskList',
+}
 
 /** 由标记所在位置判断容器语境（取最近的有意义祖先）。 */
 export function mdRuleContext($pos: ResolvedPos): MdRuleContext {
@@ -77,26 +98,80 @@ export function mdRuleContext($pos: ResolvedPos): MdRuleContext {
   for (let d = $pos.depth - 1; d > 0; d -= 1) {
     const name = $pos.node(d).type.name
     // 列表项首段本身就是列表行，不再嵌套/改型；后续段落才允许嵌套列表
-    if (LIST_ITEM.has(name)) return $pos.index(d) === 0 ? 'none' : 'list'
+    if (LIST_ITEM.has(name)) return $pos.index(d) === 0 ? 'listHead' : 'list'
     if (TABLE_CELL.has(name)) return 'tableCell'
     if (name === 'blockquote') return 'blockquote'
+    if (name === 'callout') return 'callout'
+    if (BODY_LIKE.has(name)) continue
     return 'other'
   }
   return 'top'
 }
 
-function ruleAllowed(kind: MdRuleKind, from: number, doc: import('@tiptap/pm/model').Node) {
+type MdDecision = 'convert' | 'retype' | 'block'
+
+function decide(kind: MdRuleKind, from: number, doc: PMNode): MdDecision {
   const $start = doc.resolve(from)
   const ctx = $start.parentOffset === 0 ? mdRuleContext($start) : 'none'
-  return MD_RULE_POLICY[ctx].has(kind)
+  if (!MD_RULE_POLICY[ctx].has(kind)) return 'block'
+  if (ctx !== 'listHead') return 'convert'
+  // 列表项首段：目标列表类型与当前不同才改型
+  const list = $start.node($start.depth - 2)
+  return list && list.type.name !== LIST_OF_KIND[kind] ? 'retype' : 'block'
 }
 
-/** 允许时执行原 handler，否则让出（返回 null）。 */
+/**
+ * 飞书式改型：删除标记文字，把该项所在的整个列表换成目标列表类型，
+ * 列表项在 listItem / taskItem 之间互换，内容保留。
+ */
+function retypeList(
+  kind: MdRuleKind,
+  props: Parameters<InputRule['handler']>[0],
+): void | null {
+  const { state, range, match } = props
+  const schema = state.schema
+  const listType = schema.nodes[LIST_OF_KIND[kind]]
+  const itemType = kind === 'taskItem' ? schema.nodes.taskItem : schema.nodes.listItem
+  if (!listType || !itemType) return null
+  const tr = state.tr
+  const $start = tr.doc.resolve(range.from)
+  const listDepth = $start.depth - 2
+  const listPos = $start.before(listDepth)
+  tr.delete(range.from, range.to)
+  const list = tr.doc.nodeAt(listPos)
+  if (!list) return null
+  const items: PMNode[] = []
+  list.forEach((item) => {
+    const attrs = itemType.name === 'taskItem' ? { checked: false } : {}
+    items.push(itemType.create(attrs, item.content, item.marks))
+  })
+  if (kind === 'taskItem') {
+    const checked = (match[1] || '').toLowerCase() === 'x'
+    const idx = $start.index(listDepth)
+    items[idx] = itemType.create({ checked }, items[idx].content)
+  }
+  const listAttrs = listType.name === 'orderedList' ? { start: Number(match[1]) || 1 } : {}
+  let next: PMNode
+  try {
+    next = listType.createChecked(listAttrs, Fragment.fromArray(items), list.marks)
+  } catch {
+    return null
+  }
+  tr.replaceWith(listPos, listPos + list.nodeSize, next)
+  tr.setSelection(TextSelection.create(tr.doc, range.from))
+}
+
+/** 允许时执行原 handler（列表项首段则改型），否则让出（返回 null）。 */
 function allowedRule(kind: MdRuleKind, rule: InputRule): InputRule {
   return new InputRule({
     find: rule.find,
     undoable: true,
-    handler: (props) => (ruleAllowed(kind, props.range.from, props.state.doc) ? rule.handler(props) : null),
+    handler: (props) => {
+      const d = decide(kind, props.range.from, props.state.doc)
+      if (d === 'convert') return rule.handler(props)
+      if (d === 'retype') return retypeList(kind, props)
+      return null
+    },
   })
 }
 
@@ -109,7 +184,7 @@ function blockerRule(kind: MdRuleKind, rule: InputRule): InputRule {
     find: rule.find,
     undoable: false,
     handler: (props) => {
-      if (ruleAllowed(kind, props.range.from, props.state.doc)) return null
+      if (decide(kind, props.range.from, props.state.doc) !== 'block') return null
       const tr = props.state.tr
       tr.step(new ReplaceStep(props.range.to, props.range.to, Slice.empty))
       tr.setMeta(BLOCKED_META, true)
