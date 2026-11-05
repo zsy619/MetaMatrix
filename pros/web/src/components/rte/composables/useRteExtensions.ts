@@ -78,6 +78,7 @@ import { CrossRef, findCrossRefPos } from '../../../extensions/crossRef'
 import { ListStyleAttrs } from '../../../extensions/listStyleAttrs'
 import { LinkButton } from '../../../extensions/linkButton'
 import { SyncBlock } from '../../../extensions/syncBlock'
+import { RteMarkdownInputRules } from '../../../extensions/rteMarkdownInputRules'
 
 type LateFn = (...args: any[]) => any
 
@@ -245,6 +246,8 @@ const editor = useEditor({
     Subscript,
     Superscript,
     RteCodeBlockLowlight,
+    // Markdown 输入规则（# / - / 1. / [ ] / > / ``` / ---），优先于各扩展内置规则
+    RteMarkdownInputRules,
     TextStyle,
     FontSize,
     FontFamily,
