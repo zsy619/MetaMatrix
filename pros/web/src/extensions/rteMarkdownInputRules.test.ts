@@ -557,4 +557,85 @@ describe('rteMarkdownInputRules', () => {
       ed2.destroy()
     })
   })
+
+  describe('深层与容器内列表改型', () => {
+    const emptyAt = (ed: Editor) => {
+      let pos = -1
+      ed.state.doc.descendants((n, p) => {
+        if (pos < 0 && n.type.name === 'paragraph' && n.content.size === 0) pos = p + 1
+      })
+      ed.commands.setTextSelection(pos)
+    }
+    const listsTypes = (ed: Editor) => {
+      const r: string[] = []
+      ed.state.doc.descendants((n) => {
+        if (['bulletList', 'orderedList', 'taskList'].includes(n.type.name)) r.push(n.type.name)
+      })
+      return r
+    }
+
+    it('嵌套子层改型后退格一次撤回', () => {
+      const ed = makeEditor('<ul><li><p>父</p><ol><li><p>子一</p></li><li><p></p></li></ol></li></ul><p>尾</p>')
+      emptyAt(ed)
+      type(ed, '- ')
+      expect(listsTypes(ed)).toEqual(['bulletList', 'bulletList'])
+      pressBackspace(ed)
+      expect(listsTypes(ed)).toEqual(['bulletList', 'orderedList'])
+      expect(first(ed).child(0).child(1).child(1).textContent).toBe('- ')
+    })
+
+    it.each([
+      ['1. ', 'orderedList'],
+      ['[] ', 'taskList'],
+    ])('三层嵌套最内层 %s → 只改第三层为 %s', (input, t) => {
+      const ed = makeEditor(
+        '<ul><li><p>一</p><ul><li><p>二</p><ul><li><p>三a</p></li><li><p></p></li></ul></li></ul></li></ul>',
+      )
+      emptyAt(ed)
+      type(ed, input)
+      expect(listsTypes(ed)).toEqual(['bulletList', 'bulletList', t])
+      expect(ed.state.doc.textContent).toBe('一二三a')
+      ed.commands.undo()
+      expect(listsTypes(ed)).toEqual(['bulletList', 'bulletList', 'bulletList'])
+    })
+
+    it('四层嵌套第二层改型，其余层不变', () => {
+      const ed = makeEditor(
+        '<ul><li><p>一</p><ol><li><p></p><ul><li><p>三</p><ol><li><p>四</p></li></ol></li></ul></li></ol></li></ul>',
+      )
+      emptyAt(ed)
+      type(ed, '- ')
+      expect(listsTypes(ed)).toEqual(['bulletList', 'bulletList', 'bulletList', 'orderedList'])
+      expect(ed.state.doc.textContent).toBe('一三四')
+    })
+
+    it.each([
+      ['1. ', 'orderedList'],
+      ['[] ', 'taskList'],
+    ])('表格单元格内列表 %s → %s，表格完好', (input, t) => {
+      const ed = makeEditor(
+        '<table><tbody><tr><td><ul><li><p>甲</p></li><li><p></p></li></ul></td><td><p>右</p></td></tr></tbody></table>',
+      )
+      emptyAt(ed)
+      type(ed, input)
+      expect(listsTypes(ed)).toEqual([t])
+      expect(first(ed).type.name).toBe('table')
+      expect(ed.state.doc.textContent).toBe('甲右')
+      pressBackspace(ed)
+      expect(listsTypes(ed)).toEqual(['bulletList'])
+    })
+
+    it.each([
+      ['- ', 'bulletList'],
+      ['[x] ', 'taskList'],
+    ])('提示块内有序列表 %s → %s，提示块完好', (input, t) => {
+      const ed = makeEditor('<div data-type="callout"><ol><li><p>甲</p></li><li><p></p></li></ol></div><p>尾</p>')
+      emptyAt(ed)
+      type(ed, input)
+      expect(listsTypes(ed)).toEqual([t])
+      expect(first(ed).type.name).toBe('callout')
+      ed.commands.undo()
+      expect(listsTypes(ed)).toEqual(['orderedList'])
+    })
+  })
 })
