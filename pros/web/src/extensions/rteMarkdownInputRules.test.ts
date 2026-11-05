@@ -452,4 +452,109 @@ describe('rteMarkdownInputRules', () => {
       expect(first(ed).textContent).toBe(':::warn ')
     })
   })
+
+  describe('嵌套列表改型只改当前层', () => {
+    const NESTED =
+      '<ul><li><p>父甲</p><ol><li><p>子一</p></li><li><p></p></li></ol></li><li><p>父乙</p></li></ul>'
+    const at = (ed: Editor) => {
+      let pos = -1
+      ed.state.doc.descendants((n, p) => {
+        if (pos < 0 && n.type.name === 'paragraph' && n.content.size === 0) pos = p + 1
+      })
+      ed.commands.setTextSelection(pos)
+    }
+    it.each([
+      ['- ', 'bulletList'],
+      ['[] ', 'taskList'],
+    ])('子列表（有序）项首 %s → 子列表转 %s，父列表仍是无序', (input, list) => {
+      const ed = makeEditor(NESTED)
+      at(ed)
+      type(ed, input)
+      const parent = first(ed)
+      expect(parent.type.name).toBe('bulletList')
+      expect(parent.childCount).toBe(2)
+      const child = parent.child(0).child(1)
+      expect(child.type.name).toBe(list)
+      expect(child.textContent).toBe('子一')
+      expect(parent.child(1).textContent).toBe('父乙')
+      ed.commands.undo()
+      expect(first(ed).child(0).child(1).type.name).toBe('orderedList')
+    })
+
+    it('父列表项首改型，子列表保持原类型', () => {
+      const ed = makeEditor('<ul><li><p></p><ol><li><p>子一</p></li></ol></li><li><p>父乙</p></li></ul>')
+      at(ed)
+      type(ed, '1. ')
+      expect(first(ed).type.name).toBe('orderedList')
+      expect(first(ed).child(0).child(1).type.name).toBe('orderedList')
+      expect(first(ed).child(0).child(1).textContent).toBe('子一')
+      expect(first(ed).child(1).textContent).toBe('父乙')
+    })
+
+    it('待办子列表改无序，父待办勾选不变', () => {
+      const ed = makeEditor(
+        '<ul data-type="taskList"><li data-type="taskItem" data-checked="true"><p>父</p><ul data-type="taskList"><li data-type="taskItem" data-checked="true"><p></p></li></ul></li></ul>',
+      )
+      at(ed)
+      type(ed, '- ')
+      expect(first(ed).type.name).toBe('taskList')
+      expect(first(ed).child(0).attrs.checked).toBe(true)
+      expect(first(ed).child(0).child(1).type.name).toBe('bulletList')
+    })
+  })
+
+  describe('提示块内再输入 :::', () => {
+    it.each(['::: ', ':::warn '])('提示块内 %s 不嵌套，文字保留', (input) => {
+      const ed = makeEditor('<div data-type="callout"><p></p></div><p>尾</p>')
+      ed.commands.setTextSelection(2)
+      type(ed, input)
+      let count = 0
+      ed.state.doc.descendants((n) => {
+        if (n.type.name === 'callout') count += 1
+      })
+      expect(count).toBe(1)
+      expect(first(ed).textContent).toBe(input)
+    })
+  })
+
+  describe('容器内组字结束后转换', () => {
+    const HTML: Record<string, string> = {
+      column: '<div data-type="columns"><div data-type="column"><p></p></div><div data-type="column"><p>右</p></div></div>',
+      toggleBlock: '<div data-type="toggle-block"><p></p></div>',
+      callout: '<div data-type="callout"><p></p></div>',
+    }
+    const mk = (name: string) => {
+      const ed = makeEditor('<p></p>')
+      if (name === 'tabPane')
+        ed.commands.setContent({ type: 'doc', content: [{ type: 'tabsBlock', content: [{ type: 'tabPane', content: [{ type: 'paragraph' }] }, { type: 'tabPane', content: [{ type: 'paragraph' }] }] }] })
+      else ed.commands.setContent(HTML[name])
+      let pos = -1
+      ed.state.doc.descendants((n, p, parent) => {
+        if (pos < 0 && n.type.name === 'paragraph' && parent?.type.name === name) pos = p + 1
+      })
+      ed.commands.setTextSelection(pos)
+      return ed
+    }
+    it.each(['column', 'tabPane', 'toggleBlock', 'callout'])('%s 内组字提交 "## " 后转标题；全角 ＃ 不转', async (name) => {
+      const ed = mk(name)
+      ed.view.dispatch(ed.state.tr.insertText('## '))
+      ed.view.dom.dispatchEvent(new Event('compositionend', { bubbles: true }))
+      await new Promise((r) => setTimeout(r, 20))
+      let h = false
+      ed.state.doc.descendants((n, _p, parent) => {
+        if (n.type.name === 'heading' && parent?.type.name === name) h = true
+      })
+      expect(h).toBe(true)
+      const ed2 = mk(name)
+      ed2.view.dispatch(ed2.state.tr.insertText('＃ '))
+      ed2.view.dom.dispatchEvent(new Event('compositionend', { bubbles: true }))
+      await new Promise((r) => setTimeout(r, 20))
+      let h2 = false
+      ed2.state.doc.descendants((n) => {
+        if (n.type.name === 'heading') h2 = true
+      })
+      expect(h2).toBe(false)
+      ed2.destroy()
+    })
+  })
 })

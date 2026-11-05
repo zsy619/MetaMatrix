@@ -1,4 +1,4 @@
-import { Node, mergeAttributes, wrappingInputRule } from '@tiptap/core'
+import { InputRule, Node, mergeAttributes, wrappingInputRule } from '@tiptap/core'
 
 export type CalloutVariant = 'info' | 'warn' | 'success' | 'error'
 
@@ -95,21 +95,33 @@ export const Callout = Node.create({
   },
 
   addInputRules() {
+    const rule = wrappingInputRule({
+      find: /^:::\s?(info|warn|success|error|tip|warning)?\s$/,
+      type: this.type,
+      getAttributes: (match) => {
+        const raw = (match[1] || 'info').toLowerCase()
+        const map: Record<string, CalloutVariant> = {
+          info: 'info',
+          tip: 'info',
+          warn: 'warn',
+          warning: 'warn',
+          success: 'success',
+          error: 'error',
+        }
+        return { variant: map[raw] || 'info' }
+      },
+    })
+    // 飞书行为：提示块内不再嵌套提示块，':::' 文字原样保留
     return [
-      wrappingInputRule({
-        find: /^:::\s?(info|warn|success|error|tip|warning)?\s$/,
-        type: this.type,
-        getAttributes: (match) => {
-          const raw = (match[1] || 'info').toLowerCase()
-          const map: Record<string, CalloutVariant> = {
-            info: 'info',
-            tip: 'info',
-            warn: 'warn',
-            warning: 'warn',
-            success: 'success',
-            error: 'error',
+      new InputRule({
+        find: rule.find,
+        undoable: rule.undoable,
+        handler: (props) => {
+          const $from = props.state.doc.resolve(props.range.from)
+          for (let d = $from.depth; d > 0; d -= 1) {
+            if ($from.node(d).type.name === this.name) return null
           }
-          return { variant: map[raw] || 'info' }
+          return rule.handler(props)
         },
       }),
     ]
