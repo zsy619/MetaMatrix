@@ -11,6 +11,7 @@ import (
 	"metamatrix/api/internal/config"
 	"metamatrix/api/internal/db"
 	"metamatrix/api/internal/handler"
+	"metamatrix/api/internal/media"
 	"metamatrix/api/internal/middleware"
 	"metamatrix/api/internal/service"
 
@@ -39,6 +40,16 @@ func main() {
 	})
 	docH := handler.NewDocumentsHandler(docSvc)
 	dirH := handler.NewDirectoryHandler(dirSvc)
+	mediaH := handler.NewMediaHandler(&media.Service{
+		Store:  media.NewGormStore(gdb),
+		Root:   cfg.MediaRoot,
+		Secret: cfg.MediaSignSecret,
+		Feishu: media.FeishuCreds{
+			AppID:     cfg.FeishuAppID,
+			AppSecret: cfg.FeishuAppSecret,
+			BlockID:   cfg.FeishuBlockID,
+		},
+	})
 
 	h := server.Default(
 		server.WithHostPorts(fmt.Sprintf(":%d", cfg.Port)),
@@ -122,6 +133,23 @@ func main() {
 		docs.GET("/:id/revisions/:rid/materialize", docH.Materialize)
 		docs.GET("/:id/revisions/:rid/diff", docH.Diff)
 		docs.POST("/:id/restore", docH.Restore)
+	}
+
+	// 素材库。身份只取登录态。静态路径必须写在 /:id 前面。
+	library := h.Group("/media", middleware.AuthRequired(cfg.JWTSecret))
+	{
+		library.POST("/check", mediaH.Check)
+		library.POST("/upload", mediaH.Upload)
+		library.GET("/categories", mediaH.ListCategories)
+		library.POST("/categories", mediaH.CreateCategory)
+		library.PUT("/categories/:id", mediaH.UpdateCategory)
+		library.DELETE("/categories/:id", mediaH.DeleteCategory)
+		library.GET("", mediaH.List)
+		library.GET("/:id", mediaH.Get)
+		library.DELETE("/:id", mediaH.Delete)
+		library.POST("/:id/references", mediaH.AddReference)
+		library.DELETE("/:id/references/:rid", mediaH.DeleteReference)
+		library.POST("/:id/feishu/sync", mediaH.SyncFeishu)
 	}
 
 	// 通讯录（真人 @）。与其它已认证路由同组，必须带登录态。

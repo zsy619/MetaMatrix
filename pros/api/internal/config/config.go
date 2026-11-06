@@ -21,6 +21,11 @@ type Config struct {
 	// CaptchaDebugLoopback returns the plain captcha answer to loopback
 	// callers only. CI uses it so the smoke test can read the answer.
 	CaptchaDebugLoopback bool
+	MediaRoot            string
+	MediaSignSecret      string
+	FeishuAppID          string
+	FeishuAppSecret      string
+	FeishuBlockID        string
 }
 
 func Load() Config {
@@ -39,6 +44,14 @@ func Load() Config {
 	if dbURL == "" {
 		dbURL = "postgresql://metamatrix:metamatrix@localhost:5433/metamatrix"
 	}
+	signSecret := os.Getenv("MEDIA_SIGN_SECRET")
+	if signSecret == "" {
+		signSecret = secret
+	}
+	mediaRoot := os.Getenv("MEDIA_ROOT")
+	if mediaRoot == "" {
+		mediaRoot = "data/media"
+	}
 	return Config{
 		DatabaseURL:          dbURL,
 		Port:                 port,
@@ -49,6 +62,11 @@ func Load() Config {
 		CaptchaTTL:           captchaTTLDEnv(),
 		CaptchaDebug:         boolEnv("CAPTCHA_DEBUG", false),
 		CaptchaDebugLoopback: boolEnv("CAPTCHA_DEBUG_LOOPBACK", runningInCI()),
+		MediaRoot:            mediaRoot,
+		MediaSignSecret:      signSecret,
+		FeishuAppID:          os.Getenv("FEISHU_APP_ID"),
+		FeishuAppSecret:      os.Getenv("FEISHU_APP_SECRET"),
+		FeishuBlockID:        os.Getenv("FEISHU_DOC_BLOCK_ID"),
 	}
 }
 
