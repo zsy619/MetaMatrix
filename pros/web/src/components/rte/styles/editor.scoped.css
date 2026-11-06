@@ -443,8 +443,12 @@
   padding: 0 8px;
 }
 .rte-code-chrome select:hover,
-.rte-code-chrome button:hover {
+.rte-code-chrome button:hover,
+.rte-code-chrome button.is-on {
   background: var(--mm-blue-soft, #e8f0fe);
+}
+.rte-code-chrome button.is-on {
+  color: var(--mm-blue, #1a73e8);
 }
 .rte-empty-guide {
   display: flex;
@@ -635,10 +639,39 @@
 .rte-root :deep(.ProseMirror pre) {
   background: #f7f8fa;
   border-radius: 6px;
-  padding: 10px 12px;
+  /* 顶上留出代码浮层（语言 / 行号 / 换行 / 复制）的高度，避免盖住第一行 */
+  padding: 36px 12px 10px;
   overflow: auto;
   font-size: 12px;
   margin: 0.4em 0;
+}
+
+.rte-root :deep(pre[data-line-numbers='1']) {
+  position: relative;
+  padding-left: 3.2em;
+  line-height: 1.55;
+}
+
+.rte-root :deep(.rte-code-gutter) {
+  position: absolute;
+  top: 36px;
+  left: 8px;
+  width: 2.2em;
+  text-align: right;
+  color: #86909c;
+  font-size: 12px;
+  line-height: 1.55;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: pre;
+  user-select: none;
+  pointer-events: none;
+}
+
+.rte-root :deep(pre[data-word-wrap='1']),
+.rte-root :deep(pre[data-word-wrap='1'] code) {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .rte-root :deep(.tiptap hr),

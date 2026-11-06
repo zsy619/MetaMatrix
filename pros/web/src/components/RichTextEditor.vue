@@ -3287,7 +3287,7 @@ function syncCodeChrome() {
   const rect = dom.getBoundingClientRect()
   codeChrome.value = {
     top: rect.top - canvasRect.top + canvas.scrollTop + 6,
-    left: Math.max(8, rect.right - canvasRect.left - 168),
+    left: Math.max(8, rect.right - canvasRect.left - 280),
   }
 }
 
@@ -3464,6 +3464,28 @@ function setCodeLanguage(lang: string) {
   if (!ed || !ed.isActive('codeBlock')) return
   const next = lang || 'plaintext'
   ed.chain().focus().updateAttributes('codeBlock', { language: next }).run()
+}
+
+const codeBlockUiTick = ref(0)
+
+function codeBlockFlag(name: 'lineNumbers' | 'wordWrap'): boolean {
+  void codeBlockUiTick.value
+  const ed = editor.value
+  if (!ed || !ed.isActive('codeBlock')) return false
+  return ed.getAttributes('codeBlock')?.[name] === true
+}
+
+function toggleCodeBlockFlag(name: 'lineNumbers' | 'wordWrap') {
+  const ed = editor.value
+  if (!ed || !ed.isActive('codeBlock')) {
+    ElMessage.warning('请先将光标放在代码块内')
+    return
+  }
+  const next = !codeBlockFlag(name)
+  ed.chain().focus().updateAttributes('codeBlock', { [name]: next }).run()
+  codeBlockUiTick.value += 1
+  const label = name === 'lineNumbers' ? '行号' : '自动换行'
+  announceRte(next ? `已打开代码${label}` : `已关闭代码${label}`)
 }
 
 const codeLangOpen = ref(false)
@@ -6478,6 +6500,8 @@ provideRteBindings({
   confirmLinkCardDialog,
   confirmPrintFromPreview,
   copyActiveCodeBlock,
+  codeBlockFlag,
+  toggleCodeBlockFlag,
   copyAsFeishuHtml,
   copyCurrentLinkUrl,
   copyHoveredBlock,

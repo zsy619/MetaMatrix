@@ -954,6 +954,24 @@
   color: #1d2129;
   border-color: #c9cdd4;
 }
+.rte-code-flag-btn {
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid #e5e6eb;
+  border-radius: 6px;
+  background: #fff;
+  color: #4e5969;
+  font-size: 12px;
+  cursor: pointer;
+  line-height: 1;
+  white-space: nowrap;
+}
+.rte-code-flag-btn:hover,
+.rte-code-flag-btn.is-on {
+  background: #e8f3ff;
+  color: #3370ff;
+  border-color: #c9d8ff;
+}
 .rte-table-dialog {
   width: min(460px, 100%);
 }

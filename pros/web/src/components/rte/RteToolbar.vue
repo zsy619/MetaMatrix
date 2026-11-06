@@ -1254,6 +1254,32 @@ function toggleChartGroupMenu(key: string) {
           <button data-rte-own
             v-if="rte.isActive('codeBlock')"
             type="button"
+            class="rte-code-flag-btn"
+            :class="{ 'is-on': rte.codeBlockFlag('lineNumbers') }"
+            :aria-pressed="rte.codeBlockFlag('lineNumbers')"
+            title="显示行号"
+            aria-label="行号"
+            @mousedown.prevent
+            @click="rte.toggleCodeBlockFlag('lineNumbers')"
+          >
+            行号
+          </button>
+          <button data-rte-own
+            v-if="rte.isActive('codeBlock')"
+            type="button"
+            class="rte-code-flag-btn"
+            :class="{ 'is-on': rte.codeBlockFlag('wordWrap') }"
+            :aria-pressed="rte.codeBlockFlag('wordWrap')"
+            title="自动换行"
+            aria-label="自动换行"
+            @mousedown.prevent
+            @click="rte.toggleCodeBlockFlag('wordWrap')"
+          >
+            换行
+          </button>
+          <button data-rte-own
+            v-if="rte.isActive('codeBlock')"
+            type="button"
             class="rte-code-copy-btn"
             title="复制代码块"
             aria-label="复制代码块"
