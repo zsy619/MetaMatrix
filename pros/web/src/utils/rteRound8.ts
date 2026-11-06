@@ -61,6 +61,32 @@ export function focusDialogRoot(
   return true
 }
 
+let dialogReturnFocus: HTMLElement | null = null
+
+/** 打开弹窗前记住焦点。已经在弹窗里时不覆盖，避免嵌套弹窗把返回点丢掉。 */
+export function rememberDialogReturnFocus(): void {
+  if (typeof document === 'undefined') return
+  const active = document.activeElement
+  if (!(active instanceof HTMLElement)) return
+  if (active.closest('[role="dialog"]')) return
+  dialogReturnFocus = active
+}
+
+/** 关闭后回到打开前的控件；控件已不在文档里时走 fallback（通常是编辑器）。 */
+export function restoreDialogReturnFocus(fallback?: () => void): void {
+  const el = dialogReturnFocus
+  dialogReturnFocus = null
+  if (el && el.isConnected) {
+    el.focus()
+    return
+  }
+  fallback?.()
+}
+
+export function resetDialogReturnFocusForTests(): void {
+  dialogReturnFocus = null
+}
+
 export const RTE_OVERLAY_CLOSE_ORDER = [
   'ask',
   'linkImport',

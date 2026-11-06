@@ -108,6 +108,45 @@ describe('createAvPicker', () => {
     expect(picker.open).toBe(false)
   })
 
+  it('无效链接不插入；关掉再打开不留上次的错误文本', () => {
+    const { picker, inserted, toasts } = harness('video')
+    picker.openDialog()
+    picker.tab = 'external'
+    picker.externalUrls = 'notaurl'
+    picker.confirm()
+    expect(inserted).toEqual([])
+    expect(toasts).toContain('bad-url')
+    expect(picker.open).toBe(true)
+    picker.close()
+    picker.openDialog()
+    expect(picker.externalUrls).toBe('')
+    expect(picker.tab).toBe('personal')
+    expect(picker.open).toBe(true)
+  })
+
+  it('有未提交的链接时点遮罩不关闭、不插入；空白时遮罩等于取消', () => {
+    const { picker, inserted } = harness('audio')
+    picker.openDialog()
+    picker.tab = 'external'
+    picker.externalUrls = 'https://cdn.example/a.mp3'
+    picker.onMask()
+    expect(picker.open).toBe(true)
+    expect(picker.externalUrls).toBe('https://cdn.example/a.mp3')
+    expect(inserted).toEqual([])
+    picker.externalUrls = ''
+    picker.onMask()
+    expect(picker.open).toBe(false)
+    expect(inserted).toEqual([])
+  })
+
+  it('文件选择器还开着时遮罩不关闭', () => {
+    const { picker } = harness('video')
+    picker.openDialog()
+    picker.filePickActive = true
+    picker.onMask()
+    expect(picker.open).toBe(true)
+  })
+
   it('非音频文件不插入', async () => {
     const { picker, inserted, toasts } = harness('audio')
     picker.openDialog()

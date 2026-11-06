@@ -1203,7 +1203,7 @@ const echartsDialogTemplates = computed(() => {
       <div data-rte-own
         v-if="rte.askOpen"
         class="rte-modal-overlay"
-        @mousedown.self="rte.closeAskDialog('cancel')"
+        @mousedown.self="rte.onAskMask()"
       >
         <div data-rte-own
           class="rte-link-dialog"
@@ -1540,7 +1540,7 @@ const echartsDialogTemplates = computed(() => {
       <div data-rte-own
         v-if="rte.imageDialogOpen"
         class="rte-modal-overlay"
-        @mousedown.self="rte.closeImageDialog"
+        @mousedown.self="rte.onImageDialogMask()"
       >
         <div data-rte-own
           class="rte-image-dialog"

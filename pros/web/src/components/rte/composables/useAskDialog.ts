@@ -3,7 +3,11 @@ import { nextTick, ref, type Ref } from 'vue'
 export type RteAskKind = 'prompt' | 'confirm'
 
 /** 统一自定义询问弹层，替代 window.prompt / confirm。 */
-export function useAskDialog(deps: { closeMore: () => void }) {
+export function useAskDialog(deps: {
+  closeMore: () => void
+  onOpened?: () => void
+  onClosed?: () => void
+}) {
   const askOpen = ref(false)
   const askKind = ref<RteAskKind>('prompt')
   const askTitle = ref('')
@@ -14,6 +18,7 @@ export function useAskDialog(deps: { closeMore: () => void }) {
   const askCancelLabel = ref('取消')
   const askMaxlength = ref(500)
   const askInputRef = ref<HTMLInputElement | null>(null)
+  let askBaseline = ''
   let askResolvePrompt: ((v: string | null) => void) | null = null
   let askResolveConfirm: ((v: boolean) => void) | null = null
 
@@ -29,6 +34,12 @@ export function useAskDialog(deps: { closeMore: () => void }) {
       askOpen.value = false
       if (r) r(result === 'ok')
     }
+    deps.onClosed?.()
+  }
+
+  function onAskMask() {
+    if (askKind.value === 'prompt' && askValue.value !== askBaseline) return
+    closeAskDialog('cancel')
   }
 
   function settleAskPendingAsCancel() {
@@ -62,8 +73,10 @@ export function useAskDialog(deps: { closeMore: () => void }) {
     askConfirmLabel.value = opts.confirmLabel || '确认'
     askCancelLabel.value = opts.cancelLabel || '取消'
     askMaxlength.value = opts.maxlength ?? 500
+    askBaseline = askValue.value
     askOpen.value = true
     deps.closeMore()
+    deps.onOpened?.()
     nextTick(() => {
       askInputRef.value?.focus()
       askInputRef.value?.select()
@@ -87,8 +100,10 @@ export function useAskDialog(deps: { closeMore: () => void }) {
     askValue.value = ''
     askConfirmLabel.value = opts.confirmLabel || '确定'
     askCancelLabel.value = opts.cancelLabel || '取消'
+    askBaseline = ''
     askOpen.value = true
     deps.closeMore()
+    deps.onOpened?.()
     return new Promise((resolve) => {
       askResolveConfirm = resolve
     })
@@ -106,6 +121,7 @@ export function useAskDialog(deps: { closeMore: () => void }) {
     askMaxlength,
     askInputRef,
     closeAskDialog,
+    onAskMask,
     openRtePrompt,
     openRteConfirm,
   }

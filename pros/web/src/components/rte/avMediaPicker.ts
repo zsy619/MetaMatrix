@@ -1,4 +1,5 @@
 import { reactive, type Ref } from 'vue'
+import { dialogHasDraft, maskShouldDismiss } from '../../utils/rteDialogMask'
 
 /** 视频 / 音频共用的选择窗：个人素材与外部链接。 */
 export type AvMediaKind = 'video' | 'audio'
@@ -81,6 +82,8 @@ export type AvPickerOptions = {
   fileInput: Ref<HTMLInputElement | null>
   messages: AvPickerMessages
   closeMore: () => void
+  onOpened?: () => void
+  onClosed?: () => void
   toast: (type: 'success' | 'warning' | 'error' | 'info', message: string) => void
   uid: () => string
   insertItems: (items: AvInsertItem[]) => void
@@ -101,8 +104,10 @@ export type AvPicker = {
   externalUrls: string
   addingCategory: boolean
   newCategoryName: string
+  filePickActive: boolean
   readonly filteredAssets: AvStoredAsset[]
   close: () => void
+  onMask: () => void
   openDialog: () => void
   toggleSelect: (id: string) => void
   onSelectAllChange: () => void
@@ -127,6 +132,7 @@ export function createAvPicker(options: AvPickerOptions): AvPicker {
     externalUrls: '',
     addingCategory: false,
     newCategoryName: '',
+    filePickActive: false,
   }) as AvPicker
 
   function loadStore() {
@@ -192,9 +198,28 @@ export function createAvPicker(options: AvPickerOptions): AvPicker {
     },
   })
 
+  function releaseFilePickSoon() {
+    window.setTimeout(() => {
+      picker.filePickActive = false
+    }, 350)
+  }
+
   picker.close = () => {
     picker.open = false
+    picker.filePickActive = false
     reset()
+    options.onClosed?.()
+  }
+
+  picker.onMask = () => {
+    const dirty = dialogHasDraft({
+      selectedCount: picker.selectedIds.size,
+      externalText: picker.externalUrls,
+      addingCategory: picker.addingCategory,
+      categoryName: picker.newCategoryName,
+    })
+    if (!maskShouldDismiss({ dirty, filePickActive: picker.filePickActive })) return
+    picker.close()
   }
 
   picker.openDialog = () => {
@@ -202,6 +227,7 @@ export function createAvPicker(options: AvPickerOptions): AvPicker {
     reset()
     picker.open = true
     options.closeMore()
+    options.onOpened?.()
   }
 
   picker.toggleSelect = (id: string) => {
@@ -243,7 +269,13 @@ export function createAvPicker(options: AvPickerOptions): AvPicker {
   }
 
   picker.triggerLocalPick = () => {
-    options.fileInput.value?.click()
+    const input = options.fileInput.value
+    picker.filePickActive = true
+    const release = () => releaseFilePickSoon()
+    input?.addEventListener('change', release, { once: true })
+    input?.addEventListener('cancel', release, { once: true })
+    window.addEventListener('focus', release, { once: true })
+    input?.click()
   }
 
   function insertAndClose(items: AvInsertItem[], success: string) {

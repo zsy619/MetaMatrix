@@ -1086,8 +1086,8 @@
 }
 
 .rte-image-dialog {
-  width: 720px;
-  height: 520px;
+  width: min(720px, 96vw);
+  height: min(520px, 92vh);
   max-width: 96vw;
   max-height: 92vh;
   background: #fff;
@@ -1287,6 +1287,34 @@
 .rte-image-upload-label {
   font-size: 13px;
   color: #4e5969;
+}
+@media (max-width: 720px) {
+  .rte-image-personal {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .rte-image-sidebar {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    border-right: 0;
+    border-bottom: 1px solid #eef0f3;
+    max-height: 52px;
+    padding: 6px 8px;
+  }
+  .rte-image-side-item {
+    width: auto;
+    flex: 0 0 auto;
+  }
+  .rte-image-side-spacer {
+    display: none;
+  }
+  .rte-image-add-cat-form {
+    flex-direction: row;
+    align-items: center;
+    min-width: 180px;
+  }
 }
 .rte-image-thumb {
   position: relative;

@@ -8,6 +8,7 @@ import {
 } from '../../../utils/attachmentPolicy'
 import { insertImagesBeside } from '../../../extensions/imageGroupOps'
 import { compressImageFile } from '../../../utils/rteWave21'
+import { dialogHasDraft, maskShouldDismiss } from '../../../utils/rteDialogMask'
 import { imageReplaceSide } from '../../../utils/rteRound5'
 import { NodeSelection } from '@tiptap/pm/state'
 import { getToken } from '../../../api/http'
@@ -24,6 +25,8 @@ export function useMediaLibrary(deps: {
   editor: ShallowRef<Editor | undefined>
   closeMore: () => void
   imageCompressOnInsert: { value: boolean }
+  onOpened?: () => void
+  onClosed?: () => void
 }) {
 type ImageDialogTab = 'personal' | 'external'
 type ImageCategory = { id: string; name: string }
@@ -47,6 +50,7 @@ const imageSelectedIds = ref<Set<string>>(new Set())
 const imageSelectAll = ref(false)
 const imageExternalUrls = ref('')
 const imageFileInputRef = ref<HTMLInputElement | null>(null)
+const imageFilePickActive = ref(false)
 const addingCategory = ref(false)
 const newCategoryName = ref('')
 
@@ -93,13 +97,28 @@ function resetImageDialog() {
 function openImageDialog() {
   loadImageStore()
   resetImageDialog()
+  imageFilePickActive.value = false
   imageDialogOpen.value = true
   deps.closeMore()
+  deps.onOpened?.()
 }
 
 function closeImageDialog() {
   imageDialogOpen.value = false
+  imageFilePickActive.value = false
   resetImageDialog()
+  deps.onClosed?.()
+}
+
+function onImageDialogMask() {
+  const dirty = dialogHasDraft({
+    selectedCount: imageSelectedIds.value.size,
+    externalText: imageExternalUrls.value,
+    addingCategory: addingCategory.value,
+    categoryName: newCategoryName.value,
+  })
+  if (!maskShouldDismiss({ dirty, filePickActive: imageFilePickActive.value })) return
+  closeImageDialog()
 }
 
 function insertImage() {
@@ -171,7 +190,17 @@ function confirmAddCategory() {
 }
 
 function triggerLocalImagePick() {
-  imageFileInputRef.value?.click()
+  const input = imageFileInputRef.value
+  imageFilePickActive.value = true
+  const release = () => {
+    window.setTimeout(() => {
+      imageFilePickActive.value = false
+    }, 350)
+  }
+  input?.addEventListener('change', release, { once: true })
+  input?.addEventListener('cancel', release, { once: true })
+  window.addEventListener('focus', release, { once: true })
+  input?.click()
 }
 
 function readFileAsDataURL(file: File): Promise<string> {
@@ -491,6 +520,8 @@ const videoPicker = createAvPicker({
   fileInput: videoFileInputRef,
   messages: avMessages('video'),
   closeMore: () => deps.closeMore(),
+  onOpened: () => deps.onOpened?.(),
+  onClosed: () => deps.onClosed?.(),
   toast: rteToast,
   uid,
   insertItems: (items) => insertAvItems('video', items),
@@ -515,6 +546,8 @@ const audioPicker = createAvPicker({
   fileInput: audioFileInputRef,
   messages: avMessages('audio'),
   closeMore: () => deps.closeMore(),
+  onOpened: () => deps.onOpened?.(),
+  onClosed: () => deps.onClosed?.(),
   toast: rteToast,
   uid,
   insertItems: (items) => insertAvItems('audio', items),
@@ -537,6 +570,7 @@ const audioDialogOpen = computed(() => audioPicker.open)
     newCategoryName,
     filteredImageAssets,
     closeImageDialog,
+    onImageDialogMask,
     insertImage,
     uid,
     rteToast,

@@ -48,7 +48,7 @@ import {
 import { todayIso } from '../utils/rteRound5'
 import { RTE_PAGE_SIZES } from '../utils/rtePageSize'
 import { PAGE_MARGIN_PRESETS } from '../utils/rtePageMargin'
-import { focusDialogRoot } from '../utils/rteRound8'
+import { focusDialogRoot, rememberDialogReturnFocus, restoreDialogReturnFocus } from '../utils/rteRound8'
 import {
   embedIframeSrc,
 } from '../utils/rteRound6'
@@ -516,9 +516,14 @@ const {
   askMaxlength,
   askInputRef,
   closeAskDialog,
+  onAskMask,
   openRtePrompt,
   openRteConfirm,
-} = useAskDialog({ closeMore: () => askMoreCloser.close() })
+} = useAskDialog({
+  closeMore: () => askMoreCloser.close(),
+  onOpened: () => noteDialogOpened(),
+  onClosed: () => noteDialogClosed(),
+})
 void askInputRef
 
 /** 链接卡片专用弹层 */
@@ -4194,6 +4199,7 @@ const {
   newCategoryName,
   filteredImageAssets,
   closeImageDialog,
+  onImageDialogMask,
   insertImage,
   uid,
   rteToast,
@@ -4228,6 +4234,8 @@ const {
     moreOpen.value = false
   },
   imageCompressOnInsert,
+  onOpened: () => noteDialogOpened(),
+  onClosed: () => noteDialogClosed(),
 })
 void imageFileInputRef
 void videoFileInputRef
@@ -4334,6 +4342,18 @@ function focusOpenDialog() {
     const nodes = document.querySelectorAll('[role="dialog"][aria-modal="true"]')
     const last = nodes[nodes.length - 1]
     if (last instanceof HTMLElement) focusDialogRoot(last)
+  })
+}
+
+function noteDialogOpened() {
+  rememberDialogReturnFocus()
+  focusOpenDialog()
+}
+
+function noteDialogClosed() {
+  nextTick(() => {
+    if (document.querySelector('[role="dialog"][aria-modal="true"]')) return
+    restoreDialogReturnFocus(() => editor.value?.commands.focus())
   })
 }
 
@@ -6460,6 +6480,7 @@ provideRteBindings({
   caseMenuOpen,
   charCount,
   closeAskDialog,
+  onAskMask,
   closeAttachDialog,
   closeColorMenus,
   closeExportMenu,
@@ -6483,6 +6504,7 @@ provideRteBindings({
   closeFormulaDialog,
   closeHighlightMenus,
   closeImageDialog,
+  onImageDialogMask,
   closeImportLinkDialog,
   closeImportMenu,
   closeLinkCardDialog,

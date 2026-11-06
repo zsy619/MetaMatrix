@@ -1,4 +1,5 @@
 import { onBeforeUnmount, onMounted } from 'vue'
+import { trapTab } from '../../../utils/focusTrap'
 import { RTE_OVERLAY_CLOSE_ORDER, topOpenModal } from '../../../utils/rteRound8'
 
 /** Escape 关闭最上层浮层。keydown 监听在本组合式内成对注册。 */
@@ -142,7 +143,14 @@ function closeTopOverlay(): boolean {
 }
 
 function onWindowEscape(event: KeyboardEvent) {
-  if (event.key !== 'Escape' || event.defaultPrevented) return
+  if (event.defaultPrevented) return
+  if (event.key === 'Tab') {
+    const nodes = document.querySelectorAll('[role="dialog"][aria-modal="true"]')
+    const top = nodes[nodes.length - 1]
+    if (top instanceof HTMLElement) trapTab(event, top)
+    return
+  }
+  if (event.key !== 'Escape') return
   if (!closeTopOverlay()) return
   event.preventDefault()
 }
