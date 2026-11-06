@@ -409,6 +409,7 @@ useParentScopeStamp()
           class="rte-code-chrome"
           :style="{ top: rte.codeChrome.top + 'px', left: rte.codeChrome.left + 'px' }"
           @mousedown.stop
+          @click.stop
         >
           <label data-rte-own class="rte-code-chrome-lang">
             <span data-rte-own class="rte-sr-only">代码语言</span>
@@ -422,6 +423,24 @@ useParentScopeStamp()
               </option>
             </select>
           </label>
+          <button data-rte-own
+            type="button"
+            :class="{ 'is-on': rte.codeBlockFlag('lineNumbers') }"
+            :aria-pressed="rte.codeBlockFlag('lineNumbers')"
+            aria-label="行号"
+            title="显示行号"
+            @mousedown.prevent
+            @click="rte.toggleCodeBlockFlag('lineNumbers')"
+          >行号</button>
+          <button data-rte-own
+            type="button"
+            :class="{ 'is-on': rte.codeBlockFlag('wordWrap') }"
+            :aria-pressed="rte.codeBlockFlag('wordWrap')"
+            aria-label="自动换行"
+            title="自动换行"
+            @mousedown.prevent
+            @click="rte.toggleCodeBlockFlag('wordWrap')"
+          >换行</button>
           <button data-rte-own type="button" aria-label="复制代码" @click="rte.copyActiveCodeBlock">复制</button>
         </div>
         <div data-rte-own v-if="rte.showEmptyGuide" class="rte-empty-guide" @mousedown.stop>

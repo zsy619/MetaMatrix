@@ -2,11 +2,23 @@ import { Node, mergeAttributes } from '@tiptap/core'
 import { Plugin } from '@tiptap/pm/state'
 import type { EditorView } from '@tiptap/pm/view'
 import { normalizeImageAlign } from '../utils/rteImageLayout'
-import { groupCssVars, groupUsesAspect, installImageGroupLayout, normalizeGroupRatios, ratioPercents, resizePair, rowLayout } from '../utils/rteImageGroup'
+import {
+  groupCssVars,
+  groupUsesAspect,
+  IMAGE_GROUP_GAP_DEFAULT,
+  installImageGroupLayout,
+  nextGroupGap,
+  normalizeGroupGap,
+  normalizeGroupRatios,
+  ratioPercents,
+  resizePair,
+  rowLayout,
+} from '../utils/rteImageGroup'
 import {
   buildImageGroupMigration,
   clearGroupRatios,
   setGroupAlign,
+  setGroupGap,
   setGroupRatios,
   splitImageGroup,
 } from './imageGroupOps'
@@ -40,13 +52,24 @@ function imageAspect(frame: HTMLElement): number {
 }
 
 /** 用当前行宽和比例重算行高，清掉图片节点上残留的固定宽高。 */
-function paintGroupMetrics(dom: HTMLElement, row: HTMLElement, ratios: readonly number[]) {
+function applyGroupGap(dom: HTMLElement, gap: number) {
+  if (gap === IMAGE_GROUP_GAP_DEFAULT) {
+    dom.style.removeProperty('--rte-group-gap')
+    dom.removeAttribute('data-gap')
+    return
+  }
+  dom.style.setProperty('--rte-group-gap', `${gap}px`)
+  dom.setAttribute('data-gap', String(gap))
+}
+
+function paintGroupMetrics(dom: HTMLElement, row: HTMLElement, ratios: readonly number[], gap: number) {
   const width = row.clientWidth || dom.clientWidth
   if (width < 8) return
   const sum = ratios.reduce((total, n) => total + (Number.isFinite(n) && n > 0 ? n : 0), 0) || 1
   dom.style.setProperty('--rte-row-aspect', String(Math.round(sum * 1000) / 1000))
   ratios.forEach((grow, index) => dom.style.setProperty(`--g${index}`, String(grow)))
-  const laid = rowLayout(width, ratios, 8)
+  applyGroupGap(dom, gap)
+  const laid = rowLayout(width, ratios, gap)
   row.style.height = `${laid.height}px`
   row.style.minHeight = '0'
   const kids = Array.from(row.children).filter((child): child is HTMLElement => child instanceof HTMLElement)
@@ -86,7 +109,8 @@ export function layoutImageGroupChrome(view: EditorView) {
     const ratios = groupUsesAspect(node.attrs.ratioMode)
       ? aspects
       : normalizeGroupRatios(kids.length, node.attrs.ratios)
-    if (dom.dataset.ratioDrag !== '1') paintGroupMetrics(dom, row, ratios)
+    const gap = normalizeGroupGap(node.attrs.gap)
+    if (dom.dataset.ratioDrag !== '1') paintGroupMetrics(dom, row, ratios, gap)
     if (!dom.dataset.rteObserved && typeof ResizeObserver !== 'undefined') {
       dom.dataset.rteObserved = '1'
       const ro = new ResizeObserver(() => {
@@ -143,6 +167,7 @@ export function layoutImageGroupChrome(view: EditorView) {
         const pairLeft = left.left
         const pairWidth = right.right - left.left
         const current = view.state.doc.nodeAt(groupPos)
+        const gap = normalizeGroupGap(current?.attrs.gap)
         const base = groupUsesAspect(current?.attrs.ratioMode)
           ? kids.map(imageAspect)
           : normalizeGroupRatios(kids.length, current?.attrs.ratios)
@@ -159,7 +184,7 @@ export function layoutImageGroupChrome(view: EditorView) {
           const next = resizePair(base, index, share)
           dom.style.setProperty(`--g${index}`, String(next[index]))
           dom.style.setProperty(`--g${index + 1}`, String(next[index + 1]))
-          paintGroupMetrics(dom, row, next)
+          paintGroupMetrics(dom, row, next, gap)
           const percents = ratioPercents(next)
           tip.textContent = next.map((_, i) => `${percents[i]}%`).join(' · ')
           tip.style.left = `${ev.clientX}px`
@@ -230,6 +255,15 @@ export const ImageGroup = Node.create({
         renderHTML: (attrs: { ratioMode?: string | null }) =>
           attrs.ratioMode === 'custom' ? { 'data-ratio-mode': 'custom' } : {},
       },
+      gap: {
+        default: IMAGE_GROUP_GAP_DEFAULT,
+        parseHTML: (element: HTMLElement) => normalizeGroupGap(element.getAttribute('data-gap')),
+        renderHTML: (attrs: { gap?: number | string | null }) => {
+          const gap = normalizeGroupGap(attrs.gap)
+          if (gap === IMAGE_GROUP_GAP_DEFAULT) return {}
+          return { 'data-gap': String(gap) }
+        },
+      },
     }
   },
 
@@ -249,7 +283,7 @@ export const ImageGroup = Node.create({
       mergeAttributes(HTMLAttributes, {
         'data-type': 'image-group',
         class: 'rte-image-group',
-        style: groupCssVars(node.childCount, node.attrs.ratios),
+        style: groupCssVars(node.childCount, node.attrs.ratios, node.attrs.gap),
       }),
       ['div', { class: 'rte-image-group-row' }, 0],
     ]
@@ -314,6 +348,20 @@ export const ImageGroup = Node.create({
         bar.appendChild(button)
       }
 
+      const gapBtn = document.createElement('button')
+      gapBtn.type = 'button'
+      gapBtn.className = 'rte-image-group-gap'
+      gapBtn.addEventListener('click', (event) => {
+        event.preventDefault()
+        event.stopPropagation()
+        const pos = getPos()
+        if (typeof pos !== 'number') return
+        const live = editor.state.doc.nodeAt(pos)
+        if (!live) return
+        setGroupGap(editor.view, pos, nextGroupGap(live.attrs.gap))
+      })
+      bar.appendChild(gapBtn)
+
       const split = addIconButton('rte-image-group-split', '拆分为单图', 'M2 3h5v10H2zm7 0h5v10H9z')
       split.addEventListener('click', (event) => {
         event.preventDefault()
@@ -327,7 +375,7 @@ export const ImageGroup = Node.create({
 
       const contentDOM = document.createElement('div')
       contentDOM.className = 'rte-image-group-row'
-      contentDOM.style.cssText = 'display:flex;flex-direction:row;align-items:stretch;gap:8px;width:100%;max-width:100%;box-sizing:border-box;'
+      contentDOM.style.cssText = 'display:flex;flex-direction:row;align-items:stretch;gap:var(--rte-group-gap, 8px);width:100%;max-width:100%;box-sizing:border-box;'
       dom.appendChild(contentDOM)
       ensureImageGroupStyle()
 
@@ -344,6 +392,11 @@ export const ImageGroup = Node.create({
         else dom.removeAttribute('data-ratios')
         if (current.attrs.ratioMode === 'custom') dom.setAttribute('data-ratio-mode', 'custom')
         else dom.removeAttribute('data-ratio-mode')
+        const gap = normalizeGroupGap(current.attrs.gap)
+        applyGroupGap(dom, gap)
+        gapBtn.textContent = `${gap}`
+        gapBtn.title = `组内间距 ${gap} 像素，点击在 0、8、16、24 之间切换`
+        gapBtn.setAttribute('aria-label', gapBtn.title)
         bar.querySelectorAll<HTMLButtonElement>('.rte-image-group-align').forEach((button) => {
           button.classList.toggle('is-active', button.dataset.align === normalizeImageAlign(current.attrs.align))
           button.setAttribute('aria-pressed', button.classList.contains('is-active') ? 'true' : 'false')

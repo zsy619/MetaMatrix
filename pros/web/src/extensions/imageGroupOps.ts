@@ -7,6 +7,7 @@ import {
   imagesFromColumns,
   insertRatio,
   moveItem,
+  normalizeGroupGap,
   normalizeGroupRatios,
   ratiosToAttr,
   removeRatio,
@@ -44,6 +45,16 @@ function dispatchChecked(view: EditorView, tr: Transaction, selectPos?: number):
   view.dispatch(tr)
   view.focus()
   return true
+}
+
+export function setGroupGap(view: EditorView, groupPos: number, gap: number): boolean {
+  if (!view.editable) return false
+  const node = view.state.doc.nodeAt(groupPos)
+  if (!node || node.type.name !== 'imageGroup') return false
+  const next = normalizeGroupGap(gap)
+  if (normalizeGroupGap(node.attrs.gap) === next) return false
+  const tr = view.state.tr.setNodeMarkup(groupPos, undefined, { ...node.attrs, gap: next })
+  return dispatchChecked(view, tr, groupPos)
 }
 
 export function setGroupAlign(view: EditorView, groupPos: number, align: 'left' | 'center' | 'right'): boolean {

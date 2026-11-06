@@ -11,6 +11,9 @@ import {
   MAX_IMAGES_PER_ROW,
   moveItem,
   nextImageSelection,
+  IMAGE_GROUP_GAP_DEFAULT,
+  nextGroupGap,
+  normalizeGroupGap,
   normalizeGroupRatios,
   ratioPercents,
   ratiosToAttr,
@@ -75,6 +78,15 @@ assert.equal(blockHtmlIsKept('<div data-type="image-group"><img src="x"></div>')
 
 assert.equal(groupCssVars(2, '1:2'), '--g0:1;--g1:2')
 assert.equal(groupCssVars(3, null), '--g0:1;--g1:1;--g2:1')
+assert.equal(groupCssVars(2, '1:2', 8), '--g0:1;--g1:2')
+assert.equal(groupCssVars(2, '1:2', 16), '--g0:1;--g1:2;--rte-group-gap:16px')
+assert.equal(normalizeGroupGap(null), IMAGE_GROUP_GAP_DEFAULT)
+assert.equal(normalizeGroupGap('24px'), 24)
+assert.equal(normalizeGroupGap(99), 48)
+assert.equal(normalizeGroupGap('nope'), IMAGE_GROUP_GAP_DEFAULT)
+assert.equal(nextGroupGap(8), 16)
+assert.equal(nextGroupGap(24), 0)
+assert.equal(nextGroupGap(0), 8)
 assert.equal(rowCanAccept(9, 1), true)
 assert.equal(rowCanAccept(10, 1), false)
 assert.equal(MAX_IMAGES_PER_ROW, 10)
@@ -100,7 +112,8 @@ assert.match(imageGroupLayoutCss, /\.rte-image-drag-handle\{/)
 assert.match(imageGroupLayoutCss, /-webkit-user-drag:none/)
 assert.match(imageGroupLayoutCss, /position:relative/)
 assert.match(imageGroupLayoutCss, /\.rte-image-group-divider\{/)
-assert.match(imageGroupLayoutCss, /gap:8px/)
+assert.match(imageGroupLayoutCss, /gap:var\(--rte-group-gap,8px\)/)
+assert.match(imageGroupLayoutCss, /rte-image-group-gap/)
 assert.match(imageGroupLayoutCss, /data-resize-wrapper/)
 assert.match(imageGroupLayoutCss, /left:36px;top:8px/)
 assert.doesNotMatch(imageGroupLayoutCss, /:deep/)

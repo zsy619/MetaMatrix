@@ -2,6 +2,25 @@
 export const MAX_IMAGES_PER_ROW = 10
 export const IMAGE_ROW_LIMIT_TIP = '一行最多 10 张图片'
 
+/** 图片组组内间距。缺省 8 与改之前的固定间距一致，旧文档不改外观。 */
+export const IMAGE_GROUP_GAP_DEFAULT = 8
+export const IMAGE_GROUP_GAP_MAX = 48
+export const IMAGE_GROUP_GAP_PRESETS = [0, 8, 16, 24] as const
+
+export function normalizeGroupGap(raw: unknown): number {
+  if (raw == null || raw === '') return IMAGE_GROUP_GAP_DEFAULT
+  const text = typeof raw === 'number' ? String(raw) : String(raw).trim().replace(/px$/i, '')
+  const n = Number(text)
+  if (!Number.isFinite(n)) return IMAGE_GROUP_GAP_DEFAULT
+  return Math.max(0, Math.min(IMAGE_GROUP_GAP_MAX, Math.round(n)))
+}
+
+/** 在 0 / 8 / 16 / 24 之间往后切一档，到顶回到 0。 */
+export function nextGroupGap(raw: unknown): number {
+  const gap = normalizeGroupGap(raw)
+  return IMAGE_GROUP_GAP_PRESETS.find((preset) => preset > gap) ?? IMAGE_GROUP_GAP_PRESETS[0]
+}
+
 export function rowCanAccept(current: number, incoming = 1): boolean {
   const count = Number.isFinite(current) ? current : 0
   const add = Number.isFinite(incoming) ? incoming : 0
@@ -40,7 +59,7 @@ export const imageGroupLayoutCss = [
   '[data-resize-container][data-node="image"],[data-resize-container][data-node="image"] img{-webkit-user-drag:none;}',
   '.rte-root [data-resize-container][data-node="image"].ProseMirror-selectednode{outline:2px solid #3370ff;outline-offset:2px;border-radius:4px;}',
   '.rte-image-group{position:relative;width:100%;max-width:100%;margin:8px 0;box-sizing:border-box;}',
-  '.rte-image-group-row{display:flex;flex-direction:row;align-items:stretch;gap:8px;width:100%;max-width:100%;height:auto;min-height:0;box-sizing:border-box;overflow:hidden;}',
+  '.rte-image-group-row{display:flex;flex-direction:row;align-items:stretch;gap:var(--rte-group-gap,8px);width:100%;max-width:100%;height:auto;min-height:0;box-sizing:border-box;overflow:hidden;}',
   '.rte-image-group-row>*{min-width:0;height:100%;max-width:100%;float:none !important;margin:0 !important;}',
   '.rte-image-group-row>[data-resize-container][data-node="image"]{display:flex !important;width:auto !important;height:100% !important;max-width:100%;max-height:100%;margin:0 !important;overflow:hidden;border-radius:4px;}',
   '.rte-image-group-row [data-resize-wrapper]{width:100% !important;height:100% !important;max-width:100% !important;}',
@@ -64,6 +83,7 @@ export const imageGroupLayoutCss = [
   '.rte-image-group-bar{position:absolute;left:36px;top:8px;z-index:7;display:none;align-items:center;gap:2px;padding:4px;background:#fff;border-radius:8px;box-shadow:0 8px 24px rgba(29,33,41,.12),0 0 0 1px rgba(29,33,41,.06);}',
   '.rte-image-group:hover>.rte-image-group-bar,.rte-image-group.is-selected>.rte-image-group-bar{display:flex;}',
   '.rte-image-group-bar button{appearance:none;border:0;background:transparent;color:#1d2129;width:28px;height:28px;padding:0;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;}',
+  '.rte-image-group-bar button.rte-image-group-gap{width:auto;min-width:28px;padding:0 6px;font-size:11px;font-variant-numeric:tabular-nums;}',
   '.rte-image-group-bar button:hover,.rte-image-group-bar button.is-active{background:#e8f3ff;color:#3370ff;}',
   '.rte-image-group-bar svg{width:16px;height:16px;display:block;}',
   '.rte-image-group-dividers{position:absolute;inset:0;pointer-events:none;z-index:30;}',
@@ -83,10 +103,13 @@ export function installImageGroupLayout(): void {
   }
   if (style.textContent !== imageGroupLayoutCss) style.textContent = imageGroupLayoutCss
 }
-export function groupCssVars(count: number, raw: unknown): string {
-  return normalizeGroupRatios(count, raw)
-    .map((grow, index) => `--g${index}:${grow}`)
-    .join(';')
+export function groupCssVars(count: number, raw: unknown, gap?: unknown): string {
+  const parts = normalizeGroupRatios(count, raw).map((grow, index) => `--g${index}:${grow}`)
+  const resolved = normalizeGroupGap(gap)
+  if (gap != null && gap !== '' && resolved !== IMAGE_GROUP_GAP_DEFAULT) {
+    parts.push(`--rte-group-gap:${resolved}px`)
+  }
+  return parts.join(';')
 }
 
 export function groupUsesAspect(ratioMode: unknown): boolean {
