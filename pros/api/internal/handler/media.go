@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -55,6 +56,95 @@ func (h *MediaHandler) Check(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 	c.JSON(http.StatusOK, out)
+}
+
+type prepareChunkBody struct {
+	OriginalName string `json:"originalName"`
+	MediaType    string `json:"mediaType"`
+	MimeType     string `json:"mimeType"`
+	CategoryID   string `json:"categoryId"`
+	SizeBytes    int64  `json:"sizeBytes"`
+	PartSize     int64  `json:"partSize"`
+	UserID       string `json:"userId"`
+}
+
+func (h *MediaHandler) PrepareChunk(ctx context.Context, c *app.RequestContext) {
+	uid, ok := h.owner(c)
+	if !ok {
+		return
+	}
+	var body prepareChunkBody
+	if err := c.BindJSON(&body); err != nil {
+		BadRequest(c, "invalid json")
+		return
+	}
+	out, err := h.svc.PrepareChunk(ctx, uid, media.PrepareInput{
+		OriginalName: body.OriginalName,
+		MediaType:    body.MediaType,
+		MimeType:     body.MimeType,
+		CategoryID:   body.CategoryID,
+		SizeBytes:    body.SizeBytes,
+		PartSize:     body.PartSize,
+	})
+	if err != nil {
+		h.fail(c, err)
+		return
+	}
+	c.JSON(http.StatusCreated, out)
+}
+
+func (h *MediaHandler) ChunkStatus(ctx context.Context, c *app.RequestContext) {
+	uid, ok := h.owner(c)
+	if !ok {
+		return
+	}
+	out, err := h.svc.ChunkStatus(ctx, uid, c.Param("id"))
+	if err != nil {
+		h.fail(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, out)
+}
+
+func (h *MediaHandler) PutChunk(ctx context.Context, c *app.RequestContext) {
+	uid, ok := h.owner(c)
+	if !ok {
+		return
+	}
+	index, err := strconv.Atoi(strings.TrimSpace(string(c.Query("index"))))
+	if err != nil {
+		BadRequest(c, "invalid index")
+		return
+	}
+	var body io.Reader
+	if stream := c.Request.BodyStream(); stream != nil {
+		body = stream
+	} else {
+		body = bytes.NewReader(c.Request.Body())
+	}
+	out, err := h.svc.PutChunk(ctx, uid, c.Param("id"), index, body)
+	if err != nil {
+		h.fail(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, out)
+}
+
+func (h *MediaHandler) FinishChunk(ctx context.Context, c *app.RequestContext) {
+	uid, ok := h.owner(c)
+	if !ok {
+		return
+	}
+	view, err := h.svc.FinishChunk(ctx, uid, c.Param("id"))
+	if err != nil {
+		h.fail(c, err)
+		return
+	}
+	status := http.StatusOK
+	if view.Created {
+		status = http.StatusCreated
+	}
+	c.JSON(status, view)
 }
 
 func (h *MediaHandler) Upload(ctx context.Context, c *app.RequestContext) {
@@ -382,6 +472,8 @@ func (h *MediaHandler) fail(c *app.RequestContext, err error) {
 	case errors.Is(err, media.ErrBadRange):
 		c.Header("Content-Range", "bytes */0")
 		Fail(c, http.StatusRequestedRangeNotSatisfiable, "bad range", "bad_range")
+	case errors.Is(err, media.ErrChunkIncomplete):
+		Conflict(c, "upload is missing parts", nil)
 	case errors.Is(err, media.ErrBadMediaType), errors.Is(err, media.ErrTooLarge), errors.Is(err, media.ErrPathEscape), errors.Is(err, media.ErrCategoryCycle):
 		BadRequest(c, err.Error())
 	default:
