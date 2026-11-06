@@ -69,12 +69,14 @@ function renderCellHTML(
   const borderStyle = (HTMLAttributes.borderStyle as string) || null
   const verticalAlign = (HTMLAttributes.verticalAlign as string) || null
   const formula = (HTMLAttributes.formula as string) || null
+  const colwidth = HTMLAttributes.colwidth
   const {
     backgroundColor: _bg,
     borderColor: _bc,
     borderStyle: _bs,
     verticalAlign: _va,
     formula: _formula,
+    colwidth: _cw,
     style: prevStyle,
     ...rest
   } = HTMLAttributes as Record<string, unknown> & {
@@ -83,10 +85,13 @@ function renderCellHTML(
     borderStyle?: string
     verticalAlign?: string
     formula?: string
+    colwidth?: unknown
     style?: string
   }
   const style = buildCellStyle({ backgroundColor, borderColor, borderStyle, verticalAlign })
   const attrs: Record<string, unknown> = { ...rest }
+  if (Array.isArray(colwidth) && colwidth.length) attrs.colwidth = colwidth.join(',')
+  else if (typeof colwidth === 'string' && colwidth) attrs.colwidth = colwidth
   if (backgroundColor) attrs['data-bg'] = backgroundColor
   if (borderColor) attrs['data-border-color'] = borderColor
   if (borderStyle) attrs['data-border-style'] = borderStyle
@@ -105,8 +110,12 @@ export const RteTableCell = TableCell.extend({
       ...extraCellAttrs,
     }
   },
-  renderHTML({ HTMLAttributes }) {
-    return renderCellHTML('td', HTMLAttributes, this.options.HTMLAttributes) as any
+  renderHTML({ HTMLAttributes, node }) {
+    return renderCellHTML(
+      'td',
+      { ...HTMLAttributes, ...(node?.attrs as Record<string, unknown> | undefined) },
+      this.options.HTMLAttributes,
+    ) as any
   },
 })
 
@@ -117,8 +126,12 @@ export const RteTableHeader = TableHeader.extend({
       ...extraCellAttrs,
     }
   },
-  renderHTML({ HTMLAttributes }) {
-    return renderCellHTML('th', HTMLAttributes, this.options.HTMLAttributes) as any
+  renderHTML({ HTMLAttributes, node }) {
+    return renderCellHTML(
+      'th',
+      { ...HTMLAttributes, ...(node?.attrs as Record<string, unknown> | undefined) },
+      this.options.HTMLAttributes,
+    ) as any
   },
 })
 

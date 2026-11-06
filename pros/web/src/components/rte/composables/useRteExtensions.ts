@@ -357,7 +357,7 @@ const editor = useEditor({
     }),
     TaskList,
     TaskItem.configure({ nested: true }),
-    Table.configure({ resizable: true }),
+    Table.configure({ resizable: true, handleWidth: 8 }),
     TableRow,
     RteTableHeader,
     RteTableCell,

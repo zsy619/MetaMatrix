@@ -35,6 +35,16 @@
 
 截图：`/opt/cursor/artifacts/rte-dialog-formula-1440.png`、`rte-dialog-formula-1280.png`、`rte-dialog-formula-390.png`、`rte-dialog-table-1440.png`、`rte-dialog-table-1280.png`、`rte-dialog-table-390.png`、`rte-dialog-pagesetup-1440.png`、`rte-dialog-pagesetup-1280.png`、`rte-dialog-pagesetup-390.png`、`rte-core-dialogs-applied.png`。真实系统文件选择器、系统输入法、飞书租户没有测。页面设置撤销用的是编辑器自己的 `handleKeyDown`，不是操作系统输入法。
 
+## 2026-11-06 表格操作、编号导出、图表暗色
+
+这三项原先记成缺口，代码里其实已有入口。核对之后补上的是会丢状态或对不上屏幕的部分。
+
+- 表格：工具栏菜单、右键菜单和窄屏「表格操作」都能合并、拆分、设单元格背景。列宽仍是拖列边缘（命中加宽到 8px），`table-layout: fixed` 后宽度才看得到。背景和列宽写入单元格 HTML（`data-bg`、`colwidth`），`setContent` 重载还在。撤销只撤这一步，不把整张表撤掉。右键菜单限制在视口内并可滚动。窄屏选完背景会关掉操作表，避免遮罩挡住工具栏。
+- 标题编号：开关打开时，Markdown、复制 Markdown 和 Word 用导出副本加上与屏幕相同的编号（`1. `、`1.1 `、跳级时 `2.0.1 `）。编辑器 `getHTML()` 不加编号，重复导出结果相同，关掉开关的导出没有编号。Word 是 JSZip 生成的 OOXML `.docx`，编号写在标题文字里，不是 Word 自动编号域，也不是 HTML 套壳。
+- 图表：没写 `backgroundColor` 时，暗色编辑区渲染用深底和默认文字色，浅色仍是白底。option 里已经写了背景色就保持，系列数据不改，也不写回文档。导出快照仍先画成白底再截图。
+
+脚本：`pros/web/scripts/rte-table-ops-e2e.mjs`。截图：`/opt/cursor/artifacts/rte-table-ops-1440.png`、`rte-table-ops-1280.png`、`rte-table-ops-390.png`、`rte-chart-dark.png`。
+
 ## 编辑内核（对照分享，#108）
 
 分享是通用内核说明，不是本仓库的缺陷单。没有因此加协同或插件框架。真实系统输入法仍然没测，测试里的按键是脚本派发的。
@@ -68,7 +78,7 @@
 
 只做了两件有失败证据的事：
 
-1. **标题号按钮点了没有编号，刷新也记不住。** 样式写在未加 `scoped` 的 `editor.global.css` 里，选择器却用了 `:deep()`。这不是合法 CSS，浏览器把整条规则丢掉，所以开关只改 class、成功提示会出现，标题前没有号。另外开关只活在组件 `ref` 里，H5/H6 原来也没写。现在改成普通选择器，补上 H5/H6，并按面板写入 `headingAutoNumByPanelId`（只在打开时记 `true`）。不改页面大小、页边距、页眉。编号仍是 CSS 计数器，不写进标题文字。Markdown / Word 导出因此**不会**带上这些编号，这仍是缺口。
+1. **标题号按钮点了没有编号，刷新也记不住。** 样式写在未加 `scoped` 的 `editor.global.css` 里，选择器却用了 `:deep()`。这不是合法 CSS，浏览器把整条规则丢掉，所以开关只改 class、成功提示会出现，标题前没有号。另外开关只活在组件 `ref` 里，H5/H6 原来也没写。现在改成普通选择器，补上 H5/H6，并按面板写入 `headingAutoNumByPanelId`（只在打开时记 `true`）。不改页面大小、页边距、页眉。编号仍是 CSS 计数器，不写进标题文字。Markdown / Word 的导出副本后来补上了同样的编号，见「表格操作、编号导出、图表暗色」。
 2. **表格「表筛选」编辑一下就失效。** 筛选把 `display` 写在 `<tr>` 上，文档一更新 ProseMirror 按文档重画表格，隐藏行回来。现在记住表格位置，事务落地后再画一次。筛选仍然不进 HTML。
 
 ## 正文怎么保存
@@ -105,7 +115,7 @@
 | 标题 1–6 | StarterKit `levels: [1..6]` | 已实现 | `useRteExtensions.ts` | — |
 | 标题 7–9 | 未注册 | 缺口 | 同上 | P3 |
 | 段样式 | `applyParagraphStyle` | 已实现代码；本轮未点 | `rteWave21.ts` | 未验证 |
-| 标题号 | 打开后 H1–H6 用 CSS 计数器；按面板落库 | 本轮修掉无效的 `:deep()` 选择器，并补落库和 H5/H6。导出 Word/Markdown 不含编号 | `editor.global.css`、`rteHeadingAutoNum.ts`、`RichTextEditor.char.test.ts`、`scripts/rte-heading-num-e2e.mjs` | 导出仍是 P1 |
+| 标题号 | 打开后 H1–H6 用 CSS 计数器；按面板落库。Markdown / 复制 Markdown / Word 在导出副本里写上同样的编号，不改正文 | Word 是 OOXML，编号在标题文字里，不是自动编号域 | `rteHeadingExport.ts`、`editor.global.css` | — |
 | 列表、编号样式、重编号 | 列表扩展 + `rteListRenumber.ts` | 已实现；本轮未点菜单 | `listStyleAttrs.ts` | 未验证 |
 | 对齐（含两端）、行高、段距、缩进、首行缩进 | TextAlign、ParagraphAttrs | 已实现 | `useRteExtensions.ts` | 未验证像素 |
 | 引用、代码块 | 自写引用；代码块含语言、复制、行号、换行 | 行号/换行见 #107。本轮未再点 | `rteBlockquote.ts`、`codeHighlight.ts` | — |
@@ -130,14 +140,14 @@
 | 能力 | 判定 | 证据 |
 |---|---|---|
 | 按类插入、属性面板、数据表、删除 | 已实现；本轮未再点面板 | `docs/rte-chart-panel.md`、`chart-panel/`、`ChartPanel.ops.test.ts` |
-| 暗色编辑区不换图表主题 | 缺口 | `echartsBlock.ts` 无暗色分支（见对照报告） |
+| 暗色编辑区 | 没写背景色时渲染用深底；用户写过的 `backgroundColor` 和系列色保持，不写回 option。导出快照仍是白底 | `rteChartTheme.ts`、`echartsBlock.ts`、`rte-chart-dark.png` |
 | 读屏是否念出摘要 | 未验证 | 有 `echartsBlock.a11y.test.ts`，没有读屏 |
 
 ## 6. 表格
 
 | 入口 | 行为 | 判定 | 证据 | 优先级 |
 |---|---|---|---|---|
-| 插入、合并、列宽、单元格背景 | 插入弹窗在三档视口打开过。确认按行数插入，可撤销。合并、列宽、背景本轮未点 | `useTableOps.ts`、`scripts/rte-core-dialogs-e2e.mjs` | 合并等待验 |
+| 插入、合并、列宽、单元格背景 | 1440 / 1280 / 390 从菜单合并、上色、拖列宽，撤销重做后 `setContent` 仍保留 `colspan`、`data-bg`、`colwidth` | `useTableOps.ts`、`rteTableCells.ts`、`scripts/rte-table-ops-e2e.mjs` | — |
 | 公式栏 | `SUM/AVERAGE/COUNT/MAX/MIN`、区域、四则。无跨表、无命名 | 已实现这一子集 | `rteTableFormula.ts`、`RteTableFormulaBar.vue` | 跨表是 P2 |
 | 表 CSV | 复制当前表 | 已实现代码；本轮未点 | `copyTableAs` | 未验证 |
 | 表筛选 | 关键词隐藏数据行；编辑后仍隐藏；不进 HTML | 本轮已补重画 | `rteWave21.ts` 的 `paintTableFilterAt`、`rteTableFilter.reapply.test.ts` | — |
@@ -191,7 +201,7 @@
 | 导出 HTML / Markdown / PDF / PNG / Word | 图表导出前换成白底快照 | 已实现代码与 `rteExportChartSnapshots.test.ts`。本轮未打开导出文件 | `useExport.ts` |
 | 复制 Markdown | 已实现代码 | `exportAsMarkdown` 的复制路径在工具项 `copyMd` |
 | 发布设置 | 只提示「即将支持」 | 缺口（明确的空按钮） | `onPublishSettings` | P2 |
-| 标题编号进 Word/Markdown | CSS 计数器不会出现在 `getHTML()` | 缺口 | 本文件首批说明 | P1 |
+| 标题编号进 Word/Markdown | 导出副本写入编号。正文 HTML 仍不含编号，所以再打开不会重复编号 | 本轮 `rteHeadingExport.test.ts`。Word 不是编号域 | `rteHeadingExport.ts`、`useExport.ts` | — |
 
 ## 12. 不在工具栏上、但属于编辑器
 
@@ -207,14 +217,14 @@
 ## 剩余批次（本轮不做）
 
 1. 专注模式、纸张参考线、全屏刷新后丢失。这是会话视图，没有并进表头冻结 / 暗色 / 缩放的本机偏好。
-2. 标题编号不进 Markdown / Word。
-3. 表格跨表公式、单元格命名。合并、列宽、单元格背景这轮没有再点。
-4. 图表不跟暗色主题。
-5. 同步块没有推送。
-6. 「发布设置」仍是空提示。
-7. 长文仍是整篇一个编辑器实例。不为此单开性能项目。
-8. 飞书租户凭证、真实系统输入法、操作系统文件选择器。没有凭证，不伪造。
-9. 页面设置的底栏（页面大小、页边距、页眉、页脚、页码）仍是改完即写入，只有弹窗走草稿。嵌入区块仍不套 A4，这轮没有改那条路径。
+2. 表格跨表公式、单元格命名。
+3. 同步块没有推送。
+4. 「发布设置」仍是空提示。
+5. 长文仍是整篇一个编辑器实例。不为此单开性能项目。
+6. 飞书租户凭证、真实系统输入法、操作系统文件选择器。没有凭证，不伪造。
+7. 页面设置的底栏（页面大小、页边距、页眉、页脚、页码）仍是改完即写入，只有弹窗走草稿。嵌入区块仍不套 A4。
+8. 图表暗色只改没写背景时的默认渲染。用户指定的配色、以及打印/Word 用的白底快照，都不跟着编辑区变。
+9. Word 标题编号是标题里的文字，不是 Word 自动编号域。
 
 ## 本轮验收
 
@@ -238,6 +248,8 @@ CHROME_PATH=/usr/local/bin/google-chrome node scripts/rte-heading-num-e2e.mjs
 - `npx vue-tsc -b --pretty false`：通过。
 - `npm run build`：通过。
 - `CHROME_PATH=/usr/local/bin/google-chrome node scripts/rte-heading-num-e2e.mjs`：此前通过。H1 的 `::before` 计算值是 `counter(h1) ". "`，`textContent` 仍是「代码块与图片组」。截图像素里标题显示为「1. 代码块与图片组」，文件 `/opt/cursor/artifacts/rte-heading-auto-num.png`。这轮没有重跑。
-- `CHROME_PATH=/usr/local/bin/google-chrome node scripts/rte-core-dialogs-e2e.mjs`：通过。三档视口里公式、表格、页面设置都在画面内；取消不改正文；非法公式和超出范围的行数不按原值提交；确认后的公式、4 行表格、页眉分别验证过，公式和表格走编辑器撤销/重做，页面设置走编辑器 Ctrl+Z / Ctrl+Shift+Z。暗色、125%、表头冻结刷新后还在，专注模式不记，页面大小保持 A4。
+- `npx vitest run`：表格操作、编号导出和图表暗色这轮是 96 个文件，726 通过，1 跳过。
+- `CHROME_PATH=/usr/local/bin/google-chrome node scripts/rte-core-dialogs-e2e.mjs`：此前通过。这轮没有重跑。
+- `CHROME_PATH=/usr/local/bin/google-chrome node scripts/rte-table-ops-e2e.mjs`：通过。三档视口合并、撤销、重做、浅蓝背景、拖列宽和重载都在；暗色下默认图表为深底且 option 字符串不变。
 
 表筛选的「编辑后仍隐藏、HTML 不含筛选」由 `rteTableFilter.reapply.test.ts` 覆盖，本轮没有在浏览器里点「表筛选」。

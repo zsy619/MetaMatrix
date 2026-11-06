@@ -1003,6 +1003,18 @@ function toggleChartGroupMenu(key: string) {
               </template>
               <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
               <div data-rte-own class="rte-menu-hint-line">拖拽列边缘调整列宽。多选单元格后可合并。</div>
+              <div data-rte-own class="rte-table-cell-style-title" style="padding: 4px 10px">单元格背景</div>
+              <div data-rte-own class="rte-table-swatches" style="padding: 0 10px 8px">
+                <button data-rte-own
+                  v-for="p in rte.TABLE_CELL_BG_PRESETS"
+                  :key="'menu-bg-' + p.value"
+                  type="button"
+                  class="rte-table-swatch"
+                  :title="p.label"
+                  :style="p.value ? { background: p.value } : undefined"
+                  @click="rte.setTableCellBg(p.value); rte.closeTableMenu()"
+                >{{ p.value ? '' : '无' }}</button>
+              </div>
               <button data-rte-own
                 type="button"
                 role="menuitem"

@@ -12,6 +12,7 @@ import { applyChartAria } from '../utils/echarts/chartA11yOption'
 import { buildChartA11ySummary, type ChartA11ySummary } from '../utils/echarts/chartA11y'
 import { echartsRendererFor, needsEchartsGl, resolveEchartsRenderItems } from '../utils/echarts/prepare'
 import { loadEchartsGl } from '../utils/echartsGlRuntime'
+import { chartRenderOption, type ChartRenderMode } from '../utils/rteChartTheme'
 import {
   resolveDataSourceConfig,
   startChartDataPolling,
@@ -72,14 +73,13 @@ function defaultOption(type: EchartsChartType): string {
   return serializeEchartsOption(buildTemplateOption(type))
 }
 
-/** 渲染时强制浅色、关闭动画：编辑态不跑 zrender 动画，打印/PDF 结果一致。 */
-function renderOption(option: Record<string, unknown>): Record<string, unknown> {
-  return {
-    ...option,
-    animation: false,
-    animationDuration: 0,
-    backgroundColor: '#ffffff',
-  }
+function chartMode(host: HTMLElement): ChartRenderMode {
+  return host.closest('.rte-root')?.classList.contains('is-dark-editor') ? 'dark' : 'light'
+}
+
+/** 渲染副本。用户写过的背景色保留；没写时暗色编辑区才用深底。不写回文档。 */
+function renderOption(option: Record<string, unknown>, mode: ChartRenderMode): Record<string, unknown> {
+  return chartRenderOption(option, mode)
 }
 
 export const EchartsBlock = Node.create({
@@ -195,6 +195,22 @@ export const EchartsBlock = Node.create({
       let renderSeq = 0
       /** 最近一次的无障碍摘要（导出快照的 alt 文本用它）。 */
       let a11ySummary: ChartA11ySummary | null = null
+      let classObserver: MutationObserver | null = null
+      let liveSource: Record<string, unknown> | null = null
+
+      const watchDark = () => {
+        if (classObserver) return
+        const root = dom.closest('.rte-root')
+        if (!root) return
+        let last = root.classList.contains('is-dark-editor')
+        classObserver = new MutationObserver(() => {
+          const dark = root.classList.contains('is-dark-editor')
+          if (dark === last) return
+          last = dark
+          void render()
+        })
+        classObserver.observe(root, { attributes: true, attributeFilter: ['class'] })
+      }
 
       const dom = document.createElement('div')
       dom.className = 'rte-echarts-block'
@@ -282,6 +298,8 @@ export const EchartsBlock = Node.create({
         const parsed = safeParseEchartsOption(current.attrs.option || '')
         // 接口拉到的数据优先（只影响显示，不写回文档）
         const effective = remoteOption || (parsed.ok ? parsed.option : {})
+        liveSource = effective
+        watchDark()
         // 无障碍摘要：先更新，option 解析失败时也要把摘要清空
         a11ySummary = applyChartA11y(previewEl, a11yEl, effective)
         if (!parsed.ok) {
@@ -327,9 +345,10 @@ export const EchartsBlock = Node.create({
           }
           // custom 系列的 renderItem 在文档里只存预设名，这里换成内置函数
           // 渲染前补 aria（默认开启 + 自动摘要），ECharts 自身才能把描述播报出来
-          chart.setOption(applyChartAria(renderOption(resolveEchartsRenderItems(effective))), {
-            notMerge: true,
-          })
+          chart.setOption(
+            applyChartAria(renderOption(resolveEchartsRenderItems(effective), chartMode(dom))),
+            { notMerge: true },
+          )
           chart.resize()
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err)
@@ -359,29 +378,32 @@ export const EchartsBlock = Node.create({
       /** 导出/打印前：换成白底静态快照，避免动画残帧与主题差异。 */
       const takeSnapshot = () => {
         if (!chart || !previewEl || snapshotEl) return
-        // 首选 PNG 快照（html2canvas 抓 PNG 最稳）；失败时退到内联 SVG 序列化。
-        let url = ''
         try {
-          url =
-            chart.getDataURL({
-              type: 'png',
-              pixelRatio: 2,
-              backgroundColor: '#ffffff',
-            }) || ''
-        } catch {
-          url = ''
-        }
-        if (!url) {
-          try {
-            const svg = previewEl.querySelector('svg')
-            if (!svg) return
-            const markup = new XMLSerializer().serializeToString(svg)
-            url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(markup)}`
-          } catch {
-            return
+          if (liveSource) {
+            chart.setOption(applyChartAria(renderOption(resolveEchartsRenderItems(liveSource), 'light')), {
+              notMerge: true,
+            })
           }
-        }
-        try {
+          // 首选 PNG 快照（html2canvas 抓 PNG 最稳）；失败时退到内联 SVG 序列化。
+          let url = ''
+          try {
+            url =
+              chart.getDataURL({
+                type: 'png',
+                pixelRatio: 2,
+                backgroundColor: '#ffffff',
+              }) || ''
+          } catch {
+            url = ''
+          }
+          if (!url) {
+            const svg = previewEl.querySelector('svg')
+            if (svg) {
+              const markup = new XMLSerializer().serializeToString(svg)
+              url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(markup)}`
+            }
+          }
+          if (!url) return
           snapshotEl = document.createElement('div')
           snapshotEl.className = 'rte-echarts-snapshot'
           const img = document.createElement('img')
@@ -393,6 +415,8 @@ export const EchartsBlock = Node.create({
           previewEl.classList.add('is-snapshot')
         } catch {
           snapshotEl = null
+        } finally {
+          void render()
         }
       }
 
@@ -471,6 +495,8 @@ export const EchartsBlock = Node.create({
           window.removeEventListener(RTE_AFTER_EXPORT_EVENT, onAfterExport)
           resizeObserver?.disconnect()
           resizeObserver = null
+          classObserver?.disconnect()
+          classObserver = null
           dropSnapshot()
           try {
             chart?.dispose()

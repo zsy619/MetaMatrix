@@ -95,6 +95,7 @@ export const RTE_OVERLAY_CLOSE_ORDER = [
   'audio',
   'formula',
   'table',
+  'tableOps',
   'note',
   'attach',
   'snippet',

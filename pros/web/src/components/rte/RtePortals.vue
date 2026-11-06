@@ -537,6 +537,7 @@ const echartsDialogTemplates = computed(() => {
         <div data-rte-own
           class="rte-table-ops-sheet"
           role="dialog"
+          aria-modal="true"
           aria-label="表格操作"
           @mousedown.stop
         >

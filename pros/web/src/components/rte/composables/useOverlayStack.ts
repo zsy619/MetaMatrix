@@ -11,6 +11,7 @@ export function useOverlayStack(deps: {
   audioDialogOpen: () => { value: boolean }
   formulaDialogOpen: () => { value: boolean }
   tableDialogOpen: () => { value: boolean }
+  tableOpsSheetOpen: () => { value: boolean }
   noteDialogOpen: () => { value: boolean }
   attachDialogOpen: () => { value: boolean }
   snippetDialogOpen: () => { value: boolean }
@@ -34,6 +35,7 @@ export function useOverlayStack(deps: {
   closeAudioDialog: () => void
   closeFormulaDialog: () => void
   closeTableDialog: () => void
+  closeTableOpsSheet: () => void
   closeNoteDialog: () => void
   closeAttachDialog: () => void
   closeLinkCardDialog: () => void
@@ -52,6 +54,7 @@ function closeTopOverlay(): boolean {
       audio: deps.audioDialogOpen().value,
       formula: deps.formulaDialogOpen().value,
       table: deps.tableDialogOpen().value,
+      tableOps: deps.tableOpsSheetOpen().value,
       note: deps.noteDialogOpen().value,
       attach: deps.attachDialogOpen().value,
       snippet: deps.snippetDialogOpen().value,
@@ -93,6 +96,9 @@ function closeTopOverlay(): boolean {
       break
     case 'table':
       deps.closeTableDialog()
+      break
+    case 'tableOps':
+      deps.closeTableOpsSheet()
       break
     case 'note':
       deps.closeNoteDialog()

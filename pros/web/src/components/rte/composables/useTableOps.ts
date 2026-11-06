@@ -69,6 +69,17 @@ function openTableContextMenu(event: MouseEvent) {
   }
   tableMenuOpen.value = false
   tableOpsSheetOpen.value = false
+  nextTick(() => {
+    const el = document.querySelector('.rte-table-ctx')
+    if (!(el instanceof HTMLElement) || !tableCtx.value.open) return
+    const rect = el.getBoundingClientRect()
+    const pad = 8
+    const x = Math.max(pad, Math.min(tableCtx.value.x, window.innerWidth - rect.width - pad))
+    const y = Math.max(pad, Math.min(tableCtx.value.y, window.innerHeight - rect.height - pad))
+    if (x !== tableCtx.value.x || y !== tableCtx.value.y) {
+      tableCtx.value = { open: true, x, y }
+    }
+  })
 }
 
 const tableHeaderSticky = ref(false)
@@ -164,6 +175,7 @@ function setTableCellBg(color: string) {
   if (!ed || !isInTable()) return
   const value = color || null
   ed.chain().focus().setCellAttribute('backgroundColor', value).run()
+  closeAllTableUi()
 }
 function setTableCellBorderColor(color: string) {
   const ed = deps.editor().value

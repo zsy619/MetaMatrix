@@ -1955,7 +1955,7 @@ async function copyAsMarkdown() {
   const ed = editor.value
   if (!ed) return
   try {
-    const md = await copySelectionOrDocAsMarkdown(ed)
+    const md = await copySelectionOrDocAsMarkdown(ed, headingAutoNumber.value)
     await navigator.clipboard.writeText(md)
     ElMessage.success('已复制为 Markdown')
   } catch (e) {
@@ -4482,6 +4482,8 @@ useOverlayStack({
   audioDialogOpen: () => audioDialogOpen,
   formulaDialogOpen: () => formulaDialogOpen,
   tableDialogOpen: () => tableDialogOpen,
+  tableOpsSheetOpen: () => tableOpsSheetOpen,
+  closeTableOpsSheet: () => closeTableOpsSheet(),
   noteDialogOpen: () => noteDialogOpen,
   attachDialogOpen: () => attachDialogOpen,
   snippetDialogOpen: () => snippetDialogOpen,
@@ -5054,6 +5056,7 @@ const {
   closeMore: () => {
     moreOpen.value = false
   },
+  headingNumbers: () => headingAutoNumber.value,
 })
 
 /** 工具栏分组内的按钮配置菜单（右键分组打开） */
