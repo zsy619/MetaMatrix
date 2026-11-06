@@ -16,6 +16,20 @@
 
 优先级：P0 用户能看见的失败或数据丢失；P1 设置保存后丢失；P2 体验不完整；P3 明确不做。
 
+## 编辑内核（对照分享，仍在本分支）
+
+分享是通用内核说明，不是本仓库的缺陷单。没有因此加协同或插件框架。真实系统输入法仍然没测，测试里的按键是脚本派发的。
+
+本轮核对后补上的缺口：
+
+- 粘贴清洗原来只按字面 `javascript:` 替换。`&#106;avascript:` 和 `data:text/html` 会留下。现在先剥脚本（含没闭合的），再用 DOM 重建允许的结构；链接只留 http(s) 和 `/media/{id}`，图片还可留 `data:image` 的位图。`onerror` 这类事件属性去掉。
+- 纯文本粘贴收成 `plainTextToPasteContent`：尖括号保持文字，多行变成段落。
+- 加粗后选区不丢；Ctrl+B 和工具栏 `toggleBold` 得到同一份 HTML；撤销能回到加粗前。代表性文档再加载一次后，标题、列表、链接、代码语言、素材图地址还在，再加载一次 HTML 不再变。
+
+素材窗和音视频窗关掉后的焦点回归仍是上一提交的行为。音频窗、真实文件选择器、公式/表格/页面设置弹窗，这轮没有重新在浏览器里点。
+
+2026-11-06 内核验收：`npx vitest run src/utils/rteKernel.test.ts src/utils/rtePasteClean.test.ts` 通过。浏览器 `node scripts/rte-kernel-e2e.mjs` 通过：键入「内核样本」后在页面里派发 Ctrl+B，选区仍盖住这四个字；Ctrl+Z / Ctrl+Shift+Z 能撤掉并恢复加粗；粘贴带 script 和 `javascript:` 链接的 HTML 后正文有「可编辑粘贴」且没有这些危险片段；`getHTML` 再 `setContent` 两次后字符串不变。截图 `/opt/cursor/artifacts/rte-kernel-paste.png`。这不是真实系统输入法。
+
 ## 弹窗（追加，仍在本分支）
 
 素材、音频、视频用同一类选择窗（`RteAvPickDialog.vue` 与图片窗 `RtePortals.vue`）。本轮核对后的缺陷和改动：
@@ -200,7 +214,7 @@ CHROME_PATH=/usr/local/bin/google-chrome node scripts/rte-heading-num-e2e.mjs
 
 2026-11-06 本机结果：
 
-- `npx vitest run`：87 个文件，702 通过，1 跳过。
+- `npx vitest run`：内核修订之后是 89 个文件，712 通过，1 跳过。此前标题编号那一轮是 87 个文件、702 通过。
 - `npx vue-tsc -b --pretty false`：通过。
 - `npm run build`：通过。
 - `CHROME_PATH=/usr/local/bin/google-chrome node scripts/rte-heading-num-e2e.mjs`：通过。H1 的 `::before` 计算值是 `counter(h1) ". "`，`textContent` 仍是「代码块与图片组」。截图像素里标题显示为「1. 代码块与图片组」，文件 `/opt/cursor/artifacts/rte-heading-auto-num.png`。

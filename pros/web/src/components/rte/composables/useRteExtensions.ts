@@ -41,7 +41,7 @@ import { createRteMention } from '../../../extensions/mentionSuggestion'
 import { RteCodeBlockLowlight } from '../../../extensions/codeHighlight'
 import { SlashCommands } from '../../../extensions/slashCommands'
 import { escapeHtml } from '../../../utils/itemsHtml'
-import { FEISHU_HIGHLIGHT_COLORS, isBareHttpUrl, sanitizePastedHtml } from '../../../utils/rtePasteClean'
+import { FEISHU_HIGHLIGHT_COLORS, isBareHttpUrl, plainTextToPasteContent, sanitizePastedHtml } from '../../../utils/rtePasteClean'
 import { pasteVolume, previewShortcutAllowed } from '../../../utils/rteRound8'
 import {
   htmlHasTable,
@@ -490,21 +490,11 @@ const editor = useEditor({
         event.preventDefault()
         const ed = editor.value
         if (!ed) return true
-        const normalized = plain.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
         const chainCmd = ed.chain().focus()
         if (!ed.state.selection.empty) {
           chainCmd.deleteSelection()
         }
-        if (!normalized.includes('\n')) {
-          chainCmd.insertContent(normalized).run()
-          return true
-        }
-        const lines = normalized.split('\n')
-        const nodes = lines.map((line) => ({
-          type: 'paragraph',
-          content: line ? [{ type: 'text', text: line }] : [],
-        }))
-        chainCmd.insertContent(nodes).run()
+        chainCmd.insertContent(plainTextToPasteContent(plain)).run()
         return true
       }
       // Markdown 智能粘贴：剪贴板无富文本 HTML（或仅碎片）且纯文本像 Markdown 时转 HTML

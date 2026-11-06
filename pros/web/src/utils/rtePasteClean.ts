@@ -63,18 +63,164 @@ function styleAttr(attrs: string): string {
   return matched?.[2] || matched?.[3] || ''
 }
 
-export function sanitizePastedHtml(html: string): string {
-  let out = String(html || '')
-    .replace(/<script[\s\S]*?<\/script>/gi, '')
-    .replace(/<style[\s\S]*?<\/style>/gi, '')
+const DROP_TAGS = new Set([
+  'script',
+  'style',
+  'iframe',
+  'object',
+  'embed',
+  'form',
+  'meta',
+  'link',
+  'svg',
+  'math',
+  'xml',
+])
+
+const KEEP_TAGS = new Set([
+  'p',
+  'h1',
+  'h2',
+  'h3',
+  'h4',
+  'h5',
+  'h6',
+  'ul',
+  'ol',
+  'li',
+  'blockquote',
+  'pre',
+  'code',
+  'table',
+  'thead',
+  'tbody',
+  'tr',
+  'td',
+  'th',
+  'a',
+  'img',
+  'strong',
+  'b',
+  'em',
+  'i',
+  'u',
+  's',
+  'span',
+  'br',
+  'mark',
+  'hr',
+])
+
+/** 把粘贴进来的属性值里的常见实体解开，再判断协议。 */
+export function decodePasteAttr(raw: string): string {
+  return String(raw || '')
+    .replace(/&#x([0-9a-f]+);?/gi, (_, hex: string) => {
+      const code = Number.parseInt(hex, 16)
+      return Number.isFinite(code) ? String.fromCodePoint(code) : ''
+    })
+    .replace(/&#(\d+);?/g, (_, dec: string) => {
+      const code = Number(dec)
+      return Number.isFinite(code) ? String.fromCodePoint(code) : ''
+    })
+    .replace(/&colon;/gi, ':')
+    .replace(/&tab;|&#0*9;?/gi, '')
+    .replace(/\s+/g, '')
+}
+
+/** 链接只留 http(s) 和素材库 /media/{id}。图片还可留 data:image。 */
+export function safePasteUrl(raw: string, kind: 'a' | 'img'): string | null {
+  const value = decodePasteAttr(raw).trim()
+  if (!value || value.length > 2_000_000) return null
+  if (/^\/media\/[0-9a-zA-Z-]+$/.test(value)) return value
+  if (kind === 'img' && /^data:image\/(?:png|jpe?g|gif|webp);/i.test(value)) return value
+  if (/^(javascript|data|vbscript|blob):/i.test(value)) return null
+  try {
+    const url = new URL(value)
+    if (url.protocol === 'http:' || url.protocol === 'https:') return value
+  } catch {
+    return null
+  }
+  return null
+}
+
+function stripDangerousMarkup(html: string): string {
+  return String(html || '')
+    .replace(/<script\b[^>]*>[\s\S]*?(?:<\/script>|$)/gi, '')
+    .replace(/<style\b[^>]*>[\s\S]*?(?:<\/style>|$)/gi, '')
     .replace(/<!--\[if[\s\S]*?<!\[endif\]-->/gi, '')
     .replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/<(iframe|object|embed|form|meta|link|xml|o:p)\b[^>]*>[\s\S]*?<\/\1>/gi, '')
-    .replace(/<(iframe|object|embed|form|meta|link|xml|o:p|w:[^>\s]+)[^>]*\/?>/gi, '')
+    .replace(/<(iframe|object|embed|form|meta|link|xml|svg|math|o:p)\b[^>]*>[\s\S]*?<\/\1>/gi, '')
+    .replace(/<(iframe|object|embed|form|meta|link|xml|svg|math|o:p|w:[^>\s]+)[^>]*\/?>/gi, '')
     .replace(/<\/(xml|o:p|w:[^>\s]+)>/gi, '')
     .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
-    .replace(/\s(href|src)\s*=\s*(['"])\s*javascript:[^'"]*\2/gi, ' $1="#"')
-    .replace(/\s(href|src)\s*=\s*javascript:[^\s>]+/gi, ' $1="#"')
+}
+
+function rebuildPasted(node: Node, doc: Document): Node | null {
+  if (node.nodeType === Node.TEXT_NODE) return doc.createTextNode(node.textContent || '')
+  if (node.nodeType !== Node.ELEMENT_NODE) return null
+  const el = node as HTMLElement
+  const tag = el.tagName.toLowerCase()
+  if (DROP_TAGS.has(tag)) return null
+  const parent = tag === 'font' || tag === 'div' ? null : KEEP_TAGS.has(tag) ? doc.createElement(tag === 'font' ? 'span' : tag) : null
+  const host = parent ?? doc.createDocumentFragment()
+  if (parent && (tag === 'span' || tag === 'mark' || tag === 'font')) {
+    const fromStyle = keptInlineStyle(el.getAttribute('style') || '')
+    const fromFont = tag === 'font' ? safeCssColor(el.getAttribute('color')) : null
+    if (tag === 'font') {
+      const span = doc.createElement('span')
+      if (fromFont || fromStyle) span.setAttribute('style', fromStyle || `color: ${fromFont}`)
+      el.childNodes.forEach((child) => {
+        const next = rebuildPasted(child, doc)
+        if (next) span.appendChild(next)
+      })
+      return span
+    }
+    if (fromStyle) parent.setAttribute('style', fromStyle)
+  }
+  if (parent && tag === 'a') {
+    const href = safePasteUrl(el.getAttribute('href') || '', 'a')
+    if (href) parent.setAttribute('href', href)
+  }
+  if (parent && tag === 'img') {
+    const src = safePasteUrl(el.getAttribute('src') || '', 'img')
+    if (!src) return null
+    parent.setAttribute('src', src)
+    const alt = (el.getAttribute('alt') || '').replace(/[<>"]/g, '').slice(0, 200)
+    if (alt) parent.setAttribute('alt', alt)
+    return parent
+  }
+  if (parent && tag === 'code') {
+    const lang = [...el.classList].find((name) => /^language-[\w-]+$/i.test(name) && !/mso/i.test(name))
+    if (lang) parent.setAttribute('class', lang)
+  }
+  el.childNodes.forEach((child) => {
+    const next = rebuildPasted(child, doc)
+    if (next) host.appendChild(next)
+  })
+  return parent ?? host
+}
+
+function sanitizeWithDom(html: string): string {
+  const parsed = new DOMParser().parseFromString(html, 'text/html')
+  const holder = parsed.createElement('div')
+  parsed.body.childNodes.forEach((child) => {
+    const next = rebuildPasted(child, parsed)
+    if (next) holder.appendChild(next)
+  })
+  return holder.innerHTML
+    .replace(/<p([^>]*)>\s*(?:&nbsp;|\s)*<\/p>/gi, '')
+    .replace(/(<br\s*\/?>\s*){3,}/gi, '<br><br>')
+}
+
+export function sanitizePastedHtml(html: string): string {
+  const stripped = stripDangerousMarkup(html)
+  if (typeof DOMParser !== 'undefined') return sanitizeWithDom(stripped)
+  let out = stripped
+    .replace(/\s(href|src)\s*=\s*(['"])([^'"]*)\2/gi, (_all, attr: string, quote: string, value: string) => {
+      const safe = safePasteUrl(value, attr.toLowerCase() === 'src' ? 'img' : 'a')
+      if (!safe) return ''
+      return ` ${attr}=${quote}${safe}${quote}`
+    })
 
   out = out.replace(/<font\b([^>]*)>/gi, (_all, attrs: string) => {
     const color = safeCssColor(/color\s*=\s*['"]?([^'"\s>]+)/i.exec(attrs)?.[1])
@@ -105,6 +251,18 @@ export function sanitizePastedHtml(html: string): string {
     .replace(/<p([^>]*)>\s*(?:&nbsp;|\s)*<\/p>/gi, '')
     .replace(/(<br\s*\/?>\s*){3,}/gi, '<br><br>')
   return out
+}
+
+/** 纯文本粘贴：单行保持字符串，多行拆成段落。不把内容再解析成 HTML。 */
+export function plainTextToPasteContent(
+  text: string,
+): string | Array<{ type: 'paragraph'; content?: Array<{ type: 'text'; text: string }> }> {
+  const normalized = String(text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+  if (!normalized.includes('\n')) return normalized
+  return normalized.split('\n').map((line) => ({
+    type: 'paragraph' as const,
+    content: line ? [{ type: 'text' as const, text: line }] : [],
+  }))
 }
 
 export function isBareHttpUrl(text: string): boolean {
