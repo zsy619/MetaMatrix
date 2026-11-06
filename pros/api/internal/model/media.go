@@ -31,7 +31,7 @@ type MediaAsset struct {
 	StorageDisk      string         `gorm:"type:varchar(32);not null;default:local" json:"-"`
 	MimeType         string         `gorm:"type:varchar(128);not null" json:"mimeType"`
 	SizeBytes        int64          `gorm:"not null" json:"sizeBytes"`
-	SHA256           string         `gorm:"type:char(64);not null;uniqueIndex:uniq_media_user_sha,priority:2" json:"sha256"`
+	SHA256           string         `gorm:"type:varchar(64);not null;uniqueIndex:uniq_media_user_sha,priority:2" json:"sha256"`
 	FeishuMediaToken string         `gorm:"type:varchar(128)" json:"feishuMediaToken"`
 	FeishuParentType string         `gorm:"type:varchar(32)" json:"feishuParentType"`
 	FeishuParentNode string         `gorm:"type:varchar(128)" json:"feishuParentNode"`

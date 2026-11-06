@@ -10,6 +10,22 @@ jobs:
     defaults:
       run:
         working-directory: pros/api
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: metamatrix
+          POSTGRES_PASSWORD: metamatrix
+          POSTGRES_DB: metamatrix_media_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U metamatrix -d metamatrix_media_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      MEDIA_TEST_DATABASE_URL: postgresql://metamatrix:metamatrix@127.0.0.1:5432/metamatrix_media_test?sslmode=disable
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
