@@ -27,8 +27,14 @@ func AutoMigrate(gdb *gorm.DB) error {
 		&model.CanvasDocument{},
 		&model.CanvasRevision{},
 		&model.CanvasContentBlock{},
+		&model.MediaCategory{},
+		&model.MediaAsset{},
+		&model.MediaReference{},
 	); err != nil {
 		return fmt.Errorf("automigrate: %w", err)
+	}
+	if err := gdb.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS uniq_media_user_sha ON media_asset (user_id, sha256)`).Error; err != nil {
+		return fmt.Errorf("media unique index: %w", err)
 	}
 	if err := ensureSearchSchema(gdb); err != nil {
 		log.Printf("ensureSearchSchema warning: %v", err)
@@ -36,7 +42,7 @@ func AutoMigrate(gdb *gorm.DB) error {
 	if err := ensureQueryIndexes(gdb); err != nil {
 		log.Printf("ensureQueryIndexes warning: %v", err)
 	}
-	log.Println("AutoMigrate OK: users, canvas_documents, canvas_revisions, canvas_content_blocks")
+	log.Println("AutoMigrate OK: users, canvas_documents, canvas_revisions, canvas_content_blocks, media_category, media_asset, media_reference")
 	return nil
 }
 
