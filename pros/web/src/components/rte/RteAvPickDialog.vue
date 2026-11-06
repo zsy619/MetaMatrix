@@ -16,7 +16,7 @@ useParentScopeStamp()
       v-if="picker.open"
       class="rte-modal-overlay"
       :data-av-kind="picker.kind"
-      @mousedown.self="picker.close()"
+      @mousedown.self="picker.onMask()"
     >
       <div
         data-rte-own

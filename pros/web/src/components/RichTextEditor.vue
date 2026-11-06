@@ -48,7 +48,7 @@ import {
 import { todayIso } from '../utils/rteRound5'
 import { RTE_PAGE_SIZES } from '../utils/rtePageSize'
 import { PAGE_MARGIN_PRESETS } from '../utils/rtePageMargin'
-import { focusDialogRoot } from '../utils/rteRound8'
+import { focusDialogRoot, rememberDialogReturnFocus, restoreDialogReturnFocus } from '../utils/rteRound8'
 import {
   embedIframeSrc,
 } from '../utils/rteRound6'
@@ -117,6 +117,7 @@ import { bindAskMore, useAskDialog } from './rte/composables/useAskDialog'
 import { useRtePageLayout } from './rte/composables/useRtePageLayout'
 import { usePageChrome } from './rte/composables/usePageChrome'
 import { EMPTY_PAGE_CHROME, PAGE_NUMBER_OPTIONS, type PanelPageChrome } from '../utils/rtePageChrome'
+import { readHeadingAutoNum } from '../utils/rteHeadingAutoNum'
 import { useToolbarGroups } from './rte/composables/useToolbarGroups'
 import {
   buildToolbarGroups,
@@ -239,6 +240,7 @@ const {
   tableHeaderSticky,
   copyCurrentTable,
   promptTableRowFilter,
+  reapplyTableFilter,
   setTableCellBg,
   setTableCellBorderColor,
   setTableCellBorderStyle,
@@ -514,9 +516,14 @@ const {
   askMaxlength,
   askInputRef,
   closeAskDialog,
+  onAskMask,
   openRtePrompt,
   openRteConfirm,
-} = useAskDialog({ closeMore: () => askMoreCloser.close() })
+} = useAskDialog({
+  closeMore: () => askMoreCloser.close(),
+  onOpened: () => noteDialogOpened(),
+  onClosed: () => noteDialogClosed(),
+})
 void askInputRef
 
 /** 链接卡片专用弹层 */
@@ -876,6 +883,7 @@ const editor = useRteExtensions({
   suggestionAuthor,
   bumpSuggestions: () => bumpSuggestions(),
   mentionPeople: () => directoryPeople.mentionPeople(),
+  reapplyTableFilter: (ed, transaction, appended) => reapplyTableFilter(ed as never, transaction, appended),
 })
 
 // 图表属性面板：选中图表块即弹出（侧栏）
@@ -2002,8 +2010,23 @@ function togglePaperGuide() {
 
 
 /** —— Wave21：标题自动编号 / 样式集 / 列表样式 / 注音 / 结构块 / 检查 / 全屏 / 片段 —— */
+watch(
+  () => [props.panelId, current_data.value?.headingAutoNumByPanelId] as const,
+  () => {
+    if (!props.panelId) return
+    headingAutoNumber.value = readHeadingAutoNum(current_data.value?.headingAutoNumByPanelId, props.panelId)
+  },
+  { immediate: true },
+)
+
 function toggleHeadingAutoNumber() {
-  headingAutoNumber.value = !headingAutoNumber.value
+  const next = !headingAutoNumber.value
+  if (props.panelId && current_data.value) {
+    documentStore.setPanelHeadingAutoNum(props.panelId, next)
+    headingAutoNumber.value = readHeadingAutoNum(current_data.value.headingAutoNumByPanelId, props.panelId)
+  } else {
+    headingAutoNumber.value = next
+  }
   moreOpen.value = false
   ElMessage.success(headingAutoNumber.value ? '已开启标题自动编号' : '已关闭标题自动编号')
 }
@@ -4176,6 +4199,7 @@ const {
   newCategoryName,
   filteredImageAssets,
   closeImageDialog,
+  onImageDialogMask,
   insertImage,
   uid,
   rteToast,
@@ -4210,6 +4234,8 @@ const {
     moreOpen.value = false
   },
   imageCompressOnInsert,
+  onOpened: () => noteDialogOpened(),
+  onClosed: () => noteDialogClosed(),
 })
 void imageFileInputRef
 void videoFileInputRef
@@ -4316,6 +4342,18 @@ function focusOpenDialog() {
     const nodes = document.querySelectorAll('[role="dialog"][aria-modal="true"]')
     const last = nodes[nodes.length - 1]
     if (last instanceof HTMLElement) focusDialogRoot(last)
+  })
+}
+
+function noteDialogOpened() {
+  rememberDialogReturnFocus()
+  focusOpenDialog()
+}
+
+function noteDialogClosed() {
+  nextTick(() => {
+    if (document.querySelector('[role="dialog"][aria-modal="true"]')) return
+    restoreDialogReturnFocus(() => editor.value?.commands.focus())
   })
 }
 
@@ -6442,6 +6480,7 @@ provideRteBindings({
   caseMenuOpen,
   charCount,
   closeAskDialog,
+  onAskMask,
   closeAttachDialog,
   closeColorMenus,
   closeExportMenu,
@@ -6465,6 +6504,7 @@ provideRteBindings({
   closeFormulaDialog,
   closeHighlightMenus,
   closeImageDialog,
+  onImageDialogMask,
   closeImportLinkDialog,
   closeImportMenu,
   closeLinkCardDialog,

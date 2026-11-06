@@ -2,7 +2,13 @@ import { computed, nextTick, ref, watch, type ShallowRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { Editor } from '@tiptap/core'
 import { moveTableGridHover, TABLE_QUICK_COLS, TABLE_QUICK_ROWS } from '../../../utils/rteTableGrid'
-import { copyTableAs, applyTableRowFilter } from '../../../utils/rteWave21'
+import {
+  copyTableAs,
+  applyTableRowFilter,
+  findTablePos,
+  mapTableFilterPos,
+  paintTableFilterAt,
+} from '../../../utils/rteWave21'
 import {
   setCellVerticalAlign,
   sortTableByColumn,
@@ -64,6 +70,18 @@ function openTableContextMenu(event: MouseEvent) {
 
 const tableHeaderSticky = ref(false)
 const tableFilterQuery = ref('')
+const tableFilterPos = ref<number | null>(null)
+
+function reapplyTableFilter(
+  ed: Editor,
+  transaction: { mapping: { map: (pos: number, assoc?: number) => number } },
+  appended: ReadonlyArray<{ mapping: { map: (pos: number, assoc?: number) => number } }> = [],
+) {
+  if (!tableFilterQuery.value || tableFilterPos.value == null) return
+  const pos = mapTableFilterPos(tableFilterPos.value, [transaction, ...appended])
+  tableFilterPos.value = pos
+  if (paintTableFilterAt(ed, pos, tableFilterQuery.value) < 0) tableFilterPos.value = null
+}
 
 function applyCellValign(v: string) {
   const ed = deps.editor().value
@@ -128,7 +146,10 @@ async function promptTableRowFilter() {
   })
   if (raw == null) return
   tableFilterQuery.value = raw.trim()
-  const hidden = applyTableRowFilter(ed, tableFilterQuery.value)
+  tableFilterPos.value = tableFilterQuery.value ? findTablePos(ed) : null
+  const hidden = tableFilterPos.value == null && tableFilterQuery.value
+    ? -1
+    : applyTableRowFilter(ed, tableFilterQuery.value)
   if (hidden < 0) ElMessage.info('请将光标放在表格中')
   else if (!tableFilterQuery.value) ElMessage.success('已清除行筛选')
   else ElMessage.success(`已隐藏 ${hidden} 行`)
@@ -674,6 +695,7 @@ function onTableToolbarButtonClick() {
     openTableContextMenu,
     tableHeaderSticky,
     tableFilterQuery,
+    reapplyTableFilter,
     applyCellValign,
     doSortTable,
     doTableSumRow,
