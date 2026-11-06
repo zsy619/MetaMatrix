@@ -1855,25 +1855,6 @@ async function insertToggleBlock() {
   moreOpen.value = false
 }
 
-function insertAudioBlock() {
-  const input = document.createElement('input')
-  input.type = 'file'
-  input.accept = 'audio/*'
-  input.onchange = () => {
-    const file = input.files?.[0]
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = () => {
-      const src = String(reader.result || '')
-      if (!src) return
-      editor.value?.chain().focus().setAudio({ src, title: file.name }).run()
-      ElMessage.success('已插入音频')
-    }
-    reader.readAsDataURL(file)
-  }
-  input.click()
-  moreOpen.value = false
-}
 
 function insertLinkCardBlock() {
   openLinkCardDialog()
@@ -3651,7 +3632,7 @@ function applySlashCommandItem(item: RteSlashItem) {
       insertToggleBlock()
       break
     case 'audio':
-      insertAudioBlock()
+      insertAudio()
       break
     case 'linkCard':
       insertLinkCardBlock()
@@ -4187,26 +4168,18 @@ const {
   insertUserImages,
   onLocalImageFilesChange,
   confirmInsertImages,
+  videoPicker,
+  audioPicker,
   videoDialogOpen,
-  videoDialogTab,
-  videoSidebarKey,
-  videoCategories,
-  videoSelectedIds,
-  videoSelectAll,
-  videoExternalUrls,
+  audioDialogOpen,
   videoFileInputRef,
-  videoAddingCategory,
-  videoNewCategoryName,
-  filteredVideoAssets,
+  audioFileInputRef,
   closeVideoDialog,
+  closeAudioDialog,
   insertVideo,
-  toggleVideoSelect,
-  onVideoSelectAllChange,
-  startAddVideoCategory,
-  confirmAddVideoCategory,
-  triggerLocalVideoPick,
+  insertAudio,
   onLocalVideoFilesChange,
-  confirmInsertVideos,
+  onLocalAudioFilesChange,
 } = useMediaLibrary({
   editor,
   closeMore: () => {
@@ -4216,6 +4189,7 @@ const {
 })
 void imageFileInputRef
 void videoFileInputRef
+void audioFileInputRef
 
 const FORMULA_SYMBOL_GROUPS: { title: string; items: { label: string; tex: string }[] }[] = [
   {
@@ -4326,6 +4300,7 @@ useOverlayStack({
   linkImportOpen: () => linkImportOpen,
   imageDialogOpen: () => imageDialogOpen,
   videoDialogOpen: () => videoDialogOpen,
+  audioDialogOpen: () => audioDialogOpen,
   formulaDialogOpen: () => formulaDialogOpen,
   tableDialogOpen: () => tableDialogOpen,
   noteDialogOpen: () => noteDialogOpen,
@@ -4347,6 +4322,7 @@ useOverlayStack({
   closeImportLinkDialog: (...args) => closeImportLinkDialog(...args),
   closeImageDialog: (...args) => closeImageDialog(...args),
   closeVideoDialog: (...args) => closeVideoDialog(...args),
+  closeAudioDialog: (...args) => closeAudioDialog(...args),
   closeFormulaDialog: (...args) => closeFormulaDialog(...args),
   closeTableDialog: (...args) => closeTableDialog(...args),
   closeNoteDialog: (...args) => closeNoteDialog(...args),
@@ -5856,7 +5832,7 @@ const allTools = computed((): ToolItem[] => {
       title: '插入音频',
       icon: '♪',
       iconComp: ic('video'),
-      run: insertAudioBlock,
+      run: insertAudio,
     },
     {
       key: 'linkCard',
@@ -6484,7 +6460,6 @@ provideRteBindings({
   columnsOpen,
   confirmAddAttachCategory,
   confirmAddCategory,
-  confirmAddVideoCategory,
   confirmImportLink,
   confirmInsertAttaches,
   confirmInsertFormula,
@@ -6492,7 +6467,6 @@ provideRteBindings({
   confirmInsertLink,
   confirmInsertNote,
   confirmInsertTable,
-  confirmInsertVideos,
   confirmInsertXref,
   confirmLinkCardDialog,
   confirmPrintFromPreview,
@@ -6544,7 +6518,6 @@ provideRteBindings({
   filteredAttachAssets,
   filteredImageAssets,
   filteredShortcutGroups,
-  filteredVideoAssets,
   filteredXrefTargets,
   findCaseSensitive,
   findDialogOpen,
@@ -6753,7 +6726,6 @@ provideRteBindings({
   onToolbarHandlePointerDown,
   onToolbarHandlePointerMove,
   onToolbarHandlePointerUp,
-  onVideoSelectAllChange,
   onXrefDialogKeydown,
   openCurrentLink,
   openHeadingMenu,
@@ -6841,7 +6813,6 @@ provideRteBindings({
   specialCharsOpen,
   startAddAttachCategory,
   startAddCategory,
-  startAddVideoCategory,
   startEditSnippet,
   stepTableCols,
   stepTableRows,
@@ -6884,7 +6855,6 @@ provideRteBindings({
   toggleStrike,
   toggleTaskList,
   toggleUnderline,
-  toggleVideoSelect,
   toggleWordCountDock,
   toolIcon,
   toolbarDragSource,
@@ -6900,19 +6870,13 @@ provideRteBindings({
   toolbarOrder,
   triggerLocalAttachPick,
   triggerLocalImagePick,
-  triggerLocalVideoPick,
   turnHoveredBlock,
   unlinkSelection,
   vRteFloat,
-  videoAddingCategory,
-  videoCategories,
+  audioPicker,
+  videoPicker,
+  audioDialogOpen,
   videoDialogOpen,
-  videoDialogTab,
-  videoExternalUrls,
-  videoNewCategoryName,
-  videoSelectAll,
-  videoSelectedIds,
-  videoSidebarKey,
   viewExtrasOpen,
   viewMode,
   wave21ReportLines,
@@ -7039,6 +7003,14 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
       accept="video/*,.mp4,.webm,.mov,.m4v,.ogg,.ogv"
       multiple
       @change="onLocalVideoFilesChange"
+    />
+    <input
+      ref="audioFileInputRef"
+      type="file"
+      class="rte-hidden-file"
+      accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac,.webm,.opus"
+      multiple
+      @change="onLocalAudioFilesChange"
     />
   </div>
 </template>

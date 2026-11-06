@@ -1294,13 +1294,19 @@
   flex-direction: column;
   background: #0f172a;
 }
-.rte-video-thumb video {
+.rte-video-thumb video,
+.rte-audio-thumb audio {
   width: 100%;
   flex: 1;
   min-height: 0;
   object-fit: cover;
   display: block;
   pointer-events: none;
+}
+.rte-audio-thumb audio {
+  height: 42px;
+  margin-top: auto;
+  background: #0f172a;
 }
 .rte-video-thumb-name {
   position: absolute;

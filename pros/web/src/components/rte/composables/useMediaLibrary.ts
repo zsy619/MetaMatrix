@@ -10,6 +10,12 @@ import { insertImagesBeside } from '../../../extensions/imageGroupOps'
 import { compressImageFile } from '../../../utils/rteWave21'
 import { imageReplaceSide } from '../../../utils/rteRound5'
 import { NodeSelection } from '@tiptap/pm/state'
+import {
+  createAvPicker,
+  isAudioFile,
+  isVideoFile,
+  type AvInsertItem,
+} from '../avMediaPicker'
 
 /** 图片/视频库弹层，以及粘贴、拖放插入。 */
 export function useMediaLibrary(deps: {
@@ -110,14 +116,8 @@ function rteToast(
   ElMessage({ type, message, zIndex: 5000, duration: 2800 })
 }
 
-const VIDEO_EXT_RE = /\.(mp4|webm|mov|m4v|ogg|ogv|mkv)$/i
 const ATTACH_MAX_BYTES = MAX_ATTACHMENT_BYTES
-const VIDEO_MAX_BYTES = 50 * 1024 * 1024
-
-function isVideoFile(file: File): boolean {
-  if (file.type && file.type.startsWith('video/')) return true
-  return VIDEO_EXT_RE.test(file.name || '')
-}
+const AV_MAX_BYTES = 50 * 1024 * 1024
 
 function currentCategoryIdForUpload() {
   const key = imageSidebarKey.value
@@ -400,274 +400,101 @@ function confirmInsertImages() {
   rteToast('success', `已插入 ${selected.length} 张图片`)
 }
 
-/** —— 插入视频（与图片弹窗同构） —— */
-type VideoDialogTab = 'personal' | 'external'
-type VideoCategory = { id: string; name: string }
-type StoredVideo = {
-  id: string
-  src: string
-  name: string
-  categoryId: string
-  createdAt: number
-}
-
-const VIDEO_CAT_LS = 'metamatrix-rte-video-categories'
-const VIDEO_ASSET_LS = 'metamatrix-rte-video-assets'
-
-const videoDialogOpen = ref(false)
-const videoDialogTab = ref<VideoDialogTab>('personal')
-const videoSidebarKey = ref<'all' | 'uncategorized' | string>('all')
-const videoCategories = ref<VideoCategory[]>([])
-const videoAssets = ref<StoredVideo[]>([])
-const videoSelectedIds = ref<Set<string>>(new Set())
-const videoSelectAll = ref(false)
-const videoExternalUrls = ref('')
+/** 视频与音频共用同一套选择窗，只是文案、文件类型和插入节点不同。 */
 const videoFileInputRef = ref<HTMLInputElement | null>(null)
-const videoAddingCategory = ref(false)
-const videoNewCategoryName = ref('')
+const audioFileInputRef = ref<HTMLInputElement | null>(null)
 
-function loadVideoStore() {
-  try {
-    const cats = JSON.parse(localStorage.getItem(VIDEO_CAT_LS) || '[]') as VideoCategory[]
-    const assets = JSON.parse(localStorage.getItem(VIDEO_ASSET_LS) || '[]') as StoredVideo[]
-    videoCategories.value = Array.isArray(cats) ? cats : []
-    videoAssets.value = Array.isArray(assets) ? assets.filter((a) => !!a.src) : []
-  } catch {
-    videoCategories.value = []
-    videoAssets.value = []
+function insertAvItems(kind: 'video' | 'audio', items: AvInsertItem[]) {
+  const ed = deps.editor.value
+  const valid = items.filter((item) => item.src && item.src.trim())
+  if (!ed || !valid.length) return
+  if (kind === 'video') {
+    const multi = valid.length > 1
+    const defaultWidth = multi ? Math.max(140, Math.floor(560 / Math.min(valid.length, 4))) : null
+    const nodes = valid.map((item) => ({
+      type: 'video' as const,
+      attrs: defaultWidth
+        ? { src: item.src, controls: true, width: defaultWidth }
+        : { src: item.src, controls: true },
+    }))
+    ed.chain().focus().insertContent(nodes).run()
+    return
+  }
+  ed.chain()
+    .focus()
+    .insertContent(
+      valid.map((item) => ({
+        type: 'audio' as const,
+        attrs: { src: item.src, title: item.name || null, controls: true },
+      })),
+    )
+    .run()
+}
+
+function avMessages(kind: 'video' | 'audio') {
+  const noun = kind === 'video' ? '视频' : '音频'
+  const examples = kind === 'video' ? 'mp4 / webm / mov' : 'mp3 / wav / m4a'
+  const upload = kind === 'video' ? '本地视频上传' : '本地音频上传'
+  return {
+    badType: `请选择${noun}文件（${examples} 等）`,
+    tooBig: (name: string, maxMb: number) => `${name} 超过 ${maxMb}MB，已跳过`,
+    allTooBig: `所选${noun}均超出大小限制`,
+    readFail: `${noun}读取失败，请换 ${examples} 再试`,
+    badUrl: `请输入至少一个有效的${noun} URL（http/https，每行一个）`,
+    noneSelected: `请选择${noun}，或使用「${upload}」`,
+    missingData: `所选${noun}缺少文件数据，请重新上传`,
+    inserted: (count: number) => `已插入 ${count} 个${noun}`,
   }
 }
 
-function saveVideoStore() {
-  try {
-    localStorage.setItem(VIDEO_CAT_LS, JSON.stringify(videoCategories.value))
-    // blob: 仅会话有效，不落库；http(s) 可持久。DataURL 过大则丢弃 src 以免撑爆配额
-    const persistable = videoAssets.value
-      .filter((a) => a.src && !a.src.startsWith('blob:'))
-      .map((a) =>
-        a.src.startsWith('data:') && a.src.length > 400_000
-          ? { ...a, src: '' }
-          : a,
-      )
-      .filter((a) => !!a.src)
-      .slice(0, 40)
-    localStorage.setItem(VIDEO_ASSET_LS, JSON.stringify(persistable))
-  } catch {
-    try {
-      localStorage.setItem(VIDEO_CAT_LS, JSON.stringify(videoCategories.value))
-      const light = videoAssets.value
-        .filter((a) => /^https?:\/\//i.test(a.src))
-        .slice(0, 30)
-      localStorage.setItem(VIDEO_ASSET_LS, JSON.stringify(light))
-    } catch {
-      /* private mode */
-    }
-  }
-}
-
-const filteredVideoAssets = computed(() => {
-  const key = videoSidebarKey.value
-  if (key === 'all') return videoAssets.value
-  if (key === 'uncategorized') {
-    return videoAssets.value.filter((a) => !a.categoryId || a.categoryId === 'uncategorized')
-  }
-  return videoAssets.value.filter((a) => a.categoryId === key)
+const videoPicker = createAvPicker({
+  kind: 'video',
+  copy: {
+    ariaLabel: '插入视频',
+    libraryLabel: '我的视频',
+    uploadLabel: '本地视频上传',
+    urlHint: '每行一个视频 URL，支持一次插入多个。',
+    urlPlaceholder: 'https://example.com/a.mp4\nhttps://example.com/b.webm',
+    sideIcon: '🎬',
+    preview: 'video',
+  },
+  catStorageKey: 'metamatrix-rte-video-categories',
+  assetStorageKey: 'metamatrix-rte-video-assets',
+  maxBytes: AV_MAX_BYTES,
+  isFile: isVideoFile,
+  fileInput: videoFileInputRef,
+  messages: avMessages('video'),
+  closeMore: () => deps.closeMore(),
+  toast: rteToast,
+  uid,
+  insertItems: (items) => insertAvItems('video', items),
 })
 
-function resetVideoDialog() {
-  videoDialogTab.value = 'personal'
-  videoSidebarKey.value = 'all'
-  videoSelectedIds.value = new Set()
-  videoSelectAll.value = false
-  videoExternalUrls.value = ''
-  videoAddingCategory.value = false
-  videoNewCategoryName.value = ''
-}
+const audioPicker = createAvPicker({
+  kind: 'audio',
+  copy: {
+    ariaLabel: '插入音频',
+    libraryLabel: '我的音频',
+    uploadLabel: '本地音频上传',
+    urlHint: '每行一个音频 URL，支持一次插入多个。',
+    urlPlaceholder: 'https://example.com/a.mp3\nhttps://example.com/b.wav',
+    sideIcon: '♪',
+    preview: 'audio',
+  },
+  catStorageKey: 'metamatrix-rte-audio-categories',
+  assetStorageKey: 'metamatrix-rte-audio-assets',
+  maxBytes: AV_MAX_BYTES,
+  isFile: isAudioFile,
+  fileInput: audioFileInputRef,
+  messages: avMessages('audio'),
+  closeMore: () => deps.closeMore(),
+  toast: rteToast,
+  uid,
+  insertItems: (items) => insertAvItems('audio', items),
+})
 
-function openVideoDialog() {
-  loadVideoStore()
-  resetVideoDialog()
-  videoDialogOpen.value = true
-  deps.closeMore()
-}
-
-function closeVideoDialog() {
-  videoDialogOpen.value = false
-  resetVideoDialog()
-}
-
-function insertVideo() {
-  openVideoDialog()
-}
-
-function currentVideoCategoryIdForUpload() {
-  const key = videoSidebarKey.value
-  if (key === 'all' || key === 'uncategorized') return 'uncategorized'
-  return key
-}
-
-function toggleVideoSelect(id: string) {
-  const next = new Set(videoSelectedIds.value)
-  if (next.has(id)) next.delete(id)
-  else next.add(id)
-  videoSelectedIds.value = next
-  videoSelectAll.value =
-    filteredVideoAssets.value.length > 0 &&
-    filteredVideoAssets.value.every((a) => next.has(a.id))
-}
-
-function onVideoSelectAllChange() {
-  const checked = !videoSelectAll.value
-  videoSelectAll.value = checked
-  if (checked) {
-    videoSelectedIds.value = new Set(filteredVideoAssets.value.map((a) => a.id))
-  } else {
-    videoSelectedIds.value = new Set()
-  }
-}
-
-function startAddVideoCategory() {
-  videoAddingCategory.value = true
-  videoNewCategoryName.value = ''
-}
-
-function confirmAddVideoCategory() {
-  const name = videoNewCategoryName.value.trim()
-  if (!name) {
-    videoAddingCategory.value = false
-    return
-  }
-  if (videoCategories.value.some((c) => c.name === name)) {
-    rteToast('warning', '分类已存在')
-    return
-  }
-  const cat: VideoCategory = { id: uid(), name }
-  videoCategories.value = [...videoCategories.value, cat]
-  saveVideoStore()
-  videoSidebarKey.value = cat.id
-  videoAddingCategory.value = false
-  videoNewCategoryName.value = ''
-}
-
-function triggerLocalVideoPick() {
-  videoFileInputRef.value?.click()
-}
-
-async function onLocalVideoFilesChange(event: Event) {
-  const input = event.target as HTMLInputElement
-  const rawFiles = Array.from(input.files || [])
-  input.value = ''
-  const files = rawFiles.filter(isVideoFile)
-  if (!files.length) {
-    rteToast('warning', '请选择视频文件（mp4 / webm / mov 等）')
-    return
-  }
-  const catId = currentVideoCategoryIdForUpload()
-  const added: StoredVideo[] = []
-  let skippedSize = 0
-  for (const file of files) {
-    if (file.size > VIDEO_MAX_BYTES) {
-      skippedSize += 1
-      rteToast(
-        'warning',
-        `${file.name} 超过 ${Math.round(VIDEO_MAX_BYTES / (1024 * 1024))}MB，已跳过`,
-      )
-      continue
-    }
-    try {
-      // 视频用 blob URL：避免 DataURL 撑爆内存 / localStorage，插入仍可用
-      const src = URL.createObjectURL(file)
-      if (!src) continue
-      added.push({
-        id: uid(),
-        src,
-        name: file.name,
-        categoryId: catId,
-        createdAt: Date.now(),
-      })
-    } catch {
-      /* skip */
-    }
-  }
-  if (!added.length) {
-    rteToast(
-      'error',
-      skippedSize ? '所选视频均超出大小限制' : '视频读取失败，请换 mp4/webm/mov 再试',
-    )
-    return
-  }
-  videoAssets.value = [...added, ...videoAssets.value]
-  saveVideoStore()
-  const next = new Set(videoSelectedIds.value)
-  added.forEach((a) => next.add(a.id))
-  videoSelectedIds.value = next
-  // 与图片一致：本地上传后直接插入并关闭；库保存失败也不影响本次插入
-  insertVideoSrcs(added.map((a) => a.src))
-  closeVideoDialog()
-  rteToast('success', `已插入 ${added.length} 个视频`)
-}
-
-function parseExternalVideoUrls(raw: string): string[] {
-  const lines = raw
-    .split(/[\n\r]+/)
-    .map((s) => s.trim())
-    .filter(Boolean)
-  const urls: string[] = []
-  const seen = new Set<string>()
-  for (const line of lines) {
-    const parts = line.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean)
-    for (const part of parts) {
-      if (!/^https?:\/\//i.test(part)) continue
-      if (seen.has(part)) continue
-      seen.add(part)
-      urls.push(part)
-    }
-  }
-  return urls
-}
-
-function insertVideoSrcs(srcs: string[]) {
-  const ed = deps.editor.value
-  const valid = (srcs || []).map((s) => (s || '').trim()).filter(Boolean)
-  if (!ed || !valid.length) return
-  // 与 insertImageSrcs 同构：一次 insertContent 多个 inline video 节点
-  const multi = valid.length > 1
-  const defaultWidth = multi ? Math.max(140, Math.floor(560 / Math.min(valid.length, 4))) : null
-  const nodes = valid.map((src) => ({
-    type: 'video' as const,
-    attrs: defaultWidth
-      ? { src, controls: true, width: defaultWidth }
-      : { src, controls: true },
-  }))
-  ed.chain().focus().insertContent(nodes).run()
-}
-
-function confirmInsertVideos() {
-  if (videoDialogTab.value === 'external') {
-    const urls = parseExternalVideoUrls(videoExternalUrls.value)
-    if (!urls.length) {
-      rteToast('warning', '请输入至少一个有效的视频 URL（http/https，每行一个）')
-      return
-    }
-    insertVideoSrcs(urls)
-    closeVideoDialog()
-    rteToast('success', `已插入 ${urls.length} 个视频`)
-    return
-  }
-  const selected = videoAssets.value.filter((a) => videoSelectedIds.value.has(a.id))
-  if (!selected.length) {
-    rteToast('warning', '请选择视频，或使用「本地视频上传」')
-    return
-  }
-  const usable = selected.map((a) => a.src).filter((s) => !!s && String(s).trim())
-  if (!usable.length) {
-    rteToast('warning', '所选视频缺少文件数据，请重新上传')
-    return
-  }
-  insertVideoSrcs(usable)
-  closeVideoDialog()
-  rteToast('success', `已插入 ${usable.length} 个视频`)
-}
+const videoDialogOpen = computed(() => videoPicker.open)
+const audioDialogOpen = computed(() => audioPicker.open)
 
   return {
     imageDialogOpen,
@@ -698,25 +525,17 @@ function confirmInsertVideos() {
     insertUserImages,
     onLocalImageFilesChange,
     confirmInsertImages,
+    videoPicker,
+    audioPicker,
     videoDialogOpen,
-    videoDialogTab,
-    videoSidebarKey,
-    videoCategories,
-    videoSelectedIds,
-    videoSelectAll,
-    videoExternalUrls,
+    audioDialogOpen,
     videoFileInputRef,
-    videoAddingCategory,
-    videoNewCategoryName,
-    filteredVideoAssets,
-    closeVideoDialog,
-    insertVideo,
-    toggleVideoSelect,
-    onVideoSelectAllChange,
-    startAddVideoCategory,
-    confirmAddVideoCategory,
-    triggerLocalVideoPick,
-    onLocalVideoFilesChange,
-    confirmInsertVideos,
+    audioFileInputRef,
+    closeVideoDialog: () => videoPicker.close(),
+    closeAudioDialog: () => audioPicker.close(),
+    insertVideo: () => videoPicker.openDialog(),
+    insertAudio: () => audioPicker.openDialog(),
+    onLocalVideoFilesChange: (event: Event) => videoPicker.onFiles(event),
+    onLocalAudioFilesChange: (event: Event) => audioPicker.onFiles(event),
   }
 }
