@@ -4,6 +4,7 @@
 import type { Editor } from '@tiptap/core'
 import QRCode from 'qrcode'
 import { htmlToMarkdown } from '../utils/rteExportMd'
+import { withHeadingNumbers } from '../utils/rteHeadingExport'
 import { transformCaseText, type CaseMode } from '../utils/rteCaseTransform'
 import { renumberCaptions } from '../utils/rteCaptionNumber'
 import {
@@ -55,7 +56,7 @@ export function applyCaseToSelection(editor: Editor, mode: CaseMode): boolean {
   return false
 }
 
-export async function copySelectionOrDocAsMarkdown(editor: Editor): Promise<string> {
+export async function copySelectionOrDocAsMarkdown(editor: Editor, numberHeadings = false): Promise<string> {
   const { from, to, empty } = editor.state.selection
   let html: string
   if (!empty) {
@@ -72,7 +73,7 @@ export async function copySelectionOrDocAsMarkdown(editor: Editor): Promise<stri
   } else {
     html = editor.getHTML()
   }
-  return htmlToMarkdown(html)
+  return htmlToMarkdown(numberHeadings ? withHeadingNumbers(html) : html)
 }
 
 export async function makeQrDataUrl(text: string): Promise<string> {

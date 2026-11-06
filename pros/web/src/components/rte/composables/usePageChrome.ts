@@ -67,6 +67,10 @@ export function usePageChrome(deps: {
     scheduleMeasure()
   }
 
+  function replacePageChrome(next: PanelPageChrome) {
+    publish(next)
+  }
+
   function setPageHeader(value: string) {
     publish({ ...deps.pageChrome.value, header: value })
   }
@@ -293,6 +297,7 @@ export function usePageChrome(deps: {
     pageCount,
     setPageHeader,
     setPageFooter,
+    replacePageChrome,
     setPageNumber,
     scheduleMeasure,
     presentOpen,

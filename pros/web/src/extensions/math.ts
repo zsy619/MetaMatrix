@@ -1,6 +1,24 @@
 import { Node, mergeAttributes } from '@tiptap/core'
 import katex from 'katex'
 
+/** 非法 TeX 返回第一行说明；合法返回 null。确认前用它拦住，不把错误公式写进正文。 */
+export function formulaTexIssue(tex: string): string | null {
+  const src = (tex || '').trim()
+  if (!src) return '请输入 TeX 公式'
+  try {
+    katex.renderToString(src, {
+      throwOnError: true,
+      displayMode: false,
+      strict: 'ignore',
+      output: 'html',
+    })
+    return null
+  } catch (err) {
+    const message = err instanceof Error ? err.message : '公式无法解析'
+    return message.split('\n')[0]?.slice(0, 180) || '公式无法解析'
+  }
+}
+
 export function renderKatex(tex: string, displayMode: boolean): string {
   const src = (tex || '').trim()
   if (!src) return ''

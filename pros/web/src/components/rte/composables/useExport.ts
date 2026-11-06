@@ -6,6 +6,7 @@ import { feishuClipboardDocument } from '../../../utils/rteRound7'
 import { buildDocxBlob } from '../../../utils/rteExportDocx'
 import { buildPdfFromElement } from '../../../utils/rteExportPdf'
 import { htmlToMarkdown } from '../../../utils/rteExportMd'
+import { withHeadingNumbers } from '../../../utils/rteHeadingExport'
 import { buildExportHtmlWithCharts } from '../../../utils/rteExportChartSnapshots'
 import { escapeHtml } from '../../../utils/itemsHtml'
 import type { PageMargin, PageMarginBox } from '../../../utils/rtePageMargin'
@@ -27,6 +28,8 @@ export function useExport(deps: {
   pageScreenMargin: { value: PageMarginBox }
   pageChrome: { value: PanelPageChrome }
   closeMore: () => void
+  /** 标题自动编号打开时，只在 Markdown / Word 副本里写编号。 */
+  headingNumbers?: () => boolean
 }) {
 const exportMenuOpen = ref(false)
 const exportBusy = ref(false)
@@ -38,6 +41,10 @@ function closeExportMenu() {
 function onExportMenu() {
   exportMenuOpen.value = true
   deps.closeMore()
+}
+
+function exportBodyHtml(html: string): string {
+  return deps.headingNumbers?.() ? withHeadingNumbers(html) : html
 }
 
 function exportFileBasename(): string {
@@ -237,10 +244,12 @@ async function exportAsDocx() {
   try {
     const title = (deps.title.value || '').trim() || '未命名文档'
     // 图表块先换成白底快照图，Word 里是内嵌图片，不是占位文案。
-    const bodyHtml = await buildExportHtmlWithCharts({
-      editorHtml: ed.getHTML() || '',
-      root: deps.rootEl.value,
-    })
+    const bodyHtml = exportBodyHtml(
+      await buildExportHtmlWithCharts({
+        editorHtml: ed.getHTML() || '',
+        root: deps.rootEl.value,
+      }),
+    )
     const bodyText = ed.getText({ blockSeparator: '\n' }) || ''
     const blob = await buildDocxBlob({ title, bodyHtml, bodyText })
     triggerDownloadBlob(blob, `${exportFileBasename()}.docx`)
@@ -263,10 +272,12 @@ async function exportAsMarkdown() {
   }
   const title = (deps.title.value || '').trim()
   // 图表块先换成白底快照图，Markdown 里是 ![]() 图片，不是占位文案。
-  const html = await buildExportHtmlWithCharts({
-    editorHtml: ed.getHTML() || '',
-    root: deps.rootEl.value,
-  })
+  const html = exportBodyHtml(
+    await buildExportHtmlWithCharts({
+      editorHtml: ed.getHTML() || '',
+      root: deps.rootEl.value,
+    }),
+  )
   const mdBody = htmlToMarkdown(html)
   const md = title ? `# ${title}\n\n${mdBody}` : mdBody
   triggerDownloadBlob(

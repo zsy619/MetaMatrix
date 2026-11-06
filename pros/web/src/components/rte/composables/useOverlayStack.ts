@@ -11,6 +11,7 @@ export function useOverlayStack(deps: {
   audioDialogOpen: () => { value: boolean }
   formulaDialogOpen: () => { value: boolean }
   tableDialogOpen: () => { value: boolean }
+  tableOpsSheetOpen: () => { value: boolean }
   noteDialogOpen: () => { value: boolean }
   attachDialogOpen: () => { value: boolean }
   snippetDialogOpen: () => { value: boolean }
@@ -21,6 +22,7 @@ export function useOverlayStack(deps: {
   findDialogOpen: () => { value: boolean }
   linkDialogOpen: () => { value: boolean }
   printPreviewOpen: () => { value: boolean }
+  pageSetupOpen: () => { value: boolean }
   wordCountDockOpen: () => { value: boolean }
   shortcutsOpen: () => { value: boolean }
   blockMenuOpen: () => { value: boolean }
@@ -33,12 +35,14 @@ export function useOverlayStack(deps: {
   closeAudioDialog: () => void
   closeFormulaDialog: () => void
   closeTableDialog: () => void
+  closeTableOpsSheet: () => void
   closeNoteDialog: () => void
   closeAttachDialog: () => void
   closeLinkCardDialog: () => void
   closeFindDialog: () => void
   closeLinkDialog: () => void
   closePrintPreview: () => void
+  closePageSetup: () => void
 }) {
 function closeTopOverlay(): boolean {
   const id = topOpenModal(
@@ -50,6 +54,7 @@ function closeTopOverlay(): boolean {
       audio: deps.audioDialogOpen().value,
       formula: deps.formulaDialogOpen().value,
       table: deps.tableDialogOpen().value,
+      tableOps: deps.tableOpsSheetOpen().value,
       note: deps.noteDialogOpen().value,
       attach: deps.attachDialogOpen().value,
       snippet: deps.snippetDialogOpen().value,
@@ -60,6 +65,7 @@ function closeTopOverlay(): boolean {
       find: deps.findDialogOpen().value,
       link: deps.linkDialogOpen().value,
       print: deps.printPreviewOpen().value,
+      pageSetup: deps.pageSetupOpen().value,
       wordCount: deps.wordCountDockOpen().value,
       shortcuts: deps.shortcutsOpen().value,
       blockMenu: deps.blockMenuOpen().value,
@@ -91,6 +97,9 @@ function closeTopOverlay(): boolean {
     case 'table':
       deps.closeTableDialog()
       break
+    case 'tableOps':
+      deps.closeTableOpsSheet()
+      break
     case 'note':
       deps.closeNoteDialog()
       break
@@ -120,6 +129,9 @@ function closeTopOverlay(): boolean {
       break
     case 'print':
       deps.closePrintPreview()
+      break
+    case 'pageSetup':
+      deps.closePageSetup()
       break
     case 'wordCount':
       deps.wordCountDockOpen().value = false

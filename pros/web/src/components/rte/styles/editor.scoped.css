@@ -833,6 +833,7 @@
 .rte-root :deep(.tiptap table),
 .rte-root :deep(.ProseMirror table) {
   border-collapse: collapse;
+  table-layout: fixed;
   width: 100%;
   margin: 0.5em 0;
   font-size: 12px;
@@ -842,6 +843,7 @@
 .rte-root :deep(.ProseMirror td),
 .rte-root :deep(.tiptap th),
 .rte-root :deep(.ProseMirror th) {
+  position: relative;
   border: 1px solid #d0d3d9;
   padding: 4px 8px;
   min-width: 48px;
@@ -983,9 +985,11 @@
   color: #f53f3f;
 }
 
-.rte-table-menu {
+.rte-float-menu.rte-table-menu {
   min-width: 148px;
   z-index: 60;
+  max-height: min(70vh, 520px);
+  overflow: auto;
 }
 
 .rte-table-ctx-mask {
@@ -998,6 +1002,9 @@
   position: fixed;
   z-index: 5001;
   min-width: 160px;
+  max-width: min(280px, 92vw);
+  max-height: min(92vh, 640px);
+  overflow: auto;
   padding: 4px;
   background: #fff;
   border: 1px solid #e5e6eb;
@@ -1024,10 +1031,13 @@
 
 .rte-table-ops-sheet {
   width: min(320px, 92vw);
+  max-height: min(92vh, 720px);
+  overflow: auto;
   background: #fff;
   border-radius: 10px;
   padding: 16px 16px 12px;
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.16);
+  box-sizing: border-box;
 }
 
 .rte-table-ops-list {
@@ -1711,6 +1721,8 @@
 }
 .rte-pagesetup-modal {
   width: min(420px, 92vw);
+  max-height: min(92vh, 640px);
+  overflow: auto;
 }
 .rte-pagesetup-field {
   display: flex;

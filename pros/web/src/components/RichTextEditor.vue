@@ -16,7 +16,7 @@ import { TABLE_CELL_BG_PRESETS, TABLE_BORDER_STYLE_PRESETS } from '../extensions
 import { HR_VARIANT_OPTIONS, type RteHrVariant } from '../extensions/rteHorizontalRule'
 import { ElMessage } from 'element-plus'
 import { looksLikeHtml, escapeHtml } from '../utils/itemsHtml'
-import { renderKatex } from '../extensions/math'
+import { formulaTexIssue, renderKatex } from '../extensions/math'
 import {
   isFormNodeName,
   type FormNodeName,
@@ -117,10 +117,21 @@ import { bindAskMore, useAskDialog } from './rte/composables/useAskDialog'
 import { useRtePageLayout } from './rte/composables/useRtePageLayout'
 import { usePageChrome } from './rte/composables/usePageChrome'
 import { EMPTY_PAGE_CHROME, PAGE_NUMBER_OPTIONS, type PanelPageChrome } from '../utils/rtePageChrome'
+import {
+  pageSetupDraftDirty,
+  pageSetupDraftOf,
+  resolvePageSetupDraft,
+  type PageSetupDraft,
+  type PageSetupSnap,
+} from '../utils/rtePageSetupDraft'
+import { readRteViewPref, writeRteViewPref } from '../utils/rteViewPrefs'
 import { readHeadingAutoNum } from '../utils/rteHeadingAutoNum'
+import { clearEditorFormat } from '../utils/rteClearFormat'
+import { maskShouldDismiss } from '../utils/rteDialogMask'
 import { useToolbarGroups } from './rte/composables/useToolbarGroups'
 import {
   buildToolbarGroups,
+  bumpToolbarUndoEpoch,
   COMPACT_PRIMARY_KEY_SET,
 } from '../utils/rteToolbarGroups'
 import { useFindReplace } from './rte/composables/useFindReplace'
@@ -250,6 +261,7 @@ const {
   tableQuickCells,
   tableRows,
   tableCols,
+  tableSizeHint,
   tableGridHover,
   TABLE_GRID_MAX_ROWS,
   TABLE_GRID_MAX_COLS,
@@ -258,6 +270,7 @@ const {
   pickTableGridSize,
   openTableDialog,
   closeTableDialog,
+  onTableDialogMask,
   onTableRowsInput,
   onTableColsInput,
   stepTableRows,
@@ -297,6 +310,8 @@ const {
   focusOpenDialog: () => {
     focusOpenDialog()
   },
+  onOpened: () => noteDialogOpened(),
+  onClosed: () => noteDialogClosed(),
   announceRte: (msg) => {
     announceRte(msg)
   },
@@ -425,10 +440,6 @@ async function outlineMenuCopyLink() {
 /** —— 页面设置面板（页面大小 / 页边距 / 页眉 / 页脚 / 页码） —— */
 const pageSetupOpen = ref(false)
 
-function openPageSetup() {
-  pageSetupOpen.value = true
-}
-
 /** —— @ 提及权限面板 —— */
 const directoryLoading = computed(() => directoryPeople.directoryLoading.value)
 const directoryError = computed(() => directoryPeople.directoryError.value)
@@ -495,7 +506,9 @@ function resetMentionPermission() {
 }
 
 /** 粘贴为纯文本（工具栏开关；影响后续粘贴） */
-const pastePlainTextMode = ref(false)
+type PasteFormatMode = 'keep' | 'plain' | 'markdown'
+const pasteFormatMode = ref<PasteFormatMode>('keep')
+const pastePlainTextMode = computed(() => pasteFormatMode.value === 'plain')
 /** 浏览器拼写检查（默认关；可工具栏开启） */
 const spellcheckEnabled = ref(false)
 /** 打印预览浮层 */
@@ -563,6 +576,27 @@ const editorZoom = ref(1)
 const focusMode = ref(false)
 const darkEditor = ref(false)
 const paperGuide = ref(false)
+let applyingViewPref = false
+
+function applyStoredViewPref(panelId: string | undefined) {
+  applyingViewPref = true
+  const pref = readRteViewPref(typeof localStorage === 'undefined' ? null : localStorage, panelId)
+  tableHeaderSticky.value = pref.sticky
+  darkEditor.value = pref.dark
+  editorZoom.value = pref.zoom
+  applyingViewPref = false
+}
+
+watch(() => props.panelId, (id) => applyStoredViewPref(id), { immediate: true })
+
+watch([tableHeaderSticky, darkEditor, editorZoom], () => {
+  if (applyingViewPref || !props.panelId) return
+  writeRteViewPref(typeof localStorage === 'undefined' ? null : localStorage, props.panelId, {
+    sticky: tableHeaderSticky.value,
+    dark: darkEditor.value,
+    zoom: editorZoom.value,
+  })
+})
 const sensitiveOn = ref(false)
 const revisionOn = ref(false)
 const footnotePanelOpen = ref(false)
@@ -664,6 +698,7 @@ const {
   setPageHeader,
   setPageFooter,
   setPageNumber,
+  replacePageChrome,
   scheduleMeasure,
   presentOpen,
   presentUnit,
@@ -699,6 +734,7 @@ const {
   applyPrintPageStyle,
   undoPageMargin,
   setMarginPreset,
+  replacePageMargin,
   setMarginSide,
   setPageSize,
   marginUndoArmed,
@@ -721,6 +757,108 @@ const {
   chrome: () => pageChrome.value,
   pageSheet: () => props.pageSheet,
 })
+
+const pageSetupDraft = ref<PageSetupDraft | null>(null)
+const pageSetupBase = ref<PageSetupDraft | null>(null)
+const pageSetupUndo = ref<PageSetupSnap | null>(null)
+const pageSetupRedo = ref<PageSetupSnap | null>(null)
+let pageSetupUndoStamp = 0
+
+function currentPageSetupSnap(): PageSetupSnap {
+  return {
+    size: pageSize.value,
+    margin: { ...pageMargin.value },
+    chrome: { ...pageChrome.value },
+  }
+}
+
+function disarmPageSetupUndo() {
+  pageSetupUndo.value = null
+  pageSetupRedo.value = null
+}
+
+function applyPageSetupSnap(snap: PageSetupSnap) {
+  if (snap.size !== pageSize.value) setPageSize(snap.size)
+  if (
+    snap.margin.preset !== pageMargin.value.preset ||
+    snap.margin.top !== pageMargin.value.top ||
+    snap.margin.right !== pageMargin.value.right ||
+    snap.margin.bottom !== pageMargin.value.bottom ||
+    snap.margin.left !== pageMargin.value.left
+  ) {
+    replacePageMargin({ ...snap.margin })
+  }
+  const chrome = snap.chrome
+  if (
+    chrome.header !== pageChrome.value.header ||
+    chrome.footer !== pageChrome.value.footer ||
+    chrome.pageNumber !== pageChrome.value.pageNumber
+  ) {
+    replacePageChrome({ ...chrome })
+  }
+}
+
+function pageSetupHistoryBlocked(): boolean {
+  if (marginUndoArmed() && marginUndoStamp() > pageSetupUndoStamp) return true
+  return toolbarUndoBridge.isNewer(pageSetupUndoStamp)
+}
+
+function undoPageSetup(): boolean {
+  const prev = pageSetupUndo.value
+  if (!prev || pageSetupHistoryBlocked()) return false
+  pageSetupRedo.value = currentPageSetupSnap()
+  pageSetupUndo.value = null
+  applyPageSetupSnap(prev)
+  return true
+}
+
+function redoPageSetup(): boolean {
+  const next = pageSetupRedo.value
+  if (!next || pageSetupHistoryBlocked()) return false
+  pageSetupUndo.value = currentPageSetupSnap()
+  pageSetupRedo.value = null
+  applyPageSetupSnap(next)
+  return true
+}
+
+function openPageSetup() {
+  const snap = currentPageSetupSnap()
+  const draft = pageSetupDraftOf(snap)
+  pageSetupDraft.value = draft
+  pageSetupBase.value = { ...draft }
+  pageSetupOpen.value = true
+  noteDialogOpened()
+}
+
+function closePageSetup() {
+  pageSetupOpen.value = false
+  pageSetupDraft.value = null
+  pageSetupBase.value = null
+  noteDialogClosed()
+}
+
+function onPageSetupMask() {
+  const draft = pageSetupDraft.value
+  const base = pageSetupBase.value
+  const dirty = !!draft && !!base && pageSetupDraftDirty(base, draft)
+  if (!maskShouldDismiss({ dirty, filePickActive: false })) return
+  closePageSetup()
+}
+
+function confirmPageSetup() {
+  const draft = pageSetupDraft.value
+  if (!draft) return
+  const current = currentPageSetupSnap()
+  const next = resolvePageSetupDraft(current, draft)
+  if (next) {
+    pageSetupUndo.value = current
+    pageSetupRedo.value = null
+    pageSetupUndoStamp = bumpToolbarUndoEpoch()
+    toolbarUndoBridge.disarm()
+    applyPageSetupSnap(next)
+  }
+  closePageSetup()
+}
 
 function initialEditorContent(): string {
   try {
@@ -808,6 +946,8 @@ const editor = useRteExtensions({
   tableOpsSheetOpen,
   tableQuickOpen,
   undoPageMargin,
+  undoPageSetup,
+  redoPageSetup,
   applyFormatPainterIfNeeded,
   initialEditorContent,
   insertFormula,
@@ -850,6 +990,7 @@ const editor = useRteExtensions({
   },
   noteToolbarOrderEdited: () => {
     noteToolbarOrderEdited()
+    disarmPageSetupUndo()
   },
   openBlockMenuForSelection: () => {
     openBlockMenuForSelection()
@@ -1213,31 +1354,7 @@ function redo() {
 function clearFormat() {
   const ed = editor.value
   if (!ed) return
-  // 强化：marks + 块类型回正文倾向 + 对齐 / 段距 / 字距 / 缩进
-  ed.chain()
-    .focus()
-    .unsetAllMarks()
-    .clearNodes()
-    .unsetTextAlign()
-    .unsetLetterSpacing()
-    .run()
-  try {
-    if (ed.isActive('paragraph') || ed.isActive('heading')) {
-      ed.chain()
-        .focus()
-        .updateAttributes(ed.isActive('heading') ? 'heading' : 'paragraph', {
-          indent: 0,
-          marginTop: null,
-          marginBottom: null,
-        })
-        .run()
-    }
-  } catch {
-    /* attrs 可能未注册 */
-  }
-  if (ed.isActive('highlight')) {
-    ed.chain().focus().unsetHighlight().run()
-  }
+  if (!clearEditorFormat(ed)) return
   announceRte('已清除格式')
   ElMessage.success('已清除所选格式')
 }
@@ -1617,20 +1734,16 @@ function insertColumns(cols: ColumnCount, ratios?: number[]) {
 }
 
 function togglePastePlain() {
-  pastePlainTextMode.value = !pastePlainTextMode.value
-  pasteFormatMode.value = pastePlainTextMode.value ? 'plain' : 'keep'
+  pasteFormatMode.value = pasteFormatMode.value === 'plain' ? 'keep' : 'plain'
   ElMessage.success(
     pastePlainTextMode.value ? '已开启：粘贴为纯文本' : '已关闭：粘贴为纯文本',
   )
 }
 
 /** 粘贴后格式：保留 / 纯文本 / Markdown 智能（下一轮粘贴生效） */
-type PasteFormatMode = 'keep' | 'plain' | 'markdown'
-const pasteFormatMode = ref<PasteFormatMode>('keep')
 const pasteFormatOpen = ref(false)
 function setPasteFormatMode(mode: PasteFormatMode) {
   pasteFormatMode.value = mode
-  pastePlainTextMode.value = mode === 'plain'
   const labels: Record<PasteFormatMode, string> = {
     keep: '保留原格式',
     plain: '粘贴为纯文本',
@@ -1842,7 +1955,7 @@ async function copyAsMarkdown() {
   const ed = editor.value
   if (!ed) return
   try {
-    const md = await copySelectionOrDocAsMarkdown(ed)
+    const md = await copySelectionOrDocAsMarkdown(ed, headingAutoNumber.value)
     await navigator.clipboard.writeText(md)
     ElMessage.success('已复制为 Markdown')
   } catch (e) {
@@ -4322,6 +4435,8 @@ type FormulaMode = 'inline' | 'display'
 const formulaDialogOpen = ref(false)
 const formulaMode = ref<FormulaMode>('inline')
 const formulaTex = ref('')
+const formulaBaseline = ref('')
+const formulaError = ref('')
 const formulaPreviewExpanded = ref(false)
 const formulaTexareaRef = ref<HTMLTextAreaElement | null>(null)
 
@@ -4334,6 +4449,8 @@ const formulaPreviewHtml = computed(() => {
 function resetFormulaDialog() {
   formulaMode.value = 'inline'
   formulaTex.value = ''
+  formulaBaseline.value = ''
+  formulaError.value = ''
   formulaPreviewExpanded.value = false
 }
 
@@ -4365,6 +4482,8 @@ useOverlayStack({
   audioDialogOpen: () => audioDialogOpen,
   formulaDialogOpen: () => formulaDialogOpen,
   tableDialogOpen: () => tableDialogOpen,
+  tableOpsSheetOpen: () => tableOpsSheetOpen,
+  closeTableOpsSheet: () => closeTableOpsSheet(),
   noteDialogOpen: () => noteDialogOpen,
   attachDialogOpen: () => attachDialogOpen,
   snippetDialogOpen: () => snippetDialogOpen,
@@ -4393,18 +4512,27 @@ useOverlayStack({
   closeFindDialog: (...args) => closeFindDialog(...args),
   closeLinkDialog: (...args) => closeLinkDialog(...args),
   closePrintPreview: (...args) => closePrintPreview(...args),
+  pageSetupOpen: () => pageSetupOpen,
+  closePageSetup: () => closePageSetup(),
 })
 
 function openFormulaDialog() {
   resetFormulaDialog()
   formulaDialogOpen.value = true
   moreOpen.value = false
-  focusOpenDialog()
+  noteDialogOpened()
 }
 
 function closeFormulaDialog() {
   formulaDialogOpen.value = false
   resetFormulaDialog()
+  noteDialogClosed()
+}
+
+function onFormulaMask() {
+  const dirty = formulaTex.value.trim() !== formulaBaseline.value.trim()
+  if (!maskShouldDismiss({ dirty, filePickActive: false })) return
+  closeFormulaDialog()
 }
 
 function setFormulaMode(mode: FormulaMode) {
@@ -4456,8 +4584,11 @@ function openFormulaFromChip(el: HTMLElement) {
   }
   formulaMode.value = display ? 'display' : 'inline'
   formulaTex.value = tex
+  formulaBaseline.value = tex.trim()
+  formulaError.value = ''
   formulaPreviewExpanded.value = false
   formulaDialogOpen.value = true
+  noteDialogOpened()
 }
 
 async function insertDateChip(kind: 'date' | 'remind' = 'date') {
@@ -4483,14 +4614,29 @@ function confirmInsertFormula() {
   const ed = editor.value
   if (!ed) return
   const tex = formulaTex.value.trim()
-  if (!tex) {
-    ElMessage.warning('请输入 TeX 公式')
+  const issue = formulaTexIssue(tex)
+  if (issue) {
+    formulaError.value = issue
     return
   }
-  if (formulaMode.value === 'display') {
-    ed.chain().focus().insertMathDisplay({ tex }).run()
+  formulaError.value = ''
+  const selected = ed.state.selection
+  const node = selected instanceof NodeSelection ? selected.node : null
+  const want = formulaMode.value === 'display' ? 'mathDisplay' : 'mathInline'
+  let ok = false
+  if (node && (node.type.name === 'mathInline' || node.type.name === 'mathDisplay')) {
+    ok =
+      node.type.name === want
+        ? ed.chain().focus().updateAttributes(node.type.name, { tex }).run()
+        : ed.chain().focus().insertContent({ type: want, attrs: { tex } }).run()
+  } else if (formulaMode.value === 'display') {
+    ok = ed.chain().focus().insertMathDisplay({ tex }).run()
   } else {
-    ed.chain().focus().insertMathInline({ tex }).run()
+    ok = ed.chain().focus().insertMathInline({ tex }).run()
+  }
+  if (!ok) {
+    formulaError.value = '无法写入公式，请把光标放回正文后再试'
+    return
   }
   closeFormulaDialog()
 }
@@ -4910,6 +5056,7 @@ const {
   closeMore: () => {
     moreOpen.value = false
   },
+  headingNumbers: () => headingAutoNumber.value,
 })
 
 /** 工具栏分组内的按钮配置菜单（右键分组打开） */
@@ -6502,6 +6649,8 @@ provideRteBindings({
   closeFontMenus,
   closeFormInspector,
   closeFormulaDialog,
+  onFormulaMask,
+  formulaError,
   closeHighlightMenus,
   closeImageDialog,
   onImageDialogMask,
@@ -6515,6 +6664,7 @@ provideRteBindings({
   closePrintPreview,
   closeTableCtx,
   closeTableDialog,
+  onTableDialogMask,
   closeTableMenu,
   closeTableOpsSheet,
   closeVideoDialog,
@@ -6703,7 +6853,11 @@ provideRteBindings({
   localTitle,
   markToolbarMenuOpening,
   pageSetupOpen,
+  pageSetupDraft,
   openPageSetup,
+  closePageSetup,
+  onPageSetupMask,
+  confirmPageSetup,
   outlineMenuOpen,
   outlineMenuIndex,
   outlineMenuStyle,
@@ -6901,6 +7055,7 @@ provideRteBindings({
   tableQuickHover,
   tableQuickOpen,
   tableRows,
+  tableSizeHint,
   templateOpen,
   toggleAttachSelect,
   toggleBlockMenu,
