@@ -140,6 +140,10 @@ func main() {
 	{
 		library.POST("/check", mediaH.Check)
 		library.POST("/upload", mediaH.Upload)
+		library.POST("/upload/chunk/prepare", mediaH.PrepareChunk)
+		library.GET("/upload/chunk/:id", mediaH.ChunkStatus)
+		library.POST("/upload/chunk/:id/part", mediaH.PutChunk)
+		library.POST("/upload/chunk/:id/finish", mediaH.FinishChunk)
 		library.GET("/categories", mediaH.ListCategories)
 		library.POST("/categories", mediaH.CreateCategory)
 		library.PUT("/categories/:id", mediaH.UpdateCategory)
