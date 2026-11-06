@@ -199,28 +199,54 @@ export async function copyTableAs(editor: Editor, format: 'csv' | 'tsv'): Promis
   }
 }
 
-/** 表格行筛选：按关键词隐藏不匹配的数据行（DOM 临时，不改文档） */
-export function applyTableRowFilter(editor: Editor, query: string): number {
+export function findTablePos(editor: Editor): number | null {
+  return findTable(editor)?.pos ?? null
+}
+
+function paintTableRows(tableDom: HTMLElement, query: string): number {
   const q = (query || '').trim().toLowerCase()
-  const view = editor.view
-  const found = findTable(editor)
-  if (!found) return -1
-  const tableDom = view.nodeDOM(found.pos) as HTMLElement | null
-  if (!tableDom) return -1
   const trs = tableDom.querySelectorAll('tr')
   let hidden = 0
   trs.forEach((tr, idx) => {
+    const row = tr as HTMLElement
     if (idx === 0) {
-      ;(tr as HTMLElement).style.display = ''
+      row.style.display = ''
+      delete row.dataset.rteFilterHide
       return
     }
-    const text = (tr.textContent || '').toLowerCase()
+    const text = (row.textContent || '').toLowerCase()
     const show = !q || text.includes(q)
-    ;(tr as HTMLElement).style.display = show ? '' : 'none'
-    ;(tr as HTMLElement).dataset.rteFilterHide = show ? '0' : '1'
+    row.style.display = show ? '' : 'none'
+    row.dataset.rteFilterHide = show ? '0' : '1'
     if (!show) hidden += 1
   })
   return hidden
+}
+
+/** 按表格起点把筛选画到当前 DOM。表格不在该位置时返回 -1。不改文档。 */
+export function paintTableFilterAt(editor: Editor, pos: number, query: string): number {
+  const node = editor.state.doc.nodeAt(pos)
+  if (!node || node.type.name !== 'table') return -1
+  const tableDom = editor.view.nodeDOM(pos)
+  if (!(tableDom instanceof HTMLElement)) return -1
+  return paintTableRows(tableDom, query)
+}
+
+/** 表格行筛选：按关键词隐藏不匹配的数据行（只改当前 DOM，不改文档） */
+export function applyTableRowFilter(editor: Editor, query: string): number {
+  const pos = findTablePos(editor)
+  if (pos == null) return -1
+  return paintTableFilterAt(editor, pos, query)
+}
+
+type MappedTransaction = { mapping: { map: (pos: number, assoc?: number) => number } }
+
+/**
+ * 编辑器每次更新都会按文档重画表格，上次写在 tr 上的 display 会丢。
+ * 用记住的表格位置跟过映射，在事务落地后再画一次。
+ */
+export function mapTableFilterPos(pos: number, transactions: readonly MappedTransaction[]): number {
+  return transactions.reduce((at, tr) => tr.mapping.map(at, -1), pos)
 }
 
 export function clearTableRowFilter(editor: Editor): void {

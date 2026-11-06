@@ -159,6 +159,11 @@ export function useRteExtensions(deps: {
   suggestingEnabled: () => boolean
   suggestionAuthor: () => { id: string; name: string }
   bumpSuggestions: LateFn
+  reapplyTableFilter?: (
+    ed: { state: { doc: unknown } },
+    transaction: { mapping: { map: (pos: number, assoc?: number) => number } },
+    appended?: ReadonlyArray<{ mapping: { map: (pos: number, assoc?: number) => number } }>,
+  ) => void
 }) {
   const {
     closeTableCtx,
@@ -796,9 +801,10 @@ const editor = useEditor({
     deps.syncImageCropState?.()
     deps.bumpSuggestions()
   },
-  onTransaction: ({ editor: ed }) => {
+  onTransaction: ({ editor: ed, transaction, appendedTransactions }) => {
     if (selectedFormPos.value != null) formSelectionTick.value += 1
     syncSelectedFormFromEditor(ed)
+    deps.reapplyTableFilter?.(ed, transaction, appendedTransactions)
   },
 })
   return editor

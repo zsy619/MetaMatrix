@@ -7,6 +7,7 @@ import { rememberRecentOpen } from '../utils/canvasTransfer'
 import { normalizePageSize, readPageSize, writePageSizeMap } from '../utils/rtePageSize'
 import { normalizePageMargin, writePageMargin, type PageMargin } from '../utils/rtePageMargin'
 import { normalizePageChrome, writePageChrome, type PanelPageChrome } from '../utils/rtePageChrome'
+import { readHeadingAutoNum, writeHeadingAutoNum } from '../utils/rteHeadingAutoNum'
 import { migrateToolbarGroupButtons, writeToolbarGroupOrder } from '../utils/rteToolbarGroups'
 import { writeCommentThreads, type CommentThread } from '../utils/rteCommentThreads'
 import { writeRevisions, type PanelRevision } from '../utils/rteRevisions'
@@ -1560,6 +1561,20 @@ export const useDocumentStore = defineStore('document', () => {
     if (next) doc.pageMarginByPanelId = next
     else delete doc.pageMarginByPanelId
     if (JSON.stringify(doc.pageMarginByPanelId ?? null) !== prev) markDirty()
+  }
+
+  function getPanelHeadingAutoNum(panelId: string): boolean {
+    return readHeadingAutoNum(current_data.value?.headingAutoNumByPanelId, panelId)
+  }
+
+  function setPanelHeadingAutoNum(panelId: string, on: boolean) {
+    const doc = current_data.value
+    if (!doc || !panelId) return
+    const prev = JSON.stringify(doc.headingAutoNumByPanelId ?? null)
+    const next = writeHeadingAutoNum(doc.headingAutoNumByPanelId, panelId, on)
+    if (next) doc.headingAutoNumByPanelId = next
+    else delete doc.headingAutoNumByPanelId
+    if (JSON.stringify(doc.headingAutoNumByPanelId ?? null) !== prev) markDirty()
   }
 
   function setPanelPageChrome(panelId: string, chrome: PanelPageChrome) {
@@ -3787,6 +3802,8 @@ export const useDocumentStore = defineStore('document', () => {
     setPanelPageSize,
     setPanelPageMargin,
     setPanelPageChrome,
+    getPanelHeadingAutoNum,
+    setPanelHeadingAutoNum,
     setPanelCommentThreads,
     setPanelRevisions,
     setPanelMentionPermission,

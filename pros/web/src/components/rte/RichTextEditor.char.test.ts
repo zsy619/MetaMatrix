@@ -129,6 +129,34 @@ describe('RichTextEditor 特征', () => {
     wrapper.unmount()
   })
 
+  it('标题自动编号按面板落库，关掉后字段消失，不改页眉', async () => {
+    const { wrapper, store } = await mountEditor({ expanded: true })
+    expect(wrapper.classes()).not.toContain('is-heading-auto-num')
+    expect(store.current_data?.headingAutoNumByPanelId).toBeUndefined()
+    store.setPanelHeadingAutoNum('panel-a', true)
+    await nextTick()
+    expect(wrapper.classes()).toContain('is-heading-auto-num')
+    expect(store.current_data?.headingAutoNumByPanelId).toEqual({ 'panel-a': true })
+    expect(store.current_data?.pageChromeByPanelId).toBeUndefined()
+    expect(store.current_data?.pageSizeByPanelId).toBeUndefined()
+    store.setPanelHeadingAutoNum('panel-a', false)
+    await nextTick()
+    expect(wrapper.classes()).not.toContain('is-heading-auto-num')
+    expect(store.current_data?.headingAutoNumByPanelId).toBeUndefined()
+    wrapper.unmount()
+
+    const again = await mountEditor({ expanded: true })
+    again.store.current_data = {
+      ...again.store.current_data!,
+      headingAutoNumByPanelId: { 'panel-a': true },
+      pageChromeByPanelId: { 'panel-a': { header: '保留', footer: '', pageNumber: 'none' } },
+    }
+    await nextTick()
+    expect(again.wrapper.classes()).toContain('is-heading-auto-num')
+    expect(again.store.current_data?.pageChromeByPanelId?.['panel-a']?.header).toBe('保留')
+    again.wrapper.unmount()
+  })
+
   it('最大化时可以同时挂两个实例', async () => {
     const pinia = createPinia()
     setActivePinia(pinia)

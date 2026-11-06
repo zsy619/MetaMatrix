@@ -117,6 +117,7 @@ import { bindAskMore, useAskDialog } from './rte/composables/useAskDialog'
 import { useRtePageLayout } from './rte/composables/useRtePageLayout'
 import { usePageChrome } from './rte/composables/usePageChrome'
 import { EMPTY_PAGE_CHROME, PAGE_NUMBER_OPTIONS, type PanelPageChrome } from '../utils/rtePageChrome'
+import { readHeadingAutoNum } from '../utils/rteHeadingAutoNum'
 import { useToolbarGroups } from './rte/composables/useToolbarGroups'
 import {
   buildToolbarGroups,
@@ -239,6 +240,7 @@ const {
   tableHeaderSticky,
   copyCurrentTable,
   promptTableRowFilter,
+  reapplyTableFilter,
   setTableCellBg,
   setTableCellBorderColor,
   setTableCellBorderStyle,
@@ -876,6 +878,7 @@ const editor = useRteExtensions({
   suggestionAuthor,
   bumpSuggestions: () => bumpSuggestions(),
   mentionPeople: () => directoryPeople.mentionPeople(),
+  reapplyTableFilter: (ed, transaction, appended) => reapplyTableFilter(ed as never, transaction, appended),
 })
 
 // 图表属性面板：选中图表块即弹出（侧栏）
@@ -2002,8 +2005,23 @@ function togglePaperGuide() {
 
 
 /** —— Wave21：标题自动编号 / 样式集 / 列表样式 / 注音 / 结构块 / 检查 / 全屏 / 片段 —— */
+watch(
+  () => [props.panelId, current_data.value?.headingAutoNumByPanelId] as const,
+  () => {
+    if (!props.panelId) return
+    headingAutoNumber.value = readHeadingAutoNum(current_data.value?.headingAutoNumByPanelId, props.panelId)
+  },
+  { immediate: true },
+)
+
 function toggleHeadingAutoNumber() {
-  headingAutoNumber.value = !headingAutoNumber.value
+  const next = !headingAutoNumber.value
+  if (props.panelId && current_data.value) {
+    documentStore.setPanelHeadingAutoNum(props.panelId, next)
+    headingAutoNumber.value = readHeadingAutoNum(current_data.value.headingAutoNumByPanelId, props.panelId)
+  } else {
+    headingAutoNumber.value = next
+  }
   moreOpen.value = false
   ElMessage.success(headingAutoNumber.value ? '已开启标题自动编号' : '已关闭标题自动编号')
 }
