@@ -102,6 +102,8 @@ import {
   type CaseMode,
 } from './rteWave20'
 import { countWords, normalizeHtml, toEditorContent } from '../utils/rteContent'
+import { getToken } from '../api/http'
+import { uploadMediaFile } from '../api/mediaUpload'
 import { htmlWithSuggestionsAccepted } from '../utils/rteSuggestions'
 import { buildExportHtmlWithCharts } from '../utils/rteExportChartSnapshots'
 import { useCommentThreads } from './rte/composables/useCommentThreads'
@@ -4708,19 +4710,24 @@ async function onLocalAttachFilesChange(event: Event) {
   const catId = currentAttachCategoryId()
   const added: StoredAttach[] = []
   for (const file of files) {
-    if (file.size > ATTACH_MAX_BYTES) {
+    if (!getToken() && file.size > ATTACH_MAX_BYTES) {
       rteToast('warning', `${file.name} 超过 3MB，已跳过`)
       continue
     }
     try {
-      // 优先 blob（插入可靠、不受 Link/配额影响）；小文件额外尝试 dataURL 便于素材库持久化
-      let src = URL.createObjectURL(file)
-      if (file.size <= 2 * 1024 * 1024) {
-        try {
-          const dataUrl = await readFileAsDataURL(file)
-          if (dataUrl) src = dataUrl
-        } catch {
-          /* keep blob */
+      let src = ''
+      if (getToken()) {
+        src = (await uploadMediaFile(file, { mediaType: 'file' })).insertedPath
+      } else {
+        // 未登录仍用浏览器内地址，不把磁盘路径写进文档
+        src = URL.createObjectURL(file)
+        if (file.size <= 2 * 1024 * 1024) {
+          try {
+            const dataUrl = await readFileAsDataURL(file)
+            if (dataUrl) src = dataUrl
+          } catch {
+            /* keep blob */
+          }
         }
       }
       if (!src) continue
@@ -4733,8 +4740,8 @@ async function onLocalAttachFilesChange(event: Event) {
         categoryId: catId,
         createdAt: Date.now(),
       })
-    } catch {
-      /* skip */
+    } catch (error) {
+      if (getToken()) rteToast('error', error instanceof Error ? error.message : '附件上传失败')
     }
   }
   if (!added.length) {
