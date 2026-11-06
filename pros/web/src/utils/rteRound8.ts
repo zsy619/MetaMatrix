@@ -66,6 +66,7 @@ export const RTE_OVERLAY_CLOSE_ORDER = [
   'linkImport',
   'image',
   'video',
+  'audio',
   'formula',
   'table',
   'note',

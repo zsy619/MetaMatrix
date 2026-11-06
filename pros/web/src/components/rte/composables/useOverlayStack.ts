@@ -7,6 +7,7 @@ export function useOverlayStack(deps: {
   linkImportOpen: () => { value: boolean }
   imageDialogOpen: () => { value: boolean }
   videoDialogOpen: () => { value: boolean }
+  audioDialogOpen: () => { value: boolean }
   formulaDialogOpen: () => { value: boolean }
   tableDialogOpen: () => { value: boolean }
   noteDialogOpen: () => { value: boolean }
@@ -28,6 +29,7 @@ export function useOverlayStack(deps: {
   closeImportLinkDialog: () => void
   closeImageDialog: () => void
   closeVideoDialog: () => void
+  closeAudioDialog: () => void
   closeFormulaDialog: () => void
   closeTableDialog: () => void
   closeNoteDialog: () => void
@@ -44,6 +46,7 @@ function closeTopOverlay(): boolean {
       linkImport: deps.linkImportOpen().value,
       image: deps.imageDialogOpen().value,
       video: deps.videoDialogOpen().value,
+      audio: deps.audioDialogOpen().value,
       formula: deps.formulaDialogOpen().value,
       table: deps.tableDialogOpen().value,
       note: deps.noteDialogOpen().value,
@@ -77,6 +80,9 @@ function closeTopOverlay(): boolean {
       break
     case 'video':
       deps.closeVideoDialog()
+      break
+    case 'audio':
+      deps.closeAudioDialog()
       break
     case 'formula':
       deps.closeFormulaDialog()
