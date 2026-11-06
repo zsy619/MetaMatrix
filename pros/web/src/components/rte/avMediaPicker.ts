@@ -84,6 +84,8 @@ export type AvPickerOptions = {
   toast: (type: 'success' | 'warning' | 'error' | 'info', message: string) => void
   uid: () => string
   insertItems: (items: AvInsertItem[]) => void
+  /** When set, local files go through the media library instead of a blob URL. */
+  persistFile?: (file: File) => Promise<string>
 }
 
 export type AvPicker = {
@@ -263,13 +265,13 @@ export function createAvPicker(options: AvPickerOptions): AvPicker {
     const added: AvStoredAsset[] = []
     let skippedSize = 0
     for (const file of files) {
-      if (file.size > options.maxBytes) {
+      if (!options.persistFile && file.size > options.maxBytes) {
         skippedSize += 1
         options.toast('warning', options.messages.tooBig(file.name, Math.round(options.maxBytes / (1024 * 1024))))
         continue
       }
       try {
-        const src = URL.createObjectURL(file)
+        const src = options.persistFile ? await options.persistFile(file) : URL.createObjectURL(file)
         if (!src) continue
         added.push({
           id: options.uid(),

@@ -10,6 +10,8 @@ import { insertImagesBeside } from '../../../extensions/imageGroupOps'
 import { compressImageFile } from '../../../utils/rteWave21'
 import { imageReplaceSide } from '../../../utils/rteRound5'
 import { NodeSelection } from '@tiptap/pm/state'
+import { getToken } from '../../../api/http'
+import { uploadMediaFile } from '../../../api/mediaUpload'
 import {
   createAvPicker,
   isAudioFile,
@@ -200,8 +202,17 @@ function imageFilesFromClipboard(
   return out
 }
 
-/** 图片遵守面板附件同一条 3MB DataURL 上限；过大时先尝试压缩。 */
+/** 已登录时走素材库（内部 /media/{id}）。未登录仍用原来的 DataURL，避免把磁盘路径写进文档。 */
 async function imageSrcWithinPolicy(file: File): Promise<string | null> {
+  if (getToken()) {
+    try {
+      const stored = await uploadMediaFile(file, { mediaType: 'image' })
+      return stored.insertedPath
+    } catch (error) {
+      rteToast('error', error instanceof Error ? error.message : '图片上传失败')
+      return null
+    }
+  }
   const name = file.name || 'image.png'
   const mime = file.type || 'image/png'
   const typeReason = attachmentRejectReason(name, mime, 1)
@@ -431,6 +442,21 @@ function insertAvItems(kind: 'video' | 'audio', items: AvInsertItem[]) {
     .run()
 }
 
+async function persistAvFile(file: File, kind: 'video' | 'audio') {
+  if (!getToken()) {
+    const src = URL.createObjectURL(file)
+    if (!src) throw new Error('无法读取文件')
+    return src
+  }
+  try {
+    const stored = await uploadMediaFile(file, { mediaType: kind })
+    return stored.insertedPath
+  } catch (error) {
+    rteToast('error', error instanceof Error ? error.message : '上传失败')
+    throw error
+  }
+}
+
 function avMessages(kind: 'video' | 'audio') {
   const noun = kind === 'video' ? '视频' : '音频'
   const examples = kind === 'video' ? 'mp4 / webm / mov' : 'mp3 / wav / m4a'
@@ -468,6 +494,7 @@ const videoPicker = createAvPicker({
   toast: rteToast,
   uid,
   insertItems: (items) => insertAvItems('video', items),
+  persistFile: (file) => persistAvFile(file, 'video'),
 })
 
 const audioPicker = createAvPicker({
@@ -491,6 +518,7 @@ const audioPicker = createAvPicker({
   toast: rteToast,
   uid,
   insertItems: (items) => insertAvItems('audio', items),
+  persistFile: (file) => persistAvFile(file, 'audio'),
 })
 
 const videoDialogOpen = computed(() => videoPicker.open)

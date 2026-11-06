@@ -79,6 +79,7 @@ import { ListStyleAttrs } from '../../../extensions/listStyleAttrs'
 import { LinkButton } from '../../../extensions/linkButton'
 import { SyncBlock } from '../../../extensions/syncBlock'
 import { RteMarkdownInputRules } from '../../../extensions/rteMarkdownInputRules'
+import { MediaHydrate } from '../../../extensions/mediaHydrate'
 
 type LateFn = (...args: any[]) => any
 
@@ -248,6 +249,7 @@ const editor = useEditor({
     RteCodeBlockLowlight,
     // Markdown 输入规则（# / - / 1. / [ ] / > / ``` / ---），优先于各扩展内置规则
     RteMarkdownInputRules,
+    MediaHydrate,
     TextStyle,
     FontSize,
     FontFamily,
@@ -294,6 +296,8 @@ const editor = useEditor({
       isAllowedUri: (url, ctx) => {
         if (!url) return false
         if (/^(data|blob):/i.test(url)) return true
+        // 素材库稳定路径，不是磁盘路径，也不是带签名的临时地址
+        if (/^\/media\/[0-9a-zA-Z-]+$/.test(url)) return true
         return ctx.defaultValidate(url)
       },
     }),
