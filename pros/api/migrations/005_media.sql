@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS media_asset (
   storage_disk VARCHAR(32) NOT NULL DEFAULT 'local',
   mime_type VARCHAR(128) NOT NULL,
   size_bytes BIGINT NOT NULL,
-  sha256 CHAR(64) NOT NULL,
+  sha256 VARCHAR(64) NOT NULL,
   feishu_media_token VARCHAR(128) NOT NULL DEFAULT '',
   feishu_parent_type VARCHAR(32) NOT NULL DEFAULT '',
   feishu_parent_node VARCHAR(128) NOT NULL DEFAULT '',

@@ -1,0 +1,100 @@
+{
+  "emailA": "media-a-mw4cr8on@metamatrix.local",
+  "emailB": "media-b-mw4cr8on@metamatrix.local",
+  "workers": [
+    "http://127.0.0.1:5173/src/utils/mediaHash.worker.ts?worker_file&type=module",
+    "http://127.0.0.1:5173/src/utils/mediaHash.worker.ts?worker_file&type=module",
+    "http://127.0.0.1:5173/src/utils/mediaHash.worker.ts?worker_file&type=module"
+  ],
+  "pasteReqs": [
+    "POST http://127.0.0.1:5173/api/media/check",
+    "POST http://127.0.0.1:5173/api/media/upload",
+    "GET http://127.0.0.1:5173/api/media/3d130973-81f6-41f0-8a44-da096a264676",
+    "GET http://127.0.0.1:5173/api/media/3d130973-81f6-41f0-8a44-da096a264676?exp=1793932539&sig=2f7a418218a311539a07a95f832b273e5582912aa5669eea7428788d1cfb167c"
+  ],
+  "againReqs": [
+    "POST http://127.0.0.1:5173/api/media/check"
+  ],
+  "dropReqs": [
+    "POST http://127.0.0.1:5173/api/media/check"
+  ],
+  "rangeRes": {
+    "status": 206,
+    "len": 4,
+    "contentRange": "bytes 0-3/78"
+  },
+  "expired": {
+    "status": 403,
+    "body": "{\"code\":\"forbidden\",\"message\":\"invalid or expired media signature\",\"requestId\":\"278fd000-e44e-4654-9994-86a83435e222\"}"
+  },
+  "ref": {
+    "create": 201,
+    "path": "/media/3d130973-81f6-41f0-8a44-da096a264676",
+    "delete": 409,
+    "body": "{\"code\":\"conflict\",\"message\":\"referenced media cannot be deleted\",\"requestId\":\"ef16cc72-0bf3-47db-865b-a9cd1581b8ed\"}"
+  },
+  "chunk": {
+    "early": 409,
+    "earlyBody": "{\"code\":\"conflict\",\"message\":\"upload is missing parts\",\"requestId\":\"0a45c80f-1962-4190-9be0-fe58445b6b89\"}",
+    "missing": [
+      1
+    ],
+    "hole": 200,
+    "finish": 201,
+    "sha": "4e259631b8a81d43b9d690bbefd074db3d79a13dd583653be2bcaf8b574aef5d",
+    "want": "4e259631b8a81d43b9d690bbefd074db3d79a13dd583653be2bcaf8b574aef5d",
+    "path": "/media/45543468-07d5-447e-a83c-74b4c7557588",
+    "id": "45543468-07d5-447e-a83c-74b4c7557588"
+  },
+  "isolated": {
+    "meta": 404,
+    "replay": 403
+  },
+  "notes": [
+    {
+      "step": "登录后粘贴启动哈希 Worker",
+      "ok": true,
+      "detail": "http://127.0.0.1:5173/src/utils/mediaHash.worker.ts?worker_file&type=module"
+    },
+    {
+      "step": "粘贴走到素材接口",
+      "ok": true,
+      "detail": "POST http://127.0.0.1:5173/api/media/check\nPOST http://127.0.0.1:5173/api/media/upload\nGET http://127.0.0.1:5173/api/media/3d130973-81f6-41f0-8a44-da096a264676\nGET http://127.0.0.1:5173/api/media/3d130973-81f6-41f0-8a44-da096a264676?exp=1793932539&sig=2f7a418218a311539a07a95f832b273e5582912aa5669eea7428788d1cfb167c"
+    },
+    {
+      "step": "同一用户再次粘贴只检查不重复上传",
+      "ok": true,
+      "detail": "POST http://127.0.0.1:5173/api/media/check"
+    },
+    {
+      "step": "拖拽同一字节也只检查不重复上传",
+      "ok": true,
+      "detail": "POST http://127.0.0.1:5173/api/media/check"
+    },
+    {
+      "step": "浏览器 Range 读取返回 206",
+      "ok": true,
+      "detail": "{\"status\":206,\"len\":4,\"contentRange\":\"bytes 0-3/78\"}"
+    },
+    {
+      "step": "过期签名在浏览器里是 403",
+      "ok": true,
+      "detail": "{\"code\":\"forbidden\",\"message\":\"invalid or expired media signature\",\"requestId\":\"278fd000-e44e-4654-9994-86a83435e222\"}"
+    },
+    {
+      "step": "被引用后浏览器删除得到 409，路径仍是内部 id",
+      "ok": true,
+      "detail": "{\"create\":201,\"path\":\"/media/3d130973-81f6-41f0-8a44-da096a264676\",\"delete\":409,\"body\":\"{\\\"code\\\":\\\"conflict\\\",\\\"message\\\":\\\"referenced media cannot be deleted\\\",\\\"requestId\\\":\\\"ef16cc72-0bf3-47db-865b-a9cd1581b8ed\\\"}\"}"
+    },
+    {
+      "step": "浏览器里大于 20MB 缺片后续传，哈希一致",
+      "ok": true,
+      "detail": "{\"early\":409,\"earlyBody\":\"{\\\"code\\\":\\\"conflict\\\",\\\"message\\\":\\\"upload is missing parts\\\",\\\"requestId\\\":\\\"0a45c80f-1962-4190-9be0-fe58445b6b89\\\"}\",\"missing\":[1],\"hole\":200,\"finish\":201,\"sha\":\"4e259631b8a81d43b9d690bbefd074db3d79a13dd583653be2bcaf8b574aef5d\",\"want\":\"4e259631b8a81d43b9d690bbefd074db3d79a13dd583653be2bcaf8b574aef5d\",\"path\":\"/media/45543468-07d5-447e-a83c-74b4c7557588\",\"id\":\"45543468-07d5-447e-a83c-74b4c7557588\"}"
+    },
+    {
+      "step": "另一个登录用户读不到对方素材",
+      "ok": true,
+      "detail": "{\"meta\":404,\"replay\":403}"
+    }
+  ]
+}

@@ -116,13 +116,7 @@ func (h *MediaHandler) PutChunk(ctx context.Context, c *app.RequestContext) {
 		BadRequest(c, "invalid index")
 		return
 	}
-	var body io.Reader
-	if stream := c.Request.BodyStream(); stream != nil {
-		body = stream
-	} else {
-		body = bytes.NewReader(c.Request.Body())
-	}
-	out, err := h.svc.PutChunk(ctx, uid, c.Param("id"), index, body)
+	out, err := h.svc.PutChunk(ctx, uid, c.Param("id"), index, requestBody(c))
 	if err != nil {
 		h.fail(c, err)
 		return
@@ -479,6 +473,15 @@ func (h *MediaHandler) fail(c *app.RequestContext, err error) {
 	default:
 		Internal(c, "media request failed")
 	}
+}
+
+// Hertz buffers a normal request into Body() and BodyStream() then returns a
+// non-nil empty reader. Only a real stream should be read from BodyStream.
+func requestBody(c *app.RequestContext) io.Reader {
+	if c.Request.IsBodyStream() {
+		return c.Request.BodyStream()
+	}
+	return bytes.NewReader(c.Request.Body())
 }
 
 func atoiDefault(raw string, fallback int) int {
