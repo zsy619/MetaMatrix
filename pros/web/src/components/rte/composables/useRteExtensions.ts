@@ -42,6 +42,7 @@ import { RteCodeBlockLowlight } from '../../../extensions/codeHighlight'
 import { SlashCommands } from '../../../extensions/slashCommands'
 import { escapeHtml } from '../../../utils/itemsHtml'
 import { FEISHU_HIGHLIGHT_COLORS, isBareHttpUrl, plainTextToPasteContent, sanitizePastedHtml } from '../../../utils/rtePasteClean'
+import { clearEditorFormat } from '../../../utils/rteClearFormat'
 import { pasteVolume, previewShortcutAllowed } from '../../../utils/rteRound8'
 import {
   htmlHasTable,
@@ -743,6 +744,11 @@ const editor = useEditor({
       if (event.altKey && !event.shiftKey && key === '9') {
         event.preventDefault()
         ed.chain().focus().toggleTaskList().run()
+        return true
+      }
+      if ((key === '\\' || key === '|') && !event.shiftKey && !event.altKey) {
+        event.preventDefault()
+        clearEditorFormat(ed)
         return true
       }
       if (event.shiftKey) {

@@ -118,6 +118,7 @@ import { useRtePageLayout } from './rte/composables/useRtePageLayout'
 import { usePageChrome } from './rte/composables/usePageChrome'
 import { EMPTY_PAGE_CHROME, PAGE_NUMBER_OPTIONS, type PanelPageChrome } from '../utils/rtePageChrome'
 import { readHeadingAutoNum } from '../utils/rteHeadingAutoNum'
+import { clearEditorFormat } from '../utils/rteClearFormat'
 import { useToolbarGroups } from './rte/composables/useToolbarGroups'
 import {
   buildToolbarGroups,
@@ -495,7 +496,9 @@ function resetMentionPermission() {
 }
 
 /** 粘贴为纯文本（工具栏开关；影响后续粘贴） */
-const pastePlainTextMode = ref(false)
+type PasteFormatMode = 'keep' | 'plain' | 'markdown'
+const pasteFormatMode = ref<PasteFormatMode>('keep')
+const pastePlainTextMode = computed(() => pasteFormatMode.value === 'plain')
 /** 浏览器拼写检查（默认关；可工具栏开启） */
 const spellcheckEnabled = ref(false)
 /** 打印预览浮层 */
@@ -1213,31 +1216,7 @@ function redo() {
 function clearFormat() {
   const ed = editor.value
   if (!ed) return
-  // 强化：marks + 块类型回正文倾向 + 对齐 / 段距 / 字距 / 缩进
-  ed.chain()
-    .focus()
-    .unsetAllMarks()
-    .clearNodes()
-    .unsetTextAlign()
-    .unsetLetterSpacing()
-    .run()
-  try {
-    if (ed.isActive('paragraph') || ed.isActive('heading')) {
-      ed.chain()
-        .focus()
-        .updateAttributes(ed.isActive('heading') ? 'heading' : 'paragraph', {
-          indent: 0,
-          marginTop: null,
-          marginBottom: null,
-        })
-        .run()
-    }
-  } catch {
-    /* attrs 可能未注册 */
-  }
-  if (ed.isActive('highlight')) {
-    ed.chain().focus().unsetHighlight().run()
-  }
+  if (!clearEditorFormat(ed)) return
   announceRte('已清除格式')
   ElMessage.success('已清除所选格式')
 }
@@ -1617,20 +1596,16 @@ function insertColumns(cols: ColumnCount, ratios?: number[]) {
 }
 
 function togglePastePlain() {
-  pastePlainTextMode.value = !pastePlainTextMode.value
-  pasteFormatMode.value = pastePlainTextMode.value ? 'plain' : 'keep'
+  pasteFormatMode.value = pasteFormatMode.value === 'plain' ? 'keep' : 'plain'
   ElMessage.success(
     pastePlainTextMode.value ? '已开启：粘贴为纯文本' : '已关闭：粘贴为纯文本',
   )
 }
 
 /** 粘贴后格式：保留 / 纯文本 / Markdown 智能（下一轮粘贴生效） */
-type PasteFormatMode = 'keep' | 'plain' | 'markdown'
-const pasteFormatMode = ref<PasteFormatMode>('keep')
 const pasteFormatOpen = ref(false)
 function setPasteFormatMode(mode: PasteFormatMode) {
   pasteFormatMode.value = mode
-  pastePlainTextMode.value = mode === 'plain'
   const labels: Record<PasteFormatMode, string> = {
     keep: '保留原格式',
     plain: '粘贴为纯文本',

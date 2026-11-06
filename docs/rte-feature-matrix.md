@@ -16,7 +16,13 @@
 
 优先级：P0 用户能看见的失败或数据丢失；P1 设置保存后丢失；P2 体验不完整；P3 明确不做。
 
-## 编辑内核（对照分享，仍在本分支）
+## 2026-11-06 后续批次（`fa1e375` 之后）
+
+清除格式原先分成多次 `chain().run()`，撤销一次只退回最后一步，首行缩进也不清。现在收成 `clearEditorFormat` 一次事务，工具栏和 Ctrl+\ 共用。粘贴模式只留 `pasteFormatMode`，纯文本开关由它派生，避免两个 ref 各写各的。
+
+音频和视频这轮在浏览器里分开点了，见 `scripts/rte-av-both-e2e.mjs`。截图：`/opt/cursor/artifacts/rte-dialog-audio-1440.png`、`rte-dialog-audio-390.png`、`rte-dialog-video-1440.png`、`rte-dialog-video-390.png`。窄屏分类栏横排，取消和确认都在窗内。没有打开操作系统文件选择器。
+
+## 编辑内核（对照分享，#108）
 
 分享是通用内核说明，不是本仓库的缺陷单。没有因此加协同或插件框架。真实系统输入法仍然没测，测试里的按键是脚本派发的。
 
@@ -66,7 +72,7 @@
 | 查找替换 | 区分大小写、全词、正则 | 已实现；本轮未在浏览器搜 | `useFindReplace.ts`、`rteFindRegex.test.ts` | 未验证 |
 | 格式刷 | 复制选区格式再刷 | 已实现；本轮未点 | `activateFormatPainter` | 未验证 |
 | 纯文本粘贴 / 粘贴格式 | 粘贴清洗、Word 提示 | 已实现；本轮未贴 | `useRteExtensions.ts` 的 `transformPastedHTML` | 未验证 |
-| 清除格式 | 去掉 mark、对齐、段距 | 已实现；本轮未点 | `clearFormat` | 未验证 |
+| 清除格式 | 一次事务去掉标记、对齐、段距、首行缩进，并把标题收成正文。Ctrl+\ 与按钮共用 `clearEditorFormat`。撤销一次回到清之前 | 本批补上首行缩进，并修掉原先拆成多次撤销的问题 | `utils/rteClearFormat.ts` 与其测试 | — |
 | 键盘 | 标题、列表、查找等快捷键在 `editorProps.handleKeyDown` | 已实现代码；真实系统输入法未验证 | `useRteExtensions.ts` | 未验证 |
 
 ## 2. 字体与颜色
@@ -98,7 +104,7 @@
 |---|---|---|---|
 | 链接、按钮、网页卡片 | 对话框；按钮只开 http(s) | 已实现 | `RichTextEditor.vue` 链接函数、`linkButton.ts`、`linkCard.ts` |
 | 图片 | 上传走素材库 `/media/{id}`；缩放、裁剪、环绕、图片组 | 素材路径见 `mediaHydrate.ts`、`docs/acceptance/media-1106/README.md`。图片组间距见 #107。本轮未再上传 | 未验证本轮回归 |
-| 音频、视频 | 同一套选择弹窗 | 已实现代码；本轮未再打开弹窗 | `avMediaPicker.ts`、`RteAvPickDialog.vue` |
+| 音频、视频 | 各自从工具栏打开选择窗。2026-11-06 在 1440×900 和 390×700 分别点过，取消不插入；确认外部链接后正文同时有 video 与 audio，两次撤销去掉，重做后 HTML 与再加载一致 | 已在浏览器分开验证。真实操作系统文件选择器仍未打开 | `scripts/rte-av-both-e2e.mjs` |
 | 附件 | 3MB 上限与链接芯片在既有路径 | 已实现；本轮未传附件 | `useMediaLibrary.ts` |
 | 二维码、表情、特殊字符、公式 | 各有插入命令 | 已实现代码；本轮未点 | `math.ts`、工具项 `qrcode` / `emoji` / `formula` |
 
