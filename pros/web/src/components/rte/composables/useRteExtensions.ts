@@ -117,6 +117,8 @@ export function useRteExtensions(deps: {
   tableOpsSheetOpen: { value: boolean }
   tableQuickOpen: { value: boolean }
   undoPageMargin: LateFn
+  undoPageSetup: LateFn
+  redoPageSetup: LateFn
   applyFormatPainterIfNeeded: LateFn
   initialEditorContent: LateFn
   insertFormula: LateFn
@@ -185,6 +187,8 @@ export function useRteExtensions(deps: {
     tableOpsSheetOpen,
     tableQuickOpen,
     undoPageMargin,
+    undoPageSetup,
+    redoPageSetup,
     applyFormatPainterIfNeeded,
     initialEditorContent,
     insertFormula,
@@ -620,7 +624,11 @@ const editor = useEditor({
         event.preventDefault()
         return true
       }
-      if (key === 'z' && !event.shiftKey && !event.altKey && (undoPageMargin() || undoToolbarGroupOrder())) {
+      if (key === 'z' && event.shiftKey && !event.altKey && redoPageSetup()) {
+        event.preventDefault()
+        return true
+      }
+      if (key === 'z' && !event.shiftKey && !event.altKey && (undoPageSetup() || undoPageMargin() || undoToolbarGroupOrder())) {
         event.preventDefault()
         return true
       }

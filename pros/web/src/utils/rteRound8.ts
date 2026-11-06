@@ -105,6 +105,7 @@ export const RTE_OVERLAY_CLOSE_ORDER = [
   'find',
   'link',
   'print',
+  'pageSetup',
   'wordCount',
   'shortcuts',
   'blockMenu',

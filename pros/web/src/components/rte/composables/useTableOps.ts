@@ -16,6 +16,7 @@ import {
   currentTableColIndex,
 } from '../../rteWave20'
 import { recalculateTable } from '../../../utils/rteTableFormula'
+import { maskShouldDismiss } from '../../../utils/rteDialogMask'
 
 /** 表格插入、单元格操作与表格菜单。模板绑定名与原先一致。 */
 export function useTableOps(deps: {
@@ -32,6 +33,8 @@ export function useTableOps(deps: {
   closeExportMenu: () => void
   closeFontMenus: () => void
   focusOpenDialog: () => void
+  onOpened?: () => void
+  onClosed?: () => void
   announceRte: (msg: string) => void
   rteToast: (type: 'success' | 'warning' | 'error' | 'info', message: string) => void
   openRtePrompt: (opts: {
@@ -183,6 +186,7 @@ const tableQuickCells = Array.from({ length: TABLE_QUICK_ROWS * TABLE_QUICK_COLS
 }))
 const tableRows = ref(3)
 const tableCols = ref(3)
+const tableSizeBase = ref({ rows: 3, cols: 3 })
 /** 尺寸网格悬停预览（Word 风格） */
 const tableGridHover = ref({ rows: 0, cols: 0 })
 const TABLE_GRID_MAX_ROWS = 8
@@ -192,6 +196,7 @@ function resetTableDialog() {
   tableRows.value = 3
   tableCols.value = 3
   tableGridHover.value = { rows: 0, cols: 0 }
+  tableSizeHint.value = ''
 }
 
 function onTableGridHover(r: number, c: number) {
@@ -214,9 +219,11 @@ function pickTableGridSize(r: number, c: number) {
 
 function openTableDialog() {
   resetTableDialog()
+  tableSizeBase.value = { rows: tableRows.value, cols: tableCols.value }
   tableDialogOpen.value = true
   deps.moreOpen().value = false
-  deps.focusOpenDialog()
+  if (deps.onOpened) deps.onOpened()
+  else deps.focusOpenDialog()
   tableMenuOpen.value = false
   tableOpsSheetOpen.value = false
   closeTableCtx()
@@ -225,6 +232,13 @@ function openTableDialog() {
 function closeTableDialog() {
   tableDialogOpen.value = false
   resetTableDialog()
+  deps.onClosed?.()
+}
+
+function onTableDialogMask() {
+  const dirty = tableRows.value !== tableSizeBase.value.rows || tableCols.value !== tableSizeBase.value.cols
+  if (!maskShouldDismiss({ dirty, filePickActive: false })) return
+  closeTableDialog()
 }
 
 function clampInt(v: number, min: number, max: number) {
@@ -232,23 +246,37 @@ function clampInt(v: number, min: number, max: number) {
   return Math.min(max, Math.max(min, Math.trunc(v)))
 }
 
+const tableSizeHint = ref('')
+
+function noteTableSize(raw: string, n: number, min: number, max: number, label: string) {
+  if (raw !== '' && (Number.isNaN(n) || n < min || n > max)) {
+    tableSizeHint.value = `${label}只接受 ${min} 到 ${max}，已改到范围内，不会按超出的数字插入`
+    return
+  }
+  tableSizeHint.value = ''
+}
+
 function onTableRowsInput(event: Event) {
   const raw = (event.target as HTMLInputElement).value
   const n = parseInt(raw, 10)
+  noteTableSize(raw, n, 1, 100, '行数')
   tableRows.value = clampInt(Number.isNaN(n) ? 1 : n, 1, 100)
 }
 
 function onTableColsInput(event: Event) {
   const raw = (event.target as HTMLInputElement).value
   const n = parseInt(raw, 10)
+  noteTableSize(raw, n, 1, TABLE_GRID_MAX_COLS, '列数')
   tableCols.value = clampInt(Number.isNaN(n) ? 1 : n, 1, TABLE_GRID_MAX_COLS)
 }
 
 function stepTableRows(delta: number) {
+  tableSizeHint.value = ''
   tableRows.value = clampInt(tableRows.value + delta, 1, 100)
 }
 
 function stepTableCols(delta: number) {
+  tableSizeHint.value = ''
   tableCols.value = clampInt(tableCols.value + delta, 1, TABLE_GRID_MAX_COLS)
 }
 
@@ -656,13 +684,10 @@ function onTableToolClick() {
     closeTableCtx()
     return
   }
-  const nextQuick = !tableQuickOpen.value
-  closeTableMenu()
-  if (nextQuick) tableQuickHover.value = { rows: 0, cols: 0 }
-  tableQuickOpen.value = nextQuick
+  openTableDialog()
 }
 
-/** 最大化工具栏「表格」按钮：表外网格插入；表内切换操作下拉 */
+/** 最大化工具栏「表格」按钮：表外先出尺寸网格；表内切换操作下拉 */
 function onTableToolbarButtonClick() {
   if (deps.viewMode().value !== 'edit') return
   deps.moreOpen().value = false
@@ -711,6 +736,7 @@ function onTableToolbarButtonClick() {
     tableQuickCells,
     tableRows,
     tableCols,
+    tableSizeHint,
     tableGridHover,
     TABLE_GRID_MAX_ROWS,
     TABLE_GRID_MAX_COLS,
@@ -720,6 +746,7 @@ function onTableToolbarButtonClick() {
     pickTableGridSize,
     openTableDialog,
     closeTableDialog,
+    onTableDialogMask,
     clampInt,
     onTableRowsInput,
     onTableColsInput,

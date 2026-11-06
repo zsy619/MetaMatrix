@@ -532,6 +532,22 @@
   height: 0;
   min-width: 0;
 }
+@media (max-width: 720px) {
+  .rte-formula-header {
+    flex-wrap: wrap;
+  }
+  .rte-formula-body {
+    grid-template-columns: 1fr;
+    overflow: auto;
+    height: auto;
+  }
+  .rte-formula-symbols {
+    max-height: 120px;
+  }
+  .rte-formula-dialog {
+    overflow: auto;
+  }
+}
 .rte-formula-left,
 .rte-formula-right {
   border: 1px solid #e5e6eb;
@@ -973,7 +989,9 @@
   border-color: #c9d8ff;
 }
 .rte-table-dialog {
-  width: min(460px, 100%);
+  width: min(460px, 96vw);
+  max-height: 92vh;
+  overflow: auto;
 }
 .rte-table-grid-picker {
   display: flex;

@@ -21,6 +21,7 @@ export function useOverlayStack(deps: {
   findDialogOpen: () => { value: boolean }
   linkDialogOpen: () => { value: boolean }
   printPreviewOpen: () => { value: boolean }
+  pageSetupOpen: () => { value: boolean }
   wordCountDockOpen: () => { value: boolean }
   shortcutsOpen: () => { value: boolean }
   blockMenuOpen: () => { value: boolean }
@@ -39,6 +40,7 @@ export function useOverlayStack(deps: {
   closeFindDialog: () => void
   closeLinkDialog: () => void
   closePrintPreview: () => void
+  closePageSetup: () => void
 }) {
 function closeTopOverlay(): boolean {
   const id = topOpenModal(
@@ -60,6 +62,7 @@ function closeTopOverlay(): boolean {
       find: deps.findDialogOpen().value,
       link: deps.linkDialogOpen().value,
       print: deps.printPreviewOpen().value,
+      pageSetup: deps.pageSetupOpen().value,
       wordCount: deps.wordCountDockOpen().value,
       shortcuts: deps.shortcutsOpen().value,
       blockMenu: deps.blockMenuOpen().value,
@@ -120,6 +123,9 @@ function closeTopOverlay(): boolean {
       break
     case 'print':
       deps.closePrintPreview()
+      break
+    case 'pageSetup':
+      deps.closePageSetup()
       break
     case 'wordCount':
       deps.wordCountDockOpen().value = false

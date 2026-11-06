@@ -22,6 +22,19 @@
 
 音频和视频这轮在浏览器里分开点了，见 `scripts/rte-av-both-e2e.mjs`。截图：`/opt/cursor/artifacts/rte-dialog-audio-1440.png`、`rte-dialog-audio-390.png`、`rte-dialog-video-1440.png`、`rte-dialog-video-390.png`。窄屏分类栏横排，取消和确认都在窗内。没有打开操作系统文件选择器。
 
+## 2026-11-06 公式 / 表格 / 页面设置，以及视图偏好
+
+公式、表格、页面设置此前没有逐个在三档视口里点。这轮补上，脚本是 `pros/web/scripts/rte-core-dialogs-e2e.mjs`。
+
+- 公式：非法 TeX 留在弹窗里说明原因，不写正文。合法公式先在弹窗预览出 KaTeX，确认后正文有 `data-tex` 和 `.katex`。有草稿时遮罩不关。取消（Esc）不改正文。已有公式节点仍是就地改属性。
+- 表格：宽屏仍是尺寸网格，再进「自定义尺寸」。窄屏「更多」里的「表格」直接开插入弹窗（原先只翻转一个没有挂载的网格）。行数超出 1–100 会说明并夹到范围内，不会按 0 插入。改过尺寸时遮罩不关。确认按填写的行数插入，撤销和重做走编辑器历史。
+- 页面设置改为草稿。取消或 Esc 不写页眉、页面大小、页边距。确认才调用原来的写入函数；和当前值一样时不写，避免重写已有页面设置。底栏上的页面大小 / 页边距 / 页眉仍是改完即生效，没有收成这个弹窗。确认后的页面设置可以用编辑器里的 Ctrl+Z / Ctrl+Shift+Z 撤掉和做回；一旦接着改正文，这一步撤销让给正文历史。页边距自己的旧撤销栈仍在，时间更新的那一个先撤。
+- 视图：表头冻结、暗色、缩放按面板记在本机 `localStorage`（`mm.rte.viewPrefs.v1:<panelId>`），不进画布 JSON，不改 `pageSize` / `pageMargin` / `pageChrome`。缺省不写键。面板之间不共用。专注模式和纸张参考线仍只留在当前会话。刷新后暗色、125%、表头冻结还在，页面大小仍是 A4。
+
+这三个弹窗不会互相叠开。Esc 仍按 `RTE_OVERLAY_CLOSE_ORDER` 关最上层。Tab 留在当前 `aria-modal`。快速选表从 `role="dialog"` 改成 `role="menu"`，避免和真正的插入弹窗抢同一个名字。
+
+截图：`/opt/cursor/artifacts/rte-dialog-formula-1440.png`、`rte-dialog-formula-1280.png`、`rte-dialog-formula-390.png`、`rte-dialog-table-1440.png`、`rte-dialog-table-1280.png`、`rte-dialog-table-390.png`、`rte-dialog-pagesetup-1440.png`、`rte-dialog-pagesetup-1280.png`、`rte-dialog-pagesetup-390.png`、`rte-core-dialogs-applied.png`。真实系统文件选择器、系统输入法、飞书租户没有测。页面设置撤销用的是编辑器自己的 `handleKeyDown`，不是操作系统输入法。
+
 ## 编辑内核（对照分享，#108）
 
 分享是通用内核说明，不是本仓库的缺陷单。没有因此加协同或插件框架。真实系统输入法仍然没测，测试里的按键是脚本派发的。
@@ -45,11 +58,11 @@
 - 打开时焦点进弹窗，Esc 仍关最上层，Tab 留在当前 `aria-modal` 里。全部弹窗关掉后焦点回到打开前的控件，控件不在了就回到编辑器。
 - 窄于 720px 时，图片/音视频窗的分类栏改成横排，窗体不超过视口。没有加新动画。
 
-询问框里已经改过的输入，点遮罩不提交也不丢掉。其它编辑器弹窗（公式、表格、页面设置等）仍是点遮罩即关；它们多数没有跨字段草稿，本轮没有逐个改。全站其它模块没动。
+询问框里已经改过的输入，点遮罩不提交也不丢掉。公式、表格、页面设置的遮罩和草稿见下面「公式 / 表格 / 页面设置」一节；写这句话时它们还是点遮罩即关。全站其它模块没动。
 
 浏览器验收脚本：`pros/web/scripts/rte-dialog-e2e.mjs`（1440×900、1280×800、390×700）。
 
-2026-11-06 这次脚本通过：三档视口里视频窗都在画面内；取消后正文没有视频；无效链接不插入，关掉再打开输入框是空的；已填的 https 链接点遮罩还在，确认后正文含该地址，关闭后还能打字。截图：`/opt/cursor/artifacts/rte-dialog-video-1440.png`、`rte-dialog-video-1280.png`、`rte-dialog-video-390.png`、`rte-dialog-video-inserted.png`。失败提示本身仍是原来的 2.8 秒 toast，不是弹窗里的错误字段。音频窗与视频窗同一组件，这次浏览器只点了视频。公式、表格、页面设置等其它弹窗没有逐个在三档视口里点。真实系统文件选择器（操作系统对话框）没有打开。
+2026-11-06 这次脚本通过：三档视口里视频窗都在画面内；取消后正文没有视频；无效链接不插入，关掉再打开输入框是空的；已填的 https 链接点遮罩还在，确认后正文含该地址，关闭后还能打字。截图：`/opt/cursor/artifacts/rte-dialog-video-1440.png`、`rte-dialog-video-1280.png`、`rte-dialog-video-390.png`、`rte-dialog-video-inserted.png`。失败提示本身仍是原来的 2.8 秒 toast，不是弹窗里的错误字段。音频窗与视频窗同一组件，这次浏览器只点了视频。公式、表格、页面设置留到下一节。真实系统文件选择器（操作系统对话框）没有打开。
 
 ## 首批（本分支）
 
@@ -106,7 +119,7 @@
 | 图片 | 上传走素材库 `/media/{id}`；缩放、裁剪、环绕、图片组 | 素材路径见 `mediaHydrate.ts`、`docs/acceptance/media-1106/README.md`。图片组间距见 #107。本轮未再上传 | 未验证本轮回归 |
 | 音频、视频 | 各自从工具栏打开选择窗。2026-11-06 在 1440×900 和 390×700 分别点过，取消不插入；确认外部链接后正文同时有 video 与 audio，两次撤销去掉，重做后 HTML 与再加载一致 | 已在浏览器分开验证。真实操作系统文件选择器仍未打开 | `scripts/rte-av-both-e2e.mjs` |
 | 附件 | 3MB 上限与链接芯片在既有路径 | 已实现；本轮未传附件 | `useMediaLibrary.ts` |
-| 二维码、表情、特殊字符、公式 | 各有插入命令 | 已实现代码；本轮未点 | `math.ts`、工具项 `qrcode` / `emoji` / `formula` |
+| 二维码、表情、特殊字符、公式 | 公式弹窗在 1440 / 1280 / 390 打开过。非法 TeX 不插入；确认后正文渲染 KaTeX，可撤销。二维码、表情、特殊字符本轮未点 | `math.ts`、`math.formula.test.ts`、`scripts/rte-core-dialogs-e2e.mjs` |
 
 签名 URL 与用户隔离：本轮没有改 `mediaHydrate.ts` 和 API。不能把旧验收自动说成今天又跑过一遍。飞书租户仍未验证。
 
@@ -124,11 +137,11 @@
 
 | 入口 | 行为 | 判定 | 证据 | 优先级 |
 |---|---|---|---|---|
-| 插入、合并、列宽、单元格背景 | 已实现 | 本轮未点 | `useTableOps.ts`、`rteTableCells.ts` | 未验证 |
+| 插入、合并、列宽、单元格背景 | 插入弹窗在三档视口打开过。确认按行数插入，可撤销。合并、列宽、背景本轮未点 | `useTableOps.ts`、`scripts/rte-core-dialogs-e2e.mjs` | 合并等待验 |
 | 公式栏 | `SUM/AVERAGE/COUNT/MAX/MIN`、区域、四则。无跨表、无命名 | 已实现这一子集 | `rteTableFormula.ts`、`RteTableFormulaBar.vue` | 跨表是 P2 |
 | 表 CSV | 复制当前表 | 已实现代码；本轮未点 | `copyTableAs` | 未验证 |
 | 表筛选 | 关键词隐藏数据行；编辑后仍隐藏；不进 HTML | 本轮已补重画 | `rteWave21.ts` 的 `paintTableFilterAt`、`rteTableFilter.reapply.test.ts` | — |
-| 表头冻结 | 只改根上的 class，不落库 | 缺口（刷新即关） | `tableHeaderSticky` ref、`is-table-sticky` | P1，留到下一批 |
+| 表头冻结 | 按面板记在本机，刷新仍在。不进画布 JSON，不改页面设置 | 本轮浏览器刷新后 `is-table-sticky` 还在 | `rteViewPrefs.ts`、`scripts/rte-core-dialogs-e2e.mjs` | — |
 
 ## 7. 块与结构
 
@@ -163,10 +176,10 @@
 
 | 入口 | 判定 | 证据 |
 |---|---|---|
-| 专注、暗色、纸张参考线、缩放、全屏 | 会话内开关，不进画布 JSON | 已实现。刷新即丢失，标缺口（视图偏好，不是正文） | `focusMode`、`darkEditor`、`editorZoom`、`immersiveFullscreen` |
+| 专注、暗色、纸张参考线、缩放、全屏 | 暗色和缩放按面板记在本机，刷新还在，且不改页面大小。专注模式、纸张参考线、全屏仍只留在当前会话 | `rteViewPrefs.ts`。浏览器刷新核对了暗色、125%、专注模式不落库 |
 | 大纲 | 侧栏跳标题。产品要求不要把已删除的「目录」加回去 | 已实现侧栏 | `toggleOutlinePanel`；`RichTextEditor.vue` 注释「目录已按产品要求移除」 |
 | 字数、阅读时长、快捷键 | 已实现代码 | `wordCount`、`openReadTimeDialog`、`ShortcutsDialog.vue` |
-| 页面大小、页边距、页眉页脚页码 | 按面板落库。未保存过的纸张缺省 A4；嵌入流式不套纸 | 已实现。本轮测试确认标题编号开关不改这些字段 | `useRtePageLayout.ts`、`RichTextEditor.char.test.ts` |
+| 页面大小、页边距、页眉页脚页码 | 按面板落库。未保存过的纸张缺省 A4；嵌入流式不套纸。页面设置弹窗先改草稿，取消不写；确认且有差异才写。底栏控件仍是改完即生效 | 浏览器确认过取消不出现页眉、确认后页眉出现且大小仍是 A4，并可撤销重做 | `rtePageSetupDraft.ts`、`useRtePageLayout.ts`、`scripts/rte-core-dialogs-e2e.mjs` |
 | 演示 | 只读翻页 | 已实现代码；本轮未进演示 | `usePageChrome.ts` |
 
 ## 11. 文件与导出
@@ -193,14 +206,15 @@
 
 ## 剩余批次（本轮不做）
 
-1. 表头冻结、暗色、缩放、专注模式刷新后丢失（视图开关，不是正文）。
+1. 专注模式、纸张参考线、全屏刷新后丢失。这是会话视图，没有并进表头冻结 / 暗色 / 缩放的本机偏好。
 2. 标题编号不进 Markdown / Word。
-3. 表格跨表公式、单元格命名。
+3. 表格跨表公式、单元格命名。合并、列宽、单元格背景这轮没有再点。
 4. 图表不跟暗色主题。
 5. 同步块没有推送。
 6. 「发布设置」仍是空提示。
 7. 长文仍是整篇一个编辑器实例。不为此单开性能项目。
-8. 飞书租户凭证、真实系统输入法。没有凭证，不伪造。
+8. 飞书租户凭证、真实系统输入法、操作系统文件选择器。没有凭证，不伪造。
+9. 页面设置的底栏（页面大小、页边距、页眉、页脚、页码）仍是改完即写入，只有弹窗走草稿。嵌入区块仍不套 A4，这轮没有改那条路径。
 
 ## 本轮验收
 
@@ -220,9 +234,10 @@ CHROME_PATH=/usr/local/bin/google-chrome node scripts/rte-heading-num-e2e.mjs
 
 2026-11-06 本机结果：
 
-- `npx vitest run`：内核修订之后是 89 个文件，712 通过，1 跳过。此前标题编号那一轮是 87 个文件、702 通过。
+- `npx vitest run`：公式 / 表格 / 页面设置这轮是 93 个文件，721 通过，1 跳过。此前内核修订是 89 个文件、712 通过。
 - `npx vue-tsc -b --pretty false`：通过。
 - `npm run build`：通过。
-- `CHROME_PATH=/usr/local/bin/google-chrome node scripts/rte-heading-num-e2e.mjs`：通过。H1 的 `::before` 计算值是 `counter(h1) ". "`，`textContent` 仍是「代码块与图片组」。截图像素里标题显示为「1. 代码块与图片组」，文件 `/opt/cursor/artifacts/rte-heading-auto-num.png`。
+- `CHROME_PATH=/usr/local/bin/google-chrome node scripts/rte-heading-num-e2e.mjs`：此前通过。H1 的 `::before` 计算值是 `counter(h1) ". "`，`textContent` 仍是「代码块与图片组」。截图像素里标题显示为「1. 代码块与图片组」，文件 `/opt/cursor/artifacts/rte-heading-auto-num.png`。这轮没有重跑。
+- `CHROME_PATH=/usr/local/bin/google-chrome node scripts/rte-core-dialogs-e2e.mjs`：通过。三档视口里公式、表格、页面设置都在画面内；取消不改正文；非法公式和超出范围的行数不按原值提交；确认后的公式、4 行表格、页眉分别验证过，公式和表格走编辑器撤销/重做，页面设置走编辑器 Ctrl+Z / Ctrl+Shift+Z。暗色、125%、表头冻结刷新后还在，专注模式不记，页面大小保持 A4。
 
 表筛选的「编辑后仍隐藏、HTML 不含筛选」由 `rteTableFilter.reapply.test.ts` 覆盖，本轮没有在浏览器里点「表筛选」。

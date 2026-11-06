@@ -950,7 +950,7 @@ function toggleChartGroupMenu(key: string) {
               class="rte-menu rte-table-quick"
               :class="{ 'is-dark': rte.darkEditor }"
               v-rte-float="'table'"
-              role="dialog"
+              role="menu"
               aria-label="插入表格"
               tabindex="0"
               @mousedown.prevent
