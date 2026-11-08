@@ -5,6 +5,8 @@ import type { User } from '../api/auth'
 import { getToken, setToken } from '../api/http'
 import { friendlyApiMessage } from '../utils/apiMessage'
 import { clearRecentOpens } from '../utils/canvasTransfer'
+import { clearMediaThumbs } from '../utils/mediaThumb'
+import { clearMediaHydrateBlobs } from '../extensions/mediaHydrate'
 
 const USER_KEY = 'metamatrix:auth:user'
 
@@ -55,6 +57,9 @@ export const useAuthStore = defineStore('auth', () => {
     setToken(null)
     writeCachedUser(null)
     clearRecentOpens()
+    // 素材预览带登录令牌，登出后必须回收 blob 缓存并中断在途请求
+    clearMediaThumbs()
+    clearMediaHydrateBlobs()
   }
 
   async function register(email: string, password: string, displayName?: string, captcha?: CaptchaInput) {

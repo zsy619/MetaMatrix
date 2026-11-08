@@ -1,18 +1,25 @@
 import { Extension } from '@tiptap/core'
 import { Plugin } from '@tiptap/pm/state'
 import { getToken } from '../api/http'
+import { mediaFetchUrl } from '../utils/mediaPath'
 
 const blobs = new Map<string, string>()
 const pending = new Set<string>()
 
-/** Browser fetches go through /api, which the dev server strips before the API. */
-export function mediaFetchUrl(path: string): string | null {
-  const queryAt = path.indexOf('?')
-  const base = queryAt >= 0 ? path.slice(0, queryAt) : path
-  if (!/^\/media\/[0-9a-zA-Z-]+$/.test(base)) return null
-  if (queryAt >= 0 && !/^\?[A-Za-z0-9._~%=&-]+$/.test(path.slice(queryAt))) return null
-  return `/api${path}`
+/**
+ * 释放正文图片的 blob 缓存（登出等场景）。
+ *
+ * blob: 地址绑定在创建它的文档里，登出后继续留着既占内存，也可能把上一个
+ * 会话的预览带给下一个用户，所以登出时统一回收。
+ */
+export function clearMediaHydrateBlobs(): void {
+  blobs.forEach((url) => URL.revokeObjectURL(url))
+  blobs.clear()
+  pending.clear()
 }
+
+/** Browser fetches go through /api, which the dev server strips before the API. */
+export { mediaFetchUrl }
 
 /**
  * The document keeps the stable /media/{id} path. The DOM element loads a
@@ -68,6 +75,8 @@ async function hydrate(el: HTMLImageElement, src: string, id: string, token: str
   const fileRes = await fetch(preview, { headers: { Authorization: `Bearer ${token}` } })
   if (!fileRes.ok) return
   const blobUrl = URL.createObjectURL(await fileRes.blob())
+  const old = blobs.get(src)
+  if (old) URL.revokeObjectURL(old)
   blobs.set(src, blobUrl)
   if (el.isConnected && (el.getAttribute('src') || '').startsWith('/media/')) el.src = blobUrl
 }

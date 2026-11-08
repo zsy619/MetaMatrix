@@ -1,5 +1,11 @@
 import { reactive, type Ref } from 'vue'
 import { dialogHasDraft, maskShouldDismiss } from '../../utils/rteDialogMask'
+import {
+  ensureMediaThumb,
+  mediaThumbState,
+  retryMediaThumb,
+  type MediaThumbState,
+} from '../../utils/mediaThumb'
 
 /** 视频 / 音频共用的选择窗：个人素材与外部链接。 */
 export type AvMediaKind = 'video' | 'audio'
@@ -106,6 +112,8 @@ export type AvPicker = {
   newCategoryName: string
   filePickActive: boolean
   readonly filteredAssets: AvStoredAsset[]
+  thumbState: (src: string) => MediaThumbState
+  retryThumb: (src: string) => void
   close: () => void
   onMask: () => void
   openDialog: () => void
@@ -133,6 +141,8 @@ export function createAvPicker(options: AvPickerOptions): AvPicker {
     addingCategory: false,
     newCategoryName: '',
     filePickActive: false,
+    thumbState: (src: string) => mediaThumbState(src),
+    retryThumb: (src: string) => retryMediaThumb(src),
   }) as AvPicker
 
   function loadStore() {
@@ -226,6 +236,8 @@ export function createAvPicker(options: AvPickerOptions): AvPicker {
     loadStore()
     reset()
     picker.open = true
+    // 素材库内部路径要带登录令牌取图，否则选择框里是破图
+    picker.assets.forEach((a) => ensureMediaThumb(a.src))
     options.closeMore()
     options.onOpened?.()
   }
@@ -321,6 +333,7 @@ export function createAvPicker(options: AvPickerOptions): AvPicker {
       return
     }
     picker.assets = [...added, ...picker.assets]
+    added.forEach((a) => ensureMediaThumb(a.src))
     saveStore()
     const next = new Set(picker.selectedIds)
     added.forEach((a) => next.add(a.id))
