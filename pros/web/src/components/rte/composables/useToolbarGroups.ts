@@ -194,6 +194,11 @@ export function useToolbarGroups<T extends ToolLike>(deps: {
   let toolbarDragOrigin: string[] | null = null
   let toolbarRowsOpened = false
   let toolbarChip: HTMLDivElement | null = null
+  /** 刚换过位。指针再走出这段距离前不再连跳，避免下一组滑到指针下面被提前量整组跳过。 */
+  let toolbarSwapFrom: string[] | null = null
+  let toolbarSwapX = 0
+  let toolbarSwapY = 0
+  const STEP_HOLD_PX = 64
 
   function clearDragChrome() {
     if (toolbarDragFrame) {
@@ -296,6 +301,23 @@ export function useToolbarGroups<T extends ToolLike>(deps: {
     )
   }
 
+  /** 一次最多跨过一个分组，宽分组不会在同一次落点里被连跳。 */
+  function clampToolbarDropIndex(index: number | null): number | null {
+    if (index == null || !toolbarPointerId) return index
+    const from = toolbarOrder.value.indexOf(toolbarPointerId)
+    if (from < 0) return index
+    if (index > from + 2) return from + 2
+    if (index < from - 1) return from - 1
+    return index
+  }
+
+  function swapStepHeld(clientX: number, clientY: number): boolean {
+    return (
+      !!toolbarSwapFrom &&
+      Math.hypot(clientX - toolbarSwapX, clientY - toolbarSwapY) < STEP_HOLD_PX
+    )
+  }
+
   function autoScrollToolbar(clientX: number, clientY: number) {
     const menu = moreMenuAt(clientX, clientY)
     if (menu) {
@@ -336,11 +358,14 @@ export function useToolbarGroups<T extends ToolLike>(deps: {
       }
     }
     if (toolbarDragFrame) return
-    const index = toolbarGroupDropIndexAt(clientX, clientY)
-    if (toolbarDropIndex.value !== index) toolbarDropIndex.value = index
-    if (index == null) return
-    const next = moveToolbarGroup(toolbarOrder.value, toolbarPointerId, index)
-    if (!next) return
+    const index = clampToolbarDropIndex(toolbarGroupDropIndexAt(clientX, clientY))
+    const next = index == null ? null : moveToolbarGroup(toolbarOrder.value, toolbarPointerId, index)
+    const shown = next ? index : null
+    if (toolbarDropIndex.value !== shown) toolbarDropIndex.value = shown
+    if (!next || index == null || swapStepHeld(clientX, clientY)) return
+    toolbarSwapFrom = [...toolbarOrder.value]
+    toolbarSwapX = clientX
+    toolbarSwapY = clientY
     writeToolbarOrderSilent(next)
     toolbarDragFrame = requestAnimationFrame(() => {
       toolbarDragFrame = 0
@@ -353,7 +378,7 @@ export function useToolbarGroups<T extends ToolLike>(deps: {
     toolbarGestureX = clientX - toolbarPointerStartX
     toolbarGestureY = clientY - toolbarPointerStartY
     const moved = Math.hypot(toolbarGestureX, toolbarGestureY) >= DRAG_START_PX
-    const index = id && moved ? toolbarGroupDropIndexAt(clientX, clientY) : null
+    const index = id && moved ? clampToolbarDropIndex(toolbarGroupDropIndexAt(clientX, clientY)) : null
     clearDragChrome()
     toolbarPointerId = ''
     toolbarDragSource.value = ''
@@ -365,7 +390,7 @@ export function useToolbarGroups<T extends ToolLike>(deps: {
     if (!id || !moved || deps.viewMode() !== 'edit') return
     if (index != null) {
       const next = moveToolbarGroup(toolbarOrder.value, id, index)
-      if (next) writeToolbarOrderSilent(next)
+      if (next && !swapStepHeld(clientX, clientY)) writeToolbarOrderSilent(next)
     }
     if (!origin || toolbarOrdersEqual(origin, toolbarOrder.value)) return
     toolbarOrderUndo.value = [...toolbarOrderUndo.value, origin].slice(-20)
@@ -395,6 +420,9 @@ export function useToolbarGroups<T extends ToolLike>(deps: {
     toolbarDropIndex.value = null
     toolbarDragOrigin = [...toolbarOrder.value]
     toolbarRowsOpened = false
+    toolbarSwapFrom = null
+    toolbarSwapX = 0
+    toolbarSwapY = 0
     document.documentElement.classList.add('rte-toolbar-dragging')
     const handle = event.currentTarget
     if (handle instanceof HTMLElement) {

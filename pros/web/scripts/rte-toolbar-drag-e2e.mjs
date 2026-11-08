@@ -111,10 +111,22 @@ if (!edit || !style || !paragraph || !handle) {
   const movedEdit = followed.find((g) => g.id === 'edit')
   const dragStarts = await page.evaluate(() => window.__toolbarDragStarts)
   const chip = await page.evaluate(() => document.querySelector('.rte-toolbar-drag-chip')?.textContent || '')
+  const slot = await page.evaluate(() => {
+    const el = document.querySelector('.rte-toolbar-tools .rte-tool-group.is-dragging')
+    if (!el) return null
+    const rect = el.getBoundingClientRect()
+    return { width: rect.width, height: rect.height }
+  })
   log(
-    '按下后 18px 出现跟随芯片，分组本身留在原位',
-    chip.includes('编辑') && !!movedEdit && Math.abs(movedEdit.left - edit.left) < 8 && !movedEdit.transform,
-    `chip=${chip} left ${edit.left.toFixed(0)} → ${movedEdit?.left.toFixed(0)} transform=${movedEdit?.transform}`,
+    '按下后 18px 出现跟随芯片，分组收成窄占位并留在原位',
+    chip.includes('编辑') &&
+      !!movedEdit &&
+      Math.abs(movedEdit.left - edit.left) < 8 &&
+      !movedEdit.transform &&
+      !!slot &&
+      slot.width <= 120 &&
+      slot.height <= 44,
+    `chip=${chip} left ${edit.left.toFixed(0)} → ${movedEdit?.left.toFixed(0)} slot=${slot?.width?.toFixed(0)}×${slot?.height?.toFixed(0)}`,
   )
   log('拖动不进入原生 dragstart', dragStarts === 0, String(dragStarts))
   await page.screenshot({ path: `${out}/01-follow.png` })

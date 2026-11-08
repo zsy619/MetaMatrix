@@ -3777,4 +3777,49 @@
   flex-wrap: nowrap;
   max-width: none;
 }
+.rte-root.compact .rte-tool-group {
+  align-items: center;
+  box-sizing: border-box;
+  height: 36px;
+  min-height: 36px;
+  max-height: 36px;
+  padding: 0 6px 0 4px;
+}
+.rte-root.compact .rte-group-handle {
+  align-self: center;
+  flex: 0 0 22px;
+}
+.rte-root.compact .rte-group-label {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  height: 28px;
+  line-height: 28px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.rte-root.compact .rte-tool {
+  align-self: center;
+  align-items: center;
+  flex-direction: row;
+  height: 28px;
+  min-height: 28px;
+  max-height: 28px;
+  padding: 0 5px;
+}
+/* 拖动时只留手柄和组名，高度锁在一行，避免按钮折行后把落点盖住。 */
+html.rte-toolbar-dragging .rte-toolbar-tools > .rte-tool-group.is-dragging {
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  box-sizing: border-box;
+  width: auto;
+  max-width: 120px;
+  height: 40px;
+  max-height: 40px;
+  overflow: hidden;
+  opacity: 0.55;
+}
+html.rte-toolbar-dragging .rte-toolbar-tools > .rte-tool-group.is-dragging > :not(.rte-group-handle):not(.rte-group-label) {
+  display: none;
+}
 
