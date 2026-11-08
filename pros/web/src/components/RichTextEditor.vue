@@ -5111,8 +5111,9 @@ const {
   floatMenuEls,
   markToolbarMenuOpening,
   setFloatAnchor,
-  onToolMenuEnter,
-  onToolMenuLeave,
+  onToolMenuEnter: keepToolMenuOpen,
+  onToolMenuLeave: keepToolMenuLeave,
+  isPointerOnToolMenu,
   closeAllToolbarMenus,
   vRteFloat,
 } = useFloatMenus({
@@ -5266,6 +5267,120 @@ const lineHeightOpen = ref(false)
 const moreFontSizeOpen = ref(false)
 const moreFontFamilyOpen = ref(false)
 const moreLineHeightOpen = ref(false)
+
+let hoverOpenTimer: ReturnType<typeof setTimeout> | null = null
+
+function toolbarSubmenuOpen(key: string): boolean {
+  if (key.startsWith('chart:')) return echartsGroupMenuKey.value === key
+  switch (key) {
+    case 'heading': return headingOpen.value
+    case 'list': return listOpen.value
+    case 'form': return formOpen.value
+    case 'template': return templateOpen.value
+    case 'highlight': return highlightOpen.value
+    case 'color': return colorOpen.value
+    case 'fontSize': return fontSizeOpen.value
+    case 'fontFamily': return fontFamilyOpen.value
+    case 'lineHeight': return lineHeightOpen.value
+    case 'linkButton': return linkButtonOpen.value
+    case 'align': return alignOpen.value
+    case 'table': return tableMenuOpen.value
+    case 'import': return importMenuOpen.value
+    case 'export': return exportMenuOpen.value
+    case 'codeLang': return codeLangOpen.value
+    case 'emoji': return emojiOpen.value
+    case 'specialChars': return specialCharsOpen.value
+    case 'columns': return columnsOpen.value
+    case 'spacing': return spacingOpen.value
+    case 'paraStyle': return paraStyleOpen.value
+    case 'listStyle': return listStyleOpen.value
+    case 'wordStats': return wordStatsOpen.value
+    case 'callout': return calloutOpen.value
+    case 'shortcuts': return shortcutsOpen.value
+    case 'hr': return hrOpen.value
+    case 'blockOps': return blockOpsOpen.value
+    case 'insertDate': return insertDateOpen.value
+    case 'caseTransform': return caseMenuOpen.value
+    case 'zoom': return zoomMenuOpen.value
+    case 'viewExtras': return viewExtrasOpen.value
+    case 'more': return moreOpen.value
+    default: return false
+  }
+}
+
+function openToolbarSubmenu(key: string) {
+  if (toolbarSubmenuOpen(key)) return
+  closeAllToolbarMenus()
+  paraStyleOpen.value = false
+  listStyleOpen.value = false
+  linkButtonOpen.value = false
+  echartsGroupMenuKey.value = null
+  moreChartGroupKey.value = ''
+  if (key.startsWith('chart:')) {
+    echartsGroupMenuKey.value = key
+    return
+  }
+  switch (key) {
+    case 'heading': headingOpen.value = true; break
+    case 'list': listOpen.value = true; break
+    case 'form': formOpen.value = true; break
+    case 'template': templateOpen.value = true; break
+    case 'highlight': highlightOpen.value = true; break
+    case 'color': colorOpen.value = true; break
+    case 'fontSize': fontSizeOpen.value = true; break
+    case 'fontFamily': fontFamilyOpen.value = true; break
+    case 'lineHeight': lineHeightOpen.value = true; break
+    case 'linkButton': linkButtonOpen.value = true; break
+    case 'align': alignOpen.value = true; break
+    case 'table': tableMenuOpen.value = true; break
+    case 'import': importMenuOpen.value = true; break
+    case 'export': exportMenuOpen.value = true; break
+    case 'codeLang': codeLangOpen.value = true; break
+    case 'emoji': emojiOpen.value = true; break
+    case 'specialChars': specialCharsOpen.value = true; break
+    case 'columns': columnsOpen.value = true; break
+    case 'spacing': spacingOpen.value = true; break
+    case 'paraStyle': paraStyleOpen.value = true; break
+    case 'listStyle': listStyleOpen.value = true; break
+    case 'wordStats': wordStatsOpen.value = true; break
+    case 'callout': calloutOpen.value = true; break
+    case 'shortcuts': shortcutsOpen.value = true; break
+    case 'hr': hrOpen.value = true; break
+    case 'blockOps': blockOpsOpen.value = true; break
+    case 'insertDate': insertDateOpen.value = true; break
+    case 'caseTransform': caseMenuOpen.value = true; break
+    case 'zoom': zoomMenuOpen.value = true; break
+    case 'viewExtras': viewExtrasOpen.value = true; break
+    case 'more': moreOpen.value = true; break
+    default: break
+  }
+}
+
+/** 鼠标经过带下级的工具时展开菜单；指针还在按钮上时不因为浮层重排而关掉。 */
+function onToolMenuEnter(key: string) {
+  keepToolMenuOpen(key)
+  if (toolbarSubmenuOpen(key)) return
+  if (hoverOpenTimer != null) clearTimeout(hoverOpenTimer)
+  hoverOpenTimer = setTimeout(() => {
+    hoverOpenTimer = null
+    if (!isPointerOnToolMenu(key)) return
+    openToolbarSubmenu(key)
+  }, 90)
+}
+
+function onToolMenuLeave(event: MouseEvent, key: string, close: () => void) {
+  const next = event.relatedTarget as Node | null
+  const wrap = event.currentTarget as HTMLElement | null
+  const menu =
+    floatMenuEls.get(key) || document.querySelector(`[data-rte-float-key="${key}"]`)
+  const staying =
+    (!!next && !!wrap && wrap.contains(next)) || (!!next && !!menu && menu.contains(next))
+  if (!staying && hoverOpenTimer != null && (next || !isPointerOnToolMenu(key))) {
+    clearTimeout(hoverOpenTimer)
+    hoverOpenTimer = null
+  }
+  keepToolMenuLeave(event, key, close)
+}
 const customColorOpen = ref(false)
 const customColorHex = ref('#165dff')
 
@@ -5448,6 +5563,34 @@ function onCustomColorNativeInput(event: Event) {
 
 /** 主题色按行展平后的一维列表（10 列 × 6 行） */
 const WORD_THEME_FLAT = WORD_THEME_ROWS.flat()
+
+function moreSubmenuOpen(t: ToolItem): boolean {
+  if (t.kind === 'color') return moreColorOpen.value
+  if (t.key === 'highlight') return moreHighlightOpen.value
+  if (t.kind === 'form') return moreFormOpen.value
+  if (t.kind === 'template') return moreTemplateOpen.value
+  if (t.kind === 'fontSize') return moreFontSizeOpen.value
+  if (t.kind === 'fontFamily') return moreFontFamilyOpen.value
+  if (t.kind === 'lineHeight') return moreLineHeightOpen.value
+  if (t.kind === 'callout') return moreCalloutOpen.value
+  if (t.kind === 'echartsGroup') return moreChartGroupKey.value === t.key
+  if (t.kind === 'caseTransform') return caseMenuOpen.value
+  if (t.kind === 'zoom') return zoomMenuOpen.value
+  if (t.kind === 'viewExtras') return viewExtrasOpen.value
+  return false
+}
+
+const MORE_HOVER_KINDS = new Set([
+  'color', 'form', 'template', 'fontSize', 'fontFamily', 'lineHeight',
+  'callout', 'caseTransform', 'zoom', 'viewExtras', 'echartsGroup',
+])
+
+/** 「更多」里带下级的项，鼠标经过就展开，不重复点击把它关掉。 */
+function hoverMoreSubmenu(t: ToolItem) {
+  if (t.key !== 'highlight' && (t.kind == null || !MORE_HOVER_KINDS.has(t.kind))) return
+  if (moreSubmenuOpen(t)) return
+  onMoreToolClick(t)
+}
 
 function onMoreToolClick(t: ToolItem) {
   if (t.kind === 'color') {
@@ -6975,6 +7118,7 @@ provideRteBindings({
   onHeadingMenuKeydown,
   onImageSelectAllChange,
   onMoreToolClick,
+  hoverMoreSubmenu,
   onPreview,
   onPublish,
   onPublishSettings,

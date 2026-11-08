@@ -43,6 +43,8 @@ const menuCloseTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const floatMenuEls = new Map<string, HTMLElement>()
 /** 打开瞬间抑制 mouseleave / document pointerdown 误关 */
 let ignoreDocMenuCloseUntil = 0
+let lastPointerX = -1
+let lastPointerY = -1
 function markToolbarMenuOpening() {
   ignoreDocMenuCloseUntil = Date.now() + 500
   // 取消所有待关闭定时器
@@ -50,6 +52,28 @@ function markToolbarMenuOpening() {
     clearTimeout(t)
     menuCloseTimers.delete(k)
   }
+}
+
+function rememberPointer(event: PointerEvent | MouseEvent) {
+  if (!Number.isFinite(event.clientX) || !Number.isFinite(event.clientY)) return
+  lastPointerX = event.clientX
+  lastPointerY = event.clientY
+}
+
+/** 最近一次指针是否还在该工具按钮或它的浮层上。坐标未知时保持打开，避免误关。 */
+function isPointerOnToolMenu(key: string): boolean {
+  if (lastPointerX < 0 || lastPointerY < 0 || typeof document === 'undefined') return true
+  const under = document.elementFromPoint(lastPointerX, lastPointerY)
+  if (!under) return false
+  const menu = floatMenuEls.get(key) || document.querySelector(`[data-rte-float-key="${key}"]`)
+  if (menu && (menu === under || menu.contains(under))) return true
+  if (under.closest?.(`[data-rte-float-key="${key}"]`)) return true
+  const anchor =
+    floatAnchors.get(key) || document.querySelector(`[data-rte-anchor="${key}"]`)
+  if (anchor && (anchor === under || anchor.contains(under))) return true
+  const wrap = under.closest?.('.rte-tool-wrap, .rte-more-menu, .rte-more-flyout')
+  if (wrap && anchor && wrap.contains(anchor)) return true
+  return false
 }
 
 function setFloatAnchor(key: string, el: unknown) {
@@ -85,23 +109,39 @@ function onToolMenuLeave(
   key: string,
   close: () => void,
 ) {
-  // Teleport 挂载/重排时浏览器常对 wrap 甩一次 relatedTarget=null 的 mouseleave
-  if (Date.now() < ignoreDocMenuCloseUntil) return
+  rememberPointer(event)
   const wrap = event.currentTarget as HTMLElement | null
   const next = event.relatedTarget as Node | null
   if (wrap && next && wrap.contains(next)) return
   const menu = floatMenuEls.get(key) || document.querySelector(`[data-rte-float-key="${key}"]`)
   if (menu && next && menu.contains(next)) return
-  // 指针仍在菜单上（elementFromPoint）也不关
-  if (typeof document !== 'undefined' && document.elementFromPoint) {
-    const x = (event as MouseEvent).clientX
-    const y = (event as MouseEvent).clientY
-    if (Number.isFinite(x) && Number.isFinite(y)) {
-      const under = document.elementFromPoint(x, y)
-      if (under && (under.closest?.(`[data-rte-float-key="${key}"]`) || under.closest?.('.rte-float-menu'))) {
-        return
-      }
+  // 浮层刚挂上时 relatedTarget 可能是空的，指针其实还在按钮或菜单上。
+  if (!next && typeof document !== 'undefined' && document.elementFromPoint) {
+    const under = document.elementFromPoint(event.clientX, event.clientY)
+    if (
+      under &&
+      ((wrap && wrap.contains(under)) ||
+        (menu && menu.contains(under)) ||
+        under.closest?.(`[data-rte-float-key="${key}"]`) ||
+        under.closest?.('.rte-float-menu'))
+    ) {
+      return
     }
+  }
+  // 打开后的短窗口会吞掉误触发的 mouseleave。真的移走时不能丢掉这次离开，
+  // 窗口结束后再看指针还在不在按钮或菜单上。
+  if (Date.now() < ignoreDocMenuCloseUntil) {
+    const wait = Math.max(0, ignoreDocMenuCloseUntil - Date.now()) + 40
+    cancelMenuClose(key)
+    menuCloseTimers.set(
+      key,
+      setTimeout(() => {
+        menuCloseTimers.delete(key)
+        if (isPointerOnToolMenu(key)) return
+        close()
+      }, wait),
+    )
+    return
   }
   scheduleMenuClose(key, close)
 }
@@ -308,9 +348,11 @@ function onDocPointerDownForMenus(e: PointerEvent) {
 
   onMounted(() => {
     document.addEventListener('pointerdown', onDocPointerDownForMenus, true)
+    document.addEventListener('pointermove', rememberPointer, true)
   })
   onBeforeUnmount(() => {
     document.removeEventListener('pointerdown', onDocPointerDownForMenus, true)
+    document.removeEventListener('pointermove', rememberPointer, true)
     for (const t of menuCloseTimers.values()) clearTimeout(t)
     menuCloseTimers.clear()
     floatMenuEls.clear()
@@ -330,6 +372,7 @@ function onDocPointerDownForMenus(e: PointerEvent) {
     scheduleMenuClose,
     onToolMenuEnter,
     onToolMenuLeave,
+    isPointerOnToolMenu,
     setFloatStyle,
     placeFloatMenuEl,
     vRteFloat,

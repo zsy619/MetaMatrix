@@ -2163,6 +2163,7 @@ function toggleChartGroupMenu(key: string) {
             <button data-rte-own
               type="button"
               class="rte-more-item"
+              @mouseenter="rte.hoverMoreSubmenu(mt)"
               :class="{
                 active:
                   mt.active?.() ||
