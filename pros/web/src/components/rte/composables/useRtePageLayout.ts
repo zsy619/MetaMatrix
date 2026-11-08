@@ -138,6 +138,10 @@ export function useRtePageLayout(deps: {
     return true
   }
 
+  function replacePageMargin(next: PageMargin) {
+    applyPageMargin(next, false)
+  }
+
   function setMarginPreset(id: string) {
     const preset = PAGE_MARGIN_PRESETS.find((item) => item.id === id)
     if (preset) {
@@ -193,6 +197,7 @@ export function useRtePageLayout(deps: {
     applyPrintPageStyle,
     undoPageMargin,
     setMarginPreset,
+    replacePageMargin,
     setMarginSide,
     setPageSize,
     marginUndoArmed: () => pageMarginUndoArmed,

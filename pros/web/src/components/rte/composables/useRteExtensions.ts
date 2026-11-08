@@ -42,6 +42,7 @@ import { RteCodeBlockLowlight } from '../../../extensions/codeHighlight'
 import { SlashCommands } from '../../../extensions/slashCommands'
 import { escapeHtml } from '../../../utils/itemsHtml'
 import { FEISHU_HIGHLIGHT_COLORS, isBareHttpUrl, plainTextToPasteContent, sanitizePastedHtml } from '../../../utils/rtePasteClean'
+import { clearEditorFormat } from '../../../utils/rteClearFormat'
 import { pasteVolume, previewShortcutAllowed } from '../../../utils/rteRound8'
 import {
   htmlHasTable,
@@ -116,6 +117,8 @@ export function useRteExtensions(deps: {
   tableOpsSheetOpen: { value: boolean }
   tableQuickOpen: { value: boolean }
   undoPageMargin: LateFn
+  undoPageSetup: LateFn
+  redoPageSetup: LateFn
   applyFormatPainterIfNeeded: LateFn
   initialEditorContent: LateFn
   insertFormula: LateFn
@@ -184,6 +187,8 @@ export function useRteExtensions(deps: {
     tableOpsSheetOpen,
     tableQuickOpen,
     undoPageMargin,
+    undoPageSetup,
+    redoPageSetup,
     applyFormatPainterIfNeeded,
     initialEditorContent,
     insertFormula,
@@ -352,7 +357,7 @@ const editor = useEditor({
     }),
     TaskList,
     TaskItem.configure({ nested: true }),
-    Table.configure({ resizable: true }),
+    Table.configure({ resizable: true, handleWidth: 8 }),
     TableRow,
     RteTableHeader,
     RteTableCell,
@@ -619,7 +624,11 @@ const editor = useEditor({
         event.preventDefault()
         return true
       }
-      if (key === 'z' && !event.shiftKey && !event.altKey && (undoPageMargin() || undoToolbarGroupOrder())) {
+      if (key === 'z' && event.shiftKey && !event.altKey && redoPageSetup()) {
+        event.preventDefault()
+        return true
+      }
+      if (key === 'z' && !event.shiftKey && !event.altKey && (undoPageSetup() || undoPageMargin() || undoToolbarGroupOrder())) {
         event.preventDefault()
         return true
       }
@@ -743,6 +752,11 @@ const editor = useEditor({
       if (event.altKey && !event.shiftKey && key === '9') {
         event.preventDefault()
         ed.chain().focus().toggleTaskList().run()
+        return true
+      }
+      if ((key === '\\' || key === '|') && !event.shiftKey && !event.altKey) {
+        event.preventDefault()
+        clearEditorFormat(ed)
         return true
       }
       if (event.shiftKey) {

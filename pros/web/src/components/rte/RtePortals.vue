@@ -189,18 +189,18 @@ const echartsDialogTemplates = computed(() => {
       <div data-rte-own
         v-if="rte.pageSetupOpen && rte.pageSheetEnabled"
         class="rte-modal-overlay"
-        @mousedown.self="rte.pageSetupOpen = false"
+        @mousedown.self="rte.onPageSetupMask()"
       >
-        <div data-rte-own class="rte-modal rte-pagesetup-modal" role="dialog" aria-label="页面设置">
+        <div data-rte-own class="rte-modal rte-pagesetup-modal" role="dialog" aria-modal="true" aria-label="页面设置" @mousedown.stop>
           <h3 data-rte-own class="rte-modal-title">页面设置</h3>
           <label data-rte-own class="rte-pagesetup-field">
             <span data-rte-own>页面大小</span>
             <select
               data-rte-own
               class="rte-note-input"
-              :value="rte.pageSize"
+              :value="rte.pageSetupDraft?.size"
               :disabled="rte.viewMode !== 'edit'"
-              @change="rte.setPageSize(($event.target as HTMLSelectElement).value)"
+              @change="rte.pageSetupDraft && (rte.pageSetupDraft.size = ($event.target as HTMLSelectElement).value)"
             >
               <option data-rte-own v-for="opt in rte.RTE_PAGE_SIZES" :key="'ps-setup-' + opt.id" :value="opt.id">
                 {{ opt.label }}
@@ -212,9 +212,9 @@ const echartsDialogTemplates = computed(() => {
             <select
               data-rte-own
               class="rte-note-input"
-              :value="rte.pageMargin.preset"
+              :value="rte.pageSetupDraft?.marginPreset"
               :disabled="rte.viewMode !== 'edit'"
-              @change="rte.setMarginPreset(($event.target as HTMLSelectElement).value)"
+              @change="rte.pageSetupDraft && (rte.pageSetupDraft.marginPreset = ($event.target as HTMLSelectElement).value)"
             >
               <option data-rte-own v-for="opt in rte.PAGE_MARGIN_PRESETS" :key="'mg-setup-' + opt.id" :value="opt.id">
                 {{ opt.label }}
@@ -230,9 +230,9 @@ const echartsDialogTemplates = computed(() => {
               type="text"
               maxlength="80"
               placeholder="每页顶部的内容"
-              :value="rte.pageChrome.header"
+              :value="rte.pageSetupDraft?.header"
               :disabled="rte.viewMode !== 'edit'"
-              @change="rte.setPageHeader(($event.target as HTMLInputElement).value)"
+              @input="rte.pageSetupDraft && (rte.pageSetupDraft.header = ($event.target as HTMLInputElement).value)"
             />
           </label>
           <label data-rte-own class="rte-pagesetup-field">
@@ -243,9 +243,9 @@ const echartsDialogTemplates = computed(() => {
               type="text"
               maxlength="80"
               placeholder="每页底部的内容"
-              :value="rte.pageChrome.footer"
+              :value="rte.pageSetupDraft?.footer"
               :disabled="rte.viewMode !== 'edit'"
-              @change="rte.setPageFooter(($event.target as HTMLInputElement).value)"
+              @input="rte.pageSetupDraft && (rte.pageSetupDraft.footer = ($event.target as HTMLInputElement).value)"
             />
           </label>
           <label data-rte-own class="rte-pagesetup-field">
@@ -253,9 +253,9 @@ const echartsDialogTemplates = computed(() => {
             <select
               data-rte-own
               class="rte-note-input"
-              :value="rte.pageChrome.pageNumber"
+              :value="rte.pageSetupDraft?.pageNumber"
               :disabled="rte.viewMode !== 'edit'"
-              @change="rte.setPageNumber(($event.target as HTMLSelectElement).value)"
+              @change="rte.pageSetupDraft && (rte.pageSetupDraft.pageNumber = ($event.target as HTMLSelectElement).value)"
             >
               <option data-rte-own v-for="opt in rte.PAGE_NUMBER_OPTIONS" :key="'pn-setup-' + opt.id" :value="opt.id">
                 {{ opt.label }}
@@ -263,7 +263,8 @@ const echartsDialogTemplates = computed(() => {
             </select>
           </label>
           <div data-rte-own class="rte-modal-actions">
-            <button data-rte-own type="button" class="rte-btn" @click="rte.pageSetupOpen = false">关闭</button>
+            <button data-rte-own type="button" class="rte-modal-cancel" @click="rte.closePageSetup()">取消</button>
+            <button data-rte-own type="button" class="rte-modal-confirm" @click="rte.confirmPageSetup()">确认</button>
           </div>
         </div>
       </div>
@@ -385,7 +386,7 @@ const echartsDialogTemplates = computed(() => {
       <div data-rte-own
         v-if="rte.formulaDialogOpen"
         class="rte-modal-overlay"
-        @mousedown.self="rte.closeFormulaDialog"
+        @mousedown.self="rte.onFormulaMask()"
       >
         <div data-rte-own
           class="rte-formula-dialog"
@@ -471,6 +472,7 @@ const echartsDialogTemplates = computed(() => {
               <div data-rte-own v-else class="rte-formula-preview-ph">公式实时预览中...</div>
             </div>
           </div>
+          <p data-rte-own v-if="rte.formulaError" class="rte-modal-desc is-error">{{ rte.formulaError }}</p>
 
           <div data-rte-own class="rte-modal-actions">
             <button data-rte-own type="button" class="rte-modal-cancel" @click="rte.closeFormulaDialog">
@@ -535,6 +537,7 @@ const echartsDialogTemplates = computed(() => {
         <div data-rte-own
           class="rte-table-ops-sheet"
           role="dialog"
+          aria-modal="true"
           aria-label="表格操作"
           @mousedown.stop
         >
@@ -622,7 +625,7 @@ const echartsDialogTemplates = computed(() => {
       <div data-rte-own
         v-if="rte.tableDialogOpen"
         class="rte-modal-overlay"
-        @mousedown.self="rte.closeTableDialog"
+        @mousedown.self="rte.onTableDialogMask()"
       >
         <div data-rte-own
           class="rte-table-dialog"
@@ -663,6 +666,7 @@ const echartsDialogTemplates = computed(() => {
                 @click="rte.pickTableGridSize(r, c)"
               />
             </div>
+            <p data-rte-own v-if="rte.tableSizeHint" class="rte-modal-desc is-error">{{ rte.tableSizeHint }}</p>
             <div data-rte-own class="rte-table-grid-label" aria-live="polite">
               {{
                 rte.tableGridHover.rows
