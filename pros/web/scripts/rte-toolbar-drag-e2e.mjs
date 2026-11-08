@@ -2,8 +2,8 @@
  * 工具栏分组拖拽灵敏度。
  *
  * 前置：vite dev 在 RTE_WEB_URL（默认 http://127.0.0.1:5173）。
- * 覆盖：分组跟着指针走、原生 dragstart 不抢走 pointermove、
- * 宽分组不用拖过中线就换插入线、换行后按所在行命中。
+ * 覆盖：跟随芯片、分组留在原位并在拖动中换位、原生 dragstart 不抢走 pointermove、
+ * 宽分组不用拖过中线就换位、换行后按所在行命中。
  */
 import pw from 'playwright-core'
 import { mkdirSync } from 'node:fs'
@@ -110,7 +110,12 @@ if (!edit || !style || !paragraph || !handle) {
   const followed = await groupSnapshot()
   const movedEdit = followed.find((g) => g.id === 'edit')
   const dragStarts = await page.evaluate(() => window.__toolbarDragStarts)
-  log('按下后 18px 分组就跟着指针', !!movedEdit && movedEdit.left >= edit.left + 12, `left ${edit.left.toFixed(0)} → ${movedEdit?.left.toFixed(0)} transform=${movedEdit?.transform}`)
+  const chip = await page.evaluate(() => document.querySelector('.rte-toolbar-drag-chip')?.textContent || '')
+  log(
+    '按下后 18px 出现跟随芯片，分组本身留在原位',
+    chip.includes('编辑') && !!movedEdit && Math.abs(movedEdit.left - edit.left) < 8 && !movedEdit.transform,
+    `chip=${chip} left ${edit.left.toFixed(0)} → ${movedEdit?.left.toFixed(0)} transform=${movedEdit?.transform}`,
+  )
   log('拖动不进入原生 dragstart', dragStarts === 0, String(dragStarts))
   await page.screenshot({ path: `${out}/01-follow.png` })
   await page.mouse.up()
@@ -125,12 +130,14 @@ if (!edit || !style || !paragraph || !handle) {
   await page.mouse.down()
   await page.mouse.move(intoX, startY, { steps: 8 })
   await page.mouse.move(intoX, intoY, { steps: 8 })
+  await page.waitForTimeout(80)
   const early = await groupSnapshot()
   const dropId = early.find((g) => g.drop)?.id || ''
+  const earlyIds = early.map((g) => g.id)
   log(
-    '进入宽分组远未到中线就换到它后面',
-    dropId === 'paragraph' && intoX < styleMid - 80,
-    `drop=${dropId} pointer=${intoX.toFixed(0)} mid=${styleMid.toFixed(0)} width=${style.width.toFixed(0)}`,
+    '进入宽分组远未到中线，松手前就换到它后面',
+    earlyIds.indexOf('edit') === earlyIds.indexOf('style') + 1 && intoX < styleMid - 80,
+    `order=${earlyIds.slice(0, 4).join('、')} drop=${dropId} pointer=${intoX.toFixed(0)} mid=${styleMid.toFixed(0)} width=${style.width.toFixed(0)}`,
   )
   await page.screenshot({ path: `${out}/02-early-slot.png` })
   await page.mouse.up()
@@ -142,7 +149,8 @@ if (!edit || !style || !paragraph || !handle) {
     ids.indexOf('edit') === ids.indexOf('style') + 1,
     ids.join('、'),
   )
-  log('松手后跟随位移清掉', dropped.every((g) => !g.transform), dropped.find((g) => g.transform)?.transform || '')
+  const chipGone = await page.evaluate(() => !document.querySelector('.rte-toolbar-drag-chip'))
+  log('松手后跟随芯片消失', chipGone && dropped.every((g) => !g.transform), dropped.find((g) => g.transform)?.transform || '')
   await page.screenshot({ path: `${out}/03-dropped.png` })
 }
 
@@ -160,12 +168,13 @@ if (!styleRow || !paragraphHandle) {
   await page.mouse.move(fromX, fromY)
   await page.mouse.down()
   await page.mouse.move(toX, toY, { steps: 16 })
+  await page.waitForTimeout(80)
   const over = await groupSnapshot()
-  const dropId = over.find((g) => g.drop)?.id || ''
+  const overIds = over.map((g) => g.id)
   log(
-    '拖到上一行宽分组左缘时，插入线落在该组而不是更靠左的上一段',
-    dropId === 'style',
-    `drop=${dropId} pointer=(${toX.toFixed(0)},${toY.toFixed(0)}) style=(${styleRow.left.toFixed(0)},${styleRow.top.toFixed(0)})`,
+    '拖到上一行宽分组左缘时，松手前就排到该组前面，而不是更靠左的上一段',
+    overIds[0] === 'edit' && overIds.indexOf('paragraph') === overIds.indexOf('style') - 1,
+    `order=${overIds.slice(0, 4).join('、')} pointer=(${toX.toFixed(0)},${toY.toFixed(0)}) style=(${styleRow.left.toFixed(0)},${styleRow.top.toFixed(0)})`,
   )
   await page.screenshot({ path: `${out}/04-second-row.png` })
   await page.mouse.up()
@@ -202,16 +211,18 @@ if (capsuleCount < 2) {
     await page.mouse.move(first.x + first.width / 2, first.y + first.height / 2)
     await page.mouse.down()
     await page.mouse.move(secondBox.x + 24, intoMenu, { steps: 10 })
+    await page.waitForTimeout(80)
     const menuDrop = await page.evaluate(() => {
       const el = document.querySelector('.rte-more-group.is-drop-target')
       const dragging = document.querySelector('.rte-more-group.is-dragging')
       return {
         drop: el?.dataset.groupId || '',
         transform: dragging?.style.transform || '',
+        chip: !!document.querySelector('.rte-toolbar-drag-chip'),
         open: !!document.querySelector('.rte-more-menu'),
       }
     })
-    log('更多菜单里向下拖，分组跟着走且菜单不收起', menuDrop.open && /translate3d\(/.test(menuDrop.transform), menuDrop.transform)
+    log('更多菜单里向下拖，出现跟随芯片且菜单不收起', menuDrop.open && menuDrop.chip && !menuDrop.transform, `chip=${menuDrop.chip} transform=${menuDrop.transform}`)
     log(
       '更多菜单按分组高度提前换到下一组后面，不必拖到中线',
       menuDrop.drop === thirdId && intoMenu < secondBox.y + secondBox.height / 2,

@@ -84,9 +84,10 @@
 .rte-tool-group[data-group-id='file'] { background: #f7f3ec; border-color: #ddcab2; }
 .rte-tool-group[data-group-id='other'] { background: #f7f7f8; border-color: #d2d5db; }
 .rte-tool-group.is-dragging {
-  opacity: 0.96;
-  z-index: 6;
-  box-shadow: 0 10px 24px rgba(16, 24, 40, 0.18);
+  opacity: 0.38;
+  outline: 1px dashed #3370ff;
+  outline-offset: -1px;
+  box-shadow: none;
 }
 .rte-tool-group.is-drop-target::before,
 .rte-toolbar-tools.is-drop-end::after {
@@ -1320,9 +1321,10 @@
 .rte-more-group[data-group-id='file'] { background: #f7f3ec; border-color: #e4d6c2; }
 .rte-more-group[data-group-id='other'] { background: #f7f7f8; border-color: #d9dbe0; }
 .rte-more-group.is-dragging {
-  opacity: 0.96;
-  z-index: 6;
-  box-shadow: 0 10px 24px rgba(16, 24, 40, 0.18);
+  opacity: 0.38;
+  outline: 1px dashed #3370ff;
+  outline-offset: -1px;
+  box-shadow: none;
 }
 .rte-more-group.is-drop-target::before {
   content: '';
@@ -3747,5 +3749,32 @@
     overflow-wrap: anywhere;
     word-break: break-word;
   }
+}
+
+/*
+ * 画布卡片里的小编辑器比视口窄。分组保持一行，多出来的按钮在工具栏内部横向滚动，
+ * 不要折到拖拽手柄下面。滚动限制在工具栏里，避免把整页撑出横向滚动条。
+ */
+.rte-root.compact {
+  max-width: 100%;
+  min-width: 0;
+}
+.rte-root.compact .rte-toolbar {
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+.rte-root.compact .rte-toolbar-tools {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 100%;
+  min-width: 0;
+}
+.rte-root.compact .rte-tool-group,
+.rte-root.compact .rte-tool-group .rte-tool-wrap {
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  max-width: none;
 }
 

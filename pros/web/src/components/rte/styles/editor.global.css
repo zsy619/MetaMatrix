@@ -4,6 +4,22 @@ html.rte-toolbar-dragging * {
   cursor: grabbing !important;
   user-select: none !important;
 }
+.rte-toolbar-drag-chip {
+  position: fixed;
+  z-index: 5300;
+  pointer-events: none;
+  transform: translate(-12px, -34px);
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: #3370ff;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 28px;
+  white-space: nowrap;
+  box-shadow: 0 8px 18px rgba(51, 112, 255, 0.35);
+}
 /* unscoped：Teleport 到 body 的工具条菜单兜底（避免 scoped 未命中时看不见） */
 .rte-float-menu {
   position: fixed !important;

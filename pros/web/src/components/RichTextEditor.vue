@@ -6430,6 +6430,9 @@ const {
   marginUndoStamp,
   undoPageMargin,
   disarmMarginUndo,
+  openToolbarRows: () => {
+    toolbarRowsOpen.value = true
+  },
 })
 toolbarUndoBridge.disarm = disarmToolbarUndo
 toolbarUndoBridge.isNewer = toolbarUndoIsNewer
