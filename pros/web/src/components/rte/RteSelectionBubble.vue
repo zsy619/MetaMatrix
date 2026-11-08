@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { inject, ref } from 'vue'
+import { inject, onBeforeUnmount, ref } from 'vue'
 import { BubbleMenu } from '@tiptap/vue-3/menus'
 import { RTE_BINDINGS } from './bindings'
 import { useParentScopeStamp } from './inheritScope'
@@ -46,6 +46,72 @@ function togglePanel(kind: PanelKind) {
   rte.bubbleSwatch = null
   rte.bubbleRewrite = null
 }
+
+type HoverKind = 'block' | 'font' | 'size' | 'align' | 'text' | 'highlight' | 'rewrite'
+let hoverTarget: HoverKind | null = null
+let hoverTimer: ReturnType<typeof setTimeout> | null = null
+
+function clearHoverTimer() {
+  if (hoverTimer != null) {
+    clearTimeout(hoverTimer)
+    hoverTimer = null
+  }
+}
+
+function hoverIsOpen(kind: HoverKind): boolean {
+  if (kind === 'text' || kind === 'highlight') return rte.bubbleSwatch === kind
+  if (kind === 'rewrite') return rte.bubbleRewrite === 'rewrite'
+  return panel.value === kind
+}
+
+function hoverAnyOpen(): boolean {
+  return panel.value != null || rte.bubbleSwatch != null || rte.bubbleRewrite != null
+}
+
+function showHover(kind: HoverKind) {
+  panelUp.value = resolvePanelUp()
+  if (kind === 'text' || kind === 'highlight') {
+    panel.value = null
+    rte.bubbleRewrite = null
+    rte.bubbleSwatch = kind
+    return
+  }
+  if (kind === 'rewrite') {
+    panel.value = null
+    rte.bubbleSwatch = null
+    rte.bubbleRewrite = 'rewrite'
+    return
+  }
+  rte.bubbleSwatch = null
+  rte.bubbleRewrite = null
+  panel.value = kind
+}
+
+/** 鼠标经过带下级的按钮时展开；已有菜单时立刻切换，避免扫过时连闪。 */
+function hoverEnter(kind: HoverKind) {
+  hoverTarget = kind
+  clearHoverTimer()
+  if (hoverIsOpen(kind)) return
+  const delay = hoverAnyOpen() ? 0 : 90
+  hoverTimer = setTimeout(() => {
+    hoverTimer = null
+    if (hoverTarget === kind) showHover(kind)
+  }, delay)
+}
+
+function hoverLeave() {
+  hoverTarget = null
+  clearHoverTimer()
+  hoverTimer = setTimeout(() => {
+    hoverTimer = null
+    if (hoverTarget != null) return
+    panel.value = null
+    rte.bubbleSwatch = null
+    rte.bubbleRewrite = null
+  }, 180)
+}
+
+onBeforeUnmount(clearHoverTimer)
 
 const BLOCK_STYLES = [
   { level: 0, label: '正文' },
@@ -127,7 +193,7 @@ function run(action: () => void) {
   >
     <div ref="barEl" class="rte-bubble-bar" data-rte-own @mousedown.prevent>
       <!-- 正文 / 标题（飞书选区条第一项） -->
-      <span class="rte-bubble-slot" data-rte-own>
+      <span class="rte-bubble-slot" data-rte-own @mouseenter="hoverEnter('block')" @mouseleave="hoverLeave">
         <button
           data-rte-own
           type="button"
@@ -147,6 +213,7 @@ function run(action: () => void) {
           role="listbox"
           aria-label="段落样式"
           data-rte-own
+          @mouseenter="hoverEnter('block')"
         >
           <button
             v-for="item in BLOCK_STYLES"
@@ -167,7 +234,7 @@ function run(action: () => void) {
       <span data-rte-own class="rte-bubble-sep" aria-hidden="true"></span>
 
       <!-- 字体 -->
-      <span class="rte-bubble-slot" data-rte-own>
+      <span class="rte-bubble-slot" data-rte-own @mouseenter="hoverEnter('font')" @mouseleave="hoverLeave">
         <button
           data-rte-own
           type="button"
@@ -187,6 +254,7 @@ function run(action: () => void) {
           role="listbox"
           aria-label="字体"
           data-rte-own
+          @mouseenter="hoverEnter('font')"
         >
           <button
             v-for="opt in rte.FONT_FAMILY_OPTIONS"
@@ -206,7 +274,7 @@ function run(action: () => void) {
       </span>
 
       <!-- 字号 -->
-      <span class="rte-bubble-slot" data-rte-own>
+      <span class="rte-bubble-slot" data-rte-own @mouseenter="hoverEnter('size')" @mouseleave="hoverLeave">
         <button
           data-rte-own
           type="button"
@@ -226,6 +294,7 @@ function run(action: () => void) {
           role="listbox"
           aria-label="字号"
           data-rte-own
+          @mouseenter="hoverEnter('size')"
         >
           <button
             v-for="opt in rte.FONT_SIZE_OPTIONS"
@@ -312,7 +381,7 @@ function run(action: () => void) {
       <span data-rte-own class="rte-bubble-sep" aria-hidden="true"></span>
 
       <!-- 文字颜色 -->
-      <span class="rte-bubble-slot" data-rte-own>
+      <span class="rte-bubble-slot" data-rte-own @mouseenter="hoverEnter('text')" @mouseleave="hoverLeave">
         <button
           data-rte-own
           type="button"
@@ -336,6 +405,7 @@ function run(action: () => void) {
           role="listbox"
           aria-label="文字颜色"
           data-rte-own
+          @mouseenter="hoverEnter('text')"
         >
           <button
             data-rte-own
@@ -362,7 +432,7 @@ function run(action: () => void) {
       </span>
 
       <!-- 背景高亮 -->
-      <span class="rte-bubble-slot" data-rte-own>
+      <span class="rte-bubble-slot" data-rte-own @mouseenter="hoverEnter('highlight')" @mouseleave="hoverLeave">
         <button
           data-rte-own
           type="button"
@@ -382,6 +452,7 @@ function run(action: () => void) {
           role="listbox"
           aria-label="高亮颜色"
           data-rte-own
+          @mouseenter="hoverEnter('highlight')"
         >
           <button
             data-rte-own
@@ -434,7 +505,7 @@ function run(action: () => void) {
       </button>
 
       <!-- 对齐 -->
-      <span class="rte-bubble-slot" data-rte-own>
+      <span class="rte-bubble-slot" data-rte-own @mouseenter="hoverEnter('align')" @mouseleave="hoverLeave">
         <button
           data-rte-own
           type="button"
@@ -460,6 +531,7 @@ function run(action: () => void) {
           role="menu"
           aria-label="对齐"
           data-rte-own
+          @mouseenter="hoverEnter('align')"
         >
           <button
             data-rte-own
@@ -599,7 +671,7 @@ function run(action: () => void) {
       >
         表
       </button>
-      <span class="rte-bubble-slot" data-rte-own>
+      <span class="rte-bubble-slot" data-rte-own @mouseenter="hoverEnter('rewrite')" @mouseleave="hoverLeave">
         <button
           data-rte-own
           type="button"
@@ -618,6 +690,7 @@ function run(action: () => void) {
           role="menu"
           aria-label="改写选区"
           data-rte-own
+          @mouseenter="hoverEnter('rewrite')"
         >
           <button
             data-rte-own
