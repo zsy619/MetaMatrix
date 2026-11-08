@@ -35,6 +35,15 @@ const log = (step, ok, detail) => {
   console.log(`${ok ? 'PASS' : 'FAIL'} ${step}`, detail ?? '')
 }
 
+const toolbarFoldState = () =>
+  page.evaluate(() => ({
+    oneRow: document.querySelector('.rte-toolbar')?.classList.contains('is-one-row') === true,
+    label: (document.querySelector('.rte-toolbar-fold')?.textContent || '').trim(),
+    height: Math.round(document.querySelector('.rte-toolbar')?.getBoundingClientRect().height || 0),
+  }))
+
+let foldChecked = false
+
 async function openExpanded() {
   await page.goto(`${web}/rte-code-gap-preview.html`, { waitUntil: 'domcontentloaded' })
   await page.waitForFunction(() => window.__RTE_PREVIEW_READY__ === true, null, { timeout: 60000 })
@@ -45,6 +54,24 @@ async function openExpanded() {
       window.__toolbarDragStarts += 1
     }, true)
   })
+  const collapsed = await toolbarFoldState()
+  if (!foldChecked) {
+    log(
+      '最大化默认收成一行',
+      collapsed.oneRow && collapsed.label === '展开' && collapsed.height > 0 && collapsed.height < 90,
+      `h=${collapsed.height} label=${collapsed.label}`,
+    )
+    await page.screenshot({ path: `${out}/00-folded.png` })
+    foldChecked = true
+  }
+  await page.locator('.rte-toolbar-fold').click()
+  await page.waitForTimeout(200)
+  const opened = await toolbarFoldState()
+  log(
+    '展开后放出其余工具栏',
+    !opened.oneRow && opened.label === '收起' && opened.height > collapsed.height + 40,
+    `h=${collapsed.height} → ${opened.height}`,
+  )
 }
 
 const groupSnapshot = () =>
