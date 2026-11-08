@@ -286,6 +286,7 @@ export function useToolbarGroups<T extends ToolLike>(deps: {
   }
 
   function toolbarGroupDropIndexAt(clientX: number, clientY: number): number | null {
+    const gesture = { dx: toolbarGestureX, dy: toolbarGestureY }
     const menu = moreMenuAt(clientX, clientY)
     if (menu) {
       return toolbarDropIndexFromBoxes(
@@ -295,6 +296,7 @@ export function useToolbarGroups<T extends ToolLike>(deps: {
         'y',
         toolbarOrder.value.length,
         directionAlong('y'),
+        gesture,
       )
     }
     const host = deps.rootEl.value?.querySelector('.rte-toolbar-tools')
@@ -306,6 +308,7 @@ export function useToolbarGroups<T extends ToolLike>(deps: {
       'x',
       toolbarOrder.value.length,
       directionAlong('x'),
+      gesture,
     )
   }
 

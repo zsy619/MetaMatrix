@@ -333,14 +333,25 @@ export type ToolbarDropBox = {
   height: number
 }
 
-const DROP_LEAD_MIN = 8
-const DROP_LEAD_MAX = 22
-const DROP_LEAD_RATIO = 0.4
+export type ToolbarDropGesture = {
+  dx: number
+  dy: number
+}
 
-/** 沿拖动方向，进入分组这么多像素就换到另一侧，不必拖过半组。 */
-function dropLead(span: number): number {
-  if (!Number.isFinite(span) || span <= 0) return DROP_LEAD_MIN
-  return Math.min(DROP_LEAD_MAX, Math.max(DROP_LEAD_MIN, span * DROP_LEAD_RATIO))
+/** 横向：宽分组仍在前缘约 22px 内换位，避免拖过半屏。 */
+function dropLeadAlongWidth(span: number): number {
+  if (!Number.isFinite(span) || span <= 0) return 8
+  return Math.min(22, Math.max(8, span * 0.4))
+}
+
+/**
+ * 纵向按分组高度决定提前量。
+ * 矮行大约三成高度就换；高卡片封顶 72px，并且不超过高度的 45%，所以总是早于中线。
+ */
+function dropLeadAlongHeight(span: number): number {
+  if (!Number.isFinite(span) || span <= 0) return 8
+  const byHeight = Math.min(72, Math.max(8, span * 0.28))
+  return Math.min(byHeight, span * 0.45)
 }
 
 function orientDropBoxes(boxes: readonly ToolbarDropBox[], axis: 'x' | 'y'): ToolbarDropBox[] {
@@ -374,20 +385,55 @@ function clusterDropBoxes(boxes: readonly ToolbarDropBox[]): ToolbarDropBox[][] 
   return rows
 }
 
-function pickDropCluster(rows: readonly (readonly ToolbarDropBox[])[], cross: number): readonly ToolbarDropBox[] {
-  let best = rows[0]!
+function rowSpanOf(row: readonly ToolbarDropBox[]): { top: number; bottom: number; height: number } {
+  const top = Math.min(...row.map((item) => item.top))
+  const bottom = Math.max(...row.map((item) => item.top + item.height))
+  return { top, bottom, height: Math.max(0, bottom - top) }
+}
+
+function medianNumber(values: readonly number[]): number {
+  if (!values.length) return 0
+  const sorted = [...values].sort((a, b) => a - b)
+  const mid = Math.floor(sorted.length / 2)
+  return sorted.length % 2 ? sorted[mid]! : (sorted[mid - 1]! + sorted[mid]!) / 2
+}
+
+/**
+ * 指针在两行之间的空隙时，若手势已经走出约半行高，偏向手势前方的那一行。
+ * 指针已经落进行内时不改行，避免轻拖被吸走。
+ */
+function pickDropCluster(
+  rows: readonly (readonly ToolbarDropBox[])[],
+  cross: number,
+  approach: { dir: -1 | 0 | 1; reach: number } | null,
+): readonly ToolbarDropBox[] {
+  const measured = rows.map((row) => ({ row, span: rowSpanOf(row) }))
+  for (const item of measured) {
+    if (cross >= item.span.top && cross <= item.span.bottom) return item.row
+  }
+  let best = measured[0]!
   let bestDist = Infinity
-  for (const row of rows) {
-    const top = Math.min(...row.map((item) => item.top))
-    const bottom = Math.max(...row.map((item) => item.top + item.height))
-    if (cross >= top && cross <= bottom) return row
-    const dist = cross < top ? top - cross : cross - bottom
+  for (const item of measured) {
+    const dist = cross < item.span.top ? item.span.top - cross : cross - item.span.bottom
     if (dist < bestDist) {
       bestDist = dist
-      best = row
+      best = item
     }
   }
-  return best
+  if (!approach || approach.dir === 0 || approach.reach <= 0) return best.row
+  let ahead: { row: readonly ToolbarDropBox[]; dist: number } | null = null
+  for (const item of measured) {
+    const toward = approach.dir > 0 ? item.span.top >= cross : item.span.bottom <= cross
+    if (!toward) continue
+    const dist = approach.dir > 0 ? item.span.top - cross : cross - item.span.bottom
+    if (!ahead || dist < ahead.dist) ahead = { row: item.row, dist }
+  }
+  const nearestIsBehind =
+    approach.dir > 0 ? best.span.bottom <= cross : best.span.top >= cross
+  if (ahead && nearestIsBehind && ahead.dist <= approach.reach && ahead.dist <= bestDist + approach.reach * 0.25) {
+    return ahead.row
+  }
+  return best.row
 }
 
 function nearestDropBox(row: readonly ToolbarDropBox[], point: number): ToolbarDropBox {
@@ -404,11 +450,46 @@ function nearestDropBox(row: readonly ToolbarDropBox[], point: number): ToolbarD
   return best
 }
 
+function approachFromGesture(
+  axis: 'x' | 'y',
+  gesture: ToolbarDropGesture | undefined,
+  rows: readonly (readonly ToolbarDropBox[])[],
+): { dir: -1 | 0 | 1; reach: number } | null {
+  if (!gesture || axis !== 'x') return null
+  const along = gesture.dy
+  const across = gesture.dx
+  if (Math.abs(along) < 8 || Math.abs(along) < Math.abs(across) * 0.75) return null
+  const height = medianNumber(rows.map((row) => rowSpanOf(row).height))
+  return { dir: along > 0 ? 1 : -1, reach: Math.max(8, height * 0.45) }
+}
+
+/**
+ * 指针在高分组的上/下缘，且手势已经走出约三成高度时，按高度而不是按宽度中线换位。
+ * 矮行不走这条，避免把普通的横向拖判成换行。
+ */
+function indexFromGroupHeight(
+  target: ToolbarDropBox,
+  clientX: number,
+  clientY: number,
+  gesture: ToolbarDropGesture | undefined,
+): number | null {
+  if (!gesture || target.height < 56) return null
+  if (clientX < target.left || clientX > target.left + target.width) return null
+  if (clientY < target.top || clientY > target.top + target.height) return null
+  const need = Math.max(10, target.height * 0.35)
+  if (Math.abs(gesture.dy) < need || Math.abs(gesture.dy) < Math.abs(gesture.dx)) return null
+  const frac = (clientY - target.top) / target.height
+  if (gesture.dy > 0 && frac >= 0.72) return target.orderIndex + 1
+  if (gesture.dy < 0 && frac <= 0.28) return target.orderIndex
+  return null
+}
+
 /**
  * 指针应插在第几个分组之前。
  * 横向工具栏按行命中：换到下一行时不再被上一行的横坐标抢走。
- * direction 为拖动方向（1 正向，-1 反向，0 还没沿主轴移动）。
- * 有方向时，越过分组前/后缘 lead 像素就换位，宽分组不用拖过中线。
+ * direction 为沿主轴的拖动方向（1 正向，-1 反向，0 还没沿主轴移动）。
+ * 横向越过前/后缘固定提前量就换位；纵向提前量按分组高度计算。
+ * gesture 用来在行间空隙和高于一行的分组上按高度修正落点。
  * 盒子要用分组原来的占位，不要用已经跟着指针平移之后的矩形。
  */
 export function toolbarDropIndexFromBoxes(
@@ -418,6 +499,7 @@ export function toolbarDropIndexFromBoxes(
   axis: 'x' | 'y',
   orderLength: number,
   direction: -1 | 0 | 1 = 0,
+  gesture?: ToolbarDropGesture,
 ): number | null {
   if (!Number.isInteger(orderLength) || orderLength < 0) return null
   const usable = boxes.filter(
@@ -432,16 +514,19 @@ export function toolbarDropIndexFromBoxes(
   const oriented = orientDropBoxes(usable, axis)
   const point = axis === 'x' ? clientX : clientY
   const cross = axis === 'x' ? clientY : clientX
-  const target = nearestDropBox(pickDropCluster(clusterDropBoxes(oriented), cross), point)
+  const clustered = clusterDropBoxes(oriented)
+  const target = nearestDropBox(
+    pickDropCluster(clustered, cross, approachFromGesture(axis, gesture, clustered)),
+    point,
+  )
+  const byHeight = axis === 'x' ? indexFromGroupHeight(target, clientX, clientY, gesture) : null
+  const lead = axis === 'y' ? dropLeadAlongHeight(target.width) : dropLeadAlongWidth(target.width)
   const right = target.left + target.width
   let index: number
-  if (direction > 0) {
-    index = point >= target.left + dropLead(target.width) ? target.orderIndex + 1 : target.orderIndex
-  } else if (direction < 0) {
-    index = point <= right - dropLead(target.width) ? target.orderIndex : target.orderIndex + 1
-  } else {
-    index = point < target.left + target.width / 2 ? target.orderIndex : target.orderIndex + 1
-  }
+  if (byHeight != null) index = byHeight
+  else if (direction > 0) index = point >= target.left + lead ? target.orderIndex + 1 : target.orderIndex
+  else if (direction < 0) index = point <= right - lead ? target.orderIndex : target.orderIndex + 1
+  else index = point < target.left + target.width / 2 ? target.orderIndex : target.orderIndex + 1
   if (index < 0) return 0
   if (index > orderLength) return orderLength
   return index

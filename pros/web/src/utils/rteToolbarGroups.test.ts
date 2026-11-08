@@ -140,6 +140,31 @@ const menuBoxes = [
 ]
 assert.equal(toolbarDropIndexFromBoxes(40, 100, menuBoxes, 'y', 6, 1), 5)
 assert.equal(toolbarDropIndexFromBoxes(40, 120, menuBoxes, 'y', 6, 1), 6)
+// 纵向提前量按高度：312px 的分组在 72px 处换位，30px 还不够，也不必拖到中线 156。
+const tallMenu = [
+  { id: 'notes', orderIndex: 4, left: 10, top: 0, width: 180, height: 312 },
+  { id: 'review', orderIndex: 5, left: 10, top: 320, width: 180, height: 80 },
+]
+assert.equal(toolbarDropIndexFromBoxes(40, 30, tallMenu, 'y', 6, 1), 4)
+assert.equal(toolbarDropIndexFromBoxes(40, 80, tallMenu, 'y', 6, 1), 5)
+
+// 行间空隙里，向下的手势已经超过约半行高时，落点偏向下面那一行。
+const gappedRows = [
+  { id: 'edit', orderIndex: 0, left: 0, top: 0, width: 200, height: 36 },
+  { id: 'style', orderIndex: 1, left: 0, top: 52, width: 200, height: 36 },
+]
+assert.equal(toolbarDropIndexFromBoxes(20, 44, gappedRows, 'x', 2, 0), 0)
+assert.equal(toolbarDropIndexFromBoxes(20, 44, gappedRows, 'x', 2, 0, { dx: 0, dy: 20 }), 1)
+
+// 高于一行的分组：指针在下缘且手势向下超过三成高度，即使还在宽度中线左侧，也插到它后面。
+const tallGroup = [
+  { id: 'style', orderIndex: 1, left: 20, top: 40, width: 800, height: 96 },
+  { id: 'paragraph', orderIndex: 2, left: 20, top: 146, width: 400, height: 40 },
+]
+const tallY = 40 + 96 * 0.8
+assert.equal(toolbarDropIndexFromBoxes(40, tallY, tallGroup, 'x', 3, 0), 1)
+assert.equal(toolbarDropIndexFromBoxes(40, tallY, tallGroup, 'x', 3, 0, { dx: 4, dy: 40 }), 2)
+
 assert.equal(toolbarDropIndexFromBoxes(0, 0, [], 'x', 3, 1), null)
 assert.equal(
   toolbarDropIndexFromBoxes(10, 10, [{ id: 'a', orderIndex: 0, left: 0, top: 0, width: 0, height: 10 }], 'x', 1, 1),

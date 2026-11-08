@@ -170,9 +170,11 @@ if (capsuleCount < 2) {
   if (!first || !secondBox || !secondId || !thirdId) {
     log('更多菜单分组盒子可读', false, '')
   } else {
+    const heightLead = Math.min(72, Math.max(8, secondBox.height * 0.28), secondBox.height * 0.45)
+    const intoMenu = secondBox.y + heightLead + 6
     await page.mouse.move(first.x + first.width / 2, first.y + first.height / 2)
     await page.mouse.down()
-    await page.mouse.move(secondBox.x + 24, secondBox.y + 30, { steps: 8 })
+    await page.mouse.move(secondBox.x + 24, intoMenu, { steps: 10 })
     const menuDrop = await page.evaluate(() => {
       const el = document.querySelector('.rte-more-group.is-drop-target')
       const dragging = document.querySelector('.rte-more-group.is-dragging')
@@ -184,9 +186,9 @@ if (capsuleCount < 2) {
     })
     log('更多菜单里向下拖，分组跟着走且菜单不收起', menuDrop.open && /translate3d\(/.test(menuDrop.transform), menuDrop.transform)
     log(
-      '更多菜单进入下一组约 30px 就换到它后面',
-      menuDrop.drop === thirdId && secondBox.height > 80,
-      `drop=${menuDrop.drop} third=${thirdId} height=${secondBox.height.toFixed(0)}`,
+      '更多菜单按分组高度提前换到下一组后面，不必拖到中线',
+      menuDrop.drop === thirdId && intoMenu < secondBox.y + secondBox.height / 2,
+      `drop=${menuDrop.drop} third=${thirdId} lead=${heightLead.toFixed(0)} height=${secondBox.height.toFixed(0)}`,
     )
     await page.screenshot({ path: `${out}/05-more-menu.png` })
     await page.mouse.up()
