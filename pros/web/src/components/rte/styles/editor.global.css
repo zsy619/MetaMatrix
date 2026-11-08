@@ -131,10 +131,94 @@ html.rte-toolbar-dragging * {
   white-space: nowrap;
   cursor: pointer;
 }
-.rte-selection-bubble .rte-bubble-panel-item:hover,
+.rte-selection-bubble .rte-bubble-panel-item {
+  position: relative;
+}
+.rte-selection-bubble .rte-bubble-panel-item:hover {
+  background: #f2f3f5;
+  color: #1d2129;
+}
 .rte-selection-bubble .rte-bubble-panel-item.active {
-  background: #e8f0fe;
-  color: #1a73e8;
+  background: #e8f3ff;
+  color: #1456f0;
+  padding-right: 26px;
+}
+.rte-selection-bubble .rte-bubble-panel-item.active::after {
+  content: '';
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  width: 5px;
+  height: 9px;
+  border: solid currentColor;
+  border-width: 0 2px 2px 0;
+  transform: translateY(-65%) rotate(45deg);
+}
+.rte-selection-bubble .rte-bubble-btn {
+  transition: background 120ms ease, color 120ms ease, transform 90ms ease;
+}
+.rte-selection-bubble .rte-bubble-btn:hover {
+  background: #f2f3f5;
+  color: #1d2129;
+}
+.rte-selection-bubble .rte-bubble-btn.active {
+  background: #e8f3ff;
+  color: #1456f0;
+}
+.rte-selection-bubble .rte-bubble-btn.active:hover {
+  background: #d6e8ff;
+}
+.rte-selection-bubble .rte-bubble-btn:active {
+  transform: scale(0.94);
+}
+.rte-selection-bubble .rte-bubble-btn-menu::after {
+  content: '';
+  width: 0;
+  height: 0;
+  margin-left: 4px;
+  border-left: 3px solid transparent;
+  border-right: 3px solid transparent;
+  border-top: 4px solid currentColor;
+  opacity: 0.55;
+  flex: 0 0 auto;
+}
+.rte-selection-bubble .rte-bubble-swatch {
+  transition: transform 120ms ease, outline-color 120ms ease;
+}
+.rte-selection-bubble .rte-bubble-swatch:hover {
+  transform: scale(1.12);
+}
+@keyframes rte-bubble-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes rte-bubble-pop {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes rte-bubble-pop-up {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.rte-selection-bubble {
+  animation: rte-bubble-in 160ms cubic-bezier(0.2, 0, 0, 1);
+}
+.rte-selection-bubble .rte-bubble-panel,
+.rte-selection-bubble .rte-bubble-swatches {
+  animation: rte-bubble-pop 140ms cubic-bezier(0.2, 0, 0, 1);
+}
+.rte-selection-bubble .rte-bubble-panel.is-up {
+  animation-name: rte-bubble-pop-up;
+}
+@media (prefers-reduced-motion: reduce) {
+  .rte-selection-bubble,
+  .rte-selection-bubble .rte-bubble-panel,
+  .rte-selection-bubble .rte-bubble-swatches,
+  .rte-selection-bubble .rte-bubble-btn,
+  .rte-selection-bubble .rte-bubble-swatch {
+    animation: none;
+    transition: none;
+  }
 }
 .rte-root .ProseMirror em,
 .rte-root .ProseMirror i {

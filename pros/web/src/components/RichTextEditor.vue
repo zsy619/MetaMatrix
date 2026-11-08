@@ -7125,6 +7125,7 @@ provideRteBindings({
   togglePreviewMode,
   toggleShortcutsPanel,
   toggleStrike,
+  toggleCode,
   toggleTaskList,
   toggleUnderline,
   toggleWordCountDock,

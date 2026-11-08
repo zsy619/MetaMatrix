@@ -19,7 +19,7 @@ if (!injected) throw new Error('RteSelectionBubble 必须放在 RichTextEditor �
 const rte = injected
 useParentScopeStamp()
 
-type PanelKind = 'font' | 'size' | 'align' | null
+type PanelKind = 'block' | 'font' | 'size' | 'align' | null
 
 /** 工具条里展开的下拉面板（字体 / 字号 / 对齐）。 */
 const panel = ref<PanelKind>(null)
@@ -43,10 +43,40 @@ function togglePanel(kind: PanelKind) {
   }
   panelUp.value = resolvePanelUp()
   panel.value = kind
+  rte.bubbleSwatch = null
+  rte.bubbleRewrite = null
+}
+
+const BLOCK_STYLES = [
+  { level: 0, label: '正文' },
+  { level: 1, label: '标题 1' },
+  { level: 2, label: '标题 2' },
+  { level: 3, label: '标题 3' },
+  { level: 4, label: '标题 4' },
+] as const
+
+/** 飞书选区条左侧的段落样式：正文或标题。 */
+function currentBlockLabel(): string {
+  for (const level of [1, 2, 3, 4] as const) {
+    if (rte.isActive?.('heading', { level })) return '标题 ' + level
+  }
+  return '正文'
+}
+
+function blockActive(level: 0 | 1 | 2 | 3 | 4): boolean {
+  if (level === 0) return !rte.isActive?.('heading')
+  return !!rte.isActive?.('heading', { level })
 }
 
 function closePanel() {
   panel.value = null
+}
+
+/** 颜色面板和段落菜单同时只开一个。 */
+function toggleSwatch(kind: 'text' | 'highlight') {
+  panel.value = null
+  rte.bubbleRewrite = null
+  rte.bubbleSwatch = rte.bubbleSwatch === kind ? null : kind
 }
 
 /** 选中项的字体名（用于按钮上的回显）。 */
@@ -96,12 +126,52 @@ function run(action: () => void) {
     aria-label="选区格式"
   >
     <div ref="barEl" class="rte-bubble-bar" data-rte-own @mousedown.prevent>
+      <!-- 正文 / 标题（飞书选区条第一项） -->
+      <span class="rte-bubble-slot" data-rte-own>
+        <button
+          data-rte-own
+          type="button"
+          class="rte-bubble-btn rte-bubble-btn-wide rte-bubble-btn-menu"
+          :class="{ active: panel === 'block' }"
+          :title="'段落样式：' + currentBlockLabel()"
+          aria-label="段落样式"
+          :aria-expanded="panel === 'block'"
+          @click.stop="togglePanel('block')"
+        >
+          <span data-rte-own class="rte-bubble-label">{{ currentBlockLabel() }}</span>
+        </button>
+        <div
+          v-if="panel === 'block'"
+          class="rte-bubble-panel rte-bubble-panel-block"
+          :class="{ 'is-up': panelUp }"
+          role="listbox"
+          aria-label="段落样式"
+          data-rte-own
+        >
+          <button
+            v-for="item in BLOCK_STYLES"
+            :key="'bb-' + item.level"
+            data-rte-own
+            type="button"
+            role="option"
+            class="rte-bubble-panel-item"
+            :class="{ active: blockActive(item.level) }"
+            :aria-selected="blockActive(item.level)"
+            @click.stop="run(() => rte.setHeading(item.level))"
+          >
+            {{ item.label }}
+          </button>
+        </div>
+      </span>
+
+      <span data-rte-own class="rte-bubble-sep" aria-hidden="true"></span>
+
       <!-- 字体 -->
       <span class="rte-bubble-slot" data-rte-own>
         <button
           data-rte-own
           type="button"
-          class="rte-bubble-btn rte-bubble-btn-wide"
+          class="rte-bubble-btn rte-bubble-btn-wide rte-bubble-btn-menu"
           :class="{ active: panel === 'font' }"
           :title="'字体：' + currentFontLabel()"
           aria-label="字体"
@@ -140,7 +210,7 @@ function run(action: () => void) {
         <button
           data-rte-own
           type="button"
-          class="rte-bubble-btn rte-bubble-btn-wide"
+          class="rte-bubble-btn rte-bubble-btn-wide rte-bubble-btn-menu"
           :class="{ active: panel === 'size' }"
           :title="'字号：' + currentSizeLabel()"
           aria-label="字号"
@@ -225,6 +295,19 @@ function run(action: () => void) {
       >
         <component data-rte-own :is="rte.toolIcon('strike')" class="rte-ep-icon" />
       </button>
+      <button
+        data-rte-own
+        type="button"
+        class="rte-bubble-btn"
+        :class="{ active: rte.isActive('code') }"
+        title="行内代码"
+        aria-label="行内代码"
+        :aria-pressed="rte.isActive('code')"
+        @mousedown.prevent
+        @click="rte.toggleCode"
+      >
+        <component data-rte-own :is="rte.toolIcon('codeInline')" class="rte-ep-icon" />
+      </button>
 
       <span data-rte-own class="rte-bubble-sep" aria-hidden="true"></span>
 
@@ -238,7 +321,7 @@ function run(action: () => void) {
           title="文字颜色"
           aria-label="文字颜色"
           :aria-expanded="rte.bubbleSwatch === 'text'"
-          @click.stop="rte.bubbleSwatch = rte.bubbleSwatch === 'text' ? null : 'text'"
+          @click.stop="toggleSwatch('text')"
         >
           <span
             data-rte-own
@@ -289,7 +372,7 @@ function run(action: () => void) {
           aria-label="高亮颜色"
           :aria-pressed="rte.isActive('highlight')"
           :aria-expanded="rte.bubbleSwatch === 'highlight'"
-          @click.stop="rte.bubbleSwatch = rte.bubbleSwatch === 'highlight' ? null : 'highlight'"
+          @click.stop="toggleSwatch('highlight')"
         >
           <component data-rte-own :is="rte.toolIcon('highlight')" class="rte-ep-icon" />
         </button>
@@ -355,7 +438,7 @@ function run(action: () => void) {
         <button
           data-rte-own
           type="button"
-          class="rte-bubble-btn rte-bubble-btn-wide"
+          class="rte-bubble-btn rte-bubble-btn-wide rte-bubble-btn-menu"
           :class="{
             active:
               panel === 'align' ||
