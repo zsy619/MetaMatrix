@@ -2538,18 +2538,28 @@ html.rte-toolbar-dragging * {
   font-size: 12px;
 }
 .rte-echarts-block {
+  /* 宽度跟正文栏走。SVG 自带像素宽，不能把纸张撑回原来的页面宽度。 */
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   margin: 12px 0;
   border: 1px solid #e5e6eb;
   border-radius: 8px;
   overflow: hidden;
   background: #fff;
+  box-sizing: border-box;
 }
 .rte-echarts-preview {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   padding: 12px;
-  overflow-x: auto;
+  overflow: hidden;
   background: #fff;
+  box-sizing: border-box;
 }
-.rte-echarts-preview svg {
+.rte-echarts-preview svg,
+.rte-echarts-preview canvas {
   display: block;
   max-width: 100%;
   height: auto;
@@ -2799,6 +2809,8 @@ html.rte-toolbar-dragging * {
 .rte-root.is-page-sheet .rte-body > .tiptap {
   flex: 1 1 auto;
   align-self: stretch;
+  /* 默认 min-width:auto 会按图表 SVG 的像素宽撑开纸张，页面大小改了图还是旧宽度。 */
+  min-width: 0;
   width: 100% !important;
   max-width: none !important;
   height: auto;

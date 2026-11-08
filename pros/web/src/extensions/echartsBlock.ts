@@ -339,7 +339,6 @@ export const EchartsBlock = Node.create({
             chartRenderer = renderer
             chart = mod.echarts.init(previewEl, undefined, {
               renderer,
-              width: previewEl.clientWidth,
               height: DEFAULT_HEIGHT,
             })
           }
@@ -349,7 +348,7 @@ export const EchartsBlock = Node.create({
             applyChartAria(renderOption(resolveEchartsRenderItems(effective), chartMode(dom))),
             { notMerge: true },
           )
-          chart.resize()
+          resizeChart()
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err)
           if (previewEl && seq === renderSeq) {
@@ -362,14 +361,22 @@ export const EchartsBlock = Node.create({
         }
       }
 
-      /** 容器尺寸变化：没初始化就补一次初始化，已初始化就 resize。 */
+      /** 按正文栏的当前宽度重画。页面大小变了，容器变窄，图必须跟着变。 */
+      const resizeChart = () => {
+        if (!chart || !previewEl) return
+        const width = previewEl.clientWidth
+        if (!width) return
+        chart.resize({ width, height: DEFAULT_HEIGHT })
+      }
+
+      /** 容器尺寸变化：没初始化就补一次初始化，已初始化就按新宽度重画。 */
       const onResize = () => {
         try {
           if (!chart) {
             void render()
             return
           }
-          chart.resize()
+          resizeChart()
         } catch {
           /* 实例已销毁时忽略 */
         }

@@ -70,5 +70,8 @@ assert.doesNotMatch(
   editorCss,
   /\.rte-root\.is-page-sheet \.rte-body > \.ProseMirror[\s\S]{0,400}max-width:\s*760px/,
 )
+assert.match(editorCss, /\.rte-root\.is-page-sheet \.rte-body > \.ProseMirror[\s\S]*?min-width:\s*0;/)
+assert.match(editorCss, /\.rte-echarts-block \{[^}]*width:\s*100%;[^}]*max-width:\s*100%;[^}]*min-width:\s*0;/)
+assert.match(editorCss, /\.rte-echarts-preview \{[^}]*width:\s*100%;[^}]*max-width:\s*100%;[^}]*min-width:\s*0;/)
 
 console.log('page margin ok')
