@@ -2262,7 +2262,8 @@
   z-index: 40;
 }
 
-/* 收起的是整块工具面板，分组保持原样，不再被裁成一行。 */
+/* 收起面板时仍留一行完整分组。分组本身不换行、不裁切；
+   放不下的分组整组换到下一行，再被这一行的高度裁掉。 */
 .rte-root.expanded .rte-toolbar.is-one-row {
   flex-wrap: nowrap;
   align-items: center;
@@ -2270,12 +2271,53 @@
   overflow: visible;
 }
 .rte-root.expanded .rte-toolbar.is-one-row .rte-toolbar-tools {
-  display: none;
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  align-content: flex-start;
+  min-width: 0;
+  max-height: 40px;
+  overflow: hidden;
+  row-gap: 8px;
+}
+.rte-root.expanded .rte-toolbar.is-one-row .rte-tool-group {
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  align-items: center;
+  width: max-content;
+  max-width: 100%;
+  min-width: 0;
+  height: 40px;
+  max-height: 40px;
+  padding-top: 0;
+  padding-bottom: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.rte-root.expanded .rte-toolbar.is-one-row .rte-tool:not(.is-labeled) .rte-tool-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.rte-root.expanded .rte-toolbar.is-one-row .rte-tool-divider.is-tier {
+  flex: 0 0 auto;
+  width: 1px;
+  height: 18px;
+  min-height: 18px;
+  margin: 0 6px;
 }
 .rte-root.expanded .rte-toolbar.is-one-row .rte-mode-bar {
   flex: 0 0 auto;
   align-self: center;
-  margin-left: 0;
+  margin-left: 8px;
 }
 .rte-root.expanded .rte-toolbar.is-one-row .rte-view-mode-tool {
   flex: 0 0 auto;
@@ -2283,7 +2325,7 @@
 }
 .rte-root.expanded .rte-toolbar.is-one-row .rte-tool,
 .rte-root.expanded .rte-toolbar.is-one-row .rte-tool-wrap {
-  margin-right: 8px;
+  margin-right: 2px;
 }
 .rte-mode-bar {
   display: inline-flex;

@@ -56,17 +56,39 @@ async function openExpanded() {
   })
   const collapsed = await toolbarFoldState()
   if (!foldChecked) {
-    const toolsHidden = await page.evaluate(
-      () => getComputedStyle(document.querySelector('.rte-toolbar-tools')).display === 'none',
-    )
+    const foldRow = await page.evaluate(() => {
+      const tools = document.querySelector('.rte-toolbar-tools')
+      const tr = tools.getBoundingClientRect()
+      const groups = [...tools.querySelectorAll(':scope > .rte-tool-group')].map((el) => {
+        const r = el.getBoundingClientRect()
+        const fully =
+          r.width > 24 &&
+          r.left >= tr.left - 1 &&
+          r.right <= tr.right + 1 &&
+          r.top >= tr.top - 1 &&
+          r.bottom <= tr.bottom + 1
+        const sliced =
+          r.top < tr.bottom - 2 &&
+          r.bottom > tr.top + 2 &&
+          (r.bottom > tr.bottom + 2 || r.right > tr.right + 2 || r.left < tr.left - 2)
+        return { id: el.dataset.groupId, fully, sliced }
+      })
+      return {
+        display: getComputedStyle(tools).display,
+        full: groups.filter((g) => g.fully).map((g) => g.id),
+        sliced: groups.filter((g) => g.sliced).map((g) => g.id),
+      }
+    })
     log(
-      '最大化默认收起工具面板',
+      '最大化收起后仍留一行完整工具栏',
       collapsed.oneRow &&
         collapsed.label === '展开' &&
-        toolsHidden &&
+        foldRow.display !== 'none' &&
+        foldRow.full.length >= 1 &&
+        foldRow.sliced.length === 0 &&
         collapsed.height > 0 &&
-        collapsed.height < 90,
-      `h=${collapsed.height} label=${collapsed.label} toolsHidden=${toolsHidden}`,
+        collapsed.height < 120,
+      `h=${collapsed.height} label=${collapsed.label} full=${foldRow.full.join('、')} sliced=${foldRow.sliced.join('、')}`,
     )
     await page.screenshot({ path: `${out}/00-folded.png` })
     foldChecked = true
