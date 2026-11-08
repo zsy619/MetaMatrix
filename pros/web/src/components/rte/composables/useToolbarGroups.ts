@@ -6,9 +6,11 @@ import {
   migrateToolbarGroupButtons,
   moveToolbarGroup,
   readToolbarGroupOrder,
+  toolbarDropIndexFromBoxes,
   toolbarGroupLabels,
   toolbarOrdersEqual,
   TOOLBAR_GROUPS,
+  type ToolbarDropBox,
 } from '../../../utils/rteToolbarGroups'
 import {
   isDefaultToolbarGroupConfig,
@@ -170,25 +172,179 @@ export function useToolbarGroups<T extends ToolLike>(deps: {
     return toolbarUndoArmed && toolbarUndoStamp > marginStamp
   }
 
+  /** 按下后移动这么多像素才算拖，避免点一下手柄就换位。 */
+  const DRAG_START_PX = 3
+
   let toolbarPointerId = ''
   let toolbarPointerStartX = 0
   let toolbarPointerStartY = 0
+  let toolbarGestureX = 0
+  let toolbarGestureY = 0
+  let toolbarDragFrame = 0
+
+  function sourceGroupElements(): HTMLElement[] {
+    const id = toolbarPointerId
+    if (!id || typeof CSS === 'undefined' || typeof CSS.escape !== 'function') return []
+    const sel = `[data-group-id="${CSS.escape(id)}"]`
+    const found: HTMLElement[] = []
+    const root = deps.rootEl.value
+    const inToolbar = root?.querySelector<HTMLElement>(`.rte-tool-group${sel}`)
+    if (inToolbar) found.push(inToolbar)
+    for (const menu of document.querySelectorAll<HTMLElement>('.rte-more-menu')) {
+      const inMenu = menu.querySelector<HTMLElement>(`.rte-more-group${sel}`)
+      if (inMenu) found.push(inMenu)
+    }
+    return found
+  }
+
+  function applyDragTransform() {
+    const dx = Math.round(toolbarGestureX)
+    const dy = Math.round(toolbarGestureY)
+    for (const el of sourceGroupElements()) {
+      el.style.transform = `translate3d(${dx}px, ${dy}px, 0)`
+      el.style.zIndex = '6'
+    }
+  }
+
+  /** Vue 会在插入线变化时重绘分组，下一帧把跟随位移补回去。 */
+  function scheduleDragTransform() {
+    if (toolbarDragFrame) return
+    toolbarDragFrame = requestAnimationFrame(() => {
+      toolbarDragFrame = 0
+      if (toolbarPointerId) applyDragTransform()
+    })
+  }
+
+  function clearDragTransform() {
+    if (toolbarDragFrame) {
+      cancelAnimationFrame(toolbarDragFrame)
+      toolbarDragFrame = 0
+    }
+    for (const el of sourceGroupElements()) {
+      el.style.transform = ''
+      el.style.zIndex = ''
+    }
+    document.documentElement.classList.remove('rte-toolbar-dragging')
+  }
+
+  /** 主轴位移不明显时返回 0，改用中线，避免纵向换行时被误判成横向拖。 */
+  function directionAlong(axis: 'x' | 'y'): -1 | 0 | 1 {
+    const along = axis === 'x' ? toolbarGestureX : toolbarGestureY
+    const across = axis === 'x' ? toolbarGestureY : toolbarGestureX
+    if (Math.abs(along) < 8) return 0
+    if (Math.abs(along) < Math.abs(across) * 0.75) return 0
+    return along > 0 ? 1 : -1
+  }
+
+  /** 跟随指针的 translate 会改变 getBoundingClientRect。命中要用没拖走之前的占位。 */
+  function untransformedRect(el: HTMLElement): { left: number; top: number; width: number; height: number } {
+    const rect = el.getBoundingClientRect()
+    const transform = getComputedStyle(el).transform
+    if (!transform || transform === 'none') {
+      return { left: rect.left, top: rect.top, width: rect.width, height: rect.height }
+    }
+    const matrix = new DOMMatrix(transform)
+    return {
+      left: rect.left - matrix.m41,
+      top: rect.top - matrix.m42,
+      width: rect.width,
+      height: rect.height,
+    }
+  }
+
+  function dropBoxesIn(root: ParentNode, selector: string, clip: DOMRect): ToolbarDropBox[] {
+    const boxes: ToolbarDropBox[] = []
+    for (const el of root.querySelectorAll<HTMLElement>(selector)) {
+      const id = el.dataset.groupId || ''
+      if (!id) continue
+      const rect = untransformedRect(el)
+      const visibleW = Math.min(rect.left + rect.width, clip.right) - Math.max(rect.left, clip.left)
+      const visibleH = Math.min(rect.top + rect.height, clip.bottom) - Math.max(rect.top, clip.top)
+      if (visibleW < 8 || visibleH < 8) continue
+      const orderIndex = toolbarOrder.value.indexOf(id)
+      if (orderIndex < 0) continue
+      boxes.push({
+        id,
+        orderIndex,
+        left: rect.left,
+        top: rect.top,
+        width: rect.width,
+        height: rect.height,
+      })
+    }
+    return boxes
+  }
+
+  function moreMenuAt(clientX: number, clientY: number): HTMLElement | null {
+    for (const menu of document.querySelectorAll<HTMLElement>('.rte-more-menu')) {
+      const rect = menu.getBoundingClientRect()
+      if (clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom) {
+        return menu
+      }
+    }
+    return null
+  }
+
+  function toolbarGroupDropIndexAt(clientX: number, clientY: number): number | null {
+    const gesture = { dx: toolbarGestureX, dy: toolbarGestureY }
+    const menu = moreMenuAt(clientX, clientY)
+    if (menu) {
+      return toolbarDropIndexFromBoxes(
+        clientX,
+        clientY,
+        dropBoxesIn(menu, '.rte-more-group', menu.getBoundingClientRect()),
+        'y',
+        toolbarOrder.value.length,
+        directionAlong('y'),
+        gesture,
+      )
+    }
+    const host = deps.rootEl.value?.querySelector('.rte-toolbar-tools')
+    if (!(host instanceof HTMLElement)) return null
+    return toolbarDropIndexFromBoxes(
+      clientX,
+      clientY,
+      dropBoxesIn(host, '.rte-tool-group', host.getBoundingClientRect()),
+      'x',
+      toolbarOrder.value.length,
+      directionAlong('x'),
+      gesture,
+    )
+  }
+
+  function trackToolbarPointer(clientX: number, clientY: number) {
+    if (!toolbarPointerId) return
+    toolbarGestureX = clientX - toolbarPointerStartX
+    toolbarGestureY = clientY - toolbarPointerStartY
+    applyDragTransform()
+    scheduleDragTransform()
+    if (Math.hypot(toolbarGestureX, toolbarGestureY) < DRAG_START_PX) {
+      if (toolbarDropIndex.value != null) toolbarDropIndex.value = null
+      return
+    }
+    const index = toolbarGroupDropIndexAt(clientX, clientY)
+    if (toolbarDropIndex.value !== index) toolbarDropIndex.value = index
+  }
 
   function finishToolbarPointer(clientX: number, clientY: number) {
     const id = toolbarPointerId
-    const moved = Math.hypot(clientX - toolbarPointerStartX, clientY - toolbarPointerStartY) > 6
-    const index = toolbarDropIndex.value
+    toolbarGestureX = clientX - toolbarPointerStartX
+    toolbarGestureY = clientY - toolbarPointerStartY
+    const moved = Math.hypot(toolbarGestureX, toolbarGestureY) >= DRAG_START_PX
+    const index = id && moved ? toolbarGroupDropIndexAt(clientX, clientY) : null
+    clearDragTransform()
     toolbarPointerId = ''
     toolbarDragSource.value = ''
     toolbarDropIndex.value = null
+    toolbarGestureX = 0
+    toolbarGestureY = 0
     if (!id || !moved || index == null || deps.viewMode() !== 'edit') return
     const next = moveToolbarGroup(toolbarOrder.value, id, index)
     if (next) applyToolbarOrder(next, true)
   }
 
   function onWindowToolbarPointerMove(event: PointerEvent) {
-    if (!toolbarPointerId) return
-    toolbarDropIndex.value = toolbarGroupDropIndexAt(event.clientX, event.clientY)
+    trackToolbarPointer(event.clientX, event.clientY)
   }
 
   function onWindowToolbarPointerUp(event: PointerEvent) {
@@ -202,20 +358,24 @@ export function useToolbarGroups<T extends ToolLike>(deps: {
     toolbarDragSource.value = id
     toolbarPointerStartX = event.clientX
     toolbarPointerStartY = event.clientY
-    toolbarDropIndex.value = toolbarGroupDropIndexAt(event.clientX, event.clientY)
-    const handle = event.currentTarget as HTMLElement
-    handle.focus()
-    try {
-      handle.setPointerCapture?.(event.pointerId)
-    } catch {
-      /* 合成指针事件没有有效 pointerId */
+    toolbarGestureX = 0
+    toolbarGestureY = 0
+    toolbarDropIndex.value = null
+    document.documentElement.classList.add('rte-toolbar-dragging')
+    const handle = event.currentTarget
+    if (handle instanceof HTMLElement) {
+      handle.focus()
+      try {
+        handle.setPointerCapture?.(event.pointerId)
+      } catch {
+        /* 合成指针事件没有有效 pointerId */
+      }
     }
     event.preventDefault()
   }
 
   function onToolbarHandlePointerMove(event: PointerEvent) {
-    if (!toolbarPointerId) return
-    toolbarDropIndex.value = toolbarGroupDropIndexAt(event.clientX, event.clientY)
+    trackToolbarPointer(event.clientX, event.clientY)
   }
 
   function onToolbarHandlePointerUp(event: PointerEvent) {
@@ -224,61 +384,37 @@ export function useToolbarGroups<T extends ToolLike>(deps: {
   }
 
   function onToolbarGroupDragStart(id: string, event: DragEvent) {
-    if (deps.viewMode() !== 'edit') {
+    if (toolbarPointerId || deps.viewMode() !== 'edit') {
       event.preventDefault()
       return
     }
     toolbarDragId = id
     toolbarDragSource.value = id
+    toolbarPointerStartX = event.clientX
+    toolbarPointerStartY = event.clientY
+    toolbarGestureX = 0
+    toolbarGestureY = 0
     if (event.dataTransfer) {
       event.dataTransfer.effectAllowed = 'move'
       event.dataTransfer.setData('text/plain', id)
     }
   }
 
-  function orderIndexOf(id: string | undefined, fallback: number): number {
-    if (!id) return fallback
-    const at = toolbarOrder.value.indexOf(id)
-    return at < 0 ? fallback : at
-  }
-
-  function toolbarGroupDropIndexAt(clientX: number, clientY: number): number | null {
-    const more = document.querySelector('.rte-more-menu')
-    if (more instanceof HTMLElement) {
-      const menu = more.getBoundingClientRect()
-      const inside = clientX >= menu.left && clientX <= menu.right && clientY >= menu.top && clientY <= menu.bottom
-      if (inside) {
-        const groups = Array.from(more.querySelectorAll<HTMLElement>('.rte-more-group'))
-        for (let i = 0; i < groups.length; i += 1) {
-          const rect = groups[i]!.getBoundingClientRect()
-          if (clientY < rect.top + rect.height / 2) return orderIndexOf(groups[i]!.dataset.groupId, i)
-        }
-        const last = groups[groups.length - 1]
-        const at = orderIndexOf(last?.dataset.groupId, toolbarOrder.value.length - 1)
-        return Math.min(toolbarOrder.value.length, at + 1)
-      }
-    }
-    const host = deps.rootEl.value?.querySelector('.rte-toolbar-tools')
-    if (!host) return null
-    const groups = Array.from(host.querySelectorAll<HTMLElement>('.rte-tool-group'))
-    for (let i = 0; i < groups.length; i += 1) {
-      const rect = groups[i]!.getBoundingClientRect()
-      if (clientX < rect.left + rect.width / 2) return orderIndexOf(groups[i]!.dataset.groupId, i)
-    }
-    const last = groups[groups.length - 1]
-    const at = orderIndexOf(last?.dataset.groupId, groups.length - 1)
-    return Math.min(toolbarOrder.value.length, at + 1)
-  }
-
   function onToolbarGroupDragOver(event: DragEvent) {
-    if (!toolbarDragId || deps.viewMode() !== 'edit') return
-    toolbarDropIndex.value = toolbarGroupDropIndexAt(event.clientX, event.clientY)
+    if (toolbarPointerId || !toolbarDragId || deps.viewMode() !== 'edit') return
+    toolbarGestureX = event.clientX - toolbarPointerStartX
+    toolbarGestureY = event.clientY - toolbarPointerStartY
+    const index = toolbarGroupDropIndexAt(event.clientX, event.clientY)
+    if (toolbarDropIndex.value !== index) toolbarDropIndex.value = index
   }
 
   function onWindowToolbarDragOver(event: DragEvent) {
-    if (!toolbarDragId || deps.viewMode() !== 'edit') return
+    if (toolbarPointerId || !toolbarDragId || deps.viewMode() !== 'edit') return
     event.preventDefault()
-    toolbarDropIndex.value = toolbarGroupDropIndexAt(event.clientX, event.clientY)
+    toolbarGestureX = event.clientX - toolbarPointerStartX
+    toolbarGestureY = event.clientY - toolbarPointerStartY
+    const index = toolbarGroupDropIndexAt(event.clientX, event.clientY)
+    if (toolbarDropIndex.value !== index) toolbarDropIndex.value = index
   }
 
   function onToolbarGroupDrop() {
@@ -318,9 +454,11 @@ export function useToolbarGroups<T extends ToolLike>(deps: {
 
   function onToolbarGroupDragEnd() {
     window.setTimeout(() => {
+      if (toolbarPointerId) return
       toolbarDragId = ''
       toolbarDragSource.value = ''
       toolbarDropIndex.value = null
+      document.documentElement.classList.remove('rte-toolbar-dragging')
     }, 50)
   }
 
@@ -344,6 +482,8 @@ export function useToolbarGroups<T extends ToolLike>(deps: {
     window.addEventListener('keydown', onWindowToolbarUndo, true)
   })
   onBeforeUnmount(() => {
+    if (toolbarDragFrame) cancelAnimationFrame(toolbarDragFrame)
+    document.documentElement.classList.remove('rte-toolbar-dragging')
     window.removeEventListener('pointermove', onWindowToolbarPointerMove)
     window.removeEventListener('pointerup', onWindowToolbarPointerUp)
     window.removeEventListener('dragover', onWindowToolbarDragOver)

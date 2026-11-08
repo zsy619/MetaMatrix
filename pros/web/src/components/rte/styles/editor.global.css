@@ -1,3 +1,9 @@
+/* 分组拖动期间指针往往已离开 22px 手柄，光标跟到整页。 */
+html.rte-toolbar-dragging,
+html.rte-toolbar-dragging * {
+  cursor: grabbing !important;
+  user-select: none !important;
+}
 /* unscoped：Teleport 到 body 的工具条菜单兜底（避免 scoped 未命中时看不见） */
 .rte-float-menu {
   position: fixed !important;
