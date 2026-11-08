@@ -124,26 +124,35 @@ if (!edit || !style || !paragraph || !handle) {
   log('轻拖 18px 只跟随，不把分组甩到下一行', afterNudge[0] === 'edit' && afterNudge[1] === 'style', afterNudge.slice(0, 4).join('、'))
 
   const intoY = style.top + Math.min(18, style.height / 2)
-  const beforeX = style.left + Math.min(style.width * 0.25, style.width / 2 - 40)
-  const afterX = style.left + style.width * 0.62
-  const styleMid = style.left + style.width / 2
+  const seam = Math.min(48, Math.max(28, style.width * 0.08))
+  const beforeX = style.left + Math.min(20, seam - 4)
+  const middleX = style.left + style.width * 0.5
+  const afterX = style.left + style.width - Math.min(16, seam / 2)
   await page.mouse.move(startX, startY)
   await page.mouse.down()
-  await page.mouse.move(beforeX, intoY, { steps: 10 })
+  await page.mouse.move(middleX, intoY, { steps: 12 })
+  await page.waitForTimeout(80)
+  const onMiddle = (await groupSnapshot()).map((g) => g.id)
+  log(
+    '指针在宽分组中间不换位',
+    onMiddle.indexOf('edit') === onMiddle.indexOf('style') - 1,
+    `order=${onMiddle.slice(0, 4).join('、')} pointer=${middleX.toFixed(0)} seam=${seam.toFixed(0)}`,
+  )
+  await page.mouse.move(beforeX, intoY, { steps: 8 })
   await page.waitForTimeout(80)
   const onLeft = (await groupSnapshot()).map((g) => g.id)
   log(
-    '宽分组左半边插到它前面，不会整组跳过',
-    onLeft.indexOf('edit') === onLeft.indexOf('style') - 1 && beforeX < styleMid,
-    `order=${onLeft.slice(0, 4).join('、')} pointer=${beforeX.toFixed(0)} mid=${styleMid.toFixed(0)}`,
+    '靠近宽分组左缘时插到它前面',
+    onLeft.indexOf('edit') === onLeft.indexOf('style') - 1 && beforeX <= style.left + seam,
+    `order=${onLeft.slice(0, 4).join('、')} pointer=${beforeX.toFixed(0)}`,
   )
-  await page.mouse.move(afterX, intoY, { steps: 12 })
-  await page.waitForTimeout(80)
+  await page.mouse.move(afterX, intoY, { steps: 16 })
+  await page.waitForTimeout(120)
   const onRight = (await groupSnapshot()).map((g) => g.id)
   log(
-    '宽分组右半边松手前就换到它后面',
-    onRight.indexOf('edit') === onRight.indexOf('style') + 1 && afterX > styleMid,
-    `order=${onRight.slice(0, 4).join('、')} pointer=${afterX.toFixed(0)} mid=${styleMid.toFixed(0)}`,
+    '靠近宽分组右缘时松手前就换到它后面',
+    onRight.indexOf('edit') === onRight.indexOf('style') + 1 && afterX >= style.left + style.width - seam,
+    `order=${onRight.slice(0, 4).join('、')} pointer=${afterX.toFixed(0)} right=${(style.left + style.width).toFixed(0)}`,
   )
   await page.screenshot({ path: `${out}/02-early-slot.png` })
   await page.mouse.up()
@@ -248,20 +257,31 @@ const canvasBar = await page.evaluate(() => {
   const card = document.querySelector('[data-dt-card="aesthetics"]')
   const groups = [...(card?.querySelectorAll('.rte-tool-group') || [])].map((el) => {
     const rect = el.getBoundingClientRect()
+    const tools = [...el.querySelectorAll('.rte-tool')].map((node) => node.getBoundingClientRect())
+    const handle = el.querySelector('.rte-group-handle')?.getBoundingClientRect()
+    const toolTops = new Set(tools.map((r) => Math.round(r.top)))
+    const centerGap =
+      handle && tools[0]
+        ? Math.abs(handle.top + handle.height / 2 - (tools[0].top + tools[0].height / 2))
+        : 0
     return {
       id: el.dataset.groupId || '',
       h: Math.round(rect.height),
       dir: getComputedStyle(el).flexDirection,
       wrap: getComputedStyle(el).flexWrap,
+      rows: toolTops.size,
+      centerGap: Math.round(centerGap),
     }
   })
   return { groups }
 })
 log(
-  '画布小编辑器分组保持横排，不再折成竖条',
+  '画布小编辑器分组保持横排，按钮不再折行',
   canvasBar.groups.length >= 4 &&
-    canvasBar.groups.every((g) => g.h <= 40 && g.dir === 'row' && g.wrap === 'nowrap'),
-  canvasBar.groups.map((g) => `${g.id}:${g.h}/${g.dir}/${g.wrap}`).join(' '),
+    canvasBar.groups.every(
+      (g) => g.h <= 40 && g.dir === 'row' && g.wrap === 'nowrap' && g.rows <= 1 && g.centerGap <= 4,
+    ),
+  canvasBar.groups.map((g) => `${g.id}:${g.h}/按钮${g.rows}行/偏差${g.centerGap}`).join(' '),
 )
 await page.locator('[data-dt-card="aesthetics"]').screenshot({ path: `${out}/06-canvas-card.png` })
 

@@ -194,6 +194,9 @@ export function useToolbarGroups<T extends ToolLike>(deps: {
   let toolbarDragOrigin: string[] | null = null
   let toolbarRowsOpened = false
   let toolbarChip: HTMLDivElement | null = null
+  let toolbarLiveX = 0
+  let toolbarLiveY = 0
+  let toolbarLiveApplied = false
 
   function clearDragChrome() {
     if (toolbarDragFrame) {
@@ -341,6 +344,9 @@ export function useToolbarGroups<T extends ToolLike>(deps: {
     const shown = next ? index : null
     if (toolbarDropIndex.value !== shown) toolbarDropIndex.value = shown
     if (!next || index == null) return
+    toolbarLiveApplied = true
+    toolbarLiveX = clientX
+    toolbarLiveY = clientY
     writeToolbarOrderSilent(next)
     toolbarDragFrame = requestAnimationFrame(() => {
       toolbarDragFrame = 0
@@ -363,7 +369,9 @@ export function useToolbarGroups<T extends ToolLike>(deps: {
     toolbarGestureX = 0
     toolbarGestureY = 0
     if (!id || !moved || deps.viewMode() !== 'edit') return
-    if (index != null) {
+    const sameSpot =
+      toolbarLiveApplied && Math.hypot(clientX - toolbarLiveX, clientY - toolbarLiveY) < 2
+    if (index != null && !sameSpot) {
       const next = moveToolbarGroup(toolbarOrder.value, id, index)
       if (next) writeToolbarOrderSilent(next)
     }
@@ -395,6 +403,7 @@ export function useToolbarGroups<T extends ToolLike>(deps: {
     toolbarDropIndex.value = null
     toolbarDragOrigin = [...toolbarOrder.value]
     toolbarRowsOpened = false
+    toolbarLiveApplied = false
     document.documentElement.classList.add('rte-toolbar-dragging')
     const handle = event.currentTarget
     if (handle instanceof HTMLElement) {

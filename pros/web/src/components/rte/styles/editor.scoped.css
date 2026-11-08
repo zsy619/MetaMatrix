@@ -3726,7 +3726,7 @@
     min-width: 0;
     row-gap: 2px;
   }
-  .rte-root .rte-tool-group .rte-tool-wrap {
+  .rte-root.expanded .rte-tool-group .rte-tool-wrap {
     max-width: 100%;
   }
   .rte-root .rte-group-label {
@@ -3806,6 +3806,34 @@
   min-height: 28px;
   max-height: 28px;
   padding: 0 5px;
+}
+/* 画布上未最大化的编辑器都走同一套横排，不依赖 compact 类是否写上。 */
+.rte-root:not(.expanded) .rte-toolbar-tools {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 100%;
+  min-width: 0;
+}
+.rte-root:not(.expanded) .rte-tool-group,
+.rte-root:not(.expanded) .rte-tool-group .rte-tool-wrap {
+  flex: 0 0 auto;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  max-width: none;
+}
+.rte-root:not(.expanded) .rte-tool-group {
+  align-items: center;
+  box-sizing: border-box;
+  height: 36px;
+  min-height: 36px;
+  max-height: 36px;
+  overflow: hidden;
+}
+.rte-root:not(.expanded) .rte-tool,
+.rte-root:not(.expanded) .rte-group-label,
+.rte-root:not(.expanded) .rte-tool-label {
+  white-space: nowrap;
 }
 /* 紧凑条上拖动时只留组名，避免整组宽度把后面的按钮顶开。最大化工具栏保持原宽，左右落点才不会跟着重排漂走。 */
 html.rte-toolbar-dragging .rte-root:not(.expanded) .rte-toolbar-tools > .rte-tool-group.is-dragging {
