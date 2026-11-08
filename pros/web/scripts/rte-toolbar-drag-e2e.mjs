@@ -111,22 +111,10 @@ if (!edit || !style || !paragraph || !handle) {
   const movedEdit = followed.find((g) => g.id === 'edit')
   const dragStarts = await page.evaluate(() => window.__toolbarDragStarts)
   const chip = await page.evaluate(() => document.querySelector('.rte-toolbar-drag-chip')?.textContent || '')
-  const slot = await page.evaluate(() => {
-    const el = document.querySelector('.rte-toolbar-tools .rte-tool-group.is-dragging')
-    if (!el) return null
-    const rect = el.getBoundingClientRect()
-    return { width: rect.width, height: rect.height }
-  })
   log(
-    '按下后 18px 出现跟随芯片，分组收成窄占位并留在原位',
-    chip.includes('编辑') &&
-      !!movedEdit &&
-      Math.abs(movedEdit.left - edit.left) < 8 &&
-      !movedEdit.transform &&
-      !!slot &&
-      slot.width <= 120 &&
-      slot.height <= 44,
-    `chip=${chip} left ${edit.left.toFixed(0)} → ${movedEdit?.left.toFixed(0)} slot=${slot?.width?.toFixed(0)}×${slot?.height?.toFixed(0)}`,
+    '按下后 18px 出现跟随芯片，分组留在原位',
+    chip.includes('编辑') && !!movedEdit && Math.abs(movedEdit.left - edit.left) < 8 && !movedEdit.transform,
+    `chip=${chip} left ${edit.left.toFixed(0)} → ${movedEdit?.left.toFixed(0)} transform=${movedEdit?.transform}`,
   )
   log('拖动不进入原生 dragstart', dragStarts === 0, String(dragStarts))
   await page.screenshot({ path: `${out}/01-follow.png` })
@@ -135,21 +123,27 @@ if (!edit || !style || !paragraph || !handle) {
   const afterNudge = (await groupSnapshot()).map((g) => g.id)
   log('轻拖 18px 只跟随，不把分组甩到下一行', afterNudge[0] === 'edit' && afterNudge[1] === 'style', afterNudge.slice(0, 4).join('、'))
 
-  const intoX = style.left + Math.min(120, style.width * 0.2)
   const intoY = style.top + Math.min(18, style.height / 2)
+  const beforeX = style.left + Math.min(style.width * 0.25, style.width / 2 - 40)
+  const afterX = style.left + style.width * 0.62
   const styleMid = style.left + style.width / 2
   await page.mouse.move(startX, startY)
   await page.mouse.down()
-  await page.mouse.move(intoX, startY, { steps: 8 })
-  await page.mouse.move(intoX, intoY, { steps: 8 })
+  await page.mouse.move(beforeX, intoY, { steps: 10 })
   await page.waitForTimeout(80)
-  const early = await groupSnapshot()
-  const dropId = early.find((g) => g.drop)?.id || ''
-  const earlyIds = early.map((g) => g.id)
+  const onLeft = (await groupSnapshot()).map((g) => g.id)
   log(
-    '进入宽分组远未到中线，松手前就换到它后面',
-    earlyIds.indexOf('edit') === earlyIds.indexOf('style') + 1 && intoX < styleMid - 80,
-    `order=${earlyIds.slice(0, 4).join('、')} drop=${dropId} pointer=${intoX.toFixed(0)} mid=${styleMid.toFixed(0)} width=${style.width.toFixed(0)}`,
+    '宽分组左半边插到它前面，不会整组跳过',
+    onLeft.indexOf('edit') === onLeft.indexOf('style') - 1 && beforeX < styleMid,
+    `order=${onLeft.slice(0, 4).join('、')} pointer=${beforeX.toFixed(0)} mid=${styleMid.toFixed(0)}`,
+  )
+  await page.mouse.move(afterX, intoY, { steps: 12 })
+  await page.waitForTimeout(80)
+  const onRight = (await groupSnapshot()).map((g) => g.id)
+  log(
+    '宽分组右半边松手前就换到它后面',
+    onRight.indexOf('edit') === onRight.indexOf('style') + 1 && afterX > styleMid,
+    `order=${onRight.slice(0, 4).join('、')} pointer=${afterX.toFixed(0)} mid=${styleMid.toFixed(0)}`,
   )
   await page.screenshot({ path: `${out}/02-early-slot.png` })
   await page.mouse.up()
@@ -157,7 +151,7 @@ if (!edit || !style || !paragraph || !handle) {
   const dropped = await groupSnapshot()
   const ids = dropped.map((g) => g.id)
   log(
-    '松手后编辑分组插到字体分组后面',
+    '松手后编辑分组仍在字体分组后面',
     ids.indexOf('edit') === ids.indexOf('style') + 1,
     ids.join('、'),
   )
@@ -244,6 +238,32 @@ if (capsuleCount < 2) {
     await page.mouse.up()
   }
 }
+
+await page.setViewportSize({ width: 1440, height: 900 })
+await page.goto(`${web}/canvas/dual-triangle`, { waitUntil: 'domcontentloaded' })
+await page.waitForTimeout(1500)
+await page.locator('[data-dt-card="aesthetics"] .ProseMirror').click()
+await page.waitForTimeout(300)
+const canvasBar = await page.evaluate(() => {
+  const card = document.querySelector('[data-dt-card="aesthetics"]')
+  const groups = [...(card?.querySelectorAll('.rte-tool-group') || [])].map((el) => {
+    const rect = el.getBoundingClientRect()
+    return {
+      id: el.dataset.groupId || '',
+      h: Math.round(rect.height),
+      dir: getComputedStyle(el).flexDirection,
+      wrap: getComputedStyle(el).flexWrap,
+    }
+  })
+  return { groups }
+})
+log(
+  '画布小编辑器分组保持横排，不再折成竖条',
+  canvasBar.groups.length >= 4 &&
+    canvasBar.groups.every((g) => g.h <= 40 && g.dir === 'row' && g.wrap === 'nowrap'),
+  canvasBar.groups.map((g) => `${g.id}:${g.h}/${g.dir}/${g.wrap}`).join(' '),
+)
+await page.locator('[data-dt-card="aesthetics"]').screenshot({ path: `${out}/06-canvas-card.png` })
 
 log('页面没有脚本错误', pageErrors.length === 0, pageErrors.join(' | '))
 const failed = notes.filter((note) => !note.ok)

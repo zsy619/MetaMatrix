@@ -3711,17 +3711,16 @@
     flex-wrap: wrap;
     max-width: 100%;
   }
-  .rte-root .rte-toolbar-tools,
+  .rte-root:not(.compact) .rte-toolbar-tools,
   .rte-root.expanded .rte-toolbar-tools,
-  .rte-root:not(.expanded) .rte-toolbar-tools,
-  .rte-root.compact .rte-toolbar-tools {
+  .rte-root:not(.expanded):not(.compact) .rte-toolbar-tools {
     flex-wrap: wrap;
     overflow-x: visible;
     overflow-y: visible;
     max-width: 100%;
     min-width: 0;
   }
-  .rte-root .rte-tool-group {
+  .rte-root:not(.compact) .rte-tool-group {
     flex-wrap: wrap;
     max-width: 100%;
     min-width: 0;
@@ -3778,6 +3777,7 @@
   max-width: none;
 }
 .rte-root.compact .rte-tool-group {
+  flex-direction: row;
   align-items: center;
   box-sizing: border-box;
   height: 36px;
@@ -3807,8 +3807,8 @@
   max-height: 28px;
   padding: 0 5px;
 }
-/* 拖动时只留手柄和组名，高度锁在一行，避免按钮折行后把落点盖住。 */
-html.rte-toolbar-dragging .rte-toolbar-tools > .rte-tool-group.is-dragging {
+/* 紧凑条上拖动时只留组名，避免整组宽度把后面的按钮顶开。最大化工具栏保持原宽，左右落点才不会跟着重排漂走。 */
+html.rte-toolbar-dragging .rte-root:not(.expanded) .rte-toolbar-tools > .rte-tool-group.is-dragging {
   flex: 0 0 auto;
   flex-wrap: nowrap;
   box-sizing: border-box;
@@ -3819,7 +3819,7 @@ html.rte-toolbar-dragging .rte-toolbar-tools > .rte-tool-group.is-dragging {
   overflow: hidden;
   opacity: 0.55;
 }
-html.rte-toolbar-dragging .rte-toolbar-tools > .rte-tool-group.is-dragging > :not(.rte-group-handle):not(.rte-group-label) {
+html.rte-toolbar-dragging .rte-root:not(.expanded) .rte-toolbar-tools > .rte-tool-group.is-dragging > :not(.rte-group-handle):not(.rte-group-label) {
   display: none;
 }
 

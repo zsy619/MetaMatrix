@@ -113,14 +113,12 @@ const rowBoxes = [
   { id: 'style', orderIndex: 1, left: 190, top: 0, width: 420, height: 40 },
   { id: 'paragraph', orderIndex: 2, left: 620, top: 0, width: 200, height: 40 },
 ]
-// 420 × 0.4 = 168，lead 封顶 22。向右拖，进入宽分组 22px 就插到它后面，不必拖到中线 400。
+// 横向以中线分前后。style 从 190 起、宽 420，中线在 400。左半边插到它前面，右半边插到后面。
 assert.equal(toolbarDropIndexFromBoxes(211, 20, rowBoxes, 'x', 3, 1), 1)
-assert.equal(toolbarDropIndexFromBoxes(212, 20, rowBoxes, 'x', 3, 1), 2)
-// 向左拖，进入后缘 22px 就插到它前面。右缘 = 610，610 - 22 = 588。
+assert.equal(toolbarDropIndexFromBoxes(399, 20, rowBoxes, 'x', 3, 1), 1)
+assert.equal(toolbarDropIndexFromBoxes(400, 20, rowBoxes, 'x', 3, 1), 2)
+assert.equal(toolbarDropIndexFromBoxes(300, 20, rowBoxes, 'x', 3, -1), 1)
 assert.equal(toolbarDropIndexFromBoxes(589, 20, rowBoxes, 'x', 3, -1), 2)
-assert.equal(toolbarDropIndexFromBoxes(588, 20, rowBoxes, 'x', 3, -1), 1)
-// 还没沿主轴移动时，落在中线左侧仍插在该组前面。
-assert.equal(toolbarDropIndexFromBoxes(300, 20, rowBoxes, 'x', 3, 0), 1)
 
 const wrappedBoxes = [
   { id: 'edit', orderIndex: 0, left: 20, top: 10, width: 500, height: 36 },
@@ -129,8 +127,10 @@ const wrappedBoxes = [
   { id: 'table', orderIndex: 3, left: 330, top: 56, width: 200, height: 36 },
 ]
 // 指针在第二行左侧。若只比横坐标，会先命中第一行宽度盖过该 x 的分组。
+// insert 从 20 起、宽 300，中线在 170：左侧插到它前面，越过中线才插到后面。
 assert.equal(toolbarDropIndexFromBoxes(40, 70, wrappedBoxes, 'x', 4, 1), 2)
-assert.equal(toolbarDropIndexFromBoxes(80, 70, wrappedBoxes, 'x', 4, 1), 3)
+assert.equal(toolbarDropIndexFromBoxes(80, 70, wrappedBoxes, 'x', 4, 1), 2)
+assert.equal(toolbarDropIndexFromBoxes(200, 70, wrappedBoxes, 'x', 4, 1), 3)
 // 第一行最右侧仍落在第一行末尾（insert 的下标），而不是第二行。
 assert.equal(toolbarDropIndexFromBoxes(960, 20, wrappedBoxes, 'x', 4, 1), 2)
 

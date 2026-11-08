@@ -338,12 +338,6 @@ export type ToolbarDropGesture = {
   dy: number
 }
 
-/** 横向：宽分组仍在前缘约 22px 内换位，避免拖过半屏。 */
-function dropLeadAlongWidth(span: number): number {
-  if (!Number.isFinite(span) || span <= 0) return 8
-  return Math.min(22, Math.max(8, span * 0.4))
-}
-
 /**
  * 纵向按分组高度决定提前量。
  * 矮行大约三成高度就换；高卡片封顶 72px，并且不超过高度的 45%，所以总是早于中线。
@@ -488,7 +482,8 @@ function indexFromGroupHeight(
  * 指针应插在第几个分组之前。
  * 横向工具栏按行命中：换到下一行时不再被上一行的横坐标抢走。
  * direction 为沿主轴的拖动方向（1 正向，-1 反向，0 还没沿主轴移动）。
- * 横向越过前/后缘固定提前量就换位；纵向提前量按分组高度计算。
+ * 横向以分组中线分前后：左半边插到该组前面，右半边插到后面。
+ * 纵向提前量按分组高度计算。
  * gesture 用来在行间空隙和高于一行的分组上按高度修正落点。
  * 盒子要用分组原来的占位，不要用已经跟着指针平移之后的矩形。
  */
@@ -520,10 +515,11 @@ export function toolbarDropIndexFromBoxes(
     point,
   )
   const byHeight = axis === 'x' ? indexFromGroupHeight(target, clientX, clientY, gesture) : null
-  const lead = axis === 'y' ? dropLeadAlongHeight(target.width) : dropLeadAlongWidth(target.width)
+  const lead = dropLeadAlongHeight(target.width)
   const right = target.left + target.width
   let index: number
   if (byHeight != null) index = byHeight
+  else if (axis === 'x') index = point < target.left + target.width / 2 ? target.orderIndex : target.orderIndex + 1
   else if (direction > 0) index = point >= target.left + lead ? target.orderIndex + 1 : target.orderIndex
   else if (direction < 0) index = point <= right - lead ? target.orderIndex : target.orderIndex + 1
   else index = point < target.left + target.width / 2 ? target.orderIndex : target.orderIndex + 1
