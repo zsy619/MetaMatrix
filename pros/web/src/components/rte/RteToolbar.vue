@@ -40,6 +40,7 @@ function toggleChartGroupMenu(key: string) {
 <template>
     <div data-rte-own
       class="rte-toolbar"
+      :class="{ 'is-one-row': rte.expanded && !rte.toolbarRowsOpen }"
       role="toolbar"
       aria-label="编辑工具栏"
     >
@@ -2088,36 +2089,6 @@ function toggleChartGroupMenu(key: string) {
       </template>
       </div>
 
-      <!-- 紧跟工具流末尾（导入/导出之后）：编辑 / 预览 / 源码，不作右侧贴边 -->
-      <template v-if="rte.expanded">
-        <button data-rte-own
-          v-for="opt in rte.VIEW_MODE_OPTIONS"
-          :key="'vm-' + opt.id"
-          type="button"
-          role="tab"
-          class="rte-tool rte-view-mode-tool"
-          :class="{ active: rte.viewMode === opt.id }"
-          :title="opt.title"
-          :aria-selected="rte.viewMode === opt.id"
-          @click="rte.setViewMode(opt.id)"
-        >
-          <span data-rte-own class="rte-tool-icon rte-view-mode-glyph" aria-hidden="true">{{
-            opt.icon
-          }}</span>
-          <span data-rte-own class="rte-tool-label">{{ opt.label }}</span>
-        </button>
-        <button data-rte-own
-          v-if="rte.viewMode === 'source' && rte.sourceDirty"
-          type="button"
-          class="rte-tool rte-view-mode-tool rte-view-mode-apply"
-          title="将源码应用到文档"
-          @click="rte.applySourceNow"
-        >
-          <span data-rte-own class="rte-tool-icon rte-view-mode-glyph" aria-hidden="true">↑</span>
-          <span data-rte-own class="rte-tool-label">应用</span>
-        </button>
-      </template>
-
       <!-- 未最大化：其余工具收进「更多」 -->
       <div data-rte-own
         v-if="!rte.expanded && rte.moreTools.length"
@@ -2876,5 +2847,44 @@ function toggleChartGroupMenu(key: string) {
       </Teleport>
 
       </div>
+
+      <!-- 编辑 / 预览 / 源码，以及最大化时的展开收起。放在工具行外面，收成一行时也不会被裁掉。 -->
+      <template v-if="rte.expanded">
+        <button data-rte-own
+          v-for="opt in rte.VIEW_MODE_OPTIONS"
+          :key="'vm-' + opt.id"
+          type="button"
+          role="tab"
+          class="rte-tool rte-view-mode-tool"
+          :class="{ active: rte.viewMode === opt.id }"
+          :title="opt.title"
+          :aria-selected="rte.viewMode === opt.id"
+          @click="rte.setViewMode(opt.id)"
+        >
+          <span data-rte-own class="rte-tool-icon rte-view-mode-glyph" aria-hidden="true">{{
+            opt.icon
+          }}</span>
+          <span data-rte-own class="rte-tool-label">{{ opt.label }}</span>
+        </button>
+        <button data-rte-own
+          v-if="rte.viewMode === 'source' && rte.sourceDirty"
+          type="button"
+          class="rte-tool rte-view-mode-tool rte-view-mode-apply"
+          title="将源码应用到文档"
+          @click="rte.applySourceNow"
+        >
+          <span data-rte-own class="rte-tool-icon rte-view-mode-glyph" aria-hidden="true">↑</span>
+          <span data-rte-own class="rte-tool-label">应用</span>
+        </button>
+        <button data-rte-own
+          type="button"
+          class="rte-toolbar-fold"
+          :aria-expanded="rte.toolbarRowsOpen"
+          :title="rte.toolbarRowsOpen ? '只保留第一行工具栏' : '展开其余工具栏'"
+          @click="rte.toggleToolbarRows()"
+        >
+          {{ rte.toolbarRowsOpen ? '收起' : '展开' }}
+        </button>
+      </template>
     </div>
 </template>

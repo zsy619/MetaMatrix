@@ -5505,6 +5505,12 @@ const effectiveExpanded = computed(
   () => resolveToolbarLayout(props.expanded, narrowViewport.value) === 'expanded',
 )
 
+/** 最大化时默认只留第一行；展开后才显示其余工具栏。 */
+const toolbarRowsOpen = ref(false)
+function toggleToolbarRows() {
+  toolbarRowsOpen.value = !toolbarRowsOpen.value
+}
+
 type ToolItem = {
   disabled?: () => boolean
   key: string
@@ -6581,6 +6587,8 @@ provideRteBindings({
   emojiTabId,
   estimateReadingMinutes,
   get expanded() { return effectiveExpanded.value },
+  toolbarRowsOpen,
+  toggleToolbarRows,
   exportAsDocx,
   exportAsHtml,
   exportAsMarkdown,
