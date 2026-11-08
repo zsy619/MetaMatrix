@@ -3,6 +3,7 @@ import { inject } from 'vue'
 import { RTE_BINDINGS } from './bindings'
 import { useParentScopeStamp } from './inheritScope'
 import { buildChartGroups } from '../../utils/echarts/chartGroups'
+import RteColorBoard from './RteColorBoard.vue'
 
 const rte = inject(RTE_BINDINGS)
 if (!rte) throw new Error('RteToolbar 必须放在 RichTextEditor 里')
@@ -439,107 +440,7 @@ function toggleChartGroupMenu(key: string) {
               @mouseenter="rte.onToolMenuEnter('highlight')"
               @mouseleave="rte.onToolMenuLeave($event, 'highlight', () => (rte.highlightOpen = false))"
             >
-              <div data-rte-own class="rte-hl-current" aria-live="polite">
-                当前：{{ rte.currentHighlightLabel() }}
-              </div>
-              <button data-rte-own
-                type="button"
-                class="rte-color-action rte-hl-clear"
-                :class="{ selected: !rte.isActive('highlight') }"
-                title="清除高亮"
-                aria-label="清除高亮"
-                @click="rte.applyHighlightColor('')"
-              >
-                清除高亮
-              </button>
-              <div data-rte-own class="rte-color-section-label">常用底色</div>
-              <div data-rte-own
-                class="rte-highlight-swatches"
-                role="listbox"
-                aria-label="常用高亮底色"
-              >
-                <button data-rte-own
-                  v-for="h in rte.WORD_HIGHLIGHT_SOFT"
-                  :key="'hl-s-' + h.color"
-                  type="button"
-                  role="option"
-                  class="rte-swatch rte-hl-swatch"
-                  :class="{
-                    selected: rte.colorsEqual(rte.currentHighlightColor(), h.color),
-                    'is-light': rte.isLightHighlight(h.color),
-                  }"
-                  :style="{ background: h.color }"
-                  :title="h.label"
-                  :aria-label="h.label"
-                  :aria-selected="rte.colorsEqual(rte.currentHighlightColor(), h.color)"
-                  @mouseenter="rte.highlightHoverLabel = h.label"
-                  @mouseleave="rte.highlightHoverLabel = ''"
-                  @click="rte.applyHighlightColor(h.color)"
-                />
-              </div>
-              <div data-rte-own class="rte-color-section-label">荧光笔</div>
-              <div data-rte-own
-                class="rte-highlight-swatches"
-                role="listbox"
-                aria-label="荧光笔颜色"
-              >
-                <button data-rte-own
-                  v-for="h in rte.WORD_HIGHLIGHT_VIVID"
-                  :key="'hl-v-' + h.color"
-                  type="button"
-                  role="option"
-                  class="rte-swatch rte-hl-swatch"
-                  :class="{
-                    selected: rte.colorsEqual(rte.currentHighlightColor(), h.color),
-                    'is-light': rte.isLightHighlight(h.color),
-                  }"
-                  :style="{ background: h.color }"
-                  :title="h.label"
-                  :aria-label="h.label"
-                  :aria-selected="rte.colorsEqual(rte.currentHighlightColor(), h.color)"
-                  @mouseenter="rte.highlightHoverLabel = h.label"
-                  @mouseleave="rte.highlightHoverLabel = ''"
-                  @click="rte.applyHighlightColor(h.color)"
-                />
-              </div>
-              <div data-rte-own class="rte-color-sep" />
-              <button data-rte-own
-                type="button"
-                class="rte-color-action"
-                :aria-expanded="rte.customHighlightOpen"
-                @click.stop="rte.customHighlightOpen = !rte.customHighlightOpen"
-              >
-                自定义颜色…
-              </button>
-              <div data-rte-own v-if="rte.customHighlightOpen" class="rte-custom-color" @click.stop>
-                <input data-rte-own
-                  v-model="rte.customHighlightHex"
-                  type="color"
-                  class="rte-custom-color-native"
-                  title="选取高亮色"
-                  aria-label="选取高亮色"
-                  @input="rte.onCustomHighlightNativeInput"
-                />
-                <input data-rte-own
-                  v-model="rte.customHighlightHex"
-                  type="text"
-                  class="rte-custom-color-hex"
-                  maxlength="7"
-                  placeholder="#FFF3BF"
-                  aria-label="高亮色十六进制"
-                  @keydown.enter.prevent="rte.applyCustomHighlight"
-                />
-                <button data-rte-own
-                  type="button"
-                  class="rte-custom-color-ok"
-                  @click="rte.applyCustomHighlight"
-                >
-                  确定
-                </button>
-              </div>
-              <div data-rte-own class="rte-hl-hover-hint" aria-hidden="true">
-                {{ rte.highlightHoverLabel || '悬停色块可预览名称' }}
-              </div>
+              <RteColorBoard data-rte-own kind="highlight" />
             </div>
           </Teleport>
         </div>
@@ -577,86 +478,7 @@ function toggleChartGroupMenu(key: string) {
               @mouseenter="rte.onToolMenuEnter('color')"
               @mouseleave="rte.onToolMenuLeave($event, 'color', rte.closeColorMenus)"
             >
-            <button data-rte-own
-              type="button"
-              class="rte-color-action"
-              :class="{ selected: !rte.currentTextColor() }"
-              @click="rte.applyTextColor('')"
-            >
-              自动
-            </button>
-            <div data-rte-own class="rte-color-section-label">主题颜色</div>
-            <div data-rte-own class="rte-theme-grid">
-              <button data-rte-own
-                v-for="(c, i) in rte.WORD_THEME_FLAT"
-                :key="'th-' + i + '-' + c"
-                type="button"
-                class="rte-swatch"
-                :class="{
-                  selected: rte.colorsEqual(rte.currentTextColor(), c),
-                  'is-light': c === '#FFFFFF' || c.toLowerCase() === '#ffffff',
-                }"
-                :style="{ background: c }"
-                :title="c"
-                @click="rte.applyTextColor(c)"
-              />
-            </div>
-            <div data-rte-own class="rte-color-section-label">标准颜色</div>
-            <div data-rte-own class="rte-standard-row" role="listbox" aria-label="标准文字颜色">
-              <button data-rte-own
-                v-for="item in rte.WORD_STANDARD_COLOR_ITEMS"
-                :key="'st-' + item.color"
-                type="button"
-                role="option"
-                class="rte-swatch"
-                :class="{
-                  selected: rte.colorsEqual(rte.currentTextColor(), item.color),
-                  'is-light': rte.isLightHighlight(item.color),
-                }"
-                :style="{ background: item.color }"
-                :title="item.label"
-                :aria-label="item.label"
-                :aria-selected="rte.colorsEqual(rte.currentTextColor(), item.color)"
-                @mouseenter="rte.colorHoverLabel = item.label"
-                @mouseleave="rte.colorHoverLabel = ''"
-                @click="rte.applyTextColor(item.color)"
-              />
-            </div>
-            <div data-rte-own class="rte-hl-hover-hint" aria-hidden="true">
-              {{ rte.colorHoverLabel || '悬停色块可预览名称' }}
-            </div>
-            <div data-rte-own class="rte-color-sep" />
-            <button data-rte-own
-              type="button"
-              class="rte-color-action"
-              @click.stop="rte.customColorOpen = !rte.customColorOpen"
-            >
-              其他颜色…
-            </button>
-            <div data-rte-own v-if="rte.customColorOpen" class="rte-custom-color" @click.stop>
-              <input data-rte-own
-                v-model="rte.customColorHex"
-                type="color"
-                class="rte-custom-color-native"
-                title="选取颜色"
-                @input="rte.onCustomColorNativeInput"
-              />
-              <input data-rte-own
-                v-model="rte.customColorHex"
-                type="text"
-                class="rte-custom-color-hex"
-                maxlength="7"
-                placeholder="#165dff"
-                @keydown.enter.prevent="rte.applyCustomColor"
-              />
-              <button data-rte-own
-                type="button"
-                class="rte-custom-color-ok"
-                @click="rte.applyCustomColor"
-              >
-                确定
-              </button>
-            </div>
+            <RteColorBoard data-rte-own kind="text" />
             </div>
           </Teleport>
         </div>
@@ -2370,86 +2192,7 @@ function toggleChartGroupMenu(key: string) {
               class="rte-menu rte-color-menu rte-more-flyout"
               @mousedown.prevent
             >
-              <button data-rte-own
-                type="button"
-                class="rte-color-action"
-                :class="{ selected: !rte.currentTextColor() }"
-                @click="rte.applyTextColor('')"
-              >
-                自动
-              </button>
-              <div data-rte-own class="rte-color-section-label">主题颜色</div>
-              <div data-rte-own class="rte-theme-grid">
-                <button data-rte-own
-                  v-for="(c, i) in rte.WORD_THEME_FLAT"
-                  :key="'mth-' + i + '-' + c"
-                  type="button"
-                  class="rte-swatch"
-                  :class="{
-                    selected: rte.colorsEqual(rte.currentTextColor(), c),
-                    'is-light': c === '#FFFFFF' || c.toLowerCase() === '#ffffff',
-                  }"
-                  :style="{ background: c }"
-                  :title="c"
-                  @click="rte.applyTextColor(c)"
-                />
-              </div>
-              <div data-rte-own class="rte-color-section-label">标准颜色</div>
-              <div data-rte-own class="rte-standard-row" role="listbox" aria-label="标准文字颜色">
-                <button data-rte-own
-                  v-for="item in rte.WORD_STANDARD_COLOR_ITEMS"
-                  :key="'mst-' + item.color"
-                  type="button"
-                  role="option"
-                  class="rte-swatch"
-                  :class="{
-                    selected: rte.colorsEqual(rte.currentTextColor(), item.color),
-                    'is-light': rte.isLightHighlight(item.color),
-                  }"
-                  :style="{ background: item.color }"
-                  :title="item.label"
-                  :aria-label="item.label"
-                  :aria-selected="rte.colorsEqual(rte.currentTextColor(), item.color)"
-                  @mouseenter="rte.colorHoverLabel = item.label"
-                  @mouseleave="rte.colorHoverLabel = ''"
-                  @click="rte.applyTextColor(item.color)"
-                />
-              </div>
-              <div data-rte-own class="rte-hl-hover-hint" aria-hidden="true">
-                {{ rte.colorHoverLabel || '悬停色块可预览名称' }}
-              </div>
-              <div data-rte-own class="rte-color-sep" />
-              <button data-rte-own
-                type="button"
-                class="rte-color-action"
-                @click.stop="rte.customColorOpen = !rte.customColorOpen"
-              >
-                其他颜色…
-              </button>
-              <div data-rte-own v-if="rte.customColorOpen" class="rte-custom-color" @click.stop>
-                <input data-rte-own
-                  v-model="rte.customColorHex"
-                  type="color"
-                  class="rte-custom-color-native"
-                  title="选取颜色"
-                  @input="rte.onCustomColorNativeInput"
-                />
-                <input data-rte-own
-                  v-model="rte.customColorHex"
-                  type="text"
-                  class="rte-custom-color-hex"
-                  maxlength="7"
-                  placeholder="#165dff"
-                  @keydown.enter.prevent="rte.applyCustomColor"
-                />
-                <button data-rte-own
-                  type="button"
-                  class="rte-custom-color-ok"
-                  @click="rte.applyCustomColor"
-                >
-                  确定
-                </button>
-              </div>
+              <RteColorBoard data-rte-own kind="text" />
             </div>
             <div data-rte-own
               v-if="mt.kind === 'callout' && rte.moreCalloutOpen"
@@ -2476,95 +2219,7 @@ function toggleChartGroupMenu(key: string) {
               aria-label="高亮颜色"
               @mousedown.prevent
             >
-              <div data-rte-own class="rte-hl-current" aria-live="polite">
-                当前：{{ rte.currentHighlightLabel() }}
-              </div>
-              <button data-rte-own
-                type="button"
-                class="rte-color-action rte-hl-clear"
-                :class="{ selected: !rte.isActive('highlight') }"
-                title="清除高亮"
-                aria-label="清除高亮"
-                @click="rte.applyHighlightColor('')"
-              >
-                清除高亮
-              </button>
-              <div data-rte-own class="rte-color-section-label">常用底色</div>
-              <div data-rte-own class="rte-highlight-swatches" role="listbox" aria-label="常用高亮底色">
-                <button data-rte-own
-                  v-for="h in rte.WORD_HIGHLIGHT_SOFT"
-                  :key="'mhl-s-' + h.color"
-                  type="button"
-                  role="option"
-                  class="rte-swatch rte-hl-swatch"
-                  :class="{
-                    selected: rte.colorsEqual(rte.currentHighlightColor(), h.color),
-                    'is-light': rte.isLightHighlight(h.color),
-                  }"
-                  :style="{ background: h.color }"
-                  :title="h.label"
-                  :aria-label="h.label"
-                  :aria-selected="rte.colorsEqual(rte.currentHighlightColor(), h.color)"
-                  @mouseenter="rte.highlightHoverLabel = h.label"
-                  @mouseleave="rte.highlightHoverLabel = ''"
-                  @click="rte.applyHighlightColor(h.color)"
-                />
-              </div>
-              <div data-rte-own class="rte-color-section-label">荧光笔</div>
-              <div data-rte-own class="rte-highlight-swatches" role="listbox" aria-label="荧光笔颜色">
-                <button data-rte-own
-                  v-for="h in rte.WORD_HIGHLIGHT_VIVID"
-                  :key="'mhl-v-' + h.color"
-                  type="button"
-                  role="option"
-                  class="rte-swatch rte-hl-swatch"
-                  :class="{
-                    selected: rte.colorsEqual(rte.currentHighlightColor(), h.color),
-                    'is-light': rte.isLightHighlight(h.color),
-                  }"
-                  :style="{ background: h.color }"
-                  :title="h.label"
-                  :aria-label="h.label"
-                  :aria-selected="rte.colorsEqual(rte.currentHighlightColor(), h.color)"
-                  @mouseenter="rte.highlightHoverLabel = h.label"
-                  @mouseleave="rte.highlightHoverLabel = ''"
-                  @click="rte.applyHighlightColor(h.color)"
-                />
-              </div>
-              <div data-rte-own class="rte-color-sep" />
-              <button data-rte-own
-                type="button"
-                class="rte-color-action"
-                :aria-expanded="rte.customHighlightOpen"
-                @click.stop="rte.customHighlightOpen = !rte.customHighlightOpen"
-              >
-                自定义颜色…
-              </button>
-              <div data-rte-own v-if="rte.customHighlightOpen" class="rte-custom-color" @click.stop>
-                <input data-rte-own
-                  v-model="rte.customHighlightHex"
-                  type="color"
-                  class="rte-custom-color-native"
-                  title="选取高亮色"
-                  aria-label="选取高亮色"
-                  @input="rte.onCustomHighlightNativeInput"
-                />
-                <input data-rte-own
-                  v-model="rte.customHighlightHex"
-                  type="text"
-                  class="rte-custom-color-hex"
-                  maxlength="7"
-                  placeholder="#FFF3BF"
-                  aria-label="高亮色十六进制"
-                  @keydown.enter.prevent="rte.applyCustomHighlight"
-                />
-                <button data-rte-own type="button" class="rte-custom-color-ok" @click="rte.applyCustomHighlight">
-                  确定
-                </button>
-              </div>
-              <div data-rte-own class="rte-hl-hover-hint" aria-hidden="true">
-                {{ rte.highlightHoverLabel || '悬停色块可预览名称' }}
-              </div>
+              <RteColorBoard data-rte-own kind="highlight" />
             </div>
             </template>
           </div>

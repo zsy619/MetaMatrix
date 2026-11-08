@@ -69,6 +69,7 @@ import {
   visibleBlockMenuItems,
   type BlockMenuState,
 } from './rte/rteBlockMenu'
+import { pushRecentColor, themeColorLabel } from './rte/rteColorPalette'
 import { orderedListContinuation } from '../utils/rteListContinue'
 import { planListRenumber } from '../utils/rteListRenumber'
 import {
@@ -3289,18 +3290,21 @@ function setColor(color: string) {
   }
   chain()?.setColor(color).run()
 }
+const recentTextColors = ref<string[]>([])
+const recentHighlightColors = ref<string[]>([])
+
 function applyTextColor(color: string) {
   setColor(color)
+  recentTextColors.value = pushRecentColor(recentTextColors.value, color)
   colorOpen.value = false
   moreColorOpen.value = false
   moreOpen.value = false
-  const name =
-    WORD_STANDARD_COLOR_ITEMS.find((x) => x.color.toLowerCase() === (color || '').toLowerCase())
-      ?.label || color || '自动'
+  const name = textColorLabel(color)
   announceRte(color ? `已应用文字颜色：${name}` : '已恢复自动文字颜色')
 }
 function applyHighlightColor(color: string) {
   setHighlightColor(color)
+  recentHighlightColors.value = pushRecentColor(recentHighlightColors.value, color)
   highlightOpen.value = false
   moreHighlightOpen.value = false
   moreOpen.value = false
@@ -5619,6 +5623,16 @@ function onCustomColorNativeInput(event: Event) {
 /** 主题色按行展平后的一维列表（10 列 × 6 行） */
 const WORD_THEME_FLAT = WORD_THEME_ROWS.flat()
 
+function textColorLabel(color: string): string {
+  const c = (color || '').toLowerCase()
+  if (!c) return '自动'
+  const standard = WORD_STANDARD_COLOR_ITEMS.find((item) => item.color.toLowerCase() === c)
+  if (standard) return standard.label
+  const index = WORD_THEME_FLAT.findIndex((item) => item.toLowerCase() === c)
+  if (index >= 0) return themeColorLabel(index)
+  return color
+}
+
 function moreSubmenuOpen(t: ToolItem): boolean {
   if (t.kind === 'color') return moreColorOpen.value
   if (t.key === 'highlight') return moreHighlightOpen.value
@@ -6939,6 +6953,10 @@ provideRteBindings({
   currentFontSize,
   currentHighlightColor,
   currentHighlightLabel,
+  highlightColorLabel,
+  textColorLabel,
+  recentTextColors,
+  recentHighlightColors,
   currentLetterSpacing,
   currentLineHeight,
   currentMarginBottom,

@@ -4,6 +4,7 @@ import { BubbleMenu } from '@tiptap/vue-3/menus'
 import { RTE_BINDINGS } from './bindings'
 import { useParentScopeStamp } from './inheritScope'
 import { BLOCK_MENU } from './rteBlockMenu'
+import RteColorBoard from './RteColorBoard.vue'
 
 /**
  * 选区浮动工具条（气泡）。
@@ -140,6 +141,7 @@ function closePanel() {
 
 /** 颜色面板和段落菜单同时只开一个。 */
 function toggleSwatch(kind: 'text' | 'highlight') {
+  panelUp.value = resolvePanelUp()
   panel.value = null
   rte.bubbleRewrite = null
   rte.bubbleSwatch = rte.bubbleSwatch === kind ? null : kind
@@ -433,36 +435,16 @@ function run(action: () => void) {
             >A</span
           >
         </button>
-        <div
+        <RteColorBoard
           v-if="rte.bubbleSwatch === 'text'"
+          kind="text"
           class="rte-bubble-swatches"
-          role="listbox"
+          :class="{ 'is-up': panelUp }"
+          role="dialog"
           aria-label="文字颜色"
-          data-rte-own
           @mouseenter="hoverEnter('text')"
-        >
-          <button
-            data-rte-own
-            type="button"
-            class="rte-bubble-swatch is-clear"
-            title="默认"
-            aria-label="默认文字颜色"
-            @click="rte.applyTextColor(''); rte.bubbleSwatch = null"
-          >
-            A
-          </button>
-          <button
-            v-for="color in rte.FEISHU_TEXT_COLORS"
-            :key="'bt-' + color"
-            data-rte-own
-            type="button"
-            class="rte-bubble-swatch"
-            :style="{ background: color }"
-            :aria-label="color"
-            :class="{ 'is-on': rte.currentTextColor() === color }"
-            @click="rte.applyTextColor(color); rte.bubbleSwatch = null"
-          />
-        </div>
+          @picked="rte.bubbleSwatch = null"
+        />
       </span>
 
       <!-- 背景高亮 -->
@@ -480,36 +462,16 @@ function run(action: () => void) {
         >
           <component data-rte-own :is="rte.toolIcon('highlight')" class="rte-ep-icon" />
         </button>
-        <div
+        <RteColorBoard
           v-if="rte.bubbleSwatch === 'highlight'"
+          kind="highlight"
           class="rte-bubble-swatches"
-          role="listbox"
+          :class="{ 'is-up': panelUp }"
+          role="dialog"
           aria-label="高亮颜色"
-          data-rte-own
           @mouseenter="hoverEnter('highlight')"
-        >
-          <button
-            data-rte-own
-            type="button"
-            class="rte-bubble-swatch is-clear"
-            title="清除高亮"
-            aria-label="清除高亮"
-            @click="rte.applyHighlightColor(''); rte.bubbleSwatch = null"
-          >
-            ×
-          </button>
-          <button
-            v-for="color in rte.FEISHU_HIGHLIGHT_COLORS"
-            :key="'bh-' + color"
-            data-rte-own
-            type="button"
-            class="rte-bubble-swatch"
-            :style="{ background: color }"
-            :aria-label="color"
-            :class="{ 'is-on': rte.currentHighlightColor() === color }"
-            @click="rte.applyHighlightColor(color); rte.bubbleSwatch = null"
-          />
-        </div>
+          @picked="rte.bubbleSwatch = null"
+        />
       </span>
 
       <!-- 清除格式 -->
