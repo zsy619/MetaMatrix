@@ -149,18 +149,51 @@ useParentScopeStamp()
                 :key="asset.id"
                 type="button"
                 class="rte-image-thumb rte-video-thumb"
-                :class="{ selected: picker.selectedIds.has(asset.id), 'rte-audio-thumb': picker.copy.preview === 'audio' }"
+                :class="{
+                  selected: picker.selectedIds.has(asset.id),
+                  'rte-audio-thumb': picker.copy.preview === 'audio',
+                  'is-loading': picker.thumbState(asset.src).status === 'loading',
+                  'is-error': picker.thumbState(asset.src).status === 'error',
+                }"
                 :title="asset.name"
                 @click="picker.toggleSelect(asset.id)"
               >
-                <video
+                <template
+                  v-if="picker.thumbState(asset.src).status === 'direct' || picker.thumbState(asset.src).status === 'ready'"
+                >
+                  <video
+                    data-rte-own
+                    v-if="picker.copy.preview === 'video'"
+                    :src="picker.thumbState(asset.src).url"
+                    muted
+                    preload="metadata"
+                  />
+                  <audio data-rte-own v-else :src="picker.thumbState(asset.src).url" preload="none" />
+                </template>
+                <span
+                  v-else-if="picker.thumbState(asset.src).status === 'error'"
                   data-rte-own
-                  v-if="picker.copy.preview === 'video'"
-                  :src="asset.src"
-                  muted
-                  preload="metadata"
-                />
-                <audio data-rte-own v-else :src="asset.src" preload="none" />
+                  class="rte-image-thumb-error"
+                >
+                  <span data-rte-own class="rte-image-thumb-error-text">
+                    {{ picker.thumbState(asset.src).error }}
+                  </span>
+                  <span
+                    data-rte-own
+                    class="rte-image-thumb-retry"
+                    role="button"
+                    tabindex="0"
+                    @click.stop="picker.retryThumb(asset.src)"
+                    @keydown.enter.stop="picker.retryThumb(asset.src)"
+                    @keydown.space.stop.prevent="picker.retryThumb(asset.src)"
+                  >重试</span>
+                </span>
+                <span
+                  v-else
+                  data-rte-own
+                  class="rte-image-thumb-loading"
+                  aria-live="polite"
+                >加载中…</span>
                 <span data-rte-own class="rte-video-thumb-name">{{ asset.name }}</span>
                 <span
                   data-rte-own

@@ -1,18 +1,13 @@
 import { Extension } from '@tiptap/core'
 import { Plugin } from '@tiptap/pm/state'
 import { getToken } from '../api/http'
+import { mediaFetchUrl } from '../utils/mediaPath'
 
 const blobs = new Map<string, string>()
 const pending = new Set<string>()
 
 /** Browser fetches go through /api, which the dev server strips before the API. */
-export function mediaFetchUrl(path: string): string | null {
-  const queryAt = path.indexOf('?')
-  const base = queryAt >= 0 ? path.slice(0, queryAt) : path
-  if (!/^\/media\/[0-9a-zA-Z-]+$/.test(base)) return null
-  if (queryAt >= 0 && !/^\?[A-Za-z0-9._~%=&-]+$/.test(path.slice(queryAt))) return null
-  return `/api${path}`
-}
+export { mediaFetchUrl }
 
 /**
  * The document keeps the stable /media/{id} path. The DOM element loads a

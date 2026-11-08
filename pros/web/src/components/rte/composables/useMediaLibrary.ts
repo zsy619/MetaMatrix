@@ -14,6 +14,13 @@ import { NodeSelection } from '@tiptap/pm/state'
 import { getToken } from '../../../api/http'
 import { uploadMediaFile } from '../../../api/mediaUpload'
 import {
+  ensureMediaThumb,
+  markMediaThumbError,
+  mediaThumbState,
+  retryMediaThumb,
+  type MediaThumbState,
+} from '../../../utils/mediaThumb'
+import {
   createAvPicker,
   isAudioFile,
   isVideoFile,
@@ -99,8 +106,26 @@ function openImageDialog() {
   resetImageDialog()
   imageFilePickActive.value = false
   imageDialogOpen.value = true
+  ensureImageThumbs()
   deps.closeMore()
   deps.onOpened?.()
+}
+
+/** 素材缩略图要走鉴权取图（/media/{id} 直接 <img> 会 404）。 */
+function ensureImageThumbs() {
+  imageAssets.value.forEach((asset) => ensureMediaThumb(asset.src))
+}
+
+function imageThumb(src: string): MediaThumbState {
+  return mediaThumbState(src)
+}
+
+function retryImageThumb(src: string) {
+  retryMediaThumb(src)
+}
+
+function imageThumbFailed(src: string) {
+  markMediaThumbError(src, '图片加载失败，请检查链接是否有效')
 }
 
 function closeImageDialog() {
@@ -376,6 +401,7 @@ async function onLocalImageFilesChange(event: Event) {
   }
   imageAssets.value = [...added, ...imageAssets.value]
   saveImageStore()
+  added.forEach((a) => ensureMediaThumb(a.src))
   const next = new Set(imageSelectedIds.value)
   added.forEach((a) => next.add(a.id))
   imageSelectedIds.value = next
@@ -569,6 +595,9 @@ const audioDialogOpen = computed(() => audioPicker.open)
     addingCategory,
     newCategoryName,
     filteredImageAssets,
+    imageThumb,
+    retryImageThumb,
+    imageThumbFailed,
     closeImageDialog,
     onImageDialogMask,
     insertImage,

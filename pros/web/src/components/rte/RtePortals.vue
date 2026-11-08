@@ -1662,11 +1662,45 @@ const echartsDialogTemplates = computed(() => {
                   :key="asset.id"
                   type="button"
                   class="rte-image-thumb"
-                  :class="{ selected: rte.imageSelectedIds.has(asset.id) }"
+                  :class="{
+                    selected: rte.imageSelectedIds.has(asset.id),
+                    'is-loading': rte.imageThumb(asset.src).status === 'loading',
+                    'is-error': rte.imageThumb(asset.src).status === 'error',
+                  }"
                   :title="asset.name"
                   @click="rte.toggleImageSelect(asset.id)"
                 >
-                  <img data-rte-own :src="asset.src" :alt="asset.name" />
+                  <img
+                    v-if="rte.imageThumb(asset.src).status === 'direct' || rte.imageThumb(asset.src).status === 'ready'"
+                    data-rte-own
+                    :src="rte.imageThumb(asset.src).url"
+                    :alt="asset.name"
+                    @error="rte.imageThumbFailed(asset.src)"
+                  />
+                  <span
+                    v-else-if="rte.imageThumb(asset.src).status === 'error'"
+                    data-rte-own
+                    class="rte-image-thumb-error"
+                  >
+                    <span data-rte-own class="rte-image-thumb-error-text">
+                      {{ rte.imageThumb(asset.src).error }}
+                    </span>
+                    <span
+                      data-rte-own
+                      class="rte-image-thumb-retry"
+                      role="button"
+                      tabindex="0"
+                      @click.stop="rte.retryImageThumb(asset.src)"
+                      @keydown.enter.stop="rte.retryImageThumb(asset.src)"
+                      @keydown.space.stop.prevent="rte.retryImageThumb(asset.src)"
+                    >重试</span>
+                  </span>
+                  <span
+                    v-else
+                    data-rte-own
+                    class="rte-image-thumb-loading"
+                    aria-live="polite"
+                  >加载中…</span>
                   <span data-rte-own
                     class="rte-image-thumb-check"
                     :class="{ on: rte.imageSelectedIds.has(asset.id) }"
