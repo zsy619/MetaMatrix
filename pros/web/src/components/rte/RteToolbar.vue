@@ -70,28 +70,30 @@ function toggleChartGroupMenu(key: string) {
         :data-group-id="group.id"
         @contextmenu.prevent="rte.onToolbarGroupContextMenu(group.id, $event)"
       >
-        <button data-rte-own
-          v-if="rte.viewMode === 'edit'"
-          type="button"
-          class="rte-group-handle"
-          draggable="false"
-          :aria-label="'拖动' + group.label + '分组'"
-          title="拖动整组。Alt+左/右也可移动"
-          @pointerdown="rte.onToolbarHandlePointerDown(group.id, $event)"
-          @pointermove="rte.onToolbarHandlePointerMove"
-          @pointerup="rte.onToolbarHandlePointerUp"
-          @pointercancel="rte.onToolbarHandlePointerUp"
-          @keydown="rte.onToolbarGroupKeydown(group.id, $event)"
-        >
-          ⠿
-        </button>
-        <span data-rte-own
-          class="rte-group-label"
-          @pointerdown="rte.onToolbarHandlePointerDown(group.id, $event)"
-          @pointermove="rte.onToolbarHandlePointerMove"
-          @pointerup="rte.onToolbarHandlePointerUp"
-          @pointercancel="rte.onToolbarHandlePointerUp"
-        >{{ group.label }}</span>
+        <span data-rte-own class="rte-group-head">
+          <button data-rte-own
+            v-if="rte.viewMode === 'edit'"
+            type="button"
+            class="rte-group-handle"
+            draggable="false"
+            :aria-label="'拖动' + group.label + '分组'"
+            title="拖动整组。Alt+左/右也可移动"
+            @pointerdown="rte.onToolbarHandlePointerDown(group.id, $event)"
+            @pointermove="rte.onToolbarHandlePointerMove"
+            @pointerup="rte.onToolbarHandlePointerUp"
+            @pointercancel="rte.onToolbarHandlePointerUp"
+            @keydown="rte.onToolbarGroupKeydown(group.id, $event)"
+          >
+            ⠿
+          </button>
+          <span data-rte-own
+            class="rte-group-label"
+            @pointerdown="rte.onToolbarHandlePointerDown(group.id, $event)"
+            @pointermove="rte.onToolbarHandlePointerMove"
+            @pointerup="rte.onToolbarHandlePointerUp"
+            @pointercancel="rte.onToolbarHandlePointerUp"
+          >{{ group.label }}</span>
+        </span>
       <template v-for="t in group.tools" :key="t.key">
         <div data-rte-own
           v-if="t.kind === 'heading'"
@@ -2886,12 +2888,15 @@ function toggleChartGroupMenu(key: string) {
         </button>
         <button data-rte-own
           type="button"
-          class="rte-toolbar-fold"
+          class="rte-tool rte-view-mode-tool rte-toolbar-fold"
           :aria-expanded="rte.toolbarRowsOpen"
           :title="rte.toolbarRowsOpen ? '只保留第一行工具栏' : '展开其余工具栏'"
           @click="rte.toggleToolbarRows()"
         >
-          {{ rte.toolbarRowsOpen ? '收起' : '展开' }}
+          <span data-rte-own class="rte-tool-icon rte-view-mode-glyph" aria-hidden="true">{{
+            rte.toolbarRowsOpen ? '▴' : '▾'
+          }}</span>
+          <span data-rte-own class="rte-tool-label">{{ rte.toolbarRowsOpen ? '收起' : '展开' }}</span>
         </button>
       </div>
     </div>

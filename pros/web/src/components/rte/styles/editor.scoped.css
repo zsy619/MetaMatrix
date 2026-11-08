@@ -110,31 +110,62 @@
 .rte-toolbar-tools.is-drop-end::after {
   right: 0;
 }
+.rte-group-head {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  flex: 0 0 auto;
+  gap: 4px;
+  height: 22px;
+  margin: 0 6px 0 0;
+  padding: 0 8px 0 3px;
+  border-radius: 4px 11px 11px 4px;
+  background: var(--rte-head-bg, #e8eefc);
+  color: var(--rte-head-fg, #1d4ed8);
+  box-shadow: inset 3px 0 0 var(--rte-head-fg, #1d4ed8);
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+.rte-tool-group[data-group-id='edit'] { --rte-head-bg: #dbe6ff; --rte-head-fg: #1d4ed8; }
+.rte-tool-group[data-group-id='style'] { --rte-head-bg: #dcfce7; --rte-head-fg: #15803d; }
+.rte-tool-group[data-group-id='paragraph'] { --rte-head-bg: #e0f2fe; --rte-head-fg: #0369a1; }
+.rte-tool-group[data-group-id='insert'] { --rte-head-bg: #ccfbf1; --rte-head-fg: #0f766e; }
+.rte-tool-group[data-group-id='charts'] { --rte-head-bg: #ede9fe; --rte-head-fg: #6d28d9; }
+.rte-tool-group[data-group-id='table'] { --rte-head-bg: #e0e7ff; --rte-head-fg: #3730a3; }
+.rte-tool-group[data-group-id='blocks'] { --rte-head-bg: #fce7f3; --rte-head-fg: #be185d; }
+.rte-tool-group[data-group-id='notes'] { --rte-head-bg: #fef3c7; --rte-head-fg: #b45309; }
+.rte-tool-group[data-group-id='review'] { --rte-head-bg: #fee2e2; --rte-head-fg: #b91c1c; }
+.rte-tool-group[data-group-id='view'] { --rte-head-bg: #e2e8f0; --rte-head-fg: #334155; }
+.rte-tool-group[data-group-id='file'] { --rte-head-bg: #ffedd5; --rte-head-fg: #9a3412; }
+.rte-tool-group[data-group-id='other'] { --rte-head-bg: #f3f4f6; --rte-head-fg: #4b5563; }
 .rte-group-label {
-  font-size: 11px;
-  font-weight: 700;
-  color: #1d2129;
-  padding: 0 8px 0 4px;
-  margin-right: 2px;
-  border-right: 1px solid rgba(29, 33, 41, 0.14);
-  letter-spacing: 0.02em;
+  font-size: 12px;
+  font-weight: 800;
+  color: inherit;
+  padding: 0;
+  margin: 0;
+  border: none;
+  letter-spacing: 0.04em;
   white-space: nowrap;
-  line-height: 1.4;
+  line-height: 22px;
+  background: transparent;
 }
 .rte-group-handle {
   border: 0;
-  background: #fff;
-  color: #86909c;
-  width: 22px;
-  height: 22px;
-  border-radius: 999px;
+  background: var(--rte-head-fg, #1d4ed8);
+  color: #fff;
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
   cursor: grab;
-  line-height: 22px;
+  line-height: 16px;
   padding: 0;
-  font-size: 14px;
-  box-shadow: 0 0 0 1px rgba(29, 33, 41, 0.08);
+  font-size: 10px;
+  box-shadow: none;
   touch-action: none;
   user-select: none;
+  flex: 0 0 16px;
 }
 .rte-group-handle:hover {
   color: #3370ff;
@@ -2235,19 +2266,30 @@
    放不下的分组整组换到下一行再被裁掉，不从按钮中间切开。 */
 .rte-root.expanded .rte-toolbar.is-one-row {
   flex-wrap: nowrap;
-  align-items: flex-start;
-  max-height: 76px;
+  align-items: center;
+  max-height: 58px;
   overflow: hidden;
 }
 .rte-root.expanded .rte-toolbar.is-one-row .rte-toolbar-tools {
   flex: 1 1 auto;
-  flex-wrap: wrap;
-  align-content: flex-start;
+  flex-wrap: nowrap;
+  align-items: center;
+  align-content: center;
   overflow: hidden;
-  height: 52px;
+  height: 40px;
   min-height: 0;
-  max-height: 52px;
+  max-height: 40px;
   min-width: 0;
+}
+.rte-root.expanded .rte-toolbar.is-one-row .rte-tool-group {
+  box-sizing: border-box;
+  flex-wrap: nowrap;
+  align-items: center;
+  height: 40px;
+  max-height: 40px;
+  padding-top: 0;
+  padding-bottom: 0;
+  overflow: hidden;
 }
 .rte-root.expanded .rte-toolbar.is-one-row .rte-mode-bar {
   flex: 0 0 auto;
@@ -2275,30 +2317,45 @@
   padding-top: 6px;
   border-top: 1px solid #ebeced;
 }
-.rte-root.expanded .rte-mode-bar .rte-view-mode-tool {
-  margin-right: 4px;
+.rte-root.expanded .rte-mode-bar .rte-view-mode-tool,
+.rte-root.expanded .rte-mode-bar .rte-toolbar-fold {
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  height: 32px;
+  min-height: 32px;
+  max-height: 32px;
+  width: auto;
+  margin-right: 2px;
+  padding: 0 8px;
+  gap: 4px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  box-shadow: none;
+  font-size: 12px;
+  line-height: 16px;
+}
+.rte-root.expanded .rte-mode-bar .rte-view-mode-tool .rte-tool-label,
+.rte-root.expanded .rte-mode-bar .rte-toolbar-fold .rte-tool-label {
+  position: static;
+  width: auto;
+  height: auto;
+  margin: 0;
+  padding: 0;
+  overflow: visible;
+  clip: auto;
+  font-size: 12px;
+  line-height: 16px;
+  color: inherit;
 }
 .rte-toolbar-fold {
   position: static;
-  flex: 0 0 auto;
-  height: 32px;
-  margin-left: 6px;
-  padding: 0 10px;
-  border: 1px solid #d5d8de;
-  border-radius: 6px;
-  background: #fff;
-  color: #373a40;
-  font-size: 12px;
-  line-height: 30px;
   cursor: pointer;
 }
-.rte-toolbar-fold:hover {
-  background: rgba(0, 0, 0, 0.04);
-}
-.rte-root.is-dark-editor .rte-toolbar-fold {
-  background: #171a1f;
+.rte-root.is-dark-editor .rte-mode-bar .rte-toolbar-fold {
   color: #e5e6eb;
-  border-color: #3a3f47;
 }
 .rte-root.is-dark-editor .rte-toolbar:not(.is-one-row) .rte-mode-bar {
   border-top-color: #3a3f47;
@@ -2320,14 +2377,14 @@
 .rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group {
   display: contents;
 }
-.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group > .rte-group-handle {
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group > .rte-group-head {
   margin-left: 12px;
 }
-.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group:first-child > .rte-group-handle {
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group:first-child > .rte-group-head {
   margin-left: 0;
 }
-.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group.is-drop-target > .rte-group-handle {
-  box-shadow: -4px 0 0 #3370ff;
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group.is-drop-target > .rte-group-head {
+  box-shadow: inset 3px 0 0 var(--rte-head-fg, #1d4ed8), -4px 0 0 #3370ff;
 }
 .rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group.is-dragging > * {
   opacity: 0.45;
@@ -3836,16 +3893,22 @@
   max-height: 36px;
   padding: 0 6px 0 4px;
 }
+.rte-root.compact .rte-group-head {
+  height: 22px;
+  margin-right: 4px;
+}
 .rte-root.compact .rte-group-handle {
   align-self: center;
-  flex: 0 0 22px;
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
 }
 .rte-root.compact .rte-group-label {
   display: inline-flex;
   align-items: center;
   align-self: center;
-  height: 28px;
-  line-height: 28px;
+  height: auto;
+  line-height: 16px;
   padding-top: 0;
   padding-bottom: 0;
 }
@@ -3898,7 +3961,7 @@ html.rte-toolbar-dragging .rte-root:not(.expanded) .rte-toolbar-tools > .rte-too
   overflow: hidden;
   opacity: 0.55;
 }
-html.rte-toolbar-dragging .rte-root:not(.expanded) .rte-toolbar-tools > .rte-tool-group.is-dragging > :not(.rte-group-handle):not(.rte-group-label) {
+html.rte-toolbar-dragging .rte-root:not(.expanded) .rte-toolbar-tools > .rte-tool-group.is-dragging > :not(.rte-group-head):not(.rte-group-handle):not(.rte-group-label) {
   display: none;
 }
 

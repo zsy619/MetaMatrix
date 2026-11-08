@@ -38,7 +38,7 @@ const log = (step, ok, detail) => {
 const toolbarFoldState = () =>
   page.evaluate(() => ({
     oneRow: document.querySelector('.rte-toolbar')?.classList.contains('is-one-row') === true,
-    label: (document.querySelector('.rte-toolbar-fold')?.textContent || '').trim(),
+    label: (document.querySelector('.rte-toolbar-fold .rte-tool-label')?.textContent || '').trim(),
     height: Math.round(document.querySelector('.rte-toolbar')?.getBoundingClientRect().height || 0),
   }))
 
@@ -139,7 +139,7 @@ const flow = await page.evaluate(() => {
   const barRect = bar?.getBoundingClientRect()
   return {
     foldInBar: !!bar && !!fold && bar.contains(fold),
-    foldLabel: (fold?.textContent || '').trim(),
+    foldLabel: (fold?.querySelector('.rte-tool-label')?.textContent || '').trim(),
     sameRow:
       !!foldRect &&
       !!barRect &&
