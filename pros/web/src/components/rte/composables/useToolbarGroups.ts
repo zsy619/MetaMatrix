@@ -23,6 +23,46 @@ import {
 
 type ToolLike = { key: string; kind?: string; label?: string }
 
+type GroupLineBox = {
+  left: number
+  top: number
+  width: number
+  height: number
+  seam: 'both' | 'before' | 'after' | 'none'
+}
+
+/** 流式工具栏里分组本身不占盒子，按每一行按钮的外接矩形命中。 */
+function groupLineBoxes(el: HTMLElement): GroupLineBox[] {
+  const rect = el.getBoundingClientRect()
+  if (getComputedStyle(el).display !== 'contents' && rect.width >= 8 && rect.height >= 8) {
+    return [{ left: rect.left, top: rect.top, width: rect.width, height: rect.height, seam: 'both' }]
+  }
+  const rects = [...el.children]
+    .filter((child): child is HTMLElement => child instanceof HTMLElement)
+    .map((child) => child.getBoundingClientRect())
+    .filter((item) => item.width >= 2 && item.height >= 2)
+    .sort((a, b) => a.top - b.top || a.left - b.left)
+  const lines: { left: number; right: number; top: number; bottom: number }[] = []
+  for (const item of rects) {
+    const line = lines.find((row) => Math.abs(row.top - item.top) < 10)
+    if (!line) {
+      lines.push({ left: item.left, right: item.right, top: item.top, bottom: item.bottom })
+      continue
+    }
+    line.left = Math.min(line.left, item.left)
+    line.right = Math.max(line.right, item.right)
+    line.top = Math.min(line.top, item.top)
+    line.bottom = Math.max(line.bottom, item.bottom)
+  }
+  return lines.map((line, index) => ({
+    left: line.left,
+    top: line.top,
+    width: line.right - line.left,
+    height: line.bottom - line.top,
+    seam: lines.length === 1 ? 'both' : index === 0 ? 'before' : index === lines.length - 1 ? 'after' : 'none',
+  }))
+}
+
 /** 顶栏分组顺序、拖拽排序，以及和页边距共用的 Ctrl+Z。监听在挂载时注册、卸载时移除。 */
 export function useToolbarGroups<T extends ToolLike>(deps: {
   panelId: () => string | undefined
@@ -244,20 +284,22 @@ export function useToolbarGroups<T extends ToolLike>(deps: {
     for (const el of root.querySelectorAll<HTMLElement>(selector)) {
       const id = el.dataset.groupId || ''
       if (!id) continue
-      const rect = el.getBoundingClientRect()
-      const visibleW = Math.min(rect.left + rect.width, clip.right) - Math.max(rect.left, clip.left)
-      const visibleH = Math.min(rect.top + rect.height, clip.bottom) - Math.max(rect.top, clip.top)
-      if (visibleW < 8 || visibleH < 8) continue
       const orderIndex = toolbarOrder.value.indexOf(id)
       if (orderIndex < 0) continue
-      boxes.push({
-        id,
-        orderIndex,
-        left: rect.left,
-        top: rect.top,
-        width: rect.width,
-        height: rect.height,
-      })
+      for (const rect of groupLineBoxes(el)) {
+        const visibleW = Math.min(rect.left + rect.width, clip.right) - Math.max(rect.left, clip.left)
+        const visibleH = Math.min(rect.top + rect.height, clip.bottom) - Math.max(rect.top, clip.top)
+        if (visibleW < 8 || visibleH < 8) continue
+        boxes.push({
+          id,
+          orderIndex,
+          left: rect.left,
+          top: rect.top,
+          width: rect.width,
+          height: rect.height,
+          seam: rect.seam,
+        })
+      }
     }
     return boxes
   }

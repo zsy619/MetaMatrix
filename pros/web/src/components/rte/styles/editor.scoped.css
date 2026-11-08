@@ -2220,7 +2220,7 @@
   gap: 0;
   row-gap: 4px;
   min-height: 64px;
-  padding: 10px 88px 10px 20px;
+  padding: 10px 20px;
   border-bottom: none;
   /* 知乎：底部 0.5px 发丝线，而非粗 border */
   box-shadow: inset 0 -0.5px 0 rgba(235, 235, 235);
@@ -2247,7 +2247,12 @@
   height: 52px;
   min-height: 0;
   max-height: 52px;
-  max-width: calc(100% - 220px);
+  min-width: 0;
+}
+.rte-root.expanded .rte-toolbar.is-one-row .rte-mode-bar {
+  flex: 0 0 auto;
+  align-self: center;
+  margin-left: 8px;
 }
 .rte-root.expanded .rte-toolbar.is-one-row .rte-view-mode-tool {
   flex: 0 0 auto;
@@ -2257,12 +2262,27 @@
 .rte-root.expanded .rte-toolbar.is-one-row .rte-tool-wrap {
   margin-right: 8px;
 }
+.rte-mode-bar {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 2px;
+  min-width: 0;
+}
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-mode-bar {
+  flex: 1 0 100%;
+  margin-top: 2px;
+  padding-top: 6px;
+  border-top: 1px solid #ebeced;
+}
+.rte-root.expanded .rte-mode-bar .rte-view-mode-tool {
+  margin-right: 4px;
+}
 .rte-toolbar-fold {
-  position: absolute;
-  top: 14px;
-  right: 12px;
-  z-index: 2;
+  position: static;
+  flex: 0 0 auto;
   height: 32px;
+  margin-left: 6px;
   padding: 0 10px;
   border: 1px solid #d5d8de;
   border-radius: 6px;
@@ -2280,8 +2300,39 @@
   color: #e5e6eb;
   border-color: #3a3f47;
 }
+.rte-root.is-dark-editor .rte-toolbar:not(.is-one-row) .rte-mode-bar {
+  border-top-color: #3a3f47;
+}
 
-/* 工具可换行顺延；模式按钮在流末（导入后） */
+/* 最大化展开后，分组不再各占一整行。按钮按行流过去，排满再换行。 */
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-toolbar-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  align-content: flex-start;
+  flex: 1 0 100%;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow: visible;
+  gap: 4px 2px;
+}
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group {
+  display: contents;
+}
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group > .rte-group-handle {
+  margin-left: 12px;
+}
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group:first-child > .rte-group-handle {
+  margin-left: 0;
+}
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group.is-drop-target > .rte-group-handle {
+  box-shadow: -4px 0 0 #3370ff;
+}
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group.is-dragging > * {
+  opacity: 0.45;
+}
+/* 工具可换行顺延；模式按钮在编辑 / 预览 / 源码栏 */
 .rte-root.expanded .rte-toolbar-tools {
   display: flex;
   flex-wrap: wrap;

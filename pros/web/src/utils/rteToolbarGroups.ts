@@ -331,6 +331,8 @@ export type ToolbarDropBox = {
   top: number
   width: number
   height: number
+  /** 分组折成多行时，只有首段的左缘和末段的右缘才是整组的前后。 */
+  seam?: 'both' | 'before' | 'after' | 'none'
 }
 
 export type ToolbarDropGesture = {
@@ -343,12 +345,14 @@ export type ToolbarDropGesture = {
  * 落在宽分组中间时返回 null，调用方保持当前顺序。
  */
 function horizontalEdgeIndex(target: ToolbarDropBox, point: number): number | null {
-  if (target.width <= 160) {
+  const seam = target.seam ?? 'both'
+  if (seam === 'none') return null
+  if (target.width <= 160 && seam === 'both') {
     return point < target.left + target.width / 2 ? target.orderIndex : target.orderIndex + 1
   }
   const edge = Math.min(48, Math.max(28, target.width * 0.08))
-  if (point <= target.left + edge) return target.orderIndex
-  if (point >= target.left + target.width - edge) return target.orderIndex + 1
+  if ((seam === 'both' || seam === 'before') && point <= target.left + edge) return target.orderIndex
+  if ((seam === 'both' || seam === 'after') && point >= target.left + target.width - edge) return target.orderIndex + 1
   return null
 }
 

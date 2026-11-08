@@ -2856,8 +2856,8 @@ function toggleChartGroupMenu(key: string) {
 
       </div>
 
-      <!-- 编辑 / 预览 / 源码，以及最大化时的展开收起。放在工具行外面，收成一行时也不会被裁掉。 -->
-      <template v-if="rte.expanded">
+      <!-- 编辑 / 预览 / 源码，展开收起也在这一栏。收成一行时这栏留在右侧，不会被裁掉。 -->
+      <div data-rte-own v-if="rte.expanded" class="rte-mode-bar">
         <button data-rte-own
           v-for="opt in rte.VIEW_MODE_OPTIONS"
           :key="'vm-' + opt.id"
@@ -2893,6 +2893,6 @@ function toggleChartGroupMenu(key: string) {
         >
           {{ rte.toolbarRowsOpen ? '收起' : '展开' }}
         </button>
-      </template>
+      </div>
     </div>
 </template>

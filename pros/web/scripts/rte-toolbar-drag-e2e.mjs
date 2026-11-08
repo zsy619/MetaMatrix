@@ -77,14 +77,39 @@ async function openExpanded() {
 const groupSnapshot = () =>
   page.evaluate(() =>
     [...document.querySelectorAll('.rte-toolbar-tools .rte-tool-group')].map((el) => {
-      const rect = el.getBoundingClientRect()
+      const own = el.getBoundingClientRect()
+      const kids = [...el.children]
+        .map((node) => node.getBoundingClientRect())
+        .filter((rect) => rect.width > 2 && rect.height > 2)
+      const flowing = getComputedStyle(el).display === 'contents' && kids.length > 0
+      const source = flowing ? kids : [own]
+      const lines = []
+      for (const rect of [...source].sort((a, b) => a.top - b.top || a.left - b.left)) {
+        const mid = rect.top + rect.height / 2
+        const line = lines.find((row) => Math.abs(row.mid - mid) < 16)
+        if (!line) {
+          lines.push({ left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, mid })
+        } else {
+          line.left = Math.min(line.left, rect.left)
+          line.right = Math.max(line.right, rect.right)
+          line.top = Math.min(line.top, rect.top)
+          line.bottom = Math.max(line.bottom, rect.bottom)
+          line.mid = (line.mid + mid) / 2
+        }
+      }
+      const first = lines[0] || { left: own.left, right: own.right, top: own.top, bottom: own.bottom }
+      const last = lines[lines.length - 1] || first
       return {
         id: el.dataset.groupId || '',
         label: (el.querySelector('.rte-group-label')?.textContent || '').trim(),
-        left: rect.left,
-        top: rect.top,
-        width: rect.width,
-        height: rect.height,
+        left: first.left,
+        top: first.top,
+        width: first.right - first.left,
+        height: first.bottom - first.top,
+        endLeft: last.left,
+        endTop: last.top,
+        endWidth: last.right - last.left,
+        endHeight: last.bottom - last.top,
         transform: el.style.transform || '',
         drop: el.classList.contains('is-drop-target'),
       }
@@ -92,6 +117,47 @@ const groupSnapshot = () =>
   )
 
 await openExpanded()
+const flow = await page.evaluate(() => {
+  const tools = document.querySelector('.rte-toolbar-tools')
+  const bar = document.querySelector('.rte-mode-bar')
+  const fold = document.querySelector('.rte-toolbar-fold')
+  const toolsRect = tools?.getBoundingClientRect()
+  const rows = []
+  for (const el of document.querySelectorAll('.rte-toolbar-tools .rte-tool-group > *')) {
+    const rect = el.getBoundingClientRect()
+    if (rect.width < 2 || rect.height < 2) continue
+    const mid = rect.top + rect.height / 2
+    const row = rows.find((item) => Math.abs(item.mid - mid) < 16)
+    if (!row) rows.push({ mid, right: rect.right })
+    else {
+      row.right = Math.max(row.right, rect.right)
+      row.mid = (row.mid + mid) / 2
+    }
+  }
+  const gaps = toolsRect ? rows.map((row) => Math.round(toolsRect.right - row.right)) : []
+  const foldRect = fold?.getBoundingClientRect()
+  const barRect = bar?.getBoundingClientRect()
+  return {
+    foldInBar: !!bar && !!fold && bar.contains(fold),
+    foldLabel: (fold?.textContent || '').trim(),
+    sameRow:
+      !!foldRect &&
+      !!barRect &&
+      foldRect.top < barRect.bottom &&
+      foldRect.bottom > barRect.top,
+    gaps,
+  }
+})
+log(
+  '展开收起在编辑、预览、源码这一栏',
+  flow.foldInBar && flow.sameRow && flow.foldLabel === '收起',
+  `label=${flow.foldLabel}`,
+)
+log(
+  '最大化工具栏每一行排满后再换行',
+  flow.gaps.length >= 2 && flow.gaps.slice(0, -1).every((gap) => gap <= 80),
+  `rightGap=${flow.gaps.join(',')}`,
+)
 const before = await groupSnapshot()
 log('最大化工具栏至少两行', new Set(before.map((g) => Math.round(g.top))).size >= 2, `${before.length} 组`)
 
@@ -127,7 +193,8 @@ if (!edit || !style || !paragraph || !handle) {
   const seam = Math.min(48, Math.max(28, style.width * 0.08))
   const beforeX = style.left + Math.min(20, seam - 4)
   const middleX = style.left + style.width * 0.5
-  const afterX = style.left + style.width - Math.min(16, seam / 2)
+  const afterX = style.endLeft + style.endWidth - Math.min(16, seam / 2)
+  const afterY = style.endTop + Math.min(18, style.endHeight / 2)
   await page.mouse.move(startX, startY)
   await page.mouse.down()
   await page.mouse.move(middleX, intoY, { steps: 12 })
@@ -146,13 +213,13 @@ if (!edit || !style || !paragraph || !handle) {
     onLeft.indexOf('edit') === onLeft.indexOf('style') - 1 && beforeX <= style.left + seam,
     `order=${onLeft.slice(0, 4).join('、')} pointer=${beforeX.toFixed(0)}`,
   )
-  await page.mouse.move(afterX, intoY, { steps: 16 })
+  await page.mouse.move(afterX, afterY, { steps: 16 })
   await page.waitForTimeout(120)
   const onRight = (await groupSnapshot()).map((g) => g.id)
   log(
     '靠近宽分组右缘时松手前就换到它后面',
-    onRight.indexOf('edit') === onRight.indexOf('style') + 1 && afterX >= style.left + style.width - seam,
-    `order=${onRight.slice(0, 4).join('、')} pointer=${afterX.toFixed(0)} right=${(style.left + style.width).toFixed(0)}`,
+    onRight.indexOf('edit') === onRight.indexOf('style') + 1 && afterX >= style.endLeft + style.endWidth - seam,
+    `order=${onRight.slice(0, 4).join('、')} pointer=${afterX.toFixed(0)} right=${(style.endLeft + style.endWidth).toFixed(0)}`,
   )
   await page.screenshot({ path: `${out}/02-early-slot.png` })
   await page.mouse.up()
@@ -178,7 +245,7 @@ if (!styleRow || !paragraphHandle) {
 } else {
   const fromX = paragraphHandle.x + paragraphHandle.width / 2
   const fromY = paragraphHandle.y + paragraphHandle.height / 2
-  const toX = styleRow.left + 10
+  const toX = styleRow.left + 12
   const toY = styleRow.top + Math.min(16, styleRow.height / 2)
   await page.mouse.move(fromX, fromY)
   await page.mouse.down()
