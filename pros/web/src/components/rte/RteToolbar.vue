@@ -73,15 +73,13 @@ function toggleChartGroupMenu(key: string) {
           v-if="rte.viewMode === 'edit'"
           type="button"
           class="rte-group-handle"
-          draggable="true"
+          draggable="false"
           :aria-label="'拖动' + group.label + '分组'"
           title="拖动整组。Alt+左/右也可移动"
           @pointerdown="rte.onToolbarHandlePointerDown(group.id, $event)"
           @pointermove="rte.onToolbarHandlePointerMove"
           @pointerup="rte.onToolbarHandlePointerUp"
           @pointercancel="rte.onToolbarHandlePointerUp"
-          @dragstart="rte.onToolbarGroupDragStart(group.id, $event)"
-          @dragend="rte.onToolbarGroupDragEnd"
           @keydown="rte.onToolbarGroupKeydown(group.id, $event)"
         >
           ⠿
@@ -2165,15 +2163,13 @@ function toggleChartGroupMenu(key: string) {
               v-if="rte.viewMode === 'edit'"
               type="button"
               class="rte-more-capsule"
-              draggable="true"
+              draggable="false"
               :aria-label="'拖动' + group.label + '分组'"
               title="拖动整组"
               @pointerdown="rte.onToolbarHandlePointerDown(group.id, $event)"
               @pointermove="rte.onToolbarHandlePointerMove"
               @pointerup="rte.onToolbarHandlePointerUp"
               @pointercancel="rte.onToolbarHandlePointerUp"
-              @dragstart="rte.onToolbarGroupDragStart(group.id, $event)"
-              @dragend="rte.onToolbarGroupDragEnd"
               @keydown="rte.onToolbarGroupKeydown(group.id, $event)"
             >
               ⠿ {{ group.label }}

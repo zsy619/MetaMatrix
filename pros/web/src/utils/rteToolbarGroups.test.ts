@@ -11,6 +11,7 @@ import {
   migrateToolbarGroupButtons,
   moveToolbarGroup,
   normalizeToolbarGroupOrder,
+  toolbarDropIndexFromBoxes,
   readToolbarGroupOrder,
   toolbarGroupLabels,
   writeToolbarGroupOrder,
@@ -105,6 +106,45 @@ assert.equal(moveToolbarGroup(['a', 'b', 'c'], 'b', 2), null)
 assert.deepEqual(moveToolbarGroup(['edit', 'style', 'color'], 'edit', 3), ['style', 'color', 'edit'])
 assert.deepEqual(moveToolbarGroup(['edit', 'style', 'color'], 'color', 0), ['color', 'edit', 'style'])
 assert.equal(moveToolbarGroup(['edit', 'style'], 'missing', 0), null)
+
+// —— 拖放命中：沿拖动方向提前换位，并按行而不是只看横坐标 ——
+const rowBoxes = [
+  { id: 'edit', orderIndex: 0, left: 0, top: 0, width: 180, height: 40 },
+  { id: 'style', orderIndex: 1, left: 190, top: 0, width: 420, height: 40 },
+  { id: 'paragraph', orderIndex: 2, left: 620, top: 0, width: 200, height: 40 },
+]
+// 420 × 0.4 = 168，lead 封顶 22。向右拖，进入宽分组 22px 就插到它后面，不必拖到中线 400。
+assert.equal(toolbarDropIndexFromBoxes(211, 20, rowBoxes, 'x', 3, 1), 1)
+assert.equal(toolbarDropIndexFromBoxes(212, 20, rowBoxes, 'x', 3, 1), 2)
+// 向左拖，进入后缘 22px 就插到它前面。右缘 = 610，610 - 22 = 588。
+assert.equal(toolbarDropIndexFromBoxes(589, 20, rowBoxes, 'x', 3, -1), 2)
+assert.equal(toolbarDropIndexFromBoxes(588, 20, rowBoxes, 'x', 3, -1), 1)
+// 还没沿主轴移动时，落在中线左侧仍插在该组前面。
+assert.equal(toolbarDropIndexFromBoxes(300, 20, rowBoxes, 'x', 3, 0), 1)
+
+const wrappedBoxes = [
+  { id: 'edit', orderIndex: 0, left: 20, top: 10, width: 500, height: 36 },
+  { id: 'style', orderIndex: 1, left: 530, top: 10, width: 400, height: 36 },
+  { id: 'insert', orderIndex: 2, left: 20, top: 56, width: 300, height: 36 },
+  { id: 'table', orderIndex: 3, left: 330, top: 56, width: 200, height: 36 },
+]
+// 指针在第二行左侧。若只比横坐标，会先命中第一行宽度盖过该 x 的分组。
+assert.equal(toolbarDropIndexFromBoxes(40, 70, wrappedBoxes, 'x', 4, 1), 2)
+assert.equal(toolbarDropIndexFromBoxes(80, 70, wrappedBoxes, 'x', 4, 1), 3)
+// 第一行最右侧仍落在第一行末尾（insert 的下标），而不是第二行。
+assert.equal(toolbarDropIndexFromBoxes(960, 20, wrappedBoxes, 'x', 4, 1), 2)
+
+const menuBoxes = [
+  { id: 'notes', orderIndex: 4, left: 10, top: 0, width: 160, height: 80 },
+  { id: 'review', orderIndex: 5, left: 10, top: 88, width: 160, height: 80 },
+]
+assert.equal(toolbarDropIndexFromBoxes(40, 100, menuBoxes, 'y', 6, 1), 5)
+assert.equal(toolbarDropIndexFromBoxes(40, 120, menuBoxes, 'y', 6, 1), 6)
+assert.equal(toolbarDropIndexFromBoxes(0, 0, [], 'x', 3, 1), null)
+assert.equal(
+  toolbarDropIndexFromBoxes(10, 10, [{ id: 'a', orderIndex: 0, left: 0, top: 0, width: 0, height: 10 }], 'x', 1, 1),
+  null,
+)
 
 const groups = buildToolbarGroups(
   [

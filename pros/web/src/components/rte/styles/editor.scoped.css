@@ -84,17 +84,20 @@
 .rte-tool-group[data-group-id='file'] { background: #f7f3ec; border-color: #ddcab2; }
 .rte-tool-group[data-group-id='other'] { background: #f7f7f8; border-color: #d2d5db; }
 .rte-tool-group.is-dragging {
-  opacity: 0.45;
+  opacity: 0.96;
+  z-index: 6;
+  box-shadow: 0 10px 24px rgba(16, 24, 40, 0.18);
 }
 .rte-tool-group.is-drop-target::before,
 .rte-toolbar-tools.is-drop-end::after {
   content: '';
   position: absolute;
-  top: 4px;
-  bottom: 4px;
-  width: 4px;
+  top: 3px;
+  bottom: 3px;
+  width: 5px;
   border-radius: 2px;
   background: #3370ff;
+  box-shadow: 0 0 0 1px rgba(51, 112, 255, 0.35);
   pointer-events: none;
 }
 .rte-tool-group.is-drop-target::before {
@@ -129,6 +132,8 @@
   padding: 0;
   font-size: 14px;
   box-shadow: 0 0 0 1px rgba(29, 33, 41, 0.08);
+  touch-action: none;
+  user-select: none;
 }
 .rte-group-handle:hover {
   color: #3370ff;
@@ -136,6 +141,7 @@
 .rte-group-label {
   cursor: grab;
   user-select: none;
+  touch-action: none;
 }
 .rte-group-handle:focus-visible {
   outline: 2px solid var(--mm-focus, #3370ff);
@@ -1303,7 +1309,11 @@
 .rte-more-group[data-group-id='view'] { background: #eef3f8; border-color: #c9d7e6; }
 .rte-more-group[data-group-id='file'] { background: #f7f3ec; border-color: #e4d6c2; }
 .rte-more-group[data-group-id='other'] { background: #f7f7f8; border-color: #d9dbe0; }
-.rte-more-group.is-dragging { opacity: 0.45; }
+.rte-more-group.is-dragging {
+  opacity: 0.96;
+  z-index: 6;
+  box-shadow: 0 10px 24px rgba(16, 24, 40, 0.18);
+}
 .rte-more-group.is-drop-target::before {
   content: '';
   position: absolute;
@@ -1326,6 +1336,8 @@
   font-weight: 700;
   line-height: 22px;
   padding: 0 10px;
+  touch-action: none;
+  user-select: none;
 }
 .rte-more-capsule:focus-visible {
   outline: 2px solid var(--mm-focus, #3370ff);

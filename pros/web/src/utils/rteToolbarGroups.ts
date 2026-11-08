@@ -323,6 +323,130 @@ export function currentToolbarUndoEpoch(): number {
   return toolbarUndoEpoch
 }
 
+/** 分组在视口里的盒子。orderIndex 是它在工具栏顺序里的下标。 */
+export type ToolbarDropBox = {
+  id: string
+  orderIndex: number
+  left: number
+  top: number
+  width: number
+  height: number
+}
+
+const DROP_LEAD_MIN = 8
+const DROP_LEAD_MAX = 22
+const DROP_LEAD_RATIO = 0.4
+
+/** 沿拖动方向，进入分组这么多像素就换到另一侧，不必拖过半组。 */
+function dropLead(span: number): number {
+  if (!Number.isFinite(span) || span <= 0) return DROP_LEAD_MIN
+  return Math.min(DROP_LEAD_MAX, Math.max(DROP_LEAD_MIN, span * DROP_LEAD_RATIO))
+}
+
+function orientDropBoxes(boxes: readonly ToolbarDropBox[], axis: 'x' | 'y'): ToolbarDropBox[] {
+  if (axis === 'x') return boxes.map((box) => ({ ...box }))
+  return boxes.map((box) => ({
+    id: box.id,
+    orderIndex: box.orderIndex,
+    left: box.top,
+    top: box.left,
+    width: box.height,
+    height: box.width,
+  }))
+}
+
+function clusterDropBoxes(boxes: readonly ToolbarDropBox[]): ToolbarDropBox[][] {
+  const sorted = [...boxes].sort((a, b) => a.top - b.top || a.left - b.left)
+  const rows: ToolbarDropBox[][] = []
+  for (const box of sorted) {
+    const row = rows[rows.length - 1]
+    if (!row) {
+      rows.push([box])
+      continue
+    }
+    const rowTop = Math.min(...row.map((item) => item.top))
+    const rowBottom = Math.max(...row.map((item) => item.top + item.height))
+    const overlap = Math.min(rowBottom, box.top + box.height) - Math.max(rowTop, box.top)
+    const span = Math.min(box.height, rowBottom - rowTop)
+    if (span > 0 && overlap > span * 0.45) row.push(box)
+    else rows.push([box])
+  }
+  return rows
+}
+
+function pickDropCluster(rows: readonly (readonly ToolbarDropBox[])[], cross: number): readonly ToolbarDropBox[] {
+  let best = rows[0]!
+  let bestDist = Infinity
+  for (const row of rows) {
+    const top = Math.min(...row.map((item) => item.top))
+    const bottom = Math.max(...row.map((item) => item.top + item.height))
+    if (cross >= top && cross <= bottom) return row
+    const dist = cross < top ? top - cross : cross - bottom
+    if (dist < bestDist) {
+      bestDist = dist
+      best = row
+    }
+  }
+  return best
+}
+
+function nearestDropBox(row: readonly ToolbarDropBox[], point: number): ToolbarDropBox {
+  let best = row[0]!
+  let bestDist = Infinity
+  for (const box of row) {
+    const right = box.left + box.width
+    const dist = point < box.left ? box.left - point : point > right ? point - right : 0
+    if (dist < bestDist || (dist === bestDist && box.left < best.left)) {
+      bestDist = dist
+      best = box
+    }
+  }
+  return best
+}
+
+/**
+ * 指针应插在第几个分组之前。
+ * 横向工具栏按行命中：换到下一行时不再被上一行的横坐标抢走。
+ * direction 为拖动方向（1 正向，-1 反向，0 还没沿主轴移动）。
+ * 有方向时，越过分组前/后缘 lead 像素就换位，宽分组不用拖过中线。
+ * 盒子要用分组原来的占位，不要用已经跟着指针平移之后的矩形。
+ */
+export function toolbarDropIndexFromBoxes(
+  clientX: number,
+  clientY: number,
+  boxes: readonly ToolbarDropBox[],
+  axis: 'x' | 'y',
+  orderLength: number,
+  direction: -1 | 0 | 1 = 0,
+): number | null {
+  if (!Number.isInteger(orderLength) || orderLength < 0) return null
+  const usable = boxes.filter(
+    (box) =>
+      box.width > 0 &&
+      box.height > 0 &&
+      Number.isInteger(box.orderIndex) &&
+      box.orderIndex >= 0 &&
+      box.orderIndex < orderLength,
+  )
+  if (!usable.length) return null
+  const oriented = orientDropBoxes(usable, axis)
+  const point = axis === 'x' ? clientX : clientY
+  const cross = axis === 'x' ? clientY : clientX
+  const target = nearestDropBox(pickDropCluster(clusterDropBoxes(oriented), cross), point)
+  const right = target.left + target.width
+  let index: number
+  if (direction > 0) {
+    index = point >= target.left + dropLead(target.width) ? target.orderIndex + 1 : target.orderIndex
+  } else if (direction < 0) {
+    index = point <= right - dropLead(target.width) ? target.orderIndex : target.orderIndex + 1
+  } else {
+    index = point < target.left + target.width / 2 ? target.orderIndex : target.orderIndex + 1
+  }
+  if (index < 0) return 0
+  if (index > orderLength) return orderLength
+  return index
+}
+
 /** 拖到第 toIndex 个分组之前。toIndex === length 表示放到最后。顺序没变时返回 null。 */
 export function moveToolbarGroup(order: readonly string[], fromId: string, toIndex: number): string[] | null {
   const from = order.indexOf(fromId)
