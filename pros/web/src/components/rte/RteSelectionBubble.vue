@@ -3,6 +3,7 @@ import { inject, onBeforeUnmount, ref } from 'vue'
 import { BubbleMenu } from '@tiptap/vue-3/menus'
 import { RTE_BINDINGS } from './bindings'
 import { useParentScopeStamp } from './inheritScope'
+import { BLOCK_MENU } from './rteBlockMenu'
 
 /**
  * 选区浮动工具条（气泡）。
@@ -33,7 +34,7 @@ function resolvePanelUp(): boolean {
   const el = barEl.value
   if (!el || typeof window === 'undefined') return false
   const rect = el.getBoundingClientRect()
-  return window.innerHeight - rect.bottom < 260
+  return window.innerHeight - rect.bottom < 460
 }
 
 function togglePanel(kind: PanelKind) {
@@ -69,6 +70,7 @@ function hoverAnyOpen(): boolean {
 }
 
 function showHover(kind: HoverKind) {
+  if (kind !== 'block') blockSubId.value = null
   panelUp.value = resolvePanelUp()
   if (kind === 'text' || kind === 'highlight') {
     panel.value = null
@@ -113,29 +115,27 @@ function hoverLeave() {
 
 onBeforeUnmount(clearHoverTimer)
 
-const BLOCK_STYLES = [
-  { level: 0, label: '正文' },
-  { level: 1, label: '标题 1' },
-  { level: 2, label: '标题 2' },
-  { level: 3, label: '标题 3' },
-  { level: 4, label: '标题 4' },
-] as const
+/** 选区条正文菜单当前展开的下级。 */
+const blockSubId = ref<string | null>(null)
+const blockSubFlip = ref(false)
 
-/** 飞书选区条左侧的段落样式：正文或标题。 */
 function currentBlockLabel(): string {
-  for (const level of [1, 2, 3, 4] as const) {
-    if (rte.isActive?.('heading', { level })) return '标题 ' + level
-  }
-  return '正文'
+  return rte.currentParaStyleLabel || '正文'
 }
 
-function blockActive(level: 0 | 1 | 2 | 3 | 4): boolean {
-  if (level === 0) return !rte.isActive?.('heading')
-  return !!rte.isActive?.('heading', { level })
+function openBlockSub(id: string, event: MouseEvent) {
+  const item = BLOCK_MENU.find((row) => row.id === id)
+  blockSubId.value = item?.children ? id : null
+  const row = event.currentTarget
+  if (row instanceof HTMLElement) {
+    const rect = row.getBoundingClientRect()
+    blockSubFlip.value = rect.right + 188 > window.innerWidth
+  }
 }
 
 function closePanel() {
   panel.value = null
+  blockSubId.value = null
 }
 
 /** 颜色面板和段落菜单同时只开一个。 */
@@ -215,19 +215,53 @@ function run(action: () => void) {
           data-rte-own
           @mouseenter="hoverEnter('block')"
         >
-          <button
-            v-for="item in BLOCK_STYLES"
-            :key="'bb-' + item.level"
-            data-rte-own
-            type="button"
-            role="option"
-            class="rte-bubble-panel-item"
-            :class="{ active: blockActive(item.level) }"
-            :aria-selected="blockActive(item.level)"
-            @click.stop="run(() => rte.setHeading(item.level))"
-          >
-            {{ item.label }}
-          </button>
+          <template v-for="item in BLOCK_MENU" :key="'bb-' + item.id">
+            <div v-if="item.splitBefore" data-rte-own class="rte-bubble-panel-sep" aria-hidden="true"></div>
+            <div
+              data-rte-own
+              class="rte-bubble-panel-row"
+              :class="{ 'is-sub-left': blockSubFlip }"
+              @mouseenter="openBlockSub(item.id, $event)"
+            >
+              <button
+                data-rte-own
+                type="button"
+                role="option"
+                class="rte-bubble-panel-item"
+                :class="{ active: rte.isBlockMenuActive(item.id) }"
+                :aria-selected="rte.isBlockMenuActive(item.id)"
+                :aria-haspopup="item.children ? 'menu' : undefined"
+                :aria-expanded="item.children ? blockSubId === item.id : undefined"
+                @click.stop="item.children && item.action.type === 'submenu' ? (blockSubId = item.id) : run(() => rte.applyBlockMenu(item.id))"
+              >
+                <span data-rte-own class="rte-bubble-mark">{{ item.mark }}</span>
+                <span data-rte-own>{{ item.label }}</span>
+                <span v-if="item.children" data-rte-own class="rte-bubble-sub-caret" aria-hidden="true">›</span>
+              </button>
+              <div
+                v-if="item.children && blockSubId === item.id"
+                data-rte-own
+                class="rte-bubble-sub"
+                role="listbox"
+                :aria-label="item.label"
+              >
+                <button
+                  v-for="child in item.children"
+                  :key="'bb-' + child.id"
+                  data-rte-own
+                  type="button"
+                  role="option"
+                  class="rte-bubble-panel-item"
+                  :class="{ active: rte.isBlockMenuActive(child.id) }"
+                  :aria-selected="rte.isBlockMenuActive(child.id)"
+                  @click.stop="run(() => rte.applyBlockMenu(child.id))"
+                >
+                  <span data-rte-own class="rte-bubble-mark">{{ child.mark }}</span>
+                  <span data-rte-own>{{ child.label }}</span>
+                </button>
+              </div>
+            </div>
+          </template>
         </div>
       </span>
 

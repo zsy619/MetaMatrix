@@ -238,7 +238,9 @@ function placeFloatMenuEl(menuEl: HTMLElement, key: string) {
   setFloatStyle(menuEl, 'max-height', `${Math.round(maxH)}px`)
   setFloatStyle(menuEl, 'visibility', 'visible')
   menuEl.style.setProperty('--rte-float-max-h', `${Math.round(maxH)}px`)
-  if (menuEl.classList.contains('rte-template-menu')) {
+  if (menuEl.classList.contains('rte-para-menu')) {
+    setFloatStyle(menuEl, 'overflow', 'visible')
+  } else if (menuEl.classList.contains('rte-template-menu')) {
     setFloatStyle(menuEl, 'overflow', 'hidden')
   } else {
     setFloatStyle(menuEl, 'overflow-x', 'hidden')

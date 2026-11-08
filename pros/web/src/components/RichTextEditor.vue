@@ -61,6 +61,14 @@ import {
   togglePreviewMode,
 } from '../utils/rteRound7'
 import { type CalloutVariant } from '../extensions/callout'
+import {
+  BLOCK_MENU,
+  blockMenuButtonLabel,
+  findBlockMenuItem,
+  isBlockMenuItemActive,
+  visibleBlockMenuItems,
+  type BlockMenuState,
+} from './rte/rteBlockMenu'
 import { orderedListContinuation } from '../utils/rteListContinue'
 import { planListRenumber } from '../utils/rteListRenumber'
 import {
@@ -2977,126 +2985,64 @@ function applyMarginBottom(v: string) {
   chain()?.setParagraphSpacing({ marginBottom: v || null }).run()
 }
 type HeadingLevel = 1 | 2 | 3 | 4 | 5 | 6
-type ParaStyleId = 'paragraph' | 'blockquote' | `h${HeadingLevel}`
-
-type ParaStyleItem = {
-  id: ParaStyleId
-  label: string
-  /** 预览样本文字 */
-  sample: string
-  /** 预览字号（菜单内） */
-  fontSize: string
-  fontWeight: number
-  /** 层级缩进（px） */
-  indent: number
-  group: 'text' | 'heading' | 'block'
-  shortcut?: string
-}
-
-/** 段落样式菜单：正文 + H1–H6 + 引用（Word/飞书式预览） */
-const PARA_STYLE_ITEMS: ParaStyleItem[] = [
-  {
-    id: 'paragraph',
-    label: '正文',
-    sample: '正文',
-    fontSize: '14px',
-    fontWeight: 400,
-    indent: 0,
-    group: 'text',
-    shortcut: '',
-  },
-  {
-    id: 'h1',
-    label: '标题 1',
-    sample: '标题 1',
-    fontSize: '26px',
-    fontWeight: 700,
-    indent: 0,
-    group: 'heading',
-    shortcut: 'Ctrl+Alt+1',
-  },
-  {
-    id: 'h2',
-    label: '标题 2',
-    sample: '标题 2',
-    fontSize: '22px',
-    fontWeight: 700,
-    indent: 8,
-    group: 'heading',
-    shortcut: 'Ctrl+Alt+2',
-  },
-  {
-    id: 'h3',
-    label: '标题 3',
-    sample: '标题 3',
-    fontSize: '18px',
-    fontWeight: 600,
-    indent: 16,
-    group: 'heading',
-    shortcut: 'Ctrl+Alt+3',
-  },
-  {
-    id: 'h4',
-    label: '标题 4',
-    sample: '标题 4',
-    fontSize: '16px',
-    fontWeight: 600,
-    indent: 24,
-    group: 'heading',
-    shortcut: 'Ctrl+Alt+4',
-  },
-  {
-    id: 'h5',
-    label: '标题 5',
-    sample: '标题 5',
-    fontSize: '14px',
-    fontWeight: 600,
-    indent: 32,
-    group: 'heading',
-    shortcut: 'Ctrl+Alt+5',
-  },
-  {
-    id: 'h6',
-    label: '标题 6',
-    sample: '标题 6',
-    fontSize: '13px',
-    fontWeight: 600,
-    indent: 40,
-    group: 'heading',
-    shortcut: 'Ctrl+Alt+6',
-  },
-  {
-    id: 'blockquote',
-    label: '引用',
-    sample: '引用段落',
-    fontSize: '14px',
-    fontWeight: 400,
-    indent: 0,
-    group: 'block',
-    shortcut: '',
-  },
-]
 
 const headingFocusIndex = ref(0)
+/** 正文菜单里当前展开的下级（其他标题 / 引用 / 高亮块）。 */
+const blockSubmenuId = ref<string | null>(null)
+/** 下级菜单贴着屏幕右缘时改到左侧展开。 */
+const blockSubmenuFlip = ref(false)
 
-function currentParaStyleId(): ParaStyleId {
+function readBlockMenuState(): BlockMenuState {
   const ed = editor.value
-  if (!ed) return 'paragraph'
-  if (ed.isActive('blockquote')) return 'blockquote'
-  for (let lv = 1; lv <= 6; lv++) {
-    if (ed.isActive('heading', { level: lv })) return `h${lv as HeadingLevel}`
+  if (!ed) {
+    return {
+      headingLevel: 0,
+      bullet: false,
+      ordered: false,
+      task: false,
+      code: false,
+      quote: null,
+      callout: null,
+      sync: false,
+    }
   }
-  return 'paragraph'
+  let headingLevel: BlockMenuState['headingLevel'] = 0
+  for (let lv = 1; lv <= 6; lv++) {
+    if (ed.isActive('heading', { level: lv })) {
+      headingLevel = lv as HeadingLevel
+      break
+    }
+  }
+  const quote = ed.isActive('blockquote') ? currentQuoteStyle() : null
+  let callout: CalloutVariant | null = null
+  if (ed.isActive('callout')) {
+    const variant = ed.getAttributes('callout').variant
+    callout = variant === 'warn' || variant === 'success' || variant === 'error' || variant === 'info' ? variant : 'info'
+  }
+  return {
+    headingLevel,
+    bullet: ed.isActive('bulletList'),
+    ordered: ed.isActive('orderedList'),
+    task: ed.isActive('taskList'),
+    code: ed.isActive('codeBlock'),
+    quote,
+    callout,
+    sync: ed.isActive('syncBlock'),
+  }
 }
 
 const currentParaStyleLabel = computed(() => {
   void editor.value?.state
-  const id = currentParaStyleId()
-  return PARA_STYLE_ITEMS.find((x) => x.id === id)?.label || '正文'
+  return blockMenuButtonLabel(readBlockMenuState())
 })
 
-function isParaStyleActive(id: ParaStyleId): boolean {
-  return currentParaStyleId() === id
+function isBlockMenuActive(id: string): boolean {
+  void editor.value?.state
+  return isBlockMenuItemActive(id, readBlockMenuState())
+}
+
+function visibleHeadingRows() {
+  return visibleBlockMenuItems(blockSubmenuId.value)
 }
 
 function setHeading(level: HeadingLevel | 0) {
@@ -3115,24 +3061,83 @@ function setHeading(level: HeadingLevel | 0) {
   c.setHeading({ level }).run()
 }
 
-function applyParaStyle(id: ParaStyleId) {
+/** 把当前块从列表、引用、代码块、高亮块里升出来，再设成标题或正文。 */
+function chainAsPlainBlock() {
   const ed = editor.value
-  if (!ed) return
-  if (id === 'paragraph') {
-    setHeading(0)
-  } else if (id === 'blockquote') {
-    if (ed.isActive('blockquote')) {
-      headingOpen.value = false
-      return
-    }
-    let c = ed.chain().focus()
-    if (ed.isActive('heading')) c = c.setParagraph()
-    c.setBlockquote().run()
-  } else {
-    const lv = Number(id.slice(1)) as HeadingLevel
-    setHeading(lv)
-  }
+  if (!ed) return null
+  let c = ed.chain().focus()
+  if (ed.isActive('codeBlock')) c = c.toggleCodeBlock()
+  if (ed.isActive('taskList')) c = c.toggleTaskList()
+  if (ed.isActive('orderedList')) c = c.toggleOrderedList()
+  if (ed.isActive('bulletList')) c = c.toggleBulletList()
+  if (ed.isActive('blockquote')) c = c.lift('blockquote')
+  if (ed.isActive('callout')) c = c.unsetCallout()
+  return c
+}
+
+function closeBlockMenus() {
   headingOpen.value = false
+  blockSubmenuId.value = null
+}
+
+function applyBlockMenu(id: string) {
+  const ed = editor.value
+  const item = findBlockMenuItem(id)
+  if (!ed || !item) return
+  const action = item.action
+  if (action.type === 'submenu') {
+    blockSubmenuId.value = item.id
+    return
+  }
+  if (action.type === 'sync') {
+    closeBlockMenus()
+    openCrossDoc()
+    return
+  }
+  if (action.type === 'paragraph') {
+    chainAsPlainBlock()?.setParagraph().run()
+  } else if (action.type === 'heading') {
+    chainAsPlainBlock()?.setHeading({ level: action.level }).run()
+  } else if (action.type === 'bullet' || action.type === 'ordered' || action.type === 'task' || action.type === 'code') {
+    const already =
+      (action.type === 'bullet' && ed.isActive('bulletList')) ||
+      (action.type === 'ordered' && ed.isActive('orderedList')) ||
+      (action.type === 'task' && ed.isActive('taskList')) ||
+      (action.type === 'code' && ed.isActive('codeBlock'))
+    if (!already) {
+      let c = chainAsPlainBlock()
+      if (action.type === 'bullet') c = c?.toggleBulletList() ?? null
+      else if (action.type === 'ordered') c = c?.toggleOrderedList() ?? null
+      else if (action.type === 'task') c = c?.toggleTaskList() ?? null
+      else c = c?.toggleCodeBlock() ?? null
+      c?.run()
+    }
+  } else if (action.type === 'quote') {
+    chainAsPlainBlock()
+      ?.setParagraph()
+      .setBlockquote()
+      .updateAttributes('blockquote', { quoteStyle: action.style })
+      .run()
+  } else if (action.type === 'callout') {
+    if (!ed.isActive('callout', { variant: action.variant })) {
+      ed.chain().focus().toggleCallout(action.variant).run()
+    }
+  }
+  closeBlockMenus()
+}
+
+function onBlockMenuEnter(id: string) {
+  const item = findBlockMenuItem(id)
+  if (!item) return
+  const parent = BLOCK_MENU.find((row) => row.id === id || row.children?.some((child) => child.id === id))
+  blockSubmenuId.value = parent?.children ? parent.id : null
+  const root = floatMenuEls.get('heading')
+  if (root) {
+    const rect = root.getBoundingClientRect()
+    blockSubmenuFlip.value = rect.right + 188 > window.innerWidth
+  }
+  const idx = visibleHeadingRows().findIndex((row) => row.id === id)
+  if (idx >= 0) headingFocusIndex.value = idx
 }
 
 function openHeadingMenu() {
@@ -3146,12 +3151,31 @@ function openHeadingMenu() {
   alignOpen.value = false
   const next = !headingOpen.value
   headingOpen.value = next
-  if (next) {
-    const cur = currentParaStyleId()
-    const idx = PARA_STYLE_ITEMS.findIndex((x) => x.id === cur)
-    headingFocusIndex.value = idx >= 0 ? idx : 0
-    nextTick(() => focusHeadingMenuItem(headingFocusIndex.value))
+  if (!next) {
+    blockSubmenuId.value = null
+    return
   }
+  const selected = findBlockMenuItem(blockMenuSelectionId())
+  const parent = BLOCK_MENU.find((row) => row.children?.some((child) => child.id === selected?.id))
+  blockSubmenuId.value = parent?.id || null
+  const idx = visibleHeadingRows().findIndex((row) => row.id === selected?.id)
+  headingFocusIndex.value = idx >= 0 ? idx : 0
+  nextTick(() => focusHeadingMenuItem(headingFocusIndex.value))
+}
+
+function blockMenuSelectionId(): string {
+  const state = readBlockMenuState()
+  if (state.sync) return 'sync'
+  if (state.callout) return `callout-${state.callout}`
+  if (state.code) return 'code'
+  if (state.task) return 'task'
+  if (state.ordered) return 'ordered'
+  if (state.bullet) return 'bullet'
+  if (state.quote === 'emphasis') return 'quote-emphasis'
+  if (state.quote === 'verse') return 'quote-verse'
+  if (state.quote) return 'quote-default'
+  if (state.headingLevel >= 1) return `h${state.headingLevel}`
+  return 'paragraph'
 }
 
 function focusHeadingMenuItem(index: number) {
@@ -3163,9 +3187,18 @@ function focusHeadingMenuItem(index: number) {
 }
 
 function onHeadingMenuKeydown(event: KeyboardEvent) {
-  const len = PARA_STYLE_ITEMS.length
+  const rows = visibleHeadingRows()
+  const len = rows.length
+  if (!len) return
   if (event.key === 'Escape') {
     event.preventDefault()
+    if (blockSubmenuId.value) {
+      const parentIdx = rows.findIndex((row) => row.id === blockSubmenuId.value)
+      blockSubmenuId.value = null
+      headingFocusIndex.value = parentIdx >= 0 ? parentIdx : 0
+      nextTick(() => focusHeadingMenuItem(headingFocusIndex.value))
+      return
+    }
     headingOpen.value = false
     return
   }
@@ -3179,6 +3212,28 @@ function onHeadingMenuKeydown(event: KeyboardEvent) {
     event.preventDefault()
     headingFocusIndex.value = (headingFocusIndex.value - 1 + len) % len
     focusHeadingMenuItem(headingFocusIndex.value)
+    return
+  }
+  if (event.key === 'ArrowRight') {
+    const item = rows[headingFocusIndex.value]
+    if (item?.children?.length) {
+      event.preventDefault()
+      blockSubmenuId.value = item.id
+      nextTick(() => {
+        const next = visibleHeadingRows().findIndex((row) => row.id === item.children![0]!.id)
+        headingFocusIndex.value = next >= 0 ? next : headingFocusIndex.value
+        focusHeadingMenuItem(headingFocusIndex.value)
+      })
+    }
+    return
+  }
+  if (event.key === 'ArrowLeft' && blockSubmenuId.value) {
+    event.preventDefault()
+    const parentId = blockSubmenuId.value
+    blockSubmenuId.value = null
+    const next = visibleBlockMenuItems(null).findIndex((row) => row.id === parentId)
+    headingFocusIndex.value = next >= 0 ? next : 0
+    nextTick(() => focusHeadingMenuItem(headingFocusIndex.value))
     return
   }
   if (event.key === 'Home') {
@@ -3195,8 +3250,8 @@ function onHeadingMenuKeydown(event: KeyboardEvent) {
   }
   if (event.key === 'Enter' || event.key === ' ') {
     event.preventDefault()
-    const item = PARA_STYLE_ITEMS[headingFocusIndex.value]
-    if (item) applyParaStyle(item.id)
+    const item = rows[headingFocusIndex.value]
+    if (item) applyBlockMenu(item.id)
   }
 }
 function toggleBold() {
@@ -6719,7 +6774,7 @@ provideRteBindings({
   NOTE_TYPES,
   ORDERED_LIST_STYLE_OPTIONS,
   PAGE_MARGIN_PRESETS,
-  PARA_STYLE_ITEMS,
+  BLOCK_MENU,
   PARA_STYLE_OPTIONS,
   QUOTE_STYLE_OPTIONS,
   RTE_DOC_TEMPLATES,
@@ -6755,7 +6810,7 @@ provideRteBindings({
   applyListStyle,
   applyMarginBottom,
   applyMarginTop,
-  applyParaStyle,
+  applyBlockMenu,
   applyParaStyleId,
   applyQuoteStyle,
   applySelectedFormPatch,
@@ -7016,7 +7071,10 @@ provideRteBindings({
   isKaomojiTab,
   isLargeEmojiTab,
   isLightHighlight,
-  isParaStyleActive,
+  isBlockMenuActive,
+  onBlockMenuEnter,
+  blockSubmenuId,
+  blockSubmenuFlip,
   jumpNote,
   jumpToBookmark,
   jumpToOutlineHeading,

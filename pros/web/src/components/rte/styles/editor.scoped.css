@@ -1596,12 +1596,9 @@
 
 /* —— 段落样式菜单（Word/飞书式预览） —— */
 .rte-para-menu {
-  min-width: 240px;
+  min-width: 220px;
   max-width: min(320px, calc(100vw - 16px));
-  max-height: var(--rte-float-max-h, min(70vh, 560px));
-  overflow-x: hidden;
-  overflow-y: auto;
-  overscroll-behavior: contain;
+  overflow: visible;
   padding: 6px;
   gap: 1px;
 }
@@ -1611,11 +1608,41 @@
 .rte-para-menu .rte-menu-section-label:first-child {
   margin-top: 0;
 }
+.rte-para-row {
+  position: relative;
+}
+.rte-para-mark {
+  width: 28px;
+  flex: 0 0 28px;
+  color: #86909c;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+.rte-para-menu button.active .rte-para-mark {
+  color: #165dff;
+}
+.rte-para-submenu {
+  position: absolute;
+  left: calc(100% - 6px);
+  top: 0;
+  z-index: 4;
+  min-width: 168px;
+  padding: 4px;
+  background: #fff;
+  border: 1px solid #e5e6eb;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(16, 24, 40, 0.16);
+}
+.rte-para-row.is-sub-left .rte-para-submenu {
+  left: auto;
+  right: calc(100% - 6px);
+}
 .rte-para-menu button {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  justify-content: flex-start;
+  gap: 8px;
   width: 100%;
   min-height: 36px;
   padding: 6px 10px;

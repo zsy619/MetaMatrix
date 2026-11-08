@@ -106,7 +106,7 @@ function toggleChartGroupMenu(key: string) {
             class="rte-tool is-labeled"
             :ref="(el) => rte.setFloatAnchor('heading', el)"
             data-rte-anchor="heading"
-            :class="{ active: rte.headingOpen || rte.isActive('heading') || rte.isActive('blockquote') }"
+            :class="{ active: rte.headingOpen || rte.currentParaStyleLabel !== '正文' }"
             :title="'段落样式：' + rte.currentParaStyleLabel"
             aria-label="段落样式"
             :aria-expanded="rte.headingOpen"
@@ -132,59 +132,53 @@ function toggleChartGroupMenu(key: string) {
               @mouseenter="rte.onToolMenuEnter('heading')"
               @mouseleave="rte.onToolMenuLeave($event, 'heading', () => (rte.headingOpen = false))"
             >
-              <template v-for="(it, idx) in rte.PARA_STYLE_ITEMS" :key="it.id">
+              <template v-for="it in rte.BLOCK_MENU" :key="it.id">
+                <div data-rte-own v-if="it.splitBefore" class="rte-menu-sep" aria-hidden="true"></div>
                 <div data-rte-own
-                  v-if="idx === 0 || it.group !== rte.PARA_STYLE_ITEMS[(idx as number) - 1]!.group"
-                  class="rte-menu-section-label"
+                  class="rte-para-row"
+                  :class="{ 'is-sub-left': rte.blockSubmenuFlip }"
+                  @mouseenter="rte.onBlockMenuEnter(it.id)"
                 >
-                  {{
-                    it.group === 'text'
-                      ? '文本'
-                      : it.group === 'heading'
-                        ? '标题'
-                        : '块'
-                  }}
-                </div>
-                <button data-rte-own
-                  type="button"
-                  role="menuitemradio"
-                  :data-para-style="it.id"
-                  :aria-checked="rte.isParaStyleActive(it.id)"
-                  :class="{
-                    active: rte.isParaStyleActive(it.id),
-                    'is-focused': rte.headingFocusIndex === idx,
-                    'is-quote': it.id === 'blockquote',
-                  }"
-                  :tabindex="rte.headingFocusIndex === idx ? 0 : -1"
-                  @mouseenter="rte.headingFocusIndex = idx"
-                  @click="rte.applyParaStyle(it.id)"
-                >
-                  <span data-rte-own
-                    class="rte-para-preview"
-                    :class="'rte-para-preview--' + it.id"
-                    :style="{
-                      fontSize: it.fontSize,
-                      fontWeight: it.fontWeight,
-                      paddingLeft: it.indent + 'px',
+                  <button data-rte-own
+                    type="button"
+                    role="menuitemradio"
+                    :data-para-style="it.id"
+                    :aria-checked="rte.isBlockMenuActive(it.id)"
+                    :aria-haspopup="it.children ? 'menu' : undefined"
+                    :aria-expanded="it.children ? rte.blockSubmenuId === it.id : undefined"
+                    :class="{
+                      active: rte.isBlockMenuActive(it.id),
+                      'has-sub': !!it.children,
                     }"
-                  >{{ it.sample }}</span>
-                  <span data-rte-own v-if="it.shortcut" class="rte-para-shortcut">{{ it.shortcut }}</span>
-                </button>
+                    @click="rte.applyBlockMenu(it.id)"
+                  >
+                    <span data-rte-own class="rte-para-mark">{{ it.mark }}</span>
+                    <span data-rte-own class="rte-para-preview">{{ it.label }}</span>
+                    <span data-rte-own v-if="it.children" class="rte-more-caret" aria-hidden="true">›</span>
+                  </button>
+                  <div data-rte-own
+                    v-if="it.children && rte.blockSubmenuId === it.id"
+                    class="rte-para-submenu"
+                    role="menu"
+                    @mousedown.prevent
+                  >
+                    <button data-rte-own
+                      v-for="child in it.children"
+                      :key="child.id"
+                      type="button"
+                      role="menuitemradio"
+                      :data-para-style="child.id"
+                      :aria-checked="rte.isBlockMenuActive(child.id)"
+                      :class="{ active: rte.isBlockMenuActive(child.id) }"
+                      @mouseenter="rte.onBlockMenuEnter(child.id)"
+                      @click="rte.applyBlockMenu(child.id)"
+                    >
+                      <span data-rte-own class="rte-para-mark">{{ child.mark }}</span>
+                      <span data-rte-own class="rte-para-preview">{{ child.label }}</span>
+                    </button>
+                  </div>
+                </div>
               </template>
-              <div data-rte-own class="rte-menu-section-label">引用样式</div>
-              <button data-rte-own
-                v-for="qs in rte.QUOTE_STYLE_OPTIONS"
-                :key="'qs-' + qs.value"
-                type="button"
-                role="menuitemradio"
-                :aria-checked="rte.isActive('blockquote') && rte.currentQuoteStyle() === qs.value"
-                :class="{ active: rte.isActive('blockquote') && rte.currentQuoteStyle() === qs.value }"
-                :title="qs.hint"
-                @click="rte.applyQuoteStyle(qs.value)"
-              >
-                <span data-rte-own class="rte-para-preview" :class="'rte-quote-preview--' + qs.value">{{ qs.label }}</span>
-                <span data-rte-own class="rte-para-shortcut">{{ qs.hint }}</span>
-              </button>
             </div>
           </Teleport>
         </div>

@@ -154,6 +154,61 @@ html.rte-toolbar-dragging * {
   border-width: 0 2px 2px 0;
   transform: translateY(-65%) rotate(45deg);
 }
+.rte-selection-bubble .rte-bubble-panel-block {
+  min-width: 220px;
+  max-height: none;
+  overflow: visible;
+  padding: 6px;
+}
+.rte-selection-bubble .rte-bubble-panel-row {
+  position: relative;
+}
+.rte-selection-bubble .rte-bubble-panel-block .rte-bubble-panel-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 32px;
+}
+.rte-selection-bubble .rte-bubble-mark {
+  width: 24px;
+  flex: 0 0 24px;
+  color: #86909c;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+.rte-selection-bubble .rte-bubble-panel-item.active .rte-bubble-mark {
+  color: #1456f0;
+}
+.rte-selection-bubble .rte-bubble-sub-caret {
+  margin-left: auto;
+  color: #86909c;
+  font-size: 14px;
+}
+.rte-selection-bubble .rte-bubble-panel-item.active .rte-bubble-sub-caret {
+  margin-right: 14px;
+}
+.rte-selection-bubble .rte-bubble-panel-sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: #e5e6eb;
+}
+.rte-selection-bubble .rte-bubble-sub {
+  position: absolute;
+  left: calc(100% - 4px);
+  top: -4px;
+  z-index: 3;
+  min-width: 168px;
+  padding: 4px;
+  background: #fff;
+  border: 1px solid #d5d8de;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(16, 24, 40, 0.16);
+}
+.rte-selection-bubble .rte-bubble-panel-row.is-sub-left .rte-bubble-sub {
+  left: auto;
+  right: calc(100% - 4px);
+}
 .rte-selection-bubble .rte-bubble-btn {
   transition: background 120ms ease, color 120ms ease, transform 90ms ease;
 }
