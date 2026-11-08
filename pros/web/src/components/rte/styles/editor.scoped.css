@@ -2262,39 +2262,20 @@
   z-index: 40;
 }
 
-/* 最大化默认只露第一行，避免整组工具栏把正文顶下去。
-   放不下的分组整组换到下一行再被裁掉，不从按钮中间切开。 */
+/* 收起的是整块工具面板，分组保持原样，不再被裁成一行。 */
 .rte-root.expanded .rte-toolbar.is-one-row {
   flex-wrap: nowrap;
   align-items: center;
-  max-height: 58px;
-  overflow: hidden;
+  max-height: none;
+  overflow: visible;
 }
 .rte-root.expanded .rte-toolbar.is-one-row .rte-toolbar-tools {
-  flex: 1 1 auto;
-  flex-wrap: nowrap;
-  align-items: center;
-  align-content: center;
-  overflow: hidden;
-  height: 40px;
-  min-height: 0;
-  max-height: 40px;
-  min-width: 0;
-}
-.rte-root.expanded .rte-toolbar.is-one-row .rte-tool-group {
-  box-sizing: border-box;
-  flex-wrap: nowrap;
-  align-items: center;
-  height: 40px;
-  max-height: 40px;
-  padding-top: 0;
-  padding-bottom: 0;
-  overflow: hidden;
+  display: none;
 }
 .rte-root.expanded .rte-toolbar.is-one-row .rte-mode-bar {
   flex: 0 0 auto;
   align-self: center;
-  margin-left: 8px;
+  margin-left: 0;
 }
 .rte-root.expanded .rte-toolbar.is-one-row .rte-view-mode-tool {
   flex: 0 0 auto;

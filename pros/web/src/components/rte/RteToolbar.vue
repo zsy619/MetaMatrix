@@ -698,7 +698,7 @@ function toggleChartGroupMenu(key: string) {
             >
               <button data-rte-own
                 v-for="opt in rte.FONT_SIZE_OPTIONS"
-                :key="'fs-' + (opt.value || 'default')"
+                :key="'fs-' + opt.label"
                 type="button"
                 :class="{ active: (opt.value || '') === (rte.currentFontSize() || '') }"
                 @click="rte.applyFontSize(opt.value)"
@@ -2233,7 +2233,7 @@ function toggleChartGroupMenu(key: string) {
             >
               <button data-rte-own
                 v-for="opt in rte.FONT_SIZE_OPTIONS"
-                :key="'mfs-' + (opt.value || 'default')"
+                :key="'mfs-' + opt.label"
                 type="button"
                 :class="{ active: (opt.value || '') === (rte.currentFontSize() || '') }"
                 @click="rte.applyFontSize(opt.value)"
@@ -2890,7 +2890,7 @@ function toggleChartGroupMenu(key: string) {
           type="button"
           class="rte-tool rte-view-mode-tool rte-toolbar-fold"
           :aria-expanded="rte.toolbarRowsOpen"
-          :title="rte.toolbarRowsOpen ? '只保留第一行工具栏' : '展开其余工具栏'"
+          :title="rte.toolbarRowsOpen ? '收起工具栏面板' : '展开工具栏面板'"
           @click="rte.toggleToolbarRows()"
         >
           <span data-rte-own class="rte-tool-icon rte-view-mode-glyph" aria-hidden="true">{{

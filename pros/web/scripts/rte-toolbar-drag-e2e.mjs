@@ -56,10 +56,17 @@ async function openExpanded() {
   })
   const collapsed = await toolbarFoldState()
   if (!foldChecked) {
+    const toolsHidden = await page.evaluate(
+      () => getComputedStyle(document.querySelector('.rte-toolbar-tools')).display === 'none',
+    )
     log(
-      '最大化默认收成一行',
-      collapsed.oneRow && collapsed.label === '展开' && collapsed.height > 0 && collapsed.height < 90,
-      `h=${collapsed.height} label=${collapsed.label}`,
+      '最大化默认收起工具面板',
+      collapsed.oneRow &&
+        collapsed.label === '展开' &&
+        toolsHidden &&
+        collapsed.height > 0 &&
+        collapsed.height < 90,
+      `h=${collapsed.height} label=${collapsed.label} toolsHidden=${toolsHidden}`,
     )
     await page.screenshot({ path: `${out}/00-folded.png` })
     foldChecked = true

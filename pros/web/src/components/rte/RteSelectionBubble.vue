@@ -159,7 +159,7 @@ function run(action: () => void) {
         >
           <button
             v-for="opt in rte.FONT_SIZE_OPTIONS"
-            :key="'bfs-' + (opt.value || 'default')"
+            :key="'bfs-' + opt.label"
             data-rte-own
             type="button"
             role="option"
@@ -196,6 +196,7 @@ function run(action: () => void) {
         title="斜体 (Ctrl/⌘+I)"
         aria-label="斜体"
         :aria-pressed="rte.isActive('italic')"
+        @mousedown.prevent
         @click="rte.toggleItalic"
       >
         <component data-rte-own :is="rte.toolIcon('italic')" class="rte-ep-icon" />

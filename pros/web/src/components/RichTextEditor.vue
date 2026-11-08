@@ -3283,20 +3283,49 @@ function toggleTaskList() {
   chain()?.toggleTaskList().run()
 }
 
-/** 字号 / 字体 / 行距（依赖 TextStyle + FontSize/FontFamily/LineHeight） */
+/**
+ * 字号对齐 Word：先中文字号，再磅值。
+ * 五号=10.5 磅、小四=12 磅，和 Word 字号表一致。
+ */
 const FONT_SIZE_OPTIONS: Array<{ label: string; value: string }> = [
   { label: '默认', value: '' },
-  { label: '12px', value: '12px' },
-  { label: '13px', value: '13px' },
-  { label: '14px', value: '14px' },
-  { label: '15px', value: '15px' },
-  { label: '16px', value: '16px' },
-  { label: '18px', value: '18px' },
-  { label: '20px', value: '20px' },
-  { label: '24px', value: '24px' },
-  { label: '28px', value: '28px' },
-  { label: '32px', value: '32px' },
-  { label: '36px', value: '36px' },
+  { label: '初号', value: '42pt' },
+  { label: '小初', value: '36pt' },
+  { label: '一号', value: '26pt' },
+  { label: '小一', value: '24pt' },
+  { label: '二号', value: '22pt' },
+  { label: '小二', value: '18pt' },
+  { label: '三号', value: '16pt' },
+  { label: '小三', value: '15pt' },
+  { label: '四号', value: '14pt' },
+  { label: '小四', value: '12pt' },
+  { label: '五号', value: '10.5pt' },
+  { label: '小五', value: '9pt' },
+  { label: '六号', value: '7.5pt' },
+  { label: '小六', value: '6.5pt' },
+  { label: '七号', value: '5.5pt' },
+  { label: '八号', value: '5pt' },
+  { label: '5', value: '5pt' },
+  { label: '5.5', value: '5.5pt' },
+  { label: '6.5', value: '6.5pt' },
+  { label: '7.5', value: '7.5pt' },
+  { label: '8', value: '8pt' },
+  { label: '9', value: '9pt' },
+  { label: '10', value: '10pt' },
+  { label: '10.5', value: '10.5pt' },
+  { label: '11', value: '11pt' },
+  { label: '12', value: '12pt' },
+  { label: '14', value: '14pt' },
+  { label: '16', value: '16pt' },
+  { label: '18', value: '18pt' },
+  { label: '20', value: '20pt' },
+  { label: '22', value: '22pt' },
+  { label: '24', value: '24pt' },
+  { label: '26', value: '26pt' },
+  { label: '28', value: '28pt' },
+  { label: '36', value: '36pt' },
+  { label: '48', value: '48pt' },
+  { label: '72', value: '72pt' },
 ]
 const FONT_FAMILY_OPTIONS: Array<{ label: string; value: string }> = [
   { label: '默认字体', value: '' },
