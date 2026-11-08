@@ -112,3 +112,70 @@ describe('mediaThumb：素材库内部路径要走鉴权取图', () => {
     expect(spy).not.toHaveBeenCalled()
   })
 })
+
+describe('mediaThumb：登出清理的生命周期', () => {
+  it('清理会释放 blob 地址并清空状态', async () => {
+    const mod = await freshModule()
+    installFetch((url) => {
+      if (url === '/api/media/asset-9') {
+        return jsonResponse(200, { previewUrl: '/media/asset-9?exp=10&sig=ab' })
+      }
+      return new Response(new Blob([new Uint8Array([1, 2, 3])], { type: 'image/png' }))
+    })
+    const revoked: string[] = []
+    const revokeSpy = vi.spyOn(URL, 'revokeObjectURL').mockImplementation((url: string) => {
+      revoked.push(url)
+    })
+
+    mod.ensureMediaThumb('/media/asset-9')
+    await vi.waitFor(() => expect(mod.mediaThumbState('/media/asset-9').status).toBe('ready'))
+    const blobUrl = mod.mediaThumbState('/media/asset-9').url
+    expect(blobUrl.startsWith('blob:')).toBe(true)
+
+    mod.clearMediaThumbs()
+    expect(revoked).toContain(blobUrl)
+    // 清理后没有状态残留，重新查询按「加载中」处理
+    expect(mod.mediaThumbState('/media/asset-9').status).toBe('loading')
+    revokeSpy.mockRestore()
+  })
+
+  it('清理会中断在途请求，迟到的响应不会写回缓存', async () => {
+    const mod = await freshModule()
+    const gate: { release: () => void } = { release: () => {} }
+    installFetch(async (url) => {
+      if (url === '/api/media/asset-10') {
+        await new Promise<void>((resolve) => {
+          gate.release = resolve
+        })
+        return jsonResponse(200, { previewUrl: '/media/asset-10?exp=10&sig=ab' })
+      }
+      return new Response(new Blob([new Uint8Array([1])], { type: 'image/png' }))
+    })
+
+    mod.ensureMediaThumb('/media/asset-10')
+    await vi.waitFor(() => expect(calls.length).toBe(1))
+    mod.clearMediaThumbs()
+    gate.release()
+    await new Promise((resolve) => setTimeout(resolve, 50))
+
+    expect(mod.mediaThumbState('/media/asset-10').status).not.toBe('ready')
+    expect(mod.mediaThumbState('/media/asset-10').url).toBe('')
+  })
+
+  it('重试会中止旧请求并真的再发一次', async () => {
+    const mod = await freshModule()
+    installFetch((url) => {
+      if (url === '/api/media/asset-11') {
+        return jsonResponse(200, { previewUrl: '/media/asset-11?exp=10&sig=ab' })
+      }
+      return new Response(new Blob([new Uint8Array([1])], { type: 'image/png' }))
+    })
+
+    mod.ensureMediaThumb('/media/asset-11')
+    await vi.waitFor(() => expect(mod.mediaThumbState('/media/asset-11').status).toBe('ready'))
+    const before = calls.length
+    mod.retryMediaThumb('/media/asset-11')
+    await vi.waitFor(() => expect(calls.length).toBeGreaterThan(before))
+    await vi.waitFor(() => expect(mod.mediaThumbState('/media/asset-11').status).toBe('ready'))
+  })
+})

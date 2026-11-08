@@ -23,10 +23,18 @@ export type MediaThumbState = {
 
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>
 
+type LoadRecord = { controller: AbortController }
+
 const states = reactive<Record<string, MediaThumbState>>({})
 /** src -> 已经换好的 blob: 地址，避免同一个素材反复下载 */
 const blobs = new Map<string, string>()
-const pending = new Set<string>()
+/** src -> 正在进行的加载，重试时可以中断旧的那次 */
+const loads = new Map<string, LoadRecord>()
+/**
+ * 清理代数：clearMediaThumbs 之后，在途请求即使返回也不能再写回状态，
+ * 否则登出后旧请求会把上一个会话的预览写回缓存。
+ */
+let generation = 0
 
 const DIRECT_RE = /^(data:|blob:|https?:\/\/)/i
 
@@ -80,6 +88,7 @@ export function retryMediaThumb(src: string): void {
     states[src] = directState(src)
     return
   }
+  abortLoad(src)
   const cached = blobs.get(src)
   if (cached) {
     URL.revokeObjectURL(cached)
@@ -97,17 +106,36 @@ export function markMediaThumbError(src: string, error: string): void {
   states[src] = { status: 'error', url: '', error: error || '加载失败，请重试' }
 }
 
-/** 丢弃缓存（登出等场景）。 */
+/**
+ * 丢弃缓存（登出等场景）。
+ *
+ * 同时做三件事：中断在途请求、释放已经生成的 blob: 地址、清空状态。
+ * 登出后再回来的旧请求会因为代数不匹配而被丢弃，不会写回上个会话的预览。
+ */
 export function clearMediaThumbs(): void {
+  generation += 1
+  loads.forEach((rec) => rec.controller.abort())
+  loads.clear()
   blobs.forEach((url) => URL.revokeObjectURL(url))
   blobs.clear()
-  pending.clear()
   Object.keys(states).forEach((key) => delete states[key])
 }
 
+/** 中断某个素材正在进行的请求（重试前先中止旧的那次，避免旧结果覆盖新结果）。 */
+function abortLoad(src: string): void {
+  const rec = loads.get(src)
+  if (!rec) return
+  loads.delete(src)
+  rec.controller.abort()
+}
+
 async function load(src: string, fetchImpl: FetchLike = fetch): Promise<void> {
-  if (pending.has(src)) return
-  pending.add(src)
+  if (loads.has(src)) return
+  const gen = generation
+  const record: LoadRecord = { controller: new AbortController() }
+  loads.set(src, record)
+  const controller = record.controller
+  const isStale = () => gen !== generation || controller.signal.aborted
   try {
     const token = getToken()
     if (!token) {
@@ -119,7 +147,11 @@ async function load(src: string, fetchImpl: FetchLike = fetch): Promise<void> {
       states[src] = { status: 'error', url: '', error: '素材地址不合法，无法加载预览' }
       return
     }
-    const metaRes = await fetchImpl(metaUrl, { headers: { Authorization: `Bearer ${token}` } })
+    const metaRes = await fetchImpl(metaUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: controller.signal,
+    })
+    if (isStale()) return
     if (metaRes.status === 401) {
       states[src] = { status: 'error', url: '', error: '登录状态已失效，请重新登录后重试' }
       return
@@ -140,20 +172,26 @@ async function load(src: string, fetchImpl: FetchLike = fetch): Promise<void> {
       states[src] = { status: 'error', url: '', error: '素材缺少可用预览地址，请重新上传' }
       return
     }
-    const fileRes = await fetchImpl(previewUrl, { headers: { Authorization: `Bearer ${token}` } })
+    const fileRes = await fetchImpl(previewUrl, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: controller.signal,
+    })
+    if (isStale()) return
     if (!fileRes.ok) {
       states[src] = { status: 'error', url: '', error: '素材读取失败，请重试' }
       return
     }
     const blob = await fileRes.blob()
+    if (isStale()) return
     const blobUrl = URL.createObjectURL(blob)
     const old = blobs.get(src)
     if (old) URL.revokeObjectURL(old)
     blobs.set(src, blobUrl)
     states[src] = { status: 'ready', url: blobUrl, error: '' }
   } catch {
+    if (isStale()) return
     states[src] = { status: 'error', url: '', error: '素材加载失败，请检查网络后重试' }
   } finally {
-    pending.delete(src)
+    if (loads.get(src) === record) loads.delete(src)
   }
 }
