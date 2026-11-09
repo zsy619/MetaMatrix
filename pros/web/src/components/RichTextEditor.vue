@@ -14,6 +14,7 @@ import { useDocumentStore } from '../stores/document'
 import { NodeSelection, TextSelection } from '@tiptap/pm/state'
 import { TABLE_CELL_BG_PRESETS, TABLE_BORDER_STYLE_PRESETS } from '../extensions/rteTableCells'
 import { HR_VARIANT_OPTIONS, type RteHrVariant } from '../extensions/rteHorizontalRule'
+import { letterSpacingTarget } from '../extensions/letterSpacing'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { looksLikeHtml, escapeHtml } from '../utils/itemsHtml'
 import { formulaTexIssue, renderKatex } from '../extensions/math'
@@ -690,6 +691,11 @@ const specialCharsOpen = ref(false)
 const specialCharTabId = ref(RTE_SPECIAL_CHAR_CATEGORIES[0]?.id ?? 'punct')
 const columnsOpen = ref(false)
 const spacingOpen = ref(false)
+/** 段距改完后让工具栏重新读当前段落的值。 */
+const spacingTick = ref(0)
+function bumpSpacing() {
+  spacingTick.value += 1
+}
 const wordStatsOpen = ref(false)
 const wordCountDockOpen = ref(false)
 
@@ -1915,6 +1921,7 @@ function applyTextIndent(v: string) {
     .focus()
     .setTextIndent(v || null)
     .run()
+  bumpSpacing()
 }
 
 function applyTextDir(dir: 'ltr' | 'rtl' | '') {
@@ -1924,9 +1931,11 @@ function applyTextDir(dir: 'ltr' | 'rtl' | '') {
     .focus()
     .setTextDir(dir || null)
     .run()
+  bumpSpacing()
 }
 
 function currentTextIndent(): string {
+  void spacingTick.value
   const ed = editor.value
   if (!ed) return ''
   for (const type of ['paragraph', 'heading'] as const) {
@@ -1939,6 +1948,7 @@ function currentTextIndent(): string {
 }
 
 function currentTextDir(): string {
+  void spacingTick.value
   const ed = editor.value
   if (!ed) return ''
   for (const type of ['paragraph', 'heading'] as const) {
@@ -3206,10 +3216,12 @@ function confirmPrintFromPreview() {
 }
 
 function currentLetterSpacing(): string {
+  void spacingTick.value
   const v = editor.value?.getAttributes('textStyle')?.letterSpacing
   return typeof v === 'string' ? v : ''
 }
 function currentMarginTop(): string {
+  void spacingTick.value
   const ed = editor.value
   if (!ed) return ''
   for (const type of ['paragraph', 'heading'] as const) {
@@ -3221,6 +3233,7 @@ function currentMarginTop(): string {
   return ''
 }
 function currentMarginBottom(): string {
+  void spacingTick.value
   const ed = editor.value
   if (!ed) return ''
   for (const type of ['paragraph', 'heading'] as const) {
@@ -3232,14 +3245,25 @@ function currentMarginBottom(): string {
   return ''
 }
 function applyLetterSpacing(v: string) {
-  if (!v) chain()?.unsetLetterSpacing().run()
-  else chain()?.setLetterSpacing(v).run()
+  const ed = editor.value
+  if (!ed) return
+  const saved = { from: ed.state.selection.from, to: ed.state.selection.to }
+  const target = letterSpacingTarget(ed.state.selection)
+  const collapsed = ed.state.selection.empty
+  let run = ed.chain().focus()
+  if (collapsed && target) run = run.setTextSelection(target)
+  run = v ? run.setLetterSpacing(v) : run.unsetLetterSpacing()
+  if (collapsed) run = run.setTextSelection(saved)
+  run.run()
+  bumpSpacing()
 }
 function applyMarginTop(v: string) {
   chain()?.setParagraphSpacing({ marginTop: v || null }).run()
+  bumpSpacing()
 }
 function applyMarginBottom(v: string) {
   chain()?.setParagraphSpacing({ marginBottom: v || null }).run()
+  bumpSpacing()
 }
 type HeadingLevel = 1 | 2 | 3 | 4 | 5 | 6
 

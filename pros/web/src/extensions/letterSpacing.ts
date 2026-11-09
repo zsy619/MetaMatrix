@@ -1,4 +1,18 @@
 import { Extension } from '@tiptap/core'
+import type { Selection } from '@tiptap/pm/state'
+
+/**
+ * 字间距作用范围。没有选中文字时，作用到当前段落里已有的文字。
+ * 空段落返回 null，只留给随后输入的文字。
+ */
+export function letterSpacingTarget(selection: Selection): { from: number; to: number } | null {
+  if (!selection.empty) return { from: selection.from, to: selection.to }
+  if (!selection.$from.parent.isTextblock) return null
+  const from = selection.$from.start()
+  const to = selection.$from.end()
+  if (to <= from) return null
+  return { from, to }
+}
 
 export type LetterSpacingOptions = {
   types: string[]

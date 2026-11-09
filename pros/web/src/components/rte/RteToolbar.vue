@@ -4,6 +4,7 @@ import { RTE_BINDINGS } from './bindings'
 import { useParentScopeStamp } from './inheritScope'
 import { buildChartGroups } from '../../utils/echarts/chartGroups'
 import RteColorBoard from './RteColorBoard.vue'
+import RteSpacingFields from './RteSpacingFields.vue'
 
 const rte = inject(RTE_BINDINGS)
 if (!rte) throw new Error('RteToolbar 必须放在 RichTextEditor 里')
@@ -1371,79 +1372,18 @@ function toggleChartGroupMenu(key: string) {
               @mouseenter="rte.onToolMenuEnter('spacing')"
               @mouseleave="rte.onToolMenuLeave($event, 'spacing', () => (rte.spacingOpen = false))"
             >
-              <div data-rte-own class="rte-spacing-row">
-                <span data-rte-own class="rte-spacing-label">段前</span>
-                <select data-rte-own
-                  class="rte-spacing-select"
-                  :value="rte.currentMarginTop()"
-                  @change="rte.applyMarginTop(($event.target as HTMLSelectElement).value)"
-                >
-                  <option data-rte-own value="">默认</option>
-                  <option data-rte-own value="0">0</option>
-                  <option data-rte-own value="0.5em">0.5em</option>
-                  <option data-rte-own value="1em">1em</option>
-                  <option data-rte-own value="1.5em">1.5em</option>
-                  <option data-rte-own value="2em">2em</option>
-                  <option data-rte-own value="3em">3em</option>
-                </select>
-              </div>
-              <div data-rte-own class="rte-spacing-row">
-                <span data-rte-own class="rte-spacing-label">段后</span>
-                <select data-rte-own
-                  class="rte-spacing-select"
-                  :value="rte.currentMarginBottom()"
-                  @change="rte.applyMarginBottom(($event.target as HTMLSelectElement).value)"
-                >
-                  <option data-rte-own value="">默认</option>
-                  <option data-rte-own value="0">0</option>
-                  <option data-rte-own value="0.5em">0.5em</option>
-                  <option data-rte-own value="1em">1em</option>
-                  <option data-rte-own value="1.5em">1.5em</option>
-                  <option data-rte-own value="2em">2em</option>
-                  <option data-rte-own value="3em">3em</option>
-                </select>
-              </div>
-              <div data-rte-own class="rte-spacing-row">
-                <span data-rte-own class="rte-spacing-label">字间距</span>
-                <select data-rte-own
-                  class="rte-spacing-select"
-                  :value="rte.currentLetterSpacing()"
-                  @change="rte.applyLetterSpacing(($event.target as HTMLSelectElement).value)"
-                >
-                  <option data-rte-own value="">默认</option>
-                  <option data-rte-own value="0">0</option>
-                  <option data-rte-own value="0.05em">0.05em</option>
-                  <option data-rte-own value="0.1em">0.1em</option>
-                  <option data-rte-own value="0.15em">0.15em</option>
-                  <option data-rte-own value="0.2em">0.2em</option>
-                  <option data-rte-own value="0.3em">0.3em</option>
-                </select>
-              </div>
-              <div data-rte-own class="rte-spacing-row">
-                <span data-rte-own class="rte-spacing-label">首行缩进</span>
-                <select data-rte-own
-                  class="rte-spacing-select"
-                  :value="rte.currentTextIndent()"
-                  @change="rte.applyTextIndent(($event.target as HTMLSelectElement).value)"
-                >
-                  <option data-rte-own value="">无</option>
-                  <option data-rte-own value="2em">2 字符</option>
-                  <option data-rte-own value="3em">3 字符</option>
-                  <option data-rte-own value="4em">4 字符</option>
-                </select>
-              </div>
-              <div data-rte-own class="rte-spacing-row">
-                <span data-rte-own class="rte-spacing-label">文字方向</span>
-                <select data-rte-own
-                  class="rte-spacing-select"
-                  :value="rte.currentTextDir()"
-                  @change="rte.applyTextDir(($event.target as HTMLSelectElement).value as '' | 'ltr' | 'rtl')"
-                >
-                  <option data-rte-own value="">默认</option>
-                  <option data-rte-own value="ltr">从左到右</option>
-                  <option data-rte-own value="rtl">从右到左</option>
-                </select>
-              </div>
+              <RteSpacingFields
+                :margin-top="rte.currentMarginTop()"
+                :margin-bottom="rte.currentMarginBottom()"
+                :letter-spacing="rte.currentLetterSpacing()"
+                :text-indent="rte.currentTextIndent()"
+                :text-dir="rte.currentTextDir()"
+                @margin-top="rte.applyMarginTop"
+                @margin-bottom="rte.applyMarginBottom"
+                @letter-spacing="rte.applyLetterSpacing"
+                @text-indent="rte.applyTextIndent"
+                @text-dir="rte.applyTextDir"
+              />
             </div>
           </Teleport>
         </div>
@@ -2397,79 +2337,18 @@ function toggleChartGroupMenu(key: string) {
           @mouseenter="rte.onToolMenuEnter('spacing')"
           @mouseleave="rte.onToolMenuLeave($event, 'spacing', () => (rte.spacingOpen = false))"
         >
-          <div data-rte-own class="rte-spacing-row">
-            <span data-rte-own class="rte-spacing-label">段前</span>
-            <select data-rte-own
-              class="rte-spacing-select"
-              :value="rte.currentMarginTop()"
-              @change="rte.applyMarginTop(($event.target as HTMLSelectElement).value)"
-            >
-              <option data-rte-own value="">默认</option>
-              <option data-rte-own value="0">0</option>
-              <option data-rte-own value="0.5em">0.5em</option>
-              <option data-rte-own value="1em">1em</option>
-              <option data-rte-own value="1.5em">1.5em</option>
-              <option data-rte-own value="2em">2em</option>
-              <option data-rte-own value="3em">3em</option>
-            </select>
-          </div>
-          <div data-rte-own class="rte-spacing-row">
-            <span data-rte-own class="rte-spacing-label">段后</span>
-            <select data-rte-own
-              class="rte-spacing-select"
-              :value="rte.currentMarginBottom()"
-              @change="rte.applyMarginBottom(($event.target as HTMLSelectElement).value)"
-            >
-              <option data-rte-own value="">默认</option>
-              <option data-rte-own value="0">0</option>
-              <option data-rte-own value="0.5em">0.5em</option>
-              <option data-rte-own value="1em">1em</option>
-              <option data-rte-own value="1.5em">1.5em</option>
-              <option data-rte-own value="2em">2em</option>
-              <option data-rte-own value="3em">3em</option>
-            </select>
-          </div>
-          <div data-rte-own class="rte-spacing-row">
-            <span data-rte-own class="rte-spacing-label">字间距</span>
-            <select data-rte-own
-              class="rte-spacing-select"
-              :value="rte.currentLetterSpacing()"
-              @change="rte.applyLetterSpacing(($event.target as HTMLSelectElement).value)"
-            >
-              <option data-rte-own value="">默认</option>
-              <option data-rte-own value="0">0</option>
-              <option data-rte-own value="0.05em">0.05em</option>
-              <option data-rte-own value="0.1em">0.1em</option>
-              <option data-rte-own value="0.15em">0.15em</option>
-              <option data-rte-own value="0.2em">0.2em</option>
-              <option data-rte-own value="0.3em">0.3em</option>
-            </select>
-          </div>
-          <div data-rte-own class="rte-spacing-row">
-            <span data-rte-own class="rte-spacing-label">首行缩进</span>
-            <select data-rte-own
-              class="rte-spacing-select"
-              :value="rte.currentTextIndent()"
-              @change="rte.applyTextIndent(($event.target as HTMLSelectElement).value)"
-            >
-              <option data-rte-own value="">无</option>
-              <option data-rte-own value="2em">2 字符</option>
-              <option data-rte-own value="3em">3 字符</option>
-              <option data-rte-own value="4em">4 字符</option>
-            </select>
-          </div>
-          <div data-rte-own class="rte-spacing-row">
-            <span data-rte-own class="rte-spacing-label">文字方向</span>
-            <select data-rte-own
-              class="rte-spacing-select"
-              :value="rte.currentTextDir()"
-              @change="rte.applyTextDir(($event.target as HTMLSelectElement).value as '' | 'ltr' | 'rtl')"
-            >
-              <option data-rte-own value="">默认</option>
-              <option data-rte-own value="ltr">从左到右</option>
-              <option data-rte-own value="rtl">从右到左</option>
-            </select>
-          </div>
+          <RteSpacingFields
+            :margin-top="rte.currentMarginTop()"
+            :margin-bottom="rte.currentMarginBottom()"
+            :letter-spacing="rte.currentLetterSpacing()"
+            :text-indent="rte.currentTextIndent()"
+            :text-dir="rte.currentTextDir()"
+            @margin-top="rte.applyMarginTop"
+            @margin-bottom="rte.applyMarginBottom"
+            @letter-spacing="rte.applyLetterSpacing"
+            @text-indent="rte.applyTextIndent"
+            @text-dir="rte.applyTextDir"
+          />
         </div>
       </Teleport>
       <Teleport to="body">
