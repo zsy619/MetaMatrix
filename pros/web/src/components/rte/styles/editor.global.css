@@ -3165,6 +3165,31 @@ html.rte-toolbar-dragging * {
   font-size: 12px;
   color: #4e5969;
 }
+.rte-mermaid-leading {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.rte-mermaid-more {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #4e5969;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+.rte-mermaid-more:hover {
+  background: #e8f3ff;
+  color: #165dff;
+}
+.rte-root.mode-preview .rte-mermaid-more,
+.rte-root.mode-source .rte-mermaid-more {
+  display: none;
+}
 .rte-mermaid-toolbar button {
   border: 1px solid #e5e6eb;
   background: #fff;
