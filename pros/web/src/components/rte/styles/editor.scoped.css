@@ -4232,44 +4232,56 @@ html.rte-toolbar-dragging .rte-root:not(.expanded) .rte-toolbar-tools > .rte-too
   letter-spacing: 0;
 }
 
-/* Word 式功能区：栏目在上，当前栏目的分组在白底命令带里。 */
+/* Word 功能区：栏目横贯全宽，命令带在栏目正下方，分组底边对齐。 */
 .rte-root.expanded .rte-toolbar {
   flex-direction: column;
+  flex-wrap: nowrap;
   align-items: stretch;
+  align-content: stretch;
+  width: 100%;
+  max-width: 100%;
   padding: 0;
   background: #f3f2f1;
   row-gap: 0;
+  column-gap: 0;
 }
 .rte-ribbon-bar {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
   gap: 12px;
-  min-height: 36px;
-  padding: 4px 8px 0 0;
+  flex: 0 0 auto;
+  align-self: stretch;
+  width: 100%;
+  max-width: 100%;
+  min-height: 32px;
+  padding: 2px 8px 0 6px;
+  box-sizing: border-box;
   background: #f3f2f1;
+  border-bottom: 1px solid #d2d0ce;
 }
 .rte-ribbon-tabs {
   display: flex;
   align-items: flex-end;
-  gap: 2px;
-  min-height: 32px;
-  padding: 0 12px;
+  gap: 0;
+  min-height: 30px;
+  padding: 0;
   background: transparent;
 }
 .rte-root.expanded .rte-toolbar .rte-ribbon-bar .rte-mode-bar {
   flex: 0 0 auto;
   align-self: center;
-  margin: 0 4px 4px auto;
+  margin: 0 2px 3px auto;
   padding: 0;
   border: none;
 }
 .rte-ribbon-tab {
   height: 28px;
+  margin: 0 1px;
   padding: 0 14px;
   border: 1px solid transparent;
   border-bottom: none;
-  border-radius: 4px 4px 0 0;
+  border-radius: 3px 3px 0 0;
   background: transparent;
   color: #323130;
   font-size: 13px;
@@ -4285,10 +4297,12 @@ html.rte-toolbar-dragging .rte-root:not(.expanded) .rte-toolbar-tools > .rte-too
   border-color: #d2d0ce;
   font-weight: 600;
   position: relative;
-  top: 1px;
+  margin-bottom: -1px;
+  z-index: 1;
 }
 .rte-root.expanded .rte-toolbar.is-one-row {
   flex-direction: column;
+  flex-wrap: nowrap;
   align-items: stretch;
 }
 .rte-root.expanded .rte-toolbar.is-one-row .rte-toolbar-tools {
@@ -4306,36 +4320,67 @@ html.rte-toolbar-dragging .rte-root:not(.expanded) .rte-toolbar-tools > .rte-too
   border: 0;
 }
 .rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-toolbar-tools {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
   align-items: stretch;
+  align-content: stretch;
+  align-self: stretch;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  height: auto;
   background: #fff;
-  border-top: 1px solid #d2d0ce;
-  padding: 6px 8px 0;
+  border-top: none;
+  padding: 2px 0 0;
   gap: 0;
-  min-height: 86px;
+  min-height: 102px;
+  overflow-x: auto;
+  overflow-y: hidden;
 }
 .rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group {
+  position: relative;
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-start;
   align-content: flex-start;
-  justify-content: center;
-  flex: 0 1 auto;
-  max-width: min(560px, 100%);
+  justify-content: flex-start;
+  flex: 0 0 auto;
+  align-self: flex-start;
+  width: max-content;
+  max-width: none;
+  height: 100px;
+  min-height: 100px;
+  max-height: 100px;
   margin: 0;
-  padding: 2px 10px 0;
+  gap: 0 2px;
+  padding: 2px 10px 20px;
   border: none;
-  border-right: 1px solid #edebe9;
+  border-right: 1px solid #d2d0ce;
   border-radius: 0;
   background: transparent;
   box-shadow: none;
+  box-sizing: border-box;
+}
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group:last-child {
+  border-right: none;
+}
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-toolbar-tools > .rte-tool-group + .rte-tool-group {
+  margin-left: 0;
+  padding-left: 12px;
+  box-shadow: none;
 }
 .rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group > .rte-group-head {
-  order: 2;
-  flex: 1 0 100%;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 1px;
+  order: 0;
+  flex: none;
   justify-content: center;
   height: 20px;
-  margin: 2px 0 4px;
+  margin: 0;
   padding: 0;
   background: transparent;
   box-shadow: none;
@@ -4349,12 +4394,32 @@ html.rte-toolbar-dragging .rte-root:not(.expanded) .rte-toolbar-tools > .rte-too
 }
 .rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool,
 .rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool-wrap {
-  margin-right: 2px;
-  margin-bottom: 2px;
+  height: 24px;
+  min-height: 24px;
+  max-height: 24px;
+  margin: 0 2px 0 0;
+  padding: 0 4px;
+}
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool-icon {
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  min-height: 16px;
+  font-size: 16px;
+}
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group :deep(.rte-ep-icon),
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group :deep(.rte-tool-icon > svg),
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group :deep(svg.rte-ep-icon) {
+  width: 16px !important;
+  height: 16px !important;
+  min-width: 16px;
+  min-height: 16px;
+  font-size: 16px;
 }
 .rte-root.is-dark-editor .rte-ribbon-bar,
 .rte-root.is-dark-editor.expanded .rte-toolbar {
   background: #2b2f36;
+  border-bottom-color: #3a3f47;
 }
 .rte-root.is-dark-editor .rte-ribbon-tab {
   color: #d6dae0;
@@ -4369,6 +4434,8 @@ html.rte-toolbar-dragging .rte-root:not(.expanded) .rte-toolbar-tools > .rte-too
 }
 .rte-root.is-dark-editor .rte-toolbar:not(.is-one-row) .rte-toolbar-tools {
   background: #1f2329;
-  border-top-color: #3a3f47;
+}
+.rte-root.is-dark-editor .rte-toolbar:not(.is-one-row) .rte-tool-group {
+  border-right-color: #3a3f47;
 }
 
