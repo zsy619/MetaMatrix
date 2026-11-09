@@ -143,6 +143,7 @@ import { applyTextTidy } from '../utils/rteTextPlay'
 import { countWords, normalizeHtml, toEditorContent } from '../utils/rteContent'
 import { getToken } from '../api/http'
 import { uploadMediaFile } from '../api/mediaUpload'
+import { attachmentInsertHref } from '../utils/rteAttachment'
 import { htmlWithSuggestionsAccepted } from '../utils/rteSuggestions'
 import { buildExportHtmlWithCharts } from '../utils/rteExportChartSnapshots'
 import { useCommentThreads } from './rte/composables/useCommentThreads'
@@ -1009,6 +1010,9 @@ const editor = useRteExtensions({
   openLinkDialog,
   onEditorLinkClick: (href: string) => {
     requestOpenHref(href)
+  },
+  onAttachmentOpen: (href: string, name: string) => {
+    openAttachmentPreview(href, name)
   },
   openPrintPreview,
   scheduleHtmlEmit,
@@ -4736,13 +4740,11 @@ const {
   insertImage,
   uid,
   rteToast,
-  ATTACH_MAX_BYTES,
   toggleImageSelect,
   onImageSelectAllChange,
   startAddCategory,
   confirmAddCategory,
   triggerLocalImagePick,
-  readFileAsDataURL,
   imageFilesFromClipboard,
   replaceOrInsertDroppedImages,
   insertDroppedBeside,
@@ -5333,29 +5335,15 @@ async function onLocalAttachFilesChange(event: Event) {
     rteToast('warning', '请选择附件文件')
     return
   }
+  if (!getToken()) {
+    rteToast('warning', '请登录后再上传附件')
+    return
+  }
   const catId = currentAttachCategoryId()
   const added: StoredAttach[] = []
   for (const file of files) {
-    if (!getToken() && file.size > ATTACH_MAX_BYTES) {
-      rteToast('warning', `${file.name} 超过 3MB，已跳过`)
-      continue
-    }
     try {
-      let src = ''
-      if (getToken()) {
-        src = (await uploadMediaFile(file, { mediaType: 'file' })).insertedPath
-      } else {
-        // 未登录仍用浏览器内地址，不把磁盘路径写进文档
-        src = URL.createObjectURL(file)
-        if (file.size <= 2 * 1024 * 1024) {
-          try {
-            const dataUrl = await readFileAsDataURL(file)
-            if (dataUrl) src = dataUrl
-          } catch {
-            /* keep blob */
-          }
-        }
-      }
+      const src = attachmentInsertHref((await uploadMediaFile(file, { mediaType: 'file' })).insertedPath)
       if (!src) continue
       added.push({
         id: uid(),
@@ -5367,7 +5355,7 @@ async function onLocalAttachFilesChange(event: Event) {
         createdAt: Date.now(),
       })
     } catch (error) {
-      if (getToken()) rteToast('error', error instanceof Error ? error.message : '附件上传失败')
+      rteToast('error', error instanceof Error ? error.message : '附件上传失败')
     }
   }
   if (!added.length) {
@@ -5384,27 +5372,48 @@ async function onLocalAttachFilesChange(event: Event) {
   rteToast('success', `已插入 ${added.length} 个附件`)
 }
 
+const attachmentPreview = ref<{ href: string; name: string } | null>(null)
+
+function openAttachmentPreview(href: string, name: string) {
+  const link = attachmentInsertHref(href)
+  if (!link) {
+    rteToast('warning', '这个附件不是可打开的链接，请重新上传')
+    return
+  }
+  attachmentPreview.value = { href: link, name: name || '附件' }
+}
+
+function closeAttachmentPreview() {
+  attachmentPreview.value = null
+}
+
 function insertAttachItems(items: StoredAttach[]) {
   const ed = editor.value
   if (!ed || !items.length) return
-  const usable = items.filter((a) => !!a.src && String(a.src).trim())
-  if (!usable.length) return
-  // 用 JSON 节点+link mark 插入，避免超长 href 的 HTML 解析丢标；data/blob 已在 Link 白名单
+  const usable = items.flatMap((item) => {
+    const href = attachmentInsertHref(item.src)
+    return href ? [{ ...item, href }] : []
+  })
+  if (!usable.length) {
+    rteToast('warning', '附件需要先上传成链接后再插入')
+    return
+  }
+  if (usable.length < items.length) rteToast('warning', '已跳过还不是链接的附件')
   const nodes: Record<string, unknown>[] = []
-  usable.forEach((a, i) => {
-    if (i > 0) nodes.push({ type: 'text', text: ' ' })
+  usable.forEach((item, index) => {
+    if (index > 0) nodes.push({ type: 'text', text: ' ' })
     nodes.push({
       type: 'text',
-      text: `📎 ${a.name}`,
+      text: `📎 ${item.name}`,
       marks: [
         {
           type: 'link',
           attrs: {
-            href: a.src,
+            href: item.href,
             target: '_blank',
             rel: 'noopener noreferrer nofollow',
             class: 'rte-attachment-link rte-link',
-            title: a.name,
+            title: item.name,
           },
         },
       ],
@@ -5421,7 +5430,7 @@ function confirmInsertAttaches() {
   }
   const usable = selected.filter((a) => a.src)
   if (!usable.length) {
-    rteToast('warning', '所选附件缺少文件数据，请重新上传')
+    rteToast('warning', '所选附件还不是链接，请重新上传')
     return
   }
   insertAttachItems(usable)
@@ -7456,6 +7465,8 @@ provideRteBindings({
   imagePreviewItems,
   imagePreviewIndex,
   closeImagePreview,
+  attachmentPreview,
+  closeAttachmentPreview,
   setImagePreviewIndex,
   stepImagePreview,
   imageSelectAll,

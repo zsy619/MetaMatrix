@@ -1551,6 +1551,7 @@ html.rte-toolbar-dragging * {
   color: #3b5bdb;
   text-decoration: underline;
   word-break: break-all;
+  cursor: pointer;
 }
 
 .rte-image-dialog {

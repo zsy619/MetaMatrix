@@ -4,6 +4,7 @@ import { EditorContent } from '@tiptap/vue-3'
 import { BubbleMenu } from '@tiptap/vue-3/menus'
 import FormPropertyInspector from '../FormPropertyInspector.vue'
 import CommentThreadPanel from './CommentThreadPanel.vue'
+import RteAttachmentPreview from './RteAttachmentPreview.vue'
 import RteImageLightbox from './RteImageLightbox.vue'
 import RteSelectionBubble from './RteSelectionBubble.vue'
 import RteSourceCodeEditor from './RteSourceCodeEditor.vue'
@@ -249,6 +250,7 @@ useParentScopeStamp()
       </div>
     </BubbleMenu>
     <RteImageLightbox />
+    <RteAttachmentPreview />
 
     <div data-rte-own v-if="rte.suggesting && rte.viewMode === 'edit'" class="rte-suggest-bar" role="status">
       <span data-rte-own>建议模式</span>

@@ -130,6 +130,8 @@ export function useRteExtensions(deps: {
   openLinkDialog: LateFn
   /** 正文里的链接点击。返回后由编辑器决定打开、确认或拦截。 */
   onEditorLinkClick?: (href: string) => void
+  /** 附件芯片：用链接打开预览，不把 data 地址写进文档。 */
+  onAttachmentOpen?: (href: string, name: string) => void
   openPrintPreview: LateFn
   scheduleHtmlEmit: LateFn
   setHeading: LateFn
@@ -579,6 +581,16 @@ const editor = useEditor({
         event.preventDefault()
         deps.onEditorLinkClick?.(href)
         return true
+      }
+      const attach = target?.closest?.('a.rte-attachment-link[href]') as HTMLAnchorElement | null
+      if (attach) {
+        const href = attach.getAttribute('href')?.trim() || ''
+        if (href) {
+          event.preventDefault()
+          const name = (attach.getAttribute('title') || attach.textContent || '').replace(/^📎\s*/, '').trim()
+          deps.onAttachmentOpen?.(href, name)
+          return true
+        }
       }
       const anchor = target?.closest?.('a[href]') as HTMLElement | null
       if (!anchor || viewMode.value === 'edit') return false
