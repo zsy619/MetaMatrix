@@ -828,12 +828,16 @@ const echartsDialogTemplates = computed(() => {
             </label>
             <span data-rte-own class="rte-find-status" role="status" aria-live="polite">{{ rte.findStatusText }}</span>
           </div>
-          <div data-rte-own class="rte-modal-actions rte-find-actions">
-            <button data-rte-own type="button" class="rte-modal-cancel" :disabled="!rte.canReplaceFind" @click="rte.findGo(-1)">上一个</button>
-            <button data-rte-own type="button" class="rte-modal-cancel" :disabled="!rte.canReplaceFind" @click="rte.findGo(1)">下一个</button>
-            <button data-rte-own type="button" class="rte-modal-cancel" :disabled="!rte.canReplaceFind" @click="rte.doReplaceOne">替换当前</button>
-            <button data-rte-own type="button" class="rte-modal-confirm" :disabled="!rte.canReplaceFind" @click="rte.doReplaceAll">全部替换</button>
-            <button data-rte-own type="button" class="rte-modal-cancel" @click="rte.closeFindDialog">关闭</button>
+          <div data-rte-own class="rte-find-actions">
+            <div data-rte-own class="rte-modal-actions">
+              <button data-rte-own type="button" class="rte-modal-cancel" :disabled="!rte.canReplaceFind" @click="rte.findGo(-1)">上一个</button>
+              <button data-rte-own type="button" class="rte-modal-cancel" :disabled="!rte.canReplaceFind" @click="rte.findGo(1)">下一个</button>
+            </div>
+            <div data-rte-own class="rte-modal-actions rte-find-replace-row">
+              <button data-rte-own type="button" class="rte-modal-cancel" :disabled="!rte.canReplaceFind" @click="rte.doReplaceOne">替换当前</button>
+              <button data-rte-own type="button" class="rte-modal-confirm" :disabled="!rte.canReplaceFind" @click="rte.doReplaceAll">全部替换</button>
+              <button data-rte-own type="button" class="rte-modal-cancel" @click="rte.closeFindDialog">关闭</button>
+            </div>
           </div>
         </div>
       </div>
