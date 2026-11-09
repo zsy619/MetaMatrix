@@ -3043,9 +3043,16 @@ html.rte-toolbar-dragging * {
   font-weight: 400;
 }
 .rte-snippet-dialog {
-  max-width: 520px;
+  width: min(640px, 92vw);
+  max-width: 640px;
   max-height: 80vh;
   overflow: auto;
+}
+.rte-snippet-dialog .rte-modal-actions {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.rte-snippet-dialog .rte-modal-actions:has(> :nth-child(4)) {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 .rte-root.is-focus-mode .rte-toolbar {
   display: none;
