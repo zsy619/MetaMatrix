@@ -1,6 +1,7 @@
 import { Node, mergeAttributes } from '@tiptap/core'
 import type { Node as PmNode } from '@tiptap/pm/model'
 import { TextSelection, type Transaction } from '@tiptap/pm/state'
+import { ElMessageBox } from 'element-plus'
 
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
@@ -235,6 +236,28 @@ export const TabsBlock = Node.create({
       const tools = document.createElement('div')
       tools.className = 'rte-tabs-tools'
       bar.append(scroll, tools)
+      let menu: HTMLDivElement | null = null
+      let placeMenu: (() => void) | null = null
+
+      const closeMenu = () => {
+        menu?.remove()
+        menu = null
+        placeMenu = null
+      }
+      const onDocPointer = (event: Event) => {
+        if (!menu) return
+        const target = event.target
+        if (target instanceof globalThis.Node && (menu.contains(target) || tools.contains(target))) return
+        closeMenu()
+      }
+      const onDocKey = (event: KeyboardEvent) => {
+        if (event.key === 'Escape') closeMenu()
+      }
+      const onScroll = () => placeMenu?.()
+      document.addEventListener('mousedown', onDocPointer, true)
+      document.addEventListener('keydown', onDocKey)
+      window.addEventListener('scroll', onScroll, true)
+      window.addEventListener('resize', onScroll)
 
       const body = document.createElement('div')
       body.className = 'rte-tabs-body'
@@ -312,6 +335,7 @@ export const TabsBlock = Node.create({
         const editable = editor.isEditable
         const next = `${titles.join('\u0000')}|${active}|${editable ? 1 : 0}`
         if (next === signature) return
+        closeMenu()
         signature = next
         scroll.replaceChildren()
         tools.replaceChildren()
@@ -357,44 +381,109 @@ export const TabsBlock = Node.create({
           scroll.append(btn)
         })
 
-        const add = document.createElement('button')
-        add.type = 'button'
-        add.className = 'rte-tabs-add'
-        add.textContent = '添加'
-        add.disabled = !editable || titles.length >= TABS_MAX
-        add.title = titles.length >= TABS_MAX ? `最多 ${TABS_MAX} 个标签` : '添加标签'
-        add.addEventListener('mousedown', (event) => event.preventDefault())
-        add.addEventListener('click', () => run((tr, pos) => addTabPane(tr, pos)))
-        scroll.append(add)
+        const more = document.createElement('button')
+        more.type = 'button'
+        more.className = 'rte-tabs-more'
+        more.textContent = '…'
+        more.title = '标签操作'
+        more.setAttribute('aria-label', '标签操作')
+        more.setAttribute('aria-haspopup', 'menu')
+        more.disabled = !editable
+        more.addEventListener('mousedown', (event) => {
+          event.preventDefault()
+          event.stopPropagation()
+        })
+        more.addEventListener('click', (event) => {
+          event.preventDefault()
+          event.stopPropagation()
+          if (menu) {
+            closeMenu()
+            return
+          }
+          const panel = document.createElement('div')
+          panel.className = 'rte-tabs-menu'
+          panel.setAttribute('role', 'menu')
+          const addItem = (label: string, enabled: boolean, danger: boolean, act: () => void) => {
+            const item = document.createElement('button')
+            item.type = 'button'
+            item.className = `rte-tabs-menu-item${danger ? ' is-danger' : ''}`
+            item.setAttribute('role', 'menuitem')
+            item.textContent = label
+            item.disabled = !enabled
+            item.addEventListener('mousedown', (event) => {
+              event.preventDefault()
+              event.stopPropagation()
+            })
+            item.addEventListener('click', (event) => {
+              event.preventDefault()
+              event.stopPropagation()
+              if (item.disabled) return
+              closeMenu()
+              act()
+            })
+            panel.append(item)
+            return item
+          }
+          addItem('添加', editable && titles.length < TABS_MAX, false, () => {
+            run((tr, pos) => addTabPane(tr, pos))
+          })
+          addItem('左移', editable && active > 0, false, () => {
+            run((tr, pos) => moveTabPane(tr, pos, active, active - 1))
+          })
+          addItem('右移', editable && active < titles.length - 1, false, () => {
+            run((tr, pos) => moveTabPane(tr, pos, active, active + 1))
+          })
+          addItem('改名', editable && titles.length > 0, false, () => {
+            beginRename(active, titles[active] || '标签')
+          })
+          const sep = document.createElement('div')
+          sep.className = 'rte-tabs-menu-sep'
+          panel.append(sep)
+          const lastPane = titles.length <= TABS_MIN
+          const currentTitle = titles[active] || '标签'
+          addItem('删除', editable && titles.length > 0, true, () => {
+            void confirmRemove(currentTitle, lastPane, active)
+          })
+          document.body.append(panel)
+          placeMenu = () => {
+            if (!more.isConnected) {
+              closeMenu()
+              return
+            }
+            const rect = more.getBoundingClientRect()
+            const width = panel.offsetWidth || 132
+            const height = panel.offsetHeight || 160
+            let left = rect.right - width
+            if (left < 8) left = 8
+            if (left + width > window.innerWidth - 8) left = Math.max(8, window.innerWidth - width - 8)
+            let top = rect.bottom + 4
+            if (top + height > window.innerHeight - 8) top = Math.max(8, rect.top - height - 4)
+            panel.style.left = `${left}px`
+            panel.style.top = `${top}px`
+          }
+          menu = panel
+          placeMenu()
+        })
+        tools.append(more)
+      }
 
-        const makeTool = (text: string, title: string, danger: boolean, enabled: boolean, act: () => void) => {
-          const button = document.createElement('button')
-          button.type = 'button'
-          button.className = `rte-tabs-tool${danger ? ' is-danger' : ''}`
-          button.textContent = text
-          button.title = title
-          button.disabled = !enabled
-          button.addEventListener('mousedown', (event) => event.preventDefault())
-          button.addEventListener('click', act)
-          tools.append(button)
-          return button
+      const confirmRemove = async (name: string, last: boolean, index: number) => {
+        try {
+          await ElMessageBox.confirm(
+            last ? '删除后，整个标签页都会去掉。' : `删除标签「${name}」？这一页里的内容会一起去掉。`,
+            '删除标签',
+            {
+              confirmButtonText: '删除',
+              cancelButtonText: '取消',
+              type: 'warning',
+              appendTo: 'body',
+              modalClass: 'rte-tabs-delete-confirm',
+            },
+          )
+        } catch {
+          return
         }
-        makeTool('左移', '把当前标签向左移', false, editable && active > 0, () => {
-          run((tr, pos) => moveTabPane(tr, pos, active, active - 1))
-        })
-        makeTool('右移', '把当前标签向右移', false, editable && active < titles.length - 1, () => {
-          run((tr, pos) => moveTabPane(tr, pos, active, active + 1))
-        })
-        makeTool('改名', '重命名当前标签', false, editable && titles.length > 0, () => {
-          beginRename(active, titles[active] || '标签')
-        })
-        makeTool(
-          '删除',
-          titles.length <= TABS_MIN ? '删除整个标签页' : '删除当前标签',
-          true,
-          editable && titles.length > 0,
-          () => run((tr, pos) => removeTabPane(tr, pos, active)),
-        )
+        run((tr, pos) => removeTabPane(tr, pos, index))
       }
 
       const syncBar = () => {
@@ -433,6 +522,13 @@ export const TabsBlock = Node.create({
           // 标签条和页签显隐不进文档；正文里的输入仍然要收下。
           if (!body.contains(target)) return true
           return mutation.type === 'attributes'
+        },
+        destroy() {
+          closeMenu()
+          document.removeEventListener('mousedown', onDocPointer, true)
+          document.removeEventListener('keydown', onDocKey)
+          window.removeEventListener('scroll', onScroll, true)
+          window.removeEventListener('resize', onScroll)
         },
       }
     }

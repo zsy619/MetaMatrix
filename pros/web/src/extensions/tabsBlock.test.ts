@@ -92,4 +92,31 @@ describe('多标签操作', () => {
     editor.view.dispatch(last)
     expect(blockPos(editor)).toBe(-1)
   })
+
+  it('操作收在右侧省略号菜单里', async () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    editor = new Editor({
+      element: host,
+      extensions: [StarterKit, TabsBlock, TabPane],
+      content: '<p></p>',
+    })
+    expect(editor.chain().focus('end').insertTabsBlock(['概览', '细节']).run()).toBe(true)
+    await new Promise((resolve) => queueMicrotask(resolve))
+    const more = host.querySelector('.rte-tabs-more')
+    expect(more).toBeInstanceOf(HTMLButtonElement)
+    expect(host.querySelector('.rte-tabs-tool')).toBeNull()
+    expect(more?.parentElement?.classList.contains('rte-tabs-tools')).toBe(true)
+    ;(more as HTMLButtonElement).click()
+    const labels = [...document.querySelectorAll('.rte-tabs-menu-item')].map((el) => el.textContent)
+    expect(labels).toEqual(['添加', '左移', '右移', '改名', '删除'])
+    const left = document.querySelector('.rte-tabs-menu-item')?.parentElement?.querySelector('button:nth-child(2)')
+    expect((left as HTMLButtonElement).disabled).toBe(true)
+    const add = [...document.querySelectorAll<HTMLButtonElement>('.rte-tabs-menu-item')].find(
+      (el) => el.textContent === '添加',
+    )
+    add?.click()
+    expect(document.querySelector('.rte-tabs-menu')).toBeNull()
+    expect(titlesOf(editor)).toEqual(['概览', '细节', '新标签'])
+  })
 })

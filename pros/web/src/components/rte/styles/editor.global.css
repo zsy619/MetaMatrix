@@ -608,7 +608,8 @@ html.rte-toolbar-dragging * {
  * 这里把遮罩抬到编辑器所有层级之上（inline style 需要 !important 才能压住）。
  */
 .el-overlay.is-message-box.rte-chart-delete-confirm,
-.el-overlay.is-message-box.rte-outbound-confirm {
+.el-overlay.is-message-box.rte-outbound-confirm,
+.el-overlay.is-message-box.rte-tabs-delete-confirm {
   z-index: 12000 !important;
 }
 .rte-note-overlay {
@@ -3046,39 +3047,71 @@ html.rte-toolbar-dragging * {
 .rte-tabs-tab.is-dragging {
   opacity: 0.45;
 }
-.rte-tabs-add,
-.rte-tabs-tool {
-  border: 0;
-  background: transparent;
-  color: #4e5969;
-  font-size: 12px;
-  padding: 0 8px;
-  cursor: pointer;
-  border-radius: 4px;
-  white-space: nowrap;
-}
-.rte-tabs-add {
-  margin: 6px 4px;
-}
-.rte-tabs-tool:hover,
-.rte-tabs-add:hover:not(:disabled) {
-  background: #e8f3ff;
-  color: #165dff;
-}
-.rte-tabs-tool.is-danger:hover:not(:disabled) {
-  background: #ffece8;
-  color: #f53f3f;
-}
-.rte-tabs-tool:disabled,
-.rte-tabs-add:disabled {
-  opacity: 0.35;
-  cursor: default;
-}
 .rte-tabs-tools {
   display: flex;
   align-items: center;
-  gap: 2px;
   flex-shrink: 0;
+  padding: 0 4px;
+}
+.rte-tabs-more {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #4e5969;
+  font-size: 18px;
+  line-height: 1;
+  letter-spacing: 1px;
+  cursor: pointer;
+}
+.rte-tabs-more:hover:not(:disabled) {
+  background: #e8f3ff;
+  color: #165dff;
+}
+.rte-tabs-more:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.rte-tabs-menu {
+  position: fixed;
+  z-index: 12000;
+  min-width: 132px;
+  padding: 4px;
+  background: #fff;
+  border: 1px solid #e5e6eb;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(29, 33, 41, 0.12);
+}
+.rte-tabs-menu-item {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  padding: 7px 10px;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #1d2129;
+  cursor: pointer;
+}
+.rte-tabs-menu-item:hover:not(:disabled) {
+  background: #f2f3f5;
+}
+.rte-tabs-menu-item.is-danger {
+  color: #f53f3f;
+}
+.rte-tabs-menu-item.is-danger:hover:not(:disabled) {
+  background: #ffece8;
+}
+.rte-tabs-menu-item:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.rte-tabs-menu-sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: #e5e6eb;
 }
 .rte-tabs-rename {
   width: 88px;
@@ -3090,9 +3123,7 @@ html.rte-toolbar-dragging * {
   color: #1d2129;
 }
 .rte-root.mode-preview .rte-tabs-tools,
-.rte-root.mode-preview .rte-tabs-add,
-.rte-root.mode-source .rte-tabs-tools,
-.rte-root.mode-source .rte-tabs-add {
+.rte-root.mode-source .rte-tabs-tools {
   display: none;
 }
 .rte-tabs-body {
