@@ -405,6 +405,7 @@
   border: 1px solid #ebebeb;
   background: #fff;
   max-height: var(--rte-float-max-h, min(70vh, 560px));
+  overscroll-behavior: contain;
 }
 .rte-float-menu.rte-template-menu {
   display: flex;
@@ -1906,6 +1907,13 @@
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
   z-index: 40;
   background: #fff;
+  max-height: min(360px, 60vh);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.rte-more-flyout > button {
+  flex: 0 0 auto;
 }
 .rte-root.expanded .rte-color-menu {
   /* 颜色面板较宽：优先左对齐；若贴右可由工具条 overflow:visible + bridge 兜底 */

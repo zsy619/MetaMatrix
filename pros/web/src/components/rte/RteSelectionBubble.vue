@@ -30,12 +30,18 @@ const panelUp = ref(false)
 /** 工具条根元素：用来判断面板朝上还是朝下。 */
 const barEl = ref<HTMLElement | null>(null)
 
-/** 面板展开方向：下方空间不够就朝上。 */
+/** 面板展开方向：哪边空间更大就朝哪边，高度不超过那一边，避免字号列表伸出窗口。 */
 function resolvePanelUp(): boolean {
   const el = barEl.value
   if (!el || typeof window === 'undefined') return false
   const rect = el.getBoundingClientRect()
-  return window.innerHeight - rect.bottom < 460
+  const below = window.innerHeight - rect.bottom - 12
+  const above = rect.top - 12
+  const up = above > below
+  const room = Math.max(0, Math.floor(up ? above : below))
+  const space = Math.min(360, Math.max(120, room))
+  el.style.setProperty('--rte-bubble-panel-max', `${space}px`)
+  return up
 }
 
 function togglePanel(kind: PanelKind) {
@@ -325,7 +331,7 @@ function run(action: () => void) {
         </button>
         <div
           v-if="panel === 'size'"
-          class="rte-bubble-panel rte-bubble-panel-size"
+          class="rte-bubble-panel rte-bubble-panel-size rte-font-size-menu"
           :class="{ 'is-up': panelUp }"
           role="listbox"
           aria-label="字号"

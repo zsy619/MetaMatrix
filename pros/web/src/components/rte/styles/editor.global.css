@@ -38,7 +38,36 @@ html.rte-toolbar-dragging * {
   flex-direction: column;
   padding: 4px;
   min-width: 108px;
+  min-height: 0;
   color: #1d2129;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #c9cdd4 transparent;
+}
+.rte-float-menu.rte-menu > button,
+.rte-float-menu.rte-import-menu > button,
+.rte-float-menu.rte-more-menu > button {
+  flex: 0 0 auto;
+}
+.rte-float-menu.rte-font-size-menu,
+.rte-more-flyout.rte-font-size-menu,
+.rte-selection-bubble .rte-bubble-panel-size {
+  overflow-y: scroll;
+  scrollbar-color: #86909c #f2f3f5;
+}
+.rte-float-menu.rte-font-size-menu::-webkit-scrollbar,
+.rte-more-flyout.rte-font-size-menu::-webkit-scrollbar,
+.rte-selection-bubble .rte-bubble-panel-size::-webkit-scrollbar {
+  width: 10px;
+}
+.rte-float-menu.rte-font-size-menu::-webkit-scrollbar-thumb,
+.rte-more-flyout.rte-font-size-menu::-webkit-scrollbar-thumb,
+.rte-selection-bubble .rte-bubble-panel-size::-webkit-scrollbar-thumb {
+  background: #c9cdd4;
+  border-radius: 5px;
+  border: 2px solid #fff;
 }
 .rte-float-menu.rte-import-menu {
   min-width: 220px;
@@ -103,9 +132,11 @@ html.rte-toolbar-dragging * {
   flex-direction: column;
   gap: 1px;
   min-width: 148px;
-  max-height: 280px;
+  max-height: var(--rte-bubble-panel-max, min(360px, 60vh));
   overflow-x: hidden;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
   padding: 4px;
   background: #fff;
   border: 1px solid #d5d8de;
@@ -116,8 +147,12 @@ html.rte-toolbar-dragging * {
   top: auto;
   bottom: calc(100% + 8px);
 }
+.rte-selection-bubble .rte-bubble-panel.rte-bubble-panel-size {
+  display: block;
+}
 .rte-selection-bubble .rte-bubble-panel-item {
   display: block;
+  flex: 0 0 auto;
   width: 100%;
   margin: 0;
   padding: 6px 10px;

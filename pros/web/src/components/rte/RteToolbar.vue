@@ -567,7 +567,7 @@ function toggleChartGroupMenu(key: string) {
           <Teleport to="body">
             <div data-rte-own
               v-if="rte.fontSizeOpen"
-              class="rte-menu"
+              class="rte-menu rte-font-size-menu"
               v-rte-float="'fontSize'"
               @mousedown.prevent
               @mouseenter="rte.onToolMenuEnter('fontSize')"
@@ -2106,7 +2106,7 @@ function toggleChartGroupMenu(key: string) {
             </div>
             <div data-rte-own
               v-if="mt.kind === 'fontSize' && rte.moreFontSizeOpen"
-              class="rte-menu rte-more-flyout"
+              class="rte-menu rte-more-flyout rte-font-size-menu"
               @mousedown.prevent
             >
               <button data-rte-own

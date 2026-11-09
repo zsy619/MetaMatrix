@@ -155,96 +155,112 @@ function setFloatStyle(
   el.style.setProperty(prop, value, 'important')
 }
 
+/** 重排会先把 max-height 清掉再写回，同步触发的 scroll 不能再进来，否则字号列表的 scrollTop 会被打回 0。 */
+let placingFloatMenu = false
+
 function placeFloatMenuEl(menuEl: HTMLElement, key: string) {
-  let anchor = floatAnchors.get(key)
-  if (!anchor || !anchor.isConnected) {
-    const found = document.querySelector(`[data-rte-anchor="${key}"]`)
-    if (found instanceof HTMLElement) {
-      anchor = found
-      floatAnchors.set(key, found)
+  if (placingFloatMenu) return
+  placingFloatMenu = true
+  const scrollTop = menuEl.scrollTop
+  try {
+    let anchor = floatAnchors.get(key)
+    if (!anchor || !anchor.isConnected) {
+      const found = document.querySelector(`[data-rte-anchor="${key}"]`)
+      if (found instanceof HTMLElement) {
+        anchor = found
+        floatAnchors.set(key, found)
+      }
     }
-  }
-  // 非最大化从「更多」打开时，emoji/特殊字符/段距/字数按钮不在顶栏：回退锚到「更多」
-  if (
-    (!anchor || !anchor.isConnected) &&
-    (key === 'emoji' || key === 'specialChars' || key === 'spacing' || key === 'wordStats')
-  ) {
-    const more =
-      floatAnchors.get('more') ||
-      (document.querySelector('[data-rte-anchor="more"]') as HTMLElement | null)
-    if (more instanceof HTMLElement) {
-      anchor = more
-      floatAnchors.set(key, more)
+    // 非最大化从「更多」打开时，emoji/特殊字符/段距/字数按钮不在顶栏：回退锚到「更多」
+    if (
+      (!anchor || !anchor.isConnected) &&
+      (key === 'emoji' || key === 'specialChars' || key === 'spacing' || key === 'wordStats')
+    ) {
+      const more =
+        floatAnchors.get('more') ||
+        (document.querySelector('[data-rte-anchor="more"]') as HTMLElement | null)
+      if (more instanceof HTMLElement) {
+        anchor = more
+        floatAnchors.set(key, more)
+      }
     }
-  }
-  if (!anchor || !menuEl.isConnected) {
-    menuEl.style.setProperty('visibility', 'visible', 'important')
-    return
-  }
+    if (!anchor || !menuEl.isConnected) {
+      menuEl.style.setProperty('visibility', 'visible', 'important')
+      return
+    }
 
-  const rect = anchor.getBoundingClientRect()
-  const vw = window.innerWidth
-  const vh = window.innerHeight
+    const rect = anchor.getBoundingClientRect()
+    const vw = window.innerWidth
+    const vh = window.innerHeight
 
-  setFloatStyle(menuEl, 'position', 'fixed')
-  setFloatStyle(menuEl, 'right', 'auto')
-  setFloatStyle(menuEl, 'bottom', 'auto')
-  setFloatStyle(menuEl, 'margin', '0')
-  setFloatStyle(menuEl, 'z-index', '5200')
-  // 先放到视口内可测，避免 top/left:auto 落在文档流末尾
-  setFloatStyle(menuEl, 'left', '0px')
-  setFloatStyle(menuEl, 'top', '0px')
-  setFloatStyle(menuEl, 'max-height', 'none')
-  menuEl.style.width = ''
-  setFloatStyle(menuEl, 'visibility', 'hidden')
+    setFloatStyle(menuEl, 'position', 'fixed')
+    setFloatStyle(menuEl, 'right', 'auto')
+    setFloatStyle(menuEl, 'bottom', 'auto')
+    setFloatStyle(menuEl, 'margin', '0')
+    setFloatStyle(menuEl, 'z-index', '5200')
+    // 先放到视口内可测，避免 top/left:auto 落在文档流末尾
+    setFloatStyle(menuEl, 'left', '0px')
+    setFloatStyle(menuEl, 'top', '0px')
+    setFloatStyle(menuEl, 'max-height', 'none')
+    menuEl.style.width = ''
+    setFloatStyle(menuEl, 'visibility', 'hidden')
 
-  const mw = Math.max(menuEl.offsetWidth, 1)
-  const mh = Math.max(menuEl.offsetHeight, 1)
-  const spaceBelow = vh - rect.bottom - FLOAT_VIEW_PAD
-  const spaceAbove = rect.top - FLOAT_VIEW_PAD
-  const preferBelow =
-    spaceBelow >= Math.min(mh, 220) || spaceBelow >= spaceAbove
+    const mw = Math.max(menuEl.offsetWidth, 1)
+    const mh = Math.max(menuEl.offsetHeight, 1)
+    const spaceBelow = vh - rect.bottom - FLOAT_VIEW_PAD
+    const spaceAbove = rect.top - FLOAT_VIEW_PAD
+    const preferBelow =
+      spaceBelow >= Math.min(mh, 220) || spaceBelow >= spaceAbove
 
-  let maxH: number
-  let top: number
-  if (preferBelow) {
-    maxH = Math.max(120, spaceBelow - FLOAT_GAP)
-    top = rect.bottom - FLOAT_GAP
-  } else {
-    maxH = Math.max(120, spaceAbove - FLOAT_GAP)
-    const usedH = Math.min(mh, maxH)
-    top = rect.top + FLOAT_GAP - usedH
-  }
+    let maxH: number
+    let top: number
+    if (preferBelow) {
+      maxH = Math.max(120, spaceBelow - FLOAT_GAP)
+      top = rect.bottom - FLOAT_GAP
+    } else {
+      maxH = Math.max(120, spaceAbove - FLOAT_GAP)
+      const usedH = Math.min(mh, maxH)
+      top = rect.top + FLOAT_GAP - usedH
+    }
 
-  const preferEnd =
-    key === 'import' || key === 'export' || key === 'table' || key === 'more' || key.startsWith('more-')
-  let left = preferEnd ? rect.right - mw : rect.left
-  const maxW = Math.max(160, vw - FLOAT_VIEW_PAD * 2)
-  if (mw > maxW) {
-    menuEl.style.width = `${Math.floor(maxW)}px`
-    left = FLOAT_VIEW_PAD
-  } else {
-    if (left + mw > vw - FLOAT_VIEW_PAD) left = vw - FLOAT_VIEW_PAD - mw
-    if (left < FLOAT_VIEW_PAD) left = FLOAT_VIEW_PAD
-  }
+    const preferEnd =
+      key === 'import' || key === 'export' || key === 'table' || key === 'more' || key.startsWith('more-')
+    let left = preferEnd ? rect.right - mw : rect.left
+    const maxW = Math.max(160, vw - FLOAT_VIEW_PAD * 2)
+    if (mw > maxW) {
+      menuEl.style.width = `${Math.floor(maxW)}px`
+      left = FLOAT_VIEW_PAD
+    } else {
+      if (left + mw > vw - FLOAT_VIEW_PAD) left = vw - FLOAT_VIEW_PAD - mw
+      if (left < FLOAT_VIEW_PAD) left = FLOAT_VIEW_PAD
+    }
 
-  if (top < FLOAT_VIEW_PAD) top = FLOAT_VIEW_PAD
-  if (top + Math.min(mh, maxH) > vh - FLOAT_VIEW_PAD) {
-    top = Math.max(FLOAT_VIEW_PAD, vh - FLOAT_VIEW_PAD - Math.min(mh, maxH))
-  }
+    if (top < FLOAT_VIEW_PAD) top = FLOAT_VIEW_PAD
+    if (top + Math.min(mh, maxH) > vh - FLOAT_VIEW_PAD) {
+      top = Math.max(FLOAT_VIEW_PAD, vh - FLOAT_VIEW_PAD - Math.min(mh, maxH))
+    }
 
-  setFloatStyle(menuEl, 'left', `${Math.round(left)}px`)
-  setFloatStyle(menuEl, 'top', `${Math.round(top)}px`)
-  setFloatStyle(menuEl, 'max-height', `${Math.round(maxH)}px`)
-  setFloatStyle(menuEl, 'visibility', 'visible')
-  menuEl.style.setProperty('--rte-float-max-h', `${Math.round(maxH)}px`)
-  if (menuEl.classList.contains('rte-para-menu')) {
-    setFloatStyle(menuEl, 'overflow', 'visible')
-  } else if (menuEl.classList.contains('rte-template-menu')) {
-    setFloatStyle(menuEl, 'overflow', 'hidden')
-  } else {
-    setFloatStyle(menuEl, 'overflow-x', 'hidden')
-    setFloatStyle(menuEl, 'overflow-y', 'auto')
+    setFloatStyle(menuEl, 'left', `${Math.round(left)}px`)
+    setFloatStyle(menuEl, 'top', `${Math.round(top)}px`)
+    setFloatStyle(menuEl, 'max-height', `${Math.round(maxH)}px`)
+    setFloatStyle(menuEl, 'visibility', 'visible')
+    menuEl.style.setProperty('--rte-float-max-h', `${Math.round(maxH)}px`)
+    if (menuEl.classList.contains('rte-para-menu')) {
+      setFloatStyle(menuEl, 'overflow', 'visible')
+    } else if (menuEl.classList.contains('rte-template-menu')) {
+      setFloatStyle(menuEl, 'overflow', 'hidden')
+    } else {
+      setFloatStyle(menuEl, 'overflow-x', 'hidden')
+      setFloatStyle(
+        menuEl,
+        'overflow-y',
+        menuEl.classList.contains('rte-font-size-menu') ? 'scroll' : 'auto',
+      )
+      setFloatStyle(menuEl, 'overscroll-behavior', 'contain')
+    }
+  } finally {
+    if (scrollTop > 0 && menuEl.scrollTop !== scrollTop) menuEl.scrollTop = scrollTop
+    placingFloatMenu = false
   }
 }
 
@@ -274,7 +290,14 @@ const vRteFloat: Directive<HTMLElement, string> = {
     })
     const ro = new ResizeObserver(() => placeFloatMenuEl(node, key))
     ro.observe(node)
-    const onWin = () => placeFloatMenuEl(node, key)
+    const onWin = (event: Event) => {
+      // 字号等长列表在菜单内部滚动时，不能当成页面滚动去重排。
+      if (event.type === 'scroll') {
+        const target = event.target
+        if (target instanceof Node && (target === node || node.contains(target))) return
+      }
+      placeFloatMenuEl(node, key)
+    }
     window.addEventListener('resize', onWin)
     window.addEventListener('scroll', onWin, true)
     node.__rteFloatCleanup = () => {
