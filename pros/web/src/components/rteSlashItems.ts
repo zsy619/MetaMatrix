@@ -66,6 +66,8 @@ export type RteSlashAction =
   | { type: 'xref' }
   | { type: 'snippet' }
   | { type: 'mention' }
+  | { type: 'spoiler' }
+  | { type: 'dropCap' }
   | { type: 'callout'; variant: 'info' | 'warn' | 'success' | 'error' }
   | { type: 'form'; kind: RteSlashFormKind }
   | { type: 'template'; id: string }
@@ -170,6 +172,22 @@ const BLOCK_ITEMS: RteSlashItem[] = [
     group: 'block',
     keywords: ['quote', '引用', 'blockquote', 'nested', '嵌套'],
     action: { type: 'blockquote' },
+  },
+  {
+    id: 'spoiler',
+    label: '揭晓文字',
+    description: '先藏住，点一下才显示',
+    group: 'block',
+    keywords: ['spoiler', '揭晓', '遮罩', '隐藏', '剧透'],
+    action: { type: 'spoiler' },
+  },
+  {
+    id: 'drop-cap',
+    label: '首字下沉',
+    description: '段首第一个字放大',
+    group: 'block',
+    keywords: ['dropcap', '首字', '下沉', 'drop'],
+    action: { type: 'dropCap' },
   },
   {
     id: 'code-block',

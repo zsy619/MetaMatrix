@@ -63,6 +63,7 @@ import { Callout } from '../../../extensions/callout'
 import { Bookmark } from '../../../extensions/bookmark'
 import { RteBlockquote } from '../../../extensions/rteBlockquote'
 import { EmphasisDot } from '../../../extensions/emphasisDot'
+import { Spoiler } from '../../../extensions/spoiler'
 import { ToggleBlock } from '../../../extensions/toggleBlock'
 import { Audio } from '../../../extensions/audio'
 import { LinkCard } from '../../../extensions/linkCard'
@@ -277,6 +278,7 @@ const editor = useEditor({
     Bookmark,
     RteBlockquote,
     EmphasisDot,
+    Spoiler,
     ToggleBlock,
     Audio,
     LinkCard,

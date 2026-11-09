@@ -2627,6 +2627,49 @@ html.rte-toolbar-dragging * {
   -webkit-text-emphasis-style: filled dot;
   -webkit-text-emphasis-position: under;
 }
+.rte-spoiler {
+  background: #2b303b;
+  color: transparent;
+  border-radius: 3px;
+  cursor: pointer;
+  padding: 0 2px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.rte-spoiler:hover,
+.rte-spoiler:focus,
+.rte-spoiler.is-revealed {
+  color: inherit;
+  background: #fff4cc;
+}
+.rte-root.is-dark-editor .rte-spoiler:hover,
+.rte-root.is-dark-editor .rte-spoiler:focus,
+.rte-root.is-dark-editor .rte-spoiler.is-revealed {
+  color: #f5f0e6;
+  background: #3d3420;
+}
+.rte-drop-cap {
+  display: flow-root;
+}
+.rte-drop-cap::first-letter {
+  float: left;
+  font-size: 3.1em;
+  line-height: 0.85;
+  font-weight: 700;
+  color: #1a73e8;
+  padding: 0.04em 0.08em 0 0;
+}
+.rte-root.is-dark-editor .rte-drop-cap::first-letter {
+  color: #8ab4ff;
+}
+@media print {
+  .rte-spoiler,
+  .rte-spoiler.is-revealed {
+    color: inherit !important;
+    background: transparent !important;
+  }
+}
 .rte-toggle-block {
   border: 1px solid #e5e6eb;
   border-radius: 8px;

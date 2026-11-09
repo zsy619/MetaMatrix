@@ -22,6 +22,7 @@ export function clearEditorFormat(editor: Editor): boolean {
           textIndent: null,
           dir: null,
           textAlign: null,
+          dropCap: null,
         })
       })
       return true

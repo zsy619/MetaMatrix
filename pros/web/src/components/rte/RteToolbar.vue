@@ -1835,13 +1835,13 @@ function toggleChartGroupMenu(key: string) {
             :ref="(el) => rte.setFloatAnchor('caseTransform', el)"
             data-rte-anchor="caseTransform"
             :class="{ active: rte.caseMenuOpen }"
-            title="大小写转换"
+            :title="t.title || '文字'"
             @click.stop="rte.markToolbarMenuOpening(); rte.caseMenuOpen = !rte.caseMenuOpen"
           >
             <span data-rte-own class="rte-tool-icon">
               <component data-rte-own :is="t.iconComp || rte.toolIcon('fontSize')" class="rte-ep-icon" />
             </span>
-            <span data-rte-own class="rte-tool-label">大小写<span data-rte-own class="rte-caret" aria-hidden="true"></span></span>
+            <span data-rte-own class="rte-tool-label">{{ t.label || '文字' }}<span data-rte-own class="rte-caret" aria-hidden="true"></span></span>
           </button>
           <Teleport to="body">
             <div data-rte-own
@@ -1852,9 +1852,18 @@ function toggleChartGroupMenu(key: string) {
               @mouseenter="rte.onToolMenuEnter('caseTransform')"
               @mouseleave="rte.onToolMenuLeave($event, 'caseTransform', () => (rte.caseMenuOpen = false))"
             >
-              <button data-rte-own type="button" @click="rte.runCaseTransform('upper')">全大写</button>
-              <button data-rte-own type="button" @click="rte.runCaseTransform('lower')">全小写</button>
-              <button data-rte-own type="button" @click="rte.runCaseTransform('title')">词首大写</button>
+              <template v-for="item in rte.TEXT_MENU_ITEMS" :key="'case-' + item.id">
+                <div v-if="item.sep" data-rte-own class="rte-menu-sep" aria-hidden="true"></div>
+                <button
+                  v-else
+                  data-rte-own
+                  type="button"
+                  :class="{ active: rte.textMenuActive(item.id) }"
+                  @click="rte.runTextMenu(item.id)"
+                >
+                  {{ item.label }}
+                </button>
+              </template>
             </div>
           </Teleport>
         </div>
@@ -2155,9 +2164,18 @@ function toggleChartGroupMenu(key: string) {
               class="rte-menu rte-more-flyout"
               @mousedown.prevent
             >
-              <button data-rte-own type="button" @click="rte.runCaseTransform('upper')">全大写</button>
-              <button data-rte-own type="button" @click="rte.runCaseTransform('lower')">全小写</button>
-              <button data-rte-own type="button" @click="rte.runCaseTransform('title')">词首大写</button>
+              <template v-for="item in rte.TEXT_MENU_ITEMS" :key="'mcase-' + item.id">
+                <div v-if="item.sep" data-rte-own class="rte-menu-sep" aria-hidden="true"></div>
+                <button
+                  v-else
+                  data-rte-own
+                  type="button"
+                  :class="{ active: rte.textMenuActive(item.id) }"
+                  @click="rte.runTextMenu(item.id)"
+                >
+                  {{ item.label }}
+                </button>
+              </template>
             </div>
             <div data-rte-own
               v-if="mt.kind === 'zoom' && rte.zoomMenuOpen"

@@ -135,6 +135,8 @@ import {
   RTE_ZOOM_PRESETS,
   type CaseMode,
 } from './rteWave20'
+import { TEXT_MENU_ITEMS } from '../utils/rteTextTidy'
+import { applyTextTidy } from '../utils/rteTextPlay'
 import { countWords, normalizeHtml, toEditorContent } from '../utils/rteContent'
 import { getToken } from '../api/http'
 import { uploadMediaFile } from '../api/mediaUpload'
@@ -1990,6 +1992,83 @@ function runCaseTransform(mode: CaseMode) {
   ElMessage.success(`已转换：${labels[mode]}`)
   caseMenuOpen.value = false
   moreOpen.value = false
+}
+
+function closeTextMenu() {
+  caseMenuOpen.value = false
+  moreOpen.value = false
+}
+
+function toggleSpoiler() {
+  const ed = editor.value
+  if (!ed) return
+  closeTextMenu()
+  if (ed.state.selection.empty) {
+    ed.chain()
+      .focus()
+      .insertContent({ type: 'text', text: '点击揭晓', marks: [{ type: 'spoiler' }] })
+      .run()
+    ElMessage.success('已插入揭晓文字，点击可打开')
+    return
+  }
+  const on = ed.isActive('spoiler')
+  ed.chain().focus().toggleSpoiler().run()
+  ElMessage.success(on ? '已取消揭晓' : '已设为揭晓文字，点击可打开')
+}
+
+function toggleDropCap() {
+  const ed = editor.value
+  if (!ed) return
+  closeTextMenu()
+  const on = !!(ed.getAttributes('paragraph').dropCap || ed.getAttributes('heading').dropCap)
+  ed.chain().focus().toggleDropCap().run()
+  ElMessage.success(on ? '已取消首字下沉' : '已开启首字下沉')
+}
+
+function textMenuActive(id: string): boolean {
+  const ed = editor.value
+  if (!ed) return false
+  if (id === 'spoiler') return ed.isActive('spoiler')
+  if (id === 'dropCap') return !!(ed.getAttributes('paragraph').dropCap || ed.getAttributes('heading').dropCap)
+  return false
+}
+
+function runTextMenu(id: string) {
+  if (id === 'upper' || id === 'lower' || id === 'title') {
+    runCaseTransform(id)
+    return
+  }
+  if (id === 'spoiler') {
+    toggleSpoiler()
+    return
+  }
+  if (id === 'dropCap') {
+    toggleDropCap()
+    return
+  }
+  const ed = editor.value
+  if (!ed) return
+  const labels: Record<string, string> = {
+    half: '转为半角',
+    full: '转为全角',
+    pangu: '中英文加空格',
+    squeeze: '去掉多余空格',
+    sortLines: '按行排序',
+    uniqueLines: '去掉重复行',
+    numberLines: '给每行编号',
+  }
+  const mode = id as 'half' | 'full' | 'pangu' | 'squeeze' | 'sortLines' | 'uniqueLines' | 'numberLines'
+  const result = applyTextTidy(ed, mode)
+  closeTextMenu()
+  if (result === 'applied') {
+    ElMessage.success(`已整理：${labels[id] || '文字'}`)
+    return
+  }
+  if (result === 'need-lines') {
+    ElMessage.info('请选中连续的几段文字')
+    return
+  }
+  ElMessage.info('没有需要改的文字')
 }
 
 function toggleEmphasisDot() {
@@ -4004,6 +4083,12 @@ function applySlashCommandItem(item: RteSlashItem) {
       break
     case 'blockquote':
       toggleBlockquote()
+      break
+    case 'spoiler':
+      toggleSpoiler()
+      break
+    case 'dropCap':
+      toggleDropCap()
       break
     case 'codeBlock':
       toggleCodeBlock()
@@ -6435,8 +6520,8 @@ const allTools = computed((): ToolItem[] => {
     // —— 书写 / 结构 / 审阅 / 视图（Wave20）——
     {
       key: 'caseTransform',
-      label: '大小写',
-      title: '大小写转换',
+      label: '文字',
+      title: '大小写、整理、揭晓、首字下沉',
       icon: 'Aa',
       iconComp: ic('fontSize'),
       kind: 'caseTransform',
@@ -7503,6 +7588,11 @@ provideRteBindings({
   rteSlashGlyph,
   rteSlashSectionLabel,
   runCaseTransform,
+  runTextMenu,
+  textMenuActive,
+  toggleDropCap,
+  toggleSpoiler,
+  TEXT_MENU_ITEMS,
   saveSnippetForm,
   selectCurrentBlock,
   selectNoteType,

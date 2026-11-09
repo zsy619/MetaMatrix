@@ -18,6 +18,7 @@ declare module '@tiptap/core' {
       unsetParagraphSpacing: () => ReturnType
       setTextIndent: (textIndent: string | null) => ReturnType
       setTextDir: (dir: 'ltr' | 'rtl' | null) => ReturnType
+      toggleDropCap: () => ReturnType
     }
   }
 }
@@ -114,6 +115,17 @@ export const ParagraphAttrs = Extension.create<ParagraphAttrsOptions>({
             renderHTML: (attributes: { dir?: string | null }) => {
               if (!attributes.dir) return {}
               return { dir: attributes.dir, 'data-dir': attributes.dir }
+            },
+          },
+          dropCap: {
+            default: null,
+            parseHTML: (element: HTMLElement) =>
+              element.getAttribute('data-drop-cap') === '1' || element.classList.contains('rte-drop-cap')
+                ? true
+                : null,
+            renderHTML: (attributes: { dropCap?: boolean | null }) => {
+              if (!attributes.dropCap) return {}
+              return { 'data-drop-cap': '1', class: 'rte-drop-cap' }
             },
           },
         },
@@ -214,6 +226,17 @@ export const ParagraphAttrs = Extension.create<ParagraphAttrsOptions>({
           }
           if (ok) return true
           return commands.updateAttributes('paragraph', { dir })
+        },
+      toggleDropCap:
+        () =>
+        ({ editor, commands }) => {
+          const types = this.options.types
+          for (const type of types) {
+            if (!editor.isActive(type)) continue
+            const on = !!editor.getAttributes(type).dropCap
+            return commands.updateAttributes(type, { dropCap: on ? null : true })
+          }
+          return commands.updateAttributes('paragraph', { dropCap: true })
         },
     }
   },
