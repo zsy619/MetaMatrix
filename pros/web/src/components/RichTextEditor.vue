@@ -7120,10 +7120,19 @@ function focusEditor() {
 function onCanvasClick(event: MouseEvent) {
   const target = event.target as HTMLElement | null
   if (!target) return
-  // 标题输入框已 @click.stop；此处再兜底一次
-  if (target.closest('.rte-title, .rte-block-menu, .rte-block-tools, .rte-code-chrome')) return
-  // 点在可编辑区（含 table td/th、.tableWrapper）内：不要抢走选区
-  if (target.closest('.ProseMirror, .tiptap, .rte-body')) return
+  // 节点视图在点击里改文档时，目标节点可能已从树上卸下，closest 会失效。
+  // 用派发时的路径判断，避免把光标拽到文末。
+  const path = event.composedPath()
+  const insideEditor = path.some(
+    (node) =>
+      node instanceof Element &&
+      Boolean(
+        node.matches(
+          '.rte-title, .rte-block-menu, .rte-block-tools, .rte-code-chrome, .ProseMirror, .tiptap, .rte-body',
+        ),
+      ),
+  )
+  if (insideEditor) return
   editor.value?.commands.focus('end')
 }
 
