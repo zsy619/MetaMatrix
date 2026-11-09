@@ -1,6 +1,7 @@
 import Image from '@tiptap/extension-image'
 import { mergeAttributes } from '@tiptap/core'
 import { createImageDragPlugin } from './rteImageDrag'
+import { createImageCaptionPlugin } from './rteImageCaption'
 import { normalizeImageAlign, normalizeImageLayout } from '../utils/rteImageLayout'
 import { cropAttrsStyle } from '../utils/rteImageCropAttrs'
 
@@ -159,6 +160,6 @@ export const RteImage = Image.extend({
   },
 
   addProseMirrorPlugins() {
-    return [...(this.parent?.() || []), createImageDragPlugin()]
+    return [...(this.parent?.() || []), createImageDragPlugin(), createImageCaptionPlugin()]
   },
 })

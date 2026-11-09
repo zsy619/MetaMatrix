@@ -242,6 +242,57 @@ export function formValueToCompareString(value: unknown): string {
   return String(value).trim()
 }
 
+export type FormIssue = {
+  pos: number
+  label: string
+  reason: string
+}
+
+function formFieldEmpty(typeName: string, value: unknown): boolean {
+  if (typeName === 'formSwitch') return value !== true && value !== 'true'
+  return isEmptyValue(value)
+}
+
+/** 找出必填未填或格式不符的字段，按文档顺序。 */
+export function collectFormIssues(doc: {
+  descendants: (f: (node: { type: { name: string }; attrs?: Record<string, unknown> }, pos: number) => void | boolean) => void
+}): FormIssue[] {
+  const issues: FormIssue[] = []
+  doc.descendants((node, pos) => {
+    if (!isFormNodeName(node.type.name)) return
+    const label = String(node.attrs?.label || node.attrs?.name || '未命名字段').trim() || '未命名字段'
+    const value = node.attrs?.value
+    if (node.attrs?.required && formFieldEmpty(node.type.name, value)) {
+      issues.push({ pos, label, reason: '必填未填' })
+      return
+    }
+    if (formNodeSupportsPattern(node.type.name) && !formFieldEmpty(node.type.name, value)) {
+      const re = compileFormPattern(node.attrs?.pattern)
+      if (re && !re.test(String(value))) issues.push({ pos, label, reason: '格式不符' })
+    }
+  })
+  return issues
+}
+
+/** 复制字段名：text_2 变成 text_3，其余加上 _2。 */
+export function nextFormFieldName(name: string): string {
+  const base = name.trim()
+  if (!base) return ''
+  const matched = /_(\d+)$/.exec(base)
+  if (!matched) return `${base}_2`
+  return `${base.slice(0, -matched[1]!.length)}${Number(matched[1]) + 1}`
+}
+
+/** 在当前字段后面复制一份，字段名自动错开。 */
+export function duplicateFormNode(editor: Editor, pos: number): boolean {
+  const node = editor.state.doc.nodeAt(pos)
+  if (!node || !isFormNodeName(node.type.name)) return false
+  const attrs = { ...node.attrs, name: nextFormFieldName(String(node.attrs.name || '')) }
+  const copy = node.type.create(attrs, node.content, node.marks)
+  editor.view.dispatch(editor.state.tr.insert(pos + node.nodeSize, copy))
+  return true
+}
+
 /**
  * 评估条件显示。
  * - 未配置 showIfField → 始终显示

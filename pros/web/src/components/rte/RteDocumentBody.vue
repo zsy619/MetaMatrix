@@ -130,6 +130,7 @@ useParentScopeStamp()
           placeholder="题注（写入图片标题）"
           @mousedown.stop
           @keydown.enter.prevent="rte.applyImageCaption"
+          @blur="rte.applyImageCaption"
         />
         <button data-rte-own
           type="button"
@@ -495,6 +496,8 @@ useParentScopeStamp()
         :attrs="rte.selectedFormAttrs"
         @patch="rte.applySelectedFormPatch"
         @close="rte.closeFormInspector"
+        @duplicate="rte.duplicateSelectedForm"
+        @check="rte.checkFormFields"
         @mousedown="rte.onFormInspectorMouseDown"
         @mouseup="rte.onFormInspectorMouseUp"
         @mouseleave="rte.onFormInspectorMouseUp"

@@ -32,6 +32,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   patch: [patch: Record<string, unknown>]
   close: []
+  duplicate: []
+  check: []
 }>()
 
 const typeLabel = computed(
@@ -287,6 +289,16 @@ function removeOption(index: number) {
   commitOptions()
 }
 
+function moveOption(index: number, dir: -1 | 1) {
+  const next = index + dir
+  if (next < 0 || next >= optionDrafts.value.length) return
+  const arr = [...optionDrafts.value]
+  const [item] = arr.splice(index, 1)
+  arr.splice(next, 0, item!)
+  optionDrafts.value = arr
+  commitOptions()
+}
+
 function onSelectDefaultChange() {
   emitPatch({ value: defaultDraft.value })
 }
@@ -391,6 +403,10 @@ const showIfNeedsValue = computed(
         ×
       </button>
     </header>
+    <div class="fpi-actions">
+      <button type="button" class="fpi-action" @click="emit('duplicate')">复制字段</button>
+      <button type="button" class="fpi-action" @click="emit('check')">检查填写</button>
+    </div>
 
     <div class="fpi-body">
       <div class="fpi-section">
@@ -673,6 +689,24 @@ const showIfNeedsValue = computed(
                 maxlength="80"
                 @input="onOptionInput(idx, $event)"
               />
+              <button
+                type="button"
+                class="fpi-icon-btn is-move"
+                title="上移选项"
+                :disabled="idx === 0"
+                @click="moveOption(idx, -1)"
+              >
+                ↑
+              </button>
+              <button
+                type="button"
+                class="fpi-icon-btn is-move"
+                title="下移选项"
+                :disabled="idx === optionDrafts.length - 1"
+                @click="moveOption(idx, 1)"
+              >
+                ↓
+              </button>
               <button
                 type="button"
                 class="fpi-icon-btn"
@@ -982,6 +1016,39 @@ const showIfNeedsValue = computed(
   background: #fce8e6;
   border-color: #f28b82;
   color: #d93025;
+}
+
+.fpi-icon-btn.is-move:hover:not(:disabled) {
+  background: #e8f0fe;
+  border-color: #8ab4f8;
+  color: #1a73e8;
+}
+
+.fpi-icon-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.fpi-actions {
+  display: flex;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid #eef0f3;
+}
+
+.fpi-action {
+  flex: 1;
+  height: 28px;
+  border: 1px solid #dadce0;
+  border-radius: 6px;
+  background: #fff;
+  color: #1a73e8;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.fpi-action:hover {
+  background: #e8f0fe;
 }
 
 .fpi-link {

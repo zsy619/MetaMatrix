@@ -406,6 +406,13 @@ function toggleChartGroupMenu(key: string) {
                 开关
               </button>
               <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
+              <button data-rte-own type="button" @click.stop="rte.duplicateSelectedForm()">
+                复制当前字段
+              </button>
+              <button data-rte-own type="button" @click.stop="rte.checkFormFields()">
+                检查填写
+              </button>
+              <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
               <button data-rte-own type="button" @click.stop="rte.formOpen = false; rte.openTableDialog()">
                 表格
               </button>
@@ -2232,6 +2239,9 @@ function toggleChartGroupMenu(key: string) {
               <button data-rte-own type="button" @click="rte.insertFormDate()">日期</button>
               <button data-rte-own type="button" @click="rte.insertFormDateTime()">日期时间</button>
               <button data-rte-own type="button" @click="rte.insertFormSwitch()">开关</button>
+              <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
+              <button data-rte-own type="button" @click="rte.duplicateSelectedForm()">复制当前字段</button>
+              <button data-rte-own type="button" @click="rte.checkFormFields()">检查填写</button>
               <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
               <button data-rte-own
                 type="button"

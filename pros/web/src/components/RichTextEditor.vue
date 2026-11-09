@@ -18,6 +18,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { looksLikeHtml, escapeHtml } from '../utils/itemsHtml'
 import { formulaTexIssue, renderKatex } from '../extensions/math'
 import {
+  collectFormIssues,
+  duplicateFormNode,
   isFormNodeName,
   type FormNodeName,
 } from '../extensions/forms'
@@ -4469,6 +4471,44 @@ function applySelectedFormPatch(patch: Record<string, unknown>) {
   })
 }
 
+function duplicateSelectedForm() {
+  const ed = editor.value
+  const pos = selectedFormPos.value
+  formOpen.value = false
+  moreOpen.value = false
+  if (!ed || pos == null || !duplicateFormNode(ed, pos)) {
+    ElMessage.info('请先选中一个表单字段')
+    return
+  }
+  ElMessage.success('已在下方复制该字段')
+}
+
+function checkFormFields() {
+  const ed = editor.value
+  formOpen.value = false
+  moreOpen.value = false
+  if (!ed) return
+  const issues = collectFormIssues(ed.state.doc)
+  ed.state.doc.descendants((node, pos) => {
+    if (!isFormNodeName(node.type.name)) return
+    const dom = ed.view.nodeDOM(pos)
+    if (!(dom instanceof HTMLElement)) return
+    dom.classList.toggle('rte-form-invalid', issues.some((issue) => issue.pos === pos))
+  })
+  if (!issues.length) {
+    ElMessage.success('必填项都已填写')
+    return
+  }
+  const first = issues[0]!
+  try {
+    ed.chain().focus().setNodeSelection(first.pos).run()
+  } catch {
+    /* 选不中时仍保留提示 */
+  }
+  const preview = issues.slice(0, 3).map((issue) => `${issue.label}（${issue.reason}）`).join('、')
+  ElMessage.warning(`${issues.length} 个字段需要处理：${preview}`)
+}
+
 function closeFormInspector() {
   formInspectorDismissedPos.value = selectedFormPos.value
   formInspectorPinned.value = false
@@ -7228,6 +7268,8 @@ provideRteBindings({
   closeFindDialog,
   closeFontMenus,
   closeFormInspector,
+  checkFormFields,
+  duplicateSelectedForm,
   closeFormulaDialog,
   onFormulaMask,
   formulaError,

@@ -3902,6 +3902,13 @@ html.rte-toolbar-dragging * {
 .rte-root :deep(img.rte-image[data-caption]:not([data-caption=''])) {
   outline: 1px solid transparent;
 }
+.rte-image-caption {
+  margin: 6px 0 12px;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #4e5969;
+}
 .rte-image-bubble {
   flex-direction: column;
   align-items: stretch;

@@ -17,6 +17,7 @@ import {
 } from '../../rteWave20'
 import { recalculateTable } from '../../../utils/rteTableFormula'
 import { maskShouldDismiss } from '../../../utils/rteDialogMask'
+import { duplicateTableRow, equalizeTableColumns } from '../../../utils/rteTableLayout'
 
 /** 表格插入、单元格操作与表格菜单。模板绑定名与原先一致。 */
 export function useTableOps(deps: {
@@ -538,6 +539,28 @@ function calcTableFormulas() {
   ElMessage.success(`已计算 ${changed} 个公式单元格`)
 }
 
+function duplicateCurrentTableRow() {
+  const ed = deps.editor().value
+  if (!ed || !duplicateTableRow(ed)) {
+    ElMessage.info('请把光标放进表格')
+    return
+  }
+  closeAllTableUi()
+  deps.announceRte('已复制当前行')
+  ElMessage.success('已复制当前行')
+}
+
+function equalizeCurrentTableColumns() {
+  const ed = deps.editor().value
+  if (!ed || !equalizeTableColumns(ed)) {
+    ElMessage.info('请把光标放进表格')
+    return
+  }
+  closeAllTableUi()
+  deps.announceRte('已均分列宽')
+  ElMessage.success('已均分列宽')
+}
+
 /** 在当前单元格插入公式模板。 */
 function insertCellFormula() {
   const ed = deps.editor().value
@@ -556,6 +579,8 @@ const tableOpItems = computed((): TableOpItem[] => {
     { key: 'row-after', label: '向下插入行', run: tableAddRowAfter },
     { key: 'col-before', label: '向左插入列', run: tableAddColBefore },
     { key: 'col-after', label: '向右插入列', run: tableAddColAfter },
+    { key: 'dup-row', label: '复制当前行', run: duplicateCurrentTableRow },
+    { key: 'equal-cols', label: '均分列宽', run: equalizeCurrentTableColumns },
     {
       key: 'del-row',
       label: '删除行',
