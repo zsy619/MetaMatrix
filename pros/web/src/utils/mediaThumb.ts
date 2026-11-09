@@ -60,6 +60,18 @@ export function needsAuthPreview(src: string): boolean {
   return mediaFetchUrl(src) !== null
 }
 
+/**
+ * 正文已经把素材换成 blob 地址时，预览层直接复用，不再把 `/media/{id}` 交给 `<img>`。
+ * 这个地址的生命周期归正文缓存，这里不负责释放。
+ */
+export function seedMediaThumb(src: string, url: string): void {
+  if (!src || !url) return
+  const current = states[src]
+  if (current?.status === 'ready' && current.url === url) return
+  abortLoad(src)
+  states[src] = { status: 'ready', url, error: '' }
+}
+
 /** 保证某个素材有预览地址；重复调用不会重复下载。 */
 export function ensureMediaThumb(src: string): void {
   if (!src) return

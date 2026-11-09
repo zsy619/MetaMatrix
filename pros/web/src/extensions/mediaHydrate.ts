@@ -2,6 +2,7 @@ import { Extension } from '@tiptap/core'
 import { Plugin } from '@tiptap/pm/state'
 import { getToken } from '../api/http'
 import { mediaFetchUrl } from '../utils/mediaPath'
+import { seedMediaThumb } from '../utils/mediaThumb'
 
 const blobs = new Map<string, string>()
 const pending = new Set<string>()
@@ -43,6 +44,7 @@ export const MediaHydrate = Extension.create({
               const src = el.getAttribute('src') || ''
               const cached = blobs.get(src)
               if (cached) {
+                seedMediaThumb(src, cached)
                 if (el.src !== cached) el.src = cached
                 return
               }
@@ -78,5 +80,6 @@ async function hydrate(el: HTMLImageElement, src: string, id: string, token: str
   const old = blobs.get(src)
   if (old) URL.revokeObjectURL(old)
   blobs.set(src, blobUrl)
+  seedMediaThumb(src, blobUrl)
   if (el.isConnected && (el.getAttribute('src') || '').startsWith('/media/')) el.src = blobUrl
 }

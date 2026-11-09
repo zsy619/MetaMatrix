@@ -102,6 +102,21 @@ describe('mediaThumb：素材库内部路径要走鉴权取图', () => {
     expect(attempt).toBe(2)
   })
 
+  it('正文已经换成 blob 时，预览直接复用，不再请求 /media/{id}', async () => {
+    const mod = await freshModule()
+    const spy = installFetch(() => new Response('x'))
+    const revoked: string[] = []
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation((url: string) => {
+      revoked.push(url)
+    })
+    mod.seedMediaThumb('/media/asset-3', 'blob:already')
+    expect(mod.mediaThumbState('/media/asset-3')).toEqual({ status: 'ready', url: 'blob:already', error: '' })
+    mod.ensureMediaThumb('/media/asset-3')
+    expect(spy).not.toHaveBeenCalled()
+    mod.clearMediaThumbs()
+    expect(revoked).not.toContain('blob:already')
+  })
+
   it('data:/http(s) 直链不触发鉴权请求，直接可用', async () => {
     const mod = await freshModule()
     const spy = installFetch(() => new Response('x'))

@@ -92,6 +92,15 @@ export function imageFileExt(src: string): string {
   return matched[1]!.toLowerCase().replace('jpeg', 'jpg')
 }
 
+/**
+ * 预览层 `<img src>` 只能用已经能直接显示的地址。
+ * 素材库路径 `/media/{id}` 在解析完成前不能交给浏览器，否则会 404 成裂图。
+ */
+export function lightboxImageSrc(state: { status: string; url: string }): string {
+  if (state.status !== 'ready' && state.status !== 'direct') return ''
+  return state.url || ''
+}
+
 /** 下载名：题注或替代文字，去掉路径字符，补上扩展名。 */
 export function imageDownloadName(
   item: Pick<RtePreviewImage, 'alt' | 'caption' | 'src'>,

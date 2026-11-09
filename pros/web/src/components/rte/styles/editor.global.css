@@ -3935,6 +3935,50 @@ html.rte-image-preview-open .tippy-box {
 .rte-image-lightbox-photo.is-dragging {
   transition: none;
 }
+.rte-image-lightbox-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  max-width: 360px;
+  padding: 0 24px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.rte-image-lightbox-fallback p {
+  margin: 0;
+}
+.rte-image-lightbox-retry {
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+}
+.rte-image-lightbox-retry:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+.rte-image-lightbox-spinner {
+  width: 28px;
+  height: 28px;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: rte-image-lightbox-spin 0.8s linear infinite;
+}
+@keyframes rte-image-lightbox-spin {
+  to { transform: rotate(360deg); }
+}
+.rte-image-lightbox-thumb-empty {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.08);
+}
 .rte-image-lightbox-caption {
   margin: 0;
   padding: 8px 24px 0;

@@ -8,6 +8,7 @@ import {
   collectEditorImages,
   imageDownloadName,
   indexForImage,
+  lightboxImageSrc,
   stepImageZoom,
   wheelImageZoom,
 } from './rteImagePreview'
@@ -48,6 +49,13 @@ describe('图片预览列表', () => {
     expect(stepImageZoom(0.1, -1)).toBe(0.1)
     expect(wheelImageZoom(1, -1)).toBe(1.1)
     expect(wheelImageZoom(1, 10)).toBe(0.9)
+  })
+
+  it('素材库路径在解析完成前不能当作预览地址', () => {
+    expect(lightboxImageSrc({ status: 'loading', url: '' })).toBe('')
+    expect(lightboxImageSrc({ status: 'error', url: '' })).toBe('')
+    expect(lightboxImageSrc({ status: 'direct', url: 'https://example.com/a.png' })).toBe('https://example.com/a.png')
+    expect(lightboxImageSrc({ status: 'ready', url: 'blob:preview' })).toBe('blob:preview')
   })
 
   it('下载名去掉非法字符并补扩展名', () => {

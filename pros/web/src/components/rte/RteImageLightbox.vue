@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, inject, onBeforeUnmount, ref, watch } from 'vue'
 import { RTE_BINDINGS } from './bindings'
-import { imageDownloadName, stepImageZoom, wheelImageZoom } from '../../utils/rteImagePreview'
+import { imageDownloadName, lightboxImageSrc, stepImageZoom, wheelImageZoom } from '../../utils/rteImagePreview'
+import { ensureMediaThumb, mediaThumbState, retryMediaThumb } from '../../utils/mediaThumb'
 
 /**
  * 双击图片后的全屏预览。
@@ -17,6 +18,7 @@ const panY = ref(0)
 const dragging = ref(false)
 const toast = ref('')
 const photoEl = ref<HTMLImageElement | null>(null)
+const brokenSrc = ref('')
 let toastTimer: ReturnType<typeof setTimeout> | null = null
 let dragOrigin = { x: 0, y: 0, panX: 0, panY: 0, moved: false }
 
@@ -28,6 +30,10 @@ const count = computed(() => items.value.length)
 const canPrev = computed(() => index.value > 0)
 const canNext = computed(() => index.value < count.value - 1)
 const caption = computed(() => current.value?.caption || current.value?.alt || '')
+const photoState = computed(() => (current.value ? mediaThumbState(current.value.src) : null))
+const photoUrl = computed(() => (photoState.value ? lightboxImageSrc(photoState.value) : ''))
+const photoBroken = computed(() => !!current.value && brokenSrc.value === current.value.src)
+const photoFailed = computed(() => photoBroken.value || photoState.value?.status === 'error')
 const zoomLabel = computed(() => `${Math.round(zoom.value * 100)}%`)
 const photoStyle = computed(() => ({
   transform: `translate(${panX.value}px, ${panY.value}px) rotate(${rotate.value}deg) scale(${zoom.value})`,
@@ -125,6 +131,25 @@ function onPointerUp() {
   dragging.value = false
 }
 
+function thumbUrl(src: string): string {
+  return lightboxImageSrc(mediaThumbState(src))
+}
+
+function onPhotoError() {
+  brokenSrc.value = current.value?.src || ''
+}
+
+function retryPhoto() {
+  const src = current.value?.src || ''
+  brokenSrc.value = ''
+  if (src) retryMediaThumb(src)
+}
+
+function activeSrc(): string {
+  if (photoFailed.value) return ''
+  return photoUrl.value
+}
+
 async function blobFromSrc(src: string): Promise<Blob> {
   const res = await fetch(src)
   if (!res.ok) throw new Error('fetch')
@@ -156,9 +181,13 @@ async function toPng(src: string, blob: Blob): Promise<Blob> {
 
 async function copyCurrent() {
   const item = current.value
-  if (!item) return
+  const src = activeSrc()
+  if (!item || !src) {
+    showToast(photoFailed.value ? '图片加载失败' : '图片还在加载')
+    return
+  }
   try {
-    const png = await toPng(item.src, await blobFromSrc(item.src))
+    const png = await toPng(src, await blobFromSrc(src))
     if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') throw new Error('clipboard')
     await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })])
     showToast('已复制图片')
@@ -167,7 +196,7 @@ async function copyCurrent() {
     /* 跨域或剪贴板不支持图片时，退回复制地址 */
   }
   try {
-    await navigator.clipboard.writeText(item.src)
+    await navigator.clipboard.writeText(src)
     showToast('已复制图片地址')
   } catch {
     showToast('复制失败')
@@ -176,10 +205,14 @@ async function copyCurrent() {
 
 async function downloadCurrent() {
   const item = current.value
-  if (!item) return
+  const src = activeSrc()
+  if (!item || !src) {
+    showToast(photoFailed.value ? '图片加载失败' : '图片还在加载')
+    return
+  }
   const name = imageDownloadName(item, index.value)
   try {
-    const blob = await blobFromSrc(item.src)
+    const blob = await blobFromSrc(src)
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
@@ -188,7 +221,7 @@ async function downloadCurrent() {
     URL.revokeObjectURL(url)
   } catch {
     const link = document.createElement('a')
-    link.href = item.src
+    link.href = src
     link.download = name
     link.target = '_blank'
     link.rel = 'noopener'
@@ -223,6 +256,14 @@ function onKey(event: KeyboardEvent) {
     fit()
   }
 }
+
+watch(
+  () => (open.value ? items.value.map((item) => item.src) : []),
+  (srcs) => {
+    srcs.forEach((src) => ensureMediaThumb(src))
+  },
+  { immediate: true },
+)
 
 watch(
   () => rte.imagePreviewOpen,
@@ -301,14 +342,26 @@ onBeforeUnmount(() => {
         @dblclick.stop.prevent="toggleZoom"
       >
         <img
+          v-if="photoUrl && !photoBroken"
           ref="photoEl"
           class="rte-image-lightbox-photo"
           :class="{ 'is-dragging': dragging }"
-          :src="current.src"
+          :src="photoUrl"
           :alt="current.alt || current.caption || '图片预览'"
           :style="photoStyle"
           draggable="false"
+          @error="onPhotoError"
         />
+        <div v-else class="rte-image-lightbox-fallback" role="status">
+          <template v-if="photoFailed">
+            <p>{{ photoState?.error || '图片加载失败，请重试' }}</p>
+            <button type="button" class="rte-image-lightbox-retry" @click.stop="retryPhoto">重试</button>
+          </template>
+          <template v-else>
+            <span class="rte-image-lightbox-spinner" aria-hidden="true"></span>
+            <p>正在加载图片…</p>
+          </template>
+        </div>
       </div>
 
       <p v-if="caption" class="rte-image-lightbox-caption">{{ caption }}</p>
@@ -324,7 +377,8 @@ onBeforeUnmount(() => {
           :aria-current="i === index ? 'true' : undefined"
           @click="rte.setImagePreviewIndex(i)"
         >
-          <img :src="item.src" alt="" />
+          <img v-if="thumbUrl(item.src)" :src="thumbUrl(item.src)" alt="" />
+          <span v-else class="rte-image-lightbox-thumb-empty"></span>
         </button>
       </div>
 
