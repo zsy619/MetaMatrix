@@ -740,6 +740,10 @@ html.rte-toolbar-dragging * {
   grid-template-columns: 1fr 1fr;
   gap: 12px;
 }
+/* 只有一个按钮时靠右，宽度与双按钮时右侧那颗一致。 */
+.rte-note-actions:has(> :only-child) > :only-child {
+  grid-column: 2;
+}
 .rte-note-cancel,
 .rte-note-insert {
   height: 40px;
@@ -784,6 +788,13 @@ html.rte-toolbar-dragging * {
 }
 .rte-modal-actions.is-row {
   grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+}
+/* 只有一个按钮时放在右栏。两个及以上仍左右分栏。 */
+.rte-modal-actions:has(> :only-child) {
+  grid-template-columns: 1fr 1fr;
+}
+.rte-modal-actions:has(> :only-child) > :only-child {
+  grid-column: 2;
 }
 .rte-modal {
   width: min(520px, 92vw);
