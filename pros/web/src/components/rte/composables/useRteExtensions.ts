@@ -44,6 +44,7 @@ import { escapeHtml } from '../../../utils/itemsHtml'
 import { FEISHU_HIGHLIGHT_COLORS, isBareHttpUrl, plainTextToPasteContent, sanitizePastedHtml } from '../../../utils/rtePasteClean'
 import { clearEditorFormat } from '../../../utils/rteClearFormat'
 import { pasteVolume, previewShortcutAllowed } from '../../../utils/rteRound8'
+import { filesFromImageDataUrls, pasteCarriesText } from '../../../utils/rtePasteImage'
 import {
   htmlHasTable,
   looksLikeTsvTable,
@@ -436,9 +437,17 @@ const editor = useEditor({
         return true
       }
       const pastedImages = imageFilesFromClipboard(event.clipboardData)
-      const plain = event.clipboardData?.getData('text/plain')
+      const plain = event.clipboardData?.getData('text/plain') || ''
       const html = event.clipboardData?.getData('text/html') || ''
-      const volume = pasteVolume(Math.max(plain?.length || 0, html.length))
+      if (!pasteCarriesText(plain, html)) {
+        const images = pastedImages.length ? pastedImages : filesFromImageDataUrls(html)
+        if (images.length) {
+          event.preventDefault()
+          void insertUserImages(images)
+          return true
+        }
+      }
+      const volume = pasteVolume(Math.max(plain.length, html.length))
       if (volume === 'reject') {
         event.preventDefault()
         ElMessage.error('粘贴内容过大，请分段粘贴（约 120 万字符以内）')
@@ -446,11 +455,6 @@ const editor = useEditor({
       }
       if (volume === 'warn') {
         ElMessage.info('正在粘贴较大内容，编辑器可能短暂无响应')
-      }
-      if (pastedImages.length && !html.trim()) {
-        event.preventDefault()
-        void insertUserImages(pastedImages)
-        return true
       }
       if (
         plain &&

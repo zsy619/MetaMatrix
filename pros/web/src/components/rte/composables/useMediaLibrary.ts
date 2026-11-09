@@ -60,6 +60,7 @@ const imageFileInputRef = ref<HTMLInputElement | null>(null)
 const imageFilePickActive = ref(false)
 const addingCategory = ref(false)
 const newCategoryName = ref('')
+let imageStoreReady = false
 
 function loadImageStore() {
   try {
@@ -71,6 +72,11 @@ function loadImageStore() {
     imageCategories.value = []
     imageAssets.value = []
   }
+  imageStoreReady = true
+}
+
+function ensureImageStoreLoaded() {
+  if (!imageStoreReady) loadImageStore()
 }
 
 function saveImageStore() {
@@ -296,6 +302,35 @@ async function imageSrcWithinPolicy(file: File): Promise<string | null> {
   return src
 }
 
+/** 和「本地图片上传」同一条路：上传（或未登录时的本地读取），再记进素材库。 */
+async function uploadImageFilesToLibrary(files: File[]): Promise<StoredImage[]> {
+  const images = files.filter((file) => file.type.startsWith('image/'))
+  if (!images.length) return []
+  ensureImageStoreLoaded()
+  const catId = currentCategoryIdForUpload()
+  const added: StoredImage[] = []
+  for (const file of images) {
+    try {
+      const src = await imageSrcWithinPolicy(file)
+      if (!src) continue
+      added.push({
+        id: uid(),
+        src,
+        name: file.name || '粘贴的图片',
+        categoryId: catId,
+        createdAt: Date.now(),
+      })
+    } catch {
+      /* 上传失败时 imageSrcWithinPolicy 已经提示 */
+    }
+  }
+  if (!added.length) return []
+  imageAssets.value = [...added, ...imageAssets.value]
+  saveImageStore()
+  added.forEach((asset) => ensureMediaThumb(asset.src))
+  return added
+}
+
 async function replaceOrInsertDroppedImages(
   view: {
     state: {
@@ -320,7 +355,8 @@ async function replaceOrInsertDroppedImages(
     const $pos = view.state.doc.resolve(at)
     const side = imageReplaceSide($pos.nodeBefore?.type.name, $pos.nodeAfter?.type.name)
     if (side) {
-      const src = await imageSrcWithinPolicy(files[0])
+      const added = await uploadImageFilesToLibrary([files[0]])
+      const src = added[0]?.src
       if (!src) return
       const imagePos =
         side === 'after' ? $pos.pos : $pos.pos - ($pos.nodeBefore?.nodeSize || 0)
@@ -339,28 +375,22 @@ async function replaceOrInsertDroppedImages(
 async function insertDroppedBeside(imagePos: number, side: 'left' | 'right', files: File[]) {
   const ed = deps.editor.value
   if (!ed || ed.isDestroyed) return
-  const nodes = []
-  for (const file of files) {
-    const src = await imageSrcWithinPolicy(file)
-    if (!src) continue
-    nodes.push(ed.schema.nodes.image!.create({ src, align: 'center', layout: 'block', alt: file.name || '图片' }))
-  }
+  const added = await uploadImageFilesToLibrary(files)
+  const nodes = added.map((asset) =>
+    ed.schema.nodes.image!.create({ src: asset.src, align: 'center', layout: 'block', alt: asset.name || '图片' }),
+  )
   if (!nodes.length) return
   if (!insertImagesBeside(ed.view, imagePos, side, nodes)) rteToast('warning', '一行最多 10 张图片')
 }
 
 async function insertUserImages(files: File[], at?: number) {
-  const srcs: string[] = []
-  for (const file of files) {
-    const src = await imageSrcWithinPolicy(file)
-    if (src) srcs.push(src)
-  }
-  if (!srcs.length) return
+  const added = await uploadImageFilesToLibrary(files)
+  if (!added.length) return
   const ed = deps.editor.value
   if (!ed || ed.isDestroyed) return
-  const nodes = srcs.map((src) => ({
+  const nodes = added.map((asset) => ({
     type: 'image' as const,
-    attrs: { src, align: 'center', layout: 'block' },
+    attrs: { src: asset.src, align: 'center', layout: 'block', alt: asset.name || '图片' },
   }))
   const chain = ed.chain().focus()
   let atPos = at
@@ -368,6 +398,7 @@ async function insertUserImages(files: File[], at?: number) {
   if (atPos != null) chain.insertContentAt(atPos, nodes)
   else chain.insertContent(nodes)
   chain.run()
+  rteToast('success', `已上传到素材库并插入 ${added.length} 张图片`)
 }
 
 async function onLocalImageFilesChange(event: Event) {
@@ -378,30 +409,11 @@ async function onLocalImageFilesChange(event: Event) {
     rteToast('warning', '请选择图片文件')
     return
   }
-  const catId = currentCategoryIdForUpload()
-  const added: StoredImage[] = []
-  for (const file of files) {
-    try {
-      const src = await imageSrcWithinPolicy(file)
-      if (!src) continue
-      added.push({
-        id: uid(),
-        src,
-        name: file.name,
-        categoryId: catId,
-        createdAt: Date.now(),
-      })
-    } catch {
-      /* skip broken file */
-    }
-  }
+  const added = await uploadImageFilesToLibrary(files)
   if (!added.length) {
     rteToast('error', '图片读取失败')
     return
   }
-  imageAssets.value = [...added, ...imageAssets.value]
-  saveImageStore()
-  added.forEach((a) => ensureMediaThumb(a.src))
   const next = new Set(imageSelectedIds.value)
   added.forEach((a) => next.add(a.id))
   imageSelectedIds.value = next
