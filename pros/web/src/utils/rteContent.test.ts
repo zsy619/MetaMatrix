@@ -15,7 +15,8 @@ const empty = {
   node: { type: { name: 'paragraph' }, textContent: '' },
   pos: 1,
 }
-assert.equal(rtePlaceholderText('请输入正文', empty), '输入正文，或按 / 快速插入')
+assert.equal(rtePlaceholderText('请输入正文', empty), '输入「/」快速插入内容')
+assert.equal(rtePlaceholderText('输入正文，或按 / 快速插入', empty), '输入「/」快速插入内容')
 assert.equal(rtePlaceholderText('写点什么', empty), '写点什么')
 assert.equal(
   rtePlaceholderText('请输入正文', {

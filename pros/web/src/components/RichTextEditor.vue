@@ -242,7 +242,7 @@ const props = withDefaults(
   {
     title: '',
     showTitle: false,
-    placeholder: '输入正文，或按 / 快速插入',
+    placeholder: '输入「/」快速插入内容',
     compact: false,
     expanded: false,
     showBottomBar: true,

@@ -35,10 +35,12 @@ export function rtePlaceholderText(
 ): string {
   const custom = placeholder ?? ''
   if (!custom.trim()) return ''
-  const feishu = custom === '请输入正文' || custom === '输入正文，或按 / 快速插入'
+  const feishu = custom === '请输入正文'
+    || custom === '输入正文，或按 / 快速插入'
+    || custom === '输入「/」快速插入内容'
   const nodeEmpty = !args.node.textContent
   if (args.node.type.name === 'heading' && nodeEmpty) return '标题'
-  if (args.editor.isEmpty) return feishu ? '输入正文，或按 / 快速插入' : custom
+  if (args.editor.isEmpty) return feishu ? '输入「/」快速插入内容' : custom
   if (!feishu || !nodeEmpty || args.node.type.name !== 'paragraph') return ''
   try {
     const parent = args.editor.state.doc.resolve(args.pos).parent

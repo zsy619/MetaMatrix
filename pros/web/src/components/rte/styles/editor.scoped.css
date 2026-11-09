@@ -687,10 +687,11 @@
   width: 100%;
   border: none;
   outline: none;
-  font-size: 22px;
-  font-weight: 700;
-  color: #1d2129;
-  padding: 4px 0 8px;
+  font-size: 30px;
+  line-height: 1.3;
+  font-weight: 600;
+  color: #1f2329;
+  padding: 8px 0 12px;
   background: transparent;
 }
 
@@ -713,10 +714,15 @@
 .rte-root :deep(.ProseMirror) {
   outline: none;
   min-height: 48px;
-  color: #1d2129;
-  font-size: 13px;
-  line-height: 1.65;
+  color: #1f2329;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", "Microsoft YaHei", Arial, sans-serif;
+  font-size: 16px;
+  line-height: 26px;
   word-break: break-word;
+}
+.rte-root :deep(.ProseMirror)::selection,
+.rte-root :deep(.ProseMirror *::selection) {
+  background: rgba(51, 112, 255, 0.18);
 }
 
 /* 块手柄列留白：正文左侧空出一列给 ⠿ 拖拽 / ⋮ 菜单，手柄不与正文重叠。 */
@@ -726,51 +732,59 @@
 
 .rte-root :deep(.tiptap p),
 .rte-root :deep(.ProseMirror p) {
-  margin: 0 0 0.55em;
+  margin: 0 0 8px;
 }
 
 .rte-root :deep(.tiptap h1),
 .rte-root :deep(.ProseMirror h1) {
-  font-size: 1.55em;
-  margin: 0.4em 0 0.35em;
+  font-size: 26px;
+  line-height: 36px;
+  font-weight: 600;
+  color: #1f2329;
+  margin: 26px 0 8px;
 }
 .rte-root :deep(.tiptap h2),
 .rte-root :deep(.ProseMirror h2) {
-  font-size: 1.3em;
-  margin: 0.4em 0 0.3em;
+  font-size: 22px;
+  line-height: 32px;
+  font-weight: 600;
+  color: #1f2329;
+  margin: 22px 0 8px;
 }
 .rte-root :deep(.tiptap h3),
 .rte-root :deep(.ProseMirror h3) {
-  font-size: 1.12em;
-  margin: 0.35em 0 0.25em;
+  font-size: 20px;
+  line-height: 30px;
+  font-weight: 600;
+  color: #1f2329;
+  margin: 20px 0 8px;
 }
 .rte-root :deep(.tiptap h4),
 .rte-root :deep(.ProseMirror h4) {
-  font-size: 1.02em;
-  margin: 0.3em 0 0.2em;
+  font-size: 18px;
+  line-height: 28px;
   font-weight: 600;
+  color: #1f2329;
+  margin: 18px 0 8px;
 }
 .rte-root :deep(.tiptap h5),
-.rte-root :deep(.ProseMirror h5) {
-  font-size: 0.98em;
-  margin: 0.28em 0 0.18em;
-  font-weight: 600;
-  color: #1d2129;
-}
+.rte-root :deep(.ProseMirror h5),
 .rte-root :deep(.tiptap h6),
 .rte-root :deep(.ProseMirror h6) {
-  font-size: 0.92em;
-  margin: 0.25em 0 0.15em;
+  font-size: 16px;
+  line-height: 26px;
   font-weight: 600;
-  color: #4e5969;
+  color: #1f2329;
+  margin: 16px 0 8px;
 }
 
 .rte-root :deep(code) {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 0.92em;
-  background: #f1f3f4;
+  font-size: 0.9em;
+  background: #f2f3f5;
   border-radius: 4px;
-  padding: 0.05em 0.35em;
+  padding: 1px 6px;
+  color: #1f2329;
 }
 .rte-root :deep(pre code) {
   background: transparent;
@@ -813,7 +827,7 @@
   width: 16px;
   height: 16px;
   margin: 0;
-  accent-color: var(--mm-blue, #1a73e8);
+  accent-color: #3370ff;
   cursor: pointer;
 }
 .rte-root :deep(ul[data-type='taskList'] li > label input[type='checkbox']:focus-visible) {
@@ -834,22 +848,37 @@
 
 .rte-root :deep(.tiptap blockquote),
 .rte-root :deep(.ProseMirror blockquote) {
-  margin: 0.4em 0;
-  padding: 0.2em 0.8em;
-  border-left: 3px solid #c9cdd4;
-  color: #4e5969;
-  background: #fafbfc;
+  margin: 8px 0;
+  padding: 1px 0 1px 12px;
+  border-left: 2px solid #bbbfc4;
+  color: #646a73;
+  background: transparent;
+}
+.rte-root :deep(blockquote[data-quote-style='emphasis']) {
+  border-left: 3px solid #3370ff;
+  padding: 8px 12px;
+  color: #1f2329;
+  background: #f0f4ff;
+  border-radius: 0 6px 6px 0;
+}
+.rte-root :deep(blockquote[data-quote-style='verse']) {
+  border-left: none;
+  padding: 8px 28px;
+  text-align: center;
+  color: #646a73;
+  background: transparent;
 }
 
 .rte-root :deep(.tiptap pre),
 .rte-root :deep(.ProseMirror pre) {
-  background: #f7f8fa;
-  border-radius: 6px;
+  background: #f5f6f7;
+  border-radius: 8px;
   /* 顶上留出代码浮层（语言 / 行号 / 换行 / 复制）的高度，避免盖住第一行 */
-  padding: 36px 12px 10px;
+  padding: 36px 16px 12px;
   overflow: auto;
-  font-size: 12px;
-  margin: 0.4em 0;
+  font-size: 14px;
+  line-height: 22px;
+  margin: 8px 0;
 }
 
 .rte-root :deep(pre[data-line-numbers='1']) {
@@ -883,8 +912,8 @@
 .rte-root :deep(.tiptap hr),
 .rte-root :deep(.ProseMirror hr) {
   border: none;
-  border-top: 1px dashed #c9cdd4;
-  margin: 0.8em 0;
+  border-top: 1px solid #dee0e3;
+  margin: 16px 0;
 }
 
 .rte-root :deep(.tiptap img.rte-image),
@@ -909,7 +938,7 @@
 /* 飞书式：图片/视频均为 inline + ResizableNodeView，同行并排、可拖到其他行 */
 .rte-root :deep(.tiptap p),
 .rte-root :deep(.ProseMirror p) {
-  line-height: 1.6;
+  line-height: 26px;
 }
 .rte-root :deep([data-resize-container][data-node='image']),
 .rte-root :deep([data-resize-container][data-node='video']) {
@@ -1077,6 +1106,18 @@
 }
 .rte-root :deep(.tableWrapper table) {
   margin: 0;
+  border-collapse: collapse;
+  width: 100%;
+}
+.rte-root :deep(.tableWrapper td),
+.rte-root :deep(.tableWrapper th) {
+  border: 1px solid #dee0e3;
+  padding: 8px 12px;
+  vertical-align: top;
+}
+.rte-root :deep(.tableWrapper th) {
+  background: #f5f6f7;
+  font-weight: 600;
 }
 .rte-root :deep(.column-resize-handle) {
   position: absolute;
@@ -1271,8 +1312,12 @@
 }
 
 .rte-root :deep(.tiptap a.rte-link),
-.rte-root :deep(.ProseMirror a.rte-link) {
-  color: #1a73e8;
+.rte-root :deep(.ProseMirror a.rte-link),
+.rte-root :deep(.ProseMirror a) {
+  color: #3370ff;
+  text-decoration: none;
+}
+.rte-root :deep(.ProseMirror a:hover) {
   text-decoration: underline;
 }
 
@@ -2900,21 +2945,21 @@
 }
 
 .rte-root.expanded .rte-tool:hover {
-  background: #e9edf3;
-  border-color: #d3d9e2;
-  color: var(--mm-text, #202124);
+  background: #f2f3f5;
+  border-color: transparent;
+  color: #1f2329;
 }
 
 .rte-root.expanded .rte-tool.active {
-  background: var(--mm-blue-soft, #e8f0fe);
-  border-color: #b7cdf7;
-  color: var(--mm-blue, #1a73e8);
-  box-shadow: inset 0 1px 2px rgba(26, 115, 232, 0.14);
+  background: #e1eaff;
+  border-color: transparent;
+  color: #3370ff;
+  box-shadow: none;
 }
 
 .rte-root.expanded .rte-tool.active :deep(.rte-ep-icon),
 .rte-root.expanded .rte-tool.active .rte-tool-label {
-  color: var(--mm-blue, #1a73e8);
+  color: #3370ff;
 }
 
 /* 下拉已 Teleport 为 .rte-float-menu，不再依赖 absolute/右对齐兜底 */
@@ -2939,8 +2984,8 @@
 
 .rte-root.expanded :deep(.tiptap),
 .rte-root.expanded :deep(.ProseMirror) {
-  font-size: 15px;
-  line-height: 1.85;
+  font-size: 16px;
+  line-height: 26px;
   min-height: 160px;
 }
 
@@ -3397,12 +3442,12 @@
 
 /* —— 告示框 Callout —— */
 .rte-root :deep(.rte-callout) {
-  margin: 0.6em 0;
-  padding: 10px 12px 10px 14px;
+  margin: 8px 0;
+  padding: 12px 16px;
   border-radius: 8px;
-  border-left: 4px solid #165dff;
-  background: #e8f3ff;
-  color: #1d2129;
+  border: none;
+  background: #f0f4ff;
+  color: #1f2329;
   position: relative;
 }
 .rte-root :deep(.rte-callout::before) {
@@ -3420,23 +3465,19 @@
 .rte-root :deep(.rte-callout[data-variant='error']::before) { content: '错误'; color: #cf1322; }
 .rte-root :deep(.rte-callout--info),
 .rte-root :deep(.rte-callout[data-variant='info']) {
-  border-left-color: #165dff;
-  background: #e8f3ff;
+  background: #f0f4ff;
 }
 .rte-root :deep(.rte-callout--warn),
 .rte-root :deep(.rte-callout[data-variant='warn']) {
-  border-left-color: #fa8c16;
-  background: #fff7e6;
+  background: #fff5eb;
 }
 .rte-root :deep(.rte-callout--success),
 .rte-root :deep(.rte-callout[data-variant='success']) {
-  border-left-color: #52c41a;
-  background: #f6ffed;
+  background: #e8ffea;
 }
 .rte-root :deep(.rte-callout--error),
 .rte-root :deep(.rte-callout[data-variant='error']) {
-  border-left-color: #ff4d4f;
-  background: #fff2f0;
+  background: #fef1f1;
 }
 .rte-root :deep(.rte-callout > p) {
   margin: 0.25em 0;
@@ -3860,7 +3901,7 @@
   font-size: 12px;
 }
 .rte-root.expanded .rte-canvas {
-  background: var(--mm-bg, #fafafa);
+  background: #f5f6f7;
 }
 .rte-root.expanded:not([data-page-size='full']):not(.is-page-sheet) :deep(.ProseMirror) {
   max-width: 760px;
@@ -4109,5 +4150,36 @@ html.rte-toolbar-dragging .rte-root:not(.expanded) .rte-toolbar-tools > .rte-too
 }
 html.rte-toolbar-dragging .rte-root:not(.expanded) .rte-toolbar-tools > .rte-tool-group.is-dragging > :not(.rte-group-head):not(.rte-group-handle):not(.rte-group-label) {
   display: none;
+}
+
+/* 飞书式工具栏：白底、分组用文字颜色区分，按钮不再坐在色块里。 */
+.rte-root .rte-tool-group {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  border-radius: 0;
+}
+.rte-root .rte-toolbar-tools > .rte-tool-group + .rte-tool-group {
+  box-shadow: inset 1px 0 0 #dee0e3;
+  margin-left: 4px;
+  padding-left: 8px;
+}
+.rte-root .rte-group-head {
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
+  color: var(--rte-head-fg, #646a73);
+}
+.rte-root .rte-group-handle {
+  background: transparent;
+  color: #8f959e;
+}
+.rte-root .rte-group-handle:hover {
+  color: #3370ff;
+  background: #f2f3f5;
+}
+.rte-root .rte-group-label {
+  font-weight: 650;
+  letter-spacing: 0;
 }
 

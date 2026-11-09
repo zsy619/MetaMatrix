@@ -80,10 +80,10 @@ html.rte-toolbar-dragging * {
   gap: 2px;
   padding: 4px;
   background: #fff;
-  color: #1d2129;
-  border: 1px solid #d5d8de;
+  color: #1f2329;
+  border: 1px solid #dee0e3;
   border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(16, 24, 40, 0.16);
+  box-shadow: 0 6px 18px rgba(31, 35, 41, 0.12);
 }
 .rte-selection-bubble .rte-bubble-bar {
   display: flex;
@@ -139,8 +139,8 @@ html.rte-toolbar-dragging * {
   color: #1d2129;
 }
 .rte-selection-bubble .rte-bubble-panel-item.active {
-  background: #e8f3ff;
-  color: #1456f0;
+  background: #e1eaff;
+  color: #3370ff;
   padding-right: 26px;
 }
 .rte-selection-bubble .rte-bubble-panel-item.active::after {
@@ -178,7 +178,7 @@ html.rte-toolbar-dragging * {
   letter-spacing: -0.02em;
 }
 .rte-selection-bubble .rte-bubble-panel-item.active .rte-bubble-mark {
-  color: #1456f0;
+  color: #3370ff;
 }
 .rte-selection-bubble .rte-bubble-sub-caret {
   margin-left: auto;
@@ -217,8 +217,8 @@ html.rte-toolbar-dragging * {
   color: #1d2129;
 }
 .rte-selection-bubble .rte-bubble-btn.active {
-  background: #e8f3ff;
-  color: #1456f0;
+  background: #e1eaff;
+  color: #3370ff;
 }
 .rte-selection-bubble .rte-bubble-btn.active:hover {
   background: #d6e8ff;
