@@ -6,6 +6,8 @@ import {
   migrateToolbarGroupButtons,
   moveToolbarGroup,
   readToolbarGroupOrder,
+  RIBBON_TABS,
+  ribbonGroupsFor,
   toolbarDropIndexFromBoxes,
   toolbarGroupLabels,
   toolbarOrdersEqual,
@@ -110,6 +112,20 @@ export function useToolbarGroups<T extends ToolLike>(deps: {
       ? deps.tools().filter((tool) => tool.kind !== 'divider')
       : deps.tools().filter((tool) => tool.kind !== 'divider' && deps.primaryKeys.has(tool.key))
     return buildToolbarGroups(tools, toolbarOrder.value, toolbarGroupButtonConfigs.value)
+  })
+
+  const ribbonTab = ref(RIBBON_TABS[0]!.id)
+  const ribbonTabs = RIBBON_TABS
+  function setRibbonTab(id: string) {
+    if (!RIBBON_TABS.some((tab) => tab.id === id)) return
+    ribbonTab.value = id
+    deps.openToolbarRows?.()
+  }
+  /** 最大化时只渲染当前栏目的分组。画布小编辑器仍一次放出全部高频分组。 */
+  const visibleToolbarGroups = computed(() => {
+    if (!deps.expanded()) return toolbarGroups.value
+    const allow = new Set(ribbonGroupsFor(ribbonTab.value))
+    return toolbarGroups.value.filter((group) => allow.has(group.id))
   })
 
   /** 每个分组当前生效的组内按钮配置（已归一化）。旧分组 id 的配置先迁移到新分组。 */
@@ -578,6 +594,10 @@ export function useToolbarGroups<T extends ToolLike>(deps: {
   return {
     toolbarOrder,
     toolbarGroups,
+    visibleToolbarGroups,
+    ribbonTab,
+    ribbonTabs,
+    setRibbonTab,
     toolbarGroupButtonConfigs,
     toolbarGroupButtonEntries,
     toggleToolbarGroupButton,

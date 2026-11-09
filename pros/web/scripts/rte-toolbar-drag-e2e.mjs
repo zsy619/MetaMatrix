@@ -66,37 +66,21 @@ async function openExpanded() {
     const collapsed = await toolbarFoldState()
     const foldRow = await page.evaluate(() => {
       const tools = document.querySelector('.rte-toolbar-tools')
-      const tr = tools.getBoundingClientRect()
-      const groups = [...tools.querySelectorAll(':scope > .rte-tool-group')].map((el) => {
-        const r = el.getBoundingClientRect()
-        const fully =
-          r.width > 24 &&
-          r.left >= tr.left - 1 &&
-          r.right <= tr.right + 1 &&
-          r.top >= tr.top - 1 &&
-          r.bottom <= tr.bottom + 1
-        const sliced =
-          r.top < tr.bottom - 2 &&
-          r.bottom > tr.top + 2 &&
-          (r.bottom > tr.bottom + 2 || r.right > tr.right + 2 || r.left < tr.left - 2)
-        return { id: el.dataset.groupId, fully, sliced }
-      })
+      const tabs = [...document.querySelectorAll('.rte-ribbon-tab')].map((el) => el.textContent.trim())
       return {
-        display: getComputedStyle(tools).display,
-        full: groups.filter((g) => g.fully).map((g) => g.id),
-        sliced: groups.filter((g) => g.sliced).map((g) => g.id),
+        display: tools ? getComputedStyle(tools).display : 'missing',
+        tabs,
       }
     })
     log(
-      '最大化收起后仍留一行完整工具栏',
+      '收起功能区后只留栏目',
       collapsed.oneRow &&
         collapsed.label === '展开' &&
-        foldRow.display !== 'none' &&
-        foldRow.full.length >= 1 &&
-        foldRow.sliced.length === 0 &&
+        foldRow.display === 'none' &&
+        foldRow.tabs.includes('开始') &&
         collapsed.height > 0 &&
         collapsed.height < 120,
-      `h=${collapsed.height} label=${collapsed.label} full=${foldRow.full.join('、')} sliced=${foldRow.sliced.join('、')}`,
+      `h=${collapsed.height} label=${collapsed.label} tools=${foldRow.display} tabs=${foldRow.tabs.join('、')}`,
     )
     await page.screenshot({ path: `${out}/00-folded.png` })
     await page.locator('.rte-toolbar-fold').click()
@@ -195,13 +179,25 @@ log(
   flow.foldInBar && flow.sameRow && flow.foldLabel === '收起',
   `label=${flow.foldLabel}`,
 )
+const ribbon = await page.evaluate(() => {
+  const tabs = [...document.querySelectorAll('.rte-ribbon-tab')].map((el) => ({
+    label: el.textContent.trim(),
+    active: el.classList.contains('active'),
+  }))
+  const groups = [...document.querySelectorAll('.rte-toolbar-tools .rte-tool-group')].map((el) => el.dataset.groupId)
+  return { tabs, groups }
+})
 log(
-  '最大化工具栏每一行排满后再换行',
-  flow.gaps.length >= 2 && flow.gaps.slice(0, -1).every((gap) => gap <= 80),
-  `rightGap=${flow.gaps.join(',')}`,
+  '功能区默认停在开始',
+  ribbon.tabs.some((tab) => tab.label === '开始' && tab.active) &&
+    ribbon.groups.includes('edit') &&
+    ribbon.groups.includes('style') &&
+    ribbon.groups.includes('paragraph') &&
+    !ribbon.groups.includes('insert'),
+  `tabs=${ribbon.tabs.map((tab) => tab.label + (tab.active ? '*' : '')).join('、')} groups=${ribbon.groups.join('、')}`,
 )
 const before = await groupSnapshot()
-log('最大化工具栏至少两行', new Set(before.map((g) => Math.round(g.top))).size >= 2, `${before.length} 组`)
+log('开始栏目里能看到编辑、字体和段落', before.length >= 3, `${before.length} 组`)
 
 const edit = before.find((g) => g.id === 'edit')
 const style = before.find((g) => g.id === 'style')

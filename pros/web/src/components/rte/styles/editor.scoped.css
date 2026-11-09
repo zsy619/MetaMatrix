@@ -4232,3 +4232,143 @@ html.rte-toolbar-dragging .rte-root:not(.expanded) .rte-toolbar-tools > .rte-too
   letter-spacing: 0;
 }
 
+/* Word 式功能区：栏目在上，当前栏目的分组在白底命令带里。 */
+.rte-root.expanded .rte-toolbar {
+  flex-direction: column;
+  align-items: stretch;
+  padding: 0;
+  background: #f3f2f1;
+  row-gap: 0;
+}
+.rte-ribbon-bar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 36px;
+  padding: 4px 8px 0 0;
+  background: #f3f2f1;
+}
+.rte-ribbon-tabs {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  min-height: 32px;
+  padding: 0 12px;
+  background: transparent;
+}
+.rte-root.expanded .rte-toolbar .rte-ribbon-bar .rte-mode-bar {
+  flex: 0 0 auto;
+  align-self: center;
+  margin: 0 4px 4px auto;
+  padding: 0;
+  border: none;
+}
+.rte-ribbon-tab {
+  height: 28px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 4px 4px 0 0;
+  background: transparent;
+  color: #323130;
+  font-size: 13px;
+  line-height: 26px;
+  cursor: pointer;
+}
+.rte-ribbon-tab:hover {
+  background: #edebe9;
+}
+.rte-ribbon-tab.active {
+  background: #fff;
+  color: #185abd;
+  border-color: #d2d0ce;
+  font-weight: 600;
+  position: relative;
+  top: 1px;
+}
+.rte-root.expanded .rte-toolbar.is-one-row {
+  flex-direction: column;
+  align-items: stretch;
+}
+.rte-root.expanded .rte-toolbar.is-one-row .rte-toolbar-tools {
+  display: none;
+}
+.rte-root.expanded .rte-toolbar.is-one-row .rte-mode-bar .rte-view-mode-tool .rte-tool-label {
+  position: static;
+  width: auto;
+  height: auto;
+  margin: 0;
+  padding: 0;
+  overflow: visible;
+  clip: auto;
+  white-space: nowrap;
+  border: 0;
+}
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-toolbar-tools {
+  align-items: stretch;
+  background: #fff;
+  border-top: 1px solid #d2d0ce;
+  padding: 6px 8px 0;
+  gap: 0;
+  min-height: 86px;
+}
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  align-content: flex-start;
+  justify-content: center;
+  flex: 0 1 auto;
+  max-width: min(560px, 100%);
+  margin: 0;
+  padding: 2px 10px 0;
+  border: none;
+  border-right: 1px solid #edebe9;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group > .rte-group-head {
+  order: 2;
+  flex: 1 0 100%;
+  justify-content: center;
+  height: 20px;
+  margin: 2px 0 4px;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  color: #605e5c;
+}
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-group-label {
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 16px;
+  color: #605e5c;
+}
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool,
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool-wrap {
+  margin-right: 2px;
+  margin-bottom: 2px;
+}
+.rte-root.is-dark-editor .rte-ribbon-bar,
+.rte-root.is-dark-editor.expanded .rte-toolbar {
+  background: #2b2f36;
+}
+.rte-root.is-dark-editor .rte-ribbon-tab {
+  color: #d6dae0;
+}
+.rte-root.is-dark-editor .rte-ribbon-tab:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+.rte-root.is-dark-editor .rte-ribbon-tab.active {
+  background: #1f2329;
+  color: #7eb6ff;
+  border-color: #3a3f47;
+}
+.rte-root.is-dark-editor .rte-toolbar:not(.is-one-row) .rte-toolbar-tools {
+  background: #1f2329;
+  border-top-color: #3a3f47;
+}
+

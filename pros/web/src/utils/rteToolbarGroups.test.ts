@@ -3,6 +3,7 @@ import {
   CHART_TOOLBAR_KEYS,
   DEFAULT_TOOLBAR_GROUP_ORDER,
   LEGACY_GROUP_ALIASES,
+  RIBBON_TABS,
   TOOLBAR_GROUPS,
   buildToolbarGroups,
   bumpToolbarUndoEpoch,
@@ -33,10 +34,15 @@ assert.deepEqual(DEFAULT_TOOLBAR_GROUP_ORDER, [
   'other',
 ])
 
-// 105 个 key 全部仍挂在某一组，无丢失无重复（图表组由 1 个总入口变 9 个分类下拉）
+// 每个按钮 key 只挂在一个分组里（图表组是 9 个分类下拉，另有水印、外链、审计、文内 AI）
 const allKeys = TOOLBAR_GROUPS.flatMap((group) => group.keys)
-assert.equal(allKeys.length, 105)
-assert.equal(new Set(allKeys).size, 105)
+assert.equal(allKeys.length, 109)
+assert.equal(new Set(allKeys).size, 109)
+
+const ribbonGroups = RIBBON_TABS.flatMap((tab) => tab.groups)
+assert.deepEqual([...ribbonGroups].sort(), [...DEFAULT_TOOLBAR_GROUP_ORDER].sort())
+assert.equal(new Set(ribbonGroups).size, ribbonGroups.length)
+assert.deepEqual(RIBBON_TABS.map((tab) => tab.label), ['开始', '插入', '图表', '引用', '审阅', '视图'])
 
 // —— 旧分组顺序 id 迁移 ——
 assert.deepEqual(normalizeToolbarGroupOrder(undefined), [...DEFAULT_TOOLBAR_GROUP_ORDER])

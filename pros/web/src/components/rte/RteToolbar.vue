@@ -48,19 +48,75 @@ function toggleChartGroupMenu(key: string) {
       <div data-rte-own class="rte-sr-only" role="status" aria-live="polite" aria-atomic="true">
         {{ rte.rteAriaStatus }}
       </div>
+      <div data-rte-own v-if="rte.expanded" class="rte-ribbon-bar">
+        <div data-rte-own class="rte-ribbon-tabs" role="tablist" aria-label="功能区">
+          <button data-rte-own
+            v-for="tab in rte.ribbonTabs"
+            :key="'ribbon-' + tab.id"
+            type="button"
+            role="tab"
+            class="rte-ribbon-tab"
+            :class="{ active: rte.ribbonTab === tab.id }"
+            :aria-selected="rte.ribbonTab === tab.id"
+            @click="rte.setRibbonTab(tab.id)"
+          >
+            {{ tab.label }}
+          </button>
+        </div>
+        <div data-rte-own class="rte-mode-bar">
+          <button data-rte-own
+            v-for="opt in rte.VIEW_MODE_OPTIONS"
+            :key="'vm-' + opt.id"
+            type="button"
+            role="tab"
+            class="rte-tool rte-view-mode-tool"
+            :class="{ active: rte.viewMode === opt.id }"
+            :title="opt.title"
+            :aria-selected="rte.viewMode === opt.id"
+            @click="rte.setViewMode(opt.id)"
+          >
+            <span data-rte-own class="rte-tool-icon rte-view-mode-glyph" aria-hidden="true">{{
+              opt.icon
+            }}</span>
+            <span data-rte-own class="rte-tool-label">{{ opt.label }}</span>
+          </button>
+          <button data-rte-own
+            v-if="rte.viewMode === 'source' && rte.sourceDirty"
+            type="button"
+            class="rte-tool rte-view-mode-tool rte-view-mode-apply"
+            title="将源码应用到文档"
+            @click="rte.applySourceNow"
+          >
+            <span data-rte-own class="rte-tool-icon rte-view-mode-glyph" aria-hidden="true">↑</span>
+            <span data-rte-own class="rte-tool-label">应用</span>
+          </button>
+          <button data-rte-own
+            type="button"
+            class="rte-tool rte-view-mode-tool rte-toolbar-fold"
+            :aria-expanded="rte.toolbarRowsOpen"
+            :title="rte.toolbarRowsOpen ? '收起工具栏面板' : '展开工具栏面板'"
+            @click="rte.toggleToolbarRows()"
+          >
+            <span data-rte-own class="rte-tool-icon rte-view-mode-glyph" aria-hidden="true">{{
+              rte.toolbarRowsOpen ? '▴' : '▾'
+            }}</span>
+            <span data-rte-own class="rte-tool-label">{{ rte.toolbarRowsOpen ? '收起' : '展开' }}</span>
+          </button>
+        </div>
+      </div>
       <div data-rte-own
         class="rte-toolbar-tools"
         :class="{
           'is-drop-end':
             rte.toolbarDropIndex != null &&
-            rte.toolbarGroups.length > 0 &&
-            rte.toolbarDropIndex === rte.toolbarOrder.indexOf(rte.toolbarGroups[rte.toolbarGroups.length - 1].id) + 1,
+            rte.visibleToolbarGroups.length > 0 &&
+            rte.toolbarDropIndex === rte.toolbarOrder.indexOf(rte.visibleToolbarGroups[rte.visibleToolbarGroups.length - 1].id) + 1,
         }"
         @dragover.prevent="rte.onToolbarGroupDragOver"
         @drop.prevent="rte.onToolbarGroupDrop"
       >
       <div data-rte-own
-        v-for="group in rte.toolbarGroups"
+        v-for="group in rte.visibleToolbarGroups"
         :key="group.id"
         class="rte-tool-group"
         :title="'右键可设置组内按钮的显隐与顺序'"
@@ -2506,48 +2562,6 @@ function toggleChartGroupMenu(key: string) {
         </div>
       </Teleport>
 
-      </div>
-
-      <!-- 编辑 / 预览 / 源码，展开收起也在这一栏。收成一行时这栏留在右侧，不会被裁掉。 -->
-      <div data-rte-own v-if="rte.expanded" class="rte-mode-bar">
-        <button data-rte-own
-          v-for="opt in rte.VIEW_MODE_OPTIONS"
-          :key="'vm-' + opt.id"
-          type="button"
-          role="tab"
-          class="rte-tool rte-view-mode-tool"
-          :class="{ active: rte.viewMode === opt.id }"
-          :title="opt.title"
-          :aria-selected="rte.viewMode === opt.id"
-          @click="rte.setViewMode(opt.id)"
-        >
-          <span data-rte-own class="rte-tool-icon rte-view-mode-glyph" aria-hidden="true">{{
-            opt.icon
-          }}</span>
-          <span data-rte-own class="rte-tool-label">{{ opt.label }}</span>
-        </button>
-        <button data-rte-own
-          v-if="rte.viewMode === 'source' && rte.sourceDirty"
-          type="button"
-          class="rte-tool rte-view-mode-tool rte-view-mode-apply"
-          title="将源码应用到文档"
-          @click="rte.applySourceNow"
-        >
-          <span data-rte-own class="rte-tool-icon rte-view-mode-glyph" aria-hidden="true">↑</span>
-          <span data-rte-own class="rte-tool-label">应用</span>
-        </button>
-        <button data-rte-own
-          type="button"
-          class="rte-tool rte-view-mode-tool rte-toolbar-fold"
-          :aria-expanded="rte.toolbarRowsOpen"
-          :title="rte.toolbarRowsOpen ? '收起工具栏面板' : '展开工具栏面板'"
-          @click="rte.toggleToolbarRows()"
-        >
-          <span data-rte-own class="rte-tool-icon rte-view-mode-glyph" aria-hidden="true">{{
-            rte.toolbarRowsOpen ? '▴' : '▾'
-          }}</span>
-          <span data-rte-own class="rte-tool-label">{{ rte.toolbarRowsOpen ? '收起' : '展开' }}</span>
-        </button>
       </div>
     </div>
 </template>

@@ -137,6 +137,20 @@ export const TOOLBAR_GROUPS: readonly ToolbarGroupDef[] = [
 
 export const DEFAULT_TOOLBAR_GROUP_ORDER: readonly string[] = TOOLBAR_GROUPS.map((group) => group.id)
 
+/** Word 式功能区栏目。每个栏目只展开自己的分组，按钮仍在原分组里。 */
+export const RIBBON_TABS: readonly { id: string; label: string; groups: readonly string[] }[] = [
+  { id: 'home', label: '开始', groups: ['edit', 'style', 'paragraph'] },
+  { id: 'insert', label: '插入', groups: ['insert', 'table', 'blocks'] },
+  { id: 'charts', label: '图表', groups: ['charts'] },
+  { id: 'refs', label: '引用', groups: ['notes'] },
+  { id: 'review', label: '审阅', groups: ['review'] },
+  { id: 'view', label: '视图', groups: ['view', 'file', 'other'] },
+]
+
+export function ribbonGroupsFor(tabId: string): readonly string[] {
+  return RIBBON_TABS.find((tab) => tab.id === tabId)?.groups ?? RIBBON_TABS[0]!.groups
+}
+
 const GROUP_BY_ID = new Map(TOOLBAR_GROUPS.map((group) => [group.id, group]))
 
 /**
