@@ -673,8 +673,8 @@ function run(action: () => void) {
           type="button"
           class="rte-bubble-btn"
           :class="{ active: rte.bubbleRewrite === 'rewrite' }"
-          title="改写选区（本地规则，AI 服务未接入）"
-          aria-label="改写选区"
+          title="文内改写：只用选区和上文"
+          aria-label="文内改写"
           :aria-expanded="rte.bubbleRewrite === 'rewrite'"
           @click.stop="rte.bubbleRewrite = rte.bubbleRewrite === 'rewrite' ? null : 'rewrite'"
         >
@@ -684,36 +684,20 @@ function run(action: () => void) {
           v-if="rte.bubbleRewrite === 'rewrite'"
           class="rte-bubble-swatches rte-bubble-rewrite"
           role="menu"
-          aria-label="改写选区"
+          aria-label="文内改写"
           data-rte-own
           @mouseenter="hoverEnter('rewrite')"
         >
           <button
+            v-for="mode in rte.INLINE_AI_MODES"
+            :key="mode.id"
             data-rte-own
             type="button"
             role="menuitem"
-            title="清理多余空格与空行"
-            @click="rte.rewriteSelection('trim')"
+            :title="mode.title"
+            @click="rte.rewriteSelection(mode.id)"
           >
-            清理空格
-          </button>
-          <button
-            data-rte-own
-            type="button"
-            role="menuitem"
-            title="中英文之间补空格"
-            @click="rte.rewriteSelection('space')"
-          >
-            中英文空格
-          </button>
-          <button
-            data-rte-own
-            type="button"
-            role="menuitem"
-            title="把连续短行合并成一段"
-            @click="rte.rewriteSelection('merge')"
-          >
-            合并短行
+            {{ mode.label }}
           </button>
         </div>
       </span>

@@ -325,6 +325,14 @@ useParentScopeStamp()
           class="rte-body"
           :style="{ zoom: rte.editorZoom }"
         />
+        <div
+          v-if="rte.watermark.enabled && rte.watermark.text"
+          class="rte-doc-watermark"
+          data-rte-own
+          aria-hidden="true"
+        >
+          <span v-for="n in 18" :key="'wm-' + n" data-rte-own>{{ rte.watermark.text }}</span>
+        </div>
         <div data-rte-own
           v-if="rte.pageChrome.footer || rte.screenPageLabel"
           class="rte-page-footer"

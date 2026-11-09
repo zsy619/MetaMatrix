@@ -963,6 +963,114 @@ const echartsDialogTemplates = computed(() => {
       </div>
     </Teleport>
 
+    <!-- 水印 / 外链 / 审计 / 文内改写 -->
+    <Teleport to="body">
+      <div data-rte-own
+        v-if="rte.governOpen"
+        class="rte-modal-overlay"
+        @mousedown.self="rte.governOpen = false"
+      >
+        <div data-rte-own class="rte-link-dialog rte-govern-dialog" role="dialog" aria-modal="true" aria-label="文档治理" @mousedown.stop>
+          <div data-rte-own class="rte-govern-tabs">
+            <button data-rte-own type="button" :class="{ active: rte.governTab === 'watermark' }" @click="rte.governTab = 'watermark'">水印</button>
+            <button data-rte-own type="button" :class="{ active: rte.governTab === 'outbound' }" @click="rte.governTab = 'outbound'; rte.refreshExternalLinks()">外链</button>
+            <button data-rte-own type="button" :class="{ active: rte.governTab === 'audit' }" @click="rte.governTab = 'audit'">审计</button>
+            <button data-rte-own type="button" :class="{ active: rte.governTab === 'ai' }" @click="rte.governTab = 'ai'">文内 AI</button>
+          </div>
+
+          <div v-if="rte.governTab === 'watermark'" data-rte-own class="rte-govern-pane">
+            <p data-rte-own class="rte-govern-note">水印盖在页面上，不写进正文。</p>
+            <div data-rte-own class="rte-govern-presets">
+              <button
+                v-for="preset in rte.WATERMARK_PRESETS"
+                :key="preset"
+                data-rte-own
+                type="button"
+                class="rte-import-item"
+                @click="rte.applyWatermarkPreset(preset)"
+              >
+                {{ preset }}
+              </button>
+            </div>
+            <input
+              data-rte-own
+              class="rte-page-chrome-input"
+              type="text"
+              maxlength="24"
+              :value="rte.watermarkDraft"
+              placeholder="水印文字，留空并保存即关闭"
+              @input="rte.onWatermarkDraftInput"
+            />
+            <div data-rte-own class="rte-modal-actions">
+              <button data-rte-own type="button" class="rte-modal-confirm" @click="rte.saveWatermark">保存</button>
+            </div>
+          </div>
+
+          <div v-else-if="rte.governTab === 'outbound'" data-rte-own class="rte-govern-pane">
+            <p data-rte-own class="rte-govern-note">站外的 http(s) 链接打开前需要确认。白名单里的主机直接打开。</p>
+            <label data-rte-own class="rte-govern-check">
+              <input data-rte-own type="checkbox" :checked="rte.outboundPolicy.confirmExternal" @change="rte.toggleOutboundConfirm" />
+              打开外链前确认
+            </label>
+            <textarea
+              data-rte-own
+              class="rte-govern-hosts"
+              rows="4"
+              :value="rte.outboundHostsDraft"
+              placeholder="每行一个主机，例如 feishu.cn"
+              @input="rte.onOutboundHostsInput"
+            />
+            <div data-rte-own class="rte-modal-actions">
+              <button data-rte-own type="button" class="rte-modal-confirm" @click="rte.saveOutboundPolicy">保存策略</button>
+            </div>
+            <p data-rte-own class="rte-govern-note">本文中的外链</p>
+            <p v-if="!rte.externalLinkRows.length" data-rte-own class="rte-govern-empty">还没有外链。</p>
+            <button
+              v-for="row in rte.externalLinkRows"
+              :key="row.href"
+              data-rte-own
+              type="button"
+              class="rte-import-item rte-govern-link"
+              @click="rte.requestOpenHref(row.href)"
+            >
+              {{ row.host }} · {{ row.href }}
+            </button>
+          </div>
+
+          <div v-else-if="rte.governTab === 'audit'" data-rte-own class="rte-govern-pane">
+            <p data-rte-own class="rte-govern-note">水印、外链、文内改写和导出会记在这里，随文档保存。</p>
+            <p v-if="!rte.auditLog.length" data-rte-own class="rte-govern-empty">还没有记录。</p>
+            <div data-rte-own class="rte-audit-list">
+              <div v-for="event in [...rte.auditLog].reverse()" :key="event.id" data-rte-own class="rte-audit-row">
+                <span data-rte-own class="rte-audit-action">{{ rte.AUDIT_ACTION_LABEL[event.action] }}</span>
+                <span data-rte-own>{{ event.detail }}</span>
+                <span data-rte-own class="rte-audit-meta">{{ event.actor }} · {{ rte.formatAuditTime(event.at) }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div v-else data-rte-own class="rte-govern-pane">
+            <p data-rte-own class="rte-govern-note">改写只用选中的文字和紧挨着的上文，不调用外部模型。</p>
+            <button
+              v-for="mode in rte.INLINE_AI_MODES"
+              :key="mode.id"
+              data-rte-own
+              type="button"
+              class="rte-import-item rte-govern-link"
+              :title="mode.title"
+              @click="rte.rewriteSelection(mode.id)"
+            >
+              {{ mode.label }} · {{ mode.title }}
+            </button>
+          </div>
+
+          <div data-rte-own class="rte-modal-actions">
+            <button data-rte-own type="button" class="rte-modal-cancel" @click="rte.governOpen = false">关闭</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
     <!-- Wave21 检查报告 -->
     <Teleport to="body">
       <div data-rte-own

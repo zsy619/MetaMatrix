@@ -137,6 +137,21 @@ export type WithPanelAttachments = {
    * 旧文档没有这个字段，等于用分组默认顺序、全部显示。
    */
   toolbarGroupButtonsByPanelId?: import('../utils/rteToolbarGroupButtons').ToolbarGroupButtonsByPanelId
+  /**
+   * 富文本页水印。只盖在版面上，不写进正文。
+   * 键与面板 id 对齐。旧文档没有这个字段，等于不显示。
+   */
+  watermarkByPanelId?: import('../utils/rteWatermark').WatermarkByPanelId
+  /**
+   * 外链打开策略。缺省是打开前确认、没有白名单。
+   * 键与面板 id 对齐。
+   */
+  outboundPolicyByPanelId?: import('../utils/rteOutbound').OutboundPolicyByPanelId
+  /**
+   * 富文本面板操作记录：水印、外链、文内改写、导出。
+   * 只留最近若干条，随文档保存。旧文档没有这个字段。
+   */
+  auditLogByPanelId?: import('../utils/rteAudit').AuditLogByPanelId
 }
 
 

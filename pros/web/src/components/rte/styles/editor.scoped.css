@@ -453,6 +453,102 @@
   background: #fff;
   position: relative;
 }
+.rte-doc-watermark {
+  position: absolute;
+  inset: -18% 0;
+  z-index: 4;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: space-around;
+  justify-content: space-around;
+  gap: 36px 18px;
+  overflow: hidden;
+  pointer-events: none;
+  user-select: none;
+  transform: rotate(-22deg);
+}
+.rte-doc-watermark span {
+  width: 168px;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: 0.14em;
+  color: rgba(78, 89, 105, 0.22);
+}
+.rte-govern-dialog {
+  width: min(440px, calc(100vw - 32px));
+}
+.rte-govern-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.rte-govern-tabs button {
+  border: 1px solid var(--mm-line, #e8eaed);
+  background: #fff;
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.rte-govern-tabs button.active {
+  background: #1f2329;
+  color: #fff;
+  border-color: #1f2329;
+}
+.rte-govern-note,
+.rte-govern-empty {
+  margin: 0 0 8px;
+  color: #646a73;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.rte-govern-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.rte-govern-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+.rte-govern-hosts {
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 8px;
+  padding: 8px;
+  border: 1px solid var(--mm-line, #e8eaed);
+  border-radius: 6px;
+  font: inherit;
+  resize: vertical;
+}
+.rte-govern-link {
+  display: block;
+  width: 100%;
+  margin-bottom: 6px;
+  text-align: left;
+}
+.rte-audit-list {
+  max-height: 280px;
+  overflow: auto;
+}
+.rte-audit-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 0;
+  border-bottom: 1px solid #eee;
+  font-size: 12px;
+}
+.rte-audit-action {
+  font-weight: 650;
+}
+.rte-audit-meta {
+  color: #8f959e;
+}
 /* 画布面板普通展示：正文区最高 600px，多出来的在内容区里滚。最大化另写，不套这层上限。 */
 .rte-root:not(.expanded) .rte-canvas,
 .rte-root:not(.expanded) .rte-source-pane {

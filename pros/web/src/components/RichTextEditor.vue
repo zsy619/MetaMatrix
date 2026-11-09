@@ -14,7 +14,7 @@ import { useDocumentStore } from '../stores/document'
 import { NodeSelection, TextSelection } from '@tiptap/pm/state'
 import { TABLE_CELL_BG_PRESETS, TABLE_BORDER_STYLE_PRESETS } from '../extensions/rteTableCells'
 import { HR_VARIANT_OPTIONS, type RteHrVariant } from '../extensions/rteHorizontalRule'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { looksLikeHtml, escapeHtml } from '../utils/itemsHtml'
 import { formulaTexIssue, renderKatex } from '../extensions/math'
 import {
@@ -70,6 +70,31 @@ import {
   type BlockMenuState,
 } from './rte/rteBlockMenu'
 import { pushRecentColor, themeColorLabel } from './rte/rteColorPalette'
+import {
+  EMPTY_WATERMARK,
+  readWatermark,
+  WATERMARK_PRESETS,
+  type PanelWatermark,
+} from '../utils/rteWatermark'
+import {
+  classifyHref,
+  DEFAULT_OUTBOUND_POLICY,
+  externalHrefRows,
+  hostAllowed,
+  linkHost,
+  normalizeHost,
+  readOutboundPolicy,
+  type OutboundPolicy,
+} from '../utils/rteOutbound'
+import {
+  appendAudit,
+  AUDIT_ACTION_LABEL,
+  formatAuditTime,
+  readAuditLog,
+  type AuditAction,
+  type AuditEvent,
+} from '../utils/rteAudit'
+import { INLINE_AI_MODES, inlineAiLabel, rewriteWithContext, type InlineAiMode } from '../utils/rteInlineAi'
 import { orderedListContinuation } from '../utils/rteListContinue'
 import { planListRenumber } from '../utils/rteListRenumber'
 import {
@@ -700,6 +725,14 @@ const toolbarUndoBridge = {
   },
 }
 const pageChrome = ref<PanelPageChrome>({ ...EMPTY_PAGE_CHROME })
+const watermark = ref<PanelWatermark>({ ...EMPTY_WATERMARK })
+const outboundPolicy = ref<OutboundPolicy>({ confirmExternal: true, hosts: [] })
+const auditLog = ref<AuditEvent[]>([])
+const governOpen = ref(false)
+const governTab = ref<'watermark' | 'outbound' | 'audit' | 'ai'>('watermark')
+const watermarkDraft = ref('')
+const outboundHostsDraft = ref('')
+const externalLinkRows = ref<Array<{ href: string; host: string }>>([])
 const {
   pageChromeActive,
   screenPageLabel,
@@ -964,6 +997,9 @@ const editor = useRteExtensions({
   looksLikeRichHtml,
   openFormulaFromChip,
   openLinkDialog,
+  onEditorLinkClick: (href: string) => {
+    requestOpenHref(href)
+  },
   openPrintPreview,
   scheduleHtmlEmit,
   setHeading,
@@ -2696,6 +2732,7 @@ async function selectionToLink() {
     return
   }
   editor.value?.chain().focus().setLink({ href: url }).run()
+  noteExternalLink(url)
   ElMessage.success('已设为链接')
 }
 
@@ -2728,46 +2765,183 @@ function selectionToTable() {
   ElMessage.success('已转成表格')
 }
 
+function pageOrigin(): string {
+  if (typeof location === 'undefined' || !location.origin || location.origin === 'null') return ''
+  return location.origin
+}
+
+function auditActor(): string {
+  return rteAuthor().name
+}
+
+function recordAudit(action: AuditAction, detail: string) {
+  auditLog.value = appendAudit(auditLog.value, {
+    at: Date.now(),
+    action,
+    detail,
+    actor: auditActor(),
+  })
+  const panelId = props.panelId
+  if (panelId && current_data.value) documentStore.setPanelAuditLog(panelId, auditLog.value)
+}
+
+watch(
+  () => [
+    props.panelId,
+    current_data.value?.watermarkByPanelId,
+    current_data.value?.outboundPolicyByPanelId,
+    current_data.value?.auditLogByPanelId,
+  ] as const,
+  () => {
+    if (!props.panelId) return
+    const mark = readWatermark(current_data.value?.watermarkByPanelId, props.panelId)
+    const policy = readOutboundPolicy(current_data.value?.outboundPolicyByPanelId, props.panelId)
+    watermark.value = mark
+    outboundPolicy.value = policy
+    auditLog.value = readAuditLog(current_data.value?.auditLogByPanelId, props.panelId)
+    if (governOpen.value) return
+    watermarkDraft.value = mark.text
+    outboundHostsDraft.value = policy.hosts.join('\n')
+  },
+  { immediate: true },
+)
+
+function refreshExternalLinks() {
+  externalLinkRows.value = externalHrefRows(editor.value?.getHTML() || '', pageOrigin())
+}
+
+function openGovern(tab: 'watermark' | 'outbound' | 'audit' | 'ai') {
+  governTab.value = tab
+  watermarkDraft.value = watermark.value.text
+  outboundHostsDraft.value = outboundPolicy.value.hosts.join('\n')
+  if (tab === 'outbound') refreshExternalLinks()
+  governOpen.value = true
+  moreOpen.value = false
+}
+
+function saveWatermark() {
+  const next: PanelWatermark = {
+    enabled: watermarkDraft.value.trim().length > 0,
+    text: watermarkDraft.value,
+  }
+  const normalized = readWatermark({ draft: next }, 'draft')
+  if (watermark.value.enabled === normalized.enabled && watermark.value.text === normalized.text) {
+    ElMessage.info(normalized.enabled ? '水印没有变化' : '水印已经关闭')
+    return
+  }
+  watermark.value = normalized
+  watermarkDraft.value = normalized.text
+  const panelId = props.panelId
+  if (panelId && current_data.value) documentStore.setPanelWatermark(panelId, normalized)
+  recordAudit('watermark', normalized.enabled ? `开启「${normalized.text}」` : '关闭水印')
+  ElMessage.success(normalized.enabled ? `已加上水印「${normalized.text}」` : '已关闭水印')
+}
+
+function applyWatermarkPreset(text: string) {
+  watermarkDraft.value = text
+}
+
+function onWatermarkDraftInput(event: Event) {
+  watermarkDraft.value = (event.target as HTMLInputElement).value
+}
+
+function onOutboundHostsInput(event: Event) {
+  outboundHostsDraft.value = (event.target as HTMLTextAreaElement).value
+}
+
+function saveOutboundPolicy() {
+  const hosts = outboundHostsDraft.value.split(/[\s,，]+/).map((item) => normalizeHost(item)).filter(Boolean)
+  const next: OutboundPolicy = {
+    confirmExternal: outboundPolicy.value.confirmExternal,
+    hosts,
+  }
+  outboundPolicy.value = { ...DEFAULT_OUTBOUND_POLICY, ...next, hosts: [...new Set(hosts)] }
+  outboundHostsDraft.value = outboundPolicy.value.hosts.join('\n')
+  const panelId = props.panelId
+  if (panelId && current_data.value) documentStore.setPanelOutboundPolicy(panelId, outboundPolicy.value)
+  recordAudit(
+    'policy',
+    `${outboundPolicy.value.confirmExternal ? '打开前确认' : '直接打开'}，白名单 ${outboundPolicy.value.hosts.length} 个`,
+  )
+  ElMessage.success('已保存外链策略')
+}
+
+function toggleOutboundConfirm() {
+  outboundPolicy.value = {
+    ...outboundPolicy.value,
+    confirmExternal: !outboundPolicy.value.confirmExternal,
+  }
+  const panelId = props.panelId
+  if (panelId && current_data.value) documentStore.setPanelOutboundPolicy(panelId, outboundPolicy.value)
+}
+
+function requestOpenHref(href: string) {
+  const kind = classifyHref(href, pageOrigin())
+  if (kind === 'empty') {
+    ElMessage.warning('没有可打开的链接')
+    return
+  }
+  if (kind === 'unsafe') {
+    recordAudit('outbound-block', href)
+    ElMessage.warning('已拦截不安全链接')
+    return
+  }
+  if (kind !== 'external') {
+    if (/^(https?:|mailto:|\/|#)/i.test(href)) window.open(href, '_blank', 'noopener,noreferrer')
+    else ElMessage.warning('链接协议不受支持')
+    return
+  }
+  const open = () => {
+    recordAudit('outbound-open', href)
+    window.open(href, '_blank', 'noopener,noreferrer')
+  }
+  if (!outboundPolicy.value.confirmExternal || hostAllowed(outboundPolicy.value, href)) {
+    open()
+    return
+  }
+  const host = linkHost(href) || href
+  void ElMessageBox.confirm(`即将打开外链 ${host}。确认后才会离开本文。`, '外链确认', {
+    confirmButtonText: '打开',
+    cancelButtonText: '取消',
+    type: 'warning',
+    appendTo: 'body',
+    modalClass: 'rte-outbound-confirm',
+  }).then(() => {
+    open()
+  }).catch(() => {
+    recordAudit('outbound-block', host)
+  })
+}
+
+function noteExternalLink(href: string) {
+  if (classifyHref(href, pageOrigin()) === 'external') recordAudit('link-set', href)
+}
+
 /**
- * 改写选区。当前是本地规则（stub），不调用外部 AI 服务。
- * - trim：清理多余空格与空行
- * - space：中英文之间补空格
- * - merge：把连续短行合并成一段
+ * 文内改写。只用选区和紧挨着的上文，不调用外部模型。
  */
-function rewriteSelection(mode: 'trim' | 'space' | 'merge') {
+function rewriteSelection(mode: InlineAiMode) {
   const ed = editor.value
   const range = selectionRange()
   if (!ed || !range) {
     ElMessage.info('先选中要改写的文字')
     return
   }
-  let next = range.text
-  if (mode === 'trim') {
-    next = next
-      .split(/\r?\n/)
-      .map((line) => line.replace(/[ \t]+/g, ' ').trim())
-      .filter((line) => line.length > 0)
-      .join('\n')
-  } else if (mode === 'space') {
-    next = next.replace(/([\u4e00-\u9fff])([A-Za-z0-9])/g, '$1 $2').replace(/([A-Za-z0-9])([\u4e00-\u9fff])/g, '$1 $2')
-  } else {
-    const parts = range.text
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0)
-    next = parts.join('')
-  }
-  if (next === range.text) {
-    ElMessage.info('没有需要改写的内容')
+  const context = ed.state.doc.textBetween(Math.max(0, range.from - 80), range.from, '\n')
+  const result = rewriteWithContext(mode, range.text, context)
+  if (!result) {
+    ElMessage.info('这段文字不用改')
     bubbleRewrite.value = null
     return
   }
   ed.chain()
     .focus()
-    .insertContentAt({ from: range.from, to: range.to }, next)
+    .insertContentAt({ from: range.from, to: range.to }, result.html ?? result.text)
     .run()
   bubbleRewrite.value = null
-  ElMessage.success('已改写选区')
+  governOpen.value = false
+  recordAudit('ai', `${inlineAiLabel(mode)}：${range.text.slice(0, 40)}`)
+  ElMessage.success(`已${inlineAiLabel(mode)}`)
 }
 
 
@@ -2912,6 +3086,7 @@ async function openPrintPreview() {
   scheduleMeasure()
   printPreviewOpen.value = true
   moreOpen.value = false
+  recordAudit('export', '打印预览')
 }
 
 function closePrintPreview() {
@@ -4344,11 +4519,7 @@ function openCurrentLink() {
     ElMessage.warning('没有可打开的链接')
     return
   }
-  if (/^(https?:|mailto:|\/|#)/i.test(href)) {
-    window.open(href, '_blank', 'noopener,noreferrer')
-  } else {
-    ElMessage.warning('链接协议不受支持')
-  }
+  requestOpenHref(href)
 }
 
 function confirmInsertLink() {
@@ -4383,6 +4554,7 @@ function confirmInsertLink() {
   } else {
     ed.chain().focus().setLink({ href }).run()
   }
+  noteExternalLink(href)
   closeLinkDialog()
 }
 
@@ -5148,6 +5320,7 @@ const {
     moreOpen.value = false
   },
   headingNumbers: () => headingAutoNumber.value,
+  onAudit: (detail) => recordAudit('export', detail),
 })
 
 /** 工具栏分组内的按钮配置菜单（右键分组打开） */
@@ -6567,6 +6740,39 @@ const allTools = computed((): ToolItem[] => {
       run: runDeadLinkCheck,
     },
     {
+      key: 'watermark',
+      label: '水印',
+      title: '文档水印',
+      icon: '印',
+      iconComp: ic('note'),
+      active: () => watermark.value.enabled,
+      run: () => openGovern('watermark'),
+    },
+    {
+      key: 'outbound',
+      label: '外链',
+      title: '外链确认与白名单',
+      icon: '外',
+      iconComp: ic('link'),
+      run: () => openGovern('outbound'),
+    },
+    {
+      key: 'audit',
+      label: '审计',
+      title: '文档操作记录',
+      icon: '录',
+      iconComp: ic('wordStats'),
+      run: () => openGovern('audit'),
+    },
+    {
+      key: 'inlineAi',
+      label: '文内AI',
+      title: '用选区和上文改写，不调用外部模型',
+      icon: 'AI',
+      iconComp: ic('highlight'),
+      run: () => openGovern('ai'),
+    },
+    {
       key: 'readTime',
       label: '时长',
       title: '阅读时长估算',
@@ -6875,6 +7081,27 @@ provideRteBindings({
   selectionToLink,
   selectionToTable,
   rewriteSelection,
+  watermark,
+  watermarkDraft,
+  WATERMARK_PRESETS,
+  applyWatermarkPreset,
+  onWatermarkDraftInput,
+  onOutboundHostsInput,
+  saveWatermark,
+  outboundPolicy,
+  outboundHostsDraft,
+  externalLinkRows,
+  refreshExternalLinks,
+  toggleOutboundConfirm,
+  saveOutboundPolicy,
+  requestOpenHref,
+  auditLog,
+  AUDIT_ACTION_LABEL,
+  formatAuditTime,
+  governOpen,
+  governTab,
+  openGovern,
+  INLINE_AI_MODES,
   calloutOpen,
   canReplaceFind,
   caseMenuOpen,

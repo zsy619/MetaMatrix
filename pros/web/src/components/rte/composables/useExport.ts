@@ -30,6 +30,7 @@ export function useExport(deps: {
   closeMore: () => void
   /** 标题自动编号打开时，只在 Markdown / Word 副本里写编号。 */
   headingNumbers?: () => boolean
+  onAudit?: (detail: string) => void
 }) {
 const exportMenuOpen = ref(false)
 const exportBusy = ref(false)
@@ -89,11 +90,13 @@ async function copyAsFeishuHtml() {
     } else {
       throw new Error('clipboard unavailable')
     }
+    deps.onAudit?.('复制 HTML')
     ElMessage.success('已复制为可粘贴的 HTML')
   } catch (err) {
     console.error(err)
     try {
       await navigator.clipboard.writeText(html)
+      deps.onAudit?.('复制 HTML 源码')
       ElMessage.success('已复制 HTML 源码')
     } catch {
       ElMessage.error('复制失败，请检查浏览器剪贴板权限')
@@ -136,6 +139,7 @@ ${body}
 </html>
 `
   triggerDownloadBlob(new Blob([html], { type: 'text/html;charset=utf-8' }), `${exportFileBasename()}.html`)
+  deps.onAudit?.('HTML')
   ElMessage.success('已导出 HTML')
 }
 
@@ -154,6 +158,7 @@ function exportAsPlainText() {
     new Blob([content], { type: 'text/plain;charset=utf-8' }),
     `${exportFileBasename()}.txt`,
   )
+  deps.onAudit?.('纯文本')
   ElMessage.success('已导出纯文本')
 }
 
@@ -184,6 +189,7 @@ async function exportAsPng() {
     link.download = `${exportFileBasename()}.png`
     link.href = canvas.toDataURL('image/png')
     link.click()
+    deps.onAudit?.('图片')
     ElMessage.success('已导出图片')
   } catch (err) {
     console.error(err)
@@ -220,6 +226,7 @@ async function exportAsPdf() {
       chrome: deps.pageChrome.value,
     })
     triggerDownloadBlob(blob, `${exportFileBasename()}.pdf`)
+    deps.onAudit?.('PDF')
     ElMessage.success('已导出 PDF')
   } catch (err) {
     console.error(err)
@@ -253,6 +260,7 @@ async function exportAsDocx() {
     const bodyText = ed.getText({ blockSeparator: '\n' }) || ''
     const blob = await buildDocxBlob({ title, bodyHtml, bodyText })
     triggerDownloadBlob(blob, `${exportFileBasename()}.docx`)
+    deps.onAudit?.('Word')
     ElMessage.success('已导出 Word')
   } catch (err) {
     console.error(err)
@@ -284,6 +292,7 @@ async function exportAsMarkdown() {
     new Blob([md], { type: 'text/markdown;charset=utf-8' }),
     `${exportFileBasename()}.md`,
   )
+  deps.onAudit?.('Markdown')
   ElMessage.success('已导出 Markdown')
 }
 

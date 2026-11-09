@@ -126,6 +126,8 @@ export function useRteExtensions(deps: {
   looksLikeRichHtml: LateFn
   openFormulaFromChip: LateFn
   openLinkDialog: LateFn
+  /** 正文里的链接点击。返回后由编辑器决定打开、确认或拦截。 */
+  onEditorLinkClick?: (href: string) => void
   openPrintPreview: LateFn
   scheduleHtmlEmit: LateFn
   setHeading: LateFn
@@ -565,11 +567,19 @@ const editor = useEditor({
         return true
       }
       const ann = target?.closest?.('[data-annotation]') as HTMLElement | null
-      if (!ann) return false
-      const href = ann.getAttribute('data-href')?.trim()
+      if (ann) {
+        const href = ann.getAttribute('data-href')?.trim()
+        if (!href) return false
+        event.preventDefault()
+        deps.onEditorLinkClick?.(href)
+        return true
+      }
+      const anchor = target?.closest?.('a[href]') as HTMLElement | null
+      if (!anchor || viewMode.value === 'edit') return false
+      const href = anchor.getAttribute('href')?.trim()
       if (!href) return false
       event.preventDefault()
-      window.open(href, '_blank', 'noopener,noreferrer')
+      deps.onEditorLinkClick?.(href)
       return true
     },
     handleDOMEvents: {

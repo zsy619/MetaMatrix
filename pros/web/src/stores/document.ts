@@ -20,6 +20,9 @@ import {
   writeToolbarGroupButtons,
   type ToolbarGroupButtonConfig,
 } from '../utils/rteToolbarGroupButtons'
+import { normalizeWatermark, writeWatermark, type PanelWatermark } from '../utils/rteWatermark'
+import { normalizeOutboundPolicy, writeOutboundPolicy, type OutboundPolicy } from '../utils/rteOutbound'
+import { writeAuditLog, type AuditEvent } from '../utils/rteAudit'
 import { getToken } from '../api/http'
 import type {
   BlockCanvasDocumentJSON,
@@ -1610,6 +1613,36 @@ export const useDocumentStore = defineStore('document', () => {
 
   function getPanelMentionPermission(panelId: string): DirectoryPermission | null {
     return readMentionPermission(current_data.value?.mentionPermissionByPanelId, panelId)
+  }
+
+  function setPanelWatermark(panelId: string, mark: PanelWatermark) {
+    const doc = current_data.value
+    if (!doc || !panelId) return
+    const prev = JSON.stringify(doc.watermarkByPanelId ?? null)
+    const next = writeWatermark(doc.watermarkByPanelId, panelId, normalizeWatermark(mark))
+    if (next) doc.watermarkByPanelId = next
+    else delete doc.watermarkByPanelId
+    if (JSON.stringify(doc.watermarkByPanelId ?? null) !== prev) markDirty()
+  }
+
+  function setPanelOutboundPolicy(panelId: string, policy: OutboundPolicy) {
+    const doc = current_data.value
+    if (!doc || !panelId) return
+    const prev = JSON.stringify(doc.outboundPolicyByPanelId ?? null)
+    const next = writeOutboundPolicy(doc.outboundPolicyByPanelId, panelId, normalizeOutboundPolicy(policy))
+    if (next) doc.outboundPolicyByPanelId = next
+    else delete doc.outboundPolicyByPanelId
+    if (JSON.stringify(doc.outboundPolicyByPanelId ?? null) !== prev) markDirty()
+  }
+
+  function setPanelAuditLog(panelId: string, events: readonly AuditEvent[]) {
+    const doc = current_data.value
+    if (!doc || !panelId) return
+    const prev = JSON.stringify(doc.auditLogByPanelId ?? null)
+    const next = writeAuditLog(doc.auditLogByPanelId, panelId, events)
+    if (next) doc.auditLogByPanelId = next
+    else delete doc.auditLogByPanelId
+    if (JSON.stringify(doc.auditLogByPanelId ?? null) !== prev) markDirty()
   }
 
   /** 写入某个面板某个分组的按钮显隐与顺序。传 null 恢复默认。 */
@@ -3808,6 +3841,9 @@ export const useDocumentStore = defineStore('document', () => {
     setPanelRevisions,
     setPanelMentionPermission,
     getPanelMentionPermission,
+    setPanelWatermark,
+    setPanelOutboundPolicy,
+    setPanelAuditLog,
     setPanelToolbarGroupButtons,
     getPanelAttachments,
     addPanelAttachment,
