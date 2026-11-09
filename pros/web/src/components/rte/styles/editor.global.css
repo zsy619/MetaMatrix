@@ -1905,10 +1905,10 @@ html.rte-toolbar-dragging * {
   min-width: 300px;
   max-width: min(420px, calc(100vw - 16px));
   padding: 0;
-  background: var(--mm-surface, #fff);
-  border: 1px solid var(--mm-line, #e8eaed);
-  border-radius: 10px;
-  box-shadow: 0 12px 36px rgba(32, 33, 36, 0.12);
+  background: #fff;
+  border: 1px solid #dee0e3;
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(31, 35, 41, 0.12);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1994,13 +1994,13 @@ html.rte-toolbar-dragging * {
   justify-content: center;
 }
 .rte-slash-item.is-active .rte-slash-glyph {
-  background: var(--mm-blue-soft, #e8f0fe);
-  color: var(--mm-blue, #1a73e8);
+  background: #e1eaff;
+  color: #3370ff;
 }
 .rte-slash-item:hover,
 .rte-slash-item.is-active {
-  background: var(--mm-blue-soft, #e8f0fe);
-  color: var(--mm-text, #202124);
+  background: #f0f4ff;
+  color: #1f2329;
 }
 .rte-slash-foot {
   flex-shrink: 0;
@@ -2035,7 +2035,7 @@ html.rte-toolbar-dragging * {
   text-align: center;
 }
 .rte-root .rte-slash-decoration {
-  background: rgba(22, 93, 255, 0.12);
+  background: rgba(51, 112, 255, 0.18);
   border-radius: 3px;
   box-decoration-break: clone;
 }
@@ -2104,8 +2104,8 @@ html.rte-toolbar-dragging * {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: #e8f3ff;
-  color: #165dff;
+  background: #e1eaff;
+  color: #3370ff;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2143,15 +2143,15 @@ html.rte-toolbar-dragging * {
   padding: 0 5px;
   margin: 0 1px;
   border-radius: 4px;
-  background: #e8f3ff;
-  color: #165dff;
+  background: #e1eaff;
+  color: #3370ff;
   font-weight: 500;
   text-decoration: none;
   white-space: nowrap;
   cursor: default;
 }
 .rte-root .rte-mention-decoration {
-  background: rgba(22, 93, 255, 0.12);
+  background: rgba(51, 112, 255, 0.18);
   border-radius: 3px;
   box-decoration-break: clone;
 }

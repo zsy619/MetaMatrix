@@ -1,7 +1,7 @@
 import { nextTick, ref, type Ref, type ShallowRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { Editor } from '@tiptap/core'
-import { NodeSelection } from '@tiptap/pm/state'
+import { NodeSelection, TextSelection } from '@tiptap/pm/state'
 import { Fragment } from '@tiptap/pm/model'
 import { reorderIndexes } from '../../../utils/rteBatch3'
 import { blockHandleLeft, blockToolsWidth, proseContentLeft } from '../../../utils/rteGutter'
@@ -119,6 +119,8 @@ const blockHandle = ref({ visible: false, top: 0, left: 0, index: -1 })
 const blockDropLine = ref<number | null>(null)
 let blockDragFrom = -1
 let blockDropGap = 0
+/** 刚拖完块时忽略紧接着的 click，避免松手又把块菜单打开。 */
+let gripDragged = false
 
 function topLevelBlockElements(canvas: HTMLElement): HTMLElement[] {
   const prose = canvas.querySelector('.ProseMirror')
@@ -344,7 +346,35 @@ function moveHoveredBlock(dir: -1 | 1) {
   blockMenuOpen.value = false
 }
 
+/** 在当前块下方插入空段，并写入「/」唤起飞书式斜杠菜单。 */
+function insertBelowHoveredBlock() {
+  const ed = deps.editor.value
+  const index = blockMenuIndex.value
+  if (!ed || index < 0 || index >= ed.state.doc.childCount) return
+  const paragraph = ed.schema.nodes.paragraph
+  if (!paragraph) return
+  let pos = 0
+  ed.state.doc.forEach((_node, offset, i) => {
+    if (i === index) pos = offset
+  })
+  const node = ed.state.doc.child(index)
+  const at = pos + node.nodeSize
+  const block = paragraph.create(null, ed.schema.text('/'))
+  let tr = ed.state.tr.insert(at, block)
+  const cursor = at + block.nodeSize - 1
+  tr = tr.setSelection(TextSelection.near(tr.doc.resolve(cursor)))
+  ed.view.dispatch(tr.scrollIntoView())
+  ed.commands.focus()
+  blockMenuOpen.value = false
+}
+
+function onBlockGripClick() {
+  if (gripDragged || blockDragFrom >= 0) return
+  toggleBlockMenu()
+}
+
 function onBlockDragStart(event: DragEvent) {
+  gripDragged = true
   blockDragFrom = blockHandle.value.index
   event.dataTransfer?.setData('application/x-rte-block', String(blockDragFrom))
   if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move'
@@ -353,6 +383,9 @@ function onBlockDragStart(event: DragEvent) {
 function onBlockDragEnd() {
   blockDragFrom = -1
   blockDropLine.value = null
+  window.setTimeout(() => {
+    gripDragged = false
+  }, 50)
 }
 
 function onCanvasBlockDragOver(event: DragEvent) {
@@ -404,6 +437,8 @@ function onCanvasBlockDrop(event: DragEvent) {
     copyHoveredBlock,
     deleteHoveredBlock,
     moveHoveredBlock,
+    insertBelowHoveredBlock,
+    onBlockGripClick,
     onBlockDragStart,
     onBlockDragEnd,
     onCanvasBlockDragOver,

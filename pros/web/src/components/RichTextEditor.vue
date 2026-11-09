@@ -1681,7 +1681,7 @@ const SHORTCUT_GROUPS: { title: string; items: { keys: string; desc: string }[] 
       ...FEISHU_BATCH3_SHORTCUTS,
       { keys: 'Ctrl/⌘ + Alt + H', desc: '高亮 / 取消高亮' },
       { keys: 'Ctrl/⌘ + Alt + Enter', desc: '打开当前块的操作菜单' },
-      { keys: '悬停块 · ⋮', desc: '转成标题、列表、提示块，或复制、删除、上下移' },
+      { keys: '悬停块 · ⋮', desc: '在下方插入、转成标题或列表，或复制、删除、上下移' },
     ],
   },
   {
@@ -3645,6 +3645,8 @@ const {
   copyHoveredBlock,
   deleteHoveredBlock,
   moveHoveredBlock,
+  insertBelowHoveredBlock,
+  onBlockGripClick,
   onBlockDragStart,
   onBlockDragEnd,
   onCanvasBlockDragOver,
@@ -6960,7 +6962,7 @@ function onCanvasClick(event: MouseEvent) {
   const target = event.target as HTMLElement | null
   if (!target) return
   // 标题输入框已 @click.stop；此处再兜底一次
-  if (target.closest('.rte-title')) return
+  if (target.closest('.rte-title, .rte-block-menu, .rte-block-tools, .rte-code-chrome')) return
   // 点在可编辑区（含 table td/th、.tableWrapper）内：不要抢走选区
   if (target.closest('.ProseMirror, .tiptap, .rte-body')) return
   editor.value?.commands.focus('end')
@@ -7178,6 +7180,8 @@ provideRteBindings({
   copyAsFeishuHtml,
   copyCurrentLinkUrl,
   copyHoveredBlock,
+  insertBelowHoveredBlock,
+  onBlockGripClick,
   currentCodeLanguage,
   currentFontFamily,
   currentFontSize,

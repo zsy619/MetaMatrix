@@ -124,7 +124,7 @@ for (const viewport of VIEWPORTS) {
   }
 
   // 点击首字左边缘 → 光标落在 offset 0
-  await page.mouse.click(geom.charRect.left + 1, geom.charRect.top + geom.charRect.bottom / 2)
+  await page.mouse.click(geom.charRect.left + 1, (geom.charRect.top + geom.charRect.bottom) / 2)
   await page.waitForTimeout(200)
   const sel = await page.evaluate(() => {
     const ed = window.__rte?.editor

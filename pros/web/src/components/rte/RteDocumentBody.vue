@@ -353,18 +353,27 @@ useParentScopeStamp()
           class="rte-block-tools"
           :style="{ top: rte.blockHandle.top + 'px', left: rte.blockHandle.left + 'px' }"
           @mousedown.stop
+          @click.stop
         >
           <button data-rte-own
             v-if="rte.expanded"
             type="button"
             class="rte-block-handle"
             draggable="true"
-            title="拖动调整块顺序"
+            title="拖动排序，点击打开块操作"
             aria-label="拖动调整块顺序"
+            @click.stop="rte.onBlockGripClick"
             @dragstart="rte.onBlockDragStart"
             @dragend="rte.onBlockDragEnd"
           >
-            ⠿
+            <svg data-rte-own viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+              <circle data-rte-own cx="5.5" cy="3.5" r="1.15" fill="currentColor" />
+              <circle data-rte-own cx="10.5" cy="3.5" r="1.15" fill="currentColor" />
+              <circle data-rte-own cx="5.5" cy="8" r="1.15" fill="currentColor" />
+              <circle data-rte-own cx="10.5" cy="8" r="1.15" fill="currentColor" />
+              <circle data-rte-own cx="5.5" cy="12.5" r="1.15" fill="currentColor" />
+              <circle data-rte-own cx="10.5" cy="12.5" r="1.15" fill="currentColor" />
+            </svg>
           </button>
           <button data-rte-own
             type="button"
@@ -375,7 +384,11 @@ useParentScopeStamp()
             :aria-expanded="rte.blockMenuOpen"
             @click.stop="rte.toggleBlockMenu"
           >
-            ⋮
+            <svg data-rte-own viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+              <circle data-rte-own cx="8" cy="3.5" r="1.25" fill="currentColor" />
+              <circle data-rte-own cx="8" cy="8" r="1.25" fill="currentColor" />
+              <circle data-rte-own cx="8" cy="12.5" r="1.25" fill="currentColor" />
+            </svg>
           </button>
         </div>
         <div data-rte-own
@@ -385,8 +398,11 @@ useParentScopeStamp()
           aria-label="块操作"
           :style="{ top: rte.blockHandle.top + 26 + 'px', left: rte.blockHandle.left + 'px' }"
           @mousedown.stop
+          @click.stop
           @keydown="rte.onBlockMenuKeydown"
         >
+          <button data-rte-own type="button" role="menuitem" @click="rte.insertBelowHoveredBlock">在下方插入</button>
+          <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
           <button data-rte-own type="button" role="menuitem" @click="rte.turnHoveredBlock('paragraph')">正文</button>
           <button data-rte-own type="button" role="menuitem" @click="rte.turnHoveredBlock('h1')">标题 1</button>
           <button data-rte-own type="button" role="menuitem" @click="rte.turnHoveredBlock('h2')">标题 2</button>
