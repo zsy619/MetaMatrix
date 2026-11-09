@@ -28,7 +28,12 @@ function chartCategoriesOf(groupId: string) {
   return chartGroupById.get(groupId)?.categories || []
 }
 
-/** 展开 / 收起某个一级分类的下拉（同时只开一个）。 */
+function onRibbonTab(id: string, event: MouseEvent) {
+  rteBindings.setRibbonTab(id)
+  const toolbar = (event.currentTarget as HTMLElement | null)?.closest('.rte-toolbar')
+  toolbar?.querySelector(`[data-group-id="${id}"]`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+}
+
 function toggleChartGroupMenu(key: string) {
   const wasOpen = rteBindings.echartsGroupMenuKey === key
   rteBindings.echartsGroupMenuKey = wasOpen ? null : key
@@ -58,7 +63,7 @@ function toggleChartGroupMenu(key: string) {
             class="rte-ribbon-tab"
             :class="{ active: rte.ribbonTab === tab.id }"
             :aria-selected="rte.ribbonTab === tab.id"
-            @click="rte.setRibbonTab(tab.id)"
+            @click="onRibbonTab(tab.id, $event)"
           >
             {{ tab.label }}
           </button>

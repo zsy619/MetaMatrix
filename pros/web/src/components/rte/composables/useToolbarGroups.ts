@@ -115,13 +115,16 @@ export function useToolbarGroups<T extends ToolLike>(deps: {
   })
 
   const ribbonTab = ref(RIBBON_TABS[0]!.id)
-  const ribbonTabs = RIBBON_TABS
+  /** 没有按钮的分组不占栏目。例如空的「其他」。 */
+  const ribbonTabs = computed(() =>
+    RIBBON_TABS.filter((tab) => toolbarGroups.value.some((group) => tab.groups.includes(group.id))),
+  )
   function setRibbonTab(id: string) {
     if (!RIBBON_TABS.some((tab) => tab.id === id)) return
     ribbonTab.value = id
     deps.openToolbarRows?.()
   }
-  /** 最大化时只渲染当前栏目的分组。画布小编辑器仍一次放出全部高频分组。 */
+  /** 最大化时只渲染当前分组。画布小编辑器仍一次放出全部高频分组。 */
   const visibleToolbarGroups = computed(() => {
     if (!deps.expanded()) return toolbarGroups.value
     const allow = new Set(ribbonGroupsFor(ribbonTab.value))

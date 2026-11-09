@@ -77,7 +77,7 @@ async function openExpanded() {
       collapsed.oneRow &&
         collapsed.label === '展开' &&
         foldRow.display === 'none' &&
-        foldRow.tabs.includes('开始') &&
+        foldRow.tabs.includes('编辑') &&
         collapsed.height > 0 &&
         collapsed.height < 120,
       `h=${collapsed.height} label=${collapsed.label} tools=${foldRow.display} tabs=${foldRow.tabs.join('、')}`,
@@ -188,23 +188,41 @@ const ribbon = await page.evaluate(() => {
   return { tabs, groups }
 })
 log(
-  '功能区默认停在开始',
-  ribbon.tabs.some((tab) => tab.label === '开始' && tab.active) &&
-    ribbon.groups.includes('edit') &&
-    ribbon.groups.includes('style') &&
-    ribbon.groups.includes('paragraph') &&
-    !ribbon.groups.includes('insert'),
+  '功能区默认停在编辑',
+  ribbon.tabs.some((tab) => tab.label === '编辑' && tab.active) &&
+    ribbon.tabs.some((tab) => tab.label === '字体与颜色') &&
+    ribbon.groups.length === 1 &&
+    ribbon.groups[0] === 'edit',
   `tabs=${ribbon.tabs.map((tab) => tab.label + (tab.active ? '*' : '')).join('、')} groups=${ribbon.groups.join('、')}`,
 )
 const before = await groupSnapshot()
-log('开始栏目里能看到编辑、字体和段落', before.length >= 3, `${before.length} 组`)
+log('编辑栏目只显示编辑分组', before.length === 1 && before[0]?.id === 'edit', `${before.length} 组`)
+const large = await page.evaluate(() => {
+  const btn = document.querySelector('.rte-tool-group .rte-tool')
+  const icon = btn?.querySelector('.rte-tool-icon')
+  const label = btn?.querySelector('.rte-tool-label')
+  if (!btn || !icon || !label) return null
+  const ir = icon.getBoundingClientRect()
+  const lr = label.getBoundingClientRect()
+  const br = btn.getBoundingClientRect()
+  return {
+    dir: getComputedStyle(btn).flexDirection,
+    icon: Math.round(ir.height),
+    labelW: Math.round(lr.width),
+    labelBelow: lr.top >= ir.bottom - 4,
+    h: Math.round(br.height),
+  }
+})
+log(
+  '按钮是大图标在上、文字在下',
+  !!large && large.dir === 'column' && large.icon >= 28 && large.labelW >= 12 && large.labelBelow && large.h >= 60,
+  large ? `dir=${large.dir} icon=${large.icon} labelW=${large.labelW} below=${large.labelBelow} h=${large.h}` : 'missing',
+)
 
 const edit = before.find((g) => g.id === 'edit')
-const style = before.find((g) => g.id === 'style')
-const paragraph = before.find((g) => g.id === 'paragraph')
 const handle = await page.locator('.rte-tool-group[data-group-id="edit"] .rte-group-handle').boundingBox()
-if (!edit || !style || !paragraph || !handle) {
-  log('能定位编辑/字体/段落分组', false, JSON.stringify(before.map((g) => `${g.id}@${Math.round(g.left)},${Math.round(g.top)} ${Math.round(g.width)}×${Math.round(g.height)}`)))
+if (!edit || !handle) {
+  log('能定位编辑分组', false, JSON.stringify(before.map((g) => g.id)))
 } else {
   const startX = handle.x + handle.width / 2
   const startY = handle.y + handle.height / 2
@@ -225,87 +243,23 @@ if (!edit || !style || !paragraph || !handle) {
   await page.mouse.up()
   await page.waitForTimeout(150)
   const afterNudge = (await groupSnapshot()).map((g) => g.id)
-  log('轻拖 18px 只跟随，不把分组甩到下一行', afterNudge[0] === 'edit' && afterNudge[1] === 'style', afterNudge.slice(0, 4).join('、'))
-
-  const intoY = style.top + Math.min(18, style.height / 2)
-  const seam = Math.min(48, Math.max(28, style.width * 0.08))
-  const beforeX = style.left + Math.min(20, seam - 4)
-  const middleX = style.left + style.width * 0.5
-  const afterX = style.endLeft + style.endWidth - Math.min(16, seam / 2)
-  const afterY = style.endTop + Math.min(18, style.endHeight / 2)
-  await page.mouse.move(startX, startY)
-  await page.mouse.down()
-  await page.mouse.move(middleX, intoY, { steps: 12 })
-  await page.waitForTimeout(80)
-  const onMiddle = (await groupSnapshot()).map((g) => g.id)
-  log(
-    '指针在宽分组中间不换位',
-    onMiddle.indexOf('edit') === onMiddle.indexOf('style') - 1,
-    `order=${onMiddle.slice(0, 4).join('、')} pointer=${middleX.toFixed(0)} seam=${seam.toFixed(0)}`,
-  )
-  await page.mouse.move(beforeX, intoY, { steps: 8 })
-  await page.waitForTimeout(80)
-  const onLeft = (await groupSnapshot()).map((g) => g.id)
-  log(
-    '靠近宽分组左缘时插到它前面',
-    onLeft.indexOf('edit') === onLeft.indexOf('style') - 1 && beforeX <= style.left + seam,
-    `order=${onLeft.slice(0, 4).join('、')} pointer=${beforeX.toFixed(0)}`,
-  )
-  await page.mouse.move(afterX, afterY, { steps: 16 })
-  await page.waitForTimeout(120)
-  const onRight = (await groupSnapshot()).map((g) => g.id)
-  log(
-    '靠近宽分组右缘时松手前就换到它后面',
-    onRight.indexOf('edit') === onRight.indexOf('style') + 1 && afterX >= style.endLeft + style.endWidth - seam,
-    `order=${onRight.slice(0, 4).join('、')} pointer=${afterX.toFixed(0)} right=${(style.endLeft + style.endWidth).toFixed(0)}`,
-  )
-  await page.screenshot({ path: `${out}/02-early-slot.png` })
-  await page.mouse.up()
-  await page.waitForTimeout(200)
-  const dropped = await groupSnapshot()
-  const ids = dropped.map((g) => g.id)
-  log(
-    '松手后编辑分组仍在字体分组后面',
-    ids.indexOf('edit') === ids.indexOf('style') + 1,
-    ids.join('、'),
-  )
+  log('轻拖后仍停在编辑分组', afterNudge.length === 1 && afterNudge[0] === 'edit', afterNudge.join('、'))
   const chipGone = await page.evaluate(() => !document.querySelector('.rte-toolbar-drag-chip'))
-  log('松手后跟随芯片消失', chipGone && dropped.every((g) => !g.transform), dropped.find((g) => g.transform)?.transform || '')
-  await page.screenshot({ path: `${out}/03-dropped.png` })
+  log('松手后跟随芯片消失', chipGone, '')
 }
 
-await openExpanded()
-const rows = await groupSnapshot()
-const styleRow = rows.find((g) => g.id === 'style')
-const paragraphHandle = await page.locator('.rte-tool-group[data-group-id="paragraph"] .rte-group-handle').boundingBox()
-if (!styleRow || !paragraphHandle) {
-  log('字体分组和段落手柄都在', false, rows.map((g) => g.id).join('、'))
-} else {
-  const fromX = paragraphHandle.x + paragraphHandle.width / 2
-  const fromY = paragraphHandle.y + paragraphHandle.height / 2
-  const toX = styleRow.left + 12
-  const toY = styleRow.top + Math.min(16, styleRow.height / 2)
-  await page.mouse.move(fromX, fromY)
-  await page.mouse.down()
-  await page.mouse.move(toX, toY, { steps: 16 })
-  await page.waitForTimeout(80)
-  const over = await groupSnapshot()
-  const overIds = over.map((g) => g.id)
-  log(
-    '拖到上一行宽分组左缘时，松手前就排到该组前面，而不是更靠左的上一段',
-    overIds[0] === 'edit' && overIds.indexOf('paragraph') === overIds.indexOf('style') - 1,
-    `order=${overIds.slice(0, 4).join('、')} pointer=(${toX.toFixed(0)},${toY.toFixed(0)}) style=(${styleRow.left.toFixed(0)},${styleRow.top.toFixed(0)})`,
-  )
-  await page.screenshot({ path: `${out}/04-second-row.png` })
-  await page.mouse.up()
-  await page.waitForTimeout(200)
-  const after = (await groupSnapshot()).map((g) => g.id)
-  log(
-    '松手后段落分组排到字体分组前面，编辑分组仍在最前',
-    after[0] === 'edit' && after.indexOf('paragraph') === after.indexOf('style') - 1,
-    after.join('、'),
-  )
-}
+await page.getByRole('tab', { name: '字体与颜色', exact: true }).click()
+await page.waitForTimeout(150)
+const styleOnly = await page.evaluate(() =>
+  [...document.querySelectorAll('.rte-toolbar-tools .rte-tool-group')].map((el) => el.dataset.groupId),
+)
+log('字体与颜色栏目只显示字体分组', styleOnly.length === 1 && styleOnly[0] === 'style', styleOnly.join('、'))
+await page.getByRole('tab', { name: '段落与列表', exact: true }).click()
+await page.waitForTimeout(150)
+const paragraphOnly = await page.evaluate(() =>
+  [...document.querySelectorAll('.rte-toolbar-tools .rte-tool-group')].map((el) => el.dataset.groupId),
+)
+log('段落与列表栏目只显示段落分组', paragraphOnly.length === 1 && paragraphOnly[0] === 'paragraph', paragraphOnly.join('、'))
 
 await page.setViewportSize({ width: 1280, height: 900 })
 await page.goto(`${web}/rte-compact-preview.html`, { waitUntil: 'domcontentloaded' })

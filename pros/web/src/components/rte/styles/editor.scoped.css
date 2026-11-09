@@ -4263,10 +4263,14 @@ html.rte-toolbar-dragging .rte-root:not(.expanded) .rte-toolbar-tools > .rte-too
 .rte-ribbon-tabs {
   display: flex;
   align-items: flex-end;
+  flex: 1 1 auto;
+  min-width: 0;
   gap: 0;
   min-height: 30px;
   padding: 0;
   background: transparent;
+  overflow-x: auto;
+  flex-wrap: nowrap;
 }
 .rte-root.expanded .rte-toolbar .rte-ribbon-bar .rte-mode-bar {
   flex: 0 0 auto;
@@ -4276,9 +4280,10 @@ html.rte-toolbar-dragging .rte-root:not(.expanded) .rte-toolbar-tools > .rte-too
   border: none;
 }
 .rte-ribbon-tab {
+  flex: 0 0 auto;
   height: 28px;
   margin: 0 1px;
-  padding: 0 14px;
+  padding: 0 10px;
   border: 1px solid transparent;
   border-bottom: none;
   border-radius: 3px 3px 0 0;
@@ -4287,6 +4292,7 @@ html.rte-toolbar-dragging .rte-root:not(.expanded) .rte-toolbar-tools > .rte-too
   font-size: 13px;
   line-height: 26px;
   cursor: pointer;
+  white-space: nowrap;
 }
 .rte-ribbon-tab:hover {
   background: #edebe9;
@@ -4332,32 +4338,31 @@ html.rte-toolbar-dragging .rte-root:not(.expanded) .rte-toolbar-tools > .rte-too
   height: auto;
   background: #fff;
   border-top: none;
-  padding: 2px 0 0;
-  gap: 0;
-  min-height: 102px;
-  overflow-x: auto;
-  overflow-y: hidden;
+  padding: 8px 8px 0;
+  gap: 4px;
+  min-height: 108px;
+  overflow: visible;
 }
 .rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group {
   position: relative;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   flex-wrap: wrap;
   align-items: flex-start;
   align-content: flex-start;
   justify-content: flex-start;
-  flex: 0 0 auto;
-  align-self: flex-start;
-  width: max-content;
-  max-width: none;
-  height: 100px;
-  min-height: 100px;
-  max-height: 100px;
+  flex: 1 1 auto;
+  align-self: stretch;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  min-height: 96px;
+  max-height: none;
   margin: 0;
-  gap: 0 2px;
-  padding: 2px 10px 20px;
+  gap: 4px;
+  padding: 8px 8px 24px;
   border: none;
-  border-right: 1px solid #d2d0ce;
+  border-right: none;
   border-radius: 0;
   background: transparent;
   box-shadow: none;
@@ -4392,29 +4397,57 @@ html.rte-toolbar-dragging .rte-root:not(.expanded) .rte-toolbar-tools > .rte-too
   line-height: 16px;
   color: #605e5c;
 }
-.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool,
 .rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool-wrap {
-  height: 24px;
-  min-height: 24px;
-  max-height: 24px;
-  margin: 0 2px 0 0;
-  padding: 0 4px;
+  display: inline-flex;
+  height: auto;
+  min-height: 0;
+  max-height: none;
+  margin: 0;
+}
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool {
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  width: 72px;
+  min-width: 72px;
+  max-width: 88px;
+  height: 72px;
+  min-height: 72px;
+  max-height: none;
+  margin: 0;
+  padding: 6px 4px 4px;
+  gap: 4px;
+}
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool-label {
+  position: static;
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  clip: auto;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 12px;
+  line-height: 16px;
+  text-align: center;
 }
 .rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool-icon {
-  width: 16px;
-  height: 16px;
-  min-width: 16px;
-  min-height: 16px;
-  font-size: 16px;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  font-size: 32px;
 }
 .rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group :deep(.rte-ep-icon),
 .rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group :deep(.rte-tool-icon > svg),
 .rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group :deep(svg.rte-ep-icon) {
-  width: 16px !important;
-  height: 16px !important;
-  min-width: 16px;
-  min-height: 16px;
-  font-size: 16px;
+  width: 32px !important;
+  height: 32px !important;
+  min-width: 32px;
+  min-height: 32px;
+  font-size: 32px;
 }
 .rte-root.is-dark-editor .rte-ribbon-bar,
 .rte-root.is-dark-editor.expanded .rte-toolbar {
