@@ -54,8 +54,16 @@ async function openExpanded() {
       window.__toolbarDragStarts += 1
     }, true)
   })
-  const collapsed = await toolbarFoldState()
+  const initial = await toolbarFoldState()
   if (!foldChecked) {
+    log(
+      '最大化默认展开工具栏',
+      !initial.oneRow && initial.label === '收起' && initial.height > 120,
+      `h=${initial.height} label=${initial.label}`,
+    )
+    await page.locator('.rte-toolbar-fold').click()
+    await page.waitForTimeout(200)
+    const collapsed = await toolbarFoldState()
     const foldRow = await page.evaluate(() => {
       const tools = document.querySelector('.rte-toolbar-tools')
       const tr = tools.getBoundingClientRect()
@@ -91,16 +99,21 @@ async function openExpanded() {
       `h=${collapsed.height} label=${collapsed.label} full=${foldRow.full.join('、')} sliced=${foldRow.sliced.join('、')}`,
     )
     await page.screenshot({ path: `${out}/00-folded.png` })
+    await page.locator('.rte-toolbar-fold').click()
+    await page.waitForTimeout(200)
+    const opened = await toolbarFoldState()
+    log(
+      '展开后放出其余工具栏',
+      !opened.oneRow && opened.label === '收起' && opened.height > collapsed.height + 40,
+      `h=${collapsed.height} → ${opened.height}`,
+    )
     foldChecked = true
+    return
   }
-  await page.locator('.rte-toolbar-fold').click()
-  await page.waitForTimeout(200)
-  const opened = await toolbarFoldState()
-  log(
-    '展开后放出其余工具栏',
-    !opened.oneRow && opened.label === '收起' && opened.height > collapsed.height + 40,
-    `h=${collapsed.height} → ${opened.height}`,
-  )
+  if (initial.oneRow) {
+    await page.locator('.rte-toolbar-fold').click()
+    await page.waitForTimeout(200)
+  }
 }
 
 const groupSnapshot = () =>

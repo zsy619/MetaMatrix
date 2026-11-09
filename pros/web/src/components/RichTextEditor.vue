@@ -6066,8 +6066,11 @@ const effectiveExpanded = computed(
   () => resolveToolbarLayout(props.expanded, narrowViewport.value) === 'expanded',
 )
 
-/** 最大化时默认只留第一行；展开后才显示其余工具栏。 */
-const toolbarRowsOpen = ref(false)
+/** 最大化时工具栏默认展开。收起后只留第一行，再次进入最大化会重新展开。 */
+const toolbarRowsOpen = ref(effectiveExpanded.value)
+watch(effectiveExpanded, (open) => {
+  if (open) toolbarRowsOpen.value = true
+})
 function toggleToolbarRows() {
   toolbarRowsOpen.value = !toolbarRowsOpen.value
 }
