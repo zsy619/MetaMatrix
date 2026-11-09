@@ -26,7 +26,7 @@ describe('音视频文件判断', () => {
   })
 })
 
-function harness(kind: 'video' | 'audio') {
+function harness(kind: 'video' | 'audio', confirm = true as boolean) {
   const inserted: AvInsertItem[][] = []
   const toasts: string[] = []
   const fileInput = ref<HTMLInputElement | null>(null)
@@ -64,6 +64,7 @@ function harness(kind: 'video' | 'audio') {
     insertItems: (items) => {
       inserted.push(items)
     },
+    confirmDelete: async () => confirm,
   })
   return { picker, inserted, toasts, fileInput }
 }
@@ -145,6 +146,40 @@ describe('createAvPicker', () => {
     picker.filePickActive = true
     picker.onMask()
     expect(picker.open).toBe(true)
+  })
+
+  it('确认后删除素材和分类；取消则保留', async () => {
+    const kept = harness('audio', false)
+    kept.picker.openDialog()
+    kept.picker.assets = [
+      { id: 'a1', src: 'blob:a', name: 'a.mp3', categoryId: 'cat', createdAt: 1 },
+    ]
+    kept.picker.categories = [{ id: 'cat', name: '录音' }]
+    await kept.picker.deleteAsset('a1')
+    await kept.picker.deleteCategory('cat')
+    expect(kept.picker.assets).toHaveLength(1)
+    expect(kept.picker.categories).toHaveLength(1)
+
+    const gone = harness('video', true)
+    gone.picker.openDialog()
+    gone.picker.assets = [
+      { id: 'v1', src: 'blob:v1', name: 'clip.mp4', categoryId: 'cat', createdAt: 1 },
+      { id: 'v2', src: 'https://cdn.example/b.mp4', name: 'b.mp4', categoryId: 'cat', createdAt: 2 },
+    ]
+    gone.picker.categories = [{ id: 'cat', name: '片头' }]
+    gone.picker.sidebarKey = 'cat'
+    gone.picker.selectedIds = new Set(['v1', 'v2'])
+    await gone.picker.deleteSelected()
+    expect(gone.picker.assets).toEqual([])
+    expect(gone.picker.selectedIds.size).toBe(0)
+
+    gone.picker.assets = [
+      { id: 'v3', src: 'https://cdn.example/c.mp4', name: 'c.mp4', categoryId: 'cat', createdAt: 3 },
+    ]
+    await gone.picker.deleteCategory('cat')
+    expect(gone.picker.categories).toEqual([])
+    expect(gone.picker.assets[0]?.categoryId).toBe('uncategorized')
+    expect(gone.picker.sidebarKey).toBe('all')
   })
 
   it('非音频文件不插入', async () => {

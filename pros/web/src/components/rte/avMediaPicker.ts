@@ -1,6 +1,12 @@
 import { reactive, type Ref } from 'vue'
 import { dialogHasDraft, maskShouldDismiss } from '../../utils/rteDialogMask'
 import {
+  confirmLibraryDelete,
+  dropLibraryAssets,
+  forgetStoredMedia,
+  releaseLibraryCategory,
+} from '../../utils/libraryDelete'
+import {
   ensureMediaThumb,
   mediaThumbState,
   retryMediaThumb,
@@ -95,6 +101,7 @@ export type AvPickerOptions = {
   insertItems: (items: AvInsertItem[]) => void
   /** When set, local files go through the media library instead of a blob URL. */
   persistFile?: (file: File) => Promise<string>
+  confirmDelete?: (message: string, title: string) => Promise<boolean>
 }
 
 export type AvPicker = {
@@ -124,6 +131,9 @@ export type AvPicker = {
   triggerLocalPick: () => void
   onFiles: (event: Event) => Promise<void>
   confirm: () => void
+  deleteAsset: (id: string) => Promise<void>
+  deleteSelected: () => Promise<void>
+  deleteCategory: (id: string) => Promise<void>
 }
 
 export function createAvPicker(options: AvPickerOptions): AvPicker {
@@ -342,6 +352,54 @@ export function createAvPicker(options: AvPickerOptions): AvPicker {
       added.map((a) => ({ src: a.src, name: a.name })),
       options.messages.inserted(added.length),
     )
+  }
+
+  const askDelete = options.confirmDelete ?? confirmLibraryDelete
+
+  function syncSelectAll() {
+    const visible = picker.filteredAssets
+    picker.selectAll = visible.length > 0 && visible.every((asset) => picker.selectedIds.has(asset.id))
+  }
+
+  async function removeAssets(ids: string[], message: string) {
+    if (!ids.length) return
+    if (!(await askDelete(message, '删除素材'))) return
+    const dropping = picker.assets.filter((asset) => ids.includes(asset.id))
+    await Promise.all(dropping.map((asset) => forgetStoredMedia(asset.src)))
+    picker.assets = dropLibraryAssets(picker.assets, ids)
+    picker.selectedIds = new Set([...picker.selectedIds].filter((id) => !ids.includes(id)))
+    syncSelectAll()
+    saveStore()
+    options.toast('success', ids.length > 1 ? `已删除 ${ids.length} 项` : '已删除')
+  }
+
+  picker.deleteAsset = async (id: string) => {
+    const asset = picker.assets.find((item) => item.id === id)
+    if (!asset) return
+    const name = asset.name || '这项素材'
+    await removeAssets([id], `删除「${name}」？素材库里不再显示。`)
+  }
+
+  picker.deleteSelected = async () => {
+    const ids = [...picker.selectedIds]
+    if (!ids.length) return
+    await removeAssets(ids, `删除选中的 ${ids.length} 项？素材库里不再显示。`)
+  }
+
+  picker.deleteCategory = async (id: string) => {
+    const cat = picker.categories.find((item) => item.id === id)
+    if (!cat) return
+    const count = picker.assets.filter((asset) => asset.categoryId === id).length
+    const message = count
+      ? `删除分类「${cat.name}」？里面的 ${count} 个素材会回到未分类。`
+      : `删除分类「${cat.name}」？`
+    if (!(await askDelete(message, '删除分类'))) return
+    picker.categories = picker.categories.filter((item) => item.id !== id)
+    picker.assets = releaseLibraryCategory(picker.assets, id)
+    if (picker.sidebarKey === id) picker.sidebarKey = 'all'
+    syncSelectAll()
+    saveStore()
+    options.toast('success', '已删除分类')
   }
 
   picker.confirm = () => {

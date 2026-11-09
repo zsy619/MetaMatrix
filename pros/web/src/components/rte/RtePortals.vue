@@ -1534,6 +1534,16 @@ const echartsDialogTemplates = computed(() => {
               >
                 <span data-rte-own class="rte-image-side-ico" aria-hidden="true">📁</span>
                 <span data-rte-own class="rte-image-side-label">{{ cat.name }}</span>
+                <span data-rte-own
+                  class="rte-library-cat-delete"
+                  role="button"
+                  tabindex="0"
+                  title="删除分类"
+                  aria-label="删除分类"
+                  @click.stop="rte.deleteAttachCategory(cat.id)"
+                  @keydown.enter.stop="rte.deleteAttachCategory(cat.id)"
+                  @keydown.space.stop.prevent="rte.deleteAttachCategory(cat.id)"
+                >×</span>
               </button>
               <div data-rte-own class="rte-image-side-spacer" />
               <div data-rte-own v-if="rte.attachAddingCategory" class="rte-image-add-cat-form">
@@ -1567,6 +1577,19 @@ const echartsDialogTemplates = computed(() => {
 
             <div data-rte-own class="rte-image-main">
               <div data-rte-own class="rte-image-main-top">
+                <div data-rte-own class="rte-library-tools">
+                  <button data-rte-own
+                    type="button"
+                    class="rte-library-delete"
+                    :disabled="rte.attachSelectedIds.size === 0"
+                    @click="rte.deleteSelectedAttaches()"
+                  >
+                    删除
+                  </button>
+                  <span data-rte-own v-if="rte.attachSelectedIds.size" class="rte-library-count">
+                    已选 {{ rte.attachSelectedIds.size }}
+                  </span>
+                </div>
                 <label data-rte-own class="rte-image-select-all">
                   <input data-rte-own
                     type="checkbox"
@@ -1626,6 +1649,16 @@ const echartsDialogTemplates = computed(() => {
                   <span data-rte-own class="rte-attach-thumb-ext">{{ rte.attachExtIcon(asset.name) }}</span>
                   <span data-rte-own class="rte-attach-thumb-name">{{ asset.name }}</span>
                   <span data-rte-own class="rte-attach-thumb-size">{{ rte.formatAttachSize(asset.size) }}</span>
+                  <span data-rte-own
+                    class="rte-library-card-delete"
+                    role="button"
+                    tabindex="0"
+                    title="删除"
+                    aria-label="删除附件"
+                    @click.stop="rte.deleteAttachAsset(asset.id)"
+                    @keydown.enter.stop="rte.deleteAttachAsset(asset.id)"
+                    @keydown.space.stop.prevent="rte.deleteAttachAsset(asset.id)"
+                  >×</span>
                   <span data-rte-own
                     class="rte-image-thumb-check"
                     :class="{ on: rte.attachSelectedIds.has(asset.id) }"
@@ -1714,6 +1747,16 @@ const echartsDialogTemplates = computed(() => {
               >
                 <span data-rte-own class="rte-image-side-ico" aria-hidden="true">📁</span>
                 <span data-rte-own class="rte-image-side-label">{{ cat.name }}</span>
+                <span data-rte-own
+                  class="rte-library-cat-delete"
+                  role="button"
+                  tabindex="0"
+                  title="删除分类"
+                  aria-label="删除分类"
+                  @click.stop="rte.deleteImageCategory(cat.id)"
+                  @keydown.enter.stop="rte.deleteImageCategory(cat.id)"
+                  @keydown.space.stop.prevent="rte.deleteImageCategory(cat.id)"
+                >×</span>
               </button>
               <div data-rte-own class="rte-image-side-spacer" />
               <div data-rte-own v-if="rte.addingCategory" class="rte-image-add-cat-form">
@@ -1743,6 +1786,19 @@ const echartsDialogTemplates = computed(() => {
 
             <div data-rte-own class="rte-image-main">
               <div data-rte-own class="rte-image-main-top">
+                <div data-rte-own class="rte-library-tools">
+                  <button data-rte-own
+                    type="button"
+                    class="rte-library-delete"
+                    :disabled="rte.imageSelectedIds.size === 0"
+                    @click="rte.deleteSelectedImages()"
+                  >
+                    删除
+                  </button>
+                  <span data-rte-own v-if="rte.imageSelectedIds.size" class="rte-library-count">
+                    已选 {{ rte.imageSelectedIds.size }}
+                  </span>
+                </div>
                 <label data-rte-own class="rte-image-select-all">
                   <input data-rte-own
                     type="checkbox"
@@ -1817,6 +1873,17 @@ const echartsDialogTemplates = computed(() => {
                     class="rte-image-thumb-loading"
                     aria-live="polite"
                   >加载中…</span>
+                  <span data-rte-own class="rte-library-card-name">{{ asset.name }}</span>
+                  <span data-rte-own
+                    class="rte-library-card-delete"
+                    role="button"
+                    tabindex="0"
+                    title="删除"
+                    aria-label="删除图片"
+                    @click.stop="rte.deleteImageAsset(asset.id)"
+                    @keydown.enter.stop="rte.deleteImageAsset(asset.id)"
+                    @keydown.space.stop.prevent="rte.deleteImageAsset(asset.id)"
+                  >×</span>
                   <span data-rte-own
                     class="rte-image-thumb-check"
                     :class="{ on: rte.imageSelectedIds.has(asset.id) }"

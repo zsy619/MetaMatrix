@@ -16,6 +16,12 @@ import { TABLE_CELL_BG_PRESETS, TABLE_BORDER_STYLE_PRESETS } from '../extensions
 import { HR_VARIANT_OPTIONS, type RteHrVariant } from '../extensions/rteHorizontalRule'
 import { letterSpacingTarget } from '../extensions/letterSpacing'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import {
+  confirmLibraryDelete,
+  dropLibraryAssets,
+  forgetStoredMedia,
+  releaseLibraryCategory,
+} from '../utils/libraryDelete'
 import { looksLikeHtml, escapeHtml } from '../utils/itemsHtml'
 import { formulaTexIssue, renderKatex } from '../extensions/math'
 import {
@@ -4744,6 +4750,9 @@ const {
   onImageSelectAllChange,
   startAddCategory,
   confirmAddCategory,
+  deleteImageAsset,
+  deleteSelectedImages,
+  deleteImageCategory,
   triggerLocalImagePick,
   imageFilesFromClipboard,
   replaceOrInsertDroppedImages,
@@ -5301,6 +5310,53 @@ function confirmAddAttachCategory() {
   attachSidebarKey.value = cat.id
   attachAddingCategory.value = false
   attachNewCategoryName.value = ''
+}
+
+function syncAttachSelectAll() {
+  attachSelectAll.value =
+    filteredAttachAssets.value.length > 0 &&
+    filteredAttachAssets.value.every((asset) => attachSelectedIds.value.has(asset.id))
+}
+
+async function removeAttachAssets(ids: string[], message: string) {
+  if (!ids.length) return
+  if (!(await confirmLibraryDelete(message, '删除素材'))) return
+  const dropping = attachAssets.value.filter((asset) => ids.includes(asset.id))
+  await Promise.all(dropping.map((asset) => forgetStoredMedia(asset.src)))
+  attachAssets.value = dropLibraryAssets(attachAssets.value, ids)
+  attachSelectedIds.value = new Set([...attachSelectedIds.value].filter((id) => !ids.includes(id)))
+  syncAttachSelectAll()
+  saveAttachStore()
+  rteToast('success', ids.length > 1 ? `已删除 ${ids.length} 项` : '已删除')
+}
+
+function deleteAttachAsset(id: string) {
+  const asset = attachAssets.value.find((item) => item.id === id)
+  if (!asset) return
+  const name = asset.name || '这个附件'
+  return removeAttachAssets([id], `删除「${name}」？素材库里不再显示。`)
+}
+
+function deleteSelectedAttaches() {
+  const ids = [...attachSelectedIds.value]
+  if (!ids.length) return
+  return removeAttachAssets(ids, `删除选中的 ${ids.length} 项？素材库里不再显示。`)
+}
+
+async function deleteAttachCategory(id: string) {
+  const cat = attachCategories.value.find((item) => item.id === id)
+  if (!cat) return
+  const count = attachAssets.value.filter((asset) => asset.categoryId === id).length
+  const message = count
+    ? `删除分类「${cat.name}」？里面的 ${count} 个素材会回到未分类。`
+    : `删除分类「${cat.name}」？`
+  if (!(await confirmLibraryDelete(message, '删除分类'))) return
+  attachCategories.value = attachCategories.value.filter((item) => item.id !== id)
+  attachAssets.value = releaseLibraryCategory(attachAssets.value, id)
+  if (attachSidebarKey.value === id) attachSidebarKey.value = 'all'
+  syncAttachSelectAll()
+  saveAttachStore()
+  rteToast('success', '已删除分类')
 }
 
 function triggerLocalAttachPick() {
@@ -7342,7 +7398,13 @@ provideRteBindings({
   clearFormat,
   columnsOpen,
   confirmAddAttachCategory,
+  deleteAttachAsset,
+  deleteSelectedAttaches,
+  deleteAttachCategory,
   confirmAddCategory,
+  deleteImageAsset,
+  deleteSelectedImages,
+  deleteImageCategory,
   confirmImportLink,
   confirmInsertAttaches,
   confirmInsertFormula,

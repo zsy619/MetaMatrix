@@ -609,7 +609,8 @@ html.rte-toolbar-dragging * {
  */
 .el-overlay.is-message-box.rte-chart-delete-confirm,
 .el-overlay.is-message-box.rte-outbound-confirm,
-.el-overlay.is-message-box.rte-tabs-delete-confirm {
+.el-overlay.is-message-box.rte-tabs-delete-confirm,
+.el-overlay.is-message-box.rte-library-delete-confirm {
   z-index: 12000 !important;
 }
 .rte-note-overlay {
@@ -1555,8 +1556,8 @@ html.rte-toolbar-dragging * {
 }
 
 .rte-image-dialog {
-  width: min(720px, 96vw);
-  height: min(520px, 92vh);
+  width: min(840px, 96vw);
+  height: min(560px, 92vh);
   max-width: 96vw;
   max-height: 92vh;
   background: #fff;
@@ -1697,9 +1698,95 @@ html.rte-toolbar-dragging * {
 }
 .rte-image-main-top {
   display: flex;
-  justify-content: flex-end;
-  margin-bottom: 8px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: -2px -4px 8px;
+  padding: 2px 4px 8px;
+  border-bottom: 1px solid #f2f3f5;
   flex-shrink: 0;
+}
+.rte-library-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.rte-library-delete {
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid #ffccc7;
+  border-radius: 6px;
+  background: #fff;
+  color: #f53f3f;
+  font-size: 12px;
+  cursor: pointer;
+}
+.rte-library-delete:hover:not(:disabled) {
+  background: #fff1f0;
+}
+.rte-library-delete:disabled {
+  color: #c9cdd4;
+  border-color: #e5e6eb;
+  cursor: not-allowed;
+}
+.rte-library-count {
+  font-size: 12px;
+  color: #86909c;
+}
+.rte-library-cat-delete {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  color: #f53f3f;
+  font-size: 14px;
+  line-height: 16px;
+  text-align: center;
+  opacity: 0.55;
+}
+.rte-image-side-item:hover .rte-library-cat-delete,
+.rte-library-cat-delete:focus-visible {
+  opacity: 1;
+  background: #fff1f0;
+  outline: none;
+}
+.rte-library-card-delete {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 2;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.94);
+  color: #f53f3f;
+  font-size: 14px;
+  line-height: 18px;
+  text-align: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  opacity: 0.92;
+}
+.rte-image-thumb:hover .rte-library-card-delete,
+.rte-library-card-delete:focus-visible {
+  opacity: 1;
+  background: #fff;
+  outline: none;
+}
+.rte-library-card-name {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 14px 6px 4px;
+  font-size: 11px;
+  color: #fff;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.62));
+  pointer-events: none;
 }
 .rte-image-select-all {
   display: inline-flex;

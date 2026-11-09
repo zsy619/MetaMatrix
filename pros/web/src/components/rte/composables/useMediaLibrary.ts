@@ -26,6 +26,12 @@ import {
   isVideoFile,
   type AvInsertItem,
 } from '../avMediaPicker'
+import {
+  confirmLibraryDelete,
+  dropLibraryAssets,
+  forgetStoredMedia,
+  releaseLibraryCategory,
+} from '../../../utils/libraryDelete'
 
 /** 图片/视频库弹层，以及粘贴、拖放插入。 */
 export function useMediaLibrary(deps: {
@@ -218,6 +224,53 @@ function confirmAddCategory() {
   imageSidebarKey.value = cat.id
   addingCategory.value = false
   newCategoryName.value = ''
+}
+
+function syncImageSelectAll() {
+  imageSelectAll.value =
+    filteredImageAssets.value.length > 0 &&
+    filteredImageAssets.value.every((asset) => imageSelectedIds.value.has(asset.id))
+}
+
+async function removeImageAssets(ids: string[], message: string) {
+  if (!ids.length) return
+  if (!(await confirmLibraryDelete(message, '删除素材'))) return
+  const dropping = imageAssets.value.filter((asset) => ids.includes(asset.id))
+  await Promise.all(dropping.map((asset) => forgetStoredMedia(asset.src)))
+  imageAssets.value = dropLibraryAssets(imageAssets.value, ids)
+  imageSelectedIds.value = new Set([...imageSelectedIds.value].filter((id) => !ids.includes(id)))
+  syncImageSelectAll()
+  saveImageStore()
+  rteToast('success', ids.length > 1 ? `已删除 ${ids.length} 项` : '已删除')
+}
+
+function deleteImageAsset(id: string) {
+  const asset = imageAssets.value.find((item) => item.id === id)
+  if (!asset) return
+  const name = asset.name || '这张图片'
+  return removeImageAssets([id], `删除「${name}」？素材库里不再显示。`)
+}
+
+function deleteSelectedImages() {
+  const ids = [...imageSelectedIds.value]
+  if (!ids.length) return
+  return removeImageAssets(ids, `删除选中的 ${ids.length} 项？素材库里不再显示。`)
+}
+
+async function deleteImageCategory(id: string) {
+  const cat = imageCategories.value.find((item) => item.id === id)
+  if (!cat) return
+  const count = imageAssets.value.filter((asset) => asset.categoryId === id).length
+  const message = count
+    ? `删除分类「${cat.name}」？里面的 ${count} 个素材会回到未分类。`
+    : `删除分类「${cat.name}」？`
+  if (!(await confirmLibraryDelete(message, '删除分类'))) return
+  imageCategories.value = imageCategories.value.filter((item) => item.id !== id)
+  imageAssets.value = releaseLibraryCategory(imageAssets.value, id)
+  if (imageSidebarKey.value === id) imageSidebarKey.value = 'all'
+  syncImageSelectAll()
+  saveImageStore()
+  rteToast('success', '已删除分类')
 }
 
 function triggerLocalImagePick() {
@@ -620,6 +673,9 @@ const audioDialogOpen = computed(() => audioPicker.open)
     onImageSelectAllChange,
     startAddCategory,
     confirmAddCategory,
+    deleteImageAsset,
+    deleteSelectedImages,
+    deleteImageCategory,
     triggerLocalImagePick,
     readFileAsDataURL,
     imageFilesFromClipboard,

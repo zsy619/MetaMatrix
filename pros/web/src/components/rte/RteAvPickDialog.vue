@@ -80,6 +80,17 @@ useParentScopeStamp()
             >
               <span data-rte-own class="rte-image-side-ico" aria-hidden="true">📁</span>
               <span data-rte-own class="rte-image-side-label">{{ cat.name }}</span>
+              <span
+                data-rte-own
+                class="rte-library-cat-delete"
+                role="button"
+                tabindex="0"
+                title="删除分类"
+                aria-label="删除分类"
+                @click.stop="picker.deleteCategory(cat.id)"
+                @keydown.enter.stop="picker.deleteCategory(cat.id)"
+                @keydown.space.stop.prevent="picker.deleteCategory(cat.id)"
+              >×</span>
             </button>
             <div data-rte-own class="rte-image-side-spacer" />
             <div data-rte-own v-if="picker.addingCategory" class="rte-image-add-cat-form">
@@ -111,6 +122,20 @@ useParentScopeStamp()
 
           <div data-rte-own class="rte-image-main">
             <div data-rte-own class="rte-image-main-top">
+              <div data-rte-own class="rte-library-tools">
+                <button
+                  data-rte-own
+                  type="button"
+                  class="rte-library-delete"
+                  :disabled="picker.selectedIds.size === 0"
+                  @click="picker.deleteSelected()"
+                >
+                  删除
+                </button>
+                <span data-rte-own v-if="picker.selectedIds.size" class="rte-library-count">
+                  已选 {{ picker.selectedIds.size }}
+                </span>
+              </div>
               <label data-rte-own class="rte-image-select-all">
                 <input
                   data-rte-own
@@ -195,6 +220,17 @@ useParentScopeStamp()
                   aria-live="polite"
                 >加载中…</span>
                 <span data-rte-own class="rte-video-thumb-name">{{ asset.name }}</span>
+                <span
+                  data-rte-own
+                  class="rte-library-card-delete"
+                  role="button"
+                  tabindex="0"
+                  title="删除"
+                  :aria-label="picker.kind === 'audio' ? '删除音频' : '删除视频'"
+                  @click.stop="picker.deleteAsset(asset.id)"
+                  @keydown.enter.stop="picker.deleteAsset(asset.id)"
+                  @keydown.space.stop.prevent="picker.deleteAsset(asset.id)"
+                >×</span>
                 <span
                   data-rte-own
                   class="rte-image-thumb-check"
