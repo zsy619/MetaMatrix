@@ -4,6 +4,7 @@ import { EditorContent } from '@tiptap/vue-3'
 import { BubbleMenu } from '@tiptap/vue-3/menus'
 import FormPropertyInspector from '../FormPropertyInspector.vue'
 import CommentThreadPanel from './CommentThreadPanel.vue'
+import RteImageLightbox from './RteImageLightbox.vue'
 import RteSelectionBubble from './RteSelectionBubble.vue'
 import RteSourceCodeEditor from './RteSourceCodeEditor.vue'
 import RteTableFormulaBar from './RteTableFormulaBar.vue'
@@ -146,7 +147,7 @@ useParentScopeStamp()
         <button data-rte-own type="button" class="rte-bubble-btn" title="下载原图" aria-label="下载图片" @mousedown.prevent @click="rte.downloadSelectedImage">
           下载
         </button>
-        <button data-rte-own type="button" class="rte-bubble-btn" title="查看大图" aria-label="查看大图" @mousedown.prevent @click="rte.openSelectedImage">
+        <button data-rte-own type="button" class="rte-bubble-btn" title="查看大图（双击图片）" aria-label="查看大图" @mousedown.prevent @click="rte.openSelectedImage">
           大图
         </button>
         <button data-rte-own type="button" class="rte-bubble-btn" title="换图（保留裁剪与题注）" aria-label="换图" @mousedown.prevent @click="rte.replaceImageByUrl()">
@@ -246,9 +247,7 @@ useParentScopeStamp()
         </button>
       </div>
     </BubbleMenu>
-    <div data-rte-own v-if="rte.imageLightboxSrc" class="rte-image-lightbox" role="dialog" aria-label="查看大图" @click="rte.imageLightboxSrc = ''">
-      <img data-rte-own :src="rte.imageLightboxSrc" alt="" />
-    </div>
+    <RteImageLightbox />
 
     <div data-rte-own v-if="rte.suggesting && rte.viewMode === 'edit'" class="rte-suggest-bar" role="status">
       <span data-rte-own>建议模式</span>

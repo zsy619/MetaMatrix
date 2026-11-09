@@ -1,4 +1,4 @@
-import { ref, type ShallowRef } from 'vue'
+import { onBeforeUnmount, onMounted, ref, type ShallowRef } from 'vue'
 import type { Editor } from '@tiptap/core'
 import { NodeSelection } from '@tiptap/pm/state'
 import { keepCropOnReplace } from '../../../utils/rteImageCrop'
@@ -9,6 +9,11 @@ import {
   writeCropToAttrs,
   type CropPreset,
 } from '../../../utils/rteImageCropAttrs'
+import {
+  collectEditorImages,
+  indexForImage,
+  type RtePreviewImage,
+} from '../../../utils/rteImagePreview'
 
 /** 图片气泡：对齐、题注、下载与预览。模板绑定名与原先一致。 */
 export function useImageTools(deps: {
@@ -57,6 +62,82 @@ function setImagePlacement(option: (typeof IMAGE_LAYOUT_OPTIONS)[number]) {
 }
 
 const imageLightboxSrc = ref('')
+const imagePreviewOpen = ref(false)
+const imagePreviewItems = ref<RtePreviewImage[]>([])
+const imagePreviewIndex = ref(0)
+
+function openImagePreview(pos: number | null, src: string) {
+  const ed = deps.editor.value
+  const items = ed ? collectEditorImages(ed.state.doc) : []
+  if (!items.length && src) {
+    imagePreviewItems.value = [{ src, alt: '', caption: '', pos: pos ?? 0 }]
+  } else if (!items.length) {
+    return
+  } else {
+    imagePreviewItems.value = items
+  }
+  imagePreviewIndex.value = indexForImage(imagePreviewItems.value, pos, src)
+  imagePreviewOpen.value = true
+  imageLightboxSrc.value = imagePreviewItems.value[imagePreviewIndex.value]?.src || src
+}
+
+function closeImagePreview() {
+  imagePreviewOpen.value = false
+  imageLightboxSrc.value = ''
+}
+
+function setImagePreviewIndex(index: number) {
+  const max = imagePreviewItems.value.length - 1
+  if (max < 0) return
+  const next = Math.min(max, Math.max(0, index))
+  imagePreviewIndex.value = next
+  imageLightboxSrc.value = imagePreviewItems.value[next]?.src || ''
+}
+
+function stepImagePreview(delta: number) {
+  setImagePreviewIndex(imagePreviewIndex.value + delta)
+}
+
+function imageFromDblClick(target: Element): HTMLImageElement | null {
+  if (target instanceof HTMLImageElement && target.classList.contains('rte-image')) return target
+  const direct = target.closest('img.rte-image')
+  if (direct instanceof HTMLImageElement) return direct
+  // 第二次按下后选区类落在缩放容器上，dblclick 的 target 往往不再是 img。
+  const frame = target.closest('[data-node="image"]')
+  const nested = frame?.querySelector('img.rte-image')
+  return nested instanceof HTMLImageElement ? nested : null
+}
+
+function onEditorImageDblClick(event: MouseEvent) {
+  const target = event.target
+  if (!(target instanceof Element)) return
+  const img = imageFromDblClick(target)
+  if (!img) return
+  event.preventDefault()
+  event.stopPropagation()
+  const ed = deps.editor.value
+  let pos: number | null = null
+  const host = img.closest('[data-node="image"]') || img
+  try {
+    const found = ed?.view.posAtDOM(host, 0)
+    pos = typeof found === 'number' ? found : null
+  } catch {
+    pos = null
+  }
+  openImagePreview(pos, img.currentSrc || img.src || '')
+}
+
+let previewDom: HTMLElement | null = null
+
+onMounted(() => {
+  previewDom = deps.editor.value?.view?.dom ?? null
+  previewDom?.addEventListener('dblclick', onEditorImageDblClick, true)
+})
+
+onBeforeUnmount(() => {
+  previewDom?.removeEventListener('dblclick', onEditorImageDblClick, true)
+  previewDom = null
+})
 
 function deleteSelectedImage() {
   const ed = deps.editor.value
@@ -79,7 +160,9 @@ function downloadSelectedImage() {
 function openSelectedImage() {
   const ed = deps.editor.value
   if (!ed || !isImageNodeSelected()) return
-  imageLightboxSrc.value = String(ed.getAttributes('image')?.src || '')
+  const sel = ed.state.selection
+  const pos = sel instanceof NodeSelection ? sel.from : null
+  openImagePreview(pos, String(ed.getAttributes('image')?.src || ''))
 }
 
 function applyImageCaption() {
@@ -170,6 +253,12 @@ function syncImageCropState() {
     syncImageBubbleCaption,
     setImagePlacement,
     imageLightboxSrc,
+    imagePreviewOpen,
+    imagePreviewItems,
+    imagePreviewIndex,
+    closeImagePreview,
+    setImagePreviewIndex,
+    stepImagePreview,
     deleteSelectedImage,
     downloadSelectedImage,
     openSelectedImage,
