@@ -57,6 +57,10 @@ import {
   isPdcaDoc,
   isFiveForcesDoc,
   isIncomeStatementDoc,
+  isValueChainDoc,
+  isSevenSDoc,
+  isRiceDoc,
+  isBreakEvenDoc,
   isYModelDoc,
 } from '../../types/canvas'
 import BackgroundLayer from './BackgroundLayer.vue'
@@ -117,6 +121,10 @@ import StakeholderCanvas from './StakeholderCanvas.vue'
 import PdcaCanvas from './PdcaCanvas.vue'
 import FiveForcesCanvas from './FiveForcesCanvas.vue'
 import IncomeStatementCanvas from './IncomeStatementCanvas.vue'
+import ValueChainCanvas from './ValueChainCanvas.vue'
+import SevenSCanvas from './SevenSCanvas.vue'
+import RiceCanvas from './RiceCanvas.vue'
+import BreakEvenCanvas from './BreakEvenCanvas.vue'
 
 const documentStore = useDocumentStore()
 const ui = useUiStore()
@@ -273,6 +281,10 @@ const fiveForcesDoc = computed(() => (isFiveForcesDoc(current_data.value) ? curr
 const incomeStatementDoc = computed(() =>
   isIncomeStatementDoc(current_data.value) ? current_data.value : null,
 )
+const valueChainDoc = computed(() => (isValueChainDoc(current_data.value) ? current_data.value : null))
+const sevenSDoc = computed(() => (isSevenSDoc(current_data.value) ? current_data.value : null))
+const riceDoc = computed(() => (isRiceDoc(current_data.value) ? current_data.value : null))
+const breakEvenDoc = computed(() => (isBreakEvenDoc(current_data.value) ? current_data.value : null))
 const quadrantDoc = computed(() =>
   isQuadrantDoc(current_data.value) ? current_data.value : null,
 )
@@ -448,6 +460,18 @@ const quadrantDoc = computed(() =>
         </template>
         <template v-else-if="incomeStatementDoc">
           <IncomeStatementCanvas :doc="incomeStatementDoc" />
+        </template>
+        <template v-else-if="valueChainDoc">
+          <ValueChainCanvas :doc="valueChainDoc" />
+        </template>
+        <template v-else-if="sevenSDoc">
+          <SevenSCanvas :doc="sevenSDoc" />
+        </template>
+        <template v-else-if="riceDoc">
+          <RiceCanvas :doc="riceDoc" />
+        </template>
+        <template v-else-if="breakEvenDoc">
+          <BreakEvenCanvas :doc="breakEvenDoc" />
         </template>
         <template v-else-if="quadrantDoc">
           <BackgroundLayer
