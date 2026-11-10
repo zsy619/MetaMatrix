@@ -59,6 +59,21 @@ export function setGroupGap(view: EditorView, groupPos: number, gap: number): bo
   return dispatchChecked(view, tr, groupPos)
 }
 
+export function setGroupLayout(view: EditorView, groupPos: number, layout: 'row' | '12' | '21'): boolean {
+  if (!view.editable) return false
+  const node = view.state.doc.nodeAt(groupPos)
+  if (!node || node.type.name !== 'imageGroup') return false
+  const next = normalizeGroupLayout(layout)
+  if (next !== 'row' && node.childCount !== 3) return false
+  if (normalizeGroupLayout(node.attrs.layout) === next) return false
+  const tr = view.state.tr.setNodeMarkup(groupPos, undefined, {
+    ...node.attrs,
+    layout: next,
+    ...(next === 'row' ? {} : { ratios: null, ratioMode: null }),
+  })
+  return dispatchChecked(view, tr, groupPos)
+}
+
 export function setGroupAlign(view: EditorView, groupPos: number, align: 'left' | 'center' | 'right'): boolean {
   if (!view.editable) return false
   const node = view.state.doc.nodeAt(groupPos)

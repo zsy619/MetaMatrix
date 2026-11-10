@@ -1091,21 +1091,45 @@ const echartsDialogTemplates = computed(() => {
         class="rte-modal-overlay"
         @mousedown.self="rte.wave21ReportOpen = false"
       >
-        <div data-rte-own class="rte-link-dialog" role="dialog" aria-modal="true" @mousedown.stop>
+        <div data-rte-own class="rte-link-dialog rte-optimize-dialog" role="dialog" aria-modal="true" @mousedown.stop>
           <h3 data-rte-own class="rte-table-title">{{ rte.wave21ReportTitle }}</h3>
           <div data-rte-own class="rte-wave21-report-list">
-            <button data-rte-own
+            <div data-rte-own
               v-for="(line, idx) in rte.wave21ReportLines"
               :key="'w21r-' + idx"
-              type="button"
-              class="rte-import-item"
-              style="width: 100%; margin-bottom: 6px; text-align: left"
-              @click="rte.jumpWave21Report(line.pos)"
+              class="rte-optimize-line"
+              :class="{ 'is-done': line.done }"
             >
-              {{ line.text }}
-            </button>
+              <button data-rte-own
+                v-if="line.pos != null"
+                type="button"
+                class="rte-import-item"
+                @click="rte.jumpWave21Report(line.pos)"
+              >
+                {{ line.done ? '✓ ' : '' }}{{ line.text }}
+              </button>
+              <p data-rte-own v-else class="rte-optimize-note">{{ line.done ? '✓ ' : '' }}{{ line.text }}</p>
+              <span data-rte-own v-if="line.actions?.length" class="rte-optimize-actions">
+                <button data-rte-own
+                  v-for="action in line.actions"
+                  :key="action.id"
+                  type="button"
+                  @click="rte.applyOptimizeAction(action)"
+                >
+                  {{ action.label }}
+                </button>
+              </span>
+            </div>
           </div>
           <div data-rte-own class="rte-modal-actions">
+            <button data-rte-own
+              v-if="rte.optimizePendingCount"
+              type="button"
+              class="rte-modal-cancel"
+              @click="rte.appendOptimizeChecklist"
+            >
+              写入文末清单
+            </button>
             <button data-rte-own type="button" class="rte-modal-confirm" @click="rte.wave21ReportOpen = false">关闭</button>
           </div>
         </div>

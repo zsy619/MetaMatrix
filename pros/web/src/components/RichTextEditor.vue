@@ -114,7 +114,8 @@ import {
 } from '../utils/rtePracticalToolbar'
 import { QUOTE_STYLE_OPTIONS, type QuoteStyle } from '../extensions/rteBlockquote'
 import { collectCrossRefTargets } from '../extensions/crossRef'
-import { deepOptimizeDocument } from '../utils/rteDeepOptimize'
+import { deepOptimizeDocument, type OptimizeAction, type OptimizeReportLine } from '../utils/rteDeepOptimize'
+import { setGroupLayout } from '../extensions/imageGroupOps'
 import {
   applyParagraphStyle,
   PARA_STYLE_OPTIONS,
@@ -656,7 +657,7 @@ const paraStyleOpen = ref(false)
 const listStyleOpen = ref(false)
 const wave21ReportOpen = ref(false)
 const wave21ReportTitle = ref('')
-const wave21ReportLines = ref<Array<{ text: string; pos?: number }>>([])
+const wave21ReportLines = ref<OptimizeReportLine[]>([])
 const snippetDialogOpen = ref(false)
 const snippetList = ref<RteSnippet[]>(loadSnippets())
 const snippetEditing = ref<RteSnippet | null>(null)
@@ -3050,22 +3051,59 @@ function rewriteSelection(mode: InlineAiMode) {
 }
 
 
-function runDeepOptimize() {
+function runDeepOptimize(options?: { quiet?: boolean }) {
   const ed = editor.value
   if (!ed) return
   const result = deepOptimizeDocument(ed)
   wave21ReportTitle.value = '深度优化'
-  const lines = result.changes.length
-    ? result.changes.map((item) => ({ text: item.detail }))
-    : [{ text: '没有需要自动修改的地方。' }]
-  if (result.remaining.length) {
-    lines.push({ text: '下面这些仍要手工处理：' })
-    lines.push(...result.remaining)
+  const lines = result.lines.slice()
+  if (!result.changes.length) lines.unshift({ text: '没有需要自动修改的地方。', done: true })
+  if (suggesting.value && result.changes.length) {
+    lines.splice(result.changes.length, 0, { text: '文字修改已记成修订，可逐条接受或拒绝。', done: true })
   }
   wave21ReportLines.value = lines
   wave21ReportOpen.value = true
   moreOpen.value = false
-  ElMessage.success(result.changes.length ? `已深度优化 ${result.changes.length} 项` : '文档已经比较整齐')
+  if (options?.quiet) return
+  const pending = lines.filter((line) => !line.done && line.text !== '下面这些仍要手工处理：').length
+  if (result.changes.length && pending) ElMessage.success(`已深度优化 ${result.changes.length} 项，还有 ${pending} 项待处理`)
+  else if (result.changes.length) ElMessage.success(`已深度优化 ${result.changes.length} 项`)
+  else if (pending) ElMessage.info(`还有 ${pending} 项待处理`)
+  else ElMessage.success('文档已经比较整齐')
+}
+
+function applyOptimizeAction(action: OptimizeAction) {
+  const ed = editor.value
+  if (!ed) return
+  const layout = action.id === 'layout12' ? '12' : '21'
+  if (!setGroupLayout(ed.view, action.pos, layout)) {
+    ElMessage.info('这组图片现在不能套用该布局')
+    return
+  }
+  runDeepOptimize({ quiet: true })
+  ElMessage.success(layout === '12' ? '已排成 12' : '已排成 21')
+}
+
+function appendOptimizeChecklist() {
+  const ed = editor.value
+  if (!ed) return
+  const items = wave21ReportLines.value
+    .filter((line) => !line.done && line.text !== '下面这些仍要手工处理：')
+    .map((line) => line.text)
+  const taskList = ed.schema.nodes.taskList
+  const taskItem = ed.schema.nodes.taskItem
+  const paragraph = ed.schema.nodes.paragraph
+  const heading = ed.schema.nodes.heading
+  if (!items.length || !taskList || !taskItem || !paragraph || !heading) return
+  const list = taskList.create(
+    null,
+    items.map((text) => taskItem.create({ checked: false }, paragraph.create(null, ed.schema.text(text)))),
+  )
+  const title = heading.create({ level: 2 }, ed.schema.text('优化清单'))
+  const end = ed.state.doc.content.size
+  ed.view.dispatch(ed.state.tr.insert(end, [title, list]).scrollIntoView())
+  wave21ReportOpen.value = false
+  ElMessage.success('已把待处理项写到文末')
 }
 
 function runHeadingHierarchyCheck() {
@@ -6978,7 +7016,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'deepOptimize',
       label: '深优化',
-      title: '一键整理跳级标题、连续空段、空链接、图片题注，并去掉标题和列表上的首行缩进',
+      title: '一键整理标题、空段、空格、标点、间距和题注，并列出仍要处理的项',
       icon: '✦',
       iconComp: ic('deepOptimize'),
       run: runDeepOptimize,
@@ -7617,6 +7655,11 @@ provideRteBindings({
   jumpToOutlineHeading,
   jumpToPos,
   jumpWave21Report,
+  applyOptimizeAction,
+  appendOptimizeChecklist,
+  optimizePendingCount: computed(() =>
+    wave21ReportLines.value.filter((line) => !line.done && line.text !== '下面这些仍要手工处理：').length,
+  ),
   lineHeightOpen,
   linkCardDialogOpen,
   linkCardHref,

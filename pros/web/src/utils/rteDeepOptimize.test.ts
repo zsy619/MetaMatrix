@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { Editor } from '@tiptap/core'
 import StarterKit from '@tiptap/starter-kit'
 import { ParagraphAttrs } from '../extensions/paragraphAttrs'
-import { deepOptimizeDocument } from './rteDeepOptimize'
+import { deepOptimizeDocument, tidyInlineText } from './rteDeepOptimize'
 import { filterFindMatches } from './rteFindReplace'
 
 let editor: Editor | undefined
@@ -26,6 +26,20 @@ function makeEditor(content: string) {
   })
   return editor
 }
+
+describe('行内整理', () => {
+  it('收紧空格、重复标点和中英文间距', () => {
+    const tidy = tidyInlineText('你好  世界！！Hello世界')
+    expect(tidy.text).toBe('你好 世界！Hello 世界')
+    expect(tidy.spaces).toBe(true)
+    expect(tidy.punct).toBe(true)
+    expect(tidy.gap).toBe(true)
+  })
+
+  it('带网址的句子不插入间距', () => {
+    expect(tidyInlineText('见https://a.com了解').text).toBe('见https://a.com了解')
+  })
+})
 
 describe('深度优化', () => {
   it('一次整理跳级标题、首行缩进、不安全链接和连续空段', () => {
@@ -71,5 +85,25 @@ describe('深度优化', () => {
     expect(all).toHaveLength(2)
     expect(filterFindMatches(ed.state.doc, all, 'heading')).toHaveLength(1)
     expect(filterFindMatches(ed.state.doc, all, 'all')).toHaveLength(2)
+  })
+
+  it('整理空格和标点，代码块保持原样', () => {
+    const ed = makeEditor('<p></p>')
+    ed.commands.setContent({
+      type: 'doc',
+      content: [
+        { type: 'paragraph', content: [{ type: 'text', text: '你好  世界！！Hello世界' }] },
+        { type: 'codeBlock', content: [{ type: 'text', text: '你好  世界' }] },
+      ],
+    })
+    const result = deepOptimizeDocument(ed)
+    const html = ed.getHTML()
+    expect(html).toContain('你好 世界！Hello 世界')
+    expect(html).toContain('你好  世界')
+    expect(result.changes.some((item) => item.detail.includes('连续空格'))).toBe(true)
+    expect(result.changes.some((item) => item.detail.includes('重复标点'))).toBe(true)
+    expect(result.changes.some((item) => item.detail.includes('中英文间距'))).toBe(true)
+    expect(result.lines.some((line) => line.text.includes('措辞、图表数据和评论保持原样'))).toBe(true)
+    expect(ed.getHTML()).toContain('<pre><code>你好  世界</code></pre>')
   })
 })

@@ -4,7 +4,8 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { Editor } from '@tiptap/core'
 import StarterKit from '@tiptap/starter-kit'
 import { ImageGroup } from './imageGroup'
-import { reorderInGroup, stackInGroup } from './imageGroupOps'
+import { reorderInGroup, setGroupLayout, stackInGroup } from './imageGroupOps'
+import { deepOptimizeDocument } from '../utils/rteDeepOptimize'
 import { RteImage } from './rteImage'
 
 let editor: Editor | undefined
@@ -106,6 +107,21 @@ describe('图片组 12 / 21', () => {
     expect(ed.getHTML()).toContain('data-layout="21"')
     const again = makeEditor(ed.getHTML())
     expect(again.state.doc.firstChild?.attrs.layout).toBe('21')
+  })
+
+  it('一键优化给出 12 和 21，套用后写成布局', () => {
+    const ed = makeEditor(groupHtml())
+    const result = deepOptimizeDocument(ed)
+    const line = result.lines.find((item) => item.actions?.length)
+    expect(line?.actions?.map((action) => action.label)).toEqual(['套用 12', '套用 21'])
+    expect(result.lines.some((item) => item.text.includes('缺少替代文本'))).toBe(true)
+    const action = line?.actions?.[0]
+    expect(action).toBeTruthy()
+    expect(setGroupLayout(ed.view, action!.pos, '12')).toBe(true)
+    expect(ed.state.doc.firstChild?.attrs.layout).toBe('12')
+    const row = ed.view.dom.querySelector('.rte-image-group-row') as HTMLElement
+    expect(row.style.display).toBe('grid')
+    expect(ed.view.dom.querySelector('[data-type="image-group"]')?.getAttribute('data-layout')).toBe('12')
   })
 
   it('不是三张图时不叠放', () => {
