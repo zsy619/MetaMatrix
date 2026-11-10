@@ -14,23 +14,23 @@
       "id": "operating",
       "title": "经营活动",
       "lines": [
-        { "id": "op_in", "label": "销售回款", "amount": 0 },
-        { "id": "op_out", "label": "采购与薪酬", "amount": 0 }
+        { "id": "op_in", "label": "销售回款", "amount": 120 },
+        { "id": "op_out", "label": "采购与薪酬", "amount": -70 }
       ]
     },
     {
       "id": "investing",
       "title": "投资活动",
       "lines": [
-        { "id": "inv_out", "label": "设备与资产", "amount": 0 }
+        { "id": "inv_out", "label": "设备与资产", "amount": -30 }
       ]
     },
     {
       "id": "financing",
       "title": "筹资活动",
       "lines": [
-        { "id": "fin_in", "label": "借款或出资", "amount": 0 },
-        { "id": "fin_out", "label": "还本付息", "amount": 0 }
+        { "id": "fin_in", "label": "借款或出资", "amount": 50 },
+        { "id": "fin_out", "label": "还本付息", "amount": -10 }
       ]
     }
   ]

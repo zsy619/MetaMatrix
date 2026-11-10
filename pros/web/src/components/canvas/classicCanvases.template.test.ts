@@ -79,6 +79,7 @@ describe('经典管理画布', () => {
     const cash = cloneTemplate('cash-flow')
     expect(isCashFlowDoc(cash)).toBe(true)
     if (!isCashFlowDoc(cash)) return
+    for (const section of cash.sections) for (const line of section.lines) line.amount = 0
     cash.sections[0].lines[0].amount = 100
     cash.sections[0].lines[1].amount = -40
     cash.sections[1].lines[0].amount = -30

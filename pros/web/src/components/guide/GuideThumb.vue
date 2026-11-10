@@ -1461,45 +1461,65 @@ withDefaults(
       </svg>
       <svg v-else-if="templateId === 'raci-matrix'" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
         <rect width="200" height="140" rx="10" fill="#f7f7f7" />
-        <rect x="20" y="24" width="160" height="96" fill="#fff" stroke="#ececec" />
-        <text x="70" y="48" font-size="10" font-weight="700" fill="#1a73e8">R</text>
-        <text x="110" y="48" font-size="10" font-weight="700" fill="#188038">A</text>
-        <text x="150" y="48" font-size="10" font-weight="700" fill="#e37400">C</text>
-        <text x="70" y="80" font-size="10" font-weight="700" fill="#5f6368">I</text>
-        <text x="110" y="80" font-size="10" font-weight="700" fill="#1a73e8">R</text>
-        <text x="150" y="80" font-size="10" font-weight="700" fill="#188038">A</text>
+        <rect x="16" y="18" width="168" height="22" fill="#3e5a78" />
+        <rect x="70" y="18" width="28" height="22" fill="#0e8a84" />
+        <rect x="98" y="18" width="28" height="22" fill="#a67c00" />
+        <rect x="126" y="18" width="28" height="22" fill="#b85a38" />
+        <rect x="154" y="18" width="30" height="22" fill="#2a649f" />
+        <text x="28" y="58" font-size="9" fill="#3e5a78">交付</text>
+        <text x="40" y="78" font-size="9" fill="#5f6368">立项</text>
+        <text x="52" y="98" font-size="9" fill="#5f6368">开发</text>
+        <rect x="78" y="66" width="16" height="12" rx="3" fill="#a67c00" />
+        <rect x="108" y="66" width="16" height="12" rx="3" fill="#0e8a84" />
+        <rect x="136" y="86" width="16" height="12" rx="3" fill="#2a649f" />
       </svg>
       <svg v-else-if="templateId === 'daily-kanban'" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
         <rect width="200" height="140" rx="10" fill="#f7f7f7" />
-        <rect x="12" y="20" width="40" height="100" rx="4" fill="#fff" />
-        <rect x="58" y="20" width="40" height="100" rx="4" fill="#fff" />
-        <rect x="104" y="20" width="40" height="100" rx="4" fill="#fff" />
-        <rect x="150" y="20" width="40" height="100" rx="4" fill="#fff" />
-        <rect x="16" y="28" width="32" height="16" rx="3" fill="#e8f0fe" />
-        <rect x="62" y="28" width="32" height="16" rx="3" fill="#fef7e0" />
-        <rect x="108" y="28" width="32" height="16" rx="3" fill="#fce8e6" />
-        <rect x="154" y="28" width="32" height="16" rx="3" fill="#e6f4ea" />
+        <rect x="10" y="16" width="42" height="110" rx="4" fill="#fbf6e4" />
+        <rect x="56" y="16" width="42" height="110" rx="4" fill="#e8f1fa" />
+        <rect x="102" y="16" width="42" height="110" rx="4" fill="#fdecea" />
+        <rect x="148" y="16" width="42" height="110" rx="4" fill="#e7f6ef" />
+        <rect x="10" y="16" width="42" height="16" rx="4" fill="#a67c00" />
+        <rect x="56" y="16" width="42" height="16" rx="4" fill="#2a649f" />
+        <rect x="102" y="16" width="42" height="16" rx="4" fill="#c5221f" />
+        <rect x="148" y="16" width="42" height="16" rx="4" fill="#187a4e" />
+        <rect x="14" y="40" width="34" height="18" rx="3" fill="#fff" />
+        <rect x="60" y="40" width="34" height="18" rx="3" fill="#fff" />
+        <rect x="106" y="40" width="34" height="18" rx="3" fill="#fff" />
+        <rect x="152" y="40" width="34" height="18" rx="3" fill="#fff" />
       </svg>
       <svg v-else-if="templateId === 'business-model-canvas'" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
         <rect width="200" height="140" rx="10" fill="#f7f7f7" />
-        <rect x="8" y="16" width="34" height="70" fill="#fff" stroke="#ececec" />
-        <rect x="44" y="16" width="34" height="34" fill="#fff" stroke="#ececec" />
-        <rect x="80" y="16" width="40" height="70" fill="#fef7e0" stroke="#f9e4a0" />
-        <rect x="122" y="16" width="34" height="34" fill="#fff" stroke="#ececec" />
-        <rect x="158" y="16" width="34" height="70" fill="#fff" stroke="#ececec" />
-        <rect x="44" y="52" width="34" height="34" fill="#fff" stroke="#ececec" />
-        <rect x="122" y="52" width="34" height="34" fill="#fff" stroke="#ececec" />
-        <rect x="8" y="90" width="90" height="34" fill="#fff" stroke="#ececec" />
-        <rect x="102" y="90" width="90" height="34" fill="#e6f4ea" stroke="#ceead6" />
+        <rect x="8" y="16" width="34" height="74" fill="#fbf1eb" />
+        <rect x="8" y="16" width="34" height="12" fill="#b85a38" />
+        <rect x="44" y="16" width="34" height="36" fill="#e5f6f5" />
+        <rect x="44" y="16" width="34" height="12" fill="#0e8a84" />
+        <rect x="44" y="54" width="34" height="36" fill="#f4f6e6" />
+        <rect x="44" y="54" width="34" height="12" fill="#6a7818" />
+        <rect x="80" y="16" width="40" height="74" fill="#fbf6e4" />
+        <rect x="80" y="16" width="40" height="12" fill="#a67c00" />
+        <rect x="122" y="16" width="34" height="36" fill="#e8f1fa" />
+        <rect x="122" y="16" width="34" height="12" fill="#2a649f" />
+        <rect x="122" y="54" width="34" height="36" fill="#f3eef8" />
+        <rect x="122" y="54" width="34" height="12" fill="#6b4c9a" />
+        <rect x="158" y="16" width="34" height="74" fill="#fbeff2" />
+        <rect x="158" y="16" width="34" height="12" fill="#a84562" />
+        <rect x="8" y="92" width="90" height="32" fill="#fff4ec" />
+        <rect x="8" y="92" width="90" height="10" fill="#c45c26" />
+        <rect x="102" y="92" width="90" height="32" fill="#e7f6ef" />
+        <rect x="102" y="92" width="90" height="10" fill="#187a4e" />
       </svg>
       <svg v-else-if="templateId === 'cash-flow'" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
         <rect width="200" height="140" rx="10" fill="#f7f7f7" />
-        <rect x="12" y="24" width="54" height="96" rx="4" fill="#fff" stroke="#ececec" />
-        <rect x="73" y="24" width="54" height="96" rx="4" fill="#fff" stroke="#ececec" />
-        <rect x="134" y="24" width="54" height="96" rx="4" fill="#fff" stroke="#ececec" />
-        <text x="39" y="40" text-anchor="middle" font-size="7" font-weight="700" fill="#188038">经营</text>
-        <text x="100" y="40" text-anchor="middle" font-size="7" font-weight="700" fill="#1a73e8">投资</text>
-        <text x="161" y="40" text-anchor="middle" font-size="7" font-weight="700" fill="#e37400">筹资</text>
+        <rect x="12" y="18" width="54" height="108" rx="4" fill="#e7f6ef" />
+        <rect x="73" y="18" width="54" height="108" rx="4" fill="#fbf6e4" />
+        <rect x="134" y="18" width="54" height="108" rx="4" fill="#e8f1fa" />
+        <rect x="12" y="18" width="54" height="18" rx="4" fill="#187a4e" />
+        <rect x="73" y="18" width="54" height="18" rx="4" fill="#a67c00" />
+        <rect x="134" y="18" width="54" height="18" rx="4" fill="#2a649f" />
+        <text x="39" y="31" text-anchor="middle" font-size="8" font-weight="700" fill="#fff">经营</text>
+        <text x="100" y="31" text-anchor="middle" font-size="8" font-weight="700" fill="#fff">投资</text>
+        <text x="161" y="31" text-anchor="middle" font-size="8" font-weight="700" fill="#fff">筹资</text>
       </svg>
 
   </div>

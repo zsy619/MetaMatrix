@@ -10,9 +10,34 @@
   },
   "title": "每日看板",
   "columns": [
-    { "id": "todo", "title": "待办", "cards": [{ "id": "card_todo_1", "text": "今天要开始的一件事" }] },
-    { "id": "doing", "title": "进行中", "cards": [{ "id": "card_doing_1", "text": "正在推进" }] },
-    { "id": "blocked", "title": "受阻", "cards": [{ "id": "card_blocked_1", "text": "卡在谁 / 什么上" }] },
-    { "id": "done", "title": "完成", "cards": [{ "id": "card_done_1", "text": "今天已经做完" }] }
+    {
+      "id": "todo",
+      "title": "待办",
+      "cards": [
+        { "id": "card_todo_1", "text": "今天要开始的一件事" },
+        { "id": "card_todo_2", "text": "把卡住的问题写成一句话" }
+      ]
+    },
+    {
+      "id": "doing",
+      "title": "进行中",
+      "cards": [
+        { "id": "card_doing_1", "text": "正在推进" }
+      ]
+    },
+    {
+      "id": "blocked",
+      "title": "受阻",
+      "cards": [
+        { "id": "card_blocked_1", "text": "卡在谁 / 什么上" }
+      ]
+    },
+    {
+      "id": "done",
+      "title": "完成",
+      "cards": [
+        { "id": "card_done_1", "text": "今天已经做完" }
+      ]
+    }
   ]
 }
