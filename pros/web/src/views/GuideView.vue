@@ -729,7 +729,15 @@ onMounted(async () => {
 .card--five-forces:hover,
 .card--five-forces:focus-visible,
 .card--income-statement:hover,
-.card--income-statement:focus-visible {
+.card--income-statement:focus-visible,
+.card--value-chain:hover,
+.card--value-chain:focus-visible,
+.card--seven-s:hover,
+.card--seven-s:focus-visible,
+.card--rice:hover,
+.card--rice:focus-visible,
+.card--break-even:hover,
+.card--break-even:focus-visible {
   border-color: #34a853;
 }
 
