@@ -1873,7 +1873,10 @@ export interface SwotBlock {
   id: SwotBlockId
   title: string
   hint: string
-  text: string
+  keyword?: string
+  items: QuadrantItem[]
+  /** 旧版纯文本。打开后迁入 items。 */
+  text?: string
 }
 
 export interface SwotDocumentJSON {
@@ -1900,7 +1903,9 @@ export interface LeanBlock {
   id: LeanBlockId
   title: string
   hint: string
-  text: string
+  keyword?: string
+  items: QuadrantItem[]
+  text?: string
 }
 
 export interface LeanCanvasDocumentJSON {
@@ -1918,7 +1923,9 @@ export interface ValuePropositionBlock {
   id: ValuePropositionBlockId
   title: string
   hint: string
-  text: string
+  keyword?: string
+  items: QuadrantItem[]
+  text?: string
 }
 
 export interface ValuePropositionDocumentJSON {
@@ -2066,6 +2073,9 @@ export type BlockCanvasDocumentJSON =
   | ThreeRingBasicsDocumentJSON
   | LeadershipTriangleDocumentJSON
   | ContextSixElementsDocumentJSON
+  | SwotDocumentJSON
+  | LeanCanvasDocumentJSON
+  | ValuePropositionDocumentJSON
 
 export function isDualTriangleDoc(
   doc: CanvasDocumentJSON | null | undefined,
@@ -2655,7 +2665,10 @@ export function isBlockCanvasDoc(
     isPmSolutionTriangleDoc(doc) ||
     isThreeRingBasicsDoc(doc) ||
     isLeadershipTriangleDoc(doc) ||
-    isContextSixElementsDoc(doc)
+    isContextSixElementsDoc(doc) ||
+    isSwotDoc(doc) ||
+    isLeanCanvasDoc(doc) ||
+    isValuePropositionDoc(doc)
   )
 }
 

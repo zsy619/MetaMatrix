@@ -2,12 +2,10 @@
 import { computed } from 'vue'
 import { canvasChromeStyle } from './canvasChrome'
 import type { LeanBlockId, LeanCanvasDocumentJSON } from '../../types/canvas'
-import { isLeanCanvasDoc } from '../../types/canvas'
-import { useDocumentStore } from '../../stores/document'
 import { FIVE_STEP_NEGATE_WARM, FIVE_STEP_PALETTE, type FiveStepPalette } from './fiveStepPalette'
+import FiveStepPanel from './FiveStepPanel.vue'
 
 const props = defineProps<{ doc: LeanCanvasDocumentJSON }>()
-const documentStore = useDocumentStore()
 const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 const order: LeanBlockId[] = ['problem', 'solution', 'metrics', 'uvp', 'advantage', 'channels', 'segments', 'cost', 'revenue']
 const tones: Record<LeanBlockId, FiveStepPalette> = {
@@ -24,13 +22,6 @@ const tones: Record<LeanBlockId, FiveStepPalette> = {
 
 function block(id: LeanBlockId) {
   return props.doc.blocks.find((item) => item.id === id)
-}
-
-function update(id: LeanBlockId, text: string) {
-  documentStore.mutateCanvas((doc) => {
-    if (!isLeanCanvasDoc(doc)) return
-    doc.blocks = doc.blocks.map((item) => (item.id === id ? { ...item, text } : item))
-  })
 }
 </script>
 
@@ -49,7 +40,16 @@ function update(id: LeanBlockId, text: string) {
         :style="{ '--col-header': tones[id].header, '--col-body': tones[id].body }"
       >
         <h3>{{ block(id)?.title }}</h3>
-        <textarea :value="block(id)?.text || ''" :placeholder="block(id)?.hint" :aria-label="block(id)?.title" @change="update(id, ($event.target as HTMLTextAreaElement).value)" />
+        <div v-if="block(id)" class="rte-slot">
+          <FiveStepPanel
+            chrome="fill"
+            density="compact"
+            :block="block(id)!"
+            :header="block(id)!.title"
+            :palette="tones[id]"
+            :topic-placeholder="block(id)!.hint || '主题'"
+          />
+        </div>
       </section>
     </div>
   </div>
@@ -72,6 +72,5 @@ function update(id: LeanBlockId, text: string) {
 .lean-cell--cost { grid-area: 3 / 1 / 4 / 3; }
 .lean-cell--revenue { grid-area: 3 / 3 / 4 / 6; }
 h3 { margin: 0; min-height: 36px; display: flex; align-items: center; justify-content: center; background: var(--col-header); color: #fff; font-size: 14px; letter-spacing: 0.04em; }
-textarea { flex: 1 1 auto; min-height: 0; border: 0; resize: none; background: transparent; padding: 8px 10px; font: inherit; }
-textarea:focus { outline: none; }
+.rte-slot { flex: 1 1 auto; min-height: 0; display: flex; }
 </style>

@@ -2,12 +2,10 @@
 import { computed } from 'vue'
 import { canvasChromeStyle } from './canvasChrome'
 import type { SwotBlockId, SwotDocumentJSON } from '../../types/canvas'
-import { isSwotDoc } from '../../types/canvas'
-import { useDocumentStore } from '../../stores/document'
 import { FIVE_STEP_NEGATE, FIVE_STEP_PALETTE, type FiveStepPalette } from './fiveStepPalette'
+import FiveStepPanel from './FiveStepPanel.vue'
 
 const props = defineProps<{ doc: SwotDocumentJSON }>()
-const documentStore = useDocumentStore()
 const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 const order: SwotBlockId[] = ['strengths', 'weaknesses', 'opportunities', 'threats']
 const tones: Record<SwotBlockId, FiveStepPalette> = {
@@ -19,13 +17,6 @@ const tones: Record<SwotBlockId, FiveStepPalette> = {
 
 function block(id: SwotBlockId) {
   return props.doc.blocks.find((item) => item.id === id)
-}
-
-function update(id: SwotBlockId, text: string) {
-  documentStore.mutateCanvas((doc) => {
-    if (!isSwotDoc(doc)) return
-    doc.blocks = doc.blocks.map((item) => (item.id === id ? { ...item, text } : item))
-  })
 }
 </script>
 
@@ -43,7 +34,16 @@ function update(id: SwotBlockId, text: string) {
         :style="{ '--col-header': tones[id].header, '--col-body': tones[id].body, '--col-topic': tones[id].topic }"
       >
         <h3>{{ block(id)?.title }}</h3>
-        <textarea :value="block(id)?.text || ''" :placeholder="block(id)?.hint" :aria-label="block(id)?.title" @change="update(id, ($event.target as HTMLTextAreaElement).value)" />
+        <div v-if="block(id)" class="rte-slot">
+          <FiveStepPanel
+            chrome="fill"
+            density="compact"
+            :block="block(id)!"
+            :header="block(id)!.title"
+            :palette="tones[id]"
+            :topic-placeholder="block(id)!.hint || '主题'"
+          />
+        </div>
       </section>
     </div>
   </div>
@@ -57,6 +57,5 @@ function update(id: SwotBlockId, text: string) {
 .swot-grid { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 10px; }
 section { display: flex; flex-direction: column; min-height: 0; height: 100%; background: var(--col-body); border-radius: 12px; overflow: hidden; }
 h3 { margin: 0; min-height: 44px; display: flex; align-items: center; justify-content: center; background: var(--col-header); color: #fff; letter-spacing: 0.06em; }
-textarea { flex: 1 1 auto; min-height: 0; border: 0; resize: none; background: transparent; padding: 12px; font: inherit; color: #202124; }
-textarea:focus { outline: none; }
+.rte-slot { flex: 1 1 auto; min-height: 0; display: flex; }
 </style>

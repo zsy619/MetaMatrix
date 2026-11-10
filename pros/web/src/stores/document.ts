@@ -150,6 +150,9 @@ import {
   isThreeRingBasicsDoc,
   isLeadershipTriangleDoc,
   isContextSixElementsDoc,
+  isSwotDoc,
+  isLeanCanvasDoc,
+  isValuePropositionDoc,
   coerceYModelDoc,
   normalizeYModelDoc,
 } from '../types/canvas'
@@ -1475,6 +1478,9 @@ export const useDocumentStore = defineStore('document', () => {
     if (isFiveStepFamilyDoc(next)) {
       next = applyFiveStepChrome(next)
     }
+    if (isSwotDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
+    if (isLeanCanvasDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
+    if (isValuePropositionDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
     if (
       isDualTriangleDoc(next) &&
       (tid === 'dual-triangle-human-ai' ||
@@ -2373,13 +2379,38 @@ export const useDocumentStore = defineStore('document', () => {
     return item
   }
 
+  /** 旧版纯文本按行拆成富文本条目，和五步法格子用同一套 items。 */
+  function migratePlainTextBlocks<T extends { id: string; items?: QuadrantItem[]; text?: string }>(
+    blocks: T[],
+  ): Array<Omit<T, 'text'> & { items: QuadrantItem[] }> {
+    return blocks.map((block) => {
+      const items = Array.isArray(block.items) ? [...block.items] : []
+      const legacy = typeof block.text === 'string' ? block.text.trim() : ''
+      if (!items.length && legacy) {
+        legacy.split(/\n+/).filter(Boolean).forEach((line, index) => {
+          items.push({ id: `${block.id}_line_${index}`, text: line })
+        })
+      }
+      const next = { ...block, items }
+      delete next.text
+      return next
+    })
+  }
+
   /**
    * 内容主题词，写在 block.keyword 上（current_data，不另建表）。
-   * 人类-AI 双三角与五步法系列共用。
+   * 人类-AI 双三角、五步法，以及 SWOT / 精益画布 / 价值主张画布共用。
    */
   function updateBlockKeyword(blockId: string, keyword: string): boolean {
     const doc = current_data.value
-    if (!doc || (!isDualTriangleDoc(doc) && !isFiveStepFamilyDoc(doc))) {
+    if (
+      !doc ||
+      (!isDualTriangleDoc(doc) &&
+        !isFiveStepFamilyDoc(doc) &&
+        !isSwotDoc(doc) &&
+        !isLeanCanvasDoc(doc) &&
+        !isValuePropositionDoc(doc))
+    ) {
       return false
     }
     const block = doc.blocks.find((b) => b.id === blockId)

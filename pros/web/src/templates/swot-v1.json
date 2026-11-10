@@ -10,9 +10,17 @@
   },
   "title": "SWOT 分析",
   "blocks": [
-    { "id": "strengths", "title": "优势", "hint": "我们已经做得比别人好的地方", "text": "交付节奏稳定\n团队能自己排期" },
-    { "id": "weaknesses", "title": "劣势", "hint": "内部短板，先写事实", "text": "销售材料还停留在功能清单" },
-    { "id": "opportunities", "title": "机会", "hint": "外部变化里能接住的", "text": "客户开始要求一张纸看清项目" },
-    { "id": "threats", "title": "威胁", "hint": "外部风险，不写对策", "text": "通用表格工具已经够用" }
+    {
+      "id": "strengths",
+      "title": "优势",
+      "hint": "我们已经做得比别人好的地方",
+      "items": [
+        { "id": "swot_s_1", "text": "交付节奏稳定" },
+        { "id": "swot_s_2", "text": "团队能自己排期" }
+      ]
+    },
+    { "id": "weaknesses", "title": "劣势", "hint": "内部短板，先写事实", "items": [{ "id": "swot_w_1", "text": "销售材料还停留在功能清单" }] },
+    { "id": "opportunities", "title": "机会", "hint": "外部变化里能接住的", "items": [{ "id": "swot_o_1", "text": "客户开始要求一张纸看清项目" }] },
+    { "id": "threats", "title": "威胁", "hint": "外部风险，不写对策", "items": [{ "id": "swot_t_1", "text": "通用表格工具已经够用" }] }
   ]
 }

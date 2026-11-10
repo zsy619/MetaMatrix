@@ -10,14 +10,14 @@
   },
   "title": "精益画布",
   "blocks": [
-    { "id": "problem", "title": "问题", "hint": "前三个最痛的问题", "text": "排期散落在聊天记录里" },
-    { "id": "solution", "title": "解决方案", "hint": "对应每个问题的最小做法", "text": "一张可排程的甘特图" },
-    { "id": "uvp", "title": "独特价值主张", "hint": "一句话说清为什么是我们", "text": "项目计划、责任和复盘在同一套画布里" },
-    { "id": "advantage", "title": "门槛优势", "hint": "别人不容易抄走的", "text": "和现有画布共用同一份文档" },
-    { "id": "segments", "title": "客户细分", "hint": "最早会付钱的那一群", "text": "带小团队的项目负责人" },
-    { "id": "metrics", "title": "关键指标", "hint": "怎样才算跑通", "text": "每周有人按依赖排出下周" },
-    { "id": "channels", "title": "渠道", "hint": "客户在哪里第一次碰到我们", "text": "现有用户里的项目经理" },
-    { "id": "cost", "title": "成本结构", "hint": "主要花在哪里", "text": "研发和客户成功" },
-    { "id": "revenue", "title": "收入来源", "hint": "谁为什么付钱", "text": "团队席位" }
+    { "id": "problem", "title": "问题", "hint": "前三个最痛的问题", "items": [{ "id": "lean_problem_1", "text": "排期散落在聊天记录里" }] },
+    { "id": "solution", "title": "解决方案", "hint": "对应每个问题的最小做法", "items": [{ "id": "lean_solution_1", "text": "一张可排程的甘特图" }] },
+    { "id": "uvp", "title": "独特价值主张", "hint": "一句话说清为什么是我们", "items": [{ "id": "lean_uvp_1", "text": "项目计划、责任和复盘在同一套画布里" }] },
+    { "id": "advantage", "title": "门槛优势", "hint": "别人不容易抄走的", "items": [{ "id": "lean_adv_1", "text": "和现有画布共用同一份文档" }] },
+    { "id": "segments", "title": "客户细分", "hint": "最早会付钱的那一群", "items": [{ "id": "lean_seg_1", "text": "带小团队的项目负责人" }] },
+    { "id": "metrics", "title": "关键指标", "hint": "怎样才算跑通", "items": [{ "id": "lean_met_1", "text": "每周有人按依赖排出下周" }] },
+    { "id": "channels", "title": "渠道", "hint": "客户在哪里第一次碰到我们", "items": [{ "id": "lean_ch_1", "text": "现有用户里的项目经理" }] },
+    { "id": "cost", "title": "成本结构", "hint": "主要花在哪里", "items": [{ "id": "lean_cost_1", "text": "研发和客户成功" }] },
+    { "id": "revenue", "title": "收入来源", "hint": "谁为什么付钱", "items": [{ "id": "lean_rev_1", "text": "团队席位" }] }
   ]
 }
