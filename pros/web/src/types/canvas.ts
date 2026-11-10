@@ -2045,6 +2045,89 @@ export interface IncomeStatementDocumentJSON {
   sections: IncomeSection[]
 }
 
+export type ValueChainBlockId =
+  | 'infrastructure'
+  | 'hr'
+  | 'technology'
+  | 'procurement'
+  | 'inbound'
+  | 'operations'
+  | 'outbound'
+  | 'marketing'
+  | 'service'
+
+export interface ValueChainBlock {
+  id: ValueChainBlockId
+  title: string
+  hint: string
+  keyword?: string
+  items: QuadrantItem[]
+  text?: string
+}
+
+export interface ValueChainDocumentJSON {
+  id: string
+  type: 'value_chain'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  blocks: ValueChainBlock[]
+}
+
+export type SevenSBlockId = 'strategy' | 'structure' | 'systems' | 'shared' | 'style' | 'staff' | 'skills'
+
+export interface SevenSBlock {
+  id: SevenSBlockId
+  title: string
+  hint: string
+  keyword?: string
+  items: QuadrantItem[]
+  text?: string
+}
+
+export interface SevenSDocumentJSON {
+  id: string
+  type: 'seven_s'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  blocks: SevenSBlock[]
+}
+
+export interface RiceItem {
+  id: string
+  name: string
+  reach: number
+  /** 0.25 / 0.5 / 1 / 2 / 3 */
+  impact: number
+  /** 0–100 */
+  confidence: number
+  effort: number
+}
+
+export interface RiceDocumentJSON {
+  id: string
+  type: 'rice'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  items: RiceItem[]
+}
+
+export interface BreakEvenDocumentJSON {
+  id: string
+  type: 'break_even'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  /** 单价 */
+  price: number
+  /** 单位变动成本 */
+  variableCost: number
+  /** 固定成本 */
+  fixedCost: number
+}
+
 /** 科学决策三角形（宽度 / 高度 / 深度） */
 export type DecisionTriangleBlockId = 'width' | 'height' | 'depth'
 
@@ -2121,6 +2204,10 @@ export type CanvasDocumentJSON = (
   | PdcaDocumentJSON
   | FiveForcesDocumentJSON
   | IncomeStatementDocumentJSON
+  | ValueChainDocumentJSON
+  | SevenSDocumentJSON
+  | RiceDocumentJSON
+  | BreakEvenDocumentJSON
 ) & WithPanelAttachments
 
 /** 带 blocks 的画布（双三角 / Y 模型 / 刻意练习） */
@@ -2167,6 +2254,8 @@ export type BlockCanvasDocumentJSON =
   | StakeholderDocumentJSON
   | PdcaDocumentJSON
   | FiveForcesDocumentJSON
+  | ValueChainDocumentJSON
+  | SevenSDocumentJSON
 
 export function isDualTriangleDoc(
   doc: CanvasDocumentJSON | null | undefined,
@@ -2734,6 +2823,19 @@ export function isFiveForcesDoc(
   return !!doc && doc.type === 'five_forces'
 }
 
+export function isValueChainDoc(doc: CanvasDocumentJSON | null | undefined): doc is ValueChainDocumentJSON {
+  return !!doc && doc.type === 'value_chain'
+}
+export function isSevenSDoc(doc: CanvasDocumentJSON | null | undefined): doc is SevenSDocumentJSON {
+  return !!doc && doc.type === 'seven_s'
+}
+export function isRiceDoc(doc: CanvasDocumentJSON | null | undefined): doc is RiceDocumentJSON {
+  return !!doc && doc.type === 'rice'
+}
+export function isBreakEvenDoc(doc: CanvasDocumentJSON | null | undefined): doc is BreakEvenDocumentJSON {
+  return !!doc && doc.type === 'break_even'
+}
+
 export function isIncomeStatementDoc(
   doc: CanvasDocumentJSON | null | undefined,
 ): doc is IncomeStatementDocumentJSON {
@@ -2786,7 +2888,9 @@ export function isBlockCanvasDoc(
     isValuePropositionDoc(doc) ||
     isStakeholderDoc(doc) ||
     isPdcaDoc(doc) ||
-    isFiveForcesDoc(doc)
+    isFiveForcesDoc(doc) ||
+    isValueChainDoc(doc) ||
+    isSevenSDoc(doc)
   )
 }
 

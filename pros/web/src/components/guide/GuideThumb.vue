@@ -1582,6 +1582,41 @@ withDefaults(
         <rect x="73" y="20" width="54" height="100" rx="4" fill="#fff4ec" />
         <rect x="134" y="20" width="54" height="100" rx="4" fill="#e8f1fa" />
       </svg>
+      <svg v-else-if="templateId === 'value-chain'" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <rect x="12" y="18" width="42" height="36" rx="3" fill="#eef2f6" />
+        <rect x="58" y="18" width="42" height="36" rx="3" fill="#fbf6e4" />
+        <rect x="104" y="18" width="42" height="36" rx="3" fill="#e5f6f5" />
+        <rect x="150" y="18" width="38" height="36" rx="3" fill="#f3eef8" />
+        <rect x="10" y="64" width="34" height="58" rx="3" fill="#e8f1fa" />
+        <rect x="48" y="64" width="34" height="58" rx="3" fill="#e7f6ef" />
+        <rect x="86" y="64" width="34" height="58" rx="3" fill="#fbeff2" />
+        <rect x="124" y="64" width="34" height="58" rx="3" fill="#fbf1eb" />
+        <rect x="162" y="64" width="28" height="58" rx="3" fill="#e5f6f5" />
+      </svg>
+      <svg v-else-if="templateId === 'seven-s'" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <rect x="16" y="16" width="50" height="32" rx="3" fill="#fbf6e4" />
+        <rect x="74" y="16" width="50" height="32" rx="3" fill="#e8f1fa" />
+        <rect x="132" y="16" width="50" height="32" rx="3" fill="#e5f6f5" />
+        <rect x="40" y="54" width="120" height="28" rx="3" fill="#fbeff2" />
+        <rect x="16" y="90" width="50" height="32" rx="3" fill="#f3eef8" />
+        <rect x="74" y="90" width="50" height="32" rx="3" fill="#e7f6ef" />
+        <rect x="132" y="90" width="50" height="32" rx="3" fill="#fbf1eb" />
+      </svg>
+      <svg v-else-if="templateId === 'rice'" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <rect x="16" y="20" width="168" height="22" rx="3" fill="#2a649f" />
+        <rect x="16" y="50" width="168" height="18" rx="3" fill="#e8f0fe" />
+        <rect x="16" y="76" width="140" height="18" rx="3" fill="#e8f0fe" />
+        <rect x="16" y="102" width="110" height="18" rx="3" fill="#e8f0fe" />
+      </svg>
+      <svg v-else-if="templateId === 'break-even'" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <rect x="12" y="28" width="54" height="84" rx="4" fill="#e8f1fa" />
+        <rect x="73" y="28" width="54" height="84" rx="4" fill="#fff4ec" />
+        <rect x="134" y="28" width="54" height="84" rx="4" fill="#e7f6ef" />
+      </svg>
 
   </div>
 </template>

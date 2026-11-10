@@ -1,0 +1,18 @@
+{
+  "id": "canvas_value_chain",
+  "type": "value_chain",
+  "schemaVersion": 1,
+  "theme": { "background": { "pattern": "none", "color": "#f7f7f7" }, "page": "#f7f7f7", "frame": "#ececec", "hairline": "rgba(60, 50, 20, 0.08)" },
+  "title": "价值链",
+  "blocks": [
+    { "id": "infrastructure", "title": "基础设施", "hint": "财务、法务、管理", "items": [{ "id": "vc_inf", "text": "按席位计费和权限" }] },
+    { "id": "hr", "title": "人力资源", "hint": "谁来做、怎么会", "items": [{ "id": "vc_hr", "text": "项目负责人自己就能排期" }] },
+    { "id": "technology", "title": "技术开发", "hint": "工具和数据", "items": [{ "id": "vc_tech", "text": "画布和甘特图共用一份文档" }] },
+    { "id": "procurement", "title": "采购", "hint": "外部买来的投入", "items": [{ "id": "vc_buy", "text": "云主机和字体授权" }] },
+    { "id": "inbound", "title": "进料后勤", "hint": "输入从哪来", "items": [{ "id": "vc_in", "text": "客户给一页需求" }] },
+    { "id": "operations", "title": "生产运营", "hint": "把输入变成交付", "items": [{ "id": "vc_op", "text": "排期、责任、复盘写在同一处" }] },
+    { "id": "outbound", "title": "出货后勤", "hint": "怎么交到客户手里", "items": [{ "id": "vc_out", "text": "链接打开就能看" }] },
+    { "id": "marketing", "title": "市场销售", "hint": "怎么让人知道并购买", "items": [{ "id": "vc_mkt", "text": "现有用户里的项目负责人" }] },
+    { "id": "service", "title": "服务", "hint": "交付之后怎么留下", "items": [{ "id": "vc_svc", "text": "周计划还在这张图上" }] }
+  ]
+}

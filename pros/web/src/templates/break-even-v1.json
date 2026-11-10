@@ -1,0 +1,10 @@
+{
+  "id": "canvas_break_even",
+  "type": "break_even",
+  "schemaVersion": 1,
+  "theme": { "background": { "pattern": "none", "color": "#f7f7f7" }, "page": "#f7f7f7", "frame": "#ececec", "hairline": "rgba(60, 50, 20, 0.08)" },
+  "title": "盈亏平衡",
+  "price": 100,
+  "variableCost": 40,
+  "fixedCost": 12000
+}
