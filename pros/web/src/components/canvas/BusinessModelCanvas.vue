@@ -2,12 +2,10 @@
 import { computed } from 'vue'
 import { canvasChromeStyle } from './canvasChrome'
 import type { BusinessModelBlockId, BusinessModelCanvasDocumentJSON } from '../../types/canvas'
-import { isBusinessModelCanvasDoc } from '../../types/canvas'
-import { useDocumentStore } from '../../stores/document'
 import { FIVE_STEP_NEGATE_WARM, FIVE_STEP_PALETTE, type FiveStepPalette } from './fiveStepPalette'
+import FiveStepPanel from './FiveStepPanel.vue'
 
 const props = defineProps<{ doc: BusinessModelCanvasDocumentJSON }>()
-const documentStore = useDocumentStore()
 const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 
 const order: BusinessModelBlockId[] = [
@@ -46,13 +44,6 @@ function toneStyle(id: BusinessModelBlockId) {
     '--col-topic': tone.topic,
   }
 }
-
-function update(id: BusinessModelBlockId, text: string) {
-  documentStore.mutateCanvas((doc) => {
-    if (!isBusinessModelCanvasDoc(doc)) return
-    doc.blocks = doc.blocks.map((item) => (item.id === id ? { ...item, text } : item))
-  })
-}
 </script>
 
 <template>
@@ -68,12 +59,14 @@ function update(id: BusinessModelBlockId, text: string) {
         <header>
           <h3>{{ block(id)?.title }}</h3>
         </header>
-        <div class="bmc-body">
-          <p>{{ block(id)?.hint }}</p>
-          <textarea
-            :value="block(id)?.text || ''"
-            :aria-label="block(id)?.title"
-            @change="update(id, ($event.target as HTMLTextAreaElement).value)"
+        <div v-if="block(id)" class="bmc-panel">
+          <FiveStepPanel
+            chrome="fill"
+            density="compact"
+            :block="block(id)!"
+            :header="block(id)!.title"
+            :palette="tones[id]"
+            :topic-placeholder="block(id)!.hint || '主题'"
           />
         </div>
       </section>
@@ -139,17 +132,5 @@ h3 {
   letter-spacing: 0.04em;
   text-align: center;
 }
-.bmc-body { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; padding: 8px; }
-p { margin: 0 0 6px; color: var(--col-topic); font-size: 12px; flex: none; }
-textarea {
-  flex: 1 1 auto;
-  min-height: 0;
-  width: 100%;
-  border: 0;
-  resize: none;
-  font: inherit;
-  background: transparent;
-  color: #202124;
-}
-textarea:focus { outline: none; }
+.bmc-panel { flex: 1 1 auto; min-height: 0; display: flex; }
 </style>

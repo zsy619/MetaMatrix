@@ -1813,7 +1813,12 @@ export interface BusinessModelBlock {
   id: BusinessModelBlockId
   title: string
   hint: string
-  text: string
+  /** 内容主题词，和五步法格子一样可编辑 */
+  keyword?: string
+  /** 富文本条目。旧文档里的 text 会在打开时迁到这里。 */
+  items: QuadrantItem[]
+  /** 旧版纯文本。打开后迁入 items，不再写回。 */
+  text?: string
 }
 
 export interface BusinessModelCanvasDocumentJSON {
@@ -1957,6 +1962,7 @@ export type BlockCanvasDocumentJSON =
   | ThreeRingBasicsDocumentJSON
   | LeadershipTriangleDocumentJSON
   | ContextSixElementsDocumentJSON
+  | BusinessModelCanvasDocumentJSON
 
 export function isDualTriangleDoc(
   doc: CanvasDocumentJSON | null | undefined,
@@ -2522,7 +2528,8 @@ export function isBlockCanvasDoc(
     isPmSolutionTriangleDoc(doc) ||
     isThreeRingBasicsDoc(doc) ||
     isLeadershipTriangleDoc(doc) ||
-    isContextSixElementsDoc(doc)
+    isContextSixElementsDoc(doc) ||
+    isBusinessModelCanvasDoc(doc)
   )
 }
 
