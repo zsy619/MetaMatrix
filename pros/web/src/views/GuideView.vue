@@ -745,7 +745,15 @@ onMounted(async () => {
 .card--moscow:hover,
 .card--moscow:focus-visible,
 .card--impact-effort:hover,
-.card--impact-effort:focus-visible {
+.card--impact-effort:focus-visible,
+.card--vrio:hover,
+.card--vrio:focus-visible,
+.card--golden-circle:hover,
+.card--golden-circle:focus-visible,
+.card--soar:hover,
+.card--soar:focus-visible,
+.card--playing-to-win:hover,
+.card--playing-to-win:focus-visible {
   border-color: #34a853;
 }
 

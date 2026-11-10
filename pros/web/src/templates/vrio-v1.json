@@ -1,0 +1,13 @@
+{
+  "id": "canvas_vrio",
+  "type": "vrio",
+  "schemaVersion": 1,
+  "theme": { "background": { "pattern": "none", "color": "#f7f7f7" }, "page": "#f7f7f7", "frame": "#ececec", "hairline": "rgba(60, 50, 20, 0.08)" },
+  "title": "VRIO",
+  "blocks": [
+    { "id": "value", "title": "有价值", "hint": "能抓住机会，或挡住威胁", "items": [{ "id": "vrio_value", "text": "项目、复盘和财务写在同一套画布里" }] },
+    { "id": "rarity", "title": "稀缺", "hint": "对手很少同时拥有", "items": [{ "id": "vrio_rare", "text": "同行还在用表格排期、聊天里做复盘" }] },
+    { "id": "imitability", "title": "难模仿", "hint": "买得到、学得会，就不算壁垒", "items": [{ "id": "vrio_hard", "text": "历史版本和模板绑在一起，换工具会丢掉上下文" }] },
+    { "id": "organization", "title": "有组织", "hint": "流程、人和制度真的在用它", "items": [{ "id": "vrio_org", "text": "每周例会固定打开同一张画布" }] }
+  ]
+}

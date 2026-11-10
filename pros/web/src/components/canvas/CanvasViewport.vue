@@ -65,6 +65,10 @@ import {
   isKanoDoc,
   isMoscowDoc,
   isImpactEffortDoc,
+  isVrioDoc,
+  isGoldenCircleDoc,
+  isSoarDoc,
+  isPlayingToWinDoc,
   isYModelDoc,
 } from '../../types/canvas'
 import BackgroundLayer from './BackgroundLayer.vue'
@@ -133,6 +137,10 @@ import JourneyCanvas from './JourneyCanvas.vue'
 import KanoCanvas from './KanoCanvas.vue'
 import MoscowCanvas from './MoscowCanvas.vue'
 import ImpactEffortCanvas from './ImpactEffortCanvas.vue'
+import VrioCanvas from './VrioCanvas.vue'
+import GoldenCircleCanvas from './GoldenCircleCanvas.vue'
+import SoarCanvas from './SoarCanvas.vue'
+import PlayingToWinCanvas from './PlayingToWinCanvas.vue'
 
 const documentStore = useDocumentStore()
 const ui = useUiStore()
@@ -297,6 +305,10 @@ const journeyDoc = computed(() => (isJourneyDoc(current_data.value) ? current_da
 const kanoDoc = computed(() => (isKanoDoc(current_data.value) ? current_data.value : null))
 const moscowDoc = computed(() => (isMoscowDoc(current_data.value) ? current_data.value : null))
 const impactEffortDoc = computed(() => (isImpactEffortDoc(current_data.value) ? current_data.value : null))
+const vrioDoc = computed(() => (isVrioDoc(current_data.value) ? current_data.value : null))
+const goldenCircleDoc = computed(() => (isGoldenCircleDoc(current_data.value) ? current_data.value : null))
+const soarDoc = computed(() => (isSoarDoc(current_data.value) ? current_data.value : null))
+const playingToWinDoc = computed(() => (isPlayingToWinDoc(current_data.value) ? current_data.value : null))
 const quadrantDoc = computed(() =>
   isQuadrantDoc(current_data.value) ? current_data.value : null,
 )
@@ -496,6 +508,18 @@ const quadrantDoc = computed(() =>
         </template>
         <template v-else-if="impactEffortDoc">
           <ImpactEffortCanvas :doc="impactEffortDoc" />
+        </template>
+        <template v-else-if="vrioDoc">
+          <VrioCanvas :doc="vrioDoc" />
+        </template>
+        <template v-else-if="goldenCircleDoc">
+          <GoldenCircleCanvas :doc="goldenCircleDoc" />
+        </template>
+        <template v-else-if="soarDoc">
+          <SoarCanvas :doc="soarDoc" />
+        </template>
+        <template v-else-if="playingToWinDoc">
+          <PlayingToWinCanvas :doc="playingToWinDoc" />
         </template>
         <template v-else-if="quadrantDoc">
           <BackgroundLayer

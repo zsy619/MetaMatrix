@@ -2208,6 +2208,86 @@ export interface ImpactEffortDocumentJSON {
   blocks: ImpactEffortBlock[]
 }
 
+export type VrioBlockId = 'value' | 'rarity' | 'imitability' | 'organization'
+
+export interface VrioBlock {
+  id: VrioBlockId
+  title: string
+  hint: string
+  keyword?: string
+  items: QuadrantItem[]
+  text?: string
+}
+
+export interface VrioDocumentJSON {
+  id: string
+  type: 'vrio'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  blocks: VrioBlock[]
+}
+
+export type GoldenCircleBlockId = 'why' | 'how' | 'what'
+
+export interface GoldenCircleBlock {
+  id: GoldenCircleBlockId
+  title: string
+  hint: string
+  keyword?: string
+  items: QuadrantItem[]
+  text?: string
+}
+
+export interface GoldenCircleDocumentJSON {
+  id: string
+  type: 'golden_circle'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  blocks: GoldenCircleBlock[]
+}
+
+export type SoarBlockId = 'strengths' | 'opportunities' | 'aspirations' | 'results'
+
+export interface SoarBlock {
+  id: SoarBlockId
+  title: string
+  hint: string
+  keyword?: string
+  items: QuadrantItem[]
+  text?: string
+}
+
+export interface SoarDocumentJSON {
+  id: string
+  type: 'soar'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  blocks: SoarBlock[]
+}
+
+export type PlayingToWinBlockId = 'aspiration' | 'where' | 'how' | 'capabilities' | 'systems'
+
+export interface PlayingToWinBlock {
+  id: PlayingToWinBlockId
+  title: string
+  hint: string
+  keyword?: string
+  items: QuadrantItem[]
+  text?: string
+}
+
+export interface PlayingToWinDocumentJSON {
+  id: string
+  type: 'playing_to_win'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  blocks: PlayingToWinBlock[]
+}
+
 /** 科学决策三角形（宽度 / 高度 / 深度） */
 export type DecisionTriangleBlockId = 'width' | 'height' | 'depth'
 
@@ -2292,6 +2372,10 @@ export type CanvasDocumentJSON = (
   | KanoDocumentJSON
   | MoscowDocumentJSON
   | ImpactEffortDocumentJSON
+  | VrioDocumentJSON
+  | GoldenCircleDocumentJSON
+  | SoarDocumentJSON
+  | PlayingToWinDocumentJSON
 ) & WithPanelAttachments
 
 /** 带 blocks 的画布（双三角 / Y 模型 / 刻意练习） */
@@ -2344,6 +2428,10 @@ export type BlockCanvasDocumentJSON =
   | KanoDocumentJSON
   | MoscowDocumentJSON
   | ImpactEffortDocumentJSON
+  | VrioDocumentJSON
+  | GoldenCircleDocumentJSON
+  | SoarDocumentJSON
+  | PlayingToWinDocumentJSON
 
 export function isDualTriangleDoc(
   doc: CanvasDocumentJSON | null | undefined,
@@ -2936,6 +3024,22 @@ export function isImpactEffortDoc(doc: CanvasDocumentJSON | null | undefined): d
   return !!doc && doc.type === 'impact_effort'
 }
 
+export function isVrioDoc(doc: CanvasDocumentJSON | null | undefined): doc is VrioDocumentJSON {
+  return !!doc && doc.type === 'vrio'
+}
+
+export function isGoldenCircleDoc(doc: CanvasDocumentJSON | null | undefined): doc is GoldenCircleDocumentJSON {
+  return !!doc && doc.type === 'golden_circle'
+}
+
+export function isSoarDoc(doc: CanvasDocumentJSON | null | undefined): doc is SoarDocumentJSON {
+  return !!doc && doc.type === 'soar'
+}
+
+export function isPlayingToWinDoc(doc: CanvasDocumentJSON | null | undefined): doc is PlayingToWinDocumentJSON {
+  return !!doc && doc.type === 'playing_to_win'
+}
+
 export function isBreakEvenDoc(doc: CanvasDocumentJSON | null | undefined): doc is BreakEvenDocumentJSON {
   return !!doc && doc.type === 'break_even'
 }
@@ -2998,7 +3102,11 @@ export function isBlockCanvasDoc(
     isJourneyDoc(doc) ||
     isKanoDoc(doc) ||
     isMoscowDoc(doc) ||
-    isImpactEffortDoc(doc)
+    isImpactEffortDoc(doc) ||
+    isVrioDoc(doc) ||
+    isGoldenCircleDoc(doc) ||
+    isSoarDoc(doc) ||
+    isPlayingToWinDoc(doc)
   )
 }
 

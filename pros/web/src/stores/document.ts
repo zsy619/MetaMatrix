@@ -120,6 +120,10 @@ import type {
   KanoDocumentJSON,
   MoscowDocumentJSON,
   ImpactEffortDocumentJSON,
+  VrioDocumentJSON,
+  GoldenCircleDocumentJSON,
+  SoarDocumentJSON,
+  PlayingToWinDocumentJSON,
   PanelAttachment,
   AttachmentsByPanelId,
 } from '../types/canvas'
@@ -174,6 +178,10 @@ import {
   isKanoDoc,
   isMoscowDoc,
   isImpactEffortDoc,
+  isVrioDoc,
+  isGoldenCircleDoc,
+  isSoarDoc,
+  isPlayingToWinDoc,
   coerceYModelDoc,
   normalizeYModelDoc,
 } from '../types/canvas'
@@ -244,6 +252,10 @@ import journeyTemplate from '../templates/customer-journey-v1.json'
 import kanoTemplate from '../templates/kano-v1.json'
 import moscowTemplate from '../templates/moscow-v1.json'
 import impactEffortTemplate from '../templates/impact-effort-v1.json'
+import vrioTemplate from '../templates/vrio-v1.json'
+import goldenCircleTemplate from '../templates/golden-circle-v1.json'
+import soarTemplate from '../templates/soar-v1.json'
+import playingToWinTemplate from '../templates/playing-to-win-v1.json'
 import { CONTEXT_SIX_ELEMENTS_BLOCK_ID } from '../utils/contextSixElements'
 
 export type TemplateId =
@@ -312,6 +324,10 @@ export type TemplateId =
   | 'kano'
   | 'moscow'
   | 'impact-effort'
+  | 'vrio'
+  | 'golden-circle'
+  | 'soar'
+  | 'playing-to-win'
 
 const TEMPLATES: Record<TemplateId, CanvasDocumentJSON> = {
   'dual-triangle': dualTriangleTemplate as DualTriangleDocumentJSON,
@@ -384,6 +400,10 @@ const TEMPLATES: Record<TemplateId, CanvasDocumentJSON> = {
   kano: kanoTemplate as KanoDocumentJSON,
   moscow: moscowTemplate as MoscowDocumentJSON,
   'impact-effort': impactEffortTemplate as ImpactEffortDocumentJSON,
+  vrio: vrioTemplate as VrioDocumentJSON,
+  'golden-circle': goldenCircleTemplate as GoldenCircleDocumentJSON,
+  soar: soarTemplate as SoarDocumentJSON,
+  'playing-to-win': playingToWinTemplate as PlayingToWinDocumentJSON,
 }
 
 export function isTemplateId(id: string): id is TemplateId {
@@ -908,6 +928,30 @@ export const TEMPLATE_META: Record<
     name: '影响–努力矩阵',
     badge: '优先级 · 矩阵',
     description: '影响高、努力低的立刻做。影响高、努力大的排进计划。',
+    category: 'method',
+  },
+  vrio: {
+    name: 'VRIO',
+    badge: '战略 · 资源',
+    description: '有价值、稀缺、难模仿、有组织。四项都过，才是持续优势。',
+    category: 'method',
+  },
+  'golden-circle': {
+    name: '黄金圈',
+    badge: '战略 · 黄金圈',
+    description: '先写为什么，再用怎么做证明，最后才是做什么。',
+    category: 'method',
+  },
+  soar: {
+    name: 'SOAR',
+    badge: '战略 · SOAR',
+    description: '优势、机会、愿景、成果。从已经做得好的地方往前看。',
+    category: 'method',
+  },
+  'playing-to-win': {
+    name: '制胜选择',
+    badge: '战略 · 选择',
+    description: '制胜愿景、在哪竞争、如何取胜、所需能力、管理体系。五个选择要连得上。',
     category: 'method',
   },
 }
@@ -1619,6 +1663,10 @@ export const useDocumentStore = defineStore('document', () => {
     if (isKanoDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
     if (isMoscowDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
     if (isImpactEffortDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
+    if (isVrioDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
+    if (isGoldenCircleDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
+    if (isSoarDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
+    if (isPlayingToWinDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
     if (
       isDualTriangleDoc(next) &&
       (tid === 'dual-triangle-human-ai' ||
@@ -2556,7 +2604,11 @@ export const useDocumentStore = defineStore('document', () => {
         !isJourneyDoc(doc) &&
         !isKanoDoc(doc) &&
         !isMoscowDoc(doc) &&
-        !isImpactEffortDoc(doc))
+        !isImpactEffortDoc(doc) &&
+        !isVrioDoc(doc) &&
+        !isGoldenCircleDoc(doc) &&
+        !isSoarDoc(doc) &&
+        !isPlayingToWinDoc(doc))
     ) {
       return false
     }
