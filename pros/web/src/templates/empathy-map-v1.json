@@ -1,0 +1,15 @@
+{
+  "id": "canvas_empathy",
+  "type": "empathy_map",
+  "schemaVersion": 1,
+  "theme": { "background": { "pattern": "none", "color": "#f7f7f7" }, "page": "#f7f7f7", "frame": "#ececec", "hairline": "rgba(60, 50, 20, 0.08)" },
+  "title": "同理心地图",
+  "blocks": [
+    { "id": "says", "title": "说", "hint": "他亲口说过的话", "items": [{ "id": "em_say", "text": "周会上对不上日期" }] },
+    { "id": "thinks", "title": "想", "hint": "他没说出口、但在意的", "items": [{ "id": "em_think", "text": "怕被看成计划没管住" }] },
+    { "id": "does", "title": "做", "hint": "他实际的动作", "items": [{ "id": "em_do", "text": "把排期贴在聊天记录里" }] },
+    { "id": "feels", "title": "感受", "hint": "焦虑、安心或被忽视", "items": [{ "id": "em_feel", "text": "变更一来就烦" }] },
+    { "id": "pains", "title": "痛点", "hint": "阻碍和风险", "items": [{ "id": "em_pain", "text": "责任说不清" }] },
+    { "id": "gains", "title": "收益", "hint": "他想要的结果", "items": [{ "id": "em_gain", "text": "能指着一张图说明这周" }] }
+  ]
+}

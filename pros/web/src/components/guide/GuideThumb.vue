@@ -1582,6 +1582,38 @@ withDefaults(
         <rect x="73" y="20" width="54" height="100" rx="4" fill="#fff4ec" />
         <rect x="134" y="20" width="54" height="100" rx="4" fill="#e8f1fa" />
       </svg>
+      <svg v-else-if="templateId === 'pestle'" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <rect x="12" y="18" width="54" height="48" rx="4" fill="#fbeff2" />
+        <rect x="73" y="18" width="54" height="48" rx="4" fill="#fbf6e4" />
+        <rect x="134" y="18" width="54" height="48" rx="4" fill="#e8f1fa" />
+        <rect x="12" y="74" width="54" height="48" rx="4" fill="#e5f6f5" />
+        <rect x="73" y="74" width="54" height="48" rx="4" fill="#eef2f6" />
+        <rect x="134" y="74" width="54" height="48" rx="4" fill="#e7f6ef" />
+      </svg>
+      <svg v-else-if="templateId === 'ansoff'" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <rect x="16" y="16" width="80" height="50" rx="4" fill="#e7f6ef" />
+        <rect x="104" y="16" width="80" height="50" rx="4" fill="#e8f1fa" />
+        <rect x="16" y="74" width="80" height="50" rx="4" fill="#fbf6e4" />
+        <rect x="104" y="74" width="80" height="50" rx="4" fill="#fdecea" />
+      </svg>
+      <svg v-else-if="templateId === 'empathy-map'" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <rect x="16" y="18" width="80" height="32" rx="4" fill="#e8f1fa" />
+        <rect x="104" y="18" width="80" height="32" rx="4" fill="#f3eef8" />
+        <rect x="16" y="54" width="80" height="32" rx="4" fill="#e5f6f5" />
+        <rect x="104" y="54" width="80" height="32" rx="4" fill="#fbf6e4" />
+        <rect x="16" y="90" width="80" height="32" rx="4" fill="#fdecea" />
+        <rect x="104" y="90" width="80" height="32" rx="4" fill="#e7f6ef" />
+      </svg>
+      <svg v-else-if="templateId === 'marketing-mix'" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <rect x="10" y="20" width="42" height="100" rx="4" fill="#e5f6f5" />
+        <rect x="56" y="20" width="42" height="100" rx="4" fill="#fbf6e4" />
+        <rect x="102" y="20" width="42" height="100" rx="4" fill="#e8f1fa" />
+        <rect x="148" y="20" width="42" height="100" rx="4" fill="#fbeff2" />
+      </svg>
 
   </div>
 </template>

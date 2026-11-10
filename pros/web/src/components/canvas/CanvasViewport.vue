@@ -57,6 +57,10 @@ import {
   isPdcaDoc,
   isFiveForcesDoc,
   isIncomeStatementDoc,
+  isPestleDoc,
+  isAnsoffDoc,
+  isEmpathyDoc,
+  isMarketingMixDoc,
   isYModelDoc,
 } from '../../types/canvas'
 import BackgroundLayer from './BackgroundLayer.vue'
@@ -117,6 +121,10 @@ import StakeholderCanvas from './StakeholderCanvas.vue'
 import PdcaCanvas from './PdcaCanvas.vue'
 import FiveForcesCanvas from './FiveForcesCanvas.vue'
 import IncomeStatementCanvas from './IncomeStatementCanvas.vue'
+import PestleCanvas from './PestleCanvas.vue'
+import AnsoffCanvas from './AnsoffCanvas.vue'
+import EmpathyCanvas from './EmpathyCanvas.vue'
+import MarketingMixCanvas from './MarketingMixCanvas.vue'
 
 const documentStore = useDocumentStore()
 const ui = useUiStore()
@@ -273,6 +281,10 @@ const fiveForcesDoc = computed(() => (isFiveForcesDoc(current_data.value) ? curr
 const incomeStatementDoc = computed(() =>
   isIncomeStatementDoc(current_data.value) ? current_data.value : null,
 )
+const pestleDoc = computed(() => (isPestleDoc(current_data.value) ? current_data.value : null))
+const ansoffDoc = computed(() => (isAnsoffDoc(current_data.value) ? current_data.value : null))
+const empathyDoc = computed(() => (isEmpathyDoc(current_data.value) ? current_data.value : null))
+const marketingMixDoc = computed(() => (isMarketingMixDoc(current_data.value) ? current_data.value : null))
 const quadrantDoc = computed(() =>
   isQuadrantDoc(current_data.value) ? current_data.value : null,
 )
@@ -448,6 +460,18 @@ const quadrantDoc = computed(() =>
         </template>
         <template v-else-if="incomeStatementDoc">
           <IncomeStatementCanvas :doc="incomeStatementDoc" />
+        </template>
+        <template v-else-if="pestleDoc">
+          <PestleCanvas :doc="pestleDoc" />
+        </template>
+        <template v-else-if="ansoffDoc">
+          <AnsoffCanvas :doc="ansoffDoc" />
+        </template>
+        <template v-else-if="empathyDoc">
+          <EmpathyCanvas :doc="empathyDoc" />
+        </template>
+        <template v-else-if="marketingMixDoc">
+          <MarketingMixCanvas :doc="marketingMixDoc" />
         </template>
         <template v-else-if="quadrantDoc">
           <BackgroundLayer

@@ -1,0 +1,15 @@
+{
+  "id": "canvas_pestle",
+  "type": "pestle",
+  "schemaVersion": 1,
+  "theme": { "background": { "pattern": "none", "color": "#f7f7f7" }, "page": "#f7f7f7", "frame": "#ececec", "hairline": "rgba(60, 50, 20, 0.08)" },
+  "title": "PESTLE",
+  "blocks": [
+    { "id": "political", "title": "政治", "hint": "政策、监管意向、政府采购", "items": [{ "id": "pe_p", "text": "行业准入还在收紧" }] },
+    { "id": "economic", "title": "经济", "hint": "预算、价格敏感、融资环境", "items": [{ "id": "pe_e", "text": "团队在砍工具预算" }] },
+    { "id": "social", "title": "社会", "hint": "工作方式、信任、人口变化", "items": [{ "id": "pe_s", "text": "远程团队更依赖书面计划" }] },
+    { "id": "technological", "title": "技术", "hint": "新工具会不会改掉这件事", "items": [{ "id": "pe_t", "text": "表格和聊天已经能拼出排期" }] },
+    { "id": "legal", "title": "法律", "hint": "合同、数据、劳动合规", "items": [{ "id": "pe_l", "text": "客户数据不能出域" }] },
+    { "id": "environmental", "title": "环境", "hint": "可持续、能耗、供应链", "items": [{ "id": "pe_en", "text": "暂无直接约束" }] }
+  ]
+}
