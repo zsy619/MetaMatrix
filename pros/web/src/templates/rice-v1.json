@@ -1,0 +1,12 @@
+{
+  "id": "canvas_rice",
+  "type": "rice",
+  "schemaVersion": 1,
+  "theme": { "background": { "pattern": "none", "color": "#f7f7f7" }, "page": "#f7f7f7", "frame": "#ececec", "hairline": "rgba(60, 50, 20, 0.08)" },
+  "title": "RICE 排序",
+  "items": [
+    { "id": "rice_gantt", "name": "甘特图按依赖排程", "reach": 800, "impact": 2, "confidence": 80, "effort": 2 },
+    { "id": "rice_profit", "name": "利润表", "reach": 300, "impact": 1, "confidence": 60, "effort": 1 },
+    { "id": "rice_custom", "name": "一次性定制报表", "reach": 40, "impact": 0.5, "confidence": 40, "effort": 3 }
+  ]
+}

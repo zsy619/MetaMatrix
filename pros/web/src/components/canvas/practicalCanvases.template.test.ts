@@ -20,7 +20,11 @@ vi.mock('../RichTextEditor.vue', () => ({
 import { cloneTemplate, isTemplateId, TEMPLATE_META, useDocumentStore } from '../../stores/document'
 import {
   isFiveForcesDoc,
+  isBreakEvenDoc,
   isIncomeStatementDoc,
+  isRiceDoc,
+  isSevenSDoc,
+  isValueChainDoc,
   isLeanCanvasDoc,
   isOkrDoc,
   isPdcaDoc,
@@ -125,6 +129,23 @@ describe('实用商业画布', () => {
     const sum = (id: 'revenue' | 'cost' | 'expense') =>
       income.sections.find((section) => section.id === id)!.lines.reduce((total, line) => total + line.amount, 0)
     expect(sum('revenue') - sum('cost') - sum('expense')).toBe(110)
+  })
+
+  it('价值链、7S、RICE 和盈亏平衡能登记并算出结果', () => {
+    for (const id of ['value-chain', 'seven-s', 'rice', 'break-even'] as const) expect(isTemplateId(id)).toBe(true)
+    const chain = cloneTemplate('value-chain')
+    const seven = cloneTemplate('seven-s')
+    const rice = cloneTemplate('rice')
+    const point = cloneTemplate('break-even')
+    expect(isValueChainDoc(chain) && chain.blocks).toHaveLength(9)
+    expect(isSevenSDoc(seven) && seven.blocks).toHaveLength(7)
+    expect(isRiceDoc(rice)).toBe(true)
+    if (isRiceDoc(rice)) {
+      const first = rice.items[0]
+      expect((first.reach * first.impact * (first.confidence / 100)) / first.effort).toBe(640)
+    }
+    expect(isBreakEvenDoc(point)).toBe(true)
+    if (isBreakEvenDoc(point)) expect(point.fixed / (point.price - point.variable)).toBe(2000)
   })
 
   it('甘特图后置任务指向依赖它的行', () => {

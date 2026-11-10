@@ -1,0 +1,16 @@
+{
+  "id": "canvas_seven_s",
+  "type": "seven_s",
+  "schemaVersion": 1,
+  "theme": { "background": { "pattern": "none", "color": "#f7f7f7" }, "page": "#f7f7f7", "frame": "#ececec", "hairline": "rgba(60, 50, 20, 0.08)" },
+  "title": "麦肯锡 7S",
+  "blocks": [
+    { "id": "strategy", "title": "战略", "hint": "我们选择赢在哪里", "items": [{ "id": "s7_strategy", "text": "服务带小团队的项目负责人" }] },
+    { "id": "structure", "title": "结构", "hint": "谁向谁汇报、怎么分组", "items": [{ "id": "s7_structure", "text": "产品、研发、客户成功三条线" }] },
+    { "id": "systems", "title": "制度", "hint": "日常靠什么流程运转", "items": [{ "id": "s7_systems", "text": "每周看甘特图和利润" }] },
+    { "id": "shared", "title": "共同价值观", "hint": "什么是不能让的", "items": [{ "id": "s7_shared", "text": "一张纸说清，不堆功能" }] },
+    { "id": "style", "title": "风格", "hint": "负责人实际怎么管", "items": [{ "id": "s7_style", "text": "先写事实，再排优先级" }] },
+    { "id": "staff", "title": "人员", "hint": "人从哪来、怎么留下", "items": [{ "id": "s7_staff", "text": "要能自己做完一次 PDCA" }] },
+    { "id": "skills", "title": "技能", "hint": "组织真正会的事", "items": [{ "id": "s7_skills", "text": "把计划、责任和复盘放在一起" }] }
+  ]
+}

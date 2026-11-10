@@ -112,6 +112,10 @@ import type {
   PdcaDocumentJSON,
   FiveForcesDocumentJSON,
   IncomeStatementDocumentJSON,
+  ValueChainDocumentJSON,
+  SevenSDocumentJSON,
+  RiceDocumentJSON,
+  BreakEvenDocumentJSON,
   PanelAttachment,
   AttachmentsByPanelId,
 } from '../types/canvas'
@@ -160,6 +164,8 @@ import {
   isStakeholderDoc,
   isPdcaDoc,
   isFiveForcesDoc,
+  isValueChainDoc,
+  isSevenSDoc,
   coerceYModelDoc,
   normalizeYModelDoc,
 } from '../types/canvas'
@@ -222,6 +228,10 @@ import stakeholderTemplate from '../templates/stakeholder-map-v1.json'
 import pdcaTemplate from '../templates/pdca-v1.json'
 import fiveForcesTemplate from '../templates/five-forces-v1.json'
 import incomeStatementTemplate from '../templates/income-statement-v1.json'
+import valueChainTemplate from '../templates/value-chain-v1.json'
+import sevenSTemplate from '../templates/seven-s-v1.json'
+import riceTemplate from '../templates/rice-v1.json'
+import breakEvenTemplate from '../templates/break-even-v1.json'
 import { CONTEXT_SIX_ELEMENTS_BLOCK_ID } from '../utils/contextSixElements'
 
 export type TemplateId =
@@ -282,6 +292,10 @@ export type TemplateId =
   | 'pdca'
   | 'five-forces'
   | 'income-statement'
+  | 'value-chain'
+  | 'seven-s'
+  | 'rice'
+  | 'break-even'
 
 const TEMPLATES: Record<TemplateId, CanvasDocumentJSON> = {
   'dual-triangle': dualTriangleTemplate as DualTriangleDocumentJSON,
@@ -346,6 +360,10 @@ const TEMPLATES: Record<TemplateId, CanvasDocumentJSON> = {
   pdca: pdcaTemplate as PdcaDocumentJSON,
   'five-forces': fiveForcesTemplate as FiveForcesDocumentJSON,
   'income-statement': incomeStatementTemplate as IncomeStatementDocumentJSON,
+  'value-chain': valueChainTemplate as ValueChainDocumentJSON,
+  'seven-s': sevenSTemplate as SevenSDocumentJSON,
+  rice: riceTemplate as RiceDocumentJSON,
+  'break-even': breakEvenTemplate as BreakEvenDocumentJSON,
 }
 
 export function isTemplateId(id: string): id is TemplateId {
@@ -822,6 +840,30 @@ export const TEMPLATE_META: Record<
     name: '利润表',
     badge: '财务 · 利润',
     description: '收入减去成本是毛利，再减去费用是营业利润。和现金流量放在一起看赚不赚钱。',
+    category: 'growth',
+  },
+  'value-chain': {
+    name: '价值链',
+    badge: '运营 · 价值链',
+    description: '上面是支持活动，下面是进料、生产、出货、营销和服务。看成本和优势落在哪一段。',
+    category: 'org',
+  },
+  'seven-s': {
+    name: '麦肯锡 7S',
+    badge: '组织 · 7S',
+    description: '战略、结构、制度，加上共同价值观、风格、人员和技能。看组织是不是拧在一起。',
+    category: 'org',
+  },
+  rice: {
+    name: 'RICE 排序',
+    badge: '优先级 · RICE',
+    description: '触达 × 影响 × 信心 ÷ 投入。分数高的排在前面。',
+    category: 'method',
+  },
+  'break-even': {
+    name: '盈亏平衡',
+    badge: '财务 · 盈亏',
+    description: '固定成本、单价和单位变动成本。算出要卖多少件才不亏。',
     category: 'growth',
   },
 }
@@ -1527,6 +1569,8 @@ export const useDocumentStore = defineStore('document', () => {
     if (isStakeholderDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
     if (isPdcaDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
     if (isFiveForcesDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
+    if (isValueChainDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
+    if (isSevenSDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
     if (
       isDualTriangleDoc(next) &&
       (tid === 'dual-triangle-human-ai' ||
@@ -2458,7 +2502,9 @@ export const useDocumentStore = defineStore('document', () => {
         !isValuePropositionDoc(doc) &&
         !isStakeholderDoc(doc) &&
         !isPdcaDoc(doc) &&
-        !isFiveForcesDoc(doc))
+        !isFiveForcesDoc(doc) &&
+        !isValueChainDoc(doc) &&
+        !isSevenSDoc(doc))
     ) {
       return false
     }
