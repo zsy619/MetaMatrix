@@ -1,6 +1,6 @@
-import JSZip from 'jszip'
 import { getToken } from '../api/http'
 import { mediaFetchUrl } from './mediaPath'
+import { previewDocx } from './rteOfficePreview'
 
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>
 
@@ -21,13 +21,22 @@ export function attachmentInsertHref(src: string): string | null {
   return null
 }
 
-export type AttachmentKind = 'image' | 'pdf' | 'text' | 'docx' | 'file'
+export type AttachmentKind = 'image' | 'pdf' | 'text' | 'docx' | 'doc' | 'sheet' | 'file'
 
 export function attachmentKind(name: string, mime: string): AttachmentKind {
   const fileName = name.toLowerCase()
   const type = mime.toLowerCase()
   if (type.startsWith('image/') || /\.(png|jpe?g|gif|webp|bmp|svg)$/.test(fileName)) return 'image'
   if (type === 'application/pdf' || fileName.endsWith('.pdf')) return 'pdf'
+  if (type.includes('wordprocessingml') || fileName.endsWith('.docx')) return 'docx'
+  if (type === 'application/msword' || fileName.endsWith('.doc')) return 'doc'
+  if (
+    type.includes('spreadsheet')
+    || type.includes('excel')
+    || /\.(xlsx|xlsm|xls)$/.test(fileName)
+  ) {
+    return 'sheet'
+  }
   if (
     type.startsWith('text/')
     || type === 'application/json'
@@ -35,7 +44,6 @@ export function attachmentKind(name: string, mime: string): AttachmentKind {
   ) {
     return 'text'
   }
-  if (type.includes('wordprocessingml') || fileName.endsWith('.docx')) return 'docx'
   return 'file'
 }
 
@@ -100,24 +108,11 @@ export async function loadAttachment(
   return { name, mime, href: link, blob, kind: attachmentKind(name, mime) }
 }
 
-/** 从 docx 里抽出正文，供页面预览。 */
+/** 从 docx 里抽出正文，不带字段代码和段落属性。 */
 export async function docxPlainText(blob: Blob): Promise<string> {
-  const zip = await JSZip.loadAsync(await blob.arrayBuffer())
-  const xml = await zip.file('word/document.xml')?.async('string')
-  if (!xml) return ''
-  return xml
-    .replace(/<w:p[^>]*\/>/g, '\n')
-    .replace(/<w:p[\s>]/g, '\n')
-    .replace(/<w:tab\/>/g, '\t')
-    .replace(/<w:br\/>/g, '\n')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/\n{3,}/g, '\n\n')
-    .trim()
+  const html = await previewDocx(blob)
+  const doc = new DOMParser().parseFromString(html, 'text/html')
+  return (doc.body.textContent || '').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim()
 }
 
 export function downloadAttachment(blob: Blob, name: string) {

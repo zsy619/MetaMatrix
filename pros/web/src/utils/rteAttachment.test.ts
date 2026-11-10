@@ -1,3 +1,4 @@
+// @vitest-environment happy-dom
 import JSZip from 'jszip'
 import { describe, expect, it, vi } from 'vitest'
 import { attachmentInsertHref, attachmentKind, docxPlainText, loadAttachment } from './rteAttachment'
@@ -15,7 +16,9 @@ describe('附件链接', () => {
     expect(attachmentKind('说明.docx', '')).toBe('docx')
     expect(attachmentKind('表.pdf', 'application/pdf')).toBe('pdf')
     expect(attachmentKind('图.png', 'image/png')).toBe('image')
-    expect(attachmentKind('旧版.doc', 'application/msword')).toBe('file')
+    expect(attachmentKind('旧版.doc', 'application/msword')).toBe('doc')
+    expect(attachmentKind('预算.xlsx', '')).toBe('sheet')
+    expect(attachmentKind('旧表.xls', 'application/vnd.ms-excel')).toBe('sheet')
   })
 
   it('用素材元数据里的签名地址取回文件', async () => {
@@ -41,10 +44,19 @@ describe('附件链接', () => {
     })
   })
 
-  it('抽出 docx 正文', async () => {
+  it('抽出 docx 正文，不带段落属性和域代码', async () => {
     const zip = new JSZip()
-    zip.file('word/document.xml', '<w:document><w:p><w:r><w:t>你好&amp;世界</w:t></w:r></w:p></w:document>')
+    zip.file(
+      'word/document.xml',
+      '<w:document><w:body>' +
+        '<w:p w14:paraId="36F5D964"><w:r><w:instrText>HYPERLINK \\l "section-1"</w:instrText></w:r>' +
+        '<w:r><w:t>你好&amp;世界</w:t></w:r></w:p>' +
+        '</w:body></w:document>',
+    )
     const blob = await zip.generateAsync({ type: 'blob' })
-    expect(await docxPlainText(blob)).toBe('你好&世界')
+    const text = await docxPlainText(blob)
+    expect(text).toContain('你好&世界')
+    expect(text).not.toContain('paraId')
+    expect(text).not.toContain('HYPERLINK')
   })
 })
