@@ -2,12 +2,10 @@
 import { computed } from 'vue'
 import { canvasChromeStyle } from './canvasChrome'
 import type { ValuePropositionBlockId, ValuePropositionDocumentJSON } from '../../types/canvas'
-import { isValuePropositionDoc } from '../../types/canvas'
-import { useDocumentStore } from '../../stores/document'
 import { FIVE_STEP_NEGATE, FIVE_STEP_PALETTE, type FiveStepPalette } from './fiveStepPalette'
+import FiveStepPanel from './FiveStepPanel.vue'
 
 const props = defineProps<{ doc: ValuePropositionDocumentJSON }>()
-const documentStore = useDocumentStore()
 const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 const valueIds: ValuePropositionBlockId[] = ['products', 'relievers', 'creators']
 const customerIds: ValuePropositionBlockId[] = ['jobs', 'pains', 'gains']
@@ -23,13 +21,6 @@ const tones: Record<ValuePropositionBlockId, FiveStepPalette> = {
 function block(id: ValuePropositionBlockId) {
   return props.doc.blocks.find((item) => item.id === id)
 }
-
-function update(id: ValuePropositionBlockId, text: string) {
-  documentStore.mutateCanvas((doc) => {
-    if (!isValuePropositionDoc(doc)) return
-    doc.blocks = doc.blocks.map((item) => (item.id === id ? { ...item, text } : item))
-  })
-}
 </script>
 
 <template>
@@ -44,7 +35,16 @@ function update(id: ValuePropositionBlockId, text: string) {
         <div class="stack">
           <article v-for="id in valueIds" :key="id" :data-block="id" :style="{ '--col-header': tones[id].header, '--col-body': tones[id].body }">
             <h4>{{ block(id)?.title }}</h4>
-            <textarea :value="block(id)?.text || ''" :placeholder="block(id)?.hint" :aria-label="block(id)?.title" @change="update(id, ($event.target as HTMLTextAreaElement).value)" />
+            <div v-if="block(id)" class="rte-slot">
+              <FiveStepPanel
+                chrome="fill"
+                density="compact"
+                :block="block(id)!"
+                :header="block(id)!.title"
+                :palette="tones[id]"
+                :topic-placeholder="block(id)!.hint || '主题'"
+              />
+            </div>
           </article>
         </div>
       </section>
@@ -53,7 +53,16 @@ function update(id: ValuePropositionBlockId, text: string) {
         <div class="stack">
           <article v-for="id in customerIds" :key="id" :data-block="id" :style="{ '--col-header': tones[id].header, '--col-body': tones[id].body }">
             <h4>{{ block(id)?.title }}</h4>
-            <textarea :value="block(id)?.text || ''" :placeholder="block(id)?.hint" :aria-label="block(id)?.title" @change="update(id, ($event.target as HTMLTextAreaElement).value)" />
+            <div v-if="block(id)" class="rte-slot">
+              <FiveStepPanel
+                chrome="fill"
+                density="compact"
+                :block="block(id)!"
+                :header="block(id)!.title"
+                :palette="tones[id]"
+                :topic-placeholder="block(id)!.hint || '主题'"
+              />
+            </div>
           </article>
         </div>
       </section>
@@ -73,6 +82,5 @@ function update(id: ValuePropositionBlockId, text: string) {
 .stack { flex: 1 1 auto; min-height: 0; display: grid; grid-template-rows: 1fr 1fr 1fr; gap: 8px; }
 article { display: flex; flex-direction: column; min-height: 0; background: var(--col-body); border-radius: 12px; overflow: hidden; }
 h4 { margin: 0; min-height: 36px; display: flex; align-items: center; justify-content: center; background: var(--col-header); color: #fff; font-size: 14px; }
-textarea { flex: 1 1 auto; min-height: 0; border: 0; resize: none; background: transparent; padding: 8px 10px; font: inherit; }
-textarea:focus { outline: none; }
+.rte-slot { flex: 1 1 auto; min-height: 0; display: flex; }
 </style>

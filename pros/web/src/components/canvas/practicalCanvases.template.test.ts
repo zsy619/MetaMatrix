@@ -8,6 +8,15 @@ vi.mock('../../api/documents', async (importOriginal) => {
   return { ...actual, cloneDocument: vi.fn(), listDocuments: vi.fn() }
 })
 
+vi.mock('../RichTextEditor.vue', () => ({
+  default: {
+    name: 'RichTextEditor',
+    props: { modelValue: { type: String, default: '' } },
+    emits: ['update:modelValue'],
+    template: '<div class="rte-stub">{{ modelValue }}</div>',
+  },
+}))
+
 import { cloneTemplate, isTemplateId, TEMPLATE_META, useDocumentStore } from '../../stores/document'
 import { isLeanCanvasDoc, isOkrDoc, isSwotDoc, isValuePropositionDoc } from '../../types/canvas'
 import { formatSuccessors } from '../../utils/projectGantt'
@@ -40,15 +49,21 @@ describe('实用商业画布', () => {
     store.loadFromTemplate('swot')
     const wrapper = mount(SwotCanvas, { props: { doc: store.current_data as never } })
     expect(wrapper.findAll('[data-block]')).toHaveLength(4)
+    expect(wrapper.findAll('.rte-stub')).toHaveLength(4)
+    expect((wrapper.get('[data-block="strengths"] input[aria-label="内容主题"]').element as HTMLInputElement).placeholder).toBe('我们已经做得比别人好的地方')
+    expect(store.addBlockItem('strengths', { text: '还能自己复盘' })?.text).toContain('复盘')
+    expect(store.updateBlockKeyword('strengths', '交付')).toBe(true)
     wrapper.unmount()
     store.loadFromTemplate('lean-canvas')
     const leanView = mount(LeanCanvas, { props: { doc: store.current_data as never } })
     expect(leanView.find('.lean-cell--uvp').exists()).toBe(true)
+    expect(leanView.findAll('.rte-stub')).toHaveLength(9)
     leanView.unmount()
     store.loadFromTemplate('value-proposition')
     const valueView = mount(ValuePropositionCanvas, { props: { doc: store.current_data as never } })
     expect(valueView.text()).toContain('价值图')
     expect(valueView.text()).toContain('客户画像')
+    expect(valueView.findAll('.rte-stub')).toHaveLength(6)
     valueView.unmount()
   })
 
@@ -64,6 +79,25 @@ describe('实用商业画布', () => {
     await range.setValue('100')
     const current = store.current_data
     expect(isOkrDoc(current) && current.objectives[0].keyResults[0].progress).toBe(100)
+  })
+
+  it('旧的 SWOT 纯文本会按行迁进富文本', () => {
+    const store = useDocumentStore()
+    store.loadFromTemplate('swot')
+    const source = store.current_data
+    if (!isSwotDoc(source)) return
+    store.setCurrentData({
+      ...source,
+      blocks: source.blocks.map((block) =>
+        block.id === 'strengths'
+          ? { id: block.id, title: block.title, hint: block.hint, text: '第一行\n第二行' }
+          : block,
+      ),
+    } as typeof source)
+    const current = store.current_data
+    expect(isSwotDoc(current)).toBe(true)
+    if (!isSwotDoc(current)) return
+    expect(current.blocks.find((block) => block.id === 'strengths')?.items.map((item) => item.text)).toEqual(['第一行', '第二行'])
   })
 
   it('甘特图后置任务指向依赖它的行', () => {
