@@ -713,7 +713,15 @@ onMounted(async () => {
 .card--business-model-canvas:hover,
 .card--business-model-canvas:focus-visible,
 .card--cash-flow:hover,
-.card--cash-flow:focus-visible {
+.card--cash-flow:focus-visible,
+.card--swot:hover,
+.card--swot:focus-visible,
+.card--lean-canvas:hover,
+.card--lean-canvas:focus-visible,
+.card--value-proposition:hover,
+.card--value-proposition:focus-visible,
+.card--okr:hover,
+.card--okr:focus-visible {
   border-color: #34a853;
 }
 

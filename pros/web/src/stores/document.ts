@@ -104,6 +104,10 @@ import type {
   DailyKanbanDocumentJSON,
   BusinessModelCanvasDocumentJSON,
   CashFlowDocumentJSON,
+  SwotDocumentJSON,
+  LeanCanvasDocumentJSON,
+  ValuePropositionDocumentJSON,
+  OkrDocumentJSON,
   PanelAttachment,
   AttachmentsByPanelId,
 } from '../types/canvas'
@@ -200,6 +204,10 @@ import raciMatrixTemplate from '../templates/raci-matrix-v1.json'
 import dailyKanbanTemplate from '../templates/daily-kanban-v1.json'
 import businessModelCanvasTemplate from '../templates/business-model-canvas-v1.json'
 import cashFlowTemplate from '../templates/cash-flow-v1.json'
+import swotTemplate from '../templates/swot-v1.json'
+import leanCanvasTemplate from '../templates/lean-canvas-v1.json'
+import valuePropositionTemplate from '../templates/value-proposition-v1.json'
+import okrTemplate from '../templates/okr-v1.json'
 import { CONTEXT_SIX_ELEMENTS_BLOCK_ID } from '../utils/contextSixElements'
 
 export type TemplateId =
@@ -252,6 +260,10 @@ export type TemplateId =
   | 'daily-kanban'
   | 'business-model-canvas'
   | 'cash-flow'
+  | 'swot'
+  | 'lean-canvas'
+  | 'value-proposition'
+  | 'okr'
 
 const TEMPLATES: Record<TemplateId, CanvasDocumentJSON> = {
   'dual-triangle': dualTriangleTemplate as DualTriangleDocumentJSON,
@@ -308,6 +320,10 @@ const TEMPLATES: Record<TemplateId, CanvasDocumentJSON> = {
   'daily-kanban': dailyKanbanTemplate as DailyKanbanDocumentJSON,
   'business-model-canvas': businessModelCanvasTemplate as BusinessModelCanvasDocumentJSON,
   'cash-flow': cashFlowTemplate as CashFlowDocumentJSON,
+  swot: swotTemplate as SwotDocumentJSON,
+  'lean-canvas': leanCanvasTemplate as LeanCanvasDocumentJSON,
+  'value-proposition': valuePropositionTemplate as ValuePropositionDocumentJSON,
+  okr: okrTemplate as OkrDocumentJSON,
 }
 
 export function isTemplateId(id: string): id is TemplateId {
@@ -711,7 +727,7 @@ export const TEMPLATE_META: Record<
   'project-gantt': {
     name: '项目甘特图',
     badge: '项目 · 甘特',
-    description: '任务、负责人、起止日期和进度画在同一张时间条上，用来排期和看重叠。',
+    description: '工作分解树、前置与后置、里程碑、比较基准和关键路径。按依赖排程，日周月缩放。',
     category: 'method',
   },
   'raci-matrix': {
@@ -737,6 +753,30 @@ export const TEMPLATE_META: Record<
     badge: '财务 · 现金流',
     description: '经营、投资、筹资三块铺满页面。流入为正、流出为负，净额随正负变色。',
     category: 'growth',
+  },
+  swot: {
+    name: 'SWOT 分析',
+    badge: '战略 · SWOT',
+    description: '优势、劣势、机会、威胁四格铺满页面。先写事实，再决定要做什么。',
+    category: 'growth',
+  },
+  'lean-canvas': {
+    name: '精益画布',
+    badge: '商业 · 精益',
+    description: '问题、客户、独特价值、指标、渠道、成本和收入。用来检验还没被证实的想法。',
+    category: 'growth',
+  },
+  'value-proposition': {
+    name: '价值主张画布',
+    badge: '客户 · 价值',
+    description: '左边价值图，右边客户要完成的事、痛点和收益。两边对上才算契合。',
+    category: 'growth',
+  },
+  okr: {
+    name: 'OKR',
+    badge: '目标 · OKR',
+    description: '一个目标配几条可衡量的关键结果。拖动进度，目标完成度自动取平均。',
+    category: 'method',
   },
 }
 

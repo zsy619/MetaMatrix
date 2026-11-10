@@ -1,0 +1,18 @@
+{
+  "id": "canvas_swot",
+  "type": "swot",
+  "schemaVersion": 1,
+  "theme": {
+    "background": { "pattern": "none", "color": "#f7f7f7" },
+    "page": "#f7f7f7",
+    "frame": "#ececec",
+    "hairline": "rgba(60, 50, 20, 0.08)"
+  },
+  "title": "SWOT 分析",
+  "blocks": [
+    { "id": "strengths", "title": "优势", "hint": "我们已经做得比别人好的地方", "text": "交付节奏稳定\n团队能自己排期" },
+    { "id": "weaknesses", "title": "劣势", "hint": "内部短板，先写事实", "text": "销售材料还停留在功能清单" },
+    { "id": "opportunities", "title": "机会", "hint": "外部变化里能接住的", "text": "客户开始要求一张纸看清项目" },
+    { "id": "threats", "title": "威胁", "hint": "外部风险，不写对策", "text": "通用表格工具已经够用" }
+  ]
+}
