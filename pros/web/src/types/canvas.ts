@@ -1761,6 +1761,9 @@ export interface RaciTask {
   name: string
   /** roleId → R/A/C/I */
   cells: Record<string, RaciLetter>
+  /** 缺省是顶层工作。子工作排在父工作后面。 */
+  parentId?: string | null
+  collapsed?: boolean
 }
 
 export interface RaciMatrixDocumentJSON {

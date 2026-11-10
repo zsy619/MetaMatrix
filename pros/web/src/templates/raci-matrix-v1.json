@@ -16,9 +16,12 @@
     { "id": "role_inform", "name": "知情" }
   ],
   "tasks": [
-    { "id": "task_kickoff", "name": "立项", "cells": { "role_owner": "A", "role_do": "R", "role_consult": "C", "role_inform": "I" } },
-    { "id": "task_plan", "name": "排期", "cells": { "role_owner": "A", "role_do": "R", "role_consult": "", "role_inform": "I" } },
-    { "id": "task_build", "name": "交付", "cells": { "role_owner": "A", "role_do": "R", "role_consult": "C", "role_inform": "" } },
-    { "id": "task_retro", "name": "复盘", "cells": { "role_owner": "A", "role_do": "C", "role_consult": "", "role_inform": "I" } }
+    { "id": "task_delivery", "name": "版本交付", "cells": { "role_owner": "A", "role_do": "", "role_consult": "", "role_inform": "I" } },
+    { "id": "task_kickoff", "name": "立项", "parentId": "task_delivery", "cells": { "role_owner": "A", "role_do": "R", "role_consult": "C", "role_inform": "I" } },
+    { "id": "task_plan", "name": "排期", "parentId": "task_delivery", "cells": { "role_owner": "A", "role_do": "R", "role_consult": "", "role_inform": "I" } },
+    { "id": "task_build", "name": "交付", "parentId": "task_delivery", "cells": { "role_owner": "A", "role_do": "R", "role_consult": "C", "role_inform": "" } },
+    { "id": "task_dev", "name": "开发", "parentId": "task_build", "cells": { "role_owner": "C", "role_do": "R", "role_consult": "", "role_inform": "I" } },
+    { "id": "task_test", "name": "测试", "parentId": "task_build", "cells": { "role_owner": "A", "role_do": "R", "role_consult": "C", "role_inform": "" } },
+    { "id": "task_retro", "name": "复盘", "parentId": "task_delivery", "cells": { "role_owner": "A", "role_do": "C", "role_consult": "", "role_inform": "I" } }
   ]
 }

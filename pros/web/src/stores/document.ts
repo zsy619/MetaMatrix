@@ -717,25 +717,25 @@ export const TEMPLATE_META: Record<
   'raci-matrix': {
     name: 'RACI 责任矩阵',
     badge: '项目 · RACI',
-    description: '工作 × 角色。点格子循环 R 执行、A 负责、C 顾问、I 知情。',
+    description: '工作按树缩进。点格子循环 R 执行、A 负责、C 顾问、I 知情，四种颜色分开。',
     category: 'method',
   },
   'daily-kanban': {
     name: '每日看板',
     badge: '日常 · 看板',
-    description: '待办、进行中、受阻、完成四列，把一天的事情从左推到右。',
+    description: '待办、进行中、受阻、完成四色列铺满页面，卡片跟着列的颜色走。',
     category: 'org',
   },
   'business-model-canvas': {
     name: '商业模式画布',
     badge: '商业 · 九宫',
-    description: 'Osterwalder 九格：伙伴、活动、资源、价值主张、关系、渠道、客户、成本、收入。',
+    description: '九格铺满页面：伙伴与客户分列两侧，价值主张居中，成本和收入垫底。',
     category: 'growth',
   },
   'cash-flow': {
     name: '现金流量',
     badge: '财务 · 现金流',
-    description: '经营、投资、筹资三栏。流入填正数，流出填负数，净额自动相加。',
+    description: '经营、投资、筹资三块铺满页面。流入为正、流出为负，净额随正负变色。',
     category: 'growth',
   },
 }
