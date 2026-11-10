@@ -20,6 +20,7 @@ import {
   ratioPercents,
   ratiosToAttr,
   removeRatio,
+  resizeCollageColumn,
   resizePair,
   rowCanAccept,
   rowLayout,
@@ -133,6 +134,9 @@ assert.deepEqual(planImageStack(3, 1, 0, 'below'), { layout: '21', order: [0, 1,
 assert.deepEqual(planImageStack(3, 1, 2, 'above'), { layout: '12', order: [0, 1, 2] })
 assert.deepEqual(planImageStack(3, 0, 2, 'below'), { layout: '12', order: [1, 2, 0] })
 assert.equal(planImageStack(2, 0, 1, 'above'), null)
+const column = resizeCollageColumn([1, 1, 1], '12', 0.25)
+assert.ok(column[0]! < column[1]! + column[2]!)
+assert.equal(Math.round((column[0]! + column[1]! + column[2]!) * 100) / 100, 3)
 assert.equal(planImageStack(3, 1, 1, 'above'), null)
 
 console.log('image group ok')

@@ -8,8 +8,11 @@ import {
   IMAGE_GROUP_GAP_DEFAULT,
   installImageGroupLayout,
   nextGroupGap,
+  normalizeGroupFit,
   normalizeGroupGap,
   normalizeGroupLayout,
+  resizeCollageColumn,
+  resizeCollageStack,
   normalizeGroupRatios,
   ratioPercents,
   resizePair,
@@ -70,10 +73,16 @@ const COLLAGE_AREAS = {
 } as const
 
 /** 12：左通高、右上下两张。21：左上下两张、右通高。 */
-function paintCollage(row: HTMLElement, layout: '12' | '21') {
+function paintCollage(
+  row: HTMLElement,
+  layout: '12' | '21',
+  fit: 'cover' | 'contain' = 'cover',
+  columns = 'minmax(0, 1fr) minmax(0, 1fr)',
+  rows = 'minmax(0, 1fr) minmax(0, 1fr)',
+) {
   row.style.display = 'grid'
-  row.style.gridTemplateColumns = 'minmax(0, 1fr) minmax(0, 1fr)'
-  row.style.gridTemplateRows = 'minmax(0, 1fr) minmax(0, 1fr)'
+  row.style.gridTemplateColumns = columns
+  row.style.gridTemplateRows = rows
   row.style.aspectRatio = '2 / 1'
   row.style.height = 'auto'
   row.style.minHeight = '160px'
@@ -102,7 +111,7 @@ function paintCollage(row: HTMLElement, layout: '12' | '21') {
     if (img instanceof HTMLImageElement) {
       img.style.setProperty('width', '100%', 'important')
       img.style.setProperty('height', '100%', 'important')
-      img.style.setProperty('object-fit', 'cover', 'important')
+      img.style.setProperty('object-fit', fit, 'important')
       img.style.setProperty('max-width', 'none', 'important')
     }
   })
@@ -172,6 +181,81 @@ function paintGroupMetrics(dom: HTMLElement, row: HTMLElement, ratios: readonly 
   })
 }
 
+function paintCollageDividers(
+  view: EditorView,
+  dom: HTMLElement,
+  row: HTMLElement,
+  dividers: HTMLElement,
+  kids: HTMLElement[],
+  pos: number,
+  layout: '12' | '21',
+  weights: number[],
+) {
+  if (dom.dataset.ratioDrag === '1') return
+  dividers.replaceChildren()
+  const domRect = dom.getBoundingClientRect()
+  const columnPair = layout === '12' ? [0, 1] : [1, 2]
+  const stackPair = layout === '12' ? [1, 2] : [0, 1]
+  const place = (a: number, b: number, axis: 'column' | 'stack') => {
+    const left = kids[a]!.getBoundingClientRect()
+    const right = kids[b]!.getBoundingClientRect()
+    if (left.width < 4 || right.width < 4) return
+    const handle = document.createElement('button')
+    handle.type = 'button'
+    handle.className = 'rte-image-group-divider'
+    handle.dataset.groupPos = String(pos)
+    handle.title = axis === 'column' ? '拖动调整左右列宽' : '拖动调整上下高度'
+    handle.setAttribute('aria-label', handle.title)
+    const mark = document.createElement('i')
+    mark.setAttribute('aria-hidden', 'true')
+    handle.appendChild(mark)
+    if (axis === 'column') {
+      const x = (left.right + right.left) / 2 - domRect.left
+      handle.style.cssText = `position:absolute;left:${x}px;top:${Math.min(left.top, right.top) - domRect.top}px;height:${Math.max(left.height, right.height)}px;width:16px;transform:translateX(-50%);border:0;padding:0;background:transparent;cursor:col-resize;pointer-events:auto;z-index:20;`
+    } else {
+      const y = (left.bottom + right.top) / 2 - domRect.top
+      handle.style.cssText = `position:absolute;left:${left.left - domRect.left}px;top:${y}px;width:${Math.max(left.width, right.width)}px;height:16px;transform:translateY(-50%);border:0;padding:0;background:transparent;cursor:row-resize;pointer-events:auto;z-index:20;`
+    }
+    handle.addEventListener('pointerdown', (event) => {
+      if (!view.editable || event.button !== 0) return
+      event.preventDefault()
+      event.stopPropagation()
+      const groupPos = Number(handle.dataset.groupPos)
+      if (view.state.doc.nodeAt(groupPos)?.type.name !== 'imageGroup') return
+      dom.dataset.ratioDrag = '1'
+      const origin = axis === 'column' ? left.left : left.top
+      const span = axis === 'column' ? right.right - left.left : right.bottom - left.top
+      const move = (ev: PointerEvent) => {
+        const share = span ? ((axis === 'column' ? ev.clientX : ev.clientY) - origin) / span : 0.5
+        const next = axis === 'column' ? resizeCollageColumn(weights, layout, share) : resizeCollageStack(weights, layout, share)
+        const columns =
+          layout === '12'
+            ? `minmax(0, ${next[0]}fr) minmax(0, ${next[1]! + next[2]!}fr)`
+            : `minmax(0, ${next[0]! + next[1]!}fr) minmax(0, ${next[2]}fr)`
+        const rows =
+          layout === '12'
+            ? `minmax(0, ${next[1]}fr) minmax(0, ${next[2]}fr)`
+            : `minmax(0, ${next[0]}fr) minmax(0, ${next[1]}fr)`
+        row.style.gridTemplateColumns = columns
+        row.style.gridTemplateRows = rows
+        handle.dataset.next = next.join(':')
+      }
+      const up = () => {
+        window.removeEventListener('pointermove', move)
+        window.removeEventListener('pointerup', up)
+        delete dom.dataset.ratioDrag
+        const next = (handle.dataset.next || '').split(':').map(Number)
+        if (next.length === 3 && next.every((n) => n > 0)) setGroupRatios(view, groupPos, next)
+      }
+      window.addEventListener('pointermove', move)
+      window.addEventListener('pointerup', up)
+    })
+    dividers.appendChild(handle)
+  }
+  place(columnPair[0]!, columnPair[1]!, 'column')
+  place(stackPair[0]!, stackPair[1]!, 'stack')
+}
+
 export function layoutImageGroupChrome(view: EditorView) {
   const selection = view.state.selection
   view.state.doc.descendants((node, pos) => {
@@ -196,8 +280,20 @@ export function layoutImageGroupChrome(view: EditorView) {
     else dom.removeAttribute('data-layout')
     if ((layout === '12' || layout === '21') && kids.length === 3) {
       applyGroupGap(dom, gap)
-      if (dom.dataset.ratioDrag !== '1') paintCollage(row, layout)
-      dividers.replaceChildren()
+      const fit = normalizeGroupFit(node.attrs.fit)
+      if (fit === 'contain') dom.setAttribute('data-fit', 'contain')
+      else dom.removeAttribute('data-fit')
+      const weights = normalizeGroupRatios(3, groupUsesAspect(node.attrs.ratioMode) ? aspects : node.attrs.ratios)
+      const columns =
+        layout === '12'
+          ? `minmax(0, ${weights[0]}fr) minmax(0, ${weights[1]! + weights[2]!}fr)`
+          : `minmax(0, ${weights[0]! + weights[1]!}fr) minmax(0, ${weights[2]}fr)`
+      const stack =
+        layout === '12'
+          ? `minmax(0, ${weights[1]}fr) minmax(0, ${weights[2]}fr)`
+          : `minmax(0, ${weights[0]}fr) minmax(0, ${weights[1]}fr)`
+      if (dom.dataset.ratioDrag !== '1') paintCollage(row, layout, fit, columns, stack)
+      paintCollageDividers(view, dom, row, dividers, kids, pos, layout, weights)
       return false
     }
     if (layout === 'rows' && kids.length === 2) {
@@ -362,6 +458,12 @@ export const ImageGroup = Node.create({
           return { 'data-gap': String(gap) }
         },
       },
+      fit: {
+        default: 'cover',
+        parseHTML: (element: HTMLElement) => normalizeGroupFit(element.getAttribute('data-fit')),
+        renderHTML: (attrs: { fit?: string | null }) =>
+          normalizeGroupFit(attrs.fit) === 'contain' ? { 'data-fit': 'contain' } : {},
+      },
       layout: {
         default: 'row',
         parseHTML: (element: HTMLElement) => normalizeGroupLayout(element.getAttribute('data-layout')),
@@ -469,6 +571,23 @@ export const ImageGroup = Node.create({
       })
       bar.appendChild(gapBtn)
 
+      const fitBtn = document.createElement('button')
+      fitBtn.type = 'button'
+      fitBtn.className = 'rte-image-group-fit'
+      fitBtn.addEventListener('click', (event) => {
+        event.preventDefault()
+        event.stopPropagation()
+        const pos = getPos()
+        if (typeof pos !== 'number') return
+        const live = editor.state.doc.nodeAt(pos)
+        if (!live) return
+        const next = normalizeGroupFit(live.attrs.fit) === 'contain' ? 'cover' : 'contain'
+        editor.view.dispatch(
+          editor.view.state.tr.setNodeMarkup(pos, undefined, { ...live.attrs, fit: next }),
+        )
+      })
+      bar.appendChild(fitBtn)
+
       for (const layout of ['row', '12', '21', 'rows'] as const) {
         const button = document.createElement('button')
         button.type = 'button'
@@ -520,9 +639,14 @@ export const ImageGroup = Node.create({
         const gap = normalizeGroupGap(current.attrs.gap)
         applyGroupGap(dom, gap)
         const layout = normalizeGroupLayout(current.attrs.layout)
+        const fit = normalizeGroupFit(current.attrs.fit)
+        if (fit === 'contain') dom.setAttribute('data-fit', 'contain')
+        else dom.removeAttribute('data-fit')
+        fitBtn.textContent = fit === 'contain' ? '完整' : '充满'
+        fitBtn.title = fit === 'contain' ? '完整显示图片，点击改为充满裁切' : '充满格子并裁切，点击改为完整显示'
         if (layout === '12' || layout === '21') {
           dom.setAttribute('data-layout', layout)
-          paintCollage(contentDOM, layout)
+          paintCollage(contentDOM, layout, fit)
         } else if (layout === 'rows') {
           dom.setAttribute('data-layout', layout)
           paintRows(contentDOM)

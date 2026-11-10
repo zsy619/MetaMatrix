@@ -1,4 +1,5 @@
 import { Mark, mergeAttributes } from '@tiptap/core'
+import { Plugin } from '@tiptap/pm/state'
 
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
@@ -79,5 +80,51 @@ export const Footnote = Mark.create({
         ({ commands }) =>
           commands.unsetMark(this.name),
     }
+  },
+
+  addProseMirrorPlugins() {
+    return [
+      new Plugin({
+        appendTransaction(transactions, _old, state) {
+          if (!transactions.some((tr) => tr.docChanged)) return null
+          if (transactions.some((tr) => tr.getMeta('footnoteRenumber'))) return null
+          const seen = new Set<string>()
+          const hits: Array<{ from: number; to: number; id: string; n: number; attrs: Record<string, unknown> }> = []
+          state.doc.descendants((node, pos) => {
+            if (!node.isText) return
+            for (const mark of node.marks) {
+              if (mark.type.name !== 'footnote') continue
+              const id = String(mark.attrs.id || '')
+              if (!id) continue
+              hits.push({
+                from: pos,
+                to: pos + node.nodeSize,
+                id,
+                n: Number(mark.attrs.n || 0),
+                attrs: mark.attrs as Record<string, unknown>,
+              })
+              seen.add(id)
+            }
+          })
+          if (!hits.length) return null
+          const order = [...seen]
+          const expected = new Map(order.map((id, index) => [id, index + 1]))
+          if (hits.every((hit) => hit.n === expected.get(hit.id))) return null
+          let tr = state.tr
+          const type = state.schema.marks.footnote
+          if (!type) return null
+          for (let i = hits.length - 1; i >= 0; i -= 1) {
+            const hit = hits[i]!
+            const n = expected.get(hit.id) || 1
+            if (hit.n === n) continue
+            tr = tr.removeMark(hit.from, hit.to, type)
+            tr = tr.addMark(hit.from, hit.to, type.create({ ...hit.attrs, n }))
+          }
+          if (!tr.docChanged) return null
+          tr.setMeta('footnoteRenumber', true)
+          return tr
+        },
+      }),
+    ]
   },
 })

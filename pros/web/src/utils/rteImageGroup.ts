@@ -196,6 +196,38 @@ export function insertRatio(ratios: readonly number[], index: number): number[] 
 }
 
 /** 拖分隔条时，左右两格的和不变，leftShare 是这一对里左侧所占比例。 */
+export type ImageGroupFit = 'cover' | 'contain'
+
+export function normalizeGroupFit(raw: unknown): ImageGroupFit {
+  return raw === 'contain' ? 'contain' : 'cover'
+}
+
+/** 12/21 拖左右列：左侧份额 leftShare，右侧两格按原比例分剩下的。 */
+export function resizeCollageColumn(ratios: readonly number[], layout: '12' | '21', leftShare: number): number[] {
+  const base = ratios.length === 3 ? ratios.map((n) => (n > 0 ? n : 1)) : [1, 1, 1]
+  const share = Number.isFinite(leftShare) ? Math.min(0.88, Math.max(0.12, leftShare)) : 0.5
+  const total = base[0]! + base[1]! + base[2]!
+  if (layout === '12') {
+    const right = base[1]! + base[2]!
+    const left = Math.round(total * share * 100) / 100
+    const rest = Math.round((total - left) * 100) / 100
+    const top = right > 0 ? Math.round(rest * (base[1]! / right) * 100) / 100 : rest / 2
+    return [left, top, Math.round((rest - top) * 100) / 100]
+  }
+  const leftStack = base[0]! + base[1]!
+  const right = Math.round(total * (1 - share) * 100) / 100
+  const rest = Math.round((total - right) * 100) / 100
+  const top = leftStack > 0 ? Math.round(rest * (base[0]! / leftStack) * 100) / 100 : rest / 2
+  return [top, Math.round((rest - top) * 100) / 100, right]
+}
+
+/** 拖上下两格的高度。12 调右列，21 调左列。 */
+export function resizeCollageStack(ratios: readonly number[], layout: '12' | '21', topShare: number): number[] {
+  const base = ratios.length === 3 ? [...ratios] : [1, 1, 1]
+  const index = layout === '12' ? 1 : 0
+  return resizePair(base, index, topShare)
+}
+
 export function resizePair(ratios: readonly number[], index: number, leftShare: number): number[] {
   if (index < 0 || index >= ratios.length - 1) return ratios.slice()
   const total = ratios[index]! + ratios[index + 1]!
