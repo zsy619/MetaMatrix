@@ -464,12 +464,22 @@ export const IconFind = svgIcon([
   'M10.5 17a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13z',
   'M15.5 15.5L21 21',
 ])
+export const IconQr = svgIcon([
+  'M4 4h6v6H4z',
+  'M14 4h6v6h-6z',
+  'M4 14h6v6H4z',
+  'M14 14h2.2v2.2H14z',
+  'M18 14h2v2h-2z',
+  'M14 18h2v2h-2z',
+  'M18 18h2v2h-2z',
+])
 
 export const toolbarIconMap: Record<string, Component> = {
   undo: IconUndo,
   redo: IconRedo,
   clear: IconClear,
   find: IconFind,
+  qrcode: IconQr,
   formatPainter: IconFormatPainter,
   indent: IconIndent,
   outdent: IconOutdent,

@@ -134,7 +134,6 @@ import {
 import {
   applyCaseToSelection,
   copySelectionOrDocAsMarkdown,
-  makeQrDataUrl,
   speakText,
   stopSpeak,
   collectFootnotes,
@@ -2175,29 +2174,22 @@ function doRenumberCaptions() {
   moreOpen.value = false
 }
 
-async function insertQrCode() {
-  const raw = await openRtePrompt({
-    title: '插入二维码',
-    message: '输入链接或任意文本，将生成二维码图片',
-    placeholder: 'https:// 或文本',
-    defaultValue: 'https://',
-    maxlength: 1000,
-  })
-  if (raw == null || !raw.trim()) return
+const qrDialogOpen = ref(false)
+
+function insertQrCode() {
+  qrDialogOpen.value = true
+  moreOpen.value = false
+}
+
+async function insertQrArtwork(dataUrl: string) {
   try {
-    const dataUrl = await makeQrDataUrl(raw.trim())
-    editor.value
-      ?.chain()
-      .focus()
-      .setImage({ src: dataUrl, alt: 'QR' })
-      .updateAttributes('image', { caption: raw.trim().slice(0, 80) })
-      .run()
+    editor.value?.chain().focus().setImage({ src: dataUrl, alt: '二维码' }).run()
+    qrDialogOpen.value = false
     ElMessage.success('已插入二维码')
   } catch (e) {
     console.error(e)
     ElMessage.error('二维码生成失败')
   }
-  moreOpen.value = false
 }
 
 function speakSelection() {
@@ -6734,7 +6726,7 @@ const allTools = computed((): ToolItem[] => {
       label: '二维码',
       title: '插入二维码',
       icon: '▦',
-      iconComp: ic('attach'),
+      iconComp: ic('qrcode'),
       run: insertQrCode,
     },
     {
@@ -7852,6 +7844,8 @@ provideRteBindings({
   moveToolbarGroupButton,
   closeToolbarGroupButtons,
   onToolbarGroupContextMenu,
+  qrDialogOpen,
+  insertQrArtwork,
   toolbarOrder,
   triggerLocalAttachPick,
   triggerLocalImagePick,

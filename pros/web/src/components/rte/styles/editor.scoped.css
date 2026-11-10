@@ -4473,6 +4473,69 @@ html.rte-toolbar-dragging .rte-root:not(.expanded) .rte-toolbar-tools > .rte-too
   color: #7eb6ff;
   border-color: #3a3f47;
 }
+.rte-tool-group[data-group-id='edit'] { --rte-icon-bg: linear-gradient(160deg, #60a5fa, #1d4ed8); }
+.rte-tool-group[data-group-id='style'] { --rte-icon-bg: linear-gradient(160deg, #4ade80, #15803d); }
+.rte-tool-group[data-group-id='paragraph'] { --rte-icon-bg: linear-gradient(160deg, #38bdf8, #0369a1); }
+.rte-tool-group[data-group-id='insert'] { --rte-icon-bg: linear-gradient(160deg, #2dd4bf, #0f766e); }
+.rte-tool-group[data-group-id='charts'] { --rte-icon-bg: linear-gradient(160deg, #a78bfa, #6d28d9); }
+.rte-tool-group[data-group-id='table'] { --rte-icon-bg: linear-gradient(160deg, #818cf8, #3730a3); }
+.rte-tool-group[data-group-id='blocks'] { --rte-icon-bg: linear-gradient(160deg, #f472b6, #be185d); }
+.rte-tool-group[data-group-id='notes'] { --rte-icon-bg: linear-gradient(160deg, #fbbf24, #b45309); }
+.rte-tool-group[data-group-id='review'] { --rte-icon-bg: linear-gradient(160deg, #fb7185, #b91c1c); }
+.rte-tool-group[data-group-id='view'] { --rte-icon-bg: linear-gradient(160deg, #94a3b8, #334155); }
+.rte-tool-group[data-group-id='file'] { --rte-icon-bg: linear-gradient(160deg, #fb923c, #9a3412); }
+.rte-tool-group[data-group-id='other'] { --rte-icon-bg: linear-gradient(160deg, #d1d5db, #4b5563); }
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool-icon {
+  border-radius: 8px;
+  background: var(--rte-icon-bg, var(--rte-head-fg, #1d4ed8));
+  color: #fff;
+  box-shadow: inset 0 -1px 0 rgba(15, 23, 42, 0.12);
+}
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool :deep(.rte-ep-icon),
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool :deep(.rte-tool-icon > svg) {
+  color: #fff;
+}
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool:hover .rte-tool-icon {
+  filter: brightness(1.08);
+}
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool.active .rte-tool-icon {
+  outline: 2px solid var(--rte-head-fg, #1d4ed8);
+  outline-offset: 2px;
+}
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool:disabled .rte-tool-icon,
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool.is-disabled .rte-tool-icon {
+  background: #e5e6eb;
+  color: #c9cdd4;
+  filter: none;
+  outline: none;
+}
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool:disabled :deep(.rte-ep-icon),
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool.is-disabled :deep(.rte-ep-icon) {
+  color: #c9cdd4;
+}
+.rte-group-settings {
+  border: 0;
+  background: transparent;
+  color: var(--rte-head-fg, #1d4ed8);
+  font-size: 11px;
+  line-height: 16px;
+  padding: 0 4px;
+  cursor: pointer;
+}
+.rte-group-settings:hover {
+  text-decoration: underline;
+}
+.rte-ribbon-tab[data-ribbon-tab='edit'].active { color: #1d4ed8; }
+.rte-ribbon-tab[data-ribbon-tab='style'].active { color: #15803d; }
+.rte-ribbon-tab[data-ribbon-tab='paragraph'].active { color: #0369a1; }
+.rte-ribbon-tab[data-ribbon-tab='insert'].active { color: #0f766e; }
+.rte-ribbon-tab[data-ribbon-tab='charts'].active { color: #6d28d9; }
+.rte-ribbon-tab[data-ribbon-tab='table'].active { color: #3730a3; }
+.rte-ribbon-tab[data-ribbon-tab='blocks'].active { color: #be185d; }
+.rte-ribbon-tab[data-ribbon-tab='notes'].active { color: #b45309; }
+.rte-ribbon-tab[data-ribbon-tab='review'].active { color: #b91c1c; }
+.rte-ribbon-tab[data-ribbon-tab='view'].active { color: #334155; }
+.rte-ribbon-tab[data-ribbon-tab='file'].active { color: #9a3412; }
 .rte-root.is-dark-editor .rte-toolbar:not(.is-one-row) .rte-toolbar-tools {
   background: #1f2329;
 }

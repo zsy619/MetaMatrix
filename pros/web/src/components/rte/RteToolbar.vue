@@ -62,6 +62,7 @@ function toggleChartGroupMenu(key: string) {
             type="button"
             role="tab"
             class="rte-ribbon-tab"
+            :data-ribbon-tab="tab.id"
             :class="{ active: rte.ribbonTab === tab.id }"
             :aria-selected="rte.ribbonTab === tab.id"
             @click="onRibbonTab(tab.id, $event)"
@@ -156,6 +157,16 @@ function toggleChartGroupMenu(key: string) {
             @pointerup="rte.onToolbarHandlePointerUp"
             @pointercancel="rte.onToolbarHandlePointerUp"
           >{{ group.label }}</span>
+          <button data-rte-own
+            v-if="rte.viewMode === 'edit'"
+            type="button"
+            class="rte-group-settings"
+            :aria-label="group.label + '的个性化设置'"
+            title="本分组的按钮：显示、隐藏、排序"
+            @click.stop="rte.onToolbarGroupContextMenu(group.id, $event)"
+          >
+            设置
+          </button>
         </span>
       <template v-for="t in group.tools" :key="t.key">
         <div data-rte-own
@@ -2432,7 +2443,10 @@ function toggleChartGroupMenu(key: string) {
           aria-label="组内按钮"
           @mousedown.prevent
         >
-          <div data-rte-own class="rte-menu-section-label">组内按钮 · 勾选显示，箭头调顺序</div>
+          <div data-rte-own class="rte-menu-section-label">
+            {{ (rte.visibleToolbarGroups.find((group) => group.id === rte.toolbarGroupButtonsGroupId) || {}).label || '本分组' }}
+            · 个性化设置
+          </div>
           <div data-rte-own
             v-for="entry in rte.toolbarGroupButtonEntries(rte.toolbarGroupButtonsGroupId)"
             :key="'gb-' + entry.key"
