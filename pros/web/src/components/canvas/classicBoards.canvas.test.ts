@@ -8,8 +8,18 @@ vi.mock('../../api/documents', async (importOriginal) => {
   return { ...actual, cloneDocument: vi.fn(), listDocuments: vi.fn() }
 })
 
+vi.mock('../RichTextEditor.vue', () => ({
+  default: {
+    name: 'RichTextEditor',
+    props: { modelValue: { type: String, default: '' } },
+    emits: ['update:modelValue'],
+    template: '<div class="rte-stub">{{ modelValue }}</div>',
+  },
+}))
+
 import { useDocumentStore } from '../../stores/document'
 import {
+  isBusinessModelCanvasDoc,
   isDailyKanbanDoc,
   isRaciMatrixDoc,
   type BusinessModelCanvasDocumentJSON,
@@ -63,10 +73,43 @@ describe('经典画布铺满页面', () => {
     expect(wrapper.find('.bmc-cell--value').exists()).toBe(true)
     expect(wrapper.find('.bmc-cell--costs').exists()).toBe(true)
     expect(wrapper.find('.bmc-cell--revenue').exists()).toBe(true)
-    expect(wrapper.findAll('textarea')).toHaveLength(9)
-    const value = wrapper.get('.bmc-cell--value').attributes('style') || ''
-    const activities = wrapper.get('.bmc-cell--activities').attributes('style') || ''
-    expect(value).not.toBe(activities)
+    expect(wrapper.findAll('.rte-stub')).toHaveLength(9)
+    expect(wrapper.findAll('input[aria-label="内容主题"]')).toHaveLength(9)
+    const topic = wrapper.get('.bmc-cell--value input[aria-label="内容主题"]').element as HTMLInputElement
+    expect(topic.placeholder).toBe('为谁解决什么问题')
+    const valueStyle = wrapper.get('.bmc-cell--value').attributes('style') || ''
+    const activitiesStyle = wrapper.get('.bmc-cell--activities').attributes('style') || ''
+    expect(valueStyle).not.toBe(activitiesStyle)
+    const added = store.addBlockItem('value', { text: '<p>帮团队看清怎么赚钱</p>' })
+    expect(added?.text).toContain('赚钱')
+    expect(store.updateBlockKeyword('value', '怎么赚钱')).toBe(true)
+    const current = store.current_data
+    expect(isBusinessModelCanvasDoc(current)).toBe(true)
+    if (!isBusinessModelCanvasDoc(current)) return
+    const value = current.blocks.find((item) => item.id === 'value')
+    expect(value?.items.some((item) => item.text.includes('赚钱'))).toBe(true)
+    expect(value?.keyword).toBe('怎么赚钱')
+  })
+
+  it('旧的商业模式纯文本会迁进富文本条目', () => {
+    const store = useDocumentStore()
+    store.loadFromTemplate('business-model-canvas')
+    const source = store.current_data
+    if (!isBusinessModelCanvasDoc(source)) return
+    store.setCurrentData({
+      ...source,
+      blocks: source.blocks.map((block) =>
+        block.id === 'value'
+          ? { id: block.id, title: block.title, hint: block.hint, text: '旧主张' }
+          : { id: block.id, title: block.title, hint: block.hint, items: block.items },
+      ),
+    } as BusinessModelCanvasDocumentJSON)
+    const current = store.current_data
+    expect(isBusinessModelCanvasDoc(current)).toBe(true)
+    if (!isBusinessModelCanvasDoc(current)) return
+    const value = current.blocks.find((block) => block.id === 'value')
+    expect(value?.items.map((item) => item.text)).toEqual(['旧主张'])
+    expect(value?.text).toBeUndefined()
   })
 
   it('RACI 工作缩进成树，降级后挂到上一行', async () => {

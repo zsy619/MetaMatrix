@@ -146,6 +146,7 @@ import {
   isThreeRingBasicsDoc,
   isLeadershipTriangleDoc,
   isContextSixElementsDoc,
+  isBusinessModelCanvasDoc,
   coerceYModelDoc,
   normalizeYModelDoc,
 } from '../types/canvas'
@@ -729,7 +730,7 @@ export const TEMPLATE_META: Record<
   'business-model-canvas': {
     name: '商业模式画布',
     badge: '商业 · 九宫',
-    description: '九格铺满页面：伙伴与客户分列两侧，价值主张居中，成本和收入垫底。',
+    description: '九格铺满页面，每格用和五步法一样的富文本。价值主张居中，成本和收入垫底。',
     category: 'growth',
   },
   'cash-flow': {
@@ -1434,6 +1435,9 @@ export const useDocumentStore = defineStore('document', () => {
     }
     if (isFiveStepFamilyDoc(next)) {
       next = applyFiveStepChrome(next)
+    }
+    if (isBusinessModelCanvasDoc(next)) {
+      next = normalizeBusinessModelDoc(next)
     }
     if (
       isDualTriangleDoc(next) &&
@@ -2333,13 +2337,35 @@ export const useDocumentStore = defineStore('document', () => {
     return item
   }
 
+  /** 把旧版纯文本迁进富文本条目，和五步法格子用同一套 items。 */
+  function normalizeBusinessModelDoc(
+    doc: BusinessModelCanvasDocumentJSON,
+  ): BusinessModelCanvasDocumentJSON {
+    return {
+      ...doc,
+      blocks: doc.blocks.map((block) => {
+        const items = Array.isArray(block.items) ? [...block.items] : []
+        const legacy = typeof block.text === 'string' ? block.text.trim() : ''
+        if (!items.length && legacy) {
+          items.push({ id: `bmc_${block.id}_text`, text: legacy })
+        }
+        const next = { ...block, items }
+        delete next.text
+        return next
+      }),
+    }
+  }
+
   /**
    * 内容主题词，写在 block.keyword 上（current_data，不另建表）。
-   * 人类-AI 双三角与五步法系列共用。
+   * 人类-AI 双三角、五步法，以及商业模式画布共用。
    */
   function updateBlockKeyword(blockId: string, keyword: string): boolean {
     const doc = current_data.value
-    if (!doc || (!isDualTriangleDoc(doc) && !isFiveStepFamilyDoc(doc))) {
+    if (
+      !doc ||
+      (!isDualTriangleDoc(doc) && !isFiveStepFamilyDoc(doc) && !isBusinessModelCanvasDoc(doc))
+    ) {
       return false
     }
     const block = doc.blocks.find((b) => b.id === blockId)
