@@ -711,7 +711,7 @@ export const TEMPLATE_META: Record<
   'project-gantt': {
     name: '项目甘特图',
     badge: '项目 · 甘特',
-    description: '任务、负责人、起止日期和进度画在同一张时间条上，用来排期和看重叠。',
+    description: '大纲、工期、前置任务、里程碑、比较基准和关键路径。按依赖排程，日周月缩放。',
     category: 'method',
   },
   'raci-matrix': {

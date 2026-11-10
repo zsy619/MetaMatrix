@@ -1729,7 +1729,17 @@ export interface ContextSixElementsDocumentJSON {
   blocks: ContextSixElementsBlock[]
 }
 
-/** 项目甘特图：一条任务占一行，用起止日期画横条。 */
+/** 项目甘特图。kind 缺省是普通任务；有子任务时按摘要任务画。 */
+export type GanttTaskKind = 'task' | 'summary' | 'milestone'
+export type GanttLinkType = 'FS' | 'SS' | 'FF' | 'SF'
+
+export interface GanttLink {
+  taskId: string
+  type: GanttLinkType
+  /** 工作日。正数延后，负数重叠。 */
+  lag: number
+}
+
 export interface GanttTask {
   id: string
   name: string
@@ -1738,6 +1748,12 @@ export interface GanttTask {
   /** 0–100 */
   progress: number
   owner: string
+  kind?: GanttTaskKind
+  parentId?: string | null
+  collapsed?: boolean
+  predecessors?: GanttLink[]
+  baselineStart?: string
+  baselineEnd?: string
 }
 
 export interface ProjectGanttDocumentJSON {
@@ -1746,6 +1762,8 @@ export interface ProjectGanttDocumentJSON {
   schemaVersion: number
   theme: CanvasTheme
   title: string
+  /** 时间刻度。缺省按周。 */
+  scale?: 'day' | 'week' | 'month'
   tasks: GanttTask[]
 }
 
