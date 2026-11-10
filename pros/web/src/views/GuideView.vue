@@ -695,6 +695,28 @@ onMounted(async () => {
   border-color: #2a9bd6;
 }
 
+.card--project-gantt:hover,
+.card--project-gantt:focus-visible {
+  border-color: #1a73e8;
+}
+
+.card--raci-matrix:hover,
+.card--raci-matrix:focus-visible {
+  border-color: #1a73e8;
+}
+
+.card--daily-kanban:hover,
+.card--daily-kanban:focus-visible {
+  border-color: #a142f4;
+}
+
+.card--business-model-canvas:hover,
+.card--business-model-canvas:focus-visible,
+.card--cash-flow:hover,
+.card--cash-flow:focus-visible {
+  border-color: #34a853;
+}
+
 .body {
   display: flex;
   flex-direction: column;

@@ -99,6 +99,11 @@ import type {
   LeadershipTriangleDocumentJSON,
   LeadershipTriangleRegionId,
   ContextSixElementsDocumentJSON,
+  ProjectGanttDocumentJSON,
+  RaciMatrixDocumentJSON,
+  DailyKanbanDocumentJSON,
+  BusinessModelCanvasDocumentJSON,
+  CashFlowDocumentJSON,
   PanelAttachment,
   AttachmentsByPanelId,
 } from '../types/canvas'
@@ -190,6 +195,11 @@ import leadershipTriangleTemplate from '../templates/leadership-triangle-v1.json
 import contextSixElementsTemplate, {
   buildContextSixElementsItems,
 } from '../templates/context-six-elements-v1'
+import projectGanttTemplate from '../templates/project-gantt-v1.json'
+import raciMatrixTemplate from '../templates/raci-matrix-v1.json'
+import dailyKanbanTemplate from '../templates/daily-kanban-v1.json'
+import businessModelCanvasTemplate from '../templates/business-model-canvas-v1.json'
+import cashFlowTemplate from '../templates/cash-flow-v1.json'
 import { CONTEXT_SIX_ELEMENTS_BLOCK_ID } from '../utils/contextSixElements'
 
 export type TemplateId =
@@ -237,6 +247,11 @@ export type TemplateId =
   | 'three-ring-basics'
   | 'leadership-triangle'
   | 'context-six-elements'
+  | 'project-gantt'
+  | 'raci-matrix'
+  | 'daily-kanban'
+  | 'business-model-canvas'
+  | 'cash-flow'
 
 const TEMPLATES: Record<TemplateId, CanvasDocumentJSON> = {
   'dual-triangle': dualTriangleTemplate as DualTriangleDocumentJSON,
@@ -288,6 +303,11 @@ const TEMPLATES: Record<TemplateId, CanvasDocumentJSON> = {
     leadershipTriangleTemplate as LeadershipTriangleDocumentJSON,
   'context-six-elements':
     contextSixElementsTemplate as ContextSixElementsDocumentJSON,
+  'project-gantt': projectGanttTemplate as ProjectGanttDocumentJSON,
+  'raci-matrix': raciMatrixTemplate as RaciMatrixDocumentJSON,
+  'daily-kanban': dailyKanbanTemplate as DailyKanbanDocumentJSON,
+  'business-model-canvas': businessModelCanvasTemplate as BusinessModelCanvasDocumentJSON,
+  'cash-flow': cashFlowTemplate as CashFlowDocumentJSON,
 }
 
 export function isTemplateId(id: string): id is TemplateId {
@@ -687,6 +707,36 @@ export const TEMPLATE_META: Record<
     description:
       '富文本画布：任务目标 / AI的角色 / 我的角色 / 关键信息 / 行为规则 / 交付格式，六段开箱即用，随写随存。',
     category: 'method',
+  },
+  'project-gantt': {
+    name: '项目甘特图',
+    badge: '项目 · 甘特',
+    description: '任务、负责人、起止日期和进度画在同一张时间条上，用来排期和看重叠。',
+    category: 'method',
+  },
+  'raci-matrix': {
+    name: 'RACI 责任矩阵',
+    badge: '项目 · RACI',
+    description: '工作 × 角色。点格子循环 R 执行、A 负责、C 顾问、I 知情。',
+    category: 'method',
+  },
+  'daily-kanban': {
+    name: '每日看板',
+    badge: '日常 · 看板',
+    description: '待办、进行中、受阻、完成四列，把一天的事情从左推到右。',
+    category: 'org',
+  },
+  'business-model-canvas': {
+    name: '商业模式画布',
+    badge: '商业 · 九宫',
+    description: 'Osterwalder 九格：伙伴、活动、资源、价值主张、关系、渠道、客户、成本、收入。',
+    category: 'growth',
+  },
+  'cash-flow': {
+    name: '现金流量',
+    badge: '财务 · 现金流',
+    description: '经营、投资、筹资三栏。流入填正数，流出填负数，净额自动相加。',
+    category: 'growth',
   },
 }
 
@@ -2133,6 +2183,14 @@ export const useDocumentStore = defineStore('document', () => {
 
   function markDirty() {
     dirty.value = true
+  }
+
+  function mutateCanvas(mutator: (doc: CanvasDocumentJSON) => void): boolean {
+    const doc = current_data.value
+    if (!doc) return false
+    mutator(doc)
+    markDirty()
+    return true
   }
 
   function setCurrentData(data: CanvasDocumentJSON) {
@@ -3778,6 +3836,7 @@ export const useDocumentStore = defineStore('document', () => {
     setDocNotes,
     exportJson,
     markDirty,
+    mutateCanvas,
     setCurrentData,
     addItem,
     updateItem,

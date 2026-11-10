@@ -1,0 +1,18 @@
+{
+  "id": "canvas_daily_kanban",
+  "type": "daily_kanban",
+  "schemaVersion": 1,
+  "theme": {
+    "background": { "pattern": "none", "color": "#f7f7f7" },
+    "page": "#f7f7f7",
+    "frame": "#ececec",
+    "hairline": "rgba(60, 50, 20, 0.08)"
+  },
+  "title": "每日看板",
+  "columns": [
+    { "id": "todo", "title": "待办", "cards": [{ "id": "card_todo_1", "text": "今天要开始的一件事" }] },
+    { "id": "doing", "title": "进行中", "cards": [{ "id": "card_doing_1", "text": "正在推进" }] },
+    { "id": "blocked", "title": "受阻", "cards": [{ "id": "card_blocked_1", "text": "卡在谁 / 什么上" }] },
+    { "id": "done", "title": "完成", "cards": [{ "id": "card_done_1", "text": "今天已经做完" }] }
+  ]
+}

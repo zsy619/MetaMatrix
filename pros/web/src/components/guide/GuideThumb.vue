@@ -1452,6 +1452,56 @@ withDefaults(
         </g>
       </svg>
 
+      <svg v-else-if="templateId === 'project-gantt'" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <rect x="16" y="28" width="70" height="10" rx="3" fill="#1a73e8" />
+        <rect x="40" y="50" width="90" height="10" rx="3" fill="#1a73e8" />
+        <rect x="70" y="72" width="100" height="10" rx="3" fill="#8ab4f8" />
+        <rect x="120" y="94" width="60" height="10" rx="3" fill="#d2e3fc" />
+      </svg>
+      <svg v-else-if="templateId === 'raci-matrix'" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <rect x="20" y="24" width="160" height="96" fill="#fff" stroke="#ececec" />
+        <text x="70" y="48" font-size="10" font-weight="700" fill="#1a73e8">R</text>
+        <text x="110" y="48" font-size="10" font-weight="700" fill="#188038">A</text>
+        <text x="150" y="48" font-size="10" font-weight="700" fill="#e37400">C</text>
+        <text x="70" y="80" font-size="10" font-weight="700" fill="#5f6368">I</text>
+        <text x="110" y="80" font-size="10" font-weight="700" fill="#1a73e8">R</text>
+        <text x="150" y="80" font-size="10" font-weight="700" fill="#188038">A</text>
+      </svg>
+      <svg v-else-if="templateId === 'daily-kanban'" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <rect x="12" y="20" width="40" height="100" rx="4" fill="#fff" />
+        <rect x="58" y="20" width="40" height="100" rx="4" fill="#fff" />
+        <rect x="104" y="20" width="40" height="100" rx="4" fill="#fff" />
+        <rect x="150" y="20" width="40" height="100" rx="4" fill="#fff" />
+        <rect x="16" y="28" width="32" height="16" rx="3" fill="#e8f0fe" />
+        <rect x="62" y="28" width="32" height="16" rx="3" fill="#fef7e0" />
+        <rect x="108" y="28" width="32" height="16" rx="3" fill="#fce8e6" />
+        <rect x="154" y="28" width="32" height="16" rx="3" fill="#e6f4ea" />
+      </svg>
+      <svg v-else-if="templateId === 'business-model-canvas'" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <rect x="8" y="16" width="34" height="70" fill="#fff" stroke="#ececec" />
+        <rect x="44" y="16" width="34" height="34" fill="#fff" stroke="#ececec" />
+        <rect x="80" y="16" width="40" height="70" fill="#fef7e0" stroke="#f9e4a0" />
+        <rect x="122" y="16" width="34" height="34" fill="#fff" stroke="#ececec" />
+        <rect x="158" y="16" width="34" height="70" fill="#fff" stroke="#ececec" />
+        <rect x="44" y="52" width="34" height="34" fill="#fff" stroke="#ececec" />
+        <rect x="122" y="52" width="34" height="34" fill="#fff" stroke="#ececec" />
+        <rect x="8" y="90" width="90" height="34" fill="#fff" stroke="#ececec" />
+        <rect x="102" y="90" width="90" height="34" fill="#e6f4ea" stroke="#ceead6" />
+      </svg>
+      <svg v-else-if="templateId === 'cash-flow'" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <rect x="12" y="24" width="54" height="96" rx="4" fill="#fff" stroke="#ececec" />
+        <rect x="73" y="24" width="54" height="96" rx="4" fill="#fff" stroke="#ececec" />
+        <rect x="134" y="24" width="54" height="96" rx="4" fill="#fff" stroke="#ececec" />
+        <text x="39" y="40" text-anchor="middle" font-size="7" font-weight="700" fill="#188038">经营</text>
+        <text x="100" y="40" text-anchor="middle" font-size="7" font-weight="700" fill="#1a73e8">投资</text>
+        <text x="161" y="40" text-anchor="middle" font-size="7" font-weight="700" fill="#e37400">筹资</text>
+      </svg>
+
   </div>
 </template>
 
