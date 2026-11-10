@@ -74,6 +74,16 @@ export const imageGroupLayoutCss = [
   '.rte-image-group-row>*:nth-child(9){flex:var(--g8,1) 1 0 !important;}',
   '.rte-image-group-row>*:nth-child(10){flex:var(--g9,1) 1 0 !important;}',
   '.rte-image-group-row img{width:100% !important;height:100% !important;object-fit:contain !important;max-width:none !important;display:block;}',
+  '.rte-image-group[data-layout="12"] .rte-image-group-row,.rte-image-group[data-layout="21"] .rte-image-group-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:minmax(0,1fr) minmax(0,1fr);aspect-ratio:2 / 1;height:auto;min-height:160px;}',
+  '.rte-image-group[data-layout="12"] .rte-image-group-row>*:nth-child(1){grid-area:1 / 1 / 3 / 2;flex:none !important;}',
+  '.rte-image-group[data-layout="12"] .rte-image-group-row>*:nth-child(2){grid-area:1 / 2 / 2 / 3;flex:none !important;}',
+  '.rte-image-group[data-layout="12"] .rte-image-group-row>*:nth-child(3){grid-area:2 / 2 / 3 / 3;flex:none !important;}',
+  '.rte-image-group[data-layout="21"] .rte-image-group-row>*:nth-child(1){grid-area:1 / 1 / 2 / 2;flex:none !important;}',
+  '.rte-image-group[data-layout="21"] .rte-image-group-row>*:nth-child(2){grid-area:2 / 1 / 3 / 2;flex:none !important;}',
+  '.rte-image-group[data-layout="21"] .rte-image-group-row>*:nth-child(3){grid-area:1 / 2 / 3 / 3;flex:none !important;}',
+  '.rte-image-group[data-layout="12"] .rte-image-group-row>[data-resize-container][data-node="image"],.rte-image-group[data-layout="21"] .rte-image-group-row>[data-resize-container][data-node="image"]{width:100% !important;height:100% !important;min-height:0;}',
+  '.rte-image-group[data-layout="12"] .rte-image-group-row img,.rte-image-group[data-layout="21"] .rte-image-group-row img{object-fit:cover !important;}',
+  '.rte-root.rte-printing .rte-image-group[data-layout="12"] .rte-image-group-row,.rte-root.rte-printing .rte-image-group[data-layout="21"] .rte-image-group-row{display:grid !important;aspect-ratio:2 / 1 !important;}',
   '.rte-root.rte-printing .rte-image-group-row{height:auto !important;aspect-ratio:var(--rte-row-aspect, auto);}',
   '.rte-image-drag-source{opacity:.35;}',
   '.rte-image-drag-thumb{position:fixed;z-index:10061;width:72px;height:48px;border-radius:4px;background:#fff center/cover no-repeat;box-shadow:0 8px 24px rgba(29,33,41,.28);pointer-events:none;}',
@@ -208,6 +218,37 @@ export function moveItem<T>(items: readonly T[], from: number, to: number): T[] 
 export function groupInsertIndex(from: number, target: number, side: 'left' | 'right'): number {
   const targetAfter = from < target ? target - 1 : target
   return side === 'left' ? targetAfter : targetAfter + 1
+}
+
+export type ImageGroupLayout = 'row' | '12' | '21'
+
+/** 缺省横排。12 是左一右二，21 是左二右一。 */
+export function normalizeGroupLayout(raw: unknown): ImageGroupLayout {
+  return raw === '12' || raw === '21' ? raw : 'row'
+}
+
+/**
+ * 三张图里把 from 放到 target 的上沿或下沿。
+ * 叠放落在目标所在的一侧：右侧叠放是 12，左侧叠放是 21。
+ * order 是新的子节点顺序：12 为 [左, 右上, 右下]，21 为 [左上, 左下, 右]。
+ */
+export function planImageStack(
+  count: number,
+  from: number,
+  target: number,
+  side: 'above' | 'below',
+): { layout: '12' | '21'; order: number[] } | null {
+  if (count !== 3 || from === target) return null
+  if (from < 0 || target < 0 || from >= count || target >= count) return null
+  const rest = [0, 1, 2].filter((index) => index !== from)
+  const targetPos = rest.indexOf(target)
+  if (targetPos < 0) return null
+  const top = side === 'above' ? from : target
+  const bottom = side === 'above' ? target : from
+  const other = rest.find((index) => index !== target)
+  if (other == null) return null
+  if (targetPos === rest.length - 1) return { layout: '12', order: [other, top, bottom] }
+  return { layout: '21', order: [top, bottom, other] }
 }
 
 function isEmptyParagraph(node: MiniNode): boolean {

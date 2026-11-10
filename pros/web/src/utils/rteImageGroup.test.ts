@@ -13,6 +13,8 @@ import {
   nextImageSelection,
   IMAGE_GROUP_GAP_DEFAULT,
   nextGroupGap,
+  normalizeGroupLayout,
+  planImageStack,
   normalizeGroupGap,
   normalizeGroupRatios,
   ratioPercents,
@@ -118,5 +120,19 @@ assert.match(imageGroupLayoutCss, /data-resize-wrapper/)
 assert.match(imageGroupLayoutCss, /left:36px;top:8px/)
 assert.doesNotMatch(imageGroupLayoutCss, /:deep/)
 assert.match(imageGroupLayoutCss, /mode-preview[\s\S]*rte-image-drag-handle/)
+assert.match(imageGroupLayoutCss, /data-layout="12"/)
+assert.match(imageGroupLayoutCss, /data-layout="21"/)
+assert.equal(normalizeGroupLayout(undefined), 'row')
+assert.equal(normalizeGroupLayout('12'), '12')
+assert.equal(normalizeGroupLayout('21'), '21')
+assert.deepEqual(planImageStack(3, 2, 1, 'below'), { layout: '12', order: [0, 1, 2] })
+assert.deepEqual(planImageStack(3, 2, 1, 'above'), { layout: '12', order: [0, 2, 1] })
+assert.deepEqual(planImageStack(3, 0, 1, 'above'), { layout: '21', order: [0, 1, 2] })
+assert.deepEqual(planImageStack(3, 0, 1, 'below'), { layout: '21', order: [1, 0, 2] })
+assert.deepEqual(planImageStack(3, 1, 0, 'below'), { layout: '21', order: [0, 1, 2] })
+assert.deepEqual(planImageStack(3, 1, 2, 'above'), { layout: '12', order: [0, 1, 2] })
+assert.deepEqual(planImageStack(3, 0, 2, 'below'), { layout: '12', order: [1, 2, 0] })
+assert.equal(planImageStack(2, 0, 1, 'above'), null)
+assert.equal(planImageStack(3, 1, 1, 'above'), null)
 
 console.log('image group ok')

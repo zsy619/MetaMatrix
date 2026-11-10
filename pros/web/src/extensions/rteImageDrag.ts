@@ -6,6 +6,7 @@ import {
   placeBeside,
   reorderInGroup,
   setGroupRatios,
+  stackInGroup,
 } from './imageGroupOps'
 import { installImageGroupLayout, nextImageSelection, rowCanAccept, IMAGE_ROW_LIMIT_TIP, type ImageSpot } from '../utils/rteImageGroup'
 import {
@@ -434,6 +435,10 @@ function commitDrop(
     placeBeside(view, from, plan.imagePos, plan.kind)
     return
   }
+  if ((plan.kind === 'before' || plan.kind === 'after') && plan.imagePos != null && sameRow(view, from, plan.imagePos)) {
+    const side = plan.kind === 'before' ? 'above' : 'below'
+    if (stackInGroup(view, from, plan.imagePos, side)) return
+  }
   extractOrMoveImage(view, from, dropInsertPos(view, plan))
 }
 
@@ -533,7 +538,7 @@ export function createImageDragPlugin(): Plugin {
             handle.tabIndex = -1
             handle.setAttribute('contenteditable', 'false')
             handle.setAttribute('aria-label', '拖动图片')
-            handle.title = '拖动图片'
+            handle.title = '拖到另一张图的上沿或下沿，可排成 12 或 21'
             frame.appendChild(handle)
           }
           return false

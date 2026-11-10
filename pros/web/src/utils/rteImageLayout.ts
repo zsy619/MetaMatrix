@@ -40,10 +40,12 @@ export function placementActive(
   return normalizeImageAlign(align) === option.align && normalizeImageLayout(layout) === option.layout
 }
 
-/** 拖到图片左右缘形成并排，其余按块前/块后插入。 */
+/** 上沿、下沿优先，左右缘形成并排，其余按块前/块后插入。 */
 export function imageDropKind(xRatio: number, yRatio: number, overImage: boolean): RteImageDropKind {
   const x = Number.isFinite(xRatio) ? Math.min(1, Math.max(0, xRatio)) : 0.5
   const y = Number.isFinite(yRatio) ? Math.min(1, Math.max(0, yRatio)) : 0.5
+  if (overImage && y <= 0.28) return 'before'
+  if (overImage && y >= 0.72) return 'after'
   if (overImage && x <= 0.35) return 'left'
   if (overImage && x >= 0.65) return 'right'
   return y < 0.5 ? 'before' : 'after'

@@ -8,7 +8,9 @@ import {
   insertRatio,
   moveItem,
   normalizeGroupGap,
+  normalizeGroupLayout,
   normalizeGroupRatios,
+  planImageStack,
   ratiosToAttr,
   removeRatio,
   rowCanAccept,
@@ -106,12 +108,64 @@ export function reorderInGroup(
   if (!nextImages || !nextRatios) return false
   const next = group.type.create(
     groupUsesAspect(group.attrs.ratioMode)
-      ? { ...group.attrs, ratios: null, ratioMode: null }
-      : { ...group.attrs, ratios: ratiosToAttr(nextRatios), ratioMode: 'custom' },
+      ? { ...group.attrs, ratios: null, ratioMode: null, layout: 'row' }
+      : { ...group.attrs, ratios: ratiosToAttr(nextRatios), ratioMode: 'custom', layout: 'row' },
     nextImages.map((child) => child.type.create(child.attrs, child.content, child.marks)),
   )
   const tr = view.state.tr.replaceWith(groupPos, groupPos + group.nodeSize, next)
   return dispatchChecked(view, tr, groupPos)
+}
+
+/** 从图组拔出一张后，单张解散；不再是三张时取消 12 / 21。 */
+function afterImageLeavesGroup(tr: Transaction, mappedGroup: number, original: PMNode, removedIndex: number): Transaction {
+  const group = tr.doc.nodeAt(mappedGroup)
+  if (!group || group.type.name !== 'imageGroup' || original.type.name !== 'imageGroup') return tr
+  if (group.childCount <= 1) {
+    if (group.childCount === 1) return tr.replaceWith(mappedGroup, mappedGroup + group.nodeSize, group.child(0)!)
+    return tr.delete(mappedGroup, mappedGroup + group.nodeSize)
+  }
+  const layout = group.childCount === 3 ? normalizeGroupLayout(group.attrs.layout) : 'row'
+  const custom = !groupUsesAspect(original.attrs.ratioMode)
+  const layoutChanged = normalizeGroupLayout(group.attrs.layout) !== layout
+  if (!custom && !layoutChanged) return tr
+  return tr.setNodeMarkup(mappedGroup, undefined, {
+    ...group.attrs,
+    layout,
+    ...(custom
+      ? {
+          ratios: ratiosToAttr(removeRatio(normalizeGroupRatios(original.childCount, original.attrs.ratios), removedIndex)),
+          ratioMode: 'custom',
+        }
+      : {}),
+  })
+}
+
+export function stackInGroup(
+  view: EditorView,
+  fromPos: number,
+  targetPos: number,
+  side: 'above' | 'below',
+): boolean {
+  if (!view.editable) return false
+  const src = groupInfo(view.state.doc, fromPos)
+  const dst = groupInfo(view.state.doc, targetPos)
+  if (!src || !dst || src.groupPos !== dst.groupPos || src.index === dst.index) return false
+  const group = view.state.doc.nodeAt(src.groupPos)
+  if (!group || group.type.name !== 'imageGroup') return false
+  const plan = planImageStack(group.childCount, src.index, dst.index, side)
+  if (!plan) return false
+  const images: PMNode[] = []
+  group.forEach((child) => images.push(child))
+  const ordered = plan.order.map((index) => {
+    const child = images[index]!
+    return child.type.create(child.attrs, child.content, child.marks)
+  })
+  const next = group.type.create(
+    { ...group.attrs, layout: plan.layout, ratios: null, ratioMode: null },
+    ordered,
+  )
+  const tr = view.state.tr.replaceWith(src.groupPos, src.groupPos + group.nodeSize, next)
+  return dispatchChecked(view, tr, src.groupPos)
 }
 
 function nodeToMini(node: PMNode): MiniNode {
@@ -211,21 +265,8 @@ export function placeBeside(view: EditorView, from: number, target: number, side
   let tr = state.tr.delete(from, from + moving.nodeSize)
   if (src) {
     const mappedGroup = tr.mapping.map(src.groupPos, -1)
-    const group = tr.doc.nodeAt(mappedGroup)
     const original = state.doc.nodeAt(src.groupPos)
-    if (group?.type.name === 'imageGroup' && original?.type.name === 'imageGroup') {
-      if (group.childCount <= 1) {
-        if (group.childCount === 1) tr = tr.replaceWith(mappedGroup, mappedGroup + group.nodeSize, group.child(0)!)
-        else tr = tr.delete(mappedGroup, mappedGroup + group.nodeSize)
-      } else if (!groupUsesAspect(original.attrs.ratioMode)) {
-        const ratios = removeRatio(normalizeGroupRatios(original.childCount, original.attrs.ratios), src.index)
-        tr = tr.setNodeMarkup(mappedGroup, undefined, {
-          ...group.attrs,
-          ratios: ratiosToAttr(ratios),
-          ratioMode: 'custom',
-        })
-      }
-    }
+    if (original) tr = afterImageLeavesGroup(tr, mappedGroup, original, src.index)
   }
 
   const mappedTarget = tr.mapping.map(target, -1)
@@ -241,11 +282,12 @@ export function placeBeside(view: EditorView, from: number, target: number, side
     const index = side === 'left' ? dstNow.index : dstNow.index + 1
     images.splice(index, 0, movingCopy)
     const attrs = groupUsesAspect(group.attrs.ratioMode)
-      ? { ...group.attrs, ratios: null, ratioMode: null }
+      ? { ...group.attrs, ratios: null, ratioMode: null, layout: 'row' }
       : {
           ...group.attrs,
           ratios: ratiosToAttr(insertRatio(normalizeGroupRatios(group.childCount, group.attrs.ratios), index)),
           ratioMode: 'custom',
+          layout: 'row',
         }
     const next = group.type.create(attrs, images)
     tr = tr.replaceWith(dstNow.groupPos, dstNow.groupPos + group.nodeSize, next)
@@ -277,21 +319,8 @@ export function extractOrMoveImage(view: EditorView, from: number, insertAt: num
   let tr = state.tr.delete(from, from + moving.nodeSize)
   if (src) {
     const mappedGroup = tr.mapping.map(src.groupPos, -1)
-    const group = tr.doc.nodeAt(mappedGroup)
     const original = state.doc.nodeAt(src.groupPos)
-    if (group?.type.name === 'imageGroup' && original?.type.name === 'imageGroup') {
-      if (group.childCount <= 1) {
-        if (group.childCount === 1) tr = tr.replaceWith(mappedGroup, mappedGroup + group.nodeSize, group.child(0)!)
-        else tr = tr.delete(mappedGroup, mappedGroup + group.nodeSize)
-      } else if (!groupUsesAspect(original.attrs.ratioMode)) {
-        const ratios = removeRatio(normalizeGroupRatios(original.childCount, original.attrs.ratios), src.index)
-        tr = tr.setNodeMarkup(mappedGroup, undefined, {
-          ...group.attrs,
-          ratios: ratiosToAttr(ratios),
-          ratioMode: 'custom',
-        })
-      }
-    }
+    if (original) tr = afterImageLeavesGroup(tr, mappedGroup, original, src.index)
   }
   let dest = tr.mapping.map(insertAt, -1)
   if (dest < 0) dest = 0
@@ -339,8 +368,8 @@ export function insertImagesBeside(
     kids.splice(index, 0, ...prepared)
     const next = group.type.create(
       groupUsesAspect(group.attrs.ratioMode)
-        ? { ...group.attrs, ratios: null, ratioMode: null }
-        : { ...group.attrs, ratioMode: 'custom' },
+        ? { ...group.attrs, ratios: null, ratioMode: null, layout: 'row' }
+        : { ...group.attrs, ratioMode: 'custom', layout: 'row' },
       kids,
     )
     return dispatchChecked(view, view.state.tr.replaceWith(dst.groupPos, dst.groupPos + group.nodeSize, next), dst.groupPos)

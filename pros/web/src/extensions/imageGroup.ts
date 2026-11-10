@@ -9,6 +9,7 @@ import {
   installImageGroupLayout,
   nextGroupGap,
   normalizeGroupGap,
+  normalizeGroupLayout,
   normalizeGroupRatios,
   ratioPercents,
   resizePair,
@@ -62,6 +63,49 @@ function applyGroupGap(dom: HTMLElement, gap: number) {
   dom.setAttribute('data-gap', String(gap))
 }
 
+const COLLAGE_AREAS = {
+  '12': ['1 / 1 / 3 / 2', '1 / 2 / 2 / 3', '2 / 2 / 3 / 3'],
+  '21': ['1 / 1 / 2 / 2', '2 / 1 / 3 / 2', '1 / 2 / 3 / 3'],
+} as const
+
+/** 12：左通高、右上下两张。21：左上下两张、右通高。 */
+function paintCollage(row: HTMLElement, layout: '12' | '21') {
+  row.style.display = 'grid'
+  row.style.gridTemplateColumns = 'minmax(0, 1fr) minmax(0, 1fr)'
+  row.style.gridTemplateRows = 'minmax(0, 1fr) minmax(0, 1fr)'
+  row.style.aspectRatio = '2 / 1'
+  row.style.height = 'auto'
+  row.style.minHeight = '160px'
+  const areas = COLLAGE_AREAS[layout]
+  const kids = Array.from(row.children).filter((child): child is HTMLElement => child instanceof HTMLElement)
+  kids.forEach((frame, index) => {
+    frame.style.gridArea = areas[index] || ''
+    frame.style.flex = 'none'
+    frame.style.width = '100%'
+    frame.style.height = '100%'
+    frame.style.margin = '0'
+    frame.style.maxHeight = '100%'
+    const img = frame.querySelector('img')
+    if (img instanceof HTMLImageElement) {
+      img.style.setProperty('width', '100%', 'important')
+      img.style.setProperty('height', '100%', 'important')
+      img.style.setProperty('object-fit', 'cover', 'important')
+      img.style.setProperty('max-width', 'none', 'important')
+    }
+  })
+}
+
+function clearCollage(row: HTMLElement) {
+  row.style.display = 'flex'
+  row.style.gridTemplateColumns = ''
+  row.style.gridTemplateRows = ''
+  row.style.aspectRatio = ''
+  row.style.minHeight = '0'
+  for (const child of Array.from(row.children)) {
+    if (child instanceof HTMLElement) child.style.gridArea = ''
+  }
+}
+
 function paintGroupMetrics(dom: HTMLElement, row: HTMLElement, ratios: readonly number[], gap: number) {
   const width = row.clientWidth || dom.clientWidth
   if (width < 8) return
@@ -110,6 +154,16 @@ export function layoutImageGroupChrome(view: EditorView) {
       ? aspects
       : normalizeGroupRatios(kids.length, node.attrs.ratios)
     const gap = normalizeGroupGap(node.attrs.gap)
+    const layout = normalizeGroupLayout(node.attrs.layout)
+    if (layout === '12' || layout === '21') dom.setAttribute('data-layout', layout)
+    else dom.removeAttribute('data-layout')
+    if ((layout === '12' || layout === '21') && kids.length === 3) {
+      applyGroupGap(dom, gap)
+      if (dom.dataset.ratioDrag !== '1') paintCollage(row, layout)
+      dividers.replaceChildren()
+      return false
+    }
+    clearCollage(row)
     if (dom.dataset.ratioDrag !== '1') paintGroupMetrics(dom, row, ratios, gap)
     if (!dom.dataset.rteObserved && typeof ResizeObserver !== 'undefined') {
       dom.dataset.rteObserved = '1'
@@ -264,6 +318,15 @@ export const ImageGroup = Node.create({
           return { 'data-gap': String(gap) }
         },
       },
+      layout: {
+        default: 'row',
+        parseHTML: (element: HTMLElement) => normalizeGroupLayout(element.getAttribute('data-layout')),
+        renderHTML: (attrs: { layout?: string | null }) => {
+          const layout = normalizeGroupLayout(attrs.layout)
+          if (layout === 'row') return {}
+          return { 'data-layout': layout }
+        },
+      },
     }
   },
 
@@ -394,6 +457,14 @@ export const ImageGroup = Node.create({
         else dom.removeAttribute('data-ratio-mode')
         const gap = normalizeGroupGap(current.attrs.gap)
         applyGroupGap(dom, gap)
+        const layout = normalizeGroupLayout(current.attrs.layout)
+        if (layout === '12' || layout === '21') {
+          dom.setAttribute('data-layout', layout)
+          paintCollage(contentDOM, layout)
+        } else {
+          dom.removeAttribute('data-layout')
+          clearCollage(contentDOM)
+        }
         gapBtn.textContent = `${gap}`
         gapBtn.title = `组内间距 ${gap} 像素，点击在 0、8、16、24 之间切换`
         gapBtn.setAttribute('aria-label', gapBtn.title)
