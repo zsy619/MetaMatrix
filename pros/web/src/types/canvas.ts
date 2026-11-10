@@ -2045,6 +2045,86 @@ export interface IncomeStatementDocumentJSON {
   sections: IncomeSection[]
 }
 
+export type BcgBlockId = 'star' | 'question' | 'cow' | 'dog'
+
+export interface BcgBlock {
+  id: BcgBlockId
+  title: string
+  hint: string
+  keyword?: string
+  items: QuadrantItem[]
+  text?: string
+}
+
+export interface BcgDocumentJSON {
+  id: string
+  type: 'bcg'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  blocks: BcgBlock[]
+}
+
+export type ScorecardBlockId = 'financial' | 'customer' | 'process' | 'learning'
+
+export interface ScorecardBlock {
+  id: ScorecardBlockId
+  title: string
+  hint: string
+  keyword?: string
+  items: QuadrantItem[]
+  text?: string
+}
+
+export interface ScorecardDocumentJSON {
+  id: string
+  type: 'balanced_scorecard'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  blocks: ScorecardBlock[]
+}
+
+export type ErrcBlockId = 'eliminate' | 'reduce' | 'raise' | 'create'
+
+export interface ErrcBlock {
+  id: ErrcBlockId
+  title: string
+  hint: string
+  keyword?: string
+  items: QuadrantItem[]
+  text?: string
+}
+
+export interface ErrcDocumentJSON {
+  id: string
+  type: 'errc'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  blocks: ErrcBlock[]
+}
+
+export type AarrBlockId = 'acquisition' | 'activation' | 'retention' | 'referral' | 'revenue'
+
+export interface AarrBlock {
+  id: AarrBlockId
+  title: string
+  hint: string
+  keyword?: string
+  items: QuadrantItem[]
+  text?: string
+}
+
+export interface AarrDocumentJSON {
+  id: string
+  type: 'aarr'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  blocks: AarrBlock[]
+}
+
 /** 科学决策三角形（宽度 / 高度 / 深度） */
 export type DecisionTriangleBlockId = 'width' | 'height' | 'depth'
 
@@ -2121,6 +2201,10 @@ export type CanvasDocumentJSON = (
   | PdcaDocumentJSON
   | FiveForcesDocumentJSON
   | IncomeStatementDocumentJSON
+  | BcgDocumentJSON
+  | ScorecardDocumentJSON
+  | ErrcDocumentJSON
+  | AarrDocumentJSON
 ) & WithPanelAttachments
 
 /** 带 blocks 的画布（双三角 / Y 模型 / 刻意练习） */
@@ -2167,6 +2251,10 @@ export type BlockCanvasDocumentJSON =
   | StakeholderDocumentJSON
   | PdcaDocumentJSON
   | FiveForcesDocumentJSON
+  | BcgDocumentJSON
+  | ScorecardDocumentJSON
+  | ErrcDocumentJSON
+  | AarrDocumentJSON
 
 export function isDualTriangleDoc(
   doc: CanvasDocumentJSON | null | undefined,
@@ -2734,6 +2822,22 @@ export function isFiveForcesDoc(
   return !!doc && doc.type === 'five_forces'
 }
 
+export function isBcgDoc(doc: CanvasDocumentJSON | null | undefined): doc is BcgDocumentJSON {
+  return !!doc && doc.type === 'bcg'
+}
+
+export function isScorecardDoc(doc: CanvasDocumentJSON | null | undefined): doc is ScorecardDocumentJSON {
+  return !!doc && doc.type === 'balanced_scorecard'
+}
+
+export function isErrcDoc(doc: CanvasDocumentJSON | null | undefined): doc is ErrcDocumentJSON {
+  return !!doc && doc.type === 'errc'
+}
+
+export function isAarrDoc(doc: CanvasDocumentJSON | null | undefined): doc is AarrDocumentJSON {
+  return !!doc && doc.type === 'aarr'
+}
+
 export function isIncomeStatementDoc(
   doc: CanvasDocumentJSON | null | undefined,
 ): doc is IncomeStatementDocumentJSON {
@@ -2786,7 +2890,11 @@ export function isBlockCanvasDoc(
     isValuePropositionDoc(doc) ||
     isStakeholderDoc(doc) ||
     isPdcaDoc(doc) ||
-    isFiveForcesDoc(doc)
+    isFiveForcesDoc(doc) ||
+    isBcgDoc(doc) ||
+    isScorecardDoc(doc) ||
+    isErrcDoc(doc) ||
+    isAarrDoc(doc)
   )
 }
 

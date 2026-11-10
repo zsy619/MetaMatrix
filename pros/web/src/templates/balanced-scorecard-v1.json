@@ -1,0 +1,13 @@
+{
+  "id": "canvas_scorecard",
+  "type": "balanced_scorecard",
+  "schemaVersion": 1,
+  "theme": { "background": { "pattern": "none", "color": "#f7f7f7" }, "page": "#f7f7f7", "frame": "#ececec", "hairline": "rgba(60, 50, 20, 0.08)" },
+  "title": "平衡计分卡",
+  "blocks": [
+    { "id": "financial", "title": "财务", "hint": "收入、利润、现金", "items": [{ "id": "sc_fin", "text": "营业利润为正" }] },
+    { "id": "customer", "title": "客户", "hint": "谁留下、为什么满意", "items": [{ "id": "sc_cus", "text": "项目负责人每周打开甘特图" }] },
+    { "id": "process", "title": "内部流程", "hint": "哪条流程决定交付", "items": [{ "id": "sc_pro", "text": "里程碑先写进 RACI 再排期" }] },
+    { "id": "learning", "title": "学习成长", "hint": "人和方法要补什么", "items": [{ "id": "sc_lea", "text": "每人能独立做一次 PDCA" }] }
+  ]
+}

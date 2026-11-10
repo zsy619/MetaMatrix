@@ -1,0 +1,14 @@
+{
+  "id": "canvas_aarr",
+  "type": "aarr",
+  "schemaVersion": 1,
+  "theme": { "background": { "pattern": "none", "color": "#f7f7f7" }, "page": "#f7f7f7", "frame": "#ececec", "hairline": "rgba(60, 50, 20, 0.08)" },
+  "title": "海盗指标 AARRR",
+  "blocks": [
+    { "id": "acquisition", "title": "获取", "hint": "人从哪里来", "items": [{ "id": "aa_acq", "text": "现有用户里的项目负责人" }] },
+    { "id": "activation", "title": "激活", "hint": "第一次感受到价值", "items": [{ "id": "aa_act", "text": "打开样例甘特图并改一个日期" }] },
+    { "id": "retention", "title": "留存", "hint": "为什么下周还来", "items": [{ "id": "aa_ret", "text": "周计划还在这张图上" }] },
+    { "id": "referral", "title": "推荐", "hint": "他会把谁拉进来", "items": [{ "id": "aa_ref", "text": "把链接发给同组的负责人" }] },
+    { "id": "revenue", "title": "收入", "hint": "哪一步开始付钱", "items": [{ "id": "aa_rev", "text": "团队席位" }] }
+  ]
+}
