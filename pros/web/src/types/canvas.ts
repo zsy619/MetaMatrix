@@ -1729,7 +1729,17 @@ export interface ContextSixElementsDocumentJSON {
   blocks: ContextSixElementsBlock[]
 }
 
-/** 项目甘特图：一条任务占一行，用起止日期画横条。 */
+/** 项目甘特图。kind 缺省是普通任务；有子任务时按摘要任务画。 */
+export type GanttTaskKind = 'task' | 'summary' | 'milestone'
+export type GanttLinkType = 'FS' | 'SS' | 'FF' | 'SF'
+
+export interface GanttLink {
+  taskId: string
+  type: GanttLinkType
+  /** 工作日。正数延后，负数重叠。 */
+  lag: number
+}
+
 export interface GanttTask {
   id: string
   name: string
@@ -1738,6 +1748,12 @@ export interface GanttTask {
   /** 0–100 */
   progress: number
   owner: string
+  kind?: GanttTaskKind
+  parentId?: string | null
+  collapsed?: boolean
+  predecessors?: GanttLink[]
+  baselineStart?: string
+  baselineEnd?: string
 }
 
 export interface ProjectGanttDocumentJSON {
@@ -1746,6 +1762,8 @@ export interface ProjectGanttDocumentJSON {
   schemaVersion: number
   theme: CanvasTheme
   title: string
+  /** 时间刻度。缺省按周。 */
+  scale?: 'day' | 'week' | 'month'
   tasks: GanttTask[]
 }
 
@@ -1849,6 +1867,93 @@ export interface CashFlowDocumentJSON {
   sections: CashFlowSection[]
 }
 
+export type SwotBlockId = 'strengths' | 'weaknesses' | 'opportunities' | 'threats'
+
+export interface SwotBlock {
+  id: SwotBlockId
+  title: string
+  hint: string
+  text: string
+}
+
+export interface SwotDocumentJSON {
+  id: string
+  type: 'swot'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  blocks: SwotBlock[]
+}
+
+export type LeanBlockId =
+  | 'problem'
+  | 'solution'
+  | 'uvp'
+  | 'advantage'
+  | 'segments'
+  | 'metrics'
+  | 'channels'
+  | 'cost'
+  | 'revenue'
+
+export interface LeanBlock {
+  id: LeanBlockId
+  title: string
+  hint: string
+  text: string
+}
+
+export interface LeanCanvasDocumentJSON {
+  id: string
+  type: 'lean_canvas'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  blocks: LeanBlock[]
+}
+
+export type ValuePropositionBlockId = 'jobs' | 'pains' | 'gains' | 'products' | 'relievers' | 'creators'
+
+export interface ValuePropositionBlock {
+  id: ValuePropositionBlockId
+  title: string
+  hint: string
+  text: string
+}
+
+export interface ValuePropositionDocumentJSON {
+  id: string
+  type: 'value_proposition'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  blocks: ValuePropositionBlock[]
+}
+
+export interface OkrKeyResult {
+  id: string
+  name: string
+  target: string
+  /** 0–100 */
+  progress: number
+}
+
+export interface OkrObjective {
+  id: string
+  name: string
+  keyResults: OkrKeyResult[]
+}
+
+export interface OkrDocumentJSON {
+  id: string
+  type: 'okr'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  period: string
+  objectives: OkrObjective[]
+}
+
 /** 科学决策三角形（宽度 / 高度 / 深度） */
 export type DecisionTriangleBlockId = 'width' | 'height' | 'depth'
 
@@ -1917,6 +2022,10 @@ export type CanvasDocumentJSON = (
   | DailyKanbanDocumentJSON
   | BusinessModelCanvasDocumentJSON
   | CashFlowDocumentJSON
+  | SwotDocumentJSON
+  | LeanCanvasDocumentJSON
+  | ValuePropositionDocumentJSON
+  | OkrDocumentJSON
 ) & WithPanelAttachments
 
 /** 带 blocks 的画布（双三角 / Y 模型 / 刻意练习） */
@@ -2480,6 +2589,30 @@ export function isCashFlowDoc(
   doc: CanvasDocumentJSON | null | undefined,
 ): doc is CashFlowDocumentJSON {
   return !!doc && doc.type === 'cash_flow'
+}
+
+export function isSwotDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is SwotDocumentJSON {
+  return !!doc && doc.type === 'swot'
+}
+
+export function isLeanCanvasDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is LeanCanvasDocumentJSON {
+  return !!doc && doc.type === 'lean_canvas'
+}
+
+export function isValuePropositionDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is ValuePropositionDocumentJSON {
+  return !!doc && doc.type === 'value_proposition'
+}
+
+export function isOkrDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is OkrDocumentJSON {
+  return !!doc && doc.type === 'okr'
 }
 
 

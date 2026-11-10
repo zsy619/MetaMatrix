@@ -49,6 +49,10 @@ import {
   isDailyKanbanDoc,
   isBusinessModelCanvasDoc,
   isCashFlowDoc,
+  isSwotDoc,
+  isLeanCanvasDoc,
+  isValuePropositionDoc,
+  isOkrDoc,
   isYModelDoc,
 } from '../../types/canvas'
 import BackgroundLayer from './BackgroundLayer.vue'
@@ -101,6 +105,10 @@ import RaciMatrixCanvas from './RaciMatrixCanvas.vue'
 import DailyKanbanCanvas from './DailyKanbanCanvas.vue'
 import BusinessModelCanvas from './BusinessModelCanvas.vue'
 import CashFlowCanvas from './CashFlowCanvas.vue'
+import SwotCanvas from './SwotCanvas.vue'
+import LeanCanvas from './LeanCanvas.vue'
+import ValuePropositionCanvas from './ValuePropositionCanvas.vue'
+import OkrCanvas from './OkrCanvas.vue'
 
 const documentStore = useDocumentStore()
 const ui = useUiStore()
@@ -245,6 +253,12 @@ const businessModelCanvasDoc = computed(() =>
 const cashFlowDoc = computed(() =>
   isCashFlowDoc(current_data.value) ? current_data.value : null,
 )
+const swotDoc = computed(() => (isSwotDoc(current_data.value) ? current_data.value : null))
+const leanCanvasDoc = computed(() => (isLeanCanvasDoc(current_data.value) ? current_data.value : null))
+const valuePropositionDoc = computed(() =>
+  isValuePropositionDoc(current_data.value) ? current_data.value : null,
+)
+const okrDoc = computed(() => (isOkrDoc(current_data.value) ? current_data.value : null))
 const quadrantDoc = computed(() =>
   isQuadrantDoc(current_data.value) ? current_data.value : null,
 )
@@ -396,6 +410,18 @@ const quadrantDoc = computed(() =>
         </template>
         <template v-else-if="cashFlowDoc">
           <CashFlowCanvas :doc="cashFlowDoc" />
+        </template>
+        <template v-else-if="swotDoc">
+          <SwotCanvas :doc="swotDoc" />
+        </template>
+        <template v-else-if="leanCanvasDoc">
+          <LeanCanvas :doc="leanCanvasDoc" />
+        </template>
+        <template v-else-if="valuePropositionDoc">
+          <ValuePropositionCanvas :doc="valuePropositionDoc" />
+        </template>
+        <template v-else-if="okrDoc">
+          <OkrCanvas :doc="okrDoc" />
         </template>
         <template v-else-if="quadrantDoc">
           <BackgroundLayer

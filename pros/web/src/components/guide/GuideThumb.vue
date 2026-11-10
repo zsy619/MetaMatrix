@@ -1521,6 +1521,39 @@ withDefaults(
         <text x="100" y="31" text-anchor="middle" font-size="8" font-weight="700" fill="#fff">投资</text>
         <text x="161" y="31" text-anchor="middle" font-size="8" font-weight="700" fill="#fff">筹资</text>
       </svg>
+      <svg v-else-if="templateId === 'swot'" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <rect x="12" y="16" width="84" height="50" rx="4" fill="#e7f6ef" />
+        <rect x="104" y="16" width="84" height="50" rx="4" fill="#fdecea" />
+        <rect x="12" y="74" width="84" height="50" rx="4" fill="#e8f1fa" />
+        <rect x="104" y="74" width="84" height="50" rx="4" fill="#fbf6e4" />
+        <text x="54" y="44" text-anchor="middle" font-size="11" font-weight="700" fill="#125c3b">S</text>
+        <text x="146" y="44" text-anchor="middle" font-size="11" font-weight="700" fill="#9b1c1c">W</text>
+        <text x="54" y="102" text-anchor="middle" font-size="11" font-weight="700" fill="#1c4c7c">O</text>
+        <text x="146" y="102" text-anchor="middle" font-size="11" font-weight="700" fill="#7a5c00">T</text>
+      </svg>
+      <svg v-else-if="templateId === 'lean-canvas'" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <rect x="8" y="16" width="34" height="74" fill="#fff4ec" />
+        <rect x="44" y="16" width="34" height="36" fill="#e5f6f5" />
+        <rect x="80" y="16" width="40" height="74" fill="#fbf6e4" />
+        <rect x="122" y="16" width="34" height="36" fill="#f3eef8" />
+        <rect x="158" y="16" width="34" height="74" fill="#fbeff2" />
+        <rect x="8" y="92" width="90" height="32" fill="#fbf1eb" />
+        <rect x="102" y="92" width="90" height="32" fill="#e7f6ef" />
+      </svg>
+      <svg v-else-if="templateId === 'value-proposition'" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <rect x="12" y="18" width="82" height="104" rx="8" fill="#e5f6f5" />
+        <rect x="106" y="18" width="82" height="104" rx="41" fill="#fbf6e4" />
+      </svg>
+      <svg v-else-if="templateId === 'okr'" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <rect x="16" y="20" width="168" height="28" rx="4" fill="#2a649f" />
+        <rect x="16" y="56" width="168" height="14" rx="3" fill="#e8f1fa" />
+        <rect x="16" y="76" width="120" height="14" rx="3" fill="#e8f1fa" />
+        <rect x="16" y="102" width="168" height="22" rx="4" fill="#1c4c7c" />
+      </svg>
 
   </div>
 </template>

@@ -1,0 +1,20 @@
+{
+  "id": "canvas_value_proposition",
+  "type": "value_proposition",
+  "schemaVersion": 1,
+  "theme": {
+    "background": { "pattern": "none", "color": "#f7f7f7" },
+    "page": "#f7f7f7",
+    "frame": "#ececec",
+    "hairline": "rgba(60, 50, 20, 0.08)"
+  },
+  "title": "价值主张画布",
+  "blocks": [
+    { "id": "products", "title": "产品与服务", "hint": "我们具体提供什么", "text": "甘特图、责任矩阵、复盘画布" },
+    { "id": "relievers", "title": "痛点缓解", "hint": "哪一项对着哪一个痛", "text": "依赖和里程碑写在同一张图上" },
+    { "id": "creators", "title": "收益创造", "hint": "客户因此多得到什么", "text": "开会时能直接指着计划说话" },
+    { "id": "jobs", "title": "客户要完成的事", "hint": "功能、社交或情绪上的任务", "text": "向老板说明这周为什么这样排" },
+    { "id": "pains", "title": "痛点", "hint": "阻碍、风险和糟糕体验", "text": "日期一对不上，责任就说不清" },
+    { "id": "gains", "title": "收益", "hint": "客户期望或意外的收获", "text": "计划变更后还能看出谁受影响" }
+  ]
+}
