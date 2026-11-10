@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { inject, ref, watch } from 'vue'
 import { RTE_BINDINGS } from './bindings'
-import { QR_PRESETS, QR_STYLES, makeQrArtwork, type QrModuleStyle } from '../../utils/rteQrArtwork'
+import { QR_PRESETS, QR_PRESET_ROWS, QR_STYLES, makeQrArtwork, type QrModuleStyle } from '../../utils/rteQrArtwork'
 
 const rte = inject(RTE_BINDINGS)
 if (!rte) throw new Error('RteQrDialog 必须放在 RichTextEditor 里')
@@ -103,16 +103,18 @@ async function confirm() {
         </div>
         <div class="rte-qr-label">配色</div>
         <div class="rte-qr-presets">
-          <button
-            v-for="preset in QR_PRESETS"
-            :key="preset.id"
-            type="button"
-            :class="{ active: presetId === preset.id }"
-            @click="presetId = preset.id"
-          >
-            <i :style="{ background: preset.color }"></i>
-            {{ preset.label }}
-          </button>
+          <div v-for="(row, index) in QR_PRESET_ROWS" :key="index" class="rte-qr-preset-row">
+            <button
+              v-for="preset in row"
+              :key="preset.id"
+              type="button"
+              :class="{ active: presetId === preset.id }"
+              @click="presetId = preset.id"
+            >
+              <i :style="{ background: preset.color }"></i>
+              {{ preset.label }}
+            </button>
+          </div>
         </div>
         <label class="rte-qr-caption">
           <input v-model="caption" type="checkbox" />
@@ -187,9 +189,14 @@ async function confirm() {
   color: #4e5969;
 }
 .rte-qr-styles,
-.rte-qr-presets {
+.rte-qr-preset-row {
   display: flex;
   flex-wrap: wrap;
+  gap: 8px;
+}
+.rte-qr-presets {
+  display: flex;
+  flex-direction: column;
   gap: 8px;
 }
 .rte-qr-styles button,

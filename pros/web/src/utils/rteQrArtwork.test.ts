@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from 'vitest'
-import { QR_PRESETS, QR_STYLES, makeQrArtwork, qrBits } from './rteQrArtwork'
+import { QR_PRESETS, QR_PRESET_ROWS, QR_STYLES, makeQrArtwork, qrBits } from './rteQrArtwork'
 
 describe('二维码图片', () => {
   it('定位点是实心的，配色彼此不同', () => {
@@ -8,8 +8,11 @@ describe('二维码图片', () => {
     expect(bits.size).toBeGreaterThan(20)
     expect(bits.dark(0, 0)).toBe(true)
     expect(bits.dark(3, 3)).toBe(true)
-    expect(QR_STYLES.map((item) => item.id)).toEqual(['rounded', 'dot', 'square', 'diamond', 'liquid', 'bar'])
-    expect(QR_PRESETS).toHaveLength(8)
+    expect(QR_STYLES).toHaveLength(10)
+    expect(QR_PRESET_ROWS).toHaveLength(2)
+    expect(QR_PRESET_ROWS[0]).toHaveLength(8)
+    expect(QR_PRESET_ROWS[1]).toHaveLength(8)
+    expect(QR_PRESETS).toHaveLength(16)
     expect(new Set(QR_PRESETS.map((preset) => preset.color)).size).toBe(QR_PRESETS.length)
   })
 

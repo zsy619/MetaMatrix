@@ -1,6 +1,16 @@
 import QRCode from 'qrcode'
 
-export type QrModuleStyle = 'rounded' | 'dot' | 'square' | 'diamond' | 'liquid' | 'bar'
+export type QrModuleStyle =
+  | 'rounded'
+  | 'dot'
+  | 'square'
+  | 'diamond'
+  | 'liquid'
+  | 'bar'
+  | 'column'
+  | 'triangle'
+  | 'cross'
+  | 'star'
 
 export const QR_STYLES: readonly { id: QrModuleStyle; label: string }[] = [
   { id: 'rounded', label: '圆角' },
@@ -9,6 +19,10 @@ export const QR_STYLES: readonly { id: QrModuleStyle; label: string }[] = [
   { id: 'diamond', label: '菱形' },
   { id: 'liquid', label: '液态' },
   { id: 'bar', label: '横条' },
+  { id: 'column', label: '竖条' },
+  { id: 'triangle', label: '三角' },
+  { id: 'cross', label: '十字' },
+  { id: 'star', label: '星形' },
 ]
 
 export type QrPreset = {
@@ -18,17 +32,31 @@ export type QrPreset = {
   background: string
 }
 
-/** 配色按常见扫码场景分开，深色画在浅底上，保证还能扫。 */
-export const QR_PRESETS: readonly QrPreset[] = [
-  { id: 'classic', label: '经典黑', color: '#1d2129', background: '#ffffff' },
-  { id: 'clover', label: '草料蓝', color: '#1664ff', background: '#ffffff' },
-  { id: 'wechat', label: '微信绿', color: '#059447', background: '#ffffff' },
-  { id: 'alipay', label: '支付宝蓝', color: '#1677ff', background: '#f4f8ff' },
-  { id: 'red', label: '中国红', color: '#e11d48', background: '#fff7f8' },
-  { id: 'violet', label: '暮紫', color: '#6d28d9', background: '#f6f3ff' },
-  { id: 'orange', label: '暖橙', color: '#c2410c', background: '#fff7ed' },
-  { id: 'teal', label: '墨绿', color: '#0f766e', background: '#f0fdfa' },
+/** 配色按常见扫码场景分开，深色画在浅底上，保证还能扫。第一行是原有配色，第二行是新增配色。 */
+export const QR_PRESET_ROWS: readonly (readonly QrPreset[])[] = [
+  [
+    { id: 'classic', label: '经典黑', color: '#1d2129', background: '#ffffff' },
+    { id: 'clover', label: '草料蓝', color: '#1664ff', background: '#ffffff' },
+    { id: 'wechat', label: '微信绿', color: '#059447', background: '#ffffff' },
+    { id: 'alipay', label: '支付宝蓝', color: '#1677ff', background: '#f4f8ff' },
+    { id: 'red', label: '中国红', color: '#e11d48', background: '#fff7f8' },
+    { id: 'violet', label: '暮紫', color: '#6d28d9', background: '#f6f3ff' },
+    { id: 'orange', label: '暖橙', color: '#c2410c', background: '#fff7ed' },
+    { id: 'teal', label: '墨绿', color: '#0f766e', background: '#f0fdfa' },
+  ],
+  [
+    { id: 'indigo', label: '靛蓝', color: '#1e40af', background: '#eff6ff' },
+    { id: 'rose', label: '玫红', color: '#be185d', background: '#fdf2f8' },
+    { id: 'coffee', label: '咖啡', color: '#92400e', background: '#fffbeb' },
+    { id: 'cyan', label: '深青', color: '#0e7490', background: '#ecfeff' },
+    { id: 'pine', label: '松绿', color: '#166534', background: '#f0fdf4' },
+    { id: 'wine', label: '酒红', color: '#9f1239', background: '#fff1f2' },
+    { id: 'slate', label: '炭灰', color: '#334155', background: '#f8fafc' },
+    { id: 'magenta', label: '品红', color: '#a21caf', background: '#fdf4ff' },
+  ],
 ]
+
+export const QR_PRESETS: readonly QrPreset[] = QR_PRESET_ROWS.flat()
 
 export type QrArtworkOptions = {
   color?: string
@@ -141,6 +169,48 @@ function drawModule(
   if (style === 'bar') {
     const insetY = moduleSize * 0.22
     roundRect(ctx, x + moduleSize * 0.04, y + insetY, moduleSize * 0.92, moduleSize - insetY * 2, moduleSize * 0.28)
+    ctx.fill()
+    return
+  }
+  if (style === 'column') {
+    const insetX = moduleSize * 0.26
+    roundRect(ctx, x + insetX, y + moduleSize * 0.04, moduleSize - insetX * 2, moduleSize * 0.92, moduleSize * 0.22)
+    ctx.fill()
+    return
+  }
+  if (style === 'triangle') {
+    ctx.beginPath()
+    ctx.moveTo(x + moduleSize / 2, y + moduleSize * 0.04)
+    ctx.lineTo(x + moduleSize * 0.96, y + moduleSize * 0.96)
+    ctx.lineTo(x + moduleSize * 0.04, y + moduleSize * 0.96)
+    ctx.closePath()
+    ctx.fill()
+    return
+  }
+  if (style === 'cross') {
+    const arm = moduleSize * 0.42
+    const pad = (moduleSize - arm) / 2
+    roundRect(ctx, x + moduleSize * 0.06, y + pad, moduleSize * 0.88, arm, arm * 0.35)
+    ctx.fill()
+    roundRect(ctx, x + pad, y + moduleSize * 0.06, arm, moduleSize * 0.88, arm * 0.35)
+    ctx.fill()
+    return
+  }
+  if (style === 'star') {
+    const cx = x + moduleSize / 2
+    const cy = y + moduleSize / 2
+    const outer = moduleSize * 0.48
+    const inner = moduleSize * 0.22
+    ctx.beginPath()
+    for (let i = 0; i < 8; i += 1) {
+      const radius = i % 2 === 0 ? outer : inner
+      const angle = -Math.PI / 2 + (i * Math.PI) / 4
+      const px = cx + Math.cos(angle) * radius
+      const py = cy + Math.sin(angle) * radius
+      if (i === 0) ctx.moveTo(px, py)
+      else ctx.lineTo(px, py)
+    }
+    ctx.closePath()
     ctx.fill()
     return
   }
