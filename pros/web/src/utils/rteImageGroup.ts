@@ -92,6 +92,8 @@ export const imageGroupLayoutCss = [
   '.rte-image-drag-handle:focus{opacity:1;outline:2px solid #3370ff;outline-offset:1px;}',
   '.rte-image-group-bar button.rte-image-group-layout,.rte-image-group-bar button.rte-image-group-fit,.rte-image-group-bar button.rte-image-group-alt{width:auto;min-width:28px;padding:0 6px;font-size:12px;}',
   '.rte-image-group-bar button.rte-image-group-alt{color:#d83931;}',
+  '[data-resize-container][data-node="image"],[data-node="image"]{position:relative;}',
+  '.rte-image-caption-inline{position:absolute;left:0;right:0;bottom:0;margin:0;padding:2px 6px;background:rgba(255,255,255,.9);font-size:12px;line-height:1.4;text-align:center;pointer-events:none;z-index:2;}',
   '.rte-font-size-entry{display:block;width:calc(100% - 12px);margin:4px 6px 6px;padding:4px 6px;border:1px solid #e5e6eb;border-radius:4px;font:inherit;box-sizing:border-box;}',
   '.rte-image-group[data-fit="contain"] .rte-image-group-row img{object-fit:contain !important;}',
   '.rte-image-group[data-layout="rows"] .rte-image-group-row{display:flex;flex-direction:column;height:auto;}',
@@ -261,11 +263,11 @@ export function groupInsertIndex(from: number, target: number, side: 'left' | 'r
   return side === 'left' ? targetAfter : targetAfter + 1
 }
 
-export type ImageGroupLayout = 'row' | '12' | '21' | 'rows'
+export type ImageGroupLayout = 'row' | '12' | '21' | 'rows' | 'mix'
 
-/** 缺省横排。12 是左一右二，21 是左二右一，rows 是两张上下叠放。 */
+/** 缺省横排。12 是左一右二，21 是左二右一，rows 是两张上下叠放，mix 是四张及以上里有一列上下叠放。 */
 export function normalizeGroupLayout(raw: unknown): ImageGroupLayout {
-  if (raw === '12' || raw === '21' || raw === 'rows') return raw
+  if (raw === '12' || raw === '21' || raw === 'rows' || raw === 'mix') return raw
   return 'row'
 }
 
@@ -291,6 +293,27 @@ export function planImageStack(
   if (other == null) return null
   if (targetPos === rest.length - 1) return { layout: '12', order: [other, top, bottom] }
   return { layout: '21', order: [top, bottom, other] }
+}
+
+/** 四张及以上：把 from 叠到 target 的上沿或下沿，其余图保持各自一列。stackAt 是叠放上图在新顺序里的下标。 */
+export function planMixedStack(
+  count: number,
+  from: number,
+  target: number,
+  side: 'above' | 'below',
+): { order: number[]; stackAt: number } | null {
+  if (count < 4 || from === target) return null
+  if (from < 0 || target < 0 || from >= count || target >= count) return null
+  const rest = Array.from({ length: count }, (_, index) => index).filter((index) => index !== from)
+  if (!rest.includes(target)) return null
+  const top = side === 'above' ? from : target
+  const bottom = side === 'above' ? target : from
+  const order: number[] = []
+  for (const index of rest) {
+    if (index === target) order.push(top, bottom)
+    else order.push(index)
+  }
+  return { order, stackAt: order.indexOf(top) }
 }
 
 function isEmptyParagraph(node: MiniNode): boolean {

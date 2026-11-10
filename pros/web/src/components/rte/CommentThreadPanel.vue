@@ -9,6 +9,7 @@ import type { CommentDraft } from './composables/useCommentThreads'
 
 defineProps<{
   threads: CommentThread[]
+  orphanIds?: string[]
   unresolvedCount: number
   showResolved: boolean
   draft: CommentDraft | null
@@ -72,7 +73,7 @@ const emit = defineEmits<{
         :class="{ 'is-active': thread.id === activeThreadId, 'is-resolved': thread.resolved }"
       >
         <button type="button" class="rte-comment-quote is-jump" @click="emit('jump', thread.id)">
-          {{ thread.quote || '原文已不在' }}
+          <span v-if="orphanIds?.includes(thread.id)">失锚 · </span>{{ thread.quote || '原文已不在' }}
         </button>
         <ul class="rte-comment-messages">
           <li v-for="message in thread.messages" :key="message.id">

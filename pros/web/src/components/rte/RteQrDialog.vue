@@ -42,12 +42,13 @@ async function refresh() {
 
 watch(() => rte.qrDialogOpen, (open) => {
   if (!open) return
-  text.value = 'https://'
-  description.value = ''
-  presetId.value = QR_PRESETS[1]!.id
-  style.value = 'rounded'
-  errorLevel.value = 'H'
-  caption.value = true
+  const draft = rte.qrDraft
+  text.value = draft?.text || 'https://'
+  description.value = draft?.description || ''
+  presetId.value = draft?.presetId || QR_PRESETS[1]!.id
+  style.value = (draft?.style as QrModuleStyle) || 'rounded'
+  errorLevel.value = draft?.errorLevel === 'Q' || draft?.errorLevel === 'M' ? draft.errorLevel : 'H'
+  caption.value = draft?.caption ?? true
   void refresh()
 })
 
@@ -64,7 +65,15 @@ async function confirm() {
   if (!value || !preview.value || busy.value) return
   busy.value = true
   try {
-    await rte.insertQrArtwork(preview.value)
+    const meta = JSON.stringify({
+      text: value,
+      description: description.value,
+      presetId: presetId.value,
+      style: style.value,
+      errorLevel: errorLevel.value,
+      caption: caption.value,
+    })
+    await rte.insertQrArtwork(preview.value, meta)
   } finally {
     busy.value = false
   }
@@ -82,7 +91,7 @@ async function confirm() {
       @click.self="close"
     >
       <div class="rte-qr-card">
-        <h3>插入二维码</h3>
+        <h3>{{ rte.qrEditingPos != null ? '修改二维码' : '插入二维码' }}</h3>
         <p>输入链接或文字。中间留白放标记，纠错用最高等级，打印和屏幕上都能扫。</p>
         <input
           v-model="text"
@@ -144,7 +153,7 @@ async function confirm() {
         <a v-if="preview" class="rte-qr-download" :href="preview" download="qrcode.png">下载图片</a>
         <div class="rte-qr-actions">
           <button type="button" @click="close">取消</button>
-          <button type="button" class="is-primary" :disabled="!preview || busy" @click="confirm">插入</button>
+          <button type="button" class="is-primary" :disabled="!preview || busy" @click="confirm">{{ rte.qrEditingPos != null ? '更新' : '插入' }}</button>
         </div>
       </div>
     </div>

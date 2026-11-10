@@ -216,6 +216,7 @@ function onChangeChartType(event: Event) {
 
     <div class="rte-cp-body">
       <p v-if="panel.error" class="rte-cp-error">{{ panel.error }}</p>
+      <div class="rte-cp-preview-slot">正文里的图形与左侧数据同步。导出 HTML 和 PDF 时嵌成当前画面的静态图。</div>
       <ChartGeneralSection :panel="panel" />
       <ChartAxisSection :panel="panel" />
       <ChartSeriesSection :panel="panel" />

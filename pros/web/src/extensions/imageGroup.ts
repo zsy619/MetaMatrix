@@ -117,6 +117,37 @@ function paintCollage(
   })
 }
 
+function paintMix(row: HTMLElement, stackAt: number, fit: 'cover' | 'contain') {
+  const frames = Array.from(row.children).filter(
+    (child): child is HTMLElement => child instanceof HTMLElement && !child.classList.contains('rte-image-caption-inline'),
+  )
+  const columns = Math.max(1, frames.length - 1)
+  row.style.display = 'grid'
+  row.style.flexDirection = 'row'
+  row.style.gridTemplateColumns = `repeat(${columns}, minmax(0, 1fr))`
+  row.style.gridTemplateRows = 'minmax(0, 1fr) minmax(0, 1fr)'
+  row.style.aspectRatio = `${columns} / 1`
+  row.style.height = 'auto'
+  row.style.minHeight = '160px'
+  let column = 1
+  frames.forEach((frame, index) => {
+    frame.style.flex = 'none'
+    frame.style.width = '100%'
+    frame.style.height = '100%'
+    frame.style.margin = '0'
+    if (index === stackAt || index === stackAt + 1) {
+      const rowStart = index === stackAt ? 1 : 2
+      frame.style.gridArea = `${rowStart} / ${column} / ${rowStart + 1} / ${column + 1}`
+      if (index === stackAt + 1) column += 1
+    } else {
+      frame.style.gridArea = `1 / ${column} / 3 / ${column + 1}`
+      column += 1
+    }
+    const img = frame.querySelector('img')
+    if (img instanceof HTMLImageElement) img.style.setProperty('object-fit', fit, 'important')
+  })
+}
+
 function paintRows(row: HTMLElement) {
   row.style.display = 'flex'
   row.style.flexDirection = 'column'
@@ -282,8 +313,11 @@ export function layoutImageGroupChrome(view: EditorView) {
       : normalizeGroupRatios(kids.length, node.attrs.ratios)
     const gap = normalizeGroupGap(node.attrs.gap)
     const layout = normalizeGroupLayout(node.attrs.layout)
-    if (layout === '12' || layout === '21') dom.setAttribute('data-layout', layout)
-    else dom.removeAttribute('data-layout')
+    const signature = `${layout}:${Math.round(row.clientWidth)}:${kids.length}:${node.attrs.fit || ''}:${node.attrs.ratios || ''}:${node.attrs.stackAt ?? ''}`
+    if (row.clientWidth > 8 && dom.dataset.rteSig === signature && dom.dataset.ratioDrag !== '1') return false
+    dom.dataset.rteSig = signature
+    if (layout === 'row') dom.removeAttribute('data-layout')
+    else dom.setAttribute('data-layout', layout)
     if ((layout === '12' || layout === '21') && kids.length === 3) {
       applyGroupGap(dom, gap)
       const fit = normalizeGroupFit(node.attrs.fit)
@@ -300,6 +334,17 @@ export function layoutImageGroupChrome(view: EditorView) {
           : `minmax(0, ${weights[0]}fr) minmax(0, ${weights[1]}fr)`
       if (dom.dataset.ratioDrag !== '1') paintCollage(row, layout, fit, columns, stack)
       paintCollageDividers(view, dom, row, dividers, kids, pos, layout, weights)
+      return false
+    }
+    if (layout === 'mix' && kids.length >= 4) {
+      applyGroupGap(dom, gap)
+      dom.setAttribute('data-layout', 'mix')
+      const stackAt = Number(node.attrs.stackAt)
+      const fit = normalizeGroupFit(node.attrs.fit)
+      if (fit === 'contain') dom.setAttribute('data-fit', 'contain')
+      else dom.removeAttribute('data-fit')
+      if (Number.isInteger(stackAt) && dom.dataset.ratioDrag !== '1') paintMix(row, stackAt, fit)
+      dividers.replaceChildren()
       return false
     }
     if (layout === 'rows' && kids.length === 2) {
@@ -469,6 +514,15 @@ export const ImageGroup = Node.create({
         parseHTML: (element: HTMLElement) => normalizeGroupFit(element.getAttribute('data-fit')),
         renderHTML: (attrs: { fit?: string | null }) =>
           normalizeGroupFit(attrs.fit) === 'contain' ? { 'data-fit': 'contain' } : {},
+      },
+      stackAt: {
+        default: null as number | null,
+        parseHTML: (element: HTMLElement) => {
+          const value = Number(element.getAttribute('data-stack-at'))
+          return Number.isInteger(value) && value >= 0 ? value : null
+        },
+        renderHTML: (attrs: { stackAt?: number | null }) =>
+          attrs.stackAt == null ? {} : { 'data-stack-at': String(attrs.stackAt) },
       },
       layout: {
         default: 'row',
@@ -689,6 +743,10 @@ export const ImageGroup = Node.create({
         } else if (layout === 'rows') {
           dom.setAttribute('data-layout', layout)
           paintRows(contentDOM)
+        } else if (layout === 'mix') {
+          dom.setAttribute('data-layout', layout)
+          const stackAt = Number(current.attrs.stackAt)
+          if (Number.isInteger(stackAt)) paintMix(contentDOM, stackAt, fit)
         } else {
           dom.removeAttribute('data-layout')
           clearCollage(contentDOM)

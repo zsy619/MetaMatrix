@@ -181,5 +181,63 @@ export async function buildPdfFromElement(
     offset += sliceH
   })
 
+  addSelectableLayer(pdf, el, canvas, slices, marginLeft, marginTop, imgWmm)
   return pdf.output('blob')
+}
+
+/** 在截图之上铺一层可选中的正文，并把外链做成可点击区域。 */
+function addSelectableLayer(
+  pdf: jsPDF,
+  el: HTMLElement,
+  canvas: HTMLCanvasElement,
+  slices: number[],
+  marginLeft: number,
+  marginTop: number,
+  imgWmm: number,
+) {
+  const root = el.getBoundingClientRect()
+  const scaleX = canvas.width / Math.max(1, el.scrollWidth)
+  const scaleY = canvas.height / Math.max(1, el.scrollHeight)
+  const pageOf = (yPx: number) => {
+    let cursor = 0
+    for (let page = 0; page < slices.length; page += 1) {
+      const height = slices[page]!
+      if (yPx < cursor + height) return { page, y: yPx - cursor }
+      cursor += height
+    }
+    return null
+  }
+  const toMm = (px: number) => (px * imgWmm) / Math.max(1, canvas.width)
+  el.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li').forEach((node) => {
+    if (!(node instanceof HTMLElement)) return
+    const text = (node.innerText || '').replace(/\s+/g, ' ').trim()
+    if (!text) return
+    const rect = node.getBoundingClientRect()
+    const yPx = (rect.top - root.top) * scaleY
+    const found = pageOf(yPx)
+    if (!found) return
+    pdf.setPage(found.page + 1)
+    pdf.setFontSize(Math.max(8, Math.min(16, rect.height * 0.45)))
+    pdf.text(text.slice(0, 500), marginLeft + toMm((rect.left - root.left) * scaleX), marginTop + toMm(found.y) + 4, {
+      renderingMode: 'invisible',
+      maxWidth: Math.max(10, toMm(rect.width * scaleX)),
+    })
+  })
+  el.querySelectorAll('a[href]').forEach((node) => {
+    if (!(node instanceof HTMLAnchorElement)) return
+    const href = node.href
+    if (!/^https?:|^mailto:|^tel:/i.test(href)) return
+    const rect = node.getBoundingClientRect()
+    const yPx = (rect.top - root.top) * scaleY
+    const found = pageOf(yPx)
+    if (!found) return
+    pdf.setPage(found.page + 1)
+    pdf.link(
+      marginLeft + toMm((rect.left - root.left) * scaleX),
+      marginTop + toMm(found.y),
+      Math.max(4, toMm(rect.width * scaleX)),
+      Math.max(3, toMm(rect.height * scaleY)),
+      { url: href },
+    )
+  })
 }

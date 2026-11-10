@@ -124,6 +124,22 @@ describe('图片组 12 / 21', () => {
     expect(ed.view.dom.querySelector('[data-type="image-group"]')?.getAttribute('data-layout')).toBe('12')
   })
 
+  it('四张图拖到下沿会在目标那一列叠放', () => {
+    const ed = makeEditor(
+      `<div data-type="image-group" data-align="center"><div class="rte-image-group-row"><img src="https://example.com/a.png" alt="A"><img src="https://example.com/b.png" alt="B"><img src="https://example.com/c.png" alt="C"><img src="https://example.com/d.png" alt="D"></div></div>`,
+    )
+    const positions = imagePositions(ed)
+    expect(stackInGroup(ed.view, positions[3]!, positions[1]!, 'below')).toBe(true)
+    expect(ed.state.doc.firstChild?.attrs.layout).toBe('mix')
+    expect(ed.state.doc.firstChild?.attrs.stackAt).toBe(1)
+    expect(srcs(ed)).toEqual([
+      'https://example.com/a.png',
+      'https://example.com/b.png',
+      'https://example.com/d.png',
+      'https://example.com/c.png',
+    ])
+  })
+
   it('不是三张图时不叠放', () => {
     const ed = makeEditor(
       `<div data-type="image-group" data-align="center"><div class="rte-image-group-row"><img src="https://example.com/a.png"><img src="https://example.com/b.png"></div></div>`,

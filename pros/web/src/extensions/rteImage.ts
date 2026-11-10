@@ -35,6 +35,14 @@ export const RteImage = Image.extend({
           'data-layout': normalizeImageLayout(attrs.layout),
         }),
       },
+      qrMeta: {
+        default: null as string | null,
+        parseHTML: (el: HTMLElement) => el.getAttribute('data-qr') || null,
+        renderHTML: (attrs: { qrMeta?: string | null }) => {
+          const value = (attrs.qrMeta || '').trim()
+          return value ? { 'data-qr': value } : {}
+        },
+      },
       caption: {
         default: null as string | null,
         parseHTML: (el: HTMLElement) => {

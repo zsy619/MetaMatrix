@@ -142,6 +142,23 @@ export function deepOptimizeDocument(editor: Editor): DeepOptimizeResult {
       if (nextLevel !== level || node.attrs.textIndent) {
         if (node.attrs.textIndent) indentFixed += 1
         tr = tr.setNodeMarkup(pos, undefined, { ...node.attrs, level: nextLevel, textIndent: null })
+        const mark = tr.doc.type.schema.marks.suggestionInsert
+        const suggesting = Boolean(
+          editor.extensionManager.extensions.find((ext) => ext.name === 'suggestionMode')?.options?.enabled?.(),
+        )
+        const headingText = node.firstChild
+        if (suggesting && mark && nextLevel !== level && headingText?.isText) {
+          tr = tr.addMark(
+            pos + 1,
+            pos + 1 + headingText.nodeSize,
+            mark.create({
+              id: `opt_h_${pos}`,
+              authorId: 'optimize',
+              authorName: `标题改为 ${nextLevel} 级`,
+              createdAt: String(Date.now()),
+            }),
+          )
+        }
       }
       return
     }

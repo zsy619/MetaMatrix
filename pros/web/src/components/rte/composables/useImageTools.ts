@@ -19,6 +19,7 @@ import {
 export function useImageTools(deps: {
   editor: ShallowRef<Editor | undefined>
   viewMode: () => { value: string }
+  openQr?: (pos: number) => boolean
 }) {
 /** —— 图片对齐 / 题注 —— */
 const imageBubbleCaption = ref('')
@@ -124,6 +125,21 @@ function onEditorImageDblClick(event: MouseEvent) {
   } catch {
     pos = null
   }
+  const imagePos = (() => {
+    if (!ed || pos == null) return null
+    const direct = ed.state.doc.nodeAt(pos)
+    if (direct?.type.name === 'image') return pos
+    try {
+      const $pos = ed.state.doc.resolve(Math.min(pos, ed.state.doc.content.size))
+      for (let depth = $pos.depth; depth > 0; depth -= 1) {
+        if ($pos.node(depth).type.name === 'image') return $pos.before(depth)
+      }
+    } catch {
+      return null
+    }
+    return null
+  })()
+  if (imagePos != null && ed?.state.doc.nodeAt(imagePos)?.attrs?.qrMeta && deps.openQr?.(imagePos)) return
   openImagePreview(pos, img.currentSrc || img.src || '')
 }
 

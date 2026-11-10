@@ -1,4 +1,5 @@
 import { Node, mergeAttributes } from '@tiptap/core'
+import { Plugin } from '@tiptap/pm/state'
 import type { Editor } from '@tiptap/core'
 import { findCrossRefPos } from '../utils/rteBlockRef'
 
@@ -122,5 +123,42 @@ export const CrossRef = Node.create({
             },
           }),
     }
+  },
+
+  addProseMirrorPlugins() {
+    return [
+      new Plugin({
+        appendTransaction(transactions, _old, state) {
+          if (!transactions.some((tr) => tr.docChanged)) return null
+          if (transactions.some((tr) => tr.getMeta('xrefSync'))) return null
+          const labels = new Map<string, string>()
+          let fig = 0
+          let tbl = 0
+          state.doc.descendants((node, pos) => {
+            if (node.type.name === 'heading') {
+              labels.set(String(node.attrs.id || `h-${pos}`), `§ ${node.textContent.trim() || '标题'}`)
+            }
+            if (node.type.name === 'image') {
+              fig += 1
+              labels.set(String(node.attrs.xrefId || `fig-${pos}`), String(node.attrs.caption || '').trim() || `图 ${fig}`)
+            }
+            if (node.type.name === 'table') {
+              tbl += 1
+              labels.set(String(node.attrs.xrefId || `tbl-${pos}`), `表 ${tbl}`)
+            }
+          })
+          let tr = state.tr
+          state.doc.descendants((node, pos) => {
+            if (node.type.name !== 'crossRef') return
+            const next = labels.get(String(node.attrs.targetId || ''))
+            if (!next || next === node.attrs.label) return
+            tr = tr.setNodeMarkup(pos, undefined, { ...node.attrs, label: next })
+          })
+          if (!tr.docChanged) return null
+          tr.setMeta('xrefSync', true)
+          return tr
+        },
+      }),
+    ]
   },
 })

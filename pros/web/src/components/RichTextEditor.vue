@@ -1117,6 +1117,7 @@ const {
   replyDrafts,
   activeThreadId,
   shownThreads,
+  orphanIds,
   unresolvedCount,
   beginComment,
   cancelDraft,
@@ -2197,17 +2198,51 @@ function doRenumberCaptions() {
 }
 
 const qrDialogOpen = ref(false)
+const qrEditingPos = ref<number | null>(null)
+const qrDraft = ref<{
+  text: string
+  description: string
+  presetId: string
+  style: string
+  errorLevel: string
+  caption: boolean
+} | null>(null)
 
 function insertQrCode() {
+  qrEditingPos.value = null
+  qrDraft.value = null
   qrDialogOpen.value = true
   moreOpen.value = false
 }
 
-async function insertQrArtwork(dataUrl: string) {
+function openQrEditor(pos: number) {
+  const node = editor.value?.state.doc.nodeAt(pos)
+  const raw = String(node?.attrs?.qrMeta || '')
+  if (!raw) return false
   try {
-    editor.value?.chain().focus().setImage({ src: dataUrl, alt: '二维码' }).run()
+    qrDraft.value = JSON.parse(raw)
+  } catch {
+    return false
+  }
+  qrEditingPos.value = pos
+  qrDialogOpen.value = true
+  return true
+}
+
+async function insertQrArtwork(dataUrl: string, meta?: string) {
+  try {
+    const ed = editor.value
+    if (!ed) return
+    const attrs = { src: dataUrl, alt: '二维码', ...(meta ? { qrMeta: meta } : {}) }
+    if (qrEditingPos.value != null && ed.state.doc.nodeAt(qrEditingPos.value)?.type.name === 'image') {
+      ed.chain().focus().setNodeSelection(qrEditingPos.value).updateAttributes('image', attrs).run()
+      ElMessage.success('已更新二维码')
+    } else {
+      ed.chain().focus().setImage(attrs).run()
+      ElMessage.success('已插入二维码')
+    }
     qrDialogOpen.value = false
-    ElMessage.success('已插入二维码')
+    qrEditingPos.value = null
   } catch (e) {
     console.error(e)
     ElMessage.error('二维码生成失败')
@@ -3992,6 +4027,7 @@ const {
 } = useImageTools({
   editor,
   viewMode: () => viewMode,
+  openQr: (pos) => openQrEditor(pos),
 })
 
 /** 图片气泡：换图（保留裁剪与题注）。 */
@@ -7981,6 +8017,8 @@ provideRteBindings({
   closeToolbarGroupButtons,
   onToolbarGroupContextMenu,
   qrDialogOpen,
+  qrEditingPos,
+  qrDraft,
   insertQrArtwork,
   toolbarOrder,
   triggerLocalAttachPick,
@@ -8038,6 +8076,7 @@ provideRteBindings({
   replyDrafts,
   activeThreadId,
   shownThreads,
+  orphanIds,
   unresolvedCount,
   beginComment,
   cancelDraft,

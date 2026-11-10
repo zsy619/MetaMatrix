@@ -41,6 +41,8 @@ assert.ok(/data:image\/png/i.test(bypass))
 assert.equal(safePasteUrl('javascript:alert(1)', 'a'), null)
 assert.equal(safePasteUrl('/media/asset-1', 'img'), '/media/asset-1')
 assert.equal((plainTextToPasteContent('甲\n\n\n乙') as unknown[]).length, 3)
+assert.match(sanitizePastedHtml('<table><tr><td colspan="2" rowspan="2">合并</td><td>乙</td></tr></table>'), /colspan="2"/)
+assert.match(sanitizePastedHtml('<table><tr><td colspan="2" rowspan="2">合并</td><td>乙</td></tr></table>'), /rowspan="2"/)
 assert.deepEqual(plainTextToPasteContent('甲\n乙'), [
   { type: 'paragraph', content: [{ type: 'text', text: '甲' }] },
   { type: 'paragraph', content: [{ type: 'text', text: '乙' }] },

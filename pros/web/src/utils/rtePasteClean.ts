@@ -189,6 +189,13 @@ function rebuildPasted(node: Node, doc: Document): Node | null {
     if (alt) parent.setAttribute('alt', alt)
     return parent
   }
+  if (parent && (tag === 'td' || tag === 'th')) {
+    for (const name of ['colspan', 'rowspan'] as const) {
+      const raw = el.getAttribute(name)
+      const span = Number(raw)
+      if (raw && Number.isInteger(span) && span > 1 && span <= 50) parent.setAttribute(name, String(span))
+    }
+  }
   if (parent && tag === 'code') {
     const lang = [...el.classList].find((name) => /^language-[\w-]+$/i.test(name) && !/mso/i.test(name))
     if (lang) parent.setAttribute('class', lang)

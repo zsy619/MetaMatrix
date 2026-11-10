@@ -510,6 +510,7 @@ useParentScopeStamp()
       <CommentThreadPanel
         v-if="rte.commentsOpen && rte.viewMode === 'edit'"
         :threads="rte.shownThreads"
+        :orphan-ids="rte.orphanIds"
         :unresolved-count="rte.unresolvedCount"
         :show-resolved="rte.showResolved"
         :draft="rte.commentDraft"

@@ -15,6 +15,7 @@ import {
   nextGroupGap,
   normalizeGroupLayout,
   planImageStack,
+  planMixedStack,
   normalizeGroupGap,
   normalizeGroupRatios,
   ratioPercents,
@@ -134,6 +135,7 @@ assert.deepEqual(planImageStack(3, 1, 0, 'below'), { layout: '21', order: [0, 1,
 assert.deepEqual(planImageStack(3, 1, 2, 'above'), { layout: '12', order: [0, 1, 2] })
 assert.deepEqual(planImageStack(3, 0, 2, 'below'), { layout: '12', order: [1, 2, 0] })
 assert.equal(planImageStack(2, 0, 1, 'above'), null)
+assert.deepEqual(planMixedStack(4, 3, 1, 'below'), { order: [0, 1, 3, 2], stackAt: 1 })
 const column = resizeCollageColumn([1, 1, 1], '12', 0.25)
 assert.ok(column[0]! < column[1]! + column[2]!)
 assert.equal(Math.round((column[0]! + column[1]! + column[2]!) * 100) / 100, 3)

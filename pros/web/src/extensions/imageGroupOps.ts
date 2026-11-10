@@ -11,6 +11,7 @@ import {
   normalizeGroupLayout,
   normalizeGroupRatios,
   planImageStack,
+  planMixedStack,
   ratiosToAttr,
   removeRatio,
   rowCanAccept,
@@ -140,19 +141,24 @@ function afterImageLeavesGroup(tr: Transaction, mappedGroup: number, original: P
     if (group.childCount === 1) return tr.replaceWith(mappedGroup, mappedGroup + group.nodeSize, group.child(0)!)
     return tr.delete(mappedGroup, mappedGroup + group.nodeSize)
   }
-  const layout = group.childCount === 3 ? normalizeGroupLayout(group.attrs.layout) : 'row'
+  const previous = normalizeGroupLayout(original.attrs.layout)
+  const collage = previous === '12' || previous === '21' || previous === 'rows' || previous === 'mix'
+  const layout = collage ? 'row' : group.childCount === 3 ? previous : 'row'
   const custom = !groupUsesAspect(original.attrs.ratioMode)
-  const layoutChanged = normalizeGroupLayout(group.attrs.layout) !== layout
-  if (!custom && !layoutChanged) return tr
+  const layoutChanged = previous !== layout
+  if (!collage && !custom && !layoutChanged) return tr
   return tr.setNodeMarkup(mappedGroup, undefined, {
     ...group.attrs,
     layout,
-    ...(custom
-      ? {
-          ratios: ratiosToAttr(removeRatio(normalizeGroupRatios(original.childCount, original.attrs.ratios), removedIndex)),
-          ratioMode: 'custom',
-        }
-      : {}),
+    stackAt: null,
+    ...(collage
+      ? { ratios: null, ratioMode: null }
+      : custom
+        ? {
+            ratios: ratiosToAttr(removeRatio(normalizeGroupRatios(original.childCount, original.attrs.ratios), removedIndex)),
+            ratioMode: 'custom',
+          }
+        : {}),
   })
 }
 
@@ -168,16 +174,24 @@ export function stackInGroup(
   if (!src || !dst || src.groupPos !== dst.groupPos || src.index === dst.index) return false
   const group = view.state.doc.nodeAt(src.groupPos)
   if (!group || group.type.name !== 'imageGroup') return false
-  const plan = planImageStack(group.childCount, src.index, dst.index, side)
-  if (!plan) return false
   const images: PMNode[] = []
   group.forEach((child) => images.push(child))
-  const ordered = plan.order.map((index) => {
+  const three = planImageStack(group.childCount, src.index, dst.index, side)
+  const mixed = three ? null : planMixedStack(group.childCount, src.index, dst.index, side)
+  if (!three && !mixed) return false
+  const order = three ? three.order : mixed!.order
+  const ordered = order.map((index) => {
     const child = images[index]!
     return child.type.create(child.attrs, child.content, child.marks)
   })
   const next = group.type.create(
-    { ...group.attrs, layout: plan.layout, ratios: null, ratioMode: null },
+    {
+      ...group.attrs,
+      layout: three ? three.layout : 'mix',
+      stackAt: mixed ? mixed.stackAt : null,
+      ratios: null,
+      ratioMode: null,
+    },
     ordered,
   )
   const tr = view.state.tr.replaceWith(src.groupPos, src.groupPos + group.nodeSize, next)

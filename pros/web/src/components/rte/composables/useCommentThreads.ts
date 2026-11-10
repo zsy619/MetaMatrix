@@ -36,6 +36,11 @@ export function useCommentThreads(deps: {
   const activeThreadId = ref('')
 
   const threads = computed(() => readCommentThreads(deps.getMap(), deps.panelId()))
+  const orphanIds = computed(() => {
+    const ed = deps.editor().value
+    void ed?.state.doc
+    return threads.value.filter((thread) => anchorPos(thread.id) == null).map((thread) => thread.id)
+  })
   const shownThreads = computed(() => visibleThreads(threads.value, showResolved.value))
   const unresolvedCount = computed(() => threads.value.filter((thread) => !thread.resolved).length)
 
@@ -162,6 +167,7 @@ export function useCommentThreads(deps: {
     replyDrafts,
     activeThreadId,
     threads,
+    orphanIds,
     shownThreads,
     unresolvedCount,
     beginComment,
