@@ -7,6 +7,7 @@
 
 import type { Editor } from '@tiptap/core'
 import type { Node as PmNode } from '@tiptap/pm/model'
+import type { EditorState, Transaction } from '@tiptap/pm/state'
 import {
   evaluateFormula,
   evaluateTableFormulas,
@@ -14,6 +15,9 @@ import {
   isFormulaCell,
   type FormulaErrorCode,
 } from './rteTableFormula'
+
+/** 自动重算事务的标记，避免写回结果后再触发一轮。 */
+export const TABLE_FORMULA_RECALC = 'tableFormulaRecalc'
 
 /** 定位到的单元格。 */
 export type TableCellLocation = {
@@ -239,6 +243,106 @@ export function applyCellInput(editor: Editor, loc: TableCellLocation, input: st
     if (item.text) tr.replaceWith(from, to, schema.text(item.text))
     else tr.delete(from, to)
   }
+  tr.setMeta(TABLE_FORMULA_RECALC, true)
   editor.view.dispatch(tr)
   return { ok: true, display: target, error }
+}
+
+function rangesOverlap(aFrom: number, aTo: number, bFrom: number, bTo: number): boolean {
+  return aFrom < bTo && bFrom < aTo
+}
+
+/** 把各步改动的区间映射到事务结束时的文档位置。 */
+export function editedRanges(transactions: readonly Transaction[]): Array<{ from: number; to: number }> {
+  const maps = transactions.flatMap((tr) => tr.mapping.maps)
+  const ranges: Array<{ from: number; to: number }> = []
+  let index = 0
+  for (const tr of transactions) {
+    for (const map of tr.mapping.maps) {
+      const after = index + 1
+      map.forEach((_oldStart, _oldEnd, newStart, newEnd) => {
+        let from = newStart
+        let to = newEnd
+        for (let i = after; i < maps.length; i += 1) {
+          from = maps[i]!.map(from, -1)
+          to = maps[i]!.map(to, 1)
+        }
+        if (to < from) {
+          const swap = from
+          from = to
+          to = swap
+        }
+        ranges.push({ from, to })
+      })
+      index += 1
+    }
+  }
+  return ranges
+}
+
+/**
+ * 已保存公式的单元格，在其它格子改动后重算显示值。
+ * 正在手改的公式原文不动；手改成普通数字则清掉公式。
+ */
+export function formulaRecalcTransaction(
+  state: EditorState,
+  edited: readonly { from: number; to: number }[],
+): Transaction | null {
+  const updates: Array<{ cellPos: number; cell: PmNode; text: string; formula: string | null }> = []
+  state.doc.descendants((node, pos) => {
+    if (node.type.name !== 'table') return
+    const grid = tableGrid(node)
+    const { grid: computed } = evaluateTableFormulas(grid)
+    let rowIndex = 0
+    node.forEach((rowNode, rowOffset) => {
+      const rowPos = pos + 1 + rowOffset
+      let cellPos = rowPos + 1
+      let colIndex = 0
+      rowNode.forEach((cellNode) => {
+        const stored = typeof cellNode.attrs?.formula === 'string' ? cellNode.attrs.formula.trim() : ''
+        if (stored) {
+          const display = cellDisplayText(cellNode)
+          const next = computed[rowIndex]?.[colIndex] ?? display
+          const contentFrom = cellPos + 1
+          const contentTo = cellPos + cellNode.nodeSize - 1
+          const touched = edited.some((range) => rangesOverlap(range.from, range.to, contentFrom, contentTo))
+          if (touched && isFormulaCell(display)) {
+            /* 格子里正在输入公式原文 */
+          } else if (touched && display !== next) {
+            updates.push({ cellPos, cell: cellNode, text: display, formula: null })
+          } else if (!touched && display !== next) {
+            updates.push({ cellPos, cell: cellNode, text: next, formula: stored })
+          }
+        }
+        cellPos += cellNode.nodeSize
+        colIndex += 1
+      })
+      rowIndex += 1
+    })
+    return false
+  })
+  if (!updates.length) return null
+  let tr = state.tr
+  updates.sort((a, b) => b.cellPos - a.cellPos)
+  for (const item of updates) {
+    const cellPos = tr.mapping.map(item.cellPos)
+    const cell = tr.doc.nodeAt(cellPos)
+    if (!cell) continue
+    tr = tr.setNodeMarkup(cellPos, undefined, { ...cell.attrs, formula: item.formula })
+    const first = cell.firstChild
+    if (!first || !item.formula) continue
+    const from = cellPos + 2
+    const to = cellPos + first.nodeSize
+    if (to < from) continue
+    const live = tr.doc.nodeAt(cellPos)
+    const liveFirst = live?.firstChild
+    if (!liveFirst) continue
+    const liveFrom = cellPos + 2
+    const liveTo = cellPos + liveFirst.nodeSize
+    if (item.text) tr = tr.replaceWith(liveFrom, liveTo, state.schema.text(item.text))
+    else if (liveTo > liveFrom) tr = tr.delete(liveFrom, liveTo)
+  }
+  if (!tr.docChanged) return null
+  tr.setMeta(TABLE_FORMULA_RECALC, true)
+  return tr
 }

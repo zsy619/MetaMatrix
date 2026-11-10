@@ -109,6 +109,33 @@ watch(
   { immediate: true },
 )
 
+let autoApplyTimer: ReturnType<typeof setTimeout> | null = null
+
+/** 公式已经能算出结果时写入单元格，不必再点一次「应用」。 */
+watch(draft, (value) => {
+  if (autoApplyTimer) {
+    clearTimeout(autoApplyTimer)
+    autoApplyTimer = null
+  }
+  if (!editing.value) return
+  const loc = active.value
+  if (!loc || !isFormulaCell(value) || value.trim() === source.value.trim()) return
+  const grid = tableGrid(loc.table)
+  if (!grid[loc.rowIndex]) return
+  const trial = grid.map((row) => [...row])
+  trial[loc.rowIndex]![loc.colIndex] = value.trim()
+  const evaluated = evaluateFormula(value, trial, loc.rowIndex, loc.colIndex)
+  if (!evaluated.ok) return
+  autoApplyTimer = setTimeout(() => {
+    autoApplyTimer = null
+    if (editing.value && draft.value.trim() === value.trim()) apply()
+  }, 280)
+})
+
+onBeforeUnmount(() => {
+  if (autoApplyTimer) clearTimeout(autoApplyTimer)
+})
+
 /** 回写公式并重算。 */
 function apply() {
   const ed = rawEditor.value
