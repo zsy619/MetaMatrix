@@ -20,7 +20,11 @@ vi.mock('../RichTextEditor.vue', () => ({
 import { cloneTemplate, isTemplateId, TEMPLATE_META, useDocumentStore } from '../../stores/document'
 import {
   isFiveForcesDoc,
+  isAnsoffDoc,
+  isEmpathyDoc,
   isIncomeStatementDoc,
+  isMarketingMixDoc,
+  isPestleDoc,
   isLeanCanvasDoc,
   isOkrDoc,
   isPdcaDoc,
@@ -125,6 +129,20 @@ describe('实用商业画布', () => {
     const sum = (id: 'revenue' | 'cost' | 'expense') =>
       income.sections.find((section) => section.id === id)!.lines.reduce((total, line) => total + line.amount, 0)
     expect(sum('revenue') - sum('cost') - sum('expense')).toBe(110)
+  })
+
+  it('PESTLE、安索夫、同理心和 4P 都登记在模板库', () => {
+    for (const id of ['pestle', 'ansoff', 'empathy-map', 'marketing-mix'] as const) {
+      expect(isTemplateId(id)).toBe(true)
+      expect(TEMPLATE_META[id].description.length).toBeGreaterThan(0)
+    }
+    expect(isPestleDoc(cloneTemplate('pestle')) && (cloneTemplate('pestle') as { blocks: unknown[] }).blocks).toHaveLength(6)
+    const ansoff = cloneTemplate('ansoff')
+    const empathy = cloneTemplate('empathy-map')
+    const mix = cloneTemplate('marketing-mix')
+    expect(isAnsoffDoc(ansoff) && ansoff.blocks.map((block) => block.id)).toEqual(['penetration', 'product', 'market', 'diversification'])
+    expect(isEmpathyDoc(empathy) && empathy.blocks).toHaveLength(6)
+    expect(isMarketingMixDoc(mix) && mix.blocks).toHaveLength(4)
   })
 
   it('甘特图后置任务指向依赖它的行', () => {

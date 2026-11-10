@@ -1,0 +1,13 @@
+{
+  "id": "canvas_ansoff",
+  "type": "ansoff",
+  "schemaVersion": 1,
+  "theme": { "background": { "pattern": "none", "color": "#f7f7f7" }, "page": "#f7f7f7", "frame": "#ececec", "hairline": "rgba(60, 50, 20, 0.08)" },
+  "title": "安索夫矩阵",
+  "blocks": [
+    { "id": "penetration", "title": "市场渗透", "hint": "现有产品卖给现有客户。风险最低", "items": [{ "id": "an_pen", "text": "让现有项目经理每周都用甘特图" }] },
+    { "id": "product", "title": "产品开发", "hint": "新产品卖给现有客户", "items": [{ "id": "an_prod", "text": "给同一批人加上利润表" }] },
+    { "id": "market", "title": "市场开发", "hint": "现有产品卖给新客户", "items": [{ "id": "an_mkt", "text": "把同一套画布卖给咨询团队" }] },
+    { "id": "diversification", "title": "多元化", "hint": "新产品卖给新客户。风险最高", "items": [{ "id": "an_div", "text": "先不要做，除非前三条走不通" }] }
+  ]
+}

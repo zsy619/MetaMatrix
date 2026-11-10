@@ -2045,6 +2045,86 @@ export interface IncomeStatementDocumentJSON {
   sections: IncomeSection[]
 }
 
+export type PestleBlockId = 'political' | 'economic' | 'social' | 'technological' | 'legal' | 'environmental'
+
+export interface PestleBlock {
+  id: PestleBlockId
+  title: string
+  hint: string
+  keyword?: string
+  items: QuadrantItem[]
+  text?: string
+}
+
+export interface PestleDocumentJSON {
+  id: string
+  type: 'pestle'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  blocks: PestleBlock[]
+}
+
+export type AnsoffBlockId = 'penetration' | 'product' | 'market' | 'diversification'
+
+export interface AnsoffBlock {
+  id: AnsoffBlockId
+  title: string
+  hint: string
+  keyword?: string
+  items: QuadrantItem[]
+  text?: string
+}
+
+export interface AnsoffDocumentJSON {
+  id: string
+  type: 'ansoff'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  blocks: AnsoffBlock[]
+}
+
+export type EmpathyBlockId = 'says' | 'thinks' | 'does' | 'feels' | 'pains' | 'gains'
+
+export interface EmpathyBlock {
+  id: EmpathyBlockId
+  title: string
+  hint: string
+  keyword?: string
+  items: QuadrantItem[]
+  text?: string
+}
+
+export interface EmpathyDocumentJSON {
+  id: string
+  type: 'empathy_map'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  blocks: EmpathyBlock[]
+}
+
+export type MarketingMixBlockId = 'product' | 'price' | 'place' | 'promotion'
+
+export interface MarketingMixBlock {
+  id: MarketingMixBlockId
+  title: string
+  hint: string
+  keyword?: string
+  items: QuadrantItem[]
+  text?: string
+}
+
+export interface MarketingMixDocumentJSON {
+  id: string
+  type: 'marketing_mix'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  blocks: MarketingMixBlock[]
+}
+
 /** 科学决策三角形（宽度 / 高度 / 深度） */
 export type DecisionTriangleBlockId = 'width' | 'height' | 'depth'
 
@@ -2121,6 +2201,10 @@ export type CanvasDocumentJSON = (
   | PdcaDocumentJSON
   | FiveForcesDocumentJSON
   | IncomeStatementDocumentJSON
+  | PestleDocumentJSON
+  | AnsoffDocumentJSON
+  | EmpathyDocumentJSON
+  | MarketingMixDocumentJSON
 ) & WithPanelAttachments
 
 /** 带 blocks 的画布（双三角 / Y 模型 / 刻意练习） */
@@ -2167,6 +2251,10 @@ export type BlockCanvasDocumentJSON =
   | StakeholderDocumentJSON
   | PdcaDocumentJSON
   | FiveForcesDocumentJSON
+  | PestleDocumentJSON
+  | AnsoffDocumentJSON
+  | EmpathyDocumentJSON
+  | MarketingMixDocumentJSON
 
 export function isDualTriangleDoc(
   doc: CanvasDocumentJSON | null | undefined,
@@ -2740,6 +2828,30 @@ export function isIncomeStatementDoc(
   return !!doc && doc.type === 'income_statement'
 }
 
+export function isPestleDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is PestleDocumentJSON {
+  return !!doc && doc.type === 'pestle'
+}
+
+export function isAnsoffDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is AnsoffDocumentJSON {
+  return !!doc && doc.type === 'ansoff'
+}
+
+export function isEmpathyDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is EmpathyDocumentJSON {
+  return !!doc && doc.type === 'empathy_map'
+}
+
+export function isMarketingMixDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is MarketingMixDocumentJSON {
+  return !!doc && doc.type === 'marketing_mix'
+}
+
 
 export function isBlockCanvasDoc(
   doc: CanvasDocumentJSON | null | undefined,
@@ -2786,7 +2898,11 @@ export function isBlockCanvasDoc(
     isValuePropositionDoc(doc) ||
     isStakeholderDoc(doc) ||
     isPdcaDoc(doc) ||
-    isFiveForcesDoc(doc)
+    isFiveForcesDoc(doc) ||
+    isPestleDoc(doc) ||
+    isAnsoffDoc(doc) ||
+    isEmpathyDoc(doc) ||
+    isMarketingMixDoc(doc)
   )
 }
 
