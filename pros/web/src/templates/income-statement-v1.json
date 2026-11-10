@@ -1,0 +1,37 @@
+{
+  "id": "canvas_income",
+  "type": "income_statement",
+  "schemaVersion": 1,
+  "theme": {
+    "background": { "pattern": "none", "color": "#f7f7f7" },
+    "page": "#f7f7f7",
+    "frame": "#ececec",
+    "hairline": "rgba(60, 50, 20, 0.08)"
+  },
+  "title": "利润表",
+  "sections": [
+    {
+      "id": "revenue",
+      "title": "营业收入",
+      "lines": [
+        { "id": "rev_sales", "label": "产品收入", "amount": 200 },
+        { "id": "rev_service", "label": "服务收入", "amount": 40 }
+      ]
+    },
+    {
+      "id": "cost",
+      "title": "营业成本",
+      "lines": [
+        { "id": "cost_direct", "label": "直接成本", "amount": 80 }
+      ]
+    },
+    {
+      "id": "expense",
+      "title": "期间费用",
+      "lines": [
+        { "id": "exp_sales", "label": "销售费用", "amount": 30 },
+        { "id": "exp_admin", "label": "管理费用", "amount": 20 }
+      ]
+    }
+  ]
+}

@@ -1961,6 +1961,90 @@ export interface OkrDocumentJSON {
   objectives: OkrObjective[]
 }
 
+export type StakeholderBlockId = 'manage' | 'satisfy' | 'inform' | 'monitor'
+
+export interface StakeholderBlock {
+  id: StakeholderBlockId
+  title: string
+  hint: string
+  keyword?: string
+  items: QuadrantItem[]
+  text?: string
+}
+
+export interface StakeholderDocumentJSON {
+  id: string
+  type: 'stakeholder_map'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  blocks: StakeholderBlock[]
+}
+
+export type PdcaBlockId = 'plan' | 'do' | 'check' | 'act'
+
+export interface PdcaBlock {
+  id: PdcaBlockId
+  title: string
+  hint: string
+  keyword?: string
+  items: QuadrantItem[]
+  text?: string
+}
+
+export interface PdcaDocumentJSON {
+  id: string
+  type: 'pdca'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  blocks: PdcaBlock[]
+}
+
+export type FiveForcesBlockId = 'rivalry' | 'entrants' | 'suppliers' | 'buyers' | 'substitutes'
+
+export interface FiveForcesBlock {
+  id: FiveForcesBlockId
+  title: string
+  hint: string
+  keyword?: string
+  items: QuadrantItem[]
+  text?: string
+}
+
+export interface FiveForcesDocumentJSON {
+  id: string
+  type: 'five_forces'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  blocks: FiveForcesBlock[]
+}
+
+export type IncomeSectionId = 'revenue' | 'cost' | 'expense'
+
+export interface IncomeLine {
+  id: string
+  label: string
+  /** 都填正数。收入相加，成本与费用相减。 */
+  amount: number
+}
+
+export interface IncomeSection {
+  id: IncomeSectionId
+  title: string
+  lines: IncomeLine[]
+}
+
+export interface IncomeStatementDocumentJSON {
+  id: string
+  type: 'income_statement'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  sections: IncomeSection[]
+}
+
 /** 科学决策三角形（宽度 / 高度 / 深度） */
 export type DecisionTriangleBlockId = 'width' | 'height' | 'depth'
 
@@ -2033,6 +2117,10 @@ export type CanvasDocumentJSON = (
   | LeanCanvasDocumentJSON
   | ValuePropositionDocumentJSON
   | OkrDocumentJSON
+  | StakeholderDocumentJSON
+  | PdcaDocumentJSON
+  | FiveForcesDocumentJSON
+  | IncomeStatementDocumentJSON
 ) & WithPanelAttachments
 
 /** 带 blocks 的画布（双三角 / Y 模型 / 刻意练习） */
@@ -2076,6 +2164,9 @@ export type BlockCanvasDocumentJSON =
   | SwotDocumentJSON
   | LeanCanvasDocumentJSON
   | ValuePropositionDocumentJSON
+  | StakeholderDocumentJSON
+  | PdcaDocumentJSON
+  | FiveForcesDocumentJSON
 
 export function isDualTriangleDoc(
   doc: CanvasDocumentJSON | null | undefined,
@@ -2625,6 +2716,30 @@ export function isOkrDoc(
   return !!doc && doc.type === 'okr'
 }
 
+export function isStakeholderDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is StakeholderDocumentJSON {
+  return !!doc && doc.type === 'stakeholder_map'
+}
+
+export function isPdcaDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is PdcaDocumentJSON {
+  return !!doc && doc.type === 'pdca'
+}
+
+export function isFiveForcesDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is FiveForcesDocumentJSON {
+  return !!doc && doc.type === 'five_forces'
+}
+
+export function isIncomeStatementDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is IncomeStatementDocumentJSON {
+  return !!doc && doc.type === 'income_statement'
+}
+
 
 export function isBlockCanvasDoc(
   doc: CanvasDocumentJSON | null | undefined,
@@ -2668,7 +2783,10 @@ export function isBlockCanvasDoc(
     isContextSixElementsDoc(doc) ||
     isSwotDoc(doc) ||
     isLeanCanvasDoc(doc) ||
-    isValuePropositionDoc(doc)
+    isValuePropositionDoc(doc) ||
+    isStakeholderDoc(doc) ||
+    isPdcaDoc(doc) ||
+    isFiveForcesDoc(doc)
   )
 }
 

@@ -53,6 +53,10 @@ import {
   isLeanCanvasDoc,
   isValuePropositionDoc,
   isOkrDoc,
+  isStakeholderDoc,
+  isPdcaDoc,
+  isFiveForcesDoc,
+  isIncomeStatementDoc,
   isYModelDoc,
 } from '../../types/canvas'
 import BackgroundLayer from './BackgroundLayer.vue'
@@ -109,6 +113,10 @@ import SwotCanvas from './SwotCanvas.vue'
 import LeanCanvas from './LeanCanvas.vue'
 import ValuePropositionCanvas from './ValuePropositionCanvas.vue'
 import OkrCanvas from './OkrCanvas.vue'
+import StakeholderCanvas from './StakeholderCanvas.vue'
+import PdcaCanvas from './PdcaCanvas.vue'
+import FiveForcesCanvas from './FiveForcesCanvas.vue'
+import IncomeStatementCanvas from './IncomeStatementCanvas.vue'
 
 const documentStore = useDocumentStore()
 const ui = useUiStore()
@@ -259,6 +267,12 @@ const valuePropositionDoc = computed(() =>
   isValuePropositionDoc(current_data.value) ? current_data.value : null,
 )
 const okrDoc = computed(() => (isOkrDoc(current_data.value) ? current_data.value : null))
+const stakeholderDoc = computed(() => (isStakeholderDoc(current_data.value) ? current_data.value : null))
+const pdcaDoc = computed(() => (isPdcaDoc(current_data.value) ? current_data.value : null))
+const fiveForcesDoc = computed(() => (isFiveForcesDoc(current_data.value) ? current_data.value : null))
+const incomeStatementDoc = computed(() =>
+  isIncomeStatementDoc(current_data.value) ? current_data.value : null,
+)
 const quadrantDoc = computed(() =>
   isQuadrantDoc(current_data.value) ? current_data.value : null,
 )
@@ -422,6 +436,18 @@ const quadrantDoc = computed(() =>
         </template>
         <template v-else-if="okrDoc">
           <OkrCanvas :doc="okrDoc" />
+        </template>
+        <template v-else-if="stakeholderDoc">
+          <StakeholderCanvas :doc="stakeholderDoc" />
+        </template>
+        <template v-else-if="pdcaDoc">
+          <PdcaCanvas :doc="pdcaDoc" />
+        </template>
+        <template v-else-if="fiveForcesDoc">
+          <FiveForcesCanvas :doc="fiveForcesDoc" />
+        </template>
+        <template v-else-if="incomeStatementDoc">
+          <IncomeStatementCanvas :doc="incomeStatementDoc" />
         </template>
         <template v-else-if="quadrantDoc">
           <BackgroundLayer

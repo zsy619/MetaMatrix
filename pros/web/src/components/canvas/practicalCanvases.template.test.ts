@@ -18,7 +18,16 @@ vi.mock('../RichTextEditor.vue', () => ({
 }))
 
 import { cloneTemplate, isTemplateId, TEMPLATE_META, useDocumentStore } from '../../stores/document'
-import { isLeanCanvasDoc, isOkrDoc, isSwotDoc, isValuePropositionDoc } from '../../types/canvas'
+import {
+  isFiveForcesDoc,
+  isIncomeStatementDoc,
+  isLeanCanvasDoc,
+  isOkrDoc,
+  isPdcaDoc,
+  isStakeholderDoc,
+  isSwotDoc,
+  isValuePropositionDoc,
+} from '../../types/canvas'
 import { formatSuccessors } from '../../utils/projectGantt'
 import LeanCanvas from './LeanCanvas.vue'
 import OkrCanvas from './OkrCanvas.vue'
@@ -98,6 +107,24 @@ describe('实用商业画布', () => {
     expect(isSwotDoc(current)).toBe(true)
     if (!isSwotDoc(current)) return
     expect(current.blocks.find((block) => block.id === 'strengths')?.items.map((item) => item.text)).toEqual(['第一行', '第二行'])
+  })
+
+  it('干系人、PDCA、五力和利润表都登记并能算出利润', () => {
+    for (const id of ['stakeholder-map', 'pdca', 'five-forces', 'income-statement'] as const) {
+      expect(isTemplateId(id)).toBe(true)
+    }
+    const stakeholder = cloneTemplate('stakeholder-map')
+    const pdca = cloneTemplate('pdca')
+    const forces = cloneTemplate('five-forces')
+    const income = cloneTemplate('income-statement')
+    expect(isStakeholderDoc(stakeholder) && stakeholder.blocks).toHaveLength(4)
+    expect(isPdcaDoc(pdca) && pdca.blocks).toHaveLength(4)
+    expect(isFiveForcesDoc(forces) && forces.blocks).toHaveLength(5)
+    expect(isIncomeStatementDoc(income)).toBe(true)
+    if (!isIncomeStatementDoc(income)) return
+    const sum = (id: 'revenue' | 'cost' | 'expense') =>
+      income.sections.find((section) => section.id === id)!.lines.reduce((total, line) => total + line.amount, 0)
+    expect(sum('revenue') - sum('cost') - sum('expense')).toBe(110)
   })
 
   it('甘特图后置任务指向依赖它的行', () => {
