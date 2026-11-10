@@ -1,0 +1,18 @@
+{
+  "id": "canvas_stakeholder",
+  "type": "stakeholder_map",
+  "schemaVersion": 1,
+  "theme": {
+    "background": { "pattern": "none", "color": "#f7f7f7" },
+    "page": "#f7f7f7",
+    "frame": "#ececec",
+    "hairline": "rgba(60, 50, 20, 0.08)"
+  },
+  "title": "干系人地图",
+  "blocks": [
+    { "id": "satisfy", "title": "保持满意", "hint": "权力高、利益低。定期简报，不要突然打扰", "items": [{ "id": "sh_sat_1", "text": "财务负责人：只关心预算是否超" }] },
+    { "id": "manage", "title": "重点管理", "hint": "权力高、利益高。一起做决定", "items": [{ "id": "sh_man_1", "text": "项目发起人：要看关键路径" }] },
+    { "id": "monitor", "title": "监督即可", "hint": "权力低、利益低。有变化再告知", "items": [{ "id": "sh_mon_1", "text": "外围支持团队" }] },
+    { "id": "inform", "title": "随时告知", "hint": "权力低、利益高。他们是拥护者", "items": [{ "id": "sh_inf_1", "text": "一线使用者：关心下周安排" }] }
+  ]
+}

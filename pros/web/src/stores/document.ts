@@ -108,6 +108,10 @@ import type {
   LeanCanvasDocumentJSON,
   ValuePropositionDocumentJSON,
   OkrDocumentJSON,
+  StakeholderDocumentJSON,
+  PdcaDocumentJSON,
+  FiveForcesDocumentJSON,
+  IncomeStatementDocumentJSON,
   PanelAttachment,
   AttachmentsByPanelId,
 } from '../types/canvas'
@@ -153,6 +157,9 @@ import {
   isSwotDoc,
   isLeanCanvasDoc,
   isValuePropositionDoc,
+  isStakeholderDoc,
+  isPdcaDoc,
+  isFiveForcesDoc,
   coerceYModelDoc,
   normalizeYModelDoc,
 } from '../types/canvas'
@@ -211,6 +218,10 @@ import swotTemplate from '../templates/swot-v1.json'
 import leanCanvasTemplate from '../templates/lean-canvas-v1.json'
 import valuePropositionTemplate from '../templates/value-proposition-v1.json'
 import okrTemplate from '../templates/okr-v1.json'
+import stakeholderTemplate from '../templates/stakeholder-map-v1.json'
+import pdcaTemplate from '../templates/pdca-v1.json'
+import fiveForcesTemplate from '../templates/five-forces-v1.json'
+import incomeStatementTemplate from '../templates/income-statement-v1.json'
 import { CONTEXT_SIX_ELEMENTS_BLOCK_ID } from '../utils/contextSixElements'
 
 export type TemplateId =
@@ -267,6 +278,10 @@ export type TemplateId =
   | 'lean-canvas'
   | 'value-proposition'
   | 'okr'
+  | 'stakeholder-map'
+  | 'pdca'
+  | 'five-forces'
+  | 'income-statement'
 
 const TEMPLATES: Record<TemplateId, CanvasDocumentJSON> = {
   'dual-triangle': dualTriangleTemplate as DualTriangleDocumentJSON,
@@ -327,6 +342,10 @@ const TEMPLATES: Record<TemplateId, CanvasDocumentJSON> = {
   'lean-canvas': leanCanvasTemplate as LeanCanvasDocumentJSON,
   'value-proposition': valuePropositionTemplate as ValuePropositionDocumentJSON,
   okr: okrTemplate as OkrDocumentJSON,
+  'stakeholder-map': stakeholderTemplate as StakeholderDocumentJSON,
+  pdca: pdcaTemplate as PdcaDocumentJSON,
+  'five-forces': fiveForcesTemplate as FiveForcesDocumentJSON,
+  'income-statement': incomeStatementTemplate as IncomeStatementDocumentJSON,
 }
 
 export function isTemplateId(id: string): id is TemplateId {
@@ -780,6 +799,30 @@ export const TEMPLATE_META: Record<
     badge: '目标 · OKR',
     description: '一个目标配几条可衡量的关键结果。拖动进度，目标完成度自动取平均。',
     category: 'method',
+  },
+  'stakeholder-map': {
+    name: '干系人地图',
+    badge: '项目 · 干系人',
+    description: '按权力和利益分成四格：重点管理、保持满意、随时告知、监督即可。',
+    category: 'method',
+  },
+  pdca: {
+    name: 'PDCA',
+    badge: '日常 · PDCA',
+    description: '计划、执行、检查、处理四步铺满页面。用来把一件事转起来。',
+    category: 'org',
+  },
+  'five-forces': {
+    name: '波特五力',
+    badge: '商业 · 五力',
+    description: '行业竞争居中，四周是新进入者、供应商、买方和替代品。用来看利润会从哪里漏走。',
+    category: 'industry',
+  },
+  'income-statement': {
+    name: '利润表',
+    badge: '财务 · 利润',
+    description: '收入减去成本是毛利，再减去费用是营业利润。和现金流量放在一起看赚不赚钱。',
+    category: 'growth',
   },
 }
 
@@ -1481,6 +1524,9 @@ export const useDocumentStore = defineStore('document', () => {
     if (isSwotDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
     if (isLeanCanvasDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
     if (isValuePropositionDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
+    if (isStakeholderDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
+    if (isPdcaDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
+    if (isFiveForcesDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
     if (
       isDualTriangleDoc(next) &&
       (tid === 'dual-triangle-human-ai' ||
@@ -2409,7 +2455,10 @@ export const useDocumentStore = defineStore('document', () => {
         !isFiveStepFamilyDoc(doc) &&
         !isSwotDoc(doc) &&
         !isLeanCanvasDoc(doc) &&
-        !isValuePropositionDoc(doc))
+        !isValuePropositionDoc(doc) &&
+        !isStakeholderDoc(doc) &&
+        !isPdcaDoc(doc) &&
+        !isFiveForcesDoc(doc))
     ) {
       return false
     }
