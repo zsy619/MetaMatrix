@@ -1454,10 +1454,14 @@ withDefaults(
 
       <svg v-else-if="templateId === 'project-gantt'" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
         <rect width="200" height="140" rx="10" fill="#f7f7f7" />
-        <rect x="16" y="28" width="70" height="10" rx="3" fill="#1a73e8" />
-        <rect x="40" y="50" width="90" height="10" rx="3" fill="#1a73e8" />
-        <rect x="70" y="72" width="100" height="10" rx="3" fill="#8ab4f8" />
-        <rect x="120" y="94" width="60" height="10" rx="3" fill="#d2e3fc" />
+        <rect x="18" y="26" width="150" height="6" fill="#202124" />
+        <rect x="18" y="26" width="2" height="10" fill="#202124" />
+        <rect x="166" y="26" width="2" height="10" fill="#202124" />
+        <rect x="18" y="48" width="48" height="8" rx="2" fill="#d93025" />
+        <rect x="74" y="70" width="46" height="8" rx="2" fill="#d93025" />
+        <rect x="128" y="92" width="40" height="8" rx="2" fill="#1a73e8" />
+        <rect x="176" y="112" width="8" height="8" transform="rotate(45 180 116)" fill="#d93025" />
+        <path d="M66 52 H74 V74" fill="none" stroke="#d93025" stroke-width="1.2" />
       </svg>
       <svg v-else-if="templateId === 'raci-matrix'" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
         <rect width="200" height="140" rx="10" fill="#f7f7f7" />
