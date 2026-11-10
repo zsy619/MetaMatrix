@@ -116,6 +116,7 @@ import { QUOTE_STYLE_OPTIONS, type QuoteStyle } from '../extensions/rteBlockquot
 import { collectCrossRefTargets } from '../extensions/crossRef'
 import { deepOptimizeDocument, type OptimizeAction, type OptimizeReportLine } from '../utils/rteDeepOptimize'
 import { setGroupLayout } from '../extensions/imageGroupOps'
+import { continueOrderedList, promoteTableHeader } from '../utils/rteOptimizeActions'
 import {
   applyParagraphStyle,
   PARA_STYLE_OPTIONS,
@@ -3105,13 +3106,31 @@ function runDeepOptimize(options?: { quiet?: boolean }) {
 function applyOptimizeAction(action: OptimizeAction) {
   const ed = editor.value
   if (!ed) return
-  const layout = action.id === 'layout12' ? '12' : '21'
-  if (!setGroupLayout(ed.view, action.pos, layout)) {
+  if (action.id === 'continueList') {
+    if (!continueOrderedList(ed.view, action.pos)) {
+      ElMessage.info('这个列表现在接不上编号')
+      return
+    }
+    runDeepOptimize({ quiet: true })
+    ElMessage.success('已接上编号')
+    return
+  }
+  if (action.id === 'makeHeader') {
+    if (!promoteTableHeader(ed.view, action.pos)) {
+      ElMessage.info('这一行现在不能标成表头')
+      return
+    }
+    runDeepOptimize({ quiet: true })
+    ElMessage.success('已把第一行标成表头')
+    return
+  }
+  const layout = action.id === 'layout12' ? '12' : action.id === 'layout21' ? '21' : action.id === 'layoutRows' ? 'rows' : null
+  if (!layout || !setGroupLayout(ed.view, action.pos, layout)) {
     ElMessage.info('这组图片现在不能套用该布局')
     return
   }
   runDeepOptimize({ quiet: true })
-  ElMessage.success(layout === '12' ? '已排成 12' : '已排成 21')
+  ElMessage.success(layout === '12' ? '已排成 12' : layout === '21' ? '已排成 21' : '已排成上下两行')
 }
 
 function appendOptimizeChecklist() {

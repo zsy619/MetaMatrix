@@ -1305,6 +1305,13 @@ html.rte-toolbar-dragging * {
   gap: 8px;
   margin-bottom: 14px;
 }
+.rte-outline-flash {
+  animation: rte-outline-flash 0.8s ease;
+}
+@keyframes rte-outline-flash {
+  0% { background: #fff3bf; }
+  100% { background: transparent; }
+}
 .rte-link-dialog.rte-optimize-dialog {
   width: min(560px, 100%);
 }

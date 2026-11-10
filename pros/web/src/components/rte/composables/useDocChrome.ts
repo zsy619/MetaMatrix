@@ -267,7 +267,11 @@ function jumpToOutlineHeading(item: OutlineHeading) {
   // 滚动到可见
   try {
     const dom = ed.view.nodeDOM(item.pos) as HTMLElement | null
-    dom?.scrollIntoView?.({ behavior: 'smooth', block: 'center' })
+    dom?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
+    if (dom) {
+      dom.classList.add('rte-outline-flash')
+      window.setTimeout(() => dom.classList.remove('rte-outline-flash'), 800)
+    }
   } catch {
     /* ignore */
   }

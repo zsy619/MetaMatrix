@@ -108,8 +108,26 @@ function paintCollage(row: HTMLElement, layout: '12' | '21') {
   })
 }
 
+function paintRows(row: HTMLElement) {
+  row.style.display = 'flex'
+  row.style.flexDirection = 'column'
+  row.style.gridTemplateColumns = ''
+  row.style.gridTemplateRows = ''
+  row.style.aspectRatio = ''
+  row.style.height = 'auto'
+  row.style.minHeight = '0'
+  Array.from(row.children).forEach((child) => {
+    if (!(child instanceof HTMLElement) || child.classList.contains('ProseMirror-widget')) return
+    child.style.gridArea = ''
+    child.style.flex = 'none'
+    child.style.width = '100%'
+    child.style.height = 'auto'
+  })
+}
+
 function clearCollage(row: HTMLElement) {
   row.style.display = 'flex'
+  row.style.flexDirection = 'row'
   row.style.gridTemplateColumns = ''
   row.style.gridTemplateRows = ''
   row.style.aspectRatio = ''
@@ -179,6 +197,13 @@ export function layoutImageGroupChrome(view: EditorView) {
     if ((layout === '12' || layout === '21') && kids.length === 3) {
       applyGroupGap(dom, gap)
       if (dom.dataset.ratioDrag !== '1') paintCollage(row, layout)
+      dividers.replaceChildren()
+      return false
+    }
+    if (layout === 'rows' && kids.length === 2) {
+      applyGroupGap(dom, gap)
+      dom.setAttribute('data-layout', 'rows')
+      if (dom.dataset.ratioDrag !== '1') paintRows(row)
       dividers.replaceChildren()
       return false
     }
@@ -444,13 +469,13 @@ export const ImageGroup = Node.create({
       })
       bar.appendChild(gapBtn)
 
-      for (const layout of ['row', '12', '21'] as const) {
+      for (const layout of ['row', '12', '21', 'rows'] as const) {
         const button = document.createElement('button')
         button.type = 'button'
         button.className = 'rte-image-group-layout'
         button.dataset.layout = layout
-        button.textContent = layout === 'row' ? '横排' : layout
-        button.title = layout === 'row' ? '横排' : layout === '12' ? '左一右二' : '左二右一'
+        button.textContent = layout === 'row' ? '横排' : layout === 'rows' ? '上下' : layout
+        button.title = layout === 'row' ? '横排' : layout === '12' ? '左一右二' : layout === '21' ? '左二右一' : '上下两行'
         button.setAttribute('aria-label', button.title)
         button.addEventListener('click', (event) => {
           event.preventDefault()
@@ -498,6 +523,9 @@ export const ImageGroup = Node.create({
         if (layout === '12' || layout === '21') {
           dom.setAttribute('data-layout', layout)
           paintCollage(contentDOM, layout)
+        } else if (layout === 'rows') {
+          dom.setAttribute('data-layout', layout)
+          paintRows(contentDOM)
         } else {
           dom.removeAttribute('data-layout')
           clearCollage(contentDOM)
@@ -511,10 +539,12 @@ export const ImageGroup = Node.create({
         })
         bar.querySelectorAll<HTMLButtonElement>('.rte-image-group-layout').forEach((button) => {
           const want = button.dataset.layout
-          const active = normalizeGroupLayout(current.attrs.layout) === (want === '12' || want === '21' ? want : 'row')
+          const active = normalizeGroupLayout(current.attrs.layout) === want
           button.classList.toggle('is-active', active)
           button.setAttribute('aria-pressed', active ? 'true' : 'false')
-          button.disabled = want !== 'row' && current.childCount !== 3
+          button.disabled =
+            ((want === '12' || want === '21') && current.childCount !== 3) ||
+            (want === 'rows' && current.childCount !== 2)
         })
       }
       paint()

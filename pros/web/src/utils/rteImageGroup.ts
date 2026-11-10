@@ -92,6 +92,10 @@ export const imageGroupLayoutCss = [
   '.rte-image-drag-handle:focus{opacity:1;outline:2px solid #3370ff;outline-offset:1px;}',
   '.rte-image-group-bar button.rte-image-group-layout{width:auto;min-width:28px;padding:0 6px;font-size:12px;}',
   '.rte-image-group[data-fit="contain"] .rte-image-group-row img{object-fit:contain !important;}',
+  '.rte-image-group[data-layout="rows"] .rte-image-group-row{display:flex;flex-direction:column;height:auto;}',
+  '.rte-image-group[data-layout="rows"] .rte-image-group-row>*{flex:none !important;width:100% !important;height:auto !important;}',
+  '.rte-outline-flash{animation:rte-outline-flash .8s ease;}',
+  '@keyframes rte-outline-flash{0%{background:#fff3bf;}100%{background:transparent;}}',
   '[data-resize-container][data-node="image"]:hover>.rte-image-drag-handle,[data-resize-container][data-node="image"].ProseMirror-selectednode>.rte-image-drag-handle,.rte-image-drag-handle.is-dragging{opacity:1;}',
   '.rte-image-group-bar{position:absolute;left:36px;top:8px;z-index:7;display:none;align-items:center;gap:2px;padding:4px;background:#fff;border-radius:8px;box-shadow:0 8px 24px rgba(29,33,41,.12),0 0 0 1px rgba(29,33,41,.06);}',
   '.rte-image-group:hover>.rte-image-group-bar,.rte-image-group.is-selected>.rte-image-group-bar{display:flex;}',
@@ -223,11 +227,12 @@ export function groupInsertIndex(from: number, target: number, side: 'left' | 'r
   return side === 'left' ? targetAfter : targetAfter + 1
 }
 
-export type ImageGroupLayout = 'row' | '12' | '21'
+export type ImageGroupLayout = 'row' | '12' | '21' | 'rows'
 
-/** 缺省横排。12 是左一右二，21 是左二右一。 */
+/** 缺省横排。12 是左一右二，21 是左二右一，rows 是两张上下叠放。 */
 export function normalizeGroupLayout(raw: unknown): ImageGroupLayout {
-  return raw === '12' || raw === '21' ? raw : 'row'
+  if (raw === '12' || raw === '21' || raw === 'rows') return raw
+  return 'row'
 }
 
 /**

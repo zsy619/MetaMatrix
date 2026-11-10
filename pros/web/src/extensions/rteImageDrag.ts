@@ -5,6 +5,7 @@ import {
   moveImageGroup,
   placeBeside,
   reorderInGroup,
+  setGroupLayout,
   setGroupRatios,
   stackInGroup,
 } from './imageGroupOps'
@@ -236,6 +237,14 @@ function placeLine(kind: RteImageDropKind, rect: DOMRect) {
   const line = ensureLine()
   const preview = ensurePreview()
   line.dataset.kind = kind
+  const label = kind === 'before' ? '上' : kind === 'after' ? '下' : kind === 'left' ? '左' : '右'
+  preview.textContent = label
+  preview.style.display = 'flex'
+  preview.style.alignItems = 'center'
+  preview.style.justifyContent = 'center'
+  preview.style.color = '#fff'
+  preview.style.font = '600 12px/1 sans-serif'
+  preview.style.background = 'rgba(51,112,255,.86)'
   if (kind === 'left' || kind === 'right') {
     const x = kind === 'left' ? rect.left : rect.right
     line.style.left = `${x - 2}px`
@@ -471,6 +480,11 @@ function commitDrop(
   if ((plan.kind === 'before' || plan.kind === 'after') && plan.imagePos != null && sameRow(view, from, plan.imagePos)) {
     const side = plan.kind === 'before' ? 'above' : 'below'
     if (stackInGroup(view, from, plan.imagePos, side)) return
+    const $target = view.state.doc.resolve(plan.imagePos)
+    if ($target.parent.type.name === 'imageGroup' && $target.parent.childCount === 2) {
+      if (normalizeGroupLayout($target.parent.attrs.layout) === 'rows') return
+      if (setGroupLayout(view, $target.before($target.depth), 'rows')) return
+    }
   }
   extractOrMoveImage(view, from, dropInsertPos(view, plan))
 }

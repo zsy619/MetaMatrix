@@ -13,21 +13,41 @@ import {
 } from '../../../utils/rteFindReplace'
 import { canRunFindReplace } from '../../../utils/rteRound5'
 
+const FIND_PREFS_KEY = 'rte-find-prefs-v1'
+
+function readFindPrefs(): { scope: RteFindScope; caseSensitive: boolean; wholeWord: boolean; regex: boolean } {
+  const fallback = { scope: 'all' as RteFindScope, caseSensitive: false, wholeWord: false, regex: false }
+  if (typeof localStorage === 'undefined') return fallback
+  try {
+    const raw = JSON.parse(localStorage.getItem(FIND_PREFS_KEY) || '')
+    const scope = raw?.scope
+    return {
+      scope: scope === 'heading' || scope === 'table' || scope === 'code' || scope === 'caption' ? scope : 'all',
+      caseSensitive: !!raw?.caseSensitive,
+      wholeWord: !!raw?.wholeWord,
+      regex: !!raw?.regex,
+    }
+  } catch {
+    return fallback
+  }
+}
+
 /** 查找 / 替换。模板绑定名与原先一致。 */
 export function useFindReplace(deps: {
   editor: ShallowRef<Editor | undefined>
   closeMore: () => void
 }) {
+  const savedPrefs = readFindPrefs()
   const findDialogOpen = ref(false)
   const findQuery = ref('')
   const findReplaceText = ref('')
-  const findCaseSensitive = ref(false)
-  const findWholeWord = ref(false)
+  const findCaseSensitive = ref(savedPrefs.caseSensitive)
+  const findWholeWord = ref(savedPrefs.wholeWord)
   /** 正则查找：按正则表达式匹配（不支持跨文本节点） */
-  const findRegex = ref(false)
+  const findRegex = ref(savedPrefs.regex)
   /** 多行正则：^ $ 匹配行首行尾 */
   const findMultiline = ref(false)
-  const findScope = ref<RteFindScope>('all')
+  const findScope = ref<RteFindScope>(savedPrefs.scope)
   const findMatches = ref<RteFindMatch[]>([])
   const findMatchIndex = ref(-1)
 
@@ -42,6 +62,19 @@ export function useFindReplace(deps: {
 
   function refreshFindMatches(selectNext = false) {
     const ed = deps.editor.value
+    try {
+      localStorage.setItem(
+        FIND_PREFS_KEY,
+        JSON.stringify({
+          scope: findScope.value,
+          caseSensitive: findCaseSensitive.value,
+          wholeWord: findWholeWord.value,
+          regex: findRegex.value,
+        }),
+      )
+    } catch {
+      /* 隐私模式 */
+    }
     if (!ed) {
       findMatches.value = []
       findMatchIndex.value = -1

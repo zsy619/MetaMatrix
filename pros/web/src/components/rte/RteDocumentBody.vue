@@ -647,7 +647,7 @@ useParentScopeStamp()
           title="字数统计"
           @click="rte.toggleWordCountDock"
         >
-          字数 {{ rte.charCount }}
+          字数 {{ rte.charCount }} · 中 {{ rte.wordParts.cn }} · 英 {{ rte.wordParts.en }} · 图 {{ rte.wordParts.images }}
           <template v-if="rte.selectionStats.hasSelection">
             · 选中 {{ rte.selectionStats.chars }}
           </template>

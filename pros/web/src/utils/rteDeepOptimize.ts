@@ -9,7 +9,7 @@ export type DeepOptimizeChange = {
 }
 
 export type OptimizeAction = {
-  id: 'layout12' | 'layout21'
+  id: 'layout12' | 'layout21' | 'layoutRows' | 'continueList' | 'makeHeader'
   label: string
   pos: number
 }
@@ -160,6 +160,13 @@ export function deepOptimizeDocument(editor: Editor): DeepOptimizeResult {
       if (!alt) hints.push({ text: `图片缺少替代文本（图 ${imageNo}）`, pos })
       return
     }
+    if (node.type.name === 'imageGroup' && node.childCount === 2 && normalizeGroupLayout(node.attrs.layout) === 'row') {
+      hints.push({
+        text: '两张横排可以排成上下两行',
+        pos,
+        actions: [{ id: 'layoutRows', label: '上下叠放', pos }],
+      })
+    }
     if (node.type.name === 'imageGroup' && node.childCount === 3 && normalizeGroupLayout(node.attrs.layout) === 'row') {
       hints.push({
         text: '三张横排可以排成 12（左一右二）或 21（左二右一）',
@@ -181,6 +188,19 @@ export function deepOptimizeDocument(editor: Editor): DeepOptimizeResult {
           if (!cell.textContent.trim()) empty += 1
         })
         if (headers > 0 && empty === headers) hints.push({ text: '表格表头是空的', pos })
+        else if (headers === 0) {
+          let cells = 0
+          row.forEach((cell) => {
+            if (cell.type.name === 'tableCell') cells += 1
+          })
+          if (cells > 0) {
+            hints.push({
+              text: '表格第一行还不是表头',
+              pos,
+              actions: [{ id: 'makeHeader', label: '标成表头', pos }],
+            })
+          }
+        }
       }
     }
     if (
@@ -248,7 +268,13 @@ export function deepOptimizeDocument(editor: Editor): DeepOptimizeResult {
       const childPos = pos + 1 + offset
       if (child.type.name === 'orderedList') {
         const start = Number(child.attrs.start) || 1
-        if (prevOrdered && start === 1) hints.push({ text: '有序列表从 1 重新编号', pos: childPos })
+        if (prevOrdered && start === 1) {
+          hints.push({
+            text: '有序列表从 1 重新编号',
+            pos: childPos,
+            actions: [{ id: 'continueList', label: '接上编号', pos: childPos }],
+          })
+        }
         prevOrdered = true
       } else if (!(child.type.name === 'paragraph' && child.content.size === 0)) {
         prevOrdered = false
@@ -341,6 +367,12 @@ export function deepOptimizeDocument(editor: Editor): DeepOptimizeResult {
   emptyLinks.forEach((line) => remaining.push(line))
   externalLinks.slice(0, 6).forEach((line) => remaining.push(line))
   sensitive.slice(0, 6).forEach((hit) => remaining.push({ text: `${hit.hint}：「${hit.word}」`, pos: hit.from }))
+
+  const pending = lines.filter((line) => !line.done && line.text !== '下面这些仍要手工处理：').length
+  lines.unshift({
+    text: `优化报告：自动处理 ${changes.length} 类，仍有 ${pending} 项待处理。`,
+    done: true,
+  })
 
   return { changes, remaining, lines }
 }
