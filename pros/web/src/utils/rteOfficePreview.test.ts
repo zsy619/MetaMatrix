@@ -1,48 +1,9 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from 'vitest'
-import CFB from 'cfb'
-import * as XLSX from 'xlsx'
+import JSZip from 'jszip'
 import { previewDoc, previewDocx, previewSheets, sanitizePreviewHtml } from './rteOfficePreview'
 
-function u32(buf: Uint8Array, offset: number, value: number) {
-  buf[offset] = value & 0xff
-  buf[offset + 1] = (value >> 8) & 0xff
-  buf[offset + 2] = (value >> 16) & 0xff
-  buf[offset + 3] = (value >> 24) & 0xff
-}
-
-function utf16(text: string): Uint8Array {
-  const out = new Uint8Array(text.length * 2)
-  for (let i = 0; i < text.length; i += 1) {
-    const code = text.charCodeAt(i)
-    out[i * 2] = code & 0xff
-    out[i * 2 + 1] = code >> 8
-  }
-  return out
-}
-
-function legacyDoc(body: string): Blob {
-  const text = `${body}\r`
-  const encoded = utf16(text)
-  const filePos = 0x200
-  const word = new Uint8Array(filePos + encoded.length)
-  word[0] = 0xec
-  word[1] = 0xa5
-  u32(word, 0x004c, text.length)
-  const table = new Uint8Array(21)
-  table[0] = 2
-  u32(table, 1, 16)
-  u32(table, 5, 0)
-  u32(table, 9, text.length)
-  u32(table, 15, filePos)
-  word.set(encoded, filePos)
-  const cfb = CFB.utils.cfb_new()
-  CFB.utils.cfb_add(cfb, 'WordDocument', word)
-  CFB.utils.cfb_add(cfb, '0Table', table)
-  const raw = CFB.write(cfb) as Uint8Array | number[] | string
-  const bytes = typeof raw === 'string' ? Uint8Array.from(raw, (ch) => ch.charCodeAt(0) & 0xff) : new Uint8Array(raw)
-  return new Blob([bytes])
-}
+const LEGACY_DOC = '0M8R4KGxGuEAAAAAAAAAAAAAAAAAAAAAPgADAP7/CQAGAAAAAAAAAAAAAAABAAAAAgAAAAAAAAAAEAAAAQAAAAEAAAD+////AAAAAAAAAAD////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////9/////v////7///8EAAAA/v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+////AwAAAAQAAAAFAAAABgAAAAcAAAAIAAAACQAAAAoAAAD+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+/////v////7////+////UgBvAG8AdAAgAEUAbgB0AHIAeQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABYABQH//////////wEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADAAAAwAIAAAAAAAAwAFQAYQBiAGwAZQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADgACAf////8CAAAA/////wAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAVAAAAAAAAAAEAUwBoADMAMwB0AEoANQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASAAIB/////wMAAAD/////AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAQAAAAAAAAAVwBvAHIAZABEAG8AYwB1AG0AZQBuAHQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABoAAgH///////////////8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAAAALgIAAAAAAAACEAAAAAAAAAAXAAAAAAAAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAANzI2MgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAOylAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAXAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA4wUeKViSlQTACAASABZAFAARQBSAEwASQBOAEsAIAAUAO9TwYkHaJiYFQANAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
 
 describe('办公文档预览', () => {
   it('去掉脚本，只保留表格和安全链接', () => {
@@ -104,20 +65,43 @@ describe('办公文档预览', () => {
   })
 
   it('旧版 doc 只保留正文', async () => {
-    const html = await previewDoc(legacyDoc('调研报告\x13 HYPERLINK \x14可见标题\x15'))
+    const bytes = Uint8Array.from(atob(LEGACY_DOC), (char) => char.charCodeAt(0))
+    const html = await previewDoc(new Blob([bytes]))
     expect(html).toContain('调研报告')
     expect(html).toContain('可见标题')
     expect(html).not.toContain('HYPERLINK')
   })
 
   it('excel 按工作表输出表格', async () => {
-    const book = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet([['名称', '数量'], ['报告', 2]]), '明细')
-    XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet([['合计', 2]]), '汇总')
-    const written = XLSX.write(book, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer
-    const copy = new Uint8Array(written.byteLength)
-    copy.set(new Uint8Array(written))
-    const sheets = await previewSheets(new Blob([copy.buffer]))
+    const zip = new JSZip()
+    zip.file('xl/workbook.xml', `<?xml version="1.0" encoding="UTF-8"?>
+      <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+        <sheets>
+          <sheet name="明细" sheetId="1" r:id="rId1"/>
+          <sheet name="汇总" sheetId="2" r:id="rId2"/>
+        </sheets>
+      </workbook>`)
+    zip.file('xl/_rels/workbook.xml.rels', `<?xml version="1.0" encoding="UTF-8"?>
+      <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+        <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+        <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/>
+      </Relationships>`)
+    zip.file('xl/sharedStrings.xml', `<?xml version="1.0" encoding="UTF-8"?>
+      <sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+        <si><t>名称</t></si><si><t>数量</t></si><si><t>报告</t></si><si><t>合计</t></si>
+      </sst>`)
+    zip.file('xl/worksheets/sheet1.xml', `<?xml version="1.0" encoding="UTF-8"?>
+      <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+        <sheetData>
+          <row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c></row>
+          <row r="2"><c r="A2" t="s"><v>2</v></c><c r="B2"><v>2</v></c></row>
+        </sheetData>
+      </worksheet>`)
+    zip.file('xl/worksheets/sheet2.xml', `<?xml version="1.0" encoding="UTF-8"?>
+      <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+        <sheetData><row r="1"><c r="A1" t="s"><v>3</v></c><c r="B1"><v>7</v></c></row></sheetData>
+      </worksheet>`)
+    const sheets = await previewSheets(await zip.generateAsync({ type: 'blob' }))
     expect(sheets.map((sheet) => sheet.name)).toEqual(['明细', '汇总'])
     expect(sheets[0]?.html).toContain('报告')
     expect(sheets[0]?.html).toContain('<table>')
