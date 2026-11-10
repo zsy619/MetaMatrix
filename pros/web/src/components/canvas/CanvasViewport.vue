@@ -57,6 +57,10 @@ import {
   isPdcaDoc,
   isFiveForcesDoc,
   isIncomeStatementDoc,
+  isBcgDoc,
+  isScorecardDoc,
+  isErrcDoc,
+  isAarrDoc,
   isYModelDoc,
 } from '../../types/canvas'
 import BackgroundLayer from './BackgroundLayer.vue'
@@ -117,6 +121,10 @@ import StakeholderCanvas from './StakeholderCanvas.vue'
 import PdcaCanvas from './PdcaCanvas.vue'
 import FiveForcesCanvas from './FiveForcesCanvas.vue'
 import IncomeStatementCanvas from './IncomeStatementCanvas.vue'
+import BcgCanvas from './BcgCanvas.vue'
+import ScorecardCanvas from './ScorecardCanvas.vue'
+import ErrcCanvas from './ErrcCanvas.vue'
+import AarrCanvas from './AarrCanvas.vue'
 
 const documentStore = useDocumentStore()
 const ui = useUiStore()
@@ -273,6 +281,10 @@ const fiveForcesDoc = computed(() => (isFiveForcesDoc(current_data.value) ? curr
 const incomeStatementDoc = computed(() =>
   isIncomeStatementDoc(current_data.value) ? current_data.value : null,
 )
+const bcgDoc = computed(() => (isBcgDoc(current_data.value) ? current_data.value : null))
+const scorecardDoc = computed(() => (isScorecardDoc(current_data.value) ? current_data.value : null))
+const errcDoc = computed(() => (isErrcDoc(current_data.value) ? current_data.value : null))
+const aarrDoc = computed(() => (isAarrDoc(current_data.value) ? current_data.value : null))
 const quadrantDoc = computed(() =>
   isQuadrantDoc(current_data.value) ? current_data.value : null,
 )
@@ -448,6 +460,18 @@ const quadrantDoc = computed(() =>
         </template>
         <template v-else-if="incomeStatementDoc">
           <IncomeStatementCanvas :doc="incomeStatementDoc" />
+        </template>
+        <template v-else-if="bcgDoc">
+          <BcgCanvas :doc="bcgDoc" />
+        </template>
+        <template v-else-if="scorecardDoc">
+          <ScorecardCanvas :doc="scorecardDoc" />
+        </template>
+        <template v-else-if="errcDoc">
+          <ErrcCanvas :doc="errcDoc" />
+        </template>
+        <template v-else-if="aarrDoc">
+          <AarrCanvas :doc="aarrDoc" />
         </template>
         <template v-else-if="quadrantDoc">
           <BackgroundLayer

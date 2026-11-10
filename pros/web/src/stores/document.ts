@@ -112,6 +112,10 @@ import type {
   PdcaDocumentJSON,
   FiveForcesDocumentJSON,
   IncomeStatementDocumentJSON,
+  BcgDocumentJSON,
+  ScorecardDocumentJSON,
+  ErrcDocumentJSON,
+  AarrDocumentJSON,
   PanelAttachment,
   AttachmentsByPanelId,
 } from '../types/canvas'
@@ -160,6 +164,10 @@ import {
   isStakeholderDoc,
   isPdcaDoc,
   isFiveForcesDoc,
+  isBcgDoc,
+  isScorecardDoc,
+  isErrcDoc,
+  isAarrDoc,
   coerceYModelDoc,
   normalizeYModelDoc,
 } from '../types/canvas'
@@ -222,6 +230,10 @@ import stakeholderTemplate from '../templates/stakeholder-map-v1.json'
 import pdcaTemplate from '../templates/pdca-v1.json'
 import fiveForcesTemplate from '../templates/five-forces-v1.json'
 import incomeStatementTemplate from '../templates/income-statement-v1.json'
+import bcgTemplate from '../templates/bcg-v1.json'
+import scorecardTemplate from '../templates/balanced-scorecard-v1.json'
+import errcTemplate from '../templates/errc-v1.json'
+import aarrTemplate from '../templates/aarr-v1.json'
 import { CONTEXT_SIX_ELEMENTS_BLOCK_ID } from '../utils/contextSixElements'
 
 export type TemplateId =
@@ -282,6 +294,10 @@ export type TemplateId =
   | 'pdca'
   | 'five-forces'
   | 'income-statement'
+  | 'bcg'
+  | 'balanced-scorecard'
+  | 'errc'
+  | 'aarr'
 
 const TEMPLATES: Record<TemplateId, CanvasDocumentJSON> = {
   'dual-triangle': dualTriangleTemplate as DualTriangleDocumentJSON,
@@ -346,6 +362,10 @@ const TEMPLATES: Record<TemplateId, CanvasDocumentJSON> = {
   pdca: pdcaTemplate as PdcaDocumentJSON,
   'five-forces': fiveForcesTemplate as FiveForcesDocumentJSON,
   'income-statement': incomeStatementTemplate as IncomeStatementDocumentJSON,
+  bcg: bcgTemplate as BcgDocumentJSON,
+  'balanced-scorecard': scorecardTemplate as ScorecardDocumentJSON,
+  errc: errcTemplate as ErrcDocumentJSON,
+  aarr: aarrTemplate as AarrDocumentJSON,
 }
 
 export function isTemplateId(id: string): id is TemplateId {
@@ -822,6 +842,30 @@ export const TEMPLATE_META: Record<
     name: '利润表',
     badge: '财务 · 利润',
     description: '收入减去成本是毛利，再减去费用是营业利润。和现金流量放在一起看赚不赚钱。',
+    category: 'growth',
+  },
+  bcg: {
+    name: 'BCG 矩阵',
+    badge: '组合 · BCG',
+    description: '按市场增长和份额把业务分成明星、问题、现金牛和瘦狗，决定钱往哪放。',
+    category: 'growth',
+  },
+  'balanced-scorecard': {
+    name: '平衡计分卡',
+    badge: '战略 · 计分卡',
+    description: '财务、客户、内部流程、学习成长四列。不只看赚钱，也看怎么赚到。',
+    category: 'method',
+  },
+  errc: {
+    name: '蓝海 ERRC',
+    badge: '战略 · ERRC',
+    description: '剔除、减少、增加、创造。用来离开同行都在比的那几项。',
+    category: 'growth',
+  },
+  aarr: {
+    name: '海盗指标 AARRR',
+    badge: '增长 · AARRR',
+    description: '获取、激活、留存、推荐、收入。找出用户在哪一段漏掉。',
     category: 'growth',
   },
 }
@@ -1527,6 +1571,10 @@ export const useDocumentStore = defineStore('document', () => {
     if (isStakeholderDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
     if (isPdcaDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
     if (isFiveForcesDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
+    if (isBcgDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
+    if (isScorecardDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
+    if (isErrcDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
+    if (isAarrDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
     if (
       isDualTriangleDoc(next) &&
       (tid === 'dual-triangle-human-ai' ||
@@ -2458,7 +2506,11 @@ export const useDocumentStore = defineStore('document', () => {
         !isValuePropositionDoc(doc) &&
         !isStakeholderDoc(doc) &&
         !isPdcaDoc(doc) &&
-        !isFiveForcesDoc(doc))
+        !isFiveForcesDoc(doc) &&
+        !isBcgDoc(doc) &&
+        !isScorecardDoc(doc) &&
+        !isErrcDoc(doc) &&
+        !isAarrDoc(doc))
     ) {
       return false
     }

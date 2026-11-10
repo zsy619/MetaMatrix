@@ -1,0 +1,13 @@
+{
+  "id": "canvas_errc",
+  "type": "errc",
+  "schemaVersion": 1,
+  "theme": { "background": { "pattern": "none", "color": "#f7f7f7" }, "page": "#f7f7f7", "frame": "#ececec", "hairline": "rgba(60, 50, 20, 0.08)" },
+  "title": "蓝海 ERRC",
+  "blocks": [
+    { "id": "eliminate", "title": "剔除", "hint": "行业默认有、客户并不在意的", "items": [{ "id": "errc_e", "text": "厚重的实施培训" }] },
+    { "id": "reduce", "title": "减少", "hint": "可以降到行业标准以下的", "items": [{ "id": "errc_r", "text": "功能清单的长度" }] },
+    { "id": "raise", "title": "增加", "hint": "要明显高于同行的", "items": [{ "id": "errc_a", "text": "一张图看清计划和责任" }] },
+    { "id": "create", "title": "创造", "hint": "行业里还没有的", "items": [{ "id": "errc_c", "text": "画布和项目计划共用一份文档" }] }
+  ]
+}
