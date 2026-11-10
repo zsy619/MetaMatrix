@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { inject, ref, watch } from 'vue'
 import { RTE_BINDINGS } from './bindings'
-import { QR_PRESETS, makeQrArtwork, type QrModuleStyle } from '../../utils/rteQrArtwork'
+import { QR_PRESETS, QR_STYLES, makeQrArtwork, type QrModuleStyle } from '../../utils/rteQrArtwork'
 
 const rte = inject(RTE_BINDINGS)
 if (!rte) throw new Error('RteQrDialog 必须放在 RichTextEditor 里')
 
 const text = ref('https://')
+const description = ref('')
 const presetId = ref(QR_PRESETS[1]!.id)
 const style = ref<QrModuleStyle>('rounded')
 const caption = ref(true)
@@ -28,6 +29,7 @@ async function refresh() {
       background: preset.background,
       style: style.value,
       caption: caption.value,
+      description: description.value,
     })
     error.value = ''
   } catch (err) {
@@ -39,13 +41,14 @@ async function refresh() {
 watch(() => rte.qrDialogOpen, (open) => {
   if (!open) return
   text.value = 'https://'
+  description.value = ''
   presetId.value = QR_PRESETS[1]!.id
   style.value = 'rounded'
   caption.value = true
   void refresh()
 })
 
-watch([text, presetId, style, caption], () => {
+watch([text, description, presetId, style, caption], () => {
   if (rte.qrDialogOpen) void refresh()
 })
 
@@ -88,9 +91,15 @@ async function confirm() {
         />
         <div class="rte-qr-label">样式</div>
         <div class="rte-qr-styles" role="radiogroup" aria-label="码点样式">
-          <button type="button" :class="{ active: style === 'rounded' }" @click="style = 'rounded'">圆角</button>
-          <button type="button" :class="{ active: style === 'dot' }" @click="style = 'dot'">圆点</button>
-          <button type="button" :class="{ active: style === 'square' }" @click="style = 'square'">方块</button>
+          <button
+            v-for="item in QR_STYLES"
+            :key="item.id"
+            type="button"
+            :class="{ active: style === item.id }"
+            @click="style = item.id"
+          >
+            {{ item.label }}
+          </button>
         </div>
         <div class="rte-qr-label">配色</div>
         <div class="rte-qr-presets">
@@ -109,6 +118,13 @@ async function confirm() {
           <input v-model="caption" type="checkbox" />
           底部显示内容
         </label>
+        <input
+          v-model="description"
+          type="text"
+          maxlength="40"
+          placeholder="描述，例如：扫码查看详情"
+          aria-label="描述"
+        />
         <div class="rte-qr-preview">
           <img v-if="preview" :src="preview" alt="二维码预览" />
           <span v-else>{{ error || '输入内容后在这里预览' }}</span>
@@ -135,7 +151,9 @@ async function confirm() {
   background: rgba(15, 23, 42, 0.45);
 }
 .rte-qr-card {
-  width: min(440px, 100%);
+  width: min(520px, 100%);
+  max-height: calc(100vh - 48px);
+  overflow: auto;
   padding: 20px 20px 16px;
   border-radius: 12px;
   background: #fff;
@@ -206,7 +224,7 @@ async function confirm() {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin: 12px 0;
+  margin: 12px 0 8px;
   font-size: 13px;
   color: #1d2129;
 }
