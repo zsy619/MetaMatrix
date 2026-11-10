@@ -187,7 +187,7 @@ type MammothApi = {
 }
 
 async function mammothHtml(buffer: ArrayBuffer): Promise<string> {
-  const mod = await import('mammoth/mammoth.browser.js')
+  const mod = await import('mammoth')
   const mammoth = ((mod as { default?: MammothApi }).default || mod) as MammothApi
   const options = mammoth.images
     ? {
