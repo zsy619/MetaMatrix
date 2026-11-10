@@ -1,0 +1,13 @@
+{
+  "id": "canvas_kano",
+  "type": "kano",
+  "schemaVersion": 1,
+  "theme": { "background": { "pattern": "none", "color": "#f7f7f7" }, "page": "#f7f7f7", "frame": "#ececec", "hairline": "rgba(60, 50, 20, 0.08)" },
+  "title": "卡诺模型",
+  "blocks": [
+    { "id": "must", "title": "必备", "hint": "没有就会不满，有了也不会加分", "items": [{ "id": "k_must", "text": "任务能保存，刷新不丢" }] },
+    { "id": "performance", "title": "期望", "hint": "做得越好，满意度越高", "items": [{ "id": "k_perf", "text": "依赖排程越准确越有用" }] },
+    { "id": "attractive", "title": "兴奋", "hint": "没有也能用，有了会惊喜", "items": [{ "id": "k_attr", "text": "关键路径自动变红" }] },
+    { "id": "indifferent", "title": "无差异", "hint": "做了客户也无感", "items": [{ "id": "k_ind", "text": "更多装饰性主题色" }] }
+  ]
+}

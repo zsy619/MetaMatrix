@@ -24,6 +24,10 @@ import {
   isIncomeStatementDoc,
   isRiceDoc,
   isSevenSDoc,
+  isImpactEffortDoc,
+  isJourneyDoc,
+  isKanoDoc,
+  isMoscowDoc,
   isValueChainDoc,
   isLeanCanvasDoc,
   isOkrDoc,
@@ -149,6 +153,20 @@ describe('实用商业画布', () => {
     if (isBreakEvenDoc(point)) {
       expect(point.fixedCost / (point.price - point.variableCost)).toBe(200)
     }
+  })
+
+  it('客户旅程、卡诺、MoSCoW 和影响努力矩阵都登记在模板库', () => {
+    for (const id of ['customer-journey', 'kano', 'moscow', 'impact-effort'] as const) {
+      expect(isTemplateId(id)).toBe(true)
+    }
+    const journey = cloneTemplate('customer-journey')
+    const kano = cloneTemplate('kano')
+    const moscow = cloneTemplate('moscow')
+    const impact = cloneTemplate('impact-effort')
+    expect(isJourneyDoc(journey) && journey.blocks).toHaveLength(5)
+    expect(isKanoDoc(kano) && kano.blocks.map((block) => block.id)).toEqual(['must', 'performance', 'attractive', 'indifferent'])
+    expect(isMoscowDoc(moscow) && moscow.blocks).toHaveLength(4)
+    expect(isImpactEffortDoc(impact) && impact.blocks.map((block) => block.id)).toEqual(['now', 'plan', 'fill', 'avoid'])
   })
 
   it('甘特图后置任务指向依赖它的行', () => {

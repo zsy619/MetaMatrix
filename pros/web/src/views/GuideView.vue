@@ -737,7 +737,15 @@ onMounted(async () => {
 .card--rice:hover,
 .card--rice:focus-visible,
 .card--break-even:hover,
-.card--break-even:focus-visible {
+.card--break-even:focus-visible,
+.card--customer-journey:hover,
+.card--customer-journey:focus-visible,
+.card--kano:hover,
+.card--kano:focus-visible,
+.card--moscow:hover,
+.card--moscow:focus-visible,
+.card--impact-effort:hover,
+.card--impact-effort:focus-visible {
   border-color: #34a853;
 }
 
