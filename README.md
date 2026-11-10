@@ -1,6 +1,6 @@
 # 元矩阵 MetaMatrix · 一页纸教程
 
-> **元数据驱动的通用矩阵 / 象限画布 + 飞书式富文本编辑器**：画布结构与内容分离，画布即 JSON，同一套渲染与存储机制承载四象限、双三角、Y 模型、需求三角等 42 个模板。
+> **元数据驱动的通用矩阵 / 象限画布 + 飞书式富文本编辑器**：画布结构与内容分离，画布即 JSON，同一套渲染与存储机制承载四象限、双三角、Y 模型、需求三角、甘特图、商业模式画布等模板。
 
 本文是**一页纸上手指南**：5 分钟跑起来，10 分钟用会「写文档 + 插图表 + 导出」。更详细的 Schema 与设计取舍见 [`docs/技术选型.md`](./docs/技术选型.md)、[`docs/API.md`](./docs/API.md)、[`docs/GLOBAL_RULES/`](./docs/GLOBAL_RULES/)。
 
@@ -8,7 +8,7 @@
 
 ## 1. 核心功能清单
 
-- **结构化画布**：42 个模板（`star-quadrant` 四象限、`dual-triangle` 双三角、`y-model` Y 模型、`demand-triangle` 需求三角、五步法系列等），轴标签 / 象限标题 / 条目富文本 / markers 均可编辑；模板 JSON 在 `pros/web/src/templates/`。
+- **结构化画布**：模板库（`star-quadrant` 四象限、`dual-triangle` 双三角、`y-model` Y 模型、`demand-triangle` 需求三角、五步法系列、`project-gantt` 甘特图、`raci-matrix`、`daily-kanban`、`business-model-canvas`、`cash-flow` 等），轴标签 / 象限标题 / 条目富文本 / markers 均可编辑；模板 JSON 在 `pros/web/src/templates/`。
 - **飞书式富文本编辑器（RTE）**：11 个工具栏分组（编辑、字体与颜色、段落与列表、插入、图表、表格、块与结构、注释与引用、审阅、视图、文件与导出）、斜杠菜单、`@` 提及、查找替换、修订 / 建议模式、只读预览与打印预览。
 - **ECharts 图表**：工具栏「图表」分组下 9 个一级分类下拉（基础 / 统计 / 关系 / 层级 / 地理 / 金融 / 坐标系 / 组件 / 3D·GL），覆盖 39 种图表类型；插入后可在「图表属性」面板改类型、改数据、配接口。
 - **画布 + 文档双层**：画布页承载模板画布，画布格子内是可放大的富文本编辑器（`最大化` 按钮进入沉浸编辑）。
@@ -65,6 +65,11 @@ MetaMatrix/
 | `dual-triangle` | 双三角 |
 | `dual-triangle-human-ai` | 人类三角 × AI 三角（双三角实例，与 `dual-triangle` 并存） |
 | `y-model` | Y 模型 |
+| `project-gantt` | 项目甘特图（任务 × 起止日期 × 进度） |
+| `raci-matrix` | RACI 责任矩阵 |
+| `daily-kanban` | 每日看板（待办 / 进行中 / 受阻 / 完成） |
+| `business-model-canvas` | 商业模式画布（九格） |
+| `cash-flow` | 现金流量（经营 / 投资 / 筹资） |
 | `demand-triangle` | 需求三角 |
 | `deliberate-practice` | 刻意练习 |
 | `three-ring-basics` | 苦练基本功三环分析法（务实 / 可练 / 价值 三环交叠） |

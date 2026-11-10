@@ -56,11 +56,11 @@ function showToast(text: string) {
 }
 
 function close() {
-  rte.closeImagePreview()
+  rte?.closeImagePreview()
 }
 
 function step(delta: number) {
-  rte.stepImagePreview(delta)
+  rte?.stepImagePreview(delta)
 }
 
 function fit() {
@@ -258,8 +258,8 @@ function onKey(event: KeyboardEvent) {
 }
 
 watch(
-  () => (open.value ? items.value.map((item) => item.src) : []),
-  (srcs) => {
+  () => (open.value ? items.value.map((item: { src: string }) => item.src) : []),
+  (srcs: string[]) => {
     srcs.forEach((src) => ensureMediaThumb(src))
   },
   { immediate: true },
@@ -373,7 +373,7 @@ onBeforeUnmount(() => {
           type="button"
           class="rte-image-lightbox-thumb"
           :class="{ active: i === index }"
-          :aria-label="'第 ' + (i + 1) + ' 张'"
+          :aria-label="'第 ' + (Number(i) + 1) + ' 张'"
           :aria-current="i === index ? 'true' : undefined"
           @click="rte.setImagePreviewIndex(i)"
         >

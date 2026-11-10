@@ -30,7 +30,7 @@ describe('流程图菜单', () => {
       content: '<p></p>',
     })
     expect(editor.chain().focus('end').insertMermaidBlock().run()).toBe(true)
-    await new Promise((resolve) => queueMicrotask(resolve))
+    await new Promise<void>((resolve) => queueMicrotask(() => resolve()))
     const more = host.querySelector('.rte-mermaid-more')
     expect(more).toBeInstanceOf(HTMLButtonElement)
     ;(more as HTMLButtonElement).click()
