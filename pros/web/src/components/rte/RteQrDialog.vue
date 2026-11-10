@@ -151,7 +151,7 @@ async function confirm() {
   background: rgba(15, 23, 42, 0.45);
 }
 .rte-qr-card {
-  width: min(520px, 100%);
+  width: min(720px, 100%);
   max-height: calc(100vh - 48px);
   overflow: auto;
   padding: 20px 20px 16px;
@@ -239,7 +239,7 @@ async function confirm() {
   font-size: 13px;
 }
 .rte-qr-preview img {
-  width: min(280px, 100%);
+  width: min(360px, 100%);
   height: auto;
   border-radius: 8px;
   background: #fff;
@@ -251,14 +251,13 @@ async function confirm() {
 }
 .rte-qr-actions {
   display: flex;
-  justify-content: flex-end;
-  gap: 8px;
+  gap: 12px;
   margin-top: 14px;
 }
 .rte-qr-actions button {
-  min-width: 88px;
-  height: 36px;
-  font-size: 14px;
+  flex: 1 1 0;
+  height: 40px;
+  font-size: 15px;
 }
 .rte-qr-actions .is-primary {
   border-color: #1664ff;
