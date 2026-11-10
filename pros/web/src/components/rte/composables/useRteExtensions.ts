@@ -122,6 +122,7 @@ export function useRteExtensions(deps: {
   undoPageSetup: LateFn
   redoPageSetup: LateFn
   applyFormatPainterIfNeeded: LateFn
+  cancelFormatPainter: () => boolean
   initialEditorContent: LateFn
   insertFormula: LateFn
   looksLikeMarkdown: LateFn
@@ -632,6 +633,10 @@ const editor = useEditor({
       if (event.key === 'Escape' && blockMenuOpen.value) {
         event.preventDefault()
         blockMenuOpen.value = false
+        return true
+      }
+      if (event.key === 'Escape' && deps.cancelFormatPainter()) {
+        event.preventDefault()
         return true
       }
       if (event.key === 'Escape' && findDialogOpen.value) {

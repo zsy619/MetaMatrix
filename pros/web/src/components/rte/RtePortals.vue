@@ -811,6 +811,15 @@ const echartsDialogTemplates = computed(() => {
           </div>
           <div data-rte-own class="rte-find-opts">
             <label data-rte-own class="rte-find-case">
+              <span data-rte-own>范围</span>
+              <select data-rte-own v-model="rte.findScope" aria-label="查找范围" @change="rte.refreshFindMatches(true)">
+                <option data-rte-own value="all">全文</option>
+                <option data-rte-own value="heading">标题</option>
+                <option data-rte-own value="table">表格</option>
+                <option data-rte-own value="code">代码块</option>
+              </select>
+            </label>
+            <label data-rte-own class="rte-find-case">
               <input data-rte-own v-model="rte.findCaseSensitive" type="checkbox" @change="rte.refreshFindMatches(true)" />
               <span data-rte-own>区分大小写</span>
             </label>

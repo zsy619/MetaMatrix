@@ -543,7 +543,7 @@ function toggleChartGroupMenu(key: string) {
           >
             <span data-rte-own
               class="rte-tool-icon rte-color-icon"
-              :style="{ textDecorationColor: rte.currentTextColor() || '#1d2129' }"
+              :style="{ textDecorationColor: rte.currentTextColor() || '#1d2129', '--rte-color-bar': rte.currentTextColor() || '#1d2129' }"
             >
               <component data-rte-own :is="rte.toolIcon('color')" class="rte-ep-icon" />
             </span>
@@ -1507,6 +1507,7 @@ function toggleChartGroupMenu(key: string) {
               @mouseleave="rte.onToolMenuLeave($event, 'wordStats', () => (rte.wordStatsOpen = false))"
             >
               <div data-rte-own class="rte-wordstats-title">字数统计</div>
+              <p data-rte-own class="rte-wordstats-note">全文含标题、表格和代码中的文字，不含评论。</p>
               <div data-rte-own class="rte-wordstats-row"><span data-rte-own>全文（去空白）</span><strong data-rte-own>{{ rte.charCount }}</strong></div>
               <div data-rte-own class="rte-wordstats-row"><span data-rte-own>词数（估）</span><strong data-rte-own>{{ rte.wordCount }}</strong></div>
               <div data-rte-own class="rte-wordstats-row"><span data-rte-own>阅读约</span><strong data-rte-own>{{ rte.readingMinutes }} 分钟</strong></div>
@@ -2372,6 +2373,7 @@ function toggleChartGroupMenu(key: string) {
           @mouseleave="rte.onToolMenuLeave($event, 'wordStats', () => (rte.wordStatsOpen = false))"
         >
           <div data-rte-own class="rte-wordstats-title">字数统计</div>
+          <p data-rte-own class="rte-wordstats-note">全文含标题、表格和代码中的文字，不含评论。</p>
           <div data-rte-own class="rte-wordstats-row"><span data-rte-own>全文（去空白）</span><strong data-rte-own>{{ rte.charCount }}</strong></div>
           <div data-rte-own class="rte-wordstats-row"><span data-rte-own>词数（估）</span><strong data-rte-own>{{ rte.wordCount }}</strong></div>
           <div data-rte-own class="rte-wordstats-row"><span data-rte-own>阅读约</span><strong data-rte-own>{{ rte.readingMinutes }} 分钟</strong></div>

@@ -4515,12 +4515,18 @@ html.rte-toolbar-dragging .rte-root:not(.expanded) .rte-toolbar-tools > .rte-too
 }
 .rte-group-settings {
   border: 0;
-  background: transparent;
+  background: color-mix(in srgb, var(--rte-head-fg, #1d4ed8) 12%, #fff);
   color: var(--rte-head-fg, #1d4ed8);
-  font-size: 11px;
-  line-height: 16px;
-  padding: 0 4px;
+  font-size: 12px;
+  line-height: 20px;
+  padding: 2px 8px;
+  border-radius: 4px;
   cursor: pointer;
+}
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool-icon.rte-color-icon {
+  background: #fff;
+  color: var(--rte-head-fg, #1d4ed8);
+  box-shadow: inset 0 -3px 0 var(--rte-color-bar, currentColor), inset 0 0 0 1px rgba(15, 23, 42, 0.08);
 }
 .rte-group-settings:hover {
   text-decoration: underline;

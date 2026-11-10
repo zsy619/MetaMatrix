@@ -65,6 +65,7 @@ export type QrArtworkOptions = {
   caption?: boolean
   /** 底部说明。勾选底部文字时，有描述就画描述，否则画二维码内容。 */
   description?: string
+  errorCorrectionLevel?: 'L' | 'M' | 'Q' | 'H'
 }
 
 type QrBits = {
@@ -73,8 +74,8 @@ type QrBits = {
   reserved: (row: number, col: number) => boolean
 }
 
-export function qrBits(text: string): QrBits {
-  const created = QRCode.create(text, { errorCorrectionLevel: 'H' }) as {
+export function qrBits(text: string, level: 'L' | 'M' | 'Q' | 'H' = 'H'): QrBits {
+  const created = QRCode.create(text, { errorCorrectionLevel: level }) as {
     modules: {
       size: number
       get: (row: number, col: number) => number
@@ -270,7 +271,7 @@ export function paintQr(
   const color = options.color || QR_PRESETS[1]!.color
   const background = options.background || '#ffffff'
   const style = options.style || 'rounded'
-  const bits = qrBits(text)
+  const bits = qrBits(text, options.errorCorrectionLevel || 'H')
   const quiet = 4
   const moduleSize = 12
   const qrSide = (bits.size + quiet * 2) * moduleSize

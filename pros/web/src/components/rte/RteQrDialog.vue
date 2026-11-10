@@ -10,6 +10,7 @@ const text = ref('https://')
 const description = ref('')
 const presetId = ref(QR_PRESETS[1]!.id)
 const style = ref<QrModuleStyle>('rounded')
+const errorLevel = ref<'H' | 'Q' | 'M'>('H')
 const caption = ref(true)
 const preview = ref('')
 const error = ref('')
@@ -30,6 +31,7 @@ async function refresh() {
       style: style.value,
       caption: caption.value,
       description: description.value,
+      errorCorrectionLevel: errorLevel.value,
     })
     error.value = ''
   } catch (err) {
@@ -44,11 +46,12 @@ watch(() => rte.qrDialogOpen, (open) => {
   description.value = ''
   presetId.value = QR_PRESETS[1]!.id
   style.value = 'rounded'
+  errorLevel.value = 'H'
   caption.value = true
   void refresh()
 })
 
-watch([text, description, presetId, style, caption], () => {
+watch([text, description, presetId, style, caption, errorLevel], () => {
   if (rte.qrDialogOpen) void refresh()
 })
 
@@ -116,6 +119,12 @@ async function confirm() {
             </button>
           </div>
         </div>
+        <div class="rte-qr-label">纠错</div>
+        <div class="rte-qr-styles" role="radiogroup" aria-label="纠错等级">
+          <button type="button" :class="{ active: errorLevel === 'H' }" @click="errorLevel = 'H'">高</button>
+          <button type="button" :class="{ active: errorLevel === 'Q' }" @click="errorLevel = 'Q'">较高</button>
+          <button type="button" :class="{ active: errorLevel === 'M' }" @click="errorLevel = 'M'">中</button>
+        </div>
         <label class="rte-qr-caption">
           <input v-model="caption" type="checkbox" />
           底部显示内容
@@ -124,7 +133,7 @@ async function confirm() {
           v-model="description"
           type="text"
           maxlength="40"
-          placeholder="描述，例如：扫码查看详情"
+          placeholder="描述，例如：扫码查看详情。留空时底部显示二维码内容"
           aria-label="描述"
         />
         <div class="rte-qr-preview">
@@ -132,6 +141,7 @@ async function confirm() {
           <span v-else>{{ error || '输入内容后在这里预览' }}</span>
         </div>
         <p v-if="error && preview" class="rte-qr-error">{{ error }}</p>
+        <a v-if="preview" class="rte-qr-download" :href="preview" download="qrcode.png">下载图片</a>
         <div class="rte-qr-actions">
           <button type="button" @click="close">取消</button>
           <button type="button" class="is-primary" :disabled="!preview || busy" @click="confirm">插入</button>
@@ -188,11 +198,17 @@ async function confirm() {
   font-size: 12px;
   color: #4e5969;
 }
-.rte-qr-styles,
-.rte-qr-preset-row {
+.rte-qr-styles {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+.rte-qr-preset-row {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
 }
 .rte-qr-presets {
   display: flex;
@@ -260,6 +276,17 @@ async function confirm() {
   display: flex;
   gap: 12px;
   margin-top: 14px;
+}
+.rte-qr-download {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  margin-top: 12px;
+  border-radius: 8px;
+  color: #1664ff;
+  font-size: 14px;
+  text-decoration: none;
 }
 .rte-qr-actions button {
   flex: 1 1 0;

@@ -117,6 +117,7 @@ export const TOOLBAR_GROUPS: readonly ToolbarGroupDef[] = [
     id: 'review',
     label: '审阅',
     keys: [
+      'deepOptimize',
       'spellcheck', 'sensitive', 'headingCheck', 'linkCheck', 'watermark', 'outbound', 'audit', 'inlineAi', 'cjkTip',
       'revision', 'revisionBase', 'suggest', 'suggestAccept', 'suggestReject',
       'speak', 'speakStop',

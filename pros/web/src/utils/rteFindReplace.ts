@@ -4,6 +4,27 @@ import { TextSelection } from '@tiptap/pm/state'
 
 export type RteFindMatch = { from: number; to: number }
 
+export type RteFindScope = 'all' | 'heading' | 'table' | 'code'
+
+/** 把匹配限制在标题、表格或代码块里。 */
+export function filterFindMatches(
+  doc: PmNode,
+  matches: readonly RteFindMatch[],
+  scope: RteFindScope = 'all',
+): RteFindMatch[] {
+  if (scope === 'all') return [...matches]
+  return matches.filter((match) => {
+    const $pos = doc.resolve(Math.min(match.from, doc.content.size))
+    for (let depth = $pos.depth; depth > 0; depth -= 1) {
+      const name = $pos.node(depth).type.name
+      if (scope === 'heading' && name === 'heading') return true
+      if (scope === 'table' && (name === 'table' || name === 'tableCell' || name === 'tableHeader')) return true
+      if (scope === 'code' && name === 'codeBlock') return true
+    }
+    return false
+  })
+}
+
 /** 单词字符。用于「全字匹配」判断。 */
 function isWordChar(ch: string | undefined): boolean {
   if (!ch) return false

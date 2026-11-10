@@ -36,8 +36,8 @@ assert.deepEqual(DEFAULT_TOOLBAR_GROUP_ORDER, [
 
 // 每个按钮 key 只挂在一个分组里（图表组是 9 个分类下拉，另有水印、外链、审计、文内 AI）
 const allKeys = TOOLBAR_GROUPS.flatMap((group) => group.keys)
-assert.equal(allKeys.length, 109)
-assert.equal(new Set(allKeys).size, 109)
+assert.equal(allKeys.length, 110)
+assert.equal(new Set(allKeys).size, 110)
 
 const ribbonGroups = RIBBON_TABS.flatMap((tab) => tab.groups)
 assert.deepEqual(ribbonGroups, [...DEFAULT_TOOLBAR_GROUP_ORDER])

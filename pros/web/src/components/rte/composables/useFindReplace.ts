@@ -1,13 +1,15 @@
 import { computed, nextTick, ref, type ShallowRef } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import type { Editor } from '@tiptap/core'
 import {
   collectFindMatches,
+  filterFindMatches,
   pickNextMatchIndex,
   replaceAllFindMatches,
   replaceFindMatch,
   selectFindMatch,
   type RteFindMatch,
+  type RteFindScope,
 } from '../../../utils/rteFindReplace'
 import { canRunFindReplace } from '../../../utils/rteRound5'
 
@@ -25,6 +27,7 @@ export function useFindReplace(deps: {
   const findRegex = ref(false)
   /** 多行正则：^ $ 匹配行首行尾 */
   const findMultiline = ref(false)
+  const findScope = ref<RteFindScope>('all')
   const findMatches = ref<RteFindMatch[]>([])
   const findMatchIndex = ref(-1)
 
@@ -44,7 +47,11 @@ export function useFindReplace(deps: {
       findMatchIndex.value = -1
       return
     }
-    const matches = collectFindMatches(ed.state.doc, findQuery.value, findOpts())
+    const matches = filterFindMatches(
+      ed.state.doc,
+      collectFindMatches(ed.state.doc, findQuery.value, findOpts()),
+      findScope.value,
+    )
     findMatches.value = matches
     if (!matches.length) {
       findMatchIndex.value = -1
@@ -114,7 +121,11 @@ export function useFindReplace(deps: {
     }
     replaceFindMatch(ed, matches[idx], findReplaceText.value)
     const nextFrom = matches[idx].from + findReplaceText.value.length
-    const nextMatches = collectFindMatches(ed.state.doc, findQuery.value, findOpts())
+    const nextMatches = filterFindMatches(
+      ed.state.doc,
+      collectFindMatches(ed.state.doc, findQuery.value, findOpts()),
+      findScope.value,
+    )
     findMatches.value = nextMatches
     if (!nextMatches.length) {
       findMatchIndex.value = -1
@@ -126,14 +137,27 @@ export function useFindReplace(deps: {
     if (ni >= 0) selectFindMatch(ed, nextMatches[ni]!)
   }
 
-  function doReplaceAll() {
+  async function doReplaceAll() {
     const ed = deps.editor.value
     if (!ed) return
-    const matches = collectFindMatches(ed.state.doc, findQuery.value, findOpts())
+    const matches = filterFindMatches(
+      ed.state.doc,
+      collectFindMatches(ed.state.doc, findQuery.value, findOpts()),
+      findScope.value,
+    )
     if (!matches.length) {
       ElMessage.info('没有匹配项')
       findMatches.value = []
       findMatchIndex.value = -1
+      return
+    }
+    try {
+      await ElMessageBox.confirm(`将替换 ${matches.length} 处。这一步可以撤销。`, '全部替换', {
+        confirmButtonText: '替换',
+        cancelButtonText: '取消',
+        type: 'warning',
+      })
+    } catch {
       return
     }
     const n = replaceAllFindMatches(ed, matches, findReplaceText.value)
@@ -161,6 +185,7 @@ export function useFindReplace(deps: {
     findWholeWord,
     findRegex,
     findMultiline,
+    findScope,
     findMatches,
     findMatchIndex,
     refreshFindMatches,

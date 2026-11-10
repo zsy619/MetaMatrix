@@ -114,6 +114,7 @@ import {
 } from '../utils/rtePracticalToolbar'
 import { QUOTE_STYLE_OPTIONS, type QuoteStyle } from '../extensions/rteBlockquote'
 import { collectCrossRefTargets } from '../extensions/crossRef'
+import { deepOptimizeDocument } from '../utils/rteDeepOptimize'
 import {
   applyParagraphStyle,
   PARA_STYLE_OPTIONS,
@@ -690,6 +691,7 @@ const formatPainter = ref<{
 } | null>(null)
 const formatPainterArmed = computed(() => !!formatPainter.value)
 let formatPainterSkipSelection = false
+let formatPainterClickTimer: ReturnType<typeof setTimeout> | null = null
 
 const emojiOpen = ref(false)
 const emojiTabId = ref(RTE_EMOJI_CATEGORIES[0]?.id ?? 'frequent')
@@ -1007,6 +1009,18 @@ const editor = useRteExtensions({
   undoPageSetup,
   redoPageSetup,
   applyFormatPainterIfNeeded,
+  cancelFormatPainter: () => {
+    const armed = !!formatPainter.value || !!formatPainterClickTimer
+    if (formatPainterClickTimer) {
+      clearTimeout(formatPainterClickTimer)
+      formatPainterClickTimer = null
+    }
+    if (formatPainter.value) {
+      formatPainter.value = null
+      ElMessage.info('已取消格式刷')
+    }
+    return armed
+  },
   initialEditorContent,
   insertFormula,
   looksLikeMarkdown,
@@ -1513,8 +1527,6 @@ function activateFormatPainter(sticky = false) {
   formatPainterSkipSelection = true
   ElMessage.success(sticky ? '格式刷已锁定（再点取消）' : '格式刷已启用：请选择目标文字')
 }
-
-let formatPainterClickTimer: ReturnType<typeof setTimeout> | null = null
 
 function toggleFormatPainter() {
   if (formatPainter.value) {
@@ -3037,6 +3049,24 @@ function rewriteSelection(mode: InlineAiMode) {
   ElMessage.success(`已${inlineAiLabel(mode)}`)
 }
 
+
+function runDeepOptimize() {
+  const ed = editor.value
+  if (!ed) return
+  const result = deepOptimizeDocument(ed)
+  wave21ReportTitle.value = '深度优化'
+  const lines = result.changes.length
+    ? result.changes.map((item) => ({ text: item.detail }))
+    : [{ text: '没有需要自动修改的地方。' }]
+  if (result.remaining.length) {
+    lines.push({ text: '下面这些仍要手工处理：' })
+    lines.push(...result.remaining)
+  }
+  wave21ReportLines.value = lines
+  wave21ReportOpen.value = true
+  moreOpen.value = false
+  ElMessage.success(result.changes.length ? `已深度优化 ${result.changes.length} 项` : '文档已经比较整齐')
+}
 
 function runHeadingHierarchyCheck() {
   const ed = editor.value
@@ -4564,6 +4594,7 @@ const {
   findWholeWord,
   findRegex,
   findMultiline,
+  findScope,
   refreshFindMatches,
   openFindDialog,
   closeFindDialog,
@@ -6320,7 +6351,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'undo',
       label: '撤销',
-      title: '撤销 (Ctrl/⌘+Z)',
+      title: editor.value?.can().undo() ? '撤销 (Ctrl/⌘+Z)' : '没有可撤销的操作',
       icon: '↶',
       iconComp: ic('undo'),
       run: undo,
@@ -6329,7 +6360,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'redo',
       label: '重做',
-      title: '重做 (Ctrl/⌘+Shift+Z)',
+      title: editor.value?.can().redo() ? '重做 (Ctrl/⌘+Shift+Z)' : '没有可重做的操作',
       icon: '↷',
       iconComp: ic('redo'),
       run: redo,
@@ -6355,7 +6386,11 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'formatPainter',
       label: '格式刷',
-      title: '格式刷（单击一次，双击连续）',
+      title: formatPainter.value?.sticky
+        ? '格式刷连续使用中，按 Esc 退出'
+        : formatPainter.value
+          ? '格式刷已启用，按 Esc 退出'
+          : '格式刷（单击一次，双击连续，Esc 退出）',
       icon: '🖌',
       iconComp: ic('formatPainter'),
       active: () => formatPainterArmed.value,
@@ -6685,7 +6720,7 @@ const allTools = computed((): ToolItem[] => {
       label: '音频',
       title: '插入音频',
       icon: '♪',
-      iconComp: ic('video'),
+      iconComp: ic('audio'),
       run: insertAudio,
     },
     {
@@ -6939,6 +6974,14 @@ const allTools = computed((): ToolItem[] => {
       icon: '▽',
       iconComp: ic('table'),
       run: () => { void promptTableRowFilter() },
+    },
+    {
+      key: 'deepOptimize',
+      label: '深优化',
+      title: '一键整理跳级标题、连续空段、空链接、图片题注，并去掉标题和列表上的首行缩进',
+      icon: '✦',
+      iconComp: ic('deepOptimize'),
+      run: runDeepOptimize,
     },
     {
       key: 'headingCheck',
@@ -7476,6 +7519,7 @@ provideRteBindings({
   findReplaceText,
   findRegex,
   findMultiline,
+  findScope,
   findStatusText,
   findWholeWord,
   focusMode,
