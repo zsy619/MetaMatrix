@@ -1305,6 +1305,43 @@ html.rte-toolbar-dragging * {
   gap: 8px;
   margin-bottom: 14px;
 }
+.rte-link-dialog.rte-optimize-dialog {
+  width: min(560px, 100%);
+}
+.rte-wave21-report-list {
+  max-height: 360px;
+  overflow: auto;
+  margin-bottom: 12px;
+}
+.rte-optimize-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.rte-optimize-line .rte-import-item,
+.rte-optimize-note {
+  flex: 1;
+  margin: 0;
+  text-align: left;
+}
+.rte-optimize-line.is-done {
+  color: #86909c;
+}
+.rte-optimize-actions {
+  display: flex;
+  flex: none;
+  gap: 6px;
+}
+.rte-optimize-actions button {
+  border: 1px solid #bedaff;
+  background: #e8f3ff;
+  color: #3370ff;
+  border-radius: 6px;
+  padding: 6px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
 .rte-link-dialog {
   width: min(420px, 100%);
   background: var(--mm-surface, #fff);

@@ -77,9 +77,21 @@ function paintCollage(row: HTMLElement, layout: '12' | '21') {
   row.style.height = 'auto'
   row.style.minHeight = '160px'
   const areas = COLLAGE_AREAS[layout]
-  const kids = Array.from(row.children).filter((child): child is HTMLElement => child instanceof HTMLElement)
-  kids.forEach((frame, index) => {
-    frame.style.gridArea = areas[index] || ''
+  let imageIndex = -1
+  Array.from(row.children).forEach((child) => {
+    if (!(child instanceof HTMLElement)) return
+    if (child.classList.contains('ProseMirror-widget')) {
+      const area = areas[imageIndex]
+      if (!area) return
+      child.style.gridArea = area
+      child.style.alignSelf = 'end'
+      child.style.zIndex = '2'
+      child.style.margin = '0'
+      return
+    }
+    imageIndex += 1
+    const frame = child
+    frame.style.gridArea = areas[imageIndex] || ''
     frame.style.flex = 'none'
     frame.style.width = '100%'
     frame.style.height = '100%'
@@ -102,7 +114,11 @@ function clearCollage(row: HTMLElement) {
   row.style.aspectRatio = ''
   row.style.minHeight = '0'
   for (const child of Array.from(row.children)) {
-    if (child instanceof HTMLElement) child.style.gridArea = ''
+    if (!(child instanceof HTMLElement)) continue
+    child.style.gridArea = ''
+    child.style.alignSelf = ''
+    child.style.zIndex = ''
+    if (child.classList.contains('ProseMirror-widget')) child.style.margin = ''
   }
 }
 
@@ -148,7 +164,9 @@ export function layoutImageGroupChrome(view: EditorView) {
     const row = dom.querySelector('.rte-image-group-row')
     const dividers = dom.querySelector('.rte-image-group-dividers')
     if (!(row instanceof HTMLElement) || !(dividers instanceof HTMLElement)) return false
-    const kids = Array.from(row.children).filter((child): child is HTMLElement => child instanceof HTMLElement)
+    const kids = Array.from(row.children).filter(
+      (child): child is HTMLElement => child instanceof HTMLElement && !child.classList.contains('ProseMirror-widget'),
+    )
     const aspects = kids.map(imageAspect)
     const ratios = groupUsesAspect(node.attrs.ratioMode)
       ? aspects
