@@ -28,6 +28,10 @@ import {
   isJourneyDoc,
   isKanoDoc,
   isMoscowDoc,
+  isGoldenCircleDoc,
+  isPlayingToWinDoc,
+  isSoarDoc,
+  isVrioDoc,
   isValueChainDoc,
   isLeanCanvasDoc,
   isOkrDoc,
@@ -37,10 +41,14 @@ import {
   isValuePropositionDoc,
 } from '../../types/canvas'
 import { formatSuccessors } from '../../utils/projectGantt'
+import GoldenCircleCanvas from './GoldenCircleCanvas.vue'
 import LeanCanvas from './LeanCanvas.vue'
 import OkrCanvas from './OkrCanvas.vue'
+import PlayingToWinCanvas from './PlayingToWinCanvas.vue'
+import SoarCanvas from './SoarCanvas.vue'
 import SwotCanvas from './SwotCanvas.vue'
 import ValuePropositionCanvas from './ValuePropositionCanvas.vue'
+import VrioCanvas from './VrioCanvas.vue'
 
 describe('实用商业画布', () => {
   beforeEach(() => {
@@ -167,6 +175,52 @@ describe('实用商业画布', () => {
     expect(isKanoDoc(kano) && kano.blocks.map((block) => block.id)).toEqual(['must', 'performance', 'attractive', 'indifferent'])
     expect(isMoscowDoc(moscow) && moscow.blocks).toHaveLength(4)
     expect(isImpactEffortDoc(impact) && impact.blocks.map((block) => block.id)).toEqual(['now', 'plan', 'fill', 'avoid'])
+  })
+
+  it('VRIO、黄金圈、SOAR 和制胜选择都登记在模板库', () => {
+    for (const id of ['vrio', 'golden-circle', 'soar', 'playing-to-win'] as const) {
+      expect(isTemplateId(id)).toBe(true)
+      expect(TEMPLATE_META[id].name.length).toBeGreaterThan(0)
+    }
+    const vrio = cloneTemplate('vrio')
+    const circle = cloneTemplate('golden-circle')
+    const soar = cloneTemplate('soar')
+    const playing = cloneTemplate('playing-to-win')
+    expect(isVrioDoc(vrio) && vrio.blocks.map((block) => block.id)).toEqual(['value', 'rarity', 'imitability', 'organization'])
+    expect(isGoldenCircleDoc(circle) && circle.blocks.map((block) => block.id)).toEqual(['why', 'how', 'what'])
+    expect(isSoarDoc(soar) && soar.blocks).toHaveLength(4)
+    expect(isPlayingToWinDoc(playing) && playing.blocks.map((block) => block.id)).toEqual(['aspiration', 'where', 'how', 'capabilities', 'systems'])
+    const store = useDocumentStore()
+    store.loadFromTemplate('vrio')
+    const vrioView = mount(VrioCanvas, { props: { doc: store.current_data as never } })
+    expect(vrioView.findAll('[data-block]')).toHaveLength(4)
+    expect(vrioView.findAll('.rte-stub')).toHaveLength(4)
+    expect(store.updateBlockKeyword('value', '同一套画布')).toBe(true)
+    vrioView.unmount()
+    store.loadFromTemplate('golden-circle')
+    const circleView = mount(GoldenCircleCanvas, { props: { doc: store.current_data as never } })
+    expect(circleView.text()).toContain('为什么')
+    expect(circleView.findAll('.rte-stub')).toHaveLength(3)
+    circleView.unmount()
+    store.loadFromTemplate('soar')
+    const soarView = mount(SoarCanvas, { props: { doc: store.current_data as never } })
+    expect(soarView.findAll('[data-block]')).toHaveLength(4)
+    soarView.unmount()
+    store.loadFromTemplate('playing-to-win')
+    const playingView = mount(PlayingToWinCanvas, { props: { doc: store.current_data as never } })
+    expect(playingView.findAll('[data-block]')).toHaveLength(5)
+    playingView.unmount()
+    store.loadFromTemplate('golden-circle')
+    const source = store.current_data
+    if (!isGoldenCircleDoc(source)) return
+    store.setCurrentData({
+      ...source,
+      blocks: source.blocks.map((block) =>
+        block.id === 'why' ? { id: block.id, title: block.title, hint: block.hint, text: '先写信念\n再写证据' } : block,
+      ),
+    } as typeof source)
+    const migrated = store.current_data
+    expect(isGoldenCircleDoc(migrated) && migrated.blocks.find((block) => block.id === 'why')?.items.map((item) => item.text)).toEqual(['先写信念', '再写证据'])
   })
 
   it('甘特图后置任务指向依赖它的行', () => {
