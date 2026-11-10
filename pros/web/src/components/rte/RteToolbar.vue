@@ -592,6 +592,14 @@ function toggleChartGroupMenu(key: string) {
               @mouseenter="rte.onToolMenuEnter('fontSize')"
               @mouseleave="rte.onToolMenuLeave($event, 'fontSize', () => (rte.fontSizeOpen = false))"
             >
+              <input data-rte-own
+                class="rte-font-size-entry"
+                type="text"
+                placeholder="小四 或 12"
+                aria-label="输入字号"
+                @mousedown.stop
+                @keydown.enter.prevent="rte.applyFontSize(($event.target as HTMLInputElement).value)"
+              />
               <button data-rte-own
                 v-for="opt in rte.FONT_SIZE_OPTIONS"
                 :key="'fs-' + opt.label"

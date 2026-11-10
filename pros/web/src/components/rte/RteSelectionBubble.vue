@@ -338,6 +338,15 @@ function run(action: () => void) {
           data-rte-own
           @mouseenter="hoverEnter('size')"
         >
+          <input
+            data-rte-own
+            class="rte-font-size-entry"
+            type="text"
+            placeholder="小四 或 12"
+            aria-label="输入字号"
+            @mousedown.stop
+            @keydown.enter.prevent="run(() => rte.applyFontSize(($event.target as HTMLInputElement).value))"
+          />
           <button
             v-for="opt in rte.FONT_SIZE_OPTIONS"
             :key="'bfs-' + opt.label"

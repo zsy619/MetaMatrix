@@ -216,8 +216,14 @@ function paintCollageDividers(
       const y = (left.bottom + right.top) / 2 - domRect.top
       handle.style.cssText = `position:absolute;left:${left.left - domRect.left}px;top:${y}px;width:${Math.max(left.width, right.width)}px;height:16px;transform:translateY(-50%);border:0;padding:0;background:transparent;cursor:row-resize;pointer-events:auto;z-index:20;`
     }
+    handle.addEventListener('dblclick', (event) => {
+      event.preventDefault()
+      event.stopPropagation()
+      const groupPos = Number(handle.dataset.groupPos)
+      if (view.state.doc.nodeAt(groupPos)?.type.name === 'imageGroup') clearGroupRatios(view, groupPos)
+    })
     handle.addEventListener('pointerdown', (event) => {
-      if (!view.editable || event.button !== 0) return
+      if (!view.editable || event.button !== 0 || event.detail >= 2) return
       event.preventDefault()
       event.stopPropagation()
       const groupPos = Number(handle.dataset.groupPos)
@@ -644,6 +650,39 @@ export const ImageGroup = Node.create({
         else dom.removeAttribute('data-fit')
         fitBtn.textContent = fit === 'contain' ? '完整' : '充满'
         fitBtn.title = fit === 'contain' ? '完整显示图片，点击改为充满裁切' : '充满格子并裁切，点击改为完整显示'
+        let missingAlt = 0
+        current.forEach((child) => {
+          if (child.type.name === 'image' && !String(child.attrs.alt || '').trim()) missingAlt += 1
+        })
+        let altBtn = bar.querySelector('.rte-image-group-alt') as HTMLButtonElement | null
+        if (missingAlt) {
+          if (!altBtn) {
+            altBtn = document.createElement('button')
+            altBtn.type = 'button'
+            altBtn.className = 'rte-image-group-alt'
+            altBtn.addEventListener('click', (event) => {
+              event.preventDefault()
+              event.stopPropagation()
+              const pos = getPos()
+              if (typeof pos !== 'number') return
+              const live = editor.state.doc.nodeAt(pos)
+              if (!live) return
+              let cursor = pos + 1
+              let target: number | null = null
+              live.forEach((child) => {
+                if (target == null && child.type.name === 'image' && !String(child.attrs.alt || '').trim()) target = cursor
+                cursor += child.nodeSize
+              })
+              if (target != null) editor.chain().focus().setNodeSelection(target).run()
+            })
+            bar.appendChild(altBtn)
+          }
+          altBtn.textContent = `缺${missingAlt}`
+          altBtn.title = '有图片还没有替代文本，点击选中第一张'
+          altBtn.setAttribute('aria-label', altBtn.title)
+        } else {
+          altBtn?.remove()
+        }
         if (layout === '12' || layout === '21') {
           dom.setAttribute('data-layout', layout)
           paintCollage(contentDOM, layout, fit)
