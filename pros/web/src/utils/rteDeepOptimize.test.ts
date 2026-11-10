@@ -36,8 +36,12 @@ describe('行内整理', () => {
     expect(tidy.gap).toBe(true)
   })
 
-  it('带网址的句子不插入间距', () => {
-    expect(tidyInlineText('见https://a.com了解').text).toBe('见https://a.com了解')
+  it('网址本身不拆开，句子其余部分仍补间距', () => {
+    expect(tidyInlineText('见https://a.com了解更多Hello世界').text).toBe('见https://a.com了解更多 Hello 世界')
+  })
+
+  it('全角空格收成普通空格', () => {
+    expect(tidyInlineText('你好\u3000\u3000世界').text).toBe('你好 世界')
   })
 })
 

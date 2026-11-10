@@ -8,7 +8,7 @@ import {
   setGroupRatios,
   stackInGroup,
 } from './imageGroupOps'
-import { installImageGroupLayout, nextImageSelection, rowCanAccept, IMAGE_ROW_LIMIT_TIP, type ImageSpot } from '../utils/rteImageGroup'
+import { installImageGroupLayout, nextImageSelection, normalizeGroupLayout, rowCanAccept, IMAGE_ROW_LIMIT_TIP, type ImageSpot } from '../utils/rteImageGroup'
 import {
   imageDropKind,
   sameImageDrop,
@@ -221,7 +221,18 @@ function imageVisualRect(frame: HTMLElement): DOMRect {
   return frame.getBoundingClientRect()
 }
 
+function hideDropMark() {
+  dropLine?.remove()
+  dropLine = null
+  dropPreview?.remove()
+  dropPreview = null
+}
+
 function placeLine(kind: RteImageDropKind, rect: DOMRect) {
+  if (kind === 'center') {
+    hideDropMark()
+    return
+  }
   const line = ensureLine()
   const preview = ensurePreview()
   line.dataset.kind = kind
@@ -279,6 +290,27 @@ function moveImage(view: EditorView, from: number, insertAt: number): boolean {
   } catch {
     return false
   }
+}
+
+function stackByArrow(view: EditorView, key: 'ArrowUp' | 'ArrowDown'): boolean {
+  const sel = view.state.selection
+  if (!(sel instanceof NodeSelection) || sel.node.type.name !== 'image') return false
+  const $pos = sel.$from
+  if ($pos.parent.type.name !== 'imageGroup') return false
+  const group = $pos.parent
+  if (group.childCount !== 3 || normalizeGroupLayout(group.attrs.layout) !== 'row') return false
+  const index = $pos.index()
+  let target = key === 'ArrowUp' ? index - 1 : index + 1
+  if (target < 0 || target > 2) target = 1
+  if (target === index) return false
+  const groupPos = $pos.before($pos.depth)
+  let cursor = groupPos + 1
+  const positions: number[] = []
+  group.forEach((child) => {
+    positions.push(cursor)
+    cursor += child.nodeSize
+  })
+  return stackInGroup(view, positions[index]!, positions[target]!, key === 'ArrowUp' ? 'above' : 'below')
 }
 
 function nudgeImage(view: EditorView, dir: -1 | 1): boolean {
@@ -421,6 +453,7 @@ function commitDrop(
 ) {
   const plan = readDrop(view, event)
   if (!plan) return
+  if (plan.kind === 'center') return
   if (dragKind === 'group') {
     moveImageGroup(view, from, dropInsertPos(view, plan))
     return
@@ -789,13 +822,10 @@ export function createImageDragPlugin(): Plugin {
           return true
         }
         if (!event.altKey || event.shiftKey || event.metaKey || event.ctrlKey) return false
-        if (event.key === 'ArrowUp') {
+        if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
           event.preventDefault()
-          return nudgeImage(view, -1)
-        }
-        if (event.key === 'ArrowDown') {
-          event.preventDefault()
-          return nudgeImage(view, 1)
+          if (stackByArrow(view, event.key)) return true
+          return nudgeImage(view, event.key === 'ArrowUp' ? -1 : 1)
         }
         if (
           (event.key === 'ArrowLeft' || event.key === 'ArrowRight') &&

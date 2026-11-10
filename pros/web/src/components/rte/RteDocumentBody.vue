@@ -617,6 +617,9 @@ useParentScopeStamp()
     <div data-rte-own v-if="rte.wordCountDockOpen" class="rte-word-dock" role="dialog" aria-label="字数统计">
       <div data-rte-own class="rte-word-dock-row"><span data-rte-own>字符</span><strong data-rte-own>{{ rte.charCount }}</strong></div>
       <div data-rte-own class="rte-word-dock-row"><span data-rte-own>词数</span><strong data-rte-own>{{ rte.wordCount }}</strong></div>
+      <div data-rte-own class="rte-word-dock-row"><span data-rte-own>中文</span><strong data-rte-own>{{ rte.wordParts.cn }}</strong></div>
+      <div data-rte-own class="rte-word-dock-row"><span data-rte-own>英文词</span><strong data-rte-own>{{ rte.wordParts.en }}</strong></div>
+      <div data-rte-own class="rte-word-dock-row"><span data-rte-own>图片</span><strong data-rte-own>{{ rte.wordParts.images }}</strong></div>
       <div data-rte-own class="rte-word-dock-row"><span data-rte-own>阅读</span><strong data-rte-own>约 {{ rte.readingMinutes }} 分钟</strong></div>
       <div data-rte-own class="rte-word-dock-row"><span data-rte-own>段落</span><strong data-rte-own>{{ rte.docExtraStats.paragraphs }}</strong></div>
       <div data-rte-own class="rte-word-dock-row"><span data-rte-own>标题</span><strong data-rte-own>{{ rte.docExtraStats.headings }}</strong></div>

@@ -147,7 +147,7 @@ import {
 } from './rteWave20'
 import { TEXT_MENU_ITEMS } from '../utils/rteTextTidy'
 import { applyTextTidy } from '../utils/rteTextPlay'
-import { countWords, normalizeHtml, toEditorContent } from '../utils/rteContent'
+import { countWordParts, countWords, normalizeHtml, toEditorContent } from '../utils/rteContent'
 import { getToken } from '../api/http'
 import { uploadMediaFile } from '../api/mediaUpload'
 import { attachmentInsertHref } from '../utils/rteAttachment'
@@ -1370,7 +1370,15 @@ const charCount = computed(() => {
   return Array.from(text.replace(/\s/g, '')).length
 })
 
-const wordCount = computed(() => countWords(editor.value?.getText() ?? ''))
+const wordParts = computed(() => {
+  const parts = countWordParts(editor.value?.getText() ?? '')
+  let images = 0
+  editor.value?.state.doc.descendants((node) => {
+    if (node.type.name === 'image') images += 1
+  })
+  return { ...parts, images }
+})
+const wordCount = computed(() => wordParts.value.total)
 
 const selectionStats = computed(() => {
   void editor.value?.state.selection
@@ -2209,10 +2217,32 @@ function speakSelection() {
   const ed = editor.value
   if (!ed) return
   const { from, to, empty } = ed.state.selection
-  const text = empty
-    ? ed.getText({ blockSeparator: '。' }).slice(0, 2000)
-    : ed.state.doc.textBetween(from, to, ' ')
-  if (!speakText(text)) ElMessage.warning('当前环境不支持朗读')
+  let text = ''
+  if (!empty) text = ed.state.doc.textBetween(from, to, ' ')
+  else {
+    let sectionStart = 0
+    ed.state.doc.descendants((node, pos) => {
+      if (node.type.name === 'heading' && pos <= from) sectionStart = pos
+    })
+    const bits: string[] = []
+    let inside = false
+    ed.state.doc.descendants((node, pos) => {
+      if (pos < sectionStart) return
+      if (node.type.name === 'heading') {
+        if (inside) return false
+        inside = true
+      }
+      if (!inside && sectionStart === 0) inside = true
+      if (!inside) return
+      if (node.isText && node.text) bits.push(node.text)
+      if (node.type.name === 'image') {
+        const alt = String(node.attrs.alt || node.attrs.caption || '').trim()
+        bits.push(alt || '图片')
+      }
+    })
+    text = bits.join('。')
+  }
+  if (!speakText(text.slice(0, 2000))) ElMessage.warning('当前环境不支持朗读')
   else ElMessage.success('开始朗读（再次可点停止）')
   moreOpen.value = false
 }
@@ -7949,6 +7979,7 @@ provideRteBindings({
   wave21ReportOpen,
   wave21ReportTitle,
   wordCount,
+  wordParts,
   wordCountDockOpen,
   wordStatsOpen,
   xrefDialogOpen,

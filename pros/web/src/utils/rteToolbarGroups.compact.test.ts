@@ -66,7 +66,7 @@ assert.deepEqual(
 )
 assert.deepEqual(
   compactPrimaryKeysByGroup(dragged).map((group) => group.id),
-  ['style', 'paragraph', 'insert', 'edit'],
+  ['style', 'paragraph', 'insert', 'edit', 'review'],
 )
 
 // 拖拽后的紧凑主栏（buildToolbarGroups 是紧凑态真正用的组装修配函数）
@@ -74,7 +74,7 @@ const compactTools = [...COMPACT_PRIMARY_KEY_SET].map((key) => ({ key }))
 const compactGroups = buildToolbarGroups(compactTools, normalizeToolbarGroupOrder(dragged))
 assert.deepEqual(
   compactGroups.map((group) => group.id),
-  ['style', 'paragraph', 'insert', 'edit'],
+  ['style', 'paragraph', 'insert', 'edit', 'review'],
 )
 assert.deepEqual(
   compactGroups.map((group) => group.tools.map((tool) => tool.key)),
@@ -83,6 +83,7 @@ assert.deepEqual(
     ['heading', 'list', 'align', 'quote', 'code'],
     ['link', 'image'],
     ['undo', 'redo'],
+    ['deepOptimize'],
   ],
 )
 

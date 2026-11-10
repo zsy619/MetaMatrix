@@ -20,6 +20,7 @@ import {
   clearGroupRatios,
   setGroupAlign,
   setGroupGap,
+  setGroupLayout,
   setGroupRatios,
   splitImageGroup,
 } from './imageGroupOps'
@@ -443,6 +444,24 @@ export const ImageGroup = Node.create({
       })
       bar.appendChild(gapBtn)
 
+      for (const layout of ['row', '12', '21'] as const) {
+        const button = document.createElement('button')
+        button.type = 'button'
+        button.className = 'rte-image-group-layout'
+        button.dataset.layout = layout
+        button.textContent = layout === 'row' ? '横排' : layout
+        button.title = layout === 'row' ? '横排' : layout === '12' ? '左一右二' : '左二右一'
+        button.setAttribute('aria-label', button.title)
+        button.addEventListener('click', (event) => {
+          event.preventDefault()
+          event.stopPropagation()
+          const pos = getPos()
+          if (typeof pos !== 'number') return
+          setGroupLayout(editor.view, pos, layout)
+        })
+        bar.appendChild(button)
+      }
+
       const split = addIconButton('rte-image-group-split', '拆分为单图', 'M2 3h5v10H2zm7 0h5v10H9z')
       split.addEventListener('click', (event) => {
         event.preventDefault()
@@ -489,6 +508,13 @@ export const ImageGroup = Node.create({
         bar.querySelectorAll<HTMLButtonElement>('.rte-image-group-align').forEach((button) => {
           button.classList.toggle('is-active', button.dataset.align === normalizeImageAlign(current.attrs.align))
           button.setAttribute('aria-pressed', button.classList.contains('is-active') ? 'true' : 'false')
+        })
+        bar.querySelectorAll<HTMLButtonElement>('.rte-image-group-layout').forEach((button) => {
+          const want = button.dataset.layout
+          const active = normalizeGroupLayout(current.attrs.layout) === (want === '12' || want === '21' ? want : 'row')
+          button.classList.toggle('is-active', active)
+          button.setAttribute('aria-pressed', active ? 'true' : 'false')
+          button.disabled = want !== 'row' && current.childCount !== 3
         })
       }
       paint()

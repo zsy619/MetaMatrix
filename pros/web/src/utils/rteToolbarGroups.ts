@@ -164,6 +164,7 @@ const GROUP_BY_ID = new Map(TOOLBAR_GROUPS.map((group) => [group.id, group]))
  */
 export const COMPACT_PRIMARY_KEYS_BY_GROUP: Record<string, readonly string[]> = {
   edit: ['undo', 'redo'],
+  review: ['deepOptimize'],
   style: ['bold', 'italic', 'underline', 'strike', 'color', 'highlight'],
   paragraph: ['heading', 'list', 'quote', 'code', 'align'],
   insert: ['link', 'image'],

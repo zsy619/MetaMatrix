@@ -57,21 +57,25 @@ export type TidyInline = { text: string; spaces: boolean; punct: boolean; gap: b
 
 /** 连续空格压成一个，重复标点收成一个，中文和英文或数字之间补一个空格。带网址的句子不补间距。 */
 export function tidyInlineText(input: string): TidyInline {
-  let text = input
-  const spaced = text.replace(/[ \u00a0\u3000]{2,}/g, ' ')
-  const spaces = spaced !== text
+  let text = input.replace(/\u3000/g, ' ')
+  const spaced = text.replace(/[ \u00a0]{2,}/g, ' ')
+  const spaces = spaced !== text || input.includes('\u3000')
   text = spaced
   const puncted = text.replace(/([。！？，、；：!?])\1+/g, '$1')
   const punct = puncted !== text
   text = puncted
-  let gap = false
-  if (!text.includes('://')) {
-    const gapped = text
-      .replace(/([\u3400-\u9fff])([A-Za-z0-9])/g, '$1 $2')
-      .replace(/([A-Za-z0-9])([\u3400-\u9fff])/g, '$1 $2')
-    gap = gapped !== text
-    text = gapped
-  }
+  const gapped = text
+    .split(/(https?:\/\/[^\s\u3400-\u9fff]+)/)
+    .map((part, index) =>
+      index % 2 === 1
+        ? part
+        : part
+            .replace(/([\u3400-\u9fff])([A-Za-z0-9])/g, '$1 $2')
+            .replace(/([A-Za-z0-9])([\u3400-\u9fff])/g, '$1 $2'),
+    )
+    .join('')
+  const gap = gapped !== text
+  text = gapped
   return { text, spaces, punct, gap }
 }
 

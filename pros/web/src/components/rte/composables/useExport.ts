@@ -44,8 +44,46 @@ function onExportMenu() {
   deps.closeMore()
 }
 
+function imageGroupHtmlForDocx(html: string): string {
+  if (typeof DOMParser === 'undefined' || !html.includes('image-group')) return html
+  const doc = new DOMParser().parseFromString(html, 'text/html')
+  doc.querySelectorAll('[data-type="image-group"]').forEach((group) => {
+    const layout = group.getAttribute('data-layout')
+    const images = [...group.querySelectorAll('img')]
+    if (images.length < 2) return
+    const cell = (img: Element, rowspan = 1) => {
+      const td = doc.createElement('td')
+      if (rowspan > 1) td.rowSpan = rowspan
+      td.appendChild(img.cloneNode(true))
+      return td
+    }
+    const table = doc.createElement('table')
+    if ((layout === '12' || layout === '21') && images.length >= 3) {
+      const top = doc.createElement('tr')
+      const bottom = doc.createElement('tr')
+      if (layout === '12') {
+        top.appendChild(cell(images[0]!, 2))
+        top.appendChild(cell(images[1]!))
+        bottom.appendChild(cell(images[2]!))
+      } else {
+        top.appendChild(cell(images[0]!))
+        top.appendChild(cell(images[2]!, 2))
+        bottom.appendChild(cell(images[1]!))
+      }
+      table.append(top, bottom)
+    } else {
+      const row = doc.createElement('tr')
+      images.forEach((img) => row.appendChild(cell(img)))
+      table.appendChild(row)
+    }
+    group.replaceWith(table)
+  })
+  return doc.body.innerHTML
+}
+
 function exportBodyHtml(html: string): string {
-  return deps.headingNumbers?.() ? withHeadingNumbers(html) : html
+  const numbered = deps.headingNumbers?.() ? withHeadingNumbers(html) : html
+  return imageGroupHtmlForDocx(numbered)
 }
 
 function exportFileBasename(): string {

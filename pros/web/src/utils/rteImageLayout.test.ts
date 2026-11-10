@@ -22,7 +22,7 @@ assert.equal(placementActive('left', 'wrap-left', { align: 'left', layout: 'bloc
 
 assert.equal(imageDropKind(0.3, 0.5, true), 'left')
 assert.equal(imageDropKind(0.7, 0.5, true), 'right')
-assert.equal(imageDropKind(0.5, 0.5, true), 'after')
+assert.equal(imageDropKind(0.5, 0.5, true), 'center')
 assert.equal(imageDropKind(0.5, 0.2, true), 'before')
 assert.equal(imageDropKind(0.5, 0.8, true), 'after')
 assert.equal(imageDropKind(0.1, 0.8, false), 'after')

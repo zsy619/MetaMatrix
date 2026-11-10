@@ -257,7 +257,10 @@ export function sanitizePastedHtml(html: string): string {
 export function plainTextToPasteContent(
   text: string,
 ): string | Array<{ type: 'paragraph'; content?: Array<{ type: 'text'; text: string }> }> {
-  const normalized = String(text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+  const normalized = String(text || '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
   if (!normalized.includes('\n')) return normalized
   return normalized.split('\n').map((line) => ({
     type: 'paragraph' as const,

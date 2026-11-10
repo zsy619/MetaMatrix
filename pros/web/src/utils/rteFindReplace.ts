@@ -4,7 +4,7 @@ import { TextSelection } from '@tiptap/pm/state'
 
 export type RteFindMatch = { from: number; to: number }
 
-export type RteFindScope = 'all' | 'heading' | 'table' | 'code'
+export type RteFindScope = 'all' | 'heading' | 'table' | 'code' | 'caption'
 
 /** 把匹配限制在标题、表格或代码块里。 */
 export function filterFindMatches(
@@ -21,6 +21,7 @@ export function filterFindMatches(
       if (scope === 'table' && (name === 'table' || name === 'tableCell' || name === 'tableHeader')) return true
       if (scope === 'code' && name === 'codeBlock') return true
     }
+    if (scope === 'caption' && doc.nodeAt(match.from)?.type.name === 'image') return true
     return false
   })
 }
@@ -80,6 +81,19 @@ export function collectFindMatches(
       }
       matches.push({ from, to })
       idx = found + Math.max(1, qRaw.length)
+    }
+  })
+  doc.descendants((node, pos) => {
+    if (node.type.name !== 'image') return
+    const caption = String(node.attrs.caption || '')
+    if (!caption) return
+    const hay = caseSensitive ? caption : caption.toLowerCase()
+    let at = 0
+    while (at < hay.length) {
+      const found = hay.indexOf(q, at)
+      if (found < 0) break
+      matches.push({ from: pos, to: pos + node.nodeSize })
+      at = found + Math.max(1, q.length)
     }
   })
   return matches

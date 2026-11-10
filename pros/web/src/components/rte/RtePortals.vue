@@ -817,6 +817,7 @@ const echartsDialogTemplates = computed(() => {
                 <option data-rte-own value="heading">标题</option>
                 <option data-rte-own value="table">表格</option>
                 <option data-rte-own value="code">代码块</option>
+                <option data-rte-own value="caption">题注</option>
               </select>
             </label>
             <label data-rte-own class="rte-find-case">

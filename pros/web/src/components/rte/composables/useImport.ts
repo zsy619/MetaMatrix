@@ -182,7 +182,7 @@ async function onImportFileChange(event: Event) {
     }
 
     if (name.endsWith('.doc')) {
-      ElMessage.warning('暂不支持旧版 .doc，请另存为 .docx 或 .md 后导入')
+      ElMessage.warning(`暂不支持旧版 .doc「${file.name}」，请另存为 .docx 或 .md 后导入`)
       return
     }
 

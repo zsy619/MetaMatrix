@@ -37,6 +37,22 @@ function nodeToMd(root: HTMLElement): string {
       } else if (tag === 'blockquote') {
         const inner = inlineMd(e).split('\n').map((l) => `> ${l}`).join('\n')
         parts.push(`${inner}\n\n`)
+      } else if (tag === 'ul' && e.getAttribute('data-type') === 'taskList') {
+        e.querySelectorAll(':scope > li').forEach((li) => {
+          const checked = li.getAttribute('data-checked') === 'true'
+          parts.push(`- [${checked ? 'x' : ' '}] ${inlineMd(li as HTMLElement)}\n`)
+        })
+        parts.push('\n')
+      } else if (e.getAttribute('data-type') === 'image-group') {
+        const layout = e.getAttribute('data-layout') || 'row'
+        const images = [...e.querySelectorAll('img')].map((img) => {
+          const src = img.getAttribute('src') || ''
+          const alt = img.getAttribute('alt') || 'image'
+          const safeSrc = /[\s()]/.test(src) ? `<${src}>` : src
+          const caption = img.getAttribute('data-caption')
+          return `![${alt}](${safeSrc})${caption ? `\n${caption}` : ''}`
+        })
+        parts.push(`<!-- image-group:${layout} -->\n${images.join('\n')}\n\n`)
       } else if (tag === 'ul') {
         e.querySelectorAll(':scope > li').forEach((li) => {
           parts.push(`- ${inlineMd(li as HTMLElement)}\n`)
