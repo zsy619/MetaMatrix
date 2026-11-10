@@ -116,6 +116,10 @@ import type {
   SevenSDocumentJSON,
   RiceDocumentJSON,
   BreakEvenDocumentJSON,
+  JourneyDocumentJSON,
+  KanoDocumentJSON,
+  MoscowDocumentJSON,
+  ImpactEffortDocumentJSON,
   PanelAttachment,
   AttachmentsByPanelId,
 } from '../types/canvas'
@@ -166,6 +170,10 @@ import {
   isFiveForcesDoc,
   isValueChainDoc,
   isSevenSDoc,
+  isJourneyDoc,
+  isKanoDoc,
+  isMoscowDoc,
+  isImpactEffortDoc,
   coerceYModelDoc,
   normalizeYModelDoc,
 } from '../types/canvas'
@@ -232,6 +240,10 @@ import valueChainTemplate from '../templates/value-chain-v1.json'
 import sevenSTemplate from '../templates/seven-s-v1.json'
 import riceTemplate from '../templates/rice-v1.json'
 import breakEvenTemplate from '../templates/break-even-v1.json'
+import journeyTemplate from '../templates/customer-journey-v1.json'
+import kanoTemplate from '../templates/kano-v1.json'
+import moscowTemplate from '../templates/moscow-v1.json'
+import impactEffortTemplate from '../templates/impact-effort-v1.json'
 import { CONTEXT_SIX_ELEMENTS_BLOCK_ID } from '../utils/contextSixElements'
 
 export type TemplateId =
@@ -296,6 +308,10 @@ export type TemplateId =
   | 'seven-s'
   | 'rice'
   | 'break-even'
+  | 'customer-journey'
+  | 'kano'
+  | 'moscow'
+  | 'impact-effort'
 
 const TEMPLATES: Record<TemplateId, CanvasDocumentJSON> = {
   'dual-triangle': dualTriangleTemplate as DualTriangleDocumentJSON,
@@ -364,6 +380,10 @@ const TEMPLATES: Record<TemplateId, CanvasDocumentJSON> = {
   'seven-s': sevenSTemplate as SevenSDocumentJSON,
   rice: riceTemplate as RiceDocumentJSON,
   'break-even': breakEvenTemplate as BreakEvenDocumentJSON,
+  'customer-journey': journeyTemplate as JourneyDocumentJSON,
+  kano: kanoTemplate as KanoDocumentJSON,
+  moscow: moscowTemplate as MoscowDocumentJSON,
+  'impact-effort': impactEffortTemplate as ImpactEffortDocumentJSON,
 }
 
 export function isTemplateId(id: string): id is TemplateId {
@@ -865,6 +885,30 @@ export const TEMPLATE_META: Record<
     badge: '财务 · 盈亏',
     description: '单价减单位变动成本，再去除固定成本。算出要卖多少才不亏。',
     category: 'growth',
+  },
+  'customer-journey': {
+    name: '客户旅程',
+    badge: '用户 · 旅程',
+    description: '认知、考虑、购买、使用、忠诚。每段写接触点、痛点和机会。',
+    category: 'growth',
+  },
+  kano: {
+    name: '卡诺模型',
+    badge: '产品 · 卡诺',
+    description: '必备、期望、兴奋、无差异。先保住必备，再挑能让人惊喜的。',
+    category: 'growth',
+  },
+  moscow: {
+    name: 'MoSCoW',
+    badge: '优先级 · MoSCoW',
+    description: '必须有、应该有、可以有、这次不做。用来给这一期划边界。',
+    category: 'method',
+  },
+  'impact-effort': {
+    name: '影响–努力矩阵',
+    badge: '优先级 · 矩阵',
+    description: '影响高、努力低的立刻做。影响高、努力大的排进计划。',
+    category: 'method',
   },
 }
 
@@ -1571,6 +1615,10 @@ export const useDocumentStore = defineStore('document', () => {
     if (isFiveForcesDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
     if (isValueChainDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
     if (isSevenSDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
+    if (isJourneyDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
+    if (isKanoDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
+    if (isMoscowDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
+    if (isImpactEffortDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
     if (
       isDualTriangleDoc(next) &&
       (tid === 'dual-triangle-human-ai' ||
@@ -2504,7 +2552,11 @@ export const useDocumentStore = defineStore('document', () => {
         !isPdcaDoc(doc) &&
         !isFiveForcesDoc(doc) &&
         !isValueChainDoc(doc) &&
-        !isSevenSDoc(doc))
+        !isSevenSDoc(doc) &&
+        !isJourneyDoc(doc) &&
+        !isKanoDoc(doc) &&
+        !isMoscowDoc(doc) &&
+        !isImpactEffortDoc(doc))
     ) {
       return false
     }

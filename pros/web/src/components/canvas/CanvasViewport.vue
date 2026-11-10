@@ -61,6 +61,10 @@ import {
   isSevenSDoc,
   isRiceDoc,
   isBreakEvenDoc,
+  isJourneyDoc,
+  isKanoDoc,
+  isMoscowDoc,
+  isImpactEffortDoc,
   isYModelDoc,
 } from '../../types/canvas'
 import BackgroundLayer from './BackgroundLayer.vue'
@@ -125,6 +129,10 @@ import ValueChainCanvas from './ValueChainCanvas.vue'
 import SevenSCanvas from './SevenSCanvas.vue'
 import RiceCanvas from './RiceCanvas.vue'
 import BreakEvenCanvas from './BreakEvenCanvas.vue'
+import JourneyCanvas from './JourneyCanvas.vue'
+import KanoCanvas from './KanoCanvas.vue'
+import MoscowCanvas from './MoscowCanvas.vue'
+import ImpactEffortCanvas from './ImpactEffortCanvas.vue'
 
 const documentStore = useDocumentStore()
 const ui = useUiStore()
@@ -285,6 +293,10 @@ const valueChainDoc = computed(() => (isValueChainDoc(current_data.value) ? curr
 const sevenSDoc = computed(() => (isSevenSDoc(current_data.value) ? current_data.value : null))
 const riceDoc = computed(() => (isRiceDoc(current_data.value) ? current_data.value : null))
 const breakEvenDoc = computed(() => (isBreakEvenDoc(current_data.value) ? current_data.value : null))
+const journeyDoc = computed(() => (isJourneyDoc(current_data.value) ? current_data.value : null))
+const kanoDoc = computed(() => (isKanoDoc(current_data.value) ? current_data.value : null))
+const moscowDoc = computed(() => (isMoscowDoc(current_data.value) ? current_data.value : null))
+const impactEffortDoc = computed(() => (isImpactEffortDoc(current_data.value) ? current_data.value : null))
 const quadrantDoc = computed(() =>
   isQuadrantDoc(current_data.value) ? current_data.value : null,
 )
@@ -472,6 +484,18 @@ const quadrantDoc = computed(() =>
         </template>
         <template v-else-if="breakEvenDoc">
           <BreakEvenCanvas :doc="breakEvenDoc" />
+        </template>
+        <template v-else-if="journeyDoc">
+          <JourneyCanvas :doc="journeyDoc" />
+        </template>
+        <template v-else-if="kanoDoc">
+          <KanoCanvas :doc="kanoDoc" />
+        </template>
+        <template v-else-if="moscowDoc">
+          <MoscowCanvas :doc="moscowDoc" />
+        </template>
+        <template v-else-if="impactEffortDoc">
+          <ImpactEffortCanvas :doc="impactEffortDoc" />
         </template>
         <template v-else-if="quadrantDoc">
           <BackgroundLayer

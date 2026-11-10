@@ -2128,6 +2128,86 @@ export interface BreakEvenDocumentJSON {
   fixedCost: number
 }
 
+export type JourneyBlockId = 'aware' | 'consider' | 'buy' | 'use' | 'loyal'
+
+export interface JourneyBlock {
+  id: JourneyBlockId
+  title: string
+  hint: string
+  keyword?: string
+  items: QuadrantItem[]
+  text?: string
+}
+
+export interface JourneyDocumentJSON {
+  id: string
+  type: 'customer_journey'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  blocks: JourneyBlock[]
+}
+
+export type KanoBlockId = 'must' | 'performance' | 'attractive' | 'indifferent'
+
+export interface KanoBlock {
+  id: KanoBlockId
+  title: string
+  hint: string
+  keyword?: string
+  items: QuadrantItem[]
+  text?: string
+}
+
+export interface KanoDocumentJSON {
+  id: string
+  type: 'kano'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  blocks: KanoBlock[]
+}
+
+export type MoscowBlockId = 'must' | 'should' | 'could' | 'wont'
+
+export interface MoscowBlock {
+  id: MoscowBlockId
+  title: string
+  hint: string
+  keyword?: string
+  items: QuadrantItem[]
+  text?: string
+}
+
+export interface MoscowDocumentJSON {
+  id: string
+  type: 'moscow'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  blocks: MoscowBlock[]
+}
+
+export type ImpactEffortBlockId = 'now' | 'plan' | 'fill' | 'avoid'
+
+export interface ImpactEffortBlock {
+  id: ImpactEffortBlockId
+  title: string
+  hint: string
+  keyword?: string
+  items: QuadrantItem[]
+  text?: string
+}
+
+export interface ImpactEffortDocumentJSON {
+  id: string
+  type: 'impact_effort'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  blocks: ImpactEffortBlock[]
+}
+
 /** 科学决策三角形（宽度 / 高度 / 深度） */
 export type DecisionTriangleBlockId = 'width' | 'height' | 'depth'
 
@@ -2208,6 +2288,10 @@ export type CanvasDocumentJSON = (
   | SevenSDocumentJSON
   | RiceDocumentJSON
   | BreakEvenDocumentJSON
+  | JourneyDocumentJSON
+  | KanoDocumentJSON
+  | MoscowDocumentJSON
+  | ImpactEffortDocumentJSON
 ) & WithPanelAttachments
 
 /** 带 blocks 的画布（双三角 / Y 模型 / 刻意练习） */
@@ -2256,6 +2340,10 @@ export type BlockCanvasDocumentJSON =
   | FiveForcesDocumentJSON
   | ValueChainDocumentJSON
   | SevenSDocumentJSON
+  | JourneyDocumentJSON
+  | KanoDocumentJSON
+  | MoscowDocumentJSON
+  | ImpactEffortDocumentJSON
 
 export function isDualTriangleDoc(
   doc: CanvasDocumentJSON | null | undefined,
@@ -2832,6 +2920,22 @@ export function isSevenSDoc(doc: CanvasDocumentJSON | null | undefined): doc is 
 export function isRiceDoc(doc: CanvasDocumentJSON | null | undefined): doc is RiceDocumentJSON {
   return !!doc && doc.type === 'rice'
 }
+export function isJourneyDoc(doc: CanvasDocumentJSON | null | undefined): doc is JourneyDocumentJSON {
+  return !!doc && doc.type === 'customer_journey'
+}
+
+export function isKanoDoc(doc: CanvasDocumentJSON | null | undefined): doc is KanoDocumentJSON {
+  return !!doc && doc.type === 'kano'
+}
+
+export function isMoscowDoc(doc: CanvasDocumentJSON | null | undefined): doc is MoscowDocumentJSON {
+  return !!doc && doc.type === 'moscow'
+}
+
+export function isImpactEffortDoc(doc: CanvasDocumentJSON | null | undefined): doc is ImpactEffortDocumentJSON {
+  return !!doc && doc.type === 'impact_effort'
+}
+
 export function isBreakEvenDoc(doc: CanvasDocumentJSON | null | undefined): doc is BreakEvenDocumentJSON {
   return !!doc && doc.type === 'break_even'
 }
@@ -2890,7 +2994,11 @@ export function isBlockCanvasDoc(
     isPdcaDoc(doc) ||
     isFiveForcesDoc(doc) ||
     isValueChainDoc(doc) ||
-    isSevenSDoc(doc)
+    isSevenSDoc(doc) ||
+    isJourneyDoc(doc) ||
+    isKanoDoc(doc) ||
+    isMoscowDoc(doc) ||
+    isImpactEffortDoc(doc)
   )
 }
 

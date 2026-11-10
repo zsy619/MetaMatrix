@@ -1,0 +1,13 @@
+{
+  "id": "canvas_moscow",
+  "type": "moscow",
+  "schemaVersion": 1,
+  "theme": { "background": { "pattern": "none", "color": "#f7f7f7" }, "page": "#f7f7f7", "frame": "#ececec", "hairline": "rgba(60, 50, 20, 0.08)" },
+  "title": "MoSCoW",
+  "blocks": [
+    { "id": "must", "title": "必须有", "hint": "没有就不能发布", "items": [{ "id": "mo_must", "text": "甘特图能按依赖排程" }] },
+    { "id": "should", "title": "应该有", "hint": "重要，但可以晚一个版本", "items": [{ "id": "mo_should", "text": "里程碑和 RACI 互相跳转" }] },
+    { "id": "could", "title": "可以有", "hint": "有余力再做", "items": [{ "id": "mo_could", "text": "导出一张周报" }] },
+    { "id": "wont", "title": "这次不做", "hint": "写下来，避免中途加回来", "items": [{ "id": "mo_wont", "text": "多人实时光标" }] }
+  ]
+}

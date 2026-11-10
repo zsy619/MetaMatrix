@@ -1,0 +1,13 @@
+{
+  "id": "canvas_impact_effort",
+  "type": "impact_effort",
+  "schemaVersion": 1,
+  "theme": { "background": { "pattern": "none", "color": "#f7f7f7" }, "page": "#f7f7f7", "frame": "#ececec", "hairline": "rgba(60, 50, 20, 0.08)" },
+  "title": "影响–努力矩阵",
+  "blocks": [
+    { "id": "now", "title": "立刻做", "hint": "影响高、努力低", "items": [{ "id": "ie_now", "text": "样例甘特图补上里程碑" }] },
+    { "id": "plan", "title": "排进计划", "hint": "影响高、努力高", "items": [{ "id": "ie_plan", "text": "利润表和现金流放在同一份复盘里" }] },
+    { "id": "fill", "title": "有空再做", "hint": "影响低、努力低", "items": [{ "id": "ie_fill", "text": "缩略图再换一版颜色" }] },
+    { "id": "avoid", "title": "尽量别做", "hint": "影响低、努力高", "items": [{ "id": "ie_avoid", "text": "重做一套和现有画布无关的编辑器" }] }
+  ]
+}
