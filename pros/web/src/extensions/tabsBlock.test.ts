@@ -102,7 +102,7 @@ describe('多标签操作', () => {
       content: '<p></p>',
     })
     expect(editor.chain().focus('end').insertTabsBlock(['概览', '细节']).run()).toBe(true)
-    await new Promise((resolve) => queueMicrotask(resolve))
+    await new Promise<void>((resolve) => queueMicrotask(() => resolve()))
     const more = host.querySelector('.rte-tabs-more')
     expect(more).toBeInstanceOf(HTMLButtonElement)
     expect(host.querySelector('.rte-tabs-tool')).toBeNull()

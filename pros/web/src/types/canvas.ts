@@ -1729,6 +1729,123 @@ export interface ContextSixElementsDocumentJSON {
   blocks: ContextSixElementsBlock[]
 }
 
+/** 项目甘特图：一条任务占一行，用起止日期画横条。 */
+export interface GanttTask {
+  id: string
+  name: string
+  start: string
+  end: string
+  /** 0–100 */
+  progress: number
+  owner: string
+}
+
+export interface ProjectGanttDocumentJSON {
+  id: string
+  type: 'project_gantt'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  tasks: GanttTask[]
+}
+
+export type RaciLetter = '' | 'R' | 'A' | 'C' | 'I'
+
+export interface RaciRole {
+  id: string
+  name: string
+}
+
+export interface RaciTask {
+  id: string
+  name: string
+  /** roleId → R/A/C/I */
+  cells: Record<string, RaciLetter>
+}
+
+export interface RaciMatrixDocumentJSON {
+  id: string
+  type: 'raci_matrix'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  roles: RaciRole[]
+  tasks: RaciTask[]
+}
+
+export type KanbanColumnId = 'todo' | 'doing' | 'done' | 'blocked'
+
+export interface KanbanCard {
+  id: string
+  text: string
+}
+
+export interface KanbanColumn {
+  id: KanbanColumnId
+  title: string
+  cards: KanbanCard[]
+}
+
+export interface DailyKanbanDocumentJSON {
+  id: string
+  type: 'daily_kanban'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  columns: KanbanColumn[]
+}
+
+export type BusinessModelBlockId =
+  | 'partners'
+  | 'activities'
+  | 'resources'
+  | 'value'
+  | 'relationships'
+  | 'channels'
+  | 'segments'
+  | 'costs'
+  | 'revenue'
+
+export interface BusinessModelBlock {
+  id: BusinessModelBlockId
+  title: string
+  hint: string
+  text: string
+}
+
+export interface BusinessModelCanvasDocumentJSON {
+  id: string
+  type: 'business_model_canvas'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  blocks: BusinessModelBlock[]
+}
+
+export type CashFlowSectionId = 'operating' | 'investing' | 'financing'
+
+export interface CashFlowLine {
+  id: string
+  label: string
+  /** 流入为正，流出为负 */
+  amount: number
+}
+
+export interface CashFlowSection {
+  id: CashFlowSectionId
+  title: string
+  lines: CashFlowLine[]
+}
+
+export interface CashFlowDocumentJSON {
+  id: string
+  type: 'cash_flow'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  sections: CashFlowSection[]
+}
+
 /** 科学决策三角形（宽度 / 高度 / 深度） */
 export type DecisionTriangleBlockId = 'width' | 'height' | 'depth'
 
@@ -1792,6 +1909,11 @@ export type CanvasDocumentJSON = (
   | ThreeRingBasicsDocumentJSON
   | LeadershipTriangleDocumentJSON
   | ContextSixElementsDocumentJSON
+  | ProjectGanttDocumentJSON
+  | RaciMatrixDocumentJSON
+  | DailyKanbanDocumentJSON
+  | BusinessModelCanvasDocumentJSON
+  | CashFlowDocumentJSON
 ) & WithPanelAttachments
 
 /** 带 blocks 的画布（双三角 / Y 模型 / 刻意练习） */
@@ -2325,6 +2447,36 @@ export function isContextSixElementsDoc(
   doc: CanvasDocumentJSON | null | undefined,
 ): doc is ContextSixElementsDocumentJSON {
   return !!doc && doc.type === 'context_six_elements'
+}
+
+export function isProjectGanttDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is ProjectGanttDocumentJSON {
+  return !!doc && doc.type === 'project_gantt'
+}
+
+export function isRaciMatrixDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is RaciMatrixDocumentJSON {
+  return !!doc && doc.type === 'raci_matrix'
+}
+
+export function isDailyKanbanDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is DailyKanbanDocumentJSON {
+  return !!doc && doc.type === 'daily_kanban'
+}
+
+export function isBusinessModelCanvasDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is BusinessModelCanvasDocumentJSON {
+  return !!doc && doc.type === 'business_model_canvas'
+}
+
+export function isCashFlowDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is CashFlowDocumentJSON {
+  return !!doc && doc.type === 'cash_flow'
 }
 
 

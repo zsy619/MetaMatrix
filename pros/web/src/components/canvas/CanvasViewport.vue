@@ -44,6 +44,11 @@ import {
   isThreeRingBasicsDoc,
   isLeadershipTriangleDoc,
   isContextSixElementsDoc,
+  isProjectGanttDoc,
+  isRaciMatrixDoc,
+  isDailyKanbanDoc,
+  isBusinessModelCanvasDoc,
+  isCashFlowDoc,
   isYModelDoc,
 } from '../../types/canvas'
 import BackgroundLayer from './BackgroundLayer.vue'
@@ -91,6 +96,11 @@ import BusinessFormulaCanvas from './BusinessFormulaCanvas.vue'
 import ThreeRingBasicsCanvas from './ThreeRingBasicsCanvas.vue'
 import LeadershipTriangleCanvas from './LeadershipTriangleCanvas.vue'
 import ContextSixElementsCanvas from './ContextSixElementsCanvas.vue'
+import ProjectGanttCanvas from './ProjectGanttCanvas.vue'
+import RaciMatrixCanvas from './RaciMatrixCanvas.vue'
+import DailyKanbanCanvas from './DailyKanbanCanvas.vue'
+import BusinessModelCanvas from './BusinessModelCanvas.vue'
+import CashFlowCanvas from './CashFlowCanvas.vue'
 
 const documentStore = useDocumentStore()
 const ui = useUiStore()
@@ -219,6 +229,21 @@ const leadershipTriangleDoc = computed(() =>
 )
 const contextSixElementsDoc = computed(() =>
   isContextSixElementsDoc(current_data.value) ? current_data.value : null,
+)
+const projectGanttDoc = computed(() =>
+  isProjectGanttDoc(current_data.value) ? current_data.value : null,
+)
+const raciMatrixDoc = computed(() =>
+  isRaciMatrixDoc(current_data.value) ? current_data.value : null,
+)
+const dailyKanbanDoc = computed(() =>
+  isDailyKanbanDoc(current_data.value) ? current_data.value : null,
+)
+const businessModelCanvasDoc = computed(() =>
+  isBusinessModelCanvasDoc(current_data.value) ? current_data.value : null,
+)
+const cashFlowDoc = computed(() =>
+  isCashFlowDoc(current_data.value) ? current_data.value : null,
 )
 const quadrantDoc = computed(() =>
   isQuadrantDoc(current_data.value) ? current_data.value : null,
@@ -356,6 +381,21 @@ const quadrantDoc = computed(() =>
         </template>
         <template v-else-if="contextSixElementsDoc">
           <ContextSixElementsCanvas :doc="contextSixElementsDoc" />
+        </template>
+        <template v-else-if="projectGanttDoc">
+          <ProjectGanttCanvas :doc="projectGanttDoc" />
+        </template>
+        <template v-else-if="raciMatrixDoc">
+          <RaciMatrixCanvas :doc="raciMatrixDoc" />
+        </template>
+        <template v-else-if="dailyKanbanDoc">
+          <DailyKanbanCanvas :doc="dailyKanbanDoc" />
+        </template>
+        <template v-else-if="businessModelCanvasDoc">
+          <BusinessModelCanvas :doc="businessModelCanvasDoc" />
+        </template>
+        <template v-else-if="cashFlowDoc">
+          <CashFlowCanvas :doc="cashFlowDoc" />
         </template>
         <template v-else-if="quadrantDoc">
           <BackgroundLayer

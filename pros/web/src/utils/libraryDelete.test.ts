@@ -33,7 +33,7 @@ describe('素材库删除', () => {
     await forgetStoredMedia('/media/asset-9')
     await forgetStoredMedia('https://cdn.example/a.png')
     expect(fetchMock).toHaveBeenCalledTimes(1)
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
     expect(url).toContain('/media/asset-9')
     expect(init.method).toBe('DELETE')
     expect(String((init.headers as Record<string, string>).Authorization)).toContain('token')
