@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { Editor } from '@tiptap/core'
 import StarterKit from '@tiptap/starter-kit'
 import { ParagraphAttrs } from '../extensions/paragraphAttrs'
+import { RteImage } from '../extensions/rteImage'
 import { deepOptimizeDocument, tidyInlineText } from './rteDeepOptimize'
 import { filterFindMatches } from './rteFindReplace'
 
@@ -42,6 +43,21 @@ describe('行内整理', () => {
 
   it('全角空格收成普通空格', () => {
     expect(tidyInlineText('你好\u3000\u3000世界').text).toBe('你好 世界')
+  })
+
+  it('整段只有空白时清掉这段文字', () => {
+    const ed = makeEditor('<p>   </p><p>留</p>')
+    expect(() => deepOptimizeDocument(ed)).not.toThrow()
+    expect(ed.getText()).toContain('留')
+    expect(ed.getText().replace(/\s/g, '')).toBe('留')
+  })
+
+  it('去掉零宽字符、段首段尾空白，并收起汉字和标点之间的空格', () => {
+    const tidy = tidyInlineText(' 你\u200b好 ，世界 ')
+    expect(tidy.text).toBe('你好，世界')
+    expect(tidy.invisible).toBe(true)
+    expect(tidy.edge).toBe(true)
+    expect(tidy.punct).toBe(true)
   })
 })
 
@@ -109,5 +125,42 @@ describe('深度优化', () => {
     expect(result.changes.some((item) => item.detail.includes('中英文间距'))).toBe(true)
     expect(result.lines.some((line) => line.text.includes('措辞、图表数据和评论保持原样'))).toBe(true)
     expect(ed.getHTML()).toContain('<pre><code>你好  世界</code></pre>')
+  })
+
+  it('无效列表序号改回 1，链接地址去掉两端空白', () => {
+    const ed = makeEditor('<ol start="0"><li><p>甲</p></li></ol><p><a href="https://example.com">链</a></p>')
+    let listPos = -1
+    ed.state.doc.descendants((node, pos) => {
+      if (node.type.name === 'orderedList' && listPos < 0) listPos = pos
+      if (!node.isText || node.text !== '链') return
+      const link = node.marks.find((mark) => mark.type.name === 'link')
+      if (!link) return
+      ed.view.dispatch(
+        ed.state.tr.addMark(pos, pos + node.nodeSize, link.type.create({ ...link.attrs, href: ' https://example.com ' })),
+      )
+    })
+    const list = ed.state.doc.nodeAt(listPos)
+    if (list) ed.view.dispatch(ed.state.tr.setNodeMarkup(listPos, undefined, { ...list.attrs, start: 0 }))
+    const result = deepOptimizeDocument(ed)
+    expect(ed.state.doc.nodeAt(listPos)?.attrs.start).toBe(1)
+    expect(ed.getHTML()).toContain('href="https://example.com"')
+    expect(ed.getHTML()).not.toContain('href=" https://example.com "')
+    expect(result.changes.some((item) => item.detail.includes('无效列表序号'))).toBe(true)
+    expect(result.changes.some((item) => item.detail.includes('链接地址两端'))).toBe(true)
+  })
+
+  it('没有替代文本时用题注补上', () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const ed = new Editor({
+      element: host,
+      extensions: [StarterKit, RteImage.configure({ inline: false, allowBase64: true })],
+      content: '<img src="https://example.com/a.png" data-caption="封面">',
+    })
+    editor = ed
+    const result = deepOptimizeDocument(ed)
+    expect(ed.state.doc.firstChild?.attrs.alt).toBe('封面')
+    expect(ed.state.doc.firstChild?.attrs.caption).toBe('图 1：封面')
+    expect(result.changes.some((item) => item.detail.includes('替代文本'))).toBe(true)
   })
 })

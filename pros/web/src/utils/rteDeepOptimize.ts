@@ -53,15 +53,27 @@ function skipInlineTidy(doc: PmNode, pos: number, node: PmNode): boolean {
   return false
 }
 
-export type TidyInline = { text: string; spaces: boolean; punct: boolean; gap: boolean }
+export type TidyInline = {
+  text: string
+  spaces: boolean
+  punct: boolean
+  gap: boolean
+  invisible: boolean
+  edge: boolean
+}
 
 /** 连续空格压成一个，重复标点收成一个，中文和英文或数字之间补一个空格。带网址的句子不补间距。 */
 export function tidyInlineText(input: string): TidyInline {
-  let text = input.replace(/\u3000/g, ' ')
+  const stripped = input.replace(/[\u200b\u200c\u200d\ufeff]/g, '')
+  const invisible = stripped !== input
+  let text = stripped.replace(/\u3000/g, ' ')
   const spaced = text.replace(/[ \u00a0]{2,}/g, ' ')
-  const spaces = spaced !== text || input.includes('\u3000')
+  const spaces = spaced !== text || stripped.includes('\u3000')
   text = spaced
-  const puncted = text.replace(/([。！？，、；：!?])\1+/g, '$1')
+  const puncted = text
+    .replace(/([。！？，、；：!?])\1+/g, '$1')
+    .replace(/([\u3400-\u9fff])\s+([，。！？、；：])/g, '$1$2')
+    .replace(/([，。！？、；：])\s+([\u3400-\u9fff])/g, '$1$2')
   const punct = puncted !== text
   text = puncted
   const gapped = text
@@ -76,7 +88,10 @@ export function tidyInlineText(input: string): TidyInline {
     .join('')
   const gap = gapped !== text
   text = gapped
-  return { text, spaces, punct, gap }
+  const edged = text.replace(/^[ \t]+|[ \t]+$/g, '')
+  const edge = edged !== text
+  text = edged
+  return { text, spaces, punct, gap, invisible, edge }
 }
 
 function headingNumbers(text: string): number[] | null {
@@ -119,11 +134,17 @@ export function deepOptimizeDocument(editor: Editor): DeepOptimizeResult {
   let spacesFixed = 0
   let punctFixed = 0
   let gapFixed = 0
+  let invisibleFixed = 0
+  let edgeFixed = 0
+  let altFixed = 0
+  let hrefFixed = 0
+  let listStartFixed = 0
 
   const suggesting = Boolean(
     editor.extensionManager.extensions.find((ext) => ext.name === 'suggestionMode')?.options?.enabled?.(),
   )
   const textEdits: Array<{ from: number; to: number; text: string; marks: PmNode['marks'] }> = []
+  const wipes: Array<{ from: number; to: number }> = []
   const hints: Hint[] = []
   let prevHeadingNo: number[] | null = null
   let prevLevel = 0
@@ -165,21 +186,34 @@ export function deepOptimizeDocument(editor: Editor): DeepOptimizeResult {
     if (node.type.name === 'image') {
       imageNo += 1
       const raw = String(node.attrs.caption || '').trim()
+      let caption = raw
       if (raw) {
         const rest = raw.replace(/^图\s*\d+\s*[：:\-]?\s*/, '')
-        const caption = rest ? `图 ${imageNo}：${rest}` : `图 ${imageNo}`
-        if (caption !== raw) {
-          captionsFixed += 1
-          tr = tr.setNodeMarkup(pos, undefined, {
-            ...node.attrs,
-            caption,
-            captionBefore: suggesting ? node.attrs.captionBefore ?? raw : null,
-          })
-        }
+        const nextCaption = rest ? `图 ${imageNo}：${rest}` : `图 ${imageNo}`
+        if (nextCaption !== raw) caption = nextCaption
       }
       const alt = String(node.attrs.alt || '').trim()
-      if (!alt) hints.push({ text: `图片缺少替代文本（图 ${imageNo}）`, pos })
+      const altFromCaption = caption.replace(/^图\s*\d+\s*[：:\-]?\s*/, '').trim()
+      const nextAlt = alt || altFromCaption
+      if (caption !== raw || (!alt && nextAlt)) {
+        if (caption !== raw) captionsFixed += 1
+        if (!alt && nextAlt) altFixed += 1
+        tr = tr.setNodeMarkup(pos, undefined, {
+          ...node.attrs,
+          ...(caption !== raw
+            ? {
+                caption,
+                captionBefore: suggesting ? node.attrs.captionBefore ?? raw : null,
+              }
+            : {}),
+          ...(!alt && nextAlt ? { alt: nextAlt } : {}),
+        })
+      }
+      if (!nextAlt) hints.push({ text: `图片缺少替代文本（图 ${imageNo}）`, pos })
       return
+    }
+    if (node.type.name === 'imageGroup' && node.childCount >= 4 && normalizeGroupLayout(node.attrs.layout) === 'row') {
+      hints.push({ text: '四张及以上可以把其中两张叠在一侧', pos })
     }
     if (node.type.name === 'imageGroup' && node.childCount === 2 && normalizeGroupLayout(node.attrs.layout) === 'row') {
       hints.push({
@@ -224,6 +258,13 @@ export function deepOptimizeDocument(editor: Editor): DeepOptimizeResult {
         }
       }
     }
+    if (node.type.name === 'orderedList') {
+      const start = Number(node.attrs.start)
+      if (Number.isFinite(start) && start < 1) {
+        listStartFixed += 1
+        tr = tr.setNodeMarkup(pos, undefined, { ...node.attrs, start: 1 })
+      }
+    }
     if (
       (node.type.name === 'paragraph' || node.type.name === 'codeBlock') &&
       node.attrs.textIndent &&
@@ -239,6 +280,9 @@ export function deepOptimizeDocument(editor: Editor): DeepOptimizeResult {
     if (dropLink && link) {
       linksFixed += 1
       tr = tr.removeMark(pos, pos + node.nodeSize, link.type)
+    } else if (link && href.trim() && href.trim() !== href) {
+      hrefFixed += 1
+      tr = tr.addMark(pos, pos + node.nodeSize, link.type.create({ ...link.attrs, href: href.trim() }))
     }
     if (!skipInlineTidy(doc, pos, node)) {
       const tidy = tidyInlineText(node.text)
@@ -246,8 +290,11 @@ export function deepOptimizeDocument(editor: Editor): DeepOptimizeResult {
         if (tidy.spaces) spacesFixed += 1
         if (tidy.punct) punctFixed += 1
         if (tidy.gap) gapFixed += 1
+        if (tidy.invisible) invisibleFixed += 1
+        if (tidy.edge) edgeFixed += 1
         const marks = dropLink && link ? node.marks.filter((mark) => mark !== link) : node.marks
-        textEdits.push({ from: pos, to: pos + node.nodeSize, text: tidy.text, marks })
+        if (tidy.text) textEdits.push({ from: pos, to: pos + node.nodeSize, text: tidy.text, marks })
+        else wipes.push({ from: pos, to: pos + node.nodeSize })
       }
     }
   })
@@ -258,6 +305,10 @@ export function deepOptimizeDocument(editor: Editor): DeepOptimizeResult {
     const to = tr.mapping.map(edit.to)
     const text = schema.text(edit.text, edit.marks)
     tr = tr.replaceWith(from, to, text)
+  }
+  wipes.sort((a, b) => b.from - a.from)
+  for (const range of wipes) {
+    tr = tr.delete(tr.mapping.map(range.from), tr.mapping.map(range.to))
   }
 
   const deletes: Array<{ from: number; to: number }> = []
@@ -316,6 +367,11 @@ export function deepOptimizeDocument(editor: Editor): DeepOptimizeResult {
   if (spacesFixed) changes.push({ detail: `已收紧 ${spacesFixed} 处连续空格` })
   if (punctFixed) changes.push({ detail: `已收起 ${punctFixed} 处重复标点` })
   if (gapFixed) changes.push({ detail: `已在 ${gapFixed} 处补上中英文间距` })
+  if (invisibleFixed) changes.push({ detail: `已去掉 ${invisibleFixed} 处零宽字符` })
+  if (edgeFixed) changes.push({ detail: `已去掉 ${edgeFixed} 处段首段尾空白` })
+  if (altFixed) changes.push({ detail: `已用题注补上 ${altFixed} 处替代文本` })
+  if (hrefFixed) changes.push({ detail: `已去掉 ${hrefFixed} 个链接地址两端的空白` })
+  if (listStartFixed) changes.push({ detail: `已把 ${listStartFixed} 个无效列表序号改回 1` })
 
   const lines: OptimizeReportLine[] = changes.map((item) => ({ text: item.detail, done: true }))
   lines.push({ text: SKIPPED_NOTE, done: true })
