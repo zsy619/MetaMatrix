@@ -31,6 +31,7 @@ function tableCtxOps(keys: readonly string[]) {
     insertCount?: boolean
     danger?: boolean
     disabled?: () => boolean
+    active?: () => boolean
   }>
   return keys
     .map((key) => items.find((op) => op.key === key))
@@ -576,7 +577,7 @@ const echartsDialogTemplates = computed(() => {
                 <button data-rte-own
                   v-else
                   type="button"
-                  :class="{ danger: op.danger }"
+                  :class="{ danger: op.danger, active: op.active?.() }"
                   :disabled="op.disabled?.()"
                   @click="op.run()"
                 >
@@ -655,7 +656,7 @@ const echartsDialogTemplates = computed(() => {
                 <button data-rte-own
                   type="button"
                   class="rte-table-ops-item"
-                  :class="{ danger: op.danger }"
+                  :class="{ danger: op.danger, active: op.active?.() }"
                   :disabled="op.disabled?.()"
                   @click="op.run()"
                 >

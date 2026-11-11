@@ -398,7 +398,7 @@ describe('新功能区按钮', () => {
     const menu = document.querySelector('.rte-table-ctx')
     expect(menu, '右键菜单').toBeTruthy()
     const tops = [...menu!.querySelectorAll(':scope > .rte-table-ctx-group > button')].map((button) => (button.textContent || '').replace('▸', '').trim())
-    expect(tops).toEqual(['插入', '单元格', '表头', '数据', '删除'])
+    expect(tops).toEqual(['插入', '单元格', '表头', '数据', '阅读', '删除'])
     expect(menu!.textContent).not.toContain('向上插入行')
     const insert = [...menu!.querySelectorAll(':scope > .rte-table-ctx-group > button')].find((button) => (button.textContent || '').includes('插入'))
     insert!.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }))
@@ -438,6 +438,51 @@ describe('新功能区按钮', () => {
     await clickTool(wrapper, '斑马纹')
     expect(table.getAttribute('data-zebra')).toBeNull()
     expect(getComputedStyle(rows[1].cells[0]).backgroundColor.replace(/\s/g, '').toLowerCase()).not.toBe('#e7eefc')
+    wrapper.unmount()
+    style.remove()
+  })
+
+  it('表格阅读配色写到表格上，表头和偶数行换成所选颜色', async () => {
+    const css = readFileSync('src/components/rte/styles/editor.global.css', 'utf8')
+    const style = document.createElement('style')
+    style.textContent = css
+    document.head.appendChild(style)
+    const wrapper = await mountEditor()
+    const editor = editorOf(wrapper)
+    editor.commands.setContent(
+      '<table><tbody><tr><th><p>名</p></th></tr><tr><td><p>甲</p></td></tr><tr><td><p>乙</p></td></tr></tbody></table>',
+    )
+    let cell = -1
+    editor.state.doc.descendants((node, pos) => {
+      if (cell < 0 && node.isText && node.text === '甲') cell = pos
+    })
+    editor.commands.setTextSelection(cell)
+    await openRibbon(wrapper, '表格')
+    await clickTool(wrapper, '表格')
+    const read = [...document.querySelectorAll('.rte-table-menu button')].find((button) => (button.textContent || '').replace('▸', '').trim() === '阅读')
+    expect(read, '阅读分组').toBeTruthy()
+    read!.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }))
+    await nextTick()
+    await clickMenu('护眼绿')
+    const table = wrapper.get('.ProseMirror table').element as HTMLTableElement
+    expect(table.getAttribute('data-read')).toBe('green')
+    expect(editor.getHTML()).toContain('data-read="green"')
+    const rows = [...table.querySelectorAll('tbody > tr')] as HTMLTableRowElement[]
+    expect(getComputedStyle(rows[0].cells[0]).backgroundColor.replace(/\s/g, '').toLowerCase()).toBe('#1f7a4d')
+    expect(getComputedStyle(rows[1].cells[0]).backgroundColor.replace(/\s/g, '').toLowerCase()).toBe('#e7f6ee')
+    expect(getComputedStyle(rows[2].cells[0]).backgroundColor.replace(/\s/g, '').toLowerCase()).not.toBe('#e7f6ee')
+    let again = -1
+    editor.state.doc.descendants((node, pos) => {
+      if (again < 0 && node.isText && node.text === '甲') again = pos
+    })
+    editor.commands.setTextSelection(again)
+    await clickTool(wrapper, '表格')
+    const readAgain = [...document.querySelectorAll('.rte-table-menu button')].find((button) => (button.textContent || '').replace('▸', '').trim() === '阅读')
+    readAgain!.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }))
+    await nextTick()
+    await clickMenu('关闭阅读')
+    expect(table.getAttribute('data-read')).toBeNull()
+    expect(editor.getHTML()).not.toContain('data-read=')
     wrapper.unmount()
     style.remove()
   })

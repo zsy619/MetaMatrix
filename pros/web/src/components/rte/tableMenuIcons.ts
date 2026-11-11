@@ -1,5 +1,17 @@
 import { h, type Component } from 'vue'
 
+function toneIcon(color: string): Component {
+  return {
+    render() {
+      return h(
+        'svg',
+        { viewBox: '0 0 24 24', width: '16', height: '16', 'aria-hidden': 'true' },
+        [h('rect', { x: '4', y: '4', width: '16', height: '16', rx: '3', fill: color })],
+      )
+    },
+  }
+}
+
 function ctxIcon(paths: string[]): Component {
   return {
     render() {
@@ -29,6 +41,13 @@ export const TABLE_MENU_ICONS: Record<string, Component> = {
   head: ctxIcon(['M4 5h16v14H4z', 'M4 10h16']),
   data: ctxIcon(['M5 7h14', 'M5 12h14', 'M5 17h9']),
   delete: ctxIcon(['M5 7h14', 'M9 7V5h6v2', 'M8 7l1 13h6l1-13']),
+  read: ctxIcon(['M3 6h7a3 3 0 0 1 3 3v9', 'M21 6h-7a3 3 0 0 0-3 3v9', 'M12 9v9']),
+  'read-off': toneIcon('#d0d3d8'),
+  'read-blue': toneIcon('#1d4ed8'),
+  'read-green': toneIcon('#1f7a4d'),
+  'read-orange': toneIcon('#c2410c'),
+  'read-gray': toneIcon('#4b5563'),
+  'read-night': toneIcon('#111827'),
   'insert-table': ctxIcon(['M4 5h16v14H4z', 'M4 10h16', 'M4 15h16', 'M10 5v14']),
   zebra: ctxIcon(['M4 6h16v4H4z', 'M4 14h16v4H4z']),
   'row-before': ctxIcon(['M5 7h14', 'M12 18V10', 'M8.5 13.5L12 10l3.5 3.5']),

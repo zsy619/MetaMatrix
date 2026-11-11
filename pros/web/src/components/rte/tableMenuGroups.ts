@@ -4,6 +4,7 @@ export const TABLE_MENU_GROUPS = [
   { id: 'cell', label: '单元格', keys: ['merge', 'split', 'clear-cell', 'valign-top', 'valign-middle', 'valign-bottom', 'align-left', 'align-center', 'align-right'] },
   { id: 'head', label: '表头', keys: ['header', 'header-col', 'sticky-header', 'sticky-col'] },
   { id: 'data', label: '数据', keys: ['dup-row', 'equal-cols', 'cell-formula', 'calc-formula', 'sum-row', 'sort-asc', 'sort-desc', 'row-filter', 'copy-csv', 'copy-tsv'] },
+  { id: 'read', label: '阅读', keys: ['read-off', 'read-blue', 'read-green', 'read-orange', 'read-gray', 'read-night'] },
   { id: 'delete', label: '删除', keys: ['del-row', 'del-col', 'del-table'] },
 ] as const
 

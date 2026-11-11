@@ -15,6 +15,7 @@ declare module '@tiptap/core' {
       setOrderedListStart: (start: number) => ReturnType
       padListItem: (delta: number) => ReturnType
       toggleTableZebra: () => ReturnType
+      setTableReadTone: (tone: string) => ReturnType
     }
   }
 }
@@ -96,6 +97,14 @@ export const ListStyleAttrs = Extension.create({
             default: false,
             parseHTML: (el: HTMLElement) => el.getAttribute('data-zebra') === '1',
             renderHTML: (attrs: { zebra?: boolean }) => (attrs.zebra ? { 'data-zebra': '1' } : {}),
+          },
+          readTone: {
+            default: '',
+            parseHTML: (el: HTMLElement) => el.getAttribute('data-read') || '',
+            renderHTML: (attrs: { readTone?: string }) => {
+              const tone = String(attrs.readTone || '')
+              return tone ? { 'data-read': tone } : {}
+            },
           },
         },
       },
@@ -198,6 +207,14 @@ export const ListStyleAttrs = Extension.create({
           if (!editor.isActive('table')) return false
           const on = editor.getAttributes('table').zebra === true
           return commands.updateAttributes('table', { zebra: !on })
+        },
+      setTableReadTone:
+        (tone) =>
+        ({ editor, commands }) => {
+          if (!editor.isActive('table')) return false
+          const allowed = ['', 'blue', 'green', 'orange', 'gray', 'night']
+          const next = allowed.includes(tone) ? tone : ''
+          return commands.updateAttributes('table', { readTone: next })
         },
     }
   },

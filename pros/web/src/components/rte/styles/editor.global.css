@@ -101,6 +101,11 @@ html.rte-toolbar-dragging * {
 .rte-float-menu button:hover {
   background: #f2f3f5;
 }
+.rte-float-menu button.active,
+.rte-table-ctx-flyout button.active {
+  background: #eef3ff;
+  color: #1d4ed8;
+}
 
 /* 选区浮层由 TipTap 挂到 body，scoped 样式经常套不上，这里给边框和底色。 */
 .rte-selection-bubble {
@@ -5761,6 +5766,29 @@ html.rte-image-preview-open .tippy-box {
 .rte-root .ProseMirror table[data-zebra='1'] > tbody > tr:nth-child(even) > th {
   background: #e7eefc;
 }
+/* 表格阅读配色：表头加深，偶数行铺浅底。冻结表头会另写底色，这里用 important 保住所选配色。 */
+.rte-root .ProseMirror table[data-read='blue'] > tbody > tr:first-child > td,
+.rte-root .ProseMirror table[data-read='blue'] > tbody > tr:first-child > th { background: #1d4ed8 !important; color: #fff !important; }
+.rte-root .ProseMirror table[data-read='blue'] > tbody > tr:nth-child(even) > td,
+.rte-root .ProseMirror table[data-read='blue'] > tbody > tr:nth-child(even) > th { background: #e8f0fe !important; color: #1d2129 !important; }
+.rte-root .ProseMirror table[data-read='green'] > tbody > tr:first-child > td,
+.rte-root .ProseMirror table[data-read='green'] > tbody > tr:first-child > th { background: #1f7a4d !important; color: #fff !important; }
+.rte-root .ProseMirror table[data-read='green'] > tbody > tr:nth-child(even) > td,
+.rte-root .ProseMirror table[data-read='green'] > tbody > tr:nth-child(even) > th { background: #e7f6ee !important; color: #1d2129 !important; }
+.rte-root .ProseMirror table[data-read='orange'] > tbody > tr:first-child > td,
+.rte-root .ProseMirror table[data-read='orange'] > tbody > tr:first-child > th { background: #c2410c !important; color: #fff !important; }
+.rte-root .ProseMirror table[data-read='orange'] > tbody > tr:nth-child(even) > td,
+.rte-root .ProseMirror table[data-read='orange'] > tbody > tr:nth-child(even) > th { background: #fff1e8 !important; color: #1d2129 !important; }
+.rte-root .ProseMirror table[data-read='gray'] > tbody > tr:first-child > td,
+.rte-root .ProseMirror table[data-read='gray'] > tbody > tr:first-child > th { background: #4b5563 !important; color: #fff !important; }
+.rte-root .ProseMirror table[data-read='gray'] > tbody > tr:nth-child(even) > td,
+.rte-root .ProseMirror table[data-read='gray'] > tbody > tr:nth-child(even) > th { background: #f3f4f6 !important; color: #1d2129 !important; }
+.rte-root .ProseMirror table[data-read='night'] > tbody > tr > td,
+.rte-root .ProseMirror table[data-read='night'] > tbody > tr > th { background: #1f2329 !important; color: #e8eaed !important; border-color: #3a3f47 !important; }
+.rte-root .ProseMirror table[data-read='night'] > tbody > tr:first-child > td,
+.rte-root .ProseMirror table[data-read='night'] > tbody > tr:first-child > th { background: #111827 !important; color: #fff !important; }
+.rte-root .ProseMirror table[data-read='night'] > tbody > tr:nth-child(even) > td,
+.rte-root .ProseMirror table[data-read='night'] > tbody > tr:nth-child(even) > th { background: #2a2f36 !important; color: #e8eaed !important; }
 /* 十字光标：当前行、当前列叠一层淡蓝，底下的斑马纹和表头底色还在。 */
 .rte-root .ProseMirror td.rte-cross-row,
 .rte-root .ProseMirror th.rte-cross-row,

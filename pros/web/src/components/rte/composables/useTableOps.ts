@@ -352,7 +352,11 @@ type TableOpItem = {
   sepBefore?: boolean
   /** 向上/下插行、向左/右插列：各自一个数量。 */
   insertCount?: boolean
+  active?: () => boolean
 }
+
+const TABLE_READ_TONES = ['', 'blue', 'green', 'orange', 'gray', 'night'] as const
+type TableReadTone = (typeof TABLE_READ_TONES)[number]
 
 type TableInsertKey = 'row-before' | 'row-after' | 'col-before' | 'col-after'
 
@@ -678,6 +682,33 @@ function equalizeCurrentTableColumns() {
   ElMessage.success('已均分列宽')
 }
 
+function currentTableReadTone(): string {
+  return String(deps.editor().value?.getAttributes('table')?.readTone || '')
+}
+
+function setTableReadTone(tone: TableReadTone) {
+  const ed = deps.editor().value
+  if (!ed || !isInTable()) {
+    ElMessage.info('请把光标放进表格')
+    return
+  }
+  const ok = ed.chain().focus().setTableReadTone(tone).run()
+  if (!ok) {
+    ElMessage.info('请把光标放进表格')
+    return
+  }
+  closeAllTableUi()
+  const done: Record<TableReadTone, string> = {
+    '': '已关闭阅读配色',
+    blue: '已套用商务蓝',
+    green: '已套用护眼绿',
+    orange: '已套用暖橙',
+    gray: '已套用淡灰',
+    night: '已套用夜间',
+  }
+  ElMessage.success(done[tone])
+}
+
 /** 在当前单元格插入公式模板。 */
 function insertCellFormula() {
   const ed = deps.editor().value
@@ -816,6 +847,42 @@ const tableOpItems = computed((): TableOpItem[] => {
       key: 'row-filter',
       label: '行筛选…',
       run: () => { void promptTableRowFilter() },
+    },
+    {
+      key: 'read-off',
+      label: '关闭阅读',
+      run: () => setTableReadTone(''),
+      active: () => currentTableReadTone() === '',
+    },
+    {
+      key: 'read-blue',
+      label: '商务蓝',
+      run: () => setTableReadTone('blue'),
+      active: () => currentTableReadTone() === 'blue',
+    },
+    {
+      key: 'read-green',
+      label: '护眼绿',
+      run: () => setTableReadTone('green'),
+      active: () => currentTableReadTone() === 'green',
+    },
+    {
+      key: 'read-orange',
+      label: '暖橙',
+      run: () => setTableReadTone('orange'),
+      active: () => currentTableReadTone() === 'orange',
+    },
+    {
+      key: 'read-gray',
+      label: '淡灰',
+      run: () => setTableReadTone('gray'),
+      active: () => currentTableReadTone() === 'gray',
+    },
+    {
+      key: 'read-night',
+      label: '夜间',
+      run: () => setTableReadTone('night'),
+      active: () => currentTableReadTone() === 'night',
     },
     {
       key: 'del-table',

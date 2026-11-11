@@ -28,6 +28,7 @@ function tableMenuOps(keys: readonly string[]) {
     danger?: boolean
     disabled?: () => boolean
     sepBefore?: boolean
+    active?: () => boolean
   }>
   return keys.map((key) => items.find((op) => op.key === key)).filter((op): op is NonNullable<typeof op> => !!op)
 }
@@ -1024,7 +1025,7 @@ function toggleChartGroupMenu(key: string) {
                       v-else
                       type="button"
                       role="menuitem"
-                      :class="{ danger: op.danger }"
+                      :class="{ danger: op.danger, active: op.active?.() }"
                       :disabled="op.disabled?.()"
                       @click="op.run()"
                     >

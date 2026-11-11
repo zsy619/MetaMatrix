@@ -1376,7 +1376,8 @@
   padding-right: 8px;
   white-space: nowrap;
 }
-.rte-table-ctx-group > button.active {
+.rte-table-ctx-group > button.active,
+.rte-table-ctx-flyout button.active {
   background: #eef3ff;
   color: #1d4ed8;
 }
