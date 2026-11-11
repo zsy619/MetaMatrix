@@ -1321,7 +1321,7 @@
 }
 
 .rte-float-menu.rte-table-menu {
-  min-width: 148px;
+  min-width: 240px;
   z-index: 60;
   max-height: min(70vh, 520px);
   overflow: auto;
@@ -1336,8 +1336,8 @@
 .rte-table-ctx {
   position: fixed;
   z-index: 5001;
-  min-width: 160px;
-  max-width: min(280px, 92vw);
+  min-width: 240px;
+  max-width: min(320px, 92vw);
   max-height: min(92vh, 640px);
   overflow: auto;
   padding: 4px;
@@ -1364,37 +1364,33 @@
   background: #f2f3f5;
 }
 
-.rte-table-insert-row {
+.rte-table-insert-line {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
-.rte-table-insert-actions {
-  display: flex;
-  flex-direction: column;
+.rte-table-insert-line > button {
   flex: 1 1 auto;
   min-width: 0;
-}
-.rte-table-insert-actions button {
-  width: 100%;
+  text-align: left;
 }
 .rte-table-insert-count {
-  flex: 0 0 auto;
+  flex: 0 0 56px;
   display: flex;
   align-items: center;
-  padding-right: 4px;
+  margin-right: 4px;
 }
 .rte-table-insert-count input {
-  width: 64px;
-  height: 36px;
+  width: 56px;
+  height: 28px;
   box-sizing: border-box;
   border: 1px solid #e5e6eb;
   border-radius: 6px;
   background: #fff;
   color: #1d2129;
-  font-size: 14px;
+  font-size: 13px;
   text-align: center;
-  padding: 0 4px;
+  padding: 0 2px;
 }
 .rte-table-insert-count input:focus {
   outline: 2px solid rgba(51, 112, 255, 0.35);

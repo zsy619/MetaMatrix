@@ -1,4 +1,4 @@
-import { computed, nextTick, ref, watch, type ShallowRef } from 'vue'
+import { computed, nextTick, reactive, ref, watch, type ShallowRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { Editor } from '@tiptap/core'
 import { moveTableGridHover, TABLE_QUICK_COLS, TABLE_QUICK_ROWS } from '../../../utils/rteTableGrid'
@@ -350,11 +350,22 @@ type TableOpItem = {
   disabled?: () => boolean
   danger?: boolean
   sepBefore?: boolean
-  /** 向上/下插行、向左/右插列：共用「插入数量」。 */
+  /** 向上/下插行、向左/右插列：各自一个数量。 */
   insertCount?: boolean
 }
 
-const tableInsertCount = ref(1)
+type TableInsertKey = 'row-before' | 'row-after' | 'col-before' | 'col-after'
+
+const tableInsertCounts = reactive<Record<TableInsertKey, number>>({
+  'row-before': 1,
+  'row-after': 1,
+  'col-before': 1,
+  'col-after': 1,
+})
+
+function isTableInsertKey(key: string): key is TableInsertKey {
+  return key in tableInsertCounts
+}
 let tableInsertAnchor: { fromJSON: (doc: unknown, json: unknown) => { eq: (other: unknown) => boolean }; json: unknown } | null = null
 
 function clampTableInsertCount(value: unknown): number {
@@ -363,8 +374,9 @@ function clampTableInsertCount(value: unknown): number {
   return Math.min(TABLE_INSERT_MAX, n)
 }
 
-function normalizeTableInsertCount() {
-  tableInsertCount.value = clampTableInsertCount(tableInsertCount.value)
+function normalizeTableInsertCount(key: string) {
+  if (!isTableInsertKey(key)) return
+  tableInsertCounts[key] = clampTableInsertCount(tableInsertCounts[key])
 }
 
 function rememberTableInsertSelection() {
@@ -460,9 +472,9 @@ function runTableCommand(command: () => boolean) {
   closeAllTableUi()
 }
 
-function runTableInsert(command: () => boolean) {
-  const count = clampTableInsertCount(tableInsertCount.value)
-  tableInsertCount.value = count
+function runTableInsert(key: TableInsertKey, command: () => boolean) {
+  const count = clampTableInsertCount(tableInsertCounts[key])
+  tableInsertCounts[key] = count
   restoreTableInsertSelection()
   runTableCommand(() => {
     let ok = false
@@ -475,16 +487,16 @@ function runTableInsert(command: () => boolean) {
 }
 
 function tableAddRowBefore() {
-  runTableInsert(() => deps.editor().value!.chain().focus().addRowBefore().run())
+  runTableInsert('row-before', () => deps.editor().value!.chain().focus().addRowBefore().run())
 }
 function tableAddRowAfter() {
-  runTableInsert(() => deps.editor().value!.chain().focus().addRowAfter().run())
+  runTableInsert('row-after', () => deps.editor().value!.chain().focus().addRowAfter().run())
 }
 function tableAddColBefore() {
-  runTableInsert(() => deps.editor().value!.chain().focus().addColumnBefore().run())
+  runTableInsert('col-before', () => deps.editor().value!.chain().focus().addColumnBefore().run())
 }
 function tableAddColAfter() {
-  runTableInsert(() => deps.editor().value!.chain().focus().addColumnAfter().run())
+  runTableInsert('col-after', () => deps.editor().value!.chain().focus().addColumnAfter().run())
 }
 function tableDeleteRow() {
   runTableCommand(() => deps.editor().value!.chain().focus().deleteRow().run())
@@ -928,7 +940,7 @@ function onTableToolbarButtonClick() {
     insertCellFormula,
     calcTableFormulas,
     tableOpItems,
-    tableInsertCount,
+    tableInsertCounts,
     normalizeTableInsertCount,
     rememberTableInsertSelection,
     onTableToolClick,

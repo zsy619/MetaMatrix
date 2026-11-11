@@ -340,10 +340,12 @@ describe('新功能区按钮', () => {
     editor.commands.setTextSelection(cell)
     await openRibbon(wrapper, '表格')
     await clickTool(wrapper, '表格')
-    const input = document.querySelector('input[aria-label="插入数量"]') as HTMLInputElement | null
-    expect(input, '插入数量').toBeTruthy()
-    expect(input!.value).toBe('1')
-    expect(input!.min).toBe('1')
+    const labels = ['向上插入行数量', '向下插入行数量', '向左插入列数量', '向右插入列数量']
+    const inputs = labels.map((label) => document.querySelector(`input[aria-label="${label}"]`) as HTMLInputElement | null)
+    expect(inputs.every(Boolean), '四个插入项各有数量').toBe(true)
+    const input = inputs[1]!
+    expect(input.value).toBe('1')
+    expect(input.min).toBe('1')
     input!.value = '0'
     input!.dispatchEvent(new Event('input', { bubbles: true }))
     input!.dispatchEvent(new Event('blur', { bubbles: true }))
@@ -365,7 +367,7 @@ describe('新功能区按钮', () => {
     })
     editor.commands.setTextSelection(again)
     await clickTool(wrapper, '表格')
-    const inputAgain = document.querySelector('input[aria-label="插入数量"]') as HTMLInputElement
+    const inputAgain = document.querySelector('input[aria-label="向右插入列数量"]') as HTMLInputElement
     inputAgain.value = '2'
     inputAgain.dispatchEvent(new Event('input', { bubbles: true }))
     await nextTick()

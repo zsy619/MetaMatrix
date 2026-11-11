@@ -954,32 +954,28 @@ function toggleChartGroupMenu(key: string) {
               @mouseleave="rte.onToolMenuLeave($event, 'table', rte.closeTableMenu)"
             >
               <template v-for="op in rte.tableOpItems" :key="op.key">
-                <div data-rte-own v-if="op.insertCount && op.key === 'row-before'" class="rte-table-insert-row">
-                  <div data-rte-own class="rte-table-insert-actions">
-                    <button data-rte-own
-                      v-for="item in rte.tableOpItems.filter((entry) => entry.insertCount)"
-                      :key="item.key"
-                      type="button"
-                      role="menuitem"
-                      @click="item.run()"
-                    >
-                      {{ item.label }}
-                    </button>
-                  </div>
+                <div data-rte-own v-if="op.insertCount" class="rte-table-insert-line">
+                  <button data-rte-own
+                    type="button"
+                    role="menuitem"
+                    @click="op.run()"
+                  >
+                    {{ op.label }}
+                  </button>
                   <label data-rte-own class="rte-table-insert-count">
                     <input data-rte-own
-                      v-model.number="rte.tableInsertCount"
+                      v-model.number="rte.tableInsertCounts[op.key]"
                       type="number"
                       min="1"
                       max="99"
                       step="1"
                       inputmode="numeric"
-                      aria-label="插入数量"
+                      :aria-label="op.label + '数量'"
                       title="填几就插入几行或几列，最少 1"
                       @mousedown.stop="rte.rememberTableInsertSelection()"
                       @click.stop
                       @keydown.stop
-                      @blur="rte.normalizeTableInsertCount()"
+                      @blur="rte.normalizeTableInsertCount(op.key)"
                     />
                   </label>
                 </div>
