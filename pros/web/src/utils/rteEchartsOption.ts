@@ -1660,11 +1660,14 @@ export function retypeEchartsOption(
   const oldSeries = Array.isArray(base.series) ? base.series : []
   const newSeries = Array.isArray(next.series) ? (next.series as Array<Record<string, unknown>>) : []
   if ((type === 'bar' || type === 'line') && oldSeries.length && newSeries.length) {
-    const first = oldSeries[0]
-    if (isPlainObject(first) && Array.isArray(first.data) && first.data.length) {
-      newSeries[0].data = first.data
-      if (typeof first.name === 'string') newSeries[0].name = first.name
-    }
+    oldSeries.forEach((item, index) => {
+      if (!isPlainObject(item) || !Array.isArray(item.data) || !item.data.length) return
+      const target = newSeries[index] || { ...newSeries[0], data: item.data }
+      if (!newSeries[index]) newSeries.push(target)
+      newSeries[index]!.data = item.data
+      if (typeof item.name === 'string') newSeries[index]!.name = item.name
+      if (typeof newSeries[index]!.type === 'string') newSeries[index]!.type = type
+    })
   }
   return next
 }

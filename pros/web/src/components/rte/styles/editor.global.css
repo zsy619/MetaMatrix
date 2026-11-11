@@ -3991,6 +3991,13 @@ html.rte-toolbar-dragging * {
   .rte-root.rte-printing img.rte-image {
     max-width: 100% !important;
   }
+  .rte-root.rte-printing .rte-toggle-block .rte-toggle-body {
+    display: block !important;
+  }
+  .rte-root.rte-printing img[data-qr] {
+    min-width: 32mm;
+    min-height: 32mm;
+  }
   .rte-root.rte-printing .rte-suggestion::after {
   content: ' [' attr(title) ']';
   font-size: 9pt;

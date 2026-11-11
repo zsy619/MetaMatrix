@@ -91,7 +91,7 @@ export const imageGroupLayoutCss = [
   '.rte-image-drag-handle{position:absolute;z-index:8;left:4px;top:8px;width:28px;height:28px;padding:0;border:1px solid #d6e4ff;border-radius:6px;background:#fff;color:#3370ff;font-size:14px;line-height:26px;text-align:center;cursor:grab;opacity:0;pointer-events:auto;box-shadow:0 1px 4px rgba(29,33,41,.12);}',
   '.rte-image-drag-handle:focus{opacity:1;outline:2px solid #3370ff;outline-offset:1px;}',
   '.rte-image-group-bar button.rte-image-group-layout,.rte-image-group-bar button.rte-image-group-fit,.rte-image-group-bar button.rte-image-group-alt{width:auto;min-width:28px;padding:0 6px;font-size:12px;}',
-  '.rte-image-group-bar button.rte-image-group-alt{color:#d83931;}',
+  '.rte-image-group-bar button.rte-image-group-alt,.rte-image-group-bar button.rte-image-group-fill{color:#d83931;}',
   '[data-resize-container][data-node="image"],[data-node="image"]{position:relative;}',
   '.rte-image-caption-inline{position:absolute;left:0;right:0;bottom:0;margin:0;padding:2px 6px;background:rgba(255,255,255,.9);font-size:12px;line-height:1.4;text-align:center;pointer-events:auto;z-index:2;cursor:text;}',
   '.rte-image-caption-inline.is-suggestion{box-shadow:inset 0 -2px 0 #3370ff;background:rgba(51,112,255,.12);}',

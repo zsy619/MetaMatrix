@@ -93,6 +93,14 @@ function reapplyTableFilter(
   transaction: { mapping: { map: (pos: number, assoc?: number) => number } },
   appended: ReadonlyArray<{ mapping: { map: (pos: number, assoc?: number) => number } }> = [],
 ) {
+  if (!tableFilterQuery.value) {
+    ed.state.doc.descendants((node, pos) => {
+      if (node.type.name !== 'table' || !node.attrs.rowFilter) return
+      tableFilterQuery.value = String(node.attrs.rowFilter)
+      tableFilterPos.value = pos
+      return false
+    })
+  }
   if (!tableFilterQuery.value || tableFilterPos.value == null) return
   const pos = mapTableFilterPos(tableFilterPos.value, [transaction, ...appended])
   tableFilterPos.value = pos
@@ -169,6 +177,16 @@ async function promptTableRowFilter() {
   if (raw == null) return
   tableFilterQuery.value = raw.trim()
   tableFilterPos.value = tableFilterQuery.value ? findTablePos(ed) : null
+  const filterPos = findTablePos(ed)
+  const filterNode = filterPos == null ? null : ed.state.doc.nodeAt(filterPos)
+  if (filterPos != null && filterNode?.type.name === 'table') {
+    const saved = tableFilterQuery.value || null
+    if ((filterNode.attrs.rowFilter || null) !== saved) {
+      ed.view.dispatch(
+        ed.state.tr.setNodeMarkup(filterPos, undefined, { ...filterNode.attrs, rowFilter: saved }).setMeta('addToHistory', false),
+      )
+    }
+  }
   const hidden = tableFilterPos.value == null && tableFilterQuery.value
     ? -1
     : applyTableRowFilter(ed, tableFilterQuery.value)

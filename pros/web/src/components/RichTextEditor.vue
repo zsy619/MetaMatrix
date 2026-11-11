@@ -115,7 +115,7 @@ import {
 import { QUOTE_STYLE_OPTIONS, type QuoteStyle } from '../extensions/rteBlockquote'
 import { collectCrossRefTargets } from '../extensions/crossRef'
 import { deepOptimizeDocument, type OptimizeAction, type OptimizeReportLine } from '../utils/rteDeepOptimize'
-import { moveHeadingAt } from '../utils/rteHeadingSection'
+import { cascadeHeadingAt, moveHeadingAt } from '../utils/rteHeadingSection'
 import { syncPrintTableHeads } from '../utils/rtePrintTableHead'
 import { setGroupLayout } from '../extensions/imageGroupOps'
 import { continueOrderedList, promoteTableHeader } from '../utils/rteOptimizeActions'
@@ -457,6 +457,14 @@ function outlineMenuJump() {
   const item = outlineMenuItem()
   closeOutlineMenu()
   if (item) jumpToOutlineHeading(item)
+}
+
+function outlineMenuCascade(delta: 1 | -1) {
+  const item = outlineMenuItem()
+  closeOutlineMenu()
+  const ed = editor.value
+  if (!item || !ed) return
+  if (!cascadeHeadingAt(ed, item.pos, delta)) ElMessage.info('这一级不能再调')
 }
 
 function outlineMenuMove(dir: -1 | 1) {
@@ -7795,6 +7803,7 @@ provideRteBindings({
   closeOutlineMenu,
   outlineMenuJump,
   outlineMenuMove,
+  outlineMenuCascade,
   outlineMenuCopyTitle,
   outlineMenuCopyLink,
   mentionEmptyHint,

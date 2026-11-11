@@ -858,6 +858,8 @@ useParentScopeStamp()
         <button data-rte-own type="button" role="menuitem" @click="rte.outlineMenuJump()">跳到这一节</button>
         <button data-rte-own type="button" role="menuitem" @click="rte.outlineMenuMove(-1)">上移整节</button>
         <button data-rte-own type="button" role="menuitem" @click="rte.outlineMenuMove(1)">下移整节</button>
+        <button data-rte-own type="button" role="menuitem" @click="rte.outlineMenuCascade(-1)">整节升一级</button>
+        <button data-rte-own type="button" role="menuitem" @click="rte.outlineMenuCascade(1)">整节降一级</button>
         <button data-rte-own type="button" role="menuitem" @click="rte.outlineMenuCopyTitle()">复制标题</button>
         <button data-rte-own type="button" role="menuitem" @click="rte.outlineMenuCopyLink()">复制标题链接</button>
       </div>

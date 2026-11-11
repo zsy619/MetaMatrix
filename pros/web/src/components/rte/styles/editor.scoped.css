@@ -3207,6 +3207,15 @@
   border-radius: 6px;
   overflow-x: auto;
 }
+.rte-root :deep(.tableWrapper td img),
+.rte-root :deep(.tableWrapper th img) {
+  max-height: 180px;
+  width: auto;
+  object-fit: contain;
+}
+.rte-root :deep(.rte-footnote) {
+  cursor: help;
+}
 .rte-root :deep(.rte-comment-anchor) {
   background: #fff3bf;
   border-bottom: 2px solid #f7ba1e;

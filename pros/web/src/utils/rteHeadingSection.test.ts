@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { moveSectionIndexes, type SectionNode } from './rteHeadingSection'
+import { cascadeHeadingLevels, moveSectionIndexes, type SectionNode } from './rteHeadingSection'
 
 const doc: SectionNode[] = [
   { type: 'heading', level: 1 },
@@ -25,5 +25,12 @@ describe('标题连同正文移动', () => {
 
   it('最上面的标题不能再上移', () => {
     expect(moveSectionIndexes(doc, 0, -1)).toBeNull()
+  })
+
+  it('降一级时，当前标题和更低的下级一起降', () => {
+    expect(cascadeHeadingLevels(doc, 2, 1)).toEqual([
+      { index: 2, level: 2 },
+      { index: 4, level: 3 },
+    ])
   })
 })

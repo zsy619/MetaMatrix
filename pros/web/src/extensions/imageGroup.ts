@@ -1,4 +1,5 @@
 import { Node, mergeAttributes } from '@tiptap/core'
+import { ElMessageBox } from 'element-plus'
 import { Plugin } from '@tiptap/pm/state'
 import type { EditorView } from '@tiptap/pm/view'
 import { normalizeImageAlign } from '../utils/rteImageLayout'
@@ -750,7 +751,48 @@ export const ImageGroup = Node.create({
           altBtn.textContent = `缺${missingAlt}`
           altBtn.title = '有图片还没有替代文本，点击逐张跳转'
           altBtn.setAttribute('aria-label', altBtn.title)
+          let fillBtn = bar.querySelector('.rte-image-group-fill') as HTMLButtonElement | null
+          if (!fillBtn) {
+            fillBtn = document.createElement('button')
+            fillBtn.type = 'button'
+            fillBtn.className = 'rte-image-group-fill'
+            fillBtn.textContent = '补'
+            fillBtn.title = '给缺替代文本的图片写同一句说明'
+            fillBtn.addEventListener('click', (event) => {
+              event.preventDefault()
+              event.stopPropagation()
+              const pos = getPos()
+              if (typeof pos !== 'number') return
+              void ElMessageBox.prompt('给还没有替代文本的图片写同一句说明', '补替代文本', {
+                inputValue: '图片',
+                confirmButtonText: '写入',
+                cancelButtonText: '取消',
+              })
+                .then(({ value }) => {
+                  const text = String(value || '').trim()
+                  const live = editor.state.doc.nodeAt(pos)
+                  if (!text || !live || live.type.name !== 'imageGroup') return
+                  let tr = editor.state.tr
+                  let cursor = pos + 1
+                  const jobs: number[] = []
+                  live.forEach((child) => {
+                    if (child.type.name === 'image' && !String(child.attrs.alt || '').trim()) jobs.push(cursor)
+                    cursor += child.nodeSize
+                  })
+                  for (let i = jobs.length - 1; i >= 0; i -= 1) {
+                    const at = jobs[i]!
+                    const image = tr.doc.nodeAt(at)
+                    if (!image) continue
+                    tr = tr.setNodeMarkup(at, undefined, { ...image.attrs, alt: text })
+                  }
+                  if (tr.docChanged) editor.view.dispatch(tr)
+                })
+                .catch(() => undefined)
+            })
+            bar.appendChild(fillBtn)
+          }
         } else {
+          bar.querySelector('.rte-image-group-fill')?.remove()
           altBtn?.remove()
         }
         if (layout === '12' || layout === '21') {

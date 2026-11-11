@@ -54,6 +54,25 @@ export function moveSectionIndexes(
   return [...range(0, index), ...range(end, nextEnd), ...range(index, end), ...range(nextEnd, nodes.length)]
 }
 
+/** 当前标题和它下属的更低级标题一起升或降一级，夹在 1 到 6。 */
+export function cascadeHeadingLevels(
+  nodes: readonly SectionNode[],
+  index: number,
+  delta: 1 | -1,
+): Array<{ index: number; level: number }> | null {
+  const current = nodes[index]
+  if (!current || current.type !== 'heading') return null
+  const end = sectionEnd(nodes, index)
+  const changes: Array<{ index: number; level: number }> = []
+  for (let cursor = index; cursor < end; cursor += 1) {
+    const node = nodes[cursor]
+    if (node?.type !== 'heading') continue
+    const level = Math.min(6, Math.max(1, (node.level || 1) + delta))
+    if (level !== node.level) changes.push({ index: cursor, level })
+  }
+  return changes.length ? changes : null
+}
+
 /** 把 pos 所在的标题节向上或向下移动一节。到头时返回 false。 */
 export function moveHeadingAt(editor: Editor, pos: number, dir: -1 | 1): boolean {
   const doc = editor.state.doc
@@ -81,6 +100,36 @@ export function moveHeadingAt(editor: Editor, pos: number, dir: -1 | 1): boolean
     tr = tr.scrollIntoView()
   }
   editor.view.dispatch(tr)
+  editor.view.focus()
+  return true
+}
+
+/** 把光标所在标题及其下级标题一起升或降一级。 */
+export function cascadeHeadingAt(editor: Editor, pos: number, delta: 1 | -1): boolean {
+  const doc = editor.state.doc
+  const nodes: SectionNode[] = []
+  const children: PmNode[] = []
+  let found = -1
+  let index = 0
+  doc.forEach((child, offset) => {
+    nodes.push({ type: child.type.name, level: Number(child.attrs.level) || 1 })
+    children.push(child)
+    if (found < 0 && pos >= offset && pos < offset + child.nodeSize) found = index
+    index += 1
+  })
+  const changes = found < 0 ? null : cascadeHeadingLevels(nodes, found, delta)
+  if (!changes) return false
+  let tr = editor.state.tr
+  for (let cursor = changes.length - 1; cursor >= 0; cursor -= 1) {
+    const change = changes[cursor]!
+    let at = 0
+    for (let i = 0; i < change.index; i += 1) at += children[i]!.nodeSize
+    const node = tr.doc.nodeAt(at)
+    if (!node || node.type.name !== 'heading') continue
+    tr = tr.setNodeMarkup(at, undefined, { ...node.attrs, level: change.level })
+  }
+  if (!tr.docChanged) return false
+  editor.view.dispatch(tr.scrollIntoView())
   editor.view.focus()
   return true
 }

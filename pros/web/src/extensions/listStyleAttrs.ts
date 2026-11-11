@@ -68,6 +68,12 @@ export const ListStyleAttrs = Extension.create({
       {
         types: ['image', 'table'],
         attributes: {
+          rowFilter: {
+            default: null as string | null,
+            parseHTML: (el: HTMLElement) => el.getAttribute('data-row-filter') || null,
+            renderHTML: (attrs: { rowFilter?: string | null }) =>
+              attrs.rowFilter ? { 'data-row-filter': attrs.rowFilter } : {},
+          },
           xrefId: {
             default: null,
             parseHTML: (el: HTMLElement) =>
