@@ -296,6 +296,10 @@ export function paintQr(
   const moduleSize = sized.moduleSize
   const width = sized.width
   const height = sized.height
+  const qrSide = width
+  const note = (options.description || '').trim()
+  const captionText = options.caption ? note || text.trim() : ''
+  const captionHeight = captionText ? height - qrSide : 0
   ctx.canvas.width = width
   ctx.canvas.height = height
   ctx.fillStyle = background
