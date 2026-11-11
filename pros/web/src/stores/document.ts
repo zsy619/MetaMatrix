@@ -529,7 +529,7 @@ function normalizeHumanAiDualTriangleDoc(
 }
 
 
-export type TemplateCategory = 'method' | 'growth' | 'industry' | 'org' | 'review'
+export type TemplateCategory = 'method' | 'growth' | 'industry' | 'org' | 'review' | 'fde'
 
 export const CATEGORY_LABELS: Record<TemplateCategory, string> = {
   method: '方法框架',
@@ -537,6 +537,7 @@ export const CATEGORY_LABELS: Record<TemplateCategory, string> = {
   industry: '行业调研',
   org: '组织协作',
   review: '复盘总结',
+  fde: 'FDE',
 }
 
 export const TEMPLATE_META: Record<
@@ -816,163 +817,163 @@ export const TEMPLATE_META: Record<
     name: '项目甘特图',
     badge: '项目 · 甘特',
     description: '工作分解树、前置与后置、里程碑、比较基准和关键路径。按依赖排程，日周月缩放。',
-    category: 'method',
+    category: 'fde',
   },
   'raci-matrix': {
     name: 'RACI 责任矩阵',
     badge: '项目 · RACI',
     description: '工作按树缩进。点格子循环 R 执行、A 负责、C 顾问、I 知情，四种颜色分开。',
-    category: 'method',
+    category: 'fde',
   },
   'daily-kanban': {
     name: '每日看板',
     badge: '日常 · 看板',
     description: '待办、进行中、受阻、完成四色列铺满页面，卡片跟着列的颜色走。',
-    category: 'org',
+    category: 'fde',
   },
   'business-model-canvas': {
     name: '商业模式画布',
     badge: '商业 · 九宫',
     description: '九格铺满页面：伙伴与客户分列两侧，价值主张居中，成本和收入垫底。',
-    category: 'growth',
+    category: 'fde',
   },
   'cash-flow': {
     name: '现金流量',
     badge: '财务 · 现金流',
     description: '经营、投资、筹资三块铺满页面。流入为正、流出为负，净额随正负变色。',
-    category: 'growth',
+    category: 'fde',
   },
   swot: {
     name: 'SWOT 分析',
     badge: '战略 · SWOT',
     description: '优势、劣势、机会、威胁四格铺满页面。先写事实，再决定要做什么。',
-    category: 'growth',
+    category: 'fde',
   },
   'lean-canvas': {
     name: '精益画布',
     badge: '商业 · 精益',
     description: '问题、客户、独特价值、指标、渠道、成本和收入。用来检验还没被证实的想法。',
-    category: 'growth',
+    category: 'fde',
   },
   'value-proposition': {
     name: '价值主张画布',
     badge: '客户 · 价值',
     description: '左边价值图，右边客户要完成的事、痛点和收益。两边对上才算契合。',
-    category: 'growth',
+    category: 'fde',
   },
   okr: {
     name: 'OKR',
     badge: '目标 · OKR',
     description: '一个目标配几条可衡量的关键结果。拖动进度，目标完成度自动取平均。',
-    category: 'method',
+    category: 'fde',
   },
   'stakeholder-map': {
     name: '干系人地图',
     badge: '项目 · 干系人',
     description: '按权力和利益分成四格：重点管理、保持满意、随时告知、监督即可。',
-    category: 'method',
+    category: 'fde',
   },
   pdca: {
     name: 'PDCA',
     badge: '日常 · PDCA',
     description: '计划、执行、检查、处理四步铺满页面。用来把一件事转起来。',
-    category: 'org',
+    category: 'fde',
   },
   'five-forces': {
     name: '波特五力',
     badge: '商业 · 五力',
     description: '行业竞争居中，四周是新进入者、供应商、买方和替代品。用来看利润会从哪里漏走。',
-    category: 'industry',
+    category: 'fde',
   },
   'income-statement': {
     name: '利润表',
     badge: '财务 · 利润',
     description: '收入减去成本是毛利，再减去费用是营业利润。和现金流量放在一起看赚不赚钱。',
-    category: 'growth',
+    category: 'fde',
   },
   'value-chain': {
     name: '价值链',
     badge: '运营 · 价值链',
     description: '上面是支持活动，下面是进料、生产、出货、营销和服务。看成本和优势落在哪一段。',
-    category: 'growth',
+    category: 'fde',
   },
   'seven-s': {
     name: '麦肯锡 7S',
     badge: '组织 · 7S',
     description: '战略、结构、系统、共同价值观、风格、人员、技能。看这七项是否互相配合。',
-    category: 'org',
+    category: 'fde',
   },
   rice: {
     name: 'RICE 排序',
     badge: '优先级 · RICE',
     description: '覆盖人数 × 影响 × 信心 ÷ 工作量。分数高的排在前面。',
-    category: 'method',
+    category: 'fde',
   },
   'break-even': {
     name: '盈亏平衡',
     badge: '财务 · 盈亏',
     description: '单价减单位变动成本，再去除固定成本。算出要卖多少才不亏。',
-    category: 'growth',
+    category: 'fde',
   },
   'customer-journey': {
     name: '客户旅程',
     badge: '用户 · 旅程',
     description: '认知、考虑、购买、使用、忠诚。每段写接触点、痛点和机会。',
-    category: 'growth',
+    category: 'fde',
   },
   kano: {
     name: '卡诺模型',
     badge: '产品 · 卡诺',
     description: '必备、期望、兴奋、无差异。先保住必备，再挑能让人惊喜的。',
-    category: 'growth',
+    category: 'fde',
   },
   moscow: {
     name: 'MoSCoW',
     badge: '优先级 · MoSCoW',
     description: '必须有、应该有、可以有、这次不做。用来给这一期划边界。',
-    category: 'method',
+    category: 'fde',
   },
   'impact-effort': {
     name: '影响–努力矩阵',
     badge: '优先级 · 矩阵',
     description: '影响高、努力低的立刻做。影响高、努力大的排进计划。',
-    category: 'method',
+    category: 'fde',
   },
   vrio: {
     name: 'VRIO',
     badge: '战略 · 资源',
     description: '有价值、稀缺、难模仿、有组织。四项都过，才是持续优势。',
-    category: 'method',
+    category: 'fde',
   },
   'golden-circle': {
     name: '黄金圈',
     badge: '战略 · 黄金圈',
     description: '先写为什么，再用怎么做证明，最后才是做什么。',
-    category: 'method',
+    category: 'fde',
   },
   soar: {
     name: 'SOAR',
     badge: '战略 · SOAR',
     description: '优势、机会、愿景、成果。从已经做得好的地方往前看。',
-    category: 'method',
+    category: 'fde',
   },
   'playing-to-win': {
     name: '制胜选择',
     badge: '战略 · 选择',
     description: '制胜愿景、在哪竞争、如何取胜、所需能力、管理体系。五个选择要连得上。',
-    category: 'method',
+    category: 'fde',
   },
   'ten-check': {
     name: '十格自检',
     badge: '自检 · 十格',
     description: '逐格写事实。出现不合格信号，这一格先不过。',
-    category: 'method',
+    category: 'fde',
   },
   'scene-three-high': {
     name: '选场景三高',
     badge: '选场景 · 三高',
     description: '高频、高价值、高边际成本。多个业务叠在雷达上，三项都到 7 分才进下一步。',
-    category: 'method',
+    category: 'fde',
   },
 }
 
