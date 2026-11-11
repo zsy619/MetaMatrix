@@ -3,7 +3,17 @@ import type { Mark, Node as PmNode } from '@tiptap/pm/model'
 import type { Transaction } from '@tiptap/pm/state'
 import { TextSelection } from '@tiptap/pm/state'
 
-export type RteFindMatch = { from: number; to: number }
+export type RteFindMatch = { from: number; to: number; groups?: string[] }
+
+/** 正则替换里的 $1、$2 和 $&。普通查找不展开。 */
+export function expandFindReplacement(template: string, groups?: readonly string[]): string {
+  if (!groups || !template.includes('$')) return template
+  return template.replace(/\$\$|\$&|\$(\d{1,2})/g, (all, index: string | undefined) => {
+    if (all === '$$') return '$'
+    if (all === '$&') return groups[0] ?? ''
+    return groups[Number(index)] ?? ''
+  })
+}
 
 export type RteFindScope = 'all' | 'heading' | 'table' | 'code' | 'caption'
 
@@ -187,7 +197,7 @@ function collectRegexMatches(
       if (startOwner && endOwner && startOwner.part === endOwner.part) {
         const from = startOwner.part.start + startOwner.inner
         const to = from + m[0].length
-        matches.push({ from, to })
+        matches.push({ from, to, groups: [m[0], ...m.slice(1)] })
       }
       re.lastIndex = m.index + Math.max(1, m[0].length)
     }
@@ -233,10 +243,17 @@ function marksInRange(doc: PmNode, from: number, to: number): readonly Mark[] {
 }
 
 /** 替换这段文字，并留下原来的加粗、链接等标记。 */
-function replaceKeepingMarks(tr: Transaction, from: number, to: number, replacement: string): Transaction {
+function replaceKeepingMarks(
+  tr: Transaction,
+  from: number,
+  to: number,
+  replacement: string,
+  groups?: readonly string[],
+): Transaction {
+  const text = expandFindReplacement(replacement, groups)
   const marks = marksInRange(tr.doc, from, to)
-  if (!replacement) return tr.delete(from, to)
-  return tr.replaceWith(from, to, tr.doc.type.schema.text(replacement, marks))
+  if (!text) return tr.delete(from, to)
+  return tr.replaceWith(from, to, tr.doc.type.schema.text(text, marks))
 }
 
 /** 替换当前选中匹配；若选区恰好等于该匹配则替换，否则先选中再替换 */
@@ -246,7 +263,7 @@ export function replaceFindMatch(
   replacement: string,
 ): boolean {
   const { state, view } = editor
-  const tr = replaceKeepingMarks(state.tr, match.from, match.to, replacement)
+  const tr = replaceKeepingMarks(state.tr, match.from, match.to, replacement, match.groups)
   view.dispatch(tr.scrollIntoView())
   view.focus()
   return true
@@ -264,7 +281,7 @@ export function replaceAllFindMatches(
   for (let i = matches.length - 1; i >= 0; i--) {
     const m = matches[i]
     if (!m) continue
-    tr = replaceKeepingMarks(tr, m.from, m.to, replacement)
+    tr = replaceKeepingMarks(tr, m.from, m.to, replacement, m.groups)
   }
   view.dispatch(tr.scrollIntoView())
   view.focus()

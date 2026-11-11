@@ -23,6 +23,7 @@ type Block =
   | { kind: 'listItem'; ordered: boolean; level: number; runs: Run[] }
   | { kind: 'table'; rows: Run[][][] }
   | { kind: 'image'; src: string; alt: string; width: number; height: number }
+  | { kind: 'imageRow'; images: Array<{ src: string; alt: string; width: number; height: number }> }
 
 /** Word 正文可用宽度（px，96dpi）：A4 去掉左右页边距。 */
 const MAX_IMAGE_WIDTH_PX = 600
@@ -216,6 +217,22 @@ function parseBlocks(root: HTMLElement): Block[] {
       if (child.nodeType !== Node.ELEMENT_NODE) continue
       const node = child as HTMLElement
       const tag = node.tagName.toLowerCase()
+      if (node.getAttribute('data-type') === 'image-group' || node.classList.contains('rte-image-group')) {
+        const imgs = Array.from(node.querySelectorAll('img'))
+        if (imgs.length >= 2) {
+          const share = Math.max(80, Math.floor(MAX_IMAGE_WIDTH_PX / imgs.length))
+          blocks.push({
+            kind: 'imageRow',
+            images: imgs.map((img) => {
+              const block = imageBlockFrom(img)
+              if (block.kind !== 'image') return { src: '', alt: '图片', width: share, height: share }
+              const ratio = block.height / Math.max(1, block.width)
+              return { src: block.src, alt: block.alt, width: share, height: Math.max(1, Math.round(share * ratio)) }
+            }),
+          })
+          continue
+        }
+      }
       if (/^h[1-6]$/.test(tag)) {
         pushPara(node, headingStyle(parseInt(tag[1], 10)))
       } else if (tag === 'p' || tag === 'div' || tag === 'blockquote') {
@@ -393,6 +410,36 @@ function blocksToBodyXml(
       parts.push(paraXml(b.runs, { numId, ilvl: Math.min(8, b.level) }))
     } else if (b.kind === 'table') {
       parts.push(tableToXml(b.rows))
+    } else if (b.kind === 'imageRow') {
+      const colW = Math.floor(9000 / Math.max(1, b.images.length))
+      const cells = b.images.map((img) => {
+        const resolved = resolveImage?.({ kind: 'image', ...img }) ?? null
+        let inner = paraXml([{ text: img.alt || '图片', marks: {} }])
+        if (resolved) {
+          imageIndex += 1
+          inner = imageXml({
+            rid: resolved.rid,
+            id: imageIndex,
+            name: `Picture ${imageIndex}`,
+            descr: img.alt,
+            width: img.width,
+            height: img.height,
+          })
+        }
+        return (
+          `<w:tc><w:tcPr><w:tcW w:w="${colW}" w:type="dxa"/>` +
+          `<w:tcBorders>` +
+          `<w:top w:val="nil"/><w:left w:val="nil"/><w:bottom w:val="nil"/><w:right w:val="nil"/>` +
+          `</w:tcBorders></w:tcPr>${inner}</w:tc>`
+        )
+      })
+      parts.push(
+        `<w:tbl><w:tblPr><w:tblW w:w="5000" w:type="pct"/>` +
+          `<w:tblBorders><w:top w:val="nil"/><w:left w:val="nil"/><w:bottom w:val="nil"/>` +
+          `<w:right w:val="nil"/><w:insideH w:val="nil"/><w:insideV w:val="nil"/></w:tblBorders>` +
+          `</w:tblPr><w:tblGrid>${b.images.map(() => `<w:gridCol w:w="${colW}"/>`).join('')}</w:tblGrid>` +
+          `<w:tr>${cells.join('')}</w:tr></w:tbl>`,
+      )
     } else if (b.kind === 'image') {
       const resolved = resolveImage?.(b) ?? null
       if (resolved) {
