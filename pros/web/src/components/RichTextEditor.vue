@@ -158,6 +158,7 @@ import { uploadMediaFile } from '../api/mediaUpload'
 import { attachmentInsertHref } from '../utils/rteAttachment'
 import { htmlWithSuggestionsAccepted } from '../utils/rteSuggestions'
 import { buildExportHtmlWithCharts } from '../utils/rteExportChartSnapshots'
+import { rewritePrintMediaSrc } from '../utils/rtePrintMedia'
 import { useCommentThreads } from './rte/composables/useCommentThreads'
 import { useSuggestionMode } from './rte/composables/useSuggestionMode'
 import { RTE_CTX, type RteEditorEmit, type RteEditorProps } from './rte/context'
@@ -3400,6 +3401,11 @@ async function openPrintPreview() {
     })
   } catch {
     body = accepted
+  }
+  try {
+    body = await rewritePrintMediaSrc(body, rteRootEl.value)
+  } catch {
+    /* 图片地址换不成时仍用原文，避免预览打不开 */
   }
   printPreviewHtml.value = title
     ? `<h1 class="rte-print-title">${escapeHtml(title)}</h1>${body}`

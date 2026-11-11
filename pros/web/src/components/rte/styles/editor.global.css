@@ -2809,11 +2809,33 @@ html.rte-toolbar-dragging * {
 }
 .rte-print-preview-paper .rte-print-title {
   font-size: 1.6em;
+  line-height: 1.35;
   margin: 0 0 16px;
+  padding: 0;
+  border: none;
+  outline: none;
+  box-shadow: none;
+  background: transparent;
+  text-decoration: none;
+  color: #1d2129;
+  font-weight: 600;
+}
+.rte-print-preview-paper .rte-print-title,
+.rte-print-preview-paper .rte-print-title *,
+.rte-print-preview-paper h1,
+.rte-print-preview-paper h1 * {
+  border: none !important;
+  box-shadow: none !important;
+  text-decoration: none !important;
 }
 .rte-print-preview-paper img {
   max-width: 100%;
   height: auto;
+}
+.rte-print-preview-paper .rte-image-group-bar,
+.rte-print-preview-paper .rte-image-group-dividers,
+.rte-print-preview-paper [data-resize-handle] {
+  display: none;
 }
 
 /* —— Wave20 —— */
