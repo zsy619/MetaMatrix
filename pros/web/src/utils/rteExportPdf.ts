@@ -73,6 +73,52 @@ async function rasterLine(text: string, widthPx: number): Promise<HTMLCanvasElem
   }
 }
 
+let cachedCjkFont = ''
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = ''
+  const size = 0x2000
+  for (let index = 0; index < bytes.length; index += size) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + size))
+  }
+  return btoa(binary)
+}
+
+/** 载入子集中文字体，让 PDF 文字层里的汉字可以选中。失败时仍用默认字体，下次导出再试。 */
+async function useCjkFont(pdf: jsPDF): Promise<void> {
+  try {
+    if (!cachedCjkFont) {
+      const url = `${import.meta.env.BASE_URL}fonts/DroidSansFallback.ttf`
+      const response = await fetch(url)
+      if (!response.ok) return
+      cachedCjkFont = bytesToBase64(new Uint8Array(await response.arrayBuffer()))
+    }
+    pdf.addFileToVFS('DroidSansFallback.ttf', cachedCjkFont)
+    pdf.addFont('DroidSansFallback.ttf', 'DroidSansFallback', 'normal', 'Identity-H')
+    pdf.setFont('DroidSansFallback', 'normal')
+  } catch {
+    cachedCjkFont = ''
+  }
+}
+
+function paintChromeText(pdf: jsPDF, text: string, x: number, y: number) {
+  const line = text.trim()
+  if (!line) return
+  try {
+    pdf.setFont('DroidSansFallback', 'normal')
+  } catch {
+    /* 字体没载入时用默认字体 */
+  }
+  pdf.setFontSize(9)
+  pdf.setTextColor(78, 89, 105)
+  try {
+    pdf.text(line, x, y)
+  } catch {
+    /* 个别字符缺字时不让整份导出失败 */
+  }
+  pdf.setTextColor(0, 0, 0)
+}
+
 function drawStrip(
   pdf: jsPDF,
   img: HTMLCanvasElement | null,
@@ -143,9 +189,11 @@ export async function buildPdfFromElement(
 
   const chrome = opts?.chrome && !pageChromeIsEmpty(opts.chrome) ? opts.chrome : null
   const total = Math.max(1, slices.length)
+  await useCjkFont(pdf)
+  const cjkReady = Boolean(cachedCjkFont)
   const headerImgs: Array<HTMLCanvasElement | null> = []
   const footerImgs: Array<HTMLCanvasElement | null> = []
-  if (chrome) {
+  if (chrome && !cjkReady) {
     for (let i = 0; i < total; i += 1) {
       const header = headerForPage(chrome, i + 1)
       headerImgs.push(header ? await rasterLine(header, canvas.width / scale) : null)
@@ -161,7 +209,8 @@ export async function buildPdfFromElement(
 
   if (!slices.length) {
     pdf.text(opts?.title || '', marginLeft, marginTop + 6)
-    drawStrip(pdf, headerImgs[0] || null, marginLeft, 2, usableW)
+    if (cjkReady && chrome) paintChromeText(pdf, headerForPage(chrome, 1), marginLeft, 6)
+    else drawStrip(pdf, headerImgs[0] || null, marginLeft, 2, usableW)
     return pdf.output('blob')
   }
 
@@ -179,11 +228,22 @@ export async function buildPdfFromElement(
     const sliceHmm = (sliceH * imgWmm) / canvas.width
     if (pageIndex > 0) pdf.addPage()
     pdf.addImage(imgData, 'JPEG', marginLeft, marginTop, imgWmm, sliceHmm)
-    drawStrip(pdf, headerImgs[pageIndex] || null, marginLeft, Math.max(1, (marginTop - 6) / 2), usableW)
-    const footer = footerImgs[pageIndex]
-    if (footer) {
-      const footerHmm = (footer.height / footer.width) * usableW
-      drawStrip(pdf, footer, marginLeft, pageHeight - marginBottom + Math.max(1, (marginBottom - footerHmm) / 2), usableW)
+    if (cjkReady && chrome) {
+      paintChromeText(pdf, headerForPage(chrome, pageIndex + 1), marginLeft, 6)
+      const footerLine = [
+        footerForPage(chrome, pageIndex + 1),
+        formatPageNumber(chrome.pageNumber, pageIndex + 1, total),
+      ]
+        .filter(Boolean)
+        .join('    ')
+      paintChromeText(pdf, footerLine, marginLeft, pageHeight - 6)
+    } else {
+      drawStrip(pdf, headerImgs[pageIndex] || null, marginLeft, Math.max(1, (marginTop - 6) / 2), usableW)
+      const footer = footerImgs[pageIndex]
+      if (footer) {
+        const footerHmm = (footer.height / footer.width) * usableW
+        drawStrip(pdf, footer, marginLeft, pageHeight - marginBottom + Math.max(1, (marginBottom - footerHmm) / 2), usableW)
+      }
     }
     offset += sliceH
   })
@@ -224,6 +284,11 @@ function addSelectableLayer(
     const found = pageOf(yPx)
     if (!found) return
     pdf.setPage(found.page + 1)
+    try {
+      pdf.setFont('DroidSansFallback', 'normal')
+    } catch {
+      /* 字体没载入时用默认字体 */
+    }
     pdf.setFontSize(Math.max(8, Math.min(16, rect.height * 0.45)))
     pdf.text(text.slice(0, 500), marginLeft + toMm((rect.left - root.left) * scaleX), marginTop + toMm(found.y) + 4, {
       renderingMode: 'invisible',

@@ -22,7 +22,7 @@ type Run = { text: string; marks: InlineMark }
 type Block =
   | { kind: 'p'; style?: string; runs: Run[]; indent?: number }
   | { kind: 'listItem'; ordered: boolean; level: number; runs: Run[] }
-  | { kind: 'table'; rows: Run[][][] }
+  | { kind: 'table'; rows: Run[][][]; header?: boolean }
   | { kind: 'image'; src: string; alt: string; width: number; height: number }
   | { kind: 'imageRow'; images: Array<{ src: string; alt: string; width: number; height: number }> }
 
@@ -113,7 +113,9 @@ function headingStyle(level: number): string {
   if (level <= 1) return 'Heading1'
   if (level === 2) return 'Heading2'
   if (level === 3) return 'Heading3'
-  return 'Heading4'
+  if (level === 4) return 'Heading4'
+  if (level === 5) return 'Heading5'
+  return 'Heading6'
 }
 
 function parseIndent(el: HTMLElement): number {
@@ -150,6 +152,17 @@ function imageBlockFrom(el: HTMLElement): Block {
     height = Math.max(1, Math.round(height * ratio))
   }
   return { kind: 'image', src, alt, width: Math.round(width), height: Math.round(height) }
+}
+
+function pushCaption(blocks: Block[], text: string) {
+  const caption = text.trim()
+  if (!caption) return
+  blocks.push({ kind: 'p', style: 'Caption', runs: [{ text: caption, marks: {} }] })
+}
+
+function pushImage(blocks: Block[], el: HTMLElement) {
+  blocks.push(imageBlockFrom(el))
+  pushCaption(blocks, el.getAttribute('data-caption') || '')
 }
 
 function parseBlocks(root: HTMLElement): Block[] {
@@ -202,13 +215,20 @@ function parseBlocks(root: HTMLElement): Block[] {
 
   const walkTable = (table: HTMLElement) => {
     const rows: Run[][][] = []
-    for (const tr of Array.from(table.querySelectorAll(':scope > tbody > tr, :scope > tr, :scope > thead > tr'))) {
+    let header = false
+    const rowEls = Array.from(table.querySelectorAll(':scope > thead > tr, :scope > tbody > tr, :scope > tr'))
+    rowEls.forEach((tr, index) => {
       const cells: Run[][] = []
-      for (const cell of Array.from(tr.children)) {
+      const kids = Array.from(tr.children).filter((cell) => {
         const ct = cell.tagName.toLowerCase()
-        if (ct !== 'td' && ct !== 'th') continue
+        return ct === 'td' || ct === 'th'
+      })
+      if (index === 0 && kids.length && (tr.parentElement?.tagName === 'THEAD' || kids.every((cell) => cell.tagName === 'TH'))) {
+        header = true
+      }
+      for (const cell of kids) {
+        const ct = cell.tagName.toLowerCase()
         const runs = collectRuns(cell)
-        // bold header cells
         if (ct === 'th') {
           cells.push(runs.map((r) => ({ ...r, marks: { ...r.marks, bold: true } })))
         } else {
@@ -216,8 +236,8 @@ function parseBlocks(root: HTMLElement): Block[] {
         }
       }
       if (cells.length) rows.push(cells)
-    }
-    if (rows.length) blocks.push({ kind: 'table', rows })
+    })
+    if (rows.length) blocks.push({ kind: 'table', rows, header })
   }
 
   const visit = (el: HTMLElement) => {
@@ -267,7 +287,7 @@ function parseBlocks(root: HTMLElement): Block[] {
         // 段里直接放图片（图表快照）：按图片块处理，不丢图
         const images = Array.from(node.querySelectorAll('img'))
         if (images.length) {
-          for (const img of images) blocks.push(imageBlockFrom(img as HTMLElement))
+          for (const img of images) pushImage(blocks, img as HTMLElement)
           if (tag === 'p') {
             // 图已经单独成块；段里还有文字才再补一个文字段
             const text = collectRuns(node)
@@ -289,10 +309,11 @@ function parseBlocks(root: HTMLElement): Block[] {
       } else if (tag === 'ol') {
         walkList(node, true, 0)
       } else if (tag === 'table') {
+        pushCaption(blocks, node.getAttribute('data-table-caption') || '')
         walkTable(node)
       } else if (tag === 'img') {
         // 图片（图表快照就是图片）：走 media 关系内嵌，不落成占位文案
-        blocks.push(imageBlockFrom(node))
+        pushImage(blocks, node)
       } else if (tag === 'pre' || tag === 'code') {
         const runs = collectRuns(node, { code: true })
         blocks.push({ kind: 'p', runs: runs.length ? runs : [{ text: '', marks: {} }] })
@@ -308,12 +329,12 @@ function parseBlocks(root: HTMLElement): Block[] {
   return blocks
 }
 
-function tableToXml(rows: Run[][][]): string {
+function tableToXml(rows: Run[][][], header = false): string {
   const gridCols = Math.max(...rows.map((r) => r.length), 1)
   const colW = Math.floor(9000 / gridCols)
   const tblGrid = `<w:tblGrid>${Array.from({ length: gridCols }, () => `<w:gridCol w:w="${colW}"/>`).join('')}</w:tblGrid>`
   const rowXml = rows
-    .map((row) => {
+    .map((row, index) => {
       const cells = []
       for (let i = 0; i < gridCols; i++) {
         const runs = row[i] || [{ text: '', marks: {} }]
@@ -326,7 +347,8 @@ function tableToXml(rows: Run[][][]): string {
             `</w:tcBorders></w:tcPr><w:p>${runsToXml(runs)}</w:p></w:tc>`,
         )
       }
-      return `<w:tr>${cells.join('')}</w:tr>`
+      const repeat = header && index === 0 ? '<w:trPr><w:tblHeader/></w:trPr>' : ''
+      return `<w:tr>${repeat}${cells.join('')}</w:tr>`
     })
     .join('')
   return (
@@ -437,7 +459,7 @@ function blocksToBodyXml(
       const numId = b.ordered ? 2 : 1
       parts.push(paraXml(b.runs, { numId, ilvl: Math.min(8, b.level) }))
     } else if (b.kind === 'table') {
-      parts.push(tableToXml(b.rows))
+      parts.push(tableToXml(b.rows, b.header))
     } else if (b.kind === 'imageRow') {
       const colW = Math.floor(9000 / Math.max(1, b.images.length))
       const cells = b.images.map((img) => {
@@ -521,6 +543,9 @@ function stylesXml(): string {
   <w:style w:type="paragraph" w:styleId="Heading2"><w:name w:val="heading 2"/><w:basedOn w:val="Normal"/><w:qFormat/><w:pPr><w:spacing w:before="200" w:after="100"/></w:pPr><w:rPr><w:b/><w:sz w:val="28"/></w:rPr></w:style>
   <w:style w:type="paragraph" w:styleId="Heading3"><w:name w:val="heading 3"/><w:basedOn w:val="Normal"/><w:qFormat/><w:pPr><w:spacing w:before="160" w:after="80"/></w:pPr><w:rPr><w:b/><w:sz w:val="26"/></w:rPr></w:style>
   <w:style w:type="paragraph" w:styleId="Heading4"><w:name w:val="heading 4"/><w:basedOn w:val="Normal"/><w:qFormat/><w:pPr><w:spacing w:before="120" w:after="60"/></w:pPr><w:rPr><w:b/><w:sz w:val="24"/></w:rPr></w:style>
+  <w:style w:type="paragraph" w:styleId="Heading5"><w:name w:val="heading 5"/><w:basedOn w:val="Normal"/><w:qFormat/><w:pPr><w:spacing w:before="100" w:after="40"/></w:pPr><w:rPr><w:b/><w:sz w:val="22"/></w:rPr></w:style>
+  <w:style w:type="paragraph" w:styleId="Heading6"><w:name w:val="heading 6"/><w:basedOn w:val="Normal"/><w:qFormat/><w:pPr><w:spacing w:before="80" w:after="40"/></w:pPr><w:rPr><w:b/><w:sz w:val="21"/></w:rPr></w:style>
+  <w:style w:type="paragraph" w:styleId="Caption"><w:name w:val="caption"/><w:basedOn w:val="Normal"/><w:qFormat/><w:pPr><w:jc w:val="center"/></w:pPr><w:rPr><w:i/><w:sz w:val="20"/></w:rPr></w:style>
 </w:styles>`
 }
 

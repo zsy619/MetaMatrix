@@ -231,6 +231,20 @@ function onChangeChartType(event: Event) {
         <span class="rte-cp-type">{{ props.host.chartType }}</span>
       </div>
       <label class="rte-cp-type-row">
+        <span class="rte-cp-type-label">引用表格</span>
+        <select
+          class="rte-cp-type-select"
+          :value="props.host.target?.tableRef || ''"
+          aria-label="引用正文表格"
+          @change="props.host.setTableRef(($event.target as HTMLSelectElement).value)"
+        >
+          <option value="">不引用</option>
+          <option v-for="table in props.host.listTables()" :key="table.id" :value="table.id">
+            {{ table.label }}
+          </option>
+        </select>
+      </label>
+      <label class="rte-cp-type-row">
         <span class="rte-cp-type-label">图表类型</span>
         <select
           class="rte-cp-type-select"

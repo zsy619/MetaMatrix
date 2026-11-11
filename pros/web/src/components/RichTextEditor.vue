@@ -117,6 +117,7 @@ import { collectCrossRefTargets } from '../extensions/crossRef'
 import { deepOptimizeDocument, type OptimizeAction, type OptimizeReportLine } from '../utils/rteDeepOptimize'
 import { cascadeHeadingAt, moveHeadingAt } from '../utils/rteHeadingSection'
 import { syncPrintTableHeads } from '../utils/rtePrintTableHead'
+import { printPageSideCss } from '../utils/rtePageChrome'
 import { setGroupLayout } from '../extensions/imageGroupOps'
 import { continueOrderedList, promoteTableHeader } from '../utils/rteOptimizeActions'
 import {
@@ -148,6 +149,7 @@ import {
   RTE_ZOOM_PRESETS,
   type CaseMode,
 } from './rteWave20'
+import { matchingFootnote } from '../extensions/footnote'
 import { TEXT_MENU_ITEMS } from '../utils/rteTextTidy'
 import { applyTextTidy } from '../utils/rteTextPlay'
 import { countWordParts, countWords, normalizeHtml, toEditorContent } from '../utils/rteContent'
@@ -2193,19 +2195,21 @@ async function insertFootnoteAtCursor() {
     maxlength: 500,
   })
   if (text == null || !text.trim()) return
-  const id = `fn-${Date.now().toString(36)}`
-  const n = collectFootnotes(ed).length + 1
+  const note = text.trim()
+  const existing = matchingFootnote(ed.state.doc, note)
+  const id = existing?.id || `fn-${Date.now().toString(36)}`
+  const n = existing?.n || collectFootnotes(ed).length + 1
   if (ed.state.selection.empty) {
     ed.chain()
       .focus()
       .insertContent({
         type: 'text',
         text: `[${n}]`,
-        marks: [{ type: 'footnote', attrs: { id, text: text.trim(), n } }],
+        marks: [{ type: 'footnote', attrs: { id, text: note, n } }],
       })
       .run()
   } else {
-    ed.chain().focus().setFootnote({ id, text: text.trim() }).run()
+    ed.chain().focus().setFootnote({ id, text: note }).run()
   }
   renumberFootnotes(ed)
   footnotePanelOpen.value = true
@@ -2237,6 +2241,7 @@ const qrDraft = ref<{
   style: string
   errorLevel: string
   caption: boolean
+  quiet?: number
 } | null>(null)
 
 function insertQrCode() {
@@ -2710,6 +2715,7 @@ const echartsDialogType = ref<EchartsChartType>('bar')
 const echartsDialogTemplateId = ref('')
 const echartsDialogTitle = ref('')
 const echartsDialogUseTable = ref(false)
+const echartsDialogTableRef = ref('')
 /** 工具栏下拉里展开的类别（null 表示全折叠）。 */
 const echartsOpenCategory = ref<string | null>(null)
 
@@ -2718,9 +2724,20 @@ function echartsTypeLabel(type: EchartsChartType): string {
 }
 
 /** 插入一个带示例数据的可用图表。 */
+function currentTableXref(): string {
+  const ed = editor.value
+  if (!ed) return ''
+  const { $from } = ed.state.selection
+  for (let depth = $from.depth; depth > 0; depth -= 1) {
+    const node = $from.node(depth)
+    if (node.type.name === 'table') return String(node.attrs.xrefId || '')
+  }
+  return ''
+}
+
 function insertEchartsBlockAtCursor(
   type: EchartsChartType,
-  opts: { title?: string; table?: EchartsTableData | null } = {},
+  opts: { title?: string; table?: EchartsTableData | null; tableRef?: string } = {},
 ) {
   const ed = editor.value
   if (!ed) return
@@ -2741,6 +2758,7 @@ function insertEchartsBlockAtCursor(
       chartType: type,
       theme: 'light',
       renderer: 'svg',
+      tableRef: opts.tableRef || '',
     })
     .run()
   echartsGroupMenuKey.value = null
@@ -2751,7 +2769,7 @@ function insertEchartsBlockAtCursor(
 /** 按模板 id 插入（工具栏下拉 / 对话框共用）。 */
 function insertEchartsTemplateById(
   templateId: string,
-  opts: { title?: string; table?: EchartsTableData | null } = {},
+  opts: { title?: string; table?: EchartsTableData | null; tableRef?: string } = {},
 ) {
   const ed = editor.value
   if (!ed) return
@@ -2775,6 +2793,7 @@ function insertEchartsTemplateById(
       chartType: template.categoryId,
       theme: 'light',
       renderer: template.renderer,
+      tableRef: opts.tableRef || '',
     })
     .run()
   echartsGroupMenuKey.value = null
@@ -2796,6 +2815,7 @@ function openEchartsDialog() {
   echartsDialogTemplateId.value = 'bar-basic'
   echartsDialogTitle.value = ''
   echartsDialogUseTable.value = !!echartsDialogTable.value
+  echartsDialogTableRef.value = currentTableXref()
   echartsDialogOpen.value = true
   echartsGroupMenuKey.value = null
   moreOpen.value = false
@@ -2817,11 +2837,12 @@ function applyEchartsDialog(payload: {
   const table = payload.useTable
     ? echartsDialogTable.value || currentEchartsTableData()
     : null
+  const tableRef = payload.useTable ? echartsDialogTableRef.value || currentTableXref() : ''
   const templateId = payload.templateId || ''
   if (templateId) {
-    insertEchartsTemplateById(templateId, { title: payload.title, table })
+    insertEchartsTemplateById(templateId, { title: payload.title, table, tableRef })
   } else {
-    insertEchartsBlockAtCursor(payload.type, { title: payload.title, table })
+    insertEchartsBlockAtCursor(payload.type, { title: payload.title, table, tableRef })
   }
   echartsDialogOpen.value = false
 }
@@ -3378,6 +3399,14 @@ function printEditor() {
   }
   applyPrintPageStyle(pageSize.value)
   syncPrintTableHeads(root)
+  const oddEvenCss = printPageSideCss(pageChrome.value)
+  let oddEvenStyle: HTMLStyleElement | null = null
+  if (oddEvenCss) {
+    oddEvenStyle = document.createElement('style')
+    oddEvenStyle.id = 'rte-print-odd-even'
+    oddEvenStyle.textContent = oddEvenCss
+    document.head.appendChild(oddEvenStyle)
+  }
   root.classList.add('rte-printing')
   // 嵌入区块本身不套纸张，但打印仍按文档的页面设置（A4 + 窄边距）出纸。
   const paperForPrint = !renderPaper.value && pageSizeMeta.value.paper
@@ -3385,6 +3414,7 @@ function printEditor() {
   // 打印前把图表换成白底静态快照，打印完还原
   window.dispatchEvent(new CustomEvent(RTE_BEFORE_EXPORT_EVENT))
   const cleanup = () => {
+    oddEvenStyle?.remove()
     root.classList.remove('rte-printing')
     if (paperForPrint) root.classList.remove('is-page-sheet')
     window.dispatchEvent(new CustomEvent(RTE_AFTER_EXPORT_EVENT))

@@ -1,4 +1,7 @@
 import { Node, mergeAttributes } from '@tiptap/core'
+import { Plugin } from '@tiptap/pm/state'
+import { tableGrid } from '../utils/rteTableFormulaOps'
+import { applyMappedDataToOption, tableGridToChartData } from '../utils/echarts/chartDataMapping'
 import {
   ECHARTS_CHART_TYPES,
   buildTemplateOption,
@@ -41,6 +44,7 @@ declare module '@tiptap/core' {
         renderer?: string
         chartId?: string
         dataSource?: string
+        tableRef?: string
       }) => ReturnType
       /** 更新指定位置的图表块属性。 */
       updateEchartsBlock: (pos: number, attrs: Record<string, unknown>) => ReturnType
@@ -143,6 +147,12 @@ export const EchartsBlock = Node.create({
           'data-datasource': attrs.dataSource || '',
         }),
       },
+      tableRef: {
+        default: '',
+        parseHTML: (el: HTMLElement) => el.getAttribute('data-table-ref') || '',
+        renderHTML: (attrs: { tableRef?: string }) =>
+          attrs.tableRef ? { 'data-table-ref': attrs.tableRef } : {},
+      },
     }
   },
 
@@ -158,6 +168,7 @@ export const EchartsBlock = Node.create({
       renderer?: string
       chartId?: string
       dataSource?: string
+      tableRef?: string
     }
     const chartType = isChartType(attrs.chartType) ? attrs.chartType : 'bar'
     const label = ECHARTS_CHART_TYPES.find((item) => item.value === chartType)?.label || '图表'
@@ -176,6 +187,7 @@ export const EchartsBlock = Node.create({
         // 数据接口配置随图表块持久化（不含明文密钥，密钥只存本地）
         'data-chart-id': attrs.chartId || '',
         'data-datasource': attrs.dataSource || '',
+        ...(attrs.tableRef ? { 'data-table-ref': attrs.tableRef } : {}),
         role: 'img',
         'aria-label': ariaLabel,
         style: `min-height:${DEFAULT_HEIGHT}px`,
@@ -560,6 +572,7 @@ export const EchartsBlock = Node.create({
               renderer: attrs?.renderer || 'svg',
               chartId: attrs?.chartId || createChartId(),
               dataSource: attrs?.dataSource || '',
+              tableRef: attrs?.tableRef || '',
             },
           }
           // 插完图表后，选区会落在图表这个原子节点上。再插一次时
@@ -595,5 +608,55 @@ export const EchartsBlock = Node.create({
           return true
         },
     }
+  },
+
+  addProseMirrorPlugins() {
+    return [
+      new Plugin({
+        appendTransaction(transactions, _old, state) {
+          if (!transactions.some((tr) => tr.docChanged)) return null
+          if (transactions.some((tr) => tr.getMeta('chartTableSync'))) return null
+          const tables = new Map<string, ReturnType<typeof tableGrid>>()
+          state.doc.descendants((node) => {
+            if (node.type.name !== 'table') return
+            const id = String(node.attrs.xrefId || '')
+            if (id) tables.set(id, tableGrid(node))
+          })
+          let tr = state.tr
+          const charts: number[] = []
+          state.doc.descendants((node, pos) => {
+            if (node.type.name === 'echartsBlock' && node.attrs.tableRef) charts.push(pos)
+          })
+          for (let index = charts.length - 1; index >= 0; index -= 1) {
+            const pos = charts[index]!
+            const node = tr.doc.nodeAt(pos)
+            if (!node) continue
+            const grid = tables.get(String(node.attrs.tableRef || ''))
+            const mapped = grid ? tableGridToChartData(grid) : null
+            if (!mapped) continue
+            const parsed = safeParseEchartsOption(String(node.attrs.option || ''))
+            if (!parsed.ok) continue
+            const next = applyMappedDataToOption(parsed.option, mapped)
+            const series = Array.isArray(next.series) ? next.series : []
+            const type = node.attrs.chartType === 'line' ? 'line' : 'bar'
+            next.series = mapped.series.map((item, seriesIndex) => {
+              const current = series[seriesIndex]
+              return {
+                ...(current && typeof current === 'object' ? current : { type }),
+                name: item.name,
+                data: item.data,
+              }
+            })
+            const option = serializeEchartsOption(next)
+            if (option === node.attrs.option) continue
+            tr = tr.setNodeMarkup(pos, undefined, { ...node.attrs, option })
+          }
+          if (!tr.docChanged) return null
+          tr.setMeta('chartTableSync', true)
+          tr.setMeta('addToHistory', false)
+          return tr
+        },
+      }),
+    ]
   },
 })

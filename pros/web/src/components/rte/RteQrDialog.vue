@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { inject, ref, watch } from 'vue'
 import { RTE_BINDINGS } from './bindings'
-import { QR_PRESETS, QR_PRESET_ROWS, QR_STYLES, makeQrArtwork, type QrModuleStyle } from '../../utils/rteQrArtwork'
+import { QR_PRESETS, QR_PRESET_ROWS, QR_STYLES, makeQrArtwork, qrQuietModules, type QrModuleStyle } from '../../utils/rteQrArtwork'
 
 const rte = inject(RTE_BINDINGS)
 if (!rte) throw new Error('RteQrDialog 必须放在 RichTextEditor 里')
@@ -11,6 +11,7 @@ const description = ref('')
 const presetId = ref(QR_PRESETS[1]!.id)
 const style = ref<QrModuleStyle>('rounded')
 const errorLevel = ref<'H' | 'Q' | 'M'>('H')
+const quiet = ref<2 | 4 | 6>(4)
 const caption = ref(true)
 const preview = ref('')
 const error = ref('')
@@ -32,6 +33,7 @@ async function refresh() {
       caption: caption.value,
       description: description.value,
       errorCorrectionLevel: errorLevel.value,
+      quiet: quiet.value,
     })
     error.value = ''
   } catch (err) {
@@ -42,7 +44,7 @@ async function refresh() {
 
 const QR_LAST_KEY = 'rte-qr-last'
 
-function readLastQr(): { presetId?: string; style?: string; errorLevel?: string; caption?: boolean } | null {
+function readLastQr(): { presetId?: string; style?: string; errorLevel?: string; caption?: boolean; quiet?: number } | null {
   try {
     return JSON.parse(localStorage.getItem(QR_LAST_KEY) || 'null')
   } catch {
@@ -64,10 +66,11 @@ watch(() => rte.qrDialogOpen, (open) => {
       ? last.errorLevel
       : 'H'
   caption.value = draft?.caption ?? last?.caption ?? true
+  quiet.value = qrQuietModules(draft?.quiet ?? last?.quiet)
   void refresh()
 })
 
-watch([text, description, presetId, style, caption, errorLevel], () => {
+watch([text, description, presetId, style, caption, errorLevel, quiet], () => {
   if (rte.qrDialogOpen) void refresh()
 })
 
@@ -87,11 +90,12 @@ async function confirm() {
       style: style.value,
       errorLevel: errorLevel.value,
       caption: caption.value,
+      quiet: quiet.value,
     })
     try {
       localStorage.setItem(
         QR_LAST_KEY,
-        JSON.stringify({ presetId: presetId.value, style: style.value, errorLevel: errorLevel.value, caption: caption.value }),
+        JSON.stringify({ presetId: presetId.value, style: style.value, errorLevel: errorLevel.value, caption: caption.value, quiet: quiet.value }),
       )
     } catch {
       /* 隐私模式 */
@@ -150,6 +154,12 @@ async function confirm() {
               {{ preset.label }}
             </button>
           </div>
+        </div>
+        <div class="rte-qr-label">留白</div>
+        <div class="rte-qr-styles" role="radiogroup" aria-label="留白">
+          <button type="button" :class="{ active: quiet === 2 }" @click="quiet = 2">窄</button>
+          <button type="button" :class="{ active: quiet === 4 }" @click="quiet = 4">标准</button>
+          <button type="button" :class="{ active: quiet === 6 }" @click="quiet = 6">宽</button>
         </div>
         <div class="rte-qr-label">纠错</div>
         <div class="rte-qr-styles" role="radiogroup" aria-label="纠错等级">

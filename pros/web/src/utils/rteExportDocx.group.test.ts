@@ -32,6 +32,28 @@ describe('高亮和分栏导出到 Word', () => {
   })
 })
 
+describe('标题、表头和题注导出到 Word', () => {
+  it('六级标题、重复表头和题注各用自己的样式', async () => {
+    const html =
+      '<h6>细节</h6>' +
+      '<table data-table-caption="表 1 销售">' +
+      '<tr><th>月份</th><th>新增</th></tr>' +
+      '<tr><td>一月</td><td>10</td></tr></table>' +
+      `<img src="${pixel}" alt="趋势" data-caption="图 1 趋势">`
+    const blob = await buildDocxBlob({ title: '样式', bodyHtml: html })
+    const zip = await JSZip.loadAsync(await blob.arrayBuffer())
+    const doc = await zip.file('word/document.xml')?.async('string')
+    const styles = await zip.file('word/styles.xml')?.async('string')
+    expect(doc).toContain('Heading6')
+    expect(doc).toContain('w:tblHeader')
+    expect(doc).toContain('Caption')
+    expect(doc).toContain('表 1 销售')
+    expect(doc).toContain('图 1 趋势')
+    expect(styles).toContain('heading 6')
+    expect(styles).toContain('caption')
+  })
+})
+
 describe('图片组导出到 Word', () => {
   it('两张及以上并排进同一行表格', async () => {
     const html =

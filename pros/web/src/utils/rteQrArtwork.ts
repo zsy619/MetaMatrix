@@ -66,6 +66,8 @@ export type QrArtworkOptions = {
   /** 底部说明。勾选底部文字时，有描述就画描述，否则画二维码内容。 */
   description?: string
   errorCorrectionLevel?: 'L' | 'M' | 'Q' | 'H'
+  /** 四周留白，按码点个数。只接受 2、4、6。 */
+  quiet?: number
 }
 
 type QrBits = {
@@ -263,6 +265,23 @@ function markText(text: string): string {
   }
 }
 
+export function qrQuietModules(value: unknown): 2 | 4 | 6 {
+  return value === 2 || value === 6 ? value : 4
+}
+
+export function qrPixelSize(
+  text: string,
+  options: QrArtworkOptions = {},
+): { width: number; height: number; quiet: 2 | 4 | 6; moduleSize: number } {
+  const bits = qrBits(text, options.errorCorrectionLevel || 'H')
+  const quiet = qrQuietModules(options.quiet)
+  const moduleSize = 12
+  const qrSide = (bits.size + quiet * 2) * moduleSize
+  const note = (options.description || '').trim()
+  const captionText = options.caption ? note || text.trim() : ''
+  return { width: qrSide, height: qrSide + (captionText ? 56 : 0), quiet, moduleSize }
+}
+
 export function paintQr(
   ctx: CanvasRenderingContext2D,
   text: string,
@@ -272,14 +291,11 @@ export function paintQr(
   const background = options.background || '#ffffff'
   const style = options.style || 'rounded'
   const bits = qrBits(text, options.errorCorrectionLevel || 'H')
-  const quiet = 4
-  const moduleSize = 12
-  const qrSide = (bits.size + quiet * 2) * moduleSize
-  const note = (options.description || '').trim()
-  const captionText = options.caption ? note || text.trim() : ''
-  const captionHeight = captionText ? 56 : 0
-  const width = qrSide
-  const height = qrSide + captionHeight
+  const sized = qrPixelSize(text, options)
+  const quiet = sized.quiet
+  const moduleSize = sized.moduleSize
+  const width = sized.width
+  const height = sized.height
   ctx.canvas.width = width
   ctx.canvas.height = height
   ctx.fillStyle = background

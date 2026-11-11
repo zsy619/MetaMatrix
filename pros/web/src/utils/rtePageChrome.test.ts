@@ -4,7 +4,9 @@ import {
   estimatePageCount,
   formatPageNumber,
   groupSlides,
+  headerForPage,
   normalizePageChrome,
+  printPageSideCss,
   readPageChrome,
   writePageChrome,
 } from './rtePageChrome.ts'
@@ -93,6 +95,12 @@ assert.equal(formatPageNumber('n', 2, 5), '2')
 assert.equal(formatPageNumber('page-n', 2, 5), '第 2 页')
 assert.equal(formatPageNumber('page-n-of-m', 2, 5), '第 2 页 共 5 页')
 assert.equal(formatPageNumber('dash', 2, 5), '- 2 -')
+const sideChrome = normalizePageChrome({ header: '奇数', headerEven: '偶数', footer: '', pageNumber: 'none' })
+assert.equal(headerForPage(sideChrome, 1), '奇数')
+assert.equal(headerForPage(sideChrome, 2), '偶数')
+assert.match(printPageSideCss(sideChrome), /@page :left/)
+assert.match(printPageSideCss(sideChrome), /偶数/)
+assert.equal(printPageSideCss(normalizePageChrome({ header: '只有奇数', pageNumber: 'none' })), '')
 assert.equal(estimatePageCount(1000, 400), 3)
 assert.equal(estimatePageCount(0, 400), 1)
 

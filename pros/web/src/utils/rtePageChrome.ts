@@ -80,6 +80,31 @@ export function headerForPage(chrome: PanelPageChrome, page: number): string {
   return chrome.header
 }
 
+function cssQuote(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+}
+
+/** 浏览器打印时，奇数页和偶数页各用自己的页眉页脚。 */
+export function printPageSideCss(chrome: PanelPageChrome): string {
+  if (!chrome.headerEven.trim() && !chrome.footerEven.trim()) return ''
+  const oddHeader = cssQuote(headerForPage(chrome, 1))
+  const evenHeader = cssQuote(headerForPage(chrome, 2))
+  const oddFooter = cssQuote(footerForPage(chrome, 1))
+  const evenFooter = cssQuote(footerForPage(chrome, 2))
+  return `@media print {
+    @page :right {
+      @top-center { content: "${oddHeader}"; font-size: 10pt; color: #4e5969; }
+      @bottom-center { content: "${oddFooter}"; font-size: 10pt; color: #4e5969; }
+    }
+    @page :left {
+      @top-center { content: "${evenHeader}"; font-size: 10pt; color: #4e5969; }
+      @bottom-center { content: "${evenFooter}"; font-size: 10pt; color: #4e5969; }
+    }
+    .rte-root.rte-printing .rte-running-header,
+    .rte-root.rte-printing .rte-running-footer { visibility: hidden !important; }
+  }`
+}
+
 export function footerForPage(chrome: PanelPageChrome, page: number): string {
   const even = page % 2 === 0
   if (even && chrome.footerEven.trim()) return chrome.footerEven

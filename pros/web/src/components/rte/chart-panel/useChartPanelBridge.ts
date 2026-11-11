@@ -44,12 +44,14 @@ export function useChartPanelBridge(editorRef: Ref<Editor | undefined>) {
       chartType?: string
       option?: string
       dataSource?: string
+      tableRef?: string
     }
     host.show({
       chartId,
       chartType: attrs.chartType || 'bar',
       option: attrs.option || '',
       dataSource: attrs.dataSource || '',
+      tableRef: attrs.tableRef || '',
     })
   }
 

@@ -81,6 +81,7 @@ import { MermaidBlock } from '../../../extensions/mermaidBlock'
 import { EchartsBlock } from '../../../extensions/echartsBlock'
 import { CrossRef, findCrossRefPos } from '../../../extensions/crossRef'
 import { ListStyleAttrs } from '../../../extensions/listStyleAttrs'
+import { HeadingManualNum } from '../../../extensions/headingManualNum'
 import { LinkButton } from '../../../extensions/linkButton'
 import { SyncBlock } from '../../../extensions/syncBlock'
 import { RteMarkdownInputRules } from '../../../extensions/rteMarkdownInputRules'
@@ -301,6 +302,7 @@ const editor = useEditor({
     EchartsBlock,
     CrossRef,
     ListStyleAttrs,
+    HeadingManualNum,
     LinkButton,
     Color,
     Highlight.configure({ multicolor: true }),

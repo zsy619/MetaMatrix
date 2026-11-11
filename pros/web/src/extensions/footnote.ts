@@ -1,4 +1,5 @@
 import { Mark, mergeAttributes } from '@tiptap/core'
+import type { Node as PmNode } from '@tiptap/pm/model'
 import { Plugin } from '@tiptap/pm/state'
 
 declare module '@tiptap/core' {
@@ -12,6 +13,24 @@ declare module '@tiptap/core' {
 
 function fnId(): string {
   return `fn-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`
+}
+
+/** 同一条注文再次引用时沿用原来的编号，不另计一条。 */
+export function matchingFootnote(doc: PmNode, text: string): { id: string; n: number } | null {
+  const note = text.trim()
+  if (!note) return null
+  let found: { id: string; n: number } | null = null
+  doc.descendants((node) => {
+    if (found || !node.isText) return
+    for (const mark of node.marks) {
+      if (mark.type.name !== 'footnote' || mark.attrs.place === 'end') continue
+      if (String(mark.attrs.text || '').trim() !== note) continue
+      const id = String(mark.attrs.id || '')
+      if (!id) continue
+      found = { id, n: Number(mark.attrs.n || 1) || 1 }
+    }
+  })
+  return found
 }
 
 /** 轻量脚注：上标标记，文末面板汇总 */
@@ -70,7 +89,8 @@ export const Footnote = Mark.create({
         ({ commands, state }) => {
           const text = (attrs.text || '').trim()
           if (!text) return false
-          const id = attrs.id || fnId()
+          const existing = attrs.id ? null : matchingFootnote(state.doc, text)
+          const id = attrs.id || existing?.id || fnId()
           // n 由宿主重编号；此处先写 1
           if (state.selection.empty) {
             return commands.insertContent({
