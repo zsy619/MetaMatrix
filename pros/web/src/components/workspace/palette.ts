@@ -11,6 +11,7 @@ export const CATEGORY_ACCENT: Record<TemplateCategory, string> = {
   industry: '#f9a825',
   org: '#a142f4',
   review: '#ea4335',
+  fde: '#0f766e',
 }
 
 export const TREND_COLORS = ['#1a73e8', '#34a853', '#a142f4', '#f9a825', '#ea4335', '#00897b']

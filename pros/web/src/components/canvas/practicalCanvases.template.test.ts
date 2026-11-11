@@ -229,6 +229,18 @@ describe('实用商业画布', () => {
     expect(isGoldenCircleDoc(migrated) && migrated.blocks.find((block) => block.id === 'why')?.items.map((item) => item.text)).toEqual(['先写信念', '再写证据'])
   })
 
+  it('最近两天新增的画布归在 FDE', () => {
+    const recent = [
+      'project-gantt', 'raci-matrix', 'daily-kanban', 'business-model-canvas', 'cash-flow',
+      'swot', 'lean-canvas', 'value-proposition', 'okr', 'stakeholder-map', 'pdca', 'five-forces',
+      'income-statement', 'value-chain', 'seven-s', 'rice', 'break-even', 'customer-journey',
+      'kano', 'moscow', 'impact-effort', 'vrio', 'golden-circle', 'soar', 'playing-to-win',
+      'ten-check', 'scene-three-high',
+    ] as const
+    for (const id of recent) expect(TEMPLATE_META[id].category).toBe('fde')
+    expect(TEMPLATE_META['y-model'].category).toBe('method')
+  })
+
   it('甘特图后置任务指向依赖它的行', () => {
     const doc = cloneTemplate('project-gantt')
     if (!doc || doc.type !== 'project_gantt') return

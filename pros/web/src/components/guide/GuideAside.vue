@@ -51,6 +51,7 @@ const CATEGORY_ACCENT: Record<TemplateCategory, string> = {
   industry: '#f9a825',
   org: '#a142f4',
   review: '#ea4335',
+  fde: '#0f766e',
 }
 
 function clampWidth(w: number): number {
