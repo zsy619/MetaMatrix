@@ -6676,7 +6676,8 @@ type ToolItem = {
   title?: string
   icon: string
   iconComp?: Component
-  kind?: 'heading' | 'list' | 'more' | 'btn' | 'color' | 'highlight' | 'align' | 'fontSize' | 'fontFamily' | 'lineHeight' | 'import' | 'export' | 'table' | 'attach' | 'form' | 'template' | 'code' | 'divider' | 'emoji' | 'specialChars' | 'columns' | 'spacing' | 'wordStats' | 'callout' | 'shortcuts' | 'hr' | 'blockOps' | 'insertDate' | 'pasteFormat' | 'caseTransform' | 'zoom' | 'viewExtras' | 'paraStyle' | 'listStyle' | 'linkButton' | 'echarts' | 'echartsGroup' | 'imageLayout' | 'textTidy' | 'presetMenu'
+  kind?: 'heading' | 'list' | 'more' | 'btn' | 'color' | 'highlight' | 'align' | 'fontSize' | 'fontFamily' | 'lineHeight' | 'import' | 'export' | 'table' | 'attach' | 'form' | 'template' | 'code' | 'divider' | 'emoji' | 'specialChars' | 'columns' | 'spacing' | 'wordStats' | 'callout' | 'shortcuts' | 'hr' | 'blockOps' | 'insertDate' | 'pasteFormat' | 'caseTransform' | 'zoom' | 'viewExtras' | 'paraStyle' | 'listStyle' | 'linkButton' | 'echarts' | 'echartsGroup' | 'imageLayout' | 'textTidy' | 'presetMenu' | 'paperGroup'
+  currentPreset?: () => string
   presetOptions?: { id: string; label: string }[]
   applyPreset?: (id: string) => void
   active?: () => boolean
@@ -6890,8 +6891,8 @@ const allTools = computed((): ToolItem[] => {
       label: '纸样',
       title: '小红书、公众号、信纸、稿纸、田字格',
       icon: '纸',
-      kind: 'presetMenu',
-      active: () => !!writingPaper.value,
+      kind: 'paperGroup',
+      currentPreset: () => writingPaper.value,
       presetOptions: WRITING_PAPERS.map((item) => ({ id: item.id, label: item.label })),
       applyPreset: (id: string) => setWritingPaper(id),
     },

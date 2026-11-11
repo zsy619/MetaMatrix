@@ -2153,6 +2153,27 @@ function toggleChartGroupMenu(key: string) {
             </div>
           </Teleport>
         </div>
+        <div data-rte-own
+          v-else-if="t.kind === 'paperGroup'"
+          class="rte-paper-group"
+          role="group"
+          aria-label="纸样"
+        >
+          <button data-rte-own
+            v-for="opt in t.presetOptions"
+            :key="t.key + '-' + (opt.id || 'default')"
+            type="button"
+            class="rte-paper-chip"
+            :class="{ active: (t.currentPreset?.() || '') === opt.id }"
+            :aria-pressed="(t.currentPreset?.() || '') === opt.id"
+            :title="opt.label + '纸样'"
+            @mousedown.prevent
+            @click="t.applyPreset?.(opt.id)"
+          >
+            <span data-rte-own class="rte-paper-swatch" :data-paper="opt.id || 'default'" aria-hidden="true" />
+            <span data-rte-own class="rte-paper-chip-label">{{ opt.label }}</span>
+          </button>
+        </div>
         <button data-rte-own
           v-else
           type="button"
@@ -2238,7 +2259,29 @@ function toggleChartGroupMenu(key: string) {
               ⠿ {{ group.label }}
             </button>
             <template v-for="mt in group.tools" :key="mt.key">
+            <div data-rte-own
+              v-if="mt.kind === 'paperGroup'"
+              class="rte-paper-group rte-paper-group--menu"
+              role="group"
+              aria-label="纸样"
+            >
+              <button data-rte-own
+                v-for="opt in mt.presetOptions"
+                :key="'mpaper-' + (opt.id || 'default')"
+                type="button"
+                class="rte-paper-chip"
+                :class="{ active: (mt.currentPreset?.() || '') === opt.id }"
+                :aria-pressed="(mt.currentPreset?.() || '') === opt.id"
+                :title="opt.label + '纸样'"
+                @mousedown.prevent
+                @click="mt.applyPreset?.(opt.id)"
+              >
+                <span data-rte-own class="rte-paper-swatch" :data-paper="opt.id || 'default'" aria-hidden="true" />
+                <span data-rte-own class="rte-paper-chip-label">{{ opt.label }}</span>
+              </button>
+            </div>
             <button data-rte-own
+              v-else
               type="button"
               class="rte-more-item"
               @mouseenter="rte.hoverMoreSubmenu(mt)"
