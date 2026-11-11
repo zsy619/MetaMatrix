@@ -105,3 +105,76 @@
 .canvas-viewport .cash .net {
   box-shadow: 0 1px 2px rgba(62, 48, 28, 0.06);
 }
+
+/* 仍用白底方框的旧画布，改到同一张暖纸上，去掉套在纸里的第二层白框。 */
+.canvas-viewport .as-canvas.as-canvas,
+.canvas-viewport .bf-canvas.bf-canvas,
+.canvas-viewport .ct-canvas.ct-canvas,
+.canvas-viewport .dr-canvas.dr-canvas,
+.canvas-viewport .ga-canvas.ga-canvas,
+.canvas-viewport .ir-canvas.ir-canvas,
+.canvas-viewport .key-resistance-canvas.key-resistance-canvas,
+.canvas-viewport .ooc-canvas.ooc-canvas,
+.canvas-viewport .pmc-canvas.pmc-canvas,
+.canvas-viewport .pm6d-canvas.pm6d-canvas,
+.canvas-viewport .pmst-canvas.pmst-canvas,
+.canvas-viewport .pf5d-canvas.pf5d-canvas,
+.canvas-viewport .sm10p-canvas.sm10p-canvas,
+.canvas-viewport .tm-canvas.tm-canvas,
+.canvas-viewport .wsz-canvas.wsz-canvas,
+.canvas-viewport .cse-canvas.cse-canvas,
+.canvas-viewport .fsb-canvas.fsb-canvas {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.canvas-viewport .fsb-table.fsb-table,
+.canvas-viewport .cse-page.cse-page {
+  border-radius: 16px;
+  border-color: rgba(62, 48, 28, 0.08);
+  box-shadow: 0 12px 32px rgba(62, 48, 28, 0.08);
+  overflow: hidden;
+}
+
+.canvas-viewport .dt-block.dt-block:not(.dt-block--table),
+.canvas-viewport .ym-block.ym-block {
+  border-radius: 14px;
+  box-shadow:
+    0 1px 1px rgba(62, 48, 28, 0.04),
+    0 10px 24px rgba(62, 48, 28, 0.07);
+}
+
+.canvas-viewport .dt-block.dt-block:not(.dt-block--table).selected,
+.canvas-viewport .dt-block.dt-block:not(.dt-block--table).is-source-max,
+.canvas-viewport .ym-block.ym-block.selected,
+.canvas-viewport .ym-block.ym-block.is-source-max {
+  box-shadow:
+    0 0 0 2px var(--cv-select, rgba(28, 76, 124, 0.72)),
+    0 10px 24px rgba(62, 48, 28, 0.07);
+}
+
+.canvas-viewport .gantt .grid thead th,
+.canvas-viewport .gantt .chart-head {
+  background: #f6f1e8;
+}
+
+.canvas-viewport .gantt .toolbar button,
+.canvas-viewport .gantt .zoom button,
+.canvas-viewport .sheet-top button,
+.canvas-viewport .raci .tools button {
+  border-color: rgba(62, 48, 28, 0.14);
+  border-radius: 999px;
+}
+
+.canvas-viewport .gantt .zoom button {
+  border-radius: 0;
+}
+
+.canvas-viewport .gantt .zoom button:first-child {
+  border-radius: 999px 0 0 999px;
+}
+
+.canvas-viewport .gantt .zoom button:last-child {
+  border-radius: 0 999px 999px 0;
+}
