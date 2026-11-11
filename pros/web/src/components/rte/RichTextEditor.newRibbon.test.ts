@@ -2,6 +2,7 @@
 /**
  * 新功能区按钮的自我测试：点栏目、点按钮，核对文档和界面真的变了。
  */
+import { readFileSync } from 'node:fs'
 import { nextTick } from 'vue'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
@@ -100,6 +101,24 @@ function selectImage(editor: Editor) {
 describe('新功能区按钮', () => {
   beforeEach(() => {
     document.body.innerHTML = ''
+  })
+
+  it('颜色按钮用分组色块和白色字形，底下留当前文字颜色', async () => {
+    const css = readFileSync('src/components/rte/styles/editor.scoped.css', 'utf8')
+    const rule = css.slice(css.indexOf('.rte-tool-icon.rte-color-icon {'))
+    expect(rule.startsWith('.rte-tool-icon.rte-color-icon {')).toBe(true)
+    const block = rule.slice(0, rule.indexOf('}') + 1)
+    expect(block).toContain('var(--rte-icon-bg')
+    expect(block).not.toContain('background: #fff')
+    expect(css).toContain('.rte-color-icon .rte-ep-icon) {\n  color: #fff;')
+    expect(css).toContain('.rte-color-icon::after')
+
+    const wrapper = await mountEditor()
+    await openRibbon(wrapper, '字体与颜色')
+    const icon = wrapper.get('button[aria-label="文字颜色"] .rte-color-icon')
+    expect(icon.attributes('style') || '').toContain('--rte-color-bar')
+    expect(icon.find('svg').exists()).toBe(true)
+    wrapper.unmount()
   })
 
   it('整理栏目把全角收成半角，并给中英文补空格', async () => {

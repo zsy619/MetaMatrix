@@ -1802,10 +1802,18 @@
   background: #eef0f3 !important;
 }
 .rte-color-icon {
-  text-decoration: underline;
-  text-decoration-thickness: 2px;
-  text-underline-offset: 2px;
-  text-decoration-color: #1d2129;
+  position: relative;
+}
+.rte-color-icon::after {
+  content: '';
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  bottom: 0;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--rte-color-bar, #1d2129);
+  pointer-events: none;
 }
 .rte-font-family-menu {
   min-width: 168px;
@@ -4578,9 +4586,29 @@ html.rte-toolbar-dragging .rte-root:not(.expanded) .rte-toolbar-tools > .rte-too
   cursor: pointer;
 }
 .rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool-icon.rte-color-icon {
-  background: #fff;
-  color: var(--rte-head-fg, #1d4ed8);
-  box-shadow: inset 0 -3px 0 var(--rte-color-bar, currentColor), inset 0 0 0 1px rgba(15, 23, 42, 0.08);
+  background: var(--rte-icon-bg, var(--rte-head-fg, #15803d));
+  color: #fff;
+  box-shadow: inset 0 -1px 0 rgba(15, 23, 42, 0.12);
+  overflow: hidden;
+}
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool :deep(.rte-color-icon > svg),
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool :deep(.rte-color-icon .rte-ep-icon) {
+  color: #fff;
+}
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool-icon.rte-color-icon::after {
+  left: 0;
+  right: 0;
+  height: 4px;
+  border-radius: 0;
+}
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool:disabled .rte-tool-icon.rte-color-icon,
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool.is-disabled .rte-tool-icon.rte-color-icon {
+  background: #e5e6eb;
+  color: #c9cdd4;
+}
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool:disabled :deep(.rte-color-icon > svg),
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool.is-disabled :deep(.rte-color-icon .rte-ep-icon) {
+  color: #c9cdd4;
 }
 .rte-group-settings:hover {
   text-decoration: underline;

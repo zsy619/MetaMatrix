@@ -82,7 +82,7 @@ export const IconFormula = svgIcon([
 ])
 export const IconHeading = svgIcon(['M4 3v18', 'M4 12h12', 'M16 3v18'])
 export const IconAlign = svgIcon(['M3 5h18', 'M3 12h12', 'M3 19h16'])
-export const IconColorText = svgIcon(['M5 20h14', 'M8.5 15.5L12 3.5l3.5 12', 'M9.5 12h5'])
+export const IconColorText = svgIcon(['M7 16.5L12 4l5 12.5', 'M8.6 13h6.8'])
 export const IconQuote = svgIcon([
   'M6 9h3.5v8H4.5v-5.5A4 4 0 0 1 6 9z',
   'M16 9h3.5v8H16v-5.5A4 4 0 0 1 17.5 9z',
