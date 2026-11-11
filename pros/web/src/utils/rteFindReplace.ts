@@ -1,5 +1,6 @@
 import type { Editor } from '@tiptap/core'
-import type { Node as PmNode } from '@tiptap/pm/model'
+import type { Mark, Node as PmNode } from '@tiptap/pm/model'
+import type { Transaction } from '@tiptap/pm/state'
 import { TextSelection } from '@tiptap/pm/state'
 
 export type RteFindMatch = { from: number; to: number }
@@ -40,6 +41,19 @@ export type RteFindOptions = {
   regex?: boolean
   /** 正则的多行模式 */
   multiline?: boolean
+  /** 全角和半角英数字视为相同。正则查找不用这一项。 */
+  foldWidth?: boolean
+}
+
+function foldWidthChar(ch: string): string {
+  if (ch === '\u3000') return ' '
+  const code = ch.charCodeAt(0)
+  if (code >= 0xff01 && code <= 0xff5e) return String.fromCharCode(code - 0xfee0)
+  return ch
+}
+
+function foldWidthText(text: string): string {
+  return Array.from(text, foldWidthChar).join('')
 }
 
 /**
@@ -59,33 +73,35 @@ export function collectFindMatches(
   if (opts?.regex) {
     return collectRegexMatches(doc, qRaw, caseSensitive, wholeWord, Boolean(opts.multiline))
   }
-  const q = caseSensitive ? qRaw : qRaw.toLowerCase()
+  const foldWidth = Boolean(opts?.foldWidth)
+  const qFolded = foldWidth ? foldWidthText(qRaw) : qRaw
+  const q = caseSensitive ? qFolded : qFolded.toLowerCase()
   const matches: RteFindMatch[] = []
   doc.descendants((node, pos) => {
     if (!node.isText || !node.text) return
-    const rawText = node.text
+    const rawText = foldWidth ? foldWidthText(node.text) : node.text
     const text = caseSensitive ? rawText : rawText.toLowerCase()
     let idx = 0
     while (idx < text.length) {
       const found = text.indexOf(q, idx)
       if (found < 0) break
       const from = pos + found
-      const to = pos + found + qRaw.length
+      const to = pos + found + q.length
       if (wholeWord) {
         const before = found > 0 ? rawText[found - 1] : ''
-        const after = found + qRaw.length < rawText.length ? rawText[found + qRaw.length] : ''
+        const after = found + q.length < rawText.length ? rawText[found + q.length] : ''
         if (isWordChar(before) || isWordChar(after)) {
-          idx = found + Math.max(1, qRaw.length)
+          idx = found + Math.max(1, q.length)
           continue
         }
       }
       matches.push({ from, to })
-      idx = found + Math.max(1, qRaw.length)
+      idx = found + Math.max(1, q.length)
     }
   })
   doc.descendants((node, pos) => {
     if (node.type.name !== 'image') return
-    const caption = String(node.attrs.caption || '')
+    const caption = foldWidth ? foldWidthText(String(node.attrs.caption || '')) : String(node.attrs.caption || '')
     if (!caption) return
     const hay = caseSensitive ? caption : caption.toLowerCase()
     let at = 0
@@ -207,6 +223,22 @@ export function selectFindMatch(editor: Editor, match: RteFindMatch): boolean {
   return true
 }
 
+function marksInRange(doc: PmNode, from: number, to: number): readonly Mark[] {
+  let marks: readonly Mark[] = []
+  doc.nodesBetween(from, to, (node) => {
+    if (marks.length || !node.isText) return
+    marks = node.marks
+  })
+  return marks
+}
+
+/** 替换这段文字，并留下原来的加粗、链接等标记。 */
+function replaceKeepingMarks(tr: Transaction, from: number, to: number, replacement: string): Transaction {
+  const marks = marksInRange(tr.doc, from, to)
+  if (!replacement) return tr.delete(from, to)
+  return tr.replaceWith(from, to, tr.doc.type.schema.text(replacement, marks))
+}
+
 /** 替换当前选中匹配；若选区恰好等于该匹配则替换，否则先选中再替换 */
 export function replaceFindMatch(
   editor: Editor,
@@ -214,11 +246,7 @@ export function replaceFindMatch(
   replacement: string,
 ): boolean {
   const { state, view } = editor
-  const { from, to } = state.selection
-  const tr =
-    from === match.from && to === match.to
-      ? state.tr.insertText(replacement, match.from, match.to)
-      : state.tr.insertText(replacement, match.from, match.to)
+  const tr = replaceKeepingMarks(state.tr, match.from, match.to, replacement)
   view.dispatch(tr.scrollIntoView())
   view.focus()
   return true
@@ -235,7 +263,8 @@ export function replaceAllFindMatches(
   let tr = state.tr
   for (let i = matches.length - 1; i >= 0; i--) {
     const m = matches[i]
-    tr = tr.insertText(replacement, m.from, m.to)
+    if (!m) continue
+    tr = replaceKeepingMarks(tr, m.from, m.to, replacement)
   }
   view.dispatch(tr.scrollIntoView())
   view.focus()

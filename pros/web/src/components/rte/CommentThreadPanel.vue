@@ -32,6 +32,7 @@ const emit = defineEmits<{
   toggleResolved: [thread: CommentThread]
   removeMessage: [threadId: string, messageId: string]
   jump: [threadId: string]
+  reanchor: [threadId: string]
 }>()
 </script>
 
@@ -104,6 +105,14 @@ const emit = defineEmits<{
           </li>
         </ul>
         <div v-if="editable" class="rte-comment-actions">
+          <button
+            v-if="orphanIds?.includes(thread.id)"
+            type="button"
+            class="rte-comment-btn"
+            @click="emit('reanchor', thread.id)"
+          >
+            重新钉住
+          </button>
           <button type="button" class="rte-comment-btn" @click="emit('toggleResolved', thread)">
             {{ thread.resolved ? '重新打开' : '解决' }}
           </button>

@@ -146,6 +146,32 @@ export function useCommentThreads(deps: {
     if (result.removedThread) removeAnchor(threadId)
   }
 
+  function reanchorThread(threadId: string) {
+    const ed = deps.editor().value
+    if (!ed || !deps.isEditable()) return
+    const { from, to, empty } = ed.state.selection
+    if (empty || from === to) {
+      ElMessage.warning('请先选中要重新钉住的文字')
+      return
+    }
+    const quote = ed.state.doc.textBetween(from, to, '\n', '\n').trim()
+    if (!quote) {
+      ElMessage.warning('请先选中要重新钉住的文字')
+      return
+    }
+    const thread = threads.value.find((item) => item.id === threadId)
+    if (!thread) return
+    const anchored = ed.chain().focus().unsetCommentAnchor(threadId).setTextSelection({ from, to }).setCommentAnchor(threadId).run()
+    if (!anchored) {
+      ElMessage.warning('这段文字钉不住')
+      return
+    }
+    persist(threads.value.map((item) => (item.id === threadId ? { ...item, quote: quote.slice(0, 500) } : item)))
+    orphansOnly.value = false
+    activeThreadId.value = threadId
+    ElMessage.success('已重新钉住')
+  }
+
   function jumpToThread(threadId: string) {
     const ed = deps.editor().value
     activeThreadId.value = threadId
@@ -183,6 +209,7 @@ export function useCommentThreads(deps: {
     submitReply,
     toggleResolved,
     removeMessage,
+    reanchorThread,
     jumpToThread,
   }
 }

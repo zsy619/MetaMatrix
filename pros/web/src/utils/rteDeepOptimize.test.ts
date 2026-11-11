@@ -52,6 +52,12 @@ describe('行内整理', () => {
     expect(ed.getText().replace(/\s/g, '')).toBe('留')
   })
 
+  it('汉字旁边的省略号和破折号收成中文形式', () => {
+    expect(tidyInlineText('你好...世界').text).toBe('你好……世界')
+    expect(tidyInlineText('你好--世界').text).toBe('你好——世界')
+    expect(tidyInlineText('Hello...world').text).toBe('Hello...world')
+  })
+
   it('去掉零宽字符、段首段尾空白，并收起汉字和标点之间的空格', () => {
     const tidy = tidyInlineText(' 你\u200b好 ，世界 ')
     expect(tidy.text).toBe('你好，世界')

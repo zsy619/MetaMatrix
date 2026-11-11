@@ -74,6 +74,10 @@ export function tidyInlineText(input: string): TidyInline {
     .replace(/([。！？，、；：!?])\1+/g, '$1')
     .replace(/([\u3400-\u9fff])\s+([，。！？、；：])/g, '$1$2')
     .replace(/([，。！？、；：])\s+([\u3400-\u9fff])/g, '$1$2')
+    .replace(/(?<=[\u3400-\u9fff])\.{3,}(?=[\u3400-\u9fff]|$)/g, '……')
+    .replace(/\.{3,}(?=[\u3400-\u9fff])/g, '……')
+    .replace(/(?<=[\u3400-\u9fff])-{2,}(?=[\u3400-\u9fff]|$)/g, '——')
+    .replace(/-{2,}(?=[\u3400-\u9fff])/g, '——')
   const punct = puncted !== text
   text = puncted
   const gapped = text

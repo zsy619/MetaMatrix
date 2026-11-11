@@ -111,7 +111,7 @@ function imageFromDblClick(target: Element): HTMLImageElement | null {
 
 function onEditorImageDblClick(event: MouseEvent) {
   const target = event.target
-  if (!(target instanceof Element)) return
+  if (!(target instanceof Element) || target.closest('.rte-image-caption')) return
   const img = imageFromDblClick(target)
   if (!img) return
   event.preventDefault()

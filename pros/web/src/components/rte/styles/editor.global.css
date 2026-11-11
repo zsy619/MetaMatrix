@@ -3982,6 +3982,8 @@ html.rte-toolbar-dragging * {
   .rte-root.rte-printing .rte-image-group-row {
     width: 100% !important;
     max-width: 100% !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
   .rte-root.rte-printing .rte-image-group-row {
     height: auto !important;
@@ -4289,7 +4291,8 @@ html.rte-toolbar-dragging * {
   margin: 0;
   padding: 2px 6px;
   background: rgba(255, 255, 255, 0.9);
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: text;
   z-index: 2;
 }
 .rte-image-caption-inline.is-suggestion {

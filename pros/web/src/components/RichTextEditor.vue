@@ -1127,6 +1127,7 @@ const {
   submitReply,
   toggleResolved,
   removeMessage,
+  reanchorThread,
   jumpToThread,
 } = useCommentThreads({
   editor: () => editor,
@@ -8088,6 +8089,7 @@ provideRteBindings({
   submitReply,
   toggleResolved,
   removeMessage,
+  reanchorThread,
   jumpToThread,
 })
 

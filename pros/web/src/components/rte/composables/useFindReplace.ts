@@ -57,6 +57,7 @@ export function useFindReplace(deps: {
       wholeWord: findWholeWord.value,
       regex: findRegex.value,
       multiline: findMultiline.value,
+      foldWidth: !findRegex.value,
     }
   }
 

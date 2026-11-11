@@ -529,6 +529,7 @@ useParentScopeStamp()
         @submit-reply="rte.submitReply"
         @toggle-resolved="rte.toggleResolved"
         @remove-message="rte.removeMessage"
+        @reanchor="rte.reanchorThread"
         @jump="rte.jumpToThread"
       />
       <aside data-rte-own
