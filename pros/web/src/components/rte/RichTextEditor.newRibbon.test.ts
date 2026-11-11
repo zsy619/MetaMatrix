@@ -329,6 +329,39 @@ describe('新功能区按钮', () => {
     wrapper.unmount()
   })
 
+  it('斑马纹写到表格节点上，偶数行底色和奇数行不同', async () => {
+    const css = readFileSync('src/components/rte/styles/editor.global.css', 'utf8')
+    const style = document.createElement('style')
+    style.textContent = css
+    document.head.appendChild(style)
+    const wrapper = await mountEditor()
+    const editor = editorOf(wrapper)
+    editor.commands.setContent(
+      '<table><tbody><tr><th><p>名</p></th></tr><tr><td><p>甲</p></td></tr><tr><td><p>乙</p></td></tr><tr><td><p>丙</p></td></tr></tbody></table>',
+    )
+    let cell = -1
+    editor.state.doc.descendants((node, pos) => {
+      if (cell < 0 && node.isText && node.text === '甲') cell = pos
+    })
+    editor.commands.setTextSelection(cell)
+    await openRibbon(wrapper, '表格')
+    await clickTool(wrapper, '斑马纹')
+    const table = wrapper.get('.ProseMirror table').element as HTMLTableElement
+    expect(table.getAttribute('data-zebra')).toBe('1')
+    const rows = [...table.querySelectorAll('tbody > tr')] as HTMLTableRowElement[]
+    const header = getComputedStyle(rows[0].cells[0]).backgroundColor
+    const even = getComputedStyle(rows[1].cells[0]).backgroundColor
+    const odd = getComputedStyle(rows[2].cells[0]).backgroundColor
+    expect(even.replace(/\s/g, '').toLowerCase()).toBe('#e7eefc')
+    expect(odd).not.toBe(even)
+    expect(header).not.toBe(even)
+    await clickTool(wrapper, '斑马纹')
+    expect(table.getAttribute('data-zebra')).toBeNull()
+    expect(getComputedStyle(rows[1].cells[0]).backgroundColor.replace(/\s/g, '').toLowerCase()).not.toBe('#e7eefc')
+    wrapper.unmount()
+    style.remove()
+  })
+
   it('表格行列菜单可以按当前列降序', async () => {
     const wrapper = await mountEditor()
     const editor = editorOf(wrapper)

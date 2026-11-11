@@ -13,6 +13,7 @@ import Superscript from '@tiptap/extension-superscript'
 import TextAlign from '@tiptap/extension-text-align'
 import Link from '@tiptap/extension-link'
 import { Table } from '@tiptap/extension-table'
+import { RteTableView } from '../../../extensions/rteTableView'
 import { TocBlock } from '../../../extensions/tocBlock'
 import { moveTableColumn, moveTableRow } from '../../../utils/rteTableLayout'
 import { TableRow } from '@tiptap/extension-table-row'
@@ -387,7 +388,7 @@ const editor = useEditor({
     }),
     TaskList,
     TaskItem.configure({ nested: true }),
-    Table.configure({ resizable: true, handleWidth: 8 }),
+    Table.configure({ resizable: true, handleWidth: 8, View: RteTableView }),
     TocBlock,
     TableRow,
     RteTableHeader,

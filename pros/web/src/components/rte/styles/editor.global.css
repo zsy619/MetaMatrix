@@ -5296,9 +5296,9 @@ html.rte-image-preview-open .tippy-box {
   color: #c9cdd4;
   pointer-events: none;
 }
-.ProseMirror table[data-zebra='1'] tr:nth-child(even) td,
-.ProseMirror table[data-zebra='1'] tr:nth-child(even) th {
-  background: #f7f8fa;
+.rte-root .ProseMirror table[data-zebra='1'] > tbody > tr:nth-child(even) > td,
+.rte-root .ProseMirror table[data-zebra='1'] > tbody > tr:nth-child(even) > th {
+  background: #e7eefc;
 }
 .rte-root.is-task-open-only .ProseMirror ul[data-type='taskList'] li[data-checked='true'] {
   display: none;
