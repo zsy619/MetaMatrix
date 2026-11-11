@@ -6,6 +6,12 @@ export const WRITING_PAPERS = [
   { id: 'letter', label: '信纸' },
   { id: 'draft', label: '稿纸' },
   { id: 'tianzi', label: '田字格' },
+  { id: 'mizi', label: '米字格' },
+  { id: 'english', label: '四线三格' },
+  { id: 'dot', label: '点阵' },
+  { id: 'cornell', label: '康奈尔' },
+  { id: 'vertical', label: '竖排' },
+  { id: 'graph', label: '坐标纸' },
 ] as const
 
 export type WritingPaperId = (typeof WRITING_PAPERS)[number]['id']

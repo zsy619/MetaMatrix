@@ -6,6 +6,10 @@ describe('书写纸面', () => {
   it('只接受已知样式，其它值回到默认', () => {
     expect(normalizeWritingPaper('xhs')).toBe('xhs')
     expect(normalizeWritingPaper('tianzi')).toBe('tianzi')
+    expect(normalizeWritingPaper('mizi')).toBe('mizi')
+    expect(normalizeWritingPaper('english')).toBe('english')
+    expect(normalizeWritingPaper('cornell')).toBe('cornell')
+    expect(normalizeWritingPaper('vertical')).toBe('vertical')
     expect(normalizeWritingPaper('nope')).toBe('')
     expect(normalizeWritingPaper(null)).toBe('')
   })

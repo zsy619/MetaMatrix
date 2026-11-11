@@ -3862,6 +3862,123 @@ html.rte-toolbar-dragging * {
   text-align: center;
   pointer-events: none;
 }
+.rte-root[data-writing-paper='mizi'] .rte-body > .ProseMirror,
+.rte-root[data-writing-paper='mizi'].is-page-sheet .rte-body > .ProseMirror {
+  --mz: 48px;
+  max-width: 768px !important;
+  width: auto !important;
+  margin: 16px auto 28px !important;
+  padding: 0 12px 24px max(8px, var(--rte-gutter-size, 0px)) !important;
+  color: #1d2129;
+  font-family: "KaiTi", "Kaiti SC", "STKaiti", "Songti SC", serif;
+  font-size: var(--mz);
+  line-height: var(--mz);
+  background-color: #fffef8 !important;
+  background-origin: content-box !important;
+  background-attachment: local !important;
+  background-image:
+    linear-gradient(to right, #2f6f4e 1px, transparent 1px),
+    linear-gradient(to bottom, #2f6f4e 1px, transparent 1px),
+    linear-gradient(to right, transparent calc(var(--mz) / 2 - 0.5px), rgba(47, 111, 78, 0.45) 0, rgba(47, 111, 78, 0.45) calc(var(--mz) / 2 + 0.5px), transparent 0),
+    linear-gradient(to bottom, transparent calc(var(--mz) / 2 - 0.5px), rgba(47, 111, 78, 0.45) 0, rgba(47, 111, 78, 0.45) calc(var(--mz) / 2 + 0.5px), transparent 0),
+    linear-gradient(45deg, transparent calc(50% - 0.5px), rgba(47, 111, 78, 0.4) 0, rgba(47, 111, 78, 0.4) calc(50% + 0.5px), transparent 0),
+    linear-gradient(-45deg, transparent calc(50% - 0.5px), rgba(47, 111, 78, 0.4) 0, rgba(47, 111, 78, 0.4) calc(50% + 0.5px), transparent 0) !important;
+  background-size: var(--mz) var(--mz) !important;
+  box-shadow: 0 1px 2px rgba(32, 33, 36, 0.06) !important;
+}
+.rte-root[data-writing-paper='mizi'] .ProseMirror p {
+  margin: 0 !important;
+}
+.rte-root[data-writing-paper='english'] .rte-body > .ProseMirror,
+.rte-root[data-writing-paper='english'].is-page-sheet .rte-body > .ProseMirror {
+  max-width: 760px !important;
+  width: auto !important;
+  margin: 16px auto 28px !important;
+  padding: 8px 20px 32px max(12px, var(--rte-gutter-size, 0px)) !important;
+  color: #1d2129;
+  font-family: "Times New Roman", "Songti SC", serif;
+  font-size: 20px;
+  line-height: 32px;
+  background-color: #fff !important;
+  background-origin: content-box !important;
+  background-attachment: local !important;
+  background-image: repeating-linear-gradient(to bottom, transparent 0 6px, #5b8fd6 6px 7px, transparent 7px 14px, #c5d4ea 14px 15px, transparent 15px 22px, #5b8fd6 22px 23px, transparent 23px 30px, #5b8fd6 30px 31px, transparent 31px 32px) !important;
+  box-shadow: 0 1px 2px rgba(32, 33, 36, 0.06) !important;
+}
+.rte-root[data-writing-paper='english'] .ProseMirror p {
+  margin: 0 !important;
+}
+.rte-root[data-writing-paper='dot'] .rte-body > .ProseMirror,
+.rte-root[data-writing-paper='dot'].is-page-sheet .rte-body > .ProseMirror {
+  max-width: 760px !important;
+  width: auto !important;
+  margin: 16px auto 28px !important;
+  padding: 24px 24px 48px max(16px, var(--rte-gutter-size, 0px)) !important;
+  background-color: #fbfbfb !important;
+  background-origin: content-box !important;
+  background-attachment: local !important;
+  background-image: radial-gradient(circle, #8b95a5 1.1px, transparent 1.4px) !important;
+  background-size: 24px 24px !important;
+  box-shadow: 0 1px 2px rgba(32, 33, 36, 0.06) !important;
+}
+.rte-root[data-writing-paper='cornell'] .rte-body > .ProseMirror,
+.rte-root[data-writing-paper='cornell'].is-page-sheet .rte-body > .ProseMirror {
+  max-width: 760px !important;
+  width: auto !important;
+  margin: 16px auto 28px !important;
+  padding: 16px 20px 88px max(16px, var(--rte-gutter-size, 0px)) !important;
+  background-color: #fff !important;
+  background-origin: border-box !important;
+  background-attachment: local !important;
+  background-image:
+    linear-gradient(to right, transparent 24%, #e25b5b 24%, #e25b5b calc(24% + 1px), transparent calc(24% + 1px)),
+    linear-gradient(to top, transparent 0 72px, #e25b5b 72px 73px, transparent 73px),
+    repeating-linear-gradient(to bottom, transparent 0 31px, #d5dbe3 31px 32px) !important;
+  box-shadow: 0 1px 2px rgba(32, 33, 36, 0.06) !important;
+}
+.rte-root[data-writing-paper='vertical'] .rte-body > .ProseMirror,
+.rte-root[data-writing-paper='vertical'].is-page-sheet .rte-body > .ProseMirror {
+  max-width: 760px !important;
+  width: auto !important;
+  margin: 16px auto 28px !important;
+  padding: 16px 20px 24px !important;
+  min-height: 520px;
+  background-color: #f7f1e4 !important;
+  background-image: repeating-linear-gradient(to right, transparent 0 31px, #e7c7a1 31px 32px) !important;
+  background-attachment: local !important;
+  box-shadow: 0 1px 2px rgba(32, 33, 36, 0.06) !important;
+  font-family: "KaiTi", "Kaiti SC", "STKaiti", "Songti SC", serif;
+}
+.rte-root[data-writing-paper='vertical'] .ProseMirror p,
+.rte-root[data-writing-paper='vertical'] .ProseMirror h1,
+.rte-root[data-writing-paper='vertical'] .ProseMirror h2,
+.rte-root[data-writing-paper='vertical'] .ProseMirror h3 {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  display: inline-block;
+  height: 28em;
+  max-height: 640px;
+  margin: 0 1.2em 0 0 !important;
+  vertical-align: top;
+  line-height: 1.8;
+}
+.rte-root[data-writing-paper='graph'] .rte-body > .ProseMirror,
+.rte-root[data-writing-paper='graph'].is-page-sheet .rte-body > .ProseMirror {
+  max-width: 760px !important;
+  width: auto !important;
+  margin: 16px auto 28px !important;
+  padding: 16px 16px 32px max(8px, var(--rte-gutter-size, 0px)) !important;
+  background-color: #f4f8ff !important;
+  background-origin: content-box !important;
+  background-attachment: local !important;
+  background-image:
+    linear-gradient(to right, #d5e4f7 1px, transparent 1px),
+    linear-gradient(to bottom, #d5e4f7 1px, transparent 1px),
+    linear-gradient(to right, #7ea2d4 1px, transparent 1px),
+    linear-gradient(to bottom, #7ea2d4 1px, transparent 1px) !important;
+  background-size: 16px 16px, 16px 16px, 80px 80px, 80px 80px !important;
+  box-shadow: 0 1px 2px rgba(32, 33, 36, 0.06) !important;
+}
 .rte-root.is-table-sticky .tableWrapper {
   max-height: 420px;
   overflow: auto;
@@ -5470,7 +5587,7 @@ html.rte-image-preview-open .tippy-box {
 /* 书写「纸样」小分组：每颗按钮自带对应纸面的缩略样式。 */
 .rte-paper-group {
   display: grid;
-  grid-template-columns: repeat(3, max-content);
+  grid-template-columns: repeat(6, max-content);
   gap: 2px 4px;
   align-content: center;
   margin: 0 8px 0 0;
@@ -5554,6 +5671,43 @@ html.rte-image-preview-open .tippy-box {
     linear-gradient(to bottom, transparent 3px, rgba(196, 92, 92, 0.55) 3px, rgba(196, 92, 92, 0.55) 4px, transparent 4px);
   background-size: 8px 8px;
 }
+.rte-paper-swatch[data-paper='mizi'] {
+  border-color: #b7d0c2;
+  background-color: #fffef8;
+  background-image:
+    linear-gradient(to right, #2f6f4e 1px, transparent 1px),
+    linear-gradient(to bottom, #2f6f4e 1px, transparent 1px),
+    linear-gradient(45deg, transparent calc(50% - 0.4px), rgba(47, 111, 78, 0.7) 0, rgba(47, 111, 78, 0.7) calc(50% + 0.4px), transparent 0),
+    linear-gradient(-45deg, transparent calc(50% - 0.4px), rgba(47, 111, 78, 0.7) 0, rgba(47, 111, 78, 0.7) calc(50% + 0.4px), transparent 0);
+  background-size: 8px 8px;
+}
+.rte-paper-swatch[data-paper='english'] {
+  background-color: #fff;
+  background-image: repeating-linear-gradient(to bottom, transparent 0 3px, #5b8fd6 3px 4px, transparent 4px 7px, #c5d4ea 7px 8px, transparent 8px 11px, #5b8fd6 11px 12px, transparent 12px 16px);
+}
+.rte-paper-swatch[data-paper='dot'] {
+  background-color: #fbfbfb;
+  background-image: radial-gradient(circle, #8b95a5 1px, transparent 1.2px);
+  background-size: 4px 4px;
+}
+.rte-paper-swatch[data-paper='cornell'] {
+  background-color: #fff;
+  background-image:
+    linear-gradient(to right, transparent 30%, #e25b5b 30%, #e25b5b calc(30% + 1px), transparent calc(30% + 1px)),
+    linear-gradient(to top, transparent 0 4px, #e25b5b 4px 5px, transparent 5px),
+    repeating-linear-gradient(to bottom, transparent 0 3px, #d5dbe3 3px 4px);
+}
+.rte-paper-swatch[data-paper='vertical'] {
+  background-color: #f7f1e4;
+  background-image: repeating-linear-gradient(to right, transparent 0 3px, #e7c7a1 3px 4px);
+}
+.rte-paper-swatch[data-paper='graph'] {
+  background-color: #f4f8ff;
+  background-image:
+    linear-gradient(to right, #d5e4f7 1px, transparent 1px),
+    linear-gradient(to bottom, #d5e4f7 1px, transparent 1px);
+  background-size: 4px 4px;
+}
 .rte-root.expanded .rte-toolbar.is-one-row .rte-paper-group {
   display: flex;
   flex-wrap: nowrap;
@@ -5568,6 +5722,7 @@ html.rte-image-preview-open .tippy-box {
   height: 72px;
   min-height: 72px;
   align-content: stretch;
+  grid-template-columns: repeat(6, max-content);
   grid-template-rows: repeat(2, minmax(0, 1fr));
   gap: 4px 6px;
   margin: 0 8px 0 0;

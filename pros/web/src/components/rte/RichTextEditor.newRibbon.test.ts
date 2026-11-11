@@ -451,7 +451,13 @@ describe('新功能区按钮', () => {
     paperChip('田字格')!.click()
     await nextTick()
     expect(wrapper.attributes('data-writing-paper')).toBe('tianzi')
-    expect(localStorage.getItem('rte-writing-paper:panel-a')).toBe('tianzi')
+    for (const [label, id] of [['米字格', 'mizi'], ['四线三格', 'english'], ['点阵', 'dot'], ['康奈尔', 'cornell'], ['竖排', 'vertical'], ['坐标纸', 'graph']] as const) {
+      expect(paperChip(label)?.querySelector('.rte-paper-swatch')?.getAttribute('data-paper')).toBe(id)
+      paperChip(label)!.click()
+      await nextTick()
+      expect(wrapper.attributes('data-writing-paper')).toBe(id)
+    }
+    expect(localStorage.getItem('rte-writing-paper:panel-a')).toBe('graph')
     paperChip('默认')!.click()
     await nextTick()
     expect(wrapper.attributes('data-writing-paper')).toBeUndefined()
