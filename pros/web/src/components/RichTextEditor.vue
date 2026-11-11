@@ -3391,10 +3391,15 @@ async function openPrintPreview() {
   const title = (localTitle.value || '').trim()
   const accepted = htmlWithSuggestionsAccepted(ed.getHTML() || '<p></p>')
   // 打印预览里图表要是真图：复用导出用的白底快照（预览纸面里不是空白块）
-  const body = await buildExportHtmlWithCharts({
-    editorHtml: accepted,
-    root: rteRootEl.value,
-  })
+  let body = accepted
+  try {
+    body = await buildExportHtmlWithCharts({
+      editorHtml: accepted,
+      root: rteRootEl.value,
+    })
+  } catch {
+    body = accepted
+  }
   printPreviewHtml.value = title
     ? `<h1 class="rte-print-title">${escapeHtml(title)}</h1>${body}`
     : body
@@ -6851,7 +6856,7 @@ const allTools = computed((): ToolItem[] => {
       run: toggleCodeBlock,
     },
     { key: 'pageSetup', label: '页面', title: '纸张、页边距、页眉页脚', icon: '纸', iconComp: ic('pageBreak'), run: openPageSetup },
-    { key: 'printPreview', label: '预览', title: '按当前纸张看打印效果', icon: '看', iconComp: ic('print'), run: () => void openPrintPreview() },
+    { key: 'printPreview', label: '打印预览', title: '按当前纸张看打印效果', icon: '看', iconComp: ic('print'), run: () => void openPrintPreview() },
     { key: 'paperGuide', label: '参考线', title: '在编辑区显示纸张边界', icon: '框', run: togglePaperGuide, active: () => paperGuide.value },
     { key: 'printUrls', label: '印出链接', title: '打印时在链接后面印出网址', icon: '链', run: togglePrintLinkUrls, active: () => printLinkUrls.value },
     {

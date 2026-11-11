@@ -64,6 +64,39 @@ async function clickTool(wrapper: ReturnType<typeof mount>, label: string) {
   await flushPromises()
 }
 
+async function clickMenu(label: string) {
+  await nextTick()
+  await flushPromises()
+  const item = [...document.body.querySelectorAll('button')].find((button) => button.textContent === label)
+  expect(item, `菜单 ${label}`).toBeTruthy()
+  item!.click()
+  await nextTick()
+  await flushPromises()
+}
+
+async function answerPrompt(title: string, value: string, confirm: string) {
+  await flushPromises()
+  await nextTick()
+  const dialog = document.querySelector(`[aria-label="${title}"]`)
+  expect(dialog, title).toBeTruthy()
+  const input = dialog!.querySelector('input') as HTMLInputElement
+  input.value = value
+  input.dispatchEvent(new Event('input', { bubbles: true }))
+  const ok = [...dialog!.querySelectorAll('button')].find((button) => button.textContent?.trim() === confirm)
+  expect(ok, confirm).toBeTruthy()
+  ok!.click()
+  await nextTick()
+  await flushPromises()
+}
+
+function selectImage(editor: Editor) {
+  let imagePos = -1
+  editor.state.doc.descendants((node, pos) => {
+    if (imagePos < 0 && node.type.name === 'image') imagePos = pos
+  })
+  editor.view.dispatch(editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, imagePos)))
+}
+
 describe('新功能区按钮', () => {
   beforeEach(() => {
     document.body.innerHTML = ''
@@ -108,6 +141,41 @@ describe('新功能区按钮', () => {
     wrapper.unmount()
   })
 
+  it('全角、收空格、去重复行和给每行编号都写进正文', async () => {
+    const wrapper = await mountEditor()
+    const editor = editorOf(wrapper)
+    editor.commands.setContent('<p>ABC</p>')
+    editor.commands.setTextSelection(2)
+    await openRibbon(wrapper, '整理')
+    await clickTool(wrapper, '全角')
+    expect(editor.getText()).toContain('ＡＢＣ')
+
+    editor.commands.setContent('<p>甲  乙</p>')
+    editor.commands.setTextSelection(2)
+    await clickTool(wrapper, '收空格')
+    expect(editor.getText()).toBe('甲 乙')
+
+    editor.commands.setContent('<p>甲</p><p>甲</p><p>乙</p>')
+    let from = -1
+    let to = -1
+    editor.state.doc.descendants((node, pos) => {
+      if (!node.isText) return
+      if (from < 0) from = pos
+      to = pos + node.nodeSize
+    })
+    editor.commands.setTextSelection({ from, to })
+    await clickTool(wrapper, '整理')
+    await clickMenu('去掉重复行')
+    expect(editor.getText().split('\n').filter((line) => line === '甲')).toHaveLength(1)
+
+    editor.commands.setContent('<p>甲</p>')
+    editor.commands.setTextSelection(2)
+    await clickTool(wrapper, '整理')
+    await clickMenu('给每行编号')
+    expect(editor.getText()).toContain('1. 甲')
+    wrapper.unmount()
+  })
+
   it('没有选中图片时，换图和替代文本不能点', async () => {
     const wrapper = await mountEditor()
     await openRibbon(wrapper, '图片')
@@ -131,9 +199,32 @@ describe('新功能区按钮', () => {
     await clickTool(wrapper, '排法')
     const wrap = [...document.body.querySelectorAll('button')].find((button) => button.textContent === '左环绕')
     expect(wrap).toBeTruthy()
-    wrap!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    wrap!.click()
     await nextTick()
     expect(editor.getHTML()).toContain('wrap-left')
+    await clickTool(wrapper, '排法')
+    await clickMenu('居左')
+    expect(editor.getHTML()).toContain('data-align="left"')
+    await clickTool(wrapper, '排法')
+    await clickMenu('右环绕')
+    expect(editor.getHTML()).toContain('wrap-right')
+    await clickTool(wrapper, '排法')
+    await clickMenu('居右')
+    expect(editor.getHTML()).toContain('data-align="right"')
+    await clickTool(wrapper, '排法')
+    await clickMenu('居中')
+    expect(editor.getHTML()).toContain('data-align="center"')
+
+    selectImage(editor)
+    await clickTool(wrapper, '替代文本')
+    await answerPrompt('替代文本', '产品图', '确认')
+    expect(editor.getHTML()).toContain('alt="产品图"')
+
+    selectImage(editor)
+    await clickTool(wrapper, '换图')
+    await answerPrompt('换图', 'https://example.com/new.png', '替换')
+    expect(editor.getHTML()).toContain('https://example.com/new.png')
+    expect(editor.getHTML()).toContain('alt="产品图"')
 
     editor.commands.setTextSelection(2)
     await clickTool(wrapper, '揭晓')
@@ -153,6 +244,32 @@ describe('新功能区按钮', () => {
     expect(wrapper.classes()).toContain('is-print-urls')
     await clickTool(wrapper, '印出链接')
     expect(wrapper.classes()).not.toContain('is-print-urls')
+
+    const editor = editorOf(wrapper)
+    editor.commands.setContent('<p>甲</p>')
+    editor.commands.focus('end')
+    await clickTool(wrapper, '分页符')
+    expect(editor.getHTML()).toContain('data-page-break')
+
+    await clickTool(wrapper, '页面')
+    const header = document.querySelector('[aria-label="页面设置"] input[placeholder="每页顶部的内容"]') as HTMLInputElement
+    expect(header).toBeTruthy()
+    header.value = '机密'
+    header.dispatchEvent(new Event('input', { bubbles: true }))
+    const confirm = [...document.querySelectorAll('[aria-label="页面设置"] button')].find((button) => button.textContent?.trim() === '确认')
+    expect(confirm).toBeTruthy()
+    confirm!.click()
+    await nextTick()
+    await flushPromises()
+    expect(wrapper.text()).toContain('机密')
+
+    await clickTool(wrapper, '打印预览')
+    const started = Date.now()
+    while (!document.querySelector('[aria-label="打印预览"]') && Date.now() - started < 8000) {
+      await flushPromises()
+      await nextTick()
+    }
+    expect(document.querySelector('[aria-label="打印预览"]')).toBeTruthy()
     wrapper.unmount()
   })
 
