@@ -1674,6 +1674,15 @@ withDefaults(
         <rect x="122" y="24" width="34" height="92" rx="4" fill="#f3eef8" />
         <rect x="160" y="24" width="32" height="92" rx="4" fill="#e7f6ef" />
       </svg>
+      <svg v-else-if="templateId === 'radar-check'" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+        <rect width="200" height="140" rx="10" fill="#f7f4ee" />
+        <rect x="16" y="18" width="168" height="16" rx="3" fill="#3e3428" />
+        <rect x="16" y="40" width="168" height="12" rx="2" fill="#fff" />
+        <rect x="16" y="56" width="168" height="12" rx="2" fill="#f4fbf6" />
+        <rect x="16" y="72" width="168" height="12" rx="2" fill="#fff6f6" />
+        <rect x="16" y="88" width="168" height="12" rx="2" fill="#fff" />
+        <rect x="16" y="104" width="168" height="12" rx="2" fill="#fff" />
+      </svg>
 
   </div>
 </template>

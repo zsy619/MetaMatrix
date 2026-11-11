@@ -1,0 +1,19 @@
+{
+  "id": "canvas_radar_check",
+  "type": "radar_check",
+  "schemaVersion": 1,
+  "theme": { "background": { "pattern": "none", "color": "#f7f7f7" }, "page": "#f7f7f7", "frame": "#ececec", "hairline": "rgba(60, 50, 20, 0.08)" },
+  "title": "雷达画布",
+  "rows": [
+    { "id": "scene", "name": "场景", "prompt": "一句话：你想让 AI 替你干的那件事", "judges": "范围够不够清", "fail": "说不清主语的「提升效率」", "answer": "", "passed": null },
+    { "id": "who", "name": "现在谁在做", "prompt": "岗位、几个人", "judges": "有没有人在手工补位", "fail": "根本没人在做", "answer": "", "passed": null },
+    { "id": "frequency", "name": "频次", "prompt": "一周几次", "judges": "高频才学得会", "fail": "一月一次", "answer": "", "passed": null },
+    { "id": "duration", "name": "单次耗时", "prompt": "多少分钟", "judges": "价值密度", "fail": "单次 3 分钟以内", "answer": "", "passed": null },
+    { "id": "marginal", "name": "边际成本", "prompt": "多一个客户、多一个人，成本涨多少", "judges": "高边际成本才值得上", "fail": "几乎不涨", "answer": "", "passed": null },
+    { "id": "standard", "name": "靠标准还是靠手感", "prompt": "有 SOP，还是靠师傅带", "judges": "靠手感才有机会", "fail": "早有成熟 SOP", "answer": "", "passed": null },
+    { "id": "cost", "name": "错了的代价", "prompt": "错了会怎样、能不能撤回", "judges": "第一道闸", "fail": "不可逆、涉及资金合规", "answer": "", "passed": null },
+    { "id": "chain", "name": "因果链位置", "prompt": "是这条链的第几环，前后是谁", "judges": "是不是假瓶颈", "fail": "前后都是人工等待", "answer": "", "passed": null },
+    { "id": "input", "name": "输入可用性", "prompt": "喂给它的资料，存在吗、干净吗", "judges": "能不能真跑起来", "fail": "资料散在个人微信里", "answer": "", "passed": null },
+    { "id": "accept", "name": "怎么验收", "prompt": "你怎么知道它做对了", "judges": "有没有人工确认段", "fail": "只能回答「看着差不多」", "answer": "", "passed": null }
+  ]
+}

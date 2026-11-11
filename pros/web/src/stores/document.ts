@@ -124,6 +124,7 @@ import type {
   GoldenCircleDocumentJSON,
   SoarDocumentJSON,
   PlayingToWinDocumentJSON,
+  RadarCheckDocumentJSON,
   PanelAttachment,
   AttachmentsByPanelId,
 } from '../types/canvas'
@@ -256,6 +257,7 @@ import vrioTemplate from '../templates/vrio-v1.json'
 import goldenCircleTemplate from '../templates/golden-circle-v1.json'
 import soarTemplate from '../templates/soar-v1.json'
 import playingToWinTemplate from '../templates/playing-to-win-v1.json'
+import radarCheckTemplate from '../templates/radar-check-v1.json'
 import { CONTEXT_SIX_ELEMENTS_BLOCK_ID } from '../utils/contextSixElements'
 
 export type TemplateId =
@@ -328,6 +330,7 @@ export type TemplateId =
   | 'golden-circle'
   | 'soar'
   | 'playing-to-win'
+  | 'radar-check'
 
 const TEMPLATES: Record<TemplateId, CanvasDocumentJSON> = {
   'dual-triangle': dualTriangleTemplate as DualTriangleDocumentJSON,
@@ -404,6 +407,7 @@ const TEMPLATES: Record<TemplateId, CanvasDocumentJSON> = {
   'golden-circle': goldenCircleTemplate as GoldenCircleDocumentJSON,
   soar: soarTemplate as SoarDocumentJSON,
   'playing-to-win': playingToWinTemplate as PlayingToWinDocumentJSON,
+  'radar-check': radarCheckTemplate as RadarCheckDocumentJSON,
 }
 
 export function isTemplateId(id: string): id is TemplateId {
@@ -952,6 +956,12 @@ export const TEMPLATE_META: Record<
     name: '制胜选择',
     badge: '战略 · 选择',
     description: '制胜愿景、在哪竞争、如何取胜、所需能力、管理体系。五个选择要连得上。',
+    category: 'method',
+  },
+  'radar-check': {
+    name: '雷达画布',
+    badge: '自检 · 十格',
+    description: '十格自检。逐格写事实，出现不合格信号就先不过。',
     category: 'method',
   },
 }

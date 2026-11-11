@@ -69,6 +69,7 @@ import {
   isGoldenCircleDoc,
   isSoarDoc,
   isPlayingToWinDoc,
+  isRadarCheckDoc,
   isYModelDoc,
 } from '../../types/canvas'
 import BackgroundLayer from './BackgroundLayer.vue'
@@ -141,6 +142,7 @@ import VrioCanvas from './VrioCanvas.vue'
 import GoldenCircleCanvas from './GoldenCircleCanvas.vue'
 import SoarCanvas from './SoarCanvas.vue'
 import PlayingToWinCanvas from './PlayingToWinCanvas.vue'
+import RadarCheckCanvas from './RadarCheckCanvas.vue'
 
 const documentStore = useDocumentStore()
 const ui = useUiStore()
@@ -309,6 +311,7 @@ const vrioDoc = computed(() => (isVrioDoc(current_data.value) ? current_data.val
 const goldenCircleDoc = computed(() => (isGoldenCircleDoc(current_data.value) ? current_data.value : null))
 const soarDoc = computed(() => (isSoarDoc(current_data.value) ? current_data.value : null))
 const playingToWinDoc = computed(() => (isPlayingToWinDoc(current_data.value) ? current_data.value : null))
+const radarCheckDoc = computed(() => (isRadarCheckDoc(current_data.value) ? current_data.value : null))
 const quadrantDoc = computed(() =>
   isQuadrantDoc(current_data.value) ? current_data.value : null,
 )
@@ -520,6 +523,9 @@ const quadrantDoc = computed(() =>
         </template>
         <template v-else-if="playingToWinDoc">
           <PlayingToWinCanvas :doc="playingToWinDoc" />
+        </template>
+        <template v-else-if="radarCheckDoc">
+          <RadarCheckCanvas :doc="radarCheckDoc" />
         </template>
         <template v-else-if="quadrantDoc">
           <BackgroundLayer
