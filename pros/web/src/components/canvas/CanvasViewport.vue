@@ -70,6 +70,7 @@ import {
   isSoarDoc,
   isPlayingToWinDoc,
   isTenCheckDoc,
+  isSceneThreeHighDoc,
   isYModelDoc,
 } from '../../types/canvas'
 import BackgroundLayer from './BackgroundLayer.vue'
@@ -143,6 +144,7 @@ import GoldenCircleCanvas from './GoldenCircleCanvas.vue'
 import SoarCanvas from './SoarCanvas.vue'
 import PlayingToWinCanvas from './PlayingToWinCanvas.vue'
 import TenCheckCanvas from './TenCheckCanvas.vue'
+import SceneThreeHighCanvas from './SceneThreeHighCanvas.vue'
 
 const documentStore = useDocumentStore()
 const ui = useUiStore()
@@ -312,6 +314,7 @@ const goldenCircleDoc = computed(() => (isGoldenCircleDoc(current_data.value) ? 
 const soarDoc = computed(() => (isSoarDoc(current_data.value) ? current_data.value : null))
 const playingToWinDoc = computed(() => (isPlayingToWinDoc(current_data.value) ? current_data.value : null))
 const tenCheckDoc = computed(() => (isTenCheckDoc(current_data.value) ? current_data.value : null))
+const sceneThreeHighDoc = computed(() => (isSceneThreeHighDoc(current_data.value) ? current_data.value : null))
 const quadrantDoc = computed(() =>
   isQuadrantDoc(current_data.value) ? current_data.value : null,
 )
@@ -526,6 +529,9 @@ const quadrantDoc = computed(() =>
         </template>
         <template v-else-if="tenCheckDoc">
           <TenCheckCanvas :doc="tenCheckDoc" />
+        </template>
+        <template v-else-if="sceneThreeHighDoc">
+          <SceneThreeHighCanvas :doc="sceneThreeHighDoc" />
         </template>
         <template v-else-if="quadrantDoc">
           <BackgroundLayer

@@ -755,7 +755,9 @@ onMounted(async () => {
 .card--playing-to-win:hover,
 .card--playing-to-win:focus-visible,
 .card--ten-check:hover,
-.card--ten-check:focus-visible {
+.card--ten-check:focus-visible,
+.card--scene-three-high:hover,
+.card--scene-three-high:focus-visible {
   border-color: #34a853;
 }
 

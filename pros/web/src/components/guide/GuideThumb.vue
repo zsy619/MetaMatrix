@@ -1674,6 +1674,16 @@ withDefaults(
         <rect x="122" y="24" width="34" height="92" rx="4" fill="#f3eef8" />
         <rect x="160" y="24" width="32" height="92" rx="4" fill="#e7f6ef" />
       </svg>
+      <svg v-else-if="templateId === 'scene-three-high'" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+        <rect width="200" height="140" rx="10" fill="#f7f4ee" />
+        <polygon points="100,28 156,118 44,118" fill="none" stroke="#e4ddd2" stroke-width="1.4" />
+        <polygon points="100,52 136,104 64,104" fill="none" stroke="#e4ddd2" stroke-width="1.1" />
+        <polygon points="100,36 148,112 58,108" fill="rgba(212,175,55,0.38)" stroke="#c9a227" stroke-width="1.4" />
+        <polygon points="100,78 118,100 86,96" fill="rgba(77,182,172,0.42)" stroke="#26a69a" stroke-width="1.4" />
+        <text x="100" y="20" text-anchor="middle" font-size="8" font-weight="700" fill="#3e3428">高频</text>
+        <text x="168" y="128" text-anchor="middle" font-size="7" font-weight="700" fill="#3e3428">高价值</text>
+        <text x="30" y="128" text-anchor="middle" font-size="7" font-weight="700" fill="#3e3428">高边际</text>
+      </svg>
       <svg v-else-if="templateId === 'ten-check'" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
         <rect width="200" height="140" rx="10" fill="#f7f4ee" />
         <rect x="16" y="18" width="168" height="16" rx="3" fill="#3e3428" />
