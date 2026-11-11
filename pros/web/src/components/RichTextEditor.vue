@@ -57,6 +57,7 @@ import {
 import { todayIso } from '../utils/rteRound5'
 import { RTE_PAGE_SIZES } from '../utils/rtePageSize'
 import { applyAutoRuby } from '../utils/rteRuby'
+import { tianziCharKey } from '../extensions/rteTianziGrid'
 import {
   WRITING_PAPERS,
   readWritingPaper,
@@ -1168,6 +1169,12 @@ const editor = useRteExtensions({
   mentionPeople: () => directoryPeople.mentionPeople(),
   reapplyTableFilter: (ed, transaction, appended) => reapplyTableFilter(ed as never, transaction, appended),
 })
+
+watch([writingPaper, editor], () => {
+  const ed = editor.value
+  if (!ed?.view) return
+  ed.view.dispatch(ed.state.tr.setMeta(tianziCharKey, writingPaper.value === 'tianzi'))
+}, { immediate: true })
 
 // 图表属性面板：选中图表块即弹出（侧栏）
 const chartPanelBridge = useChartPanelBridge(editor)

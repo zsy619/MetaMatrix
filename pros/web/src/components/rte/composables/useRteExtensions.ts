@@ -90,6 +90,7 @@ import { MermaidBlock } from '../../../extensions/mermaidBlock'
 import { EchartsBlock } from '../../../extensions/echartsBlock'
 import { CrossRef, findCrossRefPos } from '../../../extensions/crossRef'
 import { ListStyleAttrs } from '../../../extensions/listStyleAttrs'
+import { TianziGrid } from '../../../extensions/rteTianziGrid'
 import { HeadingManualNum } from '../../../extensions/headingManualNum'
 import { LinkButton } from '../../../extensions/linkButton'
 import { SyncBlock } from '../../../extensions/syncBlock'
@@ -321,6 +322,7 @@ const editor = useEditor({
     EchartsBlock,
     CrossRef,
     ListStyleAttrs,
+    TianziGrid,
     HeadingManualNum,
     LinkButton,
     Color,
