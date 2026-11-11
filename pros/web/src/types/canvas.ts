@@ -2591,9 +2591,9 @@ export function normalizeYModelDoc(doc: YModelDocumentJSON): YModelDocumentJSON 
     { id: 'theory_build', title: '自己建模型', placeholder: '在此填写自建模型…' },
     { id: 'facts_hypothesis', title: '提出新假设', placeholder: '在此填写新假设…' },
     { id: 'facts_analysis', title: '如何定性定量分析', placeholder: '在此填写定性定量方法…' },
-    { id: 'cognition_cause', title: '理解因', placeholder: '' },
-    { id: 'cognition_effect', title: '理解果', placeholder: '' },
-    { id: 'tools', title: '配套工具', placeholder: '' },
+    { id: 'cognition_cause', title: '理解因：我的框架（1-5条）', placeholder: '' },
+    { id: 'cognition_effect', title: '理解果：我的目标（TopN）', placeholder: '' },
+    { id: 'tools', title: '∴ 配套的组织和管理工具：', placeholder: '' },
   ]
   const present = new Set(blocks.map((b) => b.id))
   for (const req of requiredRteBlocks) {
@@ -2615,24 +2615,28 @@ export function normalizeYModelDoc(doc: YModelDocumentJSON): YModelDocumentJSON 
   for (const b of blocks) {
     if (
       b.id === 'cognition_cause' &&
-      (b.title === '理解因：基本可行框架 (2-5条)' || b.title === '理解因：我的框架 (1-5条)')
+      (b.title === '理解因' ||
+        b.title === '理解因：基本可行框架 (2-5条)' ||
+        b.title === '理解因：我的框架 (1-5条)')
     ) {
-      b.title = '理解因'
+      b.title = '理解因：我的框架（1-5条）'
     }
     if (
       b.id === 'cognition_effect' &&
-      (b.title === '理解果：我的目标 (TopN)' || b.title === '理解果：我的目标(TopN)')
+      (b.title === '理解果' ||
+        b.title === '理解果：我的目标 (TopN)' ||
+        b.title === '理解果：我的目标(TopN)')
     ) {
-      b.title = '理解果'
+      b.title = '理解果：我的目标（TopN）'
     }
     if (b.id === 'scope' && b.title === '圈定问题范围') {
       b.title = '解决真正问题'
     }
     if (
       b.id === 'tools' &&
-      (b.title === '配套的组织和管理工具' || b.title === '∴ 配套的组织和管理工具：' || !b.title)
+      (b.title === '配套工具' || b.title === '配套的组织和管理工具' || !b.title)
     ) {
-      b.title = '配套工具'
+      b.title = '∴ 配套的组织和管理工具：'
     }
   }
 

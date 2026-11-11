@@ -107,7 +107,7 @@
     },
     {
       "id": "cognition_cause",
-      "title": "理解因",
+      "title": "理解因：我的框架（1-5条）",
       "items": [
         {
           "id": "item_cognition_cause_1",
@@ -122,7 +122,7 @@
     },
     {
       "id": "cognition_effect",
-      "title": "理解果",
+      "title": "理解果：我的目标（TopN）",
       "items": [
         {
           "id": "item_cognition_effect_1",
@@ -137,7 +137,7 @@
     },
     {
       "id": "tools",
-      "title": "配套工具",
+      "title": "∴ 配套的组织和管理工具：",
       "items": [
         {
           "id": "item_tools_1",
