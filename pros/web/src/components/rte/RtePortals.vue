@@ -17,9 +17,23 @@ const TABLE_CTX_GROUPS = [
 ] as const
 
 const tableCtxGroup = ref('')
+const tableCtxFlyout = ref({ top: 0, left: 0 })
 watch(() => rte.tableCtx.open, (open: boolean) => {
   if (!open) tableCtxGroup.value = ''
 })
+
+function openTableCtxGroup(id: string, event: MouseEvent) {
+  tableCtxGroup.value = id
+  const el = event.currentTarget as HTMLElement | null
+  if (!el) return
+  const rect = el.getBoundingClientRect()
+  const flyoutWidth = 248
+  const flip = rect.right + flyoutWidth + 8 > window.innerWidth
+  tableCtxFlyout.value = {
+    top: Math.max(8, rect.top),
+    left: flip ? Math.max(8, rect.left - flyoutWidth - 4) : rect.right + 4,
+  }
+}
 
 function tableCtxOps(keys: readonly string[]) {
   const items = rte.tableOpItems as Array<{
@@ -34,12 +48,6 @@ function tableCtxOps(keys: readonly string[]) {
     .map((key) => items.find((op) => op.key === key))
     .filter((op): op is NonNullable<typeof op> => !!op)
 }
-
-const tableCtxNearRight = computed(() => {
-  const x = Number(rte.tableCtx.x) || 0
-  const width = typeof window === 'undefined' ? 1200 : window.innerWidth
-  return x > width - 520
-})
 
 /** 当前选中的类别下的子类型模板（与工具栏下拉共用同一份目录）。 */
 const echartsDialogTemplates = computed(() => {
@@ -529,7 +537,6 @@ const echartsDialogTemplates = computed(() => {
       >
         <div data-rte-own
           class="rte-table-ctx"
-          :class="{ 'is-near-right': tableCtxNearRight }"
           :style="{ left: rte.tableCtx.x + 'px', top: rte.tableCtx.y + 'px' }"
           @mousedown.stop.prevent
         >
@@ -537,13 +544,13 @@ const echartsDialogTemplates = computed(() => {
             v-for="group in TABLE_CTX_GROUPS"
             :key="'ctx-group-' + group.id"
             class="rte-table-ctx-group"
-            @mouseenter="tableCtxGroup = group.id"
           >
             <button data-rte-own
               type="button"
               :class="{ active: tableCtxGroup === group.id }"
               :aria-expanded="tableCtxGroup === group.id"
-              @click="tableCtxGroup = tableCtxGroup === group.id ? '' : group.id"
+              @mouseenter="openTableCtxGroup(group.id, $event)"
+              @click.stop="openTableCtxGroup(group.id, $event)"
             >
               {{ group.label }}
               <span data-rte-own class="rte-table-ctx-caret" aria-hidden="true">▸</span>
@@ -551,6 +558,7 @@ const echartsDialogTemplates = computed(() => {
             <div data-rte-own
               v-if="tableCtxGroup === group.id"
               class="rte-table-ctx-flyout"
+              :style="{ top: tableCtxFlyout.top + 'px', left: tableCtxFlyout.left + 'px' }"
               @mousedown.stop
             >
               <template v-for="op in tableCtxOps(group.keys)" :key="'ctx-' + op.key">
