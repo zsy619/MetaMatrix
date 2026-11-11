@@ -30,6 +30,7 @@ import {
   isMoscowDoc,
   isGoldenCircleDoc,
   isPlayingToWinDoc,
+  isRadarCheckDoc,
   isSoarDoc,
   isVrioDoc,
   isValueChainDoc,
@@ -190,6 +191,10 @@ describe('实用商业画布', () => {
     expect(isGoldenCircleDoc(circle) && circle.blocks.map((block) => block.id)).toEqual(['why', 'how', 'what'])
     expect(isSoarDoc(soar) && soar.blocks).toHaveLength(4)
     expect(isPlayingToWinDoc(playing) && playing.blocks.map((block) => block.id)).toEqual(['aspiration', 'where', 'how', 'capabilities', 'systems'])
+    const radar = cloneTemplate('radar-check')
+    expect(isRadarCheckDoc(radar) && radar.rows).toHaveLength(10)
+    expect(isRadarCheckDoc(radar) && radar.rows[0]?.name).toBe('场景')
+    expect(isRadarCheckDoc(radar) && radar.rows[9]?.fail).toContain('看着差不多')
     const store = useDocumentStore()
     store.loadFromTemplate('vrio')
     const vrioView = mount(VrioCanvas, { props: { doc: store.current_data as never } })

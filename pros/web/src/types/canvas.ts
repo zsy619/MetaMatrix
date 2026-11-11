@@ -2288,6 +2288,37 @@ export interface PlayingToWinDocumentJSON {
   blocks: PlayingToWinBlock[]
 }
 
+export type RadarCheckRowId =
+  | 'scene'
+  | 'who'
+  | 'frequency'
+  | 'duration'
+  | 'marginal'
+  | 'standard'
+  | 'cost'
+  | 'chain'
+  | 'input'
+  | 'accept'
+
+export interface RadarCheckRow {
+  id: RadarCheckRowId
+  name: string
+  prompt: string
+  judges: string
+  fail: string
+  answer: string
+  passed: boolean | null
+}
+
+export interface RadarCheckDocumentJSON {
+  id: string
+  type: 'radar_check'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  rows: RadarCheckRow[]
+}
+
 /** 科学决策三角形（宽度 / 高度 / 深度） */
 export type DecisionTriangleBlockId = 'width' | 'height' | 'depth'
 
@@ -2376,6 +2407,7 @@ export type CanvasDocumentJSON = (
   | GoldenCircleDocumentJSON
   | SoarDocumentJSON
   | PlayingToWinDocumentJSON
+  | RadarCheckDocumentJSON
 ) & WithPanelAttachments
 
 /** 带 blocks 的画布（双三角 / Y 模型 / 刻意练习） */
@@ -3054,6 +3086,10 @@ export function isSoarDoc(doc: CanvasDocumentJSON | null | undefined): doc is So
 
 export function isPlayingToWinDoc(doc: CanvasDocumentJSON | null | undefined): doc is PlayingToWinDocumentJSON {
   return !!doc && doc.type === 'playing_to_win'
+}
+
+export function isRadarCheckDoc(doc: CanvasDocumentJSON | null | undefined): doc is RadarCheckDocumentJSON {
+  return !!doc && doc.type === 'radar_check'
 }
 
 export function isBreakEvenDoc(doc: CanvasDocumentJSON | null | undefined): doc is BreakEvenDocumentJSON {
