@@ -54,7 +54,12 @@ export function collectCrossRefTargets(editor: Editor): CrossRefTarget[] {
     if (node.type.name === 'table') {
       tbl += 1
       const id = String(node.attrs.xrefId || `tbl-${pos}`)
-      out.push({ id, kind: 'table', label: `表 ${tbl}`, pos })
+      out.push({
+        id,
+        kind: 'table',
+        label: String(node.attrs.caption || '').trim() || `表 ${tbl}`,
+        pos,
+      })
     }
   })
   return out
@@ -193,7 +198,7 @@ export function syncXrefTransaction(state: EditorState): Transaction | null {
     }
     if (node.type.name === 'table' && node.attrs.xrefId) {
       tbl += 1
-      labels.set(String(node.attrs.xrefId), `表 ${tbl}`)
+              labels.set(String(node.attrs.xrefId), String(node.attrs.caption || '').trim() || `表 ${tbl}`)
     }
   })
   const refs: Array<{ pos: number }> = []

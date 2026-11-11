@@ -27,12 +27,25 @@ export function useSuggestionMode(deps: {
     suggestionTick.value += 1
   }
 
+  const suggestionAuthorFilter = ref('')
   const suggestionRanges = computed(() => {
     void suggestionTick.value
     const ed = deps.editor().value
     if (!ed) return []
     void ed.state.doc
     return collectSuggestionRanges(ed.state.doc)
+  })
+  const suggestionAuthors = computed(() => {
+    const names = suggestionRanges.value.map((range) => range.authorName).filter(Boolean)
+    return [...new Set(names)]
+  })
+  const visibleSuggestionRanges = computed(() => {
+    const list = [...suggestionRanges.value].sort(
+      (a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0),
+    )
+    const author = suggestionAuthorFilter.value
+    if (!author) return list
+    return list.filter((range) => range.authorName === author || range.authorId === author)
   })
 
   const activeSuggestionId = computed(() => {
@@ -61,6 +74,9 @@ export function useSuggestionMode(deps: {
     toggleSuggesting,
     bumpSuggestions: bump,
     suggestionRanges,
+    visibleSuggestionRanges,
+    suggestionAuthors,
+    suggestionAuthorFilter,
     activeSuggestionId,
     acceptAllSuggestions: () => decide('accept'),
     rejectAllSuggestions: () => decide('reject'),

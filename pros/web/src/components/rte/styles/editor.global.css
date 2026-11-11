@@ -3659,6 +3659,11 @@ html.rte-toolbar-dragging * {
   max-height: 420px;
   overflow: auto;
 }
+.rte-root.is-table-sticky .tableWrapper table,
+.rte-root.is-table-col-sticky .tableWrapper table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
 .rte-root.is-table-sticky .tableWrapper table thead th,
 .rte-root.is-table-sticky .tableWrapper tr:first-child th,
 .rte-root.is-table-sticky .tableWrapper tr:first-child td {

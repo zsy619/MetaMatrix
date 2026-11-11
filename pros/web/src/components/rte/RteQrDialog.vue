@@ -40,15 +40,30 @@ async function refresh() {
   }
 }
 
+const QR_LAST_KEY = 'rte-qr-last'
+
+function readLastQr(): { presetId?: string; style?: string; errorLevel?: string; caption?: boolean } | null {
+  try {
+    return JSON.parse(localStorage.getItem(QR_LAST_KEY) || 'null')
+  } catch {
+    return null
+  }
+}
+
 watch(() => rte.qrDialogOpen, (open) => {
   if (!open) return
   const draft = rte.qrDraft
+  const last = draft ? null : readLastQr()
   text.value = draft?.text || 'https://'
   description.value = draft?.description || ''
-  presetId.value = draft?.presetId || QR_PRESETS[1]!.id
-  style.value = (draft?.style as QrModuleStyle) || 'rounded'
-  errorLevel.value = draft?.errorLevel === 'Q' || draft?.errorLevel === 'M' ? draft.errorLevel : 'H'
-  caption.value = draft?.caption ?? true
+  presetId.value = draft?.presetId || last?.presetId || QR_PRESETS[1]!.id
+  style.value = (draft?.style as QrModuleStyle) || (last?.style as QrModuleStyle) || 'rounded'
+  errorLevel.value = draft?.errorLevel === 'Q' || draft?.errorLevel === 'M'
+    ? draft.errorLevel
+    : last?.errorLevel === 'Q' || last?.errorLevel === 'M'
+      ? last.errorLevel
+      : 'H'
+  caption.value = draft?.caption ?? last?.caption ?? true
   void refresh()
 })
 
@@ -73,6 +88,14 @@ async function confirm() {
       errorLevel: errorLevel.value,
       caption: caption.value,
     })
+    try {
+      localStorage.setItem(
+        QR_LAST_KEY,
+        JSON.stringify({ presetId: presetId.value, style: style.value, errorLevel: errorLevel.value, caption: caption.value }),
+      )
+    } catch {
+      /* 隐私模式 */
+    }
     await rte.insertQrArtwork(preview.value, meta)
   } finally {
     busy.value = false

@@ -198,6 +198,8 @@ function rebuildPasted(node: Node, doc: Document): Node | null {
     const bg = el.getAttribute('bgcolor') || el.style?.backgroundColor || ''
     const hex = bg.match(/#(?:[0-9a-f]{3}|[0-9a-f]{6})\b/i)?.[0]
     if (hex) parent.setAttribute('data-bg', hex)
+    const valign = el.getAttribute('data-valign') || ''
+    if (valign === 'top' || valign === 'middle' || valign === 'bottom') parent.setAttribute('data-valign', valign)
   }
   if (parent && tag === 'code') {
     const lang = [...el.classList].find((name) => /^language-[\w-]+$/i.test(name) && !/mso/i.test(name))
@@ -278,10 +280,15 @@ export function plainTextToPasteContent(
     .replace(/\r/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
   if (!normalized.includes('\n')) return normalized
-  return normalized.split('\n').map((line) => ({
-    type: 'paragraph' as const,
-    content: line ? [{ type: 'text' as const, text: line }] : [],
-  }))
+  return normalized.split(/\n{2,}/).map((block) => {
+    const lines = block.split('\n')
+    const content: Array<{ type: 'text'; text: string } | { type: 'hardBreak' }> = []
+    lines.forEach((line, index) => {
+      if (index > 0) content.push({ type: 'hardBreak' })
+      if (line) content.push({ type: 'text', text: line })
+    })
+    return { type: 'paragraph' as const, content }
+  })
 }
 
 export function isBareHttpUrl(text: string): boolean {

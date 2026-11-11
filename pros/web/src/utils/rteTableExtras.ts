@@ -1,5 +1,30 @@
 import type { Editor } from '@tiptap/core'
-import type { Node as PmNode } from '@tiptap/pm/model'
+import { Fragment, type Node as PmNode } from '@tiptap/pm/model'
+
+/** 行被挪走以后，公式里的行号跟着新位置走。 */
+export function remapFormulaRows(formula: string, rowMap: Map<number, number>): string {
+  if (!formula.startsWith('=')) return formula
+  return formula.replace(/\b([A-Za-z]{1,3})([1-9][0-9]*)\b/g, (all, col: string, row: string) => {
+    const next = rowMap.get(Number(row))
+    return next ? `${col}${next}` : all
+  })
+}
+
+function remapNode(node: PmNode, rowMap: Map<number, number>, schema: Editor['schema']): PmNode {
+  if (node.isText && node.text?.startsWith('=')) {
+    const next = remapFormulaRows(node.text, rowMap)
+    return next === node.text ? node : schema.text(next, node.marks)
+  }
+  if (!node.childCount) return node
+  let changed = false
+  const kids: PmNode[] = []
+  node.forEach((child) => {
+    const mapped = remapNode(child, rowMap, schema)
+    if (mapped !== child) changed = true
+    kids.push(mapped)
+  })
+  return changed ? node.copy(Fragment.from(kids)) : node
+}
 
 function cellText(cell: PmNode): string {
   return cell.textContent.trim()
@@ -46,8 +71,13 @@ export function sortTableByColumn(editor: Editor, colIndex: number, asc = true):
     return asc ? ca.localeCompare(cb, 'zh') : cb.localeCompare(ca, 'zh')
   })
   const newRows = [header, ...sorted, ...sumRows]
+  const oldSheet = new Map<PmNode, number>()
+  rows.forEach((row, index) => oldSheet.set(row, index + 1))
+  const rowMap = new Map<number, number>()
+  newRows.forEach((row, index) => rowMap.set(oldSheet.get(row) || index + 1, index + 1))
+  const remapped = newRows.map((row) => remapNode(row, rowMap, editor.schema))
   const tableType = table.type
-  const next = tableType.create(table.attrs, newRows)
+  const next = tableType.create(table.attrs, remapped)
   const tr = editor.state.tr.replaceWith(pos, pos + table.nodeSize, next)
   editor.view.dispatch(tr)
   return true

@@ -311,6 +311,20 @@ export const EchartsBlock = Node.create({
           previewEl.textContent = '还没有图表数据'
           return
         }
+        if (!chart && typeof IntersectionObserver !== 'undefined') {
+          const rect = previewEl.getBoundingClientRect()
+          const viewport = window.innerHeight || previewEl.ownerDocument.documentElement.clientHeight || 0
+          const inView = rect.height === 0 || (rect.bottom > 0 && rect.top < viewport)
+          if (!inView) {
+            const obs = new IntersectionObserver((entries) => {
+              if (!entries.some((entry) => entry.isIntersecting)) return
+              obs.disconnect()
+              void render()
+            })
+            obs.observe(previewEl)
+            return
+          }
+        }
         if (!parsed.ok) {
           chart?.dispose()
           chart = null

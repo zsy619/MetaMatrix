@@ -14,6 +14,7 @@ type InlineMark = {
   underline?: boolean
   strike?: boolean
   code?: boolean
+  footnoteId?: string
 }
 
 type Run = { text: string; marks: InlineMark }
@@ -48,6 +49,9 @@ function runsToXml(runs: Run[]): string {
       if (r.marks.code) {
         pr.push('<w:rFonts w:ascii="Courier New" w:hAnsi="Courier New"/>')
         pr.push('<w:sz w:val="20"/>')
+      }
+      if (r.marks.footnoteId) {
+        return `<w:r><w:rPr><w:vertAlign w:val="superscript"/></w:rPr><w:footnoteReference w:id="${r.marks.footnoteId}"/></w:r>`
       }
       const rPr = pr.length ? `<w:rPr>${pr.join('')}</w:rPr>` : ''
       return `<w:r>${rPr}<w:t xml:space="preserve">${xmlEscape(r.text)}</w:t></w:r>`
@@ -90,6 +94,11 @@ function collectRuns(node: Node, inherited: InlineMark = {}): Run[] {
     if (tag === 'code') next = mergeMarks(next, { code: true })
     if (tag === 'br') {
       out.push({ text: '\n', marks })
+      return
+    }
+    if (el.hasAttribute('data-fn-text')) {
+      const id = el.getAttribute('data-fn-export-id') || '1'
+      out.push({ text: '', marks: { ...marks, footnoteId: id } })
       return
     }
     // skip script/style
@@ -175,6 +184,10 @@ function parseBlocks(root: HTMLElement): Block[] {
         n.remove()
       }
       const runs = collectRuns(clone)
+      if (listEl.getAttribute('data-type') === 'taskList') {
+        const box = li.getAttribute('data-checked') === 'true' ? '☑ ' : '☐ '
+        runs.unshift({ text: box, marks: {} })
+      }
       blocks.push({
         kind: 'listItem',
         ordered,
@@ -511,6 +524,7 @@ export async function buildDocxBlob(opts: {
   /** 内嵌图片：zip 内文件名 + 二进制。 */
   const mediaFiles: { name: string; bytes: Uint8Array; ext: string }[] = []
   const mediaRels: { id: string; target: string }[] = []
+  let footnotesXml = ''
 
   if (opts.bodyHtml && typeof DOMParser !== 'undefined') {
     try {
@@ -519,7 +533,28 @@ export async function buildDocxBlob(opts: {
         'text/html',
       )
       const root = doc.getElementById('rte-docx-root') || doc.body
+      const footnotes: Array<{ id: string; text: string }> = []
+      root.querySelectorAll('[data-fn-text]').forEach((el, index) => {
+        const id = String(index + 1)
+        el.setAttribute('data-fn-export-id', id)
+        footnotes.push({ id, text: el.getAttribute('data-fn-text') || '' })
+      })
       const blocks = parseBlocks(root as HTMLElement)
+      if (footnotes.length) {
+        const notesXml = footnotes
+          .map(
+            (note) =>
+              `<w:footnote w:id="${note.id}"><w:p><w:r><w:t>${xmlEscape(note.text)}</w:t></w:r></w:p></w:footnote>`,
+          )
+          .join('')
+        footnotesXml =
+          `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+          `<w:footnotes xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">` +
+          `<w:footnote w:type="separator" w:id="-1"><w:p><w:r><w:separator/></w:r></w:p></w:footnote>` +
+          `<w:footnote w:type="continuationSeparator" w:id="0"><w:p><w:r><w:continuationSeparator/></w:r></w:p></w:footnote>` +
+          notesXml +
+          `</w:footnotes>`
+      }
       // 图片块 → media 关系（rId3 起，避开 styles / numbering）
       let mediaSeq = 0
       const resolveImage = (block: Extract<Block, { kind: 'image' }>) => {
@@ -578,6 +613,7 @@ export async function buildDocxBlob(opts: {
   <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
   <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
   <Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/>
+  ${footnotesXml ? '<Override PartName="/word/footnotes.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml"/>' : ''}
 </Types>`
 
   const rels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -596,6 +632,7 @@ export async function buildDocxBlob(opts: {
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
   <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>
+  ${footnotesXml ? '<Relationship Id="rId99" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes" Target="footnotes.xml"/>' : ''}
   ${mediaRelXml}
 </Relationships>`
 
@@ -606,6 +643,7 @@ export async function buildDocxBlob(opts: {
   word?.file('document.xml', documentXml)
   word?.file('styles.xml', stylesXml())
   word?.file('numbering.xml', numberingXml())
+  if (footnotesXml) word?.file('footnotes.xml', footnotesXml)
   word?.folder('_rels')?.file('document.xml.rels', docRels)
   for (const media of mediaFiles) {
     word?.folder('media')?.file(media.name, media.bytes)

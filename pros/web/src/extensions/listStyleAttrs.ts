@@ -66,6 +66,17 @@ export const ListStyleAttrs = Extension.create({
         },
       },
       {
+        types: ['table'],
+        attributes: {
+          caption: {
+            default: null as string | null,
+            parseHTML: (el: HTMLElement) => el.getAttribute('data-table-caption') || null,
+            renderHTML: (attrs: { caption?: string | null }) =>
+              attrs.caption ? { 'data-table-caption': attrs.caption } : {},
+          },
+        },
+      },
+      {
         types: ['image', 'table'],
         attributes: {
           rowFilter: {

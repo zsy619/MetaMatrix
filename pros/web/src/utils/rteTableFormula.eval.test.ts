@@ -3,6 +3,7 @@
  * 区域引用、错误码（#REF! / #VALUE! / #DIV/0! / #NAME?）、循环引用。
  */
 import { describe, expect, it } from 'vitest'
+import { remapFormulaRows } from './rteTableExtras'
 import {
   evaluateCellFormula,
   evaluateFormula,
@@ -14,6 +15,14 @@ import {
   parseCellNumber,
   recalculateTable,
 } from './rteTableFormula'
+
+describe('排序后的公式行号', () => {
+  it('行号按新位置改写', () => {
+    const map = new Map<number, number>([[2, 4], [4, 2]])
+    expect(remapFormulaRows('=A2+B4', map)).toBe('=A4+B2')
+    expect(remapFormulaRows('不是公式', map)).toBe('不是公式')
+  })
+})
 
 describe('公式引用', () => {
   it('列出单元格和区域，并去掉重复', () => {

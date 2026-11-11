@@ -48,6 +48,7 @@ function paintCaptions(view: EditorView) {
     cap.className = 'rte-image-caption rte-image-caption-inline'
     cap.dataset.pos = String(pos)
     cap.setAttribute('contenteditable', 'false')
+    cap.setAttribute('aria-hidden', 'true')
     cap.title = '双击修改题注'
     cap.textContent = text
     const before = node.attrs.captionBefore

@@ -6,6 +6,18 @@ import { buildDocxBlob } from './rteExportDocx'
 const pixel =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
 
+describe('脚注导出到 Word', () => {
+  it('脚注写进 footnotes.xml，正文留下引用', async () => {
+    const html = '<p>甲<sup class="rte-footnote" data-fn-text="注文" data-fn-n="1">1</sup></p>'
+    const blob = await buildDocxBlob({ title: '注', bodyHtml: html })
+    const zip = await JSZip.loadAsync(await blob.arrayBuffer())
+    const notes = await zip.file('word/footnotes.xml')?.async('string')
+    const doc = await zip.file('word/document.xml')?.async('string')
+    expect(notes).toContain('注文')
+    expect(doc).toContain('footnoteReference')
+  })
+})
+
 describe('图片组导出到 Word', () => {
   it('两张及以上并排进同一行表格', async () => {
     const html =

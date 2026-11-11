@@ -125,6 +125,16 @@ export function tidyInlineText(input: string): TidyInline {
   return { text, spaces, punct, gap, invisible, edge }
 }
 
+function headingFontSize(node: PmNode): string {
+  let size = ''
+  node.descendants((child) => {
+    if (size || !child.isText) return
+    const mark = child.marks.find((item) => item.type.name === 'textStyle')
+    size = String(mark?.attrs?.fontSize || '')
+  })
+  return size
+}
+
 function headingNumbers(text: string): number[] | null {
   const matched = text.trim().match(/^(\d+(?:\.\d+)*)(?:[.、\s]|$)/)
   if (!matched) return null
@@ -179,6 +189,7 @@ export function deepOptimizeDocument(editor: Editor): DeepOptimizeResult {
   const hints: Hint[] = []
   let prevHeadingNo: number[] | null = null
   let prevLevel = 0
+  let lastHeadingFont = ''
 
   doc.descendants((node, pos) => {
     if (node.type.name === 'heading') {
@@ -194,6 +205,11 @@ export function deepOptimizeDocument(editor: Editor): DeepOptimizeResult {
         hints.push({ text: `标题编号从 ${prevHeadingNo.join('.')} 跳到 ${numbers.join('.')}`, pos })
       }
       if (numbers) prevHeadingNo = numbers
+      const headingFont = headingFontSize(node)
+      if (prevLevel === nextLevel && lastHeadingFont && headingFont && lastHeadingFont !== headingFont) {
+        hints.push({ text: '同级标题字号不一致', pos })
+      }
+      if (headingFont) lastHeadingFont = headingFont
       if (nextLevel !== level || node.attrs.textIndent) {
         if (node.attrs.textIndent) indentFixed += 1
         tr = tr.setNodeMarkup(pos, undefined, { ...node.attrs, level: nextLevel, textIndent: null })

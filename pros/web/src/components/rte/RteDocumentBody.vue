@@ -257,7 +257,18 @@ useParentScopeStamp()
     <div data-rte-own v-if="rte.suggesting && rte.viewMode === 'edit'" class="rte-suggest-bar" role="status">
       <span data-rte-own>建议模式</span>
       <span data-rte-own class="rte-suggest-author" :style="{ color: rte.suggestionColor(rte.rteAuthor().id) }">{{ rte.rteAuthor().name }}</span>
-      <span data-rte-own class="rte-suggest-count">{{ rte.suggestionRanges.length }} 条修订</span>
+      <span data-rte-own class="rte-suggest-count">{{ rte.visibleSuggestionRanges.length }} 条修订</span>
+      <select
+        v-if="rte.suggestionAuthors.length > 1"
+        data-rte-own
+        class="rte-suggest-author"
+        :value="rte.suggestionAuthorFilter"
+        aria-label="只看一位作者的修订"
+        @change="rte.suggestionAuthorFilter = ($event.target as HTMLSelectElement).value"
+      >
+        <option value="">全部作者</option>
+        <option v-for="name in rte.suggestionAuthors" :key="name" :value="name">{{ name }}</option>
+      </select>
       <button data-rte-own type="button" :disabled="!rte.activeSuggestionId" @click="rte.acceptActiveSuggestion">接受</button>
       <button data-rte-own type="button" :disabled="!rte.activeSuggestionId" @click="rte.rejectActiveSuggestion">拒绝</button>
       <button data-rte-own type="button" :disabled="!rte.suggestionRanges.length" @click="rte.acceptAllSuggestions">全部接受</button>
