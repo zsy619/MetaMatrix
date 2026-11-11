@@ -685,6 +685,7 @@ async function manualCheckpoint() {
   height: 100%;
   max-height: 100%;
   overflow: hidden;
+  background: #e6dfd4;
 }
 
 .topbar {
@@ -692,9 +693,10 @@ async function manualCheckpoint() {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 10px 16px;
-  background: #fff;
-  border-bottom: 1px solid #dadce0;
+  padding: 8px 18px;
+  background: rgba(255, 252, 247, 0.92);
+  border-bottom: 1px solid rgba(62, 48, 28, 0.08);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
 .brand {
@@ -722,11 +724,12 @@ async function manualCheckpoint() {
 
 .badge {
   font-size: 12px;
-  color: #1a73e8;
-  background: #e8f0fe;
-  padding: 2px 8px;
+  color: #1c4c7c;
+  background: #e8f1fa;
+  padding: 3px 10px;
   border-radius: 999px;
   white-space: nowrap;
+  letter-spacing: 0.02em;
 }
 
 .actions {

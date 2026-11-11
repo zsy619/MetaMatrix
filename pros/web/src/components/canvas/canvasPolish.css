@@ -1,0 +1,107 @@
+/* 画布页共用的纸面：标题、分色格子、拼合表格。选择器比各画布的 scoped 样式多一层，才能盖过格子原色。 */
+
+.canvas-viewport .sheet,
+.canvas-viewport .bmc,
+.canvas-viewport .kanban,
+.canvas-viewport .cash,
+.canvas-viewport .raci,
+.canvas-viewport .gantt,
+.canvas-viewport .fsx-canvas,
+.canvas-viewport .fsd-canvas {
+  padding: 18px 20px 20px;
+}
+
+.canvas-viewport .sheet-top h2,
+.canvas-viewport .bmc > h2,
+.canvas-viewport .kanban > h2,
+.canvas-viewport .cash-top h2,
+.canvas-viewport .raci-top h2,
+.canvas-viewport .gantt .title,
+.canvas-viewport .okr-title,
+.canvas-viewport .sheet-top .title {
+  font-size: 22px;
+  font-weight: 720;
+  letter-spacing: 0.01em;
+  line-height: 1.25;
+  color: var(--cv-ink-strong, #202124);
+}
+
+.canvas-viewport .sheet-top p,
+.canvas-viewport .cash-top p,
+.canvas-viewport .raci-top p {
+  max-width: 76ch;
+  margin-top: 4px;
+  color: #5c574e;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.canvas-viewport .sheet-top,
+.canvas-viewport .cash-top,
+.canvas-viewport .raci-top,
+.canvas-viewport .gantt-head {
+  margin-bottom: 14px;
+}
+
+.canvas-viewport .sheet section:not(.lean-cell):not(.side):not(.ring),
+.canvas-viewport .sheet article,
+.canvas-viewport .kanban section,
+.canvas-viewport .cash section {
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--col-header, #2a649f) 22%, #fff);
+  box-shadow:
+    0 1px 1px rgba(62, 48, 28, 0.04),
+    0 12px 28px rgba(62, 48, 28, 0.06);
+}
+
+.canvas-viewport .sheet h3:not(.side-title),
+.canvas-viewport .sheet h4,
+.canvas-viewport .cash h3,
+.canvas-viewport .kanban header,
+.canvas-viewport .bmc header,
+.canvas-viewport .sheet section:not(.ring) > header,
+.canvas-viewport .sheet .head {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--col-header, #2a649f) 70%, #fff),
+    var(--col-header, #2a649f)
+  );
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.16);
+}
+
+.canvas-viewport .sheet .ring h3 {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--ring, #a67c00) 72%, #fff),
+    var(--ring, #a67c00)
+  );
+}
+
+.canvas-viewport .lean-grid,
+.canvas-viewport .bmc-grid,
+.canvas-viewport .raci-sheet,
+.canvas-viewport .gantt .split,
+.canvas-viewport .sheet .table,
+.canvas-viewport .quadrant-grid {
+  border-radius: 16px;
+  box-shadow: 0 12px 32px rgba(62, 48, 28, 0.08);
+}
+
+.canvas-viewport .lean-grid,
+.canvas-viewport .bmc-grid,
+.canvas-viewport .raci-sheet,
+.canvas-viewport .sheet .table,
+.canvas-viewport .quadrant-grid {
+  overflow: hidden;
+}
+
+.canvas-viewport .kanban article {
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(62, 48, 28, 0.06), 0 8px 16px rgba(62, 48, 28, 0.04);
+}
+
+.canvas-viewport .sheet .results strong,
+.canvas-viewport .sheet .totals strong,
+.canvas-viewport .cash .net {
+  box-shadow: 0 1px 2px rgba(62, 48, 28, 0.06);
+}

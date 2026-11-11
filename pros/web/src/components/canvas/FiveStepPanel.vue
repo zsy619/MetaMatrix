@@ -330,7 +330,11 @@ function onCloseMaximize(event?: Event) {
   flex-shrink: 0;
   min-height: 40px;
   padding: 8px 36px;
-  background: var(--fsp-header);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--fsp-header) 74%, #fff),
+    var(--fsp-header)
+  );
   color: #fff;
   box-sizing: border-box;
 }

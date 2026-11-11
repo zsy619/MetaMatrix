@@ -539,14 +539,18 @@ const quadrantDoc = computed(() =>
   </div>
 </template>
 
+<style src="./canvasPolish.css"></style>
+
 <style scoped>
 .viewport-shell {
   width: 100%;
   height: 100%;
   min-height: 0;
   overflow: hidden;
-  background: #efecec;
-  padding: 12px;
+  background:
+    radial-gradient(980px 420px at 18% -10%, rgba(255, 252, 246, 0.7), transparent 58%),
+    #e6dfd4;
+  padding: 16px;
   box-sizing: border-box;
   display: flex;
 }
@@ -569,11 +573,14 @@ const quadrantDoc = computed(() =>
   height: 100%;
   min-width: min(var(--canvas-min-width, 640px), 100%);
   min-height: min(var(--canvas-min-height, 480px), 100%);
-  border-radius: 12px;
+  border-radius: 18px;
   overflow: hidden;
-  box-shadow: 0 8px 24px rgba(60, 50, 20, 0.08);
+  border: 1px solid rgba(62, 48, 28, 0.08);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.75),
+    0 18px 42px rgba(62, 48, 28, 0.14);
   transform-origin: center center;
-  background: #f7f7f7;
+  background: var(--cv-page, #f4f0e8);
 }
 
 .empty {

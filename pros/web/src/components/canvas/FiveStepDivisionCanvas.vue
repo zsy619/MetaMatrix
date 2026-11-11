@@ -71,7 +71,7 @@ const notes = computed(() =>
         :key="`h-${col.id}`"
         class="fsd-head"
         role="columnheader"
-        :style="{ background: fiveStepPalette(col.id).header }"
+        :style="{ '--col-header': fiveStepPalette(col.id).header }"
       >
         <h2>{{ col.header }}</h2>
       </header>
@@ -143,8 +143,10 @@ const notes = computed(() =>
   grid-template-rows: auto repeat(3, minmax(140px, 1fr)) auto;
   background: #fff;
   border: 1px solid var(--cv-frame, #ececec);
+  border-radius: 16px;
+  box-shadow: 0 12px 32px rgba(62, 48, 28, 0.08);
   box-sizing: border-box;
-  overflow: visible;
+  overflow: hidden;
 }
 
 .fsd-corner,
@@ -190,8 +192,13 @@ const notes = computed(() =>
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 44px;
+  min-height: 48px;
   padding: 8px 8px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--col-header, #2a649f) 72%, #fff),
+    var(--col-header, #2a649f)
+  );
 }
 
 .fsd-head h2 {
