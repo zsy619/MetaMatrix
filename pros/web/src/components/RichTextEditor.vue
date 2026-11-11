@@ -56,6 +56,7 @@ import {
 } from '../utils/rtePasteClean'
 import { todayIso } from '../utils/rteRound5'
 import { RTE_PAGE_SIZES } from '../utils/rtePageSize'
+import { applyAutoRuby } from '../utils/rteRuby'
 import {
   WRITING_PAPERS,
   readWritingPaper,
@@ -2625,6 +2626,21 @@ async function insertRubyAnnotation() {
   }
   ed.chain().focus().setRuby(ann.trim()).run()
   ElMessage.success('已添加注音')
+}
+
+function insertAutoRuby() {
+  const ed = editor.value
+  if (!ed) return
+  if (ed.state.selection.empty) {
+    ElMessage.info('请先选中要注音的文字')
+    return
+  }
+  const marked = applyAutoRuby(ed)
+  if (!marked) {
+    ElMessage.info('选区里没有可以自动注音的汉字')
+    return
+  }
+  ElMessage.success(`已为 ${marked} 个字自动加上拼音`)
 }
 
 function insertTimelineBlock() {
@@ -7309,10 +7325,19 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'ruby',
       label: '注音',
-      title: '注音 / 拼音（ruby）',
+      title: '手动填写注音，或按选中汉字自动加拼音',
       icon: 'あ',
       iconComp: ic('fontSize'),
-      run: () => { void insertRubyAnnotation() },
+      kind: 'presetMenu',
+      active: () => isActive('ruby'),
+      presetOptions: [
+        { id: 'manual', label: '手动填写' },
+        { id: 'auto', label: '自动注音' },
+      ],
+      applyPreset: (id: string) => {
+        if (id === 'auto') insertAutoRuby()
+        else void insertRubyAnnotation()
+      },
     },
     {
       key: 'timeline',
