@@ -72,6 +72,7 @@ interface Stroke {
   y1: number
   x2: number
   y2: number
+  color: string
 }
 
 const rootRef = ref<HTMLElement | null>(null)
@@ -94,13 +95,19 @@ function boxOf(el: Element, rootRect: DOMRect, sx: number, sy: number) {
   }
 }
 
-function parallel(a: Pt, b: Pt, dist: number): Stroke {
+function pair(a: Pt, b: Pt, color: string): Stroke[] {
   const dx = b.x - a.x
   const dy = b.y - a.y
   const len = Math.hypot(dx, dy) || 1
-  const ox = (-dy / len) * dist
-  const oy = (dx / len) * dist
-  return { x1: a.x + ox, y1: a.y + oy, x2: b.x + ox, y2: b.y + oy }
+  const ox = (-dy / len) * 3.5
+  const oy = (dx / len) * 3.5
+  return [-1, 1].map((side) => ({
+    x1: a.x + ox * side,
+    y1: a.y + oy * side,
+    x2: b.x + ox * side,
+    y2: b.y + oy * side,
+    color,
+  }))
 }
 
 function measure() {
@@ -125,14 +132,10 @@ function measure() {
   const rightTip = { x: right.cx, y: right.cy }
   const stemTop = { x: fork.cx, y: fork.bottom + 8 }
   const stemEnd = { x: fork.cx, y: Math.max(stem.top - 8, stemTop.y + 24) }
-  const gap = 3.5
   strokes.value = [
-    parallel(leftTip, joint, -gap),
-    parallel(leftTip, joint, gap),
-    parallel(rightTip, joint, -gap),
-    parallel(rightTip, joint, gap),
-    parallel(stemTop, stemEnd, -gap),
-    parallel(stemTop, stemEnd, gap),
+    ...pair(leftTip, joint, '#A67C00'),
+    ...pair(rightTip, joint, '#0E8A84'),
+    ...pair(stemTop, stemEnd, '#2A649F'),
   ]
 }
 
@@ -160,27 +163,34 @@ watch(centerBlank, () => nextTick(measure))
 <template>
   <div class="y-model-canvas" :style="chrome" aria-label="一堂Y模型">
     <div ref="rootRef" class="ym-sheet">
+    <ol class="path">
+      <li class="path-1"><b>1</b>先写问题</li>
+      <li class="path-2"><b>2</b>收成认知</li>
+      <li class="path-theory"><b>3</b>理论校正</li>
+      <li class="path-facts"><b>3</b>事实检验</li>
+      <li class="path-4"><b>4</b>配上工具</li>
+    </ol>
     <div class="ym-grid">
-      <span class="step step-3">{{ labels.step3 }}</span>
-      <div class="cell cell-existing">
+      <span class="step step-3"><b>3</b>校正</span>
+      <div class="cell cell-existing lane-theory">
         <YModelBlockCard v-if="block('theory_existing')" editor="card" :block="block('theory_existing')!" />
       </div>
       <h2 class="word word-theory">{{ labels.theory }}</h2>
-      <div class="cell cell-build">
+      <div class="cell cell-build lane-theory">
         <YModelBlockCard v-if="block('theory_build')" editor="card" :block="block('theory_build')!" />
       </div>
-      <div class="cell cell-hypothesis">
+      <div class="cell cell-hypothesis lane-facts">
         <YModelBlockCard v-if="block('facts_hypothesis')" editor="card" :block="block('facts_hypothesis')!" />
       </div>
       <h2 class="word word-facts">{{ labels.facts }}</h2>
-      <div class="cell cell-analysis">
+      <div class="cell cell-analysis lane-facts">
         <YModelBlockCard v-if="block('facts_analysis')" editor="card" :block="block('facts_analysis')!" />
       </div>
 
       <span class="tip tip-left" data-ym="left-tip"></span>
       <span class="tip tip-right" data-ym="right-tip"></span>
 
-      <span class="step step-2">{{ labels.step2 }}</span>
+      <span class="step step-2"><b>2</b>认知</span>
       <div class="hub" data-ym="fork">
         <span class="hub-prefix">{{ centerPrefix }}</span>
         <input
@@ -193,33 +203,28 @@ watch(centerBlank, () => nextTick(measure))
         />
         <span class="hub-suffix">{{ centerSuffix }}</span>
       </div>
-      <div class="cell cell-cause">
+      <div class="cell cell-cause lane-mind">
         <YModelBlockCard v-if="block('cognition_cause')" editor="card" :block="block('cognition_cause')!" />
       </div>
 
-      <div class="cell cell-effect">
+      <div class="cell cell-effect lane-mind">
         <YModelBlockCard v-if="block('cognition_effect')" editor="card" :block="block('cognition_effect')!" />
       </div>
 
-      <span class="step step-1">{{ labels.step1 }}</span>
-      <div class="cell cell-problem" data-ym="stem">
+      <span class="step step-1"><b>1</b>问题</span>
+      <div class="cell cell-problem lane-problem" data-ym="stem">
         <YModelBlockCard v-if="block('scope') || block('problem')" editor="card" :block="(block('scope') || block('problem'))!" />
       </div>
     </div>
 
     <section class="ym-tools" :aria-label="labels.step4">
-      <span class="step">{{ labels.step4 }}</span>
-      <div class="cell">
+      <span class="step step-4"><b>4</b>工具</span>
+      <div class="cell lane-tools">
         <YModelBlockCard v-if="block('tools')" editor="card" :block="block('tools')!" />
       </div>
     </section>
 
     <svg class="ym-links" :viewBox="`0 0 ${vb.w} ${vb.h}`" aria-hidden="true">
-      <defs>
-        <marker id="ym-head" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto">
-          <path d="M0 0 L8 4 L0 8 Z" fill="#6b645c" />
-        </marker>
-      </defs>
       <line
         v-for="(ln, index) in strokes"
         :key="index"
@@ -227,11 +232,9 @@ watch(centerBlank, () => nextTick(measure))
         :y1="ln.y1"
         :x2="ln.x2"
         :y2="ln.y2"
-        stroke="#6b645c"
-        stroke-width="1.6"
+        :stroke="ln.color"
+        stroke-width="2"
         stroke-linecap="round"
-        marker-start="url(#ym-head)"
-        marker-end="url(#ym-head)"
       />
     </svg>
     </div>
@@ -260,6 +263,50 @@ watch(centerBlank, () => nextTick(measure))
   flex-direction: column;
 }
 
+.path {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.path li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.path b {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 12px;
+}
+
+.path-1 { color: #84344c; }
+.path-1 b { background: #a84562; }
+.path-2 { color: #1c4c7c; }
+.path-2 b { background: #2a649f; }
+.path-theory { color: #7a5c00; }
+.path-theory b { background: #a67c00; }
+.path-facts { color: #0b6b66; }
+.path-facts b { background: #0e8a84; }
+.path-4 { color: #125c3b; }
+.path-4 b { background: #187a4e; }
+
 .ym-grid {
   position: relative;
   z-index: 1;
@@ -267,18 +314,42 @@ watch(centerBlank, () => nextTick(measure))
   min-height: 680px;
   min-width: 980px;
   display: grid;
-  grid-template-columns: 64px minmax(180px, 1.15fr) auto minmax(140px, 0.8fr) minmax(140px, 0.8fr) auto minmax(180px, 1.15fr) minmax(180px, 0.95fr);
+  grid-template-columns: 76px minmax(180px, 1.15fr) auto minmax(140px, 0.8fr) minmax(140px, 0.8fr) auto minmax(180px, 1.15fr) minmax(200px, 0.95fr);
   grid-template-rows: 96px minmax(150px, 1fr) auto minmax(110px, 0.7fr) auto;
   gap: 12px 14px;
   align-items: stretch;
 }
 
 .step {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   color: #5f6368;
-  font-size: 16px;
-  font-weight: 650;
+  font-size: 13px;
+  font-weight: 700;
   align-self: center;
+  white-space: nowrap;
 }
+
+.step b {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 12px;
+}
+
+.step-1 { color: #84344c; }
+.step-1 b { background: #a84562; }
+.step-2 { color: #1c4c7c; }
+.step-2 b { background: #2a649f; }
+.step-3 { color: #7a5c00; }
+.step-3 b { background: #a67c00; }
+.step-4 { color: #125c3b; }
+.step-4 b { background: #187a4e; }
 
 .step-3 { grid-column: 1; grid-row: 2; }
 .step-2 { grid-column: 1; grid-row: 3; }
@@ -294,8 +365,8 @@ watch(centerBlank, () => nextTick(measure))
   white-space: nowrap;
 }
 
-.word-theory { grid-column: 3; grid-row: 2; justify-self: end; }
-.word-facts { grid-column: 6; grid-row: 2; justify-self: start; }
+.word-theory { grid-column: 3; grid-row: 2; justify-self: end; color: #7a5c00; }
+.word-facts { grid-column: 6; grid-row: 2; justify-self: start; color: #0b6b66; }
 
 .cell { min-width: 0; min-height: 0; display: flex; }
 .cell :deep(.ym-block) { width: 100%; height: 100%; }
@@ -322,6 +393,17 @@ watch(centerBlank, () => nextTick(measure))
   background: transparent;
 }
 .cell :deep(.pa-root:has(.pa-empty)) { display: none; }
+
+.lane-theory :deep(.ym-block--card) { border-color: #c4a35a; background: #fffdf6; }
+.lane-theory :deep(.ym-block-title) { color: #7a5c00; }
+.lane-facts :deep(.ym-block--card) { border-color: #7ec8c4; background: #f4fbfa; }
+.lane-facts :deep(.ym-block-title) { color: #0b6b66; }
+.lane-mind :deep(.ym-block--card) { border-color: #9bb6d6; background: #f5f8fc; }
+.lane-mind :deep(.ym-block-title) { color: #1c4c7c; }
+.lane-problem :deep(.ym-block--card) { border-color: #d7a3b4; background: #fff7f9; }
+.lane-problem :deep(.ym-block-title) { color: #84344c; }
+.lane-tools :deep(.ym-block--card) { border-color: #8fbfa4; background: #fff; }
+.lane-tools :deep(.ym-block-title) { color: #125c3b; }
 
 .cell-existing { grid-column: 2; grid-row: 2; }
 .cell-build { grid-column: 4; grid-row: 1; }
@@ -376,7 +458,9 @@ watch(centerBlank, () => nextTick(measure))
   z-index: 1;
   flex: none;
   display: grid;
-  grid-template-columns: 64px minmax(0, 1fr);
+  grid-template-columns: 76px minmax(0, 1fr);
+  border: 1px solid #cfe3d6;
+  border-radius: 12px;
   gap: 12px;
   align-items: stretch;
   min-height: 120px;
