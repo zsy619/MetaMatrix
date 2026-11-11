@@ -17,6 +17,12 @@ export const CommentAnchor = Mark.create({
 
   addAttributes() {
     return {
+      resolved: {
+        default: false,
+        parseHTML: (element: HTMLElement) => element.getAttribute('data-resolved') === 'true',
+        renderHTML: (attributes: { resolved?: boolean }) =>
+          attributes.resolved ? { 'data-resolved': 'true' } : {},
+      },
       threadId: {
         default: '',
         parseHTML: (element: HTMLElement) => element.getAttribute('data-comment-thread') || '',

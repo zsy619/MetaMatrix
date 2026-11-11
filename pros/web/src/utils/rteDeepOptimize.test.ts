@@ -4,7 +4,8 @@ import { Editor } from '@tiptap/core'
 import StarterKit from '@tiptap/starter-kit'
 import { ParagraphAttrs } from '../extensions/paragraphAttrs'
 import { RteImage } from '../extensions/rteImage'
-import { deepOptimizeDocument, tidyInlineText } from './rteDeepOptimize'
+import { breaksEmptyParagraphRun, deepOptimizeDocument, tidyInlineText, unpairedQuoteHint } from './rteDeepOptimize'
+import { applyCaseToSelection } from '../components/rteWave20'
 import { filterFindMatches } from './rteFindReplace'
 
 let editor: Editor | undefined
@@ -50,6 +51,23 @@ describe('行内整理', () => {
     expect(() => deepOptimizeDocument(ed)).not.toThrow()
     expect(ed.getText()).toContain('留')
     expect(ed.getText().replace(/\s/g, '')).toBe('留')
+  })
+
+  it('引号不成对只提示，分页符会打断空段合并', () => {
+    expect(unpairedQuoteHint('他说「你好')).toContain('引号不成对')
+    expect(unpairedQuoteHint('他说「你好」')).toBeNull()
+    expect(breaksEmptyParagraphRun('pageBreak')).toBe(true)
+    expect(breaksEmptyParagraphRun('paragraph')).toBe(false)
+  })
+
+  it('大小写转换跳过链接和代码', () => {
+    const ed = makeEditor('<p>Hello <a href="https://a.com">Link</a> <code>Code</code></p>')
+    ed.commands.setTextSelection({ from: 1, to: ed.state.doc.content.size - 1 })
+    applyCaseToSelection(ed, 'upper')
+    const text = ed.getText()
+    expect(text).toContain('HELLO')
+    expect(text).toContain('Link')
+    expect(text).toContain('Code')
   })
 
   it('汉字旁边的省略号和破折号收成中文形式', () => {

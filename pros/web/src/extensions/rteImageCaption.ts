@@ -22,7 +22,17 @@ function captionHost(view: EditorView, pos: number): HTMLElement | null {
   return dom.parentElement
 }
 
+function markBrokenImages(view: EditorView) {
+  view.dom.querySelectorAll('img.rte-image').forEach((node) => {
+    if (!(node instanceof HTMLImageElement) || node.dataset.brokenBound) return
+    node.dataset.brokenBound = '1'
+    node.addEventListener('error', () => node.classList.add('is-broken'))
+    if (node.complete && node.naturalWidth === 0 && node.src) node.classList.add('is-broken')
+  })
+}
+
 function paintCaptions(view: EditorView) {
+  markBrokenImages(view)
   const editing = editingSet(view)
   view.dom.querySelectorAll('.rte-image-caption-inline').forEach((node) => {
     if (editing.has(Number((node as HTMLElement).dataset.pos))) return

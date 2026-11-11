@@ -665,6 +665,16 @@ const editor = useEditor({
         event.preventDefault()
         return true
       }
+      if (key === 'arrowup' && event.altKey && !event.shiftKey) {
+        event.preventDefault()
+        const { from } = ed.state.selection
+        let headingPos: number | null = null
+        ed.state.doc.descendants((node, pos) => {
+          if (node.type.name === 'heading' && pos <= from) headingPos = pos
+        })
+        if (headingPos != null) ed.chain().focus().setTextSelection(headingPos + 1).run()
+        return true
+      }
       if (key === '/' && !event.altKey && !event.shiftKey) {
         event.preventDefault()
         const willOpen = !shortcutsOpen.value

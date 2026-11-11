@@ -302,6 +302,15 @@ export const EchartsBlock = Node.create({
         watchDark()
         // 无障碍摘要：先更新，option 解析失败时也要把摘要清空
         a11ySummary = applyChartA11y(previewEl, a11yEl, effective)
+        const series = (effective as { series?: unknown }).series
+        const seriesList = Array.isArray(series) ? series : series ? [series] : []
+        const emptyChart = parsed.ok && !remoteOption && !seriesList.length
+        if (emptyChart) {
+          chart?.dispose()
+          chart = null
+          previewEl.textContent = '还没有图表数据'
+          return
+        }
         if (!parsed.ok) {
           chart?.dispose()
           chart = null

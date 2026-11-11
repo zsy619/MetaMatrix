@@ -135,8 +135,25 @@ export function useCommentThreads(deps: {
     replyDrafts.value = { ...replyDrafts.value, [threadId]: '' }
   }
 
+  function setAnchorResolved(threadId: string, resolved: boolean) {
+    const ed = deps.editor().value
+    const type = ed?.schema.marks.commentAnchor
+    if (!ed || !type) return
+    let tr = ed.state.tr
+    ed.state.doc.descendants((node, pos) => {
+      if (!node.isText) return
+      const mark = node.marks.find((item) => item.type === type && item.attrs.threadId === threadId)
+      if (!mark || Boolean(mark.attrs.resolved) === resolved) return
+      tr = tr.removeMark(pos, pos + node.nodeSize, mark)
+      tr = tr.addMark(pos, pos + node.nodeSize, type.create({ ...mark.attrs, resolved }))
+    })
+    if (tr.docChanged) ed.view.dispatch(tr)
+  }
+
   function toggleResolved(thread: CommentThread) {
-    persist(setThreadResolved(threads.value, thread.id, !thread.resolved))
+    const next = !thread.resolved
+    persist(setThreadResolved(threads.value, thread.id, next))
+    setAnchorResolved(thread.id, next)
   }
 
   function removeMessage(threadId: string, messageId: string) {

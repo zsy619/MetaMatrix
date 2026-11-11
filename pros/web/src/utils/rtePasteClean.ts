@@ -195,6 +195,9 @@ function rebuildPasted(node: Node, doc: Document): Node | null {
       const span = Number(raw)
       if (raw && Number.isInteger(span) && span > 1 && span <= 50) parent.setAttribute(name, String(span))
     }
+    const bg = el.getAttribute('bgcolor') || el.style?.backgroundColor || ''
+    const hex = bg.match(/#(?:[0-9a-f]{3}|[0-9a-f]{6})\b/i)?.[0]
+    if (hex) parent.setAttribute('data-bg', hex)
   }
   if (parent && tag === 'code') {
     const lang = [...el.classList].find((name) => /^language-[\w-]+$/i.test(name) && !/mso/i.test(name))
@@ -250,6 +253,12 @@ export function sanitizePastedHtml(html: string): string {
     const lang = value.match(/language-[\w-]+/i)?.[0]
     if (lang && !/mso/i.test(value)) return ` class="${lang}"`
     return ''
+  })
+  out = out.replace(/<(td|th)\b([^>]*)>/gi, (all, tag: string, attrs: string) => {
+    if (/data-bg=/i.test(attrs)) return all
+    const bg = /bgcolor\s*=\s*["']?(#[0-9a-f]{3,8})/i.exec(attrs)?.[1]
+    if (!bg) return all
+    return `<${tag}${attrs} data-bg="${bg}">`
   })
   out = out
     .replace(/style\s*=\s*"[^"]*mso-[^"]*"/gi, '')

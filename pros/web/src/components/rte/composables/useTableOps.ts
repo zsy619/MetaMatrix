@@ -1,5 +1,5 @@
 import { computed, nextTick, ref, watch, type ShallowRef } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import type { Editor } from '@tiptap/core'
 import { moveTableGridHover, TABLE_QUICK_COLS, TABLE_QUICK_ROWS } from '../../../utils/rteTableGrid'
 import {
@@ -440,8 +440,33 @@ function tableToggleHeaderRow() {
 function tableToggleHeaderColumn() {
   runTableCommand(() => deps.editor().value!.chain().focus().toggleHeaderColumn().run())
 }
-function tableDeleteTable() {
-  runTableCommand(() => deps.editor().value!.chain().focus().deleteTable().run())
+async function tableDeleteTable() {
+  const ed = deps.editor().value
+  if (!ed || !isInTable()) {
+    ElMessage.info('请将光标放在表格中')
+    return
+  }
+  let rows = 0
+  let cols = 0
+  const { $from } = ed.state.selection
+  for (let depth = $from.depth; depth > 0; depth -= 1) {
+    const node = $from.node(depth)
+    if (node.type.name !== 'table') continue
+    rows = node.childCount
+    cols = node.firstChild?.childCount || 0
+    break
+  }
+  try {
+    await ElMessageBox.confirm(`将删除这个 ${rows} 行 ${cols} 列的表格。`, '删除表格', {
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+      type: 'warning',
+    })
+  } catch {
+    return
+  }
+  ed.chain().focus().deleteTable().run()
+  closeAllTableUi()
 }
 function tableClearCellFormat() {
   const ed = deps.editor().value

@@ -3212,6 +3212,11 @@
   border-bottom: 2px solid #f7ba1e;
   border-radius: 2px;
 }
+.rte-root :deep(.rte-comment-anchor[data-resolved='true']) {
+  background: transparent;
+  border-bottom-color: transparent;
+  opacity: 0.55;
+}
 .rte-root.mode-preview :deep(.rte-suggestion-delete),
 .rte-root.rte-printing :deep(.rte-suggestion-delete),
 .rte-root.is-preview :deep(.rte-suggestion-delete) {

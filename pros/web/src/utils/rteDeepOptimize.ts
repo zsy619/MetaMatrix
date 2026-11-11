@@ -34,6 +34,33 @@ function isEmptyParagraph(node: PmNode): boolean {
   return node.type.name === 'paragraph' && node.content.size === 0
 }
 
+/** 分页符、分栏、表格和图片旁边的空段单独保留，不并进连续空段。 */
+export function breaksEmptyParagraphRun(typeName: string): boolean {
+  return (
+    typeName === 'pageBreak' ||
+    typeName === 'columns' ||
+    typeName === 'horizontalRule' ||
+    typeName === 'image' ||
+    typeName === 'imageGroup' ||
+    typeName === 'table'
+  )
+}
+
+/** 中文引号两边数量不一致时给出提示，不改原文。 */
+export function unpairedQuoteHint(text: string): string | null {
+  const pairs: Array<[string, string]> = [
+    ['「', '」'],
+    ['『', '』'],
+    ['“', '”'],
+  ]
+  for (const [open, close] of pairs) {
+    const left = text.split(open).length - 1
+    const right = text.split(close).length - 1
+    if (left !== right) return `引号不成对：${text.trim().slice(0, 24)}`
+  }
+  return null
+}
+
 function inSkippedIndent(doc: PmNode, pos: number, name: string): boolean {
   if (name === 'heading' || name === 'codeBlock') return true
   const $pos = doc.resolve(pos)
@@ -294,6 +321,8 @@ export function deepOptimizeDocument(editor: Editor): DeepOptimizeResult {
       tr = tr.addMark(pos, pos + node.nodeSize, link.type.create({ ...link.attrs, href: href.trim() }))
     }
     if (!skipInlineTidy(doc, pos, node)) {
+      const quoteHint = unpairedQuoteHint(node.text)
+      if (quoteHint) hints.push({ text: quoteHint, pos })
       const tidy = tidyInlineText(node.text)
       if (tidy.text !== node.text) {
         if (tidy.spaces) spacesFixed += 1
@@ -330,7 +359,8 @@ export function deepOptimizeDocument(editor: Editor): DeepOptimizeResult {
     }
     node.forEach((child, offset) => {
       const childPos = pos + 1 + offset
-      if (isEmptyParagraph(child)) run.push({ from: childPos, to: childPos + child.nodeSize })
+      if (breaksEmptyParagraphRun(child.type.name)) flush()
+      else if (isEmptyParagraph(child)) run.push({ from: childPos, to: childPos + child.nodeSize })
       else flush()
       if (child.childCount) visit(child, childPos)
     })

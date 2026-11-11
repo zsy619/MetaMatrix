@@ -733,18 +733,22 @@ export const ImageGroup = Node.create({
               if (typeof pos !== 'number') return
               const live = editor.state.doc.nodeAt(pos)
               if (!live) return
+              const missing: number[] = []
               let cursor = pos + 1
-              let target: number | null = null
               live.forEach((child) => {
-                if (target == null && child.type.name === 'image' && !String(child.attrs.alt || '').trim()) target = cursor
+                if (child.type.name === 'image' && !String(child.attrs.alt || '').trim()) missing.push(cursor)
                 cursor += child.nodeSize
               })
-              if (target != null) editor.chain().focus().setNodeSelection(target).run()
+              if (!missing.length) return
+              const previous = Number(altBtn?.dataset.cursor || '-1')
+              const next = missing.find((item) => item > previous) ?? missing[0]!
+              if (altBtn) altBtn.dataset.cursor = String(next)
+              editor.chain().focus().setNodeSelection(next).run()
             })
             bar.appendChild(altBtn)
           }
           altBtn.textContent = `缺${missingAlt}`
-          altBtn.title = '有图片还没有替代文本，点击选中第一张'
+          altBtn.title = '有图片还没有替代文本，点击逐张跳转'
           altBtn.setAttribute('aria-label', altBtn.title)
         } else {
           altBtn?.remove()
