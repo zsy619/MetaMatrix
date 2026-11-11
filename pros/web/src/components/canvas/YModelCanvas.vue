@@ -7,7 +7,6 @@ import type {
   YModelDocumentJSON,
 } from '../../types/canvas'
 import { useDocumentStore } from '../../stores/document'
-import { FIVE_STEP_PALETTE } from './fiveStepPalette'
 import YModelBlockCard from './YModelBlock.vue'
 
 const props = defineProps<{
@@ -48,91 +47,75 @@ const centerBlank = computed({
 const labels = computed(() => {
   const l = props.doc.labels
   return {
-    pageTitle: l.pageTitle || '一堂Y模型：无限进步画布',
     theory: l.theory || '理论',
     facts: l.facts || '事实',
-    unity: l.unity || '知行合一',
     step1: l.step1 || 'Step1',
     step2: l.step2 || 'Step2',
     step3: l.step3 || 'Step3',
     step4: l.step4 || 'Step4',
-    arrowTheoryOut: l.arrowTheoryOut || '提炼建模',
-    arrowFactsOut: l.arrowFactsOut || '假设驱动',
   }
 })
 </script>
 
 <template>
   <div class="y-model-canvas" :style="chrome" aria-label="一堂Y模型">
-    <header class="ym-lead">
-      <div>
-        <h2>{{ labels.pageTitle }}</h2>
-        <p>从最底下的问题写起。中间写成你的认知，左边用理论校正，右边用事实检验，最后配上能执行的工具。</p>
-      </div>
-      <ol class="ym-steps">
-        <li><b>{{ labels.step1 }}</b>写问题</li>
-        <li><b>{{ labels.step2 }}</b>写认知</li>
-        <li><b>{{ labels.step3 }}</b>校正</li>
-        <li><b>{{ labels.step4 }}</b>配工具</li>
-      </ol>
-    </header>
-
-    <div class="ym-board">
-      <h3 class="arm-label arm-label--theory">{{ labels.theory }} · {{ labels.arrowTheoryOut }}</h3>
-      <h3 class="arm-label arm-label--facts">{{ labels.facts }} · {{ labels.arrowFactsOut }}</h3>
-
-      <div class="cell cell-existing lane-theory">
-        <YModelBlockCard v-if="block('theory_existing')" editor="card" :accent="FIVE_STEP_PALETTE.demand.header" :block="block('theory_existing')!" />
-      </div>
-      <div class="cell cell-build lane-theory">
-        <YModelBlockCard v-if="block('theory_build')" editor="card" :accent="FIVE_STEP_PALETTE.demand.header" :block="block('theory_build')!" />
+    <div class="ym-stage">
+      <div class="y-mark" aria-hidden="true">
+        <span class="y-arm y-arm-left"></span>
+        <span class="y-arm y-arm-right"></span>
+        <span class="y-stem-line"></span>
       </div>
 
-      <section class="hub" aria-label="我的认知">
-        <span class="step-tag">{{ labels.step2 }}</span>
-        <div class="hub-title-row">
-          <span class="hub-prefix">{{ centerPrefix }}</span>
-          <input
-            v-model="centerBlank"
-            class="hub-blank"
-            type="text"
-            maxlength="24"
-            placeholder="领域"
-            aria-label="填写认知领域"
-          />
-          <span class="hub-suffix">{{ centerSuffix }}</span>
-        </div>
-        <p class="hub-note">{{ labels.unity }}。两边的格子往这里汇合。</p>
-      </section>
+      <span class="step step-3">{{ labels.step3 }}</span>
+      <h2 class="arm arm-theory">{{ labels.theory }}</h2>
+      <h2 class="arm arm-facts">{{ labels.facts }}</h2>
 
-      <div class="cell cell-hypothesis lane-facts">
-        <YModelBlockCard v-if="block('facts_hypothesis')" editor="card" :accent="FIVE_STEP_PALETTE.solution.header" :block="block('facts_hypothesis')!" />
+      <div class="slot slot-existing">
+        <YModelBlockCard v-if="block('theory_existing')" editor="card" :block="block('theory_existing')!" />
       </div>
-      <div class="cell cell-analysis lane-facts">
-        <YModelBlockCard v-if="block('facts_analysis')" editor="card" :accent="FIVE_STEP_PALETTE.solution.header" :block="block('facts_analysis')!" />
+      <div class="slot slot-build">
+        <YModelBlockCard v-if="block('theory_build')" editor="card" :block="block('theory_build')!" />
+      </div>
+      <div class="slot slot-hypothesis">
+        <YModelBlockCard v-if="block('facts_hypothesis')" editor="card" :block="block('facts_hypothesis')!" />
+      </div>
+      <div class="slot slot-analysis">
+        <YModelBlockCard v-if="block('facts_analysis')" editor="card" :block="block('facts_analysis')!" />
       </div>
 
-      <div class="cell cell-cause lane-mind">
-        <YModelBlockCard v-if="block('cognition_cause')" editor="card" :accent="FIVE_STEP_PALETTE.business.header" :block="block('cognition_cause')!" />
+      <div class="hub">
+        <span class="hub-prefix">{{ centerPrefix }}</span>
+        <input
+          v-model="centerBlank"
+          class="hub-blank"
+          type="text"
+          maxlength="12"
+          placeholder="____"
+          aria-label="填写认知领域"
+        />
+        <span class="hub-suffix">{{ centerSuffix }}</span>
       </div>
-      <div class="cell cell-effect lane-mind">
-        <YModelBlockCard v-if="block('cognition_effect')" editor="card" :accent="FIVE_STEP_PALETTE.business.header" :block="block('cognition_effect')!" />
+      <span class="step step-2">{{ labels.step2 }}</span>
+      <span class="step step-1">{{ labels.step1 }}</span>
+
+      <div class="slot slot-cause">
+        <YModelBlockCard v-if="block('cognition_cause')" editor="card" :block="block('cognition_cause')!" />
+      </div>
+      <div class="slot slot-effect">
+        <YModelBlockCard v-if="block('cognition_effect')" editor="card" :block="block('cognition_effect')!" />
       </div>
 
-      <section class="band band-problem">
-        <span class="step-tag">{{ labels.step1 }}</span>
-        <div class="cell lane-problem">
-          <YModelBlockCard v-if="block('scope') || block('problem')" editor="card" :accent="FIVE_STEP_PALETTE.moat.header" :block="(block('scope') || block('problem'))!" />
-        </div>
-      </section>
-
-      <section class="band band-tools">
-        <span class="step-tag">{{ labels.step4 }}</span>
-        <div class="cell lane-tools">
-          <YModelBlockCard v-if="block('tools')" editor="card" :accent="FIVE_STEP_PALETTE.growth.header" :block="block('tools')!" />
-        </div>
-      </section>
+      <div class="slot slot-problem">
+        <YModelBlockCard v-if="block('scope') || block('problem')" editor="card" :block="(block('scope') || block('problem'))!" />
+      </div>
     </div>
+
+    <section class="ym-tools" :aria-label="labels.step4">
+      <span class="step">{{ labels.step4 }}</span>
+      <div class="slot slot-tools">
+        <YModelBlockCard v-if="block('tools')" editor="card" :block="block('tools')!" />
+      </div>
+    </section>
   </div>
 </template>
 
@@ -141,231 +124,155 @@ const labels = computed(() => {
   position: absolute;
   inset: 0;
   z-index: 10;
-  overflow: hidden;
   box-sizing: border-box;
-  padding: 14px 16px 16px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  min-height: 0;
+  padding: 12px 16px 14px;
   color: #202124;
 }
 
-.ym-lead {
-  flex: none;
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  align-items: flex-end;
-}
-
-.ym-lead h2,
-.ym-lead p {
-  margin: 0;
-}
-
-.ym-lead h2 {
-  font-size: 20px;
-  letter-spacing: 0.01em;
-}
-
-.ym-lead p {
-  margin-top: 4px;
-  max-width: 62ch;
-  color: #5c574e;
-  font-size: 13px;
-  line-height: 1.5;
-}
-
-.ym-steps {
-  display: flex;
-  gap: 8px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  flex-shrink: 0;
-}
-
-.ym-steps li {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.72);
-  color: #3c4043;
-  font-size: 12px;
-  white-space: nowrap;
-}
-
-.ym-steps b {
-  color: #1c4c7c;
-  font-weight: 700;
-}
-
-.ym-board {
+.ym-stage {
+  position: relative;
   flex: 1 1 auto;
   min-height: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(168px, 0.9fr) minmax(0, 1fr) minmax(0, 1fr);
-  grid-template-rows: auto minmax(0, 1.05fr) minmax(0, 0.9fr) minmax(120px, 0.82fr) minmax(108px, 0.74fr);
-  gap: 10px 8px;
 }
 
-.arm-label {
+.step {
+  position: absolute;
+  z-index: 2;
+  color: #5f6368;
+  font-size: clamp(14px, 1.5vw, 18px);
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+
+.step-3 { left: 0.5%; top: 30%; }
+.step-2 { left: 14%; top: 46%; }
+.step-1 { left: 18%; top: 78%; }
+
+.arm {
+  position: absolute;
+  z-index: 2;
   margin: 0;
-  align-self: end;
-  font-size: 13px;
-  letter-spacing: 0.08em;
+  font-size: clamp(22px, 2.4vw, 32px);
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  line-height: 1;
 }
 
-.arm-label--theory {
-  grid-column: 1 / 3;
-  color: #7a5c00;
-}
+.arm-theory { left: 24%; top: 12%; }
+.arm-facts { left: 64%; top: 12%; }
 
-.arm-label--facts {
-  grid-column: 4 / 6;
-  color: #0b6b66;
-  text-align: right;
+.y-mark { position: absolute; inset: 0; pointer-events: none; }
+.y-arm,
+.y-stem-line {
+  position: absolute;
+  background: transparent;
+  border-left: 2px solid #6b645c;
+  box-shadow: 7px 0 0 #6b645c;
 }
+.y-arm { width: 0; height: 26%; top: 13%; left: calc(50% - 4px); transform-origin: bottom center; }
+.y-arm-left { transform: rotate(-34deg); }
+.y-arm-right { transform: rotate(34deg); }
+.y-stem-line { left: calc(50% - 4px); top: 54%; height: 20%; }
 
-.cell {
+.slot {
+  position: absolute;
+  z-index: 2;
   min-width: 0;
   min-height: 0;
   display: flex;
 }
 
-.cell :deep(.ym-block) {
-  flex: 1;
-  min-height: 0;
-  background: rgba(255, 255, 255, 0.94);
+.slot :deep(.ym-block) {
+  width: 100%;
+  height: 100%;
 }
 
-.cell-existing { grid-column: 1; grid-row: 2; }
-.cell-build { grid-column: 2; grid-row: 2; }
-.cell-hypothesis { grid-column: 4; grid-row: 2; }
-.cell-analysis { grid-column: 5; grid-row: 2; }
-.cell-cause { grid-column: 1 / 3; grid-row: 3; }
-.cell-effect { grid-column: 4 / 6; grid-row: 3; }
+.slot :deep(.ym-block--card) {
+  border-radius: 2px;
+  border: 1.5px dashed #b7b1a8;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: none;
+}
+
+.slot :deep(.ym-block--card .ym-block-header) {
+  min-height: 28px;
+  padding: 4px 8px;
+  background: transparent;
+  color: #8b9096;
+}
+
+.slot :deep(.ym-block--card .ym-block-title) {
+  color: #8b9096;
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0;
+}
+
+.slot :deep(.ym-block--card .pm-max-btn) {
+  color: #5f6368;
+  background: transparent;
+}
+
+.slot :deep(.pa-root:has(.pa-empty)) { display: none; }
+
+.slot-existing { left: 5%; top: 20%; width: 20%; height: 28%; }
+.slot-build { left: 36%; top: 0; width: 13%; height: 14%; }
+.slot-hypothesis { left: 49.5%; top: 0; width: 13%; height: 14%; }
+.slot-analysis { left: 75%; top: 20%; width: 20%; height: 28%; }
+.slot-cause { left: 63%; top: 46%; width: 22%; height: 16%; }
+.slot-effect { left: 67%; top: 66%; width: 22%; height: 16%; }
+.slot-problem { left: 30%; top: 76%; width: 26%; height: 16%; }
 
 .hub {
-  grid-column: 3;
-  grid-row: 2 / 4;
+  position: absolute;
+  z-index: 3;
+  left: 22%;
+  top: 40%;
+  width: 42%;
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  text-align: center;
-  padding: 12px 10px;
-  border-radius: 16px;
-  background:
-    linear-gradient(#f7f4ee, #f7f4ee) padding-box,
-    linear-gradient(180deg, #a67c00, #1c4c7c 55%, #0e8a84) border-box;
-  border: 2px solid transparent;
-}
-
-.hub-title-row {
-  display: flex;
-  flex-wrap: wrap;
   align-items: baseline;
   justify-content: center;
-  gap: 4px;
+  gap: 6px;
+  pointer-events: none;
 }
 
 .hub-prefix,
 .hub-suffix {
-  font-size: clamp(20px, 2vw, 28px);
-  font-weight: 800;
-  letter-spacing: 0.06em;
+  font-size: clamp(26px, 3vw, 40px);
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  line-height: 1;
 }
 
 .hub-blank {
-  width: 5.2em;
+  pointer-events: auto;
+  width: 4.2em;
   border: none;
-  border-bottom: 2px solid #8a8175;
+  border-bottom: 3px solid #c5221f;
   background: transparent;
   text-align: center;
-  font-size: clamp(18px, 1.8vw, 24px);
-  font-weight: 800;
-  color: #1c4c7c;
+  font-size: clamp(24px, 2.6vw, 36px);
+  font-weight: 900;
+  color: #202124;
   outline: none;
 }
 
-.hub-blank:focus {
-  border-bottom-color: #1c4c7c;
-}
-
-.hub-note {
-  margin: 0;
-  max-width: 16em;
-  color: #5c574e;
-  font-size: 12px;
-  line-height: 1.45;
-}
-
-.band {
-  grid-column: 1 / -1;
-  min-height: 0;
+.ym-tools {
+  flex: none;
   display: grid;
-  grid-template-columns: 64px minmax(0, 1fr);
+  grid-template-columns: 72px minmax(0, 1fr);
   gap: 8px;
   align-items: stretch;
+  min-height: 92px;
+  height: 18%;
+  margin-top: 8px;
+  padding: 10px 12px;
+  background: #eceae6;
 }
 
-.band-problem { grid-row: 4; }
-.band-tools { grid-row: 5; }
-
-.step-tag {
-  align-self: center;
-  justify-self: center;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  color: #5f6368;
-}
-
-.cell :deep(.ym-block--card) {
-  width: 100%;
-}
-
-@media (max-width: 980px) {
-  .y-model-canvas {
-    overflow: auto;
-  }
-
-  .ym-lead {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .ym-steps {
-    flex-wrap: wrap;
-  }
-
-  .ym-board {
-    grid-template-columns: 1fr 1fr;
-    grid-template-rows: auto auto auto auto auto auto auto;
-    height: auto;
-    flex: none;
-  }
-
-  .arm-label--theory { grid-column: 1 / -1; grid-row: 1; text-align: left; }
-  .arm-label--facts { grid-column: 1 / -1; grid-row: 3; text-align: left; }
-  .cell-existing, .cell-build { grid-row: 2; }
-  .cell-existing { grid-column: 1; }
-  .cell-build { grid-column: 2; }
-  .cell-hypothesis, .cell-analysis { grid-row: 4; }
-  .cell-hypothesis { grid-column: 1; }
-  .cell-analysis { grid-column: 2; }
-  .hub { grid-column: 1 / -1; grid-row: 5; }
-  .cell-cause, .cell-effect { grid-row: 6; }
-  .cell-cause { grid-column: 1; }
-  .cell-effect { grid-column: 2; }
-  .band-problem { grid-row: 7; }
-  .band-tools { grid-row: 8; }
-  .cell { min-height: 140px; }
-}
-
-
+.ym-tools .step { position: static; align-self: center; }
+.slot-tools { position: relative; inset: auto; width: auto; height: auto; min-height: 0; }
 </style>
