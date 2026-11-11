@@ -14,6 +14,7 @@ import {
   TOOLBAR_GROUPS,
   type ToolbarDropBox,
 } from '../../../utils/rteToolbarGroups'
+import { FOCUS_TOOLBAR_KEYS, readStoredRibbonTab, searchToolbarTools } from '../../../utils/rteToolbarOptimize'
 import {
   isDefaultToolbarGroupConfig,
   moveGroupButton,
@@ -89,6 +90,8 @@ export function useToolbarGroups<T extends ToolLike>(deps: {
   disarmMarginUndo: () => void
   /** 拖动真正开始时把收起的工具栏展开，否则被裁掉的分组接不到指针。 */
   openToolbarRows?: () => void
+  toolbarQuery?: () => string
+  focusMode?: () => boolean
 }) {
   const localToolbarOrder = ref<string[] | null>(null)
   const toolbarOrderUndo = ref<string[][]>([])
@@ -114,21 +117,56 @@ export function useToolbarGroups<T extends ToolLike>(deps: {
     return buildToolbarGroups(tools, toolbarOrder.value, toolbarGroupButtonConfigs.value)
   })
 
-  const ribbonTab = ref(RIBBON_TABS[0]!.id)
+  const ribbonTab = ref(readStoredRibbonTab(
+    typeof localStorage === 'undefined' ? null : localStorage.getItem('rte-ribbon-tab'),
+    RIBBON_TABS.map((tab) => tab.id),
+  ))
   /** 没有按钮的分组不占栏目。例如空的「其他」。 */
   const ribbonTabs = computed(() =>
     RIBBON_TABS.filter((tab) => toolbarGroups.value.some((group) => tab.groups.includes(group.id))),
   )
   function setRibbonTab(id: string) {
-    if (!RIBBON_TABS.some((tab) => tab.id === id)) return
-    ribbonTab.value = id
+    const available = ribbonTabs.value.map((tab) => tab.id)
+    const next = readStoredRibbonTab(id, available.length ? available : RIBBON_TABS.map((tab) => tab.id))
+    if (!available.length && !RIBBON_TABS.some((tab) => tab.id === id)) return
+    ribbonTab.value = next
+    try {
+      localStorage.setItem('rte-ribbon-tab', next)
+    } catch {
+      /* 隐私模式 */
+    }
+    const label = RIBBON_TABS.find((tab) => tab.id === next)?.label || next
+    deps.announce(`功能区：${label}`)
     deps.openToolbarRows?.()
   }
-  /** 最大化时只渲染当前分组。画布小编辑器仍一次放出全部高频分组。 */
+  /** 最大化时只渲染当前分组。有搜索词时跨栏目列出匹配按钮。专注模式只留撤销、重做和查找。 */
   const visibleToolbarGroups = computed(() => {
+    if (deps.focusMode?.()) {
+      return toolbarGroups.value
+        .filter((group) => group.id === 'edit')
+        .map((group) => ({
+          ...group,
+          tools: group.tools.filter((tool) => (FOCUS_TOOLBAR_KEYS as readonly string[]).includes(tool.key)),
+        }))
+        .filter((group) => group.tools.length)
+    }
+    const query = deps.toolbarQuery?.().trim() || ''
+    if (query) {
+      const hits = new Set(searchToolbarTools(toolbarGroups.value, query, 40).map((hit) => `${hit.groupId}:${hit.key}`))
+      return toolbarGroups.value
+        .map((group) => ({
+          ...group,
+          tools: group.tools.filter((tool) => hits.has(`${group.id}:${tool.key}`)),
+        }))
+        .filter((group) => group.tools.length)
+    }
     if (!deps.expanded()) return toolbarGroups.value
     const allow = new Set(ribbonGroupsFor(ribbonTab.value))
-    return toolbarGroups.value.filter((group) => allow.has(group.id))
+    const visible = toolbarGroups.value.filter((group) => allow.has(group.id))
+    if (visible.length) return visible
+    const fallback = ribbonTabs.value[0]?.id
+    if (fallback && fallback !== ribbonTab.value) ribbonTab.value = fallback
+    return toolbarGroups.value.filter((group) => ribbonGroupsFor(fallback || ribbonTab.value).includes(group.id))
   })
 
   /** 每个分组当前生效的组内按钮配置（已归一化）。旧分组 id 的配置先迁移到新分组。 */
@@ -155,6 +193,13 @@ export function useToolbarGroups<T extends ToolLike>(deps: {
       order: config.order.indexOf(key),
       defaultIndex: index,
     }))
+  }
+
+  function restoreToolbarGroupButtons(groupId: string) {
+    const def = TOOLBAR_GROUPS.find((group) => group.id === groupId)
+    if (!def) return
+    persistGroupButtonConfig(groupId, null)
+    deps.announce(`${def.label}已恢复默认按钮`)
   }
 
   function persistGroupButtonConfig(groupId: string, config: ToolbarGroupButtonConfig | null) {
@@ -604,6 +649,7 @@ export function useToolbarGroups<T extends ToolLike>(deps: {
     toolbarGroupButtonConfigs,
     toolbarGroupButtonEntries,
     toggleToolbarGroupButton,
+    restoreToolbarGroupButtons,
     moveToolbarGroupButton,
     toolbarDropIndex,
     toolbarDragSource,

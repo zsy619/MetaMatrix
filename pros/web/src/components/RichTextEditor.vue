@@ -186,6 +186,7 @@ import {
   bumpToolbarUndoEpoch,
   COMPACT_PRIMARY_KEY_SET,
 } from '../utils/rteToolbarGroups'
+import { fontSizeCaption, pushRecentValue, recentOptions } from '../utils/rteToolbarOptimize'
 import { useFindReplace } from './rte/composables/useFindReplace'
 import { useExport } from './rte/composables/useExport'
 import { useImport } from './rte/composables/useImport'
@@ -3949,9 +3950,31 @@ function currentLineHeight(): string {
   const v = editor.value?.getAttributes('textStyle')?.lineHeight
   return typeof v === 'string' ? v : ''
 }
+const RECENT_FONT_KEY = 'rte-recent-font-sizes'
+function readRecentFontSizes(): string[] {
+  try {
+    const raw = JSON.parse(localStorage.getItem(RECENT_FONT_KEY) || '[]')
+    return Array.isArray(raw) ? raw.filter((item) => typeof item === 'string').slice(0, 5) : []
+  } catch {
+    return []
+  }
+}
+const recentFontSizes = ref<string[]>(readRecentFontSizes())
+const fontSizeButtonLabel = computed(() => fontSizeCaption(currentFontSize(), FONT_SIZE_OPTIONS))
+const recentFontSizeOptions = computed(() => recentOptions(FONT_SIZE_OPTIONS, recentFontSizes.value))
+const toolbarQuery = ref('')
+
 function applyFontSize(size: string) {
   // 复用选区格式封装：跨段落选区时选区内所有段落一起生效
   applyFontSizeToSelection(editor.value, size)
+  if (size.trim()) {
+    recentFontSizes.value = pushRecentValue(recentFontSizes.value, size.trim(), 5)
+    try {
+      localStorage.setItem(RECENT_FONT_KEY, JSON.stringify(recentFontSizes.value))
+    } catch {
+      /* 隐私模式 */
+    }
+  }
   fontSizeOpen.value = false
   moreFontSizeOpen.value = false
   moreOpen.value = false
@@ -7344,6 +7367,7 @@ const {
   onToolbarGroupDrop,
   onToolbarGroupDragEnd,
   onToolbarGroupKeydown,
+  restoreToolbarGroupButtons,
 } = useToolbarGroups({
   panelId: () => props.panelId,
   expanded: () => effectiveExpanded.value,
@@ -7364,6 +7388,8 @@ const {
   openToolbarRows: () => {
     toolbarRowsOpen.value = true
   },
+  toolbarQuery: () => toolbarQuery.value,
+  focusMode: () => focusMode.value,
 })
 toolbarUndoBridge.disarm = disarmToolbarUndo
 toolbarUndoBridge.isNewer = toolbarUndoIsNewer
@@ -8113,6 +8139,10 @@ provideRteBindings({
   ribbonTab,
   ribbonTabs,
   setRibbonTab,
+  toolbarQuery,
+  fontSizeButtonLabel,
+  recentFontSizeOptions,
+  restoreToolbarGroupButtons,
   toolbarGroupButtonEntries,
   toolbarGroupButtonsGroupId,
   toolbarGroupButtonsOpen,

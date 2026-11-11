@@ -348,6 +348,19 @@ function run(action: () => void) {
             @keydown.enter.prevent="run(() => rte.applyFontSize(($event.target as HTMLInputElement).value))"
           />
           <button
+            v-for="opt in rte.recentFontSizeOptions"
+            :key="'bfs-recent-' + opt.label"
+            data-rte-own
+            type="button"
+            role="option"
+            class="rte-bubble-panel-item"
+            :class="{ active: (opt.value || '') === (rte.currentFontSize() || '') }"
+            :aria-selected="(opt.value || '') === (rte.currentFontSize() || '')"
+            @click.stop="run(() => rte.applyFontSize(opt.value))"
+          >
+            {{ opt.label }}
+          </button>
+          <button
             v-for="opt in rte.FONT_SIZE_OPTIONS"
             :key="'bfs-' + opt.label"
             data-rte-own

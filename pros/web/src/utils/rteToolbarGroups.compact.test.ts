@@ -82,7 +82,7 @@ assert.deepEqual(
     ['color', 'highlight', 'bold', 'italic', 'underline', 'strike'],
     ['heading', 'list', 'align', 'quote', 'code'],
     ['link', 'image'],
-    ['undo', 'redo'],
+    ['undo', 'redo', 'find'],
     ['deepOptimize'],
   ],
 )

@@ -371,12 +371,21 @@ function onDocPointerDownForMenus(e: PointerEvent) {
 }
 
 
+  function onToolbarEscape(event: KeyboardEvent) {
+    if (event.key !== 'Escape') return
+    const target = event.target instanceof Element ? event.target : null
+    if (target?.closest('.el-overlay, .el-dialog, .el-message-box, .rte-modal-overlay, .rte-qr-card')) return
+    closeAllToolbarMenus()
+  }
+
   onMounted(() => {
     document.addEventListener('pointerdown', onDocPointerDownForMenus, true)
     document.addEventListener('pointermove', rememberPointer, true)
+    document.addEventListener('keydown', onToolbarEscape, true)
   })
   onBeforeUnmount(() => {
     document.removeEventListener('pointerdown', onDocPointerDownForMenus, true)
+    document.removeEventListener('keydown', onToolbarEscape, true)
     document.removeEventListener('pointermove', rememberPointer, true)
     for (const t of menuCloseTimers.values()) clearTimeout(t)
     menuCloseTimers.clear()

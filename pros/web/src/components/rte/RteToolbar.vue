@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { inject } from 'vue'
 import { RTE_BINDINGS } from './bindings'
+import { stepRibbonTab } from '../../utils/rteToolbarOptimize'
 import { useParentScopeStamp } from './inheritScope'
 import { buildChartGroups } from '../../utils/echarts/chartGroups'
 import RteColorBoard from './RteColorBoard.vue'
@@ -32,7 +33,22 @@ function chartCategoriesOf(groupId: string) {
 function onRibbonTab(id: string, event: MouseEvent) {
   rteBindings.setRibbonTab(id)
   const toolbar = (event.currentTarget as HTMLElement | null)?.closest('.rte-toolbar')
+  toolbar?.querySelector(`[data-ribbon-tab="${id}"]`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
   toolbar?.querySelector(`[data-group-id="${id}"]`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+}
+
+function onRibbonTabsKeydown(event: KeyboardEvent) {
+  const move = event.key === 'ArrowRight' ? 'next' : event.key === 'ArrowLeft' ? 'prev' : event.key === 'Home' ? 'home' : event.key === 'End' ? 'end' : ''
+  if (!move) return
+  const ids = (rteBindings.ribbonTabs || []).map((tab: { id: string }) => tab.id)
+  const next = stepRibbonTab(ids, rteBindings.ribbonTab, move)
+  event.preventDefault()
+  rteBindings.setRibbonTab(next)
+  const tabs = (event.currentTarget as HTMLElement | null)?.querySelector(`[data-ribbon-tab="${next}"]`)
+  if (tabs instanceof HTMLElement) {
+    tabs.focus()
+    tabs.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  }
 }
 
 function toggleChartGroupMenu(key: string) {
@@ -55,7 +71,7 @@ function toggleChartGroupMenu(key: string) {
         {{ rte.rteAriaStatus }}
       </div>
       <div data-rte-own v-if="rte.expanded" class="rte-ribbon-bar">
-        <div data-rte-own class="rte-ribbon-tabs" role="tablist" aria-label="功能区">
+        <div data-rte-own class="rte-ribbon-tabs" role="tablist" aria-label="功能区，左右方向键切换栏目" @keydown="onRibbonTabsKeydown">
           <button data-rte-own
             v-for="tab in rte.ribbonTabs"
             :key="'ribbon-' + tab.id"
@@ -70,6 +86,19 @@ function toggleChartGroupMenu(key: string) {
             {{ tab.label }}
           </button>
         </div>
+        <label v-if="rte.viewMode === 'edit' && !rte.focusMode" data-rte-own class="rte-toolbar-search">
+          <input
+            data-rte-own
+            v-model="rte.toolbarQuery"
+            type="search"
+            placeholder="找按钮"
+            aria-label="在工具栏里找按钮"
+            @keydown.escape.stop="rte.toolbarQuery = ''"
+          />
+        </label>
+        <span v-if="rte.viewMode !== 'edit'" data-rte-own class="rte-toolbar-mode-note">
+          {{ rte.viewMode === 'preview' ? '预览中，编辑工具已收起' : '源码中，编辑工具已收起' }}
+        </span>
         <div data-rte-own class="rte-mode-bar">
           <button data-rte-own
             v-for="opt in rte.VIEW_MODE_OPTIONS"
@@ -101,7 +130,7 @@ function toggleChartGroupMenu(key: string) {
             type="button"
             class="rte-tool rte-view-mode-tool rte-toolbar-fold"
             :aria-expanded="rte.toolbarRowsOpen"
-            :title="rte.toolbarRowsOpen ? '收起工具栏面板' : '展开工具栏面板'"
+            :title="rte.toolbarRowsOpen ? '收起工具栏面板' : '展开工具栏。收起时放不下的分组在下一行，点此全部显示'"
             @click="rte.toggleToolbarRows()"
           >
             <span data-rte-own class="rte-tool-icon rte-view-mode-glyph" aria-hidden="true">{{
@@ -111,6 +140,17 @@ function toggleChartGroupMenu(key: string) {
           </button>
         </div>
       </div>
+      <label v-if="!rte.expanded && rte.viewMode === 'edit' && !rte.focusMode" data-rte-own class="rte-toolbar-search">
+        <input
+          data-rte-own
+          v-model="rte.toolbarQuery"
+          type="search"
+          placeholder="找按钮"
+          aria-label="在工具栏里找按钮"
+          @keydown.escape.stop="rte.toolbarQuery = ''"
+        />
+      </label>
+      <p v-if="rte.toolbarQuery && !rte.visibleToolbarGroups.length" data-rte-own class="rte-toolbar-mode-note">没有匹配的按钮</p>
       <div data-rte-own
         class="rte-toolbar-tools"
         :class="{
@@ -156,16 +196,18 @@ function toggleChartGroupMenu(key: string) {
             @pointermove="rte.onToolbarHandlePointerMove"
             @pointerup="rte.onToolbarHandlePointerUp"
             @pointercancel="rte.onToolbarHandlePointerUp"
+            title="双击恢复本组按钮的默认显隐和顺序"
+            @dblclick.stop="rte.restoreToolbarGroupButtons(group.id)"
           >{{ group.label }}</span>
           <button data-rte-own
             v-if="rte.viewMode === 'edit'"
             type="button"
             class="rte-group-settings"
             :aria-label="group.label + '的个性化设置'"
-            title="本分组的按钮：显示、隐藏、排序"
+            title="本分组的按钮：显示、隐藏、排序。双击组名恢复默认"
             @click.stop="rte.onToolbarGroupContextMenu(group.id, $event)"
           >
-            设置
+            ⚙
           </button>
         </span>
       <template v-for="t in group.tools" :key="t.key">
@@ -578,14 +620,15 @@ function toggleChartGroupMenu(key: string) {
             class="rte-tool"
             :ref="(el) => rte.setFloatAnchor('fontSize', el)" data-rte-anchor="fontSize"
             :class="{ active: rte.fontSizeOpen || !!rte.currentFontSize() }"
-            title="字号"
+            :title="'字号：' + rte.fontSizeButtonLabel"
+            aria-label="字号"
             @click.stop="rte.markToolbarMenuOpening(); rte.closeColorMenus(); rte.closeHighlightMenus(); rte.fontFamilyOpen = false; rte.lineHeightOpen = false; rte.moreFontSizeOpen = false; rte.moreFontFamilyOpen = false; rte.moreLineHeightOpen = false; rte.headingOpen = false; rte.listOpen = false; rte.formOpen = false; rte.templateOpen = false; rte.alignOpen = false; rte.fontSizeOpen = !rte.fontSizeOpen"
           >
             <span data-rte-own class="rte-tool-icon">
               <component data-rte-own :is="rte.toolIcon('fontSize')" class="rte-ep-icon" />
             </span>
             <span data-rte-own class="rte-tool-label"
-              >字号<span data-rte-own class="rte-caret" aria-hidden="true"></span
+              >{{ rte.fontSizeButtonLabel }}<span data-rte-own class="rte-caret" aria-hidden="true"></span
             ></span>
           </button>
           <Teleport to="body">
@@ -605,6 +648,17 @@ function toggleChartGroupMenu(key: string) {
                 @mousedown.stop
                 @keydown.enter.prevent="rte.applyFontSize(($event.target as HTMLInputElement).value)"
               />
+              <div v-if="rte.recentFontSizeOptions.length" data-rte-own class="rte-menu-section-label">最近字号</div>
+              <button data-rte-own
+                v-for="opt in rte.recentFontSizeOptions"
+                :key="'fs-recent-' + opt.label"
+                type="button"
+                :class="{ active: (opt.value || '') === (rte.currentFontSize() || '') }"
+                @click="rte.applyFontSize(opt.value)"
+              >
+                {{ opt.label }}
+              </button>
+              <div v-if="rte.recentFontSizeOptions.length" data-rte-own class="rte-menu-sep" aria-hidden="true" />
               <button data-rte-own
                 v-for="opt in rte.FONT_SIZE_OPTIONS"
                 :key="'fs-' + opt.label"
@@ -2094,6 +2148,15 @@ function toggleChartGroupMenu(key: string) {
               @mousedown.prevent
             >
               <button data-rte-own
+                v-for="opt in rte.recentFontSizeOptions"
+                :key="'mfs-recent-' + opt.label"
+                type="button"
+                :class="{ active: (opt.value || '') === (rte.currentFontSize() || '') }"
+                @click="rte.applyFontSize(opt.value)"
+              >
+                {{ opt.label }}
+              </button>
+              <button data-rte-own
                 v-for="opt in rte.FONT_SIZE_OPTIONS"
                 :key="'mfs-' + opt.label"
                 type="button"
@@ -2502,6 +2565,7 @@ function toggleChartGroupMenu(key: string) {
             </button>
           </div>
           <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
+          <button data-rte-own type="button" @click="rte.restoreToolbarGroupButtons(rte.toolbarGroupButtonsGroupId)">恢复本组默认</button>
           <button data-rte-own type="button" @click="rte.closeToolbarGroupButtons()">完成</button>
         </div>
       </Teleport>

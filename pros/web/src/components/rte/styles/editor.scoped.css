@@ -220,10 +220,42 @@
   box-shadow: 0 0 0 3px rgba(126, 182, 255, 0.24);
 }
 
-/* 预览/源码：隐藏编辑工具，保留「编辑/预览/源码」模式按钮 */
+/* 预览/源码：隐藏编辑工具和功能区栏目，保留模式按钮和一句说明 */
 .rte-root.mode-preview .rte-toolbar-tools > :not(.rte-view-mode-tool),
-.rte-root.mode-source .rte-toolbar-tools > :not(.rte-view-mode-tool) {
+.rte-root.mode-source .rte-toolbar-tools > :not(.rte-view-mode-tool),
+.rte-root.mode-preview .rte-ribbon-tabs,
+.rte-root.mode-source .rte-ribbon-tabs,
+.rte-root.mode-preview .rte-toolbar-search,
+.rte-root.mode-source .rte-toolbar-search {
   display: none !important;
+}
+.rte-toolbar-search {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 1 140px;
+  min-width: 88px;
+  margin: 0 8px 4px;
+}
+.rte-toolbar-search input {
+  width: 100%;
+  height: 26px;
+  border: 1px solid #d0d3d8;
+  border-radius: 6px;
+  padding: 0 8px;
+  font-size: 12px;
+  background: #fff;
+  color: #1d2129;
+}
+.rte-toolbar-mode-note {
+  margin: 0 8px 4px;
+  color: #4e5969;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.rte-root.is-focus-mode .rte-ribbon-tabs,
+.rte-root.is-focus-mode .rte-toolbar-search,
+.rte-root.is-focus-mode .rte-group-head {
+  display: none;
 }
 
 .rte-view-mode-glyph {
@@ -2502,7 +2534,7 @@
   align-items: flex-start;
   align-content: flex-start;
   min-width: 0;
-  max-height: 40px;
+  max-height: 44px;
   overflow: hidden;
   row-gap: 8px;
 }
@@ -4293,6 +4325,11 @@ html.rte-toolbar-dragging .rte-root:not(.expanded) .rte-toolbar-tools > .rte-too
   background: transparent;
   overflow-x: auto;
   flex-wrap: nowrap;
+  scrollbar-width: thin;
+  scroll-snap-type: x proximity;
+}
+.rte-ribbon-tab {
+  scroll-snap-align: start;
 }
 .rte-root.expanded .rte-toolbar .rte-ribbon-bar .rte-mode-bar {
   flex: 0 0 auto;
@@ -4477,7 +4514,7 @@ html.rte-toolbar-dragging .rte-root:not(.expanded) .rte-toolbar-tools > .rte-too
   border-bottom-color: #3a3f47;
 }
 .rte-root.is-dark-editor .rte-ribbon-tab {
-  color: #d6dae0;
+  color: #f2f3f5;
 }
 .rte-root.is-dark-editor .rte-ribbon-tab:hover {
   background: rgba(255, 255, 255, 0.06);

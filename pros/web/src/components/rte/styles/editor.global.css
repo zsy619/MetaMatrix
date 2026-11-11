@@ -3495,7 +3495,9 @@ html.rte-toolbar-dragging * {
 .rte-snippet-dialog .rte-modal-actions:has(> :nth-child(4)) {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
-.rte-root.is-focus-mode .rte-toolbar {
+.rte-root.is-focus-mode .rte-ribbon-tabs,
+.rte-root.is-focus-mode .rte-toolbar-search,
+.rte-root.is-focus-mode .rte-group-head {
   display: none;
 }
 .rte-root.is-focus-mode .rte-workspace {

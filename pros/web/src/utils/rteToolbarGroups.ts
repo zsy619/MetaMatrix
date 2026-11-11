@@ -163,7 +163,7 @@ const GROUP_BY_ID = new Map(TOOLBAR_GROUPS.map((group) => [group.id, group]))
  *   窄屏也能找到入口；图表分类顺序始终等于 `CHART_TOOLBAR_KEYS`（= CHART_GROUPS 顺序）。
  */
 export const COMPACT_PRIMARY_KEYS_BY_GROUP: Record<string, readonly string[]> = {
-  edit: ['undo', 'redo'],
+  edit: ['undo', 'redo', 'find'],
   review: ['deepOptimize'],
   style: ['bold', 'italic', 'underline', 'strike', 'color', 'highlight'],
   paragraph: ['heading', 'list', 'quote', 'code', 'align'],
