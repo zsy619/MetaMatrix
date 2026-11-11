@@ -84,7 +84,7 @@ function panelHeader(section: FiveStepSectionLike, current?: FiveStepSectionBloc
         <header
           class="fsx-head"
           role="columnheader"
-          :style="{ background: fiveStepPalette(col.id).header }"
+          :style="{ '--col-header': fiveStepPalette(col.id).header }"
         >
           <h2>{{ col.header }}</h2>
         </header>

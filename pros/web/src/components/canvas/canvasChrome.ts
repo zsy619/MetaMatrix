@@ -7,7 +7,7 @@ import { toneAt, type TableTone } from './fiveStepPalette'
  * (business-topic navy) so states don't jump to a separate link blue.
  */
 export const CANVAS_CHROME = {
-  page: '#f7f7f7',
+  page: '#f4f0e8',
   frame: '#ececec',
   hairline: 'rgba(60, 50, 20, 0.08)',
   ink: '#3c4043',
@@ -42,6 +42,7 @@ const LEGACY_PAGE = new Set([
   '#e6f7ff',
   '#fdf5e6',
   '#f5f0e8',
+  '#f7f7f7',
 ])
 
 function trimmed(value: string | undefined | null): string {
