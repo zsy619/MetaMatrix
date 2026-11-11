@@ -381,6 +381,26 @@ describe('新功能区按钮', () => {
     wrapper.unmount()
   })
 
+  it('书写纸样会换成小红书、信纸和田字格', async () => {
+    localStorage.removeItem('rte-writing-paper:panel-a')
+    const wrapper = await mountEditor()
+    await openRibbon(wrapper, '书写')
+    await clickTool(wrapper, '纸样')
+    await clickMenu('小红书')
+    expect(wrapper.attributes('data-writing-paper')).toBe('xhs')
+    await clickTool(wrapper, '纸样')
+    await clickMenu('信纸')
+    expect(wrapper.attributes('data-writing-paper')).toBe('letter')
+    await clickTool(wrapper, '纸样')
+    await clickMenu('田字格')
+    expect(wrapper.attributes('data-writing-paper')).toBe('tianzi')
+    expect(localStorage.getItem('rte-writing-paper:panel-a')).toBe('tianzi')
+    await clickTool(wrapper, '纸样')
+    await clickMenu('默认')
+    expect(wrapper.attributes('data-writing-paper')).toBeUndefined()
+    wrapper.unmount()
+  })
+
   it('书写栏目能改段落方向和引用样式', async () => {
     const wrapper = await mountEditor()
     const editor = editorOf(wrapper)

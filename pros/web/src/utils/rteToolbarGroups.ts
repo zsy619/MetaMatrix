@@ -85,7 +85,7 @@ export const TOOLBAR_GROUPS: readonly ToolbarGroupDef[] = [
   {
     id: 'writing',
     label: '书写',
-    keys: ['textDir', 'quoteStyle'],
+    keys: ['textDir', 'quoteStyle', 'writingPaper'],
   },
   {
     id: 'tidy',

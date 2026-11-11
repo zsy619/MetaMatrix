@@ -2828,6 +2828,43 @@ html.rte-toolbar-dragging * {
   box-shadow: none !important;
   text-decoration: none !important;
 }
+.rte-print-preview-paper[data-writing-paper='xhs'] {
+  background: #f3f3f3;
+}
+.rte-print-preview-paper[data-writing-paper='xhs'] .rte-print-title {
+  border-top: 4px solid #ff2442;
+  padding-top: 12px;
+}
+.rte-print-preview-paper[data-writing-paper='wechat'] {
+  background: #fff;
+  font-size: 17px;
+  line-height: 1.75;
+}
+.rte-print-preview-paper[data-writing-paper='letter'] {
+  background-color: #fffdf6;
+  background-image:
+    linear-gradient(90deg, transparent 28px, #e25b5b 28px, #e25b5b 29px, transparent 29px),
+    repeating-linear-gradient(to bottom, transparent 0 31px, #b9cbe4 31px 32px);
+  line-height: 32px;
+}
+.rte-print-preview-paper[data-writing-paper='draft'] {
+  background-color: #fff;
+  background-image:
+    linear-gradient(to right, #e7b4b4 1px, transparent 1px),
+    linear-gradient(to bottom, #e7b4b4 1px, transparent 1px);
+  background-size: 32px 32px;
+  line-height: 32px;
+}
+.rte-print-preview-paper[data-writing-paper='tianzi'] {
+  background-color: #fffef8;
+  background-image:
+    linear-gradient(to right, #c45c5c 1px, transparent 1px),
+    linear-gradient(to bottom, #c45c5c 1px, transparent 1px),
+    linear-gradient(to right, transparent 15px, rgba(196, 92, 92, 0.45) 15px, rgba(196, 92, 92, 0.45) 17px, transparent 17px),
+    linear-gradient(to bottom, transparent 15px, rgba(196, 92, 92, 0.45) 15px, rgba(196, 92, 92, 0.45) 17px, transparent 17px);
+  background-size: 32px 32px;
+  line-height: 32px;
+}
 .rte-print-preview-paper img {
   max-width: 100%;
   height: auto;
@@ -3692,6 +3729,85 @@ html.rte-toolbar-dragging * {
   background: transparent !important;
   box-shadow: none !important;
   box-sizing: border-box;
+}
+.rte-root[data-writing-paper='xhs'] .rte-body > .ProseMirror,
+.rte-root[data-writing-paper='xhs'].is-page-sheet .rte-body > .ProseMirror {
+  max-width: 440px !important;
+  width: auto !important;
+  margin: 20px auto 32px !important;
+  padding: 22px 20px 36px !important;
+  background: #fff !important;
+  border-radius: 18px;
+  border-top: 4px solid #ff2442 !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.06) !important;
+  font-size: 16px;
+  line-height: 1.85;
+  color: #222;
+}
+.rte-root[data-writing-paper='wechat'] .rte-body > .ProseMirror,
+.rte-root[data-writing-paper='wechat'].is-page-sheet .rte-body > .ProseMirror {
+  max-width: 677px !important;
+  width: auto !important;
+  margin: 16px auto 36px !important;
+  padding: 28px 22px 56px !important;
+  background: #fff !important;
+  border-radius: 0;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04) !important;
+  font-size: 17px;
+  line-height: 1.75;
+  color: #333;
+}
+.rte-root[data-writing-paper='letter'] .rte-body > .ProseMirror,
+.rte-root[data-writing-paper='letter'].is-page-sheet .rte-body > .ProseMirror {
+  max-width: 760px !important;
+  width: auto !important;
+  margin: 16px auto 28px !important;
+  padding: 32px 28px 48px 56px !important;
+  color: #1d2129;
+  font-size: 16px;
+  line-height: 32px;
+  background-color: #fffdf6 !important;
+  background-attachment: local !important;
+  background-image:
+    linear-gradient(90deg, transparent 36px, #e25b5b 36px, #e25b5b 37px, transparent 37px),
+    repeating-linear-gradient(to bottom, transparent 0 31px, #b9cbe4 31px 32px) !important;
+  box-shadow: 0 1px 2px rgba(32, 33, 36, 0.06) !important;
+}
+.rte-root[data-writing-paper='draft'] .rte-body > .ProseMirror,
+.rte-root[data-writing-paper='draft'].is-page-sheet .rte-body > .ProseMirror {
+  max-width: 760px !important;
+  width: auto !important;
+  margin: 16px auto 28px !important;
+  padding: 32px 24px 48px !important;
+  color: #1d2129;
+  font-size: 22px;
+  line-height: 32px;
+  background-color: #fff !important;
+  background-attachment: local !important;
+  background-image:
+    linear-gradient(to right, #e7b4b4 1px, transparent 1px),
+    linear-gradient(to bottom, #e7b4b4 1px, transparent 1px) !important;
+  background-size: 32px 32px !important;
+  box-shadow: 0 1px 2px rgba(32, 33, 36, 0.06) !important;
+}
+.rte-root[data-writing-paper='tianzi'] .rte-body > .ProseMirror,
+.rte-root[data-writing-paper='tianzi'].is-page-sheet .rte-body > .ProseMirror {
+  max-width: 760px !important;
+  width: auto !important;
+  margin: 16px auto 28px !important;
+  padding: 32px 24px 48px !important;
+  color: #1d2129;
+  font-size: 22px;
+  line-height: 32px;
+  background-color: #fffef8 !important;
+  background-attachment: local !important;
+  background-image:
+    linear-gradient(to right, #c45c5c 1px, transparent 1px),
+    linear-gradient(to bottom, #c45c5c 1px, transparent 1px),
+    linear-gradient(to right, transparent 15px, rgba(196, 92, 92, 0.45) 15px, rgba(196, 92, 92, 0.45) 17px, transparent 17px),
+    linear-gradient(to bottom, transparent 15px, rgba(196, 92, 92, 0.45) 15px, rgba(196, 92, 92, 0.45) 17px, transparent 17px) !important;
+  background-size: 32px 32px !important;
+  box-shadow: 0 1px 2px rgba(32, 33, 36, 0.06) !important;
 }
 .rte-root.is-table-sticky .tableWrapper {
   max-height: 420px;

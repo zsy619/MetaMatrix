@@ -911,7 +911,7 @@ const echartsDialogTemplates = computed(() => {
               <button data-rte-own type="button" class="rte-modal-confirm" @click="rte.confirmPrintFromPreview">打印</button>
             </div>
           </div>
-          <div data-rte-own class="rte-print-preview-paper" :style="rte.printPreviewMarginStyle">
+          <div data-rte-own class="rte-print-preview-paper" :style="rte.printPreviewMarginStyle" :data-writing-paper="rte.writingPaper || undefined">
             <div data-rte-own v-if="rte.pageChrome.header" class="rte-preview-header">{{ rte.pageChrome.header }}</div>
             <div data-rte-own v-html="rte.printPreviewHtml"></div>
             <div data-rte-own v-if="rte.pageChrome.footer || rte.previewPageLabel" class="rte-preview-footer">

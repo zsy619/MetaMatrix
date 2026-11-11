@@ -2087,7 +2087,7 @@ function toggleChartGroupMenu(key: string) {
             class="rte-tool is-labeled"
             :ref="(el) => rte.setFloatAnchor(t.key, el)"
             :data-rte-anchor="t.key"
-            :class="{ active: rte.presetMenuKey === t.key }"
+            :class="{ active: rte.presetMenuKey === t.key || !!t.active?.() }"
             :title="t.title || t.label"
             :aria-label="t.title || t.label"
             aria-haspopup="menu"

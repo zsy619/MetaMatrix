@@ -56,6 +56,12 @@ import {
 } from '../utils/rtePasteClean'
 import { todayIso } from '../utils/rteRound5'
 import { RTE_PAGE_SIZES } from '../utils/rtePageSize'
+import {
+  WRITING_PAPERS,
+  readWritingPaper,
+  writeWritingPaper,
+  type WritingPaperId,
+} from '../utils/rteWritingPaper'
 import { PAGE_MARGIN_PRESETS } from '../utils/rtePageMargin'
 import { focusDialogRoot, rememberDialogReturnFocus, restoreDialogReturnFocus } from '../utils/rteRound8'
 import {
@@ -661,6 +667,13 @@ const editorZoom = ref(1)
 const focusMode = ref(false)
 const darkEditor = ref(false)
 const paperGuide = ref(false)
+const writingPaper = ref<WritingPaperId>(readWritingPaper(props.panelId))
+
+function setWritingPaper(id: string) {
+  const next = WRITING_PAPERS.some((item) => item.id === id) ? (id as WritingPaperId) : ''
+  writingPaper.value = next
+  writeWritingPaper(props.panelId, next)
+}
 let applyingViewPref = false
 
 function applyStoredViewPref(panelId: string | undefined) {
@@ -6870,6 +6883,16 @@ const allTools = computed((): ToolItem[] => {
       applyPreset: (id: string) => applyQuoteStyle(id === 'emphasis' || id === 'verse' ? id : 'default'),
     },
     {
+      key: 'writingPaper',
+      label: '纸样',
+      title: '小红书、公众号、信纸、稿纸、田字格',
+      icon: '纸',
+      kind: 'presetMenu',
+      active: () => !!writingPaper.value,
+      presetOptions: WRITING_PAPERS.map((item) => ({ id: item.id, label: item.label })),
+      applyPreset: (id: string) => setWritingPaper(id),
+    },
+    {
       key: 'quote',
       label: '引用',
       title: '引用 (Ctrl/⌘+Shift+9)',
@@ -8201,6 +8224,7 @@ provideRteBindings({
   pageSize,
   pageSizeMeta,
   paperGuide,
+  writingPaper,
   paraStyleOpen,
   pickImportDocument,
   pickMentionItem,
@@ -8434,6 +8458,7 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
     ref="rteRootEl"
     class="rte-root"
     :data-page-size="pageSize"
+    :data-writing-paper="writingPaper || undefined"
     :data-margin="pageMargin.preset"
     :style="pageSheetStyle"
     :class="{

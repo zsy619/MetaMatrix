@@ -4047,6 +4047,99 @@
   box-shadow: none;
   box-sizing: border-box;
 }
+/* 书写纸样：小红书卡片、公众号窄栏、信纸横线、稿纸方格、田字格。 */
+.rte-root[data-writing-paper='xhs'] :deep(.rte-canvas),
+.rte-root[data-writing-paper='wechat'] :deep(.rte-canvas) {
+  background: #f3f3f3;
+}
+.rte-root[data-writing-paper='xhs'] :deep(.ProseMirror),
+.rte-root[data-writing-paper='xhs'][data-page-size='full'].expanded :deep(.ProseMirror) {
+  max-width: 440px !important;
+  width: auto;
+  margin: 20px auto 32px !important;
+  background-color: #fff !important;
+  background-image: none !important;
+  border-radius: 18px;
+  padding: 22px 20px 36px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.06);
+  font-size: 16px;
+  line-height: 1.85;
+  color: #222;
+  border-top: 4px solid #ff2442;
+}
+.rte-root[data-writing-paper='wechat'] :deep(.ProseMirror),
+.rte-root[data-writing-paper='wechat'][data-page-size='full'].expanded :deep(.ProseMirror) {
+  max-width: 677px !important;
+  width: auto;
+  margin: 16px auto 36px !important;
+  background-color: #fff !important;
+  background-image: none !important;
+  border-radius: 0;
+  padding: 28px 22px 56px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  font-size: 17px;
+  line-height: 1.75;
+  color: #333;
+}
+.rte-root[data-writing-paper='letter'] :deep(.rte-canvas) {
+  background: #f6f1e7;
+}
+.rte-root[data-writing-paper='letter'] :deep(.ProseMirror),
+.rte-root[data-writing-paper='letter'][data-page-size='full'].expanded :deep(.ProseMirror) {
+  max-width: 760px;
+  width: auto;
+  margin: 16px auto 28px;
+  color: #1d2129;
+  font-size: 16px;
+  line-height: 32px;
+  padding: 32px 28px 48px max(56px, var(--rte-gutter-size));
+  background-color: #fffdf6 !important;
+  background-attachment: local !important;
+  background-image:
+    linear-gradient(90deg, transparent 36px, #e25b5b 36px, #e25b5b 37px, transparent 37px),
+    repeating-linear-gradient(to bottom, transparent 0 31px, #b9cbe4 31px 32px) !important;
+  box-shadow: 0 1px 2px rgba(32, 33, 36, 0.06);
+}
+.rte-root[data-writing-paper='draft'] :deep(.rte-canvas),
+.rte-root[data-writing-paper='tianzi'] :deep(.rte-canvas) {
+  background: #f7f4ef;
+}
+.rte-root[data-writing-paper='draft'] :deep(.ProseMirror),
+.rte-root[data-writing-paper='draft'][data-page-size='full'].expanded :deep(.ProseMirror) {
+  max-width: 760px;
+  width: auto;
+  margin: 16px auto 28px;
+  color: #1d2129;
+  font-size: 22px;
+  line-height: 32px;
+  padding: 32px 24px 48px max(24px, var(--rte-gutter-size));
+  background-color: #fff !important;
+  background-attachment: local !important;
+  background-image:
+    linear-gradient(to right, #e7b4b4 1px, transparent 1px),
+    linear-gradient(to bottom, #e7b4b4 1px, transparent 1px) !important;
+  background-size: 32px 32px !important;
+  box-shadow: 0 1px 2px rgba(32, 33, 36, 0.06);
+}
+.rte-root[data-writing-paper='tianzi'] :deep(.ProseMirror),
+.rte-root[data-writing-paper='tianzi'][data-page-size='full'].expanded :deep(.ProseMirror) {
+  max-width: 760px;
+  width: auto;
+  margin: 16px auto 28px;
+  color: #1d2129;
+  font-size: 22px;
+  line-height: 32px;
+  padding: 32px 24px 48px max(24px, var(--rte-gutter-size));
+  background-color: #fffef8 !important;
+  background-attachment: local !important;
+  background-image:
+    linear-gradient(to right, #c45c5c 1px, transparent 1px),
+    linear-gradient(to bottom, #c45c5c 1px, transparent 1px),
+    linear-gradient(to right, transparent 15px, rgba(196, 92, 92, 0.45) 15px, rgba(196, 92, 92, 0.45) 17px, transparent 17px),
+    linear-gradient(to bottom, transparent 15px, rgba(196, 92, 92, 0.45) 15px, rgba(196, 92, 92, 0.45) 17px, transparent 17px) !important;
+  background-size: 32px 32px !important;
+  box-shadow: 0 1px 2px rgba(32, 33, 36, 0.06);
+}
 .rte-root[data-page-size='full']:not([data-margin='none']) .rte-body,
 .rte-root[data-page-size='feishu']:not([data-margin='none']) .rte-body {
   padding-left: var(--rte-margin-left, 0mm) !important;
