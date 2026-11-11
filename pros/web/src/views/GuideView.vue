@@ -754,8 +754,8 @@ onMounted(async () => {
 .card--soar:focus-visible,
 .card--playing-to-win:hover,
 .card--playing-to-win:focus-visible,
-.card--radar-check:hover,
-.card--radar-check:focus-visible {
+.card--ten-check:hover,
+.card--ten-check:focus-visible {
   border-color: #34a853;
 }
 

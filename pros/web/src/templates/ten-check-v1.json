@@ -1,9 +1,9 @@
 {
-  "id": "canvas_radar_check",
-  "type": "radar_check",
+  "id": "canvas_ten_check",
+  "type": "ten_check",
   "schemaVersion": 1,
   "theme": { "background": { "pattern": "none", "color": "#f7f7f7" }, "page": "#f7f7f7", "frame": "#ececec", "hairline": "rgba(60, 50, 20, 0.08)" },
-  "title": "雷达画布",
+  "title": "十格自检",
   "rows": [
     { "id": "scene", "name": "场景", "prompt": "一句话：你想让 AI 替你干的那件事", "judges": "范围够不够清", "fail": "说不清主语的「提升效率」", "answer": "", "passed": null },
     { "id": "who", "name": "现在谁在做", "prompt": "岗位、几个人", "judges": "有没有人在手工补位", "fail": "根本没人在做", "answer": "", "passed": null },

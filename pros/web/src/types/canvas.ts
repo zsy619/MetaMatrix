@@ -2288,7 +2288,7 @@ export interface PlayingToWinDocumentJSON {
   blocks: PlayingToWinBlock[]
 }
 
-export type RadarCheckRowId =
+export type TenCheckRowId =
   | 'scene'
   | 'who'
   | 'frequency'
@@ -2300,8 +2300,8 @@ export type RadarCheckRowId =
   | 'input'
   | 'accept'
 
-export interface RadarCheckRow {
-  id: RadarCheckRowId
+export interface TenCheckRow {
+  id: TenCheckRowId
   name: string
   prompt: string
   judges: string
@@ -2310,13 +2310,13 @@ export interface RadarCheckRow {
   passed: boolean | null
 }
 
-export interface RadarCheckDocumentJSON {
+export interface TenCheckDocumentJSON {
   id: string
-  type: 'radar_check'
+  type: 'ten_check'
   schemaVersion: number
   theme: CanvasTheme
   title: string
-  rows: RadarCheckRow[]
+  rows: TenCheckRow[]
 }
 
 /** 科学决策三角形（宽度 / 高度 / 深度） */
@@ -2407,7 +2407,7 @@ export type CanvasDocumentJSON = (
   | GoldenCircleDocumentJSON
   | SoarDocumentJSON
   | PlayingToWinDocumentJSON
-  | RadarCheckDocumentJSON
+  | TenCheckDocumentJSON
 ) & WithPanelAttachments
 
 /** 带 blocks 的画布（双三角 / Y 模型 / 刻意练习） */
@@ -3088,8 +3088,8 @@ export function isPlayingToWinDoc(doc: CanvasDocumentJSON | null | undefined): d
   return !!doc && doc.type === 'playing_to_win'
 }
 
-export function isRadarCheckDoc(doc: CanvasDocumentJSON | null | undefined): doc is RadarCheckDocumentJSON {
-  return !!doc && doc.type === 'radar_check'
+export function isTenCheckDoc(doc: CanvasDocumentJSON | null | undefined): doc is TenCheckDocumentJSON {
+  return !!doc && doc.type === 'ten_check'
 }
 
 export function isBreakEvenDoc(doc: CanvasDocumentJSON | null | undefined): doc is BreakEvenDocumentJSON {

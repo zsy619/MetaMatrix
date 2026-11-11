@@ -1,35 +1,35 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { canvasChromeStyle } from './canvasChrome'
-import type { RadarCheckDocumentJSON, RadarCheckRowId } from '../../types/canvas'
-import { isRadarCheckDoc } from '../../types/canvas'
+import type { TenCheckDocumentJSON, TenCheckRowId } from '../../types/canvas'
+import { isTenCheckDoc } from '../../types/canvas'
 import { useDocumentStore } from '../../stores/document'
 
-const props = defineProps<{ doc: RadarCheckDocumentJSON }>()
+const props = defineProps<{ doc: TenCheckDocumentJSON }>()
 const documentStore = useDocumentStore()
 const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 const passedCount = computed(() => props.doc.rows.filter((row) => row.passed === true).length)
 const failedCount = computed(() => props.doc.rows.filter((row) => row.passed === false).length)
 
-function patch(mutator: (doc: RadarCheckDocumentJSON) => void) {
+function patch(mutator: (doc: TenCheckDocumentJSON) => void) {
   documentStore.mutateCanvas((doc) => {
-    if (!isRadarCheckDoc(doc)) return
+    if (!isTenCheckDoc(doc)) return
     mutator(doc)
   })
 }
 
-function row(id: RadarCheckRowId) {
+function row(id: TenCheckRowId) {
   return props.doc.rows.find((item) => item.id === id)
 }
 
-function write(id: RadarCheckRowId, answer: string) {
+function write(id: TenCheckRowId, answer: string) {
   patch((doc) => {
     const item = doc.rows.find((entry) => entry.id === id)
     if (item) item.answer = answer
   })
 }
 
-function mark(id: RadarCheckRowId, passed: boolean) {
+function mark(id: TenCheckRowId, passed: boolean) {
   patch((doc) => {
     const item = doc.rows.find((entry) => entry.id === id)
     if (!item) return
@@ -39,10 +39,10 @@ function mark(id: RadarCheckRowId, passed: boolean) {
 </script>
 
 <template>
-  <div class="sheet" :style="chrome" aria-label="雷达画布">
+  <div class="sheet" :style="chrome" aria-label="十格自检">
     <header class="sheet-top">
       <div>
-        <p class="kicker">可带走的那张表 · 十格自检</p>
+        <p class="kicker">可带走的那张表</p>
         <h2>{{ doc.title }}</h2>
         <p>拿一件想交给别人或交给 AI 的事，逐格写事实。出现不合格信号，这一格先不过。</p>
       </div>
