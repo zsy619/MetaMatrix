@@ -4165,6 +4165,38 @@ async function replaceImageByUrl() {
   ElMessage.success('已替换图片')
 }
 
+async function promptImageAlt() {
+  const ed = editor.value
+  if (!ed || !isImageNodeSelected()) {
+    ElMessage.info('先选中一张图片')
+    return
+  }
+  const current = String(ed.getAttributes('image')?.alt || '')
+  const raw = await openRtePrompt({
+    title: '替代文本',
+    message: '读屏和图片打不开时会读这段说明',
+    defaultValue: current,
+    placeholder: '这张图在说什么',
+  })
+  if (raw == null) return
+  setImageAlt(raw)
+}
+
+function toggleTableHeaderStickyBar() {
+  tableHeaderSticky.value = !tableHeaderSticky.value
+  ElMessage.success(tableHeaderSticky.value ? '表头在滚动时保持可见' : '已取消表头固定')
+}
+
+function toggleTableColStickyBar() {
+  tableColSticky.value = !tableColSticky.value
+  ElMessage.success(tableColSticky.value ? '首列在横向滚动时保持可见' : '已取消首列固定')
+}
+
+function togglePrintLinkUrls() {
+  printLinkUrls.value = !printLinkUrls.value
+  ElMessage.success(printLinkUrls.value ? '打印时会在链接后印出网址' : '打印时不再印出网址')
+}
+
 /** —— 跨文档：搜索跳转 + 同步块 —— */
 const {
   crossDocOpen,
@@ -5965,6 +5997,7 @@ function onPublish() {
 
 const headingOpen = ref(false)
 const listOpen = ref(false)
+const imageLayoutOpen = ref(false)
 const formOpen = ref(false)
 const templateOpen = ref(false)
 const moreFormOpen = ref(false)
@@ -6312,7 +6345,7 @@ function moreSubmenuOpen(t: ToolItem): boolean {
 
 const MORE_HOVER_KINDS = new Set([
   'color', 'form', 'template', 'fontSize', 'fontFamily', 'lineHeight',
-  'callout', 'caseTransform', 'zoom', 'viewExtras', 'echartsGroup',
+  'callout', 'caseTransform', 'zoom', 'viewExtras', 'echartsGroup', 'imageLayout',
 ])
 
 /** 「更多」里带下级的项，鼠标经过就展开，不重复点击把它关掉。 */
@@ -6323,6 +6356,10 @@ function hoverMoreSubmenu(t: ToolItem) {
 }
 
 function onMoreToolClick(t: ToolItem) {
+  if (t.kind === 'imageLayout') {
+    imageLayoutOpen.value = !imageLayoutOpen.value
+    return
+  }
   if (t.kind === 'color') {
     moreHighlightOpen.value = false
     moreFormOpen.value = false
@@ -6571,7 +6608,7 @@ type ToolItem = {
   title?: string
   icon: string
   iconComp?: Component
-  kind?: 'heading' | 'list' | 'more' | 'btn' | 'color' | 'highlight' | 'align' | 'fontSize' | 'fontFamily' | 'lineHeight' | 'import' | 'export' | 'table' | 'attach' | 'form' | 'template' | 'code' | 'divider' | 'emoji' | 'specialChars' | 'columns' | 'spacing' | 'wordStats' | 'callout' | 'shortcuts' | 'hr' | 'blockOps' | 'insertDate' | 'pasteFormat' | 'caseTransform' | 'zoom' | 'viewExtras' | 'paraStyle' | 'listStyle' | 'linkButton' | 'echarts' | 'echartsGroup'
+  kind?: 'heading' | 'list' | 'more' | 'btn' | 'color' | 'highlight' | 'align' | 'fontSize' | 'fontFamily' | 'lineHeight' | 'import' | 'export' | 'table' | 'attach' | 'form' | 'template' | 'code' | 'divider' | 'emoji' | 'specialChars' | 'columns' | 'spacing' | 'wordStats' | 'callout' | 'shortcuts' | 'hr' | 'blockOps' | 'insertDate' | 'pasteFormat' | 'caseTransform' | 'zoom' | 'viewExtras' | 'paraStyle' | 'listStyle' | 'linkButton' | 'echarts' | 'echartsGroup' | 'imageLayout'
   active?: () => boolean
   run?: () => void
 }
@@ -6799,6 +6836,10 @@ const allTools = computed((): ToolItem[] => {
       active: () => isActive('codeBlock'),
       run: toggleCodeBlock,
     },
+    { key: 'pageSetup', label: '页面', title: '纸张、页边距、页眉页脚', icon: '纸', iconComp: ic('pageBreak'), run: openPageSetup },
+    { key: 'printPreview', label: '预览', title: '按当前纸张看打印效果', icon: '看', iconComp: ic('print'), run: () => void openPrintPreview() },
+    { key: 'paperGuide', label: '参考线', title: '在编辑区显示纸张边界', icon: '框', run: togglePaperGuide, active: () => paperGuide.value },
+    { key: 'printUrls', label: '印出链接', title: '打印时在链接后面印出网址', icon: '链', run: togglePrintLinkUrls, active: () => printLinkUrls.value },
     {
       key: 'pageBreak',
       label: '分页符',
@@ -6811,6 +6852,11 @@ const allTools = computed((): ToolItem[] => {
     { key: 'div-block', label: '', icon: '', kind: 'divider' },
     // —— 插入 ——
     { key: 'image', label: '图片', icon: '🖼', iconComp: ic('image'), run: insertImage },
+    { key: 'imageLayout', label: '排法', title: '图片居中、居左、居右或环绕', icon: '▢', iconComp: ic('image'), kind: 'imageLayout', active: () => isImageNodeSelected() },
+    { key: 'imageReplace', label: '换图', title: '替换选中图片，保留题注和裁剪', icon: '↻', iconComp: ic('image'), run: () => void replaceImageByUrl(), disabled: () => !isImageNodeSelected() },
+    { key: 'imageAlt', label: '替代文本', title: '给选中图片写替代文本', icon: 'Alt', iconComp: ic('image'), run: () => void promptImageAlt(), disabled: () => !isImageNodeSelected() },
+    { key: 'spoiler', label: '揭晓', title: '把选中文字收成揭晓文字', icon: '眼', run: toggleSpoiler },
+    { key: 'dropCap', label: '首字', title: '段落首字下沉', icon: 'A', run: toggleDropCap },
     { key: 'video', label: '视频', icon: '▶', iconComp: ic('video'), run: insertVideo },
     {
       key: 'link',
@@ -7210,6 +7256,9 @@ const allTools = computed((): ToolItem[] => {
       iconComp: ic('table'),
       run: () => { void copyCurrentTable('csv') },
     },
+    { key: 'tableZebra', label: '斑马纹', title: '隔行底色只用于显示', icon: '斑马', run: toggleTableZebra, active: () => editor.value?.getAttributes('table')?.zebra === true, disabled: () => !isInTable() },
+    { key: 'tableSticky', label: '冻结表头', title: '滚动时表头保持可见', icon: '表头', run: toggleTableHeaderStickyBar, active: () => tableHeaderSticky.value },
+    { key: 'tableColSticky', label: '冻结首列', title: '横向滚动时首列保持可见', icon: '首列', run: toggleTableColStickyBar, active: () => tableColSticky.value },
     {
       key: 'tableFilter',
       label: '表筛选',
@@ -7884,6 +7933,7 @@ provideRteBindings({
   listBookmarks,
   listDepthLabel,
   listOpen,
+  imageLayoutOpen,
   listStyleOpen,
   localTitle,
   markToolbarMenuOpening,

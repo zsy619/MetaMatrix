@@ -91,14 +91,19 @@ export const TOOLBAR_GROUPS: readonly ToolbarGroupDef[] = [
       'qrcode', 'emoji', 'specialChars', 'formula',
     ],
   },
+  {
+    id: 'picture',
+    label: '图片',
+    keys: ['imageLayout', 'imageReplace', 'imageAlt', 'spoiler', 'dropCap'],
+  },
   // 图表独立分组：一级分类各占一个下拉按钮（基础 / 统计 / 关系 / 层级 / 地理 / 金融 / 坐标系 / 组件 / 3D·GL）
   { id: 'charts', label: '图表', keys: CHART_TOOLBAR_KEYS },
-  { id: 'table', label: '表格', keys: ['table', 'tableCsv', 'tableFilter'] },
+  { id: 'table', label: '表格', keys: ['table', 'tableCsv', 'tableFilter', 'tableZebra', 'tableSticky', 'tableColSticky'] },
   {
     id: 'blocks',
     label: '块与结构',
     keys: [
-      'callout', 'hr', 'columns', 'pageBreak', 'toggleBlock', 'tabsBlock',
+      'callout', 'hr', 'columns', 'toggleBlock', 'tabsBlock',
       'blockOps', 'insertDate',
       'form', 'template', 'timeline', 'statusChip', 'progressBar',
       'mermaid', 'snippets', 'crossDoc',
@@ -132,6 +137,11 @@ export const TOOLBAR_GROUPS: readonly ToolbarGroupDef[] = [
     id: 'file',
     label: '文件与导出',
     keys: ['print', 'import', 'export', 'copyMd'],
+  },
+  {
+    id: 'page',
+    label: '页面',
+    keys: ['pageSetup', 'pageBreak', 'printPreview', 'paperGuide', 'printUrls'],
   },
   { id: 'other', label: '其他', keys: [] },
 ]
@@ -234,6 +244,8 @@ const MIGRATION_SOURCE_ORDER: readonly string[] = [
   'style',
   'edit',
   'file',
+  'picture',
+  'page',
 ]
 
 export function normalizeToolbarGroupOrder(saved: unknown): string[] {

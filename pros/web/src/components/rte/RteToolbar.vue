@@ -1991,6 +1991,50 @@ function toggleChartGroupMenu(key: string) {
             </div>
           </Teleport>
         </div>
+        <div data-rte-own
+          v-else-if="t.kind === 'imageLayout'"
+          class="rte-tool-wrap"
+          @mouseenter="rte.onToolMenuEnter('imageLayout')"
+          @mouseleave="rte.onToolMenuLeave($event, 'imageLayout', () => (rte.imageLayoutOpen = false))"
+        >
+          <button data-rte-own
+            type="button"
+            class="rte-tool is-labeled"
+            :ref="(el) => rte.setFloatAnchor('imageLayout', el)"
+            data-rte-anchor="imageLayout"
+            :class="{ active: rte.imageLayoutOpen || rte.isImageNodeSelected() }"
+            title="图片排法：居中、居左、居右、左右环绕"
+            aria-label="图片排法"
+            aria-haspopup="menu"
+            :aria-expanded="rte.imageLayoutOpen"
+            :disabled="!rte.isImageNodeSelected()"
+            @click.stop="rte.markToolbarMenuOpening(); rte.imageLayoutOpen = !rte.imageLayoutOpen"
+          >
+            <span data-rte-own class="rte-tool-icon">
+              <component data-rte-own :is="rte.toolIcon('image')" class="rte-ep-icon" />
+            </span>
+            <span data-rte-own class="rte-tool-label">排法<span data-rte-own class="rte-caret" aria-hidden="true"></span></span>
+          </button>
+          <Teleport to="body">
+            <div data-rte-own
+              v-if="rte.imageLayoutOpen"
+              class="rte-menu"
+              v-rte-float="'imageLayout'"
+              @mousedown.prevent
+              @mouseenter="rte.onToolMenuEnter('imageLayout')"
+              @mouseleave="rte.onToolMenuLeave($event, 'imageLayout', () => (rte.imageLayoutOpen = false))"
+            >
+              <button data-rte-own
+                v-for="opt in rte.IMAGE_LAYOUT_OPTIONS"
+                :key="'img-layout-' + opt.id"
+                type="button"
+                @click="rte.setImagePlacement(opt); rte.imageLayoutOpen = false"
+              >
+                {{ opt.label }}
+              </button>
+            </div>
+          </Teleport>
+        </div>
         <button data-rte-own
           v-else
           type="button"
@@ -2103,7 +2147,7 @@ function toggleChartGroupMenu(key: string) {
               </span>
               <span data-rte-own>{{ mt.title || mt.label }}</span>
               <span data-rte-own
-                v-if="mt.kind === 'color' || mt.key === 'highlight' || mt.kind === 'attach' || mt.kind === 'form' || mt.kind === 'template' || mt.kind === 'fontSize' || mt.kind === 'fontFamily' || mt.kind === 'lineHeight' || mt.kind === 'callout' || mt.kind === 'caseTransform' || mt.kind === 'zoom' || mt.kind === 'viewExtras' || mt.kind === 'echartsGroup'"
+                v-if="mt.kind === 'color' || mt.key === 'highlight' || mt.kind === 'attach' || mt.kind === 'form' || mt.kind === 'template' || mt.kind === 'fontSize' || mt.kind === 'fontFamily' || mt.kind === 'lineHeight' || mt.kind === 'callout' || mt.kind === 'caseTransform' || mt.kind === 'zoom' || mt.kind === 'viewExtras' || mt.kind === 'echartsGroup' || mt.kind === 'imageLayout'"
                 class="rte-more-caret"
               >{{ mt.kind === 'attach' || mt.kind === 'form' || mt.kind === 'template' ? '▾' : '▸' }}</span>
             </button>
@@ -2141,6 +2185,21 @@ function toggleChartGroupMenu(key: string) {
               </template>
               <div data-rte-own class="rte-menu-sep" aria-hidden="true"></div>
               <button data-rte-own type="button" @click="rte.openEchartsDialog()">一键生成…</button>
+            </div>
+            <div data-rte-own
+              v-if="mt.kind === 'imageLayout' && rte.imageLayoutOpen"
+              class="rte-menu rte-more-flyout"
+              @mousedown.prevent
+            >
+              <button data-rte-own
+                v-for="opt in rte.IMAGE_LAYOUT_OPTIONS"
+                :key="'mimg-' + opt.id"
+                type="button"
+                :disabled="!rte.isImageNodeSelected()"
+                @click="rte.setImagePlacement(opt); rte.imageLayoutOpen = false"
+              >
+                {{ opt.label }}
+              </button>
             </div>
             <div data-rte-own
               v-if="mt.kind === 'fontSize' && rte.moreFontSizeOpen"
