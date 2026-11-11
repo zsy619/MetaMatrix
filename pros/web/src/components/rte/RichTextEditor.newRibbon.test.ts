@@ -500,6 +500,11 @@ describe('新功能区按钮', () => {
     editor.commands.setTextSelection(cell)
     await openRibbon(wrapper, '表格')
     await clickTool(wrapper, '行列')
+    for (const label of ['向下插入行', '删除行', '合并单元格', '拆分单元格', '切换表头行', '按列降序']) {
+      const item = [...document.body.querySelectorAll('.rte-menu button')].find((button) => button.textContent === label)
+      expect(item, label).toBeTruthy()
+      expect(item!.querySelector('svg'), `${label}图标`).toBeTruthy()
+    }
     await clickMenu('按列降序')
     const text = editor.getText()
     expect(text.indexOf('乙')).toBeLessThan(text.indexOf('甲'))

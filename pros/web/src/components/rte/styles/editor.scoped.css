@@ -477,6 +477,10 @@
 .rte-menu button:hover {
   background: #f2f3f5;
 }
+.rte-menu button .rte-table-ctx-ico {
+  margin-right: 8px;
+  vertical-align: -3px;
+}
 
 .rte-canvas {
   flex: 1;

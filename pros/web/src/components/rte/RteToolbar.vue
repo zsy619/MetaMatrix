@@ -2190,7 +2190,7 @@ function toggleChartGroupMenu(key: string) {
                 type="button"
                 @click="t.applyPreset?.(opt.id); rte.closePresetMenu()"
               >
-                {{ opt.label }}
+                <span data-rte-own v-if="TABLE_MENU_ICONS[opt.id]" class="rte-table-ctx-ico"><component :is="TABLE_MENU_ICONS[opt.id]" /></span>{{ opt.label }}
               </button>
             </div>
           </Teleport>
@@ -2415,7 +2415,7 @@ function toggleChartGroupMenu(key: string) {
                 type="button"
                 @click="mt.applyPreset?.(opt.id); rte.closePresetMenu()"
               >
-                {{ opt.label }}
+                <span data-rte-own v-if="TABLE_MENU_ICONS[opt.id]" class="rte-table-ctx-ico"><component :is="TABLE_MENU_ICONS[opt.id]" /></span>{{ opt.label }}
               </button>
             </div>
             <div data-rte-own
