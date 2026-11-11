@@ -4,6 +4,7 @@ import { RTE_BINDINGS } from './bindings'
 import { stepRibbonTab } from '../../utils/rteToolbarOptimize'
 import { useParentScopeStamp } from './inheritScope'
 import { buildChartGroups } from '../../utils/echarts/chartGroups'
+import { TABLE_MENU_ICONS } from './tableMenuIcons'
 import RteColorBoard from './RteColorBoard.vue'
 import RteSpacingFields from './RteSpacingFields.vue'
 
@@ -960,7 +961,8 @@ function toggleChartGroupMenu(key: string) {
                     role="menuitem"
                     @click="op.run()"
                   >
-                    {{ op.label }}
+                    <span data-rte-own class="rte-table-ctx-ico"><component :is="TABLE_MENU_ICONS[op.key]" /></span>
+                    <span data-rte-own>{{ op.label }}</span>
                   </button>
                   <label data-rte-own class="rte-table-insert-count">
                     <input data-rte-own
@@ -988,7 +990,8 @@ function toggleChartGroupMenu(key: string) {
                     :disabled="op.disabled?.()"
                     @click="op.run()"
                   >
-                    {{ op.label }}
+                    <span data-rte-own class="rte-table-ctx-ico"><component :is="TABLE_MENU_ICONS[op.key]" /></span>
+                    <span data-rte-own>{{ op.label }}</span>
                   </button>
                 </template>
               </template>
@@ -1011,10 +1014,12 @@ function toggleChartGroupMenu(key: string) {
                 role="menuitem"
                 @click="rte.closeTableMenu(); rte.openTableDialog()"
               >
-                插入表格
+                <span data-rte-own class="rte-table-ctx-ico"><component :is="TABLE_MENU_ICONS['insert-table']" /></span>
+                <span data-rte-own>插入表格</span>
               </button>
               <button data-rte-own type="button" role="menuitem" @click="rte.toggleTableZebra(); rte.closeTableMenu()">
-                斑马纹
+                <span data-rte-own class="rte-table-ctx-ico"><component :is="TABLE_MENU_ICONS.zebra" /></span>
+                <span data-rte-own>斑马纹</span>
               </button>
             </div>
           </Teleport>

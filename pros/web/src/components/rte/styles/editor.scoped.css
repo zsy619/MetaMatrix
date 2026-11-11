@@ -1321,7 +1321,7 @@
 }
 
 .rte-float-menu.rte-table-menu {
-  min-width: 240px;
+  min-width: 220px;
   z-index: 60;
   max-height: min(70vh, 520px);
   overflow: auto;
@@ -1482,6 +1482,13 @@
   overflow: auto;
 }
 
+.rte-table-menu > button,
+.rte-table-menu .rte-table-insert-line > button,
+.rte-table-ops-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 .rte-table-ops-item {
   border: none;
   background: transparent;
