@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, inject } from 'vue'
+import { computed, inject, ref, watch } from 'vue'
 import { RTE_BINDINGS } from './bindings'
 import { useParentScopeStamp } from './inheritScope'
 import RteAvPickDialog from './RteAvPickDialog.vue'
@@ -7,6 +7,39 @@ import RteAvPickDialog from './RteAvPickDialog.vue'
 const rte = inject(RTE_BINDINGS)
 if (!rte) throw new Error('RtePortals 必须放在 RichTextEditor 里')
 useParentScopeStamp()
+
+const TABLE_CTX_GROUPS = [
+  { id: 'insert', label: '插入', keys: ['row-before', 'row-after', 'col-before', 'col-after'] },
+  { id: 'delete', label: '删除', keys: ['del-row', 'del-col', 'del-table'] },
+  { id: 'cell', label: '单元格', keys: ['merge', 'split', 'clear-cell', 'valign-top', 'valign-middle', 'valign-bottom', 'align-left', 'align-center', 'align-right'] },
+  { id: 'head', label: '表头', keys: ['header', 'header-col', 'sticky-header', 'sticky-col'] },
+  { id: 'data', label: '数据', keys: ['dup-row', 'equal-cols', 'cell-formula', 'calc-formula', 'sum-row', 'sort-asc', 'sort-desc', 'row-filter', 'copy-csv', 'copy-tsv'] },
+] as const
+
+const tableCtxGroup = ref('')
+watch(() => rte.tableCtx.open, (open: boolean) => {
+  if (!open) tableCtxGroup.value = ''
+})
+
+function tableCtxOps(keys: readonly string[]) {
+  const items = rte.tableOpItems as Array<{
+    key: string
+    label: string
+    run: () => void
+    insertCount?: boolean
+    danger?: boolean
+    disabled?: () => boolean
+  }>
+  return keys
+    .map((key) => items.find((op) => op.key === key))
+    .filter((op): op is NonNullable<typeof op> => !!op)
+}
+
+const tableCtxNearRight = computed(() => {
+  const x = Number(rte.tableCtx.x) || 0
+  const width = typeof window === 'undefined' ? 1200 : window.innerWidth
+  return x > width - 520
+})
 
 /** 当前选中的类别下的子类型模板（与工具栏下拉共用同一份目录）。 */
 const echartsDialogTemplates = computed(() => {
@@ -496,58 +529,76 @@ const echartsDialogTemplates = computed(() => {
       >
         <div data-rte-own
           class="rte-table-ctx"
+          :class="{ 'is-near-right': tableCtxNearRight }"
           :style="{ left: rte.tableCtx.x + 'px', top: rte.tableCtx.y + 'px' }"
           @mousedown.stop.prevent
         >
-          <template v-for="op in rte.tableOpItems" :key="'ctx-' + op.key">
-            <div data-rte-own v-if="op.insertCount" class="rte-table-insert-line">
-              <button data-rte-own
-                type="button"
-                @click="op.run()"
-              >
-                {{ op.label }}
-              </button>
-              <label data-rte-own class="rte-table-insert-count">
-                <input data-rte-own
-                  v-model.number="rte.tableInsertCounts[op.key]"
-                  type="number"
-                  min="1"
-                  max="99"
-                  step="1"
-                  inputmode="numeric"
-                  :aria-label="op.label + '数量'"
-                  title="填几就插入几行或几列，最少 1"
-                  @mousedown.stop="rte.rememberTableInsertSelection()"
-                  @click.stop
-                  @keydown.stop
-                  @blur="rte.normalizeTableInsertCount(op.key)"
-                />
-              </label>
-            </div>
-            <template v-else-if="!op.insertCount">
-              <div data-rte-own v-if="op.sepBefore" class="rte-menu-sep" aria-hidden="true" />
-              <button data-rte-own
-                type="button"
-                :class="{ danger: op.danger }"
-                :disabled="op.disabled?.()"
-                @click="op.run()"
-              >
-                {{ op.label }}
-              </button>
-            </template>
-          </template>
-          <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
-          <div data-rte-own class="rte-table-cell-style-title" style="padding: 4px 10px">单元格背景</div>
-          <div data-rte-own class="rte-table-swatches" style="padding: 0 10px 8px">
+          <div data-rte-own
+            v-for="group in TABLE_CTX_GROUPS"
+            :key="'ctx-group-' + group.id"
+            class="rte-table-ctx-group"
+            @mouseenter="tableCtxGroup = group.id"
+          >
             <button data-rte-own
-              v-for="p in rte.TABLE_CELL_BG_PRESETS"
-              :key="'ctx-bg-' + p.value"
               type="button"
-              class="rte-table-swatch"
-              :title="p.label"
-              :style="p.value ? { background: p.value } : undefined"
-              @click="rte.setTableCellBg(p.value); rte.closeTableCtx()"
-            >{{ p.value ? '' : '无' }}</button>
+              :class="{ active: tableCtxGroup === group.id }"
+              :aria-expanded="tableCtxGroup === group.id"
+              @click="tableCtxGroup = tableCtxGroup === group.id ? '' : group.id"
+            >
+              {{ group.label }}
+              <span data-rte-own class="rte-table-ctx-caret" aria-hidden="true">▸</span>
+            </button>
+            <div data-rte-own
+              v-if="tableCtxGroup === group.id"
+              class="rte-table-ctx-flyout"
+              @mousedown.stop
+            >
+              <template v-for="op in tableCtxOps(group.keys)" :key="'ctx-' + op.key">
+                <div data-rte-own v-if="op.insertCount" class="rte-table-insert-line">
+                  <button data-rte-own type="button" @click="op.run()">{{ op.label }}</button>
+                  <label data-rte-own class="rte-table-insert-count">
+                    <input data-rte-own
+                      v-model.number="rte.tableInsertCounts[op.key]"
+                      type="number"
+                      min="1"
+                      max="99"
+                      step="1"
+                      inputmode="numeric"
+                      :aria-label="op.label + '数量'"
+                      title="填几就插入几行或几列，最少 1"
+                      @mousedown.stop="rte.rememberTableInsertSelection()"
+                      @click.stop
+                      @keydown.stop
+                      @blur="rte.normalizeTableInsertCount(op.key)"
+                    />
+                  </label>
+                </div>
+                <button data-rte-own
+                  v-else
+                  type="button"
+                  :class="{ danger: op.danger }"
+                  :disabled="op.disabled?.()"
+                  @click="op.run()"
+                >
+                  {{ op.label }}
+                </button>
+              </template>
+              <template v-if="group.id === 'cell'">
+                <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
+                <div data-rte-own class="rte-table-cell-style-title" style="padding: 4px 10px">单元格背景</div>
+                <div data-rte-own class="rte-table-swatches" style="padding: 0 10px 8px">
+                  <button data-rte-own
+                    v-for="p in rte.TABLE_CELL_BG_PRESETS"
+                    :key="'ctx-bg-' + p.value"
+                    type="button"
+                    class="rte-table-swatch"
+                    :title="p.label"
+                    :style="p.value ? { background: p.value } : undefined"
+                    @click="rte.setTableCellBg(p.value); rte.closeTableCtx()"
+                  >{{ p.value ? '' : '无' }}</button>
+                </div>
+              </template>
+            </div>
           </div>
         </div>
       </div>

@@ -1363,6 +1363,42 @@
 .rte-table-ctx button:hover:not(:disabled) {
   background: #f2f3f5;
 }
+.rte-table-ctx-group {
+  position: relative;
+}
+.rte-table-ctx-group > button {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.rte-table-ctx-group > button.active {
+  background: #eef3ff;
+  color: #1d4ed8;
+}
+.rte-table-ctx-caret {
+  color: #86909c;
+  font-size: 12px;
+}
+.rte-table-ctx-flyout {
+  position: absolute;
+  left: calc(100% + 4px);
+  top: 0;
+  z-index: 2;
+  min-width: 232px;
+  max-height: min(70vh, 480px);
+  overflow: auto;
+  padding: 4px;
+  background: #fff;
+  border: 1px solid #e5e6eb;
+  border-radius: 8px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.14);
+}
+.rte-table-ctx.is-near-right .rte-table-ctx-flyout {
+  left: auto;
+  right: calc(100% + 4px);
+}
 
 .rte-table-insert-line {
   display: flex;

@@ -381,6 +381,28 @@ describe('新功能区按钮', () => {
     wrapper.unmount()
   })
 
+  it('表格右键按插入、删除、单元格、表头、数据分组', async () => {
+    const wrapper = await mountEditor()
+    const editor = editorOf(wrapper)
+    editor.commands.setContent('<table><tbody><tr><td><p>甲</p></td></tr></tbody></table>')
+    await nextTick()
+    const cell = wrapper.get('.ProseMirror td').element
+    cell.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 80, clientY: 80 }))
+    await nextTick()
+    const menu = document.querySelector('.rte-table-ctx')
+    expect(menu, '右键菜单').toBeTruthy()
+    const tops = [...menu!.querySelectorAll(':scope > .rte-table-ctx-group > button')].map((button) => (button.textContent || '').replace('▸', '').trim())
+    expect(tops).toEqual(['插入', '删除', '单元格', '表头', '数据'])
+    expect(menu!.textContent).not.toContain('向上插入行')
+    const insert = [...menu!.querySelectorAll(':scope > .rte-table-ctx-group > button')].find((button) => (button.textContent || '').includes('插入'))
+    insert!.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }))
+    await nextTick()
+    expect(menu!.textContent).toContain('向上插入行')
+    expect(menu!.textContent).toContain('向右插入列')
+    expect(menu!.querySelector('input[aria-label="向下插入行数量"]')).toBeTruthy()
+    wrapper.unmount()
+  })
+
   it('斑马纹写到表格节点上，偶数行底色和奇数行不同', async () => {
     const css = readFileSync('src/components/rte/styles/editor.global.css', 'utf8')
     const style = document.createElement('style')
