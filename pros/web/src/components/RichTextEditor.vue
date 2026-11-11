@@ -781,6 +781,9 @@ const {
   screenPageLabel,
   previewPageLabel,
   setPageHeader,
+  setPageHeaderEven,
+  setPageFooterEven,
+  setPageGutter,
   setPageFooter,
   setPageNumber,
   replacePageChrome,
@@ -4365,6 +4368,9 @@ function applySlashCommandItem(item: RteSlashItem) {
       break
     case 'footnote':
       insertFootnoteAtCursor()
+      break
+    case 'toc':
+      editor.value?.chain().focus().insertContent({ type: 'toc' }).run()
       break
     case 'qrcode':
       void insertQrCode()
@@ -8089,6 +8095,9 @@ provideRteBindings({
   screenPageLabel,
   setPageFooter,
   setPageHeader,
+  setPageHeaderEven,
+  setPageFooterEven,
+  setPageGutter,
   setPageNumber,
   setPresentUnit,
   stepPresent,

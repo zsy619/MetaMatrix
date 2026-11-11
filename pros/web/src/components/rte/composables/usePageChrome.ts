@@ -74,6 +74,15 @@ export function usePageChrome(deps: {
   function setPageHeader(value: string) {
     publish({ ...deps.pageChrome.value, header: value })
   }
+  function setPageHeaderEven(value: string) {
+    publish({ ...deps.pageChrome.value, headerEven: value })
+  }
+  function setPageFooterEven(value: string) {
+    publish({ ...deps.pageChrome.value, footerEven: value })
+  }
+  function setPageGutter(value: string) {
+    publish({ ...deps.pageChrome.value, gutter: normalizePageChrome({ gutter: value }).gutter })
+  }
 
   function setPageFooter(value: string) {
     publish({ ...deps.pageChrome.value, footer: value })
@@ -296,6 +305,9 @@ export function usePageChrome(deps: {
     pageIndex,
     pageCount,
     setPageHeader,
+    setPageHeaderEven,
+    setPageFooterEven,
+    setPageGutter,
     setPageFooter,
     replacePageChrome,
     setPageNumber,

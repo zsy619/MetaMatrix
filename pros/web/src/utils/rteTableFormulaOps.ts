@@ -162,7 +162,10 @@ export function tableGrid(table: PmNode): string[][] {
     const row: string[] = []
     rowNode.forEach((cellNode) => {
       const formula = cellFormulaText(cellNode)
-      row.push(formula || cellDisplayText(cellNode))
+      const text = formula || cellDisplayText(cellNode)
+      const span = Math.max(1, Number(cellNode.attrs.colspan) || 1)
+      row.push(text)
+      for (let extra = 1; extra < span; extra += 1) row.push('')
     })
     grid.push(row)
   })

@@ -62,6 +62,15 @@ export const RteImage = Image.extend({
         renderHTML: (attrs: { captionBefore?: string | null }) =>
           attrs.captionBefore == null ? {} : { 'data-caption-before': String(attrs.captionBefore) },
       },
+      fit: {
+        default: null as string | null,
+        parseHTML: (el: HTMLElement) => {
+          const value = el.getAttribute('data-fit')
+          return value === 'cover' || value === 'contain' ? value : null
+        },
+        renderHTML: (attrs: { fit?: string | null }) =>
+          attrs.fit === 'cover' || attrs.fit === 'contain' ? { 'data-fit': attrs.fit } : {},
+      },
       caption: {
         default: null as string | null,
         parseHTML: (el: HTMLElement) => {

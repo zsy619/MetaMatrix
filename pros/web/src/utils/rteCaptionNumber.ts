@@ -4,17 +4,40 @@ import type { EditorState, Transaction } from '@tiptap/pm/state'
 
 const CAPTION_RENUMBER = 'captionRenumber'
 
-/** 已经写成「图 N」的题注，在图片增删后按出现顺序重排。没有编号的题注不动。 */
+function chapterBefore(doc: EditorState['doc'], pos: number): number {
+  let chapter = 1
+  let seen = 0
+  doc.nodesBetween(0, pos, (node) => {
+    if (node.type.name !== 'heading' || (Number(node.attrs.level) || 1) !== 1) return
+    seen += 1
+    const matched = node.textContent.trim().match(/^(\d+)/)
+    chapter = matched ? Number(matched[1]) : seen
+  })
+  return Math.max(1, chapter)
+}
+
+/** 已经写成「图 N」或「图 章-号」的题注，在图片增删后按出现顺序重排。没有编号的题注不动。 */
 export function renumberCaptionTransaction(state: EditorState): Transaction | null {
   const updates: Array<{ pos: number; attrs: Record<string, unknown> }> = []
   let imageNo = 0
+  const chapterCounts = new Map<number, number>()
   state.doc.descendants((node, pos) => {
     if (node.type.name !== 'image') return
     const raw = String(node.attrs.caption || '').trim()
-    if (!/^图\s*\d+/.test(raw)) return
-    imageNo += 1
-    const rest = raw.replace(/^图\s*\d+\s*[：:\-]?\s*/, '')
-    const caption = rest ? `图 ${imageNo}：${rest}` : `图 ${imageNo}`
+    const chaptered = /^图\s*\d+\s*-\s*\d+/.test(raw)
+    if (!chaptered && !/^图\s*\d+/.test(raw)) return
+    let caption = raw
+    if (chaptered) {
+      const chapter = chapterBefore(state.doc, pos)
+      const next = (chapterCounts.get(chapter) || 0) + 1
+      chapterCounts.set(chapter, next)
+      const rest = raw.replace(/^图\s*\d+\s*-\s*\d+\s*[：:\-]?\s*/, '')
+      caption = rest ? `图 ${chapter}-${next}：${rest}` : `图 ${chapter}-${next}`
+    } else {
+      imageNo += 1
+      const rest = raw.replace(/^图\s*\d+\s*[：:\-]?\s*/, '')
+      caption = rest ? `图 ${imageNo}：${rest}` : `图 ${imageNo}`
+    }
     if (caption !== raw) updates.push({ pos, attrs: { ...node.attrs, caption } })
   })
   if (!updates.length) return null

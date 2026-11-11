@@ -6,14 +6,21 @@ export type PageNumberStyle = (typeof PAGE_NUMBER_STYLES)[number]
 
 export type PanelPageChrome = {
   header: string
+  headerEven: string
   footer: string
+  footerEven: string
   pageNumber: PageNumberStyle
+  /** 装订线，加在左边距上，单位毫米。 */
+  gutter: number
 }
 
 export const EMPTY_PAGE_CHROME: PanelPageChrome = {
   header: '',
+  headerEven: '',
   footer: '',
+  footerEven: '',
   pageNumber: 'none',
+  gutter: 0,
 }
 
 export const PAGE_NUMBER_OPTIONS: ReadonlyArray<{ id: PageNumberStyle; label: string }> = [
@@ -50,15 +57,33 @@ export function normalizePageChrome(raw: unknown): PanelPageChrome {
   const pageNumber = PAGE_NUMBER_STYLES.includes(row.pageNumber as PageNumberStyle)
     ? (row.pageNumber as PageNumberStyle)
     : 'none'
+  const gutterRaw = Number(row.gutter)
+  const gutter = Number.isFinite(gutterRaw) ? Math.min(40, Math.max(0, Math.round(gutterRaw * 10) / 10)) : 0
   return {
     header: chromeText(row.header),
+    headerEven: chromeText(row.headerEven),
     footer: chromeText(row.footer),
+    footerEven: chromeText(row.footerEven),
     pageNumber,
+    gutter,
   }
 }
 
 export function pageChromeIsEmpty(chrome: PanelPageChrome): boolean {
-  return !chrome.header && !chrome.footer && chrome.pageNumber === 'none'
+  return !chrome.header && !chrome.headerEven && !chrome.footer && !chrome.footerEven && chrome.pageNumber === 'none' && !chrome.gutter
+}
+
+/** 奇数页用页眉，偶数页有单独页眉时用偶数页眉。 */
+export function headerForPage(chrome: PanelPageChrome, page: number): string {
+  const even = page % 2 === 0
+  if (even && chrome.headerEven.trim()) return chrome.headerEven
+  return chrome.header
+}
+
+export function footerForPage(chrome: PanelPageChrome, page: number): string {
+  const even = page % 2 === 0
+  if (even && chrome.footerEven.trim()) return chrome.footerEven
+  return chrome.footer
 }
 
 export function readPageChrome(

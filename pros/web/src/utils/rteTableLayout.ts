@@ -40,6 +40,61 @@ function sameWidths(current: unknown, next: number[]): boolean {
   return next.every((width, index) => Number(current[index]) === width)
 }
 
+/** 把当前行上移或下移一格。一次只产生一步撤销。 */
+export function moveTableRow(editor: Editor, dir: -1 | 1): boolean {
+  const table = tableAround(editor)
+  if (!table) return false
+  const { $from } = editor.state.selection
+  let rowIndex = -1
+  for (let depth = $from.depth; depth > 0; depth -= 1) {
+    if ($from.node(depth).type.name === 'tableRow') rowIndex = $from.index(depth)
+  }
+  const rows: PmNode[] = []
+  table.node.forEach((row) => rows.push(row))
+  const next = rowIndex + dir
+  if (rowIndex < 0 || next < 0 || next >= rows.length) return false
+  const order = rows.slice()
+  const [moved] = order.splice(rowIndex, 1)
+  order.splice(next, 0, moved!)
+  editor.view.dispatch(editor.state.tr.replaceWith(table.pos, table.pos + table.node.nodeSize, table.node.type.create(table.node.attrs, order)))
+  return true
+}
+
+/** 把当前列左移或右移。有合并单元格时不动。一次只产生一步撤销。 */
+export function moveTableColumn(editor: Editor, dir: -1 | 1): boolean {
+  const table = tableAround(editor)
+  if (!table) return false
+  const { $from } = editor.state.selection
+  let colIndex = -1
+  for (let depth = $from.depth; depth > 0; depth -= 1) {
+    const node = $from.node(depth)
+    if (node.type.name === 'tableCell' || node.type.name === 'tableHeader') colIndex = $from.index(depth)
+  }
+  if (colIndex < 0) return false
+  const rows: PmNode[] = []
+  table.node.forEach((row) => rows.push(row))
+  let merged = false
+  rows.forEach((row) => {
+    row.forEach((cell) => {
+      if (Number(cell.attrs.colspan) > 1 || Number(cell.attrs.rowspan) > 1) merged = true
+    })
+  })
+  if (merged) return false
+  const width = rows[0]?.childCount || 0
+  const next = colIndex + dir
+  if (next < 0 || next >= width) return false
+  const nextRows = rows.map((row) => {
+    const cells: PmNode[] = []
+    row.forEach((cell) => cells.push(cell))
+    const order = cells.slice()
+    const [moved] = order.splice(colIndex, 1)
+    order.splice(next, 0, moved!)
+    return row.type.create(row.attrs, order)
+  })
+  editor.view.dispatch(editor.state.tr.replaceWith(table.pos, table.pos + table.node.nodeSize, table.node.type.create(table.node.attrs, nextRows)))
+  return true
+}
+
 /** 当前表格每一列都写成同样的列宽。合并单元格按跨列数写多个宽度。 */
 export function equalizeTableColumns(editor: Editor, width = EQUAL_COL_WIDTH): boolean {
   const table = tableAround(editor)

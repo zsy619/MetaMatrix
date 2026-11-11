@@ -61,12 +61,12 @@ export function useRtePageLayout(deps: {
     if (panelId) return readPageMargin(deps.pageMarginMap(), panelId, pageSizeMeta.value.paper)
     return localPageMargin.value || defaultPageMargin(pageSizeMeta.value.paper)
   })
-  const pageScreenMargin = computed(() =>
-    applyChromeReserve(
-      screenMargin(pageMargin.value, !pageSizeMeta.value.paper),
-      deps.chrome?.() || EMPTY_PAGE_CHROME,
-    ),
-  )
+  const pageScreenMargin = computed(() => {
+    const chrome = deps.chrome?.() || EMPTY_PAGE_CHROME
+    const reserved = applyChromeReserve(screenMargin(pageMargin.value, !pageSizeMeta.value.paper), chrome)
+    const gutter = chrome.gutter || 0
+    return gutter ? { ...reserved, left: reserved.left + gutter } : reserved
+  })
   const pageSheetStyle = computed(() => {
     const box = sheetBox(pageSize.value)
     const margin = pageScreenMargin.value

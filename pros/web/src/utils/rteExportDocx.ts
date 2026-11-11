@@ -230,6 +230,21 @@ function parseBlocks(root: HTMLElement): Block[] {
       if (child.nodeType !== Node.ELEMENT_NODE) continue
       const node = child as HTMLElement
       const tag = node.tagName.toLowerCase()
+      if (node.getAttribute('data-type') === 'callout' || node.classList.contains('rte-callout')) {
+        const text = (node.textContent || '').replace(/\s+/g, ' ').trim()
+        blocks.push({ kind: 'p', runs: [{ text: text ? `【高亮】${text}` : '【高亮】', marks: { bold: true } }] })
+        continue
+      }
+      if (node.getAttribute('data-type') === 'columns' || node.classList.contains('rte-columns')) {
+        const cols = Array.from(node.children).map((col) => (col.textContent || '').replace(/\s+/g, ' ').trim())
+        if (cols.length >= 2) {
+          blocks.push({
+            kind: 'table',
+            rows: [cols.map((text) => [{ text, marks: {} }])],
+          })
+          continue
+        }
+      }
       if (node.getAttribute('data-type') === 'image-group' || node.classList.contains('rte-image-group')) {
         const imgs = Array.from(node.querySelectorAll('img'))
         if (imgs.length >= 2) {
@@ -534,10 +549,15 @@ export async function buildDocxBlob(opts: {
       )
       const root = doc.getElementById('rte-docx-root') || doc.body
       const footnotes: Array<{ id: string; text: string }> = []
-      root.querySelectorAll('[data-fn-text]').forEach((el, index) => {
-        const id = String(index + 1)
+      root.querySelectorAll('[data-fn-text]').forEach((el) => {
+        if (el.getAttribute('data-fn-place') === 'end') return
+        const id = String(footnotes.length + 1)
         el.setAttribute('data-fn-export-id', id)
         footnotes.push({ id, text: el.getAttribute('data-fn-text') || '' })
+      })
+      const endnotes: string[] = []
+      root.querySelectorAll('[data-fn-place="end"]').forEach((el, index) => {
+        endnotes.push(`${index + 1}. ${el.getAttribute('data-fn-text') || ''}`)
       })
       const blocks = parseBlocks(root as HTMLElement)
       if (footnotes.length) {
@@ -568,6 +588,10 @@ export async function buildDocxBlob(opts: {
         return { rid }
       }
       bodyXml = blocksToBodyXml(blocks, resolveImage)
+      if (endnotes.length) {
+        bodyXml += paraXml([{ text: '尾注', marks: { bold: true } }])
+        bodyXml += endnotes.map((line) => paraXml([{ text: line, marks: {} }])).join('')
+      }
     } catch {
       bodyXml = ''
     }

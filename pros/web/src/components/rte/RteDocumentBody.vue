@@ -726,6 +726,31 @@ useParentScopeStamp()
           />
         </label>
         <label v-if="rte.pageSheetEnabled" data-rte-own class="rte-page-size-field">
+          偶数页眉
+          <input data-rte-own
+            class="rte-page-chrome-input"
+            :value="rte.pageChrome.headerEven"
+            maxlength="80"
+            aria-label="偶数页页眉"
+            :disabled="rte.viewMode !== 'edit'"
+            @change="rte.setPageHeaderEven(($event.target as HTMLInputElement).value)"
+          />
+        </label>
+        <label v-if="rte.pageSheetEnabled" data-rte-own class="rte-page-size-field">
+          装订线
+          <input data-rte-own
+            class="rte-page-chrome-input"
+            :value="rte.pageChrome.gutter"
+            type="number"
+            min="0"
+            max="40"
+            step="0.1"
+            aria-label="装订线毫米"
+            :disabled="rte.viewMode !== 'edit'"
+            @change="rte.setPageGutter(($event.target as HTMLInputElement).value)"
+          />
+        </label>
+        <label v-if="rte.pageSheetEnabled" data-rte-own class="rte-page-size-field">
           页脚
           <input data-rte-own
             class="rte-page-chrome-input"

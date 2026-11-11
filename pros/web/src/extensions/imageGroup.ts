@@ -75,6 +75,12 @@ const COLLAGE_AREAS = {
 } as const
 
 /** 12：左通高、右上下两张。21：左上下两张、右通高。 */
+function imageFit(img: HTMLImageElement, groupFit: 'cover' | 'contain'): 'cover' | 'contain' {
+  const own = img.getAttribute('data-fit')
+  if (own === 'cover' || own === 'contain') return own
+  return groupFit
+}
+
 function paintCollage(
   row: HTMLElement,
   layout: '12' | '21',
@@ -113,7 +119,7 @@ function paintCollage(
     if (img instanceof HTMLImageElement) {
       img.style.setProperty('width', '100%', 'important')
       img.style.setProperty('height', '100%', 'important')
-      img.style.setProperty('object-fit', fit, 'important')
+      img.style.setProperty('object-fit', imageFit(img, fit), 'important')
       img.style.setProperty('max-width', 'none', 'important')
     }
   })
@@ -146,7 +152,7 @@ function paintMix(row: HTMLElement, stackAt: number, fit: 'cover' | 'contain') {
       column += 1
     }
     const img = frame.querySelector('img')
-    if (img instanceof HTMLImageElement) img.style.setProperty('object-fit', fit, 'important')
+    if (img instanceof HTMLImageElement) img.style.setProperty('object-fit', imageFit(img, fit), 'important')
   })
 }
 

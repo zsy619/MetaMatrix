@@ -18,6 +18,20 @@ describe('脚注导出到 Word', () => {
   })
 })
 
+describe('高亮和分栏导出到 Word', () => {
+  it('高亮块保留文字，分栏排成一行', async () => {
+    const html = '<div data-type="callout">注意</div><div data-type="columns"><div>左</div><div>右</div></div>'
+    const blob = await buildDocxBlob({ title: '块', bodyHtml: html })
+    const zip = await JSZip.loadAsync(await blob.arrayBuffer())
+    const doc = await zip.file('word/document.xml')?.async('string')
+    expect(doc).toContain('高亮')
+    expect(doc).toContain('注意')
+    expect(doc).toContain('<w:tbl>')
+    expect(doc).toContain('左')
+    expect(doc).toContain('右')
+  })
+})
+
 describe('图片组导出到 Word', () => {
   it('两张及以上并排进同一行表格', async () => {
     const html =

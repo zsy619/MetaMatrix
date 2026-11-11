@@ -9,34 +9,84 @@ import {
   writePageChrome,
 } from './rtePageChrome.ts'
 
-assert.deepEqual(readPageChrome(undefined, 'p1'), { header: '', footer: '', pageNumber: 'none' })
+assert.deepEqual(readPageChrome(undefined, 'p1'), {
+  header: '',
+  headerEven: '',
+  footer: '',
+  footerEven: '',
+  pageNumber: 'none',
+  gutter: 0,
+})
 assert.deepEqual(normalizePageChrome({ header: ' 机密\n', footer: '内部', pageNumber: 'nope' }), {
   header: '机密',
+  headerEven: '',
   footer: '内部',
+  footerEven: '',
   pageNumber: 'none',
+  gutter: 0,
 })
-assert.equal(writePageChrome(undefined, 'p1', { header: '', footer: '', pageNumber: 'none' }), undefined)
+assert.equal(
+  writePageChrome(undefined, 'p1', {
+    header: '',
+    headerEven: '',
+    footer: '',
+    footerEven: '',
+    pageNumber: 'none',
+    gutter: 0,
+  }),
+  undefined,
+)
 assert.deepEqual(
-  writePageChrome(undefined, 'p1', { header: '机密', footer: '内部', pageNumber: 'page-n-of-m' }),
-  { p1: { header: '机密', footer: '内部', pageNumber: 'page-n-of-m' } },
+  writePageChrome(undefined, 'p1', {
+    header: '机密',
+    headerEven: '',
+    footer: '内部',
+    footerEven: '',
+    pageNumber: 'page-n-of-m',
+    gutter: 0,
+  }),
+  {
+    p1: {
+      header: '机密',
+      headerEven: '',
+      footer: '内部',
+      footerEven: '',
+      pageNumber: 'page-n-of-m',
+      gutter: 0,
+    },
+  },
 )
 assert.equal(
   writePageChrome(
     { p1: { header: '机密', footer: '', pageNumber: 'none' } },
     'p1',
-    { header: '  ', footer: '', pageNumber: 'none' },
+    { header: '  ', headerEven: '', footer: '', footerEven: '', pageNumber: 'none', gutter: 0 },
   ),
   undefined,
 )
 
-assert.deepEqual(applyChromeReserve({ top: 25.4, bottom: 0 }, { header: '', footer: '', pageNumber: 'none' }), {
-  top: 25.4,
-  bottom: 0,
-})
-assert.deepEqual(applyChromeReserve({ top: 0, bottom: 0 }, { header: '题', footer: '', pageNumber: 'page-n' }), {
-  top: 10,
-  bottom: 10,
-})
+assert.deepEqual(
+  applyChromeReserve({ top: 25.4, bottom: 0 }, {
+    header: '',
+    headerEven: '',
+    footer: '',
+    footerEven: '',
+    pageNumber: 'none',
+    gutter: 0,
+  }),
+  { top: 25.4, bottom: 0 },
+)
+assert.deepEqual(
+  applyChromeReserve({ top: 0, bottom: 0 }, {
+    header: '题',
+    headerEven: '',
+    footer: '',
+    footerEven: '',
+    pageNumber: 'page-n',
+    gutter: 0,
+  }),
+  { top: 10, bottom: 10 },
+)
 
 assert.equal(formatPageNumber('none', 2, 5), '')
 assert.equal(formatPageNumber('n', 2, 5), '2')

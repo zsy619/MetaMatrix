@@ -37,6 +37,12 @@ export const Footnote = Mark.create({
             ? { 'data-fn-text': attrs.text, title: attrs.text }
             : {},
       },
+      place: {
+        default: 'foot',
+        parseHTML: (el: HTMLElement) => (el.getAttribute('data-fn-place') === 'end' ? 'end' : 'foot'),
+        renderHTML: (attrs: { place?: string }) =>
+          attrs.place === 'end' ? { 'data-fn-place': 'end' } : {},
+      },
       n: {
         default: 1,
         parseHTML: (el: HTMLElement) => Number(el.getAttribute('data-fn-n') || 1) || 1,
@@ -88,27 +94,33 @@ export const Footnote = Mark.create({
         appendTransaction(transactions, _old, state) {
           if (!transactions.some((tr) => tr.docChanged)) return null
           if (transactions.some((tr) => tr.getMeta('footnoteRenumber'))) return null
-          const seen = new Set<string>()
-          const hits: Array<{ from: number; to: number; id: string; n: number; attrs: Record<string, unknown> }> = []
+          const seen = new Map<string, string>()
+          const hits: Array<{ from: number; to: number; id: string; n: number; place: string; attrs: Record<string, unknown> }> = []
           state.doc.descendants((node, pos) => {
             if (!node.isText) return
             for (const mark of node.marks) {
               if (mark.type.name !== 'footnote') continue
               const id = String(mark.attrs.id || '')
               if (!id) continue
+              const place = mark.attrs.place === 'end' ? 'end' : 'foot'
               hits.push({
                 from: pos,
                 to: pos + node.nodeSize,
                 id,
                 n: Number(mark.attrs.n || 0),
+                place,
                 attrs: mark.attrs as Record<string, unknown>,
               })
-              seen.add(id)
+              if (!seen.has(id)) seen.set(id, place)
             }
           })
           if (!hits.length) return null
-          const order = [...seen]
-          const expected = new Map(order.map((id, index) => [id, index + 1]))
+          const counters = { foot: 0, end: 0 }
+          const expected = new Map<string, number>()
+          for (const [id, place] of seen) {
+            counters[place === 'end' ? 'end' : 'foot'] += 1
+            expected.set(id, counters[place === 'end' ? 'end' : 'foot'])
+          }
           if (hits.every((hit) => hit.n === expected.get(hit.id))) return null
           let tr = state.tr
           const type = state.schema.marks.footnote

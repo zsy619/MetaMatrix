@@ -13,6 +13,8 @@ import Superscript from '@tiptap/extension-superscript'
 import TextAlign from '@tiptap/extension-text-align'
 import Link from '@tiptap/extension-link'
 import { Table } from '@tiptap/extension-table'
+import { TocBlock } from '../../../extensions/tocBlock'
+import { moveTableColumn, moveTableRow } from '../../../utils/rteTableLayout'
 import { TableRow } from '@tiptap/extension-table-row'
 import { RteImage } from '../../../extensions/rteImage'
 import { RteTableCell, RteTableHeader } from '../../../extensions/rteTableCells'
@@ -366,6 +368,7 @@ const editor = useEditor({
     TaskList,
     TaskItem.configure({ nested: true }),
     Table.configure({ resizable: true, handleWidth: 8 }),
+    TocBlock,
     TableRow,
     RteTableHeader,
     RteTableCell,
@@ -645,6 +648,26 @@ const editor = useEditor({
         return true
       }
       // Extra shortcuts (StarterKit already covers Mod-b/i etc.)
+      if (
+        event.altKey &&
+        !event.metaKey &&
+        !event.ctrlKey &&
+        !event.shiftKey &&
+        (event.key === 'ArrowUp' || event.key === 'ArrowDown' || event.key === 'ArrowLeft' || event.key === 'ArrowRight')
+      ) {
+        const tableEditor = editor.value
+        if (tableEditor?.isActive('table')) {
+          const dir = event.key === 'ArrowUp' || event.key === 'ArrowLeft' ? -1 : 1
+          const moved =
+            event.key === 'ArrowLeft' || event.key === 'ArrowRight'
+              ? moveTableColumn(tableEditor, dir)
+              : moveTableRow(tableEditor, dir)
+          if (moved) {
+            event.preventDefault()
+            return true
+          }
+        }
+      }
       const mod = event.metaKey || event.ctrlKey
       if (!mod) return false
       const ed = editor.value

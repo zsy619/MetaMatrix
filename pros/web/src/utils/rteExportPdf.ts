@@ -1,6 +1,6 @@
 import html2canvas from 'html2canvas'
 import { jsPDF } from 'jspdf'
-import { formatPageNumber, pageChromeIsEmpty, type PanelPageChrome } from './rtePageChrome'
+import { footerForPage, formatPageNumber, headerForPage, pageChromeIsEmpty, type PanelPageChrome } from './rtePageChrome'
 import { pdfPageFormat, type RtePageSizeId } from './rtePageSize'
 
 /** 在接近分页处向上寻找「偏白」行，避免切到文字中间 */
@@ -143,18 +143,25 @@ export async function buildPdfFromElement(
 
   const chrome = opts?.chrome && !pageChromeIsEmpty(opts.chrome) ? opts.chrome : null
   const total = Math.max(1, slices.length)
-  const headerImg = chrome?.header ? await rasterLine(chrome.header, canvas.width / scale) : null
+  const headerImgs: Array<HTMLCanvasElement | null> = []
   const footerImgs: Array<HTMLCanvasElement | null> = []
-  if (chrome && (chrome.footer || chrome.pageNumber !== 'none')) {
+  if (chrome) {
     for (let i = 0; i < total; i += 1) {
-      const line = [chrome.footer, formatPageNumber(chrome.pageNumber, i + 1, total)].filter(Boolean).join('    ')
-      footerImgs.push(await rasterLine(line, canvas.width / scale))
+      const header = headerForPage(chrome, i + 1)
+      headerImgs.push(header ? await rasterLine(header, canvas.width / scale) : null)
+      const footer = footerForPage(chrome, i + 1)
+      if (footer || chrome.pageNumber !== 'none') {
+        const line = [footer, formatPageNumber(chrome.pageNumber, i + 1, total)].filter(Boolean).join('    ')
+        footerImgs.push(line ? await rasterLine(line, canvas.width / scale) : null)
+      } else {
+        footerImgs.push(null)
+      }
     }
   }
 
   if (!slices.length) {
     pdf.text(opts?.title || '', marginLeft, marginTop + 6)
-    drawStrip(pdf, headerImg, marginLeft, 2, usableW)
+    drawStrip(pdf, headerImgs[0] || null, marginLeft, 2, usableW)
     return pdf.output('blob')
   }
 
@@ -172,7 +179,7 @@ export async function buildPdfFromElement(
     const sliceHmm = (sliceH * imgWmm) / canvas.width
     if (pageIndex > 0) pdf.addPage()
     pdf.addImage(imgData, 'JPEG', marginLeft, marginTop, imgWmm, sliceHmm)
-    drawStrip(pdf, headerImg, marginLeft, Math.max(1, (marginTop - 6) / 2), usableW)
+    drawStrip(pdf, headerImgs[pageIndex] || null, marginLeft, Math.max(1, (marginTop - 6) / 2), usableW)
     const footer = footerImgs[pageIndex]
     if (footer) {
       const footerHmm = (footer.height / footer.width) * usableW
