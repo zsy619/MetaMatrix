@@ -340,6 +340,9 @@ describe('新功能区按钮', () => {
     editor.commands.setTextSelection(cell)
     await openRibbon(wrapper, '表格')
     await clickTool(wrapper, '表格')
+    const insertGroup = [...document.querySelectorAll('.rte-table-menu button')].find((button) => (button.textContent || '').includes('插入') && !(button.textContent || '').includes('插入行'))
+    insertGroup!.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }))
+    await nextTick()
     const labels = ['向上插入行数量', '向下插入行数量', '向左插入列数量', '向右插入列数量']
     const inputs = labels.map((label) => document.querySelector(`input[aria-label="${label}"]`) as HTMLInputElement | null)
     expect(inputs.every(Boolean), '四个插入项各有数量').toBe(true)
@@ -367,6 +370,9 @@ describe('新功能区按钮', () => {
     })
     editor.commands.setTextSelection(again)
     await clickTool(wrapper, '表格')
+    const insertAgain = [...document.querySelectorAll('.rte-table-menu button')].find((button) => (button.textContent || '').includes('插入') && !(button.textContent || '').includes('插入行'))
+    insertAgain!.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }))
+    await nextTick()
     const inputAgain = document.querySelector('input[aria-label="向右插入列数量"]') as HTMLInputElement
     inputAgain.value = '2'
     inputAgain.dispatchEvent(new Event('input', { bubbles: true }))

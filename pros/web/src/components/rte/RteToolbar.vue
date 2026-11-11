@@ -1,15 +1,36 @@
 <script setup lang="ts">
-import { inject } from 'vue'
+import { inject, ref } from 'vue'
 import { RTE_BINDINGS } from './bindings'
 import { stepRibbonTab } from '../../utils/rteToolbarOptimize'
 import { useParentScopeStamp } from './inheritScope'
 import { buildChartGroups } from '../../utils/echarts/chartGroups'
 import { TABLE_MENU_ICONS } from './tableMenuIcons'
+import { TABLE_MENU_GROUPS, placeMenuFlyout } from './tableMenuGroups'
 import RteColorBoard from './RteColorBoard.vue'
 import RteSpacingFields from './RteSpacingFields.vue'
 
 const rte = inject(RTE_BINDINGS)
 if (!rte) throw new Error('RteToolbar 必须放在 RichTextEditor 里')
+const tableMenuGroup = ref('')
+const tableMenuFlyout = ref({ top: 0, left: 0 })
+function openTableMenuGroup(id: string, event: MouseEvent) {
+  tableMenuGroup.value = id
+  const el = event.currentTarget as HTMLElement | null
+  if (!el) return
+  tableMenuFlyout.value = placeMenuFlyout(el)
+}
+function tableMenuOps(keys: readonly string[]) {
+  const items = rte.tableOpItems as Array<{
+    key: string
+    label: string
+    run: () => void
+    insertCount?: boolean
+    danger?: boolean
+    disabled?: () => boolean
+    sepBefore?: boolean
+  }>
+  return keys.map((key) => items.find((op) => op.key === key)).filter((op): op is NonNullable<typeof op> => !!op)
+}
 const rteBindings = rte
 const vRteFloat = rteBindings.vRteFloat
 useParentScopeStamp()
@@ -954,47 +975,65 @@ function toggleChartGroupMenu(key: string) {
               @mouseenter="rte.onToolMenuEnter('table')"
               @mouseleave="rte.onToolMenuLeave($event, 'table', rte.closeTableMenu)"
             >
-              <template v-for="op in rte.tableOpItems" :key="op.key">
-                <div data-rte-own v-if="op.insertCount" class="rte-table-insert-line">
-                  <button data-rte-own
-                    type="button"
-                    role="menuitem"
-                    @click="op.run()"
-                  >
-                    <span data-rte-own class="rte-table-ctx-ico"><component :is="TABLE_MENU_ICONS[op.key]" /></span>
-                    <span data-rte-own>{{ op.label }}</span>
-                  </button>
-                  <label data-rte-own class="rte-table-insert-count">
-                    <input data-rte-own
-                      v-model.number="rte.tableInsertCounts[op.key]"
-                      type="number"
-                      min="1"
-                      max="99"
-                      step="1"
-                      inputmode="numeric"
-                      :aria-label="op.label + '数量'"
-                      title="填几就插入几行或几列，最少 1"
-                      @mousedown.stop="rte.rememberTableInsertSelection()"
-                      @click.stop
-                      @keydown.stop
-                      @blur="rte.normalizeTableInsertCount(op.key)"
-                    />
-                  </label>
+              <div data-rte-own
+                v-for="group in TABLE_MENU_GROUPS"
+                :key="'tbl-group-' + group.id"
+                class="rte-table-ctx-group"
+              >
+                <button data-rte-own
+                  type="button"
+                  role="menuitem"
+                  :class="{ active: tableMenuGroup === group.id }"
+                  @mouseenter="openTableMenuGroup(group.id, $event)"
+                  @click.stop="openTableMenuGroup(group.id, $event)"
+                >
+                  <span data-rte-own class="rte-table-ctx-ico"><component :is="TABLE_MENU_ICONS[group.id]" /></span>
+                  <span data-rte-own class="rte-table-ctx-label">{{ group.label }}</span>
+                  <span data-rte-own class="rte-table-ctx-caret" aria-hidden="true">▸</span>
+                </button>
+                <div data-rte-own
+                  v-if="tableMenuGroup === group.id"
+                  class="rte-table-ctx-flyout"
+                  :style="{ top: tableMenuFlyout.top + 'px', left: tableMenuFlyout.left + 'px' }"
+                  @mousedown.stop
+                >
+                  <template v-for="op in tableMenuOps(group.keys)" :key="op.key">
+                    <div data-rte-own v-if="op.insertCount" class="rte-table-insert-line">
+                      <button data-rte-own type="button" role="menuitem" @click="op.run()">
+                        <span data-rte-own class="rte-table-ctx-ico"><component :is="TABLE_MENU_ICONS[op.key]" /></span>
+                        <span data-rte-own>{{ op.label }}</span>
+                      </button>
+                      <label data-rte-own class="rte-table-insert-count">
+                        <input data-rte-own
+                          v-model.number="rte.tableInsertCounts[op.key]"
+                          type="number"
+                          min="1"
+                          max="99"
+                          step="1"
+                          inputmode="numeric"
+                          :aria-label="op.label + '数量'"
+                          title="填几就插入几行或几列，最少 1"
+                          @mousedown.stop="rte.rememberTableInsertSelection()"
+                          @click.stop
+                          @keydown.stop
+                          @blur="rte.normalizeTableInsertCount(op.key)"
+                        />
+                      </label>
+                    </div>
+                    <button data-rte-own
+                      v-else
+                      type="button"
+                      role="menuitem"
+                      :class="{ danger: op.danger }"
+                      :disabled="op.disabled?.()"
+                      @click="op.run()"
+                    >
+                      <span data-rte-own class="rte-table-ctx-ico"><component :is="TABLE_MENU_ICONS[op.key]" /></span>
+                      <span data-rte-own>{{ op.label }}</span>
+                    </button>
+                  </template>
                 </div>
-                <template v-else-if="!op.insertCount">
-                  <div data-rte-own v-if="op.sepBefore" class="rte-menu-sep" aria-hidden="true" />
-                  <button data-rte-own
-                    type="button"
-                    role="menuitem"
-                    :class="{ danger: op.danger }"
-                    :disabled="op.disabled?.()"
-                    @click="op.run()"
-                  >
-                    <span data-rte-own class="rte-table-ctx-ico"><component :is="TABLE_MENU_ICONS[op.key]" /></span>
-                    <span data-rte-own>{{ op.label }}</span>
-                  </button>
-                </template>
-              </template>
+              </div>
               <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
               <div data-rte-own class="rte-menu-hint-line">拖拽列边缘调整列宽。多选单元格后可合并。</div>
               <div data-rte-own class="rte-table-cell-style-title" style="padding: 4px 10px">单元格背景</div>

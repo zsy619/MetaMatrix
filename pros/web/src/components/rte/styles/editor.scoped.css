@@ -1321,10 +1321,11 @@
 }
 
 .rte-float-menu.rte-table-menu {
-  min-width: 220px;
+  min-width: 128px;
+  width: max-content;
+  max-width: 168px;
   z-index: 60;
-  max-height: min(70vh, 520px);
-  overflow: auto;
+  overflow: visible;
 }
 
 .rte-table-ctx-mask {

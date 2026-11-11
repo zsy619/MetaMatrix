@@ -2,20 +2,13 @@
 import { computed, inject, ref, watch } from 'vue'
 import { RTE_BINDINGS } from './bindings'
 import { TABLE_MENU_ICONS } from './tableMenuIcons'
+import { TABLE_MENU_GROUPS, placeMenuFlyout } from './tableMenuGroups'
 import { useParentScopeStamp } from './inheritScope'
 import RteAvPickDialog from './RteAvPickDialog.vue'
 
 const rte = inject(RTE_BINDINGS)
 if (!rte) throw new Error('RtePortals 必须放在 RichTextEditor 里')
 useParentScopeStamp()
-
-const TABLE_CTX_GROUPS = [
-  { id: 'insert', label: '插入', keys: ['row-before', 'row-after', 'col-before', 'col-after'] },
-  { id: 'cell', label: '单元格', keys: ['merge', 'split', 'clear-cell', 'valign-top', 'valign-middle', 'valign-bottom', 'align-left', 'align-center', 'align-right'] },
-  { id: 'head', label: '表头', keys: ['header', 'header-col', 'sticky-header', 'sticky-col'] },
-  { id: 'data', label: '数据', keys: ['dup-row', 'equal-cols', 'cell-formula', 'calc-formula', 'sum-row', 'sort-asc', 'sort-desc', 'row-filter', 'copy-csv', 'copy-tsv'] },
-  { id: 'delete', label: '删除', keys: ['del-row', 'del-col', 'del-table'] },
-] as const
 
 const tableCtxGroup = ref('')
 const tableCtxFlyout = ref({ top: 0, left: 0 })
@@ -27,13 +20,7 @@ function openTableCtxGroup(id: string, event: MouseEvent) {
   tableCtxGroup.value = id
   const el = event.currentTarget as HTMLElement | null
   if (!el) return
-  const rect = el.getBoundingClientRect()
-  const flyoutWidth = 248
-  const flip = rect.right + flyoutWidth + 8 > window.innerWidth
-  tableCtxFlyout.value = {
-    top: Math.max(8, rect.top),
-    left: flip ? Math.max(8, rect.left - flyoutWidth - 4) : rect.right + 4,
-  }
+  tableCtxFlyout.value = placeMenuFlyout(el)
 }
 
 function tableCtxOps(keys: readonly string[]) {
@@ -542,7 +529,7 @@ const echartsDialogTemplates = computed(() => {
           @mousedown.stop.prevent
         >
           <div data-rte-own
-            v-for="group in TABLE_CTX_GROUPS"
+            v-for="group in TABLE_MENU_GROUPS"
             :key="'ctx-group-' + group.id"
             class="rte-table-ctx-group"
           >
@@ -634,7 +621,9 @@ const echartsDialogTemplates = computed(() => {
         >
           <h3 data-rte-own class="rte-table-title">表格操作</h3>
           <div data-rte-own class="rte-table-ops-list">
-            <template v-for="op in rte.tableOpItems" :key="'sheet-' + op.key">
+            <template v-for="group in TABLE_MENU_GROUPS" :key="'sheet-group-' + group.id">
+              <div data-rte-own class="rte-table-cell-style-title">{{ group.label }}</div>
+              <template v-for="op in tableCtxOps(group.keys)" :key="'sheet-' + op.key">
               <div data-rte-own v-if="op.insertCount" class="rte-table-insert-line">
                 <button data-rte-own
                   type="button"
@@ -673,6 +662,7 @@ const echartsDialogTemplates = computed(() => {
                   <span data-rte-own class="rte-table-ctx-ico"><component :is="TABLE_MENU_ICONS[op.key]" /></span>
                   <span data-rte-own>{{ op.label }}</span>
                 </button>
+              </template>
               </template>
             </template>
             <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
