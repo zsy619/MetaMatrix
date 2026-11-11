@@ -2327,6 +2327,44 @@ export interface TenCheckDocumentJSON {
   rows: TenCheckRow[]
 }
 
+/** 选场景三高：高频 / 高价值 / 高边际成本 */
+export type SceneThreeHighAxisId = 'frequency' | 'value' | 'marginal'
+
+export interface SceneThreeHighScores {
+  frequency: number
+  value: number
+  marginal: number
+}
+
+export interface SceneThreeHighAxis {
+  id: SceneThreeHighAxisId
+  title: string
+  headline: string
+  body: string
+}
+
+export interface SceneThreeHighBusiness {
+  id: string
+  name: string
+  color: string
+  stroke: string
+  scores: SceneThreeHighScores
+  note: string
+}
+
+export interface SceneThreeHighDocumentJSON {
+  id: string
+  type: 'scene_three_high'
+  schemaVersion: number
+  theme: CanvasTheme
+  kicker: string
+  title: string
+  verdict: string
+  passScore: number
+  axes: SceneThreeHighAxis[]
+  businesses: SceneThreeHighBusiness[]
+}
+
 /** 科学决策三角形（宽度 / 高度 / 深度） */
 export type DecisionTriangleBlockId = 'width' | 'height' | 'depth'
 
@@ -2416,6 +2454,7 @@ export type CanvasDocumentJSON = (
   | SoarDocumentJSON
   | PlayingToWinDocumentJSON
   | TenCheckDocumentJSON
+  | SceneThreeHighDocumentJSON
 ) & WithPanelAttachments
 
 /** 带 blocks 的画布（双三角 / Y 模型 / 刻意练习） */
@@ -3098,6 +3137,10 @@ export function isPlayingToWinDoc(doc: CanvasDocumentJSON | null | undefined): d
 
 export function isTenCheckDoc(doc: CanvasDocumentJSON | null | undefined): doc is TenCheckDocumentJSON {
   return !!doc && doc.type === 'ten_check'
+}
+
+export function isSceneThreeHighDoc(doc: CanvasDocumentJSON | null | undefined): doc is SceneThreeHighDocumentJSON {
+  return !!doc && doc.type === 'scene_three_high'
 }
 
 export function isBreakEvenDoc(doc: CanvasDocumentJSON | null | undefined): doc is BreakEvenDocumentJSON {

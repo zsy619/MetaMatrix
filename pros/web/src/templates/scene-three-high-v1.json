@@ -1,0 +1,53 @@
+{
+  "id": "canvas_scene_three_high",
+  "type": "scene_three_high",
+  "schemaVersion": 1,
+  "theme": {
+    "background": { "pattern": "none", "color": "#f7f7f7" },
+    "page": "#f7f7f7",
+    "frame": "#ececec",
+    "hairline": "rgba(60, 50, 20, 0.08)"
+  },
+  "kicker": "STEP 1 · 选场景",
+  "title": "三高：高频、高价值、高边际成本",
+  "verdict": "判断动作：把你要做的那件事按三高打分，三项都到 7 分以上，才进下一步。",
+  "passScore": 7,
+  "axes": [
+    {
+      "id": "frequency",
+      "title": "高频",
+      "headline": "一周至少三次",
+      "body": "高频才会被反复校准。一个月做一次的事，做成了也没人记得怎么用。"
+    },
+    {
+      "id": "value",
+      "title": "高价值",
+      "headline": "单次耗得起时间",
+      "body": "这件事本身值得花 30 分钟以上。3 分钟的事，AI 省下来的时间不够培训成本。"
+    },
+    {
+      "id": "marginal",
+      "title": "高边际成本",
+      "headline": "多一个人，就多一份贵",
+      "body": "靠加人才能撑规模的环节，才是 AI 真正能把曲线掰弯的地方。"
+    }
+  ],
+  "businesses": [
+    {
+      "id": "biz_service",
+      "name": "客服回复",
+      "color": "rgba(212, 175, 55, 0.38)",
+      "stroke": "#c9a227",
+      "scores": { "frequency": 9, "value": 8, "marginal": 8 },
+      "note": ""
+    },
+    {
+      "id": "biz_report",
+      "name": "月度汇报",
+      "color": "rgba(77, 182, 172, 0.42)",
+      "stroke": "#26a69a",
+      "scores": { "frequency": 2, "value": 6, "marginal": 3 },
+      "note": ""
+    }
+  ]
+}

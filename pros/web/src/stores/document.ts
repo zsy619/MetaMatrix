@@ -125,6 +125,7 @@ import type {
   SoarDocumentJSON,
   PlayingToWinDocumentJSON,
   TenCheckDocumentJSON,
+  SceneThreeHighDocumentJSON,
   PanelAttachment,
   AttachmentsByPanelId,
 } from '../types/canvas'
@@ -258,6 +259,7 @@ import goldenCircleTemplate from '../templates/golden-circle-v1.json'
 import soarTemplate from '../templates/soar-v1.json'
 import playingToWinTemplate from '../templates/playing-to-win-v1.json'
 import tenCheckTemplate from '../templates/ten-check-v1.json'
+import sceneThreeHighTemplate from '../templates/scene-three-high-v1.json'
 import { CONTEXT_SIX_ELEMENTS_BLOCK_ID } from '../utils/contextSixElements'
 
 export type TemplateId =
@@ -331,6 +333,7 @@ export type TemplateId =
   | 'soar'
   | 'playing-to-win'
   | 'ten-check'
+  | 'scene-three-high'
 
 const TEMPLATES: Record<TemplateId, CanvasDocumentJSON> = {
   'dual-triangle': dualTriangleTemplate as DualTriangleDocumentJSON,
@@ -408,6 +411,7 @@ const TEMPLATES: Record<TemplateId, CanvasDocumentJSON> = {
   soar: soarTemplate as SoarDocumentJSON,
   'playing-to-win': playingToWinTemplate as PlayingToWinDocumentJSON,
   'ten-check': tenCheckTemplate as TenCheckDocumentJSON,
+  'scene-three-high': sceneThreeHighTemplate as SceneThreeHighDocumentJSON,
 }
 
 export function isTemplateId(id: string): id is TemplateId {
@@ -962,6 +966,12 @@ export const TEMPLATE_META: Record<
     name: '十格自检',
     badge: '自检 · 十格',
     description: '逐格写事实。出现不合格信号，这一格先不过。',
+    category: 'method',
+  },
+  'scene-three-high': {
+    name: '选场景三高',
+    badge: '选场景 · 三高',
+    description: '高频、高价值、高边际成本。多个业务叠在雷达上，三项都到 7 分才进下一步。',
     category: 'method',
   },
 }
