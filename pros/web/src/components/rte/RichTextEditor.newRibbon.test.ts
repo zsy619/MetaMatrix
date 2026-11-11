@@ -608,4 +608,25 @@ describe('新功能区按钮', () => {
     expect(editor.getHTML()).toContain('data-border')
     wrapper.unmount()
   })
+
+  it('除告示外，下拉子项都带图标', async () => {
+    const wrapper = await mountEditor()
+    await openRibbon(wrapper, '段落与列表')
+    await clickTool(wrapper, '列表')
+    for (const label of ['无序列表', '有序列表', '任务列表', '增加缩进']) {
+      const item = [...document.body.querySelectorAll('.rte-menu button')].find((button) => button.textContent === label)
+      expect(item, label).toBeTruthy()
+      expect(item!.querySelector('svg'), `${label}图标`).toBeTruthy()
+    }
+    await openRibbon(wrapper, '整理')
+    await clickTool(wrapper, '整理')
+    const half = [...document.body.querySelectorAll('.rte-menu button')].find((button) => button.textContent === '转为半角')
+    expect(half?.querySelector('svg'), '整理图标').toBeTruthy()
+    await openRibbon(wrapper, '块与结构')
+    await clickTool(wrapper, '告示')
+    const calloutButtons = [...document.body.querySelectorAll('.rte-callout-menu button')]
+    expect(calloutButtons.length).toBeGreaterThan(0)
+    expect(calloutButtons.every((button) => !button.querySelector('svg'))).toBe(true)
+    wrapper.unmount()
+  })
 })

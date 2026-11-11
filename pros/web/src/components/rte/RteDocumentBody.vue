@@ -12,6 +12,7 @@ import RteSourceCodeEditor from './RteSourceCodeEditor.vue'
 import RteTableFormulaBar from './RteTableFormulaBar.vue'
 import { RTE_BINDINGS } from './bindings'
 import { useParentScopeStamp } from './inheritScope'
+import RteMenuGlyph from './RteMenuGlyph.vue'
 
 const rte = inject(RTE_BINDINGS)
 if (!rte) throw new Error('RteDocumentBody 必须放在 RichTextEditor 里')
@@ -42,6 +43,7 @@ useParentScopeStamp()
           class="rte-hr-option"
           @click="rte.insertHrVariant(opt.value)"
         >
+          <RteMenuGlyph :id="opt.value" :label="opt.label" />
           <span data-rte-own class="rte-hr-preview" :data-variant="opt.value" aria-hidden="true" />
           <span data-rte-own>{{ opt.label }}</span>
         </button>
@@ -56,11 +58,11 @@ useParentScopeStamp()
         @mouseenter="rte.onToolMenuEnter('blockOps')"
         @mouseleave="rte.onToolMenuLeave($event, 'blockOps', () => (rte.blockOpsOpen = false))"
       >
-        <button data-rte-own type="button" @click="rte.selectCurrentBlock(); rte.blockOpsOpen = false">全选当前块</button>
-        <button data-rte-own type="button" @click="rte.duplicateCurrentBlock(); rte.blockOpsOpen = false">复制当前块</button>
+        <button data-rte-own type="button" @click="rte.selectCurrentBlock(); rte.blockOpsOpen = false"><RteMenuGlyph label="全选当前块" />全选当前块</button>
+        <button data-rte-own type="button" @click="rte.duplicateCurrentBlock(); rte.blockOpsOpen = false"><RteMenuGlyph label="复制当前块" />复制当前块</button>
         <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
-        <button data-rte-own type="button" @click="rte.moveCurrentBlock(-1); rte.blockOpsOpen = false">上移一块</button>
-        <button data-rte-own type="button" @click="rte.moveCurrentBlock(1); rte.blockOpsOpen = false">下移一块</button>
+        <button data-rte-own type="button" @click="rte.moveCurrentBlock(-1); rte.blockOpsOpen = false"><RteMenuGlyph label="上移一块" />上移一块</button>
+        <button data-rte-own type="button" @click="rte.moveCurrentBlock(1); rte.blockOpsOpen = false"><RteMenuGlyph label="下移一块" />下移一块</button>
       </div>
     </Teleport>
     <Teleport to="body">
@@ -72,8 +74,8 @@ useParentScopeStamp()
         @mouseenter="rte.onToolMenuEnter('insertDate')"
         @mouseleave="rte.onToolMenuLeave($event, 'insertDate', () => (rte.insertDateOpen = false))"
       >
-        <button data-rte-own type="button" @click="rte.insertPlainDate(); rte.insertDateOpen = false">今天日期</button>
-        <button data-rte-own type="button" @click="rte.insertPlainDateTime(); rte.insertDateOpen = false">现在时间</button>
+        <button data-rte-own type="button" @click="rte.insertPlainDate(); rte.insertDateOpen = false"><RteMenuGlyph label="今天日期" />今天日期</button>
+        <button data-rte-own type="button" @click="rte.insertPlainDateTime(); rte.insertDateOpen = false"><RteMenuGlyph label="现在时间" />现在时间</button>
       </div>
     </Teleport>
 
