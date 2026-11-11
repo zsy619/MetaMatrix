@@ -3968,6 +3968,14 @@
   padding: 14px 14px 12px;
   box-shadow: 0 8px 28px rgba(32, 33, 36, 0.14);
 }
+.rte-find-drag {
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+.rte-find-drag:active {
+  cursor: grabbing;
+}
 .rte-wordcount {
   border: none;
   background: transparent;

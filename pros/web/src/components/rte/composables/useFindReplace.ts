@@ -12,6 +12,12 @@ import {
   type RteFindScope,
 } from '../../../utils/rteFindReplace'
 import { canRunFindReplace } from '../../../utils/rteRound5'
+import {
+  clampFindDialogPos,
+  readFindDialogPos,
+  writeFindDialogPos,
+  type FindDialogPos,
+} from '../../../utils/rteFindDialogPos'
 
 const FIND_PREFS_KEY = 'rte-find-prefs-v1'
 
@@ -39,6 +45,51 @@ export function useFindReplace(deps: {
 }) {
   const savedPrefs = readFindPrefs()
   const findDialogOpen = ref(false)
+  const findDialogPos = ref<FindDialogPos | null>(readFindDialogPos())
+  const findDialogStyle = computed(() => {
+    const pos = findDialogPos.value
+    if (!pos) return undefined
+    return { left: `${pos.left}px`, top: `${pos.top}px`, right: 'auto' }
+  })
+  let findDrag: { pointerId: number; dx: number; dy: number; width: number; height: number } | null = null
+
+  function placeFindDialog(pos: FindDialogPos, size: { width: number; height: number }) {
+    findDialogPos.value = clampFindDialogPos(pos.left, pos.top, size.width, size.height)
+  }
+
+  function onFindDialogDragStart(event: PointerEvent) {
+    if (event.button !== 0) return
+    const target = event.target
+    if (target instanceof Element && target.closest('input, textarea, select, button, a, label')) return
+    const handle = event.currentTarget
+    const dialog = handle instanceof HTMLElement ? handle.closest('.rte-find-dialog') : null
+    if (!(dialog instanceof HTMLElement)) return
+    const rect = dialog.getBoundingClientRect()
+    findDrag = {
+      pointerId: event.pointerId,
+      dx: event.clientX - rect.left,
+      dy: event.clientY - rect.top,
+      width: rect.width,
+      height: rect.height,
+    }
+    placeFindDialog({ left: rect.left, top: rect.top }, rect)
+    if (handle instanceof HTMLElement) handle.setPointerCapture?.(event.pointerId)
+    event.preventDefault()
+  }
+
+  function onFindDialogDragMove(event: PointerEvent) {
+    if (!findDrag || event.pointerId !== findDrag.pointerId) return
+    placeFindDialog(
+      { left: event.clientX - findDrag.dx, top: event.clientY - findDrag.dy },
+      findDrag,
+    )
+  }
+
+  function onFindDialogDragEnd(event: PointerEvent) {
+    if (!findDrag || event.pointerId !== findDrag.pointerId) return
+    findDrag = null
+    if (findDialogPos.value) writeFindDialogPos(findDialogPos.value)
+  }
   const findQuery = ref('')
   const findReplaceText = ref('')
   const findCaseSensitive = ref(savedPrefs.caseSensitive)
@@ -113,6 +164,12 @@ export function useFindReplace(deps: {
       }
     }
     nextTick(() => {
+      const dialog = document.querySelector('.rte-find-dialog') as HTMLElement | null
+      if (dialog && findDialogPos.value) {
+        const rect = dialog.getBoundingClientRect()
+        placeFindDialog(findDialogPos.value, rect)
+        writeFindDialogPos(findDialogPos.value)
+      }
       const el = document.querySelector('.rte-find-query') as HTMLInputElement | null
       el?.focus()
       el?.select()
@@ -213,6 +270,10 @@ export function useFindReplace(deps: {
 
   return {
     findDialogOpen,
+    findDialogStyle,
+    onFindDialogDragStart,
+    onFindDialogDragMove,
+    onFindDialogDragEnd,
     findQuery,
     findReplaceText,
     findCaseSensitive,

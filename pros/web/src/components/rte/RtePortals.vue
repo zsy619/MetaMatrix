@@ -782,10 +782,18 @@ const echartsDialogTemplates = computed(() => {
           class="rte-link-dialog rte-find-dialog rte-find-bar"
           role="dialog"
           aria-label="查找与替换"
+          :style="rte.findDialogStyle"
           @mousedown.stop
           @keydown.esc.prevent="rte.closeFindDialog"
         >
-          <h3 data-rte-own class="rte-table-title">查找与替换</h3>
+          <h3 data-rte-own
+            class="rte-table-title rte-find-drag"
+            title="拖动"
+            @pointerdown="rte.onFindDialogDragStart"
+            @pointermove="rte.onFindDialogDragMove"
+            @pointerup="rte.onFindDialogDragEnd"
+            @pointercancel="rte.onFindDialogDragEnd"
+          >查找与替换</h3>
           <div data-rte-own class="rte-note-field rte-note-text-field" style="width: 100%; margin-bottom: 10px">
             <span data-rte-own class="rte-note-field-icon" aria-hidden="true">🔍</span>
             <input data-rte-own

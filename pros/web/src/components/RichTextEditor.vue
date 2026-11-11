@@ -4884,6 +4884,10 @@ function onFormInspectorMouseUp() {
 /** —— 查找 / 替换 —— */
 const {
   findDialogOpen,
+  findDialogStyle,
+  onFindDialogDragStart,
+  onFindDialogDragMove,
+  onFindDialogDragEnd,
   findQuery,
   findReplaceText,
   findCaseSensitive,
@@ -7943,6 +7947,10 @@ provideRteBindings({
   filteredXrefTargets,
   findCaseSensitive,
   findDialogOpen,
+  findDialogStyle,
+  onFindDialogDragStart,
+  onFindDialogDragMove,
+  onFindDialogDragEnd,
   findGo,
   findQuery,
   findReplaceText,
