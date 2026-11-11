@@ -2303,10 +2303,18 @@ export type TenCheckRowId =
 export interface TenCheckRow {
   id: TenCheckRowId
   name: string
+  /** 你要填什么：格子上的说明，不随正文改写 */
   prompt: string
+  /** 它帮你判断：格子上的说明 */
   judges: string
+  /** 不合格的信号：格子上的说明 */
   fail: string
+  /** 「你要填什么」富文本 */
   answer: string
+  /** 「它帮你判断」富文本；旧文档若把说明写成了 HTML，会迁到这里 */
+  judgeNote?: string
+  /** 「不合格的信号」富文本 */
+  failNote?: string
   passed: boolean | null
 }
 

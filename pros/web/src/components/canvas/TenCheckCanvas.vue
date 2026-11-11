@@ -5,7 +5,8 @@ import type { TenCheckDocumentJSON, TenCheckRow, TenCheckRowId } from '../../typ
 import { isTenCheckDoc } from '../../types/canvas'
 import { useDocumentStore } from '../../stores/document'
 import TenCheckCell from './TenCheckCell.vue'
-import { itemTextToHtml, normalizeHtmlForCompare } from '../../utils/itemsHtml'
+import tenCheckTemplate from '../../templates/ten-check-v1.json'
+import { itemTextToHtml, looksLikeHtml, normalizeHtmlForCompare } from '../../utils/itemsHtml'
 
 const props = defineProps<{ doc: TenCheckDocumentJSON }>()
 const documentStore = useDocumentStore()
@@ -20,18 +21,44 @@ function patch(mutator: (doc: TenCheckDocumentJSON) => void) {
   })
 }
 
-function cellHtml(item: TenCheckRow, field: 'answer' | 'judges' | 'fail'): string {
-  if (field === 'answer' && !item.answer.trim()) return itemTextToHtml(item.prompt)
-  return itemTextToHtml(item[field])
+type NoteField = 'answer' | 'judges' | 'fail'
+
+const seedRows = (tenCheckTemplate as TenCheckDocumentJSON).rows
+
+function noteKey(field: NoteField): 'answer' | 'judgeNote' | 'failNote' {
+  if (field === 'judges') return 'judgeNote'
+  if (field === 'fail') return 'failNote'
+  return 'answer'
 }
 
-function write(id: TenCheckRowId, field: 'answer' | 'judges' | 'fail', html: string) {
+function guideKey(field: NoteField): 'prompt' | 'judges' | 'fail' {
+  if (field === 'answer') return 'prompt'
+  return field
+}
+
+/** 说明始终留在格子上。正文若曾写进说明字段，改从富文本里读。 */
+function guideText(item: TenCheckRow, field: NoteField): string {
+  const key = guideKey(field)
+  const raw = item[key] ?? ''
+  if (!looksLikeHtml(raw)) return raw
+  return seedRows.find((row) => row.id === item.id)?.[key] ?? ''
+}
+
+function cellHtml(item: TenCheckRow, field: NoteField): string {
+  const note = item[noteKey(field)] ?? ''
+  if (note.trim()) return itemTextToHtml(note)
+  if (field !== 'answer' && looksLikeHtml(item[field])) return item[field]
+  return '<p></p>'
+}
+
+function write(id: TenCheckRowId, field: NoteField, html: string) {
   const current = props.doc.rows.find((entry) => entry.id === id)
   if (!current) return
   if (normalizeHtmlForCompare(cellHtml(current, field)) === normalizeHtmlForCompare(html)) return
+  const key = noteKey(field)
   patch((doc) => {
     const item = doc.rows.find((entry) => entry.id === id)
-    if (item) item[field] = html
+    if (item) item[key] = html
   })
 }
 
@@ -71,12 +98,14 @@ function mark(id: TenCheckRowId, passed: boolean) {
         <strong>{{ item.name }}</strong>
         <TenCheckCell
           :label="`${item.name} · 你要填什么`"
+          :note="guideText(item, 'answer')"
           :panel-id="`ten:${item.id}:fill`"
           :model-value="cellHtml(item, 'answer')"
           @update:model-value="write(item.id, 'answer', $event)"
         />
         <TenCheckCell
           :label="`${item.name} · 它帮你判断`"
+          :note="guideText(item, 'judges')"
           :panel-id="`ten:${item.id}:judge`"
           :model-value="cellHtml(item, 'judges')"
           @update:model-value="write(item.id, 'judges', $event)"
@@ -84,6 +113,7 @@ function mark(id: TenCheckRowId, passed: boolean) {
         <TenCheckCell
           fail
           :label="`${item.name} · 不合格的信号`"
+          :note="guideText(item, 'fail')"
           :panel-id="`ten:${item.id}:fail`"
           :model-value="cellHtml(item, 'fail')"
           @update:model-value="write(item.id, 'fail', $event)"
@@ -109,7 +139,7 @@ function mark(id: TenCheckRowId, passed: boolean) {
 .table { flex: none; min-width: 980px; background: #fffdf8; border: 1px solid rgba(62, 48, 28, 0.08); border-radius: 14px; }
 .head, .row { display: grid; grid-template-columns: 42px 112px minmax(220px, 1.3fr) minmax(180px, 1fr) minmax(180px, 1fr) 92px; gap: 8px; align-items: stretch; }
 .head { position: sticky; top: 0; z-index: 4; align-items: center; min-height: 40px; padding: 0 12px; border-radius: 14px 14px 0 0; background: #3e3428; color: #fff; font-size: 13px; font-weight: 700; }
-.row { height: 180px; min-height: 180px; max-height: 180px; padding: 0 8px; border-top: 1px solid #f1ebe3; overflow: hidden; }
+.row { height: 200px; min-height: 200px; max-height: 200px; padding: 0 8px; border-top: 1px solid #f1ebe3; overflow: hidden; }
 .row[data-pass='false'] { background: #fff6f6; }
 .row[data-pass='true'] { background: #f4fbf6; }
 .num, .row > strong { display: flex; align-items: center; min-width: 0; }

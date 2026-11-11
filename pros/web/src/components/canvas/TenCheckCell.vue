@@ -5,6 +5,8 @@ import PanelAttachments from './PanelAttachments.vue'
 
 const props = defineProps<{
   label: string
+  /** 格子上始终保留的说明，不写进正文 */
+  note?: string
   panelId: string
   modelValue: string
   fail?: boolean
@@ -29,6 +31,7 @@ function onClose(event?: Event) {
 
 <template>
   <div class="cell" :class="{ 'is-fail': fail, 'is-source-max': isMaximized }">
+    <p v-if="note" class="cell-note">{{ note }}</p>
     <button
       type="button"
       class="pm-max-btn cell-max"
@@ -79,7 +82,10 @@ function onClose(event?: Event) {
     >
       <div class="pm-card" @click.stop>
         <div class="pm-header">
-          <h3 class="pm-title">{{ label }}</h3>
+          <div class="pm-heading">
+            <h3 class="pm-title">{{ label }}</h3>
+            <p v-if="note" class="pm-note">{{ note }}</p>
+          </div>
           <div class="pm-actions">
             <button type="button" class="pm-icon-btn" title="还原" aria-label="还原" @click="onClose">
               <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
@@ -118,6 +124,27 @@ function onClose(event?: Event) {
   min-height: 0;
   height: 100%;
   display: flex;
+  flex-direction: column;
+}
+.cell-note {
+  flex: none;
+  margin: 0;
+  padding: 8px 30px 0 8px;
+  color: #5c574e;
+  font-size: 12px;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.cell.is-fail .cell-note { color: #9b1c1c; }
+.pm-heading { flex: 1; min-width: 0; }
+.pm-note {
+  margin: 2px 0 0;
+  color: #5c574e;
+  font-size: 13px;
+  line-height: 1.45;
 }
 .cell-max {
   position: absolute;
@@ -135,7 +162,8 @@ function onClose(event?: Event) {
   font-size: 13px;
 }
 .cell :deep(.rte-root) {
-  height: 100%;
+  flex: 1 1 auto;
+  height: auto;
   min-height: 0;
   border: none;
   border-radius: 0;
@@ -147,7 +175,5 @@ function onClose(event?: Event) {
 .cell :deep(.rte-canvas),
 .cell :deep(.rte-body) { flex: 1 1 auto; min-height: 0; }
 .cell :deep(.rte-canvas) { padding: 8px 28px 4px 8px; background: transparent; overflow: auto; }
-.cell :deep(.ProseMirror) { min-height: 140px; font-size: 14px; line-height: 1.55; }
-.cell.is-fail :deep(.ProseMirror),
-.pm-rte.is-fail :deep(.ProseMirror) { color: #9b1c1c; }
+.cell :deep(.ProseMirror) { min-height: 0; font-size: 14px; line-height: 1.55; }
 </style>
