@@ -17,7 +17,6 @@ import ChartDataSourceSection from './ChartDataSourceSection.vue'
 import ChartStyleSection from './ChartStyleSection.vue'
 import ChartAdvancedJsonSection from './ChartAdvancedJsonSection.vue'
 import { useChartPanel } from './useChartPanel'
-import { useChartPanelPreview } from './useChartPanelPreview'
 import type { useChartPanelHost } from './useChartPanelHost'
 import { isSameEchartsOption } from '../../../utils/echarts/chartOptionPath'
 import { writeChartSecret } from '../../../utils/echarts/chartSecret'
@@ -37,12 +36,6 @@ watch(() => [visible.value, props.host.target?.chartId] as const, () => { void n
 const panelStyle = computed(() => ({
   '--rte-chart-panel-width': `${chartPanelWidth(chartBlockWidth.value, window.innerWidth || 1280)}px`,
 }))
-const { previewEl, previewError } = useChartPanelPreview({
-  visible,
-  option: computed(() => panel.draft),
-  tick: computed(() => panel.revision),
-})
-
 /** 把宿主里的目标转成面板需要的形状。 */
 function toPanelTarget() {
   const next = props.host.target
@@ -270,8 +263,6 @@ function onChangeChartType(event: Event) {
 
     <div class="rte-cp-body">
       <p v-if="panel.error" class="rte-cp-error">{{ panel.error }}</p>
-      <p v-if="previewError" class="rte-cp-error">{{ previewError }}</p>
-      <div ref="previewEl" class="rte-cp-preview-slot" aria-label="图表预览"></div>
       <ChartGeneralSection :panel="panel" />
       <ChartAxisSection :panel="panel" />
       <ChartSeriesSection :panel="panel" />
