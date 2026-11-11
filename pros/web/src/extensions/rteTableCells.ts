@@ -4,6 +4,7 @@ import { mergeAttributes } from '@tiptap/core'
 import { Plugin } from '@tiptap/pm/state'
 import { editedRanges, formulaRecalcTransaction, TABLE_FORMULA_RECALC } from '../utils/rteTableFormulaOps'
 import { createPrintTableHeadPlugin } from '../utils/rtePrintTableHead'
+import { createTableCrosshairPlugin } from './rteTableCrosshair'
 
 /** 引用格一改，已保存的公式立刻重算，不必再点「应用」。 */
 export function createTableFormulaPlugin(): Plugin {
@@ -140,7 +141,7 @@ export const RteTableCell = TableCell.extend({
     ) as any
   },
   addProseMirrorPlugins() {
-    return [...(this.parent?.() || []), createTableFormulaPlugin(), createPrintTableHeadPlugin()]
+    return [...(this.parent?.() || []), createTableFormulaPlugin(), createPrintTableHeadPlugin(), createTableCrosshairPlugin()]
   },
 })
 
