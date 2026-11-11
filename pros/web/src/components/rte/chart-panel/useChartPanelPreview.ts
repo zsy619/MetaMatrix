@@ -7,7 +7,7 @@ import { ensureRenderableChartOption } from '../../../utils/echarts/chartRenderG
 type PreviewChart = {
   setOption: (option: unknown, opts?: { notMerge?: boolean }) => void
   dispose: () => void
-  resize: () => void
+  resize: (size?: { width?: number; height?: number }) => void
 }
 
 export function useChartPanelPreview(source: {
@@ -19,6 +19,23 @@ export function useChartPanelPreview(source: {
   const previewError = ref('')
   let previewChart: PreviewChart | null = null
   let previewToken = 0
+  let previewObserver: ResizeObserver | null = null
+
+  function resizePreview() {
+    const host = previewEl.value
+    if (!previewChart || !host) return
+    const width = host.clientWidth
+    const height = host.clientHeight
+    if (width < 2 || height < 2) return
+    previewChart.resize({ width, height })
+  }
+
+  function watchPreviewSize() {
+    const host = previewEl.value
+    if (!host || previewObserver || typeof ResizeObserver === 'undefined') return
+    previewObserver = new ResizeObserver(() => resizePreview())
+    previewObserver.observe(host)
+  }
 
   async function paintPreview() {
     const host = previewEl.value
@@ -36,12 +53,15 @@ export function useChartPanelPreview(source: {
     if (token !== previewToken || !previewEl.value) return
     if (!previewChart) {
       previewEl.value.replaceChildren()
-      previewChart = mod.init(previewEl.value, undefined, { renderer: 'svg', height: 180 })
+      const width = previewEl.value.clientWidth || 640
+      const height = previewEl.value.clientHeight || 240
+      previewChart = mod.init(previewEl.value, undefined, { renderer: 'svg', width, height })
     }
     try {
       previewChart.setOption(ensureRenderableChartOption(option), { notMerge: true })
       previewError.value = ''
-      previewChart.resize()
+      watchPreviewSize()
+      resizePreview()
     } catch (err) {
       previewError.value = err instanceof Error ? err.message : '图表预览失败'
     }
@@ -52,6 +72,8 @@ export function useChartPanelPreview(source: {
   })
 
   onBeforeUnmount(() => {
+    previewObserver?.disconnect()
+    previewObserver = null
     previewChart?.dispose()
     previewChart = null
   })

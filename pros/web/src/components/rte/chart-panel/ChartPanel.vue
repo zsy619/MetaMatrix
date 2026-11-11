@@ -7,7 +7,7 @@
  *
  * 面板只是「编辑区」，真正的写回由宿主（useChartPanelHost）完成。
  */
-import { computed, onBeforeUnmount, onMounted, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import ChartGeneralSection from './ChartGeneralSection.vue'
 import ChartAxisSection from './ChartAxisSection.vue'
@@ -22,12 +22,21 @@ import type { useChartPanelHost } from './useChartPanelHost'
 import { isSameEchartsOption } from '../../../utils/echarts/chartOptionPath'
 import { writeChartSecret } from '../../../utils/echarts/chartSecret'
 import { ECHARTS_CHART_TYPES } from '../../../utils/rteEchartsOption'
+import { chartPanelWidth, measureChartBlockWidth } from '../../../utils/echarts/chartPanelWidth'
 import type { ChartDataSourceConfig } from '../../../utils/echarts/chartDataSource'
 
 const props = defineProps<{ host: ReturnType<typeof useChartPanelHost> }>()
 
 const panel = useChartPanel()
 const visible = computed(() => props.host.open && !!props.host.target)
+const chartBlockWidth = ref(0)
+function syncChartPanelWidth() {
+  chartBlockWidth.value = measureChartBlockWidth(props.host.target?.chartId || '')
+}
+watch(() => [visible.value, props.host.target?.chartId] as const, () => { void nextTick(syncChartPanelWidth) }, { immediate: true })
+const panelStyle = computed(() => ({
+  '--rte-chart-panel-width': `${chartPanelWidth(chartBlockWidth.value, window.innerWidth || 1280)}px`,
+}))
 const { previewEl, previewError } = useChartPanelPreview({
   visible,
   option: computed(() => panel.draft),
@@ -195,7 +204,7 @@ function onChangeChartType(event: Event) {
 </script>
 
 <template>
-  <aside v-if="visible" class="rte-chart-panel" data-rte-own aria-label="图表属性">
+  <aside v-if="visible" class="rte-chart-panel" data-rte-own aria-label="图表属性" :style="panelStyle">
     <header class="rte-cp-head">
       <div class="rte-cp-title">图表属性</div>
       <div class="rte-cp-subtitle">
