@@ -1114,6 +1114,7 @@ const chartPanelBridge = useChartPanelBridge(editor)
 const {
   commentsOpen,
   showResolved,
+  orphansOnly,
   draft: commentDraft,
   replyDrafts,
   activeThreadId,
@@ -8074,6 +8075,7 @@ provideRteBindings({
   rteAuthor,
   commentsOpen,
   showResolved,
+  orphansOnly,
   commentDraft,
   replyDrafts,
   activeThreadId,

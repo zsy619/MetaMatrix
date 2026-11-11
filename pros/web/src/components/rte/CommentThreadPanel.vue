@@ -12,6 +12,7 @@ defineProps<{
   orphanIds?: string[]
   unresolvedCount: number
   showResolved: boolean
+  orphansOnly?: boolean
   draft: CommentDraft | null
   replyDrafts: Record<string, string>
   activeThreadId: string
@@ -22,6 +23,7 @@ defineProps<{
 const emit = defineEmits<{
   close: []
   'update:showResolved': [value: boolean]
+  'update:orphansOnly': [value: boolean]
   'update:draftBody': [value: string]
   'update:reply': [threadId: string, value: string]
   cancelDraft: []
@@ -48,6 +50,14 @@ const emit = defineEmits<{
       />
       显示已解决
     </label>
+    <label class="rte-comment-resolved-toggle">
+      <input
+        type="checkbox"
+        :checked="orphansOnly"
+        @change="emit('update:orphansOnly', ($event.target as HTMLInputElement).checked)"
+      />
+      只看失锚
+    </label>
     <div v-if="draft" class="rte-comment-draft">
       <p class="rte-comment-quote">{{ draft.quote }}</p>
       <textarea
@@ -64,7 +74,7 @@ const emit = defineEmits<{
         <button type="button" class="rte-comment-btn is-primary" @click="emit('submitDraft')">发送</button>
       </div>
     </div>
-    <p v-if="!threads.length" class="rte-outline-empty">还没有评论。选中文字后点「评论」，讨论会留在这条画布里。</p>
+    <p v-if="!threads.length" class="rte-outline-empty">{{ orphansOnly ? '没有失锚的评论。' : '还没有评论。选中文字后点「评论」，讨论会留在这条画布里。' }}</p>
     <div v-else class="rte-outline-list rte-comment-list">
       <article
         v-for="thread in threads"

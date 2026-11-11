@@ -28,6 +28,7 @@ import {
   splitImageGroup,
 } from './imageGroupOps'
 import { armImageDrag } from './rteImageDrag'
+import { dispatchSuggestionDecision } from '../utils/rteSuggestions'
 
 function groupPosFromDom(view: EditorView, dom: Element | null): number | null {
   if (!(dom instanceof HTMLElement)) return null
@@ -772,8 +773,38 @@ export const ImageGroup = Node.create({
             bar.appendChild(revision)
           }
           revision.textContent = `修订 ${normalizeGroupLayout(current.attrs.layoutBefore)}→${layout}`
+          let accept = bar.querySelector('.rte-image-group-accept') as HTMLButtonElement | null
+          let reject = bar.querySelector('.rte-image-group-reject') as HTMLButtonElement | null
+          if (!accept) {
+            accept = document.createElement('button')
+            accept.type = 'button'
+            accept.className = 'rte-image-group-accept'
+            accept.textContent = '接受'
+            accept.addEventListener('click', (event) => {
+              event.preventDefault()
+              event.stopPropagation()
+              const pos = getPos()
+              if (typeof pos === 'number') dispatchSuggestionDecision(editor, 'accept', `lay_${pos}`)
+            })
+            bar.appendChild(accept)
+          }
+          if (!reject) {
+            reject = document.createElement('button')
+            reject.type = 'button'
+            reject.className = 'rte-image-group-reject'
+            reject.textContent = '拒绝'
+            reject.addEventListener('click', (event) => {
+              event.preventDefault()
+              event.stopPropagation()
+              const pos = getPos()
+              if (typeof pos === 'number') dispatchSuggestionDecision(editor, 'reject', `lay_${pos}`)
+            })
+            bar.appendChild(reject)
+          }
         } else {
           revision?.remove()
+          bar.querySelector('.rte-image-group-accept')?.remove()
+          bar.querySelector('.rte-image-group-reject')?.remove()
         }
         gapBtn.textContent = `${gap}`
         gapBtn.title = `组内间距 ${gap} 像素，点击在 0、8、16、24 之间切换`

@@ -190,7 +190,7 @@ export function collectSuggestionRanges(doc: PMNode): SuggestionRange[] {
         from: pos,
         to: pos + node.nodeSize,
         authorId: 'optimize',
-        authorName: `题注改为 ${String(node.attrs.caption || '（空）')}`,
+        authorName: `深度优化：题注改为 ${String(node.attrs.caption || '（空）')}`,
         createdAt: '',
       })
     }
@@ -202,7 +202,7 @@ export function collectSuggestionRanges(doc: PMNode): SuggestionRange[] {
         from: pos,
         to: pos + node.nodeSize,
         authorId: 'optimize',
-        authorName: `图片组改为 ${String(node.attrs.layout || 'row')}`,
+        authorName: `深度优化：图片组改为 ${String(node.attrs.layout || 'row')}`,
         createdAt: '',
       })
     }
@@ -253,10 +253,16 @@ export function applySuggestionDecision(
       const node = tr.doc.nodeAt(range.from)
       if (node?.type.name === 'image' && range.structural === 'caption') {
         const restored = node.attrs.captionBefore
+        const alt =
+          mode === 'accept' || node.attrs.altBefore == null
+            ? node.attrs.alt
+            : node.attrs.altBefore || null
         tr.setNodeMarkup(range.from, undefined, {
           ...node.attrs,
           caption: mode === 'accept' ? node.attrs.caption : restored || null,
           captionBefore: null,
+          alt,
+          altBefore: null,
         })
       } else if (node?.type.name === 'imageGroup' && range.structural === 'layout') {
         tr.setNodeMarkup(range.from, undefined, {

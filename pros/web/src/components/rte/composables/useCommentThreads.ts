@@ -31,6 +31,7 @@ export function useCommentThreads(deps: {
 }) {
   const commentsOpen = ref(false)
   const showResolved = ref(false)
+  const orphansOnly = ref(false)
   const draft = ref<CommentDraft | null>(null)
   const replyDrafts = ref<Record<string, string>>({})
   const activeThreadId = ref('')
@@ -41,7 +42,12 @@ export function useCommentThreads(deps: {
     void ed?.state.doc
     return threads.value.filter((thread) => anchorPos(thread.id) == null).map((thread) => thread.id)
   })
-  const shownThreads = computed(() => visibleThreads(threads.value, showResolved.value))
+  const shownThreads = computed(() => {
+    const list = visibleThreads(threads.value, showResolved.value)
+    if (!orphansOnly.value) return list
+    const lost = new Set(orphanIds.value)
+    return list.filter((thread) => lost.has(thread.id))
+  })
   const unresolvedCount = computed(() => threads.value.filter((thread) => !thread.resolved).length)
 
   function persist(next: CommentThread[]) {
@@ -163,6 +169,7 @@ export function useCommentThreads(deps: {
   return {
     commentsOpen,
     showResolved,
+    orphansOnly,
     draft,
     replyDrafts,
     activeThreadId,

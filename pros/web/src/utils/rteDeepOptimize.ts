@@ -175,7 +175,7 @@ export function deepOptimizeDocument(editor: Editor): DeepOptimizeResult {
             mark.create({
               id: `opt_h_${pos}`,
               authorId: 'optimize',
-              authorName: `标题改为 ${nextLevel} 级`,
+              authorName: `深度优化：标题改为 ${nextLevel} 级`,
               createdAt: String(Date.now()),
             }),
           )
@@ -206,7 +206,12 @@ export function deepOptimizeDocument(editor: Editor): DeepOptimizeResult {
                 captionBefore: suggesting ? node.attrs.captionBefore ?? raw : null,
               }
             : {}),
-          ...(!alt && nextAlt ? { alt: nextAlt } : {}),
+          ...(!alt && nextAlt
+            ? {
+                alt: nextAlt,
+                altBefore: suggesting ? (node.attrs.alt ?? '') : null,
+              }
+            : {}),
         })
       }
       if (!nextAlt) hints.push({ text: `图片缺少替代文本（图 ${imageNo}）`, pos })

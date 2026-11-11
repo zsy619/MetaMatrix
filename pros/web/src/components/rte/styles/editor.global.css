@@ -3455,6 +3455,14 @@ html.rte-toolbar-dragging * {
   border-radius: 4px;
   padding: 0 4px;
 }
+.rte-cross-ref.is-lost {
+  color: #d83931;
+  background: #fef2f2;
+  text-decoration: line-through;
+}
+.rte-outline-item.is-empty {
+  color: #d83931;
+}
 .rte-menu-desc {
   display: block;
   font-size: 11px;

@@ -1,4 +1,41 @@
 import type { Editor } from '@tiptap/core'
+import { Plugin } from '@tiptap/pm/state'
+import type { EditorState, Transaction } from '@tiptap/pm/state'
+
+const CAPTION_RENUMBER = 'captionRenumber'
+
+/** 已经写成「图 N」的题注，在图片增删后按出现顺序重排。没有编号的题注不动。 */
+export function renumberCaptionTransaction(state: EditorState): Transaction | null {
+  const updates: Array<{ pos: number; attrs: Record<string, unknown> }> = []
+  let imageNo = 0
+  state.doc.descendants((node, pos) => {
+    if (node.type.name !== 'image') return
+    const raw = String(node.attrs.caption || '').trim()
+    if (!/^图\s*\d+/.test(raw)) return
+    imageNo += 1
+    const rest = raw.replace(/^图\s*\d+\s*[：:\-]?\s*/, '')
+    const caption = rest ? `图 ${imageNo}：${rest}` : `图 ${imageNo}`
+    if (caption !== raw) updates.push({ pos, attrs: { ...node.attrs, caption } })
+  })
+  if (!updates.length) return null
+  let tr = state.tr
+  for (let index = updates.length - 1; index >= 0; index -= 1) {
+    const update = updates[index]!
+    tr = tr.setNodeMarkup(update.pos, undefined, update.attrs)
+  }
+  tr.setMeta(CAPTION_RENUMBER, true)
+  return tr
+}
+
+export function createCaptionRenumberPlugin(): Plugin {
+  return new Plugin({
+    appendTransaction(transactions, _old, state) {
+      if (!transactions.some((tr) => tr.docChanged)) return null
+      if (transactions.some((tr) => tr.getMeta(CAPTION_RENUMBER))) return null
+      return renumberCaptionTransaction(state)
+    },
+  })
+}
 
 /**
  * 题注自动编号：图片 caption / data-caption →「图 N …」；

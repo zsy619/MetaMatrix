@@ -52,7 +52,7 @@ function closeOutlinePanel() {
   outlineUserClosed.value = true
 }
 
-type OutlineHeading = { id: string; level: number; text: string; pos: number }
+type OutlineHeading = { id: string; level: number; text: string; pos: number; empty?: boolean }
 
 const outlineHeadings = ref<OutlineHeading[]>([])
 const noteRows = ref<NoteRow[]>([])
@@ -98,8 +98,14 @@ function refreshDocChrome() {
   ed.state.doc.descendants((node, pos) => {
     if (node.type.name === 'heading') {
       const level = Number(node.attrs.level) || 1
-      const text = node.textContent.trim() || `（空标题 ${level}）`
-      headings.push({ id: `h-${pos}`, level, text, pos })
+      const raw = node.textContent.trim()
+      headings.push({
+        id: String(node.attrs.id || `h-${pos}`),
+        level,
+        text: raw || `（空标题 ${level}）`,
+        pos,
+        empty: !raw,
+      })
     }
     if (!node.isText) return
     for (const mark of node.marks) {

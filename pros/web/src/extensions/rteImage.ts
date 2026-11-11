@@ -2,6 +2,7 @@ import Image from '@tiptap/extension-image'
 import { mergeAttributes } from '@tiptap/core'
 import { createImageDragPlugin } from './rteImageDrag'
 import { createImageCaptionPlugin } from './rteImageCaption'
+import { createCaptionRenumberPlugin } from '../utils/rteCaptionNumber'
 import { normalizeImageAlign, normalizeImageLayout } from '../utils/rteImageLayout'
 import { cropAttrsStyle } from '../utils/rteImageCropAttrs'
 
@@ -42,6 +43,15 @@ export const RteImage = Image.extend({
           const value = (attrs.qrMeta || '').trim()
           return value ? { 'data-qr': value } : {}
         },
+      },
+      altBefore: {
+        default: null as string | null,
+        parseHTML: (el: HTMLElement) => {
+          const value = el.getAttribute('data-alt-before')
+          return value == null ? null : value
+        },
+        renderHTML: (attrs: { altBefore?: string | null }) =>
+          attrs.altBefore == null ? {} : { 'data-alt-before': String(attrs.altBefore) },
       },
       captionBefore: {
         default: null as string | null,
@@ -177,6 +187,6 @@ export const RteImage = Image.extend({
   },
 
   addProseMirrorPlugins() {
-    return [...(this.parent?.() || []), createImageDragPlugin(), createImageCaptionPlugin()]
+    return [...(this.parent?.() || []), createImageDragPlugin(), createImageCaptionPlugin(), createCaptionRenumberPlugin()]
   },
 })
