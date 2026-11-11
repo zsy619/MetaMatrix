@@ -862,9 +862,15 @@
 .rte-root :deep(.ProseMirror ul:not([data-type='taskList'])) {
   list-style: disc;
 }
-.rte-root :deep(.tiptap ol),
-.rte-root :deep(.ProseMirror ol) {
+.rte-root :deep(.tiptap ol:not([data-list-style]):not([type])),
+.rte-root :deep(.ProseMirror ol:not([data-list-style]):not([type])) {
   list-style: decimal;
+  padding-left: 1.6em;
+}
+.rte-root :deep(.tiptap ol[data-list-style]),
+.rte-root :deep(.ProseMirror ol[data-list-style]),
+.rte-root :deep(.tiptap ol[type]),
+.rte-root :deep(.ProseMirror ol[type]) {
   padding-left: 1.6em;
 }
 .rte-root :deep(.tiptap li),

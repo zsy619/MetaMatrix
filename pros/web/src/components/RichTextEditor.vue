@@ -1498,6 +1498,12 @@ function isActive(
   return editor.value?.isActive(nameOrAttrs as never, attrs) ?? false
 }
 
+function currentOrderedListStyle(): string {
+  const ed = editor.value
+  if (!ed?.isActive('orderedList')) return ''
+  return String(ed.getAttributes('orderedList').listStyleType || 'decimal')
+}
+
 function undo() {
   chain()?.undo().run()
 }
@@ -8093,6 +8099,7 @@ provideRteBindings({
   insertSnippet,
   insertSpecialChar,
   isActive,
+  currentOrderedListStyle,
   isInTable,
   isKaomojiTab,
   isLargeEmojiTab,

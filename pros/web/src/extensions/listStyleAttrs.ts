@@ -19,6 +19,22 @@ declare module '@tiptap/core' {
   }
 }
 
+/** HTML 有序列表的 type 属性。汉字序号没有对应的 type，只靠 list-style-type。 */
+function htmlOrderedType(style: string): string | null {
+  switch (style) {
+    case 'lower-alpha':
+      return 'a'
+    case 'upper-alpha':
+      return 'A'
+    case 'lower-roman':
+      return 'i'
+    case 'upper-roman':
+      return 'I'
+    default:
+      return null
+  }
+}
+
 /** 有序列表编号样式 / 起始序号 */
 export const ListStyleAttrs = Extension.create({
   name: 'listStyleAttrs',
@@ -125,11 +141,40 @@ export const ListStyleAttrs = Extension.create({
     return {
       setOrderedListStyle:
         (listStyleType) =>
-        ({ commands, editor }) => {
-          if (!editor.isActive('orderedList')) {
-            commands.toggleOrderedList()
+        ({ commands, tr }) => {
+          const style = listStyleType || 'decimal'
+          const listType = tr.doc.type.schema.nodes.orderedList
+          if (!listType) return false
+          const inside = (doc = tr.doc, pos = tr.selection.from) => {
+            const $pos = doc.resolve(Math.max(1, Math.min(pos, doc.content.size)))
+            for (let depth = $pos.depth; depth > 0; depth -= 1) {
+              if ($pos.node(depth).type === listType) return true
+            }
+            return false
           }
-          return commands.updateAttributes('orderedList', { listStyleType })
+          if (!inside()) {
+            const created = commands.toggleList('orderedList', 'listItem', false, {
+              listStyleType: style,
+              type: htmlOrderedType(style),
+            })
+            if (!created && !inside()) return false
+          }
+          const htmlType = htmlOrderedType(style)
+          const $from = tr.selection.$from
+          for (let depth = $from.depth; depth > 0; depth -= 1) {
+            const node = $from.node(depth)
+            if (node.type !== listType) continue
+            const pos = $from.before(depth)
+            if (node.attrs.listStyleType !== style || (node.attrs.type ?? null) !== htmlType) {
+              tr.setNodeMarkup(pos, undefined, {
+                ...node.attrs,
+                listStyleType: style,
+                type: htmlType,
+              })
+            }
+            return true
+          }
+          return inside()
         },
       setOrderedListStart:
         (start) =>

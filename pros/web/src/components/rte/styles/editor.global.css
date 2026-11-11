@@ -5626,7 +5626,7 @@ html.rte-image-preview-open .tippy-box {
   color: #4e5969;
 }
 @media print {
-  .rte-root.rte-printing .ProseMirror ol {
+  .rte-root.rte-printing .ProseMirror ol:not([data-list-style]):not([type]) {
     list-style: decimal;
   }
   .rte-root.rte-printing .ProseMirror li {

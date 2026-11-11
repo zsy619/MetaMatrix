@@ -367,9 +367,9 @@ function toggleChartGroupMenu(key: string) {
               <button data-rte-own type="button" @click="rte.applyListStart()">修改编号值…</button>
               <button data-rte-own type="button" @click="rte.renumberListFromHere()">从此处重编号</button>
               <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
-              <button data-rte-own type="button" @click="rte.applyListStyle('decimal')">数字 1. 2. 3.</button>
-              <button data-rte-own type="button" @click="rte.applyListStyle('lower-alpha')">字母 a. b. c.</button>
-              <button data-rte-own type="button" @click="rte.applyListStyle('lower-roman')">罗马 i. ii. iii.</button>
+              <button data-rte-own type="button" :class="{ active: rte.currentOrderedListStyle() === 'decimal' }" @click="rte.applyListStyle('decimal')">数字 1. 2. 3.</button>
+              <button data-rte-own type="button" :class="{ active: rte.currentOrderedListStyle() === 'lower-alpha' }" @click="rte.applyListStyle('lower-alpha')">字母 a. b. c.</button>
+              <button data-rte-own type="button" :class="{ active: rte.currentOrderedListStyle() === 'lower-roman' }" @click="rte.applyListStyle('lower-roman')">罗马 i. ii. iii.</button>
               <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
               <div data-rte-own v-if="rte.listDepthLabel" class="rte-menu-hint">{{ rte.listDepthLabel }}</div>
               <div data-rte-own class="rte-menu-hint">Tab / Shift+Tab 调整层级</div>
@@ -1569,6 +1569,7 @@ function toggleChartGroupMenu(key: string) {
                 v-for="opt in rte.ORDERED_LIST_STYLE_OPTIONS"
                 :key="'ls-' + opt.value"
                 type="button"
+                :class="{ active: rte.currentOrderedListStyle() === opt.value }"
                 @click="rte.applyListStyle(opt.value)"
               >
                 {{ opt.label }}
