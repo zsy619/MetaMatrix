@@ -392,7 +392,7 @@ describe('新功能区按钮', () => {
     const menu = document.querySelector('.rte-table-ctx')
     expect(menu, '右键菜单').toBeTruthy()
     const tops = [...menu!.querySelectorAll(':scope > .rte-table-ctx-group > button')].map((button) => (button.textContent || '').replace('▸', '').trim())
-    expect(tops).toEqual(['插入', '删除', '单元格', '表头', '数据'])
+    expect(tops).toEqual(['插入', '单元格', '表头', '数据', '删除'])
     expect(menu!.textContent).not.toContain('向上插入行')
     const insert = [...menu!.querySelectorAll(':scope > .rte-table-ctx-group > button')].find((button) => (button.textContent || '').includes('插入'))
     insert!.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }))
