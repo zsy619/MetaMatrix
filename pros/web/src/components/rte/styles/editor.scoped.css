@@ -4534,6 +4534,7 @@ html.rte-toolbar-dragging .rte-root:not(.expanded) .rte-toolbar-tools > .rte-too
 .rte-tool-group[data-group-id='notes'] { --rte-icon-bg: linear-gradient(160deg, #fbbf24, #b45309); }
 .rte-tool-group[data-group-id='review'] { --rte-icon-bg: linear-gradient(160deg, #fb7185, #b91c1c); }
 .rte-tool-group[data-group-id='view'] { --rte-icon-bg: linear-gradient(160deg, #94a3b8, #334155); }
+.rte-tool-group[data-group-id='tidy'] { --rte-icon-bg: linear-gradient(160deg, #38bdf8, #0369a1); }
 .rte-tool-group[data-group-id='picture'] { --rte-icon-bg: linear-gradient(160deg, #2dd4bf, #0f766e); }
 .rte-tool-group[data-group-id='page'] { --rte-icon-bg: linear-gradient(160deg, #fdba74, #c2410c); }
 .rte-tool-group[data-group-id='file'] { --rte-icon-bg: linear-gradient(160deg, #fb923c, #9a3412); }
@@ -4595,6 +4596,7 @@ html.rte-toolbar-dragging .rte-root:not(.expanded) .rte-toolbar-tools > .rte-too
 .rte-ribbon-tab[data-ribbon-tab='review'].active { color: #b91c1c; }
 .rte-ribbon-tab[data-ribbon-tab='view'].active { color: #334155; }
 .rte-ribbon-tab[data-ribbon-tab='file'].active { color: #9a3412; }
+.rte-ribbon-tab[data-ribbon-tab='tidy'].active { color: #0369a1; }
 .rte-ribbon-tab[data-ribbon-tab='picture'].active { color: #0f766e; }
 .rte-ribbon-tab[data-ribbon-tab='page'].active { color: #9a3412; }
 .rte-root.is-dark-editor .rte-toolbar:not(.is-one-row) .rte-toolbar-tools {

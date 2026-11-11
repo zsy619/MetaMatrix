@@ -150,7 +150,7 @@ import {
   type CaseMode,
 } from './rteWave20'
 import { matchingFootnote } from '../extensions/footnote'
-import { TEXT_MENU_ITEMS } from '../utils/rteTextTidy'
+import { TEXT_MENU_ITEMS, TEXT_TIDY_ACTIONS } from '../utils/rteTextTidy'
 import { applyTextTidy } from '../utils/rteTextPlay'
 import { countWordParts, countWords, normalizeHtml, toEditorContent } from '../utils/rteContent'
 import { getToken } from '../api/http'
@@ -4192,6 +4192,15 @@ function toggleTableColStickyBar() {
   ElMessage.success(tableColSticky.value ? '首列在横向滚动时保持可见' : '已取消首列固定')
 }
 
+function runTableOpFromToolbar(key: string) {
+  const item = tableOpItems.value.find((op) => op.key === key)
+  if (!item || item.disabled?.()) {
+    ElMessage.info('请把光标放进表格')
+    return
+  }
+  item.run()
+}
+
 function togglePrintLinkUrls() {
   printLinkUrls.value = !printLinkUrls.value
   ElMessage.success(printLinkUrls.value ? '打印时会在链接后印出网址' : '打印时不再印出网址')
@@ -5998,6 +6007,7 @@ function onPublish() {
 const headingOpen = ref(false)
 const listOpen = ref(false)
 const imageLayoutOpen = ref(false)
+const textTidyOpen = ref(false)
 const formOpen = ref(false)
 const templateOpen = ref(false)
 const moreFormOpen = ref(false)
@@ -6345,7 +6355,7 @@ function moreSubmenuOpen(t: ToolItem): boolean {
 
 const MORE_HOVER_KINDS = new Set([
   'color', 'form', 'template', 'fontSize', 'fontFamily', 'lineHeight',
-  'callout', 'caseTransform', 'zoom', 'viewExtras', 'echartsGroup', 'imageLayout',
+  'callout', 'caseTransform', 'zoom', 'viewExtras', 'echartsGroup', 'imageLayout', 'textTidy',
 ])
 
 /** 「更多」里带下级的项，鼠标经过就展开，不重复点击把它关掉。 */
@@ -6356,6 +6366,10 @@ function hoverMoreSubmenu(t: ToolItem) {
 }
 
 function onMoreToolClick(t: ToolItem) {
+  if (t.kind === 'textTidy') {
+    textTidyOpen.value = !textTidyOpen.value
+    return
+  }
   if (t.kind === 'imageLayout') {
     imageLayoutOpen.value = !imageLayoutOpen.value
     return
@@ -6608,7 +6622,7 @@ type ToolItem = {
   title?: string
   icon: string
   iconComp?: Component
-  kind?: 'heading' | 'list' | 'more' | 'btn' | 'color' | 'highlight' | 'align' | 'fontSize' | 'fontFamily' | 'lineHeight' | 'import' | 'export' | 'table' | 'attach' | 'form' | 'template' | 'code' | 'divider' | 'emoji' | 'specialChars' | 'columns' | 'spacing' | 'wordStats' | 'callout' | 'shortcuts' | 'hr' | 'blockOps' | 'insertDate' | 'pasteFormat' | 'caseTransform' | 'zoom' | 'viewExtras' | 'paraStyle' | 'listStyle' | 'linkButton' | 'echarts' | 'echartsGroup' | 'imageLayout'
+  kind?: 'heading' | 'list' | 'more' | 'btn' | 'color' | 'highlight' | 'align' | 'fontSize' | 'fontFamily' | 'lineHeight' | 'import' | 'export' | 'table' | 'attach' | 'form' | 'template' | 'code' | 'divider' | 'emoji' | 'specialChars' | 'columns' | 'spacing' | 'wordStats' | 'callout' | 'shortcuts' | 'hr' | 'blockOps' | 'insertDate' | 'pasteFormat' | 'caseTransform' | 'zoom' | 'viewExtras' | 'paraStyle' | 'listStyle' | 'linkButton' | 'echarts' | 'echartsGroup' | 'imageLayout' | 'textTidy'
   active?: () => boolean
   run?: () => void
 }
@@ -7256,7 +7270,15 @@ const allTools = computed((): ToolItem[] => {
       iconComp: ic('table'),
       run: () => { void copyCurrentTable('csv') },
     },
+    { key: 'textTidy', label: '整理', title: '半角、全角、空格和按行整理', icon: '理', kind: 'textTidy' },
+    { key: 'tidyHalf', label: '半角', title: '把全角字母数字转成半角', icon: '半', run: () => runTextMenu('half') },
+    { key: 'tidyFull', label: '全角', title: '把半角字母数字转成全角', icon: '全', run: () => runTextMenu('full') },
+    { key: 'tidyPangu', label: '中英空格', title: '汉字和英文数字之间补空格', icon: '空', run: () => runTextMenu('pangu') },
+    { key: 'tidySqueeze', label: '收空格', title: '连续空格收成一个', icon: '挤', run: () => runTextMenu('squeeze') },
     { key: 'tableZebra', label: '斑马纹', title: '隔行底色只用于显示', icon: '斑马', run: toggleTableZebra, active: () => editor.value?.getAttributes('table')?.zebra === true, disabled: () => !isInTable() },
+    { key: 'tableEqual', label: '均分列', title: '把当前表格的列宽均分，一步撤销', icon: '均', run: () => runTableOpFromToolbar('equal-cols'), disabled: () => !isInTable() },
+    { key: 'tableFormula', label: '格公式', title: '在当前格插入 =SUM(ABOVE)', icon: 'Σ', run: () => runTableOpFromToolbar('cell-formula'), disabled: () => !isInTable() },
+    { key: 'tableSort', label: '升序', title: '按当前列从小到大排序', icon: '序', run: () => runTableOpFromToolbar('sort-asc'), disabled: () => !isInTable() },
     { key: 'tableSticky', label: '冻结表头', title: '滚动时表头保持可见', icon: '表头', run: toggleTableHeaderStickyBar, active: () => tableHeaderSticky.value },
     { key: 'tableColSticky', label: '冻结首列', title: '横向滚动时首列保持可见', icon: '首列', run: toggleTableColStickyBar, active: () => tableColSticky.value },
     {
@@ -7934,6 +7956,8 @@ provideRteBindings({
   listDepthLabel,
   listOpen,
   imageLayoutOpen,
+  textTidyOpen,
+  TEXT_TIDY_ACTIONS,
   listStyleOpen,
   localTitle,
   markToolbarMenuOpening,

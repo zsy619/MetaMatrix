@@ -1992,6 +1992,47 @@ function toggleChartGroupMenu(key: string) {
           </Teleport>
         </div>
         <div data-rte-own
+          v-else-if="t.kind === 'textTidy'"
+          class="rte-tool-wrap"
+          @mouseenter="rte.onToolMenuEnter('textTidy')"
+          @mouseleave="rte.onToolMenuLeave($event, 'textTidy', () => (rte.textTidyOpen = false))"
+        >
+          <button data-rte-own
+            type="button"
+            class="rte-tool is-labeled"
+            :ref="(el) => rte.setFloatAnchor('textTidy', el)"
+            data-rte-anchor="textTidy"
+            :class="{ active: rte.textTidyOpen }"
+            title="整理选中文字"
+            aria-label="整理文字"
+            aria-haspopup="menu"
+            :aria-expanded="rte.textTidyOpen"
+            @click.stop="rte.markToolbarMenuOpening(); rte.textTidyOpen = !rte.textTidyOpen"
+          >
+            <span data-rte-own class="rte-tool-icon">理</span>
+            <span data-rte-own class="rte-tool-label">整理<span data-rte-own class="rte-caret" aria-hidden="true"></span></span>
+          </button>
+          <Teleport to="body">
+            <div data-rte-own
+              v-if="rte.textTidyOpen"
+              class="rte-menu"
+              v-rte-float="'textTidy'"
+              @mousedown.prevent
+              @mouseenter="rte.onToolMenuEnter('textTidy')"
+              @mouseleave="rte.onToolMenuLeave($event, 'textTidy', () => (rte.textTidyOpen = false))"
+            >
+              <button data-rte-own
+                v-for="opt in rte.TEXT_TIDY_ACTIONS"
+                :key="'tidy-' + opt.id"
+                type="button"
+                @click="rte.runTextMenu(opt.id); rte.textTidyOpen = false"
+              >
+                {{ opt.label }}
+              </button>
+            </div>
+          </Teleport>
+        </div>
+        <div data-rte-own
           v-else-if="t.kind === 'imageLayout'"
           class="rte-tool-wrap"
           @mouseenter="rte.onToolMenuEnter('imageLayout')"
@@ -2147,7 +2188,7 @@ function toggleChartGroupMenu(key: string) {
               </span>
               <span data-rte-own>{{ mt.title || mt.label }}</span>
               <span data-rte-own
-                v-if="mt.kind === 'color' || mt.key === 'highlight' || mt.kind === 'attach' || mt.kind === 'form' || mt.kind === 'template' || mt.kind === 'fontSize' || mt.kind === 'fontFamily' || mt.kind === 'lineHeight' || mt.kind === 'callout' || mt.kind === 'caseTransform' || mt.kind === 'zoom' || mt.kind === 'viewExtras' || mt.kind === 'echartsGroup' || mt.kind === 'imageLayout'"
+                v-if="mt.kind === 'color' || mt.key === 'highlight' || mt.kind === 'attach' || mt.kind === 'form' || mt.kind === 'template' || mt.kind === 'fontSize' || mt.kind === 'fontFamily' || mt.kind === 'lineHeight' || mt.kind === 'callout' || mt.kind === 'caseTransform' || mt.kind === 'zoom' || mt.kind === 'viewExtras' || mt.kind === 'echartsGroup' || mt.kind === 'imageLayout' || mt.kind === 'textTidy'"
                 class="rte-more-caret"
               >{{ mt.kind === 'attach' || mt.kind === 'form' || mt.kind === 'template' ? '▾' : '▸' }}</span>
             </button>
@@ -2185,6 +2226,20 @@ function toggleChartGroupMenu(key: string) {
               </template>
               <div data-rte-own class="rte-menu-sep" aria-hidden="true"></div>
               <button data-rte-own type="button" @click="rte.openEchartsDialog()">一键生成…</button>
+            </div>
+            <div data-rte-own
+              v-if="mt.kind === 'textTidy' && rte.textTidyOpen"
+              class="rte-menu rte-more-flyout"
+              @mousedown.prevent
+            >
+              <button data-rte-own
+                v-for="opt in rte.TEXT_TIDY_ACTIONS"
+                :key="'mtidy-' + opt.id"
+                type="button"
+                @click="rte.runTextMenu(opt.id); rte.textTidyOpen = false"
+              >
+                {{ opt.label }}
+              </button>
             </div>
             <div data-rte-own
               v-if="mt.kind === 'imageLayout' && rte.imageLayoutOpen"
