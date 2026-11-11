@@ -130,12 +130,14 @@ const labels = computed(() => {
   min-height: 0;
   padding: 12px 16px 14px;
   color: #202124;
+  overflow: auto;
 }
 
 .ym-stage {
   position: relative;
   flex: 1 1 auto;
-  min-height: 0;
+  min-height: 720px;
+  min-width: 960px;
 }
 
 .step {
@@ -188,6 +190,10 @@ const labels = computed(() => {
 .slot :deep(.ym-block) {
   width: 100%;
   height: 100%;
+}
+
+.slot :deep(.ym-block-body) {
+  overflow: auto;
 }
 
 .slot :deep(.ym-block--card) {
@@ -266,8 +272,8 @@ const labels = computed(() => {
   grid-template-columns: 72px minmax(0, 1fr);
   gap: 8px;
   align-items: stretch;
-  min-height: 92px;
-  height: 18%;
+  min-height: 120px;
+  height: auto;
   margin-top: 8px;
   padding: 10px 12px;
   background: #eceae6;
