@@ -400,7 +400,9 @@ function onCloseMaximize(event?: Event) {
   padding: 0 0 4px;
   border: none;
   border-bottom: 1px solid transparent;
+  border-left: 3px solid color-mix(in srgb, var(--fsp-topic) 55%, transparent);
   border-radius: 0;
+  padding-left: 8px;
   background: transparent;
   color: var(--fsp-topic);
   font: inherit;

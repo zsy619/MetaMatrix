@@ -1046,10 +1046,10 @@ function goGuide() {
   --psp-ink: #1f2329;
   --psp-secondary: #646a73;
   --psp-tertiary: #8f959e;
-  --psp-line: #dee0e3;
-  --psp-line-soft: #eff0f1;
-  --psp-hover: #f5f6f7;
-  --psp-bg: #f8f9fa;
+  --psp-line: rgba(62, 48, 28, 0.12);
+  --psp-line-soft: rgba(62, 48, 28, 0.06);
+  --psp-hover: #f3efe6;
+  --psp-bg: #f7f4ee;
   --psp-blue: #3370ff;
   --psp-blue-soft: #e1eaff;
   position: relative;
@@ -1060,8 +1060,8 @@ function goGuide() {
   align-self: stretch;
   min-height: 0;
   height: 100%;
-  background: #fff;
-  border-left: 1px solid var(--psp-line);
+  background: #f7f4ee;
+  border-left: 1px solid rgba(62, 48, 28, 0.1);
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
