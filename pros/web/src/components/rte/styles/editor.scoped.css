@@ -1337,8 +1337,8 @@
   position: fixed;
   z-index: 5001;
   width: max-content;
-  min-width: 108px;
-  max-width: 148px;
+  min-width: 128px;
+  max-width: 168px;
   overflow: visible;
   padding: 4px;
   background: #fff;
@@ -1386,7 +1386,10 @@
 .rte-table-ctx-flyout {
   position: fixed;
   z-index: 5002;
-  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  min-width: 196px;
   max-width: min(280px, 92vw);
   max-height: min(70vh, 480px);
   overflow: auto;
@@ -1395,6 +1398,35 @@
   border: 1px solid #e5e6eb;
   border-radius: 8px;
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.14);
+}
+.rte-table-ctx-flyout > button,
+.rte-table-ctx-flyout .rte-table-insert-line > button {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.rte-table-ctx-ico {
+  display: inline-flex;
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  color: #4e5969;
+}
+.rte-table-ctx-ico svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+.rte-table-ctx-group > button.active .rte-table-ctx-ico,
+.rte-table-ctx-flyout > button:hover .rte-table-ctx-ico,
+.rte-table-ctx-flyout .rte-table-insert-line > button:hover .rte-table-ctx-ico {
+  color: inherit;
+}
+.rte-table-ctx-label {
+  flex: 1 1 auto;
+  text-align: left;
 }
 
 .rte-table-insert-line {
