@@ -2076,6 +2076,52 @@ function toggleChartGroupMenu(key: string) {
             </div>
           </Teleport>
         </div>
+        <div data-rte-own
+          v-else-if="t.kind === 'presetMenu'"
+          class="rte-tool-wrap"
+          @mouseenter="rte.onToolMenuEnter(t.key)"
+          @mouseleave="rte.onToolMenuLeave($event, t.key, () => { if (rte.presetMenuKey === t.key) rte.closePresetMenu() })"
+        >
+          <button data-rte-own
+            type="button"
+            class="rte-tool is-labeled"
+            :ref="(el) => rte.setFloatAnchor(t.key, el)"
+            :data-rte-anchor="t.key"
+            :class="{ active: rte.presetMenuKey === t.key }"
+            :title="t.title || t.label"
+            :aria-label="t.title || t.label"
+            aria-haspopup="menu"
+            :aria-expanded="rte.presetMenuKey === t.key"
+            :disabled="t.disabled?.() || undefined"
+            @mousedown.prevent
+            @click.stop="rte.markToolbarMenuOpening(); rte.togglePresetMenu(t.key)"
+          >
+            <span data-rte-own class="rte-tool-icon">
+              <component data-rte-own v-if="t.iconComp" :is="t.iconComp" class="rte-ep-icon" />
+              <template v-else>{{ t.icon }}</template>
+            </span>
+            <span data-rte-own class="rte-tool-label">{{ t.label }}<span data-rte-own class="rte-caret" aria-hidden="true"></span></span>
+          </button>
+          <Teleport to="body">
+            <div data-rte-own
+              v-if="rte.presetMenuKey === t.key"
+              class="rte-menu"
+              v-rte-float="t.key"
+              @mousedown.prevent
+              @mouseenter="rte.onToolMenuEnter(t.key)"
+              @mouseleave="rte.onToolMenuLeave($event, t.key, () => { if (rte.presetMenuKey === t.key) rte.closePresetMenu() })"
+            >
+              <button data-rte-own
+                v-for="opt in t.presetOptions"
+                :key="t.key + '-' + opt.label"
+                type="button"
+                @click="t.applyPreset?.(opt.id); rte.closePresetMenu()"
+              >
+                {{ opt.label }}
+              </button>
+            </div>
+          </Teleport>
+        </div>
         <button data-rte-own
           v-else
           type="button"
@@ -2130,7 +2176,7 @@ function toggleChartGroupMenu(key: string) {
             v-if="rte.moreOpen"
             class="rte-more-menu"
             v-rte-float="'more'"
-            :class="{ 'has-flyout': rte.moreColorOpen || rte.moreHighlightOpen || rte.moreFormOpen || rte.moreTemplateOpen || rte.moreFontSizeOpen || rte.moreFontFamilyOpen || rte.moreLineHeightOpen || rte.moreCalloutOpen }"
+            :class="{ 'has-flyout': rte.moreColorOpen || rte.moreHighlightOpen || rte.moreFormOpen || rte.moreTemplateOpen || rte.moreFontSizeOpen || rte.moreFontFamilyOpen || rte.moreLineHeightOpen || rte.moreCalloutOpen || !!rte.presetMenuKey }"
             @mousedown.prevent
             @mouseenter="rte.onToolMenuEnter('more')"
             @mouseleave="rte.onToolMenuLeave($event, 'more', rte.closeMore)"
@@ -2189,7 +2235,7 @@ function toggleChartGroupMenu(key: string) {
               </span>
               <span data-rte-own>{{ mt.title || mt.label }}</span>
               <span data-rte-own
-                v-if="mt.kind === 'color' || mt.key === 'highlight' || mt.kind === 'attach' || mt.kind === 'form' || mt.kind === 'template' || mt.kind === 'fontSize' || mt.kind === 'fontFamily' || mt.kind === 'lineHeight' || mt.kind === 'callout' || mt.kind === 'caseTransform' || mt.kind === 'zoom' || mt.kind === 'viewExtras' || mt.kind === 'echartsGroup' || mt.kind === 'imageLayout' || mt.kind === 'textTidy'"
+                v-if="mt.kind === 'color' || mt.key === 'highlight' || mt.kind === 'attach' || mt.kind === 'form' || mt.kind === 'template' || mt.kind === 'fontSize' || mt.kind === 'fontFamily' || mt.kind === 'lineHeight' || mt.kind === 'callout' || mt.kind === 'caseTransform' || mt.kind === 'zoom' || mt.kind === 'viewExtras' || mt.kind === 'echartsGroup' || mt.kind === 'imageLayout' || mt.kind === 'textTidy' || mt.kind === 'presetMenu'"
                 class="rte-more-caret"
               >{{ mt.kind === 'attach' || mt.kind === 'form' || mt.kind === 'template' ? '▾' : '▸' }}</span>
             </button>
@@ -2238,6 +2284,20 @@ function toggleChartGroupMenu(key: string) {
                 :key="'mtidy-' + opt.id"
                 type="button"
                 @click="rte.runTextMenu(opt.id); rte.textTidyOpen = false"
+              >
+                {{ opt.label }}
+              </button>
+            </div>
+            <div data-rte-own
+              v-if="mt.kind === 'presetMenu' && rte.presetMenuKey === mt.key"
+              class="rte-menu rte-more-flyout"
+              @mousedown.prevent
+            >
+              <button data-rte-own
+                v-for="opt in mt.presetOptions"
+                :key="'mpreset-' + mt.key + '-' + opt.label"
+                type="button"
+                @click="mt.applyPreset?.(opt.id); rte.closePresetMenu()"
               >
                 {{ opt.label }}
               </button>

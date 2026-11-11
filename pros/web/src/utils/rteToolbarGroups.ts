@@ -83,6 +83,11 @@ export const TOOLBAR_GROUPS: readonly ToolbarGroupDef[] = [
     ],
   },
   {
+    id: 'writing',
+    label: '书写',
+    keys: ['textDir', 'quoteStyle'],
+  },
+  {
     id: 'tidy',
     label: '整理',
     keys: ['textTidy', 'tidyHalf', 'tidyFull', 'tidyPangu', 'tidySqueeze'],
@@ -101,12 +106,17 @@ export const TOOLBAR_GROUPS: readonly ToolbarGroupDef[] = [
     label: '图片',
     keys: ['imageLayout', 'imageReplace', 'imageAlt', 'spoiler', 'dropCap'],
   },
+  {
+    id: 'frame',
+    label: '图片效果',
+    keys: ['imageRadius', 'imageShadow', 'imageBorder'],
+  },
   // 图表独立分组：一级分类各占一个下拉按钮（基础 / 统计 / 关系 / 层级 / 地理 / 金融 / 坐标系 / 组件 / 3D·GL）
   { id: 'charts', label: '图表', keys: CHART_TOOLBAR_KEYS },
   {
     id: 'table',
     label: '表格',
-    keys: ['table', 'tableCsv', 'tableFilter', 'tableZebra', 'tableSticky', 'tableColSticky', 'tableEqual', 'tableFormula', 'tableSort'],
+    keys: ['table', 'tableCsv', 'tableFilter', 'tableZebra', 'tableSticky', 'tableColSticky', 'tableEqual', 'tableFormula', 'tableSort', 'tableStruct'],
   },
   {
     id: 'blocks',

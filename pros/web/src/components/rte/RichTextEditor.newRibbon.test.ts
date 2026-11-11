@@ -322,6 +322,66 @@ describe('新功能区按钮', () => {
     expect(wrapper.classes()).toContain('is-table-sticky')
     await clickTool(wrapper, '冻结首列')
     expect(wrapper.classes()).toContain('is-table-col-sticky')
+    const beforeRows = editor.getHTML().split('<tr').length - 1
+    await clickTool(wrapper, '行列')
+    await clickMenu('向下插入行')
+    expect(editor.getHTML().split('<tr').length - 1).toBe(beforeRows + 1)
+    wrapper.unmount()
+  })
+
+  it('表格行列菜单可以按当前列降序', async () => {
+    const wrapper = await mountEditor()
+    const editor = editorOf(wrapper)
+    editor.commands.setContent(
+      '<table><tbody><tr><th><p>名</p></th></tr><tr><td><p>甲</p></td></tr><tr><td><p>乙</p></td></tr></tbody></table>',
+    )
+    let cell = -1
+    editor.state.doc.descendants((node, pos) => {
+      if (cell < 0 && node.isText && node.text === '甲') cell = pos
+    })
+    editor.commands.setTextSelection(cell)
+    await openRibbon(wrapper, '表格')
+    await clickTool(wrapper, '行列')
+    await clickMenu('按列降序')
+    const text = editor.getText()
+    expect(text.indexOf('乙')).toBeLessThan(text.indexOf('甲'))
+    wrapper.unmount()
+  })
+
+  it('书写栏目能改段落方向和引用样式', async () => {
+    const wrapper = await mountEditor()
+    const editor = editorOf(wrapper)
+    editor.commands.setContent('<p>甲乙</p>')
+    editor.commands.setTextSelection(2)
+    await openRibbon(wrapper, '书写')
+    await clickTool(wrapper, '方向')
+    await clickMenu('从右到左')
+    expect(editor.getHTML()).toContain('dir="rtl"')
+    editor.commands.setTextSelection(2)
+    await clickTool(wrapper, '引用样式')
+    await clickMenu('强调引用')
+    expect(editor.getHTML()).toContain('data-quote-style="emphasis"')
+    wrapper.unmount()
+  })
+
+  it('图片效果栏目能改圆角、阴影和边框', async () => {
+    const wrapper = await mountEditor()
+    const editor = editorOf(wrapper)
+    editor.commands.setContent(`<p>甲</p><img src="${PIXEL}" alt="旧图">`)
+    selectImage(editor)
+    await openRibbon(wrapper, '图片效果')
+    expect(toolButton(wrapper, '圆角')!.attributes('disabled')).toBeUndefined()
+    await clickTool(wrapper, '圆角')
+    await clickMenu('大圆')
+    expect(editor.getHTML()).toContain('data-radius="16px"')
+    selectImage(editor)
+    await clickTool(wrapper, '阴影')
+    await clickMenu('轻影')
+    expect(editor.getHTML()).toContain('data-shadow')
+    selectImage(editor)
+    await clickTool(wrapper, '边框')
+    await clickMenu('细边')
+    expect(editor.getHTML()).toContain('data-border')
     wrapper.unmount()
   })
 })

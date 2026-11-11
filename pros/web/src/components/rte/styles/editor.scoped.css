@@ -4544,6 +4544,8 @@ html.rte-toolbar-dragging .rte-root:not(.expanded) .rte-toolbar-tools > .rte-too
 .rte-tool-group[data-group-id='view'] { --rte-icon-bg: linear-gradient(160deg, #94a3b8, #334155); }
 .rte-tool-group[data-group-id='tidy'] { --rte-icon-bg: linear-gradient(160deg, #38bdf8, #0369a1); }
 .rte-tool-group[data-group-id='picture'] { --rte-icon-bg: linear-gradient(160deg, #2dd4bf, #0f766e); }
+.rte-tool-group[data-group-id='frame'] { --rte-icon-bg: linear-gradient(160deg, #f472b6, #be185d); }
+.rte-tool-group[data-group-id='writing'] { --rte-icon-bg: linear-gradient(160deg, #38bdf8, #0369a1); }
 .rte-tool-group[data-group-id='page'] { --rte-icon-bg: linear-gradient(160deg, #fdba74, #c2410c); }
 .rte-tool-group[data-group-id='file'] { --rte-icon-bg: linear-gradient(160deg, #fb923c, #9a3412); }
 .rte-tool-group[data-group-id='other'] { --rte-icon-bg: linear-gradient(160deg, #d1d5db, #4b5563); }
@@ -4626,6 +4628,8 @@ html.rte-toolbar-dragging .rte-root:not(.expanded) .rte-toolbar-tools > .rte-too
 .rte-ribbon-tab[data-ribbon-tab='file'].active { color: #9a3412; }
 .rte-ribbon-tab[data-ribbon-tab='tidy'].active { color: #0369a1; }
 .rte-ribbon-tab[data-ribbon-tab='picture'].active { color: #0f766e; }
+.rte-ribbon-tab[data-ribbon-tab='frame'].active { color: #be185d; }
+.rte-ribbon-tab[data-ribbon-tab='writing'].active { color: #0369a1; }
 .rte-ribbon-tab[data-ribbon-tab='page'].active { color: #9a3412; }
 .rte-root.is-dark-editor .rte-toolbar:not(.is-one-row) .rte-toolbar-tools {
   background: #1f2329;

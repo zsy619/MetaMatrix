@@ -2053,7 +2053,8 @@ function currentQuoteStyle(): QuoteStyle {
 function applyQuoteStyle(style: QuoteStyle) {
   const ed = editor.value
   if (!ed) return
-  ed.chain().focus().setQuoteStyle(style).run()
+  const next = ed.isActive('blockquote') ? ed.chain().focus() : ed.chain().focus().toggleBlockquote()
+  next.updateAttributes('blockquote', { quoteStyle: style }).run()
   moreOpen.value = false
   calloutOpen.value = false
 }
@@ -6013,6 +6014,18 @@ const headingOpen = ref(false)
 const listOpen = ref(false)
 const imageLayoutOpen = ref(false)
 const textTidyOpen = ref(false)
+const presetMenuKey = ref('')
+
+function closePresetMenu() {
+  presetMenuKey.value = ''
+}
+
+function togglePresetMenu(key: string) {
+  closeAllToolbarMenus()
+  textTidyOpen.value = false
+  imageLayoutOpen.value = false
+  presetMenuKey.value = presetMenuKey.value === key ? '' : key
+}
 const formOpen = ref(false)
 const templateOpen = ref(false)
 const moreFormOpen = ref(false)
@@ -6039,6 +6052,7 @@ const moreLineHeightOpen = ref(false)
 let hoverOpenTimer: ReturnType<typeof setTimeout> | null = null
 
 function toolbarSubmenuOpen(key: string): boolean {
+  if (presetMenuKey.value === key) return true
   if (key.startsWith('chart:')) return echartsGroupMenuKey.value === key
   switch (key) {
     case 'heading': return headingOpen.value
@@ -6079,6 +6093,7 @@ function toolbarSubmenuOpen(key: string): boolean {
 function openToolbarSubmenu(key: string) {
   if (toolbarSubmenuOpen(key)) return
   closeAllToolbarMenus()
+  presetMenuKey.value = ''
   paraStyleOpen.value = false
   listStyleOpen.value = false
   linkButtonOpen.value = false
@@ -6343,6 +6358,7 @@ function textColorLabel(color: string): string {
 }
 
 function moreSubmenuOpen(t: ToolItem): boolean {
+  if (t.kind === 'presetMenu') return presetMenuKey.value === t.key
   if (t.kind === 'color') return moreColorOpen.value
   if (t.key === 'highlight') return moreHighlightOpen.value
   if (t.kind === 'form') return moreFormOpen.value
@@ -6360,7 +6376,7 @@ function moreSubmenuOpen(t: ToolItem): boolean {
 
 const MORE_HOVER_KINDS = new Set([
   'color', 'form', 'template', 'fontSize', 'fontFamily', 'lineHeight',
-  'callout', 'caseTransform', 'zoom', 'viewExtras', 'echartsGroup', 'imageLayout', 'textTidy',
+  'callout', 'caseTransform', 'zoom', 'viewExtras', 'echartsGroup', 'imageLayout', 'textTidy', 'presetMenu',
 ])
 
 /** 「更多」里带下级的项，鼠标经过就展开，不重复点击把它关掉。 */
@@ -6371,6 +6387,13 @@ function hoverMoreSubmenu(t: ToolItem) {
 }
 
 function onMoreToolClick(t: ToolItem) {
+  if (t.kind === 'presetMenu') {
+    textTidyOpen.value = false
+    imageLayoutOpen.value = false
+    presetMenuKey.value = presetMenuKey.value === t.key ? '' : t.key
+    return
+  }
+  presetMenuKey.value = ''
   if (t.kind === 'textTidy') {
     textTidyOpen.value = !textTidyOpen.value
     return
@@ -6627,7 +6650,9 @@ type ToolItem = {
   title?: string
   icon: string
   iconComp?: Component
-  kind?: 'heading' | 'list' | 'more' | 'btn' | 'color' | 'highlight' | 'align' | 'fontSize' | 'fontFamily' | 'lineHeight' | 'import' | 'export' | 'table' | 'attach' | 'form' | 'template' | 'code' | 'divider' | 'emoji' | 'specialChars' | 'columns' | 'spacing' | 'wordStats' | 'callout' | 'shortcuts' | 'hr' | 'blockOps' | 'insertDate' | 'pasteFormat' | 'caseTransform' | 'zoom' | 'viewExtras' | 'paraStyle' | 'listStyle' | 'linkButton' | 'echarts' | 'echartsGroup' | 'imageLayout' | 'textTidy'
+  kind?: 'heading' | 'list' | 'more' | 'btn' | 'color' | 'highlight' | 'align' | 'fontSize' | 'fontFamily' | 'lineHeight' | 'import' | 'export' | 'table' | 'attach' | 'form' | 'template' | 'code' | 'divider' | 'emoji' | 'specialChars' | 'columns' | 'spacing' | 'wordStats' | 'callout' | 'shortcuts' | 'hr' | 'blockOps' | 'insertDate' | 'pasteFormat' | 'caseTransform' | 'zoom' | 'viewExtras' | 'paraStyle' | 'listStyle' | 'linkButton' | 'echarts' | 'echartsGroup' | 'imageLayout' | 'textTidy' | 'presetMenu'
+  presetOptions?: { id: string; label: string }[]
+  applyPreset?: (id: string) => void
   active?: () => boolean
   run?: () => void
 }
@@ -6811,6 +6836,30 @@ const allTools = computed((): ToolItem[] => {
     { key: 'div-text', label: '', icon: '', kind: 'divider' },
     // —— 高级（段落）——
     {
+      key: 'textDir',
+      label: '方向',
+      title: '段落从左到右或从右到左',
+      icon: '向',
+      iconComp: ic('align'),
+      kind: 'presetMenu',
+      presetOptions: [
+        { id: 'ltr', label: '从左到右' },
+        { id: 'rtl', label: '从右到左' },
+        { id: '', label: '自动' },
+      ],
+      applyPreset: (id: string) => applyTextDir(id === 'rtl' ? 'rtl' : id === 'ltr' ? 'ltr' : ''),
+    },
+    {
+      key: 'quoteStyle',
+      label: '引用样式',
+      title: '标准、强调或诗文引用',
+      icon: '引',
+      iconComp: ic('quote'),
+      kind: 'presetMenu',
+      presetOptions: QUOTE_STYLE_OPTIONS.map((opt) => ({ id: opt.value, label: opt.label })),
+      applyPreset: (id: string) => applyQuoteStyle(id === 'emphasis' || id === 'verse' ? id : 'default'),
+    },
+    {
       key: 'quote',
       label: '引用',
       title: '引用 (Ctrl/⌘+Shift+9)',
@@ -6876,6 +6925,39 @@ const allTools = computed((): ToolItem[] => {
     { key: 'imageAlt', label: '替代文本', title: '给选中图片写替代文本', icon: 'Alt', iconComp: ic('image'), run: () => void promptImageAlt(), disabled: () => !isImageNodeSelected() },
     { key: 'spoiler', label: '揭晓', title: '把选中文字收成揭晓文字', icon: '眼', run: toggleSpoiler },
     { key: 'dropCap', label: '首字', title: '段落首字下沉', icon: 'A', run: toggleDropCap },
+    {
+      key: 'imageRadius',
+      label: '圆角',
+      title: '图片圆角',
+      icon: '圆',
+      iconComp: ic('image'),
+      kind: 'presetMenu',
+      presetOptions: IMAGE_RADIUS_PRESETS.map((opt) => ({ id: opt.value, label: opt.label })),
+      applyPreset: (id: string) => setImageBorderRadius(id),
+      disabled: () => !isImageNodeSelected(),
+    },
+    {
+      key: 'imageShadow',
+      label: '阴影',
+      title: '图片阴影',
+      icon: '影',
+      iconComp: ic('image'),
+      kind: 'presetMenu',
+      presetOptions: IMAGE_SHADOW_PRESETS.map((opt) => ({ id: opt.value, label: opt.label })),
+      applyPreset: (id: string) => setImageBoxShadow(id),
+      disabled: () => !isImageNodeSelected(),
+    },
+    {
+      key: 'imageBorder',
+      label: '边框',
+      title: '图片边框',
+      icon: '框',
+      iconComp: ic('image'),
+      kind: 'presetMenu',
+      presetOptions: IMAGE_BORDER_PRESETS.map((opt) => ({ id: opt.value, label: opt.label })),
+      applyPreset: (id: string) => setImageBorderStyle(id),
+      disabled: () => !isImageNodeSelected(),
+    },
     { key: 'video', label: '视频', icon: '▶', iconComp: ic('video'), run: insertVideo },
     {
       key: 'link',
@@ -7284,6 +7366,24 @@ const allTools = computed((): ToolItem[] => {
     { key: 'tableEqual', label: '均分列', title: '把当前表格的列宽均分，一步撤销', icon: '均', run: () => runTableOpFromToolbar('equal-cols'), disabled: () => !isInTable() },
     { key: 'tableFormula', label: '格公式', title: '在当前格插入 =SUM(ABOVE)', icon: 'Σ', run: () => runTableOpFromToolbar('cell-formula'), disabled: () => !isInTable() },
     { key: 'tableSort', label: '升序', title: '按当前列从小到大排序', icon: '序', run: () => runTableOpFromToolbar('sort-asc'), disabled: () => !isInTable() },
+    {
+      key: 'tableStruct',
+      label: '行列',
+      title: '插入行、删除行、合并、拆分、表头和降序',
+      icon: '表',
+      iconComp: ic('table'),
+      kind: 'presetMenu',
+      presetOptions: [
+        { id: 'row-after', label: '向下插入行' },
+        { id: 'del-row', label: '删除行' },
+        { id: 'merge', label: '合并单元格' },
+        { id: 'split', label: '拆分单元格' },
+        { id: 'header', label: '切换表头行' },
+        { id: 'sort-desc', label: '按列降序' },
+      ],
+      applyPreset: (id: string) => runTableOpFromToolbar(id),
+      disabled: () => !isInTable(),
+    },
     { key: 'tableSticky', label: '冻结表头', title: '滚动时表头保持可见', icon: '表头', run: toggleTableHeaderStickyBar, active: () => tableHeaderSticky.value },
     { key: 'tableColSticky', label: '冻结首列', title: '横向滚动时首列保持可见', icon: '首列', run: toggleTableColStickyBar, active: () => tableColSticky.value },
     {
@@ -7963,6 +8063,9 @@ provideRteBindings({
   listOpen,
   imageLayoutOpen,
   textTidyOpen,
+  presetMenuKey,
+  togglePresetMenu,
+  closePresetMenu,
   TEXT_TIDY_ACTIONS,
   listStyleOpen,
   localTitle,
