@@ -5508,6 +5508,23 @@ html.rte-image-preview-open .tippy-box {
   margin-right: 4px;
   overflow: hidden;
 }
+/* 展开后的大按钮（图标 + 标题）高 72px，纸样小分组上下与它对齐。 */
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-paper-group:not(.rte-paper-group--menu) {
+  box-sizing: border-box;
+  align-self: center;
+  height: 72px;
+  min-height: 72px;
+  align-content: stretch;
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 4px 6px;
+  margin: 0 8px 0 0;
+  padding: 0;
+}
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-paper-group:not(.rte-paper-group--menu) .rte-paper-chip {
+  height: auto;
+  min-height: 0;
+  align-self: stretch;
+}
 .ProseMirror li {
   display: list-item;
 }
