@@ -2085,6 +2085,7 @@ function toggleChartGroupMenu(key: string) {
           :aria-label="t.title || t.label"
           :aria-pressed="t.active ? !!t.active() : undefined"
           :disabled="t.disabled?.() || undefined"
+          @mousedown.prevent
           @click="t.run?.()"
           @dblclick.stop="t.key === 'formatPainter' && rte.onFormatPainterDblClick()"
         >
