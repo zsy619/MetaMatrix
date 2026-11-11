@@ -4,7 +4,7 @@ import { canvasChromeStyle } from './canvasChrome'
 import type { TenCheckDocumentJSON, TenCheckRow, TenCheckRowId } from '../../types/canvas'
 import { isTenCheckDoc } from '../../types/canvas'
 import { useDocumentStore } from '../../stores/document'
-import RichTextEditor from '../RichTextEditor.vue'
+import TenCheckCell from './TenCheckCell.vue'
 import { itemTextToHtml, normalizeHtmlForCompare } from '../../utils/itemsHtml'
 
 const props = defineProps<{ doc: TenCheckDocumentJSON }>()
@@ -69,48 +69,25 @@ function mark(id: TenCheckRowId, passed: boolean) {
       <div v-for="(item, index) in doc.rows" :key="item.id" class="row" :data-row="item.id" :data-pass="item.passed">
         <span class="num">{{ index + 1 }}</span>
         <strong>{{ item.name }}</strong>
-        <div class="editor">
-          <RichTextEditor
-            compact
-            :page-sheet="false"
-            :show-title="false"
-            :show-bottom-bar="false"
-            :show-publish-actions="false"
-            :show-markdown-hint="false"
-            :aria-label="`${item.name}：你要填什么`"
-            placeholder="点击填写…"
-            :model-value="cellHtml(item, 'answer')"
-            @update:model-value="write(item.id, 'answer', $event)"
-          />
-        </div>
-        <div class="editor">
-          <RichTextEditor
-            compact
-            :page-sheet="false"
-            :show-title="false"
-            :show-bottom-bar="false"
-            :show-publish-actions="false"
-            :show-markdown-hint="false"
-            :aria-label="`${item.name}：它帮你判断`"
-            placeholder="点击填写…"
-            :model-value="cellHtml(item, 'judges')"
-            @update:model-value="write(item.id, 'judges', $event)"
-          />
-        </div>
-        <div class="editor editor-fail">
-          <RichTextEditor
-            compact
-            :page-sheet="false"
-            :show-title="false"
-            :show-bottom-bar="false"
-            :show-publish-actions="false"
-            :show-markdown-hint="false"
-            :aria-label="`${item.name}：不合格的信号`"
-            placeholder="点击填写…"
-            :model-value="cellHtml(item, 'fail')"
-            @update:model-value="write(item.id, 'fail', $event)"
-          />
-        </div>
+        <TenCheckCell
+          :label="`${item.name} · 你要填什么`"
+          :panel-id="`ten:${item.id}:fill`"
+          :model-value="cellHtml(item, 'answer')"
+          @update:model-value="write(item.id, 'answer', $event)"
+        />
+        <TenCheckCell
+          :label="`${item.name} · 它帮你判断`"
+          :panel-id="`ten:${item.id}:judge`"
+          :model-value="cellHtml(item, 'judges')"
+          @update:model-value="write(item.id, 'judges', $event)"
+        />
+        <TenCheckCell
+          fail
+          :label="`${item.name} · 不合格的信号`"
+          :panel-id="`ten:${item.id}:fail`"
+          :model-value="cellHtml(item, 'fail')"
+          @update:model-value="write(item.id, 'fail', $event)"
+        />
         <div class="marks">
           <button type="button" :aria-pressed="item.passed === true" @click="mark(item.id, true)">过</button>
           <button type="button" class="no" :aria-pressed="item.passed === false" @click="mark(item.id, false)">不过</button>
@@ -138,15 +115,6 @@ function mark(id: TenCheckRowId, passed: boolean) {
 .num, .row > strong { display: flex; align-items: center; min-width: 0; }
 .row > strong { font-size: 14px; line-height: 1.35; }
 .num { color: #8a8175; font-weight: 700; }
-.editor { min-width: 0; min-height: 0; height: 100%; display: flex; }
-.editor :deep(.rte-root) { height: 100%; min-height: 0; border: none; border-radius: 0; background: transparent; box-shadow: none; }
-.editor:not(:focus-within) :deep(.rte-toolbar) { display: none; }
-.editor :deep(.rte-workspace),
-.editor :deep(.rte-canvas),
-.editor :deep(.rte-body) { flex: 1 1 auto; min-height: 0; }
-.editor :deep(.rte-canvas) { padding: 8px 8px 4px; background: transparent; overflow: auto; }
-.editor :deep(.ProseMirror) { min-height: 140px; font-size: 14px; line-height: 1.55; }
-.editor-fail :deep(.ProseMirror) { color: #9b1c1c; }
 .marks { display: flex; flex-direction: column; justify-content: center; align-items: stretch; gap: 6px; }
 .marks button { border: 1px solid #e4ddd2; background: #fff; border-radius: 999px; padding: 4px 8px; cursor: pointer; }
 .marks button[aria-pressed='true'] { background: #187a4e; border-color: #187a4e; color: #fff; }
