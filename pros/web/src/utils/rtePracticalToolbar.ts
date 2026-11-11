@@ -37,13 +37,15 @@ export function continuedListStart(start: number, itemCount: number): number {
 
 export type ListSibling =
   | { type: 'orderedList'; start: number; items: number }
+  | { type: 'gap' }
   | { type: 'other' }
 
-/** 同一父级里往前找有序列表，中间隔着段落也可以续号。找不到则返回 null。 */
+/** 同一父级里往前找有序列表。空段不打断；中间隔着正文也可以续号。找不到则返回 null。 */
 export function previousOrderedContinuation(siblingsBefore: readonly ListSibling[]): number | null {
   for (let i = siblingsBefore.length - 1; i >= 0; i -= 1) {
     const sibling = siblingsBefore[i]
-    if (sibling?.type === 'orderedList') return continuedListStart(sibling.start, sibling.items)
+    if (!sibling || sibling.type === 'gap' || sibling.type === 'other') continue
+    return continuedListStart(sibling.start, sibling.items)
   }
   return null
 }

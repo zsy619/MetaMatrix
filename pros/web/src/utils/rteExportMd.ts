@@ -1,6 +1,15 @@
 /**
  * 轻量 HTML → Markdown（覆盖标题/列表/引用/代码/链接/粗斜体/表格粗略/分割线）
  */
+/** 导出的 HTML 里，外链补上 rel，已有 rel 的不改。 */
+export function withExternalLinkRel(html: string): string {
+  return String(html || '').replace(/<a\b([^>]*?)>/gi, (full, attrs: string) => {
+    if (!/\bhref\s*=\s*["']https?:/i.test(attrs)) return full
+    if (/\brel\s*=/i.test(attrs)) return full
+    return `<a${attrs} rel="noopener noreferrer">`
+  })
+}
+
 export function htmlToMarkdown(html: string): string {
   const tmp = typeof document !== 'undefined' ? document.createElement('div') : null
   if (!tmp) return stripTags(html)
@@ -65,9 +74,13 @@ function nodeToMd(root: HTMLElement): string {
           i += 1
         })
         parts.push('\n')
+      } else if (e.getAttribute('data-type') === 'math-display' || e.classList.contains('rte-math-display')) {
+        const tex = e.getAttribute('data-tex') || ''
+        parts.push(tex ? `$$\n${tex}\n$$\n\n` : '')
       } else if (tag === 'pre') {
         const code = e.textContent || ''
-        const lang = e.querySelector('code')?.className?.replace(/^language-/, '') || ''
+        const langClass = `${e.querySelector('code')?.className || ''} ${e.getAttribute('class') || ''}`
+        const lang = /language-([\w-]+)/.exec(langClass)?.[1] || ''
         parts.push(`\`\`\`${lang}\n${code.replace(/\n$/, '')}\n\`\`\`\n\n`)
       } else if (tag === 'hr') {
         parts.push('---\n\n')
@@ -103,6 +116,10 @@ function inlineMd(el: HTMLElement): string {
     if (tag === 'strong' || tag === 'b') out += `**${inlineMd(e)}**`
     else if (tag === 'em' || tag === 'i') out += `*${inlineMd(e)}*`
     else if (tag === 'code') out += `\`${e.textContent || ''}\``
+    else if (e.getAttribute('data-type') === 'math-inline' || e.classList.contains('rte-math-inline')) {
+      const tex = e.getAttribute('data-tex') || ''
+      out += tex ? `$${tex}$` : ''
+    }
     else if (tag === 'a') {
       const href = e.getAttribute('href') || ''
       out += `[${inlineMd(e)}](${href})`

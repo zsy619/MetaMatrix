@@ -149,9 +149,10 @@ function stripDangerousMarkup(html: string): string {
     .replace(/<style\b[^>]*>[\s\S]*?(?:<\/style>|$)/gi, '')
     .replace(/<!--\[if[\s\S]*?<!\[endif\]-->/gi, '')
     .replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/<(iframe|object|embed|form|meta|link|xml|svg|math|o:p)\b[^>]*>[\s\S]*?<\/\1>/gi, '')
-    .replace(/<(iframe|object|embed|form|meta|link|xml|svg|math|o:p|w:[^>\s]+)[^>]*\/?>/gi, '')
-    .replace(/<\/(xml|o:p|w:[^>\s]+)>/gi, '')
+    .replace(/<(iframe|object|embed|form|meta|link|xml|svg|math)\b[^>]*>[\s\S]*?<\/\1>/gi, '')
+    .replace(/<(iframe|object|embed|form|meta|link|xml|svg|math)[^>]*\/?>/gi, '')
+    .replace(/<\/?(?:o:p|w:[a-z0-9]+|v:[a-z0-9]+)[^>]*>/gi, '')
+    .replace(/\sxmlns(?::[a-z0-9]+)?\s*=\s*("[^"]*"|'[^']*')/gi, '')
     .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
 }
 
@@ -160,8 +161,29 @@ function rebuildPasted(node: Node, doc: Document): Node | null {
   if (node.nodeType !== Node.ELEMENT_NODE) return null
   const el = node as HTMLElement
   const tag = el.tagName.toLowerCase()
-  if (DROP_TAGS.has(tag)) return null
-  const parent = tag === 'font' || tag === 'div' ? null : KEEP_TAGS.has(tag) ? doc.createElement(tag === 'font' ? 'span' : tag) : null
+  if (DROP_TAGS.has(tag) || tag === 'nav' || tag === 'button' || tag === 'aside' || tag === 'footer') return null
+  if (tag === 'header' && !el.closest('table')) return null
+  const structural = tag === 'div' ? structuralPasteType(el) : ''
+  const parent = structural
+    ? doc.createElement('div')
+    : tag === 'font' || tag === 'div'
+      ? null
+      : KEEP_TAGS.has(tag)
+        ? doc.createElement(tag === 'font' ? 'span' : tag)
+        : null
+  if (parent && structural) {
+    parent.setAttribute('data-type', structural)
+    if (structural === 'callout') {
+      const variant = el.getAttribute('data-variant')
+      if (variant) parent.setAttribute('data-variant', variant)
+    }
+    if (structural === 'image-group') {
+      for (const name of ['data-layout', 'data-ratios', 'data-ratio-mode', 'data-stack-at', 'data-stack-side', 'data-stack-split', 'data-fit', 'data-gap', 'data-align']) {
+        const value = el.getAttribute(name)
+        if (value) parent.setAttribute(name, value)
+      }
+    }
+  }
   const host = parent ?? doc.createDocumentFragment()
   if (parent && (tag === 'span' || tag === 'mark' || tag === 'font')) {
     const fromStyle = keptInlineStyle(el.getAttribute('style') || '')
@@ -176,6 +198,12 @@ function rebuildPasted(node: Node, doc: Document): Node | null {
       return span
     }
     if (fromStyle) parent.setAttribute('style', fromStyle)
+  }
+  if (parent && tag === 'ul' && (el.getAttribute('data-type') === 'taskList' || /todo|task-list/i.test(el.className))) {
+    parent.setAttribute('data-type', 'taskList')
+  }
+  if (parent && tag === 'li' && el.hasAttribute('data-checked')) {
+    parent.setAttribute('data-checked', el.getAttribute('data-checked') === 'true' ? 'true' : 'false')
   }
   if (parent && tag === 'a') {
     const href = safePasteUrl(el.getAttribute('href') || '', 'a')
@@ -219,9 +247,11 @@ function sanitizeWithDom(html: string): string {
     const next = rebuildPasted(child, parsed)
     if (next) holder.appendChild(next)
   })
-  return holder.innerHTML
-    .replace(/<p([^>]*)>\s*(?:&nbsp;|\s)*<\/p>/gi, '')
-    .replace(/(<br\s*\/?>\s*){3,}/gi, '<br><br>')
+  return absorbPastedFigureCaptions(
+    holder.innerHTML
+      .replace(/<p([^>]*)>\s*(?:&nbsp;|\s)*<\/p>/gi, '')
+      .replace(/(<br\s*\/?>\s*){3,}/gi, '<br><br>'),
+  )
 }
 
 export function sanitizePastedHtml(html: string): string {
@@ -271,14 +301,90 @@ export function sanitizePastedHtml(html: string): string {
   return out
 }
 
-/** 纯文本粘贴：单行保持字符串，多行拆成段落。不把内容再解析成 HTML。 */
-export function plainTextToPasteContent(
-  text: string,
-): string | Array<{ type: 'paragraph'; content?: Array<{ type: 'text'; text: string }> }> {
+function structuralPasteType(el: HTMLElement): string {
+  const type = el.getAttribute('data-type') || ''
+  if (type === 'callout' || type === 'columns' || type === 'column' || type === 'image-group') return type
+  const className = el.className || ''
+  if (/callout|highlight-block|ace-highlight/i.test(className)) return 'callout'
+  if (/columns|column-block/i.test(className)) return 'columns'
+  return ''
+}
+
+const PASTE_BULLET = /^[ \t]*[■●○□▪▫※・•·◆◇▶►]\s+(.*)$/
+const PASTE_ORDERED = /^[ \t]*(\d+)[.、．]\s+(.*)$/
+
+type PasteInline = { type: 'text'; text: string } | { type: 'hardBreak' }
+type PasteParagraph = { type: 'paragraph'; content?: PasteInline[] }
+type PasteList = {
+  type: 'bulletList' | 'orderedList'
+  attrs?: { start: number }
+  content: Array<{ type: 'listItem'; content: PasteParagraph[] }>
+}
+
+function listFromLines(lines: string[]): PasteList | null {
+  const items = lines.map((line) => line.trim()).filter(Boolean)
+  if (items.length < 1) return null
+  if (items.every((line) => PASTE_BULLET.test(line))) {
+    return {
+      type: 'bulletList',
+      content: items.map((line) => ({
+        type: 'listItem',
+        content: [{ type: 'paragraph', content: [{ type: 'text', text: line.replace(PASTE_BULLET, '$1') }] }],
+      })),
+    }
+  }
+  if (items.every((line) => PASTE_ORDERED.test(line))) {
+    const start = Number(PASTE_ORDERED.exec(items[0]!)?.[1] || 1) || 1
+    return {
+      type: 'orderedList',
+      attrs: { start },
+      content: items.map((line) => ({
+        type: 'listItem',
+        content: [{ type: 'paragraph', content: [{ type: 'text', text: line.replace(PASTE_ORDERED, '$2') }] }],
+      })),
+    }
+  }
+  return null
+}
+
+/** 已经在列表里时，整段粘贴的列表不再多套一层。 */
+export function unwrapSinglePastedList(html: string): string {
+  if (typeof DOMParser === 'undefined') return html
+  const doc = new DOMParser().parseFromString(html, 'text/html')
+  const elements = [...doc.body.children]
+  if (elements.length !== 1) return html
+  const only = elements[0]!
+  const tag = only.tagName.toLowerCase()
+  if (tag !== 'ul' && tag !== 'ol') return html
+  return only.innerHTML
+}
+
+/** 紧挨着图片的「图 1 说明」收进题注，避免和自动编号叠成两个图号。 */
+export function absorbPastedFigureCaptions(html: string): string {
+  if (typeof DOMParser === 'undefined' || !/图\s*\d+/.test(html)) return html
+  const doc = new DOMParser().parseFromString(html, 'text/html')
+  const images = [...doc.body.querySelectorAll('img')]
+  images.forEach((img) => {
+    const next = img.nextElementSibling
+    if (!next || next.tagName !== 'P') return
+    const text = (next.textContent || '').trim()
+    const matched = text.match(/^图\s*\d+\s*(.*)$/)
+    if (!matched) return
+    const caption = (matched[1] || '').trim()
+    if (caption) img.setAttribute('data-caption', caption)
+    next.remove()
+  })
+  return doc.body.innerHTML
+}
+
+/** 纯文本粘贴：单行保持字符串，多行拆成段落。项目符号收成列表。不把内容再解析成 HTML。 */
+export function plainTextToPasteContent(text: string): string | Array<PasteParagraph | PasteList> {
   const normalized = String(text || '')
     .replace(/\r\n/g, '\n')
     .replace(/\r/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
+  const listed = listFromLines(normalized.split('\n'))
+  if (listed) return [listed]
   if (!normalized.includes('\n')) return normalized
   return normalized.split(/\n{2,}/).map((block) => {
     const lines = block.split('\n')

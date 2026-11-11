@@ -22,6 +22,9 @@ export type ChartPanelHostTarget = {
   option: string
   dataSource: string
   tableRef: string
+  chartTitle: string
+  chartUnit: string
+  chartSource: string
 }
 
 /** 找到文档里指定 chartId 的图表块位置。 */
@@ -101,6 +104,9 @@ export function useChartPanelHost(editorRef: Ref<Editor | undefined>) {
         ...(typeof patch.option === 'string' ? { option: patch.option } : {}),
         ...(typeof patch.dataSource === 'string' ? { dataSource: patch.dataSource } : {}),
         ...(typeof patch.tableRef === 'string' ? { tableRef: patch.tableRef } : {}),
+        ...(typeof patch.chartTitle === 'string' ? { chartTitle: patch.chartTitle } : {}),
+        ...(typeof patch.chartUnit === 'string' ? { chartUnit: patch.chartUnit } : {}),
+        ...(typeof patch.chartSource === 'string' ? { chartSource: patch.chartSource } : {}),
       }
     }
     return true

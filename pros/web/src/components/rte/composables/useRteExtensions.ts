@@ -43,13 +43,21 @@ import { createRteMention } from '../../../extensions/mentionSuggestion'
 import { RteCodeBlockLowlight } from '../../../extensions/codeHighlight'
 import { SlashCommands } from '../../../extensions/slashCommands'
 import { escapeHtml } from '../../../utils/itemsHtml'
-import { FEISHU_HIGHLIGHT_COLORS, isBareHttpUrl, plainTextToPasteContent, sanitizePastedHtml } from '../../../utils/rtePasteClean'
+import {
+  FEISHU_HIGHLIGHT_COLORS,
+  absorbPastedFigureCaptions,
+  isBareHttpUrl,
+  plainTextToPasteContent,
+  sanitizePastedHtml,
+  unwrapSinglePastedList,
+} from '../../../utils/rtePasteClean'
 import { clearEditorFormat } from '../../../utils/rteClearFormat'
 import { pasteVolume, previewShortcutAllowed } from '../../../utils/rteRound8'
 import { filesFromImageDataUrls, pasteCarriesText } from '../../../utils/rtePasteImage'
 import {
   htmlHasTable,
   looksLikeTsvTable,
+  pasteTsvIntoTable,
   togglePreviewMode,
   tsvToTableHtml,
 } from '../../../utils/rteRound7'
@@ -240,6 +248,16 @@ export function useRteExtensions(deps: {
   const undoToolbarGroupOrder = (...args: any[]) => deps.undoToolbarGroupOrder(...args)
   const mentionPeople = deps.mentionPeople
   let wordPasteHinted = false
+
+function qrHref(node: Element | null): string {
+  if (!node) return ''
+  try {
+    const meta = JSON.parse(node.getAttribute('data-qr') || '{}') as { text?: string }
+    return String(meta.text || '')
+  } catch {
+    return ''
+  }
+}
 
 const editor = useEditor({
 
@@ -439,7 +457,10 @@ const editor = useEditor({
           /* ignore */
         }
       }
-      return sanitizePastedHtml(html)
+      let cleaned = sanitizePastedHtml(html)
+      const ed = editor.value
+      if (ed?.isActive('listItem') || ed?.isActive('taskItem')) cleaned = unwrapSinglePastedList(cleaned)
+      return absorbPastedFigureCaptions(cleaned)
     },
     handlePaste(_view, event) {
       if (viewMode.value !== 'edit') {
@@ -465,6 +486,13 @@ const editor = useEditor({
       }
       if (volume === 'warn') {
         ElMessage.info('正在粘贴较大内容，编辑器可能短暂无响应')
+      }
+      if (plain && plain.includes('\t')) {
+        const ed = editor.value
+        if (ed && (ed.isActive('tableCell') || ed.isActive('tableHeader')) && pasteTsvIntoTable(ed, plain)) {
+          event.preventDefault()
+          return true
+        }
       }
       if (
         plain &&
@@ -557,6 +585,41 @@ const editor = useEditor({
     },
     handleClick(_view, _pos, event) {
       const target = event.target as HTMLElement | null
+      if (event.altKey && target) {
+        const ed = editor.value
+        const qr = target.closest('img[data-qr]')
+        const card = target.closest('[data-type="link-card"]')
+        if (ed && (qr || card)) {
+          const href = card?.getAttribute('data-href') || qrHref(qr)
+          if (href) {
+            let found: number | null = null
+            ed.state.doc.descendants((node, pos) => {
+              if (found != null) return false
+              if (qr && node.type.name === 'linkCard' && String(node.attrs.href || '') === href) {
+                found = pos
+                return false
+              }
+              if (card && node.type.name === 'image') {
+                try {
+                  const meta = JSON.parse(String(node.attrs.qrMeta || '{}')) as { text?: string }
+                  if (meta.text === href) {
+                    found = pos
+                    return false
+                  }
+                } catch {
+                  /* 没有二维码数据 */
+                }
+              }
+              return true
+            })
+            if (found != null) {
+              event.preventDefault()
+              jumpToPos(ed, found)
+              return true
+            }
+          }
+        }
+      }
       const math = target?.closest?.(
         '[data-type="math-inline"], [data-type="math-display"], .rte-math',
       ) as HTMLElement | null

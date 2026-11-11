@@ -5,7 +5,7 @@ import html2canvas from 'html2canvas'
 import { feishuClipboardDocument } from '../../../utils/rteRound7'
 import { buildDocxBlob } from '../../../utils/rteExportDocx'
 import { buildPdfFromElement } from '../../../utils/rteExportPdf'
-import { htmlToMarkdown } from '../../../utils/rteExportMd'
+import { htmlToMarkdown, withExternalLinkRel } from '../../../utils/rteExportMd'
 import { withHeadingNumbers } from '../../../utils/rteHeadingExport'
 import { buildExportHtmlWithCharts } from '../../../utils/rteExportChartSnapshots'
 import { escapeHtml } from '../../../utils/itemsHtml'
@@ -172,7 +172,7 @@ th,td{border:1px solid #e5e6eb;padding:6px 8px;}
 </head>
 <body>
 <h1>${escapeHtml(title)}</h1>
-${body}
+${withExternalLinkRel(body)}
 </body>
 </html>
 `

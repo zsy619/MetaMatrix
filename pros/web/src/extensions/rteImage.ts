@@ -36,6 +36,11 @@ export const RteImage = Image.extend({
           'data-layout': normalizeImageLayout(attrs.layout),
         }),
       },
+      concealed: {
+        default: false,
+        parseHTML: (el: HTMLElement) => el.getAttribute('data-concealed') === '1',
+        renderHTML: (attrs: { concealed?: boolean }) => (attrs.concealed ? { 'data-concealed': '1' } : {}),
+      },
       qrMeta: {
         default: null as string | null,
         parseHTML: (el: HTMLElement) => el.getAttribute('data-qr') || null,

@@ -13,6 +13,8 @@ declare module '@tiptap/core' {
     listStyleAttrs: {
       setOrderedListStyle: (listStyleType: OrderedListStyle) => ReturnType
       setOrderedListStart: (start: number) => ReturnType
+      padListItem: (delta: number) => ReturnType
+      toggleTableZebra: () => ReturnType
     }
   }
 }
@@ -74,6 +76,28 @@ export const ListStyleAttrs = Extension.create({
             renderHTML: (attrs: { caption?: string | null }) =>
               attrs.caption ? { 'data-table-caption': attrs.caption } : {},
           },
+          zebra: {
+            default: false,
+            parseHTML: (el: HTMLElement) => el.getAttribute('data-zebra') === '1',
+            renderHTML: (attrs: { zebra?: boolean }) => (attrs.zebra ? { 'data-zebra': '1' } : {}),
+          },
+        },
+      },
+      {
+        types: ['listItem', 'taskItem'],
+        attributes: {
+          pad: {
+            default: 0,
+            parseHTML: (el: HTMLElement) => {
+              const n = Number(el.getAttribute('data-pad') || 0)
+              return Number.isFinite(n) ? Math.max(0, Math.min(6, Math.round(n))) : 0
+            },
+            renderHTML: (attrs: { pad?: number }) => {
+              const pad = Number(attrs.pad) || 0
+              if (!pad) return {}
+              return { 'data-pad': String(pad), style: `padding-left: ${pad}em` }
+            },
+          },
         },
       },
       {
@@ -113,6 +137,22 @@ export const ListStyleAttrs = Extension.create({
           if (!editor.isActive('orderedList')) return false
           const n = Math.max(1, Math.floor(start) || 1)
           return commands.updateAttributes('orderedList', { start: n })
+        },
+      padListItem:
+        (delta) =>
+        ({ editor, commands }) => {
+          const type = editor.isActive('taskItem') ? 'taskItem' : editor.isActive('listItem') ? 'listItem' : ''
+          if (!type) return false
+          const cur = Number(editor.getAttributes(type).pad || 0)
+          const next = Math.max(0, Math.min(6, cur + (delta > 0 ? 1 : -1)))
+          return commands.updateAttributes(type, { pad: next })
+        },
+      toggleTableZebra:
+        () =>
+        ({ editor, commands }) => {
+          if (!editor.isActive('table')) return false
+          const on = editor.getAttributes('table').zebra === true
+          return commands.updateAttributes('table', { zebra: !on })
         },
     }
   },

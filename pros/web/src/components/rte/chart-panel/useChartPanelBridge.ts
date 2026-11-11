@@ -45,6 +45,9 @@ export function useChartPanelBridge(editorRef: Ref<Editor | undefined>) {
       option?: string
       dataSource?: string
       tableRef?: string
+      chartTitle?: string
+      chartUnit?: string
+      chartSource?: string
     }
     host.show({
       chartId,
@@ -52,6 +55,9 @@ export function useChartPanelBridge(editorRef: Ref<Editor | undefined>) {
       option: attrs.option || '',
       dataSource: attrs.dataSource || '',
       tableRef: attrs.tableRef || '',
+      chartTitle: attrs.chartTitle || '',
+      chartUnit: attrs.chartUnit || '',
+      chartSource: attrs.chartSource || '',
     })
   }
 

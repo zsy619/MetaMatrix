@@ -1,3 +1,5 @@
+import type { Editor } from '@tiptap/core'
+
 /** 第七轮可单测的缩进、表格粘贴、斜杠/快捷键检索与导出片段。 */
 
 export const MAX_BLOCK_INDENT = 8
@@ -271,9 +273,96 @@ export function filterLabeledTargets<T extends { label: string; kind?: string }>
           ? 'figure image'
           : item.kind === 'table'
             ? 'table'
-            : ''
+            : item.kind === 'bookmark'
+              ? 'bookmark'
+              : ''
     const kindZh =
-      item.kind === 'heading' ? '标题' : item.kind === 'figure' ? '图' : item.kind === 'table' ? '表' : ''
+      item.kind === 'heading'
+        ? '标题'
+        : item.kind === 'figure'
+          ? '图'
+          : item.kind === 'table'
+            ? '表'
+            : item.kind === 'bookmark'
+              ? '书签'
+              : ''
     return textMatchesQuery(`${item.label} ${kindEn} ${kindZh} ${item.kind || ''}`, q)
   })
+}
+
+/** 光标已经在表格里时，按制表符把纯文本填进后面的格子。一次粘贴一步撤销。 */
+export function pasteTsvIntoTable(editor: Editor, plain: string): boolean {
+  const text = String(plain || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+  if (!text.includes('\t')) return false
+  const { state } = editor
+  const $from = state.selection.$from
+  let cellDepth = -1
+  for (let depth = $from.depth; depth > 0; depth -= 1) {
+    const name = $from.node(depth).type.name
+    if (name === 'tableCell' || name === 'tableHeader') {
+      cellDepth = depth
+      break
+    }
+  }
+  if (cellDepth < 2) return false
+  const table = $from.node(cellDepth - 2)
+  if (table.type.name !== 'table') return false
+  const rows = text
+    .split('\n')
+    .filter((line) => line.length > 0)
+    .map((line) => line.split('\t'))
+  if (!rows.length) return false
+  const tablePos = $from.before(cellDepth - 2)
+  const startRow = $from.index(cellDepth - 2)
+  const startCol = $from.index(cellDepth - 1)
+  const header = table.child(0)
+  const dateCols = new Set<number>()
+  if (header) {
+    let col = 0
+    header.forEach((cell) => {
+      if (/日期|date/i.test(cell.textContent)) dateCols.add(col)
+      col += Math.max(1, Number(cell.attrs.colspan) || 1)
+    })
+  }
+  const jobs: Array<{ from: number; to: number; text: string }> = []
+  let rowIndex = 0
+  table.forEach((rowNode, rowOffset) => {
+    const gridRow = rows[rowIndex - startRow]
+    if (rowIndex >= startRow && gridRow) {
+      let colIndex = 0
+      rowNode.forEach((cellNode, cellOffset) => {
+        const span = Math.max(1, Number(cellNode.attrs.colspan) || 1)
+        if (colIndex >= startCol) {
+          let value = gridRow[colIndex - startCol]
+          if (value != null) {
+            if (dateCols.has(colIndex) && /^\d+$/.test(value.trim())) {
+              value = excelSerialToDate(Number(value.trim())) || value
+            }
+            const cellPos = tablePos + 1 + rowOffset + 1 + cellOffset
+            const para = cellNode.firstChild
+            if (para) {
+              jobs.push({
+                from: cellPos + 2,
+                to: cellPos + 1 + para.nodeSize - 1,
+                text: value,
+              })
+            }
+          }
+        }
+        colIndex += span
+      })
+    }
+    rowIndex += 1
+  })
+  if (!jobs.length) return false
+  let tr = state.tr
+  jobs.sort((a, b) => b.from - a.from)
+  for (const job of jobs) {
+    const mappedFrom = tr.mapping.map(job.from)
+    const mappedTo = tr.mapping.map(job.to)
+    const next = job.text ? state.schema.text(job.text) : []
+    tr = tr.replaceWith(mappedFrom, mappedTo, next)
+  }
+  editor.view.dispatch(tr)
+  return true
 }

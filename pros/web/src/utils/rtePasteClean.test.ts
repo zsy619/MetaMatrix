@@ -55,6 +55,12 @@ assert.deepEqual(plainTextToPasteContent('甲\n\n乙'), [
   { type: 'paragraph', content: [{ type: 'text', text: '乙' }] },
 ])
 assert.equal(plainTextToPasteContent('<b>不是标签</b>'), '<b>不是标签</b>')
+const bullets = plainTextToPasteContent('■ 甲\n● 乙') as Array<{ type: string; content: Array<{ content: Array<{ content: Array<{ text: string }> }> }> }>
+assert.equal(bullets[0]?.type, 'bulletList')
+assert.equal(bullets[0]?.content[0]?.content[0]?.content[0]?.text, '甲')
+const numbered = plainTextToPasteContent('3. 甲\n4. 乙') as Array<{ type: string; attrs?: { start: number } }>
+assert.equal(numbered[0]?.type, 'orderedList')
+assert.equal(numbered[0]?.attrs?.start, 3)
 
 assert.equal(FEISHU_TEXT_COLORS.length, 8)
 assert.equal(FEISHU_HIGHLIGHT_COLORS.length, 8)

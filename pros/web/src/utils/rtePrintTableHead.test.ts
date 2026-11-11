@@ -31,6 +31,16 @@ describe('打印表头', () => {
     expect(table.querySelector('thead')?.textContent).toBe('已有')
   })
 
+  it('表头单元格跨行时不复制表头，避免把合并格拆开', () => {
+    const root = document.createElement('div')
+    const table = document.createElement('table')
+    table.innerHTML = '<tbody><tr><th rowspan="2">甲</th><th>乙</th></tr><tr><td>1</td></tr></tbody>'
+    root.appendChild(table)
+    syncPrintTableHeads(root)
+    expect(table.querySelector('thead.rte-print-head')).toBeNull()
+    expect(table.querySelector('th')?.getAttribute('rowspan')).toBe('2')
+  })
+
   it('编辑器里的表头行会带上打印用的 thead，正文仍可改', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)

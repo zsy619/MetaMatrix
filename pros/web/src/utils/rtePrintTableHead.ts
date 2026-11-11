@@ -19,7 +19,8 @@ export function syncPrintTableHeads(root: ParentNode) {
     const row = tbody ? childByTag(tbody, 'TR') : null
     const cells = row ? Array.from(row.children) : []
     const header = !realHead && cells.length > 0 && cells.every((cell) => cell.tagName === 'TH')
-    if (!header || !row || !tbody) {
+    const rowSpans = cells.some((cell) => (cell as HTMLTableCellElement).rowSpan > 1)
+    if (!header || !row || !tbody || rowSpans) {
       existing?.remove()
       return
     }

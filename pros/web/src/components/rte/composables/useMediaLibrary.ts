@@ -322,8 +322,12 @@ async function imageSrcWithinPolicy(file: File): Promise<string | null> {
       const stored = await uploadMediaFile(file, { mediaType: 'image' })
       return stored.insertedPath
     } catch (error) {
-      rteToast('error', error instanceof Error ? error.message : '图片上传失败')
-      return null
+      rteToast('error', `${error instanceof Error ? error.message : '图片上传失败'}，已保留本地预览`)
+      try {
+        return await readFileAsDataURL(file)
+      } catch {
+        return null
+      }
     }
   }
   const name = file.name || 'image.png'

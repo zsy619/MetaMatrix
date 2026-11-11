@@ -245,6 +245,33 @@ function onChangeChartType(event: Event) {
         </select>
       </label>
       <label class="rte-cp-type-row">
+        <span class="rte-cp-type-label">标题</span>
+        <input
+          class="rte-cp-type-select"
+          :value="props.host.target?.chartTitle || ''"
+          aria-label="图表标题"
+          @change="props.host.patchAttrs({ chartTitle: ($event.target as HTMLInputElement).value })"
+        />
+      </label>
+      <label class="rte-cp-type-row">
+        <span class="rte-cp-type-label">单位</span>
+        <input
+          class="rte-cp-type-select"
+          :value="props.host.target?.chartUnit || ''"
+          aria-label="图表单位"
+          @change="props.host.patchAttrs({ chartUnit: ($event.target as HTMLInputElement).value })"
+        />
+      </label>
+      <label class="rte-cp-type-row">
+        <span class="rte-cp-type-label">来源</span>
+        <input
+          class="rte-cp-type-select"
+          :value="props.host.target?.chartSource || ''"
+          aria-label="图表来源"
+          @change="props.host.patchAttrs({ chartSource: ($event.target as HTMLInputElement).value })"
+        />
+      </label>
+      <label class="rte-cp-type-row">
         <span class="rte-cp-type-label">图表类型</span>
         <select
           class="rte-cp-type-select"

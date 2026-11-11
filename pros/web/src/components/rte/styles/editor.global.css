@@ -3021,6 +3021,12 @@ html.rte-toolbar-dragging * {
   content: counter(h1) '.' counter(h2) '.' counter(h3) '.' counter(h4) '.' counter(h5) '.' counter(h6) ' ';
   color: #86909c;
 }
+.rte-root.is-heading-auto-num .ProseMirror h1:has(img[data-layout^='wrap'])::before,
+.rte-root.is-heading-auto-num .ProseMirror h2:has(img[data-layout^='wrap'])::before,
+.rte-root.is-heading-auto-num .ProseMirror h3:has(img[data-layout^='wrap'])::before,
+.rte-root.is-heading-auto-num .ProseMirror h4:has(img[data-layout^='wrap'])::before,
+.rte-root.is-heading-auto-num .ProseMirror h5:has(img[data-layout^='wrap'])::before,
+.rte-root.is-heading-auto-num .ProseMirror h6:has(img[data-layout^='wrap'])::before,
 .rte-root.is-heading-auto-num .ProseMirror h1[data-manual-num]::before,
 .rte-root.is-heading-auto-num .ProseMirror h2[data-manual-num]::before,
 .rte-root.is-heading-auto-num .ProseMirror h3[data-manual-num]::before,
@@ -5271,4 +5277,104 @@ html.rte-image-preview-open .tippy-box {
   padding-left: 6px;
   border-left: 2px solid #eef1f6;
   margin-left: 10px;
+}
+.ProseMirror li {
+  display: list-item;
+}
+.ProseMirror li > .tableWrapper,
+.ProseMirror li table,
+.ProseMirror li img,
+.ProseMirror li .rte-image {
+  display: block;
+  max-width: 100%;
+}
+.ProseMirror td > p:only-child:empty::before,
+.ProseMirror th > p:only-child:empty::before {
+  content: '输入';
+  color: #c9cdd4;
+  pointer-events: none;
+}
+.ProseMirror table[data-zebra='1'] tr:nth-child(even) td,
+.ProseMirror table[data-zebra='1'] tr:nth-child(even) th {
+  background: #f7f8fa;
+}
+.rte-root.is-task-open-only .ProseMirror ul[data-type='taskList'] li[data-checked='true'] {
+  display: none;
+}
+.ProseMirror h1:has(img[data-layout^='wrap']),
+.ProseMirror h2:has(img[data-layout^='wrap']),
+.ProseMirror h3:has(img[data-layout^='wrap']),
+.ProseMirror h4:has(img[data-layout^='wrap']),
+.ProseMirror h5:has(img[data-layout^='wrap']),
+.ProseMirror h6:has(img[data-layout^='wrap']) {
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.7;
+}
+.rte-chart-meta {
+  margin: 6px 0 0;
+  color: #4e5969;
+  font-size: 12px;
+  text-align: center;
+}
+.rte-stack-grip {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  height: 8px;
+  margin-top: -4px;
+  cursor: ns-resize;
+  z-index: 2;
+}
+.rte-suggestion-insert {
+  background: #e8f3ff;
+  border-bottom: 2px solid #245bdb;
+}
+.rte-suggestion-delete {
+  background: #fff1f0;
+  color: #d83931;
+  text-decoration: line-through;
+}
+.rte-print-preview-paper .rte-page-break {
+  height: 24px;
+  margin: 16px 0;
+  border-top: 1px dashed #c9cdd4;
+}
+.rte-print-url-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #4e5969;
+}
+@media print {
+  .rte-root.rte-printing .ProseMirror ol {
+    list-style: decimal;
+  }
+  .rte-root.rte-printing .ProseMirror li {
+    break-inside: auto;
+  }
+  .rte-root.rte-printing .ProseMirror td[rowspan],
+  .rte-root.rte-printing .ProseMirror th[rowspan] {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .rte-root.rte-printing .rte-tabs-bar,
+  .rte-root.rte-printing .rte-tabs-tools {
+    display: none !important;
+  }
+  .rte-root.rte-printing .rte-tabs-block > .rte-tabs-body > * {
+    display: block !important;
+    break-inside: avoid;
+  }
+  .rte-root.rte-printing .rte-comment-card,
+  .rte-root.rte-printing .rte-comment-draft,
+  .rte-root.rte-printing .rte-comment-panel {
+    display: none !important;
+  }
+  .rte-root.rte-printing.is-print-urls .ProseMirror a[href]::after {
+    content: ' (' attr(href) ')';
+    font-size: 0.85em;
+    word-break: break-all;
+  }
 }

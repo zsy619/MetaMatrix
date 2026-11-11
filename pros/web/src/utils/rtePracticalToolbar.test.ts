@@ -56,6 +56,16 @@ describe('ordered list continuation', () => {
     ed.chain().setTextSelection(inSecond).setOrderedListStart(1).run()
     expect(ed.getHTML()).not.toContain('start="3"')
   })
+
+  it('中间只有空段时仍能续号', () => {
+    const ed = mount('<ol><li><p>甲</p></li></ol><p></p><p></p><ol><li><p>乙</p></li></ol>')
+    let inSecond = -1
+    ed.state.doc.descendants((node, pos) => {
+      if (node.isText && node.text === '乙') inSecond = pos
+    })
+    expect(orderedListContinuation(ed.state.doc, inSecond)?.next).toBe(2)
+    expect(previousOrderedContinuation([{ type: 'orderedList', start: 1, items: 1 }, { type: 'gap' }])).toBe(2)
+  })
 })
 
 describe('first-line indent and link button', () => {

@@ -84,9 +84,12 @@ export function useRtePageLayout(deps: {
   })
   const printPreviewMarginStyle = computed(() => {
     const box = pageScreenMargin.value
+    const sheet = sheetBox(pageSize.value)
     return {
       padding: cssPageMargin(box),
-      width: pageSizeMeta.value.paper ? 'min(100%, var(--rte-sheet-width, 210mm))' : '100%',
+      width: sheet ? `${sheet.widthPx}px` : '100%',
+      minHeight: sheet ? `${sheet.heightPx}px` : undefined,
+      maxWidth: '100%',
       margin: '0 auto',
       boxSizing: 'border-box' as const,
     }

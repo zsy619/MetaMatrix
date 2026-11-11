@@ -101,6 +101,51 @@ async function useCjkFont(pdf: jsPDF): Promise<void> {
   }
 }
 
+type TableHeadMark = { top: number; height: number; tableTop: number; tableBottom: number }
+
+function canvasPageMarks(el: HTMLElement, canvasHeight: number): { breaks: number[]; headers: TableHeadMark[] } {
+  const root = el.getBoundingClientRect()
+  const scaleY = canvasHeight / Math.max(1, el.scrollHeight)
+  const breaks: number[] = []
+  el.querySelectorAll('.rte-page-break').forEach((node) => {
+    if (!(node instanceof HTMLElement)) return
+    const at = (node.getBoundingClientRect().top - root.top) * scaleY
+    if (at > 40 && at < canvasHeight - 40) breaks.push(Math.round(at))
+  })
+  const headers: TableHeadMark[] = []
+  el.querySelectorAll('table').forEach((table) => {
+    const row = table.querySelector('tr')
+    const cells = row ? [...row.children] : []
+    if (!row || !cells.length || !cells.every((cell) => cell.tagName === 'TH')) return
+    if (cells.some((cell) => (cell as HTMLTableCellElement).rowSpan > 1)) return
+    const tableRect = table.getBoundingClientRect()
+    const rowRect = row.getBoundingClientRect()
+    headers.push({
+      top: (rowRect.top - root.top) * scaleY,
+      height: Math.max(1, rowRect.height * scaleY),
+      tableTop: (tableRect.top - root.top) * scaleY,
+      tableBottom: (tableRect.bottom - root.top) * scaleY,
+    })
+  })
+  return { breaks: breaks.sort((a, b) => a - b), headers }
+}
+
+function stampContinuedTableHead(
+  ctx: CanvasRenderingContext2D,
+  canvas: HTMLCanvasElement,
+  headers: TableHeadMark[],
+  offset: number,
+) {
+  headers.forEach((header) => {
+    const continues = header.tableBottom > offset + 8 && header.top < offset - 4 && header.tableTop < offset
+    if (!continues) return
+    const height = Math.max(1, Math.round(header.height))
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, canvas.width, height)
+    ctx.drawImage(canvas, 0, Math.round(header.top), canvas.width, height, 0, 0, canvas.width, height)
+  })
+}
+
 function paintChromeText(pdf: jsPDF, text: string, x: number, y: number) {
   const line = text.trim()
   if (!line) return
@@ -175,11 +220,14 @@ export async function buildPdfFromElement(
   const pagePx = Math.max(1, Math.floor((usableH * canvas.width) / imgWmm))
 
   const ctx = canvas.getContext('2d', { willReadFrequently: true })
+  const marks = canvasPageMarks(el, canvas.height)
   const slices: number[] = []
   let y = 0
   while (y < canvas.height - 2 && slices.length < 200) {
     let sliceH = Math.min(pagePx, canvas.height - y)
-    if (ctx && sliceH >= pagePx && y + sliceH < canvas.height) {
+    const forced = marks.breaks.find((at) => at > y + 40 && at < y + sliceH)
+    if (forced) sliceH = forced - y
+    else if (ctx && sliceH >= pagePx && y + sliceH < canvas.height) {
       const soft = findSoftBreakY(ctx, canvas.width, y, y + sliceH, y + sliceH)
       sliceH = Math.max(40, soft - y)
     }
@@ -224,6 +272,7 @@ export async function buildPdfFromElement(
     pctx.fillStyle = '#ffffff'
     pctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height)
     pctx.drawImage(canvas, 0, offset, canvas.width, sliceH, 0, 0, canvas.width, sliceH)
+    stampContinuedTableHead(pctx, canvas, marks.headers, offset)
     const imgData = pageCanvas.toDataURL('image/jpeg', 0.93)
     const sliceHmm = (sliceH * imgWmm) / canvas.width
     if (pageIndex > 0) pdf.addPage()

@@ -895,6 +895,10 @@ const echartsDialogTemplates = computed(() => {
           <div data-rte-own class="rte-print-preview-bar">
             <h3 data-rte-own class="rte-table-title">打印预览</h3>
             <div data-rte-own class="rte-print-preview-actions">
+              <label data-rte-own class="rte-print-url-toggle">
+                <input data-rte-own v-model="rte.printLinkUrls" type="checkbox" />
+                印出链接
+              </label>
               <button data-rte-own type="button" class="rte-modal-cancel" @click="rte.closePrintPreview">取消</button>
               <button data-rte-own type="button" class="rte-modal-confirm" @click="rte.confirmPrintFromPreview">打印</button>
             </div>

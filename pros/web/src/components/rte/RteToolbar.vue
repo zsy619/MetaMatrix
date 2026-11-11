@@ -320,8 +320,8 @@ function toggleChartGroupMenu(key: string) {
                 任务列表
               </button>
               <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
-              <button data-rte-own type="button" @click="rte.continueOrderedNumbering()">继续之前的编号</button>
-              <button data-rte-own type="button" @click="rte.restartOrderedNumbering()">开始新列表</button>
+              <button data-rte-own type="button" @click="rte.continueOrderedNumbering()">续号</button>
+              <button data-rte-own type="button" @click="rte.restartOrderedNumbering()">新列表</button>
               <button data-rte-own type="button" @click="rte.applyListStart()">修改编号值…</button>
               <button data-rte-own type="button" @click="rte.renumberListFromHere()">从此处重编号</button>
               <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
@@ -336,6 +336,11 @@ function toggleChartGroupMenu(key: string) {
                 @click="rte.indentBlock(); rte.listOpen = false"
               >
                 增加缩进
+              </button>
+              <button data-rte-own type="button" @click="rte.padListItem(1)">只缩进文字</button>
+              <button data-rte-own type="button" @click="rte.padListItem(-1)">只减少缩进</button>
+              <button data-rte-own type="button" @click="rte.toggleTaskOpenOnly()">
+                {{ rte.taskOpenOnly ? '显示全部任务' : '只看未完成' }}
               </button>
               <button data-rte-own
                 type="button"
@@ -926,6 +931,9 @@ function toggleChartGroupMenu(key: string) {
                 @click="rte.closeTableMenu(); rte.openTableDialog()"
               >
                 插入表格
+              </button>
+              <button data-rte-own type="button" role="menuitem" @click="rte.toggleTableZebra(); rte.closeTableMenu()">
+                斑马纹
               </button>
             </div>
           </Teleport>

@@ -125,31 +125,51 @@ function paintCollage(
   })
 }
 
-function paintMix(row: HTMLElement, stackAt: number, fit: 'cover' | 'contain') {
+function stackSideOf(value: unknown): 'left' | 'center' | 'right' {
+  return value === 'center' || value === 'right' ? value : 'left'
+}
+
+function paintMix(
+  row: HTMLElement,
+  stackAt: number,
+  fit: 'cover' | 'contain',
+  side: 'left' | 'center' | 'right' = 'left',
+  split = 0.5,
+) {
   const frames = Array.from(row.children).filter(
     (child): child is HTMLElement => child instanceof HTMLElement && !child.classList.contains('rte-image-caption-inline'),
   )
-  const columns = Math.max(1, frames.length - 1)
+  const concealed = (frame: HTMLElement | undefined) => frame?.querySelector('img')?.getAttribute('data-concealed') === '1'
+  const stackVisible = !concealed(frames[stackAt]) && !concealed(frames[stackAt + 1])
+  const visibleCount = frames.filter((frame) => !concealed(frame)).length
+  const columns = Math.max(1, stackVisible ? visibleCount - 1 : visibleCount)
   row.style.display = 'grid'
   row.style.flexDirection = 'row'
   row.style.gridTemplateColumns = `repeat(${columns}, minmax(0, 1fr))`
-  row.style.gridTemplateRows = 'minmax(0, 1fr) minmax(0, 1fr)'
+  const share = Number.isFinite(split) ? Math.min(0.8, Math.max(0.2, split)) : 0.5
+  row.style.gridTemplateRows = `minmax(0, ${share}fr) minmax(0, ${1 - share}fr)`
   row.style.aspectRatio = `${columns} / 1`
   row.style.height = 'auto'
   row.style.minHeight = '160px'
-  let column = 1
+  const stackColumn = side === 'right' ? columns : side === 'center' ? Math.ceil(columns / 2) : 1
+  let singleColumn = 1
   frames.forEach((frame, index) => {
+    if (concealed(frame)) {
+      frame.style.display = 'none'
+      return
+    }
+    frame.style.display = ''
     frame.style.flex = 'none'
     frame.style.width = '100%'
     frame.style.height = '100%'
     frame.style.margin = '0'
     if (index === stackAt || index === stackAt + 1) {
       const rowStart = index === stackAt ? 1 : 2
-      frame.style.gridArea = `${rowStart} / ${column} / ${rowStart + 1} / ${column + 1}`
-      if (index === stackAt + 1) column += 1
+      frame.style.gridArea = `${rowStart} / ${stackColumn} / ${rowStart + 1} / ${stackColumn + 1}`
     } else {
-      frame.style.gridArea = `1 / ${column} / 3 / ${column + 1}`
-      column += 1
+      if (singleColumn === stackColumn) singleColumn += 1
+      frame.style.gridArea = `1 / ${singleColumn} / 3 / ${singleColumn + 1}`
+      singleColumn += 1
     }
     const img = frame.querySelector('img')
     if (img instanceof HTMLImageElement) img.style.setProperty('object-fit', imageFit(img, fit), 'important')
@@ -315,13 +335,21 @@ export function layoutImageGroupChrome(view: EditorView) {
     const kids = Array.from(row.children).filter(
       (child): child is HTMLElement => child instanceof HTMLElement && !child.classList.contains('ProseMirror-widget'),
     )
-    const aspects = kids.map(imageAspect)
-    const ratios = groupUsesAspect(node.attrs.ratioMode)
-      ? aspects
-      : normalizeGroupRatios(kids.length, node.attrs.ratios)
+    kids.forEach((kid) => {
+      const hidden = kid.querySelector('img')?.getAttribute('data-concealed') === '1'
+      kid.style.display = hidden ? 'none' : ''
+    })
+    const visible = kids.filter((kid) => kid.style.display !== 'none')
+    const laidKids = visible.length ? visible : kids
+    const aspects = laidKids.map(imageAspect)
+    const ratios = visible.length && visible.length < kids.length
+      ? normalizeGroupRatios(laidKids.length, null)
+      : groupUsesAspect(node.attrs.ratioMode)
+        ? aspects
+        : normalizeGroupRatios(laidKids.length, node.attrs.ratios)
     const gap = normalizeGroupGap(node.attrs.gap)
     const layout = normalizeGroupLayout(node.attrs.layout)
-    const signature = `${layout}:${Math.round(row.clientWidth)}:${kids.length}:${node.attrs.fit || ''}:${node.attrs.ratios || ''}:${node.attrs.stackAt ?? ''}:${node.attrs.layoutBefore || ''}`
+    const signature = `${layout}:${Math.round(row.clientWidth)}:${laidKids.length}:${node.attrs.fit || ''}:${node.attrs.ratios || ''}:${node.attrs.stackAt ?? ''}:${node.attrs.stackSide || ''}:${node.attrs.stackSplit ?? ''}:${node.attrs.layoutBefore || ''}`
     if (row.clientWidth > 8 && dom.dataset.rteSig === signature && dom.dataset.ratioDrag !== '1') return false
     dom.dataset.rteSig = signature
     if (layout === 'row') dom.removeAttribute('data-layout')
@@ -353,7 +381,9 @@ export function layoutImageGroupChrome(view: EditorView) {
       const fit = normalizeGroupFit(node.attrs.fit)
       if (fit === 'contain') dom.setAttribute('data-fit', 'contain')
       else dom.removeAttribute('data-fit')
-      if (Number.isInteger(stackAt) && dom.dataset.ratioDrag !== '1') paintMix(row, stackAt, fit)
+      if (Number.isInteger(stackAt) && dom.dataset.ratioDrag !== '1') {
+        paintMix(row, stackAt, fit, stackSideOf(node.attrs.stackSide), Number(node.attrs.stackSplit) || 0.5)
+      }
       dividers.replaceChildren()
       return false
     }
@@ -525,6 +555,24 @@ export const ImageGroup = Node.create({
         renderHTML: (attrs: { fit?: string | null }) =>
           normalizeGroupFit(attrs.fit) === 'contain' ? { 'data-fit': 'contain' } : {},
       },
+      stackSide: {
+        default: 'left',
+        parseHTML: (element: HTMLElement) => stackSideOf(element.getAttribute('data-stack-side')),
+        renderHTML: (attrs: { stackSide?: string | null }) =>
+          stackSideOf(attrs.stackSide) === 'left' ? {} : { 'data-stack-side': stackSideOf(attrs.stackSide) },
+      },
+      stackSplit: {
+        default: 0.5,
+        parseHTML: (element: HTMLElement) => {
+          const value = Number(element.getAttribute('data-stack-split'))
+          return Number.isFinite(value) ? Math.min(0.8, Math.max(0.2, value)) : 0.5
+        },
+        renderHTML: (attrs: { stackSplit?: number | null }) => {
+          const value = Number(attrs.stackSplit)
+          if (!Number.isFinite(value) || Math.abs(value - 0.5) < 0.001) return {}
+          return { 'data-stack-split': String(value) }
+        },
+      },
       stackAt: {
         default: null as number | null,
         parseHTML: (element: HTMLElement) => {
@@ -666,6 +714,97 @@ export const ImageGroup = Node.create({
         )
       })
       bar.appendChild(fitBtn)
+
+      for (const side of ['left', 'center', 'right'] as const) {
+        const button = document.createElement('button')
+        button.type = 'button'
+        button.className = 'rte-image-group-side'
+        button.textContent = side === 'left' ? '叠左' : side === 'center' ? '叠中' : '叠右'
+        button.addEventListener('click', (event) => {
+          event.preventDefault()
+          event.stopPropagation()
+          const pos = getPos()
+          if (typeof pos !== 'number') return
+          const live = editor.state.doc.nodeAt(pos)
+          if (!live) return
+          editor.view.dispatch(editor.view.state.tr.setNodeMarkup(pos, undefined, { ...live.attrs, stackSide: side }))
+        })
+        bar.appendChild(button)
+      }
+
+      const hideBtn = document.createElement('button')
+      hideBtn.type = 'button'
+      hideBtn.className = 'rte-image-group-hide'
+      hideBtn.textContent = '藏起'
+      hideBtn.title = '藏起最后一张可见图片，剩下的比例重算'
+      hideBtn.addEventListener('click', (event) => {
+        event.preventDefault()
+        event.stopPropagation()
+        const pos = getPos()
+        if (typeof pos !== 'number') return
+        const live = editor.state.doc.nodeAt(pos)
+        if (!live) return
+        let target = -1
+        let cursor = pos + 1
+        const hidden: number[] = []
+        live.forEach((child) => {
+          if (child.type.name === 'image') {
+            if (child.attrs.concealed) hidden.push(cursor)
+            else target = cursor
+          }
+          cursor += child.nodeSize
+        })
+        let tr = editor.view.state.tr
+        if (target < 0) {
+          for (let index = hidden.length - 1; index >= 0; index -= 1) {
+            const at = hidden[index]!
+            const image = tr.doc.nodeAt(at)
+            if (image) tr = tr.setNodeMarkup(at, undefined, { ...image.attrs, concealed: false })
+          }
+        } else {
+          const image = tr.doc.nodeAt(target)
+          if (image) tr = tr.setNodeMarkup(target, undefined, { ...image.attrs, concealed: true })
+        }
+        if (tr.docChanged) editor.view.dispatch(tr)
+      })
+      bar.appendChild(hideBtn)
+
+      const grip = document.createElement('div')
+      grip.className = 'rte-stack-grip'
+      grip.setAttribute('contenteditable', 'false')
+      grip.title = '拖动叠放高度'
+      dom.appendChild(grip)
+      grip.addEventListener('pointerdown', (event) => {
+        if (event.button !== 0) return
+        event.preventDefault()
+        event.stopPropagation()
+        const pos = getPos()
+        if (typeof pos !== 'number') return
+        const live = editor.state.doc.nodeAt(pos)
+        if (!live || normalizeGroupLayout(live.attrs.layout) !== 'mix') return
+        const startY = event.clientY
+        const start = Number(live.attrs.stackSplit) || 0.5
+        const height = contentDOM.getBoundingClientRect().height || 160
+        dom.dataset.ratioDrag = '1'
+        const shareOf = (clientY: number) =>
+          Math.round(Math.min(0.8, Math.max(0.2, start + (clientY - startY) / height)) * 100) / 100
+        const move = (ev: PointerEvent) => {
+          const share = shareOf(ev.clientY)
+          contentDOM.style.gridTemplateRows = `minmax(0, ${share}fr) minmax(0, ${1 - share}fr)`
+        }
+        const up = (ev: PointerEvent) => {
+          window.removeEventListener('pointermove', move)
+          window.removeEventListener('pointerup', up)
+          delete dom.dataset.ratioDrag
+          const now = editor.state.doc.nodeAt(pos)
+          if (!now) return
+          editor.view.dispatch(
+            editor.view.state.tr.setNodeMarkup(pos, undefined, { ...now.attrs, stackSplit: shareOf(ev.clientY) }),
+          )
+        }
+        window.addEventListener('pointermove', move)
+        window.addEventListener('pointerup', up)
+      })
 
       for (const layout of ['row', '12', '21', 'rows'] as const) {
         const button = document.createElement('button')
@@ -810,7 +949,9 @@ export const ImageGroup = Node.create({
         } else if (layout === 'mix') {
           dom.setAttribute('data-layout', layout)
           const stackAt = Number(current.attrs.stackAt)
-          if (Number.isInteger(stackAt)) paintMix(contentDOM, stackAt, fit)
+          if (Number.isInteger(stackAt)) {
+            paintMix(contentDOM, stackAt, fit, stackSideOf(current.attrs.stackSide), Number(current.attrs.stackSplit) || 0.5)
+          }
         } else {
           dom.removeAttribute('data-layout')
           clearCollage(contentDOM)

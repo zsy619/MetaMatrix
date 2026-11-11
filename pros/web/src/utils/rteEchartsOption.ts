@@ -14,6 +14,7 @@
  *   一律按错误返回，绝不静默截断后当成功——用户拿到的图表必须和自己写的一致。
  */
 import { ECHARTS_CATEGORIES, ECHARTS_TEMPLATES, findEchartsTemplate } from './echarts/templates'
+import { FEISHU_TEXT_COLORS } from './rtePasteClean'
 import type { EchartsTemplateDef } from './echarts/types'
 import { CUSTOM_RENDER_ITEM_IDS } from './echarts/customRenderItems'
 
@@ -1471,6 +1472,7 @@ function buildCartesianOption(
   series: Array<{ name: string; data: number[] }>,
 ): Record<string, unknown> {
   return {
+    color: FEISHU_TEXT_COLORS.filter((item) => item !== '#1f2329' && item !== '#8f959e'),
     title: { text: title, left: 'center' },
     tooltip: { trigger: 'axis' },
     legend: { data: series.map((item) => item.name), bottom: 0 },

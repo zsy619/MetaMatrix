@@ -104,7 +104,7 @@ import {
   type AuditEvent,
 } from '../utils/rteAudit'
 import { INLINE_AI_MODES, inlineAiLabel, rewriteWithContext, type InlineAiMode } from '../utils/rteInlineAi'
-import { orderedListContinuation } from '../utils/rteListContinue'
+import { orderedListContinuation, retargetList } from '../utils/rteListContinue'
 import { planListRenumber } from '../utils/rteListRenumber'
 import {
   FIRST_LINE_INDENT,
@@ -578,7 +578,19 @@ function resetMentionPermission() {
 
 /** 粘贴为纯文本（工具栏开关；影响后续粘贴） */
 type PasteFormatMode = 'keep' | 'plain' | 'markdown'
-const pasteFormatMode = ref<PasteFormatMode>('keep')
+const PASTE_FORMAT_KEY = 'rte-paste-format'
+function readPasteFormat(): PasteFormatMode {
+  try {
+    const saved = localStorage.getItem(PASTE_FORMAT_KEY)
+    if (saved === 'plain' || saved === 'markdown' || saved === 'keep') return saved
+  } catch {
+    /* 隐私模式 */
+  }
+  return 'keep'
+}
+const pasteFormatMode = ref<PasteFormatMode>(readPasteFormat())
+const taskOpenOnly = ref(false)
+const printLinkUrls = ref(false)
 const pastePlainTextMode = computed(() => pasteFormatMode.value === 'plain')
 /** 浏览器拼写检查（默认关；可工具栏开启） */
 const spellcheckEnabled = ref(false)
@@ -1864,6 +1876,11 @@ function togglePastePlain() {
 const pasteFormatOpen = ref(false)
 function setPasteFormatMode(mode: PasteFormatMode) {
   pasteFormatMode.value = mode
+  try {
+    localStorage.setItem(PASTE_FORMAT_KEY, mode)
+  } catch {
+    /* 隐私模式 */
+  }
   const labels: Record<PasteFormatMode, string> = {
     keep: '保留原格式',
     plain: '粘贴为纯文本',
@@ -3829,13 +3846,28 @@ function setAlign(align: 'left' | 'center' | 'right' | 'justify') {
   applyTextAlignToSelection(editor.value, align)
 }
 function toggleBulletList() {
+  const ed = editor.value
+  if (ed?.isActive('orderedList') && retargetList(ed, 'bulletList')) return
   chain()?.toggleBulletList().run()
 }
 function toggleOrderedList() {
+  const ed = editor.value
+  if (ed?.isActive('bulletList') && retargetList(ed, 'orderedList')) return
   chain()?.toggleOrderedList().run()
+}
+function padListItem(delta: number) {
+  editor.value?.chain().focus().padListItem(delta).run()
 }
 function toggleTaskList() {
   chain()?.toggleTaskList().run()
+}
+function toggleTaskOpenOnly() {
+  taskOpenOnly.value = !taskOpenOnly.value
+}
+function toggleTableZebra() {
+  const ed = editor.value
+  if (!ed) return
+  ed.chain().focus().toggleTableZebra().run()
 }
 
 /**
@@ -7954,6 +7986,11 @@ provideRteBindings({
   printPreviewHtml,
   printPreviewMarginStyle,
   printPreviewOpen,
+  printLinkUrls,
+  taskOpenOnly,
+  toggleTaskOpenOnly,
+  toggleTableZebra,
+  padListItem,
   readTimeDialogOpen,
   readingMinutes,
   refreshFindMatches,
@@ -8189,6 +8226,8 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
       'has-page-chrome': pageChromeActive,
       'is-page-feishu': pageSize === 'feishu',
       'is-table-sticky': tableHeaderSticky,
+      'is-task-open-only': taskOpenOnly,
+      'is-print-urls': printLinkUrls,
       'is-table-col-sticky': tableColSticky,
       'is-cjk-typography': true,
       'is-drag-select': dragSelecting,

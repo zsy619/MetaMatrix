@@ -153,6 +153,24 @@ export const EchartsBlock = Node.create({
         renderHTML: (attrs: { tableRef?: string }) =>
           attrs.tableRef ? { 'data-table-ref': attrs.tableRef } : {},
       },
+      chartTitle: {
+        default: '',
+        parseHTML: (el: HTMLElement) => el.getAttribute('data-chart-title') || '',
+        renderHTML: (attrs: { chartTitle?: string }) =>
+          attrs.chartTitle ? { 'data-chart-title': attrs.chartTitle } : {},
+      },
+      chartUnit: {
+        default: '',
+        parseHTML: (el: HTMLElement) => el.getAttribute('data-chart-unit') || '',
+        renderHTML: (attrs: { chartUnit?: string }) =>
+          attrs.chartUnit ? { 'data-chart-unit': attrs.chartUnit } : {},
+      },
+      chartSource: {
+        default: '',
+        parseHTML: (el: HTMLElement) => el.getAttribute('data-chart-source') || '',
+        renderHTML: (attrs: { chartSource?: string }) =>
+          attrs.chartSource ? { 'data-chart-source': attrs.chartSource } : {},
+      },
     }
   },
 
@@ -169,7 +187,11 @@ export const EchartsBlock = Node.create({
       chartId?: string
       dataSource?: string
       tableRef?: string
+      chartTitle?: string
+      chartUnit?: string
+      chartSource?: string
     }
+    const metaLine = [attrs.chartTitle, attrs.chartUnit, attrs.chartSource].map((item) => String(item || '').trim()).filter(Boolean)
     const chartType = isChartType(attrs.chartType) ? attrs.chartType : 'bar'
     const label = ECHARTS_CHART_TYPES.find((item) => item.value === chartType)?.label || '图表'
     // 导出的 HTML 同样带无障碍摘要（读屏能听到图里是什么）
@@ -188,10 +210,14 @@ export const EchartsBlock = Node.create({
         'data-chart-id': attrs.chartId || '',
         'data-datasource': attrs.dataSource || '',
         ...(attrs.tableRef ? { 'data-table-ref': attrs.tableRef } : {}),
+        ...(attrs.chartTitle ? { 'data-chart-title': attrs.chartTitle } : {}),
+        ...(attrs.chartUnit ? { 'data-chart-unit': attrs.chartUnit } : {}),
+        ...(attrs.chartSource ? { 'data-chart-source': attrs.chartSource } : {}),
         role: 'img',
         'aria-label': ariaLabel,
         style: `min-height:${DEFAULT_HEIGHT}px`,
       }),
+      ...(metaLine.length ? [['p', { class: 'rte-chart-meta' }, metaLine.join(' · ')]] : []),
       ['div', { class: 'rte-echarts-fallback' }, `ECharts 图表（${label}）`],
     ]
   },
@@ -251,6 +277,22 @@ export const EchartsBlock = Node.create({
       const hint = document.createElement('div')
       hint.className = 'rte-echarts-hint'
       hint.textContent = '图表内容不参与逐条修订；导出与打印按当前显示呈现。'
+      const metaEl = document.createElement('p')
+      metaEl.className = 'rte-chart-meta'
+      const paintMeta = () => {
+        const line = [current.attrs.chartTitle, current.attrs.chartUnit, current.attrs.chartSource]
+          .map((item) => String(item || '').trim())
+          .filter(Boolean)
+        metaEl.textContent = line.join(' · ')
+        metaEl.style.display = line.length ? '' : 'none'
+        if (current.attrs.chartTitle) dom.dataset.chartTitle = String(current.attrs.chartTitle)
+        else delete dom.dataset.chartTitle
+        if (current.attrs.chartUnit) dom.dataset.chartUnit = String(current.attrs.chartUnit)
+        else delete dom.dataset.chartUnit
+        if (current.attrs.chartSource) dom.dataset.chartSource = String(current.attrs.chartSource)
+        else delete dom.dataset.chartSource
+      }
+      paintMeta()
 
       // 无障碍：图表容器打 role="img" + aria-label（数据摘要），
       // 视觉隐藏的数据表放在**兄弟节点**里（role="img" 的后代会被读屏忽略）。
@@ -258,6 +300,7 @@ export const EchartsBlock = Node.create({
       a11yEl.className = 'rte-sr-only rte-chart-a11y'
 
       dom.appendChild(previewEl)
+      dom.appendChild(metaEl)
       dom.appendChild(a11yEl)
       dom.appendChild(dataErrorEl)
       dom.appendChild(hint)
@@ -524,6 +567,7 @@ export const EchartsBlock = Node.create({
             ? updated.attrs.chartType
             : 'bar'
           dom.dataset.chartId = updated.attrs.chartId || ''
+          paintMeta()
           applyEditableState()
           void render()
           return true

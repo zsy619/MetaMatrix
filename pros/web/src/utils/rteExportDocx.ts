@@ -25,6 +25,7 @@ type Block =
   | { kind: 'table'; rows: Run[][][]; header?: boolean }
   | { kind: 'image'; src: string; alt: string; width: number; height: number }
   | { kind: 'imageRow'; images: Array<{ src: string; alt: string; width: number; height: number }> }
+  | { kind: 'pageBreak' }
 
 /** Word 正文可用宽度（px，96dpi）：A4 去掉左右页边距。 */
 const MAX_IMAGE_WIDTH_PX = 600
@@ -250,6 +251,10 @@ function parseBlocks(root: HTMLElement): Block[] {
       if (child.nodeType !== Node.ELEMENT_NODE) continue
       const node = child as HTMLElement
       const tag = node.tagName.toLowerCase()
+      if (node.getAttribute('data-page-break') === 'true' || node.classList.contains('rte-page-break')) {
+        blocks.push({ kind: 'pageBreak' })
+        continue
+      }
       if (node.getAttribute('data-type') === 'callout' || node.classList.contains('rte-callout')) {
         const text = (node.textContent || '').replace(/\s+/g, ' ').trim()
         blocks.push({ kind: 'p', runs: [{ text: text ? `【高亮】${text}` : '【高亮】', marks: { bold: true } }] })
@@ -453,7 +458,9 @@ function blocksToBodyXml(
   }
   let imageIndex = 0
   for (const b of blocks) {
-    if (b.kind === 'p') {
+    if (b.kind === 'pageBreak') {
+      parts.push('<w:p><w:r><w:br w:type="page"/></w:r></w:p>')
+    } else if (b.kind === 'p') {
       parts.push(paraXml(b.runs, { style: b.style, indent: b.indent }))
     } else if (b.kind === 'listItem') {
       const numId = b.ordered ? 2 : 1

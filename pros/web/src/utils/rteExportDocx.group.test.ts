@@ -54,6 +54,17 @@ describe('标题、表头和题注导出到 Word', () => {
   })
 })
 
+describe('分页符导出到 Word', () => {
+  it('分页符写成 Word 分页', async () => {
+    const blob = await buildDocxBlob({ title: '页', bodyHtml: '<p>上</p><div class="rte-page-break" data-page-break="true"></div><p>下</p>' })
+    const zip = await JSZip.loadAsync(await blob.arrayBuffer())
+    const doc = await zip.file('word/document.xml')?.async('string')
+    expect(doc).toContain('w:type="page"')
+    expect(doc).toContain('上')
+    expect(doc).toContain('下')
+  })
+})
+
 describe('图片组导出到 Word', () => {
   it('两张及以上并排进同一行表格', async () => {
     const html =

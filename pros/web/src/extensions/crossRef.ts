@@ -6,7 +6,7 @@ import { findCrossRefPos } from '../utils/rteBlockRef'
 
 export { findCrossRefPos }
 
-export type CrossRefKind = 'heading' | 'figure' | 'table'
+export type CrossRefKind = 'heading' | 'figure' | 'table' | 'bookmark'
 
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
@@ -50,6 +50,19 @@ export function collectCrossRefTargets(editor: Editor): CrossRefTarget[] {
         label: cap || `图 ${fig}`,
         pos,
       })
+    }
+    if (node.isText) {
+      for (const mark of node.marks) {
+        if (mark.type.name !== 'bookmark') continue
+        const id = String(mark.attrs.id || '')
+        if (!id) continue
+        out.push({
+          id,
+          kind: 'bookmark',
+          label: String(mark.attrs.label || node.textContent || '书签').trim() || '书签',
+          pos,
+        })
+      }
     }
     if (node.type.name === 'table') {
       tbl += 1
