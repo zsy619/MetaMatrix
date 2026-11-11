@@ -63,6 +63,7 @@ function closeTableCtx() {
 }
 
 function openTableContextMenu(event: MouseEvent) {
+  rememberTableInsertSelection()
   tableCtx.value = {
     open: true,
     x: event.clientX,
@@ -340,6 +341,8 @@ function confirmInsertTable() {
 }
 
 /** —— 表格内常用操作（合并/拆分/插删行列） —— */
+const TABLE_INSERT_MAX = 99
+
 type TableOpItem = {
   key: string
   label: string
@@ -347,6 +350,44 @@ type TableOpItem = {
   disabled?: () => boolean
   danger?: boolean
   sepBefore?: boolean
+  /** 向上/下插行、向左/右插列：共用「插入数量」。 */
+  insertCount?: boolean
+}
+
+const tableInsertCount = ref(1)
+let tableInsertAnchor: { fromJSON: (doc: unknown, json: unknown) => { eq: (other: unknown) => boolean }; json: unknown } | null = null
+
+function clampTableInsertCount(value: unknown): number {
+  const n = Math.floor(Number(value))
+  if (!Number.isFinite(n) || n < 1) return 1
+  return Math.min(TABLE_INSERT_MAX, n)
+}
+
+function normalizeTableInsertCount() {
+  tableInsertCount.value = clampTableInsertCount(tableInsertCount.value)
+}
+
+function rememberTableInsertSelection() {
+  const ed = deps.editor().value
+  const sel = ed?.state.selection
+  const ctor = sel?.constructor as { fromJSON?: (doc: unknown, json: unknown) => { eq: (other: unknown) => boolean } } | undefined
+  if (!ed || !sel || typeof ctor?.fromJSON !== 'function') {
+    tableInsertAnchor = null
+    return
+  }
+  tableInsertAnchor = { fromJSON: ctor.fromJSON.bind(ctor), json: sel.toJSON() }
+}
+
+function restoreTableInsertSelection() {
+  const ed = deps.editor().value
+  const anchor = tableInsertAnchor
+  if (!ed || !anchor) return
+  try {
+    const sel = anchor.fromJSON(ed.state.doc, anchor.json)
+    if (sel && !sel.eq(ed.state.selection)) ed.view.dispatch(ed.state.tr.setSelection(sel as never))
+  } catch {
+    /* 文档已经变过时，沿用当前光标 */
+  }
 }
 
 function isInTable() {
@@ -419,17 +460,31 @@ function runTableCommand(command: () => boolean) {
   closeAllTableUi()
 }
 
+function runTableInsert(command: () => boolean) {
+  const count = clampTableInsertCount(tableInsertCount.value)
+  tableInsertCount.value = count
+  restoreTableInsertSelection()
+  runTableCommand(() => {
+    let ok = false
+    for (let i = 0; i < count; i += 1) {
+      if (!command()) break
+      ok = true
+    }
+    return ok
+  })
+}
+
 function tableAddRowBefore() {
-  runTableCommand(() => deps.editor().value!.chain().focus().addRowBefore().run())
+  runTableInsert(() => deps.editor().value!.chain().focus().addRowBefore().run())
 }
 function tableAddRowAfter() {
-  runTableCommand(() => deps.editor().value!.chain().focus().addRowAfter().run())
+  runTableInsert(() => deps.editor().value!.chain().focus().addRowAfter().run())
 }
 function tableAddColBefore() {
-  runTableCommand(() => deps.editor().value!.chain().focus().addColumnBefore().run())
+  runTableInsert(() => deps.editor().value!.chain().focus().addColumnBefore().run())
 }
 function tableAddColAfter() {
-  runTableCommand(() => deps.editor().value!.chain().focus().addColumnAfter().run())
+  runTableInsert(() => deps.editor().value!.chain().focus().addColumnAfter().run())
 }
 function tableDeleteRow() {
   runTableCommand(() => deps.editor().value!.chain().focus().deleteRow().run())
@@ -625,10 +680,10 @@ function insertCellFormula() {
 
 const tableOpItems = computed((): TableOpItem[] => {
   void deps.editor().value?.state
-  return [    { key: 'row-before', label: '向上插入行', run: tableAddRowBefore },
-    { key: 'row-after', label: '向下插入行', run: tableAddRowAfter },
-    { key: 'col-before', label: '向左插入列', run: tableAddColBefore },
-    { key: 'col-after', label: '向右插入列', run: tableAddColAfter },
+  return [    { key: 'row-before', label: '向上插入行', run: tableAddRowBefore, insertCount: true },
+    { key: 'row-after', label: '向下插入行', run: tableAddRowAfter, insertCount: true },
+    { key: 'col-before', label: '向左插入列', run: tableAddColBefore, insertCount: true },
+    { key: 'col-after', label: '向右插入列', run: tableAddColAfter, insertCount: true },
     { key: 'dup-row', label: '复制当前行', run: duplicateCurrentTableRow },
     { key: 'equal-cols', label: '均分列宽', run: equalizeCurrentTableColumns },
     {
@@ -771,6 +826,7 @@ function onTableToolClick() {
   deps.closeImportMenu()
   deps.closeExportMenu()
   if (isInTable()) {
+    rememberTableInsertSelection()
     tableMenuOpen.value = false
     tableOpsSheetOpen.value = true
     closeTableCtx()
@@ -792,6 +848,7 @@ function onTableToolbarButtonClick() {
   deps.alignOpen().value = false
   deps.closeFontMenus()
   if (isInTable()) {
+    if (!tableMenuOpen.value) rememberTableInsertSelection()
     tableMenuOpen.value = !tableMenuOpen.value
     tableQuickOpen.value = false
     closeTableCtx()
@@ -871,6 +928,9 @@ function onTableToolbarButtonClick() {
     insertCellFormula,
     calcTableFormulas,
     tableOpItems,
+    tableInsertCount,
+    normalizeTableInsertCount,
+    rememberTableInsertSelection,
     onTableToolClick,
     onTableToolbarButtonClick,
   }

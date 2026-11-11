@@ -329,6 +329,56 @@ describe('新功能区按钮', () => {
     wrapper.unmount()
   })
 
+  it('表格菜单的数量框默认 1，填几就插入几行或几列', async () => {
+    const wrapper = await mountEditor()
+    const editor = editorOf(wrapper)
+    editor.commands.setContent('<table><tbody><tr><td><p>甲</p></td></tr></tbody></table>')
+    let cell = -1
+    editor.state.doc.descendants((node, pos) => {
+      if (cell < 0 && node.isText && node.text === '甲') cell = pos
+    })
+    editor.commands.setTextSelection(cell)
+    await openRibbon(wrapper, '表格')
+    await clickTool(wrapper, '表格')
+    const input = document.querySelector('input[aria-label="插入数量"]') as HTMLInputElement | null
+    expect(input, '插入数量').toBeTruthy()
+    expect(input!.value).toBe('1')
+    expect(input!.min).toBe('1')
+    input!.value = '0'
+    input!.dispatchEvent(new Event('input', { bubbles: true }))
+    input!.dispatchEvent(new Event('blur', { bubbles: true }))
+    await nextTick()
+    expect(input!.value).toBe('1')
+    input!.value = '3'
+    input!.dispatchEvent(new Event('input', { bubbles: true }))
+    await nextTick()
+    const rowsBefore = editor.getHTML().split('<tr').length - 1
+    const rowButton = [...document.body.querySelectorAll('button')].find((button) => button.textContent?.trim() === '向下插入行')
+    expect(rowButton, '向下插入行').toBeTruthy()
+    rowButton!.click()
+    await nextTick()
+    await flushPromises()
+    expect(editor.getHTML().split('<tr').length - 1).toBe(rowsBefore + 3)
+    let again = -1
+    editor.state.doc.descendants((node, pos) => {
+      if (again < 0 && node.isText && node.text === '甲') again = pos
+    })
+    editor.commands.setTextSelection(again)
+    await clickTool(wrapper, '表格')
+    const inputAgain = document.querySelector('input[aria-label="插入数量"]') as HTMLInputElement
+    inputAgain.value = '2'
+    inputAgain.dispatchEvent(new Event('input', { bubbles: true }))
+    await nextTick()
+    const colButton = [...document.body.querySelectorAll('button')].find((button) => button.textContent?.trim() === '向右插入列')
+    expect(colButton, '向右插入列').toBeTruthy()
+    colButton!.click()
+    await nextTick()
+    await flushPromises()
+    const firstRow = editor.getHTML().match(/<tr[\s\S]*?<\/tr>/)?.[0] ?? ''
+    expect((firstRow.match(/<t[dh]/g) || []).length).toBe(3)
+    wrapper.unmount()
+  })
+
   it('斑马纹写到表格节点上，偶数行底色和奇数行不同', async () => {
     const css = readFileSync('src/components/rte/styles/editor.global.css', 'utf8')
     const style = document.createElement('style')

@@ -954,16 +954,47 @@ function toggleChartGroupMenu(key: string) {
               @mouseleave="rte.onToolMenuLeave($event, 'table', rte.closeTableMenu)"
             >
               <template v-for="op in rte.tableOpItems" :key="op.key">
-                <div data-rte-own v-if="op.sepBefore" class="rte-menu-sep" aria-hidden="true" />
-                <button data-rte-own
-                  type="button"
-                  role="menuitem"
-                  :class="{ danger: op.danger }"
-                  :disabled="op.disabled?.()"
-                  @click="op.run()"
-                >
-                  {{ op.label }}
-                </button>
+                <div data-rte-own v-if="op.insertCount && op.key === 'row-before'" class="rte-table-insert-row">
+                  <div data-rte-own class="rte-table-insert-actions">
+                    <button data-rte-own
+                      v-for="item in rte.tableOpItems.filter((entry) => entry.insertCount)"
+                      :key="item.key"
+                      type="button"
+                      role="menuitem"
+                      @click="item.run()"
+                    >
+                      {{ item.label }}
+                    </button>
+                  </div>
+                  <label data-rte-own class="rte-table-insert-count">
+                    <input data-rte-own
+                      v-model.number="rte.tableInsertCount"
+                      type="number"
+                      min="1"
+                      max="99"
+                      step="1"
+                      inputmode="numeric"
+                      aria-label="插入数量"
+                      title="填几就插入几行或几列，最少 1"
+                      @mousedown.stop="rte.rememberTableInsertSelection()"
+                      @click.stop
+                      @keydown.stop
+                      @blur="rte.normalizeTableInsertCount()"
+                    />
+                  </label>
+                </div>
+                <template v-else-if="!op.insertCount">
+                  <div data-rte-own v-if="op.sepBefore" class="rte-menu-sep" aria-hidden="true" />
+                  <button data-rte-own
+                    type="button"
+                    role="menuitem"
+                    :class="{ danger: op.danger }"
+                    :disabled="op.disabled?.()"
+                    @click="op.run()"
+                  >
+                    {{ op.label }}
+                  </button>
+                </template>
               </template>
               <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
               <div data-rte-own class="rte-menu-hint-line">拖拽列边缘调整列宽。多选单元格后可合并。</div>

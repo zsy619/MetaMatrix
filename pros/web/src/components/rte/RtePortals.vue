@@ -500,15 +500,45 @@ const echartsDialogTemplates = computed(() => {
           @mousedown.stop.prevent
         >
           <template v-for="op in rte.tableOpItems" :key="'ctx-' + op.key">
-            <div data-rte-own v-if="op.sepBefore" class="rte-menu-sep" aria-hidden="true" />
-            <button data-rte-own
-              type="button"
-              :class="{ danger: op.danger }"
-              :disabled="op.disabled?.()"
-              @click="op.run()"
-            >
-              {{ op.label }}
-            </button>
+            <div data-rte-own v-if="op.insertCount && op.key === 'row-before'" class="rte-table-insert-row">
+              <div data-rte-own class="rte-table-insert-actions">
+                <button data-rte-own
+                  v-for="item in rte.tableOpItems.filter((entry) => entry.insertCount)"
+                  :key="'ctx-insert-' + item.key"
+                  type="button"
+                  @click="item.run()"
+                >
+                  {{ item.label }}
+                </button>
+              </div>
+              <label data-rte-own class="rte-table-insert-count">
+                <input data-rte-own
+                  v-model.number="rte.tableInsertCount"
+                  type="number"
+                  min="1"
+                  max="99"
+                  step="1"
+                  inputmode="numeric"
+                  aria-label="插入数量"
+                  title="填几就插入几行或几列，最少 1"
+                  @mousedown.stop="rte.rememberTableInsertSelection()"
+                  @click.stop
+                  @keydown.stop
+                  @blur="rte.normalizeTableInsertCount()"
+                />
+              </label>
+            </div>
+            <template v-else-if="!op.insertCount">
+              <div data-rte-own v-if="op.sepBefore" class="rte-menu-sep" aria-hidden="true" />
+              <button data-rte-own
+                type="button"
+                :class="{ danger: op.danger }"
+                :disabled="op.disabled?.()"
+                @click="op.run()"
+              >
+                {{ op.label }}
+              </button>
+            </template>
           </template>
           <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
           <div data-rte-own class="rte-table-cell-style-title" style="padding: 4px 10px">单元格背景</div>
@@ -544,16 +574,47 @@ const echartsDialogTemplates = computed(() => {
           <h3 data-rte-own class="rte-table-title">表格操作</h3>
           <div data-rte-own class="rte-table-ops-list">
             <template v-for="op in rte.tableOpItems" :key="'sheet-' + op.key">
-              <div data-rte-own v-if="op.sepBefore" class="rte-menu-sep" aria-hidden="true" />
-              <button data-rte-own
-                type="button"
-                class="rte-table-ops-item"
-                :class="{ danger: op.danger }"
-                :disabled="op.disabled?.()"
-                @click="op.run()"
-              >
-                {{ op.label }}
-              </button>
+              <div data-rte-own v-if="op.insertCount && op.key === 'row-before'" class="rte-table-insert-row">
+                <div data-rte-own class="rte-table-insert-actions">
+                  <button data-rte-own
+                    v-for="item in rte.tableOpItems.filter((entry) => entry.insertCount)"
+                    :key="'sheet-insert-' + item.key"
+                    type="button"
+                    class="rte-table-ops-item"
+                    @click="item.run()"
+                  >
+                    {{ item.label }}
+                  </button>
+                </div>
+                <label data-rte-own class="rte-table-insert-count">
+                  <input data-rte-own
+                    v-model.number="rte.tableInsertCount"
+                    type="number"
+                    min="1"
+                    max="99"
+                    step="1"
+                    inputmode="numeric"
+                    aria-label="插入数量"
+                    title="填几就插入几行或几列，最少 1"
+                    @mousedown.stop="rte.rememberTableInsertSelection()"
+                    @click.stop
+                    @keydown.stop
+                    @blur="rte.normalizeTableInsertCount()"
+                  />
+                </label>
+              </div>
+              <template v-else-if="!op.insertCount">
+                <div data-rte-own v-if="op.sepBefore" class="rte-menu-sep" aria-hidden="true" />
+                <button data-rte-own
+                  type="button"
+                  class="rte-table-ops-item"
+                  :class="{ danger: op.danger }"
+                  :disabled="op.disabled?.()"
+                  @click="op.run()"
+                >
+                  {{ op.label }}
+                </button>
+              </template>
             </template>
             <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
             <div data-rte-own class="rte-table-cell-style">
