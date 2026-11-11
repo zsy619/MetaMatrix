@@ -115,6 +115,7 @@ import {
 import { QUOTE_STYLE_OPTIONS, type QuoteStyle } from '../extensions/rteBlockquote'
 import { collectCrossRefTargets } from '../extensions/crossRef'
 import { deepOptimizeDocument, type OptimizeAction, type OptimizeReportLine } from '../utils/rteDeepOptimize'
+import { moveHeadingAt } from '../utils/rteHeadingSection'
 import { syncPrintTableHeads } from '../utils/rtePrintTableHead'
 import { setGroupLayout } from '../extensions/imageGroupOps'
 import { continueOrderedList, promoteTableHeader } from '../utils/rteOptimizeActions'
@@ -298,6 +299,7 @@ const {
   closeTableCtx,
   openTableContextMenu,
   tableHeaderSticky,
+  tableColSticky,
   copyCurrentTable,
   promptTableRowFilter,
   reapplyTableFilter,
@@ -455,6 +457,16 @@ function outlineMenuJump() {
   const item = outlineMenuItem()
   closeOutlineMenu()
   if (item) jumpToOutlineHeading(item)
+}
+
+function outlineMenuMove(dir: -1 | 1) {
+  const item = outlineMenuItem()
+  closeOutlineMenu()
+  const ed = editor.value
+  if (!item || !ed) return
+  if (!moveHeadingAt(ed, item.pos, dir)) {
+    ElMessage.info(dir < 0 ? '这一节已经在最上面' : '这一节已经在最下面')
+  }
 }
 
 async function outlineMenuCopyTitle() {
@@ -631,6 +643,7 @@ function applyStoredViewPref(panelId: string | undefined) {
   applyingViewPref = true
   const pref = readRteViewPref(typeof localStorage === 'undefined' ? null : localStorage, panelId)
   tableHeaderSticky.value = pref.sticky
+  tableColSticky.value = pref.stickyCol
   darkEditor.value = pref.dark
   editorZoom.value = pref.zoom
   applyingViewPref = false
@@ -638,10 +651,11 @@ function applyStoredViewPref(panelId: string | undefined) {
 
 watch(() => props.panelId, (id) => applyStoredViewPref(id), { immediate: true })
 
-watch([tableHeaderSticky, darkEditor, editorZoom], () => {
+watch([tableHeaderSticky, tableColSticky, darkEditor, editorZoom], () => {
   if (applyingViewPref || !props.panelId) return
   writeRteViewPref(typeof localStorage === 'undefined' ? null : localStorage, props.panelId, {
     sticky: tableHeaderSticky.value,
+    stickyCol: tableColSticky.value,
     dark: darkEditor.value,
     zoom: editorZoom.value,
   })
@@ -7780,6 +7794,7 @@ provideRteBindings({
   openOutlineMenu,
   closeOutlineMenu,
   outlineMenuJump,
+  outlineMenuMove,
   outlineMenuCopyTitle,
   outlineMenuCopyLink,
   mentionEmptyHint,
@@ -8120,6 +8135,7 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
       'has-page-chrome': pageChromeActive,
       'is-page-feishu': pageSize === 'feishu',
       'is-table-sticky': tableHeaderSticky,
+      'is-table-col-sticky': tableColSticky,
       'is-cjk-typography': true,
       'is-drag-select': dragSelecting,
     }"

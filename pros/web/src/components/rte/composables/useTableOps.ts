@@ -84,6 +84,7 @@ function openTableContextMenu(event: MouseEvent) {
 }
 
 const tableHeaderSticky = ref(false)
+const tableColSticky = ref(false)
 const tableFilterQuery = ref('')
 const tableFilterPos = ref<number | null>(null)
 
@@ -137,6 +138,12 @@ function doTableSumRow() {
 function toggleTableStickyHeader() {
   tableHeaderSticky.value = !tableHeaderSticky.value
   ElMessage.success(tableHeaderSticky.value ? '已开启表头冻结' : '已关闭表头冻结')
+  deps.moreOpen().value = false
+}
+
+function toggleTableStickyCol() {
+  tableColSticky.value = !tableColSticky.value
+  ElMessage.success(tableColSticky.value ? '已开启首列冻结' : '已关闭首列冻结')
   deps.moreOpen().value = false
 }
 
@@ -680,6 +687,11 @@ const tableOpItems = computed((): TableOpItem[] => {
       sepBefore: true,
     },
     {
+      key: 'sticky-col',
+      label: '首列冻结开关',
+      run: () => toggleTableStickyCol(),
+    },
+    {
       key: 'copy-csv',
       label: '复制为 CSV',
       run: () => { void copyCurrentTable('csv') },
@@ -756,6 +768,7 @@ function onTableToolbarButtonClick() {
     closeTableCtx,
     openTableContextMenu,
     tableHeaderSticky,
+    tableColSticky,
     tableFilterQuery,
     reapplyTableFilter,
     applyCellValign,

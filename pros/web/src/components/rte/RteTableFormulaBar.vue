@@ -14,7 +14,7 @@ import {
   findSelectedCell,
   tableGrid,
 } from '../../utils/rteTableFormulaOps'
-import { evaluateFormula, isFormulaCell } from '../../utils/rteTableFormula'
+import { evaluateFormula, formulaReferences, isFormulaCell } from '../../utils/rteTableFormula'
 import {
   BAR_FALLBACK_HEIGHT,
   placeFormulaBar,
@@ -99,6 +99,10 @@ const result = computed(() => {
 
 /** 输入框里的草稿。 */
 const draft = ref('')
+const refsText = computed(() => {
+  const list = formulaReferences(draft.value)
+  return list.length ? `引用 ${list.join('、')}` : ''
+})
 const editing = ref(false)
 
 watch(
@@ -235,6 +239,7 @@ watch(barEl, (el) => {
       @keydown.enter.prevent="onEnter"
       @keydown.esc.prevent="onEscape"
     />
+    <span v-if="refsText" class="rte-formula-refs">{{ refsText }}</span>
     <span v-if="result.error" class="rte-formula-error" role="status">{{ result.error }}</span>
     <span v-else class="rte-formula-value" role="status">{{ result.value }}</span>
     <button
@@ -251,6 +256,15 @@ watch(barEl, (el) => {
 </template>
 
 <style scoped>
+.rte-formula-refs {
+  flex: 0 1 auto;
+  max-width: 180px;
+  overflow: hidden;
+  color: #86909c;
+  font-size: 11px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
 .rte-formula-bar {
   position: absolute;
   z-index: 30;

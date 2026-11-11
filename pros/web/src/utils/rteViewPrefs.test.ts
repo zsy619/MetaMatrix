@@ -23,15 +23,15 @@ describe('视图偏好按面板分开', () => {
   it('缺省不写键，另一个面板不受影响', () => {
     const storage = memoryStorage()
     storage.setItem('pageSizeByPanelId', 'keep')
-    writeRteViewPref(storage, 'panel-a', { sticky: false, dark: false, zoom: 1 })
+    writeRteViewPref(storage, 'panel-a', { sticky: false, stickyCol: false, dark: false, zoom: 1 })
     expect(storage.getItem(rteViewPrefKey('panel-a'))).toBeNull()
     expect(storage.getItem('pageSizeByPanelId')).toBe('keep')
 
-    writeRteViewPref(storage, 'panel-a', { sticky: true, dark: true, zoom: 1.25 })
-    writeRteViewPref(storage, 'panel-b', { sticky: false, dark: false, zoom: 0.75 })
-    expect(readRteViewPref(storage, 'panel-a')).toEqual({ sticky: true, dark: true, zoom: 1.25 })
-    expect(readRteViewPref(storage, 'panel-b')).toEqual({ sticky: false, dark: false, zoom: 0.75 })
-    expect(readRteViewPref(storage, 'panel-c')).toEqual({ sticky: false, dark: false, zoom: 1 })
+    writeRteViewPref(storage, 'panel-a', { sticky: true, stickyCol: false, dark: true, zoom: 1.25 })
+    writeRteViewPref(storage, 'panel-b', { sticky: false, stickyCol: false, dark: false, zoom: 0.75 })
+    expect(readRteViewPref(storage, 'panel-a')).toEqual({ sticky: true, stickyCol: false, dark: true, zoom: 1.25 })
+    expect(readRteViewPref(storage, 'panel-b')).toEqual({ sticky: false, stickyCol: false, dark: false, zoom: 0.75 })
+    expect(readRteViewPref(storage, 'panel-c')).toEqual({ sticky: false, stickyCol: false, dark: false, zoom: 1 })
   })
 
   it('不认识的缩放按 100%', () => {

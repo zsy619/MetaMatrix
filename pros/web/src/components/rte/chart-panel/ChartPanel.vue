@@ -7,7 +7,7 @@
  *
  * 面板只是「编辑区」，真正的写回由宿主（useChartPanelHost）完成。
  */
-import { computed, onBeforeUnmount, onMounted, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import ChartGeneralSection from './ChartGeneralSection.vue'
 import ChartAxisSection from './ChartAxisSection.vue'
@@ -26,6 +26,30 @@ import type { ChartDataSourceConfig } from '../../../utils/echarts/chartDataSour
 const props = defineProps<{ host: ReturnType<typeof useChartPanelHost> }>()
 
 const panel = useChartPanel()
+const previewEl = ref<HTMLElement | null>(null)
+let previewChart: { setOption: (option: unknown, opts?: { notMerge?: boolean }) => void; dispose: () => void; resize: () => void } | null = null
+let previewToken = 0
+
+async function paintPreview() {
+  const host = previewEl.value
+  const token = ++previewToken
+  if (!host || !visible.value) return
+  const option = panel.draft
+  if (!option || !Object.keys(option).length) {
+    previewChart?.dispose()
+    previewChart = null
+    host.replaceChildren()
+    return
+  }
+  const mod = await import('echarts')
+  if (token !== previewToken || !previewEl.value) return
+  if (!previewChart) {
+    previewEl.value.replaceChildren()
+    previewChart = mod.init(previewEl.value, undefined, { renderer: 'svg', height: 180 })
+  }
+  previewChart.setOption(option, { notMerge: true })
+  previewChart.resize()
+}
 
 const visible = computed(() => props.host.open && !!props.host.target)
 
@@ -116,6 +140,13 @@ function onEditorTransaction() {
 
 let stopEditorUpdate: (() => void) | null = null
 
+watch(
+  () => [visible.value, panel.revision] as const,
+  () => {
+    void paintPreview()
+  },
+)
+
 onMounted(() => {
   stopEditorUpdate = props.host.onTransaction(onEditorTransaction)
 })
@@ -125,6 +156,8 @@ onBeforeUnmount(() => {
   stopEditorUpdate = null
   if (guardTimer) clearTimeout(guardTimer)
   guardTimer = null
+  previewChart?.dispose()
+  previewChart = null
 })
 
 // 草稿每次改动（revision 自增）都写回文档
@@ -216,7 +249,7 @@ function onChangeChartType(event: Event) {
 
     <div class="rte-cp-body">
       <p v-if="panel.error" class="rte-cp-error">{{ panel.error }}</p>
-      <div class="rte-cp-preview-slot">正文里的图形与左侧数据同步。导出 HTML 和 PDF 时嵌成当前画面的静态图。</div>
+      <div ref="previewEl" class="rte-cp-preview-slot" aria-label="图表预览"></div>
       <ChartGeneralSection :panel="panel" />
       <ChartAxisSection :panel="panel" />
       <ChartSeriesSection :panel="panel" />

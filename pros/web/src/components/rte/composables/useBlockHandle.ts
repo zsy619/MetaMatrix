@@ -4,6 +4,7 @@ import type { Editor } from '@tiptap/core'
 import { NodeSelection, TextSelection } from '@tiptap/pm/state'
 import { Fragment } from '@tiptap/pm/model'
 import { reorderIndexes } from '../../../utils/rteBatch3'
+import { moveHeadingAt } from '../../../utils/rteHeadingSection'
 import { blockHandleLeft, blockToolsWidth, proseContentLeft } from '../../../utils/rteGutter'
 
 /** 块手柄、块菜单与块拖拽。模板绑定名与原先一致。 */
@@ -66,6 +67,12 @@ function moveCurrentBlock(dir: -1 | 1) {
   const targetIndex = index + dir
   if (targetIndex < 0 || targetIndex >= doc.childCount) {
     ElMessage.info(dir < 0 ? '已在最顶部' : '已在最底部')
+    return
+  }
+  const current = doc.child(index)
+  if (current?.type.name === 'heading') {
+    const pos = $from.before(1)
+    if (!moveHeadingAt(ed, pos, dir)) ElMessage.info(dir < 0 ? '已在最顶部' : '已在最底部')
     return
   }
   const children: ReturnType<typeof doc.child>[] = []

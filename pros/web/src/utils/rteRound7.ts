@@ -82,6 +82,21 @@ export function looksLikeTsvTable(plain: string): boolean {
   return lines.filter((line) => line.split('\t').length >= 2).length >= 2
 }
 
+/** Excel 序列日：整数落在 1954–2118 之间才转换，避免把普通编号当成日期。 */
+export function excelSerialToDate(serial: number): string | null {
+  if (!Number.isInteger(serial) || serial < 20000 || serial > 80000) return null
+  const ms = Date.UTC(1899, 11, 30) + serial * 86400000
+  const date = new Date(ms)
+  if (Number.isNaN(date.getTime())) return null
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(date.getUTCDate()).padStart(2, '0')
+  return `${date.getUTCFullYear()}-${month}-${day}`
+}
+
+function isDateHeader(text: string): boolean {
+  return /日期|date/i.test(text.trim())
+}
+
 export function tsvToTableHtml(plain: string): string {
   const text = (plain || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim()
   const lines = text.split('\n')
@@ -89,11 +104,19 @@ export function tsvToTableHtml(plain: string): string {
     .filter((line) => line.trim().length > 0)
     .map((line) => line.replace(/\s+$/, '').split('\t'))
   if (!rows.length) return '<p></p>'
+  const dateCols = new Set<number>()
+  rows[0]?.forEach((cell, index) => {
+    if (isDateHeader(cell)) dateCols.add(index)
+  })
   const body = rows
-    .map((cells) => {
+    .map((cells, rowIndex) => {
       const tds = cells
-        .map((cell) => {
-          const value = escapeHtmlText(cell)
+        .map((cell, index) => {
+          let shown = cell
+          if (rowIndex > 0 && dateCols.has(index) && /^\d+$/.test(cell.trim())) {
+            shown = excelSerialToDate(Number(cell.trim())) || cell
+          }
+          const value = escapeHtmlText(shown)
           return `<td><p>${value || '<br>'}</p></td>`
         })
         .join('')

@@ -47,6 +47,21 @@ export function parseCellAddress(text: string): CellAddress | null {
   return { col, row }
 }
 
+/** 公式里提到的单元格和区域，按出现顺序去重。 */
+export function formulaReferences(formula: string): string[] {
+  const body = String(formula ?? '').trim().replace(/^=/, '')
+  const found = body.match(/\b[A-Za-z]{1,3}[1-9][0-9]*(?::[A-Za-z]{1,3}[1-9][0-9]*)?\b/g) || []
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const token of found) {
+    const key = token.toUpperCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(key)
+  }
+  return out
+}
+
 /** { col: 2, row: 3 } -> 'B3' */
 export function formatCellAddress(addr: CellAddress): string {
   let col = Math.max(1, Math.floor(addr.col))

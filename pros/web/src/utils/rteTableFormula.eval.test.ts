@@ -8,11 +8,19 @@ import {
   evaluateFormula,
   evaluateTableFormulas,
   formatCellAddress,
+  formulaReferences,
   isFormulaCell,
   parseCellAddress,
   parseCellNumber,
   recalculateTable,
 } from './rteTableFormula'
+
+describe('公式引用', () => {
+  it('列出单元格和区域，并去掉重复', () => {
+    expect(formulaReferences('=SUM(A1:B2)+A1+C3')).toEqual(['A1:B2', 'A1', 'C3'])
+    expect(formulaReferences('不是公式')).toEqual([])
+  })
+})
 
 describe('单元格地址', () => {
   it('解析与格式化互为逆运算', () => {

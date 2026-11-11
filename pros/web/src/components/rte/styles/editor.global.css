@@ -3667,6 +3667,19 @@ html.rte-toolbar-dragging * {
   z-index: 2;
   background: #f7f8fa;
 }
+.rte-root.is-table-col-sticky .tableWrapper {
+  overflow: auto;
+}
+.rte-root.is-table-col-sticky .tableWrapper tr > :first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: #fff;
+}
+.rte-root.is-table-sticky.is-table-col-sticky .tableWrapper tr:first-child > :first-child {
+  z-index: 3;
+  background: #f7f8fa;
+}
 /* 轻量中文禁则 */
 .rte-root.is-cjk-typography .ProseMirror {
   line-break: strict;
