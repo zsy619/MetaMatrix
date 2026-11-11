@@ -16,6 +16,7 @@ import { buildChartA11ySummary, type ChartA11ySummary } from '../utils/echarts/c
 import { echartsRendererFor, needsEchartsGl, resolveEchartsRenderItems } from '../utils/echarts/prepare'
 import { loadEchartsGl } from '../utils/echartsGlRuntime'
 import { chartRenderOption, type ChartRenderMode } from '../utils/rteChartTheme'
+import { ensureRenderableChartOption } from '../utils/echarts/chartRenderGuard'
 import {
   resolveDataSourceConfig,
   startChartDataPolling,
@@ -83,7 +84,7 @@ function chartMode(host: HTMLElement): ChartRenderMode {
 
 /** 渲染副本。用户写过的背景色保留；没写时暗色编辑区才用深底。不写回文档。 */
 function renderOption(option: Record<string, unknown>, mode: ChartRenderMode): Record<string, unknown> {
-  return chartRenderOption(option, mode)
+  return ensureRenderableChartOption(chartRenderOption(option, mode))
 }
 
 export const EchartsBlock = Node.create({
