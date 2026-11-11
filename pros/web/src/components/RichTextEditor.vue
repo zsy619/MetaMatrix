@@ -78,6 +78,7 @@ import {
   togglePreviewMode,
 } from '../utils/rteRound7'
 import { type CalloutVariant } from '../extensions/callout'
+import { MERMAID_TEMPLATES, mermaidTemplate } from '../extensions/mermaidFlow'
 import {
   BLOCK_MENU,
   blockMenuButtonLabel,
@@ -2734,10 +2735,10 @@ async function insertTabsBlockAtCursor() {
   ElMessage.success('已插入标签页')
 }
 
-function insertMermaidAtCursor() {
-  editor.value?.chain().focus().insertMermaidBlock().run()
+function insertMermaidAtCursor(id?: string) {
+  editor.value?.chain().focus().insertMermaidBlock(mermaidTemplate(id)).run()
   moreOpen.value = false
-  ElMessage.success('已插入流程图（可点块内「编辑源码」）')
+  ElMessage.success('已插入流程图，可直接改步骤名称')
 }
 
 /** 文档里的图表块数量（超过上限会提示）。 */
@@ -7388,10 +7389,12 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'mermaid',
       label: '流程图',
-      title: 'Mermaid 流程图',
+      title: '插入横向、纵向或判断流程图',
       icon: '⌥',
       iconComp: ic('code'),
-      run: () => { void insertMermaidAtCursor() },
+      kind: 'presetMenu',
+      presetOptions: MERMAID_TEMPLATES.map((item) => ({ id: item.id, label: item.label })),
+      applyPreset: (id: string) => insertMermaidAtCursor(id),
     },
     {
       key: 'xref',

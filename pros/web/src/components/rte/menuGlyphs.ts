@@ -230,6 +230,9 @@ const BY_LABEL: Record<string, Component> = {
   等宽说明: IconCode,
   注释小字: BY_ID.small,
   '一键生成…': chart,
+  横向流程: g(['M4 9h5v6H4z', 'M15 9h5v6h-5z', 'M9 12h6', 'M13 10l2 2-2 2']),
+  纵向流程: g(['M9 3h6v5H9z', 'M9 16h6v5H9z', 'M12 8v8', 'M10 14l2 2 2-2']),
+  判断分支: g(['M12 4l6 6-6 6-6-6z', 'M12 16v4']),
   代码块: IconCode,
 }
 
