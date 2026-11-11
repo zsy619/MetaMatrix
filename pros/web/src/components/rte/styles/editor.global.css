@@ -2403,13 +2403,13 @@ html.rte-toolbar-dragging * {
 .rte-root .tiptap .rte-columns,
 .rte-root div[data-type='columns'] {
   display: grid !important;
-  gap: 16px !important;
-  column-gap: 16px !important;
-  row-gap: 16px !important;
-  margin: 12px 0;
-  padding: 10px;
-  border: 1px dashed #c9cdd4 !important;
-  border-radius: 8px;
+  gap: var(--rte-col-gap, 16px) !important;
+  column-gap: var(--rte-col-gap, 16px) !important;
+  row-gap: var(--rte-col-gap, 16px) !important;
+  margin: var(--rte-col-margin, 12px) 0;
+  padding: var(--rte-col-pad, 10px);
+  border: var(--rte-col-border, 1px dashed #c9cdd4) !important;
+  border-radius: var(--rte-col-radius, 8px);
   min-height: 88px !important;
   background: #fafbfc !important;
   box-sizing: border-box;
@@ -5205,6 +5205,14 @@ html.rte-image-preview-open .tippy-box {
 }
 
 /* —— 图表属性面板（chart-panel）—— */
+.rte-columns-panel.rte-chart-panel {
+  width: min(320px, 92vw);
+}
+.rte-columns-panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
 .rte-chart-panel {
   position: absolute;
   top: 0;

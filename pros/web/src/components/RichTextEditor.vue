@@ -242,6 +242,7 @@ import {
 } from '../extensions/echartsBlock'
 import { useChartPanelBridge } from './rte/chart-panel/useChartPanelBridge'
 import ChartPanel from './rte/chart-panel/ChartPanel.vue'
+import ColumnsPanel from './rte/ColumnsPanel.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -8539,6 +8540,7 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
     <RteDocumentBody />
     <RtePortals />
     <ChartPanel :host="chartPanelBridge.host" />
+    <ColumnsPanel :editor="editor" />
 
     <!-- 隐藏文件选择：导入文档 -->
     <input

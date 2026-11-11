@@ -1,4 +1,5 @@
 import { Node, mergeAttributes } from '@tiptap/core'
+import { Plugin, TextSelection } from '@tiptap/pm/state'
 
 export type ColumnCount = 2 | 3 | 4 | 5 | 6
 
@@ -8,6 +9,16 @@ declare module '@tiptap/core' {
       /** 插入分栏；ratios 可选，如 [1,2] → 1:2 */
       setColumns: (cols: ColumnCount, ratios?: number[]) => ReturnType
     }
+  }
+}
+
+function numAttr(name: string, key: string, fallback: number, min: number, max: number) {
+  return {
+    default: fallback,
+    parseHTML: (el: HTMLElement) => clampNum(el.getAttribute(name), fallback, min, max),
+    renderHTML: (attrs: Record<string, unknown>) => ({
+      [name]: String(clampNum(attrs[key], fallback, min, max)),
+    }),
   }
 }
 
@@ -44,6 +55,48 @@ function ratiosToAttr(ratios: number[]): string {
 
 function ratiosToGrid(ratios: number[]): string {
   return ratios.map((r) => `${r}fr`).join(' ')
+}
+
+export type ColumnBorderStyle = 'none' | 'solid' | 'dashed'
+
+export type ColumnFrameAttrs = {
+  gap?: number
+  margin?: number
+  radius?: number
+  padding?: number
+  borderWidth?: number
+  borderStyle?: ColumnBorderStyle
+  borderColor?: string
+}
+
+function clampNum(value: unknown, fallback: number, min: number, max: number): number {
+  const n = Math.round(Number(value))
+  if (!Number.isFinite(n)) return fallback
+  return Math.max(min, Math.min(max, n))
+}
+
+function borderStyleOf(value: unknown): ColumnBorderStyle {
+  if (value === 'none' || value === 'solid' || value === 'dashed') return value
+  return 'dashed'
+}
+
+/** 分栏外框样式。用变量写进节点，避免全局 !important 把边框写死。 */
+export function columnsFrameVars(attrs: ColumnFrameAttrs): string {
+  const gap = clampNum(attrs.gap, 16, 0, 64)
+  const margin = clampNum(attrs.margin, 12, 0, 64)
+  const radius = clampNum(attrs.radius, 8, 0, 32)
+  const padding = clampNum(attrs.padding, 10, 0, 48)
+  const width = clampNum(attrs.borderWidth, 1, 0, 8)
+  const style = borderStyleOf(attrs.borderStyle)
+  const color = /^#[0-9a-fA-F]{3,8}$/.test(String(attrs.borderColor || '')) ? String(attrs.borderColor) : '#c9cdd4'
+  const border = style === 'none' || width === 0 ? 'none' : `${width}px ${style} ${color}`
+  return [
+    `--rte-col-gap:${gap}px`,
+    `--rte-col-margin:${margin}px`,
+    `--rte-col-radius:${radius}px`,
+    `--rte-col-pad:${padding}px`,
+    `--rte-col-border:${border}`,
+  ].join(';')
 }
 
 export const Column = Node.create({
@@ -99,6 +152,25 @@ export const Columns = Node.create({
           return { 'data-ratios': String(attrs.ratios) }
         },
       },
+      gap: numAttr('data-gap', 'gap', 16, 0, 64),
+      margin: numAttr('data-margin', 'margin', 12, 0, 64),
+      radius: numAttr('data-radius', 'radius', 8, 0, 32),
+      padding: numAttr('data-pad', 'padding', 10, 0, 48),
+      borderWidth: numAttr('data-border-width', 'borderWidth', 1, 0, 8),
+      borderStyle: {
+        default: 'dashed' as ColumnBorderStyle,
+        parseHTML: (el: HTMLElement) => borderStyleOf(el.getAttribute('data-border-style')),
+        renderHTML: (attrs: { borderStyle?: ColumnBorderStyle }) => ({
+          'data-border-style': borderStyleOf(attrs.borderStyle),
+        }),
+      },
+      borderColor: {
+        default: '#c9cdd4',
+        parseHTML: (el: HTMLElement) => el.getAttribute('data-border-color') || '#c9cdd4',
+        renderHTML: (attrs: { borderColor?: string }) => ({
+          'data-border-color': String(attrs.borderColor || '#c9cdd4'),
+        }),
+      },
     }
   },
 
@@ -115,11 +187,7 @@ export const Columns = Node.create({
     const style = [
       'display:grid',
       `grid-template-columns:${grid}`,
-      'gap:16px',
-      'margin:12px 0',
-      'padding:10px',
-      'border:1px dashed #c9cdd4',
-      'border-radius:8px',
+      columnsFrameVars(node.attrs),
       'min-height:88px',
       'background:#fafbfc',
       'box-sizing:border-box',
@@ -164,5 +232,41 @@ export const Columns = Node.create({
           })
         },
     }
+  },
+
+  addProseMirrorPlugins() {
+    return [
+      new Plugin({
+        appendTransaction(transactions, _old, state) {
+          if (!transactions.some((tr) => tr.docChanged)) return null
+          const para = state.schema.nodes.paragraph
+          if (!para) return null
+          const spots: number[] = []
+          state.doc.descendants((node, pos) => {
+            if (node.type.name !== 'column') return
+            const last = node.lastChild
+            if (last?.isTextblock) return
+            spots.push(pos + node.nodeSize - 1)
+          })
+          if (!spots.length) return null
+          let tr = state.tr
+          for (let i = spots.length - 1; i >= 0; i -= 1) tr = tr.insert(spots[i], para.create())
+          if (!tr.selection.$from.parent.isTextblock) {
+            const hrPos = transactions[transactions.length - 1]?.selection.from ?? tr.selection.from
+            let target = -1
+            tr.doc.nodesBetween(hrPos, tr.doc.content.size, (node, pos) => {
+              if (target >= 0) return false
+              if (node.type === para) {
+                target = pos + 1
+                return false
+              }
+              return undefined
+            })
+            if (target > 0) tr = tr.setSelection(TextSelection.create(tr.doc, target))
+          }
+          return tr
+        },
+      }),
+    ]
   },
 })
