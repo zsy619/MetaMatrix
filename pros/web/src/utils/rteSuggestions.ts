@@ -17,6 +17,8 @@ export type SuggestionRange = {
   authorId: string
   authorName: string
   createdAt: string
+  /** 题注和图片组布局存在节点属性里，接受或拒绝时改属性，不删节点。 */
+  structural?: 'caption' | 'layout'
 }
 
 const SUGGESTION_META = 'suggestion-internal'
@@ -180,6 +182,30 @@ export function trackTransaction(
 export function collectSuggestionRanges(doc: PMNode): SuggestionRange[] {
   const ranges: SuggestionRange[] = []
   doc.descendants((node, pos) => {
+    if (node.type.name === 'image' && node.attrs.captionBefore != null && node.attrs.captionBefore !== node.attrs.caption) {
+      ranges.push({
+        id: `cap_${pos}`,
+        kind: 'insert',
+        structural: 'caption',
+        from: pos,
+        to: pos + node.nodeSize,
+        authorId: 'optimize',
+        authorName: `题注改为 ${String(node.attrs.caption || '（空）')}`,
+        createdAt: '',
+      })
+    }
+    if (node.type.name === 'imageGroup' && node.attrs.layoutBefore) {
+      ranges.push({
+        id: `lay_${pos}`,
+        kind: 'insert',
+        structural: 'layout',
+        from: pos,
+        to: pos + node.nodeSize,
+        authorId: 'optimize',
+        authorName: `图片组改为 ${String(node.attrs.layout || 'row')}`,
+        createdAt: '',
+      })
+    }
     if (!node.isText) return
     for (const mark of node.marks) {
       const kind: SuggestionKind | null =
@@ -223,6 +249,25 @@ export function applySuggestionDecision(
   const insertType = state.schema.marks.suggestionInsert
   const deleteType = state.schema.marks.suggestionDelete
   for (const range of ranges) {
+    if (range.structural) {
+      const node = tr.doc.nodeAt(range.from)
+      if (node?.type.name === 'image' && range.structural === 'caption') {
+        const restored = node.attrs.captionBefore
+        tr.setNodeMarkup(range.from, undefined, {
+          ...node.attrs,
+          caption: mode === 'accept' ? node.attrs.caption : restored || null,
+          captionBefore: null,
+        })
+      } else if (node?.type.name === 'imageGroup' && range.structural === 'layout') {
+        tr.setNodeMarkup(range.from, undefined, {
+          ...node.attrs,
+          layout: mode === 'accept' ? node.attrs.layout : node.attrs.layoutBefore || 'row',
+          layoutBefore: null,
+          ...(mode === 'reject' ? { ratios: null, ratioMode: null, stackAt: null } : {}),
+        })
+      }
+      continue
+    }
     const remove = mode === 'accept' ? range.kind === 'delete' : range.kind === 'insert'
     if (remove) tr.delete(range.from, range.to)
     else if (range.kind === 'insert' && insertType) tr.removeMark(range.from, range.to, insertType)

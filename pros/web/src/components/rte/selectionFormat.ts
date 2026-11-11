@@ -1,4 +1,5 @@
 import type { Editor } from '@tiptap/core'
+import { gestureComposition } from '../../utils/rteHistoryGesture'
 
 /**
  * 选区格式应用（选区浮动工具条与顶部工具栏共用）。
@@ -43,8 +44,13 @@ export function resolveFontSizeToken(raw: string): string {
 export function applyFontSizeToSelection(editor: MaybeEditor, size: string): boolean {
   if (!editor || editor.isDestroyed) return false
   const next = resolveFontSizeToken(size)
-  if (!next) editor.chain().focus().unsetFontSize().run()
-  else editor.chain().focus().setFontSize(next).run()
+  const gesture = gestureComposition(editor.view, 'font-size')
+  const chain = editor.chain().focus().command(({ tr }) => {
+    tr.setMeta('composition', gesture)
+    return true
+  })
+  if (!next) chain.unsetFontSize().run()
+  else chain.setFontSize(next).run()
   return true
 }
 

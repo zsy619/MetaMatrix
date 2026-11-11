@@ -43,6 +43,15 @@ export const RteImage = Image.extend({
           return value ? { 'data-qr': value } : {}
         },
       },
+      captionBefore: {
+        default: null as string | null,
+        parseHTML: (el: HTMLElement) => {
+          const value = el.getAttribute('data-caption-before')
+          return value == null ? null : value
+        },
+        renderHTML: (attrs: { captionBefore?: string | null }) =>
+          attrs.captionBefore == null ? {} : { 'data-caption-before': String(attrs.captionBefore) },
+      },
       caption: {
         default: null as string | null,
         parseHTML: (el: HTMLElement) => {

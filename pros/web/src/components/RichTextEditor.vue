@@ -115,6 +115,7 @@ import {
 import { QUOTE_STYLE_OPTIONS, type QuoteStyle } from '../extensions/rteBlockquote'
 import { collectCrossRefTargets } from '../extensions/crossRef'
 import { deepOptimizeDocument, type OptimizeAction, type OptimizeReportLine } from '../utils/rteDeepOptimize'
+import { syncPrintTableHeads } from '../utils/rtePrintTableHead'
 import { setGroupLayout } from '../extensions/imageGroupOps'
 import { continueOrderedList, promoteTableHeader } from '../utils/rteOptimizeActions'
 import {
@@ -3160,7 +3161,7 @@ function applyOptimizeAction(action: OptimizeAction) {
     return
   }
   const layout = action.id === 'layout12' ? '12' : action.id === 'layout21' ? '21' : action.id === 'layoutRows' ? 'rows' : null
-  if (!layout || !setGroupLayout(ed.view, action.pos, layout)) {
+  if (!layout || !setGroupLayout(ed.view, action.pos, layout, { suggest: suggesting.value })) {
     ElMessage.info('这组图片现在不能套用该布局')
     return
   }
@@ -3346,6 +3347,7 @@ function printEditor() {
     return
   }
   applyPrintPageStyle(pageSize.value)
+  syncPrintTableHeads(root)
   root.classList.add('rte-printing')
   // 嵌入区块本身不套纸张，但打印仍按文档的页面设置（A4 + 窄边距）出纸。
   const paperForPrint = !renderPaper.value && pageSizeMeta.value.paper

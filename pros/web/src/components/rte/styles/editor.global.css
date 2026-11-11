@@ -3983,9 +3983,16 @@ html.rte-toolbar-dragging * {
   .rte-root.rte-printing table > thead {
     display: table-header-group;
   }
+  .rte-root.rte-printing table:has(> thead.rte-print-head) > tbody > tr:first-child {
+    display: none;
+  }
   .rte-root.is-table-sticky.rte-printing tr:first-child {
     break-inside: avoid;
   }
+}
+
+.ProseMirror thead.rte-print-head {
+  display: none;
 }
 
 
@@ -4276,6 +4283,10 @@ html.rte-toolbar-dragging * {
   background: rgba(255, 255, 255, 0.9);
   pointer-events: none;
   z-index: 2;
+}
+.rte-image-caption-inline.is-suggestion {
+  box-shadow: inset 0 -2px 0 #3370ff;
+  background: rgba(51, 112, 255, 0.12);
 }
 .rte-image-caption {
   margin: 6px 0 12px;

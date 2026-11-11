@@ -313,11 +313,13 @@ export function layoutImageGroupChrome(view: EditorView) {
       : normalizeGroupRatios(kids.length, node.attrs.ratios)
     const gap = normalizeGroupGap(node.attrs.gap)
     const layout = normalizeGroupLayout(node.attrs.layout)
-    const signature = `${layout}:${Math.round(row.clientWidth)}:${kids.length}:${node.attrs.fit || ''}:${node.attrs.ratios || ''}:${node.attrs.stackAt ?? ''}`
+    const signature = `${layout}:${Math.round(row.clientWidth)}:${kids.length}:${node.attrs.fit || ''}:${node.attrs.ratios || ''}:${node.attrs.stackAt ?? ''}:${node.attrs.layoutBefore || ''}`
     if (row.clientWidth > 8 && dom.dataset.rteSig === signature && dom.dataset.ratioDrag !== '1') return false
     dom.dataset.rteSig = signature
     if (layout === 'row') dom.removeAttribute('data-layout')
     else dom.setAttribute('data-layout', layout)
+    if (node.attrs.layoutBefore) dom.setAttribute('data-layout-before', String(node.attrs.layoutBefore))
+    else dom.removeAttribute('data-layout-before')
     if ((layout === '12' || layout === '21') && kids.length === 3) {
       applyGroupGap(dom, gap)
       const fit = normalizeGroupFit(node.attrs.fit)
@@ -523,6 +525,15 @@ export const ImageGroup = Node.create({
         },
         renderHTML: (attrs: { stackAt?: number | null }) =>
           attrs.stackAt == null ? {} : { 'data-stack-at': String(attrs.stackAt) },
+      },
+      layoutBefore: {
+        default: null as string | null,
+        parseHTML: (element: HTMLElement) => {
+          const value = element.getAttribute('data-layout-before')
+          return value ? normalizeGroupLayout(value) : null
+        },
+        renderHTML: (attrs: { layoutBefore?: string | null }) =>
+          attrs.layoutBefore ? { 'data-layout-before': normalizeGroupLayout(attrs.layoutBefore) } : {},
       },
       layout: {
         default: 'row',
@@ -750,6 +761,19 @@ export const ImageGroup = Node.create({
         } else {
           dom.removeAttribute('data-layout')
           clearCollage(contentDOM)
+        }
+        if (current.attrs.layoutBefore) dom.setAttribute('data-layout-before', String(current.attrs.layoutBefore))
+        else dom.removeAttribute('data-layout-before')
+        let revision = bar.querySelector('.rte-image-group-revision')
+        if (current.attrs.layoutBefore) {
+          if (!revision) {
+            revision = document.createElement('span')
+            revision.className = 'rte-image-group-revision'
+            bar.appendChild(revision)
+          }
+          revision.textContent = `修订 ${normalizeGroupLayout(current.attrs.layoutBefore)}→${layout}`
+        } else {
+          revision?.remove()
         }
         gapBtn.textContent = `${gap}`
         gapBtn.title = `组内间距 ${gap} 像素，点击在 0、8、16、24 之间切换`

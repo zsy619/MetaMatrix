@@ -1,6 +1,7 @@
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { NodeSelection, type EditorState, type Transaction } from '@tiptap/pm/state'
 import type { EditorView } from '@tiptap/pm/view'
+import { gestureComposition, stampGesture } from '../utils/rteHistoryGesture'
 import {
   groupInsertIndex,
   groupUsesAspect,
@@ -60,17 +61,24 @@ export function setGroupGap(view: EditorView, groupPos: number, gap: number): bo
   return dispatchChecked(view, tr, groupPos)
 }
 
-export function setGroupLayout(view: EditorView, groupPos: number, layout: 'row' | '12' | '21' | 'rows'): boolean {
+export function setGroupLayout(
+  view: EditorView,
+  groupPos: number,
+  layout: 'row' | '12' | '21' | 'rows',
+  options?: { suggest?: boolean },
+): boolean {
   if (!view.editable) return false
   const node = view.state.doc.nodeAt(groupPos)
   if (!node || node.type.name !== 'imageGroup') return false
   const next = normalizeGroupLayout(layout)
   if ((next === '12' || next === '21') && node.childCount !== 3) return false
   if (next === 'rows' && node.childCount !== 2) return false
-  if (normalizeGroupLayout(node.attrs.layout) === next) return false
+  const previous = normalizeGroupLayout(node.attrs.layout)
+  if (previous === next) return false
   const tr = view.state.tr.setNodeMarkup(groupPos, undefined, {
     ...node.attrs,
     layout: next,
+    layoutBefore: options?.suggest ? node.attrs.layoutBefore || previous : null,
     ...(next === 'row' ? {} : { ratios: null, ratioMode: null }),
   })
   return dispatchChecked(view, tr, groupPos)
@@ -88,11 +96,14 @@ export function setGroupRatios(view: EditorView, groupPos: number, ratios: numbe
   if (!view.editable) return false
   const node = view.state.doc.nodeAt(groupPos)
   if (!node || node.type.name !== 'imageGroup' || ratios.length !== node.childCount) return false
-  const tr = view.state.tr.setNodeMarkup(groupPos, undefined, {
-    ...node.attrs,
-    ratios: ratiosToAttr(ratios),
-    ratioMode: 'custom',
-  })
+  const tr = stampGesture(
+    view.state.tr.setNodeMarkup(groupPos, undefined, {
+      ...node.attrs,
+      ratios: ratiosToAttr(ratios),
+      ratioMode: 'custom',
+    }),
+    gestureComposition(view, `ratios:${groupPos}`),
+  )
   return dispatchChecked(view, tr)
 }
 

@@ -120,6 +120,9 @@ export function deepOptimizeDocument(editor: Editor): DeepOptimizeResult {
   let punctFixed = 0
   let gapFixed = 0
 
+  const suggesting = Boolean(
+    editor.extensionManager.extensions.find((ext) => ext.name === 'suggestionMode')?.options?.enabled?.(),
+  )
   const textEdits: Array<{ from: number; to: number; text: string; marks: PmNode['marks'] }> = []
   const hints: Hint[] = []
   let prevHeadingNo: number[] | null = null
@@ -143,9 +146,6 @@ export function deepOptimizeDocument(editor: Editor): DeepOptimizeResult {
         if (node.attrs.textIndent) indentFixed += 1
         tr = tr.setNodeMarkup(pos, undefined, { ...node.attrs, level: nextLevel, textIndent: null })
         const mark = tr.doc.type.schema.marks.suggestionInsert
-        const suggesting = Boolean(
-          editor.extensionManager.extensions.find((ext) => ext.name === 'suggestionMode')?.options?.enabled?.(),
-        )
         const headingText = node.firstChild
         if (suggesting && mark && nextLevel !== level && headingText?.isText) {
           tr = tr.addMark(
@@ -170,7 +170,11 @@ export function deepOptimizeDocument(editor: Editor): DeepOptimizeResult {
         const caption = rest ? `图 ${imageNo}：${rest}` : `图 ${imageNo}`
         if (caption !== raw) {
           captionsFixed += 1
-          tr = tr.setNodeMarkup(pos, undefined, { ...node.attrs, caption })
+          tr = tr.setNodeMarkup(pos, undefined, {
+            ...node.attrs,
+            caption,
+            captionBefore: suggesting ? node.attrs.captionBefore ?? raw : null,
+          })
         }
       }
       const alt = String(node.attrs.alt || '').trim()

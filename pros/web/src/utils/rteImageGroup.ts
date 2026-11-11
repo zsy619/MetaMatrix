@@ -94,6 +94,8 @@ export const imageGroupLayoutCss = [
   '.rte-image-group-bar button.rte-image-group-alt{color:#d83931;}',
   '[data-resize-container][data-node="image"],[data-node="image"]{position:relative;}',
   '.rte-image-caption-inline{position:absolute;left:0;right:0;bottom:0;margin:0;padding:2px 6px;background:rgba(255,255,255,.9);font-size:12px;line-height:1.4;text-align:center;pointer-events:none;z-index:2;}',
+  '.rte-image-caption-inline.is-suggestion{box-shadow:inset 0 -2px 0 #3370ff;background:rgba(51,112,255,.12);}',
+  '.rte-image-group-revision{padding:0 6px;color:#3370ff;font-size:11px;line-height:26px;}',
   '.rte-font-size-entry{display:block;width:calc(100% - 12px);margin:4px 6px 6px;padding:4px 6px;border:1px solid #e5e6eb;border-radius:4px;font:inherit;box-sizing:border-box;}',
   '.rte-image-group[data-fit="contain"] .rte-image-group-row img{object-fit:contain !important;}',
   '.rte-image-group[data-layout="rows"] .rte-image-group-row{display:flex;flex-direction:column;height:auto;}',

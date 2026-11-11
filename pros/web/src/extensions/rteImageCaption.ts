@@ -23,6 +23,11 @@ function paintCaptions(view: EditorView) {
     cap.className = 'rte-image-caption rte-image-caption-inline'
     cap.setAttribute('contenteditable', 'false')
     cap.textContent = text
+    const before = node.attrs.captionBefore
+    if (before != null && before !== node.attrs.caption) {
+      cap.classList.add('is-suggestion')
+      cap.title = before ? `原题注：${before}` : '原题注为空'
+    }
     host.appendChild(cap)
   })
 }
