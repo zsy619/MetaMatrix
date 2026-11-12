@@ -346,6 +346,7 @@ const TABLE_INSERT_MAX = 99
 type TableOpItem = {
   key: string
   label: string
+  title?: string
   run: () => void
   disabled?: () => boolean
   danger?: boolean
@@ -721,9 +722,48 @@ function insertCellFormula() {
   deps.announceRte('已插入公式模板，可在表格菜单里计算')
 }
 
+const TABLE_OP_TITLES: Record<string, string> = {
+  'row-before': '在当前行上面插入行',
+  'row-after': '在当前行下面插入行',
+  'col-before': '在当前列左边插入列',
+  'col-after': '在当前列右边插入列',
+  'dup-row': '在下面复制这一行',
+  'equal-cols': '把各列调成一样宽',
+  'del-row': '删掉当前行',
+  'del-col': '删掉当前列',
+  'merge': '把选中的格子合成一个',
+  'split': '把合并过的格子拆开',
+  'header': '把这一行设成表头，或取消',
+  'header-col': '把这一列设成表头，或取消',
+  'clear-cell': '去掉格子里的底色和对齐',
+  'cell-formula': '在当前格插入求和公式',
+  'calc-formula': '算出表里已有的公式',
+  'valign-top': '文字贴在格子上沿',
+  'valign-middle': '文字放在格子上下正中',
+  'valign-bottom': '文字贴在格子下沿',
+  'align-left': '格子里的文字靠左',
+  'align-center': '格子里的文字居中',
+  'align-right': '格子里的文字靠右',
+  'sort-asc': '按当前列从小到大排序',
+  'sort-desc': '按当前列从大到小排序',
+  'sum-row': '在表底加一行合计',
+  'sticky-header': '滚动时让表头停在上面',
+  'sticky-col': '横向滚动时让首列停在左边',
+  'copy-csv': '把表格复制成逗号分隔的文本',
+  'copy-tsv': '把表格复制成制表符分隔的文本',
+  'row-filter': '按文字隐藏不匹配的行',
+  'del-table': '删掉整张表',
+  'read-off': '去掉阅读配色，恢复普通表格',
+  'read-blue': '用商务蓝显示，不改表格内容',
+  'read-green': '用护眼绿显示，不改表格内容',
+  'read-orange': '用暖橙显示，不改表格内容',
+  'read-gray': '用淡灰显示，不改表格内容',
+  'read-night': '用夜间深色显示，不改表格内容',
+}
+
 const tableOpItems = computed((): TableOpItem[] => {
   void deps.editor().value?.state
-  return [    { key: 'row-before', label: '向上插入行', run: tableAddRowBefore, insertCount: true },
+  const items: TableOpItem[] = [    { key: 'row-before', label: '向上插入行', run: tableAddRowBefore, insertCount: true },
     { key: 'row-after', label: '向下插入行', run: tableAddRowAfter, insertCount: true },
     { key: 'col-before', label: '向左插入列', run: tableAddColBefore, insertCount: true },
     { key: 'col-after', label: '向右插入列', run: tableAddColAfter, insertCount: true },
@@ -892,6 +932,7 @@ const tableOpItems = computed((): TableOpItem[] => {
       sepBefore: true,
     },
   ]
+  return items.map((item) => ({ ...item, title: TABLE_OP_TITLES[item.key] || item.label }))
 })
 
 

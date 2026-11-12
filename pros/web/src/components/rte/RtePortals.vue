@@ -537,6 +537,7 @@ const echartsDialogTemplates = computed(() => {
             <button data-rte-own
               type="button"
               :class="{ active: tableCtxGroup === group.id }"
+              :title="group.title"
               :aria-expanded="tableCtxGroup === group.id"
               @mouseenter="openTableCtxGroup(group.id, $event)"
               @click.stop="openTableCtxGroup(group.id, $event)"
@@ -553,7 +554,7 @@ const echartsDialogTemplates = computed(() => {
             >
               <template v-for="op in tableCtxOps(group.keys)" :key="'ctx-' + op.key">
                 <div data-rte-own v-if="op.insertCount" class="rte-table-insert-line">
-                  <button data-rte-own type="button" @click="op.run()">
+                  <button data-rte-own type="button" :title="op.title" @click="op.run()">
                     <span data-rte-own class="rte-table-ctx-ico"><component :is="TABLE_MENU_ICONS[op.key]" /></span>
                     <span data-rte-own>{{ op.label }}</span>
                   </button>
@@ -578,6 +579,7 @@ const echartsDialogTemplates = computed(() => {
                   v-else
                   type="button"
                   :class="{ danger: op.danger, active: op.active?.() }"
+                  :title="op.title"
                   :disabled="op.disabled?.()"
                   @click="op.run()"
                 >
@@ -623,12 +625,13 @@ const echartsDialogTemplates = computed(() => {
           <h3 data-rte-own class="rte-table-title">表格操作</h3>
           <div data-rte-own class="rte-table-ops-list">
             <template v-for="group in TABLE_MENU_GROUPS" :key="'sheet-group-' + group.id">
-              <div data-rte-own class="rte-table-cell-style-title">{{ group.label }}</div>
+              <div data-rte-own class="rte-table-cell-style-title" :title="group.title">{{ group.label }}</div>
               <template v-for="op in tableCtxOps(group.keys)" :key="'sheet-' + op.key">
               <div data-rte-own v-if="op.insertCount" class="rte-table-insert-line">
                 <button data-rte-own
                   type="button"
                   class="rte-table-ops-item"
+                  :title="op.title"
                   @click="op.run()"
                 >
                   <span data-rte-own class="rte-table-ctx-ico"><component :is="TABLE_MENU_ICONS[op.key]" /></span>
@@ -657,6 +660,7 @@ const echartsDialogTemplates = computed(() => {
                   type="button"
                   class="rte-table-ops-item"
                   :class="{ danger: op.danger, active: op.active?.() }"
+                  :title="op.title"
                   :disabled="op.disabled?.()"
                   @click="op.run()"
                 >

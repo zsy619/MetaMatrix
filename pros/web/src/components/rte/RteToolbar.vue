@@ -1148,6 +1148,7 @@ function toggleChartGroupMenu(key: string) {
                   type="button"
                   role="menuitem"
                   :class="{ active: tableMenuGroup === group.id }"
+                  :title="group.title"
                   @mouseenter="openTableMenuGroup(group.id, $event)"
                   @click.stop="openTableMenuGroup(group.id, $event)"
                 >
@@ -1163,7 +1164,7 @@ function toggleChartGroupMenu(key: string) {
                 >
                   <template v-for="op in tableMenuOps(group.keys)" :key="op.key">
                     <div data-rte-own v-if="op.insertCount" class="rte-table-insert-line">
-                      <button data-rte-own type="button" role="menuitem" @click="op.run()">
+                      <button data-rte-own type="button" role="menuitem" :title="op.title" @click="op.run()">
                         <span data-rte-own class="rte-table-ctx-ico"><component :is="TABLE_MENU_ICONS[op.key]" /></span>
                         <span data-rte-own>{{ op.label }}</span>
                       </button>
@@ -1188,6 +1189,7 @@ function toggleChartGroupMenu(key: string) {
                       v-else
                       type="button"
                       role="menuitem"
+                      :title="op.title"
                       :class="{ danger: op.danger, active: op.active?.() }"
                       :disabled="op.disabled?.()"
                       @click="op.run()"
