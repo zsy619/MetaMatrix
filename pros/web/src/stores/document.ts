@@ -185,6 +185,7 @@ import {
   isSoarDoc,
   isPlayingToWinDoc,
   isSceneThreeHighDoc,
+  isFdeSheetDoc,
   coerceYModelDoc,
   normalizeYModelDoc,
 } from '../types/canvas'
@@ -1697,6 +1698,19 @@ export const useDocumentStore = defineStore('document', () => {
     if (isSceneThreeHighDoc(next) && isLegacySceneSeed(next.businesses)) {
       const seed = sceneThreeHighTemplate as SceneThreeHighDocumentJSON
       next = { ...next, businesses: cloneDoc(seed.businesses) }
+    }
+    if (isFdeSheetDoc(next) && next.id === 'canvas_fde_scenario') {
+      const seed = FDE_SHEET_TEMPLATES['fde-scenario']
+      const byId = new Map(next.blocks.map((block) => [block.id, block]))
+      next = {
+        ...next,
+        lede: seed.lede,
+        blocks: seed.blocks.map((templateBlock) => {
+          const existing = byId.get(templateBlock.id)
+          if (!existing || existing.kind !== templateBlock.kind) return cloneDoc(templateBlock)
+          return { ...existing, title: templateBlock.title, hint: templateBlock.hint }
+        }),
+      }
     }
     if (
       isDualTriangleDoc(next) &&
