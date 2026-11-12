@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { canvasChromeStyle } from './canvasChrome'
 import type {
   FdeBlock,
@@ -8,12 +8,25 @@ import type {
 } from '../../types/canvas'
 import { isFdeSheetDoc } from '../../types/canvas'
 import { useDocumentStore } from '../../stores/document'
+import { panelMaximizeKey, usePanelMaximize } from '../../composables/usePanelMaximize'
 import RichTextEditor from '../RichTextEditor.vue'
 import { itemTextToHtml, normalizeHtmlForCompare } from '../../utils/itemsHtml'
 
 const props = defineProps<{ doc: FdeSheetDocumentJSON }>()
 const documentStore = useDocumentStore()
 const chrome = computed(() => canvasChromeStyle(props.doc.theme))
+const maxRichId = ref('')
+const maxKey = computed(() => panelMaximizeKey('fde-sheet', maxRichId.value || 'idle'))
+const { isMaximized, openMaximize, closeMaximize } = usePanelMaximize(maxKey)
+const maxRich = computed(() => {
+  const item = props.doc.blocks.find((entry) => entry.id === maxRichId.value)
+  return item && item.kind === 'rich' ? item : null
+})
+
+function openRich(id: string) {
+  maxRichId.value = id
+  openMaximize()
+}
 
 function patch(mutator: (doc: FdeSheetDocumentJSON) => void) {
   documentStore.mutateCanvas((doc) => {
@@ -187,20 +200,35 @@ const weakest = computed(() => {
         <p v-if="item.hint">{{ item.hint }}</p>
       </header>
 
-      <RichTextEditor
-        v-if="item.kind === 'rich'"
-        compact
-        :page-sheet="false"
-        :expanded="false"
-        :show-title="false"
-        :show-bottom-bar="false"
-        :show-publish-actions="false"
-        :show-markdown-hint="false"
-        :aria-label="item.title"
-        placeholder="点击填写…"
-        :model-value="itemTextToHtml(item.html)"
-        @update:model-value="writeRich(item.id, $event)"
-      />
+      <div v-if="item.kind === 'rich'" class="rich">
+        <button
+          type="button"
+          class="pm-max-btn rich-max"
+          title="最大化"
+          aria-label="最大化"
+          @mousedown.stop
+          @click="openRich(item.id)"
+        >
+          <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">
+            <rect x="2.5" y="2.5" width="11" height="11" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.5" />
+          </svg>
+        </button>
+        <RichTextEditor
+          v-if="!(isMaximized && maxRichId === item.id)"
+          compact
+          :page-sheet="false"
+          :expanded="false"
+          :show-title="false"
+          :show-bottom-bar="false"
+          :show-publish-actions="false"
+          :show-markdown-hint="false"
+          :aria-label="item.title"
+          placeholder="点击填写…"
+          :model-value="itemTextToHtml(item.html)"
+          @update:model-value="writeRich(item.id, $event)"
+        />
+        <p v-else class="rich-hint">正在放大编辑…</p>
+      </div>
 
       <ul v-else-if="item.kind === 'checks'" class="checks">
         <li v-for="row in item.items" :key="row.id">
@@ -306,6 +334,44 @@ const weakest = computed(() => {
       </div>
     </section>
   </div>
+
+  <Teleport to="body">
+    <div
+      v-if="isMaximized && maxRich"
+      class="pm-overlay"
+      role="dialog"
+      aria-modal="true"
+      :aria-label="maxRich.title"
+      @click.self="closeMaximize()"
+    >
+      <div class="pm-card" @click.stop>
+        <div class="pm-header">
+          <h3 class="pm-title">{{ maxRich.title }}</h3>
+          <div class="pm-actions">
+            <button type="button" class="pm-icon-btn" title="还原" aria-label="还原" @click="closeMaximize()">
+              <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+                <rect x="4" y="4" width="9" height="9" rx="1" fill="none" stroke="currentColor" stroke-width="1.4" />
+                <path d="M3 10.5V3.5h7" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+              </svg>
+            </button>
+            <button type="button" class="pm-icon-btn pm-close" title="关闭" aria-label="关闭" @click="closeMaximize()">×</button>
+          </div>
+        </div>
+        <div class="pm-body">
+          <RichTextEditor
+            class="pm-rte"
+            :expanded="true"
+            :show-title="false"
+            :show-bottom-bar="true"
+            :show-publish-actions="false"
+            placeholder="请输入正文"
+            :model-value="itemTextToHtml(maxRich.html)"
+            @update:model-value="writeRich(maxRich.id, $event)"
+          />
+        </div>
+      </div>
+    </div>
+  </Teleport>
 </template>
 
 <style scoped>
@@ -319,6 +385,9 @@ const weakest = computed(() => {
 .score strong { display: block; color: #125c3b; font-size: 22px; }
 .block { margin-top: 14px; padding: 14px; border-radius: 14px; background: #fffdf8; border: 1px solid rgba(62, 48, 28, 0.08); }
 .block header p { margin-top: 4px; color: #5c574e; font-size: 13px; line-height: 1.5; }
+.rich { position: relative; }
+.rich-max { position: absolute; top: 14px; right: 8px; z-index: 5; }
+.rich-hint { margin: 8px 0 0; height: 150px; display: flex; align-items: center; color: #8a8175; }
 .block :deep(.rte-root) {
   margin-top: 8px;
   height: 150px;
