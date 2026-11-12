@@ -28,6 +28,11 @@ function openRich(id: string) {
   openMaximize()
 }
 
+function displayTitle(title: string): string {
+  if (props.doc.id !== 'canvas_fde_scenario') return title
+  return title.replace(/^\d+\.\s*/, '')
+}
+
 function hintLines(hint?: string): string[] {
   return (hint ?? '').split('\n').map((line) => line.trim()).filter(Boolean)
 }
@@ -183,7 +188,7 @@ const layout = computed(() => {
 })
 const checkProgress = computed(() => {
   const items = props.doc.blocks.flatMap((item) => (item.kind === 'checks' ? item.items : []))
-  if (!items.length || layout.value !== 'checks') return null
+  if (!items.length || (layout.value !== 'checks' && props.doc.id !== 'canvas_fde_scenario')) return null
   return { done: items.filter((item) => item.checked).length, total: items.length }
 })
 
@@ -222,7 +227,7 @@ const weakest = computed(() => {
     <div class="blocks">
     <section v-for="(item, index) in doc.blocks" :key="item.id" class="block" :data-block="item.id" :data-kind="item.kind">
       <header>
-        <h3><span class="idx">{{ index + 1 }}</span>{{ item.title }}</h3>
+        <h3><span class="idx">{{ index + 1 }}</span>{{ displayTitle(item.title) }}</h3>
         <ul v-if="hintLines(item.hint).length > 1" class="prompts">
           <li v-for="line in hintLines(item.hint)" :key="line">{{ line }}</li>
         </ul>
@@ -423,6 +428,7 @@ const weakest = computed(() => {
 .is-grid .block[data-kind='checks'],
 .is-grid .block[data-block='name'],
 .is-grid .block[data-block='who'],
+.is-grid .block[data-block='next'],
 .is-grid .block[data-block='gate'] { grid-column: 1 / -1; }
 .block header p, .prompts { margin: 4px 0 0; color: #5c574e; font-size: 13px; line-height: 1.5; }
 .prompts { padding-left: 1.1em; }
