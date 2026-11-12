@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import type { TemplateCategory, TemplateId } from '../stores/document'
 import { CATEGORY_LABELS, TEMPLATE_META } from '../stores/document'
+import { CATEGORY_ACCENT } from '../components/workspace/palette'
 import { useAuthStore } from '../stores/auth'
 import type { DocumentSummary, SearchHit } from '../api/documents'
 import HighlightText from '../components/ui/HighlightText.vue'
@@ -59,6 +60,15 @@ const activeCategory = ref<'all' | TemplateCategory>(readStoredCategory())
 const templateFilter = ref('')
 const asideCollapsed = ref(false)
 
+const CATEGORY_BLURBS: Record<TemplateCategory, string> = {
+  method: '双三角、五步法、Y 模型',
+  growth: '商业模式、精益画布、价值主张',
+  industry: '行业分析、波特五力、OSCAR',
+  org: '7S、RACI、每日看板',
+  review: '周月季年、故障复盘',
+  fde: '选场景、十格自检、试点',
+}
+
 const categoryChips: { id: 'all' | TemplateCategory; label: string }[] = [
   { id: 'all', label: '全部' },
   ...(Object.keys(CATEGORY_LABELS) as TemplateCategory[]).map((id) => ({
@@ -108,6 +118,8 @@ const categoryCounts = computed(() => {
   return counts
 })
 
+const templatesEl = ref<HTMLElement | null>(null)
+
 const filteredCards = computed(() => {
   const q = templateFilter.value.trim().toLowerCase()
   return allCards.filter((card) => {
@@ -124,6 +136,29 @@ const filteredCards = computed(() => {
   })
 })
 
+const visibleGroups = computed(() => {
+  const order = Object.keys(CATEGORY_LABELS) as TemplateCategory[]
+  return order
+    .filter((id) => activeCategory.value === 'all' || activeCategory.value === id)
+    .map((id) => ({
+      id,
+      label: CATEGORY_LABELS[id],
+      blurb: CATEGORY_BLURBS[id],
+      cards: filteredCards.value.filter((card) => card.category === id),
+    }))
+    .filter((group) => group.cards.length > 0)
+})
+
+function categoryAccent(id: 'all' | TemplateCategory): string {
+  if (id === 'all') return '#1a73e8'
+  return CATEGORY_ACCENT[id]
+}
+
+function categoryBlurb(id: 'all' | TemplateCategory): string {
+  if (id === 'all') return ''
+  return CATEGORY_BLURBS[id]
+}
+
 function finishLaunch() {
   showLaunch.value = false
   try {
@@ -133,13 +168,17 @@ function finishLaunch() {
   }
 }
 
-function chooseCategory(id: 'all' | TemplateCategory) {
+function chooseCategory(id: 'all' | TemplateCategory, scroll = false) {
   activeCategory.value = id
   try {
     sessionStorage.setItem('metamatrix:guide-category', id)
   } catch {
     /* ignore */
   }
+  if (!scroll) return
+  void nextTick(() => {
+    templatesEl.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  })
 }
 
 function resetTemplateFilter() {
@@ -246,9 +285,23 @@ onMounted(async () => {
       <header class="hero">
         <p class="eyebrow">MetaMatrix</p>
         <h1>元矩阵 MetaMatrix</h1>
-        <p class="lead">
-          选择一张画布模板，开始结构化梳理与可视化表达。登录后可同步到服务端（多用户）。
-        </p>
+        <p class="lead">{{ allCards.length }} 张画布，分成六类。先选一类，再打开一张开始写。</p>
+        <p class="lead-note">登录后可以同步到服务端，多台设备用同一份。</p>
+        <div class="paths">
+          <button
+            v-for="chip in categoryChips.filter((item) => item.id !== 'all')"
+            :key="chip.id"
+            type="button"
+            class="path"
+            :class="{ 'path--on': activeCategory === chip.id }"
+            :style="{ '--accent': categoryAccent(chip.id) }"
+            @click="chooseCategory(chip.id, true)"
+          >
+            <strong>{{ chip.label }}</strong>
+            <span>{{ categoryBlurb(chip.id) }}</span>
+            <em>{{ categoryCounts[chip.id] || 0 }} 张</em>
+          </button>
+        </div>
         <section v-if="auth.isAuthenticated" class="search-box" aria-label="搜索我的画布">
           <label class="search-label" for="guide-doc-search">搜索我的画布</label>
           <div class="search-row">
@@ -285,7 +338,7 @@ onMounted(async () => {
         </section>
       </header>
 
-      <section class="templates" aria-label="画布模板">
+      <section ref="templatesEl" class="templates" aria-label="画布模板">
         <div class="templates-toolbar">
           <div class="chips" role="tablist" aria-label="模板分类">
             <button
@@ -295,6 +348,7 @@ onMounted(async () => {
               role="tab"
               class="chip"
               :class="{ 'chip--active': activeCategory === chip.id }"
+              :style="{ '--accent': categoryAccent(chip.id) }"
               :aria-selected="activeCategory === chip.id"
               @click="chooseCategory(chip.id)"
             >
@@ -302,44 +356,73 @@ onMounted(async () => {
               <span class="chip-count">{{ categoryCounts[chip.id] || 0 }}</span>
             </button>
           </div>
-          <div class="tpl-search">
-            <label class="visually-hidden" for="guide-tpl-search">搜索模板</label>
-            <input
-              id="guide-tpl-search"
-              v-model="templateFilter"
-              type="search"
-              placeholder="搜索模板名称或简介…"
-              autocomplete="off"
-            />
+          <div class="toolbar-side">
+            <p class="tpl-count" role="status">{{ filteredCards.length }} 个模板</p>
+            <div class="tpl-search">
+              <label class="visually-hidden" for="guide-tpl-search">搜索模板</label>
+              <input
+                id="guide-tpl-search"
+                v-model="templateFilter"
+                type="search"
+                placeholder="搜索模板名称或简介…"
+                autocomplete="off"
+              />
+            </div>
           </div>
         </div>
 
-        <p class="tpl-count" role="status">{{ filteredCards.length }} 个模板</p>
+        <p
+          v-if="activeCategory !== 'all'"
+          class="category-line"
+          :style="{ '--accent': categoryAccent(activeCategory) }"
+        >
+          {{ categoryBlurb(activeCategory) }}
+        </p>
+
         <p v-if="!filteredCards.length" class="tpl-empty">
           没有匹配的模板。
           <button type="button" class="mm-btn mm-btn--ghost" @click="resetTemplateFilter">清除筛选</button>
         </p>
 
-        <div class="grid">
-          <button
-            v-for="card in filteredCards"
-            :key="card.id"
-            type="button"
-            class="card"
-            :class="`card--${card.id}`"
-            @click="openCanvas(card.id)"
-          >
-            <GuideThumb :template-id="card.id" />
-            <div class="body">
-              <div class="body-top">
-                <h2>{{ card.name }}</h2>
-                <span class="badge">{{ card.badge }}</span>
-              </div>
-              <p>{{ card.description }}</p>
-              <span class="cta">进入画布 →</span>
+        <section
+          v-for="group in visibleGroups"
+          :key="group.id"
+          class="family"
+          :style="{ '--accent': categoryAccent(group.id) }"
+          :aria-label="group.label"
+        >
+          <header v-if="activeCategory === 'all'" class="family-head">
+            <div>
+              <h2>{{ group.label }}</h2>
+              <p>{{ group.blurb }}</p>
             </div>
-          </button>
-        </div>
+            <button type="button" class="family-more" @click="chooseCategory(group.id, true)">
+              只看这一类 · {{ group.cards.length }}
+            </button>
+          </header>
+          <div class="grid">
+            <button
+              v-for="card in group.cards"
+              :key="card.id"
+              type="button"
+              class="card"
+              :class="`card--${card.id}`"
+              :style="{ '--accent': categoryAccent(card.category) }"
+              :title="card.description"
+              @click="openCanvas(card.id)"
+            >
+              <GuideThumb :template-id="card.id" />
+              <div class="body">
+                <div class="body-top">
+                  <h3>{{ card.name }}</h3>
+                  <span class="badge">{{ card.badge }}</span>
+                </div>
+                <p>{{ card.description }}</p>
+                <span class="cta">进入画布 →</span>
+              </div>
+            </button>
+          </div>
+        </section>
       </section>
     </div>
 
@@ -372,15 +455,16 @@ onMounted(async () => {
   height: 100%;
   overflow-x: hidden;
   overflow-y: auto;
-  padding: 40px 28px 56px;
+  padding: 0 28px 56px;
   background:
     radial-gradient(ellipse 80% 50% at 50% -10%, #e8f0fe 0%, transparent 55%),
     #fafafa;
 }
 
 .hero {
-  max-width: 720px;
-  margin: 0 auto 36px;
+  max-width: 1100px;
+  margin: 0 auto 28px;
+  padding-top: 32px;
   text-align: center;
 }
 
@@ -404,22 +488,91 @@ onMounted(async () => {
 .lead {
   margin: 0;
   font-size: 16px;
-  color: #9aa0a6;
+  color: #5f6368;
   line-height: 1.6;
+}
+
+.lead-note {
+  margin: 6px 0 0;
+  color: #9aa0a6;
+  font-size: 13px;
+}
+
+.paths {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 22px;
+  text-align: left;
+}
+
+.path {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  min-height: 86px;
+  padding: 12px 12px 10px;
+  border: 1px solid #e8eaed;
+  border-left: 3px solid var(--accent, #1a73e8);
+  border-radius: 14px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.path strong {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.path span {
+  color: #5f6368;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.path em {
+  margin-top: auto;
+  color: var(--accent, #1a73e8);
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.path:hover,
+.path--on {
+  background: color-mix(in srgb, var(--accent, #1a73e8) 10%, #fff);
+  border-color: var(--accent, #1a73e8);
 }
 
 .templates {
   max-width: 1100px;
   margin: 0 auto;
+  scroll-margin-top: 8px;
 }
 
 .templates-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 4;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 12px 16px;
-  margin-bottom: 18px;
+  margin-bottom: 8px;
+  padding: 10px 0 14px;
+  background: #fafafa;
+  box-shadow: 0 1px 0 #e8eaed;
+}
+
+.toolbar-side {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
 }
 
 .chips {
@@ -435,9 +588,10 @@ onMounted(async () => {
 }
 
 .tpl-count {
-  margin: 0 0 12px;
+  margin: 0;
   color: #5f6368;
   font-size: 13px;
+  white-space: nowrap;
 }
 
 .chip {
@@ -462,10 +616,14 @@ onMounted(async () => {
 }
 
 .chip--active {
-  background: #e8f0fe;
-  border-color: #1a73e8;
-  color: #1a73e8;
-  box-shadow: 0 0 0 1px rgba(26, 115, 232, 0.12);
+  background: color-mix(in srgb, var(--accent, #1a73e8) 14%, #fff);
+  border-color: var(--accent, #1a73e8);
+  color: var(--accent, #1a73e8);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent, #1a73e8) 20%, transparent);
+}
+
+.chip--active .chip-count {
+  color: var(--accent, #1a73e8);
 }
 
 .tpl-search input {
@@ -507,18 +665,75 @@ onMounted(async () => {
   border: 0;
 }
 
+.category-line {
+  margin: 0 0 14px;
+  padding-left: 10px;
+  border-left: 3px solid var(--accent, #1a73e8);
+  color: #5f6368;
+  font-size: 13px;
+}
+
+.family {
+  margin: 0 0 28px;
+}
+
+.family-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 12px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--accent, #1a73e8);
+}
+
+.family-head h2,
+.family-head p {
+  margin: 0;
+}
+
+.family-head h2 {
+  font-size: 20px;
+  letter-spacing: -0.01em;
+}
+
+.family-head p {
+  margin-top: 4px;
+  color: #5f6368;
+  font-size: 13px;
+}
+
+.family-more {
+  flex: none;
+  border: 1px solid var(--accent, #1a73e8);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--accent, #1a73e8);
+  padding: 6px 12px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.family-more:hover {
+  background: color-mix(in srgb, var(--accent, #1a73e8) 10%, #fff);
+}
+
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
 }
 
 .card {
+  --accent: #1a73e8;
   display: flex;
   flex-direction: column;
   text-align: left;
   padding: 0;
   border: 1px solid #dadce0;
+  border-top: 3px solid var(--accent);
   border-radius: 16px;
   background: #ffffff;
   overflow: hidden;
@@ -534,258 +749,12 @@ onMounted(async () => {
 .card:hover,
 .card:focus-visible {
   transform: translateY(-3px);
-  border-color: #bdc1c6;
+  border-color: var(--accent);
   box-shadow: 0 10px 28px rgba(32, 33, 36, 0.1);
-  outline: none;
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
-.card--dual-triangle:hover,
-.card--dual-triangle:focus-visible {
-  border-color: #c4a574;
-}
-
-.card--dual-triangle-human-ai:hover,
-.card--dual-triangle-human-ai:focus-visible {
-  border-color: #3aada3;
-}
-
-.card--star-quadrant:hover,
-.card--star-quadrant:focus-visible {
-  border-color: #e57373;
-}
-
-.card--y-model:hover,
-.card--y-model:focus-visible {
-  border-color: #e53935;
-}
-
-.card--deliberate-practice:hover,
-.card--deliberate-practice:focus-visible {
-  border-color: #f99d1c;
-}
-
-.card--demand-triangle:hover,
-.card--demand-triangle:focus-visible {
-  border-color: #26a69a;
-}
-
-.card--five-step-basic:hover,
-.card--five-step-basic:focus-visible,
-.card--five-step-division:hover,
-.card--five-step-division:focus-visible,
-.card--five-step-advanced:hover,
-.card--five-step-advanced:focus-visible,
-.card--five-step-pro:hover,
-.card--five-step-pro:focus-visible,
-.card--five-step-challenge:hover,
-.card--five-step-challenge:focus-visible,
-.card--five-step:hover,
-.card--five-step:focus-visible {
-  border-color: #f9a825;
-}
-
-.card--ai-tradeoff:hover,
-.card--ai-tradeoff:focus-visible {
-  border-color: #d93025;
-}
-
-.card--product-content:hover,
-.card--product-content:focus-visible {
-  border-color: #f9a825;
-}
-
-.card--product-features-5d:hover,
-.card--product-features-5d:focus-visible {
-  border-color: #29b6f6;
-}
-
-
-.card--oscar:hover,
-.card--oscar:focus-visible {
-  border-color: #6495ed;
-}
-
-.card--industry-analysis:hover,
-.card--industry-analysis:focus-visible {
-  border-color: #202124;
-}
-
-.card--key-resistance:hover,
-.card--key-resistance:focus-visible {
-  border-color: #f9a825;
-}
-
-.card--conversion-tradeoff:hover,
-.card--conversion-tradeoff:focus-visible {
-  border-color: #fbc02d;
-}
-
-.card--industry-forecast:hover,
-.card--industry-forecast:focus-visible {
-  border-color: #c4a574;
-}
-
-.card--scientific-meeting:hover,
-.card--scientific-meeting:focus-visible {
-  border-color: #1a1a1a;
-}
-
-
-.card--scientific-meeting-10p:hover,
-.card--scientific-meeting-10p:focus-visible {
-  border-color: #43A047;
-}
-
-
-.card--ipo:hover,
-.card--ipo:focus-visible {
-  border-color: #d32f2f;
-}
-
-.card--incident-review:hover,
-.card--incident-review:focus-visible {
-  border-color: #d93025;
-}
-
-.card--annual-summary:hover,
-.card--annual-summary:focus-visible,
-.card--weekly-summary:hover,
-.card--weekly-summary:focus-visible,
-.card--monthly-summary:hover,
-.card--monthly-summary:focus-visible,
-.card--quarterly-summary:hover,
-.card--quarterly-summary:focus-visible {
-  border-color: #5f6368;
-}
-
-.card--deep-review:hover,
-.card--deep-review:focus-visible {
-  border-color: #c9a227;
-}
-
-.card--pm-retro-value:hover,
-.card--pm-retro-value:focus-visible {
-  border-color: #d65a46;
-}
-
-.card--roi-tradeoff:hover,
-.card--roi-tradeoff:focus-visible {
-  border-color: #FFEB3B;
-}
-
-.card--roi-decision:hover,
-.card--roi-decision:focus-visible {
-  border-color: #00BFFF;
-}
-
-.card--time-matrix:hover,
-.card--time-matrix:focus-visible {
-  border-color: #fbe297;
-}
-
-.card--work-state-zones:hover,
-.card--work-state-zones:focus-visible {
-  border-color: #9ad751;
-}
-
-
-.card--unit-model-quadrant:hover,
-.card--unit-model-quadrant:focus-visible {
-  border-color: #2d9b8a;
-}
-
-.card--growth-assumptions:hover,
-.card--growth-assumptions:focus-visible {
-  border-color: #90949c;
-}
-
-.card--business-formula:hover,
-.card--business-formula:focus-visible {
-  border-color: #38bdf8;
-}
-
-.card--three-ring-basics:hover,
-.card--three-ring-basics:focus-visible {
-  border-color: #2a9bd6;
-}
-
-.card--leadership-triangle:hover,
-.card--leadership-triangle:focus-visible {
-  border-color: #e87722;
-}
-
-.card--context-six-elements:hover,
-.card--context-six-elements:focus-visible {
-  border-color: #2a9bd6;
-}
-
-.card--project-gantt:hover,
-.card--project-gantt:focus-visible {
-  border-color: #1a73e8;
-}
-
-.card--raci-matrix:hover,
-.card--raci-matrix:focus-visible {
-  border-color: #1a73e8;
-}
-
-.card--daily-kanban:hover,
-.card--daily-kanban:focus-visible {
-  border-color: #a142f4;
-}
-
-.card--business-model-canvas:hover,
-.card--business-model-canvas:focus-visible,
-.card--cash-flow:hover,
-.card--cash-flow:focus-visible,
-.card--swot:hover,
-.card--swot:focus-visible,
-.card--lean-canvas:hover,
-.card--lean-canvas:focus-visible,
-.card--value-proposition:hover,
-.card--value-proposition:focus-visible,
-.card--okr:hover,
-.card--okr:focus-visible,
-.card--stakeholder-map:hover,
-.card--stakeholder-map:focus-visible,
-.card--pdca:hover,
-.card--pdca:focus-visible,
-.card--five-forces:hover,
-.card--five-forces:focus-visible,
-.card--income-statement:hover,
-.card--income-statement:focus-visible,
-.card--value-chain:hover,
-.card--value-chain:focus-visible,
-.card--seven-s:hover,
-.card--seven-s:focus-visible,
-.card--rice:hover,
-.card--rice:focus-visible,
-.card--break-even:hover,
-.card--break-even:focus-visible,
-.card--customer-journey:hover,
-.card--customer-journey:focus-visible,
-.card--kano:hover,
-.card--kano:focus-visible,
-.card--moscow:hover,
-.card--moscow:focus-visible,
-.card--impact-effort:hover,
-.card--impact-effort:focus-visible,
-.card--vrio:hover,
-.card--vrio:focus-visible,
-.card--golden-circle:hover,
-.card--golden-circle:focus-visible,
-.card--soar:hover,
-.card--soar:focus-visible,
-.card--playing-to-win:hover,
-.card--playing-to-win:focus-visible,
-.card--ten-check:hover,
-.card--ten-check:focus-visible,
-.card--scene-three-high:hover,
-.card--scene-three-high:focus-visible,
-.card[class*='card--fde-']:hover,
-.card[class*='card--fde-']:focus-visible {
-  border-color: #34a853;
-}
 
 .body {
   display: flex;
@@ -803,10 +772,11 @@ onMounted(async () => {
   gap: 8px;
 }
 
-.body h2 {
+.body h3 {
   margin: 0;
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 650;
+  line-height: 1.35;
   color: #202124;
 }
 
@@ -814,12 +784,13 @@ onMounted(async () => {
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
+  max-width: 46%;
   padding: 3px 8px;
   border-radius: 999px;
-  background: #e8eaed;
-  color: #202124;
+  background: color-mix(in srgb, var(--accent, #1a73e8) 14%, #fff);
+  color: var(--accent, #1a73e8);
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.3;
 }
 
@@ -828,14 +799,18 @@ onMounted(async () => {
   flex: 1;
   font-size: 13.5px;
   line-height: 1.55;
-  color: #9aa0a6;
+  color: #5f6368;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .cta {
   margin-top: 6px;
   font-size: 13px;
-  font-weight: 600;
-  color: #1a73e8;
+  font-weight: 700;
+  color: var(--accent, #1a73e8);
 }
 
 .primaryish {
@@ -939,8 +914,35 @@ onMounted(async () => {
 }
 
 @media (max-width: 900px) {
-  .guide-main {
-    padding: 28px 16px 48px;
+  .templates-toolbar {
+    position: static;
+    box-shadow: none;
   }
+  .guide-main {
+    padding: 0 16px 48px;
+  }
+  .hero {
+    padding-top: 24px;
+  }
+  .paths,
+  .family-head,
+  .toolbar-side {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    margin-left: 0;
+  }
+  .paths {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+  .tpl-search input {
+    width: 100%;
+  }
+}
+
+.guide-main .card:hover,
+.guide-main .card:focus-visible {
+  border-color: var(--accent, #1a73e8);
 }
 </style>
