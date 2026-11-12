@@ -6846,7 +6846,7 @@ const allTools = computed((): ToolItem[] => {
     },
     {
       key: 'codeInline',
-      label: '行内码',
+      label: '行内代码',
       title: '行内代码 (Ctrl/⌘+E)',
       icon: '`',
       iconComp: ic('codeInline'),
@@ -6862,7 +6862,7 @@ const allTools = computed((): ToolItem[] => {
       kind: 'highlight',
       active: () => isActive('highlight'),
     },
-    { key: 'color', label: '颜色', title: '文字颜色', icon: 'A', iconComp: ic('color'), kind: 'color' },
+    { key: 'color', label: '颜色', title: '设置文字颜色', icon: 'A', iconComp: ic('color'), kind: 'color' },
     { key: 'fontSize', label: '字号', title: '设置字号，如小四、12 磅', icon: 'Aa', iconComp: ic('fontSize'), kind: 'fontSize', active: () => !!currentFontSize() },
     { key: 'fontFamily', label: '字体', title: '设置字体，如宋体、黑体', icon: 'F', iconComp: ic('fontFamily'), kind: 'fontFamily', active: () => !!currentFontFamily() },
     { key: 'lineHeight', label: '行距', title: '设置行距，如 1.5 倍', icon: '↕', iconComp: ic('lineHeight'), kind: 'lineHeight', active: () => !!currentLineHeight() },
@@ -6990,7 +6990,7 @@ const allTools = computed((): ToolItem[] => {
     { key: 'columns', label: '分栏', title: '把内容分成多栏', icon: '▥', iconComp: ic('columns'), kind: 'columns' },
     { key: 'div-block', label: '', icon: '', kind: 'divider' },
     // —— 插入 ——
-    { key: 'image', label: '图片', title: '插入图片', icon: '🖼', iconComp: ic('image'), run: insertImage },
+    { key: 'image', label: '图片', title: '插入图片，也可直接粘贴', icon: '🖼', iconComp: ic('image'), run: insertImage },
     { key: 'imageLayout', label: '排法', title: '图片居中、居左、居右或环绕', icon: '▢', iconComp: ic('image'), kind: 'imageLayout', active: () => isImageNodeSelected() },
     { key: 'imageReplace', label: '换图', title: '替换选中图片，保留题注和裁剪', icon: '↻', iconComp: ic('image'), run: () => void replaceImageByUrl(), disabled: () => !isImageNodeSelected() },
     { key: 'imageAlt', label: '替代文本', title: '给选中图片写替代文本', icon: 'Alt', iconComp: ic('image'), run: () => void promptImageAlt(), disabled: () => !isImageNodeSelected() },
@@ -7033,7 +7033,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'link',
       label: '链接',
-      title: '插入/编辑链接 (Ctrl/⌘+K)',
+      title: '插入或编辑链接 (Ctrl/⌘+K)',
       icon: '🔗',
       iconComp: ic('link'),
       active: () => isActive('link'),
@@ -7049,12 +7049,12 @@ const allTools = computed((): ToolItem[] => {
       active: () => linkButtonOpen.value || isActive('linkButton'),
       run: () => { void insertLinkButton('blue') },
     },
-    { key: 'formula', label: '公式', title: '插入公式', icon: 'Σ', iconComp: ic('formula'), run: insertFormula },
+    { key: 'formula', label: '公式', title: '插入数学公式', icon: 'Σ', iconComp: ic('formula'), run: insertFormula },
     // —— 图表：一级分类各一个下拉（基础 / 统计 / 关系 / 层级 / 地理 / 金融 / 坐标系 / 组件 / 3D·GL）——
     ...CHART_GROUPS.map((group) => ({
       key: `chart:${group.id}`,
       label: group.label,
-      title: `插入${group.label}图表`,
+      title: `插入${group.label}图表：${group.hint}`,
       icon: group.icon,
       kind: 'echartsGroup' as const,
     })),
@@ -7096,13 +7096,13 @@ const allTools = computed((): ToolItem[] => {
       run: beginComment,
     },
     { key: 'emoji', label: '表情', title: '插入表情', icon: '☺', iconComp: ic('emoji'), kind: 'emoji' },
-    { key: 'specialChars', label: '字符', title: '插入特殊符号，如箭头、希腊字母', icon: 'Ω', iconComp: ic('specialChars'), kind: 'specialChars' },
+    { key: 'specialChars', label: '符号', title: '插入特殊符号，如箭头、希腊字母', icon: 'Ω', iconComp: ic('specialChars'), kind: 'specialChars' },
     { key: 'div-insert', label: '', icon: '', kind: 'divider' },
     // —— 其他 ——
     {
       key: 'print',
       label: '打印',
-      title: '打印预览',
+      title: '打开打印预览',
       icon: '🖨',
       iconComp: ic('print'),
       run: openPrintPreview,
@@ -7138,7 +7138,7 @@ const allTools = computed((): ToolItem[] => {
     // —— 书写 / 结构 / 审阅 / 视图（Wave20）——
     {
       key: 'caseTransform',
-      label: '文字',
+      label: '大小写',
       title: '大小写、整理、揭晓、首字下沉',
       icon: 'Aa',
       iconComp: ic('fontSize'),
@@ -7155,7 +7155,7 @@ const allTools = computed((): ToolItem[] => {
     },
     {
       key: 'copyMd',
-      label: '复制MD',
+      label: 'Markdown',
       title: '把正文复制成 Markdown',
       icon: 'MD',
       iconComp: ic('exportText'),
@@ -7447,7 +7447,7 @@ const allTools = computed((): ToolItem[] => {
     { key: 'tidySqueeze', label: '收空格', title: '连续空格收成一个', icon: '挤', run: () => runTextMenu('squeeze') },
     { key: 'tableZebra', label: '斑马纹', title: editor.value?.getAttributes('table')?.zebra === true ? '斑马纹已开启，再点一次关闭' : '隔行底色只用于显示', icon: '斑马', run: toggleTableZebra, active: () => editor.value?.getAttributes('table')?.zebra === true, disabled: () => !isInTable() },
     { key: 'tableEqual', label: '均分列', title: '把当前表格的列宽均分，一步撤销', icon: '均', run: () => runTableOpFromToolbar('equal-cols'), disabled: () => !isInTable() },
-    { key: 'tableFormula', label: '格公式', title: '在当前格对上方的数字求和', icon: 'Σ', run: () => runTableOpFromToolbar('cell-formula'), disabled: () => !isInTable() },
+    { key: 'tableFormula', label: '求和', title: '在当前格对上方的数字求和', icon: 'Σ', run: () => runTableOpFromToolbar('cell-formula'), disabled: () => !isInTable() },
     { key: 'tableSort', label: '升序', title: '按当前列从小到大排序', icon: '序', run: () => runTableOpFromToolbar('sort-asc'), disabled: () => !isInTable() },
     {
       key: 'tableStruct',
@@ -7471,15 +7471,15 @@ const allTools = computed((): ToolItem[] => {
     { key: 'tableColSticky', label: '冻结首列', title: tableColSticky.value ? '首列冻结已开启，再点一次关闭' : '横向滚动时首列保持可见', icon: '首列', run: toggleTableColStickyBar, active: () => tableColSticky.value },
     {
       key: 'tableFilter',
-      label: '表筛选',
-      title: '表格行筛选',
+      label: '筛选',
+      title: '按文字隐藏不匹配的表格行',
       icon: '▽',
       iconComp: ic('table'),
       run: () => { void promptTableRowFilter() },
     },
     {
       key: 'deepOptimize',
-      label: '深优化',
+      label: '一键整理',
       title: '一键整理标题、空段、空格、标点、间距和题注，并列出仍要处理的项',
       icon: '✦',
       iconComp: ic('deepOptimize'),
@@ -7487,7 +7487,7 @@ const allTools = computed((): ToolItem[] => {
     },
     {
       key: 'headingCheck',
-      label: '标题检',
+      label: '标题检查',
       title: '检查标题是否跳级或为空',
       icon: 'H✓',
       iconComp: ic('outline'),
@@ -7495,7 +7495,7 @@ const allTools = computed((): ToolItem[] => {
     },
     {
       key: 'linkCheck',
-      label: '链检',
+      label: '链接检查',
       title: '检查打不开或空着的链接',
       icon: '🔗✓',
       iconComp: ic('link'),
@@ -7528,7 +7528,7 @@ const allTools = computed((): ToolItem[] => {
     },
     {
       key: 'inlineAi',
-      label: '文内AI',
+      label: '改写',
       title: '用选区和上文改写，不调用外部模型',
       icon: 'AI',
       iconComp: ic('highlight'),
@@ -7536,7 +7536,7 @@ const allTools = computed((): ToolItem[] => {
     },
     {
       key: 'readTime',
-      label: '时长',
+      label: '阅读时长',
       title: '阅读时长估算',
       icon: '⌛',
       iconComp: ic('wordStats'),

@@ -316,7 +316,7 @@ describe('新功能区按钮', () => {
     expect(editor.getHTML()).toContain('data-zebra="1"')
     await clickTool(wrapper, '均分列')
     expect(editor.getHTML()).toContain('colwidth="160"')
-    await clickTool(wrapper, '格公式')
+    await clickTool(wrapper, '求和')
     expect(editor.getText()).toContain('=SUM(ABOVE)')
     await clickTool(wrapper, '冻结表头')
     expect(wrapper.classes()).toContain('is-table-sticky')

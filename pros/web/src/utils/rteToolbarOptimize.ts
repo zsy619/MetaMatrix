@@ -109,8 +109,8 @@ export const TOOLBAR_SEARCH_KEYWORDS: Record<string, readonly string[]> = {
   progressBar: ['进度条', '进度'],
   sensitive: ['敏感词', '错别字'],
   wordStats: ['字数', '统计'],
-  headingCheck: ['标题检查', '跳级'],
-  linkCheck: ['链接检查', '死链'],
+  headingCheck: ['标题检查', '跳级', '标题检'],
+  linkCheck: ['链接检查', '死链', '链检'],
   outbound: ['外链', '白名单'],
   note: ['注释'],
   form: ['表单', '单选', '多选'],
@@ -133,7 +133,7 @@ export const TOOLBAR_SEARCH_KEYWORDS: Record<string, readonly string[]> = {
   suggest: ['建议', '修订建议'],
   suggestAccept: ['接受修订', '接受'],
   suggestReject: ['拒绝修订', '拒绝'],
-  deepOptimize: ['深度优化', '一键整理'],
+  deepOptimize: ['深度优化', '一键整理', '深优化'],
   toggleBlock: ['折叠'],
   tabsBlock: ['标签页', '分页签'],
   blockOps: ['块操作', '上移', '下移'],
@@ -143,7 +143,11 @@ export const TOOLBAR_SEARCH_KEYWORDS: Record<string, readonly string[]> = {
   printUrls: ['打印链接', '印出网址'],
   copyMd: ['markdown', '复制markdown'],
   audit: ['审计', '操作记录'],
-  inlineAi: ['改写', '文内'],
+  inlineAi: ['改写', '文内', '文内ai'],
+  codeInline: ['行内代码', '行内码'],
+  caseTransform: ['大小写', '全大写', '全小写'],
+  specialChars: ['符号', '字符', '希腊字母'],
+  tableFormula: ['求和', '格公式'],
   cjkTip: ['禁则', '避头尾'],
   captionNum: ['题注', '图注'],
   footnoteList: ['脚注区', '脚注列表'],
@@ -161,6 +165,21 @@ export const TOOLBAR_SEARCH_KEYWORDS: Record<string, readonly string[]> = {
   'chart:coordinate': ['雷达', '平行坐标', '日历图'],
   'chart:component': ['数据集', '区域缩放'],
   'chart:gl': ['三维', '3d', '曲面'],
+}
+
+/** 正在搜索时不要改分组顺序，避免按过滤后的结果把工具栏排乱。 */
+export function toolbarGroupReorderAllowed(query: string): boolean {
+  return !normalizeToolbarQuery(query)
+}
+
+/** 「更多」菜单里上下方向键、Home 和 End 该落到哪一项。没有对应按键时返回空。 */
+export function menuFocusStep(index: number, count: number, key: string): number | null {
+  if (count <= 0) return null
+  if (key === 'Home') return 0
+  if (key === 'End') return count - 1
+  if (key !== 'ArrowDown' && key !== 'ArrowUp') return null
+  if (index < 0) return key === 'ArrowDown' ? 0 : count - 1
+  return cycleSearchIndex(index, count, key === 'ArrowDown' ? 1 : -1)
 }
 
 /** 未最大化时平时只留常用按钮；一旦开始搜索，就要能搜到收在「更多」里的按钮。 */

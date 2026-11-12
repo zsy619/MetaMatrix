@@ -13,6 +13,7 @@ import {
   lineHeightCaption,
   listToolLabel,
   MENU_CLOSE_DELAY_MS,
+  menuFocusStep,
   menuToolNeedsCaret,
   moreToolsCaption,
   moreToolsTitle,
@@ -35,6 +36,7 @@ import {
   searchGroupCaption,
   stepRibbonTabBy,
   tableToolLabel,
+  toolbarGroupReorderAllowed,
   toolsForToolbar,
   searchToolbarTools,
   stepRibbonTab,
@@ -147,7 +149,17 @@ assert.equal(shortcutFromTitle('没有快捷键'), '')
 assert.ok(shortcutNeedles('加粗 (Ctrl/⌘+B)').includes('ctrl+b'))
 assert.equal(searchToolbarTools([{ id: 'style', label: '字体与颜色', tools: [{ key: 'bold', label: '加粗', title: '加粗 (Ctrl/⌘+B)' }] }], 'ctrl+b')[0]?.key, 'bold')
 assert.equal(searchToolbarTools([{ id: 'insert', label: '插入', tools: [{ key: 'form', label: '表单' }] }], '单选')[0]?.key, 'form')
-assert.equal(searchToolbarTools([{ id: 'review', label: '审阅', tools: [{ key: 'deepOptimize', label: '深优化' }] }], '一键整理')[0]?.key, 'deepOptimize')
+assert.equal(searchToolbarTools([{ id: 'review', label: '审阅', tools: [{ key: 'deepOptimize', label: '一键整理' }] }], '深优化')[0]?.key, 'deepOptimize')
+assert.equal(searchToolbarTools([{ id: 'review', label: '审阅', tools: [{ key: 'headingCheck', label: '标题检查' }] }], '标题检')[0]?.key, 'headingCheck')
+assert.equal(searchToolbarTools([{ id: 'table', label: '表格', tools: [{ key: 'tableFormula', label: '求和' }] }], '格公式')[0]?.key, 'tableFormula')
+assert.equal(toolbarGroupReorderAllowed(''), true)
+assert.equal(toolbarGroupReorderAllowed('饼图'), false)
+assert.equal(menuFocusStep(-1, 4, 'ArrowDown'), 0)
+assert.equal(menuFocusStep(-1, 4, 'ArrowUp'), 3)
+assert.equal(menuFocusStep(0, 4, 'End'), 3)
+assert.equal(menuFocusStep(3, 4, 'Home'), 0)
+assert.equal(menuFocusStep(1, 4, 'ArrowDown'), 2)
+assert.equal(menuFocusStep(0, 4, 'Escape'), null)
 assert.equal(menuToolNeedsCaret('wordStats'), true)
 assert.equal(menuToolNeedsCaret('attach'), false)
 const primary = new Set(['undo', 'bold'])

@@ -1788,6 +1788,11 @@
 .rte-toolbar-search-jump:hover {
   color: #165dff;
 }
+.rte-toolbar-search-jump.is-empty,
+.rte-toolbar-search-jump.is-empty:hover {
+  cursor: default;
+  color: #4e5969;
+}
 
 .rte-more-icon {
   width: 18px;

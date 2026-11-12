@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { inject, onMounted, ref, watch } from 'vue'
+import { inject, nextTick, onMounted, ref, watch } from 'vue'
 import { RTE_BINDINGS } from './bindings'
-import { alignToolTitle, clampToolbarQuery, cycleSearchIndex, disabledToolTitle, EMPTY_GROUP_NOTE, FOCUS_MODE_NOTE, fontFamilyCaption, groupHandleTitle, LAST_TOOLBAR_QUERY_KEY, lineHeightCaption, listToolLabel, menuToolNeedsCaret, moreToolsCaption, moreToolsTitle, ribbonSearchLabel, ribbonTabForDigit, ribbonTabHint, ribbonTabTabIndex, ribbonTypeaheadQuery, SEARCH_INPUT_HINT, searchEnterActivates, searchGroupCaption, shortcutFromTitle, stepRibbonTab, stepRibbonTabBy, tableToolLabel, toolbarSearchStatus, toolIsUnavailable, zoomToolLabel, zoomToolTitle } from '../../utils/rteToolbarOptimize'
+import { alignToolTitle, clampToolbarQuery, cycleSearchIndex, disabledToolTitle, EMPTY_GROUP_NOTE, FOCUS_MODE_NOTE, fontFamilyCaption, groupHandleTitle, LAST_TOOLBAR_QUERY_KEY, lineHeightCaption, listToolLabel, menuFocusStep, menuToolNeedsCaret, moreToolsCaption, moreToolsTitle, ribbonSearchLabel, ribbonTabForDigit, ribbonTabHint, ribbonTabTabIndex, ribbonTypeaheadQuery, SEARCH_INPUT_HINT, searchEnterActivates, searchGroupCaption, shortcutFromTitle, stepRibbonTab, stepRibbonTabBy, tableToolLabel, toolbarGroupReorderAllowed, toolbarSearchStatus, toolIsUnavailable, zoomToolLabel, zoomToolTitle } from '../../utils/rteToolbarOptimize'
 import { useParentScopeStamp } from './inheritScope'
 import { buildChartGroups } from '../../utils/echarts/chartGroups'
 import { TABLE_MENU_ICONS } from './tableMenuIcons'
@@ -146,9 +146,65 @@ function onToolbarQueryInput() {
   if (next !== rteBindings.toolbarQuery) rteBindings.toolbarQuery = next
   rememberToolbarQuery()
 }
-function clearToolbarQuery() {
+function clearToolbarQuery(focusInput = false) {
   rememberToolbarQuery()
   rteBindings.toolbarQuery = ''
+  if (focusInput !== true) return
+  void nextTick(() => {
+    const input = document.querySelector('.rte-toolbar-search input')
+    if (input instanceof HTMLInputElement) input.focus()
+  })
+}
+function onGroupPointerDown(id: string, event: PointerEvent) {
+  if (!toolbarGroupReorderAllowed(rteBindings.toolbarQuery || '')) return
+  rteBindings.onToolbarHandlePointerDown(id, event)
+}
+function onGroupRestore(id: string) {
+  if (!toolbarGroupReorderAllowed(rteBindings.toolbarQuery || '')) return
+  rteBindings.restoreToolbarGroupButtons(id)
+}
+function onGroupContextMenu(id: string, event: MouseEvent) {
+  if (!toolbarGroupReorderAllowed(rteBindings.toolbarQuery || '')) return
+  rteBindings.onToolbarGroupContextMenu(id, event)
+}
+function moreMenuButtons(): HTMLElement[] {
+  const root = document.querySelector('.rte-more-menu')
+  if (!root) return []
+  return [...root.querySelectorAll('button')].filter((el): el is HTMLElement => el instanceof HTMLElement && !el.hasAttribute('disabled'))
+}
+function onMoreMenuKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    event.stopPropagation()
+    rteBindings.closeMore()
+    const opener = document.querySelector('[data-rte-anchor="more"]')
+    if (opener instanceof HTMLElement) opener.focus()
+    return
+  }
+  const target = event.target
+  if (target instanceof HTMLElement && target.closest('input, textarea, [contenteditable="true"]')) return
+  const buttons = moreMenuButtons()
+  const current = target instanceof HTMLElement ? target.closest('button') : null
+  const index = current instanceof HTMLElement ? buttons.indexOf(current) : -1
+  const next = menuFocusStep(index, buttons.length, event.key)
+  if (next == null) return
+  event.preventDefault()
+  buttons[next]?.focus()
+}
+function onMoreButtonKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape' && rteBindings.moreOpen) {
+    event.preventDefault()
+    rteBindings.closeMore()
+    return
+  }
+  if (event.key !== 'ArrowDown') return
+  event.preventDefault()
+  if (!rteBindings.moreOpen) {
+    rteBindings.markToolbarMenuOpening()
+    rteBindings.moreOpen = true
+    return
+  }
+  moreMenuButtons()[0]?.focus()
 }
 function onToolbarSearchKeydown(event: KeyboardEvent) {
   if (event.key === 'Escape') {
@@ -204,6 +260,10 @@ onMounted(() => {
   } catch {
     /* 读不到上次搜索时，Alt+上 只在本次会话里生效 */
   }
+})
+watch(() => rteBindings.moreOpen, (open) => {
+  if (!open) return
+  void nextTick(() => moreMenuButtons()[0]?.focus())
 })
 watch(() => rteBindings.toolbarQuery, () => {
   requestAnimationFrame(() => {
@@ -268,7 +328,7 @@ function toggleChartGroupMenu(key: string) {
             @input="onToolbarQueryInput"
             @keydown="onToolbarSearchKeydown"
           />
-          <button data-rte-own v-if="rte.toolbarQuery" type="button" class="rte-toolbar-search-clear" title="清除搜索 (Esc)" aria-label="清除搜索 (Esc)" @click="clearToolbarQuery">×</button>
+          <button data-rte-own v-if="rte.toolbarQuery" type="button" class="rte-toolbar-search-clear" title="清除搜索 (Esc)" aria-label="清除搜索 (Esc)" @click="clearToolbarQuery(true)">×</button>
         </label>
         <span v-if="rte.focusMode && rte.viewMode === 'edit'" data-rte-own class="rte-toolbar-mode-note">{{ FOCUS_MODE_NOTE }}</span>
         <span v-if="rte.viewMode !== 'edit'" data-rte-own class="rte-toolbar-mode-note">
@@ -331,10 +391,11 @@ function toggleChartGroupMenu(key: string) {
           @input="onToolbarQueryInput"
           @keydown="onToolbarSearchKeydown"
         />
-        <button data-rte-own v-if="rte.toolbarQuery" type="button" class="rte-toolbar-search-clear" title="清除搜索 (Esc)" aria-label="清除搜索 (Esc)" @click="clearToolbarQuery">×</button>
+        <button data-rte-own v-if="rte.toolbarQuery" type="button" class="rte-toolbar-search-clear" title="清除搜索 (Esc)" aria-label="清除搜索 (Esc)" @click="clearToolbarQuery(true)">×</button>
       </label>
       <span data-rte-own class="rte-sr-only" role="status">{{ toolbarSearchMessage() }}</span>
-      <button v-if="toolbarSearchMessage()" id="rte-toolbar-search-status" data-rte-own type="button" class="rte-toolbar-search-jump" :title="SEARCH_INPUT_HINT" @click="focusFirstMatchedTool">{{ toolbarSearchMessage() }}</button>
+      <p v-if="toolbarSearchMessage() && !toolbarSearchCount()" id="rte-toolbar-search-status" data-rte-own class="rte-toolbar-search-jump is-empty">{{ toolbarSearchMessage() }}</p>
+      <button v-else-if="toolbarSearchMessage()" id="rte-toolbar-search-status" data-rte-own type="button" class="rte-toolbar-search-jump" :title="SEARCH_INPUT_HINT" @click="focusFirstMatchedTool">{{ toolbarSearchMessage() }}</button>
       <div data-rte-own
         class="rte-toolbar-tools"
         :class="{
@@ -352,7 +413,7 @@ function toggleChartGroupMenu(key: string) {
         :key="group.id"
         class="rte-tool-group"
         :data-search-best="rte.toolbarQuery && groupIndex === 0 ? '1' : undefined"
-        :title="'右键可设置组内按钮的显隐与顺序'"
+        :title="rte.toolbarQuery ? '正在搜索，先清除搜索再调整分组' : '右键可设置组内按钮的显隐与顺序'"
         :class="{
           'is-drop-target': rte.toolbarDropIndex === rte.toolbarOrder.indexOf(group.id),
           'is-dragging': rte.toolbarDragSource === group.id,
@@ -360,17 +421,17 @@ function toggleChartGroupMenu(key: string) {
         }"
         :id="'rte-group-' + group.id"
         :data-group-id="group.id"
-        @contextmenu.prevent="rte.onToolbarGroupContextMenu(group.id, $event)"
+        @contextmenu.prevent="onGroupContextMenu(group.id, $event)"
       >
         <span data-rte-own class="rte-group-head">
           <button data-rte-own
-            v-if="rte.viewMode === 'edit'"
+            v-if="rte.viewMode === 'edit' && !rte.toolbarQuery"
             type="button"
             class="rte-group-handle"
             draggable="false"
             :aria-label="'拖动' + group.label + '分组'"
             :title="groupHandleTitle(group.label, group.tools.length)"
-            @pointerdown="rte.onToolbarHandlePointerDown(group.id, $event)"
+            @pointerdown="onGroupPointerDown(group.id, $event)"
             @pointermove="rte.onToolbarHandlePointerMove"
             @pointerup="rte.onToolbarHandlePointerUp"
             @pointercancel="rte.onToolbarHandlePointerUp"
@@ -380,16 +441,16 @@ function toggleChartGroupMenu(key: string) {
           </button>
           <span data-rte-own
             class="rte-group-label"
-            @pointerdown="rte.onToolbarHandlePointerDown(group.id, $event)"
+            @pointerdown="onGroupPointerDown(group.id, $event)"
             @pointermove="rte.onToolbarHandlePointerMove"
             @pointerup="rte.onToolbarHandlePointerUp"
             @pointercancel="rte.onToolbarHandlePointerUp"
-            title="双击恢复本组按钮的默认显隐和顺序"
-            @dblclick.stop="rte.restoreToolbarGroupButtons(group.id)"
+            :title="rte.toolbarQuery ? '正在搜索，先清除搜索再调整分组' : '双击恢复本组按钮的默认显隐和顺序'"
+            @dblclick.stop="onGroupRestore(group.id)"
           >{{ searchGroupCaption(group.label, group.tools.length, !!rte.toolbarQuery) }}</span>
           <p v-if="group.hiddenAll" data-rte-own class="rte-group-empty">{{ EMPTY_GROUP_NOTE }}</p>
           <button data-rte-own
-            v-if="rte.viewMode === 'edit'"
+            v-if="rte.viewMode === 'edit' && !rte.toolbarQuery"
             type="button"
             class="rte-group-settings"
             :aria-label="group.label + '的个性化设置'"
@@ -2231,6 +2292,7 @@ function toggleChartGroupMenu(key: string) {
             :class="{ active: rte.presetMenuKey === t.key || !!t.active?.() }"
             :title="disabledToolTitle(t.title || t.label, !!t.disabled?.())"
             :aria-label="t.title || t.label"
+            :aria-keyshortcuts="shortcutFromTitle(t.title || '') || undefined"
             aria-haspopup="menu"
             :aria-expanded="rte.presetMenuKey === t.key"
             :disabled="t.disabled?.() || undefined"
@@ -2291,6 +2353,7 @@ function toggleChartGroupMenu(key: string) {
           :class="{ active: t.active?.(), 'is-disabled': t.disabled?.() }"
           :title="disabledToolTitle(t.title || t.label, !!t.disabled?.())"
           :aria-label="t.title || t.label"
+          :aria-keyshortcuts="shortcutFromTitle(t.title || '') || undefined"
           :aria-pressed="t.active ? !!t.active() : undefined"
           :disabled="t.disabled?.() || undefined"
           @mousedown.prevent
@@ -2327,6 +2390,7 @@ function toggleChartGroupMenu(key: string) {
           aria-haspopup="menu"
           :aria-expanded="rte.moreOpen"
           @click.stop="rte.markToolbarMenuOpening(); rte.moreOpen = !rte.moreOpen"
+          @keydown="onMoreButtonKeydown"
         >
           <span data-rte-own class="rte-tool-icon">
             <component data-rte-own :is="rte.toolIcon('more')" class="rte-ep-icon" />
@@ -2340,6 +2404,7 @@ function toggleChartGroupMenu(key: string) {
             v-rte-float="'more'"
             :class="{ 'has-flyout': rte.moreColorOpen || rte.moreHighlightOpen || rte.moreFormOpen || rte.moreTemplateOpen || rte.moreFontSizeOpen || rte.moreFontFamilyOpen || rte.moreLineHeightOpen || rte.moreCalloutOpen || !!rte.presetMenuKey }"
             @mousedown.prevent
+            @keydown="onMoreMenuKeydown"
             @mouseenter="rte.onToolMenuEnter('more')"
             @mouseleave="rte.onToolMenuLeave($event, 'more', rte.closeMore)"
           >
