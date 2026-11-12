@@ -182,15 +182,21 @@ const layout = computed(() => {
     id === 'canvas_fde_requirements' ||
     id === 'canvas_fde_contract'
   ) return 'grid'
-  if (id === 'canvas_fde_acceptance' || id === 'canvas_fde_kickoff') return 'checks'
-  if (id === 'canvas_fde_tooling') return 'table'
+  if (id === 'canvas_fde_interview') return 'board'
+  if (id === 'canvas_fde_self') return 'scores'
+  if (id === 'canvas_fde_pricing' || id === 'canvas_fde_org') return 'cards'
+  if (id === 'canvas_fde_roi') return 'roi'
+  if (id === 'canvas_fde_acceptance' || id === 'canvas_fde_kickoff' || id === 'canvas_fde_launch') return 'checks'
+  if (id === 'canvas_fde_tooling' || id === 'canvas_fde_select' || id === 'canvas_fde_eval' || id === 'canvas_fde_pilot') return 'table'
   return 'stack'
 })
 const checkProgress = computed(() => {
   const items = props.doc.blocks.flatMap((item) => (item.kind === 'checks' ? item.items : []))
-  if (!items.length || (layout.value !== 'checks' && props.doc.id !== 'canvas_fde_scenario')) return null
+  if (!items.length || props.doc.compute === 'self') return null
   return { done: items.filter((item) => item.checked).length, total: items.length }
 })
+const levelColumns = new Set(['frequency', 'time', 'rules', 'cost', 'data', 'will'])
+const levels = ['高', '中', '低'] as const
 
 const weakest = computed(() => {
   const groups = props.doc.blocks.filter((item) => item.kind === 'score')
@@ -315,7 +321,19 @@ const weakest = computed(() => {
           <tbody>
             <tr v-for="row in item.rows" :key="row.id">
               <td v-for="col in item.columns" :key="col.id">
+                <div v-if="levelColumns.has(col.id)" class="levels" role="group" :aria-label="col.label">
+                  <button
+                    v-for="level in levels"
+                    :key="level"
+                    type="button"
+                    :data-level="level"
+                    :class="{ on: row.cells[col.id] === level }"
+                    :aria-pressed="row.cells[col.id] === level"
+                    @click="writeCell(item.id, row.id, col.id, level)"
+                  >{{ level }}</button>
+                </div>
                 <textarea
+                  v-else
                   rows="2"
                   :value="row.cells[col.id] || ''"
                   :aria-label="`${item.title} ${col.label}`"
@@ -349,7 +367,7 @@ const weakest = computed(() => {
       </div>
 
       <div v-else-if="item.kind === 'roi'" class="roi">
-        <article v-for="scenario in item.scenarios" :key="scenario.id">
+        <article v-for="scenario in item.scenarios" :key="scenario.id" :class="{ base: scenario.id === 'base' }">
           <h4>{{ scenario.name }}</h4>
           <label>每月任务量<input type="number" :value="scenario.tasks" @change="writeRoi(item.id, scenario.id, 'tasks', ($event.target as HTMLInputElement).value)" /></label>
           <label>改造前分钟<input type="number" :value="scenario.beforeMin" @change="writeRoi(item.id, scenario.id, 'beforeMin', ($event.target as HTMLInputElement).value)" /></label>
@@ -423,8 +441,13 @@ const weakest = computed(() => {
 .block { margin-top: 14px; padding: 16px 16px 14px; border-radius: 16px; background: #fffdf8; border: 1px solid rgba(62, 48, 28, 0.08); box-shadow: 0 8px 22px rgba(62, 48, 28, 0.05); }
 .block h3 { display: flex; align-items: center; gap: 8px; font-size: 16px; }
 .idx { flex: none; width: 22px; height: 22px; border-radius: 999px; background: #0f766e; color: #fff; font-size: 12px; line-height: 22px; text-align: center; }
-.is-grid .blocks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
-.is-grid .block { margin-top: 0; display: flex; flex-direction: column; min-width: 0; }
+.is-grid .blocks,
+.is-board .blocks,
+.is-scores .blocks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+.is-grid .block,
+.is-board .block,
+.is-scores .block { margin-top: 0; display: flex; flex-direction: column; min-width: 0; }
+.is-board .block[data-kind='rich'],
 .is-grid .block[data-kind='checks'],
 .is-grid .block[data-block='name'],
 .is-grid .block[data-block='who'],
@@ -455,7 +478,10 @@ const weakest = computed(() => {
 .checks li, .scores li { display: grid; grid-template-columns: minmax(180px, 1.4fr) minmax(160px, 0.7fr); gap: 10px; align-items: center; padding: 10px 12px; border-radius: 12px; background: #fff; border: 1px solid #f1ebe3; }
 .checks li.done { background: #f4fbf6; border-color: #c9e8d4; }
 .checks label span { line-height: 1.45; }
-.is-checks .checks li { grid-template-columns: minmax(240px, 1.4fr) minmax(200px, 0.8fr); padding: 14px 16px; }
+.is-checks .checks li,
+.is-board .checks li { grid-template-columns: 1fr; padding: 12px 14px; }
+.is-scores .scores li { grid-template-columns: 1fr; align-items: stretch; }
+.is-scores .marks { justify-content: flex-start; }
 .scores li { grid-template-columns: minmax(220px, 1.4fr) auto minmax(140px, 0.8fr); }
 .checks label { display: flex; gap: 8px; align-items: flex-start; }
 .marks { display: flex; gap: 4px; }
@@ -469,10 +495,19 @@ th { position: sticky; top: 0; background: #3e3428; color: #fff; font-size: 12px
 .table-wrap textarea { border-color: transparent; background: transparent; resize: vertical; min-height: 44px; line-height: 1.45; }
 .table-wrap textarea:focus { border-color: #1c4c7c; background: #fff; outline: none; }
 .is-table td:first-child textarea { font-weight: 700; }
+.levels { display: flex; gap: 4px; flex-wrap: wrap; }
+.levels button { border: 1px solid #e4ddd2; background: #fff; border-radius: 999px; min-width: 32px; padding: 4px 8px; cursor: pointer; }
+.levels button[data-level='高'].on { background: #187a4e; border-color: #187a4e; color: #fff; }
+.levels button[data-level='中'].on { background: #a16207; border-color: #a16207; color: #fff; }
+.levels button[data-level='低'].on { background: #b91c1c; border-color: #b91c1c; color: #fff; }
 .add { margin-top: 8px; }
 .cards, .roi { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; margin-top: 10px; }
 .cards article, .roi article { padding: 12px; border-radius: 12px; background: #f7f1e6; display: flex; flex-direction: column; gap: 6px; }
-.cards article.chosen { outline: 2px solid #187a4e; }
+.cards article.chosen { outline: 2px solid #187a4e; background: #f4fbf6; }
+.roi article.base { outline: 2px solid #0f766e; background: #fff; }
+.roi article.base h4::after { content: '最可信'; margin-left: 8px; color: #0f766e; font-size: 12px; font-weight: 700; }
+.roi dl div:nth-child(3) dd,
+.roi dl div:nth-child(5) dd { font-size: 16px; font-weight: 750; color: #125c3b; }
 .cards header, .roi h4 { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
 .cards h4, .roi h4 { margin: 0; }
 .roi label { display: flex; justify-content: space-between; gap: 8px; align-items: center; font-size: 13px; }
@@ -481,14 +516,15 @@ th { position: sticky; top: 0; background: #3e3428; color: #fff; font-size: 12px
 .roi dl div { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
 .roi dt { color: #5c574e; }
 @media (max-width: 800px) {
-  .checks li, .scores li, .top, .is-grid .blocks { display: flex; flex-direction: column; align-items: stretch; }
+  .checks li, .scores li, .top, .is-grid .blocks, .is-board .blocks, .is-scores .blocks { display: flex; flex-direction: column; align-items: stretch; }
   .top h2 { font-size: 22px; }
 }
 </style>
 
 <style>
 .canvas-viewport .sheet.fde-sheet .block > header,
-.canvas-viewport .sheet.fde-sheet .block h3 {
+.canvas-viewport .sheet.fde-sheet .block h3,
+.canvas-viewport .sheet.fde-sheet h4 {
   background: none;
   text-shadow: none;
   color: #3e3428;
