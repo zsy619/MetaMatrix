@@ -408,7 +408,6 @@ onMounted(async () => {
               class="card"
               :class="`card--${card.id}`"
               :style="{ '--accent': categoryAccent(card.category) }"
-              :title="card.description"
               @click="openCanvas(card.id)"
             >
               <GuideThumb :template-id="card.id" />
