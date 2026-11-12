@@ -10,6 +10,7 @@ import {
   formatPainterLabel,
   groupHandleTitle,
   hiddenGroupPlaceholders,
+  isToolbarMenuTrigger,
   lineHeightCaption,
   listToolLabel,
   MENU_CLOSE_DELAY_MS,
@@ -37,6 +38,7 @@ import {
   stepRibbonTabBy,
   tableToolLabel,
   toolbarGroupReorderAllowed,
+  toolbarMenuKeyAction,
   toolsForToolbar,
   searchToolbarTools,
   stepRibbonTab,
@@ -72,7 +74,7 @@ const ranked = searchToolbarTools([
 assert.equal(ranked[0]?.key, 'bold')
 assert.equal(toolbarSearchStatus('  ', 3), '')
 assert.equal(toolbarSearchStatus('拼音', 0), '没有匹配的按钮。试试拼音、表格或饼图')
-assert.equal(toolbarSearchStatus('拼音', 2), '找到 2 个按钮')
+assert.equal(toolbarSearchStatus('拼音', 2), '找到 2 个按钮，左右键可在结果间移动')
 assert.equal(ribbonTabTabIndex(true), 0)
 assert.equal(ribbonTabTabIndex(false), -1)
 assert.equal(menuToolNeedsCaret('align'), true)
@@ -81,8 +83,8 @@ assert.equal(disabledToolTitle('换图', true), '换图（当前不可用）')
 assert.equal(disabledToolTitle('换图（当前不可用）', true), '换图（当前不可用）')
 assert.equal(disabledToolTitle('换图', false), '换图')
 assert.equal(groupHandleTitle('表格', 10), '拖动表格分组，本组 10 个按钮。Alt+左/右也可移动')
-assert.equal(toolbarSearchStatus('拼音', 2, '注音'), '找到 2 个按钮，首选「注音」')
-assert.equal(toolbarSearchStatus('表', 24, '表格', true), '找到 24 个按钮，首选「表格」，只列出前若干个')
+assert.equal(toolbarSearchStatus('拼音', 2, '注音'), '找到 2 个按钮，首选「注音」，左右键可在结果间移动')
+assert.equal(toolbarSearchStatus('表', 24, '表格', true), '找到 24 个按钮，首选「表格」，只列出前若干个，左右键可在结果间移动')
 const ordered = orderToolbarSearchGroups([
   { id: 'edit', label: '编辑', tools: [{ key: 'clear', label: '清除格式', title: '加粗后清除' }] },
   { id: 'style', label: '字体', tools: [{ key: 'bold', label: '加粗' }] },
@@ -130,7 +132,15 @@ assert.equal(toolbarSearchStatus('换图', 1, '换图', false, '图片', true), 
 assert.equal(MENU_CLOSE_DELAY_MS >= 300, true)
 assert.equal(hiddenGroupPlaceholders([{ id: 'edit', label: '编辑', tools: [{ key: 'undo' }] }], ['edit', 'writing'], [{ id: 'edit', label: '编辑', keyCount: 3 }, { id: 'writing', label: '书写', keyCount: 3 }, { id: 'other', label: '其他', keyCount: 0 }]).map((group) => group.id).join(','), 'edit,writing')
 assert.equal(searchToolbarTools([{ id: 'insert', label: '插入', tools: [{ key: 'qrcode', label: '二维码' }] }], 'qr')[0]?.key, 'qrcode')
-assert.equal(toolbarSearchStatus('拼音', 2, '注音', false, '字体与颜色'), '找到 2 个按钮，首选「注音」，在字体与颜色')
+assert.equal(toolbarSearchStatus('拼音', 2, '注音', false, '字体与颜色'), '找到 2 个按钮，首选「注音」，在字体与颜色，左右键可在结果间移动')
+assert.equal(toolbarMenuKeyAction('ArrowDown', true, true), 'move')
+assert.equal(toolbarMenuKeyAction('Escape', true, true), 'close')
+assert.equal(toolbarMenuKeyAction('ArrowDown', false, false), 'open')
+assert.equal(toolbarMenuKeyAction('ArrowDown', false, true), 'move')
+assert.equal(toolbarMenuKeyAction('ArrowLeft', false, true), 'ignore')
+assert.equal(isToolbarMenuTrigger({ popup: 'menu' }), true)
+assert.equal(isToolbarMenuTrigger({ caret: true }), true)
+assert.equal(isToolbarMenuTrigger({ popup: 'dialog' }), false)
 assert.equal(stepRibbonTabBy(['a', 'b', 'c', 'd', 'e'], 'b', 3), 'e')
 assert.equal(stepRibbonTabBy(['a', 'b', 'c'], 'a', -3), 'a')
 assert.equal(zoomToolLabel(1), '实际大小')

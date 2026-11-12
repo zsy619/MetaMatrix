@@ -196,7 +196,7 @@ import {
   bumpToolbarUndoEpoch,
   COMPACT_PRIMARY_KEY_SET,
 } from '../utils/rteToolbarGroups'
-import { fontSizeCaption, pushRecentValue, recentOptions } from '../utils/rteToolbarOptimize'
+import { fontSizeCaption, pushRecentValue, recentOptions, zoomToolTitle } from '../utils/rteToolbarOptimize'
 import { useFindReplace } from './rte/composables/useFindReplace'
 import { useExport } from './rte/composables/useExport'
 import { useImport } from './rte/composables/useImport'
@@ -6942,7 +6942,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'callout',
       label: '告示',
-      title: '告示框（提示/警告/成功/错误）',
+      title: '插入提示、警告、成功或错误告示',
       icon: '!',
       iconComp: ic('callout'),
       kind: 'callout',
@@ -6951,8 +6951,8 @@ const allTools = computed((): ToolItem[] => {
     { key: 'hr', label: '分割线', title: '插入分割线，并可选择样式', icon: '┄', iconComp: ic('hr'), kind: 'hr' },
     {
       key: 'blockOps',
-      label: '块',
-      title: '块操作：全选 / 复制 / 上移 / 下移',
+      label: '块操作',
+      title: '全选、复制、上移或下移当前块',
       icon: '▣',
       iconComp: ic('more'),
       kind: 'blockOps',
@@ -6982,7 +6982,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'pageBreak',
       label: '分页符',
-      title: '插入分页符（打印/PDF）',
+      title: '插入分页符，打印和导出 PDF 时从这里换页',
       icon: '=======',
       iconComp: ic('pageBreak'),
       run: insertPageBreak,
@@ -7029,7 +7029,7 @@ const allTools = computed((): ToolItem[] => {
       applyPreset: (id: string) => setImageBorderStyle(id),
       disabled: () => !isImageNodeSelected(),
     },
-    { key: 'video', label: '视频', title: '插入视频', icon: '▶', iconComp: ic('video'), run: insertVideo },
+    { key: 'video', label: '视频', title: '插入本地或网络视频', icon: '▶', iconComp: ic('video'), run: insertVideo },
     {
       key: 'link',
       label: '链接',
@@ -7085,7 +7085,7 @@ const allTools = computed((): ToolItem[] => {
     },
     { key: 'table', label: '表格', title: '插入表格，或在表内做行列操作', icon: '▦', iconComp: ic('table'), kind: 'table', active: () => isInTable(), run: onTableToolClick },
     { key: 'attach', label: '附件', title: '插入或选择附件', icon: '☁▾', iconComp: ic('attach'), kind: 'attach', run: onAttachment },
-    { key: 'note', label: '注释', title: '插入文内注释', icon: '[1]', iconComp: ic('note'), run: insertNote },
+    { key: 'note', label: '注释', title: '在光标处插入文内注释', icon: '[1]', iconComp: ic('note'), run: insertNote },
     {
       key: 'comment',
       label: '评论',
@@ -7095,7 +7095,7 @@ const allTools = computed((): ToolItem[] => {
       active: () => commentsOpen.value,
       run: beginComment,
     },
-    { key: 'emoji', label: '表情', title: '插入表情', icon: '☺', iconComp: ic('emoji'), kind: 'emoji' },
+    { key: 'emoji', label: '表情', title: '插入表情符号', icon: '☺', iconComp: ic('emoji'), kind: 'emoji' },
     { key: 'specialChars', label: '符号', title: '插入特殊符号，如箭头、希腊字母', icon: 'Ω', iconComp: ic('specialChars'), kind: 'specialChars' },
     { key: 'div-insert', label: '', icon: '', kind: 'divider' },
     // —— 其他 ——
@@ -7110,7 +7110,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'bookmark',
       label: '书签',
-      title: '书签 / 锚点（打开列表；可新建）',
+      title: '打开书签列表，也可新建书签',
       icon: '⚓',
       iconComp: ic('link'),
       active: () => isActive('bookmark') || bookmarkPanelOpen.value,
@@ -7128,7 +7128,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'pasteFormat',
       label: pasteFormatMode.value === 'plain' ? '粘贴·纯文本' : pasteFormatMode.value === 'markdown' ? '粘贴·MD' : '粘贴·保留',
-      title: '点击切换粘贴格式：保留、纯文本、Markdown',
+      title: '再点一次，在保留格式、纯文本和 Markdown 之间切换',
       icon: '📋',
       iconComp: ic('import'),
       active: () => pasteFormatMode.value !== 'keep',
@@ -7180,7 +7180,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'audio',
       label: '音频',
-      title: '插入音频',
+      title: '插入可播放的音频',
       icon: '♪',
       iconComp: ic('audio'),
       run: insertAudio,
@@ -7196,7 +7196,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'footnote',
       label: '脚注',
-      title: '插入脚注 / 打开脚注列表',
+      title: '插入脚注，或打开脚注列表',
       icon: '[n]',
       iconComp: ic('note'),
       active: () => footnotePanelOpen.value,
@@ -7205,7 +7205,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'footnoteList',
       label: '脚注区',
-      title: '脚注汇总',
+      title: '在文末列出全部脚注',
       icon: '脚',
       iconComp: ic('outline'),
       run: openFootnotePanel,
@@ -7213,7 +7213,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'captionNum',
       label: '题注号',
-      title: '题注自动编号（图/表）',
+      title: '给图和表的题注重新编号',
       icon: '№',
       iconComp: ic('note'),
       run: doRenumberCaptions,
@@ -7236,7 +7236,7 @@ const allTools = computed((): ToolItem[] => {
     },
     {
       key: 'speakStop',
-      label: '停读',
+      label: '停止',
       title: '停止朗读',
       icon: '⏹',
       iconComp: ic('clear'),
@@ -7263,7 +7263,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'revisionBase',
       label: '基线',
-      title: '重新标记修订基线',
+      title: '把当前内容记为修订起点',
       icon: '⚓',
       iconComp: ic('note'),
       run: resetRevisionBaseline,
@@ -7298,7 +7298,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'zoom',
       label: '缩放',
-      title: '编辑区缩放',
+      title: zoomToolTitle(editorZoom.value),
       icon: '🔍',
       iconComp: ic('wordStats'),
       kind: 'zoom',
@@ -7307,7 +7307,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'viewExtras',
       label: '视图',
-      title: '专注 / 暗色 / 纸张参考线',
+      title: '专注、暗色和纸张参考线',
       icon: '👁',
       iconComp: ic('outline'),
       kind: 'viewExtras',
@@ -7326,7 +7326,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'paraStyle',
       label: '段样式',
-      title: '段落样式集',
+      title: '套用导语、摘要等段落样式',
       icon: '¶',
       iconComp: ic('fontSize'),
       kind: 'paraStyle',
@@ -7335,7 +7335,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'listStyle',
       label: '编号样式',
-      title: '有序列表编号样式 / 起始',
+      title: '选择数字、字母或罗马数字，并可设置起始号',
       icon: 'a.',
       iconComp: ic('list'),
       kind: 'listStyle',
@@ -7361,7 +7361,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'timeline',
       label: '时间线',
-      title: '插入时间线',
+      title: '按时间顺序插入一条时间线',
       icon: '⏱',
       iconComp: ic('note'),
       run: insertTimelineBlock,
@@ -7513,7 +7513,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'outbound',
       label: '外链',
-      title: '外链打开前先确认',
+      title: '设置打开外链前是否先确认',
       icon: '外',
       iconComp: ic('link'),
       run: () => openGovern('outbound'),
@@ -7521,7 +7521,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'audit',
       label: '审计',
-      title: '文档操作记录',
+      title: '查看这篇文档的操作记录',
       icon: '录',
       iconComp: ic('wordStats'),
       run: () => openGovern('audit'),
@@ -7580,7 +7580,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'shortcuts',
       label: '快捷键',
-      title: '快捷键速查',
+      title: '查看全部快捷键',
       icon: '⌨',
       iconComp: ic('shortcuts'),
       kind: 'shortcuts',

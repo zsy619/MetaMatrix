@@ -298,7 +298,23 @@ export function toolbarSearchStatus(query: string, count: number, best = '', cap
   const more = capped ? '，只列出前若干个' : ''
   if (count === 1 && bestDisabled) return `找到 1 个按钮${first}${where}，当前不可用`
   if (count === 1) return `找到 1 个按钮${first}${where}，按 Enter 直接使用`
-  return `找到 ${count} 个按钮${first}${where}${more}`
+  return `找到 ${count} 个按钮${first}${where}${more}，左右键可在结果间移动`
+}
+
+export type ToolbarMenuKeyAction = 'move' | 'open' | 'close' | 'ignore'
+
+/** 工具栏浮层的按键该打开、移动、关闭，还是留给编辑器。 */
+export function toolbarMenuKeyAction(key: string, inMenu: boolean, menuOpen: boolean): ToolbarMenuKeyAction {
+  if (inMenu && key === 'Escape') return 'close'
+  if (inMenu && (key === 'ArrowDown' || key === 'ArrowUp' || key === 'Home' || key === 'End')) return 'move'
+  if (!inMenu && key === 'ArrowDown' && menuOpen) return 'move'
+  if (!inMenu && key === 'ArrowDown') return 'open'
+  return 'ignore'
+}
+
+/** 带小三角，或声明了菜单的按钮，才响应向下键。 */
+export function isToolbarMenuTrigger(attrs: { popup?: string | null; caret?: boolean }): boolean {
+  return attrs.popup === 'menu' || !!attrs.caret
 }
 
 /** 栏目上 PageUp / PageDown 一次跳三格，不绕回。 */

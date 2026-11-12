@@ -1024,16 +1024,17 @@ function toggleChartGroupMenu(key: string) {
               @mouseenter="rte.onToolMenuEnter('align')"
               @mouseleave="rte.onToolMenuLeave($event, 'align', () => (rte.alignOpen = false))"
             >
-              <button data-rte-own type="button" @click="rte.setAlign('left'); rte.alignOpen = false"><RteMenuGlyph label="左对齐" />左对齐</button>
-              <button data-rte-own type="button" @click="rte.setAlign('center'); rte.alignOpen = false"><RteMenuGlyph label="居中" />居中</button>
-              <button data-rte-own type="button" @click="rte.setAlign('right'); rte.alignOpen = false"><RteMenuGlyph label="右对齐" />右对齐</button>
-              <button data-rte-own type="button" @click="rte.setAlign('justify'); rte.alignOpen = false"><RteMenuGlyph label="两端对齐" />两端对齐</button>
+              <button data-rte-own type="button" :aria-pressed="currentAlignName() === 'left'" @click="rte.setAlign('left'); rte.alignOpen = false"><RteMenuGlyph label="左对齐" />左对齐</button>
+              <button data-rte-own type="button" :aria-pressed="currentAlignName() === 'center'" @click="rte.setAlign('center'); rte.alignOpen = false"><RteMenuGlyph label="居中" />居中</button>
+              <button data-rte-own type="button" :aria-pressed="currentAlignName() === 'right'" @click="rte.setAlign('right'); rte.alignOpen = false"><RteMenuGlyph label="右对齐" />右对齐</button>
+              <button data-rte-own type="button" :aria-pressed="currentAlignName() === 'justify'" @click="rte.setAlign('justify'); rte.alignOpen = false"><RteMenuGlyph label="两端对齐" />两端对齐</button>
               <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
               <button data-rte-own type="button" @click="rte.indentBlock(); rte.alignOpen = false"><RteMenuGlyph label="增加缩进" />增加缩进</button>
               <button data-rte-own type="button" @click="rte.outdentBlock(); rte.alignOpen = false"><RteMenuGlyph label="减少缩进" />减少缩进</button>
               <button data-rte-own
                 type="button"
                 :class="{ active: rte.currentTextIndent() === '2em' }"
+                :aria-pressed="rte.currentTextIndent() === '2em'"
                 @click="rte.setFirstLineIndent(true); rte.alignOpen = false"
               ><RteMenuGlyph label="首行缩进 2 字" />首行缩进 2 字</button>
               <button data-rte-own
@@ -1878,8 +1879,10 @@ function toggleChartGroupMenu(key: string) {
             :ref="(el) => rte.setFloatAnchor('shortcuts', el)"
             data-rte-anchor="shortcuts"
             :class="{ active: rte.shortcutsOpen }"
-            title="快捷键速查"
-            aria-label="快捷键速查"
+            title="查看全部快捷键"
+            aria-label="查看全部快捷键"
+            aria-haspopup="menu"
+            :aria-expanded="rte.shortcutsOpen"
             @click.stop="rte.toggleShortcutsPanel()"
           >
             <span data-rte-own class="rte-tool-icon">

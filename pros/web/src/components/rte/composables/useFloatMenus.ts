@@ -1,5 +1,5 @@
 import { nextTick, onBeforeUnmount, onMounted, type Directive } from 'vue'
-import { MENU_CLOSE_DELAY_MS } from '../../../utils/rteToolbarOptimize'
+import { isToolbarMenuTrigger, MENU_CLOSE_DELAY_MS, menuFocusStep, toolbarMenuKeyAction } from '../../../utils/rteToolbarOptimize'
 
 /** 工具条浮层定位与点击外部关闭。pointerdown 监听在本组合式内成对注册。 */
 export function useFloatMenus(deps: {
@@ -372,21 +372,90 @@ function onDocPointerDownForMenus(e: PointerEvent) {
 }
 
 
-  function onToolbarEscape(event: KeyboardEvent) {
-    if (event.key !== 'Escape') return
+  const FLOAT_MENU_SELECTOR = '.rte-menu, .rte-more-menu, .rte-emoji-panel, .rte-specialchars-panel, .rte-spacing-panel'
+
+  function menuButtons(root: ParentNode): HTMLElement[] {
+    return [...root.querySelectorAll('button')].filter((el): el is HTMLElement => el instanceof HTMLElement && !el.hasAttribute('disabled'))
+  }
+  function openMenuRoots(): HTMLElement[] {
+    return [...document.querySelectorAll(FLOAT_MENU_SELECTOR)].filter((el): el is HTMLElement => el instanceof HTMLElement)
+  }
+  function expandedToolbarButton(): HTMLElement | null {
+    const el = document.querySelector('.rte-toolbar button[aria-expanded="true"]')
+    return el instanceof HTMLElement ? el : null
+  }
+  function onToolbarMenuKeys(event: KeyboardEvent) {
     const target = event.target instanceof Element ? event.target : null
-    if (target?.closest('.el-overlay, .el-dialog, .el-message-box, .rte-modal-overlay, .rte-qr-card')) return
-    closeAllToolbarMenus()
+    if (!target) return
+    if (target.closest('.el-overlay, .el-dialog, .el-message-box, .rte-modal-overlay, .rte-qr-card')) return
+    if (target.closest('input, textarea, [contenteditable="true"]')) {
+      if (event.key === 'Escape') closeAllToolbarMenus()
+      return
+    }
+    const menu = target.closest(FLOAT_MENU_SELECTOR)
+    const inMenu = menu instanceof HTMLElement
+    const menuOpen = inMenu || openMenuRoots().length > 0
+    const action = toolbarMenuKeyAction(event.key, inMenu, menuOpen)
+    if (action === 'close' && menu instanceof HTMLElement) {
+      event.preventDefault()
+      event.stopPropagation()
+      const anchor = expandedToolbarButton()
+      closeAllToolbarMenus()
+      anchor?.focus()
+      return
+    }
+    if (action === 'move' && inMenu && menu instanceof HTMLElement) {
+      const buttons = menuButtons(menu)
+      const current = target.closest('button')
+      const index = current instanceof HTMLElement ? buttons.indexOf(current) : -1
+      const next = menuFocusStep(index, buttons.length, event.key)
+      if (next == null) return
+      event.preventDefault()
+      event.stopPropagation()
+      buttons[next]?.focus()
+      return
+    }
+    if (action === 'move') {
+      const button = target.closest('.rte-toolbar button')
+      const trigger = button instanceof HTMLElement && isToolbarMenuTrigger({
+        popup: button.getAttribute('aria-haspopup'),
+        caret: !!button.querySelector('.rte-caret'),
+      })
+      if (trigger && button instanceof HTMLElement && button.getAttribute('aria-expanded') !== 'true') {
+        event.preventDefault()
+        event.stopPropagation()
+        button.click()
+        void nextTick(() => openMenuRoots().flatMap((root) => menuButtons(root))[0]?.focus())
+        return
+      }
+      const buttons = openMenuRoots().flatMap((root) => menuButtons(root))
+      if (!buttons.length) return
+      event.preventDefault()
+      event.stopPropagation()
+      buttons[0]?.focus()
+      return
+    }
+    if (action === 'open') {
+      const button = target.closest('.rte-toolbar button')
+      if (!(button instanceof HTMLElement)) return
+      if (!isToolbarMenuTrigger({ popup: button.getAttribute('aria-haspopup'), caret: !!button.querySelector('.rte-caret') })) return
+      event.preventDefault()
+      event.stopPropagation()
+      button.click()
+      void nextTick(() => openMenuRoots().flatMap((root) => menuButtons(root))[0]?.focus())
+      return
+    }
+    if (event.key === 'Escape') closeAllToolbarMenus()
   }
 
   onMounted(() => {
     document.addEventListener('pointerdown', onDocPointerDownForMenus, true)
     document.addEventListener('pointermove', rememberPointer, true)
-    document.addEventListener('keydown', onToolbarEscape, true)
+    document.addEventListener('keydown', onToolbarMenuKeys, true)
   })
   onBeforeUnmount(() => {
     document.removeEventListener('pointerdown', onDocPointerDownForMenus, true)
-    document.removeEventListener('keydown', onToolbarEscape, true)
+    document.removeEventListener('keydown', onToolbarMenuKeys, true)
     document.removeEventListener('pointermove', rememberPointer, true)
     for (const t of menuCloseTimers.values()) clearTimeout(t)
     menuCloseTimers.clear()
