@@ -359,7 +359,7 @@ function toggleChartGroupMenu(key: string) {
             v-if="rte.viewMode === 'source' && rte.sourceDirty"
             type="button"
             class="rte-tool rte-view-mode-tool rte-view-mode-apply"
-            title="将源码应用到文档"
+            title="把改过的源码写回文档"
             @click="rte.applySourceNow"
           >
             <span data-rte-own class="rte-tool-icon rte-view-mode-glyph" aria-hidden="true">↑</span>
@@ -598,10 +598,10 @@ function toggleChartGroupMenu(key: string) {
               <button data-rte-own type="button" :class="{ active: rte.isActive('orderedList') }" :aria-pressed="rte.isActive('orderedList')" @click="rte.toggleOrderedList(); rte.listOpen = false"><RteMenuGlyph label="有序列表" />有序列表</button>
               <button data-rte-own type="button" :class="{ active: rte.isActive('taskList') }" :aria-pressed="rte.isActive('taskList')" @click="rte.toggleTaskList(); rte.listOpen = false"><RteMenuGlyph label="任务列表" />任务列表</button>
               <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
-              <button data-rte-own type="button" @click="rte.continueOrderedNumbering()"><RteMenuGlyph label="续号" />续号</button>
-              <button data-rte-own type="button" @click="rte.restartOrderedNumbering()"><RteMenuGlyph label="新列表" />新列表</button>
-              <button data-rte-own type="button" @click="rte.applyListStart()"><RteMenuGlyph label="修改编号值…" />修改编号值…</button>
-              <button data-rte-own type="button" @click="rte.renumberListFromHere()"><RteMenuGlyph label="从此处重编号" />从此处重编号</button>
+              <button data-rte-own type="button" title="接着上一个列表往下编号" @click="rte.continueOrderedNumbering()"><RteMenuGlyph label="续号" />续号</button>
+              <button data-rte-own type="button" title="从 1 重新开始一个列表" @click="rte.restartOrderedNumbering()"><RteMenuGlyph label="新列表" />新列表</button>
+              <button data-rte-own type="button" title="把这一项改成指定的起始编号" @click="rte.applyListStart()"><RteMenuGlyph label="修改编号值…" />修改编号值…</button>
+              <button data-rte-own type="button" title="从这一项起重新计数" @click="rte.renumberListFromHere()"><RteMenuGlyph label="从此处重编号" />从此处重编号</button>
               <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
               <button data-rte-own type="button" :class="{ active: rte.currentOrderedListStyle() === 'decimal' }" :aria-pressed="rte.currentOrderedListStyle() === 'decimal'" @click="rte.applyListStyle('decimal')"><RteMenuGlyph label="数字 1. 2. 3." />数字 1. 2. 3.</button>
               <button data-rte-own type="button" :class="{ active: rte.currentOrderedListStyle() === 'lower-alpha' }" :aria-pressed="rte.currentOrderedListStyle() === 'lower-alpha'" @click="rte.applyListStyle('lower-alpha')"><RteMenuGlyph label="字母 a. b. c." />字母 a. b. c.</button>
@@ -661,18 +661,18 @@ function toggleChartGroupMenu(key: string) {
               @mouseenter="rte.onToolMenuEnter('form')"
               @mouseleave="rte.onToolMenuLeave($event, 'form', () => (rte.formOpen = false))"
             >
-              <button data-rte-own type="button" @click.stop="rte.insertFormRadio()"><RteMenuGlyph label="单选组" />单选组</button>
-              <button data-rte-own type="button" @click.stop="rte.insertFormCheckbox()"><RteMenuGlyph label="多选组" />多选组</button>
-              <button data-rte-own type="button" @click.stop="rte.insertFormText()"><RteMenuGlyph label="文本输入" />文本输入</button>
-              <button data-rte-own type="button" @click.stop="rte.insertFormTextarea()"><RteMenuGlyph label="多行文本" />多行文本</button>
-              <button data-rte-own type="button" @click.stop="rte.insertFormNumber()"><RteMenuGlyph label="数字输入" />数字输入</button>
-              <button data-rte-own type="button" @click.stop="rte.insertFormSelect()"><RteMenuGlyph label="下拉选择" />下拉选择</button>
-              <button data-rte-own type="button" @click.stop="rte.insertFormDate()"><RteMenuGlyph label="日期" />日期</button>
-              <button data-rte-own type="button" @click.stop="rte.insertFormDateTime()"><RteMenuGlyph label="日期时间" />日期时间</button>
-              <button data-rte-own type="button" @click.stop="rte.insertFormSwitch()"><RteMenuGlyph label="开关" />开关</button>
+              <button data-rte-own type="button" title="插入一组只能选一个的选项" @click.stop="rte.insertFormRadio()"><RteMenuGlyph label="单选组" />单选组</button>
+              <button data-rte-own type="button" title="插入一组可以多选的选项" @click.stop="rte.insertFormCheckbox()"><RteMenuGlyph label="多选组" />多选组</button>
+              <button data-rte-own type="button" title="插入一行文字填写框" @click.stop="rte.insertFormText()"><RteMenuGlyph label="文本输入" />文本输入</button>
+              <button data-rte-own type="button" title="插入可以写多行的填写框" @click.stop="rte.insertFormTextarea()"><RteMenuGlyph label="多行文本" />多行文本</button>
+              <button data-rte-own type="button" title="插入只接受数字的填写框" @click.stop="rte.insertFormNumber()"><RteMenuGlyph label="数字输入" />数字输入</button>
+              <button data-rte-own type="button" title="插入从列表里选一项的框" @click.stop="rte.insertFormSelect()"><RteMenuGlyph label="下拉选择" />下拉选择</button>
+              <button data-rte-own type="button" title="插入选择日期的框" @click.stop="rte.insertFormDate()"><RteMenuGlyph label="日期" />日期</button>
+              <button data-rte-own type="button" title="插入选择日期和时间的框" @click.stop="rte.insertFormDateTime()"><RteMenuGlyph label="日期时间" />日期时间</button>
+              <button data-rte-own type="button" title="插入开或关的开关" @click.stop="rte.insertFormSwitch()"><RteMenuGlyph label="开关" />开关</button>
               <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
-              <button data-rte-own type="button" @click.stop="rte.duplicateSelectedForm()"><RteMenuGlyph label="复制当前字段" />复制当前字段</button>
-              <button data-rte-own type="button" @click.stop="rte.checkFormFields()"><RteMenuGlyph label="检查填写" />检查填写</button>
+              <button data-rte-own type="button" title="再复制一个选中的表单字段" @click.stop="rte.duplicateSelectedForm()"><RteMenuGlyph label="复制当前字段" />复制当前字段</button>
+              <button data-rte-own type="button" title="检查必填项有没有空着" @click.stop="rte.checkFormFields()"><RteMenuGlyph label="检查填写" />检查填写</button>
               <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
               <button data-rte-own type="button" @click.stop="rte.formOpen = false; rte.openTableDialog()"><RteMenuGlyph label="表格" />表格</button>
             </div>
@@ -845,7 +845,8 @@ function toggleChartGroupMenu(key: string) {
                 class="rte-font-size-entry"
                 type="text"
                 placeholder="小四 或 12"
-                aria-label="输入字号"
+                title="输入小四或 12，按 Enter 应用"
+                aria-label="输入字号，按 Enter 应用"
                 @mousedown.stop
                 @keydown.enter.prevent="rte.applyFontSize(($event.target as HTMLInputElement).value)"
               />
@@ -1895,8 +1896,8 @@ function toggleChartGroupMenu(key: string) {
             :ref="(el) => rte.setFloatAnchor('shortcuts', el)"
             data-rte-anchor="shortcuts"
             :class="{ active: rte.shortcutsOpen }"
-            title="查看全部快捷键"
-            aria-label="查看全部快捷键"
+            :title="t.title || '查看全部快捷键'"
+            :aria-label="t.title || '查看全部快捷键'"
             aria-haspopup="menu"
             :aria-expanded="rte.shortcutsOpen"
             @click.stop="rte.toggleShortcutsPanel()"
@@ -2448,7 +2449,7 @@ function toggleChartGroupMenu(key: string) {
               class="rte-more-capsule"
               draggable="false"
               :aria-label="'拖动' + group.label + '分组'"
-              title="拖动整组"
+              :title="groupHandleTitle(group.label, group.tools.length)"
               @pointerdown="rte.onToolbarHandlePointerDown(group.id, $event)"
               @pointermove="rte.onToolbarHandlePointerMove"
               @pointerup="rte.onToolbarHandlePointerUp"
@@ -2702,18 +2703,18 @@ function toggleChartGroupMenu(key: string) {
               class="rte-menu rte-more-flyout"
               @mousedown.prevent
             >
-              <button data-rte-own type="button" @click="rte.insertFormRadio()"><RteMenuGlyph label="单选组" />单选组</button>
-              <button data-rte-own type="button" @click="rte.insertFormCheckbox()"><RteMenuGlyph label="多选组" />多选组</button>
-              <button data-rte-own type="button" @click="rte.insertFormText()"><RteMenuGlyph label="文本输入" />文本输入</button>
-              <button data-rte-own type="button" @click="rte.insertFormTextarea()"><RteMenuGlyph label="多行文本" />多行文本</button>
-              <button data-rte-own type="button" @click="rte.insertFormNumber()"><RteMenuGlyph label="数字输入" />数字输入</button>
-              <button data-rte-own type="button" @click="rte.insertFormSelect()"><RteMenuGlyph label="下拉选择" />下拉选择</button>
-              <button data-rte-own type="button" @click="rte.insertFormDate()"><RteMenuGlyph label="日期" />日期</button>
-              <button data-rte-own type="button" @click="rte.insertFormDateTime()"><RteMenuGlyph label="日期时间" />日期时间</button>
-              <button data-rte-own type="button" @click="rte.insertFormSwitch()"><RteMenuGlyph label="开关" />开关</button>
+              <button data-rte-own type="button" title="插入一组只能选一个的选项" @click="rte.insertFormRadio()"><RteMenuGlyph label="单选组" />单选组</button>
+              <button data-rte-own type="button" title="插入一组可以多选的选项" @click="rte.insertFormCheckbox()"><RteMenuGlyph label="多选组" />多选组</button>
+              <button data-rte-own type="button" title="插入一行文字填写框" @click="rte.insertFormText()"><RteMenuGlyph label="文本输入" />文本输入</button>
+              <button data-rte-own type="button" title="插入可以写多行的填写框" @click="rte.insertFormTextarea()"><RteMenuGlyph label="多行文本" />多行文本</button>
+              <button data-rte-own type="button" title="插入只接受数字的填写框" @click="rte.insertFormNumber()"><RteMenuGlyph label="数字输入" />数字输入</button>
+              <button data-rte-own type="button" title="插入从列表里选一项的框" @click="rte.insertFormSelect()"><RteMenuGlyph label="下拉选择" />下拉选择</button>
+              <button data-rte-own type="button" title="插入选择日期的框" @click="rte.insertFormDate()"><RteMenuGlyph label="日期" />日期</button>
+              <button data-rte-own type="button" title="插入选择日期和时间的框" @click="rte.insertFormDateTime()"><RteMenuGlyph label="日期时间" />日期时间</button>
+              <button data-rte-own type="button" title="插入开或关的开关" @click="rte.insertFormSwitch()"><RteMenuGlyph label="开关" />开关</button>
               <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
-              <button data-rte-own type="button" @click="rte.duplicateSelectedForm()"><RteMenuGlyph label="复制当前字段" />复制当前字段</button>
-              <button data-rte-own type="button" @click="rte.checkFormFields()"><RteMenuGlyph label="检查填写" />检查填写</button>
+              <button data-rte-own type="button" title="再复制一个选中的表单字段" @click="rte.duplicateSelectedForm()"><RteMenuGlyph label="复制当前字段" />复制当前字段</button>
+              <button data-rte-own type="button" title="检查必填项有没有空着" @click="rte.checkFormFields()"><RteMenuGlyph label="检查填写" />检查填写</button>
               <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
               <button data-rte-own type="button" @click="rte.moreFormOpen = false; rte.moreOpen = false; rte.openTableDialog()"><RteMenuGlyph label="表格" />表格</button>
             </div>
@@ -2987,8 +2988,8 @@ function toggleChartGroupMenu(key: string) {
               data-rte-own
               type="button"
               class="rte-group-button-move"
-              :aria-label="'上移' + entry.label"
-              title="上移"
+              :aria-label="'把' + entry.label + '上移一位'"
+              :title="'把' + entry.label + '上移一位'"
               @click="rte.moveToolbarGroupButton(rte.toolbarGroupButtonsGroupId, entry.key, -1)"
             >
               ↑
@@ -2997,16 +2998,16 @@ function toggleChartGroupMenu(key: string) {
               data-rte-own
               type="button"
               class="rte-group-button-move"
-              :aria-label="'下移' + entry.label"
-              title="下移"
+              :aria-label="'把' + entry.label + '下移一位'"
+              :title="'把' + entry.label + '下移一位'"
               @click="rte.moveToolbarGroupButton(rte.toolbarGroupButtonsGroupId, entry.key, 1)"
             >
               ↓
             </button>
           </div>
           <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
-          <button data-rte-own type="button" @click="rte.restoreToolbarGroupButtons(rte.toolbarGroupButtonsGroupId)">恢复本组默认</button>
-          <button data-rte-own type="button" @click="rte.closeToolbarGroupButtons()">完成</button>
+          <button data-rte-own type="button" title="把显隐和顺序恢复成最初的样子" @click="rte.restoreToolbarGroupButtons(rte.toolbarGroupButtonsGroupId)">恢复本组默认</button>
+          <button data-rte-own type="button" title="关闭分组设置" @click="rte.closeToolbarGroupButtons()">完成</button>
         </div>
       </Teleport>
 

@@ -41,6 +41,7 @@ useParentScopeStamp()
           :key="'hr2-' + opt.value"
           type="button"
           class="rte-hr-option"
+          :title="'插入一条' + opt.label"
           @click="rte.insertHrVariant(opt.value)"
         >
           <RteMenuGlyph :id="opt.value" :label="opt.label" />
@@ -58,11 +59,11 @@ useParentScopeStamp()
         @mouseenter="rte.onToolMenuEnter('blockOps')"
         @mouseleave="rte.onToolMenuLeave($event, 'blockOps', () => (rte.blockOpsOpen = false))"
       >
-        <button data-rte-own type="button" @click="rte.selectCurrentBlock(); rte.blockOpsOpen = false"><RteMenuGlyph label="全选当前块" />全选当前块</button>
-        <button data-rte-own type="button" @click="rte.duplicateCurrentBlock(); rte.blockOpsOpen = false"><RteMenuGlyph label="复制当前块" />复制当前块</button>
+        <button data-rte-own type="button" title="选中光标所在的整段" @click="rte.selectCurrentBlock(); rte.blockOpsOpen = false"><RteMenuGlyph label="全选当前块" />全选当前块</button>
+        <button data-rte-own type="button" title="在下面再复制一份" @click="rte.duplicateCurrentBlock(); rte.blockOpsOpen = false"><RteMenuGlyph label="复制当前块" />复制当前块</button>
         <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
-        <button data-rte-own type="button" @click="rte.moveCurrentBlock(-1); rte.blockOpsOpen = false"><RteMenuGlyph label="上移一块" />上移一块</button>
-        <button data-rte-own type="button" @click="rte.moveCurrentBlock(1); rte.blockOpsOpen = false"><RteMenuGlyph label="下移一块" />下移一块</button>
+        <button data-rte-own type="button" title="和上面一块交换位置" @click="rte.moveCurrentBlock(-1); rte.blockOpsOpen = false"><RteMenuGlyph label="上移一块" />上移一块</button>
+        <button data-rte-own type="button" title="和下面一块交换位置" @click="rte.moveCurrentBlock(1); rte.blockOpsOpen = false"><RteMenuGlyph label="下移一块" />下移一块</button>
       </div>
     </Teleport>
     <Teleport to="body">
@@ -74,8 +75,8 @@ useParentScopeStamp()
         @mouseenter="rte.onToolMenuEnter('insertDate')"
         @mouseleave="rte.onToolMenuLeave($event, 'insertDate', () => (rte.insertDateOpen = false))"
       >
-        <button data-rte-own type="button" @click="rte.insertPlainDate(); rte.insertDateOpen = false"><RteMenuGlyph label="今天日期" />今天日期</button>
-        <button data-rte-own type="button" @click="rte.insertPlainDateTime(); rte.insertDateOpen = false"><RteMenuGlyph label="现在时间" />现在时间</button>
+        <button data-rte-own type="button" title="插入今天的日期" @click="rte.insertPlainDate(); rte.insertDateOpen = false"><RteMenuGlyph label="今天日期" />今天日期</button>
+        <button data-rte-own type="button" title="插入现在的日期和时间" @click="rte.insertPlainDateTime(); rte.insertDateOpen = false"><RteMenuGlyph label="现在时间" />现在时间</button>
       </div>
     </Teleport>
 
