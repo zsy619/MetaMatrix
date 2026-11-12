@@ -22,9 +22,23 @@ const maxRich = computed(() => {
   const item = props.doc.blocks.find((entry) => entry.id === maxRichId.value)
   return item && item.kind === 'rich' ? item : null
 })
+const maxCard = computed(() => {
+  const key = maxRichId.value
+  if (!key.startsWith('card:')) return null
+  const [, blockId, cardId] = key.split(':')
+  const item = props.doc.blocks.find((entry) => entry.id === blockId)
+  if (!item || item.kind !== 'cards') return null
+  const card = item.cards.find((entry) => entry.id === cardId)
+  return card ? { blockId, card } : null
+})
 
 function openRich(id: string) {
   maxRichId.value = id
+  openMaximize()
+}
+
+function openCard(blockId: string, cardId: string) {
+  maxRichId.value = `card:${blockId}:${cardId}`
   openMaximize()
 }
 
@@ -116,11 +130,15 @@ function addRow(blockId: string) {
 }
 
 function writeCard(blockId: string, cardId: string, note: string) {
+  const item = props.doc.blocks.find((entry) => entry.id === blockId)
+  const current = item && item.kind === 'cards' ? item.cards.find((entry) => entry.id === cardId) : undefined
+  if (!current) return
+  if (normalizeHtmlForCompare(itemTextToHtml(current.note)) === normalizeHtmlForCompare(note)) return
   patch((doc) => {
-    const item = doc.blocks.find((entry) => entry.id === blockId)
-    if (!item || item.kind !== 'cards') return
-    const card = item.cards.find((entry) => entry.id === cardId)
-    if (card && card.note !== note) card.note = note
+    const blockItem = doc.blocks.find((entry) => entry.id === blockId)
+    if (!blockItem || blockItem.kind !== 'cards') return
+    const card = blockItem.cards.find((entry) => entry.id === cardId)
+    if (card) card.note = note
   })
 }
 
@@ -357,7 +375,37 @@ const weakest = computed(() => {
           <p>{{ card.summary }}</p>
           <p><strong>适合：</strong>{{ card.fit }}</p>
           <p><strong>风险：</strong>{{ card.risk }}</p>
+          <div v-if="doc.id === 'canvas_fde_org'" class="rich card-rich">
+            <button
+              type="button"
+              class="pm-max-btn rich-max"
+              title="最大化"
+              aria-label="最大化"
+              @mousedown.stop
+              @click="openCard(item.id, card.id)"
+            >
+              <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">
+                <rect x="2.5" y="2.5" width="11" height="11" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.5" />
+              </svg>
+            </button>
+            <RichTextEditor
+              v-if="!(isMaximized && maxRichId === `card:${item.id}:${card.id}`)"
+              compact
+              :page-sheet="false"
+              :expanded="false"
+              :show-title="false"
+              :show-bottom-bar="false"
+              :show-publish-actions="false"
+              :show-markdown-hint="false"
+              :aria-label="`${card.title}的记录`"
+              placeholder="我们为什么选它，或为什么先不选"
+              :model-value="itemTextToHtml(card.note)"
+              @update:model-value="writeCard(item.id, card.id, $event)"
+            />
+            <p v-else class="rich-hint">正在放大编辑…</p>
+          </div>
           <textarea
+            v-else
             :value="card.note"
             placeholder="我们为什么选它，或为什么先不选"
             :aria-label="`${card.title}的记录`"
@@ -391,16 +439,16 @@ const weakest = computed(() => {
 
   <Teleport to="body">
     <div
-      v-if="isMaximized && maxRich"
+      v-if="isMaximized && (maxRich || maxCard)"
       class="pm-overlay"
       role="dialog"
       aria-modal="true"
-      :aria-label="maxRich.title"
+      :aria-label="maxRich?.title || maxCard?.card.title"
       @click.self="closeMaximize()"
     >
       <div class="pm-card" @click.stop>
         <div class="pm-header">
-          <h3 class="pm-title">{{ maxRich.title }}</h3>
+          <h3 class="pm-title">{{ maxRich?.title || maxCard?.card.title }}</h3>
           <div class="pm-actions">
             <button type="button" class="pm-icon-btn" title="还原" aria-label="还原" @click="closeMaximize()">
               <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
@@ -419,8 +467,8 @@ const weakest = computed(() => {
             :show-bottom-bar="true"
             :show-publish-actions="false"
             placeholder="请输入正文"
-            :model-value="itemTextToHtml(maxRich.html)"
-            @update:model-value="writeRich(maxRich.id, $event)"
+            :model-value="itemTextToHtml(maxRich ? maxRich.html : maxCard?.card.note || '')"
+            @update:model-value="maxRich ? writeRich(maxRich.id, $event) : writeCard(maxCard!.blockId, maxCard!.card.id, $event)"
           />
         </div>
       </div>
