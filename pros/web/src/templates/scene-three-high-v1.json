@@ -34,20 +34,44 @@
   ],
   "businesses": [
     {
-      "id": "biz_service",
-      "name": "客服回复",
+      "id": "biz_quote",
+      "name": "销售报价",
       "color": "rgba(212, 175, 55, 0.38)",
       "stroke": "#c9a227",
       "scores": { "frequency": 9, "value": 8, "marginal": 8 },
-      "note": ""
+      "note": "每周大量报价，单次大约半小时，销售编制随单量涨。"
     },
     {
-      "id": "biz_report",
-      "name": "月度汇报",
+      "id": "biz_ticket",
+      "name": "客服工单",
       "color": "rgba(77, 182, 172, 0.42)",
       "stroke": "#26a69a",
-      "scores": { "frequency": 2, "value": 6, "marginal": 3 },
-      "note": ""
+      "scores": { "frequency": 10, "value": 7, "marginal": 9 },
+      "note": "每天反复发生。复杂工单耗得起时间，客服人数跟着工单量走。"
+    },
+    {
+      "id": "biz_knowledge",
+      "name": "内部知识问答",
+      "color": "rgba(66, 133, 244, 0.32)",
+      "stroke": "#1a73e8",
+      "scores": { "frequency": 8, "value": 4, "marginal": 3 },
+      "note": "问得勤，但单次往往只有几分钟，不靠加人才能撑住。"
+    },
+    {
+      "id": "biz_expense",
+      "name": "报销审核",
+      "color": "rgba(234, 67, 53, 0.28)",
+      "stroke": "#d93025",
+      "scores": { "frequency": 6, "value": 7, "marginal": 7 },
+      "note": "单次够长，财务加人就贵。很多团队一周还到不了三次。"
+    },
+    {
+      "id": "biz_compliance",
+      "name": "合规审查",
+      "color": "rgba(142, 68, 173, 0.3)",
+      "stroke": "#8e44ad",
+      "scores": { "frequency": 3, "value": 9, "marginal": 5 },
+      "note": "单次很值钱，但一月才几次。出错代价高，不能当第一个试点。"
     }
   ]
 }
