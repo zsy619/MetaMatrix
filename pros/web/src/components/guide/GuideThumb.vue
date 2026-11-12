@@ -1674,6 +1674,14 @@ withDefaults(
         <rect x="122" y="24" width="34" height="92" rx="4" fill="#f3eef8" />
         <rect x="160" y="24" width="32" height="92" rx="4" fill="#e7f6ef" />
       </svg>
+      <svg v-else-if="String(templateId).startsWith('fde-')" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+        <rect width="200" height="140" rx="10" fill="#f7f4ee" />
+        <rect x="16" y="18" width="168" height="22" rx="4" fill="#0f766e" />
+        <rect x="16" y="50" width="168" height="14" rx="3" fill="#fff" />
+        <rect x="16" y="70" width="168" height="14" rx="3" fill="#fff" />
+        <rect x="16" y="90" width="80" height="14" rx="3" fill="#f4fbf6" />
+        <rect x="104" y="90" width="80" height="14" rx="3" fill="#fff6f6" />
+      </svg>
       <svg v-else-if="templateId === 'scene-three-high'" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
         <rect width="200" height="140" rx="10" fill="#f7f4ee" />
         <polygon points="100,28 156,118 44,118" fill="none" stroke="#e4ddd2" stroke-width="1.4" />

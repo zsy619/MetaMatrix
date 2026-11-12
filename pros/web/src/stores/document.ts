@@ -261,6 +261,7 @@ import soarTemplate from '../templates/soar-v1.json'
 import playingToWinTemplate from '../templates/playing-to-win-v1.json'
 import tenCheckTemplate from '../templates/ten-check-v1.json'
 import sceneThreeHighTemplate from '../templates/scene-three-high-v1.json'
+import { FDE_SHEET_META, FDE_SHEET_TEMPLATES, type FdeSheetId } from '../templates/fdeSheets'
 import { isLegacySceneSeed } from '../utils/sceneThreeHigh'
 import { CONTEXT_SIX_ELEMENTS_BLOCK_ID } from '../utils/contextSixElements'
 
@@ -336,6 +337,7 @@ export type TemplateId =
   | 'playing-to-win'
   | 'ten-check'
   | 'scene-three-high'
+  | FdeSheetId
 
 const TEMPLATES: Record<TemplateId, CanvasDocumentJSON> = {
   'dual-triangle': dualTriangleTemplate as DualTriangleDocumentJSON,
@@ -414,6 +416,7 @@ const TEMPLATES: Record<TemplateId, CanvasDocumentJSON> = {
   'playing-to-win': playingToWinTemplate as PlayingToWinDocumentJSON,
   'ten-check': tenCheckTemplate as TenCheckDocumentJSON,
   'scene-three-high': sceneThreeHighTemplate as SceneThreeHighDocumentJSON,
+  ...FDE_SHEET_TEMPLATES,
 }
 
 export function isTemplateId(id: string): id is TemplateId {
@@ -977,6 +980,7 @@ export const TEMPLATE_META: Record<
     description: '高频、高价值、高边际成本。多个业务叠在雷达上，三项都到 7 分才进下一步。',
     category: 'fde',
   },
+  ...FDE_SHEET_META,
 }
 
 function createItemId(): string {
