@@ -4601,6 +4601,9 @@ html.rte-toolbar-dragging .rte-root:not(.expanded) .rte-toolbar-tools > .rte-too
 .rte-ribbon-tab.is-search-miss {
   opacity: 0.45;
 }
+.rte-ribbon-tab.is-search-best {
+  box-shadow: inset 0 -2px 0 #165dff;
+}
 .rte-group-empty {
   margin: 4px 8px 8px;
   color: #86909c;

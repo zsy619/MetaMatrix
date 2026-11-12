@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { inject, onMounted, ref } from 'vue'
 import { RTE_BINDINGS } from './bindings'
-import { alignToolTitle, disabledToolTitle, EMPTY_GROUP_NOTE, FOCUS_MODE_NOTE, fontFamilyCaption, groupHandleTitle, lineHeightCaption, listToolLabel, ribbonTabForDigit, ribbonTabHint, ribbonTabTabIndex, ribbonTypeaheadQuery, searchEnterActivates, searchGroupCaption, stepRibbonTab, toolbarSearchStatus, zoomToolTitle } from '../../utils/rteToolbarOptimize'
+import { alignToolTitle, disabledToolTitle, EMPTY_GROUP_NOTE, FOCUS_MODE_NOTE, fontFamilyCaption, groupHandleTitle, lineHeightCaption, listToolLabel, ribbonTabForDigit, ribbonTabHint, ribbonTabTabIndex, ribbonTypeaheadQuery, searchEnterActivates, searchGroupCaption, stepRibbonTab, stepRibbonTabBy, tableToolLabel, toolbarSearchStatus, zoomToolLabel, zoomToolTitle } from '../../utils/rteToolbarOptimize'
 import { useParentScopeStamp } from './inheritScope'
 import { buildChartGroups } from '../../utils/echarts/chartGroups'
 import { TABLE_MENU_ICONS } from './tableMenuIcons'
@@ -13,6 +13,7 @@ import RteSpacingFields from './RteSpacingFields.vue'
 const rte = inject(RTE_BINDINGS)
 if (!rte) throw new Error('RteToolbar 必须放在 RichTextEditor 里')
 const tableMenuGroup = ref('')
+const lastToolbarQuery = ref('')
 const tableMenuFlyout = ref({ top: 0, left: 0 })
 function openTableMenuGroup(id: string, event: MouseEvent) {
   tableMenuGroup.value = id
@@ -64,6 +65,12 @@ function onRibbonTab(id: string, event: MouseEvent) {
 
 function onRibbonTabsKeydown(event: KeyboardEvent) {
   const ids = (rteBindings.ribbonTabs || []).map((tab: { id: string }) => tab.id)
+  if (event.key === 'PageDown' || event.key === 'PageUp') {
+    event.preventDefault()
+    clearToolbarQuery()
+    rteBindings.setRibbonTab(stepRibbonTabBy(ids, rteBindings.ribbonTab, event.key === 'PageDown' ? 3 : -3))
+    return
+  }
   if (event.altKey && /^[1-9]$/.test(event.key)) {
     const picked = ribbonTabForDigit(ids, Number(event.key))
     if (!picked) return
@@ -101,7 +108,8 @@ function toolbarSearchCount(): number {
 function toolbarSearchMessage(): string {
   const groups = rteBindings.visibleToolbarGroups || []
   const best = groups[0]?.tools?.[0]?.label || ''
-  return toolbarSearchStatus(rteBindings.toolbarQuery || '', toolbarSearchCount(), best, toolbarSearchCount() >= 24)
+  const place = groups[0]?.label || ''
+  return toolbarSearchStatus(rteBindings.toolbarQuery || '', toolbarSearchCount(), best, toolbarSearchCount() >= 24, place)
 }
 function ribbonHitCount(id: string): number {
   if (!rteBindings.toolbarQuery) return 0
@@ -115,8 +123,29 @@ function currentAlignName(): string {
   if (rteBindings.isActive?.({ textAlign: 'left' })) return 'left'
   return ''
 }
+function rememberToolbarQuery() {
+  const query = String(rteBindings.toolbarQuery || '').trim()
+  if (query) lastToolbarQuery.value = query
+}
 function clearToolbarQuery() {
+  rememberToolbarQuery()
   rteBindings.toolbarQuery = ''
+}
+function onToolbarSearchKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') {
+    event.stopPropagation()
+    clearToolbarQuery()
+    return
+  }
+  if (event.key === 'Enter' || event.key === 'ArrowDown') {
+    event.preventDefault()
+    focusFirstMatchedTool()
+    return
+  }
+  if (event.altKey && event.key === 'ArrowUp' && !String(rteBindings.toolbarQuery || '').trim() && lastToolbarQuery.value) {
+    event.preventDefault()
+    rteBindings.toolbarQuery = lastToolbarQuery.value
+  }
 }
 function focusFirstMatchedTool() {
   const button = document.querySelector('[data-search-best] button.rte-tool:not([disabled])')
@@ -162,10 +191,11 @@ function toggleChartGroupMenu(key: string) {
             role="tab"
             class="rte-ribbon-tab"
             :data-ribbon-tab="tab.id"
-            :class="{ active: rte.ribbonTab === tab.id, 'is-search-miss': !!rte.toolbarQuery && !ribbonHitCount(tab.id) }"
+            :class="{ active: rte.ribbonTab === tab.id, 'is-search-miss': !!rte.toolbarQuery && !ribbonHitCount(tab.id), 'is-search-best': !!rte.toolbarQuery && rte.visibleToolbarGroups[0]?.id === tab.id }"
             :aria-selected="rte.ribbonTab === tab.id"
             :tabindex="ribbonTabTabIndex(rte.ribbonTab === tab.id)"
             :title="ribbonTabHint(tab.id, tab.label)"
+            :aria-keyshortcuts="ribbonTabForDigit((rte.ribbonTabs || []).map((item) => item.id), (rte.ribbonTabs || []).findIndex((item) => item.id === tab.id) + 1) ? 'Alt+' + ((rte.ribbonTabs || []).findIndex((item) => item.id === tab.id) + 1) : undefined"
             :aria-controls="'rte-group-' + tab.id"
             @click="onRibbonTab(tab.id, $event)"
           >
@@ -182,8 +212,8 @@ function toggleChartGroupMenu(key: string) {
             aria-label="在工具栏里找按钮"
             :aria-describedby="rte.toolbarQuery ? 'rte-toolbar-search-status' : undefined"
             @focus="($event.target as HTMLInputElement).select()"
-            @keydown.escape.stop="clearToolbarQuery"
-            @keydown.enter.prevent="focusFirstMatchedTool"
+            @input="rememberToolbarQuery"
+            @keydown="onToolbarSearchKeydown"
           />
           <button data-rte-own v-if="rte.toolbarQuery" type="button" class="rte-toolbar-search-clear" aria-label="清除搜索" @click="clearToolbarQuery">×</button>
         </label>
@@ -241,8 +271,8 @@ function toggleChartGroupMenu(key: string) {
           aria-label="在工具栏里找按钮"
           :aria-describedby="rte.toolbarQuery ? 'rte-toolbar-search-status' : undefined"
           @focus="($event.target as HTMLInputElement).select()"
-          @keydown.escape.stop="clearToolbarQuery"
-          @keydown.enter.prevent="focusFirstMatchedTool"
+          @input="rememberToolbarQuery"
+          @keydown="onToolbarSearchKeydown"
         />
         <button data-rte-own v-if="rte.toolbarQuery" type="button" class="rte-toolbar-search-clear" aria-label="清除搜索" @click="clearToolbarQuery">×</button>
       </label>
@@ -923,7 +953,7 @@ function toggleChartGroupMenu(key: string) {
               />
             </span>
             <span data-rte-own class="rte-tool-label"
-              >表格<span data-rte-own
+              >{{ tableToolLabel(!!rte.isInTable()) }}<span data-rte-own
                 v-if="rte.isInTable()"
                 class="rte-caret"
                 aria-hidden="true"
@@ -1972,7 +2002,7 @@ function toggleChartGroupMenu(key: string) {
             <span data-rte-own class="rte-tool-icon">
               <component data-rte-own :is="t.iconComp || rte.toolIcon('wordStats')" class="rte-ep-icon" />
             </span>
-            <span data-rte-own class="rte-tool-label">{{ Math.round(rte.editorZoom * 100) }}%<span data-rte-own class="rte-caret" aria-hidden="true"></span></span>
+            <span data-rte-own class="rte-tool-label">{{ zoomToolLabel(rte.editorZoom) }}<span data-rte-own class="rte-caret" aria-hidden="true"></span></span>
           </button>
           <Teleport to="body">
             <div data-rte-own

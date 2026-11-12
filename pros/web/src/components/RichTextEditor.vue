@@ -6933,7 +6933,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'quote',
       label: '引用',
-      title: '引用 (Ctrl/⌘+Shift+9)',
+      title: isActive('blockquote') ? '已在引用中，再点一次取消 (Ctrl/⌘+Shift+9)' : '引用 (Ctrl/⌘+Shift+9)',
       icon: '❝',
       iconComp: ic('quote'),
       active: () => isActive('blockquote'),
@@ -6968,7 +6968,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'code',
       label: '代码块',
-      title: '代码块 (Ctrl/⌘+Shift+E)',
+      title: isActive('codeBlock') ? '光标在代码块里，再点一次取消' : '代码块 (Ctrl/⌘+Shift+E)',
       icon: '</>',
       iconComp: ic('code'),
       kind: 'code',
@@ -7118,7 +7118,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'spellcheck',
       label: '拼写',
-      title: '拼写检查开关（浏览器词典）',
+      title: spellcheckEnabled.value ? '拼写检查已开启，再点一次关闭' : '拼写检查（用浏览器词典）',
       icon: 'Abc',
       iconComp: ic('note'),
       active: () => spellcheckEnabled.value,
@@ -7126,8 +7126,8 @@ const allTools = computed((): ToolItem[] => {
     },
     {
       key: 'pasteFormat',
-      label: '粘贴格式',
-      title: '粘贴格式：保留 / 纯文本 / Markdown（点击切换）',
+      label: pasteFormatMode.value === 'plain' ? '粘贴·纯文本' : pasteFormatMode.value === 'markdown' ? '粘贴·MD' : '粘贴·保留',
+      title: '点击切换粘贴格式：保留、纯文本、Markdown',
       icon: '📋',
       iconComp: ic('import'),
       active: () => pasteFormatMode.value !== 'keep',
@@ -7187,7 +7187,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'linkCard',
       label: '网页卡',
-      title: '链接卡片 / 受控嵌入',
+      title: '把链接做成一张卡片',
       icon: '⧉',
       iconComp: ic('link'),
       run: insertLinkCardBlock,
@@ -7253,7 +7253,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'revision',
       label: '修订',
-      title: '单机修订高亮（相对基线）',
+      title: revisionOn.value ? '修订标记已开启，再点一次关闭' : '标出相对基线的改动',
       icon: '✎+',
       iconComp: ic('highlight'),
       active: () => revisionOn.value,
@@ -7368,7 +7368,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'statusChip',
       label: '徽章',
-      title: '状态徽章 Chip',
+      title: '插入状态徽章',
       icon: '●',
       iconComp: ic('highlight'),
       run: () => { void insertStatusChipBlock() },
@@ -7376,7 +7376,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'progressBar',
       label: '进度',
-      title: '进度条',
+      title: '插入进度条',
       icon: '▮',
       iconComp: ic('wordStats'),
       run: () => { void insertProgressBarBlock() },
@@ -7553,7 +7553,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'snippets',
       label: '片段',
-      title: '文本片段 Snippets',
+      title: '插入保存过的文字片段',
       icon: '✂',
       iconComp: ic('note'),
       run: openSnippetDialog,

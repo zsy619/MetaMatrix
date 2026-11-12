@@ -80,6 +80,18 @@ export const TOOLBAR_SEARCH_KEYWORDS: Record<string, readonly string[]> = {
   superscript: ['上标'],
   imageReplace: ['换图'],
   headingAutoNum: ['标题号', '自动编号'],
+  spellcheck: ['拼写检查', '错词'],
+  revision: ['修订', '改动'],
+  bookmark: ['书签', '锚点'],
+  readTime: ['阅读时长', '时长'],
+  shortcuts: ['快捷键'],
+  snippets: ['片段', '常用语'],
+  timeline: ['时间线'],
+  linkCard: ['网页卡', '链接卡片'],
+  speakStop: ['停止朗读', '停读'],
+  immersive: ['沉浸', '全屏'],
+  statusChip: ['徽章', '状态'],
+  progressBar: ['进度条', '进度'],
 }
 
 /** 收掉首尾和连续空格，便于「拼 音」仍能匹配。 */
@@ -136,14 +148,50 @@ export function searchToolbarTools(groups: readonly ToolbarSearchGroup[], query:
   return ranked.slice(0, Math.max(1, limit)).map((item) => item.hit)
 }
 
-/** 搜索框下方的一句结果。空查询不显示。有结果时点出首选按钮。 */
-export function toolbarSearchStatus(query: string, count: number, best = '', capped = false): string {
+/** 搜索框下方的一句结果。空查询不显示。有结果时点出首选按钮和所在栏目。 */
+export function toolbarSearchStatus(query: string, count: number, best = '', capped = false, place = ''): string {
   if (!normalizeToolbarQuery(query)) return ''
   if (count <= 0) return '没有匹配的按钮'
   const first = best.trim() ? `，首选「${best.trim()}」` : ''
+  const where = place.trim() ? `，在${place.trim()}` : ''
   const more = capped ? '，只列出前若干个' : ''
-  if (count === 1) return `找到 1 个按钮${first}，按 Enter 直接使用`
-  return `找到 ${count} 个按钮${first}${more}`
+  if (count === 1) return `找到 1 个按钮${first}${where}，按 Enter 直接使用`
+  return `找到 ${count} 个按钮${first}${where}${more}`
+}
+
+/** 栏目上 PageUp / PageDown 一次跳三格，不绕回。 */
+export function stepRibbonTabBy(ids: readonly string[], current: string, delta: number): string {
+  if (!ids.length || !Number.isFinite(delta) || delta === 0) return current
+  const index = Math.max(0, ids.indexOf(current))
+  const next = Math.min(ids.length - 1, Math.max(0, index + Math.trunc(delta)))
+  return ids[next] || current
+}
+
+export function zoomToolLabel(zoom: number): string {
+  if (!Number.isFinite(zoom) || Math.abs(zoom - 1) < 0.001) return '实际大小'
+  return `${Math.round(zoom * 100)}%`
+}
+
+export function pasteFormatLabel(mode: string): string {
+  if (mode === 'plain') return '粘贴·纯文本'
+  if (mode === 'markdown') return '粘贴·MD'
+  return '粘贴·保留'
+}
+
+export function tableToolLabel(inTable: boolean): string {
+  return inTable ? '表操作' : '插表格'
+}
+
+export function quoteToolTitle(active: boolean): string {
+  return active ? '已在引用中，再点一次取消 (Ctrl/⌘+Shift+9)' : '引用 (Ctrl/⌘+Shift+9)'
+}
+
+export function codeBlockToolTitle(active: boolean): string {
+  return active ? '光标在代码块里，再点一次取消' : '代码块 (Ctrl/⌘+Shift+E)'
+}
+
+export function spellcheckToolTitle(active: boolean): string {
+  return active ? '拼写检查已开启，再点一次关闭' : '拼写检查（用浏览器词典）'
 }
 
 export const EMPTY_GROUP_NOTE = '本组按钮都已隐藏，双击组名恢复'

@@ -195,7 +195,7 @@ export const COMPACT_PRIMARY_KEYS_BY_GROUP: Record<string, readonly string[]> = 
   edit: ['undo', 'redo', 'find'],
   review: ['deepOptimize'],
   style: ['fontSize', 'bold', 'italic', 'underline', 'strike', 'color', 'highlight'],
-  paragraph: ['heading', 'list', 'quote', 'code', 'align'],
+  paragraph: ['heading', 'list', 'quote', 'code', 'align', 'indent'],
   insert: ['link', 'image'],
   table: ['table'],
 }

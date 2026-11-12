@@ -80,7 +80,7 @@ assert.deepEqual(
   compactGroups.map((group) => group.tools.map((tool) => tool.key)),
   [
     ['fontSize', 'color', 'highlight', 'bold', 'italic', 'underline', 'strike'],
-    ['heading', 'list', 'align', 'quote', 'code'],
+    ['heading', 'list', 'align', 'indent', 'quote', 'code'],
     ['link', 'image'],
     ['undo', 'redo', 'find'],
     ['table'],

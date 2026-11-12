@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import {
   alignToolTitle,
+  codeBlockToolTitle,
   disabledToolTitle,
   fontFamilyCaption,
   fontSizeCaption,
@@ -12,7 +13,9 @@ import {
   MENU_CLOSE_DELAY_MS,
   menuToolNeedsCaret,
   orderToolbarSearchGroups,
+  pasteFormatLabel,
   pushRecentValue,
+  quoteToolTitle,
   readStoredRibbonTab,
   recentOptions,
   ribbonTabForDigit,
@@ -20,10 +23,14 @@ import {
   ribbonTabTabIndex,
   ribbonTypeaheadQuery,
   searchEnterActivates,
+  spellcheckToolTitle,
   searchGroupCaption,
+  stepRibbonTabBy,
+  tableToolLabel,
   searchToolbarTools,
   stepRibbonTab,
   toolbarSearchStatus,
+  zoomToolLabel,
   zoomToolTitle,
 } from './rteToolbarOptimize.ts'
 
@@ -95,6 +102,18 @@ assert.equal(searchEnterActivates(2), false)
 assert.equal(MENU_CLOSE_DELAY_MS >= 300, true)
 assert.equal(hiddenGroupPlaceholders([{ id: 'edit', label: '编辑', tools: [{ key: 'undo' }] }], ['edit', 'writing'], [{ id: 'edit', label: '编辑', keyCount: 3 }, { id: 'writing', label: '书写', keyCount: 3 }, { id: 'other', label: '其他', keyCount: 0 }]).map((group) => group.id).join(','), 'edit,writing')
 assert.equal(searchToolbarTools([{ id: 'insert', label: '插入', tools: [{ key: 'qrcode', label: '二维码' }] }], 'qr')[0]?.key, 'qrcode')
+assert.equal(toolbarSearchStatus('拼音', 2, '注音', false, '字体与颜色'), '找到 2 个按钮，首选「注音」，在字体与颜色')
+assert.equal(stepRibbonTabBy(['a', 'b', 'c', 'd', 'e'], 'b', 3), 'e')
+assert.equal(stepRibbonTabBy(['a', 'b', 'c'], 'a', -3), 'a')
+assert.equal(zoomToolLabel(1), '实际大小')
+assert.equal(zoomToolLabel(1.5), '150%')
+assert.equal(pasteFormatLabel('markdown'), '粘贴·MD')
+assert.equal(tableToolLabel(true), '表操作')
+assert.equal(tableToolLabel(false), '插表格')
+assert.equal(quoteToolTitle(true).startsWith('已在引用中'), true)
+assert.equal(codeBlockToolTitle(false).includes('代码块'), true)
+assert.equal(spellcheckToolTitle(true).includes('已开启'), true)
+assert.equal(searchToolbarTools([{ id: 'review', label: '审阅', tools: [{ key: 'snippets', label: '片段' }] }], '常用语')[0]?.key, 'snippets')
 
 const sizes = [
   { label: '默认', value: '' },
