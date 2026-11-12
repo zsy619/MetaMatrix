@@ -14,6 +14,7 @@ import GuideAside from '../components/guide/GuideAside.vue'
 import LaunchSplash from '../components/guide/LaunchSplash.vue'
 import { LAUNCH_SEEN_KEY, shouldShowLaunch } from '../components/guide/launchSplash'
 import { guideLaneCount, lanesFor, splitMatch } from '../components/guide/guideLanes'
+import { draftWhen, readLocalDrafts, type LocalDraft } from '../components/guide/guideDrafts'
 
 interface GuideCard {
   id: TemplateId
@@ -120,6 +121,19 @@ const categoryCounts = computed(() => {
 })
 
 const templatesEl = ref<HTMLElement | null>(null)
+const guideMainEl = ref<HTMLElement | null>(null)
+const LAYOUT_KEY = 'metamatrix:guide-layout'
+const layout = ref<'cards' | 'list'>(readLayout())
+const drafts = ref<LocalDraft[]>([])
+const activeLane = ref('')
+
+function readLayout(): 'cards' | 'list' {
+  try {
+    return localStorage.getItem(LAYOUT_KEY) === 'list' ? 'list' : 'cards'
+  } catch {
+    return 'cards'
+  }
+}
 
 const filteredCards = computed(() => {
   const q = templateFilter.value.trim().toLowerCase()
@@ -150,6 +164,13 @@ const visibleGroups = computed(() => {
     .filter((group) => group.cards.length > 0)
 })
 
+const currentLaneBlocks = computed(() => {
+  if (activeCategory.value === 'all') return []
+  const group = visibleGroups.value.find((item) => item.id === activeCategory.value)
+  if (!group) return []
+  return lanesFor(group.id, group.cards)
+})
+
 function categoryAccent(id: 'all' | TemplateCategory): string {
   if (id === 'all') return '#1a73e8'
   return CATEGORY_ACCENT[id]
@@ -158,6 +179,57 @@ function categoryAccent(id: 'all' | TemplateCategory): string {
 function categoryBlurb(id: 'all' | TemplateCategory): string {
   if (id === 'all') return ''
   return CATEGORY_BLURBS[id]
+}
+
+function laneDomId(category: TemplateCategory, laneId: string): string {
+  return `lane-${category}-${laneId}`
+}
+
+function currentLaneDomId(laneId: string): string {
+  if (activeCategory.value === 'all') return ''
+  return laneDomId(activeCategory.value, laneId)
+}
+
+function draftMeta(draft: LocalDraft): string {
+  const meta = TEMPLATE_META[draft.templateId]
+  const label = draft.title === meta.name ? CATEGORY_LABELS[meta.category] : meta.name
+  return `${label} · ${draftWhen(draft.updatedAt)}`
+}
+
+function refreshDrafts() {
+  if (typeof localStorage === 'undefined') return
+  const entries: { key: string; value: string }[] = []
+  for (let index = 0; index < localStorage.length; index += 1) {
+    const key = localStorage.key(index)
+    if (!key?.startsWith('metamatrix:doc-meta:')) continue
+    entries.push({ key, value: localStorage.getItem(key) || '' })
+  }
+  drafts.value = readLocalDrafts(entries)
+}
+
+function setLayout(next: 'cards' | 'list') {
+  layout.value = next
+  try {
+    localStorage.setItem(LAYOUT_KEY, next)
+  } catch {
+    /* ignore */
+  }
+}
+
+function scrollToLane(id: string) {
+  activeLane.value = id
+  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+function onGuideScroll() {
+  if (activeCategory.value === 'all') return
+  const bar = templatesEl.value?.querySelector('.templates-toolbar')
+  const edge = (bar?.getBoundingClientRect().bottom ?? 0) + 12
+  let current = ''
+  for (const lane of document.querySelectorAll<HTMLElement>('.lane[id]')) {
+    if (lane.getBoundingClientRect().top <= edge) current = lane.id
+  }
+  if (current) activeLane.value = current
 }
 
 function finishLaunch() {
@@ -287,6 +359,7 @@ function onGuideKey(event: KeyboardEvent) {
 }
 
 onMounted(async () => {
+  refreshDrafts()
   window.addEventListener('keydown', onGuideKey)
   if (auth.token) await auth.fetchMe()
   await refreshRecent()
@@ -298,7 +371,7 @@ onUnmounted(() => window.removeEventListener('keydown', onGuideKey))
 <template>
   <LaunchSplash v-if="showLaunch" @done="finishLaunch" />
   <div class="guide-shell" :class="{ 'guide-shell--aside-collapsed': asideCollapsed }" :inert="showLaunch">
-    <div class="guide-main">
+    <div ref="guideMainEl" class="guide-main" @scroll.passive="onGuideScroll">
       <header class="hero">
         <p class="eyebrow">MetaMatrix</p>
         <h1>元矩阵 MetaMatrix</h1>
@@ -319,6 +392,22 @@ onUnmounted(() => window.removeEventListener('keydown', onGuideKey))
             <em>{{ categoryCounts[chip.id] || 0 }} 张</em>
           </button>
         </div>
+        <section v-if="drafts.length" class="drafts" aria-label="继续写">
+          <h2>继续写</h2>
+          <div class="draft-row">
+            <button
+              v-for="draft in drafts"
+              :key="draft.templateId"
+              type="button"
+              class="draft"
+              :style="{ '--accent': categoryAccent(TEMPLATE_META[draft.templateId].category) }"
+              @click="openCanvas(draft.templateId)"
+            >
+              <strong>{{ draft.title }}</strong>
+              <span>{{ draftMeta(draft) }}</span>
+            </button>
+          </div>
+        </section>
         <section v-if="auth.isAuthenticated" class="search-box" aria-label="搜索我的画布">
           <label class="search-label" for="guide-doc-search">搜索我的画布</label>
           <div class="search-row">
@@ -375,6 +464,10 @@ onUnmounted(() => window.removeEventListener('keydown', onGuideKey))
           </div>
           <div class="toolbar-side">
             <p class="tpl-count" role="status">{{ filteredCards.length }} 个模板</p>
+            <div class="layout-toggle" role="group" aria-label="排列方式">
+              <button type="button" :aria-pressed="layout === 'cards'" @click="setLayout('cards')">卡片</button>
+              <button type="button" :aria-pressed="layout === 'list'" @click="setLayout('list')">列表</button>
+            </div>
             <div class="tpl-search">
               <label class="visually-hidden" for="guide-tpl-search">搜索模板</label>
               <input
@@ -387,6 +480,23 @@ onUnmounted(() => window.removeEventListener('keydown', onGuideKey))
               />
             </div>
           </div>
+          <nav
+            v-if="currentLaneBlocks.length > 1"
+            class="lane-jump"
+            :style="{ '--accent': categoryAccent(activeCategory) }"
+            aria-label="这一类的用途"
+          >
+            <button
+              v-for="(block, index) in currentLaneBlocks"
+              :key="block.lane.id"
+              type="button"
+              :class="{ 'is-on': activeLane === currentLaneDomId(block.lane.id) || (!activeLane && index === 0) }"
+              @click="scrollToLane(currentLaneDomId(block.lane.id))"
+            >
+              {{ block.lane.title }}
+              <span>{{ block.cards.length }}</span>
+            </button>
+          </nav>
         </div>
 
         <p
@@ -418,12 +528,28 @@ onUnmounted(() => window.removeEventListener('keydown', onGuideKey))
               只看这一类 · {{ group.cards.length }}
             </button>
           </header>
-          <div v-for="block in lanesFor(group.id, group.cards)" :key="block.lane.id" class="lane">
+          <nav v-if="activeCategory === 'all' && guideLaneCount(group.id) > 1" class="lane-jump" aria-label="这一类的用途">
+            <button
+              v-for="block in lanesFor(group.id, group.cards)"
+              :key="block.lane.id"
+              type="button"
+              @click="scrollToLane(laneDomId(group.id, block.lane.id))"
+            >
+              {{ block.lane.title }}
+              <span>{{ block.cards.length }}</span>
+            </button>
+          </nav>
+          <div
+            v-for="block in lanesFor(group.id, group.cards)"
+            :id="laneDomId(group.id, block.lane.id)"
+            :key="block.lane.id"
+            class="lane"
+          >
             <p v-if="guideLaneCount(group.id) > 1" class="lane-title">
               {{ block.lane.title }}
               <span v-if="block.lane.hint">{{ block.lane.hint }}</span>
             </p>
-            <div class="grid">
+            <div class="grid" :class="{ 'is-list': layout === 'list' }">
               <button
                 v-for="card in block.cards"
                 :key="card.id"
@@ -445,7 +571,12 @@ onUnmounted(() => window.removeEventListener('keydown', onGuideKey))
                     </h3>
                     <span class="badge">{{ card.badge }}</span>
                   </div>
-                  <p>{{ card.description }}</p>
+                  <p>
+                    <template v-for="(part, partIndex) in splitMatch(card.description, templateFilter)" :key="partIndex">
+                      <mark v-if="part.hit">{{ part.text }}</mark>
+                      <template v-else>{{ part.text }}</template>
+                    </template>
+                  </p>
                   <span class="cta">进入画布 →</span>
                 </div>
               </button>
@@ -749,8 +880,155 @@ onUnmounted(() => window.removeEventListener('keydown', onGuideKey))
   background: color-mix(in srgb, var(--accent, #1a73e8) 10%, #fff);
 }
 
+.lane {
+  scroll-margin-top: 180px;
+}
+
 .lane + .lane {
   margin-top: 8px;
+}
+
+.lane-jump {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: 100%;
+}
+
+.templates-toolbar .lane-jump {
+  flex: 1 0 100%;
+  margin-top: 2px;
+}
+
+.family .lane-jump {
+  margin: 0 0 12px;
+}
+
+.lane-jump button {
+  border: 1px solid #dadce0;
+  background: #fff;
+  border-radius: 999px;
+  padding: 4px 10px;
+  color: #202124;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.lane-jump button span {
+  margin-left: 6px;
+  color: #5f6368;
+  font-weight: 600;
+}
+
+.lane-jump button.is-on,
+.lane-jump button:hover {
+  border-color: var(--accent, #1a73e8);
+  background: color-mix(in srgb, var(--accent, #1a73e8) 12%, #fff);
+  color: var(--accent, #1a73e8);
+}
+
+.lane-jump button.is-on span,
+.lane-jump button:hover span {
+  color: var(--accent, #1a73e8);
+}
+
+.drafts {
+  max-width: 1100px;
+  margin: 0 auto 8px;
+  text-align: left;
+}
+
+.drafts h2 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.draft-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+}
+
+.draft {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid #e8eaed;
+  border-left: 3px solid var(--accent, #1a73e8);
+  border-radius: 12px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.draft strong {
+  font-size: 14px;
+}
+
+.draft span {
+  color: #5f6368;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.layout-toggle {
+  display: inline-flex;
+  border: 1px solid #dadce0;
+  border-radius: 999px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.layout-toggle button {
+  border: 0;
+  background: transparent;
+  padding: 6px 10px;
+  color: #5f6368;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.layout-toggle button[aria-pressed='true'] {
+  background: #e8f0fe;
+  color: #1a73e8;
+}
+
+.grid.is-list {
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.grid.is-list .card {
+  flex-direction: row;
+  align-items: stretch;
+  border-top-width: 1px;
+  border-left: 3px solid var(--accent);
+}
+
+.grid.is-list :deep(.thumb) {
+  width: 148px;
+  height: 104px;
+  flex: none;
+  aspect-ratio: auto;
+  border-bottom: 0;
+  border-right: 1px solid #ececec;
+}
+
+.grid.is-list .body {
+  padding: 10px 14px;
+}
+
+.grid.is-list .body p {
+  -webkit-line-clamp: 1;
 }
 
 .lane-title {
