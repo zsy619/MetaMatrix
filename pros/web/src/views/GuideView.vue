@@ -10,6 +10,8 @@ import { listDocuments, searchDocuments } from '../api/documents'
 import { friendlyApiMessage } from '../utils/apiMessage'
 import GuideThumb from '../components/guide/GuideThumb.vue'
 import GuideAside from '../components/guide/GuideAside.vue'
+import LaunchSplash from '../components/guide/LaunchSplash.vue'
+import { LAUNCH_SEEN_KEY, shouldShowLaunch } from '../components/guide/launchSplash'
 
 interface GuideCard {
   id: TemplateId
@@ -41,6 +43,18 @@ function readStoredCategory(): 'all' | TemplateCategory {
   return 'all'
 }
 
+function readLaunchVisible(): boolean {
+  if (typeof window === 'undefined') return false
+  let seen: string | null = null
+  try {
+    seen = sessionStorage.getItem(LAUNCH_SEEN_KEY)
+  } catch {
+    seen = null
+  }
+  return shouldShowLaunch(window.location.search, seen)
+}
+
+const showLaunch = ref(readLaunchVisible())
 const activeCategory = ref<'all' | TemplateCategory>(readStoredCategory())
 const templateFilter = ref('')
 const asideCollapsed = ref(false)
@@ -109,6 +123,15 @@ const filteredCards = computed(() => {
     )
   })
 })
+
+function finishLaunch() {
+  showLaunch.value = false
+  try {
+    sessionStorage.setItem(LAUNCH_SEEN_KEY, '1')
+  } catch {
+    /* ignore */
+  }
+}
 
 function chooseCategory(id: 'all' | TemplateCategory) {
   activeCategory.value = id
@@ -217,7 +240,8 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="guide-shell" :class="{ 'guide-shell--aside-collapsed': asideCollapsed }">
+  <LaunchSplash v-if="showLaunch" @done="finishLaunch" />
+  <div class="guide-shell" :class="{ 'guide-shell--aside-collapsed': asideCollapsed }" :inert="showLaunch">
     <div class="guide-main">
       <header class="hero">
         <p class="eyebrow">MetaMatrix</p>
