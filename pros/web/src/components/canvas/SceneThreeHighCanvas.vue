@@ -165,6 +165,7 @@ function writeNote(html: string) {
           <span>业务</span>
           <button type="button" @click="addBusiness">新增业务</button>
         </div>
+        <div class="list-body">
         <article
           v-for="biz in doc.businesses"
           :key="biz.id"
@@ -211,6 +212,7 @@ function writeNote(html: string) {
           <p v-if="sceneRecordText(biz.note)" class="record">{{ sceneRecordText(biz.note) }}</p>
         </article>
         <p v-if="!doc.businesses.length" class="empty">先加一个业务，再按三高打分。</p>
+        </div>
       </section>
 
       <section class="radar" aria-label="三高雷达图">
@@ -290,9 +292,10 @@ function writeNote(html: string) {
 .card h3 { color: #a84562; font-size: 14px; }
 .headline { margin-top: 10px; font-size: 22px; font-weight: 750; line-height: 1.3; }
 .card p:last-child { margin-top: 8px; color: #3c4043; font-size: 14px; line-height: 1.55; }
-.work { display: grid; grid-template-columns: minmax(340px, 440px) minmax(320px, 1fr); gap: 16px; align-items: start; }
-.list, .radar { background: #fffdf8; border: 1px solid rgba(62, 48, 28, 0.08); border-radius: 14px; }
-.list { padding: 12px; }
+.work { display: grid; grid-template-columns: minmax(340px, 440px) minmax(320px, 1fr); gap: 16px; align-items: stretch; }
+.list, .radar { background: #fffdf8; border: 1px solid rgba(62, 48, 28, 0.08); border-radius: 14px; box-sizing: border-box; }
+.list { display: flex; flex-direction: column; height: 0; min-height: 100%; overflow: hidden; padding: 12px; }
+.list-body { flex: 1 1 auto; min-height: 0; overflow: auto; }
 .list-bar { justify-content: space-between; margin-bottom: 8px; font-weight: 700; }
 .list-bar button, .biz header button { border: 1px solid #e4ddd2; background: #fff; border-radius: 999px; padding: 4px 10px; cursor: pointer; }
 .biz { margin-top: 8px; padding: 10px; border: 1px solid #f1ebe3; border-radius: 12px; }
@@ -318,6 +321,8 @@ function writeNote(html: string) {
 .empty { color: #8a8175; }
 @media (max-width: 980px) {
   .criteria, .work { grid-template-columns: 1fr; }
+  .list { height: auto; min-height: 0; overflow: visible; }
+  .list-body { overflow: visible; }
   .top h2, .headline { font-size: 22px; }
 }
 </style>
