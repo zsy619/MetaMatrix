@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { inject, nextTick, onMounted, ref, watch } from 'vue'
 import { RTE_BINDINGS } from './bindings'
-import { alignToolTitle, clampToolbarQuery, cycleSearchIndex, disabledToolTitle, EMPTY_GROUP_NOTE, FOCUS_MODE_NOTE, fontFamilyCaption, groupHandleTitle, LAST_TOOLBAR_QUERY_KEY, lineHeightCaption, listToolLabel, menuFocusStep, menuToolNeedsCaret, moreToolsCaption, moreToolsTitle, ribbonSearchLabel, ribbonTabForDigit, ribbonTabHint, ribbonTabTabIndex, ribbonTypeaheadQuery, SEARCH_INPUT_HINT, searchEnterActivates, searchGroupCaption, shortcutFromTitle, stepRibbonTab, stepRibbonTabBy, tableToolLabel, toolbarGroupReorderAllowed, toolbarSearchStatus, toolIsUnavailable, zoomToolLabel, zoomToolTitle } from '../../utils/rteToolbarOptimize'
+import { alignToolTitle, clampToolbarQuery, cycleSearchIndex, disabledToolTitle, EMPTY_GROUP_NOTE, FOCUS_MODE_NOTE, fontFamilyCaption, groupHandleTitle, LAST_TOOLBAR_QUERY_KEY, lineHeightCaption, listToolLabel, menuFocusStep, menuToolNeedsCaret, moreToolsCaption, moreToolsTitle, ribbonSearchLabel, ribbonTabForDigit, ribbonTabHint, ribbonTabTabIndex, ribbonTypeaheadQuery, SEARCH_INPUT_HINT, searchEnterActivates, searchGroupCaption, shortcutFromTitle, stepRibbonTab, stepRibbonTabBy, tableToolLabel, toolbarGroupReorderAllowed, toolbarMenuItemTitle, toolbarSearchStatus, toolIsUnavailable, zoomToolLabel, zoomToolTitle } from '../../utils/rteToolbarOptimize'
 import { useParentScopeStamp } from './inheritScope'
 import { buildChartGroups } from '../../utils/echarts/chartGroups'
 import { TABLE_MENU_ICONS } from './tableMenuIcons'
@@ -609,11 +609,11 @@ function toggleChartGroupMenu(key: string) {
               <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
               <div data-rte-own v-if="rte.listDepthLabel" class="rte-menu-hint">{{ rte.listDepthLabel }}</div>
               <div data-rte-own class="rte-menu-hint">Tab / Shift+Tab 调整层级</div>
-              <button data-rte-own type="button" @click="rte.indentBlock(); rte.listOpen = false"><RteMenuGlyph label="增加缩进" />增加缩进</button>
-              <button data-rte-own type="button" @click="rte.padListItem(1)"><RteMenuGlyph label="只缩进文字" />只缩进文字</button>
-              <button data-rte-own type="button" @click="rte.padListItem(-1)"><RteMenuGlyph label="只减少缩进" />只减少缩进</button>
+              <button data-rte-own type="button" :title="toolbarMenuItemTitle('增加缩进')" @click="rte.indentBlock(); rte.listOpen = false"><RteMenuGlyph label="增加缩进" />增加缩进</button>
+              <button data-rte-own type="button" :title="toolbarMenuItemTitle('只缩进文字')" @click="rte.padListItem(1)"><RteMenuGlyph label="只缩进文字" />只缩进文字</button>
+              <button data-rte-own type="button" :title="toolbarMenuItemTitle('只减少缩进')" @click="rte.padListItem(-1)"><RteMenuGlyph label="只减少缩进" />只减少缩进</button>
               <button data-rte-own type="button" :class="{ active: rte.taskOpenOnly }" :aria-pressed="rte.taskOpenOnly" @click="rte.toggleTaskOpenOnly()"><RteMenuGlyph :label="rte.taskOpenOnly ? '显示全部任务' : '只看未完成'" />{{ rte.taskOpenOnly ? '显示全部任务' : '只看未完成' }}</button>
-              <button data-rte-own type="button" @click="rte.outdentBlock(); rte.listOpen = false"><RteMenuGlyph label="减少缩进" />减少缩进</button>
+              <button data-rte-own type="button" :title="toolbarMenuItemTitle('减少缩进')" @click="rte.outdentBlock(); rte.listOpen = false"><RteMenuGlyph label="减少缩进" />减少缩进</button>
             </div>
           </Teleport>
         </div>
@@ -990,10 +990,11 @@ function toggleChartGroupMenu(key: string) {
                 v-for="tone in rte.LINK_BUTTON_TONES"
                 :key="'lb-' + tone.id"
                 type="button"
+                :title="toolbarMenuItemTitle(tone.label + '按钮')"
                 @click="rte.paintLinkButton(tone.id)"
               ><RteMenuGlyph :id="tone.id" :label="tone.label + '按钮'" />{{ tone.label }}按钮</button>
               <div data-rte-own v-if="rte.isActive('linkButton')" class="rte-menu-sep" aria-hidden="true" />
-              <button data-rte-own v-if="rte.isActive('linkButton')" type="button" @click="rte.editLinkButton()"><RteMenuGlyph label="修改文字和链接" />修改文字和链接</button>
+              <button data-rte-own v-if="rte.isActive('linkButton')" type="button" :title="toolbarMenuItemTitle('修改文字和链接')" @click="rte.editLinkButton()"><RteMenuGlyph label="修改文字和链接" />修改文字和链接</button>
             </div>
           </Teleport>
         </div>
@@ -1038,17 +1039,19 @@ function toggleChartGroupMenu(key: string) {
               <button data-rte-own type="button" :class="{ active: currentAlignName() === 'right' }" :aria-pressed="currentAlignName() === 'right'" @click="rte.setAlign('right'); rte.alignOpen = false"><RteMenuGlyph label="右对齐" />右对齐</button>
               <button data-rte-own type="button" :class="{ active: currentAlignName() === 'justify' }" :aria-pressed="currentAlignName() === 'justify'" @click="rte.setAlign('justify'); rte.alignOpen = false"><RteMenuGlyph label="两端对齐" />两端对齐</button>
               <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
-              <button data-rte-own type="button" @click="rte.indentBlock(); rte.alignOpen = false"><RteMenuGlyph label="增加缩进" />增加缩进</button>
-              <button data-rte-own type="button" @click="rte.outdentBlock(); rte.alignOpen = false"><RteMenuGlyph label="减少缩进" />减少缩进</button>
+              <button data-rte-own type="button" :title="toolbarMenuItemTitle('增加缩进')" @click="rte.indentBlock(); rte.alignOpen = false"><RteMenuGlyph label="增加缩进" />增加缩进</button>
+              <button data-rte-own type="button" :title="toolbarMenuItemTitle('减少缩进')" @click="rte.outdentBlock(); rte.alignOpen = false"><RteMenuGlyph label="减少缩进" />减少缩进</button>
               <button data-rte-own
                 type="button"
                 :class="{ active: rte.currentTextIndent() === '2em' }"
                 :aria-pressed="rte.currentTextIndent() === '2em'"
+                :title="toolbarMenuItemTitle('首行缩进 2 字')"
                 @click="rte.setFirstLineIndent(true); rte.alignOpen = false"
               ><RteMenuGlyph label="首行缩进 2 字" />首行缩进 2 字</button>
               <button data-rte-own
                 type="button"
                 :disabled="!rte.currentTextIndent()"
+                :title="toolbarMenuItemTitle('取消首行缩进')"
                 @click="rte.setFirstLineIndent(false); rte.alignOpen = false"
               ><RteMenuGlyph label="取消首行缩进" />取消首行缩进</button>
             </div>
@@ -1653,6 +1656,7 @@ function toggleChartGroupMenu(key: string) {
                 <button data-rte-own
                   v-else
                   type="button"
+                  :title="toolbarMenuItemTitle(it.label) || undefined"
                   @click="rte.insertColumns(it.cols, it.ratios)"
                 ><RteMenuGlyph :label="it.label" fallback="columns" />{{ it.label }}</button>
               </template>
@@ -2121,6 +2125,7 @@ function toggleChartGroupMenu(key: string) {
                   data-rte-own
                   type="button"
                   :class="{ active: rte.textMenuActive(item.id) }"
+                  :title="toolbarMenuItemTitle(item.label) || undefined"
                   @click="rte.runTextMenu(item.id)"
                 ><RteMenuGlyph :id="item.id" :label="item.label" />{{ item.label }}</button>
               </template>
@@ -2252,6 +2257,7 @@ function toggleChartGroupMenu(key: string) {
                 v-for="opt in rte.TEXT_TIDY_ACTIONS"
                 :key="'tidy-' + opt.id"
                 type="button"
+                :title="toolbarMenuItemTitle(opt.label) || undefined"
                 @click="rte.runTextMenu(opt.id); rte.textTidyOpen = false"
               ><RteMenuGlyph :id="opt.id" :label="opt.label" />{{ opt.label }}</button>
             </div>
@@ -2560,6 +2566,7 @@ function toggleChartGroupMenu(key: string) {
                 v-for="opt in rte.TEXT_TIDY_ACTIONS"
                 :key="'mtidy-' + opt.id"
                 type="button"
+                :title="toolbarMenuItemTitle(opt.label) || undefined"
                 @click="rte.runTextMenu(opt.id); rte.textTidyOpen = false"
               ><RteMenuGlyph :id="opt.id" :label="opt.label" />{{ opt.label }}</button>
             </div>
@@ -2657,6 +2664,7 @@ function toggleChartGroupMenu(key: string) {
                   data-rte-own
                   type="button"
                   :class="{ active: rte.textMenuActive(item.id) }"
+                  :title="toolbarMenuItemTitle(item.label) || undefined"
                   @click="rte.runTextMenu(item.id)"
                 ><RteMenuGlyph :id="item.id" :label="item.label" />{{ item.label }}</button>
               </template>

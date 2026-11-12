@@ -39,6 +39,7 @@ import {
   stepRibbonTabBy,
   tableToolLabel,
   toolbarGroupReorderAllowed,
+  toolbarMenuItemTitle,
   toolbarMenuKeyAction,
   toolsForToolbar,
   searchToolbarTools,
@@ -146,6 +147,9 @@ assert.equal(menuTypeaheadIndex(['居中', '居左', '居右'], '居', -1), 0)
 assert.equal(menuTypeaheadIndex(['居中', '居左', '居右'], '居', 0), 1)
 assert.equal(menuTypeaheadIndex(['居中', '居左'], '右', -1), -1)
 assert.equal(menuTypeaheadIndex(['左对齐', '居中'], ' ', -1), -1)
+assert.equal(toolbarMenuItemTitle('均分（1:1）'), '把内容分成左右等宽的两栏')
+assert.equal(toolbarMenuItemTitle('全大写'), '把选中的英文变成大写')
+assert.equal(toolbarMenuItemTitle('没有这项'), '')
 assert.equal(stepRibbonTabBy(['a', 'b', 'c', 'd', 'e'], 'b', 3), 'e')
 assert.equal(stepRibbonTabBy(['a', 'b', 'c'], 'a', -3), 'a')
 assert.equal(zoomToolLabel(1), '实际大小')
