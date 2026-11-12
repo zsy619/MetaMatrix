@@ -402,13 +402,12 @@ const weakest = computed(() => {
 .prompts { padding-left: 1.1em; }
 .rich { position: relative; }
 .rich-max { position: absolute; top: 14px; right: 8px; z-index: 5; }
-.rich-hint { margin: 8px 0 0; height: 150px; display: flex; align-items: center; color: #8a8175; }
-.is-scenario .rich-hint { height: 160px; }
+.rich-hint { margin: 8px 0 0; height: 160px; display: flex; align-items: center; color: #8a8175; }
 .block :deep(.rte-root) {
   margin-top: 8px;
-  height: 150px;
-  min-height: 150px;
-  max-height: 150px;
+  height: 160px;
+  min-height: 160px;
+  max-height: 160px;
   overflow: hidden;
   border: none;
   background: transparent;
@@ -420,11 +419,6 @@ const weakest = computed(() => {
 .block :deep(.rte-body) { flex: 1 1 auto; min-height: 0; }
 .block :deep(.rte-canvas) { background: transparent; overflow: auto; }
 .block :deep(.ProseMirror) { min-height: 0; }
-.is-scenario .block :deep(.rte-root) {
-  height: 160px;
-  min-height: 160px;
-  max-height: 160px;
-}
 .checks, .scores { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .checks li, .scores li { display: grid; grid-template-columns: minmax(180px, 1.4fr) minmax(140px, 0.8fr); gap: 8px; align-items: center; }
 .scores li { grid-template-columns: minmax(220px, 1.4fr) auto minmax(140px, 0.8fr); }
