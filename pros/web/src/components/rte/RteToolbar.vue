@@ -594,18 +594,18 @@ function toggleChartGroupMenu(key: string) {
               @mouseenter="rte.onToolMenuEnter('list')"
               @mouseleave="rte.onToolMenuLeave($event, 'list', () => (rte.listOpen = false))"
             >
-              <button data-rte-own type="button" :class="{ active: rte.isActive('bulletList') }" :aria-pressed="rte.isActive('bulletList')" @click="rte.toggleBulletList(); rte.listOpen = false"><RteMenuGlyph label="无序列表" />无序列表</button>
-              <button data-rte-own type="button" :class="{ active: rte.isActive('orderedList') }" :aria-pressed="rte.isActive('orderedList')" @click="rte.toggleOrderedList(); rte.listOpen = false"><RteMenuGlyph label="有序列表" />有序列表</button>
-              <button data-rte-own type="button" :class="{ active: rte.isActive('taskList') }" :aria-pressed="rte.isActive('taskList')" @click="rte.toggleTaskList(); rte.listOpen = false"><RteMenuGlyph label="任务列表" />任务列表</button>
+              <button data-rte-own type="button" :class="{ active: rte.isActive('bulletList') }" :aria-pressed="rte.isActive('bulletList')" :title="toolbarMenuItemTitle('无序列表')" @click="rte.toggleBulletList(); rte.listOpen = false"><RteMenuGlyph label="无序列表" />无序列表</button>
+              <button data-rte-own type="button" :class="{ active: rte.isActive('orderedList') }" :aria-pressed="rte.isActive('orderedList')" :title="toolbarMenuItemTitle('有序列表')" @click="rte.toggleOrderedList(); rte.listOpen = false"><RteMenuGlyph label="有序列表" />有序列表</button>
+              <button data-rte-own type="button" :class="{ active: rte.isActive('taskList') }" :aria-pressed="rte.isActive('taskList')" :title="toolbarMenuItemTitle('任务列表')" @click="rte.toggleTaskList(); rte.listOpen = false"><RteMenuGlyph label="任务列表" />任务列表</button>
               <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
               <button data-rte-own type="button" title="接着上一个列表往下编号" @click="rte.continueOrderedNumbering()"><RteMenuGlyph label="续号" />续号</button>
               <button data-rte-own type="button" title="从 1 重新开始一个列表" @click="rte.restartOrderedNumbering()"><RteMenuGlyph label="新列表" />新列表</button>
               <button data-rte-own type="button" title="把这一项改成指定的起始编号" @click="rte.applyListStart()"><RteMenuGlyph label="修改编号值…" />修改编号值…</button>
               <button data-rte-own type="button" title="从这一项起重新计数" @click="rte.renumberListFromHere()"><RteMenuGlyph label="从此处重编号" />从此处重编号</button>
               <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
-              <button data-rte-own type="button" :class="{ active: rte.currentOrderedListStyle() === 'decimal' }" :aria-pressed="rte.currentOrderedListStyle() === 'decimal'" @click="rte.applyListStyle('decimal')"><RteMenuGlyph label="数字 1. 2. 3." />数字 1. 2. 3.</button>
-              <button data-rte-own type="button" :class="{ active: rte.currentOrderedListStyle() === 'lower-alpha' }" :aria-pressed="rte.currentOrderedListStyle() === 'lower-alpha'" @click="rte.applyListStyle('lower-alpha')"><RteMenuGlyph label="字母 a. b. c." />字母 a. b. c.</button>
-              <button data-rte-own type="button" :class="{ active: rte.currentOrderedListStyle() === 'lower-roman' }" :aria-pressed="rte.currentOrderedListStyle() === 'lower-roman'" @click="rte.applyListStyle('lower-roman')"><RteMenuGlyph label="罗马 i. ii. iii." />罗马 i. ii. iii.</button>
+              <button data-rte-own type="button" :class="{ active: rte.currentOrderedListStyle() === 'decimal' }" :aria-pressed="rte.currentOrderedListStyle() === 'decimal'" :title="toolbarMenuItemTitle('数字 1. 2. 3.')" @click="rte.applyListStyle('decimal')"><RteMenuGlyph label="数字 1. 2. 3." />数字 1. 2. 3.</button>
+              <button data-rte-own type="button" :class="{ active: rte.currentOrderedListStyle() === 'lower-alpha' }" :aria-pressed="rte.currentOrderedListStyle() === 'lower-alpha'" :title="toolbarMenuItemTitle('字母 a. b. c.')" @click="rte.applyListStyle('lower-alpha')"><RteMenuGlyph label="字母 a. b. c." />字母 a. b. c.</button>
+              <button data-rte-own type="button" :class="{ active: rte.currentOrderedListStyle() === 'lower-roman' }" :aria-pressed="rte.currentOrderedListStyle() === 'lower-roman'" :title="toolbarMenuItemTitle('罗马 i. ii. iii.')" @click="rte.applyListStyle('lower-roman')"><RteMenuGlyph label="罗马 i. ii. iii." />罗马 i. ii. iii.</button>
               <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
               <div data-rte-own v-if="rte.listDepthLabel" class="rte-menu-hint">{{ rte.listDepthLabel }}</div>
               <div data-rte-own class="rte-menu-hint">Tab / Shift+Tab 调整层级</div>
@@ -674,7 +674,7 @@ function toggleChartGroupMenu(key: string) {
               <button data-rte-own type="button" title="再复制一个选中的表单字段" @click.stop="rte.duplicateSelectedForm()"><RteMenuGlyph label="复制当前字段" />复制当前字段</button>
               <button data-rte-own type="button" title="检查必填项有没有空着" @click.stop="rte.checkFormFields()"><RteMenuGlyph label="检查填写" />检查填写</button>
               <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
-              <button data-rte-own type="button" @click.stop="rte.formOpen = false; rte.openTableDialog()"><RteMenuGlyph label="表格" />表格</button>
+              <button data-rte-own type="button" title="打开表格尺寸对话框，自己填行数和列数" @click.stop="rte.formOpen = false; rte.openTableDialog()"><RteMenuGlyph label="表格" />表格</button>
             </div>
           </Teleport>
         </div>
@@ -1126,7 +1126,7 @@ function toggleChartGroupMenu(key: string) {
                   @click="rte.insertQuickTable(cell.r, cell.c)"
                 />
               </div>
-              <button data-rte-own type="button" class="rte-table-quick-more" @click="rte.tableQuickOpen = false; rte.openTableDialog()">
+              <button data-rte-own type="button" class="rte-table-quick-more" :title="toolbarMenuItemTitle('自定义尺寸…')" @click="rte.tableQuickOpen = false; rte.openTableDialog()">
                 自定义尺寸…
               </button>
             </div>
@@ -1738,6 +1738,7 @@ function toggleChartGroupMenu(key: string) {
                 v-for="opt in rte.PARA_STYLE_OPTIONS"
                 :key="'ps-' + opt.id"
                 type="button"
+                :title="toolbarMenuItemTitle(opt.label) || opt.desc"
                 @click="rte.applyParaStyleId(opt.id)"
               ><RteMenuGlyph :id="opt.id" :label="opt.label" /><span data-rte-own>{{ opt.label }}</span><span data-rte-own class="rte-menu-desc">{{ opt.desc }}</span></button>
             </div>
@@ -1775,10 +1776,12 @@ function toggleChartGroupMenu(key: string) {
                 :key="'ls-' + opt.value"
                 type="button"
                 :class="{ active: rte.currentOrderedListStyle() === opt.value }"
+                :aria-pressed="rte.currentOrderedListStyle() === opt.value"
+                :title="toolbarMenuItemTitle(opt.label) || undefined"
                 @click="rte.applyListStyle(opt.value)"
               ><RteMenuGlyph :id="opt.value" :label="opt.label" />{{ opt.label }}</button>
               <div data-rte-own class="rte-menu-sep" />
-              <button data-rte-own type="button" @click="rte.applyListStart()"><RteMenuGlyph label="自定义起始…" />自定义起始…</button>
+              <button data-rte-own type="button" :title="toolbarMenuItemTitle('自定义起始…')" @click="rte.applyListStart()"><RteMenuGlyph label="自定义起始…" />自定义起始…</button>
             </div>
           </Teleport>
         </div>
@@ -1881,6 +1884,7 @@ function toggleChartGroupMenu(key: string) {
               <button data-rte-own
                 type="button"
                 :disabled="!rte.isActive('callout')"
+                :title="toolbarMenuItemTitle('取消告示框')"
                 @click="rte.editor?.chain().focus().unsetCallout().run(); rte.calloutOpen = false"
               >
                 取消告示框
@@ -2085,7 +2089,7 @@ function toggleChartGroupMenu(key: string) {
                 </div>
               </template>
               <div data-rte-own class="rte-menu-sep" aria-hidden="true"></div>
-              <button data-rte-own type="button" @click="rte.openEchartsDialog()"><RteMenuGlyph label="一键生成…" />一键生成…</button>
+              <button data-rte-own type="button" :title="toolbarMenuItemTitle('一键生成…')" @click="rte.openEchartsDialog()"><RteMenuGlyph label="一键生成…" />一键生成…</button>
             </div>
           </Teleport>
         </div>
@@ -2167,6 +2171,7 @@ function toggleChartGroupMenu(key: string) {
                 type="button"
                 :class="{ active: rte.editorZoom === z.value }"
                 :aria-pressed="rte.editorZoom === z.value"
+                :title="toolbarMenuItemTitle(z.label) || undefined"
                 @click="rte.setEditorZoom(z.value)"
               ><RteMenuGlyph :label="z.label" fallback="zoom" />{{ z.label }}</button>
             </div>
@@ -2555,7 +2560,7 @@ function toggleChartGroupMenu(key: string) {
                 </div>
               </template>
               <div data-rte-own class="rte-menu-sep" aria-hidden="true"></div>
-              <button data-rte-own type="button" @click="rte.openEchartsDialog()"><RteMenuGlyph label="一键生成…" />一键生成…</button>
+              <button data-rte-own type="button" :title="toolbarMenuItemTitle('一键生成…')" @click="rte.openEchartsDialog()"><RteMenuGlyph label="一键生成…" />一键生成…</button>
             </div>
             <div data-rte-own
               v-if="mt.kind === 'textTidy' && rte.textTidyOpen"
@@ -2680,6 +2685,7 @@ function toggleChartGroupMenu(key: string) {
                 type="button"
                 :class="{ active: rte.editorZoom === z.value }"
                 :aria-pressed="rte.editorZoom === z.value"
+                :title="toolbarMenuItemTitle(z.label) || undefined"
                 @click="rte.setEditorZoom(z.value)"
               ><RteMenuGlyph :label="z.label" fallback="zoom" />{{ z.label }}</button>
             </div>
@@ -2724,7 +2730,7 @@ function toggleChartGroupMenu(key: string) {
               <button data-rte-own type="button" title="再复制一个选中的表单字段" @click="rte.duplicateSelectedForm()"><RteMenuGlyph label="复制当前字段" />复制当前字段</button>
               <button data-rte-own type="button" title="检查必填项有没有空着" @click="rte.checkFormFields()"><RteMenuGlyph label="检查填写" />检查填写</button>
               <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
-              <button data-rte-own type="button" @click="rte.moreFormOpen = false; rte.moreOpen = false; rte.openTableDialog()"><RteMenuGlyph label="表格" />表格</button>
+              <button data-rte-own type="button" title="打开表格尺寸对话框，自己填行数和列数" @click="rte.moreFormOpen = false; rte.moreOpen = false; rte.openTableDialog()"><RteMenuGlyph label="表格" />表格</button>
             </div>
             <div data-rte-own
               v-if="mt.kind === 'template' && rte.moreTemplateOpen"
