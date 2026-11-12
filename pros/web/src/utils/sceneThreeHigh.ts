@@ -23,6 +23,25 @@ export function sceneThreeHighGaps(scores: SceneThreeHighScores, passScore = 7):
   return SCENE_THREE_HIGH_AXIS_IDS.filter((id) => scores[id] < passScore).map((id) => SCENE_THREE_HIGH_AXIS_LABEL[id])
 }
 
+/** 调研记录正文。富文本只留可见文字，方便直接显示在场景卡片上。 */
+export function sceneRecordText(note: string | undefined | null): string {
+  return (note ?? '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/** 旧模板只有客服回复、月度汇报两条空记录。这种草稿换成 5 个调研场景。 */
+export function isLegacySceneSeed(
+  businesses: Array<{ id: string; note?: string | null }> | undefined | null,
+): boolean {
+  if (!Array.isArray(businesses) || businesses.length !== 2) return false
+  const ids = new Set(businesses.map((biz) => biz.id))
+  if (!ids.has('biz_service') || !ids.has('biz_report')) return false
+  return businesses.every((biz) => !sceneRecordText(biz.note))
+}
+
 /** 顶、右下、左下。分值 0 在圆心，10 在外圈。 */
 export function sceneRadarPoint(
   index: number,
