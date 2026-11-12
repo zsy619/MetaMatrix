@@ -11,6 +11,7 @@ import { useDocumentStore } from '../../stores/document'
 import { panelMaximizeKey, usePanelMaximize } from '../../composables/usePanelMaximize'
 import RichTextEditor from '../RichTextEditor.vue'
 import { itemTextToHtml, normalizeHtmlForCompare } from '../../utils/itemsHtml'
+import { fdeColumnTone } from './fdeTableTone'
 
 const props = defineProps<{ doc: FdeSheetDocumentJSON }>()
 const documentStore = useDocumentStore()
@@ -333,12 +334,12 @@ const weakest = computed(() => {
         <table>
           <thead>
             <tr>
-              <th v-for="col in item.columns" :key="col.id">{{ col.label }}</th>
+              <th v-for="col in item.columns" :key="col.id" :data-tone="fdeColumnTone(item.id, col.id)">{{ col.label }}</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="row in item.rows" :key="row.id">
-              <td v-for="col in item.columns" :key="col.id">
+              <td v-for="col in item.columns" :key="col.id" :data-tone="fdeColumnTone(item.id, col.id)">
                 <div v-if="levelColumns.has(col.id)" class="levels" role="group" :aria-label="col.label">
                   <button
                     v-for="level in levels"
@@ -536,10 +537,23 @@ const weakest = computed(() => {
 .marks button, .add, .cards button { border: 1px solid #e4ddd2; background: #fff; border-radius: 999px; padding: 4px 10px; cursor: pointer; }
 .marks button[aria-pressed='true'], .cards button[aria-pressed='true'] { background: #187a4e; border-color: #187a4e; color: #fff; }
 .note, .table-wrap textarea, .cards textarea, .roi input { width: 100%; box-sizing: border-box; border: 1px solid #e4ddd2; border-radius: 8px; padding: 6px 8px; font: inherit; background: #fff; }
-.table-wrap { overflow: auto; margin-top: 12px; border: 1px solid #f1ebe3; border-radius: 12px; background: #fff; }
+.table-wrap { overflow: auto; margin-top: 12px; border: 1px solid #d9d0c3; border-radius: 12px; background: #fff; }
 table { width: 100%; border-collapse: collapse; }
-th, td { border-bottom: 1px solid #f1ebe3; padding: 8px; text-align: left; vertical-align: top; }
-th { position: sticky; top: 0; background: #3e3428; color: #fff; font-size: 12px; font-weight: 700; }
+th, td { border-bottom: 2px solid #e4d9cc; border-right: 1px solid rgba(62, 48, 28, 0.12); padding: 8px; text-align: left; vertical-align: top; }
+th:last-child, td:last-child { border-right: none; }
+th { position: sticky; top: 0; z-index: 1; background: #1c2838; color: #fff; font-size: 12px; font-weight: 700; }
+th[data-tone='fill'] { background: #1f5f99; }
+td[data-tone='fill'] { background: #e7f1fb; }
+th[data-tone='measure'] { background: #0f766e; }
+td[data-tone='measure'] { background: #e5f4f2; }
+th[data-tone='judge'] { background: #8a6410; }
+td[data-tone='judge'] { background: #fbf3dc; }
+th[data-tone='fail'] { background: #9a3030; }
+td[data-tone='fail'] { background: #fdeceb; }
+th[data-tone='verdict'] { background: #176b45; }
+td[data-tone='verdict'] { background: #e7f6ee; }
+th[data-tone='id'] { background: #1c2838; }
+td[data-tone='id'] { background: #f6f1e8; }
 .table-wrap textarea { border-color: transparent; background: transparent; resize: vertical; min-height: 44px; line-height: 1.45; }
 .table-wrap textarea:focus { border-color: #1c4c7c; background: #fff; outline: none; }
 .is-table td:first-child textarea { font-weight: 700; }
