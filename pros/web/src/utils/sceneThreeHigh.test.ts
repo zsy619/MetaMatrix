@@ -3,6 +3,8 @@ import sceneThreeHighTemplate from '../templates/scene-three-high-v1.json'
 import {
   clampSceneScore,
   sceneRadarPoint,
+  isLegacySceneSeed,
+  sceneRecordText,
   sceneThreeHighGaps,
   sceneThreeHighPasses,
 } from './sceneThreeHigh'
@@ -26,6 +28,18 @@ describe('选场景三高', () => {
     expect(names).toEqual(['销售报价', '客服工单', '内部知识问答', '报销审核', '合规审查'])
     const passed = sceneThreeHighTemplate.businesses.filter((biz) => sceneThreeHighPasses(biz.scores))
     expect(passed.map((biz) => biz.name)).toEqual(['销售报价', '客服工单'])
+  })
+
+  it('旧的两条空示例会换成 5 个调研场景，写过记录的不覆盖', () => {
+    expect(isLegacySceneSeed([
+      { id: 'biz_service', note: '' },
+      { id: 'biz_report', note: '<p></p>' },
+    ])).toBe(true)
+    expect(isLegacySceneSeed([
+      { id: 'biz_service', note: '已经写过调研' },
+      { id: 'biz_report', note: '' },
+    ])).toBe(false)
+    expect(sceneRecordText('<p>每周大量报价</p>')).toBe('每周大量报价')
   })
 
   it('10 分落在外圈顶点，0 分落在圆心', () => {

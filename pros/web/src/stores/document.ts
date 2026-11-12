@@ -184,6 +184,7 @@ import {
   isGoldenCircleDoc,
   isSoarDoc,
   isPlayingToWinDoc,
+  isSceneThreeHighDoc,
   coerceYModelDoc,
   normalizeYModelDoc,
 } from '../types/canvas'
@@ -260,6 +261,7 @@ import soarTemplate from '../templates/soar-v1.json'
 import playingToWinTemplate from '../templates/playing-to-win-v1.json'
 import tenCheckTemplate from '../templates/ten-check-v1.json'
 import sceneThreeHighTemplate from '../templates/scene-three-high-v1.json'
+import { isLegacySceneSeed } from '../utils/sceneThreeHigh'
 import { CONTEXT_SIX_ELEMENTS_BLOCK_ID } from '../utils/contextSixElements'
 
 export type TemplateId =
@@ -1688,6 +1690,10 @@ export const useDocumentStore = defineStore('document', () => {
     if (isGoldenCircleDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
     if (isSoarDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
     if (isPlayingToWinDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
+    if (isSceneThreeHighDoc(next) && isLegacySceneSeed(next.businesses)) {
+      const seed = sceneThreeHighTemplate as SceneThreeHighDocumentJSON
+      next = { ...next, businesses: cloneDoc(seed.businesses) }
+    }
     if (
       isDualTriangleDoc(next) &&
       (tid === 'dual-triangle-human-ai' ||

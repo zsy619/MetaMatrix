@@ -17,6 +17,7 @@ import {
   clampSceneScore,
   sceneRadarPoint,
   sceneRadarRing,
+  sceneRecordText,
   sceneThreeHighGaps,
   sceneThreeHighPasses,
 } from '../../utils/sceneThreeHigh'
@@ -207,6 +208,7 @@ function writeNote(html: string) {
               @change="setScore(biz.id, axis, ($event.target as HTMLInputElement).value)"
             />
           </label>
+          <p v-if="sceneRecordText(biz.note)" class="record">{{ sceneRecordText(biz.note) }}</p>
         </article>
         <p v-if="!doc.businesses.length" class="empty">先加一个业务，再按三高打分。</p>
       </section>
@@ -305,6 +307,7 @@ function writeNote(html: string) {
 .biz label span { width: 5.5em; color: #5c574e; font-size: 13px; }
 .biz label input[type='range'] { flex: 1; }
 .num { width: 52px; border: 1px solid #e4ddd2; border-radius: 8px; padding: 4px 6px; font: inherit; }
+.record { margin: 8px 0 0; color: #3c4043; font-size: 13px; line-height: 1.5; }
 .radar { min-height: 420px; }
 .radar svg { display: block; width: 100%; height: auto; }
 .ring, .spoke { fill: none; stroke: #e4ddd2; stroke-width: 1; }
