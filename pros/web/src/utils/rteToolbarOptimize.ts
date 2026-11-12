@@ -60,7 +60,7 @@ export const TOOLBAR_SEARCH_KEYWORDS: Record<string, readonly string[]> = {
   writingPaper: ['纸样', '田字格', '稿纸', '信纸'],
   tableStruct: ['行列', '插入行'],
   speak: ['朗读'],
-  outline: ['大纲'],
+  outline: ['大纲', '目录导航'],
   hr: ['分割线'],
   emoji: ['表情'],
   qrcode: ['二维码', 'qr'],
@@ -69,7 +69,7 @@ export const TOOLBAR_SEARCH_KEYWORDS: Record<string, readonly string[]> = {
   audio: ['音频'],
   pageBreak: ['分页', '分页符'],
   printPreview: ['打印预览'],
-  comment: ['批注', '评论'],
+  comment: ['评论', '批注'],
   footnote: ['脚注'],
   watermark: ['水印'],
   emphasisDot: ['着重号'],
@@ -92,6 +92,12 @@ export const TOOLBAR_SEARCH_KEYWORDS: Record<string, readonly string[]> = {
   immersive: ['沉浸', '全屏'],
   statusChip: ['徽章', '状态'],
   progressBar: ['进度条', '进度'],
+  sensitive: ['敏感词', '错别字'],
+  wordStats: ['字数', '统计'],
+  headingCheck: ['标题检查', '跳级'],
+  linkCheck: ['链接检查', '死链'],
+  outbound: ['外链', '白名单'],
+  note: ['注释'],
 }
 
 /** 收掉首尾和连续空格，便于「拼 音」仍能匹配。 */
@@ -115,14 +121,15 @@ function searchScoreOne(tool: ToolbarSearchTool, query: string): number {
 }
 
 /** 「拼 音」去掉中间空格后再比一次。 */
-function searchScore(tool: ToolbarSearchTool, query: string): number {
+function searchScore(tool: ToolbarSearchTool, query: string, groupLabel = ''): number {
   const compact = query.replace(/\s+/g, '')
   const spaced = searchScoreOne(tool, query)
-  if (!compact || compact === query) return spaced
-  const tight = searchScoreOne(tool, compact)
-  if (spaced < 0) return tight
-  if (tight < 0) return spaced
-  return Math.min(spaced, tight)
+  const tight = !compact || compact === query ? -1 : searchScoreOne(tool, compact)
+  let own = spaced
+  if (tight >= 0 && (own < 0 || tight < own)) own = tight
+  const group = groupLabel.trim().toLowerCase()
+  if (group && (group === query || group === compact)) return own < 0 ? 6 : own
+  return own
 }
 
 /** 按名称、说明、别名或 key 找工具。空查询不返回结果。完全匹配排在前面。 */
@@ -134,7 +141,7 @@ export function searchToolbarTools(groups: readonly ToolbarSearchGroup[], query:
   for (const group of groups) {
     for (const tool of group.tools) {
       const label = (tool.label || '').trim()
-      const score = searchScore(tool, q)
+      const score = searchScore(tool, q, group.label)
       index += 1
       if (!label || score < 0) continue
       ranked.push({
@@ -347,7 +354,7 @@ const MENU_TOOL_KINDS = new Set([
   'heading', 'list', 'align', 'paraStyle', 'listStyle', 'fontSize', 'fontFamily', 'lineHeight',
   'form', 'template', 'callout', 'presetMenu', 'textTidy', 'imageLayout', 'zoom', 'viewExtras',
   'caseTransform', 'import', 'export', 'table', 'echartsGroup', 'linkButton', 'columns',
-  'hr', 'blockOps', 'insertDate', 'highlight', 'color',
+  'hr', 'blockOps', 'insertDate', 'highlight', 'color', 'wordStats', 'shortcuts', 'spacing',
 ])
 
 /** 会打开菜单的按钮需要小三角。 */

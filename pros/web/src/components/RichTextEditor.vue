@@ -6759,7 +6759,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'find',
       label: '查找',
-      title: '查找与替换 (Ctrl/⌘+F)',
+      title: findDialogOpen.value ? '查找与替换已打开 (Ctrl/⌘+F)' : '查找与替换 (Ctrl/⌘+F)',
       icon: '🔍',
       iconComp: ic('find'),
       active: () => findDialogOpen.value,
@@ -7083,12 +7083,12 @@ const allTools = computed((): ToolItem[] => {
       kind: 'template',
     },
     { key: 'table', label: '表格', icon: '▦', iconComp: ic('table'), kind: 'table', active: () => isInTable(), run: onTableToolClick },
-    { key: 'attach', label: '附件', icon: '☁▾', iconComp: ic('attach'), kind: 'attach', run: onAttachment },
-    { key: 'note', label: '注释', icon: '[1]', iconComp: ic('note'), run: insertNote },
+    { key: 'attach', label: '附件', title: '插入或选择附件', icon: '☁▾', iconComp: ic('attach'), kind: 'attach', run: onAttachment },
+    { key: 'note', label: '注释', title: '插入文内注释', icon: '[1]', iconComp: ic('note'), run: insertNote },
     {
       key: 'comment',
       label: '评论',
-      title: '对选区添加评论',
+      title: commentsOpen.value ? '评论已打开，再点一次收起' : '给选中文字加评论',
       icon: '💬',
       iconComp: ic('note'),
       active: () => commentsOpen.value,
@@ -7244,7 +7244,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'sensitive',
       label: '敏感词',
-      title: '敏感词 / 错别字提示',
+      title: sensitiveOn.value ? '敏感词检查已开启，再点一次关闭' : '检查敏感词和错别字',
       icon: '⚠',
       iconComp: ic('highlight'),
       active: () => sensitiveOn.value,
@@ -7487,7 +7487,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'headingCheck',
       label: '标题检',
-      title: '标题层级 / 空标题检查',
+      title: '检查标题是否跳级或为空',
       icon: 'H✓',
       iconComp: ic('outline'),
       run: runHeadingHierarchyCheck,
@@ -7495,7 +7495,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'linkCheck',
       label: '链检',
-      title: '死链 / 空链检查',
+      title: '检查打不开或空着的链接',
       icon: '🔗✓',
       iconComp: ic('link'),
       run: runDeadLinkCheck,
@@ -7503,7 +7503,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'watermark',
       label: '水印',
-      title: '文档水印',
+      title: watermark.value.enabled ? '水印已开启，点此修改' : '给文档加水印',
       icon: '印',
       iconComp: ic('note'),
       active: () => watermark.value.enabled,
@@ -7512,7 +7512,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'outbound',
       label: '外链',
-      title: '外链确认与白名单',
+      title: '外链打开前先确认',
       icon: '外',
       iconComp: ic('link'),
       run: () => openGovern('outbound'),
@@ -7544,7 +7544,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'immersive',
       label: '全屏',
-      title: '全屏沉浸编辑（Esc 退出）',
+      title: immersiveFullscreen.value ? '已是全屏，按 Esc 退出' : '全屏编辑，按 Esc 退出',
       icon: '⛶',
       iconComp: ic('outline'),
       active: () => immersiveFullscreen.value,
@@ -7561,7 +7561,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'wordStats',
       label: '字数',
-      title: '字数统计',
+      title: wordStatsOpen.value ? '字数统计已打开' : '查看字数和阅读时长',
       icon: '∑',
       iconComp: ic('wordStats'),
       kind: 'wordStats',
@@ -7570,7 +7570,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'outline',
       label: '大纲',
-      title: '标题大纲导航',
+      title: outlineOpen.value ? '大纲已打开，再点一次收起' : '按标题浏览文档',
       icon: '☰',
       iconComp: ic('outline'),
       active: () => outlineOpen.value,

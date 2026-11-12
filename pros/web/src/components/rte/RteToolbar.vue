@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { inject, onMounted, ref } from 'vue'
 import { RTE_BINDINGS } from './bindings'
-import { alignToolTitle, disabledToolTitle, EMPTY_GROUP_NOTE, FOCUS_MODE_NOTE, fontFamilyCaption, groupHandleTitle, lineHeightCaption, listToolLabel, ribbonTabForDigit, ribbonTabHint, ribbonTabTabIndex, ribbonTypeaheadQuery, searchEnterActivates, searchGroupCaption, stepRibbonTab, stepRibbonTabBy, tableToolLabel, toolbarSearchStatus, zoomToolLabel, zoomToolTitle } from '../../utils/rteToolbarOptimize'
+import { alignToolTitle, disabledToolTitle, EMPTY_GROUP_NOTE, FOCUS_MODE_NOTE, fontFamilyCaption, groupHandleTitle, lineHeightCaption, listToolLabel, menuToolNeedsCaret, ribbonTabForDigit, ribbonTabHint, ribbonTabTabIndex, ribbonTypeaheadQuery, searchEnterActivates, searchGroupCaption, stepRibbonTab, stepRibbonTabBy, tableToolLabel, toolbarSearchStatus, zoomToolLabel, zoomToolTitle } from '../../utils/rteToolbarOptimize'
 import { useParentScopeStamp } from './inheritScope'
 import { buildChartGroups } from '../../utils/echarts/chartGroups'
 import { TABLE_MENU_ICONS } from './tableMenuIcons'
@@ -2345,6 +2345,8 @@ function toggleChartGroupMenu(key: string) {
                   (mt.kind === 'fontFamily' && rte.moreFontFamilyOpen) ||
                   (mt.kind === 'lineHeight' && rte.moreLineHeightOpen),
               }"
+              :title="disabledToolTitle(mt.title || mt.label, !!mt.disabled?.())"
+              :disabled="mt.disabled?.() || undefined"
               @click="rte.onMoreToolClick(mt)"
             >
               <span data-rte-own class="rte-more-icon">
@@ -2355,9 +2357,9 @@ function toggleChartGroupMenu(key: string) {
                 />
                 <template v-else>{{ mt.icon }}</template>
               </span>
-              <span data-rte-own>{{ mt.title || mt.label }}</span>
+              <span data-rte-own>{{ mt.label }}</span>
               <span data-rte-own
-                v-if="mt.kind === 'color' || mt.key === 'highlight' || mt.kind === 'attach' || mt.kind === 'form' || mt.kind === 'template' || mt.kind === 'fontSize' || mt.kind === 'fontFamily' || mt.kind === 'lineHeight' || mt.kind === 'callout' || mt.kind === 'caseTransform' || mt.kind === 'zoom' || mt.kind === 'viewExtras' || mt.kind === 'echartsGroup' || mt.kind === 'imageLayout' || mt.kind === 'textTidy' || mt.kind === 'presetMenu'"
+                v-if="mt.kind === 'attach' || menuToolNeedsCaret(mt.kind)"
                 class="rte-more-caret"
               >{{ mt.kind === 'attach' || mt.kind === 'form' || mt.kind === 'template' ? '▾' : '▸' }}</span>
             </button>

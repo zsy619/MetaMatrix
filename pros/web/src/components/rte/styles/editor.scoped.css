@@ -1763,6 +1763,13 @@
 .rte-more-item.active {
   background: #f2f3f5;
 }
+.rte-more-item:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.rte-more-item:disabled:hover {
+  background: transparent;
+}
 
 .rte-more-icon {
   width: 18px;

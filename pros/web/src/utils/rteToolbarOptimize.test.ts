@@ -114,6 +114,10 @@ assert.equal(quoteToolTitle(true).startsWith('已在引用中'), true)
 assert.equal(codeBlockToolTitle(false).includes('代码块'), true)
 assert.equal(spellcheckToolTitle(true).includes('已开启'), true)
 assert.equal(searchToolbarTools([{ id: 'review', label: '审阅', tools: [{ key: 'snippets', label: '片段' }] }], '常用语')[0]?.key, 'snippets')
+assert.equal(searchToolbarTools([{ id: 'table', label: '表格', tools: [{ key: 'tableZebra', label: '斑马纹' }, { key: 'table', label: '表格' }] }], '表格')[0]?.key, 'table')
+assert.equal(searchToolbarTools([{ id: 'table', label: '表格', tools: [{ key: 'tableZebra', label: '斑马纹' }] }], '表格').length, 1)
+assert.equal(menuToolNeedsCaret('wordStats'), true)
+assert.equal(menuToolNeedsCaret('attach'), false)
 
 const sizes = [
   { label: '默认', value: '' },
