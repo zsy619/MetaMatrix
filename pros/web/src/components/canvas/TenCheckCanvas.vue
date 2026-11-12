@@ -88,15 +88,16 @@ function mark(id: TenCheckRowId, passed: boolean) {
       <div class="head">
         <span>#</span>
         <span>格子</span>
-        <span>你要填什么</span>
-        <span>它帮你判断</span>
-        <span>不合格的信号</span>
+        <span class="h-fill">你要填什么</span>
+        <span class="h-judge">它帮你判断</span>
+        <span class="h-fail">不合格的信号</span>
         <span>这一格</span>
       </div>
       <div v-for="(item, index) in doc.rows" :key="item.id" class="row" :data-row="item.id" :data-pass="item.passed">
         <span class="num">{{ index + 1 }}</span>
         <strong>{{ item.name }}</strong>
         <TenCheckCell
+          tone="fill"
           :label="`${item.name} · 你要填什么`"
           :note="guideText(item, 'answer')"
           :panel-id="`ten:${item.id}:fill`"
@@ -104,6 +105,7 @@ function mark(id: TenCheckRowId, passed: boolean) {
           @update:model-value="write(item.id, 'answer', $event)"
         />
         <TenCheckCell
+          tone="judge"
           :label="`${item.name} · 它帮你判断`"
           :note="guideText(item, 'judges')"
           :panel-id="`ten:${item.id}:judge`"
@@ -111,7 +113,7 @@ function mark(id: TenCheckRowId, passed: boolean) {
           @update:model-value="write(item.id, 'judges', $event)"
         />
         <TenCheckCell
-          fail
+          tone="fail"
           :label="`${item.name} · 不合格的信号`"
           :note="guideText(item, 'fail')"
           :panel-id="`ten:${item.id}:fail`"
@@ -136,16 +138,32 @@ function mark(id: TenCheckRowId, passed: boolean) {
 .sheet-top p { margin-top: 4px; max-width: 68ch; color: #5c574e; font-size: 13px; line-height: 1.5; }
 .score { margin: 0; padding: 8px 12px; border-radius: 999px; background: #fff; color: #3c4043; font-size: 13px; white-space: nowrap; }
 .score strong { color: #125c3b; font-size: 18px; }
-.table { flex: none; min-width: 980px; background: #fffdf8; border: 1px solid rgba(62, 48, 28, 0.08); border-radius: 14px; }
-.head, .row { display: grid; grid-template-columns: 42px 112px minmax(220px, 1.3fr) minmax(180px, 1fr) minmax(180px, 1fr) 92px; gap: 8px; align-items: stretch; }
-.head { position: sticky; top: 0; z-index: 4; align-items: center; min-height: 40px; padding: 0 12px; border-radius: 14px 14px 0 0; background: #3e3428; color: #fff; font-size: 13px; font-weight: 700; }
-.row { height: 200px; min-height: 200px; max-height: 200px; padding: 0 8px; border-top: 1px solid #f1ebe3; overflow: hidden; }
-.row[data-pass='false'] { background: #fff6f6; }
-.row[data-pass='true'] { background: #f4fbf6; }
-.num, .row > strong { display: flex; align-items: center; min-width: 0; }
-.row > strong { font-size: 14px; line-height: 1.35; }
-.num { color: #8a8175; font-weight: 700; }
-.marks { display: flex; flex-direction: column; justify-content: center; align-items: stretch; gap: 6px; }
+.table { flex: none; min-width: 980px; background: #fff; border: 1px solid #d9d0c3; border-radius: 14px; }
+.head, .row { display: grid; grid-template-columns: 48px 136px minmax(210px, 1.35fr) minmax(168px, 1fr) minmax(168px, 1fr) 88px; gap: 0; align-items: stretch; }
+.head { position: sticky; top: 0; z-index: 4; min-height: 46px; padding: 0; border-radius: 0; background: #1c2838; color: #fff; font-size: 13px; font-weight: 700; box-shadow: 0 -8px 0 0 var(--cv-page, #f7f7f7); }
+.head span { display: flex; align-items: center; min-width: 0; min-height: 46px; padding: 0 12px; box-sizing: border-box; }
+.head span + span { border-left: 1px solid rgba(255, 255, 255, 0.16); }
+.head .h-fill { background: #1f5f99; }
+.head .h-judge { background: #8a6410; }
+.head .h-fail { background: #9a3030; }
+.row { box-sizing: border-box; height: 200px; min-height: 200px; max-height: 200px; padding: 0; overflow: hidden; background: #fffdf8; box-shadow: inset 0 -2px 0 #e4d9cc; }
+.table > .row:nth-child(odd) { background: #f6f1e8; }
+.row[data-pass='false'] { background: #fde8e8; box-shadow: inset 4px 0 0 #c5221f, inset 0 -2px 0 #f0c4c3; }
+.row[data-pass='true'] { background: #e5f6ec; box-shadow: inset 4px 0 0 #187a4e, inset 0 -2px 0 #b7e0c8; }
+.row > * { box-sizing: border-box; min-width: 0; }
+.row > * + * { border-left: 1px solid rgba(62, 48, 28, 0.14); }
+.num, .row > strong { display: flex; min-width: 0; }
+.row > strong { align-items: flex-start; padding: 12px 10px 0 8px; font-size: 14px; line-height: 1.35; color: #202124; }
+.num { align-items: center; justify-content: center; background: rgba(62, 48, 28, 0.06); color: #5c5348; font-size: 16px; font-weight: 800; }
+.row[data-pass='true'] .num { background: #187a4e; color: #fff; }
+.row[data-pass='false'] .num { background: #c5221f; color: #fff; }
+.row :deep(.cell.is-fill) { background: #e7f1fb; }
+.row :deep(.cell.is-judge) { background: #fbf3dc; }
+.row :deep(.cell.is-fail) { background: #fdeceb; }
+.row > :focus-within:not(.marks) { box-shadow: inset 0 0 0 2px #1f5f99; }
+.row > :nth-child(4):focus-within { box-shadow: inset 0 0 0 2px #8a6410; }
+.row > :nth-child(5):focus-within { box-shadow: inset 0 0 0 2px #9a3030; }
+.marks { display: flex; flex-direction: column; justify-content: center; align-items: stretch; gap: 6px; padding: 0 8px; }
 .marks button { border: 1px solid #e4ddd2; background: #fff; border-radius: 999px; padding: 4px 8px; cursor: pointer; }
 .marks button[aria-pressed='true'] { background: #187a4e; border-color: #187a4e; color: #fff; }
 .marks button.no[aria-pressed='true'] { background: #c5221f; border-color: #c5221f; color: #fff; }
@@ -155,6 +173,10 @@ function mark(id: TenCheckRowId, passed: boolean) {
 /* 全局润色把表格裁成 overflow:hidden，粘性表头会跟着整页一起滚走。 */
 .canvas-viewport .sheet.ten-check-sheet {
   padding: 0 20px 20px;
+}
+.canvas-viewport .sheet.ten-check-sheet .head {
+  background: #1c2838;
+  text-shadow: none;
 }
 .canvas-viewport .sheet.ten-check-sheet .table {
   overflow: visible;

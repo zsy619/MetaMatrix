@@ -9,7 +9,8 @@ const props = defineProps<{
   note?: string
   panelId: string
   modelValue: string
-  fail?: boolean
+  /** 三列用不同底色，方便顺着表头往下看 */
+  tone?: 'fill' | 'judge' | 'fail'
 }>()
 
 const emit = defineEmits<{
@@ -30,7 +31,7 @@ function onClose(event?: Event) {
 </script>
 
 <template>
-  <div class="cell" :class="{ 'is-fail': fail, 'is-source-max': isMaximized }">
+  <div class="cell" :class="[`is-${tone || 'fill'}`, { 'is-source-max': isMaximized }]">
     <p v-if="note" class="cell-note">{{ note }}</p>
     <button
       type="button"
@@ -41,16 +42,7 @@ function onClose(event?: Event) {
       @click="onToggle"
     >
       <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">
-        <rect
-          x="2.5"
-          y="2.5"
-          width="11"
-          height="11"
-          rx="1.2"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.5"
-        />
+        <path d="M3 6.2V3.4h2.8M10.2 3.4H13v2.8M13 9.8v2.8h-2.8M5.8 12.6H3V9.8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
       </svg>
     </button>
 
@@ -101,7 +93,7 @@ function onClose(event?: Event) {
         <div class="pm-body">
           <RichTextEditor
             class="pm-rte"
-            :class="{ 'is-fail': fail }"
+            :class="{ 'is-fail': tone === 'fail' }"
             :expanded="true"
             :show-title="false"
             :show-bottom-bar="true"
@@ -138,6 +130,8 @@ function onClose(event?: Event) {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+.cell.is-fill .cell-note { color: #1d4e89; }
+.cell.is-judge .cell-note { color: #7a5b10; }
 .cell.is-fail .cell-note { color: #9b1c1c; }
 .pm-heading { flex: 1; min-width: 0; }
 .pm-note {
