@@ -1,4 +1,5 @@
 import { nextTick, onBeforeUnmount, onMounted, type Directive } from 'vue'
+import { MENU_CLOSE_DELAY_MS } from '../../../utils/rteToolbarOptimize'
 
 /** 工具条浮层定位与点击外部关闭。pointerdown 监听在本组合式内成对注册。 */
 export function useFloatMenus(deps: {
@@ -96,7 +97,7 @@ function scheduleMenuClose(key: string, close: () => void) {
     setTimeout(() => {
       menuCloseTimers.delete(key)
       close()
-    }, 200),
+    }, MENU_CLOSE_DELAY_MS),
   )
 }
 

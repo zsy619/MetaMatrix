@@ -6767,7 +6767,7 @@ const allTools = computed((): ToolItem[] => {
     },
     {
       key: 'formatPainter',
-      label: '格式刷',
+      label: formatPainter.value?.sticky ? '连刷' : formatPainter.value ? '刷中' : '格式刷',
       title: formatPainter.value?.sticky
         ? '格式刷连续使用中，按 Esc 退出'
         : formatPainter.value
@@ -6781,7 +6781,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'pastePlain',
       label: '纯文本',
-      title: '粘贴为纯文本（开关）',
+      title: pastePlainTextMode.value ? '纯文本粘贴已开启，再点一次恢复' : '粘贴为纯文本，再点一次关闭',
       icon: 'TXT',
       iconComp: ic('pastePlain'),
       active: () => pastePlainTextMode.value,
@@ -6977,7 +6977,7 @@ const allTools = computed((): ToolItem[] => {
     },
     { key: 'pageSetup', label: '页面', title: '纸张、页边距、页眉页脚', icon: '纸', iconComp: ic('pageBreak'), run: openPageSetup },
     { key: 'printPreview', label: '打印预览', title: '按当前纸张看打印效果', icon: '看', iconComp: ic('print'), run: () => void openPrintPreview() },
-    { key: 'paperGuide', label: '参考线', title: '在编辑区显示纸张边界', icon: '框', run: togglePaperGuide, active: () => paperGuide.value },
+    { key: 'paperGuide', label: '参考线', title: paperGuide.value ? '纸张参考线已显示，再点一次关闭' : '在编辑区显示纸张边界', icon: '框', run: togglePaperGuide, active: () => paperGuide.value },
     { key: 'printUrls', label: '印出链接', title: '打印时在链接后面印出网址', icon: '链', run: togglePrintLinkUrls, active: () => printLinkUrls.value },
     {
       key: 'pageBreak',
@@ -6990,7 +6990,7 @@ const allTools = computed((): ToolItem[] => {
     { key: 'columns', label: '分栏', title: '多栏布局', icon: '▥', iconComp: ic('columns'), kind: 'columns' },
     { key: 'div-block', label: '', icon: '', kind: 'divider' },
     // —— 插入 ——
-    { key: 'image', label: '图片', icon: '🖼', iconComp: ic('image'), run: insertImage },
+    { key: 'image', label: '图片', title: '插入图片', icon: '🖼', iconComp: ic('image'), run: insertImage },
     { key: 'imageLayout', label: '排法', title: '图片居中、居左、居右或环绕', icon: '▢', iconComp: ic('image'), kind: 'imageLayout', active: () => isImageNodeSelected() },
     { key: 'imageReplace', label: '换图', title: '替换选中图片，保留题注和裁剪', icon: '↻', iconComp: ic('image'), run: () => void replaceImageByUrl(), disabled: () => !isImageNodeSelected() },
     { key: 'imageAlt', label: '替代文本', title: '给选中图片写替代文本', icon: 'Alt', iconComp: ic('image'), run: () => void promptImageAlt(), disabled: () => !isImageNodeSelected() },
@@ -7029,7 +7029,7 @@ const allTools = computed((): ToolItem[] => {
       applyPreset: (id: string) => setImageBorderStyle(id),
       disabled: () => !isImageNodeSelected(),
     },
-    { key: 'video', label: '视频', icon: '▶', iconComp: ic('video'), run: insertVideo },
+    { key: 'video', label: '视频', title: '插入视频', icon: '▶', iconComp: ic('video'), run: insertVideo },
     {
       key: 'link',
       label: '链接',
@@ -7049,7 +7049,7 @@ const allTools = computed((): ToolItem[] => {
       active: () => linkButtonOpen.value || isActive('linkButton'),
       run: () => { void insertLinkButton('blue') },
     },
-    { key: 'formula', label: '公式', icon: 'Σ', iconComp: ic('formula'), run: insertFormula },
+    { key: 'formula', label: '公式', title: '插入公式', icon: 'Σ', iconComp: ic('formula'), run: insertFormula },
     // —— 图表：一级分类各一个下拉（基础 / 统计 / 关系 / 层级 / 地理 / 金融 / 坐标系 / 组件 / 3D·GL）——
     ...CHART_GROUPS.map((group) => ({
       key: `chart:${group.id}`,
@@ -7146,7 +7146,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'emphasisDot',
       label: '着重号',
-      title: '中文着重号',
+      title: '给选中的汉字加着重号',
       icon: '••',
       iconComp: ic('highlight'),
       active: () => isActive('emphasisDot'),
@@ -7220,7 +7220,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'qrcode',
       label: '二维码',
-      title: '插入二维码',
+      title: '插入二维码，可改内容和样式',
       icon: '▦',
       iconComp: ic('qrcode'),
       run: insertQrCode,
@@ -7316,7 +7316,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'headingAutoNum',
       label: '标题号',
-      title: '标题自动编号 1 / 1.1 / 1.1.1',
+      title: headingAutoNumber.value ? '标题编号已开启，再点一次关闭' : '标题自动编号 1 / 1.1 / 1.1.1',
       icon: '1.',
       iconComp: ic('list'),
       active: () => headingAutoNumber.value,
@@ -7444,7 +7444,7 @@ const allTools = computed((): ToolItem[] => {
     { key: 'tidyFull', label: '全角', title: '把半角字母数字转成全角', icon: '全', run: () => runTextMenu('full') },
     { key: 'tidyPangu', label: '中英空格', title: '汉字和英文数字之间补空格', icon: '空', run: () => runTextMenu('pangu') },
     { key: 'tidySqueeze', label: '收空格', title: '连续空格收成一个', icon: '挤', run: () => runTextMenu('squeeze') },
-    { key: 'tableZebra', label: '斑马纹', title: '隔行底色只用于显示', icon: '斑马', run: toggleTableZebra, active: () => editor.value?.getAttributes('table')?.zebra === true, disabled: () => !isInTable() },
+    { key: 'tableZebra', label: '斑马纹', title: editor.value?.getAttributes('table')?.zebra === true ? '斑马纹已开启，再点一次关闭' : '隔行底色只用于显示', icon: '斑马', run: toggleTableZebra, active: () => editor.value?.getAttributes('table')?.zebra === true, disabled: () => !isInTable() },
     { key: 'tableEqual', label: '均分列', title: '把当前表格的列宽均分，一步撤销', icon: '均', run: () => runTableOpFromToolbar('equal-cols'), disabled: () => !isInTable() },
     { key: 'tableFormula', label: '格公式', title: '在当前格插入 =SUM(ABOVE)', icon: 'Σ', run: () => runTableOpFromToolbar('cell-formula'), disabled: () => !isInTable() },
     { key: 'tableSort', label: '升序', title: '按当前列从小到大排序', icon: '序', run: () => runTableOpFromToolbar('sort-asc'), disabled: () => !isInTable() },

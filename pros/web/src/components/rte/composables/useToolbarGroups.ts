@@ -14,7 +14,7 @@ import {
   TOOLBAR_GROUPS,
   type ToolbarDropBox,
 } from '../../../utils/rteToolbarGroups'
-import { FOCUS_TOOLBAR_KEYS, orderToolbarSearchGroups, readStoredRibbonTab } from '../../../utils/rteToolbarOptimize'
+import { FOCUS_TOOLBAR_KEYS, hiddenGroupPlaceholders, orderToolbarSearchGroups, readStoredRibbonTab } from '../../../utils/rteToolbarOptimize'
 import {
   isDefaultToolbarGroupConfig,
   moveGroupButton,
@@ -123,7 +123,13 @@ export function useToolbarGroups<T extends ToolLike>(deps: {
   ))
   /** 没有按钮的分组不占栏目。例如空的「其他」。 */
   const ribbonTabs = computed(() =>
-    RIBBON_TABS.filter((tab) => toolbarGroups.value.some((group) => tab.groups.includes(group.id))),
+    RIBBON_TABS.filter((tab) =>
+      tab.groups.some((id) => {
+        if (toolbarGroups.value.some((group) => group.id === id)) return true
+        const def = TOOLBAR_GROUPS.find((group) => group.id === id)
+        return !!def && def.keys.length > 0
+      }),
+    ),
   )
   function setRibbonTab(id: string) {
     const available = ribbonTabs.value.map((tab) => tab.id)
@@ -153,12 +159,19 @@ export function useToolbarGroups<T extends ToolLike>(deps: {
     const query = deps.toolbarQuery?.().trim() || ''
     if (query) return orderToolbarSearchGroups(toolbarGroups.value, query, 24).groups
     if (!deps.expanded()) return toolbarGroups.value
-    const allow = new Set(ribbonGroupsFor(ribbonTab.value))
-    const visible = toolbarGroups.value.filter((group) => allow.has(group.id))
-    if (visible.length) return visible
+    const allowIds = ribbonGroupsFor(ribbonTab.value)
+    const visible = toolbarGroups.value.filter((group) => allowIds.includes(group.id))
+    const defined = TOOLBAR_GROUPS.map((group) => ({ id: group.id, label: group.label, keyCount: group.keys.length }))
+    const withPlaceholders = hiddenGroupPlaceholders(visible, allowIds, defined)
+    if (withPlaceholders.length) return withPlaceholders
     const fallback = ribbonTabs.value[0]?.id
     if (fallback && fallback !== ribbonTab.value) ribbonTab.value = fallback
-    return toolbarGroups.value.filter((group) => ribbonGroupsFor(fallback || ribbonTab.value).includes(group.id))
+    const fallbackIds = ribbonGroupsFor(fallback || ribbonTab.value)
+    return hiddenGroupPlaceholders(
+      toolbarGroups.value.filter((group) => fallbackIds.includes(group.id)),
+      fallbackIds,
+      defined,
+    )
   })
 
   /** 每个分组当前生效的组内按钮配置（已归一化）。旧分组 id 的配置先迁移到新分组。 */

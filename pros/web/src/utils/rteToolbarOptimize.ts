@@ -63,6 +63,23 @@ export const TOOLBAR_SEARCH_KEYWORDS: Record<string, readonly string[]> = {
   outline: ['大纲'],
   hr: ['分割线'],
   emoji: ['表情'],
+  qrcode: ['二维码', 'qr'],
+  formula: ['公式', 'latex'],
+  video: ['视频'],
+  audio: ['音频'],
+  pageBreak: ['分页', '分页符'],
+  printPreview: ['打印预览'],
+  comment: ['批注', '评论'],
+  footnote: ['脚注'],
+  watermark: ['水印'],
+  emphasisDot: ['着重号'],
+  pastePlain: ['纯文本', '粘贴'],
+  pasteFormat: ['粘贴格式'],
+  tableZebra: ['斑马纹', '隔行'],
+  subscript: ['下标'],
+  superscript: ['上标'],
+  imageReplace: ['换图'],
+  headingAutoNum: ['标题号', '自动编号'],
 }
 
 /** 收掉首尾和连续空格，便于「拼 音」仍能匹配。 */
@@ -125,7 +142,73 @@ export function toolbarSearchStatus(query: string, count: number, best = '', cap
   if (count <= 0) return '没有匹配的按钮'
   const first = best.trim() ? `，首选「${best.trim()}」` : ''
   const more = capped ? '，只列出前若干个' : ''
+  if (count === 1) return `找到 1 个按钮${first}，按 Enter 直接使用`
   return `找到 ${count} 个按钮${first}${more}`
+}
+
+export const EMPTY_GROUP_NOTE = '本组按钮都已隐藏，双击组名恢复'
+
+export const RIBBON_TAB_BLURBS: Record<string, string> = {
+  edit: '撤销、查找、格式刷、粘贴',
+  style: '字号、颜色、加粗、高亮',
+  paragraph: '段落、列表、对齐、行距',
+  writing: '方向、引用样式、纸样',
+  tidy: '半角、全角、空格',
+  insert: '链接、图片、二维码、公式',
+  picture: '排法、换图、替代文本',
+  frame: '圆角、阴影、边框',
+  charts: '基础、统计、关系等图表',
+  table: '插入、斑马纹、冻结、行列',
+  blocks: '告示、分栏、流程图、模板',
+  notes: '批注、脚注、书签',
+  review: '检查、修订、朗读',
+  view: '缩放、大纲、字数',
+  file: '打印、导入、导出',
+  page: '纸张、分页、打印预览',
+}
+
+/** 栏目悬停时写出里面有什么。 */
+export function ribbonTabHint(id: string, label: string): string {
+  const name = label.trim() || '栏目'
+  const blurb = RIBBON_TAB_BLURBS[id]
+  return blurb ? `${name}：${blurb}` : name
+}
+
+/** 定义里有按钮、但当前都被隐藏时，仍留出分组以便恢复。 */
+export function hiddenGroupPlaceholders<T extends { id: string }>(
+  visible: readonly T[],
+  allowedIds: readonly string[],
+  defined: readonly { id: string; label: string; keyCount: number }[],
+): Array<T | { id: string; label: string; tools: []; hiddenAll: true }> {
+  const seen = new Set(visible.map((group) => group.id))
+  const extra: Array<{ id: string; label: string; tools: []; hiddenAll: true }> = []
+  for (const id of allowedIds) {
+    if (seen.has(id)) continue
+    const def = defined.find((item) => item.id === id)
+    if (!def || def.keyCount <= 0) continue
+    extra.push({ id: def.id, label: def.label, tools: [], hiddenAll: true })
+  }
+  return [...visible.map((group) => ({ ...group, hiddenAll: false as const })), ...extra]
+}
+
+export function listToolLabel(kind: 'bullet' | 'ordered' | 'task' | ''): string {
+  if (kind === 'task') return '任务'
+  if (kind === 'ordered') return '有序'
+  if (kind === 'bullet') return '无序'
+  return '列表'
+}
+
+export function formatPainterLabel(mode: 'off' | 'once' | 'sticky'): string {
+  if (mode === 'sticky') return '连刷'
+  if (mode === 'once') return '刷中'
+  return '格式刷'
+}
+
+/** 鼠标移向菜单时多留一点时间，避免菜单提前关掉。 */
+export const MENU_CLOSE_DELAY_MS = 320
+
+export function searchEnterActivates(count: number): boolean {
+  return count === 1
 }
 
 /** 按相关度重排分组和组内按钮。空查询返回空列表。 */

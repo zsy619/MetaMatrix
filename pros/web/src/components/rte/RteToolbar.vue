@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { inject, onMounted, ref } from 'vue'
 import { RTE_BINDINGS } from './bindings'
-import { alignToolTitle, disabledToolTitle, FOCUS_MODE_NOTE, fontFamilyCaption, groupHandleTitle, lineHeightCaption, ribbonTabForDigit, ribbonTabTabIndex, ribbonTypeaheadQuery, searchGroupCaption, stepRibbonTab, toolbarSearchStatus, zoomToolTitle } from '../../utils/rteToolbarOptimize'
+import { alignToolTitle, disabledToolTitle, EMPTY_GROUP_NOTE, FOCUS_MODE_NOTE, fontFamilyCaption, groupHandleTitle, lineHeightCaption, listToolLabel, ribbonTabForDigit, ribbonTabHint, ribbonTabTabIndex, ribbonTypeaheadQuery, searchEnterActivates, searchGroupCaption, stepRibbonTab, toolbarSearchStatus, zoomToolTitle } from '../../utils/rteToolbarOptimize'
 import { useParentScopeStamp } from './inheritScope'
 import { buildChartGroups } from '../../utils/echarts/chartGroups'
 import { TABLE_MENU_ICONS } from './tableMenuIcons'
@@ -121,7 +121,13 @@ function clearToolbarQuery() {
 function focusFirstMatchedTool() {
   const button = document.querySelector('[data-search-best] button.rte-tool:not([disabled])')
     || document.querySelector('.rte-toolbar-tools button.rte-tool:not([disabled])')
-  if (button instanceof HTMLElement) button.focus()
+  if (!(button instanceof HTMLElement)) return
+  if (searchEnterActivates(toolbarSearchCount())) {
+    button.click()
+    clearToolbarQuery()
+    return
+  }
+  button.focus()
 }
 onMounted(() => {
   const tab = document.querySelector(`[data-ribbon-tab="${rteBindings.ribbonTab}"]`)
@@ -159,6 +165,7 @@ function toggleChartGroupMenu(key: string) {
             :class="{ active: rte.ribbonTab === tab.id, 'is-search-miss': !!rte.toolbarQuery && !ribbonHitCount(tab.id) }"
             :aria-selected="rte.ribbonTab === tab.id"
             :tabindex="ribbonTabTabIndex(rte.ribbonTab === tab.id)"
+            :title="ribbonTabHint(tab.id, tab.label)"
             :aria-controls="'rte-group-' + tab.id"
             @click="onRibbonTab(tab.id, $event)"
           >
@@ -290,6 +297,7 @@ function toggleChartGroupMenu(key: string) {
             title="双击恢复本组按钮的默认显隐和顺序"
             @dblclick.stop="rte.restoreToolbarGroupButtons(group.id)"
           >{{ searchGroupCaption(group.label, group.tools.length, !!rte.toolbarQuery) }}</span>
+          <p v-if="group.hiddenAll" data-rte-own class="rte-group-empty">{{ EMPTY_GROUP_NOTE }}</p>
           <button data-rte-own
             v-if="rte.viewMode === 'edit'"
             type="button"
@@ -419,7 +427,7 @@ function toggleChartGroupMenu(key: string) {
               />
             </span>
             <span data-rte-own class="rte-tool-label"
-              >列表<span data-rte-own class="rte-caret" aria-hidden="true"></span
+              >{{ listToolLabel(rte.isActive('taskList') ? 'task' : rte.isActive('orderedList') ? 'ordered' : rte.isActive('bulletList') ? 'bullet' : '') }}<span data-rte-own class="rte-caret" aria-hidden="true"></span>
             ></span>
           </button>
           <Teleport to="body">

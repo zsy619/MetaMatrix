@@ -4601,6 +4601,11 @@ html.rte-toolbar-dragging .rte-root:not(.expanded) .rte-toolbar-tools > .rte-too
 .rte-ribbon-tab.is-search-miss {
   opacity: 0.45;
 }
+.rte-group-empty {
+  margin: 4px 8px 8px;
+  color: #86909c;
+  font-size: 12px;
+}
 .rte-ribbon-hit {
   display: inline-block;
   min-width: 14px;

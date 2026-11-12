@@ -62,11 +62,11 @@ assert.deepEqual(
 )
 assert.deepEqual(
   compactPrimaryKeys(dragged).slice(0, 4),
-  ['color', 'highlight', 'bold', 'italic'], // style 组内仍按 TOOLBAR_GROUPS.keys 顺序
+  ['fontSize', 'color', 'highlight', 'bold'], // style 组内仍按 TOOLBAR_GROUPS.keys 顺序
 )
 assert.deepEqual(
   compactPrimaryKeysByGroup(dragged).map((group) => group.id),
-  ['style', 'paragraph', 'insert', 'edit', 'review'],
+  ['style', 'paragraph', 'insert', 'edit', 'table', 'review'],
 )
 
 // 拖拽后的紧凑主栏（buildToolbarGroups 是紧凑态真正用的组装修配函数）
@@ -74,15 +74,16 @@ const compactTools = [...COMPACT_PRIMARY_KEY_SET].map((key) => ({ key }))
 const compactGroups = buildToolbarGroups(compactTools, normalizeToolbarGroupOrder(dragged))
 assert.deepEqual(
   compactGroups.map((group) => group.id),
-  ['style', 'paragraph', 'insert', 'edit', 'review'],
+  ['style', 'paragraph', 'insert', 'edit', 'table', 'review'],
 )
 assert.deepEqual(
   compactGroups.map((group) => group.tools.map((tool) => tool.key)),
   [
-    ['color', 'highlight', 'bold', 'italic', 'underline', 'strike'],
+    ['fontSize', 'color', 'highlight', 'bold', 'italic', 'underline', 'strike'],
     ['heading', 'list', 'align', 'quote', 'code'],
     ['link', 'image'],
     ['undo', 'redo', 'find'],
+    ['table'],
     ['deepOptimize'],
   ],
 )

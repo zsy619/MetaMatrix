@@ -4,16 +4,22 @@ import {
   disabledToolTitle,
   fontFamilyCaption,
   fontSizeCaption,
+  formatPainterLabel,
   groupHandleTitle,
+  hiddenGroupPlaceholders,
   lineHeightCaption,
+  listToolLabel,
+  MENU_CLOSE_DELAY_MS,
   menuToolNeedsCaret,
   orderToolbarSearchGroups,
   pushRecentValue,
   readStoredRibbonTab,
   recentOptions,
   ribbonTabForDigit,
+  ribbonTabHint,
   ribbonTabTabIndex,
   ribbonTypeaheadQuery,
+  searchEnterActivates,
   searchGroupCaption,
   searchToolbarTools,
   stepRibbonTab,
@@ -78,6 +84,17 @@ assert.equal(ribbonTabForDigit(['edit'], 9), '')
 assert.equal(ribbonTypeaheadQuery('拼', ''), '拼')
 assert.equal(ribbonTypeaheadQuery('Backspace', '拼音'), '拼')
 assert.equal(ribbonTypeaheadQuery('ArrowLeft', '拼'), null)
+assert.equal(toolbarSearchStatus('拼音', 1, '注音'), '找到 1 个按钮，首选「注音」，按 Enter 直接使用')
+assert.equal(ribbonTabHint('table', '表格'), '表格：插入、斑马纹、冻结、行列')
+assert.equal(listToolLabel('ordered'), '有序')
+assert.equal(listToolLabel(''), '列表')
+assert.equal(formatPainterLabel('sticky'), '连刷')
+assert.equal(formatPainterLabel('off'), '格式刷')
+assert.equal(searchEnterActivates(1), true)
+assert.equal(searchEnterActivates(2), false)
+assert.equal(MENU_CLOSE_DELAY_MS >= 300, true)
+assert.equal(hiddenGroupPlaceholders([{ id: 'edit', label: '编辑', tools: [{ key: 'undo' }] }], ['edit', 'writing'], [{ id: 'edit', label: '编辑', keyCount: 3 }, { id: 'writing', label: '书写', keyCount: 3 }, { id: 'other', label: '其他', keyCount: 0 }]).map((group) => group.id).join(','), 'edit,writing')
+assert.equal(searchToolbarTools([{ id: 'insert', label: '插入', tools: [{ key: 'qrcode', label: '二维码' }] }], 'qr')[0]?.key, 'qrcode')
 
 const sizes = [
   { label: '默认', value: '' },
