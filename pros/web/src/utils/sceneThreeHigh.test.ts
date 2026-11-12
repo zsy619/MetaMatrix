@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import sceneThreeHighTemplate from '../templates/scene-three-high-v1.json'
 import {
   clampSceneScore,
   sceneRadarPoint,
@@ -18,6 +19,13 @@ describe('选场景三高', () => {
     expect(sceneThreeHighPasses({ frequency: 7, value: 7, marginal: 7 })).toBe(true)
     expect(sceneThreeHighPasses({ frequency: 9, value: 8, marginal: 6 })).toBe(false)
     expect(sceneThreeHighGaps({ frequency: 9, value: 4, marginal: 6 })).toEqual(['高价值', '高边际成本'])
+  })
+
+  it('默认给出 5 个 FDE 调研场景', () => {
+    const names = sceneThreeHighTemplate.businesses.map((biz) => biz.name)
+    expect(names).toEqual(['销售报价', '客服工单', '内部知识问答', '报销审核', '合规审查'])
+    const passed = sceneThreeHighTemplate.businesses.filter((biz) => sceneThreeHighPasses(biz.scores))
+    expect(passed.map((biz) => biz.name)).toEqual(['销售报价', '客服工单'])
   })
 
   it('10 分落在外圈顶点，0 分落在圆心', () => {
