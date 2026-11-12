@@ -11,8 +11,6 @@ import { listDocuments, searchDocuments } from '../api/documents'
 import { friendlyApiMessage } from '../utils/apiMessage'
 import GuideThumb from '../components/guide/GuideThumb.vue'
 import GuideAside from '../components/guide/GuideAside.vue'
-import LaunchSplash from '../components/guide/LaunchSplash.vue'
-import { LAUNCH_SKIP_KEY, shouldShowLaunch } from '../components/guide/launchSplash'
 import { guideLaneCount, lanesFor, splitMatch } from '../components/guide/guideLanes'
 import { draftWhen, readLocalDrafts, type LocalDraft } from '../components/guide/guideDrafts'
 
@@ -46,18 +44,6 @@ function readStoredCategory(): 'all' | TemplateCategory {
   return 'all'
 }
 
-function readLaunchVisible(): boolean {
-  if (typeof window === 'undefined') return false
-  let seen: string | null = null
-  try {
-    seen = localStorage.getItem(LAUNCH_SKIP_KEY)
-  } catch {
-    seen = null
-  }
-  return shouldShowLaunch(window.location.search, seen)
-}
-
-const showLaunch = ref(readLaunchVisible())
 const activeCategory = ref<'all' | TemplateCategory>(readStoredCategory())
 const templateFilter = ref('')
 const asideCollapsed = ref(false)
@@ -232,16 +218,6 @@ function onGuideScroll() {
   if (current) activeLane.value = current
 }
 
-function finishLaunch(skipNext = false) {
-  showLaunch.value = false
-  try {
-    if (skipNext) localStorage.setItem(LAUNCH_SKIP_KEY, '1')
-    else localStorage.removeItem(LAUNCH_SKIP_KEY)
-  } catch {
-    /* ignore */
-  }
-}
-
 function chooseCategory(id: 'all' | TemplateCategory, scroll = false) {
   activeCategory.value = id
   try {
@@ -347,7 +323,7 @@ function openHit(d: SearchHit) {
 }
 
 function onGuideKey(event: KeyboardEvent) {
-  if (showLaunch.value || event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey) return
+  if (event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey) return
   const target = event.target
   if (
     target instanceof HTMLElement &&
@@ -370,8 +346,7 @@ onUnmounted(() => window.removeEventListener('keydown', onGuideKey))
 </script>
 
 <template>
-  <LaunchSplash v-if="showLaunch" @done="finishLaunch" />
-  <div class="guide-shell" :class="{ 'guide-shell--aside-collapsed': asideCollapsed }" :inert="showLaunch">
+  <div class="guide-shell" :class="{ 'guide-shell--aside-collapsed': asideCollapsed }">
     <div ref="guideMainEl" class="guide-main" @scroll.passive="onGuideScroll">
       <header class="hero">
         <p class="eyebrow">MetaMatrix</p>
