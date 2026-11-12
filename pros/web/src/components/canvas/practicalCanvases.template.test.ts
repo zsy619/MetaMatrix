@@ -229,16 +229,39 @@ describe('实用商业画布', () => {
     expect(isGoldenCircleDoc(migrated) && migrated.blocks.find((block) => block.id === 'why')?.items.map((item) => item.text)).toEqual(['先写信念', '再写证据'])
   })
 
-  it('最近两天新增的画布归在 FDE', () => {
-    const recent = [
-      'project-gantt', 'raci-matrix', 'daily-kanban', 'business-model-canvas', 'cash-flow',
-      'swot', 'lean-canvas', 'value-proposition', 'okr', 'stakeholder-map', 'pdca', 'five-forces',
-      'income-statement', 'value-chain', 'seven-s', 'rice', 'break-even', 'customer-journey',
-      'kano', 'moscow', 'impact-effort', 'vrio', 'golden-circle', 'soar', 'playing-to-win',
-      'ten-check', 'scene-three-high',
-    ] as const
-    for (const id of recent) expect(TEMPLATE_META[id].category).toBe('fde')
-    expect(TEMPLATE_META['y-model'].category).toBe('method')
+  it('通用商业画布不放在 FDE，FDE 画布仍留在 FDE', () => {
+    const restored: Record<string, string> = {
+      'project-gantt': 'method',
+      'raci-matrix': 'method',
+      'daily-kanban': 'org',
+      'business-model-canvas': 'growth',
+      'cash-flow': 'growth',
+      swot: 'growth',
+      'lean-canvas': 'growth',
+      'value-proposition': 'growth',
+      okr: 'method',
+      'stakeholder-map': 'method',
+      pdca: 'org',
+      'five-forces': 'industry',
+      'income-statement': 'growth',
+      'value-chain': 'growth',
+      'seven-s': 'org',
+      rice: 'method',
+      'break-even': 'growth',
+      'customer-journey': 'growth',
+      kano: 'growth',
+      moscow: 'method',
+      'impact-effort': 'method',
+      vrio: 'method',
+      'golden-circle': 'method',
+      soar: 'method',
+      'playing-to-win': 'method',
+    }
+    for (const [id, category] of Object.entries(restored)) {
+      expect(TEMPLATE_META[id as keyof typeof TEMPLATE_META].category).toBe(category)
+    }
+    expect(TEMPLATE_META['ten-check'].category).toBe('fde')
+    expect(TEMPLATE_META['scene-three-high'].category).toBe('fde')
   })
 
   it('甘特图后置任务指向依赖它的行', () => {
