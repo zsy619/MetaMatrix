@@ -1,8 +1,8 @@
-export const LAUNCH_SEEN_KEY = 'metamatrix:launch-seen'
+/** 勾选「下次不再展示」之后写入这里。没勾选就每次进入引导页都播开场。 */
+export const LAUNCH_SKIP_KEY = 'metamatrix:launch-skip'
 
-/** 每个会话看一次。地址带 ?intro=1 时再看一次，方便回到开场。 */
-export function shouldShowLaunch(search: string, seen: string | null): boolean {
+export function shouldShowLaunch(search: string, skipped: string | null): boolean {
   const query = search.startsWith('?') ? search.slice(1) : search
   if (new URLSearchParams(query).get('intro') === '1') return true
-  return seen !== '1'
+  return skipped !== '1'
 }

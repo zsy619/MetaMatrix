@@ -12,7 +12,7 @@ import { friendlyApiMessage } from '../utils/apiMessage'
 import GuideThumb from '../components/guide/GuideThumb.vue'
 import GuideAside from '../components/guide/GuideAside.vue'
 import LaunchSplash from '../components/guide/LaunchSplash.vue'
-import { LAUNCH_SEEN_KEY, shouldShowLaunch } from '../components/guide/launchSplash'
+import { LAUNCH_SKIP_KEY, shouldShowLaunch } from '../components/guide/launchSplash'
 import { guideLaneCount, lanesFor, splitMatch } from '../components/guide/guideLanes'
 import { draftWhen, readLocalDrafts, type LocalDraft } from '../components/guide/guideDrafts'
 
@@ -50,7 +50,7 @@ function readLaunchVisible(): boolean {
   if (typeof window === 'undefined') return false
   let seen: string | null = null
   try {
-    seen = sessionStorage.getItem(LAUNCH_SEEN_KEY)
+    seen = localStorage.getItem(LAUNCH_SKIP_KEY)
   } catch {
     seen = null
   }
@@ -232,10 +232,11 @@ function onGuideScroll() {
   if (current) activeLane.value = current
 }
 
-function finishLaunch() {
+function finishLaunch(skipNext = false) {
   showLaunch.value = false
   try {
-    sessionStorage.setItem(LAUNCH_SEEN_KEY, '1')
+    if (skipNext) localStorage.setItem(LAUNCH_SKIP_KEY, '1')
+    else localStorage.removeItem(LAUNCH_SKIP_KEY)
   } catch {
     /* ignore */
   }

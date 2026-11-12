@@ -2,8 +2,9 @@
 import { onMounted, onUnmounted, ref } from 'vue'
 import { CATEGORY_ACCENT } from '../workspace/palette'
 import type { TemplateCategory } from '../../stores/document'
+import { LAUNCH_SKIP_KEY } from './launchSplash'
 
-const emit = defineEmits<{ done: [] }>()
+const emit = defineEmits<{ done: [skipNext: boolean] }>()
 
 const themes: { id: TemplateCategory; label: string; line: string }[] = [
   { id: 'method', label: '方法框架', line: '双三角、五步法、Y 模型' },
@@ -27,8 +28,18 @@ const coreColors = [
 ]
 
 const skipBtn = ref<HTMLButtonElement | null>(null)
+const skipNextInput = ref<HTMLInputElement | null>(null)
 const enterBtn = ref<HTMLButtonElement | null>(null)
 const leaving = ref(false)
+const skipNext = ref(readSkipNext())
+
+function readSkipNext(): boolean {
+  try {
+    return localStorage.getItem(LAUNCH_SKIP_KEY) === '1'
+  } catch {
+    return false
+  }
+}
 
 function prefersReducedMotion(): boolean {
   return typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -37,7 +48,7 @@ function prefersReducedMotion(): boolean {
 function close() {
   if (leaving.value) return
   leaving.value = true
-  window.setTimeout(() => emit('done'), prefersReducedMotion() ? 0 : 280)
+  window.setTimeout(() => emit('done', skipNext.value), prefersReducedMotion() ? 0 : 280)
 }
 
 function onKey(event: KeyboardEvent) {
@@ -47,7 +58,7 @@ function onKey(event: KeyboardEvent) {
     return
   }
   if (event.key !== 'Tab') return
-  const nodes = [skipBtn.value, enterBtn.value].filter((node): node is HTMLButtonElement => node != null)
+  const nodes = [skipBtn.value, skipNextInput.value, enterBtn.value].filter((node): node is HTMLElement => node != null)
   if (nodes.length < 2) return
   const first = nodes[0]
   const last = nodes[nodes.length - 1]
@@ -171,6 +182,10 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
           <span>{{ theme.line }}</span>
         </li>
       </ul>
+      <label class="skip-next reveal" style="--d: 1.72s">
+        <input ref="skipNextInput" v-model="skipNext" type="checkbox" />
+        下次不再展示
+      </label>
       <button ref="enterBtn" type="button" class="go mm-btn mm-btn--primary reveal" style="--d: 1.82s" @click="close">
         开始选择画布
       </button>
@@ -315,6 +330,23 @@ h1 {
   color: #5f6368;
   font-size: 12px;
   line-height: 1.4;
+}
+.skip-next {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  margin: 0 0 14px;
+  color: #5f6368;
+  font-size: 14px;
+  cursor: pointer;
+}
+.skip-next input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: #1a73e8;
 }
 .go {
   min-width: 168px;
