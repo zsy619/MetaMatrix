@@ -4,7 +4,7 @@ import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import {
   useDocumentStore,
-  isTemplateId,
+  resolveTemplateId,
   TEMPLATE_META,
   type TemplateId,
 } from '../stores/document'
@@ -50,12 +50,13 @@ const openError = ref('')
 const conflictBox = ref<HTMLElement | null>(null)
 const offline = ref(typeof navigator !== 'undefined' ? !navigator.onLine : false)
 
-const templateId = computed<TemplateId>(() => {
-  const raw = String(route.params.templateId ?? 'dual-triangle')
-  return isTemplateId(raw) ? raw : 'dual-triangle'
-})
+const routeTemplateRaw = computed(() => String(route.params.templateId ?? ''))
+const resolvedTemplateId = computed(() => resolveTemplateId(routeTemplateRaw.value))
+const unknownTemplate = computed(() => routeTemplateRaw.value.length > 0 && resolvedTemplateId.value == null)
+const templateId = computed<TemplateId>(() => resolvedTemplateId.value ?? 'dual-triangle')
 
-const badge = computed(() => TEMPLATE_META[templateId.value].badge)
+const badge = computed(() => (unknownTemplate.value ? '未找到' : TEMPLATE_META[templateId.value].badge))
+const canvasName = computed(() => (unknownTemplate.value ? '没有这张画布' : TEMPLATE_META[templateId.value].name))
 const syncLabel = computed(() => {
   if (saving.value) return '同步中…'
   if (offline.value && dirty.value) return '网络已断开，修改留在本机'
@@ -141,6 +142,15 @@ function onConflictKey(event: KeyboardEvent) {
 }
 
 async function bootstrap() {
+  if (unknownTemplate.value) return
+  const raw = routeTemplateRaw.value
+  if (resolvedTemplateId.value && raw && raw !== resolvedTemplateId.value) {
+    await router.replace({
+      name: 'canvas',
+      params: { templateId: resolvedTemplateId.value },
+      query: route.query,
+    })
+  }
   statusMsg.value = ''
   openError.value = ''
   const qid = typeof route.query.documentId === 'string' ? route.query.documentId : ''
@@ -543,6 +553,7 @@ async function manualCheckpoint() {
           aria-label="画布标题"
           @change="commitTitle"
         />
+        <span v-else class="canvas-name">{{ canvasName }}</span>
         <span class="badge">{{ badge }}</span>
       </div>
       <div class="actions">
@@ -601,7 +612,11 @@ async function manualCheckpoint() {
     </Teleport>
     <div class="workspace">
       <main class="main">
-        <CanvasViewport />
+        <div v-if="unknownTemplate" class="missing-canvas">
+          <p>没有名为「{{ routeTemplateRaw }}」的画布。</p>
+          <el-button type="primary" @click="goGuide">返回引导</el-button>
+        </div>
+        <CanvasViewport v-else />
       </main>
       <PageSettingsPanel />
     </div>
@@ -720,6 +735,26 @@ async function manualCheckpoint() {
 .title-input:focus {
   border-color: #dadce0;
   background: #fff;
+}
+
+.canvas-name {
+  font-size: 14px;
+  font-weight: 650;
+  color: #202124;
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.missing-canvas {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  color: #3c4043;
 }
 
 .badge {
