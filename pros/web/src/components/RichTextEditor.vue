@@ -3416,6 +3416,13 @@ function deleteSnippet(sn: RteSnippet) {
   ElMessage.success('已删除片段')
 }
 
+function currentImageAttr(name: string): string {
+  const ed = editor.value
+  if (!ed || !isImageNodeSelected()) return ''
+  const value = ed.getAttributes('image')?.[name]
+  return typeof value === 'string' ? value : ''
+}
+
 function setImageBorderRadius(v: string) {
   editor.value?.chain().focus().updateAttributes('image', { borderRadius: v || null }).run()
 }
@@ -6789,7 +6796,7 @@ const allTools = computed((): ToolItem[] => {
     },
     { key: 'div-ops', label: '', icon: '', kind: 'divider' },
     // —— 字体与颜色 / 段落与列表 ——
-    { key: 'heading', label: '段落', title: '段落样式（正文 / 标题 / 引用）', icon: 'H▾', iconComp: ic('heading'), kind: 'heading', active: () => isActive('heading') || isActive('blockquote') },
+    { key: 'heading', label: '段落', title: '段落样式：正文、标题或引用', icon: 'H▾', iconComp: ic('heading'), kind: 'heading', active: () => isActive('heading') || isActive('blockquote') },
     {
       key: 'bold',
       label: '加粗',
@@ -6878,7 +6885,7 @@ const allTools = computed((): ToolItem[] => {
     },
     {
       key: 'outdent',
-      label: '减少',
+      label: '减缩进',
       title: '把整段向左退回',
       icon: '←',
       iconComp: ic('outdent'),
@@ -6909,6 +6916,7 @@ const allTools = computed((): ToolItem[] => {
         { id: '', label: '自动' },
       ],
       applyPreset: (id: string) => applyTextDir(id === 'rtl' ? 'rtl' : id === 'ltr' ? 'ltr' : ''),
+      currentPreset: () => currentTextDir(),
     },
     {
       key: 'quoteStyle',
@@ -6919,6 +6927,7 @@ const allTools = computed((): ToolItem[] => {
       kind: 'presetMenu',
       presetOptions: QUOTE_STYLE_OPTIONS.map((opt) => ({ id: opt.value, label: opt.label })),
       applyPreset: (id: string) => applyQuoteStyle(id === 'emphasis' || id === 'verse' ? id : 'default'),
+      currentPreset: () => (isActive('blockquote') ? currentQuoteStyle() : ''),
     },
     {
       key: 'writingPaper',
@@ -6999,34 +7008,37 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'imageRadius',
       label: '圆角',
-      title: '图片圆角',
+      title: '给选中图片加圆角',
       icon: '圆',
       iconComp: ic('image'),
       kind: 'presetMenu',
       presetOptions: IMAGE_RADIUS_PRESETS.map((opt) => ({ id: opt.value, label: opt.label })),
       applyPreset: (id: string) => setImageBorderRadius(id),
+      currentPreset: () => currentImageAttr('borderRadius'),
       disabled: () => !isImageNodeSelected(),
     },
     {
       key: 'imageShadow',
       label: '阴影',
-      title: '图片阴影',
+      title: '给选中图片加阴影',
       icon: '影',
       iconComp: ic('image'),
       kind: 'presetMenu',
       presetOptions: IMAGE_SHADOW_PRESETS.map((opt) => ({ id: opt.value, label: opt.label })),
       applyPreset: (id: string) => setImageBoxShadow(id),
+      currentPreset: () => currentImageAttr('boxShadow'),
       disabled: () => !isImageNodeSelected(),
     },
     {
       key: 'imageBorder',
       label: '边框',
-      title: '图片边框',
+      title: '给选中图片加边框',
       icon: '框',
       iconComp: ic('image'),
       kind: 'presetMenu',
       presetOptions: IMAGE_BORDER_PRESETS.map((opt) => ({ id: opt.value, label: opt.label })),
       applyPreset: (id: string) => setImageBorderStyle(id),
+      currentPreset: () => currentImageAttr('borderStyle'),
       disabled: () => !isImageNodeSelected(),
     },
     { key: 'video', label: '视频', title: '插入本地或网络视频', icon: '▶', iconComp: ic('video'), run: insertVideo },

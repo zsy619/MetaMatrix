@@ -568,7 +568,7 @@ function toggleChartGroupMenu(key: string) {
                 rte.isActive('orderedList') ||
                 rte.isActive('taskList'),
             }"
-            :title="rte.isActive('taskList') ? '任务列表' : rte.isActive('orderedList') ? '有序列表' : rte.isActive('bulletList') ? '无序列表' : '列表（无序 / 有序 / 任务）'"
+            :title="rte.isActive('taskList') ? '任务列表' : rte.isActive('orderedList') ? '有序列表' : rte.isActive('bulletList') ? '无序列表' : '无序、有序或任务列表'"
             :aria-label="rte.isActive('taskList') ? '任务列表' : rte.isActive('orderedList') ? '有序列表' : rte.isActive('bulletList') ? '无序列表' : '列表'"
             aria-haspopup="menu"
             :aria-expanded="rte.listOpen"
@@ -1234,7 +1234,9 @@ function toggleChartGroupMenu(key: string) {
             class="rte-tool"
             :ref="(el) => rte.setFloatAnchor('import', el)" data-rte-anchor="import"
             :class="{ active: rte.importMenuOpen }"
-            title="导入"
+            :title="t.title || '导入'"
+            aria-haspopup="menu"
+            :aria-expanded="rte.importMenuOpen"
             @click.stop="rte.markToolbarMenuOpening(); rte.importMenuOpen = !rte.importMenuOpen"
           >
             <span data-rte-own class="rte-tool-icon">
@@ -1256,14 +1258,14 @@ function toggleChartGroupMenu(key: string) {
               @mouseenter="rte.onToolMenuEnter('import')"
               @mouseleave="rte.onToolMenuLeave($event, 'import', rte.closeImportMenu)"
             >
-              <button data-rte-own type="button" class="rte-import-item" @click.stop="rte.pickImportDocument">
+              <button data-rte-own type="button" class="rte-import-item" title="打开 Markdown 或 Word 文档" @click.stop="rte.pickImportDocument">
                 <span data-rte-own class="rte-import-left">
                   <component data-rte-own :is="rte.toolIcon('importDoc')" class="rte-ep-icon" />
                   <span data-rte-own>导入文档</span>
                 </span>
                 <span data-rte-own class="rte-import-pill">MD/Doc</span>
               </button>
-              <button data-rte-own type="button" class="rte-import-item" @click.stop="rte.openImportLinkDialog">
+              <button data-rte-own type="button" class="rte-import-item" title="从链接导入，例如公众号文章" @click.stop="rte.openImportLinkDialog">
                 <span data-rte-own class="rte-import-left">
                   <component data-rte-own :is="rte.toolIcon('importLink')" class="rte-ep-icon" />
                   <span data-rte-own>导入链接</span>
@@ -1284,7 +1286,9 @@ function toggleChartGroupMenu(key: string) {
             class="rte-tool"
             :ref="(el) => rte.setFloatAnchor('export', el)" data-rte-anchor="export"
             :class="{ active: rte.exportMenuOpen }"
-            title="导出"
+            :title="t.title || '导出'"
+            aria-haspopup="menu"
+            :aria-expanded="rte.exportMenuOpen"
             @click.stop="rte.markToolbarMenuOpening(); rte.exportMenuOpen = !rte.exportMenuOpen"
           >
             <span data-rte-own class="rte-tool-icon">
@@ -1306,28 +1310,28 @@ function toggleChartGroupMenu(key: string) {
               @mouseenter="rte.onToolMenuEnter('export')"
               @mouseleave="rte.onToolMenuLeave($event, 'export', rte.closeExportMenu)"
             >
-              <button data-rte-own type="button" class="rte-import-item" @click.stop="rte.copyAsFeishuHtml">
+              <button data-rte-own type="button" class="rte-import-item" title="复制成飞书能粘贴的 HTML" @click.stop="rte.copyAsFeishuHtml">
                 <span data-rte-own class="rte-import-left">
                   <component data-rte-own :is="rte.toolIcon('exportHtml')" class="rte-ep-icon" />
                   <span data-rte-own>复制为 HTML</span>
                 </span>
                 <span data-rte-own class="rte-import-pill">飞书</span>
               </button>
-              <button data-rte-own type="button" class="rte-import-item" @click.stop="rte.exportAsHtml">
+              <button data-rte-own type="button" class="rte-import-item" title="下载成网页文件" @click.stop="rte.exportAsHtml">
                 <span data-rte-own class="rte-import-left">
                   <component data-rte-own :is="rte.toolIcon('exportHtml')" class="rte-ep-icon" />
                   <span data-rte-own>导出 HTML</span>
                 </span>
                 <span data-rte-own class="rte-import-pill">.html</span>
               </button>
-              <button data-rte-own type="button" class="rte-import-item" @click.stop="rte.exportAsPlainText">
+              <button data-rte-own type="button" class="rte-import-item" title="下载成没有格式的文本" @click.stop="rte.exportAsPlainText">
                 <span data-rte-own class="rte-import-left">
                   <component data-rte-own :is="rte.toolIcon('exportText')" class="rte-ep-icon" />
                   <span data-rte-own>导出纯文本</span>
                 </span>
                 <span data-rte-own class="rte-import-pill">.txt</span>
               </button>
-              <button data-rte-own type="button" class="rte-import-item" @click.stop="rte.exportAsMarkdown">
+              <button data-rte-own type="button" class="rte-import-item" title="下载成 Markdown 文件" @click.stop="rte.exportAsMarkdown">
                 <span data-rte-own class="rte-import-left">
                   <component data-rte-own :is="rte.toolIcon('exportText')" class="rte-ep-icon" />
                   <span data-rte-own>导出 Markdown</span>
@@ -1337,6 +1341,7 @@ function toggleChartGroupMenu(key: string) {
               <button data-rte-own
                 type="button"
                 class="rte-import-item"
+                :title="rte.exportBusy ? '正在导出，请稍候' : '把文档导出成 PNG 图片'"
                 :disabled="rte.exportBusy"
                 @click.stop="rte.exportAsPng"
               >
@@ -1349,6 +1354,7 @@ function toggleChartGroupMenu(key: string) {
               <button data-rte-own
                 type="button"
                 class="rte-import-item"
+                :title="rte.exportBusy ? '正在导出，请稍候' : '把文档导出成 PDF'"
                 :disabled="rte.exportBusy"
                 @click.stop="rte.exportAsPdf"
               >
@@ -1361,6 +1367,7 @@ function toggleChartGroupMenu(key: string) {
               <button data-rte-own
                 type="button"
                 class="rte-import-item"
+                :title="rte.exportBusy ? '正在导出，请稍候' : '把文档导出成 Word'"
                 :disabled="rte.exportBusy"
                 @click.stop="rte.exportAsDocx"
               >
@@ -1426,8 +1433,8 @@ function toggleChartGroupMenu(key: string) {
               :ref="(el) => rte.setFloatAnchor('codeLang', el)"
               data-rte-anchor="codeLang"
               :class="{ active: rte.codeLangOpen }"
-              title="代码语言"
-              aria-label="代码语言"
+              :title="'代码语言：' + rte.codeLanguageLabel(rte.currentCodeLanguage())"
+              :aria-label="'代码语言：' + rte.codeLanguageLabel(rte.currentCodeLanguage())"
               :aria-expanded="rte.codeLangOpen"
               aria-haspopup="listbox"
               @mousedown.prevent
@@ -1465,8 +1472,8 @@ function toggleChartGroupMenu(key: string) {
             class="rte-code-flag-btn"
             :class="{ 'is-on': rte.codeBlockFlag('lineNumbers') }"
             :aria-pressed="rte.codeBlockFlag('lineNumbers')"
-            title="显示行号"
-            aria-label="行号"
+            title="在代码块左侧显示行号"
+            aria-label="在代码块左侧显示行号"
             @mousedown.prevent
             @click="rte.toggleCodeBlockFlag('lineNumbers')"
           >
@@ -1478,8 +1485,8 @@ function toggleChartGroupMenu(key: string) {
             class="rte-code-flag-btn"
             :class="{ 'is-on': rte.codeBlockFlag('wordWrap') }"
             :aria-pressed="rte.codeBlockFlag('wordWrap')"
-            title="自动换行"
-            aria-label="自动换行"
+            title="长行在代码块里自动换行"
+            aria-label="长行在代码块里自动换行"
             @mousedown.prevent
             @click="rte.toggleCodeBlockFlag('wordWrap')"
           >
@@ -1489,8 +1496,8 @@ function toggleChartGroupMenu(key: string) {
             v-if="rte.isActive('codeBlock')"
             type="button"
             class="rte-code-copy-btn"
-            title="复制代码块"
-            aria-label="复制代码块"
+            title="把这段代码复制到剪贴板"
+            aria-label="把这段代码复制到剪贴板"
             @mousedown.prevent
             @click="rte.copyActiveCodeBlock"
           >
@@ -2190,9 +2197,9 @@ function toggleChartGroupMenu(key: string) {
               @mouseenter="rte.onToolMenuEnter('viewExtras')"
               @mouseleave="rte.onToolMenuLeave($event, 'viewExtras', () => (rte.viewExtrasOpen = false))"
             >
-              <button data-rte-own type="button" :class="{ active: rte.focusMode }" @click="rte.toggleFocusMode"><RteMenuGlyph label="专注模式" />专注模式</button>
-              <button data-rte-own type="button" :class="{ active: rte.darkEditor }" @click="rte.toggleDarkEditor"><RteMenuGlyph label="暗色编辑区" />暗色编辑区</button>
-              <button data-rte-own type="button" :class="{ active: rte.paperGuide }" @click="rte.togglePaperGuide"><RteMenuGlyph label="纸张参考线" />纸张参考线</button>
+              <button data-rte-own type="button" :class="{ active: rte.focusMode }" :aria-pressed="rte.focusMode" @click="rte.toggleFocusMode"><RteMenuGlyph label="专注模式" />专注模式</button>
+              <button data-rte-own type="button" :class="{ active: rte.darkEditor }" :aria-pressed="rte.darkEditor" @click="rte.toggleDarkEditor"><RteMenuGlyph label="暗色编辑区" />暗色编辑区</button>
+              <button data-rte-own type="button" :class="{ active: rte.paperGuide }" :aria-pressed="rte.paperGuide" @click="rte.togglePaperGuide"><RteMenuGlyph label="纸张参考线" />纸张参考线</button>
               <template data-rte-own v-if="rte.pageSheetEnabled">
                 <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
                 <div data-rte-own class="rte-page-size-label">页面大小</div>
@@ -2333,6 +2340,8 @@ function toggleChartGroupMenu(key: string) {
                 v-for="opt in t.presetOptions"
                 :key="t.key + '-' + opt.label"
                 type="button"
+                :class="{ active: (t.currentPreset?.() || '') === opt.id }"
+                :aria-pressed="(t.currentPreset?.() || '') === opt.id"
                 @click="t.applyPreset?.(opt.id); rte.closePresetMenu()"
               >
                 <RteMenuGlyph :id="opt.id" :label="opt.label" />{{ opt.label }}
@@ -2562,6 +2571,8 @@ function toggleChartGroupMenu(key: string) {
                 v-for="opt in mt.presetOptions"
                 :key="'mpreset-' + mt.key + '-' + opt.label"
                 type="button"
+                :class="{ active: (mt.currentPreset?.() || '') === opt.id }"
+                :aria-pressed="(mt.currentPreset?.() || '') === opt.id"
                 @click="mt.applyPreset?.(opt.id); rte.closePresetMenu()"
               >
                 <RteMenuGlyph :id="opt.id" :label="opt.label" />{{ opt.label }}
@@ -2668,9 +2679,9 @@ function toggleChartGroupMenu(key: string) {
               class="rte-menu rte-more-flyout"
               @mousedown.prevent
             >
-              <button data-rte-own type="button" :class="{ active: rte.focusMode }" @click="rte.toggleFocusMode"><RteMenuGlyph label="专注模式" />专注模式</button>
-              <button data-rte-own type="button" :class="{ active: rte.darkEditor }" @click="rte.toggleDarkEditor"><RteMenuGlyph label="暗色编辑区" />暗色编辑区</button>
-              <button data-rte-own type="button" :class="{ active: rte.paperGuide }" @click="rte.togglePaperGuide"><RteMenuGlyph label="纸张参考线" />纸张参考线</button>
+              <button data-rte-own type="button" :class="{ active: rte.focusMode }" :aria-pressed="rte.focusMode" @click="rte.toggleFocusMode"><RteMenuGlyph label="专注模式" />专注模式</button>
+              <button data-rte-own type="button" :class="{ active: rte.darkEditor }" :aria-pressed="rte.darkEditor" @click="rte.toggleDarkEditor"><RteMenuGlyph label="暗色编辑区" />暗色编辑区</button>
+              <button data-rte-own type="button" :class="{ active: rte.paperGuide }" :aria-pressed="rte.paperGuide" @click="rte.togglePaperGuide"><RteMenuGlyph label="纸张参考线" />纸张参考线</button>
               <template data-rte-own v-if="rte.pageSheetEnabled">
                 <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
                 <div data-rte-own class="rte-page-size-label">页面大小</div>

@@ -372,7 +372,7 @@ function onDocPointerDownForMenus(e: PointerEvent) {
 }
 
 
-  const FLOAT_MENU_SELECTOR = '.rte-menu, .rte-more-menu, .rte-emoji-panel, .rte-specialchars-panel, .rte-spacing-panel'
+  const FLOAT_MENU_SELECTOR = '.rte-menu, .rte-more-menu, .rte-import-menu, .rte-emoji-panel, .rte-specialchars-panel, .rte-spacing-panel'
 
   function menuButtons(root: ParentNode): HTMLElement[] {
     return [...root.querySelectorAll('button')].filter((el): el is HTMLElement => el instanceof HTMLElement && !el.hasAttribute('disabled'))
