@@ -1770,6 +1770,24 @@
 .rte-more-item:disabled:hover {
   background: transparent;
 }
+.rte-more-kbd {
+  margin-left: auto;
+  color: #86909c;
+  font-size: 11px;
+}
+.rte-toolbar-search-jump {
+  margin: 0 8px 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #4e5969;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.rte-toolbar-search-jump:hover {
+  color: #165dff;
+}
 
 .rte-more-icon {
   width: 18px;

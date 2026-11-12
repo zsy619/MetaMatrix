@@ -6863,11 +6863,11 @@ const allTools = computed((): ToolItem[] => {
       active: () => isActive('highlight'),
     },
     { key: 'color', label: '颜色', title: '文字颜色', icon: 'A', iconComp: ic('color'), kind: 'color' },
-    { key: 'fontSize', label: '字号', icon: 'Aa', iconComp: ic('fontSize'), kind: 'fontSize', active: () => !!currentFontSize() },
-    { key: 'fontFamily', label: '字体', icon: 'F', iconComp: ic('fontFamily'), kind: 'fontFamily', active: () => !!currentFontFamily() },
-    { key: 'lineHeight', label: '行距', icon: '↕', iconComp: ic('lineHeight'), kind: 'lineHeight', active: () => !!currentLineHeight() },
-    { key: 'align', label: '对齐', icon: '≡', iconComp: ic('align'), kind: 'align' },
-    { key: 'list', label: '列表', icon: '☰▾', iconComp: ic('list'), kind: 'list' },
+    { key: 'fontSize', label: '字号', title: '设置字号', icon: 'Aa', iconComp: ic('fontSize'), kind: 'fontSize', active: () => !!currentFontSize() },
+    { key: 'fontFamily', label: '字体', title: '设置字体', icon: 'F', iconComp: ic('fontFamily'), kind: 'fontFamily', active: () => !!currentFontFamily() },
+    { key: 'lineHeight', label: '行距', title: '设置行距', icon: '↕', iconComp: ic('lineHeight'), kind: 'lineHeight', active: () => !!currentLineHeight() },
+    { key: 'align', label: '对齐', title: '左对齐、居中、右对齐或两端对齐', icon: '≡', iconComp: ic('align'), kind: 'align' },
+    { key: 'list', label: '列表', title: '无序、有序或任务列表', icon: '☰▾', iconComp: ic('list'), kind: 'list' },
     {
       key: 'indent',
       label: '缩进',
@@ -6887,13 +6887,13 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'firstIndent',
       label: '首行',
-      title: '首行缩进 2 字',
+      title: currentTextIndent() ? '首行缩进已开启，再点一次取消' : '首行缩进 2 字',
       icon: '⇨',
       iconComp: ic('firstIndent'),
       active: () => !!currentTextIndent(),
       run: toggleFirstLineIndent,
     },
-    { key: 'spacing', label: '段距', title: '段前段后 / 字间距', icon: '↕', iconComp: ic('spacing'), kind: 'spacing', active: () => !!(currentLetterSpacing() || currentMarginTop() || currentMarginBottom()) },
+    { key: 'spacing', label: '段距', title: (currentLetterSpacing() || currentMarginTop() || currentMarginBottom()) ? '已设置段距或字间距' : '段前、段后和字间距', icon: '↕', iconComp: ic('spacing'), kind: 'spacing', active: () => !!(currentLetterSpacing() || currentMarginTop() || currentMarginBottom()) },
     { key: 'div-text', label: '', icon: '', kind: 'divider' },
     // —— 高级（段落）——
     {
@@ -6995,7 +6995,7 @@ const allTools = computed((): ToolItem[] => {
     { key: 'imageReplace', label: '换图', title: '替换选中图片，保留题注和裁剪', icon: '↻', iconComp: ic('image'), run: () => void replaceImageByUrl(), disabled: () => !isImageNodeSelected() },
     { key: 'imageAlt', label: '替代文本', title: '给选中图片写替代文本', icon: 'Alt', iconComp: ic('image'), run: () => void promptImageAlt(), disabled: () => !isImageNodeSelected() },
     { key: 'spoiler', label: '揭晓', title: '把选中文字收成揭晓文字', icon: '眼', run: toggleSpoiler },
-    { key: 'dropCap', label: '首字', title: '段落首字下沉', icon: 'A', run: toggleDropCap },
+    { key: 'dropCap', label: '首字', title: '把段落第一个字放大下沉', icon: 'A', run: toggleDropCap },
     {
       key: 'imageRadius',
       label: '圆角',
@@ -7061,6 +7061,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'form',
       label: '表单',
+      title: '插入单选、多选、文本、日期等控件',
       icon: '☑▾',
       iconComp: ic('form'),
       kind: 'form',
@@ -7082,7 +7083,7 @@ const allTools = computed((): ToolItem[] => {
       iconComp: ic('template'),
       kind: 'template',
     },
-    { key: 'table', label: '表格', icon: '▦', iconComp: ic('table'), kind: 'table', active: () => isInTable(), run: onTableToolClick },
+    { key: 'table', label: '表格', title: '插入表格，或在表内做行列操作', icon: '▦', iconComp: ic('table'), kind: 'table', active: () => isInTable(), run: onTableToolClick },
     { key: 'attach', label: '附件', title: '插入或选择附件', icon: '☁▾', iconComp: ic('attach'), kind: 'attach', run: onAttachment },
     { key: 'note', label: '注释', title: '插入文内注释', icon: '[1]', iconComp: ic('note'), run: insertNote },
     {
@@ -7270,7 +7271,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'suggest',
       label: '建议',
-      title: '建议模式：插入和删除记成修订',
+      title: suggesting.value ? '建议模式已开启，再点一次关闭' : '把插入和删除记成修订',
       icon: '改',
       iconComp: ic('highlight'),
       active: () => suggesting.value,
@@ -7466,8 +7467,8 @@ const allTools = computed((): ToolItem[] => {
       applyPreset: (id: string) => runTableOpFromToolbar(id),
       disabled: () => !isInTable(),
     },
-    { key: 'tableSticky', label: '冻结表头', title: '滚动时表头保持可见', icon: '表头', run: toggleTableHeaderStickyBar, active: () => tableHeaderSticky.value },
-    { key: 'tableColSticky', label: '冻结首列', title: '横向滚动时首列保持可见', icon: '首列', run: toggleTableColStickyBar, active: () => tableColSticky.value },
+    { key: 'tableSticky', label: '冻结表头', title: tableHeaderSticky.value ? '表头冻结已开启，再点一次关闭' : '滚动时表头保持可见', icon: '表头', run: toggleTableHeaderStickyBar, active: () => tableHeaderSticky.value },
+    { key: 'tableColSticky', label: '冻结首列', title: tableColSticky.value ? '首列冻结已开启，再点一次关闭' : '横向滚动时首列保持可见', icon: '首列', run: toggleTableColStickyBar, active: () => tableColSticky.value },
     {
       key: 'tableFilter',
       label: '表筛选',
@@ -7586,8 +7587,8 @@ const allTools = computed((): ToolItem[] => {
       active: () => shortcutsOpen.value,
       run: toggleShortcutsPanel,
     },
-    { key: 'import', label: '导入', icon: '⇪▾', iconComp: ic('import'), kind: 'import', run: onImport },
-    { key: 'export', label: '导出', icon: '⇩▾', iconComp: ic('export'), kind: 'export', run: onExportMenu },
+    { key: 'import', label: '导入', title: '导入 Markdown 或文档', icon: '⇪▾', iconComp: ic('import'), kind: 'import', run: onImport },
+    { key: 'export', label: '导出', title: '导出 HTML、文本、图片、PDF 或 Word', icon: '⇩▾', iconComp: ic('export'), kind: 'export', run: onExportMenu },
     // 草稿备份：按产品要求先隐藏入口（保留 onDraftBackup 逻辑）
     // { key: 'draft', label: '草稿备份', icon: '⏱', run: onDraftBackup },
   ]

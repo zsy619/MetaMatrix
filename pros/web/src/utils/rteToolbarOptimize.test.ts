@@ -23,6 +23,8 @@ import {
   ribbonTabTabIndex,
   ribbonTypeaheadQuery,
   searchEnterActivates,
+  shortcutFromTitle,
+  shortcutNeedles,
   spellcheckToolTitle,
   searchGroupCaption,
   stepRibbonTabBy,
@@ -116,6 +118,12 @@ assert.equal(spellcheckToolTitle(true).includes('已开启'), true)
 assert.equal(searchToolbarTools([{ id: 'review', label: '审阅', tools: [{ key: 'snippets', label: '片段' }] }], '常用语')[0]?.key, 'snippets')
 assert.equal(searchToolbarTools([{ id: 'table', label: '表格', tools: [{ key: 'tableZebra', label: '斑马纹' }, { key: 'table', label: '表格' }] }], '表格')[0]?.key, 'table')
 assert.equal(searchToolbarTools([{ id: 'table', label: '表格', tools: [{ key: 'tableZebra', label: '斑马纹' }] }], '表格').length, 1)
+assert.equal(shortcutFromTitle('加粗 (Ctrl/⌘+B)'), 'Ctrl/⌘+B')
+assert.equal(shortcutFromTitle('没有快捷键'), '')
+assert.ok(shortcutNeedles('加粗 (Ctrl/⌘+B)').includes('ctrl+b'))
+assert.equal(searchToolbarTools([{ id: 'style', label: '字体与颜色', tools: [{ key: 'bold', label: '加粗', title: '加粗 (Ctrl/⌘+B)' }] }], 'ctrl+b')[0]?.key, 'bold')
+assert.equal(searchToolbarTools([{ id: 'insert', label: '插入', tools: [{ key: 'form', label: '表单' }] }], '单选')[0]?.key, 'form')
+assert.equal(searchToolbarTools([{ id: 'review', label: '审阅', tools: [{ key: 'deepOptimize', label: '深优化' }] }], '一键整理')[0]?.key, 'deepOptimize')
 assert.equal(menuToolNeedsCaret('wordStats'), true)
 assert.equal(menuToolNeedsCaret('attach'), false)
 

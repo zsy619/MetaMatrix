@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { inject, onMounted, ref } from 'vue'
+import { inject, onMounted, ref, watch } from 'vue'
 import { RTE_BINDINGS } from './bindings'
-import { alignToolTitle, disabledToolTitle, EMPTY_GROUP_NOTE, FOCUS_MODE_NOTE, fontFamilyCaption, groupHandleTitle, lineHeightCaption, listToolLabel, menuToolNeedsCaret, ribbonTabForDigit, ribbonTabHint, ribbonTabTabIndex, ribbonTypeaheadQuery, searchEnterActivates, searchGroupCaption, stepRibbonTab, stepRibbonTabBy, tableToolLabel, toolbarSearchStatus, zoomToolLabel, zoomToolTitle } from '../../utils/rteToolbarOptimize'
+import { alignToolTitle, disabledToolTitle, EMPTY_GROUP_NOTE, FOCUS_MODE_NOTE, fontFamilyCaption, groupHandleTitle, lineHeightCaption, listToolLabel, menuToolNeedsCaret, ribbonTabForDigit, ribbonTabHint, ribbonTabTabIndex, ribbonTypeaheadQuery, searchEnterActivates, searchGroupCaption, shortcutFromTitle, stepRibbonTab, stepRibbonTabBy, tableToolLabel, toolbarSearchStatus, zoomToolLabel, zoomToolTitle } from '../../utils/rteToolbarOptimize'
 import { useParentScopeStamp } from './inheritScope'
 import { buildChartGroups } from '../../utils/echarts/chartGroups'
 import { TABLE_MENU_ICONS } from './tableMenuIcons'
@@ -162,6 +162,11 @@ onMounted(() => {
   const tab = document.querySelector(`[data-ribbon-tab="${rteBindings.ribbonTab}"]`)
   tab?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
 })
+watch(() => rteBindings.toolbarQuery, () => {
+  requestAnimationFrame(() => {
+    document.querySelector('[data-search-best]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  })
+})
 
 function toggleChartGroupMenu(key: string) {
   const wasOpen = rteBindings.echartsGroupMenuKey === key
@@ -276,7 +281,7 @@ function toggleChartGroupMenu(key: string) {
         />
         <button data-rte-own v-if="rte.toolbarQuery" type="button" class="rte-toolbar-search-clear" aria-label="清除搜索" @click="clearToolbarQuery">×</button>
       </label>
-      <p v-if="toolbarSearchMessage()" id="rte-toolbar-search-status" data-rte-own class="rte-toolbar-mode-note" role="status">{{ toolbarSearchMessage() }}</p>
+      <button v-if="toolbarSearchMessage()" id="rte-toolbar-search-status" data-rte-own type="button" class="rte-toolbar-search-jump" @click="focusFirstMatchedTool">{{ toolbarSearchMessage() }}</button>
       <div data-rte-own
         class="rte-toolbar-tools"
         :class="{
@@ -2345,7 +2350,10 @@ function toggleChartGroupMenu(key: string) {
                   (mt.kind === 'fontFamily' && rte.moreFontFamilyOpen) ||
                   (mt.kind === 'lineHeight' && rte.moreLineHeightOpen),
               }"
+              :data-tool-key="mt.key"
               :title="disabledToolTitle(mt.title || mt.label, !!mt.disabled?.())"
+              :aria-keyshortcuts="shortcutFromTitle(mt.title || '') || undefined"
+              :aria-pressed="mt.active ? !!mt.active() : undefined"
               :disabled="mt.disabled?.() || undefined"
               @click="rte.onMoreToolClick(mt)"
             >
@@ -2358,6 +2366,7 @@ function toggleChartGroupMenu(key: string) {
                 <template v-else>{{ mt.icon }}</template>
               </span>
               <span data-rte-own>{{ mt.label }}</span>
+              <span v-if="shortcutFromTitle(mt.title || '')" data-rte-own class="rte-more-kbd">{{ shortcutFromTitle(mt.title || '') }}</span>
               <span data-rte-own
                 v-if="mt.kind === 'attach' || menuToolNeedsCaret(mt.kind)"
                 class="rte-more-caret"

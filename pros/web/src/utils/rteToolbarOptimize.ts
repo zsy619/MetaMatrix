@@ -53,8 +53,8 @@ export const TOOLBAR_SEARCH_KEYWORDS: Record<string, readonly string[]> = {
   paraStyle: ['段样式', '导语'],
   zoom: ['缩放'],
   print: ['打印'],
-  export: ['导出', 'pdf', 'word'],
-  import: ['导入'],
+  import: ['导入', '打开文档'],
+  export: ['导出', 'pdf', 'word', '下载'],
   textTidy: ['整理', '半角', '全角'],
   textDir: ['方向', '从右到左'],
   writingPaper: ['纸样', '田字格', '稿纸', '信纸'],
@@ -98,11 +98,68 @@ export const TOOLBAR_SEARCH_KEYWORDS: Record<string, readonly string[]> = {
   linkCheck: ['链接检查', '死链'],
   outbound: ['外链', '白名单'],
   note: ['注释'],
+  form: ['表单', '单选', '多选'],
+  spacing: ['段距', '段前', '字间距'],
+  firstIndent: ['首行缩进', '首行'],
+  indent: ['增加缩进', '缩进'],
+  outdent: ['减少缩进'],
+  dropCap: ['首字下沉', '首字'],
+  spoiler: ['揭晓'],
+  imageRadius: ['圆角'],
+  imageShadow: ['阴影'],
+  imageBorder: ['边框'],
+  imageAlt: ['替代文本', 'alt'],
+  tableSticky: ['冻结表头', '表头'],
+  tableColSticky: ['冻结首列', '首列'],
+  tableFilter: ['筛选', '过滤'],
+  tableEqual: ['均分列', '列宽'],
+  tableSort: ['排序', '升序', '降序'],
+  tableCsv: ['csv', '导出表格'],
+  suggest: ['建议', '修订建议'],
+  suggestAccept: ['接受修订', '接受'],
+  suggestReject: ['拒绝修订', '拒绝'],
+  deepOptimize: ['深度优化', '一键整理'],
+  toggleBlock: ['折叠'],
+  tabsBlock: ['标签页', '分页签'],
+  blockOps: ['块操作', '上移', '下移'],
+  insertDate: ['日期', '今天'],
+  pageSetup: ['页面设置', '页边距'],
+  paperGuide: ['参考线', '纸张边界'],
+  printUrls: ['打印链接', '印出网址'],
+  copyMd: ['markdown', '复制markdown'],
+  audit: ['审计', '操作记录'],
+  inlineAi: ['改写', '文内'],
+  cjkTip: ['禁则', '避头尾'],
+  captionNum: ['题注', '图注'],
+  footnoteList: ['脚注区', '脚注列表'],
+  linkButton: ['按钮', '链接按钮'],
+  crossDoc: ['跨文档'],
 }
 
 /** 收掉首尾和连续空格，便于「拼 音」仍能匹配。 */
 export function normalizeToolbarQuery(query: string): string {
   return query.trim().replace(/\s+/g, ' ').toLowerCase()
+}
+
+/** 从「加粗 (Ctrl/⌘+B)」里取出快捷键。 */
+export function shortcutFromTitle(title: string): string {
+  const matched = title.match(/[(（]([^()（）]*[+＋][^()（）]*)[)）]/)
+  return matched?.[1]?.trim() || ''
+}
+
+export function shortcutNeedles(title: string): string[] {
+  const raw = shortcutFromTitle(title)
+  if (!raw) return []
+  const out = new Set<string>()
+  const combined = raw.toLowerCase().replace(/ctrl\/⌘/g, 'ctrl').replace(/\s/g, '')
+  if (combined) out.add(combined)
+  for (const bit of raw.split('/')) {
+    const text = bit.trim().toLowerCase().replace(/\s/g, '')
+    if (!text) continue
+    out.add(text)
+    out.add(text.replace(/⌘/g, 'ctrl'))
+  }
+  return [...out]
 }
 
 function searchScoreOne(tool: ToolbarSearchTool, query: string): number {
@@ -111,11 +168,13 @@ function searchScoreOne(tool: ToolbarSearchTool, query: string): number {
   const title = (tool.title || '').toLowerCase()
   const aliases = (TOOLBAR_SEARCH_KEYWORDS[tool.key] || []).map((item) => item.toLowerCase())
   const key = tool.key.toLowerCase()
+  const folded = query.replace(/\s/g, '')
   if (label === query) return 0
   if (label.startsWith(query)) return 1
   if (label.includes(query)) return 2
   if (aliases.some((item) => item === query || item.includes(query))) return 3
   if (title.includes(query)) return 4
+  if (folded.length >= 2 && shortcutNeedles(tool.title || '').some((item) => item.includes(folded))) return 4
   if (key.includes(query)) return 5
   return -1
 }
