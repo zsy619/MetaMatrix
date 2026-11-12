@@ -321,9 +321,9 @@ const weakest = computed(() => {
 .block header p { margin-top: 4px; color: #5c574e; font-size: 13px; line-height: 1.5; }
 .block :deep(.rte-root) {
   margin-top: 8px;
-  height: 120px;
-  min-height: 120px;
-  max-height: 120px;
+  height: 150px;
+  min-height: 150px;
+  max-height: 150px;
   overflow: hidden;
   border: none;
   background: transparent;
