@@ -6751,7 +6751,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'clear',
       label: '清除格式',
-      title: '清除格式',
+      title: '清除选中文字的加粗、颜色等格式',
       icon: '⌫',
       iconComp: ic('clear'),
       run: clearFormat,
@@ -6863,15 +6863,15 @@ const allTools = computed((): ToolItem[] => {
       active: () => isActive('highlight'),
     },
     { key: 'color', label: '颜色', title: '文字颜色', icon: 'A', iconComp: ic('color'), kind: 'color' },
-    { key: 'fontSize', label: '字号', title: '设置字号', icon: 'Aa', iconComp: ic('fontSize'), kind: 'fontSize', active: () => !!currentFontSize() },
-    { key: 'fontFamily', label: '字体', title: '设置字体', icon: 'F', iconComp: ic('fontFamily'), kind: 'fontFamily', active: () => !!currentFontFamily() },
-    { key: 'lineHeight', label: '行距', title: '设置行距', icon: '↕', iconComp: ic('lineHeight'), kind: 'lineHeight', active: () => !!currentLineHeight() },
+    { key: 'fontSize', label: '字号', title: '设置字号，如小四、12 磅', icon: 'Aa', iconComp: ic('fontSize'), kind: 'fontSize', active: () => !!currentFontSize() },
+    { key: 'fontFamily', label: '字体', title: '设置字体，如宋体、黑体', icon: 'F', iconComp: ic('fontFamily'), kind: 'fontFamily', active: () => !!currentFontFamily() },
+    { key: 'lineHeight', label: '行距', title: '设置行距，如 1.5 倍', icon: '↕', iconComp: ic('lineHeight'), kind: 'lineHeight', active: () => !!currentLineHeight() },
     { key: 'align', label: '对齐', title: '左对齐、居中、右对齐或两端对齐', icon: '≡', iconComp: ic('align'), kind: 'align' },
     { key: 'list', label: '列表', title: '无序、有序或任务列表', icon: '☰▾', iconComp: ic('list'), kind: 'list' },
     {
       key: 'indent',
       label: '缩进',
-      title: '增加缩进',
+      title: '把整段向右缩进',
       icon: '→',
       iconComp: ic('indent'),
       run: indentBlock,
@@ -6879,7 +6879,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'outdent',
       label: '减少',
-      title: '减少缩进',
+      title: '把整段向左退回',
       icon: '←',
       iconComp: ic('outdent'),
       run: outdentBlock,
@@ -6948,7 +6948,7 @@ const allTools = computed((): ToolItem[] => {
       kind: 'callout',
       active: () => isActive('callout'),
     },
-    { key: 'hr', label: '分割线', title: '分割线样式', icon: '┄', iconComp: ic('hr'), kind: 'hr' },
+    { key: 'hr', label: '分割线', title: '插入分割线，并可选择样式', icon: '┄', iconComp: ic('hr'), kind: 'hr' },
     {
       key: 'blockOps',
       label: '块',
@@ -6987,7 +6987,7 @@ const allTools = computed((): ToolItem[] => {
       iconComp: ic('pageBreak'),
       run: insertPageBreak,
     },
-    { key: 'columns', label: '分栏', title: '多栏布局', icon: '▥', iconComp: ic('columns'), kind: 'columns' },
+    { key: 'columns', label: '分栏', title: '把内容分成多栏', icon: '▥', iconComp: ic('columns'), kind: 'columns' },
     { key: 'div-block', label: '', icon: '', kind: 'divider' },
     // —— 插入 ——
     { key: 'image', label: '图片', title: '插入图片', icon: '🖼', iconComp: ic('image'), run: insertImage },
@@ -7078,7 +7078,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'template',
       label: '模板',
-      title: '插入模板',
+      title: '插入会议纪要、周报等模板',
       icon: '📄▾',
       iconComp: ic('template'),
       kind: 'template',
@@ -7096,7 +7096,7 @@ const allTools = computed((): ToolItem[] => {
       run: beginComment,
     },
     { key: 'emoji', label: '表情', title: '插入表情', icon: '☺', iconComp: ic('emoji'), kind: 'emoji' },
-    { key: 'specialChars', label: '字符', title: '插入字符', icon: 'Ω', iconComp: ic('specialChars'), kind: 'specialChars' },
+    { key: 'specialChars', label: '字符', title: '插入特殊符号，如箭头、希腊字母', icon: 'Ω', iconComp: ic('specialChars'), kind: 'specialChars' },
     { key: 'div-insert', label: '', icon: '', kind: 'divider' },
     // —— 其他 ——
     {
@@ -7156,7 +7156,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'copyMd',
       label: '复制MD',
-      title: '复制为 Markdown',
+      title: '把正文复制成 Markdown',
       icon: 'MD',
       iconComp: ic('exportText'),
       run: copyAsMarkdown,
@@ -7164,7 +7164,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'cjkTip',
       label: '禁则',
-      title: '中文禁则 / 避头尾（轻量）',
+      title: '中文标点不要出现在行首或行尾',
       icon: '禁',
       iconComp: ic('note'),
       run: showCjkTypographyTip,
@@ -7447,7 +7447,7 @@ const allTools = computed((): ToolItem[] => {
     { key: 'tidySqueeze', label: '收空格', title: '连续空格收成一个', icon: '挤', run: () => runTextMenu('squeeze') },
     { key: 'tableZebra', label: '斑马纹', title: editor.value?.getAttributes('table')?.zebra === true ? '斑马纹已开启，再点一次关闭' : '隔行底色只用于显示', icon: '斑马', run: toggleTableZebra, active: () => editor.value?.getAttributes('table')?.zebra === true, disabled: () => !isInTable() },
     { key: 'tableEqual', label: '均分列', title: '把当前表格的列宽均分，一步撤销', icon: '均', run: () => runTableOpFromToolbar('equal-cols'), disabled: () => !isInTable() },
-    { key: 'tableFormula', label: '格公式', title: '在当前格插入 =SUM(ABOVE)', icon: 'Σ', run: () => runTableOpFromToolbar('cell-formula'), disabled: () => !isInTable() },
+    { key: 'tableFormula', label: '格公式', title: '在当前格对上方的数字求和', icon: 'Σ', run: () => runTableOpFromToolbar('cell-formula'), disabled: () => !isInTable() },
     { key: 'tableSort', label: '升序', title: '按当前列从小到大排序', icon: '序', run: () => runTableOpFromToolbar('sort-asc'), disabled: () => !isInTable() },
     {
       key: 'tableStruct',

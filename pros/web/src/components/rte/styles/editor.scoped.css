@@ -4632,6 +4632,9 @@ html.rte-toolbar-dragging .rte-root:not(.expanded) .rte-toolbar-tools > .rte-too
 .rte-tool-group.is-search-group .rte-tool {
   box-shadow: inset 0 0 0 1px #94bfff;
 }
+.rte-tool-group.is-search-group[data-search-best] .rte-tool {
+  box-shadow: inset 0 0 0 2px #165dff;
+}
 .rte-more-item:focus-visible {
   outline: 2px solid #165dff;
   outline-offset: 1px;

@@ -17,7 +17,22 @@ export function stepRibbonTab(ids: readonly string[], current: string, move: Rib
   return ids[(next + ids.length) % ids.length]!
 }
 
-export type ToolbarSearchTool = { key: string; label?: string; title?: string }
+export type ToolbarSearchTool = {
+  key: string
+  label?: string
+  title?: string
+  disabled?: boolean | (() => boolean)
+}
+
+/** 按钮当前点不了。判断函数抛错时当作可用，避免搜索被一颗按钮拖垮。 */
+export function toolIsUnavailable(tool: { disabled?: boolean | (() => boolean) } | null | undefined): boolean {
+  if (!tool?.disabled) return false
+  try {
+    return typeof tool.disabled === 'function' ? !!tool.disabled() : !!tool.disabled
+  } catch {
+    return false
+  }
+}
 export type ToolbarSearchGroup = { id: string; label: string; tools: readonly ToolbarSearchTool[] }
 export type ToolbarSearchHit = { groupId: string; groupLabel: string; key: string; label: string }
 
@@ -160,10 +175,25 @@ export function toolsForToolbar<T extends { key: string; kind?: string }>(
   })
 }
 
-/** 收掉首尾和连续空格，便于「拼 音」仍能匹配。 */
+/** 收掉首尾空格、全角空格和零宽字符，并把全角字母折成半角。 */
 export function normalizeToolbarQuery(query: string): string {
-  return query.trim().replace(/\s+/g, ' ').toLowerCase()
+  return query
+    .normalize('NFKC')
+    .replace(/[\u200b\u200c\u200d\ufeff]/g, '')
+    .trim()
+    .replace(/[\s\u3000]+/g, ' ')
+    .toLowerCase()
 }
+
+/** 搜索词过长时只留前若干字，避免一次贴进整段正文。 */
+export function clampToolbarQuery(query: string, max = 32): string {
+  const chars = [...query]
+  const limit = Math.max(1, max)
+  return chars.length <= limit ? query : chars.slice(0, limit).join('')
+}
+
+export const LAST_TOOLBAR_QUERY_KEY = 'rte-toolbar-last-query'
+export const SEARCH_INPUT_HINT = 'Esc 清除，向下键定位首选。只有一个可用结果时，Enter 直接使用'
 
 /** 从「加粗 (Ctrl/⌘+B)」里取出快捷键。 */
 export function shortcutFromTitle(title: string): string {
@@ -212,8 +242,9 @@ function searchScore(tool: ToolbarSearchTool, query: string, groupLabel = ''): n
   let own = spaced
   if (tight >= 0 && (own < 0 || tight < own)) own = tight
   const group = groupLabel.trim().toLowerCase()
-  if (group && (group === query || group === compact)) return own < 0 ? 6 : own
-  return own
+  if (group && (group === query || group === compact) && own < 0) own = 6
+  if (own < 0) return -1
+  return own + (toolIsUnavailable(tool) ? 20 : 0)
 }
 
 /** 按名称、说明、别名或 key 找工具。空查询不返回结果。完全匹配排在前面。 */
@@ -240,12 +271,13 @@ export function searchToolbarTools(groups: readonly ToolbarSearchGroup[], query:
 }
 
 /** 搜索框下方的一句结果。空查询不显示。有结果时点出首选按钮和所在栏目。 */
-export function toolbarSearchStatus(query: string, count: number, best = '', capped = false, place = ''): string {
+export function toolbarSearchStatus(query: string, count: number, best = '', capped = false, place = '', bestDisabled = false): string {
   if (!normalizeToolbarQuery(query)) return ''
-  if (count <= 0) return '没有匹配的按钮'
+  if (count <= 0) return '没有匹配的按钮。试试拼音、表格或饼图'
   const first = best.trim() ? `，首选「${best.trim()}」` : ''
   const where = place.trim() ? `，在${place.trim()}` : ''
   const more = capped ? '，只列出前若干个' : ''
+  if (count === 1 && bestDisabled) return `找到 1 个按钮${first}${where}，当前不可用`
   if (count === 1) return `找到 1 个按钮${first}${where}，按 Enter 直接使用`
   return `找到 ${count} 个按钮${first}${where}${more}`
 }
@@ -346,8 +378,31 @@ export function formatPainterLabel(mode: 'off' | 'once' | 'sticky'): string {
 /** 鼠标移向菜单时多留一点时间，避免菜单提前关掉。 */
 export const MENU_CLOSE_DELAY_MS = 320
 
-export function searchEnterActivates(count: number): boolean {
-  return count === 1
+export function searchEnterActivates(count: number, bestDisabled = false): boolean {
+  return count === 1 && !bestDisabled
+}
+
+/** 在搜索结果之间循环。到头之后回到另一端。 */
+export function cycleSearchIndex(index: number, count: number, delta: number): number {
+  if (count <= 0) return 0
+  const base = Number.isInteger(index) && index >= 0 && index < count ? index : 0
+  return (base + Math.trunc(delta) + count * 8) % count
+}
+
+export function moreToolsCaption(count: number): string {
+  const n = Math.max(0, Math.floor(count))
+  return n > 0 ? `更多 ${n}` : '更多'
+}
+
+export function moreToolsTitle(count: number): string {
+  const n = Math.max(0, Math.floor(count))
+  return n > 0 ? `还有 ${n} 个按钮` : '更多格式与插入'
+}
+
+export function ribbonSearchLabel(label: string, hits: number): string {
+  const name = label.trim() || '栏目'
+  const n = Math.max(0, Math.floor(hits))
+  return n > 0 ? `${name}，${n} 个匹配` : name
 }
 
 /** 按相关度重排分组和组内按钮。空查询返回空列表。 */
@@ -427,7 +482,7 @@ export function ribbonTypeaheadQuery(key: string, current: string): string | nul
   return `${current}${key}`
 }
 
-export const FOCUS_MODE_NOTE = '专注中，只留撤销、重做和查找'
+export const FOCUS_MODE_NOTE = '专注中，只留撤销、重做和查找。再点视图里的专注模式即可退出'
 
 /** 当前栏目可 Tab 进去，其余交给方向键。 */
 export function ribbonTabTabIndex(selected: boolean): 0 | -1 {

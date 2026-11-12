@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { inject, onMounted, ref, watch } from 'vue'
 import { RTE_BINDINGS } from './bindings'
-import { alignToolTitle, disabledToolTitle, EMPTY_GROUP_NOTE, FOCUS_MODE_NOTE, fontFamilyCaption, groupHandleTitle, lineHeightCaption, listToolLabel, menuToolNeedsCaret, ribbonTabForDigit, ribbonTabHint, ribbonTabTabIndex, ribbonTypeaheadQuery, searchEnterActivates, searchGroupCaption, shortcutFromTitle, stepRibbonTab, stepRibbonTabBy, tableToolLabel, toolbarSearchStatus, zoomToolLabel, zoomToolTitle } from '../../utils/rteToolbarOptimize'
+import { alignToolTitle, clampToolbarQuery, cycleSearchIndex, disabledToolTitle, EMPTY_GROUP_NOTE, FOCUS_MODE_NOTE, fontFamilyCaption, groupHandleTitle, LAST_TOOLBAR_QUERY_KEY, lineHeightCaption, listToolLabel, menuToolNeedsCaret, moreToolsCaption, moreToolsTitle, ribbonSearchLabel, ribbonTabForDigit, ribbonTabHint, ribbonTabTabIndex, ribbonTypeaheadQuery, SEARCH_INPUT_HINT, searchEnterActivates, searchGroupCaption, shortcutFromTitle, stepRibbonTab, stepRibbonTabBy, tableToolLabel, toolbarSearchStatus, toolIsUnavailable, zoomToolLabel, zoomToolTitle } from '../../utils/rteToolbarOptimize'
 import { useParentScopeStamp } from './inheritScope'
 import { buildChartGroups } from '../../utils/echarts/chartGroups'
 import { TABLE_MENU_ICONS } from './tableMenuIcons'
@@ -107,9 +107,17 @@ function toolbarSearchCount(): number {
 }
 function toolbarSearchMessage(): string {
   const groups = rteBindings.visibleToolbarGroups || []
-  const best = groups[0]?.tools?.[0]?.label || ''
+  const bestTool = groups[0]?.tools?.[0]
+  const best = bestTool?.label || ''
   const place = groups[0]?.label || ''
-  return toolbarSearchStatus(rteBindings.toolbarQuery || '', toolbarSearchCount(), best, toolbarSearchCount() >= 24, place)
+  return toolbarSearchStatus(
+    rteBindings.toolbarQuery || '',
+    toolbarSearchCount(),
+    best,
+    toolbarSearchCount() >= 24,
+    place,
+    toolIsUnavailable(bestTool),
+  )
 }
 function ribbonHitCount(id: string): number {
   if (!rteBindings.toolbarQuery) return 0
@@ -124,8 +132,19 @@ function currentAlignName(): string {
   return ''
 }
 function rememberToolbarQuery() {
-  const query = String(rteBindings.toolbarQuery || '').trim()
-  if (query) lastToolbarQuery.value = query
+  const query = clampToolbarQuery(String(rteBindings.toolbarQuery || '').trim())
+  if (!query) return
+  lastToolbarQuery.value = query
+  try {
+    sessionStorage.setItem(LAST_TOOLBAR_QUERY_KEY, query)
+  } catch {
+    /* 无存储时仍保留本次会话里的上次搜索 */
+  }
+}
+function onToolbarQueryInput() {
+  const next = clampToolbarQuery(String(rteBindings.toolbarQuery || ''))
+  if (next !== rteBindings.toolbarQuery) rteBindings.toolbarQuery = next
+  rememberToolbarQuery()
 }
 function clearToolbarQuery() {
   rememberToolbarQuery()
@@ -148,19 +167,43 @@ function onToolbarSearchKeydown(event: KeyboardEvent) {
   }
 }
 function focusFirstMatchedTool() {
+  const best = rteBindings.visibleToolbarGroups?.[0]?.tools?.[0]
   const button = document.querySelector('[data-search-best] button.rte-tool:not([disabled])')
     || document.querySelector('.rte-toolbar-tools button.rte-tool:not([disabled])')
   if (!(button instanceof HTMLElement)) return
-  if (searchEnterActivates(toolbarSearchCount())) {
+  if (searchEnterActivates(toolbarSearchCount(), toolIsUnavailable(best))) {
     button.click()
     clearToolbarQuery()
     return
   }
   button.focus()
 }
+function onMatchedToolKeydown(event: KeyboardEvent) {
+  if (!String(rteBindings.toolbarQuery || '').trim()) return
+  if (event.altKey || event.metaKey || event.ctrlKey) return
+  if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return
+  const target = event.target
+  if (!(target instanceof HTMLElement)) return
+  if (target.closest('input, textarea, [contenteditable="true"]')) return
+  const current = target.closest('button.rte-tool')
+  if (!(current instanceof HTMLElement) || current.hasAttribute('disabled')) return
+  const buttons = [...document.querySelectorAll('.rte-toolbar-tools button.rte-tool:not([disabled])')].filter(
+    (el): el is HTMLElement => el instanceof HTMLElement,
+  )
+  const index = buttons.indexOf(current)
+  if (index < 0) return
+  event.preventDefault()
+  buttons[cycleSearchIndex(index, buttons.length, event.key === 'ArrowRight' ? 1 : -1)]?.focus()
+}
 onMounted(() => {
   const tab = document.querySelector(`[data-ribbon-tab="${rteBindings.ribbonTab}"]`)
   tab?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  try {
+    const saved = sessionStorage.getItem(LAST_TOOLBAR_QUERY_KEY)
+    if (saved) lastToolbarQuery.value = clampToolbarQuery(saved)
+  } catch {
+    /* 读不到上次搜索时，Alt+上 只在本次会话里生效 */
+  }
 })
 watch(() => rteBindings.toolbarQuery, () => {
   requestAnimationFrame(() => {
@@ -200,6 +243,7 @@ function toggleChartGroupMenu(key: string) {
             :aria-selected="rte.ribbonTab === tab.id"
             :tabindex="ribbonTabTabIndex(rte.ribbonTab === tab.id)"
             :title="ribbonTabHint(tab.id, tab.label)"
+            :aria-label="ribbonSearchLabel(tab.label, ribbonHitCount(tab.id))"
             :aria-keyshortcuts="ribbonTabForDigit((rte.ribbonTabs || []).map((item) => item.id), (rte.ribbonTabs || []).findIndex((item) => item.id === tab.id) + 1) ? 'Alt+' + ((rte.ribbonTabs || []).findIndex((item) => item.id === tab.id) + 1) : undefined"
             :aria-controls="'rte-group-' + tab.id"
             @click="onRibbonTab(tab.id, $event)"
@@ -217,12 +261,14 @@ function toggleChartGroupMenu(key: string) {
             spellcheck="false"
             placeholder="找按钮，如拼音、饼图"
             aria-label="在工具栏里找按钮"
+            :title="SEARCH_INPUT_HINT"
+            maxlength="32"
             :aria-describedby="rte.toolbarQuery ? 'rte-toolbar-search-status' : undefined"
             @focus="($event.target as HTMLInputElement).select()"
-            @input="rememberToolbarQuery"
+            @input="onToolbarQueryInput"
             @keydown="onToolbarSearchKeydown"
           />
-          <button data-rte-own v-if="rte.toolbarQuery" type="button" class="rte-toolbar-search-clear" aria-label="清除搜索" @click="clearToolbarQuery">×</button>
+          <button data-rte-own v-if="rte.toolbarQuery" type="button" class="rte-toolbar-search-clear" title="清除搜索 (Esc)" aria-label="清除搜索 (Esc)" @click="clearToolbarQuery">×</button>
         </label>
         <span v-if="rte.focusMode && rte.viewMode === 'edit'" data-rte-own class="rte-toolbar-mode-note">{{ FOCUS_MODE_NOTE }}</span>
         <span v-if="rte.viewMode !== 'edit'" data-rte-own class="rte-toolbar-mode-note">
@@ -278,14 +324,17 @@ function toggleChartGroupMenu(key: string) {
           spellcheck="false"
           placeholder="找按钮，如拼音、饼图"
           aria-label="在工具栏里找按钮"
+          :title="SEARCH_INPUT_HINT"
+          maxlength="32"
           :aria-describedby="rte.toolbarQuery ? 'rte-toolbar-search-status' : undefined"
           @focus="($event.target as HTMLInputElement).select()"
-          @input="rememberToolbarQuery"
+          @input="onToolbarQueryInput"
           @keydown="onToolbarSearchKeydown"
         />
-        <button data-rte-own v-if="rte.toolbarQuery" type="button" class="rte-toolbar-search-clear" aria-label="清除搜索" @click="clearToolbarQuery">×</button>
+        <button data-rte-own v-if="rte.toolbarQuery" type="button" class="rte-toolbar-search-clear" title="清除搜索 (Esc)" aria-label="清除搜索 (Esc)" @click="clearToolbarQuery">×</button>
       </label>
-      <button v-if="toolbarSearchMessage()" id="rte-toolbar-search-status" data-rte-own type="button" class="rte-toolbar-search-jump" @click="focusFirstMatchedTool">{{ toolbarSearchMessage() }}</button>
+      <span data-rte-own class="rte-sr-only" role="status">{{ toolbarSearchMessage() }}</span>
+      <button v-if="toolbarSearchMessage()" id="rte-toolbar-search-status" data-rte-own type="button" class="rte-toolbar-search-jump" :title="SEARCH_INPUT_HINT" @click="focusFirstMatchedTool">{{ toolbarSearchMessage() }}</button>
       <div data-rte-own
         class="rte-toolbar-tools"
         :class="{
@@ -296,6 +345,7 @@ function toggleChartGroupMenu(key: string) {
         }"
         @dragover.prevent="rte.onToolbarGroupDragOver"
         @drop.prevent="rte.onToolbarGroupDrop"
+        @keydown="onMatchedToolKeydown"
       >
       <div data-rte-own
         v-for="(group, groupIndex) in rte.visibleToolbarGroups"
@@ -2272,8 +2322,8 @@ function toggleChartGroupMenu(key: string) {
           class="rte-tool is-labeled"
           :ref="(el) => rte.setFloatAnchor('more', el)" data-rte-anchor="more"
           :class="{ active: rte.moreOpen }"
-          title="更多格式与插入"
-          aria-label="更多格式与插入"
+          :title="moreToolsTitle(rte.moreTools.length)"
+          :aria-label="moreToolsTitle(rte.moreTools.length)"
           aria-haspopup="menu"
           :aria-expanded="rte.moreOpen"
           @click.stop="rte.markToolbarMenuOpening(); rte.moreOpen = !rte.moreOpen"
@@ -2281,7 +2331,7 @@ function toggleChartGroupMenu(key: string) {
           <span data-rte-own class="rte-tool-icon">
             <component data-rte-own :is="rte.toolIcon('more')" class="rte-ep-icon" />
           </span>
-          <span data-rte-own class="rte-tool-label">更多</span>
+          <span data-rte-own class="rte-tool-label">{{ moreToolsCaption(rte.moreTools.length) }}</span>
         </button>
         <Teleport to="body">
           <div data-rte-own

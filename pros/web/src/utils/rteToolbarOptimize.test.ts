@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict'
 import {
   alignToolTitle,
+  clampToolbarQuery,
   codeBlockToolTitle,
+  cycleSearchIndex,
   disabledToolTitle,
   fontFamilyCaption,
   fontSizeCaption,
@@ -12,17 +14,21 @@ import {
   listToolLabel,
   MENU_CLOSE_DELAY_MS,
   menuToolNeedsCaret,
+  moreToolsCaption,
+  moreToolsTitle,
   orderToolbarSearchGroups,
   pasteFormatLabel,
   pushRecentValue,
   quoteToolTitle,
   readStoredRibbonTab,
   recentOptions,
+  ribbonSearchLabel,
   ribbonTabForDigit,
   ribbonTabHint,
   ribbonTabTabIndex,
   ribbonTypeaheadQuery,
   searchEnterActivates,
+  toolIsUnavailable,
   shortcutFromTitle,
   shortcutNeedles,
   spellcheckToolTitle,
@@ -63,7 +69,7 @@ const ranked = searchToolbarTools([
 ], '加粗')
 assert.equal(ranked[0]?.key, 'bold')
 assert.equal(toolbarSearchStatus('  ', 3), '')
-assert.equal(toolbarSearchStatus('拼音', 0), '没有匹配的按钮')
+assert.equal(toolbarSearchStatus('拼音', 0), '没有匹配的按钮。试试拼音、表格或饼图')
 assert.equal(toolbarSearchStatus('拼音', 2), '找到 2 个按钮')
 assert.equal(ribbonTabTabIndex(true), 0)
 assert.equal(ribbonTabTabIndex(false), -1)
@@ -101,7 +107,24 @@ assert.equal(listToolLabel(''), '列表')
 assert.equal(formatPainterLabel('sticky'), '连刷')
 assert.equal(formatPainterLabel('off'), '格式刷')
 assert.equal(searchEnterActivates(1), true)
+assert.equal(searchEnterActivates(1, true), false)
 assert.equal(searchEnterActivates(2), false)
+assert.equal(cycleSearchIndex(0, 3, -1), 2)
+assert.equal(cycleSearchIndex(2, 3, 1), 0)
+assert.equal(moreToolsCaption(12), '更多 12')
+assert.equal(moreToolsTitle(0), '更多格式与插入')
+assert.equal(ribbonSearchLabel('编辑', 3), '编辑，3 个匹配')
+assert.equal(ribbonSearchLabel('编辑', 0), '编辑')
+assert.equal(clampToolbarQuery('一二三四五六七八九十一二三四五六七八九十一二三四五六七八九十额外啊', 32).length, 32)
+assert.equal(searchToolbarTools([{ id: 'edit', label: '编辑', tools: [{ key: 'find', label: '查找' }] }], '查\u200b找')[0]?.key, 'find')
+assert.equal(toolIsUnavailable({ disabled: () => true }), true)
+assert.equal(searchToolbarTools([{ id: 't', label: '表', tools: [
+  { key: 'off', label: '表格', disabled: () => true },
+  { key: 'on', label: '表格2' },
+] }], '表格')[0]?.key, 'on')
+assert.equal(searchToolbarTools([{ id: 'f', label: '文件', tools: [{ key: 'export', label: '导出' }] }], 'ＰＤＦ')[0]?.key, 'export')
+assert.equal(searchToolbarTools([{ id: 's', label: '字体', tools: [{ key: 'ruby', label: '注音' }] }], '拼\u3000音')[0]?.key, 'ruby')
+assert.equal(toolbarSearchStatus('换图', 1, '换图', false, '图片', true), '找到 1 个按钮，首选「换图」，在图片，当前不可用')
 assert.equal(MENU_CLOSE_DELAY_MS >= 300, true)
 assert.equal(hiddenGroupPlaceholders([{ id: 'edit', label: '编辑', tools: [{ key: 'undo' }] }], ['edit', 'writing'], [{ id: 'edit', label: '编辑', keyCount: 3 }, { id: 'writing', label: '书写', keyCount: 3 }, { id: 'other', label: '其他', keyCount: 0 }]).map((group) => group.id).join(','), 'edit,writing')
 assert.equal(searchToolbarTools([{ id: 'insert', label: '插入', tools: [{ key: 'qrcode', label: '二维码' }] }], 'qr')[0]?.key, 'qrcode')
