@@ -119,11 +119,90 @@ export function searchToolbarTools(groups: readonly ToolbarSearchGroup[], query:
   return ranked.slice(0, Math.max(1, limit)).map((item) => item.hit)
 }
 
-/** 搜索框下方的一句结果。空查询不显示。 */
-export function toolbarSearchStatus(query: string, count: number): string {
+/** 搜索框下方的一句结果。空查询不显示。有结果时点出首选按钮。 */
+export function toolbarSearchStatus(query: string, count: number, best = '', capped = false): string {
   if (!normalizeToolbarQuery(query)) return ''
   if (count <= 0) return '没有匹配的按钮'
-  return `找到 ${count} 个按钮`
+  const first = best.trim() ? `，首选「${best.trim()}」` : ''
+  const more = capped ? '，只列出前若干个' : ''
+  return `找到 ${count} 个按钮${first}${more}`
+}
+
+/** 按相关度重排分组和组内按钮。空查询返回空列表。 */
+export function orderToolbarSearchGroups<T extends ToolbarSearchTool>(
+  groups: readonly { id: string; label: string; tools: readonly T[] }[],
+  query: string,
+  limit = 24,
+): { groups: Array<{ id: string; label: string; tools: T[] }>; total: number; capped: boolean } {
+  const cap = Math.max(1, limit)
+  const hits = searchToolbarTools(groups, query, cap + 1)
+  const shown = hits.slice(0, cap)
+  const lookup = new Map<string, T>()
+  for (const group of groups) {
+    for (const tool of group.tools) lookup.set(`${group.id}:${tool.key}`, tool)
+  }
+  const ordered: Array<{ id: string; label: string; tools: T[] }> = []
+  for (const hit of shown) {
+    const tool = lookup.get(`${hit.groupId}:${hit.key}`)
+    if (!tool) continue
+    let bucket = ordered.find((item) => item.id === hit.groupId)
+    if (!bucket) {
+      bucket = { id: hit.groupId, label: hit.groupLabel, tools: [] }
+      ordered.push(bucket)
+    }
+    bucket.tools.push(tool)
+  }
+  return { groups: ordered, total: hits.length, capped: hits.length > cap }
+}
+
+/** 搜索时组名带上命中数量。 */
+export function searchGroupCaption(label: string, count: number, searching: boolean): string {
+  const name = label.trim() || '分组'
+  if (!searching) return name
+  return `${name} · ${Math.max(0, count)}`
+}
+
+export function fontFamilyCaption(value: string, options: readonly { label: string; value: string }[]): string {
+  const current = value.trim()
+  if (!current) return '字体'
+  const named = options.find((item) => item.value === current)
+  const raw = named?.label && named.label !== '默认字体' ? named.label.split('/')[0].trim() : current.split(',')[0].replace(/["']/g, '').trim()
+  if (!raw || raw === '默认字体') return '字体'
+  return raw.length > 6 ? `${raw.slice(0, 6)}…` : raw
+}
+
+export function lineHeightCaption(value: string, options: readonly { label: string; value: string }[]): string {
+  const current = value.trim()
+  if (!current) return '行距'
+  const named = options.find((item) => item.value === current)
+  if (!named || named.label === '默认行高') return current
+  return named.label
+}
+
+export function alignToolTitle(align: string): string {
+  if (align === 'center') return '当前居中。可选左对齐、居中、右对齐、两端对齐'
+  if (align === 'right') return '当前右对齐。可选左对齐、居中、右对齐、两端对齐'
+  if (align === 'justify') return '当前两端对齐。可选左对齐、居中、右对齐、两端对齐'
+  if (align === 'left') return '当前左对齐。可选左对齐、居中、右对齐、两端对齐'
+  return '对齐：左对齐、居中、右对齐、两端对齐'
+}
+
+export function zoomToolTitle(zoom: number): string {
+  if (!Number.isFinite(zoom) || Math.abs(zoom - 1) < 0.001) return '编辑区缩放，当前为实际大小'
+  return `编辑区缩放，当前 ${Math.round(zoom * 100)}%`
+}
+
+/** Alt+1 到 Alt+9 对应前九个栏目。越界返回空字符串。 */
+export function ribbonTabForDigit(ids: readonly string[], digit: number): string {
+  if (!Number.isInteger(digit) || digit < 1 || digit > 9) return ''
+  return ids[digit - 1] || ''
+}
+
+/** 栏目上直接打字，拼进搜索词。方向键和修饰键不接收。 */
+export function ribbonTypeaheadQuery(key: string, current: string): string | null {
+  if (key === 'Backspace') return current.slice(0, -1)
+  if (key.length !== 1 || /[\s\u0000-\u001f]/.test(key)) return null
+  return `${current}${key}`
 }
 
 export const FOCUS_MODE_NOTE = '专注中，只留撤销、重做和查找'

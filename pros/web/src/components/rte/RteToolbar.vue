@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { inject, onMounted, ref } from 'vue'
 import { RTE_BINDINGS } from './bindings'
-import { disabledToolTitle, FOCUS_MODE_NOTE, groupHandleTitle, ribbonTabTabIndex, stepRibbonTab, toolbarSearchStatus } from '../../utils/rteToolbarOptimize'
+import { alignToolTitle, disabledToolTitle, FOCUS_MODE_NOTE, fontFamilyCaption, groupHandleTitle, lineHeightCaption, ribbonTabForDigit, ribbonTabTabIndex, ribbonTypeaheadQuery, searchGroupCaption, stepRibbonTab, toolbarSearchStatus, zoomToolTitle } from '../../utils/rteToolbarOptimize'
 import { useParentScopeStamp } from './inheritScope'
 import { buildChartGroups } from '../../utils/echarts/chartGroups'
 import { TABLE_MENU_ICONS } from './tableMenuIcons'
@@ -55,6 +55,7 @@ function chartCategoriesOf(groupId: string) {
 }
 
 function onRibbonTab(id: string, event: MouseEvent) {
+  clearToolbarQuery()
   rteBindings.setRibbonTab(id)
   const toolbar = (event.currentTarget as HTMLElement | null)?.closest('.rte-toolbar')
   toolbar?.querySelector(`[data-ribbon-tab="${id}"]`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
@@ -62,9 +63,27 @@ function onRibbonTab(id: string, event: MouseEvent) {
 }
 
 function onRibbonTabsKeydown(event: KeyboardEvent) {
+  const ids = (rteBindings.ribbonTabs || []).map((tab: { id: string }) => tab.id)
+  if (event.altKey && /^[1-9]$/.test(event.key)) {
+    const picked = ribbonTabForDigit(ids, Number(event.key))
+    if (!picked) return
+    event.preventDefault()
+    clearToolbarQuery()
+    rteBindings.setRibbonTab(picked)
+    return
+  }
+  if (!event.metaKey && !event.ctrlKey && !event.altKey) {
+    const typed = ribbonTypeaheadQuery(event.key, rteBindings.toolbarQuery || '')
+    if (typed != null) {
+      event.preventDefault()
+      rteBindings.toolbarQuery = typed
+      const input = document.querySelector('.rte-toolbar-search input')
+      if (input instanceof HTMLInputElement) input.focus()
+      return
+    }
+  }
   const move = event.key === 'ArrowRight' ? 'next' : event.key === 'ArrowLeft' ? 'prev' : event.key === 'Home' ? 'home' : event.key === 'End' ? 'end' : ''
   if (!move) return
-  const ids = (rteBindings.ribbonTabs || []).map((tab: { id: string }) => tab.id)
   const next = stepRibbonTab(ids, rteBindings.ribbonTab, move)
   event.preventDefault()
   rteBindings.setRibbonTab(next)
@@ -80,13 +99,28 @@ function toolbarSearchCount(): number {
   return groups.reduce((sum: number, group: { tools?: unknown[] }) => sum + (group.tools?.length || 0), 0)
 }
 function toolbarSearchMessage(): string {
-  return toolbarSearchStatus(rteBindings.toolbarQuery || '', toolbarSearchCount())
+  const groups = rteBindings.visibleToolbarGroups || []
+  const best = groups[0]?.tools?.[0]?.label || ''
+  return toolbarSearchStatus(rteBindings.toolbarQuery || '', toolbarSearchCount(), best, toolbarSearchCount() >= 24)
+}
+function ribbonHitCount(id: string): number {
+  if (!rteBindings.toolbarQuery) return 0
+  const group = (rteBindings.visibleToolbarGroups || []).find((item: { id: string; tools?: unknown[] }) => item.id === id)
+  return group?.tools?.length || 0
+}
+function currentAlignName(): string {
+  if (rteBindings.isActive?.({ textAlign: 'center' })) return 'center'
+  if (rteBindings.isActive?.({ textAlign: 'right' })) return 'right'
+  if (rteBindings.isActive?.({ textAlign: 'justify' })) return 'justify'
+  if (rteBindings.isActive?.({ textAlign: 'left' })) return 'left'
+  return ''
 }
 function clearToolbarQuery() {
   rteBindings.toolbarQuery = ''
 }
 function focusFirstMatchedTool() {
-  const button = document.querySelector('.rte-toolbar-tools button.rte-tool:not([disabled])')
+  const button = document.querySelector('[data-search-best] button.rte-tool:not([disabled])')
+    || document.querySelector('.rte-toolbar-tools button.rte-tool:not([disabled])')
   if (button instanceof HTMLElement) button.focus()
 }
 onMounted(() => {
@@ -122,13 +156,14 @@ function toggleChartGroupMenu(key: string) {
             role="tab"
             class="rte-ribbon-tab"
             :data-ribbon-tab="tab.id"
-            :class="{ active: rte.ribbonTab === tab.id }"
+            :class="{ active: rte.ribbonTab === tab.id, 'is-search-miss': !!rte.toolbarQuery && !ribbonHitCount(tab.id) }"
             :aria-selected="rte.ribbonTab === tab.id"
             :tabindex="ribbonTabTabIndex(rte.ribbonTab === tab.id)"
             :aria-controls="'rte-group-' + tab.id"
             @click="onRibbonTab(tab.id, $event)"
           >
             {{ tab.label }}
+            <span v-if="ribbonHitCount(tab.id)" data-rte-own class="rte-ribbon-hit">{{ ribbonHitCount(tab.id) }}</span>
           </button>
         </div>
         <label v-if="rte.viewMode === 'edit' && !rte.focusMode" data-rte-own class="rte-toolbar-search">
@@ -139,6 +174,7 @@ function toggleChartGroupMenu(key: string) {
             placeholder="找按钮，如拼音、流程图"
             aria-label="在工具栏里找按钮"
             :aria-describedby="rte.toolbarQuery ? 'rte-toolbar-search-status' : undefined"
+            @focus="($event.target as HTMLInputElement).select()"
             @keydown.escape.stop="clearToolbarQuery"
             @keydown.enter.prevent="focusFirstMatchedTool"
           />
@@ -197,6 +233,7 @@ function toggleChartGroupMenu(key: string) {
           placeholder="找按钮，如拼音、流程图"
           aria-label="在工具栏里找按钮"
           :aria-describedby="rte.toolbarQuery ? 'rte-toolbar-search-status' : undefined"
+          @focus="($event.target as HTMLInputElement).select()"
           @keydown.escape.stop="clearToolbarQuery"
           @keydown.enter.prevent="focusFirstMatchedTool"
         />
@@ -215,9 +252,10 @@ function toggleChartGroupMenu(key: string) {
         @drop.prevent="rte.onToolbarGroupDrop"
       >
       <div data-rte-own
-        v-for="group in rte.visibleToolbarGroups"
+        v-for="(group, groupIndex) in rte.visibleToolbarGroups"
         :key="group.id"
         class="rte-tool-group"
+        :data-search-best="rte.toolbarQuery && groupIndex === 0 ? '1' : undefined"
         :title="'右键可设置组内按钮的显隐与顺序'"
         :class="{
           'is-drop-target': rte.toolbarDropIndex === rte.toolbarOrder.indexOf(group.id),
@@ -251,7 +289,7 @@ function toggleChartGroupMenu(key: string) {
             @pointercancel="rte.onToolbarHandlePointerUp"
             title="双击恢复本组按钮的默认显隐和顺序"
             @dblclick.stop="rte.restoreToolbarGroupButtons(group.id)"
-          >{{ group.label }}</span>
+          >{{ searchGroupCaption(group.label, group.tools.length, !!rte.toolbarQuery) }}</span>
           <button data-rte-own
             v-if="rte.viewMode === 'edit'"
             type="button"
@@ -678,14 +716,14 @@ function toggleChartGroupMenu(key: string) {
             class="rte-tool"
             :ref="(el) => rte.setFloatAnchor('fontFamily', el)" data-rte-anchor="fontFamily"
             :class="{ active: rte.fontFamilyOpen || !!rte.currentFontFamily() }"
-            title="字体"
+            :title="'字体：' + fontFamilyCaption(rte.currentFontFamily(), rte.FONT_FAMILY_OPTIONS)"
             @click.stop="rte.markToolbarMenuOpening(); rte.closeColorMenus(); rte.closeHighlightMenus(); rte.fontSizeOpen = false; rte.lineHeightOpen = false; rte.moreFontSizeOpen = false; rte.moreFontFamilyOpen = false; rte.moreLineHeightOpen = false; rte.headingOpen = false; rte.listOpen = false; rte.formOpen = false; rte.templateOpen = false; rte.alignOpen = false; rte.fontFamilyOpen = !rte.fontFamilyOpen"
           >
             <span data-rte-own class="rte-tool-icon">
               <component data-rte-own :is="rte.toolIcon('fontFamily')" class="rte-ep-icon" />
             </span>
             <span data-rte-own class="rte-tool-label"
-              >字体<span data-rte-own class="rte-caret" aria-hidden="true"></span
+              >{{ fontFamilyCaption(rte.currentFontFamily(), rte.FONT_FAMILY_OPTIONS) }}<span data-rte-own class="rte-caret" aria-hidden="true"></span
             ></span>
           </button>
           <Teleport to="body">
@@ -719,14 +757,14 @@ function toggleChartGroupMenu(key: string) {
             class="rte-tool"
             :ref="(el) => rte.setFloatAnchor('lineHeight', el)" data-rte-anchor="lineHeight"
             :class="{ active: rte.lineHeightOpen || !!rte.currentLineHeight() }"
-            title="行距"
+            :title="'行距：' + lineHeightCaption(rte.currentLineHeight(), rte.LINE_HEIGHT_OPTIONS)"
             @click.stop="rte.markToolbarMenuOpening(); rte.closeColorMenus(); rte.closeHighlightMenus(); rte.fontSizeOpen = false; rte.fontFamilyOpen = false; rte.moreFontSizeOpen = false; rte.moreFontFamilyOpen = false; rte.moreLineHeightOpen = false; rte.headingOpen = false; rte.listOpen = false; rte.formOpen = false; rte.templateOpen = false; rte.alignOpen = false; rte.lineHeightOpen = !rte.lineHeightOpen"
           >
             <span data-rte-own class="rte-tool-icon">
               <component data-rte-own :is="rte.toolIcon('lineHeight')" class="rte-ep-icon" />
             </span>
             <span data-rte-own class="rte-tool-label"
-              >行距<span data-rte-own class="rte-caret" aria-hidden="true"></span
+              >{{ lineHeightCaption(rte.currentLineHeight(), rte.LINE_HEIGHT_OPTIONS) }}<span data-rte-own class="rte-caret" aria-hidden="true"></span>
             ></span>
           </button>
           <Teleport to="body">
@@ -807,7 +845,7 @@ function toggleChartGroupMenu(key: string) {
                 rte.isActive({ textAlign: 'right' }) ||
                 rte.isActive({ textAlign: 'justify' }),
             }"
-            title="对齐"
+            :title="alignToolTitle(currentAlignName())"
             aria-label="对齐"
             aria-haspopup="menu"
             :aria-expanded="rte.alignOpen"
@@ -1920,7 +1958,7 @@ function toggleChartGroupMenu(key: string) {
             :ref="(el) => rte.setFloatAnchor('zoom', el)"
             data-rte-anchor="zoom"
             :class="{ active: rte.zoomMenuOpen || rte.editorZoom !== 1 }"
-            title="编辑区缩放"
+            :title="zoomToolTitle(rte.editorZoom)"
             @click.stop="rte.markToolbarMenuOpening(); rte.zoomMenuOpen = !rte.zoomMenuOpen"
           >
             <span data-rte-own class="rte-tool-icon">

@@ -14,7 +14,7 @@ import {
   TOOLBAR_GROUPS,
   type ToolbarDropBox,
 } from '../../../utils/rteToolbarGroups'
-import { FOCUS_TOOLBAR_KEYS, readStoredRibbonTab, searchToolbarTools } from '../../../utils/rteToolbarOptimize'
+import { FOCUS_TOOLBAR_KEYS, orderToolbarSearchGroups, readStoredRibbonTab } from '../../../utils/rteToolbarOptimize'
 import {
   isDefaultToolbarGroupConfig,
   moveGroupButton,
@@ -151,15 +151,7 @@ export function useToolbarGroups<T extends ToolLike>(deps: {
         .filter((group) => group.tools.length)
     }
     const query = deps.toolbarQuery?.().trim() || ''
-    if (query) {
-      const hits = new Set(searchToolbarTools(toolbarGroups.value, query, 40).map((hit) => `${hit.groupId}:${hit.key}`))
-      return toolbarGroups.value
-        .map((group) => ({
-          ...group,
-          tools: group.tools.filter((tool) => hits.has(`${group.id}:${tool.key}`)),
-        }))
-        .filter((group) => group.tools.length)
-    }
+    if (query) return orderToolbarSearchGroups(toolbarGroups.value, query, 24).groups
     if (!deps.expanded()) return toolbarGroups.value
     const allow = new Set(ribbonGroupsFor(ribbonTab.value))
     const visible = toolbarGroups.value.filter((group) => allow.has(group.id))

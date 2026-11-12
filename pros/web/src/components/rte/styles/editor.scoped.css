@@ -4564,6 +4564,7 @@ html.rte-toolbar-dragging .rte-root:not(.expanded) .rte-toolbar-tools > .rte-too
   flex-wrap: nowrap;
   scrollbar-width: thin;
   scroll-snap-type: x proximity;
+  mask-image: linear-gradient(to right, transparent, #000 12px, #000 calc(100% - 12px), transparent);
 }
 .rte-ribbon-tab {
   scroll-snap-align: start;
@@ -4592,6 +4593,25 @@ html.rte-toolbar-dragging .rte-root:not(.expanded) .rte-toolbar-tools > .rte-too
 }
 .rte-ribbon-tab:hover {
   background: #edebe9;
+}
+.rte-ribbon-tab:focus-visible {
+  outline: 2px solid #165dff;
+  outline-offset: -2px;
+}
+.rte-ribbon-tab.is-search-miss {
+  opacity: 0.45;
+}
+.rte-ribbon-hit {
+  display: inline-block;
+  min-width: 14px;
+  margin-left: 4px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: #165dff;
+  color: #fff;
+  font-size: 10px;
+  line-height: 14px;
+  text-align: center;
 }
 .rte-ribbon-tab.active {
   background: #fff;

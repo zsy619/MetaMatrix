@@ -6829,6 +6829,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'subscript',
       label: '下标',
+      title: '下标 (Ctrl/⌘+,)',
       icon: 'x₂',
       iconComp: ic('subscript'),
       active: () => isActive('subscript'),
@@ -6837,6 +6838,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'superscript',
       label: '上标',
+      title: '上标 (Ctrl/⌘+.)',
       icon: 'x²',
       iconComp: ic('superscript'),
       active: () => isActive('superscript'),
@@ -6854,12 +6856,13 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'highlight',
       label: '高亮',
+      title: '高亮颜色，再点一次可取消',
       icon: '🖍',
       iconComp: ic('highlight'),
       kind: 'highlight',
       active: () => isActive('highlight'),
     },
-    { key: 'color', label: '颜色', icon: 'A', iconComp: ic('color'), kind: 'color' },
+    { key: 'color', label: '颜色', title: '文字颜色', icon: 'A', iconComp: ic('color'), kind: 'color' },
     { key: 'fontSize', label: '字号', icon: 'Aa', iconComp: ic('fontSize'), kind: 'fontSize', active: () => !!currentFontSize() },
     { key: 'fontFamily', label: '字体', icon: 'F', iconComp: ic('fontFamily'), kind: 'fontFamily', active: () => !!currentFontFamily() },
     { key: 'lineHeight', label: '行距', icon: '↕', iconComp: ic('lineHeight'), kind: 'lineHeight', active: () => !!currentLineHeight() },
