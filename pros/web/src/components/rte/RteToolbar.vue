@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { inject, ref } from 'vue'
+import { inject, onMounted, ref } from 'vue'
 import { RTE_BINDINGS } from './bindings'
-import { stepRibbonTab } from '../../utils/rteToolbarOptimize'
+import { disabledToolTitle, FOCUS_MODE_NOTE, groupHandleTitle, ribbonTabTabIndex, stepRibbonTab, toolbarSearchStatus } from '../../utils/rteToolbarOptimize'
 import { useParentScopeStamp } from './inheritScope'
 import { buildChartGroups } from '../../utils/echarts/chartGroups'
 import { TABLE_MENU_ICONS } from './tableMenuIcons'
@@ -75,6 +75,25 @@ function onRibbonTabsKeydown(event: KeyboardEvent) {
   }
 }
 
+function toolbarSearchCount(): number {
+  const groups = rteBindings.visibleToolbarGroups || []
+  return groups.reduce((sum: number, group: { tools?: unknown[] }) => sum + (group.tools?.length || 0), 0)
+}
+function toolbarSearchMessage(): string {
+  return toolbarSearchStatus(rteBindings.toolbarQuery || '', toolbarSearchCount())
+}
+function clearToolbarQuery() {
+  rteBindings.toolbarQuery = ''
+}
+function focusFirstMatchedTool() {
+  const button = document.querySelector('.rte-toolbar-tools button.rte-tool:not([disabled])')
+  if (button instanceof HTMLElement) button.focus()
+}
+onMounted(() => {
+  const tab = document.querySelector(`[data-ribbon-tab="${rteBindings.ribbonTab}"]`)
+  tab?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+})
+
 function toggleChartGroupMenu(key: string) {
   const wasOpen = rteBindings.echartsGroupMenuKey === key
   rteBindings.echartsGroupMenuKey = wasOpen ? null : key
@@ -105,6 +124,8 @@ function toggleChartGroupMenu(key: string) {
             :data-ribbon-tab="tab.id"
             :class="{ active: rte.ribbonTab === tab.id }"
             :aria-selected="rte.ribbonTab === tab.id"
+            :tabindex="ribbonTabTabIndex(rte.ribbonTab === tab.id)"
+            :aria-controls="'rte-group-' + tab.id"
             @click="onRibbonTab(tab.id, $event)"
           >
             {{ tab.label }}
@@ -115,11 +136,15 @@ function toggleChartGroupMenu(key: string) {
             data-rte-own
             v-model="rte.toolbarQuery"
             type="search"
-            placeholder="找按钮"
+            placeholder="找按钮，如拼音、流程图"
             aria-label="在工具栏里找按钮"
-            @keydown.escape.stop="rte.toolbarQuery = ''"
+            :aria-describedby="rte.toolbarQuery ? 'rte-toolbar-search-status' : undefined"
+            @keydown.escape.stop="clearToolbarQuery"
+            @keydown.enter.prevent="focusFirstMatchedTool"
           />
+          <button data-rte-own v-if="rte.toolbarQuery" type="button" class="rte-toolbar-search-clear" aria-label="清除搜索" @click="clearToolbarQuery">×</button>
         </label>
+        <span v-if="rte.focusMode && rte.viewMode === 'edit'" data-rte-own class="rte-toolbar-mode-note">{{ FOCUS_MODE_NOTE }}</span>
         <span v-if="rte.viewMode !== 'edit'" data-rte-own class="rte-toolbar-mode-note">
           {{ rte.viewMode === 'preview' ? '预览中，编辑工具已收起' : '源码中，编辑工具已收起' }}
         </span>
@@ -169,12 +194,15 @@ function toggleChartGroupMenu(key: string) {
           data-rte-own
           v-model="rte.toolbarQuery"
           type="search"
-          placeholder="找按钮"
+          placeholder="找按钮，如拼音、流程图"
           aria-label="在工具栏里找按钮"
-          @keydown.escape.stop="rte.toolbarQuery = ''"
+          :aria-describedby="rte.toolbarQuery ? 'rte-toolbar-search-status' : undefined"
+          @keydown.escape.stop="clearToolbarQuery"
+          @keydown.enter.prevent="focusFirstMatchedTool"
         />
+        <button data-rte-own v-if="rte.toolbarQuery" type="button" class="rte-toolbar-search-clear" aria-label="清除搜索" @click="clearToolbarQuery">×</button>
       </label>
-      <p v-if="rte.toolbarQuery && !rte.visibleToolbarGroups.length" data-rte-own class="rte-toolbar-mode-note">没有匹配的按钮</p>
+      <p v-if="toolbarSearchMessage()" id="rte-toolbar-search-status" data-rte-own class="rte-toolbar-mode-note" role="status">{{ toolbarSearchMessage() }}</p>
       <div data-rte-own
         class="rte-toolbar-tools"
         :class="{
@@ -195,6 +223,7 @@ function toggleChartGroupMenu(key: string) {
           'is-drop-target': rte.toolbarDropIndex === rte.toolbarOrder.indexOf(group.id),
           'is-dragging': rte.toolbarDragSource === group.id,
         }"
+        :id="'rte-group-' + group.id"
         :data-group-id="group.id"
         @contextmenu.prevent="rte.onToolbarGroupContextMenu(group.id, $event)"
       >
@@ -205,7 +234,7 @@ function toggleChartGroupMenu(key: string) {
             class="rte-group-handle"
             draggable="false"
             :aria-label="'拖动' + group.label + '分组'"
-            title="拖动整组。Alt+左/右也可移动"
+            :title="groupHandleTitle(group.label, group.tools.length)"
             @pointerdown="rte.onToolbarHandlePointerDown(group.id, $event)"
             @pointermove="rte.onToolbarHandlePointerMove"
             @pointerup="rte.onToolbarHandlePointerUp"
@@ -228,7 +257,7 @@ function toggleChartGroupMenu(key: string) {
             type="button"
             class="rte-group-settings"
             :aria-label="group.label + '的个性化设置'"
-            title="本分组的按钮：显示、隐藏、排序。双击组名恢复默认"
+            :title="group.label + '的按钮：显示、隐藏、排序。当前 ' + group.tools.length + ' 个。双击组名恢复默认'"
             @click.stop="rte.onToolbarGroupContextMenu(group.id, $event)"
           >
             ⚙
@@ -787,7 +816,7 @@ function toggleChartGroupMenu(key: string) {
             <span data-rte-own class="rte-tool-icon">
               <component data-rte-own :is="rte.toolIcon('align')" class="rte-ep-icon" />
             </span>
-            <span data-rte-own class="rte-tool-label">对齐</span>
+            <span data-rte-own class="rte-tool-label">对齐<span data-rte-own class="rte-caret" aria-hidden="true"></span></span>
           </button>
           <Teleport to="body">
             <div data-rte-own
@@ -1478,7 +1507,7 @@ function toggleChartGroupMenu(key: string) {
             <span data-rte-own class="rte-tool-icon">
               <component data-rte-own :is="t.iconComp || rte.toolIcon('fontSize')" class="rte-ep-icon" />
             </span>
-            <span data-rte-own class="rte-tool-label">段样式</span>
+            <span data-rte-own class="rte-tool-label">段样式<span data-rte-own class="rte-caret" aria-hidden="true"></span></span>
           </button>
           <Teleport to="body">
             <div data-rte-own
@@ -1514,7 +1543,7 @@ function toggleChartGroupMenu(key: string) {
             <span data-rte-own class="rte-tool-icon">
               <component data-rte-own :is="t.iconComp || rte.toolIcon('list')" class="rte-ep-icon" />
             </span>
-            <span data-rte-own class="rte-tool-label">编号样式</span>
+            <span data-rte-own class="rte-tool-label">编号样式<span data-rte-own class="rte-caret" aria-hidden="true"></span></span>
           </button>
           <Teleport to="body">
             <div data-rte-own
@@ -2020,7 +2049,7 @@ function toggleChartGroupMenu(key: string) {
             :ref="(el) => rte.setFloatAnchor('imageLayout', el)"
             data-rte-anchor="imageLayout"
             :class="{ active: rte.imageLayoutOpen || rte.isImageNodeSelected() }"
-            title="图片排法：居中、居左、居右、左右环绕"
+            :title="disabledToolTitle('图片排法：居中、居左、居右、左右环绕', !rte.isImageNodeSelected())"
             aria-label="图片排法"
             aria-haspopup="menu"
             :aria-expanded="rte.imageLayoutOpen"
@@ -2062,7 +2091,7 @@ function toggleChartGroupMenu(key: string) {
             :ref="(el) => rte.setFloatAnchor(t.key, el)"
             :data-rte-anchor="t.key"
             :class="{ active: rte.presetMenuKey === t.key || !!t.active?.() }"
-            :title="t.title || t.label"
+            :title="disabledToolTitle(t.title || t.label, !!t.disabled?.())"
             :aria-label="t.title || t.label"
             aria-haspopup="menu"
             :aria-expanded="rte.presetMenuKey === t.key"
@@ -2122,7 +2151,7 @@ function toggleChartGroupMenu(key: string) {
           type="button"
           class="rte-tool"
           :class="{ active: t.active?.(), 'is-disabled': t.disabled?.() }"
-          :title="t.title || t.label"
+          :title="disabledToolTitle(t.title || t.label, !!t.disabled?.())"
           :aria-label="t.title || t.label"
           :aria-pressed="t.active ? !!t.active() : undefined"
           :disabled="t.disabled?.() || undefined"

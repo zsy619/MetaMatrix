@@ -232,8 +232,9 @@
 .rte-toolbar-search {
   display: inline-flex;
   align-items: center;
-  flex: 0 1 140px;
-  min-width: 88px;
+  position: relative;
+  flex: 0 1 168px;
+  min-width: 112px;
   margin: 0 8px 4px;
 }
 .rte-toolbar-search input {
@@ -241,10 +242,22 @@
   height: 26px;
   border: 1px solid #d0d3d8;
   border-radius: 6px;
-  padding: 0 8px;
+  padding: 0 22px 0 8px;
   font-size: 12px;
   background: #fff;
   color: #1d2129;
+}
+.rte-toolbar-search-clear {
+  position: absolute;
+  right: 2px;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #4e5969;
+  cursor: pointer;
+  line-height: 18px;
 }
 .rte-toolbar-mode-note {
   margin: 0 8px 4px;
