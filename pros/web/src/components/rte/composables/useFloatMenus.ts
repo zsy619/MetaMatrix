@@ -1,5 +1,5 @@
 import { nextTick, onBeforeUnmount, onMounted, type Directive } from 'vue'
-import { isToolbarMenuTrigger, MENU_CLOSE_DELAY_MS, menuFocusStep, toolbarMenuKeyAction } from '../../../utils/rteToolbarOptimize'
+import { isToolbarMenuTrigger, MENU_CLOSE_DELAY_MS, menuFocusStep, menuTypeaheadIndex, toolbarMenuKeyAction } from '../../../utils/rteToolbarOptimize'
 
 /** 工具条浮层定位与点击外部关闭。pointerdown 监听在本组合式内成对注册。 */
 export function useFloatMenus(deps: {
@@ -380,6 +380,14 @@ function onDocPointerDownForMenus(e: PointerEvent) {
   function openMenuRoots(): HTMLElement[] {
     return [...document.querySelectorAll(FLOAT_MENU_SELECTOR)].filter((el): el is HTMLElement => el instanceof HTMLElement)
   }
+  function focusMenuButton(button: HTMLElement | undefined) {
+    if (!button) return
+    button.focus()
+    button.scrollIntoView({ block: 'nearest' })
+  }
+  function preferredMenuButton(buttons: HTMLElement[]): HTMLElement | undefined {
+    return buttons.find((button) => button.classList.contains('active') || button.getAttribute('aria-pressed') === 'true' || button.getAttribute('aria-checked') === 'true') || buttons[0]
+  }
   function expandedToolbarButton(): HTMLElement | null {
     const el = document.querySelector('.rte-toolbar button[aria-expanded="true"]')
     return el instanceof HTMLElement ? el : null
@@ -412,7 +420,19 @@ function onDocPointerDownForMenus(e: PointerEvent) {
       if (next == null) return
       event.preventDefault()
       event.stopPropagation()
-      buttons[next]?.focus()
+      focusMenuButton(buttons[next])
+      return
+    }
+    if (inMenu && menu instanceof HTMLElement && /^[a-z0-9\u4e00-\u9fff]$/i.test(event.key) && !event.altKey && !event.ctrlKey && !event.metaKey) {
+      const buttons = menuButtons(menu)
+      const current = target.closest('button')
+      const from = current instanceof HTMLElement ? buttons.indexOf(current) : -1
+      const next = menuTypeaheadIndex(buttons.map((button) => button.textContent || ''), event.key, from)
+      if (next >= 0) {
+        event.preventDefault()
+        event.stopPropagation()
+        focusMenuButton(buttons[next])
+      }
       return
     }
     if (action === 'move') {
@@ -425,14 +445,14 @@ function onDocPointerDownForMenus(e: PointerEvent) {
         event.preventDefault()
         event.stopPropagation()
         button.click()
-        void nextTick(() => openMenuRoots().flatMap((root) => menuButtons(root))[0]?.focus())
+        void nextTick(() => focusMenuButton(preferredMenuButton(openMenuRoots().flatMap((root) => menuButtons(root)))))
         return
       }
       const buttons = openMenuRoots().flatMap((root) => menuButtons(root))
       if (!buttons.length) return
       event.preventDefault()
       event.stopPropagation()
-      buttons[0]?.focus()
+      focusMenuButton(preferredMenuButton(buttons))
       return
     }
     if (action === 'open') {
@@ -442,7 +462,7 @@ function onDocPointerDownForMenus(e: PointerEvent) {
       event.preventDefault()
       event.stopPropagation()
       button.click()
-      void nextTick(() => openMenuRoots().flatMap((root) => menuButtons(root))[0]?.focus())
+      void nextTick(() => focusMenuButton(preferredMenuButton(openMenuRoots().flatMap((root) => menuButtons(root)))))
       return
     }
     if (event.key === 'Escape') closeAllToolbarMenus()

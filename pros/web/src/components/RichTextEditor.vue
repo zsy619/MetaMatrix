@@ -6948,7 +6948,7 @@ const allTools = computed((): ToolItem[] => {
       kind: 'callout',
       active: () => isActive('callout'),
     },
-    { key: 'hr', label: '分割线', title: '插入分割线，并可选择样式', icon: '┄', iconComp: ic('hr'), kind: 'hr' },
+    { key: 'hr', label: '分割线', title: '插入分割线，并可选择样式。也可输入 ---', icon: '┄', iconComp: ic('hr'), kind: 'hr' },
     {
       key: 'blockOps',
       label: '块操作',
@@ -6987,7 +6987,7 @@ const allTools = computed((): ToolItem[] => {
       iconComp: ic('pageBreak'),
       run: insertPageBreak,
     },
-    { key: 'columns', label: '分栏', title: '把内容分成多栏', icon: '▥', iconComp: ic('columns'), kind: 'columns' },
+    { key: 'columns', label: '分栏', title: '把内容分成 2 到 6 栏', icon: '▥', iconComp: ic('columns'), kind: 'columns' },
     { key: 'div-block', label: '', icon: '', kind: 'divider' },
     // —— 插入 ——
     { key: 'image', label: '图片', title: '插入图片，也可直接粘贴', icon: '🖼', iconComp: ic('image'), run: insertImage },
@@ -7376,8 +7376,8 @@ const allTools = computed((): ToolItem[] => {
     },
     {
       key: 'progressBar',
-      label: '进度',
-      title: '插入进度条',
+      label: '进度条',
+      title: '插入一条进度条',
       icon: '▮',
       iconComp: ic('wordStats'),
       run: () => { void insertProgressBarBlock() },
@@ -7434,8 +7434,8 @@ const allTools = computed((): ToolItem[] => {
     },
     {
       key: 'tableCsv',
-      label: '表CSV',
-      title: '复制当前表为 CSV',
+      label: '导出表',
+      title: '把当前表格复制成 CSV',
       icon: 'CSV',
       iconComp: ic('table'),
       run: () => { void copyCurrentTable('csv') },

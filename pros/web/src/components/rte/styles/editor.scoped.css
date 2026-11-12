@@ -1990,7 +1990,9 @@
   max-height: 320px;
   overflow-y: auto;
 }
-.rte-menu button.active {
+.rte-menu button.active,
+.rte-menu button[aria-pressed="true"],
+.rte-more-menu button[aria-pressed="true"] {
   background: #eef3ff;
   color: #165dff;
 }

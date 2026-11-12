@@ -129,7 +129,7 @@ export const TOOLBAR_SEARCH_KEYWORDS: Record<string, readonly string[]> = {
   tableFilter: ['筛选', '过滤'],
   tableEqual: ['均分列', '列宽'],
   tableSort: ['排序', '升序', '降序'],
-  tableCsv: ['csv', '导出表格'],
+  tableCsv: ['csv', '导出表格', '表csv', '导出表'],
   suggest: ['建议', '修订建议'],
   suggestAccept: ['接受修订', '接受'],
   suggestReject: ['拒绝修订', '拒绝'],
@@ -310,6 +310,21 @@ export function toolbarMenuKeyAction(key: string, inMenu: boolean, menuOpen: boo
   if (!inMenu && key === 'ArrowDown' && menuOpen) return 'move'
   if (!inMenu && key === 'ArrowDown') return 'open'
   return 'ignore'
+}
+
+/** 在菜单里打一个字，跳到下一个以它开头的项。没有就返回 -1。 */
+export function menuTypeaheadIndex(labels: readonly string[], typed: string, from = -1): number {
+  const q = typed.trim().toLowerCase()
+  if (q.length !== 1) return -1
+  const total = labels.length
+  if (!total) return -1
+  const start = Number.isInteger(from) ? from : -1
+  for (let step = 1; step <= total; step += 1) {
+    const index = (start + step + total) % total
+    const label = (labels[index] || '').trim().toLowerCase()
+    if (label.startsWith(q)) return index
+  }
+  return -1
 }
 
 /** 带小三角，或声明了菜单的按钮，才响应向下键。 */

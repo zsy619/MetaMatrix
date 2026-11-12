@@ -124,6 +124,10 @@ function ribbonHitCount(id: string): number {
   const group = (rteBindings.visibleToolbarGroups || []).find((item: { id: string; tools?: unknown[] }) => item.id === id)
   return group?.tools?.length || 0
 }
+function imageLayoutSelected(opt: { align: string; layout: string }): boolean {
+  const attrs = rteBindings.editor?.getAttributes?.('image')
+  return !!attrs && attrs.align === opt.align && attrs.layout === opt.layout
+}
 function currentAlignName(): string {
   if (rteBindings.isActive?.({ textAlign: 'center' })) return 'center'
   if (rteBindings.isActive?.({ textAlign: 'right' })) return 'right'
@@ -590,25 +594,25 @@ function toggleChartGroupMenu(key: string) {
               @mouseenter="rte.onToolMenuEnter('list')"
               @mouseleave="rte.onToolMenuLeave($event, 'list', () => (rte.listOpen = false))"
             >
-              <button data-rte-own type="button" :class="{ active: rte.isActive('bulletList') }" @click="rte.toggleBulletList(); rte.listOpen = false"><RteMenuGlyph label="无序列表" />无序列表</button>
-              <button data-rte-own type="button" :class="{ active: rte.isActive('orderedList') }" @click="rte.toggleOrderedList(); rte.listOpen = false"><RteMenuGlyph label="有序列表" />有序列表</button>
-              <button data-rte-own type="button" :class="{ active: rte.isActive('taskList') }" @click="rte.toggleTaskList(); rte.listOpen = false"><RteMenuGlyph label="任务列表" />任务列表</button>
+              <button data-rte-own type="button" :class="{ active: rte.isActive('bulletList') }" :aria-pressed="rte.isActive('bulletList')" @click="rte.toggleBulletList(); rte.listOpen = false"><RteMenuGlyph label="无序列表" />无序列表</button>
+              <button data-rte-own type="button" :class="{ active: rte.isActive('orderedList') }" :aria-pressed="rte.isActive('orderedList')" @click="rte.toggleOrderedList(); rte.listOpen = false"><RteMenuGlyph label="有序列表" />有序列表</button>
+              <button data-rte-own type="button" :class="{ active: rte.isActive('taskList') }" :aria-pressed="rte.isActive('taskList')" @click="rte.toggleTaskList(); rte.listOpen = false"><RteMenuGlyph label="任务列表" />任务列表</button>
               <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
               <button data-rte-own type="button" @click="rte.continueOrderedNumbering()"><RteMenuGlyph label="续号" />续号</button>
               <button data-rte-own type="button" @click="rte.restartOrderedNumbering()"><RteMenuGlyph label="新列表" />新列表</button>
               <button data-rte-own type="button" @click="rte.applyListStart()"><RteMenuGlyph label="修改编号值…" />修改编号值…</button>
               <button data-rte-own type="button" @click="rte.renumberListFromHere()"><RteMenuGlyph label="从此处重编号" />从此处重编号</button>
               <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
-              <button data-rte-own type="button" :class="{ active: rte.currentOrderedListStyle() === 'decimal' }" @click="rte.applyListStyle('decimal')"><RteMenuGlyph label="数字 1. 2. 3." />数字 1. 2. 3.</button>
-              <button data-rte-own type="button" :class="{ active: rte.currentOrderedListStyle() === 'lower-alpha' }" @click="rte.applyListStyle('lower-alpha')"><RteMenuGlyph label="字母 a. b. c." />字母 a. b. c.</button>
-              <button data-rte-own type="button" :class="{ active: rte.currentOrderedListStyle() === 'lower-roman' }" @click="rte.applyListStyle('lower-roman')"><RteMenuGlyph label="罗马 i. ii. iii." />罗马 i. ii. iii.</button>
+              <button data-rte-own type="button" :class="{ active: rte.currentOrderedListStyle() === 'decimal' }" :aria-pressed="rte.currentOrderedListStyle() === 'decimal'" @click="rte.applyListStyle('decimal')"><RteMenuGlyph label="数字 1. 2. 3." />数字 1. 2. 3.</button>
+              <button data-rte-own type="button" :class="{ active: rte.currentOrderedListStyle() === 'lower-alpha' }" :aria-pressed="rte.currentOrderedListStyle() === 'lower-alpha'" @click="rte.applyListStyle('lower-alpha')"><RteMenuGlyph label="字母 a. b. c." />字母 a. b. c.</button>
+              <button data-rte-own type="button" :class="{ active: rte.currentOrderedListStyle() === 'lower-roman' }" :aria-pressed="rte.currentOrderedListStyle() === 'lower-roman'" @click="rte.applyListStyle('lower-roman')"><RteMenuGlyph label="罗马 i. ii. iii." />罗马 i. ii. iii.</button>
               <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
               <div data-rte-own v-if="rte.listDepthLabel" class="rte-menu-hint">{{ rte.listDepthLabel }}</div>
               <div data-rte-own class="rte-menu-hint">Tab / Shift+Tab 调整层级</div>
               <button data-rte-own type="button" @click="rte.indentBlock(); rte.listOpen = false"><RteMenuGlyph label="增加缩进" />增加缩进</button>
               <button data-rte-own type="button" @click="rte.padListItem(1)"><RteMenuGlyph label="只缩进文字" />只缩进文字</button>
               <button data-rte-own type="button" @click="rte.padListItem(-1)"><RteMenuGlyph label="只减少缩进" />只减少缩进</button>
-              <button data-rte-own type="button" @click="rte.toggleTaskOpenOnly()"><RteMenuGlyph :label="rte.taskOpenOnly ? '显示全部任务' : '只看未完成'" />{{ rte.taskOpenOnly ? '显示全部任务' : '只看未完成' }}</button>
+              <button data-rte-own type="button" :class="{ active: rte.taskOpenOnly }" :aria-pressed="rte.taskOpenOnly" @click="rte.toggleTaskOpenOnly()"><RteMenuGlyph :label="rte.taskOpenOnly ? '显示全部任务' : '只看未完成'" />{{ rte.taskOpenOnly ? '显示全部任务' : '只看未完成' }}</button>
               <button data-rte-own type="button" @click="rte.outdentBlock(); rte.listOpen = false"><RteMenuGlyph label="减少缩进" />减少缩进</button>
             </div>
           </Teleport>
@@ -635,7 +639,7 @@ function toggleChartGroupMenu(key: string) {
                 rte.isActive('formDateInput') ||
                 rte.isActive('formSwitch'),
             }"
-            title="表单"
+            :title="t.title || '表单'"
             aria-label="插入表单控件"
             aria-haspopup="menu"
             :aria-expanded="rte.formOpen"
@@ -685,7 +689,7 @@ function toggleChartGroupMenu(key: string) {
             class="rte-tool"
             :ref="(el) => rte.setFloatAnchor('template', el)" data-rte-anchor="template"
             :class="{ active: rte.templateOpen }"
-            title="插入模板"
+            :title="t.title || '插入模板'"
             aria-label="插入模板"
             aria-haspopup="menu"
             :aria-expanded="rte.templateOpen"
@@ -742,7 +746,7 @@ function toggleChartGroupMenu(key: string) {
             class="rte-tool"
             :ref="(el) => rte.setFloatAnchor('highlight', el)" data-rte-anchor="highlight"
             :class="{ active: rte.isActive('highlight') || rte.highlightOpen }"
-            title="高亮颜色"
+            :title="t.title || '高亮颜色'"
             aria-label="高亮颜色"
             :aria-expanded="rte.highlightOpen"
             aria-haspopup="dialog"
@@ -779,7 +783,7 @@ function toggleChartGroupMenu(key: string) {
             class="rte-tool"
             :ref="(el) => rte.setFloatAnchor('color', el)" data-rte-anchor="color"
             :class="{ active: rte.colorOpen }"
-            title="文字颜色"
+            :title="t.title || '文字颜色'"
             aria-label="文字颜色"
             :aria-expanded="rte.colorOpen"
             aria-haspopup="dialog"
@@ -851,6 +855,7 @@ function toggleChartGroupMenu(key: string) {
                 :key="'fs-recent-' + opt.label"
                 type="button"
                 :class="{ active: (opt.value || '') === (rte.currentFontSize() || '') }"
+                :aria-pressed="(opt.value || '') === (rte.currentFontSize() || '')"
                 @click="rte.applyFontSize(opt.value)"
               ><RteMenuGlyph :label="opt.label" fallback="fontSize" />{{ opt.label }}</button>
               <div v-if="rte.recentFontSizeOptions.length" data-rte-own class="rte-menu-sep" aria-hidden="true" />
@@ -859,6 +864,7 @@ function toggleChartGroupMenu(key: string) {
                 :key="'fs-' + opt.label"
                 type="button"
                 :class="{ active: (opt.value || '') === (rte.currentFontSize() || '') }"
+                :aria-pressed="(opt.value || '') === (rte.currentFontSize() || '')"
                 @click="rte.applyFontSize(opt.value)"
               ><RteMenuGlyph :label="opt.label" fallback="fontSize" />{{ opt.label }}</button>
             </div>
@@ -899,6 +905,7 @@ function toggleChartGroupMenu(key: string) {
                 :key="'ff-' + (opt.value || 'default')"
                 type="button"
                 :class="{ active: (opt.value || '') === (rte.currentFontFamily() || '') }"
+                :aria-pressed="(opt.value || '') === (rte.currentFontFamily() || '')"
                 :style="opt.value ? { fontFamily: opt.value } : undefined"
                 @click="rte.applyFontFamily(opt.value)"
               ><RteMenuGlyph :label="opt.label" fallback="fontFamily" />{{ opt.label }}</button>
@@ -940,6 +947,7 @@ function toggleChartGroupMenu(key: string) {
                 :key="'lh-' + (opt.value || 'default')"
                 type="button"
                 :class="{ active: (opt.value || '') === (rte.currentLineHeight() || '') }"
+                :aria-pressed="(opt.value || '') === (rte.currentLineHeight() || '')"
                 @click="rte.applyLineHeight(opt.value)"
               ><RteMenuGlyph :label="opt.label" fallback="lineHeight" />{{ opt.label }}</button>
             </div>
@@ -957,7 +965,7 @@ function toggleChartGroupMenu(key: string) {
             :ref="(el) => rte.setFloatAnchor('linkButton', el)"
             data-rte-anchor="linkButton"
             :class="{ active: rte.linkButtonOpen || rte.isActive('linkButton') }"
-            title="插入打开链接的按钮"
+            :title="t.title || '插入打开链接的按钮'"
             aria-label="按钮"
             aria-haspopup="menu"
             :aria-expanded="rte.linkButtonOpen"
@@ -1024,10 +1032,10 @@ function toggleChartGroupMenu(key: string) {
               @mouseenter="rte.onToolMenuEnter('align')"
               @mouseleave="rte.onToolMenuLeave($event, 'align', () => (rte.alignOpen = false))"
             >
-              <button data-rte-own type="button" :aria-pressed="currentAlignName() === 'left'" @click="rte.setAlign('left'); rte.alignOpen = false"><RteMenuGlyph label="左对齐" />左对齐</button>
-              <button data-rte-own type="button" :aria-pressed="currentAlignName() === 'center'" @click="rte.setAlign('center'); rte.alignOpen = false"><RteMenuGlyph label="居中" />居中</button>
-              <button data-rte-own type="button" :aria-pressed="currentAlignName() === 'right'" @click="rte.setAlign('right'); rte.alignOpen = false"><RteMenuGlyph label="右对齐" />右对齐</button>
-              <button data-rte-own type="button" :aria-pressed="currentAlignName() === 'justify'" @click="rte.setAlign('justify'); rte.alignOpen = false"><RteMenuGlyph label="两端对齐" />两端对齐</button>
+              <button data-rte-own type="button" :class="{ active: currentAlignName() === 'left' }" :aria-pressed="currentAlignName() === 'left'" @click="rte.setAlign('left'); rte.alignOpen = false"><RteMenuGlyph label="左对齐" />左对齐</button>
+              <button data-rte-own type="button" :class="{ active: currentAlignName() === 'center' }" :aria-pressed="currentAlignName() === 'center'" @click="rte.setAlign('center'); rte.alignOpen = false"><RteMenuGlyph label="居中" />居中</button>
+              <button data-rte-own type="button" :class="{ active: currentAlignName() === 'right' }" :aria-pressed="currentAlignName() === 'right'" @click="rte.setAlign('right'); rte.alignOpen = false"><RteMenuGlyph label="右对齐" />右对齐</button>
+              <button data-rte-own type="button" :class="{ active: currentAlignName() === 'justify' }" :aria-pressed="currentAlignName() === 'justify'" @click="rte.setAlign('justify'); rte.alignOpen = false"><RteMenuGlyph label="两端对齐" />两端对齐</button>
               <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
               <button data-rte-own type="button" @click="rte.indentBlock(); rte.alignOpen = false"><RteMenuGlyph label="增加缩进" />增加缩进</button>
               <button data-rte-own type="button" @click="rte.outdentBlock(); rte.alignOpen = false"><RteMenuGlyph label="减少缩进" />减少缩进</button>
@@ -1501,13 +1509,13 @@ function toggleChartGroupMenu(key: string) {
             :ref="(el) => rte.setFloatAnchor('emoji', el)"
             data-rte-anchor="emoji"
             :class="{ active: rte.emojiOpen }"
-            title="表情"
+            :title="t.title || '表情'"
             @click.stop="rte.markToolbarMenuOpening(); rte.closeColorMenus(); rte.closeHighlightMenus(); rte.closeFontMenus(); rte.specialCharsOpen = false; rte.emojiOpen = !rte.emojiOpen"
           >
             <span data-rte-own class="rte-tool-icon">
               <component data-rte-own :is="rte.toolIcon('emoji')" class="rte-ep-icon" />
             </span>
-            <span data-rte-own class="rte-tool-label">表情<span data-rte-own class="rte-caret" aria-hidden="true"></span></span>
+            <span data-rte-own class="rte-tool-label">{{ t.label || '表情' }}<span data-rte-own class="rte-caret" aria-hidden="true"></span></span>
           </button>
           <Teleport to="body">
             <div data-rte-own
@@ -1560,13 +1568,13 @@ function toggleChartGroupMenu(key: string) {
             :ref="(el) => rte.setFloatAnchor('specialChars', el)"
             data-rte-anchor="specialChars"
             :class="{ active: rte.specialCharsOpen }"
-            title="字符"
+            :title="t.title || '符号'"
             @click.stop="rte.markToolbarMenuOpening(); rte.closeColorMenus(); rte.closeHighlightMenus(); rte.closeFontMenus(); rte.emojiOpen = false; rte.specialCharsOpen = !rte.specialCharsOpen"
           >
             <span data-rte-own class="rte-tool-icon">
               <component data-rte-own :is="rte.toolIcon('specialChars')" class="rte-ep-icon" />
             </span>
-            <span data-rte-own class="rte-tool-label">字符<span data-rte-own class="rte-caret" aria-hidden="true"></span></span>
+            <span data-rte-own class="rte-tool-label">{{ t.label || '符号' }}<span data-rte-own class="rte-caret" aria-hidden="true"></span></span>
           </button>
           <Teleport to="body">
             <div data-rte-own
@@ -1614,7 +1622,7 @@ function toggleChartGroupMenu(key: string) {
             :ref="(el) => rte.setFloatAnchor('columns', el)"
             data-rte-anchor="columns"
             :class="{ active: rte.columnsOpen || rte.isActive('columns') }"
-            title="多栏布局（2–6 栏）"
+            :title="t.title || '把内容分成多栏'"
             @click.stop="rte.markToolbarMenuOpening(); rte.columnsOpen = !rte.columnsOpen"
           >
             <span data-rte-own class="rte-tool-icon">
@@ -1655,7 +1663,7 @@ function toggleChartGroupMenu(key: string) {
             :ref="(el) => rte.setFloatAnchor('spacing', el)"
             data-rte-anchor="spacing"
             :class="{ active: rte.spacingOpen || !!(rte.currentLetterSpacing() || rte.currentMarginTop() || rte.currentMarginBottom()) }"
-            title="段前段后 / 字间距"
+            :title="t.title || '段前、段后和字间距'"
             @click.stop="rte.markToolbarMenuOpening(); rte.spacingOpen = !rte.spacingOpen"
           >
             <span data-rte-own class="rte-tool-icon">
@@ -1699,7 +1707,7 @@ function toggleChartGroupMenu(key: string) {
             :ref="(el) => rte.setFloatAnchor('paraStyle', el)"
             data-rte-anchor="paraStyle"
             :class="{ active: rte.paraStyleOpen }"
-            title="段落样式集"
+            :title="t.title || '段落样式'"
             @click.stop="rte.markToolbarMenuOpening(); rte.paraStyleOpen = !rte.paraStyleOpen"
           >
             <span data-rte-own class="rte-tool-icon">
@@ -1735,7 +1743,7 @@ function toggleChartGroupMenu(key: string) {
             :ref="(el) => rte.setFloatAnchor('listStyle', el)"
             data-rte-anchor="listStyle"
             :class="{ active: rte.listStyleOpen }"
-            title="列表编号样式"
+            :title="t.title || '编号样式'"
             @click.stop="rte.markToolbarMenuOpening(); rte.listStyleOpen = !rte.listStyleOpen"
           >
             <span data-rte-own class="rte-tool-icon">
@@ -1774,7 +1782,7 @@ function toggleChartGroupMenu(key: string) {
             :ref="(el) => rte.setFloatAnchor('wordStats', el)"
             data-rte-anchor="wordStats"
             :class="{ active: rte.wordStatsOpen }"
-            title="字数统计"
+            :title="t.title || '字数'"
             @click.stop="rte.markToolbarMenuOpening(); rte.wordStatsOpen = !rte.wordStatsOpen"
           >
             <span data-rte-own class="rte-tool-icon">
@@ -1826,7 +1834,7 @@ function toggleChartGroupMenu(key: string) {
             :ref="(el) => rte.setFloatAnchor('callout', el)"
             data-rte-anchor="callout"
             :class="{ active: rte.calloutOpen || rte.isActive('callout') }"
-            title="告示框（提示/警告/成功/错误）"
+            :title="t.title || '告示'"
             aria-label="告示框"
             @click.stop="rte.markToolbarMenuOpening(); rte.calloutOpen = !rte.calloutOpen"
           >
@@ -1850,6 +1858,7 @@ function toggleChartGroupMenu(key: string) {
                 :key="'co-' + it.variant"
                 type="button"
                 :class="{ active: rte.isActive('callout', { variant: it.variant }) }"
+                :aria-pressed="rte.isActive('callout', { variant: it.variant })"
                 @click="rte.insertCallout(it.variant)"
               >
                 <span data-rte-own class="rte-callout-dot" :data-variant="it.variant" aria-hidden="true" />
@@ -1945,7 +1954,7 @@ function toggleChartGroupMenu(key: string) {
             :ref="(el) => rte.setFloatAnchor('hr', el)"
             data-rte-anchor="hr"
             :class="{ active: rte.hrOpen || rte.isActive('horizontalRule') }"
-            title="分割线（也可输入 ---）"
+            :title="t.title || '分割线'"
             aria-label="分割线"
             aria-haspopup="menu"
             :aria-expanded="rte.hrOpen"
@@ -1969,13 +1978,13 @@ function toggleChartGroupMenu(key: string) {
             :ref="(el) => rte.setFloatAnchor('blockOps', el)"
             data-rte-anchor="blockOps"
             :class="{ active: rte.blockOpsOpen }"
-            title="块操作"
+            :title="t.title || '块操作'"
             @click.stop="rte.markToolbarMenuOpening(); rte.blockOpsOpen = !rte.blockOpsOpen"
           >
             <span data-rte-own class="rte-tool-icon">
               <component data-rte-own :is="t.iconComp || rte.toolIcon('more')" class="rte-ep-icon" />
             </span>
-            <span data-rte-own class="rte-tool-label">块<span data-rte-own class="rte-caret" aria-hidden="true"></span></span>
+            <span data-rte-own class="rte-tool-label">{{ t.label || '块操作' }}<span data-rte-own class="rte-caret" aria-hidden="true"></span></span>
           </button>
         </div>
         <div data-rte-own
@@ -1990,7 +1999,7 @@ function toggleChartGroupMenu(key: string) {
             :ref="(el) => rte.setFloatAnchor('insertDate', el)"
             data-rte-anchor="insertDate"
             :class="{ active: rte.insertDateOpen }"
-            title="插入日期"
+            :title="t.title || '插入日期'"
             @click.stop="rte.markToolbarMenuOpening(); rte.insertDateOpen = !rte.insertDateOpen"
           >
             <span data-rte-own class="rte-tool-icon">
@@ -2144,6 +2153,7 @@ function toggleChartGroupMenu(key: string) {
                 :key="'z-' + z.value"
                 type="button"
                 :class="{ active: rte.editorZoom === z.value }"
+                :aria-pressed="rte.editorZoom === z.value"
                 @click="rte.setEditorZoom(z.value)"
               ><RteMenuGlyph :label="z.label" fallback="zoom" />{{ z.label }}</button>
             </div>
@@ -2161,7 +2171,7 @@ function toggleChartGroupMenu(key: string) {
             :ref="(el) => rte.setFloatAnchor('viewExtras', el)"
             data-rte-anchor="viewExtras"
             :class="{ active: rte.viewExtrasOpen || rte.focusMode || rte.darkEditor || rte.paperGuide || rte.pageSize !== 'full' }"
-            :title="`视图 · ${rte.pageSizeMeta.label}`"
+            :title="(t.title || '视图') + '。当前纸张：' + rte.pageSizeMeta.label"
             aria-haspopup="menu"
             :aria-expanded="rte.viewExtrasOpen"
             @click.stop="rte.markToolbarMenuOpening(); rte.viewExtrasOpen = !rte.viewExtrasOpen"
@@ -2212,7 +2222,7 @@ function toggleChartGroupMenu(key: string) {
             :ref="(el) => rte.setFloatAnchor('textTidy', el)"
             data-rte-anchor="textTidy"
             :class="{ active: rte.textTidyOpen }"
-            title="整理选中文字"
+            :title="t.title || '整理'"
             aria-label="整理文字"
             aria-haspopup="menu"
             :aria-expanded="rte.textTidyOpen"
@@ -2276,6 +2286,8 @@ function toggleChartGroupMenu(key: string) {
                 v-for="opt in rte.IMAGE_LAYOUT_OPTIONS"
                 :key="'img-layout-' + opt.id"
                 type="button"
+                :class="{ active: imageLayoutSelected(opt) }"
+                :aria-pressed="imageLayoutSelected(opt)"
                 @click="rte.setImagePlacement(opt); rte.imageLayoutOpen = false"
               ><RteMenuGlyph :id="opt.id" :label="opt.label" />{{ opt.label }}</button>
             </div>
@@ -2564,6 +2576,8 @@ function toggleChartGroupMenu(key: string) {
                 v-for="opt in rte.IMAGE_LAYOUT_OPTIONS"
                 :key="'mimg-' + opt.id"
                 type="button"
+                :class="{ active: imageLayoutSelected(opt) }"
+                :aria-pressed="imageLayoutSelected(opt)"
                 :disabled="!rte.isImageNodeSelected()"
                 @click="rte.setImagePlacement(opt); rte.imageLayoutOpen = false"
               ><RteMenuGlyph :id="opt.id" :label="opt.label" />{{ opt.label }}</button>
@@ -2578,6 +2592,7 @@ function toggleChartGroupMenu(key: string) {
                 :key="'mfs-recent-' + opt.label"
                 type="button"
                 :class="{ active: (opt.value || '') === (rte.currentFontSize() || '') }"
+                :aria-pressed="(opt.value || '') === (rte.currentFontSize() || '')"
                 @click="rte.applyFontSize(opt.value)"
               ><RteMenuGlyph :label="opt.label" fallback="fontSize" />{{ opt.label }}</button>
               <button data-rte-own
@@ -2585,6 +2600,7 @@ function toggleChartGroupMenu(key: string) {
                 :key="'mfs-' + opt.label"
                 type="button"
                 :class="{ active: (opt.value || '') === (rte.currentFontSize() || '') }"
+                :aria-pressed="(opt.value || '') === (rte.currentFontSize() || '')"
                 @click="rte.applyFontSize(opt.value)"
               ><RteMenuGlyph :label="opt.label" fallback="fontSize" />{{ opt.label }}</button>
             </div>
@@ -2598,6 +2614,7 @@ function toggleChartGroupMenu(key: string) {
                 :key="'mff-' + (opt.value || 'default')"
                 type="button"
                 :class="{ active: (opt.value || '') === (rte.currentFontFamily() || '') }"
+                :aria-pressed="(opt.value || '') === (rte.currentFontFamily() || '')"
                 :style="opt.value ? { fontFamily: opt.value } : undefined"
                 @click="rte.applyFontFamily(opt.value)"
               ><RteMenuGlyph :label="opt.label" fallback="fontFamily" />{{ opt.label }}</button>
@@ -2612,6 +2629,7 @@ function toggleChartGroupMenu(key: string) {
                 :key="'mlh-' + (opt.value || 'default')"
                 type="button"
                 :class="{ active: (opt.value || '') === (rte.currentLineHeight() || '') }"
+                :aria-pressed="(opt.value || '') === (rte.currentLineHeight() || '')"
                 @click="rte.applyLineHeight(opt.value)"
               ><RteMenuGlyph :label="opt.label" fallback="lineHeight" />{{ opt.label }}</button>
             </div>
@@ -2641,6 +2659,7 @@ function toggleChartGroupMenu(key: string) {
                 :key="'mz-' + z.value"
                 type="button"
                 :class="{ active: rte.editorZoom === z.value }"
+                :aria-pressed="rte.editorZoom === z.value"
                 @click="rte.setEditorZoom(z.value)"
               ><RteMenuGlyph :label="z.label" fallback="zoom" />{{ z.label }}</button>
             </div>
@@ -2732,6 +2751,7 @@ function toggleChartGroupMenu(key: string) {
                 :key="'mco-' + it.variant"
                 type="button"
                 :class="{ active: rte.isActive('callout', { variant: it.variant }) }"
+                :aria-pressed="rte.isActive('callout', { variant: it.variant })"
                 @click="rte.insertCallout(it.variant)"
               >
                 <span data-rte-own class="rte-callout-dot" :data-variant="it.variant" aria-hidden="true" />

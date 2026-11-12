@@ -15,6 +15,7 @@ import {
   listToolLabel,
   MENU_CLOSE_DELAY_MS,
   menuFocusStep,
+  menuTypeaheadIndex,
   menuToolNeedsCaret,
   moreToolsCaption,
   moreToolsTitle,
@@ -141,6 +142,10 @@ assert.equal(toolbarMenuKeyAction('ArrowLeft', false, true), 'ignore')
 assert.equal(isToolbarMenuTrigger({ popup: 'menu' }), true)
 assert.equal(isToolbarMenuTrigger({ caret: true }), true)
 assert.equal(isToolbarMenuTrigger({ popup: 'dialog' }), false)
+assert.equal(menuTypeaheadIndex(['居中', '居左', '居右'], '居', -1), 0)
+assert.equal(menuTypeaheadIndex(['居中', '居左', '居右'], '居', 0), 1)
+assert.equal(menuTypeaheadIndex(['居中', '居左'], '右', -1), -1)
+assert.equal(menuTypeaheadIndex(['左对齐', '居中'], ' ', -1), -1)
 assert.equal(stepRibbonTabBy(['a', 'b', 'c', 'd', 'e'], 'b', 3), 'e')
 assert.equal(stepRibbonTabBy(['a', 'b', 'c'], 'a', -3), 'a')
 assert.equal(zoomToolLabel(1), '实际大小')
