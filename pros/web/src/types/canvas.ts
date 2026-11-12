@@ -2365,6 +2365,44 @@ export interface SceneThreeHighDocumentJSON {
   businesses: SceneThreeHighBusiness[]
 }
 
+/** 业务别用 AI：四条边界，分值 0–100 */
+export type AiBoundaryAxisId = 'cause' | 'irreversible' | 'data' | 'compliance'
+
+export interface AiBoundaryScores {
+  cause: number
+  irreversible: number
+  data: number
+  compliance: number
+}
+
+export interface AiBoundaryAxis {
+  id: AiBoundaryAxisId
+  title: string
+  body: string
+}
+
+export interface AiBoundaryBusiness {
+  id: string
+  name: string
+  color: string
+  stroke: string
+  scores: AiBoundaryScores
+  note: string
+}
+
+export interface AiBoundaryDocumentJSON {
+  id: string
+  type: 'ai_boundary'
+  schemaVersion: number
+  theme: CanvasTheme
+  kicker: string
+  title: string
+  verdict: string
+  warnScore: number
+  axes: AiBoundaryAxis[]
+  businesses: AiBoundaryBusiness[]
+}
+
 export interface FdeRichBlock {
   id: string
   kind: 'rich'
@@ -2563,6 +2601,7 @@ export type CanvasDocumentJSON = (
   | PlayingToWinDocumentJSON
   | TenCheckDocumentJSON
   | SceneThreeHighDocumentJSON
+  | AiBoundaryDocumentJSON
   | FdeSheetDocumentJSON
 ) & WithPanelAttachments
 
@@ -3250,6 +3289,10 @@ export function isTenCheckDoc(doc: CanvasDocumentJSON | null | undefined): doc i
 
 export function isSceneThreeHighDoc(doc: CanvasDocumentJSON | null | undefined): doc is SceneThreeHighDocumentJSON {
   return !!doc && doc.type === 'scene_three_high'
+}
+
+export function isAiBoundaryDoc(doc: CanvasDocumentJSON | null | undefined): doc is AiBoundaryDocumentJSON {
+  return !!doc && doc.type === 'ai_boundary'
 }
 
 export function isFdeSheetDoc(doc: CanvasDocumentJSON | null | undefined): doc is FdeSheetDocumentJSON {

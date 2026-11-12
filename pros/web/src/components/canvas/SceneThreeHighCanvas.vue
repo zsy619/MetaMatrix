@@ -14,6 +14,7 @@ import { itemTextToHtml, normalizeHtmlForCompare } from '../../utils/itemsHtml'
 import {
   SCENE_THREE_HIGH_AXIS_IDS,
   SCENE_THREE_HIGH_AXIS_LABEL,
+  SCENE_THREE_HIGH_MAX,
   clampSceneScore,
   sceneRadarPoint,
   sceneRadarRing,
@@ -42,12 +43,12 @@ const PALETTE = [
 const CX = 320
 const CY = 286
 const R = 168
-const passScore = computed(() => props.doc.passScore || 7)
+const passScore = computed(() => props.doc.passScore || 70)
 const passedCount = computed(() => props.doc.businesses.filter((biz) => sceneThreeHighPasses(biz.scores, passScore.value)).length)
-const rings = [2, 4, 6, 8, 10].map((level) => sceneRadarRing(level, CX, CY, R))
+const rings = [20, 40, 60, 80, 100].map((level) => sceneRadarRing(level, CX, CY, R))
 const passRing = computed(() => sceneRadarRing(passScore.value, CX, CY, R))
 const spokes = [0, 1, 2].map((index) => {
-  const [x, y] = sceneRadarPoint(index, 10, CX, CY, R)
+  const [x, y] = sceneRadarPoint(index, SCENE_THREE_HIGH_MAX, CX, CY, R)
   return { x, y }
 })
 function axisLabelPoint(index: number): [number, number] {
@@ -101,7 +102,7 @@ function addBusiness() {
       name: `第${doc.businesses.length + 1}个业务`,
       color: palette.color,
       stroke: palette.stroke,
-      scores: { frequency: 5, value: 5, marginal: 5 },
+      scores: { frequency: 50, value: 50, marginal: 50 },
       note: '',
     })
   })
@@ -118,7 +119,7 @@ function removeBusiness(id: string) {
 
 function verdictOf(biz: SceneThreeHighBusiness): string {
   const gaps = sceneThreeHighGaps(biz.scores, passScore.value)
-  return gaps.length ? `还差${gaps.join('、')}` : '三项都到 7'
+  return gaps.length ? `还差${gaps.join('、')}` : `三项都到 ${passScore.value}`
 }
 
 const noteBiz = computed(() => props.doc.businesses.find((item) => item.id === noteBizId.value))
@@ -191,7 +192,7 @@ function writeNote(html: string) {
             <input
               type="range"
               min="0"
-              max="10"
+              :max="SCENE_THREE_HIGH_MAX"
               step="1"
               :aria-label="`${biz.name}的${SCENE_THREE_HIGH_AXIS_LABEL[axis]}`"
               :value="biz.scores[axis]"
@@ -202,7 +203,7 @@ function writeNote(html: string) {
               class="num"
               type="number"
               min="0"
-              max="10"
+              :max="SCENE_THREE_HIGH_MAX"
               step="1"
               :value="biz.scores[axis]"
               @click.stop
@@ -238,7 +239,7 @@ function writeNote(html: string) {
             dominant-baseline="middle"
             class="axis"
           >{{ label.title }}</text>
-          <text :x="CX + 14" :y="CY - (R * passScore) / 10" class="gate-label">{{ passScore }}</text>
+          <text :x="CX + 14" :y="CY - (R * passScore) / SCENE_THREE_HIGH_MAX" class="gate-label">{{ passScore }}</text>
         </svg>
       </section>
     </div>
@@ -309,7 +310,7 @@ function writeNote(html: string) {
 .biz label { gap: 8px; margin-top: 6px; }
 .biz label span { width: 5.5em; color: #5c574e; font-size: 13px; }
 .biz label input[type='range'] { flex: 1; }
-.num { width: 52px; border: 1px solid #e4ddd2; border-radius: 8px; padding: 4px 6px; font: inherit; }
+.num { width: 64px; border: 1px solid #e4ddd2; border-radius: 8px; padding: 4px 6px; font: inherit; }
 .record { margin: 8px 0 0; color: #3c4043; font-size: 13px; line-height: 1.5; }
 .radar { min-height: 420px; }
 .radar svg { display: block; width: 100%; height: auto; }

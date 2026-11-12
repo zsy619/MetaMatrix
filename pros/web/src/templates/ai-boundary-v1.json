@@ -1,0 +1,79 @@
+{
+  "id": "canvas_ai_boundary",
+  "type": "ai_boundary",
+  "schemaVersion": 1,
+  "theme": {
+    "background": { "pattern": "none", "color": "#f6f1e6" },
+    "page": "#f6f1e6",
+    "frame": "#e6d7c3",
+    "hairline": "rgba(90, 60, 30, 0.12)"
+  },
+  "kicker": "边界 · 别用 AI 的四种情况",
+  "title": "业务别用 AI 的情况",
+  "verdict": "这四条不是「AI 不行」，是「这件事不该由 AI 来做」。分清楚两句话，是专业和不专业的差别。",
+  "warnScore": 70,
+  "axes": [
+    {
+      "id": "cause",
+      "title": "单点因果",
+      "body": "有现成方案、只差人去干的事。买个钥匙，别造万能钥匙。"
+    },
+    {
+      "id": "irreversible",
+      "title": "错了不可逆",
+      "body": "涉及签约、付款、合规结论。错了收不回来的地方，人在环不能省。"
+    },
+    {
+      "id": "data",
+      "title": "数据拿不到",
+      "body": "不是脏，是压根没有。这时先补数据，不是先上模型。"
+    },
+    {
+      "id": "compliance",
+      "title": "踩合规红线",
+      "body": "个人信息、医疗、金融口径。这类事，慢比快重要。"
+    }
+  ],
+  "businesses": [
+    {
+      "id": "biz_export",
+      "name": "周报导出",
+      "color": "rgba(154, 52, 18, 0.28)",
+      "stroke": "#9a3412",
+      "scores": { "cause": 86, "irreversible": 12, "data": 20, "compliance": 8 },
+      "note": "表格和模板都在，只差人每周点一次导出。"
+    },
+    {
+      "id": "biz_contract",
+      "name": "合同用印",
+      "color": "rgba(185, 28, 28, 0.28)",
+      "stroke": "#b91c1c",
+      "scores": { "cause": 30, "irreversible": 92, "data": 40, "compliance": 55 },
+      "note": "签出去就收不回来。人必须留在最后一环。"
+    },
+    {
+      "id": "biz_forecast",
+      "name": "新品销量预测",
+      "color": "rgba(180, 83, 9, 0.3)",
+      "stroke": "#b45309",
+      "scores": { "cause": 25, "irreversible": 35, "data": 88, "compliance": 10 },
+      "note": "没有历史销量。不是数据脏，是数据不存在。"
+    },
+    {
+      "id": "biz_clinic",
+      "name": "诊疗建议",
+      "color": "rgba(124, 58, 237, 0.26)",
+      "stroke": "#7c3aed",
+      "scores": { "cause": 20, "irreversible": 70, "data": 45, "compliance": 96 },
+      "note": "医疗口径，慢比快重要。不能让模型直接给结论。"
+    },
+    {
+      "id": "biz_notes",
+      "name": "会议纪要",
+      "color": "rgba(15, 118, 110, 0.28)",
+      "stroke": "#0f766e",
+      "scores": { "cause": 22, "irreversible": 15, "data": 28, "compliance": 18 },
+      "note": "四条都不贴边，可以考虑交给 AI 起草，人再改。"
+    }
+  ]
+}

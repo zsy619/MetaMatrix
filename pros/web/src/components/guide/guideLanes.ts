@@ -109,8 +109,8 @@ export const GUIDE_LANES: Record<TemplateCategory, GuideLane[]> = {
     {
       id: 'pick',
       title: '先判断做不做',
-      hint: '十格自检，或用三高和场景画布',
-      ids: ['ten-check', 'scene-three-high', 'fde-scenario', 'fde-select'],
+      hint: '十格自检、三高，或先看别用 AI 的四种情况',
+      ids: ['ten-check', 'scene-three-high', 'ai-boundary', 'fde-scenario', 'fde-select'],
     },
     {
       id: 'listen',

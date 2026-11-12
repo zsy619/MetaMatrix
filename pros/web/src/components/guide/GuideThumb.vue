@@ -1682,6 +1682,15 @@ withDefaults(
         <rect x="16" y="90" width="80" height="14" rx="3" fill="#f4fbf6" />
         <rect x="104" y="90" width="80" height="14" rx="3" fill="#fff6f6" />
       </svg>
+      <svg v-else-if="templateId === 'ai-boundary'" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+        <rect width="200" height="140" rx="10" fill="#f6f1e6" />
+        <polygon points="100,24 164,70 100,116 36,70" fill="none" stroke="#e6d7c3" stroke-width="1.4" />
+        <polygon points="100,46 132,70 100,98 62,74" fill="rgba(154,52,18,0.28)" stroke="#9a3412" stroke-width="1.4" />
+        <text x="100" y="16" text-anchor="middle" font-size="8" font-weight="700" fill="#1c1917">单点因果</text>
+        <text x="178" y="74" text-anchor="middle" font-size="7" font-weight="700" fill="#1c1917">不可逆</text>
+        <text x="100" y="132" text-anchor="middle" font-size="8" font-weight="700" fill="#1c1917">没数据</text>
+        <text x="22" y="74" text-anchor="middle" font-size="7" font-weight="700" fill="#1c1917">合规</text>
+      </svg>
       <svg v-else-if="templateId === 'scene-three-high'" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
         <rect width="200" height="140" rx="10" fill="#f7f4ee" />
         <polygon points="100,28 156,118 44,118" fill="none" stroke="#e4ddd2" stroke-width="1.4" />

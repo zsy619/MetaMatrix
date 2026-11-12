@@ -262,6 +262,7 @@ describe('实用商业画布', () => {
     }
     expect(TEMPLATE_META['ten-check'].category).toBe('fde')
     expect(TEMPLATE_META['scene-three-high'].category).toBe('fde')
+    expect(TEMPLATE_META['ai-boundary'].category).toBe('fde')
   })
 
   it('甘特图后置任务指向依赖它的行', () => {

@@ -126,6 +126,7 @@ import type {
   PlayingToWinDocumentJSON,
   TenCheckDocumentJSON,
   SceneThreeHighDocumentJSON,
+  AiBoundaryDocumentJSON,
   PanelAttachment,
   AttachmentsByPanelId,
 } from '../types/canvas'
@@ -262,8 +263,9 @@ import soarTemplate from '../templates/soar-v1.json'
 import playingToWinTemplate from '../templates/playing-to-win-v1.json'
 import tenCheckTemplate from '../templates/ten-check-v1.json'
 import sceneThreeHighTemplate from '../templates/scene-three-high-v1.json'
+import aiBoundaryTemplate from '../templates/ai-boundary-v1.json'
 import { FDE_SHEET_META, FDE_SHEET_TEMPLATES, type FdeSheetId } from '../templates/fdeSheets'
-import { isLegacySceneSeed } from '../utils/sceneThreeHigh'
+import { isLegacySceneSeed, upgradeSceneScoresToHundred } from '../utils/sceneThreeHigh'
 import { CONTEXT_SIX_ELEMENTS_BLOCK_ID } from '../utils/contextSixElements'
 
 export type TemplateId =
@@ -338,6 +340,7 @@ export type TemplateId =
   | 'playing-to-win'
   | 'ten-check'
   | 'scene-three-high'
+  | 'ai-boundary'
   | FdeSheetId
 
 const TEMPLATES: Record<TemplateId, CanvasDocumentJSON> = {
@@ -417,6 +420,7 @@ const TEMPLATES: Record<TemplateId, CanvasDocumentJSON> = {
   'playing-to-win': playingToWinTemplate as PlayingToWinDocumentJSON,
   'ten-check': tenCheckTemplate as TenCheckDocumentJSON,
   'scene-three-high': sceneThreeHighTemplate as SceneThreeHighDocumentJSON,
+  'ai-boundary': aiBoundaryTemplate as AiBoundaryDocumentJSON,
   ...FDE_SHEET_TEMPLATES,
 }
 
@@ -978,7 +982,13 @@ export const TEMPLATE_META: Record<
   'scene-three-high': {
     name: '选场景三高',
     badge: '选场景 · 三高',
-    description: '高频、高价值、高边际成本。多个业务叠在雷达上，三项都到 7 分才进下一步。',
+    description: '高频、高价值、高边际成本。多个业务叠在雷达上，三项都到 70 分才进下一步。',
+    category: 'fde',
+  },
+  'ai-boundary': {
+    name: '业务别用 AI 的情况',
+    badge: '边界 · 别用 AI',
+    description: '单点因果、错了不可逆、数据拿不到、踩合规红线。哪一项到了 70，这件事就不该交给 AI。',
     category: 'fde',
   },
   ...FDE_SHEET_META,
@@ -1697,7 +1707,10 @@ export const useDocumentStore = defineStore('document', () => {
     if (isPlayingToWinDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
     if (isSceneThreeHighDoc(next) && isLegacySceneSeed(next.businesses)) {
       const seed = sceneThreeHighTemplate as SceneThreeHighDocumentJSON
-      next = { ...next, businesses: cloneDoc(seed.businesses) }
+      next = { ...next, businesses: cloneDoc(seed.businesses), passScore: seed.passScore, verdict: seed.verdict }
+    }
+    if (isSceneThreeHighDoc(next)) {
+      next = upgradeSceneScoresToHundred(next)
     }
     if (isFdeSheetDoc(next) && next.id === 'canvas_fde_scenario') {
       const seed = FDE_SHEET_TEMPLATES['fde-scenario']
