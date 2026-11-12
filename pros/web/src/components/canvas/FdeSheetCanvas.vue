@@ -28,6 +28,10 @@ function openRich(id: string) {
   openMaximize()
 }
 
+function hintLines(hint?: string): string[] {
+  return (hint ?? '').split('\n').map((line) => line.trim()).filter(Boolean)
+}
+
 function patch(mutator: (doc: FdeSheetDocumentJSON) => void) {
   documentStore.mutateCanvas((doc) => {
     if (!isFdeSheetDoc(doc)) return
@@ -180,7 +184,7 @@ const weakest = computed(() => {
 </script>
 
 <template>
-  <div class="sheet fde-sheet" :style="chrome" :aria-label="doc.title">
+  <div class="sheet fde-sheet" :class="{ 'is-scenario': doc.id === 'canvas_fde_scenario' }" :style="chrome" :aria-label="doc.title">
     <header class="top">
       <div>
         <p class="kicker">{{ doc.kicker }}</p>
@@ -194,10 +198,14 @@ const weakest = computed(() => {
     </header>
     <p v-if="doc.compute === 'self' && weakest" class="weak">最弱的一项：{{ weakest }}。上限由它决定。</p>
 
+    <div class="blocks">
     <section v-for="item in doc.blocks" :key="item.id" class="block" :data-block="item.id">
       <header>
         <h3>{{ item.title }}</h3>
-        <p v-if="item.hint">{{ item.hint }}</p>
+        <ul v-if="hintLines(item.hint).length > 1" class="prompts">
+          <li v-for="line in hintLines(item.hint)" :key="line">{{ line }}</li>
+        </ul>
+        <p v-else-if="item.hint">{{ item.hint }}</p>
       </header>
 
       <div v-if="item.kind === 'rich'" class="rich">
@@ -333,6 +341,7 @@ const weakest = computed(() => {
         </article>
       </div>
     </section>
+    </div>
   </div>
 
   <Teleport to="body">
@@ -383,8 +392,14 @@ const weakest = computed(() => {
 .lede, .weak { margin-top: 8px; max-width: 78ch; color: #5c574e; line-height: 1.55; }
 .score { margin: 0; padding: 8px 12px; border-radius: 16px; background: #fff; text-align: right; }
 .score strong { display: block; color: #125c3b; font-size: 22px; }
+.blocks { display: flex; flex-direction: column; }
 .block { margin-top: 14px; padding: 14px; border-radius: 14px; background: #fffdf8; border: 1px solid rgba(62, 48, 28, 0.08); }
-.block header p { margin-top: 4px; color: #5c574e; font-size: 13px; line-height: 1.5; }
+.is-scenario .blocks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+.is-scenario .block { margin-top: 0; display: flex; flex-direction: column; }
+.is-scenario .block[data-block='name'],
+.is-scenario .block[data-block='gate'] { grid-column: 1 / -1; }
+.block header p, .prompts { margin: 4px 0 0; color: #5c574e; font-size: 13px; line-height: 1.5; }
+.prompts { padding-left: 1.1em; }
 .rich { position: relative; }
 .rich-max { position: absolute; top: 14px; right: 8px; z-index: 5; }
 .rich-hint { margin: 8px 0 0; height: 150px; display: flex; align-items: center; color: #8a8175; }
@@ -428,7 +443,7 @@ th { font-size: 12px; color: #5c574e; }
 .roi dl div { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
 .roi dt { color: #5c574e; }
 @media (max-width: 800px) {
-  .checks li, .scores li, .top { display: flex; flex-direction: column; align-items: stretch; }
+  .checks li, .scores li, .top, .is-scenario .blocks { display: flex; flex-direction: column; align-items: stretch; }
   .top h2 { font-size: 22px; }
 }
 </style>
