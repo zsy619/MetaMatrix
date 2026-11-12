@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import type { TemplateCategory, TemplateId } from '../stores/document'
 import { CATEGORY_LABELS, TEMPLATE_META } from '../stores/document'
@@ -13,6 +13,7 @@ import GuideThumb from '../components/guide/GuideThumb.vue'
 import GuideAside from '../components/guide/GuideAside.vue'
 import LaunchSplash from '../components/guide/LaunchSplash.vue'
 import { LAUNCH_SEEN_KEY, shouldShowLaunch } from '../components/guide/launchSplash'
+import { guideLaneCount, lanesFor, splitMatch } from '../components/guide/guideLanes'
 
 interface GuideCard {
   id: TemplateId
@@ -272,10 +273,26 @@ function openHit(d: SearchHit) {
   })
 }
 
+function onGuideKey(event: KeyboardEvent) {
+  if (showLaunch.value || event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey) return
+  const target = event.target
+  if (
+    target instanceof HTMLElement &&
+    (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
+  ) {
+    return
+  }
+  event.preventDefault()
+  document.getElementById('guide-tpl-search')?.focus()
+}
+
 onMounted(async () => {
+  window.addEventListener('keydown', onGuideKey)
   if (auth.token) await auth.fetchMe()
   await refreshRecent()
 })
+
+onUnmounted(() => window.removeEventListener('keydown', onGuideKey))
 </script>
 
 <template>
@@ -365,6 +382,7 @@ onMounted(async () => {
                 v-model="templateFilter"
                 type="search"
                 placeholder="搜索模板名称或简介…"
+                title="按 / 聚焦"
                 autocomplete="off"
               />
             </div>
@@ -400,26 +418,38 @@ onMounted(async () => {
               只看这一类 · {{ group.cards.length }}
             </button>
           </header>
-          <div class="grid">
-            <button
-              v-for="card in group.cards"
-              :key="card.id"
-              type="button"
-              class="card"
-              :class="`card--${card.id}`"
-              :style="{ '--accent': categoryAccent(card.category) }"
-              @click="openCanvas(card.id)"
-            >
-              <GuideThumb :template-id="card.id" />
-              <div class="body">
-                <div class="body-top">
-                  <h3>{{ card.name }}</h3>
-                  <span class="badge">{{ card.badge }}</span>
+          <div v-for="block in lanesFor(group.id, group.cards)" :key="block.lane.id" class="lane">
+            <p v-if="guideLaneCount(group.id) > 1" class="lane-title">
+              {{ block.lane.title }}
+              <span v-if="block.lane.hint">{{ block.lane.hint }}</span>
+            </p>
+            <div class="grid">
+              <button
+                v-for="card in block.cards"
+                :key="card.id"
+                type="button"
+                class="card"
+                :class="`card--${card.id}`"
+                :style="{ '--accent': categoryAccent(card.category) }"
+                @click="openCanvas(card.id)"
+              >
+                <span v-if="block.lane.series" class="series-no">{{ block.lane.ids.indexOf(card.id) + 1 }}</span>
+                <GuideThumb :template-id="card.id" />
+                <div class="body">
+                  <div class="body-top">
+                    <h3>
+                      <template v-for="(part, partIndex) in splitMatch(card.name, templateFilter)" :key="partIndex">
+                        <mark v-if="part.hit">{{ part.text }}</mark>
+                        <template v-else>{{ part.text }}</template>
+                      </template>
+                    </h3>
+                    <span class="badge">{{ card.badge }}</span>
+                  </div>
+                  <p>{{ card.description }}</p>
+                  <span class="cta">进入画布 →</span>
                 </div>
-                <p>{{ card.description }}</p>
-                <span class="cta">进入画布 →</span>
-              </div>
-            </button>
+              </button>
+            </div>
           </div>
         </section>
       </section>
@@ -719,6 +749,34 @@ onMounted(async () => {
   background: color-mix(in srgb, var(--accent, #1a73e8) 10%, #fff);
 }
 
+.lane + .lane {
+  margin-top: 8px;
+}
+
+.lane-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  margin: 2px 0 8px;
+  color: #202124;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.lane-title::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 99px;
+  background: var(--accent, #1a73e8);
+}
+
+.lane-title span {
+  color: #5f6368;
+  font-weight: 500;
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -727,6 +785,7 @@ onMounted(async () => {
 
 .card {
   --accent: #1a73e8;
+  position: relative;
   display: flex;
   flex-direction: column;
   text-align: left;
@@ -743,6 +802,31 @@ onMounted(async () => {
     border-color 0.18s ease;
   font: inherit;
   color: inherit;
+}
+
+.series-no {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 1;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.card mark {
+  background: #fde293;
+  color: inherit;
+  border-radius: 3px;
+  padding: 0 1px;
 }
 
 .card:hover,
