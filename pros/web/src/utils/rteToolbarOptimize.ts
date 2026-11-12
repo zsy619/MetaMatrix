@@ -133,7 +133,31 @@ export const TOOLBAR_SEARCH_KEYWORDS: Record<string, readonly string[]> = {
   captionNum: ['题注', '图注'],
   footnoteList: ['脚注区', '脚注列表'],
   linkButton: ['按钮', '链接按钮'],
-  crossDoc: ['跨文档'],
+  crossDoc: ['跨文档', '同步块'],
+  mentionBtn: ['提及', 'at'],
+  mentionPerm: ['提及权限', '谁能被提及'],
+  xref: ['交叉引用', '见图', '见表'],
+  'chart:basic': ['折线', '柱状', '饼图', '散点'],
+  'chart:stats': ['箱线', '热力', '仪表盘', '漏斗'],
+  'chart:relation': ['关系图', '桑基', '和弦'],
+  'chart:hierarchy': ['树图', '矩形树', '旭日'],
+  'chart:geo': ['地图', '地理'],
+  'chart:finance': ['k线', '蜡烛'],
+  'chart:coordinate': ['雷达', '平行坐标', '日历图'],
+  'chart:component': ['数据集', '区域缩放'],
+  'chart:gl': ['三维', '3d', '曲面'],
+}
+
+/** 未最大化时平时只留常用按钮；一旦开始搜索，就要能搜到收在「更多」里的按钮。 */
+export function toolsForToolbar<T extends { key: string; kind?: string }>(
+  tools: readonly T[],
+  opts: { expanded: boolean; querying: boolean; primary: ReadonlySet<string> },
+): T[] {
+  return tools.filter((tool) => {
+    if (tool.kind === 'divider') return false
+    if (opts.expanded || opts.querying) return true
+    return opts.primary.has(tool.key)
+  })
 }
 
 /** 收掉首尾和连续空格，便于「拼 音」仍能匹配。 */
@@ -175,7 +199,8 @@ function searchScoreOne(tool: ToolbarSearchTool, query: string): number {
   if (aliases.some((item) => item === query || item.includes(query))) return 3
   if (title.includes(query)) return 4
   if (folded.length >= 2 && shortcutNeedles(tool.title || '').some((item) => item.includes(folded))) return 4
-  if (key.includes(query)) return 5
+  if (key === query || key.startsWith(query)) return 5
+  if (query.length >= 2 && key.includes(query)) return 5
   return -1
 }
 

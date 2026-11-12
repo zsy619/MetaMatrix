@@ -213,7 +213,9 @@ function toggleChartGroupMenu(key: string) {
             data-rte-own
             v-model="rte.toolbarQuery"
             type="search"
-            placeholder="找按钮，如拼音、流程图"
+            autocomplete="off"
+            spellcheck="false"
+            placeholder="找按钮，如拼音、饼图"
             aria-label="在工具栏里找按钮"
             :aria-describedby="rte.toolbarQuery ? 'rte-toolbar-search-status' : undefined"
             @focus="($event.target as HTMLInputElement).select()"
@@ -272,7 +274,9 @@ function toggleChartGroupMenu(key: string) {
           data-rte-own
           v-model="rte.toolbarQuery"
           type="search"
-          placeholder="找按钮，如拼音、流程图"
+          autocomplete="off"
+          spellcheck="false"
+          placeholder="找按钮，如拼音、饼图"
           aria-label="在工具栏里找按钮"
           :aria-describedby="rte.toolbarQuery ? 'rte-toolbar-search-status' : undefined"
           @focus="($event.target as HTMLInputElement).select()"
@@ -302,6 +306,7 @@ function toggleChartGroupMenu(key: string) {
         :class="{
           'is-drop-target': rte.toolbarDropIndex === rte.toolbarOrder.indexOf(group.id),
           'is-dragging': rte.toolbarDragSource === group.id,
+          'is-search-group': !!rte.toolbarQuery,
         }"
         :id="'rte-group-' + group.id"
         :data-group-id="group.id"
@@ -1788,6 +1793,8 @@ function toggleChartGroupMenu(key: string) {
                 v-model="rte.shortcutQuery"
                 class="rte-shortcuts-search"
                 type="search"
+            autocomplete="off"
+            spellcheck="false"
                 placeholder="搜索，例如 bold、引用、tab"
                 aria-label="搜索快捷键"
                 @mousedown.stop
@@ -2255,7 +2262,7 @@ function toggleChartGroupMenu(key: string) {
 
       <!-- 未最大化：其余工具收进「更多」 -->
       <div data-rte-own
-        v-if="!rte.expanded && rte.moreTools.length"
+        v-if="!rte.expanded && rte.moreTools.length && !rte.toolbarQuery"
         class="rte-tool-wrap rte-more-wrap"
         @mouseenter="rte.onToolMenuEnter('more')"
         @mouseleave="rte.onToolMenuLeave($event, 'more', rte.closeMore)"
@@ -2772,6 +2779,8 @@ function toggleChartGroupMenu(key: string) {
             v-model="rte.shortcutQuery"
             class="rte-shortcuts-search"
             type="search"
+            autocomplete="off"
+            spellcheck="false"
             placeholder="搜索，例如 bold、引用、tab"
             aria-label="搜索快捷键"
             @mousedown.stop

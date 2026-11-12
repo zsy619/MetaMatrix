@@ -6978,7 +6978,7 @@ const allTools = computed((): ToolItem[] => {
     { key: 'pageSetup', label: '页面', title: '纸张、页边距、页眉页脚', icon: '纸', iconComp: ic('pageBreak'), run: openPageSetup },
     { key: 'printPreview', label: '打印预览', title: '按当前纸张看打印效果', icon: '看', iconComp: ic('print'), run: () => void openPrintPreview() },
     { key: 'paperGuide', label: '参考线', title: paperGuide.value ? '纸张参考线已显示，再点一次关闭' : '在编辑区显示纸张边界', icon: '框', run: togglePaperGuide, active: () => paperGuide.value },
-    { key: 'printUrls', label: '印出链接', title: '打印时在链接后面印出网址', icon: '链', run: togglePrintLinkUrls, active: () => printLinkUrls.value },
+    { key: 'printUrls', label: '印出链接', title: printLinkUrls.value ? '打印时会印出网址，再点一次关闭' : '打印时在链接后面印出网址', icon: '链', run: togglePrintLinkUrls, active: () => printLinkUrls.value },
     {
       key: 'pageBreak',
       label: '分页符',
@@ -7385,7 +7385,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'tabsBlock',
       label: '标签页',
-      title: '插入 Tabs',
+      title: '插入多页标签，每页一段内容',
       icon: '⧉',
       iconComp: ic('columns'),
       run: () => { void insertTabsBlockAtCursor() },
@@ -7403,7 +7403,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'xref',
       label: '交叉引用',
-      title: '引用标题 / 图 / 表',
+      title: '引用文中的标题、图或表',
       icon: '※',
       iconComp: ic('link'),
       run: openXrefDialog,
@@ -7411,7 +7411,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'mentionBtn',
       label: '@提及',
-      title: '插入 @ 提及',
+      title: '在正文里 @ 一个人',
       icon: '@',
       iconComp: ic('note'),
       run: insertMentionFromToolbar,
@@ -7419,7 +7419,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'crossDoc',
       label: '跨文档',
-      title: '搜索其它文档，可插入同步块',
+      title: '从其它文档插入一块同步内容',
       icon: '⇄',
       iconComp: ic('link'),
       run: openCrossDoc,
@@ -7427,7 +7427,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'mentionPerm',
       label: '@权限',
-      title: '设置本文能 @ 到哪些人',
+      title: '设置本文可以 @ 哪些人',
       icon: '@',
       iconComp: ic('note'),
       run: openMentionPermission,

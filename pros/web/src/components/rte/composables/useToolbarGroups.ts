@@ -14,7 +14,7 @@ import {
   TOOLBAR_GROUPS,
   type ToolbarDropBox,
 } from '../../../utils/rteToolbarGroups'
-import { FOCUS_TOOLBAR_KEYS, hiddenGroupPlaceholders, orderToolbarSearchGroups, readStoredRibbonTab } from '../../../utils/rteToolbarOptimize'
+import { FOCUS_TOOLBAR_KEYS, hiddenGroupPlaceholders, orderToolbarSearchGroups, readStoredRibbonTab, toolsForToolbar } from '../../../utils/rteToolbarOptimize'
 import {
   isDefaultToolbarGroupConfig,
   moveGroupButton,
@@ -111,9 +111,11 @@ export function useToolbarGroups<T extends ToolLike>(deps: {
   })
 
   const toolbarGroups = computed(() => {
-    const tools = deps.expanded()
-      ? deps.tools().filter((tool) => tool.kind !== 'divider')
-      : deps.tools().filter((tool) => tool.kind !== 'divider' && deps.primaryKeys.has(tool.key))
+    const tools = toolsForToolbar(deps.tools(), {
+      expanded: deps.expanded(),
+      querying: !!deps.toolbarQuery?.().trim(),
+      primary: deps.primaryKeys,
+    })
     return buildToolbarGroups(tools, toolbarOrder.value, toolbarGroupButtonConfigs.value)
   })
 

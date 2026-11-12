@@ -29,6 +29,7 @@ import {
   searchGroupCaption,
   stepRibbonTabBy,
   tableToolLabel,
+  toolsForToolbar,
   searchToolbarTools,
   stepRibbonTab,
   toolbarSearchStatus,
@@ -126,6 +127,18 @@ assert.equal(searchToolbarTools([{ id: 'insert', label: '插入', tools: [{ key:
 assert.equal(searchToolbarTools([{ id: 'review', label: '审阅', tools: [{ key: 'deepOptimize', label: '深优化' }] }], '一键整理')[0]?.key, 'deepOptimize')
 assert.equal(menuToolNeedsCaret('wordStats'), true)
 assert.equal(menuToolNeedsCaret('attach'), false)
+const primary = new Set(['undo', 'bold'])
+assert.deepEqual(toolsForToolbar([
+  { key: 'undo' },
+  { key: 'mermaid' },
+  { key: 'div', kind: 'divider' },
+], { expanded: false, querying: false, primary }).map((tool) => tool.key), ['undo'])
+assert.deepEqual(toolsForToolbar([
+  { key: 'undo' },
+  { key: 'mermaid' },
+], { expanded: false, querying: true, primary }).map((tool) => tool.key), ['undo', 'mermaid'])
+assert.equal(searchToolbarTools([{ id: 'charts', label: '图表', tools: [{ key: 'chart:basic', label: '基础' }] }], '饼图')[0]?.key, 'chart:basic')
+assert.equal(searchToolbarTools([{ id: 'insert', label: '插入', tools: [{ key: 'table', label: '表格' }] }], 'a').length, 0)
 
 const sizes = [
   { label: '默认', value: '' },
