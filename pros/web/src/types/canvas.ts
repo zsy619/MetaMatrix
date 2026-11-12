@@ -2365,6 +2365,114 @@ export interface SceneThreeHighDocumentJSON {
   businesses: SceneThreeHighBusiness[]
 }
 
+export interface FdeRichBlock {
+  id: string
+  kind: 'rich'
+  title: string
+  hint?: string
+  html: string
+}
+
+export interface FdeCheckItem {
+  id: string
+  label: string
+  checked: boolean
+  note: string
+}
+
+export interface FdeChecksBlock {
+  id: string
+  kind: 'checks'
+  title: string
+  hint?: string
+  items: FdeCheckItem[]
+}
+
+export interface FdeScoreItem {
+  id: string
+  label: string
+  hint?: string
+  score: number
+  max: number
+  note: string
+}
+
+export interface FdeScoreBlock {
+  id: string
+  kind: 'score'
+  title: string
+  hint?: string
+  items: FdeScoreItem[]
+}
+
+export interface FdeTableBlock {
+  id: string
+  kind: 'table'
+  title: string
+  hint?: string
+  columns: { id: string; label: string }[]
+  rows: { id: string; cells: Record<string, string> }[]
+}
+
+export interface FdeCard {
+  id: string
+  title: string
+  summary: string
+  fit: string
+  risk: string
+  note: string
+  chosen: boolean
+}
+
+export interface FdeCardsBlock {
+  id: string
+  kind: 'cards'
+  title: string
+  hint?: string
+  cards: FdeCard[]
+}
+
+export interface FdeRoiScenario {
+  id: string
+  name: string
+  tasks: number
+  beforeMin: number
+  afterMin: number
+  wage: number
+  adoption: number
+  monthlyCost: number
+  upfront: number
+}
+
+export interface FdeRoiBlock {
+  id: string
+  kind: 'roi'
+  title: string
+  hint?: string
+  scenarios: FdeRoiScenario[]
+}
+
+export type FdeBlock =
+  | FdeRichBlock
+  | FdeChecksBlock
+  | FdeScoreBlock
+  | FdeTableBlock
+  | FdeCardsBlock
+  | FdeRoiBlock
+
+/** 同一套版式承载 FDE 指南里的一页纸画布。compute 只影响页眉汇总。 */
+export interface FdeSheetDocumentJSON {
+  id: string
+  type: 'fde_sheet'
+  schemaVersion: number
+  theme: CanvasTheme
+  kicker: string
+  title: string
+  lede: string
+  compute?: 'self' | 'roi'
+  blocks: FdeBlock[]
+}
+
 /** 科学决策三角形（宽度 / 高度 / 深度） */
 export type DecisionTriangleBlockId = 'width' | 'height' | 'depth'
 
@@ -2455,6 +2563,7 @@ export type CanvasDocumentJSON = (
   | PlayingToWinDocumentJSON
   | TenCheckDocumentJSON
   | SceneThreeHighDocumentJSON
+  | FdeSheetDocumentJSON
 ) & WithPanelAttachments
 
 /** 带 blocks 的画布（双三角 / Y 模型 / 刻意练习） */
@@ -3141,6 +3250,10 @@ export function isTenCheckDoc(doc: CanvasDocumentJSON | null | undefined): doc i
 
 export function isSceneThreeHighDoc(doc: CanvasDocumentJSON | null | undefined): doc is SceneThreeHighDocumentJSON {
   return !!doc && doc.type === 'scene_three_high'
+}
+
+export function isFdeSheetDoc(doc: CanvasDocumentJSON | null | undefined): doc is FdeSheetDocumentJSON {
+  return !!doc && doc.type === 'fde_sheet'
 }
 
 export function isBreakEvenDoc(doc: CanvasDocumentJSON | null | undefined): doc is BreakEvenDocumentJSON {

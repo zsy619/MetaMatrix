@@ -757,7 +757,9 @@ onMounted(async () => {
 .card--ten-check:hover,
 .card--ten-check:focus-visible,
 .card--scene-three-high:hover,
-.card--scene-three-high:focus-visible {
+.card--scene-three-high:focus-visible,
+.card[class*='card--fde-']:hover,
+.card[class*='card--fde-']:focus-visible {
   border-color: #34a853;
 }
 
