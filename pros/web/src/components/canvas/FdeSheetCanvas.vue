@@ -319,9 +319,22 @@ const weakest = computed(() => {
 .score strong { display: block; color: #125c3b; font-size: 22px; }
 .block { margin-top: 14px; padding: 14px; border-radius: 14px; background: #fffdf8; border: 1px solid rgba(62, 48, 28, 0.08); }
 .block header p { margin-top: 4px; color: #5c574e; font-size: 13px; line-height: 1.5; }
-.block :deep(.rte-root) { margin-top: 8px; min-height: 88px; border: none; background: transparent; box-shadow: none; }
+.block :deep(.rte-root) {
+  margin-top: 8px;
+  height: 120px;
+  min-height: 120px;
+  max-height: 120px;
+  overflow: hidden;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+}
 .block:not(:focus-within) :deep(.rte-toolbar) { display: none; }
-.block :deep(.rte-canvas) { background: transparent; }
+.block :deep(.rte-workspace),
+.block :deep(.rte-canvas),
+.block :deep(.rte-body) { flex: 1 1 auto; min-height: 0; }
+.block :deep(.rte-canvas) { background: transparent; overflow: auto; }
+.block :deep(.ProseMirror) { min-height: 0; }
 .checks, .scores { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .checks li, .scores li { display: grid; grid-template-columns: minmax(180px, 1.4fr) minmax(140px, 0.8fr); gap: 8px; align-items: center; }
 .scores li { grid-template-columns: minmax(220px, 1.4fr) auto minmax(140px, 0.8fr); }
