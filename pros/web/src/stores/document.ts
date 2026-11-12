@@ -266,6 +266,7 @@ import sceneThreeHighTemplate from '../templates/scene-three-high-v1.json'
 import aiBoundaryTemplate from '../templates/ai-boundary-v1.json'
 import { FDE_SHEET_META, FDE_SHEET_TEMPLATES, type FdeSheetId } from '../templates/fdeSheets'
 import { isLegacySceneSeed, upgradeSceneScoresToHundred } from '../utils/sceneThreeHigh'
+import { resolveCanvasTemplateId } from '../utils/templateId'
 import { CONTEXT_SIX_ELEMENTS_BLOCK_ID } from '../utils/contextSixElements'
 
 export type TemplateId =
@@ -426,6 +427,11 @@ const TEMPLATES: Record<TemplateId, CanvasDocumentJSON> = {
 
 export function isTemplateId(id: string): id is TemplateId {
   return id in TEMPLATES
+}
+
+/** 地址里的模板 id。ai-boundary-4734 这种带数字后缀的仍打开 ai-boundary。 */
+export function resolveTemplateId(raw: string | null | undefined): TemplateId | null {
+  return resolveCanvasTemplateId(raw, isTemplateId) as TemplateId | null
 }
 
 
@@ -1621,7 +1627,8 @@ export const useDocumentStore = defineStore('document', () => {
   }
 
   function loadFromTemplate(templateId: TemplateId | string = 'dual-triangle') {
-    const id: TemplateId = isTemplateId(templateId) ? templateId : 'dual-triangle'
+    const id = resolveTemplateId(templateId)
+    if (!id) return
     activeTemplateId.value = id
     let local = loadLocal(id)
     const meta = loadLocalMeta(id)
