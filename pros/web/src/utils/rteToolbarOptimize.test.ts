@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import {
+  alignChoiceTitle,
   alignToolTitle,
   blockHandleTitle,
   blockMenuTitle,
@@ -9,11 +10,13 @@ import {
   codeBlockToolTitle,
   cycleSearchIndex,
   disabledToolTitle,
+  emptyGuideTitle,
   fontFamilyCaption,
   fontSizeCaption,
   formatPainterLabel,
   groupHandleTitle,
   hiddenGroupPlaceholders,
+  imagePlaceTitle,
   isToolbarMenuTrigger,
   lineHeightCaption,
   listToolLabel,
@@ -196,6 +199,12 @@ assert.equal(blockHandleTitle('missing'), '')
 assert.equal(cropTitle('16:9'), '裁成宽屏，宽比高是 16 比 9')
 assert.equal(cropTitle('原始'), '取消裁剪，显示整张图')
 assert.equal(cropTitle('没有'), '')
+assert.equal(emptyGuideTitle('heading'), '插入一级标题')
+assert.equal(emptyGuideTitle('columns'), '把内容分成左右等宽的两栏')
+assert.equal(emptyGuideTitle('missing'), '')
+assert.equal(imagePlaceTitle('左环绕'), '图片在左，文字绕着排')
+assert.equal(alignChoiceTitle('justify'), '这一段左右两端对齐')
+assert.equal(alignChoiceTitle('missing'), '')
 assert.equal(stepRibbonTabBy(['a', 'b', 'c', 'd', 'e'], 'b', 3), 'e')
 assert.equal(stepRibbonTabBy(['a', 'b', 'c'], 'a', -3), 'a')
 assert.equal(zoomToolLabel(1), '实际大小')

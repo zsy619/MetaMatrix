@@ -599,6 +599,48 @@ const CROP_TITLES: Record<string, string> = {
   '9:16': '裁成竖屏，宽比高是 9 比 16',
 }
 
+const EMPTY_GUIDE_TITLES: Record<string, string> = {
+  heading: '插入一级标题',
+  list: '插入圆点列表',
+  task: '插入可勾选的待办',
+  callout: '插入蓝色提示告示',
+  code: '插入代码块',
+  formula: '插入数学公式',
+  table: '打开表格尺寸对话框，自己填行数和列数',
+  columns: '把内容分成左右等宽的两栏',
+  date: '插入今天的日期',
+}
+
+const IMAGE_PLACE_TITLES: Record<string, string> = {
+  '居中': '图片在这一行居中',
+  '居左': '图片靠左，独占一行',
+  '居右': '图片靠右，独占一行',
+  '左环绕': '图片在左，文字绕着排',
+  '右环绕': '图片在右，文字绕着排',
+}
+
+const ALIGN_CHOICE_TITLES: Record<string, string> = {
+  left: '这一段靠左对齐',
+  center: '这一段居中',
+  right: '这一段靠右对齐',
+  justify: '这一段左右两端对齐',
+}
+
+/** 空文档快捷按钮会插入什么。没有说明时返回空字符串。 */
+export function emptyGuideTitle(id: string): string {
+  return EMPTY_GUIDE_TITLES[id] || ''
+}
+
+/** 图片排法改完怎么占这一行。没有说明时返回空字符串。 */
+export function imagePlaceTitle(label: string): string {
+  return IMAGE_PLACE_TITLES[label.trim()] || ''
+}
+
+/** 选区条里的对齐改完怎么排。没有说明时返回空字符串。 */
+export function alignChoiceTitle(align: string): string {
+  return ALIGN_CHOICE_TITLES[align] || ''
+}
+
 /** 块手柄菜单改完这一块是什么。没有说明时返回空字符串。 */
 export function blockHandleTitle(id: string): string {
   return BLOCK_HANDLE_TITLES[id] || ''

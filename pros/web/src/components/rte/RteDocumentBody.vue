@@ -11,7 +11,7 @@ import RteSelectionBubble from './RteSelectionBubble.vue'
 import RteSourceCodeEditor from './RteSourceCodeEditor.vue'
 import RteTableFormulaBar from './RteTableFormulaBar.vue'
 import { RTE_BINDINGS } from './bindings'
-import { blockHandleTitle, cropTitle, imageWidthTitle, toolbarMenuItemTitle, wordStatTitle } from '../../utils/rteToolbarOptimize'
+import { blockHandleTitle, cropTitle, emptyGuideTitle, imagePlaceTitle, imageWidthTitle, toolbarMenuItemTitle, wordStatTitle } from '../../utils/rteToolbarOptimize'
 import { useParentScopeStamp } from './inheritScope'
 import RteMenuGlyph from './RteMenuGlyph.vue'
 
@@ -100,7 +100,7 @@ useParentScopeStamp()
               (rte.editor?.getAttributes('image')?.align || 'center') === opt.align &&
               (rte.editor?.getAttributes('image')?.layout || 'block') === opt.layout,
           }"
-          :title="'排版：' + opt.label"
+          :title="imagePlaceTitle(opt.label) || ('排版：' + opt.label)"
           :aria-label="'图片' + opt.label"
           :aria-pressed="
             (rte.editor?.getAttributes('image')?.align || 'center') === opt.align &&
@@ -462,6 +462,7 @@ useParentScopeStamp()
             <select data-rte-own
               :value="rte.currentCodeLanguage()"
               aria-label="代码语言"
+              title="选择这段代码按哪种语法上色"
               @change="rte.setCodeLanguage(($event.target as HTMLSelectElement).value)"
             >
               <option data-rte-own v-for="opt in rte.CODE_LANG_OPTIONS" :key="'chrome-' + opt.value" :value="opt.value">
@@ -473,8 +474,8 @@ useParentScopeStamp()
             type="button"
             :class="{ 'is-on': rte.codeBlockFlag('lineNumbers') }"
             :aria-pressed="rte.codeBlockFlag('lineNumbers')"
-            aria-label="行号"
-            title="显示行号"
+            aria-label="在代码块左侧显示行号"
+            title="在代码块左侧显示行号"
             @mousedown.prevent
             @click="rte.toggleCodeBlockFlag('lineNumbers')"
           >行号</button>
@@ -482,24 +483,24 @@ useParentScopeStamp()
             type="button"
             :class="{ 'is-on': rte.codeBlockFlag('wordWrap') }"
             :aria-pressed="rte.codeBlockFlag('wordWrap')"
-            aria-label="自动换行"
-            title="自动换行"
+            aria-label="长行在代码块里自动换行"
+            title="长行在代码块里自动换行"
             @mousedown.prevent
             @click="rte.toggleCodeBlockFlag('wordWrap')"
           >换行</button>
-          <button data-rte-own type="button" aria-label="复制代码" @click="rte.copyActiveCodeBlock">复制</button>
+          <button data-rte-own type="button" aria-label="把这段代码复制到剪贴板" title="把这段代码复制到剪贴板" @click="rte.copyActiveCodeBlock">复制</button>
         </div>
         <div data-rte-own v-if="rte.showEmptyGuide" class="rte-empty-guide" @mousedown.stop>
           <span data-rte-own>空文档</span>
-          <button data-rte-own type="button" @click="rte.setHeading(1)">标题</button>
-          <button data-rte-own type="button" @click="rte.toggleBulletList">列表</button>
-          <button data-rte-own type="button" @click="rte.toggleTaskList">待办</button>
-          <button data-rte-own type="button" @click="rte.insertCallout('info')">提示</button>
-          <button data-rte-own type="button" @click="rte.toggleCodeBlock">代码</button>
-          <button data-rte-own type="button" @click="rte.insertFormula">公式</button>
-          <button data-rte-own type="button" @click="rte.openTableDialog">表格</button>
-          <button data-rte-own type="button" @click="rte.insertColumns(2)">双栏</button>
-          <button data-rte-own type="button" @click="rte.insertDateChip('date')">日期</button>
+          <button data-rte-own type="button" :title="emptyGuideTitle('heading')" @click="rte.setHeading(1)">标题</button>
+          <button data-rte-own type="button" :title="emptyGuideTitle('list')" @click="rte.toggleBulletList">列表</button>
+          <button data-rte-own type="button" :title="emptyGuideTitle('task')" @click="rte.toggleTaskList">待办</button>
+          <button data-rte-own type="button" :title="emptyGuideTitle('callout')" @click="rte.insertCallout('info')">提示</button>
+          <button data-rte-own type="button" :title="emptyGuideTitle('code')" @click="rte.toggleCodeBlock">代码</button>
+          <button data-rte-own type="button" :title="emptyGuideTitle('formula')" @click="rte.insertFormula">公式</button>
+          <button data-rte-own type="button" :title="emptyGuideTitle('table')" @click="rte.openTableDialog">表格</button>
+          <button data-rte-own type="button" :title="emptyGuideTitle('columns')" @click="rte.insertColumns(2)">双栏</button>
+          <button data-rte-own type="button" :title="emptyGuideTitle('date')" @click="rte.insertDateChip('date')">日期</button>
           <span data-rte-own class="rte-empty-guide-hint">或输入 / 插入</span>
         </div>
       </div>
