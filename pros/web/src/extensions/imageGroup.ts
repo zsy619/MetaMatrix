@@ -78,7 +78,21 @@ const COLLAGE_AREAS = {
 function imageFit(img: HTMLImageElement, groupFit: 'cover' | 'contain'): 'cover' | 'contain' {
   const own = img.getAttribute('data-fit')
   if (own === 'cover' || own === 'contain') return own
+  if (img.getAttribute('data-crop-aspect')) return 'cover'
+  const zoom = Number(img.getAttribute('data-crop-zoom'))
+  if (Number.isFinite(zoom) && zoom > 1) return 'cover'
   return groupFit
+}
+
+function paintCropFrame(img: HTMLImageElement, fit: 'cover' | 'contain') {
+  img.style.setProperty('object-fit', imageFit(img, fit), 'important')
+  const focusX = Number(img.getAttribute('data-crop-focus-x'))
+  const focusY = Number(img.getAttribute('data-crop-focus-y'))
+  if (img.hasAttribute('data-crop-aspect') && Number.isFinite(focusX) && Number.isFinite(focusY)) {
+    img.style.setProperty('object-position', `${Math.round(focusX * 100)}% ${Math.round(focusY * 100)}%`, 'important')
+  }
+  const zoom = Number(img.getAttribute('data-crop-zoom'))
+  if (Number.isFinite(zoom) && zoom > 1) img.style.setProperty('transform', `scale(${zoom})`, 'important')
 }
 
 function paintCollage(
@@ -119,7 +133,7 @@ function paintCollage(
     if (img instanceof HTMLImageElement) {
       img.style.setProperty('width', '100%', 'important')
       img.style.setProperty('height', '100%', 'important')
-      img.style.setProperty('object-fit', imageFit(img, fit), 'important')
+      paintCropFrame(img, fit)
       img.style.setProperty('max-width', 'none', 'important')
     }
   })
@@ -172,7 +186,7 @@ function paintMix(
       singleColumn += 1
     }
     const img = frame.querySelector('img')
-    if (img instanceof HTMLImageElement) img.style.setProperty('object-fit', imageFit(img, fit), 'important')
+    if (img instanceof HTMLImageElement) paintCropFrame(img, fit)
   })
 }
 
@@ -190,6 +204,8 @@ function paintRows(row: HTMLElement) {
     child.style.flex = 'none'
     child.style.width = '100%'
     child.style.height = 'auto'
+    const img = child.querySelector('img')
+    if (img instanceof HTMLImageElement) paintCropFrame(img, 'contain')
   })
 }
 
@@ -234,7 +250,7 @@ function paintGroupMetrics(dom: HTMLElement, row: HTMLElement, ratios: readonly 
     if (img instanceof HTMLImageElement) {
       img.style.setProperty('width', '100%', 'important')
       img.style.setProperty('height', '100%', 'important')
-      img.style.setProperty('object-fit', 'contain', 'important')
+      paintCropFrame(img, 'contain')
       img.style.setProperty('max-width', 'none', 'important')
     }
   })

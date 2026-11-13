@@ -11,6 +11,7 @@ import {
 } from '../../../utils/rteImageCropAttrs'
 import {
   collectEditorImages,
+  imageDownloadName,
   indexForImage,
   type RtePreviewImage,
 } from '../../../utils/rteImagePreview'
@@ -169,7 +170,10 @@ function downloadSelectedImage() {
   if (!src) return
   const link = document.createElement('a')
   link.href = src
-  link.download = String(attrs?.alt || 'image')
+  link.download = imageDownloadName(
+    { alt: String(attrs?.alt || ''), caption: String(attrs?.caption || ''), src },
+    0,
+  )
   link.click()
 }
 

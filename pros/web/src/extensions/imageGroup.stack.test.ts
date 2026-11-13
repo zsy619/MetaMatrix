@@ -5,7 +5,7 @@ import { Editor } from '@tiptap/core'
 import { NodeSelection } from '@tiptap/pm/state'
 import StarterKit from '@tiptap/starter-kit'
 import { ImageGroup } from './imageGroup'
-import { reorderInGroup, setGroupLayout, stackInGroup } from './imageGroupOps'
+import { insertImagesBeside, reorderInGroup, setGroupLayout, stackInGroup } from './imageGroupOps'
 import { deepOptimizeDocument } from '../utils/rteDeepOptimize'
 import { RteImage } from './rteImage'
 
@@ -163,6 +163,22 @@ describe('图片组 12 / 21', () => {
       if (node.type.name === 'image' && node.attrs.concealed) concealed += 1
     })
     expect(concealed).toBe(0)
+  })
+
+  it('往自定义比例的图片组加图时，原来的宽比还在', () => {
+    const ed = makeEditor(
+      `<div data-type="image-group" data-align="center" data-ratio-mode="custom" data-ratios="2:1"><div class="rte-image-group-row"><img src="https://example.com/a.png"><img src="https://example.com/b.png"></div></div>`,
+    )
+    const extra = ed.schema.nodes.image!.create({ src: 'https://example.com/c.png' })
+    expect(insertImagesBeside(ed.view, imagePositions(ed)[0]!, 'right', [extra])).toBe(true)
+    expect(ed.state.doc.firstChild?.childCount).toBe(3)
+    expect(ed.state.doc.firstChild?.attrs.ratioMode).toBe('custom')
+    expect(ed.state.doc.firstChild?.attrs.ratios).toBe('2:1:1')
+    expect(srcs(ed)).toEqual([
+      'https://example.com/a.png',
+      'https://example.com/c.png',
+      'https://example.com/b.png',
+    ])
   })
 
   it('不是三张图时不叠放', () => {

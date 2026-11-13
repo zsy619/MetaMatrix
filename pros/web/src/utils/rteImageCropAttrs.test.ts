@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   CROP_ATTR_NAMES,
   cropAttrsStyle,
+  cropHtmlStyle,
   cropFromPreset,
   cropIsActive,
   readCropFromAttrs,
@@ -42,6 +43,11 @@ describe('图片裁剪属性读写', () => {
     const style = cropAttrsStyle(attrs)
     expect(style['object-fit']).toBe('cover')
     expect(style['object-position']).toBe('50% 50%')
+    expect(style['aspect-ratio']).toBe('1 / 1')
+    expect(cropHtmlStyle(attrs)).toContain('width: 100%')
+    expect(cropHtmlStyle(attrs)).toContain('aspect-ratio: 1 / 1')
+    expect(cropHtmlStyle({ ...attrs, displayWidth: '50%' })).not.toContain('width: 100%')
+    expect(cropHtmlStyle({ ...attrs, displayWidth: '50%' })).toContain('object-fit: cover')
   })
 
   it('没有裁剪时不产生样式', () => {

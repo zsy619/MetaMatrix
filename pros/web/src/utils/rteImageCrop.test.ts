@@ -50,6 +50,7 @@ assert.deepEqual(cropStyle(null), {})
 assert.deepEqual(cropStyle({ aspect: '16/9' }), {
   'object-fit': 'cover',
   'object-position': '50% 50%',
+  'aspect-ratio': '16 / 9',
 })
 assert.equal(cropStyle({ zoom: 2 })['transform'], 'scale(2)')
 

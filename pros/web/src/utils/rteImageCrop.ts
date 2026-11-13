@@ -91,6 +91,7 @@ export function cropStyle(crop: ImageCrop | null | undefined): Record<string, st
   const style: Record<string, string> = { 'object-fit': 'cover' }
   if (hasAspect) {
     style['object-position'] = `${Math.round(c.focusX * 100)}% ${Math.round(c.focusY * 100)}%`
+    style['aspect-ratio'] = String(c.aspect).trim().replace(/\s*[/:]+\s*/, ' / ')
   }
   if (c.zoom > 1) {
     style.transform = `scale(${c.zoom})`

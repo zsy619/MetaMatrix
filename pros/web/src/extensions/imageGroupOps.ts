@@ -442,10 +442,15 @@ export function insertImagesBeside(
     group.forEach((child) => kids.push(imageForGroup(child)))
     const index = side === 'left' ? dst.index : dst.index + 1
     kids.splice(index, 0, ...prepared)
+    const custom = !groupUsesAspect(group.attrs.ratioMode)
+    let ratios = custom ? normalizeGroupRatios(group.childCount, group.attrs.ratios) : null
+    if (ratios) {
+      for (let added = 0; added < prepared.length; added += 1) ratios = insertRatio(ratios, index + added)
+    }
     const next = group.type.create(
-      groupUsesAspect(group.attrs.ratioMode)
-        ? { ...group.attrs, ratios: null, ratioMode: null, layout: 'row' }
-        : { ...group.attrs, ratioMode: 'custom', layout: 'row' },
+      custom
+        ? { ...group.attrs, ratios: ratiosToAttr(ratios || []), ratioMode: 'custom', layout: 'row' }
+        : { ...group.attrs, ratios: null, ratioMode: null, layout: 'row' },
       kids,
     )
     return dispatchChecked(view, view.state.tr.replaceWith(dst.groupPos, dst.groupPos + group.nodeSize, next), dst.groupPos)

@@ -4,9 +4,15 @@ import { createImageDragPlugin } from './rteImageDrag'
 import { createImageCaptionPlugin } from './rteImageCaption'
 import { createCaptionRenumberPlugin } from '../utils/rteCaptionNumber'
 import { normalizeImageAlign, normalizeImageLayout } from '../utils/rteImageLayout'
-import { cropAttrsStyle } from '../utils/rteImageCropAttrs'
+import { cropHtmlStyle } from '../utils/rteImageCropAttrs'
 
 export type RteImageAlign = 'left' | 'center' | 'right' | null
+
+/** 裁剪样式和当前属性的 HTML 一起返回。编辑器节点视图只认属性 renderHTML，不会再走节点 renderHTML。 */
+function withCropStyle(attrs: Record<string, unknown>, extra: Record<string, string>): Record<string, string> {
+  const style = cropHtmlStyle(attrs)
+  return style ? { ...extra, style } : extra
+}
 
 /**
  * 图片增强：对齐（data-align）+ 题注（caption / title）。
@@ -138,10 +144,9 @@ export const RteImage = Image.extend({
       cropAspect: {
         default: null as string | null,
         parseHTML: (el: HTMLElement) => el.getAttribute('data-crop-aspect') || null,
-        renderHTML: (attrs: { cropAspect?: string | null }) => {
-          const v = (attrs.cropAspect || '').trim()
-          if (!v) return {}
-          return { 'data-crop-aspect': v }
+        renderHTML: (attrs: Record<string, unknown>) => {
+          const v = String(attrs.cropAspect || '').trim()
+          return withCropStyle(attrs, v ? { 'data-crop-aspect': v } : {})
         },
       },
       cropFocusX: {
@@ -152,9 +157,9 @@ export const RteImage = Image.extend({
           const n = Number(raw)
           return Number.isFinite(n) ? n : null
         },
-        renderHTML: (attrs: { cropFocusX?: number | null }) => {
+        renderHTML: (attrs: Record<string, unknown>) => {
           if (attrs.cropFocusX == null) return {}
-          return { 'data-crop-focus-x': String(attrs.cropFocusX) }
+          return withCropStyle(attrs, { 'data-crop-focus-x': String(attrs.cropFocusX) })
         },
       },
       cropFocusY: {
@@ -165,9 +170,9 @@ export const RteImage = Image.extend({
           const n = Number(raw)
           return Number.isFinite(n) ? n : null
         },
-        renderHTML: (attrs: { cropFocusY?: number | null }) => {
+        renderHTML: (attrs: Record<string, unknown>) => {
           if (attrs.cropFocusY == null) return {}
-          return { 'data-crop-focus-y': String(attrs.cropFocusY) }
+          return withCropStyle(attrs, { 'data-crop-focus-y': String(attrs.cropFocusY) })
         },
       },
       cropZoom: {
@@ -178,25 +183,20 @@ export const RteImage = Image.extend({
           const n = Number(raw)
           return Number.isFinite(n) ? n : null
         },
-        renderHTML: (attrs: { cropZoom?: number | null }) => {
+        renderHTML: (attrs: Record<string, unknown>) => {
           if (attrs.cropZoom == null) return {}
-          return { 'data-crop-zoom': String(attrs.cropZoom) }
+          return withCropStyle(attrs, { 'data-crop-zoom': String(attrs.cropZoom) })
         },
       },
     }
   },
 
-  renderHTML({ HTMLAttributes }) {
-    // 裁剪效果落到 style 上：object-fit / object-position / scale。
-    // 已有 style（宽度等）要保留，所以合并而不是覆盖。
-    const crop = cropAttrsStyle(HTMLAttributes as Record<string, unknown>)
+  renderHTML({ node, HTMLAttributes }) {
+    // 属性 renderHTML 已经把裁剪写进 style。这里再补一次，避免只走 toDOM 时丢掉。
+    const crop = cropHtmlStyle(node?.attrs as Record<string, unknown>)
     const attrs = HTMLAttributes as Record<string, unknown>
-    if (crop['object-fit']) {
-      const prev = typeof attrs.style === 'string' ? attrs.style : ''
-      attrs.style = [prev, `object-fit: ${crop['object-fit']}`].filter(Boolean).join('; ')
-      if (crop['object-position']) attrs.style += `; object-position: ${crop['object-position']}`
-      if (crop.transform) attrs.style += `; ${crop.transform}`
-    }
+    const prev = typeof attrs.style === 'string' ? attrs.style : ''
+    if (crop && !prev.includes('object-fit')) attrs.style = [prev, crop].filter(Boolean).join('; ')
     return ['img', mergeAttributes(this.options.HTMLAttributes, attrs)]
   },
 
