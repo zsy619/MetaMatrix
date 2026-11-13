@@ -236,17 +236,27 @@ function scorePolygon(scores: DemandTriangleScores): string {
   }).join(' ')
 }
 
-const overlays = computed(() =>
-  legendItems.value.map((item) => {
+const overlays = computed(() => {
+  const drawn = legendItems.value.map((item) => {
     const d = dirOf(item.id)
     return {
       id: item.id,
       fill: d.color,
       stroke: d.stroke,
       points: scorePolygon(d.scores),
+      selected: itemSelected(item.id),
     }
-  }),
-)
+  })
+  const anySelected = drawn.some((item) => item.selected)
+  const styled = drawn.map((item) => ({
+    ...item,
+    emphasized: !anySelected || item.selected,
+  }))
+  return [
+    ...styled.filter((item) => !item.selected),
+    ...styled.filter((item) => item.selected),
+  ]
+})
 
 /**
  * 轴标题 + 四级刻度：贴着顶点外侧排版（对齐参考图）。
@@ -604,16 +614,32 @@ const vertexPanels = computed(() => {
             opacity="0.7"
           />
 
-          <!-- 业务方向叠绘 -->
-          <polygon
-            v-for="ov in overlays"
-            :key="ov.id"
-            :points="ov.points"
-            :fill="ov.fill"
-            :stroke="ov.stroke"
-            stroke-width="1.8"
-            stroke-linejoin="round"
-          />
+          <text
+            v-for="mark in [75, 50, 25]"
+            :key="`scale-${mark}`"
+            class="radar-scale-tick"
+            :x="polar(0, (R * mark) / 100)[0] + 12"
+            :y="polar(0, (R * mark) / 100)[1]"
+          >{{ mark }}</text>
+          <!-- 业务方向叠绘：选中的方向最后画，描边转得更快 -->
+          <g v-for="ov in overlays" :key="ov.id">
+            <polygon
+              :points="ov.points"
+              :fill="ov.fill"
+              :fill-opacity="ov.emphasized ? 1 : 0.35"
+              stroke="none"
+            />
+            <polygon
+              class="radar-flow-line"
+              :class="{ 'is-selected': ov.selected }"
+              :points="ov.points"
+              fill="none"
+              :stroke="ov.stroke"
+              :stroke-width="ov.selected ? 3 : 1.8"
+              :stroke-opacity="ov.emphasized ? 1 : 0.45"
+              pointer-events="none"
+            />
+          </g>
         </svg>
 
         <!-- 顶点刻度面板：贴着三角边缘，非整屏漂浮 -->

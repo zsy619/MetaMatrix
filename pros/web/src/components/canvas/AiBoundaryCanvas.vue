@@ -244,13 +244,14 @@ function writeNote(html: string) {
               stroke="none"
             />
             <polygon
-              class="flow"
-              :class="{ on: selectedId === biz.id }"
+              class="radar-flow-line"
+              :class="{ 'is-selected': selectedId === biz.id }"
               :points="polygon(biz)"
               fill="none"
               :stroke="biz.stroke"
               :stroke-width="selectedId === biz.id ? 3.2 : 1.6"
               :stroke-opacity="selectedId === biz.id ? 1 : 0.55"
+              pointer-events="none"
             />
           </g>
           <text
@@ -365,19 +366,6 @@ function writeNote(html: string) {
 .tick, .gate-label { paint-order: stroke; stroke: #fffdf8; stroke-width: 3px; }
 .tick { fill: #a8a29e; font-size: 11px; }
 .shape { cursor: pointer; }
-.flow {
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-dasharray: 16 12;
-  animation: radar-flow 2.4s linear infinite;
-}
-.flow.on { animation-duration: 1.6s; }
-@keyframes radar-flow {
-  to { stroke-dashoffset: -168; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .flow { animation: none; stroke-dasharray: none; }
-}
 .ring, .spoke { fill: none; stroke: #e7d7c4; stroke-width: 1; }
 .gate { fill: none; stroke: #9a3412; stroke-width: 1.4; stroke-dasharray: 5 4; }
 .axis { fill: #1c1917; font-size: 15px; font-weight: 700; }

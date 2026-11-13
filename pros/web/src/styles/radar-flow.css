@@ -1,0 +1,36 @@
+/* 雷达上同一条数据的边，顺着轮廓顺时针流动。 */
+.radar-flow-line {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 16 12;
+  animation: radar-flow 2.4s linear infinite;
+  pointer-events: none;
+}
+
+.radar-flow-line.is-selected {
+  animation-duration: 1.6s;
+}
+
+@keyframes radar-flow {
+  to {
+    stroke-dashoffset: -168;
+  }
+}
+
+.radar-scale-tick {
+  fill: #5f6368;
+  font-size: 13px;
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: #fff;
+  stroke-width: 3px;
+  dominant-baseline: middle;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .radar-flow-line {
+    animation: none !important;
+    stroke-dasharray: none;
+  }
+}

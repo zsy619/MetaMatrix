@@ -9,6 +9,7 @@ import './styles/auth.css'
 import './styles/canvas-states.css'
 import './styles/panel-maximize.css'
 import './styles/table-tone.css'
+import './styles/radar-flow.css'
 import App from './App.vue'
 import router from './router'
 
