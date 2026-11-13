@@ -22,6 +22,7 @@ const columns = computed(() => props.panel.seriesNames)
         type="button"
         class="rte-cp-tab"
         :class="{ active: props.panel.dataView === 'table' }"
+        title="用表格改类目和系列"
         @click="props.panel.dataView = 'table'"
       >
         表格
@@ -30,6 +31,7 @@ const columns = computed(() => props.panel.seriesNames)
         type="button"
         class="rte-cp-tab"
         :class="{ active: props.panel.dataView === 'json' }"
+        title="用 JSON 改同一份数据"
         @click="props.panel.dataView = 'json'"
       >
         JSON
@@ -52,6 +54,7 @@ const columns = computed(() => props.panel.seriesNames)
                 class="rte-cp-input rte-cp-input-sm"
                 type="text"
                 :value="row.category"
+                title="这一行的类目名称"
                 @change="(e) => props.panel.setDataCategory(rowIndex, (e.target as HTMLInputElement).value)"
               />
             </td>
@@ -60,6 +63,7 @@ const columns = computed(() => props.panel.seriesNames)
                 class="rte-cp-input rte-cp-input-sm"
                 type="text"
                 :value="String(value)"
+                title="这一格的数值"
                 @change="(e) => props.panel.setDataCell(rowIndex, colIndex, (e.target as HTMLInputElement).value)"
               />
             </td>
@@ -67,7 +71,7 @@ const columns = computed(() => props.panel.seriesNames)
               <button
                 type="button"
                 class="rte-cp-mini"
-                title="删除该行"
+                title="删掉这一行类目"
                 @click="props.panel.removeDataRow(rowIndex)"
               >
                 ×
@@ -77,11 +81,12 @@ const columns = computed(() => props.panel.seriesNames)
         </tbody>
       </table>
       <div class="rte-cp-row-actions">
-        <button type="button" class="rte-cp-mini" @click="props.panel.addDataRow()">+ 行</button>
-        <button type="button" class="rte-cp-mini" @click="props.panel.addDataSeries()">+ 系列</button>
+        <button type="button" class="rte-cp-mini" title="在表格末尾加一行" @click="props.panel.addDataRow()">+ 行</button>
+        <button type="button" class="rte-cp-mini" title="加一列系列，数值先填 0" @click="props.panel.addDataSeries()">+ 系列</button>
         <button
           type="button"
           class="rte-cp-mini rte-cp-mini-danger"
+          title="删掉当前这一列系列"
           @click="props.panel.removeDataSeries(props.panel.seriesIndex)"
         >
           − 系列

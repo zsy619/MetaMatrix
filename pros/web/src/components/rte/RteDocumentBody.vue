@@ -928,7 +928,7 @@ useParentScopeStamp()
         class="rte-mobile-btn"
         :class="{ active: rte.isActive('bold') }"
         aria-label="加粗"
-        title="加粗"
+        title="把选中文字加粗"
         @mousedown.prevent
         @click="rte.toggleBold"
       >
@@ -940,7 +940,7 @@ useParentScopeStamp()
         class="rte-mobile-btn"
         :class="{ active: rte.isActive('italic') }"
         aria-label="斜体"
-        title="斜体"
+        title="把选中文字变成斜体"
         @mousedown.prevent
         @click="rte.toggleItalic"
       >
@@ -952,7 +952,7 @@ useParentScopeStamp()
         class="rte-mobile-btn"
         :class="{ active: rte.isActive('bulletList') }"
         aria-label="列表"
-        title="列表"
+        title="把这段改成无序列表"
         @mousedown.prevent
         @click="rte.toggleBulletList"
       >
@@ -964,7 +964,7 @@ useParentScopeStamp()
         class="rte-mobile-btn"
         :class="{ active: rte.isActive('link') }"
         aria-label="链接"
-        title="链接"
+        title="给选中文字加链接"
         @mousedown.prevent
         @click="rte.insertLink"
       >
@@ -975,7 +975,7 @@ useParentScopeStamp()
         type="button"
         class="rte-mobile-btn"
         aria-label="提及"
-        title="提及"
+        title="在光标处插入 @，再选人"
         @mousedown.prevent
         @click="rte.insertMentionFromToolbar"
       >
@@ -986,7 +986,7 @@ useParentScopeStamp()
         type="button"
         class="rte-mobile-btn"
         aria-label="评论"
-        title="评论"
+        title="给选中的文字写评论"
         @mousedown.prevent
         @click="rte.beginComment"
       >
@@ -997,7 +997,7 @@ useParentScopeStamp()
         type="button"
         class="rte-mobile-btn"
         aria-label="更多工具"
-        title="更多工具"
+        title="打开更多工具"
         @mousedown.prevent
         @click="rte.openMoreMenu"
       >

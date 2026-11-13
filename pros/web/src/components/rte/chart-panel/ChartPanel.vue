@@ -277,8 +277,8 @@ function onChangeChartType(event: Event) {
     </div>
 
     <footer class="rte-cp-foot">
-      <button type="button" class="rte-cp-btn rte-cp-btn-danger" @click="onDelete">删除图表</button>
-      <button type="button" class="rte-cp-btn" @click="props.host.hide()">关闭</button>
+      <button type="button" class="rte-cp-btn rte-cp-btn-danger" title="删掉这张图和数据，删前会再确认" @click="onDelete">删除图表</button>
+      <button type="button" class="rte-cp-btn" title="收起图表属性面板" @click="props.host.hide()">关闭</button>
     </footer>
   </aside>
 </template>

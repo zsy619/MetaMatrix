@@ -329,15 +329,16 @@ const echartsDialogTemplates = computed(() => {
               type="text"
               class="rte-note-input"
               placeholder="按标题或正文搜索"
+              title="输入关键词，最多 100 字，按 Enter 搜索"
               maxlength="100"
               @keydown.enter.prevent="rte.searchCrossDoc()"
             />
           </div>
           <div data-rte-own class="rte-crossdoc-actions">
-            <button data-rte-own type="button" class="rte-btn" :disabled="rte.crossDocBusy" @click="rte.searchCrossDoc()">
+            <button data-rte-own type="button" class="rte-btn" title="在本账号可见的文档里找" :disabled="rte.crossDocBusy" @click="rte.searchCrossDoc()">
               {{ rte.crossDocBusy ? '搜索中…' : '搜索' }}
             </button>
-            <button data-rte-own type="button" class="rte-btn" @click="rte.closeCrossDoc()">关闭</button>
+            <button data-rte-own type="button" class="rte-btn" title="关掉跨文档" @click="rte.closeCrossDoc()">关闭</button>
           </div>
           <p data-rte-own v-if="rte.crossDocError" class="rte-modal-desc is-error">{{ rte.crossDocError }}</p>
           <div data-rte-own v-if="rte.crossDocHits.length" class="rte-crossdoc-list">
@@ -392,6 +393,7 @@ const echartsDialogTemplates = computed(() => {
                   data-rte-own
                   type="checkbox"
                   :checked="rte.mentionPermDepartments.includes(dept)"
+                  :title="'勾上后，@ 只出现「' + dept + '」的人。和角色同时勾时都要符合'"
                   @change="rte.toggleMentionPermValue(rte.mentionPermDepartments, dept)"
                 />
                 <span data-rte-own>{{ dept }}</span>
@@ -405,6 +407,7 @@ const echartsDialogTemplates = computed(() => {
                   data-rte-own
                   type="checkbox"
                   :checked="rte.mentionPermRoles.includes(role)"
+                  :title="'勾上后，@ 只出现角色是「' + role + '」的人'"
                   @change="rte.toggleMentionPermValue(rte.mentionPermRoles, role)"
                 />
                 <span data-rte-own>{{ role }}</span>
@@ -413,9 +416,9 @@ const echartsDialogTemplates = computed(() => {
           </div>
           <p data-rte-own v-if="rte.directoryError" class="rte-modal-desc is-error">{{ rte.directoryError }}</p>
           <div data-rte-own class="rte-modal-actions is-row">
-            <button data-rte-own type="button" class="rte-btn" @click="rte.resetMentionPermission()">清空</button>
-            <button data-rte-own type="button" class="rte-btn" @click="rte.mentionPermOpen = false">取消</button>
-            <button data-rte-own type="button" class="rte-btn is-primary" @click="rte.saveMentionPermission()">保存</button>
+            <button data-rte-own type="button" class="rte-btn" title="去掉勾选。保存后所有人都能被提及" @click="rte.resetMentionPermission()">清空</button>
+            <button data-rte-own type="button" class="rte-btn" title="不保存这次权限" @click="rte.mentionPermOpen = false">取消</button>
+            <button data-rte-own type="button" class="rte-btn is-primary" title="按勾选限制 @ 菜单里的人" @click="rte.saveMentionPermission()">保存</button>
           </div>
         </div>
       </div>
@@ -1132,10 +1135,10 @@ const echartsDialogTemplates = computed(() => {
       >
         <div data-rte-own class="rte-link-dialog rte-govern-dialog" role="dialog" aria-modal="true" aria-label="文档治理" @mousedown.stop>
           <div data-rte-own class="rte-govern-tabs">
-            <button data-rte-own type="button" :class="{ active: rte.governTab === 'watermark' }" @click="rte.governTab = 'watermark'">水印</button>
-            <button data-rte-own type="button" :class="{ active: rte.governTab === 'outbound' }" @click="rte.governTab = 'outbound'; rte.refreshExternalLinks()">外链</button>
-            <button data-rte-own type="button" :class="{ active: rte.governTab === 'audit' }" @click="rte.governTab = 'audit'">审计</button>
-            <button data-rte-own type="button" :class="{ active: rte.governTab === 'ai' }" @click="rte.governTab = 'ai'">文内 AI</button>
+            <button data-rte-own type="button" :class="{ active: rte.governTab === 'watermark' }" title="设置盖在页面上的水印，不写进正文" @click="rte.governTab = 'watermark'">水印</button>
+            <button data-rte-own type="button" :class="{ active: rte.governTab === 'outbound' }" title="设置打开站外链接前是否确认，以及直接打开的主机" @click="rte.governTab = 'outbound'; rte.refreshExternalLinks()">外链</button>
+            <button data-rte-own type="button" :class="{ active: rte.governTab === 'audit' }" title="看水印、外链、改写和导出的记录" @click="rte.governTab = 'audit'">审计</button>
+            <button data-rte-own type="button" :class="{ active: rte.governTab === 'ai' }" title="用选中文字和紧挨着的上文改写，不调用外部模型" @click="rte.governTab = 'ai'">文内 AI</button>
           </div>
 
           <div v-if="rte.governTab === 'watermark'" data-rte-own class="rte-govern-pane">
@@ -1147,6 +1150,7 @@ const echartsDialogTemplates = computed(() => {
                 data-rte-own
                 type="button"
                 class="rte-import-item"
+                :title="'把水印文字换成「' + preset + '」，还要点保存'"
                 @click="rte.applyWatermarkPreset(preset)"
               >
                 {{ preset }}
@@ -1158,18 +1162,19 @@ const echartsDialogTemplates = computed(() => {
               type="text"
               maxlength="24"
               :value="rte.watermarkDraft"
+              title="水印文字，最多 24 字。留空再保存就关掉水印"
               placeholder="水印文字，留空并保存即关闭"
               @input="rte.onWatermarkDraftInput"
             />
             <div data-rte-own class="rte-modal-actions">
-              <button data-rte-own type="button" class="rte-modal-confirm" @click="rte.saveWatermark">保存</button>
+              <button data-rte-own type="button" class="rte-modal-confirm" title="把上面的文字盖到页面上" @click="rte.saveWatermark">保存</button>
             </div>
           </div>
 
           <div v-else-if="rte.governTab === 'outbound'" data-rte-own class="rte-govern-pane">
             <p data-rte-own class="rte-govern-note">站外的 http(s) 链接打开前需要确认。白名单里的主机直接打开。</p>
             <label data-rte-own class="rte-govern-check">
-              <input data-rte-own type="checkbox" :checked="rte.outboundPolicy.confirmExternal" @change="rte.toggleOutboundConfirm" />
+              <input data-rte-own type="checkbox" title="勾上后，打开站外链接前要再确认一次。改完立即生效" :checked="rte.outboundPolicy.confirmExternal" @change="rte.toggleOutboundConfirm" />
               打开外链前确认
             </label>
             <textarea
@@ -1177,11 +1182,12 @@ const echartsDialogTemplates = computed(() => {
               class="rte-govern-hosts"
               rows="4"
               :value="rte.outboundHostsDraft"
+              title="每行一个主机。这些地址直接打开，不用再确认"
               placeholder="每行一个主机，例如 feishu.cn"
               @input="rte.onOutboundHostsInput"
             />
             <div data-rte-own class="rte-modal-actions">
-              <button data-rte-own type="button" class="rte-modal-confirm" @click="rte.saveOutboundPolicy">保存策略</button>
+              <button data-rte-own type="button" class="rte-modal-confirm" title="保存上面的主机白名单" @click="rte.saveOutboundPolicy">保存策略</button>
             </div>
             <p data-rte-own class="rte-govern-note">本文中的外链</p>
             <p v-if="!rte.externalLinkRows.length" data-rte-own class="rte-govern-empty">还没有外链。</p>
@@ -1191,6 +1197,7 @@ const echartsDialogTemplates = computed(() => {
               data-rte-own
               type="button"
               class="rte-import-item rte-govern-link"
+              :title="'打开 ' + row.host"
               @click="rte.requestOpenHref(row.href)"
             >
               {{ row.host }} · {{ row.href }}
@@ -1225,7 +1232,7 @@ const echartsDialogTemplates = computed(() => {
           </div>
 
           <div data-rte-own class="rte-modal-actions">
-            <button data-rte-own type="button" class="rte-modal-cancel" @click="rte.governOpen = false">关闭</button>
+            <button data-rte-own type="button" class="rte-modal-cancel" title="关掉文档治理" @click="rte.governOpen = false">关闭</button>
           </div>
         </div>
       </div>
@@ -1251,6 +1258,7 @@ const echartsDialogTemplates = computed(() => {
                 v-if="line.pos != null"
                 type="button"
                 class="rte-import-item"
+                title="滚到文档里的这一处"
                 @click="rte.jumpWave21Report(line.pos)"
               >
                 {{ line.done ? '✓ ' : '' }}{{ line.text }}
@@ -1261,6 +1269,7 @@ const echartsDialogTemplates = computed(() => {
                   v-for="action in line.actions"
                   :key="action.id"
                   type="button"
+                  :title="action.id === 'continueList' ? '接上这段编号' : action.id === 'makeHeader' ? '把表格第一行标成表头' : action.id === 'layout12' ? '这组图片排成左一右二' : action.id === 'layout21' ? '这组图片排成左二右一' : '这组图片排成上下两行'"
                   @click="rte.applyOptimizeAction(action)"
                 >
                   {{ action.label }}
@@ -1273,11 +1282,12 @@ const echartsDialogTemplates = computed(() => {
               v-if="rte.optimizePendingCount"
               type="button"
               class="rte-modal-cancel"
+              title="把还没处理的项写成文末待办"
               @click="rte.appendOptimizeChecklist"
             >
               写入文末清单
             </button>
-            <button data-rte-own type="button" class="rte-modal-confirm" @click="rte.wave21ReportOpen = false">关闭</button>
+            <button data-rte-own type="button" class="rte-modal-confirm" title="关掉检查报告" @click="rte.wave21ReportOpen = false">关闭</button>
           </div>
         </div>
       </div>
@@ -1305,6 +1315,7 @@ const echartsDialogTemplates = computed(() => {
             class="rte-shortcuts-search"
             type="search"
             placeholder="搜索标题或图表，中英文均可"
+            title="搜标题、图或表，中英文都可以"
             aria-label="搜索交叉引用"
           />
           <div data-rte-own v-if="!rte.xrefTargets.length" class="rte-ask-message">暂无可用目标，请先添加标题或带题注的图/表。</div>
@@ -1316,13 +1327,14 @@ const echartsDialogTemplates = computed(() => {
             class="rte-import-item"
             :class="{ 'is-active': idx === rte.xrefIndex }"
             style="width: 100%; margin-bottom: 6px; text-align: left"
+            :title="'插入指向「' + tg.label + '」的交叉引用'"
             @mouseenter="rte.xrefIndex = idx"
             @click="rte.confirmInsertXref(tg)"
           >
             <span data-rte-own>{{ tg.kind === 'heading' ? '标题' : tg.kind === 'figure' ? '图' : '表' }} · {{ tg.label }}</span>
           </button>
           <div data-rte-own class="rte-modal-actions">
-            <button data-rte-own type="button" class="rte-modal-cancel" @click="rte.xrefDialogOpen = false">取消</button>
+            <button data-rte-own type="button" class="rte-modal-cancel" title="不插入交叉引用" @click="rte.xrefDialogOpen = false">取消</button>
           </div>
         </div>
       </div>
@@ -1354,6 +1366,7 @@ const echartsDialogTemplates = computed(() => {
                 class="rte-import-item"
                 :class="{ 'is-active': rte.echartsDialogType === cat.id }"
                 style="width: 100%; margin-bottom: 6px; text-align: left"
+                :title="'看「' + cat.label + '」这一类，共 ' + cat.templates.length + ' 种'"
                 @click="rte.selectEchartsDialogCategory(cat.id)"
               >
                 <strong data-rte-own>{{ cat.label }}</strong>
@@ -1369,6 +1382,7 @@ const echartsDialogTemplates = computed(() => {
                 class="rte-import-item"
                 :class="{ 'is-active': rte.echartsDialogTemplateId === tpl.id }"
                 style="width: 100%; margin-bottom: 6px; text-align: left"
+                :title="tpl.hint ? tpl.label + '：' + tpl.hint : '用「' + tpl.label + '」的示例数据'"
                 @click="rte.echartsDialogTemplateId = tpl.id"
               >
                 <span data-rte-own>{{ tpl.label }}</span>
@@ -1383,6 +1397,7 @@ const echartsDialogTemplates = computed(() => {
               class="rte-note-input"
               type="text"
               maxlength="60"
+              title="图表标题，最多 60 字，可以留空"
               placeholder="图表标题（可留空）"
             />
           </div>
@@ -1391,6 +1406,7 @@ const echartsDialogTemplates = computed(() => {
               data-rte-own
               v-model="rte.echartsDialogUseTable"
               type="checkbox"
+              title="用光标所在表格的数据。光标不在表格里时不能勾"
               :disabled="!rte.echartsDialogTable"
             />
             <span data-rte-own>
@@ -1400,12 +1416,13 @@ const echartsDialogTemplates = computed(() => {
           </label>
           <p data-rte-own class="rte-ask-message">提示：图表内容不参与逐条修订；单个文档图表超过 20 个会提示。</p>
           <div data-rte-own class="rte-modal-actions">
-            <button data-rte-own type="button" class="rte-modal-cancel" @click="rte.echartsDialogOpen = false">取消</button>
+            <button data-rte-own type="button" class="rte-modal-cancel" title="不插入图表" @click="rte.echartsDialogOpen = false">取消</button>
             <button
               data-rte-own
               type="button"
               class="rte-modal-confirm"
               @click="rte.applyEchartsDialog({ type: rte.echartsDialogType, templateId: rte.echartsDialogTemplateId, title: rte.echartsDialogTitle, useTable: rte.echartsDialogUseTable })"
+              title="按所选类型插入。勾了表格就用表格数据，否则用示例数据"
             >插入</button>
           </div>
         </div>
@@ -1426,7 +1443,7 @@ const echartsDialogTemplates = computed(() => {
           <div data-rte-own class="rte-wordstats-row"><span data-rte-own>常速（约 400 字/分）</span><strong data-rte-own>{{ rte.estimateReadingMinutes(rte.charCount, 400) }} 分钟</strong></div>
           <div data-rte-own class="rte-wordstats-row"><span data-rte-own>快读（约 600 字/分）</span><strong data-rte-own>{{ rte.estimateReadingMinutes(rte.charCount, 600) }} 分钟</strong></div>
           <div data-rte-own class="rte-modal-actions">
-            <button data-rte-own type="button" class="rte-modal-confirm" @click="rte.readTimeDialogOpen = false">关闭</button>
+            <button data-rte-own type="button" class="rte-modal-confirm" title="关掉阅读时长" @click="rte.readTimeDialogOpen = false">关闭</button>
           </div>
         </div>
       </div>
@@ -1447,6 +1464,7 @@ const echartsDialogTemplates = computed(() => {
             type="button"
             class="rte-import-item"
             style="width: 100%; margin-bottom: 6px; text-align: left"
+            :title="'把「' + sn.title + '」插到光标处'"
             @click="rte.insertSnippet(sn)"
           >
             <strong data-rte-own>{{ sn.title }}</strong>
@@ -1455,28 +1473,30 @@ const echartsDialogTemplates = computed(() => {
           <div data-rte-own class="rte-menu-sep" style="margin: 10px 0" />
           <p data-rte-own class="rte-ask-message">{{ rte.snippetEditing ? '编辑片段' : '新建片段' }}</p>
           <div data-rte-own class="rte-note-field" style="width: 100%; margin-bottom: 8px">
-            <input data-rte-own v-model="rte.snippetTitle" class="rte-note-input" type="text" maxlength="40" placeholder="片段标题" />
+            <input data-rte-own v-model="rte.snippetTitle" class="rte-note-input" type="text" maxlength="40" title="片段标题，最多 40 字" placeholder="片段标题" />
           </div>
           <textarea data-rte-own
             v-model="rte.snippetBody"
             class="rte-note-input"
             rows="4"
             maxlength="2000"
+            title="片段正文，最多 2000 字。插入时原样放进文档"
             placeholder="片段正文"
             style="width: 100%; margin-bottom: 8px; resize: vertical"
           />
           <div data-rte-own class="rte-modal-actions">
-            <button data-rte-own type="button" class="rte-modal-cancel" @click="rte.snippetDialogOpen = false">关闭</button>
+            <button data-rte-own type="button" class="rte-modal-cancel" title="关掉文本片段" @click="rte.snippetDialogOpen = false">关闭</button>
             <button data-rte-own
               v-if="rte.snippetEditing"
               type="button"
               class="rte-modal-cancel"
+              title="删掉正在编辑的片段。删光后会回到内置片段"
               @click="rte.deleteSnippet(rte.snippetEditing)"
             >
               删除
             </button>
-            <button data-rte-own type="button" class="rte-modal-cancel" @click="rte.startEditSnippet(null)">新建</button>
-            <button data-rte-own type="button" class="rte-modal-confirm" @click="rte.saveSnippetForm">保存</button>
+            <button data-rte-own type="button" class="rte-modal-cancel" title="清空表单，准备新建一段" @click="rte.startEditSnippet(null)">新建</button>
+            <button data-rte-own type="button" class="rte-modal-confirm" title="保存标题和正文，供以后插入" @click="rte.saveSnippetForm">保存</button>
           </div>
           <div data-rte-own style="margin-top: 8px">
             <button data-rte-own
@@ -1485,6 +1505,7 @@ const echartsDialogTemplates = computed(() => {
               type="button"
               class="rte-bubble-btn"
               style="margin: 2px"
+              :title="'把「' + sn.title + '」填进下面的表单再改'"
               @click="rte.startEditSnippet(sn)"
             >
               编辑·{{ sn.title }}

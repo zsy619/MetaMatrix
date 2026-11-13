@@ -23,6 +23,7 @@ const fields = computed(
         type="button"
         class="rte-cp-series-tab"
         :class="{ active: props.panel.seriesIndex === index }"
+        :title="'改「' + props.panel.seriesNames[index] + '」这一列'"
         @click="props.panel.seriesIndex = index"
       >
         {{ props.panel.seriesNames[index] }}
