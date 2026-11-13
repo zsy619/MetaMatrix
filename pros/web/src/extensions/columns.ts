@@ -1,5 +1,6 @@
 import { Node, mergeAttributes } from '@tiptap/core'
-import { Plugin, TextSelection } from '@tiptap/pm/state'
+import { Fragment, NodeRange, type Node as PMNode } from '@tiptap/pm/model'
+import { NodeSelection, Plugin, TextSelection, type Transaction } from '@tiptap/pm/state'
 
 export type ColumnCount = 2 | 3 | 4 | 5 | 6
 
@@ -55,6 +56,100 @@ function ratiosToAttr(ratios: number[]): string {
 
 function ratiosToGrid(ratios: number[]): string {
   return ratios.map((r) => `${r}fr`).join(' ')
+}
+
+function isEmptyParagraph(node: PMNode): boolean {
+  return node.type.name === 'paragraph' && node.content.size === 0
+}
+
+function blankParagraph(doc: PMNode): PMNode {
+  return doc.type.schema.nodes.paragraph!.create()
+}
+
+function columnContents(node: PMNode): PMNode[][] {
+  const columns: PMNode[][] = []
+  node.forEach((column) => {
+    const blocks: PMNode[] = []
+    column.forEach((block) => blocks.push(block))
+    columns.push(blocks)
+  })
+  return columns
+}
+
+/** 减少栏数时，多出来的块按顺序接到最后一栏，空段不占位。 */
+export function fitColumnBlocks(columns: PMNode[][], cols: number, blank: PMNode): PMNode[][] {
+  const next = columns.slice(0, cols).map((blocks) => blocks.slice())
+  while (next.length < cols) next.push([blank.type.create()])
+  if (columns.length > cols) {
+    const overflow = columns.slice(cols).flat().filter((block) => !isEmptyParagraph(block))
+    const kept = (next[cols - 1] ?? []).filter((block) => !isEmptyParagraph(block))
+    next[cols - 1] = kept.length || overflow.length ? [...kept, ...overflow] : [blank.type.create()]
+  }
+  return next.map((blocks) => (blocks.length ? blocks : [blank.type.create()]))
+}
+
+/** 选中的块按顺序摊进各栏，前面的栏先满。 */
+export function distributeBlocks(blocks: PMNode[], cols: number, blank: PMNode): PMNode[][] {
+  const buckets: PMNode[][] = Array.from({ length: cols }, () => [])
+  if (!blocks.length) return buckets.map(() => [blank.type.create()])
+  const size = Math.ceil(blocks.length / cols)
+  blocks.forEach((block, index) => {
+    buckets[Math.min(cols - 1, Math.floor(index / size))]!.push(block)
+  })
+  return buckets.map((bucket) => (bucket.length ? bucket : [blank.type.create()]))
+}
+
+function columnsAttrs(cols: ColumnCount, ratios?: number[] | string | null) {
+  const normalized = normalizeRatios(cols, ratios)
+  return normalized ? { cols, ratios: ratiosToAttr(normalized) } : { cols, ratios: null }
+}
+
+function buildColumns(doc: PMNode, cols: ColumnCount, ratios: number[] | string | null | undefined, buckets: PMNode[][]): PMNode {
+  const schema = doc.type.schema
+  const children = buckets.map((blocks) => schema.nodes.column!.create(null, blocks))
+  return schema.nodes.columns!.create(columnsAttrs(cols, ratios), children)
+}
+
+function columnsPosition(tr: Transaction): number | null {
+  const { selection } = tr
+  if (selection instanceof NodeSelection && selection.node.type.name === 'columns') return selection.from
+  const { $from } = selection
+  for (let depth = $from.depth; depth > 0; depth -= 1) {
+    if ($from.node(depth).type.name === 'columns') return $from.before(depth)
+  }
+  return null
+}
+
+function placeCaret(tr: Transaction, pos: number) {
+  const target = Math.max(1, Math.min(pos, tr.doc.content.size))
+  tr.setSelection(TextSelection.near(tr.doc.resolve(target)))
+}
+
+function reshapeColumns(tr: Transaction, pos: number, cols: ColumnCount, ratios?: number[]): boolean {
+  const node = tr.doc.nodeAt(pos)
+  if (!node || node.type.name !== 'columns') return false
+  const next = buildColumns(tr.doc, cols, ratios, fitColumnBlocks(columnContents(node), cols, blankParagraph(tr.doc)))
+  tr.replaceWith(pos, pos + node.nodeSize, next)
+  placeCaret(tr, pos + 1)
+  return true
+}
+
+function wrapSelection(tr: Transaction, cols: ColumnCount, ratios?: number[]): boolean {
+  const blank = blankParagraph(tr.doc)
+  const probe = Fragment.from(buildColumns(tr.doc, cols, ratios, distributeBlocks([], cols, blank)))
+  const { $from, $to } = tr.selection
+  for (let depth = $from.depth; depth >= 0; depth -= 1) {
+    if ($to.pos > $from.end(depth)) continue
+    const range = new NodeRange($from, $to, depth)
+    if (!range.parent.canReplace(range.startIndex, range.endIndex, probe)) continue
+    const blocks: PMNode[] = []
+    for (let index = range.startIndex; index < range.endIndex; index += 1) blocks.push(range.parent.child(index))
+    const from = range.start
+    tr.replaceWith(from, range.end, buildColumns(tr.doc, cols, ratios, distributeBlocks(blocks, cols, blank)))
+    placeCaret(tr, from + 1)
+    return true
+  }
+  return false
 }
 
 export type ColumnBorderStyle = 'none' | 'solid' | 'dashed'
@@ -215,21 +310,12 @@ export const Columns = Node.create({
        */
       setColumns:
         (cols: ColumnCount, ratios?: number[]) =>
-        ({ commands }) => {
-          const c = clampCols(cols)
-          const r = normalizeRatios(c, ratios)
-          const emptyPara = { type: 'paragraph' }
-          const columnNodes = Array.from({ length: c }, () => ({
-            type: 'column',
-            content: [emptyPara],
-          }))
-          return commands.insertContent({
-            type: this.name,
-            attrs: r
-              ? { cols: c, ratios: ratiosToAttr(r) }
-              : { cols: c },
-            content: columnNodes,
-          })
+        ({ tr }) => {
+          // 改的是这条链上的事务。链的 dispatch 本身是空操作，run() 才会发出去。
+          const count = clampCols(cols)
+          const pos = columnsPosition(tr)
+          if (pos != null) return reshapeColumns(tr, pos, count, ratios)
+          return wrapSelection(tr, count, ratios)
         },
     }
   },
@@ -241,16 +327,32 @@ export const Columns = Node.create({
           if (!transactions.some((tr) => tr.docChanged)) return null
           const para = state.schema.nodes.paragraph
           if (!para) return null
-          const spots: number[] = []
+          let tr = state.tr
+          const fixes: Array<{ pos: number }> = []
           state.doc.descendants((node, pos) => {
+            if (node.type.name !== 'columns') return
+            const count = node.childCount
+            if (count < 2 || count > 6) return
+            const cols = clampCols(count)
+            const next = columnsAttrs(cols, node.attrs.ratios)
+            const current = node.attrs.ratios || null
+            if (node.attrs.cols !== cols || current !== next.ratios) fixes.push({ pos })
+          })
+          for (let index = fixes.length - 1; index >= 0; index -= 1) {
+            const pos = tr.mapping.map(fixes[index]!.pos)
+            const node = tr.doc.nodeAt(pos)
+            if (!node || node.type.name !== 'columns' || node.childCount < 2 || node.childCount > 6) continue
+            tr = tr.setNodeMarkup(pos, undefined, { ...node.attrs, ...columnsAttrs(clampCols(node.childCount), node.attrs.ratios) })
+          }
+          const spots: number[] = []
+          tr.doc.descendants((node, pos) => {
             if (node.type.name !== 'column') return
             const last = node.lastChild
             if (last?.isTextblock) return
             spots.push(pos + node.nodeSize - 1)
           })
-          if (!spots.length) return null
-          let tr = state.tr
-          for (let i = spots.length - 1; i >= 0; i -= 1) tr = tr.insert(spots[i], para.create())
+          if (!fixes.length && !spots.length) return null
+          for (let i = spots.length - 1; i >= 0; i -= 1) tr = tr.insert(spots[i]!, para.create())
           if (!tr.selection.$from.parent.isTextblock) {
             const hrPos = transactions[transactions.length - 1]?.selection.from ?? tr.selection.from
             let target = -1
