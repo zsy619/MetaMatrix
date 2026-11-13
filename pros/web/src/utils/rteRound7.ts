@@ -1,4 +1,5 @@
 import type { Editor } from '@tiptap/core'
+import type { Node as PMNode } from '@tiptap/pm/model'
 
 /** 第七轮可单测的缩进、表格粘贴、斜杠/快捷键检索与导出片段。 */
 
@@ -360,7 +361,20 @@ function visualColumnAt(table: { forEach: (fn: (row: { forEach: (fn: (cell: { at
   return found
 }
 
-/** 光标已经在表格里时，按制表符把纯文本填进后面的格子。一次粘贴一步撤销。 */
+/** 按最后一行的格子结构补一行空行。跨行合并不再往下延伸，避免和新行叠在一起。 */
+function blankRowFrom(row: PMNode, schema: Editor['schema']): PMNode {
+  const paragraph = schema.nodes.paragraph
+  const cells: PMNode[] = []
+  row.forEach((cell) => {
+    const attrs = { ...cell.attrs }
+    if (Number(attrs.rowspan) > 1) attrs.rowspan = 1
+    const para = paragraph?.create()
+    cells.push(cell.type.create(attrs, para || undefined))
+  })
+  return row.type.create({ ...row.attrs }, cells)
+}
+
+/** 光标已经在表格里时，按制表符或换行把纯文本填进后面的格子。超出表格时补行。一次粘贴一步撤销。 */
 export function pasteTsvIntoTable(editor: Editor, plain: string): boolean {
   const text = String(plain || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n')
   // 一整列从表格里复制出来时往往只有换行，没有制表符。单行纯文本仍留在当前格子。
@@ -392,10 +406,22 @@ export function pasteTsvIntoTable(editor: Editor, plain: string): boolean {
       col += Math.max(1, Number(cell.attrs.colspan) || 1)
     })
   }
+  let tr = state.tr
+  let liveTable = table
+  let livePos = tablePos
+  const extra = rows.length - (table.childCount - startRow)
+  if (extra > 0 && table.lastChild) {
+    const blanks = Array.from({ length: extra }, () => blankRowFrom(table.lastChild!, state.schema))
+    tr = tr.insert(tablePos + table.nodeSize - 1, blanks)
+    livePos = tr.mapping.map(tablePos, -1)
+    const grown = tr.doc.nodeAt(livePos)
+    if (grown?.type.name === 'table') liveTable = grown
+  }
+  const stepsBeforeFill = tr.steps.length
   const jobs: Array<{ from: number; to: number; text: string }> = []
   const occupied: boolean[][] = []
   let rowIndex = 0
-  table.forEach((rowNode, rowOffset) => {
+  liveTable.forEach((rowNode, rowOffset) => {
     const gridRow = rowIndex >= startRow ? rows[rowIndex - startRow] : undefined
     let visual = 0
     let pasteCol = 0
@@ -409,7 +435,7 @@ export function pasteTsvIntoTable(editor: Editor, plain: string): boolean {
           if (dateCols.has(visual) && /^\d+$/.test(value.trim())) {
             value = excelSerialToDate(Number(value.trim())) || value
           }
-          const cellPos = tablePos + 1 + rowOffset + 1 + cellOffset
+          const cellPos = livePos + 1 + rowOffset + 1 + cellOffset
           const para = cellNode.firstChild
           if (para) {
             jobs.push({
@@ -429,11 +455,11 @@ export function pasteTsvIntoTable(editor: Editor, plain: string): boolean {
     rowIndex += 1
   })
   if (!jobs.length) return false
-  let tr = state.tr
   jobs.sort((a, b) => b.from - a.from)
   for (const job of jobs) {
-    const mappedFrom = tr.mapping.map(job.from)
-    const mappedTo = tr.mapping.map(job.to)
+    const map = tr.mapping.slice(stepsBeforeFill)
+    const mappedFrom = map.map(job.from)
+    const mappedTo = map.map(job.to)
     const next = job.text ? state.schema.text(job.text) : []
     tr = tr.replaceWith(mappedFrom, mappedTo, next)
   }
