@@ -247,3 +247,9 @@
   outline: 2px solid var(--cv-focus, #163044) !important;
   outline-offset: 2px;
 }
+
+/* 格子里先写字。整条工具栏会把窄格子撑成好几行，格式放到放大编辑里。 */
+.canvas-viewport .rte-root .rte-toolbar,
+.canvas-viewport .rte-root .rte-bottom {
+  display: none;
+}
