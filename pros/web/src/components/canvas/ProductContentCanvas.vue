@@ -86,7 +86,8 @@ const chrome = computed(() => canvasChromeStyle(props.doc.theme))
   position: absolute;
   inset: 0;
   z-index: 10;
-  overflow: hidden;
+  overflow: auto;
+  overscroll-behavior: contain;
   box-sizing: border-box;
   padding: 14px 16px 12px;
   display: flex;
@@ -94,15 +95,15 @@ const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 }
 
 .pc-grid {
-  flex: 1;
-  min-height: 0;
+  flex: 1 0 auto;
+  min-height: max(100%, 640px);
   width: 100%;
-  height: 100%;
+  height: auto;
   display: flex;
   flex-direction: column;
   border: 1px solid var(--cv-frame, #ececec);
   border-radius: 2px;
-  overflow: hidden;
+  overflow: visible;
   background: #fff;
 }
 
@@ -113,13 +114,15 @@ const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 }
 
 .pc-row--top {
-  flex: 0 0 32%;
+  flex: 1 0 auto;
+  min-height: 200px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   border-bottom: 1px solid var(--cv-frame, #ececec);
 }
 
 .pc-row--bottom {
-  flex: 1 1 68%;
+  flex: 1.4 0 auto;
+  min-height: 240px;
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
@@ -127,7 +130,8 @@ const chrome = computed(() => canvasChromeStyle(props.doc.theme))
   display: flex;
   flex-direction: column;
   min-width: 0;
-  min-height: 0;
+  min-height: min-content;
+  overflow: visible;
   background: var(--tbl-body, #fff);
   border-right: 1px solid var(--cv-frame, #ececec);
 }
@@ -183,17 +187,27 @@ const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 }
 
 .pc-items {
-  flex: 1;
-  min-height: 0;
+  flex: 1 0 auto;
+  min-height: 80px;
   min-width: 0;
   display: flex;
   flex-direction: column;
+  overflow: visible;
 }
 
-.pc-items :deep(.ym-block) {
-  flex: 1;
-  min-height: 0;
+.pc-items :deep(.ym-block),
+.pc-items :deep(.ym-block-body),
+.pc-items :deep(.rte-root) {
+  flex: 1 0 auto;
+  min-height: min-content;
+  height: auto;
+  overflow: visible;
   background: rgba(248, 249, 250, 0.55);
+}
+
+.pc-items :deep(.rte-canvas) {
+  height: auto;
+  background: transparent;
 }
 
 @media (max-width: 720px) {

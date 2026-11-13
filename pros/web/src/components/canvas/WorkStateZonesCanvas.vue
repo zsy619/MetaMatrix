@@ -182,7 +182,8 @@ function onOpenQuadrant(id: WorkStateZonesBlockId, event?: Event) {
   position: absolute;
   inset: 0;
   z-index: 10;
-  overflow: hidden; /* 页面/画布不出现滚动条 */
+  overflow: auto;
+  overscroll-behavior: contain;
   box-sizing: border-box;
   padding: 8px 10px 10px;
   display: flex;
@@ -195,12 +196,12 @@ function onOpenQuadrant(id: WorkStateZonesBlockId, event?: Event) {
 
 .wsz-frame {
   position: relative;
-  flex: 1 1 auto;
+  flex: 1 0 auto;
   width: 100%;
   max-width: none;
   margin: 0;
-  min-height: 0;
-  height: 100%;
+  min-height: 100%;
+  height: auto;
   /* 轴标签留白：双行轴字仍可读，贴 time-matrix 撑满感 */
   padding: 40px 56px 44px 60px;
   box-sizing: border-box;
@@ -265,10 +266,11 @@ function onOpenQuadrant(id: WorkStateZonesBlockId, event?: Event) {
 
 .wsz-plot {
   position: relative;
-  flex: 1 1 auto;
+  flex: 1 0 auto;
   width: 100%;
-  height: 100%;
-  min-height: 0;
+  min-height: 520px;
+  height: auto;
+  display: flex;
 }
 
 .wsz-axes {
@@ -284,12 +286,13 @@ function onOpenQuadrant(id: WorkStateZonesBlockId, event?: Event) {
 .wsz-grid {
   position: relative;
   z-index: 2;
+  flex: 1 0 auto;
   width: 100%;
-  height: 100%;
-  min-height: 0;
+  height: auto;
+  min-height: 100%;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  grid-template-rows: 1fr 1fr;
+  grid-template-rows: minmax(min-content, 1fr) minmax(min-content, 1fr);
   /* 与 time-matrix / star-quadrant 一致：四格贴满象限、边到边 */
   gap: 0;
   box-sizing: border-box;
@@ -302,9 +305,9 @@ function onOpenQuadrant(id: WorkStateZonesBlockId, event?: Event) {
   align-items: stretch;
   justify-content: flex-start;
   min-width: 0;
-  min-height: 0;
+  min-height: min-content;
   width: 100%;
-  height: 100%;
+  height: auto;
   border-radius: 0;
   /* 贴 time-matrix：面板本体占满格子，内边距仅保标题可读 */
   padding: 8px 10px 8px;
@@ -312,7 +315,7 @@ function onOpenQuadrant(id: WorkStateZonesBlockId, event?: Event) {
   gap: 6px;
   border: none;
   box-shadow: none;
-  overflow: hidden;
+  overflow: visible;
   background: transparent;
 }
 
@@ -370,17 +373,17 @@ function onOpenQuadrant(id: WorkStateZonesBlockId, event?: Event) {
 }
 
 .wsz-body {
-  flex: 1 1 auto;
-  min-height: 0;
+  flex: 1 0 auto;
+  min-height: 120px;
   min-width: 0;
   width: 100%;
-  height: 100%;
+  height: auto;
   display: flex;
   flex-direction: column;
   align-items: stretch;
   background: transparent;
   border-radius: 0;
-  overflow: hidden;
+  overflow: visible;
 }
 
 /* 与 TimeMatrixCanvas 同构：撑满格子的 RTE 链 */
@@ -388,22 +391,28 @@ function onOpenQuadrant(id: WorkStateZonesBlockId, event?: Event) {
   position: relative;
   display: flex;
   flex-direction: column;
-  flex: 1 1 auto;
+  flex: 1 0 auto;
   align-self: stretch;
-  min-height: 0;
+  min-height: min-content;
   width: 100%;
-  height: 100%;
+  height: auto;
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .wsz-body :deep(.ym-rte),
-.wsz-body :deep(.rte-root) {
-  flex: 1 1 auto;
-  min-height: 0;
-  height: 100%;
+.wsz-body :deep(.rte-root),
+.wsz-body :deep(.ym-block-body) {
+  flex: 1 0 auto;
+  min-height: min-content;
+  height: auto;
+  overflow: visible;
+}
+
+.wsz-body :deep(.rte-canvas) {
+  height: auto;
 }
 
 .wsz-body :deep(.ym-block-toolbar) {
@@ -422,9 +431,9 @@ function onOpenQuadrant(id: WorkStateZonesBlockId, event?: Event) {
 }
 
 .wsz-body :deep(.ym-block-body) {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
+  flex: 1 0 auto;
+  min-height: min-content;
+  overflow: visible;
   /* 收紧 RTE 链边距，避免格内大块空白 */
   padding: 2px 4px 4px;
   scrollbar-gutter: auto;
