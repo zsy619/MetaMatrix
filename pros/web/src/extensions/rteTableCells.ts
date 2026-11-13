@@ -2,18 +2,23 @@ import { TableCell } from '@tiptap/extension-table-cell'
 import { TableHeader } from '@tiptap/extension-table-header'
 import { mergeAttributes } from '@tiptap/core'
 import { Plugin } from '@tiptap/pm/state'
-import { editedRanges, formulaRecalcTransaction, TABLE_FORMULA_RECALC, TABLE_STRUCTURE } from '../utils/rteTableFormulaOps'
+import { editedRanges, formulaFollowTransaction, formulaRecalcTransaction, TABLE_FORMULA_RECALC, TABLE_STRUCTURE } from '../utils/rteTableFormulaOps'
 import { createPrintTableHeadPlugin } from '../utils/rtePrintTableHead'
 import { createTableCrosshairPlugin } from './rteTableCrosshair'
 
 /** 引用格一改，已保存的公式立刻重算，不必再点「应用」。 */
 export function createTableFormulaPlugin(): Plugin {
   return new Plugin({
-    appendTransaction(transactions, _old, state) {
+    appendTransaction(transactions, oldState, state) {
       if (!transactions.some((tr) => tr.docChanged)) return null
       if (transactions.some((tr) => tr.getMeta(TABLE_FORMULA_RECALC))) return null
-      const structural = transactions.some((tr) => tr.getMeta(TABLE_STRUCTURE))
-      return formulaRecalcTransaction(state, structural ? [] : editedRanges(transactions))
+      // 撤销和重做会把公式原文一并还原，不能再按结构改一遍。
+      if (transactions.some((tr) => tr.getMeta('history$'))) return null
+      if (transactions.some((tr) => tr.getMeta(TABLE_STRUCTURE))) {
+        return formulaRecalcTransaction(state, [])
+      }
+      return formulaFollowTransaction(oldState, state, transactions)
+        ?? formulaRecalcTransaction(state, editedRanges(transactions))
     },
     view(editorView) {
       queueMicrotask(() => {

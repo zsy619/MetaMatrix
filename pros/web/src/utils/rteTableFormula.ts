@@ -75,6 +75,123 @@ export function formatCellAddress(addr: CellAddress): string {
   return `${letters}${row}`
 }
 
+/**
+ * 行列被插入、删除或对调以后，公式里的地址跟着格子走。
+ * 映射返回 null 表示那一行或那一列已经不在了，写成 #REF!。
+ * 区域还连成一块时收成新的区域；中间插入的空行会把区域撑开。
+ */
+export function remapFormulaByAxis(
+  formula: string,
+  mapRow: (row: number) => number | null,
+  mapCol: (col: number) => number | null,
+): string {
+  const raw = String(formula ?? '')
+  if (!raw.trim().startsWith('=')) return raw
+  const held: string[] = []
+  const ranged = raw.replace(
+    /\b([A-Za-z]{1,3})([1-9][0-9]*):([A-Za-z]{1,3})([1-9][0-9]*)\b/g,
+    (all, c1: string, r1: string, c2: string, r2: string) => {
+      const from = parseCellAddress(`${c1}${r1}`)
+      const to = parseCellAddress(`${c2}${r2}`)
+      if (!from || !to) return all
+      const token = `\u0000${held.length}\u0000`
+      held.push(remapFormulaRange(from, to, mapRow, mapCol))
+      return token
+    },
+  )
+  const cells = ranged.replace(/\b([A-Za-z]{1,3})([1-9][0-9]*)\b/g, (all, col: string, row: string) => {
+    const addr = parseCellAddress(`${col}${row}`)
+    if (!addr) return all
+    return remapOneAddress(addr, mapRow, mapCol, all)
+  })
+  return cells.replace(/\u0000(\d+)\u0000/g, (_all, index: string) => held[Number(index)] ?? '#REF!')
+}
+
+function remapOneAddress(
+  addr: CellAddress,
+  mapRow: (row: number) => number | null,
+  mapCol: (col: number) => number | null,
+  original: string,
+): string {
+  const row = mapRow(addr.row)
+  const col = mapCol(addr.col)
+  if (row == null || col == null) return '#REF!'
+  if (row === addr.row && col === addr.col) return original || formatCellAddress(addr)
+  return formatCellAddress({ col, row })
+}
+
+function remapFormulaRange(
+  from: CellAddress,
+  to: CellAddress,
+  mapRow: (row: number) => number | null,
+  mapCol: (col: number) => number | null,
+): string {
+  const rowFrom = Math.min(from.row, to.row)
+  const rowTo = Math.max(from.row, to.row)
+  const colFrom = Math.min(from.col, to.col)
+  const colTo = Math.max(from.col, to.col)
+  const count = (rowTo - rowFrom + 1) * (colTo - colFrom + 1)
+  if (count > 2000) {
+    const start = remapOneAddress(from, mapRow, mapCol, '')
+    const end = remapOneAddress(to, mapRow, mapCol, '')
+    if (start === '#REF!' || end === '#REF!') return '#REF!'
+    return start === end ? start : `${start}:${end}`
+  }
+  const seen = new Set<string>()
+  let minRow = Number.POSITIVE_INFINITY
+  let maxRow = Number.NEGATIVE_INFINITY
+  let minCol = Number.POSITIVE_INFINITY
+  let maxCol = Number.NEGATIVE_INFINITY
+  for (let row = rowFrom; row <= rowTo; row += 1) {
+    for (let col = colFrom; col <= colTo; col += 1) {
+      const nextRow = mapRow(row)
+      const nextCol = mapCol(col)
+      if (nextRow == null || nextCol == null) continue
+      seen.add(`${nextCol},${nextRow}`)
+      minRow = Math.min(minRow, nextRow)
+      maxRow = Math.max(maxRow, nextRow)
+      minCol = Math.min(minCol, nextCol)
+      maxCol = Math.max(maxCol, nextCol)
+    }
+  }
+  if (!seen.size) return '#REF!'
+  const box = (maxRow - minRow + 1) * (maxCol - minCol + 1)
+  const solid = seen.size === box
+  const inserted = !solid && rangeGapsAreInserts(mapRow, mapCol, minRow, maxRow, minCol, maxCol, seen)
+  if (!solid && !inserted) {
+    const start = remapOneAddress(from, mapRow, mapCol, '')
+    const end = remapOneAddress(to, mapRow, mapCol, '')
+    if (start === '#REF!' || end === '#REF!') return '#REF!'
+    return start === end ? start : `${start}:${end}`
+  }
+  if (minRow === maxRow && minCol === maxCol) return formatCellAddress({ col: minCol, row: minRow })
+  return `${formatCellAddress({ col: minCol, row: minRow })}:${formatCellAddress({ col: maxCol, row: maxRow })}`
+}
+
+/** 区域中间的空档没有任何旧格子移进来，说明那是新插入的行或列。 */
+function rangeGapsAreInserts(
+  mapRow: (row: number) => number | null,
+  mapCol: (col: number) => number | null,
+  minRow: number,
+  maxRow: number,
+  minCol: number,
+  maxCol: number,
+  seen: Set<string>,
+): boolean {
+  for (let row = minRow; row <= maxRow; row += 1) {
+    for (let col = minCol; col <= maxCol; col += 1) {
+      if (seen.has(`${col},${row}`)) continue
+      for (let sourceRow = 1; sourceRow <= 400; sourceRow += 1) {
+        if (mapRow(sourceRow) !== row) continue
+        for (let sourceCol = 1; sourceCol <= 80; sourceCol += 1) {
+          if (mapCol(sourceCol) === col) return false
+        }
+      }
+    }
+  }
+  return true
+}
+
 /** 单元格文本是不是公式。 */
 export function isFormulaCell(text: string): boolean {
   return String(text ?? '').trim().startsWith('=')
@@ -112,6 +229,7 @@ type LexToken =
   | { t: 'comma' }
   | { t: 'colon' }
   | { t: 'pct' }
+  | { t: 'err'; v: FormulaErrorCode }
 
 class FormulaError extends Error {
   code: FormulaErrorCode
@@ -142,6 +260,13 @@ function lex(src: string): LexToken[] {
       i += m[0].length
       continue
     }
+    if (ch === '#') {
+      const err = /^#(REF!|VALUE!|DIV\/0!|NAME\?)/.exec(src.slice(i))
+      if (!err) throw new FormulaError('#VALUE!')
+      tokens.push({ t: 'err', v: err[0] as FormulaErrorCode })
+      i += err[0].length
+      continue
+    }
     if (ch === '(') tokens.push({ t: 'lp' })
     else if (ch === ')') tokens.push({ t: 'rp' })
     else if (ch === ',') tokens.push({ t: 'comma' })
@@ -156,6 +281,7 @@ function lex(src: string): LexToken[] {
 
 type Node =
   | { k: 'num'; v: number }
+  | { k: 'err'; code: FormulaErrorCode }
   | { k: 'ref'; addr: CellAddress }
   | { k: 'range'; from: CellAddress; to: CellAddress }
   | { k: 'above' }
@@ -221,6 +347,7 @@ class Parser {
   parsePrimary(): Node {
     const t = this.next()
     if (!t) throw new FormulaError('#VALUE!')
+    if (t.t === 'err') return { k: 'err', code: t.v }
     if (t.t === 'num') return { k: 'num', v: t.v }
     if (t.t === 'lp') {
       const inner = this.parseExpr()
@@ -405,6 +532,8 @@ function evalNode(node: Node, ctx: Ctx, at: CellAddress): EvalValue {
   switch (node.k) {
     case 'num':
       return node.v
+    case 'err':
+      return { error: node.code }
     case 'unary': {
       const v = evalNode(node.arg, ctx, at)
       if (isError(v)) return v

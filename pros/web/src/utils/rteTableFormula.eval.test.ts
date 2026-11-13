@@ -14,7 +14,24 @@ import {
   parseCellAddress,
   parseCellNumber,
   recalculateTable,
+  remapFormulaByAxis,
 } from './rteTableFormula'
+
+describe('表格结构变化后的公式', () => {
+  const sameCol = (col: number) => col
+  it('删掉的行写成 #REF!，区域会收掉这一行', () => {
+    const mapRow = (row: number) => (row === 2 ? null : row > 2 ? row - 1 : row)
+    expect(remapFormulaByAxis('=A2', mapRow, sameCol)).toBe('=#REF!')
+    expect(remapFormulaByAxis('=SUM(A1:A3)', mapRow, sameCol)).toBe('=SUM(A1:A2)')
+    expect(evaluateFormula('=#REF!', [['1']], 0, 0).error).toBe('#REF!')
+    expect(evaluateFormula('=A1+#REF!', [['4']], 0, 1).error).toBe('#REF!')
+  })
+
+  it('中间插入一行时，求和区域把新行包进来', () => {
+    const mapRow = (row: number) => (row >= 2 ? row + 1 : row)
+    expect(remapFormulaByAxis('=SUM(A1:A3)', mapRow, sameCol)).toBe('=SUM(A1:A4)')
+  })
+})
 
 describe('排序后的公式行号', () => {
   it('行号按新位置改写', () => {

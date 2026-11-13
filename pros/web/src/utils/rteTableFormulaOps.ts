@@ -7,12 +7,13 @@
 
 import type { Editor } from '@tiptap/core'
 import type { Node as PmNode } from '@tiptap/pm/model'
-import type { EditorState, Transaction } from '@tiptap/pm/state'
+import { EditorState, type Transaction } from '@tiptap/pm/state'
 import {
   evaluateFormula,
   evaluateTableFormulas,
   formatCellAddress,
   isFormulaCell,
+  remapFormulaByAxis,
   type FormulaErrorCode,
 } from './rteTableFormula'
 
@@ -410,4 +411,226 @@ export function formulaRecalcTransaction(
   if (!tr.docChanged) return null
   tr.setMeta(TABLE_FORMULA_RECALC, true)
   return tr
+}
+
+type AxisMap = Map<number, number | null>
+
+function tableRows(table: PmNode): PmNode[] {
+  const rows: PmNode[] = []
+  table.forEach((row) => {
+    if (row.type.name === 'tableRow') rows.push(row)
+  })
+  return rows
+}
+
+function tableHasMerge(table: PmNode): boolean {
+  let merged = false
+  tableRows(table).forEach((row) => {
+    row.forEach((cell) => {
+      if (Number(cell.attrs.colspan) > 1 || Number(cell.attrs.rowspan) > 1) merged = true
+    })
+  })
+  return merged
+}
+
+function cellAnchors(table: PmNode): Map<PmNode, { row: number; col: number }> {
+  const anchors = new Map<PmNode, { row: number; col: number }>()
+  tableRows(table).forEach((row, rowIndex) => {
+    row.forEach((cell, _offset, colIndex) => {
+      anchors.set(cell, { row: rowIndex + 1, col: colIndex + 1 })
+    })
+  })
+  return anchors
+}
+
+function colWidth(table: PmNode): number {
+  return tableRows(table).reduce((max, row) => Math.max(max, row.childCount), 0)
+}
+
+function missingIndexes(size: number, present: Set<number>): number[] {
+  const missing: number[] = []
+  for (let index = 1; index <= size; index += 1) {
+    if (!present.has(index)) missing.push(index)
+  }
+  return missing
+}
+
+function voteAxis(
+  pairs: Array<{ from: number; to: number }>,
+  fromSize: number,
+  missing: number[],
+): AxisMap | null {
+  const votes = new Map<number, Set<number>>()
+  for (const pair of pairs) {
+    const bucket = votes.get(pair.from) ?? new Set<number>()
+    bucket.add(pair.to)
+    votes.set(pair.from, bucket)
+  }
+  const map: AxisMap = new Map()
+  for (const [from, bucket] of votes) {
+    if (bucket.size !== 1) return null
+    map.set(from, [...bucket][0]!)
+  }
+  for (const index of missing) map.set(index, null)
+  if (map.size !== fromSize) return null
+  return map
+}
+
+function axisSame(map: AxisMap, size: number): boolean {
+  if (map.size !== size) return false
+  for (let index = 1; index <= size; index += 1) {
+    if (map.get(index) !== index) return false
+  }
+  return true
+}
+
+function formulaKey(row: PmNode): string | null {
+  const parts: string[] = []
+  let any = false
+  row.forEach((cell) => {
+    const stored = typeof cell.attrs.formula === 'string' ? cell.attrs.formula.trim() : ''
+    const text = cell.textContent.trim()
+    const formula = stored.startsWith('=') ? stored : text.startsWith('=') ? text : ''
+    if (formula) any = true
+    parts.push(formula)
+  })
+  return any ? parts.join('\u0001') : null
+}
+
+function planTableShift(oldTable: PmNode, newTable: PmNode): {
+  rowMap: AxisMap
+  colMap: AxisMap
+  duplicateDeltas: Map<number, number>
+} | null {
+  if (tableHasMerge(oldTable) || tableHasMerge(newTable)) return null
+  const oldRows = tableRows(oldTable)
+  const newRows = tableRows(newTable)
+  const oldAnchors = cellAnchors(oldTable)
+  const newAnchors = cellAnchors(newTable)
+  const pairs: Array<{ oldRow: number; oldCol: number; newRow: number; newCol: number }> = []
+  newAnchors.forEach((neu, cell) => {
+    const old = oldAnchors.get(cell)
+    if (!old) return
+    pairs.push({ oldRow: old.row, oldCol: old.col, newRow: neu.row, newCol: neu.col })
+  })
+  if (!pairs.length) return null
+  const oldRowCount = oldRows.length
+  const newRowCount = newRows.length
+  const oldColCount = colWidth(oldTable)
+  const newColCount = colWidth(newTable)
+  const matchedOldRows = new Set(pairs.map((pair) => pair.oldRow))
+  const matchedNewRows = new Set(pairs.map((pair) => pair.newRow))
+  const matchedOldCols = new Set(pairs.map((pair) => pair.oldCol))
+  const matchedNewCols = new Set(pairs.map((pair) => pair.newCol))
+  const unmatchedOldRows = missingIndexes(oldRowCount, matchedOldRows)
+  const unmatchedNewRows = missingIndexes(newRowCount, matchedNewRows)
+  const unmatchedOldCols = missingIndexes(oldColCount, matchedOldCols)
+  const unmatchedNewCols = missingIndexes(newColCount, matchedNewCols)
+  const sameShape = oldRowCount === newRowCount && oldColCount === newColCount
+  if (sameShape && unmatchedOldRows.length && unmatchedNewRows.length) return null
+  if (sameShape && unmatchedOldCols.length && unmatchedNewCols.length) return null
+  if (unmatchedNewRows.length && unmatchedNewCols.length) return null
+  if (unmatchedOldRows.length && unmatchedOldCols.length) return null
+  if (unmatchedNewRows.length && unmatchedOldCols.length) return null
+  if (unmatchedOldRows.length && unmatchedNewCols.length) return null
+  const rowMap = voteAxis(
+    pairs.map((pair) => ({ from: pair.oldRow, to: pair.newRow })),
+    oldRowCount,
+    unmatchedOldRows,
+  )
+  const colMap = voteAxis(
+    pairs.map((pair) => ({ from: pair.oldCol, to: pair.newCol })),
+    oldColCount,
+    unmatchedOldCols,
+  )
+  if (!rowMap || !colMap) return null
+  const duplicateDeltas = new Map<number, number>()
+  for (const rowIndex of unmatchedNewRows) {
+    if (rowIndex < 2) continue
+    const row = newRows[rowIndex - 1]
+    const prev = newRows[rowIndex - 2]
+    if (!row || !prev) continue
+    const key = formulaKey(row)
+    if (key && key === formulaKey(prev)) duplicateDeltas.set(rowIndex, 1)
+  }
+  if (axisSame(rowMap, oldRowCount) && axisSame(colMap, oldColCount) && !duplicateDeltas.size) return null
+  return { rowMap, colMap, duplicateDeltas }
+}
+
+function mapPosBackward(pos: number, transactions: readonly Transaction[]): number {
+  let at = pos
+  for (let index = transactions.length - 1; index >= 0; index -= 1) {
+    at = transactions[index]!.mapping.invert().map(at, -1)
+  }
+  return at
+}
+
+/**
+ * 插入、删除、移动行列后，公式地址跟着原来的格子走。
+ * 复制出来的行按相对位置再错一格。返回的事务已经带上重算。
+ */
+export function formulaFollowTransaction(
+  oldState: EditorState,
+  newState: EditorState,
+  transactions: readonly Transaction[],
+): Transaction | null {
+  const jobs: Array<{ cellPos: number; formula: string }> = []
+  newState.doc.descendants((node, pos) => {
+    if (node.type.name !== 'table') return
+    const oldNode = oldState.doc.nodeAt(mapPosBackward(pos, transactions))
+    if (!oldNode || oldNode.type.name !== 'table' || oldNode === node) return
+    const plan = planTableShift(oldNode, node)
+    if (!plan) return
+    let rowIndex = 0
+    node.forEach((rowNode, rowOffset) => {
+      if (rowNode.type.name !== 'tableRow') return
+      const rowNumber = rowIndex + 1
+      rowIndex += 1
+      const rowPos = pos + 1 + rowOffset
+      let cellPos = rowPos + 1
+      const delta = plan.duplicateDeltas.get(rowNumber)
+      const mapRow = delta
+        ? (row: number) => {
+            const next = row + delta
+            return next >= 1 ? next : null
+          }
+        : (row: number) => (plan.rowMap.has(row) ? plan.rowMap.get(row)! : row)
+      const mapCol = (col: number) => (plan.colMap.has(col) ? plan.colMap.get(col)! : col)
+      rowNode.forEach((cell) => {
+        const formula = cellFormulaText(cell)
+        if (formula.startsWith('=')) {
+          const next = remapFormulaByAxis(formula, mapRow, mapCol)
+          if (next !== formula) jobs.push({ cellPos, formula: next })
+        }
+        cellPos += cell.nodeSize
+      })
+    })
+  })
+  if (!jobs.length) return null
+  let shifted = newState.tr
+  jobs.sort((a, b) => b.cellPos - a.cellPos)
+  for (const job of jobs) {
+    const cell = shifted.doc.nodeAt(job.cellPos)
+    if (!cell) continue
+    shifted = shifted.setNodeMarkup(job.cellPos, undefined, { ...cell.attrs, formula: job.formula })
+    const live = shifted.doc.nodeAt(job.cellPos)
+    const first = live?.firstChild
+    if (!first || !isFormulaCell(first.textContent || '')) continue
+    const from = job.cellPos + 2
+    const to = job.cellPos + first.nodeSize
+    if (to <= from) continue
+    shifted = shifted.replaceWith(from, to, newState.schema.text(job.formula))
+  }
+  if (!shifted.docChanged) return null
+  // 不用 newState.apply：那会再跑一遍插件，把显示结果算进另一个状态，步骤却留在原地。
+  const bare = EditorState.create({ schema: newState.schema, doc: shifted.doc })
+  const recalc = formulaRecalcTransaction(bare, [])
+  if (recalc) {
+    for (const step of recalc.steps) {
+      if (shifted.maybeStep(step).failed) break
+    }
+  }
+  if (!shifted.docChanged) return null
+  shifted.setMeta(TABLE_FORMULA_RECALC, true)
+  return shifted
 }
