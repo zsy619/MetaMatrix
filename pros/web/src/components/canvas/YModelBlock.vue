@@ -201,9 +201,9 @@ function onCloseMaximize(event?: Event) {
         :page-sheet="false"
         :expanded="false"
         :show-title="false"
-        :show-bottom-bar="true"
+        :show-bottom-bar="false"
         :show-publish-actions="false"
-        :show-markdown-hint="!isCard"
+        :show-markdown-hint="false"
         :placeholder="isCard ? '点击填写…' : '请输入正文'"
         :model-value="editorHtml"
         @update:model-value="onEditorHtml"
@@ -558,8 +558,8 @@ function onCloseMaximize(event?: Event) {
   letter-spacing: 0.04em;
 }
 
-.ym-block--card:not(:focus-within) :deep(.rte-toolbar),
-.ym-block--card:not(:focus-within) :deep(.rte-bottom) {
+.ym-block:not(:focus-within) :deep(.rte-toolbar),
+.ym-block:not(:focus-within) :deep(.rte-bottom) {
   display: none;
 }
 
