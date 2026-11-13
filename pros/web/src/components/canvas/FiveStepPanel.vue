@@ -308,11 +308,11 @@ function onCloseMaximize(event?: Event) {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  min-height: 0;
-  height: 100%;
-  flex: 1;
+  min-height: min-content;
+  height: auto;
+  flex: 1 1 auto;
   background: var(--fsp-body);
-  overflow: hidden;
+  overflow: visible;
   cursor: pointer;
   box-sizing: border-box;
 }
@@ -374,8 +374,8 @@ function onCloseMaximize(event?: Event) {
 
 .fsp-actions .pm-max-btn,
 .fsp-float-max {
-  width: 22px;
-  height: 22px;
+  width: 28px;
+  height: 28px;
 }
 
 .fsp-float-max {
@@ -390,7 +390,7 @@ function onCloseMaximize(event?: Event) {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .fsp-topic {

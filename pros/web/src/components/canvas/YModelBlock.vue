@@ -413,9 +413,9 @@ function onCloseMaximize(event?: Event) {
 
 .ym-block.compact .add-item-btn,
 .ym-block.compact .pm-max-btn {
-  width: 18px;
-  height: 18px;
-  font-size: 13px;
+  width: 28px;
+  height: 28px;
+  font-size: 14px;
 }
 
 .add-item-btn:hover,

@@ -343,8 +343,8 @@ function onCloseMaximize(event?: Event) {
 }
 
 .cell-actions .pm-max-btn {
-  width: 22px;
-  height: 22px;
+  width: 28px;
+  height: 28px;
   background: rgba(255, 255, 255, 0.92);
 }
 
