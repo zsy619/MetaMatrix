@@ -23,6 +23,7 @@ type Block =
   | { kind: 'p'; style?: string; runs: Run[]; indent?: number }
   | { kind: 'listItem'; ordered: boolean; level: number; runs: Run[] }
   | { kind: 'table'; rows: Run[][][]; header?: boolean }
+  | { kind: 'columnTable'; widths: number[]; cells: Run[][][] }
   | { kind: 'image'; src: string; alt: string; width: number; height: number }
   | { kind: 'imageRow'; images: Array<{ src: string; alt: string; width: number; height: number }> }
   | { kind: 'pageBreak' }
@@ -261,11 +262,15 @@ function parseBlocks(root: HTMLElement): Block[] {
         continue
       }
       if (node.getAttribute('data-type') === 'columns' || node.classList.contains('rte-columns')) {
-        const cols = Array.from(node.children).map((col) => (col.textContent || '').replace(/\s+/g, ' ').trim())
-        if (cols.length >= 2) {
+        const columnNodes = Array.from(node.children).filter((col) => {
+          if (!(col instanceof HTMLElement)) return false
+          return col.getAttribute('data-type') === 'column' || col.classList.contains('rte-column') || col.tagName === 'DIV'
+        })
+        if (columnNodes.length >= 2) {
           blocks.push({
-            kind: 'table',
-            rows: [cols.map((text) => [{ text, marks: {} }])],
+            kind: 'columnTable',
+            widths: columnExportWidths(columnNodes.length, node.getAttribute('data-ratios')),
+            cells: columnNodes.map((col) => columnParagraphs(col)),
           })
           continue
         }
@@ -332,6 +337,52 @@ function parseBlocks(root: HTMLElement): Block[] {
 
   visit(root)
   return blocks
+}
+
+function columnExportWidths(count: number, raw: string | null): number[] {
+  const parts = String(raw || '')
+    .split(':')
+    .map((part) => Number(part.trim()))
+    .filter((part) => Number.isFinite(part) && part > 0)
+  const weights = parts.length === count ? parts : Array.from({ length: count }, () => 1)
+  const sum = weights.reduce((total, part) => total + part, 0) || 1
+  const widths = weights.map((part) => Math.round((9000 * part) / sum))
+  const drift = 9000 - widths.reduce((total, part) => total + part, 0)
+  if (widths.length) widths[widths.length - 1] = (widths[widths.length - 1] ?? 0) + drift
+  return widths
+}
+
+function columnParagraphs(column: HTMLElement): Run[][] {
+  const blocks = Array.from(column.children).filter((child) => /^(P|H[1-6]|LI|BLOCKQUOTE|PRE)$/.test(child.tagName))
+  if (!blocks.length) {
+    const runs = collectRuns(column)
+    return [runs.length ? runs : [{ text: '', marks: {} }]]
+  }
+  return blocks.map((block) => {
+    const runs = collectRuns(block)
+    return runs.length ? runs : [{ text: '', marks: {} }]
+  })
+}
+
+function columnTableToXml(widths: number[], cells: Run[][][]): string {
+  const grid = `<w:tblGrid>${widths.map((width) => `<w:gridCol w:w="${width}"/>`).join('')}</w:tblGrid>`
+  const row = cells
+    .map((paragraphs, index) => {
+      const width = widths[index] ?? widths[widths.length - 1] ?? 4500
+      const body = (paragraphs.length ? paragraphs : [[{ text: '', marks: {} }]]).map((runs) => paraXml(runs)).join('')
+      return (
+        `<w:tc><w:tcPr><w:tcW w:w="${width}" w:type="dxa"/>` +
+        `<w:tcBorders><w:top w:val="nil"/><w:left w:val="nil"/><w:bottom w:val="nil"/><w:right w:val="nil"/></w:tcBorders>` +
+        `</w:tcPr>${body}</w:tc>`
+      )
+    })
+    .join('')
+  return (
+    `<w:tbl><w:tblPr><w:tblW w:w="5000" w:type="pct"/>` +
+    `<w:tblBorders><w:top w:val="nil"/><w:left w:val="nil"/><w:bottom w:val="nil"/>` +
+    `<w:right w:val="nil"/><w:insideH w:val="nil"/><w:insideV w:val="nil"/></w:tblBorders>` +
+    `</w:tblPr>${grid}<w:tr>${row}</w:tr></w:tbl>`
+  )
 }
 
 function tableToXml(rows: Run[][][], header = false): string {
@@ -467,6 +518,8 @@ function blocksToBodyXml(
       parts.push(paraXml(b.runs, { numId, ilvl: Math.min(8, b.level) }))
     } else if (b.kind === 'table') {
       parts.push(tableToXml(b.rows, b.header))
+    } else if (b.kind === 'columnTable') {
+      parts.push(columnTableToXml(b.widths, b.cells))
     } else if (b.kind === 'imageRow') {
       const colW = Math.floor(9000 / Math.max(1, b.images.length))
       const cells = b.images.map((img) => {

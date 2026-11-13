@@ -9,6 +9,8 @@ declare module '@tiptap/core' {
     columns: {
       /** 插入分栏；ratios 可选，如 [1,2] → 1:2 */
       setColumns: (cols: ColumnCount, ratios?: number[]) => ReturnType
+      /** 取消分栏，各栏文字按顺序回到正文。 */
+      unsetColumns: () => ReturnType
     }
   }
 }
@@ -123,6 +125,26 @@ function columnsPosition(tr: Transaction): number | null {
 function placeCaret(tr: Transaction, pos: number) {
   const target = Math.max(1, Math.min(pos, tr.doc.content.size))
   tr.setSelection(TextSelection.near(tr.doc.resolve(target)))
+}
+
+function liftedBlocks(node: PMNode, blank: PMNode): PMNode[] {
+  const blocks: PMNode[] = []
+  node.forEach((column) => {
+    const children: PMNode[] = []
+    column.forEach((block) => children.push(block))
+    if (!children.some((block) => !isEmptyParagraph(block))) return
+    blocks.push(...children)
+  })
+  return blocks.length ? blocks : [blank]
+}
+
+function liftColumns(tr: Transaction, pos: number): boolean {
+  const node = tr.doc.nodeAt(pos)
+  if (!node || node.type.name !== 'columns') return false
+  const blocks = liftedBlocks(node, blankParagraph(tr.doc))
+  tr.replaceWith(pos, pos + node.nodeSize, blocks)
+  placeCaret(tr, pos + 1)
+  return true
 }
 
 function reshapeColumns(tr: Transaction, pos: number, cols: ColumnCount, ratios?: number[]): boolean {
@@ -316,6 +338,13 @@ export const Columns = Node.create({
           const pos = columnsPosition(tr)
           if (pos != null) return reshapeColumns(tr, pos, count, ratios)
           return wrapSelection(tr, count, ratios)
+        },
+      unsetColumns:
+        () =>
+        ({ tr }) => {
+          const pos = columnsPosition(tr)
+          if (pos == null) return false
+          return liftColumns(tr, pos)
         },
     }
   },

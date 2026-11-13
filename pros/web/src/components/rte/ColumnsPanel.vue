@@ -79,6 +79,13 @@ function onColor(event: Event) {
   patch({ borderColor: (event.target as HTMLInputElement).value })
 }
 
+function liftColumns() {
+  const ed = props.editor
+  if (!ed) return
+  ed.chain().focus().unsetColumns().run()
+  open.value = false
+}
+
 let unbind: (() => void) | null = null
 watch(() => props.editor, (ed) => {
   unbind?.()
@@ -140,6 +147,7 @@ onBeforeUnmount(() => {
         <span class="rte-cp-type-label">内边距</span>
         <input class="rte-cp-type-select" type="number" min="0" max="48" :value="frame.padding" aria-label="分栏内边距" title="栏内文字到边框的距离，0 到 48 像素" @change="onNumber('padding', $event)" />
       </label>
+      <button type="button" class="rte-columns-lift" title="取消分栏，各栏文字按顺序回到正文" @click="liftColumns">取消分栏</button>
     </div>
   </aside>
 </template>

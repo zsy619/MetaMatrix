@@ -2449,7 +2449,7 @@ html.rte-toolbar-dragging * {
   min-width: 0;
   min-height: 72px !important;
   padding: 10px 12px;
-  border: 1px dashed #91b3fa !important;
+  border: var(--rte-col-border, 1px dashed #91b3fa) !important;
   border-radius: 6px;
   background: #f0f5ff !important;
   box-sizing: border-box;
@@ -4344,11 +4344,17 @@ html.rte-toolbar-dragging * {
     display: none;
   }
   .rte-root.rte-printing .rte-columns {
-    border: none;
-    padding: 0;
+    border: none !important;
+    padding: 0 !important;
+    background: transparent !important;
+    min-height: 0 !important;
+    box-shadow: none !important;
   }
   .rte-root.rte-printing .rte-column {
-    background: transparent;
+    border: none !important;
+    background: transparent !important;
+    min-height: 0 !important;
+    padding: 0 4mm 0 0 !important;
   }
   .rte-root.rte-printing.is-page-sheet .rte-canvas,
   .rte-root.rte-printing.is-page-sheet .rte-body,
@@ -5299,6 +5305,16 @@ html.rte-image-preview-open .tippy-box {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+.rte-columns-lift {
+  margin-top: 4px;
+  border: 1px solid #e5e6eb;
+  background: #fff;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 13px;
+  color: #1d2129;
+  cursor: pointer;
 }
 .rte-chart-panel {
   position: absolute;

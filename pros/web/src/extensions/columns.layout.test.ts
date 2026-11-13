@@ -86,4 +86,15 @@ describe('分栏装入选区和栏数', () => {
     expect(ed.getHTML()).toContain('甲')
     expect(ed.getHTML()).toContain('乙')
   })
+
+  it('取消分栏后，各栏文字按顺序回到正文，空栏不留下', () => {
+    const ed = mount('<p>甲</p>')
+    ed.commands.setTextSelection(textPos(ed, '甲', 'start'))
+    ed.chain().focus().setColumns(3).run()
+    expect(ed.state.doc.firstChild?.type.name).toBe('columns')
+    expect(ed.chain().focus().unsetColumns().run()).toBe(true)
+    expect(ed.state.doc.firstChild?.type.name).not.toBe('columns')
+    expect(ed.getText()).toContain('甲')
+    expect(ed.getHTML()).not.toContain('data-type="columns"')
+  })
 })

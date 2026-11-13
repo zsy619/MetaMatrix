@@ -30,6 +30,23 @@ describe('高亮和分栏导出到 Word', () => {
     expect(doc).toContain('左')
     expect(doc).toContain('右')
   })
+
+  it('一栏里的多段分开写，宽度按比例分', async () => {
+    const html =
+      '<div data-type="columns" data-ratios="1:2">' +
+      '<div data-type="column"><p>甲</p><p>乙</p></div>' +
+      '<div data-type="column"><p>丙</p></div></div>'
+    const blob = await buildDocxBlob({ title: '栏', bodyHtml: html })
+    const zip = await JSZip.loadAsync(await blob.arrayBuffer())
+    const doc = await zip.file('word/document.xml')?.async('string')
+    expect(doc).toContain('甲')
+    expect(doc).toContain('乙')
+    expect(doc).toContain('丙')
+    const paragraphs = doc?.match(/<w:p>/g) || []
+    expect(paragraphs.length).toBeGreaterThanOrEqual(3)
+    expect(doc).toContain('w:w="3000"')
+    expect(doc).toContain('w:w="6000"')
+  })
 })
 
 describe('标题、表头和题注导出到 Word', () => {
