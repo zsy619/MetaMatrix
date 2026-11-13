@@ -64,6 +64,7 @@ describe('经典画布铺满页面', () => {
     expect(wrapper.find('.bmc-cell--costs').exists()).toBe(true)
     expect(wrapper.find('.bmc-cell--revenue').exists()).toBe(true)
     expect(wrapper.findAll('textarea')).toHaveLength(9)
+    expect(wrapper.get('textarea').attributes('placeholder')).toBe('写在这里')
     const value = wrapper.get('.bmc-cell--value').attributes('style') || ''
     const activities = wrapper.get('.bmc-cell--activities').attributes('style') || ''
     expect(value).not.toBe(activities)

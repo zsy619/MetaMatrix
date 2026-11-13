@@ -200,7 +200,7 @@ function onCloseMaximize(event?: Event) {
         :show-bottom-bar="false"
         :show-publish-actions="false"
         :show-markdown-hint="false"
-        placeholder=""
+        placeholder="写在这里"
         :model-value="editorHtml"
         @update:model-value="onEditorHtml"
         @focus="onEditorFocus"
@@ -429,8 +429,8 @@ function onCloseMaximize(event?: Event) {
 
 .fsp-topic::placeholder {
   color: var(--fsp-topic);
-  opacity: 0.45;
-  font-weight: 600;
+  opacity: 0.92;
+  font-weight: 650;
 }
 
 .fsp-topic:hover,
@@ -482,7 +482,7 @@ function onCloseMaximize(event?: Event) {
 
 .fsp :deep(.ProseMirror p.is-editor-empty:first-child::before),
 .fsp :deep(.ProseMirror p.is-empty:first-child::before) {
-  content: none;
+  color: #5c564c;
 }
 
 .fsp :deep(.pa-root) {

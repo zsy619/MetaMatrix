@@ -464,7 +464,7 @@ watch(centerBlank, () => nextTick(measure))
   gap: 12px;
   align-items: stretch;
   min-height: 120px;
-  margin-top: 14px;
+  margin: 14px 0 18px;
   padding: 12px;
   background: #eceae6;
 }
