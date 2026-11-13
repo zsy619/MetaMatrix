@@ -115,10 +115,16 @@ export function dataModelToOption(
           : model.categories[cellIndex] ?? ''
       return { ...(isPlainObject(origin) ? origin : {}), name, value }
     })
-    return { ...item, data }
+    return { ...item, name: target.name || item.name, data }
   })
 
   const next: Record<string, unknown> = { ...base, series: nextSeries }
+  if (isPlainObject(base.legend) && Array.isArray(base.legend.data)) {
+    next.legend = {
+      ...base.legend,
+      data: model.series.map((item) => item.name).filter(Boolean),
+    }
+  }
   if (hasAxis && model.categories.length) {
     const axisData = model.categories
     if (Array.isArray(xAxisRaw)) {

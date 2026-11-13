@@ -13,6 +13,7 @@
  * - 任何「被截断」的情况（数组超长、字符串超长、层级过深、系列数超限）
  *   一律按错误返回，绝不静默截断后当成功——用户拿到的图表必须和自己写的一致。
  */
+import { optionToDataModel } from './echarts/chartDataTable'
 import { ECHARTS_CATEGORIES, ECHARTS_TEMPLATES, findEchartsTemplate } from './echarts/templates'
 import { FEISHU_TEXT_COLORS } from './rtePasteClean'
 import type { EchartsTemplateDef } from './echarts/types'
@@ -1650,6 +1651,38 @@ export function cloneEchartsOption(option: unknown): unknown {
 /**
  * 换图表类型：沿用标题，柱状/折线之间切换时尽量保留原数据。
  */
+function asChartNumber(value: number | string): number {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  const num = Number(String(value).trim())
+  return Number.isFinite(num) ? num : 0
+}
+
+function buildPieFromModel(
+  title: string,
+  seriesName: string,
+  categories: string[],
+  values: Array<number | string>,
+): Record<string, unknown> {
+  return {
+    title: { text: title || '占比构成', left: 'center' },
+    tooltip: { trigger: 'item' },
+    legend: { bottom: 0 },
+    series: [
+      {
+        name: seriesName || '占比',
+        type: 'pie',
+        radius: ['38%', '64%'],
+        center: ['50%', '46%'],
+        label: { formatter: '{b} {d}%' },
+        data: categories.map((name, index) => ({
+          name: name || '数据',
+          value: asChartNumber(values[index] ?? 0),
+        })),
+      },
+    ],
+  }
+}
+
 export function retypeEchartsOption(
   option: Record<string, unknown>,
   type: EchartsChartType,
@@ -1659,18 +1692,22 @@ export function retypeEchartsOption(
   const titleNode = base.title
   const titleText =
     isPlainObject(titleNode) && typeof titleNode.text === 'string' ? titleNode.text : ''
-  const next = buildTemplateOption(type, { title: titleText })
-  const oldSeries = Array.isArray(base.series) ? base.series : []
-  const newSeries = Array.isArray(next.series) ? (next.series as Array<Record<string, unknown>>) : []
-  if ((type === 'bar' || type === 'line') && oldSeries.length && newSeries.length) {
-    oldSeries.forEach((item, index) => {
-      if (!isPlainObject(item) || !Array.isArray(item.data) || !item.data.length) return
-      const target = newSeries[index] || { ...newSeries[0], data: item.data }
-      if (!newSeries[index]) newSeries.push(target)
-      newSeries[index]!.data = item.data
-      if (typeof item.name === 'string') newSeries[index]!.name = item.name
-      if (typeof newSeries[index]!.type === 'string') newSeries[index]!.type = type
-    })
+  const model = optionToDataModel(base)
+  const usable = model.categories.length > 0 && model.series.some((item) => item.data.length > 0)
+  if (usable && (type === 'bar' || type === 'line')) {
+    return buildCartesianOption(
+      type,
+      titleText || (type === 'line' ? '趋势' : '对比'),
+      model.categories,
+      model.series.map((item) => ({
+        name: item.name,
+        data: item.data.map((value) => asChartNumber(value)),
+      })),
+    )
   }
-  return next
+  if (usable && type === 'pie') {
+    const first = model.series[0]!
+    return buildPieFromModel(titleText, first.name, model.categories, first.data)
+  }
+  return buildTemplateOption(type, { title: titleText })
 }

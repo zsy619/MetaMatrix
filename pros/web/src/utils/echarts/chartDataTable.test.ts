@@ -53,6 +53,22 @@ describe('option ⇄ 数据模型', () => {
     expect(model.series[0]!.data).toEqual([30, 70])
   })
 
+  it('改系列名会写回 series 和图例', () => {
+    const model = optionToDataModel({
+      ...CARTESIAN,
+      legend: { data: ['新增', '活跃'], bottom: 0 },
+    })
+    model.series[0]!.name = '今年'
+    const next = dataModelToOption(
+      { ...CARTESIAN, legend: { data: ['新增', '活跃'], bottom: 0 } },
+      model,
+    )
+    const series = next.series as Array<{ name: string }>
+    const legend = next.legend as { data: string[] }
+    expect(series[0]!.name).toBe('今年')
+    expect(legend.data).toEqual(['今年', '活跃'])
+  })
+
   it('写回 option 时类目进 xAxis.data、数值进 series.data', () => {
     const model = optionToDataModel(CARTESIAN)
     const next = dataModelToOption(CARTESIAN, model)

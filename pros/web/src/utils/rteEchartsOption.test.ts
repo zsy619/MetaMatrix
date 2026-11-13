@@ -5,6 +5,7 @@ import {
   ECHARTS_OPTION_MAX_BYTES,
   buildOptionFromTable,
   buildTemplateOption,
+  retypeEchartsOption,
   cloneEchartsOption,
   safeParseEchartsOption,
   sanitizeEchartsOption,
@@ -303,6 +304,41 @@ describe('ECharts 模板与表格生成', () => {
     const series = option.series as Array<Record<string, unknown>>
     const data = series[0].data as Array<Record<string, unknown>>
     expect(data[0]).toEqual({ name: '直营', value: 60 })
+  })
+
+  it('柱状换成饼图时留下原来的类目和数值', () => {
+    const next = retypeEchartsOption(
+      {
+        title: { text: '销售' },
+        xAxis: { type: 'category', data: ['华东', '华南'] },
+        yAxis: { type: 'value' },
+        series: [{ name: '本年', type: 'bar', data: [12, 8] }],
+      },
+      'pie',
+    )
+    const series = next.series as Array<{ type: string; data: Array<{ name: string; value: number }> }>
+    expect(series[0]!.type).toBe('pie')
+    expect(series[0]!.data).toEqual([
+      { name: '华东', value: 12 },
+      { name: '华南', value: 8 },
+    ])
+    expect((next.title as { text: string }).text).toBe('销售')
+  })
+
+  it('饼图换成折线时把扇区收成一条线', () => {
+    const next = retypeEchartsOption(
+      {
+        title: { text: '占比' },
+        series: [{ name: '占比', type: 'pie', data: [{ name: 'A', value: 30 }, { name: 'B', value: 70 }] }],
+      },
+      'line',
+    )
+    const series = next.series as Array<{ type: string; name: string; data: number[] }>
+    const axis = next.xAxis as { data: string[] }
+    expect(series[0]!.type).toBe('line')
+    expect(series[0]!.name).toBe('占比')
+    expect(series[0]!.data).toEqual([30, 70])
+    expect(axis.data).toEqual(['A', 'B'])
   })
 
   it('表格没有数值列时返回 null', () => {

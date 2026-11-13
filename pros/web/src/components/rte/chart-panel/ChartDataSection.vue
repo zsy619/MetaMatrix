@@ -43,7 +43,15 @@ const columns = computed(() => props.panel.seriesNames)
         <thead>
           <tr>
             <th class="rte-cp-th">类目</th>
-            <th v-for="name in columns" :key="name" class="rte-cp-th">{{ name }}</th>
+            <th v-for="(name, colIndex) in columns" :key="colIndex" class="rte-cp-th">
+              <input
+                class="rte-cp-input rte-cp-input-sm"
+                type="text"
+                :value="name"
+                title="系列名称，图例跟着改"
+                @change="(e) => props.panel.renameDataSeries(colIndex, (e.target as HTMLInputElement).value)"
+              />
+            </th>
             <th class="rte-cp-th rte-cp-th-act"></th>
           </tr>
         </thead>
