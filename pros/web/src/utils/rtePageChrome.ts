@@ -137,8 +137,8 @@ export function writePageChrome(
 
 export function chromeBand(chrome: PanelPageChrome): { top: number; bottom: number } {
   return {
-    top: chrome.header.trim() ? CHROME_BAND_MM : 0,
-    bottom: chrome.footer.trim() || chrome.pageNumber !== 'none' ? CHROME_BAND_MM : 0,
+    top: chrome.header.trim() || chrome.headerEven.trim() ? CHROME_BAND_MM : 0,
+    bottom: chrome.footer.trim() || chrome.footerEven.trim() || chrome.pageNumber !== 'none' ? CHROME_BAND_MM : 0,
   }
 }
 

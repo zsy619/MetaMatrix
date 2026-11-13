@@ -815,6 +815,8 @@ const externalLinkRows = ref<Array<{ href: string; host: string }>>([])
 const {
   pageChromeActive,
   screenPageLabel,
+  screenHeader,
+  screenFooter,
   previewPageLabel,
   setPageHeader,
   setPageHeaderEven,
@@ -8487,6 +8489,8 @@ provideRteBindings({
   presentUnit,
   previewPageLabel,
   screenPageLabel,
+  screenHeader,
+  screenFooter,
   setPageFooter,
   setPageHeader,
   setPageHeaderEven,

@@ -3,8 +3,10 @@ import type { Editor } from '@tiptap/core'
 import {
   EMPTY_PAGE_CHROME,
   estimatePageCount,
+  footerForPage,
   formatPageNumber,
   groupSlides,
+  headerForPage,
   normalizePageChrome,
   pageChromeIsEmpty,
   readPageChrome,
@@ -46,6 +48,8 @@ export function usePageChrome(deps: {
   const screenPageLabel = computed(() =>
     formatPageNumber(deps.pageChrome.value.pageNumber, pageIndex.value, pageCount.value),
   )
+  const screenHeader = computed(() => headerForPage(deps.pageChrome.value, pageIndex.value))
+  const screenFooter = computed(() => footerForPage(deps.pageChrome.value, pageIndex.value))
   const previewPageLabel = computed(() => formatPageNumber(deps.pageChrome.value.pageNumber, 1, pageCount.value))
 
   function syncFromStore() {
@@ -301,6 +305,8 @@ export function usePageChrome(deps: {
   return {
     pageChromeActive,
     screenPageLabel,
+    screenHeader,
+    screenFooter,
     previewPageLabel,
     pageIndex,
     pageCount,

@@ -41,7 +41,16 @@ export function pageSetupDraftDirty(base: PageSetupDraft, draft: PageSetupDraft)
 }
 
 function chromeEqual(a: PanelPageChrome, b: PanelPageChrome): boolean {
-  return a.header === b.header && a.footer === b.footer && a.pageNumber === b.pageNumber
+  const left = normalizePageChrome(a)
+  const right = normalizePageChrome(b)
+  return (
+    left.header === right.header
+    && left.headerEven === right.headerEven
+    && left.footer === right.footer
+    && left.footerEven === right.footerEven
+    && left.pageNumber === right.pageNumber
+    && left.gutter === right.gutter
+  )
 }
 
 /** 有差异时返回确认后应写入的快照；与当前一致时返回 null。 */
@@ -56,6 +65,7 @@ export function resolvePageSetupDraft(current: PageSetupSnap, draft: PageSetupDr
     size: normalizePageSize(draft.size),
     margin,
     chrome: normalizePageChrome({
+      ...current.chrome,
       header: draft.header,
       footer: draft.footer,
       pageNumber: draft.pageNumber,

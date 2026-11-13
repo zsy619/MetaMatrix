@@ -98,6 +98,17 @@ assert.equal(formatPageNumber('dash', 2, 5), '- 2 -')
 const sideChrome = normalizePageChrome({ header: '奇数', headerEven: '偶数', footer: '', pageNumber: 'none' })
 assert.equal(headerForPage(sideChrome, 1), '奇数')
 assert.equal(headerForPage(sideChrome, 2), '偶数')
+assert.deepEqual(
+  applyChromeReserve({ top: 0, bottom: 0 }, {
+    header: '',
+    headerEven: '偶数',
+    footer: '',
+    footerEven: '偶底',
+    pageNumber: 'none',
+    gutter: 0,
+  }),
+  { top: 10, bottom: 10 },
+)
 assert.match(printPageSideCss(sideChrome), /@page :left/)
 assert.match(printPageSideCss(sideChrome), /偶数/)
 assert.equal(printPageSideCss(normalizePageChrome({ header: '只有奇数', pageNumber: 'none' })), '')

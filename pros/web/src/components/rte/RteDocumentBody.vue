@@ -337,7 +337,7 @@ useParentScopeStamp()
           v-if="rte.showTitle && rte.viewMode === 'preview' && rte.localTitle"
           class="rte-title-sep"
         />
-        <div data-rte-own v-if="rte.pageChrome.header" class="rte-page-header">{{ rte.pageChrome.header }}</div>
+        <div data-rte-own v-if="rte.screenHeader" class="rte-page-header">{{ rte.screenHeader }}</div>
         <RteTableFormulaBar
           data-rte-own
           :editor="rte.editor"
@@ -357,17 +357,17 @@ useParentScopeStamp()
           <span v-for="n in 18" :key="'wm-' + n" data-rte-own>{{ rte.watermark.text }}</span>
         </div>
         <div data-rte-own
-          v-if="rte.pageChrome.footer || rte.screenPageLabel"
+          v-if="rte.screenFooter || rte.screenPageLabel"
           class="rte-page-footer"
-          :class="{ 'is-num-only': !rte.pageChrome.footer && rte.screenPageLabel }"
+          :class="{ 'is-num-only': !rte.screenFooter && rte.screenPageLabel }"
         >
-          <span data-rte-own class="rte-page-footer-text">{{ rte.pageChrome.footer }}</span>
+          <span data-rte-own class="rte-page-footer-text">{{ rte.screenFooter }}</span>
           <span data-rte-own v-if="rte.screenPageLabel" class="rte-page-footer-num">{{ rte.screenPageLabel }}</span>
         </div>
-        <div data-rte-own v-if="rte.pageChrome.header || rte.pageChrome.footer || rte.screenPageLabel" class="rte-running-chrome" aria-hidden="true">
-          <div data-rte-own class="rte-running-header">{{ rte.pageChrome.header }}</div>
+        <div data-rte-own v-if="rte.screenHeader || rte.screenFooter || rte.screenPageLabel" class="rte-running-chrome" aria-hidden="true">
+          <div data-rte-own class="rte-running-header">{{ rte.screenHeader }}</div>
           <div data-rte-own class="rte-running-footer">
-            <span data-rte-own>{{ rte.pageChrome.footer }}</span>
+            <span data-rte-own>{{ rte.screenFooter }}</span>
             <span data-rte-own class="rte-running-num" :data-style="rte.pageChrome.pageNumber"></span>
           </div>
         </div>
@@ -775,6 +775,18 @@ useParentScopeStamp()
             title="印在每页底部，最多 80 字"
             :disabled="rte.viewMode !== 'edit'"
             @change="rte.setPageFooter(($event.target as HTMLInputElement).value)"
+          />
+        </label>
+        <label v-if="rte.pageSheetEnabled" data-rte-own class="rte-page-size-field">
+          偶数页脚
+          <input data-rte-own
+            class="rte-page-chrome-input"
+            :value="rte.pageChrome.footerEven"
+            maxlength="80"
+            aria-label="偶数页页脚"
+            title="偶数页单独的页脚，留空则跟奇数页一样"
+            :disabled="rte.viewMode !== 'edit'"
+            @change="rte.setPageFooterEven(($event.target as HTMLInputElement).value)"
           />
         </label>
         <label v-if="rte.pageSheetEnabled" data-rte-own class="rte-page-size-field">
