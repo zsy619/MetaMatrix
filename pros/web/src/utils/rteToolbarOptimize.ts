@@ -569,6 +569,46 @@ const IMAGE_WIDTH_TITLES: Record<string, string> = {
   '100%': '图片铺满编辑区的宽度',
 }
 
+const BLOCK_HANDLE_TITLES: Record<string, string> = {
+  menu: '打开这一块的操作：改类型、复制、移动或删除',
+  insert: '在这一块下面插入空段，并打开插入菜单',
+  paragraph: '把这一块改成正文',
+  h1: '把这一块改成一级标题',
+  h2: '把这一块改成二级标题',
+  h3: '把这一块改成三级标题',
+  bullet: '把这一块改成圆点列表',
+  ordered: '把这一块改成数字列表',
+  task: '把这一块改成可勾选的待办',
+  quote: '把这一块改成引用',
+  info: '把这一块改成蓝色提示告示',
+  warn: '把这一块改成橙色警告告示',
+  success: '把这一块改成绿色成功告示',
+  error: '把这一块改成红色错误告示',
+  copy: '在下面再复制一份这一块',
+  up: '和上面一块交换位置',
+  down: '和下面一块交换位置',
+  delete: '删掉这一块',
+}
+
+const CROP_TITLES: Record<string, string> = {
+  '原始': '取消裁剪，显示整张图',
+  '1:1': '裁成正方形',
+  '4:3': '裁成横图，宽比高是 4 比 3',
+  '3:4': '裁成竖图，宽比高是 3 比 4',
+  '16:9': '裁成宽屏，宽比高是 16 比 9',
+  '9:16': '裁成竖屏，宽比高是 9 比 16',
+}
+
+/** 块手柄菜单改完这一块是什么。没有说明时返回空字符串。 */
+export function blockHandleTitle(id: string): string {
+  return BLOCK_HANDLE_TITLES[id] || ''
+}
+
+/** 图片裁剪比例改完是什么形状。没有说明时返回空字符串。 */
+export function cropTitle(label: string): string {
+  return CROP_TITLES[label.trim()] || ''
+}
+
 /** 代码语言改完怎么上色。没有说明时返回空字符串。 */
 export function codeLangTitle(label: string): string {
   return CODE_LANG_TITLES[label.trim()] || ''

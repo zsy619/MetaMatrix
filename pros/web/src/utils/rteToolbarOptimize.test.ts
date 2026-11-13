@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict'
 import {
   alignToolTitle,
+  blockHandleTitle,
   blockMenuTitle,
   clampToolbarQuery,
   codeLangTitle,
+  cropTitle,
   codeBlockToolTitle,
   cycleSearchIndex,
   disabledToolTitle,
@@ -188,6 +190,12 @@ assert.equal(pageSizeTitle('a4'), 'A4 纸，210×297 毫米')
 assert.equal(pageSizeTitle('full'), '编辑区铺满整个面板')
 assert.equal(imageWidthTitle('50%'), '图片缩到编辑区的一半宽')
 assert.equal(imageWidthTitle('没有'), '')
+assert.equal(blockHandleTitle('insert'), '在这一块下面插入空段，并打开插入菜单')
+assert.equal(blockHandleTitle('delete'), '删掉这一块')
+assert.equal(blockHandleTitle('missing'), '')
+assert.equal(cropTitle('16:9'), '裁成宽屏，宽比高是 16 比 9')
+assert.equal(cropTitle('原始'), '取消裁剪，显示整张图')
+assert.equal(cropTitle('没有'), '')
 assert.equal(stepRibbonTabBy(['a', 'b', 'c', 'd', 'e'], 'b', 3), 'e')
 assert.equal(stepRibbonTabBy(['a', 'b', 'c'], 'a', -3), 'a')
 assert.equal(zoomToolLabel(1), '实际大小')

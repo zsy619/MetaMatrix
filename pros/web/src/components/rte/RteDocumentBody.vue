@@ -11,7 +11,7 @@ import RteSelectionBubble from './RteSelectionBubble.vue'
 import RteSourceCodeEditor from './RteSourceCodeEditor.vue'
 import RteTableFormulaBar from './RteTableFormulaBar.vue'
 import { RTE_BINDINGS } from './bindings'
-import { imageWidthTitle, wordStatTitle } from '../../utils/rteToolbarOptimize'
+import { blockHandleTitle, cropTitle, imageWidthTitle, toolbarMenuItemTitle, wordStatTitle } from '../../utils/rteToolbarOptimize'
 import { useParentScopeStamp } from './inheritScope'
 import RteMenuGlyph from './RteMenuGlyph.vue'
 
@@ -141,23 +141,23 @@ useParentScopeStamp()
         <button data-rte-own
           type="button"
           class="rte-bubble-btn"
-          title="应用题注"
+          title="把输入的题注写到图片上。按 Enter 也可以"
           aria-label="应用图片说明"
           @mousedown.prevent
           @click="rte.applyImageCaption"
         >
           题注
         </button>
-        <button data-rte-own type="button" class="rte-bubble-btn" title="删除图片" aria-label="删除图片" @mousedown.prevent @click="rte.deleteSelectedImage">
+        <button data-rte-own type="button" class="rte-bubble-btn" title="删掉选中的这张图片" aria-label="删除图片" @mousedown.prevent @click="rte.deleteSelectedImage">
           删除
         </button>
-        <button data-rte-own type="button" class="rte-bubble-btn" title="下载原图" aria-label="下载图片" @mousedown.prevent @click="rte.downloadSelectedImage">
+        <button data-rte-own type="button" class="rte-bubble-btn" title="下载这张图片的原文件" aria-label="下载图片" @mousedown.prevent @click="rte.downloadSelectedImage">
           下载
         </button>
-        <button data-rte-own type="button" class="rte-bubble-btn" title="查看大图（双击图片）" aria-label="查看大图" @mousedown.prevent @click="rte.openSelectedImage">
+        <button data-rte-own type="button" class="rte-bubble-btn" title="打开大图，双击图片也可以" aria-label="查看大图" @mousedown.prevent @click="rte.openSelectedImage">
           大图
         </button>
-        <button data-rte-own type="button" class="rte-bubble-btn" title="换图（保留裁剪与题注）" aria-label="换图" @mousedown.prevent @click="rte.replaceImageByUrl()">
+        <button data-rte-own type="button" class="rte-bubble-btn" title="换成另一张图，保留裁剪和题注" aria-label="换图" @mousedown.prevent @click="rte.replaceImageByUrl()">
           换图
         </button>
         <span data-rte-own class="rte-image-replace-hint">拖到左右边缘插入该行，拖到图片中间替换</span>
@@ -170,7 +170,7 @@ useParentScopeStamp()
           type="button"
           class="rte-bubble-btn"
           :class="{ active: rte.imageCropPreset === preset.id }"
-          :title="'裁剪比例：' + preset.label"
+          :title="cropTitle(preset.label) || ('裁剪比例：' + preset.label)"
           :aria-pressed="rte.imageCropPreset === preset.id"
           @mousedown.prevent
           @click="rte.applyCropPreset(preset)"
@@ -191,7 +191,7 @@ useParentScopeStamp()
         <button data-rte-own
           type="button"
           class="rte-bubble-btn"
-          title="应用替代文字"
+          title="写上读屏和检索用的说明。按 Enter 也可以"
           aria-label="应用图片替代文字"
           @mousedown.prevent
           @click="rte.setImageAlt(rte.imageAlt)"
@@ -207,6 +207,7 @@ useParentScopeStamp()
           type="button"
           class="rte-bubble-btn"
           :class="{ active: (rte.editor?.getAttributes('image')?.borderRadius || '') === opt.value }"
+          :title="toolbarMenuItemTitle(opt.label) || undefined"
           @mousedown.prevent
           @click="rte.setImageBorderRadius(opt.value)"
         >
@@ -221,6 +222,7 @@ useParentScopeStamp()
           type="button"
           class="rte-bubble-btn"
           :class="{ active: (rte.editor?.getAttributes('image')?.boxShadow || '') === opt.value }"
+          :title="toolbarMenuItemTitle(opt.label) || undefined"
           @mousedown.prevent
           @click="rte.setImageBoxShadow(opt.value)"
         >
@@ -235,6 +237,7 @@ useParentScopeStamp()
           type="button"
           class="rte-bubble-btn"
           :class="{ active: (rte.editor?.getAttributes('image')?.borderStyle || '') === opt.value }"
+          :title="toolbarMenuItemTitle(opt.label) || undefined"
           @mousedown.prevent
           @click="rte.setImageBorderStyle(opt.value)"
         >
@@ -397,8 +400,8 @@ useParentScopeStamp()
           <button data-rte-own
             type="button"
             class="rte-block-handle"
-            title="块操作"
-            aria-label="块操作"
+            :title="blockHandleTitle('menu')"
+            :aria-label="blockHandleTitle('menu')"
             aria-haspopup="menu"
             :aria-expanded="rte.blockMenuOpen"
             @click.stop="rte.toggleBlockMenu"
@@ -420,27 +423,27 @@ useParentScopeStamp()
           @click.stop
           @keydown="rte.onBlockMenuKeydown"
         >
-          <button data-rte-own type="button" role="menuitem" @click="rte.insertBelowHoveredBlock">在下方插入</button>
+          <button data-rte-own type="button" role="menuitem" :title="blockHandleTitle('insert')" @click="rte.insertBelowHoveredBlock">在下方插入</button>
           <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
-          <button data-rte-own type="button" role="menuitem" @click="rte.turnHoveredBlock('paragraph')">正文</button>
-          <button data-rte-own type="button" role="menuitem" @click="rte.turnHoveredBlock('h1')">标题 1</button>
-          <button data-rte-own type="button" role="menuitem" @click="rte.turnHoveredBlock('h2')">标题 2</button>
-          <button data-rte-own type="button" role="menuitem" @click="rte.turnHoveredBlock('h3')">标题 3</button>
+          <button data-rte-own type="button" role="menuitem" :title="blockHandleTitle('paragraph')" @click="rte.turnHoveredBlock('paragraph')">正文</button>
+          <button data-rte-own type="button" role="menuitem" :title="blockHandleTitle('h1')" @click="rte.turnHoveredBlock('h1')">标题 1</button>
+          <button data-rte-own type="button" role="menuitem" :title="blockHandleTitle('h2')" @click="rte.turnHoveredBlock('h2')">标题 2</button>
+          <button data-rte-own type="button" role="menuitem" :title="blockHandleTitle('h3')" @click="rte.turnHoveredBlock('h3')">标题 3</button>
           <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
-          <button data-rte-own type="button" role="menuitem" @click="rte.turnHoveredBlock('bullet')">无序列表</button>
-          <button data-rte-own type="button" role="menuitem" @click="rte.turnHoveredBlock('ordered')">有序列表</button>
-          <button data-rte-own type="button" role="menuitem" @click="rte.turnHoveredBlock('task')">任务列表</button>
-          <button data-rte-own type="button" role="menuitem" @click="rte.turnHoveredBlock('quote')">引用</button>
+          <button data-rte-own type="button" role="menuitem" :title="blockHandleTitle('bullet')" @click="rte.turnHoveredBlock('bullet')">无序列表</button>
+          <button data-rte-own type="button" role="menuitem" :title="blockHandleTitle('ordered')" @click="rte.turnHoveredBlock('ordered')">有序列表</button>
+          <button data-rte-own type="button" role="menuitem" :title="blockHandleTitle('task')" @click="rte.turnHoveredBlock('task')">任务列表</button>
+          <button data-rte-own type="button" role="menuitem" :title="blockHandleTitle('quote')" @click="rte.turnHoveredBlock('quote')">引用</button>
           <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
-          <button data-rte-own type="button" role="menuitem" @click="rte.turnHoveredBlock('info')">提示</button>
-          <button data-rte-own type="button" role="menuitem" @click="rte.turnHoveredBlock('warn')">警告</button>
-          <button data-rte-own type="button" role="menuitem" @click="rte.turnHoveredBlock('success')">成功</button>
-          <button data-rte-own type="button" role="menuitem" @click="rte.turnHoveredBlock('error')">错误</button>
+          <button data-rte-own type="button" role="menuitem" :title="blockHandleTitle('info')" @click="rte.turnHoveredBlock('info')">提示</button>
+          <button data-rte-own type="button" role="menuitem" :title="blockHandleTitle('warn')" @click="rte.turnHoveredBlock('warn')">警告</button>
+          <button data-rte-own type="button" role="menuitem" :title="blockHandleTitle('success')" @click="rte.turnHoveredBlock('success')">成功</button>
+          <button data-rte-own type="button" role="menuitem" :title="blockHandleTitle('error')" @click="rte.turnHoveredBlock('error')">错误</button>
           <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
-          <button data-rte-own type="button" role="menuitem" @click="rte.copyHoveredBlock">复制块</button>
-          <button data-rte-own type="button" role="menuitem" @click="rte.moveHoveredBlock(-1)">上移</button>
-          <button data-rte-own type="button" role="menuitem" @click="rte.moveHoveredBlock(1)">下移</button>
-          <button data-rte-own type="button" role="menuitem" class="is-danger" @click="rte.deleteHoveredBlock">删除</button>
+          <button data-rte-own type="button" role="menuitem" :title="blockHandleTitle('copy')" @click="rte.copyHoveredBlock">复制块</button>
+          <button data-rte-own type="button" role="menuitem" :title="blockHandleTitle('up')" @click="rte.moveHoveredBlock(-1)">上移</button>
+          <button data-rte-own type="button" role="menuitem" :title="blockHandleTitle('down')" @click="rte.moveHoveredBlock(1)">下移</button>
+          <button data-rte-own type="button" role="menuitem" class="is-danger" :title="blockHandleTitle('delete')" @click="rte.deleteHoveredBlock">删除</button>
         </div>
         <div data-rte-own
           v-if="rte.blockDropLine != null"
