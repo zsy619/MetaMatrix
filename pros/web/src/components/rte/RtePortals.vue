@@ -1545,16 +1545,17 @@ const echartsDialogTemplates = computed(() => {
               type="text"
               class="rte-note-input"
               :placeholder="rte.askPlaceholder"
+              :title="rte.askMaxlength ? '最多 ' + rte.askMaxlength + ' 字。Enter 确定，Esc 取消' : 'Enter 确定，Esc 取消'"
               :maxlength="rte.askMaxlength"
               @keydown.enter.prevent="rte.closeAskDialog('ok')"
               @keydown.esc.prevent="rte.closeAskDialog('cancel')"
             />
           </div>
           <div data-rte-own class="rte-modal-actions">
-            <button data-rte-own type="button" class="rte-modal-cancel" @click="rte.closeAskDialog('cancel')">
+            <button data-rte-own type="button" class="rte-modal-cancel" title="不改，关掉" @click="rte.closeAskDialog('cancel')">
               {{ rte.askCancelLabel }}
             </button>
-            <button data-rte-own type="button" class="rte-modal-confirm" @click="rte.closeAskDialog('ok')">
+            <button data-rte-own type="button" class="rte-modal-confirm" title="按填的内容继续" @click="rte.closeAskDialog('ok')">
               {{ rte.askConfirmLabel }}
             </button>
           </div>

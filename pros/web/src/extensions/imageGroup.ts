@@ -650,7 +650,7 @@ export const ImageGroup = Node.create({
         return button
       }
 
-      const handle = addIconButton('rte-image-group-handle', '拖动图片组', 'M4 2h2v2H4zm6 0h2v2h-2zM4 7h2v2H4zm6 0h2v2h-2zM4 12h2v2H4zm6 0h2v2h-2z')
+      const handle = addIconButton('rte-image-group-handle', '按住拖动整组图片', 'M4 2h2v2H4zm6 0h2v2h-2zM4 7h2v2H4zm6 0h2v2h-2zM4 12h2v2H4zm6 0h2v2h-2z')
       handle.addEventListener('pointerdown', (event) => {
         const pos = getPos()
         if (typeof pos !== 'number' || event.button !== 0) return
@@ -671,8 +671,8 @@ export const ImageGroup = Node.create({
         right: 'M2 3h12v2H2zm4 4h8v2H6zm2 4h6v2H8z',
       } as const
       for (const align of ['left', 'center', 'right'] as const) {
-        const label = align === 'left' ? '居左' : align === 'center' ? '居中' : '居右'
-        const button = addIconButton('rte-image-group-align', `图片组${label}`, alignIcons[align])
+        const label = align === 'left' ? '整组图片靠左' : align === 'center' ? '整组图片居中' : '整组图片靠右'
+        const button = addIconButton('rte-image-group-align', label, alignIcons[align])
         button.dataset.align = align
         button.addEventListener('click', (event) => {
           event.preventDefault()
@@ -720,6 +720,8 @@ export const ImageGroup = Node.create({
         button.type = 'button'
         button.className = 'rte-image-group-side'
         button.textContent = side === 'left' ? '叠左' : side === 'center' ? '叠中' : '叠右'
+        button.title = side === 'left' ? '两张叠在最左一列' : side === 'center' ? '两张叠在中间一列' : '两张叠在最右一列'
+        button.setAttribute('aria-label', button.title)
         button.addEventListener('click', (event) => {
           event.preventDefault()
           event.stopPropagation()
@@ -812,7 +814,7 @@ export const ImageGroup = Node.create({
         button.className = 'rte-image-group-layout'
         button.dataset.layout = layout
         button.textContent = layout === 'row' ? '横排' : layout === 'rows' ? '上下' : layout
-        button.title = layout === 'row' ? '横排' : layout === '12' ? '左一右二' : layout === '21' ? '左二右一' : '上下两行'
+        button.title = layout === 'row' ? '所有图片排成一行' : layout === '12' ? '左边一张，右边上下两张' : layout === '21' ? '左边上下两张，右边一张' : '图片分成上下两行'
         button.setAttribute('aria-label', button.title)
         button.addEventListener('click', (event) => {
           event.preventDefault()
@@ -824,7 +826,7 @@ export const ImageGroup = Node.create({
         bar.appendChild(button)
       }
 
-      const split = addIconButton('rte-image-group-split', '拆分为单图', 'M2 3h5v10H2zm7 0h5v10H9z')
+      const split = addIconButton('rte-image-group-split', '拆成一张一张的图片，不再成组', 'M2 3h5v10H2zm7 0h5v10H9z')
       split.addEventListener('click', (event) => {
         event.preventDefault()
         event.stopPropagation()
