@@ -21,9 +21,9 @@ export function useViewMode(deps: {
 /** 最大化浮层三种视图：编辑 / 预览 / 源码 */
 type RteViewMode = 'edit' | 'preview' | 'source'
 const VIEW_MODE_OPTIONS: { id: RteViewMode; label: string; icon: string; title: string }[] = [
-  { id: 'edit', label: '编辑', icon: '✎', title: '编辑' },
-  { id: 'preview', label: '预览', icon: '◎', title: '只读预览（Ctrl/⌘+Alt+\\）' },
-  { id: 'source', label: '源码', icon: '</>', title: '查看 HTML 源码' },
+  { id: 'edit', label: '编辑', icon: '✎', title: '回到可以改字的编辑状态' },
+  { id: 'preview', label: '预览', icon: '◎', title: '按只读方式看排版，不能改字（Ctrl/⌘+Alt+\\）' },
+  { id: 'source', label: '源码', icon: '</>', title: '查看和修改 HTML 源码' },
 ]
 const viewMode = ref<RteViewMode>('edit')
 

@@ -11,7 +11,7 @@ import RteSelectionBubble from './RteSelectionBubble.vue'
 import RteSourceCodeEditor from './RteSourceCodeEditor.vue'
 import RteTableFormulaBar from './RteTableFormulaBar.vue'
 import { RTE_BINDINGS } from './bindings'
-import { wordStatTitle } from '../../utils/rteToolbarOptimize'
+import { imageWidthTitle, wordStatTitle } from '../../utils/rteToolbarOptimize'
 import { useParentScopeStamp } from './inheritScope'
 import RteMenuGlyph from './RteMenuGlyph.vue'
 
@@ -120,7 +120,7 @@ useParentScopeStamp()
           type="button"
           class="rte-bubble-btn"
           :class="{ active: (rte.editor?.getAttributes('image')?.displayWidth || '') === opt.value }"
-          :title="'宽度：' + opt.label"
+          :title="imageWidthTitle(opt.label) || ('宽度：' + opt.label)"
           @mousedown.prevent
           @click="rte.setImageDisplayWidth(opt.value)"
         >

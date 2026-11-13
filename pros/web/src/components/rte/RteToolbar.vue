@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { inject, nextTick, onMounted, ref, watch } from 'vue'
 import { RTE_BINDINGS } from './bindings'
-import { alignToolTitle, blockMenuTitle, clampToolbarQuery, cycleSearchIndex, disabledToolTitle, EMPTY_GROUP_NOTE, FOCUS_MODE_NOTE, fontFamilyCaption, groupHandleTitle, LAST_TOOLBAR_QUERY_KEY, lineHeightCaption, listToolLabel, menuFocusStep, menuToolNeedsCaret, pickerTabTitle, moreToolsCaption, moreToolsTitle, ribbonSearchLabel, ribbonTabForDigit, ribbonTabHint, ribbonTabTabIndex, ribbonTypeaheadQuery, SEARCH_INPUT_HINT, searchEnterActivates, searchGroupCaption, shortcutFromTitle, stepRibbonTab, stepRibbonTabBy, tableToolLabel, toolbarGroupReorderAllowed, toolbarMenuItemTitle, toolbarSearchStatus, toolIsUnavailable, wordStatTitle, zoomToolLabel, zoomToolTitle } from '../../utils/rteToolbarOptimize'
+import { alignToolTitle, blockMenuTitle, clampToolbarQuery, codeLangTitle, cycleSearchIndex, disabledToolTitle, EMPTY_GROUP_NOTE, FOCUS_MODE_NOTE, fontFamilyCaption, groupHandleTitle, LAST_TOOLBAR_QUERY_KEY, lineHeightCaption, listToolLabel, menuFocusStep, menuToolNeedsCaret, pageSizeTitle, pickerTabTitle, moreToolsCaption, moreToolsTitle, ribbonSearchLabel, ribbonTabForDigit, ribbonTabHint, ribbonTabTabIndex, ribbonTypeaheadQuery, SEARCH_INPUT_HINT, searchEnterActivates, searchGroupCaption, shortcutFromTitle, stepRibbonTab, stepRibbonTabBy, tableToolLabel, toolbarGroupReorderAllowed, toolbarMenuItemTitle, toolbarSearchStatus, toolIsUnavailable, wordStatTitle, zoomToolLabel, zoomToolTitle } from '../../utils/rteToolbarOptimize'
 import { useParentScopeStamp } from './inheritScope'
 import { buildChartGroups } from '../../utils/echarts/chartGroups'
 import { TABLE_MENU_ICONS } from './tableMenuIcons'
@@ -1472,6 +1472,7 @@ function toggleChartGroupMenu(key: string) {
                   role="option"
                   :class="{ active: rte.currentCodeLanguage() === opt.value }"
                   :aria-selected="rte.currentCodeLanguage() === opt.value"
+                  :title="codeLangTitle(opt.label) || undefined"
                   @click="rte.applyCodeLanguage(opt.value)"
                 ><RteMenuGlyph :id="opt.value" :label="opt.label" fallback="code" />{{ opt.label }}</button>
               </div>
@@ -2231,7 +2232,7 @@ function toggleChartGroupMenu(key: string) {
                   role="menuitemradio"
                   :aria-checked="rte.pageSize === opt.id"
                   :class="{ active: rte.pageSize === opt.id }"
-                  :title="opt.hint"
+                  :title="pageSizeTitle(opt.id) || opt.hint"
                   @click="rte.setPageSize(opt.id)"
                 ><RteMenuGlyph :id="opt.id" :label="opt.label" fallback="page" />{{ opt.label }}<span data-rte-own class="rte-menu-hint">{{ opt.hint }}</span></button>
               </template>
@@ -2719,7 +2720,7 @@ function toggleChartGroupMenu(key: string) {
                   role="menuitemradio"
                   :aria-checked="rte.pageSize === opt.id"
                   :class="{ active: rte.pageSize === opt.id }"
-                  :title="opt.hint"
+                  :title="pageSizeTitle(opt.id) || opt.hint"
                   @click="rte.setPageSize(opt.id)"
                 ><RteMenuGlyph :id="opt.id" :label="opt.label" fallback="page" />{{ opt.label }}<span data-rte-own class="rte-menu-hint">{{ opt.hint }}</span></button>
               </template>

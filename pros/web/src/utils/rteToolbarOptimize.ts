@@ -532,6 +532,58 @@ const SPACING_OPTION_TITLES: Record<string, string> = {
   'textDir:rtl': '这一段从右往左写',
 }
 
+const CODE_LANG_TITLES: Record<string, string> = {
+  '纯文本': '不按语言上色，原样显示',
+  'JavaScript': '按 JavaScript 的语法给这段代码上色',
+  'TypeScript': '按 TypeScript 的语法给这段代码上色',
+  'JSON': '按 JSON 的语法给这段代码上色',
+  'HTML': '按 HTML 的语法给这段代码上色',
+  'CSS': '按 CSS 的语法给这段代码上色',
+  'Python': '按 Python 的语法给这段代码上色',
+  'Java': '按 Java 的语法给这段代码上色',
+  'Go': '按 Go 的语法给这段代码上色',
+  'Rust': '按 Rust 的语法给这段代码上色',
+  'SQL': '按 SQL 的语法给这段代码上色',
+  'Bash': '按 Bash 命令的语法给这段代码上色',
+  'Markdown': '按 Markdown 的语法给这段代码上色',
+  'C': '按 C 的语法给这段代码上色',
+  'C++': '按 C++ 的语法给这段代码上色',
+}
+
+const PAGE_SIZE_TITLES: Record<string, string> = {
+  full: '编辑区铺满整个面板',
+  feishu: '居中一条适中的阅读栏',
+  a3: 'A3 纸，297×420 毫米',
+  a4: 'A4 纸，210×297 毫米',
+  a5: 'A5 纸，148×210 毫米',
+  '8k': '8 开纸，大约 270×390 毫米',
+  b5: 'B5 纸，176×250 毫米',
+  letter: 'Letter 纸，216×279 毫米',
+}
+
+const IMAGE_WIDTH_TITLES: Record<string, string> = {
+  '原始': '图片用本身的宽度',
+  '25%': '图片缩到编辑区的四分之一宽',
+  '50%': '图片缩到编辑区的一半宽',
+  '75%': '图片缩到编辑区的四分之三宽',
+  '100%': '图片铺满编辑区的宽度',
+}
+
+/** 代码语言改完怎么上色。没有说明时返回空字符串。 */
+export function codeLangTitle(label: string): string {
+  return CODE_LANG_TITLES[label.trim()] || ''
+}
+
+/** 页面大小改完纸面是什么样。没有说明时返回空字符串。 */
+export function pageSizeTitle(id: string): string {
+  return PAGE_SIZE_TITLES[id] || ''
+}
+
+/** 图片宽度改完占多宽。没有说明时返回空字符串。 */
+export function imageWidthTitle(label: string): string {
+  return IMAGE_WIDTH_TITLES[label.trim()] || ''
+}
+
 /** 段距面板的一组在调什么。没有说明时返回空字符串。 */
 export function spacingGroupTitle(group: string): string {
   return SPACING_GROUP_TITLES[group] || ''

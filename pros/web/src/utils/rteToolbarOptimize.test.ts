@@ -3,6 +3,7 @@ import {
   alignToolTitle,
   blockMenuTitle,
   clampToolbarQuery,
+  codeLangTitle,
   codeBlockToolTitle,
   cycleSearchIndex,
   disabledToolTitle,
@@ -21,6 +22,8 @@ import {
   moreToolsCaption,
   moreToolsTitle,
   orderToolbarSearchGroups,
+  imageWidthTitle,
+  pageSizeTitle,
   pasteFormatLabel,
   pickerTabTitle,
   pushRecentValue,
@@ -178,6 +181,13 @@ assert.equal(spacingOptionTitle('letterSpacing', '0'), '字和字贴紧')
 assert.equal(spacingOptionTitle('textIndent', '2em'), '段首空出两个字')
 assert.equal(spacingOptionTitle('textDir', 'rtl'), '这一段从右往左写')
 assert.equal(spacingOptionTitle('marginTop', '9em'), '')
+assert.equal(codeLangTitle('纯文本'), '不按语言上色，原样显示')
+assert.equal(codeLangTitle('Python'), '按 Python 的语法给这段代码上色')
+assert.equal(codeLangTitle('没有'), '')
+assert.equal(pageSizeTitle('a4'), 'A4 纸，210×297 毫米')
+assert.equal(pageSizeTitle('full'), '编辑区铺满整个面板')
+assert.equal(imageWidthTitle('50%'), '图片缩到编辑区的一半宽')
+assert.equal(imageWidthTitle('没有'), '')
 assert.equal(stepRibbonTabBy(['a', 'b', 'c', 'd', 'e'], 'b', 3), 'e')
 assert.equal(stepRibbonTabBy(['a', 'b', 'c'], 'a', -3), 'a')
 assert.equal(zoomToolLabel(1), '实际大小')
