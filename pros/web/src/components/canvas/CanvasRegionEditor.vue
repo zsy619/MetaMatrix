@@ -16,7 +16,7 @@ import {
 } from '../../composables/usePanelMaximize'
 import RichTextEditor from '../RichTextEditor.vue'
 import PanelAttachments from './PanelAttachments.vue'
-import { itemsToHtml, syncItemsFromHtml } from '../../utils/itemsHtml'
+import { isEmptyHtml, itemsToHtml, syncItemsFromHtml } from '../../utils/itemsHtml'
 
 const props = withDefaults(
   defineProps<{
@@ -38,6 +38,7 @@ const { isMaximized, toggleMaximize, closeMaximize } =
   usePanelMaximize(maximizeKey)
 
 const editorHtml = computed(() => itemsToHtml(props.items))
+const isBlank = computed(() => isEmptyHtml(editorHtml.value))
 
 /* ---- 行内输入 ---- */
 const inputEl = ref<HTMLElement | null>(null)
@@ -140,6 +141,7 @@ function onCloseMaximize(event?: Event) {
     <div
       ref="inputEl"
       class="region-input"
+      :class="{ 'is-blank': isBlank }"
       contenteditable="true"
       role="textbox"
       aria-multiline="true"
@@ -267,7 +269,9 @@ function onCloseMaximize(event?: Event) {
 }
 
 .region-input {
-  padding: 3px 7px 4px;
+  min-height: 32px;
+  box-sizing: border-box;
+  padding: 6px 26px 6px 8px;
   font-size: 14px;
   line-height: 1.5;
   color: #3c4043;
@@ -277,10 +281,27 @@ function onCloseMaximize(event?: Event) {
   overflow-y: auto;
 }
 
-.region-input:empty::before {
+.region-input:empty::before,
+.region-input.is-blank::before {
   content: attr(data-placeholder);
   color: #5c564c;
   pointer-events: none;
+}
+
+.region-input.is-blank :deep(p) {
+  display: none;
+}
+
+.region-input.is-blank {
+  max-height: 32px;
+  white-space: nowrap;
+}
+
+.region-input.is-blank::before {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* 行内内容是运行时写进去的 HTML，没有 scope 属性，这里必须用 :deep */
