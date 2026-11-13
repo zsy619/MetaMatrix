@@ -542,6 +542,8 @@ function startDrag(event: PointerEvent, task: GanttTask, mode: 'move' | 'resize'
             <path
               v-for="arrow in arrows"
               :key="arrow.key"
+              class="chart-flow-line"
+              :class="{ 'is-selected': arrow.critical }"
               :d="arrow.d"
               :stroke="arrow.critical ? '#d93025' : '#5f6368'"
               :marker-end="arrow.critical ? 'url(#gantt-arrow-critical)' : 'url(#gantt-arrow)'"

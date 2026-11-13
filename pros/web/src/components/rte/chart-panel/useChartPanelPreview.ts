@@ -3,6 +3,7 @@
  */
 import { onBeforeUnmount, ref, watch, type Ref } from 'vue'
 import { ensureRenderableChartOption } from '../../../utils/echarts/chartRenderGuard'
+import { chartRenderOption, type ChartRenderMode } from '../../../utils/rteChartTheme'
 
 type PreviewChart = {
   setOption: (option: unknown, opts?: { notMerge?: boolean }) => void
@@ -20,6 +21,7 @@ export function useChartPanelPreview(source: {
   let previewChart: PreviewChart | null = null
   let previewToken = 0
   let previewObserver: ResizeObserver | null = null
+  let previewOpened = false
 
   function resizePreview() {
     const host = previewEl.value
@@ -45,6 +47,7 @@ export function useChartPanelPreview(source: {
     if (!option || !Object.keys(option).length) {
       previewChart?.dispose()
       previewChart = null
+      previewOpened = false
       previewError.value = ''
       host.replaceChildren()
       return
@@ -58,7 +61,15 @@ export function useChartPanelPreview(source: {
       previewChart = mod.init(previewEl.value, undefined, { renderer: 'svg', width, height })
     }
     try {
-      previewChart.setOption(ensureRenderableChartOption(option), { notMerge: true })
+      const host = previewEl.value
+      const mode: ChartRenderMode = host.closest('.rte-root')?.classList.contains('is-dark-editor') ? 'dark' : 'light'
+      const opening = !previewOpened
+      previewOpened = true
+      const reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
+      previewChart.setOption(
+        ensureRenderableChartOption(chartRenderOption(option, mode, opening && !reduced ? 'play' : 'still')),
+        { notMerge: true },
+      )
       previewError.value = ''
       watchPreviewSize()
       resizePreview()

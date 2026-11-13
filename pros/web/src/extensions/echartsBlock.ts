@@ -15,7 +15,7 @@ import { applyChartAria } from '../utils/echarts/chartA11yOption'
 import { buildChartA11ySummary, type ChartA11ySummary } from '../utils/echarts/chartA11y'
 import { echartsRendererFor, needsEchartsGl, resolveEchartsRenderItems } from '../utils/echarts/prepare'
 import { loadEchartsGl } from '../utils/echartsGlRuntime'
-import { chartRenderOption, type ChartRenderMode } from '../utils/rteChartTheme'
+import { chartRenderOption, type ChartMotion, type ChartRenderMode } from '../utils/rteChartTheme'
 import { ensureRenderableChartOption } from '../utils/echarts/chartRenderGuard'
 import {
   resolveDataSourceConfig,
@@ -82,9 +82,19 @@ function chartMode(host: HTMLElement): ChartRenderMode {
   return host.closest('.rte-root')?.classList.contains('is-dark-editor') ? 'dark' : 'light'
 }
 
-/** 渲染副本。用户写过的背景色保留；没写时暗色编辑区才用深底。不写回文档。 */
-function renderOption(option: Record<string, unknown>, mode: ChartRenderMode): Record<string, unknown> {
-  return ensureRenderableChartOption(chartRenderOption(option, mode))
+/** 渲染副本。用户写过的背景色保留。不写回文档。 */
+function renderOption(
+  option: Record<string, unknown>,
+  mode: ChartRenderMode,
+  motion: ChartMotion = 'still',
+): Record<string, unknown> {
+  return ensureRenderableChartOption(chartRenderOption(option, mode, motion))
+}
+
+function chartMotion(opening: boolean): ChartMotion {
+  if (!opening) return 'still'
+  if (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches) return 'still'
+  return 'play'
 }
 
 export const EchartsBlock = Node.create({
@@ -410,6 +420,7 @@ export const EchartsBlock = Node.create({
             }
             chart = null
           }
+          const opening = !chart
           if (!chart) {
             // 面板折叠时容器宽度是 0，这时初始化会得到一张空图。
             // 先不初始化，等容器有宽度了（ResizeObserver 回调里再 render）再画。
@@ -423,8 +434,9 @@ export const EchartsBlock = Node.create({
           }
           // custom 系列的 renderItem 在文档里只存预设名，这里换成内置函数
           // 渲染前补 aria（默认开启 + 自动摘要），ECharts 自身才能把描述播报出来
+          // 只有第一次画出这张图时播放生长动画，之后的刷新和导出停在终帧。
           chart.setOption(
-            applyChartAria(renderOption(resolveEchartsRenderItems(effective), chartMode(dom))),
+            applyChartAria(renderOption(resolveEchartsRenderItems(effective), chartMode(dom), chartMotion(opening))),
             { notMerge: true },
           )
           resizeChart()
