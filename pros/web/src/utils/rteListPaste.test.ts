@@ -137,6 +137,25 @@ describe('列表、表格粘贴和换图', () => {
     expect(next).toEqual(['甲', '乙', '甲\t内', '乙', '丙'])
   })
 
+  it('只复制一列时按换行往下填', () => {
+    const ed = mount(
+      '<table><tbody><tr><td><p>甲</p></td><td><p>1</p></td></tr><tr><td><p>乙</p></td><td><p>2</p></td></tr><tr><td><p>丙</p></td><td><p>3</p></td></tr></tbody></table>',
+      [Table.configure({ resizable: false }), TableRow, RteTableHeader, RteTableCell],
+    )
+    let pos = -1
+    ed.state.doc.descendants((node, at) => {
+      if (pos < 0 && node.type.name === 'tableCell' && node.textContent === '甲') pos = at + 2
+    })
+    ed.commands.setTextSelection(pos)
+    expect(pasteTsvIntoTable(ed, '红\n绿')).toBe(true)
+    const texts: string[] = []
+    ed.state.doc.descendants((node) => {
+      if (node.type.name === 'tableCell') texts.push(node.textContent)
+    })
+    expect(texts).toEqual(['红', '1', '绿', '2', '丙', '3'])
+    expect(pasteTsvIntoTable(ed, '只改这一格')).toBe(false)
+  })
+
   it('换图保留题注、裁剪和替代文本', () => {
     const next = keepCropOnReplace(
       { src: 'old', alt: '旧图', caption: '图注', cropAspect: '1', cropZoom: 1.2 },

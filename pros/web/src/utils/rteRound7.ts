@@ -362,8 +362,9 @@ function visualColumnAt(table: { forEach: (fn: (row: { forEach: (fn: (cell: { at
 
 /** 光标已经在表格里时，按制表符把纯文本填进后面的格子。一次粘贴一步撤销。 */
 export function pasteTsvIntoTable(editor: Editor, plain: string): boolean {
-  const text = String(plain || '')
-  if (!text.includes('\t')) return false
+  const text = String(plain || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+  // 一整列从表格里复制出来时往往只有换行，没有制表符。单行纯文本仍留在当前格子。
+  if (!text.includes('\t') && !text.includes('\n')) return false
   const { state } = editor
   const $from = state.selection.$from
   let cellDepth = -1
