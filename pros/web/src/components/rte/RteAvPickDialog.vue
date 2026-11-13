@@ -32,6 +32,7 @@ useParentScopeStamp()
             type="button"
             class="rte-image-tab"
             :class="{ active: picker.tab === 'personal' }"
+            :title="picker.kind === 'audio' ? '从素材库选音频，或从本机上传' : '从素材库选视频，或从本机上传'"
             @click="picker.tab = 'personal'"
           >
             个人素材
@@ -41,6 +42,7 @@ useParentScopeStamp()
             type="button"
             class="rte-image-tab"
             :class="{ active: picker.tab === 'external' }"
+            :title="picker.kind === 'audio' ? '每行一个音频网址，一次可插多个' : '每行一个视频网址，一次可插多个'"
             @click="picker.tab = 'external'"
           >
             外部链接
@@ -54,6 +56,7 @@ useParentScopeStamp()
               type="button"
               class="rte-image-side-item"
               :class="{ active: picker.sidebarKey === 'all' }"
+              :title="picker.kind === 'audio' ? '看素材库里的全部音频' : '看素材库里的全部视频'"
               @click="picker.sidebarKey = 'all'"
             >
               <span data-rte-own class="rte-image-side-ico" aria-hidden="true">{{ picker.copy.sideIcon }}</span>
@@ -64,6 +67,7 @@ useParentScopeStamp()
               type="button"
               class="rte-image-side-item"
               :class="{ active: picker.sidebarKey === 'uncategorized' }"
+              :title="picker.kind === 'audio' ? '只看还没归类的音频' : '只看还没归类的视频'"
               @click="picker.sidebarKey = 'uncategorized'"
             >
               <span data-rte-own class="rte-image-side-ico" aria-hidden="true">📁</span>
@@ -76,6 +80,7 @@ useParentScopeStamp()
               type="button"
               class="rte-image-side-item"
               :class="{ active: picker.sidebarKey === cat.id }"
+              title="只看这个分类"
               @click="picker.sidebarKey = cat.id"
             >
               <span data-rte-own class="rte-image-side-ico" aria-hidden="true">📁</span>
@@ -85,8 +90,8 @@ useParentScopeStamp()
                 class="rte-library-cat-delete"
                 role="button"
                 tabindex="0"
-                title="删除分类"
-                aria-label="删除分类"
+                :title="picker.kind === 'audio' ? '删除这个分类，里面的音频回到未分类' : '删除这个分类，里面的视频回到未分类'"
+                aria-label="删除这个分类"
                 @click.stop="picker.deleteCategory(cat.id)"
                 @keydown.enter.stop="picker.deleteCategory(cat.id)"
                 @keydown.space.stop.prevent="picker.deleteCategory(cat.id)"
@@ -100,11 +105,12 @@ useParentScopeStamp()
                 type="text"
                 class="rte-image-add-cat-input"
                 placeholder="分类名称"
+                title="分类名称，最多 40 字，按 Enter 创建"
                 maxlength="40"
                 @keydown.enter.prevent="picker.confirmAddCategory()"
                 @keydown.esc.prevent="picker.addingCategory = false"
               />
-              <button data-rte-own type="button" class="rte-image-add-cat-ok" @click="picker.confirmAddCategory()">
+              <button data-rte-own type="button" class="rte-image-add-cat-ok" title="用这个名字建分类" @click="picker.confirmAddCategory()">
                 确定
               </button>
             </div>
@@ -113,6 +119,7 @@ useParentScopeStamp()
               v-else
               type="button"
               class="rte-image-side-item rte-image-add-cat"
+              title="新建一个分类"
               @click="picker.startAddCategory()"
             >
               <span data-rte-own class="rte-image-side-ico" aria-hidden="true">📁+</span>
@@ -127,6 +134,7 @@ useParentScopeStamp()
                   data-rte-own
                   type="button"
                   class="rte-library-delete"
+                  :title="picker.kind === 'audio' ? '从素材库删除选中的音频' : '从素材库删除选中的视频'"
                   :disabled="picker.selectedIds.size === 0"
                   @click="picker.deleteSelected()"
                 >
@@ -141,6 +149,7 @@ useParentScopeStamp()
                   data-rte-own
                   type="checkbox"
                   :checked="picker.selectAll"
+                  title="选中或取消当前分类里的全部素材"
                   @change="picker.onSelectAllChange()"
                 />
                 <span data-rte-own>本页全选</span>
@@ -155,7 +164,7 @@ useParentScopeStamp()
                 data-rte-own
                 type="button"
                 class="rte-image-upload-card"
-                :title="picker.copy.uploadLabel"
+                :title="picker.kind === 'audio' ? '从本机选音频，归到当前分类' : '从本机选视频，归到当前分类'"
                 @click="picker.triggerLocalPick()"
               >
                 <span data-rte-own class="rte-image-upload-ico" aria-hidden="true">
@@ -180,7 +189,7 @@ useParentScopeStamp()
                   'is-loading': picker.thumbState(asset.src).status === 'loading',
                   'is-error': picker.thumbState(asset.src).status === 'error',
                 }"
-                :title="asset.name"
+                :title="'点一下选中「' + asset.name + '」，再点取消'"
                 @click="picker.toggleSelect(asset.id)"
               >
                 <template
@@ -208,6 +217,7 @@ useParentScopeStamp()
                     class="rte-image-thumb-retry"
                     role="button"
                     tabindex="0"
+                    title="重新加载这条素材"
                     @click.stop="picker.retryThumb(asset.src)"
                     @keydown.enter.stop="picker.retryThumb(asset.src)"
                     @keydown.space.stop.prevent="picker.retryThumb(asset.src)"
@@ -225,8 +235,8 @@ useParentScopeStamp()
                   class="rte-library-card-delete"
                   role="button"
                   tabindex="0"
-                  title="删除"
-                  :aria-label="picker.kind === 'audio' ? '删除音频' : '删除视频'"
+                  :title="picker.kind === 'audio' ? '从素材库删除这条音频' : '从素材库删除这条视频'"
+                  :aria-label="picker.kind === 'audio' ? '从素材库删除这条音频' : '从素材库删除这条视频'"
                   @click.stop="picker.deleteAsset(asset.id)"
                   @keydown.enter.stop="picker.deleteAsset(asset.id)"
                   @keydown.space.stop.prevent="picker.deleteAsset(asset.id)"
@@ -248,15 +258,16 @@ useParentScopeStamp()
             v-model="picker.externalUrls"
             class="rte-image-url-textarea"
             :placeholder="picker.copy.urlPlaceholder"
+            :title="picker.kind === 'audio' ? '每行一个 http 或 https 音频地址' : '每行一个 http 或 https 视频地址'"
             spellcheck="false"
           />
         </div>
 
         <div data-rte-own class="rte-modal-actions rte-image-actions">
-          <button data-rte-own type="button" class="rte-modal-cancel" @click="picker.close()">
+          <button data-rte-own type="button" class="rte-modal-cancel" :title="picker.kind === 'audio' ? '不插入音频' : '不插入视频'" @click="picker.close()">
             取消
           </button>
-          <button data-rte-own type="button" class="rte-modal-confirm" @click="picker.confirm()">
+          <button data-rte-own type="button" class="rte-modal-confirm" :title="picker.kind === 'audio' ? '把选中的音频插到光标处' : '把选中的视频插到光标处'" @click="picker.confirm()">
             确认
           </button>
         </div>

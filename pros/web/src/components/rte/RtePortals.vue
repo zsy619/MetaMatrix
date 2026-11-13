@@ -878,17 +878,19 @@ const echartsDialogTemplates = computed(() => {
               type="url"
               class="rte-note-input"
               placeholder="输入公众号文章链接"
+              title="公众号文章地址，按 Enter 开始导入"
               maxlength="2000"
               @keydown.enter.prevent="rte.confirmImportLink"
             />
           </div>
           <div data-rte-own class="rte-modal-actions">
-            <button data-rte-own type="button" class="rte-modal-cancel" @click="rte.closeImportLinkDialog">
+            <button data-rte-own type="button" class="rte-modal-cancel" title="不导入这篇链接" @click="rte.closeImportLinkDialog">
               取消
             </button>
             <button data-rte-own
               type="button"
               class="rte-modal-confirm"
+              title="抓取标题和摘要；跨域失败时插入可点的链接"
               :disabled="rte.linkImportBusy"
               @click="rte.confirmImportLink"
             >
@@ -1560,6 +1562,7 @@ const echartsDialogTemplates = computed(() => {
               type="url"
               class="rte-note-input"
               placeholder="https://"
+              title="网页地址，只支持 http 或 https，按 Enter 插入"
               maxlength="2000"
               @keydown.enter.prevent="rte.confirmLinkCardDialog"
             />
@@ -1569,6 +1572,7 @@ const echartsDialogTemplates = computed(() => {
               type="button"
               class="rte-bubble-btn"
               :class="{ active: rte.linkCardMode === 'card' }"
+              title="插成一张可点开的卡片"
               @click="rte.linkCardMode = 'card'"
             >
               链接卡片（推荐）
@@ -1577,14 +1581,15 @@ const echartsDialogTemplates = computed(() => {
               type="button"
               class="rte-bubble-btn"
               :class="{ active: rte.linkCardMode === 'iframe' }"
+              title="把网页嵌进文档。不在白名单时会改成卡片"
               @click="rte.linkCardMode = 'iframe'"
             >
               受控 iframe
             </button>
           </div>
           <div data-rte-own class="rte-modal-actions">
-            <button data-rte-own type="button" class="rte-modal-cancel" @click="rte.closeLinkCardDialog">取消</button>
-            <button data-rte-own type="button" class="rte-modal-confirm" @click="rte.confirmLinkCardDialog">插入</button>
+            <button data-rte-own type="button" class="rte-modal-cancel" title="不插入网页" @click="rte.closeLinkCardDialog">取消</button>
+            <button data-rte-own type="button" class="rte-modal-confirm" title="按所选方式插入" @click="rte.confirmLinkCardDialog">插入</button>
           </div>
         </div>
       </div>
@@ -1612,6 +1617,7 @@ const echartsDialogTemplates = computed(() => {
               v-model="rte.linkText"
               type="text"
               placeholder="显示文字"
+              title="链接上显示的文字，最多 500 字"
               maxlength="500"
               @keydown.enter.prevent="rte.confirmInsertLink"
             />
@@ -1623,6 +1629,7 @@ const echartsDialogTemplates = computed(() => {
               v-model="rte.linkHref"
               type="url"
               placeholder="https://"
+              title="支持 http、https、mailto 和页内锚点，按 Enter 应用"
               maxlength="2000"
               @keydown.enter.prevent="rte.confirmInsertLink"
             />
@@ -1632,6 +1639,7 @@ const echartsDialogTemplates = computed(() => {
               v-if="rte.linkDialogEditing"
               type="button"
               class="rte-link-text-btn is-danger"
+              title="去掉链接，文字留下来"
               @click="rte.unlinkSelection"
             >
               取消链接
@@ -1640,6 +1648,7 @@ const echartsDialogTemplates = computed(() => {
               v-if="rte.linkHref.trim()"
               type="button"
               class="rte-link-text-btn"
+              title="打开这个地址"
               @click="rte.openCurrentLink"
             >
               打开
@@ -1648,15 +1657,16 @@ const echartsDialogTemplates = computed(() => {
               v-if="rte.linkHref.trim()"
               type="button"
               class="rte-link-text-btn"
+              title="把链接地址复制到剪贴板"
               @click="rte.copyCurrentLinkUrl"
             >
               复制
             </button>
             <span data-rte-own class="rte-modal-actions-spacer" aria-hidden="true" />
-            <button data-rte-own type="button" class="rte-link-text-btn" @click="rte.closeLinkDialog">
+            <button data-rte-own type="button" class="rte-link-text-btn" title="不改这条链接" @click="rte.closeLinkDialog">
               关闭
             </button>
-            <button data-rte-own type="button" class="rte-link-primary" @click="rte.confirmInsertLink">
+            <button data-rte-own type="button" class="rte-link-primary" :title="rte.linkDialogEditing ? '按上面的文字和地址更新链接' : '把链接套到选中的文字上'" @click="rte.confirmInsertLink">
               {{ rte.linkDialogEditing ? '更新' : '确认' }}
             </button>
           </div>
@@ -1688,6 +1698,7 @@ const echartsDialogTemplates = computed(() => {
                 type="button"
                 class="rte-image-side-item"
                 :class="{ active: rte.attachSidebarKey === 'all' }"
+                title="看素材库里的全部附件"
                 @click="rte.attachSidebarKey = 'all'"
               >
                 <span data-rte-own class="rte-image-side-ico" aria-hidden="true">📎</span>
@@ -1697,6 +1708,7 @@ const echartsDialogTemplates = computed(() => {
                 type="button"
                 class="rte-image-side-item"
                 :class="{ active: rte.attachSidebarKey === 'uncategorized' }"
+                title="只看还没归类的附件"
                 @click="rte.attachSidebarKey = 'uncategorized'"
               >
                 <span data-rte-own class="rte-image-side-ico" aria-hidden="true">📁</span>
@@ -1708,6 +1720,7 @@ const echartsDialogTemplates = computed(() => {
                 type="button"
                 class="rte-image-side-item"
                 :class="{ active: rte.attachSidebarKey === cat.id }"
+                title="只看这个分类里的附件"
                 @click="rte.attachSidebarKey = cat.id"
               >
                 <span data-rte-own class="rte-image-side-ico" aria-hidden="true">📁</span>
@@ -1716,8 +1729,8 @@ const echartsDialogTemplates = computed(() => {
                   class="rte-library-cat-delete"
                   role="button"
                   tabindex="0"
-                  title="删除分类"
-                  aria-label="删除分类"
+                  title="删除这个分类，里面的附件回到未分类"
+                  aria-label="删除这个分类"
                   @click.stop="rte.deleteAttachCategory(cat.id)"
                   @keydown.enter.stop="rte.deleteAttachCategory(cat.id)"
                   @keydown.space.stop.prevent="rte.deleteAttachCategory(cat.id)"
@@ -1730,6 +1743,7 @@ const echartsDialogTemplates = computed(() => {
                   type="text"
                   class="rte-image-add-cat-input"
                   placeholder="分类名称"
+                  title="分类名称，最多 40 字，按 Enter 创建"
                   maxlength="40"
                   @keydown.enter.prevent="rte.confirmAddAttachCategory"
                   @keydown.esc.prevent="rte.attachAddingCategory = false"
@@ -1737,6 +1751,7 @@ const echartsDialogTemplates = computed(() => {
                 <button data-rte-own
                   type="button"
                   class="rte-image-add-cat-ok"
+                  title="用这个名字建分类"
                   @click="rte.confirmAddAttachCategory"
                 >
                   确定
@@ -1746,6 +1761,7 @@ const echartsDialogTemplates = computed(() => {
                 v-else
                 type="button"
                 class="rte-image-side-item rte-image-add-cat"
+                title="新建一个分类"
                 @click="rte.startAddAttachCategory"
               >
                 <span data-rte-own class="rte-image-side-ico" aria-hidden="true">📁+</span>
@@ -1759,6 +1775,7 @@ const echartsDialogTemplates = computed(() => {
                   <button data-rte-own
                     type="button"
                     class="rte-library-delete"
+                    title="从素材库删除选中的附件"
                     :disabled="rte.attachSelectedIds.size === 0"
                     @click="rte.deleteSelectedAttaches()"
                   >
@@ -1772,6 +1789,7 @@ const echartsDialogTemplates = computed(() => {
                   <input data-rte-own
                     type="checkbox"
                     :checked="rte.attachSelectAll"
+                    title="选中或取消当前分类里的全部附件"
                     @change="rte.onAttachSelectAllChange"
                   />
                   <span data-rte-own>本页全选</span>
@@ -1784,7 +1802,7 @@ const echartsDialogTemplates = computed(() => {
                 <button data-rte-own
                   type="button"
                   class="rte-image-upload-card"
-                  title="本地附件上传"
+                  title="从本机选附件，归到当前分类"
                   @click="rte.triggerLocalAttachPick"
                 >
                   <span data-rte-own class="rte-image-upload-ico" aria-hidden="true">
@@ -1821,7 +1839,7 @@ const echartsDialogTemplates = computed(() => {
                   type="button"
                   class="rte-image-thumb rte-attach-thumb"
                   :class="{ selected: rte.attachSelectedIds.has(asset.id) }"
-                  :title="asset.name"
+                  :title="'点一下选中「' + asset.name + '」，再点取消'"
                   @click="rte.toggleAttachSelect(asset.id)"
                 >
                   <span data-rte-own class="rte-attach-thumb-ext">{{ rte.attachExtIcon(asset.name) }}</span>
@@ -1831,8 +1849,8 @@ const echartsDialogTemplates = computed(() => {
                     class="rte-library-card-delete"
                     role="button"
                     tabindex="0"
-                    title="删除"
-                    aria-label="删除附件"
+                    title="从素材库删除这一项"
+                    aria-label="从素材库删除这一项"
                     @click.stop="rte.deleteAttachAsset(asset.id)"
                     @keydown.enter.stop="rte.deleteAttachAsset(asset.id)"
                     @keydown.space.stop.prevent="rte.deleteAttachAsset(asset.id)"
@@ -1847,12 +1865,13 @@ const echartsDialogTemplates = computed(() => {
           </div>
 
           <div data-rte-own class="rte-modal-actions rte-image-actions">
-            <button data-rte-own type="button" class="rte-modal-cancel" @click="rte.closeAttachDialog">
+            <button data-rte-own type="button" class="rte-modal-cancel" title="不插入附件" @click="rte.closeAttachDialog">
               取消
             </button>
             <button data-rte-own
               type="button"
               class="rte-modal-confirm"
+              title="把选中的附件插到光标处"
               @click="rte.confirmInsertAttaches"
             >
               确认
@@ -1881,6 +1900,7 @@ const echartsDialogTemplates = computed(() => {
               type="button"
               class="rte-image-tab"
               :class="{ active: rte.imageDialogTab === 'personal' }"
+              title="从素材库选，或从本机上传"
               @click="rte.imageDialogTab = 'personal'"
             >
               个人素材
@@ -1889,6 +1909,7 @@ const echartsDialogTemplates = computed(() => {
               type="button"
               class="rte-image-tab"
               :class="{ active: rte.imageDialogTab === 'external' }"
+              title="每行一个图片网址，一次可插多张"
               @click="rte.imageDialogTab = 'external'"
             >
               外部链接
@@ -1901,6 +1922,7 @@ const echartsDialogTemplates = computed(() => {
                 type="button"
                 class="rte-image-side-item"
                 :class="{ active: rte.imageSidebarKey === 'all' }"
+                title="看素材库里的全部图片"
                 @click="rte.imageSidebarKey = 'all'"
               >
                 <span data-rte-own class="rte-image-side-ico" aria-hidden="true">👤</span>
@@ -1910,6 +1932,7 @@ const echartsDialogTemplates = computed(() => {
                 type="button"
                 class="rte-image-side-item"
                 :class="{ active: rte.imageSidebarKey === 'uncategorized' }"
+                title="只看还没归类的图片"
                 @click="rte.imageSidebarKey = 'uncategorized'"
               >
                 <span data-rte-own class="rte-image-side-ico" aria-hidden="true">📁</span>
@@ -1921,6 +1944,7 @@ const echartsDialogTemplates = computed(() => {
                 type="button"
                 class="rte-image-side-item"
                 :class="{ active: rte.imageSidebarKey === cat.id }"
+                title="只看这个分类里的图片"
                 @click="rte.imageSidebarKey = cat.id"
               >
                 <span data-rte-own class="rte-image-side-ico" aria-hidden="true">📁</span>
@@ -1929,8 +1953,8 @@ const echartsDialogTemplates = computed(() => {
                   class="rte-library-cat-delete"
                   role="button"
                   tabindex="0"
-                  title="删除分类"
-                  aria-label="删除分类"
+                  title="删除这个分类，里面的图片回到未分类"
+                  aria-label="删除这个分类"
                   @click.stop="rte.deleteImageCategory(cat.id)"
                   @keydown.enter.stop="rte.deleteImageCategory(cat.id)"
                   @keydown.space.stop.prevent="rte.deleteImageCategory(cat.id)"
@@ -1943,11 +1967,12 @@ const echartsDialogTemplates = computed(() => {
                   type="text"
                   class="rte-image-add-cat-input"
                   placeholder="分类名称"
+                  title="分类名称，最多 40 字，按 Enter 创建"
                   maxlength="40"
                   @keydown.enter.prevent="rte.confirmAddCategory"
                   @keydown.esc.prevent="rte.addingCategory = false"
                 />
-                <button data-rte-own type="button" class="rte-image-add-cat-ok" @click="rte.confirmAddCategory">
+                <button data-rte-own type="button" class="rte-image-add-cat-ok" title="用这个名字建分类" @click="rte.confirmAddCategory">
                   确定
                 </button>
               </div>
@@ -1955,6 +1980,7 @@ const echartsDialogTemplates = computed(() => {
                 v-else
                 type="button"
                 class="rte-image-side-item rte-image-add-cat"
+                title="新建一个分类"
                 @click="rte.startAddCategory"
               >
                 <span data-rte-own class="rte-image-side-ico" aria-hidden="true">📁+</span>
@@ -1968,6 +1994,7 @@ const echartsDialogTemplates = computed(() => {
                   <button data-rte-own
                     type="button"
                     class="rte-library-delete"
+                    title="从素材库删除选中的图片"
                     :disabled="rte.imageSelectedIds.size === 0"
                     @click="rte.deleteSelectedImages()"
                   >
@@ -1981,6 +2008,7 @@ const echartsDialogTemplates = computed(() => {
                   <input data-rte-own
                     type="checkbox"
                     :checked="rte.imageSelectAll"
+                    title="选中或取消当前分类里的全部图片"
                     @change="rte.onImageSelectAllChange"
                   />
                   <span data-rte-own>本页全选</span>
@@ -1993,7 +2021,7 @@ const echartsDialogTemplates = computed(() => {
                 <button data-rte-own
                   type="button"
                   class="rte-image-upload-card"
-                  title="本地图片上传"
+                  title="从本机选图片，归到当前分类"
                   @click="rte.triggerLocalImagePick"
                 >
                   <span data-rte-own class="rte-image-upload-ico" aria-hidden="true">
@@ -2017,7 +2045,7 @@ const echartsDialogTemplates = computed(() => {
                     'is-loading': rte.imageThumb(asset.src).status === 'loading',
                     'is-error': rte.imageThumb(asset.src).status === 'error',
                   }"
-                  :title="asset.name"
+                  :title="'点一下选中「' + asset.name + '」，再点取消'"
                   @click="rte.toggleImageSelect(asset.id)"
                 >
                   <img
@@ -2040,6 +2068,7 @@ const echartsDialogTemplates = computed(() => {
                       class="rte-image-thumb-retry"
                       role="button"
                       tabindex="0"
+                      title="重新加载这张缩略图"
                       @click.stop="rte.retryImageThumb(asset.src)"
                       @keydown.enter.stop="rte.retryImageThumb(asset.src)"
                       @keydown.space.stop.prevent="rte.retryImageThumb(asset.src)"
@@ -2056,8 +2085,8 @@ const echartsDialogTemplates = computed(() => {
                     class="rte-library-card-delete"
                     role="button"
                     tabindex="0"
-                    title="删除"
-                    aria-label="删除图片"
+                    title="从素材库删除这一张"
+                    aria-label="从素材库删除这一张"
                     @click.stop="rte.deleteImageAsset(asset.id)"
                     @keydown.enter.stop="rte.deleteImageAsset(asset.id)"
                     @keydown.space.stop.prevent="rte.deleteImageAsset(asset.id)"
@@ -2077,15 +2106,16 @@ const echartsDialogTemplates = computed(() => {
               v-model="rte.imageExternalUrls"
               class="rte-image-url-textarea"
               placeholder="https://example.com/a.png&#10;https://example.com/b.jpg"
+              title="每行一个 http 或 https 图片地址"
               spellcheck="false"
             />
           </div>
 
           <div data-rte-own class="rte-modal-actions rte-image-actions">
-            <button data-rte-own type="button" class="rte-modal-cancel" @click="rte.closeImageDialog">
+            <button data-rte-own type="button" class="rte-modal-cancel" title="不插入图片" @click="rte.closeImageDialog">
               取消
             </button>
-            <button data-rte-own type="button" class="rte-modal-confirm" @click="rte.confirmInsertImages">
+            <button data-rte-own type="button" class="rte-modal-confirm" title="把选中的图片插到光标处；外部链接则按每行一个插入" @click="rte.confirmInsertImages">
               确认
             </button>
           </div>
