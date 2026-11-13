@@ -206,6 +206,45 @@ describe('雷达图的指标和系列', () => {
   })
 })
 
+describe('dataset 里的表', () => {
+  const chart = {
+    dataset: {
+      source: [
+        ['product', '2015', '2016'],
+        ['抹茶', 43, 85],
+        ['奶茶', 83, 73],
+      ],
+    },
+    xAxis: { type: 'category' },
+    yAxis: { type: 'value' },
+    series: [{ type: 'bar' }, { type: 'bar' }],
+  }
+
+  it('没有 series.data 时从 dataset 读出类目和系列', () => {
+    const model = optionToDataModel(chart)
+    expect(model.categories).toEqual(['抹茶', '奶茶'])
+    expect(model.series.map((item) => item.name)).toEqual(['2015', '2016'])
+    expect(model.series[0]!.data).toEqual([43, 83])
+    expect(model.series[1]!.data).toEqual([85, 73])
+  })
+
+  it('改类目和数值后写回 dataset，不另造 series.data', () => {
+    const model = optionToDataModel(chart)
+    model.categories[0] = '绿茶'
+    model.series[0]!.data[0] = 50
+    const next = dataModelToOption(chart, model)
+    const dataset = next.dataset as { source: unknown[][] }
+    expect(dataset.source).toEqual([
+      ['product', '2015', '2016'],
+      ['绿茶', 50, 85],
+      ['奶茶', 83, 73],
+    ])
+    const series = next.series as Array<{ data?: unknown }>
+    expect(series[0]!.data).toBeUndefined()
+    expect(series[1]!.type).toBe('bar')
+  })
+})
+
 describe('数据 JSON 视图', () => {
   it('模型 → JSON → 模型 往返一致', () => {
     const model = optionToDataModel(CARTESIAN)
