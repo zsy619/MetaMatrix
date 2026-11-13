@@ -22,8 +22,22 @@ const errorMsg = ref('')
 const previewTarget = ref<PanelAttachment | null>(null)
 const uploadProgress = ref<number | null>(null)
 const pendingDeleteId = ref<string | null>(null)
+const adderOpen = ref(false)
 
 const list = computed(() => documentStore.getPanelAttachments(props.panelId))
+const quiet = computed(
+  () =>
+    list.value.length === 0 &&
+    !adderOpen.value &&
+    !showUrlForm.value &&
+    !errorMsg.value &&
+    uploadProgress.value == null,
+)
+
+function openAdder(event: MouseEvent) {
+  event.stopPropagation()
+  adderOpen.value = true
+}
 
 function iconFor(att: PanelAttachment): string {
   const mime = (att.mimeType || '').toLowerCase()
@@ -186,10 +200,13 @@ function closePreview() {
 <template>
   <div
     class="pa-root"
-    :class="{ compact }"
+    :class="{ compact, 'is-quiet': quiet }"
     @click.stop
   >
-    <div class="pa-head">
+    <div v-if="quiet" class="pa-head">
+      <button type="button" class="pa-btn pa-quiet" title="添加文件或链接" @click="openAdder">添加资料</button>
+    </div>
+    <div v-else class="pa-head">
       <span class="pa-title">相关资料</span>
       <div class="pa-actions">
         <button
@@ -277,7 +294,7 @@ function closePreview() {
         </button>
       </li>
     </ul>
-    <p v-else class="pa-empty">暂无资料，可添加文件或链接</p>
+    <p v-else class="pa-empty" :class="{ 'is-sr': quiet }">暂无资料，可添加文件或链接</p>
 
     <AttachmentPreviewModal
       :attachment="previewTarget"
@@ -298,6 +315,24 @@ function closePreview() {
 
 .pa-root.compact {
   padding: 4px 6px 6px;
+}
+
+.pa-root.is-quiet {
+  padding: 1px 8px 3px;
+  background: transparent;
+  border-top-color: transparent;
+}
+
+.pa-quiet {
+  border: 0;
+  background: transparent;
+  padding: 1px 0;
+  color: #6b645c;
+}
+
+.pa-quiet:hover {
+  background: transparent;
+  color: var(--cv-focus, #1c4c7c);
 }
 
 .pa-head {
@@ -481,7 +516,19 @@ function closePreview() {
 .pa-empty {
   margin: 2px 0 0;
   font-size: 11px;
-  color: #b0b4b8;
+  color: #6b645c;
   line-height: 1.4;
+}
+
+.pa-empty.is-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 </style>
