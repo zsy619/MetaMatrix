@@ -152,7 +152,7 @@ function onCloseMaximize(event?: Event) {
         :show-title="false"
         :show-bottom-bar="true"
         :show-publish-actions="false"
-        placeholder="请输入正文"
+        placeholder="写在这里"
         :model-value="editorHtml"
         @update:model-value="onEditorHtml"
         @focus="onEditorFocus"

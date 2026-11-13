@@ -204,7 +204,7 @@ function onCloseMaximize(event?: Event) {
         :show-bottom-bar="false"
         :show-publish-actions="false"
         :show-markdown-hint="false"
-        :placeholder="isCard ? '点击填写…' : '请输入正文'"
+        :placeholder="isCard ? '点击填写…' : '写在这里'"
         :model-value="editorHtml"
         @update:model-value="onEditorHtml"
         @focus="onEditorFocus"
