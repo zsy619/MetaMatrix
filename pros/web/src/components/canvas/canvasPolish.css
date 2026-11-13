@@ -253,3 +253,21 @@
 .canvas-viewport .rte-root .rte-bottom {
   display: none;
 }
+
+/* 编辑区融进格子底色，不再套一层白框。放大层在视口外面，仍是白纸。 */
+.canvas-viewport .rte-root.rte-root {
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
+}
+
+.canvas-viewport .rte-root .rte-canvas,
+.canvas-viewport .rte-root .rte-body {
+  background: transparent;
+}
+
+/* 放大是排版入口，平时也要看得见。各画布原来把按钮藏到悬停才出现。 */
+.canvas-viewport .ym-block > .ym-block-toolbar.ym-block-toolbar {
+  opacity: 0.92;
+}
