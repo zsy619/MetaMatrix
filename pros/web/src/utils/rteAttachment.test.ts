@@ -38,6 +38,16 @@ describe('附件链接', () => {
       ['甲,乙', '12'],
     ])
     expect(attachmentTable('只有一段话', '笔记.txt')).toEqual([])
+    expect(attachmentTable('{"a":1,"b":2}', '数据.json')).toEqual([])
+    expect(attachmentTable('你好,世界', '笔记.txt')).toEqual([])
+    expect(attachmentTable('名称;金额\n甲;1,5\n', '预算.csv')).toEqual([
+      ['名称', '金额'],
+      ['甲', '1,5'],
+    ])
+    expect(attachmentTable('名称,说明\n甲,"第一行\n第二行",1\n', '预算.csv')).toEqual([
+      ['名称', '说明', ''],
+      ['甲', '第一行\n第二行', '1'],
+    ])
   })
 
   it('按文件名和类型判断预览方式', () => {
@@ -47,6 +57,8 @@ describe('附件链接', () => {
     expect(attachmentKind('旧版.doc', 'application/msword')).toBe('doc')
     expect(attachmentKind('预算.xlsx', '')).toBe('sheet')
     expect(attachmentKind('旧表.xls', 'application/vnd.ms-excel')).toBe('sheet')
+    expect(attachmentKind('讲解.mp3', '')).toBe('audio')
+    expect(attachmentKind('演示.mp4', 'video/mp4')).toBe('video')
   })
 
   it('用素材元数据里的签名地址取回文件', async () => {

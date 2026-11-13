@@ -33,6 +33,8 @@ let objectOwned = ''
 function objectType(kind: LoadedAttachment['kind'], mime: string): string {
   if (kind === 'pdf') return 'application/pdf'
   if (kind === 'image') return mime.startsWith('image/') ? mime : 'image/png'
+  if (kind === 'audio') return mime.startsWith('audio/') ? mime : 'audio/mpeg'
+  if (kind === 'video') return mime.startsWith('video/') ? mime : 'video/mp4'
   return mime || 'application/octet-stream'
 }
 
@@ -90,7 +92,7 @@ watch(target, async (next) => {
     else if (file.kind === 'sheet') {
       sheets.value = await previewSheets(file.blob)
       html.value = sheets.value[0]?.html || ''
-    } else if (file.kind === 'image' || file.kind === 'pdf') {
+    }     else if (file.kind === 'image' || file.kind === 'pdf' || file.kind === 'audio' || file.kind === 'video') {
       await openObject(file.blob, objectType(file.kind, file.mime))
       if (rte.attachmentPreview?.href !== next.href) releaseObject()
     }
@@ -132,6 +134,8 @@ onBeforeUnmount(() => {
           <p v-else-if="error" class="rte-attach-preview-status is-error">{{ error }}</p>
           <img v-else-if="kind === 'image' && objectUrl" :src="objectUrl" :alt="fileName" />
           <iframe v-else-if="kind === 'pdf' && objectUrl" :src="objectUrl" :title="fileName"></iframe>
+          <audio v-else-if="kind === 'audio' && objectUrl" :src="objectUrl" :aria-label="fileName" controls></audio>
+          <video v-else-if="kind === 'video' && objectUrl" :src="objectUrl" :aria-label="fileName" controls></video>
           <div v-else-if="kind === 'sheet'" class="rte-attach-sheet">
             <div v-if="sheets.length > 1" class="rte-attach-sheet-tabs" role="tablist">
               <button
@@ -255,6 +259,16 @@ onBeforeUnmount(() => {
   border: 0;
   background: #fff;
 }
+.rte-attach-preview-body audio,
+.rte-attach-preview-body video {
+  display: block;
+  width: 100%;
+  max-height: 100%;
+  background: #111;
+}
+.rte-attach-preview-body video {
+  min-height: 240px;
+}
 .rte-attach-preview-body pre {
   margin: 0;
   padding: 16px;
@@ -303,11 +317,14 @@ onBeforeUnmount(() => {
 .rte-attach-doc :deep(td),
 .rte-attach-doc :deep(th),
 .rte-attach-sheet-table :deep(td),
-.rte-attach-sheet-table :deep(th) {
+.rte-attach-sheet-table :deep(th),
+.rte-attach-sheet-table td,
+.rte-attach-sheet-table th {
   border: 1px solid #e5e6eb;
   padding: 6px 8px;
   text-align: left;
   vertical-align: top;
+  white-space: pre-wrap;
 }
 .rte-attach-doc :deep(img) {
   max-width: 100%;

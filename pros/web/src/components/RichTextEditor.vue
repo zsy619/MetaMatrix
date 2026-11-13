@@ -5776,11 +5776,11 @@ async function onLocalAttachFilesChange(event: Event) {
   }
   const catId = currentAttachCategoryId()
   const added: StoredAttach[] = []
-  let rejected = ''
+  const rejected: string[] = []
   for (const file of files) {
     const reason = rteAttachmentUploadReject(file.name, file.type || '', file.size)
     if (reason) {
-      rejected = reason
+      if (!rejected.includes(reason)) rejected.push(reason)
       continue
     }
     try {
@@ -5800,10 +5800,10 @@ async function onLocalAttachFilesChange(event: Event) {
     }
   }
   if (!added.length) {
-    rteToast('error', rejected || '附件读取失败')
+    rteToast('error', rejected.join('\n') || '附件读取失败')
     return
   }
-  if (rejected) rteToast('warning', rejected)
+  if (rejected.length) rteToast('warning', rejected.join('\n'))
   attachAssets.value = [...added, ...attachAssets.value]
   saveAttachStore()
   const next = new Set(attachSelectedIds.value)

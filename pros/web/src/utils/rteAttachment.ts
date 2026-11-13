@@ -22,7 +22,7 @@ export function attachmentInsertHref(src: string): string | null {
   return null
 }
 
-export type AttachmentKind = 'image' | 'pdf' | 'text' | 'docx' | 'doc' | 'sheet' | 'file'
+export type AttachmentKind = 'image' | 'pdf' | 'text' | 'docx' | 'doc' | 'sheet' | 'audio' | 'video' | 'file'
 
 export function attachmentKind(name: string, mime: string): AttachmentKind {
   const fileName = name.toLowerCase()
@@ -38,6 +38,8 @@ export function attachmentKind(name: string, mime: string): AttachmentKind {
   ) {
     return 'sheet'
   }
+  if (type.startsWith('audio/') || /\.(mp3|wav|m4a|aac|ogg|flac)$/.test(fileName)) return 'audio'
+  if (type.startsWith('video/') || /\.(mp4|webm|mov|m4v|ogv)$/.test(fileName)) return 'video'
   if (
     type.startsWith('text/')
     || type === 'application/json'
@@ -89,7 +91,6 @@ export function isAttachmentAnchor(href: string, text: string, className = ''): 
 }
 
 function splitDelimitedLine(line: string, delimiter: string): string[] {
-  if (delimiter !== ',') return line.split(delimiter).map((cell) => cell.trim())
   const cells: string[] = []
   let current = ''
   let quoted = false
@@ -115,23 +116,69 @@ function splitDelimitedLine(line: string, delimiter: string): string[] {
   return cells
 }
 
-/** CSV 或 TSV 预览成表格。不是表格时返回空数组。 */
-export function attachmentTable(text: string, name = ''): string[][] {
-  const source = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n')
-  const lines = source.split('\n').filter((line) => line.trim())
-  if (!lines.length) return []
-  const fileName = name.toLowerCase()
-  const sample = lines[0] || ''
-  const delimiter = fileName.endsWith('.tsv') || (sample.split('\t').length > sample.split(',').length && sample.includes('\t'))
-    ? '\t'
-    : fileName.endsWith('.csv') || sample.includes(',')
-      ? ','
-      : ''
-  if (!delimiter) return []
-  const rows = lines.map((line) => splitDelimitedLine(line, delimiter))
-  const width = Math.max(...rows.map((row) => row.length))
+/** 引号里的换行留在同一个单元格，不提前拆成下一行。 */
+function splitRecords(source: string): string[] {
+  const records: string[] = []
+  let current = ''
+  let quoted = false
+  for (let index = 0; index < source.length; index += 1) {
+    const char = source[index]
+    if (char === '"') {
+      current += char
+      if (quoted && source[index + 1] === '"') {
+        current += '"'
+        index += 1
+      } else {
+        quoted = !quoted
+      }
+      continue
+    }
+    if (char === '\n' && !quoted) {
+      if (current.trim()) records.push(current)
+      current = ''
+      continue
+    }
+    current += char
+  }
+  if (current.trim()) records.push(current)
+  return records
+}
+
+function padRows(rows: string[][]): string[][] {
+  const width = Math.max(0, ...rows.map((row) => row.length))
   if (width < 2) return []
   return rows.map((row) => Array.from({ length: width }, (_, index) => row[index] || ''))
+}
+
+/** CSV 或 TSV 预览成表格。正文里偶尔出现的逗号、JSON 不拆成表。 */
+export function attachmentTable(text: string, name = ''): string[][] {
+  const source = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+  const records = splitRecords(source)
+  if (!records.length) return []
+  const fileName = name.toLowerCase()
+  const sample = records[0] || ''
+  const tabularName = fileName.endsWith('.csv') || fileName.endsWith('.tsv')
+  const commaWidth = splitDelimitedLine(sample, ',').length
+  const semiWidth = splitDelimitedLine(sample, ';').length
+  const tabWidth = splitDelimitedLine(sample, '\t').length
+  let delimiter = ''
+  if (fileName.endsWith('.tsv') || (sample.includes('\t') && tabWidth >= commaWidth && tabWidth >= semiWidth && tabWidth >= 2)) {
+    delimiter = '\t'
+  } else if (fileName.endsWith('.csv') && semiWidth > commaWidth) {
+    delimiter = ';'
+  } else if (tabularName || (!fileName.endsWith('.json') && !fileName.endsWith('.md') && !fileName.endsWith('.markdown') && commaWidth >= 2)) {
+    delimiter = ','
+  }
+  if (!delimiter) return []
+  const rows = padRows(records.map((line) => splitDelimitedLine(line, delimiter)))
+  if (!rows.length) return []
+  if (!tabularName) {
+    if (rows.length < 2) return []
+    const width = rows[0]?.length || 0
+    const matched = rows.filter((row) => row.length === width).length
+    if (matched < 2) return []
+  }
+  return rows
 }
 
 export type LoadedAttachment = {
