@@ -222,6 +222,13 @@
   border-radius: 0 999px 999px 0;
 }
 
+/* 画布里的紧凑编辑器默认 12px，格子里读起来费劲。 */
+.canvas-viewport .rte-root.compact .ProseMirror,
+.canvas-viewport .rte-root.compact .tiptap {
+  font-size: 15px !important;
+  line-height: 1.7 !important;
+}
+
 /* 空格子要能看清「写在这里」。各画布自己的占位色偏灰，盖在浅色底上会消失。 */
 .canvas-viewport .is-empty::before,
 .canvas-viewport .is-editor-empty::before,

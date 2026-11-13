@@ -13,7 +13,7 @@
   --cv-select-soft: rgba(22, 40, 64, 0.42);
   --cv-focus: #163044;
   --cv-hover-wash: #e8f1fa;
-  --cv-header-shadow: 0 1px 1px rgba(0, 0, 0, 0.34), 0 0 1px rgba(0, 0, 0, 0.28);
+  --cv-header-shadow: 0 1px 0 rgba(0, 0, 0, 0.18);
 }
 
 /* Keyboard focus for worksheet controls. Mouse focus on the rich-text surface stays quiet. */

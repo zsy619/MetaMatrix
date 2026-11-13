@@ -475,8 +475,8 @@ function onCloseMaximize(event?: Event) {
 .fsp :deep(.rte-body),
 .fsp :deep(.ProseMirror) {
   min-height: 48px;
-  font-size: 14px;
-  line-height: 1.65;
+  font-size: 15px;
+  line-height: 1.7;
   color: #202124;
 }
 
