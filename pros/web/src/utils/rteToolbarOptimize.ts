@@ -418,6 +418,54 @@ const MENU_ITEM_TITLES: Record<string, string> = {
   '强调': '给图片加一条蓝色粗边',
 }
 
+const BLOCK_MENU_TITLES: Record<string, string> = {
+  paragraph: '把这一段改成正文',
+  h1: '改成一级标题',
+  h2: '改成二级标题',
+  h3: '改成三级标题',
+  'other-headings': '打开四级到六级标题',
+  h4: '改成四级标题',
+  h5: '改成五级标题',
+  h6: '改成六级标题',
+  ordered: '改成有序列表',
+  bullet: '改成无序列表',
+  task: '改成可勾选的任务列表',
+  code: '改成代码块',
+  quote: '改成引用',
+  'quote-default': '左侧一条竖线的引用',
+  'quote-emphasis': '浅色底的强调引用',
+  'quote-verse': '居中的诗文引用',
+  callout: '改成高亮告示',
+  'callout-info': '插入蓝色提示告示',
+  'callout-warn': '插入橙色警告告示',
+  'callout-success': '插入绿色成功告示',
+  'callout-error': '插入红色错误告示',
+  sync: '插入一块会同步的内容',
+}
+
+/** 段落菜单每一项改完是什么。没有说明时返回空字符串。 */
+export function blockMenuTitle(id: string): string {
+  return BLOCK_MENU_TITLES[id] || ''
+}
+
+const WORD_STAT_TITLES: Record<string, string> = {
+  chars: '去掉空白后的字符数，含标题、表格和代码',
+  words: '按中英文分开估算的词数',
+  minutes: '按大约 400 字一分钟估算',
+  paragraphs: '有文字的段落个数，空段不算',
+  lines: '按换行计算的行数',
+  headings: '文档里的标题个数',
+  cjk: '汉字的个数',
+  ascii: '英文单词的个数',
+  selectionChars: '当前选中、去掉空白后的字符数',
+  selectionWords: '当前选中的词数',
+}
+
+/** 字数面板每一行在数什么。没有说明时返回空字符串。 */
+export function wordStatTitle(id: string): string {
+  return WORD_STAT_TITLES[id] || ''
+}
+
 /** 菜单项的说明。没有单独说明时返回空字符串。 */
 export function toolbarMenuItemTitle(label: string): string {
   return MENU_ITEM_TITLES[label.trim()] || ''

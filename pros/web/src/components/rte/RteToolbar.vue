@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { inject, nextTick, onMounted, ref, watch } from 'vue'
 import { RTE_BINDINGS } from './bindings'
-import { alignToolTitle, clampToolbarQuery, cycleSearchIndex, disabledToolTitle, EMPTY_GROUP_NOTE, FOCUS_MODE_NOTE, fontFamilyCaption, groupHandleTitle, LAST_TOOLBAR_QUERY_KEY, lineHeightCaption, listToolLabel, menuFocusStep, menuToolNeedsCaret, moreToolsCaption, moreToolsTitle, ribbonSearchLabel, ribbonTabForDigit, ribbonTabHint, ribbonTabTabIndex, ribbonTypeaheadQuery, SEARCH_INPUT_HINT, searchEnterActivates, searchGroupCaption, shortcutFromTitle, stepRibbonTab, stepRibbonTabBy, tableToolLabel, toolbarGroupReorderAllowed, toolbarMenuItemTitle, toolbarSearchStatus, toolIsUnavailable, zoomToolLabel, zoomToolTitle } from '../../utils/rteToolbarOptimize'
+import { alignToolTitle, blockMenuTitle, clampToolbarQuery, cycleSearchIndex, disabledToolTitle, EMPTY_GROUP_NOTE, FOCUS_MODE_NOTE, fontFamilyCaption, groupHandleTitle, LAST_TOOLBAR_QUERY_KEY, lineHeightCaption, listToolLabel, menuFocusStep, menuToolNeedsCaret, moreToolsCaption, moreToolsTitle, ribbonSearchLabel, ribbonTabForDigit, ribbonTabHint, ribbonTabTabIndex, ribbonTypeaheadQuery, SEARCH_INPUT_HINT, searchEnterActivates, searchGroupCaption, shortcutFromTitle, stepRibbonTab, stepRibbonTabBy, tableToolLabel, toolbarGroupReorderAllowed, toolbarMenuItemTitle, toolbarSearchStatus, toolIsUnavailable, wordStatTitle, zoomToolLabel, zoomToolTitle } from '../../utils/rteToolbarOptimize'
 import { useParentScopeStamp } from './inheritScope'
 import { buildChartGroups } from '../../utils/echarts/chartGroups'
 import { TABLE_MENU_ICONS } from './tableMenuIcons'
@@ -521,6 +521,7 @@ function toggleChartGroupMenu(key: string) {
                       active: rte.isBlockMenuActive(it.id),
                       'has-sub': !!it.children,
                     }"
+                    :title="blockMenuTitle(it.id) || undefined"
                     @click="rte.applyBlockMenu(it.id)"
                   >
                     <span data-rte-own class="rte-para-mark">{{ it.mark }}</span>
@@ -541,6 +542,7 @@ function toggleChartGroupMenu(key: string) {
                       :data-para-style="child.id"
                       :aria-checked="rte.isBlockMenuActive(child.id)"
                       :class="{ active: rte.isBlockMenuActive(child.id) }"
+                      :title="blockMenuTitle(child.id) || undefined"
                       @mouseenter="rte.onBlockMenuEnter(child.id)"
                       @click="rte.applyBlockMenu(child.id)"
                     >
@@ -1821,21 +1823,21 @@ function toggleChartGroupMenu(key: string) {
             >
               <div data-rte-own class="rte-wordstats-title">字数统计</div>
               <p data-rte-own class="rte-wordstats-note">全文含标题、表格和代码中的文字，不含评论。</p>
-              <div data-rte-own class="rte-wordstats-row"><span data-rte-own>全文（去空白）</span><strong data-rte-own>{{ rte.charCount }}</strong></div>
-              <div data-rte-own class="rte-wordstats-row"><span data-rte-own>词数（估）</span><strong data-rte-own>{{ rte.wordCount }}</strong></div>
-              <div data-rte-own class="rte-wordstats-row"><span data-rte-own>阅读约</span><strong data-rte-own>{{ rte.readingMinutes }} 分钟</strong></div>
+              <div data-rte-own class="rte-wordstats-row" :title="wordStatTitle('chars')"><span data-rte-own>全文（去空白）</span><strong data-rte-own>{{ rte.charCount }}</strong></div>
+              <div data-rte-own class="rte-wordstats-row" :title="wordStatTitle('words')"><span data-rte-own>词数（估）</span><strong data-rte-own>{{ rte.wordCount }}</strong></div>
+              <div data-rte-own class="rte-wordstats-row" :title="wordStatTitle('minutes')"><span data-rte-own>阅读约</span><strong data-rte-own>{{ rte.readingMinutes }} 分钟</strong></div>
               <div data-rte-own class="rte-wordstats-divider" />
-              <div data-rte-own class="rte-wordstats-row"><span data-rte-own>段落</span><strong data-rte-own>{{ rte.docExtraStats.paragraphs }}</strong></div>
-              <div data-rte-own class="rte-wordstats-row"><span data-rte-own>行数</span><strong data-rte-own>{{ rte.docExtraStats.lines }}</strong></div>
-              <div data-rte-own class="rte-wordstats-row"><span data-rte-own>标题数</span><strong data-rte-own>{{ rte.docExtraStats.headings }}</strong></div>
-              <div data-rte-own class="rte-wordstats-row"><span data-rte-own>汉字</span><strong data-rte-own>{{ rte.docExtraStats.cjk }}</strong></div>
-              <div data-rte-own class="rte-wordstats-row"><span data-rte-own>英文词</span><strong data-rte-own>{{ rte.docExtraStats.asciiWords }}</strong></div>
+              <div data-rte-own class="rte-wordstats-row" :title="wordStatTitle('paragraphs')"><span data-rte-own>段落</span><strong data-rte-own>{{ rte.docExtraStats.paragraphs }}</strong></div>
+              <div data-rte-own class="rte-wordstats-row" :title="wordStatTitle('lines')"><span data-rte-own>行数</span><strong data-rte-own>{{ rte.docExtraStats.lines }}</strong></div>
+              <div data-rte-own class="rte-wordstats-row" :title="wordStatTitle('headings')"><span data-rte-own>标题数</span><strong data-rte-own>{{ rte.docExtraStats.headings }}</strong></div>
+              <div data-rte-own class="rte-wordstats-row" :title="wordStatTitle('cjk')"><span data-rte-own>汉字</span><strong data-rte-own>{{ rte.docExtraStats.cjk }}</strong></div>
+              <div data-rte-own class="rte-wordstats-row" :title="wordStatTitle('ascii')"><span data-rte-own>英文词</span><strong data-rte-own>{{ rte.docExtraStats.asciiWords }}</strong></div>
               <div data-rte-own class="rte-wordstats-divider" />
-              <div data-rte-own class="rte-wordstats-row">
+              <div data-rte-own class="rte-wordstats-row" :title="wordStatTitle('selectionChars')">
                 <span data-rte-own>选区字符</span>
                 <strong data-rte-own>{{ rte.selectionStats.hasSelection ? rte.selectionStats.chars : '—' }}</strong>
               </div>
-              <div data-rte-own class="rte-wordstats-row">
+              <div data-rte-own class="rte-wordstats-row" :title="wordStatTitle('selectionWords')">
                 <span data-rte-own>选区词数</span>
                 <strong data-rte-own>{{ rte.selectionStats.hasSelection ? rte.selectionStats.words : '—' }}</strong>
               </div>
@@ -1879,6 +1881,7 @@ function toggleChartGroupMenu(key: string) {
                 type="button"
                 :class="{ active: rte.isActive('callout', { variant: it.variant }) }"
                 :aria-pressed="rte.isActive('callout', { variant: it.variant })"
+                :title="blockMenuTitle('callout-' + it.variant) || undefined"
                 @click="rte.insertCallout(it.variant)"
               >
                 <span data-rte-own class="rte-callout-dot" :data-variant="it.variant" aria-hidden="true" />
@@ -2785,6 +2788,7 @@ function toggleChartGroupMenu(key: string) {
                 type="button"
                 :class="{ active: rte.isActive('callout', { variant: it.variant }) }"
                 :aria-pressed="rte.isActive('callout', { variant: it.variant })"
+                :title="blockMenuTitle('callout-' + it.variant) || undefined"
                 @click="rte.insertCallout(it.variant)"
               >
                 <span data-rte-own class="rte-callout-dot" :data-variant="it.variant" aria-hidden="true" />
@@ -2913,21 +2917,21 @@ function toggleChartGroupMenu(key: string) {
         >
           <div data-rte-own class="rte-wordstats-title">字数统计</div>
           <p data-rte-own class="rte-wordstats-note">全文含标题、表格和代码中的文字，不含评论。</p>
-          <div data-rte-own class="rte-wordstats-row"><span data-rte-own>全文（去空白）</span><strong data-rte-own>{{ rte.charCount }}</strong></div>
-          <div data-rte-own class="rte-wordstats-row"><span data-rte-own>词数（估）</span><strong data-rte-own>{{ rte.wordCount }}</strong></div>
-          <div data-rte-own class="rte-wordstats-row"><span data-rte-own>阅读约</span><strong data-rte-own>{{ rte.readingMinutes }} 分钟</strong></div>
+          <div data-rte-own class="rte-wordstats-row" :title="wordStatTitle('chars')"><span data-rte-own>全文（去空白）</span><strong data-rte-own>{{ rte.charCount }}</strong></div>
+          <div data-rte-own class="rte-wordstats-row" :title="wordStatTitle('words')"><span data-rte-own>词数（估）</span><strong data-rte-own>{{ rte.wordCount }}</strong></div>
+          <div data-rte-own class="rte-wordstats-row" :title="wordStatTitle('minutes')"><span data-rte-own>阅读约</span><strong data-rte-own>{{ rte.readingMinutes }} 分钟</strong></div>
           <div data-rte-own class="rte-wordstats-divider" />
-          <div data-rte-own class="rte-wordstats-row"><span data-rte-own>段落</span><strong data-rte-own>{{ rte.docExtraStats.paragraphs }}</strong></div>
-          <div data-rte-own class="rte-wordstats-row"><span data-rte-own>行数</span><strong data-rte-own>{{ rte.docExtraStats.lines }}</strong></div>
-          <div data-rte-own class="rte-wordstats-row"><span data-rte-own>标题数</span><strong data-rte-own>{{ rte.docExtraStats.headings }}</strong></div>
-          <div data-rte-own class="rte-wordstats-row"><span data-rte-own>汉字</span><strong data-rte-own>{{ rte.docExtraStats.cjk }}</strong></div>
-          <div data-rte-own class="rte-wordstats-row"><span data-rte-own>英文词</span><strong data-rte-own>{{ rte.docExtraStats.asciiWords }}</strong></div>
+          <div data-rte-own class="rte-wordstats-row" :title="wordStatTitle('paragraphs')"><span data-rte-own>段落</span><strong data-rte-own>{{ rte.docExtraStats.paragraphs }}</strong></div>
+          <div data-rte-own class="rte-wordstats-row" :title="wordStatTitle('lines')"><span data-rte-own>行数</span><strong data-rte-own>{{ rte.docExtraStats.lines }}</strong></div>
+          <div data-rte-own class="rte-wordstats-row" :title="wordStatTitle('headings')"><span data-rte-own>标题数</span><strong data-rte-own>{{ rte.docExtraStats.headings }}</strong></div>
+          <div data-rte-own class="rte-wordstats-row" :title="wordStatTitle('cjk')"><span data-rte-own>汉字</span><strong data-rte-own>{{ rte.docExtraStats.cjk }}</strong></div>
+          <div data-rte-own class="rte-wordstats-row" :title="wordStatTitle('ascii')"><span data-rte-own>英文词</span><strong data-rte-own>{{ rte.docExtraStats.asciiWords }}</strong></div>
           <div data-rte-own class="rte-wordstats-divider" />
-          <div data-rte-own class="rte-wordstats-row">
+          <div data-rte-own class="rte-wordstats-row" :title="wordStatTitle('selectionChars')">
             <span data-rte-own>选区字符</span>
             <strong data-rte-own>{{ rte.selectionStats.hasSelection ? rte.selectionStats.chars : '—' }}</strong>
           </div>
-          <div data-rte-own class="rte-wordstats-row">
+          <div data-rte-own class="rte-wordstats-row" :title="wordStatTitle('selectionWords')">
             <span data-rte-own>选区词数</span>
             <strong data-rte-own>{{ rte.selectionStats.hasSelection ? rte.selectionStats.words : '—' }}</strong>
           </div>

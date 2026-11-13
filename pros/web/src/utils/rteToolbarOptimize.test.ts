@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import {
   alignToolTitle,
+  blockMenuTitle,
   clampToolbarQuery,
   codeBlockToolTitle,
   cycleSearchIndex,
@@ -45,6 +46,7 @@ import {
   searchToolbarTools,
   stepRibbonTab,
   toolbarSearchStatus,
+  wordStatTitle,
   zoomToolLabel,
   zoomToolTitle,
 } from './rteToolbarOptimize.ts'
@@ -156,6 +158,11 @@ assert.equal(toolbarMenuItemTitle('一键生成…'), '按数据自动生成图�
 assert.equal(toolbarMenuItemTitle('小红书'), '窄卡片，顶部一条红色')
 assert.equal(toolbarMenuItemTitle('康奈尔'), '左边线索栏，底部总结栏')
 assert.equal(toolbarMenuItemTitle('竖排'), '文字从上往下、从右往左排')
+assert.equal(blockMenuTitle('h1'), '改成一级标题')
+assert.equal(blockMenuTitle('sync'), '插入一块会同步的内容')
+assert.equal(blockMenuTitle('missing'), '')
+assert.equal(wordStatTitle('minutes'), '按大约 400 字一分钟估算')
+assert.equal(wordStatTitle('paragraphs'), '有文字的段落个数，空段不算')
 assert.equal(stepRibbonTabBy(['a', 'b', 'c', 'd', 'e'], 'b', 3), 'e')
 assert.equal(stepRibbonTabBy(['a', 'b', 'c'], 'a', -3), 'a')
 assert.equal(zoomToolLabel(1), '实际大小')
