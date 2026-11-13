@@ -9,12 +9,13 @@ import { transformCaseText, type CaseMode } from '../utils/rteCaseTransform'
 import { renumberCaptions } from '../utils/rteCaptionNumber'
 import {
   sortTableByColumn,
+  tableSortBlock,
   upsertTableSumRow,
   currentTableColIndex,
 } from '../utils/rteTableExtras'
 import { TextSelection } from '@tiptap/pm/state'
 
-export { transformCaseText, renumberCaptions, sortTableByColumn, upsertTableSumRow, currentTableColIndex }
+export { transformCaseText, renumberCaptions, sortTableByColumn, tableSortBlock, upsertTableSumRow, currentTableColIndex }
 export type { CaseMode }
 
 export const RTE_ZOOM_PRESETS = [

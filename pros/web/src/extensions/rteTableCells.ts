@@ -2,7 +2,7 @@ import { TableCell } from '@tiptap/extension-table-cell'
 import { TableHeader } from '@tiptap/extension-table-header'
 import { mergeAttributes } from '@tiptap/core'
 import { Plugin } from '@tiptap/pm/state'
-import { editedRanges, formulaRecalcTransaction, TABLE_FORMULA_RECALC } from '../utils/rteTableFormulaOps'
+import { editedRanges, formulaRecalcTransaction, TABLE_FORMULA_RECALC, TABLE_STRUCTURE } from '../utils/rteTableFormulaOps'
 import { createPrintTableHeadPlugin } from '../utils/rtePrintTableHead'
 import { createTableCrosshairPlugin } from './rteTableCrosshair'
 
@@ -12,7 +12,8 @@ export function createTableFormulaPlugin(): Plugin {
     appendTransaction(transactions, _old, state) {
       if (!transactions.some((tr) => tr.docChanged)) return null
       if (transactions.some((tr) => tr.getMeta(TABLE_FORMULA_RECALC))) return null
-      return formulaRecalcTransaction(state, editedRanges(transactions))
+      const structural = transactions.some((tr) => tr.getMeta(TABLE_STRUCTURE))
+      return formulaRecalcTransaction(state, structural ? [] : editedRanges(transactions))
     },
     view(editorView) {
       queueMicrotask(() => {

@@ -19,6 +19,9 @@ import {
 /** 自动重算事务的标记，避免写回结果后再触发一轮。 */
 export const TABLE_FORMULA_RECALC = 'tableFormulaRecalc'
 
+/** 排序、合计这类整表改写。公式要跟着重算，不能当成用户改了格子而清掉。 */
+export const TABLE_STRUCTURE = 'tableStructure'
+
 /** 定位到的单元格。 */
 export type TableCellLocation = {
   /** 表格节点在文档中的位置。 */

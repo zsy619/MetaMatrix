@@ -6,6 +6,8 @@ import { Table } from '@tiptap/extension-table'
 import { TableRow } from '@tiptap/extension-table-row'
 import { CellSelection } from '@tiptap/pm/tables'
 import { RteTableCell, RteTableHeader } from '../extensions/rteTableCells'
+import { sortTableByColumn, tableSortBlock, upsertTableSumRow } from './rteTableExtras'
+import { TABLE_FORMULA_RECALC } from './rteTableFormulaOps'
 
 let editor: Editor | undefined
 
@@ -89,5 +91,102 @@ describe('表格合并、背景和列宽', () => {
     const again = ed.state.doc.nodeAt(cellAt(ed, 0, 0))
     expect(again?.attrs.colwidth).toEqual([180])
     ed.commands.undo()
+  })
+})
+
+function firstColumn(ed: Editor): string[] {
+  const out: string[] = []
+  ed.state.doc.descendants((node) => {
+    if (node.type.name !== 'table') return
+    node.forEach((row) => out.push(row.child(0)?.textContent || ''))
+    return false
+  })
+  return out
+}
+
+function focusInsideTable(ed: Editor) {
+  let pos = -1
+  ed.state.doc.descendants((node, at) => {
+    if (pos >= 0) return false
+    if (node.type.name === 'tableCell' || node.type.name === 'tableHeader') {
+      pos = at + 1
+      return false
+    }
+  })
+  ed.commands.setTextSelection(pos)
+}
+
+describe('表格排序和合计', () => {
+  it('没有表头时每一行都参与排序', () => {
+    const ed = makeEditor()
+    ed.commands.setContent('<table><tbody><tr><td><p>b</p></td></tr><tr><td><p>a</p></td></tr></tbody></table>')
+    focusInsideTable(ed)
+    expect(tableSortBlock(ed)).toBeNull()
+    expect(sortTableByColumn(ed, 0, true)).toBe(true)
+    expect(firstColumn(ed)).toEqual(['a', 'b'])
+  })
+
+  it('表头留在上面，合计留在下面', () => {
+    const ed = makeEditor()
+    ed.commands.setContent(
+      '<table><tbody><tr><th><p>名</p></th><th><p>数</p></th></tr><tr><td><p>乙</p></td><td><p>2</p></td></tr><tr><td><p>甲</p></td><td><p>1</p></td></tr><tr><td><p>合计</p></td><td><p>3</p></td></tr></tbody></table>',
+    )
+    focusInsideTable(ed)
+    expect(sortTableByColumn(ed, 1, true)).toBe(true)
+    expect(firstColumn(ed)).toEqual(['名', '甲', '乙', '合计'])
+  })
+
+  it('合并单元格时不排序', () => {
+    const ed = makeEditor()
+    ed.commands.setContent(
+      '<table><tbody><tr><td colspan="2"><p>合</p></td></tr><tr><td><p>a</p></td><td><p>b</p></td></tr></tbody></table>',
+    )
+    focusInsideTable(ed)
+    expect(tableSortBlock(ed)).toBe('merged')
+    expect(sortTableByColumn(ed, 0, true)).toBe(false)
+    expect(firstColumn(ed)[0]).toBe('合')
+  })
+
+  it('没有表头时合计把第一行也算进去', () => {
+    const ed = makeEditor()
+    ed.commands.setContent(
+      '<table><tbody><tr><td><p>甲</p></td><td><p>1</p></td></tr><tr><td><p>乙</p></td><td><p>2</p></td></tr></tbody></table>',
+    )
+    focusInsideTable(ed)
+    expect(upsertTableSumRow(ed)).toBe(true)
+    const last = firstColumn(ed)
+    expect(last[last.length - 1]).toBe('合计')
+    let sum = ''
+    ed.state.doc.descendants((node) => {
+      if (node.type.name !== 'table') return
+      const row = node.lastChild
+      sum = row?.child(1)?.textContent || ''
+      return false
+    })
+    expect(sum).toBe('3')
+  })
+
+  it('排序后公式里的行号跟着走', () => {
+    const ed = makeEditor()
+    ed.commands.setContent(
+      '<table><tbody><tr><td><p>2</p></td></tr><tr><td><p>1</p></td></tr></tbody></table>',
+    )
+    focusInsideTable(ed)
+    let formulaPos = -1
+    ed.state.doc.descendants((node, pos) => {
+      if (formulaPos < 0 && node.type.name === 'tableCell' && node.textContent === '2') formulaPos = pos
+    })
+    const formulaCell = ed.state.doc.nodeAt(formulaPos)
+    ed.view.dispatch(
+      ed.state.tr
+        .setNodeMarkup(formulaPos, undefined, { ...formulaCell!.attrs, formula: '=A2' })
+        .setMeta(TABLE_FORMULA_RECALC, true),
+    )
+    expect(sortTableByColumn(ed, 0, true)).toBe(true)
+    const formulas: string[] = []
+    ed.state.doc.descendants((node) => {
+      if (node.type.name === 'tableCell' && node.attrs.formula) formulas.push(String(node.attrs.formula))
+    })
+    expect(formulas).toEqual(['=A1'])
   })
 })

@@ -12,6 +12,7 @@ import {
 import {
   setCellVerticalAlign,
   sortTableByColumn,
+  tableSortBlock,
   upsertTableSumRow,
   currentTableColIndex,
 } from '../../rteWave20'
@@ -124,11 +125,17 @@ function doSortTable(asc: boolean) {
     ElMessage.info('请将光标放在表格中')
     return
   }
+  const block = tableSortBlock(ed)
+  if (block === 'merged') {
+    ElMessage.warning('表格里有合并的单元格，先拆开再排序')
+    deps.moreOpen().value = false
+    return
+  }
   const col = currentTableColIndex(ed)
-  if (sortTableByColumn(ed, col, asc)) {
-    ElMessage.success(`已按第 ${col + 1} 列${asc ? '升序' : '降序'}排序`)
+  if (block === 'short' || !sortTableByColumn(ed, col, asc)) {
+    ElMessage.warning('至少要有两行数据才能排序')
   } else {
-    ElMessage.warning('排序失败（需至少 2 行）')
+    ElMessage.success(`已按第 ${col + 1} 列${asc ? '升序' : '降序'}排序`)
   }
   deps.moreOpen().value = false
 }
