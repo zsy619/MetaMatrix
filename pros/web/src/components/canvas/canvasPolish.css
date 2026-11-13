@@ -118,7 +118,8 @@
 
 /* 标题在网格外面。网格用剩余高度撑满，内容再高时整页滚动，不要按整页 100% 把标题再加一遍。 */
 .canvas-viewport .sheet > .forces,
-.canvas-viewport .sheet > .chain {
+.canvas-viewport .sheet > .chain,
+.canvas-viewport .sheet > .pdca {
   flex: 1 0 auto;
   height: auto;
   overflow: visible;
@@ -150,6 +151,8 @@
 .canvas-viewport .forces .rte-slot,
 .canvas-viewport .chain section,
 .canvas-viewport .chain .rte-slot,
+.canvas-viewport .pdca > section,
+.canvas-viewport .pdca .rte-slot,
 .canvas-viewport .swot-grid .rte-slot,
 .canvas-viewport .lean-grid .rte-slot,
 .canvas-viewport .sheet > .grid .rte-slot,

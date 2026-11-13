@@ -46,9 +46,10 @@ function block(id: ImpactEffortBlockId) {
 .sheet-top { flex: none; margin-bottom: 8px; }
 .sheet-top h2, .sheet-top p { margin: 0; }
 .sheet-top p { color: #5f6368; font-size: 13px; }
-.axis { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: 28px 1fr; grid-template-rows: 1fr auto; gap: 6px; }
-.axis-y { display: flex; flex-direction: column; justify-content: space-around; align-items: center; color: #5f6368; font-size: 12px; text-align: center; }
-.axis-x { grid-column: 2; text-align: center; color: #5f6368; font-size: 12px; }
+.axis { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: 40px 1fr; grid-template-rows: 1fr auto; gap: 8px; }
+.axis-y { display: flex; flex-direction: column; justify-content: space-around; align-items: center; }
+.axis-y span { writing-mode: vertical-rl; color: #3c3424; font-size: 14px; font-weight: 700; letter-spacing: 0.12em; }
+.axis-x { grid-column: 2; text-align: center; color: #3c3424; font-size: 14px; font-weight: 700; letter-spacing: 0.08em; }
 .grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 10px; min-height: 0; }
 section { display: flex; flex-direction: column; min-height: 0; background: var(--col-body); border-radius: 12px; overflow: hidden; }
 h3 { margin: 0; min-height: 40px; display: flex; align-items: center; justify-content: center; background: var(--col-header); color: #fff; letter-spacing: 0.04em; }
