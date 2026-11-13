@@ -31,8 +31,8 @@ import {
 const props = defineProps<{ doc: ProjectGanttDocumentJSON }>()
 const documentStore = useDocumentStore()
 const chrome = computed(() => canvasChromeStyle(props.doc.theme))
-
-const ROW = 32
+const ROW = 44
+const frame = computed(() => ({ ...chrome.value, '--gantt-row': `${ROW}px` }))
 const HEAD = 40
 const selectedId = ref<string | null>(null)
 const status = ref('')
@@ -101,7 +101,7 @@ function barStyle(task: GanttTask): Record<string, string> {
 
 function milestoneStyle(task: GanttTask): Record<string, string> {
   const box = barBox(task)
-  return box ? { left: `${box.left + px.value / 2 - 7}px` } : {}
+  return box ? { left: `${box.left + px.value / 2 - 8}px` } : {}
 }
 
 function baselineStyle(task: GanttTask): Record<string, string> {
@@ -404,7 +404,7 @@ function startDrag(event: PointerEvent, task: GanttTask, mode: 'move' | 'resize'
 </script>
 
 <template>
-  <div class="gantt" :style="chrome" aria-label="项目甘特图">
+  <div class="gantt" :style="frame" aria-label="项目甘特图">
     <header class="gantt-head">
       <input class="title" :value="doc.title" aria-label="甘特图标题" @change="setTitle(($event.target as HTMLInputElement).value)" />
       <div class="toolbar">
@@ -592,35 +592,35 @@ function startDrag(event: PointerEvent, task: GanttTask, mode: 'move' | 'resize'
 .title { font-size: 18px; font-weight: 700; border: 1px solid transparent; border-radius: 6px; padding: 2px 6px; min-width: 160px; background: transparent; }
 .title:focus { border-color: #1a73e8; background: #fff; outline: none; }
 .toolbar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-.toolbar button, .zoom button { border: 1px solid #dadce0; background: #fff; border-radius: 6px; padding: 3px 8px; font-size: 12px; color: #202124; }
+.toolbar button, .zoom button { border: 1px solid #dadce0; background: #fff; border-radius: 999px; min-height: 32px; padding: 4px 12px; font-size: 13px; color: #202124; cursor: pointer; }
 .toolbar button:disabled { color: #9aa0a6; }
 .zoom { display: inline-flex; }
 .zoom button { border-radius: 0; }
-.zoom button:first-child { border-radius: 6px 0 0 6px; }
-.zoom button:last-child { border-radius: 0 6px 6px 0; }
+.zoom button:first-child { border-radius: 999px 0 0 999px; }
+.zoom button:last-child { border-radius: 0 999px 999px 0; }
 .zoom button[aria-pressed='true'] { background: #e8f0fe; color: #174ea6; }
 .status { margin: 0 0 8px; font-size: 12px; color: #174ea6; }
 .split { flex: 1; min-height: 0; display: flex; border: 1px solid #dadce0; border-radius: 10px; overflow: hidden; background: #fff; }
 .grid { width: min(720px, 54%); min-width: 320px; overflow: auto; border-right: 1px solid #dadce0; }
-.grid table { border-collapse: collapse; width: max-content; min-width: 100%; }
-.grid th, .grid td { height: 32px; box-sizing: border-box; padding: 0 4px; border-bottom: 1px solid #f1f3f4; font-size: 12px; text-align: left; }
-.grid thead th { height: 40px; position: sticky; top: 0; background: #f3f6f9; z-index: 1; font-size: 11px; }
+.grid table { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; }
+.grid th, .grid td { height: var(--gantt-row, 44px); box-sizing: border-box; padding: 0 6px; border-bottom: 1px solid #f1f3f4; font-size: 14px; text-align: left; }
+.grid thead th { height: 40px; position: sticky; top: 0; background: #f3f6f9; z-index: 1; font-size: 13px; }
 .grid tr.selected td { background: #e8f0fe; }
 .grid tr.critical .name input { color: #d93025; font-weight: 700; }
 .grid input { width: 100%; box-sizing: border-box; border: 1px solid transparent; background: transparent; border-radius: 4px; padding: 2px 3px; font: inherit; color: inherit; }
 .grid input:focus { border-color: #1a73e8; background: #fff; outline: none; }
-.grid input[type='date'] { width: 118px; }
-.grid input[type='number'] { width: 52px; }
+.grid input[type='date'] { width: 136px; }
+.grid input[type='number'] { width: 64px; }
 .id, .wbs, .slack { color: #5f6368; text-align: right; width: 36px; }
 .name { min-width: 180px; }
 .name { display: flex; align-items: center; }
 .indent { flex: none; }
-.twist { flex: none; width: 16px; border: 0; background: transparent; padding: 0; cursor: pointer; color: #5f6368; }
+.twist { flex: none; width: 24px; height: 24px; border: 0; background: transparent; padding: 0; cursor: pointer; color: #5f6368; }
 .twist--blank { display: inline-block; }
 .chart { flex: 1; overflow: auto; position: relative; background: #fff; }
 .chart-head { position: sticky; top: 0; z-index: 2; background: #f3f6f9; border-bottom: 1px solid #e0e0e0; }
 .months, .ticks { display: flex; height: 20px; }
-.months span, .ticks span { flex: none; box-sizing: border-box; overflow: hidden; font-size: 10px; line-height: 20px; color: #5f6368; border-left: 1px solid #eceff1; padding-left: 2px; }
+.months span, .ticks span { flex: none; box-sizing: border-box; overflow: hidden; font-size: 12px; line-height: 20px; color: #5f6368; border-left: 1px solid #eceff1; padding-left: 2px; }
 .ticks span.weekend { background: #eef1f4; }
 .chart-body { position: relative; }
 .col { position: absolute; top: 0; bottom: 0; box-sizing: border-box; }
@@ -630,15 +630,15 @@ function startDrag(event: PointerEvent, task: GanttTask, mode: 'move' | 'resize'
 .links path { fill: none; stroke-width: 1.25; }
 .chart-row { position: absolute; left: 0; right: 0; }
 .chart-row.selected { background: rgba(26, 115, 232, 0.06); }
-.bar { position: absolute; top: 9px; height: 12px; border-radius: 3px; background: #1a73e8; cursor: grab; z-index: 1; }
+.bar { position: absolute; top: 11px; height: 16px; border-radius: 4px; background: #1a73e8; cursor: grab; z-index: 1; }
 .bar.critical { background: #d93025; }
-.bar.summary { top: 11px; height: 8px; border-radius: 1px; background: #202124; }
-.bar.summary::before, .bar.summary::after { content: ''; position: absolute; top: 0; width: 2px; height: 12px; background: #202124; }
+.bar.summary { top: 13px; height: 10px; border-radius: 1px; background: #202124; }
+.bar.summary::before, .bar.summary::after { content: ''; position: absolute; top: 0; width: 2px; height: 14px; background: #202124; }
 .bar.summary::before { left: 0; }
 .bar.summary::after { right: 0; }
 .progress { display: block; height: 100%; background: rgba(0, 0, 0, 0.28); border-radius: inherit; pointer-events: none; }
-.handle { position: absolute; right: 0; top: 0; width: 7px; height: 100%; cursor: ew-resize; }
-.milestone { position: absolute; top: 8px; width: 14px; height: 14px; background: #1a73e8; transform: rotate(45deg); cursor: grab; z-index: 1; }
+.handle { position: absolute; right: 0; top: 0; width: 10px; height: 100%; cursor: ew-resize; }
+.milestone { position: absolute; top: 12px; width: 16px; height: 16px; background: #1a73e8; transform: rotate(45deg); cursor: grab; z-index: 1; }
 .milestone.critical { background: #d93025; }
-.baseline { position: absolute; top: 23px; height: 4px; background: #80868b; border-radius: 2px; z-index: 1; }
+.baseline { position: absolute; top: 31px; height: 4px; background: #80868b; border-radius: 2px; z-index: 1; }
 </style>
