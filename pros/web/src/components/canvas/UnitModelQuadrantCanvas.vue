@@ -142,7 +142,8 @@ const order: UnitModelQuadrantBlockId[] = ['b', 'a', 'c', 'd']
   position: absolute;
   inset: 0;
   z-index: 10;
-  overflow: hidden;
+  overflow: auto;
+  overscroll-behavior: contain;
   box-sizing: border-box;
   padding: 8px 10px 10px;
   display: flex;
@@ -155,12 +156,12 @@ const order: UnitModelQuadrantBlockId[] = ['b', 'a', 'c', 'd']
 
 .umq-frame {
   position: relative;
-  flex: 1 1 auto;
+  flex: 1 0 auto;
   width: 100%;
   max-width: none;
   margin: 0;
-  min-height: 0;
-  height: 100%;
+  min-height: 100%;
+  height: auto;
   padding: 44px 72px 48px 80px;
   box-sizing: border-box;
   display: flex;
@@ -212,10 +213,11 @@ const order: UnitModelQuadrantBlockId[] = ['b', 'a', 'c', 'd']
 
 .umq-plot {
   position: relative;
-  flex: 1 1 auto;
+  flex: 1 0 auto;
   width: 100%;
-  height: 100%;
-  min-height: 0;
+  min-height: 520px;
+  height: auto;
+  display: flex;
 }
 
 .umq-axes {
@@ -231,12 +233,13 @@ const order: UnitModelQuadrantBlockId[] = ['b', 'a', 'c', 'd']
 .umq-grid {
   position: relative;
   z-index: 2;
+  flex: 1 0 auto;
   width: 100%;
-  height: 100%;
-  min-height: 0;
+  height: auto;
+  min-height: 100%;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  grid-template-rows: 1fr 1fr;
+  grid-template-rows: minmax(min-content, 1fr) minmax(min-content, 1fr);
   gap: clamp(16px, 2.2vh, 28px) clamp(16px, 2.2vw, 28px);
   box-sizing: border-box;
 }
@@ -248,15 +251,15 @@ const order: UnitModelQuadrantBlockId[] = ['b', 'a', 'c', 'd']
   align-items: stretch;
   justify-content: flex-start;
   min-width: 0;
-  min-height: 0;
-  height: 100%;
+  min-height: min-content;
+  height: auto;
   border-radius: 0;
   padding: clamp(12px, 1.8vh, 20px) clamp(10px, 1.4vw, 18px) 10px;
   box-sizing: border-box;
   gap: 8px;
   border: none;
   box-shadow: none;
-  overflow: hidden;
+  overflow: visible;
   background: transparent;
 }
 
@@ -274,25 +277,38 @@ const order: UnitModelQuadrantBlockId[] = ['b', 'a', 'c', 'd']
 }
 
 .umq-body {
-  flex: 1;
-  min-height: 0;
+  flex: 1 0 auto;
+  min-height: 120px;
   min-width: 0;
   display: flex;
   flex-direction: column;
   background: transparent;
   border-radius: 0;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .umq-body :deep(.ym-block) {
   position: relative;
-  flex: 1;
-  min-height: 0;
-  height: 100%;
+  flex: 1 0 auto;
+  min-height: min-content;
+  height: auto;
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
-  overflow: hidden;
+  overflow: visible;
+}
+
+.umq-body :deep(.ym-rte),
+.umq-body :deep(.rte-root),
+.umq-body :deep(.ym-block-body) {
+  flex: 1 0 auto;
+  min-height: min-content;
+  height: auto;
+  overflow: visible;
+}
+
+.umq-body :deep(.rte-canvas) {
+  height: auto;
 }
 
 .umq-body :deep(.ym-block-toolbar) {
@@ -310,9 +326,9 @@ const order: UnitModelQuadrantBlockId[] = ['b', 'a', 'c', 'd']
 }
 
 .umq-body :deep(.ym-block-body) {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
+  flex: 1 0 auto;
+  min-height: min-content;
+  overflow: visible;
 }
 
 .umq-body :deep(.ym-block-body),

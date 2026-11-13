@@ -134,7 +134,8 @@ const order: TimeMatrixBlockId[] = ['a', 'b', 'c', 'd']
   position: absolute;
   inset: 0;
   z-index: 10;
-  overflow: hidden; /* 页面/画布不出现滚动条 */
+  overflow: auto;
+  overscroll-behavior: contain;
   box-sizing: border-box;
   padding: 8px 10px 10px;
   display: flex;
@@ -147,12 +148,12 @@ const order: TimeMatrixBlockId[] = ['a', 'b', 'c', 'd']
 
 .tm-frame {
   position: relative;
-  flex: 1 1 auto;
+  flex: 1 0 auto;
   width: 100%;
   max-width: none;
   margin: 0;
-  min-height: 0;
-  height: 100%;
+  min-height: 100%;
+  height: auto;
   padding: 36px 52px 40px 58px;
   box-sizing: border-box;
   display: flex;
@@ -199,10 +200,11 @@ const order: TimeMatrixBlockId[] = ['a', 'b', 'c', 'd']
 
 .tm-plot {
   position: relative;
-  flex: 1 1 auto;
+  flex: 1 0 auto;
   width: 100%;
-  height: 100%;
-  min-height: 0;
+  min-height: 520px;
+  height: auto;
+  display: flex;
 }
 
 .tm-axes {
@@ -218,12 +220,13 @@ const order: TimeMatrixBlockId[] = ['a', 'b', 'c', 'd']
 .tm-grid {
   position: relative;
   z-index: 2;
+  flex: 1 0 auto;
   width: 100%;
-  height: 100%;
-  min-height: 0;
+  height: auto;
+  min-height: 100%;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  grid-template-rows: 1fr 1fr;
+  grid-template-rows: minmax(min-content, 1fr) minmax(min-content, 1fr);
   /* 与 star-quadrant（QuadrantGrid gap:0）一致：四格贴满象限、边到边 */
   gap: 0;
   box-sizing: border-box;
@@ -236,9 +239,9 @@ const order: TimeMatrixBlockId[] = ['a', 'b', 'c', 'd']
   align-items: stretch;
   justify-content: flex-start;
   min-width: 0;
-  min-height: 0; /* 随网格撑满，不把页面撑出滚动条 */
+  min-height: min-content;
   width: 100%;
-  height: 100%;
+  height: auto;
   border-radius: 0;
   /* padding 对齐 QuadrantCell，面板本体仍占满格子 */
   padding: 12px 14px 14px;
@@ -246,7 +249,7 @@ const order: TimeMatrixBlockId[] = ['a', 'b', 'c', 'd']
   gap: 8px;
   border: none;
   box-shadow: none;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .tm-title {
@@ -263,39 +266,45 @@ const order: TimeMatrixBlockId[] = ['a', 'b', 'c', 'd']
 }
 
 .tm-body {
-  flex: 1 1 auto;
-  min-height: 0;
+  flex: 1 0 auto;
+  min-height: 120px;
   min-width: 0;
   width: 100%;
-  height: 100%;
+  height: auto;
   display: flex;
   flex-direction: column;
   align-items: stretch;
   background: transparent;
   border-radius: 0;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .tm-body :deep(.ym-block) {
   position: relative;
   display: flex;
   flex-direction: column;
-  flex: 1 1 auto;
+  flex: 1 0 auto;
   align-self: stretch;
-  min-height: 0;
+  min-height: min-content;
   width: 100%;
-  height: 100%;
+  height: auto;
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .tm-body :deep(.ym-rte),
-.tm-body :deep(.rte-root) {
-  flex: 1 1 auto;
-  min-height: 0;
-  height: 100%;
+.tm-body :deep(.rte-root),
+.tm-body :deep(.ym-block-body) {
+  flex: 1 0 auto;
+  min-height: min-content;
+  height: auto;
+  overflow: visible;
+}
+
+.tm-body :deep(.rte-canvas) {
+  height: auto;
 }
 
 .tm-body :deep(.ym-block-toolbar) {
@@ -313,9 +322,9 @@ const order: TimeMatrixBlockId[] = ['a', 'b', 'c', 'd']
 }
 
 .tm-body :deep(.ym-block-body) {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
+  flex: 1 0 auto;
+  min-height: min-content;
+  overflow: visible;
 }
 
 .tm-body :deep(.ym-block-body),

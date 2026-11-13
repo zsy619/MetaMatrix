@@ -80,7 +80,8 @@ const chrome = computed(() => canvasChromeStyle(props.doc.theme))
   position: absolute;
   inset: 0;
   z-index: 10;
-  overflow: hidden;
+  overflow: auto;
+  overscroll-behavior: contain;
   box-sizing: border-box;
   padding: 12px;
   display: flex;
@@ -88,16 +89,16 @@ const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 }
 
 .os-grid {
-  flex: 1;
-  min-height: 0;
+  flex: 1 0 auto;
+  min-height: max(100%, 640px);
   width: 100%;
-  height: 100%;
+  height: auto;
   display: flex;
   flex-direction: column;
   gap: 0;
   border: 1px solid var(--cv-frame, #ececec);
   border-radius: 2px;
-  overflow: hidden;
+  overflow: visible;
   background: #f5f0e8;
 }
 
@@ -108,13 +109,15 @@ const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 }
 
 .os-row--top {
-  flex: 1 1 50%;
+  flex: 1 0 auto;
+  min-height: 240px;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   border-bottom: 1px solid var(--cv-frame, #ececec);
 }
 
 .os-row--bottom {
-  flex: 1 1 50%;
+  flex: 1 0 auto;
+  min-height: 240px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
@@ -123,13 +126,13 @@ const chrome = computed(() => canvasChromeStyle(props.doc.theme))
   display: flex;
   flex-direction: column;
   min-width: 0;
-  min-height: 0;
+  min-height: min-content;
   padding: 0;
   box-sizing: border-box;
   background: var(--tbl-body, #f5f0e8);
   border-right: 1px solid var(--cv-frame, #ececec);
   gap: 0;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .os-row--top .os-cell:last-child,
@@ -172,19 +175,29 @@ const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 .os-body {
   position: relative;
   z-index: 1;
-  flex: 1;
-  min-height: 0;
+  flex: 1 0 auto;
+  min-height: 100px;
   min-width: 0;
   display: flex;
   flex-direction: column;
   padding: 8px 12px 14px;
   background: var(--tbl-body, #f5f0e8);
+  overflow: visible;
 }
 
-.os-body :deep(.ym-block) {
-  flex: 1;
-  min-height: 0;
+.os-body :deep(.ym-block),
+.os-body :deep(.ym-block-body),
+.os-body :deep(.rte-root) {
+  flex: 1 0 auto;
+  min-height: min-content;
+  height: auto;
+  overflow: visible;
   background: rgba(255, 255, 255, 0.45);
+}
+
+.os-body :deep(.rte-canvas) {
+  height: auto;
+  background: transparent;
 }
 
 .os-watermark {
