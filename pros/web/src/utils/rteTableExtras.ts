@@ -1,6 +1,20 @@
 import type { Editor } from '@tiptap/core'
 import { Fragment, type Node as PmNode } from '@tiptap/pm/model'
+import { TextSelection, type Transaction } from '@tiptap/pm/state'
+import { parseCellNumber } from './rteTableFormula'
 import { TABLE_STRUCTURE } from './rteTableFormulaOps'
+
+/** 整表替换后把光标留在表内，后面的排序和合计还能找到这张表。 */
+function stayInTable(tr: Transaction, tablePos: number): Transaction {
+  const node = tr.doc.nodeAt(tablePos)
+  if (!node || node.type.name !== 'table') return tr
+  const target = Math.min(tablePos + 3, tablePos + node.nodeSize - 1)
+  try {
+    return tr.setSelection(TextSelection.near(tr.doc.resolve(target)))
+  } catch {
+    return tr
+  }
+}
 
 /** 行被挪走以后，公式里的行号跟着新位置走。 */
 export function remapFormulaRows(formula: string, rowMap: Map<number, number>): string {
@@ -99,6 +113,47 @@ function isSumRow(row: PmNode): boolean {
   return first === '合计' || first === 'SUM'
 }
 
+type SortKey = { kind: 'num' | 'date'; value: number } | { kind: 'text'; value: string }
+
+function dateStamp(year: number, month: number, day: number): number | null {
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null
+  const stamp = Date.UTC(year, month - 1, day)
+  const check = new Date(stamp)
+  if (check.getUTCFullYear() !== year || check.getUTCMonth() !== month - 1 || check.getUTCDate() !== day) return null
+  return stamp
+}
+
+/** 日期、百分数和带千分位的数字按值排，其余按文字排。 */
+export function tableSortKey(text: string): SortKey {
+  const raw = text.trim()
+  const iso = /^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/.exec(raw)
+  const cn = /^(\d{4})年(\d{1,2})月(\d{1,2})日$/.exec(raw)
+  const parts = iso || cn
+  if (parts) {
+    const stamp = dateStamp(Number(parts[1]), Number(parts[2]), Number(parts[3]))
+    if (stamp != null) return { kind: 'date', value: stamp }
+  }
+  const num = parseCellNumber(raw)
+  if (num != null) return { kind: 'num', value: num }
+  return { kind: 'text', value: raw }
+}
+
+/** 同一种值按大小排。数字在日期前面，文字在最后，倒序不把文字翻到数字前面。 */
+export function compareTableCellText(a: string, b: string, asc = true): number {
+  const ka = tableSortKey(a)
+  const kb = tableSortKey(b)
+  if (ka.kind === kb.kind && ka.kind !== 'text') {
+    const diff = ka.value - kb.value
+    return asc ? diff : -diff
+  }
+  if (ka.kind !== kb.kind) {
+    const rank = { num: 0, date: 1, text: 2 } as const
+    return rank[ka.kind] - rank[kb.kind]
+  }
+  const diff = ka.value.localeCompare(kb.value, 'zh')
+  return asc ? diff : -diff
+}
+
 /** 按列排序。表头行留在上面，合计行留在下面。没有表头时每一行都参与。 */
 export function sortTableByColumn(editor: Editor, colIndex: number, asc = true): boolean {
   const found = findTable(editor)
@@ -114,12 +169,7 @@ export function sortTableByColumn(editor: Editor, colIndex: number, asc = true):
   const sorted = [...dataRows].sort((a, b) => {
     const ca = a.childCount > colIndex ? cellText(a.child(colIndex)) : ''
     const cb = b.childCount > colIndex ? cellText(b.child(colIndex)) : ''
-    const na = parseFloat(ca.replace(/,/g, ''))
-    const nb = parseFloat(cb.replace(/,/g, ''))
-    if (Number.isFinite(na) && Number.isFinite(nb)) {
-      return asc ? na - nb : nb - na
-    }
-    return asc ? ca.localeCompare(cb, 'zh') : cb.localeCompare(ca, 'zh')
+    return compareTableCellText(ca, cb, asc)
   })
   const newRows = [...header, ...sorted, ...sumRows]
   const oldSheet = new Map<PmNode, number>()
@@ -129,8 +179,9 @@ export function sortTableByColumn(editor: Editor, colIndex: number, asc = true):
   const remapped = newRows.map((row) => remapNode(row, rowMap, editor.schema))
   const tableType = table.type
   const next = tableType.create(table.attrs, remapped)
-  const tr = editor.state.tr.replaceWith(pos, pos + table.nodeSize, next)
+  let tr = editor.state.tr.replaceWith(pos, pos + table.nodeSize, next)
   tr.setMeta(TABLE_STRUCTURE, true)
+  tr = stayInTable(tr, pos)
   editor.view.dispatch(tr)
   return true
 }
@@ -156,9 +207,9 @@ export function upsertTableSumRow(editor: Editor): boolean {
     let n = 0
     for (const row of body) {
       if (row.childCount <= c) continue
-      const t = cellText(row.child(c)).replace(/,/g, '')
-      const v = parseFloat(t)
-      if (Number.isFinite(v) && t !== '') {
+      const t = cellText(row.child(c))
+      const v = parseCellNumber(t)
+      if (v != null) {
         total += v
         n += 1
       }
@@ -179,8 +230,9 @@ export function upsertTableSumRow(editor: Editor): boolean {
   const sumRow = rowType.create(null, sumCells)
   const nextRows = [...header, ...body, sumRow]
   const next = table.type.create(table.attrs, nextRows)
-  const tr = editor.state.tr.replaceWith(pos, pos + table.nodeSize, next)
+  let tr = editor.state.tr.replaceWith(pos, pos + table.nodeSize, next)
   tr.setMeta(TABLE_STRUCTURE, true)
+  tr = stayInTable(tr, pos)
   editor.view.dispatch(tr)
   return true
 }

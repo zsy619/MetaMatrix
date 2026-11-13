@@ -6,7 +6,7 @@ import { Table } from '@tiptap/extension-table'
 import { TableRow } from '@tiptap/extension-table-row'
 import { CellSelection } from '@tiptap/pm/tables'
 import { RteTableCell, RteTableHeader } from '../extensions/rteTableCells'
-import { sortTableByColumn, tableSortBlock, upsertTableSumRow } from './rteTableExtras'
+import { compareTableCellText, sortTableByColumn, tableSortBlock, upsertTableSumRow } from './rteTableExtras'
 import { TABLE_FORMULA_RECALC } from './rteTableFormulaOps'
 
 let editor: Editor | undefined
@@ -188,5 +188,27 @@ describe('表格排序和合计', () => {
       if (node.type.name === 'tableCell' && node.attrs.formula) formulas.push(String(node.attrs.formula))
     })
     expect(formulas).toEqual(['=A1'])
+  })
+
+  it('日期按年月日排，百分数和千分位按数值合计', () => {
+    expect(compareTableCellText('2024-03-01', '2024-01-15', true)).toBeGreaterThan(0)
+    expect(compareTableCellText('2024年1月2日', '2023年12月1日', true)).toBeGreaterThan(0)
+    expect(compareTableCellText('10%', '2', true)).toBeLessThan(0)
+    expect(compareTableCellText('12月', '3', true)).toBeGreaterThan(0)
+    const ed = makeEditor()
+    ed.commands.setContent(
+      '<table><tbody><tr><th><p>日期</p></th><th><p>比例</p></th></tr><tr><td><p>2024-03-01</p></td><td><p>10%</p></td></tr><tr><td><p>2024-01-15</p></td><td><p>1,200</p></td></tr><tr><td><p>2023-12-01</p></td><td><p>20%</p></td></tr></tbody></table>',
+    )
+    focusInsideTable(ed)
+    expect(sortTableByColumn(ed, 0, true)).toBe(true)
+    expect(firstColumn(ed)).toEqual(['日期', '2023-12-01', '2024-01-15', '2024-03-01'])
+    expect(upsertTableSumRow(ed)).toBe(true)
+    let sum = ''
+    ed.state.doc.descendants((node) => {
+      if (node.type.name !== 'table') return
+      sum = node.lastChild?.child(1)?.textContent || ''
+      return false
+    })
+    expect(sum).toBe('1200.3')
   })
 })
