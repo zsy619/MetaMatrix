@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { spacingGroupTitle, spacingOptionTitle } from '../../utils/rteToolbarOptimize'
 
 /**
  * 段距面板里的五个选项。
@@ -132,7 +133,8 @@ function choose(key: GroupKey, value: string) {
           class="rte-spacing-trigger"
           :class="{ 'is-open': openKey === group.key }"
           :aria-expanded="openKey === group.key"
-          :aria-label="group.label"
+          :aria-label="(spacingGroupTitle(group.key) || group.label) + '。当前：' + shown(group)"
+          :title="(spacingGroupTitle(group.key) || group.label) + '。当前：' + shown(group)"
           @click="toggle(group.key)"
         >
           <span data-rte-own>{{ shown(group) }}</span>
@@ -154,6 +156,7 @@ function choose(key: GroupKey, value: string) {
             role="option"
             :aria-selected="picked[group.key] === opt.value"
             :class="{ 'is-on': picked[group.key] === opt.value }"
+            :title="spacingOptionTitle(group.key, opt.value) || undefined"
             @click="choose(group.key, opt.value)"
           >
             {{ opt.label }}

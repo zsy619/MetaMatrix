@@ -493,6 +493,55 @@ const PICKER_TAB_TITLES: Record<string, string> = {
   '拼音': '拼音声调符号',
 }
 
+const SPACING_GROUP_TITLES: Record<string, string> = {
+  marginTop: '设置这一段和上一段之间空多少',
+  marginBottom: '设置这一段和下一段之间空多少',
+  letterSpacing: '设置字和字之间拉开多少',
+  textIndent: '设置段首空出几个字',
+  textDir: '设置这一段从哪边开始写',
+}
+
+const SPACING_OPTION_TITLES: Record<string, string> = {
+  'marginTop:default': '段前用编辑器原来的距离',
+  'marginTop:0': '这一段和上一段贴在一起',
+  'marginTop:0.5em': '段前空出半个字',
+  'marginTop:1em': '段前空出一个字',
+  'marginTop:1.5em': '段前空出一个半字',
+  'marginTop:2em': '段前空出两个字',
+  'marginTop:3em': '段前空出三个字',
+  'marginBottom:default': '段后用编辑器原来的距离',
+  'marginBottom:0': '这一段和下一段贴在一起',
+  'marginBottom:0.5em': '段后空出半个字',
+  'marginBottom:1em': '段后空出一个字',
+  'marginBottom:1.5em': '段后空出一个半字',
+  'marginBottom:2em': '段后空出两个字',
+  'marginBottom:3em': '段后空出三个字',
+  'letterSpacing:default': '字间距用原来的疏密',
+  'letterSpacing:0': '字和字贴紧',
+  'letterSpacing:0.05em': '字间距略微拉开',
+  'letterSpacing:0.1em': '字间距拉开约十分之一个字',
+  'letterSpacing:0.15em': '字间距再拉开一点',
+  'letterSpacing:0.2em': '字间距拉开约五分之一个字',
+  'letterSpacing:0.3em': '字间距拉开约三分之一个字',
+  'textIndent:default': '段首不空字',
+  'textIndent:2em': '段首空出两个字',
+  'textIndent:3em': '段首空出三个字',
+  'textIndent:4em': '段首空出四个字',
+  'textDir:default': '按文字自己决定从哪边写',
+  'textDir:ltr': '这一段从左往右写',
+  'textDir:rtl': '这一段从右往左写',
+}
+
+/** 段距面板的一组在调什么。没有说明时返回空字符串。 */
+export function spacingGroupTitle(group: string): string {
+  return SPACING_GROUP_TITLES[group] || ''
+}
+
+/** 段距面板里某一档改完是什么。没有说明时返回空字符串。 */
+export function spacingOptionTitle(group: string, value: string): string {
+  return SPACING_OPTION_TITLES[`${group}:${value || 'default'}`] || ''
+}
+
 /** 表情和特殊字符分类在收什么。没有说明时返回空字符串。 */
 export function pickerTabTitle(label: string): string {
   return PICKER_TAB_TITLES[label.trim()] || ''

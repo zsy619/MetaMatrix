@@ -33,6 +33,8 @@ import {
   ribbonTabTabIndex,
   ribbonTypeaheadQuery,
   searchEnterActivates,
+  spacingGroupTitle,
+  spacingOptionTitle,
   toolIsUnavailable,
   shortcutFromTitle,
   shortcutNeedles,
@@ -169,6 +171,13 @@ assert.equal(pickerTabTitle('拼音'), '拼音声调符号')
 assert.equal(pickerTabTitle('没有'), '')
 assert.equal(wordStatTitle('images'), '文档里的图片张数')
 assert.equal(wordStatTitle('dock'), '打开或收起详细字数')
+assert.equal(spacingGroupTitle('marginTop'), '设置这一段和上一段之间空多少')
+assert.equal(spacingOptionTitle('marginTop', ''), '段前用编辑器原来的距离')
+assert.equal(spacingOptionTitle('marginTop', '1em'), '段前空出一个字')
+assert.equal(spacingOptionTitle('letterSpacing', '0'), '字和字贴紧')
+assert.equal(spacingOptionTitle('textIndent', '2em'), '段首空出两个字')
+assert.equal(spacingOptionTitle('textDir', 'rtl'), '这一段从右往左写')
+assert.equal(spacingOptionTitle('marginTop', '9em'), '')
 assert.equal(stepRibbonTabBy(['a', 'b', 'c', 'd', 'e'], 'b', 3), 'e')
 assert.equal(stepRibbonTabBy(['a', 'b', 'c'], 'a', -3), 'a')
 assert.equal(zoomToolLabel(1), '实际大小')
