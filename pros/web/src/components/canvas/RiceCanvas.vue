@@ -51,8 +51,9 @@ function update(id: string, field: 'name' | 'reach' | 'impact' | 'confidence' | 
       <button type="button" @click="patch((doc) => { doc.items = [...doc.items, { id: newCanvasId('rice'), name: '新事项', reach: 0, impact: 1, confidence: 80, effort: 1 }] })">添加事项</button>
     </header>
     <div class="table">
-      <div class="head"><span>事项</span><span>覆盖</span><span>影响</span><span>信心 %</span><span>工作量</span><span>分数</span><span></span></div>
-      <div v-for="item in ranked" :key="item.id" class="row" :data-score="score(item)">
+      <div class="head"><span></span><span>事项</span><span>覆盖</span><span>影响</span><span>信心 %</span><span>工作量</span><span>分数</span><span></span></div>
+      <div v-for="(item, index) in ranked" :key="item.id" class="row" :class="{ 'is-top': index === 0 }" :data-score="score(item)">
+        <span class="rank">{{ index + 1 }}</span>
         <input :value="item.name" aria-label="事项" @change="update(item.id, 'name', ($event.target as HTMLInputElement).value)" />
         <input type="number" min="0" :value="item.reach" aria-label="覆盖人数" @change="update(item.id, 'reach', ($event.target as HTMLInputElement).value)" />
         <select :value="item.impact" aria-label="影响" @change="update(item.id, 'impact', ($event.target as HTMLSelectElement).value)">
@@ -60,7 +61,7 @@ function update(id: string, field: 'name' | 'reach' | 'impact' | 'confidence' | 
         </select>
         <input type="number" min="0" max="100" :value="item.confidence" aria-label="信心" @change="update(item.id, 'confidence', ($event.target as HTMLInputElement).value)" />
         <input type="number" min="0.1" step="0.1" :value="item.effort" aria-label="工作量" @change="update(item.id, 'effort', ($event.target as HTMLInputElement).value)" />
-        <strong>{{ score(item) }}</strong>
+        <strong class="score">{{ score(item) }}</strong>
         <button type="button" :disabled="doc.items.length <= 1" @click="patch((doc) => { doc.items = doc.items.filter((row) => row.id !== item.id) })">删除</button>
       </div>
     </div>
@@ -72,11 +73,14 @@ function update(id: string, field: 'name' | 'reach' | 'impact' | 'confidence' | 
 .sheet-top { flex: none; display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-bottom: 10px; }
 .sheet-top h2, .sheet-top p { margin: 0; }
 .sheet-top p { color: #5f6368; font-size: 13px; }
-button { border: 1px solid #dadce0; background: #fff; border-radius: 8px; padding: 4px 8px; }
+button { border: 1px solid #dadce0; background: #fff; border-radius: 999px; min-height: 36px; padding: 4px 12px; font: inherit; font-size: 13px; cursor: pointer; }
 .table { flex: 1 1 auto; min-height: 0; overflow: auto; background: #fff; border: 1px solid #ececec; border-radius: 12px; }
-.head, .row { display: grid; grid-template-columns: 1.6fr 0.7fr 0.7fr 0.7fr 0.7fr 0.6fr auto; gap: 8px; align-items: center; padding: 8px 12px; }
-.head { position: sticky; top: 0; background: #2a649f; color: #fff; font-size: 12px; font-weight: 700; }
-.row { border-top: 1px solid #f1f3f4; }
-input, select { width: 100%; box-sizing: border-box; border: 1px solid #e0e0e0; border-radius: 8px; padding: 6px 8px; }
-strong { color: #174ea6; }
+.head, .row { display: grid; grid-template-columns: 36px 1.6fr 0.7fr 0.7fr 0.7fr 0.7fr 0.7fr auto; gap: 8px; align-items: center; padding: 8px 12px; }
+.head { position: sticky; top: 0; z-index: 1; min-height: 44px; background: #2a649f; color: #fff; font-size: 13px; font-weight: 700; }
+.row { min-height: 56px; border-top: 1px solid #f1f3f4; }
+.row.is-top { background: #f3faf6; }
+.rank { font-variant-numeric: tabular-nums; font-weight: 700; color: #5f6368; text-align: center; }
+input, select { width: 100%; box-sizing: border-box; min-height: 36px; border: 1px solid #e0e0e0; border-radius: 8px; padding: 6px 8px; font: inherit; font-variant-numeric: tabular-nums; }
+.score { justify-self: end; min-width: 64px; padding: 4px 10px; border-radius: 999px; background: #e8f0fe; color: #174ea6; font-variant-numeric: tabular-nums; font-size: 16px; text-align: center; }
+.row.is-top .score { background: #ceead6; color: #125c3b; }
 </style>

@@ -86,10 +86,13 @@ function patch(mutator: (doc: IncomeStatementDocumentJSON) => void) {
 section { display: flex; flex-direction: column; min-height: 0; height: 100%; background: var(--col-body); border-radius: 12px; overflow: hidden; }
 h3 { margin: 0; min-height: 44px; display: flex; align-items: center; padding: 0 12px; background: var(--col-header); color: #fff; letter-spacing: 0.04em; }
 .lines { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
-.line { display: grid; grid-template-columns: 1fr 108px 28px; gap: 6px; }
-input { border: 1px solid transparent; background: #fff; border-radius: 8px; padding: 6px 8px; color: var(--col-topic); }
+.line { display: grid; grid-template-columns: 1fr 128px 36px; gap: 8px; align-items: center; }
+input { min-height: 40px; border: 1px solid transparent; background: #fff; border-radius: 8px; padding: 6px 10px; font: inherit; font-size: 15px; color: var(--col-topic); }
+input[type='number'] { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
 footer { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; background: #fff; }
-button { border: 1px solid #dadce0; background: #fff; border-radius: 8px; color: var(--col-topic); }
+footer strong { font-size: 18px; font-variant-numeric: tabular-nums; }
+button { min-height: 36px; border: 1px solid #dadce0; background: #fff; border-radius: 8px; color: var(--col-topic); cursor: pointer; }
+.line button { width: 36px; height: 36px; padding: 0; font-size: 18px; line-height: 1; }
 .is-in { background: #e7f6ef; color: #125c3b; }
 .is-out { background: #fdecea; color: #9b1c1c; }
 .is-zero { color: #5f6368; }
