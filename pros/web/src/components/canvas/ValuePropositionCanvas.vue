@@ -75,12 +75,12 @@ function block(id: ValuePropositionBlockId) {
 .sheet-top { flex: none; margin-bottom: 10px; }
 .sheet-top h2, .sheet-top p { margin: 0; }
 .sheet-top p { color: #5f6368; font-size: 13px; }
-.vpc { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.side { display: flex; flex-direction: column; min-height: 0; height: 100%; }
+.vpc { flex: 1 0 auto; min-height: 100%; height: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.side { display: flex; flex-direction: column; min-height: min-content; height: auto; }
 .side-title { margin: 0 0 8px; text-align: center; color: #0e8a84; letter-spacing: 0.08em; }
 .side-title--customer { color: #a67c00; }
-.stack { flex: 1 1 auto; min-height: 0; display: grid; grid-template-rows: 1fr 1fr 1fr; gap: 8px; }
-article { display: flex; flex-direction: column; min-height: 0; background: var(--col-body); border-radius: 12px; overflow: hidden; }
+.stack { flex: 1 0 auto; min-height: min-content; height: auto; display: grid; grid-template-rows: repeat(3, minmax(min-content, 1fr)); gap: 8px; }
+article { display: flex; flex-direction: column; min-height: min-content; height: auto; background: var(--col-body); border-radius: 12px; overflow: visible; }
 h4 { margin: 0; min-height: 36px; display: flex; align-items: center; justify-content: center; background: var(--col-header); color: #fff; font-size: 14px; }
-.rte-slot { flex: 1 1 auto; min-height: 0; display: flex; }
+.rte-slot { flex: 1 1 auto; min-height: min-content; height: auto; display: flex; }
 </style>

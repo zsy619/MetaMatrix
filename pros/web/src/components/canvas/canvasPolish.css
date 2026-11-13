@@ -106,7 +106,10 @@
 .canvas-viewport .swot-grid,
 .canvas-viewport .lean-grid,
 .canvas-viewport .sheet > .grid,
-.canvas-viewport .sheet > .axis {
+.canvas-viewport .sheet > .axis,
+.canvas-viewport .sheet > .vpc,
+.canvas-viewport .sheet > .rings,
+.canvas-viewport .sheet > .columns {
   flex: 1 0 auto;
   min-height: 100%;
   height: auto;
@@ -117,11 +120,21 @@
 .canvas-viewport .lean-cell,
 .canvas-viewport .sheet > .grid > section,
 .canvas-viewport .sheet > .axis .grid > section,
+.canvas-viewport .vpc .side,
+.canvas-viewport .vpc .stack,
+.canvas-viewport .vpc article,
+.canvas-viewport .rings,
+.canvas-viewport .ring,
+.canvas-viewport .sheet > .columns > section,
+.canvas-viewport .sheet > .columns .lines,
 .canvas-viewport .swot-grid .rte-slot,
 .canvas-viewport .lean-grid .rte-slot,
 .canvas-viewport .sheet > .grid .rte-slot,
-.canvas-viewport .sheet > .axis .rte-slot {
+.canvas-viewport .sheet > .axis .rte-slot,
+.canvas-viewport .vpc .rte-slot,
+.canvas-viewport .rings .rte-slot {
   min-height: min-content;
+  height: auto;
   overflow: visible;
 }
 

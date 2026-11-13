@@ -47,10 +47,10 @@ function block(id: GoldenCircleBlockId) {
 .sheet-top { flex: none; margin-bottom: 10px; }
 .sheet-top h2, .sheet-top p { margin: 0; }
 .sheet-top p { color: #5f6368; font-size: 13px; }
-.rings { flex: 1 1 auto; min-height: 0; display: grid; grid-template-rows: repeat(3, minmax(0, 1fr)); }
-.ring { min-height: 0; margin: 0 var(--inset); display: grid; grid-template-columns: 92px minmax(0, 1fr); background: var(--ring-body); border: 2px solid var(--ring); border-bottom-width: 0; overflow: hidden; }
+.rings { flex: 1 0 auto; min-height: 100%; height: auto; display: grid; grid-template-rows: repeat(3, minmax(min-content, 1fr)); }
+.ring { min-height: min-content; height: auto; margin: 0 var(--inset); display: grid; grid-template-columns: 92px minmax(0, 1fr); background: var(--ring-body); border: 2px solid var(--ring); border-bottom-width: 0; overflow: visible; }
 .ring:first-child { border-radius: 28px 28px 0 0; }
 .ring:last-child { border-bottom-width: 2px; border-radius: 0 0 28px 28px; }
 h3 { margin: 0; display: flex; align-items: center; justify-content: center; background: var(--ring); color: #fff; letter-spacing: 0.08em; }
-.rte-slot { min-height: 0; display: flex; }
+.rte-slot { min-height: min-content; height: auto; display: flex; }
 </style>
