@@ -374,12 +374,25 @@ onBeforeUnmount(() => {
           stroke-width="1.1"
           opacity="0.85"
         />
+        <text
+          v-for="ring in ringOutlines.filter((item) => item.level < LEVELS)"
+          :key="`scale-${ring.level}`"
+          class="radar-scale-tick"
+          :x="polar(0, (R * ring.level) / LEVELS)[0] + 14"
+          :y="polar(0, (R * ring.level) / LEVELS)[1]"
+        >{{ Math.round((SCORE_MAX * ring.level) / LEVELS) }}</text>
         <polygon
           :points="scorePolygon"
           fill="rgba(79, 195, 247, 0.38)"
+          stroke="none"
+        />
+        <polygon
+          class="radar-flow-line is-selected"
+          :points="scorePolygon"
+          fill="none"
           stroke="#29b6f6"
-          stroke-width="2.2"
-          stroke-linejoin="round"
+          stroke-width="2.6"
+          pointer-events="none"
         />
 
         <g
