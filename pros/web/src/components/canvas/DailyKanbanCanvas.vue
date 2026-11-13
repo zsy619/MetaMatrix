@@ -158,10 +158,15 @@ header strong { font-size: 15px; letter-spacing: 0.04em; }
 header button {
   margin-left: auto;
   border: 0;
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.22);
   color: #fff;
-  border-radius: 6px;
-  padding: 3px 8px;
+  border-radius: 999px;
+  min-height: 32px;
+  padding: 4px 12px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
 }
 .cards { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 8px; }
 article {
@@ -181,16 +186,21 @@ textarea {
   font: inherit;
   color: var(--col-topic);
 }
-.kanban-move { display: flex; gap: 4px; }
+.kanban-move { display: flex; gap: 6px; margin-top: 6px; }
 .kanban-move button {
   border: 1px solid color-mix(in srgb, var(--col-header) 35%, #fff);
-  background: var(--col-body);
-  color: var(--col-topic);
-  border-radius: 6px;
-  padding: 1px 6px;
-  font-size: 12px;
+  background: #fff;
+  color: #3c3428;
+  border-radius: 999px;
+  min-height: 30px;
+  padding: 2px 10px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
 }
-.kanban-move button:disabled { opacity: 0.4; }
+.kanban-move button:last-child { color: #9b1c1c; }
+.kanban-move button:disabled { opacity: 0.4; cursor: default; }
 @media (max-width: 800px) {
   .kanban-board { grid-template-columns: repeat(4, minmax(160px, 1fr)); overflow: auto; }
 }
