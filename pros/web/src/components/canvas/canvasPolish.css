@@ -178,3 +178,22 @@
 .canvas-viewport .gantt .zoom button:last-child {
   border-radius: 0 999px 999px 0;
 }
+
+/* 空格子要能看清「写在这里」。各画布自己的占位色偏灰，盖在浅色底上会消失。 */
+.canvas-viewport .is-empty::before,
+.canvas-viewport .is-editor-empty::before,
+.canvas-viewport p.is-empty::before,
+.canvas-viewport p.is-editor-empty::before {
+  color: #5c564c !important;
+}
+
+.canvas-viewport textarea::placeholder,
+.canvas-viewport input::placeholder {
+  color: #5c564c;
+  opacity: 1;
+}
+
+.canvas-viewport :focus-visible {
+  outline: 2px solid var(--cv-focus, #163044) !important;
+  outline-offset: 2px;
+}

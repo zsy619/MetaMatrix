@@ -73,6 +73,7 @@ function update(id: BusinessModelBlockId, text: string) {
           <textarea
             :value="block(id)?.text || ''"
             :aria-label="block(id)?.title"
+            placeholder="写在这里"
             @change="update(id, ($event.target as HTMLTextAreaElement).value)"
           />
         </div>
@@ -140,16 +141,34 @@ h3 {
   text-align: center;
 }
 .bmc-body { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; padding: 8px; }
-p { margin: 0 0 6px; color: var(--col-topic); font-size: 12px; flex: none; }
+p {
+  margin: 0 0 8px;
+  padding-left: 8px;
+  border-left: 3px solid var(--col-topic);
+  color: #3c3428;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.45;
+  flex: none;
+}
 textarea {
   flex: 1 1 auto;
-  min-height: 0;
+  min-height: 72px;
   width: 100%;
-  border: 0;
+  border: 1px dashed rgba(60, 50, 20, 0.22);
+  border-radius: 8px;
+  padding: 8px 10px;
   resize: none;
   font: inherit;
-  background: transparent;
+  line-height: 1.5;
+  background: rgba(255, 255, 255, 0.55);
   color: #202124;
 }
-textarea:focus { outline: none; }
+textarea::placeholder { color: #5c564c; }
+textarea:focus {
+  outline: none;
+  border-style: solid;
+  border-color: var(--cv-focus, #163044);
+  background: #fff;
+}
 </style>

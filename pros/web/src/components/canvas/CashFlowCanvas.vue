@@ -159,7 +159,8 @@ h3 {
 }
 .lines { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
 .cash-line { display: grid; grid-template-columns: 1fr 108px 28px; gap: 6px; align-items: center; }
-input { border: 1px solid transparent; background: #fff; border-radius: 8px; padding: 6px 8px; color: var(--col-topic); }
+input { border: 1px solid transparent; background: #fff; border-radius: 8px; padding: 6px 8px; color: #202124; }
+input[type='number'] { font-variant-numeric: tabular-nums; font-weight: 700; text-align: right; }
 input:focus { border-color: var(--col-header); outline: none; }
 footer {
   flex: none;
