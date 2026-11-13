@@ -58,6 +58,23 @@ export function imageDisplayWidthPatch(value: string): { displayWidth: string | 
   return { displayWidth: next || null, width: null, height: null }
 }
 
+/** 拖出来的像素优先；否则用百分比；都没有就回到图片本身的大小。 */
+export function imageSizeStyle(attrs: { width?: unknown; height?: unknown; displayWidth?: unknown }): { width: string; height: string } {
+  const width = Number(attrs.width)
+  const height = Number(attrs.height)
+  const hasWidth = Number.isFinite(width) && width > 0
+  const hasHeight = Number.isFinite(height) && height > 0
+  if (hasWidth || hasHeight) {
+    return {
+      width: hasWidth ? `${width}px` : '',
+      height: hasHeight ? `${height}px` : 'auto',
+    }
+  }
+  const display = String(attrs.displayWidth || '').trim()
+  if (display) return { width: display, height: 'auto' }
+  return { width: '', height: '' }
+}
+
 export function clampImageWidth(width: number, maxWidth: number, minWidth = 48): number {
   const max = Number.isFinite(maxWidth) && maxWidth > minWidth ? maxWidth : minWidth
   const next = Number.isFinite(width) ? width : minWidth

@@ -1,9 +1,11 @@
 import Image from '@tiptap/extension-image'
 import { mergeAttributes } from '@tiptap/core'
+import { Plugin } from '@tiptap/pm/state'
+import type { EditorView } from '@tiptap/pm/view'
 import { createImageDragPlugin } from './rteImageDrag'
 import { createImageCaptionPlugin } from './rteImageCaption'
 import { createCaptionRenumberPlugin } from '../utils/rteCaptionNumber'
-import { normalizeImageAlign, normalizeImageLayout } from '../utils/rteImageLayout'
+import { imageSizeStyle, normalizeImageAlign, normalizeImageLayout } from '../utils/rteImageLayout'
 import { cropHtmlStyle } from '../utils/rteImageCropAttrs'
 
 export type RteImageAlign = 'left' | 'center' | 'right' | null
@@ -201,6 +203,82 @@ export const RteImage = Image.extend({
   },
 
   addProseMirrorPlugins() {
-    return [...(this.parent?.() || []), createImageDragPlugin(), createImageCaptionPlugin(), createCaptionRenumberPlugin()]
+    return [...(this.parent?.() || []), createImageDragPlugin(), createImageCaptionPlugin(), createCaptionRenumberPlugin(), createImageSizePlugin()]
   },
 })
+
+const IMAGE_SIZE_SYNC = 'imageSizeSync'
+
+function paintImageSizes(view: EditorView) {
+  view.state.doc.descendants((node, pos) => {
+    if (node.type.name !== 'image') return
+    const dom = view.nodeDOM(pos)
+    const img = dom instanceof HTMLImageElement ? dom : dom instanceof HTMLElement ? dom.querySelector('img') : null
+    if (!(img instanceof HTMLImageElement)) return
+    const next = imageSizeStyle(node.attrs)
+    if (img.style.width !== next.width) img.style.width = next.width
+    if (img.style.height !== next.height) img.style.height = next.height
+  })
+}
+
+function clearPixelVersusPreset(view: EditorView) {
+  const fixes: number[] = []
+  view.state.doc.descendants((node, pos) => {
+    if (node.type.name !== 'image' || !node.attrs.displayWidth) return
+    const width = Number(node.attrs.width)
+    const height = Number(node.attrs.height)
+    if ((Number.isFinite(width) && width > 0) || (Number.isFinite(height) && height > 0)) fixes.push(pos)
+  })
+  if (!fixes.length) return
+  let tr = view.state.tr
+  for (let index = fixes.length - 1; index >= 0; index -= 1) {
+    const pos = tr.mapping.map(fixes[index]!)
+    const node = tr.doc.nodeAt(pos)
+    if (!node || node.type.name !== 'image') continue
+    tr = tr.setNodeMarkup(pos, undefined, { ...node.attrs, displayWidth: null })
+  }
+  if (tr.docChanged) {
+    tr.setMeta(IMAGE_SIZE_SYNC, true)
+    view.dispatch(tr)
+  }
+}
+
+/** 拖拽写入像素宽高后，清掉百分比，避免松手又弹回预设。 */
+function createImageSizePlugin(): Plugin {
+  return new Plugin({
+    appendTransaction(transactions, _old, state) {
+      if (!transactions.some((tr) => tr.docChanged)) return null
+      if (transactions.some((tr) => tr.getMeta(IMAGE_SIZE_SYNC))) return null
+      const fixes: number[] = []
+      state.doc.descendants((node, pos) => {
+        if (node.type.name !== 'image') return
+        const width = Number(node.attrs.width)
+        const height = Number(node.attrs.height)
+        const sized = (Number.isFinite(width) && width > 0) || (Number.isFinite(height) && height > 0)
+        if (sized && node.attrs.displayWidth) fixes.push(pos)
+      })
+      if (!fixes.length) return null
+      let tr = state.tr
+      for (let index = fixes.length - 1; index >= 0; index -= 1) {
+        const pos = tr.mapping.map(fixes[index]!)
+        const node = tr.doc.nodeAt(pos)
+        if (!node || node.type.name !== 'image') continue
+        tr = tr.setNodeMarkup(pos, undefined, { ...node.attrs, displayWidth: null })
+      }
+      tr.setMeta(IMAGE_SIZE_SYNC, true)
+      return tr.docChanged ? tr : null
+    },
+    view(editorView) {
+      const reconcile = () => {
+        clearPixelVersusPreset(editorView)
+        paintImageSizes(editorView)
+      }
+      queueMicrotask(reconcile)
+      return {
+        update() {
+          queueMicrotask(reconcile)
+        },
+      }
+    },
+  })
+}

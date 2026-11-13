@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import {
   clampImageWidth,
   imageDisplayWidthPatch,
+  imageSizeStyle,
   imageDropKind,
   insertPosAfterDelete,
   normalizeImageAlign,
@@ -33,6 +34,9 @@ assert.equal(imageDropKind(0.1, 0.5, true), 'left')
 
 assert.deepEqual(imageDisplayWidthPatch(''), { displayWidth: null, width: null, height: null })
 assert.deepEqual(imageDisplayWidthPatch('50%'), { displayWidth: '50%', width: null, height: null })
+assert.deepEqual(imageSizeStyle({ width: 320, height: 180, displayWidth: '50%' }), { width: '320px', height: '180px' })
+assert.deepEqual(imageSizeStyle({ displayWidth: '50%' }), { width: '50%', height: 'auto' })
+assert.deepEqual(imageSizeStyle({}), { width: '', height: '' })
 assert.equal(clampImageWidth(20, 400), 48)
 assert.equal(clampImageWidth(900, 640), 640)
 assert.equal(clampImageWidth(320, 640), 320)
