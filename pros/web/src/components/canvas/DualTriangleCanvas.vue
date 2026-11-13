@@ -299,7 +299,7 @@ watch(
   position: absolute;
   inset: 0;
   z-index: 10;
-  overflow: hidden;
+  overflow: auto;
   box-sizing: border-box;
   padding: 14px 16px 12px;
 }
@@ -316,7 +316,7 @@ watch(
   z-index: 1;
   width: 100%;
   height: 100%;
-  min-height: 0;
+  min-height: 720px;
   display: grid;
   grid-template-columns:
     minmax(0, 1.16fr) minmax(0, 0.84fr) minmax(0, 0.84fr) minmax(0, 1.16fr);
