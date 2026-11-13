@@ -116,6 +116,25 @@
   overflow: visible;
 }
 
+/* 标题在网格外面。网格用剩余高度撑满，内容再高时整页滚动，不要按整页 100% 把标题再加一遍。 */
+.canvas-viewport .sheet > .forces,
+.canvas-viewport .sheet > .chain {
+  flex: 1 0 auto;
+  height: auto;
+  overflow: visible;
+}
+
+.canvas-viewport .forces {
+  grid-template-rows: minmax(160px, 0.85fr) minmax(200px, 1.2fr) minmax(160px, 0.85fr);
+}
+
+.canvas-viewport .chain .row {
+  flex: 1 0 auto;
+  min-height: 180px;
+  height: auto;
+  overflow: visible;
+}
+
 .canvas-viewport .swot-grid > section,
 .canvas-viewport .lean-cell,
 .canvas-viewport .sheet > .grid > section,
@@ -127,6 +146,10 @@
 .canvas-viewport .ring,
 .canvas-viewport .sheet > .columns > section,
 .canvas-viewport .sheet > .columns .lines,
+.canvas-viewport .forces .force,
+.canvas-viewport .forces .rte-slot,
+.canvas-viewport .chain section,
+.canvas-viewport .chain .rte-slot,
 .canvas-viewport .swot-grid .rte-slot,
 .canvas-viewport .lean-grid .rte-slot,
 .canvas-viewport .sheet > .grid .rte-slot,
