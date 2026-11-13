@@ -76,7 +76,7 @@ export function findSelectedCell(state: {
     if (!row || row.type.name !== 'tableRow') return null
     if (!table || table.type.name !== 'table') return null
     const rowIndex = headCell.index(depth - 1)
-    const colIndex = headCell.index(depth)
+    const colIndex = visualCellColumn(table, rowIndex, headCell.index(depth))
     if (rowIndex < 0 || colIndex < 0) return null
     const tablePos = headCell.before(depth - 1)
     const cellPos = cellPosition(tablePos, table, rowIndex, colIndex)
@@ -106,8 +106,8 @@ export function findSelectedCell(state: {
   if ($head.node(rowDepth).type.name !== 'tableRow') return null
   if ($head.node(tableDepth).type.name !== 'table') return null
   const rowIndex = $head.index(tableDepth)
-  const colIndex = $head.index(rowDepth)
   const table = $head.node(tableDepth)
+  const colIndex = visualCellColumn(table, rowIndex, $head.index(rowDepth))
   const tablePos = $head.before(tableDepth)
   const cellPos = cellPosition(tablePos, table, rowIndex, colIndex)
   if (cellPos == null) return null
@@ -130,16 +130,22 @@ export function findSelectedCell(state: {
  */
 export function cellPosition(tablePos: number, table: PmNode, rowIndex: number, colIndex: number): number | null {
   let found: number | null = null
+  const occupied: boolean[][] = []
   table.forEach((rowNode, rowOffset, rowIdx) => {
     if (found != null) return false
-    if (rowIdx !== rowIndex) return
     const rowPos = tablePos + 1 + rowOffset
     let cellPos = rowPos + 1
     let col = 0
     rowNode.forEach((cellNode) => {
-      if (col === colIndex) found = cellPos
+      while (occupied[rowIdx]?.[col]) col += 1
+      const { colspan, rowspan } = cellSpan(cellNode)
+      if (rowIdx === rowIndex && col === colIndex) found = cellPos
+      for (let down = 0; down < rowspan; down += 1) {
+        if (!occupied[rowIdx + down]) occupied[rowIdx + down] = []
+        for (let span = 0; span < colspan; span += 1) occupied[rowIdx + down]![col + span] = true
+      }
       cellPos += cellNode.nodeSize
-      col += 1
+      col += colspan
     })
   })
   return found
@@ -158,21 +164,72 @@ export function cellDisplayText(cell: PmNode): string {
   return (cell.textContent || '').trim()
 }
 
+function cellSpan(cell: PmNode): { colspan: number; rowspan: number } {
+  return {
+    colspan: Math.max(1, Number(cell.attrs.colspan) || 1),
+    rowspan: Math.max(1, Number(cell.attrs.rowspan) || 1),
+  }
+}
+
+/** 把合并单元格铺成矩形网格。被跨过的格子是空字符串，起点格用 textOf。 */
+export function tableTextGrid(table: PmNode, textOf: (cell: PmNode) => string): string[][] {
+  const grid: string[][] = []
+  const occupied: boolean[][] = []
+  let rowIndex = 0
+  table.forEach((rowNode) => {
+    let col = 0
+    rowNode.forEach((cellNode) => {
+      while (occupied[rowIndex]?.[col]) col += 1
+      const text = textOf(cellNode)
+      const { colspan, rowspan } = cellSpan(cellNode)
+      for (let row = 0; row < rowspan; row += 1) {
+        if (!grid[rowIndex + row]) grid[rowIndex + row] = []
+        if (!occupied[rowIndex + row]) occupied[rowIndex + row] = []
+        for (let span = 0; span < colspan; span += 1) {
+          const covered = grid[rowIndex + row]![col + span]
+          grid[rowIndex + row]![col + span] = row === 0 && span === 0 ? text : (covered ?? '')
+          occupied[rowIndex + row]![col + span] = true
+        }
+      }
+      col += colspan
+    })
+    rowIndex += 1
+  })
+  const height = rowIndex
+  const width = Math.max(0, ...grid.slice(0, height).map((row) => row.length))
+  return Array.from({ length: height }, (_, index) => {
+    const row = grid[index] ?? []
+    return Array.from({ length: width }, (_, col) => row[col] ?? '')
+  })
+}
+
+/** 子单元格在视觉网格里的起始列。上一行的 rowspan 会把后面的格子往右推。 */
+export function visualCellColumn(table: PmNode, rowIndex: number, childIndex: number): number {
+  let result = childIndex
+  const occupied: boolean[][] = []
+  let row = 0
+  table.forEach((rowNode) => {
+    let col = 0
+    let child = 0
+    rowNode.forEach((cellNode) => {
+      while (occupied[row]?.[col]) col += 1
+      if (row === rowIndex && child === childIndex) result = col
+      const { colspan, rowspan } = cellSpan(cellNode)
+      for (let down = 0; down < rowspan; down += 1) {
+        if (!occupied[row + down]) occupied[row + down] = []
+        for (let span = 0; span < colspan; span += 1) occupied[row + down]![col + span] = true
+      }
+      col += colspan
+      child += 1
+    })
+    row += 1
+  })
+  return result
+}
+
 /** 表格的原始文本网格（公式单元格取公式原文，其它取显示文本）。 */
 export function tableGrid(table: PmNode): string[][] {
-  const grid: string[][] = []
-  table.forEach((rowNode) => {
-    const row: string[] = []
-    rowNode.forEach((cellNode) => {
-      const formula = cellFormulaText(cellNode)
-      const text = formula || cellDisplayText(cellNode)
-      const span = Math.max(1, Number(cellNode.attrs.colspan) || 1)
-      row.push(text)
-      for (let extra = 1; extra < span; extra += 1) row.push('')
-    })
-    grid.push(row)
-  })
-  return grid
+  return tableTextGrid(table, (cell) => cellFormulaText(cell) || cellDisplayText(cell))
 }
 
 /** 回写结果。 */
@@ -216,8 +273,9 @@ export function applyCellInput(editor: Editor, loc: TableCellLocation, input: st
     cellPos += 1
     const cellNodes: PmNode[] = []
     rowNode.forEach((cellNode) => cellNodes.push(cellNode))
-    for (let colIndex = 0; colIndex < cellNodes.length; colIndex += 1) {
-      const cellNode = cellNodes[colIndex]!
+    for (let childIndex = 0; childIndex < cellNodes.length; childIndex += 1) {
+      const cellNode = cellNodes[childIndex]!
+      const colIndex = visualCellColumn(loc.table, rowIndex, childIndex)
       const nextText = computed[rowIndex]?.[colIndex] ?? cellDisplayText(cellNode)
       const isTarget = rowIndex === loc.rowIndex && colIndex === loc.colIndex
       const nextFormula = isTarget ? (isFormula ? trimmed : '') : cellFormulaText(cellNode)
@@ -303,8 +361,9 @@ export function formulaRecalcTransaction(
     node.forEach((rowNode, rowOffset) => {
       const rowPos = pos + 1 + rowOffset
       let cellPos = rowPos + 1
-      let colIndex = 0
+      let childIndex = 0
       rowNode.forEach((cellNode) => {
+        const colIndex = visualCellColumn(node, rowIndex, childIndex)
         const stored = typeof cellNode.attrs?.formula === 'string' ? cellNode.attrs.formula.trim() : ''
         if (stored) {
           const display = cellDisplayText(cellNode)
@@ -321,7 +380,7 @@ export function formulaRecalcTransaction(
           }
         }
         cellPos += cellNode.nodeSize
-        colIndex += 1
+        childIndex += 1
       })
       rowIndex += 1
     })

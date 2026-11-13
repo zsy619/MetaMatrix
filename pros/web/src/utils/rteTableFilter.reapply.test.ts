@@ -60,4 +60,20 @@ describe('表格行筛选在编辑后仍在', () => {
     expect(ed.getHTML()).toContain('香蕉')
     expect(ed.getHTML()).toContain('红')
   })
+
+  it('没有表头时第一行数据也能被筛掉，合计行留着', () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    editor = new Editor({
+      element: host,
+      extensions: [StarterKit, Table, TableRow, TableHeader, TableCell],
+      content: `<table><tbody>
+        <tr><td><p>香蕉</p></td></tr>
+        <tr><td><p>苹果</p></td></tr>
+        <tr><td><p>合计</p></td></tr>
+      </tbody></table>`,
+    })
+    expect(applyTableRowFilter(editor, '苹果')).toBe(1)
+    expect(rowDisplays(editor)).toEqual(['none', '', ''])
+  })
 })

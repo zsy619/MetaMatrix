@@ -165,26 +165,57 @@ function cellText(cell: PmNode): string {
   return cell.textContent.trim()
 }
 
+/** 把合并单元格铺开，复制时列和屏幕上的列对齐。被跨过的格子留空。 */
+function visualRowTexts(table: PmNode): string[][] {
+  const grid: string[][] = []
+  const occupied: boolean[][] = []
+  let rowIndex = 0
+  table.forEach((row) => {
+    if (row.type.name !== 'tableRow') return
+    let col = 0
+    row.forEach((cell) => {
+      if (cell.type.name !== 'tableCell' && cell.type.name !== 'tableHeader') return
+      while (occupied[rowIndex]?.[col]) col += 1
+      const text = cellText(cell)
+      const colspan = Math.max(1, Number(cell.attrs.colspan) || 1)
+      const rowspan = Math.max(1, Number(cell.attrs.rowspan) || 1)
+      for (let down = 0; down < rowspan; down += 1) {
+        if (!grid[rowIndex + down]) grid[rowIndex + down] = []
+        if (!occupied[rowIndex + down]) occupied[rowIndex + down] = []
+        for (let span = 0; span < colspan; span += 1) {
+          const covered = grid[rowIndex + down]![col + span]
+          grid[rowIndex + down]![col + span] = down === 0 && span === 0 ? text : (covered ?? '')
+          occupied[rowIndex + down]![col + span] = true
+        }
+      }
+      col += colspan
+    })
+    rowIndex += 1
+  })
+  const height = rowIndex
+  const width = Math.max(0, ...grid.slice(0, height).map((line) => line.length))
+  return Array.from({ length: height }, (_, index) => {
+    const line = grid[index] ?? []
+    return Array.from({ length: width }, (_, col) => line[col] ?? '')
+  })
+}
+
 /** 当前表复制为 CSV / TSV */
 export function tableToDelimited(editor: Editor, delim: ',' | '\t'): string | null {
   const found = findTable(editor)
   if (!found) return null
-  const rows: string[] = []
-  found.table.forEach((row) => {
-    if (row.type.name !== 'tableRow') return
-    const cols: string[] = []
-    row.forEach((cell) => {
-      if (cell.type.name !== 'tableCell' && cell.type.name !== 'tableHeader') return
-      let t = cellText(cell)
-      if (delim === ',') {
-        if (/[",\n\r]/.test(t)) t = `"${t.replace(/"/g, '""')}"`
-      } else {
-        t = t.replace(/\t/g, ' ').replace(/\n/g, ' ')
-      }
-      cols.push(t)
-    })
-    rows.push(cols.join(delim === ',' ? ',' : '\t'))
-  })
+  const sep = delim === ',' ? ',' : '\t'
+  const rows = visualRowTexts(found.table).map((cols) =>
+    cols
+      .map((text) => {
+        if (delim === ',') {
+          if (/[",\n\r]/.test(text)) return `"${text.replace(/"/g, '""')}"`
+          return text
+        }
+        return text.replace(/\t/g, ' ').replace(/\n/g, ' ')
+      })
+      .join(sep),
+  )
   return rows.join('\n')
 }
 
@@ -203,19 +234,31 @@ export function findTablePos(editor: Editor): number | null {
   return findTable(editor)?.pos ?? null
 }
 
+function rowIsHeader(row: HTMLElement): boolean {
+  const cells = [...row.children].filter((node) => node.tagName === 'TD' || node.tagName === 'TH')
+  return cells.length > 0 && cells.every((node) => node.tagName === 'TH')
+}
+
+function rowStaysVisible(row: HTMLElement, index: number, headerEnd: number): boolean {
+  if (index < headerEnd) return true
+  const first = (row.querySelector('th, td')?.textContent || '').replace(/\s+/g, ' ').trim()
+  return first === '合计' || first === 'SUM'
+}
+
 function paintTableRows(tableDom: HTMLElement, query: string): number {
   const q = (query || '').trim().toLowerCase()
-  const trs = tableDom.querySelectorAll('tr')
+  const trs = [...tableDom.querySelectorAll('tr')] as HTMLElement[]
+  let headerEnd = 0
+  while (headerEnd < trs.length && rowIsHeader(trs[headerEnd]!)) headerEnd += 1
   let hidden = 0
-  trs.forEach((tr, idx) => {
-    const row = tr as HTMLElement
-    if (idx === 0) {
+  trs.forEach((row, idx) => {
+    if (!q || rowStaysVisible(row, idx, headerEnd)) {
       row.style.display = ''
       delete row.dataset.rteFilterHide
       return
     }
     const text = (row.textContent || '').toLowerCase()
-    const show = !q || text.includes(q)
+    const show = text.includes(q)
     row.style.display = show ? '' : 'none'
     row.dataset.rteFilterHide = show ? '0' : '1'
     if (!show) hidden += 1
