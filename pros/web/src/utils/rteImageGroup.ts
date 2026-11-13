@@ -140,13 +140,24 @@ export function groupUsesAspect(ratioMode: unknown): boolean {
   return ratioMode !== 'custom'
 }
 
-/** 按权重把一行铺满。权重是宽高比时，行高 = 可用宽度 / 权重和，不按视口或固定上限裁切。 */
+/**
+ * 藏起的格子记成 0，不再参与这一行的宽度和行高。
+ * 全被藏起时退回原来的权重，避免行高变成 0。
+ */
+export function ratiosSkippingHidden(ratios: readonly number[], hidden: readonly boolean[]): number[] {
+  const next = ratios.map((n, index) => (hidden[index] ? 0 : Number.isFinite(n) && n > 0 ? n : 1))
+  if (next.some((n) => n > 0)) return next
+  return ratios.map((n) => (Number.isFinite(n) && n > 0 ? n : 1))
+}
+
+/** 按权重把一行铺满。权重是宽高比时，行高 = 可用宽度 / 权重和。0 表示藏起，不占宽度，也不算间距。 */
 export function rowLayout(rowWidth: number, weights: readonly number[], gap = 8): { height: number; widths: number[] } {
-  const clean = weights.map((n) => (Number.isFinite(n) && n > 0 ? n : 1))
-  const sum = clean.reduce((total, n) => total + n, 0) || 1
-  const inner = Math.max(1, rowWidth - gap * Math.max(0, clean.length - 1))
+  const clean = weights.map((n) => (Number.isFinite(n) && n > 0 ? n : 0))
+  const active = clean.some((n) => n > 0) ? clean.filter((n) => n > 0) : clean.map(() => 1)
+  const sum = active.reduce((total, n) => total + n, 0) || 1
+  const inner = Math.max(1, rowWidth - gap * Math.max(0, active.length - 1))
   const height = inner / sum
-  const widths = clean.map((n) => (inner * n) / sum)
+  const widths = active.map((n) => (inner * n) / sum)
   const rounded = widths.map((n) => Math.round(n))
   const drift = Math.round(inner) - rounded.reduce((total, n) => total + n, 0)
   if (rounded.length) rounded[rounded.length - 1] = (rounded[rounded.length - 1] ?? 0) + drift
@@ -236,15 +247,20 @@ export function resizeCollageStack(ratios: readonly number[], layout: '12' | '21
 }
 
 export function resizePair(ratios: readonly number[], index: number, leftShare: number): number[] {
-  if (index < 0 || index >= ratios.length - 1) return ratios.slice()
-  const total = ratios[index]! + ratios[index + 1]!
+  return resizeVisiblePair(ratios, index, index + 1, leftShare)
+}
+
+/** 调整两张可见图的比例，中间藏起的格子保持原权重。 */
+export function resizeVisiblePair(ratios: readonly number[], leftIndex: number, rightIndex: number, leftShare: number): number[] {
+  if (leftIndex < 0 || rightIndex <= leftIndex || rightIndex >= ratios.length) return ratios.slice()
+  const total = ratios[leftIndex]! + ratios[rightIndex]!
   if (!(total > 0)) return ratios.slice()
   const share = Number.isFinite(leftShare) ? Math.min(0.88, Math.max(0.12, leftShare)) : 0.5
   const left = Math.round(total * share * 100) / 100
   const right = Math.round((total - left) * 100) / 100
   const next = ratios.slice()
-  next[index] = left
-  next[index + 1] = right
+  next[leftIndex] = left
+  next[rightIndex] = right
   return next
 }
 

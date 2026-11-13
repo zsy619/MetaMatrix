@@ -16,7 +16,8 @@ import {
   resizeCollageStack,
   normalizeGroupRatios,
   ratioPercents,
-  resizePair,
+  ratiosSkippingHidden,
+  resizeVisiblePair,
   rowLayout,
 } from '../utils/rteImageGroup'
 import {
@@ -50,8 +51,19 @@ function ensureImageGroupStyle() {
   installImageGroupLayout()
 }
 
-function imageAspect(frame: HTMLElement): number {
+function frameImage(frame: HTMLElement): HTMLImageElement | null {
+  if (frame instanceof HTMLImageElement) return frame
   const img = frame.querySelector('img')
+  return img instanceof HTMLImageElement ? img : null
+}
+
+function frameConcealed(frame: HTMLElement | undefined): boolean {
+  if (!frame) return false
+  return frameImage(frame)?.getAttribute('data-concealed') === '1'
+}
+
+function imageAspect(frame: HTMLElement): number {
+  const img = frameImage(frame)
   if (img instanceof HTMLImageElement && img.naturalWidth > 0 && img.naturalHeight > 0) {
     return img.naturalWidth / img.naturalHeight
   }
@@ -153,7 +165,7 @@ function paintMix(
   const frames = Array.from(row.children).filter(
     (child): child is HTMLElement => child instanceof HTMLElement && !child.classList.contains('rte-image-caption-inline'),
   )
-  const concealed = (frame: HTMLElement | undefined) => frame?.querySelector('img')?.getAttribute('data-concealed') === '1'
+  const concealed = (frame: HTMLElement | undefined) => frameConcealed(frame)
   const stackVisible = !concealed(frames[stackAt]) && !concealed(frames[stackAt + 1])
   const visibleCount = frames.filter((frame) => !concealed(frame)).length
   const columns = Math.max(1, stackVisible ? visibleCount - 1 : visibleCount)
@@ -352,20 +364,21 @@ export function layoutImageGroupChrome(view: EditorView) {
       (child): child is HTMLElement => child instanceof HTMLElement && !child.classList.contains('ProseMirror-widget'),
     )
     kids.forEach((kid) => {
-      const hidden = kid.querySelector('img')?.getAttribute('data-concealed') === '1'
+      const hidden = frameConcealed(kid)
       kid.style.display = hidden ? 'none' : ''
     })
     const visible = kids.filter((kid) => kid.style.display !== 'none')
     const laidKids = visible.length ? visible : kids
-    const aspects = laidKids.map(imageAspect)
-    const ratios = visible.length && visible.length < kids.length
-      ? normalizeGroupRatios(laidKids.length, null)
-      : groupUsesAspect(node.attrs.ratioMode)
-        ? aspects
-        : normalizeGroupRatios(laidKids.length, node.attrs.ratios)
+    const hidden = kids.map((kid) => kid.style.display === 'none')
+    const aspects = kids.map(imageAspect)
+    const natural = groupUsesAspect(node.attrs.ratioMode)
+      ? aspects
+      : normalizeGroupRatios(kids.length, node.attrs.ratios)
+    const ratios = ratiosSkippingHidden(natural, hidden)
     const gap = normalizeGroupGap(node.attrs.gap)
     const layout = normalizeGroupLayout(node.attrs.layout)
-    const signature = `${layout}:${Math.round(row.clientWidth)}:${laidKids.length}:${node.attrs.fit || ''}:${node.attrs.ratios || ''}:${node.attrs.stackAt ?? ''}:${node.attrs.stackSide || ''}:${node.attrs.stackSplit ?? ''}:${node.attrs.layoutBefore || ''}`
+    const hiddenMask = hidden.map((item) => (item ? '0' : '1')).join('')
+    const signature = `${layout}:${Math.round(row.clientWidth)}:${laidKids.length}:${hiddenMask}:${node.attrs.fit || ''}:${node.attrs.ratios || ''}:${node.attrs.stackAt ?? ''}:${node.attrs.stackSide || ''}:${node.attrs.stackSplit ?? ''}:${node.attrs.layoutBefore || ''}`
     if (row.clientWidth > 8 && dom.dataset.rteSig === signature && dom.dataset.ratioDrag !== '1') return false
     dom.dataset.rteSig = signature
     if (layout === 'row') dom.removeAttribute('data-layout')
@@ -431,13 +444,17 @@ export function layoutImageGroupChrome(view: EditorView) {
     if (dom.dataset.ratioDrag === '1') return false
     dividers.replaceChildren()
     const domRect = dom.getBoundingClientRect()
-    for (let index = 0; index < kids.length - 1; index += 1) {
-      const left = kids[index]!.getBoundingClientRect()
-      const right = kids[index + 1]!.getBoundingClientRect()
+    const visibleIndex = kids.flatMap((kid, index) => (kid.style.display === 'none' ? [] : [index]))
+    for (let pair = 0; pair < visibleIndex.length - 1; pair += 1) {
+      const leftIndex = visibleIndex[pair]!
+      const rightIndex = visibleIndex[pair + 1]!
+      const left = kids[leftIndex]!.getBoundingClientRect()
+      const right = kids[rightIndex]!.getBoundingClientRect()
       const handle = document.createElement('button')
       handle.type = 'button'
       handle.className = 'rte-image-group-divider'
-      handle.dataset.index = String(index)
+      handle.dataset.index = String(leftIndex)
+      handle.dataset.right = String(rightIndex)
       handle.dataset.groupPos = String(pos)
       handle.setAttribute('aria-label', '调整图片宽度比例')
       handle.title = '拖动调整两侧宽度'
@@ -469,9 +486,10 @@ export function layoutImageGroupChrome(view: EditorView) {
         const pairWidth = right.right - left.left
         const current = view.state.doc.nodeAt(groupPos)
         const gap = normalizeGroupGap(current?.attrs.gap)
-        const base = groupUsesAspect(current?.attrs.ratioMode)
+        const natural = groupUsesAspect(current?.attrs.ratioMode)
           ? kids.map(imageAspect)
           : normalizeGroupRatios(kids.length, current?.attrs.ratios)
+        const hiddenNow = kids.map((kid) => kid.style.display === 'none')
         dom.dataset.ratioDrag = '1'
         handle.classList.add('is-active')
         const tip = document.createElement('div')
@@ -482,16 +500,17 @@ export function layoutImageGroupChrome(view: EditorView) {
         const move = (ev: PointerEvent) => {
           if (Math.abs(ev.clientX - originX) > 3) moved = true
           const share = pairWidth ? (ev.clientX - pairLeft) / pairWidth : 0.5
-          const next = resizePair(base, index, share)
-          dom.style.setProperty(`--g${index}`, String(next[index]))
-          dom.style.setProperty(`--g${index + 1}`, String(next[index + 1]))
-          paintGroupMetrics(dom, row, next, gap)
-          const percents = ratioPercents(next)
-          tip.textContent = next.map((_, i) => `${percents[i]}%`).join(' · ')
+          const next = resizeVisiblePair(natural, leftIndex, rightIndex, share)
+          const painted = ratiosSkippingHidden(next, hiddenNow)
+          dom.style.setProperty(`--g${leftIndex}`, String(next[leftIndex]))
+          dom.style.setProperty(`--g${rightIndex}`, String(next[rightIndex]))
+          paintGroupMetrics(dom, row, painted, gap)
+          const percents = ratioPercents(painted.filter((n) => n > 0))
+          tip.textContent = percents.map((percent) => `${percent}%`).join(' · ')
           tip.style.left = `${ev.clientX}px`
           tip.style.top = `${ev.clientY - 36}px`
-          const mid = kids[index]!.getBoundingClientRect().right
-          const nextLeft = kids[index + 1]!.getBoundingClientRect().left
+          const mid = kids[leftIndex]!.getBoundingClientRect().right
+          const nextLeft = kids[rightIndex]!.getBoundingClientRect().left
           handle.style.left = `${(mid + nextLeft) / 2 - dom.getBoundingClientRect().left}px`
         }
         const up = (ev: PointerEvent) => {
@@ -502,7 +521,7 @@ export function layoutImageGroupChrome(view: EditorView) {
           delete dom.dataset.ratioDrag
           if (!moved || ev.detail >= 2) return
           const share = pairWidth ? (ev.clientX - pairLeft) / pairWidth : 0.5
-          const next = resizePair(base, index, share)
+          const next = resizeVisiblePair(natural, leftIndex, rightIndex, share)
           const latest = groupPosFromDom(view, dom)
           const at = latest ?? groupPos
           if (view.state.doc.nodeAt(at)?.type.name === 'imageGroup') setGroupRatios(view, at, next)
