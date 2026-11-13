@@ -11,6 +11,8 @@ declare module '@tiptap/core' {
       setColumns: (cols: ColumnCount, ratios?: number[]) => ReturnType
       /** 取消分栏，各栏文字按顺序回到正文。 */
       unsetColumns: () => ReturnType
+      /** 光标移到相邻栏。onlyAtEdge 为真时，只有贴着栏首或栏尾才移动。 */
+      focusColumn: (dir: 1 | -1, onlyAtEdge?: boolean) => ReturnType
     }
   }
 }
@@ -125,6 +127,33 @@ function columnsPosition(tr: Transaction): number | null {
 function placeCaret(tr: Transaction, pos: number) {
   const target = Math.max(1, Math.min(pos, tr.doc.content.size))
   tr.setSelection(TextSelection.near(tr.doc.resolve(target)))
+}
+
+function focusColumn(tr: Transaction, dir: 1 | -1, onlyAtEdge = false): boolean {
+  if (onlyAtEdge && !tr.selection.empty) return false
+  const { $from } = tr.selection
+  let depth = -1
+  for (let level = $from.depth; level > 0; level -= 1) {
+    if ($from.node(level).type.name === 'column') depth = level
+  }
+  if (depth < 1 || $from.node(depth - 1).type.name !== 'columns') return false
+  for (let level = $from.depth; level > depth; level -= 1) {
+    const name = $from.node(level).type.name
+    if (name === 'listItem' || name === 'taskItem' || name === 'codeBlock') return false
+  }
+  const column = $from.node(depth)
+  if (onlyAtEdge) {
+    const atEnd = dir > 0 && $from.parentOffset === $from.parent.content.size && $from.index(depth) === column.childCount - 1
+    const atStart = dir < 0 && $from.parentOffset === 0 && $from.index(depth) === 0
+    if (!atEnd && !atStart) return false
+  }
+  const columns = $from.node(depth - 1)
+  const next = $from.index(depth - 1) + dir
+  if (next < 0 || next >= columns.childCount) return false
+  let pos = $from.before(depth - 1) + 1
+  for (let index = 0; index < next; index += 1) pos += columns.child(index).nodeSize
+  placeCaret(tr, pos + 1)
+  return true
 }
 
 function liftedBlocks(node: PMNode, blank: PMNode): PMNode[] {
@@ -303,6 +332,7 @@ export const Columns = Node.create({
       : 'repeat(' + String(cols) + ', minmax(0, 1fr))'
     const style = [
       'display:grid',
+      `--rte-col-grid:${grid}`,
       `grid-template-columns:${grid}`,
       columnsFrameVars(node.attrs),
       'min-height:88px',
@@ -346,6 +376,18 @@ export const Columns = Node.create({
           if (pos == null) return false
           return liftColumns(tr, pos)
         },
+      focusColumn:
+        (dir: 1 | -1, onlyAtEdge?: boolean) =>
+        ({ tr }) => focusColumn(tr, dir, onlyAtEdge),
+    }
+  },
+
+  addKeyboardShortcuts() {
+    return {
+      Tab: () => this.editor.commands.focusColumn(1),
+      'Shift-Tab': () => this.editor.commands.focusColumn(-1),
+      ArrowRight: () => this.editor.commands.focusColumn(1, true),
+      ArrowLeft: () => this.editor.commands.focusColumn(-1, true),
     }
   },
 

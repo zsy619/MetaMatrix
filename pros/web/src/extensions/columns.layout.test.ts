@@ -33,6 +33,19 @@ function textPos(ed: Editor, text: string, edge: 'start' | 'end') {
   return pos
 }
 
+function selectionColumn(ed: Editor): number {
+  const { $from } = ed.state.selection
+  for (let depth = $from.depth; depth > 0; depth -= 1) {
+    if ($from.node(depth).type.name === 'column') return $from.index(depth - 1)
+  }
+  return -1
+}
+
+function pressKey(ed: Editor, key: string, shiftKey = false) {
+  const event = new KeyboardEvent('keydown', { key, shiftKey, bubbles: true })
+  return ed.view.someProp('handleKeyDown', (fn) => fn(ed.view, event))
+}
+
 function columnTexts(ed: Editor): string[][] {
   const columns: string[][] = []
   ed.state.doc.descendants((node) => {
@@ -96,5 +109,44 @@ describe('分栏装入选区和栏数', () => {
     expect(ed.state.doc.firstChild?.type.name).not.toBe('columns')
     expect(ed.getText()).toContain('甲')
     expect(ed.getHTML()).not.toContain('data-type="columns"')
+  })
+
+  it('左右宽度按比例画，等宽样式不再盖住', () => {
+    const ed = mount('<p>甲</p><p>乙</p>')
+    ed.commands.setTextSelection({ from: textPos(ed, '甲', 'start'), to: textPos(ed, '乙', 'end') })
+    ed.chain().focus().setColumns(2, [1, 2]).run()
+    const html = ed.getHTML()
+    expect(html).toContain('data-ratios="1:2"')
+    expect(html).toContain('--rte-col-grid: 1fr 2fr')
+    expect(html).toContain('grid-template-columns: 1fr 2fr')
+  })
+
+  it('Tab 进下一栏，列表里的 Tab 留在本栏', () => {
+    const ed = mount()
+    ed.commands.setTextSelection({ from: textPos(ed, '甲', 'start'), to: textPos(ed, '丙', 'end') })
+    ed.chain().focus().setColumns(2).run()
+    expect(selectionColumn(ed)).toBe(0)
+    expect(pressKey(ed, 'Tab')).toBe(true)
+    expect(selectionColumn(ed)).toBe(1)
+    expect(ed.state.selection.$from.parent.textContent).toBe('丙')
+    expect(pressKey(ed, 'Tab', true)).toBe(true)
+    expect(selectionColumn(ed)).toBe(0)
+
+    ed.commands.setTextSelection(textPos(ed, '乙', 'start'))
+    expect(pressKey(ed, 'ArrowRight')).not.toBe(true)
+    expect(selectionColumn(ed)).toBe(0)
+    ed.commands.setTextSelection(textPos(ed, '乙', 'end'))
+    expect(pressKey(ed, 'ArrowRight')).toBe(true)
+    expect(selectionColumn(ed)).toBe(1)
+  })
+
+  it('列表里按 Tab 仍留在本栏', () => {
+    const ed = mount(
+      '<div data-type="columns" data-cols="2"><div data-type="column"><ul><li><p>甲</p></li></ul></div><div data-type="column"><p>乙</p></div></div>',
+    )
+    ed.commands.setTextSelection(textPos(ed, '甲', 'start'))
+    expect(selectionColumn(ed)).toBe(0)
+    pressKey(ed, 'Tab')
+    expect(selectionColumn(ed)).toBe(0)
   })
 })
