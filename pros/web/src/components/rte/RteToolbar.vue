@@ -25,6 +25,7 @@ function tableMenuOps(keys: readonly string[]) {
   const items = rte.tableOpItems as Array<{
     key: string
     label: string
+    title?: string
     run: () => void
     insertCount?: boolean
     danger?: boolean
@@ -1149,6 +1150,7 @@ function toggleChartGroupMenu(key: string) {
                   role="menuitem"
                   :class="{ active: tableMenuGroup === group.id }"
                   :title="group.title"
+                  :aria-expanded="tableMenuGroup === group.id"
                   @mouseenter="openTableMenuGroup(group.id, $event)"
                   @click.stop="openTableMenuGroup(group.id, $event)"
                 >
@@ -1189,8 +1191,8 @@ function toggleChartGroupMenu(key: string) {
                       v-else
                       type="button"
                       role="menuitem"
-                      :title="op.title"
                       :class="{ danger: op.danger, active: op.active?.() }"
+                      :title="op.title || op.label"
                       :disabled="op.disabled?.()"
                       @click="op.run()"
                     >
@@ -1217,12 +1219,13 @@ function toggleChartGroupMenu(key: string) {
               <button data-rte-own
                 type="button"
                 role="menuitem"
+                title="再插入一张表格，自己填行数和列数"
                 @click="rte.closeTableMenu(); rte.openTableDialog()"
               >
                 <span data-rte-own class="rte-table-ctx-ico"><component :is="TABLE_MENU_ICONS['insert-table']" /></span>
                 <span data-rte-own>插入表格</span>
               </button>
-              <button data-rte-own type="button" role="menuitem" @click="rte.toggleTableZebra(); rte.closeTableMenu()">
+              <button data-rte-own type="button" role="menuitem" title="隔行加底色，只用于显示" @click="rte.toggleTableZebra(); rte.closeTableMenu()">
                 <span data-rte-own class="rte-table-ctx-ico"><component :is="TABLE_MENU_ICONS.zebra" /></span>
                 <span data-rte-own>斑马纹</span>
               </button>
@@ -2356,6 +2359,7 @@ function toggleChartGroupMenu(key: string) {
                 type="button"
                 :class="{ active: (t.currentPreset?.() || '') === opt.id }"
                 :aria-pressed="(t.currentPreset?.() || '') === opt.id"
+                :title="toolbarMenuItemTitle(opt.label) || undefined"
                 @click="t.applyPreset?.(opt.id); rte.closePresetMenu()"
               >
                 <RteMenuGlyph :id="opt.id" :label="opt.label" />{{ opt.label }}
@@ -2376,7 +2380,7 @@ function toggleChartGroupMenu(key: string) {
             class="rte-paper-chip"
             :class="{ active: (t.currentPreset?.() || '') === opt.id }"
             :aria-pressed="(t.currentPreset?.() || '') === opt.id"
-            :title="opt.label + '纸样'"
+            :title="toolbarMenuItemTitle(opt.label) || (opt.label + '纸样')"
             @mousedown.prevent
             @click="t.applyPreset?.(opt.id)"
           >
@@ -2485,7 +2489,7 @@ function toggleChartGroupMenu(key: string) {
                 class="rte-paper-chip"
                 :class="{ active: (mt.currentPreset?.() || '') === opt.id }"
                 :aria-pressed="(mt.currentPreset?.() || '') === opt.id"
-                :title="opt.label + '纸样'"
+                :title="toolbarMenuItemTitle(opt.label) || (opt.label + '纸样')"
                 @mousedown.prevent
                 @click="mt.applyPreset?.(opt.id)"
               >
@@ -2588,6 +2592,7 @@ function toggleChartGroupMenu(key: string) {
                 type="button"
                 :class="{ active: (mt.currentPreset?.() || '') === opt.id }"
                 :aria-pressed="(mt.currentPreset?.() || '') === opt.id"
+                :title="toolbarMenuItemTitle(opt.label) || undefined"
                 @click="mt.applyPreset?.(opt.id); rte.closePresetMenu()"
               >
                 <RteMenuGlyph :id="opt.id" :label="opt.label" />{{ opt.label }}

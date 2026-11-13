@@ -76,6 +76,7 @@ function applyCustom() {
       type="button"
       class="rte-color-action"
       :class="{ selected: kind === 'text' ? !rte.currentTextColor() : !rte.isActive('highlight') }"
+      :title="kind === 'text' ? '使用默认文字颜色' : '去掉选中文字的底色'"
       @click="pick('')"
     >
       {{ kind === 'text' ? '自动' : '清除高亮' }}
@@ -196,7 +197,7 @@ function applyCustom() {
     </template>
 
     <div data-rte-own class="rte-color-hint">{{ hint || '悬停色块可看名称' }}</div>
-    <button data-rte-own type="button" class="rte-color-action" :aria-expanded="customOpen" @click.stop="customOpen = !customOpen">
+    <button data-rte-own type="button" class="rte-color-action" :title="kind === 'text' ? '自己选一个文字颜色' : '自己选一个底色'" :aria-expanded="customOpen" @click.stop="customOpen = !customOpen">
       其他颜色…
     </button>
     <div v-if="customOpen" data-rte-own class="rte-custom-color" @mousedown.stop @click.stop>
@@ -216,9 +217,10 @@ function applyCustom() {
         maxlength="7"
         :placeholder="kind === 'text' ? '#245bdb' : '#fff3bf'"
         :aria-label="kind === 'text' ? '文字颜色十六进制' : '高亮颜色十六进制'"
+        title="填好后按 Enter 使用"
         @keydown.enter.prevent="applyCustom"
       />
-      <button data-rte-own type="button" class="rte-custom-color-ok" @click="applyCustom">确定</button>
+      <button data-rte-own type="button" class="rte-custom-color-ok" title="使用上面填的颜色" @click="applyCustom">确定</button>
     </div>
   </div>
 </template>
