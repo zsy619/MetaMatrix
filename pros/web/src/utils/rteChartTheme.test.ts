@@ -37,11 +37,26 @@ describe('图表渲染外观', () => {
     const xAxis = light.xAxis as { axisLabel: { color: string }; nameTextStyle: { color: string } }
     expect(xAxis.axisLabel.color).toBe('#5f6368')
     expect(xAxis.nameTextStyle.color).toBe('#5f6368')
-    const series = light.series as Array<{ emphasis?: { focus?: string } }>
+    const series = light.series as Array<{
+      emphasis?: { focus?: string; label?: { show?: boolean } }
+      itemStyle?: { borderRadius?: number[]; borderWidth?: number }
+      lineStyle?: { width?: number }
+      symbolSize?: number
+    }>
     expect(series[0].emphasis?.focus).toBe('series')
+    expect(series[0].emphasis?.label?.show).toBe(true)
+    expect(series[0].itemStyle?.borderRadius).toEqual([6, 6, 0, 0])
     expect(series[1].emphasis?.focus).toBe('self')
+    expect(series[1].itemStyle?.borderWidth).toBe(2)
     expect(series[2].emphasis?.focus).toBe('none')
+    expect(series[2].lineStyle?.width).toBe(2.5)
+    expect(series[2].symbolSize).toBe(8)
+    const yAxis = light.yAxis as { splitLine: { lineStyle: { type: string } } }
+    expect(yAxis.splitLine.lineStyle.type).toBe('dashed')
+    const tooltip = light.tooltip as { backgroundColor: string; trigger?: string }
+    expect(tooltip.backgroundColor).toBe('#ffffff')
     expect(option.series[0]).not.toHaveProperty('emphasis')
+    expect(option.series[0]).not.toHaveProperty('itemStyle')
     expect(option).not.toHaveProperty('backgroundColor')
 
     const dark = chartRenderOption(option, 'dark', 'play')
@@ -73,7 +88,37 @@ describe('图表渲染外观', () => {
     expect(radar.splitNumber).toBe(4)
     expect(radar.axisName.color).toBe('#202124')
     expect(radar.axisLabel).toBeUndefined()
-    const series = view.series as Array<{ emphasis?: { focus?: string } }>
+    const series = view.series as Array<{
+      emphasis?: { focus?: string }
+      areaStyle?: { opacity?: number }
+      lineStyle?: { width?: number }
+    }>
     expect(series[0].emphasis?.focus).toBe('series')
+    expect(series[0].areaStyle?.opacity).toBe(0.16)
+    expect(series[0].lineStyle?.width).toBe(2.2)
+  })
+
+  it('堆叠柱和写过的线宽保持原样，横向柱圆在末端', () => {
+    const option = {
+      xAxis: { type: 'value' },
+      yAxis: { type: 'category', data: ['甲'] },
+      tooltip: { trigger: 'axis', backgroundColor: '#eeeeee' },
+      series: [
+        { type: 'bar', stack: '合计', data: [1], itemStyle: { color: '#111111' } },
+        { type: 'bar', data: [2] },
+        { type: 'line', data: [3], lineStyle: { width: 5 } },
+      ],
+    }
+    const view = chartRenderOption(option, 'light')
+    const series = view.series as Array<{
+      itemStyle?: { color?: string; borderRadius?: number[] }
+      lineStyle?: { width?: number }
+    }>
+    expect(series[0].itemStyle?.color).toBe('#111111')
+    expect(series[0].itemStyle?.borderRadius).toBeUndefined()
+    expect(series[1].itemStyle?.borderRadius).toEqual([0, 6, 6, 0])
+    expect(series[2].lineStyle?.width).toBe(5)
+    expect((view.tooltip as { backgroundColor: string }).backgroundColor).toBe('#eeeeee')
+    expect(option.series[1]).not.toHaveProperty('itemStyle')
   })
 })

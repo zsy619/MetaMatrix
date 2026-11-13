@@ -70,6 +70,7 @@ function paintAxis(axis: unknown, tone: Tone): unknown {
   const split = isRecord(axis.splitLine) ? { ...axis.splitLine } : {}
   const lineStyle = isRecord(split.lineStyle) ? { ...split.lineStyle } : {}
   if (!lineStyle.color) lineStyle.color = tone.line
+  if (axis.type === 'value' && !lineStyle.type) lineStyle.type = 'dashed'
   split.lineStyle = lineStyle
   const next: Record<string, unknown> = { ...axis, axisLabel: label, splitLine: split }
   if (typeof axis.name === 'string' && axis.name) {
@@ -127,16 +128,81 @@ function paintRadar(radar: unknown, tone: Tone): unknown {
   return next
 }
 
-function paintSeries(series: unknown): unknown {
-  const paint = (item: unknown): unknown => {
-    if (!isRecord(item) || item.emphasis != null) return item
-    const type = typeof item.type === 'string' ? item.type : ''
-    if (EMPHASIS_SKIP.has(type)) return item
-    const focus = type === 'pie' || type === 'funnel' || type === 'gauge' ? 'self' : 'series'
-    return { ...item, emphasis: { focus } }
+type SeriesLook = { horizontal: boolean; gap: string }
+
+function withItemStyle(item: Record<string, unknown>, patch: Record<string, unknown>): Record<string, unknown> {
+  const itemStyle = isRecord(item.itemStyle) ? { ...item.itemStyle } : {}
+  for (const [key, value] of Object.entries(patch)) {
+    if (itemStyle[key] == null) itemStyle[key] = value
   }
+  return { ...item, itemStyle }
+}
+
+/** 没写过的形状才补。堆叠柱不加圆角，避免中间一段被切圆。 */
+function paintSeriesLook(item: Record<string, unknown>, look: SeriesLook): Record<string, unknown> {
+  const type = typeof item.type === 'string' ? item.type : ''
+  let next = item
+  if (type === 'bar' && !next.stack) {
+    next = withItemStyle(next, { borderRadius: look.horizontal ? [0, 6, 6, 0] : [6, 6, 0, 0] })
+    if (next.barMaxWidth == null) next = { ...next, barMaxWidth: 42 }
+  }
+  if (type === 'line') {
+    const lineStyle = isRecord(next.lineStyle) ? { ...next.lineStyle } : {}
+    if (lineStyle.width == null) lineStyle.width = 2.5
+    next = { ...next, lineStyle }
+    if (next.symbolSize == null) next = { ...next, symbolSize: 8 }
+  }
+  if (type === 'scatter' && next.symbolSize == null) next = { ...next, symbolSize: 12 }
+  if (type === 'pie' || type === 'funnel') {
+    next = withItemStyle(next, {
+      borderColor: look.gap,
+      borderWidth: 2,
+      ...(type === 'pie' ? { borderRadius: 6 } : {}),
+    })
+  }
+  if (type === 'radar') {
+    const lineStyle = isRecord(next.lineStyle) ? { ...next.lineStyle } : {}
+    if (lineStyle.width == null) lineStyle.width = 2.2
+    next = { ...next, lineStyle }
+    if (next.areaStyle == null) next = { ...next, areaStyle: { opacity: 0.16 } }
+  }
+  if (next.emphasis == null && !EMPHASIS_SKIP.has(type)) {
+    const focus = type === 'pie' || type === 'funnel' || type === 'gauge' ? 'self' : 'series'
+    const emphasis: Record<string, unknown> = { focus }
+    if (type === 'bar' || type === 'line' || type === 'scatter' || type === 'radar') {
+      emphasis.label = { show: true, fontWeight: 700 }
+    }
+    next = { ...next, emphasis }
+  }
+  return next
+}
+
+function paintSeries(series: unknown, look: SeriesLook): unknown {
+  const paint = (item: unknown): unknown => (isRecord(item) ? paintSeriesLook(item, look) : item)
   if (Array.isArray(series)) return series.map(paint)
   return paint(series)
+}
+
+function axisKind(axis: unknown): string {
+  if (Array.isArray(axis)) return axisKind(axis[0])
+  if (isRecord(axis) && typeof axis.type === 'string') return axis.type
+  return ''
+}
+
+function paintTooltip(tooltip: unknown, tone: Tone, mode: ChartRenderMode): unknown {
+  const next = isRecord(tooltip) ? { ...tooltip } : {}
+  if (!next.backgroundColor) next.backgroundColor = mode === 'dark' ? '#2a303a' : '#ffffff'
+  if (!next.borderColor) next.borderColor = tone.line
+  if (next.borderWidth == null) next.borderWidth = 1
+  if (next.padding == null) next.padding = [8, 12]
+  const textStyle = isRecord(next.textStyle) ? { ...next.textStyle } : {}
+  if (!textStyle.color) textStyle.color = tone.ink
+  next.textStyle = textStyle
+  if (next.trigger === 'axis' && next.axisPointer == null) {
+    next.axisPointer = { type: 'line', lineStyle: { color: tone.muted, type: 'dashed' } }
+  }
+  if (!next.extraCssText) next.extraCssText = 'border-radius:10px;box-shadow:0 8px 24px rgba(32,33,36,.12);'
+  return next
 }
 
 /** 返回新对象。用户写进 option 的系列对象本身不被改写。 */
@@ -156,12 +222,22 @@ export function chartRenderOption(
   if (option.color == null) next.color = [...CHART_PALETTE]
   const textStyle = isRecord(option.textStyle) ? { ...option.textStyle } : {}
   if (!textStyle.color) textStyle.color = tone.ink
+  if (!textStyle.fontFamily) {
+    textStyle.fontFamily = "system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif"
+  }
   next.textStyle = textStyle
+  next.tooltip = paintTooltip(option.tooltip, tone, mode)
   if (option.xAxis != null) next.xAxis = paintAxis(option.xAxis, tone)
   if (option.yAxis != null) next.yAxis = paintAxis(option.yAxis, tone)
   if (option.legend != null || mode === 'dark') next.legend = paintLegend(option.legend, tone)
   if (option.title != null) next.title = paintTitle(option.title, tone)
   if (option.radar != null) next.radar = paintRadar(option.radar, tone)
-  if (option.series != null) next.series = paintSeries(option.series)
+  if (option.series != null) {
+    const horizontal = axisKind(option.xAxis) === 'value' && axisKind(option.yAxis) === 'category'
+    next.series = paintSeries(option.series, {
+      horizontal,
+      gap: mode === 'dark' ? CHART_DARK_BG : '#ffffff',
+    })
+  }
   return next
 }
