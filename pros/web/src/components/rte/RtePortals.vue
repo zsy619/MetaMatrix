@@ -433,7 +433,7 @@ const echartsDialogTemplates = computed(() => {
                 type="button"
                 class="rte-formula-mode-btn"
                 :class="{ active: rte.formulaMode === 'inline' }"
-                title="行内模式"
+                title="公式嵌在这一行文字中间"
                 @click="rte.setFormulaMode('inline')"
               >
                 <span data-rte-own class="rte-mode-glyph">行内</span>
@@ -442,7 +442,7 @@ const echartsDialogTemplates = computed(() => {
                 type="button"
                 class="rte-formula-mode-btn"
                 :class="{ active: rte.formulaMode === 'display' }"
-                title="行间模式"
+                title="公式单独占一行，居中显示"
                 @click="rte.setFormulaMode('display')"
               >
                 <span data-rte-own class="rte-mode-glyph">行间</span>
@@ -465,7 +465,7 @@ const echartsDialogTemplates = computed(() => {
                       :key="it.tex + it.label"
                       type="button"
                       class="rte-formula-sym"
-                      :title="it.tex"
+                      :title="'插入 ' + it.label + '，写法 ' + it.tex"
                       @click="rte.insertFormulaSymbol(it.tex)"
                     >
                       {{ it.label }}
@@ -505,10 +505,10 @@ const echartsDialogTemplates = computed(() => {
           <p data-rte-own v-if="rte.formulaError" class="rte-modal-desc is-error">{{ rte.formulaError }}</p>
 
           <div data-rte-own class="rte-modal-actions">
-            <button data-rte-own type="button" class="rte-modal-cancel" @click="rte.closeFormulaDialog">
+            <button data-rte-own type="button" class="rte-modal-cancel" title="不插入公式" @click="rte.closeFormulaDialog">
               取消
             </button>
-            <button data-rte-own type="button" class="rte-modal-confirm" @click="rte.confirmInsertFormula">
+            <button data-rte-own type="button" class="rte-modal-confirm" title="把当前公式插入文档" @click="rte.confirmInsertFormula">
               确认
             </button>
           </div>
@@ -803,11 +803,12 @@ const echartsDialogTemplates = computed(() => {
               max="100"
               :value="rte.tableRows"
               placeholder="输入表格行数（最大 100 行）"
+              title="表格行数，最少 1 行，最多 100 行"
               @input="rte.onTableRowsInput"
             />
             <div data-rte-own class="rte-table-stepper">
-              <button data-rte-own type="button" @click="rte.stepTableRows(1)">▴</button>
-              <button data-rte-own type="button" @click="rte.stepTableRows(-1)">▾</button>
+              <button data-rte-own type="button" title="表格多一行" aria-label="表格多一行" @click="rte.stepTableRows(1)">▴</button>
+              <button data-rte-own type="button" title="表格少一行" aria-label="表格少一行" @click="rte.stepTableRows(-1)">▾</button>
             </div>
           </div>
 
@@ -822,19 +823,20 @@ const echartsDialogTemplates = computed(() => {
               :max="rte.TABLE_GRID_MAX_COLS"
               :value="rte.tableCols"
               placeholder="输入表格列数（最大 16 列）"
+              title="表格列数，最少 1 列，最多 16 列"
               @input="rte.onTableColsInput"
             />
             <div data-rte-own class="rte-table-stepper">
-              <button data-rte-own type="button" @click="rte.stepTableCols(1)">▴</button>
-              <button data-rte-own type="button" @click="rte.stepTableCols(-1)">▾</button>
+              <button data-rte-own type="button" title="表格多一列" aria-label="表格多一列" @click="rte.stepTableCols(1)">▴</button>
+              <button data-rte-own type="button" title="表格少一列" aria-label="表格少一列" @click="rte.stepTableCols(-1)">▾</button>
             </div>
           </div>
 
           <div data-rte-own class="rte-modal-actions">
-            <button data-rte-own type="button" class="rte-modal-cancel" @click="rte.closeTableDialog">
+            <button data-rte-own type="button" class="rte-modal-cancel" title="不插入表格" @click="rte.closeTableDialog">
               取消
             </button>
-            <button data-rte-own type="button" class="rte-modal-confirm" @click="rte.confirmInsertTable">
+            <button data-rte-own type="button" class="rte-modal-confirm" title="按填的行数和列数插入表格" @click="rte.confirmInsertTable">
               插入
             </button>
           </div>
@@ -904,7 +906,7 @@ const echartsDialogTemplates = computed(() => {
         >
           <h3 data-rte-own
             class="rte-table-title rte-find-drag"
-            title="拖动"
+            title="按住拖动查找窗口"
             @pointerdown="rte.onFindDialogDragStart"
             @pointermove="rte.onFindDialogDragMove"
             @pointerup="rte.onFindDialogDragEnd"
@@ -918,6 +920,7 @@ const echartsDialogTemplates = computed(() => {
               class="rte-note-input rte-find-query"
               placeholder="查找"
               maxlength="200"
+              title="输入要找的文字，按 Enter 跳到下一处"
               @input="rte.onFindQueryInput"
               @keydown.enter.prevent="rte.findGo(1)"
             />
@@ -929,6 +932,7 @@ const echartsDialogTemplates = computed(() => {
               type="text"
               class="rte-note-input"
               placeholder="替换为"
+              title="输入要换成的文字，按 Enter 替换当前这一处"
               maxlength="200"
               @keydown.enter.prevent="rte.doReplaceOne"
             />
@@ -936,7 +940,7 @@ const echartsDialogTemplates = computed(() => {
           <div data-rte-own class="rte-find-opts">
             <label data-rte-own class="rte-find-case">
               <span data-rte-own>范围</span>
-              <select data-rte-own v-model="rte.findScope" aria-label="查找范围" @change="rte.refreshFindMatches(true)">
+              <select data-rte-own v-model="rte.findScope" aria-label="查找范围" title="选择在全文、标题、表格、代码还是题注里找" @change="rte.refreshFindMatches(true)">
                 <option data-rte-own value="all">全文</option>
                 <option data-rte-own value="heading">标题</option>
                 <option data-rte-own value="table">表格</option>
@@ -945,32 +949,32 @@ const echartsDialogTemplates = computed(() => {
               </select>
             </label>
             <label data-rte-own class="rte-find-case">
-              <input data-rte-own v-model="rte.findCaseSensitive" type="checkbox" @change="rte.refreshFindMatches(true)" />
+              <input data-rte-own v-model="rte.findCaseSensitive" type="checkbox" title="大写和小写不算同一处" @change="rte.refreshFindMatches(true)" />
               <span data-rte-own>区分大小写</span>
             </label>
             <label data-rte-own class="rte-find-case">
-              <input data-rte-own v-model="rte.findWholeWord" type="checkbox" @change="rte.refreshFindMatches(true)" />
+              <input data-rte-own v-model="rte.findWholeWord" type="checkbox" title="只匹配完整的词，不匹配词的一部分" @change="rte.refreshFindMatches(true)" />
               <span data-rte-own>全词匹配</span>
             </label>
             <label data-rte-own class="rte-find-case">
-              <input data-rte-own v-model="rte.findRegex" type="checkbox" @change="rte.refreshFindMatches(true)" />
+              <input data-rte-own v-model="rte.findRegex" type="checkbox" title="按正则表达式查找" @change="rte.refreshFindMatches(true)" />
               <span data-rte-own>正则</span>
             </label>
             <label data-rte-own v-if="rte.findRegex" class="rte-find-case">
-              <input data-rte-own v-model="rte.findMultiline" type="checkbox" @change="rte.refreshFindMatches(true)" />
+              <input data-rte-own v-model="rte.findMultiline" type="checkbox" title="正则可以跨行匹配" @change="rte.refreshFindMatches(true)" />
               <span data-rte-own>多行</span>
             </label>
             <span data-rte-own class="rte-find-status" role="status" aria-live="polite">{{ rte.findStatusText }}</span>
           </div>
           <div data-rte-own class="rte-find-actions">
             <div data-rte-own class="rte-modal-actions">
-              <button data-rte-own type="button" class="rte-modal-cancel" :disabled="!rte.canReplaceFind" @click="rte.findGo(-1)">上一个</button>
-              <button data-rte-own type="button" class="rte-modal-cancel" :disabled="!rte.canReplaceFind" @click="rte.findGo(1)">下一个</button>
+              <button data-rte-own type="button" class="rte-modal-cancel" title="跳到上一处匹配" :disabled="!rte.canReplaceFind" @click="rte.findGo(-1)">上一个</button>
+              <button data-rte-own type="button" class="rte-modal-cancel" title="跳到下一处匹配" :disabled="!rte.canReplaceFind" @click="rte.findGo(1)">下一个</button>
             </div>
             <div data-rte-own class="rte-modal-actions rte-find-replace-row">
-              <button data-rte-own type="button" class="rte-modal-cancel" :disabled="!rte.canReplaceFind" @click="rte.doReplaceOne">替换当前</button>
-              <button data-rte-own type="button" class="rte-modal-confirm" :disabled="!rte.canReplaceFind" @click="rte.doReplaceAll">全部替换</button>
-              <button data-rte-own type="button" class="rte-modal-cancel" @click="rte.closeFindDialog">关闭</button>
+              <button data-rte-own type="button" class="rte-modal-cancel" title="只把这一处换成新文字" :disabled="!rte.canReplaceFind" @click="rte.doReplaceOne">替换当前</button>
+              <button data-rte-own type="button" class="rte-modal-confirm" title="把所有匹配都换成新文字" :disabled="!rte.canReplaceFind" @click="rte.doReplaceAll">全部替换</button>
+              <button data-rte-own type="button" class="rte-modal-cancel" title="关掉查找与替换" @click="rte.closeFindDialog">关闭</button>
             </div>
           </div>
         </div>
@@ -989,15 +993,15 @@ const echartsDialogTemplates = computed(() => {
       >
         <div data-rte-own class="rte-present-top">
           <div data-rte-own class="rte-present-units" role="tablist" aria-label="翻页方式">
-            <button data-rte-own type="button" :class="{ active: rte.presentUnit === 'block' }" @click="rte.setPresentUnit('block')">按块</button>
-            <button data-rte-own type="button" :class="{ active: rte.presentUnit === 'screen' }" @click="rte.setPresentUnit('screen')">按屏</button>
+            <button data-rte-own type="button" :class="{ active: rte.presentUnit === 'block' }" title="一次翻一块内容" @click="rte.setPresentUnit('block')">按块</button>
+            <button data-rte-own type="button" :class="{ active: rte.presentUnit === 'screen' }" title="一次翻一整屏" @click="rte.setPresentUnit('screen')">按屏</button>
           </div>
           <span data-rte-own class="rte-present-progress">{{ rte.presentIndex + 1 }} / {{ rte.presentSlides.length }}</span>
-          <button data-rte-own type="button" class="rte-present-exit" @click="rte.closePresent">退出</button>
+          <button data-rte-own type="button" class="rte-present-exit" title="结束演示，回到编辑" @click="rte.closePresent">退出</button>
         </div>
-        <button data-rte-own type="button" class="rte-present-nav is-prev" aria-label="上一屏" :disabled="rte.presentIndex === 0" @click="rte.stepPresent(-1)">‹</button>
+        <button data-rte-own type="button" class="rte-present-nav is-prev" aria-label="回到上一页" title="回到上一页" :disabled="rte.presentIndex === 0" @click="rte.stepPresent(-1)">‹</button>
         <div data-rte-own class="rte-present-stage" @click="rte.onPresentStageClick" v-html="rte.presentSlides[rte.presentIndex]"></div>
-        <button data-rte-own type="button" class="rte-present-nav is-next" aria-label="下一屏" :disabled="rte.presentIndex >= rte.presentSlides.length - 1" @click="rte.stepPresent(1)">›</button>
+        <button data-rte-own type="button" class="rte-present-nav is-next" aria-label="去下一页" title="去下一页" :disabled="rte.presentIndex >= rte.presentSlides.length - 1" @click="rte.stepPresent(1)">›</button>
         <p data-rte-own class="rte-present-hint">方向键或空格翻页，Esc 退出。演示中不能编辑。</p>
       </div>
     </Teleport>

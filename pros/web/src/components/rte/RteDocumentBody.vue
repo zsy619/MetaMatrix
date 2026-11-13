@@ -276,10 +276,10 @@ useParentScopeStamp()
         <option value="">全部作者</option>
         <option v-for="name in rte.suggestionAuthors" :key="name" :value="name">{{ name }}</option>
       </select>
-      <button data-rte-own type="button" :disabled="!rte.activeSuggestionId" @click="rte.acceptActiveSuggestion">接受</button>
-      <button data-rte-own type="button" :disabled="!rte.activeSuggestionId" @click="rte.rejectActiveSuggestion">拒绝</button>
-      <button data-rte-own type="button" :disabled="!rte.suggestionRanges.length" @click="rte.acceptAllSuggestions">全部接受</button>
-      <button data-rte-own type="button" :disabled="!rte.suggestionRanges.length" @click="rte.rejectAllSuggestions">全部拒绝</button>
+      <button data-rte-own type="button" title="接受当前这一条修订" :disabled="!rte.activeSuggestionId" @click="rte.acceptActiveSuggestion">接受</button>
+      <button data-rte-own type="button" title="拒绝当前这一条修订，恢复原文" :disabled="!rte.activeSuggestionId" @click="rte.rejectActiveSuggestion">拒绝</button>
+      <button data-rte-own type="button" title="接受所有修订" :disabled="!rte.suggestionRanges.length" @click="rte.acceptAllSuggestions">全部接受</button>
+      <button data-rte-own type="button" title="拒绝所有修订，全部恢复原文" :disabled="!rte.suggestionRanges.length" @click="rte.rejectAllSuggestions">全部拒绝</button>
     </div>
     <div data-rte-own
       class="rte-workspace"
