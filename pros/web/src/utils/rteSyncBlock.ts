@@ -273,6 +273,7 @@ export function renderSyncBlockInto(el: HTMLElement, opts: SyncBlockRenderOption
   const addButton = (
     text: string,
     className: string,
+    title: string,
     onClick?: () => void,
     disabled = false,
   ): HTMLButtonElement => {
@@ -280,6 +281,7 @@ export function renderSyncBlockInto(el: HTMLElement, opts: SyncBlockRenderOption
     btn.type = 'button'
     btn.className = `rte-sync-block-btn ${className}`.trim()
     btn.textContent = text
+    btn.title = title
     btn.disabled = disabled
     if (disabled) btn.setAttribute('aria-disabled', 'true')
     if (onClick) btn.addEventListener('click', onClick)
@@ -288,13 +290,14 @@ export function renderSyncBlockInto(el: HTMLElement, opts: SyncBlockRenderOption
   }
 
   if (!view.loading) {
-    addButton(view.canRetry && opts.status !== 'synced' ? '重试' : '刷新', 'is-refresh', opts.onRefresh)
+    const retry = view.canRetry && opts.status !== 'synced'
+    addButton(retry ? '重试' : '刷新', 'is-refresh', retry ? '再从来源文档拉一次' : '从来源文档再拉一次内容', opts.onRefresh)
   }
   if (view.canUnlink) {
-    addButton('解除同步', 'is-unlink', opts.onUnlink)
+    addButton('解除同步', 'is-unlink', '留下现在的文字，不再跟着来源变', opts.onUnlink)
   }
   if (view.canRemove) {
-    addButton('移除', 'is-remove', opts.onRemove)
+    addButton('移除', 'is-remove', '从本文删掉这块', opts.onRemove)
   }
   head.appendChild(actions)
   el.appendChild(head)

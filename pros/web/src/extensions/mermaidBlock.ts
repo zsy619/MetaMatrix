@@ -98,8 +98,8 @@ export const MermaidBlock = Node.create({
       more.type = 'button'
       more.className = 'rte-mermaid-more'
       more.textContent = '…'
-      more.title = '流程图操作'
-      more.setAttribute('aria-label', '流程图操作')
+      more.title = '复制或删除这张流程图'
+      more.setAttribute('aria-label', '复制或删除这张流程图')
       more.setAttribute('aria-haspopup', 'menu')
       const label = document.createElement('span')
       label.textContent = '流程图'
@@ -128,6 +128,7 @@ export const MermaidBlock = Node.create({
       source.style.display = 'none'
       source.value = current.attrs.code || DEFAULT_MERMAID
       source.setAttribute('aria-label', '流程图源码')
+      source.title = 'Mermaid 源码。改完点「完成」写回'
 
       let renderTimer = 0
       const scheduleRender = () => {
@@ -209,7 +210,7 @@ export const MermaidBlock = Node.create({
         const dirGroup = document.createElement('div')
         dirGroup.className = 'rte-mermaid-dir'
         for (const dir of ['LR', 'TD'] as FlowDir[]) {
-          const dirBtn = button(dir === 'LR' ? '横向' : '纵向', dir === 'LR' ? '从左到右' : '从上到下', () => {
+          const dirBtn = button(dir === 'LR' ? '横向' : '纵向', dir === 'LR' ? '步骤从左往右排' : '步骤从上往下排', () => {
             write(setFlowDir(model, dir))
           })
           dirBtn.classList.toggle('is-on', model.dir === dir)
@@ -234,6 +235,7 @@ export const MermaidBlock = Node.create({
           const input = document.createElement('input')
           input.value = node.text
           input.setAttribute('aria-label', `步骤 ${node.text || node.id}`)
+          input.title = '改这一步的名称'
           input.addEventListener('mousedown', (event) => event.stopPropagation())
           input.addEventListener('input', () => {
             const live = parseFlow(current.attrs.code || '')
@@ -264,6 +266,7 @@ export const MermaidBlock = Node.create({
             input.value = edge.label
             input.placeholder = '连线文字'
             input.setAttribute('aria-label', `${from?.text || edge.from}到${to?.text || edge.to}的连线文字`)
+            input.title = '这条连线上的文字'
             input.addEventListener('mousedown', (event) => event.stopPropagation())
             input.addEventListener('input', () => {
               const live = parseFlow(current.attrs.code || '')
@@ -280,6 +283,8 @@ export const MermaidBlock = Node.create({
         source.style.display = sourceEditing ? 'block' : 'none'
         preview.style.display = sourceEditing ? 'none' : 'block'
         sourceBtn.textContent = sourceEditing ? '完成' : '源码'
+        sourceBtn.title = sourceEditing ? '把源码写回流程图' : '查看和修改 Mermaid 源码'
+        sourceBtn.setAttribute('aria-label', sourceBtn.title)
         sourceBtn.classList.toggle('is-on', sourceEditing)
         paintSteps()
       }
@@ -335,12 +340,13 @@ export const MermaidBlock = Node.create({
         const panel = document.createElement('div')
         panel.className = 'rte-tabs-menu'
         panel.setAttribute('role', 'menu')
-        const addItem = (text: string, danger: boolean, act: () => void) => {
+        const addItem = (text: string, title: string, danger: boolean, act: () => void) => {
           const item = document.createElement('button')
           item.type = 'button'
           item.className = `rte-tabs-menu-item${danger ? ' is-danger' : ''}`
           item.setAttribute('role', 'menuitem')
           item.textContent = text
+          item.title = title
           item.addEventListener('mousedown', (ev) => {
             ev.preventDefault()
             ev.stopPropagation()
@@ -353,14 +359,14 @@ export const MermaidBlock = Node.create({
           })
           panel.append(item)
         }
-        addItem('复制', false, () => {
+        addItem('复制', '在下面再复制一张同样的流程图', false, () => {
           const pos = posOf()
           if (pos == null || !editor) return
           const live = editor.state.doc.nodeAt(pos)
           if (!live) return
           editor.chain().focus().insertContentAt(pos + live.nodeSize, { type: 'mermaidBlock', attrs: { code: live.attrs.code } }).run()
         })
-        addItem('删除', true, () => {
+        addItem('删除', '从文档里删掉这张图，删前会再确认', true, () => {
           void confirmDelete()
         })
         document.body.append(panel)

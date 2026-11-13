@@ -162,6 +162,7 @@ const echartsDialogTemplates = computed(() => {
               role="option"
               :aria-selected="idx === rte.slashIndex"
               :class="{ 'is-active': idx === rte.slashIndex }"
+              :title="(it.description || '插入「' + it.label + '」') + '。Enter 插入'"
               @mouseenter="rte.slashIndex = idx"
               @click="rte.pickSlashItem(it)"
             >
@@ -204,6 +205,7 @@ const echartsDialogTemplates = computed(() => {
             type="button"
             class="rte-mention-item"
             :class="{ 'is-active': idx === rte.mentionIndex }"
+            :title="it.kind === 'block' ? '插入指向「' + it.label + '」的引用' : '在这里提及「' + it.label + '」'"
             @mouseenter="rte.mentionIndex = idx"
             @click="rte.pickMentionItem(it)"
           >
@@ -470,7 +472,7 @@ const echartsDialogTemplates = computed(() => {
                   :key="g.title"
                   class="rte-formula-group"
                 >
-                  <div data-rte-own class="rte-formula-group-title">{{ g.title }}</div>
+                  <div data-rte-own class="rte-formula-group-title" :title="g.title === '希腊字母' ? '常用希腊字母' : g.title === '运算' ? '加减乘除、求和和积分' : g.title === '关系' ? '等于、不等和属于' : g.title === '结构' ? '根号、括号、上下标和分数' : '方向箭头'">{{ g.title }}</div>
                   <div data-rte-own class="rte-formula-group-items">
                     <button data-rte-own
                       v-for="it in g.items"
@@ -490,6 +492,7 @@ const echartsDialogTemplates = computed(() => {
                 v-model="rte.formulaTex"
                 class="rte-formula-tex"
                 placeholder="输入 TeX 公式"
+                title="输入 TeX。点左边的符号会插到光标处，带括号的会把光标放进括号里"
                 spellcheck="false"
               />
             </div>
@@ -500,7 +503,7 @@ const echartsDialogTemplates = computed(() => {
               <button data-rte-own
                 type="button"
                 class="rte-formula-expand"
-                title="放大预览"
+                :title="rte.formulaPreviewExpanded ? '收回预览' : '把预览放大'"
                 @click="rte.formulaPreviewExpanded = !rte.formulaPreviewExpanded"
               >
                 ⛶

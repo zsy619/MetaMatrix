@@ -346,7 +346,7 @@ export const TabsBlock = Node.create({
           btn.className = `rte-tabs-tab${index === active ? ' is-active' : ''}`
           btn.dataset.tabIndex = String(index)
           btn.draggable = editable
-          btn.title = editable ? '拖到其他标签上可调整顺序' : title
+          btn.title = editable ? `切到「${title}」。双击改名，拖到别的标签上调整顺序` : title
           const label = document.createElement('span')
           label.textContent = title
           btn.append(label)
@@ -385,8 +385,8 @@ export const TabsBlock = Node.create({
         more.type = 'button'
         more.className = 'rte-tabs-more'
         more.textContent = '…'
-        more.title = '标签操作'
-        more.setAttribute('aria-label', '标签操作')
+        more.title = '添加、移动、改名或删除标签'
+        more.setAttribute('aria-label', '添加、移动、改名或删除标签')
         more.setAttribute('aria-haspopup', 'menu')
         more.disabled = !editable
         more.addEventListener('mousedown', (event) => {
@@ -403,12 +403,13 @@ export const TabsBlock = Node.create({
           const panel = document.createElement('div')
           panel.className = 'rte-tabs-menu'
           panel.setAttribute('role', 'menu')
-          const addItem = (label: string, enabled: boolean, danger: boolean, act: () => void) => {
+          const addItem = (label: string, title: string, enabled: boolean, danger: boolean, act: () => void) => {
             const item = document.createElement('button')
             item.type = 'button'
             item.className = `rte-tabs-menu-item${danger ? ' is-danger' : ''}`
             item.setAttribute('role', 'menuitem')
             item.textContent = label
+            item.title = title
             item.disabled = !enabled
             item.addEventListener('mousedown', (event) => {
               event.preventDefault()
@@ -424,16 +425,16 @@ export const TabsBlock = Node.create({
             panel.append(item)
             return item
           }
-          addItem('添加', editable && titles.length < TABS_MAX, false, () => {
+          addItem('添加', '再加一页，最多 12 页', editable && titles.length < TABS_MAX, false, () => {
             run((tr, pos) => addTabPane(tr, pos))
           })
-          addItem('左移', editable && active > 0, false, () => {
+          addItem('左移', '当前页和左边一页对调', editable && active > 0, false, () => {
             run((tr, pos) => moveTabPane(tr, pos, active, active - 1))
           })
-          addItem('右移', editable && active < titles.length - 1, false, () => {
+          addItem('右移', '当前页和右边一页对调', editable && active < titles.length - 1, false, () => {
             run((tr, pos) => moveTabPane(tr, pos, active, active + 1))
           })
-          addItem('改名', editable && titles.length > 0, false, () => {
+          addItem('改名', '改当前这一页的名字', editable && titles.length > 0, false, () => {
             beginRename(active, titles[active] || '标签')
           })
           const sep = document.createElement('div')
@@ -441,7 +442,7 @@ export const TabsBlock = Node.create({
           panel.append(sep)
           const lastPane = titles.length <= TABS_MIN
           const currentTitle = titles[active] || '标签'
-          addItem('删除', editable && titles.length > 0, true, () => {
+          addItem('删除', lastPane ? '删掉整个标签页，删前会再确认' : '删掉当前页和里面的内容，删前会再确认', editable && titles.length > 0, true, () => {
             void confirmRemove(currentTitle, lastPane, active)
           })
           document.body.append(panel)
