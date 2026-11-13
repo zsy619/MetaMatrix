@@ -1,5 +1,6 @@
-/* 雷达上同一条数据的边，顺着轮廓顺时针流动。 */
-.radar-flow-line {
+/* 图表上顺着路径走的边：雷达轮廓顺时针，甘特依赖从前往后。 */
+.radar-flow-line,
+.chart-flow-line {
   fill: none;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -8,7 +9,8 @@
   pointer-events: none;
 }
 
-.radar-flow-line.is-selected {
+.radar-flow-line.is-selected,
+.chart-flow-line.is-selected {
   animation-duration: 1.6s;
 }
 
@@ -29,7 +31,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .radar-flow-line {
+  .radar-flow-line,
+  .chart-flow-line {
     animation: none !important;
     stroke-dasharray: none;
   }
