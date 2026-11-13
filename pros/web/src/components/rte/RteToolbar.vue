@@ -1213,7 +1213,7 @@ function toggleChartGroupMenu(key: string) {
                   :key="'menu-bg-' + p.value"
                   type="button"
                   class="rte-table-swatch"
-                  :title="p.label"
+                  :title="p.value ? '单元格底色：' + p.label : '去掉单元格底色'"
                   :style="p.value ? { background: p.value } : undefined"
                   @click="rte.setTableCellBg(p.value); rte.closeTableMenu()"
                 >{{ p.value ? '' : '无' }}</button>
@@ -1946,6 +1946,7 @@ function toggleChartGroupMenu(key: string) {
             autocomplete="off"
             spellcheck="false"
                 placeholder="搜索，例如 bold、引用、tab"
+                title="搜快捷键，可以打 bold、引用或 tab"
                 aria-label="搜索快捷键"
                 @mousedown.stop
                 @keydown.stop
@@ -2962,6 +2963,7 @@ function toggleChartGroupMenu(key: string) {
             autocomplete="off"
             spellcheck="false"
             placeholder="搜索，例如 bold、引用、tab"
+            title="搜快捷键，可以打 bold、引用或 tab"
             aria-label="搜索快捷键"
             @mousedown.stop
             @keydown.stop

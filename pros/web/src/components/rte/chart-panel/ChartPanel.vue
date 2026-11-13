@@ -209,6 +209,7 @@ function onChangeChartType(event: Event) {
           class="rte-cp-type-select"
           :value="props.host.target?.tableRef || ''"
           aria-label="引用正文表格"
+          title="用这张表的数据画图。表改了，图跟着变"
           @change="props.host.setTableRef(($event.target as HTMLSelectElement).value)"
         >
           <option value="">不引用</option>
@@ -223,6 +224,7 @@ function onChangeChartType(event: Event) {
           class="rte-cp-type-select"
           :value="props.host.target?.chartTitle || ''"
           aria-label="图表标题"
+          title="写在图下方，和单位、来源排成一行"
           @change="props.host.patchAttrs({ chartTitle: ($event.target as HTMLInputElement).value })"
         />
       </label>
@@ -232,6 +234,7 @@ function onChangeChartType(event: Event) {
           class="rte-cp-type-select"
           :value="props.host.target?.chartUnit || ''"
           aria-label="图表单位"
+          title="单位，跟在标题后面，例如万元"
           @change="props.host.patchAttrs({ chartUnit: ($event.target as HTMLInputElement).value })"
         />
       </label>
@@ -241,6 +244,7 @@ function onChangeChartType(event: Event) {
           class="rte-cp-type-select"
           :value="props.host.target?.chartSource || ''"
           aria-label="图表来源"
+          title="数据来源，跟在单位后面"
           @change="props.host.patchAttrs({ chartSource: ($event.target as HTMLInputElement).value })"
         />
       </label>
@@ -249,6 +253,7 @@ function onChangeChartType(event: Event) {
         <select
           class="rte-cp-type-select"
           :value="panel.target?.chartType || ''"
+          title="换成另一种图"
           @change="onChangeChartType"
         >
           <option v-for="item in ECHARTS_CHART_TYPES" :key="item.value" :value="item.value">
@@ -256,7 +261,7 @@ function onChangeChartType(event: Event) {
           </option>
         </select>
       </label>
-      <button type="button" class="rte-cp-close" title="关闭面板" @click="props.host.hide()">
+      <button type="button" class="rte-cp-close" title="收起图表属性" @click="props.host.hide()">
         ×
       </button>
     </header>

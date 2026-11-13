@@ -227,13 +227,14 @@ watch(barEl, (el) => {
     @mousedown.stop
     @click.stop
   >
-    <span class="rte-formula-address" aria-label="单元格地址">{{ address }}</span>
+    <span class="rte-formula-address" aria-label="单元格地址" :title="'当前单元格 ' + address">{{ address }}</span>
     <span class="rte-formula-sign" aria-hidden="true">=</span>
     <input
       class="rte-formula-input"
       type="text"
       :value="draft"
       placeholder="输入公式，如 =SUM(A1:B3)"
+      title="公式写在等号后面。Enter 写入并重算，Esc 放弃"
       aria-label="单元格公式"
       @input="editing = true; draft = ($event.target as HTMLInputElement).value"
       @keydown.enter.prevent="onEnter"
@@ -245,7 +246,7 @@ watch(barEl, (el) => {
     <button
       class="rte-formula-apply"
       type="button"
-      title="回车写入并重算"
+      title="把公式写入这个单元格并重算"
       aria-label="写入公式并重算"
       @mousedown.prevent
       @click="apply"

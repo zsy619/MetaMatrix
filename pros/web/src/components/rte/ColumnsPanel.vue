@@ -105,12 +105,12 @@ onBeforeUnmount(() => {
     <header class="rte-cp-head">
       <div class="rte-cp-title">分栏属性</div>
       <div class="rte-cp-subtitle">边框、间距和圆角</div>
-      <button type="button" class="rte-cp-close" title="关闭" @click="dismissedPos = pos; open = false">×</button>
+      <button type="button" class="rte-cp-close" title="收起分栏属性。光标还在这里时不再自动打开" @click="dismissedPos = pos; open = false">×</button>
     </header>
     <div class="rte-cp-body rte-columns-panel-body">
       <label class="rte-cp-type-row">
         <span class="rte-cp-type-label">边框</span>
-        <select class="rte-cp-type-select" :value="frame.borderStyle" aria-label="分栏边框" @change="onStyle">
+        <select class="rte-cp-type-select" :value="frame.borderStyle" aria-label="分栏边框" title="栏与栏之间的线：虚线、实线，或不要" @change="onStyle">
           <option value="dashed">虚线</option>
           <option value="solid">实线</option>
           <option value="none">无</option>
@@ -118,27 +118,27 @@ onBeforeUnmount(() => {
       </label>
       <label class="rte-cp-type-row">
         <span class="rte-cp-type-label">粗细</span>
-        <input class="rte-cp-type-select" type="number" min="0" max="8" :value="frame.borderWidth" aria-label="边框粗细" @change="onNumber('borderWidth', $event)" />
+        <input class="rte-cp-type-select" type="number" min="0" max="8" :value="frame.borderWidth" aria-label="边框粗细" title="边框粗细，0 到 8 像素。0 等于不要边框" @change="onNumber('borderWidth', $event)" />
       </label>
       <label class="rte-cp-type-row">
         <span class="rte-cp-type-label">颜色</span>
-        <input class="rte-cp-type-select" type="color" :value="frame.borderColor" aria-label="边框颜色" @input="onColor" />
+        <input class="rte-cp-type-select" type="color" :value="frame.borderColor" aria-label="边框颜色" title="边框颜色" @input="onColor" />
       </label>
       <label class="rte-cp-type-row">
         <span class="rte-cp-type-label">栏间距</span>
-        <input class="rte-cp-type-select" type="number" min="0" max="64" :value="frame.gap" aria-label="栏间距" @change="onNumber('gap', $event)" />
+        <input class="rte-cp-type-select" type="number" min="0" max="64" :value="frame.gap" aria-label="栏间距" title="栏与栏的间距，0 到 64 像素" @change="onNumber('gap', $event)" />
       </label>
       <label class="rte-cp-type-row">
         <span class="rte-cp-type-label">外边距</span>
-        <input class="rte-cp-type-select" type="number" min="0" max="64" :value="frame.margin" aria-label="分栏外边距" @change="onNumber('margin', $event)" />
+        <input class="rte-cp-type-select" type="number" min="0" max="64" :value="frame.margin" aria-label="分栏外边距" title="整组分栏的外边距，0 到 64 像素" @change="onNumber('margin', $event)" />
       </label>
       <label class="rte-cp-type-row">
         <span class="rte-cp-type-label">圆角</span>
-        <input class="rte-cp-type-select" type="number" min="0" max="32" :value="frame.radius" aria-label="分栏圆角" @change="onNumber('radius', $event)" />
+        <input class="rte-cp-type-select" type="number" min="0" max="32" :value="frame.radius" aria-label="分栏圆角" title="分栏圆角，0 到 32 像素" @change="onNumber('radius', $event)" />
       </label>
       <label class="rte-cp-type-row">
         <span class="rte-cp-type-label">内边距</span>
-        <input class="rte-cp-type-select" type="number" min="0" max="48" :value="frame.padding" aria-label="分栏内边距" @change="onNumber('padding', $event)" />
+        <input class="rte-cp-type-select" type="number" min="0" max="48" :value="frame.padding" aria-label="分栏内边距" title="栏内文字到边框的距离，0 到 48 像素" @change="onNumber('padding', $event)" />
       </label>
     </div>
   </aside>

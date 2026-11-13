@@ -108,6 +108,7 @@ function resetConfig() {
       <input
         type="checkbox"
         :checked="config.enabled"
+        title="勾上后按下面的地址拉数据"
         @change="(e) => patch({ enabled: (e.target as HTMLInputElement).checked })"
       />
     </label>
@@ -117,13 +118,14 @@ function resetConfig() {
         class="rte-cp-input"
         type="text"
         placeholder="https://example.com/api/data"
+        title="接口地址，图表会向这里拉数据"
         :value="config.url"
         @change="(e) => patch({ url: (e.target as HTMLInputElement).value })"
       />
     </label>
     <label class="rte-cp-field">
       <span class="rte-cp-field-label">请求方法</span>
-      <select class="rte-cp-input" :value="config.method" @change="onMethod">
+      <select class="rte-cp-input" :value="config.method" title="GET 把参数放在地址上，POST 放在请求体里" @change="onMethod">
         <option value="GET">GET</option>
         <option value="POST">POST</option>
       </select>
@@ -134,6 +136,7 @@ function resetConfig() {
         class="rte-cp-textarea"
         rows="2"
         placeholder='{"page":1}'
+        title="拼到地址后面的参数，要写成 JSON"
         :value="config.params"
         @change="(e) => patch({ params: (e.target as HTMLTextAreaElement).value })"
       ></textarea>
@@ -144,6 +147,7 @@ function resetConfig() {
         class="rte-cp-textarea"
         rows="2"
         placeholder='{"date":"2024-01"}'
+        title="POST 时发出去的 JSON"
         :value="config.body"
         @change="(e) => patch({ body: (e.target as HTMLTextAreaElement).value })"
       ></textarea>
@@ -155,6 +159,7 @@ function resetConfig() {
         type="number"
         min="0"
         max="86400"
+        title="隔多少秒再拉一次。0 表示不自动刷新，最多一天"
         :value="config.refreshInterval"
         @change="(e) => patch({ refreshInterval: Number((e.target as HTMLInputElement).value) || 0 })"
       />
@@ -168,6 +173,7 @@ function resetConfig() {
           class="rte-cp-input"
           type="text"
           placeholder="data.list"
+          title="响应里数组所在的路径，例如 data.list"
           :value="config.mapping.listPath"
           @change="(e) => patchMapping('listPath', (e.target as HTMLInputElement).value)"
         />
@@ -178,6 +184,7 @@ function resetConfig() {
           class="rte-cp-input"
           type="text"
           placeholder="name"
+          title="每一项里当作类目的字段"
           :value="config.mapping.categoryField"
           @change="(e) => patchMapping('categoryField', (e.target as HTMLInputElement).value)"
         />
@@ -188,6 +195,7 @@ function resetConfig() {
           class="rte-cp-input"
           type="text"
           placeholder="value"
+          title="每一项里当作数值的字段"
           :value="config.mapping.valueField"
           @change="(e) => patchMapping('valueField', (e.target as HTMLInputElement).value)"
         />
@@ -198,6 +206,7 @@ function resetConfig() {
           class="rte-cp-input"
           type="text"
           placeholder="series"
+          title="可选。用这个字段把数据分成多个系列"
           :value="config.mapping.seriesField"
           @change="(e) => patchMapping('seriesField', (e.target as HTMLInputElement).value)"
         />
@@ -208,7 +217,7 @@ function resetConfig() {
       <div class="rte-cp-sub-title">鉴权</div>
       <label class="rte-cp-field">
         <span class="rte-cp-field-label">鉴权方式</span>
-        <select class="rte-cp-input" :value="config.auth" @change="onAuth">
+        <select class="rte-cp-input" :value="config.auth" title="无鉴权、自定义请求头，或用本系统登录态" @change="onAuth">
           <option v-for="opt in authOptions" :key="opt.value" :value="opt.value">
             {{ opt.label }}
           </option>
@@ -224,6 +233,7 @@ function resetConfig() {
             class="rte-cp-input"
             type="password"
             placeholder="仅保存在本机浏览器"
+            title="Bearer Token，只存在这台浏览器里"
             :value="bearerToken"
             @change="(e) => (bearerToken = (e.target as HTMLInputElement).value)"
           />
@@ -234,6 +244,7 @@ function resetConfig() {
             class="rte-cp-input"
             type="text"
             placeholder="X-Api-Key"
+            title="自定义请求头的名字，例如 X-Api-Key"
             :value="headerKey"
             @change="(e) => (headerKey = (e.target as HTMLInputElement).value)"
           />
@@ -243,12 +254,13 @@ function resetConfig() {
           <input
             class="rte-cp-input"
             type="password"
+            title="自定义请求头的值，只存在这台浏览器里"
             :value="headerValue"
             @change="(e) => (headerValue = (e.target as HTMLInputElement).value)"
           />
         </label>
         <div class="rte-cp-row-actions">
-          <button type="button" class="rte-cp-mini" @click="saveSecret">保存密钥到本地</button>
+          <button type="button" class="rte-cp-mini" title="把 Token 和请求头存到本机，不写进文档" @click="saveSecret">保存密钥到本地</button>
         </div>
         <p class="rte-cp-warn">
           自定义 Token 保存在本机浏览器，不会写进文档或导出的 HTML；共享文档的其他人拿不到该密钥，
@@ -258,8 +270,8 @@ function resetConfig() {
     </div>
 
     <div class="rte-cp-row-actions">
-      <button type="button" class="rte-cp-mini" @click="previewRequest">预览请求</button>
-      <button type="button" class="rte-cp-mini" @click="resetConfig">清空配置</button>
+      <button type="button" class="rte-cp-mini" title="看将要发出的地址和请求头，密钥用星号代替" @click="previewRequest">预览请求</button>
+      <button type="button" class="rte-cp-mini" title="清掉地址、参数和字段映射" @click="resetConfig">清空配置</button>
     </div>
     <pre v-if="message" class="rte-cp-message">{{ message }}</pre>
   </div>

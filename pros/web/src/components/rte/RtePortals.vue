@@ -608,7 +608,7 @@ const echartsDialogTemplates = computed(() => {
                     :key="'ctx-bg-' + p.value"
                     type="button"
                     class="rte-table-swatch"
-                    :title="p.label"
+                    :title="p.value ? '单元格底色：' + p.label : '去掉单元格底色'"
                     :style="p.value ? { background: p.value } : undefined"
                     @click="rte.setTableCellBg(p.value); rte.closeTableCtx()"
                   >{{ p.value ? '' : '无' }}</button>
@@ -691,7 +691,7 @@ const echartsDialogTemplates = computed(() => {
                   :key="'tbg-' + p.value"
                   type="button"
                   class="rte-table-swatch"
-                  :title="p.label"
+                  :title="p.value ? '单元格底色：' + p.label : '去掉单元格底色'"
                   :style="p.value ? { background: p.value } : { background: 'transparent' }"
                   @click="rte.setTableCellBg(p.value)"
                 >
@@ -705,6 +705,7 @@ const echartsDialogTemplates = computed(() => {
                   :key="'tbs-' + p.value"
                   type="button"
                   class="rte-table-ops-item rte-table-border-btn"
+                  :title="p.value === 'solid' ? '单元格用实线边框' : p.value === 'dashed' ? '单元格用虚线边框' : p.value === 'dotted' ? '单元格用点线边框' : p.value === 'double' ? '单元格用双线边框' : '去掉单元格边框'"
                   @click="rte.setTableCellBorderStyle(p.value)"
                 >
                   {{ p.label }}
@@ -715,7 +716,7 @@ const echartsDialogTemplates = computed(() => {
                 <button data-rte-own
                   type="button"
                   class="rte-table-swatch"
-                  title="默认"
+                  title="去掉单独的边框颜色，用默认灰"
                   @click="rte.setTableCellBorderColor('')"
                 >无</button>
                 <button data-rte-own
@@ -724,7 +725,7 @@ const echartsDialogTemplates = computed(() => {
                   type="button"
                   class="rte-table-swatch"
                   :style="{ background: c }"
-                  :title="c"
+                  :title="'边框用 ' + c"
                   @click="rte.setTableCellBorderColor(c)"
                 />
               </div>
@@ -733,6 +734,7 @@ const echartsDialogTemplates = computed(() => {
             <button data-rte-own
               type="button"
               class="rte-table-ops-item"
+              title="打开行列对话框，自己填行数和列数"
               @click="rte.closeTableOpsSheet(); rte.openTableDialog()"
             >
               <span data-rte-own class="rte-table-ctx-ico"><component :is="TABLE_MENU_ICONS['insert-table']" /></span>
@@ -740,7 +742,7 @@ const echartsDialogTemplates = computed(() => {
             </button>
           </div>
           <div data-rte-own class="rte-modal-actions">
-            <button data-rte-own type="button" class="rte-modal-cancel" @click="rte.closeTableOpsSheet">
+            <button data-rte-own type="button" class="rte-modal-cancel" title="关掉表格操作" @click="rte.closeTableOpsSheet">
               取消
             </button>
           </div>

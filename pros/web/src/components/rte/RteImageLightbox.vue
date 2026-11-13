@@ -315,7 +315,7 @@ onBeforeUnmount(() => {
         type="button"
         class="rte-image-lightbox-nav is-prev"
         aria-label="上一张"
-        title="上一张"
+        title="看上一张"
         :disabled="!canPrev"
         @click="step(-1)"
       >
@@ -325,7 +325,7 @@ onBeforeUnmount(() => {
         type="button"
         class="rte-image-lightbox-nav is-next"
         aria-label="下一张"
-        title="下一张"
+        title="看下一张"
         :disabled="!canNext"
         @click="step(1)"
       >
@@ -374,6 +374,7 @@ onBeforeUnmount(() => {
           class="rte-image-lightbox-thumb"
           :class="{ active: i === index }"
           :aria-label="'第 ' + (Number(i) + 1) + ' 张'"
+          :title="'看第 ' + (Number(i) + 1) + ' 张'"
           :aria-current="i === index ? 'true' : undefined"
           @click="rte.setImagePreviewIndex(i)"
         >
@@ -383,30 +384,30 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="rte-image-lightbox-bar" role="toolbar" aria-label="图片预览操作" @click.stop>
-        <button type="button" class="rte-image-lightbox-icon" aria-label="缩小" title="缩小" @click="zoomBy(-1)">
+        <button type="button" class="rte-image-lightbox-icon" aria-label="缩小" title="缩小一档，最小 10%" @click="zoomBy(-1)">
           <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M2 7h12v2H2z"/></svg>
         </button>
-        <button type="button" class="rte-image-lightbox-zoom" aria-label="适应屏幕" title="适应屏幕" @click="fit">
+        <button type="button" class="rte-image-lightbox-zoom" aria-label="适应屏幕" title="回到刚好放下的大小" @click="fit">
           {{ zoomLabel }}
         </button>
-        <button type="button" class="rte-image-lightbox-icon" aria-label="放大" title="放大" @click="zoomBy(1)">
+        <button type="button" class="rte-image-lightbox-icon" aria-label="放大" title="放大一档，最大 8 倍" @click="zoomBy(1)">
           <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M7 2h2v5h5v2H9v5H7V9H2V7h5z"/></svg>
         </button>
-        <button type="button" class="rte-image-lightbox-text" aria-label="原始尺寸" title="原始尺寸" @click="zoomActual">
+        <button type="button" class="rte-image-lightbox-text" aria-label="原始尺寸" title="按图片原始像素显示" @click="zoomActual">
           1:1
         </button>
         <span class="rte-image-lightbox-sep" aria-hidden="true"></span>
-        <button type="button" class="rte-image-lightbox-icon" aria-label="向左旋转" title="向左旋转" @click="turn(-90)">
+        <button type="button" class="rte-image-lightbox-icon" aria-label="向左旋转" title="逆时针转 90 度" @click="turn(-90)">
           <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M7.5 2.2A6 6 0 0 1 13.8 8H12a4.2 4.2 0 0 0-7.2-2.9L6.5 6.8H2.2V2.5l1.8 1.8A6 6 0 0 1 7.5 2.2zM3.2 9.2A4.2 4.2 0 0 0 12 11.2l-1.7-1.6h4.3v4.3l-1.8-1.8A6 6 0 0 1 3.2 9.2z"/></svg>
         </button>
-        <button type="button" class="rte-image-lightbox-icon" aria-label="向右旋转" title="向右旋转" @click="turn(90)">
+        <button type="button" class="rte-image-lightbox-icon" aria-label="向右旋转" title="顺时针转 90 度" @click="turn(90)">
           <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8.5 2.2A6 6 0 0 1 12 4.3l1.8-1.8v4.3H9.5l1.7-1.7A4.2 4.2 0 0 0 4 8H2.2a6 6 0 0 1 6.3-5.8zM4 11.2A4.2 4.2 0 0 0 12.8 9.2H14.6A6 6 0 0 1 5.7 13.9l-1.8 1.8V11.4h4.3L6.5 13A4.2 4.2 0 0 0 4 11.2z"/></svg>
         </button>
         <span class="rte-image-lightbox-sep" aria-hidden="true"></span>
-        <button type="button" class="rte-image-lightbox-text" aria-label="下载" title="下载" @click="downloadCurrent">
+        <button type="button" class="rte-image-lightbox-text" aria-label="下载" title="下载当前这张图片" @click="downloadCurrent">
           下载
         </button>
-        <button type="button" class="rte-image-lightbox-text" aria-label="复制图片" title="复制" @click="copyCurrent">
+        <button type="button" class="rte-image-lightbox-text" aria-label="复制图片" title="复制这张图片。复制不了时改为复制地址" @click="copyCurrent">
           复制
         </button>
       </div>
