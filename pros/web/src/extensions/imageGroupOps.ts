@@ -391,7 +391,8 @@ export function extractOrMoveImage(view: EditorView, from: number, insertAt: num
       return false
     }
   }
-  const copy = imageForGroup(moving)
+  // 拖到段落之间时保留环绕、裁剪和题注。只有收进图片组才改成独占一行。
+  const copy = moving
   let tr = state.tr.delete(from, from + moving.nodeSize)
   if (src) {
     const mappedGroup = tr.mapping.map(src.groupPos, -1)
