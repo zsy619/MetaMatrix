@@ -238,7 +238,7 @@ function onCloseMaximize(event?: Event) {
   top: 2px;
   right: 2px;
   z-index: 3;
-  opacity: 0;
+  opacity: 0.72;
   transition: opacity 0.15s ease;
 }
 
@@ -251,8 +251,8 @@ function onCloseMaximize(event?: Event) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
+  width: 24px;
+  height: 24px;
   padding: 0;
   border: 1px solid var(--cv-frame, #ececec);
   border-radius: 4px;
@@ -268,8 +268,8 @@ function onCloseMaximize(event?: Event) {
 
 .region-input {
   padding: 3px 7px 4px;
-  font-size: 12px;
-  line-height: 1.4;
+  font-size: 14px;
+  line-height: 1.5;
   color: #3c4043;
   outline: none;
   word-break: break-word;
@@ -279,7 +279,7 @@ function onCloseMaximize(event?: Event) {
 
 .region-input:empty::before {
   content: attr(data-placeholder);
-  color: #9aa0a6;
+  color: #5c564c;
   pointer-events: none;
 }
 

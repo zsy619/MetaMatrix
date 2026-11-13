@@ -135,18 +135,18 @@ const notes = computed(() =>
 }
 
 .fsd-table {
-  flex: 1 1 auto;
+  flex: 1 0 auto;
   width: 100%;
-  min-height: 640px;
+  min-height: max(100%, 640px);
   display: grid;
   grid-template-columns: 68px repeat(5, minmax(0, 1fr));
-  grid-template-rows: auto repeat(3, minmax(140px, 1fr)) auto;
+  grid-template-rows: auto repeat(3, minmax(min-content, 1fr)) auto;
   background: #fff;
   border: 1px solid var(--cv-frame, #ececec);
   border-radius: 16px;
   box-shadow: 0 12px 32px rgba(62, 48, 28, 0.08);
   box-sizing: border-box;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .fsd-corner,
@@ -156,7 +156,8 @@ const notes = computed(() =>
 .fsd-foot,
 .fsd-foot-corner {
   min-width: 0;
-  min-height: 0;
+  min-height: min-content;
+  overflow: visible;
   box-sizing: border-box;
   box-shadow:
     inset -1px 0 0 var(--cv-hairline, rgba(60, 50, 20, 0.08)),
