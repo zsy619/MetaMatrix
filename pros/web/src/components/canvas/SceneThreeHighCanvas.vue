@@ -43,9 +43,15 @@ const PALETTE = [
 const CX = 320
 const CY = 286
 const R = 168
+const ringLevels = [20, 40, 60, 80]
 const passScore = computed(() => props.doc.passScore || 70)
+const selected = computed(() => props.doc.businesses.find((biz) => biz.id === selectedId.value) ?? null)
+const radarBusinesses = computed(() => {
+  const rest = props.doc.businesses.filter((biz) => biz.id !== selectedId.value)
+  return selected.value ? [...rest, selected.value] : props.doc.businesses
+})
 const passedCount = computed(() => props.doc.businesses.filter((biz) => sceneThreeHighPasses(biz.scores, passScore.value)).length)
-const rings = [20, 40, 60, 80, 100].map((level) => sceneRadarRing(level, CX, CY, R))
+const rings = ringLevels.map((level) => sceneRadarRing(level, CX, CY, R))
 const passRing = computed(() => sceneRadarRing(passScore.value, CX, CY, R))
 const spokes = [0, 1, 2].map((index) => {
   const [x, y] = sceneRadarPoint(index, SCENE_THREE_HIGH_MAX, CX, CY, R)
@@ -153,8 +159,18 @@ function writeNote(html: string) {
     </header>
 
     <section class="criteria" aria-label="三高说明">
-      <article v-for="axis in doc.axes" :key="axis.id" class="card">
-        <h3>{{ axis.title }}</h3>
+      <article
+        v-for="axis in doc.axes"
+        :key="axis.id"
+        class="card"
+        :class="{ met: selected && selected.scores[axis.id] >= passScore }"
+      >
+        <div class="card-top">
+          <h3>{{ axis.title }}</h3>
+          <p v-if="selected" class="axis-score" :class="{ met: selected.scores[axis.id] >= passScore }">
+            {{ selected.scores[axis.id] }}
+          </p>
+        </div>
         <p class="headline">{{ axis.headline }}</p>
         <p>{{ axis.body }}</p>
       </article>
@@ -201,6 +217,7 @@ function writeNote(html: string) {
             />
             <input
               class="num"
+              :class="{ met: biz.scores[axis] >= passScore }"
               type="number"
               min="0"
               :max="SCENE_THREE_HIGH_MAX"
@@ -222,12 +239,14 @@ function writeNote(html: string) {
           <polygon :points="passRing" class="gate" />
           <line v-for="(spoke, index) in spokes" :key="index" :x1="CX" :y1="CY" :x2="spoke.x" :y2="spoke.y" class="spoke" />
           <polygon
-            v-for="biz in doc.businesses"
+            v-for="biz in radarBusinesses"
             :key="biz.id"
             :points="polygon(biz)"
             :fill="biz.color"
             :stroke="biz.stroke"
-            :stroke-width="selectedId === biz.id ? 3 : 1.6"
+            :fill-opacity="selectedId === biz.id ? 0.9 : 0.16"
+            :stroke-opacity="selectedId === biz.id ? 1 : 0.4"
+            :stroke-width="selectedId === biz.id ? 3 : 1.4"
             @click="selectedId = biz.id"
           />
           <text
@@ -239,8 +258,23 @@ function writeNote(html: string) {
             dominant-baseline="middle"
             class="axis"
           >{{ label.title }}</text>
-          <text :x="CX + 14" :y="CY - (R * passScore) / SCENE_THREE_HIGH_MAX" class="gate-label">{{ passScore }}</text>
+          <text
+            v-for="level in ringLevels"
+            :key="`tick-${level}`"
+            :x="CX + 8"
+            :y="CY - (R * level) / SCENE_THREE_HIGH_MAX + 4"
+            class="tick"
+          >{{ level }}</text>
+          <text :x="CX - 36" :y="CY - (R * passScore) / SCENE_THREE_HIGH_MAX + 4" class="gate-label">{{ passScore }}</text>
         </svg>
+        <ul class="legend">
+          <li v-for="biz in doc.businesses" :key="biz.id">
+            <button type="button" :class="{ on: selectedId === biz.id }" @click="selectedId = biz.id">
+              <i :style="{ background: biz.stroke }" />
+              {{ biz.name }}
+            </button>
+          </li>
+        </ul>
       </section>
     </div>
 
@@ -290,6 +324,11 @@ function writeNote(html: string) {
 .score strong { color: #125c3b; font-size: 18px; }
 .criteria { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
 .card { min-height: 168px; padding: 16px 16px 14px; border-radius: 12px; background: #f7f1e6; }
+.card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.card-top h3 { margin: 0; }
+.axis-score { margin: 0; color: #8a8175; font-size: 20px; font-weight: 800; }
+.axis-score.met { color: #125c3b; }
+.card.met { box-shadow: inset 0 0 0 2px #b7e0c8; }
 .card h3 { color: #a84562; font-size: 14px; }
 .headline { margin-top: 10px; font-size: 22px; font-weight: 750; line-height: 1.3; }
 .card p:last-child { margin-top: 8px; color: #3c4043; font-size: 14px; line-height: 1.55; }
@@ -310,10 +349,17 @@ function writeNote(html: string) {
 .biz label { gap: 8px; margin-top: 6px; }
 .biz label span { width: 5.5em; color: #5c574e; font-size: 13px; }
 .biz label input[type='range'] { flex: 1; }
-.num { width: 64px; border: 1px solid #e4ddd2; border-radius: 8px; padding: 4px 6px; font: inherit; }
+.num { width: 64px; border: 1px solid #e4ddd2; border-radius: 8px; padding: 4px 6px; font: inherit; font-weight: 700; color: #8a8175; }
+.num.met { color: #125c3b; border-color: #b7e0c8; background: #f4fbf6; }
 .record { margin: 8px 0 0; color: #3c4043; font-size: 13px; line-height: 1.5; }
-.radar { min-height: 420px; }
+.radar { display: flex; flex-direction: column; min-height: 420px; }
 .radar svg { display: block; width: 100%; height: auto; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 4px 12px 12px; list-style: none; }
+.legend button { display: inline-flex; align-items: center; gap: 6px; border: 1px solid transparent; background: transparent; border-radius: 999px; padding: 3px 8px; cursor: pointer; font: inherit; font-size: 12px; color: #3c4043; }
+.legend button.on { border-color: #e4ddd2; background: #fff; font-weight: 700; }
+.legend i { width: 8px; height: 8px; border-radius: 50%; }
+.tick, .gate-label { paint-order: stroke; stroke: #fffdf8; stroke-width: 3px; }
+.tick { fill: #a8a29e; font-size: 11px; }
 .ring, .spoke { fill: none; stroke: #e4ddd2; stroke-width: 1; }
 .gate { fill: none; stroke: #a84562; stroke-width: 1.4; stroke-dasharray: 5 4; }
 .axis { fill: #3e3428; font-size: 16px; font-weight: 700; }
