@@ -213,6 +213,54 @@ export function segmentHeights(breakOffsets: readonly number[], contentHeight: n
   return heights.length ? heights : [end]
 }
 
+/**
+ * 分页符后面的内容接到下一页开头。
+ * 贴顶的分页符不留空白页。标记本身已经跨过页边时不再多空一页。
+ */
+export function pageBreakGap(offsetPx: number, blockPx: number, pageInnerPx: number): number {
+  if (!Number.isFinite(pageInnerPx) || pageInnerPx <= 0) return 0
+  if (!Number.isFinite(offsetPx) || offsetPx <= 1) return 0
+  const size = Number.isFinite(blockPx) ? Math.max(0, blockPx) : 0
+  const pageEnd = Math.ceil(offsetPx / pageInnerPx) * pageInnerPx
+  const gap = pageEnd - offsetPx - size
+  return gap > 0 ? Math.round(gap) : 0
+}
+
+/** 量高度时去掉已经加上的页间空白，避免空白被再算成一页。 */
+export function unwrapPageBreaks(
+  tops: readonly number[],
+  heights: readonly number[],
+  gaps: readonly number[],
+  content: number,
+): { offsets: number[]; heights: number[]; content: number } {
+  let removed = 0
+  const offsets: number[] = []
+  const rawHeights: number[] = []
+  for (let index = 0; index < tops.length; index += 1) {
+    const gap = Math.max(0, Number(gaps[index]) || 0)
+    offsets.push((tops[index] ?? 0) - removed)
+    rawHeights.push(Math.max(0, (heights[index] ?? 0) - gap))
+    removed += gap
+  }
+  return {
+    offsets,
+    heights: rawHeights,
+    content: Math.max(0, (Number.isFinite(content) ? content : 0) - removed),
+  }
+}
+
+const PREVIEW_PAGE_BREAK =
+  /<(?:div\b[^>]*\bdata-page-break=(?:"true"|'true')[^>]*>[\s\S]*?<\/div>|hr\b[^>]*\bdata-page-break=(?:"true"|'true')[^>]*\/?>)/gi
+
+/** 打印预览按分页符拆成多张纸。贴顶的分页符不单占一张空白页。 */
+export function splitPreviewPages(html: string): string[] {
+  const source = String(html ?? '')
+  const parts = source.split(PREVIEW_PAGE_BREAK).map((part) => part.trim())
+  if (parts.length <= 1) return [source]
+  if (!parts[0]) parts.shift()
+  return parts.length ? parts : ['']
+}
+
 /** 每段至少一页。开头的空段是贴顶的分页符，不额外加空白页。 */
 export function pagesWithBreaks(segmentHeightsPx: readonly number[], pageInnerPx: number): number {
   const parts = segmentHeightsPx.length ? segmentHeightsPx : [0]

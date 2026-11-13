@@ -6,10 +6,13 @@ import {
   groupSlides,
   headerForPage,
   normalizePageChrome,
+  pageBreakGap,
   pageIndexAt,
   pagesWithBreaks,
   printPageSideCss,
   segmentHeights,
+  splitPreviewPages,
+  unwrapPageBreaks,
   readPageChrome,
   writePageChrome,
 } from './rtePageChrome.ts'
@@ -136,6 +139,20 @@ assert.equal(pagesWithBreaks([0, 100], 400), 1)
 assert.equal(pageIndexAt([200, 800], 400, 0), 1)
 assert.equal(pageIndexAt([200, 800], 400, 200), 2)
 assert.equal(pageIndexAt([200, 800], 400, 600), 3)
+assert.equal(pageBreakGap(200, 28, 400), 172)
+assert.equal(pageBreakGap(0, 28, 400), 0)
+assert.equal(pageBreakGap(390, 28, 400), 0)
+assert.deepEqual(unwrapPageBreaks([200, 800], [200, 28], [172, 0], 1200), {
+  offsets: [200, 628],
+  heights: [28, 28],
+  content: 1028,
+})
+assert.deepEqual(
+  splitPreviewPages('<p>上</p><div data-page-break="true" class="rte-page-break"><span>分页符</span></div><p>下</p>'),
+  ['<p>上</p>', '<p>下</p>'],
+)
+assert.deepEqual(splitPreviewPages('<div data-page-break="true"></div><p>下</p>'), ['<p>下</p>'])
+assert.deepEqual(splitPreviewPages('<p>没有分页</p>'), ['<p>没有分页</p>'])
 
 const blocks = [
   { html: '<p>引</p>', text: '引', heading: false },

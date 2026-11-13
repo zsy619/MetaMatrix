@@ -8,10 +8,12 @@ import {
   headerForPage,
   normalizePageChrome,
   pageChromeIsEmpty,
+  pageBreakGap,
   pageIndexAt,
   pagesWithBreaks,
   readPageChrome,
   segmentHeights,
+  unwrapPageBreaks,
   type PanelPageChrome,
   type PresentUnit,
   type SlideSource,
@@ -136,14 +138,33 @@ export function usePageChrome(deps: {
     const bottomPad = mmToPx(margin.bottom)
     const content = Math.max(1, body.scrollHeight - topPad - bottomPad)
     const bodyTop = body.getBoundingClientRect().top
-    const offsets = [...body.querySelectorAll('.rte-page-break')].map((node) => {
-      if (!(node instanceof HTMLElement)) return -1
-      return node.getBoundingClientRect().top - bodyTop - topPad
+    const breaks = [...body.querySelectorAll('.rte-page-break')].filter(
+      (node): node is HTMLElement => node instanceof HTMLElement,
+    )
+    const gaps = breaks.map((node) => Number(node.dataset.breakGap) || 0)
+    const tops = breaks.map((node) => node.getBoundingClientRect().top - bodyTop - topPad)
+    const heights = breaks.map((node) => node.offsetHeight)
+    const raw = unwrapPageBreaks(tops, heights, gaps, content)
+    const printing = !!root?.classList.contains('rte-printing')
+    let gapChanged = false
+    breaks.forEach((node, index) => {
+      const gap = box && !printing ? pageBreakGap(raw.offsets[index] ?? 0, raw.heights[index] ?? 0, inner) : 0
+      if ((node.dataset.breakGap || '0') !== String(gap)) {
+        node.dataset.breakGap = String(gap)
+        node.style.setProperty('--rte-break-gap', `${gap}px`)
+        gapChanged = true
+      }
     })
-    const segments = segmentHeights(offsets, content)
+    const segments = segmentHeights(raw.offsets, raw.content)
+    if (gapChanged) scheduleMeasure()
     const total = pagesWithBreaks(segments, inner)
     pageCount.value = total
-    pageIndex.value = Math.min(total, pageIndexAt(segments, inner, canvas.scrollTop))
+    const scroll = canvas.scrollTop
+    let gapAbove = 0
+    breaks.forEach((_, index) => {
+      if (scroll >= (tops[index] ?? 0) + (heights[index] ?? 0)) gapAbove += gaps[index] || 0
+    })
+    pageIndex.value = Math.min(total, pageIndexAt(segments, inner, Math.max(0, scroll - gapAbove)))
     placeChrome()
   }
 

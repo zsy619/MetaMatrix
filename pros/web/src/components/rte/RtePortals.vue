@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, inject, ref, watch } from 'vue'
+import { footerForPage, formatPageNumber, headerForPage, splitPreviewPages } from '../../utils/rtePageChrome'
 import { RTE_BINDINGS } from './bindings'
 import { TABLE_MENU_ICONS } from './tableMenuIcons'
 import { TABLE_MENU_GROUPS, placeMenuFlyout } from './tableMenuGroups'
@@ -9,6 +10,20 @@ import RteAvPickDialog from './RteAvPickDialog.vue'
 const rte = inject(RTE_BINDINGS)
 if (!rte) throw new Error('RtePortals 必须放在 RichTextEditor 里')
 useParentScopeStamp()
+
+const previewPages = computed(() => splitPreviewPages(String(rte.printPreviewHtml || '')))
+
+function previewHeader(page: number) {
+  return headerForPage(rte.pageChrome, page)
+}
+
+function previewFooter(page: number) {
+  return footerForPage(rte.pageChrome, page)
+}
+
+function previewLabel(page: number) {
+  return formatPageNumber(rte.pageChrome.pageNumber, page, previewPages.value.length)
+}
 
 const tableCtxGroup = ref('')
 const tableCtxFlyout = ref({ top: 0, left: 0 })
@@ -1050,12 +1065,21 @@ const echartsDialogTemplates = computed(() => {
               <button data-rte-own type="button" class="rte-modal-confirm" title="按当前预览送去打印" @click="rte.confirmPrintFromPreview">打印</button>
             </div>
           </div>
-          <div data-rte-own class="rte-print-preview-paper" :style="rte.printPreviewMarginStyle" :data-writing-paper="rte.writingPaper || undefined">
-            <div data-rte-own v-if="rte.pageChrome.header" class="rte-preview-header">{{ rte.pageChrome.header }}</div>
-            <div data-rte-own v-html="rte.printPreviewHtml"></div>
-            <div data-rte-own v-if="rte.pageChrome.footer || rte.previewPageLabel" class="rte-preview-footer">
-              <span data-rte-own>{{ rte.pageChrome.footer }}</span>
-              <span data-rte-own>{{ rte.previewPageLabel }}</span>
+          <div data-rte-own class="rte-print-preview-pages">
+            <div
+              data-rte-own
+              v-for="(page, index) in previewPages"
+              :key="index"
+              class="rte-print-preview-paper"
+              :style="rte.printPreviewMarginStyle"
+              :data-writing-paper="rte.writingPaper || undefined"
+            >
+              <div data-rte-own v-if="previewHeader(index + 1)" class="rte-preview-header">{{ previewHeader(index + 1) }}</div>
+              <div data-rte-own v-html="page"></div>
+              <div data-rte-own v-if="previewFooter(index + 1) || previewLabel(index + 1)" class="rte-preview-footer">
+                <span data-rte-own>{{ previewFooter(index + 1) }}</span>
+                <span data-rte-own>{{ previewLabel(index + 1) }}</span>
+              </div>
             </div>
           </div>
         </div>
