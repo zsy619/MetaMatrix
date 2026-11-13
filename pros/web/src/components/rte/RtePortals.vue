@@ -228,6 +228,7 @@ const echartsDialogTemplates = computed(() => {
             <select
               data-rte-own
               class="rte-note-input"
+              title="纸张大小，预览和打印按这个排"
               :value="rte.pageSetupDraft?.size"
               :disabled="rte.viewMode !== 'edit'"
               @change="rte.pageSetupDraft && (rte.pageSetupDraft.size = ($event.target as HTMLSelectElement).value)"
@@ -242,6 +243,7 @@ const echartsDialogTemplates = computed(() => {
             <select
               data-rte-own
               class="rte-note-input"
+              title="页边距预设：常规、窄、适中、宽或无边距"
               :value="rte.pageSetupDraft?.marginPreset"
               :disabled="rte.viewMode !== 'edit'"
               @change="rte.pageSetupDraft && (rte.pageSetupDraft.marginPreset = ($event.target as HTMLSelectElement).value)"
@@ -259,6 +261,7 @@ const echartsDialogTemplates = computed(() => {
               class="rte-note-input"
               type="text"
               maxlength="80"
+              title="印在每页顶部，最多 80 字"
               placeholder="每页顶部的内容"
               :value="rte.pageSetupDraft?.header"
               :disabled="rte.viewMode !== 'edit'"
@@ -272,6 +275,7 @@ const echartsDialogTemplates = computed(() => {
               class="rte-note-input"
               type="text"
               maxlength="80"
+              title="印在每页底部，最多 80 字"
               placeholder="每页底部的内容"
               :value="rte.pageSetupDraft?.footer"
               :disabled="rte.viewMode !== 'edit'"
@@ -283,6 +287,7 @@ const echartsDialogTemplates = computed(() => {
             <select
               data-rte-own
               class="rte-note-input"
+              title="页码样式：1、第 1 页、第 1 页共 n 页，或 - 1 -"
               :value="rte.pageSetupDraft?.pageNumber"
               :disabled="rte.viewMode !== 'edit'"
               @change="rte.pageSetupDraft && (rte.pageSetupDraft.pageNumber = ($event.target as HTMLSelectElement).value)"
@@ -293,8 +298,8 @@ const echartsDialogTemplates = computed(() => {
             </select>
           </label>
           <div data-rte-own class="rte-modal-actions">
-            <button data-rte-own type="button" class="rte-modal-cancel" @click="rte.closePageSetup()">取消</button>
-            <button data-rte-own type="button" class="rte-modal-confirm" @click="rte.confirmPageSetup()">确认</button>
+            <button data-rte-own type="button" class="rte-modal-cancel" title="不保存这次页面设置" @click="rte.closePageSetup()">取消</button>
+            <button data-rte-own type="button" class="rte-modal-confirm" title="按上面的纸张、边距、页眉页脚和页码排版" @click="rte.confirmPageSetup()">确认</button>
           </div>
         </div>
       </div>

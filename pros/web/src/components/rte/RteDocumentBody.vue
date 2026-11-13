@@ -294,7 +294,7 @@ useParentScopeStamp()
         role="status"
       >
         <span data-rte-own>{{ rte.charCount === 0 ? '只读预览 · 这篇文档还没有正文' : '只读预览中' }}</span>
-        <button data-rte-own type="button" class="rte-preview-back" @click="rte.setViewMode('edit')">
+        <button data-rte-own type="button" class="rte-preview-back" title="回到可以改字的编辑状态" @click="rte.setViewMode('edit')">
           返回编辑
         </button>
       </div>
@@ -317,6 +317,7 @@ useParentScopeStamp()
           class="rte-title"
           type="text"
           maxlength="100"
+          title="文档标题，最多 100 字，不写进正文"
           :value="rte.localTitle"
           placeholder="请输入标题（最多 100 个字）"
           @input="rte.onTitleInput"
@@ -558,16 +559,16 @@ useParentScopeStamp()
       >
         <div data-rte-own class="rte-outline-head">
           <span data-rte-own class="rte-outline-title">批注</span>
-          <button data-rte-own type="button" class="rte-outline-close" aria-label="关闭批注" @click="rte.notesOpen = false">×</button>
+          <button data-rte-own type="button" class="rte-outline-close" title="收起批注侧栏" aria-label="收起批注侧栏" @click="rte.notesOpen = false">×</button>
         </div>
         <p data-rte-own v-if="!rte.noteRows.length" class="rte-outline-empty">还没有批注。选中文字后用工具栏「注释」添加，内容会留在正文里。</p>
         <nav data-rte-own v-else class="rte-outline-list">
           <div data-rte-own v-for="(row, idx) in rte.noteRows" :key="row.from + '-' + idx" class="rte-note-row">
-            <button data-rte-own type="button" class="rte-outline-item" @click="rte.jumpNote(row)">
+            <button data-rte-own type="button" class="rte-outline-item" title="滚到正文里的这条注释" @click="rte.jumpNote(row)">
               <span data-rte-own class="rte-note-type">{{ row.type }}</span>
               {{ row.text || row.note || '空批注' }}
             </button>
-            <button data-rte-own type="button" class="rte-note-remove" aria-label="删除批注" @click="rte.removeNote(row)">删除</button>
+            <button data-rte-own type="button" class="rte-note-remove" title="删掉这条注释，正文留下来" aria-label="删掉这条注释" @click="rte.removeNote(row)">删除</button>
           </div>
         </nav>
       </aside>
@@ -578,10 +579,10 @@ useParentScopeStamp()
       >
         <div data-rte-own class="rte-outline-head">
           <span data-rte-own class="rte-outline-title">版本</span>
-          <button data-rte-own type="button" class="rte-outline-close" aria-label="关闭版本" @click="rte.historyOpen = false">×</button>
+          <button data-rte-own type="button" class="rte-outline-close" title="收起版本侧栏" aria-label="收起版本侧栏" @click="rte.historyOpen = false">×</button>
         </div>
         <p data-rte-own class="rte-outline-empty">记在这篇画布里，刷新后还在。自动记录保留最近 15 次，命名版本保留 8 个。不是多人协作的历史。</p>
-        <button data-rte-own type="button" class="rte-revision-name" @click="rte.nameCurrentRevision()">命名当前版本</button>
+        <button data-rte-own type="button" class="rte-revision-name" title="给现在的正文起名，命名版本会优先保留" @click="rte.nameCurrentRevision()">命名当前版本</button>
         <p data-rte-own v-if="rte.revisionNote" class="rte-outline-empty">{{ rte.revisionNote }}</p>
         <p data-rte-own v-if="!rte.revisions.length" class="rte-outline-empty">还没有版本。继续编辑一会儿会自动记下，也可以现在命名。</p>
         <nav data-rte-own v-else class="rte-outline-list">
@@ -594,7 +595,7 @@ useParentScopeStamp()
               <span data-rte-own class="rte-revision-label">{{ rev.label || '自动记录' }}</span>
               <span data-rte-own class="rte-revision-time">{{ rte.formatRevisionTime(rev.at) }}</span>
             </div>
-            <button data-rte-own type="button" class="rte-revision-restore" @click="rte.restoreRevision(rev.id)">恢复</button>
+            <button data-rte-own type="button" class="rte-revision-restore" title="先记下当前正文，再换成这一版" @click="rte.restoreRevision(rev.id)">恢复</button>
           </div>
         </nav>
       </aside>
@@ -608,8 +609,8 @@ useParentScopeStamp()
           <button data-rte-own
             type="button"
             class="rte-outline-close"
-            title="关闭大纲"
-            aria-label="关闭大纲"
+            title="收起大纲侧栏"
+            aria-label="收起大纲侧栏"
             @click="rte.closeOutlinePanel"
           >
             ×
@@ -659,6 +660,7 @@ useParentScopeStamp()
           v-if="rte.showPublishActions"
           type="button"
           class="rte-bottom-link"
+          title="打开发布选项。这项还在准备中"
           @click="rte.onPublishSettings"
         >
           发布设置 ▾
@@ -700,6 +702,7 @@ useParentScopeStamp()
           <select data-rte-own
             :value="rte.pageSize"
             aria-label="页面大小"
+            title="纸张大小，预览和打印按这个排"
             :disabled="rte.viewMode !== 'edit'"
             @change="rte.setPageSize(($event.target as HTMLSelectElement).value)"
           >
@@ -713,6 +716,7 @@ useParentScopeStamp()
           <select data-rte-own
             :value="rte.pageMargin.preset"
             aria-label="页边距"
+            title="页边距预设：常规、窄、适中、宽或无边距"
             :disabled="rte.viewMode !== 'edit'"
             @change="rte.setMarginPreset(($event.target as HTMLSelectElement).value)"
           >
@@ -729,6 +733,7 @@ useParentScopeStamp()
             :value="rte.pageChrome.header"
             maxlength="80"
             aria-label="页眉"
+            title="印在每页顶部，最多 80 字"
             :disabled="rte.viewMode !== 'edit'"
             @change="rte.setPageHeader(($event.target as HTMLInputElement).value)"
           />
@@ -740,6 +745,7 @@ useParentScopeStamp()
             :value="rte.pageChrome.headerEven"
             maxlength="80"
             aria-label="偶数页页眉"
+            title="偶数页单独的页眉，留空则跟奇数页一样"
             :disabled="rte.viewMode !== 'edit'"
             @change="rte.setPageHeaderEven(($event.target as HTMLInputElement).value)"
           />
@@ -754,6 +760,7 @@ useParentScopeStamp()
             max="40"
             step="0.1"
             aria-label="装订线毫米"
+            title="加在左边距上，0 到 40 毫米"
             :disabled="rte.viewMode !== 'edit'"
             @change="rte.setPageGutter(($event.target as HTMLInputElement).value)"
           />
@@ -765,6 +772,7 @@ useParentScopeStamp()
             :value="rte.pageChrome.footer"
             maxlength="80"
             aria-label="页脚"
+            title="印在每页底部，最多 80 字"
             :disabled="rte.viewMode !== 'edit'"
             @change="rte.setPageFooter(($event.target as HTMLInputElement).value)"
           />
@@ -774,6 +782,7 @@ useParentScopeStamp()
           <select data-rte-own
             :value="rte.pageChrome.pageNumber"
             aria-label="页码"
+            title="页码样式：1、第 1 页、第 1 页共 n 页，或 - 1 -"
             :disabled="rte.viewMode !== 'edit'"
             @change="rte.setPageNumber(($event.target as HTMLSelectElement).value)"
           >
@@ -782,18 +791,19 @@ useParentScopeStamp()
             </option>
           </select>
         </label>
-        <button data-rte-own type="button" class="rte-bottom-link" @click="rte.openPresent">演示</button>
+        <button data-rte-own type="button" class="rte-bottom-link" title="开始演示，按块或按屏翻页，Esc 退出" @click="rte.openPresent">演示</button>
         <span data-rte-own v-if="rte.pageSheetEnabled && rte.pageMargin.preset === 'custom'" class="rte-margin-custom">
-          <label data-rte-own>上<input data-rte-own :value="rte.pageMargin.top" type="number" min="0" max="80" step="0.1" aria-label="上边距毫米" :disabled="rte.viewMode !== 'edit'" @change="rte.setMarginSide('top', ($event.target as HTMLInputElement).value)" /></label>
-          <label data-rte-own>下<input data-rte-own :value="rte.pageMargin.bottom" type="number" min="0" max="80" step="0.1" aria-label="下边距毫米" :disabled="rte.viewMode !== 'edit'" @change="rte.setMarginSide('bottom', ($event.target as HTMLInputElement).value)" /></label>
-          <label data-rte-own>左<input data-rte-own :value="rte.pageMargin.left" type="number" min="0" max="80" step="0.1" aria-label="左边距毫米" :disabled="rte.viewMode !== 'edit'" @change="rte.setMarginSide('left', ($event.target as HTMLInputElement).value)" /></label>
-          <label data-rte-own>右<input data-rte-own :value="rte.pageMargin.right" type="number" min="0" max="80" step="0.1" aria-label="右边距毫米" :disabled="rte.viewMode !== 'edit'" @change="rte.setMarginSide('right', ($event.target as HTMLInputElement).value)" /></label>
+          <label data-rte-own>上<input data-rte-own :value="rte.pageMargin.top" type="number" min="0" max="80" step="0.1" aria-label="上边距毫米" title="上边距，0 到 80 毫米" :disabled="rte.viewMode !== 'edit'" @change="rte.setMarginSide('top', ($event.target as HTMLInputElement).value)" /></label>
+          <label data-rte-own>下<input data-rte-own :value="rte.pageMargin.bottom" type="number" min="0" max="80" step="0.1" aria-label="下边距毫米" title="下边距，0 到 80 毫米" :disabled="rte.viewMode !== 'edit'" @change="rte.setMarginSide('bottom', ($event.target as HTMLInputElement).value)" /></label>
+          <label data-rte-own>左<input data-rte-own :value="rte.pageMargin.left" type="number" min="0" max="80" step="0.1" aria-label="左边距毫米" title="左边距，0 到 80 毫米" :disabled="rte.viewMode !== 'edit'" @change="rte.setMarginSide('left', ($event.target as HTMLInputElement).value)" /></label>
+          <label data-rte-own>右<input data-rte-own :value="rte.pageMargin.right" type="number" min="0" max="80" step="0.1" aria-label="右边距毫米" title="右边距，0 到 80 毫米" :disabled="rte.viewMode !== 'edit'" @change="rte.setMarginSide('right', ($event.target as HTMLInputElement).value)" /></label>
         </span>
         <button data-rte-own
           v-if="rte.expanded && rte.viewMode === 'edit'"
           type="button"
           class="rte-bottom-link"
           :aria-pressed="rte.notesOpen"
+          title="打开侧栏，看正文里的注释"
           @click="rte.notesOpen = !rte.notesOpen"
         >
           批注
@@ -803,6 +813,7 @@ useParentScopeStamp()
           type="button"
           class="rte-bottom-link"
           :aria-pressed="rte.commentsOpen"
+          title="打开评论栏，看还没解决的讨论"
           @click="rte.commentsOpen = !rte.commentsOpen"
         >
           评论<span data-rte-own v-if="rte.unresolvedCount"> {{ rte.unresolvedCount }}</span>
@@ -899,13 +910,13 @@ useParentScopeStamp()
         @mousedown.prevent
         @contextmenu.prevent
       >
-        <button data-rte-own type="button" role="menuitem" @click="rte.outlineMenuJump()">跳到这一节</button>
-        <button data-rte-own type="button" role="menuitem" @click="rte.outlineMenuMove(-1)">上移整节</button>
-        <button data-rte-own type="button" role="menuitem" @click="rte.outlineMenuMove(1)">下移整节</button>
-        <button data-rte-own type="button" role="menuitem" @click="rte.outlineMenuCascade(-1)">整节升一级</button>
-        <button data-rte-own type="button" role="menuitem" @click="rte.outlineMenuCascade(1)">整节降一级</button>
-        <button data-rte-own type="button" role="menuitem" @click="rte.outlineMenuCopyTitle()">复制标题</button>
-        <button data-rte-own type="button" role="menuitem" @click="rte.outlineMenuCopyLink()">复制标题链接</button>
+        <button data-rte-own type="button" role="menuitem" title="滚到这个标题，并闪一下" @click="rte.outlineMenuJump()">跳到这一节</button>
+        <button data-rte-own type="button" role="menuitem" title="这一节连同下面的正文，和上一节对调" @click="rte.outlineMenuMove(-1)">上移整节</button>
+        <button data-rte-own type="button" role="menuitem" title="这一节连同下面的正文，和下一节对调" @click="rte.outlineMenuMove(1)">下移整节</button>
+        <button data-rte-own type="button" role="menuitem" title="这一节和下属标题都提高一级" @click="rte.outlineMenuCascade(-1)">整节升一级</button>
+        <button data-rte-own type="button" role="menuitem" title="这一节和下属标题都降低一级" @click="rte.outlineMenuCascade(1)">整节降一级</button>
+        <button data-rte-own type="button" role="menuitem" title="把这一节的标题复制到剪贴板" @click="rte.outlineMenuCopyTitle()">复制标题</button>
+        <button data-rte-own type="button" role="menuitem" title="复制可以跳到这一节的链接" @click="rte.outlineMenuCopyLink()">复制标题链接</button>
       </div>
     </Teleport>
 
