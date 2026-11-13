@@ -11,6 +11,7 @@ import RteSelectionBubble from './RteSelectionBubble.vue'
 import RteSourceCodeEditor from './RteSourceCodeEditor.vue'
 import RteTableFormulaBar from './RteTableFormulaBar.vue'
 import { RTE_BINDINGS } from './bindings'
+import { wordStatTitle } from '../../utils/rteToolbarOptimize'
 import { useParentScopeStamp } from './inheritScope'
 import RteMenuGlyph from './RteMenuGlyph.vue'
 
@@ -633,19 +634,19 @@ useParentScopeStamp()
     </div>
 
     <div data-rte-own v-if="rte.wordCountDockOpen" class="rte-word-dock" role="dialog" aria-label="字数统计">
-      <div data-rte-own class="rte-word-dock-row"><span data-rte-own>字符</span><strong data-rte-own>{{ rte.charCount }}</strong></div>
-      <div data-rte-own class="rte-word-dock-row"><span data-rte-own>词数</span><strong data-rte-own>{{ rte.wordCount }}</strong></div>
-      <div data-rte-own class="rte-word-dock-row"><span data-rte-own>中文</span><strong data-rte-own>{{ rte.wordParts.cn }}</strong></div>
-      <div data-rte-own class="rte-word-dock-row"><span data-rte-own>英文词</span><strong data-rte-own>{{ rte.wordParts.en }}</strong></div>
-      <div data-rte-own class="rte-word-dock-row"><span data-rte-own>图片</span><strong data-rte-own>{{ rte.wordParts.images }}</strong></div>
-      <div data-rte-own class="rte-word-dock-row"><span data-rte-own>阅读</span><strong data-rte-own>约 {{ rte.readingMinutes }} 分钟</strong></div>
-      <div data-rte-own class="rte-word-dock-row"><span data-rte-own>段落</span><strong data-rte-own>{{ rte.docExtraStats.paragraphs }}</strong></div>
-      <div data-rte-own class="rte-word-dock-row"><span data-rte-own>标题</span><strong data-rte-own>{{ rte.docExtraStats.headings }}</strong></div>
-      <div data-rte-own class="rte-word-dock-row">
+      <div data-rte-own class="rte-word-dock-row" :title="wordStatTitle('chars')"><span data-rte-own>字符</span><strong data-rte-own>{{ rte.charCount }}</strong></div>
+      <div data-rte-own class="rte-word-dock-row" :title="wordStatTitle('words')"><span data-rte-own>词数</span><strong data-rte-own>{{ rte.wordCount }}</strong></div>
+      <div data-rte-own class="rte-word-dock-row" :title="wordStatTitle('cn')"><span data-rte-own>中文</span><strong data-rte-own>{{ rte.wordParts.cn }}</strong></div>
+      <div data-rte-own class="rte-word-dock-row" :title="wordStatTitle('ascii')"><span data-rte-own>英文词</span><strong data-rte-own>{{ rte.wordParts.en }}</strong></div>
+      <div data-rte-own class="rte-word-dock-row" :title="wordStatTitle('images')"><span data-rte-own>图片</span><strong data-rte-own>{{ rte.wordParts.images }}</strong></div>
+      <div data-rte-own class="rte-word-dock-row" :title="wordStatTitle('minutes')"><span data-rte-own>阅读</span><strong data-rte-own>约 {{ rte.readingMinutes }} 分钟</strong></div>
+      <div data-rte-own class="rte-word-dock-row" :title="wordStatTitle('paragraphs')"><span data-rte-own>段落</span><strong data-rte-own>{{ rte.docExtraStats.paragraphs }}</strong></div>
+      <div data-rte-own class="rte-word-dock-row" :title="wordStatTitle('headings')"><span data-rte-own>标题</span><strong data-rte-own>{{ rte.docExtraStats.headings }}</strong></div>
+      <div data-rte-own class="rte-word-dock-row" :title="wordStatTitle('selectionChars')">
         <span data-rte-own>选区</span>
         <strong data-rte-own>{{ rte.selectionStats.hasSelection ? rte.selectionStats.chars : '—' }}</strong>
       </div>
-      <button data-rte-own type="button" class="rte-word-dock-close" @click="rte.wordCountDockOpen = false">关闭</button>
+      <button data-rte-own type="button" class="rte-word-dock-close" :title="wordStatTitle('close')" @click="rte.wordCountDockOpen = false">关闭</button>
     </div>
 
     <div data-rte-own v-if="rte.showBottomBar" class="rte-bottom">
@@ -662,7 +663,7 @@ useParentScopeStamp()
           type="button"
           class="rte-wordcount"
           :aria-expanded="rte.wordCountDockOpen"
-          title="字数统计"
+          :title="wordStatTitle('dock')"
           @click="rte.toggleWordCountDock"
         >
           字数 {{ rte.charCount }} · 中 {{ rte.wordParts.cn }} · 英 {{ rte.wordParts.en }} · 图 {{ rte.wordParts.images }}

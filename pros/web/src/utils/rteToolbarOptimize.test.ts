@@ -22,6 +22,7 @@ import {
   moreToolsTitle,
   orderToolbarSearchGroups,
   pasteFormatLabel,
+  pickerTabTitle,
   pushRecentValue,
   quoteToolTitle,
   readStoredRibbonTab,
@@ -163,6 +164,11 @@ assert.equal(blockMenuTitle('sync'), '插入一块会同步的内容')
 assert.equal(blockMenuTitle('missing'), '')
 assert.equal(wordStatTitle('minutes'), '按大约 400 字一分钟估算')
 assert.equal(wordStatTitle('paragraphs'), '有文字的段落个数，空段不算')
+assert.equal(pickerTabTitle('颜文字'), '用符号拼成的表情')
+assert.equal(pickerTabTitle('拼音'), '拼音声调符号')
+assert.equal(pickerTabTitle('没有'), '')
+assert.equal(wordStatTitle('images'), '文档里的图片张数')
+assert.equal(wordStatTitle('dock'), '打开或收起详细字数')
 assert.equal(stepRibbonTabBy(['a', 'b', 'c', 'd', 'e'], 'b', 3), 'e')
 assert.equal(stepRibbonTabBy(['a', 'b', 'c'], 'a', -3), 'a')
 assert.equal(zoomToolLabel(1), '实际大小')

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { inject, nextTick, onMounted, ref, watch } from 'vue'
 import { RTE_BINDINGS } from './bindings'
-import { alignToolTitle, blockMenuTitle, clampToolbarQuery, cycleSearchIndex, disabledToolTitle, EMPTY_GROUP_NOTE, FOCUS_MODE_NOTE, fontFamilyCaption, groupHandleTitle, LAST_TOOLBAR_QUERY_KEY, lineHeightCaption, listToolLabel, menuFocusStep, menuToolNeedsCaret, moreToolsCaption, moreToolsTitle, ribbonSearchLabel, ribbonTabForDigit, ribbonTabHint, ribbonTabTabIndex, ribbonTypeaheadQuery, SEARCH_INPUT_HINT, searchEnterActivates, searchGroupCaption, shortcutFromTitle, stepRibbonTab, stepRibbonTabBy, tableToolLabel, toolbarGroupReorderAllowed, toolbarMenuItemTitle, toolbarSearchStatus, toolIsUnavailable, wordStatTitle, zoomToolLabel, zoomToolTitle } from '../../utils/rteToolbarOptimize'
+import { alignToolTitle, blockMenuTitle, clampToolbarQuery, cycleSearchIndex, disabledToolTitle, EMPTY_GROUP_NOTE, FOCUS_MODE_NOTE, fontFamilyCaption, groupHandleTitle, LAST_TOOLBAR_QUERY_KEY, lineHeightCaption, listToolLabel, menuFocusStep, menuToolNeedsCaret, pickerTabTitle, moreToolsCaption, moreToolsTitle, ribbonSearchLabel, ribbonTabForDigit, ribbonTabHint, ribbonTabTabIndex, ribbonTypeaheadQuery, SEARCH_INPUT_HINT, searchEnterActivates, searchGroupCaption, shortcutFromTitle, stepRibbonTab, stepRibbonTabBy, tableToolLabel, toolbarGroupReorderAllowed, toolbarMenuItemTitle, toolbarSearchStatus, toolIsUnavailable, wordStatTitle, zoomToolLabel, zoomToolTitle } from '../../utils/rteToolbarOptimize'
 import { useParentScopeStamp } from './inheritScope'
 import { buildChartGroups } from '../../utils/echarts/chartGroups'
 import { TABLE_MENU_ICONS } from './tableMenuIcons'
@@ -1553,6 +1553,7 @@ function toggleChartGroupMenu(key: string) {
                   class="rte-picker-tab"
                   :class="{ active: rte.emojiTabId === cat.id }"
                   :aria-selected="rte.emojiTabId === cat.id"
+                  :title="pickerTabTitle(cat.label) || undefined"
                   @click.stop="rte.emojiTabId = cat.id"
                 >{{ cat.label }}</button>
               </div>
@@ -1612,6 +1613,7 @@ function toggleChartGroupMenu(key: string) {
                   class="rte-picker-tab"
                   :class="{ active: rte.specialCharTabId === cat.id }"
                   :aria-selected="rte.specialCharTabId === cat.id"
+                  :title="pickerTabTitle(cat.label) || undefined"
                   @click.stop="rte.specialCharTabId = cat.id"
                 >{{ cat.label }}</button>
               </div>
@@ -2830,6 +2832,7 @@ function toggleChartGroupMenu(key: string) {
               class="rte-picker-tab"
               :class="{ active: rte.emojiTabId === cat.id }"
               :aria-selected="rte.emojiTabId === cat.id"
+              :title="pickerTabTitle(cat.label) || undefined"
               @click.stop="rte.emojiTabId = cat.id"
             >{{ cat.label }}</button>
           </div>
@@ -2868,6 +2871,7 @@ function toggleChartGroupMenu(key: string) {
               class="rte-picker-tab"
               :class="{ active: rte.specialCharTabId === cat.id }"
               :aria-selected="rte.specialCharTabId === cat.id"
+              :title="pickerTabTitle(cat.label) || undefined"
               @click.stop="rte.specialCharTabId = cat.id"
             >{{ cat.label }}</button>
           </div>
