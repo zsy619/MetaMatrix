@@ -13,6 +13,7 @@ import GuideThumb from '../components/guide/GuideThumb.vue'
 import GuideAside from '../components/guide/GuideAside.vue'
 import { guideLaneCount, lanesFor, splitMatch } from '../components/guide/guideLanes'
 import { draftWhen, readLocalDrafts, type LocalDraft } from '../components/guide/guideDrafts'
+import { createGuideScrollMemory, readGuideScroll, writeGuideScroll } from '../components/guide/guideScroll'
 
 interface GuideCard {
   id: TemplateId
@@ -108,6 +109,20 @@ const categoryCounts = computed(() => {
 
 const templatesEl = ref<HTMLElement | null>(null)
 const guideMainEl = ref<HTMLElement | null>(null)
+
+function guideStorage(): Storage | null {
+  try {
+    return sessionStorage
+  } catch {
+    return null
+  }
+}
+
+const guideScroll = createGuideScrollMemory(readGuideScroll(guideStorage()))
+let guideScrollFrame = 0
+let guideScrollPending = 0
+let guideScrollTimer = 0
+let guideScrollUntil = 0
 const LAYOUT_KEY = 'metamatrix:guide-layout'
 const layout = ref<'cards' | 'list'>(readLayout())
 const drafts = ref<LocalDraft[]>([])
@@ -202,12 +217,75 @@ function setLayout(next: 'cards' | 'list') {
   }
 }
 
+function queueGuideScrollWrite(top: number) {
+  guideScrollPending = top
+  if (guideScrollFrame) return
+  guideScrollFrame = requestAnimationFrame(() => {
+    guideScrollFrame = 0
+    writeGuideScroll(guideStorage(), guideScrollPending)
+  })
+}
+
+function flushGuideScroll() {
+  if (guideScrollFrame) {
+    cancelAnimationFrame(guideScrollFrame)
+    guideScrollFrame = 0
+  }
+  writeGuideScroll(guideStorage(), guideScroll.snapshot(guideMainEl.value))
+}
+
+function restoreGuideScroll() {
+  const el = guideMainEl.value
+  if (!el) return
+  const settled = guideScroll.apply(el)
+  if (settled || guideScroll.userMoved || Date.now() > guideScrollUntil) return
+  window.clearTimeout(guideScrollTimer)
+  guideScrollTimer = window.setTimeout(restoreGuideScroll, 50)
+}
+
+function stopGuideScrollRestore() {
+  window.clearTimeout(guideScrollTimer)
+  guideScrollTimer = 0
+}
+
+function onGuideScrollIntent(event: Event) {
+  if (event.type === 'keydown') {
+    const key = (event as KeyboardEvent).key
+    const scrolls = key === 'ArrowDown' || key === 'ArrowUp' || key === 'PageDown' || key === 'PageUp' || key === 'Home' || key === 'End' || key === ' '
+    if (!scrolls) return
+    const target = event.target
+    if (
+      target instanceof HTMLElement &&
+      (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
+    ) {
+      return
+    }
+  }
+  guideScroll.armUserScroll()
+}
+
+function onGuidePointerDown(event: PointerEvent) {
+  const el = guideMainEl.value
+  if (!el) return
+  const bar = el.getBoundingClientRect().width - el.clientWidth
+  if (bar > 1 && event.clientX >= el.getBoundingClientRect().right - bar - 1) {
+    onGuideScrollIntent(event)
+  }
+}
+
 function scrollToLane(id: string) {
   activeLane.value = id
+  guideScroll.noteUserMove()
+  stopGuideScrollRestore()
   document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
 function onGuideScroll() {
+  const el = guideMainEl.value
+  if (el) {
+    const saved = guideScroll.onScroll(el)
+    if (saved != null) queueGuideScrollWrite(saved)
+  }
   if (activeCategory.value === 'all') return
   const bar = templatesEl.value?.querySelector('.templates-toolbar')
   const edge = (bar?.getBoundingClientRect().bottom ?? 0) + 12
@@ -226,6 +304,8 @@ function chooseCategory(id: 'all' | TemplateCategory, scroll = false) {
     /* ignore */
   }
   if (!scroll) return
+  guideScroll.noteUserMove()
+  stopGuideScrollRestore()
   void nextTick(() => {
     templatesEl.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   })
@@ -338,11 +418,33 @@ function onGuideKey(event: KeyboardEvent) {
 onMounted(async () => {
   refreshDrafts()
   window.addEventListener('keydown', onGuideKey)
+  window.addEventListener('keydown', onGuideScrollIntent)
+  window.addEventListener('pagehide', flushGuideScroll)
+  const el = guideMainEl.value
+  el?.addEventListener('wheel', onGuideScrollIntent, { passive: true })
+  el?.addEventListener('touchmove', onGuideScrollIntent, { passive: true })
+  el?.addEventListener('pointerdown', onGuidePointerDown)
+  guideScrollUntil = Date.now() + 1200
+  await nextTick()
+  restoreGuideScroll()
   if (auth.token) await auth.fetchMe()
   await refreshRecent()
+  guideScrollUntil = Date.now() + 400
+  await nextTick()
+  restoreGuideScroll()
 })
 
-onUnmounted(() => window.removeEventListener('keydown', onGuideKey))
+onUnmounted(() => {
+  flushGuideScroll()
+  stopGuideScrollRestore()
+  window.removeEventListener('keydown', onGuideKey)
+  window.removeEventListener('keydown', onGuideScrollIntent)
+  window.removeEventListener('pagehide', flushGuideScroll)
+  const el = guideMainEl.value
+  el?.removeEventListener('wheel', onGuideScrollIntent)
+  el?.removeEventListener('touchmove', onGuideScrollIntent)
+  el?.removeEventListener('pointerdown', onGuidePointerDown)
+})
 </script>
 
 <template>
@@ -591,6 +693,7 @@ onUnmounted(() => window.removeEventListener('keydown', onGuideKey))
   height: 100%;
   overflow-x: hidden;
   overflow-y: auto;
+  overflow-anchor: none;
   padding: 0 28px 56px;
   background:
     radial-gradient(ellipse 80% 50% at 50% -10%, #e8f0fe 0%, transparent 55%),
