@@ -385,7 +385,7 @@ const vertexPanels = computed(() => {
               @click.stop
             >
               <label class="score-chip" title="普遍性">
-                <span>普</span>
+                <span>普遍</span>
                 <input
                   type="range"
                   min="0.1"
@@ -396,7 +396,7 @@ const vertexPanels = computed(() => {
                 />
               </label>
               <label class="score-chip" title="频次">
-                <span>频</span>
+                <span>频次</span>
                 <input
                   type="range"
                   min="0.1"
@@ -407,7 +407,7 @@ const vertexPanels = computed(() => {
                 />
               </label>
               <label class="score-chip" title="刚性">
-                <span>刚</span>
+                <span>刚性</span>
                 <input
                   type="range"
                   min="0.1"
@@ -694,11 +694,11 @@ const vertexPanels = computed(() => {
   position: absolute;
   inset: 0;
   z-index: 10;
-  overflow: hidden;
+  overflow: auto;
   box-sizing: border-box;
   padding: 18px 20px 20px;
   display: grid;
-  grid-template-columns: minmax(200px, 280px) minmax(0, 1fr);
+  grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
   grid-template-rows: 1fr;
   gap: 8px 4px;
   font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui,
@@ -824,13 +824,13 @@ const vertexPanels = computed(() => {
 }
 
 .legend-notes-btn {
-  height: 22px;
-  padding: 0 7px;
+  min-height: 32px;
+  padding: 0 10px;
   border: 1px solid var(--cv-frame, #ececec);
-  border-radius: 5px;
+  border-radius: 999px;
   background: rgba(255, 255, 255, 0.92);
-  color: #5f6368;
-  font-size: 11px;
+  color: #3c3424;
+  font-size: 13px;
   font-weight: 650;
   letter-spacing: 0.02em;
   cursor: pointer;
@@ -848,29 +848,30 @@ const vertexPanels = computed(() => {
   grid-column: 2 / 4;
   grid-row: 2;
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px 8px;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .score-chip {
-  display: inline-flex;
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
   align-items: center;
-  gap: 4px;
-  font-size: 10px;
-  font-weight: 650;
-  color: #80868b;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #3c3424;
 }
 
 .score-chip input[type='range'] {
-  width: 56px;
-  height: 4px;
-  accent-color: #5f6368;
+  width: 100%;
+  height: 24px;
+  accent-color: #1a73e8;
   cursor: pointer;
 }
 
 .legend-remove {
-  width: 20px;
-  height: 20px;
+  width: 32px;
+  height: 32px;
   border: none;
   border-radius: 4px;
   background: transparent;
@@ -886,8 +887,8 @@ const vertexPanels = computed(() => {
 
 .legend-add {
   align-self: flex-start;
-  width: 24px;
-  height: 24px;
+  width: 32px;
+  height: 32px;
   border: 1px solid #e4e6e8;
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.8);
@@ -966,15 +967,15 @@ const vertexPanels = computed(() => {
   display: flex;
   align-items: baseline;
   gap: 0;
-  font-size: 12.5px;
-  line-height: 1.45;
-  color: #8a8175;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #5c564c;
   white-space: nowrap;
 }
 
 .axis-level-row strong {
   font-weight: 700;
-  color: #5f6368;
+  color: #3c3424;
 }
 
 .axis-level-sep {
