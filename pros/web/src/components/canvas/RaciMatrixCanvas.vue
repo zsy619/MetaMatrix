@@ -170,9 +170,10 @@ function toggle(id: string) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 36px;
-  min-height: 28px;
-  padding: 2px 8px;
+  min-width: 40px;
+  min-height: 36px;
+  padding: 4px 10px;
+  cursor: pointer;
   border-radius: 8px;
   font-weight: 700;
   border: 0;
