@@ -12,17 +12,17 @@ export type QrModuleStyle =
   | 'cross'
   | 'star'
 
-export const QR_STYLES: readonly { id: QrModuleStyle; label: string }[] = [
-  { id: 'rounded', label: '圆角' },
-  { id: 'dot', label: '圆点' },
-  { id: 'square', label: '方块' },
-  { id: 'diamond', label: '菱形' },
-  { id: 'liquid', label: '液态' },
-  { id: 'bar', label: '横条' },
-  { id: 'column', label: '竖条' },
-  { id: 'triangle', label: '三角' },
-  { id: 'cross', label: '十字' },
-  { id: 'star', label: '星形' },
+export const QR_STYLES: readonly { id: QrModuleStyle; label: string; title: string }[] = [
+  { id: 'rounded', label: '圆角', title: '码点用圆角方块' },
+  { id: 'dot', label: '圆点', title: '码点画成圆点' },
+  { id: 'square', label: '方块', title: '码点用方角方块' },
+  { id: 'diamond', label: '菱形', title: '码点画成菱形' },
+  { id: 'liquid', label: '液态', title: '相邻码点连成一块' },
+  { id: 'bar', label: '横条', title: '码点画成横条' },
+  { id: 'column', label: '竖条', title: '码点画成竖条' },
+  { id: 'triangle', label: '三角', title: '码点画成三角' },
+  { id: 'cross', label: '十字', title: '码点画成十字' },
+  { id: 'star', label: '星形', title: '码点画成星形' },
 ]
 
 export type QrPreset = {

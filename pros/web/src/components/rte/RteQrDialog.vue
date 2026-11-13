@@ -126,6 +126,7 @@ async function confirm() {
           maxlength="1000"
           placeholder="https:// 或任意文字"
           aria-label="二维码内容"
+          title="二维码里的链接或文字，最多 1000 字，按 Enter 插入"
           @keydown.enter.prevent="confirm"
         />
         <div class="rte-qr-label">样式</div>
@@ -135,6 +136,7 @@ async function confirm() {
             :key="item.id"
             type="button"
             :class="{ active: style === item.id }"
+            :title="item.title"
             @click="style = item.id"
           >
             {{ item.label }}
@@ -148,6 +150,7 @@ async function confirm() {
               :key="preset.id"
               type="button"
               :class="{ active: presetId === preset.id }"
+              :title="'码用' + preset.label + '，深色画在浅底上'"
               @click="presetId = preset.id"
             >
               <i :style="{ background: preset.color }"></i>
@@ -157,18 +160,18 @@ async function confirm() {
         </div>
         <div class="rte-qr-label">留白</div>
         <div class="rte-qr-styles" role="radiogroup" aria-label="留白">
-          <button type="button" :class="{ active: quiet === 2 }" @click="quiet = 2">窄</button>
-          <button type="button" :class="{ active: quiet === 4 }" @click="quiet = 4">标准</button>
-          <button type="button" :class="{ active: quiet === 6 }" @click="quiet = 6">宽</button>
+          <button type="button" :class="{ active: quiet === 2 }" title="四周留 2 个码点" @click="quiet = 2">窄</button>
+          <button type="button" :class="{ active: quiet === 4 }" title="四周留 4 个码点" @click="quiet = 4">标准</button>
+          <button type="button" :class="{ active: quiet === 6 }" title="四周留 6 个码点" @click="quiet = 6">宽</button>
         </div>
         <div class="rte-qr-label">纠错</div>
         <div class="rte-qr-styles" role="radiogroup" aria-label="纠错等级">
-          <button type="button" :class="{ active: errorLevel === 'H' }" @click="errorLevel = 'H'">高</button>
-          <button type="button" :class="{ active: errorLevel === 'Q' }" @click="errorLevel = 'Q'">较高</button>
-          <button type="button" :class="{ active: errorLevel === 'M' }" @click="errorLevel = 'M'">中</button>
+          <button type="button" :class="{ active: errorLevel === 'H' }" title="纠错最高，大约能恢复三成损坏" @click="errorLevel = 'H'">高</button>
+          <button type="button" :class="{ active: errorLevel === 'Q' }" title="纠错较高，大约能恢复四分之一损坏" @click="errorLevel = 'Q'">较高</button>
+          <button type="button" :class="{ active: errorLevel === 'M' }" title="纠错中等，大约能恢复 15% 损坏" @click="errorLevel = 'M'">中</button>
         </div>
         <label class="rte-qr-caption">
-          <input v-model="caption" type="checkbox" />
+          <input v-model="caption" type="checkbox" title="勾选后，在码下方印出描述或内容" />
           底部显示内容
         </label>
         <input
@@ -177,16 +180,17 @@ async function confirm() {
           maxlength="40"
           placeholder="描述，例如：扫码查看详情。留空时底部显示二维码内容"
           aria-label="描述"
+          title="底部说明，最多 40 字。留空时显示二维码内容"
         />
         <div class="rte-qr-preview">
           <img v-if="preview" :src="preview" alt="二维码预览" />
           <span v-else>{{ error || '输入内容后在这里预览' }}</span>
         </div>
         <p v-if="error && preview" class="rte-qr-error">{{ error }}</p>
-        <a v-if="preview" class="rte-qr-download" :href="preview" download="qrcode.png">下载图片</a>
+        <a v-if="preview" class="rte-qr-download" :href="preview" download="qrcode.png" title="把当前预览存成 PNG">下载图片</a>
         <div class="rte-qr-actions">
-          <button type="button" @click="close">取消</button>
-          <button type="button" class="is-primary" :disabled="!preview || busy" @click="confirm">{{ rte.qrEditingPos != null ? '更新' : '插入' }}</button>
+          <button type="button" title="不插入二维码" @click="close">取消</button>
+          <button type="button" class="is-primary" :title="rte.qrEditingPos != null ? '用当前样式换掉这张二维码' : '把这张二维码插到光标处'" :disabled="!preview || busy" @click="confirm">{{ rte.qrEditingPos != null ? '更新' : '插入' }}</button>
         </div>
       </div>
     </div>

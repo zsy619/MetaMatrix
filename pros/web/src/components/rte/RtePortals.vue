@@ -71,6 +71,7 @@ const echartsDialogTemplates = computed(() => {
               <button data-rte-own
                 type="button"
                 class="rte-note-type"
+                title="选择注释类型：新注释、重要或待办"
                 @click.stop="rte.noteTypeOpen = !rte.noteTypeOpen"
               >
                 <span data-rte-own class="rte-note-type-icon">[{{ rte.noteTypeMeta.icon }}]</span>
@@ -85,6 +86,7 @@ const echartsDialogTemplates = computed(() => {
                   :key="t.value"
                   type="button"
                   :class="{ active: rte.noteType === t.value }"
+                  :title="t.title"
                   @click="rte.selectNoteType(t.value)"
                 >
                   <span data-rte-own class="rte-note-type-icon">[{{ t.icon }}]</span>
@@ -99,6 +101,7 @@ const echartsDialogTemplates = computed(() => {
                 type="text"
                 class="rte-note-input"
                 placeholder="输入注释文本"
+                title="注释正文，最多 500 字。没选中文字时会把这段插进去"
                 maxlength="500"
                 @keydown.enter.prevent="rte.confirmInsertNote"
               />
@@ -112,16 +115,17 @@ const echartsDialogTemplates = computed(() => {
               type="url"
               class="rte-note-input"
               placeholder="输入链接地址"
+              title="可选。填了以后，点这条注释会打开链接"
               maxlength="2000"
               @keydown.enter.prevent="rte.confirmInsertNote"
             />
           </div>
 
           <div data-rte-own class="rte-note-actions">
-            <button data-rte-own type="button" class="rte-note-cancel" @click="rte.closeNoteDialog">
+            <button data-rte-own type="button" class="rte-note-cancel" title="不插入注释" @click="rte.closeNoteDialog">
               取消
             </button>
-            <button data-rte-own type="button" class="rte-note-insert" @click="rte.confirmInsertNote">
+            <button data-rte-own type="button" class="rte-note-insert" title="把注释套到选中的文字上" @click="rte.confirmInsertNote">
               插入
             </button>
           </div>
@@ -1029,11 +1033,11 @@ const echartsDialogTemplates = computed(() => {
             <h3 data-rte-own class="rte-table-title">打印预览</h3>
             <div data-rte-own class="rte-print-preview-actions">
               <label data-rte-own class="rte-print-url-toggle">
-                <input data-rte-own v-model="rte.printLinkUrls" type="checkbox" />
+                <input data-rte-own v-model="rte.printLinkUrls" type="checkbox" title="打印时在链接后面印出网址" />
                 印出链接
               </label>
-              <button data-rte-own type="button" class="rte-modal-cancel" @click="rte.closePrintPreview">取消</button>
-              <button data-rte-own type="button" class="rte-modal-confirm" @click="rte.confirmPrintFromPreview">打印</button>
+              <button data-rte-own type="button" class="rte-modal-cancel" title="关掉预览，不打印" @click="rte.closePrintPreview">取消</button>
+              <button data-rte-own type="button" class="rte-modal-confirm" title="按当前预览送去打印" @click="rte.confirmPrintFromPreview">打印</button>
             </div>
           </div>
           <div data-rte-own class="rte-print-preview-paper" :style="rte.printPreviewMarginStyle" :data-writing-paper="rte.writingPaper || undefined">
@@ -1064,14 +1068,15 @@ const echartsDialogTemplates = computed(() => {
             type="button"
             class="rte-import-item"
             style="width: 100%; margin-bottom: 6px"
+            :title="'跳到书签：' + b.label"
             @click="rte.jumpToBookmark(b.id); rte.bookmarkPanelOpen = false"
           >
             <span data-rte-own>{{ b.label }}</span>
             <span data-rte-own class="rte-import-pill">#{{ b.id.slice(0, 10) }}</span>
           </button>
           <div data-rte-own class="rte-modal-actions">
-            <button data-rte-own type="button" class="rte-modal-cancel" @click="rte.insertBookmark">新建书签</button>
-            <button data-rte-own type="button" class="rte-modal-confirm" @click="rte.bookmarkPanelOpen = false">关闭</button>
+            <button data-rte-own type="button" class="rte-modal-cancel" title="在光标处新建一个书签" @click="rte.insertBookmark">新建书签</button>
+            <button data-rte-own type="button" class="rte-modal-confirm" title="关掉书签列表" @click="rte.bookmarkPanelOpen = false">关闭</button>
           </div>
         </div>
       </div>
@@ -1095,20 +1100,22 @@ const echartsDialogTemplates = computed(() => {
             type="button"
             class="rte-import-item"
             style="width: 100%; margin-bottom: 6px; text-align: left"
+            :title="'跳到第 ' + fn.n + ' 条脚注'"
             @click="rte.jumpToPos(rte.editor!, fn.from)"
           >
             <span data-rte-own>[{{ fn.n }}] {{ fn.text }}</span>
           </button>
           <div data-rte-own class="rte-modal-actions">
-            <button data-rte-own type="button" class="rte-modal-cancel" @click="rte.insertFootnoteAtCursor">新建</button>
+            <button data-rte-own type="button" class="rte-modal-cancel" title="在光标处加一条脚注" @click="rte.insertFootnoteAtCursor">新建</button>
             <button data-rte-own
               type="button"
               class="rte-modal-cancel"
+              title="按文中顺序重新编号"
               @click="rte.editor && rte.renumberFootnotes(rte.editor)"
             >
               重编号
             </button>
-            <button data-rte-own type="button" class="rte-modal-confirm" @click="rte.footnotePanelOpen = false">关闭</button>
+            <button data-rte-own type="button" class="rte-modal-confirm" title="关掉脚注列表" @click="rte.footnotePanelOpen = false">关闭</button>
           </div>
         </div>
       </div>

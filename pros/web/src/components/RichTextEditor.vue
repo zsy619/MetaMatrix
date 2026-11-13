@@ -5450,9 +5450,9 @@ function confirmInsertFormula() {
 }
 
 const NOTE_TYPES = [
-  { value: '新注释', icon: 'N', label: '新注释' },
-  { value: '重要', icon: '!', label: '重要' },
-  { value: '待办', icon: '✓', label: '待办' },
+  { value: '新注释', icon: 'N', label: '新注释', title: '普通注释，标在选中的文字上' },
+  { value: '重要', icon: '!', label: '重要', title: '标成重要注释' },
+  { value: '待办', icon: '✓', label: '待办', title: '标成待办注释' },
 ] as const
 
 const noteDialogOpen = ref(false)
