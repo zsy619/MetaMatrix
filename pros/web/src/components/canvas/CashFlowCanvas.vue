@@ -127,7 +127,7 @@ function removeLine(sectionId: string, lineId: string) {
 .cash-top { flex: none; display: flex; justify-content: space-between; gap: 16px; align-items: center; margin-bottom: 10px; }
 .cash-top h2, .cash-top p { margin: 0; }
 .cash-top p { color: #5f6368; font-size: 13px; }
-.net { font-size: 18px; padding: 6px 12px; border-radius: 999px; background: #fff; }
+.net { font-size: 18px; padding: 8px 14px; border-radius: 999px; background: #fff; font-variant-numeric: tabular-nums; }
 .cash-grid {
   flex: 1 1 auto;
   min-height: 0;
@@ -158,8 +158,8 @@ h3 {
   letter-spacing: 0.04em;
 }
 .lines { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
-.cash-line { display: grid; grid-template-columns: 1fr 108px 28px; gap: 6px; align-items: center; }
-input { border: 1px solid transparent; background: #fff; border-radius: 8px; padding: 6px 8px; color: #202124; }
+.cash-line { display: grid; grid-template-columns: 1fr 128px 36px; gap: 8px; align-items: center; }
+input { min-height: 40px; border: 1px solid transparent; background: #fff; border-radius: 8px; padding: 6px 10px; font: inherit; font-size: 15px; color: #202124; }
 input[type='number'] { font-variant-numeric: tabular-nums; font-weight: 700; text-align: right; }
 input:focus { border-color: var(--col-header); outline: none; }
 footer {
@@ -171,7 +171,9 @@ footer {
   background: #fff;
   border-top: 1px solid color-mix(in srgb, var(--col-header) 24%, #fff);
 }
-footer button, .cash-line button { border: 1px solid color-mix(in srgb, var(--col-header) 30%, #fff); background: #fff; color: var(--col-topic); border-radius: 8px; }
+footer button, .cash-line button { min-height: 36px; border: 1px solid color-mix(in srgb, var(--col-header) 30%, #fff); background: #fff; color: var(--col-topic); border-radius: 8px; cursor: pointer; }
+.cash-line button { width: 36px; height: 36px; padding: 0; font-size: 18px; line-height: 1; }
+footer strong { font-size: 18px; font-variant-numeric: tabular-nums; }
 .cash-line button:disabled { opacity: 0.35; }
 .is-in { color: #137333; }
 .is-out { color: #c5221f; }
