@@ -87,12 +87,42 @@
   box-shadow: 0 12px 32px rgba(62, 48, 28, 0.08);
 }
 
-.canvas-viewport .lean-grid,
 .canvas-viewport .bmc-grid,
-.canvas-viewport .raci-sheet,
-.canvas-viewport .sheet .table,
+.canvas-viewport .gantt .split,
 .canvas-viewport .quadrant-grid {
   overflow: hidden;
+}
+
+.canvas-viewport .raci-sheet {
+  overflow: auto;
+}
+
+/* 格子按内容增高，页面自己滚。不要把多出来的字裁在视口里。 */
+.canvas-viewport .sheet,
+.canvas-viewport .bmc {
+  overflow: auto;
+}
+
+.canvas-viewport .swot-grid,
+.canvas-viewport .lean-grid,
+.canvas-viewport .sheet > .grid,
+.canvas-viewport .sheet > .axis {
+  flex: 1 0 auto;
+  min-height: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.canvas-viewport .swot-grid > section,
+.canvas-viewport .lean-cell,
+.canvas-viewport .sheet > .grid > section,
+.canvas-viewport .sheet > .axis .grid > section,
+.canvas-viewport .swot-grid .rte-slot,
+.canvas-viewport .lean-grid .rte-slot,
+.canvas-viewport .sheet > .grid .rte-slot,
+.canvas-viewport .sheet > .axis .rte-slot {
+  min-height: min-content;
+  overflow: visible;
 }
 
 .canvas-viewport .kanban article {
