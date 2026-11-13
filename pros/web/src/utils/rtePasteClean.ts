@@ -359,20 +359,57 @@ export function unwrapSinglePastedList(html: string): string {
   return only.innerHTML
 }
 
-/** 紧挨着图片的「图 1 说明」收进题注，避免和自动编号叠成两个图号。 */
+const FIGURE_CAPTION_RE = /^图\s*\d+(?:\s*-\s*\d+)?\s*[：:\-]?\s*(.*)$/
+
+function pastedCaptionRest(text: string): string | null {
+  const matched = text.trim().match(FIGURE_CAPTION_RE)
+  if (!matched) return null
+  return (matched[1] || '').trim()
+}
+
+/** 这一段里只有一张图（空格和换行不算），题注才会写在下一段。 */
+function imageOnlyHost(el: Element | null): Element | null {
+  if (!el || el.tagName === 'BODY' || el.querySelectorAll('img').length !== 1) return null
+  for (const child of el.childNodes) {
+    if (child.nodeType === Node.TEXT_NODE) {
+      if ((child.textContent || '').trim()) return null
+      continue
+    }
+    if (child.nodeType !== Node.ELEMENT_NODE) return null
+    const tag = (child as Element).tagName
+    if (tag !== 'IMG' && tag !== 'BR') return null
+  }
+  return el
+}
+
+function captionBlock(el: Element | null): el is Element {
+  if (!el || el.querySelector('img')) return false
+  return el.tagName === 'P' || el.tagName === 'DIV'
+}
+
+function takePastedCaption(img: HTMLImageElement, text: string, remove: () => void) {
+  const caption = pastedCaptionRest(text)
+  if (caption == null) return false
+  if (caption && !img.getAttribute('data-caption')) img.setAttribute('data-caption', caption)
+  remove()
+  return true
+}
+
+/** 紧挨着图片的「图 1 说明」收进题注，避免和自动编号叠成两个图号。图片单独成段、或题注来自 figcaption 时也收。 */
 export function absorbPastedFigureCaptions(html: string): string {
   if (typeof DOMParser === 'undefined' || !/图\s*\d+/.test(html)) return html
   const doc = new DOMParser().parseFromString(html, 'text/html')
   const images = [...doc.body.querySelectorAll('img')]
   images.forEach((img) => {
-    const next = img.nextElementSibling
-    if (!next || next.tagName !== 'P') return
-    const text = (next.textContent || '').trim()
-    const matched = text.match(/^图\s*\d+\s*(.*)$/)
-    if (!matched) return
-    const caption = (matched[1] || '').trim()
-    if (caption) img.setAttribute('data-caption', caption)
-    next.remove()
+    const sibling = img.nextElementSibling
+    if (captionBlock(sibling) && takePastedCaption(img, sibling.textContent || '', () => sibling.remove())) return
+    const text = img.nextSibling
+    if (text && text.nodeType === Node.TEXT_NODE && takePastedCaption(img, text.textContent || '', () => text.remove())) {
+      return
+    }
+    const host = imageOnlyHost(img.parentElement)
+    const next = host?.nextElementSibling
+    if (captionBlock(next ?? null)) takePastedCaption(img, next?.textContent || '', () => next?.remove())
   })
   return doc.body.innerHTML
 }

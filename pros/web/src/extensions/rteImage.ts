@@ -270,6 +270,7 @@ function createImageSizePlugin(): Plugin {
     },
     view(editorView) {
       const reconcile = () => {
+        if (!editorView.dom?.isConnected) return
         clearPixelVersusPreset(editorView)
         paintImageSizes(editorView)
       }

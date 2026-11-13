@@ -5,6 +5,7 @@ import StarterKit from '@tiptap/starter-kit'
 import { Table } from '@tiptap/extension-table'
 import { TableRow } from '@tiptap/extension-table-row'
 import { ListStyleAttrs } from '../extensions/listStyleAttrs'
+import { RteImage } from '../extensions/rteImage'
 import { RteTableCell, RteTableHeader } from '../extensions/rteTableCells'
 import { retargetList } from './rteListContinue'
 import { pasteTsvIntoTable } from './rteRound7'
@@ -48,7 +49,7 @@ describe('列表、表格粘贴和换图', () => {
     expect(unwrapSinglePastedList('<p>甲</p><ul><li>乙</li></ul>')).toContain('<p>甲</p>')
   })
 
-  it('粘贴表格丢掉命名空间，留下合并和文字，并收起重复图号', () => {
+  it('粘贴表格丢掉命名空间，留下合并和文字，并收起重复图号', async () => {
     const html = sanitizePastedHtml(
       '<p><o:p>甲</o:p></p><table xmlns:w="urn:schemas-microsoft-com:office:word"><tr><td colspan="2">合并</td></tr></table>' +
         '<img src="data:image/png;base64,aaaa" alt="图"><p>图 1 销售趋势</p><nav>导航</nav>',
@@ -60,6 +61,23 @@ describe('列表、表格粘贴和换图', () => {
     expect(html).not.toContain('<nav')
     expect(html).toContain('data-caption="销售趋势"')
     expect(html).not.toContain('图 1')
+    const wrapped = sanitizePastedHtml(
+      '<p><img src="https://example.com/a.png" alt="趋势"></p><p>图 1 销售趋势</p>',
+    )
+    expect(wrapped).toContain('data-caption="销售趋势"')
+    expect(wrapped).not.toContain('图 1')
+    const figure = sanitizePastedHtml(
+      '<figure><img src="https://example.com/b.png" alt="章节"><figcaption>图 2-1：季度对比</figcaption></figure>',
+    )
+    expect(figure).toContain('data-caption="季度对比"')
+    expect(figure).not.toContain('图 2-1')
+    const ed = mount(wrapped, [RteImage.configure({ inline: false, allowBase64: true })])
+    let caption = ''
+    ed.state.doc.descendants((node) => {
+      if (node.type.name === 'image') caption = String(node.attrs.caption || '')
+    })
+    expect(caption).toBe('销售趋势')
+    await new Promise((resolve) => queueMicrotask(resolve))
     const group = sanitizePastedHtml(
       '<div data-type="image-group" data-layout="mix" data-ratios="1,2,1" data-stack-at="1" data-stack-side="right"><img src="data:image/png;base64,aaaa" alt="甲"></div>',
     )
