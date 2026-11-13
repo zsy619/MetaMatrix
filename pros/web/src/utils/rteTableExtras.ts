@@ -2,7 +2,7 @@ import type { Editor } from '@tiptap/core'
 import { Fragment, type Node as PmNode } from '@tiptap/pm/model'
 import { TextSelection, type Transaction } from '@tiptap/pm/state'
 import { parseCellNumber } from './rteTableFormula'
-import { TABLE_STRUCTURE } from './rteTableFormulaOps'
+import { cellDisplayText, tableTextGrid, TABLE_STRUCTURE } from './rteTableFormulaOps'
 
 /** 整表替换后把光标留在表内，后面的排序和合计还能找到这张表。 */
 function stayInTable(tr: Transaction, tablePos: number): Transaction {
@@ -199,16 +199,23 @@ export function upsertTableSumRow(editor: Editor): boolean {
   const { header, body: rawBody } = splitTableRows(rows)
   const body = rawBody.filter((row) => !isSumRow(row))
   if (!body.length) return false
-  const colCount = (header[0] || body[0])!.childCount
-  const sample = (header[0] || body[0])!.child(0)!
+  const grid = tableTextGrid(table, (cell) => cellDisplayText(cell))
+  const bodySet = new Set(body)
+  const bodyIndexes: number[] = []
+  let seen = 0
+  table.forEach((row) => {
+    if (row.type.name !== 'tableRow') return
+    if (bodySet.has(row)) bodyIndexes.push(seen)
+    seen += 1
+  })
+  const colCount = Math.max(1, ...grid.map((line) => line.length))
+  const sample = (body[0] || header[0])!.child(0)!
   const sums: (string | null)[] = Array.from({ length: colCount }, () => null)
   for (let c = 1; c < colCount; c++) {
     let total = 0
     let n = 0
-    for (const row of body) {
-      if (row.childCount <= c) continue
-      const t = cellText(row.child(c))
-      const v = parseCellNumber(t)
+    for (const rowIndex of bodyIndexes) {
+      const v = parseCellNumber(grid[rowIndex]?.[c] ?? '')
       if (v != null) {
         total += v
         n += 1

@@ -211,4 +211,34 @@ describe('表格排序和合计', () => {
     })
     expect(sum).toBe('1200.3')
   })
+
+  it('合并单元格按屏幕上的列合计，跨行的数字只算一次', () => {
+    const ed = makeEditor()
+    ed.commands.setContent(
+      '<table><tbody><tr><td colspan="2"><p>分组</p></td><td><p>10</p></td></tr><tr><td><p>甲</p></td><td><p>乙</p></td><td><p>20</p></td></tr></tbody></table>',
+    )
+    focusInsideTable(ed)
+    expect(upsertTableSumRow(ed)).toBe(true)
+    let cells: string[] = []
+    ed.state.doc.descendants((node) => {
+      if (node.type.name !== 'table' || !node.lastChild) return
+      cells = []
+      node.lastChild.forEach((cell) => cells.push(cell.textContent))
+      return false
+    })
+    expect(cells).toEqual(['合计', '', '30'])
+
+    ed.commands.setContent(
+      '<table><tbody><tr><td><p>甲</p></td><td rowspan="2"><p>5</p></td><td><p>1</p></td></tr><tr><td><p>乙</p></td><td><p>2</p></td></tr></tbody></table>',
+    )
+    focusInsideTable(ed)
+    expect(upsertTableSumRow(ed)).toBe(true)
+    ed.state.doc.descendants((node) => {
+      if (node.type.name !== 'table' || !node.lastChild) return
+      cells = []
+      node.lastChild.forEach((cell) => cells.push(cell.textContent))
+      return false
+    })
+    expect(cells).toEqual(['合计', '5', '3'])
+  })
 })
