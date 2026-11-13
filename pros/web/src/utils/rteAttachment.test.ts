@@ -2,9 +2,12 @@
 import JSZip from 'jszip'
 import { describe, expect, it, vi } from 'vitest'
 import {
+  attachmentDownloadName,
   attachmentInsertHref,
   attachmentKind,
+  attachmentKindFor,
   attachmentTable,
+  attachmentText,
   docxPlainText,
   isAttachmentAnchor,
   loadAttachment,
@@ -59,6 +62,15 @@ describe('附件链接', () => {
     expect(attachmentKind('旧表.xls', 'application/vnd.ms-excel')).toBe('sheet')
     expect(attachmentKind('讲解.mp3', '')).toBe('audio')
     expect(attachmentKind('演示.mp4', 'video/mp4')).toBe('video')
+    expect(attachmentKindFor('说明', 'https://files.example.com/a.docx', 'application/octet-stream')).toBe('docx')
+    expect(attachmentDownloadName('报告/说明?.pdf')).toBe('报告-说明-.pdf')
+  })
+
+  it('国标编码的文本按中文读出，UTF-8 保持原样', async () => {
+    const gbk = new Blob([new Uint8Array([0xd6, 0xd0, 0xce, 0xc4])])
+    expect(await attachmentText(gbk)).toBe('中文')
+    const utf8 = new Blob([new TextEncoder().encode('中文')])
+    expect(await attachmentText(utf8)).toBe('中文')
   })
 
   it('用素材元数据里的签名地址取回文件', async () => {

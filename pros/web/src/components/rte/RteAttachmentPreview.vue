@@ -4,6 +4,7 @@ import { RTE_BINDINGS } from './bindings'
 import {
   attachmentDisplayName,
   attachmentTable,
+  attachmentText,
   downloadAttachment,
   loadAttachment,
   type LoadedAttachment,
@@ -86,7 +87,7 @@ watch(target, async (next) => {
     const file = await loadAttachment(next.href, next.name)
     if (rte.attachmentPreview?.href !== next.href) return
     loaded.value = file
-    if (file.kind === 'text') text.value = await file.blob.text()
+    if (file.kind === 'text') text.value = await attachmentText(file.blob)
     else if (file.kind === 'docx') html.value = await previewDocx(file.blob)
     else if (file.kind === 'doc') html.value = await previewDoc(file.blob)
     else if (file.kind === 'sheet') {

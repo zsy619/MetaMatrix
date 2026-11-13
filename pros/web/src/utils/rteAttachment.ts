@@ -63,6 +63,43 @@ export function attachmentDisplayName(name: string, href = ''): string {
   return '附件'
 }
 
+/** 下载名去掉路径字符，避免浏览器把斜杠当成目录。 */
+export function attachmentDownloadName(name: string, href = ''): string {
+  const base = attachmentDisplayName(name, href)
+  const safe = base.replace(/[\\/:*?"<>|\s]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 180)
+  return safe || '附件'
+}
+
+/** 链接文字没有扩展名时，用地址里的扩展名决定怎么预览。 */
+export function attachmentKindFor(name: string, href: string, mime: string): AttachmentKind {
+  const fromName = attachmentKind(name, mime)
+  if (fromName !== 'file') return fromName
+  let path = href
+  try {
+    path = decodeURIComponent(new URL(href, 'https://attachment.local').pathname)
+  } catch {
+    path = href.split('?')[0] || href
+  }
+  return attachmentKind(path, '')
+}
+
+/** 文本按 UTF-8 读。没有 BOM 且出现乱码时，再试国标编码。 */
+export async function attachmentText(blob: Blob): Promise<string> {
+  const bytes = new Uint8Array(await blob.arrayBuffer())
+  const utf8Offset = bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf ? 3 : 0
+  const utf8 = new TextDecoder('utf-8').decode(bytes.subarray(utf8Offset)).replace(/^\uFEFF/, '')
+  const bad = (utf8.match(/\uFFFD/g) || []).length
+  if (!bad || utf8Offset) return utf8
+  try {
+    const gbk = new TextDecoder('gb18030').decode(bytes)
+    const gbkBad = (gbk.match(/\uFFFD/g) || []).length
+    if (gbkBad < bad) return gbk.replace(/^\uFEFF/, '')
+  } catch {
+    /* 环境不支持国标编码时仍用 UTF-8 */
+  }
+  return utf8
+}
+
 const DANGEROUS_ATTACHMENT_EXT = new Set(['svg', 'html', 'htm', 'js', 'mjs', 'xhtml'])
 
 /** 编辑器里上传附件：超大文件和网页脚本不收，Word、Excel、PDF、图片和文本可以。 */
@@ -219,14 +256,14 @@ export async function loadAttachment(
     const blob = await fileRes.blob()
     const name = attachmentDisplayName(meta.originalName || nameHint, link)
     const mime = meta.mimeType || blob.type || ''
-    return { name, mime, href: link, blob, kind: attachmentKind(name, mime) }
+    return { name, mime, href: link, blob, kind: attachmentKindFor(name, link, mime) }
   }
   const res = await fetchImpl(link)
   if (!res.ok) throw new Error('附件读取失败')
   const blob = await res.blob()
   const name = attachmentDisplayName(nameHint, link)
   const mime = blob.type || ''
-  return { name, mime, href: link, blob, kind: attachmentKind(name, mime) }
+  return { name, mime, href: link, blob, kind: attachmentKindFor(name, link, mime) }
 }
 
 /** 从 docx 里抽出正文，不带字段代码和段落属性。 */
@@ -240,7 +277,7 @@ export function downloadAttachment(blob: Blob, name: string) {
   const url = URL.createObjectURL(blob)
   const anchor = document.createElement('a')
   anchor.href = url
-  anchor.download = attachmentDisplayName(name)
+  anchor.download = attachmentDownloadName(name)
   document.body.append(anchor)
   anchor.click()
   anchor.remove()
