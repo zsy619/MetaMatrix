@@ -54,13 +54,7 @@ function nodeToMd(root: HTMLElement): string {
         parts.push('\n')
       } else if (e.getAttribute('data-type') === 'image-group') {
         const layout = e.getAttribute('data-layout') || 'row'
-        const images = [...e.querySelectorAll('img')].map((img) => {
-          const src = img.getAttribute('src') || ''
-          const alt = img.getAttribute('alt') || 'image'
-          const safeSrc = /[\s()]/.test(src) ? `<${src}>` : src
-          const caption = img.getAttribute('data-caption')
-          return `![${alt}](${safeSrc})${caption ? `\n${caption}` : ''}`
-        })
+        const images = [...e.querySelectorAll('img')].map((img) => imageMarkdown(img).trimEnd())
         parts.push(`<!-- image-group:${layout} -->\n${images.join('\n')}\n\n`)
       } else if (tag === 'ul') {
         e.querySelectorAll(':scope > li').forEach((li) => {
@@ -87,11 +81,7 @@ function nodeToMd(root: HTMLElement): string {
       } else if (tag === 'table') {
         parts.push(tableToMd(e) + '\n\n')
       } else if (tag === 'img') {
-        const src = e.getAttribute('src') || ''
-        const alt = e.getAttribute('alt') || e.getAttribute('title') || 'image'
-        // data URL 里可能有空格 / 括号（SVG 快照），用 <...> 包起来才不会截断链接
-        const safeSrc = /[\s()]/.test(src) ? `<${src}>` : src
-        parts.push(`![${alt}](${safeSrc})\n\n`)
+        parts.push(imageMarkdown(e))
       } else if (tag === 'br') {
         parts.push('  \n')
       } else {
@@ -101,6 +91,15 @@ function nodeToMd(root: HTMLElement): string {
   }
   walkBlocks(root)
   return parts.join('')
+}
+
+function imageMarkdown(img: HTMLElement): string {
+  const src = img.getAttribute('src') || ''
+  const alt = img.getAttribute('alt') || img.getAttribute('title') || 'image'
+  // data URL 里可能有空格 / 括号（SVG 快照），用 <...> 包起来才不会截断链接
+  const safeSrc = /[\s()]/.test(src) ? `<${src}>` : src
+  const caption = (img.getAttribute('data-caption') || '').trim()
+  return `![${alt}](${safeSrc})${caption ? `\n${caption}` : ''}\n\n`
 }
 
 function inlineMd(el: HTMLElement): string {

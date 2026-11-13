@@ -71,6 +71,11 @@ describe('列表、表格粘贴和换图', () => {
     )
     expect(figure).toContain('data-caption="季度对比"')
     expect(figure).not.toContain('图 2-1')
+    const plainCaption = sanitizePastedHtml(
+      '<figure><img src="https://example.com/c.png" alt="趋势"><figcaption>季度趋势</figcaption></figure>',
+    )
+    expect(plainCaption).toContain('data-caption="季度趋势"')
+    expect(plainCaption).not.toContain('<figcaption')
     const ed = mount(wrapped, [RteImage.configure({ inline: false, allowBase64: true })])
     let caption = ''
     ed.state.doc.descendants((node) => {

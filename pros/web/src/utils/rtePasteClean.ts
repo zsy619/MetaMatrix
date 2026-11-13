@@ -109,6 +109,7 @@ const KEEP_TAGS = new Set([
   'br',
   'mark',
   'hr',
+  'figcaption',
 ])
 
 /** 把粘贴进来的属性值里的常见实体解开，再判断协议。 */
@@ -384,12 +385,18 @@ function imageOnlyHost(el: Element | null): Element | null {
 
 function captionBlock(el: Element | null): el is Element {
   if (!el || el.querySelector('img')) return false
-  return el.tagName === 'P' || el.tagName === 'DIV'
+  return el.tagName === 'P' || el.tagName === 'DIV' || el.tagName === 'FIGCAPTION'
 }
 
-function takePastedCaption(img: HTMLImageElement, text: string, remove: () => void) {
-  const caption = pastedCaptionRest(text)
-  if (caption == null) return false
+function takePastedCaption(img: HTMLImageElement, text: string, remove: () => void, plain = false) {
+  const numbered = pastedCaptionRest(text)
+  if (numbered != null) {
+    if (numbered && !img.getAttribute('data-caption')) img.setAttribute('data-caption', numbered)
+    remove()
+    return true
+  }
+  if (!plain) return false
+  const caption = text.replace(/\s+/g, ' ').trim()
   if (caption && !img.getAttribute('data-caption')) img.setAttribute('data-caption', caption)
   remove()
   return true
@@ -397,12 +404,15 @@ function takePastedCaption(img: HTMLImageElement, text: string, remove: () => vo
 
 /** 紧挨着图片的「图 1 说明」收进题注，避免和自动编号叠成两个图号。图片单独成段、或题注来自 figcaption 时也收。 */
 export function absorbPastedFigureCaptions(html: string): string {
-  if (typeof DOMParser === 'undefined' || !/图\s*\d+/.test(html)) return html
+  if (typeof DOMParser === 'undefined' || (!/图\s*\d+/.test(html) && !/<figcaption\b/i.test(html))) return html
   const doc = new DOMParser().parseFromString(html, 'text/html')
   const images = [...doc.body.querySelectorAll('img')]
   images.forEach((img) => {
     const sibling = img.nextElementSibling
-    if (captionBlock(sibling) && takePastedCaption(img, sibling.textContent || '', () => sibling.remove())) return
+    const plain = sibling?.tagName === 'FIGCAPTION'
+    if (captionBlock(sibling) && takePastedCaption(img, sibling.textContent || '', () => sibling.remove(), plain)) return
+    const prev = img.previousElementSibling
+    if (prev?.tagName === 'FIGCAPTION' && takePastedCaption(img, prev.textContent || '', () => prev.remove(), true)) return
     const text = img.nextSibling
     if (text && text.nodeType === Node.TEXT_NODE && takePastedCaption(img, text.textContent || '', () => text.remove())) {
       return
