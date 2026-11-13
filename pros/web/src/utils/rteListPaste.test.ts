@@ -86,6 +86,39 @@ describe('列表、表格粘贴和换图', () => {
     expect(ed.getText()).toContain('8')
   })
 
+  it('合并单元格后粘贴按屏幕上的列填入', () => {
+    const ed = mount(
+      `<table><tbody>
+        <tr><td colspan="2"><p>合</p></td><td><p>右</p></td></tr>
+        <tr><td><p>a</p></td><td><p>b</p></td><td><p>c</p></td></tr>
+      </tbody></table>`,
+      [Table.configure({ resizable: false }), TableRow, RteTableHeader, RteTableCell],
+    )
+    let pos = -1
+    ed.state.doc.descendants((node, at) => {
+      if (pos < 0 && node.type.name === 'tableCell' && node.textContent === '合') pos = at + 2
+    })
+    ed.commands.setTextSelection(pos)
+    expect(pasteTsvIntoTable(ed, '甲\t乙')).toBe(true)
+    const texts: string[] = []
+    ed.state.doc.descendants((node) => {
+      if (node.type.name === 'tableCell') texts.push(node.textContent)
+    })
+    expect(texts).toEqual(['甲', '乙', 'a', 'b', 'c'])
+
+    let left = -1
+    ed.state.doc.descendants((node, at) => {
+      if (left < 0 && node.type.name === 'tableCell' && node.textContent === 'a') left = at + 2
+    })
+    ed.commands.setTextSelection(left)
+    expect(pasteTsvIntoTable(ed, '"甲\t内"\t乙\t丙')).toBe(true)
+    const next: string[] = []
+    ed.state.doc.descendants((node) => {
+      if (node.type.name === 'tableCell') next.push(node.textContent)
+    })
+    expect(next).toEqual(['甲', '乙', '甲\t内', '乙', '丙'])
+  })
+
   it('换图保留题注、裁剪和替代文本', () => {
     const next = keepCropOnReplace(
       { src: 'old', alt: '旧图', caption: '图注', cropAspect: '1', cropZoom: 1.2 },

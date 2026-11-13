@@ -290,9 +290,79 @@ export function filterLabeledTargets<T extends { label: string; kind?: string }>
   })
 }
 
+/** 制表符分隔。引号里的制表符和换行留在同一个格子。 */
+function splitTsvGrid(plain: string): string[][] {
+  const source = String(plain || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+  const rows: string[][] = []
+  let row: string[] = []
+  let current = ''
+  let quoted = false
+  const pushRow = () => {
+    row.push(current)
+    if (row.some((cell) => cell.length > 0)) rows.push(row)
+    row = []
+    current = ''
+  }
+  for (let index = 0; index < source.length; index += 1) {
+    const char = source[index]
+    if (char === '"') {
+      if (quoted && source[index + 1] === '"') {
+        current += '"'
+        index += 1
+      } else {
+        quoted = !quoted
+      }
+      continue
+    }
+    if (!quoted && char === '\t') {
+      row.push(current)
+      current = ''
+      continue
+    }
+    if (!quoted && char === '\n') {
+      pushRow()
+      continue
+    }
+    current += char
+  }
+  pushRow()
+  return rows
+}
+
+function cellSpan(cell: { attrs: { colspan?: unknown; rowspan?: unknown } }): { colspan: number; rowspan: number } {
+  return {
+    colspan: Math.max(1, Number(cell.attrs.colspan) || 1),
+    rowspan: Math.max(1, Number(cell.attrs.rowspan) || 1),
+  }
+}
+
+/** 子单元格在视觉网格里的起始列。上一行的 rowspan 会把后面的格子往右推。 */
+function visualColumnAt(table: { forEach: (fn: (row: { forEach: (fn: (cell: { attrs: { colspan?: unknown; rowspan?: unknown } }) => void) => void }) => void) => void }, targetRow: number, targetChild: number): number {
+  const occupied: boolean[][] = []
+  let found = targetChild
+  let rowIndex = 0
+  table.forEach((rowNode) => {
+    let visual = 0
+    let child = 0
+    rowNode.forEach((cellNode) => {
+      while (occupied[rowIndex]?.[visual]) visual += 1
+      if (rowIndex === targetRow && child === targetChild) found = visual
+      const { colspan, rowspan } = cellSpan(cellNode)
+      for (let down = 0; down < rowspan; down += 1) {
+        if (!occupied[rowIndex + down]) occupied[rowIndex + down] = []
+        for (let span = 0; span < colspan; span += 1) occupied[rowIndex + down]![visual + span] = true
+      }
+      visual += colspan
+      child += 1
+    })
+    rowIndex += 1
+  })
+  return found
+}
+
 /** 光标已经在表格里时，按制表符把纯文本填进后面的格子。一次粘贴一步撤销。 */
 export function pasteTsvIntoTable(editor: Editor, plain: string): boolean {
-  const text = String(plain || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+  const text = String(plain || '')
   if (!text.includes('\t')) return false
   const { state } = editor
   const $from = state.selection.$from
@@ -307,14 +377,11 @@ export function pasteTsvIntoTable(editor: Editor, plain: string): boolean {
   if (cellDepth < 2) return false
   const table = $from.node(cellDepth - 2)
   if (table.type.name !== 'table') return false
-  const rows = text
-    .split('\n')
-    .filter((line) => line.length > 0)
-    .map((line) => line.split('\t'))
+  const rows = splitTsvGrid(text)
   if (!rows.length) return false
   const tablePos = $from.before(cellDepth - 2)
   const startRow = $from.index(cellDepth - 2)
-  const startCol = $from.index(cellDepth - 1)
+  const startCol = visualColumnAt(table, startRow, $from.index(cellDepth - 1))
   const header = table.child(0)
   const dateCols = new Set<number>()
   if (header) {
@@ -325,33 +392,39 @@ export function pasteTsvIntoTable(editor: Editor, plain: string): boolean {
     })
   }
   const jobs: Array<{ from: number; to: number; text: string }> = []
+  const occupied: boolean[][] = []
   let rowIndex = 0
   table.forEach((rowNode, rowOffset) => {
-    const gridRow = rows[rowIndex - startRow]
-    if (rowIndex >= startRow && gridRow) {
-      let colIndex = 0
-      rowNode.forEach((cellNode, cellOffset) => {
-        const span = Math.max(1, Number(cellNode.attrs.colspan) || 1)
-        if (colIndex >= startCol) {
-          let value = gridRow[colIndex - startCol]
-          if (value != null) {
-            if (dateCols.has(colIndex) && /^\d+$/.test(value.trim())) {
-              value = excelSerialToDate(Number(value.trim())) || value
-            }
-            const cellPos = tablePos + 1 + rowOffset + 1 + cellOffset
-            const para = cellNode.firstChild
-            if (para) {
-              jobs.push({
-                from: cellPos + 2,
-                to: cellPos + 1 + para.nodeSize - 1,
-                text: value,
-              })
-            }
+    const gridRow = rowIndex >= startRow ? rows[rowIndex - startRow] : undefined
+    let visual = 0
+    let pasteCol = 0
+    rowNode.forEach((cellNode, cellOffset) => {
+      while (occupied[rowIndex]?.[visual]) visual += 1
+      const { colspan, rowspan } = cellSpan(cellNode)
+      if (gridRow && visual >= startCol) {
+        let value = gridRow[pasteCol]
+        pasteCol += 1
+        if (value != null) {
+          if (dateCols.has(visual) && /^\d+$/.test(value.trim())) {
+            value = excelSerialToDate(Number(value.trim())) || value
+          }
+          const cellPos = tablePos + 1 + rowOffset + 1 + cellOffset
+          const para = cellNode.firstChild
+          if (para) {
+            jobs.push({
+              from: cellPos + 2,
+              to: cellPos + 1 + para.nodeSize - 1,
+              text: value,
+            })
           }
         }
-        colIndex += span
-      })
-    }
+      }
+      for (let down = 0; down < rowspan; down += 1) {
+        if (!occupied[rowIndex + down]) occupied[rowIndex + down] = []
+        for (let span = 0; span < colspan; span += 1) occupied[rowIndex + down]![visual + span] = true
+      }
+      visual += colspan
+    })
     rowIndex += 1
   })
   if (!jobs.length) return false
