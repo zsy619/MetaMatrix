@@ -15,6 +15,7 @@ import {
   planMixedStack,
   ratiosToAttr,
   removeRatio,
+  repairGroupAttrs,
   rowCanAccept,
   type MiniNode,
 } from '../utils/rteImageGroup'
@@ -238,11 +239,25 @@ export function buildImageGroupMigration(state: EditorState): Transaction | null
     return false
   })
   const singletons: number[] = []
+  const repairs: Array<{ pos: number; attrs: Record<string, unknown> | null; unconceal: boolean }> = []
   state.doc.descendants((node, pos) => {
-    if (node.type.name === 'imageGroup' && node.childCount <= 1) singletons.push(pos)
-    return node.type.name !== 'imageGroup'
+    if (node.type.name !== 'imageGroup') return true
+    if (node.childCount <= 1) singletons.push(pos)
+    else {
+      const attrs = repairGroupAttrs(node.childCount, node.attrs as Record<string, unknown>)
+      let images = 0
+      let visible = 0
+      node.forEach((child) => {
+        if (child.type.name !== 'image') return
+        images += 1
+        if (!child.attrs.concealed) visible += 1
+      })
+      const unconceal = images > 0 && visible === 0
+      if (attrs || unconceal) repairs.push({ pos, attrs, unconceal })
+    }
+    return false
   })
-  if (!hits.length && !singletons.length) return null
+  if (!hits.length && !singletons.length && !repairs.length) return null
   let tr = state.tr
   const ordered = [
     ...hits.map((hit) => ({ pos: hit.pos, kind: 'columns' as const, hit })),
@@ -263,6 +278,26 @@ export function buildImageGroupMigration(state: EditorState): Transaction | null
     if (item.kind === 'single' && current.type.name === 'imageGroup' && current.childCount <= 1) {
       if (current.childCount === 1) tr = tr.replaceWith(pos, pos + current.nodeSize, current.child(0)!)
       else tr = tr.delete(pos, pos + current.nodeSize)
+    }
+  }
+  for (const item of [...repairs].sort((a, b) => b.pos - a.pos)) {
+    const pos = tr.mapping.map(item.pos, -1)
+    const current = tr.doc.nodeAt(pos)
+    if (!current || current.type.name !== 'imageGroup' || current.childCount < 2) continue
+    if (item.attrs) tr = tr.setNodeMarkup(pos, undefined, item.attrs)
+    if (!item.unconceal) continue
+    const group = tr.doc.nodeAt(pos)
+    if (!group) continue
+    const jobs: number[] = []
+    let cursor = pos + 1
+    group.forEach((child) => {
+      if (child.type.name === 'image' && child.attrs.concealed) jobs.push(cursor)
+      cursor += child.nodeSize
+    })
+    for (let index = jobs.length - 1; index >= 0; index -= 1) {
+      const at = jobs[index]!
+      const image = tr.doc.nodeAt(at)
+      if (image) tr = tr.setNodeMarkup(at, undefined, { ...image.attrs, concealed: false })
     }
   }
   tr.setMeta('imageGroupMigrate', true)

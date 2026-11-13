@@ -14,6 +14,7 @@ import {
   IMAGE_GROUP_GAP_DEFAULT,
   nextGroupGap,
   normalizeGroupLayout,
+  repairGroupAttrs,
   planImageStack,
   planMixedStack,
   normalizeGroupGap,
@@ -140,5 +141,10 @@ const column = resizeCollageColumn([1, 1, 1], '12', 0.25)
 assert.ok(column[0]! < column[1]! + column[2]!)
 assert.equal(Math.round((column[0]! + column[1]! + column[2]!) * 100) / 100, 3)
 assert.equal(planImageStack(3, 1, 1, 'above'), null)
+const repaired = repairGroupAttrs(2, { layout: '12', ratioMode: 'custom', ratios: '1:1:1', stackAt: 1 })
+assert.equal(repaired?.layout, 'row')
+assert.equal(repaired?.ratios, null)
+assert.equal(repaired?.ratioMode, null)
+assert.equal(repairGroupAttrs(3, { layout: '12', ratioMode: null, ratios: null }), null)
 
 console.log('image group ok')

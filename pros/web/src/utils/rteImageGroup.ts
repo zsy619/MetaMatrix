@@ -268,6 +268,31 @@ export function groupInsertIndex(from: number, target: number, side: 'left' | 'r
 
 export type ImageGroupLayout = 'row' | '12' | '21' | 'rows' | 'mix'
 
+/**
+ * 张数对不上时，把 12 / 21 / 上下 / 叠放收回横排，并清掉对不上的宽度比例。
+ * 返回 null 表示不用改。
+ */
+export function repairGroupAttrs(
+  childCount: number,
+  attrs: Record<string, unknown>,
+): Record<string, unknown> | null {
+  if (childCount < 2) return null
+  const layout = normalizeGroupLayout(attrs.layout)
+  const stackAt = Number(attrs.stackAt)
+  const layoutBroken =
+    ((layout === '12' || layout === '21') && childCount !== 3) ||
+    (layout === 'rows' && childCount !== 2) ||
+    (layout === 'mix' && !(Number.isInteger(stackAt) && stackAt >= 0 && stackAt + 1 < childCount))
+  const parts = typeof attrs.ratios === 'string' ? attrs.ratios.split(':').filter((part) => part.trim()) : []
+  const ratiosBroken = attrs.ratioMode === 'custom' && parts.length !== childCount
+  if (!layoutBroken && !ratiosBroken) return null
+  return {
+    ...attrs,
+    ...(layoutBroken ? { layout: 'row', stackAt: null, stackSplit: null, layoutBefore: null } : {}),
+    ...(layoutBroken || ratiosBroken ? { ratios: null, ratioMode: null } : {}),
+  }
+}
+
 /** 缺省横排。12 是左一右二，21 是左二右一，rows 是两张上下叠放，mix 是四张及以上里有一列上下叠放。 */
 export function normalizeGroupLayout(raw: unknown): ImageGroupLayout {
   if (raw === '12' || raw === '21' || raw === 'rows' || raw === 'mix') return raw
