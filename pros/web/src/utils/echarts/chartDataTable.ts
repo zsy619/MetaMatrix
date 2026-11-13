@@ -75,6 +75,14 @@ function readCategoryAxis(
   return null
 }
 
+/** 散点是 [x, y] 或 { value: [x, y] }。x 进类目列，y 进系列值，避免收成 "1,2"。 */
+function pointTuple(entry: unknown): Array<number | string> | null {
+  const raw = isPlainObject(entry) && Array.isArray(entry.value) ? entry.value : entry
+  if (!Array.isArray(raw) || raw.length < 2) return null
+  if (raw.some((item) => Array.isArray(item) || isPlainObject(item))) return null
+  return raw.map((item) => itemToValue(item))
+}
+
 function asValueList(raw: unknown): Array<number | string> | null {
   if (!Array.isArray(raw) || !raw.length) return null
   if (raw.some((item) => Array.isArray(item) || isPlainObject(item))) return null
@@ -351,6 +359,12 @@ export function optionToDataModel(option: unknown): ChartDataModel {
     if (!isPlainObject(item)) continue
     const dataRaw = Array.isArray(item.data) ? item.data : []
     const name = typeof item.name === 'string' ? item.name : `系列${series.length + 1}`
+    if (item.type === 'scatter' && dataRaw.length && dataRaw.every((entry) => pointTuple(entry))) {
+      const points = dataRaw.map((entry) => pointTuple(entry)!)
+      if (!categories.length) categories = points.map((point) => String(point[0] ?? ''))
+      series.push({ name, data: points.map((point) => point[1] ?? '') })
+      continue
+    }
     if (dataRaw.length && isPlainObject(dataRaw[0])) {
       // { name, value } 形态：类目来自数据项自身
       const values = dataRaw.map((entry) =>
@@ -398,8 +412,22 @@ export function dataModelToOption(
     const target = model.series[index]
     if (!target) return item
     const original = Array.isArray(item.data) ? item.data : []
+    const scatter = item.type === 'scatter' && (original.length === 0 || original.every((entry) => pointTuple(entry)))
     const useObjectShape = original.length > 0 && isPlainObject(original[0])
     const data = target.data.map((value, cellIndex) => {
+      if (scatter) {
+        const origin = original[cellIndex]
+        const x = textToValue(String(model.categories[cellIndex] ?? ''))
+        const y = value === '' || value == null ? '' : value
+        if (isPlainObject(origin) && Array.isArray(origin.value)) {
+          const next = origin.value.slice()
+          next[0] = x
+          next[1] = y
+          return { ...origin, value: next }
+        }
+        if (Array.isArray(origin) && origin.length > 2) return [x, y, ...origin.slice(2)]
+        return [x, y]
+      }
       if (!useObjectShape) return value
       const origin = original[cellIndex]
       const name =

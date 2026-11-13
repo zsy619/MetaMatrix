@@ -206,6 +206,29 @@ describe('雷达图的指标和系列', () => {
   })
 })
 
+describe('散点图的坐标', () => {
+  const scatter = {
+    xAxis: { type: 'value' },
+    yAxis: { type: 'value' },
+    series: [{ name: '样本', type: 'scatter', symbolSize: 12, data: [[1, 2], [3, 4]] }],
+  }
+
+  it('横纵坐标分开读，不收成一段文字', () => {
+    const model = optionToDataModel(scatter)
+    expect(model.categories).toEqual(['1', '3'])
+    expect(model.series[0]!.data).toEqual([2, 4])
+  })
+
+  it('改坐标后仍写回数组', () => {
+    const model = optionToDataModel(scatter)
+    model.categories[0] = '1.5'
+    model.series[0]!.data[0] = 9
+    const next = dataModelToOption(scatter, model)
+    const series = next.series as Array<{ data: unknown[] }>
+    expect(series[0]!.data).toEqual([[1.5, 9], [3, 4]])
+  })
+})
+
 describe('dataset 里的表', () => {
   const chart = {
     dataset: {
