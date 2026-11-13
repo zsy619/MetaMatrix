@@ -183,7 +183,7 @@ function toggle(id: string) {
 .letter-C, .cell.letter-C { background: #b85a38; color: #fff; }
 .letter-I, .cell.letter-I { background: #2a649f; color: #fff; }
 .letter-empty, .cell.letter-empty { background: #f1f3f4; color: #9aa0a6; }
-.tools button { border: 1px solid #dadce0; background: #fff; border-radius: 8px; padding: 4px 10px; }
+.tools button { border: 1px solid #dadce0; background: #fff; border-radius: 999px; min-height: 32px; padding: 4px 12px; font-size: 13px; cursor: pointer; }
 .tools button:disabled { color: #9aa0a6; }
 .raci-sheet {
   flex: 1 1 auto;
@@ -194,22 +194,24 @@ function toggle(id: string) {
   border-radius: 12px;
 }
 table { width: 100%; border-collapse: collapse; }
-th, td { border-bottom: 1px solid #f1f3f4; padding: 6px 8px; text-align: center; }
+th, td { border-bottom: 1px solid #f1f3f4; padding: 8px 10px; text-align: center; font-size: 14px; }
 thead th {
   position: sticky;
   top: 0;
   z-index: 1;
+  min-height: 44px;
   background: var(--role-header, #f3f6f9);
   color: #fff;
+  font-size: 13px;
 }
 .work-head { text-align: left; background: #3e5a78 !important; width: 32%; }
 thead input { color: #fff; }
 tbody th { text-align: left; font-weight: 500; }
 tr.selected td, tr.selected th { background: #e8f0fe; }
-input { width: 100%; border: 0; background: transparent; font: inherit; color: inherit; }
-.work { display: flex; align-items: center; gap: 4px; }
-.indent, .twist--blank { flex: none; display: inline-block; width: 16px; }
-.twist { flex: none; width: 16px; border: 0; background: transparent; color: #5f6368; cursor: pointer; }
-.wbs { flex: none; color: #5f6368; font-size: 12px; min-width: 28px; }
-.cell { width: 42px; height: 32px; cursor: pointer; }
+input { width: 100%; min-height: 32px; border: 0; background: transparent; font: inherit; font-size: 15px; color: inherit; }
+.work { display: flex; align-items: center; gap: 6px; }
+.indent, .twist--blank { flex: none; display: inline-block; width: 24px; }
+.twist { flex: none; width: 24px; height: 24px; border: 0; background: transparent; color: #5f6368; cursor: pointer; }
+.wbs { flex: none; color: #5f6368; font-size: 13px; min-width: 36px; font-variant-numeric: tabular-nums; }
+.cell { width: 44px; height: 44px; min-width: 44px; min-height: 44px; font-size: 16px; cursor: pointer; }
 </style>
