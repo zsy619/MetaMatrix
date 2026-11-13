@@ -149,4 +149,22 @@ describe('分栏装入选区和栏数', () => {
     pressKey(ed, 'Tab')
     expect(selectionColumn(ed)).toBe(0)
   })
+
+  it('栏首退格把这段接到上一栏，内边距写在栏上', () => {
+    const ed = mount('<p>甲</p><p>乙</p>')
+    ed.commands.setTextSelection({ from: textPos(ed, '甲', 'start'), to: textPos(ed, '乙', 'end') })
+    ed.chain().focus().setColumns(2).run()
+    ed.commands.setTextSelection(textPos(ed, '乙', 'start'))
+    expect(pressKey(ed, 'Backspace')).toBe(true)
+    expect(columnTexts(ed)).toEqual([['甲乙'], ['']])
+    expect(selectionColumn(ed)).toBe(0)
+
+    const columns = ed.state.doc.firstChild
+    expect(columns?.type.name).toBe('columns')
+    ed.view.dispatch(ed.state.tr.setNodeMarkup(0, undefined, { ...columns!.attrs, padding: 24 }))
+    const html = ed.getHTML()
+    expect(html).toContain('--rte-col-pad: 24px')
+    expect(html).not.toContain('padding: 8px')
+    expect(html).not.toContain('padding:8px')
+  })
 })

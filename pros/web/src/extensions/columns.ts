@@ -13,6 +13,8 @@ declare module '@tiptap/core' {
       unsetColumns: () => ReturnType
       /** 光标移到相邻栏。onlyAtEdge 为真时，只有贴着栏首或栏尾才移动。 */
       focusColumn: (dir: 1 | -1, onlyAtEdge?: boolean) => ReturnType
+      /** 栏首退格：把这段接到上一栏末尾。 */
+      joinColumnBackward: () => ReturnType
     }
   }
 }
@@ -127,6 +129,47 @@ function columnsPosition(tr: Transaction): number | null {
 function placeCaret(tr: Transaction, pos: number) {
   const target = Math.max(1, Math.min(pos, tr.doc.content.size))
   tr.setSelection(TextSelection.near(tr.doc.resolve(target)))
+}
+
+function joinColumnBackward(tr: Transaction): boolean {
+  if (!tr.selection.empty) return false
+  const { $from } = tr.selection
+  if ($from.parentOffset !== 0) return false
+  let depth = -1
+  for (let level = $from.depth; level > 0; level -= 1) {
+    if ($from.node(level).type.name === 'column') depth = level
+  }
+  if (depth < 1 || $from.node(depth - 1).type.name !== 'columns') return false
+  for (let level = $from.depth; level > depth; level -= 1) {
+    const name = $from.node(level).type.name
+    if (name === 'listItem' || name === 'taskItem' || name === 'codeBlock') return false
+  }
+  if ($from.index(depth) !== 0 || $from.parent !== $from.node(depth).firstChild) return false
+  const columnIndex = $from.index(depth - 1)
+  if (columnIndex <= 0) return false
+  const columns = $from.node(depth - 1)
+  const previous = columns.child(columnIndex - 1)
+  const currentColumn = $from.node(depth)
+  const currentBlock = currentColumn.firstChild
+  const previousBlock = previous?.lastChild
+  if (!currentBlock?.isTextblock || !previousBlock?.isTextblock) return false
+  let previousPos = $from.before(depth - 1) + 1
+  for (let index = 0; index < columnIndex - 1; index += 1) previousPos += columns.child(index).nodeSize
+  const previousBlockStart = previousPos + 1 + previous.content.size - previousBlock.nodeSize
+  const joinAt = previousBlockStart + 1 + previousBlock.content.size
+  const content = currentBlock.content
+  if (content.size) tr.insert(joinAt, content)
+  if (currentColumn.childCount === 1) {
+    const start = tr.mapping.map($from.start())
+    const end = tr.mapping.map($from.end())
+    if (end > start) tr.delete(start, end)
+  } else {
+    const blockFrom = tr.mapping.map($from.before())
+    const blockTo = tr.mapping.map($from.after())
+    if (blockTo > blockFrom) tr.delete(blockFrom, blockTo)
+  }
+  placeCaret(tr, tr.mapping.map(joinAt, 1))
+  return true
 }
 
 function focusColumn(tr: Transaction, dir: 1 | -1, onlyAtEdge = false): boolean {
@@ -263,7 +306,7 @@ export const Column = Node.create({
         class: 'rte-column',
         // 内联保底：即使 scoped/:deep 失效，空栏仍可见浅蓝虚线框
         style:
-          'min-width:0;min-height:64px;padding:8px 10px;border:1px solid #e8eaed;border-radius:6px;background:#fff;box-sizing:border-box;',
+          'min-width:0;min-height:64px;border:1px solid #e8eaed;border-radius:6px;background:#fff;box-sizing:border-box;',
       }),
       0,
     ]
@@ -379,6 +422,9 @@ export const Columns = Node.create({
       focusColumn:
         (dir: 1 | -1, onlyAtEdge?: boolean) =>
         ({ tr }) => focusColumn(tr, dir, onlyAtEdge),
+      joinColumnBackward:
+        () =>
+        ({ tr }) => joinColumnBackward(tr),
     }
   },
 
@@ -388,6 +434,7 @@ export const Columns = Node.create({
       'Shift-Tab': () => this.editor.commands.focusColumn(-1),
       ArrowRight: () => this.editor.commands.focusColumn(1, true),
       ArrowLeft: () => this.editor.commands.focusColumn(-1, true),
+      Backspace: () => this.editor.commands.joinColumnBackward(),
     }
   },
 

@@ -2413,7 +2413,7 @@ html.rte-toolbar-dragging * {
   column-gap: var(--rte-col-gap, 16px) !important;
   row-gap: var(--rte-col-gap, 16px) !important;
   margin: var(--rte-col-margin, 12px) 0;
-  padding: var(--rte-col-pad, 10px);
+  padding: 8px;
   border: var(--rte-col-border, 1px dashed #c9cdd4) !important;
   border-radius: var(--rte-col-radius, 8px);
   min-height: 88px !important;
@@ -2452,7 +2452,7 @@ html.rte-toolbar-dragging * {
 .rte-root div[data-type='column'] {
   min-width: 0;
   min-height: 72px !important;
-  padding: 10px 12px;
+  padding: var(--rte-col-pad, 10px) !important;
   border: var(--rte-col-border, 1px dashed #91b3fa) !important;
   border-radius: 6px;
   background: #f0f5ff !important;
