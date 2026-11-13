@@ -4518,39 +4518,49 @@ html.rte-toolbar-dragging * {
   border-top-color: #6b7280;
 }
 
-.rte-root :deep(img.rte-image) {
+.rte-root img.rte-image {
   max-width: 100%;
   height: auto;
 }
-.rte-root :deep([data-resize-container][data-node='image']) {
+.rte-root [data-resize-container][data-node='image'] {
   position: relative;
   max-width: 100%;
   clear: none;
 }
-.rte-root :deep([data-resize-container][data-node='image']:has(img[data-layout='block'][data-align='center'])),
-.rte-root :deep([data-resize-container][data-node='image']:has(img:not([data-layout]))) {
+.rte-root [data-resize-container][data-node='image']:has(img[data-layout='block'][data-align='center']),
+.rte-root [data-resize-container][data-node='image']:has(img:not([data-layout])) {
   float: none;
-  margin-left: auto;
-  margin-right: auto;
+  display: block;
+  width: fit-content;
+  margin-left: auto !important;
+  margin-right: auto !important;
 }
-.rte-root :deep([data-resize-container][data-node='image']:has(img[data-layout='block'][data-align='left'])) {
+.rte-root [data-resize-container][data-node='image']:has(img[data-layout='block'][data-align='left']) {
   float: none;
-  margin-left: 0;
-  margin-right: auto;
+  display: block;
+  width: fit-content;
+  margin-left: 0 !important;
+  margin-right: auto !important;
 }
-.rte-root :deep([data-resize-container][data-node='image']:has(img[data-layout='block'][data-align='right'])) {
+.rte-root [data-resize-container][data-node='image']:has(img[data-layout='block'][data-align='right']) {
   float: none;
-  margin-left: auto;
-  margin-right: 0;
+  display: block;
+  width: fit-content;
+  margin-left: auto !important;
+  margin-right: 0 !important;
 }
-.rte-root :deep([data-resize-container][data-node='image']:has(img[data-layout='wrap-left'])) {
-  float: left;
-  margin: 0.35em 1em 0.5em 0;
+.rte-root [data-resize-container][data-node='image']:has(img[data-layout='wrap-left']) {
+  float: left !important;
+  display: block;
+  width: fit-content;
+  margin: 0.35em 1em 0.5em 0 !important;
   max-width: min(70%, 100%);
 }
-.rte-root :deep([data-resize-container][data-node='image']:has(img[data-layout='wrap-right'])) {
-  float: right;
-  margin: 0.35em 0 0.5em 1em;
+.rte-root [data-resize-container][data-node='image']:has(img[data-layout='wrap-right']) {
+  float: right !important;
+  display: block;
+  width: fit-content;
+  margin: 0.35em 0 0.5em 1em !important;
   max-width: min(70%, 100%);
 }
 .rte-root.mode-preview :deep([data-resize-handle]),

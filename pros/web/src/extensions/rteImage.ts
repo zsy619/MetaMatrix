@@ -100,11 +100,11 @@ export const RteImage = Image.extend({
       displayWidth: {
         default: null as string | null,
         parseHTML: (el: HTMLElement) => {
-          const w =
-            el.getAttribute('data-display-width') ||
-            (el.style?.width || '').trim() ||
-            null
-          return w || null
+          const explicit = (el.getAttribute('data-display-width') || '').trim()
+          if (explicit) return explicit
+          // 裁剪会自己写 width:100%，不能当成用户设过的显示宽度。
+          if (el.getAttribute('data-crop-aspect')) return null
+          return (el.style?.width || '').trim() || null
         },
         renderHTML: (attrs: { displayWidth?: string | null }) => {
           const w = (attrs.displayWidth || '').trim()

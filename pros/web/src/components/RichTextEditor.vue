@@ -166,6 +166,7 @@ import { getToken } from '../api/http'
 import { uploadMediaFile } from '../api/mediaUpload'
 import { attachmentInsertHref, rteAttachmentUploadReject } from '../utils/rteAttachment'
 import { imageReplaceSrc } from '../utils/rteImageCrop'
+import { imageDisplayWidthPatch } from '../utils/rteImageLayout'
 import { htmlWithSuggestionsAccepted } from '../utils/rteSuggestions'
 import { buildExportHtmlWithCharts } from '../utils/rteExportChartSnapshots'
 import { rewritePrintMediaSrc } from '../utils/rtePrintMedia'
@@ -2108,7 +2109,7 @@ function setImageDisplayWidth(w: string) {
   if (!ed || !isImageNodeSelected()) return
   ed.chain()
     .focus()
-    .updateAttributes('image', { displayWidth: w || null })
+    .updateAttributes('image', imageDisplayWidthPatch(w))
     .run()
 }
 

@@ -48,6 +48,24 @@ describe('图片裁剪画到画面上', () => {
     expect(live).toContain('aspect-ratio: 16 / 9')
   })
 
+  it('裁剪写上的宽度不会变成显示宽度，粘贴的宽度仍保留', () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    editor = new Editor({
+      element: host,
+      extensions: [
+        StarterKit.configure({ dropcursor: false }),
+        RteImage.configure({ inline: false, allowBase64: true, HTMLAttributes: { class: 'rte-image' } }),
+      ],
+      content: `<img src="${PIXEL}" data-crop-aspect="16/9" style="width: 100%; height: auto"><img src="${PIXEL}" style="width: 40%">`,
+    })
+    const widths: Array<string | null> = []
+    editor.state.doc.descendants((node) => {
+      if (node.type.name === 'image') widths.push(node.attrs.displayWidth)
+    })
+    expect(widths).toEqual([null, '40%'])
+  })
+
   it('图片组里的裁剪按焦点裁切，不被横排的完整显示盖住', () => {
     const host = document.createElement('div')
     document.body.appendChild(host)

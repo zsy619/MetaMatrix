@@ -52,6 +52,12 @@ export function imageDropKind(xRatio: number, yRatio: number, overImage: boolean
   return y < 0.5 ? 'before' : 'after'
 }
 
+/** 选宽度预设。百分比和「原始」都清掉拖出来的像素宽高，避免和预设抢尺寸。 */
+export function imageDisplayWidthPatch(value: string): { displayWidth: string | null; width: null; height: null } {
+  const next = String(value ?? '').trim()
+  return { displayWidth: next || null, width: null, height: null }
+}
+
 export function clampImageWidth(width: number, maxWidth: number, minWidth = 48): number {
   const max = Number.isFinite(maxWidth) && maxWidth > minWidth ? maxWidth : minWidth
   const next = Number.isFinite(width) ? width : minWidth
