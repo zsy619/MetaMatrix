@@ -40,9 +40,15 @@ const PALETTE = [
 const CX = 320
 const CY = 320
 const R = 168
+const ringLevels = [20, 40, 60, 80]
 const warnScore = computed(() => props.doc.warnScore || 70)
+const selected = computed(() => props.doc.businesses.find((biz) => biz.id === selectedId.value) ?? null)
+const radarBusinesses = computed(() => {
+  const rest = props.doc.businesses.filter((biz) => biz.id !== selectedId.value)
+  return selected.value ? [...rest, selected.value] : props.doc.businesses
+})
 const stoppedCount = computed(() => props.doc.businesses.filter((biz) => aiBoundaryStops(biz.scores, warnScore.value)).length)
-const rings = [20, 40, 60, 80, 100].map((level) => aiBoundaryRadarRing(level, CX, CY, R))
+const rings = ringLevels.map((level) => aiBoundaryRadarRing(level, CX, CY, R))
 const warnRing = computed(() => aiBoundaryRadarRing(warnScore.value, CX, CY, R))
 const spokes = [0, 1, 2, 3].map((index) => {
   const [x, y] = aiBoundaryRadarPoint(index, AI_BOUNDARY_MAX, CX, CY, R)
@@ -151,8 +157,18 @@ function writeNote(html: string) {
     </header>
 
     <section class="criteria" aria-label="四种情况">
-      <article v-for="(axis, index) in doc.axes" :key="axis.id" class="card">
-        <p class="index">{{ AI_BOUNDARY_NUMERAL[index] || index + 1 }}</p>
+      <article
+        v-for="(axis, index) in doc.axes"
+        :key="axis.id"
+        class="card"
+        :class="{ hot: selected && selected.scores[axis.id] >= warnScore }"
+      >
+        <div class="card-top">
+          <p class="index">{{ AI_BOUNDARY_NUMERAL[index] || index + 1 }}</p>
+          <p v-if="selected" class="axis-score" :class="{ hot: selected.scores[axis.id] >= warnScore }">
+            {{ selected.scores[axis.id] }}
+          </p>
+        </div>
         <h3>{{ axis.title }}</h3>
         <p>{{ axis.body }}</p>
       </article>
@@ -199,6 +215,7 @@ function writeNote(html: string) {
               />
               <input
                 class="num"
+                :class="{ hot: biz.scores[axis] >= warnScore }"
                 type="number"
                 min="0"
                 :max="AI_BOUNDARY_MAX"
@@ -220,12 +237,14 @@ function writeNote(html: string) {
           <polygon :points="warnRing" class="gate" />
           <line v-for="(spoke, index) in spokes" :key="index" :x1="CX" :y1="CY" :x2="spoke.x" :y2="spoke.y" class="spoke" />
           <polygon
-            v-for="biz in doc.businesses"
+            v-for="biz in radarBusinesses"
             :key="biz.id"
             :points="polygon(biz)"
             :fill="biz.color"
             :stroke="biz.stroke"
-            :stroke-width="selectedId === biz.id ? 3 : 1.6"
+            :fill-opacity="selectedId === biz.id ? 0.9 : 0.18"
+            :stroke-opacity="selectedId === biz.id ? 1 : 0.4"
+            :stroke-width="selectedId === biz.id ? 3 : 1.4"
             @click="selectedId = biz.id"
           />
           <text
@@ -237,8 +256,23 @@ function writeNote(html: string) {
             dominant-baseline="middle"
             class="axis"
           >{{ label.title }}</text>
-          <text :x="CX + 14" :y="CY - (R * warnScore) / AI_BOUNDARY_MAX" class="gate-label">{{ warnScore }}</text>
+          <text
+            v-for="level in ringLevels"
+            :key="`tick-${level}`"
+            :x="CX + 8"
+            :y="CY - (R * level) / AI_BOUNDARY_MAX + 4"
+            class="tick"
+          >{{ level }}</text>
+          <text :x="CX - 36" :y="CY - (R * warnScore) / AI_BOUNDARY_MAX + 4" class="gate-label">{{ warnScore }}</text>
         </svg>
+        <ul class="legend">
+          <li v-for="biz in doc.businesses" :key="biz.id">
+            <button type="button" :class="{ on: selectedId === biz.id }" @click="selectedId = biz.id">
+              <i :style="{ background: biz.stroke }" />
+              {{ biz.name }}
+            </button>
+          </li>
+        </ul>
       </section>
     </div>
 
@@ -288,7 +322,11 @@ function writeNote(html: string) {
 .score strong { color: #9a3412; font-size: 18px; }
 .criteria { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
 .card { padding: 16px 16px 14px; border: 1px solid #e6d7c3; border-radius: 4px; background: #fbf7f1; }
+.card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .index { color: #a8a29e; font-size: 13px; font-weight: 700; }
+.axis-score { margin: 0; color: #0f766e; font-size: 18px; font-weight: 800; }
+.axis-score.hot { color: #9a3412; }
+.card.hot { border-color: #e7b8a8; background: #fff6f4; }
 .card h3 { margin-top: 8px; color: #1c1917; font-size: 20px; letter-spacing: -0.02em; }
 .card p:last-child { margin-top: 8px; color: #44403c; font-size: 14px; line-height: 1.6; }
 .work { display: grid; grid-template-columns: minmax(380px, 480px) minmax(320px, 1fr); gap: 16px; align-items: stretch; }
@@ -300,7 +338,8 @@ function writeNote(html: string) {
 .biz { margin-top: 8px; padding: 10px; border: 1px solid #f1ebe3; border-radius: 12px; background: #f4fbf6; }
 .biz.selected { border-color: #9a3412; }
 .biz.stop { background: #fff6f4; }
-.biz header { gap: 8px; }
+.biz header { gap: 8px; flex-wrap: wrap; }
+.biz header strong { white-space: normal; line-height: 1.35; max-width: 10em; text-align: right; }
 .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
 .biz header input { flex: 1; min-width: 0; border: none; background: transparent; font: inherit; font-weight: 700; }
 .biz header strong { color: #0f766e; font-size: 12px; font-weight: 650; }
@@ -308,10 +347,17 @@ function writeNote(html: string) {
 .biz label { gap: 8px; margin-top: 6px; }
 .biz label span { width: 6.2em; color: #57534e; font-size: 13px; flex: none; }
 .biz label input[type='range'] { flex: 1; }
-.num { width: 68px; border: 1px solid #e4ddd2; border-radius: 8px; padding: 4px 6px; font: inherit; }
+.num { width: 68px; border: 1px solid #e4ddd2; border-radius: 8px; padding: 4px 6px; font: inherit; color: #0f766e; font-weight: 700; }
+.num.hot { color: #9a3412; border-color: #e7c4b8; background: #fff6f4; }
 .record { margin: 8px 0 0; color: #44403c; font-size: 13px; line-height: 1.5; }
-.radar { min-height: 460px; }
+.radar { display: flex; flex-direction: column; min-height: 460px; }
 .radar svg { display: block; width: 100%; height: auto; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 4px 12px 12px; list-style: none; }
+.legend button { display: inline-flex; align-items: center; gap: 6px; border: 1px solid transparent; background: transparent; border-radius: 999px; padding: 3px 8px; cursor: pointer; font: inherit; font-size: 12px; color: #44403c; }
+.legend button.on { border-color: #e6d7c3; background: #fff; font-weight: 700; }
+.legend i { width: 8px; height: 8px; border-radius: 50%; }
+.tick, .gate-label { paint-order: stroke; stroke: #fffdf8; stroke-width: 3px; }
+.tick { fill: #a8a29e; font-size: 11px; }
 .ring, .spoke { fill: none; stroke: #e7d7c4; stroke-width: 1; }
 .gate { fill: none; stroke: #9a3412; stroke-width: 1.4; stroke-dasharray: 5 4; }
 .axis { fill: #1c1917; font-size: 15px; font-weight: 700; }
