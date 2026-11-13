@@ -160,6 +160,52 @@ describe('横向柱状图的类目轴', () => {
   })
 })
 
+describe('雷达图的指标和系列', () => {
+  const radar = {
+    radar: {
+      indicator: [
+        { name: '销售', max: 100 },
+        { name: '管理', max: 100 },
+        { name: '技术', max: 80 },
+      ],
+    },
+    legend: { data: ['当前', '对比'] },
+    series: [
+      {
+        name: '能力',
+        type: 'radar',
+        data: [
+          { name: '当前', value: [80, 70, 60] },
+          { name: '对比', value: [60, 75, 90] },
+        ],
+      },
+    ],
+  }
+
+  it('指标是行，每个数据项是一列，数值保持数字', () => {
+    const model = optionToDataModel(radar)
+    expect(model.categories).toEqual(['销售', '管理', '技术'])
+    expect(model.series.map((item) => item.name)).toEqual(['当前', '对比'])
+    expect(model.series[0]!.data).toEqual([80, 70, 60])
+    expect(model.series[1]!.data).toEqual([60, 75, 90])
+  })
+
+  it('改指标名和分数后仍写回数组，并保留指标上限', () => {
+    const model = optionToDataModel(radar)
+    model.categories[0] = '营收'
+    model.series[0]!.data[0] = 88
+    model.series[0]!.name = '今年'
+    const next = dataModelToOption(radar, model)
+    const indicator = (next.radar as { indicator: Array<{ name: string; max: number }> }).indicator
+    expect(indicator[0]).toEqual({ name: '营收', max: 100 })
+    expect(indicator[2]).toEqual({ name: '技术', max: 80 })
+    const series = next.series as Array<{ data: Array<{ name: string; value: unknown[] }> }>
+    expect(series[0]!.data[0]).toEqual({ name: '今年', value: [88, 70, 60] })
+    expect(Array.isArray(series[0]!.data[1]!.value)).toBe(true)
+    expect((next.legend as { data: string[] }).data).toEqual(['今年', '对比'])
+  })
+})
+
 describe('数据 JSON 视图', () => {
   it('模型 → JSON → 模型 往返一致', () => {
     const model = optionToDataModel(CARTESIAN)
