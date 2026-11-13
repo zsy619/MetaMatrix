@@ -473,8 +473,8 @@ function onCloseMaximize(event?: Event) {
 }
 
 .dt-block-actions .pm-max-btn {
-  width: 22px;
-  height: 22px;
+  width: 28px;
+  height: 28px;
 }
 
 .dt-block-subtitle {

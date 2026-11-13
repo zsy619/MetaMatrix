@@ -166,8 +166,8 @@
 /* 面板内嵌最大化按钮：实线，和表头上的浅色按钮同一套 */
 .pm-max-btn {
   flex-shrink: 0;
-  width: 20px;
-  height: 20px;
+  width: 28px;
+  height: 28px;
   border: 1px solid var(--cv-frame, #ececec);
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.92);

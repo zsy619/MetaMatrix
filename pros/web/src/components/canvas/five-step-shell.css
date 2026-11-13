@@ -14,9 +14,9 @@
 }
 
 .fsx-grid {
-  flex: 1 1 auto;
+  flex: 1 0 auto;
   width: 100%;
-  min-height: var(--fsx-min, 560px);
+  min-height: max(100%, var(--fsx-min, 560px));
   display: grid;
   grid-template-columns: repeat(var(--fsx-cols, 5), minmax(0, 1fr));
   gap: 0;
@@ -32,7 +32,7 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
-  min-height: 0;
+  min-height: min-content;
   background: #fff;
   box-shadow: inset -1px 0 0 var(--cv-hairline, rgba(60, 50, 20, 0.08));
 }
@@ -86,7 +86,7 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  min-height: 0;
+  min-height: min-content;
 }
 
 .fsx-stack--qual {
@@ -106,8 +106,8 @@
 }
 
 .fsx-panel {
-  flex: 1 1 0;
-  min-height: 0;
+  flex: 1 1 auto;
+  min-height: min-content;
   display: flex;
 }
 
