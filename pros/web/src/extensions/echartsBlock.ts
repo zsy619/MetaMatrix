@@ -55,8 +55,8 @@ declare module '@tiptap/core' {
   }
 }
 
-/** 图表块默认高度（px）。 */
-const DEFAULT_HEIGHT = 320
+/** 图表块默认高度（px）。留出标题、图例和坐标，避免 320 里挤成一条。 */
+const DEFAULT_HEIGHT = 400
 /** 导出/打印前后的自定义事件，NodeView 靠它做白底快照。 */
 export const RTE_BEFORE_EXPORT_EVENT = 'rte:before-export'
 export const RTE_AFTER_EXPORT_EVENT = 'rte:after-export'

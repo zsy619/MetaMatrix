@@ -24,7 +24,7 @@ function fakeEditorRoot(chartId = 'chart-1'): HTMLElement {
     <div class="ProseMirror">
       <p>正文</p>
       <div class="rte-echarts-block" data-type="echarts-block" data-chart-id="${chartId}">
-        <div class="rte-echarts-preview" style="width:640px;height:320px">
+        <div class="rte-echarts-preview" style="width:640px;height:400px">
           <div class="rte-echarts-snapshot">
             <img class="rte-echarts-snapshot-img" alt="图表快照" src="${PNG_DATA_URL}" />
           </div>
@@ -47,7 +47,7 @@ describe('图表导出保真', () => {
     expect(snapshots[0].id).toBe('chart-1')
     expect(snapshots[0].src).toContain('data:image/png')
     expect(snapshots[0].width).toBe(640)
-    expect(snapshots[0].height).toBe(320)
+    expect(snapshots[0].height).toBe(400)
   })
 
   it('HTML 嵌入：占位块换成 <img>，不再有「[图表]」占位文案', () => {
