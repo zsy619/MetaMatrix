@@ -6,7 +6,7 @@ import StarterKit from '@tiptap/starter-kit'
 import { Table } from '@tiptap/extension-table'
 import { TableRow } from '@tiptap/extension-table-row'
 import { RteTableCell, RteTableHeader } from '../extensions/rteTableCells'
-import { applyCellInput, findSelectedCell, TABLE_FORMULA_RECALC } from './rteTableFormulaOps'
+import { applyCellInput, findSelectedCell, tableFormulaUpdates, TABLE_FORMULA_RECALC } from './rteTableFormulaOps'
 import { duplicateTableRow, moveTableColumn, moveTableRow } from './rteTableLayout'
 
 let editor: Editor | undefined
@@ -62,6 +62,17 @@ function focusCell(ed: Editor, row: number, col: number) {
 }
 
 describe('表格公式自动重算', () => {
+  it('合并单元格后面的公式按视觉列计算', () => {
+    const ed = makeEditor(`<table><tbody>
+      <tr><td colspan="2"><p>标题</p></td><td><p>10</p></td></tr>
+      <tr><td><p>20</p></td><td><p></p></td><td><p>=C1+A2</p></td></tr>
+    </tbody></table>`)
+    const table = ed.state.doc.firstChild!
+    const updates = tableFormulaUpdates(table)
+    expect(updates).toHaveLength(1)
+    expect(updates[0]!.next).toBe('30')
+  })
+
   it('改引用单元格后，公式单元格跟着变', () => {
     const ed = makeEditor()
     focusCell(ed, 2, 1)

@@ -16,7 +16,7 @@ import {
   upsertTableSumRow,
   currentTableColIndex,
 } from '../../rteWave20'
-import { recalculateTable } from '../../../utils/rteTableFormula'
+import { tableFormulaUpdates } from '../../../utils/rteTableFormulaOps'
 import { maskShouldDismiss } from '../../../utils/rteDialogMask'
 import { duplicateTableRow, equalizeTableColumns } from '../../../utils/rteTableLayout'
 
@@ -605,31 +605,13 @@ function calcTableFormulas() {
     return
   }
   const table = found.node
-  const cells: Array<{ row: number; col: number; formula: string; value: string }> = []
-  const grid: string[][] = []
-  table.forEach((row: any, rowIndex: number) => {
-    const rowGrid: string[] = []
-    row.forEach((cell: any, colIndex: number) => {
-      const stored = typeof cell.attrs?.formula === 'string' ? cell.attrs.formula : ''
-      const text = (cell.textContent || '').trim()
-      const formula = text.startsWith('=') ? text : stored
-      rowGrid.push(formula || text)
-      cells.push({ row: rowIndex, col: colIndex, formula, value: text })
-    })
-    grid.push(rowGrid)
-  })
-  const results = recalculateTable(grid)
-  let changed = 0
-  cells.forEach((cell) => {
-    if (!cell.formula) return
-    const next = results[cell.row]?.[cell.col] ?? ''
-    if (next !== cell.value) changed += 1
-  })
-  if (!changed) {
+  const updates = tableFormulaUpdates(table).filter((item) => item.next !== item.display)
+  if (!updates.length) {
     ElMessage.info('表里没有需要计算的公式')
     closeAllTableUi()
     return
   }
+  const byCell = new Map(updates.map((item) => [`${item.rowIndex}:${item.childIndex}`, item]))
   // 从后往前改，避免前面的替换影响后面的位置
   const tr = ed.state.tr
   const schema = ed.state.schema
@@ -641,9 +623,9 @@ function calcTableFormulas() {
     rowNode.forEach((cell: any) => cellNodes.push(cell))
     for (let colIndex = cellNodes.length - 1; colIndex >= 0; colIndex -= 1) {
       const cellNode = cellNodes[colIndex]
-      const cell = cells.find((c) => c.row === rowIndex && c.col === colIndex)
-      if (!cell || !cell.formula) continue
-      const value = results[rowIndex]?.[colIndex] ?? ''
+      const cell = byCell.get(`${rowIndex}:${colIndex}`)
+      if (!cell) continue
+      const value = cell.next
       // 单元格位置：表内容起点 + 前面各行 + 行内容起点 + 前面各单元格
       let cellPos = found.pos + 1
       for (let r = 0; r < rowIndex; r += 1) cellPos += rowNodes[r].nodeSize
@@ -665,7 +647,7 @@ function calcTableFormulas() {
   ed.view.dispatch(tr)
   closeAllTableUi()
   deps.announceRte('表格公式已计算')
-  ElMessage.success(`已计算 ${changed} 个公式单元格`)
+  ElMessage.success(`已计算 ${updates.length} 个公式单元格`)
 }
 
 function duplicateCurrentTableRow() {

@@ -233,6 +233,36 @@ export function tableGrid(table: PmNode): string[][] {
   return tableTextGrid(table, (cell) => cellFormulaText(cell) || cellDisplayText(cell))
 }
 
+export type TableFormulaUpdate = {
+  rowIndex: number
+  childIndex: number
+  formula: string
+  display: string
+  next: string
+}
+
+/** 按视觉列重算。合并单元格占掉的列也算进地址，公式不会读到旁边那一格。 */
+export function tableFormulaUpdates(table: PmNode): TableFormulaUpdate[] {
+  const { grid } = evaluateTableFormulas(tableGrid(table))
+  const updates: TableFormulaUpdate[] = []
+  table.forEach((row, _rowOffset, rowIndex) => {
+    if (row.type.name !== 'tableRow') return
+    row.forEach((cell, _cellOffset, childIndex) => {
+      const formula = cellFormulaText(cell)
+      if (!formula) return
+      const colIndex = visualCellColumn(table, rowIndex, childIndex)
+      updates.push({
+        rowIndex,
+        childIndex,
+        formula,
+        display: cellDisplayText(cell),
+        next: grid[rowIndex]?.[colIndex] ?? '',
+      })
+    })
+  })
+  return updates
+}
+
 /** 回写结果。 */
 export type ApplyFormulaResult = {
   /** 是否成功写入。 */
