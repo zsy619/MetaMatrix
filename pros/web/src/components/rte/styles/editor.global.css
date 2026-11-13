@@ -3521,12 +3521,13 @@ html.rte-toolbar-dragging * {
   width: 100%;
   max-width: 100%;
   min-width: 0;
-  margin: 12px 0;
-  border: 1px solid #e5e6eb;
-  border-radius: 8px;
+  margin: 16px 0;
+  border: 1px solid #e8eaed;
+  border-radius: 12px;
   overflow: hidden;
   background: #fff;
   box-sizing: border-box;
+  box-shadow: 0 1px 2px rgba(32, 33, 36, 0.04);
 }
 .rte-echarts-preview {
   width: 100%;
@@ -3570,11 +3571,11 @@ html.rte-toolbar-dragging * {
   margin: 4px 0;
 }
 .rte-echarts-hint {
-  padding: 6px 10px;
+  padding: 4px 12px 8px;
   font-size: 11px;
-  color: #86909c;
-  background: #f7f8fa;
-  border-top: 1px solid #e5e6eb;
+  color: #9aa0a6;
+  background: #fff;
+  border-top: 0;
 }
 /* 图表无障碍：视觉隐藏的数据摘要与数据表（读屏可读，视觉不可见） */
 .rte-chart-a11y {

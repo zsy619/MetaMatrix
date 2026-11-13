@@ -14,7 +14,7 @@ import { RTE_AFTER_EXPORT_EVENT, RTE_BEFORE_EXPORT_EVENT } from '../extensions/e
 
 /** 图表块默认宽高（兜底用：面板折叠时量不到真实宽度）。 */
 export const DEFAULT_CHART_WIDTH = 640
-export const DEFAULT_CHART_HEIGHT = 320
+export const DEFAULT_CHART_HEIGHT = 400
 
 /** 一张图表的白底快照。 */
 export type ChartSnapshot = {

@@ -55,6 +55,12 @@ describe('图表渲染外观', () => {
     expect(yAxis.splitLine.lineStyle.type).toBe('dashed')
     const tooltip = light.tooltip as { backgroundColor: string; trigger?: string }
     expect(tooltip.backgroundColor).toBe('#ffffff')
+    const legend = light.legend as { icon: string; type: string }
+    const title = light.title as { textStyle: { fontWeight: number; fontSize: number } }
+    expect(legend.icon).toBe('roundRect')
+    expect(legend.type).toBe('scroll')
+    expect(title.textStyle.fontWeight).toBe(700)
+    expect(title.textStyle.fontSize).toBe(15)
     expect(option.series[0]).not.toHaveProperty('emphasis')
     expect(option.series[0]).not.toHaveProperty('itemStyle')
     expect(option).not.toHaveProperty('backgroundColor')
@@ -120,5 +126,25 @@ describe('图表渲染外观', () => {
     expect(series[2].lineStyle?.width).toBe(5)
     expect((view.tooltip as { backgroundColor: string }).backgroundColor).toBe('#eeeeee')
     expect(option.series[1]).not.toHaveProperty('itemStyle')
+  })
+
+  it('旭日图留出间隔，仪表盘用圆头', () => {
+    const option = {
+      series: [
+        { type: 'sunburst', data: [{ name: '甲', value: 1 }] },
+        { type: 'gauge', data: [{ value: 60 }] },
+      ],
+    }
+    const view = chartRenderOption(option, 'light')
+    const series = view.series as Array<{
+      itemStyle?: { borderRadius?: number; borderWidth?: number }
+      progress?: { roundCap?: boolean }
+      axisLine?: { lineStyle?: { roundCap?: boolean } }
+    }>
+    expect(series[0].itemStyle?.borderRadius).toBe(6)
+    expect(series[0].itemStyle?.borderWidth).toBe(2)
+    expect(series[1].progress?.roundCap).toBe(true)
+    expect(series[1].axisLine?.lineStyle?.roundCap).toBe(true)
+    expect(option.series[1]).not.toHaveProperty('progress')
   })
 })

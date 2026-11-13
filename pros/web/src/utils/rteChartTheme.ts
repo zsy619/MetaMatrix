@@ -86,7 +86,13 @@ function paintLegend(legend: unknown, tone: Tone): unknown {
   if (!isRecord(legend)) return { textStyle: { color: tone.ink } }
   const textStyle = isRecord(legend.textStyle) ? { ...legend.textStyle } : {}
   if (!textStyle.color) textStyle.color = tone.ink
-  return { ...legend, textStyle }
+  const next: Record<string, unknown> = { ...legend, textStyle }
+  if (!next.icon) next.icon = 'roundRect'
+  if (next.itemWidth == null) next.itemWidth = 14
+  if (next.itemHeight == null) next.itemHeight = 8
+  if (next.itemGap == null) next.itemGap = 16
+  if (next.type == null) next.type = 'scroll'
+  return next
 }
 
 function paintTitle(title: unknown, tone: Tone): unknown {
@@ -94,6 +100,8 @@ function paintTitle(title: unknown, tone: Tone): unknown {
   if (!isRecord(title)) return title
   const textStyle = isRecord(title.textStyle) ? { ...title.textStyle } : {}
   if (!textStyle.color) textStyle.color = tone.ink
+  if (textStyle.fontSize == null) textStyle.fontSize = 15
+  if (textStyle.fontWeight == null) textStyle.fontWeight = 700
   return { ...title, textStyle }
 }
 
@@ -165,6 +173,24 @@ function paintSeriesLook(item: Record<string, unknown>, look: SeriesLook): Recor
     if (lineStyle.width == null) lineStyle.width = 2.2
     next = { ...next, lineStyle }
     if (next.areaStyle == null) next = { ...next, areaStyle: { opacity: 0.16 } }
+  }
+  if (type === 'sunburst') {
+    next = withItemStyle(next, { borderColor: look.gap, borderWidth: 2, borderRadius: 6 })
+  }
+  if (type === 'treemap') {
+    next = withItemStyle(next, { borderColor: look.gap, borderWidth: 2, gapWidth: 2, borderRadius: 4 })
+  }
+  if (type === 'gauge') {
+    const progress = isRecord(next.progress) ? { ...next.progress } : {}
+    if (progress.roundCap == null) progress.roundCap = true
+    const axisLine = isRecord(next.axisLine) ? { ...next.axisLine } : {}
+    const lineStyle = isRecord(axisLine.lineStyle) ? { ...axisLine.lineStyle } : {}
+    if (lineStyle.roundCap == null) lineStyle.roundCap = true
+    axisLine.lineStyle = lineStyle
+    next = { ...next, progress, axisLine }
+  }
+  if (type === 'boxplot') {
+    next = withItemStyle(next, { borderWidth: 1.5 })
   }
   if (next.emphasis == null && !EMPHASIS_SKIP.has(type)) {
     const focus = type === 'pie' || type === 'funnel' || type === 'gauge' ? 'self' : 'series'

@@ -148,6 +148,7 @@ const ARIA_DECAL_KEYS: readonly string[] = ['show']
 
 const STYLE_KEYS: readonly string[] = [
   'color',
+  'curveness',
   'backgroundColor',
   'borderColor',
   'borderWidth',
