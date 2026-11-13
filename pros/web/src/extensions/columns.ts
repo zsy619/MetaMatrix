@@ -110,10 +110,36 @@ function columnsAttrs(cols: ColumnCount, ratios?: number[] | string | null) {
   return normalized ? { cols, ratios: ratiosToAttr(normalized) } : { cols, ratios: null }
 }
 
-function buildColumns(doc: PMNode, cols: ColumnCount, ratios: number[] | string | null | undefined, buckets: PMNode[][]): PMNode {
+const FRAME_KEYS = ['gap', 'margin', 'radius', 'padding', 'borderWidth', 'borderStyle', 'borderColor'] as const
+
+function frameAttrs(attrs: Record<string, unknown> | null | undefined): Record<string, unknown> {
+  const frame: Record<string, unknown> = {}
+  if (!attrs) return frame
+  for (const key of FRAME_KEYS) {
+    if (attrs[key] != null) frame[key] = attrs[key]
+  }
+  return frame
+}
+
+/** 删掉一栏后的比例。原来等宽，或剩下的栏比例相同，就回到等宽。 */
+export function columnRatiosAfterRemoval(ratios: string | null, cols: number, index: number): string | null {
+  const parsed = normalizeRatios(clampCols(cols), ratios)
+  if (!parsed || index < 0 || index >= parsed.length) return null
+  const next = parsed.filter((_, item) => item !== index)
+  const normalized = normalizeRatios(clampCols(next.length), next)
+  return normalized ? ratiosToAttr(normalized) : null
+}
+
+function buildColumns(
+  doc: PMNode,
+  cols: ColumnCount,
+  ratios: number[] | string | null | undefined,
+  buckets: PMNode[][],
+  frame?: Record<string, unknown>,
+): PMNode {
   const schema = doc.type.schema
   const children = buckets.map((blocks) => schema.nodes.column!.create(null, blocks))
-  return schema.nodes.columns!.create(columnsAttrs(cols, ratios), children)
+  return schema.nodes.columns!.create({ ...frame, ...columnsAttrs(cols, ratios) }, children)
 }
 
 function columnsPosition(tr: Transaction): number | null {
@@ -146,11 +172,14 @@ function joinColumnBackward(tr: Transaction): boolean {
   }
   if ($from.index(depth) !== 0 || $from.parent !== $from.node(depth).firstChild) return false
   const columnIndex = $from.index(depth - 1)
+  const currentBlock = $from.node(depth).firstChild
+  if (currentBlock && isEmptyParagraph(currentBlock) && $from.node(depth).childCount === 1) {
+    return dropColumn(tr, $from.before(depth - 1), columnIndex)
+  }
   if (columnIndex <= 0) return false
   const columns = $from.node(depth - 1)
   const previous = columns.child(columnIndex - 1)
   const currentColumn = $from.node(depth)
-  const currentBlock = currentColumn.firstChild
   const previousBlock = previous?.lastChild
   if (!currentBlock?.isTextblock || !previousBlock?.isTextblock) return false
   let previousPos = $from.before(depth - 1) + 1
@@ -222,9 +251,39 @@ function liftColumns(tr: Transaction, pos: number): boolean {
 function reshapeColumns(tr: Transaction, pos: number, cols: ColumnCount, ratios?: number[]): boolean {
   const node = tr.doc.nodeAt(pos)
   if (!node || node.type.name !== 'columns') return false
-  const next = buildColumns(tr.doc, cols, ratios, fitColumnBlocks(columnContents(node), cols, blankParagraph(tr.doc)))
+  const next = buildColumns(
+    tr.doc,
+    cols,
+    ratios,
+    fitColumnBlocks(columnContents(node), cols, blankParagraph(tr.doc)),
+    frameAttrs(node.attrs as Record<string, unknown>),
+  )
   tr.replaceWith(pos, pos + node.nodeSize, next)
   placeCaret(tr, pos + 1)
+  return true
+}
+
+/** 空栏退格：三栏及以上删掉这一栏；只剩两栏时取消分栏。 */
+function dropColumn(tr: Transaction, pos: number, index: number): boolean {
+  const node = tr.doc.nodeAt(pos)
+  if (!node || node.type.name !== 'columns') return false
+  if (index < 0 || index >= node.childCount) return false
+  if (node.childCount <= 2) return liftColumns(tr, pos)
+  const buckets = columnContents(node)
+  buckets.splice(index, 1)
+  const cols = clampCols(buckets.length)
+  const next = buildColumns(
+    tr.doc,
+    cols,
+    columnRatiosAfterRemoval(node.attrs.ratios ?? null, node.childCount, index),
+    buckets,
+    frameAttrs(node.attrs as Record<string, unknown>),
+  )
+  tr.replaceWith(pos, pos + node.nodeSize, next)
+  let caret = pos + 1
+  const focus = Math.min(index, next.childCount - 1)
+  for (let item = 0; item < focus; item += 1) caret += next.child(item).nodeSize
+  placeCaret(tr, caret + 1)
   return true
 }
 

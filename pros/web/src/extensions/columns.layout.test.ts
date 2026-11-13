@@ -3,7 +3,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { Editor } from '@tiptap/core'
 import StarterKit from '@tiptap/starter-kit'
-import { Column, Columns } from './columns'
+import { Column, Columns, columnRatiosAfterRemoval } from './columns'
 
 let editor: Editor | undefined
 
@@ -166,5 +166,61 @@ describe('分栏装入选区和栏数', () => {
     expect(html).toContain('--rte-col-pad: 24px')
     expect(html).not.toContain('padding: 8px')
     expect(html).not.toContain('padding:8px')
+  })
+
+  it('改栏数时保留边框和间距', () => {
+    const ed = mount('<p>甲</p><p>乙</p><p>丙</p>')
+    ed.commands.setTextSelection({ from: textPos(ed, '甲', 'start'), to: textPos(ed, '丙', 'end') })
+    ed.chain().focus().setColumns(3, [1, 2, 1]).run()
+    const columns = ed.state.doc.firstChild
+    expect(columns?.type.name).toBe('columns')
+    ed.view.dispatch(
+      ed.state.tr.setNodeMarkup(0, undefined, {
+        ...columns!.attrs,
+        gap: 4,
+        padding: 24,
+        borderStyle: 'solid',
+      }),
+    )
+    ed.chain().focus().setColumns(2).run()
+    const next = ed.state.doc.firstChild
+    expect(next?.attrs.gap).toBe(4)
+    expect(next?.attrs.padding).toBe(24)
+    expect(next?.attrs.borderStyle).toBe('solid')
+    expect(columnTexts(ed)).toEqual([
+      ['甲'],
+      ['乙', '丙'],
+    ])
+  })
+
+  it('空栏退格会删掉这一栏，只剩两栏时取消分栏', () => {
+    expect(columnRatiosAfterRemoval('1:2:3', 3, 1)).toBe('1:3')
+    expect(columnRatiosAfterRemoval('1:2:1', 3, 1)).toBeNull()
+    const ed = mount(
+      '<div data-type="columns" data-cols="3" data-ratios="1:2:3" data-gap="6"><div data-type="column"><p>甲</p></div><div data-type="column"><p></p></div><div data-type="column"><p>丙</p></div></div>',
+    )
+    let empty = -1
+    ed.state.doc.descendants((node, pos) => {
+      if (node.type.name === 'paragraph' && node.content.size === 0) empty = pos + 1
+    })
+    ed.commands.setTextSelection(empty)
+    expect(pressKey(ed, 'Backspace')).toBe(true)
+    expect(columnTexts(ed)).toEqual([['甲'], ['丙']])
+    expect(ed.state.doc.firstChild?.attrs.ratios).toBe('1:3')
+    expect(ed.state.doc.firstChild?.attrs.gap).toBe(6)
+    expect(ed.state.doc.firstChild?.childCount).toBe(2)
+
+    const two = mount(
+      '<div data-type="columns" data-cols="2"><div data-type="column"><p>甲</p></div><div data-type="column"><p></p></div></div>',
+    )
+    let blank = -1
+    two.state.doc.descendants((node, pos) => {
+      if (node.type.name === 'paragraph' && node.content.size === 0) blank = pos + 1
+    })
+    two.commands.setTextSelection(blank)
+    expect(pressKey(two, 'Backspace')).toBe(true)
+    expect(two.state.doc.firstChild?.type.name).toBe('paragraph')
+    expect(two.getText()).toContain('甲')
+    expect(two.getHTML()).not.toContain('data-type="columns"')
   })
 })
