@@ -12,6 +12,7 @@ import Subscript from '@tiptap/extension-subscript'
 import Superscript from '@tiptap/extension-superscript'
 import TextAlign from '@tiptap/extension-text-align'
 import Link from '@tiptap/extension-link'
+import { isAttachmentAnchor } from '../../../utils/rteAttachment'
 import { Table } from '@tiptap/extension-table'
 import { RteTableView } from '../../../extensions/rteTableView'
 import { TocBlock } from '../../../extensions/tocBlock'
@@ -654,15 +655,13 @@ const editor = useEditor({
         deps.onEditorLinkClick?.(href)
         return true
       }
-      const attach = target?.closest?.('a.rte-attachment-link[href]') as HTMLAnchorElement | null
-      if (attach) {
+      const attach = target?.closest?.('a[href]') as HTMLAnchorElement | null
+      if (attach && isAttachmentAnchor(attach.getAttribute('href') || '', attach.textContent || '', attach.className || '')) {
         const href = attach.getAttribute('href')?.trim() || ''
-        if (href) {
-          event.preventDefault()
-          const name = (attach.getAttribute('title') || attach.textContent || '').replace(/^📎\s*/, '').trim()
-          deps.onAttachmentOpen?.(href, name)
-          return true
-        }
+        event.preventDefault()
+        const name = (attach.getAttribute('title') || attach.textContent || '').replace(/^📎\s*/, '').trim()
+        deps.onAttachmentOpen?.(href, name)
+        return true
       }
       const anchor = target?.closest?.('a[href]') as HTMLElement | null
       if (!anchor || viewMode.value === 'edit') return false

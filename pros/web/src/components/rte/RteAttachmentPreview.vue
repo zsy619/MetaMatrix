@@ -3,6 +3,7 @@ import { computed, inject, onBeforeUnmount, ref, watch } from 'vue'
 import { RTE_BINDINGS } from './bindings'
 import {
   attachmentDisplayName,
+  attachmentTable,
   downloadAttachment,
   loadAttachment,
   type LoadedAttachment,
@@ -25,6 +26,7 @@ const target = computed(() => rte.attachmentPreview as { href: string; name: str
 const open = computed(() => !!target.value)
 const kind = computed(() => loaded.value?.kind || 'file')
 const fileName = computed(() => attachmentDisplayName(loaded.value?.name || target.value?.name || ''))
+const textRows = computed(() => (kind.value === 'text' ? attachmentTable(text.value, fileName.value) : []))
 
 let objectOwned = ''
 
@@ -156,6 +158,15 @@ onBeforeUnmount(() => {
             class="rte-attach-doc"
             v-html="html"
           ></div>
+          <div v-else-if="kind === 'text' && textRows.length" class="rte-attach-sheet-table">
+            <table>
+              <tbody>
+                <tr v-for="(row, rowIndex) in textRows" :key="rowIndex">
+                  <td v-for="(cell, cellIndex) in row" :key="cellIndex">{{ cell }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
           <pre v-else-if="kind === 'text'">{{ text || '这份文档里没有可预览的文字，可以下载原文件。' }}</pre>
           <p v-else-if="kind === 'docx' || kind === 'doc'" class="rte-attach-preview-status">
             这份文档里没有可预览的文字，可以下载原文件。

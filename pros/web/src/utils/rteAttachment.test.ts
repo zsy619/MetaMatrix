@@ -1,7 +1,15 @@
 // @vitest-environment happy-dom
 import JSZip from 'jszip'
 import { describe, expect, it, vi } from 'vitest'
-import { attachmentInsertHref, attachmentKind, docxPlainText, loadAttachment } from './rteAttachment'
+import {
+  attachmentInsertHref,
+  attachmentKind,
+  attachmentTable,
+  docxPlainText,
+  isAttachmentAnchor,
+  loadAttachment,
+  rteAttachmentUploadReject,
+} from './rteAttachment'
 
 describe('附件链接', () => {
   it('只接受素材路径和 http 链接', () => {
@@ -10,6 +18,26 @@ describe('附件链接', () => {
     expect(attachmentInsertHref('data:application/pdf;base64,QQ==')).toBeNull()
     expect(attachmentInsertHref('blob:http://localhost/abc')).toBeNull()
     expect(attachmentInsertHref('javascript:alert(1)')).toBeNull()
+  })
+
+  it('回形针链接和附件样式都能打开预览', () => {
+    expect(isAttachmentAnchor('https://files.example.com/a.pdf', '📎 说明.pdf', 'rte-link')).toBe(true)
+    expect(isAttachmentAnchor('/media/asset-1', '说明.pdf', 'rte-attachment-link rte-link')).toBe(true)
+    expect(isAttachmentAnchor('https://example.com', '普通链接', 'rte-link')).toBe(false)
+  })
+
+  it('超大文件和网页脚本不能上传，Word 可以', () => {
+    expect(rteAttachmentUploadReject('说明.docx', '', 1024)).toBeNull()
+    expect(rteAttachmentUploadReject('页.html', 'text/html', 100)).toMatch(/SVG|脚本/)
+    expect(rteAttachmentUploadReject('大.zip', 'application/zip', 4 * 1024 * 1024)).toMatch(/3MB/)
+  })
+
+  it('CSV 预览成表格，引号里的逗号留在单元格里', () => {
+    expect(attachmentTable('名称,金额\n"甲,乙",12\n', '预算.csv')).toEqual([
+      ['名称', '金额'],
+      ['甲,乙', '12'],
+    ])
+    expect(attachmentTable('只有一段话', '笔记.txt')).toEqual([])
   })
 
   it('按文件名和类型判断预览方式', () => {

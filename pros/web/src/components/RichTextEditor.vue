@@ -164,7 +164,7 @@ import { applyTextTidy } from '../utils/rteTextPlay'
 import { countWordParts, countWords, normalizeHtml, toEditorContent } from '../utils/rteContent'
 import { getToken } from '../api/http'
 import { uploadMediaFile } from '../api/mediaUpload'
-import { attachmentInsertHref } from '../utils/rteAttachment'
+import { attachmentInsertHref, rteAttachmentUploadReject } from '../utils/rteAttachment'
 import { htmlWithSuggestionsAccepted } from '../utils/rteSuggestions'
 import { buildExportHtmlWithCharts } from '../utils/rteExportChartSnapshots'
 import { rewritePrintMediaSrc } from '../utils/rtePrintMedia'
@@ -5774,7 +5774,13 @@ async function onLocalAttachFilesChange(event: Event) {
   }
   const catId = currentAttachCategoryId()
   const added: StoredAttach[] = []
+  let rejected = ''
   for (const file of files) {
+    const reason = rteAttachmentUploadReject(file.name, file.type || '', file.size)
+    if (reason) {
+      rejected = reason
+      continue
+    }
     try {
       const src = attachmentInsertHref((await uploadMediaFile(file, { mediaType: 'file' })).insertedPath)
       if (!src) continue
@@ -5792,17 +5798,19 @@ async function onLocalAttachFilesChange(event: Event) {
     }
   }
   if (!added.length) {
-    rteToast('error', '附件读取失败')
+    rteToast('error', rejected || '附件读取失败')
     return
   }
+  if (rejected) rteToast('warning', rejected)
   attachAssets.value = [...added, ...attachAssets.value]
   saveAttachStore()
   const next = new Set(attachSelectedIds.value)
   added.forEach((a) => next.add(a.id))
   attachSelectedIds.value = next
-  insertAttachItems(added)
+  const count = insertAttachItems(added)
+  if (!count) return
   closeAttachDialog()
-  rteToast('success', `已插入 ${added.length} 个附件`)
+  rteToast('success', `已插入 ${count} 个附件`)
 }
 
 const attachmentPreview = ref<{ href: string; name: string } | null>(null)
@@ -5820,16 +5828,16 @@ function closeAttachmentPreview() {
   attachmentPreview.value = null
 }
 
-function insertAttachItems(items: StoredAttach[]) {
+function insertAttachItems(items: StoredAttach[]): number {
   const ed = editor.value
-  if (!ed || !items.length) return
+  if (!ed || !items.length) return 0
   const usable = items.flatMap((item) => {
     const href = attachmentInsertHref(item.src)
     return href ? [{ ...item, href }] : []
   })
   if (!usable.length) {
     rteToast('warning', '附件需要先上传成链接后再插入')
-    return
+    return 0
   }
   if (usable.length < items.length) rteToast('warning', '已跳过还不是链接的附件')
   const nodes: Record<string, unknown>[] = []
@@ -5853,6 +5861,7 @@ function insertAttachItems(items: StoredAttach[]) {
     })
   })
   ed.chain().focus().insertContent(nodes).run()
+  return usable.length
 }
 
 function confirmInsertAttaches() {
@@ -5866,9 +5875,10 @@ function confirmInsertAttaches() {
     rteToast('warning', '所选附件还不是链接，请重新上传')
     return
   }
-  insertAttachItems(usable)
+  const count = insertAttachItems(usable)
+  if (!count) return
   closeAttachDialog()
-  rteToast('success', `已插入 ${usable.length} 个附件`)
+  rteToast('success', `已插入 ${count} 个附件`)
 }
 
 const {

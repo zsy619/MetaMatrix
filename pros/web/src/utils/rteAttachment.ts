@@ -1,4 +1,5 @@
 import { getToken } from '../api/http'
+import { MAX_ATTACHMENT_BYTES } from './attachmentPolicy'
 import { mediaFetchUrl } from './mediaPath'
 import { previewDocx } from './rteOfficePreview'
 
@@ -58,6 +59,79 @@ export function attachmentDisplayName(name: string, href = ''): string {
     /* 用默认名 */
   }
   return '附件'
+}
+
+const DANGEROUS_ATTACHMENT_EXT = new Set(['svg', 'html', 'htm', 'js', 'mjs', 'xhtml'])
+
+/** 编辑器里上传附件：超大文件和网页脚本不收，Word、Excel、PDF、图片和文本可以。 */
+export function rteAttachmentUploadReject(name: string, mime: string, size: number): string | null {
+  if (size > MAX_ATTACHMENT_BYTES) {
+    return `文件超过 3MB（当前 ${(size / 1024 / 1024).toFixed(1)}MB），请压缩后重试。`
+  }
+  const ext = name.includes('.') ? name.slice(name.lastIndexOf('.') + 1).toLowerCase() : ''
+  const type = mime.toLowerCase()
+  if (
+    DANGEROUS_ATTACHMENT_EXT.has(ext)
+    || type === 'image/svg+xml'
+    || type === 'text/html'
+    || type.includes('javascript')
+  ) {
+    return '为安全起见，不接受网页脚本或 SVG。请改用 PNG、PDF、Word 或 Excel。'
+  }
+  return null
+}
+
+/** 正文里的附件链接：带附件样式，或文字以回形针开头。 */
+export function isAttachmentAnchor(href: string, text: string, className = ''): boolean {
+  if (!attachmentInsertHref(href)) return false
+  if (className.split(/\s+/).includes('rte-attachment-link')) return true
+  return text.replace(/^\s+/, '').startsWith('📎')
+}
+
+function splitDelimitedLine(line: string, delimiter: string): string[] {
+  if (delimiter !== ',') return line.split(delimiter).map((cell) => cell.trim())
+  const cells: string[] = []
+  let current = ''
+  let quoted = false
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index]
+    if (char === '"') {
+      if (quoted && line[index + 1] === '"') {
+        current += '"'
+        index += 1
+      } else {
+        quoted = !quoted
+      }
+      continue
+    }
+    if (char === delimiter && !quoted) {
+      cells.push(current.trim())
+      current = ''
+      continue
+    }
+    current += char
+  }
+  cells.push(current.trim())
+  return cells
+}
+
+/** CSV 或 TSV 预览成表格。不是表格时返回空数组。 */
+export function attachmentTable(text: string, name = ''): string[][] {
+  const source = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+  const lines = source.split('\n').filter((line) => line.trim())
+  if (!lines.length) return []
+  const fileName = name.toLowerCase()
+  const sample = lines[0] || ''
+  const delimiter = fileName.endsWith('.tsv') || (sample.split('\t').length > sample.split(',').length && sample.includes('\t'))
+    ? '\t'
+    : fileName.endsWith('.csv') || sample.includes(',')
+      ? ','
+      : ''
+  if (!delimiter) return []
+  const rows = lines.map((line) => splitDelimitedLine(line, delimiter))
+  const width = Math.max(...rows.map((row) => row.length))
+  if (width < 2) return []
+  return rows.map((row) => Array.from({ length: width }, (_, index) => row[index] || ''))
 }
 
 export type LoadedAttachment = {
