@@ -577,8 +577,12 @@ async function manualCheckpoint() {
         <el-button size="small" type="primary" :loading="saving" @click="doSave(false)">
           保存
         </el-button>
-        <el-button size="small" @click="ui.toggleConfigPanel">
-          设置
+        <el-button
+          size="small"
+          :aria-pressed="ui.configPanelOpen"
+          @click="ui.toggleConfigPanel"
+        >
+          {{ ui.configPanelOpen ? '收起设置' : '页面设置' }}
         </el-button>
       </div>
     </header>
@@ -619,6 +623,14 @@ async function manualCheckpoint() {
         <CanvasViewport v-else />
       </main>
       <PageSettingsPanel />
+      <button
+        v-if="!ui.configPanelOpen"
+        type="button"
+        class="settings-rail"
+        @click="ui.toggleConfigPanel"
+      >
+        页面设置
+      </button>
     </div>
 
     <RevisionHistory
@@ -872,6 +884,25 @@ async function manualCheckpoint() {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+
+.settings-rail {
+  flex: none;
+  width: 40px;
+  border: 0;
+  border-left: 1px solid rgba(62, 48, 28, 0.1);
+  background: #f7f4ee;
+  color: #3c3428;
+  writing-mode: vertical-rl;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  cursor: pointer;
+}
+
+.settings-rail:hover {
+  background: #efeae2;
 }
 
 .doc-list {
