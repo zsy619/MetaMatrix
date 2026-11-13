@@ -1653,8 +1653,13 @@ export function cloneEchartsOption(option: unknown): unknown {
  */
 function asChartNumber(value: number | string): number {
   if (typeof value === 'number' && Number.isFinite(value)) return value
-  const num = Number(String(value).trim())
-  return Number.isFinite(num) ? num : 0
+  const text = String(value ?? '').trim()
+  if (!text) return 0
+  const percent = text.endsWith('%')
+  const body = (percent ? text.slice(0, -1) : text).replace(/,/g, '').trim()
+  const num = Number(body)
+  if (!Number.isFinite(num)) return 0
+  return percent ? num / 100 : num
 }
 
 function buildPieFromModel(

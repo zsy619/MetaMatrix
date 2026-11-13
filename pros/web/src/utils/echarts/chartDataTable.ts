@@ -36,13 +36,53 @@ function itemToText(raw: unknown): string {
   return String(raw)
 }
 
-/** 把文本转回数值 / 文本。 */
+/** 把文本转回数值 / 文本。千分位和百分号按数字处理。 */
 export function textToValue(text: string): number | string {
   const trimmed = String(text ?? '').trim()
   if (!trimmed) return ''
-  const num = Number(trimmed)
-  if (Number.isFinite(num) && /^-?\d+(\.\d+)?$/.test(trimmed)) return num
+  const percent = trimmed.endsWith('%')
+  const body = (percent ? trimmed.slice(0, -1) : trimmed).replace(/,/g, '').trim()
+  if (/^-?\d+(\.\d+)?$/.test(body)) {
+    const num = Number(body)
+    return percent ? num / 100 : num
+  }
   return trimmed
+}
+
+function axisEntries(raw: unknown): Record<string, unknown>[] {
+  if (Array.isArray(raw)) return raw.filter(isPlainObject)
+  return isPlainObject(raw) ? [raw] : []
+}
+
+function isCategoryAxis(axis: Record<string, unknown>): boolean {
+  if (axis.type === 'value' || axis.type === 'time' || axis.type === 'log') return false
+  return axis.type === 'category' || Array.isArray(axis.data)
+}
+
+/** 类目在横轴，或只在纵轴（横向柱状图）。 */
+function readCategoryAxis(
+  option: Record<string, unknown>,
+): { key: 'xAxis' | 'yAxis'; index: number; categories: string[] } | null {
+  for (const key of ['xAxis', 'yAxis'] as const) {
+    const axes = axisEntries(option[key])
+    for (let index = 0; index < axes.length; index += 1) {
+      const axis = axes[index]!
+      if (!isCategoryAxis(axis) || !Array.isArray(axis.data)) continue
+      if (key === 'yAxis' && axis.type !== 'category') continue
+      return { key, index, categories: axis.data.map((item) => itemToText(item)) }
+    }
+  }
+  return null
+}
+
+function writeAxisData(raw: unknown, index: number, data: string[]): unknown {
+  if (Array.isArray(raw)) {
+    return raw.map((item, itemIndex) =>
+      itemIndex === index && isPlainObject(item) ? { ...item, data } : item,
+    )
+  }
+  if (isPlainObject(raw) && index === 0) return { ...raw, data }
+  return raw
 }
 
 /** 从 option 抽出数据模型。 */
@@ -50,12 +90,8 @@ export function optionToDataModel(option: unknown): ChartDataModel {
   const empty: ChartDataModel = { categories: [], series: [] }
   if (!isPlainObject(option)) return empty
   const seriesRaw = Array.isArray(option.series) ? option.series : []
-  const xAxisRaw = option.xAxis
-  const xAxisFirst = Array.isArray(xAxisRaw) ? xAxisRaw[0] : xAxisRaw
-  const axisCategories =
-    isPlainObject(xAxisFirst) && Array.isArray(xAxisFirst.data)
-      ? xAxisFirst.data.map((item) => itemToText(item))
-      : []
+  const categoryAxis = readCategoryAxis(option)
+  const axisCategories = categoryAxis?.categories ?? []
 
   const series: ChartDataModel['series'] = []
   let categories = axisCategories
@@ -87,7 +123,7 @@ export function optionToDataModel(option: unknown): ChartDataModel {
 /**
  * 把数据模型写回 option。
  *
- * - 类目轴存在时写回 xAxis.data；
+ * - 类目轴在横轴或纵轴时，写回那一根轴的 data；
  * - 类目轴不存在且数据是 { name, value } 形态时，按类目写回数据项的 name。
  */
 export function dataModelToOption(
@@ -96,9 +132,7 @@ export function dataModelToOption(
 ): Record<string, unknown> {
   const base: Record<string, unknown> = isPlainObject(option) ? { ...option } : {}
   const seriesRaw = Array.isArray(base.series) ? base.series : []
-  const xAxisRaw = base.xAxis
-  const xAxisFirst = Array.isArray(xAxisRaw) ? xAxisRaw[0] : xAxisRaw
-  const hasAxis = isPlainObject(xAxisFirst)
+  const categoryAxis = readCategoryAxis(base)
 
   const nextSeries = seriesRaw.map((item, index) => {
     if (!isPlainObject(item)) return item
@@ -110,9 +144,8 @@ export function dataModelToOption(
       if (!useObjectShape) return value
       const origin = original[cellIndex]
       const name =
-        isPlainObject(origin) && typeof origin.name === 'string'
-          ? origin.name
-          : model.categories[cellIndex] ?? ''
+        model.categories[cellIndex]
+        ?? (isPlainObject(origin) && typeof origin.name === 'string' ? origin.name : '')
       return { ...(isPlainObject(origin) ? origin : {}), name, value }
     })
     return { ...item, name: target.name || item.name, data }
@@ -125,15 +158,8 @@ export function dataModelToOption(
       data: model.series.map((item) => item.name).filter(Boolean),
     }
   }
-  if (hasAxis && model.categories.length) {
-    const axisData = model.categories
-    if (Array.isArray(xAxisRaw)) {
-      next.xAxis = xAxisRaw.map((item, index) =>
-        index === 0 && isPlainObject(item) ? { ...item, data: axisData } : item,
-      )
-    } else {
-      next.xAxis = { ...(xAxisFirst as Record<string, unknown>), data: axisData }
-    }
+  if (categoryAxis) {
+    next[categoryAxis.key] = writeAxisData(base[categoryAxis.key], categoryAxis.index, model.categories)
   }
   return next
 }

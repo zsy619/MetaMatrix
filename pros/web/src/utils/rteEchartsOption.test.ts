@@ -325,6 +325,20 @@ describe('ECharts 模板与表格生成', () => {
     expect((next.title as { text: string }).text).toBe('销售')
   })
 
+  it('带千分位和百分号的数在换类型后仍是原数', () => {
+    const next = retypeEchartsOption(
+      {
+        title: { text: '销售' },
+        xAxis: { type: 'category', data: ['华东'] },
+        yAxis: { type: 'value' },
+        series: [{ name: '本年', type: 'bar', data: ['1,200', '50%'] }],
+      },
+      'line',
+    )
+    const series = next.series as Array<{ data: number[] }>
+    expect(series[0]!.data).toEqual([1200, 0.5])
+  })
+
   it('饼图换成折线时把扇区收成一条线', () => {
     const next = retypeEchartsOption(
       {

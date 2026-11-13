@@ -85,6 +85,14 @@ describe('option ⇄ 数据模型', () => {
     const series = next.series as Array<{ data: Array<{ name: string; value: unknown }> }>
     expect(series[0]!.data[0]).toEqual({ name: 'A', value: 30 })
   })
+
+  it('饼图改类目名会写回扇区名称', () => {
+    const model = optionToDataModel(PIE)
+    model.categories[0] = '直营'
+    const next = dataModelToOption(PIE, model)
+    const series = next.series as Array<{ data: Array<{ name: string; value: unknown }> }>
+    expect(series[0]!.data[0]).toEqual({ name: '直营', value: 30 })
+  })
 })
 
 describe('表格 ⇄ 数据模型', () => {
@@ -119,8 +127,36 @@ describe('表格 ⇄ 数据模型', () => {
   it('文本转值：数字串转数字，非数字保持文本', () => {
     expect(textToValue('12')).toBe(12)
     expect(textToValue('12.5')).toBe(12.5)
+    expect(textToValue('1,200')).toBe(1200)
+    expect(textToValue('50%')).toBe(0.5)
     expect(textToValue('abc')).toBe('abc')
     expect(textToValue('')).toBe('')
+  })
+})
+
+describe('横向柱状图的类目轴', () => {
+  const horizontal = {
+    xAxis: { type: 'value' },
+    yAxis: { type: 'category', data: ['甲', '乙'] },
+    series: [{ name: '销量', type: 'bar', data: [3, 8] }],
+  }
+
+  it('类目从纵轴读出，改名仍写回纵轴', () => {
+    const model = optionToDataModel(horizontal)
+    expect(model.categories).toEqual(['甲', '乙'])
+    expect(model.series[0]!.data).toEqual([3, 8])
+    model.categories[0] = '华北'
+    const next = dataModelToOption(horizontal, model)
+    expect(next.xAxis).toEqual({ type: 'value' })
+    expect((next.yAxis as { data: string[] }).data).toEqual(['华北', '乙'])
+  })
+
+  it('删光数据行时类目轴也清空', () => {
+    const model = optionToDataModel(CARTESIAN)
+    model.categories = []
+    model.series = model.series.map((item) => ({ ...item, data: [] }))
+    const next = dataModelToOption(CARTESIAN, model)
+    expect((next.xAxis as { data: string[] }).data).toEqual([])
   })
 })
 
