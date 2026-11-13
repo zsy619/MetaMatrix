@@ -2,14 +2,16 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type Ref } 
 import type { Editor } from '@tiptap/core'
 import {
   EMPTY_PAGE_CHROME,
-  estimatePageCount,
   footerForPage,
   formatPageNumber,
   groupSlides,
   headerForPage,
   normalizePageChrome,
   pageChromeIsEmpty,
+  pageIndexAt,
+  pagesWithBreaks,
   readPageChrome,
+  segmentHeights,
   type PanelPageChrome,
   type PresentUnit,
   type SlideSource,
@@ -130,10 +132,18 @@ export function usePageChrome(deps: {
     const inner = box
       ? Math.max(1, box.heightPx - mmToPx(margin.top) - mmToPx(margin.bottom))
       : Math.max(1, canvas.clientHeight || 1)
-    const content = Math.max(1, body.scrollHeight - mmToPx(margin.top) - mmToPx(margin.bottom))
-    const total = estimatePageCount(content, inner)
+    const topPad = mmToPx(margin.top)
+    const bottomPad = mmToPx(margin.bottom)
+    const content = Math.max(1, body.scrollHeight - topPad - bottomPad)
+    const bodyTop = body.getBoundingClientRect().top
+    const offsets = [...body.querySelectorAll('.rte-page-break')].map((node) => {
+      if (!(node instanceof HTMLElement)) return -1
+      return node.getBoundingClientRect().top - bodyTop - topPad
+    })
+    const segments = segmentHeights(offsets, content)
+    const total = pagesWithBreaks(segments, inner)
     pageCount.value = total
-    pageIndex.value = Math.min(total, Math.max(1, Math.floor(canvas.scrollTop / inner) + 1))
+    pageIndex.value = Math.min(total, pageIndexAt(segments, inner, canvas.scrollTop))
     placeChrome()
   }
 

@@ -6,7 +6,10 @@ import {
   groupSlides,
   headerForPage,
   normalizePageChrome,
+  pageIndexAt,
+  pagesWithBreaks,
   printPageSideCss,
+  segmentHeights,
   readPageChrome,
   writePageChrome,
 } from './rtePageChrome.ts'
@@ -112,8 +115,27 @@ assert.deepEqual(
 assert.match(printPageSideCss(sideChrome), /@page :left/)
 assert.match(printPageSideCss(sideChrome), /偶数/)
 assert.equal(printPageSideCss(normalizePageChrome({ header: '只有奇数', pageNumber: 'none' })), '')
+const numbered = normalizePageChrome({
+  header: '奇数',
+  headerEven: '偶数',
+  footer: '底',
+  footerEven: '偶底',
+  pageNumber: 'page-n-of-m',
+})
+const numberedCss = printPageSideCss(numbered)
+assert.match(numberedCss, /counter\(page\)/)
+assert.match(numberedCss, /counter\(pages\)/)
+assert.match(numberedCss, /@bottom-right/)
+assert.match(numberedCss, /偶底/)
 assert.equal(estimatePageCount(1000, 400), 3)
 assert.equal(estimatePageCount(0, 400), 1)
+assert.deepEqual(segmentHeights([200, 0, 5000], 1000), [200, 800])
+assert.equal(pagesWithBreaks([1000], 400), 3)
+assert.equal(pagesWithBreaks([200, 800], 400), 3)
+assert.equal(pagesWithBreaks([0, 100], 400), 1)
+assert.equal(pageIndexAt([200, 800], 400, 0), 1)
+assert.equal(pageIndexAt([200, 800], 400, 200), 2)
+assert.equal(pageIndexAt([200, 800], 400, 600), 3)
 
 const blocks = [
   { html: '<p>引</p>', text: '引', heading: false },

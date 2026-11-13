@@ -84,22 +84,47 @@ function cssQuote(value: string): string {
   return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
 }
 
-/** 浏览器打印时，奇数页和偶数页各用自己的页眉页脚。 */
+/** 页码写成 @page 的 content，才能在隐藏正文页脚后仍印出来。 */
+function pageNumberCss(style: PageNumberStyle): string {
+  switch (style) {
+    case 'n':
+      return 'counter(page)'
+    case 'page-n':
+      return '"第 " counter(page) " 页"'
+    case 'page-n-of-m':
+      return '"第 " counter(page) " 页 共 " counter(pages) " 页"'
+    case 'dash':
+      return '"- " counter(page) " -"'
+    default:
+      return ''
+  }
+}
+
+function pageSideRule(selector: string, header: string, footer: string, pageNumber: PageNumberStyle): string {
+  const text = 'font-size: 10pt; color: #4e5969;'
+  const lines = [`@top-center { content: "${cssQuote(header)}"; ${text} }`]
+  const number = pageNumberCss(pageNumber)
+  if (footer && number) {
+    lines.push(`@bottom-left { content: "${cssQuote(footer)}"; ${text} }`)
+    lines.push(`@bottom-right { content: ${number}; ${text} }`)
+  } else if (footer) {
+    lines.push(`@bottom-center { content: "${cssQuote(footer)}"; ${text} }`)
+  } else if (number) {
+    lines.push(`@bottom-center { content: ${number}; ${text} }`)
+  } else {
+    lines.push(`@bottom-center { content: ""; ${text} }`)
+  }
+  return `@page ${selector} {\n${lines.join('\n')}\n}`
+}
+
+/** 浏览器打印时，奇数页和偶数页各用自己的页眉页脚，页码留在页边。 */
 export function printPageSideCss(chrome: PanelPageChrome): string {
   if (!chrome.headerEven.trim() && !chrome.footerEven.trim()) return ''
-  const oddHeader = cssQuote(headerForPage(chrome, 1))
-  const evenHeader = cssQuote(headerForPage(chrome, 2))
-  const oddFooter = cssQuote(footerForPage(chrome, 1))
-  const evenFooter = cssQuote(footerForPage(chrome, 2))
+  const odd = pageSideRule(':right', headerForPage(chrome, 1), footerForPage(chrome, 1), chrome.pageNumber)
+  const even = pageSideRule(':left', headerForPage(chrome, 2), footerForPage(chrome, 2), chrome.pageNumber)
   return `@media print {
-    @page :right {
-      @top-center { content: "${oddHeader}"; font-size: 10pt; color: #4e5969; }
-      @bottom-center { content: "${oddFooter}"; font-size: 10pt; color: #4e5969; }
-    }
-    @page :left {
-      @top-center { content: "${evenHeader}"; font-size: 10pt; color: #4e5969; }
-      @bottom-center { content: "${evenFooter}"; font-size: 10pt; color: #4e5969; }
-    }
+    ${odd}
+    ${even}
     .rte-root.rte-printing .rte-running-header,
     .rte-root.rte-printing .rte-running-footer { visibility: hidden !important; }
   }`
@@ -172,6 +197,55 @@ export function estimatePageCount(contentPx: number, pageInnerPx: number): numbe
   if (!Number.isFinite(contentPx) || contentPx <= 0) return 1
   if (!Number.isFinite(pageInnerPx) || pageInnerPx <= 0) return 1
   return Math.max(1, Math.ceil(contentPx / pageInnerPx))
+}
+
+/** 分页符把正文切成几段。落在开头或结尾的符不单独占一段。 */
+export function segmentHeights(breakOffsets: readonly number[], contentHeight: number): number[] {
+  const end = Number.isFinite(contentHeight) ? Math.max(0, contentHeight) : 0
+  const marks = breakOffsets
+    .filter((offset) => Number.isFinite(offset) && offset > 0 && offset < end)
+    .sort((a, b) => a - b)
+  const points = [0, ...marks, end]
+  const heights: number[] = []
+  for (let index = 0; index < points.length - 1; index += 1) {
+    heights.push(Math.max(0, points[index + 1]! - points[index]!))
+  }
+  return heights.length ? heights : [end]
+}
+
+/** 每段至少一页。开头的空段是贴顶的分页符，不额外加空白页。 */
+export function pagesWithBreaks(segmentHeightsPx: readonly number[], pageInnerPx: number): number {
+  const parts = segmentHeightsPx.length ? segmentHeightsPx : [0]
+  let total = 0
+  parts.forEach((height, index) => {
+    if (index === 0 && height <= 0 && parts.length > 1) return
+    total += estimatePageCount(height, pageInnerPx)
+  })
+  return Math.max(1, total)
+}
+
+/** 滚动位置落在哪一页。分段规则与 pagesWithBreaks 相同。 */
+export function pageIndexAt(segmentHeightsPx: readonly number[], pageInnerPx: number, offsetPx: number): number {
+  const parts = segmentHeightsPx.length ? segmentHeightsPx : [0]
+  const inner = Number.isFinite(pageInnerPx) && pageInnerPx > 0 ? pageInnerPx : 1
+  const offset = Number.isFinite(offsetPx) ? Math.max(0, offsetPx) : 0
+  let cursor = 0
+  let page = 1
+  for (let index = 0; index < parts.length; index += 1) {
+    const height = Math.max(0, parts[index] ?? 0)
+    if (index === 0 && height <= 0 && parts.length > 1) continue
+    const pages = estimatePageCount(height, inner)
+    const last = index === parts.length - 1
+    if (!last && offset >= cursor + height) {
+      cursor += height
+      page += pages
+      continue
+    }
+    const into = Math.max(0, offset - cursor)
+    const local = Math.min(pages, Math.floor(into / inner) + 1)
+    return page + local - 1
+  }
+  return page
 }
 
 /** 按块：每个可见块一屏。按屏：标题另起一屏，过长时再按字数切开。 */
