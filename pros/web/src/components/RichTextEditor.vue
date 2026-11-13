@@ -165,6 +165,7 @@ import { countWordParts, countWords, normalizeHtml, toEditorContent } from '../u
 import { getToken } from '../api/http'
 import { uploadMediaFile } from '../api/mediaUpload'
 import { attachmentInsertHref, rteAttachmentUploadReject } from '../utils/rteAttachment'
+import { imageReplaceSrc } from '../utils/rteImageCrop'
 import { htmlWithSuggestionsAccepted } from '../utils/rteSuggestions'
 import { buildExportHtmlWithCharts } from '../utils/rteExportChartSnapshots'
 import { rewritePrintMediaSrc } from '../utils/rtePrintMedia'
@@ -4223,13 +4224,12 @@ async function replaceImageByUrl() {
     placeholder: 'https://',
     confirmLabel: '替换',
   })
-  const url = (raw || '').trim()
-  if (!url) return
-  if (!/^https?:\/\//i.test(url) && !url.startsWith('data:image')) {
-    ElMessage.warning('图片地址需要以 http:// 或 https:// 开头')
+  const url = imageReplaceSrc(raw || '')
+  if (!url) {
+    ElMessage.warning('图片地址需要是 http(s) 链接、素材库路径，或 PNG、JPEG、GIF、WebP 图片')
     return
   }
-  replaceImageSource(url)
+  if (!replaceImageSource(url)) return
   ElMessage.success('已替换图片')
 }
 

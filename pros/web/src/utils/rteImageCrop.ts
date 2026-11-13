@@ -99,13 +99,40 @@ export function cropStyle(crop: ImageCrop | null | undefined): Record<string, st
   return style
 }
 
-/** 图片替换时保留裁剪参数。 */
+/**
+ * 换图地址：http(s)、素材库路径，或常见位图的 data URL。
+ * 不接受带账号的链接和 SVG。
+ */
+export function imageReplaceSrc(raw: string): string | null {
+  const value = String(raw ?? '').trim()
+  if (!value) return null
+  if (/^\/media\/[0-9a-zA-Z-]+$/.test(value)) return value
+  if (/^data:image\//i.test(value)) {
+    if (/^data:image\/svg\+xml/i.test(value)) return null
+    if (!/^data:image\/(?:png|jpe?g|gif|webp|bmp|avif)[;,]/i.test(value)) return null
+    return value
+  }
+  if (/^https?:\/\//i.test(value)) {
+    try {
+      const url = new URL(value)
+      if (url.username || url.password) return null
+      return url.toString()
+    } catch {
+      return null
+    }
+  }
+  return null
+}
+
+/** 图片替换时保留裁剪、题注和显示宽度，丢掉旧图的像素框。 */
 export function keepCropOnReplace(
   oldAttrs: Record<string, unknown>,
   nextSrc: string,
 ): Record<string, unknown> {
   const next: Record<string, unknown> = { ...(oldAttrs || {}) }
   next.src = nextSrc
+  delete next.width
+  delete next.height
   const aspect = (oldAttrs || {}).cropAspect
   const focusX = (oldAttrs || {}).cropFocusX
   const focusY = (oldAttrs || {}).cropFocusY

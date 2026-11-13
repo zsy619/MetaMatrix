@@ -266,6 +266,13 @@ watch(
 )
 
 watch(
+  () => rte.imagePreviewIndex,
+  () => {
+    if (rte.imagePreviewOpen) resetView()
+  },
+)
+
+watch(
   () => rte.imagePreviewOpen,
   (visible) => {
     if (visible) {

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import {
   cropRect,
   cropStyle,
+  imageReplaceSrc,
   keepCropOnReplace,
   normalizeImageCrop,
   parseAspectRatio,
@@ -56,7 +57,17 @@ assert.equal(cropStyle({ zoom: 2 })['transform'], 'scale(2)')
 
 // 替换保留裁剪
 const replaced = keepCropOnReplace(
-  { src: 'old.png', cropAspect: '1/1', cropFocusX: 0.2, cropFocusY: 0.8, cropZoom: 1.5, alt: '图' },
+  {
+    src: 'old.png',
+    cropAspect: '1/1',
+    cropFocusX: 0.2,
+    cropFocusY: 0.8,
+    cropZoom: 1.5,
+    alt: '图',
+    displayWidth: '50%',
+    width: 800,
+    height: 200,
+  },
   'new.png',
 )
 assert.equal(replaced.src, 'new.png')
@@ -65,6 +76,14 @@ assert.equal(replaced.cropFocusX, 0.2)
 assert.equal(replaced.cropFocusY, 0.8)
 assert.equal(replaced.cropZoom, 1.5)
 assert.equal(replaced.alt, '图')
+assert.equal(replaced.displayWidth, '50%')
+assert.equal(replaced.width, undefined)
+assert.equal(replaced.height, undefined)
+assert.equal(imageReplaceSrc('https://files.example.com/a.png'), 'https://files.example.com/a.png')
+assert.equal(imageReplaceSrc('/media/asset-1'), '/media/asset-1')
+assert.equal(imageReplaceSrc('javascript:alert(1)'), null)
+assert.equal(imageReplaceSrc('https://user:pass@files.example.com/a.png'), null)
+assert.equal(imageReplaceSrc('data:image/svg+xml;base64,PHN2Zy8+'), null)
 
 // 没有裁剪参数时不凭空加
 const plain = keepCropOnReplace({ src: 'old.png' }, 'new.png')

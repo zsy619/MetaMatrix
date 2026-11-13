@@ -235,12 +235,12 @@ function applyCropPreset(preset: CropPreset) {
 }
 
 /** 换图：保留裁剪、题注等其它属性。 */
-function replaceImageSource(src: string) {
+function replaceImageSource(src: string): boolean {
   const ed = deps.editor.value
-  if (!ed || !isImageNodeSelected() || !src) return
+  if (!ed || !isImageNodeSelected() || !src) return false
   const attrs = ed.getAttributes('image') as Record<string, unknown>
   const next = keepCropOnReplace(attrs, src)
-  ed.chain().focus().updateAttributes('image', next).run()
+  return ed.chain().focus().updateAttributes('image', next).run()
 }
 
 /** 改图片替代文字。 */
