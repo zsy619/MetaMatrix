@@ -179,21 +179,35 @@ article {
 }
 textarea {
   width: 100%;
-  min-height: 48px;
+  min-height: 64px;
   border: 0;
   background: transparent;
   resize: vertical;
   font: inherit;
+  font-size: 15px;
+  line-height: 1.55;
   color: var(--col-topic);
 }
-.kanban-move { display: flex; gap: 6px; margin-top: 6px; }
+.kanban-move {
+  display: flex;
+  gap: 6px;
+  margin-top: 0;
+  max-height: 0;
+  overflow: hidden;
+}
+article:hover .kanban-move,
+article:focus-within .kanban-move {
+  margin-top: 8px;
+  max-height: 40px;
+  overflow: visible;
+}
 .kanban-move button {
   border: 1px solid color-mix(in srgb, var(--col-header) 35%, #fff);
   background: #fff;
   color: #3c3428;
   border-radius: 999px;
-  min-height: 30px;
-  padding: 2px 10px;
+  min-height: 32px;
+  padding: 4px 12px;
   font: inherit;
   font-size: 13px;
   font-weight: 650;

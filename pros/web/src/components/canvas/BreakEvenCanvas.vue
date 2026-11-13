@@ -61,9 +61,9 @@ function setField(field: 'price' | 'variableCost' | 'fixedCost', raw: string) {
 .sheet-top h2, .sheet-top p { margin: 0; }
 .sheet-top p { color: #5f6368; font-size: 13px; }
 .results { display: flex; gap: 8px; }
-.results strong { padding: 8px 12px; border-radius: 999px; background: #e7f6ef; color: #125c3b; }
+.results strong { padding: 10px 16px; border-radius: 999px; background: #e7f6ef; color: #125c3b; font-size: 16px; font-variant-numeric: tabular-nums; }
 .grid { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-section { display: flex; flex-direction: column; min-height: 0; background: #fff; border-radius: 12px; overflow: hidden; border: 1px solid #ececec; }
-h3 { margin: 0; min-height: 48px; display: flex; align-items: center; justify-content: center; background: #2a649f; color: #fff; }
-input { margin: auto; width: min(220px, 80%); border: 1px solid #dadce0; border-radius: 10px; padding: 12px; font-size: 22px; text-align: center; }
+section { display: flex; flex-direction: column; align-items: center; min-height: 0; background: #fff; border-radius: 12px; overflow: hidden; border: 1px solid #ececec; }
+h3 { margin: 0; width: 100%; min-height: 48px; display: flex; align-items: center; justify-content: center; background: #2a649f; color: #fff; }
+input { margin: 28px auto 0; width: min(240px, 80%); border: 1px solid #dadce0; border-radius: 12px; padding: 14px 12px; font-size: 32px; font-weight: 700; font-variant-numeric: tabular-nums; text-align: center; }
 </style>

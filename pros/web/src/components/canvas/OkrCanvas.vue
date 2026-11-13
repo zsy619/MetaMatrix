@@ -58,13 +58,16 @@ function patch(mutator: (doc: OkrDocumentJSON) => void) {
 .sheet-top { flex: none; display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-bottom: 10px; }
 .title { font-size: 18px; font-weight: 700; border: 1px solid transparent; background: transparent; border-radius: 6px; }
 .period { margin-left: 8px; border: 1px solid #dadce0; border-radius: 8px; padding: 4px 8px; }
-.sheet-top button, .kr button, header button { border: 1px solid #dadce0; background: #fff; border-radius: 8px; padding: 4px 8px; }
-.objectives { flex: 1 1 auto; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 10px; }
+.sheet-top button, .kr button, header button { border: 1px solid #dadce0; background: #fff; border-radius: 999px; min-height: 36px; padding: 4px 12px; font: inherit; font-size: 13px; font-weight: 650; cursor: pointer; }
+.objectives { flex: 1 1 auto; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 12px; }
 section { background: #fff; border: 1px solid #ececec; border-radius: 12px; overflow: hidden; }
-header { display: flex; gap: 8px; align-items: center; padding: 8px 10px; background: #2a649f; color: #fff; }
-header input { flex: 1; border: 0; background: transparent; color: #fff; font: inherit; font-weight: 700; }
+header { display: flex; gap: 8px; align-items: center; min-height: 52px; padding: 8px 12px; background: #2a649f; color: #fff; }
+header input { flex: 1; border: 0; background: transparent; color: #fff; font: inherit; font-size: 16px; font-weight: 700; }
+header strong { font-variant-numeric: tabular-nums; font-size: 18px; }
 .index { font-weight: 700; letter-spacing: 0.04em; }
 header button { color: #1c4c7c; }
-.kr { display: grid; grid-template-columns: 1.4fr 1fr 140px 42px auto; gap: 8px; align-items: center; padding: 8px 10px; border-top: 1px solid #f1f3f4; }
-.kr input[type='text'], .kr input:not([type]) { border: 1px solid #e0e0e0; border-radius: 8px; padding: 4px 8px; }
+.kr { display: grid; grid-template-columns: 1.4fr 1fr minmax(140px, 180px) 48px auto; gap: 8px; align-items: center; min-height: 52px; padding: 8px 12px; border-top: 1px solid #f1f3f4; }
+.kr input[type='text'], .kr input:not([type]) { border: 1px solid #e0e0e0; border-radius: 8px; min-height: 36px; padding: 6px 8px; font: inherit; }
+.kr input[type='range'] { width: 100%; height: 28px; accent-color: #1a73e8; }
+.kr span { font-variant-numeric: tabular-nums; font-weight: 700; text-align: right; }
 </style>
