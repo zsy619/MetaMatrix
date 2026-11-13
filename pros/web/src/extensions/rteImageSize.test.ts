@@ -68,4 +68,30 @@ describe('图片尺寸预设和拖拽', () => {
     expect(img.style.width).toBe('')
     expect(img.style.height).toBe('')
   })
+
+  it('裁成正方形时不再沿用拖出来的扁高度', async () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const ed = new Editor({
+      element: host,
+      extensions: [
+        StarterKit.configure({ dropcursor: false }),
+        RteImage.configure({
+          inline: false,
+          allowBase64: true,
+          HTMLAttributes: { class: 'rte-image' },
+          resize: { enabled: true, directions: ['right'], minWidth: 48, minHeight: 48, alwaysPreserveAspectRatio: true },
+        }),
+      ],
+      content: `<img src="${PIXEL}" width="320" height="180" data-crop-aspect="1/1" data-crop-focus-x="0.2" data-crop-focus-y="0.8">`,
+    })
+    editor = ed
+    await new Promise((resolve) => queueMicrotask(resolve))
+    const img = ed.view.dom.querySelector('img') as HTMLImageElement
+    expect(img.style.width).toBe('320px')
+    expect(img.style.height).toBe('auto')
+    const live = (img.getAttribute('style') || '').split(';').map((part) => part.trim())
+    expect(live).toContain('aspect-ratio: 1 / 1')
+    expect(live).toContain('object-fit: cover')
+  })
 })
