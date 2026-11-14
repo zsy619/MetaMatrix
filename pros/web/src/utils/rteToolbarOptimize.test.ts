@@ -58,11 +58,17 @@ import {
   stepRibbonTab,
   toolbarSearchStatus,
   wordStatTitle,
+  toolbarActionTitle,
+  TOOLBAR_ACTION_TITLES,
   zoomToolLabel,
   zoomToolTitle,
 } from './rteToolbarOptimize.ts'
 
 const tabs = ['edit', 'style', 'paragraph']
+assert.equal(Object.keys(TOOLBAR_ACTION_TITLES).length, 30)
+assert.equal(new Set(Object.values(TOOLBAR_ACTION_TITLES)).size, 30)
+assert.equal(toolbarActionTitle('list-continue').includes('不会从 1'), true)
+assert.equal(toolbarActionTitle('missing'), '')
 assert.equal(readStoredRibbonTab('style', tabs), 'style')
 assert.equal(readStoredRibbonTab('missing', tabs), 'edit')
 assert.equal(readStoredRibbonTab(null, []), 'edit')

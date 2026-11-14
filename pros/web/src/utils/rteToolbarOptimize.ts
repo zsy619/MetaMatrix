@@ -955,3 +955,41 @@ export function recentOptions<T extends { value: string }>(options: readonly T[]
 
 /** 专注模式只留这几个按钮。 */
 export const FOCUS_TOOLBAR_KEYS = ['undo', 'redo', 'find'] as const
+
+/** 工具栏里原先只有短说明的 30 个动作，悬停时写出改完会怎样。 */
+export const TOOLBAR_ACTION_TITLES: Record<string, string> = {
+  'list-continue': '接着上一段列表往下编号，编号不会从 1 重来',
+  'list-restart': '从 1 开始一个新的有序列表，和上一段分开',
+  'list-start': '把当前这一项改成指定的起始编号',
+  'list-renumber': '从这一项起，后面的编号重新往下数',
+  'form-radio': '插入一组只能选一个的选项',
+  'form-check': '插入一组可以同时勾选多项的选项',
+  'form-text': '插入一行可以填写的文字框',
+  'form-textarea': '插入可以写多行的填写框',
+  'form-number': '插入只接受数字的填写框',
+  'form-select': '插入从列表里选一项的下拉框',
+  'form-date': '插入选择日期的框',
+  'form-datetime': '插入选择日期和时间的框',
+  'form-switch': '插入开或关的开关',
+  'form-duplicate': '再复制一个当前选中的表单字段',
+  'form-check-fill': '检查必填项有没有空着',
+  'source-apply': '把改过的源码写回文档，会盖掉正文里对应的内容',
+  'search-clear': '清除搜索并回到全部按钮 (Esc)',
+  'import-doc': '打开本机的 Markdown 或 Word 文档',
+  'import-link': '从链接导入，例如公众号文章',
+  'export-feishu': '复制成飞书能直接粘贴的 HTML',
+  'export-html': '下载成可以在浏览器打开的网页文件',
+  'export-text': '下载成没有格式的纯文本',
+  'export-md': '下载成 Markdown 文件',
+  'export-png': '把当前文档导出成一张 PNG 图片',
+  'export-pdf': '把当前文档导出成 PDF',
+  'export-word': '把当前文档导出成 Word',
+  'table-zebra': '隔行加底色，只改变显示，不改单元格内容',
+  'table-another': '再插入一张表格，自己填行数和列数',
+  'font-size-input': '输入小四或 12，按 Enter 应用这个字号',
+  'table-insert-count': '填几就插入几行或几列，最少 1',
+}
+
+export function toolbarActionTitle(id: string): string {
+  return TOOLBAR_ACTION_TITLES[id] || ''
+}
