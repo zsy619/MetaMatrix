@@ -21,10 +21,10 @@ function block(id: ImpactEffortBlockId) {
 </script>
 
 <template>
-  <div class="sheet" :style="chrome" aria-label="影响–努力矩阵">
+  <div class="sheet quad-sheet" :style="chrome" aria-label="影响–努力矩阵">
     <header class="sheet-top">
       <h2>{{ doc.title }}</h2>
-      <p>上排影响高。左边容易做，右边费劲。先做左上，右上排进计划，右下尽量别做。</p>
+      <p>高影响、低努力的立刻做。高影响、高努力的排进计划。低影响、高努力的尽量别做。</p>
     </header>
     <div class="axis">
       <span class="axis-y"><span>高影响</span><span>低影响</span></span>
@@ -52,6 +52,30 @@ function block(id: ImpactEffortBlockId) {
 .axis-x { grid-column: 2; text-align: center; color: #3c3424; font-size: 14px; font-weight: 700; letter-spacing: 0.08em; }
 .grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 10px; min-height: 0; }
 section { display: flex; flex-direction: column; min-height: 0; background: var(--col-body); border-radius: 12px; overflow: hidden; }
-h3 { margin: 0; min-height: 40px; display: flex; align-items: center; justify-content: center; background: var(--col-header); color: #fff; letter-spacing: 0.04em; }
+h3 { margin: 0; min-height: 44px; display: flex; align-items: center; justify-content: center; padding: 6px 8px; background: var(--col-header); color: #fff; font-size: 16px; letter-spacing: 0.02em; }
+.axis-y span, .axis-x { font-size: 16px; }
 .rte-slot { flex: 1 1 auto; min-height: 0; display: flex; }
+</style>
+
+<style>
+@media (max-width: 720px) {
+  .canvas-viewport .quad-sheet[aria-label='影响–努力矩阵'] > .axis {
+    grid-template-columns: 1fr;
+    min-height: 0;
+  }
+
+  .canvas-viewport .quad-sheet[aria-label='影响–努力矩阵'] > .axis .axis-y,
+  .canvas-viewport .quad-sheet[aria-label='影响–努力矩阵'] > .axis .axis-x {
+    display: none;
+  }
+
+  .canvas-viewport .quad-sheet[aria-label='影响–努力矩阵'] > .axis .grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: none;
+  }
+
+  .canvas-viewport .quad-sheet[aria-label='影响–努力矩阵'] > .axis .grid > section {
+    min-height: 240px;
+  }
+}
 </style>
