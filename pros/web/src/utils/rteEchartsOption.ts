@@ -1677,6 +1677,12 @@ function cartesianNameLayout(option: Record<string, unknown>): {
   }
 }
 
+function valueSplitAreaShown(option: Record<string, unknown>): boolean {
+  const axis = categoryOnYAxis(option) ? option.xAxis : option.yAxis
+  const node = Array.isArray(axis) ? axis[0] : axis
+  return isPlainObject(node) && isPlainObject(node.splitArea) && node.splitArea.show === true
+}
+
 function categoryAxisLineHidden(option: Record<string, unknown>): boolean {
   const axis = categoryOnYAxis(option) ? option.yAxis : option.xAxis
   const node = Array.isArray(axis) ? axis[0] : axis
@@ -1788,6 +1794,7 @@ function buildCartesianOption(
   },
   hideValueSplitLine = false,
   hideCategoryAxisLine = false,
+  showValueSplitArea = false,
 ): Record<string, unknown> {
   const category = {
     type: 'category' as const,
@@ -1811,6 +1818,7 @@ function buildCartesianOption(
     ...(namePlace?.value.location ? { nameLocation: namePlace.value.location } : {}),
     ...(namePlace?.value.gap != null ? { nameGap: namePlace.value.gap } : {}),
     ...(hideValueSplitLine ? { splitLine: { show: false } } : {}),
+    ...(showValueSplitArea ? { splitArea: { show: true } } : {}),
   }
   return {
     color: FEISHU_TEXT_COLORS.filter((item) => item !== '#1f2329' && item !== '#8f959e'),
@@ -2086,6 +2094,7 @@ export function retypeEchartsOption(
       cartesianNameLayout(base),
       valueSplitLineHidden(base),
       categoryAxisLineHidden(base),
+      valueSplitAreaShown(base),
     )
   }
   if (usable && type === 'pie') {
