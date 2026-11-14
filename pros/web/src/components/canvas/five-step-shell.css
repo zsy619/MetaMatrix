@@ -138,14 +138,113 @@
 
 @media (max-width: 900px) {
   .fsx-canvas {
-    padding: 8px;
+    padding: 12px 12px 96px;
   }
 
   .fsx-grid {
-    min-width: calc(var(--fsx-cols, 5) * 148px);
+    min-width: 0;
+    width: 100%;
+    min-height: 0;
+    height: auto;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .fsx-col {
+    min-height: 0;
+    border: 1px solid var(--cv-frame, #ececec);
+    border-radius: 16px;
+    overflow: hidden;
+    background: #fff;
+    box-shadow: 0 8px 20px rgba(62, 48, 28, 0.06);
+  }
+
+  .fsx-col:first-child .fsx-head,
+  .fsx-col:last-child .fsx-head {
+    border-radius: 0;
+  }
+
+  .fsx-head {
+    position: static;
+    min-height: 48px;
   }
 
   .fsx-head h2 {
+    font-size: 17px;
     letter-spacing: 0.02em;
+  }
+
+  .fsx-body,
+  .fsx-stack,
+  .fsx-stack--qual,
+  .fsx-stack--quant,
+  .fsx-panel {
+    flex: 0 0 auto;
+    min-height: 0;
+  }
+
+  .fsx-panel {
+    min-height: 132px;
+  }
+
+  .fsx-group {
+    font-size: 14px;
+    letter-spacing: 0.08em;
+  }
+
+  .fsx-foot {
+    min-height: 40px;
+    font-size: 15px;
+  }
+
+  .fsx-canvas .fsp,
+  .fsx-canvas .rte-root,
+  .fsx-canvas .rte-canvas,
+  .fsx-canvas .ProseMirror {
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .fsx-canvas .rte-canvas {
+    flex: 0 0 auto;
+    min-height: 72px;
+  }
+
+  .fsx-canvas .fsp--compact .fsp-header {
+    min-height: 44px;
+    padding: 8px 48px;
+  }
+
+  .fsx-canvas .fsp--compact .fsp-title {
+    display: block;
+    overflow: visible;
+    -webkit-line-clamp: unset;
+    font-size: 15px;
+    line-height: 1.35;
+  }
+
+  .fsx-canvas .fsp--compact .fsp-topic {
+    font-size: 15px;
+  }
+
+  .fsx-canvas .fsp-actions .pm-max-btn,
+  .fsx-canvas .fsp-float-max {
+    width: 36px;
+    height: 36px;
+  }
+
+  .fsx-canvas .fsp--compact .pa-title,
+  .fsx-canvas .fsp--compact .pa-btn {
+    font-size: 14px;
+  }
+
+  .fsx-canvas .fsp--compact .pa-btn {
+    min-height: 36px;
+    padding: 0 10px;
   }
 }
