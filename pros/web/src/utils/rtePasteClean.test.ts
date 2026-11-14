@@ -45,6 +45,8 @@ const linked = sanitizePastedHtml(
 )
 assert.ok(linked.includes('data-href="https://example.com/doc"'))
 assert.ok(!/javascript:/i.test(linked))
+assert.equal(safePasteUrl('//cdn.example.com/a.png', 'img'), 'https://cdn.example.com/a.png')
+assert.ok(sanitizePastedHtml('<img src="//cdn.example.com/a.png" alt="图">').includes('https://cdn.example.com/a.png'))
 assert.equal(safePasteUrl('javascript:alert(1)', 'a'), null)
 assert.equal(safePasteUrl('/media/asset-1', 'img'), '/media/asset-1')
 assert.equal((plainTextToPasteContent('甲\n\n\n乙') as unknown[]).length, 2)

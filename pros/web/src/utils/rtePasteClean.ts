@@ -131,7 +131,8 @@ export function decodePasteAttr(raw: string): string {
 
 /** 链接只留 http(s) 和素材库 /media/{id}。图片还可留 data:image。 */
 export function safePasteUrl(raw: string, kind: 'a' | 'img'): string | null {
-  const value = decodePasteAttr(raw).trim()
+  const decoded = decodePasteAttr(raw).trim()
+  const value = decoded.startsWith('//') ? `https:${decoded}` : decoded
   if (!value || value.length > 2_000_000) return null
   if (/^\/media\/[0-9a-zA-Z-]+$/.test(value)) return value
   if (kind === 'img' && /^data:image\/(?:png|jpe?g|gif|webp);/i.test(value)) return value
