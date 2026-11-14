@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import {
   evaluateCellFormula,
+  evaluateFormula,
   formatCellAddress,
   isFormulaCell,
   parseCellAddress,
@@ -75,6 +76,9 @@ assert.equal(evaluateCellFormula('=$A$1', grid2, 0, 0), '1')
 assert.equal(evaluateCellFormula('=SUM($A$1:$B$1)', grid2, 0, 0), '3')
 
 // 求和区域比表格长时，多出来的格子跳过，不把整段算成 #REF!
+assert.equal(evaluateCellFormula('=MOD(A1,B1)', [['5', '2']], 0, 0), '1')
+assert.equal(evaluateCellFormula('=MOD(A1,B1)', [['-5', '2']], 0, 0), '1')
+assert.deepEqual(evaluateFormula('=MOD(A1,0)', [['5']], 0, 0), { ok: false, value: null, error: '#DIV/0!' })
 assert.equal(evaluateCellFormula('=INT(A1)', [['3.7']], 0, 0), '3')
 assert.equal(evaluateCellFormula('=INT(A1)', [['-1.2']], 0, 0), '-2')
 assert.equal(evaluateCellFormula('=ABS(A1)', [['-3.5']], 0, 0), '3.5')
