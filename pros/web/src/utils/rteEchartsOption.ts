@@ -1677,6 +1677,12 @@ function cartesianNameLayout(option: Record<string, unknown>): {
   }
 }
 
+function categoryAxisLineHidden(option: Record<string, unknown>): boolean {
+  const axis = categoryOnYAxis(option) ? option.yAxis : option.xAxis
+  const node = Array.isArray(axis) ? axis[0] : axis
+  return isPlainObject(node) && isPlainObject(node.axisLine) && node.axisLine.show === false
+}
+
 function valueSplitLineHidden(option: Record<string, unknown>): boolean {
   const axis = categoryOnYAxis(option) ? option.xAxis : option.yAxis
   const node = Array.isArray(axis) ? axis[0] : axis
@@ -1781,6 +1787,7 @@ function buildCartesianOption(
     value: { location?: 'start' | 'middle' | 'end'; gap?: number }
   },
   hideValueSplitLine = false,
+  hideCategoryAxisLine = false,
 ): Record<string, unknown> {
   const category = {
     type: 'category' as const,
@@ -1789,6 +1796,7 @@ function buildCartesianOption(
     ...(names?.category ? { name: names.category } : {}),
     ...(categoryRotate != null ? { axisLabel: { rotate: categoryRotate } } : {}),
     ...(boundaryGap != null ? { boundaryGap } : {}),
+    ...(hideCategoryAxisLine ? { axisLine: { show: false } } : {}),
     ...(namePlace?.category.location ? { nameLocation: namePlace.category.location } : {}),
     ...(namePlace?.category.gap != null ? { nameGap: namePlace.category.gap } : {}),
   }
@@ -2077,6 +2085,7 @@ export function retypeEchartsOption(
       categoryBoundaryGap(base),
       cartesianNameLayout(base),
       valueSplitLineHidden(base),
+      categoryAxisLineHidden(base),
     )
   }
   if (usable && type === 'pie') {
