@@ -1467,20 +1467,33 @@ function toNumber(value: string): number | null {
 const SAMPLE_LABELS = ['一月', '二月', '三月', '四月', '五月', '六月']
 
 /** 内置示例数据的柱状/折线 option。 */
+function categoryOnYAxis(option: Record<string, unknown>): boolean {
+  const raw = option.yAxis
+  const axes = Array.isArray(raw) ? raw : raw ? [raw] : []
+  return axes.some((axis) => {
+    if (!isPlainObject(axis)) return false
+    if (axis.type === 'value' || axis.type === 'time' || axis.type === 'log') return false
+    return axis.type === 'category' || Array.isArray(axis.data)
+  })
+}
+
 function buildCartesianOption(
   type: 'bar' | 'line',
   title: string,
   labels: string[],
   series: Array<{ name: string; data: number[] }>,
+  horizontal = false,
 ): Record<string, unknown> {
+  const category = { type: 'category', data: labels, axisTick: { alignWithLabel: true } }
+  const value = { type: 'value', name: '数值' }
   return {
     color: FEISHU_TEXT_COLORS.filter((item) => item !== '#1f2329' && item !== '#8f959e'),
     title: { text: title, left: 'center' },
     tooltip: { trigger: 'axis' },
     legend: { data: series.map((item) => item.name), bottom: 0 },
     grid: { left: 48, right: 24, top: 48, bottom: 56, containLabel: true },
-    xAxis: { type: 'category', data: labels, axisTick: { alignWithLabel: true } },
-    yAxis: { type: 'value', name: '数值' },
+    xAxis: horizontal ? value : category,
+    yAxis: horizontal ? category : value,
     series: series.map((item) => ({
       name: item.name,
       type,
@@ -1708,6 +1721,7 @@ export function retypeEchartsOption(
         name: item.name,
         data: item.data.map((value) => asChartNumber(value)),
       })),
+      categoryOnYAxis(base),
     )
   }
   if (usable && type === 'pie') {

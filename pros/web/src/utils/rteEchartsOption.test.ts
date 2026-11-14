@@ -339,6 +339,25 @@ describe('ECharts 模板与表格生成', () => {
     expect(series[0]!.data).toEqual([1200, 0.5])
   })
 
+  it('横向柱状图换成折线后类目仍在纵轴', () => {
+    const next = retypeEchartsOption(
+      {
+        title: { text: '销售' },
+        xAxis: { type: 'value' },
+        yAxis: { type: 'category', data: ['华东', '华南'] },
+        series: [{ name: '本年', type: 'bar', data: [12, 8] }],
+      },
+      'line',
+    )
+    const yAxis = next.yAxis as { type: string; data: string[] }
+    const xAxis = next.xAxis as { type: string }
+    const series = next.series as Array<{ type: string; data: number[] }>
+    expect(yAxis.type).toBe('category')
+    expect(yAxis.data).toEqual(['华东', '华南'])
+    expect(xAxis.type).toBe('value')
+    expect(series[0]).toMatchObject({ type: 'line', data: [12, 8] })
+  })
+
   it('饼图换成折线时把扇区收成一条线', () => {
     const next = retypeEchartsOption(
       {
