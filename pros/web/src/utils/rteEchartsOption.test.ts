@@ -339,6 +339,31 @@ describe('ECharts 模板与表格生成', () => {
     expect(series[0]!.data).toEqual([1200, 0.5])
   })
 
+  it('换成折线后数值轴的上下限还在', () => {
+    const next = retypeEchartsOption(
+      {
+        title: { text: '销售' },
+        xAxis: { type: 'category', data: ['一月', '二月'] },
+        yAxis: { type: 'value', name: '万元', min: 0, max: 100 },
+        series: [{ name: '今年', type: 'bar', data: [1, 2] }],
+      },
+      'line',
+    )
+    const yAxis = next.yAxis as { min?: number; max?: number; name?: string }
+    expect(yAxis).toMatchObject({ name: '万元', min: 0, max: 100 })
+    const horizontal = retypeEchartsOption(
+      {
+        title: { text: '销售' },
+        xAxis: { type: 'value', min: 0, max: 50 },
+        yAxis: { type: 'category', data: ['华东', '华南'] },
+        series: [{ name: '今年', type: 'bar', data: [1, 2] }],
+      },
+      'line',
+    )
+    expect(horizontal.xAxis).toMatchObject({ type: 'value', min: 0, max: 50 })
+    expect((horizontal.yAxis as { type: string }).type).toBe('category')
+  })
+
   it('换成折线后数据标签还在', () => {
     const next = retypeEchartsOption(
       {

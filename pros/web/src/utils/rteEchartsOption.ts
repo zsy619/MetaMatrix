@@ -1519,6 +1519,22 @@ function seriesStackAt(option: Record<string, unknown>, index: number): string |
   return stack || undefined
 }
 
+function valueAxisBounds(option: Record<string, unknown>): { min?: number; max?: number } {
+  const axis = categoryOnYAxis(option) ? option.xAxis : option.yAxis
+  const node = Array.isArray(axis) ? axis[0] : axis
+  if (!isPlainObject(node)) return {}
+  const read = (key: 'min' | 'max') => {
+    const value = node[key]
+    if (typeof value === 'number' && Number.isFinite(value)) return value
+    if (typeof value === 'string' && value.trim() && Number.isFinite(Number(value.trim()))) return Number(value.trim())
+    return undefined
+  }
+  const min = read('min')
+  const max = read('max')
+  if (min != null && max != null && min > max) return {}
+  return { min, max }
+}
+
 function axisTitle(axis: unknown): string | undefined {
   const node = Array.isArray(axis) ? axis[0] : axis
   if (!isPlainObject(node) || typeof node.name !== 'string') return undefined
@@ -1547,6 +1563,7 @@ function buildCartesianOption(
   }>,
   horizontal = false,
   names?: { category?: string; value?: string },
+  bounds?: { min?: number; max?: number },
 ): Record<string, unknown> {
   const category = {
     type: 'category' as const,
@@ -1554,7 +1571,12 @@ function buildCartesianOption(
     axisTick: { alignWithLabel: true },
     ...(names?.category ? { name: names.category } : {}),
   }
-  const value = { type: 'value' as const, name: names?.value || '数值' }
+  const value = {
+    type: 'value' as const,
+    name: names?.value || '数值',
+    ...(bounds?.min != null ? { min: bounds.min } : {}),
+    ...(bounds?.max != null ? { max: bounds.max } : {}),
+  }
   return {
     color: FEISHU_TEXT_COLORS.filter((item) => item !== '#1f2329' && item !== '#8f959e'),
     title: { text: title, left: 'center' },
@@ -1799,6 +1821,7 @@ export function retypeEchartsOption(
       })),
       categoryOnYAxis(base),
       cartesianAxisNames(base),
+      valueAxisBounds(base),
     )
   }
   if (usable && type === 'pie') {
