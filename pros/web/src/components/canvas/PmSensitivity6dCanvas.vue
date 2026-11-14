@@ -31,6 +31,13 @@ documentStore.ensurePmSensitivity6dBlocks()
 
 const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 
+const narrow = ref(false)
+let narrowQuery: MediaQueryList | null = null
+
+function syncNarrow() {
+  narrow.value = !!narrowQuery?.matches
+}
+
 /**
  * 顺时针自顶：预算 → 老板 → 风险 → 协作 → 人力 → 时间
  */
@@ -318,6 +325,9 @@ function onWindowPointerUp() {
 
 onMounted(() => {
   documentStore.ensurePmSensitivity6dBlocks()
+  narrowQuery = window.matchMedia('(max-width: 800px)')
+  syncNarrow()
+  narrowQuery.addEventListener('change', syncNarrow)
 })
 
 if (typeof window !== 'undefined') {
@@ -326,6 +336,7 @@ if (typeof window !== 'undefined') {
 }
 
 onBeforeUnmount(() => {
+  narrowQuery?.removeEventListener('change', syncNarrow)
   if (typeof window !== 'undefined') {
     window.removeEventListener('pointerup', onWindowPointerUp)
     window.removeEventListener('pointercancel', onWindowPointerUp)
@@ -493,14 +504,15 @@ onBeforeUnmount(() => {
       隐藏挂载六轴 YModelBlock：点击顶点时写入全局 maximizedPanelKey，
       由块内 Teleport .pm-overlay 铺满文档视口（panel-maximize 规则）。
     -->
-    <div class="pm6d-block-host" aria-hidden="true">
-      <template v-for="item in axisBlocks" :key="item.axis">
+    <div class="pm6d-block-host" :aria-hidden="narrow ? undefined : true">
+      <section v-for="item in axisBlocks" :key="item.axis" class="pm6d-card">
+        <h3 class="pm6d-card-title">{{ item.title }}</h3>
         <YModelBlockCard
           v-if="item.block"
           :block="item.block"
           hide-title
         />
-      </template>
+      </section>
     </div>
   </div>
 </template>
@@ -652,6 +664,11 @@ onBeforeUnmount(() => {
   margin: -1px;
 }
 
+.pm6d-card-title {
+  display: none;
+  margin: 0;
+}
+
 @media (max-width: 1100px) {
   .pm6d-sliders {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -671,5 +688,63 @@ onBeforeUnmount(() => {
   .pm6d-axis-label {
     font-size: 13px;
   }
+}
+
+@media (max-width: 800px) {
+  .pm6d-canvas { padding-bottom: 96px; }
+  .pm6d-stage { flex: 0 0 auto; min-height: 0; }
+  .pm6d-radar { width: 100%; height: auto; max-height: none; aspect-ratio: 800 / 720; }
+  .pm6d-sliders { grid-template-columns: 1fr; }
+  .pm6d-slider input[type='range'] { height: 36px; }
+  .pm6d-block-host {
+    position: static;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: auto;
+    height: auto;
+    margin: 14px 0 0;
+    padding: 0;
+    overflow: visible;
+    clip: auto;
+    clip-path: none;
+    white-space: normal;
+  }
+  .pm6d-card {
+    padding: 12px 12px 10px;
+    border: 1px solid var(--cv-frame, #ececec);
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 8px 20px rgba(62, 48, 28, 0.06);
+  }
+  .pm6d-card-title {
+    display: block;
+    margin: 0 0 8px;
+    font-size: 16px;
+    font-weight: 750;
+    line-height: 1.35;
+    color: #202124;
+  }
+  .pm6d-card :deep(.ym-block),
+  .pm6d-card :deep(.ym-block-body),
+  .pm6d-card :deep(.rte-root),
+  .pm6d-card :deep(.rte-workspace),
+  .pm6d-card :deep(.rte-canvas),
+  .pm6d-card :deep(.rte-body),
+  .pm6d-card :deep(.ProseMirror) {
+    height: auto;
+    max-height: none;
+    max-width: 100%;
+    min-width: 0;
+    overflow: visible;
+    flex: 0 0 auto;
+  }
+  .pm6d-card :deep(.ym-block) { min-height: 0; background: transparent; border: none; box-shadow: none; }
+  .pm6d-card :deep(.rte-workspace),
+  .pm6d-card :deep(.rte-canvas),
+  .pm6d-card :deep(.ProseMirror) { width: 100%; }
+  .pm6d-card :deep(.ProseMirror) { min-height: 96px; font-size: 15px; line-height: 1.55; }
+  .pm6d-card :deep(.ProseMirror p) { max-width: 100%; overflow-wrap: anywhere; }
+  .pm6d-card :deep(.pm-max-btn) { width: 36px; height: 36px; border-radius: 8px; }
 }
 </style>
