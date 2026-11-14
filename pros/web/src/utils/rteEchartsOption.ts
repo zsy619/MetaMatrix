@@ -1481,6 +1481,18 @@ function categoryOnYAxis(option: Record<string, unknown>): boolean {
   })
 }
 
+function seriesColorAt(option: Record<string, unknown>, index: number): string | undefined {
+  const series = option.series
+  if (!Array.isArray(series)) return undefined
+  const item = series[index]
+  if (!isPlainObject(item)) return undefined
+  const style = item.itemStyle
+  if (!isPlainObject(style) || typeof style.color !== 'string') return undefined
+  const color = style.color.trim()
+  if (!color || /url\(|expression\(|javascript:/i.test(color)) return undefined
+  return color
+}
+
 function seriesStackAt(option: Record<string, unknown>, index: number): string | undefined {
   const series = option.series
   if (!Array.isArray(series)) return undefined
@@ -1494,7 +1506,7 @@ function buildCartesianOption(
   type: 'bar' | 'line',
   title: string,
   labels: string[],
-  series: Array<{ name: string; data: Array<number | null>; stack?: string }>,
+  series: Array<{ name: string; data: Array<number | null>; stack?: string; color?: string }>,
   horizontal = false,
 ): Record<string, unknown> {
   const category = { type: 'category', data: labels, axisTick: { alignWithLabel: true } }
@@ -1512,6 +1524,7 @@ function buildCartesianOption(
       type,
       data: item.data,
       ...(item.stack ? { stack: item.stack } : {}),
+      ...(item.color ? { itemStyle: { color: item.color } } : {}),
       smooth: type === 'line' ? true : undefined,
       areaStyle: type === 'line' ? { opacity: 0.12 } : undefined,
     })),
@@ -1736,6 +1749,7 @@ export function retypeEchartsOption(
         name: item.name,
         data: item.data.map((value) => asChartNumber(value)),
         stack: seriesStackAt(base, index),
+        color: seriesColorAt(base, index),
       })),
       categoryOnYAxis(base),
     )

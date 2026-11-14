@@ -339,6 +339,24 @@ describe('ECharts 模板与表格生成', () => {
     expect(series[0]!.data).toEqual([1200, 0.5])
   })
 
+  it('换成折线后系列颜色还在', () => {
+    const next = retypeEchartsOption(
+      {
+        title: { text: '销售' },
+        xAxis: { type: 'category', data: ['一月'] },
+        yAxis: { type: 'value' },
+        series: [
+          { name: '今年', type: 'bar', data: [10], itemStyle: { color: '#d83931' } },
+          { name: '去年', type: 'bar', data: [8], itemStyle: { color: '#245bdb' } },
+        ],
+      },
+      'line',
+    )
+    const series = next.series as Array<{ itemStyle?: { color?: string } }>
+    expect(series[0]!.itemStyle?.color).toBe('#d83931')
+    expect(series[1]!.itemStyle?.color).toBe('#245bdb')
+  })
+
   it('堆叠柱状图换成折线后仍然堆在一起', () => {
     const next = retypeEchartsOption(
       {
