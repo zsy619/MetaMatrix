@@ -133,7 +133,7 @@ describe('错误码', () => {
   })
 
   it('未知函数返回 #NAME?', () => {
-    expect(evaluateFormula('=PRODUCT(A1)', grid, 0, 0).error).toBe('#NAME?')
+    expect(evaluateFormula('=MEDIAN(A1)', grid, 0, 0).error).toBe('#NAME?')
     expect(evaluateFormula('=NOPE(', grid, 0, 0).error).toBe('#NAME?')
   })
 
