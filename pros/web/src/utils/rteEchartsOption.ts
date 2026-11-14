@@ -1683,6 +1683,12 @@ function valueSplitAreaShown(option: Record<string, unknown>): boolean {
   return isPlainObject(node) && isPlainObject(node.splitArea) && node.splitArea.show === true
 }
 
+function valueAxisLineHidden(option: Record<string, unknown>): boolean {
+  const axis = categoryOnYAxis(option) ? option.xAxis : option.yAxis
+  const node = Array.isArray(axis) ? axis[0] : axis
+  return isPlainObject(node) && isPlainObject(node.axisLine) && node.axisLine.show === false
+}
+
 function categoryAxisTickHidden(option: Record<string, unknown>): boolean {
   const axis = categoryOnYAxis(option) ? option.yAxis : option.xAxis
   const node = Array.isArray(axis) ? axis[0] : axis
@@ -1802,6 +1808,7 @@ function buildCartesianOption(
   hideCategoryAxisLine = false,
   showValueSplitArea = false,
   hideCategoryAxisTick = false,
+  hideValueAxisLine = false,
 ): Record<string, unknown> {
   const category = {
     type: 'category' as const,
@@ -1826,6 +1833,7 @@ function buildCartesianOption(
     ...(namePlace?.value.gap != null ? { nameGap: namePlace.value.gap } : {}),
     ...(hideValueSplitLine ? { splitLine: { show: false } } : {}),
     ...(showValueSplitArea ? { splitArea: { show: true } } : {}),
+    ...(hideValueAxisLine ? { axisLine: { show: false } } : {}),
   }
   return {
     color: FEISHU_TEXT_COLORS.filter((item) => item !== '#1f2329' && item !== '#8f959e'),
@@ -2103,6 +2111,7 @@ export function retypeEchartsOption(
       categoryAxisLineHidden(base),
       valueSplitAreaShown(base),
       categoryAxisTickHidden(base),
+      valueAxisLineHidden(base),
     )
   }
   if (usable && type === 'pie') {
