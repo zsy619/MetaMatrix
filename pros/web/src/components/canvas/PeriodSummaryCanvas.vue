@@ -129,16 +129,54 @@ const fallbackTitle = computed(() => {
 }
 
 .as-panel :deep(.ym-block) {
-  flex: 1;
+  flex: 0 0 auto;
+  height: auto;
   min-height: 0;
   background: transparent;
   border: none;
   box-shadow: none;
 }
 
+.as-panel :deep(.ym-block-body),
+.as-panel :deep(.rte-root),
+.as-panel :deep(.rte-workspace),
+.as-panel :deep(.rte-canvas),
+.as-panel :deep(.rte-body),
+.as-panel :deep(.ProseMirror) {
+  height: auto;
+  max-height: none;
+  max-width: 100%;
+  min-width: 0;
+  overflow: visible;
+  flex: 0 0 auto;
+}
+
+.as-panel :deep(.rte-workspace),
+.as-panel :deep(.rte-canvas),
+.as-panel :deep(.ProseMirror) {
+  width: 100%;
+}
+
+.as-panel :deep(.ProseMirror) {
+  min-height: 160px;
+  font-size: 16px;
+  line-height: 1.7;
+}
+
+.as-panel :deep(.ProseMirror p) {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.as-panel :deep(.pm-max-btn) {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+}
+
 @media (max-width: 720px) {
   .as-scroll {
-    padding: 20px 14px 40px;
+    padding: 20px 14px 96px;
   }
 
   .as-panel {
