@@ -1,7 +1,7 @@
 /** 页眉、页脚、页码。旧文档没有这个字段时视为空，不改变版心。 */
 import { cssPageMargin, type PageMarginBox } from './rtePageMargin'
 
-export const PAGE_NUMBER_STYLES = ['none', 'n', 'page-n', 'page-n-of-m', 'dash', 'roman', 'upper-roman', 'alpha', 'upper-alpha', 'cjk', 'pad', 'slash'] as const
+export const PAGE_NUMBER_STYLES = ['none', 'n', 'page-n', 'page-n-of-m', 'dash', 'roman', 'upper-roman', 'alpha', 'upper-alpha', 'cjk', 'pad', 'slash', 'cjk-formal'] as const
 
 export type PageNumberStyle = (typeof PAGE_NUMBER_STYLES)[number]
 
@@ -37,6 +37,7 @@ export const PAGE_NUMBER_OPTIONS: ReadonlyArray<{ id: PageNumberStyle; label: st
   { id: 'cjk', label: '一, 二, 三' },
   { id: 'pad', label: '01, 02, 03' },
   { id: 'slash', label: '1/5' },
+  { id: 'cjk-formal', label: '壹, 贰, 叁' },
 ]
 
 /** 页眉或页脚占用的最小边带。已有边距更大时不额外加高。 */
@@ -122,6 +123,8 @@ function pageNumberCss(style: PageNumberStyle): string {
       return 'counter(page, decimal-leading-zero)'
     case 'slash':
       return 'counter(page) "/" counter(pages)'
+    case 'cjk-formal':
+      return 'counter(page, simp-chinese-formal)'
     default:
       return ''
   }
@@ -224,6 +227,26 @@ export function applyChromeReserve<T extends { top: number; bottom: number }>(bo
   }
 }
 
+function toCjkFormal(page: number): string {
+  const digits = ['零', '壹', '贰', '叁', '肆', '伍', '陆', '柒', '捌', '玖']
+  const n = Math.max(1, Math.min(9999, Math.floor(page)))
+  if (n < 10) return digits[n]!
+  if (n < 20) return n === 10 ? '拾' : `拾${digits[n - 10]}`
+  const chars = String(n).split('').map((item) => Number(item))
+  const units = ['', '拾', '佰', '仟']
+  const parts: string[] = []
+  chars.forEach((digit, index) => {
+    const place = chars.length - 1 - index
+    if (digit === 0) {
+      if (parts.length && parts[parts.length - 1] !== '零' && index !== chars.length - 1) parts.push('零')
+      return
+    }
+    const head = place === 1 && digit === 1 && index === 0 ? '' : digits[digit]
+    parts.push(`${head}${units[place]}`)
+  })
+  return parts.join('').replace(/零+$/g, '')
+}
+
 function toCjk(page: number): string {
   const digits = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九']
   const n = Math.max(1, Math.min(9999, Math.floor(page)))
@@ -308,6 +331,8 @@ export function formatPageNumber(style: PageNumberStyle, page: number, total: nu
       return String(n).padStart(2, '0')
     case 'slash':
       return `${n}/${m}`
+    case 'cjk-formal':
+      return toCjkFormal(n)
     default:
       return ''
   }
