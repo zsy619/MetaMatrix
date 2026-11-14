@@ -264,9 +264,47 @@ function onRemoveRow(rowId: string) {
 }
 
 .kr-cell :deep(.ym-block) {
-  flex: 1;
+  flex: 0 0 auto;
+  height: auto;
   min-height: 0;
   background: rgba(248, 249, 250, 0.55);
+}
+
+.kr-cell :deep(.ym-block-body),
+.kr-cell :deep(.rte-root),
+.kr-cell :deep(.rte-workspace),
+.kr-cell :deep(.rte-canvas),
+.kr-cell :deep(.rte-body),
+.kr-cell :deep(.ProseMirror) {
+  height: auto;
+  max-height: none;
+  max-width: 100%;
+  min-width: 0;
+  overflow: visible;
+  flex: 0 0 auto;
+}
+
+.kr-cell :deep(.rte-workspace),
+.kr-cell :deep(.rte-canvas),
+.kr-cell :deep(.ProseMirror) {
+  width: 100%;
+}
+
+.kr-cell :deep(.ProseMirror) {
+  min-height: 96px;
+  font-size: 16px;
+  line-height: 1.65;
+}
+
+.kr-cell :deep(.ProseMirror p) {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.kr-cell :deep(.pm-max-btn) {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
 }
 
 .kr-row-actions {
@@ -369,6 +407,7 @@ function onRemoveRow(rowId: string) {
 @media (max-width: 720px) {
   .key-resistance-canvas {
     overflow-y: auto;
+    padding-bottom: 96px;
   }
 
   .kr-col-headers,
@@ -413,7 +452,8 @@ function onRemoveRow(rowId: string) {
   .kr-cell {
     border-right: none;
     border-bottom: 1px solid #eee;
-    min-height: 400px;
+    min-height: 180px;
+    height: auto;
   }
 }
 </style>
