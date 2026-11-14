@@ -330,7 +330,7 @@ type Node =
   | { k: 'cmp'; op: string; l: Node; r: Node }
   | { k: 'call'; name: string; args: Node[] }
 
-const FUNC_NAMES = new Set(['SUM', 'AVERAGE', 'COUNT', 'MAX', 'MIN', 'IF', 'ROUND', 'AND', 'OR', 'ABS', 'INT', 'MOD', 'POWER', 'SQRT', 'SIGN', 'CEILING', 'FLOOR', 'NOT', 'PRODUCT', 'MEDIAN', 'COUNTA', 'ROUNDUP', 'ROUNDDOWN', 'PI', 'EXP', 'LN', 'LOG', 'LOG10', 'FACT'])
+const FUNC_NAMES = new Set(['SUM', 'AVERAGE', 'COUNT', 'MAX', 'MIN', 'IF', 'ROUND', 'AND', 'OR', 'ABS', 'INT', 'MOD', 'POWER', 'SQRT', 'SIGN', 'CEILING', 'FLOOR', 'NOT', 'PRODUCT', 'MEDIAN', 'COUNTA', 'ROUNDUP', 'ROUNDDOWN', 'PI', 'EXP', 'LN', 'LOG', 'LOG10', 'FACT', 'GCD'])
 
 class Parser {
   tokens: LexToken[]
@@ -791,6 +791,28 @@ function evalCall(name: string, args: Node[], ctx: Ctx, at: CellAddress): EvalVa
     let result = 1
     for (let n = 2; n <= Math.floor(value); n += 1) result *= n
     return Number.isFinite(result) ? result : { error: '#VALUE!' }
+  }
+  if (name === 'GCD') {
+    if (!args.length) return { error: '#VALUE!' }
+    const nums: number[] = []
+    for (const arg of args) {
+      const value = evalNode(arg, ctx, at)
+      if (isError(value)) return value
+      if (value < 0) return { error: '#VALUE!' }
+      nums.push(Math.floor(value))
+    }
+    if (nums.every((item) => item === 0)) return { error: '#VALUE!' }
+    const gcd2 = (left: number, right: number): number => {
+      let a = left
+      let b = right
+      while (b) {
+        const next = a % b
+        a = b
+        b = next
+      }
+      return a
+    }
+    return nums.reduce((left, right) => gcd2(left, right))
   }
   if (name === 'ROUND') return evalRound(args, ctx, at)
   if (name === 'ROUNDUP') return evalRoundUp(args, ctx, at)
