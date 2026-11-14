@@ -121,12 +121,13 @@ function removeLine(sectionId: string, lineId: string) {
   flex-direction: column;
   min-height: 0;
   padding: 12px 14px 14px;
+  overflow: auto;
   color: #202124;
   background: var(--cv-page, #f7f7f7);
 }
 .cash-top { flex: none; display: flex; justify-content: space-between; gap: 16px; align-items: center; margin-bottom: 10px; }
 .cash-top h2, .cash-top p { margin: 0; }
-.cash-top p { color: #5f6368; font-size: 13px; }
+.cash-top p { max-width: 42em; color: #3c4043; font-size: 15px; line-height: 1.55; }
 .net { font-size: 18px; padding: 8px 14px; border-radius: 999px; background: #fff; font-variant-numeric: tabular-nums; }
 .cash-grid {
   flex: 1 1 auto;
@@ -158,9 +159,11 @@ h3 {
   letter-spacing: 0.04em;
 }
 .lines { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
-.cash-line { display: grid; grid-template-columns: 1fr 128px 36px; gap: 8px; align-items: center; }
-input { min-height: 40px; border: 1px solid transparent; background: #fff; border-radius: 8px; padding: 6px 10px; font: inherit; font-size: 15px; color: #202124; }
-input[type='number'] { font-variant-numeric: tabular-nums; font-weight: 700; text-align: right; }
+.cash-line { display: grid; grid-template-columns: minmax(0, 1fr) 120px 36px; gap: 8px; align-items: center; min-width: 0; }
+input { width: 100%; min-width: 0; box-sizing: border-box; min-height: 40px; border: 1px solid transparent; background: #fff; border-radius: 8px; padding: 6px 10px; font: inherit; font-size: 15px; color: #202124; }
+input[type='number'] { font-variant-numeric: tabular-nums; font-weight: 700; text-align: right; appearance: textfield; }
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 input:focus { border-color: var(--col-header); outline: none; }
 footer {
   flex: none;
@@ -172,6 +175,7 @@ footer {
   border-top: 1px solid color-mix(in srgb, var(--col-header) 24%, #fff);
 }
 footer button, .cash-line button { min-height: 36px; border: 1px solid color-mix(in srgb, var(--col-header) 30%, #fff); background: #fff; color: var(--col-topic); border-radius: 8px; cursor: pointer; }
+footer button { min-height: 40px; padding: 0 12px; }
 .cash-line button { width: 36px; height: 36px; padding: 0; font-size: 18px; line-height: 1; }
 footer strong { font-size: 18px; font-variant-numeric: tabular-nums; }
 .cash-line button:disabled { opacity: 0.35; }
@@ -180,7 +184,14 @@ footer strong { font-size: 18px; font-variant-numeric: tabular-nums; }
 .is-zero { color: #5f6368; }
 .net.is-in { background: #e7f6ef; color: #125c3b; }
 .net.is-out { background: #fdecea; color: #9b1c1c; }
-@media (max-width: 800px) {
-  .cash-grid { grid-template-columns: repeat(3, minmax(200px, 1fr)); overflow: auto; }
+@media (max-width: 1000px) {
+  .cash-top { flex-wrap: wrap; align-items: flex-start; }
+  .cash-grid { grid-template-columns: 1fr; overflow: visible; }
+  section { min-height: 280px; height: auto; }
+  .lines { overflow: visible; }
+  .cash-line { grid-template-columns: minmax(0, 1fr) 108px 36px; }
+}
+@media (max-width: 480px) {
+  .cash-line { grid-template-columns: minmax(0, 1fr) 84px 36px; }
 }
 </style>
