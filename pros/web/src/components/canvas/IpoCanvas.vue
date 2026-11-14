@@ -15,6 +15,7 @@ import {
   usePanelMaximize,
 } from '../../composables/usePanelMaximize'
 import YModelBlockCard from './YModelBlock.vue'
+import { ipoBlockPreview, ipoPreviewIsShort } from './ipoPreview'
 
 const props = defineProps<{
   doc: IpoDocumentJSON
@@ -66,6 +67,18 @@ function block(id: IpoBlockId): IpoBlock | undefined {
 
 function titleOf(id: IpoBlockId): string {
   return block(id)?.title || DEFAULT_CN[id]
+}
+
+function previewOf(id: IpoBlockId): string {
+  return ipoBlockPreview(block(id)?.items)
+}
+
+function previewClass(id: IpoBlockId): Record<string, boolean> {
+  const text = previewOf(id)
+  return {
+    'is-empty': !text,
+    'is-short': ipoPreviewIsShort(text),
+  }
 }
 
 const hostBlocks = computed(() =>
@@ -170,7 +183,9 @@ onBeforeUnmount(() => {
         @keydown.enter.prevent="openEditor('goal')"
         @keydown.space.prevent="openEditor('goal')"
       >
-        <div class="ipo-box ipo-box--wide" aria-hidden="true" />
+        <div class="ipo-box ipo-box--wide" aria-hidden="true">
+          <p class="ipo-preview" :class="previewClass('goal')">{{ previewOf('goal') || '点击填写' }}</p>
+        </div>
         <div class="ipo-label ipo-label--dark">
           <span class="ipo-cn">{{ titleOf('goal') }}</span>
           <span class="ipo-en">{{ EN_LABEL.goal }}</span>
@@ -199,7 +214,9 @@ onBeforeUnmount(() => {
           <span class="ipo-cn">{{ titleOf('input') }}</span>
           <span class="ipo-en">{{ EN_LABEL.input }}</span>
         </div>
-        <div class="ipo-box" aria-hidden="true" />
+        <div class="ipo-box" aria-hidden="true">
+          <p class="ipo-preview" :class="previewClass('input')">{{ previewOf('input') || '点击填写' }}</p>
+        </div>
       </section>
 
       <!-- Red arrow Input → Process -->
@@ -223,7 +240,9 @@ onBeforeUnmount(() => {
           <span class="ipo-cn">{{ titleOf('process') }}</span>
           <span class="ipo-en">{{ EN_LABEL.process }}</span>
         </div>
-        <div class="ipo-box" aria-hidden="true" />
+        <div class="ipo-box" aria-hidden="true">
+          <p class="ipo-preview" :class="previewClass('process')">{{ previewOf('process') || '点击填写' }}</p>
+        </div>
       </section>
 
       <!-- Red arrow Process → Output -->
@@ -247,7 +266,9 @@ onBeforeUnmount(() => {
           <span class="ipo-cn">{{ titleOf('output') }}</span>
           <span class="ipo-en">{{ EN_LABEL.output }}</span>
         </div>
-        <div class="ipo-box" aria-hidden="true" />
+        <div class="ipo-box" aria-hidden="true">
+          <p class="ipo-preview" :class="previewClass('output')">{{ previewOf('output') || '点击填写' }}</p>
+        </div>
       </section>
 
       <!-- Bidirectional Process ↔ Pattern -->
@@ -272,7 +293,9 @@ onBeforeUnmount(() => {
           <span class="ipo-cn">{{ titleOf('pattern') }}</span>
           <span class="ipo-en">{{ EN_LABEL.pattern }}</span>
         </div>
-        <div class="ipo-box" aria-hidden="true" />
+        <div class="ipo-box" aria-hidden="true">
+          <p class="ipo-preview" :class="previewClass('pattern')">{{ previewOf('pattern') || '点击填写' }}</p>
+        </div>
       </section>
 
       <!-- Feedback: bottom, label left of wide box -->
@@ -290,7 +313,9 @@ onBeforeUnmount(() => {
           <span class="ipo-cn">{{ titleOf('feedback') }}</span>
           <span class="ipo-en">{{ EN_LABEL.feedback }}</span>
         </div>
-        <div class="ipo-box ipo-box--wide" aria-hidden="true" />
+        <div class="ipo-box ipo-box--wide" aria-hidden="true">
+          <p class="ipo-preview" :class="previewClass('feedback')">{{ previewOf('feedback') || '点击填写' }}</p>
+        </div>
       </section>
     </div>
 
@@ -475,11 +500,55 @@ onBeforeUnmount(() => {
 }
 
 .ipo-en {
-  font-size: 11px;
-  font-weight: 500;
+  font-size: 13px;
+  font-weight: 550;
   color: #5f6368;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
   text-transform: none;
+}
+
+.ipo-preview {
+  margin: 0;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  overflow: hidden;
+  color: #202124;
+  font-size: 14px;
+  font-weight: 550;
+  line-height: 1.45;
+  text-align: left;
+  white-space: pre-line;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+}
+
+.ipo-box--wide .ipo-preview {
+  padding: 6px 12px;
+  font-size: 14px;
+  line-height: 1.3;
+  -webkit-line-clamp: 2;
+}
+
+.ipo-preview.is-empty,
+.ipo-preview.is-short {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  -webkit-line-clamp: unset;
+}
+
+.ipo-preview.is-empty {
+  color: #9aa0a6;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+
+.ipo-box--wide .ipo-preview.is-short {
+  justify-content: flex-start;
+  text-align: left;
 }
 
 .ipo-label--accent .ipo-cn {
@@ -624,7 +693,7 @@ onBeforeUnmount(() => {
 }
 
 .ipo-varrow {
-  font-size: 8px;
+  font-size: 11px;
   line-height: 1;
   color: #202124;
 }
