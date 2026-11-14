@@ -57,6 +57,20 @@ const notesBlocks = computed(() => {
   return list
 })
 
+const narrow = ref(false)
+let narrowQuery: MediaQueryList | null = null
+
+function syncNarrow() {
+  narrow.value = !!narrowQuery?.matches
+}
+
+function notesTitle(block: DemandTriangleNotesBlock): string {
+  const dirId = String(block.id).slice('notes:'.length)
+  const raw = legendItems.value.find((item) => item.id === dirId)?.text ?? ''
+  const name = raw.replace(/<[^>]+>/g, '').trim()
+  return name ? `${name} · 描述` : block.title
+}
+
 function notesBlockOf(dirId: string): DemandTriangleNotesBlock | undefined {
   const id = demandTriangleNotesBlockId(dirId)
   return props.doc.blocks.find((b) => b.id === id) as
@@ -190,9 +204,13 @@ watch(maximizedPanelKey, (key) => {
 
 onMounted(() => {
   documentStore.ensureDemandTriangleNotesBlocks()
+  narrowQuery = window.matchMedia('(max-width: 960px)')
+  syncNarrow()
+  narrowQuery.addEventListener('change', syncNarrow)
 })
 
 onBeforeUnmount(() => {
+  narrowQuery?.removeEventListener('change', syncNarrow)
   if (
     activeNotesDirId.value &&
     maximizedPanelKey.value === activeNotesMaximizeKey.value
@@ -693,14 +711,15 @@ const vertexPanels = computed(() => {
       隐藏挂载各方向描述 YModelBlock：点击「描述」写入全局 maximizedPanelKey，
       由块内 Teleport .pm-overlay 铺满文档视口（approach B，v-if 避免 undefined block.id）。
     -->
-    <div class="dt-notes-host" aria-hidden="true">
-      <template v-for="block in notesBlocks" :key="block.id">
+    <div class="dt-notes-host" :aria-hidden="narrow ? undefined : true">
+      <section v-for="block in notesBlocks" :key="block.id" class="dt-note-card">
+        <h3 class="dt-note-title">{{ notesTitle(block) }}</h3>
         <YModelBlockCard
           v-if="block"
           :block="block"
           hide-title
         />
-      </template>
+      </section>
     </div>
   </div>
 </template>
@@ -1045,6 +1064,11 @@ const vertexPanels = computed(() => {
   pointer-events: none;
 }
 
+.dt-note-title {
+  display: none;
+  margin: 0;
+}
+
 .axis-key { display: none; }
 
 @media (max-width: 960px) {
@@ -1090,6 +1114,88 @@ const vertexPanels = computed(() => {
     font-size: 15px;
     line-height: 1.55;
     color: #3c4043;
+  }
+
+  .dt-canvas { padding-bottom: 96px; }
+
+  .dt-notes-host {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    opacity: 1;
+    pointer-events: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 12px;
+  }
+
+  .dt-note-card {
+    padding: 12px 12px 10px;
+    border: 1px solid #e4e6e8;
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 8px 20px rgba(62, 48, 28, 0.06);
+  }
+
+  .dt-note-title {
+    display: block;
+    margin: 0 0 8px;
+    font-size: 16px;
+    font-weight: 750;
+    line-height: 1.35;
+    color: #202124;
+  }
+
+  .dt-note-card :deep(.ym-block),
+  .dt-note-card :deep(.ym-block-body),
+  .dt-note-card :deep(.rte-root),
+  .dt-note-card :deep(.rte-workspace),
+  .dt-note-card :deep(.rte-canvas),
+  .dt-note-card :deep(.rte-body),
+  .dt-note-card :deep(.ProseMirror) {
+    height: auto;
+    max-height: none;
+    max-width: 100%;
+    min-width: 0;
+    overflow: visible;
+    flex: 0 0 auto;
+  }
+
+  .dt-note-card :deep(.ym-block) {
+    min-height: 0;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+  }
+
+  .dt-note-card :deep(.rte-workspace),
+  .dt-note-card :deep(.rte-canvas),
+  .dt-note-card :deep(.ProseMirror) {
+    width: 100%;
+  }
+
+  .dt-note-card :deep(.ProseMirror) {
+    min-height: 96px;
+    font-size: 15px;
+    line-height: 1.55;
+  }
+
+  .dt-note-card :deep(.ProseMirror p) {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .dt-note-card :deep(.pm-max-btn) {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+  }
+
+  .legend-notes-btn {
+    min-height: 40px;
+    font-size: 15px;
   }
 }
 </style>
