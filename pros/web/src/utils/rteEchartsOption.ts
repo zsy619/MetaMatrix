@@ -1659,10 +1659,10 @@ function legendLayout(option: Record<string, unknown>): Record<string, unknown> 
   return place
 }
 
-function axisNameLayout(axis: unknown): { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique'; family?: string } {
+function axisNameLayout(axis: unknown): { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique'; family?: string; leading?: number } {
   const node = Array.isArray(axis) ? axis[0] : axis
   if (!isPlainObject(node)) return {}
-  const place: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique'; family?: string } = {}
+  const place: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique'; family?: string; leading?: number } = {}
   if (node.nameLocation === 'start' || node.nameLocation === 'middle' || node.nameLocation === 'end') {
     place.location = node.nameLocation
   }
@@ -1695,24 +1695,29 @@ function axisNameLayout(axis: unknown): { location?: 'start' | 'middle' | 'end';
       const family = style.fontFamily.trim()
       if (family && family.length <= 40 && !/url\(|expression\(|javascript:|;/i.test(family)) place.family = family
     }
+    if (typeof style.lineHeight === 'number' && Number.isFinite(style.lineHeight)) {
+      const leading = Math.round(style.lineHeight)
+      if (leading >= 8 && leading <= 80) place.leading = leading
+    }
   }
   return place
 }
 
-function axisNameTextStyle(place?: { font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique'; family?: string }): { fontSize?: number; color?: string; fontWeight?: string | number; fontStyle?: 'normal' | 'italic' | 'oblique'; fontFamily?: string } | undefined {
-  if (!place || (place.font == null && !place.ink && place.weight == null && !place.slant && !place.family)) return undefined
+function axisNameTextStyle(place?: { font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique'; family?: string; leading?: number }): { fontSize?: number; color?: string; fontWeight?: string | number; fontStyle?: 'normal' | 'italic' | 'oblique'; fontFamily?: string; lineHeight?: number } | undefined {
+  if (!place || (place.font == null && !place.ink && place.weight == null && !place.slant && !place.family && place.leading == null)) return undefined
   return {
     ...(place.font != null ? { fontSize: place.font } : {}),
     ...(place.ink ? { color: place.ink } : {}),
     ...(place.weight != null ? { fontWeight: place.weight } : {}),
     ...(place.slant ? { fontStyle: place.slant } : {}),
     ...(place.family ? { fontFamily: place.family } : {}),
+    ...(place.leading != null ? { lineHeight: place.leading } : {}),
   }
 }
 
 function cartesianNameLayout(option: Record<string, unknown>): {
-  category: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique'; family?: string }
-  value: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique'; family?: string }
+  category: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique'; family?: string; leading?: number }
+  value: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique'; family?: string; leading?: number }
 } {
   const horizontal = categoryOnYAxis(option)
   return {
@@ -1888,8 +1893,8 @@ function buildCartesianOption(
   scale?: { interval?: number; minInterval?: number; inverse?: boolean; log?: boolean; logBase?: number; fromData?: boolean; side?: 'left' | 'right' | 'top' | 'bottom'; shift?: number; hidden?: boolean; parts?: number },
   boundaryGap?: boolean,
   namePlace?: {
-    category: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique'; family?: string }
-    value: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique'; family?: string }
+    category: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique'; family?: string; leading?: number }
+    value: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique'; family?: string; leading?: number }
   },
   hideValueSplitLine = false,
   hideCategoryAxisLine = false,
