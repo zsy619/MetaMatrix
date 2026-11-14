@@ -213,8 +213,14 @@ export function estimatePageCount(contentPx: number, pageInnerPx: number): numbe
 /** 分页符把正文切成几段。落在开头或结尾的符不单独占一段。 */
 export function segmentHeights(breakOffsets: readonly number[], contentHeight: number): number[] {
   const end = Number.isFinite(contentHeight) ? Math.max(0, contentHeight) : 0
+  const seen = new Set<number>()
   const marks = breakOffsets
     .filter((offset) => Number.isFinite(offset) && offset > 0 && offset < end)
+    .filter((offset) => {
+      if (seen.has(offset)) return false
+      seen.add(offset)
+      return true
+    })
     .sort((a, b) => a - b)
   const points = [0, ...marks, end]
   const heights: number[] = []
