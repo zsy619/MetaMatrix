@@ -126,7 +126,9 @@ export function isAttachmentAnchor(href: string, text: string, className = ''): 
   if (className.split(/\s+/).includes('rte-attachment-link')) return true
   if (text.replace(/^\s+/, '').startsWith('📎')) return true
   const kind = attachmentKindFor(text, href, '')
-  return kind === 'pdf' || kind === 'docx' || kind === 'doc' || kind === 'sheet' || kind === 'audio' || kind === 'video'
+  if (kind === 'pdf' || kind === 'docx' || kind === 'doc' || kind === 'sheet' || kind === 'audio' || kind === 'video') return true
+  const path = href.split('?')[0]?.toLowerCase() || ''
+  return /\.(csv|tsv)$/.test(path)
 }
 
 function splitDelimitedLine(line: string, delimiter: string): string[] {
