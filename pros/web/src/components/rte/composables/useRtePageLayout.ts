@@ -18,7 +18,7 @@ import {
   type PageMargin,
 } from '../../../utils/rtePageMargin'
 import { bumpToolbarUndoEpoch } from '../../../utils/rteToolbarGroups'
-import { applyChromeReserve, EMPTY_PAGE_CHROME, type PanelPageChrome } from '../../../utils/rtePageChrome'
+import { applyChromeReserve, EMPTY_PAGE_CHROME, printSheetCss, type PanelPageChrome } from '../../../utils/rtePageChrome'
 
 /** 页面大小、页边距和打印 @page。与工具栏分组共用一次 Ctrl+Z。 */
 export function useRtePageLayout(deps: {
@@ -97,14 +97,15 @@ export function useRtePageLayout(deps: {
 
   function applyPrintPageStyle(id: RtePageSizeId) {
     const size = cssPageSize(id)
-    const margin = pageScreenMargin.value
+    const chrome = deps.chrome?.() || EMPTY_PAGE_CHROME
+    const box = applyChromeReserve(screenMargin(pageMargin.value, !pageSizeMeta.value.paper), chrome)
     let el = document.getElementById('rte-print-page-size')
     if (!el) {
       el = document.createElement('style')
       el.id = 'rte-print-page-size'
       document.head.appendChild(el)
     }
-    el.textContent = `@media print { @page { size: ${size}; margin: ${cssPageMargin(margin)}; } }`
+    el.textContent = printSheetCss(size, box, chrome.gutter)
   }
 
   function applyPageMargin(next: PageMargin, recordUndo: boolean) {

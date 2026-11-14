@@ -1,4 +1,5 @@
 /** 页眉、页脚、页码。旧文档没有这个字段时视为空，不改变版心。 */
+import { cssPageMargin, type PageMarginBox } from './rtePageMargin'
 
 export const PAGE_NUMBER_STYLES = ['none', 'n', 'page-n', 'page-n-of-m', 'dash'] as const
 
@@ -10,7 +11,7 @@ export type PanelPageChrome = {
   footer: string
   footerEven: string
   pageNumber: PageNumberStyle
-  /** 装订线，加在左边距上，单位毫米。 */
+  /** 装订线，单位毫米。屏幕上加在左边，打印时奇数页在左、偶数页在右。 */
   gutter: number
 }
 
@@ -115,6 +116,16 @@ function pageSideRule(selector: string, header: string, footer: string, pageNumb
     lines.push(`@bottom-center { content: ""; ${text} }`)
   }
   return `@page ${selector} {\n${lines.join('\n')}\n}`
+}
+
+/** 打印用的纸张和页边距。有装订线时，奇数页加在左边，偶数页加在右边。 */
+export function printSheetCss(size: string, box: PageMarginBox, gutter = 0): string {
+  const safeSize = String(size || 'A4').replace(/[^a-z0-9.\s-]/gi, '') || 'A4'
+  const g = Number.isFinite(gutter) ? Math.min(40, Math.max(0, Math.round(gutter * 10) / 10)) : 0
+  if (!g) return `@media print { @page { size: ${safeSize}; margin: ${cssPageMargin(box)}; } }`
+  const odd = cssPageMargin({ ...box, left: box.left + g })
+  const even = cssPageMargin({ ...box, right: box.right + g })
+  return `@media print { @page { size: ${safeSize}; margin: ${odd}; } @page :left { margin: ${even}; } }`
 }
 
 /** 浏览器打印时，奇数页和偶数页各用自己的页眉页脚，页码留在页边。 */

@@ -10,6 +10,7 @@ import {
   pageIndexAt,
   pagesWithBreaks,
   printPageSideCss,
+  printSheetCss,
   segmentHeights,
   splitPreviewPages,
   unwrapPageBreaks,
@@ -115,6 +116,9 @@ assert.deepEqual(
   }),
   { top: 10, bottom: 10 },
 )
+assert.match(printSheetCss('A4', { top: 20, right: 15, bottom: 20, left: 15 }, 8), /margin: 20mm 15mm 20mm 23mm/)
+assert.match(printSheetCss('A4', { top: 20, right: 15, bottom: 20, left: 15 }, 8), /@page :left \{ margin: 20mm 23mm 20mm 15mm/)
+assert.equal(printSheetCss('A4', { top: 20, right: 15, bottom: 20, left: 15 }, 0).includes(':left'), false)
 assert.match(printPageSideCss(sideChrome), /@page :left/)
 assert.match(printPageSideCss(sideChrome), /偶数/)
 assert.equal(printPageSideCss(normalizePageChrome({ header: '只有奇数', pageNumber: 'none' })), '')
