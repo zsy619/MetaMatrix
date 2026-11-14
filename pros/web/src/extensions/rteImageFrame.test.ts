@@ -38,6 +38,20 @@ describe('图片边框和圆角', () => {
     expect(style).toContain('width: 40%')
   })
 
+  it('宽度写成全角 ５０％ 时按 50% 留下', () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    editor = new Editor({
+      element: host,
+      extensions: [
+        StarterKit.configure({ dropcursor: false }),
+        RteImage.configure({ inline: false, allowBase64: true, HTMLAttributes: { class: 'rte-image' } }),
+      ],
+      content: `<img src="${PIXEL}" width="５０％" alt="全角百分">`,
+    })
+    expect(editor.getHTML()).toContain('data-display-width="50%"')
+  })
+
   it('宽度写成 50,5% 时按 50.5% 留下', () => {
     const host = document.createElement('div')
     document.body.appendChild(host)

@@ -17,7 +17,7 @@ function withCropStyle(attrs: Record<string, unknown>, extra: Record<string, str
 }
 
 function percentWidthAttr(raw: string): string | null {
-  const text = raw.trim().replace(/\s+/g, '').replace(/％/g, '%').replace(/，/g, '.').replace(/,/g, '.')
+  const text = raw.trim().normalize('NFKC').replace(/\s+/g, '').replace(/，/g, '.').replace(/,/g, '.')
   return /^\d+(\.\d+)?%$/.test(text) ? text : null
 }
 
