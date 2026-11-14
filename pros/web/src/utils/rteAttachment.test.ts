@@ -27,6 +27,9 @@ describe('附件链接', () => {
     expect(isAttachmentAnchor('https://files.example.com/a.pdf', '📎 说明.pdf', 'rte-link')).toBe(true)
     expect(isAttachmentAnchor('/media/asset-1', '说明.pdf', 'rte-attachment-link rte-link')).toBe(true)
     expect(isAttachmentAnchor('https://example.com', '普通链接', 'rte-link')).toBe(false)
+    expect(isAttachmentAnchor('https://files.example.com/说明.pdf', '说明', 'rte-link')).toBe(true)
+    expect(isAttachmentAnchor('https://files.example.com/预算.xlsx', '预算', 'rte-link')).toBe(true)
+    expect(isAttachmentAnchor('https://files.example.com/讲解.mp3', '讲解', 'rte-link')).toBe(true)
   })
 
   it('超大文件和网页脚本不能上传，Word 可以', () => {

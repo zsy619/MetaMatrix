@@ -124,7 +124,9 @@ export function rteAttachmentUploadReject(name: string, mime: string, size: numb
 export function isAttachmentAnchor(href: string, text: string, className = ''): boolean {
   if (!attachmentInsertHref(href)) return false
   if (className.split(/\s+/).includes('rte-attachment-link')) return true
-  return text.replace(/^\s+/, '').startsWith('📎')
+  if (text.replace(/^\s+/, '').startsWith('📎')) return true
+  const kind = attachmentKindFor(text, href, '')
+  return kind === 'pdf' || kind === 'docx' || kind === 'doc' || kind === 'sheet' || kind === 'audio' || kind === 'video'
 }
 
 function splitDelimitedLine(line: string, delimiter: string): string[] {
