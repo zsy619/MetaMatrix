@@ -109,6 +109,21 @@ describe('图片边框和圆角', () => {
     expect(editor.getHTML()).toContain('height="180"')
   })
 
+  it('样式里的 object-fit 会收成适配方式', () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    editor = new Editor({
+      element: host,
+      extensions: [
+        StarterKit.configure({ dropcursor: false }),
+        RteImage.configure({ inline: false, allowBase64: true, HTMLAttributes: { class: 'rte-image' } }),
+      ],
+      content: `<img src="${PIXEL}" style="object-fit: cover" alt="覆盖">`,
+    })
+    expect(editor.getHTML()).toContain('data-fit="cover"')
+    expect(editor.getHTML()).toContain('object-fit: cover')
+  })
+
   it('图片设成不缩放时保持原始尺寸', () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
