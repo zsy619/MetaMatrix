@@ -108,6 +108,22 @@ assert.equal(searchToolbarTools(moreAliases, '加黑')[0]?.key, 'bold')
 assert.equal(searchToolbarTools(moreAliases, '颜文字')[0]?.key, 'emoji')
 assert.equal(searchToolbarTools(moreAliases, '复制md')[0]?.key, 'copyMd')
 assert.equal(searchToolbarTools(moreAliases, '艾特')[0]?.key, 'mentionBtn')
+const spoken = [{
+  id: 'spoken',
+  label: '口语',
+  tools: [
+    { key: 'undo', label: '撤销钮' },
+    { key: 'bold', label: '粗' },
+    { key: 'table', label: '表格钮' },
+    { key: 'speak', label: '朗读钮' },
+    { key: 'clear', label: '清除钮' },
+  ],
+}]
+assert.equal(searchToolbarTools(spoken, '返回')[0]?.key, 'undo')
+assert.equal(searchToolbarTools(spoken, '变粗')[0]?.key, 'bold')
+assert.equal(searchToolbarTools(spoken, '画表')[0]?.key, 'table')
+assert.equal(searchToolbarTools(spoken, '念出来')[0]?.key, 'speak')
+assert.equal(searchToolbarTools(spoken, '去掉格式')[0]?.key, 'clear')
 assert.equal(readStoredRibbonTab('style', tabs), 'style')
 assert.equal(readStoredRibbonTab('missing', tabs), 'edit')
 assert.equal(readStoredRibbonTab(null, []), 'edit')
