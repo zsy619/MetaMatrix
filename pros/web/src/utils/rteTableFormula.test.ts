@@ -70,6 +70,10 @@ assert.equal(evaluateCellFormula('B2', grid2, 0, 0), null)
 // 百分号
 assert.equal(evaluateCellFormula('=50%+1', grid2, 0, 0), '1.5')
 
+// 从 Excel 贴来的绝对引用，$ 不影响取值
+assert.equal(evaluateCellFormula('=$A$1', grid2, 0, 0), '1')
+assert.equal(evaluateCellFormula('=SUM($A$1:$B$1)', grid2, 0, 0), '3')
+
 // 重算：公式引用另一个公式
 const grid3 = [
   ['10', '20'],

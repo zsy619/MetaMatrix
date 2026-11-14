@@ -31,6 +31,12 @@ describe('表格结构变化后的公式', () => {
     const mapRow = (row: number) => (row >= 2 ? row + 1 : row)
     expect(remapFormulaByAxis('=SUM(A1:A3)', mapRow, sameCol)).toBe('=SUM(A1:A4)')
   })
+
+  it('绝对引用跟着格子走，美元符号留着', () => {
+    const mapRow = (row: number) => row + 1
+    expect(remapFormulaByAxis('=$A$1', mapRow, sameCol)).toBe('=$A$2')
+    expect(remapFormulaByAxis('=SUM($A$1:$A$3)', mapRow, sameCol)).toBe('=SUM($A$2:$A$4)')
+  })
 })
 
 describe('排序后的公式行号', () => {

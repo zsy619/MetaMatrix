@@ -50,16 +50,21 @@ export function parseCellAddress(text: string): CellAddress | null {
 /** 公式里提到的单元格和区域，按出现顺序去重。 */
 export function formulaReferences(formula: string): string[] {
   const body = String(formula ?? '').trim().replace(/^=/, '')
-  const found = body.match(/\b[A-Za-z]{1,3}[1-9][0-9]*(?::[A-Za-z]{1,3}[1-9][0-9]*)?\b/g) || []
+  const found = body.match(/\$?[A-Za-z]{1,3}\$?[1-9][0-9]*(?::\$?[A-Za-z]{1,3}\$?[1-9][0-9]*)?/g) || []
   const seen = new Set<string>()
   const out: string[] = []
   for (const token of found) {
-    const key = token.toUpperCase()
+    const key = token.replace(/\$/g, '').toUpperCase()
     if (seen.has(key)) continue
     seen.add(key)
     out.push(key)
   }
   return out
+}
+
+function relockRef(text: string, colAbs: boolean, rowAbs: boolean): string {
+  if (text === '#REF!' || (!colAbs && !rowAbs)) return text
+  return text.replace(/([A-Za-z]+)([0-9]+)/g, (_, col: string, row: string) => `${colAbs ? '$' : ''}${col}${rowAbs ? '$' : ''}${row}`)
 }
 
 /** { col: 2, row: 3 } -> 'B3' */
@@ -89,20 +94,22 @@ export function remapFormulaByAxis(
   if (!raw.trim().startsWith('=')) return raw
   const held: string[] = []
   const ranged = raw.replace(
-    /\b([A-Za-z]{1,3})([1-9][0-9]*):([A-Za-z]{1,3})([1-9][0-9]*)\b/g,
-    (all, c1: string, r1: string, c2: string, r2: string) => {
+    /(\$?)([A-Za-z]{1,3})(\$?)([1-9][0-9]*):(\$?)([A-Za-z]{1,3})(\$?)([1-9][0-9]*)/g,
+    (all, c1lock: string, c1: string, r1lock: string, r1: string, c2lock: string, c2: string, r2lock: string, r2: string) => {
       const from = parseCellAddress(`${c1}${r1}`)
       const to = parseCellAddress(`${c2}${r2}`)
       if (!from || !to) return all
       const token = `\u0000${held.length}\u0000`
-      held.push(remapFormulaRange(from, to, mapRow, mapCol))
+      const next = remapFormulaRange(from, to, mapRow, mapCol)
+      held.push(relockRef(next, c1lock === '$' && c2lock === '$', r1lock === '$' && r2lock === '$'))
       return token
     },
   )
-  const cells = ranged.replace(/\b([A-Za-z]{1,3})([1-9][0-9]*)\b/g, (all, col: string, row: string) => {
+  const cells = ranged.replace(/(\$?)([A-Za-z]{1,3})(\$?)([1-9][0-9]*)\b/g, (all, colLock: string, col: string, rowLock: string, row: string) => {
     const addr = parseCellAddress(`${col}${row}`)
     if (!addr) return all
-    return remapOneAddress(addr, mapRow, mapCol, all)
+    const next = remapOneAddress(addr, mapRow, mapCol, `${col}${row}`)
+    return relockRef(next, colLock === '$', rowLock === '$')
   })
   return cells.replace(/\u0000(\d+)\u0000/g, (_all, index: string) => held[Number(index)] ?? '#REF!')
 }
@@ -587,7 +594,7 @@ function evalNode(node: Node, ctx: Ctx, at: CellAddress): EvalValue {
 
 /** 求公式主体（不含前导 =）。抛 FormulaError 表示公式非法。 */
 function evalFormulaText(body: string, ctx: Ctx, at: CellAddress): EvalValue {
-  const text = String(body ?? '').trim()
+  const text = String(body ?? '').trim().replace(/\$/g, '')
   if (!text) throw new FormulaError('#VALUE!')
   const node = parseFormula(text)
   return evalNode(node, ctx, at)

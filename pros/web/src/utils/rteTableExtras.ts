@@ -19,9 +19,9 @@ function stayInTable(tr: Transaction, tablePos: number): Transaction {
 /** 行被挪走以后，公式里的行号跟着新位置走。 */
 export function remapFormulaRows(formula: string, rowMap: Map<number, number>): string {
   if (!formula.startsWith('=')) return formula
-  return formula.replace(/\b([A-Za-z]{1,3})([1-9][0-9]*)\b/g, (all, col: string, row: string) => {
+  return formula.replace(/(\$?)([A-Za-z]{1,3})(\$?)([1-9][0-9]*)\b/g, (all, colLock: string, col: string, rowLock: string, row: string) => {
     const next = rowMap.get(Number(row))
-    return next ? `${col}${next}` : all
+    return next ? `${colLock}${col}${rowLock}${next}` : all
   })
 }
 
