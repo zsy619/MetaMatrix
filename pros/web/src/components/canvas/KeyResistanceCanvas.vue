@@ -105,10 +105,12 @@ function onRemoveRow(rowId: string) {
               type="button"
               class="kr-row-delete"
               title="删除本行"
+              aria-label="删除本行"
               :disabled="doc.rows.length <= 1"
               @click="onRemoveRow(row.id)"
             >
-              ×
+              <span class="kr-row-delete-mark" aria-hidden="true">×</span>
+              <span class="kr-row-delete-text">删除本行</span>
             </button>
           </div>
         </div>
@@ -202,7 +204,7 @@ function onRemoveRow(rowId: string) {
 .kr-col-headers {
   flex-shrink: 0;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr)) 36px;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) 52px;
   background: transparent;
   border-bottom: 1px solid var(--cv-frame, #ececec);
 }
@@ -245,7 +247,7 @@ function onRemoveRow(rowId: string) {
 
 .kr-row {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr)) 36px;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) 52px;
   min-height: 400px;
   border-bottom: 1px solid var(--cv-frame, #ececec);
 }
@@ -275,16 +277,23 @@ function onRemoveRow(rowId: string) {
 }
 
 .kr-row-delete {
-  width: 22px;
-  height: 22px;
-  border: none;
-  border-radius: 4px;
-  background: transparent;
-  color: #9aa0a6;
-  font-size: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid #e4e6e8;
+  border-radius: 8px;
+  background: #fff;
+  color: #5f6368;
+  font-size: 22px;
   line-height: 1;
   cursor: pointer;
   padding: 0;
+}
+
+.kr-row-delete-text {
+  display: none;
 }
 
 .kr-row-delete:hover:not(:disabled) {
@@ -308,12 +317,13 @@ function onRemoveRow(rowId: string) {
 
 .kr-add-btn {
   border: 1px solid #e4e6e8;
-  border-radius: 6px;
+  border-radius: 8px;
   background: #fff;
-  color: #5f6368;
-  font-size: 13px;
-  font-weight: 600;
-  padding: 6px 16px;
+  color: #3c4043;
+  font-size: 15px;
+  font-weight: 650;
+  min-height: 40px;
+  padding: 8px 18px;
   cursor: pointer;
   transition:
     background 0.12s ease,
@@ -335,10 +345,10 @@ function onRemoveRow(rowId: string) {
 }
 
 .kr-tips-title {
-  margin: 0 0 4px;
-  font-size: 12px;
-  font-weight: 600;
-  color: #5f6368;
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #3c4043;
 }
 
 .kr-tips {
@@ -351,10 +361,9 @@ function onRemoveRow(rowId: string) {
 }
 
 .kr-tips li {
-  font-size: 12px;
+  font-size: 14px;
   color: #c75b3a;
-  line-height: 1.45;
-  opacity: 0.92;
+  line-height: 1.5;
 }
 
 @media (max-width: 720px) {
@@ -367,9 +376,34 @@ function onRemoveRow(rowId: string) {
     grid-template-columns: 1fr;
   }
 
-  .kr-col-header--actions,
-  .kr-row-actions {
+  .kr-col-header--actions {
     display: none;
+  }
+
+  .kr-row-actions {
+    display: flex;
+    justify-content: flex-end;
+    padding: 8px 12px 14px;
+  }
+
+  .kr-row-delete {
+    width: auto;
+    height: 40px;
+    gap: 6px;
+    padding: 0 14px;
+    border-color: #f3c1bc;
+    background: #fff;
+    color: #c5221f;
+    font-size: 15px;
+    font-weight: 650;
+  }
+
+  .kr-row-delete-mark {
+    font-size: 20px;
+  }
+
+  .kr-row-delete-text {
+    display: inline;
   }
 
   .kr-row {
