@@ -93,6 +93,13 @@
   overflow: hidden;
 }
 
+@media (max-width: 900px) {
+  .canvas-viewport .bmc-grid.bmc-grid {
+    min-width: 0;
+    overflow: visible;
+  }
+}
+
 .canvas-viewport .raci-sheet {
   overflow: auto;
 }
