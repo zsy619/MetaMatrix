@@ -76,6 +76,11 @@ assert.equal(evaluateCellFormula('=$A$1', grid2, 0, 0), '1')
 assert.equal(evaluateCellFormula('=SUM($A$1:$B$1)', grid2, 0, 0), '3')
 
 // 求和区域比表格长时，多出来的格子跳过，不把整段算成 #REF!
+assert.equal(evaluateCellFormula('=POWER(A1,B1)', [['2', '3']], 0, 0), '8')
+assert.equal(evaluateCellFormula('=A1^B1', [['2', '3']], 0, 0), '8')
+assert.equal(evaluateCellFormula('=2^3^2', [['0']], 0, 0), '512')
+assert.equal(evaluateCellFormula('=-2^2', [['0']], 0, 0), '-4')
+assert.deepEqual(evaluateFormula('=POWER(0,-1)', [['0']], 0, 0), { ok: false, value: null, error: '#DIV/0!' })
 assert.equal(evaluateCellFormula('=MOD(A1,B1)', [['5', '2']], 0, 0), '1')
 assert.equal(evaluateCellFormula('=MOD(A1,B1)', [['-5', '2']], 0, 0), '1')
 assert.deepEqual(evaluateFormula('=MOD(A1,0)', [['5']], 0, 0), { ok: false, value: null, error: '#DIV/0!' })

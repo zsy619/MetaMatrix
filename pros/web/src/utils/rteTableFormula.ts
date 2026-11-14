@@ -60,6 +60,7 @@ export function normalizeFormulaPunctuation(text: string): string {
     .replace(/\uFF0D/g, '-')
     .replace(/\u00D7/g, '*')
     .replace(/\u00F7/g, '/')
+    .replace(/\uFF3E/g, '^')
     .replace(/\uFF1E/g, '>')
     .replace(/\uFF1C/g, '<')
     .replace(/\uFF1D/g, '=')
@@ -302,7 +303,7 @@ function lex(src: string): LexToken[] {
     else if (ch === ',') tokens.push({ t: 'comma' })
     else if (ch === ':') tokens.push({ t: 'colon' })
     else if (ch === '%') tokens.push({ t: 'pct' })
-    else if (ch === '+' || ch === '-' || ch === '*' || ch === '/') tokens.push({ t: 'op', v: ch })
+    else if (ch === '+' || ch === '-' || ch === '*' || ch === '/' || ch === '^') tokens.push({ t: 'op', v: ch })
     else if (ch === '<' || ch === '>' || ch === '=') {
       const next = src[i + 1]
       let op = ch
@@ -329,7 +330,7 @@ type Node =
   | { k: 'cmp'; op: string; l: Node; r: Node }
   | { k: 'call'; name: string; args: Node[] }
 
-const FUNC_NAMES = new Set(['SUM', 'AVERAGE', 'COUNT', 'MAX', 'MIN', 'IF', 'ROUND', 'AND', 'OR', 'ABS', 'INT', 'MOD'])
+const FUNC_NAMES = new Set(['SUM', 'AVERAGE', 'COUNT', 'MAX', 'MIN', 'IF', 'ROUND', 'AND', 'OR', 'ABS', 'INT', 'MOD', 'POWER'])
 
 class Parser {
   tokens: LexToken[]
@@ -380,7 +381,14 @@ class Parser {
       const arg = this.parseUnary()
       return t.v === '-' ? { k: 'unary', op: '-', arg } : arg
     }
-    return this.parsePostfix()
+    return this.parsePower()
+  }
+  parsePower(): Node {
+    const left = this.parsePostfix()
+    const token = this.peek()
+    if (!token || token.t !== 'op' || token.v !== '^') return left
+    this.next()
+    return { k: 'bin', op: '^', l: left, r: this.parseUnary() }
   }
   parsePostfix(): Node {
     let node = this.parsePrimary()
@@ -567,6 +575,23 @@ function evalRound(args: Node[], ctx: Ctx, at: CellAddress): EvalValue {
   return roundHalfAway(value, digits)
 }
 
+function raisePower(base: number, exp: number): EvalValue {
+  if (base === 0 && exp < 0) return { error: '#DIV/0!' }
+  if (base < 0 && !Number.isInteger(exp)) return { error: '#VALUE!' }
+  const result = base ** exp
+  if (!Number.isFinite(result)) return { error: '#VALUE!' }
+  return result
+}
+
+function evalPower(args: Node[], ctx: Ctx, at: CellAddress): EvalValue {
+  if (args.length !== 2) return { error: '#VALUE!' }
+  const base = evalNode(args[0]!, ctx, at)
+  if (isError(base)) return base
+  const exp = evalNode(args[1]!, ctx, at)
+  if (isError(exp)) return exp
+  return raisePower(base, exp)
+}
+
 function evalMod(args: Node[], ctx: Ctx, at: CellAddress): EvalValue {
   if (args.length !== 2) return { error: '#VALUE!' }
   const value = evalNode(args[0]!, ctx, at)
@@ -624,6 +649,7 @@ function evalCall(name: string, args: Node[], ctx: Ctx, at: CellAddress): EvalVa
   if (name === 'ABS') return evalAbs(args, ctx, at)
   if (name === 'INT') return evalInt(args, ctx, at)
   if (name === 'MOD') return evalMod(args, ctx, at)
+  if (name === 'POWER') return evalPower(args, ctx, at)
   if (name === 'ROUND') return evalRound(args, ctx, at)
   const values: number[] = []
   for (const arg of args) {
@@ -705,6 +731,8 @@ function evalNode(node: Node, ctx: Ctx, at: CellAddress): EvalValue {
         case '/':
           if (r === 0) return { error: '#DIV/0!' }
           return l / r
+        case '^':
+          return raisePower(l, r)
         default:
           return { error: '#VALUE!' }
       }
