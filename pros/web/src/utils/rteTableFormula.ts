@@ -330,7 +330,7 @@ type Node =
   | { k: 'cmp'; op: string; l: Node; r: Node }
   | { k: 'call'; name: string; args: Node[] }
 
-const FUNC_NAMES = new Set(['SUM', 'AVERAGE', 'COUNT', 'MAX', 'MIN', 'IF', 'ROUND', 'AND', 'OR', 'ABS', 'INT', 'MOD', 'POWER', 'SQRT', 'SIGN', 'CEILING', 'FLOOR', 'NOT', 'PRODUCT', 'MEDIAN', 'COUNTA', 'ROUNDUP'])
+const FUNC_NAMES = new Set(['SUM', 'AVERAGE', 'COUNT', 'MAX', 'MIN', 'IF', 'ROUND', 'AND', 'OR', 'ABS', 'INT', 'MOD', 'POWER', 'SQRT', 'SIGN', 'CEILING', 'FLOOR', 'NOT', 'PRODUCT', 'MEDIAN', 'COUNTA', 'ROUNDUP', 'ROUNDDOWN'])
 
 class Parser {
   tokens: LexToken[]
@@ -562,6 +562,26 @@ function roundHalfAway(value: number, digits: number): number {
   return rounded / factor
 }
 
+function roundToward(value: number, digits: number): number {
+  const factor = 10 ** digits
+  const scaled = Math.abs(value) * factor
+  const cut = Math.floor(scaled + 1e-10)
+  return (Math.sign(value) * cut) / factor
+}
+
+function evalRoundDown(args: Node[], ctx: Ctx, at: CellAddress): EvalValue {
+  if (!args.length || args.length > 2) return { error: '#VALUE!' }
+  const value = evalNode(args[0]!, ctx, at)
+  if (isError(value)) return value
+  let digits = 0
+  if (args[1]) {
+    const places = evalNode(args[1], ctx, at)
+    if (isError(places)) return places
+    digits = Math.max(-6, Math.min(6, Math.trunc(places)))
+  }
+  return roundToward(value, digits)
+}
+
 function roundAway(value: number, digits: number): number {
   const factor = 10 ** digits
   const scaled = Math.abs(value) * factor
@@ -727,6 +747,7 @@ function evalCall(name: string, args: Node[], ctx: Ctx, at: CellAddress): EvalVa
   if (name === 'FLOOR') return evalFloor(args, ctx, at)
   if (name === 'ROUND') return evalRound(args, ctx, at)
   if (name === 'ROUNDUP') return evalRoundUp(args, ctx, at)
+  if (name === 'ROUNDDOWN') return evalRoundDown(args, ctx, at)
   const values: number[] = []
   let filled = 0
   for (const arg of args) {
