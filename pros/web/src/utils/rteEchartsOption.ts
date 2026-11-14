@@ -1169,6 +1169,10 @@ function sanitizeSeriesData(raw: unknown, state: SanitizeState): unknown[] {
       out.push(sanitizeDataItemObject(item, state))
       continue
     }
+    if (item == null) {
+      out.push(null)
+      continue
+    }
     // 其他类型直接丢弃
   }
   return out
@@ -1481,7 +1485,7 @@ function buildCartesianOption(
   type: 'bar' | 'line',
   title: string,
   labels: string[],
-  series: Array<{ name: string; data: number[] }>,
+  series: Array<{ name: string; data: Array<number | null> }>,
   horizontal = false,
 ): Record<string, unknown> {
   const category = { type: 'category', data: labels, axisTick: { alignWithLabel: true } }
@@ -1664,14 +1668,15 @@ export function cloneEchartsOption(option: unknown): unknown {
 /**
  * 换图表类型：沿用标题，柱状/折线之间切换时尽量保留原数据。
  */
-function asChartNumber(value: number | string): number {
+function asChartNumber(value: number | string | null): number | null {
+  if (value == null) return null
   if (typeof value === 'number' && Number.isFinite(value)) return value
-  const text = String(value ?? '').trim()
-  if (!text) return 0
+  const text = String(value).trim()
+  if (!text) return null
   const percent = text.endsWith('%')
   const body = (percent ? text.slice(0, -1) : text).replace(/,/g, '').trim()
   const num = Number(body)
-  if (!Number.isFinite(num)) return 0
+  if (!Number.isFinite(num)) return null
   return percent ? num / 100 : num
 }
 
@@ -1694,7 +1699,7 @@ function buildPieFromModel(
         label: { formatter: '{b} {d}%' },
         data: categories.map((name, index) => ({
           name: name || '数据',
-          value: asChartNumber(values[index] ?? 0),
+          value: asChartNumber(values[index] ?? 0) ?? 0,
         })),
       },
     ],

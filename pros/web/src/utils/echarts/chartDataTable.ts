@@ -12,7 +12,7 @@
 /** 图表数据模型。 */
 export type ChartDataModel = {
   categories: string[]
-  series: Array<{ name: string; data: Array<number | string> }>
+  series: Array<{ name: string; data: Array<number | string | null> }>
 }
 
 /** 表格视图的行数据。 */
@@ -495,7 +495,8 @@ export function dataModelToJson(model: ChartDataModel): string {
 }
 
 /** 把一个数据项转成「数值保持数值、其余转文本」。 */
-function itemToValue(raw: unknown): number | string {
+function itemToValue(raw: unknown): number | string | null {
+  if (raw == null) return null
   if (typeof raw === 'number' && Number.isFinite(raw)) return raw
   return itemToText(raw)
 }

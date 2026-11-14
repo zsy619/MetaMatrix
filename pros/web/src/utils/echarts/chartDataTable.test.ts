@@ -69,6 +69,19 @@ describe('option ⇄ 数据模型', () => {
     expect(legend.data).toEqual(['今年', '活跃'])
   })
 
+  it('空点保持 null，写回后折线仍断开', () => {
+    const option = {
+      xAxis: { type: 'category', data: ['一月', '二月', '三月'] },
+      yAxis: { type: 'value' },
+      series: [{ name: '新增', type: 'line', data: [10, null, 30] }],
+    }
+    const model = optionToDataModel(option)
+    expect(model.series[0]!.data).toEqual([10, null, 30])
+    const next = dataModelToOption(option, model)
+    const series = next.series as Array<{ data: unknown[] }>
+    expect(series[0]!.data).toEqual([10, null, 30])
+  })
+
   it('写回 option 时类目进 xAxis.data、数值进 series.data', () => {
     const model = optionToDataModel(CARTESIAN)
     const next = dataModelToOption(CARTESIAN, model)

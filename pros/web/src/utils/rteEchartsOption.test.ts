@@ -339,6 +339,20 @@ describe('ECharts 模板与表格生成', () => {
     expect(series[0]!.data).toEqual([1200, 0.5])
   })
 
+  it('折线中间的空点保持断开，不画成 0', () => {
+    const next = retypeEchartsOption(
+      {
+        title: { text: '趋势' },
+        xAxis: { type: 'category', data: ['一月', '二月', '三月'] },
+        yAxis: { type: 'value' },
+        series: [{ name: '新增', type: 'line', data: [10, null, 30] }],
+      },
+      'bar',
+    )
+    const series = next.series as Array<{ data: Array<number | null> }>
+    expect(series[0]!.data).toEqual([10, null, 30])
+  })
+
   it('横向柱状图换成折线后类目仍在纵轴', () => {
     const next = retypeEchartsOption(
       {
