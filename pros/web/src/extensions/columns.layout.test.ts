@@ -59,6 +59,13 @@ function columnTexts(ed: Editor): string[][] {
 }
 
 describe('分栏装入选区和栏数', () => {
+  it('四段分三栏时每一栏都有字', () => {
+    const ed = mount('<p>甲</p><p>乙</p><p>丙</p><p>丁</p>')
+    ed.commands.setTextSelection({ from: textPos(ed, '甲', 'start'), to: textPos(ed, '丁', 'end') })
+    expect(ed.chain().focus().setColumns(3).run()).toBe(true)
+    expect(columnTexts(ed)).toEqual([['甲', '乙'], ['丙'], ['丁']])
+  })
+
   it('选中的段落按顺序进入各栏', () => {
     const ed = mount()
     ed.commands.setTextSelection({ from: textPos(ed, '甲', 'start'), to: textPos(ed, '丙', 'end') })

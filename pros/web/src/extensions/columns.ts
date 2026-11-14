@@ -94,14 +94,19 @@ export function fitColumnBlocks(columns: PMNode[][], cols: number, blank: PMNode
   return next.map((blocks) => (blocks.length ? blocks : [blank.type.create()]))
 }
 
-/** 选中的块按顺序摊进各栏，前面的栏先满。 */
+/** 选中的块按顺序摊进各栏。多出来的块从前面的栏开始，每栏至少有一块（块数够的时候）。 */
 export function distributeBlocks(blocks: PMNode[], cols: number, blank: PMNode): PMNode[][] {
-  const buckets: PMNode[][] = Array.from({ length: cols }, () => [])
-  if (!blocks.length) return buckets.map(() => [blank.type.create()])
-  const size = Math.ceil(blocks.length / cols)
-  blocks.forEach((block, index) => {
-    buckets[Math.min(cols - 1, Math.floor(index / size))]!.push(block)
-  })
+  const count = Math.max(0, Math.floor(cols))
+  const buckets: PMNode[][] = Array.from({ length: count }, () => [])
+  if (!blocks.length || !count) return buckets.map(() => [blank.type.create()])
+  const base = Math.floor(blocks.length / count)
+  const extra = blocks.length % count
+  let cursor = 0
+  for (let col = 0; col < count; col += 1) {
+    const take = base + (col < extra ? 1 : 0)
+    buckets[col] = blocks.slice(cursor, cursor + take)
+    cursor += take
+  }
   return buckets.map((bucket) => (bucket.length ? bucket : [blank.type.create()]))
 }
 
