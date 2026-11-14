@@ -168,6 +168,20 @@ describe('图片边框和圆角', () => {
     expect(editor.getHTML()).toContain('width="320"')
   })
 
+  it('宽度写成 2.5rem 时按 40 像素留下', () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    editor = new Editor({
+      element: host,
+      extensions: [
+        StarterKit.configure({ dropcursor: false }),
+        RteImage.configure({ inline: false, allowBase64: true, HTMLAttributes: { class: 'rte-image' } }),
+      ],
+      content: `<img src="${PIXEL}" width="2.5rem" alt="根字号">`,
+    })
+    expect(editor.getHTML()).toContain('width="40"')
+  })
+
   it('宽度写成 4em 时按 64 像素留下', () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
