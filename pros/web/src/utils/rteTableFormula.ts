@@ -330,7 +330,7 @@ type Node =
   | { k: 'cmp'; op: string; l: Node; r: Node }
   | { k: 'call'; name: string; args: Node[] }
 
-const FUNC_NAMES = new Set(['SUM', 'AVERAGE', 'COUNT', 'MAX', 'MIN', 'IF', 'ROUND', 'AND', 'OR', 'ABS', 'INT', 'MOD', 'POWER', 'SQRT', 'SIGN', 'CEILING'])
+const FUNC_NAMES = new Set(['SUM', 'AVERAGE', 'COUNT', 'MAX', 'MIN', 'IF', 'ROUND', 'AND', 'OR', 'ABS', 'INT', 'MOD', 'POWER', 'SQRT', 'SIGN', 'CEILING', 'FLOOR'])
 
 class Parser {
   tokens: LexToken[]
@@ -583,6 +583,19 @@ function raisePower(base: number, exp: number): EvalValue {
   return result
 }
 
+function evalFloor(args: Node[], ctx: Ctx, at: CellAddress): EvalValue {
+  if (!args.length || args.length > 2) return { error: '#VALUE!' }
+  const value = evalNode(args[0]!, ctx, at)
+  if (isError(value)) return value
+  if (!args[1]) return Math.floor(value)
+  const step = evalNode(args[1], ctx, at)
+  if (isError(step)) return step
+  if (step === 0) return { error: '#DIV/0!' }
+  const result = Math.floor(value / step) * step
+  if (!Number.isFinite(result)) return { error: '#VALUE!' }
+  return result
+}
+
 function evalCeiling(args: Node[], ctx: Ctx, at: CellAddress): EvalValue {
   if (!args.length || args.length > 2) return { error: '#VALUE!' }
   const value = evalNode(args[0]!, ctx, at)
@@ -683,6 +696,7 @@ function evalCall(name: string, args: Node[], ctx: Ctx, at: CellAddress): EvalVa
   if (name === 'SQRT') return evalSqrt(args, ctx, at)
   if (name === 'SIGN') return evalSign(args, ctx, at)
   if (name === 'CEILING') return evalCeiling(args, ctx, at)
+  if (name === 'FLOOR') return evalFloor(args, ctx, at)
   if (name === 'ROUND') return evalRound(args, ctx, at)
   const values: number[] = []
   for (const arg of args) {
