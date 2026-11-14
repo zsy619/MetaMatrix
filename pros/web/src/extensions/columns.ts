@@ -333,6 +333,7 @@ function clampNum(value: unknown, fallback: number, min: number, max: number): n
   const quarter = /^(\d+(?:\.\d+)?)\s*q$/i.exec(raw)
   const rootEm = /^(\d+(?:\.\d+)?)\s*rem$/i.exec(raw)
   const em = /^(\d+(?:\.\d+)?)\s*em$/i.exec(raw)
+  const ch = /^(\d+(?:\.\d+)?)\s*ch$/i.exec(raw)
   const n = point
     ? Math.round((Number(point[1]) * 4) / 3)
     : milli
@@ -349,7 +350,9 @@ function clampNum(value: unknown, fallback: number, min: number, max: number): n
                 ? Math.round(Number(rootEm[1]) * 16)
                 : em
                   ? Math.round(Number(em[1]) * 16)
-                  : Math.round(Number(raw.replace(/\s*px$/i, '')))
+                  : ch
+                    ? Math.round(Number(ch[1]) * 8)
+                    : Math.round(Number(raw.replace(/\s*px$/i, '')))
   if (!Number.isFinite(n)) return fallback
   return Math.max(min, Math.min(max, n))
 }
