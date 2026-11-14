@@ -1,0 +1,37 @@
+# 元矩阵 MetaMatrix — 发布包内置 Caddy 配置
+#
+# 用法（在 output/ 目录下执行）：
+#   caddy run --config Caddyfile
+#
+# 所有路径均相对当前目录（output/），不含任何本机绝对路径：
+#   ./web        前端静态资源（vite 构建产物）
+#   反代目标     127.0.0.1:3000，即 run.sh / run.bat 启动的本地 API
+#
+# 行为与现有 nginx.conf（pros/web/nginx.conf）保持一致：
+#   /api/ → 去掉 /api 前缀后转发到后端；其余路径为 SPA，回退到 index.html。
+{
+	# 发布包里不启用 Caddy 管理端与自动 HTTPS（对外只用 http://host:8080）
+	admin off
+	auto_https off
+}
+
+:8080 {
+	root * ./web
+
+	# 请求体上限 8MB，与现有网关 client_max_body_size 8m 相当
+	request_body {
+		max_size 8MB
+	}
+
+	handle /api/* {
+		# 与 nginx 的 proxy_pass http://api:3000/ 一致：去掉 /api 前缀
+		uri strip_prefix /api
+		reverse_proxy 127.0.0.1:3000
+	}
+
+	handle {
+		# SPA 回退
+		try_files {path} /index.html
+		file_server
+	}
+}
