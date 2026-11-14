@@ -280,7 +280,8 @@ export function splitPreviewPages(html: string): string[] {
   const parts = source.split(PREVIEW_PAGE_BREAK).map((part) => part.trim())
   if (parts.length <= 1) return [source]
   if (!parts[0]) parts.shift()
-  return parts.length ? parts : ['']
+  const kept = parts.filter((part, index) => part.length > 0 || index === parts.length - 1)
+  return kept.length ? kept : ['']
 }
 
 /** 每段至少一页。开头的空段是贴顶的分页符，不额外加空白页。 */

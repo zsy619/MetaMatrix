@@ -157,6 +157,10 @@ assert.deepEqual(
   splitPreviewPages('<p>上</p><div data-page-break="true" class="rte-page-break"><span>分页符</span></div><p>下</p>'),
   ['<p>上</p>', '<p>下</p>'],
 )
+assert.deepEqual(
+  splitPreviewPages('<p>甲</p><hr data-page-break="true"><hr data-page-break="true"><p>乙</p>'),
+  ['<p>甲</p>', '<p>乙</p>'],
+)
 assert.deepEqual(splitPreviewPages('<div data-page-break="true"></div><p>下</p>'), ['<p>下</p>'])
 assert.deepEqual(splitPreviewPages('<p>没有分页</p>'), ['<p>没有分页</p>'])
 
