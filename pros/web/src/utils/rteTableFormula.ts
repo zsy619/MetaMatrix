@@ -330,7 +330,7 @@ type Node =
   | { k: 'cmp'; op: string; l: Node; r: Node }
   | { k: 'call'; name: string; args: Node[] }
 
-const FUNC_NAMES = new Set(['SUM', 'AVERAGE', 'COUNT', 'MAX', 'MIN', 'IF', 'ROUND', 'AND', 'OR', 'ABS', 'INT', 'MOD', 'POWER', 'SQRT'])
+const FUNC_NAMES = new Set(['SUM', 'AVERAGE', 'COUNT', 'MAX', 'MIN', 'IF', 'ROUND', 'AND', 'OR', 'ABS', 'INT', 'MOD', 'POWER', 'SQRT', 'SIGN'])
 
 class Parser {
   tokens: LexToken[]
@@ -583,6 +583,15 @@ function raisePower(base: number, exp: number): EvalValue {
   return result
 }
 
+function evalSign(args: Node[], ctx: Ctx, at: CellAddress): EvalValue {
+  if (args.length !== 1) return { error: '#VALUE!' }
+  const value = evalNode(args[0]!, ctx, at)
+  if (isError(value)) return value
+  if (value > 0) return 1
+  if (value < 0) return -1
+  return 0
+}
+
 function evalSqrt(args: Node[], ctx: Ctx, at: CellAddress): EvalValue {
   if (args.length !== 1) return { error: '#VALUE!' }
   const value = evalNode(args[0]!, ctx, at)
@@ -659,6 +668,7 @@ function evalCall(name: string, args: Node[], ctx: Ctx, at: CellAddress): EvalVa
   if (name === 'MOD') return evalMod(args, ctx, at)
   if (name === 'POWER') return evalPower(args, ctx, at)
   if (name === 'SQRT') return evalSqrt(args, ctx, at)
+  if (name === 'SIGN') return evalSign(args, ctx, at)
   if (name === 'ROUND') return evalRound(args, ctx, at)
   const values: number[] = []
   for (const arg of args) {
