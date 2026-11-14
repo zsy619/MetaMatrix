@@ -328,13 +328,16 @@ function clampNum(value: unknown, fallback: number, min: number, max: number): n
   const point = /^(\d+(?:\.\d+)?)\s*pt$/i.exec(raw)
   const milli = /^(\d+(?:\.\d+)?)\s*mm$/i.exec(raw)
   const centi = /^(\d+(?:\.\d+)?)\s*cm$/i.exec(raw)
+  const inch = /^(\d+(?:\.\d+)?)\s*in$/i.exec(raw)
   const n = point
     ? Math.round((Number(point[1]) * 4) / 3)
     : milli
       ? Math.round((Number(milli[1]) * 96) / 25.4)
       : centi
         ? Math.round((Number(centi[1]) * 96) / 2.54)
-        : Math.round(Number(raw.replace(/\s*px$/i, '')))
+        : inch
+          ? Math.round(Number(inch[1]) * 96)
+          : Math.round(Number(raw.replace(/\s*px$/i, '')))
   if (!Number.isFinite(n)) return fallback
   return Math.max(min, Math.min(max, n))
 }
