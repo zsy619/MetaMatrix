@@ -339,6 +339,24 @@ describe('ECharts 模板与表格生成', () => {
     expect(series[0]!.data).toEqual([1200, 0.5])
   })
 
+  it('换成折线后绘图区边距还在', () => {
+    const next = retypeEchartsOption(
+      {
+        title: { text: '销售' },
+        grid: { left: '12%', right: 80, containLabel: false },
+        xAxis: { type: 'category', data: ['一月', '二月'] },
+        yAxis: { type: 'value' },
+        series: [{ name: '今年', type: 'bar', data: [1, 2] }],
+      },
+      'line',
+    )
+    const grid = next.grid as { left?: string; right?: number; top?: number; containLabel?: boolean }
+    expect(grid.left).toBe('12%')
+    expect(grid.right).toBe(80)
+    expect(grid.containLabel).toBe(false)
+    expect(grid.top).toBe(48)
+  })
+
   it('折线再点一次还是直线，也不会铺上面积', () => {
     const next = retypeEchartsOption(
       {

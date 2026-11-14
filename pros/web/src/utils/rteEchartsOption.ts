@@ -1519,6 +1519,19 @@ function seriesStackAt(option: Record<string, unknown>, index: number): string |
   return stack || undefined
 }
 
+function gridMargins(option: Record<string, unknown>): Record<string, unknown> | undefined {
+  const grid = option.grid
+  if (!isPlainObject(grid)) return undefined
+  const place: Record<string, unknown> = {}
+  for (const key of ['left', 'right', 'top', 'bottom'] as const) {
+    const value = grid[key]
+    if (typeof value === 'string' && value.trim()) place[key] = value.trim()
+    else if (typeof value === 'number' && Number.isFinite(value)) place[key] = value
+  }
+  if (grid.containLabel === false) place.containLabel = false
+  return Object.keys(place).length ? place : undefined
+}
+
 function lineLooks(option: Record<string, unknown>): Array<{ straight: boolean; filled: boolean } | null> {
   if (!Array.isArray(option.series)) return []
   return option.series.map((item) => {
@@ -1598,6 +1611,7 @@ function buildCartesianOption(
   categoryRotate?: number,
   legendPlace?: Record<string, unknown>,
   looks?: Array<{ straight: boolean; filled: boolean } | null>,
+  margins?: Record<string, unknown>,
 ): Record<string, unknown> {
   const category = {
     type: 'category' as const,
@@ -1617,7 +1631,7 @@ function buildCartesianOption(
     title: { text: title, left: 'center' },
     tooltip: { trigger: 'axis' },
     legend: { ...(legendPlace || { bottom: 0 }), data: series.map((item) => item.name) },
-    grid: { left: 48, right: 24, top: 48, bottom: 56, containLabel: true },
+    grid: { left: 48, right: 24, top: 48, bottom: 56, containLabel: true, ...(margins || {}) },
     xAxis: horizontal ? value : category,
     yAxis: horizontal ? category : value,
     series: series.map((item, index) => ({
@@ -1861,6 +1875,7 @@ export function retypeEchartsOption(
       categoryLabelRotate(base),
       legendLayout(base),
       lineLooks(base),
+      gridMargins(base),
     )
   }
   if (usable && type === 'pie') {
