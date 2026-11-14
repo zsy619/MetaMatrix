@@ -38,6 +38,8 @@ describe('附件链接', () => {
     expect(isAttachmentAnchor('https://files.example.com/文稿.pages', '文稿', 'rte-link')).toBe(true)
     expect(isAttachmentAnchor('https://files.example.com/书.epub', '书', 'rte-link')).toBe(true)
     expect(isAttachmentAnchor('https://files.example.com/书.azw3', '书', 'rte-link')).toBe(true)
+    expect(isAttachmentAnchor('https://files.example.com/书.djvu', '书', 'rte-link')).toBe(true)
+    expect(isAttachmentAnchor('https://files.example.com/画.cbz', '画', 'rte-link')).toBe(true)
     expect(isAttachmentAnchor('https://files.example.com/书.fb2', '书', 'rte-link')).toBe(true)
     expect(isAttachmentAnchor('https://files.example.com/书.mobi', '书', 'rte-link')).toBe(true)
     expect(isAttachmentAnchor('https://files.example.com/预算.numbers', '预算', 'rte-link')).toBe(true)
