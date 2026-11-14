@@ -131,7 +131,9 @@ export const RteImage = Image.extend({
           return value === 'cover' || value === 'contain' ? value : null
         },
         renderHTML: (attrs: { fit?: string | null }) =>
-          attrs.fit === 'cover' || attrs.fit === 'contain' ? { 'data-fit': attrs.fit } : {},
+          attrs.fit === 'cover' || attrs.fit === 'contain'
+            ? { 'data-fit': attrs.fit, style: `object-fit: ${attrs.fit}` }
+            : {},
       },
       href: {
         default: null as string | null,
