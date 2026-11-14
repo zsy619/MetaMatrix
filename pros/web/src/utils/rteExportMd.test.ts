@@ -22,6 +22,12 @@ describe('导出 Markdown 和 HTML 链接', () => {
     expect(md).toContain('季度趋势')
   })
 
+  it('替代文本和题注一样时只写一次', () => {
+    const md = htmlToMarkdown('<img src="https://example.com/a.png" alt="季度趋势" data-caption="季度趋势">')
+    expect(md).toContain('![季度趋势](https://example.com/a.png)')
+    expect(md.match(/季度趋势/g)).toHaveLength(1)
+  })
+
   it('没有替代文本时题注不重复写成说明', () => {
     const md = htmlToMarkdown('<img src="https://example.com/a.png" title="季度趋势" data-caption="季度趋势">')
     expect(md).toContain('![image](https://example.com/a.png)')

@@ -108,7 +108,8 @@ function imageMarkdown(img: HTMLElement): string {
   const href = imageLinkHref(img.getAttribute('data-href') || '')
   const body = `![${alt}](${safeSrc})`
   const linked = href ? `[${body}](${/[\s()]/.test(href) ? `<${href}>` : href})` : body
-  return `${linked}${caption ? `\n${caption}` : ''}\n\n`
+  const captionLine = caption && caption !== rawAlt ? `\n${caption}` : ''
+  return `${linked}${captionLine}\n\n`
 }
 
 function inlineMd(el: HTMLElement): string {
