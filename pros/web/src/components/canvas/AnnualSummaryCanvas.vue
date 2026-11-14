@@ -117,13 +117,16 @@ const SECTIONS: {
 }
 
 .as-hint {
-  margin: 12px 16px;
-  padding-left: 12px;
-  border-left: 2px solid var(--tbl-topic, #dadce0);
-  font-size: 13px;
-  font-style: italic;
-  line-height: 1.55;
-  color: var(--tbl-topic, #5f6368);
+  margin: 14px 16px 10px;
+  padding: 8px 12px;
+  border-left: 3px solid var(--tbl-topic, #0e8a84);
+  border-radius: 0 8px 8px 0;
+  background: rgba(255, 255, 255, 0.72);
+  font-size: 15px;
+  font-style: normal;
+  font-weight: 550;
+  line-height: 1.6;
+  color: #202124;
 }
 
 .as-panel {
@@ -144,5 +147,15 @@ const SECTIONS: {
   background: transparent;
   border: none;
   box-shadow: none;
+}
+
+@media (max-width: 720px) {
+  .as-scroll {
+    padding: 20px 14px 40px;
+  }
+
+  .as-panel {
+    min-height: 240px;
+  }
 }
 </style>

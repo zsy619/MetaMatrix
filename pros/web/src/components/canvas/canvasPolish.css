@@ -288,6 +288,18 @@
   border-radius: 0;
 }
 
+/* 窄屏多列会挤成一行几个字。改成上下排列，格子仍保持可写的高度。 */
+@media (max-width: 800px) {
+  .canvas-viewport .sheet > .grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: none;
+  }
+
+  .canvas-viewport .sheet > .grid > section {
+    min-height: 240px;
+  }
+}
+
 .canvas-viewport .rte-root .rte-canvas,
 .canvas-viewport .rte-root .rte-body {
   background: transparent;
