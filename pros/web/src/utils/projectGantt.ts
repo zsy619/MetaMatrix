@@ -44,7 +44,57 @@ export function isoFromDay(day: number): string {
 export function shiftIso(iso: string, deltaDays: number): string {
   const day = dayNumber(iso)
   if (day == null) return iso
-  return isoFromDay(day + deltaDays)
+  const next = isoFromDay(day + deltaDays)
+  const time = /(?:[ T])(\d{2}:\d{2})$/.exec(iso.trim())
+  return time ? `${next} ${time[1]}` : next
+}
+
+const DATE_TIME = /^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}))?$/
+
+/** 开工、完成：yyyy-MM-dd HH:mm。没有时间的旧日期按 00:00。 */
+export function parseGanttDateTime(value: string): { day: number; minutes: number } | null {
+  const match = DATE_TIME.exec(value.trim())
+  if (!match) return null
+  const day = dayNumber(`${match[1]}-${match[2]}-${match[3]}`)
+  if (day == null) return null
+  const hour = match[4] == null ? 0 : Number(match[4])
+  const minute = match[5] == null ? 0 : Number(match[5])
+  if (hour > 23 || minute > 59) return null
+  return { day, minutes: hour * 60 + minute }
+}
+
+export function ganttHasTime(value: string): boolean {
+  return /[ T]\d{2}:\d{2}$/.test(value.trim())
+}
+
+export function formatGanttDateTime(value: string): string {
+  const parsed = parseGanttDateTime(value)
+  if (!parsed) return ''
+  const hour = String(Math.floor(parsed.minutes / 60)).padStart(2, '0')
+  const minute = String(parsed.minutes % 60).padStart(2, '0')
+  return `${isoFromDay(parsed.day)} ${hour}:${minute}`
+}
+
+/** 交给 datetime-local 的值。 */
+export function ganttDateTimeLocal(value: string): string {
+  const text = formatGanttDateTime(value)
+  return text ? text.replace(' ', 'T') : ''
+}
+
+export function normalizeGanttDateTime(value: string): string | null {
+  const parsed = parseGanttDateTime(value.trim().replace('T', ' '))
+  if (!parsed) return null
+  return formatGanttDateTime(value.trim().replace('T', ' '))
+}
+
+/** 横条区间。纯日期的完成日含当天；带时间则停在那一分钟。 */
+export function ganttRange(start: string, end: string): { from: number; to: number } | null {
+  const a = parseGanttDateTime(start)
+  const b = parseGanttDateTime(end)
+  if (!a || !b) return null
+  const from = a.day + (ganttHasTime(start) ? a.minutes / 1440 : 0)
+  const to = b.day + (ganttHasTime(end) ? b.minutes / 1440 : 1)
+  return from <= to ? { from, to } : { from: to, to: from }
 }
 
 export function isWeekend(day: number): boolean {

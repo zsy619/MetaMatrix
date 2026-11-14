@@ -7,6 +7,10 @@ import {
   clampGanttPaneWidth,
   dayBandPercent,
   ganttUnitIndex,
+  formatGanttDateTime,
+  ganttRange,
+  normalizeGanttDateTime,
+  shiftIso,
   zoomGanttScale,
   formatPredecessors,
   indentTask,
@@ -189,6 +193,18 @@ describe('项目甘特排程', () => {
     const year = buildGanttAxis(day, day, 'year')
     expect(year.ticks.map((tick) => tick.label)).toEqual(['2026'])
     expect(year.groups[0]?.label).toBe('2020年代')
+  })
+
+  it('开工和完成写成 yyyy-MM-dd HH:mm', () => {
+    expect(dayNumber('2026-11-13 09:30')).toBe(dayNumber('2026-11-13'))
+    expect(formatGanttDateTime('2026-11-09')).toBe('2026-11-09 00:00')
+    expect(normalizeGanttDateTime('2026-11-09T09:05')).toBe('2026-11-09 09:05')
+    expect(normalizeGanttDateTime('2026-11-09 25:00')).toBeNull()
+    expect(shiftIso('2026-11-09 09:30', 2)).toBe('2026-11-11 09:30')
+    const dated = ganttRange('2026-11-09', '2026-11-13')
+    const timed = ganttRange('2026-11-09 09:30', '2026-11-09 18:00')
+    expect(dated && dated.to - dated.from).toBe(5)
+    expect(timed && timed.to - timed.from).toBeCloseTo(8.5 / 24)
   })
 
   it('日期列等分后贴齐时间轴右缘', () => {

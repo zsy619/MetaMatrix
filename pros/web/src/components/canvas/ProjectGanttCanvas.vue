@@ -14,7 +14,11 @@ import {
   clampGanttPaneWidth,
   dayBandPercent,
   finishFromStart,
+  formatGanttDateTime,
+  ganttDateTimeLocal,
+  ganttRange,
   ganttUnitIndex,
+  normalizeGanttDateTime,
   formatPredecessors,
   formatSuccessors,
   indentTask,
@@ -179,7 +183,7 @@ function rangePercent(from: number, to: number): { left: number; width: number }
   const ticks = axis.value.ticks
   const n = tickCount.value
   const left = (ganttUnitIndex(from, ticks) / n) * 100
-  const right = (ganttUnitIndex(to + 1, ticks) / n) * 100
+  const right = (ganttUnitIndex(to, ticks) / n) * 100
   const minWidth = (ganttUnitIndex(from + 0.35, ticks) / n) * 100 - left
   return { left, width: Math.max(minWidth, right - left) }
 }
@@ -190,22 +194,14 @@ function axisX(day: number): number {
 
 function barBox(task: GanttTask): { left: number; width: number } | null {
   const item = shown(task)
-  const start = dayNumber(item.start)
-  const end = dayNumber(item.end)
-  if (start == null || end == null) return null
-  const from = Math.min(start, end)
-  const to = Math.max(start, end)
-  return rangePercent(from, to)
+  const range = ganttRange(item.start, item.end)
+  return range ? rangePercent(range.from, range.to) : null
 }
 
 function baselineBox(task: GanttTask): { left: number; width: number } | null {
   if (!task.baselineStart || !task.baselineEnd) return null
-  const start = dayNumber(task.baselineStart)
-  const end = dayNumber(task.baselineEnd)
-  if (start == null || end == null) return null
-  const from = Math.min(start, end)
-  const to = Math.max(start, end)
-  return rangePercent(from, to)
+  const range = ganttRange(task.baselineStart, task.baselineEnd)
+  return range ? rangePercent(range.from, range.to) : null
 }
 
 function columnStyle(index: number): Record<string, string> {
@@ -231,14 +227,12 @@ const arrows = computed(() => {
       const pred = tasks.value.find((item) => item.id === link.taskId)
       if (fromIndex == null || !pred) return []
       const predShown = shown(pred)
-      const predStart = dayNumber(predShown.start)
-      const predEnd = dayNumber(predShown.end)
-      const succStart = dayNumber(task.start)
-      const succEnd = dayNumber(task.end)
-      if (predStart == null || predEnd == null || succStart == null || succEnd == null) return []
+      const predRange = ganttRange(predShown.start, predShown.end)
+      const succRange = ganttRange(task.start, task.end)
+      if (!predRange || !succRange) return []
       const type = link.type || 'FS'
-      const fromX = type === 'SS' || type === 'SF' ? axisX(predStart) : axisX(predEnd + 1)
-      const toX = type === 'FF' || type === 'SF' ? axisX(succEnd + 1) : axisX(succStart)
+      const fromX = type === 'SS' || type === 'SF' ? axisX(predRange.from) : axisX(predRange.to)
+      const toX = type === 'FF' || type === 'SF' ? axisX(succRange.to) : axisX(succRange.from)
       const fromY = fromIndex * ROW + ROW / 2
       const toY = toIndex * ROW + ROW / 2
       return [{
@@ -390,6 +384,16 @@ function setTitle(value: string) {
   })
 }
 
+function setWhen(id: string, key: 'start' | 'end', raw: string, input: HTMLInputElement) {
+  const next = normalizeGanttDateTime(raw)
+  const task = tasks.value.find((item) => item.id === id)
+  if (!next) {
+    if (task) input.value = formatGanttDateTime(task[key])
+    return
+  }
+  patchTask(id, { [key]: next })
+}
+
 function setDuration(task: GanttTask, raw: string) {
   if (taskHasChildren(tasks.value, task.id)) return
   const days = Math.round(Number(raw))
@@ -464,9 +468,10 @@ function startDrag(event: PointerEvent, task: GanttTask, mode: 'move' | 'resize'
     for (const item of snapshot) {
       if (mode === 'resize') {
         const startDay = dayNumber(item.start) ?? 0
-        let endDay = (dayNumber(item.end) ?? startDay) + delta
+        const originEnd = dayNumber(item.end) ?? startDay
+        let endDay = originEnd + delta
         if (endDay < startDay) endDay = startDay
-        next[item.id] = { start: item.start, end: isoFromDay(endDay) }
+        next[item.id] = { start: item.start, end: shiftIso(item.end, endDay - originEnd) }
       } else {
         next[item.id] = { start: shiftIso(item.start, delta), end: shiftIso(item.end, delta) }
       }
@@ -526,7 +531,7 @@ function startDrag(event: PointerEvent, task: GanttTask, mode: 'move' | 'resize'
               <th>WBS</th>
               <th>任务名称</th>
               <th>工期</th>
-              <th>开始</th>
+              <th>开工</th>
               <th>完成</th>
               <th>前置任务</th>
               <th>后置任务</th>
@@ -568,8 +573,48 @@ function startDrag(event: PointerEvent, task: GanttTask, mode: 'move' | 'resize'
                   @change="setDuration(row.task, ($event.target as HTMLInputElement).value)"
                 />
               </td>
-              <td><input type="date" :value="shown(row.task).start" aria-label="开始日期" @click.stop @change="patchTask(row.task.id, { start: ($event.target as HTMLInputElement).value })" /></td>
-              <td><input type="date" :value="shown(row.task).end" aria-label="结束日期" @click.stop @change="patchTask(row.task.id, { end: ($event.target as HTMLInputElement).value })" /></td>
+              <td>
+                <span class="when">
+                  <input
+                    class="when-text"
+                    :value="formatGanttDateTime(shown(row.task).start)"
+                    aria-label="开工时间"
+                    placeholder="yyyy-MM-dd HH:mm"
+                    @click.stop
+                    @change="setWhen(row.task.id, 'start', ($event.target as HTMLInputElement).value, $event.target as HTMLInputElement)"
+                  />
+                  <input
+                    class="when-picker"
+                    type="datetime-local"
+                    step="60"
+                    aria-label="选择开工时间"
+                    :value="ganttDateTimeLocal(shown(row.task).start)"
+                    @click.stop
+                    @change="setWhen(row.task.id, 'start', ($event.target as HTMLInputElement).value, $event.target as HTMLInputElement)"
+                  />
+                </span>
+              </td>
+              <td>
+                <span class="when">
+                  <input
+                    class="when-text"
+                    :value="formatGanttDateTime(shown(row.task).end)"
+                    aria-label="完成时间"
+                    placeholder="yyyy-MM-dd HH:mm"
+                    @click.stop
+                    @change="setWhen(row.task.id, 'end', ($event.target as HTMLInputElement).value, $event.target as HTMLInputElement)"
+                  />
+                  <input
+                    class="when-picker"
+                    type="datetime-local"
+                    step="60"
+                    aria-label="选择完成时间"
+                    :value="ganttDateTimeLocal(shown(row.task).end)"
+                    @click.stop
+                    @change="setWhen(row.task.id, 'end', ($event.target as HTMLInputElement).value, $event.target as HTMLInputElement)"
+                  />
+                </span>
+              </td>
               <td>
                 <input
                   :value="formatPredecessors(tasks, row.task)"
@@ -710,7 +755,10 @@ function startDrag(event: PointerEvent, task: GanttTask, mode: 'move' | 'resize'
 .grid tr.critical .name input { color: #d93025; font-weight: 700; }
 .grid input { width: 100%; box-sizing: border-box; border: 1px solid transparent; background: transparent; border-radius: 4px; padding: 2px 3px; font: inherit; color: inherit; }
 .grid input:focus { border-color: #1a73e8; background: #fff; outline: none; }
-.grid input[type='date'] { width: 136px; }
+.when { position: relative; display: inline-flex; align-items: center; }
+.when::after { content: ''; position: absolute; right: 6px; width: 12px; height: 12px; border: 1.5px solid #5f6368; border-radius: 2px; box-shadow: inset 0 3px 0 #5f6368; pointer-events: none; }
+.grid input.when-text { width: 168px; padding-right: 22px; }
+.when-picker { position: absolute; right: 2px; width: 28px; height: 28px; opacity: 0; cursor: pointer; z-index: 1; }
 .grid input[type='number'] { width: 64px; }
 .id, .wbs, .slack { color: #5f6368; text-align: right; width: 36px; }
 .name { min-width: 180px; }
