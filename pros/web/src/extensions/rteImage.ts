@@ -22,9 +22,15 @@ function percentWidthAttr(raw: string): string | null {
 }
 
 function pixelAttr(raw: string): number | null {
-  const text = raw.trim().normalize('NFKC').replace(/\s*px$/i, '').replace(/，/g, '.').replace(/,/g, '.')
-  if (!text || /%|％/.test(text)) return null
-  const n = Number(text)
+  const text = raw.trim().normalize('NFKC').replace(/，/g, '.').replace(/,/g, '.')
+  const point = /^(\d+(?:\.\d+)?)\s*pt$/i.exec(text)
+  if (point) {
+    const n = Number(point[1]) * 4 / 3
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : null
+  }
+  const px = text.replace(/\s*px$/i, '')
+  if (!px || /%/.test(px)) return null
+  const n = Number(px)
   return Number.isFinite(n) && n > 0 ? Math.round(n) : null
 }
 

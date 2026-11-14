@@ -109,6 +109,20 @@ describe('图片边框和圆角', () => {
     expect(editor.getHTML()).toContain('height="180"')
   })
 
+  it('宽度写成 240pt 时按 320 像素留下', () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    editor = new Editor({
+      element: host,
+      extensions: [
+        StarterKit.configure({ dropcursor: false }),
+        RteImage.configure({ inline: false, allowBase64: true, HTMLAttributes: { class: 'rte-image' } }),
+      ],
+      content: `<img src="${PIXEL}" width="240pt" alt="磅">`,
+    })
+    expect(editor.getHTML()).toContain('width="320"')
+  })
+
   it('图片设成铺满时画面拉满边框', () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
