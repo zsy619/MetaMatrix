@@ -1683,6 +1683,12 @@ function valueSplitAreaShown(option: Record<string, unknown>): boolean {
   return isPlainObject(node) && isPlainObject(node.splitArea) && node.splitArea.show === true
 }
 
+function categoryAxisLabelHidden(option: Record<string, unknown>): boolean {
+  const axis = categoryOnYAxis(option) ? option.yAxis : option.xAxis
+  const node = Array.isArray(axis) ? axis[0] : axis
+  return isPlainObject(node) && isPlainObject(node.axisLabel) && node.axisLabel.show === false
+}
+
 function valueAxisLineHidden(option: Record<string, unknown>): boolean {
   const axis = categoryOnYAxis(option) ? option.xAxis : option.yAxis
   const node = Array.isArray(axis) ? axis[0] : axis
@@ -1809,13 +1815,21 @@ function buildCartesianOption(
   showValueSplitArea = false,
   hideCategoryAxisTick = false,
   hideValueAxisLine = false,
+  hideCategoryAxisLabel = false,
 ): Record<string, unknown> {
   const category = {
     type: 'category' as const,
     data: labels,
     axisTick: hideCategoryAxisTick ? { alignWithLabel: true, show: false } : { alignWithLabel: true },
     ...(names?.category ? { name: names.category } : {}),
-    ...(categoryRotate != null ? { axisLabel: { rotate: categoryRotate } } : {}),
+    ...(categoryRotate != null || hideCategoryAxisLabel
+      ? {
+          axisLabel: {
+            ...(categoryRotate != null ? { rotate: categoryRotate } : {}),
+            ...(hideCategoryAxisLabel ? { show: false } : {}),
+          },
+        }
+      : {}),
     ...(boundaryGap != null ? { boundaryGap } : {}),
     ...(hideCategoryAxisLine ? { axisLine: { show: false } } : {}),
     ...(namePlace?.category.location ? { nameLocation: namePlace.category.location } : {}),
@@ -2112,6 +2126,7 @@ export function retypeEchartsOption(
       valueSplitAreaShown(base),
       categoryAxisTickHidden(base),
       valueAxisLineHidden(base),
+      categoryAxisLabelHidden(base),
     )
   }
   if (usable && type === 'pie') {
