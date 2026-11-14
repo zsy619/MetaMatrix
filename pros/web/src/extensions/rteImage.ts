@@ -88,6 +88,11 @@ function pixelAttr(raw: string): number | null {
     const n = (Number(cap[1]) * 56) / 5
     return Number.isFinite(n) && n > 0 ? Math.round(n) : null
   }
+  const rootCap = /^(\d+(?:\.\d+)?)\s*rcap$/i.exec(text)
+  if (rootCap) {
+    const n = (Number(rootCap[1]) * 56) / 5
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : null
+  }
   const px = text.replace(/\s*px$/i, '')
   if (!px || /%/.test(px)) return null
   const n = Number(px)

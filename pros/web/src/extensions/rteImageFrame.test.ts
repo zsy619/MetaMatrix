@@ -168,6 +168,20 @@ describe('图片边框和圆角', () => {
     expect(editor.getHTML()).toContain('width="320"')
   })
 
+  it('宽度写成 2rcap 时按 22 像素留下', () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    editor = new Editor({
+      element: host,
+      extensions: [
+        StarterKit.configure({ dropcursor: false }),
+        RteImage.configure({ inline: false, allowBase64: true, HTMLAttributes: { class: 'rte-image' } }),
+      ],
+      content: `<img src="${PIXEL}" width="2rcap" alt="字高">`,
+    })
+    expect(editor.getHTML()).toContain('width="22"')
+  })
+
   it('宽度写成 4cap 时按 45 像素留下', () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
