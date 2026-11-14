@@ -489,7 +489,7 @@ const weakest = computed(() => {
 .blocks { display: flex; flex-direction: column; }
 .block { margin-top: 14px; padding: 16px 16px 14px; border-radius: 16px; background: #fffdf8; border: 1px solid rgba(62, 48, 28, 0.08); box-shadow: 0 8px 22px rgba(62, 48, 28, 0.05); }
 .block h3 { display: flex; align-items: center; gap: 8px; font-size: 16px; }
-.idx { flex: none; width: 22px; height: 22px; border-radius: 999px; background: #0f766e; color: #fff; font-size: 12px; line-height: 22px; text-align: center; }
+.idx { flex: none; width: 26px; height: 26px; border-radius: 999px; background: #0f766e; color: #fff; font-size: 13px; line-height: 26px; text-align: center; }
 .is-grid .blocks,
 .is-board .blocks,
 .is-scores .blocks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
@@ -504,15 +504,16 @@ const weakest = computed(() => {
 .is-grid .block[data-block='gate'] { grid-column: 1 / -1; }
 .block header p, .prompts { margin: 4px 0 0; color: #5c574e; font-size: 13px; line-height: 1.5; }
 .prompts { padding-left: 1.1em; }
-.rich { position: relative; }
+.rich { position: relative; display: flex; flex-direction: column; }
 .rich-max { position: absolute; top: 14px; right: 8px; z-index: 5; }
 .rich-hint { margin: 8px 0 0; height: 160px; display: flex; align-items: center; color: #8a8175; }
 .block :deep(.rte-root) {
   margin-top: 8px;
-  height: 160px;
+  flex: 1 1 auto;
+  height: auto !important;
   min-height: 160px;
-  max-height: 160px;
-  overflow: hidden;
+  max-height: none !important;
+  overflow: visible !important;
   border: none;
   background: transparent;
   box-shadow: none;
@@ -520,9 +521,20 @@ const weakest = computed(() => {
 .block:not(:focus-within) :deep(.rte-toolbar) { display: none; }
 .block :deep(.rte-workspace),
 .block :deep(.rte-canvas),
-.block :deep(.rte-body) { flex: 1 1 auto; min-height: 0; }
-.block :deep(.rte-canvas) { background: transparent; overflow: auto; }
-.block :deep(.ProseMirror) { min-height: 0; }
+.block :deep(.rte-body) {
+  flex: 1 1 auto;
+  height: auto !important;
+  min-height: min-content;
+  overflow: visible !important;
+}
+.block :deep(.rte-canvas) { background: transparent; max-height: none !important; }
+.block :deep(.ProseMirror) {
+  height: auto !important;
+  min-height: 120px;
+  overflow: visible !important;
+  font-size: 15px;
+  line-height: 1.65;
+}
 .checks, .scores { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .checks li, .scores li { display: grid; grid-template-columns: minmax(180px, 1.4fr) minmax(160px, 0.7fr); gap: 10px; align-items: center; padding: 10px 12px; border-radius: 12px; background: #fff; border: 1px solid #f1ebe3; }
 .checks li.done { background: #f4fbf6; border-color: #c9e8d4; }
@@ -532,16 +544,17 @@ const weakest = computed(() => {
 .is-scores .scores li { grid-template-columns: 1fr; align-items: stretch; }
 .is-scores .marks { justify-content: flex-start; }
 .scores li { grid-template-columns: minmax(220px, 1.4fr) auto minmax(140px, 0.8fr); }
-.checks label { display: flex; gap: 8px; align-items: flex-start; }
-.marks { display: flex; gap: 4px; }
-.marks button, .add, .cards button { border: 1px solid #e4ddd2; background: #fff; border-radius: 999px; padding: 4px 10px; cursor: pointer; }
+.checks label { display: flex; gap: 10px; align-items: flex-start; font-size: 15px; line-height: 1.45; }
+.checks input[type='checkbox'] { width: 20px; height: 20px; margin-top: 2px; flex: none; }
+.marks { display: flex; flex-wrap: wrap; gap: 6px; }
+.marks button, .add, .cards button { border: 1px solid #e4ddd2; background: #fff; border-radius: 999px; min-height: 36px; padding: 6px 14px; font-size: 15px; font-weight: 650; cursor: pointer; }
 .marks button[aria-pressed='true'], .cards button[aria-pressed='true'] { background: #187a4e; border-color: #187a4e; color: #fff; }
-.note, .table-wrap textarea, .cards textarea, .roi input { width: 100%; box-sizing: border-box; border: 1px solid #e4ddd2; border-radius: 8px; padding: 6px 8px; font: inherit; background: #fff; }
+.note, .table-wrap textarea, .cards textarea, .roi input { width: 100%; box-sizing: border-box; border: 1px solid #e4ddd2; border-radius: 8px; min-height: 40px; padding: 8px 10px; font: inherit; font-size: 15px; background: #fff; }
 .table-wrap { overflow: auto; margin-top: 12px; border: 1px solid #d9d0c3; border-radius: 12px; background: #fff; }
 table { width: 100%; border-collapse: collapse; }
 th, td { border-bottom: 2px solid #e4d9cc; border-right: 1px solid rgba(62, 48, 28, 0.12); padding: 8px; text-align: left; vertical-align: top; }
 th:last-child, td:last-child { border-right: none; }
-th { position: sticky; top: 0; z-index: 1; background: #1c2838; color: #fff; font-size: 12px; font-weight: 700; }
+th { position: sticky; top: 0; z-index: 1; background: #1c2838; color: #fff; font-size: 14px; font-weight: 700; }
 th[data-tone='fill'] { background: #1f5f99; }
 td[data-tone='fill'] { background: #e7f1fb; }
 th[data-tone='measure'] { background: #0f766e; }
@@ -554,11 +567,11 @@ th[data-tone='verdict'] { background: #176b45; }
 td[data-tone='verdict'] { background: #e7f6ee; }
 th[data-tone='id'] { background: #1c2838; }
 td[data-tone='id'] { background: #f6f1e8; }
-.table-wrap textarea { border-color: transparent; background: transparent; resize: vertical; min-height: 44px; line-height: 1.45; }
+.table-wrap textarea { border-color: transparent; background: transparent; resize: vertical; min-height: 64px; line-height: 1.5; }
 .table-wrap textarea:focus { border-color: #1c4c7c; background: #fff; outline: none; }
 .is-table td:first-child textarea { font-weight: 700; }
 .levels { display: flex; gap: 4px; flex-wrap: wrap; }
-.levels button { border: 1px solid #e4ddd2; background: #fff; border-radius: 999px; min-width: 32px; padding: 4px 8px; cursor: pointer; }
+.levels button { border: 1px solid #e4ddd2; background: #fff; border-radius: 999px; min-width: 44px; min-height: 36px; padding: 6px 12px; font-size: 15px; font-weight: 700; cursor: pointer; }
 .levels button[data-level='高'].on { background: #187a4e; border-color: #187a4e; color: #fff; }
 .levels button[data-level='中'].on { background: #a16207; border-color: #a16207; color: #fff; }
 .levels button[data-level='低'].on { background: #b91c1c; border-color: #b91c1c; color: #fff; }
