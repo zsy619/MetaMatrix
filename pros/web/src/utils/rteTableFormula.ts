@@ -427,6 +427,7 @@ type Ctx = {
 type CellValue =
   | { kind: 'num'; v: number }
   | { kind: 'blank' }
+  | { kind: 'missing' }
   | { kind: 'text' }
   | { kind: 'err'; error: FormulaErrorCode }
 
@@ -445,7 +446,7 @@ function cellTextAt(ctx: Ctx, addr: CellAddress): string | null {
 /** 求某个单元格的数值：常量取数字，公式单元格递归求值。 */
 function resolveCell(ctx: Ctx, addr: CellAddress): CellValue {
   const text = cellTextAt(ctx, addr)
-  if (text == null) return { kind: 'err', error: '#REF!' }
+  if (text == null) return { kind: 'missing' }
   const trimmed = text.trim()
   if (!trimmed) return { kind: 'blank' }
   if (isFormulaCell(trimmed)) {
@@ -513,12 +514,20 @@ function evalCall(name: string, args: Node[], ctx: Ctx, at: CellAddress): EvalVa
   for (const arg of args) {
     const cells = cellsOf(arg, at)
     if (cells) {
+      let sawCell = false
+      let sawMissing = false
       for (const addr of cells) {
         const cell = resolveCell(ctx, addr)
+        if (cell.kind === 'missing') {
+          sawMissing = true
+          continue
+        }
+        sawCell = true
         if (cell.kind === 'err') return cell
         if (cell.kind === 'num') values.push(cell.v)
-        // 空白和文字在求和、平均里跳过，空白在加减里按 0 算
+        // 空白和文字在求和、平均里跳过。整段都在表格外才是 #REF!。
       }
+      if (!sawCell && sawMissing) return { error: '#REF!' }
       continue
     }
     const v = evalNode(arg, ctx, at)
@@ -583,6 +592,7 @@ function evalNode(node: Node, ctx: Ctx, at: CellAddress): EvalValue {
       if (cells.length > 1) return { error: '#VALUE!' }
       const cell = resolveCell(ctx, cells[0]!)
       if (cell.kind === 'err') return cell
+      if (cell.kind === 'missing') return { error: '#REF!' }
       if (cell.kind === 'blank') return 0
       if (cell.kind === 'text') return { error: '#VALUE!' }
       return cell.v
