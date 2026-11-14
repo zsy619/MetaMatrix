@@ -96,13 +96,15 @@ function nodeToMd(root: HTMLElement): string {
 
 function imageMarkdown(img: HTMLElement): string {
   const src = img.getAttribute('src') || ''
-  const alt = (img.getAttribute('alt') || img.getAttribute('title') || 'image')
+  const caption = (img.getAttribute('data-caption') || '').trim()
+  const rawAlt = (img.getAttribute('alt') || '').trim()
+  const title = (img.getAttribute('title') || '').trim()
+  const alt = (rawAlt || (title && title !== caption ? title : '') || 'image')
     .replace(/\\/g, '\\\\')
     .replace(/[\[\]]/g, '\\$&')
     .replace(/\r?\n/g, ' ')
   // data URL 里可能有空格 / 括号（SVG 快照），用 <...> 包起来才不会截断链接
   const safeSrc = /[\s()]/.test(src) ? `<${src}>` : src
-  const caption = (img.getAttribute('data-caption') || '').trim()
   const href = imageLinkHref(img.getAttribute('data-href') || '')
   const body = `![${alt}](${safeSrc})`
   const linked = href ? `[${body}](${/[\s()]/.test(href) ? `<${href}>` : href})` : body
