@@ -59,6 +59,15 @@ function columnTexts(ed: Editor): string[][] {
 }
 
 describe('分栏装入选区和栏数', () => {
+  it('栏间距写成 8 px 时仍是 8', () => {
+    const ed = mount('<p></p>')
+    ed.commands.setContent(
+      '<div data-type="columns" data-cols="2" data-gap="8 px"><div data-type="column"><p>甲</p></div><div data-type="column"><p>乙</p></div></div>',
+    )
+    expect(ed.state.doc.firstChild?.attrs.gap).toBe(8)
+    expect(ed.getHTML()).toMatch(/--rte-col-gap:\s*8px/)
+  })
+
   it('栏间距写成 8px 时仍是 8', () => {
     const ed = mount('<p></p>')
     ed.commands.setContent(
