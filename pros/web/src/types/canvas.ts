@@ -1762,8 +1762,8 @@ export interface ProjectGanttDocumentJSON {
   schemaVersion: number
   theme: CanvasTheme
   title: string
-  /** 时间刻度。缺省按周。 */
-  scale?: 'day' | 'week' | 'month'
+  /** 时间刻度。缺省按周。时、天、周、月、年。 */
+  scale?: 'hour' | 'day' | 'week' | 'month' | 'year'
   tasks: GanttTask[]
 }
 

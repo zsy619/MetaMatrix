@@ -49,7 +49,9 @@ describe('项目甘特图', () => {
     const ticks = wrapper.findAll('.ticks span')
     expect(ticks.length).toBeGreaterThan(1)
     const headMin = Number((head.attributes('style') || '').match(/min-width:\s*(\d+)px/)?.[1])
-    expect(headMin).toBe(ticks.length * 16)
+    expect(headMin).toBe(ticks.length * 84)
+    expect(wrapper.get('[aria-label="时间刻度"]').text()).toContain('时')
+    expect(wrapper.get('[aria-label="时间刻度"]').text()).toContain('年')
     const docRow = wrapper.findAll('tbody tr').find((row) => row.get('input[aria-label="任务名称"]').element instanceof HTMLInputElement && (row.get('input[aria-label="任务名称"]').element as HTMLInputElement).value === '文档')
     expect(docRow).toBeTruthy()
     expect(Number(docRow!.get('[data-slack]').attributes('data-slack'))).toBeGreaterThan(0)
@@ -77,8 +79,17 @@ describe('项目甘特图', () => {
     const inserted = store.current_data
     expect(isProjectGanttDoc(inserted) && inserted.tasks.some((task) => task.kind === 'milestone' && task.name === '里程碑')).toBe(true)
 
-    await wrapper.findAll('button').find((button) => button.text() === '日')!.trigger('click')
+    await wrapper.findAll('button').find((button) => button.text() === '天')!.trigger('click')
     expect(isProjectGanttDoc(store.current_data) && store.current_data.scale).toBe('day')
+    const head = wrapper.get('.chart-head')
+    head.element.dispatchEvent(new WheelEvent('wheel', { deltaY: -80, bubbles: true, cancelable: true }))
+    await nextTick()
+    expect(isProjectGanttDoc(store.current_data) && store.current_data.scale).toBe('hour')
+    expect(wrapper.findAll('.ticks span').some((tick) => tick.text() === '00')).toBe(true)
+    await wrapper.findAll('button').find((button) => button.text() === '年')!.trigger('click')
+    expect(isProjectGanttDoc(store.current_data) && store.current_data.scale).toBe('year')
+    expect(wrapper.findAll('.ticks span').some((tick) => tick.text() === '2026')).toBe(true)
+    expect(wrapper.findAll('.months span').some((group) => group.text() === '2020年代')).toBe(true)
   })
 
   it('旧的平铺任务仍能画出横条', async () => {

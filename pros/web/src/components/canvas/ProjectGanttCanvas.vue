@@ -8,10 +8,13 @@ import { dayNumber, newCanvasId } from '../../utils/classicCanvases'
 import {
   analyzeSchedule,
   applyDependencySchedule,
+  GANTT_SCALES,
+  buildGanttAxis,
   calendarSpan,
   clampGanttPaneWidth,
   dayBandPercent,
   finishFromStart,
+  ganttUnitIndex,
   formatPredecessors,
   formatSuccessors,
   indentTask,
@@ -25,6 +28,7 @@ import {
   removeGanttTask,
   scalePx,
   shiftIso,
+  zoomGanttScale,
   shiftWorkDays,
   taskDuration,
   taskHasChildren,
@@ -50,8 +54,28 @@ function onNarrowChange() {
   narrow.value = !!narrowQuery?.matches
 }
 
-onMounted(() => narrowQuery?.addEventListener('change', onNarrowChange))
-onBeforeUnmount(() => narrowQuery?.removeEventListener('change', onNarrowChange))
+let wheelBucket = 0
+
+function onChartWheel(event: WheelEvent) {
+  const target = event.target
+  const onHead = target instanceof Element && !!target.closest('.chart-head')
+  if (!onHead && !event.ctrlKey && !event.metaKey) return
+  event.preventDefault()
+  wheelBucket += event.deltaY
+  if (Math.abs(wheelBucket) < 48) return
+  const direction = wheelBucket > 0 ? 1 : -1
+  wheelBucket = 0
+  setScale(zoomGanttScale(props.doc.scale, direction))
+}
+
+onMounted(() => {
+  narrowQuery?.addEventListener('change', onNarrowChange)
+  chartRef.value?.addEventListener('wheel', onChartWheel, { passive: false })
+})
+onBeforeUnmount(() => {
+  narrowQuery?.removeEventListener('change', onNarrowChange)
+  chartRef.value?.removeEventListener('wheel', onChartWheel)
+})
 
 const gridPaneStyle = computed(() => (narrow.value || gridWidth.value == null ? {} : { width: `${gridWidth.value}px` }))
 
@@ -113,40 +137,20 @@ function shown(task: GanttTask): GanttTask {
 }
 
 const span = computed(() => calendarSpan(tasks.value.map((task) => shown(task))))
-const days = computed(() => {
-  const list: number[] = []
-  for (let day = span.value.min; day <= span.value.max; day += 1) list.push(day)
-  return list
-})
-const dayCount = computed(() => Math.max(1, days.value.length))
-const naturalWidth = computed(() => dayCount.value * unit.value)
-const months = computed(() => {
-  const groups: Array<{ label: string; days: number }> = []
-  for (const day of days.value) {
-    const label = isoFromDay(day).slice(0, 7)
-    const last = groups[groups.length - 1]
-    if (!last || last.label !== label) groups.push({ label, days: 1 })
-    else last.days += 1
-  }
-  return groups
-})
+const axis = computed(() => buildGanttAxis(span.value.min, span.value.max, props.doc.scale))
+const tickCount = computed(() => Math.max(1, axis.value.ticks.length))
+const naturalWidth = computed(() => tickCount.value * unit.value)
+const daySpan = computed(() => Math.max(1, axis.value.end - axis.value.start))
 
 const todayLeft = computed(() => {
   const now = new Date()
   const iso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
   const day = dayNumber(iso)
-  if (day == null || day < span.value.min || day > span.value.max) return null
-  return dayBandPercent(day - span.value.min, dayCount.value).left + dayBandPercent(0, dayCount.value).width / 2
+  if (day == null || day < axis.value.start || day >= axis.value.end) return null
+  return (ganttUnitIndex(day + 0.5, axis.value.ticks) / tickCount.value) * 100
 })
 
 const selectedIndex = computed(() => tasks.value.findIndex((task) => task.id === selectedId.value))
-
-function tickLabel(day: number): string {
-  const date = new Date(day * 86_400_000)
-  if (props.doc.scale === 'month') return ''
-  if (props.doc.scale !== 'day' && date.getUTCDay() !== 1) return ''
-  return String(date.getUTCDate())
-}
 
 function slackOf(id: string): number {
   return analysis.value.get(id)?.slack ?? 0
@@ -172,9 +176,16 @@ function baselineStyle(task: GanttTask): Record<string, string> {
 }
 
 function rangePercent(from: number, to: number): { left: number; width: number } {
-  const n = dayCount.value
-  const spanDays = Math.max(0.35, to - from + 1)
-  return { left: ((from - span.value.min) / n) * 100, width: (spanDays / n) * 100 }
+  const ticks = axis.value.ticks
+  const n = tickCount.value
+  const left = (ganttUnitIndex(from, ticks) / n) * 100
+  const right = (ganttUnitIndex(to + 1, ticks) / n) * 100
+  const minWidth = (ganttUnitIndex(from + 0.35, ticks) / n) * 100 - left
+  return { left, width: Math.max(minWidth, right - left) }
+}
+
+function axisX(day: number): number {
+  return (ganttUnitIndex(day, axis.value.ticks) / tickCount.value) * naturalWidth.value
 }
 
 function barBox(task: GanttTask): { left: number; width: number } | null {
@@ -198,7 +209,7 @@ function baselineBox(task: GanttTask): { left: number; width: number } | null {
 }
 
 function columnStyle(index: number): Record<string, string> {
-  const band = dayBandPercent(index, dayCount.value)
+  const band = dayBandPercent(index, tickCount.value)
   return { left: `${band.left}%`, width: `${band.width}%` }
 }
 
@@ -226,8 +237,8 @@ const arrows = computed(() => {
       const succEnd = dayNumber(task.end)
       if (predStart == null || predEnd == null || succStart == null || succEnd == null) return []
       const type = link.type || 'FS'
-      const fromX = type === 'SS' || type === 'SF' ? (predStart - span.value.min) * unit.value : (predEnd - span.value.min + 1) * unit.value
-      const toX = type === 'FF' || type === 'SF' ? (succEnd - span.value.min + 1) * unit.value : (succStart - span.value.min) * unit.value
+      const fromX = type === 'SS' || type === 'SF' ? axisX(predStart) : axisX(predEnd + 1)
+      const toX = type === 'FF' || type === 'SF' ? axisX(succEnd + 1) : axisX(succStart)
       const fromY = fromIndex * ROW + ROW / 2
       const toY = toIndex * ROW + ROW / 2
       return [{
@@ -365,7 +376,7 @@ function setBaseline() {
   status.value = id ? '已设置选中任务的比较基准' : '已设置全部任务的比较基准'
 }
 
-function setScale(scale: 'day' | 'week' | 'month') {
+function setScale(scale: 'hour' | 'day' | 'week' | 'month' | 'year') {
   documentStore.mutateCanvas((doc) => {
     if (!isProjectGanttDoc(doc)) return
     doc.scale = scale
@@ -444,7 +455,7 @@ function startDrag(event: PointerEvent, task: GanttTask, mode: 'move' | 'resize'
   const originX = event.clientX
   const body = chartRef.value?.querySelector('.chart-body') as HTMLElement | null
   const bodyWidth = body?.getBoundingClientRect().width || 0
-  const dayPx = bodyWidth > 0 ? bodyWidth / dayCount.value : unit.value
+  const dayPx = (bodyWidth > 0 ? bodyWidth : naturalWidth.value) / daySpan.value
   const ids = mode === 'move' ? [task.id, ...descendantIds(task.id)] : [task.id]
   const snapshot = tasks.value.filter((item) => ids.includes(item.id)).map((item) => ({ id: item.id, start: item.start, end: item.end }))
   const move = (ev: PointerEvent) => {
@@ -495,9 +506,13 @@ function startDrag(event: PointerEvent, task: GanttTask, mode: 'move' | 'resize'
         <button type="button" @click="setBaseline">设置比较基准</button>
         <button type="button" :disabled="!selectedId || tasks.length <= 1" @click="removeSelected">删除</button>
         <span class="zoom" role="group" aria-label="时间刻度">
-          <button type="button" :aria-pressed="doc.scale === 'day'" @click="setScale('day')">日</button>
-          <button type="button" :aria-pressed="!doc.scale || doc.scale === 'week'" @click="setScale('week')">周</button>
-          <button type="button" :aria-pressed="doc.scale === 'month'" @click="setScale('month')">月</button>
+          <button
+            v-for="item in GANTT_SCALES"
+            :key="item.id"
+            type="button"
+            :aria-pressed="(doc.scale || 'week') === item.id"
+            @click="setScale(item.id)"
+          >{{ item.label }}</button>
         </span>
       </div>
     </header>
@@ -593,24 +608,24 @@ function startDrag(event: PointerEvent, task: GanttTask, mode: 'move' | 'resize'
         @keydown="onSplitKey"
       />
       <div ref="chartRef" class="chart" aria-label="甘特图时间刻度" :style="{ '--gantt-day': unit + 'px' }" @scroll="onChartScroll">
-        <div class="chart-head" :style="{ width: '100%', minWidth: naturalWidth + 'px', height: HEAD + 'px' }">
+        <div class="chart-head" title="在日期上滚动可切换时、天、周、月、年" :style="{ width: '100%', minWidth: naturalWidth + 'px', height: HEAD + 'px' }">
           <div class="months">
-            <span v-for="month in months" :key="month.label" :style="{ flexGrow: month.days, minWidth: month.days * unit + 'px' }">{{ month.label }}</span>
+            <span v-for="group in axis.groups" :key="group.key" :style="{ flexGrow: group.count, minWidth: group.count * unit + 'px' }">{{ group.label }}</span>
           </div>
           <div class="ticks">
             <span
-              v-for="day in days"
-              :key="day"
-              :class="{ weekend: isWeekend(day) }"
-            >{{ tickLabel(day) }}</span>
+              v-for="tick in axis.ticks"
+              :key="tick.key"
+              :class="{ weekend: tick.weekend }"
+            >{{ tick.label }}</span>
           </div>
         </div>
         <div class="chart-body" :style="{ width: '100%', minWidth: naturalWidth + 'px', height: visibleRows.length * ROW + 'px' }">
           <div
-            v-for="(day, index) in days"
-            :key="'col-' + day"
+            v-for="(tick, index) in axis.ticks"
+            :key="'col-' + tick.key"
             class="col"
-            :class="{ weekend: isWeekend(day) }"
+            :class="{ weekend: tick.weekend }"
             :style="columnStyle(index)"
           />
           <div v-if="todayLeft != null" class="today" :style="{ left: todayLeft + '%' }" />

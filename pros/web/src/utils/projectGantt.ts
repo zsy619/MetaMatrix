@@ -437,10 +437,211 @@ export function calendarSpan(tasks: GanttTask[]): { min: number; max: number } {
   return { min: Math.min(...days) - 1, max: Math.max(...days) + 2 }
 }
 
+export type GanttScale = 'hour' | 'day' | 'week' | 'month' | 'year'
+
+export const GANTT_SCALES: Array<{ id: GanttScale; label: string }> = [
+  { id: 'hour', label: '时' },
+  { id: 'day', label: '天' },
+  { id: 'week', label: '周' },
+  { id: 'month', label: '月' },
+  { id: 'year', label: '年' },
+]
+
+export function normalizeGanttScale(scale: string | undefined): GanttScale {
+  if (scale === 'hour' || scale === 'day' || scale === 'week' || scale === 'month' || scale === 'year') return scale
+  return 'week'
+}
+
+/** 正数把刻度拉远（时→年），负数拉近。已经到头时停住。 */
+export function zoomGanttScale(scale: string | undefined, direction: -1 | 1): GanttScale {
+  const order = GANTT_SCALES.map((item) => item.id)
+  const index = order.indexOf(normalizeGanttScale(scale))
+  const next = Math.min(order.length - 1, Math.max(0, index + direction))
+  return order[next] || 'week'
+}
+
 export function scalePx(scale: string | undefined): number {
-  if (scale === 'day') return 28
-  if (scale === 'month') return 6
-  return 16
+  switch (normalizeGanttScale(scale)) {
+    case 'hour':
+      return 18
+    case 'day':
+      return 28
+    case 'week':
+      return 84
+    case 'month':
+      return 72
+    case 'year':
+      return 96
+  }
+}
+
+export interface GanttAxisTick {
+  key: string
+  label: string
+  group: string
+  start: number
+  end: number
+  weekend: boolean
+}
+
+export interface GanttAxisGroup {
+  key: string
+  label: string
+  count: number
+}
+
+export interface GanttAxis {
+  scale: GanttScale
+  /** 轴起点（含），单位是日序号，小时刻度可以是小数。 */
+  start: number
+  /** 轴终点（不含）。 */
+  end: number
+  ticks: GanttAxisTick[]
+  groups: GanttAxisGroup[]
+}
+
+function utcParts(day: number): { year: number; month: number; date: number; dow: number } {
+  const date = new Date(Math.round(day) * MS_DAY)
+  return {
+    year: date.getUTCFullYear(),
+    month: date.getUTCMonth(),
+    date: date.getUTCDate(),
+    dow: date.getUTCDay(),
+  }
+}
+
+function utcDay(year: number, monthIndex: number, date: number): number {
+  return Math.floor(Date.UTC(year, monthIndex, date) / MS_DAY)
+}
+
+function mondayOnOrBefore(day: number): number {
+  const dow = utcParts(day).dow
+  return day - (dow === 0 ? 6 : dow - 1)
+}
+
+function alignAxis(minDay: number, maxDay: number, scale: GanttScale): { start: number; end: number } {
+  const first = Math.min(minDay, maxDay)
+  const last = Math.max(minDay, maxDay)
+  if (scale === 'hour' || scale === 'day') return { start: first, end: last + 1 }
+  if (scale === 'week') {
+    const start = mondayOnOrBefore(first)
+    return { start, end: mondayOnOrBefore(last) + 7 }
+  }
+  if (scale === 'month') {
+    const a = utcParts(first)
+    const b = utcParts(last)
+    return { start: utcDay(a.year, a.month, 1), end: utcDay(b.year, b.month + 1, 1) }
+  }
+  const a = utcParts(first)
+  const b = utcParts(last)
+  return { start: utcDay(a.year, 0, 1), end: utcDay(b.year + 1, 0, 1) }
+}
+
+function groupTicks(ticks: GanttAxisTick[]): GanttAxisGroup[] {
+  const groups: GanttAxisGroup[] = []
+  for (const tick of ticks) {
+    const last = groups[groups.length - 1]
+    if (!last || last.label !== tick.group) groups.push({ key: `${tick.group}-${tick.key}`, label: tick.group, count: 1 })
+    else last.count += 1
+  }
+  return groups
+}
+
+/** 把任务跨度铺成当前刻度的列。小时一列一小时，天一列一天，依此类推。 */
+export function buildGanttAxis(minDay: number, maxDay: number, scale: string | undefined): GanttAxis {
+  const kind = normalizeGanttScale(scale)
+  const { start, end } = alignAxis(minDay, maxDay, kind)
+  const ticks: GanttAxisTick[] = []
+  if (kind === 'hour') {
+    for (let day = start; day < end; day += 1) {
+      const parts = utcParts(day)
+      const group = `${parts.month + 1}/${String(parts.date).padStart(2, '0')}`
+      const weekend = isWeekend(day)
+      for (let hour = 0; hour < 24; hour += 1) {
+        ticks.push({
+          key: `${day}-${hour}`,
+          label: hour % 6 === 0 ? String(hour).padStart(2, '0') : '',
+          group,
+          start: day + hour / 24,
+          end: day + (hour + 1) / 24,
+          weekend,
+        })
+      }
+    }
+  } else if (kind === 'day') {
+    for (let day = start; day < end; day += 1) {
+      const parts = utcParts(day)
+      ticks.push({
+        key: String(day),
+        label: String(parts.date),
+        group: isoFromDay(day).slice(0, 7),
+        start: day,
+        end: day + 1,
+        weekend: isWeekend(day),
+      })
+    }
+  } else if (kind === 'week') {
+    for (let day = start; day < end; day += 7) {
+      const parts = utcParts(day)
+      ticks.push({
+        key: `w-${day}`,
+        label: `${parts.month + 1}/${parts.date}`,
+        group: isoFromDay(day).slice(0, 7),
+        start: day,
+        end: day + 7,
+        weekend: false,
+      })
+    }
+  } else if (kind === 'month') {
+    let cursor = start
+    while (cursor < end) {
+      const parts = utcParts(cursor)
+      const next = utcDay(parts.year, parts.month + 1, 1)
+      ticks.push({
+        key: `m-${cursor}`,
+        label: `${parts.month + 1}月`,
+        group: String(parts.year),
+        start: cursor,
+        end: next,
+        weekend: false,
+      })
+      cursor = next
+    }
+  } else {
+    let cursor = start
+    while (cursor < end) {
+      const parts = utcParts(cursor)
+      const next = utcDay(parts.year + 1, 0, 1)
+      const decade = Math.floor(parts.year / 10) * 10
+      ticks.push({
+        key: `y-${parts.year}`,
+        label: String(parts.year),
+        group: `${decade}年代`,
+        start: cursor,
+        end: next,
+        weekend: false,
+      })
+      cursor = next
+    }
+  }
+  return { scale: kind, start, end, ticks, groups: groupTicks(ticks) }
+}
+
+/** 某个日序号在刻度列上的位置。0 是第一列左缘，列数是右缘。 */
+export function ganttUnitIndex(day: number, ticks: Array<{ start: number; end: number }>): number {
+  if (!ticks.length) return 0
+  if (day <= ticks[0]!.start) return 0
+  const last = ticks[ticks.length - 1]!
+  if (day >= last.end) return ticks.length
+  for (let index = 0; index < ticks.length; index += 1) {
+    const tick = ticks[index]!
+    if (day < tick.end) {
+      const span = tick.end - tick.start
+      const frac = span <= 0 ? 0 : (day - tick.start) / span
+      return index + Math.min(1, Math.max(0, frac))
+    }
+  }
+  return ticks.length
 }
 
 /**
