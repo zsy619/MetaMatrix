@@ -336,6 +336,7 @@ function clampNum(value: unknown, fallback: number, min: number, max: number): n
   const ch = /^(\d+(?:\.\d+)?)\s*ch$/i.exec(raw)
   const ex = /^(\d+(?:\.\d+)?)\s*ex$/i.exec(raw)
   const ideo = /^(\d+(?:\.\d+)?)\s*ic$/i.exec(raw)
+  const line = /^(\d+(?:\.\d+)?)\s*lh$/i.exec(raw)
   const n = point
     ? Math.round((Number(point[1]) * 4) / 3)
     : milli
@@ -358,7 +359,9 @@ function clampNum(value: unknown, fallback: number, min: number, max: number): n
                       ? Math.round(Number(ex[1]) * 8)
                       : ideo
                         ? Math.round(Number(ideo[1]) * 16)
-                        : Math.round(Number(raw.replace(/\s*px$/i, '')))
+                        : line
+                          ? Math.round(Number(line[1]) * 24)
+                          : Math.round(Number(raw.replace(/\s*px$/i, '')))
   if (!Number.isFinite(n)) return fallback
   return Math.max(min, Math.min(max, n))
 }
