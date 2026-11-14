@@ -27,7 +27,7 @@ function block(id: ValuePropositionBlockId) {
   <div class="sheet" :style="chrome" aria-label="价值主张画布">
     <header class="sheet-top">
       <h2>{{ doc.title }}</h2>
-      <p>左边是我们提供的价值，右边是客户真正要完成的事、痛点和收益。两边对上才算契合。</p>
+      <p>一边是我们提供的价值，一边是客户真正要完成的事、痛点和收益。两边对上才算契合。</p>
     </header>
     <div class="vpc">
       <section class="side" aria-label="价值图">
@@ -77,10 +77,15 @@ function block(id: ValuePropositionBlockId) {
 .sheet-top p { color: #5f6368; font-size: 13px; }
 .vpc { flex: 1 0 auto; min-height: 100%; height: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .side { display: flex; flex-direction: column; min-height: min-content; height: auto; }
-.side-title { margin: 0 0 8px; text-align: center; color: #0e8a84; letter-spacing: 0.08em; }
+.side-title { margin: 0 0 8px; text-align: center; color: #0e8a84; font-size: 18px; font-weight: 800; letter-spacing: 0.06em; }
 .side-title--customer { color: #a67c00; }
 .stack { flex: 1 0 auto; min-height: min-content; height: auto; display: grid; grid-template-rows: repeat(3, minmax(min-content, 1fr)); gap: 8px; }
 article { display: flex; flex-direction: column; min-height: min-content; height: auto; background: var(--col-body); border-radius: 12px; overflow: visible; }
-h4 { margin: 0; min-height: 36px; display: flex; align-items: center; justify-content: center; background: var(--col-header); color: #fff; font-size: 14px; }
+h4 { margin: 0; min-height: 44px; display: flex; align-items: center; justify-content: center; padding: 6px 8px; background: var(--col-header); color: #fff; font-size: 16px; text-align: center; }
 .rte-slot { flex: 1 1 auto; min-height: min-content; height: auto; display: flex; }
+
+@media (max-width: 800px) {
+  .vpc { grid-template-columns: 1fr; }
+  article { min-height: 200px; }
+}
 </style>
