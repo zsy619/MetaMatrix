@@ -392,6 +392,7 @@ const vertexPanels = computed(() => {
                   max="1"
                   step="0.05"
                   :value="dirOf(item.id).scores.universality"
+                  aria-label="普遍性"
                   @input="onScoreInput(item.id, 'universality', $event)"
                 />
               </label>
@@ -403,6 +404,7 @@ const vertexPanels = computed(() => {
                   max="1"
                   step="0.05"
                   :value="dirOf(item.id).scores.frequency"
+                  aria-label="频次"
                   @input="onScoreInput(item.id, 'frequency', $event)"
                 />
               </label>
@@ -414,6 +416,7 @@ const vertexPanels = computed(() => {
                   max="1"
                   step="0.05"
                   :value="dirOf(item.id).scores.rigidity"
+                  aria-label="刚性"
                   @input="onScoreInput(item.id, 'rigidity', $event)"
                 />
               </label>
@@ -536,35 +539,38 @@ const vertexPanels = computed(() => {
                   @click.stop
                 >
                   <label class="score-chip" title="普遍性">
-                    <span>普</span>
+                    <span>普遍</span>
                     <input
                       type="range"
                       min="0.1"
                       max="1"
                       step="0.05"
                       :value="dirOf(item.id).scores.universality"
+                      aria-label="普遍性"
                       @input="onScoreInput(item.id, 'universality', $event)"
                     />
                   </label>
                   <label class="score-chip" title="频次">
-                    <span>频</span>
+                    <span>频次</span>
                     <input
                       type="range"
                       min="0.1"
                       max="1"
                       step="0.05"
                       :value="dirOf(item.id).scores.frequency"
+                      aria-label="频次"
                       @input="onScoreInput(item.id, 'frequency', $event)"
                     />
                   </label>
                   <label class="score-chip" title="刚性">
-                    <span>刚</span>
+                    <span>刚性</span>
                     <input
                       type="range"
                       min="0.1"
                       max="1"
                       step="0.05"
                       :value="dirOf(item.id).scores.rigidity"
+                      aria-label="刚性"
                       @input="onScoreInput(item.id, 'rigidity', $event)"
                     />
                   </label>
@@ -672,6 +678,16 @@ const vertexPanels = computed(() => {
         </div>
       </div>
     </div>
+
+    <section class="axis-key" aria-label="三个刻度">
+      <article v-for="vp in vertexPanels" :key="`key-${vp.key}`">
+        <h3>{{ vp.axis.title }}</h3>
+        <p v-for="(lv, index) in vp.axis.levels" :key="`${vp.key}-key-${index}`">
+          <strong>{{ lv.label }}</strong>
+          <span>{{ lv.detail }}</span>
+        </p>
+      </article>
+    </section>
 
     <!--
       隐藏挂载各方向描述 YModelBlock：点击「描述」写入全局 maximizedPanelKey，
@@ -824,8 +840,8 @@ const vertexPanels = computed(() => {
 }
 
 .legend-notes-btn {
-  min-height: 32px;
-  padding: 0 10px;
+  min-height: 40px;
+  padding: 0 12px;
   border: 1px solid var(--cv-frame, #ececec);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.92);
@@ -854,17 +870,17 @@ const vertexPanels = computed(() => {
 
 .score-chip {
   display: grid;
-  grid-template-columns: 40px minmax(0, 1fr);
+  grid-template-columns: 48px minmax(0, 1fr);
   align-items: center;
-  gap: 6px;
-  font-size: 13px;
+  gap: 8px;
+  font-size: 15px;
   font-weight: 700;
   color: #3c3424;
 }
 
 .score-chip input[type='range'] {
   width: 100%;
-  height: 24px;
+  height: 32px;
   accent-color: #1a73e8;
   cursor: pointer;
 }
@@ -887,8 +903,8 @@ const vertexPanels = computed(() => {
 
 .legend-add {
   align-self: flex-start;
-  width: 32px;
-  height: 32px;
+  width: 40px;
+  height: 40px;
   border: 1px solid #e4e6e8;
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.8);
@@ -1029,10 +1045,12 @@ const vertexPanels = computed(() => {
   pointer-events: none;
 }
 
+.axis-key { display: none; }
+
 @media (max-width: 960px) {
   .dt-canvas {
     grid-template-columns: 1fr;
-    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-rows: auto auto auto;
     overflow-y: auto;
     overflow-x: hidden;
   }
@@ -1042,15 +1060,36 @@ const vertexPanels = computed(() => {
   }
 
   .dt-stage {
-    min-height: 420px;
+    min-height: 360px;
   }
 
-  .axis-level-row {
-    font-size: 11px;
+  .axis-panel { display: none; }
+
+  .axis-key {
+    display: grid;
+    gap: 10px;
   }
 
-  .axis-title {
+  .axis-key article {
+    background: #fff;
+    border: 1px solid #e4e6e8;
+    border-radius: 12px;
+    padding: 12px 14px;
+  }
+
+  .axis-key h3 {
+    margin: 0 0 6px;
     font-size: 16px;
+    letter-spacing: 0.04em;
+  }
+
+  .axis-key p {
+    display: flex;
+    gap: 8px;
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.55;
+    color: #3c4043;
   }
 }
 </style>
