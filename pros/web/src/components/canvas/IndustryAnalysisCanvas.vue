@@ -167,10 +167,10 @@ const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 
 .ia-subtitle {
   margin: 0;
-  font-size: clamp(12px, 1.15vw, 14px);
+  font-size: clamp(14px, 1.15vw, 15px);
   font-weight: 400;
   color: rgba(255, 255, 255, 0.9);
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 .ia-body {
@@ -184,12 +184,54 @@ const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 }
 
 .ia-body :deep(.ym-block) {
-  flex: 1;
+  flex: 0 0 auto;
+  height: auto;
   min-height: 0;
   background: rgba(248, 249, 250, 0.55);
 }
 
+.ia-body :deep(.ym-block-body),
+.ia-body :deep(.rte-root),
+.ia-body :deep(.rte-workspace),
+.ia-body :deep(.rte-canvas),
+.ia-body :deep(.rte-body),
+.ia-body :deep(.ProseMirror) {
+  height: auto;
+  max-height: none;
+  max-width: 100%;
+  min-width: 0;
+  overflow: visible;
+  flex: 0 0 auto;
+}
+
+.ia-body :deep(.rte-workspace),
+.ia-body :deep(.rte-canvas),
+.ia-body :deep(.ProseMirror) {
+  width: 100%;
+}
+
+.ia-body :deep(.ProseMirror) {
+  min-height: 140px;
+  font-size: 16px;
+  line-height: 1.7;
+}
+
+.ia-body :deep(.ProseMirror p) {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.ia-body :deep(.pm-max-btn) {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+}
+
 @media (max-width: 720px) {
+  .industry-analysis-canvas {
+    padding-bottom: 96px;
+  }
+
   .ia-row--top {
     flex: none;
     grid-template-columns: 1fr;
@@ -199,12 +241,14 @@ const chrome = computed(() => canvasChromeStyle(props.doc.theme))
   .ia-cell {
     border-right: none;
     border-bottom: 1px solid var(--cv-frame, #ececec);
-    min-height: 400px;
+    min-height: 240px;
+    height: auto;
   }
 
   .ia-cell--full {
     flex: none;
-    min-height: 400px;
+    min-height: 240px;
+    height: auto;
   }
 
   .ia-cell--full:last-child {
