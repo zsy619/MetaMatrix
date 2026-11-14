@@ -261,9 +261,47 @@ function onRemoveRow(rowId: string) {
 }
 
 .ct-cell :deep(.ym-block) {
-  flex: 1;
+  flex: 0 0 auto;
+  height: auto;
   min-height: 0;
   background: rgba(248, 249, 250, 0.55);
+}
+
+.ct-cell :deep(.ym-block-body),
+.ct-cell :deep(.rte-root),
+.ct-cell :deep(.rte-workspace),
+.ct-cell :deep(.rte-canvas),
+.ct-cell :deep(.rte-body),
+.ct-cell :deep(.ProseMirror) {
+  height: auto;
+  max-height: none;
+  max-width: 100%;
+  min-width: 0;
+  overflow: visible;
+  flex: 0 0 auto;
+}
+
+.ct-cell :deep(.rte-workspace),
+.ct-cell :deep(.rte-canvas),
+.ct-cell :deep(.ProseMirror) {
+  width: 100%;
+}
+
+.ct-cell :deep(.ProseMirror) {
+  min-height: 96px;
+  font-size: 16px;
+  line-height: 1.65;
+}
+
+.ct-cell :deep(.ProseMirror p) {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.ct-cell :deep(.pm-max-btn) {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
 }
 
 .ct-row-actions {
@@ -337,6 +375,7 @@ function onRemoveRow(rowId: string) {
 @media (max-width: 720px) {
   .ct-canvas {
     overflow-y: auto;
+    padding-bottom: 96px;
   }
 
   .ct-col-headers,
@@ -389,11 +428,8 @@ function onRemoveRow(rowId: string) {
   }
 
   .ct-cell {
-    min-height: 400px;
-  }
-
-  .ct-cell :deep(.ym-block) {
-    min-height: 0;
+    min-height: 180px;
+    height: auto;
   }
 }
 </style>

@@ -207,11 +207,49 @@ function onRemoveRow(rowId: string) {
 }
 
 .ga-cell :deep(.ym-block) {
-  flex: 1;
+  flex: 0 0 auto;
+  height: auto;
   min-height: 0;
   background: transparent;
   border: none;
   box-shadow: none;
+}
+
+.ga-cell :deep(.ym-block-body),
+.ga-cell :deep(.rte-root),
+.ga-cell :deep(.rte-workspace),
+.ga-cell :deep(.rte-canvas),
+.ga-cell :deep(.rte-body),
+.ga-cell :deep(.ProseMirror) {
+  height: auto;
+  max-height: none;
+  max-width: 100%;
+  min-width: 0;
+  overflow: visible;
+  flex: 0 0 auto;
+}
+
+.ga-cell :deep(.rte-workspace),
+.ga-cell :deep(.rte-canvas),
+.ga-cell :deep(.ProseMirror) {
+  width: 100%;
+}
+
+.ga-cell :deep(.ProseMirror) {
+  min-height: 96px;
+  font-size: 16px;
+  line-height: 1.65;
+}
+
+.ga-cell :deep(.ProseMirror p) {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.ga-cell :deep(.pm-max-btn) {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
 }
 
 .ga-cell :deep(.ym-block-toolbar) {
@@ -297,6 +335,7 @@ function onRemoveRow(rowId: string) {
 @media (max-width: 720px) {
   .ga-canvas {
     overflow-y: auto;
+    padding-bottom: 96px;
   }
 
   .ga-col-headers,
@@ -313,7 +352,8 @@ function onRemoveRow(rowId: string) {
   }
 
   .ga-cell {
-    min-height: 220px;
+    min-height: 180px;
+    height: auto;
     border-right: none;
     border-bottom: 1px solid #eee;
   }
