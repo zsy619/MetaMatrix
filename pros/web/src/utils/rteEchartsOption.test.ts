@@ -339,6 +339,22 @@ describe('ECharts 模板与表格生成', () => {
     expect(series[0]!.data).toEqual([1200, 0.5])
   })
 
+  it('换成折线后坐标轴名称的角度还在', () => {
+    const next = retypeEchartsOption(
+      {
+        title: { text: '销售' },
+        xAxis: { type: 'category', data: ['一月', '二月'], name: '月份', nameRotate: 30 },
+        yAxis: { type: 'value', name: '金额', nameRotate: -15 },
+        series: [{ name: '今年', type: 'bar', data: [2, 8] }],
+      },
+      'line',
+    )
+    const xAxis = next.xAxis as { nameRotate?: number }
+    const yAxis = next.yAxis as { nameRotate?: number }
+    expect(xAxis.nameRotate).toBe(30)
+    expect(yAxis.nameRotate).toBe(-15)
+  })
+
   it('换成折线后图例仍然隐藏', () => {
     const next = retypeEchartsOption(
       {

@@ -1653,22 +1653,25 @@ function legendLayout(option: Record<string, unknown>): Record<string, unknown> 
   return place
 }
 
-function axisNameLayout(axis: unknown): { location?: 'start' | 'middle' | 'end'; gap?: number } {
+function axisNameLayout(axis: unknown): { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number } {
   const node = Array.isArray(axis) ? axis[0] : axis
   if (!isPlainObject(node)) return {}
-  const place: { location?: 'start' | 'middle' | 'end'; gap?: number } = {}
+  const place: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number } = {}
   if (node.nameLocation === 'start' || node.nameLocation === 'middle' || node.nameLocation === 'end') {
     place.location = node.nameLocation
   }
   if (typeof node.nameGap === 'number' && Number.isFinite(node.nameGap)) {
     place.gap = Math.max(0, Math.min(80, node.nameGap))
   }
+  if (typeof node.nameRotate === 'number' && Number.isFinite(node.nameRotate)) {
+    place.rotate = Math.max(-90, Math.min(90, node.nameRotate))
+  }
   return place
 }
 
 function cartesianNameLayout(option: Record<string, unknown>): {
-  category: { location?: 'start' | 'middle' | 'end'; gap?: number }
-  value: { location?: 'start' | 'middle' | 'end'; gap?: number }
+  category: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number }
+  value: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number }
 } {
   const horizontal = categoryOnYAxis(option)
   return {
@@ -1829,8 +1832,8 @@ function buildCartesianOption(
   scale?: { interval?: number; inverse?: boolean; log?: boolean; logBase?: number },
   boundaryGap?: boolean,
   namePlace?: {
-    category: { location?: 'start' | 'middle' | 'end'; gap?: number }
-    value: { location?: 'start' | 'middle' | 'end'; gap?: number }
+    category: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number }
+    value: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number }
   },
   hideValueSplitLine = false,
   hideCategoryAxisLine = false,
@@ -1861,6 +1864,7 @@ function buildCartesianOption(
     ...(hideCategorySplitLine ? { splitLine: { show: false } } : {}),
     ...(namePlace?.category.location ? { nameLocation: namePlace.category.location } : {}),
     ...(namePlace?.category.gap != null ? { nameGap: namePlace.category.gap } : {}),
+    ...(namePlace?.category.rotate != null ? { nameRotate: namePlace.category.rotate } : {}),
   }
   const value = {
     type: scale?.log ? ('log' as const) : ('value' as const),
@@ -1872,6 +1876,7 @@ function buildCartesianOption(
     ...(scale?.logBase != null ? { logBase: scale.logBase } : {}),
     ...(namePlace?.value.location ? { nameLocation: namePlace.value.location } : {}),
     ...(namePlace?.value.gap != null ? { nameGap: namePlace.value.gap } : {}),
+    ...(namePlace?.value.rotate != null ? { nameRotate: namePlace.value.rotate } : {}),
     ...(hideValueSplitLine ? { splitLine: { show: false } } : {}),
     ...(showValueSplitArea ? { splitArea: { show: true } } : {}),
     ...(hideValueAxisLine ? { axisLine: { show: false } } : {}),
