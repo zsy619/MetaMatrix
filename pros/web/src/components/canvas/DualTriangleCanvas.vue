@@ -399,4 +399,107 @@ watch(
     gap: 10px;
   }
 }
+
+/* 手机单列：连线按桌面几何定位，收起后改由阅读顺序连接六张卡片。 */
+@media (max-width: 800px) {
+  .dual-triangle-canvas {
+    padding-bottom: 96px;
+  }
+
+  .dt-grid {
+    height: auto;
+    min-height: 0;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+    grid-template-areas:
+      'innovation'
+      'scenario'
+      'center'
+      'aesthetics'
+      'data'
+      'system'
+      'basics';
+    gap: 12px;
+  }
+
+  .cell {
+    min-height: 0;
+    height: auto;
+    overflow: visible;
+  }
+
+  .cell-center {
+    min-height: 0;
+  }
+
+  .cell-center :deep(.dt-center) {
+    height: auto;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-areas:
+      'stage stage stage'
+      'innovation scenario aesthetics'
+      'system basics data';
+    gap: 4px 6px;
+    container-type: inline-size;
+  }
+
+  .cell-center :deep(.tri-stage) {
+    grid-area: stage;
+    position: relative;
+    left: auto;
+    right: auto;
+    top: auto;
+    bottom: auto;
+    width: 100%;
+    height: 280px;
+  }
+
+  .cell :deep(.dt-block) {
+    height: auto;
+    min-height: 220px;
+    overflow: visible;
+  }
+
+  .cell :deep(.dt-block-subtitle) {
+    display: block;
+    overflow: visible;
+    -webkit-line-clamp: unset;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .cell :deep(.dt-block-body),
+  .cell :deep(.dt-rte) {
+    flex: 0 0 auto;
+    min-height: 120px;
+    overflow: visible;
+  }
+
+  .cell-center :deep(.kw) {
+    position: static;
+    transform: none;
+    justify-self: center;
+    min-height: 40px;
+    padding: 8px 6px;
+    font-size: 15px;
+  }
+
+  .cell-center :deep(.kw-creativity) { grid-area: innovation; }
+  .cell-center :deep(.kw-scenario) { grid-area: scenario; }
+  .cell-center :deep(.kw-aesthetics) { grid-area: aesthetics; }
+  .cell-center :deep(.kw-system) { grid-area: system; }
+  .cell-center :deep(.kw-basics) { grid-area: basics; }
+  .cell-center :deep(.kw-data) { grid-area: data; }
+
+  .cell-center :deep(.cap),
+  .cell-center :deep(.sub) {
+    white-space: normal;
+  }
+
+  .dt-links {
+    display: none;
+  }
+}
 </style>

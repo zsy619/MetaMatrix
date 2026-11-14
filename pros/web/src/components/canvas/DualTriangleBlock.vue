@@ -437,9 +437,7 @@ function onCloseMaximize(event?: Event) {
   font-size: 15px;
   font-weight: 700;
   letter-spacing: 0.02em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 1.35;
   min-width: 0;
   flex: 1;
 }
@@ -453,13 +451,13 @@ function onCloseMaximize(event?: Event) {
 
 .add-item-btn {
   flex-shrink: 0;
-  width: 22px;
-  height: 22px;
+  width: 36px;
+  height: 36px;
   border: 1px solid rgba(255, 255, 255, 0.72);
-  border-radius: 4px;
+  border-radius: 8px;
   background: rgba(255, 255, 255, 0.18);
   color: #fff;
-  font-size: 16px;
+  font-size: 20px;
   line-height: 1;
   cursor: pointer;
   padding: 0;
@@ -473,21 +471,18 @@ function onCloseMaximize(event?: Event) {
 }
 
 .dt-block-actions .pm-max-btn {
-  width: 28px;
-  height: 28px;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
 }
 
 .dt-block-subtitle {
   margin: 0;
   padding: 8px 12px 4px;
-  font-size: 11px;
-  line-height: 1.45;
+  font-size: 13px;
+  line-height: 1.5;
   color: #5f6368;
   flex-shrink: 0;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
 }
 
 .dt-block-body {
@@ -541,13 +536,13 @@ function onCloseMaximize(event?: Event) {
 
 .remove-item-btn {
   flex-shrink: 0;
-  width: 20px;
-  height: 20px;
+  width: 36px;
+  height: 36px;
   border: none;
-  border-radius: 4px;
+  border-radius: 8px;
   background: transparent;
   color: #d93025;
-  font-size: 16px;
+  font-size: 18px;
   line-height: 1;
   cursor: pointer;
   padding: 0;
@@ -563,9 +558,9 @@ function onCloseMaximize(event?: Event) {
 .dt-empty {
   margin: 0;
   padding: 8px 2px;
-  font-size: 12px;
+  font-size: 14px;
   color: var(--cv-muted, #5f6368);
-  line-height: 1.45;
+  line-height: 1.5;
 }
 
 .dt-max-hint {
@@ -785,10 +780,9 @@ function onCloseMaximize(event?: Event) {
 
 .dt-block:not(.dt-block--table) .dt-block-subtitle {
   padding: 8px 12px 0;
-  font-size: 12px;
-  line-height: 1.45;
-  color: #8b9096;
-  -webkit-line-clamp: 3;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #5f6368;
 }
 
 .dt-block:not(.dt-block--table) :deep(.rte-root) {
