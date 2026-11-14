@@ -326,7 +326,12 @@ export type ColumnFrameAttrs = {
 function clampNum(value: unknown, fallback: number, min: number, max: number): number {
   const raw = String(value ?? '').trim().normalize('NFKC').replace(/，/g, '.').replace(/,/g, '.')
   const point = /^(\d+(?:\.\d+)?)\s*pt$/i.exec(raw)
-  const n = point ? Math.round((Number(point[1]) * 4) / 3) : Math.round(Number(raw.replace(/\s*px$/i, '')))
+  const milli = /^(\d+(?:\.\d+)?)\s*mm$/i.exec(raw)
+  const n = point
+    ? Math.round((Number(point[1]) * 4) / 3)
+    : milli
+      ? Math.round((Number(milli[1]) * 96) / 25.4)
+      : Math.round(Number(raw.replace(/\s*px$/i, '')))
   if (!Number.isFinite(n)) return fallback
   return Math.max(min, Math.min(max, n))
 }
