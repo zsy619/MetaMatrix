@@ -66,33 +66,31 @@ const notes = computed(() =>
   <div class="fsd-canvas" :style="chrome" aria-label="五步法（分工版）">
     <div class="fsd-table" role="table" aria-label="五步法（分工版）">
       <div class="fsd-corner" aria-hidden="true" />
-      <header
-        v-for="col in doc.columns"
-        :key="`h-${col.id}`"
-        class="fsd-head"
-        role="columnheader"
-        :style="{ '--col-header': fiveStepPalette(col.id).header }"
+      <div
+        v-for="(row, rowIndex) in doc.rows"
+        :key="`rail-${row.id}`"
+        class="fsd-rail"
+        role="rowheader"
+        :data-row="rowIndex"
+        :style="{
+          background: railStyle(row.id).background,
+          color: railStyle(row.id).color,
+        }"
       >
-        <h2>{{ col.header }}</h2>
-      </header>
-
-      <template v-for="row in doc.rows" :key="row.id">
-        <div
-          class="fsd-rail"
-          role="rowheader"
-          :style="{
-            background: railStyle(row.id).background,
-            color: railStyle(row.id).color,
-          }"
-        >
-          <span>{{ row.label }}</span>
-        </div>
-        <div
-          v-for="col in doc.columns"
-          :key="`${col.id}_${row.id}`"
-          class="fsd-cell"
-          role="cell"
-        >
+        <span>{{ row.label }}</span>
+      </div>
+      <div class="fsd-foot-corner" aria-hidden="true" />
+      <article
+        v-for="(col, colIndex) in doc.columns"
+        :key="col.id"
+        class="fsd-col"
+        :style="{ '--c': String(colIndex + 2) }"
+      >
+        <header class="fsd-head" role="columnheader" :style="{ '--col-header': fiveStepPalette(col.id).header }">
+          <h2>{{ col.header }}</h2>
+        </header>
+        <div v-for="(row, rowIndex) in doc.rows" :key="`${col.id}_${row.id}`" class="fsd-cell" role="cell" :data-row="rowIndex">
+          <p class="fsd-row-label" :style="{ color: railStyle(row.id).color }">{{ row.label }}</p>
           <FiveStepPanel
             v-if="block(col.id, row.id)"
             chrome="fill"
@@ -103,17 +101,10 @@ const notes = computed(() =>
             :topic-placeholder="TOPIC_PLACEHOLDER[row.id]"
           />
         </div>
-      </template>
-
-      <div class="fsd-foot-corner" aria-hidden="true" />
-      <footer
-        v-for="col in doc.columns"
-        :key="`f-${col.id}`"
-        class="fsd-foot"
-        :style="{ color: fiveStepPalette(col.id).topic }"
-      >
-        <span>{{ col.footerLabel }}</span>
-      </footer>
+        <footer class="fsd-foot" :style="{ color: fiveStepPalette(col.id).topic }">
+          <span>{{ col.footerLabel }}</span>
+        </footer>
+      </article>
     </div>
 
     <FiveStepNotes :lead="notes.lead" :reminders="notes.reminders" />
@@ -149,6 +140,8 @@ const notes = computed(() =>
   overflow: visible;
 }
 
+.fsd-col { display: contents; }
+
 .fsd-corner,
 .fsd-head,
 .fsd-rail,
@@ -164,20 +157,23 @@ const notes = computed(() =>
     inset 0 -1px 0 var(--cv-hairline, rgba(60, 50, 20, 0.08));
 }
 
-.fsd-head:nth-child(6),
-.fsd-cell:nth-child(6n),
-.fsd-foot:nth-child(6n) {
+.fsd-col:last-child .fsd-head,
+.fsd-col:last-child .fsd-cell,
+.fsd-col:last-child .fsd-foot {
   box-shadow: inset 0 -1px 0 var(--cv-hairline, rgba(60, 50, 20, 0.08));
 }
 
-.fsd-foot,
-.fsd-foot-corner {
-  box-shadow: inset -1px 0 0 var(--cv-hairline, rgba(60, 50, 20, 0.08));
-}
-
-.fsd-foot:last-child {
-  box-shadow: none;
-}
+.fsd-corner { grid-column: 1; grid-row: 1; }
+.fsd-rail[data-row='0'] { grid-column: 1; grid-row: 2; }
+.fsd-rail[data-row='1'] { grid-column: 1; grid-row: 3; }
+.fsd-rail[data-row='2'] { grid-column: 1; grid-row: 4; }
+.fsd-foot-corner { grid-column: 1; grid-row: 5; box-shadow: inset -1px 0 0 var(--cv-hairline, rgba(60, 50, 20, 0.08)); }
+.fsd-head { grid-column: var(--c); grid-row: 1; }
+.fsd-cell[data-row='0'] { grid-column: var(--c); grid-row: 2; }
+.fsd-cell[data-row='1'] { grid-column: var(--c); grid-row: 3; }
+.fsd-cell[data-row='2'] { grid-column: var(--c); grid-row: 4; }
+.fsd-foot { grid-column: var(--c); grid-row: 5; }
+.fsd-row-label { display: none; margin: 0; }
 
 .fsd-corner {
   position: sticky;
@@ -204,7 +200,7 @@ const notes = computed(() =>
 
 .fsd-head h2 {
   margin: 0;
-  font-size: clamp(13px, 1.3vw, 16px);
+  font-size: 16px;
   font-weight: 700;
   letter-spacing: 0.04em;
   line-height: 1.25;
@@ -239,10 +235,10 @@ const notes = computed(() =>
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 36px;
+  min-height: 44px;
   padding: 8px 4px;
   background: #fafafa;
-  font-size: clamp(12px, 1.1vw, 14px);
+  font-size: 15px;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-align: center;
@@ -250,18 +246,50 @@ const notes = computed(() =>
 }
 
 @media (max-width: 900px) {
-  .fsd-canvas {
-    padding: 8px;
-  }
-
+  .fsd-canvas { padding: 12px; }
   .fsd-table {
-    min-width: 820px;
-    grid-template-columns: 44px repeat(5, minmax(0, 1fr));
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+    min-height: max-content;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
   }
-
-  .fsd-rail span {
-    font-size: 12px;
-    letter-spacing: 0.08em;
+  .fsd-corner,
+  .fsd-foot-corner,
+  .fsd-rail { display: none; }
+  .fsd-col {
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    min-width: 0;
+    background: #fff;
+    border: 1px solid var(--cv-frame, #ececec);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  .fsd-head,
+  .fsd-cell,
+  .fsd-foot {
+    grid-column: auto;
+    grid-row: auto;
+    position: static;
+    box-shadow: none;
+  }
+  .fsd-cell {
+    min-height: 200px;
+    flex-direction: column;
+    border-top: 1px solid var(--cv-hairline, rgba(60, 50, 20, 0.08));
+  }
+  .fsd-row-label {
+    display: block;
+    padding: 8px 12px 0;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
   }
 }
 </style>
