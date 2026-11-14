@@ -13,7 +13,7 @@ vi.mock('../RichTextEditor.vue', () => ({
   default: defineComponent({
     name: 'RichTextEditor',
     props: { modelValue: { type: String, default: '' } },
-    template: '<div class="rte-stub">{{ modelValue }}</div>',
+    template: '<div class="rte-stub ProseMirror">{{ modelValue }}</div>',
   }),
 }))
 
@@ -28,26 +28,22 @@ import { useDocumentStore } from '../../stores/document'
 import ScientificMeeting10pCanvas from './ScientificMeeting10pCanvas.vue'
 import type { ScientificMeeting10pDocumentJSON } from '../../types/canvas'
 
-describe('科学会议十原则', () => {
+const TITLES = ['民主', '落实', '激发', '点燃', '投入', '高效', '学习', '责任', '务实', '良性']
+
+describe('科学开会十大原则', () => {
   beforeEach(() => {
     localStorage.clear()
     setActivePinia(createPinia())
   })
 
-  it('十个滑块都在，拖动民主会改分数', async () => {
+  it('十条原则的备注卡都在', () => {
     const store = useDocumentStore()
     store.loadFromTemplate('scientific-meeting-10p')
     const wrapper = mount(ScientificMeeting10pCanvas, {
       props: { doc: store.current_data as ScientificMeeting10pDocumentJSON },
     })
-    const sliders = wrapper.findAll('input[type="range"]')
-    expect(sliders).toHaveLength(10)
-    const democratic = wrapper.get('input[aria-label="民主 滑块"]')
-    expect((democratic.element as HTMLInputElement).value).toBe('82')
-    await democratic.setValue('40')
-    await democratic.trigger('input')
-    expect((store.current_data as ScientificMeeting10pDocumentJSON).scores.democratic).toBe(40)
-    expect(wrapper.get('.sm10p-slider-val').text()).toBe('40')
+    expect(wrapper.findAll('.sm10p-card')).toHaveLength(10)
+    for (const title of TITLES) expect(wrapper.text()).toContain(title)
     wrapper.unmount()
   })
 })
