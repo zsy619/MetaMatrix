@@ -1653,6 +1653,30 @@ function legendLayout(option: Record<string, unknown>): Record<string, unknown> 
   return place
 }
 
+function axisNameLayout(axis: unknown): { location?: 'start' | 'middle' | 'end'; gap?: number } {
+  const node = Array.isArray(axis) ? axis[0] : axis
+  if (!isPlainObject(node)) return {}
+  const place: { location?: 'start' | 'middle' | 'end'; gap?: number } = {}
+  if (node.nameLocation === 'start' || node.nameLocation === 'middle' || node.nameLocation === 'end') {
+    place.location = node.nameLocation
+  }
+  if (typeof node.nameGap === 'number' && Number.isFinite(node.nameGap)) {
+    place.gap = Math.max(0, Math.min(80, node.nameGap))
+  }
+  return place
+}
+
+function cartesianNameLayout(option: Record<string, unknown>): {
+  category: { location?: 'start' | 'middle' | 'end'; gap?: number }
+  value: { location?: 'start' | 'middle' | 'end'; gap?: number }
+} {
+  const horizontal = categoryOnYAxis(option)
+  return {
+    category: axisNameLayout(horizontal ? option.yAxis : option.xAxis),
+    value: axisNameLayout(horizontal ? option.xAxis : option.yAxis),
+  }
+}
+
 function categoryBoundaryGap(option: Record<string, unknown>): boolean | undefined {
   const axis = categoryOnYAxis(option) ? option.yAxis : option.xAxis
   const node = Array.isArray(axis) ? axis[0] : axis
@@ -1746,6 +1770,10 @@ function buildCartesianOption(
   tip?: Record<string, unknown>,
   scale?: { interval?: number; inverse?: boolean; log?: boolean; logBase?: number },
   boundaryGap?: boolean,
+  namePlace?: {
+    category: { location?: 'start' | 'middle' | 'end'; gap?: number }
+    value: { location?: 'start' | 'middle' | 'end'; gap?: number }
+  },
 ): Record<string, unknown> {
   const category = {
     type: 'category' as const,
@@ -1754,6 +1782,8 @@ function buildCartesianOption(
     ...(names?.category ? { name: names.category } : {}),
     ...(categoryRotate != null ? { axisLabel: { rotate: categoryRotate } } : {}),
     ...(boundaryGap != null ? { boundaryGap } : {}),
+    ...(namePlace?.category.location ? { nameLocation: namePlace.category.location } : {}),
+    ...(namePlace?.category.gap != null ? { nameGap: namePlace.category.gap } : {}),
   }
   const value = {
     type: scale?.log ? ('log' as const) : ('value' as const),
@@ -1763,6 +1793,8 @@ function buildCartesianOption(
     ...(scale?.interval != null ? { interval: scale.interval } : {}),
     ...(scale?.inverse ? { inverse: true } : {}),
     ...(scale?.logBase != null ? { logBase: scale.logBase } : {}),
+    ...(namePlace?.value.location ? { nameLocation: namePlace.value.location } : {}),
+    ...(namePlace?.value.gap != null ? { nameGap: namePlace.value.gap } : {}),
   }
   return {
     color: FEISHU_TEXT_COLORS.filter((item) => item !== '#1f2329' && item !== '#8f959e'),
@@ -2035,6 +2067,7 @@ export function retypeEchartsOption(
       tooltipLayout(base),
       valueAxisScale(base),
       categoryBoundaryGap(base),
+      cartesianNameLayout(base),
     )
   }
   if (usable && type === 'pie') {
