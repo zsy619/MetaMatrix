@@ -74,9 +74,14 @@ export function pageChromeIsEmpty(chrome: PanelPageChrome): boolean {
   return !chrome.header && !chrome.headerEven && !chrome.footer && !chrome.footerEven && chrome.pageNumber === 'none' && !chrome.gutter
 }
 
-/** 奇数页用页眉，偶数页有单独页眉时用偶数页眉。 */
+function pageOrdinal(page: number): number {
+  const n = Math.floor(page)
+  return Number.isFinite(n) && n >= 1 ? n : 1
+}
+
+/** 奇数页用页眉，偶数页有单独页眉时用偶数页眉。页码从 1 起算。 */
 export function headerForPage(chrome: PanelPageChrome, page: number): string {
-  const even = page % 2 === 0
+  const even = pageOrdinal(page) % 2 === 0
   if (even && chrome.headerEven.trim()) return chrome.headerEven
   return chrome.header
 }
@@ -142,7 +147,7 @@ export function printPageSideCss(chrome: PanelPageChrome): string {
 }
 
 export function footerForPage(chrome: PanelPageChrome, page: number): string {
-  const even = page % 2 === 0
+  const even = pageOrdinal(page) % 2 === 0
   if (even && chrome.footerEven.trim()) return chrome.footerEven
   return chrome.footer
 }
