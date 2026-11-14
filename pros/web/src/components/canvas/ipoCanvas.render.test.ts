@@ -1,4 +1,7 @@
 // @vitest-environment happy-dom
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -43,6 +46,9 @@ describe('IPO 梳理画布', () => {
     expect(previews.filter((text) => text === '点击填写')).toHaveLength(4)
     expect(wrapper.get('.ipo-node--input .ipo-preview').classes()).not.toContain('is-short')
     expect(wrapper.get('.ipo-node--process .ipo-preview').classes()).toContain('is-short')
+    const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'IpoCanvas.vue'), 'utf8')
+    expect(source).toContain('max-height: none')
+    expect(source).toContain('-webkit-line-clamp: unset')
     wrapper.unmount()
   })
 })

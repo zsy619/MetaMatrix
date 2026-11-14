@@ -772,6 +772,10 @@ onBeforeUnmount(() => {
     width: 100%;
   }
 
+  .ipo-node--goal {
+    flex-direction: column-reverse;
+  }
+
   .ipo-node--goal .ipo-box--wide,
   .ipo-node--feedback .ipo-box--wide {
     max-width: none;
@@ -789,9 +793,23 @@ onBeforeUnmount(() => {
     padding: 0;
   }
 
-  .ipo-box {
-    height: 100px;
-    max-height: 100px;
+  .ipo-box,
+  .ipo-box--wide,
+  .ipo-node--goal .ipo-box--wide,
+  .ipo-node--feedback .ipo-box--wide {
+    height: auto;
+    max-height: none;
+    min-height: 88px;
+  }
+
+  .ipo-preview,
+  .ipo-box--wide .ipo-preview {
+    display: block;
+    height: auto;
+    overflow: visible;
+    -webkit-line-clamp: unset;
+    font-size: 15px;
+    line-height: 1.55;
   }
 }
 </style>
