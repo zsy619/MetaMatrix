@@ -60,6 +60,12 @@ export function normalizeFormulaPunctuation(text: string): string {
     .replace(/\uFF0D/g, '-')
     .replace(/\u00D7/g, '*')
     .replace(/\u00F7/g, '/')
+    .replace(/\uFF1E/g, '>')
+    .replace(/\uFF1C/g, '<')
+    .replace(/\uFF1D/g, '=')
+    .replace(/\u2265/g, '>=')
+    .replace(/\u2264/g, '<=')
+    .replace(/\u2260/g, '<>')
 }
 
 /** 公式里提到的单元格和区域，按出现顺序去重。 */
@@ -252,6 +258,7 @@ type LexToken =
   | { t: 'comma' }
   | { t: 'colon' }
   | { t: 'pct' }
+  | { t: 'cmp'; v: string }
   | { t: 'err'; v: FormulaErrorCode }
 
 class FormulaError extends Error {
@@ -296,7 +303,14 @@ function lex(src: string): LexToken[] {
     else if (ch === ':') tokens.push({ t: 'colon' })
     else if (ch === '%') tokens.push({ t: 'pct' })
     else if (ch === '+' || ch === '-' || ch === '*' || ch === '/') tokens.push({ t: 'op', v: ch })
-    else throw new FormulaError('#VALUE!')
+    else if (ch === '<' || ch === '>' || ch === '=') {
+      const next = src[i + 1]
+      let op = ch
+      if (ch === '<' && (next === '>' || next === '=')) op = ch + next
+      else if (ch === '>' && next === '=') op = ch + next
+      if (op.length === 2) i += 1
+      tokens.push({ t: 'cmp', v: op })
+    } else throw new FormulaError('#VALUE!')
     i += 1
   }
   return tokens
@@ -312,6 +326,7 @@ type Node =
   | { k: 'unary'; op: string; arg: Node }
   | { k: 'pct'; arg: Node }
   | { k: 'bin'; op: string; l: Node; r: Node }
+  | { k: 'cmp'; op: string; l: Node; r: Node }
   | { k: 'call'; name: string; args: Node[] }
 
 const FUNC_NAMES = new Set(['SUM', 'AVERAGE', 'COUNT', 'MAX', 'MIN'])
@@ -327,6 +342,14 @@ class Parser {
   }
   next(): LexToken | undefined {
     return this.tokens[this.pos++]
+  }
+  parseCompare(): Node {
+    let left = this.parseExpr()
+    const token = this.peek()
+    if (!token || token.t !== 'cmp') return left
+    this.next()
+    const right = this.parseExpr()
+    return { k: 'cmp', op: token.v, l: left, r: right }
   }
   parseExpr(): Node {
     let left = this.parseTerm()
@@ -425,7 +448,7 @@ function parseFormula(body: string): Node {
   const tokens = lex(body)
   if (!tokens.length) throw new FormulaError('#VALUE!')
   const parser = new Parser(tokens)
-  const node = parser.parseExpr()
+  const node = parser.parseCompare()
   if (parser.pos !== parser.tokens.length) throw new FormulaError('#VALUE!')
   return node
 }
@@ -576,6 +599,20 @@ function evalNode(node: Node, ctx: Ctx, at: CellAddress): EvalValue {
       const v = evalNode(node.arg, ctx, at)
       if (isError(v)) return v
       return v / 100
+    }
+    case 'cmp': {
+      const l = evalNode(node.l, ctx, at)
+      if (isError(l)) return l
+      const r = evalNode(node.r, ctx, at)
+      if (isError(r)) return r
+      const ok =
+        node.op === '>' ? l > r
+        : node.op === '<' ? l < r
+        : node.op === '>=' ? l >= r
+        : node.op === '<=' ? l <= r
+        : node.op === '<>' ? l !== r
+        : l === r
+      return ok ? 1 : 0
     }
     case 'bin': {
       const l = evalNode(node.l, ctx, at)

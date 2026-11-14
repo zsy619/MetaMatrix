@@ -75,6 +75,11 @@ assert.equal(evaluateCellFormula('=$A$1', grid2, 0, 0), '1')
 assert.equal(evaluateCellFormula('=SUM($A$1:$B$1)', grid2, 0, 0), '3')
 
 // 求和区域比表格长时，多出来的格子跳过，不把整段算成 #REF!
+assert.equal(evaluateCellFormula('=A1>10', [['12']], 0, 0), '1')
+assert.equal(evaluateCellFormula('=A1>10', [['8']], 0, 0), '0')
+assert.equal(evaluateCellFormula('=A1>=8', [['8']], 0, 0), '1')
+assert.equal(evaluateCellFormula('=A1<>8', [['9']], 0, 0), '1')
+assert.equal(evaluateCellFormula('=A1=8', [['8']], 0, 0), '1')
 assert.equal(evaluateCellFormula('=SUM（A1：A2）', [['1'], ['2']], 0, 0), '3')
 assert.equal(evaluateCellFormula('=50％+1', grid2, 0, 0), '1.5')
 assert.equal(evaluateCellFormula('=SUM(A1:A5)', [['1'], ['2'], ['3']], 0, 0), '6')
