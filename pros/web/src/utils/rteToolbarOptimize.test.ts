@@ -70,6 +70,28 @@ assert.equal(new Set(Object.values(TOOLBAR_ACTION_TITLES)).size, 60)
 assert.equal(toolbarActionTitle('code-lines').includes('行号'), true)
 assert.equal(toolbarActionTitle('list-continue').includes('不会从 1'), true)
 assert.equal(toolbarActionTitle('missing'), '')
+const aliasGroups = [{
+  id: 'tools',
+  label: '工具',
+  tools: [
+    { key: 'code', label: '代码' },
+    { key: 'lineHeight', label: '行高' },
+    { key: 'attach', label: '附件钮' },
+    { key: 'tidyHalf', label: '半' },
+    { key: 'template', label: '套用' },
+    { key: 'redo', label: '重做钮' },
+    { key: 'find', label: '查找钮' },
+    { key: 'table', label: '表格钮' },
+  ],
+}]
+assert.equal(searchToolbarTools(aliasGroups, '代码块')[0]?.key, 'code')
+assert.equal(searchToolbarTools(aliasGroups, '行距')[0]?.key, 'lineHeight')
+assert.equal(searchToolbarTools(aliasGroups, '回形针')[0]?.key, 'attach')
+assert.equal(searchToolbarTools(aliasGroups, '转半角')[0]?.key, 'tidyHalf')
+assert.equal(searchToolbarTools(aliasGroups, '文档模板')[0]?.key, 'template')
+assert.equal(searchToolbarTools(aliasGroups, '恢复')[0]?.key, 'redo')
+assert.equal(searchToolbarTools(aliasGroups, '寻找')[0]?.key, 'find')
+assert.equal(searchToolbarTools(aliasGroups, '插表')[0]?.key, 'table')
 assert.equal(readStoredRibbonTab('style', tabs), 'style')
 assert.equal(readStoredRibbonTab('missing', tabs), 'edit')
 assert.equal(readStoredRibbonTab(null, []), 'edit')
