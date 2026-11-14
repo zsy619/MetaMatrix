@@ -1,7 +1,7 @@
 /** 页眉、页脚、页码。旧文档没有这个字段时视为空，不改变版心。 */
 import { cssPageMargin, type PageMarginBox } from './rtePageMargin'
 
-export const PAGE_NUMBER_STYLES = ['none', 'n', 'page-n', 'page-n-of-m', 'dash', 'roman', 'upper-roman', 'alpha', 'upper-alpha', 'cjk', 'pad', 'slash', 'cjk-formal', 'greek', 'of', 'p', 'no'] as const
+export const PAGE_NUMBER_STYLES = ['none', 'n', 'page-n', 'page-n-of-m', 'dash', 'roman', 'upper-roman', 'alpha', 'upper-alpha', 'cjk', 'pad', 'slash', 'cjk-formal', 'greek', 'of', 'p', 'no', 'pg'] as const
 
 export type PageNumberStyle = (typeof PAGE_NUMBER_STYLES)[number]
 
@@ -42,6 +42,7 @@ export const PAGE_NUMBER_OPTIONS: ReadonlyArray<{ id: PageNumberStyle; label: st
   { id: 'of', label: '1 of 5' },
   { id: 'p', label: 'p. 1' },
   { id: 'no', label: 'No. 1' },
+  { id: 'pg', label: 'Page 1' },
 ]
 
 /** 页眉或页脚占用的最小边带。已有边距更大时不额外加高。 */
@@ -137,6 +138,8 @@ function pageNumberCss(style: PageNumberStyle): string {
       return '"p. " counter(page)'
     case 'no':
       return '"No. " counter(page)'
+    case 'pg':
+      return '"Page " counter(page)'
     default:
       return ''
   }
@@ -365,6 +368,8 @@ export function formatPageNumber(style: PageNumberStyle, page: number, total: nu
       return `p. ${n}`
     case 'no':
       return `No. ${n}`
+    case 'pg':
+      return `Page ${n}`
     default:
       return ''
   }
