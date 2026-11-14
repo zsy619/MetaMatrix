@@ -43,7 +43,7 @@ export function attachmentKind(name: string, mime: string): AttachmentKind {
   if (
     type.startsWith('text/')
     || type === 'application/json'
-    || /\.(txt|md|markdown|json|csv|log)$/.test(fileName)
+    || /\.(txt|md|markdown|json|csv|log|rtf)$/.test(fileName)
   ) {
     return 'text'
   }
@@ -128,7 +128,7 @@ export function isAttachmentAnchor(href: string, text: string, className = ''): 
   const kind = attachmentKindFor(text, href, '')
   if (kind === 'pdf' || kind === 'docx' || kind === 'doc' || kind === 'sheet' || kind === 'audio' || kind === 'video') return true
   const path = href.split('?')[0]?.toLowerCase() || ''
-  return /\.(csv|tsv|pptx?|pptm|ppsx)$/.test(path)
+  return /\.(csv|tsv|pptx?|pptm|ppsx|rtf)$/.test(path)
 }
 
 function splitDelimitedLine(line: string, delimiter: string): string[] {
