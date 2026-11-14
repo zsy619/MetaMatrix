@@ -54,15 +54,20 @@ function block(id: ValueChainBlockId) {
 </template>
 
 <style scoped>
-.sheet { position: absolute; inset: 0; box-sizing: border-box; display: flex; flex-direction: column; min-height: 0; padding: 12px 14px 14px; background: var(--cv-page, #f7f7f7); color: #202124; }
+.sheet { position: absolute; inset: 0; box-sizing: border-box; display: flex; flex-direction: column; min-height: 0; padding: 12px 14px 14px; overflow: auto; background: var(--cv-page, #f7f7f7); color: #202124; }
 .sheet-top { flex: none; margin-bottom: 10px; }
 .sheet-top h2, .sheet-top p { margin: 0; }
-.sheet-top p { color: #5f6368; font-size: 13px; }
+.sheet-top p { max-width: 42em; color: #3c4043; font-size: 15px; line-height: 1.55; }
 .chain { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 10px; }
 .row { display: grid; gap: 8px; min-height: 0; }
 .row--support { flex: 0.85; grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .row--primary { flex: 1.15; grid-template-columns: repeat(5, minmax(0, 1fr)); }
 section { display: flex; flex-direction: column; min-height: 0; background: var(--col-body); border-radius: 12px; overflow: hidden; }
-h3 { margin: 0; min-height: 36px; display: flex; align-items: center; justify-content: center; background: var(--col-header); color: #fff; font-size: 13px; letter-spacing: 0.04em; }
+h3 { margin: 0; min-height: 44px; display: flex; align-items: center; justify-content: center; padding: 0 8px; background: var(--col-header); color: #fff; font-size: 15px; letter-spacing: 0.04em; text-align: center; }
 .rte-slot { flex: 1 1 auto; min-height: 0; display: flex; }
+@media (max-width: 1000px) {
+  .row--support.row--support,
+  .row--primary.row--primary { grid-template-columns: 1fr; }
+  section { min-height: 220px; height: auto; }
+}
 </style>

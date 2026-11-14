@@ -38,7 +38,11 @@
 
 .canvas-viewport .sheet[aria-label='利润表'] .sheet-top p,
 .canvas-viewport .cash[aria-label='现金流量'] .cash-top p,
-.canvas-viewport .sheet[aria-label='RICE 排序'] .sheet-top p {
+.canvas-viewport .sheet[aria-label='RICE 排序'] .sheet-top p,
+.canvas-viewport .sheet[aria-label='PDCA'] .sheet-top p,
+.canvas-viewport .sheet[aria-label='波特五力'] .sheet-top p,
+.canvas-viewport .sheet[aria-label='SWOT 分析'] .sheet-top p,
+.canvas-viewport .sheet[aria-label='价值链'] .sheet-top p {
   font-size: 15px;
   color: #3c4043;
 }
@@ -117,7 +121,6 @@
   overflow: auto;
 }
 
-.canvas-viewport .swot-grid,
 .canvas-viewport .lean-grid,
 .canvas-viewport .sheet > .grid,
 .canvas-viewport .sheet > .axis,
@@ -134,7 +137,8 @@
 .canvas-viewport .sheet > .chain,
 .canvas-viewport .sheet > .pdca,
 .canvas-viewport .sheet > .columns,
-.canvas-viewport .cash > .cash-grid {
+.canvas-viewport .cash > .cash-grid,
+.canvas-viewport .swot-grid {
   flex: 1 0 auto;
   height: auto;
   overflow: visible;
@@ -311,6 +315,42 @@
   }
 
   .canvas-viewport .sheet > .grid > section {
+    min-height: 240px;
+  }
+
+  .canvas-viewport .swot-grid.swot-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: none;
+  }
+
+  .canvas-viewport .forces.forces {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .canvas-viewport .forces .force {
+    grid-area: auto;
+    min-height: 240px;
+  }
+
+  .canvas-viewport .swot-grid > section,
+  .canvas-viewport .forces .force {
+    min-height: 240px;
+  }
+}
+
+@media (max-width: 1000px) {
+  .canvas-viewport .sheet > .pdca.pdca {
+    grid-template-columns: 1fr;
+  }
+
+  .canvas-viewport .chain .row--support.row--support,
+  .canvas-viewport .chain .row--primary.row--primary {
+    grid-template-columns: 1fr;
+  }
+
+  .canvas-viewport .pdca > section,
+  .canvas-viewport .chain section {
     min-height: 240px;
   }
 }
