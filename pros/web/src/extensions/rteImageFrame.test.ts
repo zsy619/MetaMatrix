@@ -52,6 +52,20 @@ describe('图片边框和圆角', () => {
     expect(editor.getHTML()).toContain('data-display-width="50.5%"')
   })
 
+  it('宽度写成全角 ３２０px 时仍是 320 像素', () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    editor = new Editor({
+      element: host,
+      extensions: [
+        StarterKit.configure({ dropcursor: false }),
+        RteImage.configure({ inline: false, allowBase64: true, HTMLAttributes: { class: 'rte-image' } }),
+      ],
+      content: `<img src="${PIXEL}" width="３２０px" alt="全角">`,
+    })
+    expect(editor.getHTML()).toContain('width="320"')
+  })
+
   it('宽度写成 320,5px 时按 321 像素留下', () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
