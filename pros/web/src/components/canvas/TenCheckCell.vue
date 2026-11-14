@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { usePanelMaximize } from '../../composables/usePanelMaximize'
 import RichTextEditor from '../RichTextEditor.vue'
 import PanelAttachments from './PanelAttachments.vue'
@@ -17,6 +18,12 @@ const emit = defineEmits<{
   'update:modelValue': [html: string]
 }>()
 
+const caption = computed(() => {
+  if (props.tone === 'judge') return '它帮你判断'
+  if (props.tone === 'fail') return '不合格的信号'
+  return '你要填什么'
+})
+
 const { isMaximized, toggleMaximize, closeMaximize } = usePanelMaximize(() => props.panelId)
 
 function onToggle(event: MouseEvent) {
@@ -32,6 +39,7 @@ function onClose(event?: Event) {
 
 <template>
   <div class="cell" :class="[`is-${tone || 'fill'}`, { 'is-source-max': isMaximized }]">
+    <p class="cell-kicker">{{ caption }}</p>
     <p v-if="note" class="cell-note">{{ note }}</p>
     <button
       type="button"
@@ -113,26 +121,33 @@ function onClose(event?: Event) {
 .cell {
   position: relative;
   min-width: 0;
-  min-height: 0;
-  height: 100%;
+  min-height: 200px;
+  height: auto;
   display: flex;
   flex-direction: column;
+}
+.cell-kicker {
+  display: none;
+  margin: 0;
+  padding: 8px 32px 0 10px;
+  font-size: 13px;
+  font-weight: 750;
+  line-height: 1.3;
 }
 .cell-note {
   flex: none;
   margin: 0;
   padding: 8px 30px 0 8px;
   color: #5c574e;
-  font-size: 12px;
-  line-height: 1.4;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  font-size: 14px;
+  line-height: 1.5;
 }
-.cell.is-fill .cell-note { color: #1d4e89; }
-.cell.is-judge .cell-note { color: #7a5b10; }
-.cell.is-fail .cell-note { color: #9b1c1c; }
+.cell.is-fill .cell-note,
+.cell.is-fill .cell-kicker { color: #1d4e89; }
+.cell.is-judge .cell-note,
+.cell.is-judge .cell-kicker { color: #7a5b10; }
+.cell.is-fail .cell-note,
+.cell.is-fail .cell-kicker { color: #9b1c1c; }
 .pm-heading { flex: 1; min-width: 0; }
 .pm-note {
   margin: 2px 0 0;
@@ -168,6 +183,11 @@ function onClose(event?: Event) {
 .cell :deep(.rte-workspace),
 .cell :deep(.rte-canvas),
 .cell :deep(.rte-body) { flex: 1 1 auto; min-height: 0; }
-.cell :deep(.rte-canvas) { padding: 8px 28px 4px 8px; background: transparent; overflow: auto; }
-.cell :deep(.ProseMirror) { min-height: 0; font-size: 14px; line-height: 1.55; }
+.cell :deep(.rte-canvas) { padding: 8px 28px 8px 8px; background: transparent; overflow: visible; }
+.cell :deep(.ProseMirror) { min-height: 72px; font-size: 15px; line-height: 1.6; }
+
+@media (max-width: 800px) {
+  .cell { min-height: 0; }
+  .cell-kicker { display: block; }
+}
 </style>
