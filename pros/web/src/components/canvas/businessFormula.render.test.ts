@@ -1,4 +1,7 @@
 // @vitest-environment happy-dom
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -41,6 +44,12 @@ describe('业务公式画布', () => {
 
     await wrapper.get('button[title="餐饮连锁"]').trigger('click')
     expect(wrapper.get('textarea').element.value).toContain('餐饮营收')
+    const source = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), 'BusinessFormulaCanvas.vue'),
+      'utf8',
+    )
+    expect(source).toContain('max-height: none')
+    expect(source).toContain('-webkit-line-clamp: unset')
     wrapper.unmount()
   })
 })
