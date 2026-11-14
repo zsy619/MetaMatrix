@@ -109,6 +109,21 @@ describe('图片边框和圆角', () => {
     expect(editor.getHTML()).toContain('height="180"')
   })
 
+  it('图片设成缩小以适应时不放大原图', () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    editor = new Editor({
+      element: host,
+      extensions: [
+        StarterKit.configure({ dropcursor: false }),
+        RteImage.configure({ inline: false, allowBase64: true, HTMLAttributes: { class: 'rte-image' } }),
+      ],
+      content: `<img src="${PIXEL}" data-fit="scale-down" alt="缩小">`,
+    })
+    expect(editor.getHTML()).toContain('object-fit: scale-down')
+    expect(editor.getHTML()).toContain('data-fit="scale-down"')
+  })
+
   it('图片设成包含时画面按原比例留在框里', () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
