@@ -330,7 +330,7 @@ type Node =
   | { k: 'cmp'; op: string; l: Node; r: Node }
   | { k: 'call'; name: string; args: Node[] }
 
-const FUNC_NAMES = new Set(['SUM', 'AVERAGE', 'COUNT', 'MAX', 'MIN', 'IF', 'ROUND', 'AND', 'OR', 'ABS', 'INT', 'MOD', 'POWER', 'SQRT', 'SIGN', 'CEILING', 'FLOOR', 'NOT', 'PRODUCT', 'MEDIAN', 'COUNTA', 'ROUNDUP', 'ROUNDDOWN', 'PI', 'EXP', 'LN', 'LOG', 'LOG10', 'FACT', 'GCD', 'LCM', 'TRUNC'])
+const FUNC_NAMES = new Set(['SUM', 'AVERAGE', 'COUNT', 'MAX', 'MIN', 'IF', 'ROUND', 'AND', 'OR', 'ABS', 'INT', 'MOD', 'POWER', 'SQRT', 'SIGN', 'CEILING', 'FLOOR', 'NOT', 'PRODUCT', 'MEDIAN', 'COUNTA', 'ROUNDUP', 'ROUNDDOWN', 'PI', 'EXP', 'LN', 'LOG', 'LOG10', 'FACT', 'GCD', 'LCM', 'TRUNC', 'QUOTIENT'])
 
 class Parser {
   tokens: LexToken[]
@@ -853,6 +853,16 @@ function evalCall(name: string, args: Node[], ctx: Ctx, at: CellAddress): EvalVa
     const factor = 10 ** digits
     if (!Number.isFinite(factor) || factor === 0) return { error: '#VALUE!' }
     const result = Math.trunc(value * factor) / factor
+    return Number.isFinite(result) ? result : { error: '#VALUE!' }
+  }
+  if (name === 'QUOTIENT') {
+    if (args.length !== 2) return { error: '#VALUE!' }
+    const left = evalNode(args[0]!, ctx, at)
+    if (isError(left)) return left
+    const right = evalNode(args[1]!, ctx, at)
+    if (isError(right)) return right
+    if (right === 0) return { error: '#DIV/0!' }
+    const result = Math.trunc(left / right)
     return Number.isFinite(result) ? result : { error: '#VALUE!' }
   }
   if (name === 'ROUND') return evalRound(args, ctx, at)
