@@ -496,7 +496,7 @@ onBeforeUnmount(() => {
   position: absolute;
   inset: 0;
   z-index: 10;
-  overflow: hidden;
+  overflow: auto;
   box-sizing: border-box;
   padding: 8px 12px 10px;
   display: flex;
@@ -591,7 +591,8 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 8px;
   min-width: 0;
-  padding: 6px 10px;
+  min-height: 40px;
+  padding: 6px 12px;
   border-radius: 999px;
   background: rgba(244, 245, 247, 0.95);
   border: 1px solid #e8eaed;
@@ -599,29 +600,26 @@ onBeforeUnmount(() => {
 }
 
 .pmst-slider-name {
-  flex: 0 1 auto;
-  max-width: 46%;
-  font-size: 12px;
+  flex: 0 0 auto;
+  font-size: 14px;
   font-weight: 700;
   color: var(--axis, #1565c0);
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .pmst-slider input[type='range'] {
   flex: 1 1 auto;
-  min-width: 0;
-  height: 4px;
+  min-width: 48px;
+  height: 22px;
   accent-color: var(--axis, #1565c0);
   cursor: pointer;
 }
 
 .pmst-slider-val {
   flex: 0 0 auto;
-  min-width: 2em;
+  min-width: 2.2em;
   font-variant-numeric: tabular-nums;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 800;
   color: var(--axis, #1565c0);
   text-align: right;
