@@ -45,6 +45,7 @@ function normalizeRatios(
   let arr: number[] | null = null
   if (typeof ratios === 'string' && ratios.trim()) {
     arr = ratios
+      .normalize('NFKC')
       .split(/[:：/／比∶]/)
       .map((s) => Math.round(Number(s.trim()) * 100) / 100)
       .filter((n) => Number.isFinite(n) && n > 0)
