@@ -533,6 +533,7 @@ const CHILD_KEYS: Record<string, readonly string[]> = {
     'log',
     'logBase',
     'inverse',
+    'scale',
     'show',
     'position',
     'offset',
@@ -562,6 +563,7 @@ const CHILD_KEYS: Record<string, readonly string[]> = {
     'log',
     'logBase',
     'inverse',
+    'scale',
     'show',
     'position',
     'offset',
@@ -1756,13 +1758,14 @@ function categoryLabelRotate(option: Record<string, unknown>): number | undefine
   return Math.max(-90, Math.min(90, rotate))
 }
 
-function valueAxisScale(option: Record<string, unknown>): { interval?: number; inverse?: boolean; log?: boolean; logBase?: number } {
+function valueAxisScale(option: Record<string, unknown>): { interval?: number; inverse?: boolean; log?: boolean; logBase?: number; fromData?: boolean } {
   const axis = categoryOnYAxis(option) ? option.xAxis : option.yAxis
   const node = Array.isArray(axis) ? axis[0] : axis
   if (!isPlainObject(node)) return {}
-  const scale: { interval?: number; inverse?: boolean; log?: boolean; logBase?: number } = {}
+  const scale: { interval?: number; inverse?: boolean; log?: boolean; logBase?: number; fromData?: boolean } = {}
   if (typeof node.interval === 'number' && Number.isFinite(node.interval) && node.interval > 0) scale.interval = node.interval
   if (node.inverse === true) scale.inverse = true
+  if (node.scale === true) scale.fromData = true
   if (node.type === 'log') scale.log = true
   if (typeof node.logBase === 'number' && Number.isFinite(node.logBase) && node.logBase > 0 && node.logBase !== 1) {
     scale.logBase = node.logBase
@@ -1829,7 +1832,7 @@ function buildCartesianOption(
   looks?: Array<{ straight: boolean; filled: boolean } | null>,
   margins?: Record<string, unknown>,
   tip?: Record<string, unknown>,
-  scale?: { interval?: number; inverse?: boolean; log?: boolean; logBase?: number },
+  scale?: { interval?: number; inverse?: boolean; log?: boolean; logBase?: number; fromData?: boolean },
   boundaryGap?: boolean,
   namePlace?: {
     category: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number }
@@ -1873,6 +1876,7 @@ function buildCartesianOption(
     ...(bounds?.max != null ? { max: bounds.max } : {}),
     ...(scale?.interval != null ? { interval: scale.interval } : {}),
     ...(scale?.inverse ? { inverse: true } : {}),
+    ...(scale?.fromData ? { scale: true } : {}),
     ...(scale?.logBase != null ? { logBase: scale.logBase } : {}),
     ...(namePlace?.value.location ? { nameLocation: namePlace.value.location } : {}),
     ...(namePlace?.value.gap != null ? { nameGap: namePlace.value.gap } : {}),
