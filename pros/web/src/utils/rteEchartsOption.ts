@@ -1580,6 +1580,16 @@ function categoryLabelRotate(option: Record<string, unknown>): number | undefine
   return Math.max(-90, Math.min(90, rotate))
 }
 
+function valueAxisScale(option: Record<string, unknown>): { interval?: number; inverse?: boolean } {
+  const axis = categoryOnYAxis(option) ? option.xAxis : option.yAxis
+  const node = Array.isArray(axis) ? axis[0] : axis
+  if (!isPlainObject(node)) return {}
+  const scale: { interval?: number; inverse?: boolean } = {}
+  if (typeof node.interval === 'number' && Number.isFinite(node.interval) && node.interval > 0) scale.interval = node.interval
+  if (node.inverse === true) scale.inverse = true
+  return scale
+}
+
 function valueAxisBounds(option: Record<string, unknown>): { min?: number; max?: number } {
   const axis = categoryOnYAxis(option) ? option.xAxis : option.yAxis
   const node = Array.isArray(axis) ? axis[0] : axis
@@ -1630,6 +1640,7 @@ function buildCartesianOption(
   looks?: Array<{ straight: boolean; filled: boolean } | null>,
   margins?: Record<string, unknown>,
   tip?: Record<string, unknown>,
+  scale?: { interval?: number; inverse?: boolean },
 ): Record<string, unknown> {
   const category = {
     type: 'category' as const,
@@ -1643,6 +1654,8 @@ function buildCartesianOption(
     name: names?.value || '数值',
     ...(bounds?.min != null ? { min: bounds.min } : {}),
     ...(bounds?.max != null ? { max: bounds.max } : {}),
+    ...(scale?.interval != null ? { interval: scale.interval } : {}),
+    ...(scale?.inverse ? { inverse: true } : {}),
   }
   return {
     color: FEISHU_TEXT_COLORS.filter((item) => item !== '#1f2329' && item !== '#8f959e'),
@@ -1895,6 +1908,7 @@ export function retypeEchartsOption(
       lineLooks(base),
       gridMargins(base),
       tooltipLayout(base),
+      valueAxisScale(base),
     )
   }
   if (usable && type === 'pie') {
