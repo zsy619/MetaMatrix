@@ -138,15 +138,15 @@ function mark(id: TenCheckRowId, passed: boolean) {
 .sheet-top p { margin-top: 4px; max-width: 68ch; color: #5c574e; font-size: 13px; line-height: 1.5; }
 .score { margin: 0; padding: 8px 12px; border-radius: 999px; background: #fff; color: #3c4043; font-size: 13px; white-space: nowrap; }
 .score strong { color: #125c3b; font-size: 18px; }
-.table { flex: none; min-width: 980px; background: #fff; border: 1px solid #d9d0c3; border-radius: 14px; }
-.head, .row { display: grid; grid-template-columns: 48px 136px minmax(210px, 1.35fr) minmax(168px, 1fr) minmax(168px, 1fr) 88px; gap: 0; align-items: stretch; }
+.table { flex: none; min-width: 1000px; background: #fff; border: 1px solid #d9d0c3; border-radius: 14px; }
+.head, .row { display: grid; grid-template-columns: 48px 136px minmax(210px, 1.35fr) minmax(168px, 1fr) minmax(168px, 1fr) 104px; gap: 0; align-items: stretch; }
 .head { position: sticky; top: 0; z-index: 4; min-height: 46px; padding: 0; border-radius: 0; background: #1c2838; color: #fff; font-size: 13px; font-weight: 700; box-shadow: 0 -8px 0 0 var(--cv-page, #f7f7f7); }
 .head span { display: flex; align-items: center; min-width: 0; min-height: 46px; padding: 0 12px; box-sizing: border-box; }
 .head span + span { border-left: 1px solid rgba(255, 255, 255, 0.16); }
 .head .h-fill { background: #1f5f99; }
 .head .h-judge { background: #8a6410; }
 .head .h-fail { background: #9a3030; }
-.row { box-sizing: border-box; height: 200px; min-height: 200px; max-height: 200px; padding: 0; overflow: hidden; background: #fffdf8; box-shadow: inset 0 -2px 0 #e4d9cc; }
+.row { box-sizing: border-box; height: auto; min-height: 200px; padding: 0; overflow: visible; background: #fffdf8; box-shadow: inset 0 -2px 0 #e4d9cc; }
 .table > .row:nth-child(odd) { background: #f6f1e8; }
 .row[data-pass='false'] { background: #fde8e8; box-shadow: inset 4px 0 0 #c5221f, inset 0 -2px 0 #f0c4c3; }
 .row[data-pass='true'] { background: #e5f6ec; box-shadow: inset 4px 0 0 #187a4e, inset 0 -2px 0 #b7e0c8; }
@@ -163,8 +163,8 @@ function mark(id: TenCheckRowId, passed: boolean) {
 .row > :focus-within:not(.marks) { box-shadow: inset 0 0 0 2px #1f5f99; }
 .row > :nth-child(4):focus-within { box-shadow: inset 0 0 0 2px #8a6410; }
 .row > :nth-child(5):focus-within { box-shadow: inset 0 0 0 2px #9a3030; }
-.marks { display: flex; flex-direction: column; justify-content: center; align-items: stretch; gap: 6px; padding: 0 8px; }
-.marks button { border: 1px solid #e4ddd2; background: #fff; border-radius: 999px; padding: 4px 8px; cursor: pointer; }
+.marks { display: flex; flex-direction: column; justify-content: center; align-items: stretch; gap: 8px; padding: 8px; }
+.marks button { border: 1px solid #e4ddd2; background: #fff; border-radius: 999px; min-height: 36px; padding: 6px 10px; font-size: 15px; font-weight: 700; cursor: pointer; }
 .marks button[aria-pressed='true'] { background: #187a4e; border-color: #187a4e; color: #fff; }
 .marks button.no[aria-pressed='true'] { background: #c5221f; border-color: #c5221f; color: #fff; }
 </style>
@@ -180,5 +180,42 @@ function mark(id: TenCheckRowId, passed: boolean) {
 }
 .canvas-viewport .sheet.ten-check-sheet .table {
   overflow: visible;
+}
+
+@media (max-width: 800px) {
+  .ten-check-sheet .table {
+    min-width: 0;
+  }
+
+  .ten-check-sheet .head {
+    display: none;
+  }
+
+  .ten-check-sheet .row {
+    grid-template-columns: 40px minmax(0, 1fr);
+    grid-template-areas:
+      "num name"
+      "fill fill"
+      "judge judge"
+      "fail fail"
+      "marks marks";
+    min-height: 0;
+  }
+
+  .ten-check-sheet .num { grid-area: num; }
+  .ten-check-sheet .row > strong { grid-area: name; align-items: center; padding: 8px 8px 8px 0; }
+  .ten-check-sheet .row > :nth-child(3) { grid-area: fill; }
+  .ten-check-sheet .row > :nth-child(4) { grid-area: judge; }
+  .ten-check-sheet .row > :nth-child(5) { grid-area: fail; }
+  .ten-check-sheet .marks {
+    grid-area: marks;
+    flex-direction: row;
+    justify-content: flex-end;
+    padding: 8px 12px 12px;
+  }
+
+  .ten-check-sheet .marks button {
+    min-width: 72px;
+  }
 }
 </style>
