@@ -157,6 +157,40 @@ assert.equal(searchToolbarTools([{ id: 'p', label: '纸', tools: [{ key: 'writin
 assert.equal(searchToolbarTools([{ id: 'r', label: '音', tools: [{ key: 'ruby', label: '音' }] }], '再注音')[0]?.key, 'ruby')
 assert.equal(searchToolbarTools([{ id: 'c', label: '栏', tools: [{ key: 'columns', label: '栏' }] }], '再排成栏')[0]?.key, 'columns')
 assert.equal(searchToolbarTools([{ id: 'w', label: '纸', tools: [{ key: 'writingPaper', label: '纸' }] }], '再铺稿纸')[0]?.key, 'writingPaper')
+for (const [query, key] of [
+  ['改成小四', 'fontSize'],
+  ['换个引号', 'quoteStyle'],
+  ['列成清单', 'list'],
+  ['换成罗马数字', 'listStyle'],
+  ['改成导语', 'paraStyle'],
+  ['再加一行', 'tableStruct'],
+  ['念给我听', 'speak'],
+  ['打开提纲', 'outline'],
+  ['再画条线', 'hr'],
+  ['再贴表情', 'emoji'],
+  ['再做二维码', 'qrcode'],
+  ['再写公式', 'formula'],
+  ['再另起一页', 'pageBreak'],
+  ['再预看', 'printPreview'],
+  ['再加批注', 'comment'],
+  ['再加脚注', 'footnote'],
+  ['再加水印', 'watermark'],
+  ['再加点', 'emphasisDot'],
+  ['只贴字', 'pastePlain'],
+  ['连格式一起贴', 'pasteFormat'],
+  ['再隔行上色', 'tableZebra'],
+  ['再写下标', 'subscript'],
+  ['再写上标', 'superscript'],
+  ['再换一张', 'imageReplace'],
+  ['自动编标题号', 'headingAutoNum'],
+  ['再查错', 'spellcheck'],
+  ['看修订记录', 'revision'],
+  ['再加书签', 'bookmark'],
+  ['要读几分钟', 'readTime'],
+  ['看看快捷键', 'shortcuts'],
+] as const) {
+  assert.equal(searchToolbarTools([{ id: 'g', label: '组', tools: [{ key, label: '钮' }] }], query)[0]?.key, key)
+}
 assert.equal(readStoredRibbonTab('style', tabs), 'style')
 assert.equal(readStoredRibbonTab('missing', tabs), 'edit')
 assert.equal(readStoredRibbonTab(null, []), 'edit')
