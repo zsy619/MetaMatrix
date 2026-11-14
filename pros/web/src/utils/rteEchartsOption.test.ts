@@ -339,6 +339,33 @@ describe('ECharts 模板与表格生成', () => {
     expect(series[0]!.data).toEqual([1200, 0.5])
   })
 
+  it('换成折线后坐标轴名称还在', () => {
+    const next = retypeEchartsOption(
+      {
+        title: { text: '销售' },
+        xAxis: { type: 'category', name: '月份', data: ['一月', '二月'] },
+        yAxis: { type: 'value', name: '万元' },
+        series: [{ name: '今年', type: 'bar', data: [1, 2] }],
+      },
+      'line',
+    )
+    expect((next.xAxis as { name?: string }).name).toBe('月份')
+    expect((next.yAxis as { name?: string }).name).toBe('万元')
+    const horizontal = retypeEchartsOption(
+      {
+        title: { text: '销售' },
+        xAxis: { type: 'value', name: '万元' },
+        yAxis: { type: 'category', name: '地区', data: ['华东', '华南'] },
+        series: [{ name: '今年', type: 'bar', data: [1, 2] }],
+      },
+      'line',
+    )
+    expect((horizontal.yAxis as { name?: string; data: string[] }).name).toBe('地区')
+    expect((horizontal.yAxis as { data: string[] }).data).toEqual(['华东', '华南'])
+    expect((horizontal.xAxis as { name?: string; type: string }).name).toBe('万元')
+    expect((horizontal.xAxis as { type: string }).type).toBe('value')
+  })
+
   it('换成折线后系列颜色还在', () => {
     const next = retypeEchartsOption(
       {

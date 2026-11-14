@@ -1502,15 +1502,36 @@ function seriesStackAt(option: Record<string, unknown>, index: number): string |
   return stack || undefined
 }
 
+function axisTitle(axis: unknown): string | undefined {
+  const node = Array.isArray(axis) ? axis[0] : axis
+  if (!isPlainObject(node) || typeof node.name !== 'string') return undefined
+  const name = node.name.trim()
+  return name || undefined
+}
+
+function cartesianAxisNames(option: Record<string, unknown>): { category?: string; value?: string } {
+  const horizontal = categoryOnYAxis(option)
+  return {
+    category: axisTitle(horizontal ? option.yAxis : option.xAxis),
+    value: axisTitle(horizontal ? option.xAxis : option.yAxis),
+  }
+}
+
 function buildCartesianOption(
   type: 'bar' | 'line',
   title: string,
   labels: string[],
   series: Array<{ name: string; data: Array<number | null>; stack?: string; color?: string }>,
   horizontal = false,
+  names?: { category?: string; value?: string },
 ): Record<string, unknown> {
-  const category = { type: 'category', data: labels, axisTick: { alignWithLabel: true } }
-  const value = { type: 'value', name: '数值' }
+  const category = {
+    type: 'category' as const,
+    data: labels,
+    axisTick: { alignWithLabel: true },
+    ...(names?.category ? { name: names.category } : {}),
+  }
+  const value = { type: 'value' as const, name: names?.value || '数值' }
   return {
     color: FEISHU_TEXT_COLORS.filter((item) => item !== '#1f2329' && item !== '#8f959e'),
     title: { text: title, left: 'center' },
@@ -1752,6 +1773,7 @@ export function retypeEchartsOption(
         color: seriesColorAt(base, index),
       })),
       categoryOnYAxis(base),
+      cartesianAxisNames(base),
     )
   }
   if (usable && type === 'pie') {
