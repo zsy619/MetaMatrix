@@ -31,6 +31,13 @@ documentStore.ensurePmSolutionTriangleBlocks()
 
 const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 
+const narrow = ref(false)
+let narrowQuery: MediaQueryList | null = null
+
+function syncNarrow() {
+  narrow.value = !!narrowQuery?.matches
+}
+
 /**
  * 顺时针自顶：投入产出比ROI → 机会窗口 → 机会成本
  * （顶 / 右下 / 左下）
@@ -304,6 +311,9 @@ function onWindowPointerUp() {
 
 onMounted(() => {
   documentStore.ensurePmSolutionTriangleBlocks()
+  narrowQuery = window.matchMedia('(max-width: 800px)')
+  syncNarrow()
+  narrowQuery.addEventListener('change', syncNarrow)
 })
 
 if (typeof window !== 'undefined') {
@@ -312,6 +322,7 @@ if (typeof window !== 'undefined') {
 }
 
 onBeforeUnmount(() => {
+  narrowQuery?.removeEventListener('change', syncNarrow)
   if (typeof window !== 'undefined') {
     window.removeEventListener('pointerup', onWindowPointerUp)
     window.removeEventListener('pointercancel', onWindowPointerUp)
@@ -479,14 +490,15 @@ onBeforeUnmount(() => {
       隐藏挂载三轴 YModelBlock：点击顶点时写入全局 maximizedPanelKey，
       由块内 Teleport .pm-overlay 铺满文档视口（panel-maximize 规则）。
     -->
-    <div class="pmst-block-host" aria-hidden="true">
-      <template v-for="item in axisBlocks" :key="item.axis">
+    <div class="pmst-block-host" :aria-hidden="narrow ? undefined : true">
+      <section v-for="item in axisBlocks" :key="item.axis" class="pmst-card">
+        <h3 class="pmst-card-title">{{ item.title }}</h3>
         <YModelBlockCard
           v-if="item.block"
           :block="item.block"
           hide-title
         />
-      </template>
+      </section>
     </div>
   </div>
 </template>
@@ -639,6 +651,11 @@ onBeforeUnmount(() => {
   margin: -1px;
 }
 
+.pmst-card-title {
+  display: none;
+  margin: 0;
+}
+
 @media (max-width: 900px) {
   .pmst-sliders {
     grid-template-columns: 1fr;
@@ -652,5 +669,63 @@ onBeforeUnmount(() => {
   .pmst-axis-label {
     font-size: 15px;
   }
+}
+
+@media (max-width: 800px) {
+  .pmst-canvas { padding-bottom: 96px; }
+  .pmst-stage { flex: 0 0 auto; min-height: 0; }
+  .pmst-radar { width: 100%; height: auto; max-height: none; aspect-ratio: 800 / 720; }
+  .pmst-sliders { grid-template-columns: 1fr; }
+  .pmst-slider input[type='range'] { height: 36px; }
+  .pmst-block-host {
+    position: static;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: auto;
+    height: auto;
+    margin: 14px 0 0;
+    padding: 0;
+    overflow: visible;
+    clip: auto;
+    clip-path: none;
+    white-space: normal;
+  }
+  .pmst-card {
+    padding: 12px 12px 10px;
+    border: 1px solid var(--cv-frame, #ececec);
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 8px 20px rgba(62, 48, 28, 0.06);
+  }
+  .pmst-card-title {
+    display: block;
+    margin: 0 0 8px;
+    font-size: 16px;
+    font-weight: 750;
+    line-height: 1.35;
+    color: #202124;
+  }
+  .pmst-card :deep(.ym-block),
+  .pmst-card :deep(.ym-block-body),
+  .pmst-card :deep(.rte-root),
+  .pmst-card :deep(.rte-workspace),
+  .pmst-card :deep(.rte-canvas),
+  .pmst-card :deep(.rte-body),
+  .pmst-card :deep(.ProseMirror) {
+    height: auto;
+    max-height: none;
+    max-width: 100%;
+    min-width: 0;
+    overflow: visible;
+    flex: 0 0 auto;
+  }
+  .pmst-card :deep(.ym-block) { min-height: 0; background: transparent; border: none; box-shadow: none; }
+  .pmst-card :deep(.rte-workspace),
+  .pmst-card :deep(.rte-canvas),
+  .pmst-card :deep(.ProseMirror) { width: 100%; }
+  .pmst-card :deep(.ProseMirror) { min-height: 96px; font-size: 15px; line-height: 1.55; }
+  .pmst-card :deep(.ProseMirror p) { max-width: 100%; overflow-wrap: anywhere; }
+  .pmst-card :deep(.pm-max-btn) { width: 36px; height: 36px; border-radius: 8px; }
 }
 </style>

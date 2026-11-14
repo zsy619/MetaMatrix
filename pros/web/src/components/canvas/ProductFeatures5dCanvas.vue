@@ -31,6 +31,13 @@ documentStore.ensureProductFeatures5dBlocks()
 
 const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 
+const narrow = ref(false)
+let narrowQuery: MediaQueryList | null = null
+
+function syncNarrow() {
+  narrow.value = !!narrowQuery?.matches
+}
+
 /**
  * 顺时针自顶：开放性 → 投入性 → 易错性 → 迭代性 → 创新性
  * （与参考雷达图一致）
@@ -312,6 +319,9 @@ function onWindowPointerUp() {
 
 onMounted(() => {
   documentStore.ensureProductFeatures5dBlocks()
+  narrowQuery = window.matchMedia('(max-width: 800px)')
+  syncNarrow()
+  narrowQuery.addEventListener('change', syncNarrow)
 })
 
 if (typeof window !== 'undefined') {
@@ -320,6 +330,7 @@ if (typeof window !== 'undefined') {
 }
 
 onBeforeUnmount(() => {
+  narrowQuery?.removeEventListener('change', syncNarrow)
   if (typeof window !== 'undefined') {
     window.removeEventListener('pointerup', onWindowPointerUp)
     window.removeEventListener('pointercancel', onWindowPointerUp)
@@ -485,14 +496,15 @@ onBeforeUnmount(() => {
       隐藏挂载五轴 YModelBlock：点击顶点时写入全局 maximizedPanelKey，
       由块内 Teleport .pm-overlay 铺满文档视口（panel-maximize 规则）。
     -->
-    <div class="pf5d-block-host" aria-hidden="true">
-      <template v-for="item in axisBlocks" :key="item.axis">
+    <div class="pf5d-block-host" :aria-hidden="narrow ? undefined : true">
+      <section v-for="item in axisBlocks" :key="item.axis" class="pf5d-card">
+        <h3 class="pf5d-card-title">{{ item.title }}</h3>
         <YModelBlockCard
           v-if="item.block"
           :block="item.block"
           hide-title
         />
-      </template>
+      </section>
     </div>
   </div>
 </template>
@@ -645,6 +657,11 @@ onBeforeUnmount(() => {
   margin: -1px;
 }
 
+.pf5d-card-title {
+  display: none;
+  margin: 0;
+}
+
 @media (max-width: 1100px) {
   .pf5d-sliders {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -664,5 +681,63 @@ onBeforeUnmount(() => {
   .pf5d-axis-label {
     font-size: 13px;
   }
+}
+
+@media (max-width: 800px) {
+  .pf5d-canvas { padding-bottom: 96px; }
+  .pf5d-stage { flex: 0 0 auto; min-height: 0; }
+  .pf5d-radar { width: 100%; height: auto; max-height: none; aspect-ratio: 800 / 720; }
+  .pf5d-sliders { grid-template-columns: 1fr; }
+  .pf5d-slider input[type='range'] { height: 36px; }
+  .pf5d-block-host {
+    position: static;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: auto;
+    height: auto;
+    margin: 14px 0 0;
+    padding: 0;
+    overflow: visible;
+    clip: auto;
+    clip-path: none;
+    white-space: normal;
+  }
+  .pf5d-card {
+    padding: 12px 12px 10px;
+    border: 1px solid var(--cv-frame, #ececec);
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 8px 20px rgba(62, 48, 28, 0.06);
+  }
+  .pf5d-card-title {
+    display: block;
+    margin: 0 0 8px;
+    font-size: 16px;
+    font-weight: 750;
+    line-height: 1.35;
+    color: #202124;
+  }
+  .pf5d-card :deep(.ym-block),
+  .pf5d-card :deep(.ym-block-body),
+  .pf5d-card :deep(.rte-root),
+  .pf5d-card :deep(.rte-workspace),
+  .pf5d-card :deep(.rte-canvas),
+  .pf5d-card :deep(.rte-body),
+  .pf5d-card :deep(.ProseMirror) {
+    height: auto;
+    max-height: none;
+    max-width: 100%;
+    min-width: 0;
+    overflow: visible;
+    flex: 0 0 auto;
+  }
+  .pf5d-card :deep(.ym-block) { min-height: 0; background: transparent; border: none; box-shadow: none; }
+  .pf5d-card :deep(.rte-workspace),
+  .pf5d-card :deep(.rte-canvas),
+  .pf5d-card :deep(.ProseMirror) { width: 100%; }
+  .pf5d-card :deep(.ProseMirror) { min-height: 96px; font-size: 15px; line-height: 1.55; }
+  .pf5d-card :deep(.ProseMirror p) { max-width: 100%; overflow-wrap: anywhere; }
+  .pf5d-card :deep(.pm-max-btn) { width: 36px; height: 36px; border-radius: 8px; }
 }
 </style>
