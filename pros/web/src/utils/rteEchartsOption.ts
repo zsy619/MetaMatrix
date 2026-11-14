@@ -1518,6 +1518,24 @@ function seriesSymbolAt(
   return mark.symbol || mark.symbolSize != null ? mark : undefined
 }
 
+function seriesLineStyleAt(
+  option: Record<string, unknown>,
+  index: number,
+): { width?: number; type?: 'solid' | 'dashed' | 'dotted' } | undefined {
+  const series = option.series
+  if (!Array.isArray(series)) return undefined
+  const item = series[index]
+  if (!isPlainObject(item) || !isPlainObject(item.lineStyle)) return undefined
+  const style: { width?: number; type?: 'solid' | 'dashed' | 'dotted' } = {}
+  if (typeof item.lineStyle.width === 'number' && Number.isFinite(item.lineStyle.width) && item.lineStyle.width > 0 && item.lineStyle.width <= 16) {
+    style.width = item.lineStyle.width
+  }
+  if (item.lineStyle.type === 'solid' || item.lineStyle.type === 'dashed' || item.lineStyle.type === 'dotted') {
+    style.type = item.lineStyle.type
+  }
+  return style.width != null || style.type ? style : undefined
+}
+
 function seriesStepAt(option: Record<string, unknown>, index: number): true | 'start' | 'middle' | 'end' | undefined {
   const series = option.series
   if (!Array.isArray(series)) return undefined
@@ -1683,6 +1701,7 @@ function buildCartesianOption(
     step?: true | 'start' | 'middle' | 'end'
     symbol?: string
     symbolSize?: number | string
+    lineStyle?: { width?: number; type?: 'solid' | 'dashed' | 'dotted' }
   }>,
   horizontal = false,
   names?: { category?: string; value?: string },
@@ -1730,6 +1749,7 @@ function buildCartesianOption(
       ...(item.step != null ? { step: item.step } : {}),
       ...(item.symbol ? { symbol: item.symbol } : {}),
       ...(item.symbolSize != null ? { symbolSize: item.symbolSize } : {}),
+      ...(item.lineStyle ? { lineStyle: item.lineStyle } : {}),
       smooth: type === 'line' ? looks?.[index]?.straight !== true : undefined,
       areaStyle:
         type === 'line' && (looks?.[index] ? looks[index]!.filled : true) ? { opacity: 0.12 } : undefined,
@@ -1962,6 +1982,7 @@ export function retypeEchartsOption(
         step: seriesStepAt(base, index),
         symbol: seriesSymbolAt(base, index)?.symbol,
         symbolSize: seriesSymbolAt(base, index)?.symbolSize,
+        lineStyle: seriesLineStyleAt(base, index),
       })),
       categoryOnYAxis(base),
       cartesianAxisNames(base),

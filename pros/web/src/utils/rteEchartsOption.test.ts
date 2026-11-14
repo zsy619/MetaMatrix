@@ -339,6 +339,23 @@ describe('ECharts 模板与表格生成', () => {
     expect(series[0]!.data).toEqual([1200, 0.5])
   })
 
+  it('换成柱状图再换回折线后还是虚线', () => {
+    const bar = retypeEchartsOption(
+      {
+        title: { text: '销售' },
+        xAxis: { type: 'category', data: ['一月', '二月'] },
+        yAxis: { type: 'value' },
+        series: [{ name: '今年', type: 'line', lineStyle: { width: 4, type: 'dashed' }, data: [2, 8] }],
+      },
+      'bar',
+    )
+    const back = retypeEchartsOption(bar, 'line')
+    const series = back.series as Array<{ type?: string; lineStyle?: { width?: number; type?: string } }>
+    expect(series[0]?.type).toBe('line')
+    expect(series[0]?.lineStyle?.width).toBe(4)
+    expect(series[0]?.lineStyle?.type).toBe('dashed')
+  })
+
   it('换成柱状图再换回折线后符号还在', () => {
     const bar = retypeEchartsOption(
       {
