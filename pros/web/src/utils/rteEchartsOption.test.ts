@@ -339,6 +339,25 @@ describe('ECharts 模板与表格生成', () => {
     expect(series[0]!.data).toEqual([1200, 0.5])
   })
 
+  it('堆叠柱状图换成折线后仍然堆在一起', () => {
+    const next = retypeEchartsOption(
+      {
+        title: { text: '销售' },
+        xAxis: { type: 'category', data: ['一月', '二月'] },
+        yAxis: { type: 'value' },
+        series: [
+          { name: '直营', type: 'bar', stack: '总量', data: [10, 20] },
+          { name: '渠道', type: 'bar', stack: '总量', data: [5, 8] },
+        ],
+      },
+      'line',
+    )
+    const series = next.series as Array<{ type: string; stack?: string; data: number[] }>
+    expect(series.map((item) => item.type)).toEqual(['line', 'line'])
+    expect(series.map((item) => item.stack)).toEqual(['总量', '总量'])
+    expect(series[1]!.data).toEqual([5, 8])
+  })
+
   it('折线中间的空点保持断开，不画成 0', () => {
     const next = retypeEchartsOption(
       {

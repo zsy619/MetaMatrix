@@ -1481,11 +1481,20 @@ function categoryOnYAxis(option: Record<string, unknown>): boolean {
   })
 }
 
+function seriesStackAt(option: Record<string, unknown>, index: number): string | undefined {
+  const series = option.series
+  if (!Array.isArray(series)) return undefined
+  const item = series[index]
+  if (!isPlainObject(item) || typeof item.stack !== 'string') return undefined
+  const stack = item.stack.trim()
+  return stack || undefined
+}
+
 function buildCartesianOption(
   type: 'bar' | 'line',
   title: string,
   labels: string[],
-  series: Array<{ name: string; data: Array<number | null> }>,
+  series: Array<{ name: string; data: Array<number | null>; stack?: string }>,
   horizontal = false,
 ): Record<string, unknown> {
   const category = { type: 'category', data: labels, axisTick: { alignWithLabel: true } }
@@ -1502,6 +1511,7 @@ function buildCartesianOption(
       name: item.name,
       type,
       data: item.data,
+      ...(item.stack ? { stack: item.stack } : {}),
       smooth: type === 'line' ? true : undefined,
       areaStyle: type === 'line' ? { opacity: 0.12 } : undefined,
     })),
@@ -1722,9 +1732,10 @@ export function retypeEchartsOption(
       type,
       titleText || (type === 'line' ? '趋势' : '对比'),
       model.categories,
-      model.series.map((item) => ({
+      model.series.map((item, index) => ({
         name: item.name,
         data: item.data.map((value) => asChartNumber(value)),
+        stack: seriesStackAt(base, index),
       })),
       categoryOnYAxis(base),
     )
