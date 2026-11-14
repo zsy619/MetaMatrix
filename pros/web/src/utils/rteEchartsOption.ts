@@ -1519,6 +1519,23 @@ function seriesStackAt(option: Record<string, unknown>, index: number): string |
   return stack || undefined
 }
 
+function tooltipLayout(option: Record<string, unknown>): Record<string, unknown> {
+  const place: Record<string, unknown> = { trigger: 'axis' }
+  const tooltip = option.tooltip
+  if (!isPlainObject(tooltip)) return place
+  if (tooltip.trigger === 'item' || tooltip.trigger === 'axis' || tooltip.trigger === 'none') place.trigger = tooltip.trigger
+  if (typeof tooltip.confine === 'boolean') place.confine = tooltip.confine
+  if (typeof tooltip.show === 'boolean') place.show = tooltip.show
+  for (const key of ['backgroundColor', 'borderColor'] as const) {
+    const value = tooltip[key]
+    if (typeof value === 'string' && value.trim() && value.length <= 40 && !/url\(|expression\(/i.test(value)) {
+      place[key] = value.trim()
+    }
+  }
+  if (typeof tooltip.borderWidth === 'number' && Number.isFinite(tooltip.borderWidth)) place.borderWidth = tooltip.borderWidth
+  return place
+}
+
 function gridMargins(option: Record<string, unknown>): Record<string, unknown> | undefined {
   const grid = option.grid
   if (!isPlainObject(grid)) return undefined
@@ -1612,6 +1629,7 @@ function buildCartesianOption(
   legendPlace?: Record<string, unknown>,
   looks?: Array<{ straight: boolean; filled: boolean } | null>,
   margins?: Record<string, unknown>,
+  tip?: Record<string, unknown>,
 ): Record<string, unknown> {
   const category = {
     type: 'category' as const,
@@ -1629,7 +1647,7 @@ function buildCartesianOption(
   return {
     color: FEISHU_TEXT_COLORS.filter((item) => item !== '#1f2329' && item !== '#8f959e'),
     title: { text: title, left: 'center' },
-    tooltip: { trigger: 'axis' },
+    tooltip: tip || { trigger: 'axis' },
     legend: { ...(legendPlace || { bottom: 0 }), data: series.map((item) => item.name) },
     grid: { left: 48, right: 24, top: 48, bottom: 56, containLabel: true, ...(margins || {}) },
     xAxis: horizontal ? value : category,
@@ -1876,6 +1894,7 @@ export function retypeEchartsOption(
       legendLayout(base),
       lineLooks(base),
       gridMargins(base),
+      tooltipLayout(base),
     )
   }
   if (usable && type === 'pie') {

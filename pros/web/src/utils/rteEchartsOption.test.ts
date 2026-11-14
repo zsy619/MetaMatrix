@@ -339,6 +339,23 @@ describe('ECharts 模板与表格生成', () => {
     expect(series[0]!.data).toEqual([1200, 0.5])
   })
 
+  it('换成折线后提示框还按单点弹出', () => {
+    const next = retypeEchartsOption(
+      {
+        title: { text: '销售' },
+        tooltip: { trigger: 'item', confine: true, backgroundColor: '#fff7e8' },
+        xAxis: { type: 'category', data: ['一月', '二月'] },
+        yAxis: { type: 'value' },
+        series: [{ name: '今年', type: 'bar', data: [1, 2] }],
+      },
+      'line',
+    )
+    const tooltip = next.tooltip as { trigger?: string; confine?: boolean; backgroundColor?: string }
+    expect(tooltip.trigger).toBe('item')
+    expect(tooltip.confine).toBe(true)
+    expect(tooltip.backgroundColor).toBe('#fff7e8')
+  })
+
   it('换成折线后绘图区边距还在', () => {
     const next = retypeEchartsOption(
       {
