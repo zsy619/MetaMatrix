@@ -28,7 +28,7 @@ describe('经典画布铺满页面', () => {
     setActivePinia(createPinia())
   })
 
-  it('每日看板四列颜色不同，卡片能右移', async () => {
+  it('每日看板四列颜色不同，卡片能移到下一列', async () => {
     const store = useDocumentStore()
     store.loadFromTemplate('daily-kanban')
     const doc = store.current_data as DailyKanbanDocumentJSON
@@ -38,7 +38,7 @@ describe('经典画布铺满页面', () => {
     const headers = columns.map((column) => column.attributes('style'))
     expect(new Set(headers).size).toBe(4)
     const before = doc.columns[0].cards[0].id
-    await columns[0].findAll('button').find((button) => button.text() === '右移')!.trigger('click')
+    await columns[0].findAll('button').find((button) => button.text() === '下一列')!.trigger('click')
     expect(isDailyKanbanDoc(store.current_data) && store.current_data.columns[1].cards.some((card) => card.id === before)).toBe(true)
   })
 

@@ -37,7 +37,8 @@
 }
 
 .canvas-viewport .sheet[aria-label='利润表'] .sheet-top p,
-.canvas-viewport .cash[aria-label='现金流量'] .cash-top p {
+.canvas-viewport .cash[aria-label='现金流量'] .cash-top p,
+.canvas-viewport .sheet[aria-label='RICE 排序'] .sheet-top p {
   font-size: 15px;
   color: #3c4043;
 }

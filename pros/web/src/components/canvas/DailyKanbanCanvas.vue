@@ -95,9 +95,9 @@ function removeCard(cardId: string) {
           <article v-for="card in column.cards" :key="card.id">
             <textarea :value="card.text" :aria-label="`${column.title}卡片`" @change="editCard(card.id, ($event.target as HTMLTextAreaElement).value)" />
             <div class="kanban-move">
-              <button type="button" :disabled="index === 0" @click="move(card.id, -1)">左移</button>
-              <button type="button" :disabled="index === doc.columns.length - 1" @click="move(card.id, 1)">右移</button>
-              <button type="button" @click="removeCard(card.id)">删除</button>
+              <button type="button" :disabled="index === 0" aria-label="移到上一列" @click="move(card.id, -1)">上一列</button>
+              <button type="button" :disabled="index === doc.columns.length - 1" aria-label="移到下一列" @click="move(card.id, 1)">下一列</button>
+              <button type="button" aria-label="删除卡片" @click="removeCard(card.id)">删除</button>
             </div>
           </article>
         </div>
@@ -115,6 +115,7 @@ function removeCard(cardId: string) {
   flex-direction: column;
   min-height: 0;
   padding: 12px 14px 14px;
+  overflow: auto;
   color: #202124;
   background: var(--cv-page, #f7f7f7);
 }
@@ -148,11 +149,11 @@ header {
 }
 header strong { font-size: 15px; letter-spacing: 0.04em; }
 .count {
-  min-width: 20px;
-  padding: 0 6px;
+  min-width: 22px;
+  padding: 0 7px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.22);
-  font-size: 12px;
+  font-size: 14px;
   text-align: center;
 }
 header button {
@@ -161,10 +162,10 @@ header button {
   background: rgba(255, 255, 255, 0.22);
   color: #fff;
   border-radius: 999px;
-  min-height: 32px;
-  padding: 4px 12px;
+  min-height: 36px;
+  padding: 4px 14px;
   font: inherit;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   cursor: pointer;
 }
@@ -190,32 +191,27 @@ textarea {
 }
 .kanban-move {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
-  margin-top: 0;
-  max-height: 0;
-  overflow: hidden;
-}
-article:hover .kanban-move,
-article:focus-within .kanban-move {
   margin-top: 8px;
-  max-height: 40px;
-  overflow: visible;
 }
 .kanban-move button {
   border: 1px solid color-mix(in srgb, var(--col-header) 35%, #fff);
   background: #fff;
   color: #3c3428;
   border-radius: 999px;
-  min-height: 32px;
+  min-height: 36px;
   padding: 4px 12px;
   font: inherit;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 650;
   cursor: pointer;
 }
 .kanban-move button:last-child { color: #9b1c1c; }
 .kanban-move button:disabled { opacity: 0.4; cursor: default; }
-@media (max-width: 800px) {
-  .kanban-board { grid-template-columns: repeat(4, minmax(160px, 1fr)); overflow: auto; }
+@media (max-width: 1100px) {
+  .kanban-board { grid-template-columns: 1fr; overflow: visible; }
+  section { min-height: 220px; height: auto; }
+  .cards { overflow: visible; }
 }
 </style>
