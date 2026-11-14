@@ -310,7 +310,7 @@ function wrapSelection(tr: Transaction, cols: ColumnCount, ratios?: number[]): b
   return false
 }
 
-export type ColumnBorderStyle = 'none' | 'solid' | 'dashed'
+export type ColumnBorderStyle = 'none' | 'solid' | 'dashed' | 'dotted'
 
 export type ColumnFrameAttrs = {
   gap?: number
@@ -329,7 +329,7 @@ function clampNum(value: unknown, fallback: number, min: number, max: number): n
 }
 
 function borderStyleOf(value: unknown): ColumnBorderStyle {
-  if (value === 'none' || value === 'solid' || value === 'dashed') return value
+  if (value === 'none' || value === 'solid' || value === 'dashed' || value === 'dotted') return value
   return 'dashed'
 }
 
