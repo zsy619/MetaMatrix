@@ -92,10 +92,12 @@ function onRemoveRow(rowId: string) {
               type="button"
               class="ga-row-delete"
               title="删除本行"
+              aria-label="删除本行"
               :disabled="doc.rows.length <= 1"
               @click="onRemoveRow(row.id)"
             >
-              ×
+              <span class="ga-row-delete-mark" aria-hidden="true">×</span>
+              <span class="ga-row-delete-text">删除本行</span>
             </button>
           </div>
         </div>
@@ -137,7 +139,7 @@ function onRemoveRow(rowId: string) {
 .ga-col-headers {
   flex-shrink: 0;
   display: grid;
-  grid-template-columns: 1.4fr 0.85fr 0.85fr 0.95fr 1.1fr 36px;
+  grid-template-columns: 1.4fr 0.85fr 0.85fr 0.95fr 1.1fr 52px;
   background: transparent;
   border-bottom: 1px solid var(--cv-frame, #ececec);
 }
@@ -183,7 +185,7 @@ function onRemoveRow(rowId: string) {
 
 .ga-row {
   display: grid;
-  grid-template-columns: 1.4fr 0.85fr 0.85fr 0.95fr 1.1fr 36px;
+  grid-template-columns: 1.4fr 0.85fr 0.85fr 0.95fr 1.1fr 52px;
   min-height: 400px;
   border-bottom: 1px solid var(--cv-frame, #ececec);
   background: #fff;
@@ -231,16 +233,23 @@ function onRemoveRow(rowId: string) {
 }
 
 .ga-row-delete {
-  width: 22px;
-  height: 22px;
-  border: none;
-  border-radius: 4px;
-  background: transparent;
-  color: #9aa0a6;
-  font-size: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid #e4e6e8;
+  border-radius: 8px;
+  background: #fff;
+  color: #5f6368;
+  font-size: 22px;
   line-height: 1;
   cursor: pointer;
   padding: 0;
+}
+
+.ga-row-delete-text {
+  display: none;
 }
 
 .ga-row-delete:hover:not(:disabled) {
@@ -263,11 +272,12 @@ function onRemoveRow(rowId: string) {
 .ga-add-btn {
   border: 1px solid #e4e6e8;
   background: #fff;
-  color: #5f6368;
+  color: #3c4043;
   border-radius: 8px;
-  padding: 8px 16px;
-  font-size: 13px;
-  font-weight: 600;
+  min-height: 40px;
+  padding: 8px 18px;
+  font-size: 15px;
+  font-weight: 650;
   cursor: pointer;
 }
 
@@ -280,7 +290,57 @@ function onRemoveRow(rowId: string) {
 @media (max-width: 900px) {
   .ga-col-headers,
   .ga-row {
-    grid-template-columns: 1.2fr 0.8fr 0.8fr 0.9fr 1fr 32px;
+    grid-template-columns: 1.2fr 0.8fr 0.8fr 0.9fr 1fr 52px;
+  }
+}
+
+@media (max-width: 720px) {
+  .ga-canvas {
+    overflow-y: auto;
+  }
+
+  .ga-col-headers,
+  .ga-row {
+    grid-template-columns: 1fr;
+  }
+
+  .ga-col-header--actions {
+    display: none;
+  }
+
+  .ga-row {
+    min-height: 0;
+  }
+
+  .ga-cell {
+    min-height: 220px;
+    border-right: none;
+    border-bottom: 1px solid #eee;
+  }
+
+  .ga-row-actions {
+    justify-content: flex-end;
+    padding: 8px 12px 14px;
+  }
+
+  .ga-row-delete {
+    width: auto;
+    height: 40px;
+    gap: 6px;
+    padding: 0 14px;
+    border-color: #f3c1bc;
+    background: #fff;
+    color: #c5221f;
+    font-size: 15px;
+    font-weight: 650;
+  }
+
+  .ga-row-delete-mark {
+    font-size: 20px;
+  }
+
+  .ga-row-delete-text {
+    display: inline;
   }
 }
 </style>
