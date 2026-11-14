@@ -109,6 +109,21 @@ describe('图片边框和圆角', () => {
     expect(editor.getHTML()).toContain('height="180"')
   })
 
+  it('图片设成不缩放时保持原始尺寸', () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    editor = new Editor({
+      element: host,
+      extensions: [
+        StarterKit.configure({ dropcursor: false }),
+        RteImage.configure({ inline: false, allowBase64: true, HTMLAttributes: { class: 'rte-image' } }),
+      ],
+      content: `<img src="${PIXEL}" data-fit="none" alt="原尺寸">`,
+    })
+    expect(editor.getHTML()).toContain('object-fit: none')
+    expect(editor.getHTML()).toContain('data-fit="none"')
+  })
+
   it('宽度写成 240pt 时按 320 像素留下', () => {
     const host = document.createElement('div')
     document.body.appendChild(host)

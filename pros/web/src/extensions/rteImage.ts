@@ -134,10 +134,10 @@ export const RteImage = Image.extend({
         default: null as string | null,
         parseHTML: (el: HTMLElement) => {
           const value = el.getAttribute('data-fit')
-          return value === 'cover' || value === 'contain' || value === 'scale-down' || value === 'fill' ? value : null
+          return value === 'cover' || value === 'contain' || value === 'scale-down' || value === 'fill' || value === 'none' ? value : null
         },
         renderHTML: (attrs: { fit?: string | null }) =>
-          attrs.fit === 'cover' || attrs.fit === 'contain' || attrs.fit === 'scale-down' || attrs.fit === 'fill'
+          attrs.fit === 'cover' || attrs.fit === 'contain' || attrs.fit === 'scale-down' || attrs.fit === 'fill' || attrs.fit === 'none'
             ? { 'data-fit': attrs.fit, style: `object-fit: ${attrs.fit}` }
             : {},
       },
