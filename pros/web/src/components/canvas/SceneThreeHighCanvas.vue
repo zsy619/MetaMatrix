@@ -325,7 +325,7 @@ function writeNote(html: string) {
 .top, .list-bar, .biz header, .biz label { display: flex; align-items: center; }
 .top { justify-content: space-between; gap: 16px; margin-bottom: 14px; }
 .kicker, .top h2, .card h3, .card p, .verdict, .empty { margin: 0; }
-.kicker { color: #a84562; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; }
+.kicker { color: #a84562; font-size: 13px; font-weight: 700; letter-spacing: 0.08em; }
 .top h2 { margin-top: 4px; font-size: 28px; letter-spacing: -0.02em; }
 .score { margin: 0; padding: 8px 12px; border-radius: 999px; background: #fff; white-space: nowrap; }
 .score strong { color: #125c3b; font-size: 18px; }
@@ -344,34 +344,34 @@ function writeNote(html: string) {
 .list { display: flex; flex-direction: column; height: 0; min-height: 100%; overflow: hidden; padding: 12px; }
 .list-body { flex: 1 1 auto; min-height: 0; overflow: auto; }
 .list-bar { justify-content: space-between; margin-bottom: 8px; font-weight: 700; }
-.list-bar button, .biz header button { border: 1px solid #e4ddd2; background: #fff; border-radius: 999px; padding: 4px 10px; cursor: pointer; }
+.list-bar button, .biz header button { border: 1px solid #e4ddd2; background: #fff; border-radius: 999px; min-height: 32px; padding: 4px 12px; cursor: pointer; font-size: 13px; }
 .biz { margin-top: 8px; padding: 10px; border: 1px solid #f1ebe3; border-radius: 12px; }
 .biz.selected { border-color: #1c4c7c; }
 .biz.pass { background: #f4fbf6; }
 .biz header { gap: 8px; }
 .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
 .biz header input { flex: 1; min-width: 0; border: none; background: transparent; font: inherit; font-weight: 700; }
-.biz header strong { color: #5c574e; font-size: 12px; font-weight: 650; white-space: nowrap; }
+.biz header strong { color: #5c574e; font-size: 14px; font-weight: 700; white-space: nowrap; }
 .biz.pass header strong { color: #125c3b; }
 .biz label { gap: 8px; margin-top: 6px; }
 .biz label span { width: 5.5em; color: #5c574e; font-size: 13px; }
-.biz label input[type='range'] { flex: 1; }
-.num { width: 64px; border: 1px solid #e4ddd2; border-radius: 8px; padding: 4px 6px; font: inherit; font-weight: 700; color: #8a8175; }
+.biz label input[type='range'] { flex: 1; height: 22px; accent-color: #a84562; cursor: pointer; }
+.num { width: 72px; min-height: 36px; border: 1px solid #e4ddd2; border-radius: 8px; padding: 4px 8px; font: inherit; font-size: 15px; font-variant-numeric: tabular-nums; text-align: right; font-weight: 700; color: #8a8175; }
 .num.met { color: #125c3b; border-color: #b7e0c8; background: #f4fbf6; }
 .record { margin: 8px 0 0; color: #3c4043; font-size: 13px; line-height: 1.5; }
 .radar { display: flex; flex-direction: column; min-height: 420px; }
 .radar svg { display: block; width: 100%; height: auto; }
 .legend { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 4px 12px 12px; list-style: none; }
-.legend button { display: inline-flex; align-items: center; gap: 6px; border: 1px solid transparent; background: transparent; border-radius: 999px; padding: 3px 8px; cursor: pointer; font: inherit; font-size: 12px; color: #3c4043; }
+.legend button { display: inline-flex; align-items: center; gap: 6px; border: 1px solid transparent; background: transparent; border-radius: 999px; min-height: 32px; padding: 4px 12px; cursor: pointer; font: inherit; font-size: 13px; color: #3c4043; }
 .legend button.on { border-color: #e4ddd2; background: #fff; font-weight: 700; }
 .legend i { width: 8px; height: 8px; border-radius: 50%; }
 .tick, .gate-label { paint-order: stroke; stroke: #fffdf8; stroke-width: 3px; }
-.tick { fill: #a8a29e; font-size: 11px; }
+.tick { fill: #5f6368; font-size: 18px; font-weight: 700; }
 .shape { cursor: pointer; }
 .ring, .spoke { fill: none; stroke: #e4ddd2; stroke-width: 1; }
 .gate { fill: none; stroke: #a84562; stroke-width: 1.4; stroke-dasharray: 5 4; }
 .axis { fill: #3e3428; font-size: 16px; font-weight: 700; }
-.gate-label { fill: #a84562; font-size: 12px; font-weight: 700; }
+.gate-label { fill: #a84562; font-size: 20px; font-weight: 700; }
 .verdict { margin-top: 14px; font-size: 16px; font-weight: 750; }
 .empty { color: #8a8175; }
 @media (max-width: 980px) {

@@ -341,7 +341,7 @@ function writeNote(html: string) {
 .list { display: flex; flex-direction: column; height: 0; min-height: 100%; overflow: hidden; padding: 12px; }
 .list-body { flex: 1 1 auto; min-height: 0; overflow: auto; }
 .list-bar { justify-content: space-between; margin-bottom: 8px; font-weight: 700; }
-.list-bar button, .biz header button { border: 1px solid #e4ddd2; background: #fff; border-radius: 999px; padding: 4px 10px; cursor: pointer; }
+.list-bar button, .biz header button { border: 1px solid #e4ddd2; background: #fff; border-radius: 999px; min-height: 32px; padding: 4px 12px; cursor: pointer; font-size: 13px; }
 .biz { margin-top: 8px; padding: 10px; border: 1px solid #f1ebe3; border-radius: 12px; background: #f4fbf6; }
 .biz.selected { border-color: #9a3412; }
 .biz.stop { background: #fff6f4; }
@@ -349,27 +349,27 @@ function writeNote(html: string) {
 .biz header strong { white-space: normal; line-height: 1.35; max-width: 10em; text-align: right; }
 .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
 .biz header input { flex: 1; min-width: 0; border: none; background: transparent; font: inherit; font-weight: 700; }
-.biz header strong { color: #0f766e; font-size: 12px; font-weight: 650; }
+.biz header strong { color: #0f766e; font-size: 14px; font-weight: 700; }
 .biz.stop header strong { color: #9a3412; }
 .biz label { gap: 8px; margin-top: 6px; }
 .biz label span { width: 6.2em; color: #57534e; font-size: 13px; flex: none; }
-.biz label input[type='range'] { flex: 1; }
-.num { width: 68px; border: 1px solid #e4ddd2; border-radius: 8px; padding: 4px 6px; font: inherit; color: #0f766e; font-weight: 700; }
+.biz label input[type='range'] { flex: 1; height: 22px; accent-color: #0f766e; cursor: pointer; }
+.num { width: 72px; min-height: 36px; border: 1px solid #e4ddd2; border-radius: 8px; padding: 4px 8px; font: inherit; font-size: 15px; font-variant-numeric: tabular-nums; text-align: right; color: #0f766e; font-weight: 700; }
 .num.hot { color: #9a3412; border-color: #e7c4b8; background: #fff6f4; }
 .record { margin: 8px 0 0; color: #44403c; font-size: 13px; line-height: 1.5; }
 .radar { display: flex; flex-direction: column; min-height: 460px; }
 .radar svg { display: block; width: 100%; height: auto; }
 .legend { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 4px 12px 12px; list-style: none; }
-.legend button { display: inline-flex; align-items: center; gap: 6px; border: 1px solid transparent; background: transparent; border-radius: 999px; padding: 3px 8px; cursor: pointer; font: inherit; font-size: 12px; color: #44403c; }
+.legend button { display: inline-flex; align-items: center; gap: 6px; border: 1px solid transparent; background: transparent; border-radius: 999px; min-height: 32px; padding: 4px 12px; cursor: pointer; font: inherit; font-size: 13px; color: #44403c; }
 .legend button.on { border-color: #e6d7c3; background: #fff; font-weight: 700; }
 .legend i { width: 8px; height: 8px; border-radius: 50%; }
 .tick, .gate-label { paint-order: stroke; stroke: #fffdf8; stroke-width: 3px; }
-.tick { fill: #a8a29e; font-size: 11px; }
+.tick { fill: #5f6368; font-size: 18px; font-weight: 700; }
 .shape { cursor: pointer; }
 .ring, .spoke { fill: none; stroke: #e7d7c4; stroke-width: 1; }
 .gate { fill: none; stroke: #9a3412; stroke-width: 1.4; stroke-dasharray: 5 4; }
 .axis { fill: #1c1917; font-size: 15px; font-weight: 700; }
-.gate-label { fill: #9a3412; font-size: 12px; font-weight: 700; }
+.gate-label { fill: #9a3412; font-size: 20px; font-weight: 700; }
 .verdict { margin-top: 16px; font-size: 16px; font-weight: 650; line-height: 1.6; }
 .empty { color: #8a8175; }
 @media (max-width: 1100px) {
