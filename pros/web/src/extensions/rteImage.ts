@@ -16,6 +16,24 @@ function withCropStyle(attrs: Record<string, unknown>, extra: Record<string, str
   return style ? { ...extra, style } : extra
 }
 
+function styleDecl(style: string, prop: string): string {
+  const match = new RegExp(`(?:^|;)\\s*${prop}\\s*:\\s*([^;]+)`, 'i').exec(style)
+  return (match?.[1] || '').trim()
+}
+
+/** 粘贴进来的边框、圆角和阴影。拒绝 url()，避免把外部图塞进样式。 */
+function imageDecor(value: string): string | null {
+  const text = value.trim()
+  if (!text || text.length > 120 || /url\(|expression\(|javascript:/i.test(text)) return null
+  if (text === 'none' || text === '0') return null
+  return text
+}
+
+function pastedDecor(el: HTMLElement, attr: string, prop: string, cssom: string): string | null {
+  const style = el.getAttribute('style') || ''
+  return imageDecor(el.getAttribute(attr) || '') || imageDecor(styleDecl(style, prop)) || imageDecor(cssom)
+}
+
 /**
  * 图片增强：对齐（data-align）+ 题注（caption / title）。
  * 保留 TipTap 3 内置 resize NodeView。
@@ -116,8 +134,7 @@ export const RteImage = Image.extend({
       },
       borderRadius: {
         default: null as string | null,
-        parseHTML: (el: HTMLElement) =>
-          el.getAttribute('data-radius') || (el.style?.borderRadius || '').trim() || null,
+        parseHTML: (el: HTMLElement) => pastedDecor(el, 'data-radius', 'border-radius', el.style?.borderRadius || ''),
         renderHTML: (attrs: { borderRadius?: string | null }) => {
           const v = (attrs.borderRadius || '').trim()
           if (!v) return {}
@@ -126,8 +143,7 @@ export const RteImage = Image.extend({
       },
       boxShadow: {
         default: null as string | null,
-        parseHTML: (el: HTMLElement) =>
-          el.getAttribute('data-shadow') || (el.style?.boxShadow || '').trim() || null,
+        parseHTML: (el: HTMLElement) => pastedDecor(el, 'data-shadow', 'box-shadow', el.style?.boxShadow || ''),
         renderHTML: (attrs: { boxShadow?: string | null }) => {
           const v = (attrs.boxShadow || '').trim()
           if (!v) return {}
@@ -136,7 +152,7 @@ export const RteImage = Image.extend({
       },
       borderStyle: {
         default: null as string | null,
-        parseHTML: (el: HTMLElement) => el.getAttribute('data-border') || null,
+        parseHTML: (el: HTMLElement) => pastedDecor(el, 'data-border', 'border', el.style?.border || ''),
         renderHTML: (attrs: { borderStyle?: string | null }) => {
           const v = (attrs.borderStyle || '').trim()
           if (!v) return {}
