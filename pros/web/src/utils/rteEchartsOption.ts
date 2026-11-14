@@ -1545,6 +1545,17 @@ function seriesStepAt(option: Record<string, unknown>, index: number): true | 's
   return undefined
 }
 
+function seriesBarGap(option: Record<string, unknown>, index: number, key: 'barGap' | 'barCategoryGap'): string | undefined {
+  const series = option.series
+  if (!Array.isArray(series)) return undefined
+  const item = series[index]
+  if (!isPlainObject(item)) return undefined
+  const value = item[key]
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value)
+  if (typeof value === 'string' && /^-?\d+(\.\d+)?%?$/.test(value.trim())) return value.trim()
+  return undefined
+}
+
 function seriesBarMeasure(option: Record<string, unknown>, index: number, key: 'barWidth' | 'barMaxWidth'): string | number | undefined {
   const series = option.series
   if (!Array.isArray(series)) return undefined
@@ -1698,6 +1709,8 @@ function buildCartesianOption(
     label?: { show: true; position?: string; formatter?: string }
     barWidth?: string | number
     barMaxWidth?: string | number
+    barGap?: string
+    barCategoryGap?: string
     step?: true | 'start' | 'middle' | 'end'
     symbol?: string
     symbolSize?: number | string
@@ -1746,6 +1759,8 @@ function buildCartesianOption(
       ...(item.label ? { label: item.label } : {}),
       ...(item.barWidth != null ? { barWidth: item.barWidth } : {}),
       ...(item.barMaxWidth != null ? { barMaxWidth: item.barMaxWidth } : {}),
+      ...(item.barGap ? { barGap: item.barGap } : {}),
+      ...(item.barCategoryGap ? { barCategoryGap: item.barCategoryGap } : {}),
       ...(item.step != null ? { step: item.step } : {}),
       ...(item.symbol ? { symbol: item.symbol } : {}),
       ...(item.symbolSize != null ? { symbolSize: item.symbolSize } : {}),
@@ -1979,6 +1994,8 @@ export function retypeEchartsOption(
         label: seriesLabelAt(base, index),
         barWidth: seriesBarMeasure(base, index, 'barWidth'),
         barMaxWidth: seriesBarMeasure(base, index, 'barMaxWidth'),
+        barGap: seriesBarGap(base, index, 'barGap'),
+        barCategoryGap: seriesBarGap(base, index, 'barCategoryGap'),
         step: seriesStepAt(base, index),
         symbol: seriesSymbolAt(base, index)?.symbol,
         symbolSize: seriesSymbolAt(base, index)?.symbolSize,

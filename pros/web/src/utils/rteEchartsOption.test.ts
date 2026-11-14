@@ -339,6 +339,23 @@ describe('ECharts 模板与表格生成', () => {
     expect(series[0]!.data).toEqual([1200, 0.5])
   })
 
+  it('换成折线再换回柱状图后柱间距还在', () => {
+    const line = retypeEchartsOption(
+      {
+        title: { text: '销售' },
+        xAxis: { type: 'category', data: ['一月', '二月'] },
+        yAxis: { type: 'value' },
+        series: [{ name: '今年', type: 'bar', barGap: '30%', barCategoryGap: '20%', data: [2, 8] }],
+      },
+      'line',
+    )
+    const back = retypeEchartsOption(line, 'bar')
+    const series = back.series as Array<{ type?: string; barGap?: string; barCategoryGap?: string }>
+    expect(series[0]?.type).toBe('bar')
+    expect(series[0]?.barGap).toBe('30%')
+    expect(series[0]?.barCategoryGap).toBe('20%')
+  })
+
   it('换成柱状图再换回折线后还是虚线', () => {
     const bar = retypeEchartsOption(
       {
