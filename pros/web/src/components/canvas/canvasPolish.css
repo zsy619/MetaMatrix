@@ -45,7 +45,12 @@
 .canvas-viewport .sheet[aria-label='价值链'] .sheet-top p,
 .canvas-viewport .sheet[aria-label='黄金圈'] .sheet-top p,
 .canvas-viewport .sheet[aria-label='麦肯锡 7S'] .sheet-top p,
-.canvas-viewport .sheet[aria-label='盈亏平衡'] .sheet-top p {
+.canvas-viewport .sheet[aria-label='盈亏平衡'] .sheet-top p,
+.canvas-viewport .sheet[aria-label='卡诺模型'] .sheet-top p,
+.canvas-viewport .sheet[aria-label='MoSCoW'] .sheet-top p,
+.canvas-viewport .sheet[aria-label='VRIO'] .sheet-top p,
+.canvas-viewport .sheet[aria-label='制胜选择'] .sheet-top p,
+.canvas-viewport .sheet[aria-label='客户旅程'] .sheet-top p {
   font-size: 15px;
   color: #3c4043;
 }
@@ -143,7 +148,12 @@
 .canvas-viewport .swot-grid,
 .canvas-viewport .sheet > .rings,
 .canvas-viewport .sheet[aria-label='麦肯锡 7S'] > .grid,
-.canvas-viewport .sheet[aria-label='盈亏平衡'] > .grid {
+.canvas-viewport .sheet[aria-label='盈亏平衡'] > .grid,
+.canvas-viewport .sheet[aria-label='卡诺模型'] > .grid,
+.canvas-viewport .sheet[aria-label='MoSCoW'] > .grid,
+.canvas-viewport .sheet[aria-label='VRIO'] > .grid,
+.canvas-viewport .sheet[aria-label='制胜选择'] > .grid,
+.canvas-viewport .sheet[aria-label='客户旅程'] > .grid {
   flex: 1 0 auto;
   min-height: 0;
   height: auto;
