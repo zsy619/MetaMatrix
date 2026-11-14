@@ -38,6 +38,23 @@ describe('图片边框和圆角', () => {
     expect(style).toContain('width: 40%')
   })
 
+  it('宽度写成 320px 或全角百分号时都能留下', () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    editor = new Editor({
+      element: host,
+      extensions: [
+        StarterKit.configure({ dropcursor: false }),
+        RteImage.configure({ inline: false, allowBase64: true, HTMLAttributes: { class: 'rte-image' } }),
+      ],
+      content: `<img src="${PIXEL}" width="320px" height="180px" alt="像素">`,
+    })
+    expect(editor.getHTML()).toContain('width="320"')
+    expect(editor.getHTML()).toContain('height="180"')
+    editor.commands.setContent(`<img src="${PIXEL}" width="50％" alt="全角">`)
+    expect(editor.getHTML()).toContain('data-display-width="50%"')
+  })
+
   it('百分宽旁边的像素高度不把宽度收成像素', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)

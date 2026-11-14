@@ -16,6 +16,18 @@ function withCropStyle(attrs: Record<string, unknown>, extra: Record<string, str
   return style ? { ...extra, style } : extra
 }
 
+function percentWidthAttr(raw: string): string | null {
+  const text = raw.trim().replace(/\s+/g, '').replace(/％/g, '%')
+  return /^\d+(\.\d+)?%$/.test(text) ? text : null
+}
+
+function pixelAttr(raw: string): number | null {
+  const text = raw.trim().replace(/px$/i, '')
+  if (!text || /%|％/.test(text)) return null
+  const n = Number(text)
+  return Number.isFinite(n) && n > 0 ? Math.round(n) : null
+}
+
 function styleDecl(style: string, prop: string): string {
   const match = new RegExp(`(?:^|;)\\s*${prop}\\s*:\\s*([^;]+)`, 'i').exec(style)
   return (match?.[1] || '').trim()
@@ -50,12 +62,8 @@ export const RteImage = Image.extend({
       height: {
         default: null as number | null,
         parseHTML: (el: HTMLElement) => {
-          const width = (el.getAttribute('width') || '').trim()
-          if (/^\d+(\.\d+)?%$/.test(width)) return null
-          const raw = (el.getAttribute('height') || '').trim()
-          if (!raw || /%$/.test(raw)) return null
-          const n = Number(raw)
-          return Number.isFinite(n) && n > 0 ? Math.round(n) : null
+          if (percentWidthAttr(el.getAttribute('width') || '')) return null
+          return pixelAttr(el.getAttribute('height') || '')
         },
         renderHTML: (attrs: { height?: number | null }) => {
           const n = Number(attrs.height)
@@ -64,12 +72,7 @@ export const RteImage = Image.extend({
       },
       width: {
         default: null as number | null,
-        parseHTML: (el: HTMLElement) => {
-          const raw = (el.getAttribute('width') || '').trim()
-          if (!raw || /%$/.test(raw)) return null
-          const n = Number(raw)
-          return Number.isFinite(n) && n > 0 ? Math.round(n) : null
-        },
+        parseHTML: (el: HTMLElement) => pixelAttr(el.getAttribute('width') || ''),
         renderHTML: (attrs: { width?: number | null }) => {
           const n = Number(attrs.width)
           return Number.isFinite(n) && n > 0 ? { width: String(Math.round(n)) } : {}
@@ -161,8 +164,8 @@ export const RteImage = Image.extend({
           if (explicit) return explicit
           // 裁剪会自己写 width:100%，不能当成用户设过的显示宽度。
           if (el.getAttribute('data-crop-aspect')) return null
-          const attrWidth = (el.getAttribute('width') || '').trim()
-          if (/^\d+(\.\d+)?%$/.test(attrWidth)) return attrWidth
+          const attrWidth = percentWidthAttr(el.getAttribute('width') || '')
+          if (attrWidth) return attrWidth
           return (el.style?.width || '').trim() || null
         },
         renderHTML: (attrs: { displayWidth?: string | null }) => {
