@@ -36,6 +36,12 @@
   line-height: 1.55;
 }
 
+.canvas-viewport .sheet[aria-label='利润表'] .sheet-top p,
+.canvas-viewport .cash[aria-label='现金流量'] .cash-top p {
+  font-size: 15px;
+  color: #3c4043;
+}
+
 .canvas-viewport .sheet-top,
 .canvas-viewport .cash-top,
 .canvas-viewport .raci-top,
@@ -115,8 +121,7 @@
 .canvas-viewport .sheet > .grid,
 .canvas-viewport .sheet > .axis,
 .canvas-viewport .sheet > .vpc,
-.canvas-viewport .sheet > .rings,
-.canvas-viewport .sheet > .columns {
+.canvas-viewport .sheet > .rings {
   flex: 1 0 auto;
   min-height: 100%;
   height: auto;
@@ -126,7 +131,9 @@
 /* 标题在网格外面。网格用剩余高度撑满，内容再高时整页滚动，不要按整页 100% 把标题再加一遍。 */
 .canvas-viewport .sheet > .forces,
 .canvas-viewport .sheet > .chain,
-.canvas-viewport .sheet > .pdca {
+.canvas-viewport .sheet > .pdca,
+.canvas-viewport .sheet > .columns,
+.canvas-viewport .cash > .cash-grid {
   flex: 1 0 auto;
   height: auto;
   overflow: visible;

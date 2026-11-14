@@ -76,24 +76,40 @@ function patch(mutator: (doc: IncomeStatementDocumentJSON) => void) {
 </template>
 
 <style scoped>
-.sheet { position: absolute; inset: 0; box-sizing: border-box; display: flex; flex-direction: column; min-height: 0; padding: 12px 14px 14px; background: var(--cv-page, #f7f7f7); color: #202124; }
+.sheet { position: absolute; inset: 0; box-sizing: border-box; display: flex; flex-direction: column; min-height: 0; padding: 12px 14px 14px; overflow: auto; background: var(--cv-page, #f7f7f7); color: #202124; }
 .sheet-top { flex: none; display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-bottom: 10px; }
 .sheet-top h2, .sheet-top p { margin: 0; }
-.sheet-top p { color: #5f6368; font-size: 13px; }
+.sheet-top p { max-width: 42em; color: #3c4043; font-size: 15px; line-height: 1.55; }
 .totals { display: flex; gap: 8px; }
 .totals strong { padding: 6px 12px; border-radius: 999px; background: #fff; }
 .columns { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 section { display: flex; flex-direction: column; min-height: 0; height: 100%; background: var(--col-body); border-radius: 12px; overflow: hidden; }
 h3 { margin: 0; min-height: 44px; display: flex; align-items: center; padding: 0 12px; background: var(--col-header); color: #fff; letter-spacing: 0.04em; }
 .lines { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
-.line { display: grid; grid-template-columns: 1fr 128px 36px; gap: 8px; align-items: center; }
-input { min-height: 40px; border: 1px solid transparent; background: #fff; border-radius: 8px; padding: 6px 10px; font: inherit; font-size: 15px; color: var(--col-topic); }
-input[type='number'] { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+.line { display: grid; grid-template-columns: minmax(0, 1fr) 120px 36px; gap: 8px; align-items: center; min-width: 0; }
+input { width: 100%; min-width: 0; box-sizing: border-box; min-height: 40px; border: 1px solid transparent; background: #fff; border-radius: 8px; padding: 6px 10px; font: inherit; font-size: 15px; color: var(--col-topic); }
+input[type='number'] { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; appearance: textfield; }
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+input:focus { border-color: var(--col-header); outline: none; }
 footer { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; background: #fff; }
 footer strong { font-size: 18px; font-variant-numeric: tabular-nums; }
 button { min-height: 36px; border: 1px solid #dadce0; background: #fff; border-radius: 8px; color: var(--col-topic); cursor: pointer; }
 .line button { width: 36px; height: 36px; padding: 0; font-size: 18px; line-height: 1; }
+.line button:disabled { opacity: 0.35; cursor: default; }
+footer button { min-height: 40px; padding: 0 12px; }
 .is-in { background: #e7f6ef; color: #125c3b; }
 .is-out { background: #fdecea; color: #9b1c1c; }
 .is-zero { color: #5f6368; }
+
+@media (max-width: 1000px) {
+  .sheet-top, .totals { flex-wrap: wrap; align-items: flex-start; }
+  .columns { grid-template-columns: 1fr; }
+  section { min-height: 280px; height: auto; }
+  .lines { overflow: visible; }
+  .line { grid-template-columns: minmax(0, 1fr) 108px 36px; }
+}
+@media (max-width: 480px) {
+  .line { grid-template-columns: minmax(0, 1fr) 84px 36px; }
+}
 </style>
