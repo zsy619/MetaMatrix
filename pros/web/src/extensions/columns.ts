@@ -330,6 +330,7 @@ function clampNum(value: unknown, fallback: number, min: number, max: number): n
   const centi = /^(\d+(?:\.\d+)?)\s*cm$/i.exec(raw)
   const inch = /^(\d+(?:\.\d+)?)\s*in$/i.exec(raw)
   const pica = /^(\d+(?:\.\d+)?)\s*pc$/i.exec(raw)
+  const quarter = /^(\d+(?:\.\d+)?)\s*q$/i.exec(raw)
   const n = point
     ? Math.round((Number(point[1]) * 4) / 3)
     : milli
@@ -340,7 +341,9 @@ function clampNum(value: unknown, fallback: number, min: number, max: number): n
           ? Math.round(Number(inch[1]) * 96)
           : pica
             ? Math.round(Number(pica[1]) * 16)
-            : Math.round(Number(raw.replace(/\s*px$/i, '')))
+            : quarter
+              ? Math.round((Number(quarter[1]) * 24) / 25.4)
+              : Math.round(Number(raw.replace(/\s*px$/i, '')))
   if (!Number.isFinite(n)) return fallback
   return Math.max(min, Math.min(max, n))
 }
