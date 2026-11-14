@@ -47,6 +47,21 @@ export const RteImage = Image.extend({
   addAttributes() {
     return {
       ...this.parent?.(),
+      height: {
+        default: null as number | null,
+        parseHTML: (el: HTMLElement) => {
+          const width = (el.getAttribute('width') || '').trim()
+          if (/^\d+(\.\d+)?%$/.test(width)) return null
+          const raw = (el.getAttribute('height') || '').trim()
+          if (!raw || /%$/.test(raw)) return null
+          const n = Number(raw)
+          return Number.isFinite(n) && n > 0 ? Math.round(n) : null
+        },
+        renderHTML: (attrs: { height?: number | null }) => {
+          const n = Number(attrs.height)
+          return Number.isFinite(n) && n > 0 ? { height: String(Math.round(n)) } : {}
+        },
+      },
       width: {
         default: null as number | null,
         parseHTML: (el: HTMLElement) => {
