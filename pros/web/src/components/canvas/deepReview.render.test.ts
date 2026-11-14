@@ -1,4 +1,7 @@
 // @vitest-environment happy-dom
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -40,6 +43,11 @@ describe('深度复盘', () => {
     expect(doc.projectName).toBe('支付改造')
     expect(doc.reviewTime).toBe('2026-11')
     expect(wrapper.get('.dr-hint').text()).toContain('低于预期')
+    for (const title of ['整体评价', '亮点共识', '问题共识', '坚持做', '放弃做', '新任务', '过程资产']) {
+      expect(wrapper.text()).toContain(title)
+    }
+    const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'DeepReviewCanvas.vue'), 'utf8')
+    expect(source).toContain('overflow-wrap: anywhere')
     wrapper.unmount()
   })
 })

@@ -317,15 +317,57 @@ function onReviewTime(event: Event) {
   }
 
   .dr-panel {
-    min-height: 220px;
+    min-height: 180px;
+  }
+
+  .dr-canvas {
+    padding-bottom: 96px;
   }
 }
 
 .dr-panel :deep(.ym-block) {
-  flex: 1;
+  flex: 0 0 auto;
+  height: auto;
   min-height: 0;
   background: transparent;
   border: none;
   box-shadow: none;
+}
+
+.dr-panel :deep(.ym-block-body),
+.dr-panel :deep(.rte-root),
+.dr-panel :deep(.rte-workspace),
+.dr-panel :deep(.rte-canvas),
+.dr-panel :deep(.rte-body),
+.dr-panel :deep(.ProseMirror) {
+  height: auto;
+  max-height: none;
+  max-width: 100%;
+  min-width: 0;
+  overflow: visible;
+  flex: 0 0 auto;
+}
+
+.dr-panel :deep(.rte-workspace),
+.dr-panel :deep(.rte-canvas),
+.dr-panel :deep(.ProseMirror) {
+  width: 100%;
+}
+
+.dr-panel :deep(.ProseMirror) {
+  min-height: 120px;
+  font-size: 16px;
+  line-height: 1.7;
+}
+
+.dr-panel :deep(.ProseMirror p) {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.dr-panel :deep(.pm-max-btn) {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
 }
 </style>
