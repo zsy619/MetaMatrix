@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { canvasChromeStyle } from './canvasChrome'
 import type { GanttTask, ProjectGanttDocumentJSON } from '../../types/canvas'
 import { isProjectGanttDoc } from '../../types/canvas'
@@ -9,6 +9,7 @@ import {
   analyzeSchedule,
   applyDependencySchedule,
   calendarSpan,
+  clampGanttPaneWidth,
   dayBandPercent,
   finishFromStart,
   formatPredecessors,
@@ -40,6 +41,65 @@ const status = ref('')
 const preview = ref<Record<string, { start: string; end: string }>>({})
 const gridRef = ref<HTMLElement | null>(null)
 const chartRef = ref<HTMLElement | null>(null)
+const splitRef = ref<HTMLElement | null>(null)
+const gridWidth = ref<number | null>(null)
+const narrowQuery = typeof window !== 'undefined' && typeof window.matchMedia === 'function' ? window.matchMedia('(max-width: 900px)') : null
+const narrow = ref(narrowQuery?.matches ?? false)
+
+function onNarrowChange() {
+  narrow.value = !!narrowQuery?.matches
+}
+
+onMounted(() => narrowQuery?.addEventListener('change', onNarrowChange))
+onBeforeUnmount(() => narrowQuery?.removeEventListener('change', onNarrowChange))
+
+const gridPaneStyle = computed(() => (narrow.value || gridWidth.value == null ? {} : { width: `${gridWidth.value}px` }))
+
+function resizeGrid(clientX: number) {
+  const split = splitRef.value
+  if (!split || narrow.value) return
+  const bounds = split.getBoundingClientRect()
+  gridWidth.value = clampGanttPaneWidth(clientX - bounds.left, bounds.width)
+}
+
+function startSplit(event: PointerEvent) {
+  if (event.button !== 0 || narrow.value) return
+  event.preventDefault()
+  const handle = event.currentTarget as HTMLElement
+  handle.setPointerCapture?.(event.pointerId)
+  const previousCursor = document.body.style.cursor
+  const previousSelect = document.body.style.userSelect
+  document.body.style.cursor = 'col-resize'
+  document.body.style.userSelect = 'none'
+  const move = (ev: PointerEvent) => resizeGrid(ev.clientX)
+  const up = (ev: PointerEvent) => {
+    handle.removeEventListener('pointermove', move)
+    handle.removeEventListener('pointerup', up)
+    document.body.style.cursor = previousCursor
+    document.body.style.userSelect = previousSelect
+    try {
+      handle.releasePointerCapture?.(ev.pointerId)
+    } catch {
+      /* 指针已经松开 */
+    }
+  }
+  handle.addEventListener('pointermove', move)
+  handle.addEventListener('pointerup', up)
+  resizeGrid(event.clientX)
+}
+
+function onSplitKey(event: KeyboardEvent) {
+  if (narrow.value) return
+  const step = event.shiftKey ? 48 : 16
+  const delta = event.key === 'ArrowRight' ? step : event.key === 'ArrowLeft' ? -step : 0
+  if (!delta) return
+  const split = splitRef.value
+  const grid = gridRef.value
+  if (!split || !grid) return
+  event.preventDefault()
+  const current = gridWidth.value ?? grid.getBoundingClientRect().width
+  gridWidth.value = clampGanttPaneWidth(current + delta, split.getBoundingClientRect().width)
+}
 let syncing = false
 
 const tasks = computed(() => props.doc.tasks)
@@ -442,8 +502,8 @@ function startDrag(event: PointerEvent, task: GanttTask, mode: 'move' | 'resize'
       </div>
     </header>
     <p v-if="status" class="status" role="status">{{ status }}</p>
-    <div class="split">
-      <div ref="gridRef" class="grid" @scroll="onGridScroll">
+    <div ref="splitRef" class="split">
+      <div ref="gridRef" class="grid" :style="gridPaneStyle" @scroll="onGridScroll">
         <table>
           <thead>
             <tr>
@@ -523,6 +583,15 @@ function startDrag(event: PointerEvent, task: GanttTask, mode: 'move' | 'resize'
           </tbody>
         </table>
       </div>
+      <div
+        class="split-bar"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="调节左右面板宽度"
+        tabindex="0"
+        @pointerdown="startSplit"
+        @keydown="onSplitKey"
+      />
       <div ref="chartRef" class="chart" aria-label="甘特图时间刻度" :style="{ '--gantt-day': unit + 'px' }" @scroll="onChartScroll">
         <div class="chart-head" :style="{ width: '100%', minWidth: naturalWidth + 'px', height: HEAD + 'px' }">
           <div class="months">
@@ -616,7 +685,9 @@ function startDrag(event: PointerEvent, task: GanttTask, mode: 'move' | 'resize'
 .zoom button[aria-pressed='true'] { background: #e8f0fe; color: #174ea6; }
 .status { margin: 0 0 8px; font-size: 15px; color: #174ea6; }
 .split { flex: 1; min-height: 0; display: flex; border: 1px solid #dadce0; border-radius: 10px; overflow: hidden; background: #fff; }
-.grid { width: min(720px, 54%); min-width: 320px; overflow: auto; border-right: 1px solid #dadce0; }
+.grid { width: min(720px, 54%); min-width: 0; flex: none; overflow: auto; }
+.split-bar { flex: none; width: 9px; cursor: col-resize; touch-action: none; background: #fff linear-gradient(#dadce0, #dadce0) center / 1px 100% no-repeat; z-index: 4; }
+.split-bar:hover, .split-bar:focus-visible { background-image: linear-gradient(#1a73e8, #1a73e8); outline: none; }
 .grid table { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; }
 .grid th, .grid td { height: var(--gantt-row, 44px); box-sizing: border-box; padding: 0 6px; border-bottom: 1px solid #f1f3f4; font-size: 14px; text-align: left; }
 .grid thead th { height: 40px; position: sticky; top: 0; background: #f3f6f9; z-index: 1; font-size: 13px; }
@@ -632,7 +703,7 @@ function startDrag(event: PointerEvent, task: GanttTask, mode: 'move' | 'resize'
 .indent { flex: none; }
 .twist { flex: none; width: 36px; height: 36px; border: 0; background: transparent; padding: 0; font-size: 16px; cursor: pointer; color: #5f6368; }
 .twist--blank { display: inline-block; }
-.chart { flex: 1; overflow: auto; position: relative; background: #fff; }
+.chart { flex: 1 1 auto; min-width: 0; overflow: auto; position: relative; background: #fff; }
 .chart-head { position: sticky; top: 0; z-index: 2; background: #f3f6f9; border-bottom: 1px solid #e0e0e0; box-sizing: border-box; }
 .months, .ticks { display: flex; width: 100%; height: 20px; }
 .months span, .ticks span { flex: 1 1 0; box-sizing: border-box; min-width: var(--gantt-day, 16px); overflow: hidden; font-size: 12px; line-height: 20px; color: #5f6368; border-left: 1px solid #eceff1; padding-left: 2px; }
@@ -658,6 +729,7 @@ function startDrag(event: PointerEvent, task: GanttTask, mode: 'move' | 'resize'
 .baseline { position: absolute; top: 31px; height: 4px; background: #80868b; border-radius: 2px; z-index: 1; }
 @media (max-width: 900px) {
   .gantt .split.split { flex-direction: column; overflow: visible; }
+  .split-bar { display: none; }
   .grid {
     flex: 1 1 240px;
     width: 100%;

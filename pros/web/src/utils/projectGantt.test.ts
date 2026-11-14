@@ -3,6 +3,7 @@ import type { GanttTask } from '../types/canvas'
 import {
   applyDependencySchedule,
   analyzeSchedule,
+  clampGanttPaneWidth,
   dayBandPercent,
   formatPredecessors,
   indentTask,
@@ -149,6 +150,14 @@ describe('项目甘特排程', () => {
     expect(removed.map((item) => item.id)).toEqual(['a', 'c'])
     expect(removed.find((item) => item.id === 'c')?.parentId).toBe('a')
     expect(removed.find((item) => item.id === 'c')?.predecessors).toEqual([])
+  })
+
+  it('拖拽分栏时两侧都留得下', () => {
+    expect(clampGanttPaneWidth(600, 1000)).toBe(600)
+    expect(clampGanttPaneWidth(20, 1000)).toBe(280)
+    expect(clampGanttPaneWidth(990, 1000)).toBe(820)
+    expect(clampGanttPaneWidth(80, 400)).toBe(120)
+    expect(clampGanttPaneWidth(10, 0)).toBe(0)
   })
 
   it('日期列等分后贴齐时间轴右缘', () => {

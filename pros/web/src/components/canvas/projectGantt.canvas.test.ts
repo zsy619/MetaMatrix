@@ -93,4 +93,32 @@ describe('项目甘特图', () => {
     expect(wrapper.find('.bar.summary').exists()).toBe(false)
     expect(wrapper.find('.milestone').exists()).toBe(false)
   })
+
+  it('拖动中间竖线改变左栏宽度', async () => {
+    const { wrapper } = mountGantt()
+    const split = wrapper.get('.split').element as HTMLElement
+    const grid = wrapper.get('.grid').element as HTMLElement
+    vi.spyOn(split, 'getBoundingClientRect').mockReturnValue({
+      left: 100,
+      width: 1000,
+      top: 0,
+      height: 400,
+      right: 1100,
+      bottom: 400,
+      x: 100,
+      y: 0,
+      toJSON() { return {} },
+    })
+    const bar = wrapper.get('[aria-label="调节左右面板宽度"]')
+    expect(bar.attributes('role')).toBe('separator')
+    await bar.trigger('pointerdown', { button: 0, clientX: 700, pointerId: 1 })
+    bar.element.dispatchEvent(new PointerEvent('pointermove', { clientX: 640, pointerId: 1 }))
+    await nextTick()
+    expect((grid as HTMLElement).style.width).toBe('540px')
+    bar.element.dispatchEvent(new PointerEvent('pointerup', { clientX: 640, pointerId: 1 }))
+    await bar.trigger('keydown', { key: 'ArrowRight' })
+    expect((grid as HTMLElement).style.width).toBe('556px')
+    await bar.trigger('keydown', { key: 'ArrowLeft', shiftKey: true })
+    expect((grid as HTMLElement).style.width).toBe('508px')
+  })
 })

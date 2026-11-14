@@ -443,6 +443,18 @@ export function scalePx(scale: string | undefined): number {
   return 16
 }
 
+/**
+ * 左栏拖拽后的宽度。两侧都留出可读的最小宽度；总宽不够时按比例收回。
+ */
+export function clampGanttPaneWidth(next: number, total: number): number {
+  if (!Number.isFinite(total) || total <= 0) return 0
+  const minLeft = Math.min(280, Math.max(120, Math.floor(total * 0.28)))
+  const minRight = Math.min(180, Math.max(96, Math.floor(total * 0.22)))
+  const maxLeft = Math.max(minLeft, total - minRight)
+  const width = Number.isFinite(next) ? next : minLeft
+  return Math.round(Math.min(maxLeft, Math.max(minLeft, width)))
+}
+
 /** 第 index 天在时间轴上的百分比。列等分，加起来贴齐右侧面板。 */
 export function dayBandPercent(index: number, count: number): { left: number; width: number } {
   const n = Math.max(1, count)
