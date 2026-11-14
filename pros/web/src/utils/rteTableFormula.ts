@@ -419,6 +419,7 @@ type Ctx = {
 
 type CellValue =
   | { kind: 'num'; v: number }
+  | { kind: 'blank' }
   | { kind: 'text' }
   | { kind: 'err'; error: FormulaErrorCode }
 
@@ -439,7 +440,7 @@ function resolveCell(ctx: Ctx, addr: CellAddress): CellValue {
   const text = cellTextAt(ctx, addr)
   if (text == null) return { kind: 'err', error: '#REF!' }
   const trimmed = text.trim()
-  if (!trimmed) return { kind: 'text' }
+  if (!trimmed) return { kind: 'blank' }
   if (isFormulaCell(trimmed)) {
     const key = visitKey(addr.row, addr.col)
     if (ctx.visiting.has(key)) return { kind: 'err', error: '#REF!' }
@@ -509,7 +510,7 @@ function evalCall(name: string, args: Node[], ctx: Ctx, at: CellAddress): EvalVa
         const cell = resolveCell(ctx, addr)
         if (cell.kind === 'err') return cell
         if (cell.kind === 'num') values.push(cell.v)
-        // 文本单元格在聚合函数里被忽略
+        // 空白和文字在求和、平均里跳过，空白在加减里按 0 算
       }
       continue
     }
@@ -575,6 +576,7 @@ function evalNode(node: Node, ctx: Ctx, at: CellAddress): EvalValue {
       if (cells.length > 1) return { error: '#VALUE!' }
       const cell = resolveCell(ctx, cells[0]!)
       if (cell.kind === 'err') return cell
+      if (cell.kind === 'blank') return 0
       if (cell.kind === 'text') return { error: '#VALUE!' }
       return cell.v
     }

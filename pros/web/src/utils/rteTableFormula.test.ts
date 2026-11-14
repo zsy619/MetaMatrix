@@ -40,6 +40,13 @@ assert.equal(evaluateCellFormula('=AVERAGE(ABOVE)', grid, 3, 1), '15')
 // COUNT 只数数字
 assert.equal(evaluateCellFormula('=COUNT(ABOVE)', grid, 3, 1), '2')
 
+// 空白格在加减里当 0，文字仍然算不了。求和和计数跳过空白。
+assert.equal(evaluateCellFormula('=A1+1', [['']], 0, 0), '1')
+assert.equal(evaluateCellFormula('=A1+1', [['文字']], 0, 0), null)
+assert.equal(evaluateCellFormula('=SUM(A1:A2)', [[''], ['5']], 0, 0), '5')
+assert.equal(evaluateCellFormula('=COUNT(A1:A2)', [[''], ['5']], 0, 0), '1')
+assert.equal(evaluateCellFormula('=AVERAGE(A1:A2)', [[''], ['5']], 0, 0), '5')
+
 // 区域求和与列表求和
 const grid2 = [
   ['1', '2', '3'],
