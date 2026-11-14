@@ -1519,6 +1519,14 @@ function seriesStackAt(option: Record<string, unknown>, index: number): string |
   return stack || undefined
 }
 
+function lineLooks(option: Record<string, unknown>): Array<{ straight: boolean; filled: boolean } | null> {
+  if (!Array.isArray(option.series)) return []
+  return option.series.map((item) => {
+    if (!isPlainObject(item) || item.type !== 'line') return null
+    return { straight: item.smooth !== true, filled: isPlainObject(item.areaStyle) }
+  })
+}
+
 function legendLayout(option: Record<string, unknown>): Record<string, unknown> {
   const legend = option.legend
   const place: Record<string, unknown> = {}
@@ -1589,6 +1597,7 @@ function buildCartesianOption(
   bounds?: { min?: number; max?: number },
   categoryRotate?: number,
   legendPlace?: Record<string, unknown>,
+  looks?: Array<{ straight: boolean; filled: boolean } | null>,
 ): Record<string, unknown> {
   const category = {
     type: 'category' as const,
@@ -1611,15 +1620,16 @@ function buildCartesianOption(
     grid: { left: 48, right: 24, top: 48, bottom: 56, containLabel: true },
     xAxis: horizontal ? value : category,
     yAxis: horizontal ? category : value,
-    series: series.map((item) => ({
+    series: series.map((item, index) => ({
       name: item.name,
       type,
       data: item.data,
       ...(item.stack ? { stack: item.stack } : {}),
       ...(item.color ? { itemStyle: { color: item.color } } : {}),
       ...(item.label ? { label: item.label } : {}),
-      smooth: type === 'line' ? true : undefined,
-      areaStyle: type === 'line' ? { opacity: 0.12 } : undefined,
+      smooth: type === 'line' ? looks?.[index]?.straight !== true : undefined,
+      areaStyle:
+        type === 'line' && (looks?.[index] ? looks[index]!.filled : true) ? { opacity: 0.12 } : undefined,
     })),
   }
 }
@@ -1850,6 +1860,7 @@ export function retypeEchartsOption(
       valueAxisBounds(base),
       categoryLabelRotate(base),
       legendLayout(base),
+      lineLooks(base),
     )
   }
   if (usable && type === 'pie') {

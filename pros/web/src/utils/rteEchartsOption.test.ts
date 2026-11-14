@@ -339,6 +339,21 @@ describe('ECharts 模板与表格生成', () => {
     expect(series[0]!.data).toEqual([1200, 0.5])
   })
 
+  it('折线再点一次还是直线，也不会铺上面积', () => {
+    const next = retypeEchartsOption(
+      {
+        title: { text: '销售' },
+        xAxis: { type: 'category', data: ['一月', '二月'] },
+        yAxis: { type: 'value' },
+        series: [{ name: '今年', type: 'line', smooth: false, data: [1, 2] }],
+      },
+      'line',
+    )
+    const series = next.series as Array<{ smooth?: boolean; areaStyle?: { opacity: number } }>
+    expect(series[0]?.smooth).toBe(false)
+    expect(series[0]?.areaStyle).toBeUndefined()
+  })
+
   it('换成折线后图例还在右侧', () => {
     const next = retypeEchartsOption(
       {
