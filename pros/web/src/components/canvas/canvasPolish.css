@@ -42,7 +42,9 @@
 .canvas-viewport .sheet[aria-label='PDCA'] .sheet-top p,
 .canvas-viewport .sheet[aria-label='波特五力'] .sheet-top p,
 .canvas-viewport .sheet[aria-label='SWOT 分析'] .sheet-top p,
-.canvas-viewport .sheet[aria-label='价值链'] .sheet-top p {
+.canvas-viewport .sheet[aria-label='价值链'] .sheet-top p,
+.canvas-viewport .sheet[aria-label='黄金圈'] .sheet-top p,
+.canvas-viewport .sheet[aria-label='麦肯锡 7S'] .sheet-top p {
   font-size: 15px;
   color: #3c4043;
 }
@@ -124,8 +126,7 @@
 .canvas-viewport .lean-grid,
 .canvas-viewport .sheet > .grid,
 .canvas-viewport .sheet > .axis,
-.canvas-viewport .sheet > .vpc,
-.canvas-viewport .sheet > .rings {
+.canvas-viewport .sheet > .vpc {
   flex: 1 0 auto;
   min-height: 100%;
   height: auto;
@@ -138,8 +139,11 @@
 .canvas-viewport .sheet > .pdca,
 .canvas-viewport .sheet > .columns,
 .canvas-viewport .cash > .cash-grid,
-.canvas-viewport .swot-grid {
+.canvas-viewport .swot-grid,
+.canvas-viewport .sheet > .rings,
+.canvas-viewport .sheet[aria-label='麦肯锡 7S'] > .grid {
   flex: 1 0 auto;
+  min-height: 0;
   height: auto;
   overflow: visible;
 }

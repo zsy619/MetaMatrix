@@ -31,7 +31,7 @@ function block(id: GoldenCircleBlockId) {
         :key="id"
         class="ring"
         :data-block="id"
-        :style="{ '--ring': tones[id].header, '--ring-body': tones[id].body, '--inset': `${index * 18}px` }"
+        :style="{ '--ring': tones[id].header, '--ring-body': tones[id].body, '--inset': `${(order.length - 1 - index) * 28}px` }"
       >
         <h3><span>{{ block(id)?.title }}</span></h3>
         <div v-if="block(id)" class="rte-slot">
@@ -43,14 +43,18 @@ function block(id: GoldenCircleBlockId) {
 </template>
 
 <style scoped>
-.sheet { position: absolute; inset: 0; box-sizing: border-box; display: flex; flex-direction: column; min-height: 0; padding: 12px 14px 14px; background: var(--cv-page, #f7f7f7); color: #202124; }
+.sheet { position: absolute; inset: 0; box-sizing: border-box; display: flex; flex-direction: column; min-height: 0; padding: 12px 14px 14px; overflow: auto; background: var(--cv-page, #f7f7f7); color: #202124; }
 .sheet-top { flex: none; margin-bottom: 10px; }
 .sheet-top h2, .sheet-top p { margin: 0; }
-.sheet-top p { color: #5f6368; font-size: 13px; }
-.rings { flex: 1 0 auto; min-height: 100%; height: auto; display: grid; grid-template-rows: repeat(3, minmax(min-content, 1fr)); }
-.ring { min-height: min-content; height: auto; margin: 0 var(--inset); display: grid; grid-template-columns: 92px minmax(0, 1fr); background: var(--ring-body); border: 2px solid var(--ring); border-bottom-width: 0; overflow: visible; }
+.sheet-top p { max-width: 42em; color: #3c4043; font-size: 15px; line-height: 1.55; }
+.rings { flex: 1 0 auto; min-height: 0; height: auto; display: grid; grid-template-rows: repeat(3, minmax(180px, 1fr)); }
+.ring { min-height: 180px; height: auto; margin: 0 var(--inset); display: grid; grid-template-columns: 96px minmax(0, 1fr); background: var(--ring-body); border: 2px solid var(--ring); border-bottom-width: 0; overflow: visible; }
 .ring:first-child { border-radius: 28px 28px 0 0; }
 .ring:last-child { border-bottom-width: 2px; border-radius: 0 0 28px 28px; }
-h3 { margin: 0; display: flex; align-items: center; justify-content: center; background: var(--ring); color: #fff; letter-spacing: 0.08em; }
+h3 { margin: 0; min-height: 48px; display: flex; align-items: center; justify-content: center; padding: 8px; background: var(--ring); color: #fff; font-size: 16px; letter-spacing: 0.08em; text-align: center; }
 .rte-slot { min-height: min-content; height: auto; display: flex; }
+@media (max-width: 800px) {
+  .ring { margin: 0; grid-template-columns: 1fr; min-height: 220px; }
+  h3 { min-height: 44px; }
+}
 </style>
