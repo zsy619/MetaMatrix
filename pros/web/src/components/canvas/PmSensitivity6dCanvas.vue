@@ -510,7 +510,7 @@ onBeforeUnmount(() => {
   position: absolute;
   inset: 0;
   z-index: 10;
-  overflow: hidden;
+  overflow: auto;
   box-sizing: border-box;
   padding: 8px 12px 10px;
   display: flex;
@@ -594,17 +594,18 @@ onBeforeUnmount(() => {
   flex-shrink: 0;
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 8px 10px;
-  padding: 8px 4px 2px;
+  gap: 10px 12px;
+  padding: 10px 4px 4px;
   border-top: 1px solid #e8eaed;
 }
 
 .pm6d-slider {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
-  padding: 6px 8px;
+  min-height: 40px;
+  padding: 6px 10px;
   border-radius: 999px;
   background: rgba(244, 245, 247, 0.95);
   border: 1px solid #e8eaed;
@@ -612,29 +613,26 @@ onBeforeUnmount(() => {
 }
 
 .pm6d-slider-name {
-  flex: 0 1 auto;
-  max-width: 40%;
-  font-size: 11px;
+  flex: 0 0 auto;
+  font-size: 14px;
   font-weight: 700;
   color: var(--axis, #1565c0);
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .pm6d-slider input[type='range'] {
   flex: 1 1 auto;
-  min-width: 0;
-  height: 4px;
+  min-width: 28px;
+  height: 22px;
   accent-color: var(--axis, #1565c0);
   cursor: pointer;
 }
 
 .pm6d-slider-val {
   flex: 0 0 auto;
-  min-width: 2em;
+  min-width: 2.2em;
   font-variant-numeric: tabular-nums;
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 800;
   color: var(--axis, #1565c0);
   text-align: right;
