@@ -18,7 +18,7 @@ import {
   type PageMargin,
 } from '../../../utils/rtePageMargin'
 import { bumpToolbarUndoEpoch } from '../../../utils/rteToolbarGroups'
-import { applyChromeReserve, EMPTY_PAGE_CHROME, printSheetCss, type PanelPageChrome } from '../../../utils/rtePageChrome'
+import { applyChromeReserve, EMPTY_PAGE_CHROME, printSheetCss, shiftGutterSide, type PanelPageChrome } from '../../../utils/rtePageChrome'
 
 /** 页面大小、页边距和打印 @page。与工具栏分组共用一次 Ctrl+Z。 */
 export function useRtePageLayout(deps: {
@@ -82,8 +82,9 @@ export function useRtePageLayout(deps: {
     }
     return style
   })
-  const printPreviewMarginStyle = computed(() => {
-    const box = pageScreenMargin.value
+  function printPreviewPaperStyle(page = 1) {
+    const chrome = deps.chrome?.() || EMPTY_PAGE_CHROME
+    const box = shiftGutterSide(pageScreenMargin.value, chrome.gutter, page)
     const sheet = sheetBox(pageSize.value)
     return {
       padding: cssPageMargin(box),
@@ -93,7 +94,8 @@ export function useRtePageLayout(deps: {
       margin: '0 auto',
       boxSizing: 'border-box' as const,
     }
-  })
+  }
+  const printPreviewMarginStyle = computed(() => printPreviewPaperStyle(1))
 
   function applyPrintPageStyle(id: RtePageSizeId) {
     const size = cssPageSize(id)
@@ -198,6 +200,7 @@ export function useRtePageLayout(deps: {
     pageScreenMargin,
     pageSheetStyle,
     printPreviewMarginStyle,
+    printPreviewPaperStyle,
     applyPrintPageStyle,
     undoPageMargin,
     setMarginPreset,

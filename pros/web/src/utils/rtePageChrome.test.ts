@@ -12,6 +12,7 @@ import {
   printPageSideCss,
   printSheetCss,
   segmentHeights,
+  shiftGutterSide,
   splitPreviewPages,
   unwrapPageBreaks,
   readPageChrome,
@@ -103,6 +104,18 @@ assert.equal(formatPageNumber('page-n', 2, 5), '第 2 页')
 assert.equal(formatPageNumber('page-n-of-m', 2, 5), '第 2 页 共 5 页')
 assert.equal(formatPageNumber('dash', 2, 5), '- 2 -')
 const sideChrome = normalizePageChrome({ header: '奇数', headerEven: '偶数', footer: '', pageNumber: 'none' })
+assert.deepEqual(shiftGutterSide({ top: 10, right: 12, bottom: 10, left: 20 }, 8, 1), {
+  top: 10,
+  right: 12,
+  bottom: 10,
+  left: 20,
+})
+assert.deepEqual(shiftGutterSide({ top: 10, right: 12, bottom: 10, left: 20 }, 8, 2), {
+  top: 10,
+  right: 20,
+  bottom: 10,
+  left: 12,
+})
 assert.equal(headerForPage(sideChrome, 0), '奇数')
 assert.equal(headerForPage(sideChrome, 1), '奇数')
 assert.equal(headerForPage(sideChrome, 2), '偶数')

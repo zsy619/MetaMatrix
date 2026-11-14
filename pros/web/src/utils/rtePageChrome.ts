@@ -183,6 +183,17 @@ export function chromeBand(chrome: PanelPageChrome): { top: number; bottom: numb
   }
 }
 
+/** 屏幕边距把装订线加在左边。偶数页预览时改加到右边。 */
+export function shiftGutterSide<T extends { top: number; right: number; bottom: number; left: number }>(
+  box: T,
+  gutter: number,
+  page: number,
+): T {
+  const g = Number.isFinite(gutter) ? Math.min(40, Math.max(0, gutter)) : 0
+  if (g <= 0 || pageOrdinal(page) % 2 === 1) return box
+  return { ...box, left: Math.max(0, box.left - g), right: box.right + g }
+}
+
 export function applyChromeReserve<T extends { top: number; bottom: number }>(box: T, chrome: PanelPageChrome): T {
   const band = chromeBand(chrome)
   return {

@@ -1071,7 +1071,7 @@ const echartsDialogTemplates = computed(() => {
               v-for="(page, index) in previewPages"
               :key="index"
               class="rte-print-preview-paper"
-              :style="rte.printPreviewMarginStyle"
+              :style="rte.printPreviewPaperStyle(index + 1)"
               :data-writing-paper="rte.writingPaper || undefined"
             >
               <div data-rte-own v-if="previewHeader(index + 1)" class="rte-preview-header">{{ previewHeader(index + 1) }}</div>
