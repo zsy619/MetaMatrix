@@ -68,6 +68,11 @@ function pixelAttr(raw: string): number | null {
     const n = Number(ch[1]) * 8
     return Number.isFinite(n) && n > 0 ? Math.round(n) : null
   }
+  const ex = /^(\d+(?:\.\d+)?)\s*ex$/i.exec(text)
+  if (ex) {
+    const n = Number(ex[1]) * 8
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : null
+  }
   const px = text.replace(/\s*px$/i, '')
   if (!px || /%/.test(px)) return null
   const n = Number(px)
