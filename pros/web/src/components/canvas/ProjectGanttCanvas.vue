@@ -587,19 +587,19 @@ function startDrag(event: PointerEvent, task: GanttTask, mode: 'move' | 'resize'
 </template>
 
 <style scoped>
-.gantt { height: 100%; min-height: 0; display: flex; flex-direction: column; padding: 12px 14px 14px; box-sizing: border-box; color: #202124; }
+.gantt { height: 100%; min-height: 0; display: flex; flex-direction: column; padding: 12px 14px 14px; box-sizing: border-box; overflow: auto; color: #202124; }
 .gantt-head { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin-bottom: 8px; }
-.title { font-size: 18px; font-weight: 700; border: 1px solid transparent; border-radius: 6px; padding: 2px 6px; min-width: 160px; background: transparent; }
+.title { font-size: 20px; font-weight: 700; border: 1px solid transparent; border-radius: 6px; padding: 4px 8px; min-width: 0; min-height: 40px; max-width: 100%; background: transparent; }
 .title:focus { border-color: #1a73e8; background: #fff; outline: none; }
 .toolbar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-.toolbar button, .zoom button { border: 1px solid #dadce0; background: #fff; border-radius: 999px; min-height: 32px; padding: 4px 12px; font-size: 13px; color: #202124; cursor: pointer; }
+.toolbar button, .zoom button { border: 1px solid #dadce0; background: #fff; border-radius: 999px; min-height: 40px; padding: 4px 14px; font-size: 15px; color: #202124; cursor: pointer; }
 .toolbar button:disabled { color: #9aa0a6; }
 .zoom { display: inline-flex; }
 .zoom button { border-radius: 0; }
 .zoom button:first-child { border-radius: 999px 0 0 999px; }
 .zoom button:last-child { border-radius: 0 999px 999px 0; }
 .zoom button[aria-pressed='true'] { background: #e8f0fe; color: #174ea6; }
-.status { margin: 0 0 8px; font-size: 12px; color: #174ea6; }
+.status { margin: 0 0 8px; font-size: 15px; color: #174ea6; }
 .split { flex: 1; min-height: 0; display: flex; border: 1px solid #dadce0; border-radius: 10px; overflow: hidden; background: #fff; }
 .grid { width: min(720px, 54%); min-width: 320px; overflow: auto; border-right: 1px solid #dadce0; }
 .grid table { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; }
@@ -615,7 +615,7 @@ function startDrag(event: PointerEvent, task: GanttTask, mode: 'move' | 'resize'
 .name { min-width: 180px; }
 .name { display: flex; align-items: center; }
 .indent { flex: none; }
-.twist { flex: none; width: 24px; height: 24px; border: 0; background: transparent; padding: 0; cursor: pointer; color: #5f6368; }
+.twist { flex: none; width: 36px; height: 36px; border: 0; background: transparent; padding: 0; font-size: 16px; cursor: pointer; color: #5f6368; }
 .twist--blank { display: inline-block; }
 .chart { flex: 1; overflow: auto; position: relative; background: #fff; }
 .chart-head { position: sticky; top: 0; z-index: 2; background: #f3f6f9; border-bottom: 1px solid #e0e0e0; }
@@ -641,4 +641,17 @@ function startDrag(event: PointerEvent, task: GanttTask, mode: 'move' | 'resize'
 .milestone { position: absolute; top: 12px; width: 16px; height: 16px; background: #1a73e8; transform: rotate(45deg); cursor: grab; z-index: 1; }
 .milestone.critical { background: #d93025; }
 .baseline { position: absolute; top: 31px; height: 4px; background: #80868b; border-radius: 2px; z-index: 1; }
+@media (max-width: 900px) {
+  .gantt .split.split { flex-direction: column; overflow: visible; }
+  .grid {
+    flex: 1 1 240px;
+    width: 100%;
+    min-width: 0;
+    min-height: 240px;
+    max-height: 48vh;
+    border-right: 0;
+    border-bottom: 1px solid #dadce0;
+  }
+  .chart { flex: 1 1 220px; width: 100%; height: auto; min-height: 220px; }
+}
 </style>
