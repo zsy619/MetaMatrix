@@ -133,7 +133,11 @@ export const RteImage = Image.extend({
       fit: {
         default: null as string | null,
         parseHTML: (el: HTMLElement) => {
-          const value = (el.getAttribute('data-fit') || styleDecl(el.getAttribute('style') || '', 'object-fit') || el.style?.objectFit || '').trim()
+          const value = (el.getAttribute('data-fit') || styleDecl(el.getAttribute('style') || '', 'object-fit') || el.style?.objectFit || '')
+            .trim()
+            .toLowerCase()
+            .replace(/\s*!important$/i, '')
+            .trim()
           return value === 'cover' || value === 'contain' || value === 'scale-down' || value === 'fill' || value === 'none' ? value : null
         },
         renderHTML: (attrs: { fit?: string | null }) =>
