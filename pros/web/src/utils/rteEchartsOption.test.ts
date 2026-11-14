@@ -339,6 +339,22 @@ describe('ECharts 模板与表格生成', () => {
     expect(series[0]!.data).toEqual([1200, 0.5])
   })
 
+  it('换成折线后轴标题字号还在', () => {
+    const next = retypeEchartsOption(
+      {
+        title: { text: '销售' },
+        xAxis: { type: 'category', data: ['一月', '二月'], name: '月份', nameTextStyle: { fontSize: 18 } },
+        yAxis: { type: 'value', name: '金额', nameTextStyle: { fontSize: 14 } },
+        series: [{ name: '今年', type: 'bar', data: [12, 18] }],
+      },
+      'line',
+    )
+    const xAxis = next.xAxis as { nameTextStyle?: { fontSize?: number } }
+    const yAxis = next.yAxis as { nameTextStyle?: { fontSize?: number } }
+    expect(xAxis.nameTextStyle?.fontSize).toBe(18)
+    expect(yAxis.nameTextStyle?.fontSize).toBe(14)
+  })
+
   it('换成折线后数值轴分段数还在', () => {
     const next = retypeEchartsOption(
       {
