@@ -1,7 +1,7 @@
 /** 页眉、页脚、页码。旧文档没有这个字段时视为空，不改变版心。 */
 import { cssPageMargin, type PageMarginBox } from './rtePageMargin'
 
-export const PAGE_NUMBER_STYLES = ['none', 'n', 'page-n', 'page-n-of-m', 'dash', 'roman', 'upper-roman', 'alpha', 'upper-alpha', 'cjk'] as const
+export const PAGE_NUMBER_STYLES = ['none', 'n', 'page-n', 'page-n-of-m', 'dash', 'roman', 'upper-roman', 'alpha', 'upper-alpha', 'cjk', 'pad'] as const
 
 export type PageNumberStyle = (typeof PAGE_NUMBER_STYLES)[number]
 
@@ -35,6 +35,7 @@ export const PAGE_NUMBER_OPTIONS: ReadonlyArray<{ id: PageNumberStyle; label: st
   { id: 'alpha', label: 'a, b, c' },
   { id: 'upper-alpha', label: 'A, B, C' },
   { id: 'cjk', label: '一, 二, 三' },
+  { id: 'pad', label: '01, 02, 03' },
 ]
 
 /** 页眉或页脚占用的最小边带。已有边距更大时不额外加高。 */
@@ -116,6 +117,8 @@ function pageNumberCss(style: PageNumberStyle): string {
       return 'counter(page, upper-alpha)'
     case 'cjk':
       return 'counter(page, cjk-ideographic)'
+    case 'pad':
+      return 'counter(page, decimal-leading-zero)'
     default:
       return ''
   }
@@ -298,6 +301,8 @@ export function formatPageNumber(style: PageNumberStyle, page: number, total: nu
       return toLowerAlpha(n).toUpperCase()
     case 'cjk':
       return toCjk(n)
+    case 'pad':
+      return String(n).padStart(2, '0')
     default:
       return ''
   }
