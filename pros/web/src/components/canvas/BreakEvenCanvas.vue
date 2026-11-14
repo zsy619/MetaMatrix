@@ -17,6 +17,11 @@ function format(value: number | null): string {
   return Number.isInteger(value) ? String(value) : String(Math.round(value * 100) / 100)
 }
 
+function amountClass(value: number | null): string {
+  if (value == null || !Number.isFinite(value) || value <= 0) return 'is-out'
+  return 'is-in'
+}
+
 function setField(field: 'price' | 'variableCost' | 'fixedCost', raw: string) {
   const value = Math.max(0, Number(raw) || 0)
   documentStore.mutateCanvas((doc) => {
@@ -34,8 +39,9 @@ function setField(field: 'price' | 'variableCost' | 'fixedCost', raw: string) {
         <p>盈亏平衡销量 = 固定成本 ÷（单价 − 单位变动成本）。单价不高于变动成本时，卖得越多亏得越多。</p>
       </div>
       <div class="results">
-        <strong :aria-label="`盈亏平衡销量 ${format(units)}`">销量 {{ format(units) }}</strong>
-        <strong :aria-label="`盈亏平衡收入 ${format(revenue)}`">收入 {{ format(revenue) }}</strong>
+        <strong :class="amountClass(contribution)" :aria-label="`单位贡献 ${format(contribution)}`">贡献 {{ format(contribution) }}</strong>
+        <strong :class="amountClass(units)" :aria-label="`盈亏平衡销量 ${format(units)}`">销量 {{ format(units) }}</strong>
+        <strong :class="amountClass(revenue)" :aria-label="`盈亏平衡收入 ${format(revenue)}`">收入 {{ format(revenue) }}</strong>
       </div>
     </header>
     <div class="grid">
@@ -56,14 +62,23 @@ function setField(field: 'price' | 'variableCost' | 'fixedCost', raw: string) {
 </template>
 
 <style scoped>
-.sheet { position: absolute; inset: 0; box-sizing: border-box; display: flex; flex-direction: column; min-height: 0; padding: 12px 14px 14px; background: var(--cv-page, #f7f7f7); color: #202124; }
-.sheet-top { flex: none; display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-bottom: 10px; }
+.sheet { position: absolute; inset: 0; box-sizing: border-box; display: flex; flex-direction: column; min-height: 0; padding: 12px 14px 14px; overflow: auto; background: var(--cv-page, #f7f7f7); color: #202124; }
+.sheet-top { flex: none; display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; flex-wrap: wrap; margin-bottom: 10px; }
 .sheet-top h2, .sheet-top p { margin: 0; }
-.sheet-top p { color: #5f6368; font-size: 13px; }
-.results { display: flex; gap: 8px; }
-.results strong { padding: 10px 16px; border-radius: 999px; background: #e7f6ef; color: #125c3b; font-size: 16px; font-variant-numeric: tabular-nums; }
+.sheet-top p { max-width: 42em; color: #3c4043; font-size: 15px; line-height: 1.55; }
+.results { display: flex; flex-wrap: wrap; gap: 8px; }
+.results strong { min-height: 44px; display: inline-flex; align-items: center; padding: 8px 16px; border-radius: 999px; font-size: 16px; font-variant-numeric: tabular-nums; }
+.is-in { background: #e7f6ef; color: #125c3b; }
+.is-out { background: #fdecea; color: #9b1c1c; }
 .grid { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-section { display: flex; flex-direction: column; align-items: center; min-height: 0; background: #fff; border-radius: 12px; overflow: hidden; border: 1px solid #ececec; }
-h3 { margin: 0; width: 100%; min-height: 48px; display: flex; align-items: center; justify-content: center; background: #2a649f; color: #fff; }
-input { margin: 28px auto 0; width: min(240px, 80%); border: 1px solid #dadce0; border-radius: 12px; padding: 14px 12px; font-size: 32px; font-weight: 700; font-variant-numeric: tabular-nums; text-align: center; }
+section { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; min-height: 0; background: #fff; border-radius: 12px; overflow: hidden; border: 1px solid #ececec; }
+h3 { margin: 0; width: 100%; min-height: 48px; display: flex; align-items: center; justify-content: center; background: #2a649f; color: #fff; font-size: 16px; }
+input { margin: 28px 16px 0; width: min(240px, calc(100% - 32px)); box-sizing: border-box; min-height: 72px; border: 1px solid #dadce0; border-radius: 12px; padding: 12px; font: inherit; font-size: 32px; font-weight: 700; font-variant-numeric: tabular-nums; text-align: center; appearance: textfield; }
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+input:focus { outline: none; border-color: #1a73e8; }
+@media (max-width: 800px) {
+  .grid.grid { grid-template-columns: 1fr; }
+  section { min-height: 180px; height: auto; }
+}
 </style>

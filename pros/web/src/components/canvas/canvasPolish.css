@@ -44,7 +44,8 @@
 .canvas-viewport .sheet[aria-label='SWOT 分析'] .sheet-top p,
 .canvas-viewport .sheet[aria-label='价值链'] .sheet-top p,
 .canvas-viewport .sheet[aria-label='黄金圈'] .sheet-top p,
-.canvas-viewport .sheet[aria-label='麦肯锡 7S'] .sheet-top p {
+.canvas-viewport .sheet[aria-label='麦肯锡 7S'] .sheet-top p,
+.canvas-viewport .sheet[aria-label='盈亏平衡'] .sheet-top p {
   font-size: 15px;
   color: #3c4043;
 }
@@ -141,7 +142,8 @@
 .canvas-viewport .cash > .cash-grid,
 .canvas-viewport .swot-grid,
 .canvas-viewport .sheet > .rings,
-.canvas-viewport .sheet[aria-label='麦肯锡 7S'] > .grid {
+.canvas-viewport .sheet[aria-label='麦肯锡 7S'] > .grid,
+.canvas-viewport .sheet[aria-label='盈亏平衡'] > .grid {
   flex: 1 0 auto;
   min-height: 0;
   height: auto;
