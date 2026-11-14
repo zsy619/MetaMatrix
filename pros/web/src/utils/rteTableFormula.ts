@@ -330,7 +330,7 @@ type Node =
   | { k: 'cmp'; op: string; l: Node; r: Node }
   | { k: 'call'; name: string; args: Node[] }
 
-const FUNC_NAMES = new Set(['SUM', 'AVERAGE', 'COUNT', 'MAX', 'MIN', 'IF', 'ROUND', 'AND', 'OR', 'ABS', 'INT', 'MOD', 'POWER', 'SQRT', 'SIGN', 'CEILING', 'FLOOR', 'NOT', 'PRODUCT', 'MEDIAN', 'COUNTA', 'ROUNDUP', 'ROUNDDOWN', 'PI'])
+const FUNC_NAMES = new Set(['SUM', 'AVERAGE', 'COUNT', 'MAX', 'MIN', 'IF', 'ROUND', 'AND', 'OR', 'ABS', 'INT', 'MOD', 'POWER', 'SQRT', 'SIGN', 'CEILING', 'FLOOR', 'NOT', 'PRODUCT', 'MEDIAN', 'COUNTA', 'ROUNDUP', 'ROUNDDOWN', 'PI', 'EXP'])
 
 class Parser {
   tokens: LexToken[]
@@ -746,6 +746,13 @@ function evalCall(name: string, args: Node[], ctx: Ctx, at: CellAddress): EvalVa
   if (name === 'CEILING') return evalCeiling(args, ctx, at)
   if (name === 'FLOOR') return evalFloor(args, ctx, at)
   if (name === 'PI') return args.length ? { error: '#VALUE!' } : Math.PI
+  if (name === 'EXP') {
+    if (args.length !== 1) return { error: '#VALUE!' }
+    const value = evalNode(args[0]!, ctx, at)
+    if (isError(value)) return value
+    const result = Math.exp(value)
+    return Number.isFinite(result) ? result : { error: '#VALUE!' }
+  }
   if (name === 'ROUND') return evalRound(args, ctx, at)
   if (name === 'ROUNDUP') return evalRoundUp(args, ctx, at)
   if (name === 'ROUNDDOWN') return evalRoundDown(args, ctx, at)
