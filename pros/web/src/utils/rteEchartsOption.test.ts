@@ -339,6 +339,20 @@ describe('ECharts 模板与表格生成', () => {
     expect(series[0]!.data).toEqual([1200, 0.5])
   })
 
+  it('换成折线后数值轴仍不画网格线', () => {
+    const next = retypeEchartsOption(
+      {
+        title: { text: '销售' },
+        xAxis: { type: 'category', data: ['一月', '二月'] },
+        yAxis: { type: 'value', splitLine: { show: false } },
+        series: [{ name: '今年', type: 'bar', data: [2, 8] }],
+      },
+      'line',
+    )
+    const yAxis = next.yAxis as { splitLine?: { show?: boolean } }
+    expect(yAxis.splitLine?.show).toBe(false)
+  })
+
   it('换成折线后坐标轴名称的位置还在', () => {
     const next = retypeEchartsOption(
       {

@@ -1677,6 +1677,12 @@ function cartesianNameLayout(option: Record<string, unknown>): {
   }
 }
 
+function valueSplitLineHidden(option: Record<string, unknown>): boolean {
+  const axis = categoryOnYAxis(option) ? option.xAxis : option.yAxis
+  const node = Array.isArray(axis) ? axis[0] : axis
+  return isPlainObject(node) && isPlainObject(node.splitLine) && node.splitLine.show === false
+}
+
 function categoryBoundaryGap(option: Record<string, unknown>): boolean | undefined {
   const axis = categoryOnYAxis(option) ? option.yAxis : option.xAxis
   const node = Array.isArray(axis) ? axis[0] : axis
@@ -1774,6 +1780,7 @@ function buildCartesianOption(
     category: { location?: 'start' | 'middle' | 'end'; gap?: number }
     value: { location?: 'start' | 'middle' | 'end'; gap?: number }
   },
+  hideValueSplitLine = false,
 ): Record<string, unknown> {
   const category = {
     type: 'category' as const,
@@ -1795,6 +1802,7 @@ function buildCartesianOption(
     ...(scale?.logBase != null ? { logBase: scale.logBase } : {}),
     ...(namePlace?.value.location ? { nameLocation: namePlace.value.location } : {}),
     ...(namePlace?.value.gap != null ? { nameGap: namePlace.value.gap } : {}),
+    ...(hideValueSplitLine ? { splitLine: { show: false } } : {}),
   }
   return {
     color: FEISHU_TEXT_COLORS.filter((item) => item !== '#1f2329' && item !== '#8f959e'),
@@ -2068,6 +2076,7 @@ export function retypeEchartsOption(
       valueAxisScale(base),
       categoryBoundaryGap(base),
       cartesianNameLayout(base),
+      valueSplitLineHidden(base),
     )
   }
   if (usable && type === 'pie') {
