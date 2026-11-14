@@ -339,6 +339,20 @@ describe('ECharts 模板与表格生成', () => {
     expect(series[0]!.data).toEqual([1200, 0.5])
   })
 
+  it('换成折线后数据标签还在', () => {
+    const next = retypeEchartsOption(
+      {
+        title: { text: '销售' },
+        xAxis: { type: 'category', data: ['一月', '二月'] },
+        yAxis: { type: 'value' },
+        series: [{ name: '今年', type: 'bar', data: [1, 2], label: { show: true, position: 'top', formatter: '{c}' } }],
+      },
+      'line',
+    )
+    const series = next.series as Array<{ label?: { show?: boolean; position?: string; formatter?: string } }>
+    expect(series[0]!.label).toEqual({ show: true, position: 'top', formatter: '{c}' })
+  })
+
   it('换成折线后坐标轴名称还在', () => {
     const next = retypeEchartsOption(
       {

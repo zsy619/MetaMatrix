@@ -1481,6 +1481,23 @@ function categoryOnYAxis(option: Record<string, unknown>): boolean {
   })
 }
 
+function seriesLabelAt(
+  option: Record<string, unknown>,
+  index: number,
+): { show: true; position?: string; formatter?: string } | undefined {
+  const series = option.series
+  if (!Array.isArray(series)) return undefined
+  const item = series[index]
+  if (!isPlainObject(item) || !isPlainObject(item.label) || item.label.show !== true) return undefined
+  const label: { show: true; position?: string; formatter?: string } = { show: true }
+  if (typeof item.label.position === 'string' && item.label.position.trim()) label.position = item.label.position.trim()
+  if (typeof item.label.formatter === 'string') {
+    const formatter = item.label.formatter.trim()
+    if (formatter && !/javascript:|function\s*\(/i.test(formatter)) label.formatter = formatter
+  }
+  return label
+}
+
 function seriesColorAt(option: Record<string, unknown>, index: number): string | undefined {
   const series = option.series
   if (!Array.isArray(series)) return undefined
@@ -1521,7 +1538,13 @@ function buildCartesianOption(
   type: 'bar' | 'line',
   title: string,
   labels: string[],
-  series: Array<{ name: string; data: Array<number | null>; stack?: string; color?: string }>,
+  series: Array<{
+    name: string
+    data: Array<number | null>
+    stack?: string
+    color?: string
+    label?: { show: true; position?: string; formatter?: string }
+  }>,
   horizontal = false,
   names?: { category?: string; value?: string },
 ): Record<string, unknown> {
@@ -1546,6 +1569,7 @@ function buildCartesianOption(
       data: item.data,
       ...(item.stack ? { stack: item.stack } : {}),
       ...(item.color ? { itemStyle: { color: item.color } } : {}),
+      ...(item.label ? { label: item.label } : {}),
       smooth: type === 'line' ? true : undefined,
       areaStyle: type === 'line' ? { opacity: 0.12 } : undefined,
     })),
@@ -1771,6 +1795,7 @@ export function retypeEchartsOption(
         data: item.data.map((value) => asChartNumber(value)),
         stack: seriesStackAt(base, index),
         color: seriesColorAt(base, index),
+        label: seriesLabelAt(base, index),
       })),
       categoryOnYAxis(base),
       cartesianAxisNames(base),
