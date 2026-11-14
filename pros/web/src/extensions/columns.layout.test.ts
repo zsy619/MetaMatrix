@@ -59,6 +59,16 @@ function columnTexts(ed: Editor): string[][] {
 }
 
 describe('分栏装入选区和栏数', () => {
+  it('栏宽比例可以带小数', () => {
+    const ed = mount('<p></p>')
+    ed.commands.setContent(
+      '<div data-type="columns" data-cols="2" data-ratios="1.5:2.5"><div data-type="column"><p>甲</p></div><div data-type="column"><p>乙</p></div></div>',
+    )
+    const html = ed.getHTML()
+    expect(html).toContain('data-ratios="1.5:2.5"')
+    expect(html).toContain('1.5fr 2.5fr')
+  })
+
   it('分栏边框可以画成点线', () => {
     const ed = mount('<p>甲</p><p>乙</p>')
     ed.commands.setTextSelection({ from: textPos(ed, '甲', 'start'), to: textPos(ed, '乙', 'end') })

@@ -46,7 +46,7 @@ function normalizeRatios(
   if (typeof ratios === 'string' && ratios.trim()) {
     arr = ratios
       .split(':')
-      .map((s) => parseInt(s.trim(), 10))
+      .map((s) => Math.round(Number(s.trim()) * 100) / 100)
       .filter((n) => Number.isFinite(n) && n > 0)
   } else if (Array.isArray(ratios)) {
     arr = ratios.filter((n) => Number.isFinite(n) && n > 0)
