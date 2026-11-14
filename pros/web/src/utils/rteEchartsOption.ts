@@ -1519,6 +1519,20 @@ function seriesStackAt(option: Record<string, unknown>, index: number): string |
   return stack || undefined
 }
 
+function legendLayout(option: Record<string, unknown>): Record<string, unknown> {
+  const legend = option.legend
+  const place: Record<string, unknown> = {}
+  if (isPlainObject(legend)) {
+    for (const key of ['left', 'top', 'right', 'bottom', 'orient'] as const) {
+      const value = legend[key]
+      if (typeof value === 'string' && value.trim()) place[key] = value.trim()
+      else if (typeof value === 'number' && Number.isFinite(value)) place[key] = value
+    }
+  }
+  if (!('left' in place) && !('right' in place) && !('top' in place) && !('bottom' in place)) place.bottom = 0
+  return place
+}
+
 function categoryLabelRotate(option: Record<string, unknown>): number | undefined {
   const axis = categoryOnYAxis(option) ? option.yAxis : option.xAxis
   const node = Array.isArray(axis) ? axis[0] : axis
@@ -1574,6 +1588,7 @@ function buildCartesianOption(
   names?: { category?: string; value?: string },
   bounds?: { min?: number; max?: number },
   categoryRotate?: number,
+  legendPlace?: Record<string, unknown>,
 ): Record<string, unknown> {
   const category = {
     type: 'category' as const,
@@ -1592,7 +1607,7 @@ function buildCartesianOption(
     color: FEISHU_TEXT_COLORS.filter((item) => item !== '#1f2329' && item !== '#8f959e'),
     title: { text: title, left: 'center' },
     tooltip: { trigger: 'axis' },
-    legend: { data: series.map((item) => item.name), bottom: 0 },
+    legend: { ...(legendPlace || { bottom: 0 }), data: series.map((item) => item.name) },
     grid: { left: 48, right: 24, top: 48, bottom: 56, containLabel: true },
     xAxis: horizontal ? value : category,
     yAxis: horizontal ? category : value,
@@ -1834,6 +1849,7 @@ export function retypeEchartsOption(
       cartesianAxisNames(base),
       valueAxisBounds(base),
       categoryLabelRotate(base),
+      legendLayout(base),
     )
   }
   if (usable && type === 'pie') {

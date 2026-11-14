@@ -339,6 +339,24 @@ describe('ECharts 模板与表格生成', () => {
     expect(series[0]!.data).toEqual([1200, 0.5])
   })
 
+  it('换成折线后图例还在右侧', () => {
+    const next = retypeEchartsOption(
+      {
+        title: { text: '销售' },
+        legend: { right: 0, orient: 'vertical', data: ['今年'] },
+        xAxis: { type: 'category', data: ['一月', '二月'] },
+        yAxis: { type: 'value' },
+        series: [{ name: '今年', type: 'bar', data: [1, 2] }],
+      },
+      'line',
+    )
+    const legend = next.legend as { right?: number; orient?: string; bottom?: number; data?: string[] }
+    expect(legend.right).toBe(0)
+    expect(legend.orient).toBe('vertical')
+    expect(legend.bottom).toBeUndefined()
+    expect(legend.data).toEqual(['今年'])
+  })
+
   it('换成折线后类目标签的角度还在', () => {
     const next = retypeEchartsOption(
       {
