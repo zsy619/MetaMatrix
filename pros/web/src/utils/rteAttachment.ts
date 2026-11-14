@@ -128,7 +128,7 @@ export function isAttachmentAnchor(href: string, text: string, className = ''): 
   const kind = attachmentKindFor(text, href, '')
   if (kind === 'pdf' || kind === 'docx' || kind === 'doc' || kind === 'sheet' || kind === 'audio' || kind === 'video') return true
   const path = href.split('?')[0]?.toLowerCase() || ''
-  return /\.(csv|tsv)$/.test(path)
+  return /\.(csv|tsv|pptx?)$/.test(path)
 }
 
 function splitDelimitedLine(line: string, delimiter: string): string[] {
