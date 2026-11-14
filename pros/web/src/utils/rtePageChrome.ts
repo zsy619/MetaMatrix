@@ -260,7 +260,8 @@ export function formatPageNumber(style: PageNumberStyle, page: number, total: nu
 export function estimatePageCount(contentPx: number, pageInnerPx: number): number {
   if (!Number.isFinite(contentPx) || contentPx <= 0) return 1
   if (!Number.isFinite(pageInnerPx) || pageInnerPx <= 0) return 1
-  return Math.max(1, Math.ceil(contentPx / pageInnerPx))
+  if (contentPx <= pageInnerPx + 0.5) return 1
+  return Math.max(1, Math.ceil((contentPx - 0.5) / pageInnerPx))
 }
 
 /** 分页符把正文切成几段。落在开头或结尾的符不单独占一段。 */
