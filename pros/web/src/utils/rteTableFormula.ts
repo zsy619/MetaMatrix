@@ -330,7 +330,7 @@ type Node =
   | { k: 'cmp'; op: string; l: Node; r: Node }
   | { k: 'call'; name: string; args: Node[] }
 
-const FUNC_NAMES = new Set(['SUM', 'AVERAGE', 'COUNT', 'MAX', 'MIN', 'IF', 'ROUND', 'AND', 'OR', 'ABS', 'INT', 'MOD', 'POWER', 'SQRT', 'SIGN', 'CEILING', 'FLOOR', 'NOT', 'PRODUCT'])
+const FUNC_NAMES = new Set(['SUM', 'AVERAGE', 'COUNT', 'MAX', 'MIN', 'IF', 'ROUND', 'AND', 'OR', 'ABS', 'INT', 'MOD', 'POWER', 'SQRT', 'SIGN', 'CEILING', 'FLOOR', 'NOT', 'PRODUCT', 'MEDIAN'])
 
 class Parser {
   tokens: LexToken[]
@@ -739,6 +739,12 @@ function evalCall(name: string, args: Node[], ctx: Ctx, at: CellAddress): EvalVa
   if (name === 'MAX') return values.length ? Math.max(...values) : 0
   if (name === 'MIN') return values.length ? Math.min(...values) : 0
   if (name === 'PRODUCT') return values.length ? values.reduce((a, b) => a * b, 1) : 0
+  if (name === 'MEDIAN') {
+    if (!values.length) return { error: '#DIV/0!' }
+    const sorted = [...values].sort((a, b) => a - b)
+    const mid = Math.floor(sorted.length / 2)
+    return sorted.length % 2 ? sorted[mid]! : (sorted[mid - 1]! + sorted[mid]!) / 2
+  }
   return { error: '#NAME?' }
 }
 
