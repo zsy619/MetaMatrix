@@ -37,6 +37,8 @@ describe('需求三角', () => {
     await slider.trigger('input')
     const doc = store.current_data as DemandTriangleDocumentJSON
     expect(doc.directions.find((item) => item.id === 'dir_1')?.scores.universality).toBe(0.8)
+    expect(wrapper.findAll('.dt-note-card')).toHaveLength(3)
+    expect(wrapper.text()).toContain('第1个业务方向 · 描述')
     wrapper.unmount()
   })
 })
