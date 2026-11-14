@@ -1500,6 +1500,24 @@ function seriesLabelAt(
   return label
 }
 
+const LINE_SYMBOLS = new Set(['circle', 'rect', 'roundRect', 'triangle', 'diamond', 'pin', 'arrow', 'none'])
+
+function seriesSymbolAt(
+  option: Record<string, unknown>,
+  index: number,
+): { symbol?: string; symbolSize?: number | string } | undefined {
+  const series = option.series
+  if (!Array.isArray(series)) return undefined
+  const item = series[index]
+  if (!isPlainObject(item)) return undefined
+  const mark: { symbol?: string; symbolSize?: number | string } = {}
+  if (typeof item.symbol === 'string' && LINE_SYMBOLS.has(item.symbol)) mark.symbol = item.symbol
+  const size = item.symbolSize
+  if (typeof size === 'number' && Number.isFinite(size) && size > 0 && size <= 80) mark.symbolSize = size
+  else if (typeof size === 'string' && /^\d+(\.\d+)?px$/.test(size.trim())) mark.symbolSize = size.trim()
+  return mark.symbol || mark.symbolSize != null ? mark : undefined
+}
+
 function seriesStepAt(option: Record<string, unknown>, index: number): true | 'start' | 'middle' | 'end' | undefined {
   const series = option.series
   if (!Array.isArray(series)) return undefined
@@ -1663,6 +1681,8 @@ function buildCartesianOption(
     barWidth?: string | number
     barMaxWidth?: string | number
     step?: true | 'start' | 'middle' | 'end'
+    symbol?: string
+    symbolSize?: number | string
   }>,
   horizontal = false,
   names?: { category?: string; value?: string },
@@ -1708,6 +1728,8 @@ function buildCartesianOption(
       ...(item.barWidth != null ? { barWidth: item.barWidth } : {}),
       ...(item.barMaxWidth != null ? { barMaxWidth: item.barMaxWidth } : {}),
       ...(item.step != null ? { step: item.step } : {}),
+      ...(item.symbol ? { symbol: item.symbol } : {}),
+      ...(item.symbolSize != null ? { symbolSize: item.symbolSize } : {}),
       smooth: type === 'line' ? looks?.[index]?.straight !== true : undefined,
       areaStyle:
         type === 'line' && (looks?.[index] ? looks[index]!.filled : true) ? { opacity: 0.12 } : undefined,
@@ -1938,6 +1960,8 @@ export function retypeEchartsOption(
         barWidth: seriesBarMeasure(base, index, 'barWidth'),
         barMaxWidth: seriesBarMeasure(base, index, 'barMaxWidth'),
         step: seriesStepAt(base, index),
+        symbol: seriesSymbolAt(base, index)?.symbol,
+        symbolSize: seriesSymbolAt(base, index)?.symbolSize,
       })),
       categoryOnYAxis(base),
       cartesianAxisNames(base),
