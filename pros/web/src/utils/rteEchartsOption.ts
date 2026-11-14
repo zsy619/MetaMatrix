@@ -1659,10 +1659,10 @@ function legendLayout(option: Record<string, unknown>): Record<string, unknown> 
   return place
 }
 
-function axisNameLayout(axis: unknown): { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique'; family?: string; leading?: number } {
+function axisNameLayout(axis: unknown): { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique'; family?: string; leading?: number; alignTo?: 'left' | 'center' | 'right' } {
   const node = Array.isArray(axis) ? axis[0] : axis
   if (!isPlainObject(node)) return {}
-  const place: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique'; family?: string; leading?: number } = {}
+  const place: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique'; family?: string; leading?: number; alignTo?: 'left' | 'center' | 'right' } = {}
   if (node.nameLocation === 'start' || node.nameLocation === 'middle' || node.nameLocation === 'end') {
     place.location = node.nameLocation
   }
@@ -1699,12 +1699,13 @@ function axisNameLayout(axis: unknown): { location?: 'start' | 'middle' | 'end';
       const leading = Math.round(style.lineHeight)
       if (leading >= 8 && leading <= 80) place.leading = leading
     }
+    if (style.align === 'left' || style.align === 'center' || style.align === 'right') place.alignTo = style.align
   }
   return place
 }
 
-function axisNameTextStyle(place?: { font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique'; family?: string; leading?: number }): { fontSize?: number; color?: string; fontWeight?: string | number; fontStyle?: 'normal' | 'italic' | 'oblique'; fontFamily?: string; lineHeight?: number } | undefined {
-  if (!place || (place.font == null && !place.ink && place.weight == null && !place.slant && !place.family && place.leading == null)) return undefined
+function axisNameTextStyle(place?: { font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique'; family?: string; leading?: number; alignTo?: 'left' | 'center' | 'right' }): { fontSize?: number; color?: string; fontWeight?: string | number; fontStyle?: 'normal' | 'italic' | 'oblique'; fontFamily?: string; lineHeight?: number; align?: 'left' | 'center' | 'right' } | undefined {
+  if (!place || (place.font == null && !place.ink && place.weight == null && !place.slant && !place.family && place.leading == null && !place.alignTo)) return undefined
   return {
     ...(place.font != null ? { fontSize: place.font } : {}),
     ...(place.ink ? { color: place.ink } : {}),
@@ -1712,12 +1713,13 @@ function axisNameTextStyle(place?: { font?: number; ink?: string; weight?: strin
     ...(place.slant ? { fontStyle: place.slant } : {}),
     ...(place.family ? { fontFamily: place.family } : {}),
     ...(place.leading != null ? { lineHeight: place.leading } : {}),
+    ...(place.alignTo ? { align: place.alignTo } : {}),
   }
 }
 
 function cartesianNameLayout(option: Record<string, unknown>): {
-  category: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique'; family?: string; leading?: number }
-  value: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique'; family?: string; leading?: number }
+  category: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique'; family?: string; leading?: number; alignTo?: 'left' | 'center' | 'right' }
+  value: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique'; family?: string; leading?: number; alignTo?: 'left' | 'center' | 'right' }
 } {
   const horizontal = categoryOnYAxis(option)
   return {
@@ -1893,8 +1895,8 @@ function buildCartesianOption(
   scale?: { interval?: number; minInterval?: number; inverse?: boolean; log?: boolean; logBase?: number; fromData?: boolean; side?: 'left' | 'right' | 'top' | 'bottom'; shift?: number; hidden?: boolean; parts?: number },
   boundaryGap?: boolean,
   namePlace?: {
-    category: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique'; family?: string; leading?: number }
-    value: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique'; family?: string; leading?: number }
+    category: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique'; family?: string; leading?: number; alignTo?: 'left' | 'center' | 'right' }
+    value: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique'; family?: string; leading?: number; alignTo?: 'left' | 'center' | 'right' }
   },
   hideValueSplitLine = false,
   hideCategoryAxisLine = false,
