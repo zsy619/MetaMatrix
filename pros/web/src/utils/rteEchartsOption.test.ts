@@ -339,6 +339,29 @@ describe('ECharts 模板与表格生成', () => {
     expect(series[0]!.data).toEqual([1200, 0.5])
   })
 
+  it('换成折线后类目标签的角度还在', () => {
+    const next = retypeEchartsOption(
+      {
+        title: { text: '销售' },
+        xAxis: { type: 'category', data: ['一月', '二月'], axisLabel: { rotate: 45 } },
+        yAxis: { type: 'value' },
+        series: [{ name: '今年', type: 'bar', data: [1, 2] }],
+      },
+      'line',
+    )
+    expect((next.xAxis as { axisLabel?: { rotate?: number } }).axisLabel?.rotate).toBe(45)
+    const horizontal = retypeEchartsOption(
+      {
+        title: { text: '销售' },
+        xAxis: { type: 'value' },
+        yAxis: { type: 'category', data: ['华东', '华南'], axisLabel: { rotate: -30 } },
+        series: [{ name: '今年', type: 'bar', data: [1, 2] }],
+      },
+      'line',
+    )
+    expect((horizontal.yAxis as { axisLabel?: { rotate?: number } }).axisLabel?.rotate).toBe(-30)
+  })
+
   it('换成折线后数值轴的上下限还在', () => {
     const next = retypeEchartsOption(
       {

@@ -1519,6 +1519,15 @@ function seriesStackAt(option: Record<string, unknown>, index: number): string |
   return stack || undefined
 }
 
+function categoryLabelRotate(option: Record<string, unknown>): number | undefined {
+  const axis = categoryOnYAxis(option) ? option.yAxis : option.xAxis
+  const node = Array.isArray(axis) ? axis[0] : axis
+  if (!isPlainObject(node) || !isPlainObject(node.axisLabel)) return undefined
+  const rotate = node.axisLabel.rotate
+  if (typeof rotate !== 'number' || !Number.isFinite(rotate) || rotate === 0) return undefined
+  return Math.max(-90, Math.min(90, rotate))
+}
+
 function valueAxisBounds(option: Record<string, unknown>): { min?: number; max?: number } {
   const axis = categoryOnYAxis(option) ? option.xAxis : option.yAxis
   const node = Array.isArray(axis) ? axis[0] : axis
@@ -1564,12 +1573,14 @@ function buildCartesianOption(
   horizontal = false,
   names?: { category?: string; value?: string },
   bounds?: { min?: number; max?: number },
+  categoryRotate?: number,
 ): Record<string, unknown> {
   const category = {
     type: 'category' as const,
     data: labels,
     axisTick: { alignWithLabel: true },
     ...(names?.category ? { name: names.category } : {}),
+    ...(categoryRotate != null ? { axisLabel: { rotate: categoryRotate } } : {}),
   }
   const value = {
     type: 'value' as const,
@@ -1822,6 +1833,7 @@ export function retypeEchartsOption(
       categoryOnYAxis(base),
       cartesianAxisNames(base),
       valueAxisBounds(base),
+      categoryLabelRotate(base),
     )
   }
   if (usable && type === 'pie') {
