@@ -1683,6 +1683,10 @@ function valueSplitAreaShown(option: Record<string, unknown>): boolean {
   return isPlainObject(node) && isPlainObject(node.splitArea) && node.splitArea.show === true
 }
 
+function legendHidden(option: Record<string, unknown>): boolean {
+  return isPlainObject(option.legend) && option.legend.show === false
+}
+
 function categorySplitLineHidden(option: Record<string, unknown>): boolean {
   const axis = categoryOnYAxis(option) ? option.yAxis : option.xAxis
   const node = Array.isArray(axis) ? axis[0] : axis
@@ -1837,6 +1841,7 @@ function buildCartesianOption(
   hideValueAxisTick = false,
   hideValueAxisLabel = false,
   hideCategorySplitLine = false,
+  hideLegend = false,
 ): Record<string, unknown> {
   const category = {
     type: 'category' as const,
@@ -1877,7 +1882,7 @@ function buildCartesianOption(
     color: FEISHU_TEXT_COLORS.filter((item) => item !== '#1f2329' && item !== '#8f959e'),
     title: { text: title, left: 'center' },
     tooltip: tip || { trigger: 'axis' },
-    legend: { ...(legendPlace || { bottom: 0 }), data: series.map((item) => item.name) },
+    legend: { ...(legendPlace || { bottom: 0 }), data: series.map((item) => item.name), ...(hideLegend ? { show: false } : {}) },
     grid: { left: 48, right: 24, top: 48, bottom: 56, containLabel: true, ...(margins || {}) },
     xAxis: horizontal ? value : category,
     yAxis: horizontal ? category : value,
@@ -2154,6 +2159,7 @@ export function retypeEchartsOption(
       valueAxisTickHidden(base),
       valueAxisLabelHidden(base),
       categorySplitLineHidden(base),
+      legendHidden(base),
     )
   }
   if (usable && type === 'pie') {
