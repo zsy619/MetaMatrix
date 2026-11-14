@@ -131,6 +131,7 @@ describe('领导核心价值驱动三角画布组件', () => {
     }
 
     expect(wrapper.findAll('[data-region-id]')).toHaveLength(12)
+    expect(wrapper.findAll('.lt-card-title')).toHaveLength(12)
     // 5 层金字塔
     expect(wrapper.findAll('polygon')).toHaveLength(5)
   })
