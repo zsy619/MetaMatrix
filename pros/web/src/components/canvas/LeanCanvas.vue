@@ -71,6 +71,29 @@ function block(id: LeanBlockId) {
 .lean-cell--segments { grid-area: 1 / 5 / 3 / 6; }
 .lean-cell--cost { grid-area: 3 / 1 / 4 / 3; }
 .lean-cell--revenue { grid-area: 3 / 3 / 4 / 6; }
-h3 { margin: 0; min-height: 36px; display: flex; align-items: center; justify-content: center; background: var(--col-header); color: #fff; font-size: 14px; letter-spacing: 0.04em; }
+h3 { margin: 0; min-height: 44px; display: flex; align-items: center; justify-content: center; padding: 6px 8px; background: var(--col-header); color: #fff; font-size: 16px; letter-spacing: 0.02em; text-align: center; }
 .rte-slot { flex: 1 1 auto; min-height: 0; display: flex; }
+
+@media (max-width: 900px) {
+  .lean-grid {
+    min-width: 0;
+    grid-template-columns: 1fr;
+    grid-template-rows: none;
+  }
+
+  .lean-grid .lean-cell {
+    grid-area: auto;
+    min-height: 220px;
+  }
+
+  .lean-cell--problem { order: 1; }
+  .lean-cell--segments { order: 2; }
+  .lean-cell--uvp { order: 3; }
+  .lean-cell--solution { order: 4; }
+  .lean-cell--advantage { order: 5; }
+  .lean-cell--channels { order: 6; }
+  .lean-cell--metrics { order: 7; }
+  .lean-cell--cost { order: 8; }
+  .lean-cell--revenue { order: 9; }
+}
 </style>
