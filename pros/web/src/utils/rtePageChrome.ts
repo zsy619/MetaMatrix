@@ -1,7 +1,7 @@
 /** 页眉、页脚、页码。旧文档没有这个字段时视为空，不改变版心。 */
 import { cssPageMargin, type PageMarginBox } from './rtePageMargin'
 
-export const PAGE_NUMBER_STYLES = ['none', 'n', 'page-n', 'page-n-of-m', 'dash', 'roman', 'upper-roman'] as const
+export const PAGE_NUMBER_STYLES = ['none', 'n', 'page-n', 'page-n-of-m', 'dash', 'roman', 'upper-roman', 'alpha', 'upper-alpha'] as const
 
 export type PageNumberStyle = (typeof PAGE_NUMBER_STYLES)[number]
 
@@ -32,6 +32,8 @@ export const PAGE_NUMBER_OPTIONS: ReadonlyArray<{ id: PageNumberStyle; label: st
   { id: 'dash', label: '- 1 -' },
   { id: 'roman', label: 'i, ii, iii' },
   { id: 'upper-roman', label: 'I, II, III' },
+  { id: 'alpha', label: 'a, b, c' },
+  { id: 'upper-alpha', label: 'A, B, C' },
 ]
 
 /** 页眉或页脚占用的最小边带。已有边距更大时不额外加高。 */
@@ -107,6 +109,10 @@ function pageNumberCss(style: PageNumberStyle): string {
       return 'counter(page, lower-roman)'
     case 'upper-roman':
       return 'counter(page, upper-roman)'
+    case 'alpha':
+      return 'counter(page, lower-alpha)'
+    case 'upper-alpha':
+      return 'counter(page, upper-alpha)'
     default:
       return ''
   }
@@ -209,6 +215,17 @@ export function applyChromeReserve<T extends { top: number; bottom: number }>(bo
   }
 }
 
+function toLowerAlpha(page: number): string {
+  let n = Math.max(1, Math.min(702, Math.floor(page)))
+  let out = ''
+  while (n > 0) {
+    n -= 1
+    out = String.fromCharCode(97 + (n % 26)) + out
+    n = Math.floor(n / 26)
+  }
+  return out
+}
+
 function toLowerRoman(page: number): string {
   const parts: Array<[number, string]> = [
     [1000, 'm'],
@@ -252,6 +269,10 @@ export function formatPageNumber(style: PageNumberStyle, page: number, total: nu
       return toLowerRoman(n)
     case 'upper-roman':
       return toLowerRoman(n).toUpperCase()
+    case 'alpha':
+      return toLowerAlpha(n)
+    case 'upper-alpha':
+      return toLowerAlpha(n).toUpperCase()
     default:
       return ''
   }
