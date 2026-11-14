@@ -33,6 +33,11 @@ function pixelAttr(raw: string): number | null {
     const n = Number(milli[1]) * 96 / 25.4
     return Number.isFinite(n) && n > 0 ? Math.round(n) : null
   }
+  const centi = /^(\d+(?:\.\d+)?)\s*cm$/i.exec(text)
+  if (centi) {
+    const n = Number(centi[1]) * 96 / 2.54
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : null
+  }
   const px = text.replace(/\s*px$/i, '')
   if (!px || /%/.test(px)) return null
   const n = Number(px)
