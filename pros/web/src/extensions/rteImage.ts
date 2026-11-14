@@ -38,6 +38,11 @@ function pixelAttr(raw: string): number | null {
     const n = Number(centi[1]) * 96 / 2.54
     return Number.isFinite(n) && n > 0 ? Math.round(n) : null
   }
+  const inch = /^(\d+(?:\.\d+)?)\s*in$/i.exec(text)
+  if (inch) {
+    const n = Number(inch[1]) * 96
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : null
+  }
   const px = text.replace(/\s*px$/i, '')
   if (!px || /%/.test(px)) return null
   const n = Number(px)
