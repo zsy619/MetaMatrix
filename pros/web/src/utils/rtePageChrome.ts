@@ -1,7 +1,7 @@
 /** 页眉、页脚、页码。旧文档没有这个字段时视为空，不改变版心。 */
 import { cssPageMargin, type PageMarginBox } from './rtePageMargin'
 
-export const PAGE_NUMBER_STYLES = ['none', 'n', 'page-n', 'page-n-of-m', 'dash', 'roman', 'upper-roman', 'alpha', 'upper-alpha'] as const
+export const PAGE_NUMBER_STYLES = ['none', 'n', 'page-n', 'page-n-of-m', 'dash', 'roman', 'upper-roman', 'alpha', 'upper-alpha', 'cjk'] as const
 
 export type PageNumberStyle = (typeof PAGE_NUMBER_STYLES)[number]
 
@@ -34,6 +34,7 @@ export const PAGE_NUMBER_OPTIONS: ReadonlyArray<{ id: PageNumberStyle; label: st
   { id: 'upper-roman', label: 'I, II, III' },
   { id: 'alpha', label: 'a, b, c' },
   { id: 'upper-alpha', label: 'A, B, C' },
+  { id: 'cjk', label: '一, 二, 三' },
 ]
 
 /** 页眉或页脚占用的最小边带。已有边距更大时不额外加高。 */
@@ -113,6 +114,8 @@ function pageNumberCss(style: PageNumberStyle): string {
       return 'counter(page, lower-alpha)'
     case 'upper-alpha':
       return 'counter(page, upper-alpha)'
+    case 'cjk':
+      return 'counter(page, cjk-ideographic)'
     default:
       return ''
   }
@@ -215,6 +218,26 @@ export function applyChromeReserve<T extends { top: number; bottom: number }>(bo
   }
 }
 
+function toCjk(page: number): string {
+  const digits = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九']
+  const n = Math.max(1, Math.min(9999, Math.floor(page)))
+  if (n < 10) return digits[n]!
+  if (n < 20) return n === 10 ? '十' : `十${digits[n - 10]}`
+  const chars = String(n).split('').map((item) => Number(item))
+  const units = ['', '十', '百', '千']
+  const parts: string[] = []
+  chars.forEach((digit, index) => {
+    const place = chars.length - 1 - index
+    if (digit === 0) {
+      if (parts.length && parts[parts.length - 1] !== '零' && index !== chars.length - 1) parts.push('零')
+      return
+    }
+    const head = place === 1 && digit === 1 && index === 0 ? '' : digits[digit]
+    parts.push(`${head}${units[place]}`)
+  })
+  return parts.join('').replace(/零+$/g, '')
+}
+
 function toLowerAlpha(page: number): string {
   let n = Math.max(1, Math.min(702, Math.floor(page)))
   let out = ''
@@ -273,6 +296,8 @@ export function formatPageNumber(style: PageNumberStyle, page: number, total: nu
       return toLowerAlpha(n)
     case 'upper-alpha':
       return toLowerAlpha(n).toUpperCase()
+    case 'cjk':
+      return toCjk(n)
     default:
       return ''
   }
