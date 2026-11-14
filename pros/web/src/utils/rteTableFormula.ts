@@ -329,7 +329,7 @@ type Node =
   | { k: 'cmp'; op: string; l: Node; r: Node }
   | { k: 'call'; name: string; args: Node[] }
 
-const FUNC_NAMES = new Set(['SUM', 'AVERAGE', 'COUNT', 'MAX', 'MIN'])
+const FUNC_NAMES = new Set(['SUM', 'AVERAGE', 'COUNT', 'MAX', 'MIN', 'IF'])
 
 class Parser {
   tokens: LexToken[]
@@ -420,9 +420,8 @@ class Parser {
         const args: Node[] = []
         if (this.peek()?.t !== 'rp') {
           for (;;) {
-            // 参数只能是单元格 / 区域 / 数字 / 嵌套函数，不允许二元运算，
-            // 否则 '=SUM(A1:B2)*2' 里的 '*' 会被吞进参数里。
-            args.push(this.parsePostfix())
+            // 括号里可以是加减和比较。括号外的 * 不会被吃进去，SUM(A1:B2)*2 仍然先求和再乘。
+            args.push(this.parseCompare())
             if (this.peek()?.t === 'comma') {
               this.next()
               continue
@@ -548,7 +547,17 @@ function cellsOf(node: Node, at: CellAddress): CellAddress[] | null {
   return null
 }
 
+function evalIf(args: Node[], ctx: Ctx, at: CellAddress): EvalValue {
+  if (args.length < 2 || args.length > 3) return { error: '#VALUE!' }
+  const cond = evalNode(args[0]!, ctx, at)
+  if (isError(cond)) return cond
+  const chosen = cond !== 0 ? args[1] : args[2]
+  if (!chosen) return 0
+  return evalNode(chosen, ctx, at)
+}
+
 function evalCall(name: string, args: Node[], ctx: Ctx, at: CellAddress): EvalValue {
+  if (name === 'IF') return evalIf(args, ctx, at)
   const values: number[] = []
   for (const arg of args) {
     const cells = cellsOf(arg, at)
