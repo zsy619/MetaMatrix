@@ -333,6 +333,13 @@ function borderStyleOf(value: unknown): ColumnBorderStyle {
   return 'dashed'
 }
 
+function borderColorOf(value: unknown): string {
+  const text = String(value || '').trim()
+  if (/^#[0-9a-fA-F]{3,8}$/.test(text)) return text
+  if (/^rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}(?:\s*,\s*(?:0|1|0?\.\d+))?\s*\)$/i.test(text)) return text
+  return '#c9cdd4'
+}
+
 /** 分栏外框样式。用变量写进节点，避免全局 !important 把边框写死。 */
 export function columnsFrameVars(attrs: ColumnFrameAttrs): string {
   const gap = clampNum(attrs.gap, 16, 0, 64)
@@ -341,7 +348,7 @@ export function columnsFrameVars(attrs: ColumnFrameAttrs): string {
   const padding = clampNum(attrs.padding, 10, 0, 48)
   const width = clampNum(attrs.borderWidth, 1, 0, 8)
   const style = borderStyleOf(attrs.borderStyle)
-  const color = /^#[0-9a-fA-F]{3,8}$/.test(String(attrs.borderColor || '')) ? String(attrs.borderColor) : '#c9cdd4'
+  const color = borderColorOf(attrs.borderColor)
   const border = style === 'none' || width === 0 ? 'none' : `${width}px ${style} ${color}`
   return [
     `--rte-col-gap:${gap}px`,

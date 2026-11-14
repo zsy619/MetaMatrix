@@ -59,6 +59,18 @@ function columnTexts(ed: Editor): string[][] {
 }
 
 describe('分栏装入选区和栏数', () => {
+  it('分栏边框可以用 rgb 颜色', () => {
+    const ed = mount('<p>甲</p><p>乙</p>')
+    ed.commands.setTextSelection({ from: textPos(ed, '甲', 'start'), to: textPos(ed, '乙', 'end') })
+    ed.chain().focus().setColumns(2).run()
+    const columns = ed.state.doc.firstChild
+    expect(columns?.type.name).toBe('columns')
+    ed.view.dispatch(
+      ed.state.tr.setNodeMarkup(0, undefined, { ...columns!.attrs, borderColor: 'rgb(91, 140, 255)', borderStyle: 'solid' }),
+    )
+    expect(ed.getHTML()).toContain('rgb(91, 140, 255)')
+  })
+
   it('四段分三栏时每一栏都有字', () => {
     const ed = mount('<p>甲</p><p>乙</p><p>丙</p><p>丁</p>')
     ed.commands.setTextSelection({ from: textPos(ed, '甲', 'start'), to: textPos(ed, '丁', 'end') })
