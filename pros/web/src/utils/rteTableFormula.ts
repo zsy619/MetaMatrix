@@ -47,6 +47,21 @@ export function parseCellAddress(text: string): CellAddress | null {
   return { col, row }
 }
 
+/** 中文输入法打出来的全角括号、冒号和百分号，收成公式认得的符号。 */
+export function normalizeFormulaPunctuation(text: string): string {
+  return text
+    .replace(/\u00a0|\u3000/g, ' ')
+    .replace(/\uFF08/g, '(')
+    .replace(/\uFF09/g, ')')
+    .replace(/\uFF1A/g, ':')
+    .replace(/\uFF0C/g, ',')
+    .replace(/\uFF05/g, '%')
+    .replace(/\uFF0B/g, '+')
+    .replace(/\uFF0D/g, '-')
+    .replace(/\u00D7/g, '*')
+    .replace(/\u00F7/g, '/')
+}
+
 /** 公式里提到的单元格和区域，按出现顺序去重。 */
 export function formulaReferences(formula: string): string[] {
   const body = String(formula ?? '').trim().replace(/^=/, '')
@@ -90,8 +105,9 @@ export function remapFormulaByAxis(
   mapRow: (row: number) => number | null,
   mapCol: (col: number) => number | null,
 ): string {
-  const raw = String(formula ?? '')
-  if (!raw.trim().startsWith('=')) return raw
+  const source = String(formula ?? '')
+  if (!source.trim().startsWith('=')) return source
+  const raw = normalizeFormulaPunctuation(source)
   const held: string[] = []
   const ranged = raw.replace(
     /(\$?)([A-Za-z]{1,3})(\$?)([1-9][0-9]*):(\$?)([A-Za-z]{1,3})(\$?)([1-9][0-9]*)/g,
@@ -604,7 +620,7 @@ function evalNode(node: Node, ctx: Ctx, at: CellAddress): EvalValue {
 
 /** 求公式主体（不含前导 =）。抛 FormulaError 表示公式非法。 */
 function evalFormulaText(body: string, ctx: Ctx, at: CellAddress): EvalValue {
-  const text = String(body ?? '').trim().replace(/\$/g, '')
+  const text = normalizeFormulaPunctuation(String(body ?? '')).trim().replace(/\$/g, '')
   if (!text) throw new FormulaError('#VALUE!')
   const node = parseFormula(text)
   return evalNode(node, ctx, at)
