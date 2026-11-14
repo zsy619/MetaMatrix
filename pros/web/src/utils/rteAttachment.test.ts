@@ -36,6 +36,8 @@ describe('附件链接', () => {
     expect(isAttachmentAnchor('https://files.example.com/说明.rtf', '说明', 'rte-link')).toBe(true)
     expect(isAttachmentAnchor('https://files.example.com/文稿.odt', '文稿', 'rte-link')).toBe(true)
     expect(attachmentKind('说明.rtf', '')).toBe('text')
+    expect(attachmentKind('宏.docm', '')).toBe('doc')
+    expect(isAttachmentAnchor('https://files.example.com/宏.docm', '宏', 'rte-link')).toBe(true)
     expect(isAttachmentAnchor('https://files.example.com/readme.md', '说明', 'rte-link')).toBe(false)
   })
 

@@ -30,7 +30,7 @@ export function attachmentKind(name: string, mime: string): AttachmentKind {
   if (type.startsWith('image/') || /\.(png|jpe?g|gif|webp|bmp|svg)$/.test(fileName)) return 'image'
   if (type === 'application/pdf' || fileName.endsWith('.pdf')) return 'pdf'
   if (type.includes('wordprocessingml') || fileName.endsWith('.docx')) return 'docx'
-  if (type === 'application/msword' || fileName.endsWith('.doc')) return 'doc'
+  if (type === 'application/msword' || fileName.endsWith('.doc') || fileName.endsWith('.docm')) return 'doc'
   if (
     type.includes('spreadsheet')
     || type.includes('excel')
