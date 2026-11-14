@@ -1500,6 +1500,15 @@ function seriesLabelAt(
   return label
 }
 
+function seriesStepAt(option: Record<string, unknown>, index: number): true | 'start' | 'middle' | 'end' | undefined {
+  const series = option.series
+  if (!Array.isArray(series)) return undefined
+  const item = series[index]
+  if (!isPlainObject(item)) return undefined
+  if (item.step === true || item.step === 'start' || item.step === 'middle' || item.step === 'end') return item.step
+  return undefined
+}
+
 function seriesBarMeasure(option: Record<string, unknown>, index: number, key: 'barWidth' | 'barMaxWidth'): string | number | undefined {
   const series = option.series
   if (!Array.isArray(series)) return undefined
@@ -1653,6 +1662,7 @@ function buildCartesianOption(
     label?: { show: true; position?: string; formatter?: string }
     barWidth?: string | number
     barMaxWidth?: string | number
+    step?: true | 'start' | 'middle' | 'end'
   }>,
   horizontal = false,
   names?: { category?: string; value?: string },
@@ -1697,6 +1707,7 @@ function buildCartesianOption(
       ...(item.label ? { label: item.label } : {}),
       ...(item.barWidth != null ? { barWidth: item.barWidth } : {}),
       ...(item.barMaxWidth != null ? { barMaxWidth: item.barMaxWidth } : {}),
+      ...(item.step != null ? { step: item.step } : {}),
       smooth: type === 'line' ? looks?.[index]?.straight !== true : undefined,
       areaStyle:
         type === 'line' && (looks?.[index] ? looks[index]!.filled : true) ? { opacity: 0.12 } : undefined,
@@ -1926,6 +1937,7 @@ export function retypeEchartsOption(
         label: seriesLabelAt(base, index),
         barWidth: seriesBarMeasure(base, index, 'barWidth'),
         barMaxWidth: seriesBarMeasure(base, index, 'barMaxWidth'),
+        step: seriesStepAt(base, index),
       })),
       categoryOnYAxis(base),
       cartesianAxisNames(base),
