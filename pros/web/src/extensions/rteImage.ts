@@ -48,6 +48,11 @@ function pixelAttr(raw: string): number | null {
     const n = Number(pica[1]) * 16
     return Number.isFinite(n) && n > 0 ? Math.round(n) : null
   }
+  const quarter = /^(\d+(?:\.\d+)?)\s*q$/i.exec(text)
+  if (quarter) {
+    const n = (Number(quarter[1]) * 24) / 25.4
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : null
+  }
   const px = text.replace(/\s*px$/i, '')
   if (!px || /%/.test(px)) return null
   const n = Number(px)

@@ -168,6 +168,20 @@ describe('图片边框和圆角', () => {
     expect(editor.getHTML()).toContain('width="320"')
   })
 
+  it('宽度写成 40q 时按 38 像素留下', () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    editor = new Editor({
+      element: host,
+      extensions: [
+        StarterKit.configure({ dropcursor: false }),
+        RteImage.configure({ inline: false, allowBase64: true, HTMLAttributes: { class: 'rte-image' } }),
+      ],
+      content: `<img src="${PIXEL}" width="40q" alt="级">`,
+    })
+    expect(editor.getHTML()).toContain('width="38"')
+  })
+
   it('宽度写成 3pc 时按 48 像素留下', () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
