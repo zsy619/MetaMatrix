@@ -39,7 +39,7 @@ export function attachmentKind(name: string, mime: string): AttachmentKind {
     return 'sheet'
   }
   if (type.startsWith('audio/') || /\.(mp3|wav|m4a|aac|ogg|flac)$/.test(fileName)) return 'audio'
-  if (type.startsWith('video/') || /\.(mp4|webm|mov|m4v|ogv)$/.test(fileName)) return 'video'
+  if (type.startsWith('video/') || /\.(mp4|webm|mov|m4v|ogv|mkv|avi)$/.test(fileName)) return 'video'
   if (
     type.startsWith('text/')
     || type === 'application/json'
