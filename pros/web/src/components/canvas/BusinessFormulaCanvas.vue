@@ -587,13 +587,13 @@ onUnmounted(() => {
                     <circle
                       :cx="link.badgeX"
                       :cy="link.badgeY"
-                      r="14"
+                      r="18"
                       class="bf-op-circle"
                       :class="opCircleClass(link.op)"
                     />
                     <text
                       :x="link.badgeX"
-                      :y="link.badgeY + 5"
+                      :y="link.badgeY + 6"
                       text-anchor="middle"
                       class="bf-op-text"
                     >{{ link.op }}</text>
@@ -668,7 +668,8 @@ onUnmounted(() => {
 }
 
 .bf-sidebar {
-  width: 320px;
+  width: 360px;
+  min-width: 0;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -689,20 +690,20 @@ onUnmounted(() => {
 }
 
 .bf-logo-mark {
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
   display: grid;
   place-items: center;
   background: #f1f3f4;
   color: #202124;
   font-weight: 800;
-  font-size: 14px;
+  font-size: 18px;
 }
 
 .bf-logo h1 {
   margin: 0;
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 800;
   color: #202124;
   letter-spacing: 0.01em;
@@ -710,9 +711,9 @@ onUnmounted(() => {
 
 .bf-sub {
   margin: 8px 0 0;
-  font-size: 12px;
-  color: #9aa0a6;
-  line-height: 1.4;
+  font-size: 14px;
+  color: #5f6368;
+  line-height: 1.45;
 }
 
 .bf-sidebar-content {
@@ -733,18 +734,18 @@ onUnmounted(() => {
   justify-content: space-between;
   gap: 8px;
   margin-bottom: 8px;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 700;
-  color: #5f6368;
+  color: #3c4043;
 }
 
 .bf-count {
-  font-size: 11px;
-  font-weight: 600;
-  color: #9aa0a6;
+  font-size: 13px;
+  font-weight: 650;
+  color: #5f6368;
   background: #f1f3f4;
   border-radius: 999px;
-  padding: 1px 7px;
+  padding: 2px 8px;
 }
 
 .bf-label-actions {
@@ -756,9 +757,11 @@ onUnmounted(() => {
   border: 1px solid var(--cv-frame, #ececec);
   background: #ffffff;
   color: #202124;
-  border-radius: 4px;
-  padding: 3px 8px;
-  font-size: 12px;
+  border-radius: 8px;
+  min-height: 32px;
+  padding: 6px 12px;
+  font-size: 14px;
+  font-weight: 650;
   cursor: pointer;
 }
 
@@ -791,14 +794,14 @@ onUnmounted(() => {
 .bf-search {
   flex: 1;
   min-width: 0;
-  height: 30px;
+  height: 40px;
   box-sizing: border-box;
   border: 1px solid var(--cv-frame, #ececec);
-  border-radius: 4px;
+  border-radius: 8px;
   background: #fafafa;
   color: #202124;
-  padding: 0 10px;
-  font-size: 12px;
+  padding: 0 12px;
+  font-size: 15px;
 }
 
 .bf-search:focus {
@@ -812,11 +815,12 @@ onUnmounted(() => {
   flex-shrink: 0;
   border: 1px solid var(--cv-frame, #ececec);
   background: #ffffff;
-  color: #5f6368;
-  border-radius: 4px;
-  height: 30px;
-  padding: 0 8px;
-  font-size: 11px;
+  color: #3c4043;
+  border-radius: 8px;
+  height: 40px;
+  padding: 0 12px;
+  font-size: 14px;
+  font-weight: 650;
   cursor: pointer;
 }
 
@@ -827,6 +831,8 @@ onUnmounted(() => {
 .bf-chip-row {
   display: flex;
   gap: 6px;
+  max-width: 100%;
+  min-width: 0;
   overflow-x: auto;
   padding-bottom: 6px;
   scrollbar-width: thin;
@@ -840,10 +846,11 @@ onUnmounted(() => {
   flex-shrink: 0;
   border: 1px solid #e8eaed;
   background: #fafafa;
-  color: #5f6368;
+  color: #3c4043;
   border-radius: 999px;
-  padding: 4px 10px;
-  font-size: 11px;
+  min-height: 34px;
+  padding: 6px 12px;
+  font-size: 14px;
   line-height: 1.2;
   cursor: pointer;
   white-space: nowrap;
@@ -871,8 +878,8 @@ onUnmounted(() => {
 .bf-template-grid {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
-  gap: 6px;
-  max-height: 260px;
+  gap: 8px;
+  max-height: 360px;
   overflow: auto;
   padding-right: 2px;
 }
@@ -881,15 +888,17 @@ onUnmounted(() => {
   border: 1px solid #e8eaed;
   background: #fafafa;
   color: #202124;
-  border-radius: 4px;
-  padding: 6px 4px;
-  font-size: 11px;
+  border-radius: 8px;
+  min-height: 68px;
+  padding: 8px 6px;
+  font-size: 14px;
   line-height: 1.25;
   cursor: pointer;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  justify-content: center;
+  gap: 4px;
   text-align: center;
 }
 
@@ -906,29 +915,31 @@ onUnmounted(() => {
 }
 
 .bf-emoji {
-  font-size: 14px;
+  font-size: 18px;
   line-height: 1;
 }
 
 .bf-template-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   max-width: 100%;
+  white-space: normal;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .bf-textarea {
   width: 100%;
-  min-height: 140px;
+  min-height: 168px;
   box-sizing: border-box;
   resize: vertical;
   border: 1px solid var(--cv-frame, #ececec);
-  border-radius: 4px;
+  border-radius: 8px;
   background: #fafafa;
   color: #202124;
-  padding: 10px;
-  font-size: 12px;
-  line-height: 1.5;
+  padding: 12px;
+  font-size: 15px;
+  line-height: 1.65;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
@@ -942,7 +953,7 @@ onUnmounted(() => {
 .bf-max-hint {
   margin: 0 0 8px;
   color: #5f6368;
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .bf-textarea-overlay {
@@ -981,15 +992,20 @@ onUnmounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 11px;
+  font-size: 14px;
 }
 
 .bf-saved-del {
-  color: #d93025;
+  color: #c5221f;
   margin-left: 6px;
   flex-shrink: 0;
-  font-size: 12px;
-  opacity: 0.75;
+  min-width: 28px;
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 700;
 }
 
 .bf-saved-btn:hover .bf-saved-del {
@@ -998,8 +1014,8 @@ onUnmounted(() => {
 
 .bf-empty {
   margin: 0;
-  font-size: 12px;
-  color: #9aa0a6;
+  font-size: 14px;
+  color: #5f6368;
   line-height: 1.5;
 }
 
@@ -1023,9 +1039,10 @@ onUnmounted(() => {
 
 .bf-primary {
   border: none;
-  border-radius: 4px;
-  padding: 11px 12px;
-  font-size: 13px;
+  border-radius: 8px;
+  min-height: 46px;
+  padding: 12px 14px;
+  font-size: 16px;
   font-weight: 700;
   cursor: pointer;
   background: var(--cv-focus, #1c4c7c);
@@ -1039,13 +1056,14 @@ onUnmounted(() => {
 
 .bf-secondary {
   border: 1px solid var(--cv-frame, #ececec);
-  border-radius: 4px;
-  padding: 8px 12px;
-  font-size: 12px;
-  font-weight: 600;
+  border-radius: 8px;
+  min-height: 40px;
+  padding: 8px 14px;
+  font-size: 15px;
+  font-weight: 650;
   cursor: pointer;
   background: #ffffff;
-  color: #5f6368;
+  color: #3c4043;
 }
 
 .bf-secondary:hover {
@@ -1065,6 +1083,7 @@ onUnmounted(() => {
 .bf-toolbar {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   padding: 10px 12px;
   border-bottom: 1px solid #e8eaed;
@@ -1080,15 +1099,16 @@ onUnmounted(() => {
 .bf-tool-btn {
   border: 1px solid var(--cv-frame, #ececec);
   background: #ffffff;
-  color: #5f6368;
-  border-radius: 4px;
-  min-width: 40px;
-  height: 32px;
-  padding: 0 8px;
+  color: #3c4043;
+  border-radius: 8px;
+  min-width: 44px;
+  height: 40px;
+  padding: 0 12px;
   display: grid;
   place-items: center;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 15px;
+  font-weight: 650;
 }
 
 .bf-tool-btn:hover,
@@ -1102,10 +1122,10 @@ onUnmounted(() => {
   border: 1px solid var(--cv-frame, #ececec);
   background: #ffffff;
   color: #202124;
-  border-radius: 4px;
-  height: 32px;
-  padding: 0 10px;
-  font-size: 13px;
+  border-radius: 8px;
+  height: 40px;
+  padding: 0 12px;
+  font-size: 15px;
 }
 
 .bf-diagram {
@@ -1134,8 +1154,8 @@ onUnmounted(() => {
 
 .bf-node-text {
   fill: #202124;
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 16px;
+  font-weight: 650;
 }
 
 .bf-op-circle {
@@ -1171,7 +1191,7 @@ onUnmounted(() => {
 
 .bf-op-text {
   fill: #202124;
-  font-size: 14px;
+  font-size: 18px;
   font-weight: 800;
 }
 
@@ -1188,10 +1208,11 @@ onUnmounted(() => {
 @media (max-width: 900px) {
   .bf-canvas {
     flex-direction: column;
+    overflow-x: hidden;
   }
   .bf-sidebar {
     width: 100%;
-    max-height: 42vh;
+    max-height: 46vh;
     border-right: none;
     border-bottom: 1px solid var(--cv-frame, #ececec);
   }
