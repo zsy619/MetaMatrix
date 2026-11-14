@@ -15,6 +15,8 @@ import {
   filterTemplateButtons,
   buildDiagramModel,
   formatFormulaText,
+  NODE_H,
+  NODE_W,
   nodeRectAttrs,
   nodeTextAttrs,
   opCircleClass,
@@ -67,9 +69,16 @@ const filteredSavedFormulas = computed(() => {
 
 const showSavedSearch = computed(() => savedFormulas.value.length > 3)
 
+const narrowDiagram = ref(false)
+const layoutTouched = ref(false)
+
+const effectiveLayout = computed<LayoutDirection>(() =>
+  narrowDiagram.value && !layoutTouched.value ? 'vertical' : layout.value,
+)
+
 const diagram = computed(() => {
   renderTick.value
-  return buildDiagramModel(formulaText.value, layout.value, crossCenter.value)
+  return buildDiagramModel(formulaText.value, effectiveLayout.value, crossCenter.value)
 })
 
 const viewportTransform = computed(
@@ -126,9 +135,13 @@ function onFormulaInput() {
 }
 
 function setLayout(dir: LayoutDirection) {
+  layoutTouched.value = true
   layout.value = dir
   persist()
-  nextTick(() => resetView())
+  nextTick(() => {
+    measureCenter()
+    resetView()
+  })
 }
 
 function setPalette(name: PaletteName) {
@@ -175,10 +188,52 @@ function deleteSaved(index: number, e: Event) {
 }
 
 function resetView() {
+  const host = diagramHost.value
+  const nodes = diagram.value?.nodes ?? []
+  if (host && host.clientWidth > 0 && host.clientWidth < 720 && nodes.length > 0) {
+    const pad = 28
+    let minX = Infinity
+    let minY = Infinity
+    let maxX = -Infinity
+    let maxY = -Infinity
+    for (const node of nodes) {
+      minX = Math.min(minX, node.x)
+      maxX = Math.max(maxX, node.x + NODE_W)
+      minY = Math.min(minY, node.y - NODE_H / 2)
+      maxY = Math.max(maxY, node.y + NODE_H / 2)
+    }
+    minX -= 56
+    maxX += 28
+    minY -= 28
+    maxY += 28
+    const contentW = Math.max(1, maxX - minX)
+    const contentH = Math.max(1, maxY - minY)
+    const availW = Math.max(1, host.clientWidth - pad * 2)
+    const availH = Math.max(1, host.clientHeight - pad * 2)
+    const next = Math.max(0.2, Math.min(1, availW / contentW, availH / contentH))
+    scale.value = next
+    translate.value = {
+      x: pad + (availW - contentW * next) / 2 - minX * next,
+      y: pad + (availH - contentH * next) / 2 - minY * next,
+    }
+    return
+  }
   scale.value = 0.8
   translate.value = {
-    x: layout.value === 'horizontal' ? 50 : 0,
+    x: effectiveLayout.value === 'horizontal' ? 50 : 0,
     y: 100,
+  }
+}
+
+function syncNarrowDiagram() {
+  narrowDiagram.value = window.innerWidth < 900
+}
+
+function onResize() {
+  syncNarrowDiagram()
+  if (narrowDiagram.value) {
+    measureCenter()
+    resetView()
   }
 }
 
@@ -228,7 +283,7 @@ function measureCenter() {
   if (!el) return
   const h = el.clientHeight || 800
   const w = el.clientWidth || 800
-  crossCenter.value = layout.value === 'horizontal' ? h / 2 : w / 2
+  crossCenter.value = effectiveLayout.value === 'horizontal' ? h / 2 : w / 2
 }
 
 function exportSvgImage() {
@@ -333,6 +388,8 @@ function exportSvgImage() {
 onMounted(() => {
   window.addEventListener('mousemove', onMouseMove)
   window.addEventListener('mouseup', onMouseUp)
+  window.addEventListener('resize', onResize)
+  syncNarrowDiagram()
   measureCenter()
   if (!formulaText.value.trim()) {
     formulaText.value = formatFormulaText(DEFAULT_FORMULA_TEXT)
@@ -349,6 +406,7 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('mousemove', onMouseMove)
   window.removeEventListener('mouseup', onMouseUp)
+  window.removeEventListener('resize', onResize)
 })
 </script>
 
@@ -519,7 +577,7 @@ onUnmounted(() => {
           <button
             type="button"
             class="bf-tool-btn"
-            :class="{ active: layout === 'horizontal' }"
+            :class="{ active: effectiveLayout === 'horizontal' }"
             title="横向布局"
             @click="setLayout('horizontal')"
           >
@@ -528,7 +586,7 @@ onUnmounted(() => {
           <button
             type="button"
             class="bf-tool-btn"
-            :class="{ active: layout === 'vertical' }"
+            :class="{ active: effectiveLayout === 'vertical' }"
             title="纵向布局"
             @click="setLayout('vertical')"
           >
@@ -1207,14 +1265,73 @@ onUnmounted(() => {
 
 @media (max-width: 900px) {
   .bf-canvas {
+    inset: 0;
     flex-direction: column;
-    overflow-x: hidden;
+    overflow: auto;
+    padding-bottom: 96px;
   }
+
+  .bf-main {
+    order: 1;
+  }
+
   .bf-sidebar {
+    order: 2;
     width: 100%;
-    max-height: 46vh;
+    height: auto;
+    max-height: none;
+    flex: 0 0 auto;
     border-right: none;
-    border-bottom: 1px solid var(--cv-frame, #ececec);
+    border-bottom: none;
+    border-top: 1px solid var(--cv-frame, #ececec);
+  }
+
+  .bf-sidebar-content {
+    overflow: visible;
+    flex: 0 0 auto;
+  }
+
+  .bf-template-grid {
+    grid-template-columns: 1fr 1fr;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .bf-template-label {
+    display: block;
+    overflow: visible;
+    -webkit-line-clamp: unset;
+    font-size: 15px;
+    line-height: 1.35;
+  }
+
+  .bf-chip-row {
+    flex-wrap: wrap;
+    overflow: visible;
+  }
+
+  .bf-chip {
+    white-space: normal;
+    min-height: 36px;
+  }
+
+  .bf-saved-name {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+  }
+
+  .bf-mini-btn {
+    min-height: 40px;
+  }
+
+  .bf-main {
+    flex: 0 0 auto;
+    min-height: 420px;
+  }
+
+  .bf-diagram {
+    min-height: 360px;
   }
 }
 </style>
