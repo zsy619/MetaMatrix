@@ -76,6 +76,10 @@ assert.equal(evaluateCellFormula('=$A$1', grid2, 0, 0), '1')
 assert.equal(evaluateCellFormula('=SUM($A$1:$B$1)', grid2, 0, 0), '3')
 
 // 求和区域比表格长时，多出来的格子跳过，不把整段算成 #REF!
+assert.equal(evaluateCellFormula('=CEILING(A1)', [['3.2']], 0, 0), '4')
+assert.equal(evaluateCellFormula('=CEILING(A1)', [['-1.2']], 0, 0), '-1')
+assert.equal(evaluateCellFormula('=CEILING(A1,B1)', [['7', '3']], 0, 0), '9')
+assert.deepEqual(evaluateFormula('=CEILING(A1,0)', [['7']], 0, 0), { ok: false, value: null, error: '#DIV/0!' })
 assert.equal(evaluateCellFormula('=SIGN(A1)', [['-4']], 0, 0), '-1')
 assert.equal(evaluateCellFormula('=SIGN(A1)', [['0']], 0, 0), '0')
 assert.equal(evaluateCellFormula('=SIGN(A1)', [['3.2']], 0, 0), '1')
