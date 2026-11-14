@@ -103,6 +103,8 @@ assert.equal(formatPageNumber('n', 2, 5), '2')
 assert.equal(formatPageNumber('page-n', 2, 5), '第 2 页')
 assert.equal(formatPageNumber('page-n-of-m', 2, 5), '第 2 页 共 5 页')
 assert.equal(formatPageNumber('dash', 2, 5), '- 2 -')
+assert.equal(formatPageNumber('roman', 4, 10), 'iv')
+assert.equal(formatPageNumber('roman', 9, 10), 'ix')
 const sideChrome = normalizePageChrome({ header: '奇数', headerEven: '偶数', footer: '', pageNumber: 'none' })
 assert.deepEqual(shiftGutterSide({ top: 10, right: 12, bottom: 10, left: 20 }, 8, 1), {
   top: 10,

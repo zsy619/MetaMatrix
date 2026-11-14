@@ -1,7 +1,7 @@
 /** 页眉、页脚、页码。旧文档没有这个字段时视为空，不改变版心。 */
 import { cssPageMargin, type PageMarginBox } from './rtePageMargin'
 
-export const PAGE_NUMBER_STYLES = ['none', 'n', 'page-n', 'page-n-of-m', 'dash'] as const
+export const PAGE_NUMBER_STYLES = ['none', 'n', 'page-n', 'page-n-of-m', 'dash', 'roman'] as const
 
 export type PageNumberStyle = (typeof PAGE_NUMBER_STYLES)[number]
 
@@ -30,6 +30,7 @@ export const PAGE_NUMBER_OPTIONS: ReadonlyArray<{ id: PageNumberStyle; label: st
   { id: 'page-n', label: '第 1 页' },
   { id: 'page-n-of-m', label: '第 1 页 共 n 页' },
   { id: 'dash', label: '- 1 -' },
+  { id: 'roman', label: 'i, ii, iii' },
 ]
 
 /** 页眉或页脚占用的最小边带。已有边距更大时不额外加高。 */
@@ -101,6 +102,8 @@ function pageNumberCss(style: PageNumberStyle): string {
       return '"第 " counter(page) " 页 共 " counter(pages) " 页"'
     case 'dash':
       return '"- " counter(page) " -"'
+    case 'roman':
+      return 'counter(page, lower-roman)'
     default:
       return ''
   }
@@ -203,6 +206,33 @@ export function applyChromeReserve<T extends { top: number; bottom: number }>(bo
   }
 }
 
+function toLowerRoman(page: number): string {
+  const parts: Array<[number, string]> = [
+    [1000, 'm'],
+    [900, 'cm'],
+    [500, 'd'],
+    [400, 'cd'],
+    [100, 'c'],
+    [90, 'xc'],
+    [50, 'l'],
+    [40, 'xl'],
+    [10, 'x'],
+    [9, 'ix'],
+    [5, 'v'],
+    [4, 'iv'],
+    [1, 'i'],
+  ]
+  let left = Math.max(1, Math.min(3999, Math.floor(page)))
+  let out = ''
+  for (const [value, glyph] of parts) {
+    while (left >= value) {
+      out += glyph
+      left -= value
+    }
+  }
+  return out
+}
+
 export function formatPageNumber(style: PageNumberStyle, page: number, total: number): string {
   const n = Math.max(1, Math.floor(page) || 1)
   const m = Math.max(n, Math.floor(total) || 1)
@@ -215,6 +245,8 @@ export function formatPageNumber(style: PageNumberStyle, page: number, total: nu
       return `第 ${n} 页 共 ${m} 页`
     case 'dash':
       return `- ${n} -`
+    case 'roman':
+      return toLowerRoman(n)
     default:
       return ''
   }
