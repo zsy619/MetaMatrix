@@ -330,7 +330,7 @@ type Node =
   | { k: 'cmp'; op: string; l: Node; r: Node }
   | { k: 'call'; name: string; args: Node[] }
 
-const FUNC_NAMES = new Set(['SUM', 'AVERAGE', 'COUNT', 'MAX', 'MIN', 'IF', 'ROUND', 'AND', 'OR', 'ABS', 'INT', 'MOD', 'POWER', 'SQRT', 'SIGN', 'CEILING', 'FLOOR', 'NOT', 'PRODUCT', 'MEDIAN', 'COUNTA', 'ROUNDUP', 'ROUNDDOWN', 'PI', 'EXP', 'LN', 'LOG', 'LOG10', 'FACT', 'GCD', 'LCM', 'TRUNC', 'QUOTIENT', 'EVEN', 'ODD', 'COMBIN'])
+const FUNC_NAMES = new Set(['SUM', 'AVERAGE', 'COUNT', 'MAX', 'MIN', 'IF', 'ROUND', 'AND', 'OR', 'ABS', 'INT', 'MOD', 'POWER', 'SQRT', 'SIGN', 'CEILING', 'FLOOR', 'NOT', 'PRODUCT', 'MEDIAN', 'COUNTA', 'ROUNDUP', 'ROUNDDOWN', 'PI', 'EXP', 'LN', 'LOG', 'LOG10', 'FACT', 'GCD', 'LCM', 'TRUNC', 'QUOTIENT', 'EVEN', 'ODD', 'COMBIN', 'PERMUT'])
 
 class Parser {
   tokens: LexToken[]
@@ -899,6 +899,19 @@ function evalCall(name: string, args: Node[], ctx: Ctx, at: CellAddress): EvalVa
     for (let i = 1; i <= k; i += 1) result = (result * (n - k + i)) / i
     const rounded = Math.round(result)
     return Number.isFinite(rounded) ? rounded : { error: '#VALUE!' }
+  }
+  if (name === 'PERMUT') {
+    if (args.length !== 2) return { error: '#VALUE!' }
+    const total = evalNode(args[0]!, ctx, at)
+    if (isError(total)) return total
+    const pick = evalNode(args[1]!, ctx, at)
+    if (isError(pick)) return pick
+    const n = Math.floor(total)
+    const k = Math.floor(pick)
+    if (n < 0 || k < 0 || k > n || n > 1000) return { error: '#VALUE!' }
+    let result = 1
+    for (let i = 0; i < k; i += 1) result *= n - i
+    return Number.isFinite(result) ? result : { error: '#VALUE!' }
   }
   if (name === 'ROUND') return evalRound(args, ctx, at)
   if (name === 'ROUNDUP') return evalRoundUp(args, ctx, at)
