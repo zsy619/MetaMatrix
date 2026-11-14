@@ -339,6 +339,22 @@ describe('ECharts 模板与表格生成', () => {
     expect(series[0]!.data).toEqual([1200, 0.5])
   })
 
+  it('换成折线后对数轴和底数还在', () => {
+    const next = retypeEchartsOption(
+      {
+        title: { text: '销售' },
+        xAxis: { type: 'category', data: ['一月', '二月'] },
+        yAxis: { type: 'log', logBase: 2, min: 1 },
+        series: [{ name: '今年', type: 'bar', data: [2, 8] }],
+      },
+      'line',
+    )
+    const yAxis = next.yAxis as { type?: string; logBase?: number; min?: number }
+    expect(yAxis.type).toBe('log')
+    expect(yAxis.logBase).toBe(2)
+    expect(yAxis.min).toBe(1)
+  })
+
   it('换成折线后数值轴的刻度间隔还在', () => {
     const next = retypeEchartsOption(
       {

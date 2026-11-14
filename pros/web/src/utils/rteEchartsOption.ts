@@ -531,6 +531,7 @@ const CHILD_KEYS: Record<string, readonly string[]> = {
     'max',
     'interval',
     'log',
+    'logBase',
     'inverse',
     'show',
     'position',
@@ -559,6 +560,7 @@ const CHILD_KEYS: Record<string, readonly string[]> = {
     'max',
     'interval',
     'log',
+    'logBase',
     'inverse',
     'show',
     'position',
@@ -1580,13 +1582,17 @@ function categoryLabelRotate(option: Record<string, unknown>): number | undefine
   return Math.max(-90, Math.min(90, rotate))
 }
 
-function valueAxisScale(option: Record<string, unknown>): { interval?: number; inverse?: boolean } {
+function valueAxisScale(option: Record<string, unknown>): { interval?: number; inverse?: boolean; log?: boolean; logBase?: number } {
   const axis = categoryOnYAxis(option) ? option.xAxis : option.yAxis
   const node = Array.isArray(axis) ? axis[0] : axis
   if (!isPlainObject(node)) return {}
-  const scale: { interval?: number; inverse?: boolean } = {}
+  const scale: { interval?: number; inverse?: boolean; log?: boolean; logBase?: number } = {}
   if (typeof node.interval === 'number' && Number.isFinite(node.interval) && node.interval > 0) scale.interval = node.interval
   if (node.inverse === true) scale.inverse = true
+  if (node.type === 'log') scale.log = true
+  if (typeof node.logBase === 'number' && Number.isFinite(node.logBase) && node.logBase > 0 && node.logBase !== 1) {
+    scale.logBase = node.logBase
+  }
   return scale
 }
 
@@ -1640,7 +1646,7 @@ function buildCartesianOption(
   looks?: Array<{ straight: boolean; filled: boolean } | null>,
   margins?: Record<string, unknown>,
   tip?: Record<string, unknown>,
-  scale?: { interval?: number; inverse?: boolean },
+  scale?: { interval?: number; inverse?: boolean; log?: boolean; logBase?: number },
 ): Record<string, unknown> {
   const category = {
     type: 'category' as const,
@@ -1650,12 +1656,13 @@ function buildCartesianOption(
     ...(categoryRotate != null ? { axisLabel: { rotate: categoryRotate } } : {}),
   }
   const value = {
-    type: 'value' as const,
+    type: scale?.log ? ('log' as const) : ('value' as const),
     name: names?.value || '数值',
     ...(bounds?.min != null ? { min: bounds.min } : {}),
     ...(bounds?.max != null ? { max: bounds.max } : {}),
     ...(scale?.interval != null ? { interval: scale.interval } : {}),
     ...(scale?.inverse ? { inverse: true } : {}),
+    ...(scale?.logBase != null ? { logBase: scale.logBase } : {}),
   }
   return {
     color: FEISHU_TEXT_COLORS.filter((item) => item !== '#1f2329' && item !== '#8f959e'),
