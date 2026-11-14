@@ -1500,6 +1500,20 @@ function seriesLabelAt(
   return label
 }
 
+function seriesBarMeasure(option: Record<string, unknown>, index: number, key: 'barWidth' | 'barMaxWidth'): string | number | undefined {
+  const series = option.series
+  if (!Array.isArray(series)) return undefined
+  const item = series[index]
+  if (!isPlainObject(item)) return undefined
+  const value = item[key]
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) return value
+  if (typeof value === 'string') {
+    const text = value.trim()
+    if (/^\d+(\.\d+)?(%|px)?$/.test(text)) return text
+  }
+  return undefined
+}
+
 function seriesColorAt(option: Record<string, unknown>, index: number): string | undefined {
   const series = option.series
   if (!Array.isArray(series)) return undefined
@@ -1637,6 +1651,8 @@ function buildCartesianOption(
     stack?: string
     color?: string
     label?: { show: true; position?: string; formatter?: string }
+    barWidth?: string | number
+    barMaxWidth?: string | number
   }>,
   horizontal = false,
   names?: { category?: string; value?: string },
@@ -1679,6 +1695,8 @@ function buildCartesianOption(
       ...(item.stack ? { stack: item.stack } : {}),
       ...(item.color ? { itemStyle: { color: item.color } } : {}),
       ...(item.label ? { label: item.label } : {}),
+      ...(item.barWidth != null ? { barWidth: item.barWidth } : {}),
+      ...(item.barMaxWidth != null ? { barMaxWidth: item.barMaxWidth } : {}),
       smooth: type === 'line' ? looks?.[index]?.straight !== true : undefined,
       areaStyle:
         type === 'line' && (looks?.[index] ? looks[index]!.filled : true) ? { opacity: 0.12 } : undefined,
@@ -1906,6 +1924,8 @@ export function retypeEchartsOption(
         stack: seriesStackAt(base, index),
         color: seriesColorAt(base, index),
         label: seriesLabelAt(base, index),
+        barWidth: seriesBarMeasure(base, index, 'barWidth'),
+        barMaxWidth: seriesBarMeasure(base, index, 'barMaxWidth'),
       })),
       categoryOnYAxis(base),
       cartesianAxisNames(base),

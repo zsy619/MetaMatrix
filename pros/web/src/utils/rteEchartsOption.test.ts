@@ -339,6 +339,23 @@ describe('ECharts 模板与表格生成', () => {
     expect(series[0]!.data).toEqual([1200, 0.5])
   })
 
+  it('换成折线再换回柱状图后柱宽还在', () => {
+    const line = retypeEchartsOption(
+      {
+        title: { text: '销售' },
+        xAxis: { type: 'category', data: ['一月', '二月'] },
+        yAxis: { type: 'value' },
+        series: [{ name: '今年', type: 'bar', barWidth: '40%', barMaxWidth: 28, data: [2, 8] }],
+      },
+      'line',
+    )
+    const back = retypeEchartsOption(line, 'bar')
+    const series = back.series as Array<{ type?: string; barWidth?: string; barMaxWidth?: number }>
+    expect(series[0]?.type).toBe('bar')
+    expect(series[0]?.barWidth).toBe('40%')
+    expect(series[0]?.barMaxWidth).toBe(28)
+  })
+
   it('换成折线后对数轴和底数还在', () => {
     const next = retypeEchartsOption(
       {
