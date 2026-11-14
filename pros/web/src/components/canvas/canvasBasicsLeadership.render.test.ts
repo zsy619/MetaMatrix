@@ -69,6 +69,7 @@ describe('三环分析法画布组件', () => {
 
     const regions = wrapper.findAll('[data-region-id]')
     expect(regions).toHaveLength(13)
+    expect(wrapper.findAll('.trb-card-title')).toHaveLength(13)
   })
 
   it('在区域里填写内容后写回文档 JSON', async () => {

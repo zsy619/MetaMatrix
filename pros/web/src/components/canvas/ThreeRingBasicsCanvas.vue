@@ -97,6 +97,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="trb-canvas" :style="chrome" aria-label="苦练基本功三环分析法画布">
+    <div class="trb-board">
     <div class="trb-stage">
       <svg
         class="trb-svg"
@@ -208,24 +209,27 @@ onBeforeUnmount(() => {
           </template>
         </g>
       </svg>
+    </div>
 
-      <!-- 用户可填写区域 -->
-      <div
-        v-for="r in placedRegions"
-        :key="`ed-${r.id}`"
-        class="trb-region"
-        :style="{
-          left: r.left,
-          top: r.top,
-          width: r.width,
-        }"
-      >
-        <CanvasRegionEditor
-          :block-id="r.id"
-          :title="r.title"
-          :items="r.items"
-          :placeholder="`填写${r.title}`"
-        />
+      <div class="trb-regions">
+        <section
+          v-for="r in placedRegions"
+          :key="`ed-${r.id}`"
+          class="trb-region"
+          :style="{
+            left: r.left,
+            top: r.top,
+            width: r.width,
+          }"
+        >
+          <h3 class="trb-card-title">{{ r.title }}</h3>
+          <CanvasRegionEditor
+            :block-id="r.id"
+            :title="r.title"
+            :items="r.items"
+            :placeholder="`填写${r.title}`"
+          />
+        </section>
       </div>
     </div>
   </div>
@@ -244,12 +248,23 @@ onBeforeUnmount(() => {
     sans-serif;
 }
 
-.trb-stage {
+.trb-board {
   position: relative;
   flex: 0 0 auto;
   margin: auto;
   width: min(100%, 1040px);
+}
+
+.trb-stage {
+  position: relative;
+  width: 100%;
   aspect-ratio: 1000 / 900;
+}
+
+.trb-regions {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
 }
 
 .trb-svg {
@@ -270,5 +285,92 @@ onBeforeUnmount(() => {
   position: absolute;
   z-index: 2;
   box-sizing: border-box;
+  pointer-events: auto;
+}
+
+.trb-card-title {
+  display: none;
+  margin: 0;
+}
+
+@media (max-width: 800px) {
+  .trb-canvas {
+    display: block;
+    padding: 12px 12px 96px;
+  }
+
+  .trb-board {
+    width: 100%;
+    margin: 0;
+  }
+
+  .trb-regions {
+    position: static;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 14px;
+    pointer-events: auto;
+  }
+
+  .trb-region {
+    position: static;
+    left: auto;
+    top: auto;
+    width: auto !important;
+    padding: 12px 12px 10px;
+    border: 1px solid var(--cv-frame, #ececec);
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 8px 20px rgba(62, 48, 28, 0.06);
+  }
+
+  .trb-card-title {
+    display: block;
+    margin: 0 0 8px;
+    font-size: 16px;
+    font-weight: 750;
+    line-height: 1.35;
+    color: var(--cv-ink-strong, #202124);
+  }
+
+  .trb-region :deep(.region-editor) {
+    border: none;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .trb-region :deep(.region-toolbar) {
+    opacity: 1;
+    top: 8px;
+    right: 8px;
+  }
+
+  .trb-region :deep(.region-max-btn) {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+  }
+
+  .trb-region :deep(.region-input) {
+    min-height: 72px;
+    max-height: none;
+    overflow: visible;
+    padding: 4px 48px 4px 2px;
+    font-size: 15px;
+    line-height: 1.55;
+    white-space: normal;
+  }
+
+  .trb-region :deep(.region-input.is-blank) {
+    max-height: none;
+    white-space: normal;
+  }
+
+  .trb-region :deep(.region-input.is-blank::before) {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+  }
 }
 </style>
