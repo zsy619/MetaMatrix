@@ -32,6 +32,7 @@ describe('附件链接', () => {
     expect(isAttachmentAnchor('https://files.example.com/讲解.mp3', '讲解', 'rte-link')).toBe(true)
     expect(isAttachmentAnchor('https://files.example.com/预算.csv', '预算', 'rte-link')).toBe(true)
     expect(isAttachmentAnchor('https://files.example.com/汇报.pptx', '汇报', 'rte-link')).toBe(true)
+    expect(isAttachmentAnchor('https://files.example.com/汇报.ppsx', '放映', 'rte-link')).toBe(true)
     expect(isAttachmentAnchor('https://files.example.com/readme.md', '说明', 'rte-link')).toBe(false)
   })
 
