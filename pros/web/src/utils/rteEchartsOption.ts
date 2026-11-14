@@ -1659,10 +1659,10 @@ function legendLayout(option: Record<string, unknown>): Record<string, unknown> 
   return place
 }
 
-function axisNameLayout(axis: unknown): { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string; weight?: string | number } {
+function axisNameLayout(axis: unknown): { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique' } {
   const node = Array.isArray(axis) ? axis[0] : axis
   if (!isPlainObject(node)) return {}
-  const place: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string; weight?: string | number } = {}
+  const place: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique' } = {}
   if (node.nameLocation === 'start' || node.nameLocation === 'middle' || node.nameLocation === 'end') {
     place.location = node.nameLocation
   }
@@ -1689,22 +1689,25 @@ function axisNameLayout(axis: unknown): { location?: 'start' | 'middle' | 'end';
       const next = Math.round(weight)
       if (next >= 100 && next <= 900) place.weight = next
     }
+    const slant = style.fontStyle
+    if (slant === 'normal' || slant === 'italic' || slant === 'oblique') place.slant = slant
   }
   return place
 }
 
-function axisNameTextStyle(place?: { font?: number; ink?: string; weight?: string | number }): { fontSize?: number; color?: string; fontWeight?: string | number } | undefined {
-  if (!place || (place.font == null && !place.ink && place.weight == null)) return undefined
+function axisNameTextStyle(place?: { font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique' }): { fontSize?: number; color?: string; fontWeight?: string | number; fontStyle?: 'normal' | 'italic' | 'oblique' } | undefined {
+  if (!place || (place.font == null && !place.ink && place.weight == null && !place.slant)) return undefined
   return {
     ...(place.font != null ? { fontSize: place.font } : {}),
     ...(place.ink ? { color: place.ink } : {}),
     ...(place.weight != null ? { fontWeight: place.weight } : {}),
+    ...(place.slant ? { fontStyle: place.slant } : {}),
   }
 }
 
 function cartesianNameLayout(option: Record<string, unknown>): {
-  category: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string; weight?: string | number }
-  value: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string; weight?: string | number }
+  category: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique' }
+  value: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique' }
 } {
   const horizontal = categoryOnYAxis(option)
   return {
@@ -1880,8 +1883,8 @@ function buildCartesianOption(
   scale?: { interval?: number; minInterval?: number; inverse?: boolean; log?: boolean; logBase?: number; fromData?: boolean; side?: 'left' | 'right' | 'top' | 'bottom'; shift?: number; hidden?: boolean; parts?: number },
   boundaryGap?: boolean,
   namePlace?: {
-    category: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string; weight?: string | number }
-    value: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string; weight?: string | number }
+    category: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique' }
+    value: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique' }
   },
   hideValueSplitLine = false,
   hideCategoryAxisLine = false,
