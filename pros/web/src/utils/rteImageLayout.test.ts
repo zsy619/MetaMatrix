@@ -6,6 +6,7 @@ import {
   imageDropKind,
   insertPosAfterDelete,
   normalizeImageAlign,
+  imageLinkHref,
   normalizeImageLayout,
   placementActive,
   sameImageDrop,
@@ -18,6 +19,10 @@ assert.equal(normalizeImageAlign('left'), 'left')
 assert.equal(normalizeImageLayout(undefined), 'block')
 assert.equal(normalizeImageLayout(null, 'left'), 'wrap-left')
 assert.equal(normalizeImageLayout('wrap-right'), 'wrap-right')
+assert.equal(imageLinkHref('https://example.com/doc'), 'https://example.com/doc')
+assert.equal(imageLinkHref('/media/abc-1'), '/media/abc-1')
+assert.equal(imageLinkHref('javascript:alert(1)'), null)
+assert.equal(imageLinkHref('https://user:pass@example.com/a'), null)
 assert.equal(placementActive(undefined, undefined, { align: 'center', layout: 'block' }), true)
 assert.equal(placementActive('left', 'block', { align: 'left', layout: 'block' }), true)
 assert.equal(placementActive('left', 'wrap-left', { align: 'left', layout: 'block' }), false)

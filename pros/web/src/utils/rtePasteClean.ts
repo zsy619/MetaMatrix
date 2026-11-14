@@ -1,4 +1,5 @@
 /** 飞书日常编辑：粘贴清洗与裸链接识别。保留标题、列表、强调和安全颜色。 */
+import { imageLinkHref } from './rteImageLayout'
 
 export const FEISHU_TEXT_COLORS = [
   '#1f2329',
@@ -216,6 +217,8 @@ function rebuildPasted(node: Node, doc: Document): Node | null {
     parent.setAttribute('src', src)
     const alt = (el.getAttribute('alt') || '').replace(/[<>"]/g, '').slice(0, 200)
     if (alt) parent.setAttribute('alt', alt)
+    const href = imageLinkHref(el.closest('a')?.getAttribute('href') || el.getAttribute('data-href') || '')
+    if (href) parent.setAttribute('data-href', href)
     return parent
   }
   if (parent && (tag === 'td' || tag === 'th')) {
@@ -292,6 +295,13 @@ export function sanitizePastedHtml(html: string): string {
     const bg = /bgcolor\s*=\s*["']?(#[0-9a-f]{3,8})/i.exec(attrs)?.[1]
     if (!bg) return all
     return `<${tag}${attrs} data-bg="${bg}">`
+  })
+  out = out.replace(/<a\b([^>]*)>(\s*)<img\b([^>]*)>/gi, (all, aAttrs: string, space: string, imgAttrs: string) => {
+    if (/\bdata-href\s*=/i.test(imgAttrs)) return all
+    const quoted = /\bhref\s*=\s*(['"])([^'"]*)\1/i.exec(aAttrs)
+    const href = imageLinkHref(quoted?.[2] || '')
+    if (!href) return all
+    return `<a${aAttrs}>${space}<img${imgAttrs} data-href="${href}">`
   })
   out = out
     .replace(/style\s*=\s*"[^"]*mso-[^"]*"/gi, '')

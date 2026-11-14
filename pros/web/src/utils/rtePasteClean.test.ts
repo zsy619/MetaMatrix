@@ -38,6 +38,13 @@ assert.ok(!/onerror/i.test(bypass))
 assert.ok(bypass.includes('实体链'))
 assert.ok(bypass.includes('一项'))
 assert.ok(/data:image\/png/i.test(bypass))
+
+const linked = sanitizePastedHtml(
+  '<a href="https://example.com/doc"><img src="https://example.com/a.png" alt="说明"></a>' +
+    '<a href="javascript:alert(1)"><img src="https://example.com/b.png" alt="坏"></a>',
+)
+assert.ok(linked.includes('data-href="https://example.com/doc"'))
+assert.ok(!/javascript:/i.test(linked))
 assert.equal(safePasteUrl('javascript:alert(1)', 'a'), null)
 assert.equal(safePasteUrl('/media/asset-1', 'img'), '/media/asset-1')
 assert.equal((plainTextToPasteContent('甲\n\n\n乙') as unknown[]).length, 2)

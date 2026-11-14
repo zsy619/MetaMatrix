@@ -38,6 +38,25 @@ describe('图片边框和圆角', () => {
     expect(style).toContain('width: 40%')
   })
 
+  it('包在链接里的图片记下地址', () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    editor = new Editor({
+      element: host,
+      extensions: [
+        StarterKit.configure({ dropcursor: false }),
+        RteImage.configure({ inline: false, allowBase64: true, HTMLAttributes: { class: 'rte-image' } }),
+      ],
+      content: `<a href="https://example.com/doc"><img src="${PIXEL}" alt="说明"></a>`,
+    })
+    expect(editor.getHTML()).toContain('data-href="https://example.com/doc"')
+    let href = ''
+    editor.state.doc.descendants((node) => {
+      if (node.type.name === 'image') href = String(node.attrs.href || '')
+    })
+    expect(href).toBe('https://example.com/doc')
+  })
+
   it('再裁成 16:9 时边框还在', () => {
     const host = document.createElement('div')
     document.body.appendChild(host)

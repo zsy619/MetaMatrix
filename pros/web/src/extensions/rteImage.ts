@@ -5,7 +5,7 @@ import type { EditorView } from '@tiptap/pm/view'
 import { createImageDragPlugin } from './rteImageDrag'
 import { createImageCaptionPlugin } from './rteImageCaption'
 import { createCaptionRenumberPlugin } from '../utils/rteCaptionNumber'
-import { imageSizeStyle, normalizeImageAlign, normalizeImageLayout } from '../utils/rteImageLayout'
+import { imageLinkHref, imageSizeStyle, normalizeImageAlign, normalizeImageLayout } from '../utils/rteImageLayout'
 import { cropHtmlStyle } from '../utils/rteImageCropAttrs'
 
 export type RteImageAlign = 'left' | 'center' | 'right' | null
@@ -101,6 +101,15 @@ export const RteImage = Image.extend({
         },
         renderHTML: (attrs: { fit?: string | null }) =>
           attrs.fit === 'cover' || attrs.fit === 'contain' ? { 'data-fit': attrs.fit } : {},
+      },
+      href: {
+        default: null as string | null,
+        parseHTML: (el: HTMLElement) =>
+          imageLinkHref(el.getAttribute('data-href') || el.closest('a')?.getAttribute('href') || ''),
+        renderHTML: (attrs: { href?: string | null }) => {
+          const value = imageLinkHref(attrs.href)
+          return value ? { 'data-href': value } : {}
+        },
       },
       caption: {
         default: null as string | null,

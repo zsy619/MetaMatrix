@@ -14,6 +14,14 @@ describe('导出 Markdown 和 HTML 链接', () => {
     expect(md).toContain('$$\nx^2\n$$')
   })
 
+  it('带链接的图片导出成可点的图片', () => {
+    const md = htmlToMarkdown(
+      '<img src="https://example.com/a.png" alt="说明" data-href="https://example.com/doc" data-caption="季度趋势">',
+    )
+    expect(md).toContain('[![说明](https://example.com/a.png)](https://example.com/doc)')
+    expect(md).toContain('季度趋势')
+  })
+
   it('单图题注跟在图片后面', () => {
     const md = htmlToMarkdown('<img src="https://example.com/a.png" alt="趋势" data-caption="季度趋势">')
     expect(md).toContain('![趋势](https://example.com/a.png)')

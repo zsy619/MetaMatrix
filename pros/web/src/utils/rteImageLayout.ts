@@ -120,3 +120,18 @@ export function siblingInsertPos(childStarts: number[], childSizes: number[], in
 export function containerCanHoldImage(typeName: string): boolean {
   return CONTAINERS.has(typeName)
 }
+
+/** 图片上的链接只留 http(s) 和素材库路径，不接受带账号的地址。 */
+export function imageLinkHref(raw: unknown): string | null {
+  const value = String(raw ?? '').trim()
+  if (!value || value.length > 2000) return null
+  if (/^\/media\/[0-9a-zA-Z-]+$/.test(value)) return value
+  try {
+    const url = new URL(value)
+    if (url.username || url.password) return null
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null
+    return value
+  } catch {
+    return null
+  }
+}

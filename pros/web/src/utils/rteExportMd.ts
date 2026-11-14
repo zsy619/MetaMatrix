@@ -1,6 +1,7 @@
 /**
  * 轻量 HTML → Markdown（覆盖标题/列表/引用/代码/链接/粗斜体/表格粗略/分割线）
  */
+import { imageLinkHref } from './rteImageLayout'
 /** 导出的 HTML 里，外链补上 rel，已有 rel 的不改。 */
 export function withExternalLinkRel(html: string): string {
   return String(html || '').replace(/<a\b([^>]*?)>/gi, (full, attrs: string) => {
@@ -95,11 +96,17 @@ function nodeToMd(root: HTMLElement): string {
 
 function imageMarkdown(img: HTMLElement): string {
   const src = img.getAttribute('src') || ''
-  const alt = img.getAttribute('alt') || img.getAttribute('title') || 'image'
+  const alt = (img.getAttribute('alt') || img.getAttribute('title') || 'image')
+    .replace(/\\/g, '\\\\')
+    .replace(/[\[\]]/g, '\\$&')
+    .replace(/\r?\n/g, ' ')
   // data URL 里可能有空格 / 括号（SVG 快照），用 <...> 包起来才不会截断链接
   const safeSrc = /[\s()]/.test(src) ? `<${src}>` : src
   const caption = (img.getAttribute('data-caption') || '').trim()
-  return `![${alt}](${safeSrc})${caption ? `\n${caption}` : ''}\n\n`
+  const href = imageLinkHref(img.getAttribute('data-href') || '')
+  const body = `![${alt}](${safeSrc})`
+  const linked = href ? `[${body}](${/[\s()]/.test(href) ? `<${href}>` : href})` : body
+  return `${linked}${caption ? `\n${caption}` : ''}\n\n`
 }
 
 function inlineMd(el: HTMLElement): string {
