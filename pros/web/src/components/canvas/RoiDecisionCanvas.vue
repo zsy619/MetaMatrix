@@ -259,8 +259,10 @@ onMounted(() => {
 .rd-row {
   display: grid;
   grid-template-columns: minmax(96px, 0.7fr) minmax(0, 1.4fr) minmax(0, 1.4fr) 52px;
-  /* Align with global panel min-height (≥400px), including newly added rows */
+  grid-auto-rows: max-content;
+  /* Empty rows stay readable; taller notes extend the row */
   min-height: 400px;
+  height: auto;
   border-bottom: 1px solid var(--cv-frame, #ececec);
   background: transparent;
 }
@@ -314,7 +316,7 @@ onMounted(() => {
 
 .rd-cell {
   min-width: 0;
-  min-height: inherit;
+  height: auto;
   padding: 6px 8px;
   box-sizing: border-box;
   border-right: 1px solid var(--cv-frame, #ececec);
@@ -328,12 +330,44 @@ onMounted(() => {
 }
 
 .rd-cell :deep(.ym-block) {
-  flex: 1;
-  /* Match .rd-panel :deep(.ym-block) global panel min-height */
-  min-height: 400px;
+  flex: 1 0 auto;
+  height: auto;
+  min-height: 100%;
+  width: 100%;
   background: transparent;
   border: none;
   box-shadow: none;
+}
+
+.rd-cell :deep(.ym-block-body),
+.rd-cell :deep(.rte-root),
+.rd-cell :deep(.rte-workspace),
+.rd-cell :deep(.rte-canvas),
+.rd-cell :deep(.rte-body),
+.rd-cell :deep(.ProseMirror) {
+  height: auto;
+  max-height: none;
+  max-width: 100%;
+  min-width: 0;
+  overflow: visible;
+  flex: 1 0 auto;
+}
+
+.rd-cell :deep(.rte-workspace),
+.rd-cell :deep(.rte-canvas),
+.rd-cell :deep(.ProseMirror) {
+  width: 100%;
+}
+
+.rd-cell :deep(.ProseMirror p) {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.rd-cell :deep(.pm-max-btn) {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
 }
 
 .rd-cell :deep(.ym-block-toolbar) {
@@ -346,9 +380,11 @@ onMounted(() => {
   opacity: 1;
 }
 
-.rd-cell :deep(.ProseMirror) {
+.rd-cell :deep(.rte-root .ProseMirror),
+.rd-cell :deep(.rte-root.compact .ProseMirror) {
   text-align: left;
-  font-size: 14px;
+  min-height: 320px;
+  font-size: 16px;
   line-height: 1.65;
   color: #202124;
 }
@@ -469,33 +505,66 @@ onMounted(() => {
 }
 
 .rd-panel {
-  flex: 1;
+  flex: 0 0 auto;
   min-height: 400px;
+  height: auto;
   display: flex;
   flex-direction: column;
   background: transparent;
   padding: 10px 12px 8px;
   box-sizing: border-box;
-  overflow: auto;
+  overflow: visible;
 }
 
 .rd-panel :deep(.ym-block) {
-  flex: 1;
-  min-height: 400px;
+  flex: 1 0 auto;
+  height: auto;
+  min-height: 100%;
+  width: 100%;
   background: transparent;
   border: none;
   box-shadow: none;
 }
 
+.rd-panel :deep(.ym-block-body),
+.rd-panel :deep(.rte-root),
+.rd-panel :deep(.rte-workspace),
+.rd-panel :deep(.rte-canvas),
+.rd-panel :deep(.rte-body),
 .rd-panel :deep(.ProseMirror) {
+  height: auto;
+  max-height: none;
+  max-width: 100%;
+  min-width: 0;
+  overflow: visible;
+  flex: 1 0 auto;
+}
+
+.rd-panel :deep(.rte-workspace),
+.rd-panel :deep(.rte-canvas),
+.rd-panel :deep(.ProseMirror) {
+  width: 100%;
+}
+
+.rd-panel :deep(.rte-root .ProseMirror),
+.rd-panel :deep(.rte-root.compact .ProseMirror) {
   text-align: left;
-  font-size: 14px;
-  line-height: 1.65;
+  min-height: 320px;
+  font-size: 16px;
+  line-height: 1.7;
   color: #202124;
+}
+
+.rd-panel :deep(.pm-max-btn) {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
 }
 
 .rd-panel :deep(.ProseMirror p) {
   margin: 0.35em 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 /* ---- Bottom conclusion ---- */
@@ -525,6 +594,10 @@ onMounted(() => {
 }
 
 @media (max-width: 720px) {
+  .rd-canvas {
+    padding-bottom: 96px;
+  }
+
   .rd-matrix-headers,
   .rd-row {
     grid-template-columns: 1fr;
@@ -580,7 +653,24 @@ onMounted(() => {
   }
 
   .rd-cell {
-    min-height: 200px;
+    min-height: 180px;
+    height: auto;
+  }
+
+  .rd-cell :deep(.rte-root .ProseMirror),
+  .rd-cell :deep(.rte-root.compact .ProseMirror),
+  .rd-panel :deep(.rte-root .ProseMirror),
+  .rd-panel :deep(.rte-root.compact .ProseMirror) {
+    min-height: 96px;
+  }
+
+  .rd-cell :deep(.ym-block-toolbar) {
+    opacity: 1;
+  }
+
+  .rd-panel,
+  .rd-panel--conclusion {
+    min-height: 180px;
   }
 
   .rd-middle {

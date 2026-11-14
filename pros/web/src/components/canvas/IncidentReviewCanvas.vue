@@ -322,8 +322,8 @@ function onRemoveRow(rowId: string) {
 
 .ir-hint {
   margin: 0 14px 10px;
-  font-size: 13px;
-  line-height: 1.55;
+  font-size: 15px;
+  line-height: 1.6;
   color: var(--tbl-topic, #80868b);
   white-space: pre-wrap;
 }
@@ -371,18 +371,58 @@ function onRemoveRow(rowId: string) {
 }
 
 .ir-panel :deep(.ym-block) {
-  flex: 1;
-  min-height: 0;
+  flex: 1 0 auto;
+  height: auto;
+  min-height: 100%;
+  width: 100%;
   background: transparent;
   border: none;
   box-shadow: none;
 }
 
+.ir-panel :deep(.ym-block-body),
+.ir-panel :deep(.rte-root),
+.ir-panel :deep(.rte-workspace),
+.ir-panel :deep(.rte-canvas),
+.ir-panel :deep(.rte-body),
+.ir-panel :deep(.ProseMirror) {
+  height: auto;
+  max-height: none;
+  max-width: 100%;
+  min-width: 0;
+  overflow: visible;
+  flex: 1 0 auto;
+}
+
+.ir-panel :deep(.rte-workspace),
+.ir-panel :deep(.rte-canvas),
+.ir-panel :deep(.ProseMirror) {
+  width: 100%;
+}
+
+.ir-panel :deep(.rte-root .ProseMirror),
+.ir-panel :deep(.rte-root.compact .ProseMirror) {
+  min-height: 320px;
+  font-size: 16px;
+  line-height: 1.7;
+}
+
+.ir-panel :deep(.ProseMirror p) {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.ir-panel :deep(.pm-max-btn) {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+}
+
 .ir-tip {
   margin: 0 14px 12px;
   padding: 10px 12px;
-  font-size: 12.5px;
-  line-height: 1.55;
+  font-size: 15px;
+  line-height: 1.6;
   color: #5f6368;
   border-radius: 4px;
   border: 1px solid transparent;
@@ -401,7 +441,7 @@ function onRemoveRow(rowId: string) {
 .ir-impact-guide {
   margin: 0 14px 12px;
   padding-left: 20px;
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1.7;
   color: #3c4043;
 }
@@ -446,8 +486,10 @@ function onRemoveRow(rowId: string) {
 .ir-tl-row {
   display: grid;
   grid-template-columns: 180px minmax(0, 1fr) 52px;
+  grid-auto-rows: max-content;
   border-bottom: 1px solid #e8eaed;
   min-height: 400px;
+  height: auto;
 }
 
 .ir-tl-row:last-child {
@@ -474,11 +516,51 @@ function onRemoveRow(rowId: string) {
 }
 
 .ir-tl-cell--behavior :deep(.ym-block) {
-  flex: 1;
-  min-height: 0;
+  flex: 1 0 auto;
+  height: auto;
+  min-height: 100%;
+  width: 100%;
   background: transparent;
   border: none;
   box-shadow: none;
+}
+
+.ir-tl-cell--behavior :deep(.ym-block-body),
+.ir-tl-cell--behavior :deep(.rte-root),
+.ir-tl-cell--behavior :deep(.rte-workspace),
+.ir-tl-cell--behavior :deep(.rte-canvas),
+.ir-tl-cell--behavior :deep(.rte-body),
+.ir-tl-cell--behavior :deep(.ProseMirror) {
+  height: auto;
+  max-height: none;
+  max-width: 100%;
+  min-width: 0;
+  overflow: visible;
+  flex: 1 0 auto;
+}
+
+.ir-tl-cell--behavior :deep(.rte-workspace),
+.ir-tl-cell--behavior :deep(.rte-canvas),
+.ir-tl-cell--behavior :deep(.ProseMirror) {
+  width: 100%;
+}
+
+.ir-tl-cell--behavior :deep(.rte-root .ProseMirror),
+.ir-tl-cell--behavior :deep(.rte-root.compact .ProseMirror) {
+  min-height: 320px;
+  font-size: 16px;
+  line-height: 1.65;
+}
+
+.ir-tl-cell--behavior :deep(.ProseMirror p) {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.ir-tl-cell--behavior :deep(.pm-max-btn) {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
 }
 
 .ir-tl-cell--actions {
@@ -565,7 +647,20 @@ function onRemoveRow(rowId: string) {
 
 @media (max-width: 720px) {
   .ir-scroll {
-    padding: 16px 12px 32px;
+    padding: 16px 12px 96px;
+  }
+
+  .ir-panel,
+  .ir-panel--sub {
+    min-height: 180px;
+    height: auto;
+  }
+
+  .ir-panel :deep(.rte-root .ProseMirror),
+  .ir-panel :deep(.rte-root.compact .ProseMirror),
+  .ir-tl-cell--behavior :deep(.rte-root .ProseMirror),
+  .ir-tl-cell--behavior :deep(.rte-root.compact .ProseMirror) {
+    min-height: 96px;
   }
 
   .ir-tl-head,
@@ -587,7 +682,8 @@ function onRemoveRow(rowId: string) {
   }
 
   .ir-tl-cell--behavior {
-    min-height: 220px;
+    min-height: 180px;
+    height: auto;
   }
 
   .ir-tl-cell--actions {
