@@ -245,8 +245,13 @@ function rowStaysVisible(row: HTMLElement, index: number, headerEnd: number): bo
   return first === '合计' || first === 'SUM'
 }
 
+/** 筛选时忽略千分位逗号，让 1200 能对上 1,200。 */
+export function tableFilterHaystack(text: string): string {
+  return text.toLowerCase().replace(/[,，]/g, '')
+}
+
 function paintTableRows(tableDom: HTMLElement, query: string): number {
-  const q = (query || '').trim().toLowerCase()
+  const q = tableFilterHaystack((query || '').trim())
   const trs = [...tableDom.querySelectorAll('tr')] as HTMLElement[]
   let headerEnd = 0
   while (headerEnd < trs.length && rowIsHeader(trs[headerEnd]!)) headerEnd += 1
@@ -257,7 +262,7 @@ function paintTableRows(tableDom: HTMLElement, query: string): number {
       delete row.dataset.rteFilterHide
       return
     }
-    const text = (row.textContent || '').toLowerCase()
+    const text = tableFilterHaystack(row.textContent || '')
     const show = text.includes(q)
     row.style.display = show ? '' : 'none'
     row.dataset.rteFilterHide = show ? '0' : '1'
