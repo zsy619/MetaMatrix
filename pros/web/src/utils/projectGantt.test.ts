@@ -3,6 +3,7 @@ import type { GanttTask } from '../types/canvas'
 import {
   applyDependencySchedule,
   analyzeSchedule,
+  dayBandPercent,
   formatPredecessors,
   indentTask,
   outdentTask,
@@ -148,5 +149,13 @@ describe('项目甘特排程', () => {
     expect(removed.map((item) => item.id)).toEqual(['a', 'c'])
     expect(removed.find((item) => item.id === 'c')?.parentId).toBe('a')
     expect(removed.find((item) => item.id === 'c')?.predecessors).toEqual([])
+  })
+
+  it('日期列等分后贴齐时间轴右缘', () => {
+    const first = dayBandPercent(0, 4)
+    const last = dayBandPercent(3, 4)
+    expect(first).toEqual({ left: 0, width: 25 })
+    expect(last.left + last.width).toBe(100)
+    expect(dayBandPercent(0, 0).width).toBe(100)
   })
 })

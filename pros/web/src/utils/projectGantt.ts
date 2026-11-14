@@ -442,3 +442,10 @@ export function scalePx(scale: string | undefined): number {
   if (scale === 'month') return 6
   return 16
 }
+
+/** 第 index 天在时间轴上的百分比。列等分，加起来贴齐右侧面板。 */
+export function dayBandPercent(index: number, count: number): { left: number; width: number } {
+  const n = Math.max(1, count)
+  const i = Math.min(Math.max(0, index), n)
+  return { left: (i / n) * 100, width: 100 / n }
+}

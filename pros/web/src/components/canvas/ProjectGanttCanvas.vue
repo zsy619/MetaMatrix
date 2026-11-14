@@ -9,6 +9,7 @@ import {
   analyzeSchedule,
   applyDependencySchedule,
   calendarSpan,
+  dayBandPercent,
   finishFromStart,
   formatPredecessors,
   formatSuccessors,
@@ -44,7 +45,7 @@ let syncing = false
 const tasks = computed(() => props.doc.tasks)
 const analysis = computed(() => analyzeSchedule(tasks.value))
 const visibleRows = computed(() => outlineRows(tasks.value).filter((row) => !row.hidden))
-const px = computed(() => scalePx(props.doc.scale))
+const unit = computed(() => scalePx(props.doc.scale))
 
 function shown(task: GanttTask): GanttTask {
   const over = preview.value[task.id]
@@ -57,7 +58,8 @@ const days = computed(() => {
   for (let day = span.value.min; day <= span.value.max; day += 1) list.push(day)
   return list
 })
-const chartWidth = computed(() => Math.max(px.value, days.value.length * px.value))
+const dayCount = computed(() => Math.max(1, days.value.length))
+const naturalWidth = computed(() => dayCount.value * unit.value)
 const months = computed(() => {
   const groups: Array<{ label: string; days: number }> = []
   for (const day of days.value) {
@@ -74,7 +76,7 @@ const todayLeft = computed(() => {
   const iso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
   const day = dayNumber(iso)
   if (day == null || day < span.value.min || day > span.value.max) return null
-  return (day - span.value.min) * px.value + px.value / 2
+  return dayBandPercent(day - span.value.min, dayCount.value).left + dayBandPercent(0, dayCount.value).width / 2
 })
 
 const selectedIndex = computed(() => tasks.value.findIndex((task) => task.id === selectedId.value))
@@ -96,17 +98,23 @@ function isCritical(id: string): boolean {
 
 function barStyle(task: GanttTask): Record<string, string> {
   const box = barBox(task)
-  return box ? { left: `${box.left}px`, width: `${box.width}px` } : {}
+  return box ? { left: `${box.left}%`, width: `${box.width}%` } : {}
 }
 
 function milestoneStyle(task: GanttTask): Record<string, string> {
   const box = barBox(task)
-  return box ? { left: `${box.left + px.value / 2 - 8}px` } : {}
+  return box ? { left: `calc(${box.left + box.width / 2}% - 8px)` } : {}
 }
 
 function baselineStyle(task: GanttTask): Record<string, string> {
   const box = baselineBox(task)
-  return box ? { left: `${box.left}px`, width: `${box.width}px` } : {}
+  return box ? { left: `${box.left}%`, width: `${box.width}%` } : {}
+}
+
+function rangePercent(from: number, to: number): { left: number; width: number } {
+  const n = dayCount.value
+  const spanDays = Math.max(0.35, to - from + 1)
+  return { left: ((from - span.value.min) / n) * 100, width: (spanDays / n) * 100 }
 }
 
 function barBox(task: GanttTask): { left: number; width: number } | null {
@@ -116,7 +124,7 @@ function barBox(task: GanttTask): { left: number; width: number } | null {
   if (start == null || end == null) return null
   const from = Math.min(start, end)
   const to = Math.max(start, end)
-  return { left: (from - span.value.min) * px.value, width: Math.max(px.value * 0.35, (to - from + 1) * px.value) }
+  return rangePercent(from, to)
 }
 
 function baselineBox(task: GanttTask): { left: number; width: number } | null {
@@ -126,7 +134,12 @@ function baselineBox(task: GanttTask): { left: number; width: number } | null {
   if (start == null || end == null) return null
   const from = Math.min(start, end)
   const to = Math.max(start, end)
-  return { left: (from - span.value.min) * px.value, width: Math.max(4, (to - from + 1) * px.value) }
+  return rangePercent(from, to)
+}
+
+function columnStyle(index: number): Record<string, string> {
+  const band = dayBandPercent(index, dayCount.value)
+  return { left: `${band.left}%`, width: `${band.width}%` }
 }
 
 function arrowPath(x1: number, y1: number, x2: number, y2: number): string {
@@ -153,8 +166,8 @@ const arrows = computed(() => {
       const succEnd = dayNumber(task.end)
       if (predStart == null || predEnd == null || succStart == null || succEnd == null) return []
       const type = link.type || 'FS'
-      const fromX = type === 'SS' || type === 'SF' ? (predStart - span.value.min) * px.value : (predEnd - span.value.min + 1) * px.value
-      const toX = type === 'FF' || type === 'SF' ? (succEnd - span.value.min + 1) * px.value : (succStart - span.value.min) * px.value
+      const fromX = type === 'SS' || type === 'SF' ? (predStart - span.value.min) * unit.value : (predEnd - span.value.min + 1) * unit.value
+      const toX = type === 'FF' || type === 'SF' ? (succEnd - span.value.min + 1) * unit.value : (succStart - span.value.min) * unit.value
       const fromY = fromIndex * ROW + ROW / 2
       const toY = toIndex * ROW + ROW / 2
       return [{
@@ -369,10 +382,13 @@ function startDrag(event: PointerEvent, task: GanttTask, mode: 'move' | 'resize'
   event.stopPropagation()
   selectedId.value = task.id
   const originX = event.clientX
+  const body = chartRef.value?.querySelector('.chart-body') as HTMLElement | null
+  const bodyWidth = body?.getBoundingClientRect().width || 0
+  const dayPx = bodyWidth > 0 ? bodyWidth / dayCount.value : unit.value
   const ids = mode === 'move' ? [task.id, ...descendantIds(task.id)] : [task.id]
   const snapshot = tasks.value.filter((item) => ids.includes(item.id)).map((item) => ({ id: item.id, start: item.start, end: item.end }))
   const move = (ev: PointerEvent) => {
-    const delta = Math.round((ev.clientX - originX) / px.value)
+    const delta = Math.round((ev.clientX - originX) / dayPx)
     const next: Record<string, { start: string; end: string }> = {}
     for (const item of snapshot) {
       if (mode === 'resize') {
@@ -507,30 +523,29 @@ function startDrag(event: PointerEvent, task: GanttTask, mode: 'move' | 'resize'
           </tbody>
         </table>
       </div>
-      <div ref="chartRef" class="chart" aria-label="甘特图时间刻度" @scroll="onChartScroll">
-        <div class="chart-head" :style="{ width: chartWidth + 'px', height: HEAD + 'px' }">
+      <div ref="chartRef" class="chart" aria-label="甘特图时间刻度" :style="{ '--gantt-day': unit + 'px' }" @scroll="onChartScroll">
+        <div class="chart-head" :style="{ width: '100%', minWidth: naturalWidth + 'px', height: HEAD + 'px' }">
           <div class="months">
-            <span v-for="month in months" :key="month.label" :style="{ width: month.days * px + 'px' }">{{ month.label }}</span>
+            <span v-for="month in months" :key="month.label" :style="{ flexGrow: month.days, minWidth: month.days * unit + 'px' }">{{ month.label }}</span>
           </div>
           <div class="ticks">
             <span
               v-for="day in days"
               :key="day"
               :class="{ weekend: isWeekend(day) }"
-              :style="{ width: px + 'px' }"
             >{{ tickLabel(day) }}</span>
           </div>
         </div>
-        <div class="chart-body" :style="{ width: chartWidth + 'px', height: visibleRows.length * ROW + 'px' }">
+        <div class="chart-body" :style="{ width: '100%', minWidth: naturalWidth + 'px', height: visibleRows.length * ROW + 'px' }">
           <div
-            v-for="day in days"
+            v-for="(day, index) in days"
             :key="'col-' + day"
             class="col"
             :class="{ weekend: isWeekend(day) }"
-            :style="{ left: (day - span.min) * px + 'px', width: px + 'px' }"
+            :style="columnStyle(index)"
           />
-          <div v-if="todayLeft != null" class="today" :style="{ left: todayLeft + 'px' }" />
-          <svg class="links" :width="chartWidth" :height="visibleRows.length * ROW">
+          <div v-if="todayLeft != null" class="today" :style="{ left: todayLeft + '%' }" />
+          <svg class="links" width="100%" height="100%" :viewBox="`0 0 ${naturalWidth} ${visibleRows.length * ROW}`" preserveAspectRatio="none">
             <defs>
               <marker id="gantt-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
                 <path d="M0,0 L8,4 L0,8 Z" fill="#5f6368" />
@@ -618,16 +633,16 @@ function startDrag(event: PointerEvent, task: GanttTask, mode: 'move' | 'resize'
 .twist { flex: none; width: 36px; height: 36px; border: 0; background: transparent; padding: 0; font-size: 16px; cursor: pointer; color: #5f6368; }
 .twist--blank { display: inline-block; }
 .chart { flex: 1; overflow: auto; position: relative; background: #fff; }
-.chart-head { position: sticky; top: 0; z-index: 2; background: #f3f6f9; border-bottom: 1px solid #e0e0e0; }
-.months, .ticks { display: flex; height: 20px; }
-.months span, .ticks span { flex: none; box-sizing: border-box; overflow: hidden; font-size: 12px; line-height: 20px; color: #5f6368; border-left: 1px solid #eceff1; padding-left: 2px; }
+.chart-head { position: sticky; top: 0; z-index: 2; background: #f3f6f9; border-bottom: 1px solid #e0e0e0; box-sizing: border-box; }
+.months, .ticks { display: flex; width: 100%; height: 20px; }
+.months span, .ticks span { flex: 1 1 0; box-sizing: border-box; min-width: var(--gantt-day, 16px); overflow: hidden; font-size: 12px; line-height: 20px; color: #5f6368; border-left: 1px solid #eceff1; padding-left: 2px; }
 .ticks span.weekend { background: #eef1f4; }
-.chart-body { position: relative; }
+.chart-body { position: relative; box-sizing: border-box; }
 .col { position: absolute; top: 0; bottom: 0; box-sizing: border-box; }
 .col.weekend { background: #f6f8fa; }
 .today { position: absolute; top: 0; bottom: 0; width: 0; border-left: 2px solid #e37400; z-index: 1; pointer-events: none; }
-.links { position: absolute; inset: 0; pointer-events: none; }
-.links path { fill: none; stroke-width: 1.25; }
+.links { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.links path { fill: none; stroke-width: 1.25; vector-effect: non-scaling-stroke; }
 .chart-row { position: absolute; left: 0; right: 0; }
 .chart-row.selected { background: rgba(26, 115, 232, 0.06); }
 .bar { position: absolute; top: 11px; height: 16px; border-radius: 4px; background: #1a73e8; cursor: grab; z-index: 1; }
