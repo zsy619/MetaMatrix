@@ -1659,10 +1659,10 @@ function legendLayout(option: Record<string, unknown>): Record<string, unknown> 
   return place
 }
 
-function axisNameLayout(axis: unknown): { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number } {
+function axisNameLayout(axis: unknown): { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string } {
   const node = Array.isArray(axis) ? axis[0] : axis
   if (!isPlainObject(node)) return {}
-  const place: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number } = {}
+  const place: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string } = {}
   if (node.nameLocation === 'start' || node.nameLocation === 'middle' || node.nameLocation === 'end') {
     place.location = node.nameLocation
   }
@@ -1676,12 +1676,26 @@ function axisNameLayout(axis: unknown): { location?: 'start' | 'middle' | 'end';
   if (isPlainObject(style) && typeof style.fontSize === 'number' && Number.isFinite(style.fontSize)) {
     place.font = Math.max(8, Math.min(72, Math.round(style.fontSize)))
   }
+  if (isPlainObject(style) && typeof style.color === 'string') {
+    const color = style.color.trim()
+    if (/^#[0-9a-fA-F]{3,8}$/.test(color) || /^rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}(?:\s*,\s*(?:0|1|0?\.\d+))?\s*\)$/i.test(color)) {
+      place.ink = color
+    }
+  }
   return place
 }
 
+function axisNameTextStyle(place?: { font?: number; ink?: string }): { fontSize?: number; color?: string } | undefined {
+  if (!place || (place.font == null && !place.ink)) return undefined
+  return {
+    ...(place.font != null ? { fontSize: place.font } : {}),
+    ...(place.ink ? { color: place.ink } : {}),
+  }
+}
+
 function cartesianNameLayout(option: Record<string, unknown>): {
-  category: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number }
-  value: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number }
+  category: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string }
+  value: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string }
 } {
   const horizontal = categoryOnYAxis(option)
   return {
@@ -1857,8 +1871,8 @@ function buildCartesianOption(
   scale?: { interval?: number; minInterval?: number; inverse?: boolean; log?: boolean; logBase?: number; fromData?: boolean; side?: 'left' | 'right' | 'top' | 'bottom'; shift?: number; hidden?: boolean; parts?: number },
   boundaryGap?: boolean,
   namePlace?: {
-    category: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number }
-    value: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number }
+    category: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string }
+    value: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string }
   },
   hideValueSplitLine = false,
   hideCategoryAxisLine = false,
@@ -1890,7 +1904,7 @@ function buildCartesianOption(
     ...(namePlace?.category.location ? { nameLocation: namePlace.category.location } : {}),
     ...(namePlace?.category.gap != null ? { nameGap: namePlace.category.gap } : {}),
     ...(namePlace?.category.rotate != null ? { nameRotate: namePlace.category.rotate } : {}),
-    ...(namePlace?.category.font != null ? { nameTextStyle: { fontSize: namePlace.category.font } } : {}),
+    ...(axisNameTextStyle(namePlace?.category) ? { nameTextStyle: axisNameTextStyle(namePlace?.category) } : {}),
   }
   const value = {
     type: scale?.log ? ('log' as const) : ('value' as const),
@@ -1909,7 +1923,7 @@ function buildCartesianOption(
     ...(namePlace?.value.location ? { nameLocation: namePlace.value.location } : {}),
     ...(namePlace?.value.gap != null ? { nameGap: namePlace.value.gap } : {}),
     ...(namePlace?.value.rotate != null ? { nameRotate: namePlace.value.rotate } : {}),
-    ...(namePlace?.value.font != null ? { nameTextStyle: { fontSize: namePlace.value.font } } : {}),
+    ...(axisNameTextStyle(namePlace?.value) ? { nameTextStyle: axisNameTextStyle(namePlace?.value) } : {}),
     ...(hideValueSplitLine ? { splitLine: { show: false } } : {}),
     ...(showValueSplitArea ? { splitArea: { show: true } } : {}),
     ...(hideValueAxisLine ? { axisLine: { show: false } } : {}),
