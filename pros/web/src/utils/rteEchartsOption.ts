@@ -1760,15 +1760,20 @@ function categoryLabelRotate(option: Record<string, unknown>): number | undefine
   return Math.max(-90, Math.min(90, rotate))
 }
 
-function valueAxisScale(option: Record<string, unknown>): { interval?: number; minInterval?: number; inverse?: boolean; log?: boolean; logBase?: number; fromData?: boolean } {
-  const axis = categoryOnYAxis(option) ? option.xAxis : option.yAxis
+function valueAxisScale(option: Record<string, unknown>): { interval?: number; minInterval?: number; inverse?: boolean; log?: boolean; logBase?: number; fromData?: boolean; side?: 'left' | 'right' | 'top' | 'bottom' } {
+  const horizontal = categoryOnYAxis(option)
+  const axis = horizontal ? option.xAxis : option.yAxis
   const node = Array.isArray(axis) ? axis[0] : axis
   if (!isPlainObject(node)) return {}
-  const scale: { interval?: number; minInterval?: number; inverse?: boolean; log?: boolean; logBase?: number; fromData?: boolean } = {}
+  const scale: { interval?: number; minInterval?: number; inverse?: boolean; log?: boolean; logBase?: number; fromData?: boolean; side?: 'left' | 'right' | 'top' | 'bottom' } = {}
   if (typeof node.interval === 'number' && Number.isFinite(node.interval) && node.interval > 0) scale.interval = node.interval
   if (typeof node.minInterval === 'number' && Number.isFinite(node.minInterval) && node.minInterval > 0) scale.minInterval = node.minInterval
   if (node.inverse === true) scale.inverse = true
   if (node.scale === true) scale.fromData = true
+  const pos = node.position
+  if ((horizontal && (pos === 'top' || pos === 'bottom')) || (!horizontal && (pos === 'left' || pos === 'right'))) {
+    scale.side = pos
+  }
   if (node.type === 'log') scale.log = true
   if (typeof node.logBase === 'number' && Number.isFinite(node.logBase) && node.logBase > 0 && node.logBase !== 1) {
     scale.logBase = node.logBase
@@ -1835,7 +1840,7 @@ function buildCartesianOption(
   looks?: Array<{ straight: boolean; filled: boolean } | null>,
   margins?: Record<string, unknown>,
   tip?: Record<string, unknown>,
-  scale?: { interval?: number; minInterval?: number; inverse?: boolean; log?: boolean; logBase?: number; fromData?: boolean },
+  scale?: { interval?: number; minInterval?: number; inverse?: boolean; log?: boolean; logBase?: number; fromData?: boolean; side?: 'left' | 'right' | 'top' | 'bottom' },
   boundaryGap?: boolean,
   namePlace?: {
     category: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number }
@@ -1881,6 +1886,7 @@ function buildCartesianOption(
     ...(scale?.minInterval != null ? { minInterval: scale.minInterval } : {}),
     ...(scale?.inverse ? { inverse: true } : {}),
     ...(scale?.fromData ? { scale: true } : {}),
+    ...(scale?.side ? { position: scale.side } : {}),
     ...(scale?.logBase != null ? { logBase: scale.logBase } : {}),
     ...(namePlace?.value.location ? { nameLocation: namePlace.value.location } : {}),
     ...(namePlace?.value.gap != null ? { nameGap: namePlace.value.gap } : {}),
