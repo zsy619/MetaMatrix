@@ -329,7 +329,7 @@ type Node =
   | { k: 'cmp'; op: string; l: Node; r: Node }
   | { k: 'call'; name: string; args: Node[] }
 
-const FUNC_NAMES = new Set(['SUM', 'AVERAGE', 'COUNT', 'MAX', 'MIN', 'IF'])
+const FUNC_NAMES = new Set(['SUM', 'AVERAGE', 'COUNT', 'MAX', 'MIN', 'IF', 'ROUND'])
 
 class Parser {
   tokens: LexToken[]
@@ -547,6 +547,26 @@ function cellsOf(node: Node, at: CellAddress): CellAddress[] | null {
   return null
 }
 
+function roundHalfAway(value: number, digits: number): number {
+  const factor = 10 ** digits
+  const scaled = value * factor
+  const rounded = Math.sign(scaled) * Math.round(Math.abs(scaled))
+  return rounded / factor
+}
+
+function evalRound(args: Node[], ctx: Ctx, at: CellAddress): EvalValue {
+  if (!args.length || args.length > 2) return { error: '#VALUE!' }
+  const value = evalNode(args[0]!, ctx, at)
+  if (isError(value)) return value
+  let digits = 0
+  if (args[1]) {
+    const places = evalNode(args[1], ctx, at)
+    if (isError(places)) return places
+    digits = Math.max(-6, Math.min(6, Math.trunc(places)))
+  }
+  return roundHalfAway(value, digits)
+}
+
 function evalIf(args: Node[], ctx: Ctx, at: CellAddress): EvalValue {
   if (args.length < 2 || args.length > 3) return { error: '#VALUE!' }
   const cond = evalNode(args[0]!, ctx, at)
@@ -558,6 +578,7 @@ function evalIf(args: Node[], ctx: Ctx, at: CellAddress): EvalValue {
 
 function evalCall(name: string, args: Node[], ctx: Ctx, at: CellAddress): EvalValue {
   if (name === 'IF') return evalIf(args, ctx, at)
+  if (name === 'ROUND') return evalRound(args, ctx, at)
   const values: number[] = []
   for (const arg of args) {
     const cells = cellsOf(arg, at)

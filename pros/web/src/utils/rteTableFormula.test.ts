@@ -75,6 +75,9 @@ assert.equal(evaluateCellFormula('=$A$1', grid2, 0, 0), '1')
 assert.equal(evaluateCellFormula('=SUM($A$1:$B$1)', grid2, 0, 0), '3')
 
 // 求和区域比表格长时，多出来的格子跳过，不把整段算成 #REF!
+assert.equal(evaluateCellFormula('=ROUND(A1)', [['1.6']], 0, 0), '2')
+assert.equal(evaluateCellFormula('=ROUND(A1,1)', [['1.25']], 0, 0), '1.3')
+assert.equal(evaluateCellFormula('=ROUND(1.234,2)', [['']], 0, 0), '1.23')
 assert.equal(evaluateCellFormula('=IF(A1>10,A1,0)', [['12']], 0, 0), '12')
 assert.equal(evaluateCellFormula('=IF(A1>10,A1,0)', [['8']], 0, 0), '0')
 assert.equal(evaluateCellFormula('=IF(A1,1/0,5)', [['0']], 0, 0), '5')
