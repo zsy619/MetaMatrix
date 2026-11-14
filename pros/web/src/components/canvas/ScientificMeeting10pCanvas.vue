@@ -31,6 +31,13 @@ documentStore.ensureScientificMeeting10pBlocks()
 
 const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 
+const narrow = ref(false)
+let narrowQuery: MediaQueryList | null = null
+
+function syncNarrow() {
+  narrow.value = !!narrowQuery?.matches
+}
+
 /**
  * 顺时针自顶（12 点）：民主 → … → 良性
  * （与十瓣花参考图一致）
@@ -269,9 +276,13 @@ watch(maximizedPanelKey, (key) => {
 
 onMounted(() => {
   documentStore.ensureScientificMeeting10pBlocks()
+  narrowQuery = window.matchMedia('(max-width: 800px)')
+  syncNarrow()
+  narrowQuery.addEventListener('change', syncNarrow)
 })
 
 onBeforeUnmount(() => {
+  narrowQuery?.removeEventListener('change', syncNarrow)
   if (
     activeEditorAxis.value &&
     maximizedPanelKey.value === activeMaximizeKey.value
@@ -446,14 +457,15 @@ onBeforeUnmount(() => {
       隐藏挂载十轴 YModelBlock：点击花瓣时写入全局 maximizedPanelKey，
       由块内 Teleport .pm-overlay 铺满文档视口（panel-maximize 规则）。
     -->
-    <div class="sm10p-block-host" aria-hidden="true">
-      <template v-for="item in axisBlocks" :key="item.axis">
+    <div class="sm10p-block-host" :aria-hidden="narrow ? undefined : true">
+      <section v-for="item in axisBlocks" :key="item.axis" class="sm10p-card">
+        <h3 class="sm10p-card-title">{{ item.title }}</h3>
         <YModelBlockCard
           v-if="item.block"
           :block="item.block"
           hide-title
         />
-      </template>
+      </section>
     </div>
   </div>
 </template>
@@ -609,6 +621,11 @@ onBeforeUnmount(() => {
   margin: -1px;
 }
 
+.sm10p-card-title {
+  display: none;
+  margin: 0;
+}
+
 @media (max-width: 1100px) {
   .sm10p-sliders {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -639,5 +656,69 @@ onBeforeUnmount(() => {
   .sm10p-en {
     display: none;
   }
+}
+
+@media (max-width: 800px) {
+  .sm10p-canvas { padding-bottom: 96px; }
+  .sm10p-stage { flex: 0 0 auto; min-height: 0; }
+  .sm10p-flower {
+    width: 100%;
+    height: auto;
+    max-height: none;
+    min-height: 0;
+    aspect-ratio: 800 / 720;
+  }
+  .sm10p-sliders { grid-template-columns: 1fr; }
+  .sm10p-slider input[type='range'] { height: 36px; }
+  .sm10p-block-host {
+    position: static;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: auto;
+    height: auto;
+    margin: 14px 0 0;
+    padding: 0;
+    overflow: visible;
+    clip: auto;
+    clip-path: none;
+    white-space: normal;
+  }
+  .sm10p-card {
+    padding: 12px 12px 10px;
+    border: 1px solid var(--cv-frame, #ececec);
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 8px 20px rgba(62, 48, 28, 0.06);
+  }
+  .sm10p-card-title {
+    display: block;
+    margin: 0 0 8px;
+    font-size: 16px;
+    font-weight: 750;
+    line-height: 1.35;
+    color: #202124;
+  }
+  .sm10p-card :deep(.ym-block),
+  .sm10p-card :deep(.ym-block-body),
+  .sm10p-card :deep(.rte-root),
+  .sm10p-card :deep(.rte-workspace),
+  .sm10p-card :deep(.rte-canvas),
+  .sm10p-card :deep(.rte-body),
+  .sm10p-card :deep(.ProseMirror) {
+    height: auto;
+    max-height: none;
+    max-width: 100%;
+    min-width: 0;
+    overflow: visible;
+    flex: 0 0 auto;
+  }
+  .sm10p-card :deep(.ym-block) { min-height: 0; background: transparent; border: none; box-shadow: none; }
+  .sm10p-card :deep(.rte-workspace),
+  .sm10p-card :deep(.rte-canvas),
+  .sm10p-card :deep(.ProseMirror) { width: 100%; }
+  .sm10p-card :deep(.ProseMirror) { min-height: 96px; font-size: 15px; line-height: 1.55; }
+  .sm10p-card :deep(.ProseMirror p) { max-width: 100%; overflow-wrap: anywhere; }
+  .sm10p-card :deep(.pm-max-btn) { width: 36px; height: 36px; border-radius: 8px; }
 }
 </style>
