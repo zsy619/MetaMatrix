@@ -328,7 +328,7 @@ export function splitPreviewPages(html: string): string[] {
   const parts = source.split(PREVIEW_PAGE_BREAK).map((part) => part.trim())
   if (parts.length <= 1) return [source]
   if (!parts[0]) parts.shift()
-  const kept = parts.filter((part, index) => part.length > 0 || index === parts.length - 1)
+  const kept = parts.filter((part) => part.length > 0)
   return kept.length ? kept : ['']
 }
 
