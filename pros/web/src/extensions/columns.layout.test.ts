@@ -59,6 +59,17 @@ function columnTexts(ed: Editor): string[][] {
 }
 
 describe('分栏装入选区和栏数', () => {
+  it('分栏边框可以画成双线', () => {
+    const ed = mount('<p>甲</p><p>乙</p>')
+    ed.commands.setTextSelection({ from: textPos(ed, '甲', 'start'), to: textPos(ed, '乙', 'end') })
+    ed.chain().focus().setColumns(2).run()
+    const columns = ed.state.doc.firstChild
+    expect(columns?.type.name).toBe('columns')
+    ed.view.dispatch(ed.state.tr.setNodeMarkup(0, undefined, { ...columns!.attrs, borderStyle: 'double', borderWidth: 3 }))
+    expect(ed.getHTML()).toContain('double')
+    expect(ed.state.doc.firstChild?.attrs.borderStyle).toBe('double')
+  })
+
   it('栏间距写成 8 px 时仍是 8', () => {
     const ed = mount('<p></p>')
     ed.commands.setContent(
