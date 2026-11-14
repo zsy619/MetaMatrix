@@ -324,7 +324,7 @@ export type ColumnFrameAttrs = {
 }
 
 function clampNum(value: unknown, fallback: number, min: number, max: number): number {
-  const text = String(value ?? '').trim().replace(/\s*px$/i, '')
+  const text = String(value ?? '').trim().normalize('NFKC').replace(/\s*px$/i, '')
   const n = Math.round(Number(text))
   if (!Number.isFinite(n)) return fallback
   return Math.max(min, Math.min(max, n))
