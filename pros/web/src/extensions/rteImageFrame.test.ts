@@ -38,6 +38,22 @@ describe('图片边框和圆角', () => {
     expect(style).toContain('width: 40%')
   })
 
+  it('宽度写成百分号时按显示宽度留下', () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    editor = new Editor({
+      element: host,
+      extensions: [
+        StarterKit.configure({ dropcursor: false }),
+        RteImage.configure({ inline: false, allowBase64: true, HTMLAttributes: { class: 'rte-image' } }),
+      ],
+      content: `<img src="${PIXEL}" width="50%" alt="说明">`,
+    })
+    const html = editor.getHTML()
+    expect(html).toContain('data-display-width="50%"')
+    expect(html).not.toContain('width="50"')
+  })
+
   it('包在链接里的图片记下地址', () => {
     const host = document.createElement('div')
     document.body.appendChild(host)

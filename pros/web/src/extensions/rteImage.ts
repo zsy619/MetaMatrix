@@ -47,6 +47,19 @@ export const RteImage = Image.extend({
   addAttributes() {
     return {
       ...this.parent?.(),
+      width: {
+        default: null as number | null,
+        parseHTML: (el: HTMLElement) => {
+          const raw = (el.getAttribute('width') || '').trim()
+          if (!raw || /%$/.test(raw)) return null
+          const n = Number(raw)
+          return Number.isFinite(n) && n > 0 ? Math.round(n) : null
+        },
+        renderHTML: (attrs: { width?: number | null }) => {
+          const n = Number(attrs.width)
+          return Number.isFinite(n) && n > 0 ? { width: String(Math.round(n)) } : {}
+        },
+      },
       align: {
         default: 'center' as RteImageAlign,
         parseHTML: (el: HTMLElement) => normalizeImageAlign(el.getAttribute('data-align')),
@@ -133,6 +146,8 @@ export const RteImage = Image.extend({
           if (explicit) return explicit
           // 裁剪会自己写 width:100%，不能当成用户设过的显示宽度。
           if (el.getAttribute('data-crop-aspect')) return null
+          const attrWidth = (el.getAttribute('width') || '').trim()
+          if (/^\d+(\.\d+)?%$/.test(attrWidth)) return attrWidth
           return (el.style?.width || '').trim() || null
         },
         renderHTML: (attrs: { displayWidth?: string | null }) => {
