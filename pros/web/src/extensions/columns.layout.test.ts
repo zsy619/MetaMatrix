@@ -69,6 +69,14 @@ describe('分栏装入选区和栏数', () => {
     expect(html).toContain('1fr 2fr')
   })
 
+  it('栏间距写成 0.5cm 时按 19 像素留下', () => {
+    const ed = mount('<p></p>')
+    ed.commands.setContent(
+      '<div data-type="columns" data-cols="2" data-gap="0.5cm"><div data-type="column"><p>甲</p></div><div data-type="column"><p>乙</p></div></div>',
+    )
+    expect(ed.getHTML()).toMatch(/--rte-col-gap:\s*19px/)
+  })
+
   it('栏间距写成 3mm 时按 11 像素留下', () => {
     const ed = mount('<p></p>')
     ed.commands.setContent(
