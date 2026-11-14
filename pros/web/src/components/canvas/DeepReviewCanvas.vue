@@ -169,8 +169,9 @@ function onReviewTime(event: Event) {
 .dr-meta-field {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 10px 14px;
+  gap: 10px;
+  min-height: 56px;
+  padding: 8px 16px;
   min-width: 0;
   box-sizing: border-box;
 }
@@ -181,7 +182,7 @@ function onReviewTime(event: Event) {
 
 .dr-meta-label {
   flex-shrink: 0;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 700;
   color: #202124;
 }
@@ -189,14 +190,16 @@ function onReviewTime(event: Event) {
 .dr-meta-input {
   flex: 1;
   min-width: 0;
+  min-height: 40px;
   border: none;
-  border-bottom: 1px solid transparent;
+  border-bottom: 1.5px solid rgba(60, 50, 20, 0.28);
   background: transparent;
-  font-size: 13px;
+  font-size: 16px;
+  font-weight: 650;
   font-family: inherit;
   color: #202124;
   outline: none;
-  padding: 2px 4px;
+  padding: 6px 2px;
 }
 
 .dr-meta-input:hover,
@@ -253,8 +256,8 @@ function onReviewTime(event: Event) {
 .dr-title {
   margin: 0;
   flex-shrink: 0;
-  padding: 10px 12px;
-  font-size: clamp(14px, 1.4vw, 16px);
+  padding: 12px 14px;
+  font-size: clamp(16px, 1.5vw, 18px);
   font-weight: 800;
   color: #fff;
   line-height: 1.3;
@@ -263,13 +266,16 @@ function onReviewTime(event: Event) {
 }
 
 .dr-hint {
-  margin: 0;
+  margin: 8px 12px 4px;
   flex-shrink: 0;
-  padding: 0 12px;
-  font-size: clamp(11px, 1.05vw, 12.5px);
-  font-style: italic;
-  line-height: 1.45;
-  color: var(--tbl-topic, #5f6368);
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+  font-size: 15px;
+  font-style: normal;
+  font-weight: 550;
+  line-height: 1.55;
+  color: #202124;
   white-space: pre-wrap;
 }
 
@@ -284,6 +290,35 @@ function onReviewTime(event: Event) {
   margin: 0 8px;
   padding: 2px;
   box-sizing: border-box;
+}
+
+@media (max-width: 720px) {
+  .dr-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .dr-meta-field + .dr-meta-field {
+    border-left: none;
+    border-top: 1px solid var(--cv-frame, #ececec);
+  }
+
+  .dr-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: none;
+  }
+
+  .dr-cell,
+  .dr-cell--full,
+  .dr-cell:nth-child(4),
+  .dr-cell:nth-child(5),
+  .dr-cell:nth-child(6) {
+    grid-column: 1 / -1;
+    min-height: 0;
+  }
+
+  .dr-panel {
+    min-height: 220px;
+  }
 }
 
 .dr-panel :deep(.ym-block) {
