@@ -1643,6 +1643,15 @@ function legendLayout(option: Record<string, unknown>): Record<string, unknown> 
   return place
 }
 
+function categoryBoundaryGap(option: Record<string, unknown>): boolean | undefined {
+  const axis = categoryOnYAxis(option) ? option.yAxis : option.xAxis
+  const node = Array.isArray(axis) ? axis[0] : axis
+  if (!isPlainObject(node)) return undefined
+  if (node.boundaryGap === false) return false
+  if (node.boundaryGap === true) return true
+  return undefined
+}
+
 function categoryLabelRotate(option: Record<string, unknown>): number | undefined {
   const axis = categoryOnYAxis(option) ? option.yAxis : option.xAxis
   const node = Array.isArray(axis) ? axis[0] : axis
@@ -1725,6 +1734,7 @@ function buildCartesianOption(
   margins?: Record<string, unknown>,
   tip?: Record<string, unknown>,
   scale?: { interval?: number; inverse?: boolean; log?: boolean; logBase?: number },
+  boundaryGap?: boolean,
 ): Record<string, unknown> {
   const category = {
     type: 'category' as const,
@@ -1732,6 +1742,7 @@ function buildCartesianOption(
     axisTick: { alignWithLabel: true },
     ...(names?.category ? { name: names.category } : {}),
     ...(categoryRotate != null ? { axisLabel: { rotate: categoryRotate } } : {}),
+    ...(boundaryGap != null ? { boundaryGap } : {}),
   }
   const value = {
     type: scale?.log ? ('log' as const) : ('value' as const),
@@ -2010,6 +2021,7 @@ export function retypeEchartsOption(
       gridMargins(base),
       tooltipLayout(base),
       valueAxisScale(base),
+      categoryBoundaryGap(base),
     )
   }
   if (usable && type === 'pie') {

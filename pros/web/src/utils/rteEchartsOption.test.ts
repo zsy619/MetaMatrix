@@ -339,6 +339,21 @@ describe('ECharts 模板与表格生成', () => {
     expect(series[0]!.data).toEqual([1200, 0.5])
   })
 
+  it('换成柱状图再换回折线后类目仍贴着刻度', () => {
+    const bar = retypeEchartsOption(
+      {
+        title: { text: '销售' },
+        xAxis: { type: 'category', data: ['一月', '二月'], boundaryGap: false },
+        yAxis: { type: 'value' },
+        series: [{ name: '今年', type: 'line', data: [2, 8] }],
+      },
+      'bar',
+    )
+    const back = retypeEchartsOption(bar, 'line')
+    const xAxis = back.xAxis as { boundaryGap?: boolean }
+    expect(xAxis.boundaryGap).toBe(false)
+  })
+
   it('换成折线再换回柱状图后柱间距还在', () => {
     const line = retypeEchartsOption(
       {
