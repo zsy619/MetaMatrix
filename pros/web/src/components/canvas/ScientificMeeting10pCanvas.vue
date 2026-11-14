@@ -541,7 +541,7 @@ onBeforeUnmount(() => {
 
 .sm10p-en {
   fill: rgba(255, 255, 255, 0.92);
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.02em;
   pointer-events: none;
@@ -562,8 +562,8 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 8px;
   min-width: 0;
-  min-height: 40px;
-  padding: 6px 12px;
+  min-height: 48px;
+  padding: 8px 14px;
   border-radius: 999px;
   background: rgba(244, 245, 247, 0.95);
   border: 1px solid #e8eaed;
@@ -572,7 +572,7 @@ onBeforeUnmount(() => {
 
 .sm10p-slider-name {
   flex: 0 0 auto;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--axis, #43a047);
   white-space: nowrap;
@@ -580,17 +580,17 @@ onBeforeUnmount(() => {
 
 .sm10p-slider input[type='range'] {
   flex: 1 1 auto;
-  min-width: 48px;
-  height: 22px;
+  min-width: 72px;
+  height: 32px;
   accent-color: var(--axis, #43a047);
   cursor: pointer;
 }
 
 .sm10p-slider-val {
   flex: 0 0 auto;
-  min-width: 2.2em;
+  min-width: 2.4em;
   font-variant-numeric: tabular-nums;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 800;
   color: var(--axis, #43a047);
   text-align: right;
@@ -623,14 +623,21 @@ onBeforeUnmount(() => {
   .sm10p-flower {
     width: min(100%, 640px);
     height: min(100%, 52vh, 480px);
+    min-height: 280px;
   }
 
   .sm10p-zh {
-    font-size: 16px;
+    font-size: 18px;
+  }
+}
+
+@media (max-width: 720px) {
+  .sm10p-sliders {
+    grid-template-columns: 1fr;
   }
 
   .sm10p-en {
-    font-size: 9px;
+    display: none;
   }
 }
 </style>
