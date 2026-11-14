@@ -38,6 +38,21 @@ describe('图片边框和圆角', () => {
     expect(style).toContain('width: 40%')
   })
 
+  it('宽度写成 320 px 时仍是 320 像素', () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    editor = new Editor({
+      element: host,
+      extensions: [
+        StarterKit.configure({ dropcursor: false }),
+        RteImage.configure({ inline: false, allowBase64: true, HTMLAttributes: { class: 'rte-image' } }),
+      ],
+      content: `<img src="${PIXEL}" width="320 px" height="180 px" alt="像素">`,
+    })
+    expect(editor.getHTML()).toContain('width="320"')
+    expect(editor.getHTML()).toContain('height="180"')
+  })
+
   it('图片设成包含时画面按原比例留在框里', () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
