@@ -27,7 +27,7 @@ function block(id: SevenSBlockId) {
   <div class="sheet" :style="chrome" aria-label="麦肯锡 7S">
     <header class="sheet-top">
       <h2>{{ doc.title }}</h2>
-      <p>中间是共同价值观。周围六项如果互相打架，战略就落不下去。</p>
+      <p>共同价值观是大家真正相信的。另外六项如果互相打架，战略就落不下去。</p>
     </header>
     <div class="grid">
       <section
@@ -47,13 +47,17 @@ function block(id: SevenSBlockId) {
 </template>
 
 <style scoped>
-.sheet { position: absolute; inset: 0; box-sizing: border-box; display: flex; flex-direction: column; min-height: 0; padding: 12px 14px 14px; background: var(--cv-page, #f7f7f7); color: #202124; }
+.sheet { position: absolute; inset: 0; box-sizing: border-box; display: flex; flex-direction: column; min-height: 0; padding: 12px 14px 14px; overflow: auto; background: var(--cv-page, #f7f7f7); color: #202124; }
 .sheet-top { flex: none; margin-bottom: 10px; }
 .sheet-top h2, .sheet-top p { margin: 0; }
-.sheet-top p { color: #5f6368; font-size: 13px; }
+.sheet-top p { max-width: 42em; color: #3c4043; font-size: 15px; line-height: 1.55; }
 .grid { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: 1fr 1fr 1fr; grid-template-rows: 1fr 0.8fr 1fr; gap: 8px; }
 .shared { grid-column: 1 / -1; }
 section { display: flex; flex-direction: column; min-height: 0; background: var(--col-body); border-radius: 12px; overflow: hidden; }
-h3 { margin: 0; min-height: 36px; display: flex; align-items: center; justify-content: center; background: var(--col-header); color: #fff; letter-spacing: 0.04em; }
+h3 { margin: 0; min-height: 44px; display: flex; align-items: center; justify-content: center; padding: 0 8px; background: var(--col-header); color: #fff; font-size: 16px; letter-spacing: 0.04em; text-align: center; }
 .rte-slot { flex: 1 1 auto; min-height: 0; display: flex; }
+@media (max-width: 800px) {
+  .grid.grid { grid-template-columns: 1fr; grid-template-rows: none; }
+  section { min-height: 220px; height: auto; }
+}
 </style>
