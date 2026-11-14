@@ -92,6 +92,22 @@ assert.equal(searchToolbarTools(aliasGroups, '文档模板')[0]?.key, 'template'
 assert.equal(searchToolbarTools(aliasGroups, '恢复')[0]?.key, 'redo')
 assert.equal(searchToolbarTools(aliasGroups, '寻找')[0]?.key, 'find')
 assert.equal(searchToolbarTools(aliasGroups, '插表')[0]?.key, 'table')
+const moreAliases = [{
+  id: 'more',
+  label: '更多',
+  tools: [
+    { key: 'undo', label: '撤销钮' },
+    { key: 'bold', label: '粗' },
+    { key: 'emoji', label: '表情钮' },
+    { key: 'copyMd', label: '复制' },
+    { key: 'mentionBtn', label: '提及钮' },
+  ],
+}]
+assert.equal(searchToolbarTools(moreAliases, '撤回')[0]?.key, 'undo')
+assert.equal(searchToolbarTools(moreAliases, '加黑')[0]?.key, 'bold')
+assert.equal(searchToolbarTools(moreAliases, '颜文字')[0]?.key, 'emoji')
+assert.equal(searchToolbarTools(moreAliases, '复制md')[0]?.key, 'copyMd')
+assert.equal(searchToolbarTools(moreAliases, '艾特')[0]?.key, 'mentionBtn')
 assert.equal(readStoredRibbonTab('style', tabs), 'style')
 assert.equal(readStoredRibbonTab('missing', tabs), 'edit')
 assert.equal(readStoredRibbonTab(null, []), 'edit')
