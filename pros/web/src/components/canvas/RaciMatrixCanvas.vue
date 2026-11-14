@@ -140,7 +140,8 @@ function toggle(id: string) {
                 :aria-label="`${row.task.name} ${role.name}`"
                 @click.stop="cycle(row.task.id, role.id)"
               >
-                {{ row.task.cells[role.id] || '·' }}
+                <span class="role-name">{{ role.name }}</span>
+                <span class="role-letter">{{ row.task.cells[role.id] || '·' }}</span>
               </button>
             </td>
           </tr>
@@ -159,13 +160,14 @@ function toggle(id: string) {
   flex-direction: column;
   min-height: 0;
   padding: 12px 14px 14px;
+  overflow: auto;
   color: #202124;
   background: var(--cv-page, #f7f7f7);
 }
 .raci-top { flex: none; display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin-bottom: 10px; }
 .raci-top h2, .raci-top p { margin: 0; }
-.raci-top p { color: #5f6368; font-size: 13px; }
-.legend, .tools { display: flex; gap: 6px; align-items: center; }
+.raci-top p { max-width: 42em; color: #3c4043; font-size: 15px; line-height: 1.55; }
+.legend, .tools { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .letter, .cell {
   display: inline-flex;
   align-items: center;
@@ -183,7 +185,7 @@ function toggle(id: string) {
 .letter-C, .cell.letter-C { background: #b85a38; color: #fff; }
 .letter-I, .cell.letter-I { background: #2a649f; color: #fff; }
 .letter-empty, .cell.letter-empty { background: #f1f3f4; color: #9aa0a6; }
-.tools button { border: 1px solid #dadce0; background: #fff; border-radius: 999px; min-height: 32px; padding: 4px 12px; font-size: 13px; cursor: pointer; }
+.tools button { border: 1px solid #dadce0; background: #fff; border-radius: 999px; min-height: 40px; padding: 4px 14px; font: inherit; font-size: 15px; cursor: pointer; }
 .tools button:disabled { color: #9aa0a6; }
 .raci-sheet {
   flex: 1 1 auto;
@@ -211,7 +213,38 @@ tr.selected td, tr.selected th { background: #e8f0fe; }
 input { width: 100%; min-height: 32px; border: 0; background: transparent; font: inherit; font-size: 15px; color: inherit; }
 .work { display: flex; align-items: center; gap: 6px; }
 .indent, .twist--blank { flex: none; display: inline-block; width: 24px; }
-.twist { flex: none; width: 24px; height: 24px; border: 0; background: transparent; color: #5f6368; cursor: pointer; }
-.wbs { flex: none; color: #5f6368; font-size: 13px; min-width: 36px; font-variant-numeric: tabular-nums; }
+.twist { flex: none; width: 36px; height: 36px; border: 0; background: transparent; color: #5f6368; font-size: 16px; cursor: pointer; }
+.wbs { flex: none; color: #5f6368; font-size: 14px; min-width: 36px; font-variant-numeric: tabular-nums; }
+.work input { min-width: 0; }
 .cell { width: 44px; height: 44px; min-width: 44px; min-height: 44px; font-size: 16px; cursor: pointer; }
+.role-name { display: none; }
+.role-letter { line-height: 1; }
+@media (max-width: 800px) {
+  .raci-sheet.raci-sheet { overflow: visible; background: transparent; border: 0; box-shadow: none; }
+  table, tbody, tr, th, td { display: block; }
+  thead { display: none; }
+  tbody tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 10px;
+    padding: 10px;
+    background: #fff;
+    border: 1px solid #ececec;
+    border-radius: 12px;
+  }
+  tbody th { flex: 1 1 100%; padding: 0; border: 0; }
+  tbody td { flex: 1 1 0; padding: 0; border: 0; }
+  .cell {
+    width: 100%;
+    height: auto;
+    min-width: 0;
+    min-height: 56px;
+    flex-direction: column;
+    gap: 2px;
+    padding: 6px 4px;
+  }
+  .role-name { display: block; font-size: 13px; font-weight: 650; }
+}
 </style>
