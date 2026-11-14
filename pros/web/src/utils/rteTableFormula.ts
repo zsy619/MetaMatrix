@@ -330,7 +330,7 @@ type Node =
   | { k: 'cmp'; op: string; l: Node; r: Node }
   | { k: 'call'; name: string; args: Node[] }
 
-const FUNC_NAMES = new Set(['SUM', 'AVERAGE', 'COUNT', 'MAX', 'MIN', 'IF', 'ROUND', 'AND', 'OR', 'ABS', 'INT', 'MOD', 'POWER', 'SQRT', 'SIGN', 'CEILING', 'FLOOR', 'NOT', 'PRODUCT', 'MEDIAN'])
+const FUNC_NAMES = new Set(['SUM', 'AVERAGE', 'COUNT', 'MAX', 'MIN', 'IF', 'ROUND', 'AND', 'OR', 'ABS', 'INT', 'MOD', 'POWER', 'SQRT', 'SIGN', 'CEILING', 'FLOOR', 'NOT', 'PRODUCT', 'MEDIAN', 'COUNTA'])
 
 class Parser {
   tokens: LexToken[]
@@ -707,6 +707,7 @@ function evalCall(name: string, args: Node[], ctx: Ctx, at: CellAddress): EvalVa
   if (name === 'FLOOR') return evalFloor(args, ctx, at)
   if (name === 'ROUND') return evalRound(args, ctx, at)
   const values: number[] = []
+  let filled = 0
   for (const arg of args) {
     const cells = cellsOf(arg, at)
     if (cells) {
@@ -720,8 +721,10 @@ function evalCall(name: string, args: Node[], ctx: Ctx, at: CellAddress): EvalVa
         }
         sawCell = true
         if (cell.kind === 'err') return cell
+        if (cell.kind === 'blank') continue
+        filled += 1
         if (cell.kind === 'num') values.push(cell.v)
-        // 空白和文字在求和、平均里跳过。整段都在表格外才是 #REF!。
+        // 空白在求和、平均里跳过。文字计入 COUNTA。整段都在表格外才是 #REF!。
       }
       if (!sawCell && sawMissing) return { error: '#REF!' }
       continue
@@ -729,7 +732,9 @@ function evalCall(name: string, args: Node[], ctx: Ctx, at: CellAddress): EvalVa
     const v = evalNode(arg, ctx, at)
     if (isError(v)) return v
     values.push(v)
+    filled += 1
   }
+  if (name === 'COUNTA') return filled
   if (name === 'COUNT') return values.length
   if (name === 'SUM') return values.reduce((a, b) => a + b, 0)
   if (name === 'AVERAGE') {

@@ -76,6 +76,8 @@ assert.equal(evaluateCellFormula('=$A$1', grid2, 0, 0), '1')
 assert.equal(evaluateCellFormula('=SUM($A$1:$B$1)', grid2, 0, 0), '3')
 
 // 求和区域比表格长时，多出来的格子跳过，不把整段算成 #REF!
+assert.equal(evaluateCellFormula('=COUNTA(A1:A3)', [['1'], [''], ['甲']], 0, 0), '2')
+assert.equal(evaluateCellFormula('=COUNT(A1:A3)', [['1'], [''], ['甲']], 0, 0), '1')
 assert.equal(evaluateCellFormula('=MEDIAN(A1:A3)', [['1'], ['9'], ['2']], 0, 0), '2')
 assert.equal(evaluateCellFormula('=MEDIAN(A1:A4)', [['1'], ['2'], ['3'], ['4']], 0, 0), '2.5')
 assert.deepEqual(evaluateFormula('=MEDIAN(A1)', [['']], 0, 0), { ok: false, value: null, error: '#DIV/0!' })
