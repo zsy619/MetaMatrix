@@ -1,7 +1,7 @@
 /** 页眉、页脚、页码。旧文档没有这个字段时视为空，不改变版心。 */
 import { cssPageMargin, type PageMarginBox } from './rtePageMargin'
 
-export const PAGE_NUMBER_STYLES = ['none', 'n', 'page-n', 'page-n-of-m', 'dash', 'roman'] as const
+export const PAGE_NUMBER_STYLES = ['none', 'n', 'page-n', 'page-n-of-m', 'dash', 'roman', 'upper-roman'] as const
 
 export type PageNumberStyle = (typeof PAGE_NUMBER_STYLES)[number]
 
@@ -31,6 +31,7 @@ export const PAGE_NUMBER_OPTIONS: ReadonlyArray<{ id: PageNumberStyle; label: st
   { id: 'page-n-of-m', label: '第 1 页 共 n 页' },
   { id: 'dash', label: '- 1 -' },
   { id: 'roman', label: 'i, ii, iii' },
+  { id: 'upper-roman', label: 'I, II, III' },
 ]
 
 /** 页眉或页脚占用的最小边带。已有边距更大时不额外加高。 */
@@ -104,6 +105,8 @@ function pageNumberCss(style: PageNumberStyle): string {
       return '"- " counter(page) " -"'
     case 'roman':
       return 'counter(page, lower-roman)'
+    case 'upper-roman':
+      return 'counter(page, upper-roman)'
     default:
       return ''
   }
@@ -247,6 +250,8 @@ export function formatPageNumber(style: PageNumberStyle, page: number, total: nu
       return `- ${n} -`
     case 'roman':
       return toLowerRoman(n)
+    case 'upper-roman':
+      return toLowerRoman(n).toUpperCase()
     default:
       return ''
   }
