@@ -1518,6 +1518,16 @@ function seriesSymbolAt(
   return mark.symbol || mark.symbolSize != null ? mark : undefined
 }
 
+function seriesShowSymbol(option: Record<string, unknown>, index: number): boolean | undefined {
+  const series = option.series
+  if (!Array.isArray(series)) return undefined
+  const item = series[index]
+  if (!isPlainObject(item)) return undefined
+  if (item.showSymbol === false) return false
+  if (item.showSymbol === true) return true
+  return undefined
+}
+
 function seriesLineStyleAt(
   option: Record<string, unknown>,
   index: number,
@@ -1724,6 +1734,7 @@ function buildCartesianOption(
     symbol?: string
     symbolSize?: number | string
     lineStyle?: { width?: number; type?: 'solid' | 'dashed' | 'dotted' }
+    showSymbol?: boolean
   }>,
   horizontal = false,
   names?: { category?: string; value?: string },
@@ -1776,6 +1787,7 @@ function buildCartesianOption(
       ...(item.symbol ? { symbol: item.symbol } : {}),
       ...(item.symbolSize != null ? { symbolSize: item.symbolSize } : {}),
       ...(item.lineStyle ? { lineStyle: item.lineStyle } : {}),
+      ...(item.showSymbol != null ? { showSymbol: item.showSymbol } : {}),
       smooth: type === 'line' ? looks?.[index]?.straight !== true : undefined,
       areaStyle:
         type === 'line' && (looks?.[index] ? looks[index]!.filled : true) ? { opacity: 0.12 } : undefined,
@@ -2011,6 +2023,7 @@ export function retypeEchartsOption(
         symbol: seriesSymbolAt(base, index)?.symbol,
         symbolSize: seriesSymbolAt(base, index)?.symbolSize,
         lineStyle: seriesLineStyleAt(base, index),
+        showSymbol: seriesShowSymbol(base, index),
       })),
       categoryOnYAxis(base),
       cartesianAxisNames(base),
