@@ -370,7 +370,7 @@ function toggleChartGroupMenu(key: string) {
             type="button"
             class="rte-tool rte-view-mode-tool rte-toolbar-fold"
             :aria-expanded="rte.toolbarRowsOpen"
-            :title="rte.toolbarRowsOpen ? '收起工具栏面板' : '展开工具栏。收起时放不下的分组在下一行，点此全部显示'"
+            :title="rte.toolbarRowsOpen ? toolbarActionTitle('rows-collapse') : toolbarActionTitle('rows-expand')"
             @click="rte.toggleToolbarRows()"
           >
             <span data-rte-own class="rte-tool-icon rte-view-mode-glyph" aria-hidden="true">{{
@@ -418,7 +418,7 @@ function toggleChartGroupMenu(key: string) {
         :key="group.id"
         class="rte-tool-group"
         :data-search-best="rte.toolbarQuery && groupIndex === 0 ? '1' : undefined"
-        :title="rte.toolbarQuery ? '正在搜索，先清除搜索再调整分组' : '右键可设置组内按钮的显隐与顺序'"
+        :title="rte.toolbarQuery ? toolbarActionTitle('group-search-lock') : toolbarActionTitle('group-context')"
         :class="{
           'is-drop-target': rte.toolbarDropIndex === rte.toolbarOrder.indexOf(group.id),
           'is-dragging': rte.toolbarDragSource === group.id,
@@ -450,7 +450,7 @@ function toggleChartGroupMenu(key: string) {
             @pointermove="rte.onToolbarHandlePointerMove"
             @pointerup="rte.onToolbarHandlePointerUp"
             @pointercancel="rte.onToolbarHandlePointerUp"
-            :title="rte.toolbarQuery ? '正在搜索，先清除搜索再调整分组' : '双击恢复本组按钮的默认显隐和顺序'"
+            :title="rte.toolbarQuery ? toolbarActionTitle('group-search-lock') : toolbarActionTitle('group-dbl-reset')"
             @dblclick.stop="onGroupRestore(group.id)"
           >{{ searchGroupCaption(group.label, group.tools.length, !!rte.toolbarQuery) }}</span>
           <p v-if="group.hiddenAll" data-rte-own class="rte-group-empty">{{ EMPTY_GROUP_NOTE }}</p>
@@ -478,7 +478,7 @@ function toggleChartGroupMenu(key: string) {
             :ref="(el) => rte.setFloatAnchor('heading', el)"
             data-rte-anchor="heading"
             :class="{ active: rte.headingOpen || rte.currentParaStyleLabel !== '正文' }"
-            :title="'段落样式：' + rte.currentParaStyleLabel"
+            :title="toolbarActionTitle('para-current') + rte.currentParaStyleLabel"
             aria-label="段落样式"
             :aria-expanded="rte.headingOpen"
             aria-haspopup="menu"
@@ -571,7 +571,7 @@ function toggleChartGroupMenu(key: string) {
                 rte.isActive('orderedList') ||
                 rte.isActive('taskList'),
             }"
-            :title="rte.isActive('taskList') ? '任务列表' : rte.isActive('orderedList') ? '有序列表' : rte.isActive('bulletList') ? '无序列表' : '无序、有序或任务列表'"
+            :title="rte.isActive('taskList') ? '任务列表' : rte.isActive('orderedList') ? '有序列表' : rte.isActive('bulletList') ? '无序列表' : toolbarActionTitle('list-menu')"
             :aria-label="rte.isActive('taskList') ? '任务列表' : rte.isActive('orderedList') ? '有序列表' : rte.isActive('bulletList') ? '无序列表' : '列表'"
             aria-haspopup="menu"
             :aria-expanded="rte.listOpen"
@@ -642,7 +642,7 @@ function toggleChartGroupMenu(key: string) {
                 rte.isActive('formDateInput') ||
                 rte.isActive('formSwitch'),
             }"
-            :title="t.title || '表单'"
+            :title="t.title || toolbarActionTitle('form-menu')"
             aria-label="插入表单控件"
             aria-haspopup="menu"
             :aria-expanded="rte.formOpen"
@@ -677,7 +677,7 @@ function toggleChartGroupMenu(key: string) {
               <button data-rte-own type="button" :title="toolbarActionTitle('form-duplicate')" @click.stop="rte.duplicateSelectedForm()"><RteMenuGlyph label="复制当前字段" />复制当前字段</button>
               <button data-rte-own type="button" :title="toolbarActionTitle('form-check-fill')" @click.stop="rte.checkFormFields()"><RteMenuGlyph label="检查填写" />检查填写</button>
               <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
-              <button data-rte-own type="button" title="打开表格尺寸对话框，自己填行数和列数" @click.stop="rte.formOpen = false; rte.openTableDialog()"><RteMenuGlyph label="表格" />表格</button>
+              <button data-rte-own type="button" :title="toolbarActionTitle('table-size-dialog')" @click.stop="rte.formOpen = false; rte.openTableDialog()"><RteMenuGlyph label="表格" />表格</button>
             </div>
           </Teleport>
         </div>
@@ -692,7 +692,7 @@ function toggleChartGroupMenu(key: string) {
             class="rte-tool"
             :ref="(el) => rte.setFloatAnchor('template', el)" data-rte-anchor="template"
             :class="{ active: rte.templateOpen }"
-            :title="t.title || '插入模板'"
+            :title="t.title || toolbarActionTitle('template-menu')"
             aria-label="插入模板"
             aria-haspopup="menu"
             :aria-expanded="rte.templateOpen"
@@ -749,7 +749,7 @@ function toggleChartGroupMenu(key: string) {
             class="rte-tool"
             :ref="(el) => rte.setFloatAnchor('highlight', el)" data-rte-anchor="highlight"
             :class="{ active: rte.isActive('highlight') || rte.highlightOpen }"
-            :title="t.title || '高亮颜色'"
+            :title="t.title || toolbarActionTitle('highlight-menu')"
             aria-label="高亮颜色"
             :aria-expanded="rte.highlightOpen"
             aria-haspopup="dialog"
@@ -786,7 +786,7 @@ function toggleChartGroupMenu(key: string) {
             class="rte-tool"
             :ref="(el) => rte.setFloatAnchor('color', el)" data-rte-anchor="color"
             :class="{ active: rte.colorOpen }"
-            :title="t.title || '文字颜色'"
+            :title="t.title || toolbarActionTitle('color-menu')"
             aria-label="文字颜色"
             :aria-expanded="rte.colorOpen"
             aria-haspopup="dialog"
@@ -969,7 +969,7 @@ function toggleChartGroupMenu(key: string) {
             :ref="(el) => rte.setFloatAnchor('linkButton', el)"
             data-rte-anchor="linkButton"
             :class="{ active: rte.linkButtonOpen || rte.isActive('linkButton') }"
-            :title="t.title || '插入打开链接的按钮'"
+            :title="t.title || toolbarActionTitle('link-button-menu')"
             aria-label="按钮"
             aria-haspopup="menu"
             :aria-expanded="rte.linkButtonOpen"
@@ -1077,7 +1077,7 @@ function toggleChartGroupMenu(key: string) {
             class="rte-tool"
             :ref="(el) => rte.setFloatAnchor('table', el)" data-rte-anchor="table"
             :class="{ active: rte.tableMenuOpen || rte.tableQuickOpen || rte.tableDialogOpen || rte.isInTable() }"
-            :title="rte.isInTable() ? '表格操作' : '插入表格'"
+            :title="rte.isInTable() ? toolbarActionTitle('table-inside') : toolbarActionTitle('table-insert')"
             aria-label="表格"
             aria-haspopup="menu"
             :aria-expanded="rte.isInTable() ? rte.tableMenuOpen : rte.tableQuickOpen"
@@ -1213,7 +1213,7 @@ function toggleChartGroupMenu(key: string) {
                   :key="'menu-bg-' + p.value"
                   type="button"
                   class="rte-table-swatch"
-                  :title="p.value ? '单元格底色：' + p.label : '去掉单元格底色'"
+                  :title="p.value ? '单元格底色：' + p.label : toolbarActionTitle('cell-fill-clear')"
                   :style="p.value ? { background: p.value } : undefined"
                   @click="rte.setTableCellBg(p.value); rte.closeTableMenu()"
                 >{{ p.value ? '' : '无' }}</button>
@@ -1245,7 +1245,7 @@ function toggleChartGroupMenu(key: string) {
             class="rte-tool"
             :ref="(el) => rte.setFloatAnchor('import', el)" data-rte-anchor="import"
             :class="{ active: rte.importMenuOpen }"
-            :title="t.title || '导入'"
+            :title="t.title || toolbarActionTitle('import-menu')"
             aria-haspopup="menu"
             :aria-expanded="rte.importMenuOpen"
             @click.stop="rte.markToolbarMenuOpening(); rte.importMenuOpen = !rte.importMenuOpen"
@@ -1297,7 +1297,7 @@ function toggleChartGroupMenu(key: string) {
             class="rte-tool"
             :ref="(el) => rte.setFloatAnchor('export', el)" data-rte-anchor="export"
             :class="{ active: rte.exportMenuOpen }"
-            :title="t.title || '导出'"
+            :title="t.title || toolbarActionTitle('export-menu')"
             aria-haspopup="menu"
             :aria-expanded="rte.exportMenuOpen"
             @click.stop="rte.markToolbarMenuOpening(); rte.exportMenuOpen = !rte.exportMenuOpen"
@@ -1396,8 +1396,8 @@ function toggleChartGroupMenu(key: string) {
           type="button"
           class="rte-tool"
           :class="{ active: rte.attachDialogOpen }"
-          :title="t.title || t.label"
-          :aria-label="t.title || t.label"
+          :title="t.title || toolbarActionTitle('attach-menu')"
+          :aria-label="t.title || toolbarActionTitle('attach-menu')"
           aria-haspopup="dialog"
           @click="t.run?.()"
         >
@@ -1484,8 +1484,8 @@ function toggleChartGroupMenu(key: string) {
             class="rte-code-flag-btn"
             :class="{ 'is-on': rte.codeBlockFlag('lineNumbers') }"
             :aria-pressed="rte.codeBlockFlag('lineNumbers')"
-            title="在代码块左侧显示行号"
-            aria-label="在代码块左侧显示行号"
+            :title="toolbarActionTitle('code-lines')"
+            :aria-label="toolbarActionTitle('code-lines')"
             @mousedown.prevent
             @click="rte.toggleCodeBlockFlag('lineNumbers')"
           >
@@ -1497,8 +1497,8 @@ function toggleChartGroupMenu(key: string) {
             class="rte-code-flag-btn"
             :class="{ 'is-on': rte.codeBlockFlag('wordWrap') }"
             :aria-pressed="rte.codeBlockFlag('wordWrap')"
-            title="长行在代码块里自动换行"
-            aria-label="长行在代码块里自动换行"
+            :title="toolbarActionTitle('code-wrap')"
+            :aria-label="toolbarActionTitle('code-wrap')"
             @mousedown.prevent
             @click="rte.toggleCodeBlockFlag('wordWrap')"
           >
@@ -1508,8 +1508,8 @@ function toggleChartGroupMenu(key: string) {
             v-if="rte.isActive('codeBlock')"
             type="button"
             class="rte-code-copy-btn"
-            title="把这段代码复制到剪贴板"
-            aria-label="把这段代码复制到剪贴板"
+            :title="toolbarActionTitle('code-copy')"
+            :aria-label="toolbarActionTitle('code-copy')"
             @mousedown.prevent
             @click="rte.copyActiveCodeBlock"
           >
@@ -1528,7 +1528,7 @@ function toggleChartGroupMenu(key: string) {
             :ref="(el) => rte.setFloatAnchor('emoji', el)"
             data-rte-anchor="emoji"
             :class="{ active: rte.emojiOpen }"
-            :title="t.title || '表情'"
+            :title="t.title || toolbarActionTitle('emoji-menu')"
             @click.stop="rte.markToolbarMenuOpening(); rte.closeColorMenus(); rte.closeHighlightMenus(); rte.closeFontMenus(); rte.specialCharsOpen = false; rte.emojiOpen = !rte.emojiOpen"
           >
             <span data-rte-own class="rte-tool-icon">
@@ -1685,7 +1685,7 @@ function toggleChartGroupMenu(key: string) {
             :ref="(el) => rte.setFloatAnchor('spacing', el)"
             data-rte-anchor="spacing"
             :class="{ active: rte.spacingOpen || !!(rte.currentLetterSpacing() || rte.currentMarginTop() || rte.currentMarginBottom()) }"
-            :title="t.title || '段前、段后和字间距'"
+            :title="t.title || toolbarActionTitle('spacing-menu')"
             @click.stop="rte.markToolbarMenuOpening(); rte.spacingOpen = !rte.spacingOpen"
           >
             <span data-rte-own class="rte-tool-icon">
@@ -1729,7 +1729,7 @@ function toggleChartGroupMenu(key: string) {
             :ref="(el) => rte.setFloatAnchor('paraStyle', el)"
             data-rte-anchor="paraStyle"
             :class="{ active: rte.paraStyleOpen }"
-            :title="t.title || '段落样式'"
+            :title="t.title || toolbarActionTitle('para-style-menu')"
             @click.stop="rte.markToolbarMenuOpening(); rte.paraStyleOpen = !rte.paraStyleOpen"
           >
             <span data-rte-own class="rte-tool-icon">
@@ -1766,7 +1766,7 @@ function toggleChartGroupMenu(key: string) {
             :ref="(el) => rte.setFloatAnchor('listStyle', el)"
             data-rte-anchor="listStyle"
             :class="{ active: rte.listStyleOpen }"
-            :title="t.title || '编号样式'"
+            :title="t.title || toolbarActionTitle('list-style-menu')"
             @click.stop="rte.markToolbarMenuOpening(); rte.listStyleOpen = !rte.listStyleOpen"
           >
             <span data-rte-own class="rte-tool-icon">
@@ -1807,7 +1807,7 @@ function toggleChartGroupMenu(key: string) {
             :ref="(el) => rte.setFloatAnchor('wordStats', el)"
             data-rte-anchor="wordStats"
             :class="{ active: rte.wordStatsOpen }"
-            :title="t.title || '字数'"
+            :title="t.title || toolbarActionTitle('word-stats-menu')"
             @click.stop="rte.markToolbarMenuOpening(); rte.wordStatsOpen = !rte.wordStatsOpen"
           >
             <span data-rte-own class="rte-tool-icon">
@@ -1946,7 +1946,7 @@ function toggleChartGroupMenu(key: string) {
             autocomplete="off"
             spellcheck="false"
                 placeholder="搜索，例如 bold、引用、tab"
-                title="搜快捷键，可以打 bold、引用或 tab"
+                :title="toolbarActionTitle('shortcut-find')"
                 aria-label="搜索快捷键"
                 @mousedown.stop
                 @keydown.stop
@@ -2744,7 +2744,7 @@ function toggleChartGroupMenu(key: string) {
               <button data-rte-own type="button" :title="toolbarActionTitle('form-duplicate')" @click="rte.duplicateSelectedForm()"><RteMenuGlyph label="复制当前字段" />复制当前字段</button>
               <button data-rte-own type="button" :title="toolbarActionTitle('form-check-fill')" @click="rte.checkFormFields()"><RteMenuGlyph label="检查填写" />检查填写</button>
               <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
-              <button data-rte-own type="button" title="打开表格尺寸对话框，自己填行数和列数" @click="rte.moreFormOpen = false; rte.moreOpen = false; rte.openTableDialog()"><RteMenuGlyph label="表格" />表格</button>
+              <button data-rte-own type="button" :title="toolbarActionTitle('table-size-dialog')" @click="rte.moreFormOpen = false; rte.moreOpen = false; rte.openTableDialog()"><RteMenuGlyph label="表格" />表格</button>
             </div>
             <div data-rte-own
               v-if="mt.kind === 'template' && rte.moreTemplateOpen"
@@ -2963,7 +2963,7 @@ function toggleChartGroupMenu(key: string) {
             autocomplete="off"
             spellcheck="false"
             placeholder="搜索，例如 bold、引用、tab"
-            title="搜快捷键，可以打 bold、引用或 tab"
+            :title="toolbarActionTitle('shortcut-find')"
             aria-label="搜索快捷键"
             @mousedown.stop
             @keydown.stop
@@ -3038,8 +3038,8 @@ function toggleChartGroupMenu(key: string) {
             </button>
           </div>
           <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
-          <button data-rte-own type="button" title="把显隐和顺序恢复成最初的样子" @click="rte.restoreToolbarGroupButtons(rte.toolbarGroupButtonsGroupId)">恢复本组默认</button>
-          <button data-rte-own type="button" title="关闭分组设置" @click="rte.closeToolbarGroupButtons()">完成</button>
+          <button data-rte-own type="button" :title="toolbarActionTitle('group-restore')" @click="rte.restoreToolbarGroupButtons(rte.toolbarGroupButtonsGroupId)">恢复本组默认</button>
+          <button data-rte-own type="button" :title="toolbarActionTitle('group-done')" @click="rte.closeToolbarGroupButtons()">完成</button>
         </div>
       </Teleport>
 
