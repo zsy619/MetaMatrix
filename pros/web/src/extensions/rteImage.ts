@@ -22,7 +22,7 @@ function percentWidthAttr(raw: string): string | null {
 }
 
 function pixelAttr(raw: string): number | null {
-  const text = raw.trim().replace(/\s*px$/i, '')
+  const text = raw.trim().replace(/\s*px$/i, '').replace(/，/g, '.').replace(/,/g, '.')
   if (!text || /%|％/.test(text)) return null
   const n = Number(text)
   return Number.isFinite(n) && n > 0 ? Math.round(n) : null
