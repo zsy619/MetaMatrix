@@ -46,7 +46,7 @@ function normalizeRatios(
   if (typeof ratios === 'string' && ratios.trim()) {
     arr = ratios
       .normalize('NFKC')
-      .split(/[:：/／比∶;|x×、]/)
+      .split(/[:：/／比∶;|x×、\s]+/)
       .map((s) => Math.round(Number(s.trim()) * 100) / 100)
       .filter((n) => Number.isFinite(n) && n > 0)
   } else if (Array.isArray(ratios)) {
