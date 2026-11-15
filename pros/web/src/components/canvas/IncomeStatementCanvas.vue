@@ -110,6 +110,25 @@ footer button { min-height: 40px; padding: 0 12px; }
   .line { grid-template-columns: minmax(0, 1fr) 108px 36px; }
 }
 @media (max-width: 480px) {
-  .line { grid-template-columns: minmax(0, 1fr) 84px 36px; }
+  .sheet { padding-bottom: 28px; }
+  .line {
+    grid-template-columns: minmax(0, 1fr) 40px;
+  }
+  .line input:not([type='number']) {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .line input[type='number'] {
+    grid-column: 1;
+    grid-row: 2;
+    text-align: left;
+  }
+  .line button {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    width: 40px;
+    height: 40px;
+    align-self: center;
+  }
 }
 </style>
