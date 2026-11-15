@@ -28,7 +28,7 @@ describe('计划画布', () => {
     expect(todo.get('.count').text()).toBe('2')
     await todo.get('header button').trigger('click')
     expect(wrapper.get('[data-column="todo"] .count').text()).toBe('3')
-    await wrapper.get('[data-column="todo"] [aria-label="移到下一列"]').trigger('click')
+    await wrapper.get('[data-column="todo"] [aria-label="移到进行中"]').trigger('click')
     expect(wrapper.get('[data-column="doing"] .count').text()).toBe('2')
     wrapper.unmount()
   })

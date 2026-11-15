@@ -93,10 +93,20 @@ function removeCard(cardId: string) {
         </header>
         <div class="cards">
           <article v-for="card in column.cards" :key="card.id">
-            <textarea :value="card.text" :aria-label="`${column.title}卡片`" @change="editCard(card.id, ($event.target as HTMLTextAreaElement).value)" />
+            <textarea :value="card.text" :aria-label="`${column.title}卡片`" @input="editCard(card.id, ($event.target as HTMLTextAreaElement).value)" />
             <div class="kanban-move">
-              <button type="button" :disabled="index === 0" aria-label="移到上一列" @click="move(card.id, -1)">上一列</button>
-              <button type="button" :disabled="index === doc.columns.length - 1" aria-label="移到下一列" @click="move(card.id, 1)">下一列</button>
+              <button
+                v-if="index > 0"
+                type="button"
+                :aria-label="`移到${doc.columns[index - 1].title}`"
+                @click="move(card.id, -1)"
+              >移到{{ doc.columns[index - 1].title }}</button>
+              <button
+                v-if="index < doc.columns.length - 1"
+                type="button"
+                :aria-label="`移到${doc.columns[index + 1].title}`"
+                @click="move(card.id, 1)"
+              >移到{{ doc.columns[index + 1].title }}</button>
               <button type="button" aria-label="删除卡片" @click="removeCard(card.id)">删除</button>
             </div>
           </article>
@@ -180,10 +190,12 @@ article {
 }
 textarea {
   width: 100%;
-  min-height: 64px;
+  min-height: 72px;
   border: 0;
   background: transparent;
-  resize: vertical;
+  resize: none;
+  field-sizing: content;
+  overflow: hidden;
   font: inherit;
   font-size: 15px;
   line-height: 1.55;
@@ -210,8 +222,14 @@ textarea {
 .kanban-move button:last-child { color: #9b1c1c; }
 .kanban-move button:disabled { opacity: 0.4; cursor: default; }
 @media (max-width: 1100px) {
+  .kanban { padding-bottom: 28px; }
   .kanban-board { grid-template-columns: 1fr; overflow: visible; }
   section { min-height: 220px; height: auto; }
   .cards { overflow: visible; }
+  header button,
+  .kanban-move button {
+    min-height: 40px;
+    font-size: 15px;
+  }
 }
 </style>
