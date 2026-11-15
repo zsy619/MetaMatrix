@@ -339,6 +339,22 @@ describe('ECharts 模板与表格生成', () => {
     expect(series[0]!.data).toEqual([1200, 0.5])
   })
 
+  it('换成折线后轴标题底色还在', () => {
+    const next = retypeEchartsOption(
+      {
+        title: { text: '销售' },
+        xAxis: { type: 'category', data: ['一月', '二月'], name: '月份', nameTextStyle: { backgroundColor: '#1d4ed8' } },
+        yAxis: { type: 'value', name: '金额', nameTextStyle: { backgroundColor: 'rgb(20, 30, 40)' } },
+        series: [{ name: '今年', type: 'bar', data: [12, 18] }],
+      },
+      'line',
+    )
+    const xAxis = next.xAxis as { nameTextStyle?: { backgroundColor?: string } }
+    const yAxis = next.yAxis as { nameTextStyle?: { backgroundColor?: string } }
+    expect(xAxis.nameTextStyle?.backgroundColor).toBe('#1d4ed8')
+    expect(yAxis.nameTextStyle?.backgroundColor).toBe('rgb(20, 30, 40)')
+  })
+
   it('换成折线后轴标题超出仍截断', () => {
     const next = retypeEchartsOption(
       {
