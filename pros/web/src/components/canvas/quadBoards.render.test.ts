@@ -45,6 +45,8 @@ describe('四格画布', () => {
     for (const title of ['立刻做', '排进计划', '有空再做', '尽量别做']) {
       expect(wrapper.text()).toContain(title)
     }
+    expect(wrapper.text()).toContain('高影响 · 努力低')
+    expect(wrapper.text()).toContain('低影响 · 努力高')
     expect(wrapper.findAll('.grid section')).toHaveLength(4)
     wrapper.unmount()
   })
@@ -59,6 +61,8 @@ describe('四格画布', () => {
     for (const title of ['重点管理', '保持满意', '随时告知', '监督即可']) {
       expect(wrapper.text()).toContain(title)
     }
+    expect(wrapper.text()).toContain('权力高 · 利益高')
+    expect(wrapper.text()).toContain('权力低 · 利益低')
     expect(wrapper.findAll('.grid section')).toHaveLength(4)
     wrapper.unmount()
   })
