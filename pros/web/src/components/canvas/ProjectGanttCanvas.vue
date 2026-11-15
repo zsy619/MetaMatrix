@@ -37,6 +37,7 @@ import {
   taskDuration,
   taskHasChildren,
 } from '../../utils/projectGantt'
+import { parseMicrosoftProjectXml } from '../../utils/projectGanttImport'
 
 const props = defineProps<{ doc: ProjectGanttDocumentJSON }>()
 const documentStore = useDocumentStore()
@@ -50,6 +51,7 @@ const preview = ref<Record<string, { start: string; end: string }>>({})
 const gridRef = ref<HTMLElement | null>(null)
 const chartRef = ref<HTMLElement | null>(null)
 const splitRef = ref<HTMLElement | null>(null)
+const projectFileRef = ref<HTMLInputElement | null>(null)
 const gridWidth = ref<number | null>(null)
 const narrowQuery = typeof window !== 'undefined' && typeof window.matchMedia === 'function' ? window.matchMedia('(max-width: 900px)') : null
 const narrow = ref(narrowQuery?.matches ?? false)
@@ -377,6 +379,31 @@ function setScale(scale: 'hour' | 'day' | 'week' | 'month' | 'year') {
   })
 }
 
+function pickProject() {
+  projectFileRef.value?.click()
+}
+
+function onProjectFile(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+  void file.text().then((raw) => {
+    const parsed = parseMicrosoftProjectXml(raw)
+    if ('error' in parsed) {
+      status.value = parsed.error
+      return
+    }
+    documentStore.mutateCanvas((doc) => {
+      if (!isProjectGanttDoc(doc)) return
+      doc.title = parsed.title
+      doc.tasks = parsed.tasks
+    })
+    selectedId.value = parsed.tasks[0]?.id ?? null
+    status.value = `已导入 ${parsed.tasks.length} 条任务`
+  })
+}
+
 function setTitle(value: string) {
   documentStore.mutateCanvas((doc) => {
     if (!isProjectGanttDoc(doc)) return
@@ -500,6 +527,15 @@ function startDrag(event: PointerEvent, task: GanttTask, mode: 'move' | 'resize'
     <header class="gantt-head">
       <input class="title" :value="doc.title" aria-label="甘特图标题" @change="setTitle(($event.target as HTMLInputElement).value)" />
       <div class="toolbar">
+        <button type="button" @click="pickProject">导入 Project</button>
+        <input
+          ref="projectFileRef"
+          class="file"
+          type="file"
+          accept=".xml,text/xml,application/xml"
+          aria-label="导入 Project 文件"
+          @change="onProjectFile"
+        />
         <button type="button" @click="insert('task')">插入任务</button>
         <button type="button" @click="insert('milestone')">插入里程碑</button>
         <button type="button" :disabled="selectedIndex < 0" @click="toggleMilestone">设为里程碑</button>
@@ -736,6 +772,7 @@ function startDrag(event: PointerEvent, task: GanttTask, mode: 'move' | 'resize'
 .title { font-size: 20px; font-weight: 700; border: 1px solid transparent; border-radius: 6px; padding: 4px 8px; min-width: 0; min-height: 40px; max-width: 100%; background: transparent; }
 .title:focus { border-color: #1a73e8; background: #fff; outline: none; }
 .toolbar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.file { display: none; }
 .toolbar button, .zoom button { border: 1px solid #dadce0; background: #fff; border-radius: 999px; min-height: 40px; padding: 4px 14px; font-size: 15px; color: #202124; cursor: pointer; }
 .toolbar button:disabled { color: #9aa0a6; }
 .zoom { display: inline-flex; }

@@ -133,6 +133,7 @@ describe('项目甘特排程', () => {
       ['c', 'SS', -1],
     ])
     expect(parsePredecessors('1.2', tasks)).toEqual([])
+    expect(parsePredecessors('2FS+0.5', tasks).map((link) => [link.taskId, link.type, link.lag])).toEqual([['b', 'FS', 0.5]])
   })
 
   it('降级升级折叠，删除后子任务挂回上一级', () => {

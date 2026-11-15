@@ -140,4 +140,19 @@ describe('项目甘特图', () => {
     await bar.trigger('keydown', { key: 'ArrowLeft', shiftKey: true })
     expect((grid as HTMLElement).style.width).toBe('508px')
   })
+
+  it('导入 Project XML 后换成文件里的任务', async () => {
+    const { store, wrapper } = mountGantt()
+    const xml = `<?xml version="1.0"?><Project xmlns="http://schemas.microsoft.com/project"><Title>导入计划</Title><Tasks><Task><UID>1</UID><ID>1</ID><Name>立项</Name><OutlineLevel>1</OutlineLevel><Start>2026-12-01T08:00:00</Start><Finish>2026-12-01T17:00:00</Finish><Milestone>1</Milestone></Task></Tasks></Project>`
+    const input = wrapper.get('input[aria-label="导入 Project 文件"]')
+    const file = new File([xml], 'plan.xml', { type: 'text/xml' })
+    Object.defineProperty(input.element, 'files', { value: [file] })
+    await input.trigger('change')
+    await file.text()
+    await nextTick()
+    const doc = store.current_data
+    expect(isProjectGanttDoc(doc) && doc.title).toBe('导入计划')
+    expect(isProjectGanttDoc(doc) && doc.tasks.map((task) => task.name)).toEqual(['立项'])
+    expect(wrapper.text()).toContain('已导入 1 条任务')
+  })
 })

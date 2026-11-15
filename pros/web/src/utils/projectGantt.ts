@@ -104,9 +104,10 @@ export function isWeekend(day: number): boolean {
 
 /** 从某一天起再走 delta 个工作日。0 表示停在当天。 */
 export function shiftWorkDays(day: number, delta: number): number {
-  if (delta === 0) return day
+  const whole = delta > 0 ? Math.floor(delta) : Math.ceil(delta)
+  if (whole === 0) return day
   let cursor = day
-  let left = Math.abs(delta)
+  let left = Math.abs(whole)
   const step = delta > 0 ? 1 : -1
   while (left > 0) {
     cursor += step
@@ -246,7 +247,7 @@ export function formatPredecessors(tasks: GanttTask[], task: GanttTask): string 
 export function parsePredecessors(text: string, tasks: GanttTask[]): GanttLink[] {
   const links: GanttLink[] = []
   const seen = new Set<string>()
-  const pattern = /(?<!\d\.)(\d+)(?!\.\d)\s*(FS|SS|FF|SF)?\s*([+-]\d+)?/gi
+  const pattern = /(?<!\d\.)(\d+)(?!\.\d)\s*(FS|SS|FF|SF)?\s*([+-]\d+(?:\.\d+)?)?/gi
   for (const match of text.matchAll(pattern)) {
     const index = Number(match[1]) - 1
     const pred = tasks[index]
