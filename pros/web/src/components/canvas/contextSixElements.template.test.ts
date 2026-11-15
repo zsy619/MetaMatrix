@@ -194,6 +194,7 @@ describe('画布组件 · 上下文六要素', () => {
     const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'ContextSixElementsCanvas.vue'), 'utf8')
     expect(source).toContain('padding: 12px 12px 16px')
     expect(source).toContain('font-size: 15px')
+    expect(source).toContain('class="pm-max-btn cse-max"')
     expect(source).toContain(':expanded="true"')
     expect(source).toContain(':page-sheet="false"')
     expect(source).toContain('min-height: 100%')
