@@ -584,8 +584,8 @@ function startDrag(event: PointerEvent, task: GanttTask, mode: 'move' | 'resize'
               :data-critical="isCritical(row.task.id) ? '1' : '0'"
               @click="select(row.task.id)"
             >
-              <td class="id">{{ row.index + 1 }}</td>
-              <td class="wbs">{{ row.wbs }}</td>
+              <td class="id" data-label="ID">{{ row.index + 1 }}</td>
+              <td class="wbs" data-label="WBS">{{ row.wbs }}</td>
               <td class="name">
                 <span class="indent" :style="{ width: row.level * 14 + 'px' }" />
                 <button
@@ -598,7 +598,7 @@ function startDrag(event: PointerEvent, task: GanttTask, mode: 'move' | 'resize'
                 <span v-else class="twist twist--blank" />
                 <input :value="row.task.name" aria-label="任务名称" @click.stop @change="patchTask(row.task.id, { name: ($event.target as HTMLInputElement).value })" />
               </td>
-              <td>
+              <td class="dur" data-label="工期">
                 <input
                   type="number"
                   min="0"
@@ -609,7 +609,7 @@ function startDrag(event: PointerEvent, task: GanttTask, mode: 'move' | 'resize'
                   @change="setDuration(row.task, ($event.target as HTMLInputElement).value)"
                 />
               </td>
-              <td>
+              <td class="start" data-label="开工">
                 <span class="when">
                   <input
                     class="when-text"
@@ -630,7 +630,7 @@ function startDrag(event: PointerEvent, task: GanttTask, mode: 'move' | 'resize'
                   />
                 </span>
               </td>
-              <td>
+              <td class="end" data-label="完成">
                 <span class="when">
                   <input
                     class="when-text"
@@ -651,7 +651,7 @@ function startDrag(event: PointerEvent, task: GanttTask, mode: 'move' | 'resize'
                   />
                 </span>
               </td>
-              <td>
+              <td class="pred" data-label="前置任务">
                 <input
                   :value="formatPredecessors(tasks, row.task)"
                   aria-label="前置任务"
@@ -660,9 +660,9 @@ function startDrag(event: PointerEvent, task: GanttTask, mode: 'move' | 'resize'
                   @change="setPred(row.task, ($event.target as HTMLInputElement).value)"
                 />
               </td>
-              <td class="succ" :aria-label="`后置任务 ${formatSuccessors(tasks, row.task)}`">{{ formatSuccessors(tasks, row.task) || '·' }}</td>
-              <td><input :value="row.task.owner" aria-label="资源" @click.stop @change="patchTask(row.task.id, { owner: ($event.target as HTMLInputElement).value })" /></td>
-              <td>
+              <td class="succ" data-label="后置任务" :aria-label="`后置任务 ${formatSuccessors(tasks, row.task)}`">{{ formatSuccessors(tasks, row.task) || '·' }}</td>
+              <td class="owner" data-label="资源"><input :value="row.task.owner" aria-label="资源" @click.stop @change="patchTask(row.task.id, { owner: ($event.target as HTMLInputElement).value })" /></td>
+              <td class="progress" data-label="进度">
                 <input
                   type="number"
                   min="0"
@@ -674,7 +674,7 @@ function startDrag(event: PointerEvent, task: GanttTask, mode: 'move' | 'resize'
                   @change="patchTask(row.task.id, { progress: Math.max(0, Math.min(100, Number(($event.target as HTMLInputElement).value) || 0)) })"
                 />
               </td>
-              <td class="slack" :data-slack="slackOf(row.task.id)">{{ slackOf(row.task.id) }}</td>
+              <td class="slack" data-label="时差" :data-slack="slackOf(row.task.id)">{{ slackOf(row.task.id) }}</td>
             </tr>
           </tbody>
         </table>
@@ -683,7 +683,7 @@ function startDrag(event: PointerEvent, task: GanttTask, mode: 'move' | 'resize'
         class="split-bar"
         role="separator"
         aria-orientation="vertical"
-        aria-label="调节左右面板宽度"
+        aria-label="调节任务表宽度"
         tabindex="0"
         @pointerdown="startSplit"
         @keydown="onSplitKey"
@@ -831,14 +831,48 @@ function startDrag(event: PointerEvent, task: GanttTask, mode: 'move' | 'resize'
   .gantt .split.split { flex-direction: column; overflow: visible; }
   .split-bar { display: none; }
   .grid {
-    flex: 1 1 240px;
+    flex: 1 1 auto;
     width: 100%;
     min-width: 0;
-    min-height: 240px;
-    max-height: 48vh;
+    min-height: 0;
+    max-height: none;
+    overflow: visible;
     border-right: 0;
     border-bottom: 1px solid #dadce0;
   }
   .chart { flex: 1 1 220px; width: 100%; height: auto; min-height: 220px; }
+  .grid table { width: 100%; }
+  .grid thead { display: none; }
+  .grid tbody tr {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 10px 12px 12px;
+    border-bottom: 1px solid #eceff1;
+  }
+  .grid td {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    height: auto;
+    padding: 0;
+  }
+  .grid td::before {
+    content: attr(data-label);
+    font-size: 15px;
+    font-weight: 650;
+    line-height: 1.3;
+    color: #3c4043;
+  }
+  .grid td.name { grid-column: 1 / -1; min-width: 0; }
+  .grid td.name::before { content: none; }
+  .grid td.id,
+  .grid td.wbs,
+  .grid td.succ,
+  .grid td.slack { display: none; }
+  .grid td .when { display: flex; width: 100%; }
+  .grid input,
+  .grid input.when-text,
+  .grid input[type='number'] { width: 100%; min-height: 40px; }
 }
 </style>
