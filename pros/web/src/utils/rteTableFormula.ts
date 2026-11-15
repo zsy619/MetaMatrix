@@ -14,6 +14,7 @@
  * - #REF!   引用无效（越界、地址非法）或循环引用
  * - #VALUE! 操作数不是数值 / 公式语法非法
  * - #DIV/0! 除数为 0，或 AVERAGE 没有可参与计算的数字
+ * - #NUM!   数值超出函数定义域
  * - #NAME?  未知函数名
  */
 
@@ -21,13 +22,14 @@
 export type CellAddress = { col: number; row: number }
 
 /** 公式错误码。 */
-export type FormulaErrorCode = '#REF!' | '#VALUE!' | '#DIV/0!' | '#NAME?'
+export type FormulaErrorCode = '#REF!' | '#VALUE!' | '#DIV/0!' | '#NUM!' | '#NAME?'
 
 /** 全部错误码，供 UI 展示 / 校验用。 */
 export const FORMULA_ERROR_CODES: readonly FormulaErrorCode[] = [
   '#REF!',
   '#VALUE!',
   '#DIV/0!',
+  '#NUM!',
   '#NAME?',
 ]
 
@@ -292,7 +294,7 @@ function lex(src: string): LexToken[] {
       continue
     }
     if (ch === '#') {
-      const err = /^#(REF!|VALUE!|DIV\/0!|NAME\?)/.exec(src.slice(i))
+      const err = /^#(REF!|VALUE!|DIV\/0!|NUM!|NAME\?)/.exec(src.slice(i))
       if (!err) throw new FormulaError('#VALUE!')
       tokens.push({ t: 'err', v: err[0] as FormulaErrorCode })
       i += err[0].length
@@ -330,7 +332,7 @@ type Node =
   | { k: 'cmp'; op: string; l: Node; r: Node }
   | { k: 'call'; name: string; args: Node[] }
 
-const FUNC_NAMES = new Set(['SUM', 'AVERAGE', 'COUNT', 'MAX', 'MIN', 'IF', 'ROUND', 'AND', 'OR', 'ABS', 'INT', 'MOD', 'POWER', 'SQRT', 'SIGN', 'CEILING', 'FLOOR', 'NOT', 'PRODUCT', 'MEDIAN', 'COUNTA', 'ROUNDUP', 'ROUNDDOWN', 'PI', 'EXP', 'LN', 'LOG', 'LOG10', 'FACT', 'GCD', 'LCM', 'TRUNC', 'QUOTIENT', 'EVEN', 'ODD', 'COMBIN', 'PERMUT', 'DEGREES', 'RADIANS', 'SIN', 'COS', 'TAN', 'ASIN', 'ACOS', 'ATAN', 'ATAN2', 'SINH', 'COSH', 'TANH', 'ASINH'])
+const FUNC_NAMES = new Set(['SUM', 'AVERAGE', 'COUNT', 'MAX', 'MIN', 'IF', 'ROUND', 'AND', 'OR', 'ABS', 'INT', 'MOD', 'POWER', 'SQRT', 'SIGN', 'CEILING', 'FLOOR', 'NOT', 'PRODUCT', 'MEDIAN', 'COUNTA', 'ROUNDUP', 'ROUNDDOWN', 'PI', 'EXP', 'LN', 'LOG', 'LOG10', 'FACT', 'GCD', 'LCM', 'TRUNC', 'QUOTIENT', 'EVEN', 'ODD', 'COMBIN', 'PERMUT', 'DEGREES', 'RADIANS', 'SIN', 'COS', 'TAN', 'ASIN', 'ACOS', 'ATAN', 'ATAN2', 'SINH', 'COSH', 'TANH', 'ASINH', 'ACOSH'])
 
 class Parser {
   tokens: LexToken[]
@@ -1007,6 +1009,14 @@ function evalCall(name: string, args: Node[], ctx: Ctx, at: CellAddress): EvalVa
     const value = evalNode(args[0]!, ctx, at)
     if (isError(value)) return value
     const result = Math.asinh(value)
+    return Number.isFinite(result) ? result : { error: '#VALUE!' }
+  }
+  if (name === 'ACOSH') {
+    if (args.length !== 1) return { error: '#VALUE!' }
+    const value = evalNode(args[0]!, ctx, at)
+    if (isError(value)) return value
+    if (value < 1) return { error: '#NUM!' }
+    const result = Math.acosh(value)
     return Number.isFinite(result) ? result : { error: '#VALUE!' }
   }
   if (name === 'ROUND') return evalRound(args, ctx, at)
