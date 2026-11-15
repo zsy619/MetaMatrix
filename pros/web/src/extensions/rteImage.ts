@@ -134,6 +134,11 @@ function pixelAttr(raw: string): number | null {
     const n = (Number(milliWord[1]) * 96) / 25.4
     return Number.isFinite(n) && n > 0 ? Math.round(n) : null
   }
+  const centiWord = /^(\d+(?:\.\d+)?)\s*厘米$/.exec(text)
+  if (centiWord) {
+    const n = (Number(centiWord[1]) * 96) / 2.54
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : null
+  }
   const px = text.replace(/\s*px$/i, '')
   if (!px || /%/.test(px)) return null
   const n = Number(px)
