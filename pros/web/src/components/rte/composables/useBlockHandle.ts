@@ -2,10 +2,16 @@ import { nextTick, ref, type Ref, type ShallowRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { Editor } from '@tiptap/core'
 import { NodeSelection, TextSelection } from '@tiptap/pm/state'
-import { Fragment } from '@tiptap/pm/model'
+import { DOMSerializer, Fragment } from '@tiptap/pm/model'
 import { reorderIndexes } from '../../../utils/rteBatch3'
 import { moveHeadingAt } from '../../../utils/rteHeadingSection'
 import { blockHandleLeft, blockToolsWidth, proseContentLeft } from '../../../utils/rteGutter'
+import { applyTextAlignToSelection } from '../selectionFormat'
+import {
+  blockFaceFromNode,
+  type BlockHandleAlign,
+  type BlockHandleTurn,
+} from '../blockHandleMenu'
 
 /** 块手柄、块菜单与块拖拽。模板绑定名与原先一致。 */
 export function useBlockHandle(deps: {
@@ -15,7 +21,16 @@ export function useBlockHandle(deps: {
   expanded: () => boolean
 }) {
 /** —— 块操作：全选当前块 / 复制块 / 上移下移 —— */
-function getTopLevelBlockRange(): { from: number; to: number; node: { type: { name: string }; nodeSize: number; copy: (c?: unknown) => unknown } } | null {
+function getTopLevelBlockRange(): {
+  from: number
+  to: number
+  node: {
+    type: { name: string }
+    nodeSize: number
+    textContent: string
+    copy: (c?: unknown) => unknown
+  }
+} | null {
   const ed = deps.editor.value
   if (!ed) return null
   const { $from } = ed.state.selection
@@ -287,39 +302,176 @@ function focusTopLevelBlock(index: number): boolean {
   }
 }
 
-type BlockTurn =
-  | 'paragraph'
-  | 'h1'
-  | 'h2'
-  | 'h3'
-  | 'bullet'
-  | 'ordered'
-  | 'task'
-  | 'quote'
-  | 'info'
-  | 'warn'
-  | 'success'
-  | 'error'
+function hoveredBlockFace(): string {
+  const ed = deps.editor.value
+  const index = blockMenuIndex.value
+  if (!ed || index < 0 || index >= ed.state.doc.childCount) return ''
+  const node = ed.state.doc.child(index)
+  return blockFaceFromNode(node.type.name, node.attrs)
+}
 
-function turnHoveredBlock(kind: BlockTurn) {
+function readAlign(attrs: { textAlign?: unknown } | null | undefined): BlockHandleAlign | '' {
+  const align = String(attrs?.textAlign || '')
+  if (align === 'center' || align === 'right' || align === 'justify' || align === 'left') return align
+  return ''
+}
+
+function hoveredBlockAlign(): BlockHandleAlign {
+  const ed = deps.editor.value
+  const index = blockMenuIndex.value
+  if (!ed || index < 0 || index >= ed.state.doc.childCount) return 'left'
+  const node = ed.state.doc.child(index)
+  const own = readAlign(node.attrs)
+  if (own) return own
+  let found: BlockHandleAlign = 'left'
+  node.descendants((child) => {
+    if (child.type.name !== 'paragraph' && child.type.name !== 'heading') return
+    const align = readAlign(child.attrs)
+    if (!align) return
+    found = align
+    return false
+  })
+  return found
+}
+
+function turnHoveredBlock(kind: BlockHandleTurn) {
   const index = blockMenuIndex.value
   if (!focusTopLevelBlock(index)) return
   const ed = deps.editor.value
   if (!ed) return
+  if (kind === 'hr') {
+    const range = getTopLevelBlockRange()
+    const hrType = ed.schema.nodes.horizontalRule
+    if (!range || !hrType) return
+    ed.view.dispatch(ed.state.tr.insert(range.to, hrType.create()).scrollIntoView())
+    ed.view.focus()
+    blockMenuOpen.value = false
+    return
+  }
   const chain = ed.chain().focus()
   if (kind === 'paragraph') chain.setParagraph()
   else if (kind === 'h1') chain.setHeading({ level: 1 })
   else if (kind === 'h2') chain.setHeading({ level: 2 })
   else if (kind === 'h3') chain.setHeading({ level: 3 })
+  else if (kind === 'h4') chain.setHeading({ level: 4 })
   else if (kind === 'bullet' && !ed.isActive('bulletList')) chain.toggleBulletList()
   else if (kind === 'ordered' && !ed.isActive('orderedList')) chain.toggleOrderedList()
   else if (kind === 'task' && !ed.isActive('taskList')) chain.toggleTaskList()
   else if (kind === 'quote' && !ed.isActive('blockquote')) chain.toggleBlockquote()
+  else if (kind === 'code' && !ed.isActive('codeBlock')) chain.toggleCodeBlock()
   else if (kind === 'info' || kind === 'warn' || kind === 'success' || kind === 'error') {
     chain.setCallout(kind)
   }
   chain.run()
   blockMenuOpen.value = false
+}
+
+function alignHoveredBlock(align: BlockHandleAlign) {
+  if (!selectHoveredBlockText() && !focusTopLevelBlock(blockMenuIndex.value)) return
+  applyTextAlignToSelection(deps.editor.value, align)
+  blockMenuOpen.value = false
+}
+
+function indentHoveredBlock(dir: 1 | -1) {
+  if (!focusTopLevelBlock(blockMenuIndex.value)) return
+  const ed = deps.editor.value
+  if (!ed) return
+  if (dir > 0) ed.chain().focus().indent().run()
+  else ed.chain().focus().outdent().run()
+  blockMenuOpen.value = false
+}
+
+/** 选中当前块里的文字，供上色和评论使用。空块返回 false。 */
+function selectHoveredBlockText(): boolean {
+  if (!focusTopLevelBlock(blockMenuIndex.value)) return false
+  const ed = deps.editor.value
+  const range = getTopLevelBlockRange()
+  if (!ed || !range || !range.node.textContent.trim()) return false
+  const from = range.from + 1
+  const to = range.to - 1
+  if (to <= from) return false
+  return ed.chain().focus().setTextSelection({ from, to }).run()
+}
+
+function paintHoveredBlock(kind: 'color' | 'highlight', color: string) {
+  if (!selectHoveredBlockText()) {
+    ElMessage.info('这一块里没有可上色的文字')
+    return
+  }
+  const ed = deps.editor.value
+  if (!ed) return
+  const chain = ed.chain().focus()
+  if (kind === 'color') {
+    if (!color) chain.unsetColor()
+    else chain.setColor(color)
+  } else if (!color) chain.unsetHighlight()
+  else chain.setHighlight({ color })
+  chain.run()
+  blockMenuOpen.value = false
+}
+
+function hoveredBlockPayload(): { html: string; text: string } | null {
+  const ed = deps.editor.value
+  const index = blockMenuIndex.value
+  if (!ed || index < 0 || index >= ed.state.doc.childCount) return null
+  const node = ed.state.doc.child(index)
+  const host = document.createElement('div')
+  host.appendChild(DOMSerializer.fromSchema(ed.schema).serializeNode(node))
+  return { html: host.innerHTML, text: node.textContent || '' }
+}
+
+/** 优先写入 HTML，纯文本环境只保留文字。空块没有文字时要求 HTML 写入成功。 */
+async function writeBlockClipboard(html: string, text: string): Promise<void> {
+  const clip = navigator.clipboard
+  if (!clip) throw new Error('no clipboard')
+  const Item = typeof globalThis.ClipboardItem === 'undefined' ? undefined : globalThis.ClipboardItem
+  if (Item && typeof clip.write === 'function') {
+    try {
+      await clip.write([
+        new Item({
+          'text/html': new Blob([html], { type: 'text/html' }),
+          'text/plain': new Blob([text], { type: 'text/plain' }),
+        }),
+      ])
+      return
+    } catch {
+      /* 退回纯文本 */
+    }
+  }
+  if (!text.trim() || typeof clip.writeText !== 'function') throw new Error('no text clipboard')
+  await clip.writeText(text)
+}
+
+async function copyHoveredBlockClipboard() {
+  const payload = hoveredBlockPayload()
+  if (!payload) {
+    ElMessage.warning('无法复制当前块')
+    return
+  }
+  try {
+    await writeBlockClipboard(payload.html, payload.text)
+  } catch {
+    ElMessage.warning('无法写入剪贴板')
+    return
+  }
+  ElMessage.success('已复制到剪贴板')
+  blockMenuOpen.value = false
+}
+
+async function cutHoveredBlock() {
+  const payload = hoveredBlockPayload()
+  if (!payload) {
+    ElMessage.warning('无法剪切当前块')
+    return
+  }
+  try {
+    await writeBlockClipboard(payload.html, payload.text)
+  } catch {
+    ElMessage.warning('无法写入剪贴板，未删除这一块')
+    return
+  }
+  deleteHoveredBlock()
+  ElMessage.success('已剪切')
 }
 
 function copyHoveredBlock() {
@@ -440,7 +592,15 @@ function onCanvasBlockDrop(event: DragEvent) {
     openBlockMenuForSelection,
     onBlockMenuKeydown,
     focusTopLevelBlock,
+    hoveredBlockFace,
+    hoveredBlockAlign,
     turnHoveredBlock,
+    alignHoveredBlock,
+    indentHoveredBlock,
+    selectHoveredBlockText,
+    paintHoveredBlock,
+    copyHoveredBlockClipboard,
+    cutHoveredBlock,
     copyHoveredBlock,
     deleteHoveredBlock,
     moveHoveredBlock,

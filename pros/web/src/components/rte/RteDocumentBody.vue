@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { inject } from 'vue'
+import { inject, nextTick, ref, watch } from 'vue'
+import { ElMessage } from 'element-plus'
 import { EditorContent } from '@tiptap/vue-3'
 import { BubbleMenu } from '@tiptap/vue-3/menus'
 import FormPropertyInspector from '../FormPropertyInspector.vue'
@@ -14,11 +15,96 @@ import { RTE_BINDINGS } from './bindings'
 import { blockHandleTitle, cropTitle, emptyGuideTitle, imagePlaceTitle, imageWidthTitle, toolbarMenuItemTitle, wordStatTitle } from '../../utils/rteToolbarOptimize'
 import { useParentScopeStamp } from './inheritScope'
 import RteMenuGlyph from './RteMenuGlyph.vue'
+import {
+  BLOCK_HANDLE_ALIGNS,
+  BLOCK_HANDLE_CALLOUTS,
+  BLOCK_HANDLE_INDENTS,
+  BLOCK_HANDLE_ROWS,
+  BLOCK_HANDLE_TYPE_GRID,
+  type BlockHandleFlyout,
+} from './blockHandleMenu'
+import { FEISHU_HIGHLIGHT_COLORS, FEISHU_TEXT_COLORS } from '../../utils/rtePasteClean'
 
 const rte = inject(RTE_BINDINGS)
 if (!rte) throw new Error('RteDocumentBody 必须放在 RichTextEditor 里')
 const vRteFloat = rte.vRteFloat
 useParentScopeStamp()
+
+const blockFlyout = ref<BlockHandleFlyout | ''>('')
+
+watch(
+  () => rte.blockMenuOpen,
+  (open) => {
+    if (!open) blockFlyout.value = ''
+  },
+)
+
+function placeBlockFlyout() {
+  void nextTick(() => {
+    const fly = document.querySelector('.rte-block-flyout') as HTMLElement | null
+    if (!fly) return
+    fly.style.left = ''
+    fly.style.top = ''
+    const rect = fly.getBoundingClientRect()
+    if (rect.right <= window.innerWidth - 8 && rect.left >= 0) return
+    fly.style.left = '0px'
+    fly.style.top = '100%'
+  })
+}
+
+function toggleBlockFlyout(name: BlockHandleFlyout) {
+  blockFlyout.value = blockFlyout.value === name ? '' : name
+  if (blockFlyout.value) placeBlockFlyout()
+}
+
+const runBlockRow = (id: string) => {
+  if (id === 'comment') {
+    if (!rte.selectHoveredBlockText()) {
+      ElMessage.info('这一块里没有可评论的文字')
+      return
+    }
+    rte.beginComment()
+    rte.blockMenuOpen = false
+    return
+  }
+  if (id === 'cut') return rte.cutHoveredBlock()
+  if (id === 'clipboard') return rte.copyHoveredBlockClipboard()
+  if (id === 'duplicate') return rte.copyHoveredBlock()
+  if (id === 'up') return rte.moveHoveredBlock(-1)
+  if (id === 'down') return rte.moveHoveredBlock(1)
+  if (id === 'delete') return rte.deleteHoveredBlock()
+  if (id === 'insert') return rte.insertBelowHoveredBlock()
+}
+
+const onBlockMenuKey = (event: KeyboardEvent) => {
+  const target = event.target as HTMLElement | null
+  const fly = target?.dataset?.flyout as BlockHandleFlyout | undefined
+  if (event.key === 'ArrowRight' && fly) {
+    event.preventDefault()
+    blockFlyout.value = fly
+    placeBlockFlyout()
+    void nextTick(() => {
+      const panel = (event.currentTarget as HTMLElement).querySelector(
+        '.rte-block-flyout [role="menuitem"]',
+      ) as HTMLButtonElement | null
+      panel?.focus()
+    })
+    return
+  }
+  if (event.key === 'ArrowLeft' && blockFlyout.value) {
+    event.preventDefault()
+    const name = blockFlyout.value
+    blockFlyout.value = ''
+    void nextTick(() => {
+      const row = (event.currentTarget as HTMLElement).querySelector(
+        `[data-flyout="${name}"]`,
+      ) as HTMLButtonElement | null
+      row?.focus()
+    })
+    return
+  }
+  rte.onBlockMenuKeydown(event)
+}
 </script>
 
 <template>
@@ -422,29 +508,129 @@ useParentScopeStamp()
           :style="{ top: rte.blockHandle.top + 26 + 'px', left: rte.blockHandle.left + 'px' }"
           @mousedown.stop
           @click.stop
-          @keydown="rte.onBlockMenuKeydown"
+          @keydown="onBlockMenuKey"
         >
-          <button data-rte-own type="button" role="menuitem" :title="blockHandleTitle('insert')" @click="rte.insertBelowHoveredBlock">在下方插入</button>
-          <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
-          <button data-rte-own type="button" role="menuitem" :title="blockHandleTitle('paragraph')" @click="rte.turnHoveredBlock('paragraph')">正文</button>
-          <button data-rte-own type="button" role="menuitem" :title="blockHandleTitle('h1')" @click="rte.turnHoveredBlock('h1')">标题 1</button>
-          <button data-rte-own type="button" role="menuitem" :title="blockHandleTitle('h2')" @click="rte.turnHoveredBlock('h2')">标题 2</button>
-          <button data-rte-own type="button" role="menuitem" :title="blockHandleTitle('h3')" @click="rte.turnHoveredBlock('h3')">标题 3</button>
-          <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
-          <button data-rte-own type="button" role="menuitem" :title="blockHandleTitle('bullet')" @click="rte.turnHoveredBlock('bullet')">无序列表</button>
-          <button data-rte-own type="button" role="menuitem" :title="blockHandleTitle('ordered')" @click="rte.turnHoveredBlock('ordered')">有序列表</button>
-          <button data-rte-own type="button" role="menuitem" :title="blockHandleTitle('task')" @click="rte.turnHoveredBlock('task')">任务列表</button>
-          <button data-rte-own type="button" role="menuitem" :title="blockHandleTitle('quote')" @click="rte.turnHoveredBlock('quote')">引用</button>
-          <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
-          <button data-rte-own type="button" role="menuitem" :title="blockHandleTitle('info')" @click="rte.turnHoveredBlock('info')">提示</button>
-          <button data-rte-own type="button" role="menuitem" :title="blockHandleTitle('warn')" @click="rte.turnHoveredBlock('warn')">警告</button>
-          <button data-rte-own type="button" role="menuitem" :title="blockHandleTitle('success')" @click="rte.turnHoveredBlock('success')">成功</button>
-          <button data-rte-own type="button" role="menuitem" :title="blockHandleTitle('error')" @click="rte.turnHoveredBlock('error')">错误</button>
-          <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
-          <button data-rte-own type="button" role="menuitem" :title="blockHandleTitle('copy')" @click="rte.copyHoveredBlock">复制块</button>
-          <button data-rte-own type="button" role="menuitem" :title="blockHandleTitle('up')" @click="rte.moveHoveredBlock(-1)">上移</button>
-          <button data-rte-own type="button" role="menuitem" :title="blockHandleTitle('down')" @click="rte.moveHoveredBlock(1)">下移</button>
-          <button data-rte-own type="button" role="menuitem" class="is-danger" :title="blockHandleTitle('delete')" @click="rte.deleteHoveredBlock">删除</button>
+          <div data-rte-own class="rte-block-types" role="group" aria-label="块类型">
+            <button data-rte-own
+              v-for="item in BLOCK_HANDLE_TYPE_GRID"
+              :key="item.id"
+              type="button"
+              role="menuitem"
+              class="rte-block-type"
+              :class="{ 'is-on': rte.hoveredBlockFace() === item.id }"
+              :aria-pressed="rte.hoveredBlockFace() === item.id"
+              :aria-label="item.label"
+              :title="blockHandleTitle(item.id)"
+              @click="rte.turnHoveredBlock(item.id)"
+            >{{ item.glyph }}</button>
+          </div>
+          <template v-for="row in BLOCK_HANDLE_ROWS" :key="row.id">
+            <div data-rte-own class="rte-block-menu__slot">
+            <div data-rte-own v-if="!row.label" class="rte-menu-sep" role="separator" />
+            <button data-rte-own
+              v-else-if="row.flyout"
+              type="button"
+              role="menuitem"
+              class="rte-block-menu__row"
+              :data-flyout="row.flyout"
+              :aria-expanded="blockFlyout === row.flyout"
+              aria-haspopup="true"
+              :title="blockHandleTitle(row.id)"
+              @click="toggleBlockFlyout(row.flyout)"
+            >
+              <span data-rte-own>{{ row.label }}</span>
+              <span data-rte-own class="rte-block-menu__chev" aria-hidden="true">›</span>
+            </button>
+            <button data-rte-own
+              v-else
+              type="button"
+              role="menuitem"
+              class="rte-block-menu__row"
+              :class="{ 'is-danger': row.danger }"
+              :title="blockHandleTitle(row.id)"
+              @click="runBlockRow(row.id)"
+            >{{ row.label }}</button>
+            <div data-rte-own v-if="row.flyout && blockFlyout === row.flyout" class="rte-block-flyout">
+              <template v-if="row.flyout === 'layout'">
+                <button data-rte-own
+                  v-for="indent in BLOCK_HANDLE_INDENTS"
+                  :key="indent.label"
+                  type="button"
+                  role="menuitem"
+                  :title="blockHandleTitle(indent.id > 0 ? 'indent' : 'outdent')"
+                  @click="rte.indentHoveredBlock(indent.id)"
+                >{{ indent.label }}</button>
+                <div data-rte-own class="rte-menu-sep" role="separator" />
+                <button data-rte-own
+                  v-for="align in BLOCK_HANDLE_ALIGNS"
+                  :key="align.id"
+                  type="button"
+                  role="menuitem"
+                  :class="{ 'is-on': rte.hoveredBlockAlign() === align.id }"
+                  :title="blockHandleTitle(align.id)"
+                  @click="rte.alignHoveredBlock(align.id)"
+                >{{ align.label }}</button>
+              </template>
+              <template v-else-if="row.flyout === 'color'">
+                <div data-rte-own class="rte-menu-section-label">文字颜色</div>
+                <div data-rte-own class="rte-block-swatches">
+                  <button data-rte-own
+                    type="button"
+                    role="menuitem"
+                    class="rte-block-swatch is-clear"
+                    title="恢复默认文字颜色"
+                    aria-label="恢复默认文字颜色"
+                    @click="rte.paintHoveredBlock('color', '')"
+                  />
+                  <button data-rte-own
+                    v-for="color in FEISHU_TEXT_COLORS"
+                    :key="'fg-' + color"
+                    type="button"
+                    role="menuitem"
+                    class="rte-block-swatch"
+                    :style="{ background: color }"
+                    :title="rte.textColorLabel(color)"
+                    :aria-label="'文字颜色 ' + rte.textColorLabel(color)"
+                    @click="rte.paintHoveredBlock('color', color)"
+                  />
+                </div>
+                <div data-rte-own class="rte-menu-section-label">高亮</div>
+                <div data-rte-own class="rte-block-swatches">
+                  <button data-rte-own
+                    type="button"
+                    role="menuitem"
+                    class="rte-block-swatch is-clear"
+                    title="去掉高亮"
+                    aria-label="去掉高亮"
+                    @click="rte.paintHoveredBlock('highlight', '')"
+                  />
+                  <button data-rte-own
+                    v-for="color in FEISHU_HIGHLIGHT_COLORS"
+                    :key="'bg-' + color"
+                    type="button"
+                    role="menuitem"
+                    class="rte-block-swatch"
+                    :style="{ background: color }"
+                    :title="rte.highlightColorLabel(color)"
+                    :aria-label="'高亮 ' + rte.highlightColorLabel(color)"
+                    @click="rte.paintHoveredBlock('highlight', color)"
+                  />
+                </div>
+              </template>
+              <template v-else>
+                <button data-rte-own
+                  v-for="callout in BLOCK_HANDLE_CALLOUTS"
+                  :key="callout.id"
+                  type="button"
+                  role="menuitem"
+                  :class="{ 'is-on': rte.hoveredBlockFace() === callout.id }"
+                  :title="blockHandleTitle(callout.id)"
+                  @click="rte.turnHoveredBlock(callout.id)"
+                >{{ callout.label }}</button>
+              </template>
+            </div>
+            </div>
+          </template>
         </div>
         <div data-rte-own
           v-if="rte.blockDropLine != null"
