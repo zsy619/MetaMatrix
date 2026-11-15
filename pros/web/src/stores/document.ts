@@ -71,6 +71,8 @@ import type {
   RoiDecisionDocumentJSON,
   RoiDecisionRow,
   RoiDecisionFixedBlockId,
+  RoiDecisionChoice,
+  RoiDecisionVerdict,
   TimeMatrixDocumentJSON,
   WorkStateZonesDocumentJSON,
   OnlineOfflineCommDocumentJSON,
@@ -1526,6 +1528,32 @@ export const useDocumentStore = defineStore('document', () => {
     return true
   }
 
+  function updateRoiDecisionDecision(decision: string): boolean {
+    const doc = asRoiDecision()
+    if (!doc) return false
+    doc.decision = decision
+    markDirty()
+    return true
+  }
+
+  function updateRoiDecisionChoice(choice: RoiDecisionChoice): boolean {
+    const doc = asRoiDecision()
+    if (!doc) return false
+    doc.choice = doc.choice === choice ? '' : choice
+    markDirty()
+    return true
+  }
+
+  function updateRoiDecisionVerdict(rowId: string, verdict: RoiDecisionVerdict): boolean {
+    const doc = asRoiDecision()
+    if (!doc) return false
+    const row = doc.rows.find((r) => r.id === rowId)
+    if (!row) return false
+    row.verdict = row.verdict === verdict ? '' : verdict
+    markDirty()
+    return true
+  }
+
 
 
   function parseIncidentReviewTimelineCellId(
@@ -1633,7 +1661,11 @@ export const useDocumentStore = defineStore('document', () => {
     let local = loadLocal(id)
     const meta = loadLocalMeta(id)
     if (local) {
-      current_data.value = normalizeLoadedDoc(local, id)
+      const normalized = normalizeLoadedDoc(local, id)
+      current_data.value = normalized
+      if ((local as { type?: string }).type !== (normalized as { type?: string }).type) {
+        persistLocal(id)
+      }
       dirty.value = false
       head_revision_id.value = null
       document_id.value = meta?.documentId || null
@@ -1680,14 +1712,35 @@ export const useDocumentStore = defineStore('document', () => {
     doc_title.value = TEMPLATE_META[id]?.name || ''
   }
 
+  /**
+   * A draft saved as y_model can still be an ROI decision if the rows survived.
+   * Put the type back before Y-model normalization adds the fork blocks.
+   */
+  function reclaimRoiDecision(
+    doc: CanvasDocumentJSON,
+    templateId?: TemplateId | string | null,
+  ): CanvasDocumentJSON {
+    const raw = doc as CanvasDocumentJSON & { type?: string; id?: string; rows?: unknown }
+    const addressed =
+      templateId === 'roi-decision' ||
+      raw.type === 'roi_decision' ||
+      raw.id === 'canvas_roi_decision'
+    if (!addressed || raw.type === 'roi_decision') return doc
+    if (!Array.isArray(raw.rows) || raw.rows.length === 0) return doc
+    return { ...doc, type: 'roi_decision' }
+  }
+
   /** 加载后温和升级已知模板结构（Y 模型 + attachmentsByPanelId） */
   function normalizeLoadedDoc(
     doc: CanvasDocumentJSON,
     templateId?: TemplateId | string | null,
   ): CanvasDocumentJSON {
-    const tid = templateId ?? activeTemplateId.value
-    let next: CanvasDocumentJSON = coerceYModelDoc(doc, tid)
-    if (isYModelDoc(next)) {
+    const tid = templateId !== undefined ? templateId : activeTemplateId.value
+    let next: CanvasDocumentJSON = reclaimRoiDecision(doc, tid)
+    next = coerceYModelDoc(next, tid)
+    if (tid === 'roi-decision' && isYModelDoc(next)) {
+      next = cloneTemplate('roi-decision')
+    } else if (isYModelDoc(next)) {
       next = normalizeYModelDoc(next)
     }
     if (isFiveStepProDoc(next)) {
@@ -2202,7 +2255,8 @@ export const useDocumentStore = defineStore('document', () => {
     loading.value = true
     try {
       const doc = await documentsApi.getDocument(id)
-      current_data.value = normalizeLoadedDoc(doc.currentData)
+      const tid = doc.templateId && isTemplateId(doc.templateId) ? doc.templateId : null
+      current_data.value = normalizeLoadedDoc(doc.currentData, tid)
       document_id.value = doc.id
       head_revision_id.value = doc.headRevisionId
       if (doc.templateId && isTemplateId(doc.templateId)) {
@@ -2247,9 +2301,10 @@ export const useDocumentStore = defineStore('document', () => {
       TEMPLATE_META[tid]?.name ||
       (typeof data.id === 'string' ? data.id : 'Untitled')
     const notes = opts?.notes != null ? opts.notes : doc_notes.value
+    const payload = normalizeLoadedDoc(cloneDoc(data) as CanvasDocumentJSON, tid)
     const canvasType =
-      typeof (data as { type?: string }).type === 'string'
-        ? String((data as { type?: string }).type)
+      typeof (payload as { type?: string }).type === 'string'
+        ? String((payload as { type?: string }).type)
         : tid
     saving.value = true
     try {
@@ -2258,9 +2313,9 @@ export const useDocumentStore = defineStore('document', () => {
         notes,
         canvasType,
         templateId: tid,
-        data: normalizeLoadedDoc(cloneDoc(data) as CanvasDocumentJSON),
+        data: payload,
       })
-      current_data.value = normalizeLoadedDoc(doc.currentData)
+      current_data.value = normalizeLoadedDoc(doc.currentData, tid)
       document_id.value = doc.id
       head_revision_id.value = doc.headRevisionId
       activeTemplateId.value = tid
@@ -2297,11 +2352,12 @@ export const useDocumentStore = defineStore('document', () => {
         ...(opts?.title != null ? { title: opts.title } : {}),
         ...(opts?.notes != null ? { notes: opts.notes } : {}),
       })
-      current_data.value = normalizeLoadedDoc(doc.currentData)
+      const tid = doc.templateId && isTemplateId(doc.templateId) ? doc.templateId : null
+      current_data.value = normalizeLoadedDoc(doc.currentData, tid)
       document_id.value = doc.id
       head_revision_id.value = doc.headRevisionId
-      if (doc.templateId && isTemplateId(doc.templateId)) {
-        activeTemplateId.value = doc.templateId
+      if (tid) {
+        activeTemplateId.value = tid
       }
       applyMeta({
         title: doc.title,
@@ -4217,6 +4273,9 @@ export const useDocumentStore = defineStore('document', () => {
     removeConversionTradeoffRow,
     ensureRoiDecisionBlocks,
     updateRoiDecisionDimension,
+    updateRoiDecisionDecision,
+    updateRoiDecisionChoice,
+    updateRoiDecisionVerdict,
     addRoiDecisionRow,
     removeRoiDecisionRow,
     updateIncidentReviewTimelineTime,
