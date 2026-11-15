@@ -1,4 +1,7 @@
 // @vitest-environment happy-dom
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -25,6 +28,10 @@ describe('RACI 责任矩阵', () => {
     const wrapper = mount(RaciMatrixCanvas, { props: { doc: store.current_data as RaciMatrixDocumentJSON } })
     const cell = wrapper.get('[aria-label="版本交付 执行"]')
     expect(cell.get('.role-letter').text()).toBe('·')
+    expect(cell.get('.role-name').text()).toBe('执行')
+    const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'RaciMatrixCanvas.vue'), 'utf8')
+    expect(source).toContain('justify-content: space-between')
+    expect(source).toContain('.role-name { display: block; font-size: 15px; font-weight: 650; }')
     await cell.trigger('click')
     expect(wrapper.get('[aria-label="版本交付 执行"] .role-letter').text()).toBe('R')
     await wrapper.get('[aria-label="版本交付 执行"]').trigger('click')
