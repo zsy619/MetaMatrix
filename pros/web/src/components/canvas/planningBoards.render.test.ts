@@ -39,6 +39,7 @@ describe('计划画布', () => {
     const wrapper = mount(OkrCanvas, { props: { doc: store.current_data as OkrDocumentJSON } })
     const objective = wrapper.get('section[data-objective="obj_plan"]')
     expect(objective.get('header strong').text()).toBe('30%')
+    expect(objective.text()).toContain('进度')
     const range = objective.get('input[type="range"]')
     await range.setValue('100')
     await range.trigger('input')

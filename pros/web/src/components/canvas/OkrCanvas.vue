@@ -42,10 +42,11 @@ function patch(mutator: (doc: OkrDocumentJSON) => void) {
           <button type="button" :disabled="doc.objectives.length <= 1" aria-label="删除目标" @click="patch((doc) => { doc.objectives = doc.objectives.filter((row) => row.id !== objective.id) })">删除</button>
         </header>
         <div v-for="kr in objective.keyResults" :key="kr.id" class="kr">
-          <input :value="kr.name" aria-label="关键结果" @change="patch((doc) => { const item = doc.objectives.find((row) => row.id === objective.id)?.keyResults.find((row) => row.id === kr.id); if (item) item.name = ($event.target as HTMLInputElement).value })" />
-          <input :value="kr.target" aria-label="目标值" placeholder="如何衡量" @change="patch((doc) => { const item = doc.objectives.find((row) => row.id === objective.id)?.keyResults.find((row) => row.id === kr.id); if (item) item.target = ($event.target as HTMLInputElement).value })" />
-          <input type="range" min="0" max="100" :value="kr.progress" :aria-label="`${kr.name}进度`" @input="patch((doc) => { const item = doc.objectives.find((row) => row.id === objective.id)?.keyResults.find((row) => row.id === kr.id); if (item) item.progress = Number(($event.target as HTMLInputElement).value) })" />
-          <span>{{ kr.progress }}%</span>
+          <input class="kr-name" :value="kr.name" aria-label="关键结果" placeholder="关键结果" @change="patch((doc) => { const item = doc.objectives.find((row) => row.id === objective.id)?.keyResults.find((row) => row.id === kr.id); if (item) item.name = ($event.target as HTMLInputElement).value })" />
+          <input class="kr-target" :value="kr.target" aria-label="目标值" placeholder="如何衡量" @change="patch((doc) => { const item = doc.objectives.find((row) => row.id === objective.id)?.keyResults.find((row) => row.id === kr.id); if (item) item.target = ($event.target as HTMLInputElement).value })" />
+          <span class="kr-label">进度</span>
+          <input class="kr-progress" type="range" min="0" max="100" :value="kr.progress" :aria-label="`${kr.name}进度`" @input="patch((doc) => { const item = doc.objectives.find((row) => row.id === objective.id)?.keyResults.find((row) => row.id === kr.id); if (item) item.progress = Number(($event.target as HTMLInputElement).value) })" />
+          <span class="kr-pct">{{ kr.progress }}%</span>
           <button type="button" :disabled="objective.keyResults.length <= 1" aria-label="删除关键结果" @click="patch((doc) => { const item = doc.objectives.find((row) => row.id === objective.id); if (item) item.keyResults = item.keyResults.filter((row) => row.id !== kr.id) })">删除</button>
         </div>
       </section>
@@ -71,11 +72,25 @@ header button:disabled { opacity: 0.45; cursor: default; }
 .kr { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(120px, 180px) 52px auto; gap: 8px; align-items: center; min-height: 52px; padding: 8px 12px; border-top: 1px solid #f1f3f4; }
 .kr input[type='text'], .kr input:not([type]) { width: 100%; min-width: 0; box-sizing: border-box; border: 1px solid #e0e0e0; border-radius: 8px; min-height: 40px; padding: 6px 8px; font: inherit; font-size: 15px; }
 .kr input[type='range'] { width: 100%; min-width: 0; height: 36px; accent-color: #1a73e8; }
-.kr span { font-variant-numeric: tabular-nums; font-weight: 700; text-align: right; }
+.kr-label { display: none; }
+.kr-pct { font-variant-numeric: tabular-nums; font-weight: 700; text-align: right; }
 .kr button:disabled { opacity: 0.45; cursor: default; }
 @media (max-width: 800px) {
+  .sheet { padding-bottom: 28px; }
   header input { flex-basis: 100%; }
-  .kr { grid-template-columns: minmax(0, 1fr) 52px auto; }
-  .kr input:not([type='range']) { grid-column: 1 / -1; }
+  .kr { grid-template-columns: auto minmax(0, 1fr) 56px; }
+  .kr-name,
+  .kr-target,
+  .kr button { grid-column: 1 / -1; }
+  .kr-label {
+    display: block;
+    grid-column: 1;
+    font-size: 15px;
+    font-weight: 650;
+    color: #3c4043;
+  }
+  .kr input.kr-progress { grid-column: 2; height: 40px; }
+  .kr-pct { grid-column: 3; }
+  .kr button { justify-self: start; }
 }
 </style>
