@@ -192,6 +192,25 @@ footer strong { font-size: 18px; font-variant-numeric: tabular-nums; }
   .cash-line { grid-template-columns: minmax(0, 1fr) 108px 36px; }
 }
 @media (max-width: 480px) {
-  .cash-line { grid-template-columns: minmax(0, 1fr) 84px 36px; }
+  .cash { padding-bottom: 28px; }
+  .cash-line {
+    grid-template-columns: minmax(0, 1fr) 40px;
+  }
+  .cash-line input:not([type='number']) {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .cash-line input[type='number'] {
+    grid-column: 1;
+    grid-row: 2;
+    text-align: left;
+  }
+  .cash-line button {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    width: 40px;
+    height: 40px;
+    align-self: center;
+  }
 }
 </style>
