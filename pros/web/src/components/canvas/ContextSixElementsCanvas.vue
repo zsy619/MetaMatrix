@@ -12,7 +12,7 @@ import { canvasChromeStyle } from './canvasChrome'
 import type { ContextSixElementsDocumentJSON } from '../../types/canvas'
 import { useDocumentStore } from '../../stores/document'
 import { useSelectionStore } from '../../stores/selection'
-import { panelMaximizeKey } from '../../composables/usePanelMaximize'
+import { panelMaximizeKey, usePanelMaximize } from '../../composables/usePanelMaximize'
 import RichTextEditor from '../RichTextEditor.vue'
 import { itemsToHtml, syncItemsFromHtml } from '../../utils/itemsHtml'
 import {
@@ -33,6 +33,8 @@ documentStore.ensureContextSixElementsBlocks()
 const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 
 const panelId = panelMaximizeKey('block', CONTEXT_SIX_ELEMENTS_BLOCK_ID)
+const { isMaximized, openMaximize, closeMaximize } = usePanelMaximize(panelId)
+openMaximize()
 
 const block = computed(() => {
   const list = Array.isArray(props.doc.blocks) ? props.doc.blocks : []
@@ -66,6 +68,7 @@ function onEditorFocus() {
 
 onMounted(() => {
   documentStore.ensureContextSixElementsBlocks()
+  openMaximize()
 })
 </script>
 
@@ -82,6 +85,7 @@ onMounted(() => {
       </header>
 
       <RichTextEditor
+        v-if="!isMaximized"
         class="cse-rte"
         :panel-id="panelId"
         :expanded="false"
@@ -95,8 +99,43 @@ onMounted(() => {
         @update:model-value="onEditorHtml"
         @focus="onEditorFocus"
       />
+      <button type="button" class="cse-max" aria-label="最大化" @click="openMaximize">最大化</button>
     </div>
   </div>
+
+  <Teleport to="body">
+    <div
+      v-if="isMaximized"
+      class="pm-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-label="上下文六要素"
+    >
+      <div class="pm-card" @click.stop>
+        <div class="pm-header">
+          <h3 class="pm-title">上下文六要素</h3>
+          <div class="pm-actions">
+            <button type="button" class="cse-restore" aria-label="还原" @click="closeMaximize">还原</button>
+          </div>
+        </div>
+        <div class="pm-body">
+          <RichTextEditor
+            class="pm-rte"
+            :panel-id="panelId"
+            :expanded="true"
+            :show-title="false"
+            :show-bottom-bar="true"
+            :show-publish-actions="false"
+            :show-markdown-hint="false"
+            placeholder="按六段结构填写上下文…"
+            :model-value="editorHtml"
+            @update:model-value="onEditorHtml"
+            @focus="onEditorFocus"
+          />
+        </div>
+      </div>
+    </div>
+  </Teleport>
 </template>
 
 <style scoped>
@@ -198,6 +237,21 @@ onMounted(() => {
   flex: 1 1 auto;
   min-height: 100%;
   box-sizing: border-box;
+}
+
+.cse-restore,
+.cse-max {
+  margin-top: 12px;
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px solid var(--cv-frame, #ececec);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--cv-focus, #1c4c7c);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 650;
+  cursor: pointer;
 }
 
 @media (max-width: 800px) {
