@@ -174,12 +174,16 @@ textarea:focus {
 }
 
 @media (max-width: 900px) {
+  .bmc { padding-bottom: 28px; }
+
   .bmc-grid {
     min-width: 0;
     grid-template-columns: 1fr;
     grid-template-rows: none;
     overflow: visible;
   }
+
+  h3 { font-size: 16px; }
 
   .bmc-cell--partners,
   .bmc-cell--activities,
@@ -191,11 +195,21 @@ textarea:focus {
   .bmc-cell--costs,
   .bmc-cell--revenue {
     grid-area: auto;
-    min-height: 220px;
+    height: auto;
+    min-height: 0;
+  }
+
+  .bmc-body {
+    flex: 0 0 auto;
+    height: auto;
   }
 
   textarea {
+    flex: 0 0 auto;
+    height: auto;
     min-height: 120px;
+    field-sizing: content;
+    overflow: hidden;
   }
 }
 </style>

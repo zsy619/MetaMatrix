@@ -1,4 +1,7 @@
 // @vitest-environment happy-dom
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -28,6 +31,8 @@ describe('商业模式画布', () => {
     for (const title of ['重要伙伴', '价值主张', '客户细分', '成本结构', '收入来源']) {
       expect(wrapper.text()).toContain(title)
     }
+    const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'BusinessModelCanvas.vue'), 'utf8')
+    expect(source).toContain('field-sizing: content')
     const area = wrapper.get('textarea[aria-label="价值主张"]')
     await area.setValue('帮团队把报价从一天缩短到一小时')
     await area.trigger('change')
