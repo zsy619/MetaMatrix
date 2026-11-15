@@ -144,6 +144,11 @@ function pixelAttr(raw: string): number | null {
     const n = Number(inchWord[1]) * 96
     return Number.isFinite(n) && n > 0 ? Math.round(n) : null
   }
+  const gongfen = /^(\d+(?:\.\d+)?)\s*公分$/.exec(text)
+  if (gongfen) {
+    const n = (Number(gongfen[1]) * 96) / 2.54
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : null
+  }
   const px = text.replace(/\s*px$/i, '')
   if (!px || /%/.test(px)) return null
   const n = Number(px)
