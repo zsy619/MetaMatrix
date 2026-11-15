@@ -129,6 +129,11 @@ function pixelAttr(raw: string): number | null {
     const n = (Number(pointWord[1]) * 4) / 3
     return Number.isFinite(n) && n > 0 ? Math.round(n) : null
   }
+  const milliWord = /^(\d+(?:\.\d+)?)\s*毫米$/.exec(text)
+  if (milliWord) {
+    const n = (Number(milliWord[1]) * 96) / 25.4
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : null
+  }
   const px = text.replace(/\s*px$/i, '')
   if (!px || /%/.test(px)) return null
   const n = Number(px)
