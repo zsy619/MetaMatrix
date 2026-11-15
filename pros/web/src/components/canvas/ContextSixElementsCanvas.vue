@@ -85,6 +85,7 @@ onMounted(() => {
         class="cse-rte"
         :panel-id="panelId"
         :expanded="false"
+        :page-sheet="false"
         :show-title="false"
         :show-bottom-bar="true"
         :show-publish-actions="false"
@@ -106,7 +107,6 @@ onMounted(() => {
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  height: 100%;
   min-height: 0;
   overflow: hidden;
   padding: 18px;
@@ -118,11 +118,10 @@ onMounted(() => {
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  width: min(100%, 880px);
-  height: 100%;
+  width: 100%;
   min-height: 0;
   flex: 1 1 auto;
-  margin: 0 auto;
+  margin: 0;
   padding: 22px 26px 18px;
   border-radius: 12px;
   background: #ffffff;
@@ -154,39 +153,51 @@ onMounted(() => {
 }
 
 .cse-rte {
-  --rte-sheet-min-height: 0px;
   flex: 1 1 auto;
   min-height: 0;
-  height: 100%;
-}
-
-.cse-canvas :deep(.rte-root),
-.cse-canvas :deep(.rte-workspace),
-.cse-canvas :deep(.rte-canvas) {
-  flex: 1 1 auto;
-  min-height: 0;
-  height: 100%;
-}
-
-.cse-canvas :deep(.rte-root.is-page-sheet .rte-canvas) {
   display: flex;
   flex-direction: column;
+}
+
+.cse-canvas :deep(.rte-root) {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto !important;
+  max-height: none;
+  border: none;
+  border-radius: 0;
   background: transparent;
 }
 
-.cse-canvas :deep(.rte-root.is-page-sheet .rte-body) {
+.cse-canvas :deep(.rte-workspace) {
   flex: 1 1 auto;
-  width: 100%;
-  max-width: none;
-  min-height: 100%;
-  height: auto;
-  margin: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
-.cse-canvas :deep(.rte-root.is-page-sheet .rte-body > .ProseMirror),
-.cse-canvas :deep(.rte-root.is-page-sheet .rte-body > .tiptap) {
+.cse-canvas :deep(.rte-canvas) {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+  overflow: auto;
+  background: transparent;
+}
+
+.cse-canvas :deep(.rte-body) {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  box-sizing: border-box;
+}
+
+.cse-canvas :deep(.rte-body > .ProseMirror),
+.cse-canvas :deep(.rte-body > .tiptap) {
   flex: 1 1 auto;
   min-height: 100%;
+  box-sizing: border-box;
 }
 
 @media (max-width: 800px) {
@@ -195,21 +206,11 @@ onMounted(() => {
   }
 
   .cse-page {
-    width: 100%;
-    margin: 0;
     padding: 16px 14px 20px;
   }
 
-  .cse-canvas :deep(.rte-root.is-page-sheet .rte-body) {
-    padding: 12px 12px 16px;
-    box-shadow: none;
-  }
-
-  .cse-canvas :deep(.rte-root.is-page-sheet .rte-body::before) {
-    display: none;
-  }
-
   .cse-canvas :deep(.ProseMirror) {
+    padding: 12px 12px 16px;
     max-width: 100%;
     overflow-wrap: anywhere;
   }
