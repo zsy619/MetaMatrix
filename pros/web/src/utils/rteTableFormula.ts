@@ -332,7 +332,7 @@ type Node =
   | { k: 'cmp'; op: string; l: Node; r: Node }
   | { k: 'call'; name: string; args: Node[] }
 
-const FUNC_NAMES = new Set(['SUM', 'AVERAGE', 'COUNT', 'MAX', 'MIN', 'IF', 'ROUND', 'AND', 'OR', 'ABS', 'INT', 'MOD', 'POWER', 'SQRT', 'SIGN', 'CEILING', 'FLOOR', 'NOT', 'PRODUCT', 'MEDIAN', 'COUNTA', 'ROUNDUP', 'ROUNDDOWN', 'PI', 'EXP', 'LN', 'LOG', 'LOG10', 'FACT', 'GCD', 'LCM', 'TRUNC', 'QUOTIENT', 'EVEN', 'ODD', 'COMBIN', 'PERMUT', 'DEGREES', 'RADIANS', 'SIN', 'COS', 'TAN', 'ASIN', 'ACOS', 'ATAN', 'ATAN2', 'SINH', 'COSH', 'TANH', 'ASINH', 'ACOSH'])
+const FUNC_NAMES = new Set(['SUM', 'AVERAGE', 'COUNT', 'MAX', 'MIN', 'IF', 'ROUND', 'AND', 'OR', 'ABS', 'INT', 'MOD', 'POWER', 'SQRT', 'SIGN', 'CEILING', 'FLOOR', 'NOT', 'PRODUCT', 'MEDIAN', 'COUNTA', 'ROUNDUP', 'ROUNDDOWN', 'PI', 'EXP', 'LN', 'LOG', 'LOG10', 'FACT', 'GCD', 'LCM', 'TRUNC', 'QUOTIENT', 'EVEN', 'ODD', 'COMBIN', 'PERMUT', 'DEGREES', 'RADIANS', 'SIN', 'COS', 'TAN', 'ASIN', 'ACOS', 'ATAN', 'ATAN2', 'SINH', 'COSH', 'TANH', 'ASINH', 'ACOSH', 'ATANH'])
 
 class Parser {
   tokens: LexToken[]
@@ -1017,6 +1017,14 @@ function evalCall(name: string, args: Node[], ctx: Ctx, at: CellAddress): EvalVa
     if (isError(value)) return value
     if (value < 1) return { error: '#NUM!' }
     const result = Math.acosh(value)
+    return Number.isFinite(result) ? result : { error: '#VALUE!' }
+  }
+  if (name === 'ATANH') {
+    if (args.length !== 1) return { error: '#VALUE!' }
+    const value = evalNode(args[0]!, ctx, at)
+    if (isError(value)) return value
+    if (Math.abs(value) >= 1) return { error: '#NUM!' }
+    const result = Math.atanh(value)
     return Number.isFinite(result) ? result : { error: '#VALUE!' }
   }
   if (name === 'ROUND') return evalRound(args, ctx, at)
