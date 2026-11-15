@@ -88,6 +88,11 @@ function pixelAttr(raw: string): number | null {
     const n = Number(ideo[1]) * 16
     return Number.isFinite(n) && n > 0 ? Math.round(n) : null
   }
+  const rootIdeo = /^(\d+(?:\.\d+)?)\s*ric$/i.exec(text)
+  if (rootIdeo) {
+    const n = Number(rootIdeo[1]) * 16
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : null
+  }
   const line = /^(\d+(?:\.\d+)?)\s*lh$/i.exec(text)
   if (line) {
     const n = Number(line[1]) * 24
