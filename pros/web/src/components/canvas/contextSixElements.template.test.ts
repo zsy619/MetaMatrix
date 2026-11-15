@@ -184,7 +184,7 @@ describe('画布组件 · 上下文六要素', () => {
       props: { doc: store.current_data as never },
     })
 
-    const text = wrapper.text()
+    const text = `${wrapper.text()}\n${document.body.textContent ?? ''}`
     for (const title of TITLES) {
       expect(text, `缺少标题 ${title}`).toContain(title)
     }
@@ -194,6 +194,8 @@ describe('画布组件 · 上下文六要素', () => {
     const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'ContextSixElementsCanvas.vue'), 'utf8')
     expect(source).toContain('padding: 12px 12px 16px')
     expect(source).toContain('font-size: 15px')
+    expect(source).toContain(':expanded="true"')
+    expect(document.body.querySelector('.pm-overlay')).toBeTruthy()
   })
 
   it('编辑器里改内容后写回文档 JSON', async () => {
