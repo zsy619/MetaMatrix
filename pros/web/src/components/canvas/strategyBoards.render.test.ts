@@ -31,6 +31,7 @@ import { useDocumentStore } from '../../stores/document'
 import FiveForcesCanvas from './FiveForcesCanvas.vue'
 import LeanCanvas from './LeanCanvas.vue'
 import PdcaCanvas from './PdcaCanvas.vue'
+import SoarCanvas from './SoarCanvas.vue'
 import SwotCanvas from './SwotCanvas.vue'
 import ValueChainCanvas from './ValueChainCanvas.vue'
 import ValuePropositionCanvas from './ValuePropositionCanvas.vue'
@@ -38,6 +39,7 @@ import type {
   FiveForcesDocumentJSON,
   LeanCanvasDocumentJSON,
   PdcaDocumentJSON,
+  SoarDocumentJSON,
   SwotDocumentJSON,
   ValueChainDocumentJSON,
   ValuePropositionDocumentJSON,
@@ -59,17 +61,18 @@ describe('战略画布格子', () => {
     for (const title of ['问题', '解决方案', '独特价值主张', '客户细分', '关键指标', '成本结构', '收入来源']) {
       expect(wrapper.text()).toContain(title)
     }
+    expect(wrapper.text()).toContain('先写问题和客户')
     expect(wrapper.findAll('.lean-cell')).toHaveLength(9)
     wrapper.unmount()
   })
 
-  it('价值主张左右六格都在', () => {
+  it('价值主张六格都在', () => {
     const store = useDocumentStore()
     store.loadFromTemplate('value-proposition')
     const wrapper = mount(ValuePropositionCanvas, {
       props: { doc: store.current_data as ValuePropositionDocumentJSON },
     })
-    expect(wrapper.text()).toContain('价值图')
+    expect(wrapper.text()).toContain('价值图写我们提供什么')
     expect(wrapper.text()).toContain('客户画像')
     for (const title of ['产品与服务', '痛点缓解', '收益创造', '客户要完成的事', '痛点', '收益']) {
       expect(wrapper.text()).toContain(title)
@@ -103,6 +106,11 @@ describe('战略画布格子', () => {
     const swot = mount(SwotCanvas, { props: { doc: store.current_data as SwotDocumentJSON } })
     for (const title of ['优势', '劣势', '机会', '威胁']) expect(swot.text()).toContain(title)
     expect(swot.findAll('section')).toHaveLength(4)
+    store.loadFromTemplate('soar')
+    const soar = mount(SoarCanvas, { props: { doc: store.current_data as SoarDocumentJSON } })
+    expect(soar.text()).toContain('先写现在已经做得好的地方和外部机会')
+    for (const title of ['优势', '机会', '愿景', '成果']) expect(soar.text()).toContain(title)
+    soar.unmount()
     expect(swot.findAll('button[aria-label="最大化"]')).toHaveLength(4)
     const panel = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'FiveStepPanel.vue'), 'utf8')
     expect(panel).toContain('width: 36px;\n  height: 36px;')

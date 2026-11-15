@@ -51,6 +51,9 @@
 .canvas-viewport .sheet[aria-label='VRIO'] .sheet-top p,
 .canvas-viewport .sheet[aria-label='制胜选择'] .sheet-top p,
 .canvas-viewport .sheet[aria-label='客户旅程'] .sheet-top p,
+.canvas-viewport .sheet[aria-label='精益画布'] .sheet-top p,
+.canvas-viewport .sheet[aria-label='价值主张画布'] .sheet-top p,
+.canvas-viewport .sheet[aria-label='SOAR'] .sheet-top p,
 .canvas-viewport .raci[aria-label='RACI 责任矩阵'] .raci-top p {
   font-size: 15px;
   color: #3c4043;

@@ -86,6 +86,7 @@ h3 { margin: 0; min-height: 44px; display: flex; align-items: center; justify-co
     min-height: 220px;
   }
 
+  .sheet { padding-bottom: 96px; }
   .lean-cell--problem { order: 1; }
   .lean-cell--segments { order: 2; }
   .lean-cell--uvp { order: 3; }

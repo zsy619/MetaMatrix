@@ -24,7 +24,7 @@ function block(id: SoarBlockId) {
   <div class="sheet" :style="chrome" aria-label="SOAR">
     <header class="sheet-top">
       <h2>{{ doc.title }}</h2>
-      <p>从已经做得好的地方出发。上排看现在，下排写想成为的样子和怎样算做到。</p>
+      <p>先写现在已经做得好的地方和外部机会，再写想成为的样子和怎样算做到。</p>
     </header>
     <div class="grid">
       <section v-for="id in order" :key="id" :data-block="id" :style="{ '--col-header': tones[id].header, '--col-body': tones[id].body }">
@@ -46,4 +46,7 @@ function block(id: SoarBlockId) {
 section { display: flex; flex-direction: column; min-height: 0; background: var(--col-body); border-radius: 12px; overflow: hidden; }
 h3 { margin: 0; min-height: 40px; display: flex; align-items: center; justify-content: center; background: var(--col-header); color: #fff; letter-spacing: 0.06em; }
 .rte-slot { flex: 1 1 auto; min-height: 0; display: flex; }
+@media (max-width: 800px) {
+  .sheet { padding-bottom: 96px; }
+}
 </style>
