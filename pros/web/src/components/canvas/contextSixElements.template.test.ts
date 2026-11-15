@@ -194,6 +194,8 @@ describe('画布组件 · 上下文六要素', () => {
     const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'ContextSixElementsCanvas.vue'), 'utf8')
     expect(source).toContain('padding: 12px 12px 16px')
     expect(source).toContain('font-size: 15px')
+    expect(source).toContain('--rte-sheet-min-height: 0px')
+    expect(source).toContain('height: 100%')
   })
 
   it('编辑器里改内容后写回文档 JSON', async () => {

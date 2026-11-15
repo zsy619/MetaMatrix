@@ -105,7 +105,10 @@ onMounted(() => {
   z-index: 10;
   box-sizing: border-box;
   display: flex;
-  overflow: auto;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
   padding: 18px;
   font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui,
     sans-serif;
@@ -113,16 +116,23 @@ onMounted(() => {
 
 .cse-page {
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
   width: min(100%, 880px);
-  margin: auto;
-  padding: 22px 26px 30px;
+  height: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
+  margin: 0 auto;
+  padding: 22px 26px 18px;
   border-radius: 12px;
   background: #ffffff;
   border: 1px solid var(--cv-frame, #ececec);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
 }
 
 .cse-head {
+  flex: none;
   margin-bottom: 10px;
   padding-bottom: 10px;
   border-bottom: 1px solid var(--cv-hairline, rgba(60, 50, 20, 0.08));
@@ -144,7 +154,39 @@ onMounted(() => {
 }
 
 .cse-rte {
-  min-height: 420px;
+  --rte-sheet-min-height: 0px;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+}
+
+.cse-canvas :deep(.rte-root),
+.cse-canvas :deep(.rte-workspace),
+.cse-canvas :deep(.rte-canvas) {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+}
+
+.cse-canvas :deep(.rte-root.is-page-sheet .rte-canvas) {
+  display: flex;
+  flex-direction: column;
+  background: transparent;
+}
+
+.cse-canvas :deep(.rte-root.is-page-sheet .rte-body) {
+  flex: 1 1 auto;
+  width: 100%;
+  max-width: none;
+  min-height: 100%;
+  height: auto;
+  margin: 0;
+}
+
+.cse-canvas :deep(.rte-root.is-page-sheet .rte-body > .ProseMirror),
+.cse-canvas :deep(.rte-root.is-page-sheet .rte-body > .tiptap) {
+  flex: 1 1 auto;
+  min-height: 100%;
 }
 
 @media (max-width: 800px) {
@@ -158,23 +200,7 @@ onMounted(() => {
     padding: 16px 14px 20px;
   }
 
-  .cse-canvas :deep(.rte-root),
-  .cse-canvas :deep(.rte-workspace),
-  .cse-canvas :deep(.rte-canvas) {
-    height: auto;
-    min-height: 0;
-    overflow: visible;
-  }
-
-  .cse-canvas :deep(.rte-root.is-page-sheet .rte-canvas) {
-    background: transparent;
-  }
-
   .cse-canvas :deep(.rte-root.is-page-sheet .rte-body) {
-    width: 100%;
-    min-height: 280px;
-    height: auto;
-    margin: 0;
     padding: 12px 12px 16px;
     box-shadow: none;
   }
