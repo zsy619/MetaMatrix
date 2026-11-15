@@ -123,6 +123,7 @@ const order: OnlineOfflineCommBlockId[] = ['a', 'b', 'c', 'd']
               '--ooc-accent': cellPaint(id).accent,
             }"
           >
+            <h2 class="ooc-title">{{ block(id)!.title }}</h2>
             <div class="ooc-body">
               <YModelBlockCard :block="block(id)!" hide-title />
             </div>
@@ -259,6 +260,16 @@ const order: OnlineOfflineCommBlockId[] = ['a', 'b', 'c', 'd']
   background: transparent;
 }
 
+.ooc-title {
+  display: none;
+  margin: 0;
+  text-align: center;
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1.35;
+  color: var(--ooc-ink, #3c3424);
+}
+
 .ooc-body {
   flex: 1 0 auto;
   min-height: 120px;
@@ -379,7 +390,7 @@ const order: OnlineOfflineCommBlockId[] = ['a', 'b', 'c', 'd']
   }
 
   .ooc-frame {
-    padding: 36px 10px 42px;
+    padding: 12px 10px 96px;
     min-height: 0;
     height: auto;
   }
@@ -400,9 +411,40 @@ const order: OnlineOfflineCommBlockId[] = ['a', 'b', 'c', 'd']
     display: none;
   }
 
-  .ooc-axis-label--left,
-  .ooc-axis-label--right {
+  .ooc-axis-label {
     display: none;
+  }
+
+  .ooc-title {
+    display: block;
+  }
+
+  .ooc-body :deep(.ym-block-toolbar),
+  .ooc-body :deep(.panel-attachments),
+  .ooc-body :deep(.pa-root) {
+    opacity: 1;
+  }
+
+  .ooc-body :deep(.pm-max-btn) {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+  }
+
+  .ooc-body :deep(.rte-workspace),
+  .ooc-body :deep(.rte-canvas),
+  .ooc-body :deep(.ProseMirror) {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .ooc-body :deep(.rte-canvas) {
+    padding-right: 44px;
+  }
+
+  .ooc-body :deep(.ProseMirror p) {
+    overflow-wrap: anywhere;
   }
 
   .ooc-cell {
