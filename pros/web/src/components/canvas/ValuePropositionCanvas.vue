@@ -27,7 +27,7 @@ function block(id: ValuePropositionBlockId) {
   <div class="sheet" :style="chrome" aria-label="价值主张画布">
     <header class="sheet-top">
       <h2>{{ doc.title }}</h2>
-      <p>一边是我们提供的价值，一边是客户真正要完成的事、痛点和收益。两边对上才算契合。</p>
+      <p>价值图写我们提供什么，客户画像写客户要完成的事、痛点和收益。对得上才算契合。</p>
     </header>
     <div class="vpc">
       <section class="side" aria-label="价值图">
@@ -85,6 +85,7 @@ h4 { margin: 0; min-height: 44px; display: flex; align-items: center; justify-co
 .rte-slot { flex: 1 1 auto; min-height: min-content; height: auto; display: flex; }
 
 @media (max-width: 800px) {
+  .sheet { padding-bottom: 96px; }
   .vpc { grid-template-columns: 1fr; }
   article { min-height: 200px; }
 }
