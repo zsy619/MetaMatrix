@@ -195,6 +195,8 @@ describe('画布组件 · 上下文六要素', () => {
     expect(source).toContain('padding: 12px 12px 16px')
     expect(source).toContain('font-size: 15px')
     expect(source).toContain(':expanded="true"')
+    expect(source).toContain(':page-sheet="false"')
+    expect(source).toContain('min-height: 100%')
     expect(document.body.querySelector('.pm-overlay')).toBeTruthy()
   })
 
