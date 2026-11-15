@@ -157,7 +157,16 @@ async function bootstrap() {
   if (qid && auth.isAuthenticated) {
     try {
       await documentStore.load(qid)
-      await revealSearchMatch()
+      if (openedDocumentMatchesRoute()) {
+        await revealSearchMatch()
+        return
+      }
+      documentStore.loadFromTemplate(templateId.value)
+      await router.replace({
+        name: 'canvas',
+        params: { templateId: templateId.value },
+        query: queryWithoutDocument(),
+      })
       return
     } catch (e) {
       openError.value = friendlyApiMessage(e, '打开文档失败')
@@ -174,6 +183,10 @@ async function bootstrap() {
         const localExists = Boolean(documentStore.loadLocal(templateId.value))
         if (!localExists) {
           await documentStore.load(list[0].id)
+          if (!openedDocumentMatchesRoute()) {
+            documentStore.loadFromTemplate(templateId.value)
+            return
+          }
           router.replace({
             name: 'canvas',
             params: { templateId: templateId.value },
@@ -185,6 +198,20 @@ async function bootstrap() {
       /* ignore list errors */
     }
   }
+}
+
+function openedDocumentMatchesRoute(): boolean {
+  const opened = documentStore.activeTemplateId
+  return !opened || opened === templateId.value
+}
+
+function queryWithoutDocument(): Record<string, string | string[]> {
+  const next: Record<string, string | string[]> = {}
+  for (const [key, value] of Object.entries(route.query)) {
+    if (key === 'documentId' || value == null) continue
+    next[key] = Array.isArray(value) ? value.filter((item): item is string => item != null) : value
+  }
+  return next
 }
 
 watch(conflict, async (value) => {

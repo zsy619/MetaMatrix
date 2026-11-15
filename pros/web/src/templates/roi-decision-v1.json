@@ -12,6 +12,8 @@
     "hairline": "rgba(60, 50, 20, 0.08)"
   },
   "title": "ROI决策评估",
+  "decision": "",
+  "choice": "",
   "rows": [
     {
       "id": "row_basic",
