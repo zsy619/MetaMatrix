@@ -78,6 +78,8 @@ describe('附件链接', () => {
     expect(isAttachmentAnchor('https://files.example.com/包.phar', '包', 'rte-link')).toBe(true)
     expect(isAttachmentAnchor('https://files.example.com/包.xapk', '包', 'rte-link')).toBe(true)
     expect(isAttachmentAnchor('https://files.example.com/包.apks', '包', 'rte-link')).toBe(true)
+    expect(isAttachmentAnchor('https://files.example.com/包.msix', '包', 'rte-link')).toBe(true)
+    expect(isAttachmentAnchor('https://files.example.com/包.appxbundle', '包', 'rte-link')).toBe(true)
     expect(isAttachmentAnchor('https://files.example.com/包.tgz', '包', 'rte-link')).toBe(true)
     expect(isAttachmentAnchor('https://files.example.com/盘.iso', '盘', 'rte-link')).toBe(true)
     expect(isAttachmentAnchor('https://files.example.com/表.et', '表', 'rte-link')).toBe(true)
