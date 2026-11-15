@@ -1727,7 +1727,7 @@ export const useDocumentStore = defineStore('document', () => {
       raw.id === 'canvas_roi_decision'
     if (!addressed || raw.type === 'roi_decision') return doc
     if (!Array.isArray(raw.rows) || raw.rows.length === 0) return doc
-    return { ...doc, type: 'roi_decision' }
+    return { ...doc, type: 'roi_decision' } as CanvasDocumentJSON
   }
 
   /** 加载后温和升级已知模板结构（Y 模型 + attachmentsByPanelId） */
