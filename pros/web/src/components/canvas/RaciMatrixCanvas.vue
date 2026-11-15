@@ -220,13 +220,14 @@ input { width: 100%; min-height: 32px; border: 0; background: transparent; font:
 .role-name { display: none; }
 .role-letter { line-height: 1; }
 @media (max-width: 800px) {
+  .raci { padding-bottom: 28px; }
   .raci-sheet.raci-sheet { overflow: visible; background: transparent; border: 0; box-shadow: none; }
   table, tbody, tr, th, td { display: block; }
   thead { display: none; }
   tbody tr {
     display: flex;
     flex-wrap: wrap;
-    align-items: center;
+    align-items: stretch;
     gap: 8px;
     margin: 0 0 10px;
     padding: 10px;
@@ -235,16 +236,19 @@ input { width: 100%; min-height: 32px; border: 0; background: transparent; font:
     border-radius: 12px;
   }
   tbody th { flex: 1 1 100%; padding: 0; border: 0; }
-  tbody td { flex: 1 1 0; padding: 0; border: 0; }
+  tbody td { flex: 1 1 100%; padding: 0; border: 0; }
+  .work input { min-height: 40px; font-size: 16px; }
   .cell {
     width: 100%;
     height: auto;
     min-width: 0;
-    min-height: 56px;
-    flex-direction: column;
-    gap: 2px;
-    padding: 6px 4px;
+    min-height: 48px;
+    flex-direction: row;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 12px;
   }
-  .role-name { display: block; font-size: 13px; font-weight: 650; }
+  .role-name { display: block; font-size: 15px; font-weight: 650; }
+  .role-letter { font-size: 18px; font-weight: 800; }
 }
 </style>
