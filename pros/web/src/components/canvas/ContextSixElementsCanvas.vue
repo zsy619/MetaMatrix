@@ -84,22 +84,28 @@ onMounted(() => {
         </p>
       </header>
 
-      <RichTextEditor
-        v-if="!isMaximized"
-        class="cse-rte"
-        :panel-id="panelId"
-        :expanded="false"
-        :page-sheet="false"
-        :show-title="false"
-        :show-bottom-bar="true"
-        :show-publish-actions="false"
-        :show-markdown-hint="false"
-        placeholder="按六段结构填写上下文…"
-        :model-value="editorHtml"
-        @update:model-value="onEditorHtml"
-        @focus="onEditorFocus"
-      />
-      <button type="button" class="cse-max" aria-label="最大化" @click="openMaximize">最大化</button>
+      <div class="cse-editor">
+        <RichTextEditor
+          v-if="!isMaximized"
+          class="cse-rte"
+          :panel-id="panelId"
+          :expanded="false"
+          :page-sheet="false"
+          :show-title="false"
+          :show-bottom-bar="true"
+          :show-publish-actions="false"
+          :show-markdown-hint="false"
+          placeholder="按六段结构填写上下文…"
+          :model-value="editorHtml"
+          @update:model-value="onEditorHtml"
+          @focus="onEditorFocus"
+        />
+        <button type="button" class="pm-max-btn cse-max" title="最大化" aria-label="最大化" @click="openMaximize">
+          <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true">
+            <rect x="2.5" y="2.5" width="11" height="11" rx="1.2" fill="none" stroke="currentColor" stroke-width="1.5" />
+          </svg>
+        </button>
+      </div>
     </div>
   </div>
 
@@ -191,11 +197,26 @@ onMounted(() => {
   color: #3c4043;
 }
 
+.cse-editor {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .cse-rte {
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
+}
+
+.cse-max {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 4;
 }
 
 .cse-canvas :deep(.rte-root) {
@@ -239,11 +260,9 @@ onMounted(() => {
   box-sizing: border-box;
 }
 
-.cse-restore,
-.cse-max {
-  margin-top: 12px;
-  min-height: 40px;
-  padding: 0 16px;
+.cse-restore {
+  min-height: 36px;
+  padding: 0 14px;
   border: 1px solid var(--cv-frame, #ececec);
   border-radius: 999px;
   background: #fff;
