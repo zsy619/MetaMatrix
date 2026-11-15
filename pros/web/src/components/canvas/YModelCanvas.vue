@@ -511,7 +511,61 @@ watch(centerBlank, () => nextTick(measure))
     align-self: stretch;
     max-width: none;
   }
-  .cell { width: 100%; min-height: 180px; }
+  .y-model-canvas {
+    padding-bottom: 96px;
+  }
+
+  .cell {
+    width: 100%;
+    min-height: 180px;
+    height: auto;
+  }
+
+  .cell :deep(.ym-block) {
+    height: auto;
+    min-height: 0;
+    flex: 0 0 auto;
+    overflow: visible;
+  }
+
+  .cell :deep(.ym-block-body),
+  .cell :deep(.rte-root),
+  .cell :deep(.rte-workspace),
+  .cell :deep(.rte-canvas),
+  .cell :deep(.rte-body),
+  .cell :deep(.ProseMirror) {
+    height: auto;
+    max-height: none;
+    max-width: 100%;
+    min-width: 0;
+    overflow: visible;
+    flex: 0 0 auto;
+  }
+
+  .cell :deep(.rte-workspace),
+  .cell :deep(.rte-canvas),
+  .cell :deep(.ProseMirror) {
+    width: 100%;
+  }
+
+  .cell :deep(.rte-root .ProseMirror),
+  .cell :deep(.rte-root.compact .ProseMirror) {
+    min-height: 96px;
+    font-size: 16px;
+    line-height: 1.65;
+  }
+
+  .cell :deep(.ProseMirror p) {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .cell :deep(.pm-max-btn) {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+  }
+
   .cell-problem :deep(.ym-block) { max-width: none; }
   .word { font-size: 22px; letter-spacing: 0.08em; }
   .step { font-size: 15px; }
