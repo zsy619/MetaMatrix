@@ -1,7 +1,7 @@
 /** 页眉、页脚、页码。旧文档没有这个字段时视为空，不改变版心。 */
 import { cssPageMargin, type PageMarginBox } from './rtePageMargin'
 
-export const PAGE_NUMBER_STYLES = ['none', 'n', 'page-n', 'page-n-of-m', 'dash', 'roman', 'upper-roman', 'alpha', 'upper-alpha', 'cjk', 'pad', 'slash', 'cjk-formal', 'greek', 'of', 'p', 'no', 'pg', 'bracket', 'paren', 'square', 'hash', 'dot', 'angle', 'corner', 'dcorner', 'shell', 'lens', 'book', 'numero', 'section', 'pilcrow', 'wave', 'diamond', 'star'] as const
+export const PAGE_NUMBER_STYLES = ['none', 'n', 'page-n', 'page-n-of-m', 'dash', 'roman', 'upper-roman', 'alpha', 'upper-alpha', 'cjk', 'pad', 'slash', 'cjk-formal', 'greek', 'of', 'p', 'no', 'pg', 'bracket', 'paren', 'square', 'hash', 'dot', 'angle', 'corner', 'dcorner', 'shell', 'lens', 'book', 'numero', 'section', 'pilcrow', 'wave', 'diamond', 'star', 'ring'] as const
 
 export type PageNumberStyle = (typeof PAGE_NUMBER_STYLES)[number]
 
@@ -60,6 +60,7 @@ export const PAGE_NUMBER_OPTIONS: ReadonlyArray<{ id: PageNumberStyle; label: st
   { id: 'wave', label: '～1～' },
   { id: 'diamond', label: '◆ 1' },
   { id: 'star', label: '★ 1' },
+  { id: 'ring', label: '○ 1' },
 ]
 
 /** 页眉或页脚占用的最小边带。已有边距更大时不额外加高。 */
@@ -191,6 +192,8 @@ function pageNumberCss(style: PageNumberStyle): string {
       return '"◆ " counter(page)'
     case 'star':
       return '"★ " counter(page)'
+    case 'ring':
+      return '"○ " counter(page)'
     default:
       return ''
   }
@@ -455,6 +458,8 @@ export function formatPageNumber(style: PageNumberStyle, page: number, total: nu
       return `◆ ${n}`
     case 'star':
       return `★ ${n}`
+    case 'ring':
+      return `○ ${n}`
     default:
       return ''
   }
