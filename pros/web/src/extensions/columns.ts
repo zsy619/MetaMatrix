@@ -354,6 +354,7 @@ function clampNum(value: unknown, fallback: number, min: number, max: number): n
   const milliWord = /^(\d+(?:\.\d+)?)\s*毫米$/.exec(raw)
   const centiWord = /^(\d+(?:\.\d+)?)\s*厘米$/.exec(raw)
   const inchWord = /^(\d+(?:\.\d+)?)\s*英寸$/.exec(raw)
+  const gongfen = /^(\d+(?:\.\d+)?)\s*公分$/.exec(raw)
   const n = point
     ? Math.round((Number(point[1]) * 4) / 3)
     : milli
@@ -400,7 +401,9 @@ function clampNum(value: unknown, fallback: number, min: number, max: number): n
                                       ? Math.round((Number(centiWord[1]) * 96) / 2.54)
                                       : inchWord
                                         ? Math.round(Number(inchWord[1]) * 96)
-                                        : Math.round(Number(raw.replace(/\s*px$/i, '')))
+                                        : gongfen
+                                          ? Math.round((Number(gongfen[1]) * 96) / 2.54)
+                                          : Math.round(Number(raw.replace(/\s*px$/i, '')))
   if (!Number.isFinite(n)) return fallback
   return Math.max(min, Math.min(max, n))
 }
