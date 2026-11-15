@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { canvasChromeStyle } from './canvasChrome'
 import type { GanttTask, ProjectGanttDocumentJSON } from '../../types/canvas'
 import { isProjectGanttDoc } from '../../types/canvas'
@@ -43,8 +43,21 @@ const props = defineProps<{ doc: ProjectGanttDocumentJSON }>()
 const documentStore = useDocumentStore()
 const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 const ROW = 44
-const frame = computed(() => ({ ...chrome.value, '--gantt-row': `${ROW}px` }))
 const HEAD = 40
+const headStride = ref(HEAD)
+const rowBoxes = ref<Array<{ top: number; height: number }>>([])
+const frame = computed(() => ({ ...chrome.value, '--gantt-row': `${ROW}px` }))
+
+function rowBox(index: number) {
+  return rowBoxes.value[index] ?? { top: index * ROW, height: ROW }
+}
+
+const chartBodyHeight = computed(() => {
+  const boxes = rowBoxes.value
+  if (!boxes.length) return visibleRows.value.length * ROW
+  const last = boxes[boxes.length - 1]
+  return last.top + last.height
+})
 const selectedId = ref<string | null>(null)
 const status = ref('')
 const preview = ref<Record<string, { start: string; end: string }>>({})
@@ -74,9 +87,36 @@ function onChartWheel(event: WheelEvent) {
   setScale(zoomGanttScale(props.doc.scale, direction))
 }
 
+async function measureStride() {
+  await nextTick()
+  if (narrow.value) {
+    headStride.value = HEAD
+    rowBoxes.value = []
+    return
+  }
+  const tableHead = gridRef.value?.querySelector('thead')
+  const body = gridRef.value?.querySelector('tbody')
+  if (tableHead && getComputedStyle(tableHead).display !== 'none') {
+    const height = Math.round(tableHead.getBoundingClientRect().height)
+    if (height > 0) headStride.value = height
+  }
+  const chartBody = chartRef.value?.querySelector('.chart-body')
+  if (!body || !chartBody) return
+  const origin = chartBody.getBoundingClientRect().top
+  const next = [...body.querySelectorAll('tr')].map((row) => {
+    const rect = row.getBoundingClientRect()
+    return { top: rect.top - origin, height: rect.height }
+  })
+  const prev = rowBoxes.value
+  const same = prev.length === next.length && prev.every((box, index) => box.top === next[index].top && box.height === next[index].height)
+  if (!same) rowBoxes.value = next
+}
+
 onMounted(() => {
   narrowQuery?.addEventListener('change', onNarrowChange)
   chartRef.value?.addEventListener('wheel', onChartWheel, { passive: false })
+  void measureStride()
+  requestAnimationFrame(() => { void measureStride() })
 })
 onBeforeUnmount(() => {
   narrowQuery?.removeEventListener('change', onNarrowChange)
@@ -135,6 +175,8 @@ let syncing = false
 const tasks = computed(() => props.doc.tasks)
 const analysis = computed(() => analyzeSchedule(tasks.value))
 const visibleRows = computed(() => outlineRows(tasks.value).filter((row) => !row.hidden))
+watch(visibleRows, () => { void measureStride() })
+watch(narrow, () => { void measureStride() })
 const unit = computed(() => scalePx(props.doc.scale))
 
 function shown(task: GanttTask): GanttTask {
@@ -235,8 +277,10 @@ const arrows = computed(() => {
       const type = link.type || 'FS'
       const fromX = type === 'SS' || type === 'SF' ? axisX(predRange.from) : axisX(predRange.to)
       const toX = type === 'FF' || type === 'SF' ? axisX(succRange.to) : axisX(succRange.from)
-      const fromY = fromIndex * ROW + ROW / 2
-      const toY = toIndex * ROW + ROW / 2
+      const fromBox = rowBox(fromIndex)
+      const toBox = rowBox(toIndex)
+      const fromY = fromBox.top + fromBox.height / 2
+      const toY = toBox.top + toBox.height / 2
       return [{
         key: `${pred.id}-${task.id}-${type}-${link.lag || 0}`,
         critical: isCritical(pred.id) && isCritical(task.id),
@@ -689,7 +733,7 @@ function startDrag(event: PointerEvent, task: GanttTask, mode: 'move' | 'resize'
         @keydown="onSplitKey"
       />
       <div ref="chartRef" class="chart" aria-label="甘特图时间刻度" :style="{ '--gantt-day': unit + 'px' }" @scroll="onChartScroll">
-        <div class="chart-head" title="在日期上滚动可切换时、天、周、月、年" :style="{ width: '100%', minWidth: naturalWidth + 'px', height: HEAD + 'px' }">
+        <div class="chart-head" title="在日期上滚动可切换时、天、周、月、年" :style="{ width: '100%', minWidth: naturalWidth + 'px', height: headStride + 'px' }">
           <div class="months">
             <span v-for="group in axis.groups" :key="group.key" :style="{ flexGrow: group.count, minWidth: group.count * unit + 'px' }">{{ group.label }}</span>
           </div>
@@ -701,7 +745,7 @@ function startDrag(event: PointerEvent, task: GanttTask, mode: 'move' | 'resize'
             >{{ tick.label }}</span>
           </div>
         </div>
-        <div class="chart-body" :style="{ width: '100%', minWidth: naturalWidth + 'px', height: visibleRows.length * ROW + 'px' }">
+        <div class="chart-body" :style="{ width: '100%', minWidth: naturalWidth + 'px', height: chartBodyHeight + 'px' }">
           <div
             v-for="(tick, index) in axis.ticks"
             :key="'col-' + tick.key"
@@ -710,7 +754,7 @@ function startDrag(event: PointerEvent, task: GanttTask, mode: 'move' | 'resize'
             :style="columnStyle(index)"
           />
           <div v-if="todayLeft != null" class="today" :style="{ left: todayLeft + '%' }" />
-          <svg class="links" width="100%" height="100%" :viewBox="`0 0 ${naturalWidth} ${visibleRows.length * ROW}`" preserveAspectRatio="none">
+          <svg class="links" width="100%" height="100%" :viewBox="`0 0 ${naturalWidth} ${chartBodyHeight}`" preserveAspectRatio="none">
             <defs>
               <marker id="gantt-arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
                 <path d="M0,0 L8,4 L0,8 Z" fill="#5f6368" />
@@ -736,7 +780,7 @@ function startDrag(event: PointerEvent, task: GanttTask, mode: 'move' | 'resize'
             :key="row.task.id"
             class="chart-row"
             :class="{ selected: row.task.id === selectedId }"
-            :style="{ top: index * ROW + 'px', height: ROW + 'px' }"
+            :style="{ top: rowBox(index).top + 'px', height: rowBox(index).height + 'px' }"
             @click="select(row.task.id)"
           >
             <div v-if="baselineBox(row.task)" class="baseline" :style="baselineStyle(row.task)" />
@@ -785,12 +829,14 @@ function startDrag(event: PointerEvent, task: GanttTask, mode: 'move' | 'resize'
 .grid { width: min(720px, 54%); min-width: 0; flex: none; overflow: auto; }
 .split-bar { flex: none; width: 9px; cursor: col-resize; touch-action: none; background: #fff linear-gradient(#dadce0, #dadce0) center / 1px 100% no-repeat; z-index: 4; }
 .split-bar:hover, .split-bar:focus-visible { background-image: linear-gradient(#1a73e8, #1a73e8); outline: none; }
-.grid table { border-collapse: separate; border-spacing: 0; width: max-content; min-width: 100%; }
-.grid th, .grid td { height: var(--gantt-row, 44px); box-sizing: border-box; padding: 0 6px; border-bottom: 1px solid #f1f3f4; font-size: 14px; text-align: left; }
-.grid thead th { height: 40px; position: sticky; top: 0; background: #f3f6f9; z-index: 1; font-size: 13px; }
+.grid table { border-collapse: collapse; border-spacing: 0; width: max-content; min-width: 100%; }
+.grid tbody tr { height: var(--gantt-row, 44px); }
+.grid th, .grid td { height: var(--gantt-row, 44px); box-sizing: border-box; padding: 0 6px; border-bottom: 1px solid #f1f3f4; font-size: 14px; line-height: 20px; text-align: left; vertical-align: middle; }
+.grid thead tr { height: 40px; }
+.grid thead th { height: 40px; position: sticky; top: 0; background: #f3f6f9; z-index: 1; font-size: 13px; line-height: 20px; }
 .grid tr.selected td { background: #e8f0fe; }
 .grid tr.critical .name input { color: #d93025; font-weight: 700; }
-.grid input { width: 100%; box-sizing: border-box; border: 1px solid transparent; background: transparent; border-radius: 4px; padding: 2px 3px; font: inherit; color: inherit; }
+.grid input { width: 100%; height: 28px; min-height: 0; box-sizing: border-box; border: 1px solid transparent; background: transparent; border-radius: 4px; padding: 2px 3px; font: inherit; line-height: 20px; color: inherit; }
 .grid input:focus { border-color: #1a73e8; background: #fff; outline: none; }
 .when { position: relative; display: inline-flex; align-items: center; }
 .when::after { content: ''; position: absolute; right: 6px; width: 12px; height: 12px; border: 1.5px solid #5f6368; border-radius: 2px; box-shadow: inset 0 3px 0 #5f6368; pointer-events: none; }
@@ -801,7 +847,7 @@ function startDrag(event: PointerEvent, task: GanttTask, mode: 'move' | 'resize'
 .name { min-width: 180px; }
 .name { display: flex; align-items: center; }
 .indent { flex: none; }
-.twist { flex: none; width: 36px; height: 36px; border: 0; background: transparent; padding: 0; font-size: 16px; cursor: pointer; color: #5f6368; }
+.twist { flex: none; width: 32px; height: 32px; border: 0; background: transparent; padding: 0; font-size: 16px; cursor: pointer; color: #5f6368; }
 .twist--blank { display: inline-block; }
 .chart { flex: 1 1 auto; min-width: 0; overflow: auto; position: relative; background: #fff; }
 .chart-head { position: sticky; top: 0; z-index: 2; background: #f3f6f9; border-bottom: 1px solid #e0e0e0; box-sizing: border-box; }
