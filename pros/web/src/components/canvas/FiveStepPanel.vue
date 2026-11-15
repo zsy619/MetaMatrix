@@ -329,7 +329,7 @@ function onCloseMaximize(event?: Event) {
   justify-content: center;
   flex-shrink: 0;
   min-height: 40px;
-  padding: 8px 36px;
+  padding: 8px 52px;
   background: linear-gradient(
     180deg,
     color-mix(in srgb, var(--fsp-header) 74%, #fff),
@@ -340,8 +340,8 @@ function onCloseMaximize(event?: Event) {
 }
 
 .fsp--compact .fsp-header {
-  min-height: 32px;
-  padding: 5px 32px;
+  min-height: 36px;
+  padding: 6px 48px;
 }
 
 .fsp-title {
@@ -361,7 +361,7 @@ function onCloseMaximize(event?: Event) {
 }
 
 .fsp--compact .fsp-title {
-  font-size: 12.5px;
+  font-size: 15px;
   letter-spacing: 0.01em;
 }
 
@@ -374,8 +374,8 @@ function onCloseMaximize(event?: Event) {
 
 .fsp-actions .pm-max-btn,
 .fsp-float-max {
-  width: 28px;
-  height: 28px;
+  width: 36px;
+  height: 36px;
 }
 
 .fsp-float-max {
@@ -419,12 +419,12 @@ function onCloseMaximize(event?: Event) {
 .fsp--compact .fsp-topic {
   margin: 6px 10px 0;
   width: calc(100% - 20px);
-  font-size: 13px;
+  font-size: 15px;
 }
 
 .fsp--fill .fsp-topic {
-  width: calc(100% - 40px);
-  margin-right: 28px;
+  width: calc(100% - 52px);
+  margin-right: 8px;
 }
 
 .fsp-topic::placeholder {
@@ -507,7 +507,7 @@ function onCloseMaximize(event?: Event) {
 
 .fsp--compact :deep(.pa-title) {
   flex: 1 0 auto;
-  font-size: 10px;
+  font-size: 14px;
 }
 
 .fsp--compact :deep(.pa-actions) {
@@ -516,9 +516,10 @@ function onCloseMaximize(event?: Event) {
 }
 
 .fsp--compact :deep(.pa-btn) {
-  padding: 0 4px;
-  font-size: 10px;
-  line-height: 1.5;
+  min-height: 32px;
+  padding: 4px 8px;
+  font-size: 14px;
+  line-height: 1.4;
 }
 
 .fsp :deep(.pa-empty) {

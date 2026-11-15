@@ -1,4 +1,7 @@
 // @vitest-environment happy-dom
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -100,6 +103,10 @@ describe('战略画布格子', () => {
     const swot = mount(SwotCanvas, { props: { doc: store.current_data as SwotDocumentJSON } })
     for (const title of ['优势', '劣势', '机会', '威胁']) expect(swot.text()).toContain(title)
     expect(swot.findAll('section')).toHaveLength(4)
+    expect(swot.findAll('button[aria-label="最大化"]')).toHaveLength(4)
+    const panel = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'FiveStepPanel.vue'), 'utf8')
+    expect(panel).toContain('width: 36px;\n  height: 36px;')
+    expect(panel).toContain('width: calc(100% - 52px);')
     swot.unmount()
 
     store.loadFromTemplate('value-chain')
