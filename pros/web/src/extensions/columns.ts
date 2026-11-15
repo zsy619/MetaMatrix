@@ -324,7 +324,13 @@ export type ColumnFrameAttrs = {
 }
 
 function clampNum(value: unknown, fallback: number, min: number, max: number): number {
-  const raw = String(value ?? '').trim().normalize('NFKC').replace(/，/g, '.').replace(/,/g, '.')
+  const raw = String(value ?? '')
+    .trim()
+    .normalize('NFKC')
+    .replace(/，/g, '.')
+    .replace(/,/g, '.')
+    .replace(/\s*!important\s*;?$/i, '')
+    .replace(/;+\s*$/, '')
   const point = /^(\d+(?:\.\d+)?)\s*pt$/i.exec(raw)
   const milli = /^(\d+(?:\.\d+)?)\s*mm$/i.exec(raw)
   const centi = /^(\d+(?:\.\d+)?)\s*cm$/i.exec(raw)
