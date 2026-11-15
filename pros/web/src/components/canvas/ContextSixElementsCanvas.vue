@@ -130,19 +130,62 @@ onMounted(() => {
 
 .cse-title {
   margin: 0;
-  font-size: 18px;
-  font-weight: 700;
+  font-size: 22px;
+  font-weight: 720;
+  line-height: 1.3;
   color: var(--cv-ink-strong, #202124);
 }
 
 .cse-hint {
-  margin: 4px 0 0;
-  font-size: 12px;
+  margin: 6px 0 0;
+  font-size: 15px;
   line-height: 1.6;
-  color: var(--cv-muted, #5f6368);
+  color: #3c4043;
 }
 
 .cse-rte {
   min-height: 420px;
+}
+
+@media (max-width: 800px) {
+  .cse-canvas {
+    padding: 12px 10px 96px;
+  }
+
+  .cse-page {
+    width: 100%;
+    margin: 0;
+    padding: 16px 14px 20px;
+  }
+
+  .cse-canvas :deep(.rte-root),
+  .cse-canvas :deep(.rte-workspace),
+  .cse-canvas :deep(.rte-canvas) {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .cse-canvas :deep(.rte-root.is-page-sheet .rte-canvas) {
+    background: transparent;
+  }
+
+  .cse-canvas :deep(.rte-root.is-page-sheet .rte-body) {
+    width: 100%;
+    min-height: 280px;
+    height: auto;
+    margin: 0;
+    padding: 12px 12px 16px;
+    box-shadow: none;
+  }
+
+  .cse-canvas :deep(.rte-root.is-page-sheet .rte-body::before) {
+    display: none;
+  }
+
+  .cse-canvas :deep(.ProseMirror) {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
 }
 </style>
