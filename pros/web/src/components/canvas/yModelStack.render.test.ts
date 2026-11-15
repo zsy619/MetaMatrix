@@ -1,4 +1,7 @@
 // @vitest-environment happy-dom
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -51,6 +54,8 @@ describe('Y 模型', () => {
       expect(wrapper.text()).toContain(title)
     }
     expect(wrapper.text()).toContain('先写问题')
+    const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'YModelCanvas.vue'), 'utf8')
+    expect(source).toContain('overflow-wrap: anywhere')
     const field = wrapper.get('input[aria-label="填写认知领域"]')
     await field.setValue('产品')
     expect((store.current_data as YModelDocumentJSON).center.blank).toBe('产品')
