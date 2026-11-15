@@ -50,6 +50,8 @@ describe('项目甘特图', () => {
     expect(ticks.length).toBeGreaterThan(1)
     const headMin = Number((head.attributes('style') || '').match(/min-width:\s*(\d+)px/)?.[1])
     expect(headMin).toBe(ticks.length * 84)
+    expect(wrapper.get('td.start').attributes('data-label')).toBe('开工')
+    expect(wrapper.get('td.end').attributes('data-label')).toBe('完成')
     expect(wrapper.get('[aria-label="时间刻度"]').text()).toContain('时')
     expect(wrapper.get('[aria-label="时间刻度"]').text()).toContain('年')
     const docRow = wrapper.findAll('tbody tr').find((row) => row.get('input[aria-label="任务名称"]').element instanceof HTMLInputElement && (row.get('input[aria-label="任务名称"]').element as HTMLInputElement).value === '文档')
@@ -128,7 +130,7 @@ describe('项目甘特图', () => {
       y: 0,
       toJSON() { return {} },
     })
-    const bar = wrapper.get('[aria-label="调节左右面板宽度"]')
+    const bar = wrapper.get('[aria-label="调节任务表宽度"]')
     expect(bar.attributes('role')).toBe('separator')
     await bar.trigger('pointerdown', { button: 0, clientX: 700, pointerId: 1 })
     bar.element.dispatchEvent(new PointerEvent('pointermove', { clientX: 640, pointerId: 1 }))
