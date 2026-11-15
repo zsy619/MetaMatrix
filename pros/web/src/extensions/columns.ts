@@ -334,6 +334,7 @@ function clampNum(value: unknown, fallback: number, min: number, max: number): n
   const rootEm = /^(\d+(?:\.\d+)?)\s*rem$/i.exec(raw)
   const em = /^(\d+(?:\.\d+)?)\s*em$/i.exec(raw)
   const ch = /^(\d+(?:\.\d+)?)\s*ch$/i.exec(raw)
+  const rootCh = /^(\d+(?:\.\d+)?)\s*rch$/i.exec(raw)
   const ex = /^(\d+(?:\.\d+)?)\s*ex$/i.exec(raw)
   const rootEx = /^(\d+(?:\.\d+)?)\s*rex$/i.exec(raw)
   const ideo = /^(\d+(?:\.\d+)?)\s*ic$/i.exec(raw)
@@ -359,7 +360,9 @@ function clampNum(value: unknown, fallback: number, min: number, max: number): n
                   ? Math.round(Number(em[1]) * 16)
                   : ch
                     ? Math.round(Number(ch[1]) * 8)
-                    : ex
+                    : rootCh
+                      ? Math.round(Number(rootCh[1]) * 8)
+                      : ex
                       ? Math.round(Number(ex[1]) * 8)
                       : rootEx
                         ? Math.round(Number(rootEx[1]) * 8)
