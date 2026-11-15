@@ -168,6 +168,20 @@ describe('图片边框和圆角', () => {
     expect(editor.getHTML()).toContain('width="320"')
   })
 
+  it('宽度写成 36像素 时按 36 像素留下', () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    editor = new Editor({
+      element: host,
+      extensions: [
+        StarterKit.configure({ dropcursor: false }),
+        RteImage.configure({ inline: false, allowBase64: true, HTMLAttributes: { class: 'rte-image' } }),
+      ],
+      content: `<img src="${PIXEL}" width="36像素" alt="宽">`,
+    })
+    expect(editor.getHTML()).toContain('width="36"')
+  })
+
   it('宽度写成 48px; 时仍是 48', () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
