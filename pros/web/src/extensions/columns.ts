@@ -351,6 +351,7 @@ function clampNum(value: unknown, fallback: number, min: number, max: number): n
   const rootCap = /^(\d+(?:\.\d+)?)\s*rcap$/i.exec(raw)
   const pxWord = /^(\d+(?:\.\d+)?)\s*像素$/.exec(raw)
   const pointWord = /^(\d+(?:\.\d+)?)\s*磅$/.exec(raw)
+  const milliWord = /^(\d+(?:\.\d+)?)\s*毫米$/.exec(raw)
   const n = point
     ? Math.round((Number(point[1]) * 4) / 3)
     : milli
@@ -391,7 +392,9 @@ function clampNum(value: unknown, fallback: number, min: number, max: number): n
                                 ? Math.round(Number(pxWord[1]))
                                 : pointWord
                                   ? Math.round((Number(pointWord[1]) * 4) / 3)
-                                  : Math.round(Number(raw.replace(/\s*px$/i, '')))
+                                  : milliWord
+                                    ? Math.round((Number(milliWord[1]) * 96) / 25.4)
+                                    : Math.round(Number(raw.replace(/\s*px$/i, '')))
   if (!Number.isFinite(n)) return fallback
   return Math.max(min, Math.min(max, n))
 }
