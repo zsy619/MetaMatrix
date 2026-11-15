@@ -39,6 +39,15 @@ function cellPaint(id: WorkStateZonesBlockId) {
   return paintForTone(item?.tone, item)
 }
 
+function axisNote(id: WorkStateZonesBlockId): { main: string; sub: string } {
+  const vertical = id === 'a' || id === 'b' ? axes.value.autonomyHigh : axes.value.autonomyLow
+  const horizontal = id === 'a' || id === 'c' ? axes.value.comfort : axes.value.nonComfort
+  return {
+    main: `${vertical.label} · ${horizontal.label}`,
+    sub: `${vertical.sub} · ${horizontal.sub}`,
+  }
+}
+
 const order: WorkStateZonesBlockId[] = ['a', 'b', 'c', 'd']
 
 /**
@@ -166,6 +175,8 @@ function onOpenQuadrant(id: WorkStateZonesBlockId, event?: Event) {
               >
                 {{ block(id)!.description }}
               </p>
+              <p class="wsz-axis-note">{{ axisNote(id).main }}</p>
+              <p class="wsz-axis-note wsz-axis-note--sub">{{ axisNote(id).sub }}</p>
             </div>
             <div class="wsz-body">
               <YModelBlockCard :block="block(id)!" hide-title />
@@ -360,6 +371,21 @@ function onOpenQuadrant(id: WorkStateZonesBlockId, event?: Event) {
   pointer-events: none;
 }
 
+.wsz-axis-note {
+  display: none;
+  margin: 0;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1.45;
+  color: #3c3424;
+  pointer-events: none;
+}
+
+.wsz-axis-note--sub {
+  font-weight: 550;
+}
+
 .wsz-desc {
   margin: 0;
   text-align: center;
@@ -474,7 +500,7 @@ function onOpenQuadrant(id: WorkStateZonesBlockId, event?: Event) {
   }
 
   .wsz-frame {
-    padding: 44px 10px 48px;
+    padding: 12px 10px 96px;
     min-height: 0;
     height: auto;
   }
@@ -495,9 +521,40 @@ function onOpenQuadrant(id: WorkStateZonesBlockId, event?: Event) {
     display: none;
   }
 
-  .wsz-axis-label--left,
-  .wsz-axis-label--right {
+  .wsz-axis-label {
     display: none;
+  }
+
+  .wsz-axis-note {
+    display: block;
+  }
+
+  .wsz-body :deep(.ym-block-toolbar),
+  .wsz-body :deep(.panel-attachments),
+  .wsz-body :deep(.pa-root) {
+    opacity: 1;
+  }
+
+  .wsz-body :deep(.pm-max-btn) {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+  }
+
+  .wsz-body :deep(.rte-workspace),
+  .wsz-body :deep(.rte-canvas),
+  .wsz-body :deep(.ProseMirror) {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .wsz-body :deep(.rte-canvas) {
+    padding-right: 44px;
+  }
+
+  .wsz-body :deep(.ProseMirror p) {
+    overflow-wrap: anywhere;
   }
 
   .wsz-cell {

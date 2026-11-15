@@ -352,7 +352,7 @@ const order: TimeMatrixBlockId[] = ['a', 'b', 'c', 'd']
   }
 
   .tm-frame {
-    padding: 36px 10px 42px;
+    padding: 12px 10px 96px;
     min-height: 0;
     height: auto;
   }
@@ -373,9 +373,36 @@ const order: TimeMatrixBlockId[] = ['a', 'b', 'c', 'd']
     display: none;
   }
 
-  .tm-axis-label--left,
-  .tm-axis-label--right {
+  .tm-axis-label {
     display: none;
+  }
+
+  .tm-body :deep(.ym-block-toolbar),
+  .tm-body :deep(.panel-attachments),
+  .tm-body :deep(.pa-root) {
+    opacity: 1;
+  }
+
+  .tm-body :deep(.pm-max-btn) {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+  }
+
+  .tm-body :deep(.rte-workspace),
+  .tm-body :deep(.rte-canvas),
+  .tm-body :deep(.ProseMirror) {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .tm-body :deep(.rte-canvas) {
+    padding-right: 44px;
+  }
+
+  .tm-body :deep(.ProseMirror p) {
+    overflow-wrap: anywhere;
   }
 
   .tm-cell {

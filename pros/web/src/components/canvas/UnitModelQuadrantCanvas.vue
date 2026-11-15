@@ -32,6 +32,12 @@ function cellPaint(id: UnitModelQuadrantBlockId) {
   return paintForTone(item?.tone, item)
 }
 
+function axisNote(id: UnitModelQuadrantBlockId): string {
+  const vertical = id === 'a' || id === 'b' ? axes.value.unitModelLongTerm : axes.value.unitModelInvalid
+  const horizontal = id === 'a' || id === 'd' ? axes.value.companyAccountLongTerm : axes.value.companyAccountInvalid
+  return `${vertical} · ${horizontal}`
+}
+
 /** CSS 网格顺序：TL b · TR a · BL c · BR d（与附图 id 位置一致） */
 const order: UnitModelQuadrantBlockId[] = ['b', 'a', 'c', 'd']
 </script>
@@ -126,6 +132,7 @@ const order: UnitModelQuadrantBlockId[] = ['b', 'a', 'c', 'd']
               >
                 {{ block(id)!.title }}
               </h2>
+              <p class="umq-axis-note">{{ axisNote(id) }}</p>
               <div class="umq-body">
                 <YModelBlockCard :block="block(id)!" hide-title />
               </div>
@@ -263,6 +270,16 @@ const order: UnitModelQuadrantBlockId[] = ['b', 'a', 'c', 'd']
   background: transparent;
 }
 
+.umq-axis-note {
+  display: none;
+  margin: 0;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1.45;
+  color: #3c3424;
+}
+
 .umq-title {
   margin: 0;
   flex-shrink: 0;
@@ -356,7 +373,7 @@ const order: UnitModelQuadrantBlockId[] = ['b', 'a', 'c', 'd']
   }
 
   .umq-frame {
-    padding: 48px 10px 56px;
+    padding: 12px 10px 96px;
     min-height: 0;
     height: auto;
   }
@@ -377,9 +394,40 @@ const order: UnitModelQuadrantBlockId[] = ['b', 'a', 'c', 'd']
     display: none;
   }
 
-  .umq-axis-label--left,
-  .umq-axis-label--right {
+  .umq-axis-label {
     display: none;
+  }
+
+  .umq-axis-note {
+    display: block;
+  }
+
+  .umq-body :deep(.ym-block-toolbar),
+  .umq-body :deep(.panel-attachments),
+  .umq-body :deep(.pa-root) {
+    opacity: 1;
+  }
+
+  .umq-body :deep(.pm-max-btn) {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+  }
+
+  .umq-body :deep(.rte-workspace),
+  .umq-body :deep(.rte-canvas),
+  .umq-body :deep(.ProseMirror) {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .umq-body :deep(.rte-canvas) {
+    padding-right: 44px;
+  }
+
+  .umq-body :deep(.ProseMirror p) {
+    overflow-wrap: anywhere;
   }
 
   .umq-cell {
