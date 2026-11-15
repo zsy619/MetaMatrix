@@ -1659,10 +1659,10 @@ function legendLayout(option: Record<string, unknown>): Record<string, unknown> 
   return place
 }
 
-function axisNameLayout(axis: unknown): { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique'; family?: string; leading?: number; alignTo?: 'left' | 'center' | 'right'; valign?: 'top' | 'middle' | 'bottom'; clip?: 'none' | 'truncate' | 'break' | 'breakAll'; badge?: string; box?: number; edge?: string; stroke?: number } {
+function axisNameLayout(axis: unknown): { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique'; family?: string; leading?: number; alignTo?: 'left' | 'center' | 'right'; valign?: 'top' | 'middle' | 'bottom'; clip?: 'none' | 'truncate' | 'break' | 'breakAll'; badge?: string; box?: number; edge?: string; stroke?: number; radius?: number } {
   const node = Array.isArray(axis) ? axis[0] : axis
   if (!isPlainObject(node)) return {}
-  const place: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique'; family?: string; leading?: number; alignTo?: 'left' | 'center' | 'right'; valign?: 'top' | 'middle' | 'bottom'; clip?: 'none' | 'truncate' | 'break' | 'breakAll'; badge?: string; box?: number; edge?: string; stroke?: number } = {}
+  const place: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique'; family?: string; leading?: number; alignTo?: 'left' | 'center' | 'right'; valign?: 'top' | 'middle' | 'bottom'; clip?: 'none' | 'truncate' | 'break' | 'breakAll'; badge?: string; box?: number; edge?: string; stroke?: number; radius?: number } = {}
   if (node.nameLocation === 'start' || node.nameLocation === 'middle' || node.nameLocation === 'end') {
     place.location = node.nameLocation
   }
@@ -1722,12 +1722,16 @@ function axisNameLayout(axis: unknown): { location?: 'start' | 'middle' | 'end';
       const stroke = Math.round(style.borderWidth)
       if (stroke >= 0 && stroke <= 16) place.stroke = stroke
     }
+    if (typeof style.borderRadius === 'number' && Number.isFinite(style.borderRadius)) {
+      const radius = Math.round(style.borderRadius)
+      if (radius >= 0 && radius <= 24) place.radius = radius
+    }
   }
   return place
 }
 
-function axisNameTextStyle(place?: { font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique'; family?: string; leading?: number; alignTo?: 'left' | 'center' | 'right'; valign?: 'top' | 'middle' | 'bottom'; clip?: 'none' | 'truncate' | 'break' | 'breakAll'; badge?: string; box?: number; edge?: string; stroke?: number }): { fontSize?: number; color?: string; fontWeight?: string | number; fontStyle?: 'normal' | 'italic' | 'oblique'; fontFamily?: string; lineHeight?: number; align?: 'left' | 'center' | 'right'; verticalAlign?: 'top' | 'middle' | 'bottom'; overflow?: 'none' | 'truncate' | 'break' | 'breakAll'; backgroundColor?: string; width?: number; borderColor?: string; borderWidth?: number } | undefined {
-  if (!place || (place.font == null && !place.ink && place.weight == null && !place.slant && !place.family && place.leading == null && !place.alignTo && !place.valign && !place.clip && !place.badge && place.box == null && !place.edge && place.stroke == null)) return undefined
+function axisNameTextStyle(place?: { font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique'; family?: string; leading?: number; alignTo?: 'left' | 'center' | 'right'; valign?: 'top' | 'middle' | 'bottom'; clip?: 'none' | 'truncate' | 'break' | 'breakAll'; badge?: string; box?: number; edge?: string; stroke?: number; radius?: number }): { fontSize?: number; color?: string; fontWeight?: string | number; fontStyle?: 'normal' | 'italic' | 'oblique'; fontFamily?: string; lineHeight?: number; align?: 'left' | 'center' | 'right'; verticalAlign?: 'top' | 'middle' | 'bottom'; overflow?: 'none' | 'truncate' | 'break' | 'breakAll'; backgroundColor?: string; width?: number; borderColor?: string; borderWidth?: number; borderRadius?: number } | undefined {
+  if (!place || (place.font == null && !place.ink && place.weight == null && !place.slant && !place.family && place.leading == null && !place.alignTo && !place.valign && !place.clip && !place.badge && place.box == null && !place.edge && place.stroke == null && place.radius == null)) return undefined
   return {
     ...(place.font != null ? { fontSize: place.font } : {}),
     ...(place.ink ? { color: place.ink } : {}),
@@ -1742,12 +1746,13 @@ function axisNameTextStyle(place?: { font?: number; ink?: string; weight?: strin
     ...(place.box != null ? { width: place.box } : {}),
     ...(place.edge ? { borderColor: place.edge } : {}),
     ...(place.stroke != null ? { borderWidth: place.stroke } : {}),
+    ...(place.radius != null ? { borderRadius: place.radius } : {}),
   }
 }
 
 function cartesianNameLayout(option: Record<string, unknown>): {
-  category: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique'; family?: string; leading?: number; alignTo?: 'left' | 'center' | 'right'; valign?: 'top' | 'middle' | 'bottom'; clip?: 'none' | 'truncate' | 'break' | 'breakAll'; badge?: string; box?: number; edge?: string; stroke?: number }
-  value: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique'; family?: string; leading?: number; alignTo?: 'left' | 'center' | 'right'; valign?: 'top' | 'middle' | 'bottom'; clip?: 'none' | 'truncate' | 'break' | 'breakAll'; badge?: string; box?: number; edge?: string; stroke?: number }
+  category: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique'; family?: string; leading?: number; alignTo?: 'left' | 'center' | 'right'; valign?: 'top' | 'middle' | 'bottom'; clip?: 'none' | 'truncate' | 'break' | 'breakAll'; badge?: string; box?: number; edge?: string; stroke?: number; radius?: number }
+  value: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique'; family?: string; leading?: number; alignTo?: 'left' | 'center' | 'right'; valign?: 'top' | 'middle' | 'bottom'; clip?: 'none' | 'truncate' | 'break' | 'breakAll'; badge?: string; box?: number; edge?: string; stroke?: number; radius?: number }
 } {
   const horizontal = categoryOnYAxis(option)
   return {
@@ -1923,8 +1928,8 @@ function buildCartesianOption(
   scale?: { interval?: number; minInterval?: number; inverse?: boolean; log?: boolean; logBase?: number; fromData?: boolean; side?: 'left' | 'right' | 'top' | 'bottom'; shift?: number; hidden?: boolean; parts?: number },
   boundaryGap?: boolean,
   namePlace?: {
-    category: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique'; family?: string; leading?: number; alignTo?: 'left' | 'center' | 'right'; valign?: 'top' | 'middle' | 'bottom'; clip?: 'none' | 'truncate' | 'break' | 'breakAll'; badge?: string; box?: number; edge?: string; stroke?: number }
-    value: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique'; family?: string; leading?: number; alignTo?: 'left' | 'center' | 'right'; valign?: 'top' | 'middle' | 'bottom'; clip?: 'none' | 'truncate' | 'break' | 'breakAll'; badge?: string; box?: number; edge?: string; stroke?: number }
+    category: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique'; family?: string; leading?: number; alignTo?: 'left' | 'center' | 'right'; valign?: 'top' | 'middle' | 'bottom'; clip?: 'none' | 'truncate' | 'break' | 'breakAll'; badge?: string; box?: number; edge?: string; stroke?: number; radius?: number }
+    value: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique'; family?: string; leading?: number; alignTo?: 'left' | 'center' | 'right'; valign?: 'top' | 'middle' | 'bottom'; clip?: 'none' | 'truncate' | 'break' | 'breakAll'; badge?: string; box?: number; edge?: string; stroke?: number; radius?: number }
   },
   hideValueSplitLine = false,
   hideCategoryAxisLine = false,
