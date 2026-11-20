@@ -26,7 +26,76 @@ type Config struct {
 	FeishuAppID          string
 	FeishuAppSecret      string
 	FeishuBlockID        string
+	// Mail holds the outbound mail settings.
+	Mail MailConfig
+	// PasswordReset holds the reset code settings.
+	PasswordReset PasswordResetConfig
 }
+
+// MailConfig describes the outbound mail transport.
+//
+// The transport is vendor neutral: any SMTP server works by filling in the
+// host, port and credentials. MAIL_MODE decides what happens when the
+// settings are incomplete.
+type MailConfig struct {
+	// Mode is "smtp", "log" or "auto".
+	//
+	// "auto" is the default: use SMTP when the settings are complete,
+	// otherwise fall back to the log transport in development and refuse to
+	// send in production. See ResolveMailMode for the exact rules.
+	Mode string
+	// Host is the SMTP server host name.
+	Host string
+	// Port is the SMTP port. 465 is implicit TLS, 587 is STARTTLS.
+	Port int
+	// Username and Password are the SMTP credentials. They may be empty for
+	// a relay that does not authenticate.
+	Username string
+	Password string
+	// From is the envelope sender address, for example no-reply@example.com.
+	From string
+	// FromName is the display name shown in the client's sender column.
+	FromName string
+	// Insecure allows plain SMTP without TLS. Local debugging only.
+	Insecure bool
+	// Timeout bounds one delivery.
+	Timeout time.Duration
+}
+
+// PasswordResetConfig describes the reset code policy.
+type PasswordResetConfig struct {
+	// CodeTTL is how long a code stays valid.
+	CodeTTL time.Duration
+	// MaxAttempts is the failure budget per code.
+	MaxAttempts int
+	// Cooldown is the minimum gap between two codes for the same address.
+	Cooldown time.Duration
+	// HourlyPerAddress caps the codes per address per hour.
+	HourlyPerAddress int
+	// DailyPerAddress caps the codes per address per day.
+	DailyPerAddress int
+	// HourlyPerIP caps the codes per IP per hour.
+	HourlyPerIP int
+	// RevealCode returns the code in the API response. Only safe with the
+	// log transport.
+	RevealCode bool
+	// UnknownEmailMode decides what the request endpoint answers for an
+	// address that is not registered.
+	//
+	// "uniform" returns the same answer as for a known address, so the
+	// endpoint cannot be used to test whether an address has an account.
+	// "explicit" reports the fact, which is friendlier but allows account
+	// enumeration.
+	UnknownEmailMode string
+}
+
+// Unknown email response modes.
+const (
+	// UnknownEmailUniform hides whether the address exists.
+	UnknownEmailUniform = "uniform"
+	// UnknownEmailExplicit tells the requester the address is unknown.
+	UnknownEmailExplicit = "explicit"
+)
 
 func Load() Config {
 	_ = godotenv.Load()
@@ -42,7 +111,7 @@ func Load() Config {
 	}
 	dbURL := os.Getenv("DATABASE_URL")
 	if dbURL == "" {
-		dbURL = "postgresql://metamatrix:metamatrix@localhost:5433/metamatrix"
+		dbURL = "postgresql://metamatrix:metamatrix@localhost:5432/metamatrix"
 	}
 	signSecret := os.Getenv("MEDIA_SIGN_SECRET")
 	if signSecret == "" {
@@ -67,6 +136,50 @@ func Load() Config {
 		FeishuAppID:          os.Getenv("FEISHU_APP_ID"),
 		FeishuAppSecret:      os.Getenv("FEISHU_APP_SECRET"),
 		FeishuBlockID:        os.Getenv("FEISHU_DOC_BLOCK_ID"),
+		Mail:                 loadMailConfig(),
+		PasswordReset:        loadPasswordResetConfig(),
+	}
+}
+
+// loadMailConfig reads the outbound mail settings.
+func loadMailConfig() MailConfig {
+	return MailConfig{
+		Mode:     strings.ToLower(strings.TrimSpace(os.Getenv("MAIL_MODE"))),
+		Host:     strings.TrimSpace(os.Getenv("SMTP_HOST")),
+		Port:     intEnv("SMTP_PORT", 587),
+		Username: strings.TrimSpace(os.Getenv("SMTP_USERNAME")),
+		Password: os.Getenv("SMTP_PASSWORD"),
+		From:     strings.TrimSpace(os.Getenv("SMTP_FROM")),
+		FromName: strings.TrimSpace(os.Getenv("SMTP_FROM_NAME")),
+		Insecure: boolEnv("SMTP_INSECURE", false),
+		Timeout:  durationEnv("SMTP_TIMEOUT", 15*time.Second),
+	}
+}
+
+// loadPasswordResetConfig reads the reset code policy.
+func loadPasswordResetConfig() PasswordResetConfig {
+	mode := strings.ToLower(strings.TrimSpace(os.Getenv("RESET_UNKNOWN_EMAIL_MODE")))
+	switch mode {
+	case "":
+		// 默认走显式模式：邮箱没注册时直接告诉用户"这个邮箱还没有账号"。
+		// 体验更直白，代价是接口可以被用来试探某个邮箱是否注册过。
+		// 想关掉这个信息泄露，把 RESET_UNKNOWN_EMAIL_MODE 设成 uniform。
+		mode = UnknownEmailExplicit
+	case UnknownEmailExplicit, UnknownEmailUniform:
+		// 合法值，原样使用。
+	default:
+		// 变量写错时回落到统一响应，宁可少提示，也不要无意中放开账号枚举。
+		mode = UnknownEmailUniform
+	}
+	return PasswordResetConfig{
+		CodeTTL:          durationEnv("RESET_CODE_TTL", 10*time.Minute),
+		MaxAttempts:      intEnv("RESET_CODE_MAX_ATTEMPTS", 5),
+		Cooldown:         durationEnv("RESET_COOLDOWN", 60*time.Second),
+		HourlyPerAddress: intEnv("RESET_HOURLY_PER_ADDRESS", 5),
+		DailyPerAddress:  intEnv("RESET_DAILY_PER_ADDRESS", 10),
+		HourlyPerIP:      intEnv("RESET_HOURLY_PER_IP", 20),
+		RevealCode:       boolEnv("RESET_REVEAL_CODE", false),
+		UnknownEmailMode: mode,
 	}
 }
 

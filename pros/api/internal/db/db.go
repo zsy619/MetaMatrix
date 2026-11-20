@@ -24,12 +24,19 @@ func Connect(databaseURL string) (*gorm.DB, error) {
 func AutoMigrate(gdb *gorm.DB) error {
 	if err := gdb.AutoMigrate(
 		&model.User{},
+		&model.Project{},
 		&model.CanvasDocument{},
 		&model.CanvasRevision{},
 		&model.CanvasContentBlock{},
+		// 保存与备份的幂等记录必须随服务一起迁移；唯一约束是并发重试的最终防线。
+		&model.DocumentSaveOperation{},
+		&model.BackupImport{},
 		&model.MediaCategory{},
 		&model.MediaAsset{},
 		&model.MediaReference{},
+		&model.PasswordResetToken{},
+		// 活动日志：登录、退出与写操作的留痕。
+		&model.ActivityLog{},
 	); err != nil {
 		return fmt.Errorf("automigrate: %w", err)
 	}
@@ -42,7 +49,28 @@ func AutoMigrate(gdb *gorm.DB) error {
 	if err := ensureQueryIndexes(gdb); err != nil {
 		log.Printf("ensureQueryIndexes warning: %v", err)
 	}
-	log.Println("AutoMigrate OK: users, canvas_documents, canvas_revisions, canvas_content_blocks, media_category, media_asset, media_reference")
+	if err := ensureResetIndexes(gdb); err != nil {
+		log.Printf("ensureResetIndexes warning: %v", err)
+	}
+	log.Println("AutoMigrate OK: users, canvas_documents, canvas_revisions, canvas_content_blocks, document_save_operations, backup_imports, media_category, media_asset, media_reference, password_reset_tokens")
+	return nil
+}
+
+// ensureResetIndexes adds the indexes the reset code rate limit relies on.
+//
+// The service counts issued codes per address and per IP inside a time
+// window. Without these indexes every rate limit check would scan the whole
+// table, which is exactly the kind of query an attacker can hammer.
+func ensureResetIndexes(gdb *gorm.DB) error {
+	stmts := []string{
+		`CREATE INDEX IF NOT EXISTS idx_reset_email_created ON password_reset_tokens (email, created_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_reset_ip_created ON password_reset_tokens (request_ip, created_at DESC)`,
+	}
+	for _, stmt := range stmts {
+		if err := gdb.Exec(stmt).Error; err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -95,7 +123,10 @@ func ensureQueryIndexes(gdb *gorm.DB) error {
 		`CREATE INDEX IF NOT EXISTS idx_docs_owner_updated ON canvas_documents (owner_user_id, updated_at DESC)`,
 		`CREATE INDEX IF NOT EXISTS idx_docs_owner_active_updated ON canvas_documents (owner_user_id, updated_at DESC) WHERE deleted_at IS NULL`,
 		`CREATE INDEX IF NOT EXISTS idx_docs_owner_archived ON canvas_documents (owner_user_id, updated_at DESC) WHERE deleted_at IS NOT NULL`,
+		// keyset 排序包含 id 决胜键；索引保持完全同序，深页翻页不需要额外排序或 offset 扫描。
+		`CREATE INDEX IF NOT EXISTS idx_docs_owner_keyset ON canvas_documents (owner_user_id, updated_at DESC, id ASC)`,
 		`CREATE INDEX IF NOT EXISTS idx_revisions_doc_created ON canvas_revisions (document_id, created_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_revisions_doc_keyset ON canvas_revisions (document_id, created_at DESC, id ASC)`,
 	}
 	for _, stmt := range stmts {
 		if err := gdb.Exec(stmt).Error; err != nil {
