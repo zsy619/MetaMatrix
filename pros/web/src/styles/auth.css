@@ -154,6 +154,77 @@
   box-shadow: 0 0 0 3px rgba(217, 48, 37, 0.28);
 }
 
+/*
+ * 带图标的输入框容器。
+ * 输入框本身仍然铺满容器（width:100%），图标和尾部按钮用绝对定位叠在上面，
+ * 这样聚焦时输入框的边框依然完整，不会被图标切断。
+ */
+.auth-field__control {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+/* 左侧图标：纯装饰，不参与点击，点它等于点输入框。 */
+.auth-field__icon {
+  position: absolute;
+  left: 12px;
+  display: grid;
+  place-items: center;
+  color: var(--mm-faint);
+  pointer-events: none;
+  transition: color 0.15s ease;
+}
+/* 输入框获得焦点时图标跟着变主色，形成"这个框是活动的"的视觉反馈。 */
+.auth-field__control:focus-within .auth-field__icon {
+  color: var(--mm-blue);
+}
+
+/* 尾部按钮区（显示/隐藏密码）。 */
+.auth-field__trailing {
+  position: absolute;
+  right: 6px;
+  display: grid;
+  place-items: center;
+}
+
+.auth-field__toggle {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--mm-faint);
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.auth-field__toggle:hover {
+  color: var(--mm-muted);
+  background: rgba(60, 64, 67, 0.06);
+}
+.auth-field__toggle:focus-visible {
+  outline: 2px solid var(--mm-blue);
+  outline-offset: -1px;
+}
+.auth-field__toggle-icon {
+  display: grid;
+  place-items: center;
+  line-height: 0;
+}
+
+/* 有图标时，输入框文字要让开图标位置。 */
+.auth-field__control.has-icon .auth-input {
+  padding-left: 38px;
+}
+/* 有尾部按钮时，文字要让开按钮位置，避免长密码把按钮压住。 */
+.auth-field__control.has-trailing .auth-input {
+  padding-right: 40px;
+}
+
 /* 密码强度提示 */
 .auth-strength {
   display: flex;
@@ -169,6 +240,12 @@
   overflow: hidden;
 }
 .auth-strength__fill {
+  /*
+   * 必须显式设 display:block。
+   * 这是个 span，默认 display:inline，而 width 对 inline 元素无效 ——
+   * 结果是填充条永远渲染成 0 宽度，强度提示只剩一条灰色空槽。
+   */
+  display: block;
   height: 100%;
   border-radius: 999px;
   transition: width 0.2s ease, background 0.2s ease;
@@ -233,6 +310,160 @@
 }
 .auth-footer a:hover {
   text-decoration: underline;
+}
+
+/* 字段下方的辅助行（例如密码框下的"忘记密码？"）。 */
+.auth-field__aux {
+  display: flex;
+  justify-content: flex-end;
+  /*
+   * 往上收一点：.auth-fields 的 gap 是 14px，这行紧贴上一个输入框，
+   * 不收回来的话会和输入框之间空出两倍间距，看起来像脱节的两块内容。
+   */
+  margin: -8px 0 0;
+}
+
+.auth-link {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--mm-blue);
+  text-decoration: none;
+  border-radius: 6px;
+}
+.auth-link:hover {
+  text-decoration: underline;
+}
+.auth-link:focus-visible {
+  outline: 2px solid var(--mm-blue);
+  outline-offset: 2px;
+}
+
+/* 成功提示：与 .auth-alert（红色错误）成对，用绿色表达"已经完成"。 */
+.auth-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--mm-green-soft, #e6f4ea);
+  color: var(--mm-green, #137333);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.auth-notice__icon {
+  flex: 0 0 auto;
+  font-weight: 700;
+}
+
+/* 开发模式下显示验证码的提示行：用等宽字体区分验证码和普通说明文字。 */
+.auth-field__hint--debug {
+  font-family: 'SF Mono', 'Menlo', 'Consolas', 'Courier New', monospace;
+  color: var(--mm-blue);
+}
+
+/* ===== 找回密码：步骤指示器 ===== */
+.reset-steps {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  min-width: 0;
+}
+
+.reset-steps__item {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--mm-faint);
+  transition: color 0.15s ease;
+}
+
+/* 圆点：序号 / 勾。未激活时是灰色描边，完成后填蓝。 */
+.reset-steps__dot {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid var(--mm-line-strong);
+  background: var(--mm-surface);
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.reset-steps__label {
+  min-width: 0;
+  /* 窄屏放不下三个标签时截断，而不是把布局挤到横向滚动。 */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 当前步骤：蓝色圆点 + 深色文字。 */
+.reset-steps__item.is-active {
+  color: var(--mm-text);
+}
+.reset-steps__item.is-active .reset-steps__dot {
+  border-color: var(--mm-blue);
+  color: var(--mm-blue);
+  box-shadow: var(--mm-focus);
+}
+
+/* 已完成步骤：实心蓝底 + 白色勾。 */
+.reset-steps__item.is-done {
+  color: var(--mm-muted);
+}
+.reset-steps__item.is-done .reset-steps__dot {
+  background: var(--mm-blue);
+  border-color: var(--mm-blue);
+  color: #fff;
+}
+
+/* ===== 找回密码：底部操作区 ===== */
+.reset-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.reset-actions__back {
+  flex: 0 0 auto;
+  padding: 12px 16px;
+  border: 1px solid var(--mm-line-strong);
+  border-radius: 999px;
+  background: var(--mm-surface);
+  color: var(--mm-muted);
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.reset-actions__back:hover {
+  border-color: var(--mm-blue);
+  color: var(--mm-blue);
+  background: var(--mm-blue-soft);
+}
+.reset-actions__back:focus-visible {
+  outline: 2px solid var(--mm-blue);
+  outline-offset: 2px;
+}
+
+/* 主按钮占满剩余宽度，视觉上仍是页面唯一的主操作。 */
+.reset-actions__primary {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto;
 }
 
 .auth-legal {
