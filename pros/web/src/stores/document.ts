@@ -1739,6 +1739,10 @@ export const useDocumentStore = defineStore('document', () => {
     ) {
       next = normalizeHumanAiDualTriangleDoc(next)
     }
+    // FDE 四象限的英文水印长短不齐（ARCH/CTXT/EVALUATION…），加载时统一成词首 4 个字母。
+    if (isQuadrantDoc(next) && next.id === 'canvas_fde_reliable') {
+      next = normalizeFdeReliableWatermarks(next)
+    }
     if (!next.attachmentsByPanelId) {
       next = { ...next, attachmentsByPanelId: {} }
     }
@@ -1746,6 +1750,26 @@ export const useDocumentStore = defineStore('document', () => {
       ...next,
       theme: normalizeCanvasTheme(next.theme),
     }
+  }
+
+
+  function normalizeFdeReliableWatermarks(
+    doc: QuadrantDocumentJSON,
+  ): QuadrantDocumentJSON {
+    const letters: Record<string, string> = {
+      A: 'ARCH',
+      C: 'CONT',
+      E: 'EVAL',
+      R: 'RELI',
+    }
+    let changed = false
+    const quadrants = doc.quadrants.map((cell) => {
+      const want = letters[cell.watermark?.letter?.toUpperCase()]
+      if (!want || cell.watermark?.text === want) return cell
+      changed = true
+      return { ...cell, watermark: { ...cell.watermark, text: want } }
+    })
+    return changed ? { ...doc, quadrants } : doc
   }
 
   /** 温和升级进阶版：旧 upper 合并块 → 每提示独立 RTE */
