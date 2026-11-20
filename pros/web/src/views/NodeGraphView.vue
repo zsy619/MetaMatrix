@@ -177,7 +177,12 @@ async function load() {
   try {
     const [project, list] = await Promise.all([
       projectsApi.getProject(projectId.value),
-      documentsApi.listDocuments({ projectId: projectId.value }),
+      // 「本项目的画布」只列真画布：知识库富文本不能被节点引用；
+      // 节点绑定的画布副本也是可引用的画布，所以取 canvas 分类。
+      documentsApi
+        .listDocuments({ projectId: projectId.value, category: 'canvas' })
+        // 后端未升级（不认 category）时兜底：doc 永远不进可引用集合。
+        .then((rows) => rows.filter((d) => d.canvasType !== 'doc')),
     ])
     projectName.value = project.name
     canvases.value = list
@@ -374,6 +379,7 @@ watch([projectId, canvasId], load)
       <!-- 双击节点：全屏最大化的内容编辑（组件自己 Teleport 到 body） -->
       <NodeGraphCanvasEditor
         v-if="editorNode && editorNode.type === 'canvasRef'"
+        :key="editorNode.id"
         :node="editorNode"
         :project-id="projectId"
         @close="closeEditor"

@@ -21,6 +21,15 @@ export type DocumentSummary = {
   updatedAt: string
 }
 
+/**
+ * 内容分类：把同一张 canvas_documents 表里的内容切成互不重叠的集合。
+ *
+ * - canvas    普通画布（除知识库富文本外的一切）
+ * - node-graph 项目节点画布
+ * - doc       知识库富文本
+ */
+export type DocumentCategory = 'canvas' | 'node-graph' | 'doc'
+
 export type DocumentFull = DocumentSummary & {
   ownerUserId: string
   currentData: CanvasDocumentJSON
@@ -112,6 +121,10 @@ function documentQuery(params?: {
   canvasType?: string
   /** 只列出某个项目下的画布。 */
   projectId?: string
+  /** 排除知识库富文本（canvasType='doc'）：项目详情页只认画布。 */
+  excludeDoc?: boolean
+  /** 内容分类：canvas（普通画布）/ node-graph（项目节点画布）/ doc（知识库富文本）。 */
+  category?: DocumentCategory
   limit?: number
   offset?: number
   archived?: boolean
@@ -122,6 +135,8 @@ function documentQuery(params?: {
   if (params?.templateId) q.set('templateId', params.templateId)
   if (params?.canvasType) q.set('canvasType', params.canvasType)
   if (params?.projectId) q.set('projectId', params.projectId)
+  if (params?.excludeDoc) q.set('excludeDoc', '1')
+  if (params?.category) q.set('category', params.category)
   if (params?.limit != null) q.set('limit', String(params.limit))
   if (params?.offset != null) q.set('offset', String(params.offset))
   if (params?.archived) q.set('archived', '1')
@@ -135,6 +150,8 @@ export function listDocuments(params?: {
   templateId?: string
   canvasType?: string
   projectId?: string
+  excludeDoc?: boolean
+  category?: DocumentCategory
   limit?: number
   offset?: number
   archived?: boolean
@@ -146,6 +163,8 @@ export function listDocuments(params?: {
 export function listDocumentsCursor(params?: {
   templateId?: string
   canvasType?: string
+  excludeDoc?: boolean
+  category?: DocumentCategory
   limit?: number
   cursor?: string
   archived?: boolean
@@ -167,6 +186,7 @@ export async function listDocumentsPage(params?: {
   templateId?: string
   canvasType?: string
   projectId?: string
+  category?: DocumentCategory
   limit?: number
   offset?: number
   archived?: boolean
@@ -440,6 +460,9 @@ export function searchDocuments(
     q?: string
     templateId?: string
     limit?: number
+    projectId?: string
+    /** 只搜画布，排除知识库富文本。 */
+    excludeDoc?: boolean
   },
   opts?: { signal?: AbortSignal },
 ) {
@@ -447,6 +470,8 @@ export function searchDocuments(
   if (params.q) q.set('q', params.q)
   if (params.templateId) q.set('templateId', params.templateId)
   if (params.limit != null) q.set('limit', String(params.limit))
+  if (params.projectId) q.set('projectId', params.projectId)
+  if (params.excludeDoc) q.set('excludeDoc', '1')
   const qs = q.toString()
   return apiRequest<SearchHit[]>(`/documents/search${qs ? `?${qs}` : ''}`, {
     signal: opts?.signal,

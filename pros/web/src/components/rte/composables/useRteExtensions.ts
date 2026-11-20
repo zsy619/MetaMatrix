@@ -90,6 +90,7 @@ import { TabsBlock, TabPane } from '../../../extensions/tabsBlock'
 import { MermaidBlock } from '../../../extensions/mermaidBlock'
 import { EchartsBlock } from '../../../extensions/echartsBlock'
 import { CrossRef, findCrossRefPos } from '../../../extensions/crossRef'
+import { CanvasEmbed } from '../../../extensions/canvasEmbed'
 import { ListStyleAttrs } from '../../../extensions/listStyleAttrs'
 import { TianziGrid } from '../../../extensions/rteTianziGrid'
 import { HeadingManualNum } from '../../../extensions/headingManualNum'
@@ -120,6 +121,8 @@ export function useRteExtensions(deps: {
   mentionUi: any
   /** 组织通讯录真人候选。宿主从通讯录接口取人并按文档权限过滤。 */
   mentionPeople?: () => Promise<any[]>
+  /** 知识库文档候选（@ 文档 mention）。宿主从知识树 API 取当前项目的文档节点。 */
+  mentionDocuments?: () => Promise<any[]>
   openTableContextMenu: LateFn
   pastePlainTextMode: { value: boolean }
   shortcutsOpen: { value: boolean }
@@ -250,6 +253,7 @@ export function useRteExtensions(deps: {
   const toggleOutlinePanel = (...args: any[]) => deps.toggleOutlinePanel(...args)
   const undoToolbarGroupOrder = (...args: any[]) => deps.undoToolbarGroupOrder(...args)
   const mentionPeople = deps.mentionPeople
+  const mentionDocuments = deps.mentionDocuments
   let wordPasteHinted = false
 
 function qrHref(node: Element | null): string {
@@ -322,6 +326,7 @@ const editor = useEditor({
     MermaidBlock,
     EchartsBlock,
     CrossRef,
+    CanvasEmbed,
     ListStyleAttrs,
     TianziGrid,
     HeadingManualNum,
@@ -430,6 +435,7 @@ const editor = useEditor({
     createRteMention({
       ui: mentionUi,
       people: mentionPeople,
+      documents: mentionDocuments,
     }),
     SlashCommands.configure({
       ui: slashUi,

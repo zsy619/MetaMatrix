@@ -13,6 +13,7 @@ import type {
 } from '@tiptap/suggestion'
 import {
   mergeMentionCandidates,
+  type RteDocCandidate,
   type RteMentionItem,
 } from '../components/rteMentionItems'
 import { collectCrossRefTargets } from './crossRef'
@@ -35,6 +36,11 @@ export type RteMentionOptions = {
    * 没提供时 @ 菜单里没有真人候选（不再有写死的示例人员）。
    */
   people?: () => Promise<RteMentionItem[]>
+  /**
+   * 知识库里的文档候选（@ 文档 mention）。宿主从知识树 API 取当前项目的文档节点。
+   * 没提供时 @ 菜单里没有文档候选。
+   */
+  documents?: () => Promise<RteDocCandidate[]>
 }
 
 /**
@@ -44,6 +50,7 @@ export type RteMentionOptions = {
 export function createRteMention(options: RteMentionOptions) {
   const ui = options.ui
   const people = options.people
+  const documents = options.documents
   return Mention.configure({
     HTMLAttributes: {
       class: 'rte-mention',
@@ -83,7 +90,15 @@ export function createRteMention(options: RteMentionOptions) {
             candidates = []
           }
         }
-        return mergeMentionCandidates(query, blocks, 12, candidates)
+        let docCandidates: RteDocCandidate[] = []
+        if (documents) {
+          try {
+            docCandidates = await documents()
+          } catch {
+            docCandidates = []
+          }
+        }
+        return mergeMentionCandidates(query, blocks, 12, candidates, docCandidates)
       },
       command: ({ editor, range, props }) => {
         const item = props as RteMentionItem
@@ -103,6 +118,42 @@ export function createRteMention(options: RteMentionOptions) {
               { type: 'text', text: ' ' },
             ])
             .run()
+          return
+        }
+        if (item.kind === 'document' && item.documentId) {
+          // doc 类型走 inline mention；画布类走 block canvasEmbed。
+          if (item.canvasType === 'doc' || !item.canvasType) {
+            editor
+              .chain()
+              .focus()
+              .insertContentAt(range, [
+                {
+                  type: 'mention',
+                  attrs: {
+                    id: item.documentId,
+                    label: item.label,
+                  },
+                },
+                { type: 'text', text: ' ' },
+              ])
+              .run()
+          } else {
+            editor
+              .chain()
+              .focus()
+              .insertContentAt(range, [
+                {
+                  type: 'canvasEmbed',
+                  attrs: {
+                    docId: item.documentId,
+                    title: item.label,
+                    canvasType: item.canvasType,
+                  },
+                },
+                { type: 'paragraph', attrs: {} },
+              ])
+              .run()
+          }
           return
         }
         editor

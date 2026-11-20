@@ -165,8 +165,9 @@ async function ensureLoaded() {
   loading.value = true
   try {
     const [rows, hits] = await Promise.all([
-      listDocuments({ limit: 40 }),
-      searchDocuments({ q: '待办', limit: 5 }).catch(() => [] as SearchHit[]),
+      // 工作台只看画布：知识库文档有自己的入口，混进来点开会跳错视图。
+      listDocuments({ limit: 40, excludeDoc: true }),
+      searchDocuments({ q: '待办', limit: 5, excludeDoc: true }).catch(() => [] as SearchHit[]),
     ])
     const list = Array.isArray(rows) ? rows : []
     list.sort((a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt))
@@ -204,7 +205,7 @@ async function runSearch() {
   searching.value = true
   searched.value = true
   try {
-    searchHits.value = await searchDocuments({ q, limit: 8 }, { signal: ctrl.signal })
+    searchHits.value = await searchDocuments({ q, limit: 8, excludeDoc: true }, { signal: ctrl.signal })
   } catch (e) {
     if (e instanceof DOMException && e.name === 'AbortError') return
     searchErr.value = friendlyApiMessage(e, '搜索失败')

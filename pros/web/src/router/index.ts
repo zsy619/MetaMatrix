@@ -63,6 +63,27 @@ const routes = [
     meta: { scrollable: true, requiresAuth: true },
   },
   {
+    // 分享页：公开入口，靠分享 token 授权，不需要登录态。
+    path: '/share/:token',
+    name: 'share',
+    component: () => import('../views/ShareView.vue'),
+    meta: { scrollable: true },
+  },
+  {
+    // 知识库：目录树 + 富文本文档。
+    path: '/projects/:projectId/knowledge',
+    name: 'knowledge',
+    component: () => import('../views/KnowledgeView.vue'),
+    meta: { scrollable: false, requiresAuth: true },
+  },
+  {
+    // 知识库：直接打开某篇文档（@ 文档 mention 跳转）。
+    path: '/projects/:projectId/knowledge/docs/:documentId',
+    name: 'knowledge-doc',
+    component: () => import('../views/KnowledgeView.vue'),
+    meta: { scrollable: false, requiresAuth: true },
+  },
+  {
     // 节点画布：富文本节点 + 画布引用节点 + 连线。
     path: '/projects/:projectId/canvas/:canvasId',
     name: 'node-graph',

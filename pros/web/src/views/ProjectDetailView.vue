@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft, Delete, Document, DocumentAdd, Edit } from '@element-plus/icons-vue'
+import { Collection } from '@element-plus/icons-vue'
 import * as projectsApi from '../api/projects'
 import * as documentsApi from '../api/documents'
 import type { DocumentSummary } from '../api/documents'
@@ -31,7 +32,16 @@ async function load() {
   error.value = ''
   try {
     project.value = await projectsApi.getProject(projectId.value)
-    canvases.value = await documentsApi.listDocuments({ projectId: projectId.value })
+    // 项目画布只取 node-graph 这一类：
+    // - doc（知识库富文本）有自己的知识库视图
+    // - 模板 id 类型（fde-contract / pm-solution-triangle…）是节点绑定的画布副本
+    // 混进来都会变成打不开的假条目，所以按内容分类取集合，而不是按 project_id 全取。
+    const rows = await documentsApi.listDocuments({
+      projectId: projectId.value,
+      category: 'node-graph',
+    })
+    // 客户端再兜一层：后端未升级（不认 category）时也不会把别的内容放进来。
+    canvases.value = rows.filter((d) => d.canvasType === NODE_GRAPH_TYPE)
   } catch (err) {
     error.value = friendlyApiMessage(err, '操作失败')
   } finally {
@@ -41,6 +51,10 @@ async function load() {
 
 function goBack() {
   void router.push({ name: 'projects' })
+}
+
+function goKnowledge() {
+  void router.push({ name: 'knowledge', params: { projectId: projectId.value } })
 }
 
 function openEdit() {
@@ -134,8 +148,8 @@ async function deleteProject() {
   if (!project.value) return
   try {
     await ElMessageBox.confirm(
-      '删除项目「' + project.value.name + '」会同时删除项目里的 ' +
-        canvases.value.length + ' 张画布，且无法恢复。',
+      '删除项目「' + project.value.name + '」会同时删除项目里的全部画布、' +
+        '节点绑定的画布副本与知识库文档，且无法恢复。',
       '确认删除项目？',
       { confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning' },
     )
@@ -181,6 +195,7 @@ onMounted(load)
         </div>
       </div>
       <div class="pg-head__actions">
+        <el-button size="small" :icon="Collection" @click="goKnowledge">知识库</el-button>
         <el-button size="small" :icon="Edit" @click="openEdit">编辑信息</el-button>
         <el-button size="small" :icon="DocumentAdd" @click="createCanvas">新建画布</el-button>
         <el-button size="small" type="danger" plain :icon="Delete" @click="deleteProject">删除项目</el-button>

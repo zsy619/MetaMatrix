@@ -220,6 +220,7 @@ import { useImageTools } from './rte/composables/useImageTools'
 import { useDocChrome } from './rte/composables/useDocChrome'
 import { useRteExtensions } from './rte/composables/useRteExtensions'
 import { useDirectoryPeople } from './rte/composables/useDirectoryPeople'
+import { useKnowledgeDocs } from './rte/composables/useKnowledgeDocs'
 import { useCrossDoc } from './rte/composables/useCrossDoc'
 import type { DirectoryPermission } from '../utils/rteDirectory'
 import { RTE_EMOJI_CATEGORIES } from '../utils/rteEmojiList'
@@ -264,6 +265,8 @@ const props = withDefaults(
     showMarkdownHint?: boolean
     /** 与最大化 key / 相关资料 panelId 对齐，页面大小写入画布 JSON。 */
     panelId?: string
+    /** 知识库项目 id：提供后 @ 菜单可 @ 当前项目知识库里的文档。 */
+    knowledgeProjectId?: string
     /**
      * 是否按「纸张」排版（默认 true，A4 + 窄边距）。
      * 画布里嵌入的紧凑区块传 false：正文按内容流式排版，不再撑出 A4 纸张高度，
@@ -281,6 +284,7 @@ const props = withDefaults(
     showPublishActions: false,
     showMarkdownHint: true,
     panelId: '',
+    knowledgeProjectId: '',
     pageSheet: true,
   },
 )
@@ -435,6 +439,7 @@ const directoryPeople = useDirectoryPeople({
   editor: () => editor,
   permission: () => mentionPermission.value,
 })
+const knowledgeDocs = useKnowledgeDocs(() => props.knowledgeProjectId)
 
 /** —— 大纲右键菜单 —— */
 const outlineMenuOpen = ref(false)
@@ -1174,6 +1179,7 @@ const editor = useRteExtensions({
   suggestionAuthor,
   bumpSuggestions: () => bumpSuggestions(),
   mentionPeople: () => directoryPeople.mentionPeople(),
+  mentionDocuments: () => knowledgeDocs.mentionDocuments(),
   reapplyTableFilter: (ed, transaction, appended) => reapplyTableFilter(ed as never, transaction, appended),
 })
 

@@ -3697,6 +3697,21 @@ html.rte-toolbar-dragging * {
   background: #fef2f2;
   text-decoration: line-through;
 }
+.rte-canvas-embed {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+  padding: 10px 14px;
+  border: 1px solid var(--mm-line, #e5e6eb);
+  border-left: 3px solid var(--mm-blue, #1677ff);
+  border-radius: 6px;
+  background: var(--mm-blue-soft, #f0f6ff);
+  cursor: pointer;
+  user-select: none;
+}
+.rte-canvas-embed__icon { font-size: 18px; }
+.rte-canvas-embed__title { font-size: 14px; color: var(--mm-text, #1d2129); }
 .rte-outline-item.is-empty {
   color: #d83931;
 }

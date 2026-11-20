@@ -337,7 +337,8 @@ async function refreshRecent() {
   recentLoading.value = true
   recentError.value = ''
   try {
-    recent.value = await listDocuments({ limit: 12 })
+    // 引导页的「最近打开」是画布入口，知识库文档不在这里出现。
+    recent.value = await listDocuments({ limit: 12, excludeDoc: true })
   } catch (e) {
     recent.value = []
     recentError.value = friendlyApiMessage(e, '最近文档暂时不可用')

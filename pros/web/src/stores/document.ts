@@ -3,6 +3,7 @@ import { ref, computed, toRaw, onScopeDispose } from 'vue'
 import { normalizeCanvasTheme } from '../components/canvas/canvasChrome'
 import { ApiError } from '../api/http'
 import * as documentsApi from '../api/documents'
+import type { AnyCanvasDocumentJSON } from '../api/documents'
 import { documentTabs, type DocumentSaveNotice } from './documentTabs'
 import { rememberRecentOpen } from '../utils/canvasTransfer'
 import { normalizePageSize, readPageSize, writePageSizeMap } from '../utils/rtePageSize'
@@ -2916,6 +2917,62 @@ export const useDocumentStore = defineStore('document', () => {
     markDirty()
   }
 
+  /**
+   * 整篇替换当前编辑上下文（节点画布的「双击编辑」弹窗在用）。
+   *
+   * 与 load/loadFromTemplate 不同：不读后端、不读写本地草稿、不留加载痕迹，
+   * 只是把调用方持有的文档快照挂进 store 供 CanvasViewport 编辑；
+   * 调用方负责在关闭弹窗时用 restoreDocContext 把原状态换回来。
+   * 换文档一律递增代次，弹窗期间飞行的旧保存响应会被自动作废。
+   */
+  function mountDocContext(ctx: {
+    data: AnyCanvasDocumentJSON
+    documentId: string | null
+    templateId?: TemplateId | string | null
+    title?: string
+    headRevisionId?: string | null
+    saveVersion?: number
+  }) {
+    docEpoch += 1
+    remoteSaveNotice.value = null
+    activeTemplateId.value = (ctx.templateId as TemplateId | null) || null
+    current_data.value = normalizeLoadedDoc(ctx.data as CanvasDocumentJSON, ctx.templateId)
+    document_id.value = ctx.documentId
+    head_revision_id.value = ctx.headRevisionId ?? null
+    save_version.value = ctx.saveVersion ?? 0
+    if (ctx.title != null) doc_title.value = ctx.title
+    editSeq.value = 0
+    dirty.value = false
+  }
+
+  /**
+   * 把 mountDocContext 之前的状态换回来（弹窗关闭时调用）。
+   *
+   * 快照由调用方在挂载前自行保存；这里只负责原样落回，
+   * 不触发 normalize（快照里的 data 已经是挂载前的最终形态）、不写本地草稿。
+   */
+  function restoreDocContext(ctx: {
+    data: AnyCanvasDocumentJSON | null
+    documentId: string | null
+    templateId: TemplateId | null
+    title: string
+    headRevisionId: string | null
+    saveVersion: number
+    editSeq: number
+    dirty: boolean
+  }) {
+    docEpoch += 1
+    remoteSaveNotice.value = null
+    current_data.value = ctx.data as CanvasDocumentJSON | null
+    document_id.value = ctx.documentId
+    activeTemplateId.value = ctx.templateId
+    doc_title.value = ctx.title
+    head_revision_id.value = ctx.headRevisionId
+    save_version.value = ctx.saveVersion
+    editSeq.value = ctx.editSeq
+    dirty.value = ctx.dirty
+  }
+
   function addItem(
     position: QuadrantPosition,
     partial?: Partial<QuadrantItem>,
@@ -4596,6 +4653,8 @@ export const useDocumentStore = defineStore('document', () => {
     loadLocalMeta,
     setDocTitle,
     setDocNotes,
+    mountDocContext,
+    restoreDocContext,
     exportJson,
     markDirty,
     mutateCanvas,

@@ -13,12 +13,18 @@ import { ElMessage } from 'element-plus'
 import { Check, Connection } from '@element-plus/icons-vue'
 import CanvasViewport from '../CanvasViewport.vue'
 import {
+  cloneTemplate,
   TEMPLATE_META,
   useDocumentStore,
   type TemplateId,
 } from '../../../stores/document'
 import { useNodeGraphStore } from '../../../stores/nodeGraph'
-import { createDocument, type AnyCanvasDocumentJSON } from '../../../api/documents'
+import {
+  createDocument,
+  getDocument,
+  updateDocument,
+  type AnyCanvasDocumentJSON,
+} from '../../../api/documents'
 import { friendlyApiMessage } from '../../../utils/apiMessage'
 import type { GraphNode } from '../../../types/nodeGraph'
 
@@ -42,10 +48,39 @@ const templateId = computed(() =>
   props.node.refTemplateId ? (props.node.refTemplateId as TemplateId) : null,
 )
 
+/**
+ * 弹窗自己持有的这份画布。
+ *
+ * docStore 是全应用单例（首页/项目详情都指着它渲染）：弹窗直接 load 进去
+ * 会顶掉别的页面正打开的画布；两次双击不同节点时，第二次 load 之前
+ * CanvasViewport 还拿着第一次的内容，看起来就像「缓存」。
+ * 弹窗期间这份内容只存在于这里，挂载/摘除时整份拷进拷出 docStore。
+ */
+type OwnedDoc = {
+  data: AnyCanvasDocumentJSON
+  documentId: string | null
+  title: string
+  headRevisionId: string | null
+  saveVersion: number
+}
+let owned: OwnedDoc | null = null
+/** 挂载进 docStore 之前保存的原状态，关闭弹窗时整份恢复。 */
+let snapshot: {
+  data: AnyCanvasDocumentJSON | null
+  documentId: string | null
+  templateId: TemplateId | null
+  title: string
+  headRevisionId: string | null
+  saveVersion: number
+  editSeq: number
+  dirty: boolean
+} | null = null
+
 /** 弹窗标题：优先用画布本身的名字，其次用节点名。 */
 const canvasName = computed(() => {
+  if (owned?.title) return owned.title
   if (templateId.value) return TEMPLATE_META[templateId.value]?.name || props.node.title
-  return docStore.title || props.node.title || '画布'
+  return props.node.title || '画布'
 })
 
 /** 绑定状态：模板画布还没落副本，保存后会绑定到项目画布。 */
@@ -60,16 +95,57 @@ async function prepare() {
   error.value = ''
   try {
     if (props.node.refCanvasId) {
-      await docStore.load(props.node.refCanvasId)
+      // 直接读后端，不经过 docStore.load：后者会写本地草稿和最近打开列表，
+      // 把首页正在编辑的画布顶掉。
+      const doc = await getDocument(props.node.refCanvasId)
+      if (doc.canvasType === 'doc') {
+        // 历史数据里可能有 refCanvasId 指向知识库文档：它不是画布，
+        // 不能在画布编辑器里渲染。提示用户换绑，而不是显示一张空画布。
+        error.value = '这个节点绑定的目标不是画布（知识库文档），请在节点属性里重新选择画布。'
+        return
+      }
+      owned = {
+        data: doc.currentData as AnyCanvasDocumentJSON,
+        documentId: doc.id,
+        title: doc.title || props.node.title,
+        headRevisionId: doc.headRevisionId,
+        saveVersion: doc.saveVersion ?? 0,
+      }
     } else if (templateId.value) {
-      docStore.loadFromTemplate(templateId.value)
+      // 模板画布：深拷贝模板默认内容，不读写该模板的本地草稿。
+      owned = {
+        data: cloneTemplate(templateId.value) as AnyCanvasDocumentJSON,
+        documentId: null,
+        title: TEMPLATE_META[templateId.value]?.name || props.node.title,
+        headRevisionId: null,
+        saveVersion: 0,
+      }
     } else {
       error.value = '这个节点还没有绑定画布。'
       return
     }
-    if (!docStore.current_data) {
+    if (!owned.data) {
       error.value = '这份画布的内容读不出来，可能已被删除。'
+      return
     }
+    snapshot = {
+      data: docStore.current_data,
+      documentId: docStore.document_id,
+      templateId: docStore.activeTemplateId,
+      title: docStore.title,
+      headRevisionId: docStore.head_revision_id,
+      saveVersion: docStore.save_version,
+      editSeq: docStore.editSeq,
+      dirty: docStore.dirty,
+    }
+    docStore.mountDocContext({
+      data: owned.data,
+      documentId: owned.documentId,
+      templateId: templateId.value,
+      title: owned.title,
+      headRevisionId: owned.headRevisionId,
+      saveVersion: owned.saveVersion,
+    })
   } catch (e) {
     error.value = friendlyApiMessage(e, '打开画布失败')
   } finally {
@@ -78,9 +154,10 @@ async function prepare() {
 }
 
 async function save() {
+  if (!docStore.current_data) return
   saving.value = true
   try {
-    if (!docStore.document_id) {
+    if (!owned?.documentId) {
       // 模板画布：先在项目里落一份副本，再把节点绑到这份副本上。
       const created = await createDocument({
         title: props.node.title || canvasName.value,
@@ -89,16 +166,43 @@ async function save() {
         projectId: props.projectId || undefined,
         data: docStore.current_data as AnyCanvasDocumentJSON,
       })
-      await docStore.load(created.id)
+      owned = {
+        data: docStore.current_data as AnyCanvasDocumentJSON,
+        documentId: created.id,
+        title: created.title || owned?.title || props.node.title,
+        headRevisionId: created.headRevisionId,
+        saveVersion: created.saveVersion ?? 0,
+      }
+      docStore.mountDocContext({
+        data: owned.data,
+        documentId: owned.documentId,
+        templateId: templateId.value,
+        title: owned.title,
+        headRevisionId: owned.headRevisionId,
+        saveVersion: owned.saveVersion,
+      })
       nodeStore.updateNode(props.node.id, { refCanvasId: created.id })
       ElMessage.success('已保存并与节点绑定')
       return
     }
-    await docStore.save()
-    // 保存时如果原文档已不属于当前账号，store 会新建一份副本（见 store 的 404 自愈），
-    // 这时节点要绑到新副本上，否则下次打开还是拿不到这份画布。
-    if (!props.node.refCanvasId && docStore.document_id) {
-      nodeStore.updateNode(props.node.id, { refCanvasId: docStore.document_id })
+    // 直接按 owned 的版本号提交：docStore 的 save 会按首页的草稿语义
+    // 写本地存储，弹窗的内容不该回写到首页的模板草稿里。
+    const updated = await updateDocument(owned.documentId, {
+      currentData: docStore.current_data as AnyCanvasDocumentJSON,
+      expectedHeadRevisionId: owned.headRevisionId,
+      expectedSaveVersion: owned.saveVersion || undefined,
+    })
+    owned = {
+      data: docStore.current_data as AnyCanvasDocumentJSON,
+      documentId: updated.id,
+      title: updated.title || owned.title,
+      headRevisionId: updated.headRevisionId,
+      saveVersion: updated.saveVersion ?? 0,
+    }
+    if (!props.node.refCanvasId) {
+      // 保存时如果原文档已不属于当前账号，落到副本后节点要绑到新副本上，
+      // 否则下次打开还是拿不到这份画布。
+      nodeStore.updateNode(props.node.id, { refCanvasId: updated.id })
       ElMessage.success('已保存并与节点绑定')
       return
     }
@@ -126,12 +230,24 @@ function onKeydown(event: KeyboardEvent) {
   if (event.key === 'Escape') emit('close')
 }
 
+/** 关闭弹窗：把挂载前 docStore 的状态整份恢复，不留痕迹。 */
+function unmount() {
+  const prev = snapshot
+  snapshot = null
+  owned = null
+  if (!prev) return
+  docStore.restoreDocContext(prev)
+}
+
 // 捕获阶段监听：画布里的编辑器会吞掉 Esc（冒泡阶段收不到）。
 onMounted(() => {
   window.addEventListener('keydown', onKeydown, true)
   void prepare()
 })
-onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown, true))
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onKeydown, true)
+  unmount()
+})
 </script>
 
 <template>

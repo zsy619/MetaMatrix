@@ -17,6 +17,9 @@ export const LAYOUT_LABELS = {
   columnFirst: '纵向网格',
   stagger: '错列排列',
   masonry: '瀑布排列',
+  sheared: '斜格排列',
+  reverseGrid: '倒序网格',
+  sparse: '宽松排列',
   row: '横向排开',
   column: '纵向排开',
   zigzag: '之字排列',
@@ -25,10 +28,17 @@ export const LAYOUT_LABELS = {
   diagonal: '对角排列',
   wave: '波浪排列',
   vee: '折角排列',
+  slope: '斜坡排列',
+  arc: '拱形排列',
+  chevron: '尖折排列',
+  ribbon: '丝带排列',
   pyramid: '塔形排列',
   funnel: '漏斗排列',
   frame: '回形排列',
   whirl: '回旋排列',
+  diamond: '菱形排列',
+  cross: '十字排列',
+  hexagon: '六边形排列',
   tree: '树形排列',
   treeReverse: '反向树形',
   layered: '分层排列',
@@ -38,6 +48,8 @@ export const LAYOUT_LABELS = {
   orgSide: '横向架构',
   outline: '大纲排列',
   lanes: '泳道排列',
+  forest: '森林排列',
+  fishbone: '鱼骨排列',
   ring: '环形排列',
   fan: '扇形排列',
   spiral: '螺旋排列',
@@ -48,23 +60,26 @@ export const LAYOUT_LABELS = {
   ellipse: '椭圆排列',
   star: '星形排列',
   sunflower: '葵花排列',
+  halfRing: '半环排列',
+  doubleRing: '双环排列',
   byTitle: '标题排序',
   byProgress: '进度排序',
   byType: '类型分组',
   byGroup: '编组分组',
   byColor: '颜色分组',
+  byTag: '标签分组',
 } as const
 
 export type LayoutMode = keyof typeof LAYOUT_LABELS
 
 /** 菜单分组；每种模式必须且只能出现一次（layout.test.ts 校验）。 */
 export const LAYOUT_GROUPS: { title: string; modes: LayoutMode[] }[] = [
-  { title: '网格', modes: ['grid', 'snake', 'honeycomb', 'compact', 'wide', 'tall', 'columnFirst', 'stagger', 'masonry'] },
-  { title: '线性', modes: ['row', 'column', 'zigzag', 'timeline', 'stairs', 'diagonal', 'wave', 'vee'] },
-  { title: '图形', modes: ['pyramid', 'funnel', 'frame', 'whirl'] },
-  { title: '层级', modes: ['tree', 'treeReverse', 'layered', 'layeredReverse', 'mindmap', 'org', 'orgSide', 'outline', 'lanes'] },
-  { title: '环形', modes: ['ring', 'fan', 'spiral', 'radial', 'center', 'force', 'concentric', 'ellipse', 'star', 'sunflower'] },
-  { title: '分类', modes: ['byTitle', 'byProgress', 'byType', 'byGroup', 'byColor'] },
+  { title: '网格', modes: ['grid', 'snake', 'honeycomb', 'compact', 'wide', 'tall', 'columnFirst', 'stagger', 'masonry', 'sheared', 'reverseGrid', 'sparse'] },
+  { title: '线性', modes: ['row', 'column', 'zigzag', 'timeline', 'stairs', 'diagonal', 'wave', 'vee', 'slope', 'arc', 'chevron', 'ribbon'] },
+  { title: '图形', modes: ['pyramid', 'funnel', 'frame', 'whirl', 'diamond', 'cross', 'hexagon'] },
+  { title: '层级', modes: ['tree', 'treeReverse', 'layered', 'layeredReverse', 'mindmap', 'org', 'orgSide', 'outline', 'lanes', 'forest', 'fishbone'] },
+  { title: '环形', modes: ['ring', 'halfRing', 'doubleRing', 'fan', 'spiral', 'radial', 'center', 'force', 'concentric', 'ellipse', 'star', 'sunflower'] },
+  { title: '分类', modes: ['byTitle', 'byProgress', 'byType', 'byGroup', 'byColor', 'byTag'] },
 ]
 
 export type LayoutResult = Record<string, { x: number; y: number }>
@@ -77,6 +92,8 @@ const COMPACT_GAP = 12
 const MASONRY_GAP = 24
 /** 大纲排列每深一级右移多少。 */
 const OUTLINE_INDENT = 48
+/** 图形类（菱形/十字/六边形）行距：行内半格居中错位，行间多留一档余量。 */
+const CELL_GAP_Y = 168
 
 type Box = { minX: number; minY: number; maxW: number; maxH: number }
 
@@ -152,10 +169,32 @@ const CELLS = {
   stagger: (i, n) => [i % gridCols(n), Math.floor(i / gridCols(n)) + ((i % gridCols(n)) % 2) / 2],
   /** 每个节点右移一格、下移一格。 */
   diagonal: (i) => [i, i],
+  /** 网格，但每列整体竖向剪切：越往右的列越往下沉。 */
+  sheared: (i, n) => {
+    const cols = gridCols(n)
+    const col = i % cols
+    return [col, Math.floor(i / cols) + col]
+  },
+  /** 网格，但顺序倒过来：最后一个节点落在左上角。 */
+  reverseGrid: (i, n) => {
+    const cols = gridCols(n)
+    const rev = n - 1 - i
+    return [rev % cols, Math.floor(rev / cols)]
+  },
+  /** 列数翻倍、隔列留空，节点之间更宽松。 */
+  sparse: (i) => [(i % 2) * 2 + Math.floor(i / 2) % 2, Math.floor(i / 2)],
   /** 一路向右，纵向按 0、1、2、1 起伏。 */
   wave: (i) => [i, 1 - Math.cos((i * Math.PI) / 2)],
   /** 一路向右，先降后升排成 V 形。 */
   vee: (i, n) => [i, (n - 1) / 2 - Math.abs(i - (n - 1) / 2)],
+  /** 一路向右，折线抬升：前半段上行、后半段横走。 */
+  slope: (i, n) => [i, Math.min(i, Math.ceil((n - 1) / 2))],
+  /** 一路向右，先升后降排成拱形：两端低、中间高。 */
+  arc: (i, n) => [i, Math.floor(Math.min(i, n - 1 - i) / 2)],
+  /** 一路向右，升到顶再折回半程，排成尖折形。 */
+  chevron: (i, n) => [i, Math.min(i, (n - 1) / 2) + Math.max(0, i - Math.ceil((n - 1) / 2))],
+  /** 一路向右，升两次降一次，排成 S 形丝带。 */
+  ribbon: (i, n) => [i, Math.min(i, n - 1 - Math.abs(n - 1 - 2 * i))],
   /** 沿正方形的四条边顺时针摆一圈，中间留空。 */
   frame: (i, n) => {
     // 每条边放 side 个，边的终点算作下一条边的起点。
@@ -195,6 +234,46 @@ function centeredCells(sizes: number[]): CellAt[] {
   )
 }
 
+/** 菱形：行宽先增后减，共用中间最宽的一行。 */
+function diamondRows(count: number): number[] {
+  const sizes: number[] = []
+  let left = count
+  for (let size = 1; left > 0; size += 1) {
+    sizes.push(Math.min(size, left))
+    left -= sizes[sizes.length - 1]
+  }
+  const lower: number[] = []
+  for (let size = sizes[sizes.length - 1] - 1; size > 0 && left > 0; size -= 1) {
+    lower.push(Math.min(size, left))
+    left -= lower[lower.length - 1]
+  }
+  return [...sizes, ...lower]
+}
+
+/** 十字：中心一格，其余节点交替分到横臂和竖臂上。 */
+function crossCells(count: number): CellAt[] {
+  const cells: CellAt[] = [[0, 0]]
+  for (let i = 1; i < count; i += 1) {
+    const step = Math.ceil(i / 2)
+    cells.push(i % 2 ? [step, 0] : [0, step])
+  }
+  return cells
+}
+
+/** 六边形：行宽按 1、2、3…3、2、1 堆叠，外轮廓接近正六边形。 */
+function hexagonRows(count: number): number[] {
+  const sizes: number[] = []
+  let left = count
+  for (let size = 1; left > 0; size += 1) {
+    for (const take of [size, size]) {
+      if (left <= 0) break
+      sizes.push(Math.min(take, left))
+      left -= sizes[sizes.length - 1]
+    }
+  }
+  return sizes
+}
+
 /** 回旋：从中心格出发，顺时针一圈圈往外绕（方形螺旋）。 */
 function whirlCells(count: number): CellAt[] {
   const cells: CellAt[] = []
@@ -211,6 +290,30 @@ function whirlCells(count: number): CellAt[] {
     left = run
   }
   return cells
+}
+
+/** 半环：节点沿下半圆从左到右摆开（扇形的镜像，开口朝上）。 */
+function layoutHalfRing(nodes: GraphNode[]): LayoutResult {
+  const box = bounds(nodes)
+  const step = nodes.length > 1 ? Math.PI / (nodes.length - 1) : 0
+  const radius = step ? ringUnit(box) / (2 * Math.sin(step / 2)) : 0
+  const out: LayoutResult = {}
+  nodes.forEach((node, index) => {
+    out[node.id] = polar(node, radius, index * step)
+  })
+  return pinTopLeft(out, box)
+}
+
+/** 双环：节点平分两圈，内圈等角度摆开后，外圈半径再加一个半 unit。 */
+function layoutDoubleRing(nodes: GraphNode[]): LayoutResult {
+  const box = bounds(nodes)
+  const unit = ringUnit(box)
+  const half = Math.ceil(nodes.length / 2)
+  const inner = ringRadius(half, unit)
+  const out: LayoutResult = {}
+  placeRing(out, nodes.slice(0, half), inner)
+  placeRing(out, nodes.slice(half), inner + unit * 1.6)
+  return pinTopLeft(out, box)
 }
 
 /** 瀑布：列数同网格，每个节点落到当前最矮的一列；节点高矮不一时比网格紧凑。 */
@@ -371,6 +474,50 @@ function layoutOutline(nodes: GraphNode[], edges: GraphEdge[]): LayoutResult {
     for (const kid of children.get(node.id) || []) walk(kid, level + 1)
   }
   for (const root of roots) walk(root, 0)
+  return pinTopLeft(out, box)
+}
+
+/** 森林：每棵树自上而下占一列，多棵树从左到右铺开。 */
+function layoutForest(nodes: GraphNode[], edges: GraphEdge[]): LayoutResult {
+  const box = bounds(nodes)
+  const { roots, children } = buildForest(nodes, edges)
+  const out: LayoutResult = {}
+  const walk = (node: GraphNode, col: number, depth: number): number => {
+    const kids = children.get(node.id) || []
+    // 没有子节点的叶子各占一列；有子节点的分支占满子树宽度后再居中。
+    let span = 0
+    if (!kids.length) span = 1
+    else for (const kid of kids) span += walk(kid, col + span, depth + 1)
+    out[node.id] = {
+      x: Math.round((col + (span - 1) / 2) * (box.maxW + GAP_X)),
+      y: depth * (box.maxH + GAP_Y),
+    }
+    return span
+  }
+  let col = 0
+  for (const root of roots) col += walk(root, col, 0)
+  return pinTopLeft(out, box)
+}
+
+/**
+ * 鱼骨：主干自左向右，节点交替挂在主干上下两侧、逐层往外斜。
+ * shortcut: 不看连线的主次，只按节点顺序交替；要严格按因果主干时请手动排。
+ */
+function layoutFishbone(nodes: GraphNode[]): LayoutResult {
+  const box = bounds(nodes)
+  const out: LayoutResult = {}
+  nodes.forEach((node, index) => {
+    if (index % 3 === 0) {
+      out[node.id] = { x: (index / 3) * (box.maxW + GAP_X) * 2, y: 0 }
+    } else {
+      const slot = Math.floor(index / 3)
+      const up = index % 3 === 1
+      out[node.id] = {
+        x: (slot + 1) * (box.maxW + GAP_X) * 2,
+        y: (up ? -1 : 1) * Math.ceil((slot + 1) / 2) * (box.maxH + GAP_Y),
+      }
+    }
+  })
   return pinTopLeft(out, box)
 }
 
@@ -694,6 +841,20 @@ export function computeLayout(nodes: GraphNode[], edges: GraphEdge[], mode: Layo
       return layoutCells(nodes, fromList(centeredCells(pyramidRows(nodes.length))))
     case 'funnel':
       return layoutCells(nodes, fromList(centeredCells(pyramidRows(nodes.length).reverse())))
+    case 'diamond':
+      return layoutCells(nodes, fromList(centeredCells(diamondRows(nodes.length))), GAP_X, CELL_GAP_Y)
+    case 'cross':
+      return layoutCells(nodes, fromList(crossCells(nodes.length)), GAP_X, CELL_GAP_Y)
+    case 'hexagon':
+      return layoutCells(nodes, fromList(centeredCells(hexagonRows(nodes.length))), GAP_X, CELL_GAP_Y)
+    case 'halfRing':
+      return layoutHalfRing(nodes)
+    case 'doubleRing':
+      return layoutDoubleRing(nodes)
+    case 'forest':
+      return layoutForest(nodes, edges)
+    case 'fishbone':
+      return layoutFishbone(nodes)
     case 'whirl':
       return layoutCells(nodes, fromList(whirlCells(nodes.length)))
     case 'org':
@@ -723,6 +884,8 @@ export function computeLayout(nodes: GraphNode[], edges: GraphEdge[], mode: Layo
       return layoutGroups(nodes, (node) => node.groupId)
     case 'byColor':
       return layoutGroups(nodes, (node) => node.color)
+    case 'byTag':
+      return layoutGroups(nodes, (node) => (node.tags || [])[0])
     case 'tree':
       return layoutTree(nodes, edges)
     case 'treeReverse':
@@ -746,6 +909,6 @@ export function computeLayout(nodes: GraphNode[], edges: GraphEdge[], mode: Layo
     case 'force':
       return layoutForce(nodes, edges)
     default:
-      return layoutCells(nodes, CELLS[mode])
+      return layoutCells(nodes, CELLS[mode as keyof typeof CELLS])
   }
 }

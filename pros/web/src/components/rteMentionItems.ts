@@ -8,7 +8,7 @@
  */
 import { matchesPinyin } from '../utils/rtePinyin'
 
-export type RteMentionKind = 'person' | 'block'
+export type RteMentionKind = 'person' | 'block' | 'document'
 
 export type RteMentionItem = {
   id: string
@@ -18,12 +18,25 @@ export type RteMentionItem = {
   kind?: RteMentionKind
   blockKind?: 'heading' | 'figure' | 'table'
   targetId?: string
+  /** document mention 指向的知识库文档 id */
+  documentId?: string
+  /** document mention 目标类型：doc 走 inline mention，其他走 canvasEmbed 块。 */
+  canvasType?: string
 }
 
-export type RteBlockCandidate = {
+type RteBlockCandidate = {
   id: string
   label: string
   kind: 'heading' | 'figure' | 'table'
+}
+
+/** 知识库里的文档候选（@ 文档 mention）。 */
+export type RteDocCandidate = {
+  documentId: string
+  title: string
+  icon?: string
+  /** 目标文档类型：doc 走 mention，其他（node-graph/quadrant 等）走 canvasEmbed 块。 */
+  canvasType?: string
 }
 
 /**
@@ -71,6 +84,7 @@ export function mergeMentionCandidates(
   blocks: RteBlockCandidate[] = [],
   limit = 12,
   people: RteMentionItem[] = DEFAULT_MENTION_ITEMS,
+  docs: RteDocCandidate[] = [],
 ): RteMentionItem[] {
   const cap = Math.max(1, limit)
   const persons = filterRteMentionItems(query, cap, people).map((item) => ({
@@ -78,6 +92,21 @@ export function mergeMentionCandidates(
     kind: 'person' as const,
   }))
   const q = query.trim().toLowerCase()
+  const docItems: RteMentionItem[] = docs
+    .filter((d) => {
+      if (!q) return true
+      const hay = `${d.title} ${d.icon || ''}`
+      if (hay.toLowerCase().includes(q)) return true
+      return matchesPinyin(hay, q)
+    })
+    .map((d) => ({
+      id: `doc:${d.documentId}`,
+      label: d.title,
+      role: d.icon || '文档',
+      kind: 'document' as const,
+      documentId: d.documentId,
+      canvasType: d.canvasType,
+    }))
   const blockItems: RteMentionItem[] = blocks
     .filter((block) => {
       if (!q) return true
@@ -93,11 +122,14 @@ export function mergeMentionCandidates(
       blockKind: block.kind,
       targetId: block.id,
     }))
-  const peopleShown = persons.slice(0, Math.min(8, cap))
-  const blockRoom = Math.max(0, cap - peopleShown.length)
-  return [...peopleShown, ...blockItems.slice(0, blockRoom)]
+  const peopleShown = persons.slice(0, Math.min(6, cap))
+  const docsShown = docItems.slice(0, Math.max(0, cap - peopleShown.length))
+  const blockRoom = Math.max(0, cap - peopleShown.length - docsShown.length)
+  return [...peopleShown, ...docsShown, ...blockItems.slice(0, blockRoom)]
 }
 
 export function mentionSectionLabel(item: RteMentionItem): string {
-  return item.kind === 'block' ? '本文' : '人员'
+  if (item.kind === 'block') return '本文'
+  if (item.kind === 'document') return '文档'
+  return '人员'
 }
