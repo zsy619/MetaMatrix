@@ -6,6 +6,9 @@ import { friendlyApiMessage } from '../utils/apiMessage'
 import { safeRedirect } from '../utils/safeRedirect'
 import { isCaptchaBlank } from '../utils/captcha'
 import CaptchaField from '../components/ui/CaptchaField.vue'
+import AuthField from '../components/ui/AuthField.vue'
+import AuthSubmitOverlay from '../components/ui/AuthSubmitOverlay.vue'
+import { ICON_EYE, ICON_EYE_OFF, ICON_LOCK, ICON_MAIL, ICON_USER, authIcon } from '../components/ui/authIcons'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -18,6 +21,14 @@ const captchaCode = ref('')
 const busy = ref(false)
 const message = ref('')
 const captchaRef = ref<InstanceType<typeof CaptchaField> | null>(null)
+
+/** 密码是否以明文显示。默认隐藏，防止旁观者一眼看到密码。 */
+const showPassword = ref(false)
+/** 输入框类型随 showPassword 切换。 */
+const passwordType = computed(() => (showPassword.value ? 'text' : 'password'))
+const passwordToggleIcon = computed(() =>
+  authIcon(showPassword.value ? ICON_EYE_OFF : ICON_EYE),
+)
 
 onMounted(() => {
   document.title = '注册 · 元矩阵 MetaMatrix'
@@ -38,7 +49,18 @@ const strength = computed(() => {
   return { level: 4, percent: 100, text: '强度很强', color: 'var(--mm-green-solid)' }
 })
 
+/**
+ * 提交注册。
+ *
+ * 防二次提交有两道闸：
+ * 1. 遮罩层（AuthSubmitOverlay）铺满视口，鼠标点不到底下的表单；
+ * 2. 这里的 busy 守卫，拦住键盘回车触发的表单提交 —— 遮罩挡不住回车。
+ *
+ * 注意顺序：本地校验放在 busy 置位之前，这样校验失败直接 return，
+ * 不会闪现一下遮罩又立刻消失（那样看着像出错了）。
+ */
 async function submit() {
+  if (busy.value) return
   message.value = ''
   const mail = email.value.trim()
   if (!mail.includes('@') || mail.startsWith('@') || mail.endsWith('@')) {
@@ -94,54 +116,64 @@ async function submit() {
       </div>
 
       <div class="auth-fields">
-        <label class="auth-field" for="reg-name">
-          <span class="auth-field__label">显示名（可选）</span>
-          <input
-            id="reg-name"
-            v-model="displayName"
-            class="auth-input"
-            type="text"
-            maxlength="64"
-            autocomplete="nickname"
-            placeholder="留空则使用邮箱前缀"
-          />
-        </label>
+        <AuthField
+          id="reg-name"
+          v-model="displayName"
+          label="显示名（可选）"
+          type="text"
+          placeholder="留空则使用邮箱前缀"
+          :icon="authIcon(ICON_USER)"
+          maxlength="64"
+          autocomplete="nickname"
+        />
 
-        <label class="auth-field" for="reg-email">
-          <span class="auth-field__label">邮箱</span>
-          <input
-            id="reg-email"
-            v-model="email"
-            class="auth-input"
-            type="email"
-            required
-            autocomplete="username"
-            placeholder="name@example.com"
-            :aria-invalid="Boolean(message)"
-          />
-        </label>
+        <AuthField
+          id="reg-email"
+          v-model="email"
+          label="邮箱"
+          type="email"
+          placeholder="name@example.com"
+          :icon="authIcon(ICON_MAIL)"
+          required
+          autocomplete="username"
+          :aria-invalid="Boolean(message)"
+        />
 
-        <div class="auth-field">
-          <label class="auth-field__label" for="reg-password">密码</label>
-          <input
-            id="reg-password"
-            v-model="password"
-            class="auth-input"
-            type="password"
-            required
-            minlength="6"
-            maxlength="72"
-            autocomplete="new-password"
-            placeholder="至少 6 位"
-            :aria-invalid="Boolean(message)"
-          />
-          <p class="auth-strength">
-            <span class="auth-strength__bar">
-              <span class="auth-strength__fill" :style="{ width: strength.percent + '%', background: strength.color }" />
-            </span>
-            <span class="auth-strength__text">{{ strength.text }}</span>
-          </p>
-        </div>
+        <AuthField
+          id="reg-password"
+          v-model="password"
+          label="密码"
+          :type="passwordType"
+          placeholder="至少 6 位"
+          :icon="authIcon(ICON_LOCK)"
+          has-trailing
+          required
+          minlength="6"
+          maxlength="72"
+          autocomplete="new-password"
+          :aria-invalid="Boolean(message)"
+        >
+          <template #trailing>
+            <button
+              type="button"
+              class="auth-field__toggle"
+              :aria-label="showPassword ? '隐藏密码' : '显示密码'"
+              :aria-pressed="showPassword"
+              :title="showPassword ? '隐藏密码' : '显示密码'"
+              @click="showPassword = !showPassword"
+            >
+              <span class="auth-field__toggle-icon" aria-hidden="true" v-html="passwordToggleIcon" />
+            </button>
+          </template>
+          <template #hint>
+            <p class="auth-strength">
+              <span class="auth-strength__bar">
+                <span class="auth-strength__fill" :style="{ width: strength.percent + '%', background: strength.color }" />
+              </span>
+              <span class="auth-strength__text">{{ strength.text }}</span>
+            </p>
+          </template>
+        </AuthField>
 
         <CaptchaField ref="captchaRef" v-model="captchaCode" />
       </div>
@@ -160,5 +192,15 @@ async function submit() {
         <router-link :to="{ name: 'login', query: route.query }">登录</router-link>
       </p>
     </form>
+
+    <!--
+      提交遮罩。放在 .auth-page 内部而不是 body，避免 Teleport 带来的层级问题。
+      stages 描述注册的三个真实阶段，让等待有节奏感。
+    -->
+    <AuthSubmitOverlay
+      :visible="busy"
+      title="正在创建账号"
+      :stages="['正在校验图形验证码', '正在创建账号与密钥', '正在准备工作台']"
+    />
   </div>
 </template>

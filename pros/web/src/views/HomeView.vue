@@ -10,6 +10,7 @@ import {
 } from '../stores/document'
 import { useUiStore } from '../stores/ui'
 import { useAuthStore } from '../stores/auth'
+import { NODE_GRAPH_TYPE } from '../types/nodeGraph'
 import CanvasViewport from '../components/canvas/CanvasViewport.vue'
 import RevisionHistory from '../components/canvas/RevisionHistory.vue'
 import PageSettingsPanel from '../components/PageSettingsPanel.vue'
@@ -30,7 +31,14 @@ const router = useRouter()
 const documentStore = useDocumentStore()
 const ui = useUiStore()
 const auth = useAuthStore()
-const { dirty, saving, document_id, conflict } = storeToRefs(documentStore)
+const {
+  dirty,
+  saving,
+  document_id,
+  conflict,
+  localPersistError,
+  remoteSaveNotice,
+} = storeToRefs(documentStore)
 
 const statusMsg = ref('')
 const docsOpen = ref(false)
@@ -59,8 +67,12 @@ const badge = computed(() => (unknownTemplate.value ? '未找到' : TEMPLATE_MET
 const canvasName = computed(() => (unknownTemplate.value ? '没有这张画布' : TEMPLATE_META[templateId.value].name))
 const syncLabel = computed(() => {
   if (saving.value) return '同步中…'
+  if (localPersistError.value) {
+    return dirty.value ? '本地保存失败，修改未保存' : '云端已同步，本地缓存失败'
+  }
   if (offline.value && dirty.value) return '网络已断开，修改留在本机'
   if (saveFailed.value) return '同步失败，可重试'
+  if (remoteSaveNotice.value) return '另一标签页有新版本'
   if (statusMsg.value) return statusMsg.value
   if (!auth.isAuthenticated) return dirty.value ? '本地未保存' : '仅本地'
   if (dirty.value) return '未同步'
@@ -87,8 +99,13 @@ function scheduleAutoSave() {
   }, autosaveDelay())
 }
 
+function hasUnsavedWork(): boolean {
+  // dirty 只代表编辑/云端状态；本地存储失败本身也是离页风险，必须独立提醒。
+  return documentStore.dirty || Boolean(documentStore.localPersistError)
+}
+
 function onBeforeUnload(event: BeforeUnloadEvent) {
-  if (!documentStore.dirty) return
+  if (!hasUnsavedWork()) return
   event.preventDefault()
   event.returnValue = ''
 }
@@ -115,15 +132,19 @@ onMounted(() => {
 })
 
 onBeforeRouteLeave(() => {
-  if (!documentStore.dirty) return true
+  if (!hasUnsavedWork()) return true
+  if (documentStore.localPersistError) {
+    return window.confirm('画布尚未可靠保存到本机，现在离开可能丢失修改。确定离开？')
+  }
   return window.confirm('画布还有未同步的修改。离开后本机仍保留草稿，云端可能不是最新。确定离开？')
 })
 
+// 用编辑序号而不是 dirty 布尔值驱动自动保存。
+// dirty 从 false 变 true 只发生一次，飞行期间的新编辑不会再次触发 watch，
+// 于是旧实现会把新改动一直留在“未保存”状态。序号每次编辑都递增，天然可重入。
 watch(
-  () => dirty.value,
-  (d) => {
-    if (d) scheduleAutoSave()
-  },
+  () => documentStore.editSeq,
+  () => scheduleAutoSave(),
 )
 
 async function revealSearchMatch() {
@@ -157,6 +178,17 @@ async function bootstrap() {
   if (qid && auth.isAuthenticated) {
     try {
       await documentStore.load(qid)
+      if (
+        documentStore.loaded_canvas_type === NODE_GRAPH_TYPE &&
+        documentStore.loaded_project_id
+      ) {
+        // 节点画布有自己的视图：模板画布渲染它只会得到一张白纸。
+        await router.replace({
+          name: 'node-graph',
+          params: { projectId: documentStore.loaded_project_id, canvasId: qid },
+        })
+        return
+      }
       await revealSearchMatch()
       return
     } catch (e) {
@@ -296,10 +328,16 @@ async function doSave(checkpoint: boolean) {
     return
   }
   statusMsg.value = ''
-  documentStore.persistLocal(templateId.value)
+  const localSaved = documentStore.persistLocal(templateId.value)
   if (!auth.isAuthenticated) {
-    statusMsg.value = '已存本地（登录后可同步云端）'
-    documentStore.dirty = false
+    if (localSaved) {
+      documentStore.dirty = false
+      saveFailed.value = false
+      statusMsg.value = '已存本地（登录后可同步云端）'
+    } else {
+      // 本地写入失败时绝不能再清 dirty，否则用户会看到“仅本地”的假安全感。
+      statusMsg.value = documentStore.localPersistError || '本地保存失败，请重试'
+    }
     return
   }
   const taskName = (documentStore.doc_title || '').trim()
@@ -310,8 +348,12 @@ async function doSave(checkpoint: boolean) {
   }
   // 任务名为空时跳过云端 PUT，仅本地
   if (documentStore.document_id && !taskName) {
-    statusMsg.value = '任务名称为空，已仅存本地'
-    documentStore.dirty = false
+    if (localSaved) {
+      documentStore.dirty = false
+      statusMsg.value = '任务名称为空，已仅存本地'
+    } else {
+      statusMsg.value = documentStore.localPersistError || '任务名称为空，且本地保存失败'
+    }
     return
   }
   try {
@@ -328,7 +370,11 @@ async function doSave(checkpoint: boolean) {
       })
     }
     saveFailed.value = false
-    statusMsg.value = checkpoint ? '已存版' : '已同步'
+    statusMsg.value = documentStore.localPersistError
+      ? `${checkpoint ? '已存版' : '云端已同步'}，但本地缓存失败`
+      : checkpoint
+        ? '已存版'
+        : '已同步'
   } catch (e) {
     saveFailed.value = true
     statusMsg.value = conflict.value
@@ -590,8 +636,18 @@ async function manualCheckpoint() {
       {{ openError }}
       <button type="button" class="mm-btn mm-btn--primary" @click="bootstrap">重试打开</button>
     </p>
+    <p v-if="localPersistError" class="save-retry" role="alert">
+      <span>{{ localPersistError }}</span>
+      <button type="button" class="mm-btn mm-btn--primary" :disabled="saving" @click="doSave(false)">
+        重试保存
+      </button>
+    </p>
+    <p v-if="remoteSaveNotice" class="save-retry" role="status">
+      另一标签页已保存到版本 {{ remoteSaveNotice.saveVersion }}（{{ remoteSaveNotice.updatedAt }}）。
+      当前页已记录该版本，下次保存会先检查冲突，不会直接用旧草稿覆盖。
+    </p>
     <p v-if="saveFailed || offline" class="save-retry" role="status">
-      {{ offline ? '网络已断开，修改留在本机。' : '同步没有成功，修改仍在本机。' }}
+      {{ offline ? (localPersistError ? '网络已断开，且本地保存失败。' : '网络已断开，修改留在本机。') : '同步没有成功，修改仍在本机。' }}
       <button type="button" class="mm-btn mm-btn--primary" :disabled="saving || offline" @click="doSave(false)">
         重试同步
       </button>

@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { friendlyApiMessage } from '../utils/apiMessage'
 import { downloadBackup, restoreBackup, type BackupBundle } from '../api/documents'
+import { listActivityLogs, type ActivityLogEntry } from '../api/logs'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -21,6 +22,50 @@ function readDensity(): 'comfortable' | 'compact' {
   }
 }
 const density = ref(readDensity())
+
+// ---------- 活动日志（登录 / 退出 / 写操作） ----------
+const logs = ref<ActivityLogEntry[]>([])
+const logCategory = ref('')
+const logsBusy = ref(false)
+const logMsg = ref('')
+const logTabs = [
+  { label: '全部', value: '' },
+  { label: '登录', value: 'login' },
+  { label: '退出', value: 'logout' },
+  { label: '操作', value: 'operation' },
+]
+
+async function loadLogs() {
+  logsBusy.value = true
+  logMsg.value = ''
+  try {
+    const res = await listActivityLogs({ category: logCategory.value, limit: 50 })
+    logs.value = res.items || []
+  } catch (e) {
+    logs.value = []
+    logMsg.value = friendlyApiMessage(e, '日志加载失败')
+  } finally {
+    logsBusy.value = false
+  }
+}
+
+function switchLogCategory(value: string) {
+  logCategory.value = value
+  void loadLogs()
+}
+
+function categoryLabel(category: string) {
+  if (category === 'login') return '登录'
+  if (category === 'logout') return '退出'
+  if (category === 'operation') return '操作'
+  return category
+}
+
+function formatTime(iso: string) {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return iso
+  return d.toLocaleString('zh-CN', { hour12: false })
+}
 
 const expiryLabel = computed(() => {
   const raw = auth.token
@@ -43,6 +88,7 @@ onMounted(async () => {
     return
   }
   if (auth.token) await auth.fetchMe()
+  void loadLogs()
 })
 
 async function submit() {
@@ -89,17 +135,16 @@ async function exportBackup() {
   backupMsg.value = ''
   backupBusy.value = true
   try {
-    const bundle = await downloadBackup()
-    const blob = new Blob([JSON.stringify(bundle)], { type: 'application/json' })
+    // 服务端已经逐批编码为合法 JSON；直接下载响应 Blob，不再读取整份 bundle 后
+    // JSON.stringify 一次，避免导出期间同时占用文档、JSON 字符串和 Blob 三份内存。
+    const blob = await downloadBackup()
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
     link.download = 'metamatrix-backup.json'
     link.click()
     URL.revokeObjectURL(url)
-    backupMsg.value = bundle.truncated
-      ? `已下载最近 ${bundle.count} 份。更早的画布请用数据库备份。`
-      : `已下载 ${bundle.count} 份画布。`
+    backupMsg.value = '备份文件已下载。若画布超过 200 份，文件只包含最近 200 份，更早内容请用数据库备份。'
   } catch (e) {
     backupMsg.value = friendlyApiMessage(e, '导出失败')
   } finally {
@@ -117,7 +162,10 @@ async function importBackup(event: Event) {
   try {
     const text = await file.text()
     const bundle = JSON.parse(text) as BackupBundle
-    const result = await restoreBackup(bundle)
+    // 一次文件选择就是一次导入意图；restoreBackup 内部的网络重试会复用此 id。
+    // 不使用 X-Request-Id，因为它标识单次 HTTP 尝试，不能跨重试去重。
+    const importBatchId = crypto.randomUUID()
+    const result = await restoreBackup(bundle, importBatchId)
     backupMsg.value = `已作为新画布导入 ${result.imported} 份，跳过 ${result.skipped} 份。`
   } catch (e) {
     backupMsg.value = friendlyApiMessage(e, '导入失败')
@@ -168,6 +216,42 @@ function logout() {
         </label>
       </div>
       <p v-if="backupMsg" role="status">{{ backupMsg }}</p>
+      <h2>登录与操作日志</h2>
+      <p class="hint">只记录本账号的登录、退出与写操作（改哪张画布、传什么素材）。别的账号看不到这些内容。</p>
+      <div class="actions">
+        <button
+          v-for="tab in logTabs"
+          :key="tab.value"
+          type="button"
+          class="mm-btn"
+          :class="{ 'mm-btn--primary': logCategory === tab.value }"
+          @click="switchLogCategory(tab.value)"
+        >
+          {{ tab.label }}
+        </button>
+        <button type="button" class="mm-btn mm-btn--ghost" :disabled="logsBusy" @click="loadLogs">
+          {{ logsBusy ? '加载中…' : '刷新' }}
+        </button>
+      </div>
+      <p v-if="logMsg" class="err" role="status">{{ logMsg }}</p>
+      <table v-if="logs.length" class="log-table">
+        <thead>
+          <tr><th>时间</th><th>类别</th><th>动作</th><th>结果</th><th>详情</th></tr>
+        </thead>
+        <tbody>
+          <tr v-for="entry in logs" :key="entry.id">
+            <td>{{ formatTime(entry.createdAt) }}</td>
+            <td>{{ categoryLabel(entry.category) }}</td>
+            <td><code>{{ entry.action }}</code></td>
+            <td :class="entry.status === 'success' ? 'ok' : 'err'">
+              {{ entry.status === 'success' ? '成功' : '失败' }}
+            </td>
+            <td class="log-detail">{{ entry.detail || '—' }}</td>
+          </tr>
+        </tbody>
+      </table>
+      <p v-else-if="!logsBusy" class="hint">暂无记录。</p>
+
       <h2>修改密码</h2>
       <label for="cur-pass">
         当前密码
@@ -247,6 +331,33 @@ input {
   overflow: hidden;
   clip: rect(0, 0, 0, 0);
   border: 0;
+}
+.log-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+.log-table th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--mm-muted);
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--mm-line);
+  white-space: nowrap;
+}
+.log-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--mm-line);
+  color: var(--mm-text);
+  vertical-align: top;
+}
+.log-table code {
+  font-size: 12px;
+  color: var(--mm-muted);
+}
+.log-detail {
+  color: var(--mm-muted);
+  word-break: break-all;
 }
 .err { color: var(--mm-red); margin: 0; font-size: 13px; }
 .ok { color: var(--mm-green); margin: 0; font-size: 13px; }
