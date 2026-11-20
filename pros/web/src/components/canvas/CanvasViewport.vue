@@ -41,6 +41,10 @@ import {
   isPmSolutionTriangleDoc,
   isGrowthAssumptionsDoc,
   isBusinessFormulaDoc,
+  isAbcModelDoc,
+  isBusinessFormulaPatternsDoc,
+  isCultivationMountainDoc,
+  isHackerFiveStepsDoc,
   isThreeRingBasicsDoc,
   isLeadershipTriangleDoc,
   isContextSixElementsDoc,
@@ -117,6 +121,10 @@ import ProductFeatures5dCanvas from './ProductFeatures5dCanvas.vue'
 import PmSolutionTriangleCanvas from './PmSolutionTriangleCanvas.vue'
 import GrowthAssumptionsCanvas from './GrowthAssumptionsCanvas.vue'
 import BusinessFormulaCanvas from './BusinessFormulaCanvas.vue'
+import AbcModelCanvas from './AbcModelCanvas.vue'
+import BusinessFormulaPatternsCanvas from './BusinessFormulaPatternsCanvas.vue'
+import CultivationMountainCanvas from './CultivationMountainCanvas.vue'
+import HackerFiveStepsCanvas from './HackerFiveStepsCanvas.vue'
 import ThreeRingBasicsCanvas from './ThreeRingBasicsCanvas.vue'
 import LeadershipTriangleCanvas from './LeadershipTriangleCanvas.vue'
 import ContextSixElementsCanvas from './ContextSixElementsCanvas.vue'
@@ -268,6 +276,18 @@ const growthAssumptionsDoc = computed(() =>
 )
 const businessFormulaDoc = computed(() =>
   isBusinessFormulaDoc(current_data.value) ? current_data.value : null,
+)
+const abcModelDoc = computed(() =>
+  isAbcModelDoc(current_data.value) ? current_data.value : null,
+)
+const businessFormulaPatternsDoc = computed(() =>
+  isBusinessFormulaPatternsDoc(current_data.value) ? current_data.value : null,
+)
+const cultivationMountainDoc = computed(() =>
+  isCultivationMountainDoc(current_data.value) ? current_data.value : null,
+)
+const hackerFiveStepsDoc = computed(() =>
+  isHackerFiveStepsDoc(current_data.value) ? current_data.value : null,
 )
 const threeRingBasicsDoc = computed(() =>
   isThreeRingBasicsDoc(current_data.value) ? current_data.value : null,
@@ -448,6 +468,18 @@ const quadrantDoc = computed(() =>
         </template>
         <template v-else-if="businessFormulaDoc">
           <BusinessFormulaCanvas :doc="businessFormulaDoc" />
+        </template>
+        <template v-else-if="abcModelDoc">
+          <AbcModelCanvas :doc="abcModelDoc" />
+        </template>
+        <template v-else-if="businessFormulaPatternsDoc">
+          <BusinessFormulaPatternsCanvas :doc="businessFormulaPatternsDoc" />
+        </template>
+        <template v-else-if="cultivationMountainDoc">
+          <CultivationMountainCanvas :doc="cultivationMountainDoc" />
+        </template>
+        <template v-else-if="hackerFiveStepsDoc">
+          <HackerFiveStepsCanvas :doc="hackerFiveStepsDoc" />
         </template>
         <template v-else-if="threeRingBasicsDoc">
           <ThreeRingBasicsCanvas :doc="threeRingBasicsDoc" />

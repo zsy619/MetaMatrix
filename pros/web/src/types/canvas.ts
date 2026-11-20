@@ -1629,6 +1629,127 @@ export interface BusinessFormulaDocumentJSON {
 }
 
 /* ------------------------------------------------------------------ *
+ * 业务公式ABC模型
+ * ------------------------------------------------------------------ */
+
+export type AbcModelBlockId = 'ambition' | 'basis' | 'connection'
+
+export interface AbcModelBlock {
+  id: AbcModelBlockId
+  title: string
+  hint: string
+  text: string
+  items: QuadrantItem[]
+}
+
+export interface AbcModelDocumentJSON {
+  id: string
+  type: 'abc_model'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  blocks: AbcModelBlock[]
+  formula: string
+}
+
+/* ------------------------------------------------------------------ *
+ * 业务公式十大经典范式
+ * ------------------------------------------------------------------ */
+
+export interface BusinessFormulaPatternParam {
+  name: string
+  desc: string
+  unit: string
+  defaultValue: number
+}
+
+export interface BusinessFormulaPattern {
+  id: number
+  name: string
+  category: 'revenue' | 'competition' | 'operation'
+  badge: string
+  badgeText: string
+  desc: string
+  formula: string
+  params: BusinessFormulaPatternParam[]
+}
+
+export interface BusinessFormulaPatternsDocumentJSON {
+  id: string
+  type: 'business_formula_patterns'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  patterns: BusinessFormulaPattern[]
+  savedParams: Record<number, Record<string, number>>
+}
+
+/* ------------------------------------------------------------------ *
+ * 业务公式修炼爬山
+ * ------------------------------------------------------------------ */
+
+export interface CultivationLevel {
+  level: number
+  name: string
+  subtitle: string
+  color: string
+  stage: 'beginner' | 'intermediate' | 'advanced'
+  problem: string
+  problems: string[]
+  paths: string[]
+  description: string
+}
+
+export interface CultivationMountainDocumentJSON {
+  id: string
+  type: 'cultivation_mountain'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  levels: CultivationLevel[]
+  currentLevel: number
+  assessmentAnswers: number[]
+}
+
+/* ------------------------------------------------------------------ *
+ * 调用黑客五部曲
+ * ------------------------------------------------------------------ */
+
+export interface HackerFiveStep {
+  id: string
+  /** 第几步（1-5） */
+  index: number
+  /** 关键工作 */
+  work: string
+  /** 依次回答：这一步要回答的问题 */
+  question: string
+  /** 真正难点 */
+  difficulty: string
+  /** 「依次回答」内容块 id，指向 doc.blocks */
+  blockId: string
+  /** 旧版纯文本答案（已迁移到 blocks，仅为容错） */
+  answer?: string
+}
+
+/** 「依次回答」内容块，与 Y 模型 / 五步法共用 items 结构 */
+export interface HackerFiveStepBlock {
+  id: string
+  title: string
+  items: QuadrantItem[]
+}
+
+export interface HackerFiveStepsDocumentJSON {
+  id: string
+  type: 'hacker_five_steps'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  steps: HackerFiveStep[]
+  /** 五个「依次回答」内容块，与 steps[i].blockId 一一对应 */
+  blocks: HackerFiveStepBlock[]
+}
+
+/* ------------------------------------------------------------------ *
  * 苦练基本功三环分析法
  * ------------------------------------------------------------------ */
 
@@ -2571,6 +2692,10 @@ export type CanvasDocumentJSON = (
   | PmSolutionTriangleDocumentJSON
   | GrowthAssumptionsDocumentJSON
   | BusinessFormulaDocumentJSON
+  | AbcModelDocumentJSON
+  | BusinessFormulaPatternsDocumentJSON
+  | CultivationMountainDocumentJSON
+  | HackerFiveStepsDocumentJSON
   | ThreeRingBasicsDocumentJSON
   | LeadershipTriangleDocumentJSON
   | ContextSixElementsDocumentJSON
@@ -2599,6 +2724,7 @@ export type CanvasDocumentJSON = (
   | GoldenCircleDocumentJSON
   | SoarDocumentJSON
   | PlayingToWinDocumentJSON
+  | HackerFiveStepsDocumentJSON
   | TenCheckDocumentJSON
   | SceneThreeHighDocumentJSON
   | AiBoundaryDocumentJSON
@@ -3149,6 +3275,34 @@ export function isBusinessFormulaDoc(
   return !!doc && doc.type === 'business_formula'
 }
 
+/** 业务公式ABC模型 */
+export function isAbcModelDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is AbcModelDocumentJSON {
+  return !!doc && doc.type === 'abc_model'
+}
+
+/** 业务公式十大经典范式 */
+export function isBusinessFormulaPatternsDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is BusinessFormulaPatternsDocumentJSON {
+  return !!doc && doc.type === 'business_formula_patterns'
+}
+
+/** 业务公式修炼爬山 */
+export function isCultivationMountainDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is CultivationMountainDocumentJSON {
+  return !!doc && doc.type === 'cultivation_mountain'
+}
+
+/** 调用黑客五部曲 */
+export function isHackerFiveStepsDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is HackerFiveStepsDocumentJSON {
+  return !!doc && doc.type === 'hacker_five_steps'
+}
+
 /** 苦练基本功三环分析法 */
 export function isThreeRingBasicsDoc(
   doc: CanvasDocumentJSON | null | undefined,
@@ -3365,7 +3519,8 @@ export function isBlockCanvasDoc(
     isVrioDoc(doc) ||
     isGoldenCircleDoc(doc) ||
     isSoarDoc(doc) ||
-    isPlayingToWinDoc(doc)
+    isPlayingToWinDoc(doc) ||
+    isHackerFiveStepsDoc(doc)
   )
 }
 
