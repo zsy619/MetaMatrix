@@ -31,6 +31,10 @@ func main() {
 	if err := db.AutoMigrate(gdb); err != nil {
 		log.Fatalf("migrate: %v", err)
 	}
+	// 内置文档模板：飞书模板中心的最小可用集，幂等写入。
+	if err := service.SeedBuiltinTemplates(gdb); err != nil {
+		log.Printf("seed builtin templates warning: %v", err)
+	}
 
 	// 活动日志（登录、退出、写操作）落库。
 	activitySvc := service.NewActivityService(gdb)
@@ -38,6 +42,9 @@ func main() {
 	docSvc := service.NewDocumentsService(gdb)
 	projSvc := service.NewProjectsService(gdb)
 	dirSvc := service.NewDirectoryService(gdb)
+	knSvc := service.NewKnowledgeService(gdb)
+	// 飞书开放平台凭证：知识空间导入与群机器人通知共用同一套应用配置。
+	knSvc.ConfigureFeishu(cfg.FeishuAppID, cfg.FeishuAppSecret, os.Getenv("FEISHU_WEBHOOK_URL"), os.Getenv("FEISHU_BASE_URL"))
 	authH := handler.NewAuthHandler(authSvc, service.NewAttemptLimiter(cfg.LoginWindow, cfg.LoginPairLimit, cfg.LoginIPLimit), handler.AuthOptions{
 		DebugAll:      cfg.CaptchaDebug,
 		DebugLoopback: cfg.CaptchaDebugLoopback,
@@ -83,6 +90,7 @@ func main() {
 	docH := handler.NewDocumentsHandler(docSvc)
 	projH := handler.NewProjectsHandler(projSvc)
 	dirH := handler.NewDirectoryHandler(dirSvc)
+	knH := handler.NewKnowledgeHandler(knSvc)
 	mediaSvc := &media.Service{
 		Store:  media.NewGormStore(gdb),
 		Root:   cfg.MediaRoot,
@@ -209,6 +217,7 @@ func main() {
 		docs.GET("/:id/revisions/:rid/materialize", docH.Materialize)
 		docs.GET("/:id/revisions/:rid/diff", docH.Diff)
 		docs.POST("/:id/restore", docH.Restore)
+		docs.GET("/:id/backrefs", knH.Backrefs)
 	}
 
 	// 素材库。身份只取登录态。静态路径必须写在 /:id 前面。
@@ -248,6 +257,64 @@ func main() {
 		projects.PUT("/:id", projH.Rename)
 		projects.DELETE("/:id", projH.Delete)
 	}
+
+	// 知识库目录树：挂在项目下的文档/文件夹组织。
+	knowledge := h.Group("/projects/:projectId/knowledge", middleware.AuthRequired(cfg.JWTSecret))
+	{
+		knowledge.GET("/tree", knH.Tree)
+		knowledge.POST("/nodes", knH.Create)
+		knowledge.PATCH("/nodes/:nodeId", knH.Update)
+		knowledge.PATCH("/nodes/:nodeId/meta", knH.UpdateMeta)
+		knowledge.POST("/nodes/:nodeId/move", knH.Move)
+		knowledge.POST("/nodes/:nodeId/copy", knH.Copy)
+		knowledge.POST("/reorder", knH.Reorder)
+		knowledge.DELETE("/nodes/:nodeId", knH.Delete)
+		knowledge.GET("/trash", knH.Trash)
+		knowledge.DELETE("/nodes/:nodeId/purge", knH.Purge)
+		knowledge.POST("/batch", knH.Batch)
+		knowledge.GET("/summary", knH.Summary)
+		knowledge.GET("/events", knH.Events)
+		knowledge.GET("/export", knH.ExportTree)
+		knowledge.GET("/templates", knH.Templates)
+		knowledge.POST("/templates", knH.CreateTemplate)
+		knowledge.DELETE("/templates/:templateId", knH.DeleteTemplate)
+		// 知识库 3.0：图谱、作者维度检索、节点数据、导入与飞书同步。
+		knowledge.GET("/graph", knH.Graph)
+		knowledge.GET("/search", knH.SearchSpace)
+		knowledge.POST("/ask", knH.Ask)
+		knowledge.GET("/nodes/:nodeId/data", knH.GetNodeData)
+		knowledge.PUT("/nodes/:nodeId/data", knH.SaveNodeData)
+		knowledge.POST("/import", knH.ImportFile)
+		knowledge.POST("/feishu/import", knH.ImportFeishuSpace)
+		knowledge.POST("/feishu/notify", knH.NotifyFeishu)
+	}
+
+	// 知识库文档级能力：属性、评论、最近浏览、导出。
+	knowledgeDocs := h.Group("/documents", middleware.AuthRequired(cfg.JWTSecret))
+	{
+		knowledgeDocs.GET("/:id/properties", knH.GetDocProps)
+		knowledgeDocs.PUT("/:id/properties", knH.UpdateDocProps)
+		knowledgeDocs.GET("/:id/comments", knH.ListComments)
+		knowledgeDocs.POST("/:id/comments", knH.AddComment)
+		knowledgeDocs.PATCH("/:id/comments/:commentId", knH.UpdateComment)
+		knowledgeDocs.DELETE("/:id/comments/:commentId", knH.DeleteComment)
+		knowledgeDocs.POST("/:id/view", knH.TouchView)
+		knowledgeDocs.GET("/:id/knowledge-export", knH.ExportDoc)
+		knowledgeDocs.GET("/knowledge/recent", knH.RecentViews)
+		// 分享链接、历史版本对比、在线协作状态、摘要与标签。
+		knowledgeDocs.GET("/:id/shares", knH.ListShares)
+		knowledgeDocs.POST("/:id/shares", knH.CreateShare)
+		knowledgeDocs.DELETE("/:id/shares/:shareId", knH.RevokeShare)
+		knowledgeDocs.GET("/:id/versions", knH.ListVersions)
+		knowledgeDocs.GET("/:id/versions/:from/diff/:to", knH.VersionDiff)
+		knowledgeDocs.POST("/:id/presence", knH.PresenceHeartbeat)
+		knowledgeDocs.GET("/:id/presence", knH.PresenceList)
+		knowledgeDocs.GET("/:id/summary", knH.DocSummary)
+		knowledgeDocs.GET("/:id/tags", knH.DocTags)
+	}
+
+	// 分享页是公开入口：靠分享 token 授权，不需要登录态。
+	h.GET("/knowledge/shares/:token", knH.SharedDoc)
 
 	// 活动日志查询（当前账号自己的记录）。
 	h.GET("/logs", middleware.AuthRequired(cfg.JWTSecret), logsH.List)

@@ -58,6 +58,7 @@ func openDocumentsSQLite(t *testing.T) *gorm.DB {
 		&backupRevisionSQLite{},
 		&backupContentBlockSQLite{},
 		&documentSaveOperationSQLite{},
+		&pageReferencesSQLite{},
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -523,6 +524,62 @@ func TestListKeysetStaticDataHasNoDuplicatesOrGaps(t *testing.T) {
 			t.Fatalf("duplicate document %s", collected[i])
 		}
 		seen[collected[i]] = true
+	}
+}
+
+// TestListCategorySplitsContentSets 锁定「项目画布列表只含 node-graph」这件事。
+//
+// 同一个项目下混着三类内容：节点画布、知识库富文本、节点绑定的模板副本。
+// 分类过滤必须把它们切成互不重叠的集合，否则项目详情页会出现打不开的假条目。
+func TestListCategorySplitsContentSets(t *testing.T) {
+	db := openDocumentsSQLite(t)
+	svc, ownerID, _ := newDocumentFixture(t, db)
+	projectID := uuid.New()
+	title := "分类文档"
+	created := []*model.CanvasDocument{}
+	for _, canvasType := range []string{NodeGraphCanvasType, DocCanvasType, "pm-solution-triangle"} {
+		ct := canvasType
+		doc, err := svc.Create(ownerID, CreateDocumentInput{
+			Title:      &title,
+			CanvasType: &ct,
+			ProjectID:  &projectID,
+			Data:       documentTestPayload(canvasType),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		created = append(created, doc)
+	}
+
+	typesOf := func(category string) []string {
+		rows, _, err := svc.List(ownerID, ListFilter{ProjectID: &projectID, Category: category})
+		if err != nil {
+			t.Fatal(err)
+		}
+		types := []string{}
+		for _, row := range rows {
+			types = append(types, row.CanvasType)
+		}
+		return types
+	}
+
+	nodeGraph := typesOf(CategoryNodeGraph)
+	if len(nodeGraph) != 1 || nodeGraph[0] != NodeGraphCanvasType {
+		t.Fatalf("node-graph category = %v, want only %s", nodeGraph, NodeGraphCanvasType)
+	}
+	doc := typesOf(CategoryDoc)
+	if len(doc) != 1 || doc[0] != DocCanvasType {
+		t.Fatalf("doc category = %v, want only %s", doc, DocCanvasType)
+	}
+	canvas := typesOf(CategoryCanvas)
+	if len(canvas) != 2 {
+		t.Fatalf("canvas category = %v, want 2 rows", canvas)
+	}
+	if !IsCategory(CategoryCanvas) || !IsCategory(CategoryNodeGraph) || !IsCategory(CategoryDoc) {
+		t.Fatal("known categories must be accepted")
+	}
+	if IsCategory("unknown") {
+		t.Fatal("unknown category must be rejected")
 	}
 }
 

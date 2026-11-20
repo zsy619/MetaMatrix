@@ -68,9 +68,11 @@ func (s *ProjectsService) Refs(ownerID, projectID uuid.UUID) (map[string][]strin
 		ID          uuid.UUID
 		CurrentData datatypes.JSON
 	}
+	// 引用图只描述画布之间的引用：知识库富文本不会出现在节点画布的选择器里，
+	// 读进来只是让 map 多一堆解析失败的空 key。
 	if err := s.db.Model(&model.CanvasDocument{}).
 		Select("id, current_data").
-		Where("owner_user_id = ? AND project_id = ?", ownerID, projectID).
+		Where("owner_user_id = ? AND project_id = ? AND canvas_type <> ?", ownerID, projectID, DocCanvasType).
 		Find(&rows).Error; err != nil {
 		return nil, err
 	}
@@ -119,7 +121,9 @@ func (s *ProjectsService) List(ownerID uuid.UUID) ([]model.ProjectSummary, error
 		Select(`projects.id, projects.name, projects.emoji, projects.progress,
 			projects.created_at, projects.updated_at,
 			(SELECT COUNT(*) FROM canvas_documents d
-			  WHERE d.project_id = projects.id AND d.deleted_at IS NULL) AS canvas_count`).
+			  WHERE d.project_id = projects.id AND d.deleted_at IS NULL
+			    AND d.canvas_type = ?) AS canvas_count`,
+			NodeGraphCanvasType).
 		Where("projects.owner_user_id = ?", ownerID).
 		Order("projects.updated_at DESC").
 		Order("projects.id ASC").

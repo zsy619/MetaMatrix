@@ -37,6 +37,20 @@ func AutoMigrate(gdb *gorm.DB) error {
 		&model.PasswordResetToken{},
 		// 活动日志：登录、退出与写操作的留痕。
 		&model.ActivityLog{},
+		// 知识库目录树节点。
+		&model.KnowledgeNode{},
+		// 知识库反向引用：@ 文档 mention / 画布嵌入块的出向索引。
+		&model.PageReference{},
+		// 知识库 2.0：模板、页面属性、评论、变更事件、最近浏览。
+		&model.KnowledgeTemplate{},
+		&model.DocProperty{},
+		&model.DocComment{},
+		&model.KnowledgeEvent{},
+		&model.KnowledgeView{},
+		// 知识库 3.0：节点结构化数据、分享链接、历史版本快照。
+		&model.KnowledgeNodeData{},
+		&model.KnowledgeShare{},
+		&model.KnowledgeDocVersion{},
 	); err != nil {
 		return fmt.Errorf("automigrate: %w", err)
 	}

@@ -125,6 +125,7 @@ func newBackupTestService(t *testing.T, maxOpenConns int) (*DocumentsService, *g
 		&backupRevisionSQLite{},
 		&backupContentBlockSQLite{},
 		&backupImportSQLite{},
+		&pageReferencesSQLite{},
 	); err != nil {
 		t.Fatal(err)
 	}

@@ -226,7 +226,7 @@ func (s *DocumentsService) reloadDoc(ownerID, docID uuid.UUID) *model.CanvasDocu
 }
 
 // syncExtract rewrites content_text and rebuilds canvas_content_blocks inside tx.
-func syncExtract(tx *gorm.DB, docID uuid.UUID, data []byte, now time.Time) (string, error) {
+func syncExtract(tx *gorm.DB, docID uuid.UUID, data []byte, now time.Time, canvasType string) (string, error) {
 	ext := content.Extract(data)
 	if err := tx.Model(&model.CanvasDocument{}).Where("id = ?", docID).
 		Update("content_text", ext.PlainText).Error; err != nil {
@@ -236,7 +236,7 @@ func syncExtract(tx *gorm.DB, docID uuid.UUID, data []byte, now time.Time) (stri
 		return "", err
 	}
 	if len(ext.Blocks) == 0 {
-		return ext.PlainText, nil
+		return ext.PlainText, rebuildRefs(tx, docID, data, now)
 	}
 	rows := make([]model.CanvasContentBlock, 0, len(ext.Blocks))
 	for _, b := range ext.Blocks {
@@ -254,7 +254,17 @@ func syncExtract(tx *gorm.DB, docID uuid.UUID, data []byte, now time.Time) (stri
 	if err := tx.CreateInBatches(rows, 100).Error; err != nil {
 		return "", err
 	}
-	return ext.PlainText, nil
+	if IsCanvasType(canvasType) {
+		// 画布 JSON 没有 mention/embed 节点，引用索引只对知识库文档有意义。
+		return ext.PlainText, nil
+	}
+	return ext.PlainText, rebuildRefs(tx, docID, data, now)
+}
+
+// rebuildRefs 全量重建 doc 的出向引用索引（mention/embed → page_references）。
+// 非 doc 类型（画布 JSON）跳过：只有 doc 类型的 current_data 有 html 字段。
+func rebuildRefs(tx *gorm.DB, docID uuid.UUID, data []byte, now time.Time) error {
+	return RebuildPageReferences(tx, docID, datatypes.JSON(data), now)
 }
 
 func truncateStr(s string, n int) string {
@@ -288,6 +298,66 @@ func validatePayload(data []byte) error {
 	return nil
 }
 
+// DocCanvasType 是知识库富文本的 canvas_type。
+//
+// canvas_documents 同时收画布和知识库文档，两者共用修订历史、乐观锁与抽取层。
+// 「画布」不是一个表，而是 canvas_type <> 'doc' 的一个集合：画布消费端
+// （项目列表计数、项目详情、画布选择器、引用图）统一用 IsCanvasType 判定，
+// 不在调用点各自硬编码字符串。
+const DocCanvasType = "doc"
+
+// NodeGraphCanvasType 是项目节点画布的 canvas_type。
+//
+// 项目详情页里的「画布」只指这一类：节点画布是项目的一等资产，
+// 而节点绑定的模板副本（canvas_type = 模板 id）与知识库富文本（'doc'）
+// 都是别的内容类别，混进项目画布列表会变成打不开的假条目。
+const NodeGraphCanvasType = "node-graph"
+
+// 内容分类：把同一张 canvas_documents 表里的不同内容切成互不重叠的集合。
+//
+// - CategoryCanvas    普通画布集合（除知识库富文本外的一切）
+// - CategoryNodeGraph 项目节点画布集合（canvas_type = 'node-graph'）
+// - CategoryDoc       知识库富文本集合（canvas_type = 'doc'）
+const (
+	CategoryCanvas    = "canvas"
+	CategoryNodeGraph = "node-graph"
+	CategoryDoc       = "doc"
+)
+
+// IsCategory 报告 category 是否是已知的内容分类。
+func IsCategory(category string) bool {
+	switch category {
+	case CategoryCanvas, CategoryNodeGraph, CategoryDoc:
+		return true
+	default:
+		return false
+	}
+}
+
+// ApplyCategory 把内容分类翻译成 canvas_type 谓词。
+//
+// 空分类表示不按分类过滤，行为与旧调用方一致。
+func ApplyCategory(q *gorm.DB, category string) *gorm.DB {
+	switch category {
+	case CategoryNodeGraph:
+		return q.Where("canvas_type = ?", NodeGraphCanvasType)
+	case CategoryDoc:
+		return q.Where("canvas_type = ?", DocCanvasType)
+	case CategoryCanvas:
+		return q.Where("canvas_type <> ?", DocCanvasType)
+	default:
+		return q
+	}
+}
+
+// IsCanvasType 报告这条记录属不属于「画布」集合。
+//
+// 空串视为画布：历史数据的 canvas_type 是默认值 'canvas'，也可能为空，
+// 它们从来不是知识库文档，按画布处理与既有行为一致。
+func IsCanvasType(canvasType string) bool {
+	return canvasType != DocCanvasType
+}
+
 // ListFilter selects one owner's documents. Paged is false when the client
 // omitted limit and offset, which preserves the historical full-list response.
 type ListFilter struct {
@@ -299,6 +369,12 @@ type ListFilter struct {
 	Offset    int
 	Paged     bool
 	Archived  bool
+	// ExcludeDoc 排除知识库富文本（canvas_type='doc'）。
+	// 项目详情页只认画布，doc 混进去会成为打不开的假条目。
+	ExcludeDoc bool
+	// Category 按内容分类过滤（canvas / node-graph / doc）。
+	// 空值表示不按分类过滤；它与 ExcludeDoc 可以同时使用。
+	Category string
 }
 
 // ListCursorFilter 是可选的 keyset 分页参数。旧 ListFilter/offset 路径保持不变，
@@ -311,6 +387,10 @@ type ListCursorFilter struct {
 	Limit     int
 	Cursor    string
 	Archived  bool
+	// ExcludeDoc 排除知识库富文本（canvas_type='doc'），语义同 ListFilter。
+	ExcludeDoc bool
+	// Category 按内容分类过滤，语义同 ListFilter。
+	Category string
 }
 
 // DocumentCursorPage 只用于新的 keyset 请求，不改变旧接口的数组响应。
@@ -565,8 +645,13 @@ func (s *DocumentsService) Create(ownerID uuid.UUID, in CreateDocumentInput) (*m
 		if err := tx.Create(rev).Error; err != nil {
 			return err
 		}
-		_, err := syncExtract(tx, docID, data, now)
-		return err
+		_, err := syncExtract(tx, docID, data, now, canvasType)
+		if err != nil {
+			return err
+		}
+		// 知识库文档创建时留首版快照；写失败不阻断创建。
+		_ = SnapshotDocVersion(tx, doc)
+		return nil
 	})
 	if err != nil {
 		return nil, err
@@ -709,7 +794,7 @@ func (s *DocumentsService) Clone(ownerID, docID uuid.UUID, in CloneDocumentInput
 		if err := tx.Create(rev).Error; err != nil {
 			return err
 		}
-		_, err := syncExtract(tx, doc.ID, data, doc.CreatedAt)
+		_, err := syncExtract(tx, doc.ID, data, doc.CreatedAt, doc.CanvasType)
 		return err
 	})
 	if err != nil {
@@ -730,6 +815,10 @@ func (s *DocumentsService) List(ownerID uuid.UUID, f ListFilter) ([]model.Docume
 		if f.CanvasType != "" {
 			q = q.Where("canvas_type = ?", f.CanvasType)
 		}
+		if f.ExcludeDoc {
+			q = q.Where("canvas_type <> ?", DocCanvasType)
+		}
+		q = ApplyCategory(q, f.Category)
 		if f.ProjectID != nil {
 			q = q.Where("project_id = ?", *f.ProjectID)
 		}
@@ -779,6 +868,10 @@ func (s *DocumentsService) ListKeyset(ownerID uuid.UUID, f ListCursorFilter) (*D
 		if f.CanvasType != "" {
 			q = q.Where("canvas_type = ?", f.CanvasType)
 		}
+		if f.ExcludeDoc {
+			q = q.Where("canvas_type <> ?", DocCanvasType)
+		}
+		q = ApplyCategory(q, f.Category)
 		if f.ProjectID != nil {
 			q = q.Where("project_id = ?", *f.ProjectID)
 		}
@@ -1010,13 +1103,16 @@ func (s *DocumentsService) Update(ownerID, docID uuid.UUID, in UpdateDocumentInp
 		}
 		if contentChanged {
 			// syncExtract 会删除并重建内容块；哈希未变时跳过可避免整块写放大和 ID 抖动。
-			if _, err := syncExtract(tx, docID, in.CurrentData, now); err != nil {
+			if _, err := syncExtract(tx, docID, in.CurrentData, now, doc.CanvasType); err != nil {
 				return err
 			}
 		}
 		if err := tx.Where("id = ?", docID).First(doc).Error; err != nil {
 			return err
 		}
+		// 知识库文档保存时留一条历史快照（历史版本对比用）。
+		// 写失败不阻断保存：知识库快照是增强能力，不能拖垮文档主链路。
+		_ = SnapshotDocVersion(tx, doc)
 		if pendingOperation != nil {
 			result, err := json.Marshal(doc)
 			if err != nil {
@@ -1317,7 +1413,7 @@ func (s *DocumentsService) Restore(ownerID, docID uuid.UUID, in RestoreInput) (*
 		}); err != nil {
 			return err
 		}
-		_, err := syncExtract(tx, docID, payload, now)
+		_, err := syncExtract(tx, docID, payload, now, doc.CanvasType)
 		return err
 	})
 	if err != nil {
@@ -1337,6 +1433,10 @@ type SearchInput struct {
 	Q          string
 	TemplateID string
 	Limit      int
+	ProjectID  string
+	// ExcludeDoc 只搜画布：工作台的全文搜索面向画布，
+	// 知识库文档有自己的搜索入口（KnowledgeTree）。
+	ExcludeDoc bool
 }
 
 func (s *DocumentsService) Search(ownerID uuid.UUID, in SearchInput) ([]model.SearchHit, error) {
@@ -1350,6 +1450,12 @@ func (s *DocumentsService) Search(ownerID uuid.UUID, in SearchInput) ([]model.Se
 		query := s.db.Model(&model.CanvasDocument{}).Where("owner_user_id = ?", ownerID)
 		if in.TemplateID != "" {
 			query = query.Where("template_id = ?", in.TemplateID)
+		}
+		if in.ProjectID != "" {
+			query = query.Where("project_id = ?", in.ProjectID)
+		}
+		if in.ExcludeDoc {
+			query = query.Where("canvas_type <> ?", DocCanvasType)
 		}
 		err := query.Select("id, title, notes, template_id, canvas_type, created_at, updated_at, substr(content_text, 1, 160) AS snippet").
 			Order("updated_at DESC").Limit(limit).Find(&rows).Error
@@ -1384,6 +1490,14 @@ WHERE owner_user_id = ? AND deleted_at IS NULL
 		sql += ` AND template_id = ?`
 		args = append(args, in.TemplateID)
 	}
+	if in.ProjectID != "" {
+		sql += ` AND project_id = ?`
+		args = append(args, in.ProjectID)
+	}
+	if in.ExcludeDoc {
+		sql += ` AND canvas_type <> ?`
+		args = append(args, DocCanvasType)
+	}
 	sql += ` ORDER BY rank DESC, updated_at DESC LIMIT ?`
 	args = append(args, limit)
 
@@ -1395,6 +1509,12 @@ WHERE owner_user_id = ? AND deleted_at IS NULL
 			Where("owner_user_id = ? AND (title ILIKE ? OR content_text ILIKE ?)", ownerID, like, like)
 		if in.TemplateID != "" {
 			fq = fq.Where("template_id = ?", in.TemplateID)
+		}
+		if in.ProjectID != "" {
+			fq = fq.Where("project_id = ?", in.ProjectID)
+		}
+		if in.ExcludeDoc {
+			fq = fq.Where("canvas_type <> ?", DocCanvasType)
 		}
 		err2 := fq.Select("id, title, notes, template_id, canvas_type, created_at, updated_at, substr(content_text, 1, 160) AS snippet").
 			Order("updated_at DESC").Limit(limit).Find(&fb).Error

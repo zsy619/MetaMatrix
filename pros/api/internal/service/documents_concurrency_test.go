@@ -38,7 +38,7 @@ func openPostgresForServiceTest(t *testing.T) *gorm.DB {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = sqlDB.Close() })
-	if err := db.AutoMigrate(&model.User{}, &model.CanvasDocument{}, &model.CanvasRevision{}, &model.CanvasContentBlock{}, &model.DocumentSaveOperation{}, &model.PasswordResetToken{}); err != nil {
+	if err := db.AutoMigrate(&model.User{}, &model.CanvasDocument{}, &model.CanvasRevision{}, &model.CanvasContentBlock{}, &model.DocumentSaveOperation{}, &model.PasswordResetToken{}, &model.PageReference{}); err != nil {
 		t.Fatal(err)
 	}
 	return db

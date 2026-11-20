@@ -28,6 +28,19 @@ type projectSQLite struct {
 
 func (projectSQLite) TableName() string { return "projects" }
 
+// pageReferencesSQLite 是 page_references 的 SQLite 影子模型：保存时的事务会
+// 全量重建该表，缺表会让项目删除测试直接报 no such table。
+type pageReferencesSQLite struct {
+	ID          uuid.UUID `gorm:"type:uuid;primaryKey"`
+	SourceDocID uuid.UUID `gorm:"type:uuid;not null;index:idx_pr_source,priority:1"`
+	TargetDocID uuid.UUID `gorm:"type:uuid;not null;index:idx_pr_target"`
+	RefType     string    `gorm:"type:varchar(16);not null"`
+	TargetLabel string    `gorm:"type:varchar(255);not null;default:''"`
+	CreatedAt   time.Time `gorm:"not null"`
+}
+
+func (pageReferencesSQLite) TableName() string { return "page_references" }
+
 func openProjectsSQLite(t *testing.T) *gorm.DB {
 	t.Helper()
 	db, err := gorm.Open(sqlite.Open("file:projects-"+uuid.NewString()+"?mode=memory&cache=shared"), &gorm.Config{
@@ -49,6 +62,7 @@ func openProjectsSQLite(t *testing.T) *gorm.DB {
 		&backupRevisionSQLite{},
 		&backupContentBlockSQLite{},
 		&documentSaveOperationSQLite{},
+		&pageReferencesSQLite{},
 	); err != nil {
 		t.Fatal(err)
 	}

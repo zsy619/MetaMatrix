@@ -194,6 +194,15 @@ func (h *DocumentsHandler) List(ctx context.Context, c *app.RequestContext) {
 	}
 	templateID := string(c.Query("templateId"))
 	canvasType := string(c.Query("canvasType"))
+	// excludeDoc=1：项目详情页要的是画布，知识库富文本不算。
+	excludeDoc := string(c.Query("excludeDoc")) == "1"
+	// category=canvas|node-graph|doc：按内容分类取集合，
+	// 避免把知识库文档或节点绑定的模板副本混进「项目画布」列表。
+	category := string(c.Query("category"))
+	if category != "" && !service.IsCategory(category) {
+		Fail(c, http.StatusBadRequest, "invalid category", "validation_error")
+		return
+	}
 	projectIDRaw := string(c.Query("projectId"))
 	projectID, err := parseOptionalUUID(&projectIDRaw)
 	if err != nil {
@@ -220,6 +229,8 @@ func (h *DocumentsHandler) List(ctx context.Context, c *app.RequestContext) {
 			Limit:      limit,
 			Cursor:     cursor,
 			Archived:   archived,
+			ExcludeDoc: excludeDoc,
+			Category:   category,
 		})
 		if handleDocErr(c, err, nil) {
 			return
@@ -244,6 +255,8 @@ func (h *DocumentsHandler) List(ctx context.Context, c *app.RequestContext) {
 		Offset:     offset,
 		Paged:      paged,
 		Archived:   archived,
+		ExcludeDoc: excludeDoc,
+		Category:   category,
 	})
 	if handleDocErr(c, err, nil) {
 		return
@@ -723,6 +736,8 @@ func (h *DocumentsHandler) Search(ctx context.Context, c *app.RequestContext) {
 		Q:          string(c.Query("q")),
 		TemplateID: string(c.Query("templateId")),
 		Limit:      limit,
+		ProjectID:  string(c.Query("projectId")),
+		ExcludeDoc: string(c.Query("excludeDoc")) == "1",
 	})
 	if handleDocErr(c, err, nil) {
 		return

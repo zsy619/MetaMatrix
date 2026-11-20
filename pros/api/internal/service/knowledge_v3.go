@@ -1,0 +1,787 @@
+package service
+
+import (
+	"encoding/json"
+	"regexp"
+	"sort"
+	"strings"
+	"sync"
+	"time"
+	"unicode/utf8"
+
+	"metamatrix/api/internal/content"
+	"metamatrix/api/internal/model"
+
+	"github.com/google/uuid"
+	"gorm.io/datatypes"
+	"gorm.io/gorm"
+)
+
+// 知识库 3.0：多维表格 / 思维导图节点、分享链接、历史版本对比、
+// 知识图谱、作者维度检索、在线协作状态（presence）与本地智能检索问答。
+
+const (
+	maxNodeDataBytes = 256 * 1024
+	maxVersionKeep   = 50
+	presenceTTL      = 45 * time.Second
+)
+
+// ---------------------------------------------------------------- 节点数据（表格 / 导图）
+
+// docs 借 DocumentsService 读文档：知识库与文档共用同一套所有权校验。
+func (s *KnowledgeService) docs() *DocumentsService { return NewDocumentsService(s.db) }
+
+// GetNodeData 读取节点的结构化数据；没有记录时返回按类型生成的空骨架。
+func (s *KnowledgeService) GetNodeData(ownerID, projectID, nodeID uuid.UUID) (*model.KnowledgeNodeData, error) {
+	node, err := s.getOwnedNode(ownerID, projectID, nodeID)
+	if err != nil {
+		return nil, err
+	}
+	var row model.KnowledgeNodeData
+	err = s.db.Where("node_id = ?", nodeID).First(&row).Error
+	if err == nil {
+		return &row, nil
+	}
+	if err != gorm.ErrRecordNotFound {
+		return nil, err
+	}
+	return &model.KnowledgeNodeData{
+		NodeID: nodeID,
+		Kind:   dataKindForNodeType(node.NodeType),
+		Data:   datatypes.JSON(defaultNodeData(dataKindForNodeType(node.NodeType))),
+	}, nil
+}
+
+// SaveNodeData 保存节点的结构化数据。
+func (s *KnowledgeService) SaveNodeData(ownerID, projectID, nodeID uuid.UUID, kind string, data json.RawMessage) (*model.KnowledgeNodeData, error) {
+	node, err := s.getOwnedNode(ownerID, projectID, nodeID)
+	if err != nil {
+		return nil, err
+	}
+	want := dataKindForNodeType(node.NodeType)
+	if want == "" {
+		return nil, ErrValidation
+	}
+	if kind != "" && kind != want {
+		return nil, ErrValidation
+	}
+	if len(data) == 0 || len(data) > maxNodeDataBytes {
+		return nil, ErrValidation
+	}
+	now := time.Now().UTC()
+	row := model.KnowledgeNodeData{
+		NodeID:    nodeID,
+		Kind:      want,
+		Data:      datatypes.JSON(data),
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	err = s.db.Where("node_id = ?", nodeID).
+		Assign(map[string]interface{}{"kind": want, "data": datatypes.JSON(data), "updated_at": now}).
+		FirstOrCreate(&row).Error
+	if err != nil {
+		return nil, err
+	}
+	return &row, nil
+}
+
+// dataKindForNodeType 把节点类型映射到结构化数据的类别。
+func dataKindForNodeType(nodeType string) string {
+	switch nodeType {
+	case "sheet":
+		return "sheet"
+	case "mindmap":
+		return "mindmap"
+	default:
+		return ""
+	}
+}
+
+// defaultNodeData 生成空骨架：表格给一行表头，导图给一个根节点。
+func defaultNodeData(kind string) []byte {
+	switch kind {
+	case "sheet":
+		return []byte(`{"columns":["列 1","列 2","列 3"],"rows":[["","",""]]}`)
+	case "mindmap":
+		return []byte(`{"title":"中心主题","children":[{"title":"分支 1","children":[]}]}`)
+	default:
+		return []byte(`{}`)
+	}
+}
+
+// ---------------------------------------------------------------- 分享链接
+
+// CreateShare 为文档创建分享链接。
+func (s *KnowledgeService) CreateShare(ownerID, docID uuid.UUID, role string, expiresAt *time.Time) (*model.KnowledgeShare, error) {
+	if _, err := s.docs().GetOwned(ownerID, docID); err != nil {
+		return nil, err
+	}
+	role = strings.TrimSpace(role)
+	switch role {
+	case "", "view":
+		role = "view"
+	case "comment", "edit":
+	default:
+		return nil, ErrValidation
+	}
+	share := &model.KnowledgeShare{
+		ID:         uuid.New(),
+		DocumentID: docID,
+		Token:      uuid.NewString() + uuid.NewString()[:8],
+		Role:       role,
+		CreatedBy:  ownerID,
+		ExpiresAt:  expiresAt,
+		CreatedAt:  time.Now().UTC(),
+	}
+	if err := s.db.Create(share).Error; err != nil {
+		return nil, err
+	}
+	return share, nil
+}
+
+// ListShares 返回文档的分享链接。
+func (s *KnowledgeService) ListShares(ownerID, docID uuid.UUID) ([]model.KnowledgeShare, error) {
+	if _, err := s.docs().GetOwned(ownerID, docID); err != nil {
+		return nil, err
+	}
+	var rows []model.KnowledgeShare
+	err := s.db.Where("document_id = ?", docID).Order("created_at DESC").Find(&rows).Error
+	return rows, err
+}
+
+// RevokeShare 撤销分享链接。
+func (s *KnowledgeService) RevokeShare(ownerID, shareID uuid.UUID) error {
+	res := s.db.Where("id = ? AND created_by = ?", shareID, ownerID).Delete(&model.KnowledgeShare{})
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		return ErrDocumentNotFound
+	}
+	return nil
+}
+
+// SharedDoc 是分享页可读的文档内容。
+type SharedDoc struct {
+	Token     string     `json:"token"`
+	Role      string     `json:"role"`
+	Title     string     `json:"title"`
+	HTML      string     `json:"html"`
+	ExpiresAt *time.Time `json:"expiresAt"`
+}
+
+// ResolveShare 按分享 token 取文档内容（公开访问，不需要登录态）。
+func (s *KnowledgeService) ResolveShare(token string) (*SharedDoc, error) {
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return nil, ErrDocumentNotFound
+	}
+	var share model.KnowledgeShare
+	if err := s.db.Where("token = ?", token).First(&share).Error; err != nil {
+		return nil, ErrDocumentNotFound
+	}
+	if share.ExpiresAt != nil && share.ExpiresAt.Before(time.Now().UTC()) {
+		return nil, ErrDocumentNotFound
+	}
+	var doc model.CanvasDocument
+	if err := s.db.Where("id = ?", share.DocumentID).First(&doc).Error; err != nil {
+		return nil, ErrDocumentNotFound
+	}
+	html := ""
+	if len(doc.CurrentData) > 0 {
+		var payload struct {
+			HTML string `json:"html"`
+		}
+		if err := json.Unmarshal(doc.CurrentData, &payload); err == nil {
+			html = payload.HTML
+		}
+	}
+	return &SharedDoc{
+		Token:     share.Token,
+		Role:      share.Role,
+		Title:     doc.Title,
+		HTML:      html,
+		ExpiresAt: share.ExpiresAt,
+	}, nil
+}
+
+// ---------------------------------------------------------------- 历史版本
+
+// SnapshotDocVersion 为文档追加一条历史快照；同一 saveVersion 只留一条。
+func SnapshotDocVersion(tx *gorm.DB, doc *model.CanvasDocument) error {
+	if doc == nil || doc.CanvasType != "doc" {
+		return nil
+	}
+	html := ""
+	if len(doc.CurrentData) > 0 {
+		var payload struct {
+			HTML string `json:"html"`
+		}
+		if err := json.Unmarshal(doc.CurrentData, &payload); err == nil {
+			html = payload.HTML
+		}
+	}
+	var exists int64
+	if err := tx.Model(&model.KnowledgeDocVersion{}).
+		Where("document_id = ? AND save_version = ?", doc.ID, doc.SaveVersion).
+		Count(&exists).Error; err != nil {
+		return err
+	}
+	if exists > 0 {
+		return nil
+	}
+	version := &model.KnowledgeDocVersion{
+		ID:           uuid.New(),
+		DocumentID:   doc.ID,
+		Title:        doc.Title,
+		HTML:         html,
+		AuthorUserID: doc.OwnerUserID,
+		SaveVersion:  doc.SaveVersion,
+		CreatedAt:    time.Now().UTC(),
+	}
+	if err := tx.Create(version).Error; err != nil {
+		return err
+	}
+	// 只保留最近 keepVersionLimit 条，多余的旧快照删掉。
+	var stale []uuid.UUID
+	if err := tx.Model(&model.KnowledgeDocVersion{}).
+		Where("document_id = ?", doc.ID).
+		Order("created_at DESC").Offset(maxVersionKeep).
+		Pluck("id", &stale).Error; err != nil {
+		return err
+	}
+	if len(stale) > 0 {
+		if err := tx.Unscoped().Where("id IN ?", stale).Delete(&model.KnowledgeDocVersion{}).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// ListDocVersions 返回文档的历史快照。
+func (s *KnowledgeService) ListDocVersions(ownerID, docID uuid.UUID, limit int) ([]model.KnowledgeDocVersion, error) {
+	if _, err := s.docs().GetOwned(ownerID, docID); err != nil {
+		return nil, err
+	}
+	if limit <= 0 || limit > maxVersionKeep {
+		limit = maxVersionKeep
+	}
+	var rows []model.KnowledgeDocVersion
+	err := s.db.Where("document_id = ?", docID).
+		Order("created_at DESC").Limit(limit).Find(&rows).Error
+	return rows, err
+}
+
+// VersionDiff 对比两个历史快照，返回统一 diff 文本。
+func (s *KnowledgeService) VersionDiff(ownerID, docID, fromID, toID uuid.UUID) (string, error) {
+	if _, err := s.docs().GetOwned(ownerID, docID); err != nil {
+		return "", err
+	}
+	load := func(id uuid.UUID) (model.KnowledgeDocVersion, error) {
+		var row model.KnowledgeDocVersion
+		err := s.db.Where("id = ? AND document_id = ?", id, docID).First(&row).Error
+		if err != nil {
+			return row, ErrDocumentNotFound
+		}
+		return row, nil
+	}
+	from, err := load(fromID)
+	if err != nil {
+		return "", err
+	}
+	to, err := load(toID)
+	if err != nil {
+		return "", err
+	}
+	ops := content.DiffTextLines(stripHTML(from.HTML), stripHTML(to.HTML))
+	return content.UnifiedDiff(ops), nil
+}
+
+var htmlTagRe = regexp.MustCompile(`<[^>]+>`)
+
+func stripHTML(s string) string {
+	text := htmlTagRe.ReplaceAllString(s, "")
+	text = strings.ReplaceAll(text, "&nbsp;", " ")
+	text = strings.ReplaceAll(text, "&amp;", "&")
+	text = strings.ReplaceAll(text, "&lt;", "<")
+	text = strings.ReplaceAll(text, "&gt;", ">")
+	return strings.TrimSpace(text)
+}
+
+// ---------------------------------------------------------------- 知识图谱
+
+// KnowledgeGraph 是知识图谱数据。
+type KnowledgeGraph struct {
+	Nodes []KnowledgeGraphNode `json:"nodes"`
+	Edges []KnowledgeGraphEdge `json:"edges"`
+}
+
+// KnowledgeGraphNode 是图谱中的一个节点。
+type KnowledgeGraphNode struct {
+	ID         string `json:"id"`
+	Title      string `json:"title"`
+	NodeType   string `json:"nodeType"`
+	DocumentID string `json:"documentId"`
+	Author     string `json:"author"`
+}
+
+// KnowledgeGraphEdge 是图谱中的一条关系。
+type KnowledgeGraphEdge struct {
+	Source string `json:"source"`
+	Target string `json:"target"`
+	Type   string `json:"type"` // tree | reference
+}
+
+// BuildGraph 用「目录父子关系 + 文档引用关系」拼出知识图谱。
+func (s *KnowledgeService) BuildGraph(ownerID, projectID uuid.UUID) (*KnowledgeGraph, error) {
+	if err := s.assertProjectOwned(ownerID, projectID); err != nil {
+		return nil, err
+	}
+	var nodes []model.KnowledgeNode
+	if err := s.db.Where("project_id = ? AND trashed_at IS NULL", projectID).
+		Find(&nodes).Error; err != nil {
+		return nil, err
+	}
+	graph := &KnowledgeGraph{Nodes: []KnowledgeGraphNode{}, Edges: []KnowledgeGraphEdge{}}
+	docToNode := map[uuid.UUID]uuid.UUID{}
+	for _, n := range nodes {
+		graphNode := KnowledgeGraphNode{
+			ID:       n.ID.String(),
+			Title:    n.Title,
+			NodeType: n.NodeType,
+			Author:   s.userName(n.CreatedBy),
+		}
+		if n.DocumentID != nil {
+			graphNode.DocumentID = n.DocumentID.String()
+			docToNode[*n.DocumentID] = n.ID
+		}
+		graph.Nodes = append(graph.Nodes, graphNode)
+	}
+	for _, n := range nodes {
+		if n.ParentID != nil {
+			graph.Edges = append(graph.Edges, KnowledgeGraphEdge{
+				Source: n.ParentID.String(), Target: n.ID.String(), Type: "tree",
+			})
+		}
+	}
+	var refs []model.PageReference
+	if err := s.db.Model(&model.PageReference{}).
+		Where("source_doc_id IN ?", s.projectDocIDs(projectID)).
+		Find(&refs).Error; err != nil {
+		return nil, err
+	}
+	for _, ref := range refs {
+		source, ok := docToNode[ref.SourceDocID]
+		if !ok {
+			continue
+		}
+		target, ok := docToNode[ref.TargetDocID]
+		if !ok || source == target {
+			continue
+		}
+		graph.Edges = append(graph.Edges, KnowledgeGraphEdge{
+			Source: source.String(), Target: target.String(), Type: "reference",
+		})
+	}
+	return graph, nil
+}
+
+// userName 查用户显示名，查不到就返回空串。
+func (s *KnowledgeService) userName(id *uuid.UUID) string {
+	if id == nil || *id == uuid.Nil {
+		return ""
+	}
+	var user model.User
+	if err := s.db.Select("display_name", "email").Where("id = ?", *id).First(&user).Error; err != nil {
+		return ""
+	}
+	if user.DisplayName != "" {
+		return user.DisplayName
+	}
+	return user.Email
+}
+
+// ---------------------------------------------------------------- 作者维度检索
+
+// KnowledgeSearchHit 是一条检索结果。
+type KnowledgeSearchHit struct {
+	NodeID     string    `json:"nodeId"`
+	DocumentID string    `json:"documentId"`
+	Title      string    `json:"title"`
+	Summary    string    `json:"summary"`
+	NodeType   string    `json:"nodeType"`
+	Author     string    `json:"author"`
+	AuthorID   string    `json:"authorId"`
+	Tags       string    `json:"tags"`
+	UpdatedAt  time.Time `json:"updatedAt"`
+	Snippet    string    `json:"snippet"`
+}
+
+// KnowledgeSearchFilter 是检索条件。
+type KnowledgeSearchFilter struct {
+	Query    string
+	AuthorID string
+	NodeType string
+	From     *time.Time
+	To       *time.Time
+	Limit    int
+}
+
+// SearchSpace 在知识空间内检索节点与文档，支持作者、类型、时间过滤。
+func (s *KnowledgeService) SearchSpace(ownerID, projectID uuid.UUID, f KnowledgeSearchFilter) ([]KnowledgeSearchHit, error) {
+	if err := s.assertProjectOwned(ownerID, projectID); err != nil {
+		return nil, err
+	}
+	if f.Limit <= 0 || f.Limit > 100 {
+		f.Limit = 30
+	}
+	query := strings.TrimSpace(f.Query)
+	var nodes []model.KnowledgeNode
+	q := s.db.Where("project_id = ? AND trashed_at IS NULL", projectID)
+	if f.NodeType != "" {
+		q = q.Where("node_type = ?", f.NodeType)
+	}
+	if f.AuthorID != "" {
+		author, err := uuid.Parse(f.AuthorID)
+		if err != nil {
+			return nil, ErrValidation
+		}
+		q = q.Where("created_by = ?", author)
+	}
+	if f.From != nil {
+		q = q.Where("updated_at >= ?", *f.From)
+	}
+	if f.To != nil {
+		q = q.Where("updated_at <= ?", *f.To)
+	}
+	if query != "" {
+		// LOWER + LIKE 而不是 ILIKE：SQLite 测试库不支持 ILIKE。
+		like := "%" + strings.ToLower(query) + "%"
+		// 标题/摘要命中，或正文命中（子查询）都算命中。
+		q = q.Where("LOWER(title) LIKE ? OR LOWER(summary) LIKE ? OR LOWER(alias) LIKE ?"+
+			" OR document_id IN (SELECT id FROM canvas_documents WHERE LOWER(content_text) LIKE ?)",
+			like, like, like, like)
+	}
+	if err := q.Order("updated_at DESC").Limit(f.Limit * 2).Find(&nodes).Error; err != nil {
+		return nil, err
+	}
+	hits := make([]KnowledgeSearchHit, 0, len(nodes))
+	for _, n := range nodes {
+		if len(hits) >= f.Limit {
+			break
+		}
+		hit := KnowledgeSearchHit{
+			NodeID:    n.ID.String(),
+			Title:     n.Title,
+			Summary:   n.Summary,
+			NodeType:  n.NodeType,
+			Author:    s.userName(n.CreatedBy),
+			AuthorID:  authorID(n.CreatedBy),
+			Tags:      n.Alias,
+			UpdatedAt: n.UpdatedAt,
+		}
+		if n.DocumentID != nil {
+			hit.DocumentID = n.DocumentID.String()
+			hit.Snippet = s.snippet(ownerID, *n.DocumentID, query)
+		}
+		hits = append(hits, hit)
+	}
+	return hits, nil
+}
+
+// authorID 取作者 ID 的字符串形式，空作者返回空串。
+func authorID(id *uuid.UUID) string {
+	if id == nil {
+		return ""
+	}
+	return id.String()
+}
+
+// snippet 截取文档里命中关键词的一段文字。
+func (s *KnowledgeService) snippet(ownerID, docID uuid.UUID, query string) string {
+	var doc model.CanvasDocument
+	if err := s.db.Select("content_text").Where("id = ? AND owner_user_id = ?", docID, ownerID).
+		First(&doc).Error; err != nil {
+		return ""
+	}
+	text := strings.TrimSpace(stripHTML(doc.ContentText))
+	if text == "" {
+		return ""
+	}
+	if query == "" {
+		return truncateRunes(text, 120)
+	}
+	if idx := strings.Index(strings.ToLower(text), strings.ToLower(query)); idx >= 0 {
+		start := idx - 40
+		if start < 0 {
+			start = 0
+		}
+		return truncateRunes(text[start:], 160)
+	}
+	return truncateRunes(text, 120)
+}
+
+func truncateRunes(s string, n int) string {
+	if utf8.RuneCountInString(s) <= n {
+		return s
+	}
+	runes := []rune(s)
+	return string(runes[:n]) + "…"
+}
+
+// ---------------------------------------------------------------- 在线协作状态（presence）
+
+// PresenceUser 是当前在线的协作者。
+type PresenceUser struct {
+	UserID   string    `json:"userId"`
+	Name     string    `json:"name"`
+	Avatar   string    `json:"avatar"`
+	Editing  bool      `json:"editing"`
+	LastSeen time.Time `json:"lastSeen"`
+}
+
+type presenceEntry struct {
+	userID   uuid.UUID
+	docID    uuid.UUID
+	name     string
+	avatar   string
+	editing  bool
+	lastSeen time.Time
+}
+
+// PresenceRegistry 是进程内的在线状态表。
+//
+// 有意做成内存态：在线状态是瞬时信息，落库只会制造垃圾行；
+// 多实例部署时换成 Redis 即可，接口不变。
+type PresenceRegistry struct {
+	mu      sync.Mutex
+	entries map[uuid.UUID]map[uuid.UUID]presenceEntry
+}
+
+// NewPresenceRegistry 建一个空的在线状态表。
+func NewPresenceRegistry() *PresenceRegistry {
+	return &PresenceRegistry{entries: map[uuid.UUID]map[uuid.UUID]presenceEntry{}}
+}
+
+// Heartbeat 上报一次在线状态。
+func (r *PresenceRegistry) Heartbeat(docID, userID uuid.UUID, name, avatar string, editing bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.entries[docID] == nil {
+		r.entries[docID] = map[uuid.UUID]presenceEntry{}
+	}
+	r.entries[docID][userID] = presenceEntry{
+		userID: userID, docID: docID, name: name, avatar: avatar,
+		editing: editing, lastSeen: time.Now().UTC(),
+	}
+}
+
+// List 返回文档当前在线的人（超过 TTL 的自动剔除）。
+func (r *PresenceRegistry) List(docID uuid.UUID) []PresenceUser {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	out := []PresenceUser{}
+	for userID, entry := range r.entries[docID] {
+		if time.Since(entry.lastSeen) > presenceTTL {
+			delete(r.entries[docID], userID)
+			continue
+		}
+		out = append(out, PresenceUser{
+			UserID:   userID.String(),
+			Name:     entry.name,
+			Avatar:   entry.avatar,
+			Editing:  entry.editing,
+			LastSeen: entry.lastSeen,
+		})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].LastSeen.After(out[j].LastSeen) })
+	return out
+}
+
+// PresenceHeartbeat 上报当前用户的在线状态。
+func (s *KnowledgeService) PresenceHeartbeat(ownerID, docID uuid.UUID, editing bool) error {
+	if _, err := s.docs().GetOwned(ownerID, docID); err != nil {
+		return err
+	}
+	var user model.User
+	if err := s.db.Select("display_name", "email", "avatar_url").Where("id = ?", ownerID).
+		First(&user).Error; err != nil {
+		return err
+	}
+	name := user.DisplayName
+	if name == "" {
+		name = user.Email
+	}
+	s.presence.Heartbeat(docID, ownerID, name, user.AvatarURL, editing)
+	return nil
+}
+
+// PresenceList 返回文档当前在线的协作者。
+func (s *KnowledgeService) PresenceList(ownerID, docID uuid.UUID) ([]PresenceUser, error) {
+	if _, err := s.docs().GetOwned(ownerID, docID); err != nil {
+		return nil, err
+	}
+	return s.presence.List(docID), nil
+}
+
+// ---------------------------------------------------------------- 本地智能：摘要 / 标签 / 问答
+
+// SummarizeDoc 用标题层级与首句生成摘要（不依赖外部大模型）。
+func (s *KnowledgeService) SummarizeDoc(ownerID, docID uuid.UUID) (string, error) {
+	doc, err := s.docs().GetOwned(ownerID, docID)
+	if err != nil {
+		return "", err
+	}
+	text := strings.TrimSpace(stripHTML(doc.ContentText))
+	if text == "" {
+		return "", nil
+	}
+	sentences := splitSentences(text)
+	summary := ""
+	for _, sentence := range sentences {
+		if len([]rune(summary))+len([]rune(sentence)) > 180 {
+			break
+		}
+		if summary != "" {
+			summary += " "
+		}
+		summary += sentence
+	}
+	return summary, nil
+}
+
+// SuggestTags 从标题与正文里抽取高频词作为标签建议。
+func (s *KnowledgeService) SuggestTags(ownerID, docID uuid.UUID) ([]string, error) {
+	doc, err := s.docs().GetOwned(ownerID, docID)
+	if err != nil {
+		return nil, err
+	}
+	return extractKeywords(doc.Title+" "+stripHTML(doc.ContentText), 8), nil
+}
+
+// KnowledgeAnswer 是问答命中的一条结果。
+type KnowledgeAnswer struct {
+	DocumentID string  `json:"documentId"`
+	Title      string  `json:"title"`
+	Snippet    string  `json:"snippet"`
+	Score      float64 `json:"score"`
+}
+
+// AskSpace 在知识空间内做关键词检索问答，返回带出处的片段。
+//
+// shortcut: 目前是本地关键词检索，不做语义理解；需要语义问答时接 LLM 检索层。
+func (s *KnowledgeService) AskSpace(ownerID, projectID uuid.UUID, question string, limit int) ([]KnowledgeAnswer, error) {
+	if err := s.assertProjectOwned(ownerID, projectID); err != nil {
+		return nil, err
+	}
+	if limit <= 0 || limit > 20 {
+		limit = 5
+	}
+	terms := tokenize(question)
+	if len(terms) == 0 {
+		return []KnowledgeAnswer{}, nil
+	}
+	var docs []model.CanvasDocument
+	if err := s.db.Where("owner_user_id = ? AND project_id = ? AND canvas_type = 'doc'",
+		ownerID, projectID).Find(&docs).Error; err != nil {
+		return nil, err
+	}
+	answers := make([]KnowledgeAnswer, 0, limit)
+	for _, doc := range docs {
+		haystack := strings.ToLower(doc.Title + " " + stripHTML(doc.ContentText))
+		score := 0.0
+		for _, term := range terms {
+			score += float64(strings.Count(haystack, term))
+		}
+		if score == 0 {
+			continue
+		}
+		answers = append(answers, KnowledgeAnswer{
+			DocumentID: doc.ID.String(),
+			Title:      doc.Title,
+			Snippet:    s.snippet(ownerID, doc.ID, terms[0]),
+			Score:      score,
+		})
+	}
+	sort.Slice(answers, func(i, j int) bool { return answers[i].Score > answers[j].Score })
+	if len(answers) > limit {
+		answers = answers[:limit]
+	}
+	return answers, nil
+}
+
+// splitSentences 按中文/英文句号切句。
+func splitSentences(text string) []string {
+	re := regexp.MustCompile(`[^。！？.!?\n]+[。！？.!?]?`)
+	parts := re.FindAllString(text, -1)
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+var stopWords = map[string]bool{
+	"的": true, "了": true, "和": true, "是": true, "在": true, "我们": true,
+	"可以": true, "这个": true, "一个": true, "the": true, "and": true, "for": true,
+	"with": true, "that": true, "this": true, "from": true,
+}
+
+// tokenize 把问题拆成检索词：英文按单词，中文按二元组。
+func tokenize(text string) []string {
+	lower := strings.ToLower(text)
+	terms := []string{}
+	for _, word := range strings.FieldsFunc(lower, func(r rune) bool {
+		return !(r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r > 0x4e00 && r < 0x9fff)
+	}) {
+		if len(word) >= 2 && !stopWords[word] {
+			terms = append(terms, word)
+		}
+	}
+	runes := []rune(lower)
+	for i := 0; i+1 < len(runes); i++ {
+		if runes[i] > 0x4e00 && runes[i] < 0x9fff && runes[i+1] > 0x4e00 && runes[i+1] < 0x9fff {
+			term := string(runes[i : i+2])
+			if !stopWords[term] {
+				terms = append(terms, term)
+			}
+		}
+	}
+	return terms
+}
+
+// extractKeywords 抽取高频词（英文单词 + 中文二元组）。
+func extractKeywords(text string, limit int) []string {
+	counts := map[string]int{}
+	for _, term := range tokenize(text) {
+		if stopWords[term] || len([]rune(term)) < 2 {
+			continue
+		}
+		counts[term]++
+	}
+	type kv struct {
+		word string
+		n    int
+	}
+	list := make([]kv, 0, len(counts))
+	for word, n := range counts {
+		list = append(list, kv{word, n})
+	}
+	sort.Slice(list, func(i, j int) bool {
+		if list[i].n != list[j].n {
+			return list[i].n > list[j].n
+		}
+		return list[i].word < list[j].word
+	})
+	out := []string{}
+	for i, item := range list {
+		if i >= limit {
+			break
+		}
+		out = append(out, item.word)
+	}
+	return out
+}
