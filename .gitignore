@@ -41,6 +41,9 @@ $RECYCLE.BIN/
 !.vscode/extensions.json
 !.vscode/settings.json
 *.code-workspace
+.github
+.omc
+.trae
 
 # JetBrains（GoLand / WebStorm / IntelliJ）
 .idea/
@@ -118,6 +121,10 @@ coverage.html
 # 构建 / 临时目录
 bin/
 tmp/
+# 验收截图等本地产物
+.screenshots/
+# pros/build.sh 的统一产物目录（api 多平台二进制 + web 静态资源）
+/pros/output/
 build/
 
 # ---------- 日志 ----------

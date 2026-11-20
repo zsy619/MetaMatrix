@@ -78,7 +78,9 @@ curl -s -X POST http://localhost:3000/auth/register \
 （CI 里检测到 `CI=true` 会自动打开）。生产环境两个开关都别开，
 详见 `docs/生产配置.md`。
 
-`image` 是 200x64 的 PNG data URI，服务端用自带的点阵字库渲染，图里没有明文答案。
+`image` 是 240x64 的 PNG data URI，服务端用自带的点阵字库渲染，图里没有明文答案。
+答案固定 6 位，字符集是大写字母 + 数字（`A-Z` 去掉 `I`、`O`，加上 `2-9`）。
+比对不区分大小写，用户用小写键盘敲字母同样能通过。
 
 ## API 一览
 
