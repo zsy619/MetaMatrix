@@ -41,9 +41,10 @@
   align-items: center;
   gap: 12px;
   flex-shrink: 0;
-  padding: 14px 16px 10px;
+  padding: 12px 16px;
   border-bottom: 1px solid var(--cv-frame, #ececec);
-  background: var(--cv-page, #f7f7f7);
+  background: linear-gradient(180deg, #ffffff 0%, var(--cv-page, #f7f7f7) 100%);
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04);
 }
 
 .pm-title {
@@ -57,6 +58,21 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  /* 标题左侧一条主色竖条，和 Element Plus 弹窗标题同一套视觉。 */
+  padding-left: 12px;
+  position: relative;
+}
+
+.pm-title::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 16px;
+  border-radius: 2px;
+  background: var(--mm-blue, #1a73e8);
 }
 
 .pm-actions {
@@ -67,10 +83,10 @@
 }
 
 .pm-actions .pm-icon-btn {
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   font-size: 16px;
-  border-radius: 6px;
+  border-radius: 9px;
   border: 1px solid var(--cv-frame, #ececec);
   background: #fff;
   color: var(--cv-ink, #3c4043);
@@ -93,6 +109,19 @@
   font-size: 20px;
   font-weight: 500;
   border-style: solid;
+}
+
+/* 关闭按钮常态更轻，悬停才实心（与弹窗标题栏的关闭键一致）。 */
+.pm-actions .pm-icon-btn.pm-close {
+  border-color: transparent;
+  background: transparent;
+  color: var(--mm-muted, #5f6368);
+}
+
+.pm-actions .pm-icon-btn.pm-close:hover {
+  background: var(--mm-red-soft, #fce8e6);
+  border-color: transparent;
+  color: var(--mm-red, #d93025);
 }
 
 .pm-body {

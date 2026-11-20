@@ -25,8 +25,8 @@
 }
 
 .rte-root {
-  /* 块手柄列留白：正文左侧必须空出的宽度（收起态只有 ⋮ 菜单一个按钮）。 */
-  --rte-gutter-size: 26px;
+  /* 紧凑态为「+ + ⋮」两个按钮，正文左侧留白与 rteGutter.ts 保持一致。 */
+  --rte-gutter-size: 50px;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -40,9 +40,9 @@
   cursor: text;
 }
 
-/* 展开态手柄有 ⠿ 拖拽 + ⋮ 菜单两个按钮，留白要够放下一整列。 */
+/* 展开态手柄有「+ 插入 + ⠿ 拖拽 + ⋮ 菜单」三个按钮，另留 4px 正文间距。 */
 .rte-root.expanded {
-  --rte-gutter-size: 50px;
+  --rte-gutter-size: 74px;
 }
 
 .rte-toolbar-tools {
@@ -637,7 +637,7 @@
   justify-content: center;
   padding: 0;
   pointer-events: auto;
-  transition: background 120ms ease, color 120ms ease;
+  transition: background 120ms ease, color 120ms ease, opacity 140ms ease, transform 140ms ease;
 }
 .rte-block-handle:hover,
 .rte-block-handle:focus-visible {
@@ -648,25 +648,54 @@
 .rte-block-handle[draggable='true'] {
   cursor: grab;
 }
+
+/* 「+」是左侧唯一的入口，做得更像飞书：细线条、悬停时浮起、焦点有环。 */
+.rte-block-add {
+  color: #646a73;
+}
+/* 「+」同时是拖拽柄，但主用途是点开面板，光标仍按按钮给。 */
+.rte-block-add[draggable='true'] {
+  cursor: pointer;
+}
+.rte-block-add:hover {
+  background: #eef0f3;
+  color: #1f2329;
+  box-shadow: 0 1px 2px rgba(31, 35, 41, 0.08);
+}
+.rte-block-add:focus-visible {
+  background: #eef0f3;
+  color: #1f2329;
+  box-shadow: 0 0 0 2px rgba(51, 112, 255, 0.32);
+}
+.rte-block-add svg {
+  transition: transform 140ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+.rte-block-add:hover svg {
+  transform: scale(1.12);
+}
 .rte-block-menu {
   position: absolute;
   z-index: 6;
-  min-width: 168px;
-  max-height: min(360px, 64vh);
-  overflow: auto;
-  padding: 6px;
+  box-sizing: border-box;
+  /* 宽度同时受视口约束，窄屏不横向溢出。 */
+  width: min(304px, calc(100vw - 16px));
+  max-height: min(520px, 70vh);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  padding: 8px;
   background: #fff;
   border: 1px solid #dee0e3;
-  border-radius: 8px;
-  box-shadow: 0 6px 18px rgba(31, 35, 41, 0.12);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(31, 35, 41, 0.14), 0 2px 6px rgba(31, 35, 41, 0.06);
   display: flex;
   flex-direction: column;
+  color: #1f2329;
 }
 .rte-block-menu button {
-  text-align: left;
   border: none;
   background: transparent;
-  padding: 6px 10px;
   border-radius: 6px;
   font-size: 14px;
   color: #1f2329;
@@ -677,12 +706,89 @@
   background: #f2f3f5;
   outline: none;
 }
-.rte-block-menu button.is-danger {
+.rte-block-menu button:focus-visible {
+  box-shadow: inset 0 0 0 2px rgba(51, 112, 255, 0.55);
+}
+/* 分组标题只承担信息层级，不进入 menuitem 键盘导航序列。 */
+.rte-block-menu-section {
+  padding: 8px 8px 4px;
+  color: #8f959e;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+  user-select: none;
+}
+.rte-block-menu-section:first-child {
+  padding-top: 2px;
+}
+/* 基础区采用六列等宽网格，与飞书的高频图标入口保持一致。 */
+.rte-block-quick-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 4px;
+  padding: 2px 0 6px;
+}
+.rte-block-menu .rte-block-quick {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  height: 38px;
+  padding: 0;
+  border: 1px solid transparent;
+  text-align: center;
+}
+.rte-block-menu .rte-block-quick:hover,
+.rte-block-menu .rte-block-quick:focus-visible {
+  border-color: #dee0e3;
+  background: #f5f6f7;
+}
+/* 普通命令统一为「图标 + 文字」，避免原纯文字列表难以扫描。 */
+.rte-block-menu .rte-block-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 34px;
+  padding: 6px 8px;
+  line-height: 20px;
+  text-align: left;
+  white-space: nowrap;
+}
+.rte-block-menu .rte-menu-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  color: #4e5969;
+}
+.rte-block-menu .rte-menu-glyph :deep(svg) {
+  display: block;
+  width: 18px;
+  height: 18px;
+}
+.rte-block-menu .rte-block-quick .rte-menu-glyph,
+.rte-block-menu .rte-block-quick .rte-menu-glyph :deep(svg) {
+  width: 20px;
+  height: 20px;
+}
+.rte-block-menu .rte-block-quick .rte-menu-glyph {
+  flex-basis: 20px;
+}
+.rte-block-menu button.is-danger,
+.rte-block-menu button.is-danger .rte-menu-glyph {
   color: #f54a45;
 }
 .rte-block-menu button.is-danger:hover,
 .rte-block-menu button.is-danger:focus-visible {
   background: #fef1f1;
+}
+/* 当前已打开的面板对应手柄保持高亮，便于识别菜单来源。 */
+.rte-block-handle[aria-expanded='true'] {
+  background: #e8f0fe;
+  color: #3370ff;
 }
 .rte-block-handle:active {
   cursor: grabbing;

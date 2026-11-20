@@ -2226,6 +2226,47 @@ html.rte-toolbar-dragging * {
   cursor: not-allowed;
 }
 
+/* 长文档导出脱离已关闭的菜单显示真实进度，并始终保留取消入口。 */
+.rte-export-progress {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 10000;
+  width: min(320px, calc(100vw - 32px));
+  padding: 12px;
+  border: 1px solid var(--mm-line, #e5e6eb);
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.16);
+  color: #1f2329;
+  font-size: 12px;
+}
+.rte-export-progress__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.rte-export-progress__bar {
+  display: block;
+  width: 100%;
+  height: 6px;
+  accent-color: var(--mm-blue, #3370ff);
+}
+.rte-export-progress__cancel {
+  margin-top: 10px;
+  padding: 5px 10px;
+  border: 1px solid var(--mm-line, #d9dce1);
+  border-radius: 6px;
+  background: #fff;
+  color: #4e5969;
+  cursor: pointer;
+}
+.rte-export-progress__cancel:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
 
 /* —— @提及 —— */
 .rte-mention-menu {
@@ -2407,9 +2448,9 @@ html.rte-toolbar-dragging * {
   align-items: flex-start;
   box-sizing: border-box;
   height: calc(28px + var(--rte-break-gap, 0px));
-  margin-left: calc(-1 * max(var(--rte-margin-left, 12.7mm), var(--rte-gutter-size, 26px)));
+  margin-left: calc(-1 * max(var(--rte-margin-left, 12.7mm), var(--rte-gutter-size, 50px)));
   margin-right: calc(-1 * var(--rte-margin-right, 12.7mm));
-  padding: 4px max(var(--rte-margin-right, 12.7mm), 0px) 0 max(var(--rte-margin-left, 12.7mm), var(--rte-gutter-size, 26px));
+  padding: 4px max(var(--rte-margin-right, 12.7mm), 0px) 0 max(var(--rte-margin-left, 12.7mm), var(--rte-gutter-size, 50px));
   background-image:
     linear-gradient(#e8eaed, #e8eaed),
     repeating-linear-gradient(90deg, #c9cdd4 0 8px, transparent 8px 14px);
@@ -3749,7 +3790,7 @@ html.rte-toolbar-dragging * {
   margin-right: auto;
   box-shadow: 0 0 0 1px #e5e6eb, 0 8px 24px rgba(0, 0, 0, 0.06);
   /* 左侧留白至少放得下一列手柄（gutter）。 */
-  padding: 48px max(56px, var(--rte-gutter-size, 26px));
+  padding: 48px max(56px, var(--rte-gutter-size, 50px));
   min-height: 1123px;
   background: #fff;
 }
@@ -3804,7 +3845,7 @@ html.rte-toolbar-dragging * {
   margin: 16px auto 28px;
   padding: var(--rte-margin-top, 25.4mm) var(--rte-margin-right, 31.8mm) var(--rte-margin-bottom, 25.4mm) var(--rte-margin-left, 31.8mm);
   /* 纸张左侧也要留出块手柄列（gutter），窄边距时以手柄列宽度为准。 */
-  padding-left: max(var(--rte-margin-left, 31.8mm), var(--rte-gutter-size, 26px));
+  padding-left: max(var(--rte-margin-left, 31.8mm), var(--rte-gutter-size, 50px));
   box-sizing: border-box;
   background: #fff;
   box-shadow:
@@ -3815,7 +3856,7 @@ html.rte-toolbar-dragging * {
   content: '';
   position: absolute;
   /* 虚线框与正文起始位置对齐（含手柄列留白）。 */
-  inset: var(--rte-margin-top, 25.4mm) var(--rte-margin-right, 31.8mm) var(--rte-margin-bottom, 25.4mm) max(var(--rte-margin-left, 31.8mm), var(--rte-gutter-size, 26px));
+  inset: var(--rte-margin-top, 25.4mm) var(--rte-margin-right, 31.8mm) var(--rte-margin-bottom, 25.4mm) max(var(--rte-margin-left, 31.8mm), var(--rte-gutter-size, 50px));
   border: 1px dashed rgba(51, 112, 255, 0.35);
   pointer-events: none;
   z-index: 2;

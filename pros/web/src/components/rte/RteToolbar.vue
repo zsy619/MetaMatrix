@@ -35,6 +35,18 @@ function tableMenuOps(keys: readonly string[]) {
   }>
   return keys.map((key) => items.find((op) => op.key === key)).filter((op): op is NonNullable<typeof op> => !!op)
 }
+/** 把导出内部阶段转换为可理解的中文状态，不向用户暴露英文实现标识。 */
+function exportPhaseLabel() {
+  const labels: Record<string, string> = {
+    prepare: '准备导出',
+    rasterize: '生成高清图像',
+    paginate: '规划分页',
+    render: '渲染页面',
+    finalize: '生成文件',
+  }
+  return labels[rte.exportPhase] || '正在导出'
+}
+
 const rteBindings = rte
 const vRteFloat = rteBindings.vRteFloat
 useParentScopeStamp()
@@ -3044,5 +3056,35 @@ function toggleChartGroupMenu(key: string) {
       </Teleport>
 
       </div>
+
+      <!-- 导出菜单会在任务开始后关闭；独立状态条保证长任务仍能查看进度并取消。 -->
+      <Teleport to="body">
+        <div
+          v-if="rte.exportBusy && (rte.exportStatus === 'running' || rte.exportStatus === 'cancelling')"
+          class="rte-export-progress"
+          role="status"
+          aria-live="polite"
+          data-rte-own
+        >
+          <div class="rte-export-progress__head" data-rte-own>
+            <span data-rte-own>{{ rte.exportStatus === 'cancelling' ? '正在取消…' : exportPhaseLabel() }}</span>
+            <span data-rte-own>{{ rte.exportProgress }}%</span>
+          </div>
+          <progress
+            class="rte-export-progress__bar"
+            :value="rte.exportProgress"
+            max="100"
+            :aria-label="exportPhaseLabel()"
+            data-rte-own
+          />
+          <button
+            type="button"
+            class="rte-export-progress__cancel"
+            :disabled="rte.exportStatus === 'cancelling'"
+            @click="rte.cancelExport"
+            data-rte-own
+          >取消导出</button>
+        </div>
+      </Teleport>
     </div>
 </template>

@@ -258,15 +258,18 @@ for (const group of TOOLBAR_GROUPS) {
   }
 }
 
-/** 迁移组内配置时旧分组配置的处理顺序（先旧组、后新组）。 */
+/**
+ * 迁移组内配置时的读取顺序：旧分组优先，当前分组随后。
+ *
+ * 当前分组直接取完整默认顺序，不再维护容易漏项的手写清单；否则新增
+ * writing、frame 这类分组后，已保存的按钮显隐与顺序会在再次迁移时丢失。
+ * Set 同时去掉既出现在别名表、又属于当前方案的分组 id，保证只合并一次。
+ */
 const MIGRATION_SOURCE_ORDER: readonly string[] = [
-  ...Object.keys(LEGACY_GROUP_ALIASES),
-  'style',
-  'edit',
-  'file',
-  'picture',
-  'page',
-  'tidy',
+  ...new Set([
+    ...Object.keys(LEGACY_GROUP_ALIASES),
+    ...DEFAULT_TOOLBAR_GROUP_ORDER,
+  ]),
 ]
 
 export function normalizeToolbarGroupOrder(saved: unknown): string[] {

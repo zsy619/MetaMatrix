@@ -135,7 +135,12 @@ function freshTitle(id: TemplateId): string {
 async function quickCreate(id: TemplateId) {
   createError.value = ''
   if (!auth.isAuthenticated) {
-    router.push({ name: 'canvas', params: { templateId: id } })
+    // 画布需要登录，未登录时直接送登录页。redirect 带上目标，
+    // 登录后回到这个模板的画布。
+    router.push({
+      name: 'login',
+      query: { redirect: `/canvas/${id}` },
+    })
     return
   }
   if (creatingId.value) return

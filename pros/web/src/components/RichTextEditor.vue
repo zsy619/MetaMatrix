@@ -4086,6 +4086,9 @@ const {
   onCanvasBlockHover,
   hideBlockHandle,
   toggleBlockMenu,
+  onBlockAddEnter,
+  onBlockPanelEnter,
+  onBlockPanelLeave,
   openBlockMenuForSelection,
   onBlockMenuKeydown,
   turnHoveredBlock,
@@ -4093,7 +4096,8 @@ const {
   deleteHoveredBlock,
   moveHoveredBlock,
   insertBelowHoveredBlock,
-  onBlockGripClick,
+  prepareInsertBelowHoveredBlock,
+  onBlockAddClick,
   onBlockDragStart,
   onBlockDragEnd,
   onCanvasBlockDragOver,
@@ -4102,7 +4106,6 @@ const {
   editor,
   viewMode: () => viewMode,
   rteRootEl,
-  expanded: () => props.expanded,
 })
 
 const codeChrome = ref<{ top: number; left: number } | null>(null)
@@ -4636,6 +4639,15 @@ function applySlashCommandItem(item: RteSlashItem) {
       insertDocTemplate(action.id)
       break
   }
+}
+
+/**
+ * 「+」面板的统一插入入口。
+ * 先在目标块后建立空段，再复用斜杠命令，避免复制一套插入逻辑或遗留「/」。
+ */
+function applyBlockInsertItem(item: RteSlashItem) {
+  if (!prepareInsertBelowHoveredBlock()) return
+  applySlashCommandItem(item)
 }
 
 function closeTemplateMenus() {
@@ -5911,6 +5923,11 @@ void presentRoot
 const {
   exportMenuOpen,
   exportBusy,
+  // 导出菜单在任务开始后会关闭，因此进度与取消必须交给独立状态条消费。
+  exportProgress,
+  exportPhase,
+  exportStatus,
+  cancelExport,
   closeExportMenu,
   onExportMenu,
   copyAsFeishuHtml,
@@ -7836,6 +7853,7 @@ provideRteBindings({
   applyMarginBottom,
   applyMarginTop,
   applyBlockMenu,
+  applyBlockInsertItem,
   applyParaStyleId,
   applyQuoteStyle,
   applySelectedFormPatch,
@@ -7989,7 +8007,7 @@ provideRteBindings({
   copyCurrentLinkUrl,
   copyHoveredBlock,
   insertBelowHoveredBlock,
-  onBlockGripClick,
+  onBlockAddClick,
   currentCodeLanguage,
   currentFontFamily,
   currentFontSize,
@@ -8037,6 +8055,10 @@ provideRteBindings({
   exportAsPng,
   exportBusy,
   exportMenuOpen,
+  exportProgress,
+  exportPhase,
+  exportStatus,
+  cancelExport,
   filteredAttachAssets,
   filteredImageAssets,
   imageThumb,
@@ -8246,9 +8268,12 @@ provideRteBindings({
   noteTypeOpen,
   notesOpen,
   onAttachSelectAllChange,
+  onBlockAddEnter,
   onBlockDragEnd,
   onBlockDragStart,
   onBlockMenuKeydown,
+  onBlockPanelEnter,
+  onBlockPanelLeave,
   onCanvasBlockDragOver,
   onCanvasBlockDrop,
   onCanvasBlockHover,

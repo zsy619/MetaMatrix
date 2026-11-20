@@ -1,6 +1,8 @@
 import { h, type Component } from 'vue'
 import { TABLE_MENU_ICONS } from './tableMenuIcons'
 import {
+  IconAttach,
+  IconCallout,
   IconCode,
   IconColumns,
   IconDocument,
@@ -10,15 +12,22 @@ import {
   IconFormCheckbox,
   IconFormRadio,
   IconFormText,
+  IconFormula,
+  IconHr,
+  IconImage,
   IconIndent,
   IconLineHeight,
+  IconLink,
+  IconLinkButton,
   IconList,
   IconListOrdered,
   IconListTask,
   IconOutdent,
+  IconOutline,
   IconQuote,
   IconTable,
   IconTemplate,
+  IconVideo,
 } from '../rteToolbarIcons'
 
 function g(paths: string[]): Component {
@@ -38,6 +47,33 @@ function g(paths: string[]): Component {
           'aria-hidden': 'true',
         },
         paths.map((d) => h('path', { d })),
+      )
+    },
+  }
+}
+
+/** H1/H2/H3 等飞书式文字图标，仍是可继承当前色的矢量 SVG。 */
+function textIcon(text: string): Component {
+  return {
+    render() {
+      return h(
+        'svg',
+        { viewBox: '0 0 24 24', width: '16', height: '16', 'aria-hidden': 'true' },
+        [
+          h(
+            'text',
+            {
+              x: '12',
+              y: '16',
+              'text-anchor': 'middle',
+              fill: 'currentColor',
+              'font-size': text.length > 2 ? '10' : '12',
+              'font-weight': '600',
+              'font-family': 'Arial, sans-serif',
+            },
+            text,
+          ),
+        ],
       )
     },
   }
@@ -73,6 +109,40 @@ const arrowDown = g(['M12 5v14', 'M6 13l6 6 6-6'])
 const fullWidth = g(['M5 6h14', 'M5 12h14', 'M5 18h14'])
 
 const BY_ID: Record<string, Component> = {
+  // 块句柄「+ / ⋮」菜单：稳定 ID 避免同名菜单误用其他图标。
+  paragraph: g(['M5 6h14', 'M5 12h14', 'M5 18h9']),
+  h1: textIcon('H1'),
+  h2: textIcon('H2'),
+  h3: textIcon('H3'),
+  bullet: IconList,
+  ordered: IconListOrdered,
+  task: IconListTask,
+  code: IconCode,
+  quote: IconQuote,
+  info: IconCallout,
+  warn: g(['M12 4l9 16H3z', 'M12 9v4', 'M12 17h.01']),
+  success: g(['M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0-18 0', 'M8 12l3 3 5-6']),
+  error: g(['M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0-18 0', 'M9 9l6 6', 'M15 9l-6 6']),
+  image: IconImage,
+  video: IconVideo,
+  attach: IconAttach,
+  table: IconTable,
+  columns: IconColumns,
+  linkButton: IconLinkButton,
+  formula: IconFormula,
+  hr: IconHr,
+  link: IconLink,
+  toc: IconOutline,
+  toggleBlock: g(['M5 7h14', 'M5 12h9', 'M5 17h9', 'M17 14l3 3-3 3']),
+  date: calendar,
+  linkCard: g(['M4 5h16v14H4z', 'M8 12h8', 'M12 8l4 4-4 4']),
+  mermaid: g(['M4 5h5v5H4z', 'M15 14h5v5h-5z', 'M4 14h5v5H4z', 'M9 7h6v10', 'M12 10l3 3 3-3']),
+  echarts: chart,
+  insertBelow: g(['M5 5h14', 'M5 10h14', 'M12 13v7', 'M9 17l3 3 3-3']),
+  copyBlock: copy,
+  moveUp: arrowUp,
+  moveDown: arrowDown,
+  deleteBlock: g(['M5 7h14', 'M9 7V4h6v3', 'M7 7l1 13h8l1-13', 'M10 11v5', 'M14 11v5']),
   ltr: arrowRight,
   rtl: arrowLeft,
   manual: g(['M4 20h4l11-11-4-4L4 16z', 'M13 7l4 4']),

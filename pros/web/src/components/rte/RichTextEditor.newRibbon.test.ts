@@ -54,7 +54,12 @@ async function openRibbon(wrapper: ReturnType<typeof mount>, label: string) {
 }
 
 function toolButton(wrapper: ReturnType<typeof mount>, label: string) {
-  return wrapper.findAll('button.rte-tool').find((button) => (button.text() || '').includes(label))
+  const buttons = wrapper.findAll('button.rte-tool')
+  // 表格等按钮会按上下文显示「表操作 / 插表格」，稳定的语义名称在 aria-label。
+  // 只对无障碍名称做精确匹配，随后完全沿用原来的文本查找；若对 aria-label
+  // 也做模糊匹配，「全角」会提前命中标题为「半角、全角、空格和按行整理」的总菜单。
+  return buttons.find((button) => button.attributes('aria-label') === label)
+    ?? buttons.find((button) => (button.text() || '').includes(label))
 }
 
 async function clickTool(wrapper: ReturnType<typeof mount>, label: string) {
