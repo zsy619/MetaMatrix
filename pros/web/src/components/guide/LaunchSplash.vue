@@ -7,12 +7,12 @@ import { LAUNCH_SKIP_KEY } from './launchSplash'
 const emit = defineEmits<{ done: [skipNext: boolean] }>()
 
 const themes: { id: TemplateCategory; label: string; line: string }[] = [
-  { id: 'method', label: '方法框架', line: '双三角、五步法、Y 模型' },
-  { id: 'growth', label: '产品增长', line: '商业模式、精益画布、价值主张' },
-  { id: 'industry', label: '行业调研', line: '行业分析、波特五力、OSCAR' },
-  { id: 'org', label: '组织协作', line: '7S、RACI、每日看板' },
+  { id: 'method', label: '方法框架', line: '双三角、Y 模型、评估取舍' },
+  { id: 'growth', label: '产品与经营', line: '五步法、商业模式、业务公式' },
+  { id: 'industry', label: '行业与竞争', line: '波特五力、SWOT、OSCAR' },
+  { id: 'org', label: '项目与组织', line: '甘特、RACI、7S、看板' },
   { id: 'review', label: '复盘总结', line: '周月季年、故障复盘' },
-  { id: 'fde', label: 'FDE', line: '选场景、十格自检、试点' },
+  { id: 'fde', label: 'FDE', line: '选场景、十格自检、上线' },
 ]
 
 const coreColors = [

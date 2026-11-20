@@ -50,12 +50,12 @@ const templateFilter = ref('')
 const asideCollapsed = ref(false)
 
 const CATEGORY_BLURBS: Record<TemplateCategory, string> = {
-  method: '双三角、五步法、Y 模型',
-  growth: '商业模式、精益画布、价值主张',
-  industry: '行业分析、波特五力、OSCAR',
-  org: '7S、RACI、每日看板',
+  method: '双三角、Y 模型、评估取舍',
+  growth: '五步法、商业模式、业务公式、钱和经营',
+  industry: 'OSCAR、行业分析、波特五力、SWOT',
+  org: '甘特、RACI、7S、每日看板',
   review: '周月季年、故障复盘',
-  fde: '选场景、十格自检、试点',
+  fde: '选场景、十格自检、试点到上线',
 }
 
 const categoryChips: { id: 'all' | TemplateCategory; label: string }[] = [
@@ -455,6 +455,11 @@ onUnmounted(() => {
         <h1>元矩阵 MetaMatrix</h1>
         <p class="lead">{{ allCards.length }} 张画布，分成六类。先选一类，再打开一张开始写。</p>
         <p class="lead-note">登录后可以同步到服务端，多台设备用同一份。</p>
+        <p v-if="auth.isAuthenticated" class="lead-note">
+          <button type="button" class="project-entry" @click="router.push({ name: 'projects' })">
+            我的项目 · 用项目组织多张画布 →
+          </button>
+        </p>
         <div class="paths">
           <button
             v-for="chip in categoryChips.filter((item) => item.id !== 'all')"
@@ -745,6 +750,19 @@ onUnmounted(() => {
   text-align: left;
 }
 
+.project-entry {
+  border: none;
+  background: none;
+  padding: 0;
+  color: #1a73e8;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.project-entry:hover {
+  text-decoration: underline;
+}
+
 .path {
   display: flex;
   flex-direction: column;
@@ -816,14 +834,40 @@ onUnmounted(() => {
 
 .chips {
   display: flex;
-  flex-wrap: wrap;
+  /* 分类永远排一行：放不下就横向滚动，不换成两行。 */
+  flex-wrap: nowrap;
   gap: 8px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  /* 角标要探出 chip 顶部，容器得留出上边距，不然会被裁掉。 */
+  padding: 8px 10px;
+}
+
+.chips::-webkit-scrollbar {
+  display: none;
 }
 
 .chip-count {
-  margin-left: 6px;
-  color: #5f6368;
-  font-weight: 500;
+  /* 数量用角标表示：贴在 chip 右上角的小徽标。 */
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #80868b;
+  color: #ffffff;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1;
+  /* 白圈压在 chip 边框上，像贴在角上的通知角标 */
+  box-shadow: 0 0 0 2px #fafafa;
 }
 
 .tpl-count {
@@ -834,11 +878,15 @@ onUnmounted(() => {
 }
 
 .chip {
+  position: relative;
+  flex: 0 0 auto;
+  white-space: nowrap;
   border: 1px solid #dadce0;
   background: #ffffff;
   color: #202124;
   border-radius: 999px;
-  padding: 7px 14px;
+  /* 右边多留一点，标签不会被角标压住 */
+  padding: 7px 22px 7px 14px;
   font-size: 13px;
   font-weight: 550;
   cursor: pointer;
@@ -862,7 +910,7 @@ onUnmounted(() => {
 }
 
 .chip--active .chip-count {
-  color: var(--accent, #1a73e8);
+  background: var(--accent, #1a73e8);
 }
 
 .tpl-search input {
