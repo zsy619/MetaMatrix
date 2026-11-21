@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import * as knowledgeApi from '../../api/knowledge'
+import * as knowledgeApiV5 from '../../api/knowledge_v5'
+import { pinyin } from 'pinyin-pro'
 import type { KnowledgeNode, KnowledgeTemplate } from '../../api/knowledge'
-import { createDocument, updateDocument } from '../../api/documents'
+import { createDocument, getDocument, updateDocument } from '../../api/documents'
 import { useAuthStore } from '../../stores/auth'
 import {
   CATEGORY_LABELS,
@@ -17,6 +19,7 @@ import MenuCascade from './MenuCascade.vue'
 import type { MenuAnchor, MenuNode } from './MenuCascade.vue'
 import { RTE_DOC_TEMPLATES, RTE_DOC_TEMPLATE_GROUPS } from '../rteDocTemplates'
 import { SHEET_PRESETS, type SheetPreset } from './sheetModel'
+import { mindmapFromHeadings } from './mindmapModel'
 import ProjectEmojiPicker from '../project/ProjectEmojiPicker.vue'
 
 const props = defineProps<{ projectId: string; activeDocumentId?: string }>()
@@ -256,6 +259,9 @@ function openSearchHit(hit: knowledgeApi.KnowledgeSearchHit) {
     sortOrder: 0,
     icon: '📄',
     alias: '',
+    pinyin: '',
+    visibility: 'space',
+    allowedUsers: '',
     summary: hit.summary,
     favorite: false,
     locked: false,
@@ -651,6 +657,31 @@ async function addStructuredNode(parentId: string | null, nodeType: 'sheet' | 'm
   }
 }
 
+/** 文档 → 一键脑图：取正文标题层级生成导图节点。 */
+async function convertToMindmap(node: KnowledgeNode) {
+  if (!node.documentId) {
+    ElMessage.warning('该节点没有文档正文')
+    return
+  }
+  try {
+    const doc = await getDocument(node.documentId)
+    const html = (doc.currentData as { html?: string } | undefined)?.html ?? ''
+    const map = mindmapFromHeadings(doc.title || node.title, html)
+    const created = await knowledgeApi.createKnowledgeNode(props.projectId, {
+      parentId: node.parentId,
+      nodeType: 'mindmap',
+      title: `${node.title} · 脑图`,
+      icon: '🧠',
+    })
+    await knowledgeApi.saveNodeData(props.projectId, created.id, 'mindmap', map)
+    ElMessage.success('已生成思维导图')
+    await load()
+    emit('open-node', created)
+  } catch {
+    ElMessage.error('生成思维导图失败')
+  }
+}
+
 /** 导入 Word / Excel / Markdown / 纯文本。 */
 const fileInput = ref<HTMLInputElement | null>(null)
 
@@ -707,7 +738,11 @@ async function renameNode(node: KnowledgeNode) {
       inputValidator: (i) => (i && i.trim() ? true : '请输入名称'),
     })
     const title = value.trim()
-    await knowledgeApi.updateKnowledgeNode(props.projectId, node.id, { title })
+    // 改名时同步写拼音列：中文按拼音检索靠它（055）。
+    await knowledgeApi.updateKnowledgeNode(props.projectId, node.id, {
+      title,
+      pinyin: pinyinOf(title),
+    })
     if (node.documentId) emit('renamed', node.documentId, title)
     await load()
   } catch (err) {
@@ -808,6 +843,283 @@ async function onDrop(dragging: DropTarget, drop: DropTarget, dropType: 'before'
   await load()
 }
 
+// ---------------------------------------------------------------- 快速创建面板（021/023）
+
+/** 统一快速创建面板：空白 / 模板 / 导入 / 表格 / 导图 / 文件夹 / 画布。 */
+const quickOpen = ref(false)
+const quickTitle = ref('')
+const quickParentId = ref<string | null>(null)
+const quickTitleInput = ref<{ focus: () => void } | null>(null)
+
+/** 模板预览（025）。 */
+const previewTemplate = ref<KnowledgeTemplate | null>(null)
+
+/** 批量属性（033）。 */
+const batchPropsOpen = ref(false)
+const batchProps = ref({ status: '', priority: '', tags: '', members: '' })
+
+/** 节点可见范围（069/070）。 */
+const accessTarget = ref<KnowledgeNode | null>(null)
+const accessVisibility = ref<'space' | 'private'>('space')
+const accessUsers = ref('')
+
+/** 导入预览与批量导入（090/091）。 */
+const importOpen = ref(false)
+const batchFileInput = ref<HTMLInputElement | null>(null)
+const importFiles = ref<File[]>([])
+const importPreviews = ref<knowledgeApiV5.ImportPreview[]>([])
+const importBusy = ref(false)
+
+/** 保存的筛选视图（058）与结果内再筛（059）。 */
+type SavedView = { name: string; type: string; author: string; scope: string; sort: string }
+const savedViews = ref<SavedView[]>([])
+const viewName = ref('')
+const resultFilter = ref('')
+
+const filteredHits = computed(() => {
+  const q = resultFilter.value.trim().toLowerCase()
+  if (!q) return searchHits.value
+  return searchHits.value.filter((hit) =>
+    `${hit.title} ${hit.snippet ?? ''} ${hit.author ?? ''}`.toLowerCase().includes(q),
+  )
+})
+
+/** 标题的拼音与首字母：中文按拼音检索（055）。 */
+function pinyinOf(title: string) {
+  if (!title) return ''
+  const full = pinyin(title, { toneType: 'none', type: 'array' }).join('')
+  const first = pinyin(title, { pattern: 'first', toneType: 'none', type: 'array' }).join('')
+  return `${full} ${first}`.toLowerCase()
+}
+
+function openQuickCreate(parentId: string | null = null) {
+  quickParentId.value = parentId
+  quickTitle.value = ''
+  quickOpen.value = true
+  void nextTick(() => quickTitleInput.value?.focus())
+}
+
+/** 快速创建：空白文档。 */
+async function quickBlankDoc() {
+  const title = quickTitle.value.trim() || '无标题文档'
+  try {
+    const node = await knowledgeApi.createKnowledgeNode(props.projectId, {
+      parentId: quickParentId.value,
+      nodeType: 'doc',
+      title,
+      icon: '📄',
+      createDoc: true,
+      pinyin: pinyinOf(title),
+    })
+    quickOpen.value = false
+    ElMessage.success('已创建')
+    await load()
+    emit('open-doc', node)
+  } catch {
+    ElMessage.error('创建失败')
+  }
+}
+
+/** 快速创建：用模板建文档（017：模板自带属性定义）。 */
+async function quickFromTemplate(tpl: KnowledgeTemplate) {
+  const title = quickTitle.value.trim() || tpl.label
+  try {
+    const node = await knowledgeApiV5.createDocFromTemplate(props.projectId, tpl.id, {
+      parentId: quickParentId.value,
+      title,
+    })
+    quickOpen.value = false
+    ElMessage.success('已按模板创建')
+    await load()
+    emit('open-doc', node)
+  } catch {
+    ElMessage.error('按模板创建失败')
+  }
+}
+
+/** 模板拖拽：把模板拖到目录树里直接生成节点（024）。 */
+function onTemplateDragStart(tpl: KnowledgeTemplate, e: DragEvent) {
+  e.dataTransfer?.setData('application/x-kb-template', tpl.id)
+  if (e.dataTransfer) e.dataTransfer.effectAllowed = 'copy'
+}
+
+async function onTemplateDrop(e: DragEvent) {
+  const templateId = e.dataTransfer?.getData('application/x-kb-template')
+  if (!templateId) return
+  const target = (e.target as HTMLElement)?.closest('[data-node-id]') as HTMLElement | null
+  const parentId = target?.dataset.nodeId ?? quickParentId.value
+  try {
+    const node = await knowledgeApiV5.createDocFromTemplate(props.projectId, templateId, {
+      parentId: parentId || null,
+    })
+    ElMessage.success('已按模板创建节点')
+    await load()
+    emit('open-doc', node)
+  } catch {
+    ElMessage.error('按模板创建失败')
+  }
+}
+
+/** 批量属性（033）。 */
+function openBatchProps() {
+  batchProps.value = { status: '', priority: '', tags: '', members: '' }
+  batchPropsOpen.value = true
+}
+
+async function applyBatchProps() {
+  const docIds = nodes.value
+    .filter((node) => selectedIds.value.includes(node.id) && node.documentId)
+    .map((node) => node.documentId as string)
+  if (!docIds.length) {
+    ElMessage.warning('选中的节点里没有文档')
+    return
+  }
+  const input: Record<string, unknown> = {}
+  if (batchProps.value.status) input.status = batchProps.value.status
+  if (batchProps.value.priority) input.priority = batchProps.value.priority
+  if (batchProps.value.tags) input.tags = batchProps.value.tags
+  if (batchProps.value.members) input.members = batchProps.value.members
+  try {
+    const res = await knowledgeApiV5.batchUpdateDocProps(props.projectId, docIds, input)
+    ElMessage.success(`已更新 ${res.updated} 篇文档的属性`)
+    batchPropsOpen.value = false
+    selectedIds.value = []
+  } catch {
+    ElMessage.error('批量改属性失败')
+  }
+}
+
+/** 节点可见范围（069/070）。 */
+function openAccess(node: KnowledgeNode) {
+  accessTarget.value = node
+  accessVisibility.value = node.visibility === 'private' ? 'private' : 'space'
+  accessUsers.value = node.allowedUsers ?? ''
+}
+
+async function saveAccess() {
+  if (!accessTarget.value) return
+  try {
+    await knowledgeApiV5.setNodeAccess(props.projectId, accessTarget.value.id, {
+      visibility: accessVisibility.value,
+      allowedUsers: accessUsers.value,
+    })
+    ElMessage.success('可见范围已更新')
+    accessTarget.value = null
+    await load()
+  } catch {
+    ElMessage.error('更新可见范围失败')
+  }
+}
+
+/** 打开多选文件导入。 */
+function pickFiles() {
+  batchFileInput.value?.click()
+}
+
+/** 导入预览（090）与批量导入（091）。 */
+async function onFilesPicked(event: Event) {
+  const input = event.target as HTMLInputElement
+  const files = [...(input.files ?? [])]
+  input.value = ''
+  if (!files.length) return
+  importFiles.value = files
+  importPreviews.value = []
+  importOpen.value = true
+  importBusy.value = true
+  try {
+    for (const file of files) {
+      const buffer = await file.arrayBuffer()
+      let binary = ''
+      const bytes = new Uint8Array(buffer)
+      for (let i = 0; i < bytes.length; i += 1) binary += String.fromCharCode(bytes[i])
+      try {
+        importPreviews.value.push(
+          await knowledgeApiV5.previewImport(props.projectId, file.name, btoa(binary)),
+        )
+      } catch {
+        importPreviews.value.push({
+          filename: file.name,
+          kind: file.name.split('.').pop() ?? '',
+          title: file.name,
+          headings: ['无法预览该格式'],
+          columns: [],
+          preview: '',
+        })
+      }
+    }
+  } finally {
+    importBusy.value = false
+  }
+}
+
+async function confirmImport() {
+  importBusy.value = true
+  try {
+    const results = await knowledgeApiV5.importKnowledgeFiles(
+      props.projectId,
+      importFiles.value,
+      quickParentId.value,
+    )
+    const failed = results.filter((item) => item.error)
+    ElMessage.success(`导入完成：成功 ${results.length - failed.length} 个`)
+    importOpen.value = false
+    importFiles.value = []
+    await load()
+  } catch {
+    ElMessage.error('导入失败')
+  } finally {
+    importBusy.value = false
+  }
+}
+
+/** 保存常用筛选视图（058）。 */
+function saveCurrentView() {
+  const name = viewName.value.trim()
+  if (!name) {
+    ElMessage.warning('请给筛选视图起个名字')
+    return
+  }
+  savedViews.value.push({
+    name,
+    type: searchType.value,
+    author: searchAuthor.value,
+    scope: searchScope.value,
+    sort: searchSort.value,
+  })
+  viewName.value = ''
+  persistViews()
+}
+
+function applyView(view: SavedView) {
+  searchType.value = view.type as typeof searchType.value
+  searchAuthor.value = view.author
+  searchScope.value = view.scope as typeof searchScope.value
+  searchSort.value = view.sort as typeof searchSort.value
+  void runSearch()
+}
+
+function removeView(view: SavedView) {
+  savedViews.value = savedViews.value.filter((item) => item.name !== view.name)
+  persistViews()
+}
+
+function persistViews() {
+  try {
+    localStorage.setItem(`mm-kb-views-${props.projectId}`, JSON.stringify(savedViews.value))
+  } catch {
+    /* 隐私模式下忽略 */
+  }
+}
+
+function loadViews() {
+  try {
+    const raw = localStorage.getItem(`mm-kb-views-${props.projectId}`)
+    if (raw) savedViews.value = JSON.parse(raw) as SavedView[]
+  } catch {
+    savedViews.value = []
+  }
+}
+
 /** 右键菜单：与飞书一致的动作集合。 */
 async function onContext(cmd: string, node: KnowledgeNode) {
   if (cmd === 'child') return addDoc(node.id)
@@ -818,6 +1130,8 @@ async function onContext(cmd: string, node: KnowledgeNode) {
   if (cmd === 'archive') return archiveNode(node)
   if (cmd === 'trash') return trashNode(node)
   if (cmd === 'delete') return askDelete(node)
+  if (cmd === 'access') return openAccess(node)
+  if (cmd === 'mindmap') return convertToMindmap(node)
 }
 
 /** 合并后的新建菜单：新建项 + 文档模板（分类→模板）+ 画布（分类→画布）+ 导入。 */
@@ -940,6 +1254,7 @@ function onKeydown(event: KeyboardEvent) {
 }
 
 onMounted(() => {
+  loadViews()
   window.addEventListener('keydown', onKeydown)
   document.addEventListener('mousedown', onDocMouseDown)
   document.addEventListener('keydown', onDocKeydown)
@@ -973,7 +1288,7 @@ onBeforeUnmount(() => {
             </el-dropdown-menu>
           </template>
         </el-dropdown>
-        <el-button ref="createBtn" class="kn-create__btn" size="small" text @click="toggleCreate">
+        <el-button ref="createBtn" class="kn-create__btn" size="small" text @click="openQuickCreate(null)">
           + 新建
         </el-button>
         <MenuCascade
@@ -1041,9 +1356,32 @@ onBeforeUnmount(() => {
         <el-button size="small" type="primary" @click="importFeishuDoc">导入到知识库</el-button>
       </div>
 
-      <ul v-if="searchHits.length" class="kn-tree__hits">
+      <div class="kn-tree__views-saved">
+        <el-input v-model="viewName" size="small" placeholder="保存当前筛选为视图" style="width: 150px" />
+        <el-button size="small" text @click="saveCurrentView">保存视图</el-button>
+        <el-tag
+          v-for="saved in savedViews"
+          :key="saved.name"
+          size="small"
+          closable
+          class="kn-tree__view-tag"
+          @click="applyView(saved)"
+          @close="removeView(saved)"
+        >
+          {{ saved.name }}
+        </el-tag>
+      </div>
+      <el-input
+        v-if="searchHits.length"
+        v-model="resultFilter"
+        size="small"
+        clearable
+        placeholder="在结果内再筛…"
+        class="kn-tree__result-filter"
+      />
+      <ul v-if="filteredHits.length" class="kn-tree__hits">
         <li
-          v-for="hit in searchHits"
+          v-for="hit in filteredHits"
           :key="hit.nodeId"
           class="kn-tree__hit"
           @click="openSearchHit(hit)"
@@ -1072,6 +1410,7 @@ onBeforeUnmount(() => {
         <el-option label="附件" value="attachment" />
       </el-select>
       <el-button size="small" text @click="applyBatchType">改类型</el-button>
+      <el-button size="small" text @click="openBatchProps">批量属性</el-button>
       <el-button size="small" text @click="batch('trash')">移入回收站</el-button>
     </div>
 
@@ -1101,8 +1440,13 @@ onBeforeUnmount(() => {
 
     <p v-else-if="!nodes.length" class="kn-tree__empty">空知识库。点上方按钮新建。</p>
 
-    <el-tree
+    <div
       v-else
+      class="kn-tree__dropzone"
+      @dragover.prevent
+      @drop="onTemplateDrop"
+    >
+    <el-tree
       :data="treeData"
       node-key="id"
       draggable
@@ -1121,6 +1465,7 @@ onBeforeUnmount(() => {
         <el-dropdown trigger="contextmenu" @command="(cmd: string) => onContext(cmd, data.node)">
           <div
             class="kn-tree__node"
+            :data-node-id="data.node.id"
             @mouseenter="onNodeHover(data.node)"
             @mouseleave="hoveredNodeId = ''"
           >
@@ -1177,6 +1522,13 @@ onBeforeUnmount(() => {
                       {{ data.node.favorite ? '取消收藏' : '收藏' }}
                     </el-dropdown-item>
                     <el-dropdown-item @click="copyNode(data.node)">复制节点</el-dropdown-item>
+                    <el-dropdown-item
+                      v-if="data.node.nodeType === 'doc' && data.node.documentId"
+                      @click="convertToMindmap(data.node)"
+                    >
+                      转为思维导图
+                    </el-dropdown-item>
+                    <el-dropdown-item @click="openAccess(data.node)">可见范围</el-dropdown-item>
                     <el-dropdown-item @click="archiveNode(data.node)" divided>归档</el-dropdown-item>
                     <el-dropdown-item @click="trashNode(data.node)">
                       <span style="color: var(--el-color-danger)">移入回收站</span>
@@ -1195,6 +1547,12 @@ onBeforeUnmount(() => {
                 {{ data.node.favorite ? '取消收藏' : '收藏' }}
               </el-dropdown-item>
               <el-dropdown-item command="copy">复制节点</el-dropdown-item>
+              <el-dropdown-item
+                v-if="data.node.nodeType === 'doc' && data.node.documentId"
+                command="mindmap"
+              >
+                转为思维导图
+              </el-dropdown-item>
               <el-dropdown-item command="archive" divided>归档</el-dropdown-item>
               <el-dropdown-item command="trash">
                 <span style="color: var(--el-color-danger)">移入回收站</span>
@@ -1205,6 +1563,7 @@ onBeforeUnmount(() => {
         </el-dropdown>
       </template>
     </el-tree>
+    </div>
 
     <el-dialog v-model="deleteDialogOpen" title="删除节点" width="380px">
       <p class="kn-tree__dialog-text">
@@ -1239,9 +1598,169 @@ onBeforeUnmount(() => {
       ref="fileInput"
       type="file"
       class="kn-tree__file"
-      accept=".docx,.xlsx,.md,.markdown,.txt,.html,.htm"
+      accept=".docx,.xlsx,.pptx,.md,.markdown,.txt,.html,.htm"
       @change="onFilePicked"
     />
+    <input
+      ref="batchFileInput"
+      type="file"
+      class="kn-tree__file"
+      multiple
+      accept=".docx,.xlsx,.pptx,.md,.markdown,.txt,.html,.htm"
+      @change="onFilesPicked"
+    />
+
+    <!-- 统一快速创建面板（021/023） -->
+    <el-dialog v-model="quickOpen" title="快速创建" width="560px" append-to-body>
+      <div class="kn-quick">
+        <el-input
+          ref="quickTitleInput"
+          v-model="quickTitle"
+          placeholder="标题（创建后自动聚焦）"
+          @keyup.enter="quickBlankDoc"
+        />
+        <div class="kn-quick__grid">
+          <button type="button" class="kn-quick__card" @click="quickBlankDoc">
+            <span class="kn-quick__icon">📄</span><span>空白文档</span>
+          </button>
+          <button type="button" class="kn-quick__card" @click="pickFiles()">
+            <span class="kn-quick__icon">⬆️</span><span>导入文件</span>
+          </button>
+          <button
+            type="button"
+            class="kn-quick__card"
+            @click="quickOpen = false; addStructuredNode(null, 'sheet')"
+          >
+            <span class="kn-quick__icon">📊</span><span>多维表格</span>
+          </button>
+          <button
+            type="button"
+            class="kn-quick__card"
+            @click="quickOpen = false; addStructuredNode(null, 'mindmap')"
+          >
+            <span class="kn-quick__icon">🧠</span><span>思维导图</span>
+          </button>
+          <button
+            type="button"
+            class="kn-quick__card"
+            @click="quickOpen = false; addStructuredNode(null, 'folder')"
+          >
+            <span class="kn-quick__icon">📁</span><span>文件夹</span>
+          </button>
+          <button type="button" class="kn-quick__card" @click="quickOpen = false; toggleCreate()">
+            <span class="kn-quick__icon">🎨</span><span>高级创建</span>
+          </button>
+        </div>
+        <div class="kn-quick__templates">
+          <div class="kn-quick__label">从模板创建（可拖到目录树）</div>
+          <div class="kn-quick__template-list">
+            <div
+              v-for="tpl in templates"
+              :key="tpl.id"
+              class="kn-quick__template"
+              draggable="true"
+              @dragstart="onTemplateDragStart(tpl, $event)"
+              @click="quickFromTemplate(tpl)"
+              @dblclick="previewTemplate = tpl"
+            >
+              <span>{{ tpl.icon }}</span>
+              <span class="kn-quick__template-label">{{ tpl.label }}</span>
+              <el-button size="small" text @click.stop="previewTemplate = tpl">预览</el-button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </el-dialog>
+
+    <!-- 模板预览（025） -->
+    <el-dialog
+      :model-value="!!previewTemplate"
+      :title="previewTemplate?.label ?? ''"
+      width="520px"
+      append-to-body
+      @close="previewTemplate = null"
+    >
+      <div class="kn-preview" v-html="previewTemplate?.html || '（空模板）'"></div>
+      <template #footer>
+        <el-button @click="previewTemplate = null">关闭</el-button>
+        <el-button
+          type="primary"
+          @click="previewTemplate && quickFromTemplate(previewTemplate)"
+        >
+          用此模板创建
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 批量属性（033） -->
+    <el-dialog v-model="batchPropsOpen" title="批量改属性" width="420px" append-to-body>
+      <div class="kn-quick">
+        <el-select v-model="batchProps.status" placeholder="状态" clearable style="width: 100%">
+          <el-option label="草稿" value="draft" />
+          <el-option label="已发布" value="published" />
+          <el-option label="已归档" value="archived" />
+        </el-select>
+        <el-select v-model="batchProps.priority" placeholder="优先级" clearable style="width: 100%">
+          <el-option label="低" value="low" />
+          <el-option label="普通" value="normal" />
+          <el-option label="高" value="high" />
+          <el-option label="紧急" value="urgent" />
+        </el-select>
+        <el-input v-model="batchProps.tags" placeholder="标签（逗号分隔）" />
+        <el-input v-model="batchProps.members" placeholder="参与人（用户 ID，逗号分隔）" />
+      </div>
+      <template #footer>
+        <el-button @click="batchPropsOpen = false">取消</el-button>
+        <el-button type="primary" @click="applyBatchProps">应用</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 节点可见范围（069/070） -->
+    <el-dialog
+      :model-value="!!accessTarget"
+      title="可见范围"
+      width="420px"
+      append-to-body
+      @close="accessTarget = null"
+    >
+      <div class="kn-quick">
+        <el-radio-group v-model="accessVisibility">
+          <el-radio value="space">空间内可见</el-radio>
+          <el-radio value="private">仅指定成员可见</el-radio>
+        </el-radio-group>
+        <el-input
+          v-model="accessUsers"
+          placeholder="用户 ID，逗号分隔（子节点继承该范围）"
+          :disabled="accessVisibility !== 'private'"
+        />
+      </div>
+      <template #footer>
+        <el-button @click="accessTarget = null">取消</el-button>
+        <el-button type="primary" @click="saveAccess">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 导入预览（090）与批量导入（091） -->
+    <el-dialog v-model="importOpen" title="导入预览" width="640px" append-to-body>
+      <p v-if="importBusy" class="kn-preview__hint">正在解析文件…</p>
+      <div v-for="preview in importPreviews" :key="preview.filename" class="kn-preview__item">
+        <div class="kn-preview__file">
+          <strong>{{ preview.filename }}</strong>
+          <el-tag size="small">{{ preview.kind }}</el-tag>
+          <span>{{ preview.title }}</span>
+        </div>
+        <div v-if="preview.columns.length" class="kn-preview__columns">
+          表格列：{{ preview.columns.join(' / ') }}
+        </div>
+        <ul v-else class="kn-preview__headings">
+          <li v-for="heading in preview.headings" :key="heading">{{ heading }}</li>
+        </ul>
+      </div>
+      <template #footer>
+        <el-button @click="importOpen = false">取消</el-button>
+        <el-button type="primary" :loading="importBusy" @click="confirmImport">导入</el-button>
+      </template>
+    </el-dialog>
   </aside>
 </template>
 
@@ -1343,4 +1862,31 @@ onBeforeUnmount(() => {
   padding: 0 4px; border: 0; background: none;
 }
 .kn-tree__star.is-on { color: #f5a623; opacity: 1; }
+.kn-tree__dropzone { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.kn-tree__views-saved { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
+.kn-tree__view-tag { cursor: pointer; }
+.kn-tree__result-filter { margin-top: 6px; }
+.kn-quick { display: flex; flex-direction: column; gap: 10px; }
+.kn-quick__grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.kn-quick__card {
+  display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 6px;
+  border: 1px solid var(--mm-line, #e5e6eb); border-radius: 8px; background: transparent;
+  cursor: pointer; font-size: 12px; color: var(--mm-text, #1d2129);
+}
+.kn-quick__card:hover { border-color: var(--mm-blue, #1677ff); background: #f2f7ff; }
+.kn-quick__icon { font-size: 20px; }
+.kn-quick__label { font-size: 12px; color: var(--mm-muted, #86909c); }
+.kn-quick__template-list { display: flex; flex-direction: column; gap: 4px; max-height: 220px; overflow: auto; }
+.kn-quick__template {
+  display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 6px;
+  cursor: grab; font-size: 13px;
+}
+.kn-quick__template:hover { background: var(--mm-hover, #f2f3f5); }
+.kn-quick__template-label { flex: 1; }
+.kn-preview { max-height: 420px; overflow: auto; font-size: 13px; }
+.kn-preview__hint { font-size: 12px; color: var(--mm-muted, #86909c); }
+.kn-preview__item { border: 1px solid var(--mm-line, #e5e6eb); border-radius: 6px; padding: 8px 10px; margin-bottom: 8px; }
+.kn-preview__file { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.kn-preview__columns { font-size: 12px; color: var(--mm-muted, #86909c); margin-top: 4px; }
+.kn-preview__headings { margin: 4px 0 0; padding-left: 18px; font-size: 12px; color: var(--mm-muted, #86909c); }
 </style>

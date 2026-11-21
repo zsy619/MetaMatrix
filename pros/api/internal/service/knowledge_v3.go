@@ -248,7 +248,9 @@ func (s *KnowledgeService) auditShareAccess(share *model.KnowledgeShare) {
 	if count > 0 {
 		return
 	}
-	_ = s.AppendEvent(s.db, share.ProjectID, "share.access", nil, &share.DocumentID, share.CreatedBy, share.Token)
+	// 审计事件里不写完整 token：分享链接本身就是访问凭证，事件表会被导出。
+	// 只留脱敏后的前缀，足够排查「谁在什么时候访问过」（112）。
+	_ = s.AppendEvent(s.db, share.ProjectID, "share.access", nil, &share.DocumentID, share.CreatedBy, maskShareToken(share.Token))
 }
 
 // ---------------------------------------------------------------- 历史版本
@@ -525,14 +527,22 @@ func truncateRunes(s string, n int) string {
 	return string(runes[:n]) + "…"
 }
 
+// maskShareToken 脱敏分享 token：保留前 6 位，其余以 * 代替。
+func maskShareToken(token string) string {
+	if len(token) <= 6 {
+		return "***"
+	}
+	return token[:6] + strings.Repeat("*", 8)
+}
+
 // ---------------------------------------------------------------- 在线协作状态（presence）
 
 // PresenceUser 是当前在线的协作者。
 type PresenceUser struct {
-	UserID string `json:"userId"`
-	Name   string `json:"name"`
-	Avatar string `json:"avatar"`
-	Editing bool     `json:"editing"`
+	UserID  string `json:"userId"`
+	Name    string `json:"name"`
+	Avatar  string `json:"avatar"`
+	Editing bool   `json:"editing"`
 	// Cursor 是协作者当前编辑位置（段落标题 + 字符偏移），前端用来「跳到 TA 的位置」。
 	Cursor   string    `json:"cursor"`
 	LastSeen time.Time `json:"lastSeen"`

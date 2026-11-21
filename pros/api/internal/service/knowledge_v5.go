@@ -494,6 +494,7 @@ func (s *KnowledgeService) SetDocFields(ownerID, docID uuid.UUID, defs []FieldDe
 	if err := s.db.Save(props).Error; err != nil {
 		return nil, err
 	}
+	decorateDocProps(props)
 	return props, nil
 }
 

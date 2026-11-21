@@ -17,6 +17,7 @@ import AiPanel from './AiPanel.vue'
 import ShareDialog from './ShareDialog.vue'
 import ProjectEmojiPicker from '../project/ProjectEmojiPicker.vue'
 import { getDocument, updateDocument } from '../../api/documents'
+import { apiRequestBlob } from '../../api/http'
 import type { DocumentFull } from '../../api/documents'
 import {
   exportKnowledgeDoc,
@@ -27,6 +28,7 @@ import {
   listVersionAuthors,
   saveDocAsTemplate,
 } from '../../api/knowledge'
+import * as knowledgeApiV5 from '../../api/knowledge_v5'
 import type { PresenceUser } from '../../api/knowledge'
 import { friendlyApiMessage } from '../../utils/apiMessage'
 
@@ -60,10 +62,13 @@ const dirty = ref(false)
 const saveTimer = ref<ReturnType<typeof setTimeout> | null>(null)
 const exporting = ref(false)
 const iconOpen = ref(false)
-const sidebarTab = ref<'outline' | 'properties' | 'comments' | 'backrefs' | 'history' | 'versions' | 'ai'>('outline')
+const sidebarTab = ref<'outline' | 'tasks' | 'properties' | 'comments' | 'backrefs' | 'history' | 'versions' | 'ai'>('outline')
 const shareVisible = ref(false)
 const presence = ref<PresenceUser[]>([])
 const quote = ref('')
+/** 划线区间：正文字符偏移（041）。 */
+const anchorFrom = ref(-1)
+const anchorTo = ref(-1)
 const editorRef = ref<InstanceType<typeof RichTextEditor>>()
 const appliedTemplate = ref('')
 /** 专注模式：隐藏侧栏与头部，只留正文。 */
@@ -73,6 +78,10 @@ const relatedDocs = ref<import('../../api/knowledge').KnowledgeSearchHit[]>([])
 const relatedLoading = ref(false)
 /** 最后编辑人（081/052）。 */
 const lastEditor = ref('')
+/** 正文待办块（045）。 */
+const tasks = ref<knowledgeApiV5.DocTask[]>([])
+/** 正文标题层级（051 目录块 / 046 大纲）。 */
+const outlineItems = ref<knowledgeApiV5.OutlineItem[]>([])
 let presenceTimer: ReturnType<typeof setInterval> | null = null
 
 const panelId = computed(() => `doc:${props.documentId}`)
@@ -91,6 +100,8 @@ async function load() {
     void touchView(props.documentId).catch(() => undefined)
     void loadLastEditor()
     void loadRelated()
+    void loadTasks()
+    void loadOutline()
   } catch (err) {
     ElMessage.error(friendlyApiMessage(err, '加载文档失败'))
   } finally {
@@ -172,20 +183,144 @@ function onEditorClick(e: MouseEvent) {
   }
 }
 
-/** 划线评论：记录鼠标抬起时选中的文本，作为评论引用。 */
+/** 划线评论：记录选中的文本与字符区间，作为评论引用与跳转锚点。 */
 function onSelectionChange() {
   const selection = window.getSelection()
   const text = selection?.toString().trim() ?? ''
-  if (text.length >= 2 && text.length <= 500) quote.value = text
+  if (text.length < 2 || text.length > 500) {
+    quote.value = ''
+    anchorFrom.value = -1
+    anchorTo.value = -1
+    return
+  }
+  quote.value = text
+  const inst = editorRef.value as unknown as {
+    editor?: { state?: { selection?: { from?: number; to?: number } } }
+  } | null
+  const sel = inst?.editor?.state?.selection
+  if (sel && typeof sel.from === 'number' && typeof sel.to === 'number') {
+    anchorFrom.value = sel.from
+    anchorTo.value = sel.to
+  } else {
+    anchorFrom.value = -1
+    anchorTo.value = -1
+  }
 }
 
 /** 在线协作：定时上报心跳并刷新协作者列表。 */
 async function syncPresence() {
   try {
-    await heartbeatPresence(props.documentId, dirty.value)
+    await heartbeatPresence(props.documentId, dirty.value, currentCursor())
     presence.value = await listPresence(props.documentId)
   } catch {
     /* 心跳失败不打扰用户 */
+  }
+}
+
+/** 当前光标位置（077）：标题文本 + 段落偏移，用于「跳到 TA 的位置」。 */
+function currentCursor() {
+  const inst = editorRef.value as unknown as {
+    editor?: { state?: { selection?: { $from?: { parent?: { textContent?: string } }; from?: number } } }
+  } | null
+  const sel = inst?.editor?.state?.selection
+  if (!sel?.$from) return ''
+  const text = sel.$from.parent?.textContent ?? ''
+  return `${text.slice(0, 40)}@${sel.from ?? 0}`
+}
+
+/** 待办块（045）。 */
+async function loadTasks() {
+  try {
+    tasks.value = await knowledgeApiV5.getDocTasks(props.documentId)
+  } catch {
+    tasks.value = []
+  }
+}
+
+async function toggleTask(task: knowledgeApiV5.DocTask) {
+  await knowledgeApiV5.toggleDocTask(props.documentId, task.index, !task.checked)
+  await loadTasks()
+}
+
+/** 标题层级（051/046）。 */
+async function loadOutline() {
+  try {
+    outlineItems.value = await knowledgeApiV5.getDocOutline(props.documentId)
+  } catch {
+    outlineItems.value = []
+  }
+}
+
+/** 插入目录块（051）：按当前标题生成可点击目录。 */
+function insertToc() {
+  const items = outlineItems.value.filter((item) => item.text)
+  if (!items.length) {
+    ElMessage.warning('正文还没有标题，先加几个标题再插入目录')
+    return
+  }
+  const list = items
+    .map((item) => `<li style="margin-left:${(item.level - 1) * 16}px">${item.text}</li>`)
+    .join('')
+  const block = `<h2>目录</h2><ul>${list}</ul>`
+  // TipTap 会丢掉自定义属性，目录块靠「目录」标题来识别与替换。
+  const next = /<h2>目录<\/h2>/.test(html.value)
+    ? html.value.replace(/<h2>目录<\/h2>[\s\S]*?<\/ul>/, block)
+    : `${html.value}${block}`
+  onHtml(next)
+  ElMessage.success('目录已插入')
+}
+
+/** 导出 PDF（093）：用 html2canvas 渲染正文，jspdf 分页输出。 */
+async function exportPdf() {
+  if (exporting.value) return
+  exporting.value = true
+  try {
+    const root = document.querySelector('.doc-view__editor .ProseMirror') as HTMLElement | null
+    if (!root) throw new Error('正文未渲染')
+    const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+      import('html2canvas'),
+      import('jspdf'),
+    ])
+    const canvas = await html2canvas(root, { scale: 2, backgroundColor: '#ffffff' })
+    const pdf = new jsPDF({ unit: 'pt', format: 'a4' })
+    const pageWidth = pdf.internal.pageSize.getWidth()
+    const pageHeight = pdf.internal.pageSize.getHeight()
+    const ratio = canvas.height / canvas.width
+    const imgHeight = pageWidth * ratio
+    let remaining = imgHeight
+    let position = 0
+    pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0, position, pageWidth, imgHeight)
+    remaining -= pageHeight
+    while (remaining > 0) {
+      position -= pageHeight
+      pdf.addPage()
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0, position, pageWidth, imgHeight)
+      remaining -= pageHeight
+    }
+    pdf.save(`${title.value || 'document'}.pdf`)
+  } catch (err) {
+    ElMessage.error(friendlyApiMessage(err, '导出 PDF 失败'))
+  } finally {
+    exporting.value = false
+  }
+}
+
+/** 导出 docx（094）：服务端生成，带登录态下载。 */
+async function exportDocx() {
+  if (exporting.value) return
+  exporting.value = true
+  try {
+    const res = await apiRequestBlob(knowledgeApiV5.docxExportUrl(props.documentId))
+    const url = URL.createObjectURL(res.data)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${title.value || 'document'}.docx`
+    a.click()
+    URL.revokeObjectURL(url)
+  } catch (err) {
+    ElMessage.error(friendlyApiMessage(err, '导出 Word 失败'))
+  } finally {
+    exporting.value = false
   }
 }
 
@@ -407,6 +542,8 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
             <el-dropdown-item command="html">HTML</el-dropdown-item>
             <el-dropdown-item command="text">纯文本</el-dropdown-item>
             <el-dropdown-item command="json">JSON</el-dropdown-item>
+            <el-dropdown-item command="pdf" divided @click.stop="exportPdf">PDF（分页）</el-dropdown-item>
+            <el-dropdown-item command="docx" @click.stop="exportDocx">Word（docx）</el-dropdown-item>
           </el-dropdown-menu>
         </template>
       </el-dropdown>
@@ -421,6 +558,7 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
           </el-dropdown-menu>
         </template>
       </el-dropdown>
+      <el-button text @click="insertToc">目录</el-button>
       <el-button text :icon="Clock" @click="sidebarTab = 'history'">历史</el-button>
       <el-button text :icon="Share" @click="shareVisible = true">分享</el-button>
       <span v-if="lastEditor" class="doc-view__last-editor">
@@ -468,13 +606,35 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
       <aside class="doc-view__sidebar">
         <el-tabs v-model="sidebarTab" class="doc-view__tabs">
           <el-tab-pane label="大纲" name="outline">
-            <DocOutline :html="html" />
+            <DocOutline
+              :html="html"
+              :document-id="documentId"
+              @reordered="loadOutline"
+            />
+          </el-tab-pane>
+          <el-tab-pane label="任务" name="tasks">
+            <div class="doc-view__tasks">
+              <p v-if="!tasks.length" class="doc-view__tasks-empty">正文里还没有待办块。</p>
+              <label v-for="task in tasks" :key="task.index" class="doc-view__task">
+                <el-checkbox
+                  :model-value="task.checked"
+                  @change="(v: boolean) => toggleTask({ ...task, checked: v })"
+                />
+                <span :class="{ 'is-done': task.checked }">{{ task.text }}</span>
+              </label>
+            </div>
           </el-tab-pane>
           <el-tab-pane label="属性" name="properties">
             <DocProperties :document-id="documentId" />
           </el-tab-pane>
           <el-tab-pane label="评论" name="comments">
-            <DocComments :document-id="documentId" :quote="quote" @quoted="quote = ''" />
+            <DocComments
+              :document-id="documentId"
+              :quote="quote"
+              :anchor-from="anchorFrom"
+              :anchor-to="anchorTo"
+              @quoted="quote = ''; anchorFrom = -1; anchorTo = -1"
+            />
           </el-tab-pane>
           <el-tab-pane label="反向引用" name="backrefs">
             <DocBackrefs :document-id="documentId" :project-id="projectId" @back="emit('back')" />
@@ -584,6 +744,10 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
 .doc-view__crumb-item { overflow: hidden; text-overflow: ellipsis; }
 .doc-view__crumb-sep { color: var(--mm-faint, #c9cdd4); }
 .doc-view__last-editor { font-size: 12px; color: var(--mm-muted, #86909c); }
+.doc-view__tasks { padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
+.doc-view__tasks-empty { font-size: 12px; color: var(--mm-muted, #86909c); }
+.doc-view__task { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.doc-view__task .is-done { text-decoration: line-through; color: var(--mm-muted, #86909c); }
 .doc-view__lock {
   display: flex; align-items: center; gap: 6px;
   padding: 6px 16px;

@@ -1,7 +1,14 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
+import { ElMessage } from 'element-plus'
+import { reorderDocOutline } from '../../api/knowledge_v5'
 
-const props = defineProps<{ html: string }>()
+const props = defineProps<{ html: string; documentId?: string }>()
+const emit = defineEmits<{ reordered: [] }>()
+
+/** 拖拽排序（046）：拖动标题后按新顺序回写正文。 */
+const dragIndex = ref<number | null>(null)
+const overIndex = ref<number | null>(null)
 
 interface Heading {
   level: number
@@ -26,6 +33,35 @@ const headings = computed<Heading[]>(() => {
   })
   return out
 })
+
+/** 拖拽开始 / 经过 / 结束。 */
+function onDragStart(index: number, e: DragEvent) {
+  dragIndex.value = index
+  e.dataTransfer?.setData('text/plain', String(index))
+  if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move'
+}
+
+function onDragOver(index: number, e: DragEvent) {
+  e.preventDefault()
+  overIndex.value = index
+  if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
+}
+
+async function onDrop(index: number) {
+  const from = dragIndex.value
+  dragIndex.value = null
+  overIndex.value = null
+  if (from === null || from === index || !props.documentId) return
+  const order = headings.value.map((_, i) => i)
+  const [moved] = order.splice(from, 1)
+  order.splice(index, 0, moved)
+  try {
+    await reorderDocOutline(props.documentId, order)
+    emit('reordered')
+  } catch {
+    ElMessage.error('大纲排序失败')
+  }
+}
 
 function jump(h: Heading) {
   // 编辑器渲染在父级 .doc-view__editor .ProseMirror 里。
@@ -52,9 +88,17 @@ function jump(h: Heading) {
     <div class="doc-outline__title">大纲</div>
     <ul class="doc-outline__list">
       <li
-        v-for="h in headings"
+        v-for="(h, index) in headings"
         :key="h.id"
-        :class="`doc-outline__item is-h${h.level}`"
+        :class="[
+          `doc-outline__item is-h${h.level}`,
+          { 'is-over': overIndex === index, 'is-dragging': dragIndex === index },
+        ]"
+        draggable="true"
+        @dragstart="onDragStart(index, $event)"
+        @dragover="onDragOver(index, $event)"
+        @drop="onDrop(index)"
+        @dragend="dragIndex = null; overIndex = null"
         @click="jump(h)"
       >
         {{ h.text }}
@@ -96,4 +140,6 @@ function jump(h: Heading) {
 .is-h2 { padding-left: 14px; }
 .is-h3 { padding-left: 22px; }
 .is-h4 { padding-left: 30px; font-size: 12px; color: var(--mm-muted, #86909c); }
+.doc-outline__item.is-over { outline: 1px dashed var(--mm-blue, #1677ff); }
+.doc-outline__item.is-dragging { opacity: 0.5; }
 </style>

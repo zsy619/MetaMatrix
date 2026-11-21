@@ -11,6 +11,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import * as knowledgeApi from '../api/knowledge'
 import { updateDocument } from '../api/documents'
 import type { KnowledgeTemplate } from '../api/knowledge'
+import { updateTemplateProperties } from '../api/knowledge_v5'
+import type { FieldDef } from '../api/knowledge_v5'
 import { friendlyApiMessage } from '../utils/apiMessage'
 import { useAuthStore } from '../stores/auth'
 
@@ -69,6 +71,39 @@ function fillPlaceholders(html: string, title: string) {
 }
 
 const categories = computed(() => [...new Set(templates.value.map((t) => t.category || '通用'))])
+
+/** 模板携带的属性定义（017）。 */
+const propsTarget = ref<KnowledgeTemplate | null>(null)
+const propsFields = ref<FieldDef[]>([])
+const propsOpen = ref(false)
+
+function openProps(tpl: KnowledgeTemplate) {
+  propsTarget.value = tpl
+  propsFields.value = [...((tpl as unknown as { properties?: FieldDef[] }).properties ?? [])]
+  propsOpen.value = true
+}
+
+function addPropsField() {
+  propsFields.value.push({
+    key: `field${propsFields.value.length + 1}`,
+    label: '新字段',
+    type: 'text',
+    required: false,
+    order: propsFields.value.length + 1,
+  })
+}
+
+async function saveProps() {
+  if (!propsTarget.value) return
+  try {
+    await updateTemplateProperties(projectId.value, propsTarget.value.id, propsFields.value)
+    ElMessage.success('模板属性已保存')
+    propsOpen.value = false
+    await load()
+  } catch {
+    ElMessage.error('保存模板属性失败')
+  }
+}
 
 async function load() {
   loading.value = true
@@ -204,6 +239,7 @@ onMounted(load)
                   </el-dropdown-menu>
                 </template>
               </el-dropdown>
+              <el-button size="small" text @click="openProps(tpl)">属性</el-button>
               <el-button size="small" text @click="move(tpl, -1)">↑</el-button>
               <el-button size="small" text @click="move(tpl, 1)">↓</el-button>
               <el-button size="small" text type="danger" @click="remove(tpl)">删除</el-button>
@@ -212,6 +248,27 @@ onMounted(load)
         </article>
       </div>
     </section>
+    <el-dialog v-model="propsOpen" title="模板属性定义" width="520px" append-to-body>
+      <p class="tpl-center__empty">用模板创建文档时，这些属性会自动写入页面属性。</p>
+      <div v-for="(field, index) in propsFields" :key="index" class="tpl-center__field">
+        <el-input v-model="field.label" size="small" style="width: 120px" />
+        <el-input v-model="field.key" size="small" style="width: 110px" />
+        <el-select v-model="field.type" size="small" style="width: 100px">
+          <el-option label="文本" value="text" />
+          <el-option label="数字" value="number" />
+          <el-option label="日期" value="date" />
+          <el-option label="单选" value="select" />
+          <el-option label="人员" value="user" />
+        </el-select>
+        <el-checkbox v-model="field.required" size="small">必填</el-checkbox>
+        <el-button size="small" text type="danger" @click="propsFields.splice(index, 1)">删除</el-button>
+      </div>
+      <template #footer>
+        <el-button @click="propsOpen = false">取消</el-button>
+        <el-button @click="addPropsField">添加字段</el-button>
+        <el-button type="primary" @click="saveProps">保存</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -236,4 +293,5 @@ onMounted(load)
 .tpl-card__meta { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--mm-muted, #86909c); margin-top: 2px; }
 .tpl-card__ops { display: flex; align-items: center; gap: 2px; }
 .tpl-center__empty { color: var(--mm-muted, #86909c); font-size: 13px; padding: 24px 0; }
+.tpl-center__field { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
 </style>

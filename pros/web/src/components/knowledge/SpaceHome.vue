@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Download, Plus, Warning } from '@element-plus/icons-vue'
 import * as knowledgeApi from '../../api/knowledge'
+import * as knowledgeApiV5 from '../../api/knowledge_v5'
 import type {
   KnowledgeEvent,
   KnowledgeQualityItem,
@@ -21,6 +22,14 @@ const events = ref<KnowledgeEvent[]>([])
 const quality = ref<KnowledgeQualityItem[]>([])
 /** 疑似重复文档（102）。 */
 const similar = ref<KnowledgeSearchHit[][]>([])
+/** 属性看板（034）。 */
+const board = ref<knowledgeApiV5.DocBoardItem[]>([])
+const boardGroupBy = ref<'status' | 'priority'>('status')
+/** 业务标签词库（098）。 */
+const dict = ref<knowledgeApiV5.TagDictEntry[]>([])
+const dictTag = ref('')
+const dictCategory = ref('')
+const dictAliases = ref('')
 
 const healthLabels: Record<string, string> = {
   no_title: '缺标题',
@@ -54,6 +63,8 @@ async function load() {
     events.value = eventRows
     quality.value = qualityRows
     similar.value = similarRows
+    board.value = await knowledgeApiV5.getDocPropsBoard(props.projectId).catch(() => [])
+    dict.value = await knowledgeApiV5.listTagDict(props.projectId).catch(() => [])
   } catch {
     summary.value = null
   } finally {
@@ -81,6 +92,51 @@ const eventLabels: Record<string, string> = {
   'doc.publish': '发布文档',
   'comment.create': '新增评论',
   'share.access': '通过链接访问',
+}
+
+/** 属性看板：按状态或优先级分组。 */
+const boardGroups = computed(() => {
+  const key = boardGroupBy.value
+  const map = new Map<string, knowledgeApiV5.DocBoardItem[]>()
+  for (const item of board.value) {
+    const group = (item[key] || '未设置') as string
+    const list = map.get(group) ?? []
+    list.push(item)
+    map.set(group, list)
+  }
+  const order = key === 'status' ? ['draft', 'published', 'archived'] : ['urgent', 'high', 'normal', 'low']
+  return [...map.entries()].sort((a, b) => {
+    const ia = order.indexOf(a[0])
+    const ib = order.indexOf(b[0])
+    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib)
+  })
+})
+
+/** 词库维护（098）。 */
+async function addDictEntry() {
+  if (!dictTag.value.trim()) {
+    ElMessage.warning('请输入词条')
+    return
+  }
+  try {
+    await knowledgeApiV5.addTagDict(props.projectId, {
+      tag: dictTag.value.trim(),
+      category: dictCategory.value.trim(),
+      aliases: dictAliases.value.trim(),
+    })
+    dictTag.value = ''
+    dictCategory.value = ''
+    dictAliases.value = ''
+    dict.value = await knowledgeApiV5.listTagDict(props.projectId)
+    ElMessage.success('已加入词库')
+  } catch {
+    ElMessage.error('加入词库失败')
+  }
+}
+
+async function removeDictEntry(entry: knowledgeApiV5.TagDictEntry) {
+  await knowledgeApiV5.deleteTagDict(props.projectId, entry.id)
+  dict.value = await knowledgeApiV5.listTagDict(props.projectId)
 }
 
 async function exportTree() {
@@ -178,6 +234,53 @@ onMounted(load)
           </ul>
         </section>
 
+        <section class="kn-home__panel kn-home__panel--board">
+          <h3>
+            属性看板
+            <el-radio-group v-model="boardGroupBy" size="small" style="margin-left: auto">
+              <el-radio-button value="status">按状态</el-radio-button>
+              <el-radio-button value="priority">按优先级</el-radio-button>
+            </el-radio-group>
+          </h3>
+          <p v-if="!board.length" class="kn-home__ok">还没有挂载到目录的文档。</p>
+          <div v-else class="kn-board">
+            <div v-for="[group, items] in boardGroups" :key="group" class="kn-board__column">
+              <div class="kn-board__column-title">{{ group }}（{{ items.length }}）</div>
+              <button
+                v-for="item in items"
+                :key="item.docId"
+                type="button"
+                class="kn-board__card"
+                @click="emit('open-doc', item.docId)"
+              >
+                <span>{{ item.icon }} {{ item.title }}</span>
+                <span v-if="item.dueAt" class="kn-home__msg">
+                  截止 {{ new Date(item.dueAt).toLocaleDateString() }}
+                </span>
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section class="kn-home__panel">
+          <h3>业务标签词库</h3>
+          <div class="kn-home__dict">
+            <el-input v-model="dictTag" size="small" placeholder="词条" style="width: 110px" />
+            <el-input v-model="dictCategory" size="small" placeholder="分类" style="width: 90px" />
+            <el-input v-model="dictAliases" size="small" placeholder="别名（逗号分隔）" style="width: 140px" />
+            <el-button size="small" type="primary" @click="addDictEntry">添加</el-button>
+          </div>
+          <p v-if="!dict.length" class="kn-home__ok">词库还是空的：统一标签命名后，标签推荐会更准。</p>
+          <ul v-else class="kn-home__recent">
+            <li v-for="entry in dict" :key="entry.id">
+              <span class="kn-home__health-link">{{ entry.tag }}</span>
+              <span v-if="entry.category" class="kn-home__tag">{{ entry.category }}</span>
+              <span v-if="entry.aliases" class="kn-home__msg">{{ entry.aliases }}</span>
+              <el-button size="small" text type="danger" @click="removeDictEntry(entry)">删除</el-button>
+            </li>
+          </ul>
+        </section>
+
         <section class="kn-home__panel">
           <h3><el-icon><Plus /></el-icon> 最近更新</h3>
           <p v-if="!summary.recentUpdates.length" class="kn-home__ok">还没有内容。</p>
@@ -237,5 +340,19 @@ onMounted(load)
 }
 .kn-home__msg { font-size: 12px; color: var(--mm-muted, #86909c); }
 .kn-home__ok { font-size: 13px; color: var(--mm-muted, #86909c); margin: 0; }
+.kn-home__panel--board { grid-column: 1 / -1; }
+.kn-home__dict { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.kn-board { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 4px; }
+.kn-board__column {
+  min-width: 180px; background: var(--mm-hover, #f7f8fa);
+  border-radius: 8px; padding: 8px; display: flex; flex-direction: column; gap: 6px;
+}
+.kn-board__column-title { font-size: 12px; color: var(--mm-muted, #86909c); font-weight: 600; }
+.kn-board__card {
+  display: flex; flex-direction: column; gap: 2px; text-align: left; cursor: pointer;
+  border: 1px solid var(--mm-line, #e5e6eb); border-radius: 6px; background: var(--mm-surface, #fff);
+  padding: 6px 8px; font-size: 13px; color: var(--mm-text, #1d2129);
+}
+.kn-board__card:hover { border-color: var(--mm-blue, #1677ff); }
 .kn-home__empty { padding: 32px; text-align: center; color: var(--mm-muted, #86909c); font-size: 13px; }
 </style>

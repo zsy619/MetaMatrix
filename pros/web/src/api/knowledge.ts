@@ -1,4 +1,5 @@
 import { apiRequest, getToken } from './http'
+import type { FieldDef } from './knowledge_v5'
 
 export type KnowledgeNodeType =
   | 'folder'
@@ -22,6 +23,12 @@ export type KnowledgeNode = {
   alias: string
   /** 摘要：目录卡片与搜索结果读它。 */
   summary: string
+  /** 标题的拼音与首字母：中文按拼音检索。 */
+  pinyin: string
+  /** 可见范围：space（空间内）| private（仅 allowedUsers）。 */
+  visibility: 'space' | 'private'
+  /** 私有节点的可见用户 ID（逗号分隔）。 */
+  allowedUsers: string
   favorite: boolean
   locked: boolean
   /** 非空表示在回收站里。 */
@@ -51,6 +58,8 @@ export function createKnowledgeNode(
     icon?: string
     documentId?: string
     createDoc?: boolean
+    /** 标题的拼音与首字母（pinyin-pro 生成）：中文按拼音检索。 */
+    pinyin?: string
   },
 ) {
   return apiRequest<KnowledgeNode>(`/projects/${projectId}/knowledge/nodes`, {
@@ -62,7 +71,7 @@ export function createKnowledgeNode(
 export function updateKnowledgeNode(
   projectId: string,
   nodeId: string,
-  input: { title?: string; icon?: string; documentId?: string },
+  input: { title?: string; icon?: string; documentId?: string; pinyin?: string },
 ) {
   return apiRequest<KnowledgeNode>(
     `/projects/${projectId}/knowledge/nodes/${nodeId}`,
@@ -267,6 +276,11 @@ export type DocProperties = {
   milestone: string
   sprint: string
   number: number
+  /** 自定义字段定义与取值。 */
+  fields: FieldDef[]
+  fieldValues: Record<string, unknown>
+  /** 公式字段的计算结果。 */
+  computed: Record<string, number>
   updatedAt: string
   createdAt: string
 }
@@ -308,6 +322,15 @@ export type DocComment = {
   parentId: string | null
   quote: string
   anchor: number
+  /** 划线区间（正文字符偏移）。 */
+  anchorFrom: number
+  anchorTo: number
+  /** 被 @ 的用户 ID（逗号分隔）。 */
+  mentions: string
+  /** 表情回应：{"👍": ["userId"]}。 */
+  reactions: Record<string, string[]>
+  /** 当前用户是否未读。 */
+  unread: boolean
   content: string
   resolved: boolean
   createdAt: string
@@ -322,7 +345,16 @@ export function listComments(documentId: string) {
 
 export function addComment(
   documentId: string,
-  input: { content: string; quote?: string; parentId?: string | null },
+  input: {
+    content: string
+    quote?: string
+    parentId?: string | null
+    /** 划线区间（正文字符偏移）。 */
+    anchorFrom?: number
+    anchorTo?: number
+    /** 被 @ 的用户 ID。 */
+    mentions?: string[]
+  },
 ) {
   return apiRequest<DocComment>(`/documents/${documentId}/comments`, {
     method: 'POST',
@@ -405,6 +437,8 @@ export type KnowledgeShare = {
   expiresAt: string | null
   /** false 时分享页禁止复制与导出。 */
   allowCopy: boolean
+  /** 分享白名单（逗号分隔的用户 ID）：非空时仅名单内成员可访问。 */
+  allowUsers: string
   createdAt: string
 }
 
@@ -554,13 +588,15 @@ export type PresenceUser = {
   name: string
   avatar: string
   editing: boolean
+  /** 协作者当前编辑位置（标题文本 + 偏移）。 */
+  cursor: string
   lastSeen: string
 }
 
-export function heartbeatPresence(documentId: string, editing: boolean) {
+export function heartbeatPresence(documentId: string, editing: boolean, cursor = '') {
   return apiRequest<{ ok: boolean }>(`/documents/${documentId}/presence`, {
     method: 'POST',
-    body: { editing },
+    body: { editing, cursor },
   })
 }
 

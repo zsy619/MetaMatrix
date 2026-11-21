@@ -2,6 +2,8 @@
 import { onMounted, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { diffDocVersions, labelDocVersion, listDocVersions, listVersionAuthors } from '../../api/knowledge'
+import { listVersionComments } from '../../api/knowledge_v5'
+import type { DocComment } from '../../api/knowledge'
 import type { DocVersion } from '../../api/knowledge'
 
 const props = defineProps<{ documentId: string }>()
@@ -18,6 +20,10 @@ const authors = ref<Record<string, string>>({})
 const sideBySide = ref(false)
 const fromHtml = ref('')
 const toHtml = ref('')
+/** 某个版本当时的评论（084）。 */
+const versionComments = ref<DocComment[]>([])
+const commentsOpen = ref(false)
+const commentsVersion = ref('')
 
 async function load() {
   loading.value = true
@@ -68,6 +74,17 @@ async function label(version: DocVersion) {
   }
 }
 
+/** 查看版本当时的评论（084）。 */
+async function showComments(version: DocVersion) {
+  try {
+    versionComments.value = await listVersionComments(props.documentId, version.id)
+    commentsVersion.value = new Date(version.createdAt).toLocaleString()
+    commentsOpen.value = true
+  } catch {
+    ElMessage.error('读取历史评论失败')
+  }
+}
+
 function restore(version: DocVersion) {
   emit('restored', version.html)
   ElMessage.success('已载入该版本，保存后生效')
@@ -115,6 +132,7 @@ onMounted(load)
           </span>
           <el-tag v-if="v.label" size="small" type="info">{{ v.label }}</el-tag>
           <el-button link size="small" @click="label(v)">标记</el-button>
+          <el-button link size="small" @click="showComments(v)">当时的评论</el-button>
           <el-button link size="small" @click="restore(v)">恢复</el-button>
         </li>
       </ul>
@@ -129,8 +147,28 @@ onMounted(load)
         </div>
       </div>
       <pre v-else-if="diff" class="versions__diff">{{ diff }}</pre>
-    </template>
+        <el-dialog v-model="commentsOpen" title="该版本当时的评论" width="480px" append-to-body>
+      <p class="versions__empty">版本时间：{{ commentsVersion }}</p>
+      <p v-if="!versionComments.length" class="versions__empty">该版本之前还没有评论。</p>
+      <ul v-else class="versions__comments">
+        <li v-for="comment in versionComments" :key="comment.id">
+          <span class="versions__time">{{ new Date(comment.createdAt).toLocaleString() }}</span>
+          <span>{{ comment.content }}</span>
+        </li>
+      </ul>
+    </el-dialog>
+</template>
   </div>
+    <el-dialog v-model="commentsOpen" title="该版本当时的评论" width="480px" append-to-body>
+      <p class="versions__empty">版本时间：{{ commentsVersion }}</p>
+      <p v-if="!versionComments.length" class="versions__empty">该版本之前还没有评论。</p>
+      <ul v-else class="versions__comments">
+        <li v-for="comment in versionComments" :key="comment.id">
+          <span class="versions__time">{{ new Date(comment.createdAt).toLocaleString() }}</span>
+          <span>{{ comment.content }}</span>
+        </li>
+      </ul>
+    </el-dialog>
 </template>
 
 <style scoped>
@@ -182,5 +220,10 @@ onMounted(load)
   color: var(--mm-muted, #86909c);
   font-size: 13px;
   padding: 10px 0;
+}
+.versions__comments { list-style: none; margin: 0; padding: 0; }
+.versions__comments li {
+  display: flex; gap: 8px; font-size: 13px; padding: 4px 0;
+  border-bottom: 1px solid var(--mm-line, #f2f3f5);
 }
 </style>

@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import * as knowledgeApi from '../../api/knowledge'
+import * as knowledgeApiV5 from '../../api/knowledge_v5'
 import type { DocProperties } from '../../api/knowledge'
+import type { FieldDef } from '../../api/knowledge_v5'
 
 const props = defineProps<{ documentId: string }>()
 const emit = defineEmits<{ changed: [props: DocProperties] }>()
@@ -20,11 +22,30 @@ const milestone = ref('')
 const sprint = ref('')
 const number = ref(0)
 
+/** 自定义字段定义与取值。 */
+const fields = ref<FieldDef[]>([])
+const fieldValues = ref<Record<string, unknown>>({})
+const newKey = ref('')
+
 const STATUS_LABELS: Record<string, string> = {
   draft: '草稿',
   published: '已发布',
   archived: '已归档',
 }
+
+const TYPE_LABELS: Record<string, string> = {
+  text: '文本',
+  number: '数字',
+  date: '日期',
+  select: '单选',
+  multi: '多选',
+  user: '人员',
+  checkbox: '勾选',
+  formula: '公式',
+}
+
+/** 公式字段的计算结果。 */
+const computedValues = computed(() => props_.value?.computed ?? {})
 
 async function load() {
   try {
@@ -40,9 +61,57 @@ async function load() {
     milestone.value = data.milestone ?? ''
     sprint.value = data.sprint ?? ''
     number.value = data.number ?? 0
+    fields.value = [...(data.fields ?? [])]
+    fieldValues.value = { ...(data.fieldValues ?? {}) }
   } catch {
     props_.value = null
   }
+}
+
+/** 新增自定义字段：key 由标签自动生成，避免手输重复。 */
+function addField() {
+  const label = newKey.value.trim()
+  if (!label) {
+    ElMessage.warning('请输入字段名')
+    return
+  }
+  const base =
+    label
+      .replace(/[^a-zA-Z0-9一-龥]/g, '')
+      .toLowerCase() || `field${fields.value.length + 1}`
+  let key = base
+  let i = 2
+  while (fields.value.some((f) => f.key === key)) {
+    key = `${base}${i++}`
+  }
+  fields.value.push({ key, label, type: 'text', required: false, order: fields.value.length + 1 })
+  newKey.value = ''
+}
+
+function removeField(key: string) {
+  fields.value = fields.value.filter((f) => f.key !== key)
+  const next = { ...fieldValues.value }
+  delete next[key]
+  fieldValues.value = next
+}
+
+function moveField(index: number, delta: number) {
+  const target = index + delta
+  if (target < 0 || target >= fields.value.length) return
+  const list = [...fields.value]
+  const [item] = list.splice(index, 1)
+  list.splice(target, 0, item)
+  list.forEach((f, i) => (f.order = i + 1))
+  fields.value = list
+}
+
+function fieldValue(key: string) {
+  const value = fieldValues.value[key]
+  return value === undefined || value === null ? '' : String(value)
+}
+
+function setFieldValue(key: string, value: string) {
+  fieldValues.value = { ...fieldValues.value, [key]: value }
 }
 
 async function save() {
@@ -62,10 +131,17 @@ async function save() {
       number: number.value,
     })
     props_.value = updated
-    emit('changed', updated)
+    // 自定义字段单独保存：定义与取值走 fields 接口。
+    const saved = await knowledgeApiV5.updateDocFields(
+      props.documentId,
+      fields.value,
+      fieldValues.value,
+    )
+    props_.value = saved
+    emit('changed', saved)
     ElMessage.success('属性已保存')
-  } catch {
-    ElMessage.error('属性保存失败')
+  } catch (err) {
+    ElMessage.error(`属性保存失败：${(err as Error)?.message ?? '未知错误'}`)
   } finally {
     saving.value = false
   }
@@ -129,6 +205,52 @@ onMounted(load)
       <span>封面色</span>
       <el-color-picker v-model="coverColor" size="small" />
     </label>
+
+    <div class="doc-props__section">自定义字段</div>
+    <div v-if="!fields.length" class="doc-props__hint">还没有自定义字段，可添加编号、预算、剩余天数等。</div>
+    <div v-for="(field, index) in fields" :key="field.key" class="doc-props__custom">
+      <div class="doc-props__custom-head">
+        <el-input v-model="field.label" size="small" style="width: 110px" />
+        <el-select v-model="field.type" size="small" style="width: 92px">
+          <el-option v-for="(label, key) in TYPE_LABELS" :key="key" :label="label" :value="key" />
+        </el-select>
+        <el-checkbox v-model="field.required" size="small">必填</el-checkbox>
+        <el-tooltip content="上移" placement="top">
+          <el-button size="small" text :disabled="index === 0" @click="moveField(index, -1)">↑</el-button>
+        </el-tooltip>
+        <el-tooltip content="下移" placement="top">
+          <el-button size="small" text :disabled="index === fields.length - 1" @click="moveField(index, 1)">↓</el-button>
+        </el-tooltip>
+        <el-tooltip content="在面板中隐藏" placement="top">
+          <el-button size="small" text @click="field.hidden = !field.hidden">
+            {{ field.hidden ? '显示' : '隐藏' }}
+          </el-button>
+        </el-tooltip>
+        <el-button size="small" text type="danger" @click="removeField(field.key)">删除</el-button>
+      </div>
+      <div v-if="field.type === 'formula'" class="doc-props__value">
+        <el-input
+          v-model="field.formula"
+          size="small"
+          placeholder="公式：如 {budget} - {cost}、remainingDays({dueAt})"
+        />
+        <span class="doc-props__computed">= {{ computedValues[field.key] ?? '—' }}</span>
+      </div>
+      <div v-else class="doc-props__value">
+        <el-input
+          :model-value="fieldValue(field.key)"
+          size="small"
+          :type="field.type === 'number' ? 'number' : 'text'"
+          :placeholder="field.required ? '必填' : '填写'"
+          @update:model-value="(v: string) => setFieldValue(field.key, v)"
+        />
+      </div>
+    </div>
+    <div class="doc-props__add">
+      <el-input v-model="newKey" size="small" placeholder="新增字段名，如：预算" @keyup.enter="addField" />
+      <el-button size="small" @click="addField">添加</el-button>
+    </div>
+
     <el-button size="small" type="primary" :loading="saving" @click="save">保存属性</el-button>
   </section>
 </template>
@@ -138,4 +260,17 @@ onMounted(load)
 .doc-props__title { font-size: 12px; font-weight: 600; color: var(--mm-muted, #86909c); }
 .doc-props__field { display: flex; flex-direction: column; gap: 4px; }
 .doc-props__field > span { font-size: 12px; color: var(--mm-muted, #86909c); }
+.doc-props__section {
+  margin-top: 6px; padding-top: 8px; border-top: 1px solid var(--mm-line, #f2f3f5);
+  font-size: 12px; font-weight: 600; color: var(--mm-muted, #86909c);
+}
+.doc-props__hint { font-size: 12px; color: var(--mm-muted, #86909c); }
+.doc-props__custom {
+  display: flex; flex-direction: column; gap: 6px; padding: 8px;
+  border: 1px solid var(--mm-line, #f2f3f5); border-radius: 6px;
+}
+.doc-props__custom-head { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.doc-props__value { display: flex; align-items: center; gap: 6px; }
+.doc-props__computed { font-size: 12px; color: var(--mm-blue, #1677ff); white-space: nowrap; }
+.doc-props__add { display: flex; gap: 6px; align-items: center; }
 </style>
