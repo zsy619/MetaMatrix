@@ -4,7 +4,10 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getNodeData, saveNodeData } from '../../api/knowledge'
 import SheetCell from './SheetCell.vue'
+import SheetExtras from './SheetExtras.vue'
+import SheetCalendarView from './SheetCalendarView.vue'
 import {
+  cellText,
   FIELD_TYPES,
   FILTER_OPS,
   createField,
@@ -17,6 +20,7 @@ import {
   migrateSheet,
   sortRows,
   uid,
+  type SheetCellValue,
   type SheetData,
   type SheetField,
   type SheetFieldType,
@@ -24,7 +28,7 @@ import {
   type SheetViewType,
 } from './sheetModel'
 
-const props = defineProps<{ projectId: string; nodeId: string }>()
+const props = defineProps<{ projectId: string; nodeId: string; title?: string }>()
 
 const data = ref<SheetData>(emptySheet())
 const activeViewId = ref('')
@@ -183,11 +187,44 @@ function moveField(field: SheetField, dir: -1 | 1) {
   scheduleSave()
 }
 
+/** 导入 CSV：把列与行追加到当前表格。 */
+function applyCsv(payload: { fields: SheetData['fields']; rows: SheetData['rows'] }) {
+  const fields = [...data.value.fields]
+  const rows = [...data.value.rows]
+  const idMap = new Map<string, string>()
+  for (const field of payload.fields) {
+    const existing = fields.find((f) => f.name === field.name)
+    if (existing) {
+      idMap.set(field.id, existing.id)
+      continue
+    }
+    fields.push(field)
+    idMap.set(field.id, field.id)
+  }
+  for (const row of payload.rows) {
+    const cells: Record<string, SheetCellValue> = {}
+    for (const [sourceId, value] of Object.entries(row.cells)) {
+      const targetId = idMap.get(sourceId)
+      if (targetId) cells[targetId] = value
+    }
+    rows.push({ id: row.id, cells })
+  }
+  data.value.fields = fields
+  data.value.rows = rows
+  scheduleSave()
+}
+
 // —— 视图 ——
 
 function addView(type: SheetViewType) {
   const name =
-    type === 'grid' ? '表格视图' : type === 'kanban' ? '看板视图' : '画廊视图'
+    type === 'grid'
+      ? '表格视图'
+      : type === 'kanban'
+        ? '看板视图'
+        : type === 'gallery'
+          ? '画廊视图'
+          : '日历视图'
   const v = createView(type, `${name} ${data.value.views.length + 1}`)
   data.value.views.push(v)
   activeViewId.value = v.id
@@ -273,7 +310,7 @@ onMounted(() => void load())
     <header class="sheet__bar">
       <div class="sheet__left">
         <span class="sheet__icon">📊</span>
-        <span class="sheet__name">多维表格</span>
+        <span class="sheet__name">{{ props.title || '多维表格' }}</span>
       </div>
 
       <nav class="sheet__views">
@@ -295,6 +332,7 @@ onMounted(() => void load())
               <el-dropdown-item command="grid">表格视图</el-dropdown-item>
               <el-dropdown-item command="kanban">看板视图</el-dropdown-item>
               <el-dropdown-item command="gallery">画廊视图</el-dropdown-item>
+              <el-dropdown-item command="calendar">日历视图</el-dropdown-item>
             </el-dropdown-menu>
           </template>
         </el-dropdown>
@@ -381,6 +419,7 @@ onMounted(() => void load())
           </div>
         </el-popover>
 
+        <SheetExtras :data="data" :view="view" @import-csv="applyCsv" />
         <el-button size="small" @click="fieldPanel = true">字段</el-button>
         <span v-if="dirty" class="sheet__dirty">未保存</span>
         <el-button size="small" type="primary" :loading="saving" @click="save">保存</el-button>
@@ -394,6 +433,11 @@ onMounted(() => void load())
     </div>
 
     <div v-if="loading" class="sheet__empty">加载中…</div>
+
+    <!-- 日历视图 -->
+    <div v-else-if="view?.type === 'calendar'">
+      <SheetCalendarView :data="data" :view="view" />
+    </div>
 
     <!-- 表格视图 -->
     <div v-else-if="view?.type === 'grid'" class="sheet__grid-wrap">
@@ -504,7 +548,7 @@ onMounted(() => void load())
               @click="detailRowId = row.id"
             >
               <div class="sheet__card-title">
-                {{ primaryField ? row.cells[primaryField.id] : '' }}
+                {{ primaryField ? cellText(row.cells[primaryField.id]) : '' }}
               </div>
               <div class="sheet__card-meta">
                 <span
@@ -512,7 +556,7 @@ onMounted(() => void load())
                   :key="fd.id"
                   class="sheet__card-chip"
                 >
-                  {{ fd.name }}：{{ row.cells[fd.id] ?? '' }}
+                  {{ fd.name }}：{{ cellText(row.cells[fd.id]) }}
                 </span>
               </div>
             </article>
@@ -531,11 +575,11 @@ onMounted(() => void load())
         @click="detailRowId = row.id"
       >
         <div class="sheet__gallery-title">
-          {{ primaryField ? row.cells[primaryField.id] : '未命名' }}
+          {{ primaryField ? cellText(row.cells[primaryField.id]) : '未命名' }}
         </div>
         <div v-for="fd in fields.filter((f) => f.id !== primaryField?.id)" :key="fd.id" class="sheet__gallery-line">
           <span class="sheet__gallery-label">{{ fd.name }}</span>
-          <span class="sheet__gallery-value">{{ row.cells[fd.id] ?? '' }}</span>
+          <span class="sheet__gallery-value">{{ cellText(row.cells[fd.id]) }}</span>
         </div>
       </article>
     </div>

@@ -12,6 +12,7 @@ import * as knowledgeApi from '../api/knowledge'
 import { updateDocument } from '../api/documents'
 import type { KnowledgeTemplate } from '../api/knowledge'
 import { updateTemplateProperties } from '../api/knowledge_v5'
+import { publishTemplate } from '../api/knowledge_v6'
 import type { FieldDef } from '../api/knowledge_v5'
 import { friendlyApiMessage } from '../utils/apiMessage'
 import { useAuthStore } from '../stores/auth'
@@ -168,6 +169,17 @@ async function changeScope(tpl: KnowledgeTemplate, next: string) {
   }
 }
 
+/** 发布 / 下架团队共享模板（清单 026）。 */
+async function togglePublish(tpl: KnowledgeTemplate, published: boolean) {
+  try {
+    await publishTemplate(projectId.value, tpl.id, published)
+    tpl.published = published
+    ElMessage.success(published ? '模板已发布，团队成员可见' : '模板已下架')
+  } catch (err) {
+    ElMessage.error(friendlyApiMessage(err, '操作失败'))
+  }
+}
+
 async function remove(tpl: KnowledgeTemplate) {
   try {
     await ElMessageBox.confirm(`删除模板「${tpl.label}」？`, '确认删除', {
@@ -223,6 +235,9 @@ onMounted(load)
             <div class="tpl-card__title">{{ tpl.label }}</div>
             <div class="tpl-card__meta">
               <el-tag size="small" type="info">{{ scopeLabels[tpl.builtin ? 'builtin' : tpl.scope] ?? '个人' }}</el-tag>
+              <el-tag v-if="tpl.scope === 'team'" size="small" :type="tpl.published ? 'success' : 'info'">
+                {{ tpl.published ? '已发布' : '未发布' }}
+              </el-tag>
               <span>{{ tpl.builtin ? '系统内置' : '自定义模板' }}</span>
             </div>
           </div>
@@ -239,6 +254,14 @@ onMounted(load)
                   </el-dropdown-menu>
                 </template>
               </el-dropdown>
+              <el-button
+                v-if="tpl.scope === 'team'"
+                size="small"
+                :type="tpl.published ? 'success' : 'warning'"
+                @click="togglePublish(tpl, !tpl.published)"
+              >
+                {{ tpl.published ? '下架' : '发布' }}
+              </el-button>
               <el-button size="small" text @click="openProps(tpl)">属性</el-button>
               <el-button size="small" text @click="move(tpl, -1)">↑</el-button>
               <el-button size="small" text @click="move(tpl, 1)">↓</el-button>

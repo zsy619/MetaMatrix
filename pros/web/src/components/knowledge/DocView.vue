@@ -14,8 +14,11 @@ import DocProperties from './DocProperties.vue'
 import DocComments from './DocComments.vue'
 import DocVersions from './DocVersions.vue'
 import AiPanel from './AiPanel.vue'
+import WriteAssist from './WriteAssist.vue'
+import MeetingMinutesDialog from './MeetingMinutesDialog.vue'
+import { CollabDoc } from './collab/crdtDoc'
 import ShareDialog from './ShareDialog.vue'
-import ProjectEmojiPicker from '../project/ProjectEmojiPicker.vue'
+import IconPicker from '../common/IconPicker.vue'
 import { getDocument, updateDocument } from '../../api/documents'
 import { apiRequestBlob } from '../../api/http'
 import type { DocumentFull } from '../../api/documents'
@@ -64,6 +67,10 @@ const exporting = ref(false)
 const iconOpen = ref(false)
 const sidebarTab = ref<'outline' | 'tasks' | 'properties' | 'comments' | 'backrefs' | 'history' | 'versions' | 'ai'>('outline')
 const shareVisible = ref(false)
+const minutesVisible = ref(false)
+/** 协同编辑（079）：开启后本地改动先写入 CRDT，再由服务端增量同步给其他人。 */
+const collabOn = ref(false)
+const collab = ref<CollabDoc | null>(null)
 const presence = ref<PresenceUser[]>([])
 const quote = ref('')
 /** 划线区间：正文字符偏移（041）。 */
@@ -124,8 +131,55 @@ async function loadLastEditor() {
 
 function onHtml(next: string) {
   html.value = next
+  // 协同模式下本地改动先写进 CRDT：增量会同步给其他协作者。
+  collab.value?.applyLocal(next)
   dirty.value = true
   scheduleSave()
+}
+
+/** 插入 AI 续写建议。 */
+function insertSuggestion(text: string) {
+  const inst = editorRef.value as unknown as {
+    editor?: { commands?: { insertContent?: (content: string) => boolean } }
+  } | null
+  const inserted = inst?.editor?.commands?.insertContent?.(text)
+  if (!inserted) {
+    html.value = `${html.value}${text}`
+    dirty.value = true
+    scheduleSave()
+  }
+}
+
+/** 开启 / 关闭协同编辑。 */
+async function toggleCollab() {
+  if (collabOn.value) {
+    collab.value?.stop()
+    collab.value = null
+    collabOn.value = false
+    ElMessage.info('已退出协同模式')
+    return
+  }
+  try {
+    const instance = new CollabDoc({
+      documentId: props.documentId,
+      onRemote: (merged) => {
+        if (!merged || merged === html.value) return
+        html.value = merged
+        // 远端内容已合并进 CRDT，不再触发一次本地保存，避免两边互相覆盖。
+        dirty.value = false
+      },
+      onError: () => {
+        ElMessage.warning('协同同步暂时不可用，已继续本地编辑')
+      },
+    })
+    const merged = await instance.start(html.value)
+    if (merged && merged !== html.value) html.value = merged
+    collab.value = instance
+    collabOn.value = true
+    ElMessage.success('已进入协同模式')
+  } catch {
+    ElMessage.error('协同模式开启失败')
+  }
 }
 
 /**
@@ -226,6 +280,14 @@ function currentCursor() {
   if (!sel?.$from) return ''
   const text = sel.$from.parent?.textContent ?? ''
   return `${text.slice(0, 40)}@${sel.from ?? 0}`
+}
+
+/** 当前段落文本：写作补全的上下文。 */
+function currentParagraph(): string {
+  const inst = editorRef.value as unknown as {
+    editor?: { state?: { selection?: { $from?: { parent?: { textContent?: string } } } } }
+  } | null
+  return inst?.editor?.state?.selection?.$from?.parent?.textContent ?? ''
 }
 
 /** 待办块（045）。 */
@@ -491,6 +553,8 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('beforeunload', onBeforeUnload)
   if (presenceTimer) clearInterval(presenceTimer)
+  collab.value?.stop()
+  collab.value = null
 })
 
 function onBeforeUnload(e: BeforeUnloadEvent) {
@@ -517,10 +581,11 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
             {{ icon }}
           </button>
         </template>
-        <ProjectEmojiPicker :model-value="icon" @update:model-value="pickIcon" />
-        <el-button class="doc-view__icon-reset" text size="small" @click="pickIcon('')">
-          恢复默认图标
-        </el-button>
+        <IconPicker
+          :model-value="icon"
+          :width="420"
+          @update:model-value="pickIcon"
+        />
       </el-popover>
       <input
         class="doc-view__title"
@@ -559,6 +624,13 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
         </template>
       </el-dropdown>
       <el-button text @click="insertToc">目录</el-button>
+      <WriteAssist
+        :document-id="props.documentId"
+        :paragraph="currentParagraph()"
+        @insert="insertSuggestion"
+      />
+      <el-button text @click="minutesVisible = true">会议纪要</el-button>
+      <el-button text @click="toggleCollab">{{ collabOn ? '退出协同' : '协同编辑' }}</el-button>
       <el-button text :icon="Clock" @click="sidebarTab = 'history'">历史</el-button>
       <el-button text :icon="Share" @click="shareVisible = true">分享</el-button>
       <span v-if="lastEditor" class="doc-view__last-editor">
@@ -666,6 +738,11 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
         </el-tabs>
       </aside>
     </div>
+    <MeetingMinutesDialog
+      v-model="minutesVisible"
+      :project-id="props.projectId"
+      :parent-id="props.nodeId ?? null"
+    />
     <ShareDialog :document-id="documentId" :visible="shareVisible" @close="shareVisible = false" />
   </section>
 </template>

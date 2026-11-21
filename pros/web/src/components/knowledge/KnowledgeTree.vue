@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import * as knowledgeApi from '../../api/knowledge'
+import * as knowledgeApiV6 from '../../api/knowledge_v6'
 import * as knowledgeApiV5 from '../../api/knowledge_v5'
 import { pinyin } from 'pinyin-pro'
 import type { KnowledgeNode, KnowledgeTemplate } from '../../api/knowledge'
@@ -17,10 +18,11 @@ import {
 } from '../../stores/document'
 import MenuCascade from './MenuCascade.vue'
 import type { MenuAnchor, MenuNode } from './MenuCascade.vue'
+import NodeMenu from './NodeMenu.vue'
 import { RTE_DOC_TEMPLATES, RTE_DOC_TEMPLATE_GROUPS } from '../rteDocTemplates'
 import { SHEET_PRESETS, type SheetPreset } from './sheetModel'
 import { mindmapFromHeadings } from './mindmapModel'
-import ProjectEmojiPicker from '../project/ProjectEmojiPicker.vue'
+import IconPicker from '../common/IconPicker.vue'
 
 const props = defineProps<{ projectId: string; activeDocumentId?: string }>()
 const router = useRouter()
@@ -43,6 +45,8 @@ const templates = ref<KnowledgeTemplate[]>([])
 const loading = ref(false)
 const error = ref('')
 const view = ref<'all' | 'favorite' | 'archived' | 'trash'>('all')
+/** 检索筛选区暂时隐藏（保留代码，改回 true 即恢复）。 */
+const showSearchFilters = false
 const archivedNodes = ref<KnowledgeNode[]>([])
 /** 目录排序视图：按树结构 / 按最近更新。 */
 const sortMode = ref<'tree' | 'updated'>('tree')
@@ -164,6 +168,8 @@ const searchType = ref<'all' | 'doc' | 'sheet' | 'mindmap' | 'folder'>('all')
 const searchScope = ref<'space' | 'global'>('space')
 /** 结果排序：最近更新 / 字数 / 标题（057）。 */
 const searchSort = ref<'updated' | 'word' | 'title'>('updated')
+/** 语义检索（106）：开启后用向量召回补充关键词结果。 */
+const semanticSearchOn = ref(false)
 const searchAuthor = ref('')
 const authors = ref<{ id: string; name: string }[]>([])
 let searchTimer: ReturnType<typeof setTimeout> | null = null
@@ -195,7 +201,35 @@ async function runSearch() {
             limit: 30,
           })
     if (seq !== searchSeq) return
-    searchHits.value = hits
+    let merged = hits
+    // 语义召回：同空间下把向量结果并进关键词结果（按文档去重）。
+    if (semanticSearchOn.value && searchScope.value === 'space' && searchQuery.value.trim()) {
+      try {
+        const semantic = await knowledgeApiV6.semanticSearch(props.projectId, searchQuery.value.trim(), 20)
+        const seen = new Set(hits.map((hit) => hit.documentId))
+        for (const item of semantic) {
+          if (!item.documentId || seen.has(item.documentId)) continue
+          seen.add(item.documentId)
+          merged.push({
+            nodeId: '',
+            documentId: item.documentId,
+            title: item.title,
+            summary: item.snippet,
+            nodeType: 'doc',
+            author: '',
+            authorId: '',
+            tags: '',
+            updatedAt: '',
+            snippet: item.snippet,
+            words: 0,
+          })
+        }
+      } catch {
+        /* 语义检索不可用时退回关键词结果 */
+      }
+    }
+    if (seq !== searchSeq) return
+    searchHits.value = merged
   } catch {
     if (seq === searchSeq) searchHits.value = []
   } finally {
@@ -533,7 +567,10 @@ function nodeOf(documentId: string): KnowledgeNode | null {
 
 defineExpose({ setDocTitle, docIcon, setDocIcon, pathOf, nodeOf })
 
-function onNodeClick(data: TreeNode) {
+function onNodeClick(data: TreeNode, _node?: unknown, _component?: unknown, event?: MouseEvent) {
+  // 点「⋯」这类操作按钮时不打开文档，只让菜单自己处理。
+  const target = event?.target as HTMLElement | undefined
+  if (target?.closest?.('.kn-tree__node-tools')) return
   if (data.node.nodeType === 'canvas') {
     emit('open-canvas', data.node)
     return
@@ -1134,6 +1171,26 @@ async function onContext(cmd: string, node: KnowledgeNode) {
   if (cmd === 'mindmap') return convertToMindmap(node)
 }
 
+/** 右键 / 「⋯」共用的节点菜单。 */
+const nodeMenu = ref<{ node: KnowledgeNode; x: number; y: number } | null>(null)
+
+function openNodeMenu(event: MouseEvent, node: KnowledgeNode) {
+  const target = event.currentTarget as HTMLElement | null
+  const rect = target?.getBoundingClientRect()
+  const x = event.type === 'contextmenu' ? event.clientX : (rect?.left ?? 0)
+  const y = event.type === 'contextmenu' ? event.clientY : (rect?.bottom ?? 0)
+  nodeMenu.value = {
+    node,
+    x: Math.min(x, window.innerWidth - 190),
+    y: Math.min(y, window.innerHeight - 340),
+  }
+}
+
+function onNodeMenuCommand(cmd: string, node: KnowledgeNode) {
+  nodeMenu.value = null
+  void onContext(cmd, node)
+}
+
 /** 合并后的新建菜单：新建项 + 文档模板（分类→模板）+ 画布（分类→画布）+ 导入。 */
 const menuNodes = computed<MenuNode[]>(() => [
   { key: 'folder', label: '文件夹', icon: '📁', action: () => addStructuredNode(null, 'folder') },
@@ -1235,13 +1292,19 @@ function updateAnchor() {
 }
 
 function onDocMouseDown(e: MouseEvent) {
-  if (!createOpen.value) return
   const t = e.target as HTMLElement | null
+  if (nodeMenu.value) {
+    if (t?.closest('.node-menu')) return
+    nodeMenu.value = null
+    return
+  }
+  if (!createOpen.value) return
   if (t?.closest('.mm-menu-root, .mm-flyout, .kn-create__btn')) return
   createOpen.value = false
 }
 
 function onDocKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape') nodeMenu.value = null
   if (e.key === 'Escape') createOpen.value = false
 }
 
@@ -1329,23 +1392,26 @@ onBeforeUnmount(() => {
         clearable
         @input="onSearchInput"
       />
+      <el-tooltip content="语义检索：用向量召回补充关键词结果" placement="top">
+        <el-checkbox v-model="semanticSearchOn" size="small" class="kn-tree__semantic">语义</el-checkbox>
+      </el-tooltip>
       <div class="kn-tree__filters">
-        <el-select v-model="searchType" size="small">
+        <el-select v-if="showSearchFilters" v-model="searchType" size="small">
           <el-option label="全部类型" value="all" />
           <el-option label="知识库文档" value="doc" />
           <el-option label="多维表格" value="sheet" />
           <el-option label="思维导图" value="mindmap" />
           <el-option label="文件夹" value="folder" />
         </el-select>
-        <el-select v-model="searchAuthor" size="small" clearable placeholder="作者">
+        <el-select v-if="showSearchFilters" v-model="searchAuthor" size="small" clearable placeholder="作者">
           <el-option label="全部作者" value="" />
           <el-option v-for="author in authors" :key="author.id" :label="author.name" :value="author.id" />
         </el-select>
-        <el-select v-model="searchScope" size="small">
+        <el-select v-if="showSearchFilters" v-model="searchScope" size="small">
           <el-option label="本空间" value="space" />
           <el-option label="全部项目" value="global" />
         </el-select>
-        <el-select v-model="searchSort" size="small">
+        <el-select v-if="showSearchFilters" v-model="searchSort" size="small">
           <el-option label="最近更新" value="updated" />
           <el-option label="字数最多" value="word" />
           <el-option label="标题" value="title" />
@@ -1356,7 +1422,7 @@ onBeforeUnmount(() => {
         <el-button size="small" type="primary" @click="importFeishuDoc">导入到知识库</el-button>
       </div>
 
-      <div class="kn-tree__views-saved">
+      <div v-if="showSearchFilters" class="kn-tree__views-saved">
         <el-input v-model="viewName" size="small" placeholder="保存当前筛选为视图" style="width: 150px" />
         <el-button size="small" text @click="saveCurrentView">保存视图</el-button>
         <el-tag
@@ -1462,17 +1528,17 @@ onBeforeUnmount(() => {
       @keydown="onTreeKeydown"
     >
       <template #default="{ data }">
-        <el-dropdown trigger="contextmenu" @command="(cmd: string) => onContext(cmd, data.node)">
-          <div
-            class="kn-tree__node"
-            :data-node-id="data.node.id"
-            @mouseenter="onNodeHover(data.node)"
-            @mouseleave="hoveredNodeId = ''"
-          >
+        <div
+          class="kn-tree__node"
+          :data-node-id="data.node.id"
+          @mouseenter="onNodeHover(data.node)"
+          @mouseleave="hoveredNodeId = ''"
+          @contextmenu.prevent="openNodeMenu($event, data.node)"
+        >
             <el-popover
               trigger="click"
               placement="right-start"
-              :width="220"
+              :width="320"
               popper-class="kn-emoji-popper"
               @show="emojiTarget = data.node"
               @hide="emojiTarget = null"
@@ -1480,7 +1546,12 @@ onBeforeUnmount(() => {
               <template #reference>
                 <span class="kn-tree__node-icon" title="更换图标">{{ data.node.icon }}</span>
               </template>
-              <ProjectEmojiPicker :model-value="data.node.icon" @update:model-value="applyEmoji" />
+              <IconPicker
+                v-if="emojiTarget && emojiTarget.id === data.node.id"
+                :model-value="data.node.icon"
+                :width="300"
+                @update:model-value="applyEmoji"
+              />
             </el-popover>
             <span
               v-if="hoveredNodeId === data.node.id && hoveredStats"
@@ -1513,57 +1584,26 @@ onBeforeUnmount(() => {
                 aria-label="收藏"
                 @click.stop="toggleFavorite(data.node)"
               >★</button>
-              <el-dropdown trigger="click" @click.stop>
-                <span class="kn-tree__more">⋯</span>
-                <template #dropdown>
-                  <el-dropdown-menu>
-                    <el-dropdown-item @click="renameNode(data.node)">重命名</el-dropdown-item>
-                    <el-dropdown-item @click="toggleFavorite(data.node)">
-                      {{ data.node.favorite ? '取消收藏' : '收藏' }}
-                    </el-dropdown-item>
-                    <el-dropdown-item @click="copyNode(data.node)">复制节点</el-dropdown-item>
-                    <el-dropdown-item
-                      v-if="data.node.nodeType === 'doc' && data.node.documentId"
-                      @click="convertToMindmap(data.node)"
-                    >
-                      转为思维导图
-                    </el-dropdown-item>
-                    <el-dropdown-item @click="openAccess(data.node)">可见范围</el-dropdown-item>
-                    <el-dropdown-item @click="archiveNode(data.node)" divided>归档</el-dropdown-item>
-                    <el-dropdown-item @click="trashNode(data.node)">
-                      <span style="color: var(--el-color-danger)">移入回收站</span>
-                    </el-dropdown-item>
-                  </el-dropdown-menu>
-                </template>
-              </el-dropdown>
+              <button
+                type="button"
+                class="kn-tree__more"
+                title="更多操作"
+                aria-label="更多操作"
+                @click.stop="openNodeMenu($event, data.node)"
+              >⋯</button>
             </span>
           </div>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item command="child">新建子文档</el-dropdown-item>
-              <el-dropdown-item command="sibling">新建同级文档</el-dropdown-item>
-              <el-dropdown-item command="rename" divided>重命名</el-dropdown-item>
-              <el-dropdown-item command="favorite">
-                {{ data.node.favorite ? '取消收藏' : '收藏' }}
-              </el-dropdown-item>
-              <el-dropdown-item command="copy">复制节点</el-dropdown-item>
-              <el-dropdown-item
-                v-if="data.node.nodeType === 'doc' && data.node.documentId"
-                command="mindmap"
-              >
-                转为思维导图
-              </el-dropdown-item>
-              <el-dropdown-item command="archive" divided>归档</el-dropdown-item>
-              <el-dropdown-item command="trash">
-                <span style="color: var(--el-color-danger)">移入回收站</span>
-              </el-dropdown-item>
-              <el-dropdown-item command="delete" divided>删除（含子节点）</el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
       </template>
     </el-tree>
     </div>
+
+    <NodeMenu
+      v-if="nodeMenu"
+      :node="nodeMenu.node"
+      :x="nodeMenu.x"
+      :y="nodeMenu.y"
+      @command="onNodeMenuCommand"
+    />
 
     <el-dialog v-model="deleteDialogOpen" title="删除节点" width="380px">
       <p class="kn-tree__dialog-text">

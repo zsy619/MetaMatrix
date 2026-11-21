@@ -4,6 +4,7 @@ import { ElMessage } from 'element-plus'
 import { Download, Plus, Warning } from '@element-plus/icons-vue'
 import * as knowledgeApi from '../../api/knowledge'
 import * as knowledgeApiV5 from '../../api/knowledge_v5'
+import SpaceMembers from './SpaceMembers.vue'
 import type {
   KnowledgeEvent,
   KnowledgeQualityItem,
@@ -30,6 +31,8 @@ const dict = ref<knowledgeApiV5.TagDictEntry[]>([])
 const dictTag = ref('')
 const dictCategory = ref('')
 const dictAliases = ref('')
+/** 空间成员与角色（069）。 */
+const membersVisible = ref(false)
 
 const healthLabels: Record<string, string> = {
   no_title: '缺标题',
@@ -156,6 +159,7 @@ onMounted(load)
 
 <template>
   <section class="kn-home">
+    <SpaceMembers v-model="membersVisible" :project-id="props.projectId" />
     <header class="kn-home__head">
       <div>
         <h2>空间概览</h2>
@@ -164,6 +168,7 @@ onMounted(load)
       <div class="kn-home__actions">
         <el-button size="small" :icon="Download" @click="exportTree">导出目录树</el-button>
         <el-button size="small" @click="exportSpace">打包导出空间</el-button>
+        <el-button size="small" @click="membersVisible = true">空间成员</el-button>
       </div>
     </header>
 

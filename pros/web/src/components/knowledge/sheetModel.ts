@@ -38,7 +38,7 @@ export type SheetFilter = {
   value: string
 }
 
-export type SheetViewType = 'grid' | 'kanban' | 'gallery'
+export type SheetViewType = 'grid' | 'kanban' | 'gallery' | 'calendar'
 
 export type SheetView = {
   id: string
@@ -379,3 +379,265 @@ export const SHEET_PRESETS: SheetPreset[] = [
       ),
   },
 ]
+
+// ---------------------------------------------------------------- 公式与汇总（038）
+
+/** 汇总方式。 */
+export type SheetAggregate = 'sum' | 'avg' | 'count' | 'max' | 'min'
+
+/** 单元格公式：引用同行的其它列，如 `={单价}*{数量}`。 */
+export const FORMULA_PREFIX = '='
+
+/**
+ * 计算公式列的值。
+ *
+ * 只支持四则运算与括号，列引用用 {列名} 写死，够用且不会引入表达式解析器。
+ * 引用不存在或算式非法时返回空串，不抛错：表格里一个坏公式不该拖垮整张表。
+ */
+export function evaluateFormula(
+  formula: string,
+  row: SheetRow,
+  fields: SheetField[],
+): number | string {
+  const expr = (formula ?? '').trim()
+  if (!expr.startsWith(FORMULA_PREFIX)) return ''
+  const body = expr.slice(FORMULA_PREFIX.length).trim()
+  if (!body) return ''
+  let substituted = body
+  for (const field of fields) {
+    const raw = row.cells[field.id]
+    const value = typeof raw === 'number' ? raw : Number(raw ?? 0)
+    const safe = Number.isFinite(value) ? String(value) : '0'
+    substituted = substituted.split(`{${field.name}}`).join(safe)
+  }
+  // 未解析的 {列名} 说明引用了不存在的列。
+  if (/[{}]/.test(substituted)) return ''
+  const result = evalArithmetic(substituted)
+  return result === null ? '' : result
+}
+
+/** 极简四则运算求值：只支持数字与 + - * / ( )。 */
+function evalArithmetic(expr: string): number | null {
+  const tokens = expr.match(/\d+(\.\d+)?|[()+\-*/]/g)
+  if (!tokens) return null
+  let pos = 0
+  const peek = () => tokens[pos]
+  const eat = () => tokens[pos++]
+
+  function parseExpr(): number | null {
+    let left = parseTerm()
+    if (left === null) return null
+    while (peek() === '+' || peek() === '-') {
+      const op = eat()
+      const right = parseTerm()
+      if (right === null) return null
+      left = op === '+' ? left + right : left - right
+    }
+    return left
+  }
+
+  function parseTerm(): number | null {
+    let left = parseFactor()
+    if (left === null) return null
+    while (peek() === '*' || peek() === '/') {
+      const op = eat()
+      const right = parseFactor()
+      if (right === null) return null
+      if (op === '*') left *= right
+      else {
+        if (right === 0) return null
+        left /= right
+      }
+    }
+    return left
+  }
+
+  function parseFactor(): number | null {
+    const token = peek()
+    if (token === undefined) return null
+    if (token === '(') {
+      eat()
+      const value = parseExpr()
+      if (value === null || eat() !== ')') return null
+      return value
+    }
+    if (token === '-') {
+      eat()
+      const value = parseFactor()
+      return value === null ? null : -value
+    }
+    if (/^\d/.test(token)) {
+      eat()
+      return Number(token)
+    }
+    return null
+  }
+
+  const value = parseExpr()
+  if (value === null || pos !== tokens.length) return null
+  return Number.isFinite(value) ? value : null
+}
+
+/** 汇总行：按视图配置计算每列的聚合值。 */
+export function summaryValues(
+  rows: SheetRow[],
+  fields: SheetField[],
+  aggregates: Record<string, SheetAggregate>,
+): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const field of fields) {
+    const mode = aggregates[field.id]
+    if (!mode) continue
+    const values = rows
+      .map((row) => row.cells[field.id])
+      .map((value) => (typeof value === 'number' ? value : Number(value)))
+      .filter((value) => Number.isFinite(value))
+    if (mode === 'count') {
+      out[field.id] = String(rows.length)
+      continue
+    }
+    if (!values.length) {
+      out[field.id] = ''
+      continue
+    }
+    const sum = values.reduce((acc, value) => acc + value, 0)
+    if (mode === 'sum') out[field.id] = formatNumber(sum)
+    else if (mode === 'avg') out[field.id] = formatNumber(sum / values.length)
+    else if (mode === 'max') out[field.id] = formatNumber(Math.max(...values))
+    else out[field.id] = formatNumber(Math.min(...values))
+  }
+  return out
+}
+
+function formatNumber(value: number): string {
+  if (Number.isInteger(value)) return String(value)
+  return String(Number(value.toFixed(2)))
+}
+
+// ---------------------------------------------------------------- 日历视图（035）
+
+/** 日历视图：按日期字段把行分到每天。 */
+export function calendarBuckets(
+  rows: SheetRow[],
+  dateFieldId: string | null,
+): Map<string, SheetRow[]> {
+  const buckets = new Map<string, SheetRow[]>()
+  if (!dateFieldId) return buckets
+  for (const row of rows) {
+    const raw = row.cells[dateFieldId]
+    const day = typeof raw === 'string' ? raw.slice(0, 10) : ''
+    if (!day) continue
+    const list = buckets.get(day) ?? []
+    list.push(row)
+    buckets.set(day, list)
+  }
+  return buckets
+}
+
+/** 日历视图的月份列表（含前后补齐的空白周）。 */
+export function calendarMonthDays(year: number, month: number): string[] {
+  const days: string[] = []
+  const first = new Date(year, month, 1)
+  const offset = (first.getDay() + 6) % 7 // 周一为一周起点
+  for (let i = 0; i < offset; i++) days.push('')
+  const last = new Date(year, month + 1, 0).getDate()
+  for (let day = 1; day <= last; day++) {
+    days.push(`${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`)
+  }
+  return days
+}
+
+// ---------------------------------------------------------------- CSV 导入导出（039 / 040）
+
+/**
+ * 解析 CSV：第一行是列名，其余是行。
+ *
+ * 支持引号包裹、引号内逗号与换行；不做类型推断，导入后全部按文本，
+ * 用户可以在表格里改列类型。
+ */
+export function parseCSV(text: string): { fields: SheetField[]; rows: SheetRow[] } {
+  const records = parseCSVRecords(text ?? '')
+  if (!records.length) return { fields: [], rows: [] }
+  const names = records[0].map((name, i) => name.trim() || `列 ${i + 1}`)
+  const fields: SheetField[] = names.map((name, i) => ({
+    ...createField('text', name),
+    id: `f_csv_${i}`,
+  }))
+  const rows: SheetRow[] = records.slice(1).map((record) => {
+    const cells: Record<string, SheetCellValue> = {}
+    fields.forEach((field, i) => {
+      cells[field.id] = record[i] ?? ''
+    })
+    return { id: uid('r'), cells }
+  })
+  return { fields, rows }
+}
+
+function parseCSVRecords(text: string): string[][] {
+  const records: string[][] = []
+  let record: string[] = []
+  let field = ''
+  let inQuotes = false
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i]
+    if (inQuotes) {
+      if (char === '"') {
+        if (text[i + 1] === '"') {
+          field += '"'
+          i++
+        } else {
+          inQuotes = false
+        }
+      } else {
+        field += char
+      }
+      continue
+    }
+    if (char === '"') {
+      inQuotes = true
+      continue
+    }
+    if (char === ',') {
+      record.push(field)
+      field = ''
+      continue
+    }
+    if (char === '\n' || char === '\r') {
+      if (char === '\r' && text[i + 1] === '\n') i++
+      record.push(field)
+      field = ''
+      if (record.some((value) => value !== '')) records.push(record)
+      record = []
+      continue
+    }
+    field += char
+  }
+  if (field !== '' || record.length) {
+    record.push(field)
+    if (record.some((value) => value !== '')) records.push(record)
+  }
+  return records
+}
+
+/** 导出 CSV：当前视图的筛选与排序结果。 */
+export function toCSV(data: SheetData, view?: SheetView): string {
+  const fields = data.fields
+  const rows = view ? viewRows(data, view) : data.rows
+  const lines: string[] = [fields.map((field) => csvCell(field.name)).join(',')]
+  for (const row of rows) {
+    lines.push(fields.map((field) => csvCell(cellText(row.cells[field.id]))).join(','))
+  }
+  return lines.join('\n')
+}
+
+function csvCell(value: string): string {
+  const text = value ?? ''
+  if (/[",\n]/.test(text)) return `"${text.replace(/"/g, '""')}"`
+  return text
+}
+
+/** 按视图的筛选与排序得到行集合。 */
+export function viewRows(data: SheetData, view: SheetView): SheetRow[] {
+  const filtered = filterRows(data.rows, view.filters, '')
+  return sortRows(filtered, view.sortBy, view.sortOrder)
+}

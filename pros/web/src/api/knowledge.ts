@@ -135,6 +135,9 @@ export type KnowledgeTemplate = {
   scope: string
   html: string
   builtin: boolean
+  /** 团队模板是否已发布（发布后空间成员可见）。 */
+  published: boolean
+  publishedAt: string | null
   sortOrder: number
 }
 

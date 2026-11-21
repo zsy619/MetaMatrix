@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import * as knowledgeApi from '../../api/knowledge'
 import * as knowledgeApiV5 from '../../api/knowledge_v5'
+import { getDocStructure, type DocStructure } from '../../api/knowledge_v6'
 import type { DocProperties } from '../../api/knowledge'
 import type { FieldDef } from '../../api/knowledge_v5'
 
@@ -21,6 +22,9 @@ const priority = ref('normal')
 const milestone = ref('')
 const sprint = ref('')
 const number = ref(0)
+
+/** 结构块统计（047）：表格 / 白板 / 流程图 / 图表。 */
+const structure = ref<DocStructure | null>(null)
 
 /** 自定义字段定义与取值。 */
 const fields = ref<FieldDef[]>([])
@@ -49,6 +53,14 @@ const computedValues = computed(() => props_.value?.computed ?? {})
 
 async function load() {
   try {
+    // 结构块统计失败不影响属性面板本身。
+    getDocStructure(props.documentId)
+      .then((data) => {
+        structure.value = data
+      })
+      .catch(() => {
+        structure.value = null
+      })
     const data = await knowledgeApi.getDocProperties(props.documentId)
     props_.value = data
     status.value = data.status
@@ -205,6 +217,16 @@ onMounted(load)
       <span>封面色</span>
       <el-color-picker v-model="coverColor" size="small" />
     </label>
+
+    <div class="doc-props__section">结构块</div>
+    <div v-if="structure" class="doc-props__blocks">
+      <el-tag size="small" type="info">表格 {{ structure.tables }}</el-tag>
+      <el-tag size="small" type="info">白板 {{ structure.whiteboards }}</el-tag>
+      <el-tag size="small" type="info">流程图 {{ structure.flowcharts }}</el-tag>
+      <el-tag size="small" type="info">画布嵌入 {{ structure.embeds }}</el-tag>
+      <el-tag size="small" type="success">结构引用 {{ structure.refs }}</el-tag>
+    </div>
+    <div v-else class="doc-props__hint">结构块统计读取中…</div>
 
     <div class="doc-props__section">自定义字段</div>
     <div v-if="!fields.length" class="doc-props__hint">还没有自定义字段，可添加编号、预算、剩余天数等。</div>
