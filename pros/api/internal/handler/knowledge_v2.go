@@ -40,6 +40,8 @@ type templateBody struct {
 	Icon     string `json:"icon"`
 	Category string `json:"category"`
 	HTML     string `json:"html"`
+	// Scope 是模板作用域：personal | team | project。
+	Scope string `json:"scope"`
 }
 
 func (h *KnowledgeHandler) CreateTemplate(ctx context.Context, c *app.RequestContext) {
@@ -62,6 +64,7 @@ func (h *KnowledgeHandler) CreateTemplate(ctx context.Context, c *app.RequestCon
 		Icon:     body.Icon,
 		Category: body.Category,
 		HTML:     body.HTML,
+		Scope:    body.Scope,
 	})
 	if handleKnowledgeErr(c, err) {
 		return
@@ -297,14 +300,19 @@ func (h *KnowledgeHandler) ExportTree(ctx context.Context, c *app.RequestContext
 // ---------------------------------------------------------------- 文档属性
 
 type docPropsBody struct {
-	Status         *string `json:"status"`
-	ReviewerUserID *string `json:"reviewerUserId"`
-	DueAt          *string `json:"dueAt"`
-	ClearDueAt     bool    `json:"clearDueAt"`
-	Tags           *string `json:"tags"`
-	Summary        *string `json:"summary"`
-	CoverColor     *string `json:"coverColor"`
-	CoverURL       *string `json:"coverUrl"`
+	Status         *string  `json:"status"`
+	ReviewerUserID *string  `json:"reviewerUserId"`
+	DueAt          *string  `json:"dueAt"`
+	ClearDueAt     bool     `json:"clearDueAt"`
+	Tags           *string  `json:"tags"`
+	Summary        *string  `json:"summary"`
+	CoverColor     *string  `json:"coverColor"`
+	CoverURL       *string  `json:"coverUrl"`
+	Members        *string  `json:"members"`
+	Priority       *string  `json:"priority"`
+	Milestone      *string  `json:"milestone"`
+	Sprint         *string  `json:"sprint"`
+	Number         *float64 `json:"number"`
 }
 
 func (h *KnowledgeHandler) GetDocProps(ctx context.Context, c *app.RequestContext) {
@@ -344,6 +352,11 @@ func (h *KnowledgeHandler) UpdateDocProps(ctx context.Context, c *app.RequestCon
 		CoverColor: body.CoverColor,
 		CoverURL:   body.CoverURL,
 		ClearDueAt: body.ClearDueAt,
+		Members:    body.Members,
+		Priority:   body.Priority,
+		Milestone:  body.Milestone,
+		Sprint:     body.Sprint,
+		Number:     body.Number,
 	}
 	if body.ReviewerUserID != nil && *body.ReviewerUserID != "" {
 		reviewer, err := uuid.Parse(*body.ReviewerUserID)

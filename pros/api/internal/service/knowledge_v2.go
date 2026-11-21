@@ -33,6 +33,8 @@ type KnowledgeTemplateInput struct {
 	Icon     string
 	Category string
 	HTML     string
+	// Scope 是模板作用域：personal（仅自己）| team（团队共享）| project（仅本项目）。
+	Scope string
 }
 
 // NodeMetaInput 是节点元数据的增量更新。
@@ -48,13 +50,13 @@ type NodeMetaInput struct {
 
 // KnowledgeSummary 是空间看板数据。
 type KnowledgeSummary struct {
-	NodeCount     int64            `json:"nodeCount"`
-	DocCount      int64            `json:"docCount"`
-	FolderCount   int64            `json:"folderCount"`
-	CommentCount  int64            `json:"commentCount"`
-	OpenComments  int64            `json:"openComments"`
-	TagCount      int              `json:"tagCount"`
-	RecentUpdates []model.KnowledgeNode `json:"recentUpdates"`
+	NodeCount     int64                  `json:"nodeCount"`
+	DocCount      int64                  `json:"docCount"`
+	FolderCount   int64                  `json:"folderCount"`
+	CommentCount  int64                  `json:"commentCount"`
+	OpenComments  int64                  `json:"openComments"`
+	TagCount      int                    `json:"tagCount"`
+	RecentUpdates []model.KnowledgeNode  `json:"recentUpdates"`
 	Contributors  []KnowledgeContributor `json:"contributors"`
 	Health        []KnowledgeHealthItem  `json:"health"`
 }
@@ -67,7 +69,7 @@ type KnowledgeContributor struct {
 
 // KnowledgeHealthItem 是一条知识健康度提示。
 type KnowledgeHealthItem struct {
-	Kind    string `json:"kind"`    // no_title | empty_doc | stale | no_summary
+	Kind    string `json:"kind"` // no_title | empty_doc | stale | no_summary
 	DocID   string `json:"docId"`
 	Title   string `json:"title"`
 	Message string `json:"message"`
@@ -123,7 +125,7 @@ func SeedBuiltinTemplates(db *gorm.DB) error {
 // ListTemplates 返回内置模板 + 当前用户的个人模板 + 项目模板。
 func (s *KnowledgeService) ListTemplates(ownerID, projectID uuid.UUID) ([]model.KnowledgeTemplate, error) {
 	var rows []model.KnowledgeTemplate
-	err := s.db.Where("builtin = true OR owner_user_id = ?", ownerID).
+	err := s.db.Where("builtin = true OR owner_user_id = ? OR scope = 'team'", ownerID).
 		Where("project_id IS NULL OR project_id = ?", projectID).
 		Order("builtin DESC").Order("sort_order ASC").Order("created_at ASC").
 		Find(&rows).Error
@@ -154,19 +156,31 @@ func (s *KnowledgeService) CreateTemplate(ownerID, projectID uuid.UUID, in Knowl
 	if category == "" {
 		category = "我的模板"
 	}
+	scope := strings.TrimSpace(in.Scope)
+	switch scope {
+	case "", "personal", "team", "project":
+	default:
+		return nil, ErrValidation
+	}
+	if scope == "" {
+		scope = "personal"
+	}
 	now := time.Now().UTC()
 	tpl := &model.KnowledgeTemplate{
 		ID:          uuid.New(),
 		OwnerUserID: &ownerID,
-		ProjectID:   &projectID,
 		Key:         key,
 		Label:       label,
 		Icon:        icon,
 		Category:    category,
+		Scope:       scope,
 		HTML:        in.HTML,
 		SortOrder:   100,
 		CreatedAt:   now,
 		UpdatedAt:   now,
+	}
+	if scope == "project" {
+		tpl.ProjectID = &projectID
 	}
 	if err := s.db.Create(tpl).Error; err != nil {
 		return nil, err
@@ -193,6 +207,9 @@ func (s *KnowledgeService) UpdateNodeMeta(ownerID, projectID, nodeID uuid.UUID, 
 		alias := strings.TrimSpace(*in.Alias)
 		if utf8.RuneCountInString(alias) > 64 {
 			return nil, ErrValidation
+		}
+		if err := s.EnsureAliasUnique(projectID, nodeID, alias); err != nil {
+			return nil, err
 		}
 		fields["alias"] = alias
 	}
@@ -309,19 +326,19 @@ func (s *KnowledgeService) copyDocument(ownerID, docID uuid.UUID, title string) 
 	}
 	now := time.Now().UTC()
 	dst := model.CanvasDocument{
-		ID:             uuid.New(),
-		OwnerUserID:    ownerID,
-		CanvasType:     src.CanvasType,
-		Title:          title,
-		Notes:          src.Notes,
-		TemplateID:     src.TemplateID,
-		ProjectID:      src.ProjectID,
-		SchemaVersion:  src.SchemaVersion,
-		SaveVersion:    1,
-		CurrentData:    src.CurrentData,
-		ContentText:    src.ContentText,
-		CreatedAt:      now,
-		UpdatedAt:      now,
+		ID:            uuid.New(),
+		OwnerUserID:   ownerID,
+		CanvasType:    src.CanvasType,
+		Title:         title,
+		Notes:         src.Notes,
+		TemplateID:    src.TemplateID,
+		ProjectID:     src.ProjectID,
+		SchemaVersion: src.SchemaVersion,
+		SaveVersion:   1,
+		CurrentData:   src.CurrentData,
+		ContentText:   src.ContentText,
+		CreatedAt:     now,
+		UpdatedAt:     now,
 	}
 	if err := s.db.Create(&dst).Error; err != nil {
 		return uuid.Nil, err
@@ -372,6 +389,13 @@ func (s *KnowledgeService) BatchNodes(ownerID, projectID uuid.UUID, ids []uuid.U
 			if _, err := s.Move(ownerID, projectID, id, KnowledgeMoveInput{ParentID: parentID}); err != nil {
 				return count, err
 			}
+		case "type":
+			nodeType := validateNodeType(value)
+			if err := s.db.Model(&model.KnowledgeNode{}).
+				Where("id = ? AND project_id = ?", id, projectID).
+				Update("node_type", nodeType).Error; err != nil {
+				return count, err
+			}
 		case BatchIcon:
 			icon, err := cleanNodeIcon(value, "doc")
 			if err != nil {
@@ -419,6 +443,15 @@ type DocPropsInput struct {
 	Summary        *string
 	CoverColor     *string
 	CoverURL       *string
+	// Members 是参与人（逗号分隔的用户 ID）。
+	Members *string
+	// Priority 是优先级：low | normal | high | urgent。
+	Priority *string
+	// Milestone 是里程碑，Sprint 是迭代周期。
+	Milestone *string
+	Sprint    *string
+	// Number 是自定义数值（预算 / 工时 / 评分）。
+	Number *float64
 }
 
 // UpsertDocProps 写文档属性。
@@ -461,6 +494,35 @@ func (s *KnowledgeService) UpsertDocProps(ownerID, docID uuid.UUID, in DocPropsI
 	}
 	if in.CoverURL != nil {
 		props.CoverURL = strings.TrimSpace(*in.CoverURL)
+	}
+	if in.Members != nil {
+		members := strings.TrimSpace(*in.Members)
+		if utf8.RuneCountInString(members) > 512 {
+			return nil, ErrValidation
+		}
+		props.Members = members
+	}
+	if in.Priority != nil {
+		priority := strings.TrimSpace(*in.Priority)
+		switch priority {
+		case "low", "normal", "high", "urgent":
+		default:
+			return nil, ErrValidation
+		}
+		props.Priority = priority
+	}
+	if in.Milestone != nil {
+		props.Milestone = strings.TrimSpace(*in.Milestone)
+	}
+	if in.Sprint != nil {
+		props.Sprint = strings.TrimSpace(*in.Sprint)
+	}
+	if in.Number != nil {
+		props.Number = *in.Number
+	}
+	// 发布态必须有摘要：否则目录卡片与搜索结果显示不出这篇讲了什么。
+	if props.Status == "published" && strings.TrimSpace(props.Summary) == "" {
+		return nil, ErrValidation
 	}
 	props.UpdatedAt = time.Now().UTC()
 	if err := s.db.Save(props).Error; err != nil {
@@ -761,7 +823,7 @@ func (s *KnowledgeService) ExportTreeMarkdown(ownerID, projectID uuid.UUID) (str
 		document string
 	}
 	entries := map[uuid.UUID]*entry{}
-order := []uuid.UUID{}
+	order := []uuid.UUID{}
 	for _, node := range nodes {
 		entries[node.ID] = &entry{node: node}
 		order = append(order, node.ID)

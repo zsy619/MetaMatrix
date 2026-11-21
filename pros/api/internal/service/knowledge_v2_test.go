@@ -21,6 +21,7 @@ type knowledgeTemplateSQLite struct {
 	Label       string     `gorm:"type:varchar(64);not null"`
 	Icon        string     `gorm:"type:varchar(16);not null;default:'📄'"`
 	Category    string     `gorm:"type:varchar(32);not null;default:'通用'"`
+	Scope       string     `gorm:"type:varchar(16);not null;default:'personal'"`
 	HTML        string     `gorm:"type:text;not null;default:''"`
 	Builtin     bool       `gorm:"not null;default:false"`
 	SortOrder   int        `gorm:"not null;default:0"`
@@ -40,6 +41,11 @@ type docPropertySQLite struct {
 	Summary        string     `gorm:"type:varchar(255);not null;default:''"`
 	CoverColor     string     `gorm:"type:varchar(32);not null;default:''"`
 	CoverURL       string     `gorm:"type:varchar(512);not null;default:''"`
+	Members        string     `gorm:"type:varchar(512);not null;default:''"`
+	Priority       string     `gorm:"type:varchar(16);not null;default:'normal'"`
+	Milestone      string     `gorm:"type:varchar(64);not null;default:''"`
+	Sprint         string     `gorm:"type:varchar(64);not null;default:''"`
+	Number         float64    `gorm:"not null;default:0"`
 	CreatedAt      time.Time  `gorm:"not null"`
 	UpdatedAt      time.Time  `gorm:"not null"`
 }

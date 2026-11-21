@@ -36,8 +36,12 @@ type KnowledgeNode struct {
 	TrashedAt *time.Time `gorm:"index" json:"trashedAt"`
 	// ArchivedAt 非空表示节点归档：仍可访问，但不出现在默认目录视图。
 	ArchivedAt *time.Time `gorm:"index" json:"archivedAt"`
-	CreatedAt  time.Time  `gorm:"type:timestamptz;not null" json:"createdAt"`
-	UpdatedAt  time.Time  `gorm:"type:timestamptz;not null" json:"updatedAt"`
+	// DocumentCanvasType / DocumentTemplateID 是拼上来的文档信息，不是本表的列：
+	// 目录树要靠它判断节点指向的是哪张画布、用哪个模板打开。
+	DocumentCanvasType  string `gorm:"-" json:"documentCanvasType"`
+	DocumentTemplateID string `gorm:"-" json:"documentTemplateId"`
+	CreatedAt           time.Time `gorm:"type:timestamptz;not null" json:"createdAt"`
+	UpdatedAt           time.Time `gorm:"type:timestamptz;not null" json:"updatedAt"`
 }
 
 func (KnowledgeNode) TableName() string { return "knowledge_nodes" }

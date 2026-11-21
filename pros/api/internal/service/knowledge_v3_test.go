@@ -25,14 +25,16 @@ type knowledgeNodeDataSQLite struct {
 func (knowledgeNodeDataSQLite) TableName() string { return "knowledge_node_data" }
 
 type knowledgeShareSQLite struct {
-	ID         uuid.UUID  `gorm:"type:uuid;primaryKey"`
-	DocumentID uuid.UUID  `gorm:"type:uuid;not null;index"`
-	ProjectID  uuid.UUID  `gorm:"type:uuid;not null;index"`
-	Token      string     `gorm:"type:varchar(64);not null;uniqueIndex"`
-	Role       string     `gorm:"type:varchar(16);not null;default:'view'"`
-	CreatedBy  uuid.UUID  `gorm:"type:uuid;not null"`
-	ExpiresAt  *time.Time `gorm:"index"`
-	CreatedAt  time.Time  `gorm:"not null"`
+	ID           uuid.UUID  `gorm:"type:uuid;primaryKey"`
+	DocumentID   uuid.UUID  `gorm:"type:uuid;not null;index"`
+	ProjectID    uuid.UUID  `gorm:"type:uuid;not null;index"`
+	Token        string     `gorm:"type:varchar(64);not null;uniqueIndex"`
+	Role         string     `gorm:"type:varchar(16);not null;default:'view'"`
+	CreatedBy    uuid.UUID  `gorm:"type:uuid;not null"`
+	ExpiresAt    *time.Time `gorm:"index"`
+	PasswordHash string     `gorm:"type:varchar(64);not null;default:''"`
+	AllowCopy    bool       `gorm:"not null;default:true"`
+	CreatedAt    time.Time  `gorm:"not null"`
 }
 
 func (knowledgeShareSQLite) TableName() string { return "knowledge_shares" }
@@ -44,6 +46,7 @@ type knowledgeDocVersionSQLite struct {
 	HTML         string    `gorm:"type:text;not null;default:''"`
 	AuthorUserID uuid.UUID `gorm:"type:uuid;not null;index"`
 	SaveVersion  int64     `gorm:"not null;default:0"`
+	Label        string    `gorm:"type:varchar(64);not null;default:''"`
 	CreatedAt    time.Time `gorm:"not null;index"`
 }
 
@@ -57,6 +60,7 @@ func openKnowledgeV3SQLite(t *testing.T) (*gorm.DB, uuid.UUID, *model.Project, *
 		&knowledgeNodeDataSQLite{},
 		&knowledgeShareSQLite{},
 		&knowledgeDocVersionSQLite{},
+		&docCommentSQLite{},
 	); err != nil {
 		t.Fatal(err)
 	}

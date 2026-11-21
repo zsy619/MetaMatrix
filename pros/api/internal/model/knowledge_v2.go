@@ -16,13 +16,15 @@ type KnowledgeTemplate struct {
 	OwnerUserID *uuid.UUID `gorm:"type:uuid;index" json:"ownerUserId"`
 	// ProjectID 为空表示跨项目通用模板。
 	ProjectID *uuid.UUID `gorm:"type:uuid;index" json:"projectId"`
-	Key        string     `gorm:"type:varchar(64);not null" json:"key"`
-	Label      string     `gorm:"type:varchar(64);not null" json:"label"`
-	Icon       string     `gorm:"type:varchar(16);not null;default:'📄'" json:"icon"`
+	Key       string     `gorm:"type:varchar(64);not null" json:"key"`
+	Label     string     `gorm:"type:varchar(64);not null" json:"label"`
+	Icon      string     `gorm:"type:varchar(16);not null;default:'📄'" json:"icon"`
 	// Category 是模板分组（飞书模板中心按场景分类）。
 	Category string `gorm:"type:varchar(32);not null;default:'通用'" json:"category"`
-	HTML     string `gorm:"type:text;not null;default:''" json:"html"`
-	Builtin  bool   `gorm:"not null;default:false" json:"builtin"`
+	// Scope 是模板作用域：builtin | team | personal | project。
+	Scope   string `gorm:"type:varchar(16);not null;default:'personal'" json:"scope"`
+	HTML    string `gorm:"type:text;not null;default:''" json:"html"`
+	Builtin bool   `gorm:"not null;default:false" json:"builtin"`
 	// SortOrder 控制模板面板内的顺序。
 	SortOrder int       `gorm:"not null;default:0" json:"sortOrder"`
 	CreatedAt time.Time `gorm:"type:timestamptz;not null" json:"createdAt"`
@@ -50,8 +52,17 @@ type DocProperty struct {
 	// CoverColor / CoverURL 是封面。
 	CoverColor string `gorm:"type:varchar(32);not null;default:''" json:"coverColor"`
 	CoverURL   string `gorm:"type:varchar(512);not null;default:''" json:"coverUrl"`
-	UpdatedAt  time.Time `gorm:"type:timestamptz;not null" json:"updatedAt"`
-	CreatedAt  time.Time `gorm:"type:timestamptz;not null" json:"createdAt"`
+	// Members 是参与人（逗号分隔的用户 ID）：飞书页面属性的「参与人」字段。
+	Members string `gorm:"type:varchar(512);not null;default:''" json:"members"`
+	// Priority 是优先级：low | normal | high | urgent。
+	Priority string `gorm:"type:varchar(16);not null;default:'normal'" json:"priority"`
+	// Milestone 是所属里程碑，Sprint 是所属迭代周期。
+	Milestone string `gorm:"type:varchar(64);not null;default:''" json:"milestone"`
+	Sprint    string `gorm:"type:varchar(64);not null;default:''" json:"sprint"`
+	// Number 是自定义数值字段：预算、工时、评分都走它。
+	Number    float64   `gorm:"not null;default:0" json:"number"`
+	UpdatedAt time.Time `gorm:"type:timestamptz;not null" json:"updatedAt"`
+	CreatedAt time.Time `gorm:"type:timestamptz;not null" json:"createdAt"`
 }
 
 func (DocProperty) TableName() string { return "doc_properties" }

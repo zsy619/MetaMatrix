@@ -64,7 +64,7 @@ func validateNodeTitle(s string) (string, error) {
 func validateNodeType(t string) string {
 	t = strings.TrimSpace(t)
 	switch t {
-	case "folder", "doc", "canvas", "note", "sheet", "mindmap":
+	case "folder", "doc", "canvas", "note", "sheet", "mindmap", "attachment":
 		return t
 	default:
 		return "doc"
@@ -83,6 +83,8 @@ func defaultNodeIcon(nodeType string) string {
 		return "📊"
 	case "mindmap":
 		return "🧠"
+	case "attachment":
+		return "📎"
 	default:
 		return "📄"
 	}
@@ -133,14 +135,20 @@ func (s *KnowledgeService) overlayDocTitles(ownerID uuid.UUID, nodes []model.Kno
 		return nodes, nil
 	}
 	var docs []model.CanvasDocument
-	if err := s.db.Select("id", "title").
+	if err := s.db.Select("id", "title", "canvas_type", "template_id").
 		Where("id IN ? AND owner_user_id = ?", docIDs, ownerID).
 		Find(&docs).Error; err != nil {
 		return nil, err
 	}
 	titles := make(map[uuid.UUID]string, len(docs))
+	canvasTypes := make(map[uuid.UUID]string, len(docs))
+	templateIDs := make(map[uuid.UUID]string, len(docs))
 	for _, doc := range docs {
 		titles[doc.ID] = doc.Title
+		canvasTypes[doc.ID] = doc.CanvasType
+		if doc.TemplateID != nil {
+			templateIDs[doc.ID] = *doc.TemplateID
+		}
 	}
 	for index := range nodes {
 		if nodes[index].DocumentID == nil {
@@ -149,6 +157,8 @@ func (s *KnowledgeService) overlayDocTitles(ownerID uuid.UUID, nodes []model.Kno
 		if title, ok := titles[*nodes[index].DocumentID]; ok {
 			nodes[index].Title = title
 		}
+		nodes[index].DocumentCanvasType = canvasTypes[*nodes[index].DocumentID]
+		nodes[index].DocumentTemplateID = templateIDs[*nodes[index].DocumentID]
 	}
 	return nodes, nil
 }

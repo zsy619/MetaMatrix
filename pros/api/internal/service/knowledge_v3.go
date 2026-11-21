@@ -92,6 +92,8 @@ func dataKindForNodeType(nodeType string) string {
 		return "sheet"
 	case "mindmap":
 		return "mindmap"
+	case "attachment":
+		return "attachment"
 	default:
 		return ""
 	}
@@ -104,6 +106,8 @@ func defaultNodeData(kind string) []byte {
 		return []byte(`{"columns":["列 1","列 2","列 3"],"rows":[["","",""]]}`)
 	case "mindmap":
 		return []byte(`{"title":"中心主题","children":[{"title":"分支 1","children":[]}]}`)
+	case "attachment":
+		return []byte(`{"files":[]}`)
 	default:
 		return []byte(`{}`)
 	}
@@ -168,6 +172,10 @@ type SharedDoc struct {
 	Title     string     `json:"title"`
 	HTML      string     `json:"html"`
 	ExpiresAt *time.Time `json:"expiresAt"`
+	// AllowCopy=false 时分享页禁止复制与导出。
+	AllowCopy bool `json:"allowCopy"`
+	// RequiresPassword=true 表示需要口令才能读取正文。
+	RequiresPassword bool `json:"requiresPassword"`
 }
 
 // ResolveShare 按分享 token 取文档内容（公开访问，不需要登录态）。
@@ -187,6 +195,17 @@ func (s *KnowledgeService) ResolveShare(token string) (*SharedDoc, error) {
 	if err := s.db.Where("id = ?", share.DocumentID).First(&doc).Error; err != nil {
 		return nil, ErrDocumentNotFound
 	}
+	// 有口令的分享：没有口令就不返回正文，只提示需要口令。
+	if share.PasswordHash != "" {
+		return &SharedDoc{
+			Token:            share.Token,
+			Role:             share.Role,
+			Title:            doc.Title,
+			ExpiresAt:        share.ExpiresAt,
+			AllowCopy:        share.AllowCopy,
+			RequiresPassword: true,
+		}, nil
+	}
 	html := ""
 	if len(doc.CurrentData) > 0 {
 		var payload struct {
@@ -196,13 +215,34 @@ func (s *KnowledgeService) ResolveShare(token string) (*SharedDoc, error) {
 			html = payload.HTML
 		}
 	}
+	// 分享访问审计：同一文档 5 分钟内只记一次，避免轮询刷事件。
+	s.auditShareAccess(&share)
 	return &SharedDoc{
 		Token:     share.Token,
 		Role:      share.Role,
 		Title:     doc.Title,
 		HTML:      html,
 		ExpiresAt: share.ExpiresAt,
+		AllowCopy: share.AllowCopy,
 	}, nil
+}
+
+// auditShareAccess 记录「谁在何时通过链接访问了文档」。
+func (s *KnowledgeService) auditShareAccess(share *model.KnowledgeShare) {
+	if share.ProjectID == uuid.Nil {
+		return
+	}
+	recent := time.Now().UTC().Add(-5 * time.Minute)
+	var count int64
+	if err := s.db.Model(&model.KnowledgeEvent{}).
+		Where("project_id = ? AND event_type = 'share.access' AND document_id = ? AND created_at > ?",
+			share.ProjectID, share.DocumentID, recent).Count(&count).Error; err != nil {
+		return
+	}
+	if count > 0 {
+		return
+	}
+	_ = s.AppendEvent(s.db, share.ProjectID, "share.access", nil, &share.DocumentID, share.CreatedBy, share.Token)
 }
 
 // ---------------------------------------------------------------- 历史版本
@@ -415,6 +455,8 @@ type KnowledgeSearchHit struct {
 	Tags       string    `json:"tags"`
 	UpdatedAt  time.Time `json:"updatedAt"`
 	Snippet    string    `json:"snippet"`
+	// Words 是正文字数：搜索结果按字数排序时用它。
+	Words int `json:"words"`
 }
 
 // KnowledgeSearchFilter 是检索条件。
@@ -425,68 +467,13 @@ type KnowledgeSearchFilter struct {
 	From     *time.Time
 	To       *time.Time
 	Limit    int
+	// Sort 是排序方式：""（最近更新）| word（字数）| title（标题）。
+	Sort string
 }
 
-// SearchSpace 在知识空间内检索节点与文档，支持作者、类型、时间过滤。
+// SearchSpace 在知识空间内检索节点与文档，支持作者、类型、时间过滤与排序。
 func (s *KnowledgeService) SearchSpace(ownerID, projectID uuid.UUID, f KnowledgeSearchFilter) ([]KnowledgeSearchHit, error) {
-	if err := s.assertProjectOwned(ownerID, projectID); err != nil {
-		return nil, err
-	}
-	if f.Limit <= 0 || f.Limit > 100 {
-		f.Limit = 30
-	}
-	query := strings.TrimSpace(f.Query)
-	var nodes []model.KnowledgeNode
-	q := s.db.Where("project_id = ? AND trashed_at IS NULL", projectID)
-	if f.NodeType != "" {
-		q = q.Where("node_type = ?", f.NodeType)
-	}
-	if f.AuthorID != "" {
-		author, err := uuid.Parse(f.AuthorID)
-		if err != nil {
-			return nil, ErrValidation
-		}
-		q = q.Where("created_by = ?", author)
-	}
-	if f.From != nil {
-		q = q.Where("updated_at >= ?", *f.From)
-	}
-	if f.To != nil {
-		q = q.Where("updated_at <= ?", *f.To)
-	}
-	if query != "" {
-		// LOWER + LIKE 而不是 ILIKE：SQLite 测试库不支持 ILIKE。
-		like := "%" + strings.ToLower(query) + "%"
-		// 标题/摘要命中，或正文命中（子查询）都算命中。
-		q = q.Where("LOWER(title) LIKE ? OR LOWER(summary) LIKE ? OR LOWER(alias) LIKE ?"+
-			" OR document_id IN (SELECT id FROM canvas_documents WHERE LOWER(content_text) LIKE ?)",
-			like, like, like, like)
-	}
-	if err := q.Order("updated_at DESC").Limit(f.Limit * 2).Find(&nodes).Error; err != nil {
-		return nil, err
-	}
-	hits := make([]KnowledgeSearchHit, 0, len(nodes))
-	for _, n := range nodes {
-		if len(hits) >= f.Limit {
-			break
-		}
-		hit := KnowledgeSearchHit{
-			NodeID:    n.ID.String(),
-			Title:     n.Title,
-			Summary:   n.Summary,
-			NodeType:  n.NodeType,
-			Author:    s.userName(n.CreatedBy),
-			AuthorID:  authorID(n.CreatedBy),
-			Tags:      n.Alias,
-			UpdatedAt: n.UpdatedAt,
-		}
-		if n.DocumentID != nil {
-			hit.DocumentID = n.DocumentID.String()
-			hit.Snippet = s.snippet(ownerID, *n.DocumentID, query)
-		}
-		hits = append(hits, hit)
-	}
-	return hits, nil
+	return s.searchSpaceExtended(ownerID, &projectID, f)
 }
 
 // authorID 取作者 ID 的字符串形式，空作者返回空串。
@@ -665,14 +652,24 @@ type KnowledgeAnswer struct {
 	Title      string  `json:"title"`
 	Snippet    string  `json:"snippet"`
 	Score      float64 `json:"score"`
+	// Source 是出处（文档标题 + 命中片段），Confidence 是置信度（0-1）。
+	Source     string  `json:"source"`
+	Confidence float64 `json:"confidence"`
 }
 
 // AskSpace 在知识空间内做关键词检索问答，返回带出处的片段。
 //
 // shortcut: 目前是本地关键词检索，不做语义理解；需要语义问答时接 LLM 检索层。
 func (s *KnowledgeService) AskSpace(ownerID, projectID uuid.UUID, question string, limit int) ([]KnowledgeAnswer, error) {
-	if err := s.assertProjectOwned(ownerID, projectID); err != nil {
-		return nil, err
+	return s.askSpace(ownerID, &projectID, question, limit)
+}
+
+// askSpace 是问答实现：projectID 为 nil 时跨本人全部项目检索。
+func (s *KnowledgeService) askSpace(ownerID uuid.UUID, projectID *uuid.UUID, question string, limit int) ([]KnowledgeAnswer, error) {
+	if projectID != nil {
+		if err := s.assertProjectOwned(ownerID, *projectID); err != nil {
+			return nil, err
+		}
 	}
 	if limit <= 0 || limit > 20 {
 		limit = 5
@@ -681,12 +678,18 @@ func (s *KnowledgeService) AskSpace(ownerID, projectID uuid.UUID, question strin
 	if len(terms) == 0 {
 		return []KnowledgeAnswer{}, nil
 	}
+	q := s.db.Where("owner_user_id = ? AND canvas_type = 'doc'", ownerID)
+	if projectID != nil {
+		q = q.Where("project_id = ?", *projectID)
+	} else {
+		q = q.Where("project_id IN (SELECT id FROM projects WHERE owner_user_id = ?)", ownerID)
+	}
 	var docs []model.CanvasDocument
-	if err := s.db.Where("owner_user_id = ? AND project_id = ? AND canvas_type = 'doc'",
-		ownerID, projectID).Find(&docs).Error; err != nil {
+	if err := q.Find(&docs).Error; err != nil {
 		return nil, err
 	}
 	answers := make([]KnowledgeAnswer, 0, limit)
+	maxScore := 0.0
 	for _, doc := range docs {
 		haystack := strings.ToLower(doc.Title + " " + stripHTML(doc.ContentText))
 		score := 0.0
@@ -696,16 +699,25 @@ func (s *KnowledgeService) AskSpace(ownerID, projectID uuid.UUID, question strin
 		if score == 0 {
 			continue
 		}
+		if score > maxScore {
+			maxScore = score
+		}
 		answers = append(answers, KnowledgeAnswer{
 			DocumentID: doc.ID.String(),
 			Title:      doc.Title,
 			Snippet:    s.snippet(ownerID, doc.ID, terms[0]),
 			Score:      score,
+			Source:     doc.Title,
 		})
 	}
 	sort.Slice(answers, func(i, j int) bool { return answers[i].Score > answers[j].Score })
 	if len(answers) > limit {
 		answers = answers[:limit]
+	}
+	if maxScore > 0 {
+		for i := range answers {
+			answers[i].Confidence = answers[i].Score / maxScore
+		}
 	}
 	return answers, nil
 }

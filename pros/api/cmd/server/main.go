@@ -287,6 +287,19 @@ func main() {
 		knowledge.POST("/import", knH.ImportFile)
 		knowledge.POST("/feishu/import", knH.ImportFeishuSpace)
 		knowledge.POST("/feishu/notify", knH.NotifyFeishu)
+		// 知识库 4.0：归档区、节点统计、关联推荐、模板维护、跨类型检索、
+		// 空间打包导出、敏感扫描、质量体检与回收站清理。
+		knowledge.GET("/archived", knH.Archived)
+		knowledge.GET("/nodes/:nodeId/stats", knH.NodeStats)
+		knowledge.GET("/nodes/:nodeId/related", knH.RelatedDocs)
+		knowledge.POST("/summaries/fill", knH.FillSummaries)
+		knowledge.PATCH("/templates/:templateId", knH.UpdateTemplate)
+		knowledge.POST("/ask/followup", knH.AskFollowUp)
+		knowledge.GET("/export/zip", knH.ExportZip)
+		knowledge.GET("/similar", knH.SimilarDocs)
+		knowledge.GET("/quality", knH.QualityAudit)
+		knowledge.POST("/scan", knH.ScanSensitive)
+		knowledge.POST("/trash/purge", knH.PurgeTrash)
 	}
 
 	// 知识库文档级能力：属性、评论、最近浏览、导出。
@@ -311,10 +324,19 @@ func main() {
 		knowledgeDocs.GET("/:id/presence", knH.PresenceList)
 		knowledgeDocs.GET("/:id/summary", knH.DocSummary)
 		knowledgeDocs.GET("/:id/tags", knH.DocTags)
+		knowledgeDocs.POST("/:id/versions/:versionId/label", knH.LabelVersion)
+		knowledgeDocs.GET("/:id/versions/authors", knH.VersionAuthors)
+		knowledgeDocs.POST("/:id/save-as-template", knH.SaveDocAsTemplate)
 	}
+
+	// 跨项目检索与问答：本人全部项目的语料。
+	h.GET("/knowledge/search/global", middleware.AuthRequired(cfg.JWTSecret), knH.GlobalSearch)
+	h.POST("/knowledge/ask/global", middleware.AuthRequired(cfg.JWTSecret), knH.AskGlobal)
 
 	// 分享页是公开入口：靠分享 token 授权，不需要登录态。
 	h.GET("/knowledge/shares/:token", knH.SharedDoc)
+	h.POST("/knowledge/shares/:token/comments", knH.AddShareComment)
+	h.PUT("/knowledge/shares/:token/content", knH.UpdateShareContent)
 
 	// 活动日志查询（当前账号自己的记录）。
 	h.GET("/logs", middleware.AuthRequired(cfg.JWTSecret), logsH.List)

@@ -66,6 +66,9 @@ func AutoMigrate(gdb *gorm.DB) error {
 	if err := ensureResetIndexes(gdb); err != nil {
 		log.Printf("ensureResetIndexes warning: %v", err)
 	}
+	if err := backfillKnowledgeAuthors(gdb); err != nil {
+		log.Printf("backfillKnowledgeAuthors warning: %v", err)
+	}
 	log.Println("AutoMigrate OK: users, canvas_documents, canvas_revisions, canvas_content_blocks, document_save_operations, backup_imports, media_category, media_asset, media_reference, password_reset_tokens")
 	return nil
 }
@@ -148,6 +151,15 @@ func ensureQueryIndexes(gdb *gorm.DB) error {
 		}
 	}
 	return nil
+}
+
+// backfillKnowledgeAuthors 回填存量目录节点的作者：旧数据没有 created_by，
+// 作者维度检索与图谱归属会失效。
+func backfillKnowledgeAuthors(gdb *gorm.DB) error {
+	return gdb.Exec(`UPDATE knowledge_nodes n
+  SET created_by = p.owner_user_id
+  FROM projects p
+  WHERE n.project_id = p.id AND n.created_by IS NULL`).Error
 }
 
 func min(a, b int) int {

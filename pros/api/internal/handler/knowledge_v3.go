@@ -72,6 +72,10 @@ func (h *KnowledgeHandler) SaveNodeData(ctx context.Context, c *app.RequestConte
 type shareBody struct {
 	Role      string  `json:"role"`
 	ExpiresAt *string `json:"expiresAt"`
+	// Password 是访问口令（明文，服务端只存摘要）。
+	Password string `json:"password"`
+	// AllowCopy=false 时分享页禁止复制与导出。
+	AllowCopy *bool `json:"allowCopy"`
 }
 
 func (h *KnowledgeHandler) ListShares(ctx context.Context, c *app.RequestContext) {
@@ -110,7 +114,16 @@ func (h *KnowledgeHandler) CreateShare(ctx context.Context, c *app.RequestContex
 		}
 		expiresAt = &t
 	}
-	share, err := h.svc.CreateShare(uid, docID, body.Role, expiresAt)
+	allowCopy := true
+	if body.AllowCopy != nil {
+		allowCopy = *body.AllowCopy
+	}
+	share, err := h.svc.CreateShareWith(uid, docID, service.CreateShareInput{
+		Role:      body.Role,
+		ExpiresAt: expiresAt,
+		Password:  body.Password,
+		AllowCopy: allowCopy,
+	})
 	if handleKnowledgeErr(c, err) {
 		return
 	}
@@ -136,7 +149,9 @@ func (h *KnowledgeHandler) RevokeShare(ctx context.Context, c *app.RequestContex
 // SharedDoc 是公开分享页的数据（无需登录态）。
 func (h *KnowledgeHandler) SharedDoc(ctx context.Context, c *app.RequestContext) {
 	token := string(c.Param("token"))
-	doc, err := h.svc.ResolveShare(token)
+	// 带口令时直接校验口令；没带口令时只返回「需要口令」标记，不泄露正文。
+	password := string(c.Query("password"))
+	doc, err := h.svc.ResolveShareWithPassword(token, password)
 	if handleKnowledgeErr(c, err) {
 		return
 	}

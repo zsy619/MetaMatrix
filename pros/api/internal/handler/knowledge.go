@@ -260,7 +260,9 @@ func (h *KnowledgeHandler) Delete(ctx context.Context, c *app.RequestContext) {
 	if !ok {
 		return
 	}
-	if err := h.svc.Delete(uid, projectID, nodeID); handleKnowledgeErr(c, err) {
+	// promote=1：子节点提升到父级而不是级联删除。
+	promote := string(c.Query("promote")) == "1"
+	if err := h.svc.DeleteWithPolicy(uid, projectID, nodeID, promote); handleKnowledgeErr(c, err) {
 		return
 	}
 	middleware.Audit(c, "delete", uid.String(), "knowledge-node="+nodeID.String())

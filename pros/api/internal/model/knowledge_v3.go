@@ -33,7 +33,11 @@ type KnowledgeShare struct {
 	Role       string     `gorm:"type:varchar(16);not null;default:'view'" json:"role"`
 	CreatedBy  uuid.UUID  `gorm:"type:uuid;not null" json:"createdBy"`
 	ExpiresAt  *time.Time `gorm:"index" json:"expiresAt"`
-	CreatedAt  time.Time  `gorm:"type:timestamptz;not null" json:"createdAt"`
+	// PasswordHash 是访问口令的 SHA-256 摘要；空串表示无需口令。
+	PasswordHash string `gorm:"type:varchar(64);not null;default:''" json:"-"`
+	// AllowCopy=false 时分享页禁止复制正文与下载。
+	AllowCopy bool      `gorm:"not null;default:true" json:"allowCopy"`
+	CreatedAt time.Time `gorm:"type:timestamptz;not null" json:"createdAt"`
 }
 
 func (KnowledgeShare) TableName() string { return "knowledge_shares" }
@@ -49,7 +53,9 @@ type KnowledgeDocVersion struct {
 	HTML         string    `gorm:"type:text;not null;default:''" json:"html"`
 	AuthorUserID uuid.UUID `gorm:"type:uuid;not null;index" json:"authorUserId"`
 	SaveVersion  int64     `gorm:"not null;default:0" json:"saveVersion"`
-	CreatedAt    time.Time `gorm:"type:timestamptz;not null;index:idx_kdv_doc,priority:2,sort:desc" json:"createdAt"`
+	// Label 是版本备注：如「发布版」。
+	Label     string    `gorm:"type:varchar(64);not null;default:''" json:"label"`
+	CreatedAt time.Time `gorm:"type:timestamptz;not null;index:idx_kdv_doc,priority:2,sort:desc" json:"createdAt"`
 }
 
 func (KnowledgeDocVersion) TableName() string { return "knowledge_doc_versions" }
