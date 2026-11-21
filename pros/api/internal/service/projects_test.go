@@ -35,6 +35,7 @@ type pageReferencesSQLite struct {
 	SourceDocID uuid.UUID `gorm:"type:uuid;not null;index:idx_pr_source,priority:1"`
 	TargetDocID uuid.UUID `gorm:"type:uuid;not null;index:idx_pr_target"`
 	RefType     string    `gorm:"type:varchar(16);not null"`
+	BlockType   string    `gorm:"type:varchar(16);not null;default:''"`
 	TargetLabel string    `gorm:"type:varchar(255);not null;default:''"`
 	CreatedAt   time.Time `gorm:"not null"`
 }
@@ -199,7 +200,6 @@ func TestProjectsServiceDeleteRemovesCanvases(t *testing.T) {
 		t.Fatalf("second delete error = %v, want ErrProjectNotFound", err)
 	}
 }
-
 
 func TestProjectsServiceRefsReturnsReferenceGraph(t *testing.T) {
 	db := openProjectsSQLite(t)
