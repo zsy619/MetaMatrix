@@ -61,6 +61,8 @@ type CanvasDocument struct {
 	OwnerUserID   uuid.UUID `gorm:"type:uuid;not null;index:idx_docs_owner_updated,priority:1;index:idx_docs_owner_type,priority:1;index:idx_docs_owner_template,priority:1" json:"ownerUserId"`
 	CanvasType    string    `gorm:"type:varchar(64);not null;index:idx_docs_owner_type,priority:2" json:"canvasType"`
 	Title         string    `gorm:"type:varchar(255);not null" json:"title"`
+	// Icon 是画布标题前的图标（emoji）。知识库目录树另有自己的节点图标列。
+	Icon          string    `gorm:"type:varchar(16);not null;default:''" json:"icon"`
 	Notes         string    `gorm:"type:text" json:"notes"`
 	SchemaVersion int       `gorm:"not null;default:1" json:"schemaVersion"`
 	// SaveVersion 是文档内容的单调递增版本号，专门用于并发控制。
@@ -124,6 +126,7 @@ func (CanvasContentBlock) TableName() string { return "canvas_content_blocks" }
 type DocumentSummary struct {
 	ID             uuid.UUID  `json:"id"`
 	Title          string     `json:"title"`
+	Icon           string     `json:"icon"`
 	Notes          string     `json:"notes"`
 	TemplateID     *string    `json:"templateId"`
 	CanvasType     string     `json:"canvasType"`

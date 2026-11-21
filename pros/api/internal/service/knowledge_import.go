@@ -28,7 +28,7 @@ const (
 
 // ImportFile 把上传的文件转成一篇文档，并在目录下建对应节点。
 func (s *KnowledgeService) ImportFile(ownerID, projectID uuid.UUID, parentID *uuid.UUID, filename string, data []byte) (*model.KnowledgeNode, error) {
-	if err := s.assertProjectOwned(ownerID, projectID); err != nil {
+	if err := s.assertSpaceAccess(ownerID, projectID, SpaceRoleEditor); err != nil {
 		return nil, err
 	}
 	if len(data) == 0 || len(data) > maxImportBytes {
@@ -314,7 +314,7 @@ func (s *KnowledgeService) FeishuConfigured() bool {
 
 // ImportFeishuSpace 把飞书知识空间的一级节点导入成本项目的知识库节点。
 func (s *KnowledgeService) ImportFeishuSpace(ctx context.Context, ownerID, projectID uuid.UUID, spaceToken string, parentID *uuid.UUID) (int, error) {
-	if err := s.assertProjectOwned(ownerID, projectID); err != nil {
+	if err := s.assertSpaceAccess(ownerID, projectID, SpaceRoleEditor); err != nil {
 		return 0, err
 	}
 	if !s.FeishuConfigured() {
@@ -352,7 +352,7 @@ func (s *KnowledgeService) ImportFeishuSpace(ctx context.Context, ownerID, proje
 //
 // docToken 可以是 obj_token，也可以是完整的飞书文档链接（会从中解析 token）。
 func (s *KnowledgeService) ImportFeishuDoc(ctx context.Context, ownerID, projectID uuid.UUID, docToken string, parentID *uuid.UUID) (*model.KnowledgeNode, error) {
-	if err := s.assertProjectOwned(ownerID, projectID); err != nil {
+	if err := s.assertSpaceAccess(ownerID, projectID, SpaceRoleEditor); err != nil {
 		return nil, err
 	}
 	if !s.FeishuConfigured() {

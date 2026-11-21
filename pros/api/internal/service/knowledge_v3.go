@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"regexp"
 	"sort"
@@ -54,7 +55,7 @@ func (s *KnowledgeService) GetNodeData(ownerID, projectID, nodeID uuid.UUID) (*m
 
 // SaveNodeData 保存节点的结构化数据。
 func (s *KnowledgeService) SaveNodeData(ownerID, projectID, nodeID uuid.UUID, kind string, data json.RawMessage) (*model.KnowledgeNodeData, error) {
-	node, err := s.getOwnedNode(ownerID, projectID, nodeID)
+	node, err := s.getWritableNode(ownerID, projectID, nodeID)
 	if err != nil {
 		return nil, err
 	}
@@ -385,7 +386,7 @@ type KnowledgeGraphEdge struct {
 
 // BuildGraph 用「目录父子关系 + 文档引用关系」拼出知识图谱。
 func (s *KnowledgeService) BuildGraph(ownerID, projectID uuid.UUID) (*KnowledgeGraph, error) {
-	if err := s.assertProjectOwned(ownerID, projectID); err != nil {
+	if err := s.assertSpaceAccess(ownerID, projectID, SpaceRoleViewer); err != nil {
 		return nil, err
 	}
 	var nodes []model.KnowledgeNode
@@ -430,8 +431,12 @@ func (s *KnowledgeService) BuildGraph(ownerID, projectID uuid.UUID) (*KnowledgeG
 		if !ok || source == target {
 			continue
 		}
+		edgeType := "reference"
+		if ref.BlockType != "" {
+			edgeType = "structure"
+		}
 		graph.Edges = append(graph.Edges, KnowledgeGraphEdge{
-			Source: source.String(), Target: target.String(), Type: "reference",
+			Source: source.String(), Target: target.String(), Type: edgeType,
 		})
 	}
 	return graph, nil
@@ -690,7 +695,7 @@ func (s *KnowledgeService) AskSpace(ownerID, projectID uuid.UUID, question strin
 // askSpace 是问答实现：projectID 为 nil 时跨本人全部项目检索。
 func (s *KnowledgeService) askSpace(ownerID uuid.UUID, projectID *uuid.UUID, question string, limit int) ([]KnowledgeAnswer, error) {
 	if projectID != nil {
-		if err := s.assertProjectOwned(ownerID, *projectID); err != nil {
+		if err := s.assertSpaceAccess(ownerID, *projectID, SpaceRoleViewer); err != nil {
 			return nil, err
 		}
 	}
@@ -742,7 +747,46 @@ func (s *KnowledgeService) askSpace(ownerID uuid.UUID, projectID *uuid.UUID, que
 			answers[i].Confidence = answers[i].Score / maxScore
 		}
 	}
+	// 向量召回作为第二层：关键词没命中或命中太少时，语义相似的结果补进来。
+	answers = s.mergeSemanticAnswers(ownerID, projectID, question, answers, limit)
 	return answers, nil
+}
+
+// mergeSemanticAnswers 把向量召回结果并进关键词答案。
+//
+// 关键词命中为 0 时这一层才是主力；两边都命中时按文档去重，
+// 关键词结果的排序优先。
+func (s *KnowledgeService) mergeSemanticAnswers(ownerID uuid.UUID, projectID *uuid.UUID, question string, answers []KnowledgeAnswer, limit int) []KnowledgeAnswer {
+	if projectID == nil {
+		return answers
+	}
+	hits, err := s.SemanticSearch(context.Background(), ownerID, *projectID, question, limit)
+	if err != nil || len(hits) == 0 {
+		return answers
+	}
+	seen := map[string]bool{}
+	for _, a := range answers {
+		seen[a.DocumentID] = true
+	}
+	for _, hit := range hits {
+		if seen[hit.DocumentID] {
+			continue
+		}
+		seen[hit.DocumentID] = true
+		answers = append(answers, KnowledgeAnswer{
+			DocumentID: hit.DocumentID,
+			Title:      hit.Title,
+			Snippet:    hit.Snippet,
+			Score:      hit.Score,
+			Source:     hit.Title,
+			Confidence: hit.Score,
+		})
+	}
+	sort.SliceStable(answers, func(i, j int) bool { return answers[i].Score > answers[j].Score })
+	if len(answers) > limit {
+		answers = answers[:limit]
+	}
+	return answers
 }
 
 // splitSentences 按中文/英文句号切句。

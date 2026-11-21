@@ -64,6 +64,8 @@ func handleKnowledgeErr(c *app.RequestContext, err error) bool {
 		Fail(c, http.StatusBadRequest, "validation failed", "validation_error")
 	case errors.Is(err, service.ErrShareForbidden):
 		Forbidden(c, "share not allowed for current user")
+	case errors.Is(err, service.ErrSpaceForbidden):
+		Forbidden(c, "space access denied")
 	default:
 		log.Printf("knowledge error: %v", err)
 		Internal(c, "request failed")

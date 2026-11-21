@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	"metamatrix/api/internal/ai"
 	"metamatrix/api/internal/config"
 	"metamatrix/api/internal/db"
 	"metamatrix/api/internal/handler"
@@ -43,6 +44,13 @@ func main() {
 	projSvc := service.NewProjectsService(gdb)
 	dirSvc := service.NewDirectoryService(gdb)
 	knSvc := service.NewKnowledgeService(gdb)
+	// 外部模型可选：没配 AI_API_KEY 时知识库走本地降级实现。
+	knSvc.SetAIClient(ai.New(ai.Config{
+		BaseURL:        cfg.AI.BaseURL,
+		APIKey:         cfg.AI.APIKey,
+		Model:          cfg.AI.Model,
+		EmbeddingModel: cfg.AI.EmbeddingModel,
+	}))
 	// 飞书开放平台凭证：知识空间导入与群机器人通知共用同一套应用配置。
 	knSvc.ConfigureFeishu(cfg.FeishuAppID, cfg.FeishuAppSecret, os.Getenv("FEISHU_WEBHOOK_URL"), os.Getenv("FEISHU_BASE_URL"))
 	authH := handler.NewAuthHandler(authSvc, service.NewAttemptLimiter(cfg.LoginWindow, cfg.LoginPairLimit, cfg.LoginIPLimit), handler.AuthOptions{
@@ -223,6 +231,7 @@ func main() {
 		docs.GET("/:id/export", docH.Export)
 		docs.PUT("/:id", docH.Update)
 		docs.PATCH("/:id/title", docH.Rename)
+		docs.PATCH("/:id/icon", docH.SetIcon)
 		docs.POST("/:id/clone", docH.Clone)
 		docs.DELETE("/:id", docH.Delete)
 		docs.GET("/:id/ai-context", docH.AIContext)
@@ -318,6 +327,15 @@ func main() {
 		// 知识库 5.0：模板属性与模板建文档、属性看板与批量改属性、节点权限、
 		// 分享白名单、标签词库、导入预览与批量导入。
 		knowledge.POST("/templates/:templateId/docs", knH.CreateDocFromTemplate)
+		knowledge.GET("/members", knH.ListMembers)
+		knowledge.POST("/members", knH.SetMemberRole)
+		knowledge.DELETE("/members/:userId", knH.RemoveMember)
+		knowledge.POST("/templates/:templateId/publish", knH.PublishTemplate)
+		knowledge.GET("/semantic", knH.SemanticSearch)
+		knowledge.POST("/index", knH.IndexDocument)
+		knowledge.POST("/meeting/minutes", knH.BuildMeetingMinutes)
+		knowledge.POST("/audio/transcribe", knH.TranscribeAudio)
+		knowledge.POST("/transcript", knH.CreateDocFromTranscript)
 		knowledge.PATCH("/templates/:templateId/properties", knH.UpdateTemplateProperties)
 		knowledge.GET("/props/board", knH.DocPropsBoard)
 		knowledge.POST("/props/batch", knH.BatchDocProps)
@@ -354,6 +372,10 @@ func main() {
 		knowledgeDocs.POST("/:id/versions/:versionId/label", knH.LabelVersion)
 		knowledgeDocs.GET("/:id/versions/authors", knH.VersionAuthors)
 		knowledgeDocs.POST("/:id/save-as-template", knH.SaveDocAsTemplate)
+		knowledgeDocs.GET("/:id/structure", knH.DocStructure)
+		knowledgeDocs.POST("/:id/suggest", knH.SuggestWriting)
+		knowledgeDocs.GET("/:id/crdt", knH.CRDTUpdates)
+		knowledgeDocs.POST("/:id/crdt", knH.AppendCRDT)
 		// 知识库 5.0：自定义字段、评论增强、任务块、大纲与目录、docx 导出。
 		knowledgeDocs.PUT("/:id/properties/fields", knH.UpdateDocFields)
 		knowledgeDocs.POST("/:id/comments/:commentId/reaction", knH.ToggleCommentReaction)

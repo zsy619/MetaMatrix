@@ -39,7 +39,7 @@ func (s *KnowledgeService) GetOwnedDocument(ownerID, docID uuid.UUID) (*model.Ca
 
 // ListArchived 返回归档区节点（默认目录不显示，这里单独列出）。
 func (s *KnowledgeService) ListArchived(ownerID, projectID uuid.UUID) ([]model.KnowledgeNode, error) {
-	if err := s.assertProjectOwned(ownerID, projectID); err != nil {
+	if err := s.assertSpaceAccess(ownerID, projectID, SpaceRoleViewer); err != nil {
 		return nil, err
 	}
 	var rows []model.KnowledgeNode
@@ -88,7 +88,7 @@ func (s *KnowledgeService) NodeStatsOf(ownerID, projectID, nodeID uuid.UUID) (*N
 
 // DeleteWithPolicy 删除节点：promote=true 时子节点提升到父级，否则级联删除。
 func (s *KnowledgeService) DeleteWithPolicy(ownerID, projectID, nodeID uuid.UUID, promote bool) error {
-	node, err := s.getOwnedNode(ownerID, projectID, nodeID)
+	node, err := s.getWritableNode(ownerID, projectID, nodeID)
 	if err != nil {
 		return err
 	}
@@ -102,7 +102,7 @@ func (s *KnowledgeService) DeleteWithPolicy(ownerID, projectID, nodeID uuid.UUID
 
 // AutoFillSummaries 为缺摘要的文档节点回填摘要，返回回填数量。
 func (s *KnowledgeService) AutoFillSummaries(ownerID, projectID uuid.UUID) (int, error) {
-	if err := s.assertProjectOwned(ownerID, projectID); err != nil {
+	if err := s.assertSpaceAccess(ownerID, projectID, SpaceRoleEditor); err != nil {
 		return 0, err
 	}
 	var nodes []model.KnowledgeNode
@@ -452,7 +452,7 @@ func (s *KnowledgeService) VersionAuthorNames(docID uuid.UUID) (map[string]strin
 // SearchSpace 扩展：支持跨类型（未挂节点的文档）、评论命中与排序。
 func (s *KnowledgeService) searchSpaceExtended(ownerID uuid.UUID, projectID *uuid.UUID, f KnowledgeSearchFilter) ([]KnowledgeSearchHit, error) {
 	if projectID != nil {
-		if err := s.assertProjectOwned(ownerID, *projectID); err != nil {
+		if err := s.assertSpaceAccess(ownerID, *projectID, SpaceRoleViewer); err != nil {
 			return nil, err
 		}
 	}
@@ -626,7 +626,7 @@ func (s *KnowledgeService) RelatedDocsOf(ownerID, projectID, nodeID uuid.UUID, l
 
 // SimilarDocs 找目录树里的疑似重复文档（标题相同或高度相似）。
 func (s *KnowledgeService) SimilarDocs(ownerID, projectID uuid.UUID) ([][]KnowledgeSearchHit, error) {
-	if err := s.assertProjectOwned(ownerID, projectID); err != nil {
+	if err := s.assertSpaceAccess(ownerID, projectID, SpaceRoleViewer); err != nil {
 		return nil, err
 	}
 	var nodes []model.KnowledgeNode
@@ -681,7 +681,7 @@ type QualityItem struct {
 
 // QualityAudit 文档质量体检：空摘要、重复表述、空段落、超长文档。
 func (s *KnowledgeService) QualityAudit(ownerID, projectID uuid.UUID, limit int) ([]QualityItem, error) {
-	if err := s.assertProjectOwned(ownerID, projectID); err != nil {
+	if err := s.assertSpaceAccess(ownerID, projectID, SpaceRoleViewer); err != nil {
 		return nil, err
 	}
 	if limit <= 0 || limit > 200 {
@@ -739,7 +739,7 @@ func (s *KnowledgeService) QualityAudit(ownerID, projectID uuid.UUID, limit int)
 
 // ExportSpaceZip 把整个知识空间打包成 zip：目录树 + 每篇文档的 Markdown。
 func (s *KnowledgeService) ExportSpaceZip(ownerID, projectID uuid.UUID) ([]byte, string, error) {
-	if err := s.assertProjectOwned(ownerID, projectID); err != nil {
+	if err := s.assertSpaceAccess(ownerID, projectID, SpaceRoleEditor); err != nil {
 		return nil, "", err
 	}
 	nodes, err := s.Tree(ownerID, projectID)

@@ -24,6 +24,60 @@ var canvasEmbedRe = regexp.MustCompile(`data-type="canvasEmbed"[^>]*data-doc-id=
 // labelRe 抽 mention/embed 节点的可见文本作为 targetLabel。
 var labelRe = regexp.MustCompile(`>([^<]*)<`)
 
+// 结构块模式：表格、白板、流程图、图表、画布嵌入。
+// 引用落在这些块里时记到 PageReference.BlockType，图谱里连成「结构」边。
+var (
+	tableRe      = regexp.MustCompile(`(?s)<table[^>]*>.*?</table>`)
+	whiteboardRe = regexp.MustCompile(`data-type="whiteboard"`)
+	flowchartRe  = regexp.MustCompile(`data-type="flowchart"`)
+	chartRe      = regexp.MustCompile(`data-type="(echartsChart|chart)"`)
+	embedRe      = regexp.MustCompile(`data-type="canvasEmbed"`)
+)
+
+// blockRange 是一段结构块在 HTML 里的区间。
+type blockRange struct {
+	start int
+	end   int
+	kind  string
+}
+
+// scanBlockRanges 找出正文里的结构块区间。
+func scanBlockRanges(html string) []blockRange {
+	out := []blockRange{}
+	for _, m := range tableRe.FindAllStringIndex(html, -1) {
+		out = append(out, blockRange{start: m[0], end: m[1], kind: "table"})
+	}
+	for _, item := range []struct {
+		re   *regexp.Regexp
+		kind string
+	}{
+		{whiteboardRe, "whiteboard"},
+		{flowchartRe, "flowchart"},
+		{chartRe, "chart"},
+		{embedRe, "embed"},
+	} {
+		for _, m := range item.re.FindAllStringIndex(html, -1) {
+			out = append(out, blockRange{start: m[0], end: m[1] + 32, kind: item.kind})
+		}
+	}
+	return out
+}
+
+// blockKindAt 返回某个位置所在结构块的类型；不在结构块里返回空串。
+func blockKindAt(ranges []blockRange, pos int) string {
+	kind := ""
+	for _, r := range ranges {
+		if pos < r.start || pos > r.end {
+			continue
+		}
+		// 表格是更大的容器，优先级更高：表格里的引用仍算表格引用。
+		if kind == "" || r.kind == "table" {
+			kind = r.kind
+		}
+	}
+	return kind
+}
+
 // RebuildPageReferences 全量重建一篇文档的出向引用索引。
 // 在 syncExtract 同事务内调用：先删旧记录，再扫描 current_data 里的 mention/embed。
 // data 是 canvas_documents.current_data（JSON），doc 类型的 html 字段里含 mention/embed 节点。
@@ -46,7 +100,8 @@ func scanPageReferences(data datatypes.JSON, sourceDocID uuid.UUID, now time.Tim
 	}
 	var out []model.PageReference
 	seen := map[string]bool{}
-	add := func(targetID, refType, label string) {
+	ranges := scanBlockRanges(html)
+	add := func(targetID, refType, label, blockType string) {
 		if targetID == "" || targetID == sourceDocID.String() {
 			return
 		}
@@ -64,15 +119,17 @@ func scanPageReferences(data datatypes.JSON, sourceDocID uuid.UUID, now time.Tim
 			SourceDocID: sourceDocID,
 			TargetDocID: uid,
 			RefType:     refType,
+			BlockType:   blockType,
 			TargetLabel: label,
 			CreatedAt:   now,
 		})
 	}
-	for _, m := range mentionNodeRe.FindAllStringSubmatch(html, -1) {
-		add(m[1], "mention", extractLabel(html, m[0]))
+	for _, m := range mentionNodeRe.FindAllStringSubmatchIndex(html, -1) {
+		matched := html[m[0]:m[1]]
+		add(html[m[2]:m[3]], "mention", extractLabel(html, matched), blockKindAt(ranges, m[2]))
 	}
-	for _, m := range canvasEmbedRe.FindAllStringSubmatch(html, -1) {
-		add(m[1], "embed", "")
+	for _, m := range canvasEmbedRe.FindAllStringSubmatchIndex(html, -1) {
+		add(html[m[2]:m[3]], "embed", "", blockKindAt(ranges, m[2]))
 	}
 	return out
 }

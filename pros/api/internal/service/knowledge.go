@@ -6,6 +6,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"metamatrix/api/internal/ai"
 	"metamatrix/api/internal/model"
 
 	"github.com/google/uuid"
@@ -27,8 +28,10 @@ const (
 
 type KnowledgeService struct {
 	db *gorm.DB
-	// presence 是进程内的在线协作状态表。
-	presence *PresenceRegistry
+	// presence 是在线协作状态存储：数据库为主、内存兜底（多实例共享同一份状态）。
+	presence PresenceStore
+	// ai 是可选的外部模型客户端：没配置时所有智能化能力走本地降级。
+	ai *ai.Client
 	// 飞书开放平台配置：知识空间导入与群机器人通知。
 	feishuAppID     string
 	feishuAppSecret string
@@ -37,7 +40,7 @@ type KnowledgeService struct {
 }
 
 func NewKnowledgeService(db *gorm.DB) *KnowledgeService {
-	return &KnowledgeService{db: db, presence: NewPresenceRegistry()}
+	return &KnowledgeService{db: db, presence: newHybridPresenceStore(db)}
 }
 
 type KnowledgeNodeInput struct {
@@ -108,7 +111,7 @@ func cleanNodeIcon(raw, nodeType string) (string, error) {
 // Tree 返回一个项目下的全部目录节点，前端一次性构建整棵树。
 // 同时把文档的基本信息（title/canvasType/updatedAt）拼到节点上，避免前端二次请求。
 func (s *KnowledgeService) Tree(ownerID, projectID uuid.UUID) ([]model.KnowledgeNode, error) {
-	if err := s.assertProjectOwned(ownerID, projectID); err != nil {
+	if err := s.assertSpaceAccess(ownerID, projectID, SpaceRoleViewer); err != nil {
 		return nil, err
 	}
 	var nodes []model.KnowledgeNode
@@ -175,7 +178,7 @@ func (s *KnowledgeService) overlayDocTitles(ownerID uuid.UUID, nodes []model.Kno
 // Create 新建节点。doc 类型可同时带 documentId 指向一篇已有文档；
 // 不带 documentId 时由调用方先建文档再建节点。
 func (s *KnowledgeService) Create(ownerID, projectID uuid.UUID, in KnowledgeNodeInput) (*model.KnowledgeNode, error) {
-	if err := s.assertProjectOwned(ownerID, projectID); err != nil {
+	if err := s.assertSpaceAccess(ownerID, projectID, SpaceRoleEditor); err != nil {
 		return nil, err
 	}
 	title, err := validateNodeTitle(in.Title)
@@ -225,7 +228,7 @@ func (s *KnowledgeService) Create(ownerID, projectID uuid.UUID, in KnowledgeNode
 
 // Update 重命名 / 改图标 / 换文档。
 func (s *KnowledgeService) Update(ownerID, projectID, nodeID uuid.UUID, title *string, icon *string, documentID *uuid.UUID, pinyin *string) (*model.KnowledgeNode, error) {
-	node, err := s.getOwnedNode(ownerID, projectID, nodeID)
+	node, err := s.getWritableNode(ownerID, projectID, nodeID)
 	if err != nil {
 		return nil, err
 	}
@@ -273,13 +276,13 @@ func (s *KnowledgeService) Update(ownerID, projectID, nodeID uuid.UUID, title *s
 	if err != nil {
 		return nil, err
 	}
-	return s.getOwnedNode(ownerID, projectID, nodeID)
+	return s.getWritableNode(ownerID, projectID, nodeID)
 }
 
 // Move 移动节点 / 调整排序。parentId=nil 表示移到根级。
 // 会检查环：不能把自己移到自己的子孙下面。
 func (s *KnowledgeService) Move(ownerID, projectID, nodeID uuid.UUID, in KnowledgeMoveInput) (*model.KnowledgeNode, error) {
-	node, err := s.getOwnedNode(ownerID, projectID, nodeID)
+	node, err := s.getWritableNode(ownerID, projectID, nodeID)
 	if err != nil {
 		return nil, err
 	}
@@ -306,7 +309,7 @@ func (s *KnowledgeService) Move(ownerID, projectID, nodeID uuid.UUID, in Knowled
 	if err := s.db.Model(&model.KnowledgeNode{}).Where("id = ?", nodeID).Updates(fields).Error; err != nil {
 		return nil, err
 	}
-	return s.getOwnedNode(ownerID, projectID, nodeID)
+	return s.getWritableNode(ownerID, projectID, nodeID)
 }
 
 func hasParentColumn(node *model.KnowledgeNode) bool {
@@ -319,7 +322,7 @@ func (s *KnowledgeService) Reorder(ownerID, projectID uuid.UUID, ids []uuid.UUID
 	if len(ids) == 0 {
 		return nil
 	}
-	if err := s.assertProjectOwned(ownerID, projectID); err != nil {
+	if err := s.assertSpaceAccess(ownerID, projectID, SpaceRoleEditor); err != nil {
 		return err
 	}
 	now := time.Now().UTC()
@@ -337,7 +340,7 @@ func (s *KnowledgeService) Reorder(ownerID, projectID uuid.UUID, ids []uuid.UUID
 
 // Delete 删节点并级联删它下面的全部子节点；只删节点，不删文档本身。
 func (s *KnowledgeService) Delete(ownerID, projectID, nodeID uuid.UUID) error {
-	node, err := s.getOwnedNode(ownerID, projectID, nodeID)
+	node, err := s.getWritableNode(ownerID, projectID, nodeID)
 	if err != nil {
 		return err
 	}
@@ -385,10 +388,25 @@ func (s *KnowledgeService) getOwnedNode(ownerID, projectID, nodeID uuid.UUID) (*
 		return nil, err
 	}
 	// 校验项目归属：项目不属于该用户时整个树都不可见。
-	if err := s.assertProjectOwned(ownerID, projectID); err != nil {
+	if err := s.assertSpaceAccess(ownerID, projectID, SpaceRoleViewer); err != nil {
 		return nil, err
 	}
 	return &node, nil
+}
+
+// getWritableNode 取节点并要求空间编辑权限。
+//
+// 读路径用 getOwnedNode（空间成员可读），写路径必须走这里，
+// 否则 viewer 角色就能改节点。
+func (s *KnowledgeService) getWritableNode(ownerID, projectID, nodeID uuid.UUID) (*model.KnowledgeNode, error) {
+	node, err := s.getOwnedNode(ownerID, projectID, nodeID)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.assertSpaceAccess(ownerID, projectID, SpaceRoleEditor); err != nil {
+		return nil, err
+	}
+	return node, nil
 }
 
 func (s *KnowledgeService) assertProjectOwned(ownerID, projectID uuid.UUID) error {
@@ -441,7 +459,7 @@ func (s *KnowledgeService) assertParentCycle(ownerID, projectID uuid.UUID, paren
 // CreateDocWithNode 一步建文档 + 挂节点。
 // 文档 canvasType="doc"，current_data 是 TipTap 空 doc。
 func (s *KnowledgeService) CreateDocWithNode(ownerID, projectID uuid.UUID, parentID *uuid.UUID, title string, icon string) (*model.KnowledgeNode, error) {
-	if err := s.assertProjectOwned(ownerID, projectID); err != nil {
+	if err := s.assertSpaceAccess(ownerID, projectID, SpaceRoleEditor); err != nil {
 		return nil, err
 	}
 	cleanTitle, err := validateNodeTitle(title)

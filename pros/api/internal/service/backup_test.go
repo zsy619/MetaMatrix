@@ -45,6 +45,7 @@ type backupDocumentSQLite struct {
 	OwnerUserID    uuid.UUID      `gorm:"type:uuid;not null;index:idx_docs_owner_updated,priority:1;index:idx_docs_owner_type,priority:1;index:idx_docs_owner_template,priority:1"`
 	CanvasType     string         `gorm:"type:varchar(64);not null;index:idx_docs_owner_type,priority:2"`
 	Title          string         `gorm:"type:varchar(255);not null"`
+	Icon           string         `gorm:"type:varchar(16);not null;default:''"`
 	Notes          string         `gorm:"type:text"`
 	SchemaVersion  int            `gorm:"not null;default:1"`
 	SaveVersion    int64          `gorm:"not null;default:1"`

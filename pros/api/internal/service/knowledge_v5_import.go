@@ -387,7 +387,7 @@ type ImportResult struct {
 
 // ImportFiles 批量导入：逐个文件处理，单个失败不影响其余文件。
 func (s *KnowledgeService) ImportFiles(ownerID, projectID uuid.UUID, parentID *uuid.UUID, files []ImportFileInput) ([]ImportResult, error) {
-	if err := s.assertProjectOwned(ownerID, projectID); err != nil {
+	if err := s.assertSpaceAccess(ownerID, projectID, SpaceRoleEditor); err != nil {
 		return nil, err
 	}
 	if len(files) == 0 || len(files) > 50 {

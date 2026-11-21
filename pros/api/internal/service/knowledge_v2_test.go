@@ -26,6 +26,9 @@ type knowledgeTemplateSQLite struct {
 	HTML        string         `gorm:"type:text;not null;default:''"`
 	Properties  datatypes.JSON `gorm:"type:jsonb;not null;default:'[]'"`
 	Builtin     bool           `gorm:"not null;default:false"`
+	Published   bool           `gorm:"not null;default:false"`
+	PublishedAt *time.Time     `gorm:""`
+	PublishedBy *uuid.UUID     `gorm:"type:uuid"`
 	SortOrder   int            `gorm:"not null;default:0"`
 	CreatedAt   time.Time      `gorm:"not null"`
 	UpdatedAt   time.Time      `gorm:"not null"`

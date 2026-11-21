@@ -399,7 +399,7 @@ func (s *KnowledgeService) loadTemplateForOwner(ownerID, templateID uuid.UUID) (
 
 // CreateDocFromTemplate 用模板创建节点 + 文档：注入占位符并写入属性默认值。
 func (s *KnowledgeService) CreateDocFromTemplate(ownerID, projectID uuid.UUID, parentID *uuid.UUID, templateID uuid.UUID, title string) (*model.KnowledgeNode, error) {
-	if err := s.assertProjectOwned(ownerID, projectID); err != nil {
+	if err := s.assertSpaceAccess(ownerID, projectID, SpaceRoleEditor); err != nil {
 		return nil, err
 	}
 	tpl, err := s.loadTemplateForOwner(ownerID, templateID)
@@ -531,7 +531,7 @@ type DocBoardItem struct {
 
 // DocPropsBoard 列出空间里所有挂载文档的关键属性：驱动看板视图。
 func (s *KnowledgeService) DocPropsBoard(ownerID, projectID uuid.UUID) ([]DocBoardItem, error) {
-	if err := s.assertProjectOwned(ownerID, projectID); err != nil {
+	if err := s.assertSpaceAccess(ownerID, projectID, SpaceRoleViewer); err != nil {
 		return nil, err
 	}
 	var nodes []model.KnowledgeNode

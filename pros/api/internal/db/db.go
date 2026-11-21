@@ -47,6 +47,11 @@ func AutoMigrate(gdb *gorm.DB) error {
 		&model.DocComment{},
 		&model.KnowledgeEvent{},
 		&model.KnowledgeView{},
+		// 知识库 6.0：空间成员、presence 共享存储、协同增量、向量切片。
+		&model.KnowledgeMember{},
+		&model.KnowledgePresence{},
+		&model.DocCRDTUpdate{},
+		&model.KnowledgeChunk{},
 		// 知识库 5.0：评论已读位与业务标签词库。
 		&model.DocCommentRead{},
 		&model.KnowledgeTagDict{},

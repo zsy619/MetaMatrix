@@ -369,7 +369,7 @@ type NodeAccessInput struct {
 
 // SetNodeAccess 设置节点可见范围与可见成员。
 func (s *KnowledgeService) SetNodeAccess(ownerID, projectID, nodeID uuid.UUID, in NodeAccessInput) (*model.KnowledgeNode, error) {
-	node, err := s.getOwnedNode(ownerID, projectID, nodeID)
+	node, err := s.getWritableNode(ownerID, projectID, nodeID)
 	if err != nil {
 		return nil, err
 	}
@@ -470,7 +470,7 @@ func shareAllowed(share *model.KnowledgeShare, userID *uuid.UUID) bool {
 
 // ListTagDict 列出空间的业务词库。
 func (s *KnowledgeService) ListTagDict(ownerID, projectID uuid.UUID) ([]model.KnowledgeTagDict, error) {
-	if err := s.assertProjectOwned(ownerID, projectID); err != nil {
+	if err := s.assertSpaceAccess(ownerID, projectID, SpaceRoleViewer); err != nil {
 		return nil, err
 	}
 	var rows []model.KnowledgeTagDict
@@ -482,7 +482,7 @@ func (s *KnowledgeService) ListTagDict(ownerID, projectID uuid.UUID) ([]model.Kn
 
 // AddTagDict 往词库加词条（同词条覆盖分类与别名）。
 func (s *KnowledgeService) AddTagDict(ownerID, projectID uuid.UUID, tag, category, aliases string) (*model.KnowledgeTagDict, error) {
-	if err := s.assertProjectOwned(ownerID, projectID); err != nil {
+	if err := s.assertSpaceAccess(ownerID, projectID, SpaceRoleEditor); err != nil {
 		return nil, err
 	}
 	tag = strings.TrimSpace(tag)
@@ -507,7 +507,7 @@ func (s *KnowledgeService) AddTagDict(ownerID, projectID uuid.UUID, tag, categor
 
 // DeleteTagDict 删除词条。
 func (s *KnowledgeService) DeleteTagDict(ownerID, projectID uuid.UUID, id uuid.UUID) error {
-	if err := s.assertProjectOwned(ownerID, projectID); err != nil {
+	if err := s.assertSpaceAccess(ownerID, projectID, SpaceRoleEditor); err != nil {
 		return err
 	}
 	return s.db.Where("id = ? AND project_id = ?", id, projectID).Delete(&model.KnowledgeTagDict{}).Error

@@ -34,6 +34,22 @@ type Config struct {
 	KnowledgeTrashKeepDays int
 	// KnowledgeVersionKeep 是每篇文档保留的历史版本条数。
 	KnowledgeVersionKeep int
+	// AI holds the optional external model settings. Empty means the
+	// knowledge base falls back to its local implementations.
+	AI AIConfig
+}
+
+// AIConfig describes the external model endpoint.
+//
+// Any OpenAI-compatible gateway works: OpenAI, DeepSeek, Qwen or a local
+// vLLM. Without an API key the knowledge base keeps working with local
+// fallbacks (hashed embeddings, rule-based minutes, corpus-based writing
+// suggestions).
+type AIConfig struct {
+	BaseURL        string
+	APIKey         string
+	Model          string
+	EmbeddingModel string
 }
 
 // MailConfig describes the outbound mail transport.
@@ -144,6 +160,12 @@ func Load() Config {
 		PasswordReset:          loadPasswordResetConfig(),
 		KnowledgeTrashKeepDays: intEnv("KNOWLEDGE_TRASH_KEEP_DAYS", 30),
 		KnowledgeVersionKeep:   intEnv("KNOWLEDGE_VERSION_KEEP", 50),
+		AI: AIConfig{
+			BaseURL:        strings.TrimSpace(os.Getenv("AI_BASE_URL")),
+			APIKey:         strings.TrimSpace(os.Getenv("AI_API_KEY")),
+			Model:          strings.TrimSpace(os.Getenv("AI_MODEL")),
+			EmbeddingModel: strings.TrimSpace(os.Getenv("AI_EMBEDDING_MODEL")),
+		},
 	}
 }
 

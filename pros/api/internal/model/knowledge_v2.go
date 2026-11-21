@@ -23,11 +23,15 @@ type KnowledgeTemplate struct {
 	// Category 是模板分组（飞书模板中心按场景分类）。
 	Category string `gorm:"type:varchar(32);not null;default:'通用'" json:"category"`
 	// Scope 是模板作用域：builtin | team | personal | project。
-	Scope   string `gorm:"type:varchar(16);not null;default:'personal'" json:"scope"`
-	HTML    string `gorm:"type:text;not null;default:''" json:"html"`
+	Scope string `gorm:"type:varchar(16);not null;default:'personal'" json:"scope"`
+	HTML  string `gorm:"type:text;not null;default:''" json:"html"`
 	// Properties 是模板携带的页面属性定义：创建文档时自动写入 doc_properties。
 	Properties datatypes.JSON `gorm:"type:jsonb;not null;default:'[]'" json:"properties"`
-	Builtin bool   `gorm:"not null;default:false" json:"builtin"`
+	Builtin    bool           `gorm:"not null;default:false" json:"builtin"`
+	// Published 表示团队共享模板已发布（清单 026）：发布后空间成员都能看到。
+	Published   bool       `gorm:"not null;default:false" json:"published"`
+	PublishedAt *time.Time `json:"publishedAt"`
+	PublishedBy *uuid.UUID `json:"publishedBy"`
 	// SortOrder 控制模板面板内的顺序。
 	SortOrder int       `gorm:"not null;default:0" json:"sortOrder"`
 	CreatedAt time.Time `gorm:"type:timestamptz;not null" json:"createdAt"`
@@ -69,9 +73,9 @@ type DocProperty struct {
 	// FieldValues 是自定义字段的值：{"key": value}。
 	FieldValues datatypes.JSON `gorm:"type:jsonb;not null;default:'{}'" json:"fieldValues"`
 	// Computed 是公式字段的计算结果（读时算，不落库）。
-	Computed map[string]float64 `gorm:"-" json:"computed"`
-	UpdatedAt time.Time `gorm:"type:timestamptz;not null" json:"updatedAt"`
-	CreatedAt time.Time `gorm:"type:timestamptz;not null" json:"createdAt"`
+	Computed  map[string]float64 `gorm:"-" json:"computed"`
+	UpdatedAt time.Time          `gorm:"type:timestamptz;not null" json:"updatedAt"`
+	CreatedAt time.Time          `gorm:"type:timestamptz;not null" json:"createdAt"`
 }
 
 func (DocProperty) TableName() string { return "doc_properties" }
@@ -95,11 +99,11 @@ type DocComment struct {
 	// Reactions 是表情回应：{"👍": ["userId"]}。
 	Reactions datatypes.JSON `gorm:"type:jsonb;not null;default:'{}'" json:"reactions"`
 	// Unread 是「当前用户尚未读到该评论」的标记（读时算，不落库）。
-	Unread bool `gorm:"-" json:"unread"`
-	Content      string     `gorm:"type:text;not null" json:"content"`
-	Resolved     bool       `gorm:"not null;default:false" json:"resolved"`
-	CreatedAt    time.Time  `gorm:"type:timestamptz;not null" json:"createdAt"`
-	UpdatedAt    time.Time  `gorm:"type:timestamptz;not null" json:"updatedAt"`
+	Unread    bool      `gorm:"-" json:"unread"`
+	Content   string    `gorm:"type:text;not null" json:"content"`
+	Resolved  bool      `gorm:"not null;default:false" json:"resolved"`
+	CreatedAt time.Time `gorm:"type:timestamptz;not null" json:"createdAt"`
+	UpdatedAt time.Time `gorm:"type:timestamptz;not null" json:"updatedAt"`
 }
 
 func (DocComment) TableName() string { return "doc_comments" }

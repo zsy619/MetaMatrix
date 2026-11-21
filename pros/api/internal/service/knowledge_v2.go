@@ -156,7 +156,8 @@ func SeedBuiltinTemplates(db *gorm.DB) error {
 // ListTemplates 返回内置模板 + 当前用户的个人模板 + 项目模板。
 func (s *KnowledgeService) ListTemplates(ownerID, projectID uuid.UUID) ([]model.KnowledgeTemplate, error) {
 	var rows []model.KnowledgeTemplate
-	err := s.db.Where("builtin = true OR owner_user_id = ? OR scope = 'team'", ownerID).
+	// 团队模板只有发布后才对空间成员可见（清单 026）；作者本人始终可见。
+	err := s.db.Where("builtin = true OR owner_user_id = ? OR (scope = 'team' AND published = true)", ownerID).
 		Where("project_id IS NULL OR project_id = ?", projectID).
 		Order("builtin DESC").Order("sort_order ASC").Order("created_at ASC").
 		Find(&rows).Error
@@ -229,7 +230,7 @@ func (s *KnowledgeService) DeleteTemplate(ownerID, id uuid.UUID) error {
 
 // UpdateNodeMeta 更新节点的别名、摘要、收藏、锁定、归档与回收站状态。
 func (s *KnowledgeService) UpdateNodeMeta(ownerID, projectID, nodeID uuid.UUID, in NodeMetaInput) (*model.KnowledgeNode, error) {
-	node, err := s.getOwnedNode(ownerID, projectID, nodeID)
+	node, err := s.getWritableNode(ownerID, projectID, nodeID)
 	if err != nil {
 		return nil, err
 	}
@@ -281,12 +282,12 @@ func (s *KnowledgeService) UpdateNodeMeta(ownerID, projectID, nodeID uuid.UUID, 
 		return nil, err
 	}
 	_ = s.AppendEvent(s.db, projectID, "node.meta", &nodeID, node.DocumentID, ownerID, "")
-	return s.getOwnedNode(ownerID, projectID, nodeID)
+	return s.getWritableNode(ownerID, projectID, nodeID)
 }
 
 // ListTrash 返回回收站里的节点（含子孙）。
 func (s *KnowledgeService) ListTrash(ownerID, projectID uuid.UUID) ([]model.KnowledgeNode, error) {
-	if err := s.assertProjectOwned(ownerID, projectID); err != nil {
+	if err := s.assertSpaceAccess(ownerID, projectID, SpaceRoleViewer); err != nil {
 		return nil, err
 	}
 	var rows []model.KnowledgeNode
@@ -299,7 +300,7 @@ func (s *KnowledgeService) ListTrash(ownerID, projectID uuid.UUID) ([]model.Know
 
 // PurgeNode 彻底删除回收站里的节点（连带子孙）。
 func (s *KnowledgeService) PurgeNode(ownerID, projectID, nodeID uuid.UUID) error {
-	node, err := s.getOwnedNode(ownerID, projectID, nodeID)
+	node, err := s.getWritableNode(ownerID, projectID, nodeID)
 	if err != nil {
 		return err
 	}
@@ -317,7 +318,7 @@ func (s *KnowledgeService) PurgeNode(ownerID, projectID, nodeID uuid.UUID) error
 
 // CopyNode 复制一个节点（文档节点连正文一起复制），落到目标父级下。
 func (s *KnowledgeService) CopyNode(ownerID, projectID, nodeID uuid.UUID, newParentID *uuid.UUID) (*model.KnowledgeNode, error) {
-	node, err := s.getOwnedNode(ownerID, projectID, nodeID)
+	node, err := s.getWritableNode(ownerID, projectID, nodeID)
 	if err != nil {
 		return nil, err
 	}
@@ -791,7 +792,7 @@ func (s *KnowledgeService) AppendEvent(db *gorm.DB, projectID uuid.UUID, eventTy
 
 // ListEvents 返回项目最近的知识变更事件。
 func (s *KnowledgeService) ListEvents(ownerID, projectID uuid.UUID, limit int) ([]model.KnowledgeEvent, error) {
-	if err := s.assertProjectOwned(ownerID, projectID); err != nil {
+	if err := s.assertSpaceAccess(ownerID, projectID, SpaceRoleViewer); err != nil {
 		return nil, err
 	}
 	if limit <= 0 || limit > 200 {
@@ -809,7 +810,7 @@ func (s *KnowledgeService) ListEvents(ownerID, projectID uuid.UUID, limit int) (
 
 // SpaceSummary 汇总空间看板数据。
 func (s *KnowledgeService) SpaceSummary(ownerID, projectID uuid.UUID) (*KnowledgeSummary, error) {
-	if err := s.assertProjectOwned(ownerID, projectID); err != nil {
+	if err := s.assertSpaceAccess(ownerID, projectID, SpaceRoleViewer); err != nil {
 		return nil, err
 	}
 	summary := &KnowledgeSummary{
