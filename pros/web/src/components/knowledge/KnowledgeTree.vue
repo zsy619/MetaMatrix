@@ -171,6 +171,7 @@ function onSearchInput() {
 }
 
 async function runSearch() {
+  detectFeishuLink(searchQuery.value)
   searching.value = true
   const seq = ++searchSeq
   try {
@@ -209,6 +210,27 @@ async function loadAuthors() {
     authors.value = [...seen.entries()].map(([id, name]) => ({ id, name }))
   } catch {
     authors.value = []
+  }
+}
+
+/** 粘贴的飞书文档链接：命中时给出「一键导入」入口（087）。 */
+const feishuLink = ref('')
+
+function detectFeishuLink(query: string) {
+  feishuLink.value = /feishu\.cn\/(docx|docs)\//i.test(query) ? query.trim() : ''
+}
+
+/** 从飞书链接导入一篇文档。 */
+async function importFeishuDoc() {
+  try {
+    const node = await knowledgeApi.importFeishuDoc(props.projectId, feishuLink.value)
+    ElMessage.success(`已导入：${node.title}`)
+    feishuLink.value = ''
+    searchQuery.value = ''
+    await load()
+    emit('open-doc', node)
+  } catch {
+    ElMessage.error('导入失败，请确认已配置飞书应用凭证')
   }
 }
 
@@ -464,6 +486,17 @@ async function exportSpace() {
     ElMessage.success('已导出知识空间压缩包')
   } catch {
     ElMessage.error('导出失败')
+  }
+}
+
+/** 清理超过保留期的回收站节点（073）。 */
+async function purgeTrash() {
+  try {
+    const res = await knowledgeApi.purgeExpiredTrash(props.projectId, 30)
+    ElMessage.success(res.purged ? `已清理 ${res.purged} 个超期节点` : '没有超期节点')
+    await load()
+  } catch {
+    ElMessage.error('清理失败')
   }
 }
 
@@ -899,6 +932,7 @@ onBeforeUnmount(() => {
               <el-dropdown-item @click="fillSummaries">一键补全摘要</el-dropdown-item>
               <el-dropdown-item @click="exportSpace">导出整个空间</el-dropdown-item>
               <el-dropdown-item @click="openTemplateCenter">模板中心</el-dropdown-item>
+              <el-dropdown-item divided @click="purgeTrash">清理超期回收站</el-dropdown-item>
             </el-dropdown-menu>
           </template>
         </el-dropdown>
@@ -965,6 +999,11 @@ onBeforeUnmount(() => {
           <el-option label="标题" value="title" />
         </el-select>
       </div>
+      <div v-if="feishuLink" class="kn-tree__feishu">
+        <span>识别到飞书文档链接</span>
+        <el-button size="small" type="primary" @click="importFeishuDoc">导入到知识库</el-button>
+      </div>
+
       <ul v-if="searchHits.length" class="kn-tree__hits">
         <li
           v-for="hit in searchHits"
@@ -1223,6 +1262,12 @@ onBeforeUnmount(() => {
   margin-left: 6px;
   font-size: 11px;
   color: var(--mm-muted, #86909c);
+}
+.kn-tree__feishu {
+  display: flex; align-items: center; gap: 8px;
+  margin-top: 6px; padding: 6px 8px;
+  font-size: 12px; color: var(--mm-text, #1d2129);
+  border: 1px dashed var(--mm-blue, #1677ff); border-radius: 6px;
 }
 .kn-tree__file { display: none; }
 .kn-tree__hit :deep(mark) { background: #fff3a3; color: inherit; padding: 0 1px; }

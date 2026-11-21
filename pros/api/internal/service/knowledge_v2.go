@@ -1,6 +1,9 @@
 package service
 
 import (
+	"context"
+	"fmt"
+	"log"
 	"regexp"
 	"sort"
 	"strings"
@@ -94,6 +97,32 @@ var builtinTemplates = []model.KnowledgeTemplate{
 		HTML: `<h1>复盘</h1><h2>目标</h2><p></p><h2>实际结果</h2><p></p><h2>做得好的</h2><ul><li></li></ul><h2>待改进</h2><ul><li></li></ul><h2>行动项</h2><ul><li></li></ul>`},
 	{Key: "faq", Label: "FAQ", Icon: "❓", Category: "通用",
 		HTML: `<h1>常见问题</h1><h2>Q1</h2><p></p><h2>A1</h2><p></p><h2>Q2</h2><p></p><h2>A2</h2><p></p>`},
+	{Key: "prd", Label: "PRD 产品需求", Icon: "📘", Category: "产品",
+		HTML: `<h1>PRD：{标题}</h1><p><strong>负责人：</strong>{负责人}</p><p><strong>日期：</strong>{日期}</p><h2>问题陈述</h2><p></p><h2>用户与场景</h2><ul><li></li></ul><h2>需求清单</h2><ul><li></li></ul><h2>验收标准</h2><ul><li></li></ul><h2>风险</h2><ul><li></li></ul>`},
+	{Key: "okr", Label: "OKR 目标", Icon: "🎯", Category: "管理",
+		HTML: `<h1>OKR：{标题}</h1><p><strong>周期：</strong></p><h2>目标</h2><p></p><h3>关键结果</h3><ul><li></li></ul><h2>进展记录</h2><ul><li></li></ul>`},
+	{Key: "risk", Label: "风险登记册", Icon: "⚠️", Category: "管理",
+		HTML: `<h1>风险登记册</h1><h2>风险清单</h2><ul><li><strong>风险：</strong>　<strong>影响：</strong>　<strong>对策：</strong>　<strong>责任人：</strong></li></ul><h2>升级路径</h2><p></p>`},
+	{Key: "interview", Label: "用户访谈纪要", Icon: "🎙️", Category: "协作",
+		HTML: `<h1>用户访谈纪要</h1><p><strong>受访者：</strong></p><p><strong>时间：</strong>{日期}</p><h2>访谈目标</h2><p></p><h2>关键发现</h2><ul><li></li></ul><h2>原话摘录</h2><blockquote></blockquote><h2>后续行动</h2><ul><li></li></ul>`},
+	{Key: "competitor", Label: "竞品分析", Icon: "🔍", Category: "产品",
+		HTML: `<h1>竞品分析</h1><h2>对比维度</h2><ul><li></li></ul><h2>差异点</h2><ul><li></li></ul><h2>可借鉴</h2><ul><li></li></ul><h2>结论</h2><p></p>`},
+	{Key: "sprint-plan", Label: "迭代排期表", Icon: "🗓️", Category: "管理",
+		HTML: `<h1>迭代排期</h1><p><strong>迭代：</strong></p><p><strong>起止：</strong></p><h2>任务列表</h2><ul><li></li></ul><h2>里程碑</h2><ul><li></li></ul>`},
+	{Key: "onboarding", Label: "新人上手指南", Icon: "🧭", Category: "流程",
+		HTML: `<h1>新人上手指南</h1><h2>第一天</h2><ul><li></li></ul><h2>第一周</h2><ul><li></li></ul><h2>常用工具</h2><ul><li></li></ul><h2>找人</h2><p></p>`},
+	{Key: "incident", Label: "故障复盘报告", Icon: "🚨", Category: "流程",
+		HTML: `<h1>故障复盘</h1><p><strong>时间：</strong>{日期}</p><h2>影响面</h2><p></p><h2>时间线</h2><ol><li></li></ol><h2>根因</h2><p></p><h2>改进项</h2><ul><li></li></ul>`},
+	{Key: "one-pager", Label: "一页纸方案", Icon: "📄", Category: "通用",
+		HTML: `<h1>{标题}</h1><p><strong>负责人：</strong>{负责人}</p><h2>问题</h2><p></p><h2>方案</h2><p></p><h2>收益</h2><p></p><h2>成本</h2><p></p>`},
+	{Key: "checklist", Label: "检查清单", Icon: "✅", Category: "通用",
+		HTML: `<h1>检查清单</h1><ul><li></li><li></li><li></li></ul><h2>结论</h2><p></p>`},
+	{Key: "glossary", Label: "术语表", Icon: "📖", Category: "通用",
+		HTML: `<h1>术语表</h1><p><strong>术语：</strong>　<strong>含义：</strong></p><p><strong>术语：</strong>　<strong>含义：</strong></p>`},
+	{Key: "review", Label: "文档评审意见", Icon: "🔍", Category: "协作",
+		HTML: `<h1>评审意见</h1><p><strong>评审人：</strong></p><h2>结论</h2><p>通过 / 有条件通过 / 需修改</p><h2>问题清单</h2><ul><li></li></ul>`},
+	{Key: "handover", Label: "工作交接单", Icon: "🤝", Category: "协作",
+		HTML: `<h1>工作交接单</h1><p><strong>交接人：</strong></p><p><strong>接收人：</strong></p><h2>交接内容</h2><ul><li></li></ul><h2>账号与权限</h2><ul><li></li></ul>`},
 }
 
 // SeedBuiltinTemplates 幂等写入内置模板。
@@ -658,8 +687,11 @@ func (s *KnowledgeService) ListRecentViews(ownerID uuid.UUID, limit int) ([]Rece
 // ---------------------------------------------------------------- 事件
 
 // AppendEvent 追加一条知识变更事件（outbox）。
+//
+// 配置了飞书机器人 webhook 时，变更会自动推送到群里（096）：
+// 推送是尽力而为，失败只记日志，不影响事件落库。
 func (s *KnowledgeService) AppendEvent(db *gorm.DB, projectID uuid.UUID, eventType string, nodeID, docID *uuid.UUID, actorID uuid.UUID, payload string) error {
-	return db.Create(&model.KnowledgeEvent{
+	err := db.Create(&model.KnowledgeEvent{
 		ID:          uuid.New(),
 		ProjectID:   projectID,
 		EventType:   eventType,
@@ -669,6 +701,17 @@ func (s *KnowledgeService) AppendEvent(db *gorm.DB, projectID uuid.UUID, eventTy
 		Payload:     payload,
 		CreatedAt:   time.Now().UTC(),
 	}).Error
+	if err == nil && s.feishuWebhook != "" {
+		text := fmt.Sprintf("知识库变更：%s（项目 %s）", eventType, projectID.String()[:8])
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if notifyErr := s.NotifyFeishu(ctx, text); notifyErr != nil {
+				log.Printf("knowledge feishu notify failed: %v", notifyErr)
+			}
+		}()
+	}
+	return err
 }
 
 // ListEvents 返回项目最近的知识变更事件。

@@ -158,6 +158,39 @@ func (h *KnowledgeHandler) SharedDoc(ctx context.Context, c *app.RequestContext)
 	c.JSON(http.StatusOK, doc)
 }
 
+// ImportFeishuDocBody 是单篇飞书文档导入的入参。
+type ImportFeishuDocBody struct {
+	DocToken string  `json:"docToken"`
+	ParentID *string `json:"parentId"`
+}
+
+// ImportFeishuDoc 导入单篇飞书文档（粘贴链接即可）。
+func (h *KnowledgeHandler) ImportFeishuDoc(ctx context.Context, c *app.RequestContext) {
+	uid, ok := h.owner(c)
+	if !ok {
+		return
+	}
+	projectID, ok := parseID(c, "projectId")
+	if !ok {
+		return
+	}
+	var body ImportFeishuDocBody
+	if err := c.BindAndValidate(&body); err != nil {
+		BadRequest(c, "invalid body")
+		return
+	}
+	parentID, err := parseOptionalUUIDField(body.ParentID)
+	if err != nil {
+		BadRequest(c, "invalid parentId")
+		return
+	}
+	node, err := h.svc.ImportFeishuDoc(ctx, uid, projectID, body.DocToken, parentID)
+	if handleKnowledgeErr(c, err) {
+		return
+	}
+	c.JSON(http.StatusCreated, node)
+}
+
 // ---------------------------------------------------------------- 历史版本
 
 func (h *KnowledgeHandler) ListVersions(ctx context.Context, c *app.RequestContext) {

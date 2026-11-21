@@ -33,8 +33,8 @@ const cards = computed(() => {
   const s = summary.value
   if (!s) return []
   return [
-    { label: '节点', value: s.nodeCount },
-    { label: '文档', value: s.docCount },
+    { label: '目录节点', value: s.nodeCount },
+    { label: '内容文档', value: s.docCount },
     { label: '文件夹', value: s.folderCount },
     { label: '标签', value: s.tagCount },
     { label: '评论', value: s.commentCount },

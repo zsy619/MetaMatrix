@@ -807,6 +807,26 @@ func maskSensitive(text string) string {
 
 // ---------------------------------------------------------------- 回收站清理
 
+// PurgeAllExpiredTrash 清理所有用户超期的回收站节点（定时任务用）。
+func (s *KnowledgeService) PurgeAllExpiredTrash(keepDays int) (int, error) {
+	if keepDays <= 0 {
+		return 0, nil
+	}
+	var users []model.User
+	if err := s.db.Select("id").Find(&users).Error; err != nil {
+		return 0, err
+	}
+	total := 0
+	for _, user := range users {
+		purged, err := s.PurgeExpiredTrash(user.ID, keepDays)
+		if err != nil {
+			continue
+		}
+		total += purged
+	}
+	return total, nil
+}
+
 // PurgeExpiredTrash 清理超过保留期的回收站节点。
 func (s *KnowledgeService) PurgeExpiredTrash(ownerID uuid.UUID, keepDays int) (int, error) {
 	if keepDays <= 0 {

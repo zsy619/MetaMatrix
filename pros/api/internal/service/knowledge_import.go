@@ -417,6 +417,55 @@ func (s *KnowledgeService) ImportFeishuSpace(ctx context.Context, ownerID, proje
 	return count, nil
 }
 
+// ImportFeishuDoc 导入单篇飞书文档：粘贴飞书文档链接即可（087）。
+//
+// docToken 可以是 obj_token，也可以是完整的飞书文档链接（会从中解析 token）。
+func (s *KnowledgeService) ImportFeishuDoc(ctx context.Context, ownerID, projectID uuid.UUID, docToken string, parentID *uuid.UUID) (*model.KnowledgeNode, error) {
+	if err := s.assertProjectOwned(ownerID, projectID); err != nil {
+		return nil, err
+	}
+	if !s.FeishuConfigured() {
+		return nil, ErrValidation
+	}
+	token := ParseFeishuDocToken(docToken)
+	if token == "" {
+		return nil, ErrValidation
+	}
+	client := feishu.New(s.feishuAppID, s.feishuAppSecret)
+	if s.feishuBaseURL != "" {
+		client.BaseURL = s.feishuBaseURL
+	}
+	content, err := client.DocContent(ctx, token)
+	if err != nil {
+		return nil, err
+	}
+	title := "飞书文档 " + token
+	return s.createImportedDoc(ownerID, projectID, parentID, title, markdownToHTML(content))
+}
+
+// ParseFeishuDocToken 从粘贴的链接或裸 token 里取出飞书文档 token。
+func ParseFeishuDocToken(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	if idx := strings.Index(raw, "/docx/"); idx >= 0 {
+		rest := raw[idx+len("/docx/"):]
+		if end := strings.IndexAny(rest, "?#"); end >= 0 {
+			rest = rest[:end]
+		}
+		return strings.TrimSpace(rest)
+	}
+	if idx := strings.Index(raw, "/docs/"); idx >= 0 {
+		rest := raw[idx+len("/docs/"):]
+		if end := strings.IndexAny(rest, "?#"); end >= 0 {
+			rest = rest[:end]
+		}
+		return strings.TrimSpace(rest)
+	}
+	return raw
+}
+
 // NotifyFeishu 把一条消息发到飞书群机器人。
 func (s *KnowledgeService) NotifyFeishu(ctx context.Context, text string) error {
 	if s.feishuWebhook == "" {

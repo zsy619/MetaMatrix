@@ -247,6 +247,9 @@ func (s *KnowledgeService) auditShareAccess(share *model.KnowledgeShare) {
 
 // ---------------------------------------------------------------- 历史版本
 
+// VersionKeep 是每篇文档保留的历史版本条数：启动时按配置覆盖（111）。
+var VersionKeep = maxVersionKeep
+
 // SnapshotDocVersion 为文档追加一条历史快照；同一 saveVersion 只留一条。
 func SnapshotDocVersion(tx *gorm.DB, doc *model.CanvasDocument) error {
 	if doc == nil || doc.CanvasType != "doc" {
@@ -286,7 +289,7 @@ func SnapshotDocVersion(tx *gorm.DB, doc *model.CanvasDocument) error {
 	var stale []uuid.UUID
 	if err := tx.Model(&model.KnowledgeDocVersion{}).
 		Where("document_id = ?", doc.ID).
-		Order("created_at DESC").Offset(maxVersionKeep).
+		Order("created_at DESC").Offset(VersionKeep).
 		Pluck("id", &stale).Error; err != nil {
 		return err
 	}
@@ -303,8 +306,8 @@ func (s *KnowledgeService) ListDocVersions(ownerID, docID uuid.UUID, limit int) 
 	if _, err := s.docs().GetOwned(ownerID, docID); err != nil {
 		return nil, err
 	}
-	if limit <= 0 || limit > maxVersionKeep {
-		limit = maxVersionKeep
+	if limit <= 0 || limit > VersionKeep {
+		limit = VersionKeep
 	}
 	var rows []model.KnowledgeDocVersion
 	err := s.db.Where("document_id = ?", docID).

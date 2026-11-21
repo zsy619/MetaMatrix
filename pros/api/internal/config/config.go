@@ -30,6 +30,10 @@ type Config struct {
 	Mail MailConfig
 	// PasswordReset holds the reset code settings.
 	PasswordReset PasswordResetConfig
+	// KnowledgeTrashKeepDays 是回收站节点的保留天数，超期由清理任务清除。
+	KnowledgeTrashKeepDays int
+	// KnowledgeVersionKeep 是每篇文档保留的历史版本条数。
+	KnowledgeVersionKeep int
 }
 
 // MailConfig describes the outbound mail transport.
@@ -122,22 +126,24 @@ func Load() Config {
 		mediaRoot = "data/media"
 	}
 	return Config{
-		DatabaseURL:          dbURL,
-		Port:                 port,
-		JWTSecret:            secret,
-		LoginWindow:          durationEnv("LOGIN_WINDOW", 15*time.Minute),
-		LoginPairLimit:       intEnv("LOGIN_PAIR_LIMIT", 8),
-		LoginIPLimit:         intEnv("LOGIN_IP_LIMIT", 30),
-		CaptchaTTL:           captchaTTLDEnv(),
-		CaptchaDebug:         boolEnv("CAPTCHA_DEBUG", false),
-		CaptchaDebugLoopback: boolEnv("CAPTCHA_DEBUG_LOOPBACK", runningInCI()),
-		MediaRoot:            mediaRoot,
-		MediaSignSecret:      signSecret,
-		FeishuAppID:          os.Getenv("FEISHU_APP_ID"),
-		FeishuAppSecret:      os.Getenv("FEISHU_APP_SECRET"),
-		FeishuBlockID:        os.Getenv("FEISHU_DOC_BLOCK_ID"),
-		Mail:                 loadMailConfig(),
-		PasswordReset:        loadPasswordResetConfig(),
+		DatabaseURL:            dbURL,
+		Port:                   port,
+		JWTSecret:              secret,
+		LoginWindow:            durationEnv("LOGIN_WINDOW", 15*time.Minute),
+		LoginPairLimit:         intEnv("LOGIN_PAIR_LIMIT", 8),
+		LoginIPLimit:           intEnv("LOGIN_IP_LIMIT", 30),
+		CaptchaTTL:             captchaTTLDEnv(),
+		CaptchaDebug:           boolEnv("CAPTCHA_DEBUG", false),
+		CaptchaDebugLoopback:   boolEnv("CAPTCHA_DEBUG_LOOPBACK", runningInCI()),
+		MediaRoot:              mediaRoot,
+		MediaSignSecret:        signSecret,
+		FeishuAppID:            os.Getenv("FEISHU_APP_ID"),
+		FeishuAppSecret:        os.Getenv("FEISHU_APP_SECRET"),
+		FeishuBlockID:          os.Getenv("FEISHU_DOC_BLOCK_ID"),
+		Mail:                   loadMailConfig(),
+		PasswordReset:          loadPasswordResetConfig(),
+		KnowledgeTrashKeepDays: intEnv("KNOWLEDGE_TRASH_KEEP_DAYS", 30),
+		KnowledgeVersionKeep:   intEnv("KNOWLEDGE_VERSION_KEEP", 50),
 	}
 }
 

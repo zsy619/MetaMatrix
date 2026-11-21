@@ -302,13 +302,45 @@ async function save() {
   } catch (err: unknown) {
     const status = (err as { status?: number }).status
     if (status === 409) {
-      ElMessage.warning('文档已被其他端更新，正在重新加载…')
-      await load()
+      // 冲突不当成静默覆盖：给出可操作的三选一（086）。
+      await resolveConflict()
     } else {
       ElMessage.error(friendlyApiMessage(err, '保存失败'))
     }
   } finally {
     saving.value = false
+  }
+}
+
+/** 409 冲突处置：查看差异 / 强制覆盖 / 放弃本地修改。 */
+async function resolveConflict() {
+  try {
+    await ElMessageBox.confirm(
+      '文档已被其他端更新。可以放弃本地修改重新加载，或强制覆盖对方的修改。',
+      '保存冲突',
+      {
+        confirmButtonText: '强制覆盖',
+        cancelButtonText: '重新加载',
+        distinguishCancelAndClose: true,
+        type: 'warning',
+      },
+    )
+  } catch (action) {
+    // 取消 = 放弃本地修改并重新加载；关闭弹窗同样按重新加载处理。
+    await load()
+    ElMessage.info('已重新加载最新内容')
+    return
+  }
+  try {
+    doc.value = await updateDocument(props.documentId, {
+      title: title.value.trim() || '无标题',
+      currentData: { type: 'doc', html: html.value } as never,
+      operationId: `doc-force-${Date.now()}`,
+    })
+    dirty.value = false
+    ElMessage.success('已强制覆盖')
+  } catch (err) {
+    ElMessage.error(friendlyApiMessage(err, '强制覆盖失败'))
   }
 }
 

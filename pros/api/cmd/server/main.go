@@ -91,6 +91,20 @@ func main() {
 	projH := handler.NewProjectsHandler(projSvc)
 	dirH := handler.NewDirectoryHandler(dirSvc)
 	knH := handler.NewKnowledgeHandler(knSvc)
+	// 历史版本保留条数可配置（111）。
+	service.VersionKeep = cfg.KnowledgeVersionKeep
+	// 回收站自动清理：超期节点由定时任务清除（073）。
+	go func() {
+		ticker := time.NewTicker(6 * time.Hour)
+		defer ticker.Stop()
+		for range ticker.C {
+			if purged, err := knSvc.PurgeAllExpiredTrash(cfg.KnowledgeTrashKeepDays); err != nil {
+				log.Printf("knowledge trash purge failed: %v", err)
+			} else if purged > 0 {
+				log.Printf("knowledge trash purge: %d nodes removed", purged)
+			}
+		}
+	}()
 	mediaSvc := &media.Service{
 		Store:  media.NewGormStore(gdb),
 		Root:   cfg.MediaRoot,
@@ -286,6 +300,7 @@ func main() {
 		knowledge.PUT("/nodes/:nodeId/data", knH.SaveNodeData)
 		knowledge.POST("/import", knH.ImportFile)
 		knowledge.POST("/feishu/import", knH.ImportFeishuSpace)
+		knowledge.POST("/feishu/import-doc", knH.ImportFeishuDoc)
 		knowledge.POST("/feishu/notify", knH.NotifyFeishu)
 		// 知识库 4.0：归档区、节点统计、关联推荐、模板维护、跨类型检索、
 		// 空间打包导出、敏感扫描、质量体检与回收站清理。

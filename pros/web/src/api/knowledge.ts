@@ -607,6 +607,14 @@ export function importFeishuSpace(projectId: string, spaceToken: string, parentI
   })
 }
 
+/** 导入单篇飞书文档：粘贴飞书文档链接即可（087）。 */
+export function importFeishuDoc(projectId: string, docToken: string, parentId?: string | null) {
+  return apiRequest<KnowledgeNode>(`/projects/${projectId}/knowledge/feishu/import-doc`, {
+    method: 'POST',
+    body: { docToken, parentId: parentId ?? null },
+  })
+}
+
 export function notifyFeishu(projectId: string, text: string) {
   return apiRequest<{ ok: boolean }>(`/projects/${projectId}/knowledge/feishu/notify`, {
     method: 'POST',
