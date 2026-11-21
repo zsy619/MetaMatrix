@@ -55,7 +55,10 @@ export function migrateMindmap(raw: unknown): MindmapDoc {
   }
   if (data && Array.isArray(data.nodes) && Array.isArray(data.edges)) {
     const nodes = data.nodes.map((n) => ({ ...createNode(n.title ?? ''), ...n }))
-    return { title: data.title ?? nodes[0]?.title ?? '中心主题', nodes, edges: data.edges }
+    const ids = new Set(nodes.map((node) => node.id))
+    // 旧数据可能有删除残留的孤儿边；读取时丢掉，避免环和幽灵子节点。
+    const edges = data.edges.filter((edge) => ids.has(edge.source) && ids.has(edge.target))
+    return { title: data.title ?? nodes[0]?.title ?? '中心主题', nodes, edges }
   }
   const legacyTitle = typeof data?.title === 'string' ? data.title : '中心主题'
   const doc: MindmapDoc = { title: legacyTitle, nodes: [], edges: [] }
@@ -140,13 +143,9 @@ export function addSibling(doc: MindmapDoc, nodeId: string, title = '新分支')
 }
 
 export function removeNode(doc: MindmapDoc, id: string): void {
-  const kids = childrenMap(doc)
-  const drop = (nodeId: string) => {
-    for (const child of kids.get(nodeId) ?? []) drop(child)
-    doc.nodes = doc.nodes.filter((n) => n.id !== nodeId)
-  }
-  drop(id)
-  doc.edges = doc.edges.filter((e) => e.source !== id && e.target !== id)
+  const drop = new Set(subtreeIds(doc, id))
+  doc.nodes = doc.nodes.filter((node) => !drop.has(node.id))
+  doc.edges = doc.edges.filter((edge) => !drop.has(edge.source) && !drop.has(edge.target))
 }
 
 /** 升级：变成前一个兄弟的最后��孩子。 */

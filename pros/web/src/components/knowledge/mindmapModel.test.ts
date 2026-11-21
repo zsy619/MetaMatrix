@@ -34,6 +34,16 @@ describe('思维导图模型', () => {
     expect(buildTree(doc)[0].children).toHaveLength(2)
   })
 
+  it('迁移时丢弃指向不存在节点的孤儿边', () => {
+    const doc = migrateMindmap({
+      title: '项目',
+      nodes: [{ id: 'a', title: '甲', type: 'richtext', x: 0, y: 0, width: 170, height: 44 }],
+      edges: [{ id: 'e', source: 'a', target: 'ghost', label: '' }],
+    })
+    expect(doc.nodes).toHaveLength(1)
+    expect(doc.edges).toHaveLength(0)
+  })
+
   it('增删子节点与同级', () => {
     const doc = sample()
     const root = doc.nodes[0].id
@@ -42,6 +52,16 @@ describe('思维导图模型', () => {
     expect(doc.nodes).toHaveLength(5)
     removeNode(doc, child!)
     expect(doc.nodes).toHaveLength(4)
+  })
+
+  it('删除子树后不留下孤儿边', () => {
+    const doc = sample()
+    const second = buildTree(doc)[0].children[1].node.id
+    const child = addChild(doc, second, '丙')!
+    addChild(doc, child, '丁')
+    removeNode(doc, second)
+    const ids = new Set(doc.nodes.map((node) => node.id))
+    expect(doc.edges.every((edge) => ids.has(edge.source) && ids.has(edge.target))).toBe(true)
   })
 
   it('升级降级与同级换序', () => {

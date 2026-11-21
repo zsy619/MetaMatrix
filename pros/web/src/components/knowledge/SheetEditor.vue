@@ -6,6 +6,7 @@ import { getNodeData, saveNodeData } from '../../api/knowledge'
 import SheetCell from './SheetCell.vue'
 import SheetExtras from './SheetExtras.vue'
 import SheetCalendarView from './SheetCalendarView.vue'
+import ShareDialog from './ShareDialog.vue'
 import {
   cellText,
   FIELD_TYPES,
@@ -39,6 +40,7 @@ const saving = ref(false)
 const dirty = ref(false)
 const fieldPanel = ref(false)
 const detailRowId = ref('')
+const shareVisible = ref(false)
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 
 const view = computed(
@@ -421,10 +423,19 @@ onMounted(() => void load())
 
         <SheetExtras :data="data" :view="view" @import-csv="applyCsv" />
         <el-button size="small" @click="fieldPanel = true">字段</el-button>
+        <el-button size="small" @click="shareVisible = true">分享</el-button>
         <span v-if="dirty" class="sheet__dirty">未保存</span>
         <el-button size="small" type="primary" :loading="saving" @click="save">保存</el-button>
       </div>
     </header>
+
+    <ShareDialog
+      :project-id="props.projectId"
+      :node-id="props.nodeId"
+      kind="sheet"
+      :visible="shareVisible"
+      @close="shareVisible = false"
+    />
 
     <div v-if="selected.length" class="sheet__batch">
       已选 {{ selected.length }} 条
@@ -660,7 +671,7 @@ onMounted(() => void load())
   min-width: 0;
   display: flex;
   flex-direction: column;
-  background: var(--mm-surface, #fff);
+  background: transparent;
   overflow: hidden;
 }
 .sheet__bar {
@@ -668,7 +679,10 @@ onMounted(() => void load())
   align-items: center;
   gap: 12px;
   padding: 8px 16px;
-  border-bottom: 1px solid var(--mm-line, #e5e6eb);
+  border-bottom: 1px solid var(--glass-ring, rgba(15, 23, 42, 0.09));
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(var(--glass-blur, 18px)) saturate(var(--glass-saturate, 165%));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 18px)) saturate(var(--glass-saturate, 165%));
   flex-wrap: wrap;
 }
 .sheet__left {
@@ -690,18 +704,25 @@ onMounted(() => void load())
 }
 .sheet__chip {
   padding: 4px 10px;
-  border: 0;
+  border: 1px solid transparent;
   border-radius: 6px;
   background: transparent;
   cursor: pointer;
   font-size: 13px;
   color: var(--mm-text, #1d2129);
+  transition: background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease,
+    color 0.18s ease;
 }
 .sheet__chip:hover {
-  background: var(--mm-hover, #f2f3f5);
+  background: rgba(255, 255, 255, 0.72);
+  border-color: var(--glass-border, rgba(255, 255, 255, 0.7));
+  box-shadow: var(--glass-shadow-sm, 0 6px 18px rgba(15, 23, 42, 0.1));
+  backdrop-filter: blur(var(--glass-blur-sm, 10px));
+  -webkit-backdrop-filter: blur(var(--glass-blur-sm, 10px));
 }
 .sheet__chip.is-active {
   background: rgba(51, 112, 255, 0.12);
+  border-color: rgba(51, 112, 255, 0.28);
   color: var(--mm-blue, #3370ff);
 }
 .sheet__chip--add {
@@ -753,6 +774,13 @@ onMounted(() => void load())
 .sheet__grid-wrap {
   flex: 1;
   overflow: auto;
+  margin: 0 16px 16px;
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.7));
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.22);
+  backdrop-filter: blur(var(--glass-blur, 18px)) saturate(var(--glass-saturate, 165%));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 18px)) saturate(var(--glass-saturate, 165%));
+  box-shadow: var(--glass-shadow-sm, 0 6px 18px rgba(15, 23, 42, 0.1));
 }
 .sheet-grid {
   border-collapse: separate;
@@ -762,8 +790,8 @@ onMounted(() => void load())
 }
 .sheet-grid th,
 .sheet-grid td {
-  border-right: 1px solid var(--mm-line, #e5e6eb);
-  border-bottom: 1px solid var(--mm-line, #e5e6eb);
+  border-right: 1px solid var(--glass-ring, rgba(15, 23, 42, 0.09));
+  border-bottom: 1px solid var(--glass-ring, rgba(15, 23, 42, 0.09));
   padding: 0;
   text-align: left;
   vertical-align: middle;
@@ -772,7 +800,10 @@ onMounted(() => void load())
   position: sticky;
   top: 0;
   z-index: 2;
-  background: var(--mm-page, #f7f7f7);
+  background: rgba(255, 255, 255, 0.68);
+  backdrop-filter: blur(var(--glass-blur-sm, 10px)) saturate(var(--glass-saturate, 165%));
+  -webkit-backdrop-filter: blur(var(--glass-blur-sm, 10px)) saturate(var(--glass-saturate, 165%));
+  box-shadow: inset 0 -1px 0 var(--glass-ring, rgba(15, 23, 42, 0.09));
 }
 .sheet-grid__head-inner {
   display: flex;
@@ -795,6 +826,12 @@ onMounted(() => void load())
   padding: 0 2px;
   cursor: pointer;
   color: var(--mm-muted, #86909c);
+  border-radius: 4px;
+  transition: background-color 0.16s ease, color 0.16s ease;
+}
+.sheet-grid__head-more:hover {
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--mm-blue, #3370ff);
 }
 .sheet-grid__check {
   width: 40px;
@@ -809,6 +846,12 @@ onMounted(() => void load())
   padding: 4px 8px;
   cursor: pointer;
   color: var(--mm-muted, #86909c);
+  border-radius: 6px;
+  transition: background-color 0.16s ease, color 0.16s ease;
+}
+.sheet-grid__add-btn:hover {
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--mm-blue, #3370ff);
 }
 .sheet-grid__cell {
   padding: 4px 8px;
@@ -822,12 +865,18 @@ onMounted(() => void load())
   padding: 2px 6px;
   cursor: pointer;
   color: var(--mm-muted, #86909c);
+  border-radius: 6px;
+  transition: background-color 0.16s ease, color 0.16s ease;
+}
+.sheet-grid__ops-btn:hover {
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--mm-blue, #3370ff);
 }
 .sheet-grid__row:hover {
-  background: rgba(51, 112, 255, 0.04);
+  background: rgba(255, 255, 255, 0.58);
 }
 .sheet-grid__group td {
-  background: var(--mm-page, #f7f7f7);
+  background: rgba(255, 255, 255, 0.52);
   padding: 5px 10px;
 }
 .sheet-grid__group-label {
@@ -885,8 +934,11 @@ onMounted(() => void load())
   gap: 8px;
 }
 .sheet__card {
-  background: var(--mm-surface, #fff);
-  border: 1px solid var(--mm-line, #e5e6eb);
+  background: rgba(255, 255, 255, 0.62);
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.7));
+  box-shadow: var(--glass-shadow-sm, 0 6px 18px rgba(15, 23, 42, 0.1));
+  backdrop-filter: blur(var(--glass-blur-sm, 10px));
+  -webkit-backdrop-filter: blur(var(--glass-blur-sm, 10px));
   border-radius: 8px;
   padding: 10px;
   cursor: pointer;
