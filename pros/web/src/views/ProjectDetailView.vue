@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowLeft, Delete, Document, DocumentAdd, Edit } from '@element-plus/icons-vue'
+import { ArrowLeft, Delete, DocumentAdd, Edit } from '@element-plus/icons-vue'
 import { Collection } from '@element-plus/icons-vue'
 import * as projectsApi from '../api/projects'
 import * as documentsApi from '../api/documents'
@@ -10,7 +10,7 @@ import type { DocumentSummary } from '../api/documents'
 import type { Project } from '../types/project'
 import { friendlyApiMessage } from '../utils/apiMessage'
 import { NODE_GRAPH_TYPE, emptyNodeGraphDoc } from '../types/nodeGraph'
-import ProjectEmojiPicker from '../components/project/ProjectEmojiPicker.vue'
+import IconPicker from '../components/common/IconPicker.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -108,6 +108,19 @@ async function createCanvas() {
   } catch (err) {
     if (err === 'cancel' || err === 'close') return
     ElMessage.error(friendlyApiMessage(err, '操作失败'))
+  }
+}
+
+/** 当前打开图标选择器的画布。 */
+const iconTarget = ref('')
+
+/** 画布标题图标：走统一的文档图标接口，改完立即回写列表。 */
+async function pickCanvasIcon(canvas: DocumentSummary, icon: string) {
+  try {
+    await documentsApi.setDocumentIcon(canvas.id, icon)
+    canvas.icon = icon
+  } catch (err) {
+    ElMessage.error(friendlyApiMessage(err, '修改图标失败'))
   }
 }
 
@@ -217,9 +230,31 @@ onMounted(load)
         @keydown.enter="openCanvas(canvas)"
       >
         <div class="pg-canvas__main">
-          <span class="pg-canvas__icon" aria-hidden="true">
-            <el-icon><Document /></el-icon>
-          </span>
+          <el-popover
+            trigger="click"
+            placement="right-start"
+            :width="340"
+            @show="iconTarget = canvas.id"
+            @hide="iconTarget = ''"
+          >
+            <template #reference>
+              <button
+                type="button"
+                class="pg-canvas__icon"
+                title="更换图标"
+                aria-label="更换图标"
+                @click.stop
+              >
+                {{ canvas.icon || '🎨' }}
+              </button>
+            </template>
+            <IconPicker
+              v-if="iconTarget === canvas.id"
+              :model-value="canvas.icon || '🎨'"
+              :width="320"
+              @update:model-value="(icon: string) => pickCanvasIcon(canvas, icon)"
+            />
+          </el-popover>
           <h2 class="pg-canvas__name">{{ canvas.title }}</h2>
           <p class="pg-canvas__meta">更新于 {{ new Date(canvas.updatedAt).toLocaleString() }}</p>
         </div>
@@ -237,7 +272,7 @@ onMounted(load)
       </label>
       <div class="pg-field">
         <span class="pg-field__label">项目表情</span>
-        <ProjectEmojiPicker v-model="editEmoji" />
+        <IconPicker v-model="editEmoji" />
       </div>
       <div class="pg-field">
         <span class="pg-field__label">项目进度（{{ editProgress }}%）</span>
@@ -395,14 +430,16 @@ onMounted(load)
 }
 
 .pg-canvas__icon {
-  grid-row: span 2;
-  width: 28px;
-  height: 28px;
-  display: grid;
-  place-items: center;
-  border-radius: 8px;
-  background: #e8f0fe;
-  color: var(--mm-blue);
+  border: 0;
+  background: none;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 6px;
+}
+.pg-canvas__icon:hover {
+  background: var(--el-fill-color-light, #f2f3f5);
 }
 
 .pg-canvas__name {

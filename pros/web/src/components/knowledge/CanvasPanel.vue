@@ -12,9 +12,14 @@ import CanvasViewport from '../canvas/CanvasViewport.vue'
 import { useDocumentStore } from '../../stores/document'
 import { useUiStore } from '../../stores/ui'
 import { friendlyApiMessage } from '../../utils/apiMessage'
+import IconPicker from '../common/IconPicker.vue'
 
-const props = defineProps<{ documentId: string; templateId: string }>()
-const emit = defineEmits<{ saved: [title: string]; 'open-full': [] }>()
+const props = defineProps<{ documentId: string; templateId: string; icon?: string }>()
+const emit = defineEmits<{
+  saved: [title: string]
+  'open-full': []
+  'icon-change': [icon: string]
+}>()
 
 const store = useDocumentStore()
 const ui = useUiStore()
@@ -61,6 +66,18 @@ async function save() {
 <template>
   <section class="kn-canvas-panel">
     <header class="kn-canvas-panel__head">
+      <el-popover trigger="click" placement="bottom-start" :width="340">
+        <template #reference>
+          <button type="button" class="kn-canvas-panel__icon" title="更换图标" aria-label="更换图标">
+            {{ props.icon || '🎨' }}
+          </button>
+        </template>
+        <IconPicker
+          :model-value="props.icon || '🎨'"
+          :width="320"
+          @update:model-value="(icon: string) => emit('icon-change', icon)"
+        />
+      </el-popover>
       <input
         class="kn-canvas-panel__title"
         :value="title"
@@ -100,6 +117,18 @@ async function save() {
   padding: 8px 16px;
   border-bottom: 1px solid var(--mm-line, #e5e6eb);
   background: var(--mm-surface, #fff);
+}
+.kn-canvas-panel__icon {
+  border: 0;
+  background: none;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 6px;
+}
+.kn-canvas-panel__icon:hover {
+  background: var(--el-fill-color-light, #f2f3f5);
 }
 .kn-canvas-panel__title {
   flex: 1;

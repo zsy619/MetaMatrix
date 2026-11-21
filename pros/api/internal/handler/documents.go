@@ -549,6 +549,33 @@ type renameBody struct {
 	ExpectedSaveVersion *int64 `json:"expectedSaveVersion"`
 }
 
+type iconBody struct {
+	Icon string `json:"icon"`
+}
+
+// SetIcon 更新画布标题图标。
+func (h *DocumentsHandler) SetIcon(ctx context.Context, c *app.RequestContext) {
+	uid, ok := h.owner(c)
+	if !ok {
+		return
+	}
+	id, ok := parseID(c, "id")
+	if !ok {
+		return
+	}
+	var body iconBody
+	if err := c.BindAndValidate(&body); err != nil {
+		Fail(c, http.StatusBadRequest, "invalid body", "validation_error")
+		return
+	}
+	doc, err := h.svc.SetIcon(uid, id, body.Icon)
+	if handleDocErr(c, err, doc) {
+		return
+	}
+	middleware.Audit(c, "set_icon", uid.String(), "id="+id.String())
+	c.JSON(http.StatusOK, doc)
+}
+
 func (h *DocumentsHandler) Rename(ctx context.Context, c *app.RequestContext) {
 	uid, ok := h.owner(c)
 	if !ok {

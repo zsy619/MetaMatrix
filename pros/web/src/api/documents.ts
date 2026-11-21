@@ -8,6 +8,8 @@ export type AnyCanvasDocumentJSON = CanvasDocumentJSON | NodeGraphDocumentJSON
 export type DocumentSummary = {
   id: string
   title: string
+  /** 画布标题图标（emoji），空串或缺省表示用默认图标。 */
+  icon?: string
   notes: string
   templateId: string | null
   canvasType: string
@@ -283,6 +285,14 @@ export function updateDocument(
   return apiRequest<DocumentFull>(`/documents/${id}`, {
     method: 'PUT',
     body: input,
+  })
+}
+
+/** 更新画布标题图标。 */
+export function setDocumentIcon(id: string, icon: string) {
+  return apiRequest<DocumentSummary>(`/documents/${id}/icon`, {
+    method: 'PATCH',
+    body: { icon },
   })
 }
 

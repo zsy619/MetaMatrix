@@ -543,6 +543,7 @@ func documentSummary(doc *model.CanvasDocument) *model.DocumentSummary {
 	return &model.DocumentSummary{
 		ID:             doc.ID,
 		Title:          doc.Title,
+		Icon:           doc.Icon,
 		Notes:          doc.Notes,
 		TemplateID:     doc.TemplateID,
 		CanvasType:     doc.CanvasType,
@@ -553,6 +554,29 @@ func documentSummary(doc *model.CanvasDocument) *model.DocumentSummary {
 		CreatedAt:      doc.CreatedAt,
 		UpdatedAt:      doc.UpdatedAt,
 	}
+}
+
+// SetIcon 更新画布标题图标。图标只有一个 emoji 字符，留空表示用默认图标。
+func (s *DocumentsService) SetIcon(ownerID, docID uuid.UUID, icon string) (*model.DocumentSummary, error) {
+	icon = strings.TrimSpace(icon)
+	if utf8.RuneCountInString(icon) > 4 {
+		return nil, ErrValidation
+	}
+	err := bumpSaveVersion(s.db, ownerID, docID, nil, map[string]interface{}{
+		"icon":       icon,
+		"updated_at": time.Now().UTC(),
+	})
+	if err != nil {
+		if errors.Is(err, ErrSaveConflict) {
+			return nil, ErrDocumentNotFound
+		}
+		return nil, err
+	}
+	fresh, err := s.GetOwned(ownerID, docID)
+	if err != nil {
+		return nil, err
+	}
+	return documentSummary(fresh), nil
 }
 
 func (s *DocumentsService) Create(ownerID uuid.UUID, in CreateDocumentInput) (*model.CanvasDocument, error) {
@@ -829,7 +853,7 @@ func (s *DocumentsService) List(ownerID uuid.UUID, f ListFilter) ([]model.Docume
 		return nil, 0, err
 	}
 	q := scope().
-		Select("id, title, notes, template_id, canvas_type, project_id, schema_version, save_version, head_revision_id, created_at, updated_at").
+		Select("id, title, icon, notes, template_id, canvas_type, project_id, schema_version, save_version, head_revision_id, created_at, updated_at").
 		Order("updated_at DESC").
 		Order("id ASC")
 	if f.Paged {
@@ -881,7 +905,7 @@ func (s *DocumentsService) ListKeyset(ownerID uuid.UUID, f ListCursorFilter) (*D
 	if err := scope().Count(&total).Error; err != nil {
 		return nil, err
 	}
-	q := scope().Select("id, title, notes, template_id, canvas_type, project_id, schema_version, save_version, head_revision_id, created_at, updated_at")
+	q := scope().Select("id, title, icon, notes, template_id, canvas_type, project_id, schema_version, save_version, head_revision_id, created_at, updated_at")
 	if f.Cursor != "" {
 		var cursor documentKeysetCursor
 		if err := decodeKeysetCursor(f.Cursor, &cursor); err != nil || cursor.ID == uuid.Nil || cursor.UpdatedAt.IsZero() {

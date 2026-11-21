@@ -3,7 +3,7 @@
 import { ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
-import ProjectEmojiPicker from './ProjectEmojiPicker.vue'
+import IconPicker from '../common/IconPicker.vue'
 
 const props = defineProps<{ modelValue: boolean }>()
 const emit = defineEmits<{
@@ -52,7 +52,7 @@ function submit() {
     </label>
     <div class="field">
       <span class="field__label">项目表情</span>
-      <ProjectEmojiPicker v-model="emoji" />
+      <IconPicker v-model="emoji" />
     </div>
     <template #footer>
       <el-button @click="close">取消</el-button>
