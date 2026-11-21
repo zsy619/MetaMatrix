@@ -1,7 +1,22 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Download, Plus, Warning } from '@element-plus/icons-vue'
+import {
+  Box,
+  ChatDotRound,
+  CircleCheck,
+  Collection,
+  CopyDocument,
+  Download,
+  Folder,
+  Grid,
+  PriceTag,
+  Promotion,
+  Reading,
+  Tickets,
+  User,
+  Warning,
+} from '@element-plus/icons-vue'
 import * as knowledgeApi from '../../api/knowledge'
 import * as knowledgeApiV5 from '../../api/knowledge_v5'
 import SpaceMembers from './SpaceMembers.vue'
@@ -41,16 +56,33 @@ const healthLabels: Record<string, string> = {
   no_summary: '缺摘要',
 }
 
+/** 健康度徽标语义色：按问题严重度分档。 */
+const healthTones: Record<string, string> = {
+  no_title: 'danger',
+  empty_doc: 'warning',
+  stale: 'info',
+  no_summary: 'purple',
+}
+
+/** 质量体检徽标语义色（kind 是后端返回的中文分类）。 */
+const qualityTones: Record<string, string> = {
+  缺少摘要: 'purple',
+  空文档: 'warning',
+  空段落: 'info',
+  重复表述: 'cyan',
+  超长文档: 'muted',
+}
+
 const cards = computed(() => {
   const s = summary.value
   if (!s) return []
   return [
-    { label: '目录节点', value: s.nodeCount },
-    { label: '内容文档', value: s.docCount },
-    { label: '文件夹', value: s.folderCount },
-    { label: '标签', value: s.tagCount },
-    { label: '评论', value: s.commentCount },
-    { label: '未解决评论', value: s.openComments },
+    { label: '目录节点', value: s.nodeCount, icon: Grid, tone: 'info' },
+    { label: '内容文档', value: s.docCount, icon: Reading, tone: 'info' },
+    { label: '文件夹', value: s.folderCount, icon: Folder, tone: 'cyan' },
+    { label: '标签', value: s.tagCount, icon: PriceTag, tone: 'purple' },
+    { label: '评论', value: s.commentCount, icon: ChatDotRound, tone: 'success' },
+    { label: '未解决评论', value: s.openComments, icon: Tickets, tone: 'warning' },
   ]
 })
 
@@ -115,6 +147,17 @@ const boardGroups = computed(() => {
   })
 })
 
+/** 看板分组名本地化：后端给的是英文状态码。 */
+const boardLabels: Record<string, string> = {
+  draft: '草稿',
+  published: '已发布',
+  archived: '已归档',
+  urgent: '紧急',
+  high: '高',
+  normal: '普通',
+  low: '低',
+}
+
 /** 词库维护（098）。 */
 async function addDictEntry() {
   if (!dictTag.value.trim()) {
@@ -160,143 +203,263 @@ onMounted(load)
 <template>
   <section class="kn-home">
     <SpaceMembers v-model="membersVisible" :project-id="props.projectId" />
+
     <header class="kn-home__head">
-      <div>
+      <div class="kn-home__head-text">
         <h2>空间概览</h2>
         <p>知识库的规模、活跃度与待补内容。</p>
       </div>
       <div class="kn-home__actions">
         <el-button size="small" :icon="Download" @click="exportTree">导出目录树</el-button>
-        <el-button size="small" @click="exportSpace">打包导出空间</el-button>
-        <el-button size="small" @click="membersVisible = true">空间成员</el-button>
+        <el-button size="small" :icon="Box" @click="exportSpace">打包导出空间</el-button>
+        <el-button size="small" type="primary" :icon="User" @click="membersVisible = true">空间成员</el-button>
       </div>
     </header>
 
-    <div v-if="loading" class="kn-home__empty">加载中…</div>
+    <div v-if="loading" class="kn-home__empty">
+      <el-skeleton :rows="6" animated />
+    </div>
+
     <template v-else-if="summary">
+      <!-- KPI -->
       <div class="kn-home__cards">
-        <div v-for="card in cards" :key="card.label" class="kn-home__card">
-          <span class="kn-home__card-value">{{ card.value }}</span>
-          <span class="kn-home__card-label">{{ card.label }}</span>
+        <div
+          v-for="card in cards"
+          :key="card.label"
+          class="ent-stat"
+          :style="{
+            '--ent-stat-accent': `var(--ent-${card.tone})`,
+            '--ent-stat-soft': `var(--ent-${card.tone}-soft)`,
+          }"
+        >
+          <span class="ent-stat__icon"><el-icon><component :is="card.icon" /></el-icon></span>
+          <span class="ent-stat__body">
+            <span class="ent-stat__value">{{ card.value }}</span>
+            <span class="ent-stat__label">{{ card.label }}</span>
+          </span>
         </div>
       </div>
 
       <div class="kn-home__grid">
-        <section class="kn-home__panel">
-          <h3><el-icon><Warning /></el-icon> 健康度检查</h3>
-          <p v-if="!summary.health.length" class="kn-home__ok">没有发现问题，知识库状态良好。</p>
-          <ul v-else class="kn-home__health">
-            <li v-for="(item, index) in summary.health" :key="index">
-              <button type="button" class="kn-home__health-link" @click="emit('open-doc', item.docId)">
-                {{ item.title || '未命名文档' }}
-              </button>
-              <span class="kn-home__tag">{{ healthLabels[item.kind] || item.kind }}</span>
-              <span class="kn-home__msg">{{ item.message }}</span>
-            </li>
-          </ul>
-        </section>
-
-        <section class="kn-home__panel">
-          <h3>最近活动</h3>
-          <p v-if="!events.length" class="kn-home__ok">还没有活动记录。</p>
-          <ul v-else class="kn-home__recent">
-            <li v-for="event in events" :key="event.id">
-              <span class="kn-home__tag">{{ eventLabels[event.eventType] || event.eventType }}</span>
-              <span class="kn-home__msg">{{ new Date(event.createdAt).toLocaleString() }}</span>
-            </li>
-          </ul>
-        </section>
-
-        <section class="kn-home__panel">
-          <h3>质量体检</h3>
-          <p v-if="!quality.length" class="kn-home__ok">没有发现质量问题。</p>
-          <ul v-else class="kn-home__health">
-            <li v-for="(item, index) in quality.slice(0, 20)" :key="index">
-              <button type="button" class="kn-home__health-link" @click="emit('open-doc', item.docId)">
-                {{ item.title || '未命名文档' }}
-              </button>
-              <span class="kn-home__tag">{{ item.kind }}</span>
-              <span class="kn-home__msg">{{ item.detail }} · {{ item.suggest }}</span>
-            </li>
-          </ul>
-        </section>
-
-        <section class="kn-home__panel">
-          <h3>疑似重复文档</h3>
-          <p v-if="!similar.length" class="kn-home__ok">没有发现重复文档。</p>
-          <ul v-else class="kn-home__health">
-            <li v-for="(group, index) in similar" :key="index">
-              <button
-                v-for="item in group"
-                :key="item.nodeId"
-                type="button"
-                class="kn-home__health-link"
-                @click="item.documentId && emit('open-doc', item.documentId)"
-              >
-                {{ item.title }}
-              </button>
-            </li>
-          </ul>
-        </section>
-
-        <section class="kn-home__panel kn-home__panel--board">
-          <h3>
-            属性看板
-            <el-radio-group v-model="boardGroupBy" size="small" style="margin-left: auto">
-              <el-radio-button value="status">按状态</el-radio-button>
-              <el-radio-button value="priority">按优先级</el-radio-button>
-            </el-radio-group>
-          </h3>
-          <p v-if="!board.length" class="kn-home__ok">还没有挂载到目录的文档。</p>
-          <div v-else class="kn-board">
-            <div v-for="[group, items] in boardGroups" :key="group" class="kn-board__column">
-              <div class="kn-board__column-title">{{ group }}（{{ items.length }}）</div>
-              <button
-                v-for="item in items"
-                :key="item.docId"
-                type="button"
-                class="kn-board__card"
-                @click="emit('open-doc', item.docId)"
-              >
-                <span>{{ item.icon }} {{ item.title }}</span>
-                <span v-if="item.dueAt" class="kn-home__msg">
-                  截止 {{ new Date(item.dueAt).toLocaleDateString() }}
+        <!-- 健康度检查 -->
+        <section class="ent-card">
+          <div class="ent-card__head">
+            <span class="ent-card__icon"><el-icon><Warning /></el-icon></span>
+            <span class="ent-card__title">健康度检查</span>
+            <span v-if="summary.health.length" class="ent-card__count">{{ summary.health.length }}</span>
+          </div>
+          <div class="ent-card__body">
+            <div v-if="!summary.health.length" class="ent-empty">
+              <span class="ent-empty__icon"><el-icon><CircleCheck /></el-icon></span>
+              <span>没有发现问题，知识库状态良好。</span>
+            </div>
+            <ul v-else class="ent-list">
+              <li v-for="(item, index) in summary.health" :key="index" class="ent-list__row">
+                <span class="ent-list__main">
+                  <button
+                    type="button"
+                    class="ent-list__title"
+                    @click="emit('open-doc', item.docId)"
+                  >
+                    {{ item.title || '未命名文档' }}
+                  </button>
+                  <span class="ent-badge" :class="`ent-badge--${healthTones[item.kind] || 'muted'}`">
+                    {{ healthLabels[item.kind] || item.kind }}
+                  </span>
                 </span>
-              </button>
+                <span class="ent-list__msg">{{ item.message }}</span>
+              </li>
+            </ul>
+          </div>
+        </section>
+
+        <!-- 最近活动 -->
+        <section class="ent-card">
+          <div class="ent-card__head">
+            <span class="ent-card__icon"><el-icon><Promotion /></el-icon></span>
+            <span class="ent-card__title">最近活动</span>
+            <span v-if="events.length" class="ent-card__count">{{ events.length }}</span>
+          </div>
+          <div class="ent-card__body">
+            <div v-if="!events.length" class="ent-empty">
+              <span class="ent-empty__icon"><el-icon><Promotion /></el-icon></span>
+              <span>还没有活动记录。</span>
+            </div>
+            <ul v-else class="ent-list">
+              <li v-for="event in events" :key="event.id" class="ent-list__row">
+                <span class="ent-list__main">
+                  <span class="ent-badge ent-badge--info">
+                    {{ eventLabels[event.eventType] || event.eventType }}
+                  </span>
+                </span>
+                <span class="ent-list__meta">{{ new Date(event.createdAt).toLocaleString() }}</span>
+              </li>
+            </ul>
+          </div>
+        </section>
+
+        <!-- 质量体检 -->
+        <section class="ent-card">
+          <div class="ent-card__head">
+            <span class="ent-card__icon"><el-icon><Tickets /></el-icon></span>
+            <span class="ent-card__title">质量体检</span>
+            <span v-if="quality.length" class="ent-card__count">{{ quality.length }}</span>
+          </div>
+          <div class="ent-card__body">
+            <div v-if="!quality.length" class="ent-empty">
+              <span class="ent-empty__icon"><el-icon><CircleCheck /></el-icon></span>
+              <span>没有发现质量问题。</span>
+            </div>
+            <ul v-else class="ent-list">
+              <li v-for="(item, index) in quality.slice(0, 20)" :key="index" class="ent-list__row">
+                <span class="ent-list__main">
+                  <button
+                    type="button"
+                    class="ent-list__title"
+                    @click="emit('open-doc', item.docId)"
+                  >
+                    {{ item.title || '未命名文档' }}
+                  </button>
+                  <span class="ent-badge" :class="`ent-badge--${qualityTones[item.kind] || 'muted'}`">
+                    {{ item.kind }}
+                  </span>
+                </span>
+                <span class="ent-list__msg">{{ item.detail }} · {{ item.suggest }}</span>
+              </li>
+            </ul>
+          </div>
+        </section>
+
+        <!-- 疑似重复文档 -->
+        <section class="ent-card">
+          <div class="ent-card__head">
+            <span class="ent-card__icon"><el-icon><CopyDocument /></el-icon></span>
+            <span class="ent-card__title">疑似重复文档</span>
+            <span v-if="similar.length" class="ent-card__count">{{ similar.length }}</span>
+          </div>
+          <div class="ent-card__body">
+            <div v-if="!similar.length" class="ent-empty">
+              <span class="ent-empty__icon"><el-icon><CircleCheck /></el-icon></span>
+              <span>没有发现重复文档。</span>
+            </div>
+            <ul v-else class="ent-list">
+              <li v-for="(group, index) in similar" :key="index" class="ent-list__row">
+                <span class="ent-list__main">
+                  <button
+                    v-for="item in group"
+                    :key="item.nodeId"
+                    type="button"
+                    class="ent-list__title"
+                    @click="item.documentId && emit('open-doc', item.documentId)"
+                  >
+                    {{ item.title }}
+                  </button>
+                </span>
+              </li>
+            </ul>
+          </div>
+        </section>
+
+        <!-- 属性看板 -->
+        <section class="ent-card kn-home__panel--board">
+          <div class="ent-card__head">
+            <span class="ent-card__icon"><el-icon><Grid /></el-icon></span>
+            <span class="ent-card__title">属性看板</span>
+            <div class="ent-card__actions">
+              <el-radio-group v-model="boardGroupBy" size="small">
+                <el-radio-button value="status">按状态</el-radio-button>
+                <el-radio-button value="priority">按优先级</el-radio-button>
+              </el-radio-group>
+            </div>
+          </div>
+          <div class="ent-card__body">
+            <div v-if="!board.length" class="ent-empty">
+              <span class="ent-empty__icon"><el-icon><Grid /></el-icon></span>
+              <span>还没有挂载到目录的文档。</span>
+            </div>
+            <div v-else class="kn-board">
+              <div v-for="[group, items] in boardGroups" :key="group" class="kn-board__column">
+                <div class="kn-board__column-title">
+                  <span>{{ boardLabels[group] || group }}</span>
+                  <span class="kn-board__column-count">{{ items.length }}</span>
+                </div>
+                <button
+                  v-for="item in items"
+                  :key="item.docId"
+                  type="button"
+                  class="kn-board__card"
+                  @click="emit('open-doc', item.docId)"
+                >
+                  <span class="kn-board__card-title">{{ item.icon }} {{ item.title }}</span>
+                  <span v-if="item.dueAt" class="kn-board__card-meta">
+                    截止 {{ new Date(item.dueAt).toLocaleDateString() }}
+                  </span>
+                </button>
+              </div>
             </div>
           </div>
         </section>
 
-        <section class="kn-home__panel">
-          <h3>业务标签词库</h3>
-          <div class="kn-home__dict">
-            <el-input v-model="dictTag" size="small" placeholder="词条" style="width: 110px" />
-            <el-input v-model="dictCategory" size="small" placeholder="分类" style="width: 90px" />
-            <el-input v-model="dictAliases" size="small" placeholder="别名（逗号分隔）" style="width: 140px" />
-            <el-button size="small" type="primary" @click="addDictEntry">添加</el-button>
+        <!-- 业务标签词库 -->
+        <section class="ent-card">
+          <div class="ent-card__head">
+            <span class="ent-card__icon"><el-icon><Collection /></el-icon></span>
+            <span class="ent-card__title">业务标签词库</span>
+            <span v-if="dict.length" class="ent-card__count">{{ dict.length }}</span>
           </div>
-          <p v-if="!dict.length" class="kn-home__ok">词库还是空的：统一标签命名后，标签推荐会更准。</p>
-          <ul v-else class="kn-home__recent">
-            <li v-for="entry in dict" :key="entry.id">
-              <span class="kn-home__health-link">{{ entry.tag }}</span>
-              <span v-if="entry.category" class="kn-home__tag">{{ entry.category }}</span>
-              <span v-if="entry.aliases" class="kn-home__msg">{{ entry.aliases }}</span>
-              <el-button size="small" text type="danger" @click="removeDictEntry(entry)">删除</el-button>
-            </li>
-          </ul>
+          <div class="ent-card__body">
+            <div class="kn-home__dict">
+              <el-input v-model="dictTag" size="small" placeholder="词条" style="width: 110px" />
+              <el-input v-model="dictCategory" size="small" placeholder="分类" style="width: 90px" />
+              <el-input v-model="dictAliases" size="small" placeholder="别名（逗号分隔）" style="width: 140px" />
+              <el-button size="small" type="primary" @click="addDictEntry">添加</el-button>
+            </div>
+            <div v-if="!dict.length" class="ent-empty">
+              <span class="ent-empty__icon"><el-icon><PriceTag /></el-icon></span>
+              <span>词库还是空的：统一标签命名后，标签推荐会更准。</span>
+            </div>
+            <ul v-else class="ent-list">
+              <li v-for="entry in dict" :key="entry.id" class="ent-list__row">
+                <span class="ent-list__main">
+                  <span class="ent-list__title ent-list__title--plain">{{ entry.tag }}</span>
+                  <span v-if="entry.category" class="ent-badge ent-badge--info">{{ entry.category }}</span>
+                </span>
+                <span v-if="entry.aliases" class="ent-list__meta">{{ entry.aliases }}</span>
+                <el-button size="small" text type="danger" @click="removeDictEntry(entry)">删除</el-button>
+              </li>
+            </ul>
+          </div>
         </section>
 
-        <section class="kn-home__panel">
-          <h3><el-icon><Plus /></el-icon> 最近更新</h3>
-          <p v-if="!summary.recentUpdates.length" class="kn-home__ok">还没有内容。</p>
-          <ul v-else class="kn-home__recent">
-            <li v-for="node in summary.recentUpdates" :key="node.id">
-              <button type="button" class="kn-home__health-link" @click="node.documentId && emit('open-doc', node.documentId)">
-                {{ node.icon }} {{ node.title }}
-              </button>
-              <span class="kn-home__msg">{{ new Date(node.updatedAt).toLocaleString() }}</span>
-            </li>
-          </ul>
+        <!-- 最近更新 -->
+        <section class="ent-card">
+          <div class="ent-card__head">
+            <span class="ent-card__icon"><el-icon><Promotion /></el-icon></span>
+            <span class="ent-card__title">最近更新</span>
+            <span v-if="summary.recentUpdates.length" class="ent-card__count">
+              {{ summary.recentUpdates.length }}
+            </span>
+          </div>
+          <div class="ent-card__body">
+            <div v-if="!summary.recentUpdates.length" class="ent-empty">
+              <span class="ent-empty__icon"><el-icon><Reading /></el-icon></span>
+              <span>还没有内容。</span>
+            </div>
+            <ul v-else class="ent-list">
+              <li v-for="node in summary.recentUpdates" :key="node.id" class="ent-list__row">
+                <span class="ent-list__main">
+                  <button
+                    type="button"
+                    class="ent-list__title"
+                    @click="node.documentId && emit('open-doc', node.documentId)"
+                  >
+                    {{ node.icon }} {{ node.title }}
+                  </button>
+                </span>
+                <span class="ent-list__meta">{{ new Date(node.updatedAt).toLocaleString() }}</span>
+              </li>
+            </ul>
+          </div>
         </section>
       </div>
     </template>
@@ -305,59 +468,155 @@ onMounted(load)
 </template>
 
 <style scoped>
-.kn-home { padding: 20px 24px; overflow: auto; }
-.kn-home__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.kn-home__head h2 { margin: 0; font-size: 18px; color: var(--mm-text, #1d2129); }
-.kn-home__head p { margin: 4px 0 0; font-size: 13px; color: var(--mm-muted, #86909c); }
-.kn-home__cards {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 12px; margin: 16px 0;
+.kn-home {
+  padding: 20px 24px 32px;
+  overflow: auto;
+  background: var(--ent-surface-2, #f8fafc);
 }
-.kn-home__card {
-  display: flex; flex-direction: column; gap: 4px;
-  padding: 12px 14px; border: 1px solid var(--mm-line, #e5e6eb);
-  border-radius: 10px; background: var(--mm-surface, #fff);
+
+/* 页头：标题 + 右侧操作 */
+.kn-home__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
 }
-.kn-home__card-value { font-size: 22px; font-weight: 600; color: var(--mm-text, #1d2129); }
-.kn-home__card-label { font-size: 12px; color: var(--mm-muted, #86909c); }
-.kn-home__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
-.kn-home__panel {
-  border: 1px solid var(--mm-line, #e5e6eb); border-radius: 10px;
-  background: var(--mm-surface, #fff); padding: 12px 14px;
+.kn-home__head h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--ent-text, #1f2733);
 }
-.kn-home__panel h3 {
-  display: flex; align-items: center; gap: 6px;
-  margin: 0 0 8px; font-size: 14px; color: var(--mm-text, #1d2129);
-}
-.kn-home__health, .kn-home__recent { list-style: none; margin: 0; padding: 0; }
-.kn-home__health li, .kn-home__recent li {
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-  padding: 6px 0; border-bottom: 1px solid var(--mm-line, #f2f3f5);
+.kn-home__head p {
+  margin: 5px 0 0;
   font-size: 13px;
+  color: var(--ent-text-2, #5a6472);
 }
-.kn-home__health-link {
-  border: 0; background: none; padding: 0; cursor: pointer;
-  color: var(--mm-blue, #1677ff); font-size: 13px;
+.kn-home__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
 }
-.kn-home__tag {
-  font-size: 11px; padding: 1px 6px; border-radius: 10px;
-  background: var(--mm-hover, #f2f3f5); color: var(--mm-muted, #86909c);
+
+/* KPI 区 */
+.kn-home__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
 }
-.kn-home__msg { font-size: 12px; color: var(--mm-muted, #86909c); }
-.kn-home__ok { font-size: 13px; color: var(--mm-muted, #86909c); margin: 0; }
-.kn-home__panel--board { grid-column: 1 / -1; }
-.kn-home__dict { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
-.kn-board { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 4px; }
+
+/* 面板栅格：宽屏三列，窄屏自动降列 */
+.kn-home__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+
+/* 看板横跨整行 */
+.kn-home__panel--board {
+  grid-column: 1 / -1;
+}
+
+/* 词库录入行 */
+.kn-home__dict {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px dashed var(--ent-border, #e6e9ef);
+}
+
+/* 看板列 */
+.kn-board {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
 .kn-board__column {
-  min-width: 180px; background: var(--mm-hover, #f7f8fa);
-  border-radius: 8px; padding: 8px; display: flex; flex-direction: column; gap: 6px;
+  flex: 0 0 260px;
+  width: 260px;
+  max-height: 420px;
+  overflow-y: auto;
+  background: var(--ent-surface-2, #f8fafc);
+  border: 1px solid var(--ent-border, #e6e9ef);
+  border-radius: var(--ent-radius-sm, 8px);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
-.kn-board__column-title { font-size: 12px; color: var(--mm-muted, #86909c); font-weight: 600; }
+.kn-board__column-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ent-text-2, #5a6472);
+}
+.kn-board__column-count {
+  min-width: 18px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--ent-surface-3, #f1f5f9);
+  color: var(--ent-text-2, #5a6472);
+  font-size: 11px;
+  line-height: 17px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
 .kn-board__card {
-  display: flex; flex-direction: column; gap: 2px; text-align: left; cursor: pointer;
-  border: 1px solid var(--mm-line, #e5e6eb); border-radius: 6px; background: var(--mm-surface, #fff);
-  padding: 6px 8px; font-size: 13px; color: var(--mm-text, #1d2129);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  text-align: left;
+  cursor: pointer;
+  border: 1px solid var(--ent-border, #e6e9ef);
+  border-radius: var(--ent-radius-xs, 6px);
+  background: var(--ent-surface, #fff);
+  padding: 8px 10px;
+  font-size: 13px;
+  color: var(--ent-text, #1f2733);
+  box-shadow: var(--ent-shadow-xs, 0 1px 2px rgba(15, 23, 42, 0.05));
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
 }
-.kn-board__card:hover { border-color: var(--mm-blue, #1677ff); }
-.kn-home__empty { padding: 32px; text-align: center; color: var(--mm-muted, #86909c); font-size: 13px; }
+.kn-board__card:hover {
+  border-color: var(--ent-primary, #1a73e8);
+  box-shadow: var(--ent-shadow-md, 0 6px 16px rgba(15, 23, 42, 0.08));
+  transform: translateY(-1px);
+}
+.kn-board__card-title {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kn-board__card-meta {
+  font-size: 11px;
+  color: var(--ent-text-3, #8a94a3);
+}
+
+/* 词库标签是纯文本，不可点击 */
+.ent-list__title--plain {
+  color: var(--ent-text, #1f2733);
+  font-weight: 500;
+  cursor: default;
+}
+.ent-list__title--plain:hover {
+  text-decoration: none;
+}
+
+.kn-home__empty {
+  padding: 24px;
+  border: 1px solid var(--ent-border, #e6e9ef);
+  border-radius: var(--ent-radius-md, 12px);
+  background: var(--ent-surface, #fff);
+}
 </style>

@@ -3,6 +3,8 @@ import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft } from '@element-plus/icons-vue'
 import * as projectsApi from '../api/projects'
+import * as knowledgeApi from '../api/knowledge'
+import * as documentsApi from '../api/documents'
 import type { Project } from '../types/project'
 import KnowledgeTree from '../components/knowledge/KnowledgeTree.vue'
 import DocView from '../components/knowledge/DocView.vue'
@@ -121,6 +123,17 @@ function openCanvasFull(node: KnowledgeNode) {
   })
 }
 
+/** 画布标题图标：写回目录树节点，树的行图标与画布标题保持一致。 */
+async function setCanvasIcon(node: KnowledgeNode, icon: string) {
+  try {
+    await knowledgeApi.updateKnowledgeNode(projectId.value, node.id, { icon })
+    node.icon = icon
+    if (node.documentId) await documentsApi.setDocumentIcon(node.documentId, icon)
+  } catch {
+    ElMessage.error('修改图标失败')
+  }
+}
+
 function openGraph() {
   mainTab.value = 'graph'
   showHome.value = false
@@ -178,6 +191,7 @@ loadProject()
             :key="structuredNode.id"
             :project-id="projectId"
             :node-id="structuredNode.id"
+            :title="structuredNode.title"
           />
           <MindmapEditor
             v-else-if="structuredNode && structuredNode.nodeType === 'mindmap'"
@@ -190,7 +204,9 @@ loadProject()
             :key="canvasNode.id"
             :document-id="canvasNode.documentId ?? ''"
             :template-id="(canvasNode.documentTemplateId || canvasNode.documentCanvasType || '').replace(/_/g, '-')"
+            :icon="canvasNode.icon"
             @saved="(title) => treeRef?.setDocTitle(canvasNode!.documentId ?? '', title)"
+            @icon-change="(icon) => setCanvasIcon(canvasNode!, icon)"
             @open-full="openCanvasFull(canvasNode!)"
           />
           <DocView
@@ -226,33 +242,58 @@ loadProject()
   height: 100%;
   display: flex;
   flex-direction: column;
+  background: var(--ent-surface-2, #f8fafc);
 }
+
+/* 面包屑：返回项目做成返回按钮，路径文字降级为辅助信息 */
 .kn-crumb {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 10px 16px;
-  border-bottom: 1px solid var(--mm-line, #e5e6eb);
+  border-bottom: 1px solid var(--ent-border, #e6e9ef);
   font-size: 13px;
-  color: var(--mm-muted, #86909c);
-  background: var(--mm-surface, #fff);
+  color: var(--ent-text-2, #5a6472);
+  background: var(--ent-surface, #fff);
 }
-.kn-crumb__sep { color: var(--mm-faint, #c9cdd4); }
+.kn-crumb__sep {
+  color: var(--ent-text-3, #8a94a3);
+}
+.kn-crumb :deep(.el-button) {
+  font-weight: 500;
+}
+
 .kn-layout {
   flex: 1;
   min-height: 0;
 }
+
+/* 左侧目录与右侧主区之间的分隔线 */
+.kn-layout :deep(.el-splitter-panel) {
+  background: var(--ent-surface, #fff);
+}
+.kn-layout :deep(.el-splitter-bar) {
+  background: var(--ent-border, #e6e9ef);
+}
+
 .kn-main {
   height: 100%;
   min-width: 0;
   display: flex;
   flex-direction: column;
+  background: var(--ent-surface-2, #f8fafc);
 }
+
+/* 视图切换：分段控件贴顶，右侧留白 */
 .kn-main__tabs {
-  padding: 8px 16px;
-  border-bottom: 1px solid var(--mm-line, #e5e6eb);
-  background: var(--mm-surface, #fff);
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--ent-border, #e6e9ef);
+  background: var(--ent-surface, #fff);
 }
+.kn-main__tabs :deep(.el-radio-button__inner) {
+  padding: 7px 16px;
+}
+
 .kn-main__empty {
   flex: 1;
   display: flex;
@@ -260,7 +301,7 @@ loadProject()
   align-items: center;
   justify-content: center;
   gap: 12px;
-  color: var(--mm-muted, #86909c);
+  color: var(--ent-text-2, #5a6472);
   font-size: 14px;
 }
 </style>
