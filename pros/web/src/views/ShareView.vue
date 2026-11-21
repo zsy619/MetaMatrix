@@ -10,6 +10,9 @@ import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { addShareComment, fetchSharedDoc, updateShareContent } from '../api/knowledge'
 import type { SharedDoc } from '../api/knowledge'
+import SharedCanvasView from '../components/knowledge/SharedCanvasView.vue'
+import MindmapPreview from '../components/knowledge/MindmapPreview.vue'
+import SheetPreview from '../components/knowledge/SheetPreview.vue'
 
 const route = useRoute()
 const doc = ref<SharedDoc | null>(null)
@@ -35,8 +38,18 @@ const visitorId = ref('')
 
 const role = computed(() => (doc.value ? roleLabel[doc.value.role] ?? '分享' : ''))
 const canComment = computed(() => doc.value?.role === 'comment' || doc.value?.role === 'edit')
-const canEdit = computed(() => doc.value?.role === 'edit')
+/** 只有富文本文档能在分享页回写正文。 */
+const canEdit = computed(() => doc.value?.role === 'edit' && (doc.value?.kind ?? 'doc') === 'doc')
 const allowCopy = computed(() => doc.value?.allowCopy !== false)
+/** 内容类型：doc | canvas | mindmap | sheet。 */
+const kind = computed(() => doc.value?.kind ?? 'doc')
+/** 正文是否已解锁（导图 / 表格没有 HTML 正文）。 */
+const hasContent = computed(() => {
+  if (!doc.value) return false
+  if (kind.value === 'mindmap' || kind.value === 'sheet') return Boolean(doc.value.data)
+  if (kind.value === 'canvas') return Boolean(doc.value.canvas)
+  return Boolean(doc.value.html)
+})
 
 /** 水印文案：昵称 + 时间（048）。 */
 const watermark = computed(() => `${visitor.value} · ${new Date().toLocaleDateString()}`)
@@ -122,7 +135,7 @@ onMounted(() => {
   <div class="share-view">
     <div v-if="loading" class="share-view__state">加载中…</div>
 
-    <div v-else-if="needsPassword && !doc?.html" class="share-view__state">
+    <div v-else-if="needsPassword && !hasContent" class="share-view__state">
       <p>该分享需要访问口令。</p>
       <div class="share-view__unlock">
         <el-input
@@ -151,6 +164,15 @@ onMounted(() => {
         </el-button>
       </header>
 
+      <div v-if="kind === 'canvas' && doc?.canvas" class="share-view__canvas">
+        <SharedCanvasView :template-id="doc.canvas.templateId" :data="doc.canvas.data" />
+      </div>
+      <div v-else-if="kind === 'mindmap'" class="share-view__structured">
+        <MindmapPreview :data="doc?.data ?? null" />
+      </div>
+      <div v-else-if="kind === 'sheet'" class="share-view__structured">
+        <SheetPreview :data="doc?.data ?? null" />
+      </div>
       <div v-if="editing" class="share-view__editor">
         <el-input
           v-model="editHtml"
@@ -159,7 +181,7 @@ onMounted(() => {
           placeholder="直接编辑正文 HTML"
         />
       </div>
-      <div v-else class="share-view__content" v-html="doc?.html"></div>
+      <div v-else-if="kind === 'doc'" class="share-view__content" v-html="doc?.html"></div>
 
       <section v-if="canComment" class="share-view__comments">
         <h3>评论</h3>
@@ -183,7 +205,7 @@ onMounted(() => {
 <style scoped>
 .share-view {
   min-height: 100vh;
-  background: var(--mm-page, #f7f7f7);
+  background: transparent;
   padding: 32px 16px;
 }
 .share-view__state {
@@ -204,17 +226,20 @@ onMounted(() => {
   position: relative;
   max-width: 860px;
   margin: 0 auto;
-  background: var(--mm-surface, #fff);
-  border-radius: 10px;
+  background: var(--glass-bg, rgba(255, 255, 255, 0.5));
+  backdrop-filter: blur(var(--glass-blur, 18px)) saturate(var(--glass-saturate, 165%));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 18px)) saturate(var(--glass-saturate, 165%));
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.7));
+  border-radius: 14px;
   padding: 28px 36px;
-  box-shadow: 0 2px 10px rgb(0 0 0 / 6%);
+  box-shadow: var(--glass-shadow, 0 18px 48px rgba(15, 23, 42, 0.14));
   overflow: hidden;
 }
 .share-view__head {
   display: flex;
   align-items: center;
   gap: 12px;
-  border-bottom: 1px solid var(--mm-line, #e5e6eb);
+  border-bottom: 1px solid var(--glass-ring, rgba(15, 23, 42, 0.09));
   padding-bottom: 12px;
   margin-bottom: 16px;
 }
@@ -232,7 +257,7 @@ onMounted(() => {
 }
 .share-view__comments {
   margin-top: 24px;
-  border-top: 1px solid var(--mm-line, #e5e6eb);
+  border-top: 1px solid var(--glass-ring, rgba(15, 23, 42, 0.09));
   padding-top: 16px;
 }
 .share-view__comments h3 {
@@ -251,7 +276,8 @@ onMounted(() => {
   padding: 0;
 }
 .share-view__comment-list li {
-  border: 1px solid var(--mm-line, #e5e6eb);
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.7));
+  background: rgba(255, 255, 255, 0.42);
   border-radius: 6px;
   padding: 8px 10px;
   margin-bottom: 8px;

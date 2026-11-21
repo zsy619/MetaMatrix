@@ -432,12 +432,19 @@ export function saveNodeData(projectId: string, nodeId: string, kind: string, da
 
 export type KnowledgeShare = {
   id: string
-  documentId: string
+  /** 被分享的文档；节点分享（导图 / 表格）时为空。 */
+  documentId: string | null
+  /** 被分享的知识库节点；文档分享时为空。 */
+  nodeId?: string | null
+  /** 内容类型：doc | canvas | mindmap | sheet。 */
+  kind?: string
   projectId: string
   token: string
   role: 'view' | 'comment' | 'edit'
   createdBy: string
   expiresAt: string | null
+  /** true 表示该分享设置了访问口令（口令只存摘要，明文不可还原）。 */
+  hasPassword?: boolean
   /** false 时分享页禁止复制与导出。 */
   allowCopy: boolean
   /** 分享白名单（逗号分隔的用户 ID）：非空时仅名单内成员可访问。 */
@@ -472,11 +479,64 @@ export function revokeShare(documentId: string, shareId: string) {
   })
 }
 
+/** 列出知识库节点的分享链接（思维导图 / 多维表格）。 */
+export function listNodeShares(projectId: string, nodeId: string) {
+  return apiRequest<KnowledgeShare[]>(`/projects/${projectId}/knowledge/nodes/${nodeId}/shares`, {
+    cache: 'no-store',
+  })
+}
+
+/** 给知识库节点创建分享链接。 */
+export function createNodeShare(
+  projectId: string,
+  nodeId: string,
+  input: {
+    role: 'view' | 'comment' | 'edit'
+    expiresAt?: string | null
+    /** 访问口令（服务端只存摘要）。 */
+    password?: string
+    /** false 时分享页禁止复制与导出。 */
+    allowCopy?: boolean
+  },
+) {
+  return apiRequest<KnowledgeShare>(`/projects/${projectId}/knowledge/nodes/${nodeId}/shares`, {
+    method: 'POST',
+    body: input,
+  })
+}
+
+/** 撤销节点分享链接。 */
+export function revokeNodeShare(projectId: string, nodeId: string, shareId: string) {
+  return apiRequest<{ revoked: boolean }>(
+    `/projects/${projectId}/knowledge/nodes/${nodeId}/shares/${shareId}`,
+    { method: 'DELETE' },
+  )
+}
+
+/** 设置节点分享白名单。 */
+export function setNodeShareAllowList(
+  projectId: string,
+  nodeId: string,
+  shareId: string,
+  allowUsers: string,
+) {
+  return apiRequest<KnowledgeShare>(
+    `/projects/${projectId}/knowledge/nodes/${nodeId}/shares/${shareId}/allowlist`,
+    { method: 'PATCH', body: { allowUsers } },
+  )
+}
+
 export type SharedDoc = {
   token: string
   role: 'view' | 'comment' | 'edit'
+  /** 内容类型：doc | canvas | mindmap | sheet。 */
+  kind: string
   title: string
   html: string
+  /** 画布分享的模板与内容。 */
+  canvas?: { templateId: string; data: unknown } | null
+  /** 导图 / 表格的结构化内容。 */
+  data?: unknown
   expiresAt: string | null
   /** false 时分享页禁止复制与导出。 */
   allowCopy: boolean
