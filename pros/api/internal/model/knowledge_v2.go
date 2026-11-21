@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"gorm.io/datatypes"
 )
 
 // KnowledgeTemplate 是知识库文档模板。
@@ -24,6 +25,8 @@ type KnowledgeTemplate struct {
 	// Scope 是模板作用域：builtin | team | personal | project。
 	Scope   string `gorm:"type:varchar(16);not null;default:'personal'" json:"scope"`
 	HTML    string `gorm:"type:text;not null;default:''" json:"html"`
+	// Properties 是模板携带的页面属性定义：创建文档时自动写入 doc_properties。
+	Properties datatypes.JSON `gorm:"type:jsonb;not null;default:'[]'" json:"properties"`
 	Builtin bool   `gorm:"not null;default:false" json:"builtin"`
 	// SortOrder 控制模板面板内的顺序。
 	SortOrder int       `gorm:"not null;default:0" json:"sortOrder"`
@@ -60,7 +63,13 @@ type DocProperty struct {
 	Milestone string `gorm:"type:varchar(64);not null;default:''" json:"milestone"`
 	Sprint    string `gorm:"type:varchar(64);not null;default:''" json:"sprint"`
 	// Number 是自定义数值字段：预算、工时、评分都走它。
-	Number    float64   `gorm:"not null;default:0" json:"number"`
+	Number float64 `gorm:"not null;default:0" json:"number"`
+	// Fields 是自定义字段定义：key/label/type/required/default/formula/order/hidden。
+	Fields datatypes.JSON `gorm:"type:jsonb;not null;default:'[]'" json:"fields"`
+	// FieldValues 是自定义字段的值：{"key": value}。
+	FieldValues datatypes.JSON `gorm:"type:jsonb;not null;default:'{}'" json:"fieldValues"`
+	// Computed 是公式字段的计算结果（读时算，不落库）。
+	Computed map[string]float64 `gorm:"-" json:"computed"`
 	UpdatedAt time.Time `gorm:"type:timestamptz;not null" json:"updatedAt"`
 	CreatedAt time.Time `gorm:"type:timestamptz;not null" json:"createdAt"`
 }
@@ -78,6 +87,15 @@ type DocComment struct {
 	ParentID     *uuid.UUID `gorm:"type:uuid;index" json:"parentId"`
 	Quote        string     `gorm:"type:text;not null;default:''" json:"quote"`
 	Anchor       int        `gorm:"not null;default:-1" json:"anchor"`
+	// AnchorFrom / AnchorTo 是划线区间（正文字符偏移）：-1 表示整篇评论。
+	AnchorFrom int `gorm:"not null;default:-1" json:"anchorFrom"`
+	AnchorTo   int `gorm:"not null;default:-1" json:"anchorTo"`
+	// Mentions 是被 @ 的用户 ID（逗号分隔）。
+	Mentions string `gorm:"type:varchar(512);not null;default:''" json:"mentions"`
+	// Reactions 是表情回应：{"👍": ["userId"]}。
+	Reactions datatypes.JSON `gorm:"type:jsonb;not null;default:'{}'" json:"reactions"`
+	// Unread 是「当前用户尚未读到该评论」的标记（读时算，不落库）。
+	Unread bool `gorm:"-" json:"unread"`
 	Content      string     `gorm:"type:text;not null" json:"content"`
 	Resolved     bool       `gorm:"not null;default:false" json:"resolved"`
 	CreatedAt    time.Time  `gorm:"type:timestamptz;not null" json:"createdAt"`

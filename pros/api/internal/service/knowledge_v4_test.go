@@ -68,10 +68,10 @@ func TestKnowledgeV4SharePasswordGate(t *testing.T) {
 	if !doc.RequiresPassword || doc.HTML != "" {
 		t.Fatalf("无口令不应返回正文：%+v", doc)
 	}
-	if _, err := svc.ResolveShareWithPassword(share.Token, "wrong"); err != ErrValidation {
+	if _, err := svc.ResolveShareWithPassword(share.Token, "wrong", nil); err != ErrValidation {
 		t.Fatalf("口令错误应当报错，得到 %v", err)
 	}
-	doc, err = svc.ResolveShareWithPassword(share.Token, "s3cret")
+	doc, err = svc.ResolveShareWithPassword(share.Token, "s3cret", nil)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -82,6 +82,9 @@ func parseImportFile(filename string, data []byte) (string, string, error) {
 	case ".xlsx":
 		html, err := xlsxToHTML(data)
 		return base, html, err
+	case ".pptx":
+		html, err := pptxToHTML(data)
+		return base, html, err
 	case ".md", ".markdown":
 		return base, markdownToHTML(string(data)), nil
 	case ".html", ".htm":
@@ -91,78 +94,6 @@ func parseImportFile(filename string, data []byte) (string, string, error) {
 	default:
 		return "", "", ErrValidation
 	}
-}
-
-// ---------------------------------------------------------------- Word
-
-// docxToHTML 解析 docx 正文：按段落输出，标题样式映射成 h1/h2/h3。
-func docxToHTML(data []byte) (string, error) {
-	zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
-	if err != nil {
-		return "", ErrValidation
-	}
-	var documentXML []byte
-	for _, file := range zr.File {
-		if file.Name == "word/document.xml" {
-			rc, err := file.Open()
-			if err != nil {
-				return "", ErrValidation
-			}
-			documentXML, err = io.ReadAll(io.LimitReader(rc, maxImportBytes))
-			rc.Close()
-			break
-		}
-	}
-	if len(documentXML) == 0 {
-		return "", ErrValidation
-	}
-	type style struct {
-		Val string `xml:"val,attr"`
-	}
-	type paraProps struct {
-		Style style `xml:"pStyle"`
-	}
-	type runProps struct {
-		Text string `xml:"t"`
-		Bold bool   `xml:"b"`
-	}
-	type paragraph struct {
-		Props paraProps  `xml:"pPr"`
-		Runs  []runProps `xml:"r"`
-	}
-	type document struct {
-		Paragraphs []paragraph `xml:"body>p"`
-	}
-	var doc document
-	if err := xml.Unmarshal(documentXML, &doc); err != nil {
-		return "", ErrValidation
-	}
-	var b strings.Builder
-	for _, p := range doc.Paragraphs {
-		text := ""
-		for _, r := range p.Runs {
-			text += r.Text
-		}
-		text = strings.TrimSpace(text)
-		if text == "" {
-			continue
-		}
-		tag := "p"
-		switch {
-		case strings.HasPrefix(p.Props.Style.Val, "Heading1"):
-			tag = "h1"
-		case strings.HasPrefix(p.Props.Style.Val, "Heading2"):
-			tag = "h2"
-		case strings.HasPrefix(p.Props.Style.Val, "Heading3"):
-			tag = "h3"
-		case strings.HasPrefix(p.Props.Style.Val, "Title"):
-			tag = "h1"
-		}
-		b.WriteString("<" + tag + ">")
-		b.WriteString(escapeHTML(text))
-		b.WriteString("</" + tag + ">")
-	}
-	return b.String(), nil
 }
 
 // ---------------------------------------------------------------- Excel

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"strings"
 
 	"metamatrix/api/internal/middleware"
 	"metamatrix/api/internal/service"
@@ -15,10 +16,29 @@ import (
 
 type KnowledgeHandler struct {
 	svc *service.KnowledgeService
+	// jwtSecret 用于分享页的可选鉴权：白名单分享需要识别访问者身份。
+	jwtSecret string
 }
 
-func NewKnowledgeHandler(svc *service.KnowledgeService) *KnowledgeHandler {
-	return &KnowledgeHandler{svc: svc}
+func NewKnowledgeHandler(svc *service.KnowledgeService, jwtSecret string) *KnowledgeHandler {
+	return &KnowledgeHandler{svc: svc, jwtSecret: jwtSecret}
+}
+
+// optionalOwner 尝试解析 Bearer token：分享页允许匿名访问，但白名单分享要校验身份。
+func (h *KnowledgeHandler) optionalOwner(c *app.RequestContext) (*uuid.UUID, bool) {
+	auth := string(c.GetHeader("Authorization"))
+	if !strings.HasPrefix(auth, "Bearer ") {
+		return nil, false
+	}
+	claims, err := middleware.ParseToken(h.jwtSecret, strings.TrimPrefix(auth, "Bearer "))
+	if err != nil {
+		return nil, false
+	}
+	uid, err := uuid.Parse(claims.UserID)
+	if err != nil {
+		return nil, false
+	}
+	return &uid, true
 }
 
 func (h *KnowledgeHandler) owner(c *app.RequestContext) (uuid.UUID, bool) {
@@ -42,6 +62,8 @@ func handleKnowledgeErr(c *app.RequestContext, err error) bool {
 		Conflict(c, err.Error(), nil)
 	case errors.Is(err, service.ErrValidation):
 		Fail(c, http.StatusBadRequest, "validation failed", "validation_error")
+	case errors.Is(err, service.ErrShareForbidden):
+		Forbidden(c, "share not allowed for current user")
 	default:
 		log.Printf("knowledge error: %v", err)
 		Internal(c, "request failed")
@@ -55,6 +77,8 @@ type createNodeBody struct {
 	Title      string  `json:"title"`
 	Icon       string  `json:"icon"`
 	DocumentID *string `json:"documentId"`
+	// Pinyin 是标题的拼音与首字母（前端 pinyin-pro 生成）：中文按拼音检索。
+	Pinyin string `json:"pinyin"`
 	// CreateDoc=true 时一步建文档 + 节点；忽略 DocumentID。
 	CreateDoc bool `json:"createDoc"`
 }
@@ -126,6 +150,7 @@ func (h *KnowledgeHandler) Create(ctx context.Context, c *app.RequestContext) {
 		Title:      body.Title,
 		Icon:       body.Icon,
 		DocumentID: docID,
+		Pinyin:     body.Pinyin,
 	})
 	if handleKnowledgeErr(c, err) {
 		return
@@ -138,6 +163,8 @@ type updateNodeBody struct {
 	Title      *string `json:"title"`
 	Icon       *string `json:"icon"`
 	DocumentID *string `json:"documentId"`
+	// Pinyin 是标题的拼音与首字母（前端 pinyin-pro 生成）。
+	Pinyin *string `json:"pinyin"`
 }
 
 func (h *KnowledgeHandler) Update(ctx context.Context, c *app.RequestContext) {
@@ -167,7 +194,7 @@ func (h *KnowledgeHandler) Update(ctx context.Context, c *app.RequestContext) {
 		}
 		docID = &id
 	}
-	node, err := h.svc.Update(uid, projectID, nodeID, body.Title, body.Icon, docID)
+	node, err := h.svc.Update(uid, projectID, nodeID, body.Title, body.Icon, docID, body.Pinyin)
 	if handleKnowledgeErr(c, err) {
 		return
 	}

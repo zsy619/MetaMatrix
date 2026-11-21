@@ -26,6 +26,12 @@ type KnowledgeNode struct {
 	Icon      string     `gorm:"type:varchar(16);not null;default:'📄'" json:"icon"`
 	// Alias 是别名/短链：飞书知识库允许节点用短名被引用。
 	Alias string `gorm:"type:varchar(64);not null;default:''" json:"alias"`
+	// Pinyin 是标题的拼音与首字母串：中文场景按拼音检索用（由前端用 pinyin-pro 生成）。
+	Pinyin string `gorm:"type:varchar(255);not null;default:''" json:"pinyin"`
+	// Visibility 是可见范围：space（空间内可见）| private（仅 AllowedUsers 可见）。
+	Visibility string `gorm:"type:varchar(16);not null;default:'space'" json:"visibility"`
+	// AllowedUsers 是私有节点可见的用户 ID（逗号分隔）：节点级权限。
+	AllowedUsers string `gorm:"type:varchar(512);not null;default:''" json:"allowedUsers"`
 	// Summary 是节点摘要：目录卡片与搜索结果用它代替全文。
 	Summary string `gorm:"type:varchar(255);not null;default:''" json:"summary"`
 	// Favorite 是收藏标记。

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"regexp"
@@ -13,6 +14,7 @@ import (
 	"metamatrix/api/internal/model"
 
 	"github.com/google/uuid"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -430,7 +432,7 @@ func (s *KnowledgeService) BatchNodes(ownerID, projectID uuid.UUID, ids []uuid.U
 			if err != nil {
 				return count, err
 			}
-			if _, err := s.Update(ownerID, projectID, id, nil, &icon, nil); err != nil {
+			if _, err := s.Update(ownerID, projectID, id, nil, &icon, nil, nil); err != nil {
 				return count, err
 			}
 		default:
@@ -448,18 +450,37 @@ func (s *KnowledgeService) GetDocProps(ownerID, docID uuid.UUID) (*model.DocProp
 	var props model.DocProperty
 	err := s.db.Where("doc_id = ? AND owner_user_id = ?", docID, ownerID).First(&props).Error
 	if err == gorm.ErrRecordNotFound {
-		return &model.DocProperty{
+		blank := &model.DocProperty{
 			DocID:       docID,
 			OwnerUserID: ownerID,
 			Status:      "draft",
 			CreatedAt:   time.Now().UTC(),
 			UpdatedAt:   time.Now().UTC(),
-		}, nil
+		}
+		decorateDocProps(blank)
+		return blank, nil
 	}
 	if err != nil {
 		return nil, err
 	}
+	decorateDocProps(&props)
 	return &props, nil
+}
+
+// decorateDocProps 计算公式字段，并把内置数值（预算、截止日期）并入公式上下文。
+func decorateDocProps(props *model.DocProperty) {
+	defs := fieldDefsFromJSON(props.Fields)
+	values := fieldValuesFromJSON(props.FieldValues)
+	base := map[string]float64{"number": props.Number, "today": todayDays()}
+	for _, f := range defs {
+		if v, ok := valueToNumber(values[f.Key]); ok {
+			base[f.Key] = v
+		}
+	}
+	if props.DueAt != nil {
+		base["dueAt"] = daysFromTime(*props.DueAt)
+	}
+	props.Computed = computeFields(defs, values, base)
 }
 
 // DocPropsInput 是文档属性的增量更新。
@@ -481,6 +502,10 @@ type DocPropsInput struct {
 	Sprint    *string
 	// Number 是自定义数值（预算 / 工时 / 评分）。
 	Number *float64
+	// Fields 是自定义字段定义（覆盖式写入）。
+	Fields *[]FieldDef
+	// FieldValues 是自定义字段取值（按 key 合并）。
+	FieldValues *map[string]any
 }
 
 // UpsertDocProps 写文档属性。
@@ -549,15 +574,65 @@ func (s *KnowledgeService) UpsertDocProps(ownerID, docID uuid.UUID, in DocPropsI
 	if in.Number != nil {
 		props.Number = *in.Number
 	}
+	if in.Fields != nil {
+		clean, err := normalizeFieldDefs(*in.Fields)
+		if err != nil {
+			return nil, err
+		}
+		raw, err := json.Marshal(clean)
+		if err != nil {
+			return nil, err
+		}
+		props.Fields = datatypes.JSON(raw)
+	}
+	if in.FieldValues != nil {
+		merged := fieldValuesFromJSON(props.FieldValues)
+		for k, v := range *in.FieldValues {
+			merged[k] = v
+		}
+		raw, err := json.Marshal(merged)
+		if err != nil {
+			return nil, err
+		}
+		props.FieldValues = datatypes.JSON(raw)
+	}
 	// 发布态必须有摘要：否则目录卡片与搜索结果显示不出这篇讲了什么。
 	if props.Status == "published" && strings.TrimSpace(props.Summary) == "" {
 		return nil, ErrValidation
+	}
+	// 必填字段：定义了必填项却没填值时拒绝保存。
+	if err := validateRequiredFields(props); err != nil {
+		return nil, err
 	}
 	props.UpdatedAt = time.Now().UTC()
 	if err := s.db.Save(props).Error; err != nil {
 		return nil, err
 	}
+	decorateDocProps(props)
 	return props, nil
+}
+
+// validateRequiredFields 校验必填自定义字段。
+func validateRequiredFields(props *model.DocProperty) error {
+	defs := fieldDefsFromJSON(props.Fields)
+	if len(defs) == 0 {
+		return nil
+	}
+	values := fieldValuesFromJSON(props.FieldValues)
+	for _, f := range defs {
+		if !f.Required {
+			continue
+		}
+		switch v := values[f.Key].(type) {
+		case nil:
+			return ErrValidation
+		case string:
+			if strings.TrimSpace(v) == "" {
+				return ErrValidation
+			}
+		}
+	}
+	return nil
 }
 
 // ---------------------------------------------------------------- 评论

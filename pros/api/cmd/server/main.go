@@ -90,7 +90,7 @@ func main() {
 	docH := handler.NewDocumentsHandler(docSvc)
 	projH := handler.NewProjectsHandler(projSvc)
 	dirH := handler.NewDirectoryHandler(dirSvc)
-	knH := handler.NewKnowledgeHandler(knSvc)
+	knH := handler.NewKnowledgeHandler(knSvc, cfg.JWTSecret)
 	// 历史版本保留条数可配置（111）。
 	service.VersionKeep = cfg.KnowledgeVersionKeep
 	// 回收站自动清理：超期节点由定时任务清除（073）。
@@ -315,6 +315,18 @@ func main() {
 		knowledge.GET("/quality", knH.QualityAudit)
 		knowledge.POST("/scan", knH.ScanSensitive)
 		knowledge.POST("/trash/purge", knH.PurgeTrash)
+		// 知识库 5.0：模板属性与模板建文档、属性看板与批量改属性、节点权限、
+		// 分享白名单、标签词库、导入预览与批量导入。
+		knowledge.POST("/templates/:templateId/docs", knH.CreateDocFromTemplate)
+		knowledge.PATCH("/templates/:templateId/properties", knH.UpdateTemplateProperties)
+		knowledge.GET("/props/board", knH.DocPropsBoard)
+		knowledge.POST("/props/batch", knH.BatchDocProps)
+		knowledge.PATCH("/nodes/:nodeId/access", knH.SetNodeAccess)
+		knowledge.GET("/tags/dict", knH.ListTagDict)
+		knowledge.POST("/tags/dict", knH.AddTagDict)
+		knowledge.DELETE("/tags/dict/:dictId", knH.DeleteTagDict)
+		knowledge.POST("/import/preview", knH.PreviewImport)
+		knowledge.POST("/import/batch", knH.ImportFiles)
 	}
 
 	// 知识库文档级能力：属性、评论、最近浏览、导出。
@@ -342,6 +354,17 @@ func main() {
 		knowledgeDocs.POST("/:id/versions/:versionId/label", knH.LabelVersion)
 		knowledgeDocs.GET("/:id/versions/authors", knH.VersionAuthors)
 		knowledgeDocs.POST("/:id/save-as-template", knH.SaveDocAsTemplate)
+		// 知识库 5.0：自定义字段、评论增强、任务块、大纲与目录、docx 导出。
+		knowledgeDocs.PUT("/:id/properties/fields", knH.UpdateDocFields)
+		knowledgeDocs.POST("/:id/comments/:commentId/reaction", knH.ToggleCommentReaction)
+		knowledgeDocs.POST("/:id/comments/read", knH.MarkCommentsRead)
+		knowledgeDocs.GET("/:id/versions/:versionId/comments", knH.VersionComments)
+		knowledgeDocs.GET("/:id/tasks", knH.DocTasks)
+		knowledgeDocs.PATCH("/:id/tasks/:index", knH.ToggleDocTask)
+		knowledgeDocs.GET("/:id/outline", knH.DocOutline)
+		knowledgeDocs.POST("/:id/outline/reorder", knH.ReorderOutline)
+		knowledgeDocs.PATCH("/:id/shares/:shareId/allowlist", knH.SetShareAllowList)
+		knowledgeDocs.GET("/:id/docx", knH.ExportDocx)
 	}
 
 	// 跨项目检索与问答：本人全部项目的语料。

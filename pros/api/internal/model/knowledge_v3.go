@@ -37,6 +37,8 @@ type KnowledgeShare struct {
 	PasswordHash string `gorm:"type:varchar(64);not null;default:''" json:"-"`
 	// AllowCopy=false 时分享页禁止复制正文与下载。
 	AllowCopy bool      `gorm:"not null;default:true" json:"allowCopy"`
+	// AllowUsers 是分享白名单（逗号分隔的用户 ID）：非空时仅名单内成员可访问。
+	AllowUsers string `gorm:"type:varchar(512);not null;default:''" json:"allowUsers"`
 	CreatedAt time.Time `gorm:"type:timestamptz;not null" json:"createdAt"`
 }
 

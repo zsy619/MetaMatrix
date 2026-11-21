@@ -388,6 +388,11 @@ type commentBody struct {
 	Quote    string  `json:"quote"`
 	Content  string  `json:"content"`
 	Resolved *bool   `json:"resolved"`
+	// AnchorFrom / AnchorTo 是划线区间的字符偏移（-1 表示整篇评论）。
+	AnchorFrom int `json:"anchorFrom"`
+	AnchorTo   int `json:"anchorTo"`
+	// Mentions 是被 @ 的用户 ID。
+	Mentions []string `json:"mentions"`
 }
 
 func (h *KnowledgeHandler) ListComments(ctx context.Context, c *app.RequestContext) {
@@ -399,7 +404,19 @@ func (h *KnowledgeHandler) ListComments(ctx context.Context, c *app.RequestConte
 	if !ok {
 		return
 	}
-	rows, err := h.svc.ListComments(uid, docID)
+	// 可选筛选：resolved=true|false 只看已解决/未解决，unread=1 只看未读。
+	resolvedFilter := c.Query("resolved")
+	var resolved *bool
+	switch resolvedFilter {
+	case "true":
+		v := true
+		resolved = &v
+	case "false":
+		v := false
+		resolved = &v
+	}
+	unreadOnly := c.Query("unread") == "1" || c.Query("unread") == "true"
+	rows, err := h.svc.ListCommentsFiltered(uid, docID, resolved, unreadOnly)
 	if handleKnowledgeErr(c, err) {
 		return
 	}
@@ -425,7 +442,8 @@ func (h *KnowledgeHandler) AddComment(ctx context.Context, c *app.RequestContext
 		BadRequest(c, "invalid parentId")
 		return
 	}
-	comment, err := h.svc.AddComment(uid, docID, parentID, body.Quote, body.Content)
+	comment, err := h.svc.AddCommentDetailed(uid, docID, parentID, body.Quote, body.Content,
+		body.AnchorFrom, body.AnchorTo, body.Mentions)
 	if handleKnowledgeErr(c, err) {
 		return
 	}

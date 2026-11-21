@@ -151,7 +151,8 @@ func (h *KnowledgeHandler) SharedDoc(ctx context.Context, c *app.RequestContext)
 	token := string(c.Param("token"))
 	// 带口令时直接校验口令；没带口令时只返回「需要口令」标记，不泄露正文。
 	password := string(c.Query("password"))
-	doc, err := h.svc.ResolveShareWithPassword(token, password)
+	viewer, _ := h.optionalOwner(c)
+	doc, err := h.svc.ResolveShareWithPassword(token, password, viewer)
 	if handleKnowledgeErr(c, err) {
 		return
 	}
@@ -314,6 +315,8 @@ func (h *KnowledgeHandler) Ask(ctx context.Context, c *app.RequestContext) {
 
 type presenceBody struct {
 	Editing bool `json:"editing"`
+	// Cursor 是当前编辑位置（标题锚点 + 字符偏移），用于「跳到 TA 的位置」。
+	Cursor string `json:"cursor"`
 }
 
 func (h *KnowledgeHandler) PresenceHeartbeat(ctx context.Context, c *app.RequestContext) {
@@ -327,7 +330,7 @@ func (h *KnowledgeHandler) PresenceHeartbeat(ctx context.Context, c *app.Request
 	}
 	var body presenceBody
 	_ = c.BindAndValidate(&body)
-	if err := h.svc.PresenceHeartbeat(uid, docID, body.Editing); err != nil {
+	if err := h.svc.PresenceHeartbeat(uid, docID, body.Editing, body.Cursor); err != nil {
 		handleKnowledgeErr(c, err)
 		return
 	}

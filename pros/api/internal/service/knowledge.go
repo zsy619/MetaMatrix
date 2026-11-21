@@ -46,6 +46,8 @@ type KnowledgeNodeInput struct {
 	Title      string
 	Icon       string
 	DocumentID *uuid.UUID
+	// Pinyin 是标题的拼音与首字母（前端用 pinyin-pro 生成）：中文按拼音检索。
+	Pinyin string
 }
 
 type KnowledgeMoveInput struct {
@@ -119,7 +121,14 @@ func (s *KnowledgeService) Tree(ownerID, projectID uuid.UUID) ([]model.Knowledge
 	if err != nil {
 		return nil, err
 	}
-	return s.overlayDocTitles(ownerID, nodes)
+	// 私有节点对未授权用户不可见（节点级权限）。
+	visible := nodes[:0]
+	for _, n := range nodes {
+		if s.nodeVisible(ownerID, n) {
+			visible = append(visible, n)
+		}
+	}
+	return s.overlayDocTitles(ownerID, visible)
 }
 
 // overlayDocTitles 用文档标题覆盖文档节点的标题：标题只有文档这一个数据源，
@@ -202,6 +211,7 @@ func (s *KnowledgeService) Create(ownerID, projectID uuid.UUID, in KnowledgeNode
 		NodeType:   nodeType,
 		DocumentID: in.DocumentID,
 		Title:      title,
+		Pinyin:     strings.TrimSpace(in.Pinyin),
 		SortOrder:  maxOrder + 1,
 		Icon:       icon,
 		CreatedAt:  now,
@@ -214,7 +224,7 @@ func (s *KnowledgeService) Create(ownerID, projectID uuid.UUID, in KnowledgeNode
 }
 
 // Update 重命名 / 改图标 / 换文档。
-func (s *KnowledgeService) Update(ownerID, projectID, nodeID uuid.UUID, title *string, icon *string, documentID *uuid.UUID) (*model.KnowledgeNode, error) {
+func (s *KnowledgeService) Update(ownerID, projectID, nodeID uuid.UUID, title *string, icon *string, documentID *uuid.UUID, pinyin *string) (*model.KnowledgeNode, error) {
 	node, err := s.getOwnedNode(ownerID, projectID, nodeID)
 	if err != nil {
 		return nil, err
@@ -236,6 +246,13 @@ func (s *KnowledgeService) Update(ownerID, projectID, nodeID uuid.UUID, title *s
 	}
 	if documentID != nil {
 		fields["document_id"] = *documentID
+	}
+	if pinyin != nil {
+		clean := strings.TrimSpace(*pinyin)
+		if utf8.RuneCountInString(clean) > 255 {
+			return nil, ErrValidation
+		}
+		fields["pinyin"] = clean
 	}
 	if len(fields) == 0 {
 		return node, nil

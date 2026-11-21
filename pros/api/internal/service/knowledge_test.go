@@ -13,23 +13,26 @@ import (
 
 // knowledgeNodeSQLite 是 knowledge_nodes 的 SQLite 影子模型：只把时间列换成 SQLite 认得的类型。
 type knowledgeNodeSQLite struct {
-	ID         uuid.UUID  `gorm:"type:uuid;primaryKey"`
-	ProjectID  uuid.UUID  `gorm:"type:uuid;not null"`
-	ParentID   *uuid.UUID `gorm:"type:uuid"`
-	NodeType   string     `gorm:"type:varchar(16);not null"`
-	DocumentID *uuid.UUID `gorm:"type:uuid"`
-	Title      string     `gorm:"type:varchar(255);not null"`
-	CreatedBy  uuid.UUID  `gorm:"type:uuid;index"`
-	SortOrder  int        `gorm:"not null;default:0"`
-	Icon       string     `gorm:"type:varchar(16);not null;default:'📄'"`
-	Alias      string     `gorm:"type:varchar(64);not null;default:''"`
-	Summary    string     `gorm:"type:varchar(255);not null;default:''"`
-	Favorite   bool       `gorm:"not null;default:false"`
-	Locked     bool       `gorm:"not null;default:false"`
-	TrashedAt  *time.Time `gorm:"index"`
-	ArchivedAt *time.Time `gorm:"index"`
-	CreatedAt  time.Time  `gorm:"not null"`
-	UpdatedAt  time.Time  `gorm:"not null"`
+	ID           uuid.UUID  `gorm:"type:uuid;primaryKey"`
+	ProjectID    uuid.UUID  `gorm:"type:uuid;not null"`
+	ParentID     *uuid.UUID `gorm:"type:uuid"`
+	NodeType     string     `gorm:"type:varchar(16);not null"`
+	DocumentID   *uuid.UUID `gorm:"type:uuid"`
+	Title        string     `gorm:"type:varchar(255);not null"`
+	CreatedBy    uuid.UUID  `gorm:"type:uuid;index"`
+	SortOrder    int        `gorm:"not null;default:0"`
+	Icon         string     `gorm:"type:varchar(16);not null;default:'📄'"`
+	Alias        string     `gorm:"type:varchar(64);not null;default:''"`
+	Pinyin       string     `gorm:"type:varchar(255);not null;default:''"`
+	Visibility   string     `gorm:"type:varchar(16);not null;default:'space'"`
+	AllowedUsers string     `gorm:"type:varchar(512);not null;default:''"`
+	Summary      string     `gorm:"type:varchar(255);not null;default:''"`
+	Favorite     bool       `gorm:"not null;default:false"`
+	Locked       bool       `gorm:"not null;default:false"`
+	TrashedAt    *time.Time `gorm:"index"`
+	ArchivedAt   *time.Time `gorm:"index"`
+	CreatedAt    time.Time  `gorm:"not null"`
+	UpdatedAt    time.Time  `gorm:"not null"`
 }
 
 func (knowledgeNodeSQLite) TableName() string { return "knowledge_nodes" }
@@ -74,7 +77,7 @@ func TestKnowledgeDocsNestAndShareTitleWithDocument(t *testing.T) {
 
 	// 在目录树上改名，文档标题跟着变。
 	renamed := "目录树改名"
-	if _, err := svc.Update(owner, project.ID, parent.ID, &renamed, nil, nil); err != nil {
+	if _, err := svc.Update(owner, project.ID, parent.ID, &renamed, nil, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 	var doc model.CanvasDocument
@@ -96,7 +99,7 @@ func TestKnowledgeDocsNestAndShareTitleWithDocument(t *testing.T) {
 		t.Fatal(err)
 	}
 	hijack := "被篡改"
-	if _, err := svc.Update(stranger, strangerProject.ID, foreign.ID, &hijack, nil, nil); err != nil {
+	if _, err := svc.Update(stranger, strangerProject.ID, foreign.ID, &hijack, nil, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 	if err := db.First(&doc, "id = ?", *parent.DocumentID).Error; err != nil {
@@ -108,15 +111,15 @@ func TestKnowledgeDocsNestAndShareTitleWithDocument(t *testing.T) {
 
 	// 换图标：正常落库，清空回落到默认，超出列宽被拒。
 	icon := "🚀"
-	if node, err := svc.Update(owner, project.ID, child.ID, nil, &icon, nil); err != nil || node.Icon != icon {
+	if node, err := svc.Update(owner, project.ID, child.ID, nil, &icon, nil, nil); err != nil || node.Icon != icon {
 		t.Fatalf("set icon: node = %+v, err = %v", node, err)
 	}
 	icon = ""
-	if node, err := svc.Update(owner, project.ID, child.ID, nil, &icon, nil); err != nil || node.Icon != "📄" {
+	if node, err := svc.Update(owner, project.ID, child.ID, nil, &icon, nil, nil); err != nil || node.Icon != "📄" {
 		t.Fatalf("reset icon: node = %+v, err = %v", node, err)
 	}
 	icon = strings.Repeat("🚀", 17)
-	if _, err := svc.Update(owner, project.ID, child.ID, nil, &icon, nil); !errors.Is(err, ErrValidation) {
+	if _, err := svc.Update(owner, project.ID, child.ID, nil, &icon, nil, nil); !errors.Is(err, ErrValidation) {
 		t.Fatalf("oversized icon error = %v, want ErrValidation", err)
 	}
 

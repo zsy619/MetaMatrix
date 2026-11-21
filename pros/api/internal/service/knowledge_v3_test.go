@@ -34,6 +34,7 @@ type knowledgeShareSQLite struct {
 	ExpiresAt    *time.Time `gorm:"index"`
 	PasswordHash string     `gorm:"type:varchar(64);not null;default:''"`
 	AllowCopy    bool       `gorm:"not null;default:true"`
+	AllowUsers   string     `gorm:"type:varchar(512);not null;default:''"`
 	CreatedAt    time.Time  `gorm:"not null"`
 }
 

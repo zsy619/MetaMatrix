@@ -8,61 +8,69 @@ import (
 	"metamatrix/api/internal/model"
 
 	"github.com/google/uuid"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
 // 知识库 2.0 的 SQLite 影子模型：只把时间列换成 SQLite 认得的类型，
 // 列与索引与真实 schema 一致。
 type knowledgeTemplateSQLite struct {
-	ID          uuid.UUID  `gorm:"type:uuid;primaryKey"`
-	OwnerUserID *uuid.UUID `gorm:"type:uuid;index"`
-	ProjectID   *uuid.UUID `gorm:"type:uuid;index"`
-	Key         string     `gorm:"type:varchar(64);not null"`
-	Label       string     `gorm:"type:varchar(64);not null"`
-	Icon        string     `gorm:"type:varchar(16);not null;default:'📄'"`
-	Category    string     `gorm:"type:varchar(32);not null;default:'通用'"`
-	Scope       string     `gorm:"type:varchar(16);not null;default:'personal'"`
-	HTML        string     `gorm:"type:text;not null;default:''"`
-	Builtin     bool       `gorm:"not null;default:false"`
-	SortOrder   int        `gorm:"not null;default:0"`
-	CreatedAt   time.Time  `gorm:"not null"`
-	UpdatedAt   time.Time  `gorm:"not null"`
+	ID          uuid.UUID      `gorm:"type:uuid;primaryKey"`
+	OwnerUserID *uuid.UUID     `gorm:"type:uuid;index"`
+	ProjectID   *uuid.UUID     `gorm:"type:uuid;index"`
+	Key         string         `gorm:"type:varchar(64);not null"`
+	Label       string         `gorm:"type:varchar(64);not null"`
+	Icon        string         `gorm:"type:varchar(16);not null;default:'📄'"`
+	Category    string         `gorm:"type:varchar(32);not null;default:'通用'"`
+	Scope       string         `gorm:"type:varchar(16);not null;default:'personal'"`
+	HTML        string         `gorm:"type:text;not null;default:''"`
+	Properties  datatypes.JSON `gorm:"type:jsonb;not null;default:'[]'"`
+	Builtin     bool           `gorm:"not null;default:false"`
+	SortOrder   int            `gorm:"not null;default:0"`
+	CreatedAt   time.Time      `gorm:"not null"`
+	UpdatedAt   time.Time      `gorm:"not null"`
 }
 
 func (knowledgeTemplateSQLite) TableName() string { return "knowledge_templates" }
 
 type docPropertySQLite struct {
-	DocID          uuid.UUID  `gorm:"type:uuid;primaryKey"`
-	OwnerUserID    uuid.UUID  `gorm:"type:uuid;not null;index"`
-	Status         string     `gorm:"type:varchar(16);not null;default:'draft'"`
-	ReviewerUserID *uuid.UUID `gorm:"type:uuid"`
-	DueAt          *time.Time `gorm:"index"`
-	Tags           string     `gorm:"type:varchar(255);not null;default:''"`
-	Summary        string     `gorm:"type:varchar(255);not null;default:''"`
-	CoverColor     string     `gorm:"type:varchar(32);not null;default:''"`
-	CoverURL       string     `gorm:"type:varchar(512);not null;default:''"`
-	Members        string     `gorm:"type:varchar(512);not null;default:''"`
-	Priority       string     `gorm:"type:varchar(16);not null;default:'normal'"`
-	Milestone      string     `gorm:"type:varchar(64);not null;default:''"`
-	Sprint         string     `gorm:"type:varchar(64);not null;default:''"`
-	Number         float64    `gorm:"not null;default:0"`
-	CreatedAt      time.Time  `gorm:"not null"`
-	UpdatedAt      time.Time  `gorm:"not null"`
+	DocID          uuid.UUID      `gorm:"type:uuid;primaryKey"`
+	OwnerUserID    uuid.UUID      `gorm:"type:uuid;not null;index"`
+	Status         string         `gorm:"type:varchar(16);not null;default:'draft'"`
+	ReviewerUserID *uuid.UUID     `gorm:"type:uuid"`
+	DueAt          *time.Time     `gorm:"index"`
+	Tags           string         `gorm:"type:varchar(255);not null;default:''"`
+	Summary        string         `gorm:"type:varchar(255);not null;default:''"`
+	CoverColor     string         `gorm:"type:varchar(32);not null;default:''"`
+	CoverURL       string         `gorm:"type:varchar(512);not null;default:''"`
+	Members        string         `gorm:"type:varchar(512);not null;default:''"`
+	Priority       string         `gorm:"type:varchar(16);not null;default:'normal'"`
+	Milestone      string         `gorm:"type:varchar(64);not null;default:''"`
+	Sprint         string         `gorm:"type:varchar(64);not null;default:''"`
+	Number         float64        `gorm:"not null;default:0"`
+	Fields         datatypes.JSON `gorm:"type:jsonb;not null;default:'[]'"`
+	FieldValues    datatypes.JSON `gorm:"type:jsonb;not null;default:'{}'"`
+	CreatedAt      time.Time      `gorm:"not null"`
+	UpdatedAt      time.Time      `gorm:"not null"`
 }
 
 func (docPropertySQLite) TableName() string { return "doc_properties" }
 
 type docCommentSQLite struct {
-	ID           uuid.UUID  `gorm:"type:uuid;primaryKey"`
-	DocID        uuid.UUID  `gorm:"type:uuid;not null;index:idx_dc_doc"`
-	AuthorUserID uuid.UUID  `gorm:"type:uuid;not null"`
-	ParentID     *uuid.UUID `gorm:"type:uuid;index"`
-	Quote        string     `gorm:"type:text;not null;default:''"`
-	Anchor       int        `gorm:"not null;default:-1"`
-	Content      string     `gorm:"type:text;not null"`
-	Resolved     bool       `gorm:"not null;default:false"`
-	CreatedAt    time.Time  `gorm:"not null"`
-	UpdatedAt    time.Time  `gorm:"not null"`
+	ID           uuid.UUID      `gorm:"type:uuid;primaryKey"`
+	DocID        uuid.UUID      `gorm:"type:uuid;not null;index:idx_dc_doc"`
+	AuthorUserID uuid.UUID      `gorm:"type:uuid;not null"`
+	ParentID     *uuid.UUID     `gorm:"type:uuid;index"`
+	Quote        string         `gorm:"type:text;not null;default:''"`
+	Anchor       int            `gorm:"not null;default:-1"`
+	AnchorFrom   int            `gorm:"not null;default:-1"`
+	AnchorTo     int            `gorm:"not null;default:-1"`
+	Mentions     string         `gorm:"type:varchar(512);not null;default:''"`
+	Reactions    datatypes.JSON `gorm:"type:jsonb;not null;default:'{}'"`
+	Content      string         `gorm:"type:text;not null"`
+	Resolved     bool           `gorm:"not null;default:false"`
+	CreatedAt    time.Time      `gorm:"not null"`
+	UpdatedAt    time.Time      `gorm:"not null"`
 }
 
 func (docCommentSQLite) TableName() string { return "doc_comments" }

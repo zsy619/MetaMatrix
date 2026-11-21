@@ -295,18 +295,21 @@ func (s *KnowledgeService) CreateShareWith(ownerID, docID uuid.UUID, in CreateSh
 // ResolveShareWithPassword 按 token + 口令取文档。
 //
 // 没带口令时只返回「需要口令」标记（不泄露正文）；口令不对返回 ErrValidation。
-func (s *KnowledgeService) ResolveShareWithPassword(token, password string) (*SharedDoc, error) {
+func (s *KnowledgeService) ResolveShareWithPassword(token, password string, viewer *uuid.UUID) (*SharedDoc, error) {
 	doc, err := s.ResolveShare(token)
 	if err != nil {
 		return nil, err
 	}
+	var share model.KnowledgeShare
+	if err := s.db.Where("token = ?", token).First(&share).Error; err != nil {
+		return nil, ErrDocumentNotFound
+	}
+	if !shareAllowed(&share, viewer) {
+		return nil, ErrShareForbidden
+	}
 	if doc.RequiresPassword {
 		if password == "" {
 			return doc, nil
-		}
-		var share model.KnowledgeShare
-		if err := s.db.Where("token = ?", token).First(&share).Error; err != nil {
-			return nil, ErrDocumentNotFound
 		}
 		if share.PasswordHash != SharePasswordDigest(password) {
 			return nil, ErrValidation
@@ -329,8 +332,8 @@ func (s *KnowledgeService) ResolveShareWithPassword(token, password string) (*Sh
 }
 
 // AddShareComment 往分享文档写评论（分享页可评论角色）。
-func (s *KnowledgeService) AddShareComment(token, password, content string) (*model.DocComment, error) {
-	share, doc, err := s.shareWithAccess(token, password)
+func (s *KnowledgeService) AddShareComment(token, password, content string, viewer *uuid.UUID) (*model.DocComment, error) {
+	share, doc, err := s.shareWithAccess(token, password, viewer)
 	if err != nil {
 		return nil, err
 	}
@@ -356,8 +359,8 @@ func (s *KnowledgeService) AddShareComment(token, password, content string) (*mo
 }
 
 // UpdateShareContent 通过分享链接改文档正文（分享页可编辑角色）。
-func (s *KnowledgeService) UpdateShareContent(token, password, html string) error {
-	share, doc, err := s.shareWithAccess(token, password)
+func (s *KnowledgeService) UpdateShareContent(token, password, html string, viewer *uuid.UUID) error {
+	share, doc, err := s.shareWithAccess(token, password, viewer)
 	if err != nil {
 		return err
 	}
@@ -376,7 +379,7 @@ func (s *KnowledgeService) UpdateShareContent(token, password, html string) erro
 }
 
 // shareWithAccess 解析分享并校验口令与有效期。
-func (s *KnowledgeService) shareWithAccess(token, password string) (*model.KnowledgeShare, *model.CanvasDocument, error) {
+func (s *KnowledgeService) shareWithAccess(token, password string, viewer *uuid.UUID) (*model.KnowledgeShare, *model.CanvasDocument, error) {
 	token = strings.TrimSpace(token)
 	if token == "" {
 		return nil, nil, ErrDocumentNotFound
@@ -390,6 +393,9 @@ func (s *KnowledgeService) shareWithAccess(token, password string) (*model.Knowl
 	}
 	if share.PasswordHash != "" && share.PasswordHash != SharePasswordDigest(password) {
 		return nil, nil, ErrValidation
+	}
+	if !shareAllowed(&share, viewer) {
+		return nil, nil, ErrShareForbidden
 	}
 	var doc model.CanvasDocument
 	if err := s.db.Where("id = ?", share.DocumentID).First(&doc).Error; err != nil {
@@ -479,10 +485,11 @@ func (s *KnowledgeService) searchSpaceExtended(ownerID uuid.UUID, projectID *uui
 		q = q.Where("updated_at <= ?", *f.To)
 	}
 	if query != "" {
-		q = q.Where("LOWER(title) LIKE ? OR LOWER(summary) LIKE ? OR LOWER(alias) LIKE ?"+
+		// 拼音列由前端用 pinyin-pro 生成，中文场景可直接按拼音或首字母命中。
+		q = q.Where("LOWER(title) LIKE ? OR LOWER(summary) LIKE ? OR LOWER(alias) LIKE ? OR LOWER(pinyin) LIKE ?"+
 			" OR document_id IN (SELECT id FROM canvas_documents WHERE LOWER(content_text) LIKE ?)"+
 			" OR document_id IN (SELECT doc_id FROM doc_comments WHERE LOWER(content) LIKE ?)",
-			like, like, like, like, like)
+			like, like, like, like, like, like)
 	}
 	var nodes []model.KnowledgeNode
 	if err := q.Order("updated_at DESC").Limit(f.Limit * 2).Find(&nodes).Error; err != nil {

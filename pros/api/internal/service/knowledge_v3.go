@@ -529,10 +529,12 @@ func truncateRunes(s string, n int) string {
 
 // PresenceUser 是当前在线的协作者。
 type PresenceUser struct {
-	UserID   string    `json:"userId"`
-	Name     string    `json:"name"`
-	Avatar   string    `json:"avatar"`
-	Editing  bool      `json:"editing"`
+	UserID string `json:"userId"`
+	Name   string `json:"name"`
+	Avatar string `json:"avatar"`
+	Editing bool     `json:"editing"`
+	// Cursor 是协作者当前编辑位置（段落标题 + 字符偏移），前端用来「跳到 TA 的位置」。
+	Cursor   string    `json:"cursor"`
 	LastSeen time.Time `json:"lastSeen"`
 }
 
@@ -542,6 +544,7 @@ type presenceEntry struct {
 	name     string
 	avatar   string
 	editing  bool
+	cursor   string
 	lastSeen time.Time
 }
 
@@ -560,7 +563,7 @@ func NewPresenceRegistry() *PresenceRegistry {
 }
 
 // Heartbeat 上报一次在线状态。
-func (r *PresenceRegistry) Heartbeat(docID, userID uuid.UUID, name, avatar string, editing bool) {
+func (r *PresenceRegistry) Heartbeat(docID, userID uuid.UUID, name, avatar string, editing bool, cursor string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if r.entries[docID] == nil {
@@ -568,7 +571,7 @@ func (r *PresenceRegistry) Heartbeat(docID, userID uuid.UUID, name, avatar strin
 	}
 	r.entries[docID][userID] = presenceEntry{
 		userID: userID, docID: docID, name: name, avatar: avatar,
-		editing: editing, lastSeen: time.Now().UTC(),
+		editing: editing, cursor: cursor, lastSeen: time.Now().UTC(),
 	}
 }
 
@@ -587,6 +590,7 @@ func (r *PresenceRegistry) List(docID uuid.UUID) []PresenceUser {
 			Name:     entry.name,
 			Avatar:   entry.avatar,
 			Editing:  entry.editing,
+			Cursor:   entry.cursor,
 			LastSeen: entry.lastSeen,
 		})
 	}
@@ -594,8 +598,8 @@ func (r *PresenceRegistry) List(docID uuid.UUID) []PresenceUser {
 	return out
 }
 
-// PresenceHeartbeat 上报当前用户的在线状态。
-func (s *KnowledgeService) PresenceHeartbeat(ownerID, docID uuid.UUID, editing bool) error {
+// PresenceHeartbeat 上报当前用户的在线状态与编辑位置。
+func (s *KnowledgeService) PresenceHeartbeat(ownerID, docID uuid.UUID, editing bool, cursor string) error {
 	if _, err := s.docs().GetOwned(ownerID, docID); err != nil {
 		return err
 	}
@@ -608,7 +612,7 @@ func (s *KnowledgeService) PresenceHeartbeat(ownerID, docID uuid.UUID, editing b
 	if name == "" {
 		name = user.Email
 	}
-	s.presence.Heartbeat(docID, ownerID, name, user.AvatarURL, editing)
+	s.presence.Heartbeat(docID, ownerID, name, user.AvatarURL, editing, cursor)
 	return nil
 }
 

@@ -47,6 +47,9 @@ func AutoMigrate(gdb *gorm.DB) error {
 		&model.DocComment{},
 		&model.KnowledgeEvent{},
 		&model.KnowledgeView{},
+		// 知识库 5.0：评论已读位与业务标签词库。
+		&model.DocCommentRead{},
+		&model.KnowledgeTagDict{},
 		// 知识库 3.0：节点结构化数据、分享链接、历史版本快照。
 		&model.KnowledgeNodeData{},
 		&model.KnowledgeShare{},

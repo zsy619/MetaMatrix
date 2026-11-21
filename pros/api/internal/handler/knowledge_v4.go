@@ -344,7 +344,8 @@ func (h *KnowledgeHandler) VersionAuthors(ctx context.Context, c *app.RequestCon
 func (h *KnowledgeHandler) SharedDocWithPassword(ctx context.Context, c *app.RequestContext) {
 	token := string(c.Param("token"))
 	password := string(c.Query("password"))
-	doc, err := h.svc.ResolveShareWithPassword(token, password)
+	viewer, _ := h.optionalOwner(c)
+	doc, err := h.svc.ResolveShareWithPassword(token, password, viewer)
 	if handleKnowledgeErr(c, err) {
 		return
 	}
@@ -363,7 +364,8 @@ func (h *KnowledgeHandler) AddShareComment(ctx context.Context, c *app.RequestCo
 		BadRequest(c, "invalid body")
 		return
 	}
-	comment, err := h.svc.AddShareComment(token, body.Password, body.Content)
+	viewer, _ := h.optionalOwner(c)
+	comment, err := h.svc.AddShareComment(token, body.Password, body.Content, viewer)
 	if handleKnowledgeErr(c, err) {
 		return
 	}
@@ -382,7 +384,8 @@ func (h *KnowledgeHandler) UpdateShareContent(ctx context.Context, c *app.Reques
 		BadRequest(c, "invalid body")
 		return
 	}
-	if err := h.svc.UpdateShareContent(token, body.Password, body.HTML); err != nil {
+	viewer, _ := h.optionalOwner(c)
+	if err := h.svc.UpdateShareContent(token, body.Password, body.HTML, viewer); err != nil {
 		handleKnowledgeErr(c, err)
 		return
 	}
