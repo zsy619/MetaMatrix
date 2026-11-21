@@ -178,6 +178,20 @@ type SharedDoc struct {
 	RequiresPassword bool `json:"requiresPassword"`
 }
 
+// documentHTML 取文档正文 HTML：正文存在 current_data 里。
+func documentHTML(doc *model.CanvasDocument) string {
+	if doc == nil || len(doc.CurrentData) == 0 {
+		return ""
+	}
+	var payload struct {
+		HTML string `json:"html"`
+	}
+	if err := json.Unmarshal(doc.CurrentData, &payload); err != nil {
+		return ""
+	}
+	return payload.HTML
+}
+
 // ResolveShare 按分享 token 取文档内容（公开访问，不需要登录态）。
 func (s *KnowledgeService) ResolveShare(token string) (*SharedDoc, error) {
 	token = strings.TrimSpace(token)
@@ -206,15 +220,7 @@ func (s *KnowledgeService) ResolveShare(token string) (*SharedDoc, error) {
 			RequiresPassword: true,
 		}, nil
 	}
-	html := ""
-	if len(doc.CurrentData) > 0 {
-		var payload struct {
-			HTML string `json:"html"`
-		}
-		if err := json.Unmarshal(doc.CurrentData, &payload); err == nil {
-			html = payload.HTML
-		}
-	}
+	html := documentHTML(&doc)
 	// 分享访问审计：同一文档 5 分钟内只记一次，避免轮询刷事件。
 	s.auditShareAccess(&share)
 	return &SharedDoc{

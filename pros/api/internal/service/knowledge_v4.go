@@ -292,20 +292,39 @@ func (s *KnowledgeService) CreateShareWith(ownerID, docID uuid.UUID, in CreateSh
 	return share, nil
 }
 
-// ResolveShareWithPassword 按 token + 口令取文档；口令不对返回 ErrValidation。
+// ResolveShareWithPassword 按 token + 口令取文档。
+//
+// 没带口令时只返回「需要口令」标记（不泄露正文）；口令不对返回 ErrValidation。
 func (s *KnowledgeService) ResolveShareWithPassword(token, password string) (*SharedDoc, error) {
 	doc, err := s.ResolveShare(token)
 	if err != nil {
 		return nil, err
 	}
-	var share model.KnowledgeShare
-	if err := s.db.Where("token = ?", token).First(&share).Error; err != nil {
-		return nil, ErrDocumentNotFound
+	if doc.RequiresPassword {
+		if password == "" {
+			return doc, nil
+		}
+		var share model.KnowledgeShare
+		if err := s.db.Where("token = ?", token).First(&share).Error; err != nil {
+			return nil, ErrDocumentNotFound
+		}
+		if share.PasswordHash != SharePasswordDigest(password) {
+			return nil, ErrValidation
+		}
+		// 口令正确：取正文。
+		var doc model.CanvasDocument
+		if err := s.db.Where("id = ?", share.DocumentID).First(&doc).Error; err != nil {
+			return nil, ErrDocumentNotFound
+		}
+		return &SharedDoc{
+			Token:     share.Token,
+			Role:      share.Role,
+			Title:     doc.Title,
+			HTML:      documentHTML(&doc),
+			ExpiresAt: share.ExpiresAt,
+			AllowCopy: share.AllowCopy,
+		}, nil
 	}
-	if share.PasswordHash != "" && share.PasswordHash != SharePasswordDigest(password) {
-		return nil, ErrValidation
-	}
-	doc.AllowCopy = share.AllowCopy
 	return doc, nil
 }
 

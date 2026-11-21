@@ -16,6 +16,7 @@ import {
 import MenuCascade from './MenuCascade.vue'
 import type { MenuAnchor, MenuNode } from './MenuCascade.vue'
 import { RTE_DOC_TEMPLATES, RTE_DOC_TEMPLATE_GROUPS } from '../rteDocTemplates'
+import { SHEET_PRESETS, type SheetPreset } from './sheetModel'
 import ProjectEmojiPicker from '../project/ProjectEmojiPicker.vue'
 
 const props = defineProps<{ projectId: string; activeDocumentId?: string }>()
@@ -609,6 +610,23 @@ async function addDocFromEditorTemplate(title: string, editorTemplateId: string)
   }
 }
 
+/** 从推荐模板建多维表格：建节点后把模板数据写进节点数据。 */
+async function addSheetFromPreset(preset: SheetPreset) {
+  try {
+    const node = await knowledgeApi.createKnowledgeNode(props.projectId, {
+      nodeType: 'sheet',
+      title: preset.name,
+      icon: preset.icon,
+    })
+    await knowledgeApi.saveNodeData(props.projectId, node.id, 'sheet', preset.build())
+    ElMessage.success(`已创建「${preset.name}」`)
+    await load()
+    emit('open-node', node)
+  } catch {
+    ElMessage.error('创建多维表格失败')
+  }
+}
+
 /** 新建表格 / 导图等结构化节点：没有文档正文，直接交给右侧编辑器。 */
 async function addStructuredNode(parentId: string | null, nodeType: 'sheet' | 'mindmap' | 'folder') {
   const labels: Record<string, string> = { sheet: '多维表格', mindmap: '思维导图', folder: '文件夹' }
@@ -805,7 +823,26 @@ async function onContext(cmd: string, node: KnowledgeNode) {
 /** 合并后的新建菜单：新建项 + 文档模板（分类→模板）+ 画布（分类→画布）+ 导入。 */
 const menuNodes = computed<MenuNode[]>(() => [
   { key: 'folder', label: '文件夹', icon: '📁', action: () => addStructuredNode(null, 'folder') },
-  { key: 'sheet', label: '多维表格', icon: '📊', action: () => addStructuredNode(null, 'sheet') },
+  {
+    key: 'sheets',
+    label: '多维表格',
+    icon: '📊',
+    children: [
+      {
+        key: 'sheet-blank',
+        label: '空白多维表格',
+        icon: '⬜',
+        action: () => addStructuredNode(null, 'sheet'),
+      },
+      ...SHEET_PRESETS.map((preset) => ({
+        key: `sheet-preset-${preset.key}`,
+        label: preset.name,
+        icon: preset.icon,
+        desc: preset.description,
+        action: () => addSheetFromPreset(preset),
+      })),
+    ],
+  },
   { key: 'mindmap', label: '思维导图', icon: '🧠', action: () => addStructuredNode(null, 'mindmap') },
   {
     key: 'docs',
