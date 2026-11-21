@@ -7,6 +7,7 @@
  */
 import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { MagicStick } from '@element-plus/icons-vue'
 import { suggestWriting, type WritingSuggestion } from '../../api/knowledge_v6'
 import { friendlyApiMessage } from '../../utils/apiMessage'
 
@@ -47,7 +48,7 @@ function insert() {
 
 <template>
   <div class="write-assist">
-    <el-button text :loading="loading" @click="request">AI 续写</el-button>
+    <el-button text size="small" :icon="MagicStick" :loading="loading" @click="request">AI 续写</el-button>
     <transition name="write-assist__fade">
       <div v-if="visible && suggestion?.text" class="write-assist__card">
         <div class="write-assist__meta">

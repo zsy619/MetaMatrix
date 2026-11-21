@@ -2,10 +2,17 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowLeft, Lock } from '@element-plus/icons-vue'
-import { Download } from '@element-plus/icons-vue'
-import { Clock } from '@element-plus/icons-vue'
-import { Share } from '@element-plus/icons-vue'
+import {
+  ArrowLeft,
+  Clock,
+  Connection,
+  Download,
+  Lock,
+  Memo,
+  MoreFilled,
+  Share,
+  Tickets,
+} from '@element-plus/icons-vue'
 import RichTextEditor from '../RichTextEditor.vue'
 import DocOutline from './DocOutline.vue'
 import DocBackrefs from './DocBackrefs.vue'
@@ -599,53 +606,60 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
         <span v-else-if="dirty">未保存</span>
         <span v-else class="is-saved">已保存</span>
       </span>
-      <el-dropdown trigger="click" @command="(format: string) => exportAs(format)">
-        <el-button text :icon="Download" :loading="exporting">导出</el-button>
-        <template #dropdown>
-          <el-dropdown-menu>
-            <el-dropdown-item command="markdown">Markdown</el-dropdown-item>
-            <el-dropdown-item command="html">HTML</el-dropdown-item>
-            <el-dropdown-item command="text">纯文本</el-dropdown-item>
-            <el-dropdown-item command="json">JSON</el-dropdown-item>
-            <el-dropdown-item command="pdf" divided @click.stop="exportPdf">PDF（分页）</el-dropdown-item>
-            <el-dropdown-item command="docx" @click.stop="exportDocx">Word（docx）</el-dropdown-item>
-          </el-dropdown-menu>
-        </template>
-      </el-dropdown>
-      <el-dropdown trigger="click">
-        <el-button text>更多</el-button>
-        <template #dropdown>
-          <el-dropdown-menu>
-            <el-dropdown-item @click="saveAsTemplate">另存为模板</el-dropdown-item>
-            <el-dropdown-item @click="focusMode = !focusMode">
-              {{ focusMode ? '退出专注模式' : '专注模式' }}
-            </el-dropdown-item>
-          </el-dropdown-menu>
-        </template>
-      </el-dropdown>
-      <el-button text @click="insertToc">目录</el-button>
-      <WriteAssist
-        :document-id="props.documentId"
-        :paragraph="currentParagraph()"
-        @insert="insertSuggestion"
-      />
-      <el-button text @click="minutesVisible = true">会议纪要</el-button>
-      <el-button text @click="toggleCollab">{{ collabOn ? '退出协同' : '协同编辑' }}</el-button>
-      <el-button text :icon="Clock" @click="sidebarTab = 'history'">历史</el-button>
-      <el-button text :icon="Share" @click="shareVisible = true">分享</el-button>
-      <span v-if="lastEditor" class="doc-view__last-editor">
-        最后编辑：{{ lastEditor }}
-      </span>
-      <el-avatar-group v-if="presence.length" class="doc-view__presence" :size="24">
-        <el-avatar
-          v-for="user in presence"
-          :key="user.userId"
-          :src="user.avatar || undefined"
-          :title="`${user.name}${user.editing ? '（正在编辑）' : ''}`"
-        >
-          {{ user.name.slice(0, 1) }}
-        </el-avatar>
-      </el-avatar-group>
+      <div class="doc-view__meta">
+        <span v-if="lastEditor" class="doc-view__last-editor">
+          最后编辑：{{ lastEditor }}
+        </span>
+        <el-avatar-group v-if="presence.length" class="doc-view__presence" :size="24">
+          <el-avatar
+            v-for="user in presence"
+            :key="user.userId"
+            :src="user.avatar || undefined"
+            :title="`${user.name}${user.editing ? '（正在编辑）' : ''}`"
+          >
+            {{ user.name.slice(0, 1) }}
+          </el-avatar>
+        </el-avatar-group>
+      </div>
+      <!-- 工具栏：按使用频率排序，「更多」收口放最后 -->
+      <div class="doc-view__actions">
+        <el-button text size="small" :icon="Tickets" @click="insertToc">目录</el-button>
+        <WriteAssist
+          :document-id="props.documentId"
+          :paragraph="currentParagraph()"
+          @insert="insertSuggestion"
+        />
+        <el-button text size="small" :icon="Memo" @click="minutesVisible = true">会议纪要</el-button>
+        <el-button text size="small" :icon="Connection" @click="toggleCollab">
+          {{ collabOn ? '退出协同' : '协同编辑' }}
+        </el-button>
+        <el-button text size="small" :icon="Clock" @click="sidebarTab = 'history'">历史</el-button>
+        <el-button text size="small" :icon="Share" @click="shareVisible = true">分享</el-button>
+        <el-dropdown trigger="click" @command="(format: string) => exportAs(format)">
+          <el-button text size="small" :icon="Download" :loading="exporting">导出</el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="markdown">Markdown</el-dropdown-item>
+              <el-dropdown-item command="html">HTML</el-dropdown-item>
+              <el-dropdown-item command="text">纯文本</el-dropdown-item>
+              <el-dropdown-item command="json">JSON</el-dropdown-item>
+              <el-dropdown-item command="pdf" divided @click.stop="exportPdf">PDF（分页）</el-dropdown-item>
+              <el-dropdown-item command="docx" @click.stop="exportDocx">Word（docx）</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+        <el-dropdown trigger="click">
+          <el-button text size="small" :icon="MoreFilled">更多</el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item @click="saveAsTemplate">另存为模板</el-dropdown-item>
+              <el-dropdown-item @click="focusMode = !focusMode">
+                {{ focusMode ? '退出专注模式' : '专注模式' }}
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+      </div>
     </header>
 
     <div v-if="locked" class="doc-view__lock">
@@ -759,10 +773,12 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
 .doc-view__head {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 16px;
-  border-bottom: 1px solid var(--mm-line, #e5e6eb);
-  background: var(--mm-surface, #fff);
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--glass-ring, rgba(15, 23, 42, 0.09));
+  background: rgba(255, 255, 255, 0.34);
+  backdrop-filter: blur(var(--glass-blur, 18px)) saturate(var(--glass-saturate, 165%));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 18px)) saturate(var(--glass-saturate, 165%));
 }
 .doc-view__icon {
   flex: none;
@@ -803,8 +819,32 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
 .doc-view__status .is-saved {
   color: var(--el-color-success);
 }
-.doc-view__presence {
+/* 工具栏：紧凑成组，靠右排列，分隔线与内容区区分 */
+.doc-view__meta {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.doc-view__actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin-left: 4px;
+  padding-left: 8px;
+  border-left: 1px solid var(--glass-ring, rgba(15, 23, 42, 0.09));
+}
+.doc-view__actions :deep(.el-button) {
+  padding: 0 7px;
+  font-size: 13px;
+}
+.doc-view__actions :deep(.el-button .el-icon) {
+  font-size: 15px;
   margin-right: 4px;
+}
+.doc-view__presence {
+  margin-right: 0;
 }
 .doc-view__empty {
   flex: 1;
@@ -852,7 +892,7 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
   display: flex;
   flex-direction: row;
   overflow: auto;
-  background: var(--mm-page, #f7f7f7);
+  background: transparent;
 }
 .doc-view__editor {
   flex: 1;
@@ -865,7 +905,9 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
   display: flex;
   flex-direction: column;
   overflow: auto;
-  border-left: 1px solid var(--mm-line, #e5e6eb);
-  background: var(--mm-surface, #fff);
+  border-left: 1px solid var(--glass-ring, rgba(15, 23, 42, 0.09));
+  background: rgba(255, 255, 255, 0.3);
+  backdrop-filter: blur(var(--glass-blur, 18px)) saturate(var(--glass-saturate, 165%));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 18px)) saturate(var(--glass-saturate, 165%));
 }
 </style>
