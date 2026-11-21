@@ -70,6 +70,9 @@ const emit = defineEmits<{ command: [cmd: string, node: KnowledgeNode] }>()
   position: fixed;
   z-index: 3000;
   min-width: 168px;
+  /* body 锁了 overflow:hidden，菜单过长时只能自己滚动，否则底部会被视口裁掉 */
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
   padding: 4px;
   border-radius: 8px;
   background: var(--mm-surface, #fff);

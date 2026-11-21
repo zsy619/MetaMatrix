@@ -34,6 +34,10 @@ const emit = defineEmits<{
   'open-node': [node: KnowledgeNode]
   /** 画布节点：用画布编辑器打开。新建节点还没回填模板 id，所以模板 id 一起带出去。 */
   'open-canvas': [node: KnowledgeNode, templateId?: string]
+  /** 点击文件夹：右侧展示该文件夹的子节点列表（图标 / 名称 / 创建时间等）。 */
+  'open-folder': [node: KnowledgeNode, children: KnowledgeNode[]]
+  /** 目录树数据刷新（新建 / 重命名 / 删除后）：右侧文件夹列表据此同步。 */
+  'tree-updated': []
   renamed: [documentId: string, title: string]
   home: []
   graph: []
@@ -143,6 +147,13 @@ function buildTree(list: KnowledgeNode[]): TreeNode[] {
     return kids.map((n) => ({ id: n.id, node: n, children: make(n.id) }))
   }
   return make(null)
+}
+
+/** 文件夹的直接子节点：右侧「子列表」面板用。 */
+function childrenOf(folderId: string): KnowledgeNode[] {
+  return nodes.value
+    .filter((n) => n.parentId === folderId && !n.trashedAt && !n.archivedAt)
+    .sort((a, b) => a.sortOrder - b.sortOrder)
 }
 
 /** 画布按分类分组：菜单里的「画布 → 分类 → 画布」两级。 */
@@ -321,6 +332,7 @@ async function load() {
     nodes.value = await knowledgeApi.getKnowledgeTree(props.projectId)
     trashNodes.value = await knowledgeApi.listTrash(props.projectId)
     archivedNodes.value = await knowledgeApi.listArchivedNodes(props.projectId)
+    emit('tree-updated')
   } catch {
     error.value = '加载目录失败'
   } finally {
@@ -470,6 +482,7 @@ function focusNode(index: number) {
   const node = list[focusedIndex.value]
   if (node.documentId) emit('open-doc', node)
   else if (node.nodeType === 'sheet' || node.nodeType === 'mindmap') emit('open-node', node)
+  else if (node.nodeType === 'folder') emit('open-folder', node, childrenOf(node.id))
 }
 
 /** 目录键盘导航：↑↓ 切换、Enter 打开、Delete 进回收站。 */
@@ -565,12 +578,16 @@ function nodeOf(documentId: string): KnowledgeNode | null {
   return nodes.value.find((n) => n.documentId === documentId) ?? null
 }
 
-defineExpose({ setDocTitle, docIcon, setDocIcon, pathOf, nodeOf })
+defineExpose({ setDocTitle, docIcon, setDocIcon, pathOf, nodeOf, childrenOf, openQuickCreate })
 
 function onNodeClick(data: TreeNode, _node?: unknown, _component?: unknown, event?: MouseEvent) {
   // 点「⋯」这类操作按钮时不打开文档，只让菜单自己处理。
   const target = event?.target as HTMLElement | undefined
   if (target?.closest?.('.kn-tree__node-tools')) return
+  if (data.node.nodeType === 'folder') {
+    emit('open-folder', data.node, childrenOf(data.node.id))
+    return
+  }
   if (data.node.nodeType === 'canvas') {
     emit('open-canvas', data.node)
     return
@@ -1381,6 +1398,9 @@ onBeforeUnmount(() => {
           <el-radio-button value="tree">树结构</el-radio-button>
           <el-radio-button value="updated">最近更新</el-radio-button>
         </el-radio-group>
+        <el-tooltip content="语义检索：用向量召回补充关键词结果" placement="top">
+          <el-checkbox v-model="semanticSearchOn" size="small" class="kn-tree__semantic">语义</el-checkbox>
+        </el-tooltip>
       </div>
     </div>
 
@@ -1392,9 +1412,6 @@ onBeforeUnmount(() => {
         clearable
         @input="onSearchInput"
       />
-      <el-tooltip content="语义检索：用向量召回补充关键词结果" placement="top">
-        <el-checkbox v-model="semanticSearchOn" size="small" class="kn-tree__semantic">语义</el-checkbox>
-      </el-tooltip>
       <div class="kn-tree__filters">
         <el-select v-if="showSearchFilters" v-model="searchType" size="small">
           <el-option label="全部类型" value="all" />
@@ -1597,15 +1614,18 @@ onBeforeUnmount(() => {
     </el-tree>
     </div>
 
-    <NodeMenu
-      v-if="nodeMenu"
-      :node="nodeMenu.node"
-      :x="nodeMenu.x"
-      :y="nodeMenu.y"
-      @command="onNodeMenuCommand"
-    />
+    <!-- 传送到 body：侧栏 overflow:hidden 会把浮层裁掉，菜单要能溢出面板 -->
+    <Teleport to="body">
+      <NodeMenu
+        v-if="nodeMenu"
+        :node="nodeMenu.node"
+        :x="nodeMenu.x"
+        :y="nodeMenu.y"
+        @command="onNodeMenuCommand"
+      />
+    </Teleport>
 
-    <el-dialog v-model="deleteDialogOpen" title="删除节点" width="380px">
+    <el-dialog v-model="deleteDialogOpen" title="删除节点" width="380px" append-to-body>
       <p class="kn-tree__dialog-text">
         节点「{{ deleteTarget?.title ?? '' }}」下面的子节点如何处理？
       </p>
@@ -1619,7 +1639,7 @@ onBeforeUnmount(() => {
       </template>
     </el-dialog>
 
-    <el-dialog v-model="batchMoveOpen" title="批量移动到" width="380px">
+    <el-dialog v-model="batchMoveOpen" title="批量移动到" width="380px" append-to-body>
       <el-tree-select
         v-model="batchMoveParent"
         :data="moveTargets"
@@ -1811,7 +1831,7 @@ onBeforeUnmount(() => {
   flex-direction: column;
   height: 100%;
   overflow: hidden;
-  background: var(--ent-surface, #fff);
+  background: transparent;
 }
 
 /* 侧栏头部：标题 + 操作 */
@@ -1845,19 +1865,45 @@ onBeforeUnmount(() => {
   padding: 10px 10px 0;
 }
 .kn-tree__count {
-  display: inline-block;
-  min-width: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  height: 12px;
+  min-width: 14px;
   margin-left: 4px;
   padding: 0 4px;
-  border-radius: 8px;
+  border-radius: 6px;
   background: var(--ent-surface-3, #f1f5f9);
   color: var(--ent-text-2, #5a6472);
   font-size: 10px;
-  line-height: 15px;
+  line-height: 12px;
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
-.kn-tree__sort { margin-top: 8px; }
+/* 带角标的「回收站」曾经比其它按钮高：角标撑高了行盒。
+   统一锁死按钮高度并用 flex 居中，角标不再影响按钮高度。 */
+.kn-tree__views :deep(.el-radio-button__inner) {
+  box-sizing: border-box;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+}
+.kn-tree__sort {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.kn-tree__semantic {
+  height: 24px;
+  margin: 0;
+  font-size: 12px;
+}
+.kn-tree__semantic :deep(.el-checkbox__label) {
+  font-size: 12px;
+  color: var(--ent-text-2, #5a6472);
+}
 .kn-tree__batch-type { width: 96px; }
 .kn-tree__dialog-text { margin: 0 0 10px; font-size: 13px; color: var(--ent-text, #1f2733); }
 

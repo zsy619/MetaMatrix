@@ -273,31 +273,6 @@ onMounted(load)
           </div>
         </section>
 
-        <!-- 最近活动 -->
-        <section class="ent-card">
-          <div class="ent-card__head">
-            <span class="ent-card__icon"><el-icon><Promotion /></el-icon></span>
-            <span class="ent-card__title">最近活动</span>
-            <span v-if="events.length" class="ent-card__count">{{ events.length }}</span>
-          </div>
-          <div class="ent-card__body">
-            <div v-if="!events.length" class="ent-empty">
-              <span class="ent-empty__icon"><el-icon><Promotion /></el-icon></span>
-              <span>还没有活动记录。</span>
-            </div>
-            <ul v-else class="ent-list">
-              <li v-for="event in events" :key="event.id" class="ent-list__row">
-                <span class="ent-list__main">
-                  <span class="ent-badge ent-badge--info">
-                    {{ eventLabels[event.eventType] || event.eventType }}
-                  </span>
-                </span>
-                <span class="ent-list__meta">{{ new Date(event.createdAt).toLocaleString() }}</span>
-              </li>
-            </ul>
-          </div>
-        </section>
-
         <!-- 质量体检 -->
         <section class="ent-card">
           <div class="ent-card__head">
@@ -330,8 +305,33 @@ onMounted(load)
           </div>
         </section>
 
-        <!-- 疑似重复文档 -->
+        <!-- 最近活动 -->
         <section class="ent-card">
+          <div class="ent-card__head">
+            <span class="ent-card__icon"><el-icon><Promotion /></el-icon></span>
+            <span class="ent-card__title">最近活动</span>
+            <span v-if="events.length" class="ent-card__count">{{ events.length }}</span>
+          </div>
+          <div class="ent-card__body">
+            <div v-if="!events.length" class="ent-empty">
+              <span class="ent-empty__icon"><el-icon><Promotion /></el-icon></span>
+              <span>还没有活动记录。</span>
+            </div>
+            <ul v-else class="ent-list">
+              <li v-for="event in events" :key="event.id" class="ent-list__row">
+                <span class="ent-list__main">
+                  <span class="ent-badge ent-badge--info">
+                    {{ eventLabels[event.eventType] || event.eventType }}
+                  </span>
+                </span>
+                <span class="ent-list__meta">{{ new Date(event.createdAt).toLocaleString() }}</span>
+              </li>
+            </ul>
+          </div>
+        </section>
+
+        <!-- 疑似重复文档 -->
+        <section class="ent-card kn-home__panel--similar">
           <div class="ent-card__head">
             <span class="ent-card__icon"><el-icon><CopyDocument /></el-icon></span>
             <span class="ent-card__title">疑似重复文档</span>
@@ -355,48 +355,9 @@ onMounted(load)
                     {{ item.title }}
                   </button>
                 </span>
+                <span class="ent-badge ent-badge--muted">{{ group.length }} 篇</span>
               </li>
             </ul>
-          </div>
-        </section>
-
-        <!-- 属性看板 -->
-        <section class="ent-card kn-home__panel--board">
-          <div class="ent-card__head">
-            <span class="ent-card__icon"><el-icon><Grid /></el-icon></span>
-            <span class="ent-card__title">属性看板</span>
-            <div class="ent-card__actions">
-              <el-radio-group v-model="boardGroupBy" size="small">
-                <el-radio-button value="status">按状态</el-radio-button>
-                <el-radio-button value="priority">按优先级</el-radio-button>
-              </el-radio-group>
-            </div>
-          </div>
-          <div class="ent-card__body">
-            <div v-if="!board.length" class="ent-empty">
-              <span class="ent-empty__icon"><el-icon><Grid /></el-icon></span>
-              <span>还没有挂载到目录的文档。</span>
-            </div>
-            <div v-else class="kn-board">
-              <div v-for="[group, items] in boardGroups" :key="group" class="kn-board__column">
-                <div class="kn-board__column-title">
-                  <span>{{ boardLabels[group] || group }}</span>
-                  <span class="kn-board__column-count">{{ items.length }}</span>
-                </div>
-                <button
-                  v-for="item in items"
-                  :key="item.docId"
-                  type="button"
-                  class="kn-board__card"
-                  @click="emit('open-doc', item.docId)"
-                >
-                  <span class="kn-board__card-title">{{ item.icon }} {{ item.title }}</span>
-                  <span v-if="item.dueAt" class="kn-board__card-meta">
-                    截止 {{ new Date(item.dueAt).toLocaleDateString() }}
-                  </span>
-                </button>
-              </div>
-            </div>
           </div>
         </section>
 
@@ -461,6 +422,47 @@ onMounted(load)
             </ul>
           </div>
         </section>
+
+        <!-- 属性看板 -->
+        <section class="ent-card kn-home__panel--board">
+          <div class="ent-card__head">
+            <span class="ent-card__icon"><el-icon><Grid /></el-icon></span>
+            <span class="ent-card__title">属性看板</span>
+            <div class="ent-card__actions">
+              <el-radio-group v-model="boardGroupBy" size="small">
+                <el-radio-button value="status">按状态</el-radio-button>
+                <el-radio-button value="priority">按优先级</el-radio-button>
+              </el-radio-group>
+            </div>
+          </div>
+          <div class="ent-card__body">
+            <div v-if="!board.length" class="ent-empty">
+              <span class="ent-empty__icon"><el-icon><Grid /></el-icon></span>
+              <span>还没有挂载到目录的文档。</span>
+            </div>
+            <div v-else class="kn-board">
+              <div v-for="[group, items] in boardGroups" :key="group" class="kn-board__column">
+                <div class="kn-board__column-title">
+                  <span>{{ boardLabels[group] || group }}</span>
+                  <span class="kn-board__column-count">{{ items.length }}</span>
+                </div>
+                <button
+                  v-for="item in items"
+                  :key="item.docId"
+                  type="button"
+                  class="kn-board__card"
+                  @click="emit('open-doc', item.docId)"
+                >
+                  <span class="kn-board__card-title">{{ item.icon }} {{ item.title }}</span>
+                  <span v-if="item.dueAt" class="kn-board__card-meta">
+                    截止 {{ new Date(item.dueAt).toLocaleDateString() }}
+                  </span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
       </div>
     </template>
     <div v-else class="kn-home__empty">看板数据加载失败。</div>
@@ -471,7 +473,10 @@ onMounted(load)
 .kn-home {
   padding: 20px 24px 32px;
   overflow: auto;
-  background: var(--ent-surface-2, #f8fafc);
+  background: transparent;
+  /* 面板按自身宽度排版：右侧主区被拖窄时自动降列。 */
+  container-type: inline-size;
+  container-name: kn-home;
 }
 
 /* 页头：标题 + 右侧操作 */
@@ -479,8 +484,12 @@ onMounted(load)
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 16px;
   margin-bottom: 16px;
+}
+.kn-home__head-text {
+  min-width: 0;
 }
 .kn-home__head h2 {
   margin: 0;
@@ -497,29 +506,67 @@ onMounted(load)
 .kn-home__actions {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 8px;
-  flex: none;
+  flex: 0 1 auto;
+  max-width: 100%;
 }
 
 /* KPI 区 */
 .kn-home__cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 12px;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
 }
 
-/* 面板栅格：宽屏三列，窄屏自动降列 */
+/* 面板栅格：三列等宽等高，窄屏依次降到两列、一列 */
 .kn-home__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
-  align-items: start;
+  align-items: stretch;
+}
+
+/* 卡片统一为纵向弹性布局：头部固定，主体占满剩余高度 */
+.kn-home__grid > .ent-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  height: var(--kn-panel-h, 396px);
+}
+
+/* 列表型面板：超出部分内部滚动，避免一张卡把整行撑高 */
+.kn-home__grid > .ent-card > .ent-card__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ent-border-strong, #c8cfda) transparent;
+}
+
+.kn-home__grid > .ent-card > .ent-card__body::-webkit-scrollbar {
+  width: 6px;
+}
+.kn-home__grid > .ent-card > .ent-card__body::-webkit-scrollbar-thumb {
+  background: var(--ent-border-strong, #c8cfda);
+  border-radius: 999px;
 }
 
 /* 看板横跨整行 */
 .kn-home__panel--board {
   grid-column: 1 / -1;
+}
+
+/* 看板自身有列内滚动，不受通用高度限制 */
+.kn-home__grid > .kn-home__panel--board > .ent-card__body {
+  overflow: visible;
+}
+
+/* 看板按内容自适应高度 */
+.kn-home__grid > .kn-home__panel--board {
+  height: auto;
 }
 
 /* 词库录入行 */
@@ -538,11 +585,12 @@ onMounted(load)
   gap: 12px;
   overflow-x: auto;
   padding-bottom: 4px;
+  min-width: 0;
 }
 .kn-board__column {
   flex: 0 0 260px;
   width: 260px;
-  max-height: 420px;
+  max-height: 340px;
   overflow-y: auto;
   background: var(--ent-surface-2, #f8fafc);
   border: 1px solid var(--ent-border, #e6e9ef);
@@ -613,10 +661,39 @@ onMounted(load)
   text-decoration: none;
 }
 
+/* 重复文档：同组标题做成小标签，避免连排难读 */
+.kn-home__panel--similar .ent-list__main {
+  gap: 6px;
+}
+.kn-home__panel--similar .ent-list__title {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--ent-surface-3, #f1f5f9);
+}
+.kn-home__panel--similar .ent-list__title:hover {
+  background: var(--ent-primary-soft, #eaf1fd);
+}
+
 .kn-home__empty {
   padding: 24px;
   border: 1px solid var(--ent-border, #e6e9ef);
   border-radius: var(--ent-radius-md, 12px);
   background: var(--ent-surface, #fff);
+}
+
+/* 主区变窄：面板降列，KPI 收成两列 */
+@container kn-home (max-width: 1080px) {
+  .kn-home__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container kn-home (max-width: 720px) {
+  .kn-home__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .kn-home__cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 </style>

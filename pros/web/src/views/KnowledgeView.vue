@@ -13,6 +13,7 @@ import SpaceHome from '../components/knowledge/SpaceHome.vue'
 import KnowledgeGraph from '../components/knowledge/KnowledgeGraph.vue'
 import SheetEditor from '../components/knowledge/SheetEditor.vue'
 import MindmapEditor from '../components/knowledge/MindmapEditor.vue'
+import FolderPanel from '../components/knowledge/FolderPanel.vue'
 import type { KnowledgeNode } from '../api/knowledge'
 import { friendlyApiMessage } from '../utils/apiMessage'
 import { ElMessage } from 'element-plus'
@@ -38,6 +39,8 @@ const structuredNode = ref<KnowledgeNode | null>(null)
 const canvasNode = ref<KnowledgeNode | null>(null)
 // 从模板新建时，把要插入的编辑器模板 id 传给文档视图。
 const pendingEditorTemplate = ref('')
+// 打开的文件夹：右侧展示它的子节点列表。
+const folderView = ref<{ folder: KnowledgeNode; children: KnowledgeNode[] } | null>(null)
 
 async function loadProject() {
   try {
@@ -65,6 +68,7 @@ function openDoc(node: KnowledgeNode, editorTemplateId?: string) {
   mainTab.value = 'doc'
   structuredNode.value = null
   canvasNode.value = null
+  folderView.value = null
   pendingEditorTemplate.value = editorTemplateId ?? ''
   void router.replace({ name: 'knowledge-doc', params: { projectId: projectId.value, documentId: node.documentId ?? '' } })
 }
@@ -74,6 +78,7 @@ function openHome() {
   mainTab.value = 'home'
   structuredNode.value = null
   canvasNode.value = null
+  folderView.value = null
   void router.replace({ name: 'knowledge', params: { projectId: projectId.value } })
 }
 
@@ -82,6 +87,7 @@ function openDocById(documentId: string) {
   mainTab.value = 'doc'
   structuredNode.value = null
   canvasNode.value = null
+  folderView.value = null
   void router.replace({ name: 'knowledge-doc', params: { projectId: projectId.value, documentId } })
 }
 
@@ -93,6 +99,7 @@ function backToTree() {
 function openStructuredNode(node: KnowledgeNode) {
   structuredNode.value = node
   canvasNode.value = null
+  folderView.value = null
   mainTab.value = 'doc'
   showHome.value = false
   void router.replace({ name: 'knowledge', params: { projectId: projectId.value } })
@@ -107,9 +114,43 @@ function openCanvasNode(node: KnowledgeNode, templateId?: string) {
   }
   canvasNode.value = node
   structuredNode.value = null
+  folderView.value = null
   showHome.value = false
   mainTab.value = 'doc'
   void router.replace({ name: 'knowledge', params: { projectId: projectId.value } })
+}
+
+/** 点击文件夹：右侧展示该文件夹的子节点列表。 */
+function openFolder(folder: KnowledgeNode, children: KnowledgeNode[]) {
+  folderView.value = { folder, children }
+  structuredNode.value = null
+  canvasNode.value = null
+  showHome.value = false
+  mainTab.value = 'doc'
+  void router.replace({ name: 'knowledge', params: { projectId: projectId.value } })
+}
+
+/** 子列表里点开一项：按节点类型分派到对应编辑器。 */
+function openFolderChild(node: KnowledgeNode) {
+  if (node.nodeType === 'canvas') return openCanvasNode(node)
+  if (node.nodeType === 'sheet' || node.nodeType === 'mindmap') return openStructuredNode(node)
+  if (node.nodeType === 'folder') return openFolder(node, treeRef.value?.childrenOf(node.id) ?? [])
+  if (node.documentId) return openDoc(node)
+}
+
+/** 在文件夹下新建子文档：复用目录树的快速新建面板。 */
+function createInFolder(folder: KnowledgeNode) {
+  treeRef.value?.openQuickCreate(folder.id)
+}
+
+/** 目录树刷新后，同步右侧打开着的文件夹子列表。 */
+function onTreeUpdated() {
+  const view = folderView.value
+  if (!view) return
+  folderView.value = {
+    folder: view.folder,
+    children: treeRef.value?.childrenOf(view.folder.id) ?? view.children,
+  }
 }
 
 /** 独立窗口打开：在画布编辑器里打开这一份，带完整工具栏。 */
@@ -167,6 +208,8 @@ loadProject()
           @open-doc="openDoc"
           @open-node="openStructuredNode"
           @open-canvas="openCanvasNode"
+          @open-folder="openFolder"
+          @tree-updated="onTreeUpdated"
           @renamed="onTreeRenamed"
           @home="openHome"
           @graph="openGraph"
@@ -176,7 +219,7 @@ loadProject()
         <main class="kn-main">
           <div class="kn-main__tabs">
             <el-radio-group v-model="mainTab" size="small">
-              <el-radio-button value="home" @click="showHome = true">概览</el-radio-button>
+              <el-radio-button value="home" @click="openHome()">概览</el-radio-button>
               <el-radio-button value="doc" @click="showHome = false">内容</el-radio-button>
               <el-radio-button value="graph">图谱</el-radio-button>
             </el-radio-group>
@@ -208,6 +251,15 @@ loadProject()
             @saved="(title) => treeRef?.setDocTitle(canvasNode!.documentId ?? '', title)"
             @icon-change="(icon) => setCanvasIcon(canvasNode!, icon)"
             @open-full="openCanvasFull(canvasNode!)"
+          />
+          <FolderPanel
+            v-else-if="folderView && !showHome"
+            :key="folderView.folder.id"
+            :folder="folderView.folder"
+            :children="folderView.children"
+            @open="openFolderChild"
+            @back="openHome"
+            @create="createInFolder"
           />
           <DocView
             v-else-if="activeDocumentId && !showHome"
@@ -242,7 +294,7 @@ loadProject()
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: var(--ent-surface-2, #f8fafc);
+  background: transparent;
 }
 
 /* 面包屑：返回项目做成返回按钮，路径文字降级为辅助信息 */
@@ -251,10 +303,12 @@ loadProject()
   align-items: center;
   gap: 8px;
   padding: 10px 16px;
-  border-bottom: 1px solid var(--ent-border, #e6e9ef);
+  border-bottom: 1px solid var(--glass-ring, rgba(15, 23, 42, 0.09));
   font-size: 13px;
   color: var(--ent-text-2, #5a6472);
-  background: var(--ent-surface, #fff);
+  background: rgba(255, 255, 255, 0.3);
+  backdrop-filter: blur(var(--glass-blur, 18px)) saturate(var(--glass-saturate, 165%));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 18px)) saturate(var(--glass-saturate, 165%));
 }
 .kn-crumb__sep {
   color: var(--ent-text-3, #8a94a3);
@@ -270,10 +324,12 @@ loadProject()
 
 /* 左侧目录与右侧主区之间的分隔线 */
 .kn-layout :deep(.el-splitter-panel) {
-  background: var(--ent-surface, #fff);
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(var(--glass-blur, 18px)) saturate(var(--glass-saturate, 165%));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 18px)) saturate(var(--glass-saturate, 165%));
 }
 .kn-layout :deep(.el-splitter-bar) {
-  background: var(--ent-border, #e6e9ef);
+  background: var(--glass-ring, rgba(15, 23, 42, 0.09));
 }
 
 .kn-main {
@@ -281,14 +337,16 @@ loadProject()
   min-width: 0;
   display: flex;
   flex-direction: column;
-  background: var(--ent-surface-2, #f8fafc);
+  background: transparent;
 }
 
 /* 视图切换：分段控件贴顶，右侧留白 */
 .kn-main__tabs {
   padding: 10px 16px;
-  border-bottom: 1px solid var(--ent-border, #e6e9ef);
-  background: var(--ent-surface, #fff);
+  border-bottom: 1px solid var(--glass-ring, rgba(15, 23, 42, 0.09));
+  background: rgba(255, 255, 255, 0.3);
+  backdrop-filter: blur(var(--glass-blur, 18px)) saturate(var(--glass-saturate, 165%));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 18px)) saturate(var(--glass-saturate, 165%));
 }
 .kn-main__tabs :deep(.el-radio-button__inner) {
   padding: 7px 16px;

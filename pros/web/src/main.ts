@@ -11,6 +11,8 @@ import './styles/panel-maximize.css'
 import './styles/dialog.css'
 import './styles/table-tone.css'
 import './styles/radar-flow.css'
+// 玻璃拟态层必须最后导入：它要覆盖前面几层的表面与悬停样式。
+import './styles/glass.css'
 import App from './App.vue'
 import router from './router'
 import { pinia } from './stores'
