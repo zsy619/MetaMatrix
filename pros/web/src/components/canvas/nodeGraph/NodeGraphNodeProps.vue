@@ -19,7 +19,7 @@ const store = useNodeGraphStore()
 const spec = computed(() => nodeTypeSpec(props.node.type))
 const comments = computed(() => store.commentsOf(props.node.id))
 const history = computed(() => store.nodeHistory(props.node.id))
-const COLORS = ['#2563eb', '#7c3aed', '#059669', '#d97706', '#dc2626', '#475569']
+import { DEFAULT_NODE_COLOR, NODE_COLORS } from './colors'
 
 function setTags(value: string) {
   const tags = value.split(/[,，\s]+/).map((tag) => tag.trim()).filter(Boolean).slice(0, 12)
@@ -163,15 +163,21 @@ const target = computed(() => {
       <span class="ng-field__label">配色</span>
       <div class="ng-colors">
         <button
-          v-for="color in COLORS"
+          v-for="color in NODE_COLORS"
           :key="color"
           type="button"
           class="ng-colors__dot"
           :class="{ 'is-on': node.color === color }"
-          :style="{ background: color }"
+          :style="{ background: color, color }"
           :aria-label="'节点颜色 ' + color"
           @click="store.setNodeColor([node.id], color)"
         ></button>
+        <el-color-picker
+          :model-value="node.color || DEFAULT_NODE_COLOR"
+          size="small"
+          title="自定义颜色"
+          @change="(color: string) => store.setNodeColor([node.id], color || undefined)"
+        />
         <button
           type="button"
           class="ng-colors__dot ng-colors__dot--reset"
@@ -323,8 +329,9 @@ const target = computed(() => {
 
 .ng-colors {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: 6px 8px;
 }
 
 .ng-colors__dot {
@@ -336,7 +343,12 @@ const target = computed(() => {
   cursor: pointer;
 }
 
+.ng-colors__dot:hover {
+  transform: scale(1.12);
+}
+
 .ng-colors__dot.is-on {
+  color: inherit;
   box-shadow: 0 0 0 2px #fff, 0 0 0 4px currentColor;
 }
 
@@ -346,6 +358,14 @@ const target = computed(() => {
   border-style: dashed;
   font-size: 12px;
   line-height: 1;
+}
+
+/* 自定义取色器：与色块同尺寸，视觉对齐 */
+.ng-colors :deep(.el-color-picker__trigger) {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border-radius: 6px;
 }
 
 .ng-comments {

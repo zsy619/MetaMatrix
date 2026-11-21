@@ -87,6 +87,7 @@ import {
 import type { GraphNode } from '../../../types/nodeGraph'
 import AlignIcon from './AlignIcon.vue'
 import { LAYOUT_GROUPS, LAYOUT_LABELS, type LayoutMode } from './layout'
+import { NODE_COLORS } from './colors'
 
 const props = defineProps<{
   x: number
@@ -190,7 +191,7 @@ const subPos = ref({ x: 0, y: 0 })
 const showColors = ref(false)
 
 /** 节点配色预设：6 个色相，够用且不喧宾夺主。 */
-const NODE_COLORS = ['#2563eb', '#7c3aed', '#059669', '#d97706', '#dc2626', '#475569']
+
 
 function fitToViewport() {
   const node = menuEl.value
