@@ -84,6 +84,13 @@ const routes = [
     meta: { scrollable: false, requiresAuth: true },
   },
   {
+    // 知识库模板中心：模板多了以后单独一页检索与管理。
+    path: '/projects/:projectId/knowledge/templates',
+    name: 'knowledge-templates',
+    component: () => import('../views/TemplateCenterView.vue'),
+    meta: { scrollable: true, requiresAuth: true },
+  },
+  {
     // 节点画布：富文本节点 + 画布引用节点 + 连线。
     path: '/projects/:projectId/canvas/:canvasId',
     name: 'node-graph',

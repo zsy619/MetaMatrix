@@ -362,7 +362,7 @@ export type TemplateId =
   | 'fde-reliable-quadrant'
   | FdeSheetId
 
-const TEMPLATES: Record<TemplateId, CanvasDocumentJSON> = {
+export const TEMPLATES: Record<TemplateId, CanvasDocumentJSON> = {
   'dual-triangle': dualTriangleTemplate as DualTriangleDocumentJSON,
   'dual-triangle-human-ai':
     dualTriangleHumanAiTemplate as DualTriangleDocumentJSON,

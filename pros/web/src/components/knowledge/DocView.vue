@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { ArrowLeft } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { ArrowLeft, Lock } from '@element-plus/icons-vue'
 import { Download } from '@element-plus/icons-vue'
 import { Clock } from '@element-plus/icons-vue'
 import { Share } from '@element-plus/icons-vue'
@@ -18,15 +18,37 @@ import ShareDialog from './ShareDialog.vue'
 import ProjectEmojiPicker from '../project/ProjectEmojiPicker.vue'
 import { getDocument, updateDocument } from '../../api/documents'
 import type { DocumentFull } from '../../api/documents'
-import { exportKnowledgeDoc, touchView, heartbeatPresence, listPresence } from '../../api/knowledge'
+import {
+  exportKnowledgeDoc,
+  touchView,
+  heartbeatPresence,
+  listPresence,
+  getRelatedDocs,
+  listVersionAuthors,
+  saveDocAsTemplate,
+} from '../../api/knowledge'
 import type { PresenceUser } from '../../api/knowledge'
 import { friendlyApiMessage } from '../../utils/apiMessage'
 
-const props = defineProps<{ documentId: string; projectId: string; icon?: string }>()
+const props = defineProps<{
+  documentId: string
+  projectId: string
+  icon?: string
+  /** 需要插入正文的编辑器模板 id（从「新建 → 文档」进来时带上）。 */
+  editorTemplate?: string
+  /** 节点被锁定时文档只读。 */
+  locked?: boolean
+  /** 目录树里的路径：文档头部面包屑。 */
+  breadcrumb?: { id: string; title: string }[]
+  /** 目录节点 id：关联推荐按节点查。 */
+  nodeId?: string
+}>()
 const emit = defineEmits<{
   back: []
+  'open-related': [documentId: string]
   'title-change': [title: string]
   'icon-change': [icon: string]
+  'editor-template-applied': []
 }>()
 
 const doc = ref<DocumentFull | null>(null)
@@ -42,6 +64,15 @@ const sidebarTab = ref<'outline' | 'properties' | 'comments' | 'backrefs' | 'his
 const shareVisible = ref(false)
 const presence = ref<PresenceUser[]>([])
 const quote = ref('')
+const editorRef = ref<InstanceType<typeof RichTextEditor>>()
+const appliedTemplate = ref('')
+/** 专注模式：隐藏侧栏与头部，只留正文。 */
+const focusMode = ref(false)
+/** 关联推荐（064）。 */
+const relatedDocs = ref<import('../../api/knowledge').KnowledgeSearchHit[]>([])
+const relatedLoading = ref(false)
+/** 最后编辑人（081/052）。 */
+const lastEditor = ref('')
 let presenceTimer: ReturnType<typeof setInterval> | null = null
 
 const panelId = computed(() => `doc:${props.documentId}`)
@@ -55,8 +86,11 @@ async function load() {
     html.value = data.html ?? ''
     title.value = doc.value.title
     dirty.value = false
+    void applyEditorTemplate()
     // 最近浏览：飞书知识库首页有「最近浏览」入口。
     void touchView(props.documentId).catch(() => undefined)
+    void loadLastEditor()
+    void loadRelated()
   } catch (err) {
     ElMessage.error(friendlyApiMessage(err, '加载文档失败'))
   } finally {
@@ -64,10 +98,48 @@ async function load() {
   }
 }
 
+/** 最后编辑人：从版本作者表里取最近一次保存的人。 */
+async function loadLastEditor() {
+  try {
+    const names = await listVersionAuthors(props.documentId)
+    const entries = Object.entries(names)
+    if (entries.length) {
+      lastEditor.value = entries[entries.length - 1][1]
+    }
+  } catch {
+    lastEditor.value = ''
+  }
+}
+
 function onHtml(next: string) {
   html.value = next
   dirty.value = true
   scheduleSave()
+}
+
+/**
+ * 插入「新建」时选的模板：模板是 TipTap JSON，只能由编辑器自己插入并序列化，
+ * 所以等编辑器就绪后调 insertDocTemplate，再把序列化出的 HTML 存回文档。
+ */
+async function applyEditorTemplate() {
+  const id = props.editorTemplate
+  if (!id || !doc.value || appliedTemplate.value === id) return
+  appliedTemplate.value = id
+  await nextTick()
+  type EditorInstance = {
+    editor?: { getHTML: () => string }
+    insertDocTemplate?: (templateId: string) => void
+  }
+  let inst: EditorInstance | null = null
+  for (let i = 0; i < 40; i++) {
+    inst = editorRef.value as unknown as EditorInstance | null
+    if (inst?.editor) break
+    await new Promise((r) => setTimeout(r, 50))
+  }
+  if (!inst?.editor || !inst.insertDocTemplate) return
+  inst.insertDocTemplate(id)
+  onHtml(inst.editor.getHTML())
+  emit('editor-template-applied')
 }
 
 /** 点击 @ 文档 mention 节点跳转到目标文档。 */
@@ -127,6 +199,38 @@ function onTitleInput(e: Event) {
 function pickIcon(next: string) {
   iconOpen.value = false
   emit('icon-change', next)
+}
+
+/** 另存为模板（018）。 */
+async function saveAsTemplate() {
+  try {
+    const { value } = await ElMessageBox.prompt('模板名称', '另存为模板', {
+      confirmButtonText: '保存',
+      cancelButtonText: '取消',
+      inputValue: title.value.trim() || '未命名模板',
+    })
+    await saveDocAsTemplate(props.documentId, value.trim())
+    ElMessage.success('已保存到模板中心')
+  } catch (err) {
+    if (err === 'cancel' || err === 'close') return
+    ElMessage.error('保存模板失败')
+  }
+}
+
+/** 关联推荐：同作者 / 同引用 / 同标签的文档。 */
+async function loadRelated() {
+  if (!props.nodeId) {
+    relatedDocs.value = []
+    return
+  }
+  relatedLoading.value = true
+  try {
+    relatedDocs.value = await getRelatedDocs(props.projectId, props.nodeId)
+  } catch {
+    relatedDocs.value = []
+  } finally {
+    relatedLoading.value = false
+  }
 }
 
 /** 目录树里重命名后同步过来：后端已改文档标题，这里只对齐输入框，免得下次保存把旧标题写回去。 */
@@ -209,6 +313,7 @@ async function save() {
 }
 
 watch(() => props.documentId, load, { immediate: true })
+watch(() => props.editorTemplate, () => void applyEditorTemplate())
 
 onMounted(() => {
   window.addEventListener('beforeunload', onBeforeUnload)
@@ -233,6 +338,12 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
   <section class="doc-view">
     <header class="doc-view__head">
       <el-button text :icon="ArrowLeft" @click="emit('back')">返回目录</el-button>
+      <nav v-if="breadcrumb?.length" class="doc-view__crumb">
+        <template v-for="(item, index) in breadcrumb" :key="item.id">
+          <span class="doc-view__crumb-item">{{ item.title }}</span>
+          <span v-if="index < breadcrumb.length - 1" class="doc-view__crumb-sep">/</span>
+        </template>
+      </nav>
       <el-popover v-if="icon" v-model:visible="iconOpen" trigger="click" :width="420">
         <template #reference>
           <button type="button" class="doc-view__icon" title="更换图标" aria-label="更换图标">
@@ -267,8 +378,22 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
           </el-dropdown-menu>
         </template>
       </el-dropdown>
+      <el-dropdown trigger="click">
+        <el-button text>更多</el-button>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item @click="saveAsTemplate">另存为模板</el-dropdown-item>
+            <el-dropdown-item @click="focusMode = !focusMode">
+              {{ focusMode ? '退出专注模式' : '专注模式' }}
+            </el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
       <el-button text :icon="Clock" @click="sidebarTab = 'history'">历史</el-button>
       <el-button text :icon="Share" @click="shareVisible = true">分享</el-button>
+      <span v-if="lastEditor" class="doc-view__last-editor">
+        最后编辑：{{ lastEditor }}
+      </span>
       <el-avatar-group v-if="presence.length" class="doc-view__presence" :size="24">
         <el-avatar
           v-for="user in presence"
@@ -281,10 +406,18 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
       </el-avatar-group>
     </header>
 
+    <div v-if="locked" class="doc-view__lock">
+      <el-icon><Lock /></el-icon>
+      此文档已被锁定，当前为只读状态。
+    </div>
+
     <div v-if="loading" class="doc-view__empty">加载中…</div>
     <div v-else-if="!doc" class="doc-view__empty">文档不存在或已被删除。</div>
-    <div v-else class="doc-view__body">
+    <div v-else class="doc-view__body" :class="{ 'is-focus': focusMode }">
+      <div v-if="locked" class="doc-view__readonly" v-html="html" />
       <RichTextEditor
+        v-else
+        ref="editorRef"
         class="doc-view__editor"
         :panel-id="panelId"
         :knowledge-project-id="projectId"
@@ -322,6 +455,21 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
           </el-tab-pane>
           <el-tab-pane label="智能" name="ai">
             <AiPanel :project-id="projectId" :document-id="documentId" />
+          </el-tab-pane>
+          <el-tab-pane label="相关" name="related">
+            <p v-if="relatedLoading" class="doc-view__related-empty">加载中…</p>
+            <p v-else-if="!relatedDocs.length" class="doc-view__related-empty">暂无相关文档。</p>
+            <ul v-else class="doc-view__related">
+              <li
+                v-for="item in relatedDocs"
+                :key="item.nodeId"
+                class="doc-view__related-item"
+                @click="item.documentId && emit('open-related', item.documentId)"
+              >
+                <span class="doc-view__related-title">{{ item.title }}</span>
+                <span v-if="item.author" class="doc-view__related-author">{{ item.author }}</span>
+              </li>
+            </ul>
           </el-tab-pane>
         </el-tabs>
       </aside>
@@ -396,6 +544,36 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
   color: var(--mm-muted, #86909c);
   font-size: 14px;
 }
+.doc-view__crumb {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 12px; color: var(--mm-muted, #86909c);
+  max-width: 320px; overflow: hidden; white-space: nowrap;
+}
+.doc-view__crumb-item { overflow: hidden; text-overflow: ellipsis; }
+.doc-view__crumb-sep { color: var(--mm-faint, #c9cdd4); }
+.doc-view__last-editor { font-size: 12px; color: var(--mm-muted, #86909c); }
+.doc-view__lock {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 16px;
+  font-size: 12px;
+  color: #b26a00;
+  background: #fff7e6;
+  border-bottom: 1px solid #ffe0a3;
+}
+.doc-view__readonly {
+  flex: 1; min-width: 0; padding: 24px 32px; overflow: auto;
+  background: var(--mm-surface, #fff);
+}
+.doc-view__related { list-style: none; margin: 0; padding: 0; }
+.doc-view__related-item {
+  padding: 6px 4px; cursor: pointer; border-bottom: 1px solid var(--mm-line, #f2f3f5);
+  display: flex; flex-direction: column; gap: 2px;
+}
+.doc-view__related-item:hover { background: var(--mm-hover, #f2f3f5); }
+.doc-view__related-title { font-size: 13px; color: var(--mm-text, #1d2129); }
+.doc-view__related-author { font-size: 11px; color: var(--mm-muted, #86909c); }
+.doc-view__related-empty { font-size: 12px; color: var(--mm-muted, #86909c); padding: 8px 4px; }
+.doc-view__body.is-focus .doc-view__sidebar { display: none; }
 .doc-view__body {
   flex: 1;
   display: flex;

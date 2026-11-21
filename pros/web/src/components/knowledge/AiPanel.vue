@@ -2,6 +2,8 @@
 import { onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
+  askKnowledgeFollowUp,
+  askKnowledgeGlobal,
   askKnowledgeSpace,
   getDocSummary,
   getDocTags,
@@ -17,6 +19,10 @@ const question = ref('')
 const answers = ref<KnowledgeAnswer[]>([])
 const loading = ref(false)
 const asking = ref(false)
+/** 多轮追问的上下文（历史问题）。 */
+const history = ref<string[]>([])
+/** 语料范围：当前空间 / 全部项目。 */
+const scope = ref<'space' | 'global'>('space')
 
 async function load() {
   loading.value = true
@@ -48,13 +54,28 @@ async function ask() {
   if (!q) return
   asking.value = true
   try {
-    answers.value = await askKnowledgeSpace(props.projectId, q)
+    if (scope.value === 'global') {
+      // 跨项目语料（100）。
+      answers.value = await askKnowledgeGlobal(q)
+    } else if (history.value.length) {
+      // 多轮追问（061）：把历史问题一起带上。
+      answers.value = await askKnowledgeFollowUp(props.projectId, q, history.value)
+    } else {
+      answers.value = await askKnowledgeSpace(props.projectId, q)
+    }
+    history.value = [...history.value, q].slice(-5)
+    question.value = ''
     if (!answers.value.length) ElMessage.info('没有检索到相关内容')
   } catch {
     ElMessage.error('检索失败')
   } finally {
     asking.value = false
   }
+}
+
+/** 跳到出处文档（062）。 */
+function openSource(documentId: string) {
+  window.location.href = `/projects/${props.projectId}/knowledge/docs/${documentId}`
 }
 
 watch(() => props.documentId, load)
@@ -81,19 +102,35 @@ onMounted(load)
     </section>
     <section class="ai__block">
       <h4>知识问答</h4>
+      <el-radio-group v-model="scope" size="small">
+        <el-radio-button value="space">本空间</el-radio-button>
+        <el-radio-button value="global">全部项目</el-radio-button>
+      </el-radio-group>
       <el-input
         v-model="question"
         size="small"
-        placeholder="例如：预算是多少？"
+        placeholder="例如：预算是多少？（可继续追问）"
         @keyup.enter="ask"
       />
       <el-button size="small" type="primary" :loading="asking" @click="ask">检索</el-button>
       <ul v-if="answers.length" class="ai__answers">
         <li v-for="item in answers" :key="item.documentId">
-          <div class="ai__answer-title">{{ item.title }}</div>
+          <div class="ai__answer-title" @click="openSource(item.documentId)">
+            {{ item.title }}
+          </div>
           <div class="ai__answer-snippet">{{ item.snippet }}</div>
+          <div class="ai__answer-meta">
+            <span v-if="item.source">出处：{{ item.source }}</span>
+            <span v-if="item.confidence">
+              置信度 {{ Math.round(item.confidence * 100) }}%
+            </span>
+          </div>
         </li>
       </ul>
+      <div v-if="history.length" class="ai__history">
+        <span class="ai__empty">已追问 {{ history.length }} 轮</span>
+        <el-button link size="small" @click="history = []">清空上下文</el-button>
+      </div>
     </section>
   </div>
 </template>
@@ -137,6 +174,12 @@ onMounted(load)
   color: var(--mm-muted, #86909c);
   line-height: 1.5;
 }
+.ai__answer-meta {
+  display: flex; gap: 8px;
+  font-size: 11px; color: var(--mm-muted, #86909c); margin-top: 2px;
+}
+.ai__answer-title { cursor: pointer; }
+.ai__history { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
 .ai__empty {
   font-size: 12px;
   color: var(--mm-muted, #86909c);

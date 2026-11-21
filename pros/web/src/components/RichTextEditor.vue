@@ -8564,7 +8564,7 @@ provideRteBindings({
   jumpToThread,
 })
 
-defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm })
+defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm, insertDocTemplate })
 </script>
 
 <template>

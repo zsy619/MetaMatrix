@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
-import { ElMessage } from 'element-plus'
-import { diffDocVersions, listDocVersions } from '../../api/knowledge'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { diffDocVersions, labelDocVersion, listDocVersions, listVersionAuthors } from '../../api/knowledge'
 import type { DocVersion } from '../../api/knowledge'
 
 const props = defineProps<{ documentId: string }>()
@@ -12,11 +12,18 @@ const loading = ref(false)
 const fromId = ref('')
 const toId = ref('')
 const diff = ref('')
+/** 版本作者显示名。 */
+const authors = ref<Record<string, string>>({})
+/** 并排对比视图（080）。 */
+const sideBySide = ref(false)
+const fromHtml = ref('')
+const toHtml = ref('')
 
 async function load() {
   loading.value = true
   try {
     versions.value = await listDocVersions(props.documentId, 30)
+    authors.value = await listVersionAuthors(props.documentId).catch(() => ({}))
     if (versions.value.length >= 2) {
       toId.value = versions.value[0].id
       fromId.value = versions.value[1].id
@@ -36,8 +43,28 @@ async function compare() {
   try {
     const res = await diffDocVersions(props.documentId, fromId.value, toId.value)
     diff.value = res.diff || '（两个版本内容一致）'
+    const from = versions.value.find((v) => v.id === fromId.value)
+    const to = versions.value.find((v) => v.id === toId.value)
+    fromHtml.value = from?.html ?? ''
+    toHtml.value = to?.html ?? ''
   } catch {
     ElMessage.error('对比失败')
+  }
+}
+
+/** 给版本加备注：如「发布版」「终稿」（082）。 */
+async function label(version: DocVersion) {
+  const { value } = await ElMessageBox.prompt('版本备注', '标记版本', {
+    confirmButtonText: '保存',
+    cancelButtonText: '取消',
+    inputValue: version.label || '',
+  })
+  try {
+    const updated = await labelDocVersion(props.documentId, version.id, value.trim())
+    version.label = updated.label
+    ElMessage.success('已标记')
+  } catch {
+    ElMessage.error('标记失败')
   }
 }
 
@@ -72,6 +99,9 @@ onMounted(load)
         />
       </el-select>
       <el-button size="small" type="primary" @click="compare">对比</el-button>
+      <el-button size="small" text @click="sideBySide = !sideBySide">
+        {{ sideBySide ? '文本对比' : '并排对比' }}
+      </el-button>
     </div>
     <div v-if="loading" class="versions__empty">加载中…</div>
     <div v-else-if="!versions.length" class="versions__empty">还没有历史版本，编辑并保存后自动生成。</div>
@@ -80,10 +110,25 @@ onMounted(load)
         <li v-for="v in versions" :key="v.id">
           <span class="versions__time">{{ new Date(v.createdAt).toLocaleString() }}</span>
           <span class="versions__ver">v{{ v.saveVersion }}</span>
+          <span v-if="authors[v.authorUserId]" class="versions__author">
+            {{ authors[v.authorUserId] }}
+          </span>
+          <el-tag v-if="v.label" size="small" type="info">{{ v.label }}</el-tag>
+          <el-button link size="small" @click="label(v)">标记</el-button>
           <el-button link size="small" @click="restore(v)">恢复</el-button>
         </li>
       </ul>
-      <pre v-if="diff" class="versions__diff">{{ diff }}</pre>
+      <div v-if="sideBySide && diff" class="versions__side">
+        <div class="versions__side-col">
+          <div class="versions__side-title">旧版本</div>
+          <div class="versions__side-body" v-html="fromHtml" />
+        </div>
+        <div class="versions__side-col">
+          <div class="versions__side-title">新版本</div>
+          <div class="versions__side-body" v-html="toHtml" />
+        </div>
+      </div>
+      <pre v-else-if="diff" class="versions__diff">{{ diff }}</pre>
     </template>
   </div>
 </template>
@@ -124,6 +169,14 @@ onMounted(load)
   max-height: 240px;
   overflow: auto;
   white-space: pre-wrap;
+}
+.versions__author { font-size: 11px; color: var(--mm-blue, #1677ff); }
+.versions__side { display: flex; gap: 8px; margin-top: 10px; }
+.versions__side-col { flex: 1; min-width: 0; }
+.versions__side-title { font-size: 11px; color: var(--mm-muted, #86909c); margin-bottom: 4px; }
+.versions__side-body {
+  padding: 8px; background: var(--mm-page, #f7f7f7); border-radius: 6px;
+  font-size: 12px; line-height: 1.6; max-height: 260px; overflow: auto;
 }
 .versions__empty {
   color: var(--mm-muted, #86909c);

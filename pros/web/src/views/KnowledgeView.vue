@@ -6,6 +6,7 @@ import * as projectsApi from '../api/projects'
 import type { Project } from '../types/project'
 import KnowledgeTree from '../components/knowledge/KnowledgeTree.vue'
 import DocView from '../components/knowledge/DocView.vue'
+import CanvasPanel from '../components/knowledge/CanvasPanel.vue'
 import SpaceHome from '../components/knowledge/SpaceHome.vue'
 import KnowledgeGraph from '../components/knowledge/KnowledgeGraph.vue'
 import SheetEditor from '../components/knowledge/SheetEditor.vue'
@@ -31,6 +32,10 @@ const showHome = ref(true)
 const mainTab = ref<'home' | 'doc' | 'graph'>('home')
 // 表格与导图没有文档正文，单独用结构化编辑器承载。
 const structuredNode = ref<KnowledgeNode | null>(null)
+// 画布在右侧面板里渲染：和文档同级，不跳到独立画布页。
+const canvasNode = ref<KnowledgeNode | null>(null)
+// 从模板新建时，把要插入的编辑器模板 id 传给文档视图。
+const pendingEditorTemplate = ref('')
 
 async function loadProject() {
   try {
@@ -53,10 +58,12 @@ watch(
   { immediate: true },
 )
 
-function openDoc(node: KnowledgeNode) {
+function openDoc(node: KnowledgeNode, editorTemplateId?: string) {
   showHome.value = false
   mainTab.value = 'doc'
   structuredNode.value = null
+  canvasNode.value = null
+  pendingEditorTemplate.value = editorTemplateId ?? ''
   void router.replace({ name: 'knowledge-doc', params: { projectId: projectId.value, documentId: node.documentId ?? '' } })
 }
 
@@ -64,6 +71,7 @@ function openHome() {
   showHome.value = true
   mainTab.value = 'home'
   structuredNode.value = null
+  canvasNode.value = null
   void router.replace({ name: 'knowledge', params: { projectId: projectId.value } })
 }
 
@@ -71,6 +79,7 @@ function openDocById(documentId: string) {
   showHome.value = false
   mainTab.value = 'doc'
   structuredNode.value = null
+  canvasNode.value = null
   void router.replace({ name: 'knowledge-doc', params: { projectId: projectId.value, documentId } })
 }
 
@@ -81,9 +90,35 @@ function backToTree() {
 /** 表格 / 导图节点：右侧切换到结构化编辑器。 */
 function openStructuredNode(node: KnowledgeNode) {
   structuredNode.value = node
+  canvasNode.value = null
   mainTab.value = 'doc'
   showHome.value = false
   void router.replace({ name: 'knowledge', params: { projectId: projectId.value } })
+}
+
+/** 画布节点：跳到画布编辑器，按模板 id 选组件，带文档 id 打开本项目这一份。 */
+function openCanvasNode(node: KnowledgeNode, templateId?: string) {
+  const id = (templateId || node.documentTemplateId || node.documentCanvasType || '').replace(/_/g, '-')
+  if (!id || !node.documentId) {
+    ElMessage.warning('这张画布没有可用的模板信息')
+    return
+  }
+  canvasNode.value = node
+  structuredNode.value = null
+  showHome.value = false
+  mainTab.value = 'doc'
+  void router.replace({ name: 'knowledge', params: { projectId: projectId.value } })
+}
+
+/** 独立窗口打开：在画布编辑器里打开这一份，带完整工具栏。 */
+function openCanvasFull(node: KnowledgeNode) {
+  const id = (node.documentTemplateId || node.documentCanvasType || '').replace(/_/g, '-')
+  if (!id || !node.documentId) return
+  void router.push({
+    name: 'canvas',
+    params: { templateId: id },
+    query: { documentId: node.documentId },
+  })
 }
 
 function openGraph() {
@@ -118,6 +153,7 @@ loadProject()
           :active-document-id="activeDocumentId"
           @open-doc="openDoc"
           @open-node="openStructuredNode"
+          @open-canvas="openCanvasNode"
           @renamed="onTreeRenamed"
           @home="openHome"
           @graph="openGraph"
@@ -149,6 +185,14 @@ loadProject()
             :project-id="projectId"
             :node-id="structuredNode.id"
           />
+          <CanvasPanel
+            v-else-if="canvasNode"
+            :key="canvasNode.id"
+            :document-id="canvasNode.documentId ?? ''"
+            :template-id="(canvasNode.documentTemplateId || canvasNode.documentCanvasType || '').replace(/_/g, '-')"
+            @saved="(title) => treeRef?.setDocTitle(canvasNode!.documentId ?? '', title)"
+            @open-full="openCanvasFull(canvasNode!)"
+          />
           <DocView
             v-else-if="activeDocumentId && !showHome"
             ref="docViewRef"
@@ -156,9 +200,15 @@ loadProject()
             :document-id="activeDocumentId"
             :project-id="projectId"
             :icon="treeRef?.docIcon(activeDocumentId)"
+            :editor-template="pendingEditorTemplate"
+            :locked="treeRef?.nodeOf(activeDocumentId)?.locked"
+            :breadcrumb="treeRef?.pathOf(activeDocumentId) ?? []"
+            :node-id="treeRef?.nodeOf(activeDocumentId)?.id"
             @back="backToTree"
+            @open-related="openDocById"
             @title-change="(title) => treeRef?.setDocTitle(activeDocumentId, title)"
             @icon-change="(icon) => treeRef?.setDocIcon(activeDocumentId, icon)"
+            @editor-template-applied="pendingEditorTemplate = ''"
           />
           <SpaceHome
             v-else

@@ -3,13 +3,24 @@ import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Download, Plus, Warning } from '@element-plus/icons-vue'
 import * as knowledgeApi from '../../api/knowledge'
-import type { KnowledgeSummary } from '../../api/knowledge'
+import type {
+  KnowledgeEvent,
+  KnowledgeQualityItem,
+  KnowledgeSearchHit,
+  KnowledgeSummary,
+} from '../../api/knowledge'
 
 const props = defineProps<{ projectId: string }>()
 const emit = defineEmits<{ 'open-doc': [documentId: string] }>()
 
 const summary = ref<KnowledgeSummary | null>(null)
 const loading = ref(false)
+/** 最近活动（107）。 */
+const events = ref<KnowledgeEvent[]>([])
+/** 质量体检（101）。 */
+const quality = ref<KnowledgeQualityItem[]>([])
+/** 疑似重复文档（102）。 */
+const similar = ref<KnowledgeSearchHit[][]>([])
 
 const healthLabels: Record<string, string> = {
   no_title: '缺标题',
@@ -35,11 +46,41 @@ async function load() {
   loading.value = true
   try {
     summary.value = await knowledgeApi.getKnowledgeSummary(props.projectId)
+    const [eventRows, qualityRows, similarRows] = await Promise.all([
+      knowledgeApi.listKnowledgeEvents(props.projectId, 20).catch(() => []),
+      knowledgeApi.listQualityIssues(props.projectId).catch(() => []),
+      knowledgeApi.listSimilarDocs(props.projectId).catch(() => []),
+    ])
+    events.value = eventRows
+    quality.value = qualityRows
+    similar.value = similarRows
   } catch {
     summary.value = null
   } finally {
     loading.value = false
   }
+}
+
+/** 整空间打包导出（092/095）。 */
+async function exportSpace() {
+  try {
+    await knowledgeApi.exportKnowledgeSpaceZip(props.projectId)
+    ElMessage.success('已导出知识空间压缩包')
+  } catch {
+    ElMessage.error('导出失败')
+  }
+}
+
+const eventLabels: Record<string, string> = {
+  'node.create': '新建节点',
+  'node.update': '更新节点',
+  'node.meta': '修改节点信息',
+  'node.move': '移动节点',
+  'node.delete': '删除节点',
+  'doc.update': '更新文档',
+  'doc.publish': '发布文档',
+  'comment.create': '新增评论',
+  'share.access': '通过链接访问',
 }
 
 async function exportTree() {
@@ -66,6 +107,7 @@ onMounted(load)
       </div>
       <div class="kn-home__actions">
         <el-button size="small" :icon="Download" @click="exportTree">导出目录树</el-button>
+        <el-button size="small" @click="exportSpace">打包导出空间</el-button>
       </div>
     </header>
 
@@ -89,6 +131,49 @@ onMounted(load)
               </button>
               <span class="kn-home__tag">{{ healthLabels[item.kind] || item.kind }}</span>
               <span class="kn-home__msg">{{ item.message }}</span>
+            </li>
+          </ul>
+        </section>
+
+        <section class="kn-home__panel">
+          <h3>最近活动</h3>
+          <p v-if="!events.length" class="kn-home__ok">还没有活动记录。</p>
+          <ul v-else class="kn-home__recent">
+            <li v-for="event in events" :key="event.id">
+              <span class="kn-home__tag">{{ eventLabels[event.eventType] || event.eventType }}</span>
+              <span class="kn-home__msg">{{ new Date(event.createdAt).toLocaleString() }}</span>
+            </li>
+          </ul>
+        </section>
+
+        <section class="kn-home__panel">
+          <h3>质量体检</h3>
+          <p v-if="!quality.length" class="kn-home__ok">没有发现质量问题。</p>
+          <ul v-else class="kn-home__health">
+            <li v-for="(item, index) in quality.slice(0, 20)" :key="index">
+              <button type="button" class="kn-home__health-link" @click="emit('open-doc', item.docId)">
+                {{ item.title || '未命名文档' }}
+              </button>
+              <span class="kn-home__tag">{{ item.kind }}</span>
+              <span class="kn-home__msg">{{ item.detail }} · {{ item.suggest }}</span>
+            </li>
+          </ul>
+        </section>
+
+        <section class="kn-home__panel">
+          <h3>疑似重复文档</h3>
+          <p v-if="!similar.length" class="kn-home__ok">没有发现重复文档。</p>
+          <ul v-else class="kn-home__health">
+            <li v-for="(group, index) in similar" :key="index">
+              <button
+                v-for="item in group"
+                :key="item.nodeId"
+                type="button"
+                class="kn-home__health-link"
+                @click="item.documentId && emit('open-doc', item.documentId)"
+              >
+                {{ item.title }}
+              </button>
             </li>
           </ul>
         </section>

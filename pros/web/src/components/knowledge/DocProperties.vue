@@ -14,6 +14,11 @@ const tags = ref('')
 const summary = ref('')
 const coverColor = ref('')
 const dueAt = ref('')
+const members = ref('')
+const priority = ref('normal')
+const milestone = ref('')
+const sprint = ref('')
+const number = ref(0)
 
 const STATUS_LABELS: Record<string, string> = {
   draft: '草稿',
@@ -30,6 +35,11 @@ async function load() {
     summary.value = data.summary
     coverColor.value = data.coverColor
     dueAt.value = data.dueAt ? new Date(data.dueAt).toISOString().slice(0, 10) : ''
+    members.value = data.members ?? ''
+    priority.value = data.priority ?? 'normal'
+    milestone.value = data.milestone ?? ''
+    sprint.value = data.sprint ?? ''
+    number.value = data.number ?? 0
   } catch {
     props_.value = null
   }
@@ -45,6 +55,11 @@ async function save() {
       coverColor: coverColor.value,
       dueAt: dueAt.value ? new Date(dueAt.value).toISOString() : null,
       clearDueAt: !dueAt.value,
+      members: members.value,
+      priority: priority.value,
+      milestone: milestone.value,
+      sprint: sprint.value,
+      number: number.value,
     })
     props_.value = updated
     emit('changed', updated)
@@ -84,6 +99,31 @@ onMounted(load)
     <label class="doc-props__field">
       <span>摘要</span>
       <el-input v-model="summary" size="small" type="textarea" :rows="3" maxlength="255" show-word-limit />
+    </label>
+    <label class="doc-props__field">
+      <span>参与人</span>
+      <el-input v-model="members" size="small" placeholder="用户 ID，逗号分隔" />
+    </label>
+    <label class="doc-props__field">
+      <span>优先级</span>
+      <el-select v-model="priority" size="small">
+        <el-option label="低" value="low" />
+        <el-option label="普通" value="normal" />
+        <el-option label="高" value="high" />
+        <el-option label="紧急" value="urgent" />
+      </el-select>
+    </label>
+    <label class="doc-props__field">
+      <span>里程碑</span>
+      <el-input v-model="milestone" size="small" placeholder="如：V1 上线" />
+    </label>
+    <label class="doc-props__field">
+      <span>迭代周期</span>
+      <el-input v-model="sprint" size="small" placeholder="如：Sprint 7" />
+    </label>
+    <label class="doc-props__field">
+      <span>数值</span>
+      <el-input-number v-model="number" size="small" :controls="false" />
     </label>
     <label class="doc-props__field">
       <span>封面色</span>

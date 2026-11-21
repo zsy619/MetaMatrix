@@ -9,6 +9,12 @@ const emit = defineEmits<{ close: [] }>()
 
 const shares = ref<KnowledgeShare[]>([])
 const role = ref<'view' | 'comment' | 'edit'>('view')
+/** 有效期：留空表示永久有效。 */
+const expiresAt = ref('')
+/** 访问口令：留空表示无需口令。 */
+const password = ref('')
+/** 是否允许复制正文（分享页禁用复制与导出）。 */
+const allowCopy = ref(true)
 const loading = ref(false)
 const busy = ref(false)
 
@@ -42,7 +48,12 @@ async function copy(token: string) {
 async function create() {
   busy.value = true
   try {
-    await createShare(props.documentId, { role: role.value })
+    await createShare(props.documentId, {
+      role: role.value,
+      expiresAt: expiresAt.value ? new Date(expiresAt.value).toISOString() : null,
+      password: password.value,
+      allowCopy: allowCopy.value,
+    })
     ElMessage.success('分享链接已创建')
     await load()
   } catch {
@@ -80,6 +91,16 @@ onMounted(load)
           <el-option label="可评论" value="comment" />
           <el-option label="可编辑" value="edit" />
         </el-select>
+        <el-date-picker
+          v-model="expiresAt"
+          type="datetime"
+          size="default"
+          placeholder="有效期"
+          value-format="YYYY-MM-DDTHH:mm:ssZ"
+          style="width: 200px"
+        />
+        <el-input v-model="password" placeholder="访问口令（可空）" style="width: 160px" />
+        <el-checkbox v-model="allowCopy">允许复制</el-checkbox>
         <el-button type="primary" :loading="busy" @click="create">创建链接</el-button>
       </div>
       <div v-if="loading" class="share__empty">加载中…</div>
@@ -88,7 +109,11 @@ onMounted(load)
         <li v-for="share in shares" :key="share.id">
           <div class="share__meta">
             <el-tag size="small" type="info">{{ roleLabel[share.role] }}</el-tag>
+            <el-tag v-if="!share.allowCopy" size="small" type="warning">禁止复制</el-tag>
             <span class="share__time">{{ new Date(share.createdAt).toLocaleString() }}</span>
+            <span v-if="share.expiresAt" class="share__time">
+              到期：{{ new Date(share.expiresAt).toLocaleString() }}
+            </span>
           </div>
           <div class="share__link">{{ linkOf(share.token) }}</div>
           <div class="share__ops">

@@ -1,6 +1,13 @@
 import { apiRequest, getToken } from './http'
 
-export type KnowledgeNodeType = 'folder' | 'doc' | 'canvas' | 'note' | 'sheet' | 'mindmap'
+export type KnowledgeNodeType =
+  | 'folder'
+  | 'doc'
+  | 'canvas'
+  | 'note'
+  | 'sheet'
+  | 'mindmap'
+  | 'attachment'
 
 export type KnowledgeNode = {
   id: string
@@ -21,6 +28,10 @@ export type KnowledgeNode = {
   trashedAt: string | null
   /** 非空表示已归档。 */
   archivedAt: string | null
+  /** 指向的文档是什么类型的画布（画布节点用）。 */
+  documentCanvasType: string
+  /** 指向的文档用的是哪个模板（画布节点用它决定打开方式）。 */
+  documentTemplateId: string
   createdAt: string
   updatedAt: string
 }
@@ -77,9 +88,10 @@ export function reorderKnowledgeNodes(projectId: string, ids: string[]) {
   )
 }
 
-export function deleteKnowledgeNode(projectId: string, nodeId: string) {
+export function deleteKnowledgeNode(projectId: string, nodeId: string, promote = false) {
+  const suffix = promote ? '?promote=1' : ''
   return apiRequest<{ deleted: boolean }>(
-    `/projects/${projectId}/knowledge/nodes/${nodeId}`,
+    `/projects/${projectId}/knowledge/nodes/${nodeId}${suffix}`,
     { method: 'DELETE' },
   )
 }
@@ -110,6 +122,8 @@ export type KnowledgeTemplate = {
   label: string
   icon: string
   category: string
+  /** 作用域：personal | team | project（builtin 模板为 personal）。 */
+  scope: string
   html: string
   builtin: boolean
   sortOrder: number
@@ -123,7 +137,14 @@ export function listTemplates(projectId: string) {
 
 export function createTemplate(
   projectId: string,
-  input: { key?: string; label: string; icon?: string; category?: string; html?: string },
+  input: {
+    key?: string
+    label: string
+    icon?: string
+    category?: string
+    html?: string
+    scope?: 'personal' | 'team' | 'project'
+  },
 ) {
   return apiRequest<KnowledgeTemplate>(`/projects/${projectId}/knowledge/templates`, {
     method: 'POST',
@@ -238,6 +259,14 @@ export type DocProperties = {
   summary: string
   coverColor: string
   coverUrl: string
+  /** 参与人（逗号分隔的用户 ID）。 */
+  members: string
+  /** 优先级：low | normal | high | urgent。 */
+  priority: string
+  /** 里程碑 / 迭代周期 / 自定义数值。 */
+  milestone: string
+  sprint: string
+  number: number
   updatedAt: string
   createdAt: string
 }
@@ -259,6 +288,11 @@ export function updateDocProperties(
     dueAt?: string | null
     clearDueAt?: boolean
     reviewerUserId?: string | null
+    members?: string
+    priority?: string
+    milestone?: string
+    sprint?: string
+    number?: number
   },
 ) {
   return apiRequest<DocProperties>(`/documents/${documentId}/properties`, {
@@ -369,6 +403,8 @@ export type KnowledgeShare = {
   role: 'view' | 'comment' | 'edit'
   createdBy: string
   expiresAt: string | null
+  /** false 时分享页禁止复制与导出。 */
+  allowCopy: boolean
   createdAt: string
 }
 
@@ -378,7 +414,14 @@ export function listShares(documentId: string) {
 
 export function createShare(
   documentId: string,
-  input: { role: 'view' | 'comment' | 'edit'; expiresAt?: string | null },
+  input: {
+    role: 'view' | 'comment' | 'edit'
+    expiresAt?: string | null
+    /** 访问口令（服务端只存摘要）。 */
+    password?: string
+    /** false 时分享页禁止复制与导出。 */
+    allowCopy?: boolean
+  },
 ) {
   return apiRequest<KnowledgeShare>(`/documents/${documentId}/shares`, {
     method: 'POST',
@@ -398,11 +441,16 @@ export type SharedDoc = {
   title: string
   html: string
   expiresAt: string | null
+  /** false 时分享页禁止复制与导出。 */
+  allowCopy: boolean
+  /** true 表示这份分享需要口令，正文要带口令换取。 */
+  requiresPassword: boolean
 }
 
 /** 分享页是公开入口：用裸 fetch 拉取，访客不需要登录态。 */
-export async function fetchSharedDoc(token: string): Promise<SharedDoc> {
-  const res = await fetch(`/api/knowledge/shares/${encodeURIComponent(token)}`, {
+export async function fetchSharedDoc(token: string, password = ''): Promise<SharedDoc> {
+  const query = password ? `?password=${encodeURIComponent(password)}` : ''
+  const res = await fetch(`/api/knowledge/shares/${encodeURIComponent(token)}${query}`, {
     headers: { Accept: 'application/json' },
   })
   if (!res.ok) throw new Error('分享链接无效或已过期')
@@ -416,6 +464,8 @@ export type DocVersion = {
   html: string
   authorUserId: string
   saveVersion: number
+  /** 版本备注：如「发布版」。 */
+  label: string
   createdAt: string
 }
 
@@ -453,6 +503,8 @@ export type KnowledgeSearchHit = {
   tags: string
   updatedAt: string
   snippet: string
+  /** 正文字数：搜索结果按字数排序时用。 */
+  words: number
 }
 
 export function searchKnowledgeSpace(
@@ -462,12 +514,15 @@ export function searchKnowledgeSpace(
     authorId?: string
     nodeType?: string
     limit?: number
+    /** 排序：''（最近更新）| word（字数）| title（标题）。 */
+    sort?: string
   } = {},
 ) {
   const query = new URLSearchParams()
   if (params.q) query.set('q', params.q)
   if (params.authorId) query.set('authorId', params.authorId)
   if (params.nodeType) query.set('nodeType', params.nodeType)
+  if (params.sort) query.set('sort', params.sort)
   if (params.limit) query.set('limit', String(params.limit))
   const suffix = query.toString() ? `?${query.toString()}` : ''
   return apiRequest<KnowledgeSearchHit[]>(
@@ -481,6 +536,10 @@ export type KnowledgeAnswer = {
   title: string
   snippet: string
   score: number
+  /** 出处：命中来自哪篇文档。 */
+  source: string
+  /** 置信度 0-1。 */
+  confidence: number
 }
 
 export function askKnowledgeSpace(projectId: string, question: string) {
@@ -552,5 +611,179 @@ export function notifyFeishu(projectId: string, text: string) {
   return apiRequest<{ ok: boolean }>(`/projects/${projectId}/knowledge/feishu/notify`, {
     method: 'POST',
     body: { text },
+  })
+}
+
+// ---------------------------------------------------------------- 知识库 4.0
+
+/** 归档区节点。 */
+export function listArchivedNodes(projectId: string) {
+  return apiRequest<KnowledgeNode[]>(`/projects/${projectId}/knowledge/archived`, {
+    cache: 'no-store',
+  })
+}
+
+/** 节点悬浮统计：子节点数、正文字数、评论数。 */
+export type KnowledgeNodeStats = { children: number; words: number; comments: number }
+
+export function getKnowledgeNodeStats(projectId: string, nodeId: string) {
+  return apiRequest<KnowledgeNodeStats>(
+    `/projects/${projectId}/knowledge/nodes/${nodeId}/stats`,
+    { cache: 'no-store' },
+  )
+}
+
+/** 关联推荐：同作者 / 同引用 / 同标签的相关文档。 */
+export function getRelatedDocs(projectId: string, nodeId: string, limit = 6) {
+  return apiRequest<KnowledgeSearchHit[]>(
+    `/projects/${projectId}/knowledge/nodes/${nodeId}/related?limit=${limit}`,
+    { cache: 'no-store' },
+  )
+}
+
+/** 一键回填缺失的摘要。 */
+export function fillKnowledgeSummaries(projectId: string) {
+  return apiRequest<{ filled: number }>(`/projects/${projectId}/knowledge/summaries/fill`, {
+    method: 'POST',
+  })
+}
+
+export function updateTemplate(
+  projectId: string,
+  templateId: string,
+  input: { label?: string; html?: string; sortOrder?: number; scope?: string },
+) {
+  return apiRequest<KnowledgeTemplate>(
+    `/projects/${projectId}/knowledge/templates/${templateId}`,
+    { method: 'PATCH', body: input },
+  )
+}
+
+/** 把一篇文档另存为模板。 */
+export function saveDocAsTemplate(documentId: string, label: string) {
+  return apiRequest<KnowledgeTemplate>(`/documents/${documentId}/save-as-template`, {
+    method: 'POST',
+    body: { label },
+  })
+}
+
+/** 跨项目检索。 */
+export function globalSearchKnowledge(
+  params: { q?: string; projectId?: string; nodeType?: string; sort?: string; limit?: number } = {},
+) {
+  const query = new URLSearchParams()
+  if (params.q) query.set('q', params.q)
+  if (params.projectId) query.set('projectId', params.projectId)
+  if (params.nodeType) query.set('type', params.nodeType)
+  if (params.sort) query.set('sort', params.sort)
+  if (params.limit) query.set('limit', String(params.limit))
+  const suffix = query.toString() ? `?${query.toString()}` : ''
+  return apiRequest<KnowledgeSearchHit[]>(`/knowledge/search/global${suffix}`, { cache: 'no-store' })
+}
+
+/** 多轮追问：把历史问题一起带上。 */
+export function askKnowledgeFollowUp(projectId: string, question: string, context: string[]) {
+  return apiRequest<KnowledgeAnswer[]>(`/projects/${projectId}/knowledge/ask/followup`, {
+    method: 'POST',
+    body: { question, context },
+  })
+}
+
+/** 跨项目问答。 */
+export function askKnowledgeGlobal(question: string) {
+  return apiRequest<KnowledgeAnswer[]>('/knowledge/ask/global', {
+    method: 'POST',
+    body: { question },
+  })
+}
+
+/** 整空间打包导出：目录树 + 每篇文档的 Markdown。 */
+export async function exportKnowledgeSpaceZip(projectId: string) {
+  const res = await apiRequest<Blob>(`/projects/${projectId}/knowledge/export/zip`, {
+    responseType: 'blob',
+  })
+  const url = URL.createObjectURL(res)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = 'knowledge-space.zip'
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
+}
+
+/** 疑似重复文档分组。 */
+export function listSimilarDocs(projectId: string) {
+  return apiRequest<KnowledgeSearchHit[][]>(`/projects/${projectId}/knowledge/similar`, {
+    cache: 'no-store',
+  })
+}
+
+export type KnowledgeQualityItem = {
+  docId: string
+  title: string
+  kind: string
+  detail: string
+  suggest: string
+}
+
+/** 文档质量体检。 */
+export function listQualityIssues(projectId: string, limit = 50) {
+  return apiRequest<KnowledgeQualityItem[]>(
+    `/projects/${projectId}/knowledge/quality?limit=${limit}`,
+    { cache: 'no-store' },
+  )
+}
+
+/** 敏感内容扫描。 */
+export function scanSensitiveText(projectId: string, text: string) {
+  return apiRequest<{ kind: string; match: string }[]>(
+    `/projects/${projectId}/knowledge/scan`,
+    { method: 'POST', body: { text } },
+  )
+}
+
+/** 给历史版本加备注。 */
+export function labelDocVersion(documentId: string, versionId: string, label: string) {
+  return apiRequest<DocVersion>(`/documents/${documentId}/versions/${versionId}/label`, {
+    method: 'POST',
+    body: { label },
+  })
+}
+
+/** 版本作者显示名。 */
+export function listVersionAuthors(documentId: string) {
+  return apiRequest<Record<string, string>>(`/documents/${documentId}/versions/authors`, {
+    cache: 'no-store',
+  })
+}
+
+/** 分享页评论（role=comment / edit）。 */
+export async function addShareComment(token: string, password: string, content: string) {
+  const res = await fetch(`/api/knowledge/shares/${encodeURIComponent(token)}/comments`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password, content }),
+  })
+  if (!res.ok) throw new Error('评论失败')
+  return (await res.json()) as DocComment
+}
+
+/** 分享页保存正文（role=edit）。 */
+export async function updateShareContent(token: string, password: string, html: string) {
+  const res = await fetch(`/api/knowledge/shares/${encodeURIComponent(token)}/content`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password, html }),
+  })
+  if (!res.ok) throw new Error('保存失败')
+  return (await res.json()) as { ok: boolean }
+}
+
+/** 清理超期回收站节点。 */
+export function purgeExpiredTrash(projectId: string, keepDays = 30) {
+  return apiRequest<{ purged: number }>(`/projects/${projectId}/knowledge/trash/purge`, {
+    method: 'POST',
+    body: { keepDays },
   })
 }
