@@ -146,6 +146,85 @@ func (h *KnowledgeHandler) RevokeShare(ctx context.Context, c *app.RequestContex
 	c.JSON(http.StatusOK, map[string]bool{"revoked": true})
 }
 
+// ListNodeShares 列出知识库节点的分享链接（思维导图 / 多维表格）。
+func (h *KnowledgeHandler) ListNodeShares(ctx context.Context, c *app.RequestContext) {
+	uid, ok := h.owner(c)
+	if !ok {
+		return
+	}
+	projectID, ok := parseID(c, "projectId")
+	if !ok {
+		return
+	}
+	nodeID, ok := parseID(c, "nodeId")
+	if !ok {
+		return
+	}
+	rows, err := h.svc.ListNodeShares(uid, projectID, nodeID)
+	if handleKnowledgeErr(c, err) {
+		return
+	}
+	c.JSON(http.StatusOK, rows)
+}
+
+// CreateNodeShare 给知识库节点创建分享链接。
+func (h *KnowledgeHandler) CreateNodeShare(ctx context.Context, c *app.RequestContext) {
+	uid, ok := h.owner(c)
+	if !ok {
+		return
+	}
+	projectID, ok := parseID(c, "projectId")
+	if !ok {
+		return
+	}
+	nodeID, ok := parseID(c, "nodeId")
+	if !ok {
+		return
+	}
+	var body shareBody
+	_ = c.BindAndValidate(&body)
+	var expiresAt *time.Time
+	if body.ExpiresAt != nil && *body.ExpiresAt != "" {
+		t, err := time.Parse(time.RFC3339, *body.ExpiresAt)
+		if err != nil {
+			BadRequest(c, "invalid expiresAt")
+			return
+		}
+		expiresAt = &t
+	}
+	allowCopy := true
+	if body.AllowCopy != nil {
+		allowCopy = *body.AllowCopy
+	}
+	share, err := h.svc.CreateShareForNode(uid, projectID, nodeID, service.CreateShareInput{
+		Role:      body.Role,
+		ExpiresAt: expiresAt,
+		Password:  body.Password,
+		AllowCopy: allowCopy,
+	})
+	if handleKnowledgeErr(c, err) {
+		return
+	}
+	c.JSON(http.StatusCreated, share)
+}
+
+// RevokeNodeShare 撤销节点分享链接。
+func (h *KnowledgeHandler) RevokeNodeShare(ctx context.Context, c *app.RequestContext) {
+	uid, ok := h.owner(c)
+	if !ok {
+		return
+	}
+	shareID, ok := parseID(c, "shareId")
+	if !ok {
+		return
+	}
+	if err := h.svc.RevokeShare(uid, shareID); err != nil {
+		handleKnowledgeErr(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, map[string]bool{"revoked": true})
+}
+
 // SharedDoc 是公开分享页的数据（无需登录态）。
 func (h *KnowledgeHandler) SharedDoc(ctx context.Context, c *app.RequestContext) {
 	token := string(c.Param("token"))

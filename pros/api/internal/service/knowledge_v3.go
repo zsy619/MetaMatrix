@@ -118,7 +118,8 @@ func defaultNodeData(kind string) []byte {
 
 // CreateShare 为文档创建分享链接。
 func (s *KnowledgeService) CreateShare(ownerID, docID uuid.UUID, role string, expiresAt *time.Time) (*model.KnowledgeShare, error) {
-	if _, err := s.docs().GetOwned(ownerID, docID); err != nil {
+	doc, err := s.docs().GetOwned(ownerID, docID)
+	if err != nil {
 		return nil, err
 	}
 	role = strings.TrimSpace(role)
@@ -131,9 +132,10 @@ func (s *KnowledgeService) CreateShare(ownerID, docID uuid.UUID, role string, ex
 	}
 	share := &model.KnowledgeShare{
 		ID:         uuid.New(),
-		DocumentID: docID,
+		DocumentID: &docID,
 		Token:      uuid.NewString() + uuid.NewString()[:8],
 		Role:       role,
+		Kind:       shareKindForDoc(doc),
 		CreatedBy:  ownerID,
 		ExpiresAt:  expiresAt,
 		CreatedAt:  time.Now().UTC(),
@@ -151,6 +153,9 @@ func (s *KnowledgeService) ListShares(ownerID, docID uuid.UUID) ([]model.Knowled
 	}
 	var rows []model.KnowledgeShare
 	err := s.db.Where("document_id = ?", docID).Order("created_at DESC").Find(&rows).Error
+	for i := range rows {
+		rows[i].HasPassword = rows[i].PasswordHash != ""
+	}
 	return rows, err
 }
 
@@ -166,17 +171,31 @@ func (s *KnowledgeService) RevokeShare(ownerID, shareID uuid.UUID) error {
 	return nil
 }
 
-// SharedDoc 是分享页可读的文档内容。
+// SharedDoc 是分享页可读的内容。
+//
+// Kind 决定渲染方式：doc 用 HTML，canvas 走画布模板，
+// mindmap / sheet 直接下发结构化 JSON。
 type SharedDoc struct {
 	Token     string     `json:"token"`
 	Role      string     `json:"role"`
+	Kind      string     `json:"kind"`
 	Title     string     `json:"title"`
 	HTML      string     `json:"html"`
 	ExpiresAt *time.Time `json:"expiresAt"`
+	// Canvas 是画布分享的模板与内容：前端按模板 id 渲染。
+	Canvas *SharedCanvas `json:"canvas,omitempty"`
+	// Data 是导图 / 表格的结构化内容（原始 JSON）。
+	Data json.RawMessage `json:"data,omitempty"`
 	// AllowCopy=false 时分享页禁止复制与导出。
 	AllowCopy bool `json:"allowCopy"`
 	// RequiresPassword=true 表示需要口令才能读取正文。
 	RequiresPassword bool `json:"requiresPassword"`
+}
+
+// SharedCanvas 是画布分享的内容。
+type SharedCanvas struct {
+	TemplateID string          `json:"templateId"`
+	Data       json.RawMessage `json:"data"`
 }
 
 // documentHTML 取文档正文 HTML：正文存在 current_data 里。
@@ -195,6 +214,15 @@ func documentHTML(doc *model.CanvasDocument) string {
 
 // ResolveShare 按分享 token 取文档内容（公开访问，不需要登录态）。
 func (s *KnowledgeService) ResolveShare(token string) (*SharedDoc, error) {
+	share, err := s.findShareByToken(token)
+	if err != nil {
+		return nil, err
+	}
+	return s.resolveShareContent(share, false)
+}
+
+// findShareByToken 按 token 取分享记录，顺带校验有效期。
+func (s *KnowledgeService) findShareByToken(token string) (*model.KnowledgeShare, error) {
 	token = strings.TrimSpace(token)
 	if token == "" {
 		return nil, ErrDocumentNotFound
@@ -206,27 +234,59 @@ func (s *KnowledgeService) ResolveShare(token string) (*SharedDoc, error) {
 	if share.ExpiresAt != nil && share.ExpiresAt.Before(time.Now().UTC()) {
 		return nil, ErrDocumentNotFound
 	}
+	return &share, nil
+}
+
+// resolveShareContent 按分享类型取正文。
+//
+// unlocked 表示口令已校验通过：带口令的分享在解锁前只回「需要口令」标记。
+func (s *KnowledgeService) resolveShareContent(share *model.KnowledgeShare, unlocked bool) (*SharedDoc, error) {
+	kind := shareKind(share)
+	if kind == "mindmap" || kind == "sheet" {
+		return s.resolveNodeShare(share, unlocked)
+	}
 	var doc model.CanvasDocument
-	if err := s.db.Where("id = ?", share.DocumentID).First(&doc).Error; err != nil {
+	if share.DocumentID == nil {
+		return nil, ErrDocumentNotFound
+	}
+	if err := s.db.Where("id = ?", *share.DocumentID).First(&doc).Error; err != nil {
 		return nil, ErrDocumentNotFound
 	}
 	// 有口令的分享：没有口令就不返回正文，只提示需要口令。
-	if share.PasswordHash != "" {
+	if share.PasswordHash != "" && !unlocked {
 		return &SharedDoc{
 			Token:            share.Token,
 			Role:             share.Role,
+			Kind:             kind,
 			Title:            doc.Title,
 			ExpiresAt:        share.ExpiresAt,
 			AllowCopy:        share.AllowCopy,
 			RequiresPassword: true,
 		}, nil
 	}
+	// 画布不是富文本文档：正文是模板 JSON，分享页要按模板渲染。
+	if kind == "canvas" {
+		s.auditShareAccess(share)
+		return &SharedDoc{
+			Token:     share.Token,
+			Role:      share.Role,
+			Kind:      "canvas",
+			Title:     doc.Title,
+			ExpiresAt: share.ExpiresAt,
+			AllowCopy: share.AllowCopy,
+			Canvas: &SharedCanvas{
+				TemplateID: canvasTemplateID(&doc),
+				Data:       json.RawMessage(doc.CurrentData),
+			},
+		}, nil
+	}
 	html := documentHTML(&doc)
 	// 分享访问审计：同一文档 5 分钟内只记一次，避免轮询刷事件。
-	s.auditShareAccess(&share)
+	s.auditShareAccess(share)
 	return &SharedDoc{
 		Token:     share.Token,
 		Role:      share.Role,
+		Kind:      kind,
 		Title:     doc.Title,
 		HTML:      html,
 		ExpiresAt: share.ExpiresAt,
@@ -234,16 +294,49 @@ func (s *KnowledgeService) ResolveShare(token string) (*SharedDoc, error) {
 	}, nil
 }
 
+// shareKindForDoc 按文档类型判定分享内容类型：画布类走模板渲染，其余按富文本处理。
+func shareKindForDoc(doc *model.CanvasDocument) string {
+	if doc == nil {
+		return "doc"
+	}
+	if doc.CanvasType != "" && doc.CanvasType != "doc" {
+		return "canvas"
+	}
+	return "doc"
+}
+
+// shareKind 返回分享的内容类型，兼容存量数据（没有 kind 列时按文档处理）。
+func shareKind(share *model.KnowledgeShare) string {
+	if share.Kind != "" {
+		return share.Kind
+	}
+	return "doc"
+}
+
+// canvasTemplateID 取画布模板 id：优先用模板字段，回退到画布类型。
+func canvasTemplateID(doc *model.CanvasDocument) string {
+	if doc == nil {
+		return ""
+	}
+	if doc.TemplateID != nil && *doc.TemplateID != "" {
+		return *doc.TemplateID
+	}
+	return doc.CanvasType
+}
+
 // auditShareAccess 记录「谁在何时通过链接访问了文档」。
 func (s *KnowledgeService) auditShareAccess(share *model.KnowledgeShare) {
 	if share.ProjectID == uuid.Nil {
+		return
+	}
+	if share.DocumentID == nil {
 		return
 	}
 	recent := time.Now().UTC().Add(-5 * time.Minute)
 	var count int64
 	if err := s.db.Model(&model.KnowledgeEvent{}).
 		Where("project_id = ? AND event_type = 'share.access' AND document_id = ? AND created_at > ?",
-			share.ProjectID, share.DocumentID, recent).Count(&count).Error; err != nil {
+			share.ProjectID, *share.DocumentID, recent).Count(&count).Error; err != nil {
 		return
 	}
 	if count > 0 {
@@ -251,7 +344,7 @@ func (s *KnowledgeService) auditShareAccess(share *model.KnowledgeShare) {
 	}
 	// 审计事件里不写完整 token：分享链接本身就是访问凭证，事件表会被导出。
 	// 只留脱敏后的前缀，足够排查「谁在什么时候访问过」（112）。
-	_ = s.AppendEvent(s.db, share.ProjectID, "share.access", nil, &share.DocumentID, share.CreatedBy, maskShareToken(share.Token))
+	_ = s.AppendEvent(s.db, share.ProjectID, "share.access", nil, share.DocumentID, share.CreatedBy, maskShareToken(share.Token))
 }
 
 // ---------------------------------------------------------------- 历史版本

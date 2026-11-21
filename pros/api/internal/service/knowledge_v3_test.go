@@ -26,10 +26,12 @@ func (knowledgeNodeDataSQLite) TableName() string { return "knowledge_node_data"
 
 type knowledgeShareSQLite struct {
 	ID           uuid.UUID  `gorm:"type:uuid;primaryKey"`
-	DocumentID   uuid.UUID  `gorm:"type:uuid;not null;index"`
+	DocumentID   *uuid.UUID `gorm:"type:uuid;index"`
+	NodeID       *uuid.UUID `gorm:"type:uuid;index"`
 	ProjectID    uuid.UUID  `gorm:"type:uuid;not null;index"`
 	Token        string     `gorm:"type:varchar(64);not null;uniqueIndex"`
 	Role         string     `gorm:"type:varchar(16);not null;default:'view'"`
+	Kind         string     `gorm:"type:varchar(16);not null;default:'doc'"`
 	CreatedBy    uuid.UUID  `gorm:"type:uuid;not null"`
 	ExpiresAt    *time.Time `gorm:"index"`
 	PasswordHash string     `gorm:"type:varchar(64);not null;default:''"`

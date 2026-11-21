@@ -265,9 +265,10 @@ func (s *KnowledgeService) CreateShareWith(ownerID, docID uuid.UUID, in CreateSh
 	}
 	share := &model.KnowledgeShare{
 		ID:         uuid.New(),
-		DocumentID: docID,
+		DocumentID: &docID,
 		Token:      uuid.NewString() + uuid.NewString()[:8],
 		Role:       role,
+		Kind:       shareKindForDoc(doc),
 		CreatedBy:  ownerID,
 		ExpiresAt:  in.ExpiresAt,
 		AllowCopy:  in.AllowCopy,
@@ -279,6 +280,7 @@ func (s *KnowledgeService) CreateShareWith(ownerID, docID uuid.UUID, in CreateSh
 	if in.Password != "" {
 		share.PasswordHash = SharePasswordDigest(in.Password)
 	}
+	share.HasPassword = in.Password != ""
 	if err := s.db.Create(share).Error; err != nil {
 		return nil, err
 	}
@@ -314,19 +316,8 @@ func (s *KnowledgeService) ResolveShareWithPassword(token, password string, view
 		if share.PasswordHash != SharePasswordDigest(password) {
 			return nil, ErrValidation
 		}
-		// 口令正确：取正文。
-		var doc model.CanvasDocument
-		if err := s.db.Where("id = ?", share.DocumentID).First(&doc).Error; err != nil {
-			return nil, ErrDocumentNotFound
-		}
-		return &SharedDoc{
-			Token:     share.Token,
-			Role:      share.Role,
-			Title:     doc.Title,
-			HTML:      documentHTML(&doc),
-			ExpiresAt: share.ExpiresAt,
-			AllowCopy: share.AllowCopy,
-		}, nil
+		// 口令正确：按分享类型取正文（文档 HTML / 画布模板 / 导图表格数据）。
+		return s.resolveShareContent(&share, true)
 	}
 	return doc, nil
 }
@@ -338,6 +329,10 @@ func (s *KnowledgeService) AddShareComment(token, password, content string, view
 		return nil, err
 	}
 	if share.Role != "comment" && share.Role != "edit" {
+		return nil, ErrValidation
+	}
+	// 导图与表格没有文档正文，评论无处落地：这类分享只读。
+	if doc == nil {
 		return nil, ErrValidation
 	}
 	content = strings.TrimSpace(content)
@@ -365,6 +360,10 @@ func (s *KnowledgeService) UpdateShareContent(token, password, html string, view
 		return err
 	}
 	if share.Role != "edit" {
+		return ErrValidation
+	}
+	// 画布正文是模板 JSON，导图表格是结构化数据：都不能按富文本回写。
+	if shareKind(share) != "doc" || doc == nil {
 		return ErrValidation
 	}
 	if len(html) > maxNodeDataBytes {
@@ -397,8 +396,12 @@ func (s *KnowledgeService) shareWithAccess(token, password string, viewer *uuid.
 	if !shareAllowed(&share, viewer) {
 		return nil, nil, ErrShareForbidden
 	}
+	// 导图 / 表格的分享没有文档正文，doc 返回 nil，调用方按只读处理。
+	if share.DocumentID == nil {
+		return &share, nil, nil
+	}
 	var doc model.CanvasDocument
-	if err := s.db.Where("id = ?", share.DocumentID).First(&doc).Error; err != nil {
+	if err := s.db.Where("id = ?", *share.DocumentID).First(&doc).Error; err != nil {
 		return nil, nil, ErrDocumentNotFound
 	}
 	return &share, &doc, nil

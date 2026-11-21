@@ -77,7 +77,35 @@ func AutoMigrate(gdb *gorm.DB) error {
 	if err := backfillKnowledgeAuthors(gdb); err != nil {
 		log.Printf("backfillKnowledgeAuthors warning: %v", err)
 	}
+	if err := ensureShareSchema(gdb); err != nil {
+		log.Printf("ensureShareSchema warning: %v", err)
+	}
 	log.Println("AutoMigrate OK: users, canvas_documents, canvas_revisions, canvas_content_blocks, document_save_operations, backup_imports, media_category, media_asset, media_reference, password_reset_tokens")
+	return nil
+}
+
+// ensureShareSchema 让分享链接同时支持「文档」与「知识库节点」两种对象。
+//
+// GORM 的 AutoMigrate 会补新列，但不会把已有的 NOT NULL 约束放开，
+// 所以 document_id 变可空必须显式 ALTER。
+func ensureShareSchema(gdb *gorm.DB) error {
+	stmts := []string{
+		`ALTER TABLE knowledge_shares ALTER COLUMN document_id DROP NOT NULL`,
+		`ALTER TABLE knowledge_shares ADD COLUMN IF NOT EXISTS node_id uuid`,
+		`ALTER TABLE knowledge_shares ADD COLUMN IF NOT EXISTS kind varchar(16) NOT NULL DEFAULT 'doc'`,
+		`CREATE INDEX IF NOT EXISTS idx_shares_node ON knowledge_shares (node_id)`,
+	}
+	for _, stmt := range stmts {
+		if err := gdb.Exec(stmt).Error; err != nil {
+			log.Printf("share schema step skip/warn: %v (%s)", err, stmt)
+		}
+	}
+	// 存量分享链接补类型：画布文档按画布渲染，其余按富文本。
+	if err := gdb.Exec(`UPDATE knowledge_shares s SET kind = 'canvas'
+  FROM canvas_documents d
+  WHERE d.id = s.document_id AND d.canvas_type <> '' AND d.canvas_type <> 'doc'`).Error; err != nil {
+		log.Printf("share kind backfill warning: %v", err)
+	}
 	return nil
 }
 

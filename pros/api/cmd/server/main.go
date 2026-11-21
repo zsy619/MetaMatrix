@@ -298,6 +298,11 @@ func main() {
 		knowledge.GET("/summary", knH.Summary)
 		knowledge.GET("/events", knH.Events)
 		knowledge.GET("/export", knH.ExportTree)
+		// 节点分享链接：思维导图与多维表格没有文档正文，分享挂在节点上。
+		knowledge.GET("/nodes/:nodeId/shares", knH.ListNodeShares)
+		knowledge.POST("/nodes/:nodeId/shares", knH.CreateNodeShare)
+		knowledge.DELETE("/nodes/:nodeId/shares/:shareId", knH.RevokeNodeShare)
+		knowledge.PATCH("/nodes/:nodeId/shares/:shareId/allowlist", knH.SetShareAllowList)
 		knowledge.GET("/templates", knH.Templates)
 		knowledge.POST("/templates", knH.CreateTemplate)
 		knowledge.DELETE("/templates/:templateId", knH.DeleteTemplate)
