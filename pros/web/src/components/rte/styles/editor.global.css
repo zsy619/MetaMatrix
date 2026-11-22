@@ -3751,6 +3751,44 @@ html.rte-toolbar-dragging * {
 .rte-root.is-dark-editor .ProseMirror a {
   color: #7eb6ff;
 }
+
+/*
+ * 双击打开链接的可发现性设计（正文里的普通链接）：
+ * - 指针光标告诉用户"这个链接可以点开"；
+ * - 悬停时给一层极淡的底色，和普通文字区分开；
+ * - 打开瞬间闪一下（.rte-link--opening），避免新标签页切换后
+ *   用户以为双击没生效。
+ */
+.rte-root .ProseMirror a.rte-link,
+.rte-root .tiptap a.rte-link {
+  cursor: pointer;
+  border-radius: 3px;
+  transition: background-color 0.16s ease;
+}
+.rte-root .ProseMirror a.rte-link:hover,
+.rte-root .tiptap a.rte-link:hover {
+  background: rgba(51, 112, 255, 0.1);
+  text-decoration: underline;
+}
+.rte-root .ProseMirror a.rte-link--opening,
+.rte-root .tiptap a.rte-link--opening {
+  animation: rte-link-open-pulse 0.7s ease;
+}
+@keyframes rte-link-open-pulse {
+  0% {
+    background: rgba(51, 112, 255, 0.34);
+  }
+  100% {
+    background: rgba(51, 112, 255, 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rte-root .ProseMirror a.rte-link--opening,
+  .rte-root .tiptap a.rte-link--opening {
+    animation: none;
+  }
+}
+
 .rte-root.is-dark-editor {
   background: #171a1f;
   border-color: #3a3f47;

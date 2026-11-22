@@ -13,6 +13,7 @@ import Superscript from '@tiptap/extension-superscript'
 import TextAlign from '@tiptap/extension-text-align'
 import Link from '@tiptap/extension-link'
 import { isAttachmentAnchor } from '../../../utils/rteAttachment'
+import { handleLinkDoubleClick, linkHrefAtSelection } from './linkDblClick'
 import { Table } from '@tiptap/extension-table'
 import { RteTableView } from '../../../extensions/rteTableView'
 import { TocBlock } from '../../../extensions/tocBlock'
@@ -678,6 +679,23 @@ const editor = useEditor({
       return true
     },
     handleDOMEvents: {
+      /*
+       * 编辑态双击链接 = 打开链接。
+       *
+       * 为什么放在 DOM 事件而不是 handleClick：
+       * 单击要留给"选中文字 / 唤出链接气泡"，只有第二次点击才是"我要打开"。
+       * 打开动作统一走 deps.onEditorLinkClick（宿主侧 requestOpenHref），
+       * 复用既有的外链确认、危险协议拦截与审计记录，
+       * 不在这里另起一套 window.open，避免绕开安全策略。
+       */
+      dblclick: (_view, event) => {
+        // 预览态单击已经会打开，双击会重复打开，这里不插手。
+        if (viewMode.value !== 'edit') return false
+        return handleLinkDoubleClick(event as MouseEvent, {
+          onOpen: (href) => deps.onEditorLinkClick?.(href),
+          onAttachmentOpen: (href, name) => deps.onAttachmentOpen?.(href, name),
+        })
+      },
       contextmenu: (_view, event) => {
         const target = event.target as HTMLElement | null
         if (!target?.closest?.('td, th, table, .tableWrapper')) return false
@@ -695,6 +713,26 @@ const editor = useEditor({
       },
     },
     handleKeyDown(view, event) {
+      /*
+       * ⌘/Ctrl + Enter：打开光标所在的链接。
+       * 这是双击打开的键盘等价操作 —— 同一个动作两种输入方式，
+       * 不用鼠标也能打开，同时不占用普通 Enter 的换行语义。
+       */
+      if (
+        event.key === 'Enter' &&
+        (event.metaKey || event.ctrlKey) &&
+        !event.shiftKey &&
+        !event.altKey &&
+        viewMode.value === 'edit'
+      ) {
+        const ed = editor.value
+        if (!ed) return false
+        const href = linkHrefAtSelection(ed)
+        if (!href) return false
+        event.preventDefault()
+        deps.onEditorLinkClick?.(href)
+        return true
+      }
       if (
         event.key === 'End' &&
         !event.shiftKey &&
