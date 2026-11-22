@@ -2,6 +2,7 @@ import { ref, type ShallowRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { Editor } from '@tiptap/core'
 import { escapeHtml } from '../../../utils/itemsHtml'
+import { isSafeMarkdownHref } from '../../../utils/rteMarkdownLinks'
 import JSZip from 'jszip'
 
 /** 导入 md/docx/链接。markdownToHtml 仍供粘贴路径使用。 */
@@ -65,8 +66,11 @@ function markdownToHtml(md: string): string {
       .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
       .replace(/\*([^*]+)\*/g, '<em>$1</em>')
       .replace(
-        /\[([^\]]+)\]\((https?:[^)\s]+)\)/g,
-        '<a href="$2" class="rte-link">$1</a>',
+        /\[([^\]]+)\]\(([^)\s]+)\)/g,
+        (all, label: string, url: string) =>
+          isSafeMarkdownHref(url)
+            ? `<a href="${url.replace(/"/g, '&quot;')}" class="rte-link">${label}</a>`
+            : all,
       )
 
   for (const raw of lines) {

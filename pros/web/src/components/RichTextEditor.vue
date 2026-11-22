@@ -67,6 +67,7 @@ import {
 } from '../utils/rteWritingPaper'
 import { PAGE_MARGIN_PRESETS } from '../utils/rtePageMargin'
 import { focusDialogRoot, rememberDialogReturnFocus, restoreDialogReturnFocus } from '../utils/rteRound8'
+import { normalizeLinkHref } from '../utils/rteLinkHref'
 import {
   embedIframeSrc,
 } from '../utils/rteRound6'
@@ -1809,7 +1810,7 @@ const SHORTCUT_GROUPS: { title: string; items: { keys: string; desc: string }[] 
       { keys: 'Ctrl/⌘ + Shift + E', desc: '代码块' },
       { keys: '/', desc: '斜杠命令，快速插入段落类型' },
       { keys: 'Tab / Shift + Tab', desc: '段落、引用与列表缩进；表格内切换单元格' },
-      { keys: 'Ctrl/⌘ + Enter', desc: '折叠块展开或收起' },
+      { keys: 'Ctrl/⌘ + Enter', desc: '打开光标处的链接；折叠块内展开或收起' },
       { keys: 'Ctrl/⌘ + Alt + \\', desc: '只读预览与编辑切换' },
       { keys: 'Ctrl/⌘ + /', desc: '打开快捷键说明' },
       ...FEISHU_BATCH3_SHORTCUTS,
@@ -5094,7 +5095,7 @@ function unlinkSelection() {
 function openCurrentLink() {
   const ed = editor.value
   const href =
-    (linkDialogOpen.value ? linkHref.value.trim() : '') ||
+    (linkDialogOpen.value ? normalizeLinkHref(linkHref.value) : '') ||
     (ed?.getAttributes('link').href as string | undefined) ||
     ''
   if (!href) {
@@ -5107,7 +5108,8 @@ function openCurrentLink() {
 function confirmInsertLink() {
   const ed = editor.value
   if (!ed) return
-  const href = linkHref.value.trim()
+  // 规范化：去掉末尾粘连的标点、裸域名补 https://
+  const href = normalizeLinkHref(linkHref.value)
   const text = linkText.value.trim()
   if (!href) {
     ElMessage.warning('请输入链接地址')

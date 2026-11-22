@@ -16,6 +16,7 @@
  */
 import { Extension, InputRule, markInputRule } from '@tiptap/core'
 import { ref } from 'vue'
+import { isSafeMarkdownHref } from '../utils/rteMarkdownLinks'
 
 const STORAGE_KEY = 'rte-markdown-inline'
 
@@ -47,11 +48,7 @@ export function setMarkdownInlineEnabled(enabled: boolean) {
 
 /** 允许的地址形态：绝对 http(s)、邮件/电话、站内相对路径、锚点。 */
 export function isSafeMarkdownLink(url: string): boolean {
-  const value = url.trim()
-  if (!value) return false
-  if (/^(https?:|mailto:|tel:)/i.test(value)) return true
-  if (value.startsWith('/') || value.startsWith('#')) return true
-  return false
+  return isSafeMarkdownHref(url)
 }
 
 /**

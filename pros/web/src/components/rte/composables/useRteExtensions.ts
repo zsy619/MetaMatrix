@@ -54,6 +54,8 @@ import {
   sanitizePastedHtml,
   unwrapSinglePastedList,
 } from '../../../utils/rtePasteClean'
+import { hasMarkdownLinkSyntax, markdownLinksToHtml } from '../../../utils/rteMarkdownLinks'
+import { normalizeLinkHref } from '../../../utils/rteLinkHref'
 import { clearEditorFormat } from '../../../utils/rteClearFormat'
 import { pasteVolume, previewShortcutAllowed } from '../../../utils/rteRound8'
 import { filesFromImageDataUrls, pasteCarriesText } from '../../../utils/rtePasteImage'
@@ -100,6 +102,7 @@ import { SyncBlock } from '../../../extensions/syncBlock'
 import { RteMarkdownInputRules } from '../../../extensions/rteMarkdownInputRules'
 import { MediaHydrate } from '../../../extensions/mediaHydrate'
 import { RteInlineMarkdown } from '../../../extensions/rteInlineMarkdown'
+import { RteAutoLink } from '../../../extensions/rteAutoLink'
 
 type LateFn = (...args: any[]) => any
 
@@ -297,6 +300,7 @@ const editor = useEditor({
     // Markdown 输入规则（# / - / 1. / [ ] / > / ``` / ---），优先于各扩展内置规则
     RteMarkdownInputRules,
     RteInlineMarkdown,
+    RteAutoLink,
     MediaHydrate,
     TextStyle,
     FontSize,
@@ -342,6 +346,9 @@ const editor = useEditor({
     }),
     Link.configure({
       openOnClick: false,
+      // 自动链接交给 RteAutoLink：内置 linkify 会把中文标点吞进 href，
+      // 且撤销一次会删掉整条网址，这里换成本项目自带的实现。
+      autolink: false,
       // data/blob：本地附件 DataURL / ObjectURL 可作为链接芯片插入
       protocols: ['http', 'https', 'data', 'blob'],
       HTMLAttributes: { class: 'rte-link' },
@@ -523,7 +530,7 @@ const editor = useEditor({
         event.preventDefault()
         const ed = editor.value
         if (!ed) return true
-        const href = plain.trim()
+        const href = normalizeLinkHref(plain)
         if (!ed.state.selection.empty) {
           ed.chain().focus().setLink({ href }).run()
         } else {
@@ -567,6 +574,21 @@ const editor = useEditor({
         const normalized = plain.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
         const mdHtml = markdownToHtml(normalized)
         ed.chain().focus().insertContent(mdHtml).run()
+        return true
+      }
+      /*
+       * 窄口径 Markdown 链接粘贴。
+       *
+       * 只含 "[文字](地址)" 的纯文本不满足 looksLikeMarkdown（要 2 处特征），
+       * 会落到 ProseMirror 默认粘贴；而 Link 扩展自带的粘贴规则会把地址单独
+       * 识别成链接，语法被拆成 "[文字](<a>地址</a>)"。这里先把它转成锚点，结构不丢。
+       */
+      if (plain && !html.trim() && hasMarkdownLinkSyntax(plain)) {
+        event.preventDefault()
+        const ed = editor.value
+        if (!ed) return true
+        const normalized = plain.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+        ed.chain().focus().insertContent(markdownLinksToHtml(normalized)).run()
         return true
       }
       return false
