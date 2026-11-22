@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, defineAsyncComponent, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import GuideThumb from '../guide/GuideThumb.vue'
+// 模板缩略图渲染器（~130KB 源码 + 画布模板）按需加载。
+const GuideThumb = defineAsyncComponent(() => import('../guide/GuideThumb.vue'))
 import {
   listDocuments,
   searchDocuments,

@@ -57,6 +57,7 @@ import {
 import { todayIso } from '../utils/rteRound5'
 import { RTE_PAGE_SIZES } from '../utils/rtePageSize'
 import { applyAutoRuby } from '../utils/rteRuby'
+import { loadPinyin } from '../utils/pinyinRuntime'
 import { tianziCharKey } from '../extensions/rteTianziGrid'
 import {
   WRITING_PAPERS,
@@ -2654,13 +2655,15 @@ async function insertRubyAnnotation() {
   ElMessage.success('已添加注音')
 }
 
-function insertAutoRuby() {
+async function insertAutoRuby() {
   const ed = editor.value
   if (!ed) return
   if (ed.state.selection.empty) {
     ElMessage.info('请先选中要注音的文字')
     return
   }
+  // 拼音库按需加载：第一次点「自动注音」时先把它拉进来。
+  await loadPinyin()
   const marked = applyAutoRuby(ed)
   if (!marked) {
     ElMessage.info('选区里没有可以自动注音的汉字')
@@ -6028,6 +6031,8 @@ const {
 })
 
 onMounted(() => {
+  // 后台预热拼音库（拼音检索 / 注音要用），不阻塞首屏。
+  void loadPinyin()
   nextTick(() => {
     syncSpellcheckToDom()
     editor.value?.commands.captureRevisionBaseline()
