@@ -16,6 +16,7 @@ import { publishTemplate } from '../api/knowledge_v6'
 import type { FieldDef } from '../api/knowledge_v5'
 import { friendlyApiMessage } from '../utils/apiMessage'
 import { useAuthStore } from '../stores/auth'
+import AppLoading from '../components/common/AppLoading.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -223,7 +224,7 @@ onMounted(load)
       </div>
     </header>
 
-    <p v-if="loading" class="tpl-center__empty">加载中…</p>
+    <div v-if="loading" class="tpl-center__empty"><AppLoading /></div>
     <p v-else-if="!groups.length" class="tpl-center__empty">没有匹配的模板。</p>
 
     <section v-for="group in groups" :key="group.name" class="tpl-center__group">

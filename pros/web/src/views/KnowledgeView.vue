@@ -29,6 +29,7 @@ const activeDocumentId = computed(() =>
 )
 const treeRef = ref<InstanceType<typeof KnowledgeTree>>()
 const docViewRef = ref<InstanceType<typeof DocView>>()
+const canvasPanelRef = ref<InstanceType<typeof CanvasPanel>>()
 // 空间概览是知识库的首页：没有打开文档时显示看板。
 const showHome = ref(true)
 // 主区视图：概览 / 文档 / 图谱。
@@ -145,6 +146,13 @@ function createInFolder(folder: KnowledgeNode) {
 
 /** 目录树刷新后，同步右侧打开着的文件夹子列表。 */
 function onTreeUpdated() {
+  // 树重载后节点对象会换新：把右侧打开着的面板重新绑到新对象，标题 / 图标才不是旧的。
+  if (canvasNode.value) {
+    canvasNode.value = treeRef.value?.nodeById(canvasNode.value.id) ?? canvasNode.value
+  }
+  if (structuredNode.value) {
+    structuredNode.value = treeRef.value?.nodeById(structuredNode.value.id) ?? structuredNode.value
+  }
   const view = folderView.value
   if (!view) return
   folderView.value = {
@@ -164,14 +172,77 @@ function openCanvasFull(node: KnowledgeNode) {
   })
 }
 
+/** 画布标题保存：回写目录树（树里防抖落库，刷新后标题不回退）。 */
+function onCanvasSaved(node: KnowledgeNode, title: string) {
+  const clean = title.trim()
+  if (!clean) return
+  treeRef.value?.setDocTitle(node.documentId ?? '', clean)
+}
+
 /** 画布标题图标：写回目录树节点，树的行图标与画布标题保持一致。 */
 async function setCanvasIcon(node: KnowledgeNode, icon: string) {
   try {
     await knowledgeApi.updateKnowledgeNode(projectId.value, node.id, { icon })
     node.icon = icon
-    if (node.documentId) await documentsApi.setDocumentIcon(node.documentId, icon)
+    if (node.documentId) {
+      await documentsApi.setDocumentIcon(node.documentId, icon)
+      // 改图标会推进文档的 save_version：同步刷新面板手里的版本号，下一次保存才不会误判冲突。
+      if (canvasNode.value?.id === node.id) await canvasPanelRef.value?.refreshSaveVersion()
+    }
   } catch {
     ElMessage.error('修改图标失败')
+  }
+}
+
+/** 树里改了标题 / 图标：同步右侧打开着的面板。 */
+function onTreeNodeMeta(nodeId: string, meta: { title?: string; icon?: string }) {
+  const apply = (node: KnowledgeNode | null) => {
+    if (!node || node.id !== nodeId) return
+    if (meta.title !== undefined) node.title = meta.title
+    if (meta.icon !== undefined) node.icon = meta.icon
+  }
+  apply(canvasNode.value)
+  apply(structuredNode.value)
+  if (meta.title !== undefined) void syncDocTitle(nodeId, meta.title)
+  if (meta.icon !== undefined) void syncDocIcon(nodeId, meta.icon)
+}
+
+/**
+ * 文档侧标题：面板开着就让面板自己存（它手里有当前 save_version，直接写会撞乐观锁），
+ * 面板没开才直接改文档。
+ */
+async function syncDocTitle(nodeId: string, title: string) {
+  const node = treeRef.value?.nodeById(nodeId)
+  const documentId = node?.documentId
+  if (!documentId) return
+  if (canvasNode.value?.id === nodeId) {
+    canvasPanelRef.value?.applyTitle(title)
+    return
+  }
+  try {
+    await documentsApi.renameDocument(documentId, title)
+    // 文档面板开着：把输入框对齐，并刷新它手里的 save_version，避免下次保存误判冲突。
+    if (activeDocumentId.value === documentId) {
+      docViewRef.value?.setTitle(title)
+      await docViewRef.value?.refreshSaveVersion()
+    }
+  } catch {
+    ElMessage.warning('节点已改名，文档标题同步失败')
+  }
+}
+
+/** 文档侧图标：面板开着只更新面板显示（节点图标就是面板的图标来源），面板没开才写文档。 */
+async function syncDocIcon(nodeId: string, icon: string) {
+  const node = treeRef.value?.nodeById(nodeId)
+  const documentId = node?.documentId
+  if (!documentId) return
+  const panelOpen =
+    canvasNode.value?.id === nodeId || activeDocumentId.value === documentId
+  if (panelOpen) return
+  try {
+    await documentsApi.setDocumentIcon(documentId, icon)
+  } catch {
+    ElMessage.warning('节点图标已更新，文档图标同步失败')
   }
 }
 
@@ -211,6 +282,7 @@ loadProject()
           @open-folder="openFolder"
           @tree-updated="onTreeUpdated"
           @renamed="onTreeRenamed"
+          @node-meta="onTreeNodeMeta"
           @home="openHome"
           @graph="openGraph"
         />
@@ -244,11 +316,12 @@ loadProject()
           />
           <CanvasPanel
             v-else-if="canvasNode"
+            ref="canvasPanelRef"
             :key="canvasNode.id"
             :document-id="canvasNode.documentId ?? ''"
             :template-id="(canvasNode.documentTemplateId || canvasNode.documentCanvasType || '').replace(/_/g, '-')"
             :icon="canvasNode.icon"
-            @saved="(title) => treeRef?.setDocTitle(canvasNode!.documentId ?? '', title)"
+            @saved="(title) => onCanvasSaved(canvasNode!, title)"
             @icon-change="(icon) => setCanvasIcon(canvasNode!, icon)"
             @open-full="openCanvasFull(canvasNode!)"
           />

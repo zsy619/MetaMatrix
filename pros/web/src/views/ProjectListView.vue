@@ -7,6 +7,7 @@ import * as projectsApi from '../api/projects'
 import type { ProjectSummary } from '../types/project'
 import { friendlyApiMessage } from '../utils/apiMessage'
 import ProjectCreateDialog from '../components/project/ProjectCreateDialog.vue'
+import AppLoading from '../components/common/AppLoading.vue'
 
 const router = useRouter()
 const projects = ref<ProjectSummary[]>([])
@@ -99,7 +100,7 @@ onMounted(load)
 
     <p v-if="error" class="pg-error">{{ error }}</p>
 
-    <div v-if="loading" class="pg-empty">加载中…</div>
+    <div v-if="loading" class="pg-empty"><AppLoading /></div>
     <div v-else-if="!projects.length" class="pg-empty">还没有项目。点右上角「新建项目」开始。</div>
 
     <div v-else class="pg-grid">

@@ -22,6 +22,7 @@ import {
   diffRevisions,
 } from '../api/documents'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Camera, Check, Clock, Document, Loading, MagicStick, MoreFilled, Plus, Setting, Switch } from '@element-plus/icons-vue'
 import { friendlyApiMessage } from '../utils/apiMessage'
 import { focusSearchMatch } from '../utils/highlight'
 import { trapTab } from '../utils/focusTrap'
@@ -78,6 +79,23 @@ const syncLabel = computed(() => {
   if (dirty.value) return '未同步'
   return document_id.value ? '已同步' : '未建档'
 })
+
+const syncStateClass = computed(() => {
+  if (saving.value) return 'is-saving'
+  if (localPersistError.value || saveFailed.value) return 'is-error'
+  if (dirty.value || offline.value) return 'is-dirty'
+  return 'is-saved'
+})
+
+const userInitial = computed(() => {
+  const name = auth.user?.displayName || auth.user?.email || ''
+  return name ? name.slice(0, 1).toUpperCase() : '?'
+})
+
+function onMoreCommand(command: string) {
+  if (command === 'ai') copyAIContext(false)
+  else if (command === 'diff') diffPrevRevision()
+}
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -603,15 +621,37 @@ async function manualCheckpoint() {
         <span class="badge">{{ badge }}</span>
       </div>
       <div class="actions">
-        <span class="meta">{{ syncLabel }}</span>
+        <span class="mm-bar__status" :class="syncStateClass">
+          <i class="mm-bar__status-dot" />
+          <span>{{ syncLabel }}</span>
+        </span>
         <template v-if="auth.isAuthenticated">
-          <router-link class="user" :to="{ name: 'account' }">{{ auth.user?.displayName || auth.user?.email }}</router-link>
-          <el-button size="small" @click="openDocsPanel">我的文档</el-button>
-          <el-button size="small" @click="newDocument">新建</el-button>
-          <el-button size="small" @click="manualCheckpoint">存版</el-button>
-          <el-button size="small" @click="historyOpen = true">版本</el-button>
-          <el-button size="small" @click="copyAIContext(false)">AI 上下文</el-button>
-          <el-button size="small" @click="diffPrevRevision">与上一版对比</el-button>
+          <router-link class="user" :to="{ name: 'account' }" title="账号与设置">
+            <span class="user__avatar">{{ userInitial }}</span>
+            <span class="user__name">{{ auth.user?.displayName || auth.user?.email }}</span>
+          </router-link>
+          <div class="mm-bar__group">
+            <el-tooltip content="我的文档" placement="bottom" :show-after="400">
+              <button type="button" class="mm-bar__btn" aria-label="我的文档" @click="openDocsPanel">
+                <el-icon><Document /></el-icon>
+              </button>
+            </el-tooltip>
+            <el-tooltip content="新建画布" placement="bottom" :show-after="400">
+              <button type="button" class="mm-bar__btn" aria-label="新建画布" @click="newDocument">
+                <el-icon><Plus /></el-icon>
+              </button>
+            </el-tooltip>
+            <el-tooltip content="存版（手动快照）" placement="bottom" :show-after="400">
+              <button type="button" class="mm-bar__btn" aria-label="存版" @click="manualCheckpoint">
+                <el-icon><Camera /></el-icon>
+              </button>
+            </el-tooltip>
+            <el-tooltip content="版本历史" placement="bottom" :show-after="400">
+              <button type="button" class="mm-bar__btn" aria-label="版本历史" @click="historyOpen = true">
+                <el-icon><Clock /></el-icon>
+              </button>
+            </el-tooltip>
+          </div>
         </template>
         <el-button
           v-else
@@ -620,16 +660,42 @@ async function manualCheckpoint() {
         >
           登录同步
         </el-button>
-        <el-button size="small" type="primary" :loading="saving" @click="doSave(false)">
-          保存
-        </el-button>
-        <el-button
-          size="small"
-          :aria-pressed="ui.configPanelOpen"
-          @click="ui.toggleConfigPanel"
-        >
-          {{ ui.configPanelOpen ? '收起设置' : '页面设置' }}
-        </el-button>
+        <el-tooltip :content="ui.configPanelOpen ? '收起设置' : '页面设置'" placement="bottom" :show-after="400">
+          <button
+            type="button"
+            class="mm-bar__btn mm-bar__btn--square home__settings"
+            :class="{ 'is-active': ui.configPanelOpen }"
+            :aria-pressed="ui.configPanelOpen"
+            aria-label="页面设置"
+            @click="ui.toggleConfigPanel"
+          >
+            <el-icon><Setting /></el-icon>
+          </button>
+        </el-tooltip>
+        <button type="button" class="mm-bar__primary home__save" :disabled="saving" @click="doSave(false)">
+          <el-icon class="home__save-icon" :class="{ 'is-spin': saving }">
+            <Loading v-if="saving" />
+            <Check v-else />
+          </el-icon>
+          <span>{{ saving ? '保存中…' : '保存' }}</span>
+        </button>
+        <el-dropdown v-if="auth.isAuthenticated" trigger="click" @command="onMoreCommand">
+          <button type="button" class="mm-bar__btn mm-bar__btn--square" aria-label="更多操作">
+            <el-icon><MoreFilled /></el-icon>
+          </button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="ai">
+                <el-icon><MagicStick /></el-icon>
+                <span>AI 上下文</span>
+              </el-dropdown-item>
+              <el-dropdown-item command="diff">
+                <el-icon><Switch /></el-icon>
+                <span>与上一版对比</span>
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
       </div>
     </header>
     <p v-if="openError" class="save-retry" role="alert">
@@ -838,7 +904,7 @@ async function manualCheckpoint() {
 .actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
 }
 
@@ -897,19 +963,64 @@ async function manualCheckpoint() {
   background: #fff;
 }
 
-.meta {
+.user {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 8px 0 3px;
+  border-radius: 999px;
+  color: var(--ent-text-2, #5a6472);
+  text-decoration: none;
   font-size: 12px;
-  color: #5f6368;
-  max-width: 280px;
+  transition: background-color 0.16s ease, box-shadow 0.16s ease;
+}
+.user:hover {
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: var(--glass-shadow-sm, 0 6px 18px rgba(15, 23, 42, 0.1));
+}
+.user__avatar {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #2f8cff, #1264e8);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+.user__name {
+  max-width: 120px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.user {
-  font-size: 12px;
-  color: #1a73e8;
-  text-decoration: none;
+/* 设置开关：打开态用主色描边+浅底提示当前面板已展开 */
+.home__settings.is-active {
+  background: rgba(47, 140, 255, 0.14);
+  color: var(--mm-blue, #1677ff);
+}
+
+.home__save {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.home__save:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: 0 6px 16px rgba(22, 119, 255, 0.18);
+}
+.home__save-icon.is-spin {
+  animation: home-spin 0.9s linear infinite;
+}
+@keyframes home-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .save-retry {

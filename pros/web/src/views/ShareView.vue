@@ -13,6 +13,7 @@ import type { SharedDoc } from '../api/knowledge'
 import SharedCanvasView from '../components/knowledge/SharedCanvasView.vue'
 import MindmapPreview from '../components/knowledge/MindmapPreview.vue'
 import SheetPreview from '../components/knowledge/SheetPreview.vue'
+import AppLoading from '../components/common/AppLoading.vue'
 
 const route = useRoute()
 const doc = ref<SharedDoc | null>(null)
@@ -133,7 +134,7 @@ onMounted(() => {
 
 <template>
   <div class="share-view">
-    <div v-if="loading" class="share-view__state">加载中…</div>
+    <div v-if="loading" class="share-view__state"><AppLoading /></div>
 
     <div v-else-if="needsPassword && !hasContent" class="share-view__state">
       <p>该分享需要访问口令。</p>

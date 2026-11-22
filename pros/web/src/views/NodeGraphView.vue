@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
+  Back,
   ChatDotRound,
   Clock,
   Collection,
@@ -22,6 +23,7 @@ import NodeGraphNodeProps from '../components/canvas/nodeGraph/NodeGraphNodeProp
 import NodeGraphNodeEditor from '../components/canvas/nodeGraph/NodeGraphNodeEditor.vue'
 import NodeGraphCanvasEditor from '../components/canvas/nodeGraph/NodeGraphCanvasEditor.vue'
 import { friendlyApiMessage } from '../utils/apiMessage'
+import AppLoading from '../components/common/AppLoading.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -306,48 +308,79 @@ watch([projectId, canvasId], load)
           ← 返回上一级
         </el-button>
       </nav>
-      <div class="ng-status">
-        <span v-if="store.saveError" class="ng-status__error">{{ store.saveError }}</span>
-        <span v-else-if="store.saving" class="ng-status__text">保存中…</span>
-        <span v-else-if="store.dirty" class="ng-status__text">未保存</span>
-        <span v-else class="ng-status__text" :class="{ 'ng-status__text--ok': !store.retryCount }">{{ savedLabel }}</span>
-        <template v-if="!readonly">
-        <el-button size="small" :loading="versionBusy" @click="saveCheckpoint">
-          <el-icon><Collection /></el-icon>
+      <div class="ng-actions">
+        <span
+          class="mm-bar__status"
+          :class="{
+            'is-error': !!store.saveError,
+            'is-saving': !store.saveError && store.saving,
+            'is-dirty': !store.saveError && !store.saving && store.dirty,
+            'is-saved': !store.saveError && !store.saving && !store.dirty,
+          }"
+        >
+          <i class="mm-bar__status-dot" />
+          <span v-if="store.saveError">{{ store.saveError }}</span>
+          <span v-else-if="store.saving">保存中…</span>
+          <span v-else-if="store.dirty">未保存</span>
+          <span v-else>{{ savedLabel }}</span>
+        </span>
+        <el-button
+          v-if="!readonly"
+          class="mm-bar__primary"
+          size="small"
+          type="primary"
+          :icon="Collection"
+          :loading="versionBusy"
+          @click="saveCheckpoint"
+        >
           存版
         </el-button>
-        <el-button size="small" @click="openHistory">
-          <el-icon><Clock /></el-icon>
-          历史
-        </el-button>
-        <el-button size="small" @click="undoOpen = true">
-          <el-icon><RefreshLeft /></el-icon>
-          步骤
-        </el-button>
-        <el-button size="small" @click="openTemplates">
-          <el-icon><Files /></el-icon>
-          模板
-        </el-button>
-        <el-button size="small" @click="recycleOpen = true">
-          <el-icon><Delete /></el-icon>
-          回收站
-        </el-button>
-        <el-button size="small" @click="openComments(store.activeNodeId || store.nodes[0]?.id || '')">
-          <el-icon><ChatDotRound /></el-icon>
-          评论
-        </el-button>
-        </template>
-        <el-button size="small" @click="shareReadonly">
-          <el-icon><Share /></el-icon>
-          分享
-        </el-button>
-        <el-button size="small" @click="goProject">返回项目</el-button>
+        <div class="mm-bar__group">
+          <template v-if="!readonly">
+            <el-button class="mm-bar__btn" text size="small" :icon="Clock" title="版本历史" @click="openHistory">
+              历史
+            </el-button>
+            <el-button
+              class="mm-bar__btn"
+              text
+              size="small"
+              :icon="RefreshLeft"
+              title="回到本次编辑的某一步"
+              @click="undoOpen = true"
+            >
+              步骤
+            </el-button>
+            <i class="mm-bar__divider" />
+            <el-button class="mm-bar__btn" text size="small" :icon="Files" title="画布模板" @click="openTemplates">
+              模板
+            </el-button>
+            <el-button class="mm-bar__btn" text size="small" :icon="Delete" title="回收站" @click="recycleOpen = true">
+              回收站
+            </el-button>
+            <i class="mm-bar__divider" />
+            <el-button
+              class="mm-bar__btn"
+              text
+              size="small"
+              :icon="ChatDotRound"
+              title="节点评论"
+              @click="openComments(store.activeNodeId || store.nodes[0]?.id || '')"
+            >
+              评论
+            </el-button>
+          </template>
+          <el-button class="mm-bar__btn" text size="small" :icon="Share" title="生成只读分享链接" @click="shareReadonly">
+            分享
+          </el-button>
+          <i class="mm-bar__divider" />
+          <el-button class="mm-bar__btn" text size="small" :icon="Back" @click="goProject">返回项目</el-button>
+        </div>
       </div>
     </header>
 
     <div class="ng-stage">
       <p v-if="error" class="ng-error">{{ error }}</p>
-      <div v-else-if="loading" class="ng-loading">加载中…</div>
+      <div v-else-if="loading" class="ng-loading"><AppLoading /></div>
       <NodeGraphCanvas
         v-else
         :canvases="canvases"
@@ -541,17 +574,19 @@ watch([projectId, canvasId], load)
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background: var(--mm-bg);
+  background: transparent;
 }
 
 .ng-topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding: 8px 16px;
-  border-bottom: 1px solid var(--mm-line);
-  background: var(--mm-surface);
+  gap: 12px;
+  padding: 7px 14px;
+  border-bottom: 1px solid var(--glass-ring, rgba(15, 23, 42, 0.09));
+  background: rgba(255, 255, 255, 0.34);
+  backdrop-filter: blur(var(--glass-blur, 18px)) saturate(var(--glass-saturate, 165%));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 18px)) saturate(var(--glass-saturate, 165%));
   flex: none;
 }
 
@@ -562,6 +597,9 @@ watch([projectId, canvasId], load)
   font-size: 13px;
   color: var(--mm-muted);
   min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .ng-crumb a {
@@ -576,35 +614,40 @@ watch([projectId, canvasId], load)
 .ng-crumb__current {
   color: var(--mm-text);
   font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .ng-crumb__back {
   margin-left: 8px;
 }
 
-.ng-status {
+/* 右侧动作区：状态胶囊 + 主操作 + 玻璃动作组，样式全部走共享 .mm-bar__* */
+.ng-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   flex: none;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.ng-actions::-webkit-scrollbar {
+  display: none;
 }
 
-.ng-status__text {
-  font-size: 12px;
-  color: var(--mm-muted);
+/* 窄屏优先保住操作按钮：面包屑可省略，返回项目仍在工具栏里 */
+@media (max-width: 860px) {
+  .ng-crumb {
+    display: none;
+  }
+  .ng-topbar {
+    justify-content: flex-end;
+  }
 }
 
-.ng-status__text--ok {
-  color: #16a34a;
-}
-
-.ng-status__error {
-  font-size: 12px;
-  color: #b91c1c;
-}
-
-.ng-error,
-.ng-loading {
+.ng-error {
   margin: 24px;
   padding: 12px;
   border-radius: 8px;
@@ -614,8 +657,9 @@ watch([projectId, canvasId], load)
 }
 
 .ng-loading {
-  background: var(--mm-surface);
-  color: var(--mm-muted);
+  display: grid;
+  place-items: center;
+  padding: 24px;
 }
 
 .ng-stage {

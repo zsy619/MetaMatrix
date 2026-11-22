@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, defineAsyncComponent, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft, Delete, DocumentAdd, Edit } from '@element-plus/icons-vue'
@@ -10,7 +10,9 @@ import type { DocumentSummary } from '../api/documents'
 import type { Project } from '../types/project'
 import { friendlyApiMessage } from '../utils/apiMessage'
 import { NODE_GRAPH_TYPE, emptyNodeGraphDoc } from '../types/nodeGraph'
-import IconPicker from '../components/common/IconPicker.vue'
+// 图标库按需加载：点击画布图标 / 编辑项目时才下载。
+const IconPicker = defineAsyncComponent(() => import('../components/common/IconPicker.vue'))
+import AppLoading from '../components/common/AppLoading.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -216,7 +218,7 @@ onMounted(load)
     </header>
 
     <p v-if="error" class="pg-error">{{ error }}</p>
-    <div v-if="loading" class="pg-empty">加载中…</div>
+    <div v-if="loading" class="pg-empty"><AppLoading /></div>
     <div v-else-if="!canvases.length" class="pg-empty">这个项目还没有画布。点右上角「新建画布」。</div>
 
     <div v-else class="pg-list">
@@ -265,18 +267,35 @@ onMounted(load)
       </article>
     </div>
 
-    <el-dialog v-model="editOpen" title="编辑项目信息" width="420px" :close-on-click-modal="false">
-      <label class="pg-field">
-        <span class="pg-field__label">项目名称</span>
-        <el-input v-model="editName" placeholder="项目名称" maxlength="120" />
-      </label>
-      <div class="pg-field">
-        <span class="pg-field__label">项目表情</span>
-        <IconPicker v-model="editEmoji" />
-      </div>
-      <div class="pg-field">
-        <span class="pg-field__label">项目进度（{{ editProgress }}%）</span>
-        <el-slider v-model="editProgress" :min="0" :max="100" :step="5" />
+    <el-dialog
+      v-model="editOpen"
+      title="编辑项目信息"
+      width="min(880px, 94vw)"
+      class="pg-edit-dialog"
+      :close-on-click-modal="false"
+    >
+      <div class="pg-edit">
+        <section class="pg-edit__side">
+          <div class="pg-edit__preview">
+            <span class="pg-edit__emoji">{{ editEmoji || '📁' }}</span>
+            <div class="pg-edit__preview-text">
+              <strong>{{ editName || '未命名项目' }}</strong>
+              <span>进度 {{ editProgress }}%</span>
+            </div>
+          </div>
+          <label class="pg-field">
+            <span class="pg-field__label">项目名称</span>
+            <el-input v-model="editName" placeholder="项目名称" maxlength="120" />
+          </label>
+          <div class="pg-field">
+            <span class="pg-field__label">项目进度（{{ editProgress }}%）</span>
+            <el-slider v-model="editProgress" :min="0" :max="100" :step="5" />
+          </div>
+        </section>
+        <section class="pg-edit__main">
+          <span class="pg-field__label">项目表情</span>
+          <IconPicker v-model="editEmoji" :width="520" />
+        </section>
       </div>
       <template #footer>
         <el-button @click="editOpen = false">取消</el-button>
@@ -472,5 +491,81 @@ onMounted(load)
   font-size: 12px;
   font-weight: 600;
   color: #5f6368;
+}
+
+/* 编辑项目信息弹窗：左信息右选图，两栏布局 */
+.pg-edit {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 22px;
+  align-items: start;
+}
+
+.pg-edit__side {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pg-edit__preview {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+  border: 1px solid var(--glass-ring, rgba(15, 23, 42, 0.09));
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.5);
+  box-shadow: var(--glass-shadow-sm, 0 2px 8px rgba(15, 23, 42, 0.06));
+}
+
+.pg-edit__emoji {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  font-size: 24px;
+  line-height: 1;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--glass-ring, rgba(15, 23, 42, 0.09));
+}
+
+.pg-edit__preview-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pg-edit__preview-text strong {
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--cv-ink, #3c4043);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pg-edit__preview-text span {
+  font-size: 12px;
+  color: var(--mm-muted, #5f6368);
+}
+
+.pg-edit__main {
+  min-width: 0;
+}
+
+@media (max-width: 760px) {
+  .pg-edit {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+  }
+
+  /* IconPicker 宽度是内联样式，窄屏必须强制覆盖，否则撑破弹窗 */
+  .pg-edit__main :deep(.icon-picker) {
+    width: 100% !important;
+  }
 }
 </style>
