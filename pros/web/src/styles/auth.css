@@ -278,6 +278,11 @@
   border: none;
   border-radius: 999px;
   padding: 12px 16px;
+  /* 标签 + 进度条纵向排布：进度条常驻占位，按钮高度提交前后一致。 */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
   background: var(--mm-blue);
   color: #fff;
   font-size: 14px;
@@ -295,6 +300,27 @@
 .auth-submit:disabled {
   opacity: 0.6;
   cursor: default;
+}
+/* 提交中：保持满不透明度，否则白色进度条会被一起压暗，看不清进度。 */
+.auth-submit.is-busy:disabled {
+  opacity: 1;
+}
+
+/* 按钮文案。 */
+.auth-submit__label {
+  line-height: 1.2;
+}
+
+/*
+ * 按钮内进度条：空闲时透明隐藏（但保留占位，避免按钮高度跳动），
+ * 提交时淡入，用白色渐变在品牌蓝底上保持对比度。
+ */
+.auth-submit__progress {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.auth-submit.is-busy .auth-submit__progress {
+  opacity: 1;
 }
 
 .auth-footer {

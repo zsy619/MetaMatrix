@@ -98,12 +98,19 @@ body::before {
 body .overlay,
 body .rev-overlay,
 body .ap-overlay,
-body .bfp-modal-overlay,
-body .auth-overlay {
+body .bfp-modal-overlay {
   background: var(--mm-dlg-backdrop);
   backdrop-filter: blur(10px) saturate(120%);
   -webkit-backdrop-filter: blur(10px) saturate(120%);
 }
+
+/*
+ * 登录 / 注册的提交遮罩（.auth-overlay）刻意不走玻璃模糊：
+ * 它的职责只是"吃掉指针事件 + 显示进度"，而登录卡片按钮里有一条
+ * 正在推进的品牌进度条，10px 模糊会把卡片连同进度条一起糊掉，
+ * 用户就看不到自己点下去的反馈。该遮罩的样式由
+ * components/ui/AuthSubmitOverlay.vue 自行管理。
+ */
 
 .el-dialog {
   /* 弹窗要压住背后内容，用强玻璃而不是弱玻璃，否则正文透出背景文字看不清 */

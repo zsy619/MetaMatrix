@@ -8,6 +8,8 @@ import { isCaptchaBlank } from '../utils/captcha'
 import CaptchaField from '../components/ui/CaptchaField.vue'
 import AuthField from '../components/ui/AuthField.vue'
 import AuthSubmitOverlay from '../components/ui/AuthSubmitOverlay.vue'
+import BrandProgressBar from '../components/ui/BrandProgressBar.vue'
+import { useSubmitProgress } from '../composables/useSubmitProgress'
 import { ICON_EYE, ICON_EYE_OFF, ICON_LOCK, ICON_MAIL, ICON_USER, authIcon } from '../components/ui/authIcons'
 
 const auth = useAuthStore()
@@ -21,6 +23,17 @@ const captchaCode = ref('')
 const busy = ref(false)
 const message = ref('')
 const captchaRef = ref<InstanceType<typeof CaptchaField> | null>(null)
+
+/**
+ * 提交期间锁定输入区（v-bind 传对象的原因见 LoginView.vue 同名常量）。
+ */
+const fieldsAttrs = computed<Record<string, unknown>>(() => (busy.value ? { inert: '' } : {}))
+
+/** 注册流程的阶段文案，与进度条同步。 */
+const STAGES = ['正在校验图形验证码', '正在创建账号与密钥', '正在准备工作台']
+
+/** 提交进度（百分比 + 阶段）。 */
+const progress = useSubmitProgress()
 
 /** 密码是否以明文显示。默认隐藏，防止旁观者一眼看到密码。 */
 const showPassword = ref(false)
@@ -81,13 +94,16 @@ async function submit() {
     return
   }
   busy.value = true
+  progress.start(STAGES.length)
   try {
     await auth.register(mail, password.value, displayName.value.trim() || undefined, {
       captchaId: captchaRef.value?.getCaptchaId() ?? '',
       captchaCode: captchaRef.value?.getCaptchaCode() ?? '',
     })
+    progress.complete()
     router.replace(safeRedirect(route.query.redirect, '/'))
   } catch (e: unknown) {
+    progress.stop()
     message.value = friendlyApiMessage(e, '注册失败')
     // 验证码是一次性的：服务端在校验通过后就把这张图作废，不管账号能不能注册。
     // 只要这次提交失败就换一张，避免用户拿着作废的图重试。
@@ -115,7 +131,8 @@ async function submit() {
         <p class="auth-hint">创建账号后，画布按登录用户隔离保存。密码至少 6 位，且不超过 72 个字节。</p>
       </div>
 
-      <div class="auth-fields">
+      <!-- 提交期间锁定输入，避免用户在等待时改动表单。 -->
+      <div class="auth-fields" v-bind="fieldsAttrs">
         <AuthField
           id="reg-name"
           v-model="displayName"
@@ -183,8 +200,22 @@ async function submit() {
         <span>{{ message }}</span>
       </p>
 
-      <button type="submit" class="auth-submit" :disabled="busy">
-        {{ busy ? '注册中…' : '注册' }}
+      <button
+        type="submit"
+        class="auth-submit"
+        :class="{ 'is-busy': busy }"
+        :disabled="busy"
+        :aria-busy="busy"
+      >
+        <span class="auth-submit__label">{{ busy ? '注册中…' : '注册' }}</span>
+        <BrandProgressBar
+          class="auth-submit__progress"
+          :percent="progress.percent.value"
+          :active="busy"
+          variant="light"
+          size="sm"
+          label="注册进度"
+        />
       </button>
 
       <p class="auth-footer">
@@ -200,7 +231,8 @@ async function submit() {
     <AuthSubmitOverlay
       :visible="busy"
       title="正在创建账号"
-      :stages="['正在校验图形验证码', '正在创建账号与密钥', '正在准备工作台']"
+      :stages="STAGES"
+      :percent="progress.percent.value"
     />
   </div>
 </template>

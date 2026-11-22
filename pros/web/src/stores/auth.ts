@@ -105,44 +105,74 @@ export const useAuthStore = defineStore('auth', () => {
     clearMediaHydrateBlobs()
   }
 
+  /** 在途的登录请求。同一时刻只允许一个 POST /auth/login 真正发出。 */
+  let loginPromise: Promise<User> | null = null
+  /** 在途的注册请求。 */
+  let registerPromise: Promise<User> | null = null
+
   async function register(email: string, password: string, displayName?: string, captcha?: CaptchaInput) {
-    loading.value = true
-    error.value = null
+    // single-flight：注册在途时再次调用直接复用同一个请求，避免重复提交。
+    if (registerPromise) return registerPromise
+    const task = (async () => {
+      loading.value = true
+      error.value = null
+      try {
+        const res = await authApi.register({
+          email,
+          password,
+          displayName,
+          captchaId: captcha?.captchaId ?? '',
+          captchaCode: captcha?.captchaCode ?? '',
+        })
+        applySession(res.token, res.user)
+        return res.user
+      } catch (e: unknown) {
+        error.value = friendlyApiMessage(e, '注册失败')
+        throw e
+      } finally {
+        loading.value = false
+      }
+    })()
+    registerPromise = task
     try {
-      const res = await authApi.register({
-        email,
-        password,
-        displayName,
-        captchaId: captcha?.captchaId ?? '',
-        captchaCode: captcha?.captchaCode ?? '',
-      })
-      applySession(res.token, res.user)
-      return res.user
-    } catch (e: unknown) {
-      error.value = friendlyApiMessage(e, '注册失败')
-      throw e
+      return await task
     } finally {
-      loading.value = false
+      if (registerPromise === task) registerPromise = null
     }
   }
 
   async function login(email: string, password: string, captcha?: CaptchaInput) {
-    loading.value = true
-    error.value = null
+    /*
+     * single-flight 守卫：视图层已经有 busy 拦截，但守卫只覆盖"当前视图实例"。
+     * 双击标签页、组件重挂载、或者将来新增的入口都可能绕过它，
+     * 所以在数据层再兜一层：同一时刻的重复登录复用同一个 Promise，
+     * 真正发出去的 POST /auth/login 永远只有一个。
+     */
+    if (loginPromise) return loginPromise
+    const task = (async () => {
+      loading.value = true
+      error.value = null
+      try {
+        const res = await authApi.login({
+          email,
+          password,
+          captchaId: captcha?.captchaId ?? '',
+          captchaCode: captcha?.captchaCode ?? '',
+        })
+        applySession(res.token, res.user)
+        return res.user
+      } catch (e: unknown) {
+        error.value = friendlyApiMessage(e, '登录失败')
+        throw e
+      } finally {
+        loading.value = false
+      }
+    })()
+    loginPromise = task
     try {
-      const res = await authApi.login({
-        email,
-        password,
-        captchaId: captcha?.captchaId ?? '',
-        captchaCode: captcha?.captchaCode ?? '',
-      })
-      applySession(res.token, res.user)
-      return res.user
-    } catch (e: unknown) {
-      error.value = friendlyApiMessage(e, '登录失败')
-      throw e
+      return await task
     } finally {
-      loading.value = false
+      if (loginPromise === task) loginPromise = null
     }
   }
 

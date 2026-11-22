@@ -13,6 +13,7 @@
  * 而不是随手塞一个通用 spinner。
  */
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import BrandProgressBar from './BrandProgressBar.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -28,8 +29,14 @@ const props = withDefaults(
     stages?: string[]
     /** 每个阶段的停留时长（毫秒）。 */
     stageInterval?: number
+    /**
+     * 确定进度百分比（0~100）。
+     * 传入时面板显示确定进度条并由该值推导阶段文案；
+     * 不传时退回内部计时器驱动的阶段切换 + 不确定进度条。
+     */
+    percent?: number
   }>(),
-  { stages: () => [], stageInterval: 900 },
+  { stages: () => [], stageInterval: 900, percent: -1 },
 )
 
 const stageIndex = ref(0)
@@ -41,6 +48,9 @@ const stageText = computed(() => props.stages[stageIndex.value] ?? '')
 /** 是否还有后续阶段，决定要不要显示阶段文案。 */
 const hasStages = computed(() => props.stages.length > 0)
 
+/** 是否由外部驱动确定进度。 */
+const determinate = computed(() => props.percent >= 0)
+
 function clearTimer() {
   if (timer !== null) {
     clearInterval(timer)
@@ -51,6 +61,8 @@ function clearTimer() {
 function startTimer() {
   clearTimer()
   stageIndex.value = 0
+  // 外部给定进度时阶段由进度推导，内部计时器让位，避免两套节奏打架。
+  if (determinate.value) return
   if (props.stages.length <= 1) return
   timer = setInterval(() => {
     // 走到最后一个阶段就停住，不再循环。
@@ -70,6 +82,19 @@ watch(
     else clearTimer()
   },
   { immediate: true },
+)
+
+// 外部驱动时，阶段序号跟随进度走，保证"百分比"和"阶段文案"讲同一件事。
+watch(
+  () => props.percent,
+  (value) => {
+    if (!determinate.value || props.stages.length === 0) return
+    const next = Math.min(
+      props.stages.length - 1,
+      Math.floor((Math.max(0, Math.min(100, value)) / 100) * props.stages.length),
+    )
+    stageIndex.value = Math.max(0, next)
+  },
 )
 
 onBeforeUnmount(clearTimer)
@@ -92,27 +117,43 @@ onBeforeUnmount(clearTimer)
     >
       <div class="auth-overlay__panel">
         <!--
-          九宫格进度动画：八个外围格子依次脉冲，中心格子持续呼吸。
+          头部：九宫格动画 + 文案并排。
+          九宫格进度动画：八个外围格子依次脉冲，中心格子持续呼吸，
           每个格子的动画延迟由 --i 决定，形成对角线推进的波纹。
         -->
-        <div class="auth-overlay__matrix" aria-hidden="true">
-          <span
-            v-for="i in 8"
-            :key="i"
-            class="auth-overlay__cell"
-            :style="{ '--i': i - 1 }"
-          />
-          <span class="auth-overlay__cell auth-overlay__cell--core" aria-hidden="true">
-            <span class="auth-overlay__core-dot" />
-          </span>
+        <div class="auth-overlay__head">
+          <div class="auth-overlay__matrix" aria-hidden="true">
+            <span
+              v-for="i in 8"
+              :key="i"
+              class="auth-overlay__cell"
+              :style="{ '--i': i - 1 }"
+            />
+            <span class="auth-overlay__cell auth-overlay__cell--core" aria-hidden="true">
+              <span class="auth-overlay__core-dot" />
+            </span>
+          </div>
+          <div class="auth-overlay__text">
+            <p class="auth-overlay__title">{{ title }}</p>
+            <!-- 阶段文案用 aria-live 播报，视觉用户看到动画，读屏用户听到进展。 -->
+            <p v-if="hasStages" class="auth-overlay__stage" aria-live="polite">{{ stageText }}</p>
+          </div>
         </div>
 
-        <p class="auth-overlay__title">{{ title }}</p>
-        <!-- 阶段文案用 aria-live 播报，视觉用户看到动画，读屏用户听到进展。 -->
-        <p v-if="hasStages" class="auth-overlay__stage" aria-live="polite">{{ stageText }}</p>
-
-        <!-- 不确定进度条：来回往复，明确表达"还在进行中但不知道还要多久"。 -->
-        <div class="auth-overlay__bar" aria-hidden="true">
+        <!--
+          进度条。外部给定 percent 时是确定进度（百分比数字同步显示）；
+          否则退回不确定进度，表达"还在进行中但不知道还要多久"。
+        -->
+        <BrandProgressBar
+          v-if="determinate"
+          class="auth-overlay__progress"
+          :percent="percent"
+          active
+          size="sm"
+          show-percent
+          :label="`${title}进度`"
+        />
+        <div v-else class="auth-overlay__bar" aria-hidden="true">
           <span class="auth-overlay__bar-fill" />
         </div>
       </div>
@@ -125,33 +166,52 @@ onBeforeUnmount(clearTimer)
   position: fixed;
   inset: 0;
   z-index: 200;
-  display: grid;
-  place-items: center;
-  /* 半透明 + 模糊：既挡住交互，也让用户知道底下是自己刚才点的表单。 */
-  background: rgba(250, 250, 250, 0.72);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 14px;
+  /*
+   * 极淡的半透明：只负责吃掉指针事件（防重复提交），
+   * 刻意不做模糊，保证卡片与按钮内的进度条始终清晰可见。
+   */
+  background: rgba(250, 250, 250, 0.18);
 }
 
 .auth-overlay__panel {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 14px;
-  padding: 32px 40px 28px;
-  border-radius: 20px;
+  gap: 10px;
+  padding: 12px 18px 14px;
+  border-radius: 16px;
   background: var(--mm-surface);
   border: 1px solid var(--mm-line);
-  box-shadow: 0 24px 60px rgba(32, 33, 36, 0.16);
-  min-width: 260px;
+  box-shadow: 0 16px 40px rgba(32, 33, 36, 0.14);
+  min-width: 268px;
+}
+
+/* 头部：动画 + 文案并排，压低面板高度，避免遮住登录卡片顶部。 */
+.auth-overlay__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.auth-overlay__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 
 /* 九宫格：3x3 布局，中心格放核心点。 */
 .auth-overlay__matrix {
   display: grid;
-  grid-template-columns: repeat(3, 22px);
-  grid-template-rows: repeat(3, 22px);
-  gap: 5px;
+  flex: 0 0 auto;
+  grid-template-columns: repeat(3, 14px);
+  grid-template-rows: repeat(3, 14px);
+  gap: 3px;
 }
 
 .auth-overlay__cell {
@@ -173,8 +233,8 @@ onBeforeUnmount(clearTimer)
 }
 
 .auth-overlay__core-dot {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: #fff;
   animation: overlay-dot 1.5s ease-in-out infinite;
@@ -182,17 +242,22 @@ onBeforeUnmount(clearTimer)
 
 .auth-overlay__title {
   margin: 0;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 650;
   color: var(--mm-text);
   letter-spacing: 0.01em;
 }
 
 .auth-overlay__stage {
-  margin: -6px 0 0;
+  margin: 0;
   font-size: 12px;
   color: var(--mm-muted);
-  min-height: 17px;
+  min-height: 16px;
+}
+
+/* 面板内的确定进度条：宽度固定，和文案对齐。 */
+.auth-overlay__progress {
+  width: 100%;
 }
 
 /* 不确定进度条：一条来回滑动的短条。 */

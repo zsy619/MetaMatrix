@@ -8,6 +8,8 @@ import { isCaptchaBlank } from '../utils/captcha'
 import CaptchaField from '../components/ui/CaptchaField.vue'
 import AuthField from '../components/ui/AuthField.vue'
 import AuthSubmitOverlay from '../components/ui/AuthSubmitOverlay.vue'
+import BrandProgressBar from '../components/ui/BrandProgressBar.vue'
+import { useSubmitProgress } from '../composables/useSubmitProgress'
 import { ICON_EYE, ICON_EYE_OFF, ICON_LOCK, ICON_MAIL, authIcon } from '../components/ui/authIcons'
 
 const auth = useAuthStore()
@@ -20,6 +22,12 @@ const captchaCode = ref('')
 const busy = ref(false)
 const message = ref('')
 const captchaRef = ref<InstanceType<typeof CaptchaField> | null>(null)
+
+/** 认证过程的阶段文案，驱动进度条与遮罩面板的文案同步。 */
+const STAGES = ['正在校验图形验证码', '正在核对账号密码', '正在建立会话']
+
+/** 提交进度（百分比 + 阶段）。 */
+const progress = useSubmitProgress()
 
 /** 密码是否以明文显示。默认隐藏，防止旁观者一眼看到密码。 */
 const showPassword = ref(false)
@@ -35,6 +43,13 @@ const passwordToggleIcon = computed(() =>
  * 否则用户改完密码回到登录页会以为什么都没发生。
  */
 const resetDone = computed(() => route.query.reset === 'done')
+
+/**
+ * 提交期间锁定输入区。
+ * 用 v-bind 传对象而不是 :inert="busy"，是因为 Vue 没有把 inert 当布尔属性，
+ * 直接绑定 false 会渲染成 inert="false"，而 inert 只要存在就生效。
+ */
+const fieldsAttrs = computed<Record<string, unknown>>(() => (busy.value ? { inert: '' } : {}))
 
 onMounted(() => {
   document.title = '登录 · 元矩阵 MetaMatrix'
@@ -58,13 +73,16 @@ async function submit() {
     return
   }
   busy.value = true
+  progress.start(STAGES.length)
   try {
     await auth.login(email.value.trim(), password.value, {
       captchaId: captchaRef.value?.getCaptchaId() ?? '',
       captchaCode: captchaRef.value?.getCaptchaCode() ?? '',
     })
+    progress.complete()
     router.replace(safeRedirect(route.query.redirect, '/'))
   } catch (e: unknown) {
+    progress.stop()
     message.value = friendlyApiMessage(e, '登录失败')
     // 验证码是一次性的：服务端在校验通过后就把这张图作废，不管密码对不对。
     // 所以只要这次提交失败就得换一张，否则用户会拿着已经作废的图重试，
@@ -93,7 +111,8 @@ async function submit() {
         <p class="auth-hint">登录后只同步你自己的画布。会话保存在本机，离开账号后不会继续看到别人的文档。</p>
       </div>
 
-      <div class="auth-fields">
+      <!-- 提交期间锁定输入，避免用户在等待时改动凭证造成状态不一致。 -->
+      <div class="auth-fields" v-bind="fieldsAttrs">
         <AuthField
           id="login-email"
           v-model="email"
@@ -150,8 +169,26 @@ async function submit() {
         <span>{{ message }}</span>
       </p>
 
-      <button type="submit" class="auth-submit" :disabled="busy">
-        {{ busy ? '登录中…' : '登录' }}
+      <button
+        type="submit"
+        class="auth-submit"
+        :class="{ 'is-busy': busy }"
+        :disabled="busy"
+        :aria-busy="busy"
+      >
+        <span class="auth-submit__label">{{ busy ? '登录中…' : '登录' }}</span>
+        <!--
+          按钮内的品牌进度条。始终占位（空闲时透明），
+          这样按钮高度在提交前后完全一致，不会出现跳动。
+        -->
+        <BrandProgressBar
+          class="auth-submit__progress"
+          :percent="progress.percent.value"
+          :active="busy"
+          variant="light"
+          size="sm"
+          label="登录进度"
+        />
       </button>
 
       <p class="auth-footer">
@@ -167,7 +204,8 @@ async function submit() {
     <AuthSubmitOverlay
       :visible="busy"
       title="正在登录"
-      :stages="['正在校验图形验证码', '正在核对账号密码', '正在建立会话']"
+      :stages="STAGES"
+      :percent="progress.percent.value"
     />
   </div>
 </template>

@@ -14,11 +14,18 @@
 body .overlay,
 body .rev-overlay,
 body .ap-overlay,
-body .bfp-modal-overlay,
-body .auth-overlay {
+body .bfp-modal-overlay {
   background: var(--mm-dlg-backdrop);
   backdrop-filter: blur(4px);
 }
+
+/*
+ * 登录 / 注册的提交遮罩（.auth-overlay）不在统一遮罩名单里：
+ * 登录卡片按钮内有一条正在推进的品牌进度条，遮罩一旦模糊就会把
+ * 卡片连同进度条一起糊掉，用户看不到自己点击后的反馈。
+ * 该遮罩只需要"吃掉指针事件 + 显示进度"，样式由
+ * components/ui/AuthSubmitOverlay.vue 自行管理（浅色半透明、不做模糊）。
+ */
 
 /* 滚动条：细窄、圆角、悬停变深（弹窗内部统一）。 */
 .el-dialog__body,
