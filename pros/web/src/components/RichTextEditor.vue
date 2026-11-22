@@ -79,6 +79,7 @@ import {
   togglePreviewMode,
 } from '../utils/rteRound7'
 import { type CalloutVariant } from '../extensions/callout'
+import { markdownInlineEnabled, setMarkdownInlineEnabled } from '../extensions/rteInlineMarkdown'
 import { MERMAID_TEMPLATES, mermaidTemplate } from '../extensions/mermaidFlow'
 import {
   BLOCK_MENU,
@@ -1940,6 +1941,18 @@ function cyclePasteFormatMode() {
   const order: PasteFormatMode[] = ['keep', 'plain', 'markdown']
   const i = order.indexOf(pasteFormatMode.value)
   setPasteFormatMode(order[(i + 1) % order.length]!)
+}
+
+/**
+ * 行内 Markdown 语法开关。
+ * 开启时输入 **粗体**、*斜体*、[文字](地址)、==高亮== 会直接转成富文本；
+ * 关闭后这些符号保持原样，适合需要写出字面符号的场景。
+ */
+function toggleMarkdownInline() {
+  const next = !markdownInlineEnabled.value
+  setMarkdownInlineEnabled(next)
+  ElMessage.success(next ? 'Markdown 行内语法：开' : 'Markdown 行内语法：关')
+  moreOpen.value = false
 }
 
 function syncSpellcheckToDom() {
@@ -7187,6 +7200,14 @@ const allTools = computed((): ToolItem[] => {
       iconComp: ic('import'),
       active: () => pasteFormatMode.value !== 'keep',
       run: cyclePasteFormatMode,
+    },
+    {
+      key: 'markdownInline',
+      label: markdownInlineEnabled.value ? 'MD语法·开' : 'MD语法·关',
+      title: '输入 **粗体**、*斜体*、[文字](地址)、==高亮== 时直接转成富文本；再点一次关闭',
+      icon: 'Md',
+      active: () => markdownInlineEnabled.value,
+      run: toggleMarkdownInline,
     },
     { key: 'div-wave20a', label: '', icon: '', kind: 'divider' },
     // —— 书写 / 结构 / 审阅 / 视图（Wave20）——

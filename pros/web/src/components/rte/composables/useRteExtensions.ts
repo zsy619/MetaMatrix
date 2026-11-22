@@ -99,6 +99,7 @@ import { LinkButton } from '../../../extensions/linkButton'
 import { SyncBlock } from '../../../extensions/syncBlock'
 import { RteMarkdownInputRules } from '../../../extensions/rteMarkdownInputRules'
 import { MediaHydrate } from '../../../extensions/mediaHydrate'
+import { RteInlineMarkdown } from '../../../extensions/rteInlineMarkdown'
 
 type LateFn = (...args: any[]) => any
 
@@ -295,6 +296,7 @@ const editor = useEditor({
     RteCodeBlockLowlight,
     // Markdown 输入规则（# / - / 1. / [ ] / > / ``` / ---），优先于各扩展内置规则
     RteMarkdownInputRules,
+    RteInlineMarkdown,
     MediaHydrate,
     TextStyle,
     FontSize,
