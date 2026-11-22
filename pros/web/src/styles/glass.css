@@ -427,6 +427,212 @@ body .auth-overlay {
   transform: translateY(-1px);
 }
 
+/* ---------------- 统一工具条：画布 / 表格 / 文档 / 节点画布 四处复用 ---------------- */
+/* 参照画布工具条：白玻璃动作组 + 胶囊状态 + 蓝色主按钮。改这一处，四处同时生效 */
+
+.mm-bar__group {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 34px;
+  padding: 3px;
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.7));
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.46);
+  backdrop-filter: blur(var(--glass-blur-sm, 10px));
+  -webkit-backdrop-filter: blur(var(--glass-blur-sm, 10px));
+  box-shadow: var(--glass-shadow-sm, 0 6px 18px rgba(15, 23, 42, 0.1));
+}
+.mm-bar__cluster {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+}
+.mm-bar__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ent-text-2, #5a6472);
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease,
+    color 0.16s ease;
+}
+.mm-bar__btn:hover {
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow: var(--glass-shadow-sm, 0 6px 18px rgba(15, 23, 42, 0.1));
+  transform: translateY(-1px);
+  color: var(--mm-text, #1d2129);
+}
+.mm-bar__btn--square {
+  width: 26px;
+  padding: 0;
+  justify-content: center;
+}
+.mm-bar__value {
+  width: 40px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--ent-text-2, #5a6472);
+  font-variant-numeric: tabular-nums;
+}
+.mm-bar__divider {
+  width: 1px;
+  height: 16px;
+  margin: 0 3px;
+  background: var(--glass-ring, rgba(15, 23, 42, 0.09));
+}
+
+/* 开关态按钮（抓手 / 编号 / 背景等按下状态），所有画布工具条一致 */
+.mm-bar__btn.is-on {
+  background: rgba(47, 140, 255, 0.14);
+  color: var(--mm-blue, #1677ff);
+}
+
+.mm-bar__btn:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+
+/* 画布工具条里的原生下拉（配色、刻度等） */
+.mm-bar__select {
+  height: 26px;
+  padding: 0 6px;
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.7));
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.6);
+  color: var(--mm-text, #1d2129);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+/* EP 按钮的底色/边框由 CSS 变量驱动，全局规则特异性更高，只能用 !important 压成透明 */
+.el-button.mm-bar__btn {
+  padding: 0 8px;
+  font-size: 12px;
+  color: var(--ent-text-2, #5a6472);
+  background: transparent !important;
+  border-color: transparent !important;
+}
+.el-button.mm-bar__btn:hover {
+  background: rgba(255, 255, 255, 0.86) !important;
+  border-color: transparent !important;
+  color: var(--mm-text, #1d2129);
+}
+.el-button.mm-bar__btn .el-icon {
+  font-size: 14px;
+  margin-right: 0;
+}
+
+/* 状态胶囊：未保存 / 保存中 / 已保存 */
+.mm-bar__status {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  max-width: 280px;
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.7));
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.52);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  font-size: 12px;
+  color: var(--mm-muted, #86909c);
+  white-space: nowrap;
+}
+/* 胶囊里的长文案（如保存失败原因）超出时省略号收尾，不撑破工具条 */
+.mm-bar__status > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mm-bar__status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #a9b0bb;
+}
+.mm-bar__status.is-saved {
+  color: var(--el-color-success);
+}
+.mm-bar__status.is-saved .mm-bar__status-dot {
+  background: var(--el-color-success);
+  box-shadow: 0 0 0 3px rgba(103, 194, 58, 0.14);
+}
+.mm-bar__status.is-dirty {
+  color: #d46b08;
+}
+.mm-bar__status.is-dirty .mm-bar__status-dot {
+  background: #fa8c16;
+  box-shadow: 0 0 0 3px rgba(250, 140, 22, 0.14);
+}
+.mm-bar__status.is-saving .mm-bar__status-dot {
+  background: var(--el-color-primary);
+  animation: mm-bar-pulse 1s ease-in-out infinite;
+}
+.mm-bar__status.is-error {
+  color: #d93025;
+  background: rgba(252, 232, 230, 0.72);
+  border-color: rgba(217, 48, 37, 0.24);
+}
+.mm-bar__status.is-error .mm-bar__status-dot {
+  background: #d93025;
+  box-shadow: 0 0 0 3px rgba(217, 48, 37, 0.12);
+}
+
+/* 主按钮 */
+.mm-bar__primary {
+  height: 34px;
+  padding: 0 15px;
+  border: 0;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #2f8cff, #1264e8);
+  box-shadow: 0 6px 16px rgba(22, 119, 255, 0.28);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.16s ease, box-shadow 0.16s ease, filter 0.16s ease;
+}
+.mm-bar__primary:hover {
+  background: linear-gradient(135deg, #3d97ff, #1a6df0);
+  box-shadow: 0 8px 20px rgba(22, 119, 255, 0.34);
+  transform: translateY(-1px);
+  filter: saturate(1.08);
+}
+.el-button.mm-bar__primary {
+  padding: 0 15px;
+  font-size: 13px;
+  color: #fff !important;
+  background: linear-gradient(135deg, #2f8cff, #1264e8) !important;
+  border-color: transparent !important;
+  border-radius: 10px;
+  box-shadow: 0 6px 16px rgba(22, 119, 255, 0.28);
+}
+.el-button.mm-bar__primary:hover {
+  background: linear-gradient(135deg, #3d97ff, #1a6df0) !important;
+  box-shadow: 0 8px 20px rgba(22, 119, 255, 0.34);
+  transform: translateY(-1px);
+  filter: saturate(1.08);
+}
+
+@keyframes mm-bar-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
 /* ---------------- 无障碍与降级 ---------------- */
 
 @media (prefers-reduced-motion: reduce) {
