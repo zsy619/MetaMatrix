@@ -107,6 +107,9 @@ export function applyMediaBlobToElement(el: HTMLElement, src: string, blobUrl: s
   el.setAttribute('src', blobUrl)
   el.dataset.mediaSrc = src
   el.classList.remove('is-broken')
+  el.classList.remove('is-media-placeholder')
+  delete el.dataset.mediaPlaceholder
+  delete el.dataset.mediaOrigSrc
   delete el.dataset.mediaMissing
   return true
 }
@@ -145,8 +148,8 @@ export function observeMediaBlobRestore(root: HTMLElement): () => void {
     scheduled = true
     const run = () => {
       scheduled = false
-      root.querySelectorAll<HTMLElement>('img[src^="/media/"]').forEach((node) => {
-        const src = node.getAttribute('src') || ''
+      root.querySelectorAll<HTMLElement>('img[src^="/media/"], img[data-media-src^="/media/"]').forEach((node) => {
+        const src = node.dataset.mediaSrc || node.getAttribute('src') || ''
         installMediaSrcResolver(node as HTMLImageElement)
         const cached = mediaBlobs.get(src)
         if (cached) applyMediaBlobToElement(node, src, cached)

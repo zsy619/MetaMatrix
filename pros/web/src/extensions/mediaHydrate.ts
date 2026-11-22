@@ -4,6 +4,7 @@ import type { EditorView } from '@tiptap/pm/view'
 import { getToken } from '../api/http'
 import { mediaFetchUrl } from '../utils/mediaPath'
 import { seedMediaThumb } from '../utils/mediaThumb'
+import { applyMediaPlaceholder, placeholderKind } from '../utils/mediaPlaceholder'
 
 import {
   applyMediaBlobToEditor,
@@ -46,11 +47,14 @@ export const MediaHydrate = Extension.create({
             const token = getToken()
             if (!token) return
             const nodes = editorView.dom.querySelectorAll(
-              'img[src^="/media/"], audio[src^="/media/"], video[src^="/media/"]',
+              'img[src^="/media/"], img[data-media-src^="/media/"], audio[src^="/media/"], video[src^="/media/"]',
             )
             nodes.forEach((node) => {
               const el = node as HTMLImageElement
-              const src = el.getAttribute('src') || ''
+              const attr = el.getAttribute('src') || ''
+              // 换成占位图后 src 变成 data URI，真实路径改存在 data-media-src 上
+              const src = el.dataset.mediaSrc || attr
+              if (!src.startsWith('/media/')) return
               const cached = blobs.get(src)
               if (cached) {
                 seedMediaThumb(src, cached)
@@ -61,7 +65,13 @@ export const MediaHydrate = Extension.create({
                 markMissing(el)
                 return
               }
-              if (!src.startsWith('/media/') || pending.has(src) || mediaHydrateWaiting(src)) return
+              // 字节还没到：先换上"正在加载"占位图，别让浏览器画裂图
+              if (el instanceof HTMLImageElement && el.dataset.mediaPlaceholder !== '1') {
+                el.dataset.mediaSrc = src
+                const name = el.getAttribute('alt') || '图片'
+                applyMediaPlaceholder(el, { name, kind: placeholderKind(name), status: 'loading' })
+              }
+              if (pending.has(src) || mediaHydrateWaiting(src)) return
               const id = src.slice('/media/'.length)
               if (!/^[0-9a-zA-Z-]+$/.test(id)) return
               pending.add(src)
@@ -85,6 +95,11 @@ export const MediaHydrate = Extension.create({
 function markMissing(el: HTMLElement) {
   el.dataset.mediaMissing = '1'
   if (!el.title) el.title = '素材已失效或被删除'
+  // 素材没了也要给一张占位图，而不是浏览器裂图
+  if (el instanceof HTMLImageElement && el.dataset.mediaPlaceholder !== '1') {
+    const name = el.getAttribute('alt') || el.dataset.mediaSrc?.split('/').pop() || '图片'
+    applyMediaPlaceholder(el, { name, kind: placeholderKind(name), status: 'missing' })
+  }
 }
 
 async function hydrate(editorView: EditorView, el: HTMLImageElement, src: string, id: string, token: string) {
