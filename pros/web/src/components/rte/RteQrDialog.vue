@@ -158,17 +158,27 @@ async function confirm() {
             </button>
           </div>
         </div>
-        <div class="rte-qr-label">留白</div>
-        <div class="rte-qr-styles" role="radiogroup" aria-label="留白">
-          <button type="button" :class="{ active: quiet === 2 }" title="四周留 2 个码点" @click="quiet = 2">窄</button>
-          <button type="button" :class="{ active: quiet === 4 }" title="四周留 4 个码点" @click="quiet = 4">标准</button>
-          <button type="button" :class="{ active: quiet === 6 }" title="四周留 6 个码点" @click="quiet = 6">宽</button>
-        </div>
-        <div class="rte-qr-label">纠错</div>
-        <div class="rte-qr-styles" role="radiogroup" aria-label="纠错等级">
-          <button type="button" :class="{ active: errorLevel === 'H' }" title="纠错最高，大约能恢复三成损坏" @click="errorLevel = 'H'">高</button>
-          <button type="button" :class="{ active: errorLevel === 'Q' }" title="纠错较高，大约能恢复四分之一损坏" @click="errorLevel = 'Q'">较高</button>
-          <button type="button" :class="{ active: errorLevel === 'M' }" title="纠错中等，大约能恢复 15% 损坏" @click="errorLevel = 'M'">中</button>
+        <!--
+          留白与纠错并排一行：
+          两组都是"同一维度的小按钮组"，上下堆叠会拉长弹窗、让人误以为是两段内容。
+        -->
+        <div class="rte-qr-row">
+          <div class="rte-qr-field">
+            <div class="rte-qr-label">留白</div>
+            <div class="rte-qr-styles" role="radiogroup" aria-label="留白">
+              <button type="button" :class="{ active: quiet === 2 }" title="四周留 2 个码点" @click="quiet = 2">窄</button>
+              <button type="button" :class="{ active: quiet === 4 }" title="四周留 4 个码点" @click="quiet = 4">标准</button>
+              <button type="button" :class="{ active: quiet === 6 }" title="四周留 6 个码点" @click="quiet = 6">宽</button>
+            </div>
+          </div>
+          <div class="rte-qr-field">
+            <div class="rte-qr-label">纠错</div>
+            <div class="rte-qr-styles" role="radiogroup" aria-label="纠错等级">
+              <button type="button" :class="{ active: errorLevel === 'H' }" title="纠错最高，大约能恢复三成损坏" @click="errorLevel = 'H'">高</button>
+              <button type="button" :class="{ active: errorLevel === 'Q' }" title="纠错较高，大约能恢复四分之一损坏" @click="errorLevel = 'Q'">较高</button>
+              <button type="button" :class="{ active: errorLevel === 'M' }" title="纠错中等，大约能恢复 15% 损坏" @click="errorLevel = 'M'">中</button>
+            </div>
+          </div>
         </div>
         <label class="rte-qr-caption">
           <input v-model="caption" type="checkbox" title="勾选后，在码下方印出描述或内容" />
@@ -243,6 +253,21 @@ async function confirm() {
   margin: 12px 0 6px;
   font-size: 12px;
   color: #4e5969;
+}
+/* 留白 / 纠错并排一行；窄屏时回落为上下排列，避免挤压。 */
+.rte-qr-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 24px;
+  align-items: flex-start;
+}
+.rte-qr-field {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.rte-qr-field .rte-qr-label {
+  margin-top: 12px;
 }
 .rte-qr-styles {
   display: flex;
