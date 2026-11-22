@@ -7,6 +7,7 @@ import { createImageCaptionPlugin } from './rteImageCaption'
 import { createCaptionRenumberPlugin } from '../utils/rteCaptionNumber'
 import { imageLinkHref, imageSizeStyle, normalizeImageAlign, normalizeImageLayout } from '../utils/rteImageLayout'
 import { cropHtmlStyle } from '../utils/rteImageCropAttrs'
+import { applyMediaBlobToElement, installMediaSrcResolver, mediaBlobs } from './mediaHydrateState'
 
 export type RteImageAlign = 'left' | 'center' | 'right' | null
 
@@ -395,6 +396,42 @@ export const RteImage = Image.extend({
 
   addProseMirrorPlugins() {
     return [...(this.parent?.() || []), createImageDragPlugin(), createImageCaptionPlugin(), createCaptionRenumberPlugin(), createImageSizePlugin()]
+  },
+
+  /**
+   * 接管 TipTap 的图片节点视图，给 <img> 装上素材库地址解析器。
+   *
+   * TipTap 的节点视图每次更新节点都会执行 `el.src = 节点属性里的 /media/{id}`，
+   * 会把 mediaHydrate 已经换好的 blob 地址冲掉，图片于是又变回裂图
+   * （浏览器去站点域名取回的是 index.html，不是图片）。
+   * 装了解析器之后，写入 /media/{id} 会被自动换成缓存里的 blob。
+   */
+  addNodeView() {
+    const parent = this.parent?.() as ((props: unknown) => any) | null | undefined
+    if (!parent) return null
+    return (props: unknown) => {
+      const view = parent(props) as any
+      if (!view) return view
+      const img = (view.dom as HTMLElement | undefined)?.querySelector?.('img') as HTMLImageElement | null
+      if (img) {
+        installMediaSrcResolver(img)
+        const raw = String((props as any)?.node?.attrs?.src ?? '')
+        const cached = raw ? mediaBlobs.get(raw) : undefined
+        if (cached) applyMediaBlobToElement(img, raw, cached)
+      }
+      const originalUpdate = typeof view.update === 'function' ? view.update.bind(view) : null
+      if (originalUpdate) {
+        view.update = (node: any, decorations: any, innerDecorations: any) => {
+          const result = originalUpdate(node, decorations, innerDecorations)
+          const el = (view.dom as HTMLElement | undefined)?.querySelector?.('img') as HTMLImageElement | null
+          const raw = String(node?.attrs?.src ?? '')
+          const cached = raw ? mediaBlobs.get(raw) : undefined
+          if (el && cached) applyMediaBlobToElement(el, raw, cached)
+          return result
+        }
+      }
+      return view
+    }
   },
 })
 

@@ -1,16 +1,20 @@
 import { Extension } from '@tiptap/core'
 import { Plugin } from '@tiptap/pm/state'
+import type { EditorView } from '@tiptap/pm/view'
 import { getToken } from '../api/http'
 import { mediaFetchUrl } from '../utils/mediaPath'
 import { seedMediaThumb } from '../utils/mediaThumb'
 
 import {
+  applyMediaBlobToEditor,
+  applyMediaBlobToElement,
   isMediaHydrateGone,
   mediaBlobs as blobs,
   mediaHydrateWaiting,
   mediaPending as pending,
   noteMediaHydrateError,
   noteMediaHydrateStatus,
+  observeMediaBlobRestore,
   clearMediaHydrateBlobs,
 } from './mediaHydrateState'
 
@@ -50,7 +54,7 @@ export const MediaHydrate = Extension.create({
               const cached = blobs.get(src)
               if (cached) {
                 seedMediaThumb(src, cached)
-                if (el.src !== cached) el.src = cached
+                applyMediaBlobToElement(el, src, cached)
                 return
               }
               if (isMediaHydrateGone(src)) {
@@ -61,13 +65,16 @@ export const MediaHydrate = Extension.create({
               const id = src.slice('/media/'.length)
               if (!/^[0-9a-zA-Z-]+$/.test(id)) return
               pending.add(src)
-              void hydrate(el, src, id, token).finally(() => pending.delete(src))
+              void hydrate(editorView, el, src, id, token).finally(() => pending.delete(src))
             })
           }
           queueMicrotask(run)
+          // ProseMirror 的节点视图（图片缩放框）会在选中/更新时重建 img 元素，
+          // 新元素又变回文档里的 /media/{id}。观察器负责把缓存里的 blob 贴回去。
+          const stopObserving = observeMediaBlobRestore(editorView.dom)
           return {
             update: run,
-            destroy() {},
+            destroy: stopObserving,
           }
         },
       }),
@@ -80,7 +87,7 @@ function markMissing(el: HTMLElement) {
   if (!el.title) el.title = '素材已失效或被删除'
 }
 
-async function hydrate(el: HTMLImageElement, src: string, id: string, token: string) {
+async function hydrate(editorView: EditorView, el: HTMLImageElement, src: string, id: string, token: string) {
   const metaUrl = mediaFetchUrl(`/media/${id}`)
   if (!metaUrl) return
   let metaRes: Response
@@ -126,5 +133,8 @@ async function hydrate(el: HTMLImageElement, src: string, id: string, token: str
   if (old) URL.revokeObjectURL(old)
   blobs.set(src, blobUrl)
   seedMediaThumb(src, blobUrl)
-  if (el.isConnected && (el.getAttribute('src') || '').startsWith('/media/')) el.src = blobUrl
+  // 先贴当前文档里所有同源元素（元素可能已被 ProseMirror 重建过），
+  // 再补发起请求的那个元素，避免它被换掉后写到废弃节点上。
+  applyMediaBlobToEditor(editorView.dom, src, blobUrl)
+  if (el.isConnected) applyMediaBlobToElement(el, src, blobUrl)
 }
