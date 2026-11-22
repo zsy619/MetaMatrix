@@ -144,3 +144,7 @@ pgdata/
 *.orig
 *.rej
 pros/api/data
+
+# ---------- Python 缓存（schema 同步脚本） ----------
+__pycache__/
+*.pyc
