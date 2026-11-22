@@ -1,5 +1,17 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import {
+  Back,
+  Connection,
+  Delete,
+  Flag,
+  Position,
+  Remove,
+  Right,
+  Sort,
+  Tickets,
+  Upload,
+} from '@element-plus/icons-vue'
 import { canvasChromeStyle } from './canvasChrome'
 import type { GanttTask, ProjectGanttDocumentJSON } from '../../types/canvas'
 import { isProjectGanttDoc } from '../../types/canvas'
@@ -571,30 +583,134 @@ function startDrag(event: PointerEvent, task: GanttTask, mode: 'move' | 'resize'
     <header class="gantt-head">
       <input class="title" :value="doc.title" aria-label="甘特图标题" @change="setTitle(($event.target as HTMLInputElement).value)" />
       <div class="toolbar">
-        <button type="button" @click="pickProject">导入 Project</button>
-        <input
-          ref="projectFileRef"
-          class="file"
-          type="file"
-          accept=".xml,text/xml,application/xml"
-          aria-label="导入 Project 文件"
-          @change="onProjectFile"
-        />
-        <button type="button" @click="insert('task')">插入任务</button>
-        <button type="button" @click="insert('milestone')">插入里程碑</button>
-        <button type="button" :disabled="selectedIndex < 0" @click="toggleMilestone">设为里程碑</button>
-        <button type="button" :disabled="selectedIndex <= 0" @click="indent">降级</button>
-        <button type="button" :disabled="selectedIndex < 0 || !tasks[selectedIndex]?.parentId" @click="outdent">升级</button>
-        <button type="button" :disabled="selectedIndex <= 0" @click="linkPrevious">链接任务</button>
-        <button type="button" :disabled="selectedIndex < 0" @click="unlink">取消链接</button>
-        <button type="button" @click="schedule">按依赖排程</button>
-        <button type="button" @click="setBaseline">设置比较基准</button>
-        <button type="button" :disabled="!selectedId || tasks.length <= 1" @click="removeSelected">删除</button>
-        <span class="zoom" role="group" aria-label="时间刻度">
+        <div class="mm-bar__group">
+          <button
+            type="button"
+            class="mm-bar__btn"
+            title="导入 Project"
+            aria-label="导入 Project"
+            @click="pickProject"
+          >
+            <el-icon><Upload /></el-icon>
+          </button>
+          <input
+            ref="projectFileRef"
+            class="file"
+            type="file"
+            accept=".xml,text/xml,application/xml"
+            aria-label="导入 Project 文件"
+            @change="onProjectFile"
+          />
+          <button
+            type="button"
+            class="mm-bar__btn"
+            title="插入任务"
+            aria-label="插入任务"
+            @click="insert('task')"
+          >
+            <el-icon><Tickets /></el-icon>
+          </button>
+          <button
+            type="button"
+            class="mm-bar__btn"
+            title="插入里程碑"
+            aria-label="插入里程碑"
+            @click="insert('milestone')"
+          >
+            <el-icon><Flag /></el-icon>
+          </button>
+          <button
+            type="button"
+            class="mm-bar__btn"
+            :disabled="selectedIndex < 0"
+            title="设为里程碑"
+            aria-label="设为里程碑"
+            @click="toggleMilestone"
+          >
+            <el-icon><Position /></el-icon>
+          </button>
+        </div>
+        <div class="mm-bar__group">
+          <button
+            type="button"
+            class="mm-bar__btn"
+            :disabled="selectedIndex <= 0"
+            title="降级"
+            aria-label="降级"
+            @click="indent"
+          >
+            <el-icon><Right /></el-icon>
+          </button>
+          <button
+            type="button"
+            class="mm-bar__btn"
+            :disabled="selectedIndex < 0 || !tasks[selectedIndex]?.parentId"
+            title="升级"
+            aria-label="升级"
+            @click="outdent"
+          >
+            <el-icon><Back /></el-icon>
+          </button>
+        </div>
+        <div class="mm-bar__group">
+          <button
+            type="button"
+            class="mm-bar__btn"
+            :disabled="selectedIndex <= 0"
+            title="链接任务"
+            aria-label="链接任务"
+            @click="linkPrevious"
+          >
+            <el-icon><Connection /></el-icon>
+          </button>
+          <button
+            type="button"
+            class="mm-bar__btn"
+            :disabled="selectedIndex < 0"
+            title="取消链接"
+            aria-label="取消链接"
+            @click="unlink"
+          >
+            <el-icon><Remove /></el-icon>
+          </button>
+        </div>
+        <div class="mm-bar__group">
+          <button
+            type="button"
+            class="mm-bar__btn"
+            title="按依赖排程"
+            aria-label="按依赖排程"
+            @click="schedule"
+          >
+            <el-icon><Sort /></el-icon>
+          </button>
+          <button
+            type="button"
+            class="mm-bar__btn"
+            title="设置比较基准"
+            aria-label="设置比较基准"
+            @click="setBaseline"
+          >
+            <el-icon><Flag /></el-icon>
+          </button>
+          <button
+            type="button"
+            class="mm-bar__btn"
+            :disabled="!selectedId || tasks.length <= 1"
+            title="删除"
+            aria-label="删除"
+            @click="removeSelected"
+          >
+            <el-icon><Delete /></el-icon>
+          </button>
+        </div>
+        <span class="zoom mm-bar__group" role="group" aria-label="时间刻度">
           <button
             v-for="item in GANTT_SCALES"
             :key="item.id"
             type="button"
+            class="mm-bar__btn"
+            :class="{ 'is-on': (doc.scale || 'week') === item.id }"
             :aria-pressed="(doc.scale || 'week') === item.id"
             @click="setScale(item.id)"
           >{{ item.label }}</button>
@@ -817,13 +933,7 @@ function startDrag(event: PointerEvent, task: GanttTask, mode: 'move' | 'resize'
 .title:focus { border-color: #1a73e8; background: #fff; outline: none; }
 .toolbar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .file { display: none; }
-.toolbar button, .zoom button { border: 1px solid #dadce0; background: #fff; border-radius: 999px; min-height: 40px; padding: 4px 14px; font-size: 15px; color: #202124; cursor: pointer; }
-.toolbar button:disabled { color: #9aa0a6; }
 .zoom { display: inline-flex; }
-.zoom button { border-radius: 0; }
-.zoom button:first-child { border-radius: 999px 0 0 999px; }
-.zoom button:last-child { border-radius: 0 999px 999px 0; }
-.zoom button[aria-pressed='true'] { background: #e8f0fe; color: #174ea6; }
 .status { margin: 0 0 8px; font-size: 15px; color: #174ea6; }
 .split { flex: 1; min-height: 0; display: flex; border: 1px solid #dadce0; border-radius: 10px; overflow: hidden; background: #fff; }
 .grid { width: min(720px, 54%); min-width: 0; flex: none; overflow: auto; }

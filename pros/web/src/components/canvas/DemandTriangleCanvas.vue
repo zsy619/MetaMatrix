@@ -97,6 +97,11 @@ function dirOf(id: string): DemandTriangleDirection {
   )
 }
 
+/** 滑杆已填充比例，供 CSS 渐变轨道显示进度 */
+function scorePct(v: number) {
+  return `${Math.round(Math.min(1, Math.max(0, v)) * 100)}%`
+}
+
 function itemSelected(id: string) {
   return (
     selection.kind === 'item' &&
@@ -411,6 +416,7 @@ const vertexPanels = computed(() => {
                   step="0.05"
                   :value="dirOf(item.id).scores.universality"
                   aria-label="普遍性"
+                  :style="{ '--v': scorePct(dirOf(item.id).scores.universality) }"
                   @input="onScoreInput(item.id, 'universality', $event)"
                 />
               </label>
@@ -423,6 +429,7 @@ const vertexPanels = computed(() => {
                   step="0.05"
                   :value="dirOf(item.id).scores.frequency"
                   aria-label="频次"
+                  :style="{ '--v': scorePct(dirOf(item.id).scores.frequency) }"
                   @input="onScoreInput(item.id, 'frequency', $event)"
                 />
               </label>
@@ -435,6 +442,7 @@ const vertexPanels = computed(() => {
                   step="0.05"
                   :value="dirOf(item.id).scores.rigidity"
                   aria-label="刚性"
+                  :style="{ '--v': scorePct(dirOf(item.id).scores.rigidity) }"
                   @input="onScoreInput(item.id, 'rigidity', $event)"
                 />
               </label>
@@ -565,6 +573,7 @@ const vertexPanels = computed(() => {
                       step="0.05"
                       :value="dirOf(item.id).scores.universality"
                       aria-label="普遍性"
+                  :style="{ '--v': scorePct(dirOf(item.id).scores.universality) }"
                       @input="onScoreInput(item.id, 'universality', $event)"
                     />
                   </label>
@@ -577,6 +586,7 @@ const vertexPanels = computed(() => {
                       step="0.05"
                       :value="dirOf(item.id).scores.frequency"
                       aria-label="频次"
+                  :style="{ '--v': scorePct(dirOf(item.id).scores.frequency) }"
                       @input="onScoreInput(item.id, 'frequency', $event)"
                     />
                   </label>
@@ -589,6 +599,7 @@ const vertexPanels = computed(() => {
                       step="0.05"
                       :value="dirOf(item.id).scores.rigidity"
                       aria-label="刚性"
+                  :style="{ '--v': scorePct(dirOf(item.id).scores.rigidity) }"
                       @input="onScoreInput(item.id, 'rigidity', $event)"
                     />
                   </label>
@@ -766,7 +777,7 @@ const vertexPanels = computed(() => {
 .legend-toolbar {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-shrink: 0;
 }
 
@@ -782,7 +793,7 @@ const vertexPanels = computed(() => {
 .legend-toolbar-actions {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   flex-shrink: 0;
 }
 
@@ -796,11 +807,23 @@ const vertexPanels = computed(() => {
 }
 
 .legend-list-max {
-  gap: 10px;
+  gap: 6px;
+  /* 放大态内容不铺满整屏，条目按内容宽度排布，避免按钮贴到屏幕最右侧 */
+  max-width: 560px;
 }
 
 .legend-list-max .legend-row {
-  padding: 8px 8px 8px 4px;
+  /* 名称列按内容宽度收缩，操作按钮紧跟名称，不再拉到 720px 之外 */
+  grid-template-columns: 12px max-content auto;
+  padding: 6px 8px 6px 4px;
+}
+
+.legend-list-max .legend-name {
+  width: fit-content;
+}
+
+.legend-list-max .legend-row:hover {
+  background: var(--cv-hover-wash, #e8f1fa);
 }
 
 .legend-list {
@@ -809,17 +832,17 @@ const vertexPanels = computed(() => {
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
 }
 
 .legend-row {
   display: grid;
-  grid-template-columns: 14px minmax(0, 1fr) auto;
+  grid-template-columns: 12px minmax(0, 1fr) auto;
   grid-template-rows: auto auto;
-  column-gap: 8px;
-  row-gap: 4px;
+  column-gap: 6px;
+  row-gap: 2px;
   align-items: center;
-  padding: 4px 4px 4px 2px;
+  padding: 3px 4px 3px 2px;
   border-radius: 8px;
   border: 1px solid transparent;
   cursor: pointer;
@@ -831,8 +854,8 @@ const vertexPanels = computed(() => {
 }
 
 .legend-dot {
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   grid-row: 1;
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
@@ -842,6 +865,7 @@ const vertexPanels = computed(() => {
   grid-column: 2;
   grid-row: 1;
   min-width: 0;
+  max-width: 420px;
   border: none;
   outline: none;
   background: transparent;
@@ -859,18 +883,22 @@ const vertexPanels = computed(() => {
 }
 
 .legend-notes-btn {
-  min-height: 40px;
-  padding: 0 12px;
+  min-height: 22px;
+  padding: 0 9px;
   border: 1px solid var(--cv-frame, #ececec);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.92);
   color: #3c3424;
-  font-size: 13px;
-  font-weight: 650;
+  font-size: 12px;
+  font-weight: 600;
   letter-spacing: 0.02em;
   cursor: pointer;
   line-height: 1;
   white-space: nowrap;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease;
 }
 
 .legend-notes-btn:hover {
@@ -884,34 +912,78 @@ const vertexPanels = computed(() => {
   grid-row: 2;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 2px;
+  margin-top: 2px;
 }
 
 .score-chip {
   display: grid;
-  grid-template-columns: 48px minmax(0, 1fr);
+  grid-template-columns: 34px minmax(0, 1fr);
   align-items: center;
   gap: 8px;
-  font-size: 15px;
-  font-weight: 700;
+  font-size: 12px;
+  font-weight: 600;
   color: #3c3424;
 }
 
 .score-chip input[type='range'] {
   width: 100%;
-  height: 32px;
-  accent-color: #1a73e8;
+  height: 16px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
   cursor: pointer;
 }
 
+.score-chip input[type='range']::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(
+    to right,
+    #1a73e8 0 var(--v, 50%),
+    #dfe3e8 var(--v, 50%) 100%
+  );
+}
+
+.score-chip input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  margin-top: -4px;
+  border-radius: 50%;
+  background: #1a73e8;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.28);
+}
+
+.score-chip input[type='range']::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(
+    to right,
+    #1a73e8 0 var(--v, 50%),
+    #dfe3e8 var(--v, 50%) 100%
+  );
+}
+
+.score-chip input[type='range']::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #1a73e8;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.28);
+}
+
 .legend-remove {
-  width: 32px;
-  height: 32px;
+  width: 22px;
+  height: 22px;
   border: none;
-  border-radius: 4px;
+  border-radius: 6px;
   background: transparent;
   color: #d93025;
-  font-size: 15px;
+  font-size: 13px;
   cursor: pointer;
   line-height: 1;
 }
@@ -922,21 +994,36 @@ const vertexPanels = computed(() => {
 
 .legend-add {
   align-self: flex-start;
-  width: 40px;
-  height: 40px;
-  border: 1px solid #e4e6e8;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.8);
-  color: #5f6368;
-  font-size: 16px;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.7));
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.52);
+  backdrop-filter: blur(var(--glass-blur-sm, 10px));
+  -webkit-backdrop-filter: blur(var(--glass-blur-sm, 10px));
+  color: var(--ent-text-2, #5a6472);
+  font-size: 15px;
   cursor: pointer;
   line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  box-sizing: border-box;
+  transition:
+    background-color 0.16s ease,
+    border-color 0.16s ease,
+    color 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s ease;
 }
 
 .legend-add:hover {
-  border-color: var(--cv-focus, #1c4c7c);
-  color: var(--cv-focus, #1c4c7c);
-  background: var(--cv-hover-wash, #e8f1fa);
+  background: rgba(255, 255, 255, 0.86);
+  border-color: transparent;
+  color: var(--mm-text, #1d2129);
+  box-shadow: var(--glass-shadow-sm, 0 6px 18px rgba(15, 23, 42, 0.1));
+  transform: translateY(-1px);
 }
 
 .dt-stage {

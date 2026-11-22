@@ -16,6 +16,8 @@ const props = defineProps<{
   dimmed?: boolean
   /** 未解决的评论数。 */
   commentCount?: number
+  /** 连线拖拽时指针停在（或吸附到）这个节点上：给一圈就绪高亮。 */
+  connectReady?: boolean
   canvases: DocumentSummary[]
 }>()
 
@@ -114,6 +116,7 @@ function onBodyDblClick(event: MouseEvent) {
     :class="{
       'ng-node--selected': selected,
       'ng-node--highlighted': highlighted,
+      'ng-node--connect-ready': connectReady,
       'ng-node--locked': node.locked,
       'ng-node--collapsed': node.collapsed,
       'ng-node--dimmed': dimmed,
@@ -272,6 +275,12 @@ function onBodyDblClick(event: MouseEvent) {
   box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.35), 0 6px 20px rgba(245, 158, 11, 0.25);
 }
 
+/* 拖线时目标节点亮起，松手就能连上 */
+.ng-node--connect-ready {
+  border-color: var(--ng-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ng-accent) 30%, transparent), 0 8px 22px rgba(15, 23, 42, 0.12);
+}
+
 .ng-node--locked {
   cursor: default;
   background-image: repeating-linear-gradient(135deg, rgba(148, 163, 184, 0.08) 0 6px, transparent 6px 12px);
@@ -387,10 +396,12 @@ function onBodyDblClick(event: MouseEvent) {
   display: flex;
   gap: 2px;
   padding: 2px;
-  border-radius: 8px;
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.1);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.52);
+  backdrop-filter: blur(var(--glass-blur-sm, 10px));
+  -webkit-backdrop-filter: blur(var(--glass-blur-sm, 10px));
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.7));
+  box-shadow: var(--glass-shadow-sm, 0 6px 18px rgba(15, 23, 42, 0.1));
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.12s ease;
@@ -411,14 +422,19 @@ function onBodyDblClick(event: MouseEvent) {
   border: 0;
   border-radius: 6px;
   background: transparent;
-  color: #5f6368;
+  color: var(--ent-text-2, #5a6472);
   font-size: 12px;
   cursor: pointer;
+  transition:
+    background-color 0.16s ease,
+    color 0.16s ease,
+    box-shadow 0.16s ease;
 }
 
 .ng-node__tools button:hover {
-  background: #eef2ff;
-  color: #2563eb;
+  background: rgba(255, 255, 255, 0.86);
+  color: var(--mm-text, #1d2129);
+  box-shadow: var(--glass-shadow-sm, 0 6px 18px rgba(15, 23, 42, 0.1));
 }
 
 /* 评论角标 */

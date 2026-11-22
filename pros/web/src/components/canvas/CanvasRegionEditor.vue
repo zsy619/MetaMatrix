@@ -253,19 +253,30 @@ function onCloseMaximize(event?: Event) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 26px;
+  height: 26px;
   padding: 0;
-  border: 1px solid var(--cv-frame, #ececec);
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.95);
-  color: #5f6368;
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.7));
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.52);
+  backdrop-filter: blur(var(--glass-blur-sm, 10px));
+  -webkit-backdrop-filter: blur(var(--glass-blur-sm, 10px));
+  color: var(--ent-text-2, #5a6472);
   cursor: pointer;
+  transition:
+    background-color 0.16s ease,
+    border-color 0.16s ease,
+    color 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s ease;
 }
 
 .region-max-btn:hover {
-  border-color: var(--cv-focus, #1c4c7c);
-  color: var(--cv-focus, #1c4c7c);
+  background: rgba(255, 255, 255, 0.86);
+  border-color: transparent;
+  color: var(--mm-text, #1d2129);
+  box-shadow: var(--glass-shadow-sm, 0 6px 18px rgba(15, 23, 42, 0.1));
+  transform: translateY(-1px);
 }
 
 .region-input {

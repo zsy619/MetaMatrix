@@ -394,10 +394,12 @@ function onCloseMaximize(event?: Event) {
   flex-shrink: 0;
   width: 20px;
   height: 20px;
-  border: 1px solid var(--cv-frame, #ececec);
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.75);
-  color: #5f6368;
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.7));
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.52);
+  backdrop-filter: blur(var(--glass-blur-sm, 10px));
+  -webkit-backdrop-filter: blur(var(--glass-blur-sm, 10px));
+  color: var(--ent-text-2, #5a6472);
   font-size: 14px;
   line-height: 1;
   cursor: pointer;
@@ -406,9 +408,11 @@ function onCloseMaximize(event?: Event) {
   align-items: center;
   justify-content: center;
   transition:
-    background 0.12s ease,
-    border-color 0.12s ease,
-    color 0.12s ease;
+    background-color 0.16s ease,
+    border-color 0.16s ease,
+    color 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s ease;
 }
 
 .ym-block.compact .add-item-btn,
@@ -420,9 +424,11 @@ function onCloseMaximize(event?: Event) {
 
 .add-item-btn:hover,
 .add-item-btn.muted:hover {
-  background: var(--cv-hover-wash, #e8f1fa);
-  border-color: var(--cv-focus, #1c4c7c);
-  color: var(--cv-focus, #1c4c7c);
+  background: rgba(255, 255, 255, 0.86);
+  border-color: transparent;
+  color: var(--mm-text, #1d2129);
+  box-shadow: var(--glass-shadow-sm, 0 6px 18px rgba(15, 23, 42, 0.1));
+  transform: translateY(-1px);
 }
 
 .ym-block-body {

@@ -17,7 +17,11 @@ function mountGantt() {
   const store = useDocumentStore()
   store.loadFromTemplate('project-gantt')
   const doc = store.current_data as ProjectGanttDocumentJSON
-  const wrapper = mount(ProjectGanttCanvas, { props: { doc } })
+  // el-icon 只做装饰，测试环境不装 Element Plus，用空壳替身即可
+  const wrapper = mount(ProjectGanttCanvas, {
+    props: { doc },
+    global: { stubs: { 'el-icon': true } },
+  })
   return { store, wrapper, doc }
 }
 
@@ -64,20 +68,20 @@ describe('项目甘特图', () => {
     const { store, wrapper } = mountGantt()
     const docRow = wrapper.findAll('tbody tr').find((row) => (row.get('input[aria-label="任务名称"]').element as HTMLInputElement).value === '文档')
     await docRow!.trigger('click')
-    await wrapper.findAll('button').find((button) => button.text() === '降级')!.trigger('click')
+    await wrapper.get('button[aria-label="降级"]').trigger('click')
     const afterIndent = store.current_data
     expect(isProjectGanttDoc(afterIndent)).toBe(true)
     if (!isProjectGanttDoc(afterIndent)) return
     expect(afterIndent.tasks.find((task) => task.name === '文档')?.parentId).toBe('gantt_2')
     expect(afterIndent.tasks.find((task) => task.id === 'gantt_2')?.kind).toBe('summary')
 
-    await wrapper.findAll('button').find((button) => button.text() === '按依赖排程')!.trigger('click')
+    await wrapper.get('button[aria-label="按依赖排程"]').trigger('click')
     expect(wrapper.get('[role="status"]').text()).toBe('已按依赖排程')
     const scheduled = store.current_data
     if (!isProjectGanttDoc(scheduled)) return
     expect(scheduled.tasks.find((task) => task.name === '方案设计')?.start).toBe('2026-11-16')
 
-    await wrapper.findAll('button').find((button) => button.text() === '插入里程碑')!.trigger('click')
+    await wrapper.get('button[aria-label="插入里程碑"]').trigger('click')
     const inserted = store.current_data
     expect(isProjectGanttDoc(inserted) && inserted.tasks.some((task) => task.kind === 'milestone' && task.name === '里程碑')).toBe(true)
 

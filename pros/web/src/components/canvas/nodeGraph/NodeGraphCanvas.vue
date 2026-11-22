@@ -25,6 +25,7 @@ import { findFreeSpot } from './placeNode'
 import { escapeHtml } from '../../../utils/itemsHtml'
 import { marqueeRect } from './marquee'
 import { anchorForPoint, type AnchorSide, type GraphEdgeAnchor } from './anchors'
+import { connectTargetAt, nodeAtPoint } from './hitTest'
 import { buildNodeGraphSvg, exportNodeGraphImage, type ExportFormat } from './exportImage'
 import { computeGuides, snapToGrid, type Guide } from './guides'
 import { createPresence, type PeerCursor } from './presence'
@@ -387,19 +388,21 @@ function onConnectStart(event: PointerEvent, node: GraphNode) {
 
 /** 命中测试：世界坐标点落在哪个节点上。 */
 function nodeAt(worldX: number, worldY: number): GraphNode | null {
-  for (let i = store.nodes.length - 1; i >= 0; i -= 1) {
-    const node = store.nodes[i]
-    if (
-      worldX >= node.x &&
-      worldX <= node.x + node.width &&
-      worldY >= node.y &&
-      worldY <= node.y + node.height
-    ) {
-      return node
-    }
-  }
-  return null
+  return nodeAtPoint(store.nodes, worldX, worldY)
 }
+
+/** 连线落点：先精确命中，再按 24 屏幕像素吸附，缩放后手感一致。 */
+function connectTarget(worldX: number, worldY: number): GraphNode | null {
+  return connectTargetAt(store.nodes, worldX, worldY, 24 / (viewport.value.zoom || 1))
+}
+
+/** 拖线时指针停在哪个节点上（空串表示空白处），用来点亮目标节点。 */
+const connectHoverId = computed(() => {
+  const state = drag.value
+  if (state.kind !== 'connect') return ''
+  const hit = connectTarget(state.x, state.y)
+  return hit && hit.id !== state.source ? hit.id : ''
+})
 
 // ---------- 指针移动与抬起 ----------
 
@@ -542,11 +545,12 @@ function onPointerUp(event: PointerEvent) {
   if (state.kind === 'resize') return
   if (state.kind === 'connect') {
     const world = clientToWorld(event.clientX, event.clientY)
-    const target = nodeAt(world.x, world.y)
+    const target = connectTarget(world.x, world.y)
     if (target && target.id !== state.source) {
       // 自己连自己、同方向重复连线都由 store 挡下。
       const from: GraphEdgeAnchor = { side: state.side, offset: state.offset }
-      store.addEdge(state.source, target.id, '', from, anchorForPoint(target, world))
+      const ok = store.addEdge(state.source, target.id, '', from, anchorForPoint(target, world))
+      if (!ok) ElMessage.info('这两个节点之间已经有一条连线了')
     } else if (!target) {
       // 拖到空白处：保留悬空端点，之后再拖到节点上接上。
       const from: GraphEdgeAnchor = { side: state.side, offset: state.offset }
@@ -557,7 +561,7 @@ function onPointerUp(event: PointerEvent) {
   if (state.kind === 'reconnect') {
     if (!state.moved) return
     const world = clientToWorld(event.clientX, event.clientY)
-    const target = nodeAt(world.x, world.y)
+    const target = connectTarget(world.x, world.y)
     if (!target) {
       store.reconnectEdge(state.edgeId, state.which, '', undefined, world)
       return
@@ -1491,6 +1495,7 @@ onBeforeUnmount(() => {
         :readonly="props.readonly"
         :dimmed="!!trace && !trace.nodes.has(node.id)"
         :comment-count="store.commentsOf(node.id).filter((item) => !item.resolved).length"
+        :connect-ready="connectHoverId === node.id"
         :canvases="props.canvases"
         @open-panel="openPanel"
         @open-editor="(id: string) => emit('openEditor', id)"
@@ -1550,10 +1555,10 @@ onBeforeUnmount(() => {
     </div>
 
     <!-- 浮动工具面板（同 excalidraw：左上角一块小面板，图标 + 分隔线） -->
-    <div v-if="!props.readonly" class="ng-toolbar" role="toolbar" aria-label="画布工具">
+    <div v-if="!props.readonly" class="ng-toolbar mm-bar__group" role="toolbar" aria-label="画布工具">
       <button
         type="button"
-        class="ng-tool-btn"
+        class="ng-tool-btn mm-bar__btn mm-bar__btn--square"
         :disabled="!store.canUndo"
         title="撤销 (Cmd/Ctrl+Z)"
         aria-label="撤销"
@@ -1563,7 +1568,7 @@ onBeforeUnmount(() => {
       </button>
       <button
         type="button"
-        class="ng-tool-btn"
+        class="ng-tool-btn mm-bar__btn mm-bar__btn--square"
         :disabled="!store.canRedo"
         title="重做 (Cmd/Ctrl+Shift+Z)"
         aria-label="重做"
@@ -1571,10 +1576,10 @@ onBeforeUnmount(() => {
       >
         <el-icon><RefreshRight /></el-icon>
       </button>
-      <span class="ng-tool-sep"></span>
+      <span class="ng-tool-sep mm-bar__divider"></span>
       <button
         type="button"
-        class="ng-tool-btn"
+        class="ng-tool-btn mm-bar__btn mm-bar__btn--square"
         title="新建富文本节点"
         aria-label="新建富文本节点"
         @click="addNodeAtCenter('richtext')"
@@ -1583,17 +1588,17 @@ onBeforeUnmount(() => {
       </button>
       <button
         type="button"
-        class="ng-tool-btn"
+        class="ng-tool-btn mm-bar__btn mm-bar__btn--square"
         title="新建画布节点"
         aria-label="新建画布节点"
         @click="requestCanvasNode"
       >
         <el-icon><Connection /></el-icon>
       </button>
-      <span class="ng-tool-sep"></span>
+      <span class="ng-tool-sep mm-bar__divider"></span>
       <button
         type="button"
-        class="ng-tool-btn"
+        class="ng-tool-btn mm-bar__btn mm-bar__btn--square"
         :class="{ 'is-on': bgPanelOpen }"
         title="画布背景"
         aria-label="画布背景"
@@ -1604,7 +1609,7 @@ onBeforeUnmount(() => {
       </button>
       <button
         type="button"
-        class="ng-tool-btn"
+        class="ng-tool-btn mm-bar__btn mm-bar__btn--square"
         :class="{ 'is-on': panMode }"
         title="抓手：拖拽平移画布 (H)"
         aria-label="抓手工具"
@@ -1615,7 +1620,7 @@ onBeforeUnmount(() => {
       </button>
       <button
         type="button"
-        class="ng-tool-btn"
+        class="ng-tool-btn mm-bar__btn mm-bar__btn--square"
         title="适应画布"
         aria-label="适应画布"
         @click="fitToContent"
@@ -1624,7 +1629,7 @@ onBeforeUnmount(() => {
       </button>
       <button
         type="button"
-        class="ng-tool-btn"
+        class="ng-tool-btn mm-bar__btn mm-bar__btn--square"
         :class="{ 'is-on': searchOpen }"
         title="搜索节点 (Cmd/Ctrl+F)"
         aria-label="搜索节点"
@@ -1635,7 +1640,7 @@ onBeforeUnmount(() => {
       </button>
       <button
         type="button"
-        class="ng-tool-btn"
+        class="ng-tool-btn mm-bar__btn mm-bar__btn--square"
         :class="{ 'is-on': statsOpen }"
         title="画布统计"
         aria-label="画布统计"
@@ -1645,7 +1650,7 @@ onBeforeUnmount(() => {
       </button>
       <button
         type="button"
-        class="ng-tool-btn"
+        class="ng-tool-btn mm-bar__btn mm-bar__btn--square"
         :class="{ 'is-on': helpOpen }"
         title="快捷键说明"
         aria-label="快捷键说明"
@@ -2082,48 +2087,6 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 2px;
-  padding: 4px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.94);
-  border: 1px solid #e5e7eb;
-  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
-}
-
-.ng-tool-btn {
-  width: 30px;
-  height: 30px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: #5f6368;
-  font-size: 15px;
-  cursor: pointer;
-  transition: background 0.12s ease, color 0.12s ease;
-}
-
-.ng-tool-btn:hover:not(:disabled) {
-  background: #f1f3f4;
-  color: #1f2329;
-}
-
-.ng-tool-btn:disabled {
-  opacity: 0.35;
-  cursor: default;
-}
-
-.ng-tool-btn.is-on {
-  background: #e8f0fe;
-  color: #1a73e8;
-}
-
-.ng-tool-sep {
-  width: 1px;
-  height: 18px;
-  margin: 0 3px;
-  background: #e5e7eb;
 }
 
 /* 快捷键说明：原来常驻在工具栏上的长提示收进这个面板，画布不再被一行字占着 */

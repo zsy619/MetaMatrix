@@ -11,6 +11,7 @@
  * 工具栏可做六题能力自评，结果直接写到当前等级。
  */
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { Guide, RefreshLeft } from '@element-plus/icons-vue'
 import { canvasChromeStyle } from './canvasChrome'
 import type { CultivationMountainDocumentJSON, CultivationLevel } from '../../types/canvas'
 import { isCultivationMountainDoc } from '../../types/canvas'
@@ -231,14 +232,23 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       <header class="cm-title-bar">
         <h1>{{ doc.title }}</h1>
         <div class="cm-toolbar">
-          <button type="button" class="cm-btn cm-btn--primary" @click="startAssessment">能力自评</button>
           <button
             type="button"
-            class="cm-btn cm-btn--secondary"
+            class="cm-btn cm-btn--primary mm-bar__primary"
+            @click="startAssessment"
+          >
+            <el-icon><Guide /></el-icon>
+            <span>能力自评</span>
+          </button>
+          <button
+            type="button"
+            class="cm-btn cm-btn--secondary mm-bar__btn"
             :disabled="!doc.currentLevel"
+            title="重置修炼进度"
             @click="resetProgress"
           >
-            重置进度
+            <el-icon><RefreshLeft /></el-icon>
+            <span>重置进度</span>
           </button>
           <span v-if="currentLevelData" class="cm-current">
             当前修炼进度 · <strong>L{{ doc.currentLevel }} {{ currentLevelData.name }}</strong>
@@ -666,13 +676,22 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 .cm-toolbar {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
   flex-wrap: wrap;
 }
 
 .cm-current {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.7));
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.52);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
   font-size: 13px;
   color: var(--cv-muted, #5f6368);
+  white-space: nowrap;
 }
 
 .cm-current strong {
@@ -680,12 +699,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 }
 
 .cm-btn {
-  padding: 8px 20px;
-  border: none;
-  border-radius: 8px;
-  font-size: 14px;
-  cursor: pointer;
-  transition: background 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 
 .cm-btn:disabled {
@@ -694,21 +710,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 }
 
 .cm-btn--primary {
-  background: #202124;
-  color: #fff;
-}
-
-.cm-btn--primary:hover:not(:disabled) {
-  background: #3c4043;
-}
-
-.cm-btn--secondary {
-  background: #f0f0f0;
-  color: #666;
-}
-
-.cm-btn--secondary:hover:not(:disabled) {
-  background: #e0e0e0;
+  border: 0;
 }
 
 /* ---------------- 矩阵 ---------------- */
