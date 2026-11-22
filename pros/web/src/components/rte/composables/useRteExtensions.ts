@@ -59,6 +59,7 @@ import { normalizeLinkHref } from '../../../utils/rteLinkHref'
 import { clearEditorFormat } from '../../../utils/rteClearFormat'
 import { pasteVolume, previewShortcutAllowed } from '../../../utils/rteRound8'
 import { filesFromImageDataUrls, pasteCarriesText } from '../../../utils/rtePasteImage'
+import { pasteIntoCodeBlock } from '../../../utils/rteCodePaste'
 import {
   htmlHasTable,
   looksLikeTsvTable,
@@ -506,6 +507,16 @@ const editor = useEditor({
       }
       if (volume === 'warn') {
         ElMessage.info('正在粘贴较大内容，编辑器可能短暂无响应')
+      }
+      /*
+       * 代码块粘贴：一律按原文逐字插入。
+       * 下面几条（Markdown 模式 / 纯文本模式 / Markdown 智能识别）都会把纯文本
+       * 解析成 HTML 再 insertContent，而代码块是 text* 纯文本节点，
+       * 块级 HTML 插不进去 —— 表现就是"粘不进去"。
+       */
+      if (pasteIntoCodeBlock(_view, plain, html)) {
+        event.preventDefault()
+        return true
       }
       if (plain && plain.includes('\t')) {
         const ed = editor.value

@@ -819,11 +819,15 @@
   display: flex;
   align-items: center;
   gap: 2px;
-  padding: 0;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  box-shadow: none;
+  padding: 3px 4px;
+  border: 1px solid rgba(15, 23, 42, .07);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, .74);
+  backdrop-filter: blur(10px) saturate(165%);
+  -webkit-backdrop-filter: blur(10px) saturate(165%);
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, .05),
+    0 8px 20px -14px rgba(15, 23, 42, .32);
 }
 .rte-code-chrome select,
 .rte-code-chrome button {
@@ -834,18 +838,30 @@
   font-size: 12px;
   border-radius: 4px;
   cursor: pointer;
+  transition:
+    background .16s ease,
+    color .16s ease;
 }
 .rte-code-chrome button {
   padding: 0 8px;
 }
+.rte-code-chrome select {
+  padding: 0 4px 0 6px;
+  outline: none;
+}
+.rte-code-chrome select:focus-visible,
+.rte-code-chrome button:focus-visible {
+  outline: 2px solid rgba(51, 112, 255, .45);
+  outline-offset: 1px;
+}
 .rte-code-chrome select:hover,
 .rte-code-chrome button:hover,
 .rte-code-chrome button.is-on {
-  background: #f2f3f5;
+  background: rgba(15, 23, 42, .06);
 }
 .rte-code-chrome button.is-on {
   color: #3370ff;
-  background: #e1eaff;
+  background: rgba(51, 112, 255, .12);
 }
 .rte-empty-guide {
   display: flex;
@@ -1089,32 +1105,93 @@
 
 .rte-root :deep(.tiptap pre),
 .rte-root :deep(.ProseMirror pre) {
-  background: #f5f6f7;
-  border-radius: 8px;
+  position: relative;
+  background: linear-gradient(180deg, #fbfcfe 0%, #f3f5f8 100%);
+  border: 1px solid rgba(15, 23, 42, .08);
+  border-radius: 12px;
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, .04),
+    0 10px 26px -18px rgba(15, 23, 42, .28);
   /* 顶上留出代码浮层（语言 / 行号 / 换行 / 复制）的高度，避免盖住第一行 */
-  padding: 36px 16px 12px;
+  padding: 36px 18px 14px;
   overflow: auto;
-  font-size: 14px;
+  color: #1f2937;
+  font-family: ui-monospace, SFMono-Regular, 'JetBrains Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  font-size: 13.5px;
   line-height: 22px;
-  margin: 8px 0;
+  letter-spacing: .2px;
+  tab-size: 2;
+  margin: 10px 0;
+  transition:
+    border-color .18s ease,
+    box-shadow .18s ease;
+}
+
+.rte-root :deep(.tiptap pre:hover),
+.rte-root :deep(.ProseMirror pre:hover) {
+  border-color: rgba(15, 23, 42, .12);
+  box-shadow:
+    0 1px 2px rgba(15, 23, 42, .05),
+    0 14px 30px -18px rgba(15, 23, 42, .32);
+}
+
+.rte-root :deep(pre code),
+.rte-root :deep(pre pre) {
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  padding: 0;
+}
+
+.rte-root :deep(pre ::selection) {
+  background: rgba(51, 112, 255, .18);
+}
+
+/* 空代码块给个提示，别让人以为是块空白砖 */
+.rte-root :deep(pre:has(> code:empty))::before,
+.rte-root :deep(pre:has(> code > br.ProseMirror-trailingBreak))::before {
+  content: '在此粘贴或输入代码…';
+  display: block;
+  color: #a9aeb8;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* 代码块滚动条 */
+.rte-root :deep(pre::-webkit-scrollbar) {
+  width: 10px;
+  height: 10px;
+}
+
+.rte-root :deep(pre::-webkit-scrollbar-thumb) {
+  background: rgba(15, 23, 42, .18);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: 999px;
+}
+
+.rte-root :deep(pre::-webkit-scrollbar-thumb:hover) {
+  background: rgba(15, 23, 42, .32);
+  background-clip: content-box;
 }
 
 .rte-root :deep(pre[data-line-numbers='1']) {
   position: relative;
-  padding-left: 3.2em;
+  padding-left: 3.4em;
   line-height: 22px;
 }
 
 .rte-root :deep(.rte-code-gutter) {
   position: absolute;
   top: 36px;
-  left: 8px;
+  left: 10px;
   width: 2.2em;
   text-align: right;
-  color: #8f959e;
+  color: #a5abb5;
   font-size: 12px;
   line-height: 22px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: ui-monospace, SFMono-Regular, 'JetBrains Mono', Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
   white-space: pre;
   user-select: none;
   pointer-events: none;
