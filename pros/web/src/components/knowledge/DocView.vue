@@ -103,6 +103,8 @@ const outlineItems = ref<knowledgeApiV5.OutlineItem[]>([])
 let presenceTimer: ReturnType<typeof setInterval> | null = null
 
 const panelId = computed(() => `doc:${props.documentId}`)
+/** 阅读位置记忆作用域：同一篇文档下次打开回到上次滚动的地方。 */
+const scrollMemoryKey = computed(() => `doc:${props.documentId}`)
 const router = useRouter()
 
 async function load() {
@@ -698,6 +700,7 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
         ref="editorRef"
         class="doc-view__editor"
         :panel-id="panelId"
+        :scroll-memory-key="scrollMemoryKey"
         :knowledge-project-id="projectId"
         :compact="false"
         :expanded="true"

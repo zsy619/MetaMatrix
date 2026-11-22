@@ -81,6 +81,7 @@ import {
 } from '../utils/rteRound7'
 import { type CalloutVariant } from '../extensions/callout'
 import { markdownInlineEnabled, setMarkdownInlineEnabled } from '../extensions/rteInlineMarkdown'
+import { useRteScrollMemory } from './rte/composables/useRteScrollMemory'
 import { MERMAID_TEMPLATES, mermaidTemplate } from '../extensions/mermaidFlow'
 import {
   BLOCK_MENU,
@@ -276,6 +277,11 @@ const props = withDefaults(
      * 也不会把页面大小写回文档。最大化/独立文档仍走默认的纸张视图。
      */
     pageSheet?: boolean
+    /**
+     * 阅读位置记忆的作用域（如 doc:xxx）。
+     * 传了才会记住滚动位置并在下次打开时回到原处；不传（画布内嵌面板等）不记忆。
+     */
+    scrollMemoryKey?: string
   }>(),
   {
     title: '',
@@ -289,6 +295,7 @@ const props = withDefaults(
     panelId: '',
     knowledgeProjectId: '',
     pageSheet: true,
+    scrollMemoryKey: '',
   },
 )
 
@@ -301,6 +308,12 @@ const emit = defineEmits<{
 
 const localTitle = ref(props.title ?? '')
 const rteRootEl = ref<HTMLElement | null>(null)
+/**
+ * 阅读位置记忆：同一篇文档下次打开回到上次滚动的地方。
+ * 作用域由外部传入（doc:xxx），不传就不记忆。
+ */
+const scrollMemoryScope = computed(() => props.scrollMemoryKey || '')
+useRteScrollMemory({ rootEl: rteRootEl, scope: scrollMemoryScope })
 watch(
   () => props.title,
   (v) => {
