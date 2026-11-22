@@ -1,5 +1,5 @@
 import type { Editor } from '@tiptap/core'
-import { pinyin } from 'pinyin-pro'
+import { pinyinImpl } from './pinyinRuntime'
 
 export type RubyPiece = {
   text: string
@@ -14,6 +14,9 @@ export type RubyPiece = {
 export function rubyPieces(text: string): RubyPiece[] {
   const raw = String(text ?? '')
   if (!raw) return []
+  const pinyin = pinyinImpl()
+  // 拼音库按需加载；没加载完时先不注音（调用方会先 await loadPinyin）。
+  if (!pinyin) return []
   const tokens = pinyin(raw, { type: 'all', toneType: 'symbol', nonZh: 'consecutive' })
   const pieces = tokens.map((token) => ({
     text: token.origin,

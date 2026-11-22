@@ -1,5 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 import { rubyPieces } from './rteRuby'
+import { loadPinyin } from './pinyinRuntime'
+
+// 拼音库按需加载：先等它就绪再断言。
+beforeAll(async () => {
+  await loadPinyin()
+})
 
 describe('自动注音', () => {
   it('按词给汉字标声调，多音字跟着词走', () => {

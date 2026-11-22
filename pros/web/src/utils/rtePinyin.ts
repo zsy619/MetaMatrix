@@ -4,12 +4,19 @@
  * 依赖 pinyin-pro：中文取首字母、全拼（不带声调），
  * 英文与数字原样保留，方便「bt」搜到「标题」。
  */
-import { pinyin } from 'pinyin-pro'
+import { loadPinyin, pinyinImpl } from './pinyinRuntime'
+
+/** 预热拼音库（后台加载，不阻塞交互）。 */
+export function ensurePinyin(): Promise<unknown> {
+  return loadPinyin()
+}
 
 /** 汉字转拼音首字母，非汉字字符原样保留（小写）。「标题 1」-> 「bt1」 */
 export function pinyinInitials(text: string): string {
   const raw = String(text ?? '')
   if (!raw) return ''
+  const pinyin = pinyinImpl()
+  if (!pinyin) return ''
   return pinyin(raw, {
     pattern: 'first',
     toneType: 'none',
@@ -24,6 +31,8 @@ export function pinyinInitials(text: string): string {
 export function pinyinFull(text: string): string {
   const raw = String(text ?? '')
   if (!raw) return ''
+  const pinyin = pinyinImpl()
+  if (!pinyin) return ''
   return pinyin(raw, {
     pattern: 'pinyin',
     toneType: 'none',

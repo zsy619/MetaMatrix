@@ -1,4 +1,4 @@
-import html2canvas from 'html2canvas'
+import type html2canvasType from 'html2canvas'
 import { jsPDF } from 'jspdf'
 import { footerForPage, formatPageNumber, headerForPage, pageChromeIsEmpty, type PanelPageChrome } from './rtePageChrome'
 import { pdfPageFormat, type RtePageSizeId } from './rtePageSize'
@@ -138,8 +138,10 @@ export function planPdfSlices(options: {
 export async function rasterizeElementForExport(
   el: HTMLElement,
   options: RasterizeExportOptions = {},
-  rasterizeImpl: typeof html2canvas = html2canvas,
+  rasterizeImpl?: typeof html2canvasType,
 ): Promise<HTMLCanvasElement> {
+  // html2canvas 约 1MB，按需加载：只有真的导出时才拉进来。
+  const rasterize = rasterizeImpl ?? (await loadHtml2Canvas())
   const scale = options.scale ?? 2
   const maxPixels = options.maxPixels ?? DEFAULT_EXPORT_PIXEL_BUDGET
   const signal = options.signal
@@ -154,7 +156,7 @@ export async function rasterizeElementForExport(
   assertRasterPixelBudget(width, height, scale, maxPixels)
 
   report('rasterize', 0, 10)
-  const canvas = await rasterizeImpl(el, {
+  const canvas = await rasterize(el, {
     backgroundColor: '#ffffff',
     scale,
     useCORS: true,
@@ -231,7 +233,8 @@ async function rasterLine(text: string, widthPx: number, signal?: AbortSignal): 
   ].join(';')
   document.body.appendChild(host)
   try {
-    const canvas = await html2canvas(host, { backgroundColor: '#ffffff', scale: 2, logging: false })
+    const rasterize = await loadHtml2Canvas()
+    const canvas = await rasterize(host, { backgroundColor: '#ffffff', scale: 2, logging: false })
     throwIfExportAborted(signal)
     return canvas
   } catch (error) {
@@ -581,4 +584,11 @@ async function addSelectableLayer(
       { url: href },
     )
   }
+}
+
+/** html2canvas 按需加载，进程内只加载一次。 */
+let html2canvasLoader: Promise<typeof html2canvasType> | null = null
+function loadHtml2Canvas(): Promise<typeof html2canvasType> {
+  html2canvasLoader ??= import('html2canvas').then((mod) => mod.default)
+  return html2canvasLoader
 }

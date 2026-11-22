@@ -1,5 +1,6 @@
 import { createApp } from 'vue'
-import ElementPlus from 'element-plus'
+// Element Plus 组件改为按需自动引入（unplugin-vue-components + ElementPlusResolver），
+// 这里只保留全量样式表，避免程序化弹层（ElMessage / ElMessageBox）缺样式。
 import 'element-plus/dist/index.css'
 import 'katex/dist/katex.min.css'
 import './styles/base.css'
@@ -16,10 +17,13 @@ import './styles/glass.css'
 import App from './App.vue'
 import router from './router'
 import { pinia } from './stores'
+// v-loading 指令：整库引入被移除后必须单独注册（ElLoading.install 会注册
+// 'loading' 指令并注入 app._context，供 loading service 使用）。
+import { ElLoading } from 'element-plus/es/components/loading/index'
 
 const app = createApp(App)
 // pinia 必须先于 router 挂载：路由守卫里要拿 auth store。
 app.use(pinia)
+app.use(ElLoading)
 app.use(router)
-app.use(ElementPlus)
 app.mount('#app')

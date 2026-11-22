@@ -7,10 +7,10 @@ import {
   type ToolbarGroupButtonConfig,
   type ToolbarGroupButtonsByPanelId,
 } from './rteToolbarGroupButtons'
-import { CHART_GROUPS } from './echarts/chartGroups'
+import { CHART_GROUP_IDS } from './echarts/chartGroupIds'
 
 /** 图表分组在工具栏里的按钮 key（与 CHART_GROUPS 一一对应）。 */
-export const CHART_TOOLBAR_KEYS: readonly string[] = CHART_GROUPS.map((group) => `chart:${group.id}`)
+export const CHART_TOOLBAR_KEYS: readonly string[] = CHART_GROUP_IDS.map((id) => `chart:${id}`)
 
 /** 旧版「图表」总入口的按钮 key：一个下拉里再分区，现在拆成 9 个分类下拉。 */
 export const LEGACY_CHART_ENTRY_KEY = 'echarts'

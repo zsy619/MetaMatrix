@@ -4,56 +4,24 @@ import { getToken } from '../api/http'
 import { mediaFetchUrl } from '../utils/mediaPath'
 import { seedMediaThumb } from '../utils/mediaThumb'
 
-const blobs = new Map<string, string>()
-const pending = new Set<string>()
-/** 服务端明确说不存在的路径。编辑器每次更新都会再扫一遍 DOM，不记住的话会一直打 404。 */
-const gone = new Set<string>()
-/** 其它失败（网络、5xx）的下次可请求时间，避免每次按键都再打一次。 */
-const retryAt = new Map<string, number>()
-const RETRY_GAP_MS = 30_000
+import {
+  isMediaHydrateGone,
+  mediaBlobs as blobs,
+  mediaHydrateWaiting,
+  mediaPending as pending,
+  noteMediaHydrateError,
+  noteMediaHydrateStatus,
+  clearMediaHydrateBlobs,
+} from './mediaHydrateState'
 
-/** 404 / 410：素材已删除或不属于当前用户，本会话不再请求。 */
-export function noteMediaHydrateStatus(src: string, status: number, now = Date.now()): 'gone' | 'ok' | 'wait' {
-  if (status === 404 || status === 410) {
-    gone.add(src)
-    retryAt.delete(src)
-    return 'gone'
-  }
-  if (status >= 200 && status < 300) {
-    gone.delete(src)
-    retryAt.delete(src)
-    return 'ok'
-  }
-  retryAt.set(src, now + RETRY_GAP_MS)
-  return 'wait'
-}
-
-export function noteMediaHydrateError(src: string, now = Date.now()): void {
-  if (!src || gone.has(src)) return
-  retryAt.set(src, now + RETRY_GAP_MS)
-}
-
-export function isMediaHydrateGone(src: string): boolean {
-  return gone.has(src)
-}
-
-export function mediaHydrateWaiting(src: string, now = Date.now()): boolean {
-  const until = retryAt.get(src)
-  return until != null && now < until
-}
-
-/**
- * 释放正文图片的 blob 缓存（登出等场景）。
- *
- * blob: 地址绑定在创建它的文档里，登出后继续留着既占内存，也可能把上一个
- * 会话的预览带给下一个用户，所以登出时统一回收。
- */
-export function clearMediaHydrateBlobs(): void {
-  blobs.forEach((url) => URL.revokeObjectURL(url))
-  blobs.clear()
-  pending.clear()
-  gone.clear()
-  retryAt.clear()
+// 状态与判定函数都放在 mediaHydrateState（不依赖 TipTap），
+// 这里原样转出，保持既有 import 路径可用。
+export {
+  clearMediaHydrateBlobs,
+  isMediaHydrateGone,
+  mediaHydrateWaiting,
+  noteMediaHydrateError,
+  noteMediaHydrateStatus,
 }
 
 /** Browser fetches go through /api, which the dev server strips before the API. */

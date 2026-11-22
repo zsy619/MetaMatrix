@@ -13,7 +13,7 @@ import {
 import { friendlyApiMessage } from '../utils/apiMessage'
 import { clearRecentOpens } from '../utils/canvasTransfer'
 import { clearMediaThumbs } from '../utils/mediaThumb'
-import { clearMediaHydrateBlobs } from '../extensions/mediaHydrate'
+import { clearMediaHydrateBlobs } from '../extensions/mediaHydrateState'
 
 const USER_KEY = 'metamatrix:auth:user'
 
