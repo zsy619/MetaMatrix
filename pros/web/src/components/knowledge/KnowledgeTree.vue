@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import * as knowledgeApi from '../../api/knowledge'
 import * as knowledgeApiV6 from '../../api/knowledge_v6'
 import * as knowledgeApiV5 from '../../api/knowledge_v5'
-import { pinyin } from 'pinyin-pro'
+import { loadPinyin, pinyinImpl } from '../../utils/pinyinRuntime'
 import type { KnowledgeNode, KnowledgeTemplate } from '../../api/knowledge'
 import { createDocument, getDocument, updateDocument } from '../../api/documents'
 import { useAuthStore } from '../../stores/auth'
@@ -22,7 +22,8 @@ import NodeMenu from './NodeMenu.vue'
 import { RTE_DOC_TEMPLATES, RTE_DOC_TEMPLATE_GROUPS } from '../rteDocTemplates'
 import { SHEET_PRESETS, type SheetPreset } from './sheetModel'
 import { mindmapFromHeadings } from './mindmapModel'
-import IconPicker from '../common/IconPicker.vue'
+// 图标库按需加载：右键菜单里点「改图标」时才下载。
+const IconPicker = defineAsyncComponent(() => import('../common/IconPicker.vue'))
 
 const props = defineProps<{ projectId: string; activeDocumentId?: string }>()
 const router = useRouter()
@@ -39,6 +40,8 @@ const emit = defineEmits<{
   /** 目录树数据刷新（新建 / 重命名 / 删除后）：右侧文件夹列表据此同步。 */
   'tree-updated': []
   renamed: [documentId: string, title: string]
+  /** 树里改了节点的标题 / 图标：右侧打开着的面板要同步。 */
+  'node-meta': [nodeId: string, meta: { title?: string; icon?: string }]
   home: []
   graph: []
 }>()
@@ -360,10 +363,19 @@ watch(
 
 watch(view, () => void load())
 
-/** 右侧编辑器改标题时实时回写左侧；落库由文档保存负责，目录树读的就是文档标题。 */
+/** 右侧编辑器改标题：先本地回写左侧，再防抖落库到节点（否则刷新后标题回退）。 */
+let titleSyncTimer: ReturnType<typeof setTimeout> | null = null
 function setDocTitle(documentId: string, title: string) {
   const node = nodes.value.find((n) => n.documentId === documentId)
-  if (node) node.title = title.trim() || '无标题'
+  if (!node) return
+  const clean = title.trim() || '无标题'
+  node.title = clean
+  if (titleSyncTimer) clearTimeout(titleSyncTimer)
+  titleSyncTimer = setTimeout(() => {
+    void knowledgeApi
+      .updateKnowledgeNode(props.projectId, node.id, { title: clean, pinyin: pinyinOf(clean) })
+      .catch(() => ElMessage.error('标题同步失败'))
+  }, 600)
 }
 
 function docIcon(documentId: string) {
@@ -377,6 +389,8 @@ async function setDocIcon(documentId: string, icon: string) {
   try {
     const updated = await knowledgeApi.updateKnowledgeNode(props.projectId, node.id, { icon })
     node.icon = updated.icon
+    // 图标只写节点：面板显示的就是节点图标，写文档会顶掉面板正在用的 save_version。
+    emit('node-meta', node.id, { icon: updated.icon })
   } catch {
     ElMessage.error('修改图标失败')
   }
@@ -405,6 +419,7 @@ async function applyEmoji(icon: string) {
   try {
     const updated = await knowledgeApi.updateKnowledgeNode(props.projectId, node.id, { icon })
     node.icon = updated.icon
+    emit('node-meta', node.id, { icon: updated.icon })
   } catch {
     ElMessage.error('修改图标失败')
   }
@@ -578,7 +593,12 @@ function nodeOf(documentId: string): KnowledgeNode | null {
   return nodes.value.find((n) => n.documentId === documentId) ?? null
 }
 
-defineExpose({ setDocTitle, docIcon, setDocIcon, pathOf, nodeOf, childrenOf, openQuickCreate })
+/** 按节点 id 取当前树里的节点（树重载后对象会换新，右侧面板要重新绑定）。 */
+function nodeById(id: string): KnowledgeNode | null {
+  return nodes.value.find((n) => n.id === id) ?? null
+}
+
+defineExpose({ setDocTitle, docIcon, setDocIcon, pathOf, nodeOf, nodeById, childrenOf, openQuickCreate })
 
 function onNodeClick(data: TreeNode, _node?: unknown, _component?: unknown, event?: MouseEvent) {
   // 点「⋯」这类操作按钮时不打开文档，只让菜单自己处理。
@@ -792,12 +812,14 @@ async function renameNode(node: KnowledgeNode) {
       inputValidator: (i) => (i && i.trim() ? true : '请输入名称'),
     })
     const title = value.trim()
-    // 改名时同步写拼音列：中文按拼音检索靠它（055）。
+    // 改名时同步写拼音列：中文按拼音检索靠它（055）。拼音库按需加载，先等它就绪。
+    await loadPinyin()
     await knowledgeApi.updateKnowledgeNode(props.projectId, node.id, {
       title,
       pinyin: pinyinOf(title),
     })
     if (node.documentId) emit('renamed', node.documentId, title)
+    emit('node-meta', node.id, { title })
     await load()
   } catch (err) {
     if (err === 'cancel' || err === 'close') return
@@ -938,9 +960,11 @@ const filteredHits = computed(() => {
   )
 })
 
-/** 标题的拼音与首字母：中文按拼音检索（055）。 */
+/** 标题的拼音与首字母：中文按拼音检索（055）。拼音库按需加载，未就绪时留空。 */
 function pinyinOf(title: string) {
   if (!title) return ''
+  const pinyin = pinyinImpl()
+  if (!pinyin) return ''
   const full = pinyin(title, { toneType: 'none', type: 'array' }).join('')
   const first = pinyin(title, { pattern: 'first', toneType: 'none', type: 'array' }).join('')
   return `${full} ${first}`.toLowerCase()
@@ -957,6 +981,7 @@ function openQuickCreate(parentId: string | null = null) {
 async function quickBlankDoc() {
   const title = quickTitle.value.trim() || '无标题文档'
   try {
+    await loadPinyin()
     const node = await knowledgeApi.createKnowledgeNode(props.projectId, {
       parentId: quickParentId.value,
       nodeType: 'doc',
@@ -1334,6 +1359,8 @@ function onKeydown(event: KeyboardEvent) {
 }
 
 onMounted(() => {
+  // 后台预热拼音库（拼音检索要用），不阻塞首屏渲染。
+  void loadPinyin()
   loadViews()
   window.addEventListener('keydown', onKeydown)
   document.addEventListener('mousedown', onDocMouseDown)
@@ -1342,6 +1369,7 @@ onMounted(() => {
   window.addEventListener('scroll', updateAnchor, true)
 })
 onBeforeUnmount(() => {
+  if (titleSyncTimer) clearTimeout(titleSyncTimer)
   window.removeEventListener('keydown', onKeydown)
   document.removeEventListener('mousedown', onDocMouseDown)
   document.removeEventListener('keydown', onDocKeydown)

@@ -28,6 +28,7 @@ import {
   type SheetRow,
   type SheetViewType,
 } from './sheetModel'
+import AppLoading from '../common/AppLoading.vue'
 
 const props = defineProps<{ projectId: string; nodeId: string; title?: string }>()
 
@@ -348,84 +349,102 @@ onMounted(() => void load())
           clearable
           placeholder="搜索记录"
         />
-        <el-popover placement="bottom-end" :width="320" trigger="click">
-          <template #reference>
-            <el-button size="small">
-              筛选<template v-if="view?.filters.length"> ({{ view.filters.length }})</template>
-            </el-button>
-          </template>
-          <div class="sheet__filters">
-            <div v-for="(f, i) in view?.filters ?? []" :key="i" class="sheet__filter">
-              <el-select v-model="f.fieldId" size="small" placeholder="字段">
+        <div class="mm-bar__group">
+          <el-popover placement="bottom-end" :width="320" trigger="click">
+            <template #reference>
+              <el-button class="mm-bar__btn" text size="small">
+                筛选<template v-if="view?.filters.length"> ({{ view.filters.length }})</template>
+              </el-button>
+            </template>
+            <div class="sheet__filters">
+              <div v-for="(f, i) in view?.filters ?? []" :key="i" class="sheet__filter">
+                <el-select v-model="f.fieldId" size="small" placeholder="字段">
+                  <el-option v-for="fd in fields" :key="fd.id" :label="fd.name" :value="fd.id" />
+                </el-select>
+                <el-select v-model="f.op" size="small">
+                  <el-option v-for="op in FILTER_OPS" :key="op.op" :label="op.label" :value="op.op" />
+                </el-select>
+                <el-input
+                  v-if="f.op !== 'empty' && f.op !== 'notEmpty'"
+                  v-model="f.value"
+                  size="small"
+                  placeholder="值"
+                  @change="scheduleSave"
+                />
+                <el-button link size="small" @click="removeFilter(i)">✕</el-button>
+              </div>
+              <el-button link size="small" @click="addFilter">+ 添加筛选条件</el-button>
+            </div>
+          </el-popover>
+
+          <el-popover placement="bottom-end" :width="240" trigger="click">
+            <template #reference>
+              <el-button class="mm-bar__btn" text size="small">
+                排序<template v-if="view?.sortBy"> ({{ fields.find(f => f.id === view?.sortBy)?.name }})</template>
+              </el-button>
+            </template>
+            <div class="sheet__sort">
+              <el-select
+                :model-value="view?.sortBy ?? ''"
+                size="small"
+                clearable
+                placeholder="不排序"
+                @update:model-value="(v: string) => setSort(v || null)"
+              >
                 <el-option v-for="fd in fields" :key="fd.id" :label="fd.name" :value="fd.id" />
               </el-select>
-              <el-select v-model="f.op" size="small">
-                <el-option v-for="op in FILTER_OPS" :key="op.op" :label="op.label" :value="op.op" />
-              </el-select>
-              <el-input
-                v-if="f.op !== 'empty' && f.op !== 'notEmpty'"
-                v-model="f.value"
+              <el-radio-group
+                :model-value="view?.sortOrder ?? 'asc'"
                 size="small"
-                placeholder="值"
-                @change="scheduleSave"
-              />
-              <el-button link size="small" @click="removeFilter(i)">✕</el-button>
+                @update:model-value="(v: any) => { if (view) { view.sortOrder = v; scheduleSave() } }"
+              >
+                <el-radio-button value="asc">升序</el-radio-button>
+                <el-radio-button value="desc">降序</el-radio-button>
+              </el-radio-group>
             </div>
-            <el-button link size="small" @click="addFilter">+ 添加筛选条件</el-button>
-          </div>
-        </el-popover>
+          </el-popover>
 
-        <el-popover placement="bottom-end" :width="240" trigger="click">
-          <template #reference>
-            <el-button size="small">
-              排序<template v-if="view?.sortBy"> ({{ fields.find(f => f.id === view?.sortBy)?.name }})</template>
-            </el-button>
-          </template>
-          <div class="sheet__sort">
-            <el-select
-              :model-value="view?.sortBy ?? ''"
-              size="small"
-              clearable
-              placeholder="不排序"
-              @update:model-value="(v: string) => setSort(v || null)"
-            >
-              <el-option v-for="fd in fields" :key="fd.id" :label="fd.name" :value="fd.id" />
-            </el-select>
-            <el-radio-group
-              :model-value="view?.sortOrder ?? 'asc'"
-              size="small"
-              @update:model-value="(v: any) => { if (view) { view.sortOrder = v; scheduleSave() } }"
-            >
-              <el-radio-button value="asc">升序</el-radio-button>
-              <el-radio-button value="desc">降序</el-radio-button>
-            </el-radio-group>
-          </div>
-        </el-popover>
+          <el-popover placement="bottom-end" :width="240" trigger="click">
+            <template #reference>
+              <el-button class="mm-bar__btn" text size="small">
+                分组<template v-if="groupField"> ({{ groupField.name }})</template>
+              </el-button>
+            </template>
+            <div class="sheet__sort">
+              <el-select
+                :model-value="view?.groupBy ?? ''"
+                size="small"
+                clearable
+                placeholder="不分组"
+                @update:model-value="(v: string) => setGroup(v || null)"
+              >
+                <el-option v-for="fd in fields" :key="fd.id" :label="fd.name" :value="fd.id" />
+              </el-select>
+            </div>
+          </el-popover>
 
-        <el-popover placement="bottom-end" :width="240" trigger="click">
-          <template #reference>
-            <el-button size="small">
-              分组<template v-if="groupField"> ({{ groupField.name }})</template>
-            </el-button>
-          </template>
-          <div class="sheet__sort">
-            <el-select
-              :model-value="view?.groupBy ?? ''"
-              size="small"
-              clearable
-              placeholder="不分组"
-              @update:model-value="(v: string) => setGroup(v || null)"
-            >
-              <el-option v-for="fd in fields" :key="fd.id" :label="fd.name" :value="fd.id" />
-            </el-select>
-          </div>
-        </el-popover>
-
-        <SheetExtras :data="data" :view="view" @import-csv="applyCsv" />
-        <el-button size="small" @click="fieldPanel = true">字段</el-button>
-        <el-button size="small" @click="shareVisible = true">分享</el-button>
-        <span v-if="dirty" class="sheet__dirty">未保存</span>
-        <el-button size="small" type="primary" :loading="saving" @click="save">保存</el-button>
+          <SheetExtras :data="data" :view="view" @import-csv="applyCsv" />
+          <el-button class="mm-bar__btn" text size="small" @click="fieldPanel = true">字段</el-button>
+          <el-button class="mm-bar__btn" text size="small" @click="shareVisible = true">分享</el-button>
+        </div>
+        <span
+          class="mm-bar__status"
+          :class="{ 'is-saving': saving, 'is-dirty': dirty && !saving, 'is-saved': !dirty && !saving }"
+        >
+          <i class="mm-bar__status-dot" />
+          <span v-if="saving">保存中…</span>
+          <span v-else-if="dirty">未保存</span>
+          <span v-else>已保存</span>
+        </span>
+        <el-button
+          class="mm-bar__primary"
+          size="small"
+          type="primary"
+          :loading="saving"
+          @click="save"
+        >
+          保存
+        </el-button>
       </div>
     </header>
 
@@ -443,7 +462,7 @@ onMounted(() => void load())
       <el-button link size="small" @click="selected = []">取消选择</el-button>
     </div>
 
-    <div v-if="loading" class="sheet__empty">加载中…</div>
+    <div v-if="loading" class="sheet__empty"><AppLoading /></div>
 
     <!-- 日历视图 -->
     <div v-else-if="view?.type === 'calendar'">
@@ -675,6 +694,7 @@ onMounted(() => void load())
   overflow: hidden;
 }
 .sheet__bar {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -737,10 +757,6 @@ onMounted(() => void load())
 }
 .sheet__search {
   width: 160px;
-}
-.sheet__dirty {
-  font-size: 12px;
-  color: var(--mm-muted, #86909c);
 }
 .sheet__batch {
   display: flex;

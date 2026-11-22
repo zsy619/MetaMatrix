@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getKnowledgeGraph } from '../../api/knowledge'
 import type { KnowledgeGraph } from '../../api/knowledge'
+import AppLoading from '../common/AppLoading.vue'
 
 const props = defineProps<{ projectId: string }>()
 const emit = defineEmits<{ 'open-node': [documentId: string] }>()
@@ -483,7 +484,7 @@ onBeforeUnmount(() => {
       </div>
     </header>
 
-    <div v-if="loading" class="kg__empty">加载中…</div>
+    <div v-if="loading" class="kg__empty"><AppLoading /></div>
     <div v-else-if="!graph.nodes.length" class="kg__empty">还没有节点，先在目录里创建文档。</div>
     <div
       v-else

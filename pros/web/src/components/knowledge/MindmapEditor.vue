@@ -5,7 +5,7 @@
  * 数据是 nodeGraph 的 nodes/edges 存进 knowledge_node_data（kind=mindmap），
  * 自动布局复用 nodeGraph 的 computeLayout。
  */
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Check,
@@ -13,8 +13,10 @@ import {
   Expand,
   Fold,
   FullScreen,
+  List,
   Minus,
   Plus,
+  Present,
   RefreshLeft,
   RefreshRight,
   Search,
@@ -29,6 +31,7 @@ import {
   applyLayout,
   addChild,
   addSibling,
+  cyclePriority,
   downloadBlob,
   emptyMindmap,
   fromFreeMind,
@@ -42,8 +45,14 @@ import {
   outdentNode,
   parentMap,
   childrenMap,
+  nodeNumbers,
+  presentationOrder,
+  presentationStep,
+  PRIORITY_LABELS,
+  PRIORITY_MARKS,
   removeNode,
   setCollapsed,
+  setNote,
   subtreeIds,
   toFreeMind,
   toMarkdown,
@@ -51,6 +60,7 @@ import {
   toXMind,
   type MindmapDoc,
 } from './mindmapModel'
+import AppLoading from '../common/AppLoading.vue'
 
 const props = defineProps<{ projectId: string; nodeId: string; title?: string }>()
 
@@ -64,6 +74,8 @@ const LAYOUTS: Array<{ mode: LayoutMode; label: string }> = [
   { mode: 'fishbone', label: '鱼骨排列' },
 ]
 
+const ZOOM_LEVELS = [25, 50, 75, 100, 150, 200, 250]
+
 const BRANCH_COLORS = ['#2563eb', '#7c3aed', '#0891b2', '#16a34a', '#f97316', '#db2777', '#0d9488', '#6366f1']
 
 const doc = ref<MindmapDoc>(emptyMindmap())
@@ -75,11 +87,17 @@ const selectedId = ref('')
 const editingId = ref('')
 const query = ref('')
 const zoom = ref(1)
+/** 显示兄弟编号（1 / 1.2）。 */
+const showNumbers = ref(false)
+/** 演示模式：当前展示的节点 id。 */
+const presentId = ref('')
 const offset = ref({ x: 40, y: 40 })
 const shareVisible = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
 const undoStack = ref<string[]>([])
 const redoStack = ref<string[]>([])
+/** 画布节点右键菜单。 */
+const menu = reactive({ visible: false, x: 0, y: 0, nodeId: '' })
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 let historyBase = ''
 let dragState: {
@@ -90,7 +108,8 @@ let dragState: {
   origins: Record<string, { x: number; y: number }>
   originX: number
   originY: number
-} = { kind: 'none', ids: [], startX: 0, startY: 0, origins: {}, originX: 0, originY: 0 }
+  moved: boolean
+} = { kind: 'none', ids: [], startX: 0, startY: 0, origins: {}, originX: 0, originY: 0, moved: false }
 
 const rows = computed(() => outlineRows(doc.value))
 const nodeById = computed(() => new Map(doc.value.nodes.map((n) => [n.id, n])))
@@ -268,6 +287,40 @@ function onRemove(id: string) {
     .catch(() => undefined)
 }
 
+/** 画布节点右键：选中并弹出操作菜单。 */
+function onNodeContextMenu(event: MouseEvent, id: string) {
+  const el = canvasEl.value
+  if (!el) return
+  const rect = el.getBoundingClientRect()
+  select(id)
+  menu.nodeId = id
+  menu.x = Math.min(event.clientX - rect.left, Math.max(8, rect.width - 176))
+  menu.y = Math.min(event.clientY - rect.top, Math.max(8, rect.height - 240))
+  menu.visible = true
+}
+
+function closeMenu() {
+  menu.visible = false
+  menu.nodeId = ''
+}
+
+function menuAction(action: string) {
+  const id = menu.nodeId
+  closeMenu()
+  if (!id) return
+  if (action === 'rename') startEdit(id)
+  else if (action === 'child') onChild(id)
+  else if (action === 'sibling') onSibling(id)
+  else if (action === 'indent') onIndent(id)
+  else if (action === 'outdent') onOutdent(id)
+  else if (action === 'collapse') onToggleCollapse(id)
+  else if (action === 'color') setColor(id, '')
+  else if (action === 'priority') togglePriority(id)
+  else if (action === 'note') void editNote(id)
+  else if (action === 'present') startPresent(id)
+  else if (action === 'delete') onRemove(id)
+}
+
 function onIndent(id: string) {
   if (indentNode(doc.value, id)) commit()
 }
@@ -367,7 +420,72 @@ function onRowCommand(id: string, command: string) {
   else if (command === 'up') onMove(id, -1)
   else if (command === 'down') onMove(id, 1)
   else if (command === 'collapse') onToggleCollapse(id)
+  else if (command === 'priority') togglePriority(id)
+  else if (command === 'note') void editNote(id)
+  else if (command === 'present') startPresent(id)
   else if (command === 'delete') onRemove(id)
+}
+
+// ---------------- 优先级 / 备注 / 编号 / 演示模式 ----------------
+
+const numbers = computed(() => (showNumbers.value ? nodeNumbers(doc.value) : new Map<string, string>()))
+
+/** 循环切换节点优先级：无 → 低 → 中 → 高。 */
+function togglePriority(id: string) {
+  const level = cyclePriority(doc.value, id)
+  commit(false)
+  ElMessage.closeAll()
+  ElMessage({ message: PRIORITY_LABELS[level], type: 'info', duration: 900 })
+}
+
+/** 编辑节点备注。 */
+async function editNote(id: string) {
+  const node = nodeById.value.get(id)
+  if (!node) return
+  try {
+    const { value } = await ElMessageBox.prompt('给节点加一条备注', '节点备注', {
+      confirmButtonText: '保存',
+      cancelButtonText: '取消',
+      inputValue: node.note ?? '',
+      inputPlaceholder: '例如：需要和法务确认',
+    })
+    setNote(doc.value, id, value ?? '')
+    commit(false)
+  } catch {
+    // 取消备注编辑，保留原值。
+  }
+}
+
+const presentOrder = computed(() => presentationOrder(doc.value))
+const presentIndex = computed(() => presentOrder.value.indexOf(presentId.value))
+const presentNode = computed(() => nodeById.value.get(presentId.value) ?? null)
+const presentChildren = computed(() =>
+  (childMap.value.get(presentId.value) ?? [])
+    .map((id) => nodeById.value.get(id))
+    .filter((node): node is NonNullable<typeof node> => !!node),
+)
+/** 演示模式的面包屑：从根节点到当前节点。 */
+const presentPath = computed(() => {
+  const path: string[] = []
+  let current: string | undefined = presentId.value
+  while (current) {
+    path.unshift(current)
+    current = parents.value.get(current)
+  }
+  return path
+})
+
+function startPresent(id?: string) {
+  presentId.value = id || rootId.value
+}
+
+function stopPresent() {
+  presentId.value = ''
+}
+
+function presentGo(dir: 'next' | 'prev' | 'parent' | 'firstChild') {
+  const target = presentationStep(doc.value, presentId.value, dir)
+  if (target) presentId.value = target
 }
 
 // ---------------- 画布交互 ----------------
@@ -396,11 +514,13 @@ function onNodePointerDown(event: PointerEvent, id: string) {
     origins,
     originX: offset.value.x,
     originY: offset.value.y,
+    moved: false,
   }
   ;(event.target as HTMLElement).setPointerCapture?.(event.pointerId)
 }
 
 function onCanvasPointerDown(event: PointerEvent) {
+  closeMenu()
   dragState = {
     kind: 'pan',
     ids: [],
@@ -409,6 +529,7 @@ function onCanvasPointerDown(event: PointerEvent) {
     origins: {},
     originX: offset.value.x,
     originY: offset.value.y,
+    moved: false,
   }
 }
 
@@ -424,6 +545,7 @@ function onPointerMove(event: PointerEvent) {
     const point = worldPoint(event)
     const dx = point.x - dragState.startX
     const dy = point.y - dragState.startY
+    if (Math.abs(dx) > 1 || Math.abs(dy) > 1) dragState.moved = true
     for (const id of dragState.ids) {
       const origin = dragState.origins[id]
       const node = nodeById.value.get(id)
@@ -435,8 +557,9 @@ function onPointerMove(event: PointerEvent) {
 }
 
 function onPointerUp() {
-  if (dragState.kind === 'node') commit(false)
-  dragState = { kind: 'none', ids: [], startX: 0, startY: 0, origins: {}, originX: 0, originY: 0 }
+  // 只是点选（没拖动）不该把导图标记成未保存。
+  if (dragState.kind === 'node' && dragState.moved) commit(false)
+  dragState = { kind: 'none', ids: [], startX: 0, startY: 0, origins: {}, originX: 0, originY: 0, moved: false }
 }
 
 function onWheel(event: WheelEvent) {
@@ -472,17 +595,100 @@ function fitView() {
   }
 }
 
+/** 缩放下拉：百分比直接跳转，另有「适应视图」。 */
+function onZoomCommand(command: string | number) {
+  if (command === 'fit') {
+    fitView()
+    return
+  }
+  setZoom(Number(command) / 100)
+}
+
 function zoomBy(delta: number) {
+  setZoom(zoom.value + delta)
+}
+
+/** 设定缩放比例，保持画布中心点不动。 */
+function setZoom(target: number) {
   const el = canvasEl.value
   if (!el) return
   const rect = el.getBoundingClientRect()
-  const next = Math.min(2.5, Math.max(0.25, zoom.value + delta))
+  const next = Math.min(2.5, Math.max(0.2, target))
   const ratio = next / zoom.value
   offset.value = {
     x: rect.width / 2 - (rect.width / 2 - offset.value.x) * ratio,
     y: rect.height / 2 - (rect.height / 2 - offset.value.y) * ratio,
   }
   zoom.value = next
+}
+
+/** 导出画布为图片：SVG 直接序列化，PNG 用 canvas 栅格化。 */
+async function exportImage(kind: 'svg' | 'png') {
+  const svg = canvasEl.value?.querySelector<SVGSVGElement>('.mm__svg')
+  if (!svg || !doc.value.nodes.length) {
+    ElMessage.warning('没有可导出的内容')
+    return
+  }
+  const nodes = doc.value.nodes
+  const pad = 24
+  const minX = Math.min(...nodes.map((n) => n.x)) - pad
+  const minY = Math.min(...nodes.map((n) => n.y)) - pad
+  const maxX = Math.max(...nodes.map((n) => n.x + n.width)) + pad
+  const maxY = Math.max(...nodes.map((n) => n.y + n.height)) + pad
+  const width = Math.ceil(maxX - minX)
+  const height = Math.ceil(maxY - minY)
+
+  const clone = svg.cloneNode(true) as SVGSVGElement
+  const group = clone.querySelector('g')
+  if (group) group.setAttribute('transform', `translate(${-minX}, ${-minY})`)
+  clone.setAttribute('width', String(width))
+  clone.setAttribute('height', String(height))
+  clone.setAttribute('viewBox', `0 0 ${width} ${height}`)
+  // scoped 样式不会进克隆体，这里补一份导出专用样式。
+  const style = document.createElementNS('http://www.w3.org/2000/svg', 'style')
+  style.textContent = `
+    text { font-family: system-ui, -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+    .mm__edge { fill: none; stroke-linecap: round; opacity: 0.46; }
+    .mm__fold { opacity: 0; }
+    .mm__node-ring { display: none; }
+  `
+  clone.insertBefore(style, clone.firstChild)
+  const source = new XMLSerializer().serializeToString(clone)
+  const name = (doc.value.title || '思维导图').replace(/[\\/:*?"<>|]/g, '_')
+
+  if (kind === 'svg') {
+    downloadBlob(new Blob([source], { type: 'image/svg+xml;charset=utf-8' }), `${name}.svg`)
+    ElMessage.success('已导出 SVG')
+    return
+  }
+
+  const img = new Image()
+  await new Promise<void>((resolve, reject) => {
+    img.onload = () => resolve()
+    img.onerror = () => reject(new Error('渲染失败'))
+    img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(source)}`
+  }).catch(() => {
+    ElMessage.error('导出 PNG 失败')
+  })
+  const scale = 2
+  const canvas = document.createElement('canvas')
+  canvas.width = width * scale
+  canvas.height = height * scale
+  const ctx = canvas.getContext('2d')
+  if (!ctx) {
+    ElMessage.error('当前浏览器不支持导出 PNG')
+    return
+  }
+  ctx.fillStyle = '#ffffff'
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'))
+  if (!blob) {
+    ElMessage.error('导出 PNG 失败')
+    return
+  }
+  downloadBlob(blob, `${name}.png`)
+  ElMessage.success('已导出 PNG')
 }
 
 // ---------------- 导入导出 ----------------
@@ -531,6 +737,26 @@ async function exportAs(kind: 'md' | 'mm' | 'opml' | 'xmind') {
 }
 
 function onKeydown(event: KeyboardEvent) {
+  // 演示模式独占键盘：方向键翻页，Esc 退出。
+  if (presentId.value) {
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      stopPresent()
+    } else if (event.key === 'ArrowRight' || event.key === ' ' || event.key === 'PageDown') {
+      event.preventDefault()
+      presentGo('next')
+    } else if (event.key === 'ArrowLeft' || event.key === 'PageUp') {
+      event.preventDefault()
+      presentGo('prev')
+    } else if (event.key === 'ArrowDown') {
+      event.preventDefault()
+      presentGo('firstChild')
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault()
+      presentGo('parent')
+    }
+    return
+  }
   if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
     event.preventDefault()
     void save()
@@ -540,6 +766,10 @@ function onKeydown(event: KeyboardEvent) {
   // 工具按钮上保留浏览器自己的 Tab/Enter 导航，不在画布外抢快捷键。
   if (target?.closest('input, textarea, select, button, a, [contenteditable="true"], [role="button"]')) {
     if (event.key === 'Escape') editingId.value = ''
+    return
+  }
+  if (event.key === 'Escape') {
+    closeMenu()
     return
   }
   if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'z') {
@@ -572,6 +802,14 @@ function onKeydown(event: KeyboardEvent) {
 const canvasEl = ref<HTMLElement | null>(null)
 
 watch(() => props.nodeId, () => void load())
+// 图谱里选中节点后，大纲同步滚动到对应行（双向联动的另一半）。
+watch(selectedId, (id) => {
+  if (!id) return
+  nextTick(() => {
+    const row = document.querySelector<HTMLElement>(`[data-mm-row="${id}"]`)
+    row?.scrollIntoView({ block: 'nearest' })
+  })
+})
 onMounted(() => {
   void load()
   window.addEventListener('keydown', onKeydown)
@@ -690,16 +928,33 @@ function shortText(text: string, width: number): string {
           </button>
         </div>
         <i class="mm__divider" />
+        <button
+          type="button"
+          class="mm__tool"
+          :class="{ 'is-on': showNumbers }"
+          title="显示编号"
+          @click="showNumbers = !showNumbers"
+        >
+          <el-icon><List /></el-icon><span>编号</span>
+        </button>
+        <button type="button" class="mm__tool" title="演示模式" @click="startPresent()">
+          <el-icon><Present /></el-icon><span>演示</span>
+        </button>
         <button type="button" class="mm__tool" title="导入文件" @click="triggerImport">
           <el-icon><Upload /></el-icon><span>导入</span>
         </button>
-        <el-dropdown trigger="click" @command="(k: string) => exportAs(k as 'md')">
+        <el-dropdown
+          trigger="click"
+          @command="(k: string) => (k === 'png' || k === 'svg' ? exportImage(k) : exportAs(k as 'md'))"
+        >
           <button type="button" class="mm__tool" title="导出">
             <el-icon><Download /></el-icon><span>导出</span>
           </button>
           <template #dropdown>
             <el-dropdown-menu>
-              <el-dropdown-item command="md">Markdown 大纲 (.md)</el-dropdown-item>
+              <el-dropdown-item command="png">PNG 图片 (.png)</el-dropdown-item>
+              <el-dropdown-item command="svg">SVG 图片 (.svg)</el-dropdown-item>
+              <el-dropdown-item command="md" divided>Markdown 大纲 (.md)</el-dropdown-item>
               <el-dropdown-item command="mm">FreeMind (.mm)</el-dropdown-item>
               <el-dropdown-item command="opml">OPML (.opml)</el-dropdown-item>
               <el-dropdown-item command="xmind">XMind (.xmind)</el-dropdown-item>
@@ -743,6 +998,7 @@ function shortText(text: string, width: number): string {
             v-for="row in rows"
             :key="row.node.id"
             class="mm__row"
+            :data-mm-row="row.node.id"
             :class="{
               'is-selected': row.node.id === selectedId,
               'is-dim': isDim(row.node.id),
@@ -761,6 +1017,7 @@ function shortText(text: string, width: number): string {
             </button>
             <span v-else class="mm__toggle mm__toggle--empty" />
             <i class="mm__branch-dot" :style="{ background: branchColor(row.node.id) }" />
+            <span v-if="numbers.get(row.node.id)" class="mm__row-no">{{ numbers.get(row.node.id) }}</span>
             <input
               v-if="editingId === row.node.id"
               class="mm__input"
@@ -776,9 +1033,21 @@ function shortText(text: string, width: number): string {
               class="mm__row-title"
               @dblclick.stop="startEdit(row.node.id)"
             >{{ row.node.title }}</span>
+            <span
+              v-if="row.node.priority"
+              class="mm__row-priority"
+              :title="PRIORITY_LABELS[row.node.priority]"
+            >{{ PRIORITY_MARKS[row.node.priority] }}</span>
+            <span v-if="row.node.note" class="mm__row-note" title="有备注">备注</span>
             <span class="mm__ops">
               <button type="button" class="mm__op" title="添加子节点" @click.stop="onChild(row.node.id)">＋子</button>
               <button type="button" class="mm__op" title="添加同级节点" @click.stop="onSibling(row.node.id)">＋同</button>
+              <button
+                type="button"
+                class="mm__op mm__op--priority"
+                :title="`优先级：${PRIORITY_LABELS[row.node.priority ?? 0]}（点击切换）`"
+                @click.stop="togglePriority(row.node.id)"
+              >优</button>
               <el-popover
                 v-model:visible="colorOpen[row.node.id]"
                 placement="right-start"
@@ -827,6 +1096,13 @@ function shortText(text: string, width: number): string {
                     <el-dropdown-item command="collapse">
                       {{ row.node.collapsed ? '展开子节点' : '收起子节点' }}
                     </el-dropdown-item>
+                    <el-dropdown-item command="priority">
+                      优先级：{{ PRIORITY_LABELS[row.node.priority ?? 0] }}
+                    </el-dropdown-item>
+                    <el-dropdown-item command="note">
+                      {{ row.node.note ? '编辑备注' : '添加备注' }}
+                    </el-dropdown-item>
+                    <el-dropdown-item command="present">从此节点演示</el-dropdown-item>
                     <el-dropdown-item command="delete" divided>删除节点</el-dropdown-item>
                   </el-dropdown-menu>
                 </template>
@@ -878,6 +1154,7 @@ function shortText(text: string, width: number): string {
                 'is-root': node.id === rootId,
               }"
               @pointerdown="onNodePointerDown($event, node.id)"
+              @contextmenu.prevent="onNodeContextMenu($event, node.id)"
               @dblclick.stop="startEdit(node.id)"
             >
               <rect
@@ -911,13 +1188,41 @@ function shortText(text: string, width: number): string {
                 :fill="node.id === rootId && !node.color ? 'rgba(255,255,255,.82)' : branchColor(node.id)"
               />
               <text
-                :x="node.x + 14"
+                :x="node.x + (numbers.get(node.id) ? 30 : 14)"
                 :y="node.y + node.height / 2"
                 dominant-baseline="central"
                 font-size="13"
                 :font-weight="node.id === rootId ? 700 : 500"
                 :fill="nodeTextColor(node.id)"
               >{{ shortText(node.title, node.width) }}</text>
+              <text
+                v-if="numbers.get(node.id)"
+                class="mm__node-no"
+                :x="node.x + 14"
+                :y="node.y + node.height / 2"
+                dominant-baseline="central"
+                font-size="10"
+                :fill="nodeTextColor(node.id)"
+                opacity="0.62"
+              >{{ numbers.get(node.id) }}</text>
+              <text
+                v-if="node.priority"
+                class="mm__node-priority"
+                :x="node.x + node.width - 12"
+                :y="node.y + node.height / 2"
+                text-anchor="end"
+                dominant-baseline="central"
+                font-size="12"
+                :fill="nodeTextColor(node.id)"
+              >{{ PRIORITY_MARKS[node.priority] }}</text>
+              <text
+                v-if="node.note"
+                class="mm__node-note"
+                :x="node.x + 14"
+                :y="node.y + node.height + 14"
+                font-size="10.5"
+                fill="#6b645c"
+              >{{ shortText(node.note, node.width) }}</text>
               <g
                 v-if="childCount(node.id)"
                 class="mm__fold"
@@ -953,7 +1258,17 @@ function shortText(text: string, width: number): string {
           <button type="button" title="缩小" @click="zoomBy(-0.1)">
             <el-icon><Minus /></el-icon>
           </button>
-          <span>{{ Math.round(zoom * 100) }}%</span>
+          <el-dropdown trigger="click" @command="onZoomCommand">
+            <button type="button" class="mm__zoom-value">{{ Math.round(zoom * 100) }}%</button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item v-for="pct in ZOOM_LEVELS" :key="pct" :command="pct">
+                  {{ pct }}%
+                </el-dropdown-item>
+                <el-dropdown-item command="fit" divided>适应视图</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
           <button type="button" title="放大" @click="zoomBy(0.1)">
             <el-icon><Plus /></el-icon>
           </button>
@@ -962,12 +1277,101 @@ function shortText(text: string, width: number): string {
             <el-icon><FullScreen /></el-icon>
           </button>
         </div>
+        <!-- 节点右键菜单 -->
+        <div
+          v-if="menu.visible"
+          class="mm__menu"
+          :style="{ left: `${menu.x}px`, top: `${menu.y}px` }"
+          @pointerdown.stop
+          @contextmenu.prevent
+        >
+          <button type="button" @click="menuAction('rename')">重命名</button>
+          <button type="button" @click="menuAction('child')">添加子节点</button>
+          <button type="button" @click="menuAction('sibling')">添加同级节点</button>
+          <i class="mm__menu-sep" />
+          <button type="button" @click="menuAction('indent')">升级</button>
+          <button type="button" @click="menuAction('outdent')">降级</button>
+          <button type="button" @click="menuAction('collapse')">
+            {{ nodeById.get(menu.nodeId)?.collapsed ? '展开子节点' : '收起子节点' }}
+          </button>
+          <button
+            v-if="nodeById.get(menu.nodeId)?.color"
+            type="button"
+            @click="menuAction('color')"
+          >
+            恢复默认颜色
+          </button>
+          <i class="mm__menu-sep" />
+          <button type="button" @click="menuAction('priority')">
+            优先级：{{ PRIORITY_LABELS[nodeById.get(menu.nodeId)?.priority ?? 0] }}
+          </button>
+          <button type="button" @click="menuAction('note')">
+            {{ nodeById.get(menu.nodeId)?.note ? '编辑备注' : '添加备注' }}
+          </button>
+          <button type="button" @click="menuAction('present')">从此节点演示</button>
+          <i class="mm__menu-sep" />
+          <button type="button" class="is-danger" @click="menuAction('delete')">删除节点</button>
+        </div>
         <div class="mm__shortcuts">
           <span v-if="selectedNode" class="mm__current">当前：{{ selectedNode.title }}</span>
           <span>Tab 子级 · Enter 同级 · Del 删除 · 双击重命名</span>
         </div>
-        <div v-if="loading" class="mm__empty">加载中…</div>
+        <div v-if="loading" class="mm__empty"><AppLoading /></div>
         <div v-else-if="!rows.length" class="mm__empty">还没有内容，先在左侧添加节点。</div>
+      </div>
+    </div>
+
+    <!-- 演示模式：全屏逐节点展示 -->
+    <div
+      v-if="presentNode"
+      class="mm__present"
+      role="dialog"
+      aria-modal="true"
+      aria-label="演示模式"
+      @click.self="stopPresent"
+    >
+      <div class="mm__present-card">
+        <header class="mm__present-head">
+          <span class="mm__present-crumb">
+            <span
+              v-for="(id, index) in presentPath"
+              :key="id"
+              class="mm__present-crumb-item"
+            >
+              {{ nodeById.get(id)?.title }}
+              <i v-if="index < presentPath.length - 1">›</i>
+            </span>
+          </span>
+          <button type="button" class="mm__present-close" title="退出演示 (Esc)" @click="stopPresent">
+            ✕
+          </button>
+        </header>
+        <div class="mm__present-body">
+          <h2 class="mm__present-title">
+            <span v-if="presentNode.priority" class="mm__present-priority">
+              {{ PRIORITY_MARKS[presentNode.priority] }}
+            </span>
+            {{ presentNode.title }}
+          </h2>
+          <p v-if="presentNode.note" class="mm__present-note">{{ presentNode.note }}</p>
+          <ul v-if="presentChildren.length" class="mm__present-kids">
+            <li v-for="kid in presentChildren" :key="kid.id">
+              <button type="button" @click="presentId = kid.id">
+                <span v-if="kid.priority" class="mm__present-priority">
+                  {{ PRIORITY_MARKS[kid.priority] }}
+                </span>
+                {{ kid.title }}
+              </button>
+            </li>
+          </ul>
+          <p v-else class="mm__present-leaf">没有子节点</p>
+        </div>
+        <footer class="mm__present-foot">
+          <button type="button" class="mm__present-nav" title="上一个 (←)" @click="presentGo('prev')">‹</button>
+          <span class="mm__present-count">{{ presentIndex + 1 }} / {{ presentOrder.length }}</span>
+          <button type="button" class="mm__present-nav" title="下一个 (→)" @click="presentGo('next')">›</button>
+          <span class="mm__present-hint">← → 翻页 · ↑ 父节点 · ↓ 子节点 · Esc 退出</span>
+        </footer>
       </div>
     </div>
   </section>
@@ -1144,6 +1548,11 @@ function shortText(text: string, width: number): string {
   font-size: 12px;
   white-space: nowrap;
 }
+.mm__tool.is-on {
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--mm-blue, #3370ff);
+  box-shadow: var(--glass-shadow-sm, 0 6px 18px rgba(15, 23, 42, 0.1));
+}
 .mm__history button:hover:not(:disabled),
 .mm__tool:hover,
 .mm__outline-actions button:hover,
@@ -1223,6 +1632,7 @@ function shortText(text: string, width: number): string {
   display: flex;
   align-items: center;
   gap: 4px;
+  position: relative;
   min-height: 30px;
   padding: 2px 6px 2px 0;
   border-radius: 8px;
@@ -1269,6 +1679,29 @@ function shortText(text: string, width: number): string {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.mm__row-no {
+  flex: none;
+  min-width: 18px;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--mm-muted, #86909c);
+  opacity: 0.85;
+}
+.mm__row-priority {
+  flex: none;
+  font-size: 12px;
+  line-height: 1;
+  color: #e0a32e;
+}
+.mm__row-note {
+  flex: none;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: rgba(22, 119, 255, 0.1);
+  color: var(--mm-blue, #3370ff);
+  font-size: 10px;
+  line-height: 15px;
+}
 .mm__input {
   flex: 1;
   min-width: 0;
@@ -1285,6 +1718,15 @@ function shortText(text: string, width: number): string {
   transition: opacity 0.15s;
   gap: 2px;
   flex: none;
+  /* 操作按钮浮在行尾，不占布局宽度，标题能占满整行 */
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 0 3px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
 }
 .mm__row:hover .mm__ops,
 .mm__row.is-selected .mm__ops {
@@ -1296,8 +1738,8 @@ function shortText(text: string, width: number): string {
   cursor: pointer;
   font-size: 11px;
   color: var(--mm-muted, #86909c);
-  height: 20px;
-  padding: 0 4px;
+  height: 18px;
+  padding: 0 3px;
   border-radius: 5px;
   display: inline-grid;
   place-items: center;
@@ -1310,6 +1752,9 @@ function shortText(text: string, width: number): string {
 }
 .mm__op--danger:hover {
   color: #ef4444;
+}
+.mm__op--priority {
+  color: #d99a25;
 }
 .mm__op-swatch {
   width: 10px;
@@ -1452,6 +1897,67 @@ function shortText(text: string, width: number): string {
   color: var(--ent-text-2, #5a6472);
   font-variant-numeric: tabular-nums;
 }
+.mm__zoom-value {
+  width: 46px;
+  height: 27px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--ent-text-2, #5a6472);
+  font-variant-numeric: tabular-nums;
+  transition: background-color 0.16s ease, transform 0.16s ease;
+}
+.mm__zoom-value:hover {
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow: var(--glass-shadow-sm, 0 6px 18px rgba(15, 23, 42, 0.1));
+  transform: translateY(-1px);
+}
+/* 节点右键菜单 */
+.mm__menu {
+  position: absolute;
+  z-index: 12;
+  min-width: 168px;
+  padding: 5px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.7));
+  border-radius: 11px;
+  background: var(--glass-bg-strong, rgba(255, 255, 255, 0.82));
+  backdrop-filter: blur(var(--glass-blur, 18px)) saturate(var(--glass-saturate, 165%));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 18px)) saturate(var(--glass-saturate, 165%));
+  box-shadow: var(--glass-shadow, 0 18px 48px rgba(15, 23, 42, 0.18));
+}
+.mm__menu button {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  padding: 6px 10px;
+  border-radius: 7px;
+  font-size: 12.5px;
+  color: var(--ent-text, #1f2733);
+  transition: background-color 0.14s ease, color 0.14s ease;
+}
+.mm__menu button:hover {
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--mm-blue, #3370ff);
+}
+.mm__menu button.is-danger {
+  color: #d93025;
+}
+.mm__menu button.is-danger:hover {
+  background: #fce8e6;
+  color: #d93025;
+}
+.mm__menu-sep {
+  height: 1px;
+  margin: 3px 6px;
+  background: var(--glass-ring, rgba(15, 23, 42, 0.09));
+}
 .mm__shortcuts {
   position: absolute;
   left: 16px;
@@ -1490,5 +1996,162 @@ function shortText(text: string, width: number): string {
   color: var(--mm-muted, #86909c);
   font-size: 13px;
   pointer-events: none;
+}
+
+/* ---------------- 演示模式 ---------------- */
+.mm__present {
+  position: fixed;
+  inset: 0;
+  z-index: 2200;
+  display: grid;
+  place-items: center;
+  padding: 40px;
+  background: rgba(15, 23, 42, 0.42);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+.mm__present-card {
+  width: min(880px, 100%);
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.7));
+  border-radius: 18px;
+  background: var(--glass-bg-strong, rgba(255, 255, 255, 0.86));
+  backdrop-filter: blur(var(--glass-blur, 18px)) saturate(var(--glass-saturate, 165%));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 18px)) saturate(var(--glass-saturate, 165%));
+  box-shadow: var(--glass-shadow, 0 24px 64px rgba(15, 23, 42, 0.28));
+}
+.mm__present-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--glass-ring, rgba(15, 23, 42, 0.09));
+}
+.mm__present-crumb {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--mm-muted, #86909c);
+}
+.mm__present-crumb-item i {
+  margin-left: 4px;
+  font-style: normal;
+  opacity: 0.5;
+}
+.mm__present-close {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--mm-muted, #86909c);
+  font-size: 14px;
+  cursor: pointer;
+}
+.mm__present-close:hover {
+  background: rgba(255, 255, 255, 0.85);
+  color: var(--mm-red, #d93025);
+}
+.mm__present-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 28px 32px 22px;
+}
+.mm__present-title {
+  margin: 0;
+  font-size: 30px;
+  line-height: 1.35;
+  font-weight: 700;
+  color: var(--cv-ink, #1f2733);
+}
+.mm__present-priority {
+  color: #e0a32e;
+  margin-right: 6px;
+}
+.mm__present-note {
+  margin: 14px 0 0;
+  padding: 10px 14px;
+  border-left: 3px solid var(--mm-blue, #3370ff);
+  border-radius: 0 8px 8px 0;
+  background: rgba(22, 119, 255, 0.08);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--ent-text-2, #5a6472);
+}
+.mm__present-kids {
+  margin: 20px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+.mm__present-kids button {
+  width: 100%;
+  text-align: left;
+  padding: 12px 14px;
+  border: 1px solid var(--glass-ring, rgba(15, 23, 42, 0.09));
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--ent-text, #1f2733);
+  font-size: 14px;
+  font-family: inherit;
+  cursor: pointer;
+  transition:
+    transform 0.16s ease,
+    box-shadow 0.16s ease,
+    border-color 0.16s ease;
+}
+.mm__present-kids button:hover {
+  transform: translateY(-2px);
+  border-color: var(--mm-blue, #3370ff);
+  box-shadow: var(--glass-shadow-sm, 0 8px 20px rgba(15, 23, 42, 0.12));
+}
+.mm__present-leaf {
+  margin: 20px 0 0;
+  font-size: 13px;
+  color: var(--mm-muted, #86909c);
+}
+.mm__present-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--glass-ring, rgba(15, 23, 42, 0.09));
+}
+.mm__present-nav {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--glass-ring, rgba(15, 23, 42, 0.09));
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.8);
+  color: var(--ent-text-2, #5a6472);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+.mm__present-nav:hover {
+  border-color: var(--mm-blue, #3370ff);
+  color: var(--mm-blue, #3370ff);
+}
+.mm__present-count {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ent-text-2, #5a6472);
+}
+.mm__present-hint {
+  margin-left: auto;
+  font-size: 11.5px;
+  color: var(--mm-muted, #86909c);
 }
 </style>

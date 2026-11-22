@@ -5,16 +5,19 @@
  * 画布内容在全局 document store 里（CanvasViewport 只认 store），
  * 所以这里按 HomeView 的顺序：先切模板，再把云端文档载入 store。
  */
-import { ref, watch } from 'vue'
+import { defineAsyncComponent, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { ElMessage } from 'element-plus'
 import { Check, FullScreen, Minus, Plus, Share } from '@element-plus/icons-vue'
 import CanvasViewport from '../canvas/CanvasViewport.vue'
+import { getDocument } from '../../api/documents'
 import { useDocumentStore } from '../../stores/document'
 import { useUiStore } from '../../stores/ui'
 import { friendlyApiMessage } from '../../utils/apiMessage'
-import IconPicker from '../common/IconPicker.vue'
+// 图标库按需加载：面板首次打开时才下载图标数据。
+const IconPicker = defineAsyncComponent(() => import('../common/IconPicker.vue'))
 import ShareDialog from './ShareDialog.vue'
+import AppLoading from '../common/AppLoading.vue'
 
 const props = defineProps<{ documentId: string; templateId: string; icon?: string }>()
 const emit = defineEmits<{
@@ -55,6 +58,14 @@ function onTitleInput(event: Event) {
   store.dirty = true
 }
 
+/** 左侧目录树改了标题：面板用自己的 save_version 存，标题与画布内容一起落库。 */
+async function applyTitle(next: string) {
+  const clean = next.trim()
+  if (!clean || clean === title.value) return
+  title.value = clean
+  await save()
+}
+
 async function save() {
   try {
     await store.save({ title: title.value.trim() || undefined })
@@ -64,6 +75,18 @@ async function save() {
     ElMessage.error(friendlyApiMessage(err, '保存失败'))
   }
 }
+/** 后端改过文档元信息（标题 / 图标）会推进 save_version：刷新它，下一次保存才不会误判冲突。 */
+async function refreshSaveVersion() {
+  if (!props.documentId) return
+  try {
+    const fresh = await getDocument(props.documentId)
+    store.save_version = fresh.saveVersion ?? store.save_version
+  } catch {
+    // 刷不到就沿用旧版本号，冲突时走原有的冲突处理流程。
+  }
+}
+
+defineExpose({ applyTitle, refreshSaveVersion })
 </script>
 
 <template>
@@ -91,34 +114,46 @@ async function save() {
         />
       </div>
       <span
-        class="kn-canvas-panel__status"
+        class="mm-bar__status"
         :class="{ 'is-saving': saving, 'is-dirty': dirty && !saving, 'is-saved': !dirty && !saving }"
       >
-        <i class="kn-canvas-panel__status-dot" />
+        <i class="mm-bar__status-dot" />
         <span v-if="saving">保存中…</span>
         <span v-else-if="dirty">未保存</span>
         <span v-else>已保存</span>
       </span>
-      <div class="kn-canvas-panel__tools">
-        <div class="kn-canvas-panel__zoom" aria-label="画布缩放">
-          <button type="button" title="缩小" aria-label="缩小" @click="ui.zoomOut()">
+      <div class="mm-bar__group">
+        <div class="mm-bar__cluster" aria-label="画布缩放">
+          <button
+            type="button"
+            class="mm-bar__btn mm-bar__btn--square"
+            title="缩小"
+            aria-label="缩小"
+            @click="ui.zoomOut()"
+          >
             <el-icon><Minus /></el-icon>
           </button>
-          <span>{{ Math.round(ui.zoom * 100) }}%</span>
-          <button type="button" title="放大" aria-label="放大" @click="ui.zoomIn()">
+          <span class="mm-bar__value">{{ Math.round(ui.zoom * 100) }}%</span>
+          <button
+            type="button"
+            class="mm-bar__btn mm-bar__btn--square"
+            title="放大"
+            aria-label="放大"
+            @click="ui.zoomIn()"
+          >
             <el-icon><Plus /></el-icon>
           </button>
         </div>
-        <i class="kn-canvas-panel__divider" />
-        <button type="button" class="kn-canvas-panel__action" @click="emit('open-full')">
+        <i class="mm-bar__divider" />
+        <button type="button" class="mm-bar__btn" @click="emit('open-full')">
           <el-icon><FullScreen /></el-icon><span>独立窗口</span>
         </button>
-        <button type="button" class="kn-canvas-panel__action" @click="shareVisible = true">
+        <button type="button" class="mm-bar__btn" @click="shareVisible = true">
           <el-icon><Share /></el-icon><span>分享</span>
         </button>
       </div>
       <el-button
-        class="kn-canvas-panel__save"
+        class="mm-bar__primary"
         size="small"
         type="primary"
         :loading="saving"
@@ -128,7 +163,7 @@ async function save() {
         <span>保存</span>
       </el-button>
     </header>
-    <div v-if="loading" class="kn-canvas-panel__empty">加载中…</div>
+    <div v-if="loading" class="kn-canvas-panel__empty"><AppLoading /></div>
     <div v-else-if="error" class="kn-canvas-panel__empty">{{ error }}</div>
     <div v-else class="kn-canvas-panel__body">
       <CanvasViewport />
@@ -192,129 +227,6 @@ async function save() {
 }
 .kn-canvas-panel__title:focus {
   border-bottom: 2px solid var(--mm-blue, #1677ff);
-}
-.kn-canvas-panel__status {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 26px;
-  padding: 0 10px;
-  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.7));
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.52);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
-  font-size: 12px;
-  color: var(--mm-muted, #86909c);
-  white-space: nowrap;
-}
-.kn-canvas-panel__status-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #a9b0bb;
-}
-.kn-canvas-panel__status.is-saved {
-  color: var(--el-color-success);
-}
-.kn-canvas-panel__status.is-saved .kn-canvas-panel__status-dot {
-  background: var(--el-color-success);
-  box-shadow: 0 0 0 3px rgba(103, 194, 58, 0.14);
-}
-.kn-canvas-panel__status.is-dirty {
-  color: #d46b08;
-}
-.kn-canvas-panel__status.is-dirty .kn-canvas-panel__status-dot {
-  background: #fa8c16;
-  box-shadow: 0 0 0 3px rgba(250, 140, 22, 0.14);
-}
-.kn-canvas-panel__status.is-saving .kn-canvas-panel__status-dot {
-  background: var(--el-color-primary);
-  animation: kn-pulse 1s ease-in-out infinite;
-}
-.kn-canvas-panel__tools {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  height: 34px;
-  padding: 3px;
-  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.7));
-  border-radius: 11px;
-  background: rgba(255, 255, 255, 0.46);
-  backdrop-filter: blur(var(--glass-blur-sm, 10px));
-  -webkit-backdrop-filter: blur(var(--glass-blur-sm, 10px));
-  box-shadow: var(--glass-shadow-sm, 0 6px 18px rgba(15, 23, 42, 0.1));
-}
-.kn-canvas-panel__zoom {
-  display: flex;
-  align-items: center;
-  gap: 1px;
-}
-.kn-canvas-panel__zoom button,
-.kn-canvas-panel__action {
-  border: 0;
-  background: transparent;
-  color: var(--ent-text-2, #5a6472);
-  cursor: pointer;
-  transition: background-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
-}
-.kn-canvas-panel__zoom button {
-  width: 26px;
-  height: 26px;
-  border-radius: 7px;
-  display: grid;
-  place-items: center;
-  padding: 0;
-}
-.kn-canvas-panel__zoom > span {
-  width: 40px;
-  text-align: center;
-  font-size: 11px;
-  color: var(--ent-text-2, #5a6472);
-  font-variant-numeric: tabular-nums;
-}
-.kn-canvas-panel__divider {
-  width: 1px;
-  height: 16px;
-  margin: 0 3px;
-  background: var(--glass-ring, rgba(15, 23, 42, 0.09));
-}
-.kn-canvas-panel__action {
-  height: 26px;
-  padding: 0 8px;
-  border-radius: 7px;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 12px;
-}
-.kn-canvas-panel__zoom button:hover,
-.kn-canvas-panel__action:hover {
-  background: rgba(255, 255, 255, 0.86);
-  box-shadow: var(--glass-shadow-sm, 0 6px 18px rgba(15, 23, 42, 0.1));
-  transform: translateY(-1px);
-}
-.kn-canvas-panel__save {
-  height: 34px;
-  padding: 0 15px;
-  border: 0;
-  border-radius: 10px;
-  background: linear-gradient(135deg, #2f8cff, #1264e8);
-  box-shadow: 0 6px 16px rgba(22, 119, 255, 0.28);
-  font-weight: 600;
-  transition: transform 0.16s ease, box-shadow 0.16s ease, filter 0.16s ease;
-}
-.kn-canvas-panel__save:hover {
-  background: linear-gradient(135deg, #3d97ff, #1a6df0);
-  box-shadow: 0 8px 20px rgba(22, 119, 255, 0.34);
-  transform: translateY(-1px);
-  filter: saturate(1.08);
-}
-@keyframes kn-pulse {
-  50% {
-    opacity: 0.35;
-  }
 }
 .kn-canvas-panel__body {
   flex: 1;

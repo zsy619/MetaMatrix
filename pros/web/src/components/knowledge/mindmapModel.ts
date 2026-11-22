@@ -11,14 +11,38 @@ import { computeLayout, type LayoutMode } from '../../components/canvas/nodeGrap
 export const MINDMAP_NODE_WIDTH = 170
 export const MINDMAP_NODE_HEIGHT = 44
 
+/** 节点优先级：0 无 / 1 低 / 2 中 / 3 高。 */
+export type MindmapPriority = 0 | 1 | 2 | 3
+
+/** 优先级标记符号，与百度脑图一致（低 ※ / 中 ！ / 高 ★）。 */
+export const PRIORITY_MARKS: Record<MindmapPriority, string> = {
+  0: '',
+  1: '※',
+  2: '！',
+  3: '★',
+}
+
+export const PRIORITY_LABELS: Record<MindmapPriority, string> = {
+  0: '无优先级',
+  1: '低优先级',
+  2: '中优先级',
+  3: '高优先级',
+}
+
+export type MindmapNode = GraphNode & {
+  priority?: MindmapPriority
+  /** 节点备注，画布与演示模式里展示。 */
+  note?: string
+}
+
 export type MindmapDoc = {
   title: string
-  nodes: GraphNode[]
+  nodes: MindmapNode[]
   edges: GraphEdge[]
 }
 
 export type MindmapTreeNode = {
-  node: GraphNode
+  node: MindmapNode
   depth: number
   children: MindmapTreeNode[]
 }
@@ -27,7 +51,7 @@ export function uid(prefix: string): string {
   return `${prefix}_${Math.random().toString(36).slice(2, 9)}${Date.now().toString(36).slice(-3)}`
 }
 
-export function createNode(title: string): GraphNode {
+export function createNode(title: string): MindmapNode {
   return {
     id: uid('mn'),
     type: 'richtext',
@@ -215,6 +239,84 @@ export function applyLayout(doc: MindmapDoc, mode: LayoutMode): MindmapDoc {
 export function setCollapsed(doc: MindmapDoc, id: string, collapsed: boolean): void {
   const node = doc.nodes.find((n) => n.id === id)
   if (node) node.collapsed = collapsed
+}
+
+// ---------------- 优先级 / 备注 / 编号 / 演示 ----------------
+
+/** 设置节点优先级（0–3，超范围按 0 处理）。 */
+export function setPriority(doc: MindmapDoc, id: string, level: number): MindmapPriority {
+  const node = doc.nodes.find((n) => n.id === id)
+  if (!node) return 0
+  const value = (level < 0 ? 0 : level > 3 ? 3 : Math.round(level)) as MindmapPriority
+  // 0 表示没有优先级，不落字段，避免旧数据里堆积空标记。
+  if (value === 0) delete node.priority
+  else node.priority = value
+  return value
+}
+
+/** 循环切换优先级：无 → 低 → 中 → 高 → 无。 */
+export function cyclePriority(doc: MindmapDoc, id: string): MindmapPriority {
+  const node = doc.nodes.find((n) => n.id === id)
+  if (!node) return 0
+  return setPriority(doc, id, ((node.priority ?? 0) + 1) % 4)
+}
+
+/** 写节点备注（空串表示清除）。 */
+export function setNote(doc: MindmapDoc, id: string, note: string): void {
+  const node = doc.nodes.find((n) => n.id === id)
+  if (!node) return
+  const clean = note.trim()
+  if (clean) node.note = clean
+  else delete node.note
+}
+
+/**
+ * 兄弟序号编号（1 / 1.2 / 1.2.3）。
+ * 根节点不编号，只有子节点按所在层级递增。
+ */
+export function nodeNumbers(doc: MindmapDoc): Map<string, string> {
+  const kids = childrenMap(doc)
+  const out = new Map<string, string>()
+  const roots = doc.nodes.filter((n) => !parentMap(doc).has(n.id))
+  const walk = (id: string, prefix: string) => {
+    const children = kids.get(id) ?? []
+    children.forEach((childId, index) => {
+      const number = prefix ? `${prefix}.${index + 1}` : `${index + 1}`
+      out.set(childId, number)
+      walk(childId, number)
+    })
+  }
+  roots.forEach((root) => walk(root.id, ''))
+  return out
+}
+
+/** 演示模式的节点顺序：先序遍历（父节点在子节点前）。 */
+export function presentationOrder(doc: MindmapDoc): string[] {
+  const out: string[] = []
+  const walk = (id: string) => {
+    out.push(id)
+    for (const child of childrenMap(doc).get(id) ?? []) walk(child)
+  }
+  const parents = parentMap(doc)
+  doc.nodes.filter((n) => !parents.has(n.id)).forEach((root) => walk(root.id))
+  return out
+}
+
+/** 演示模式的相邻节点：dir 取 next / prev / parent / firstChild。 */
+export function presentationStep(
+  doc: MindmapDoc,
+  currentId: string,
+  dir: 'next' | 'prev' | 'parent' | 'firstChild',
+): string | null {
+  const kids = childrenMap(doc)
+  const parents = parentMap(doc)
+  if (dir === 'parent') return parents.get(currentId) ?? null
+  if (dir === 'firstChild') return kids.get(currentId)?.[0] ?? null
+  const order = presentationOrder(doc)
+  const index = order.indexOf(currentId)
+  if (index < 0) return null
+  const target = dir === 'next' ? index + 1 : index - 1
+  return order[target] ?? null
 }
 
 export function isAncestor(doc: MindmapDoc, ancestorId: string, nodeId: string): boolean {

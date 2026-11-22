@@ -95,9 +95,9 @@ function numberText(fieldId: string): string {
 
 <template>
   <div class="sheet-extras">
-    <el-button size="small" @click="pickCsv">导入 CSV</el-button>
-    <el-button size="small" @click="exportCsv">导出 CSV</el-button>
-    <el-button size="small" @click="toggleSummary">
+    <el-button class="mm-bar__btn" text size="small" @click="pickCsv">导入 CSV</el-button>
+    <el-button class="mm-bar__btn" text size="small" @click="exportCsv">导出 CSV</el-button>
+    <el-button class="mm-bar__btn" text size="small" @click="toggleSummary">
       {{ showSummary ? '隐藏汇总' : '显示汇总' }}
     </el-button>
     <input ref="fileInput" type="file" accept=".csv,text/csv" hidden @change="onFile" />
@@ -112,25 +112,30 @@ function numberText(fieldId: string): string {
 </template>
 
 <style scoped>
+/* 按钮并入外层 mm-bar__group，汇总面板改成工具条下方的浮层 */
 .sheet-extras {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  display: contents;
 }
 .sheet-extras__summary {
-  display: flex;
+  /* 汇总就地显示在动作组里（同排、同一高度）；浮层会被粘性表头的 backdrop-filter 压住 */
+  flex: none;
+  display: inline-flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 10px;
-  padding: 4px 10px;
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 6px;
-  background: var(--el-fill-color-blank);
+  max-width: 60vw;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.7));
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--mm-text, #1d2129);
   font-size: 12px;
 }
 .sheet-extras__label {
   color: var(--el-text-color-secondary);
 }
 .sheet-extras__item {
-  color: var(--el-text-color-regular);
+  color: var(--mm-text, #1d2129);
 }
 </style>

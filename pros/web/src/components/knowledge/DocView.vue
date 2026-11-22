@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
@@ -13,7 +13,9 @@ import {
   Share,
   Tickets,
 } from '@element-plus/icons-vue'
-import RichTextEditor from '../RichTextEditor.vue'
+// 富文本编辑器（~260KB 源码 + TipTap 全家桶）按需加载：
+// 文档页挂载时先渲染骨架，编辑器 chunk 到达后再挂载。
+const RichTextEditor = defineAsyncComponent(() => import('../RichTextEditor.vue'))
 import DocOutline from './DocOutline.vue'
 import DocBackrefs from './DocBackrefs.vue'
 import DocHistory from './DocHistory.vue'
@@ -23,9 +25,10 @@ import DocVersions from './DocVersions.vue'
 import AiPanel from './AiPanel.vue'
 import WriteAssist from './WriteAssist.vue'
 import MeetingMinutesDialog from './MeetingMinutesDialog.vue'
-import { CollabDoc } from './collab/crdtDoc'
+import type { CollabDoc } from './collab/crdtDoc'
 import ShareDialog from './ShareDialog.vue'
-import IconPicker from '../common/IconPicker.vue'
+// 图标库按需加载。
+const IconPicker = defineAsyncComponent(() => import('../common/IconPicker.vue'))
 import { getDocument, updateDocument } from '../../api/documents'
 import { apiRequestBlob } from '../../api/http'
 import type { DocumentFull } from '../../api/documents'
@@ -41,6 +44,7 @@ import {
 import * as knowledgeApiV5 from '../../api/knowledge_v5'
 import type { PresenceUser } from '../../api/knowledge'
 import { friendlyApiMessage } from '../../utils/apiMessage'
+import AppLoading from '../common/AppLoading.vue'
 
 const props = defineProps<{
   documentId: string
@@ -167,7 +171,9 @@ async function toggleCollab() {
     return
   }
   try {
-    const instance = new CollabDoc({
+    // yjs（CRDT）只在真正开启协同时下载，不占文档首屏带宽。
+    const { CollabDoc: CollabDocCtor } = await import('./collab/crdtDoc')
+    const instance = new CollabDocCtor({
       documentId: props.documentId,
       onRemote: (merged) => {
         if (!merged || merged === html.value) return
@@ -442,6 +448,16 @@ defineExpose({
   setTitle(next: string) {
     title.value = next
   },
+  /** 后端改过文档元信息（标题 / 图标）会推进 save_version：刷新它，下一次保存才不会误判冲突。 */
+  async refreshSaveVersion() {
+    if (!props.documentId || !doc.value) return
+    try {
+      const fresh = await getDocument(props.documentId)
+      if (fresh.saveVersion != null) doc.value.saveVersion = fresh.saveVersion
+    } catch {
+      // 刷不到就沿用旧版本号，保存冲突时走原有的冲突处理流程。
+    }
+  },
 })
 
 /** 按格式导出：Markdown / HTML / 纯文本 / JSON。 */
@@ -601,10 +617,14 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
         placeholder="无标题文档"
         maxlength="200"
       />
-      <span class="doc-view__status">
+      <span
+        class="mm-bar__status"
+        :class="{ 'is-saving': saving, 'is-dirty': dirty && !saving, 'is-saved': !dirty && !saving }"
+      >
+        <i class="mm-bar__status-dot" />
         <span v-if="saving">保存中…</span>
         <span v-else-if="dirty">未保存</span>
-        <span v-else class="is-saved">已保存</span>
+        <span v-else>已保存</span>
       </span>
       <div class="doc-view__meta">
         <span v-if="lastEditor" class="doc-view__last-editor">
@@ -623,20 +643,21 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
       </div>
       <!-- 工具栏：按使用频率排序，「更多」收口放最后 -->
       <div class="doc-view__actions">
-        <el-button text size="small" :icon="Tickets" @click="insertToc">目录</el-button>
+        <div class="mm-bar__group">
+        <el-button class="mm-bar__btn" text size="small" :icon="Tickets" @click="insertToc">目录</el-button>
         <WriteAssist
           :document-id="props.documentId"
           :paragraph="currentParagraph()"
           @insert="insertSuggestion"
         />
-        <el-button text size="small" :icon="Memo" @click="minutesVisible = true">会议纪要</el-button>
-        <el-button text size="small" :icon="Connection" @click="toggleCollab">
+        <el-button class="mm-bar__btn" text size="small" :icon="Memo" @click="minutesVisible = true">会议纪要</el-button>
+        <el-button class="mm-bar__btn" text size="small" :icon="Connection" @click="toggleCollab">
           {{ collabOn ? '退出协同' : '协同编辑' }}
         </el-button>
-        <el-button text size="small" :icon="Clock" @click="sidebarTab = 'history'">历史</el-button>
-        <el-button text size="small" :icon="Share" @click="shareVisible = true">分享</el-button>
+        <el-button class="mm-bar__btn" text size="small" :icon="Clock" @click="sidebarTab = 'history'">历史</el-button>
+        <el-button class="mm-bar__btn" text size="small" :icon="Share" @click="shareVisible = true">分享</el-button>
         <el-dropdown trigger="click" @command="(format: string) => exportAs(format)">
-          <el-button text size="small" :icon="Download" :loading="exporting">导出</el-button>
+          <el-button class="mm-bar__btn" text size="small" :icon="Download" :loading="exporting">导出</el-button>
           <template #dropdown>
             <el-dropdown-menu>
               <el-dropdown-item command="markdown">Markdown</el-dropdown-item>
@@ -649,7 +670,7 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
           </template>
         </el-dropdown>
         <el-dropdown trigger="click">
-          <el-button text size="small" :icon="MoreFilled">更多</el-button>
+          <el-button class="mm-bar__btn" text size="small" :icon="MoreFilled">更多</el-button>
           <template #dropdown>
             <el-dropdown-menu>
               <el-dropdown-item @click="saveAsTemplate">另存为模板</el-dropdown-item>
@@ -659,6 +680,7 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
             </el-dropdown-menu>
           </template>
         </el-dropdown>
+        </div>
       </div>
     </header>
 
@@ -667,7 +689,7 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
       此文档已被锁定，当前为只读状态。
     </div>
 
-    <div v-if="loading" class="doc-view__empty">加载中…</div>
+    <div v-if="loading" class="doc-view__empty"><AppLoading /></div>
     <div v-else-if="!doc" class="doc-view__empty">文档不存在或已被删除。</div>
     <div v-else class="doc-view__body" :class="{ 'is-focus': focusMode }">
       <div v-if="locked" class="doc-view__readonly" v-html="html" />
@@ -811,14 +833,6 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
 .doc-view__title:focus {
   border-bottom: 2px solid var(--mm-blue, #1677ff);
 }
-.doc-view__status {
-  flex: none;
-  font-size: 12px;
-  color: var(--mm-muted, #86909c);
-}
-.doc-view__status .is-saved {
-  color: var(--el-color-success);
-}
 /* 工具栏：紧凑成组，靠右排列，分隔线与内容区区分 */
 .doc-view__meta {
   flex: none;
@@ -834,14 +848,6 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
   margin-left: 4px;
   padding-left: 8px;
   border-left: 1px solid var(--glass-ring, rgba(15, 23, 42, 0.09));
-}
-.doc-view__actions :deep(.el-button) {
-  padding: 0 7px;
-  font-size: 13px;
-}
-.doc-view__actions :deep(.el-button .el-icon) {
-  font-size: 15px;
-  margin-right: 4px;
 }
 .doc-view__presence {
   margin-right: 0;

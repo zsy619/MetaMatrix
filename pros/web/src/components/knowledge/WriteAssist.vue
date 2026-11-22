@@ -48,7 +48,7 @@ function insert() {
 
 <template>
   <div class="write-assist">
-    <el-button text size="small" :icon="MagicStick" :loading="loading" @click="request">AI 续写</el-button>
+    <el-button class="mm-bar__btn" text size="small" :icon="MagicStick" :loading="loading" @click="request">AI 续写</el-button>
     <transition name="write-assist__fade">
       <div v-if="visible && suggestion?.text" class="write-assist__card">
         <div class="write-assist__meta">
