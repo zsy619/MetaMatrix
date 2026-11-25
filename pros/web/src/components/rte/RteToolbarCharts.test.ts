@@ -92,7 +92,7 @@ describe('工具栏「图表」分组', () => {
     await nextTick()
     const menu = document.querySelector('.rte-menu-echarts')
     expect(menu).toBeTruthy()
-    const cats = menu?.querySelectorAll('.rte-menu-cat') || []
+    const cats = menu?.querySelectorAll('.rte-chart-menu__row') || []
     // 基础组 5 类（不是全部 39 类）
     expect(cats.length).toBe(5)
     const labels = Array.from(cats).map((el) => el.textContent || '')
@@ -109,7 +109,7 @@ describe('工具栏「图表」分组', () => {
     await flushPromises()
     await nextTick()
     const menu = document.querySelector('.rte-menu-echarts')
-    const cats = menu?.querySelectorAll('.rte-menu-cat') || []
+    const cats = menu?.querySelectorAll('.rte-chart-menu__row') || []
     expect(cats.length).toBe(11)
     wrapper.unmount()
   })
@@ -127,7 +127,7 @@ describe('工具栏「图表」分组', () => {
     await flushPromises()
     await nextTick()
     expect(document.querySelectorAll('.rte-menu-echarts').length).toBe(1)
-    const cats = document.querySelectorAll('.rte-menu-echarts .rte-menu-cat')
+    const cats = document.querySelectorAll('.rte-menu-echarts .rte-chart-menu__row')
     expect(cats.length).toBe(5)
     // 再点一次「统计」→ 收起
     await stats.trigger('click')
@@ -144,11 +144,11 @@ describe('工具栏「图表」分组', () => {
     await flushPromises()
     await nextTick()
     const menu = document.querySelector('.rte-menu-echarts') as HTMLElement
-    const firstCat = menu.querySelector('.rte-menu-cat') as HTMLElement
+    const firstCat = menu.querySelector('.rte-chart-menu__row') as HTMLElement
     firstCat.click()
     await flushPromises()
     await nextTick()
-    const subs = menu.querySelectorAll('.rte-menu-sub button')
+    const subs = menu.querySelectorAll('.rte-chart-menu__sub-row')
     expect(subs.length).toBeGreaterThan(0)
     ;(subs[0] as HTMLElement).click()
     await flushPromises()

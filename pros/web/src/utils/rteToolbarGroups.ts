@@ -124,7 +124,8 @@ export const TOOLBAR_GROUPS: readonly ToolbarGroupDef[] = [
     keys: [
       'callout', 'hr', 'columns', 'toggleBlock', 'tabsBlock',
       'blockOps', 'insertDate',
-      'form', 'template', 'timeline', 'statusChip', 'progressBar',
+      'form', 'template', 'timeline', 'timelineAdd', 'timelineDelete',
+      'statusChip', 'progressBar',
       'mermaid', 'snippets', 'crossDoc',
     ],
   },

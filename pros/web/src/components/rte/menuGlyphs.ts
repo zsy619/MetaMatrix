@@ -1,5 +1,6 @@
 import { h, type Component } from 'vue'
 import { TABLE_MENU_ICONS } from './tableMenuIcons'
+import { chartCategoryIcon } from './chartCategoryIcons'
 import {
   IconAttach,
   IconCallout,
@@ -320,6 +321,11 @@ const FALLBACK: Record<string, Component> = {
 
 /** 下拉子项图标。告示菜单不走这里。 */
 export function menuGlyph(id = '', label = '', fallback = ''): Component | undefined {
+  // 图表类别：'chart:<categoryId>' 走专属图标，避免 39 个类别共用一个柱状图。
+  if (id.startsWith('chart:')) {
+    const categoryIcon = chartCategoryIcon(id.slice('chart:'.length))
+    if (categoryIcon) return categoryIcon
+  }
   if (id && TABLE_MENU_ICONS[id]) return TABLE_MENU_ICONS[id]
   if (label && BY_LABEL[label]) return BY_LABEL[label]
   if (id && BY_ID[id]) return BY_ID[id]

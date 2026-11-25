@@ -75,18 +75,17 @@ html.rte-toolbar-dragging * {
   gap: 2px;
 }
 .rte-float-menu.rte-template-menu {
-  padding: 0;
-  min-width: 480px;
-  max-width: 560px;
+  width: 600px;
+  min-width: 0;
+  max-width: 100%;
+  /* !important：压过 telegram.ui.css 的通用浮层外壳（8px 圆角 + 轻阴影），
+     模板面板按 AGENTS.md §2 走「浮层表面」规格：12px 圆角 + 中性投影。 */
+  padding: 0 !important;
+  border-radius: 12px !important;
+  border: 1px solid var(--tg-border, #e6e6e6) !important;
+  background: var(--tg-surface, #fff) !important;
+  box-shadow: var(--tg-shadow-3, 0 24px 64px rgba(15, 23, 42, 0.18)) !important;
   overflow: hidden !important;
-}
-.rte-float-menu .rte-template-menu-body {
-  padding: 6px;
-  overflow-x: hidden;
-  overflow-y: auto;
-  max-height: var(--rte-float-max-h, min(70vh, 560px));
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
 }
 .rte-float-menu button {
   border: none;
@@ -515,102 +514,24 @@ html.rte-toolbar-dragging * {
   font-synthesis: style;
 }
 
-/* 图表下拉：官方示例 39 类，按类别分区展开 */
+/* 图表下拉：官方示例 39 类，按类别分区展开。
+   面板本体由 components/rte/RteChartGroupMenu.vue 渲染，
+   这里只负责外层容器（滚动交给面板内部的列表）。 */
 .rte-float-menu.rte-menu-echarts {
-  min-width: 240px;
+  min-width: 252px;
   max-height: var(--rte-float-max-h, min(70vh, 560px));
-  overflow-y: auto;
-  overscroll-behavior: contain;
-}
-.rte-float-menu.rte-menu-echarts .rte-menu-section {
-  padding: 6px 12px 2px;
-  font-size: 11px;
-  font-weight: 600;
-  color: #86909c;
-  letter-spacing: 0.02em;
-  user-select: none;
-}
-.rte-float-menu.rte-menu-echarts .rte-menu-cat {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  font-weight: 600;
-}
-.rte-float-menu.rte-menu-echarts .rte-menu-cat.is-open {
-  background: #f2f3f5;
-}
-.rte-float-menu.rte-menu-echarts .rte-menu-sub {
-  display: flex;
-  flex-direction: column;
-  padding: 0 0 4px 12px;
-  border-left: 2px solid #eef0f3;
-  margin: 0 0 4px 12px;
-}
-.rte-float-menu.rte-menu-echarts .rte-menu-sub button {
-  font-size: 12px;
-  padding: 5px 10px;
+  /* 列表在面板内部滚动：标题栏与底部「一键生成」常驻可见。
+     padding 用 !important 压过 telegram.ui.css 的 `.rte-float-menu { padding: 4px !important }`，
+     那条规则统一了所有浮层的内边距，这里要把内边距交给面板组件自己排。 */
+  padding: 0 !important;
+  overflow: hidden;
 }
 /* 「更多」里的一级分类下拉（紧凑态窄屏也能找到图表 9 分类入口）
    ——「更多」菜单 Teleport 到 body，scoped 命不中，这里用 unscoped 兜底。 */
 .rte-more-menu .rte-chart-more-flyout {
   margin: 4px 0 8px;
-  padding: 4px;
-  border: 1px solid #ebebeb;
-  border-radius: 8px;
-  background: #fff;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  padding: 0;
   z-index: 40;
-}
-.rte-more-menu .rte-chart-more-flyout .rte-menu-section {
-  padding: 6px 12px 2px;
-  font-size: 11px;
-  font-weight: 600;
-  color: #86909c;
-  letter-spacing: 0.02em;
-}
-.rte-more-menu .rte-chart-more-flyout .rte-menu-cat {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  width: 100%;
-  border: none;
-  background: transparent;
-  text-align: left;
-  padding: 6px 10px;
-  font-size: 12px;
-  color: #1d2129;
-  border-radius: 4px;
-  cursor: pointer;
-}
-.rte-more-menu .rte-chart-more-flyout .rte-menu-cat:hover,
-.rte-more-menu .rte-chart-more-flyout .rte-menu-cat.is-open {
-  background: #f2f3f5;
-}
-.rte-more-menu .rte-chart-more-flyout .rte-menu-sub {
-  display: flex;
-  flex-direction: column;
-  padding: 0 0 4px 12px;
-  border-left: 2px solid #eef0f3;
-  margin: 0 0 4px 12px;
-}
-.rte-more-menu .rte-chart-more-flyout .rte-menu-sub button {
-  border: none;
-  background: transparent;
-  text-align: left;
-  padding: 5px 10px;
-  font-size: 12px;
-  color: #1d2129;
-  cursor: pointer;
-}
-.rte-more-menu .rte-chart-more-flyout .rte-menu-sub button:hover {
-  background: #f2f3f5;
-}
-.rte-more-menu .rte-chart-more-flyout .rte-menu-sep {
-  height: 1px;
-  background: #eef0f3;
-  margin: 4px 0;
 }
 /* 一键生成对话框：左侧类型 + 右侧模板两栏 */
 .rte-link-dialog.rte-echarts-dialog {
@@ -2792,8 +2713,8 @@ html.rte-toolbar-dragging * {
   box-sizing: border-box;
   height: calc(28px + var(--rte-break-gap, 0px));
   margin-left: calc(-1 * max(var(--rte-margin-left, 12.7mm), var(--rte-gutter-size, 50px)));
-  margin-right: calc(-1 * var(--rte-margin-right, 12.7mm));
-  padding: 4px max(var(--rte-margin-right, 12.7mm), 0px) 0 max(var(--rte-margin-left, 12.7mm), var(--rte-gutter-size, 50px));
+  margin-right: calc(-1 * max(var(--rte-margin-right, 12.7mm), var(--rte-gutter-size, 50px)));
+  padding: 4px max(var(--rte-margin-right, 12.7mm), var(--rte-gutter-size, 50px)) 0 max(var(--rte-margin-left, 12.7mm), var(--rte-gutter-size, 50px));
   background-image:
     linear-gradient(#e8eaed, #e8eaed),
     repeating-linear-gradient(90deg, #c9cdd4 0 8px, transparent 8px 14px);
@@ -2886,130 +2807,13 @@ html.rte-toolbar-dragging * {
 }
 .rte-emoji-panel,
 .rte-specialchars-panel {
-  display: flex;
-  flex-direction: column;
-  /* 两者固定同高同宽，切换标签/面板时高度不变 */
-  width: 380px;
-  max-width: min(380px, calc(100vw - 24px));
-  height: 340px;
-  max-height: 340px;
-  min-height: 340px;
-  padding: 0;
-  background: #fff;
-  border: 1px solid #e5e6eb;
-  border-radius: 10px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-  z-index: 6000;
-  overflow: hidden;
-  box-sizing: border-box;
-}
-.rte-picker-tabs {
-  display: flex;
-  /* 表情分类从 10 个增到 13 个，单行放不下；折行显示，避免末尾分类（旗帜）被横向滚动藏住 */
-  flex-wrap: wrap;
-  gap: 2px;
-  padding: 6px 8px 4px;
-  border-bottom: 1px solid #e5e6eb;
-  background: #fafafa;
-  flex: 0 0 auto;
+  /* 表情 / 符号面板：同一套外壳规格（420px 宽 + 高度随内容自适应），
+     内边距与圆角/投影由 telegram.ui.css 的 `.rte-emoji-panel` 规则统一给。 */
+  width: 420px;
+  max-width: min(420px, calc(100vw - 24px));
   height: auto;
-  min-height: 40px;
-  max-height: none;
-  overflow-x: hidden;
-  overflow-y: hidden;
-  align-items: center;
-  box-sizing: border-box;
-}
-.rte-picker-tab {
-  border: none;
-  background: transparent;
-  color: #4e5969;
-  font-size: 12px;
-  line-height: 1;
-  padding: 5px 8px;
-  border-radius: 6px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-.rte-picker-tab:hover {
-  background: #f2f3f5;
-  color: #1d2129;
-}
-.rte-picker-tab.active {
-  background: #e8f3ff;
-  color: #1772f6;
-  font-weight: 600;
-}
-.rte-picker-grid {
-  display: grid;
-  gap: 2px;
-  padding: 8px;
-  overflow-y: auto;
-  overflow-x: hidden;
-  flex: 1 1 auto;
-  min-height: 0; /* 固定面板高度下允许网格滚动 */
-  height: auto;
-  scrollbar-width: thin;
-  align-content: start;
-  box-sizing: border-box;
-}
-.rte-emoji-grid {
-  grid-template-columns: repeat(10, minmax(0, 1fr));
-}
-.rte-emoji-grid--large {
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 4px;
-}
-.rte-emoji-grid--kaomoji {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 4px;
-}
-.rte-emoji-grid--kaomoji .rte-emoji-btn--kaomoji {
-  grid-column: span 1;
-  min-height: 40px;
-  font-size: 14px !important;
-}
-.rte-specialchars-grid {
-  grid-template-columns: repeat(10, minmax(0, 1fr));
-}
-.rte-emoji-btn,
-.rte-specialchars-btn {
-  width: 100%;
-  aspect-ratio: 1;
-  min-height: 28px;
-  border: none;
-  background: transparent;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 18px;
-  line-height: 1;
-  padding: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: #1d2129;
-}
-.rte-emoji-grid--large .rte-emoji-btn {
-  font-size: 28px;
-  min-height: 40px;
-}
-.rte-emoji-btn--kaomoji {
-  aspect-ratio: auto;
-  min-height: 36px;
-  grid-column: span 2;
-  font-size: 13px !important;
-  padding: 4px 6px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.rte-specialchars-btn {
-  font-size: 15px;
-  font-family: "PingFang SC", "Helvetica Neue", Arial, "Segoe UI Symbol", "Noto Sans Symbols", sans-serif;
-}
-.rte-emoji-btn:hover,
-.rte-specialchars-btn:hover {
-  background: #f2f3f5;
+  max-height: min(460px, 70vh);
+  min-height: 0;
 }
 .rte-spacing-panel {
   min-width: 200px;
@@ -3101,43 +2905,34 @@ html.rte-toolbar-dragging * {
   background: #e8f3ff;
   color: #3370ff;
 }
-.rte-wordstats-panel {
-  min-width: 220px;
-  padding: 12px 14px;
-  background: #fff;
-  border: 1px solid #e5e6eb;
-  border-radius: 10px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+.rte-float-menu.rte-wordstats-panel {
+  width: 320px;
+  max-width: 100%;
+  min-width: 0;
+  /* !important：压过 telegram.ui.css 的通用浮层外壳（8px 圆角 + 轻阴影 + 4px 内边距）。
+     字数面板按 AGENTS.md §2「浮层表面」规格走：12px 圆角 + 发丝线 + 中性投影，
+     内边距交给面板组件自己管。 */
+  padding: 0 !important;
+  border-radius: 12px !important;
+  border: 1px solid var(--tg-border, #e6e6e6) !important;
+  background: var(--tg-surface, #fff) !important;
+  box-shadow: var(--tg-shadow-3, 0 24px 64px rgba(15, 23, 42, 0.18)) !important;
   z-index: 6000;
 }
-.rte-wordstats-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: #1d2129;
-  margin-bottom: 4px;
-}
-.rte-wordstats-note {
-  margin: 0 0 8px;
-  font-size: 12px;
-  line-height: 1.4;
-  color: #86909c;
-}
-.rte-wordstats-row {
+/* 「阅读时长估算」弹窗的档位行（原 .rte-wordstats-row，字数面板重做后独立成类名） */
+.rte-readtime-row {
   display: flex;
+  align-items: baseline;
   justify-content: space-between;
   gap: 16px;
+  padding: 6px 0;
   font-size: 13px;
-  color: #4e5969;
-  padding: 4px 0;
+  color: var(--tg-text-2, #707579);
 }
-.rte-wordstats-row strong {
-  color: #1d2129;
+.rte-readtime-row strong {
+  color: var(--tg-text, #0f0f0f);
   font-weight: 600;
-}
-.rte-wordstats-divider {
-  height: 1px;
-  background: #e5e6eb;
-  margin: 6px 0;
+  font-variant-numeric: tabular-nums;
 }
 .rte-tool.format-painter-on,
 .rte-tool.active[title*='格式刷'] {
@@ -3630,7 +3425,7 @@ html.rte-toolbar-dragging * {
 .rte-timeline-item-head {
   display: flex;
   gap: 8px;
-  align-items: baseline;
+  align-items: center;
   margin-bottom: 4px;
 }
 .rte-timeline-time {
@@ -3641,6 +3436,145 @@ html.rte-toolbar-dragging * {
 .rte-timeline-title {
   font-weight: 600;
   color: #1d2129;
+}
+/* 时间线：节点视图（可编辑时间 / 标题 + 增删节点） */
+.rte-timeline-list {
+  position: relative;
+}
+input.rte-timeline-time,
+input.rte-timeline-title {
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 3px 8px;
+  outline: none;
+  transition: border-color 160ms cubic-bezier(0.2, 0.8, 0.3, 1),
+    background-color 160ms cubic-bezier(0.2, 0.8, 0.3, 1),
+    box-shadow 160ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+input.rte-timeline-time {
+  flex: 0 0 auto;
+  width: 196px;
+  font-size: 12px;
+  color: var(--tg-text-2, #86909c);
+}
+input.rte-timeline-time.is-invalid {
+  border-color: #f5222d;
+  color: #f5222d;
+}
+input.rte-timeline-title {
+  flex: 1 1 auto;
+  min-width: 80px;
+  font-weight: 600;
+  color: var(--tg-text-1, #1d2129);
+}
+input.rte-timeline-time:hover,
+input.rte-timeline-title:hover {
+  background: rgba(15, 23, 42, 0.04);
+  border-color: rgba(15, 23, 42, 0.08);
+}
+input.rte-timeline-time:focus,
+input.rte-timeline-title:focus {
+  background: #fff;
+  border-color: var(--tg-blue, #3390ec);
+  box-shadow: 0 0 0 3px rgba(51, 144, 236, 0.14);
+}
+.rte-timeline-pick {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+.rte-timeline-picker {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+.rte-timeline-pick-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  padding: 0;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--tg-text-3, #8a94a6);
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity 160ms cubic-bezier(0.2, 0.8, 0.3, 1),
+    background-color 160ms cubic-bezier(0.2, 0.8, 0.3, 1),
+    color 160ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+.rte-timeline-item:hover .rte-timeline-pick-btn,
+.rte-timeline-pick-btn:focus-visible {
+  opacity: 1;
+}
+.rte-timeline-pick-btn:hover {
+  background: rgba(51, 144, 236, 0.12);
+  color: var(--tg-blue, #3390ec);
+}
+.rte-timeline-del {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--tg-text-3, #8a94a6);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 160ms cubic-bezier(0.2, 0.8, 0.3, 1),
+    background-color 160ms cubic-bezier(0.2, 0.8, 0.3, 1),
+    color 160ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+.rte-timeline-item:hover .rte-timeline-del,
+.rte-timeline-del:focus-visible {
+  opacity: 1;
+}
+.rte-timeline-del:hover {
+  background: rgba(245, 34, 45, 0.1);
+  color: #f5222d;
+}
+.rte-timeline-add-item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--tg-text-3, #8a94a6);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 160ms cubic-bezier(0.2, 0.8, 0.3, 1),
+    background-color 160ms cubic-bezier(0.2, 0.8, 0.3, 1),
+    color 160ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+.rte-timeline-item:hover .rte-timeline-add-item,
+.rte-timeline-add-item:focus-visible {
+  opacity: 1;
+}
+.rte-timeline-add-item:hover {
+  background: rgba(51, 144, 236, 0.12);
+  color: var(--tg-blue, #3390ec);
 }
 .rte-tabs-block {
   margin: 12px 0;
@@ -4240,8 +4174,10 @@ html.rte-toolbar-dragging * {
   min-height: var(--rte-sheet-min-height, 1123px);
   margin: 16px auto 28px;
   padding: var(--rte-margin-top, 25.4mm) var(--rte-margin-right, 31.8mm) var(--rte-margin-bottom, 25.4mm) var(--rte-margin-left, 31.8mm);
-  /* 纸张左侧也要留出块手柄列（gutter），窄边距时以手柄列宽度为准。 */
+  /* 左右留白对称：两侧都按「页边距 / 块手柄列宽度」取大值预留。
+     只给左侧留手柄列会让版心整体偏左（左侧 74px、右侧 48px），观感上纸张不正。 */
   padding-left: max(var(--rte-margin-left, 31.8mm), var(--rte-gutter-size, 50px));
+  padding-right: max(var(--rte-margin-right, 31.8mm), var(--rte-gutter-size, 50px));
   box-sizing: border-box;
   background: #fff;
   box-shadow:
@@ -4251,8 +4187,9 @@ html.rte-toolbar-dragging * {
 .rte-root.is-page-sheet .rte-body::before {
   content: '';
   position: absolute;
-  /* 虚线框与正文起始位置对齐（含手柄列留白）。 */
+  /* 虚线框与正文起始位置对齐（含两侧留白）。 */
   inset: var(--rte-margin-top, 25.4mm) var(--rte-margin-right, 31.8mm) var(--rte-margin-bottom, 25.4mm) max(var(--rte-margin-left, 31.8mm), var(--rte-gutter-size, 50px));
+  right: max(var(--rte-margin-right, 31.8mm), var(--rte-gutter-size, 50px));
   border: 1px dashed rgba(51, 112, 255, 0.35);
   pointer-events: none;
   z-index: 2;

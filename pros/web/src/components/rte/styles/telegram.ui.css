@@ -182,9 +182,18 @@
   border-radius: var(--rte-tg-radius) !important;
 }
 
-/* emoji / 特殊字符 / 颜色面板：8px 圆角 + 轻阴影 */
+/* emoji / 特殊字符面板：按 AGENTS.md §2 走「浮层表面」规格（12px 圆角 + 中性投影） */
 .rte-emoji-panel,
-.rte-specialchars-panel,
+.rte-specialchars-panel {
+  border-radius: 12px !important;
+  border: 1px solid var(--tg-border, #e6e6e6) !important;
+  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.18) !important;
+  background: var(--tg-surface, #fff) !important;
+  /* 这两个面板的内部排版自己管内边距（搜索框 / 分类条要贴边），
+     压过上面 `.rte-float-menu` 的 4px 内边距。 */
+  padding: 0 !important;
+}
+/* 颜色面板 / 代码语言菜单：保持 8px 圆角 + 轻阴影 */
 .rte-selection-bubble .rte-bubble-swatches.rte-color-board,
 .rte-code-lang-menu {
   border-radius: var(--rte-tg-radius-panel) !important;

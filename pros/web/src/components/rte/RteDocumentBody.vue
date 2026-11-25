@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { inject } from 'vue'
+import { computed, inject } from 'vue'
 import { EditorContent } from '@tiptap/vue-3'
 import { BubbleMenu } from '@tiptap/vue-3/menus'
 import FormPropertyInspector from '../FormPropertyInspector.vue'
@@ -10,8 +10,10 @@ import RteImageLightbox from './RteImageLightbox.vue'
 import RteSelectionBubble from './RteSelectionBubble.vue'
 import RteSourceCodeEditor from './RteSourceCodeEditor.vue'
 import RteTableFormulaBar from './RteTableFormulaBar.vue'
+import RteWordStatsPanel from './RteWordStatsPanel.vue'
 import { RTE_BINDINGS } from './bindings'
 import { blockHandleTitle, cropTitle, emptyGuideTitle, imagePlaceTitle, imageWidthTitle, toolbarMenuItemTitle, wordStatTitle } from '../../utils/rteToolbarOptimize'
+import { buildWordStatsPanelData } from '../../utils/rteWordStats'
 import {
   BLOCK_PANEL_INSERT_SECTIONS,
   BLOCK_PANEL_QUICK_ACTIONS,
@@ -27,6 +29,9 @@ const rte = inject(RTE_BINDINGS)!
 if (!rte) throw new Error('RteDocumentBody 必须放在 RichTextEditor 里')
 const vRteFloat = rte.vRteFloat
 useParentScopeStamp()
+
+/** 字数面板数据（与工具栏下拉面板共用同一口径）。 */
+const wordStatsPanelProps = computed(() => buildWordStatsPanelData(rte))
 
 function findBlockSlashItem(id: string | undefined) {
   if (!id) return undefined
@@ -461,7 +466,7 @@ function blockInsertTitle(label: string, slashId: string | undefined): string {
               @click="runBlockQuickAction(action)"
             >
               <RteMenuGlyph :id="action.id" :label="action.label" />
-              <span data-rte-own class="rte-sr-only">{{ action.label }}</span>
+              <span data-rte-own class="rte-block-quick-label">{{ action.label }}</span>
             </button>
           </div>
           <template v-for="section in BLOCK_PANEL_INSERT_SECTIONS" :key="section.label">
@@ -483,9 +488,9 @@ function blockInsertTitle(label: string, slashId: string | undefined): string {
           </template>
 
           <!-- 块操作区：转换与块管理，跟插入区同属一个面板。 -->
-          <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
+          <div data-rte-own class="rte-block-menu-section">块操作</div>
           <button data-rte-own type="button" class="rte-block-menu-item" role="menuitem" :title="blockHandleTitle('insert')" @click="rte.insertBelowHoveredBlock"><RteMenuGlyph id="insertBelow" label="在下方插入" /><span data-rte-own>在下方插入</span></button>
-          <div data-rte-own class="rte-block-menu-section">转换为</div>
+          <div data-rte-own class="rte-block-menu-sublabel">转换为</div>
           <button data-rte-own
             v-for="item in BLOCK_PANEL_TURN_ACTIONS"
             :key="'turn-' + item.id"
@@ -496,8 +501,6 @@ function blockInsertTitle(label: string, slashId: string | undefined): string {
             :data-command="item.turn"
             @click="runBlockTurn(item)"
           ><RteMenuGlyph :id="item.id" :label="item.label" /><span data-rte-own>{{ item.label }}</span></button>
-          <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
-          <div data-rte-own class="rte-block-menu-section">块操作</div>
           <button data-rte-own type="button" class="rte-block-menu-item" role="menuitem" :title="blockHandleTitle('copy')" @click="rte.copyHoveredBlock"><RteMenuGlyph id="copyBlock" label="复制块" /><span data-rte-own>复制块</span></button>
           <button data-rte-own type="button" class="rte-block-menu-item" role="menuitem" :title="blockHandleTitle('up')" @click="rte.moveHoveredBlock(-1)"><RteMenuGlyph id="moveUp" label="上移" /><span data-rte-own>上移</span></button>
           <button data-rte-own type="button" class="rte-block-menu-item" role="menuitem" :title="blockHandleTitle('down')" @click="rte.moveHoveredBlock(1)"><RteMenuGlyph id="moveDown" label="下移" /><span data-rte-own>下移</span></button>
@@ -696,19 +699,7 @@ function blockInsertTitle(label: string, slashId: string | undefined): string {
     </div>
 
     <div data-rte-own v-if="rte.wordCountDockOpen" class="rte-word-dock" role="dialog" aria-label="字数统计">
-      <div data-rte-own class="rte-word-dock-row" :title="wordStatTitle('chars')"><span data-rte-own>字符</span><strong data-rte-own>{{ rte.charCount }}</strong></div>
-      <div data-rte-own class="rte-word-dock-row" :title="wordStatTitle('words')"><span data-rte-own>词数</span><strong data-rte-own>{{ rte.wordCount }}</strong></div>
-      <div data-rte-own class="rte-word-dock-row" :title="wordStatTitle('cn')"><span data-rte-own>中文</span><strong data-rte-own>{{ rte.wordParts.cn }}</strong></div>
-      <div data-rte-own class="rte-word-dock-row" :title="wordStatTitle('ascii')"><span data-rte-own>英文词</span><strong data-rte-own>{{ rte.wordParts.en }}</strong></div>
-      <div data-rte-own class="rte-word-dock-row" :title="wordStatTitle('images')"><span data-rte-own>图片</span><strong data-rte-own>{{ rte.wordParts.images }}</strong></div>
-      <div data-rte-own class="rte-word-dock-row" :title="wordStatTitle('minutes')"><span data-rte-own>阅读</span><strong data-rte-own>约 {{ rte.readingMinutes }} 分钟</strong></div>
-      <div data-rte-own class="rte-word-dock-row" :title="wordStatTitle('paragraphs')"><span data-rte-own>段落</span><strong data-rte-own>{{ rte.docExtraStats.paragraphs }}</strong></div>
-      <div data-rte-own class="rte-word-dock-row" :title="wordStatTitle('headings')"><span data-rte-own>标题</span><strong data-rte-own>{{ rte.docExtraStats.headings }}</strong></div>
-      <div data-rte-own class="rte-word-dock-row" :title="wordStatTitle('selectionChars')">
-        <span data-rte-own>选区</span>
-        <strong data-rte-own>{{ rte.selectionStats.hasSelection ? rte.selectionStats.chars : '—' }}</strong>
-      </div>
-      <button data-rte-own type="button" class="rte-word-dock-close" :title="wordStatTitle('close')" @click="rte.wordCountDockOpen = false">关闭</button>
+      <RteWordStatsPanel v-bind="wordStatsPanelProps" @close="rte.wordCountDockOpen = false" />
     </div>
 
     <div data-rte-own v-if="rte.showBottomBar" class="rte-bottom">

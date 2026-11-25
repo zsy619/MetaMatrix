@@ -33,7 +33,7 @@ describe('「+」块操作面板', () => {
     expect(BLOCK_PANEL_TURN_ACTIONS.map((item) => item.id)).toEqual(['warn', 'success', 'error'])
   })
 
-  it('基础区保持 12 个图标（两行六列）', () => {
+  it('基础区保持 12 个条目（面板里排成四列三行）', () => {
     expect(BLOCK_PANEL_QUICK_ACTIONS).toHaveLength(12)
   })
 

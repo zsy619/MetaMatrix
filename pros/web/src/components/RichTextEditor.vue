@@ -2705,6 +2705,23 @@ function insertTimelineBlock() {
   ElMessage.success('已插入时间线')
 }
 
+/** 在光标所在节点下方追加节点；光标不在时间线里就新建一条。 */
+function addTimelineNode() {
+  const ed = editor.value
+  if (!ed) return
+  ed.chain().focus().addTimelineItem().run()
+  ElMessage.success('已添加时间线节点')
+}
+
+/** 删除光标所在的节点；只有一个节点时整条时间线一起删。 */
+function deleteTimelineNode() {
+  const ed = editor.value
+  if (!ed) return
+  const ok = ed.chain().focus().deleteTimelineItem().run()
+  if (ok) ElMessage.success('已删除时间线节点')
+  else ElMessage.info('请先把光标放到时间线的某个节点上')
+}
+
 async function insertStatusChipBlock() {
   const label = await openRtePrompt({
     title: '状态徽章',
@@ -7508,6 +7525,22 @@ const allTools = computed((): ToolItem[] => {
       icon: '⏱',
       iconComp: ic('note'),
       run: insertTimelineBlock,
+    },
+    {
+      key: 'timelineAdd',
+      label: '加节点',
+      title: '在光标所在节点下方添加一个节点',
+      icon: '＋',
+      iconComp: ic('list'),
+      run: addTimelineNode,
+    },
+    {
+      key: 'timelineDelete',
+      label: '删节点',
+      title: '删除当前时间线里光标所在的节点',
+      icon: '✕',
+      iconComp: ic('clear'),
+      run: deleteTimelineNode,
     },
     {
       key: 'statusChip',

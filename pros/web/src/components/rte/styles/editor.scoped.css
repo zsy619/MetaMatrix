@@ -456,16 +456,17 @@
   display: flex;
   flex-direction: column;
   overflow: hidden !important;
-  padding: 0;
-}
-.rte-float-menu.rte-template-menu .rte-template-menu-body {
-  flex: 1 1 auto;
-  min-height: 0;
-  max-height: var(--rte-float-max-h, min(70vh, 560px));
-  overflow-x: hidden;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
+  width: 600px;
+  max-width: 100%;
+  min-width: 0;
+  /* !important：压过 telegram.ui.css 的通用浮层外壳（8px 圆角 + 轻阴影）。
+     模板面板是 600px 的大浮层，按 AGENTS.md §2「浮层表面」规格走：
+     12px 圆角 + 1px 发丝线 + 中性投影 0 24px 64px。 */
+  padding: 0 !important;
+  border-radius: 12px !important;
+  border: 1px solid var(--tg-border, #e6e6e6) !important;
+  background: var(--tg-surface, #fff) !important;
+  box-shadow: var(--tg-shadow-3, 0 24px 64px rgba(15, 23, 42, 0.18)) !important;
 }
 .rte-float-menu.rte-import-menu,
 .rte-float-menu.rte-more-menu {
@@ -678,17 +679,17 @@
   z-index: 6;
   box-sizing: border-box;
   /* 宽度同时受视口约束，窄屏不横向溢出。 */
-  width: min(304px, calc(100vw - 16px));
-  max-height: min(520px, 70vh);
+  width: min(320px, calc(100vw - 16px));
+  max-height: min(560px, 72vh);
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
-  padding: 8px;
+  padding: 6px;
   background: #fff;
   border: 1px solid #dee0e3;
-  border-radius: 10px;
-  box-shadow: 0 8px 24px rgba(31, 35, 41, 0.14), 0 2px 6px rgba(31, 35, 41, 0.06);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(31, 35, 41, 0.16), 0 2px 6px rgba(31, 35, 41, 0.06);
   display: flex;
   flex-direction: column;
   color: #1f2329;
@@ -696,8 +697,8 @@
 .rte-block-menu button {
   border: none;
   background: transparent;
-  border-radius: 6px;
-  font-size: 14px;
+  border-radius: 8px;
+  font-size: 13px;
   color: #1f2329;
   cursor: pointer;
 }
@@ -711,30 +712,46 @@
 }
 /* 分组标题只承担信息层级，不进入 menuitem 键盘导航序列。 */
 .rte-block-menu-section {
-  padding: 8px 8px 4px;
-  color: #8f959e;
+  /* 组与组之间一条发丝线 + 稍强的小标题，避免整块菜单看起来是一张平铺清单。 */
+  margin: 4px 0 0;
+  padding: 10px 8px 6px;
+  border-top: 1px solid #f0f1f3;
+  color: #4e5969;
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
   line-height: 18px;
   user-select: none;
 }
 .rte-block-menu-section:first-child {
+  margin-top: 0;
   padding-top: 2px;
+  border-top: none;
 }
-/* 基础区采用六列等宽网格，与飞书的高频图标入口保持一致。 */
+/* 子分组标题（块操作下的「转换为」）：不画分隔线，只做弱层级。 */
+.rte-block-menu-sublabel {
+  padding: 8px 8px 2px;
+  color: #8f959e;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 16px;
+  user-select: none;
+}
+/* 基础区：四列等宽格子，图标在上、名称在下，不再是一排认不出的图标。 */
 .rte-block-quick-grid {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 4px;
   padding: 2px 0 6px;
 }
 .rte-block-menu .rte-block-quick {
   display: inline-flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 3px;
   min-width: 0;
-  height: 38px;
-  padding: 0;
+  height: 54px;
+  padding: 6px 2px;
   border: 1px solid transparent;
   text-align: center;
 }
@@ -743,6 +760,24 @@
   border-color: #dee0e3;
   background: #f5f6f7;
 }
+/* 格子里的名称：11px，hover 时转主色，和图标一起反馈。 */
+.rte-block-quick-label {
+  max-width: 100%;
+  font-size: 11px;
+  line-height: 14px;
+  color: #4e5969;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rte-block-menu .rte-block-quick:hover .rte-block-quick-label,
+.rte-block-menu .rte-block-quick:focus-visible .rte-block-quick-label {
+  color: #3370ff;
+}
+.rte-block-menu .rte-block-quick:hover .rte-menu-glyph,
+.rte-block-menu .rte-block-quick:focus-visible .rte-menu-glyph {
+  color: #3370ff;
+}
 /* 普通命令统一为「图标 + 文字」，避免原纯文字列表难以扫描。 */
 .rte-block-menu .rte-block-menu-item {
   display: flex;
@@ -750,7 +785,7 @@
   gap: 10px;
   width: 100%;
   min-height: 34px;
-  padding: 6px 8px;
+  padding: 5px 8px;
   line-height: 20px;
   text-align: left;
   white-space: nowrap;
@@ -768,6 +803,10 @@
   display: block;
   width: 18px;
   height: 18px;
+}
+.rte-block-menu .rte-block-menu-item:hover .rte-menu-glyph,
+.rte-block-menu .rte-block-menu-item:focus-visible .rte-menu-glyph {
+  color: #3370ff;
 }
 .rte-block-menu .rte-block-quick .rte-menu-glyph,
 .rte-block-menu .rte-block-quick .rte-menu-glyph :deep(svg) {
@@ -1445,76 +1484,6 @@
   color: #86909c;
   letter-spacing: 0.02em;
   user-select: none;
-}
-
-.rte-template-menu {
-  min-width: 480px;
-  max-width: 560px;
-  padding: 0;
-  /* 外层不裁切，避免挡住移入路径；滚动在 .rte-template-menu-body */
-  overflow: visible;
-}
-
-.rte-template-menu-body {
-  padding: 6px;
-  max-height: min(70vh, 560px);
-  overflow-x: hidden;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
-}
-
-.rte-template-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 4px;
-  margin: 0 0 8px;
-}
-
-.rte-template-menu .rte-menu-section-label {
-  grid-column: 1 / -1;
-  padding: 6px 8px 4px;
-}
-
-.rte-template-menu .rte-template-item {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: flex-start;
-  gap: 2px;
-  min-width: 0;
-  width: 100%;
-  box-sizing: border-box;
-  padding: 8px 10px;
-  text-align: left;
-  line-height: 1.35;
-  white-space: normal;
-  border: 1px solid transparent;
-  border-radius: 6px;
-}
-
-.rte-template-menu .rte-template-item:hover {
-  background: #f2f3f5;
-  border-color: #e5e6eb;
-}
-
-.rte-template-item-label {
-  font-size: 13px;
-  font-weight: 600;
-  color: #1d2129;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
-}
-
-.rte-template-item-desc {
-  font-size: 11px;
-  font-weight: 400;
-  color: #86909c;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
 }
 
 .rte-menu button:disabled,
@@ -2309,6 +2278,28 @@
 }
 .rte-more-flyout > button {
   flex: 0 0 auto;
+}
+/* 「更多」里的模板面板：与工具栏直开面板同一套外观（Telegram Web K） */
+.rte-more-flyout.rte-template-menu {
+  /* 「更多」面板自身可滚动高度只有 min(420px, 70vh)，模板面板要矮于它，
+     否则 sticky 定位的浮层底部会被裁掉。 */
+  --rte-float-max-h: min(380px, 56vh);
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  /* !important 理由同 .rte-float-menu.rte-template-menu：压过 telegram.ui.css 通用外壳 */
+  padding: 0 !important;
+  border: 1px solid var(--tg-border, #e6e6e6) !important;
+  border-radius: 12px !important;
+  background: var(--tg-surface, #fff) !important;
+  box-shadow: var(--tg-shadow-3, 0 24px 64px rgba(15, 23, 42, 0.18)) !important;
+  max-height: min(380px, 56vh);
+  overflow: hidden;
+}
+/* 模板面板要完整展开，把「更多」浮层撑到能容纳面板的宽度 */
+.rte-more-menu:has(.rte-template-menu) {
+  min-width: min(600px, 92vw);
 }
 .rte-root.expanded .rte-color-menu {
   /* 颜色面板较宽：优先左对齐；若贴右可由工具条 overflow:visible + bridge 兜底 */
@@ -4346,41 +4337,23 @@
   font: inherit;
   cursor: pointer;
   padding: 2px 4px;
-  border-radius: 4px;
+  border-radius: var(--tg-radius-xs, 6px);
 }
 .rte-wordcount:hover,
 .rte-wordcount[aria-expanded='true'] {
-  background: var(--mm-blue-soft, #e8f0fe);
-  color: var(--mm-blue, #1a73e8);
+  background: var(--tg-blue-soft, rgba(51, 144, 236, 0.12));
+  color: var(--tg-blue, #3390ec);
 }
 .rte-word-dock {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px 12px;
-  margin: 0;
-  padding: 8px 12px;
-  border-top: 1px solid var(--mm-line, #e8eaed);
-  background: var(--mm-surface, #fff);
-  font-size: 12px;
-  color: var(--mm-muted, #5f6368);
-}
-.rte-word-dock-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-}
-.rte-word-dock-row strong {
-  color: var(--mm-text, #202124);
-  font-weight: 600;
-}
-.rte-word-dock-close {
-  justify-self: end;
-  grid-column: 1 / -1;
-  border: none;
-  background: transparent;
-  color: var(--mm-blue, #1a73e8);
-  cursor: pointer;
-  font-size: 12px;
+  /* 底栏入口复用工具栏的「字数统计」面板组件，这里只做浮层外壳。 */
+  width: 320px;
+  max-width: 100%;
+  margin: 0 auto 12px;
+  border: 1px solid var(--tg-border, #e6e6e6);
+  border-radius: var(--tg-radius-md, 12px);
+  background: var(--tg-surface, #fff);
+  box-shadow: var(--tg-shadow-3, 0 24px 64px rgba(15, 23, 42, 0.18));
+  overflow: hidden;
 }
 .rte-root.expanded .rte-canvas {
   background: #f5f6f7;

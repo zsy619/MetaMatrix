@@ -1488,9 +1488,9 @@ const echartsDialogTemplates = computed(() => {
         <div data-rte-own class="rte-link-dialog" role="dialog" aria-modal="true" aria-label="阅读时长" @mousedown.stop>
           <h3 data-rte-own class="rte-table-title">阅读时长估算</h3>
           <p data-rte-own class="rte-ask-message">基于全文去空白字数 {{ rte.charCount }}</p>
-          <div data-rte-own class="rte-wordstats-row"><span data-rte-own>慢读（约 250 字/分）</span><strong data-rte-own>{{ rte.estimateReadingMinutes(rte.charCount, 250) }} 分钟</strong></div>
-          <div data-rte-own class="rte-wordstats-row"><span data-rte-own>常速（约 400 字/分）</span><strong data-rte-own>{{ rte.estimateReadingMinutes(rte.charCount, 400) }} 分钟</strong></div>
-          <div data-rte-own class="rte-wordstats-row"><span data-rte-own>快读（约 600 字/分）</span><strong data-rte-own>{{ rte.estimateReadingMinutes(rte.charCount, 600) }} 分钟</strong></div>
+          <div data-rte-own class="rte-readtime-row"><span data-rte-own>慢读（约 250 字/分）</span><strong data-rte-own>{{ rte.estimateReadingMinutes(rte.charCount, 250) }} 分钟</strong></div>
+          <div data-rte-own class="rte-readtime-row"><span data-rte-own>常速（约 400 字/分）</span><strong data-rte-own>{{ rte.estimateReadingMinutes(rte.charCount, 400) }} 分钟</strong></div>
+          <div data-rte-own class="rte-readtime-row"><span data-rte-own>快读（约 600 字/分）</span><strong data-rte-own>{{ rte.estimateReadingMinutes(rte.charCount, 600) }} 分钟</strong></div>
           <div data-rte-own class="rte-modal-actions">
             <button data-rte-own type="button" class="rte-modal-confirm" title="关掉阅读时长" @click="rte.readTimeDialogOpen = false">关闭</button>
           </div>
