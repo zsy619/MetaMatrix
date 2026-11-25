@@ -795,15 +795,23 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
   height: 100%;
   overflow: hidden;
 }
+/* 头部玻璃条与功能区之间必须留出安全间距：
+   1) z-index 高于功能区的 sticky(40)，任何滚动状态下头部都不会被功能区压住；
+   2) 底部多留 6px + 动作组 4px，玻璃卡的圆角与投影不再压到功能区首行（此前被误读成「遮挡」）。 */
 .doc-view__head {
+  position: relative;
+  z-index: 60;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
+  padding: 8px 12px 14px;
   border-bottom: 1px solid var(--glass-ring, rgba(15, 23, 42, 0.09));
   background: rgba(255, 255, 255, 0.34);
   backdrop-filter: blur(var(--glass-blur, 18px)) saturate(var(--glass-saturate, 165%));
   -webkit-backdrop-filter: blur(var(--glass-blur, 18px)) saturate(var(--glass-saturate, 165%));
+}
+.doc-view__head .mm-bar__group {
+  margin-bottom: 4px;
 }
 .doc-view__icon {
   flex: none;
@@ -897,6 +905,7 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
 .doc-view__related-empty { font-size: 12px; color: var(--mm-muted, #86909c); padding: 8px 4px; }
 .doc-view__body.is-focus .doc-view__sidebar { display: none; }
 .doc-view__body {
+  border-top: 1px solid var(--glass-ring, rgba(15, 23, 42, 0.09));
   flex: 1;
   display: flex;
   flex-direction: row;

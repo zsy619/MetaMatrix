@@ -233,9 +233,9 @@
   display: inline-flex;
   align-items: center;
   position: relative;
-  flex: 0 1 168px;
-  min-width: 112px;
-  margin: 0 8px 4px;
+  flex: 0 1 96px;
+  min-width: 80px;
+  margin: 0 4px 4px;
 }
 .rte-toolbar-search input {
   width: 100%;
@@ -2971,8 +2971,8 @@
   max-height: 32px;
   width: auto;
   margin-right: 2px;
-  padding: 0 8px;
-  gap: 4px;
+  padding: 0 4px;
+  gap: 2px;
   border: 1px solid transparent;
   border-radius: 6px;
   background: transparent;
@@ -2992,6 +2992,14 @@
   font-size: 12px;
   line-height: 16px;
   color: inherit;
+}
+/* 收起/展开只留箭头（title 已提供悬浮说明），把宽度让给栏目标签，
+   避免窄窗口下最后几个栏目被挤到横向滚动区里看不见。 */
+.rte-root.expanded .rte-mode-bar .rte-toolbar-fold .rte-tool-label {
+  display: none;
+}
+.rte-root.expanded .rte-mode-bar .rte-toolbar-fold {
+  padding: 0 6px;
 }
 .rte-toolbar-fold {
   position: static;
@@ -4783,13 +4791,14 @@ html.rte-toolbar-dragging .rte-root:not(.expanded) .rte-toolbar-tools > .rte-too
   min-width: 0;
   gap: 0;
   min-height: 30px;
-  padding: 0;
+  padding: 0 4px 0 0;
   background: transparent;
   overflow-x: auto;
   flex-wrap: nowrap;
   scrollbar-width: thin;
   scroll-snap-type: x proximity;
-  mask-image: linear-gradient(to right, transparent, #000 12px, #000 calc(100% - 12px), transparent);
+  /* 只在真正溢出时才做边缘渐隐，避免「最后一个栏目被抹掉」的误读 */
+  mask-image: linear-gradient(to right, transparent, #000 6px, #000 calc(100% - 6px), transparent);
 }
 .rte-ribbon-tab {
   scroll-snap-align: start;
@@ -4804,14 +4813,14 @@ html.rte-toolbar-dragging .rte-root:not(.expanded) .rte-toolbar-tools > .rte-too
 .rte-ribbon-tab {
   flex: 0 0 auto;
   height: 28px;
-  margin: 0 1px;
-  padding: 0 10px;
+  margin: 0;
+  padding: 0 4px;
   border: 1px solid transparent;
   border-bottom: none;
   border-radius: 3px 3px 0 0;
   background: transparent;
   color: #323130;
-  font-size: 13px;
+  font-size: 12px;
   line-height: 26px;
   cursor: pointer;
   white-space: nowrap;
