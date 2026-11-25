@@ -1,0 +1,20 @@
+name: deploy-probe
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: probe ssh
+        env:
+          DEPLOY_PASSWORD: ${{ secrets.DEPLOY_PASSWORD }}
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq sshpass >/dev/null
+          set +e
+          echo "--- nc 22 ---"
+          timeout 8 nc -zv 101.132.237.173 22; echo "nc_exit=$?"
+          echo "--- ssh ---"
+          SSHPASS="$DEPLOY_PASSWORD" timeout 25 sshpass -e ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=15 root@101.132.237.173 'echo CONNECTED; hostname; uname -a; ls -la /home/metamatrix 2>/dev/null | head -30' 2>&1
+          echo "ssh_exit=$?"
