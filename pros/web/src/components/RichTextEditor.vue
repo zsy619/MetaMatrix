@@ -6762,7 +6762,36 @@ function onNarrowMediaChange(event: MediaQueryListEvent) {
   narrowViewport.value = event.matches
 }
 
-/** 实际生效的工具栏形态：窄屏一律紧凑（compact），其余跟随 expanded。 */
+/**
+ * 工具栏样式：tg = Telegram 式紧凑图标条，ribbon = 完整功能区。
+ * 持久化在 localStorage，供用户自己选择（工具栏右侧可一键切换）。
+ */
+const TOOLBAR_STYLE_KEY = 'rte.toolbar.style'
+/** 默认保持既有功能区工具栏；用户主动切到 Telegram 风格后写入 localStorage。 */
+const tgStyle = ref(false)
+try {
+  const saved = localStorage.getItem(TOOLBAR_STYLE_KEY)
+  if (saved === 'ribbon' || saved === 'tg') tgStyle.value = saved === 'tg'
+} catch {
+  /* 读不到偏好就用默认的 Telegram 风格 */
+}
+function setToolbarStyle(style: 'tg' | 'ribbon') {
+  tgStyle.value = style === 'tg'
+  try {
+    localStorage.setItem(TOOLBAR_STYLE_KEY, style)
+  } catch {
+    /* 偏好写不进去也不影响使用 */
+  }
+}
+function toggleTgStyle() {
+  setToolbarStyle(tgStyle.value ? 'ribbon' : 'tg')
+}
+
+/**
+ * 实际生效的工具栏形态：窄屏一律紧凑（compact），其余跟随 expanded。
+ * Telegram 风格只改「呈现」（图标化 + 分组分隔线），不改变功能区 / 紧凑主栏的布局：
+ * 最大化时仍是 Ribbon 功能区菜单，只是按钮换成 Telegram 式纯图标。
+ */
 const effectiveExpanded = computed(
   () => resolveToolbarLayout(props.expanded, narrowViewport.value) === 'expanded',
 )
@@ -8092,6 +8121,9 @@ provideRteBindings({
   emojiTabId,
   estimateReadingMinutes,
   get expanded() { return effectiveExpanded.value },
+  get tgStyle() { return tgStyle.value },
+  toggleTgStyle,
+  setToolbarStyle,
   toolbarRowsOpen,
   toggleToolbarRows,
   exportAsDocx,
@@ -8625,6 +8657,7 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
       'mode-preview': viewMode === 'preview',
       'mode-source': viewMode === 'source',
       'is-focus-mode': focusMode,
+      'is-tg-style': tgStyle,
       'is-dark-editor': darkEditor,
       'is-heading-auto-num': headingAutoNumber,
       'is-immersive': immersiveFullscreen,

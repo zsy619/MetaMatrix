@@ -288,6 +288,43 @@ watch(() => rteBindings.toolbarQuery, () => {
   })
 })
 
+/** 「更多」面板里的工具栏设置分组清单（勾选显隐 / 调整顺序）。 */
+const showToolbarSettings = ref(false)
+
+/** Telegram 风格的悬停气泡提示：跟随按钮定位，Teleport 到 body，避免被横向滚动容器裁剪。 */
+const tgTip = ref<{ text: string; x: number; y: number } | null>(null)
+let tgTipTimer: number | null = null
+function clearTgTipTimer() {
+  if (tgTipTimer != null) {
+    window.clearTimeout(tgTipTimer)
+    tgTipTimer = null
+  }
+}
+function onToolbarMouseover(event: MouseEvent) {
+  if (!rteBindings.tgStyle) return
+  const target = event.target as HTMLElement | null
+  const host = target?.closest?.('[data-tip]') as HTMLElement | null
+  if (!host) return
+  const text = host.getAttribute('data-tip') || ''
+  if (!text) return
+  const rect = host.getBoundingClientRect()
+  clearTgTipTimer()
+  tgTip.value = { text, x: rect.left + rect.width / 2, y: rect.bottom + 10 }
+}
+function onToolbarMouseout(event: MouseEvent) {
+  if (!rteBindings.tgStyle) return
+  const target = event.target as HTMLElement | null
+  const host = target?.closest?.('[data-tip]') as HTMLElement | null
+  if (!host) return
+  const to = event.relatedTarget as HTMLElement | null
+  if (to && host.contains(to)) return
+  clearTgTipTimer()
+  tgTipTimer = window.setTimeout(() => {
+    tgTip.value = null
+    tgTipTimer = null
+  }, 80)
+}
+
 function toggleChartGroupMenu(key: string) {
   const wasOpen = rteBindings.echartsGroupMenuKey === key
   rteBindings.echartsGroupMenuKey = wasOpen ? null : key
@@ -303,6 +340,8 @@ function toggleChartGroupMenu(key: string) {
       :class="{ 'is-one-row': rte.expanded && !rte.toolbarRowsOpen }"
       role="toolbar"
       aria-label="编辑工具栏"
+      @mouseover="onToolbarMouseover"
+      @mouseout="onToolbarMouseout"
     >
       <div data-rte-own class="rte-sr-only" role="status" aria-live="polite" aria-atomic="true">
         {{ rte.rteAriaStatus }}
@@ -377,6 +416,19 @@ function toggleChartGroupMenu(key: string) {
           >
             <span data-rte-own class="rte-tool-icon rte-view-mode-glyph" aria-hidden="true">↑</span>
             <span data-rte-own class="rte-tool-label">应用</span>
+          </button>
+          <button data-rte-own
+            type="button"
+            class="rte-tool rte-view-mode-tool rte-toolbar-style-toggle"
+            :title="rte.tgStyle ? '恢复标准功能区样式' : '切换到 Telegram 风格功能区'"
+            :aria-label="rte.tgStyle ? '恢复标准功能区样式' : '切换到 Telegram 风格功能区'"
+            :aria-pressed="rte.tgStyle"
+            @click.stop="rte.toggleTgStyle()"
+          >
+            <span data-rte-own class="rte-tool-icon">
+              <component data-rte-own :is="rte.toolIcon(rte.tgStyle ? 'ribbonStyle' : 'tgStyle')" class="rte-ep-icon" />
+            </span>
+            <span data-rte-own class="rte-tool-label">{{ rte.tgStyle ? '标准' : 'Telegram' }}</span>
           </button>
           <button data-rte-own
             type="button"
@@ -2412,7 +2464,8 @@ function toggleChartGroupMenu(key: string) {
           type="button"
           class="rte-tool"
           :class="{ active: t.active?.(), 'is-disabled': t.disabled?.() }"
-          :title="disabledToolTitle(t.title || t.label, !!t.disabled?.())"
+          :data-tip="rte.tgStyle ? t.title || t.label : undefined"
+          :title="rte.tgStyle ? undefined : disabledToolTitle(t.title || t.label, !!t.disabled?.())"
           :aria-label="t.title || t.label"
           :aria-keyshortcuts="shortcutFromTitle(t.title || '') || undefined"
           :aria-pressed="t.active ? !!t.active() : undefined"
@@ -2463,12 +2516,44 @@ function toggleChartGroupMenu(key: string) {
             v-if="rte.moreOpen"
             class="rte-more-menu"
             v-rte-float="'more'"
-            :class="{ 'has-flyout': rte.moreColorOpen || rte.moreHighlightOpen || rte.moreFormOpen || rte.moreTemplateOpen || rte.moreFontSizeOpen || rte.moreFontFamilyOpen || rte.moreLineHeightOpen || rte.moreCalloutOpen || !!rte.presetMenuKey }"
+            :class="{ 'is-tg': rte.tgStyle, 'has-flyout': rte.moreColorOpen || rte.moreHighlightOpen || rte.moreFormOpen || rte.moreTemplateOpen || rte.moreFontSizeOpen || rte.moreFontFamilyOpen || rte.moreLineHeightOpen || rte.moreCalloutOpen || !!rte.presetMenuKey }"
             @mousedown.prevent
             @keydown="onMoreMenuKeydown"
             @mouseenter="rte.onToolMenuEnter('more')"
             @mouseleave="rte.onToolMenuLeave($event, 'more', rte.closeMore)"
           >
+          <div data-rte-own class="rte-more-settings">
+            <button data-rte-own
+              type="button"
+              class="rte-more-settings-toggle"
+              :class="{ active: showToolbarSettings }"
+              :aria-expanded="showToolbarSettings"
+              title="工具栏设置：分组内按钮的显示与顺序"
+              @click.stop="showToolbarSettings = !showToolbarSettings"
+            >
+              <span data-rte-own class="rte-more-settings-glyph" aria-hidden="true">⚙</span>
+              <span data-rte-own>工具栏设置</span>
+              <span data-rte-own class="rte-more-settings-caret" aria-hidden="true">{{ showToolbarSettings ? '▴' : '▾' }}</span>
+            </button>
+            <p data-rte-own class="rte-more-settings-hint">按分组调整按钮的显示与顺序；分组本身可拖动手柄排序。</p>
+            <div data-rte-own v-if="showToolbarSettings" class="rte-more-settings-list">
+              <div data-rte-own
+                v-for="group in rte.moreGroups"
+                :key="'ts-' + group.id"
+                class="rte-more-settings-row"
+              >
+                <span data-rte-own class="rte-more-settings-name">{{ group.label }}</span>
+                <span data-rte-own class="rte-more-settings-count">{{ group.tools.length }}</span>
+                <button data-rte-own
+                  type="button"
+                  class="rte-more-settings-btn"
+                  :title="'自定义' + group.label + '的按钮'"
+                  :aria-label="'自定义' + group.label + '的按钮'"
+                  @click.stop="onGroupContextMenu(group.id, $event)"
+                >⚙</button>
+              </div>
+            </div>
+          </div>
           <div data-rte-own
             v-for="group in rte.moreGroups"
             :key="group.id"
@@ -2494,6 +2579,14 @@ function toggleChartGroupMenu(key: string) {
             >
               ⠿ {{ group.label }}
             </button>
+            <button data-rte-own
+              v-if="rte.viewMode === 'edit'"
+              type="button"
+              class="rte-more-group-settings"
+              :title="'自定义' + group.label + '的按钮'"
+              :aria-label="'自定义' + group.label + '的按钮'"
+              @click.stop="onGroupContextMenu(group.id, $event)"
+            >⚙</button>
             <template v-for="mt in group.tools" :key="mt.key">
             <div data-rte-own
               v-if="mt.kind === 'paperGroup'"
@@ -2827,6 +2920,22 @@ function toggleChartGroupMenu(key: string) {
         </Teleport>
       </div>
 
+      <!-- 工具栏样式切换：Telegram 风格（紧凑图标条） / 完整功能区 -->
+      <div data-rte-own v-if="!rte.expanded" class="rte-tg-switch">
+        <button data-rte-own
+          type="button"
+          class="rte-tool rte-tg-switch-btn"
+          :title="rte.tgStyle ? '恢复标准工具栏样式' : '切换到 Telegram 风格工具栏'"
+          :aria-label="rte.tgStyle ? '恢复标准工具栏样式' : '切换到 Telegram 风格工具栏'"
+          :aria-pressed="rte.tgStyle"
+          @click.stop="rte.toggleTgStyle()"
+        >
+          <span data-rte-own class="rte-tool-icon">
+            <component data-rte-own :is="rte.toolIcon(rte.tgStyle ? 'ribbonStyle' : 'tgStyle')" class="rte-ep-icon" />
+          </span>
+        </button>
+      </div>
+
       <!-- 紧凑「更多」打开的浮层面板（顶栏无对应按钮时，锚到「更多」） -->
       <Teleport to="body">
         <div data-rte-own
@@ -3085,6 +3194,15 @@ function toggleChartGroupMenu(key: string) {
             data-rte-own
           >取消导出</button>
         </div>
+      </Teleport>
+      <Teleport to="body">
+        <div
+          v-if="tgTip"
+          data-rte-own
+          class="rte-tg-tip"
+          :style="{ left: tgTip.x + 'px', top: tgTip.y + 'px' }"
+          role="tooltip"
+        >{{ tgTip.text }}</div>
       </Teleport>
     </div>
 </template>

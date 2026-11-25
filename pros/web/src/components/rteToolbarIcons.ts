@@ -483,6 +483,20 @@ export const IconQr = svgIcon([
   'M18 18h2v2h-2z',
 ])
 
+/** Telegram 风格：单行紧凑图标条。 */
+export const IconToolbarTelegram = svgIcon([
+  'M4 7h16',
+  'M4 12h11',
+  'M4 17h7',
+])
+/** 完整功能区：标签页 + 分组卡片。 */
+export const IconToolbarRibbon = svgIcon([
+  'M3.5 5.5h17v3.6h-17z',
+  'M5.5 11.6h4v6.9h-4z',
+  'M11 11.6h4v6.9h-4z',
+  'M16.5 11.6h2v6.9h-2z',
+])
+
 export const toolbarIconMap: Record<string, Component> = {
   undo: IconUndo,
   redo: IconRedo,
@@ -542,6 +556,8 @@ export const toolbarIconMap: Record<string, Component> = {
   exportText: IconExportText,
   exportPng: IconExportPng,
   more: IconMore,
+  tgStyle: IconToolbarTelegram,
+  ribbonStyle: IconToolbarRibbon,
   importDoc: IconDocument,
   importLink: IconConnection,
   form: IconForm,

@@ -2562,19 +2562,19 @@ html.rte-toolbar-dragging * {
 }
 .rte-picker-tabs {
   display: flex;
-  flex-wrap: nowrap;
+  /* 表情分类从 10 个增到 13 个，单行放不下；折行显示，避免末尾分类（旗帜）被横向滚动藏住 */
+  flex-wrap: wrap;
   gap: 2px;
   padding: 6px 8px 4px;
   border-bottom: 1px solid #e5e6eb;
   background: #fafafa;
   flex: 0 0 auto;
-  height: 40px;
+  height: auto;
   min-height: 40px;
-  max-height: 40px;
-  overflow-x: auto;
+  max-height: none;
+  overflow-x: hidden;
   overflow-y: hidden;
   align-items: center;
-  scrollbar-width: thin;
   box-sizing: border-box;
 }
 .rte-picker-tab {
@@ -6154,4 +6154,449 @@ html.rte-image-preview-open .tippy-box {
     font-size: 0.85em;
     word-break: break-all;
   }
+}
+
+/* ==========================================================================
+   Telegram 风格工具栏：单行紧凑图标条 + 分组分隔线 + 「更多」多列浮层
+   仅在 .rte-root.is-tg-style 下生效；与既有功能区 / 紧凑主栏并存，可一键切换。
+   说明：这里的 !important 是为了压过 editor.scoped.css 里 .rte-tool /
+   .rte-tool-label / .rte-tool-group 的旧尺寸规则（scoped 带 data-v-hash，
+   特异性同级），否则图标条会被旧的文字尺寸撑开、无法单行排布。
+   ========================================================================== */
+.rte-root.is-tg-style .rte-toolbar-tools {
+  gap: 2px !important;
+  flex-wrap: nowrap !important;
+  overflow-x: auto;
+  overflow-y: hidden;
+  align-items: center;
+  padding: 2px 0;
+  scrollbar-width: none;
+}
+.rte-root.is-tg-style .rte-toolbar-tools::-webkit-scrollbar {
+  height: 0;
+}
+.rte-root.is-tg-style .rte-tool-group {
+  border: 0 !important;
+  background: transparent !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  gap: 1px;
+  flex-wrap: nowrap;
+}
+.rte-root.is-tg-style .rte-tool-group + .rte-tool-group {
+  margin-left: 8px;
+  padding-left: 8px;
+  border-left: 1px solid rgba(15, 23, 42, 0.14);
+}
+/* Telegram 风格下仍保留分组拖拽手柄：紧凑条只留手柄，功能区保留手柄 + 分组说明 */
+.rte-root.is-tg-style .rte-group-head {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 2px;
+  height: auto;
+  margin: 0 2px 0 0;
+  padding: 0;
+  border-radius: 0;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.rte-root.is-tg-style:not(.expanded) .rte-group-label,
+.rte-root.is-tg-style:not(.expanded) .rte-group-empty {
+  display: none !important;
+}
+.rte-root.is-tg-style .rte-group-handle {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 22px;
+  margin: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 11px;
+  line-height: 1;
+  opacity: 0.4;
+  cursor: grab;
+}
+.rte-root.is-tg-style .rte-group-handle:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+}
+.rte-root.is-tg-style .rte-group-handle:active {
+  cursor: grabbing;
+}
+.rte-root.is-tg-style .rte-tool {
+  width: 30px !important;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 !important;
+  border-radius: 9px !important;
+  border: 1px solid transparent;
+  background: transparent !important;
+  flex-direction: row;
+  gap: 0;
+}
+.rte-root.is-tg-style .rte-tool.is-labeled {
+  width: 30px !important;
+  min-width: 30px;
+}
+.rte-root.is-tg-style .rte-tool-label {
+  display: none !important;
+}
+.rte-root.is-tg-style .rte-tool .rte-caret {
+  display: none !important;
+}
+.rte-root.is-tg-style .rte-tool-icon {
+  height: auto;
+  font-size: 15px;
+}
+.rte-root.is-tg-style .rte-tool .rte-ep-icon {
+  width: 17px;
+  height: 17px;
+}
+/* 悬停：白玻璃片 + 顶部高光 + 上浮（与全局玻璃拟态规范一致） */
+.rte-root.is-tg-style .rte-tool:hover {
+  background: rgba(255, 255, 255, 0.72) !important;
+  border-color: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.1);
+  transform: translateY(-1px);
+}
+.rte-root.is-tg-style .rte-tool.active {
+  background: rgba(37, 99, 235, 0.12) !important;
+  border-color: rgba(37, 99, 235, 0.28);
+  color: #1d4ed8;
+  box-shadow: none;
+}
+.rte-root.is-tg-style .rte-tool:active {
+  background: rgba(37, 99, 235, 0.16) !important;
+}
+.rte-root.is-tg-style .rte-tool.is-disabled,
+.rte-root.is-tg-style .rte-tool:disabled {
+  opacity: 0.38;
+  background: transparent !important;
+}
+/* 样式切换按钮：与图标条同排，靠右 */
+.rte-tg-switch {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding-left: 8px;
+  border-left: 1px solid rgba(15, 23, 42, 0.14);
+}
+/* 悬停气泡提示（Teleport 到 body，不受工具栏横向滚动裁剪） */
+.rte-tg-tip {
+  position: fixed;
+  z-index: 6000;
+  transform: translateX(-50%);
+  max-width: 260px;
+  padding: 4px 9px;
+  border-radius: 8px;
+  background: #0f172a;
+  color: #fff;
+  font-size: 11.5px;
+  line-height: 1.5;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.28);
+}
+/* 「更多」浮层：多列分组，去掉彩色胶囊卡片 */
+.rte-more-menu.is-tg {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(138px, 1fr));
+  gap: 10px 16px;
+  align-items: start;
+  min-width: min(480px, 86vw);
+  max-width: min(900px, 94vw);
+  /* 多列分组比单列高得多，这里显式限高并允许纵向滚动（浮层定位写入的是内联 max-height，
+     需用 !important 压过，否则面板会超出视口底部）。 */
+  max-height: min(70vh, 620px) !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(18px) saturate(165%);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+}
+.rte-more-menu.is-tg .rte-more-group {
+  border: 0 !important;
+  background: transparent !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  gap: 1px;
+}
+.rte-more-menu.is-tg .rte-more-capsule {
+  background: transparent;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0 4px 2px;
+  line-height: 20px;
+  cursor: default;
+}
+.rte-more-menu.is-tg .rte-more-item {
+  border-radius: 7px;
+  padding: 5px 8px;
+}
+.rte-more-menu.is-tg .rte-more-item:hover {
+  background: rgba(37, 99, 235, 0.1);
+}
+
+/* ==========================================================================
+   Telegram 风格 · 最大化（功能区 Ribbon）形态
+   仍然是 Ribbon 栏目菜单（编辑 / 字体与颜色 / 段落与列表 …），
+   只是栏目条与分组按钮换成 Telegram 式纯图标 + 分组分隔线。
+   说明：这里的 !important 用来压过 editor.scoped.css 里 .rte-root.expanded .rte-tool
+   / .rte-tool-icon / .rte-group-head 的旧规则（scoped 带 data-v-hash，特异性更高）：
+   展开态的按钮是 72px 图标色块（绿色渐变方块），Telegram 风格要改成 30px 纯图标。
+   ========================================================================== */
+.rte-root.is-tg-style.expanded .rte-ribbon-bar {
+  background: transparent;
+  border-bottom-color: rgba(15, 23, 42, 0.1);
+}
+.rte-root.is-tg-style.expanded .rte-ribbon-tabs {
+  gap: 2px;
+  mask-image: none;
+}
+.rte-root.is-tg-style.expanded .rte-ribbon-tab {
+  height: 30px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent !important;
+  color: #64748b;
+  font-size: 12.5px;
+  line-height: 28px;
+}
+.rte-root.is-tg-style.expanded .rte-ribbon-tab:hover {
+  background: rgba(255, 255, 255, 0.72) !important;
+  color: #334155;
+}
+.rte-root.is-tg-style.expanded .rte-ribbon-tab.active {
+  background: rgba(37, 99, 235, 0.1) !important;
+  color: #1d4ed8 !important;
+  border-color: transparent !important;
+  margin-bottom: 0;
+}
+/* 分组按钮：30px 纯图标（去掉展开态的彩色图标方块） */
+.rte-root.is-tg-style.expanded .rte-tool {
+  display: inline-flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  justify-content: center;
+  width: 30px !important;
+  min-width: 30px !important;
+  height: 30px !important;
+  min-height: 30px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 1px solid transparent !important;
+  border-radius: 9px !important;
+  background: transparent !important;
+  color: #334155;
+  gap: 0;
+}
+.rte-root.is-tg-style.expanded .rte-tool-wrap {
+  margin-right: 0 !important;
+  display: inline-flex;
+}
+.rte-root.is-tg-style.expanded .rte-tool-wrap > .rte-tool {
+  min-width: 30px !important;
+}
+.rte-root.is-tg-style.expanded .rte-tool-icon {
+  width: 22px !important;
+  height: 22px !important;
+  min-width: 22px !important;
+  min-height: 22px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 8px !important;
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  color: inherit !important;
+  font-size: 0 !important;
+}
+.rte-root.is-tg-style.expanded .rte-tool .rte-ep-icon {
+  width: 18px !important;
+  height: 18px !important;
+  color: inherit !important;
+}
+.rte-root.is-tg-style.expanded .rte-tool-label {
+  display: none !important;
+}
+.rte-root.is-tg-style.expanded .rte-tool:hover {
+  background: rgba(255, 255, 255, 0.72) !important;
+  border-color: rgba(255, 255, 255, 0.85) !important;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.1) !important;
+  color: #0f172a;
+}
+.rte-root.is-tg-style.expanded .rte-tool:active {
+  background: rgba(37, 99, 235, 0.16) !important;
+}
+.rte-root.is-tg-style.expanded .rte-tool.active {
+  background: rgba(37, 99, 235, 0.12) !important;
+  border-color: rgba(37, 99, 235, 0.28) !important;
+  color: #1d4ed8 !important;
+  box-shadow: none !important;
+}
+/* 分组：保留栏目名作为底部小字说明，去掉彩色胶囊与拖拽手柄 */
+.rte-root.is-tg-style.expanded .rte-group-head {
+  display: flex !important;
+  position: absolute;
+  left: 0;
+  right: auto;
+  bottom: 0;
+  align-items: center;
+  justify-content: flex-start !important;
+  right: auto !important;
+  gap: 2px;
+  height: 18px;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.rte-root.is-tg-style.expanded .rte-group-label {
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 16px;
+  color: #94a3b8 !important;
+  cursor: grab;
+  white-space: nowrap;
+}
+.rte-root.is-tg-style.expanded .rte-group-handle {
+  width: 14px;
+  height: 16px;
+  font-size: 10px;
+}
+.rte-root.is-tg-style.expanded .rte-group-settings {
+  width: 18px;
+  height: 18px;
+  font-size: 10px;
+  opacity: 0.5;
+}
+.rte-root.is-tg-style.expanded .rte-group-settings:hover {
+  opacity: 1;
+}
+.rte-root.is-tg-style.expanded .rte-toolbar-tools {
+  align-items: flex-start;
+  gap: 6px !important;
+  padding-bottom: 18px;
+}
+.rte-root.is-tg-style.expanded .rte-toolbar-tools > .rte-tool-group {
+  flex: 0 0 auto !important;
+  width: auto !important;
+}
+.rte-root.is-tg-style.expanded .rte-toolbar-tools > .rte-tool-group + .rte-tool-group {
+  margin-left: 10px !important;
+  padding-left: 10px !important;
+  border-left: 1px solid rgba(15, 23, 42, 0.14);
+}
+
+/* ==========================================================================
+   「更多」面板 · 工具栏设置入口（分组按钮显隐 / 顺序 / 恢复默认）
+   ========================================================================== */
+.rte-more-settings {
+  grid-column: 1 / -1;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.1);
+  padding-bottom: 8px;
+  margin-bottom: 2px;
+}
+.rte-more-settings-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+  color: #334155;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 9px;
+  cursor: pointer;
+}
+.rte-more-settings-toggle:hover {
+  background: rgba(37, 99, 235, 0.1);
+  border-color: rgba(37, 99, 235, 0.28);
+  color: #1d4ed8;
+}
+.rte-more-settings-toggle.active {
+  background: rgba(37, 99, 235, 0.12);
+  border-color: rgba(37, 99, 235, 0.32);
+  color: #1d4ed8;
+}
+.rte-more-settings-glyph {
+  font-size: 12px;
+  line-height: 1;
+}
+.rte-more-settings-caret {
+  margin-left: 2px;
+  font-size: 10px;
+  opacity: 0.6;
+}
+.rte-more-settings-hint {
+  margin: 6px 0 0;
+  font-size: 11px;
+  color: #94a3b8;
+}
+.rte-more-settings-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 2px 12px;
+  margin-top: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.rte-more-settings-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px;
+  border-radius: 6px;
+}
+.rte-more-settings-row:hover {
+  background: rgba(255, 255, 255, 0.8);
+}
+.rte-more-settings-name {
+  font-size: 12px;
+  color: #334155;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rte-more-settings-count {
+  margin-left: auto;
+  font-size: 10px;
+  color: #94a3b8;
+}
+.rte-more-settings-btn,
+.rte-more-group-settings {
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1;
+  padding: 3px 5px;
+  cursor: pointer;
+}
+.rte-more-settings-btn:hover,
+.rte-more-group-settings:hover {
+  background: rgba(37, 99, 235, 0.12);
+  color: #1d4ed8;
+}
+/* 分组胶囊与个性化按钮同行 */
+.rte-more-group > .rte-more-capsule {
+  margin-right: 2px;
+}
+.rte-more-group > .rte-more-group-settings {
+  align-self: flex-start;
+  margin: 1px 0 0 2px;
+  opacity: 0.55;
+}
+.rte-more-group > .rte-more-group-settings:hover {
+  opacity: 1;
 }
