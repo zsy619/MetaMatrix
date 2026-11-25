@@ -254,78 +254,104 @@
 }
 
 /* --------------------------------------------------------------------------
-   3b) Ribbon 图标：扁平彩色磁贴（Telegram 设置页磁贴语法）
-   - 图形沿用统一单色线稿（24 viewBox / 1.7 stroke / round），改成白色画在
-     纯色扁平圆角方块上（7px 圆角，32×32 槽位尺寸不变）；
-   - 配色按「分组同色」：同组命令共用一个色相，跨组换色，既保留分组识别度，
-     又避免 137 个按钮各自一色造成的视觉噪声；
-   - 色值全部满足「白色图形 vs 底色」对比度 ≥ 4.5:1（见下方注释实测值）；
-   - 禁用态回到灰底灰图标；颜色类图标（字体颜色 / 高亮）磁贴直接取当前颜色；
-   - 深色模式（is-dark-editor）另有暗色调色板，避免浅灰底 + 深色磁贴冲突。
-   说明：!important 用于压过 editor.scoped.css 里带 data-v-hash 的旧规则。
+   3b) Ribbon 图标：背景透明 + 扁平彩色线稿
+   - 图形沿用统一单色线稿（24 viewBox / 1.7 stroke / round / fill none），
+     颜色改为分组色，磁贴底色完全透明（background: transparent），
+     只保留图形本身；尺寸不变（槽位 32×32、命令块 72×72）；
+   - 配色按「分组同色」：同组命令共用一个色相，跨组换色；
+   - 悬停 / 选中用同色系浅底（color-mix）做状态反馈，不铺实色块；
+   - 深色模式（is-dark-editor）换用亮色档，保证图形与 #1f2126 底 ≥ 3:1。
+   说明：!important 用于压过 editor.scoped.css 里带 data-v-hash 的旧规则
+   （旧规则把图标强制成白字 + 渐变底块）。
    -------------------------------------------------------------------------- */
 
-/* —— 分组扁平色（白字对比度实测）——
-   edit 5.17 / style 5.02 / paragraph 5.36 / insert 5.47 / charts 7.10 /
-   table 7.90 / blocks 6.04 / notes 5.02 / review 6.47 / view 10.35 /
-   tidy 5.36 / picture 5.47 / frame 6.04 / writing 5.36 / page 5.18 /
-   file 7.31 / other 7.56（均为 :1） */
-.rte-root .rte-tool-group[data-group-id='edit'] { --rte-icon-bg: #2563eb; }
-.rte-root .rte-tool-group[data-group-id='style'] { --rte-icon-bg: #15803d; }
-.rte-root .rte-tool-group[data-group-id='paragraph'] { --rte-icon-bg: #0e7490; }
-.rte-root .rte-tool-group[data-group-id='insert'] { --rte-icon-bg: #0f766e; }
-.rte-root .rte-tool-group[data-group-id='charts'] { --rte-icon-bg: #6d28d9; }
-.rte-root .rte-tool-group[data-group-id='table'] { --rte-icon-bg: #4338ca; }
-.rte-root .rte-tool-group[data-group-id='blocks'] { --rte-icon-bg: #be185d; }
-.rte-root .rte-tool-group[data-group-id='notes'] { --rte-icon-bg: #b45309; }
-.rte-root .rte-tool-group[data-group-id='review'] { --rte-icon-bg: #b91c1c; }
-.rte-root .rte-tool-group[data-group-id='view'] { --rte-icon-bg: #334155; }
-.rte-root .rte-tool-group[data-group-id='tidy'] { --rte-icon-bg: #0e7490; }
-.rte-root .rte-tool-group[data-group-id='picture'] { --rte-icon-bg: #0f766e; }
-.rte-root .rte-tool-group[data-group-id='frame'] { --rte-icon-bg: #be185d; }
-.rte-root .rte-tool-group[data-group-id='writing'] { --rte-icon-bg: #0e7490; }
-.rte-root .rte-tool-group[data-group-id='page'] { --rte-icon-bg: #c2410c; }
-.rte-root .rte-tool-group[data-group-id='file'] { --rte-icon-bg: #9a3412; }
-.rte-root .rte-tool-group[data-group-id='other'] { --rte-icon-bg: #4b5563; }
+/* —— 浅色底分组色（图形 vs 底 #f2f2f7 对比度实测）——
+   edit 4.74 / style 4.36 / paragraph 4.71 / insert 4.58 / charts 6.53 /
+   table 7.16 / blocks 5.61 / notes 4.85 / review 5.98 / view 9.36 /
+   tidy 4.71 / picture 4.58 / frame 5.61 / writing 4.71 / page 4.90 /
+   file 6.70 / other 6.94（图形对象阈值 3:1，全部满足） */
+.rte-root .rte-tool-group[data-group-id='edit'] { --rte-icon-fg: #2563eb; }
+.rte-root .rte-tool-group[data-group-id='style'] { --rte-icon-fg: #15803d; }
+.rte-root .rte-tool-group[data-group-id='paragraph'] { --rte-icon-fg: #0e7490; }
+.rte-root .rte-tool-group[data-group-id='insert'] { --rte-icon-fg: #0f766e; }
+.rte-root .rte-tool-group[data-group-id='charts'] { --rte-icon-fg: #6d28d9; }
+.rte-root .rte-tool-group[data-group-id='table'] { --rte-icon-fg: #4338ca; }
+.rte-root .rte-tool-group[data-group-id='blocks'] { --rte-icon-fg: #be185d; }
+.rte-root .rte-tool-group[data-group-id='notes'] { --rte-icon-fg: #b45309; }
+.rte-root .rte-tool-group[data-group-id='review'] { --rte-icon-fg: #b91c1c; }
+.rte-root .rte-tool-group[data-group-id='view'] { --rte-icon-fg: #334155; }
+.rte-root .rte-tool-group[data-group-id='tidy'] { --rte-icon-fg: #0e7490; }
+.rte-root .rte-tool-group[data-group-id='picture'] { --rte-icon-fg: #0f766e; }
+.rte-root .rte-tool-group[data-group-id='frame'] { --rte-icon-fg: #be185d; }
+.rte-root .rte-tool-group[data-group-id='writing'] { --rte-icon-fg: #0e7490; }
+.rte-root .rte-tool-group[data-group-id='page'] { --rte-icon-fg: #c2410c; }
+.rte-root .rte-tool-group[data-group-id='file'] { --rte-icon-fg: #9a3412; }
+.rte-root .rte-tool-group[data-group-id='other'] { --rte-icon-fg: #4b5563; }
 
+/* —— 深色底分组色（图形 vs 底 #1f2126，WCAG 图形对象阈值 3:1）——
+   edit 5.85 / style 7.03 / paragraph 8.02 / insert 7.96 / charts 5.28 /
+   table 5.55 / blocks 5.65 / notes 9.08 / review 5.79 / view 6.32 /
+   tidy 8.02 / picture 7.96 / frame 5.65 / writing 8.02 / page 7.34 /
+   file 7.34 / other 6.52 */
+.rte-root.is-dark-editor .rte-tool-group[data-group-id='edit'] { --rte-icon-fg: #60a5fa; }
+.rte-root.is-dark-editor .rte-tool-group[data-group-id='style'] { --rte-icon-fg: #4ade80; }
+.rte-root.is-dark-editor .rte-tool-group[data-group-id='paragraph'] { --rte-icon-fg: #22d3ee; }
+.rte-root.is-dark-editor .rte-tool-group[data-group-id='insert'] { --rte-icon-fg: #2dd4bf; }
+.rte-root.is-dark-editor .rte-tool-group[data-group-id='charts'] { --rte-icon-fg: #a78bfa; }
+.rte-root.is-dark-editor .rte-tool-group[data-group-id='table'] { --rte-icon-fg: #818cf8; }
+.rte-root.is-dark-editor .rte-tool-group[data-group-id='blocks'] { --rte-icon-fg: #f472b6; }
+.rte-root.is-dark-editor .rte-tool-group[data-group-id='notes'] { --rte-icon-fg: #fbbf24; }
+.rte-root.is-dark-editor .rte-tool-group[data-group-id='review'] { --rte-icon-fg: #f87171; }
+.rte-root.is-dark-editor .rte-tool-group[data-group-id='view'] { --rte-icon-fg: #94a3b8; }
+.rte-root.is-dark-editor .rte-tool-group[data-group-id='tidy'] { --rte-icon-fg: #22d3ee; }
+.rte-root.is-dark-editor .rte-tool-group[data-group-id='picture'] { --rte-icon-fg: #2dd4bf; }
+.rte-root.is-dark-editor .rte-tool-group[data-group-id='frame'] { --rte-icon-fg: #f472b6; }
+.rte-root.is-dark-editor .rte-tool-group[data-group-id='writing'] { --rte-icon-fg: #22d3ee; }
+.rte-root.is-dark-editor .rte-tool-group[data-group-id='page'] { --rte-icon-fg: #fb923c; }
+.rte-root.is-dark-editor .rte-tool-group[data-group-id='file'] { --rte-icon-fg: #fb923c; }
+.rte-root.is-dark-editor .rte-tool-group[data-group-id='other'] { --rte-icon-fg: #9ca3af; }
+
+/* 图标本体：底色透明，只有彩色线稿 */
 .rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool-icon {
-  background: var(--rte-icon-bg, #2563eb) !important;
-  color: #fff !important;
+  background: transparent !important;
+  color: var(--rte-icon-fg, #2563eb) !important;
   border-radius: 7px !important;
   box-shadow: none !important;
-  transition: filter var(--rte-tg-dur) ease, transform var(--rte-tg-dur) ease,
+  transition: background var(--rte-tg-dur) ease, transform var(--rte-tg-dur) ease,
     box-shadow var(--rte-tg-dur) ease;
 }
 .rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool .rte-ep-icon,
 .rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool .rte-tool-icon > svg {
-  color: #fff !important;
+  color: var(--rte-icon-fg, #2563eb) !important;
 }
+/* 悬停：同色系浅底 + 上浮 1px */
 .rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool:hover .rte-tool-icon {
-  filter: brightness(1.08) saturate(1.02);
+  background: color-mix(in srgb, var(--rte-icon-fg, #2563eb) 12%, transparent) !important;
   transform: translateY(-1px);
 }
+/* 选中：同色系 18% 底 + 1.5px 同色描边 */
 .rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool.active .rte-tool-icon {
-  background: var(--rte-icon-bg, #2563eb) !important;
-  box-shadow: 0 0 0 2px var(--rte-tg-accent) !important;
-  filter: none;
+  background: color-mix(in srgb, var(--rte-icon-fg, #2563eb) 18%, transparent) !important;
+  box-shadow: inset 0 0 0 1.5px var(--rte-icon-fg, #2563eb) !important;
 }
-/* 禁用态：灰底灰图标 */
+/* 禁用态：淡灰线稿，无底色 */
 .rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool:disabled .rte-tool-icon,
 .rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool.is-disabled .rte-tool-icon {
-  background: #e5e6eb !important;
+  background: transparent !important;
   color: #c9cdd4 !important;
   filter: none !important;
   box-shadow: none !important;
+  transform: none !important;
 }
 .rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool:disabled .rte-ep-icon,
 .rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool.is-disabled .rte-ep-icon {
   color: #c9cdd4 !important;
 }
-/* 颜色类图标（字体颜色 / 高亮）：磁贴直接取当前颜色，取消底部色条 */
+/* 颜色类图标（字体颜色 / 高亮）：图形直接取当前颜色，底色保持透明 */
 .rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool-icon.rte-color-icon {
-  background: var(--rte-color-bar, #1d2129) !important;
-  color: #fff !important;
-  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.16) !important;
+  background: transparent !important;
+  color: var(--rte-color-bar, #1d2129) !important;
+  box-shadow: none !important;
 }
 .rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool-icon.rte-color-icon::after {
   display: none !important;
@@ -783,10 +809,10 @@
 .rte-root.is-dark-editor.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool.active {
   background: rgba(255, 255, 255, 0.08) !important;
 }
-/* 深色下彩色磁贴略压暗一档，保证白字对比 */
+/* 深色模式：彩色线稿（透明底）保持原色，不再压暗 */
 .rte-root.is-dark-editor.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool-icon {
-  filter: brightness(0.88) saturate(0.95);
+  filter: none !important;
 }
 .rte-root.is-dark-editor.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool:hover .rte-tool-icon {
-  filter: brightness(1) saturate(1);
+  background: color-mix(in srgb, var(--rte-icon-fg, #60a5fa) 20%, transparent) !important;
 }

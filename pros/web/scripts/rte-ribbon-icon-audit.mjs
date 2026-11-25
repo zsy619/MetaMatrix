@@ -74,20 +74,30 @@ function parseRgb(str) {
   const parts = m[1].split(',').map((x) => parseFloat(x))
   return parts.slice(0, 3)
 }
-const tiles = {}
+// 透明底 + 彩色线稿：校验「图形 vs Ribbon 底」对比度（WCAG 图形对象阈值 3:1）
+const ribbonBg = await page.evaluate(() => {
+  const bar = document.querySelector('.rte-ribbon-bar')
+  return bar ? getComputedStyle(bar).backgroundColor : null
+})
+const bgRgb = parseRgb(ribbonBg) || [242, 242, 247]
+const glyphs = {}
 let lowContrast = 0
+let transparentBg = 0
 for (const r of allRows) {
-  const bg = parseRgb(r.bg)
   const fg = parseRgb(r.svgColor)
-  if (!bg || !fg) continue
-  const cr = ratio(bg, fg)
-  if (cr < 4.5) lowContrast += 1
-  const key = r.bg
-  tiles[key] = tiles[key] || { count: 0, contrast: Math.round(cr * 100) / 100, radius: r.radius }
-  tiles[key].count += 1
+  const bg = parseRgb(r.bg)
+  if (!fg) continue
+  if (bg && (bg[0] === 0 && bg[1] === 0 && bg[2] === 0)) transparentBg += 1
+  const cr = ratio(bgRgb, fg)
+  if (cr < 3) lowContrast += 1
+  const key = r.svgColor
+  glyphs[key] = glyphs[key] || { count: 0, contrast: Math.round(cr * 100) / 100 }
+  glyphs[key].count += 1
 }
-console.log('tile palette', JSON.stringify(tiles))
-console.log('tiles below 4.5:1 =', lowContrast, '/', allRows.length)
+console.log('ribbon bg', ribbonBg)
+console.log('glyph palette (vs bg)', JSON.stringify(glyphs))
+console.log('transparent icon backgrounds =', transparentBg, '/', allRows.length)
+console.log('glyphs below 3:1 =', lowContrast, '/', allRows.length)
 const fills = {}; const caps = {}
 for (const r of allRows) { fills[r.svgFill] = (fills[r.svgFill]||0)+1; caps[String(r.svgCap)] = (caps[String(r.svgCap)]||0)+1 }
 console.log('fill distribution', fills); console.log('linecap distribution', caps)

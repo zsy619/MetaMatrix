@@ -73,9 +73,11 @@ async function shot(dark) {
     const info2 = await page.evaluate(() => {
       const groups = [...document.querySelectorAll('.rte-tool-group[data-group-id]')].map((g) => {
         const gi = g.querySelector('.rte-tool-icon')
+        const svg = gi?.querySelector('svg')
         return {
           group: g.getAttribute('data-group-id'),
           bg: gi ? getComputedStyle(gi).backgroundColor : null,
+          glyph: svg ? getComputedStyle(svg).color : null,
         }
       })
       return { tab: document.querySelector('[data-ribbon-tab].is-active')?.getAttribute('data-ribbon-tab'), groups }
