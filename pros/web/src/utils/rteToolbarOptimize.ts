@@ -762,11 +762,44 @@ export const RIBBON_TAB_BLURBS: Record<string, string> = {
   page: '纸张、分页、打印预览',
 }
 
+/** 栏目短标签：功能区横向空间有限，标题用 2-4 字，完整含义放在悬停提示里。 */
+export const RIBBON_TAB_SHORT: Record<string, string> = {
+  edit: '编辑',
+  style: '字体',
+  paragraph: '段落',
+  writing: '书写',
+  tidy: '整理',
+  insert: '插入',
+  picture: '图片',
+  frame: '效果',
+  charts: '图表',
+  table: '表格',
+  blocks: '结构',
+  notes: '引用',
+  review: '审阅',
+  view: '视图',
+  file: '文件',
+  page: '页面',
+}
+
+/** 栏目显示用的短标题；没有登记的栏目保持原名。 */
+export function ribbonTabShort(id: string, label: string): string {
+  return RIBBON_TAB_SHORT[id] || label.trim() || '栏目'
+}
+
 /** 栏目悬停时写出里面有什么。 */
 export function ribbonTabHint(id: string, label: string): string {
   const name = label.trim() || '栏目'
   const blurb = RIBBON_TAB_BLURBS[id]
   return blurb ? `${name}：${blurb}` : name
+}
+
+/** 悬停气泡拆成标题 + 描述两段，便于分层排版。 */
+export function ribbonTabHintParts(id: string, label: string): { title: string; desc: string } {
+  const name = label.trim() || '栏目'
+  const short = RIBBON_TAB_SHORT[id] || name
+  const blurb = RIBBON_TAB_BLURBS[id] || ''
+  return { title: short === name ? name : `${short} · ${name}`, desc: blurb }
 }
 
 /** 定义里有按钮、但当前都被隐藏时，仍留出分组以便恢复。 */

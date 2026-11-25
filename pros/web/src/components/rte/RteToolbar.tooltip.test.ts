@@ -2,8 +2,9 @@
 /**
  * Telegram 风格常驻气泡提示：
  * - 工具按钮始终带 data-tip（两种工具栏风格都能出提示）；
- * - 悬停 320ms 后出现自定义提示，并临时摘掉原生 title（避免双气泡）；
- * - 移开后提示消失、原生 title 还原（读屏 / 键盘仍能拿到文本）。
+ * - 悬停 320ms 后出现自定义提示，并摘掉原生 title（避免双气泡）；
+ * - 原生 title 不再还原：浏览器自带气泡会压在刚打开的颜色 / 高亮面板上，
+ *   文本转存到 data-tip 供自定义气泡继续使用（键盘聚焦时仍会还原）。
  */
 import { nextTick } from 'vue'
 import { mount, flushPromises } from '@vue/test-utils'
@@ -54,7 +55,7 @@ describe('工具栏常驻气泡提示', () => {
     wrapper.unmount()
   })
 
-  it('悬停出现提示并摘掉原生 title，移开后恢复', async () => {
+  it('悬停出现提示并摘掉原生 title，移开后不再还原（避免气泡压住面板）', async () => {
     const wrapper = await mountEditor(false)
     const tool = wrapper.find('.rte-toolbar-tools .rte-tool')
     const el = tool.element as HTMLElement
@@ -76,7 +77,10 @@ describe('工具栏常驻气泡提示', () => {
     await nextTick()
     await flushPromises()
     expect(document.querySelector('.rte-tip')).toBeFalsy()
-    expect(el.getAttribute('title')).toBe(originalTitle)
+    // 原生 title 不还原：浏览器气泡不会在移开按钮后继续挡住颜色面板
+    expect(el.hasAttribute('title')).toBe(false)
+    // 提示文本转存到 data-tip，自定义气泡下次仍能取到
+    expect(el.getAttribute('data-tip')).toBe(originalTitle)
     wrapper.unmount()
   })
 })

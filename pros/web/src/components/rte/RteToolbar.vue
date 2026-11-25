@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, inject, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RTE_BINDINGS } from './bindings'
-import { alignToolTitle, blockMenuTitle, clampToolbarQuery, codeLangTitle, cycleSearchIndex, disabledToolTitle, EMPTY_GROUP_NOTE, FOCUS_MODE_NOTE, fontFamilyCaption, groupHandleTitle, LAST_TOOLBAR_QUERY_KEY, lineHeightCaption, listToolLabel, menuFocusStep, menuToolNeedsCaret, pageSizeTitle, pickerTabTitle, moreToolsCaption, moreToolsTitle, ribbonSearchLabel, ribbonTabForDigit, ribbonTabHint, ribbonTabTabIndex, ribbonTypeaheadQuery, SEARCH_INPUT_HINT, searchEnterActivates, searchGroupCaption, shortcutFromTitle, stepRibbonTab, stepRibbonTabBy, tableToolLabel, toolbarActionTitle, toolbarGroupReorderAllowed, toolbarMenuItemTitle, toolbarSearchStatus, toolIsUnavailable, wordStatTitle, zoomToolLabel, zoomToolTitle } from '../../utils/rteToolbarOptimize'
+import { alignToolTitle, blockMenuTitle, clampToolbarQuery, codeLangTitle, cycleSearchIndex, disabledToolTitle, EMPTY_GROUP_NOTE, FOCUS_MODE_NOTE, fontFamilyCaption, groupHandleTitle, LAST_TOOLBAR_QUERY_KEY, lineHeightCaption, listToolLabel, menuFocusStep, menuToolNeedsCaret, pageSizeTitle, pickerTabTitle, moreToolsCaption, moreToolsTitle, ribbonSearchLabel, ribbonTabForDigit, ribbonTabHintParts, ribbonTabShort, ribbonTabTabIndex, ribbonTypeaheadQuery, SEARCH_INPUT_HINT, searchEnterActivates, searchGroupCaption, shortcutFromTitle, stepRibbonTab, stepRibbonTabBy, tableToolLabel, toolbarActionTitle, toolbarGroupReorderAllowed, toolbarMenuItemTitle, toolbarSearchStatus, toolIsUnavailable, wordStatTitle, zoomToolLabel, zoomToolTitle } from '../../utils/rteToolbarOptimize'
 import { useParentScopeStamp } from './inheritScope'
 import { buildChartGroups } from '../../utils/echarts/chartGroups'
 import { TABLE_MENU_ICONS } from './tableMenuIcons'
@@ -173,6 +173,26 @@ function toolbarSearchMessage(): string {
     toolIsUnavailable(bestTool),
   )
 }
+/** 栏目悬停提示：显示完整栏目名 + 里面有哪些命令。 */
+const ribbonHint = ref<{ title: string; desc: string; left: number; top: number } | null>(null)
+
+function showRibbonHint(tab: { id: string; label: string }, event: Event) {
+  const el = event.currentTarget as HTMLElement | null
+  if (!el) return
+  const rect = el.getBoundingClientRect()
+  const parts = ribbonTabHintParts(tab.id, tab.label)
+  ribbonHint.value = {
+    title: parts.title,
+    desc: parts.desc,
+    left: Math.round(rect.left + rect.width / 2),
+    top: Math.round(rect.bottom + 6),
+  }
+}
+
+function hideRibbonHint() {
+  ribbonHint.value = null
+}
+
 function ribbonHitCount(id: string): number {
   if (!rteBindings.toolbarQuery) return 0
   const group = (rteBindings.visibleToolbarGroups || []).find((item: { id: string; tools?: unknown[] }) => item.id === id)
@@ -318,6 +338,19 @@ onMounted(() => {
   } catch {
     /* 读不到上次搜索时，Alt+上 只在本次会话里生效 */
   }
+  // 任何一次按下（打开颜色面板、点击按钮…）都立刻收起气泡，
+ // 不给提示任何压在面板上的机会。
+  document.addEventListener('mousedown', hideAllHints, true)
+  document.addEventListener('touchstart', hideAllHints, true)
+  // 键盘聚焦时把原生 title 还原，键盘用户仍能拿到提示文本。
+  document.addEventListener('focusin', restoreNativeTitle, true)
+  document.addEventListener('focusout', stripNativeTitle, true)
+})
+onBeforeUnmount(() => {
+  document.removeEventListener('mousedown', hideAllHints, true)
+  document.removeEventListener('touchstart', hideAllHints, true)
+  document.removeEventListener('focusin', restoreNativeTitle, true)
+  document.removeEventListener('focusout', stripNativeTitle, true)
 })
 watch(() => rteBindings.moreOpen, (open) => {
   if (!open) return
@@ -341,11 +374,25 @@ function clearTgTipTimer() {
     tgTipTimer = null
   }
 }
+
+/**
+ * 这个按钮下面是否已经展开了浮层面板（注音 / 大小写 / 字号 …）。
+ * 展开时不能再冒气泡：气泡正好落在面板上方，会把第一项盖住。
+ */
+function hasOpenFloatPanel(host: HTMLElement): boolean {
+  if (host.getAttribute('aria-expanded') === 'true') return true
+  const anchor = host.closest('[data-rte-anchor]') as HTMLElement | null
+  const key = anchor?.getAttribute('data-rte-anchor')
+  if (!key) return false
+  return !!document.querySelector(`[data-rte-float-key="${key}"]`)
+}
+
 /**
  * 常驻气泡提示（Telegram 式）：两种工具栏风格都生效。
  * - 文本取 data-tip，其次取原生 title（因此禁用原因「（当前不可用）」也能提示）；
  * - 悬停 320ms 后才出现，移开即消失（Telegram 的延迟提示手感）；
- * - 出现前临时摘掉原生 title，避免浏览器自带气泡与自定义气泡重复。
+ * - 永久摘掉原生 title：浏览器自带气泡会压在刚打开的颜色/高亮面板上，
+ *   而且移开按钮后它还会补回来继续挡着；这里只保留 Telegram 风格的自定义气泡。
  */
 function onToolbarMouseover(event: MouseEvent) {
   const target = event.target as HTMLElement | null
@@ -353,13 +400,25 @@ function onToolbarMouseover(event: MouseEvent) {
   if (!host) return
   const text = host.getAttribute('data-tip') || host.getAttribute('title') || ''
   if (!text) return
+  // 已经展开下拉面板（悬停即展开的那一类）：不冒气泡，避免压住面板第一项。
+  if (hasOpenFloatPanel(host)) {
+    clearTgTipTimer()
+    tgTip.value = null
+    return
+  }
   if (host.hasAttribute('title')) {
-    host.setAttribute('data-title', host.getAttribute('title') || '')
+    // 文本转存到 data-tip：自定义气泡继续可用，原生气泡不再出现。
+    host.setAttribute('data-tip', text)
     host.removeAttribute('title')
   }
   const rect = host.getBoundingClientRect()
   clearTgTipTimer()
   tgTipTimer = window.setTimeout(() => {
+    // 面板可能在 320ms 等待期间才展开（悬停展开），这时不再弹气泡。
+    if (hasOpenFloatPanel(host)) {
+      tgTipTimer = null
+      return
+    }
     // 偏右的按钮：气泡右对齐到按钮右边缘，
     // 否则居中后会被裁成竖排、还压住右侧面板。
     const nearRightEdge = rect.right > window.innerWidth * 0.6
@@ -379,17 +438,40 @@ function onToolbarMouseout(event: MouseEvent) {
   if (!host) return
   const to = event.relatedTarget as HTMLElement | null
   if (to && host.contains(to)) return
-  // 还原被摘掉的原生 title，保证键盘 / 读屏仍能拿到提示文本
-  const saved = host.getAttribute('data-title')
-  if (saved != null) {
-    host.setAttribute('title', saved)
-    host.removeAttribute('data-title')
-  }
   clearTgTipTimer()
   tgTipTimer = window.setTimeout(() => {
     tgTip.value = null
     tgTipTimer = null
   }, 80)
+}
+
+/** 立刻收起所有提示气泡（点击 / 打开面板时用）。 */
+function hideAllHints() {
+  clearTgTipTimer()
+  tgTip.value = null
+  ribbonHint.value = null
+}
+
+/** 键盘聚焦：把 data-tip 还原成原生 title，键盘用户仍能拿到提示。 */
+function restoreNativeTitle(event: FocusEvent) {
+  const host = (event.target as HTMLElement | null)?.closest?.('[data-tip]') as HTMLElement | null
+  if (!host) return
+  // 只在键盘聚焦时还原；鼠标点击也会聚焦按钮，还原 title 会让浏览器气泡重新冒出来。
+  try {
+    if (!host.matches(':focus-visible')) return
+  } catch {
+    return
+  }
+  const text = host.getAttribute('data-tip')
+  if (text && !host.hasAttribute('title')) host.setAttribute('title', text)
+}
+
+/** 失焦后继续摘掉原生 title，避免鼠标移回时又冒出浏览器气泡。 */
+function stripNativeTitle(event: FocusEvent) {
+  const host = (event.target as HTMLElement | null)?.closest?.('[data-tip]') as HTMLElement | null
+  if (!host) return
+  const text = host.getAttribute('data-tip')
+  if (text && host.hasAttribute('title')) host.removeAttribute('title')
 }
 
 function toggleChartGroupMenu(key: string) {
@@ -422,16 +504,18 @@ function toggleChartGroupMenu(key: string) {
             role="tab"
             class="rte-ribbon-tab"
             :data-ribbon-tab="tab.id"
+            :data-ribbon-label="tab.label"
             :class="{ active: rte.ribbonTab === tab.id, 'is-search-miss': !!rte.toolbarQuery && !ribbonHitCount(tab.id), 'is-search-best': !!rte.toolbarQuery && rte.visibleToolbarGroups[0]?.id === tab.id }"
             :aria-selected="rte.ribbonTab === tab.id"
             :tabindex="ribbonTabTabIndex(rte.ribbonTab === tab.id)"
-            :title="ribbonTabHint(tab.id, tab.label)"
+            @mouseenter="showRibbonHint(tab, $event)"
+            @mouseleave="hideRibbonHint"
             :aria-label="ribbonSearchLabel(tab.label, ribbonHitCount(tab.id))"
             :aria-keyshortcuts="ribbonTabForDigit((rte.ribbonTabs || []).map((item) => item.id), (rte.ribbonTabs || []).findIndex((item) => item.id === tab.id) + 1) ? 'Alt+' + ((rte.ribbonTabs || []).findIndex((item) => item.id === tab.id) + 1) : undefined"
             :aria-controls="'rte-group-' + tab.id"
             @click="onRibbonTab(tab.id, $event)"
           >
-            {{ tab.label }}
+            {{ ribbonTabShort(tab.id, tab.label) }}
             <span v-if="ribbonHitCount(tab.id)" data-rte-own class="rte-ribbon-hit">{{ ribbonHitCount(tab.id) }}</span>
           </button>
         </div>
@@ -703,7 +787,7 @@ function toggleChartGroupMenu(key: string) {
               />
             </span>
             <span data-rte-own class="rte-tool-label"
-              >{{ listToolLabel(rte.isActive('taskList') ? 'task' : rte.isActive('orderedList') ? 'ordered' : rte.isActive('bulletList') ? 'bullet' : '') }}<span data-rte-own class="rte-caret" aria-hidden="true"></span>
+              >{{ listToolLabel(rte.isActive('taskList') ? 'task' : rte.isActive('orderedList') ? 'ordered' : rte.isActive('bulletList') ? 'bullet' : '') }}<span data-rte-own class="rte-caret" aria-hidden="true"></span
             ></span>
           </button>
           <Teleport to="body">
@@ -1052,7 +1136,7 @@ function toggleChartGroupMenu(key: string) {
               <component data-rte-own :is="rte.toolIcon('lineHeight')" class="rte-ep-icon" />
             </span>
             <span data-rte-own class="rte-tool-label"
-              >{{ lineHeightCaption(rte.currentLineHeight(), rte.LINE_HEIGHT_OPTIONS) }}<span data-rte-own class="rte-caret" aria-hidden="true"></span>
+              >{{ lineHeightCaption(rte.currentLineHeight(), rte.LINE_HEIGHT_OPTIONS) }}<span data-rte-own class="rte-caret" aria-hidden="true"></span
             ></span>
           </button>
           <Teleport to="body">
@@ -2463,7 +2547,7 @@ function toggleChartGroupMenu(key: string) {
             :aria-expanded="rte.presetMenuKey === t.key"
             :disabled="t.disabled?.() || undefined"
             @mousedown.prevent
-            @click.stop="rte.markToolbarMenuOpening(); rte.togglePresetMenu(t.key)"
+            @click.stop="rte.markToolbarMenuOpening(); rte.openPresetMenu(t.key)"
           >
             <span data-rte-own class="rte-tool-icon">
               <component data-rte-own v-if="t.iconComp" :is="t.iconComp" class="rte-ep-icon" />
@@ -3310,6 +3394,18 @@ function toggleChartGroupMenu(key: string) {
           :style="{ left: tgTip.x + 'px', top: tgTip.y + 'px' }"
           role="tooltip"
         >{{ tgTip.text }}</div>
+      </Teleport>
+      <Teleport to="body">
+        <div
+          v-if="ribbonHint"
+          data-rte-own
+          class="rte-tip rte-ribbon-hint"
+          :style="{ left: ribbonHint.left + 'px', top: ribbonHint.top + 'px' }"
+          role="tooltip"
+        >
+          <strong class="rte-ribbon-hint__title">{{ ribbonHint.title }}</strong>
+          <span class="rte-ribbon-hint__desc">{{ ribbonHint.desc }}</span>
+        </div>
       </Teleport>
     </div>
 </template>

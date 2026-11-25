@@ -47,7 +47,13 @@ function editorOf(wrapper: ReturnType<typeof mount>): Editor {
 }
 
 async function openRibbon(wrapper: ReturnType<typeof mount>, label: string) {
-  const tab = wrapper.findAll('button.rte-ribbon-tab').find((button) => button.text() === label)
+  // 功能区栏目现在显示短标题（2-4 字），完整名称放在 data-ribbon-label 与悬停气泡里。
+  const tab = wrapper
+    .findAll('button.rte-ribbon-tab')
+    .find(
+      (button) =>
+        button.text() === label || button.attributes('data-ribbon-label') === label,
+    )
   expect(tab, `栏目 ${label}`).toBeTruthy()
   await tab!.trigger('click')
   await nextTick()

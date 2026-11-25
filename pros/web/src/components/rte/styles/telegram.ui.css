@@ -698,6 +698,27 @@
 .rte-tip.is-right {
   animation-name: rte-tg-fade-right;
 }
+
+/* 功能区栏目悬停气泡：标题 + 说明两行 */
+.rte-ribbon-hint {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 280px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  text-align: left;
+}
+.rte-ribbon-hint__title {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+.rte-ribbon-hint__desc {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 12px;
+  line-height: 1.5;
+}
 @keyframes rte-tg-fade {
   from {
     opacity: 0;

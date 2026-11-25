@@ -6160,6 +6160,23 @@ function togglePresetMenu(key: string) {
   imageLayoutOpen.value = false
   presetMenuKey.value = presetMenuKey.value === key ? '' : key
 }
+
+/**
+ * 打开预置菜单（注音 / 着重号 等带 presetOptions 的工具）。
+ * 与「大小写」一致：悬停即展开，点击只保证展开，不做开合切换——
+ * 否则鼠标悬停已经展开后再点击会把面板关掉，手感与参考按钮不一致。
+ */
+function openPresetMenu(key: string) {
+  closeAllToolbarMenus()
+  textTidyOpen.value = false
+  imageLayoutOpen.value = false
+  presetMenuKey.value = key
+}
+
+/** 该 key 是否是带下级的预置菜单工具（注音 / 着重号 …）。 */
+function isPresetMenuTool(key: string): boolean {
+  return allTools.value.some((t) => t.key === key && t.kind === 'presetMenu')
+}
 const formOpen = ref(false)
 const templateOpen = ref(false)
 const moreFormOpen = ref(false)
@@ -6235,6 +6252,11 @@ function openToolbarSubmenu(key: string) {
   moreChartGroupKey.value = ''
   if (key.startsWith('chart:')) {
     echartsGroupMenuKey.value = key
+    return
+  }
+  // 预置菜单（注音 / 着重号 …）：与「大小写」一样悬停即展开下拉面板
+  if (isPresetMenuTool(key)) {
+    presetMenuKey.value = key
     return
   }
   switch (key) {
@@ -8286,6 +8308,7 @@ provideRteBindings({
   textTidyOpen,
   presetMenuKey,
   togglePresetMenu,
+  openPresetMenu,
   closePresetMenu,
   TEXT_TIDY_ACTIONS,
   listStyleOpen,

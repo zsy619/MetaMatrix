@@ -351,26 +351,57 @@ html.rte-toolbar-dragging * {
 .rte-color-board .rte-standard-row,
 .rte-color-board .rte-highlight-swatches {
   display: grid;
-  gap: 3px;
-  margin: 0 2px 4px;
+  gap: 4px;
+  margin: 0 0 6px;
+  /* 关键：固定行高 + 顶对齐，色块不会被拉成长条，分区标题也不会被压住 */
+  align-content: start;
+  align-items: start;
+  justify-content: start;
+  grid-auto-rows: 18px;
 }
-.rte-color-board .rte-theme-grid,
+.rte-color-board .rte-theme-grid {
+  grid-template-columns: repeat(10, 18px);
+  grid-template-rows: repeat(6, 18px);
+}
 .rte-color-board .rte-standard-row {
   grid-template-columns: repeat(10, 18px);
+  grid-auto-rows: 18px;
 }
 .rte-color-board .rte-highlight-swatches {
   grid-template-columns: repeat(5, 18px);
+  grid-auto-rows: 18px;
+}
+/* 分区标题与色块之间留白，避免「标准颜色」被上方色块压住 */
+.rte-color-board .rte-color-section-label {
+  clear: both;
+  margin: 10px 0 6px;
+  padding-top: 2px;
 }
 .rte-color-board .rte-swatch {
   width: 18px !important;
   height: 18px !important;
   min-width: 18px !important;
+  max-width: 18px;
   padding: 0 !important;
-  border: 1px solid rgba(0, 0, 0, 0.18);
-  border-radius: 2px;
+  /* 浮动菜单里的按钮统一 min-height:30px，会把色块撑成 30px 高、压住下一行标题；
+     这里显式清零，保证色块严格 18×18 的正方形网格。 */
+  min-height: 0 !important;
+  min-width: 18px !important;
+  flex: 0 0 auto;
+  margin: 0;
+  border: 1px solid rgba(0, 0, 0, 0.16);
+  border-radius: 4px;
   cursor: pointer;
   position: relative;
   box-sizing: border-box;
+  align-self: start;
+  justify-self: start;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+.rte-color-board .rte-swatch:hover {
+  transform: scale(1.14);
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.18);
+  z-index: 2;
 }
 .rte-color-board .rte-swatch:hover {
   outline: 1px solid #1d2129;
@@ -581,24 +612,224 @@ html.rte-toolbar-dragging * {
   background: #eef0f3;
   margin: 4px 0;
 }
-/* 一键生成对话框：类别 + 子类型两栏 */
+/* 一键生成对话框：左侧类型 + 右侧模板两栏 */
+.rte-link-dialog.rte-echarts-dialog {
+  width: min(760px, 100%);
+  padding: 18px 20px 16px;
+}
+.rte-echarts-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 12px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+}
+.rte-echarts-head-icon {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  color: var(--tg-blue, #3390ec);
+  background: rgba(51, 144, 236, 0.12);
+}
+.rte-echarts-head-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.rte-echarts-head-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--tg-text, #0f0f0f);
+}
+.rte-echarts-head-sub {
+  font-size: 12px;
+  color: var(--tg-text-2, #707579);
+  line-height: 1.4;
+}
 .rte-echarts-type-list {
   display: flex;
-  gap: 10px;
+  gap: 14px;
   width: 100%;
-  max-height: 320px;
-  margin-bottom: 8px;
+  height: 320px;
+  margin-bottom: 12px;
+}
+.rte-echarts-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.rte-echarts-col:first-child {
+  flex: 0 0 168px;
+}
+.rte-echarts-col:last-child {
+  flex: 1 1 auto;
+}
+.rte-echarts-col-title {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--tg-text-2, #707579);
+  letter-spacing: 0.02em;
+  margin-bottom: 6px;
 }
 .rte-echarts-cats {
-  flex: 1 1 45%;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
-  padding-right: 6px;
-  border-right: 1px solid #eef0f3;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-right: 4px;
+  /* 底部渐隐：列表可滚动到底，末项不再被硬切 */
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 20px), transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 20px), transparent 100%);
 }
+/* 类型项：名称 + 数量徽标，数量不换行 */
+.rte-echarts-cat-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 9px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+  font-size: 13px;
+  color: var(--tg-text, #0f0f0f);
+  cursor: pointer;
+  transition: background 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+}
+.rte-echarts-cat-item:hover {
+  background: rgba(15, 23, 42, 0.05);
+}
+.rte-echarts-cat-item.is-active {
+  background: rgba(51, 144, 236, 0.1);
+  border-color: rgba(51, 144, 236, 0.28);
+  color: var(--tg-blue, #3390ec);
+  font-weight: 600;
+}
+.rte-echarts-cat-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rte-echarts-cat-count {
+  flex: none;
+  min-width: 20px;
+  text-align: center;
+  font-size: 11px;
+  line-height: 16px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  color: var(--tg-text-2, #707579);
+  background: rgba(15, 23, 42, 0.07);
+}
+.rte-echarts-cat-item.is-active .rte-echarts-cat-count {
+  color: #fff;
+  background: var(--tg-blue, #3390ec);
+}
+/* 模板：卡片两列，名称在上、说明在下，不再挤在右侧 */
 .rte-echarts-subtypes {
-  flex: 1 1 55%;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
-  padding-left: 6px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
+  gap: 8px;
+  padding-right: 4px;
+}
+.rte-echarts-tpl-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 9px;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
+}
+.rte-echarts-tpl-item:hover {
+  border-color: rgba(51, 144, 236, 0.4);
+}
+.rte-echarts-tpl-item.is-active {
+  border-color: var(--tg-blue, #3390ec);
+  background: rgba(51, 144, 236, 0.06);
+  box-shadow: 0 0 0 2px rgba(51, 144, 236, 0.14);
+}
+.rte-echarts-tpl-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--tg-text, #0f0f0f);
+  line-height: 1.3;
+}
+.rte-echarts-tpl-item.is-active .rte-echarts-tpl-label {
+  color: var(--tg-blue, #3390ec);
+}
+.rte-echarts-tpl-hint {
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--tg-text-2, #707579);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 底部：标题输入 + 表格数据开关 + 提示 */
+.rte-echarts-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
+}
+.rte-echarts-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.rte-echarts-field-label {
+  flex: none;
+  width: 60px;
+  font-size: 12.5px;
+  color: var(--tg-text-2, #707579);
+}
+.rte-echarts-field .rte-note-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 7px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: #fff;
+  font-size: 13px;
+  box-sizing: border-box;
+}
+.rte-echarts-check {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  color: var(--tg-text-2, #707579);
+  cursor: pointer;
+}
+.rte-echarts-tip {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--tg-text-3, #8e8e8e);
 }
 
 /* 盖过 .rte-modal-overlay(4100)，避免弹窗内 toast 被挡住变成「没反应」 */
@@ -1191,32 +1422,121 @@ html.rte-toolbar-dragging * {
 }
 
 
-/* 插入链接 */
+/* 查找与替换面板（Telegram 风格：紧凑、清晰、一行两组动作） */
 .rte-find-dialog {
-  min-width: 380px;
-  max-width: min(480px, 94vw);
+  min-width: 400px;
+  max-width: min(520px, 94vw);
+  padding: 14px 16px 14px;
+  border-radius: 14px;
+  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.18);
 }
-.rte-find-case {
+.rte-find-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  cursor: move;
+}
+.rte-find-head .rte-table-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #1d2129;
+}
+.rte-find-close {
+  margin-left: auto;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #86909c;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+.rte-find-close:hover {
+  background: rgba(15, 23, 42, 0.06);
+  color: #1d2129;
+}
+.rte-find-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.rte-find-field {
   display: flex;
   align-items: center;
   gap: 8px;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid #e5e6eb;
+  border-radius: 10px;
+  background: #fff;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+.rte-find-field:focus-within {
+  border-color: var(--mm-blue, #165dff);
+  box-shadow: 0 0 0 3px rgba(22, 93, 255, 0.12);
+}
+.rte-find-field__icon {
+  flex: none;
   font-size: 13px;
+  line-height: 1;
+  opacity: 0.75;
+}
+.rte-find-input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  outline: none;
+  padding: 0;
+  background: transparent;
+  color: #1d2129;
+  font-size: 13px;
+}
+.rte-find-input::placeholder {
+  color: #a9b4c8;
+}
+.rte-find-case {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
   color: #4e5969;
-  margin: 0 0 14px;
   user-select: none;
+  white-space: nowrap;
 }
 .rte-find-case input {
   margin: 0;
+}
+.rte-find-case select {
+  height: 26px;
+  border: 1px solid #e5e6eb;
+  border-radius: 8px;
+  padding: 0 6px;
+  background: #fff;
+  color: #1d2129;
+  font-size: 12px;
+  outline: none;
+}
+.rte-find-case select:focus {
+  border-color: var(--mm-blue, #165dff);
 }
 .rte-find-opts {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 10px 14px;
-  margin-bottom: 8px;
+  gap: 8px 14px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f7f8fa;
 }
 .rte-find-status {
-  margin-left: auto;
+  margin: 8px 2px 0;
+  font-size: 12px;
   color: #86909c;
   font-variant-numeric: tabular-nums;
 }
@@ -1224,7 +1544,6 @@ html.rte-toolbar-dragging * {
   opacity: 0.4;
   cursor: default;
 }
-.rte-find-query:focus-visible,
 .rte-shortcuts-panel:focus-visible,
 .rte-block-handle:focus-visible,
 .rte-tool:focus-visible {
@@ -1255,16 +1574,40 @@ html.rte-toolbar-dragging * {
 }
 .rte-find-actions {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
 }
-.rte-find-replace-row {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin-top: 0;
+.rte-find-actions__nav,
+.rte-find-actions__ops {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
-.rte-find-replace-row button {
+.rte-find-btn {
+  height: 30px;
+  padding: 0 14px;
+  border: 1px solid #e5e6eb;
+  border-radius: 8px;
+  background: #fff;
+  color: #1d2129;
+  font-size: 13px;
+  cursor: pointer;
   white-space: nowrap;
-  padding: 0 4px;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+.rte-find-btn:hover:not(:disabled) {
+  background: #f2f3f5;
+}
+.rte-find-btn--primary {
+  border-color: transparent;
+  background: var(--el-color-primary, #165dff);
+  color: #fff;
+}
+.rte-find-btn--primary:hover:not(:disabled) {
+  filter: brightness(1.06);
+  background: var(--el-color-primary, #165dff);
 }
 .rte-code-tool-wrap {
   display: inline-flex;
@@ -5480,8 +5823,8 @@ html.rte-image-preview-open .tippy-box {
   z-index: 5300;
   display: flex;
   flex-direction: column;
-  width: min(var(--rte-chart-panel-width, 760px), 92vw);
-  max-width: 92vw;
+  width: min(var(--rte-chart-panel-width, 480px), 92vw);
+  max-width: min(480px, 92vw);
   height: 100%;
   background: #fff;
   border-left: 1px solid #e5e6eb;

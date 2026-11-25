@@ -938,38 +938,43 @@ const echartsDialogTemplates = computed(() => {
           @mousedown.stop
           @keydown.esc.prevent="rte.closeFindDialog"
         >
-          <h3 data-rte-own
-            class="rte-table-title rte-find-drag"
+          <div data-rte-own
+            class="rte-find-head rte-find-drag"
             title="按住拖动查找窗口"
             @pointerdown="rte.onFindDialogDragStart"
             @pointermove="rte.onFindDialogDragMove"
             @pointerup="rte.onFindDialogDragEnd"
             @pointercancel="rte.onFindDialogDragEnd"
-          >查找与替换</h3>
-          <div data-rte-own class="rte-note-field rte-note-text-field" style="width: 100%; margin-bottom: 10px">
-            <span data-rte-own class="rte-note-field-icon" aria-hidden="true">🔍</span>
-            <input data-rte-own
-              v-model="rte.findQuery"
-              type="text"
-              class="rte-note-input rte-find-query"
-              placeholder="查找"
-              maxlength="200"
-              title="输入要找的文字，按 Enter 跳到下一处"
-              @input="rte.onFindQueryInput"
-              @keydown.enter.prevent="rte.findGo(1)"
-            />
+          >
+            <h3 data-rte-own class="rte-table-title">查找与替换</h3>
+            <button data-rte-own type="button" class="rte-find-close" title="关闭查找与替换" aria-label="关闭查找与替换" @click="rte.closeFindDialog">✕</button>
           </div>
-          <div data-rte-own class="rte-note-field rte-note-text-field" style="width: 100%; margin-bottom: 10px">
-            <span data-rte-own class="rte-note-field-icon" aria-hidden="true">⇄</span>
-            <input data-rte-own
-              v-model="rte.findReplaceText"
-              type="text"
-              class="rte-note-input"
-              placeholder="替换为"
-              title="输入要换成的文字，按 Enter 替换当前这一处"
-              maxlength="200"
-              @keydown.enter.prevent="rte.doReplaceOne"
-            />
+          <div data-rte-own class="rte-find-fields">
+            <label data-rte-own class="rte-find-field">
+              <span data-rte-own class="rte-find-field__icon" aria-hidden="true">🔍</span>
+              <input data-rte-own
+                v-model="rte.findQuery"
+                type="text"
+                class="rte-find-input rte-find-query"
+                placeholder="查找内容"
+                maxlength="200"
+                title="输入要找的文字，按 Enter 跳到下一处"
+                @input="rte.onFindQueryInput"
+                @keydown.enter.prevent="rte.findGo(1)"
+              />
+            </label>
+            <label data-rte-own class="rte-find-field">
+              <span data-rte-own class="rte-find-field__icon" aria-hidden="true">⇄</span>
+              <input data-rte-own
+                v-model="rte.findReplaceText"
+                type="text"
+                class="rte-find-input"
+                placeholder="替换为"
+                title="输入要换成的文字，按 Enter 替换当前这一处"
+                maxlength="200"
+                @keydown.enter.prevent="rte.doReplaceOne"
+              />
+            </label>
           </div>
           <div data-rte-own class="rte-find-opts">
             <label data-rte-own class="rte-find-case">
@@ -998,17 +1003,16 @@ const echartsDialogTemplates = computed(() => {
               <input data-rte-own v-model="rte.findMultiline" type="checkbox" title="正则可以跨行匹配" @change="rte.refreshFindMatches(true)" />
               <span data-rte-own>多行</span>
             </label>
-            <span data-rte-own class="rte-find-status" role="status" aria-live="polite">{{ rte.findStatusText }}</span>
           </div>
+          <p data-rte-own class="rte-find-status" role="status" aria-live="polite">{{ rte.findStatusText }}</p>
           <div data-rte-own class="rte-find-actions">
-            <div data-rte-own class="rte-modal-actions">
-              <button data-rte-own type="button" class="rte-modal-cancel" title="跳到上一处匹配" :disabled="!rte.canReplaceFind" @click="rte.findGo(-1)">上一个</button>
-              <button data-rte-own type="button" class="rte-modal-cancel" title="跳到下一处匹配" :disabled="!rte.canReplaceFind" @click="rte.findGo(1)">下一个</button>
+            <div data-rte-own class="rte-find-actions__nav">
+              <button data-rte-own type="button" class="rte-find-btn" title="跳到上一处匹配" :disabled="!rte.canReplaceFind" @click="rte.findGo(-1)">上一个</button>
+              <button data-rte-own type="button" class="rte-find-btn" title="跳到下一处匹配" :disabled="!rte.canReplaceFind" @click="rte.findGo(1)">下一个</button>
             </div>
-            <div data-rte-own class="rte-modal-actions rte-find-replace-row">
-              <button data-rte-own type="button" class="rte-modal-cancel" title="只把这一处换成新文字" :disabled="!rte.canReplaceFind" @click="rte.doReplaceOne">替换当前</button>
-              <button data-rte-own type="button" class="rte-modal-confirm" title="把所有匹配都换成新文字" :disabled="!rte.canReplaceFind" @click="rte.doReplaceAll">全部替换</button>
-              <button data-rte-own type="button" class="rte-modal-cancel" title="关掉查找与替换" @click="rte.closeFindDialog">关闭</button>
+            <div data-rte-own class="rte-find-actions__ops">
+              <button data-rte-own type="button" class="rte-find-btn" title="只把这一处换成新文字" :disabled="!rte.canReplaceFind" @click="rte.doReplaceOne">替换当前</button>
+              <button data-rte-own type="button" class="rte-find-btn rte-find-btn--primary" title="把所有匹配都换成新文字" :disabled="!rte.canReplaceFind" @click="rte.doReplaceAll">全部替换</button>
             </div>
           </div>
         </div>
@@ -1383,67 +1387,83 @@ const echartsDialogTemplates = computed(() => {
           aria-label="插入图表"
           @mousedown.stop
         >
-          <h3 data-rte-own class="rte-table-title">一键生成图表</h3>
-          <p data-rte-own class="rte-ask-message">选择图表类型，插入后带示例数据；选中图表可在属性面板改类型 / 改数据。</p>
-          <div data-rte-own class="rte-echarts-type-list">
-            <div data-rte-own class="rte-echarts-cats">
-              <button
-                v-for="cat in rte.ECHARTS_CATEGORIES"
-                :key="'ect-' + cat.id"
-                data-rte-own
-                type="button"
-                class="rte-import-item"
-                :class="{ 'is-active': rte.echartsDialogType === cat.id }"
-                style="width: 100%; margin-bottom: 6px; text-align: left"
-                :title="'看「' + cat.label + '」这一类，共 ' + cat.templates.length + ' 种'"
-                @click="rte.selectEchartsDialogCategory(cat.id)"
-              >
-                <strong data-rte-own>{{ cat.label }}</strong>
-                <span data-rte-own class="rte-menu-hint">{{ cat.templates.length }} 种</span>
-              </button>
-            </div>
-            <div data-rte-own class="rte-echarts-subtypes">
-              <button
-                v-for="tpl in echartsDialogTemplates"
-                :key="'ectpl-' + tpl.id"
-                data-rte-own
-                type="button"
-                class="rte-import-item"
-                :class="{ 'is-active': rte.echartsDialogTemplateId === tpl.id }"
-                style="width: 100%; margin-bottom: 6px; text-align: left"
-                :title="tpl.hint ? tpl.label + '：' + tpl.hint : '用「' + tpl.label + '」的示例数据'"
-                @click="rte.echartsDialogTemplateId = tpl.id"
-              >
-                <span data-rte-own>{{ tpl.label }}</span>
-                <span data-rte-own class="rte-menu-hint">{{ tpl.hint }}</span>
-              </button>
-            </div>
-          </div>
-          <div data-rte-own class="rte-note-field" style="width: 100%; margin-bottom: 8px">
-            <input
-              data-rte-own
-              v-model="rte.echartsDialogTitle"
-              class="rte-note-input"
-              type="text"
-              maxlength="60"
-              title="图表标题，最多 60 字，可以留空"
-              placeholder="图表标题（可留空）"
-            />
-          </div>
-          <label data-rte-own class="rte-ask-message" style="display: flex; gap: 6px; align-items: center">
-            <input
-              data-rte-own
-              v-model="rte.echartsDialogUseTable"
-              type="checkbox"
-              title="用光标所在表格的数据。光标不在表格里时不能勾"
-              :disabled="!rte.echartsDialogTable"
-            />
-            <span data-rte-own>
-              用光标所在表格的数据生成
-              <template v-if="!rte.echartsDialogTable">（当前光标不在表格里）</template>
+          <header data-rte-own class="rte-echarts-head">
+            <span data-rte-own class="rte-echarts-head-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />
+              </svg>
             </span>
-          </label>
-          <p data-rte-own class="rte-ask-message">提示：图表内容不参与逐条修订；单个文档图表超过 20 个会提示。</p>
+            <span data-rte-own class="rte-echarts-head-text">
+              <strong data-rte-own class="rte-echarts-head-title">一键生成图表</strong>
+              <span data-rte-own class="rte-echarts-head-sub">插入后带示例数据，选中图表可在属性面板改类型 / 改数据</span>
+            </span>
+          </header>
+          <div data-rte-own class="rte-echarts-type-list">
+            <div data-rte-own class="rte-echarts-col">
+              <div data-rte-own class="rte-echarts-col-title">图表类型</div>
+              <div data-rte-own class="rte-echarts-cats">
+                <button
+                  v-for="cat in rte.ECHARTS_CATEGORIES"
+                  :key="'ect-' + cat.id"
+                  data-rte-own
+                  type="button"
+                  class="rte-echarts-cat-item"
+                  :class="{ 'is-active': rte.echartsDialogType === cat.id }"
+                  :title="'看「' + cat.label + '」这一类，共 ' + cat.templates.length + ' 种'"
+                  @click="rte.selectEchartsDialogCategory(cat.id)"
+                >
+                  <span data-rte-own class="rte-echarts-cat-label">{{ cat.label }}</span>
+                  <span data-rte-own class="rte-echarts-cat-count">{{ cat.templates.length }}</span>
+                </button>
+              </div>
+            </div>
+            <div data-rte-own class="rte-echarts-col">
+              <div data-rte-own class="rte-echarts-col-title">模板</div>
+              <div data-rte-own class="rte-echarts-subtypes">
+                <button
+                  v-for="tpl in echartsDialogTemplates"
+                  :key="'ectpl-' + tpl.id"
+                  data-rte-own
+                  type="button"
+                  class="rte-echarts-tpl-item"
+                  :class="{ 'is-active': rte.echartsDialogTemplateId === tpl.id }"
+                  :title="tpl.hint ? tpl.label + '：' + tpl.hint : '用「' + tpl.label + '」的示例数据'"
+                  @click="rte.echartsDialogTemplateId = tpl.id"
+                >
+                  <span data-rte-own class="rte-echarts-tpl-label">{{ tpl.label }}</span>
+                  <span v-if="tpl.hint" data-rte-own class="rte-echarts-tpl-hint">{{ tpl.hint }}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+          <div data-rte-own class="rte-echarts-foot">
+            <label data-rte-own class="rte-echarts-field">
+              <span data-rte-own class="rte-echarts-field-label">图表标题</span>
+              <input
+                data-rte-own
+                v-model="rte.echartsDialogTitle"
+                class="rte-note-input"
+                type="text"
+                maxlength="60"
+                title="图表标题，最多 60 字，可以留空"
+                placeholder="可留空"
+              />
+            </label>
+            <label data-rte-own class="rte-echarts-check">
+              <input
+                data-rte-own
+                v-model="rte.echartsDialogUseTable"
+                type="checkbox"
+                title="用光标所在表格的数据。光标不在表格里时不能勾"
+                :disabled="!rte.echartsDialogTable"
+              />
+              <span data-rte-own>
+                用光标所在表格的数据生成
+                <template v-if="!rte.echartsDialogTable">（当前光标不在表格里）</template>
+              </span>
+            </label>
+            <p data-rte-own class="rte-echarts-tip">提示：图表内容不参与逐条修订；单个文档图表超过 20 个会提示。</p>
+          </div>
           <div data-rte-own class="rte-modal-actions">
             <button data-rte-own type="button" class="rte-modal-cancel" title="不插入图表" @click="rte.echartsDialogOpen = false">取消</button>
             <button

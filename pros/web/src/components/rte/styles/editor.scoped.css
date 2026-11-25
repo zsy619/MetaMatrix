@@ -4795,10 +4795,24 @@ html.rte-toolbar-dragging .rte-root:not(.expanded) .rte-toolbar-tools > .rte-too
   background: transparent;
   overflow-x: auto;
   flex-wrap: nowrap;
-  scrollbar-width: thin;
+  /* 横向滚动时不显示任何滚动条（Windows / macOS / Firefox 全覆盖） */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   scroll-snap-type: x proximity;
   /* 只在真正溢出时才做边缘渐隐，避免「最后一个栏目被抹掉」的误读 */
   mask-image: linear-gradient(to right, transparent, #000 6px, #000 calc(100% - 6px), transparent);
+}
+.rte-ribbon-tabs::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+.rte-ribbon-tabs::-webkit-scrollbar-track,
+.rte-ribbon-tabs::-webkit-scrollbar-thumb,
+.rte-ribbon-tabs::-webkit-scrollbar-corner {
+  display: none;
+  width: 0;
+  height: 0;
 }
 .rte-ribbon-tab {
   scroll-snap-align: start;
@@ -4814,19 +4828,24 @@ html.rte-toolbar-dragging .rte-root:not(.expanded) .rte-toolbar-tools > .rte-too
   flex: 0 0 auto;
   height: 28px;
   margin: 0;
-  padding: 0 4px;
+  padding: 0 10px;
   border: 1px solid transparent;
   border-bottom: none;
-  border-radius: 3px 3px 0 0;
+  border-radius: 8px 8px 0 0;
   background: transparent;
-  color: #323130;
+  color: #5b6675;
   font-size: 12px;
+  font-weight: 500;
   line-height: 26px;
   cursor: pointer;
   white-space: nowrap;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
 }
 .rte-ribbon-tab:hover {
-  background: #edebe9;
+  background: rgba(15, 23, 42, 0.06);
+  color: #1d2129;
 }
 .rte-ribbon-tab:focus-visible {
   outline: 2px solid #165dff;
