@@ -254,62 +254,81 @@
 }
 
 /* --------------------------------------------------------------------------
-   3b) Ribbon 图标统一为 Telegram 单色线稿
-   - 取消分组彩色渐变底块（--rte-icon-bg），改为单色描边图标：
-     默认 #707579（Telegram hint）、悬停 #3370ff（主色）、选中主色 + 浅面；
-   - 图标尺寸保持不变（槽位 32×32、线稿 24 viewBox 渲染在 32 槽内）；
-   - 禁用态改为「降透明度」（Telegram 做法），不再铺灰底块；
-   - 颜色类图标（字体颜色 / 高亮）保留底部色条，色条高度 4px → 3px。
-   说明：!important 用于压过 editor.scoped.css 里带 data-v-hash 的旧规则
-   （旧规则把图标强制成白字 + 渐变底块）。
+   3b) Ribbon 图标：扁平彩色磁贴（Telegram 设置页磁贴语法）
+   - 图形沿用统一单色线稿（24 viewBox / 1.7 stroke / round），改成白色画在
+     纯色扁平圆角方块上（7px 圆角，32×32 槽位尺寸不变）；
+   - 配色按「分组同色」：同组命令共用一个色相，跨组换色，既保留分组识别度，
+     又避免 137 个按钮各自一色造成的视觉噪声；
+   - 色值全部满足「白色图形 vs 底色」对比度 ≥ 4.5:1（见下方注释实测值）；
+   - 禁用态回到灰底灰图标；颜色类图标（字体颜色 / 高亮）磁贴直接取当前颜色；
+   - 深色模式（is-dark-editor）另有暗色调色板，避免浅灰底 + 深色磁贴冲突。
+   说明：!important 用于压过 editor.scoped.css 里带 data-v-hash 的旧规则。
    -------------------------------------------------------------------------- */
+
+/* —— 分组扁平色（白字对比度实测）——
+   edit 5.17 / style 5.02 / paragraph 5.36 / insert 5.47 / charts 7.10 /
+   table 7.90 / blocks 6.04 / notes 5.02 / review 6.47 / view 10.35 /
+   tidy 5.36 / picture 5.47 / frame 6.04 / writing 5.36 / page 5.18 /
+   file 7.31 / other 7.56（均为 :1） */
+.rte-root .rte-tool-group[data-group-id='edit'] { --rte-icon-bg: #2563eb; }
+.rte-root .rte-tool-group[data-group-id='style'] { --rte-icon-bg: #15803d; }
+.rte-root .rte-tool-group[data-group-id='paragraph'] { --rte-icon-bg: #0e7490; }
+.rte-root .rte-tool-group[data-group-id='insert'] { --rte-icon-bg: #0f766e; }
+.rte-root .rte-tool-group[data-group-id='charts'] { --rte-icon-bg: #6d28d9; }
+.rte-root .rte-tool-group[data-group-id='table'] { --rte-icon-bg: #4338ca; }
+.rte-root .rte-tool-group[data-group-id='blocks'] { --rte-icon-bg: #be185d; }
+.rte-root .rte-tool-group[data-group-id='notes'] { --rte-icon-bg: #b45309; }
+.rte-root .rte-tool-group[data-group-id='review'] { --rte-icon-bg: #b91c1c; }
+.rte-root .rte-tool-group[data-group-id='view'] { --rte-icon-bg: #334155; }
+.rte-root .rte-tool-group[data-group-id='tidy'] { --rte-icon-bg: #0e7490; }
+.rte-root .rte-tool-group[data-group-id='picture'] { --rte-icon-bg: #0f766e; }
+.rte-root .rte-tool-group[data-group-id='frame'] { --rte-icon-bg: #be185d; }
+.rte-root .rte-tool-group[data-group-id='writing'] { --rte-icon-bg: #0e7490; }
+.rte-root .rte-tool-group[data-group-id='page'] { --rte-icon-bg: #c2410c; }
+.rte-root .rte-tool-group[data-group-id='file'] { --rte-icon-bg: #9a3412; }
+.rte-root .rte-tool-group[data-group-id='other'] { --rte-icon-bg: #4b5563; }
+
 .rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool-icon {
-  background: transparent !important;
+  background: var(--rte-icon-bg, #2563eb) !important;
+  color: #fff !important;
+  border-radius: 7px !important;
   box-shadow: none !important;
-  color: #707579 !important;
-  border-radius: 6px;
-  transition: color var(--rte-tg-dur) ease, background var(--rte-tg-dur) ease;
+  transition: filter var(--rte-tg-dur) ease, transform var(--rte-tg-dur) ease,
+    box-shadow var(--rte-tg-dur) ease;
 }
 .rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool .rte-ep-icon,
 .rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool .rte-tool-icon > svg {
-  color: #707579 !important;
+  color: #fff !important;
 }
-.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool:hover .rte-tool-icon,
-.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool:hover .rte-ep-icon,
-.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool:hover .rte-tool-icon > svg {
-  color: var(--rte-tg-accent) !important;
-  filter: none !important;
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool:hover .rte-tool-icon {
+  filter: brightness(1.08) saturate(1.02);
+  transform: translateY(-1px);
 }
-.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool.active .rte-tool-icon,
-.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool.active .rte-ep-icon,
-.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool.active .rte-tool-icon > svg {
-  color: var(--rte-tg-accent) !important;
-  background: rgba(51, 112, 255, 0.1) !important;
-  outline: none !important;
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool.active .rte-tool-icon {
+  background: var(--rte-icon-bg, #2563eb) !important;
+  box-shadow: 0 0 0 2px var(--rte-tg-accent) !important;
+  filter: none;
 }
-/* 禁用态：降透明度，不再铺灰底块 */
+/* 禁用态：灰底灰图标 */
 .rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool:disabled .rte-tool-icon,
-.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool.is-disabled .rte-tool-icon,
-.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool:disabled .rte-ep-icon,
-.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool.is-disabled .rte-ep-icon {
-  background: transparent !important;
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool.is-disabled .rte-tool-icon {
+  background: #e5e6eb !important;
   color: #c9cdd4 !important;
-  opacity: 0.6;
   filter: none !important;
-  outline: none !important;
-}
-/* 颜色类图标：保留底部色条（高度 4 → 3px，色条仍是当前颜色） */
-.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool-icon.rte-color-icon {
-  background: transparent !important;
-  color: #707579 !important;
   box-shadow: none !important;
 }
-.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool-icon.rte-color-icon::after {
-  left: 4px !important;
-  right: 4px !important;
-  height: 3px !important;
-  border-radius: 2px !important;
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool:disabled .rte-ep-icon,
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool.is-disabled .rte-ep-icon {
+  color: #c9cdd4 !important;
+}
+/* 颜色类图标（字体颜色 / 高亮）：磁贴直接取当前颜色，取消底部色条 */
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool-icon.rte-color-icon {
   background: var(--rte-color-bar, #1d2129) !important;
+  color: #fff !important;
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.16) !important;
+}
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool-icon.rte-color-icon::after {
+  display: none !important;
 }
 
 /* --------------------------------------------------------------------------
@@ -726,23 +745,48 @@
 }
 
 /* Ribbon：Telegram 浅灰页面底 + 白色磁贴（命令块悬停白底圆角） */
-.rte-root.expanded .rte-toolbar {
+.rte-root.expanded:not(.is-dark-editor) .rte-toolbar {
   background: var(--rte-tg-page) !important;
 }
-.rte-root.expanded .rte-ribbon-bar {
+.rte-root.expanded:not(.is-dark-editor) .rte-ribbon-bar {
   background: var(--rte-tg-page) !important;
   border-bottom-color: #d8d8dc !important;
 }
-.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-toolbar-tools {
+.rte-root.expanded:not(.is-dark-editor) .rte-toolbar:not(.is-one-row) .rte-toolbar-tools {
   background: var(--rte-tg-page) !important;
 }
-.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool:hover {
+.rte-root.expanded:not(.is-dark-editor) .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool:hover {
   background: #fff !important;
   border-radius: 6px;
 }
-.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool.active {
+.rte-root.expanded:not(.is-dark-editor) .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool.active {
   background: #fff !important;
 }
-.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group + .rte-tool-group {
+.rte-root.expanded:not(.is-dark-editor) .rte-toolbar:not(.is-one-row) .rte-tool-group + .rte-tool-group {
   box-shadow: inset 1px 0 0 #d8d8dc !important;
+}
+
+/* 深色模式：暗色页面底 + 暗色磁贴体系（避免浅灰底与深色磁贴打架） */
+.rte-root.is-dark-editor.expanded .rte-toolbar,
+.rte-root.is-dark-editor.expanded .rte-ribbon-bar,
+.rte-root.is-dark-editor.expanded .rte-toolbar:not(.is-one-row) .rte-toolbar-tools {
+  background: #1f2126 !important;
+  border-bottom-color: #3a3f47 !important;
+}
+.rte-root.is-dark-editor.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group + .rte-tool-group {
+  box-shadow: inset 1px 0 0 #3a3f47 !important;
+}
+.rte-root.is-dark-editor.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-radius: 6px;
+}
+.rte-root.is-dark-editor.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool.active {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+/* 深色下彩色磁贴略压暗一档，保证白字对比 */
+.rte-root.is-dark-editor.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool-icon {
+  filter: brightness(0.88) saturate(0.95);
+}
+.rte-root.is-dark-editor.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool:hover .rte-tool-icon {
+  filter: brightness(1) saturate(1);
 }

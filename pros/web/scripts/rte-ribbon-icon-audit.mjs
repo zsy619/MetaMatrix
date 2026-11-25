@@ -35,6 +35,7 @@ for (const name of tabNames) {
         svgColor: scs?.color,
         svgBox: svg ? `${Math.round(svg.getBoundingClientRect().width)}x${Math.round(svg.getBoundingClientRect().height)}` : null,
         svgFill: scs?.fill,
+        svgColorRaw: scs?.color,
         svgCap: scs?.strokeLinecap,
       })
     })
@@ -52,6 +53,41 @@ const byStroke = {}
 for (const r of allRows) { const k = String(r.svgStroke); byStroke[k] = (byStroke[k] || 0) + 1 }
 console.log('stroke distribution', byStroke)
 const grads = allRows.filter(r => r.bg === 'gradient').length
+// 磁贴配色与对比度校验
+function lum(rgb) {
+  const [r, g, b] = rgb.map((v) => {
+    const c = v / 255
+    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)
+  })
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b
+}
+function ratio(a, b) {
+  const l1 = lum(a)
+  const l2 = lum(b)
+  const hi = Math.max(l1, l2)
+  const lo = Math.min(l1, l2)
+  return (hi + 0.05) / (lo + 0.05)
+}
+function parseRgb(str) {
+  const m = /rgba?\(([^)]+)\)/.exec(str || '')
+  if (!m) return null
+  const parts = m[1].split(',').map((x) => parseFloat(x))
+  return parts.slice(0, 3)
+}
+const tiles = {}
+let lowContrast = 0
+for (const r of allRows) {
+  const bg = parseRgb(r.bg)
+  const fg = parseRgb(r.svgColor)
+  if (!bg || !fg) continue
+  const cr = ratio(bg, fg)
+  if (cr < 4.5) lowContrast += 1
+  const key = r.bg
+  tiles[key] = tiles[key] || { count: 0, contrast: Math.round(cr * 100) / 100, radius: r.radius }
+  tiles[key].count += 1
+}
+console.log('tile palette', JSON.stringify(tiles))
+console.log('tiles below 4.5:1 =', lowContrast, '/', allRows.length)
 const fills = {}; const caps = {}
 for (const r of allRows) { fills[r.svgFill] = (fills[r.svgFill]||0)+1; caps[String(r.svgCap)] = (caps[String(r.svgCap)]||0)+1 }
 console.log('fill distribution', fills); console.log('linecap distribution', caps)
