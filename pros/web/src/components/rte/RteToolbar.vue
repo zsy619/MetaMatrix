@@ -333,7 +333,7 @@ watch(() => rteBindings.toolbarQuery, () => {
 const showToolbarSettings = ref(false)
 
 /** Telegram 风格的悬停气泡提示：跟随按钮定位，Teleport 到 body，避免被横向滚动容器裁剪。 */
-const tgTip = ref<{ text: string; x: number; y: number } | null>(null)
+const tgTip = ref<{ text: string; x: number; y: number; align: 'center' | 'right' } | null>(null)
 let tgTipTimer: number | null = null
 function clearTgTipTimer() {
   if (tgTipTimer != null) {
@@ -360,7 +360,16 @@ function onToolbarMouseover(event: MouseEvent) {
   const rect = host.getBoundingClientRect()
   clearTgTipTimer()
   tgTipTimer = window.setTimeout(() => {
-    tgTip.value = { text, x: rect.left + rect.width / 2, y: rect.bottom + 8 }
+    // 偏右的按钮：气泡右对齐到按钮右边缘，
+    // 否则居中后会被裁成竖排、还压住右侧面板。
+    const nearRightEdge = rect.right > window.innerWidth * 0.6
+    const x = nearRightEdge ? rect.right : rect.left + rect.width / 2
+    tgTip.value = {
+      text,
+      x: Math.min(Math.max(x, 90), window.innerWidth - 12),
+      y: rect.bottom + 8,
+      align: nearRightEdge ? 'right' : 'center',
+    }
     tgTipTimer = null
   }, 320)
 }
@@ -3297,6 +3306,7 @@ function toggleChartGroupMenu(key: string) {
           v-if="tgTip"
           data-rte-own
           class="rte-tip"
+          :class="{ 'is-right': tgTip.align === 'right' }"
           :style="{ left: tgTip.x + 'px', top: tgTip.y + 'px' }"
           role="tooltip"
         >{{ tgTip.text }}</div>

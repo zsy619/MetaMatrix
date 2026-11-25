@@ -919,7 +919,8 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
 }
 .doc-view__sidebar {
   flex: none;
-  width: 220px;
+  /* 220px 太窄：正文里的标题被截成「…」，侧栏页签也挤成一行。放宽 80px。 */
+  width: 300px;
   display: flex;
   flex-direction: column;
   overflow: auto;
@@ -927,5 +928,60 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
   background: rgba(255, 255, 255, 0.3);
   backdrop-filter: blur(var(--glass-blur, 18px)) saturate(var(--glass-saturate, 165%));
   -webkit-backdrop-filter: blur(var(--glass-blur, 18px)) saturate(var(--glass-saturate, 165%));
+}
+
+/* ---------------- 侧栏页签：药丸分段 + 自动换行 ---------------- */
+/* 9 个页签一行放不下，Element Plus 默认会出左右滚动箭头；
+   这里改成可换行的药丸标签，去掉箭头，选中态用品牌色。 */
+.doc-view__tabs :deep(.el-tabs__header) {
+  margin: 0 0 8px;
+}
+.doc-view__tabs :deep(.el-tabs__nav-wrap) {
+  height: auto;
+  overflow: visible;
+}
+.doc-view__tabs :deep(.el-tabs__nav-scroll) {
+  overflow: visible;
+}
+.doc-view__tabs :deep(.el-tabs__nav) {
+  height: auto;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.doc-view__tabs :deep(.el-tabs__nav-prev),
+.doc-view__tabs :deep(.el-tabs__nav-next) {
+  display: none;
+}
+.doc-view__tabs :deep(.el-tabs__active-bar) {
+  display: none;
+}
+.doc-view__tabs :deep(.el-tabs__item) {
+  height: 28px;
+  line-height: 26px;
+  padding: 0 12px;
+  border: 1px solid var(--glass-ring, rgba(15, 23, 42, 0.09));
+  border-radius: 999px;
+  background: var(--glass-bg-soft, rgba(255, 255, 255, 0.45));
+  color: var(--mm-muted, #86909c);
+  font-size: 12.5px;
+  transition:
+    background 0.16s ease,
+    color 0.16s ease,
+    transform 0.16s ease,
+    box-shadow 0.16s ease;
+}
+.doc-view__tabs :deep(.el-tabs__item:hover) {
+  color: var(--mm-text, #1d2129);
+  background: var(--glass-bg-hover, rgba(255, 255, 255, 0.72));
+  transform: translateY(-1px);
+}
+.doc-view__tabs :deep(.el-tabs__item.is-active) {
+  color: #fff;
+  border-color: transparent;
+  background: linear-gradient(135deg, #3370ff, #5b8cff);
+  box-shadow: 0 2px 8px rgba(51, 112, 255, 0.32);
+}
+.doc-view__tabs :deep(.el-tabs__content) {
+  padding-top: 4px;
 }
 </style>

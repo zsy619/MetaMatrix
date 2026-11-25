@@ -668,6 +668,8 @@
   position: fixed;
   z-index: 6000;
   transform: translateX(-50%);
+  /* width: max-content：避免所在容器太窄时把提示压成一字一行 */
+  width: max-content;
   max-width: 260px;
   padding: 5px 9px;
   border-radius: var(--rte-tg-radius);
@@ -678,6 +680,23 @@
   pointer-events: none;
   box-shadow: var(--rte-tg-shadow-sm);
   animation: rte-tg-fade 120ms ease-out;
+}
+/* 贴右边缘时右对齐到按钮右边缘，不再压住右侧面板 */
+.rte-tip.is-right {
+  transform: translateX(-100%);
+}
+@keyframes rte-tg-fade-right {
+  from {
+    opacity: 0;
+    transform: translate(-100%, 4px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-100%, 0);
+  }
+}
+.rte-tip.is-right {
+  animation-name: rte-tg-fade-right;
 }
 @keyframes rte-tg-fade {
   from {
