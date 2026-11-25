@@ -419,19 +419,6 @@ function toggleChartGroupMenu(key: string) {
           </button>
           <button data-rte-own
             type="button"
-            class="rte-tool rte-view-mode-tool rte-toolbar-style-toggle"
-            :title="rte.tgStyle ? '恢复标准功能区样式' : '切换到 Telegram 风格功能区'"
-            :aria-label="rte.tgStyle ? '恢复标准功能区样式' : '切换到 Telegram 风格功能区'"
-            :aria-pressed="rte.tgStyle"
-            @click.stop="rte.toggleTgStyle()"
-          >
-            <span data-rte-own class="rte-tool-icon">
-              <component data-rte-own :is="rte.toolIcon(rte.tgStyle ? 'ribbonStyle' : 'tgStyle')" class="rte-ep-icon" />
-            </span>
-            <span data-rte-own class="rte-tool-label">{{ rte.tgStyle ? '标准' : 'Telegram' }}</span>
-          </button>
-          <button data-rte-own
-            type="button"
             class="rte-tool rte-view-mode-tool rte-toolbar-fold"
             :aria-expanded="rte.toolbarRowsOpen"
             :title="rte.toolbarRowsOpen ? toolbarActionTitle('rows-collapse') : toolbarActionTitle('rows-expand')"

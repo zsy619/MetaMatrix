@@ -43,24 +43,16 @@ describe('Telegram 风格工具栏', () => {
     localStorage.clear()
   })
 
-  it('最大化（功能区）里保留 Ribbon 菜单，只切换 Telegram 风格', async () => {
+  it('最大化（功能区）始终保持原始 Ribbon 样式，不被 Telegram 风格改写', async () => {
+    // 即便用户偏好是 Telegram 风格，最大化后也不套用紧凑条样式
+    localStorage.setItem('rte.toolbar.style', 'tg')
     const wrapper = await mountEditor(true)
     expect(wrapper.find('.rte-ribbon-bar').exists()).toBe(true)
-    const toggle = wrapper.find('.rte-toolbar-style-toggle')
-    expect(toggle.exists()).toBe(true)
-    await toggle.trigger('click')
-    await nextTick()
-    // 仍然是功能区 Ribbon，只是换成 Telegram 风格
-    expect(wrapper.find('.is-tg-style').exists()).toBe(true)
-    expect(wrapper.find('.rte-ribbon-bar').exists()).toBe(true)
     expect(wrapper.findAll('.rte-ribbon-tab').length).toBeGreaterThan(10)
-    expect(localStorage.getItem('rte.toolbar.style')).toBe('tg')
-    // 再点一次回到标准样式
-    await wrapper.find('.rte-toolbar-style-toggle').trigger('click')
-    await nextTick()
-    expect(localStorage.getItem('rte.toolbar.style')).toBe('ribbon')
-    expect(wrapper.find('.is-tg-style').exists()).toBe(false)
-    expect(wrapper.find('.rte-ribbon-bar').exists()).toBe(true)
+    // 最大化根节点不带 is-tg-style → 不会被压缩成纯图标条
+    expect(wrapper.find('.rte-root.is-tg-style').exists()).toBe(false)
+    // 最大化不出现紧凑条的样式切换按钮
+    expect(wrapper.find('.rte-tg-switch-btn').exists()).toBe(false)
     wrapper.unmount()
   })
 

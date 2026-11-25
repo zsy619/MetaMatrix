@@ -8657,7 +8657,8 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
       'mode-preview': viewMode === 'preview',
       'mode-source': viewMode === 'source',
       'is-focus-mode': focusMode,
-      'is-tg-style': tgStyle,
+      // Telegram 紧凑风格只在非最大化（紧凑条）下生效；最大化始终保持原始 Ribbon 功能区样式
+      'is-tg-style': tgStyle && !effectiveExpanded,
       'is-dark-editor': darkEditor,
       'is-heading-auto-num': headingAutoNumber,
       'is-immersive': immersiveFullscreen,

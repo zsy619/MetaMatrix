@@ -6158,12 +6158,12 @@ html.rte-image-preview-open .tippy-box {
 
 /* ==========================================================================
    Telegram 风格工具栏：单行紧凑图标条 + 分组分隔线 + 「更多」多列浮层
-   仅在 .rte-root.is-tg-style 下生效；与既有功能区 / 紧凑主栏并存，可一键切换。
+   仅在 .rte-root.is-tg-style:not(.expanded) 下生效；与既有功能区 / 紧凑主栏并存，可一键切换。
    说明：这里的 !important 是为了压过 editor.scoped.css 里 .rte-tool /
    .rte-tool-label / .rte-tool-group 的旧尺寸规则（scoped 带 data-v-hash，
    特异性同级），否则图标条会被旧的文字尺寸撑开、无法单行排布。
    ========================================================================== */
-.rte-root.is-tg-style .rte-toolbar-tools {
+.rte-root.is-tg-style:not(.expanded) .rte-toolbar-tools {
   gap: 2px !important;
   flex-wrap: nowrap !important;
   overflow-x: auto;
@@ -6172,10 +6172,10 @@ html.rte-image-preview-open .tippy-box {
   padding: 2px 0;
   scrollbar-width: none;
 }
-.rte-root.is-tg-style .rte-toolbar-tools::-webkit-scrollbar {
+.rte-root.is-tg-style:not(.expanded) .rte-toolbar-tools::-webkit-scrollbar {
   height: 0;
 }
-.rte-root.is-tg-style .rte-tool-group {
+.rte-root.is-tg-style:not(.expanded) .rte-tool-group {
   border: 0 !important;
   background: transparent !important;
   border-radius: 0 !important;
@@ -6183,13 +6183,13 @@ html.rte-image-preview-open .tippy-box {
   gap: 1px;
   flex-wrap: nowrap;
 }
-.rte-root.is-tg-style .rte-tool-group + .rte-tool-group {
+.rte-root.is-tg-style:not(.expanded) .rte-tool-group + .rte-tool-group {
   margin-left: 8px;
   padding-left: 8px;
   border-left: 1px solid rgba(15, 23, 42, 0.14);
 }
 /* Telegram 风格下仍保留分组拖拽手柄：紧凑条只留手柄，功能区保留手柄 + 分组说明 */
-.rte-root.is-tg-style .rte-group-head {
+.rte-root.is-tg-style:not(.expanded) .rte-group-head {
   display: inline-flex !important;
   align-items: center;
   gap: 2px;
@@ -6204,7 +6204,7 @@ html.rte-image-preview-open .tippy-box {
 .rte-root.is-tg-style:not(.expanded) .rte-group-empty {
   display: none !important;
 }
-.rte-root.is-tg-style .rte-group-handle {
+.rte-root.is-tg-style:not(.expanded) .rte-group-handle {
   display: inline-flex !important;
   align-items: center;
   justify-content: center;
@@ -6219,15 +6219,15 @@ html.rte-image-preview-open .tippy-box {
   opacity: 0.4;
   cursor: grab;
 }
-.rte-root.is-tg-style .rte-group-handle:hover {
+.rte-root.is-tg-style:not(.expanded) .rte-group-handle:hover {
   opacity: 1;
   background: rgba(255, 255, 255, 0.72);
   box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
 }
-.rte-root.is-tg-style .rte-group-handle:active {
+.rte-root.is-tg-style:not(.expanded) .rte-group-handle:active {
   cursor: grabbing;
 }
-.rte-root.is-tg-style .rte-tool {
+.rte-root.is-tg-style:not(.expanded) .rte-tool {
   width: 30px !important;
   min-width: 30px;
   height: 30px;
@@ -6238,42 +6238,42 @@ html.rte-image-preview-open .tippy-box {
   flex-direction: row;
   gap: 0;
 }
-.rte-root.is-tg-style .rte-tool.is-labeled {
+.rte-root.is-tg-style:not(.expanded) .rte-tool.is-labeled {
   width: 30px !important;
   min-width: 30px;
 }
-.rte-root.is-tg-style .rte-tool-label {
+.rte-root.is-tg-style:not(.expanded) .rte-tool-label {
   display: none !important;
 }
-.rte-root.is-tg-style .rte-tool .rte-caret {
+.rte-root.is-tg-style:not(.expanded) .rte-tool .rte-caret {
   display: none !important;
 }
-.rte-root.is-tg-style .rte-tool-icon {
+.rte-root.is-tg-style:not(.expanded) .rte-tool-icon {
   height: auto;
   font-size: 15px;
 }
-.rte-root.is-tg-style .rte-tool .rte-ep-icon {
+.rte-root.is-tg-style:not(.expanded) .rte-tool .rte-ep-icon {
   width: 17px;
   height: 17px;
 }
 /* 悬停：白玻璃片 + 顶部高光 + 上浮（与全局玻璃拟态规范一致） */
-.rte-root.is-tg-style .rte-tool:hover {
+.rte-root.is-tg-style:not(.expanded) .rte-tool:hover {
   background: rgba(255, 255, 255, 0.72) !important;
   border-color: rgba(255, 255, 255, 0.85);
   box-shadow: 0 6px 16px rgba(15, 23, 42, 0.1);
   transform: translateY(-1px);
 }
-.rte-root.is-tg-style .rte-tool.active {
+.rte-root.is-tg-style:not(.expanded) .rte-tool.active {
   background: rgba(37, 99, 235, 0.12) !important;
   border-color: rgba(37, 99, 235, 0.28);
   color: #1d4ed8;
   box-shadow: none;
 }
-.rte-root.is-tg-style .rte-tool:active {
+.rte-root.is-tg-style:not(.expanded) .rte-tool:active {
   background: rgba(37, 99, 235, 0.16) !important;
 }
-.rte-root.is-tg-style .rte-tool.is-disabled,
-.rte-root.is-tg-style .rte-tool:disabled {
+.rte-root.is-tg-style:not(.expanded) .rte-tool.is-disabled,
+.rte-root.is-tg-style:not(.expanded) .rte-tool:disabled {
   opacity: 0.38;
   background: transparent !important;
 }
@@ -6345,157 +6345,57 @@ html.rte-image-preview-open .tippy-box {
 }
 
 /* ==========================================================================
-   Telegram 风格 · 最大化（功能区 Ribbon）形态
-   仍然是 Ribbon 栏目菜单（编辑 / 字体与颜色 / 段落与列表 …），
-   只是栏目条与分组按钮换成 Telegram 式纯图标 + 分组分隔线。
-   说明：这里的 !important 用来压过 editor.scoped.css 里 .rte-root.expanded .rte-tool
-   / .rte-tool-icon / .rte-group-head 的旧规则（scoped 带 data-v-hash，特异性更高）：
-   展开态的按钮是 72px 图标色块（绿色渐变方块），Telegram 风格要改成 30px 纯图标。
+   Ribbon 功能区深度重构（对齐 Office Word 功能区观感）
+   1) 分组标题从「整行居中」改为「分组末端右对齐」——Word 把组名放在该组命令的
+      右下角，原实现里组名飘在整行正中间、与左侧命令脱节；
+   2) 栏目条（#f3f2f1）与命令区（白底）分层，命令区底部补 1px 分隔线；
+   3) 拖拽手柄 / ⚙ 保持低调（默认低透明，hover 提亮），不破坏 Office 观感。
+   说明：这里的 !important 用于压过 editor.scoped.css 中的同规则
+   （scoped 编译后带 data-v-hash，特异性更高），否则改不动已展开态的定位。
    ========================================================================== */
-.rte-root.is-tg-style.expanded .rte-ribbon-bar {
-  background: transparent;
-  border-bottom-color: rgba(15, 23, 42, 0.1);
-}
-.rte-root.is-tg-style.expanded .rte-ribbon-tabs {
-  gap: 2px;
-  mask-image: none;
-}
-.rte-root.is-tg-style.expanded .rte-ribbon-tab {
-  height: 30px;
-  padding: 0 10px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent !important;
-  color: #64748b;
-  font-size: 12.5px;
-  line-height: 28px;
-}
-.rte-root.is-tg-style.expanded .rte-ribbon-tab:hover {
-  background: rgba(255, 255, 255, 0.72) !important;
-  color: #334155;
-}
-.rte-root.is-tg-style.expanded .rte-ribbon-tab.active {
-  background: rgba(37, 99, 235, 0.1) !important;
-  color: #1d4ed8 !important;
-  border-color: transparent !important;
-  margin-bottom: 0;
-}
-/* 分组按钮：30px 纯图标（去掉展开态的彩色图标方块） */
-.rte-root.is-tg-style.expanded .rte-tool {
-  display: inline-flex !important;
-  flex-direction: row !important;
-  align-items: center;
-  justify-content: center;
-  width: 30px !important;
-  min-width: 30px !important;
-  height: 30px !important;
-  min-height: 30px !important;
-  padding: 0 !important;
-  margin: 0 !important;
-  border: 1px solid transparent !important;
-  border-radius: 9px !important;
-  background: transparent !important;
-  color: #334155;
-  gap: 0;
-}
-.rte-root.is-tg-style.expanded .rte-tool-wrap {
-  margin-right: 0 !important;
-  display: inline-flex;
-}
-.rte-root.is-tg-style.expanded .rte-tool-wrap > .rte-tool {
-  min-width: 30px !important;
-}
-.rte-root.is-tg-style.expanded .rte-tool-icon {
-  width: 22px !important;
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group > .rte-group-head {
+  justify-content: flex-end !important;
+  padding-right: 10px !important;
+  gap: 4px;
   height: 22px !important;
-  min-width: 22px !important;
-  min-height: 22px !important;
-  padding: 0 !important;
-  border: 0 !important;
-  border-radius: 8px !important;
-  background: transparent !important;
-  background-image: none !important;
-  box-shadow: none !important;
-  color: inherit !important;
-  font-size: 0 !important;
 }
-.rte-root.is-tg-style.expanded .rte-tool .rte-ep-icon {
-  width: 18px !important;
-  height: 18px !important;
-  color: inherit !important;
-}
-.rte-root.is-tg-style.expanded .rte-tool-label {
-  display: none !important;
-}
-.rte-root.is-tg-style.expanded .rte-tool:hover {
-  background: rgba(255, 255, 255, 0.72) !important;
-  border-color: rgba(255, 255, 255, 0.85) !important;
-  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.1) !important;
-  color: #0f172a;
-}
-.rte-root.is-tg-style.expanded .rte-tool:active {
-  background: rgba(37, 99, 235, 0.16) !important;
-}
-.rte-root.is-tg-style.expanded .rte-tool.active {
-  background: rgba(37, 99, 235, 0.12) !important;
-  border-color: rgba(37, 99, 235, 0.28) !important;
-  color: #1d4ed8 !important;
-  box-shadow: none !important;
-}
-/* 分组：保留栏目名作为底部小字说明，去掉彩色胶囊与拖拽手柄 */
-.rte-root.is-tg-style.expanded .rte-group-head {
-  display: flex !important;
-  position: absolute;
-  left: 0;
-  right: auto;
-  bottom: 0;
-  align-items: center;
-  justify-content: flex-start !important;
-  right: auto !important;
-  gap: 2px;
-  height: 18px;
-  margin: 0 !important;
-  padding: 0 !important;
-  background: transparent !important;
-  box-shadow: none !important;
-}
-.rte-root.is-tg-style.expanded .rte-group-label {
-  font-size: 11px;
-  font-weight: 400;
-  line-height: 16px;
-  color: #94a3b8 !important;
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-group-label {
+  font-size: 11.5px !important;
+  font-weight: 500 !important;
+  line-height: 18px;
+  color: #605e5c !important;
+  letter-spacing: 0.02em;
   cursor: grab;
-  white-space: nowrap;
 }
-.rte-root.is-tg-style.expanded .rte-group-handle {
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-group-label:hover {
+  color: #1d4ed8 !important;
+}
+/* 手柄 / 个性化齿轮：常驻低调，hover 才显形（Office 观感优先，功能不丢） */
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-group-handle {
   width: 14px;
   height: 16px;
   font-size: 10px;
+  opacity: 0.3;
+  cursor: grab;
 }
-.rte-root.is-tg-style.expanded .rte-group-settings {
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-group-handle:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.8);
+}
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-group-settings {
   width: 18px;
   height: 18px;
   font-size: 10px;
-  opacity: 0.5;
+  opacity: 0.4;
 }
-.rte-root.is-tg-style.expanded .rte-group-settings:hover {
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-group-settings:hover {
   opacity: 1;
 }
-.rte-root.is-tg-style.expanded .rte-toolbar-tools {
-  align-items: flex-start;
-  gap: 6px !important;
-  padding-bottom: 18px;
+/* 命令区白底 + 底部分隔线（Word 功能区层次） */
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-toolbar-tools {
+  background: #fff;
+  border-bottom: 1px solid #e8e6e4;
 }
-.rte-root.is-tg-style.expanded .rte-toolbar-tools > .rte-tool-group {
-  flex: 0 0 auto !important;
-  width: auto !important;
-}
-.rte-root.is-tg-style.expanded .rte-toolbar-tools > .rte-tool-group + .rte-tool-group {
-  margin-left: 10px !important;
-  padding-left: 10px !important;
-  border-left: 1px solid rgba(15, 23, 42, 0.14);
-}
-
 /* ==========================================================================
    「更多」面板 · 工具栏设置入口（分组按钮显隐 / 顺序 / 恢复默认）
    ========================================================================== */
