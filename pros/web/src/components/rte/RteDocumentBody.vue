@@ -12,6 +12,12 @@ import RteSourceCodeEditor from './RteSourceCodeEditor.vue'
 import RteTableFormulaBar from './RteTableFormulaBar.vue'
 import { RTE_BINDINGS } from './bindings'
 import { blockHandleTitle, cropTitle, emptyGuideTitle, imagePlaceTitle, imageWidthTitle, toolbarMenuItemTitle, wordStatTitle } from '../../utils/rteToolbarOptimize'
+import {
+  BLOCK_PANEL_INSERT_SECTIONS,
+  BLOCK_PANEL_QUICK_ACTIONS,
+  BLOCK_PANEL_TURN_ACTIONS,
+  type BlockPanelEntry,
+} from '../../utils/rteBlockPanelMenu'
 import { useParentScopeStamp } from './inheritScope'
 import RteMenuGlyph from './RteMenuGlyph.vue'
 import { RTE_SLASH_ITEMS } from '../rteSlashItems'
@@ -22,69 +28,27 @@ if (!rte) throw new Error('RteDocumentBody 必须放在 RichTextEditor 里')
 const vRteFloat = rte.vRteFloat
 useParentScopeStamp()
 
-/**
- * 「+」面板的高频块类型。turn 复用原块转换，slashId 复用真实斜杠命令；
- * 图标只负责呈现，不在模板里重复实现任何编辑逻辑。
- */
-const BLOCK_QUICK_ACTIONS = [
-  { id: 'paragraph', label: '正文', turn: 'paragraph' },
-  { id: 'h1', label: '标题 1', turn: 'h1' },
-  { id: 'h2', label: '标题 2', turn: 'h2' },
-  { id: 'h3', label: '标题 3', turn: 'h3' },
-  { id: 'bullet', label: '无序列表', turn: 'bullet' },
-  { id: 'ordered', label: '有序列表', turn: 'ordered' },
-  { id: 'task', label: '任务列表', turn: 'task' },
-  { id: 'code', label: '代码块', turn: 'code' },
-  { id: 'quote', label: '引用', turn: 'quote' },
-  { id: 'info', label: '高亮块', turn: 'info' },
-  { id: 'formula', label: '公式', slashId: 'formula' },
-  { id: 'hr', label: '分割线', slashId: 'hr' },
-] as const
-
-/** 常用与更多插入均指向 rteSlashItems 已有 ID，避免出现无实际功能的入口。 */
-const BLOCK_INSERT_SECTIONS = [
-  {
-    label: '常用',
-    items: [
-      { id: 'image', label: '图片', slashId: 'image' },
-      { id: 'video', label: '视频', slashId: 'video' },
-      { id: 'attach', label: '附件', slashId: 'attach' },
-      { id: 'table', label: '表格', slashId: 'table' },
-      { id: 'columns', label: '分栏', slashId: 'columns-2' },
-      { id: 'linkButton', label: '按钮', slashId: 'link-button' },
-      { id: 'formula', label: '公式', slashId: 'formula' },
-      { id: 'hr', label: '分割线', slashId: 'hr' },
-      { id: 'link', label: '链接', slashId: 'link' },
-    ],
-  },
-  {
-    label: '更多插入',
-    items: [
-      { id: 'toc', label: '目录', slashId: 'toc' },
-      { id: 'toggleBlock', label: '折叠块', slashId: 'toggle-block' },
-      { id: 'date', label: '今天日期', slashId: 'plain-date' },
-      { id: 'linkCard', label: '网页卡片', slashId: 'link-card' },
-      { id: 'mermaid', label: '流程图', slashId: 'mermaid' },
-      { id: 'echarts', label: '图表', slashId: 'echarts' },
-    ],
-  },
-] as const
-
-function findBlockSlashItem(id: string) {
+function findBlockSlashItem(id: string | undefined) {
+  if (!id) return undefined
   return RTE_SLASH_ITEMS.find((item) => item.id === id)
 }
 
-function runBlockInsert(slashId: string) {
+function runBlockInsert(slashId: string | undefined) {
+  if (!slashId) return
   const item = findBlockSlashItem(slashId)
   if (item) rte.applyBlockInsertItem(item)
 }
 
-function runBlockQuickAction(action: (typeof BLOCK_QUICK_ACTIONS)[number]) {
-  if ('turn' in action) rte.turnHoveredBlock(action.turn)
-  else runBlockInsert(action.slashId)
+function runBlockQuickAction(action: BlockPanelEntry) {
+  if (action.turn) rte.turnHoveredBlock(action.turn)
+  else if (action.slashId) runBlockInsert(action.slashId)
 }
 
-function blockInsertTitle(label: string, slashId: string): string {
+function runBlockTurn(action: BlockPanelEntry) {
+  if (action.turn) rte.turnHoveredBlock(action.turn)
+}
+
+function blockInsertTitle(label: string, slashId: string | undefined): string {
   const description = findBlockSlashItem(slashId)?.description
   return description ? `${label}：${description}` : `插入${label}`
 }
@@ -486,21 +450,21 @@ function blockInsertTitle(label: string, slashId: string): string {
           <div data-rte-own class="rte-block-menu-section">基础</div>
           <div data-rte-own class="rte-block-quick-grid">
             <button data-rte-own
-              v-for="action in BLOCK_QUICK_ACTIONS"
+              v-for="action in BLOCK_PANEL_QUICK_ACTIONS"
               :key="action.id"
               type="button"
               class="rte-block-quick"
               role="menuitem"
               :title="action.label"
               :aria-label="action.label"
-              :data-command="'slashId' in action ? action.slashId : action.turn"
+              :data-command="action.slashId ?? action.turn"
               @click="runBlockQuickAction(action)"
             >
               <RteMenuGlyph :id="action.id" :label="action.label" />
               <span data-rte-own class="rte-sr-only">{{ action.label }}</span>
             </button>
           </div>
-          <template v-for="section in BLOCK_INSERT_SECTIONS" :key="section.label">
+          <template v-for="section in BLOCK_PANEL_INSERT_SECTIONS" :key="section.label">
             <div data-rte-own class="rte-block-menu-section">{{ section.label }}</div>
             <button data-rte-own
               v-for="item in section.items"
@@ -522,19 +486,16 @@ function blockInsertTitle(label: string, slashId: string): string {
           <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
           <button data-rte-own type="button" class="rte-block-menu-item" role="menuitem" :title="blockHandleTitle('insert')" @click="rte.insertBelowHoveredBlock"><RteMenuGlyph id="insertBelow" label="在下方插入" /><span data-rte-own>在下方插入</span></button>
           <div data-rte-own class="rte-block-menu-section">转换为</div>
-          <button data-rte-own type="button" class="rte-block-menu-item" role="menuitem" :title="blockHandleTitle('paragraph')" @click="rte.turnHoveredBlock('paragraph')"><RteMenuGlyph id="paragraph" label="正文" /><span data-rte-own>正文</span></button>
-          <button data-rte-own type="button" class="rte-block-menu-item" role="menuitem" :title="blockHandleTitle('h1')" @click="rte.turnHoveredBlock('h1')"><RteMenuGlyph id="h1" label="标题 1" /><span data-rte-own>标题 1</span></button>
-          <button data-rte-own type="button" class="rte-block-menu-item" role="menuitem" :title="blockHandleTitle('h2')" @click="rte.turnHoveredBlock('h2')"><RteMenuGlyph id="h2" label="标题 2" /><span data-rte-own>标题 2</span></button>
-          <button data-rte-own type="button" class="rte-block-menu-item" role="menuitem" :title="blockHandleTitle('h3')" @click="rte.turnHoveredBlock('h3')"><RteMenuGlyph id="h3" label="标题 3" /><span data-rte-own>标题 3</span></button>
-          <button data-rte-own type="button" class="rte-block-menu-item" role="menuitem" :title="blockHandleTitle('bullet')" @click="rte.turnHoveredBlock('bullet')"><RteMenuGlyph id="bullet" label="无序列表" /><span data-rte-own>无序列表</span></button>
-          <button data-rte-own type="button" class="rte-block-menu-item" role="menuitem" :title="blockHandleTitle('ordered')" @click="rte.turnHoveredBlock('ordered')"><RteMenuGlyph id="ordered" label="有序列表" /><span data-rte-own>有序列表</span></button>
-          <button data-rte-own type="button" class="rte-block-menu-item" role="menuitem" :title="blockHandleTitle('task')" @click="rte.turnHoveredBlock('task')"><RteMenuGlyph id="task" label="任务列表" /><span data-rte-own>任务列表</span></button>
-          <button data-rte-own type="button" class="rte-block-menu-item" role="menuitem" :title="blockHandleTitle('quote')" @click="rte.turnHoveredBlock('quote')"><RteMenuGlyph id="quote" label="引用" /><span data-rte-own>引用</span></button>
-          <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
-          <button data-rte-own type="button" class="rte-block-menu-item" role="menuitem" :title="blockHandleTitle('info')" @click="rte.turnHoveredBlock('info')"><RteMenuGlyph id="info" label="提示" /><span data-rte-own>提示</span></button>
-          <button data-rte-own type="button" class="rte-block-menu-item" role="menuitem" :title="blockHandleTitle('warn')" @click="rte.turnHoveredBlock('warn')"><RteMenuGlyph id="warn" label="警告" /><span data-rte-own>警告</span></button>
-          <button data-rte-own type="button" class="rte-block-menu-item" role="menuitem" :title="blockHandleTitle('success')" @click="rte.turnHoveredBlock('success')"><RteMenuGlyph id="success" label="成功" /><span data-rte-own>成功</span></button>
-          <button data-rte-own type="button" class="rte-block-menu-item" role="menuitem" :title="blockHandleTitle('error')" @click="rte.turnHoveredBlock('error')"><RteMenuGlyph id="error" label="错误" /><span data-rte-own>错误</span></button>
+          <button data-rte-own
+            v-for="item in BLOCK_PANEL_TURN_ACTIONS"
+            :key="'turn-' + item.id"
+            type="button"
+            class="rte-block-menu-item"
+            role="menuitem"
+            :title="blockHandleTitle(item.turn ?? '')"
+            :data-command="item.turn"
+            @click="runBlockTurn(item)"
+          ><RteMenuGlyph :id="item.id" :label="item.label" /><span data-rte-own>{{ item.label }}</span></button>
           <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
           <div data-rte-own class="rte-block-menu-section">块操作</div>
           <button data-rte-own type="button" class="rte-block-menu-item" role="menuitem" :title="blockHandleTitle('copy')" @click="rte.copyHoveredBlock"><RteMenuGlyph id="copyBlock" label="复制块" /><span data-rte-own>复制块</span></button>
