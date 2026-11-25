@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { inject, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, inject, nextTick, onMounted, ref, watch } from 'vue'
 import { RTE_BINDINGS } from './bindings'
 import { alignToolTitle, blockMenuTitle, clampToolbarQuery, codeLangTitle, cycleSearchIndex, disabledToolTitle, EMPTY_GROUP_NOTE, FOCUS_MODE_NOTE, fontFamilyCaption, groupHandleTitle, LAST_TOOLBAR_QUERY_KEY, lineHeightCaption, listToolLabel, menuFocusStep, menuToolNeedsCaret, pageSizeTitle, pickerTabTitle, moreToolsCaption, moreToolsTitle, ribbonSearchLabel, ribbonTabForDigit, ribbonTabHint, ribbonTabTabIndex, ribbonTypeaheadQuery, SEARCH_INPUT_HINT, searchEnterActivates, searchGroupCaption, shortcutFromTitle, stepRibbonTab, stepRibbonTabBy, tableToolLabel, toolbarActionTitle, toolbarGroupReorderAllowed, toolbarMenuItemTitle, toolbarSearchStatus, toolIsUnavailable, wordStatTitle, zoomToolLabel, zoomToolTitle } from '../../utils/rteToolbarOptimize'
 import { useParentScopeStamp } from './inheritScope'
@@ -12,6 +12,47 @@ import RteSpacingFields from './RteSpacingFields.vue'
 
 const rte = inject(RTE_BINDINGS)
 if (!rte) throw new Error('RteToolbar 必须放在 RichTextEditor 里')
+/* —— 个性化设置面板：组内按钮的显隐与顺序 —— */
+type GroupButtonEntry = {
+  key: string
+  label: string
+  hidden: boolean
+  canMoveUp: boolean
+  canMoveDown: boolean
+}
+// 用一个已判空的别名，避免闭包里 rte 的可选类型报错（与文件内既有写法保持一致）
+const bindings = rte!
+const groupButtonEntries = computed<GroupButtonEntry[]>(() =>
+  bindings.toolbarGroupButtonEntries(bindings.toolbarGroupButtonsGroupId) as GroupButtonEntry[],
+)
+const groupButtonLabel = computed(() => {
+  const found = bindings.visibleToolbarGroups.find(
+    (group: { id: string; label: string }) => group.id === bindings.toolbarGroupButtonsGroupId,
+  )
+  return found?.label || '本分组'
+})
+const groupButtonVisibleCount = computed(
+  () => groupButtonEntries.value.filter((entry) => !entry.hidden).length,
+)
+/** 上移 / 下移一位。 */
+function moveGroupButtonBy(entry: GroupButtonEntry, dir: -1 | 1) {
+  bindings.moveToolbarGroupButton(bindings.toolbarGroupButtonsGroupId, entry.key, dir)
+}
+/** 置顶 / 置底。 */
+function moveGroupButtonToEdge(entry: GroupButtonEntry, edge: 'top' | 'bottom') {
+  bindings.moveToolbarGroupButtonToEdge(bindings.toolbarGroupButtonsGroupId, entry.key, edge)
+}
+/** Alt + ↑ / ↓ 也可以调顺序（键盘可达）。 */
+function onGroupButtonKeydown(event: KeyboardEvent, entry: GroupButtonEntry) {
+  if (!event.altKey) return
+  if (event.key === 'ArrowUp') {
+    event.preventDefault()
+    moveGroupButtonBy(entry, -1)
+  } else if (event.key === 'ArrowDown') {
+    event.preventDefault()
+    moveGroupButtonBy(entry, 1)
+  }
+}
 const tableMenuGroup = ref('')
 const lastToolbarQuery = ref('')
 const tableMenuFlyout = ref({ top: 0, left: 0 })
@@ -3125,45 +3166,94 @@ function toggleChartGroupMenu(key: string) {
           aria-label="组内按钮"
           @mousedown.prevent
         >
-          <div data-rte-own class="rte-menu-section-label">
-            {{ (rte.visibleToolbarGroups.find((group) => group.id === rte.toolbarGroupButtonsGroupId) || {}).label || '本分组' }}
-            · 个性化设置
+          <div data-rte-own class="rte-menu-section-label rte-group-buttons-head">
+            <span>
+              {{ groupButtonLabel }} · 个性化设置
+            </span>
+            <span class="rte-group-buttons-count">
+              显示 {{ groupButtonVisibleCount }} / {{ groupButtonEntries.length }}
+            </span>
           </div>
-          <div data-rte-own
-            v-for="entry in rte.toolbarGroupButtonEntries(rte.toolbarGroupButtonsGroupId)"
-            :key="'gb-' + entry.key"
-            class="rte-group-button-row"
-          >
-            <label data-rte-own class="rte-group-button-check">
-              <input
+          <div data-rte-own class="rte-group-button-list">
+            <div
+              data-rte-own
+              v-for="entry in groupButtonEntries"
+              :key="'gb-' + entry.key"
+              class="rte-group-button-row"
+              :class="{ 'is-off': entry.hidden }"
+            >
+              <label data-rte-own class="rte-group-button-check">
+                <input
+                  data-rte-own
+                  type="checkbox"
+                  :checked="!entry.hidden"
+                  :aria-label="'显示' + entry.label"
+                  @change="rte.toggleToolbarGroupButton(rte.toolbarGroupButtonsGroupId, entry.key)"
+                />
+                <span data-rte-own>{{ entry.label }}</span>
+              </label>
+              <div
                 data-rte-own
-                type="checkbox"
-                :checked="!entry.hidden"
-                :aria-label="'显示' + entry.label"
-                @change="rte.toggleToolbarGroupButton(rte.toolbarGroupButtonsGroupId, entry.key)"
-              />
-              <span data-rte-own>{{ entry.label }}</span>
-            </label>
-            <button
-              data-rte-own
-              type="button"
-              class="rte-group-button-move"
-              :aria-label="'把' + entry.label + '上移一位'"
-              :title="'把' + entry.label + '上移一位'"
-              @click="rte.moveToolbarGroupButton(rte.toolbarGroupButtonsGroupId, entry.key, -1)"
-            >
-              ↑
-            </button>
-            <button
-              data-rte-own
-              type="button"
-              class="rte-group-button-move"
-              :aria-label="'把' + entry.label + '下移一位'"
-              :title="'把' + entry.label + '下移一位'"
-              @click="rte.moveToolbarGroupButton(rte.toolbarGroupButtonsGroupId, entry.key, 1)"
-            >
-              ↓
-            </button>
+                class="rte-group-button-ops"
+                tabindex="0"
+                role="group"
+                :aria-label="entry.label + ' 顺序调整'"
+                @keydown="onGroupButtonKeydown($event, entry)"
+              >
+                <button
+                  data-rte-own
+                  type="button"
+                  class="rte-group-button-move"
+                  :disabled="!entry.canMoveUp"
+                  :aria-label="'把' + entry.label + '置顶'"
+                  :title="'把' + entry.label + '置顶'"
+                  @click="moveGroupButtonToEdge(entry, 'top')"
+                >
+                  <svg viewBox="0 0 16 16" aria-hidden="true">
+                    <path d="M8 3.2v9.6M8 3.2 4.6 6.6M8 3.2l3.4 3.4M3.4 12.8h9.2" />
+                  </svg>
+                </button>
+                <button
+                  data-rte-own
+                  type="button"
+                  class="rte-group-button-move"
+                  :disabled="!entry.canMoveUp"
+                  :aria-label="'把' + entry.label + '上移一位'"
+                  :title="'把' + entry.label + '上移一位'"
+                  @click="moveGroupButtonBy(entry, -1)"
+                >
+                  <svg viewBox="0 0 16 16" aria-hidden="true">
+                    <path d="M8 12.8V3.2M8 12.8 4.6 9.4M8 12.8l3.4-3.4" />
+                  </svg>
+                </button>
+                <button
+                  data-rte-own
+                  type="button"
+                  class="rte-group-button-move"
+                  :disabled="!entry.canMoveDown"
+                  :aria-label="'把' + entry.label + '下移一位'"
+                  :title="'把' + entry.label + '下移一位'"
+                  @click="moveGroupButtonBy(entry, 1)"
+                >
+                  <svg viewBox="0 0 16 16" aria-hidden="true">
+                    <path d="M8 3.2v9.6M8 12.8 4.6 9.4M8 12.8l3.4-3.4" />
+                  </svg>
+                </button>
+                <button
+                  data-rte-own
+                  type="button"
+                  class="rte-group-button-move"
+                  :disabled="!entry.canMoveDown"
+                  :aria-label="'把' + entry.label + '置底'"
+                  :title="'把' + entry.label + '置底'"
+                  @click="moveGroupButtonToEdge(entry, 'bottom')"
+                >
+                  <svg viewBox="0 0 16 16" aria-hidden="true">
+                    <path d="M8 12.8V3.2M8 12.8l3.4-3.4M8 12.8 4.6 9.4M3.4 3.2h9.2" />
+                  </svg>
+                </button>
+              </div>
+            </div>
           </div>
           <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
           <button data-rte-own type="button" :title="toolbarActionTitle('group-restore')" @click="rte.restoreToolbarGroupButtons(rte.toolbarGroupButtonsGroupId)">恢复本组默认</button>

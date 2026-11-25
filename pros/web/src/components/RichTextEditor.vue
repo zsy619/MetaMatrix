@@ -7733,6 +7733,7 @@ const {
   toolbarGroupButtonEntries,
   toggleToolbarGroupButton,
   moveToolbarGroupButton,
+  moveToolbarGroupButtonToEdge,
   toolbarDropIndex,
   toolbarDragSource,
   undoToolbarGroupOrder,
@@ -7754,6 +7755,9 @@ const {
   orderMap: () => current_data.value?.toolbarGroupOrderByPanelId,
   setPanelToolbarOrder: (panelId, order) => documentStore.setPanelToolbarOrder(panelId, order),
   buttonConfigMap: () => current_data.value?.toolbarGroupButtonsByPanelId,
+  // 知识库文档页自己加载文档，store 里没有 currentData，
+  // 组内按钮顺序要落到本地镜像，不能只依赖画布 JSON。
+  hasStoreDoc: () => !!current_data.value,
   setPanelGroupButtons: (panelId, groupId, config) =>
     documentStore.setPanelToolbarGroupButtons(panelId, groupId, config),
   tools: () => allTools.value,
@@ -8556,6 +8560,7 @@ provideRteBindings({
   toolbarGroupButtonsOpen,
   toggleToolbarGroupButton,
   moveToolbarGroupButton,
+  moveToolbarGroupButtonToEdge,
   closeToolbarGroupButtons,
   onToolbarGroupContextMenu,
   qrDialogOpen,

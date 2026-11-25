@@ -396,6 +396,8 @@ function onDocPointerDownForMenus(e: PointerEvent) {
     const target = event.target instanceof Element ? event.target : null
     if (!target) return
     if (target.closest('.el-overlay, .el-dialog, .el-message-box, .rte-modal-overlay, .rte-qr-card')) return
+    // Alt + ↑/↓ 留给「组内按钮顺序调整」，别被菜单的箭头键导航抢走。
+    if (event.altKey && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) return
     if (target.closest('input, textarea, [contenteditable="true"]')) {
       if (event.key === 'Escape') closeAllToolbarMenus()
       return

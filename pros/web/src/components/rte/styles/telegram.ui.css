@@ -358,6 +358,125 @@
 }
 
 /* --------------------------------------------------------------------------
+   3c) 个性化设置面板：组内按钮的顺序操作
+   - ↑ / ↓ 从「文字箭头」换成 16px 线性图标（与 Ribbon 单色线稿同一套画法）；
+   - 边界禁用：首项不能上移、末项不能下移，禁用态灰且不可点；
+   - 新增「置顶 / 置底」：一次挪到首尾，省去连续点击；
+   - 列表按当前生效顺序展示，上移/下移立刻可见；
+   - 面板最多 60vh，超出滚动，不撑破视口。
+   说明：!important 用于压过本文件第 1 节「所有菜单按钮 30px 行高」的通用规则。
+   -------------------------------------------------------------------------- */
+.rte-group-buttons-menu {
+  min-width: 260px !important;
+  max-width: 340px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+.rte-group-buttons-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 8px 8px !important;
+}
+.rte-group-buttons-count {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: var(--rte-tg-accent-soft, rgba(51, 112, 255, 0.12));
+  color: var(--rte-tg-accent, #3370ff) !important;
+  font-size: 11px !important;
+  font-variant-numeric: tabular-nums;
+}
+.rte-group-button-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.rte-group-button-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 6px !important;
+  border-radius: var(--rte-tg-radius, 6px);
+}
+.rte-group-button-row:hover {
+  background: var(--rte-tg-hover, rgba(15, 23, 42, 0.05));
+}
+.rte-group-button-row.is-off .rte-group-button-check span {
+  color: var(--rte-tg-muted, #707579);
+  text-decoration: line-through;
+  text-decoration-color: var(--rte-tg-line, #dfe3e8);
+}
+.rte-group-button-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+  cursor: pointer;
+  font-size: 13px !important;
+  color: var(--rte-tg-text, #1d2129) !important;
+}
+.rte-group-button-check span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rte-group-button-ops {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+  outline: none;
+}
+.rte-group-button-ops:focus-visible {
+  box-shadow: 0 0 0 2px var(--rte-tg-accent-soft, rgba(51, 112, 255, 0.28));
+  border-radius: var(--rte-tg-radius, 6px);
+}
+.rte-group-buttons-menu .rte-group-button-move {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  min-height: 24px;
+  padding: 0 !important;
+  border: 1px solid transparent;
+  border-radius: var(--rte-tg-radius, 6px) !important;
+  background: transparent !important;
+  color: var(--rte-tg-muted, #707579) !important;
+  cursor: pointer;
+  transition: background var(--rte-tg-dur) ease, color var(--rte-tg-dur) ease,
+    transform var(--rte-tg-dur) ease;
+}
+.rte-group-buttons-menu .rte-group-button-move svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.rte-group-buttons-menu .rte-group-button-move:hover:not(:disabled) {
+  background: var(--rte-tg-hover, rgba(15, 23, 42, 0.06)) !important;
+  color: var(--rte-tg-accent, #3370ff) !important;
+  transform: translateY(-1px);
+}
+.rte-group-buttons-menu .rte-group-button-move:active:not(:disabled) {
+  transform: translateY(0);
+}
+.rte-group-buttons-menu .rte-group-button-move:focus-visible {
+  outline: 2px solid var(--rte-tg-accent, #3370ff);
+  outline-offset: 1px;
+}
+.rte-group-buttons-menu .rte-group-button-move:disabled {
+  opacity: 0.32 !important;
+  cursor: not-allowed;
+}
+
+/* --------------------------------------------------------------------------
    4) 下拉选择（原生 select / 代码语言选择 / 字号字体面板）
    -------------------------------------------------------------------------- */
 .rte-cp-type-select,
