@@ -1,0 +1,468 @@
+/* ==========================================================================
+   Telegram 风格化 UI 层（富文本编辑器全域）
+   参考：Telegram Desktop / Web K / TelegramUI 的视觉与交互规范
+   - 主色沿用本项目品牌 #3370ff（不引入第二主色，保留品牌一致性）；
+   - 基础圆角 6px（面板 8px / 卡片 10px），偏锐利、规整；
+   - 紧凑行高：菜单项 30px、按钮 28×28、输入 30px；
+   - 反馈面：hover #f2f3f5 / 选中 #eef3ff + 主色字 / 危险 #f53f3f；
+   - 动效 120–140ms，浮层两级阴影（0 4px 12px / 0 8px 24px）；
+   - 分层信息：分组标题 11px 灰字 + 1px 分隔线。
+   覆盖范围：普通工具栏 / Ribbon 功能区 / 弹窗 / 右键菜单 / 下拉选择 / 下拉面板。
+   说明：本文件在 editor.scoped.css、editor.global.css 之后加载；
+   对需要压过 scoped（带 data-v-hash，特异性更高）规则的属性使用 !important，
+   并在对应小节注明原因。
+   ========================================================================== */
+
+/* 令牌定义在 :root 上：编辑器里大量浮层是 Teleport 到 body 的（更多面板、
+   右键菜单、气泡提示），挂在 .rte-root 上取不到变量。
+   变量名统一带 --rte-tg- 前缀，避免污染其它组件。 */
+:root {
+  /* Telegram 风格令牌 */
+  --rte-tg-radius: 6px;
+  --rte-tg-radius-panel: 8px;
+  --rte-tg-accent: #3370ff;
+  --rte-tg-accent-soft: #eef3ff;
+  --rte-tg-accent-line: rgba(51, 112, 255, 0.28);
+  --rte-tg-hover: #f2f3f5;
+  --rte-tg-text: #1d2129;
+  --rte-tg-hint: #86909c;
+  --rte-tg-line: #e5e6eb;
+  --rte-tg-line-soft: #f0f1f3;
+  --rte-tg-danger: #f53f3f;
+  --rte-tg-shadow-sm: 0 4px 12px rgba(15, 23, 42, 0.1);
+  --rte-tg-shadow: 0 8px 24px rgba(15, 23, 42, 0.14);
+  --rte-tg-dur: 140ms;
+}
+
+.rte-root {
+  --rte-tg-radius: 6px;
+  --rte-tg-radius-panel: 8px;
+  --rte-tg-accent: #3370ff;
+  --rte-tg-accent-soft: #eef3ff;
+  --rte-tg-accent-line: rgba(51, 112, 255, 0.28);
+  --rte-tg-hover: #f2f3f5;
+  --rte-tg-text: #1d2129;
+  --rte-tg-hint: #86909c;
+  --rte-tg-line: #e5e6eb;
+  --rte-tg-line-soft: #f0f1f3;
+  --rte-tg-danger: #f53f3f;
+  --rte-tg-shadow-sm: 0 4px 12px rgba(15, 23, 42, 0.1);
+  --rte-tg-shadow: 0 8px 24px rgba(15, 23, 42, 0.14);
+  --rte-tg-dur: 140ms;
+}
+
+/* --------------------------------------------------------------------------
+   1) 下拉面板 / 浮层外壳（菜单、更多面板、个性化面板、emoji、颜色、代码语言）
+   -------------------------------------------------------------------------- */
+.rte-float-menu,
+.rte-more-flyout,
+.rte-table-ctx,
+.rte-table-ctx-flyout,
+.rte-group-buttons-menu {
+  border-radius: var(--rte-tg-radius-panel) !important;
+  border: 1px solid var(--rte-tg-line) !important;
+  box-shadow: var(--rte-tg-shadow) !important;
+  background: #fff !important;
+  padding: 4px !important;
+  animation: rte-tg-pop 120ms ease-out;
+}
+
+@keyframes rte-tg-pop {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* 菜单项：30px 行高、6px 圆角、图标 16px */
+.rte-float-menu button,
+.rte-more-flyout button,
+.rte-table-ctx button,
+.rte-table-ctx-flyout button,
+.rte-group-buttons-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 0 10px !important;
+  border-radius: var(--rte-tg-radius) !important;
+  font-size: 13px !important;
+  color: var(--rte-tg-text) !important;
+  transition: background var(--rte-tg-dur) ease, color var(--rte-tg-dur) ease;
+}
+.rte-float-menu button:hover,
+.rte-more-flyout button:hover,
+.rte-table-ctx button:hover:not(:disabled),
+.rte-table-ctx-flyout button:hover:not(:disabled),
+.rte-group-buttons-menu button:hover {
+  background: var(--rte-tg-hover) !important;
+  color: var(--rte-tg-text) !important;
+}
+.rte-float-menu button.active,
+.rte-more-flyout button.active,
+.rte-table-ctx button.active,
+.rte-table-ctx-flyout button.active,
+.rte-group-buttons-menu button.active {
+  background: var(--rte-tg-accent-soft) !important;
+  color: var(--rte-tg-accent) !important;
+}
+/* 危险项 */
+.rte-float-menu button.danger,
+.rte-table-ctx button.danger,
+.rte-table-ctx-flyout button.danger,
+.rte-group-buttons-menu button.danger {
+  color: var(--rte-tg-danger) !important;
+}
+/* 禁用项 */
+.rte-float-menu button:disabled,
+.rte-table-ctx button:disabled,
+.rte-table-ctx-flyout button:disabled {
+  opacity: 0.4 !important;
+  cursor: not-allowed;
+}
+/* 菜单内图标：16px 线性，hover 转主色 */
+.rte-float-menu button svg,
+.rte-table-ctx button svg,
+.rte-table-ctx-flyout button svg,
+.rte-table-ctx-ico {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  color: var(--rte-tg-hint);
+  transition: color var(--rte-tg-dur) ease;
+}
+.rte-float-menu button:hover svg,
+.rte-table-ctx button:hover svg,
+.rte-table-ctx-flyout button:hover svg {
+  color: var(--rte-tg-accent);
+}
+/* 右键菜单分组：标题小字 + 分隔线 */
+.rte-table-ctx-group + .rte-table-ctx-group {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--rte-tg-line-soft);
+}
+.rte-table-ctx-caret {
+  color: var(--rte-tg-hint) !important;
+  font-size: 11px !important;
+}
+
+/* 「更多」面板：分组标题小字灰、条目密排 */
+.rte-more-menu .rte-more-capsule,
+.rte-more-flyout .rte-more-capsule {
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  color: var(--rte-tg-hint) !important;
+  letter-spacing: 0.02em;
+  padding: 2px 4px !important;
+}
+.rte-more-menu .rte-more-item {
+  border-radius: var(--rte-tg-radius) !important;
+  padding: 5px 8px !important;
+  font-size: 12.5px !important;
+  transition: background var(--rte-tg-dur) ease;
+}
+.rte-more-menu .rte-more-item:hover {
+  background: var(--rte-tg-hover) !important;
+}
+
+
+/* Telegram 紧凑风格下的「更多」面板同样走统一外壳（6/8px 圆角 + 两级阴影） */
+.rte-more-menu.is-tg {
+  border-radius: var(--rte-tg-radius-panel) !important;
+  border: 1px solid var(--rte-tg-line) !important;
+  box-shadow: var(--rte-tg-shadow) !important;
+  background: #fff !important;
+}
+.rte-more-menu.is-tg .rte-more-group {
+  border-radius: var(--rte-tg-radius) !important;
+}
+
+/* emoji / 特殊字符 / 颜色面板：8px 圆角 + 轻阴影 */
+.rte-emoji-panel,
+.rte-specialchars-panel,
+.rte-selection-bubble .rte-bubble-swatches.rte-color-board,
+.rte-code-lang-menu {
+  border-radius: var(--rte-tg-radius-panel) !important;
+  border: 1px solid var(--rte-tg-line) !important;
+  box-shadow: var(--rte-tg-shadow) !important;
+}
+
+/* 选区气泡工具条 */
+.rte-selection-bubble {
+  border-radius: var(--rte-tg-radius-panel) !important;
+  border: 1px solid var(--rte-tg-line) !important;
+  box-shadow: var(--rte-tg-shadow-sm) !important;
+  padding: 3px !important;
+}
+
+/* --------------------------------------------------------------------------
+   2) 普通工具栏（紧凑单行条）
+   -------------------------------------------------------------------------- */
+.rte-root:not(.expanded) .rte-tool {
+  border-radius: var(--rte-tg-radius) !important;
+  transition: background var(--rte-tg-dur) ease, color var(--rte-tg-dur) ease,
+    transform var(--rte-tg-dur) ease;
+}
+.rte-root:not(.expanded) .rte-tool:hover {
+  background: var(--rte-tg-hover) !important;
+  transform: translateY(-1px);
+}
+.rte-root:not(.expanded) .rte-tool.active {
+  background: var(--rte-tg-accent-soft) !important;
+  color: var(--rte-tg-accent) !important;
+}
+/* 分组胶囊（紧凑态的组名标签）：6px 圆角 + 主色左侧条 */
+.rte-root:not(.expanded) .rte-group-head {
+  border-radius: var(--rte-tg-radius) !important;
+  transition: background var(--rte-tg-dur) ease;
+}
+.rte-root:not(.expanded) .rte-group-head:hover {
+  background: var(--rte-tg-hover) !important;
+}
+
+/* --------------------------------------------------------------------------
+   3) Ribbon 功能区
+   -------------------------------------------------------------------------- */
+.rte-root.expanded .rte-ribbon-tab {
+  border-radius: var(--rte-tg-radius) !important;
+  transition: background var(--rte-tg-dur) ease, color var(--rte-tg-dur) ease;
+}
+.rte-root.expanded .rte-ribbon-tab:hover {
+  background: rgba(15, 23, 42, 0.06) !important;
+}
+.rte-root.expanded .rte-ribbon-tab.active {
+  color: var(--rte-tg-accent) !important;
+  font-weight: 600;
+}
+/* Ribbon 命令块：hover 浅面 + 轻微上浮（Office 观感保留） */
+.rte-root.expanded .rte-toolbar-tools .rte-tool {
+  border-radius: var(--rte-tg-radius) !important;
+  transition: background var(--rte-tg-dur) ease, color var(--rte-tg-dur) ease,
+    transform var(--rte-tg-dur) ease;
+}
+.rte-root.expanded .rte-toolbar-tools .rte-tool:hover {
+  background: rgba(15, 23, 42, 0.05) !important;
+  transform: translateY(-1px);
+}
+.rte-root.expanded .rte-toolbar-tools .rte-tool.active {
+  color: var(--rte-tg-accent) !important;
+}
+
+/* --------------------------------------------------------------------------
+   4) 下拉选择（原生 select / 代码语言选择 / 字号字体面板）
+   -------------------------------------------------------------------------- */
+.rte-cp-type-select,
+.rte-cp-input select,
+.rte-cp-input,
+.rte-code-lang-select,
+.rte-root select {
+  border-radius: var(--rte-tg-radius) !important;
+  border: 1px solid #d9dce1 !important;
+  transition: border-color var(--rte-tg-dur) ease, box-shadow var(--rte-tg-dur) ease;
+}
+.rte-root select:hover,
+.rte-cp-type-select:hover {
+  border-color: var(--rte-tg-accent-line) !important;
+}
+.rte-root select:focus,
+.rte-cp-type-select:focus {
+  outline: none !important;
+  border-color: var(--rte-tg-accent) !important;
+  box-shadow: 0 0 0 3px rgba(51, 112, 255, 0.14) !important;
+}
+/* 原生 select 的下拉箭头：改为 Telegram 式细 chevron */
+.rte-root select,
+.rte-cp-type-select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 26px !important;
+  background-image: linear-gradient(45deg, transparent 50%, #86909c 50%),
+    linear-gradient(135deg, #86909c 50%, transparent 50%);
+  background-position: calc(100% - 14px) calc(50% + 1px), calc(100% - 9px) calc(50% + 1px);
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+
+/* --------------------------------------------------------------------------
+   5) 弹窗（编辑器内弹层：附件、图表配置、二维码、AV 选择、导出进度）
+   -------------------------------------------------------------------------- */
+.rte-attach-dialog,
+.rte-cp-panel,
+.rte-cp-body {
+  border-radius: var(--rte-tg-radius-panel) !important;
+}
+.rte-cp-head,
+.rte-attach-title {
+  border-bottom: 1px solid var(--rte-tg-line-soft) !important;
+}
+.rte-cp-title,
+.rte-attach-title {
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  color: var(--rte-tg-text) !important;
+}
+.rte-cp-subtitle,
+.rte-cp-sub {
+  color: var(--rte-tg-hint) !important;
+  font-size: 12px !important;
+}
+/* 弹窗按钮：32px 高、6px 圆角、主按钮实心主色 */
+.rte-cp-btn,
+.rte-btn,
+.rte-attach-dialog .el-button,
+.rte-root .el-dialog__footer .el-button {
+  min-height: 32px;
+  border-radius: var(--rte-tg-radius) !important;
+  font-size: 13px !important;
+  transition: background var(--rte-tg-dur) ease, transform var(--rte-tg-dur) ease;
+}
+.rte-btn.is-primary,
+.rte-cp-btn.is-primary,
+.rte-root .el-dialog__footer .el-button--primary {
+  background: var(--rte-tg-accent) !important;
+  border-color: var(--rte-tg-accent) !important;
+  color: #fff !important;
+}
+.rte-btn.is-primary:hover,
+.rte-cp-btn.is-primary:hover {
+  filter: brightness(0.96);
+  transform: translateY(-1px);
+}
+/* 表单标签与输入 */
+.rte-cp-field-label,
+.rte-cp-type-label {
+  font-size: 12px !important;
+  color: var(--rte-tg-hint) !important;
+}
+.rte-cp-input,
+.rte-cp-textarea {
+  border-radius: var(--rte-tg-radius) !important;
+  border: 1px solid #d9dce1 !important;
+  transition: border-color var(--rte-tg-dur) ease, box-shadow var(--rte-tg-dur) ease;
+}
+.rte-cp-input:focus,
+.rte-cp-textarea:focus {
+  border-color: var(--rte-tg-accent) !important;
+  box-shadow: 0 0 0 3px rgba(51, 112, 255, 0.14) !important;
+  outline: none !important;
+}
+/* 弹窗内分区标题 */
+.rte-cp-section-title,
+.rte-cp-sub-title {
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  color: var(--rte-tg-text) !important;
+}
+
+/* --------------------------------------------------------------------------
+   5b) 弹窗外壳与内部控件（二维码卡、媒体选择、图表配置、附件、导出进度）
+   这些弹窗的样式分散在各自 SFC 的 scoped 里（带 data-v-hash，特异性更高），
+   故这里用 !important 统一 Telegram 观感（圆角 8px、两级阴影、30px 输入）。
+   -------------------------------------------------------------------------- */
+.rte-qr-card,
+.rte-image-dialog,
+.rte-cp-panel,
+.rte-attach-dialog,
+.rte-modal-card {
+  border-radius: var(--rte-tg-radius-panel) !important;
+  box-shadow: var(--rte-tg-shadow) !important;
+  border: 1px solid var(--rte-tg-line) !important;
+}
+/* 遮罩：暗化 + 背景模糊（Telegram 弹层观感） */
+.rte-modal-overlay,
+.rte-qr-mask {
+  background: rgba(15, 23, 42, 0.32) !important;
+  backdrop-filter: blur(6px);
+}
+/* 弹窗标题 */
+.rte-qr-card h3,
+.rte-cp-title,
+.rte-attach-title {
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  color: var(--rte-tg-text) !important;
+}
+/* 弹窗说明文字 */
+.rte-qr-card > p,
+.rte-cp-subtitle,
+.rte-cp-hint {
+  color: var(--rte-tg-hint) !important;
+  font-size: 12.5px !important;
+}
+/* 弹窗输入：30px 高、6px 圆角、聚焦主色环 */
+.rte-qr-card input[type='text'],
+.rte-qr-card input[type='number'],
+.rte-cp-input,
+.rte-cp-textarea {
+  height: 32px !important;
+  border-radius: var(--rte-tg-radius) !important;
+  border: 1px solid #d9dce1 !important;
+  transition: border-color var(--rte-tg-dur) ease, box-shadow var(--rte-tg-dur) ease;
+}
+.rte-qr-card input[type='text']:focus,
+.rte-qr-card input[type='number']:focus,
+.rte-cp-input:focus,
+.rte-cp-textarea:focus {
+  outline: none !important;
+  border-color: var(--rte-tg-accent) !important;
+  box-shadow: 0 0 0 3px rgba(51, 112, 255, 0.14) !important;
+}
+/* 弹窗内标签页：Telegram 式分段（激活为主色浅面 + 主色字） */
+.rte-qr-tabs .rte-qr-tab,
+.rte-image-tabs .rte-image-tab {
+  border-radius: var(--rte-tg-radius) !important;
+  font-size: 13px !important;
+  transition: background var(--rte-tg-dur) ease, color var(--rte-tg-dur) ease;
+}
+.rte-qr-tabs .rte-qr-tab.active,
+.rte-image-tabs .rte-image-tab.active {
+  color: var(--rte-tg-accent) !important;
+  background: var(--rte-tg-accent-soft) !important;
+}
+.rte-qr-tabs .rte-qr-tab:hover:not(.active),
+.rte-image-tabs .rte-image-tab:hover:not(.active) {
+  background: var(--rte-tg-hover) !important;
+}
+/* 弹窗底部按钮：32px、6px 圆角；主按钮实心主色 */
+.rte-qr-card button,
+.rte-modal-actions button,
+.rte-attach-dialog .el-button {
+  min-height: 32px;
+  border-radius: var(--rte-tg-radius) !important;
+  font-size: 13px !important;
+}
+
+/* --------------------------------------------------------------------------
+   6) 常驻气泡提示（替代浏览器原生 title，延迟出现，键盘可达）
+   -------------------------------------------------------------------------- */
+.rte-tg-tip,
+.rte-tip {
+  position: fixed;
+  z-index: 6000;
+  transform: translateX(-50%);
+  max-width: 260px;
+  padding: 5px 9px;
+  border-radius: var(--rte-tg-radius);
+  background: rgba(15, 23, 42, 0.92);
+  color: #fff;
+  font-size: 12px;
+  line-height: 1.45;
+  pointer-events: none;
+  box-shadow: var(--rte-tg-shadow-sm);
+  animation: rte-tg-fade 120ms ease-out;
+}
+@keyframes rte-tg-fade {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 4px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}

@@ -8729,3 +8729,4 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
 
 <style scoped src="./rte/styles/editor.scoped.css"></style>
 <style src="./rte/styles/editor.global.css"></style>
+<style src="./rte/styles/telegram.ui.css"></style>

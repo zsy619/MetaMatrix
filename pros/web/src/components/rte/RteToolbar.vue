@@ -300,24 +300,41 @@ function clearTgTipTimer() {
     tgTipTimer = null
   }
 }
+/**
+ * 常驻气泡提示（Telegram 式）：两种工具栏风格都生效。
+ * - 文本取 data-tip，其次取原生 title（因此禁用原因「（当前不可用）」也能提示）；
+ * - 悬停 320ms 后才出现，移开即消失（Telegram 的延迟提示手感）；
+ * - 出现前临时摘掉原生 title，避免浏览器自带气泡与自定义气泡重复。
+ */
 function onToolbarMouseover(event: MouseEvent) {
-  if (!rteBindings.tgStyle) return
   const target = event.target as HTMLElement | null
-  const host = target?.closest?.('[data-tip]') as HTMLElement | null
+  const host = target?.closest?.('[data-tip], [title]') as HTMLElement | null
   if (!host) return
-  const text = host.getAttribute('data-tip') || ''
+  const text = host.getAttribute('data-tip') || host.getAttribute('title') || ''
   if (!text) return
+  if (host.hasAttribute('title')) {
+    host.setAttribute('data-title', host.getAttribute('title') || '')
+    host.removeAttribute('title')
+  }
   const rect = host.getBoundingClientRect()
   clearTgTipTimer()
-  tgTip.value = { text, x: rect.left + rect.width / 2, y: rect.bottom + 10 }
+  tgTipTimer = window.setTimeout(() => {
+    tgTip.value = { text, x: rect.left + rect.width / 2, y: rect.bottom + 8 }
+    tgTipTimer = null
+  }, 320)
 }
 function onToolbarMouseout(event: MouseEvent) {
-  if (!rteBindings.tgStyle) return
   const target = event.target as HTMLElement | null
-  const host = target?.closest?.('[data-tip]') as HTMLElement | null
+  const host = target?.closest?.('[data-tip], [title]') as HTMLElement | null
   if (!host) return
   const to = event.relatedTarget as HTMLElement | null
   if (to && host.contains(to)) return
+  // 还原被摘掉的原生 title，保证键盘 / 读屏仍能拿到提示文本
+  const saved = host.getAttribute('data-title')
+  if (saved != null) {
+    host.setAttribute('title', saved)
+    host.removeAttribute('data-title')
+  }
   clearTgTipTimer()
   tgTipTimer = window.setTimeout(() => {
     tgTip.value = null
@@ -2451,8 +2468,8 @@ function toggleChartGroupMenu(key: string) {
           type="button"
           class="rte-tool"
           :class="{ active: t.active?.(), 'is-disabled': t.disabled?.() }"
-          :data-tip="rte.tgStyle ? t.title || t.label : undefined"
-          :title="rte.tgStyle ? undefined : disabledToolTitle(t.title || t.label, !!t.disabled?.())"
+          :data-tip="disabledToolTitle(t.title || t.label, !!t.disabled?.())"
+          :title="disabledToolTitle(t.title || t.label, !!t.disabled?.())"
           :aria-label="t.title || t.label"
           :aria-keyshortcuts="shortcutFromTitle(t.title || '') || undefined"
           :aria-pressed="t.active ? !!t.active() : undefined"
@@ -2614,6 +2631,7 @@ function toggleChartGroupMenu(key: string) {
                   (mt.kind === 'lineHeight' && rte.moreLineHeightOpen),
               }"
               :data-tool-key="mt.key"
+              :data-tip="disabledToolTitle(mt.title || mt.label, !!mt.disabled?.())"
               :title="disabledToolTitle(mt.title || mt.label, !!mt.disabled?.())"
               :aria-keyshortcuts="shortcutFromTitle(mt.title || '') || undefined"
               :aria-pressed="mt.active ? !!mt.active() : undefined"
@@ -3186,7 +3204,7 @@ function toggleChartGroupMenu(key: string) {
         <div
           v-if="tgTip"
           data-rte-own
-          class="rte-tg-tip"
+          class="rte-tip"
           :style="{ left: tgTip.x + 'px', top: tgTip.y + 'px' }"
           role="tooltip"
         >{{ tgTip.text }}</div>
