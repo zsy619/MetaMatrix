@@ -525,3 +525,224 @@
     transform: translate(-50%, 0);
   }
 }
+
+/* --------------------------------------------------------------------------
+   7) Telegram App（iOS / macOS）视觉语言
+   依据 Telegram 桌面端「设置 / 通知」页截图归纳：
+   - 页面底色浅灰 #f2f2f7；分组卡片纯白、圆角 12px；组内行间 1px #e5e5ea 发丝线；
+   - 行结构：左侧 28px 彩色圆角磁贴（白字）→ 标题 17px #000 → 右侧副值 #8e8e93
+     → 末端 chevron #c4c4c6；
+   - 小节标题 13px #8e8e93；搜索框圆角 10px、浅灰底 + 放大镜；
+   - 导航栏标题居中 17px/600，右侧动作用 Telegram 绿 #4fae4e。
+   -------------------------------------------------------------------------- */
+:root {
+  --rte-tg-page: #f2f2f7;
+  --rte-tg-card: #fff;
+  --rte-tg-sep: #e5e5ea;
+  --rte-tg-title: #000;
+  --rte-tg-value: #8e8e93;
+  --rte-tg-chevron: #c4c4c6;
+  --rte-tg-section: #8e8e93;
+  --rte-tg-green: #4fae4e;
+  --rte-tg-switch: #4cd964;
+  --rte-tg-tile-radius: 7px;
+}
+
+/* 弹窗外壳：浅灰页面底 + 白卡圆角 12px + Telegram 阴影 */
+/* 浅灰页面底的弹窗（内容已按分组卡组织） */
+.rte-qr-card,
+.rte-modal-card {
+  background: var(--rte-tg-page) !important;
+  border: none !important;
+  border-radius: 12px !important;
+  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.22) !important;
+}
+/* 内容本身已是白面板的弹窗：只统一圆角与阴影，避免半灰半白 */
+.rte-image-dialog,
+.rte-cp-panel {
+  border-radius: 12px !important;
+  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.22) !important;
+}
+
+/* 分组卡片：白底圆角 12px，组内发丝分隔 */
+.rte-tg-card {
+  background: var(--rte-tg-card);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.rte-tg-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 8px 14px;
+  background: var(--rte-tg-card);
+  color: var(--rte-tg-title);
+  font-size: 15px;
+  line-height: 20px;
+}
+.rte-tg-row + .rte-tg-row {
+  border-top: 1px solid var(--rte-tg-sep);
+}
+.rte-tg-row-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  border-radius: var(--rte-tg-tile-radius);
+  background: var(--rte-tg-accent);
+  color: #fff;
+  font-size: 14px;
+  line-height: 1;
+}
+.rte-tg-row-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rte-tg-row-value {
+  color: var(--rte-tg-value);
+  font-size: 15px;
+  white-space: nowrap;
+}
+.rte-tg-row-chevron {
+  color: var(--rte-tg-chevron);
+  font-size: 18px;
+  line-height: 1;
+  flex: 0 0 auto;
+}
+/* 小节标题（分组上方的灰字） */
+.rte-tg-section-title {
+  margin: 14px 4px 6px;
+  color: var(--rte-tg-section);
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+}
+.rte-tg-section-title:first-child {
+  margin-top: 4px;
+}
+/* 分段控件（Telegram 风格标签页：灰底槽 + 白色选中块） */
+.rte-tg-segmented {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 8px;
+  background: rgba(118, 118, 128, 0.12);
+}
+.rte-tg-segmented button {
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 13px;
+  color: var(--rte-tg-title);
+  cursor: pointer;
+  transition: background var(--rte-tg-dur) ease;
+}
+.rte-tg-segmented button.active {
+  background: #fff;
+  color: var(--rte-tg-accent);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+/* 搜索框 */
+.rte-tg-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 10px;
+  background: rgba(118, 118, 128, 0.12);
+  color: var(--rte-tg-value);
+  font-size: 15px;
+}
+/* 开关（iOS 风格） */
+.rte-tg-switch {
+  position: relative;
+  width: 44px;
+  height: 26px;
+  flex: 0 0 44px;
+  border-radius: 13px;
+  background: rgba(120, 120, 128, 0.16);
+  transition: background var(--rte-tg-dur) ease;
+}
+.rte-tg-switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  transition: transform var(--rte-tg-dur) ease;
+}
+.rte-tg-switch.is-on {
+  background: var(--rte-tg-switch);
+}
+.rte-tg-switch.is-on::after {
+  transform: translateX(18px);
+}
+/* 弹窗底部主/次按钮（Telegram：主按钮实心品牌蓝、次按钮灰面） */
+.rte-tg-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+}
+.rte-tg-btn {
+  min-height: 34px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 8px;
+  background: rgba(118, 118, 128, 0.12);
+  color: var(--rte-tg-accent);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: filter var(--rte-tg-dur) ease, transform var(--rte-tg-dur) ease;
+}
+.rte-tg-btn:hover {
+  filter: brightness(0.97);
+}
+.rte-tg-btn.is-primary {
+  background: var(--rte-tg-accent);
+  color: #fff;
+}
+.rte-tg-btn.is-primary:hover {
+  transform: translateY(-1px);
+}
+.rte-tg-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Ribbon：Telegram 浅灰页面底 + 白色磁贴（命令块悬停白底圆角） */
+.rte-root.expanded .rte-toolbar {
+  background: var(--rte-tg-page) !important;
+}
+.rte-root.expanded .rte-ribbon-bar {
+  background: var(--rte-tg-page) !important;
+  border-bottom-color: #d8d8dc !important;
+}
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-toolbar-tools {
+  background: var(--rte-tg-page) !important;
+}
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool:hover {
+  background: #fff !important;
+  border-radius: 6px;
+}
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool.active {
+  background: #fff !important;
+}
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group + .rte-tool-group {
+  box-shadow: inset 1px 0 0 #d8d8dc !important;
+}

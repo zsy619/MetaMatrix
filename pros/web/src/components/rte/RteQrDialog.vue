@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { IconLink } from '../rteToolbarIcons'
 import { inject, ref, watch } from 'vue'
 import { RTE_BINDINGS } from './bindings'
 import { QR_PRESETS, QR_PRESET_ROWS, QR_STYLES, makeQrArtwork, qrQuietModules, type QrModuleStyle } from '../../utils/rteQrArtwork'
@@ -139,23 +140,34 @@ async function confirm() {
     >
       <div class="rte-qr-card">
         <h3>{{ rte.qrEditingPos != null ? '修改二维码' : '插入二维码' }}</h3>
-        <p>输入链接或文字。中间留白放标记，纠错用最高等级，打印和屏幕上都能扫。</p>
-        <input
-          v-model="text"
-          type="text"
-          maxlength="1000"
-          placeholder="https:// 或任意文字"
-          aria-label="二维码内容"
-          title="二维码里的链接或文字，最多 1000 字，按 Enter 插入"
-          @keydown.enter.prevent="confirm"
-        />
+        <p class="rte-qr-intro">输入链接或文字。中间留白放标记，纠错用最高等级，打印和屏幕上都能扫。</p>
+        <div class="rte-tg-section-title">内容</div>
+        <div class="rte-tg-card">
+          <div class="rte-tg-row">
+            <span class="rte-tg-row-icon" aria-hidden="true">
+              <component :is="IconLink" />
+            </span>
+            <input
+              v-model="text"
+              class="rte-tg-row-field"
+              type="text"
+              maxlength="1000"
+              placeholder="https:// 或任意文字"
+              aria-label="二维码内容"
+              title="二维码里的链接或文字，最多 1000 字，按 Enter 插入"
+              @keydown.enter.prevent="confirm"
+            />
+          </div>
+        </div>
+        <div class="rte-tg-section-title">配置</div>
         <!--
           配置区改成标签页 + 固定高度面板：
           原来三段配置纵向堆叠，弹窗被拉到近 900px 高；
           现在拆成"样式 / 配色 / 高级"三页，面板高度固定，弹窗整体矮一截，
           切换标签时高度也不跳。
         -->
-        <div class="rte-qr-tabs" role="tablist" aria-label="二维码配置" @keydown="onTabKeydown">
+        <div class="rte-tg-card">
+        <div class="rte-qr-tabs rte-tg-segmented" role="tablist" aria-label="二维码配置" @keydown="onTabKeydown">
           <button
             v-for="tab in QR_CONFIG_TABS"
             :key="tab.id"
@@ -169,7 +181,7 @@ async function confirm() {
             {{ tab.label }}
           </button>
         </div>
-        <div class="rte-qr-tabpanel">
+        <div class="rte-qr-tabpanel rte-tg-row rte-tg-row--block">
           <div v-show="activeTab === 'style'" class="rte-qr-tabbody" role="tabpanel" aria-label="码点样式">
             <div class="rte-qr-label">码点样式</div>
             <div class="rte-qr-styles" role="radiogroup" aria-label="码点样式">
@@ -240,13 +252,17 @@ async function confirm() {
             />
           </div>
         </div>
+        </div>
+        <div class="rte-tg-section-title">预览</div>
+        <div class="rte-tg-card">
         <div class="rte-qr-preview">
           <img v-if="preview" :src="preview" alt="二维码预览" />
           <span v-else>{{ error || '输入内容后在这里预览' }}</span>
         </div>
         <p v-if="error && preview" class="rte-qr-error">{{ error }}</p>
         <a v-if="preview" class="rte-qr-download" :href="preview" download="qrcode.png" title="把当前预览存成 PNG">下载图片</a>
-        <div class="rte-qr-actions">
+        </div>
+        <div class="rte-tg-actions rte-qr-actions">
           <button type="button" title="不插入二维码" @click="close">取消</button>
           <button type="button" class="is-primary" :title="rte.qrEditingPos != null ? '用当前样式换掉这张二维码' : '把这张二维码插到光标处'" :disabled="!preview || busy" @click="confirm">{{ rte.qrEditingPos != null ? '更新' : '插入' }}</button>
         </div>
@@ -266,36 +282,56 @@ async function confirm() {
   padding: 24px;
   background: rgba(15, 23, 42, 0.45);
 }
+/* Telegram App 风格外壳：浅灰页面底 + 白色分组卡（详见 telegram.ui.css 的第 7 节） */
 .rte-qr-card {
   width: min(720px, 100%);
   max-height: calc(100vh - 48px);
   overflow: auto;
-  padding: 20px 20px 16px;
+  padding: 18px 18px 16px;
   border-radius: 12px;
-  background: #fff;
-  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.24);
+  background: #f2f2f7;
+  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.22);
 }
 .rte-qr-card h3 {
   margin: 0;
   text-align: center;
-  font-size: 18px;
-  color: #1d2129;
+  font-size: 17px;
+  font-weight: 600;
+  color: #000;
 }
 .rte-qr-card > p {
-  margin: 8px 0 12px;
-  color: #86909c;
-  font-size: 13px;
+  margin: 6px 0 0;
+  color: #8e8e93;
+  font-size: 12.5px;
   line-height: 1.5;
+  text-align: center;
 }
 .rte-qr-card input[type='text'] {
   box-sizing: border-box;
   width: 100%;
-  height: 40px;
-  padding: 0 12px;
-  border: 1px solid #94bfff;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid #e5e5ea;
   border-radius: 8px;
+  background: #fff;
   font-size: 14px;
-  color: #1d2129;
+  color: #000;
+}
+/* 分组行里的输入：去掉自身边框，融进行 */
+.rte-tg-row .rte-tg-row-field {
+  height: 32px;
+  border-color: transparent;
+  background: rgba(118, 118, 128, 0.1);
+}
+.rte-tg-row .rte-tg-row-field:focus {
+  outline: none;
+  border-color: #3370ff;
+  background: #fff;
+}
+/* 卡片内的整块内容行 */
+.rte-tg-row--block {
+  display: block;
+  padding: 12px 14px;
 }
 .rte-qr-label {
   margin: 12px 0 6px;
@@ -304,12 +340,13 @@ async function confirm() {
 }
 /* 配置区标签页：面板固定高度，切换标签时弹窗高度不跳。 */
 .rte-qr-tabs {
-  display: inline-flex;
+  display: flex;
+  justify-content: center;
   gap: 2px;
-  margin-top: 12px;
+  margin: 0;
   padding: 3px;
-  border-radius: 10px;
-  background: #f2f3f5;
+  border-radius: 9px;
+  background: rgba(118, 118, 128, 0.12);
 }
 .rte-qr-tabs button {
   height: 28px;
@@ -339,9 +376,10 @@ async function confirm() {
 }
 .rte-qr-tabpanel {
   height: 156px;
-  margin-top: 4px;
+  margin-top: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
+  border-top: 1px solid #e5e5ea;
 }
 .rte-qr-tabbody {
   padding-top: 4px;
@@ -422,9 +460,9 @@ async function confirm() {
   align-items: center;
   justify-content: center;
   min-height: 176px;
-  border-radius: 10px;
-  background: #f7f8fa;
-  color: #86909c;
+  border-radius: 0;
+  background: #fff;
+  color: #8e8e93;
   font-size: 13px;
 }
 .rte-qr-preview img {
@@ -442,7 +480,8 @@ async function confirm() {
 }
 .rte-qr-actions {
   display: flex;
-  gap: 12px;
+  justify-content: flex-end;
+  gap: 8px;
   margin-top: 14px;
 }
 .rte-qr-download {
@@ -457,13 +496,18 @@ async function confirm() {
   text-decoration: none;
 }
 .rte-qr-actions button {
-  flex: 1 1 0;
-  height: 40px;
-  font-size: 15px;
+  flex: 0 0 auto;
+  min-height: 34px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 8px;
+  background: rgba(118, 118, 128, 0.12);
+  color: #3370ff;
+  font-size: 14px;
+  cursor: pointer;
 }
 .rte-qr-actions .is-primary {
-  border-color: #1664ff;
-  background: #1664ff;
+  background: #3370ff;
   color: #fff;
 }
 .rte-qr-actions .is-primary:disabled {
