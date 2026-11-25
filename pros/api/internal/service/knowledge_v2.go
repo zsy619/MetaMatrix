@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"regexp"
@@ -83,62 +84,39 @@ type KnowledgeHealthItem struct {
 // ---------------------------------------------------------------- 模板
 
 // builtinTemplates 是内置模板种子：飞书模板中心的最小可用集。
-var builtinTemplates = []model.KnowledgeTemplate{
-	{Key: "blank", Label: "空白文档", Icon: "📄", Category: "通用", HTML: ""},
-	{Key: "meeting", Label: "会议纪要", Icon: "📝", Category: "协作",
-		HTML: `<h1>会议纪要</h1><p><strong>日期：</strong></p><p><strong>参会人：</strong></p><h2>议题</h2><ul><li></li></ul><h2>决议</h2><ul><li></li></ul><h2>待办</h2><ul><li></li></ul>`},
-	{Key: "requirement", Label: "需求文档", Icon: "📋", Category: "产品",
-		HTML: `<h1>需求文档</h1><h2>背景</h2><p></p><h2>目标</h2><ul><li></li></ul><h2>功能列表</h2><ul><li></li></ul><h2>非功能需求</h2><ul><li></li></ul><h2>里程碑</h2><ul><li></li></ul>`},
-	{Key: "weekly", Label: "周报", Icon: "📅", Category: "协作",
-		HTML: `<h1>周报</h1><p><strong>周期：</strong></p><h2>本周完成</h2><ul><li></li></ul><h2>下周计划</h2><ul><li></li></ul><h2>风险与求助</h2><ul><li></li></ul>`},
-	{Key: "decision", Label: "决策记录", Icon: "⚖️", Category: "协作",
-		HTML: `<h1>决策记录</h1><p><strong>日期：</strong></p><h2>背景</h2><p></p><h2>候选方案</h2><ul><li></li></ul><h2>结论</h2><p></p><h2>影响</h2><ul><li></li></ul>`},
-	{Key: "sop", Label: "标准流程 SOP", Icon: "🧭", Category: "流程",
-		HTML: `<h1>标准流程</h1><h2>适用场景</h2><p></p><h2>步骤</h2><ol><li></li></ol><h2>责任人</h2><p></p><h2>异常处理</h2><p></p>`},
-	{Key: "retro", Label: "复盘", Icon: "🔁", Category: "协作",
-		HTML: `<h1>复盘</h1><h2>目标</h2><p></p><h2>实际结果</h2><p></p><h2>做得好的</h2><ul><li></li></ul><h2>待改进</h2><ul><li></li></ul><h2>行动项</h2><ul><li></li></ul>`},
-	{Key: "faq", Label: "FAQ", Icon: "❓", Category: "通用",
-		HTML: `<h1>常见问题</h1><h2>Q1</h2><p></p><h2>A1</h2><p></p><h2>Q2</h2><p></p><h2>A2</h2><p></p>`},
-	{Key: "prd", Label: "PRD 产品需求", Icon: "📘", Category: "产品",
-		HTML: `<h1>PRD：{标题}</h1><p><strong>负责人：</strong>{负责人}</p><p><strong>日期：</strong>{日期}</p><h2>问题陈述</h2><p></p><h2>用户与场景</h2><ul><li></li></ul><h2>需求清单</h2><ul><li></li></ul><h2>验收标准</h2><ul><li></li></ul><h2>风险</h2><ul><li></li></ul>`},
-	{Key: "okr", Label: "OKR 目标", Icon: "🎯", Category: "管理",
-		HTML: `<h1>OKR：{标题}</h1><p><strong>周期：</strong></p><h2>目标</h2><p></p><h3>关键结果</h3><ul><li></li></ul><h2>进展记录</h2><ul><li></li></ul>`},
-	{Key: "risk", Label: "风险登记册", Icon: "⚠️", Category: "管理",
-		HTML: `<h1>风险登记册</h1><h2>风险清单</h2><ul><li><strong>风险：</strong>　<strong>影响：</strong>　<strong>对策：</strong>　<strong>责任人：</strong></li></ul><h2>升级路径</h2><p></p>`},
-	{Key: "interview", Label: "用户访谈纪要", Icon: "🎙️", Category: "协作",
-		HTML: `<h1>用户访谈纪要</h1><p><strong>受访者：</strong></p><p><strong>时间：</strong>{日期}</p><h2>访谈目标</h2><p></p><h2>关键发现</h2><ul><li></li></ul><h2>原话摘录</h2><blockquote></blockquote><h2>后续行动</h2><ul><li></li></ul>`},
-	{Key: "competitor", Label: "竞品分析", Icon: "🔍", Category: "产品",
-		HTML: `<h1>竞品分析</h1><h2>对比维度</h2><ul><li></li></ul><h2>差异点</h2><ul><li></li></ul><h2>可借鉴</h2><ul><li></li></ul><h2>结论</h2><p></p>`},
-	{Key: "sprint-plan", Label: "迭代排期表", Icon: "🗓️", Category: "管理",
-		HTML: `<h1>迭代排期</h1><p><strong>迭代：</strong></p><p><strong>起止：</strong></p><h2>任务列表</h2><ul><li></li></ul><h2>里程碑</h2><ul><li></li></ul>`},
-	{Key: "onboarding", Label: "新人上手指南", Icon: "🧭", Category: "流程",
-		HTML: `<h1>新人上手指南</h1><h2>第一天</h2><ul><li></li></ul><h2>第一周</h2><ul><li></li></ul><h2>常用工具</h2><ul><li></li></ul><h2>找人</h2><p></p>`},
-	{Key: "incident", Label: "故障复盘报告", Icon: "🚨", Category: "流程",
-		HTML: `<h1>故障复盘</h1><p><strong>时间：</strong>{日期}</p><h2>影响面</h2><p></p><h2>时间线</h2><ol><li></li></ol><h2>根因</h2><p></p><h2>改进项</h2><ul><li></li></ul>`},
-	{Key: "one-pager", Label: "一页纸方案", Icon: "📄", Category: "通用",
-		HTML: `<h1>{标题}</h1><p><strong>负责人：</strong>{负责人}</p><h2>问题</h2><p></p><h2>方案</h2><p></p><h2>收益</h2><p></p><h2>成本</h2><p></p>`},
-	{Key: "checklist", Label: "检查清单", Icon: "✅", Category: "通用",
-		HTML: `<h1>检查清单</h1><ul><li></li><li></li><li></li></ul><h2>结论</h2><p></p>`},
-	{Key: "glossary", Label: "术语表", Icon: "📖", Category: "通用",
-		HTML: `<h1>术语表</h1><p><strong>术语：</strong>　<strong>含义：</strong></p><p><strong>术语：</strong>　<strong>含义：</strong></p>`},
-	{Key: "review", Label: "文档评审意见", Icon: "🔍", Category: "协作",
-		HTML: `<h1>评审意见</h1><p><strong>评审人：</strong></p><h2>结论</h2><p>通过 / 有条件通过 / 需修改</p><h2>问题清单</h2><ul><li></li></ul>`},
-	{Key: "handover", Label: "工作交接单", Icon: "🤝", Category: "协作",
-		HTML: `<h1>工作交接单</h1><p><strong>交接人：</strong></p><p><strong>接收人：</strong></p><h2>交接内容</h2><ul><li></li></ul><h2>账号与权限</h2><ul><li></li></ul>`},
-}
+var builtinTemplates = buildBuiltinTemplates()
 
 // SeedBuiltinTemplates 幂等写入内置模板。
 // 按 key 去重：重复启动不会产生第二份同名模板。
+// 同 key 的内置模板如果正文与当前生成的骨架不一致（内置模板是系统生成内容，
+// 用户不能在界面上改），就地更新正文，保证升级后模板结构同步到最新版本。
 func SeedBuiltinTemplates(db *gorm.DB) error {
 	now := time.Now().UTC()
 	for i := range builtinTemplates {
 		tpl := builtinTemplates[i]
-		var count int64
-		if err := db.Model(&model.KnowledgeTemplate{}).
-			Where("key = ? AND builtin = true", tpl.Key).Count(&count).Error; err != nil {
+		var exist model.KnowledgeTemplate
+		err := db.Model(&model.KnowledgeTemplate{}).
+			Where("key = ? AND builtin = true", tpl.Key).First(&exist).Error
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 			return err
 		}
-		if count > 0 {
+		if err == nil {
+			// 已存在：只有正文/标题/图标/分类变化时才更新，避免无谓写库。
+			if exist.HTML == tpl.HTML && exist.Label == tpl.Label &&
+				exist.Icon == tpl.Icon && exist.Category == tpl.Category {
+				continue
+			}
+			if err := db.Model(&model.KnowledgeTemplate{}).
+				Where("id = ?", exist.ID).
+				Updates(map[string]any{
+					"label":      tpl.Label,
+					"icon":       tpl.Icon,
+					"category":   tpl.Category,
+					"html":       tpl.HTML,
+					"updated_at": now,
+				}).Error; err != nil {
+				return err
+			}
 			continue
 		}
 		tpl.ID = uuid.New()
