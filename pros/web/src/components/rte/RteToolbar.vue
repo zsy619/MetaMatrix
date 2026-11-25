@@ -2326,7 +2326,9 @@ function toggleChartGroupMenu(key: string) {
             :aria-expanded="rte.textTidyOpen"
             @click.stop="rte.markToolbarMenuOpening(); rte.textTidyOpen = !rte.textTidyOpen"
           >
-            <span data-rte-own class="rte-tool-icon">理</span>
+            <span data-rte-own class="rte-tool-icon">
+              <component data-rte-own :is="rte.toolIcon('tidy')" class="rte-ep-icon" />
+            </span>
             <span data-rte-own class="rte-tool-label">整理<span data-rte-own class="rte-caret" aria-hidden="true"></span></span>
           </button>
           <Teleport to="body">

@@ -254,6 +254,65 @@
 }
 
 /* --------------------------------------------------------------------------
+   3b) Ribbon 图标统一为 Telegram 单色线稿
+   - 取消分组彩色渐变底块（--rte-icon-bg），改为单色描边图标：
+     默认 #707579（Telegram hint）、悬停 #3370ff（主色）、选中主色 + 浅面；
+   - 图标尺寸保持不变（槽位 32×32、线稿 24 viewBox 渲染在 32 槽内）；
+   - 禁用态改为「降透明度」（Telegram 做法），不再铺灰底块；
+   - 颜色类图标（字体颜色 / 高亮）保留底部色条，色条高度 4px → 3px。
+   说明：!important 用于压过 editor.scoped.css 里带 data-v-hash 的旧规则
+   （旧规则把图标强制成白字 + 渐变底块）。
+   -------------------------------------------------------------------------- */
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool-icon {
+  background: transparent !important;
+  box-shadow: none !important;
+  color: #707579 !important;
+  border-radius: 6px;
+  transition: color var(--rte-tg-dur) ease, background var(--rte-tg-dur) ease;
+}
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool .rte-ep-icon,
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool .rte-tool-icon > svg {
+  color: #707579 !important;
+}
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool:hover .rte-tool-icon,
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool:hover .rte-ep-icon,
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool:hover .rte-tool-icon > svg {
+  color: var(--rte-tg-accent) !important;
+  filter: none !important;
+}
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool.active .rte-tool-icon,
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool.active .rte-ep-icon,
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool.active .rte-tool-icon > svg {
+  color: var(--rte-tg-accent) !important;
+  background: rgba(51, 112, 255, 0.1) !important;
+  outline: none !important;
+}
+/* 禁用态：降透明度，不再铺灰底块 */
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool:disabled .rte-tool-icon,
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool.is-disabled .rte-tool-icon,
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool:disabled .rte-ep-icon,
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool.is-disabled .rte-ep-icon {
+  background: transparent !important;
+  color: #c9cdd4 !important;
+  opacity: 0.6;
+  filter: none !important;
+  outline: none !important;
+}
+/* 颜色类图标：保留底部色条（高度 4 → 3px，色条仍是当前颜色） */
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool-icon.rte-color-icon {
+  background: transparent !important;
+  color: #707579 !important;
+  box-shadow: none !important;
+}
+.rte-root.expanded .rte-toolbar:not(.is-one-row) .rte-tool-group .rte-tool-icon.rte-color-icon::after {
+  left: 4px !important;
+  right: 4px !important;
+  height: 3px !important;
+  border-radius: 2px !important;
+  background: var(--rte-color-bar, #1d2129) !important;
+}
+
+/* --------------------------------------------------------------------------
    4) 下拉选择（原生 select / 代码语言选择 / 字号字体面板）
    -------------------------------------------------------------------------- */
 .rte-cp-type-select,

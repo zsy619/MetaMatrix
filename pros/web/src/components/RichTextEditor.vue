@@ -30,7 +30,7 @@ import {
   isFormNodeName,
   type FormNodeName,
 } from '../extensions/forms'
-import { toolbarIconMap, IconTableRows, IconTableCols } from './rteToolbarIcons'
+import { toolbarIconMap, chartGroupIcon, IconTableRows, IconTableCols } from './rteToolbarIcons'
 import { NARROW_LAYOUT_MEDIA_QUERY, resolveToolbarLayout } from '../utils/rteNarrowLayout'
 import { RTE_CODE_LANGUAGES } from '../extensions/codeHighlight'
 import 'highlight.js/styles/github.css'
@@ -7032,7 +7032,7 @@ const allTools = computed((): ToolItem[] => {
       key: 'writingPaper',
       label: '纸样',
       title: '小红书、公众号、信纸、稿纸、田字格',
-      icon: '纸',
+      icon: '纸', iconComp: ic('paperSample'),
       kind: 'paperGroup',
       currentPreset: () => writingPaper.value,
       presetOptions: WRITING_PAPERS.map((item) => ({ id: item.id, label: item.label })),
@@ -7085,8 +7085,8 @@ const allTools = computed((): ToolItem[] => {
     },
     { key: 'pageSetup', label: '页面', title: '纸张、页边距、页眉页脚', icon: '纸', iconComp: ic('pageBreak'), run: openPageSetup },
     { key: 'printPreview', label: '打印预览', title: '按当前纸张看打印效果', icon: '看', iconComp: ic('print'), run: () => void openPrintPreview() },
-    { key: 'paperGuide', label: '参考线', title: paperGuide.value ? '纸张参考线已显示，再点一次关闭' : '在编辑区显示纸张边界', icon: '框', run: togglePaperGuide, active: () => paperGuide.value },
-    { key: 'printUrls', label: '印出链接', title: printLinkUrls.value ? '打印时会印出网址，再点一次关闭' : '打印时在链接后面印出网址', icon: '链', run: togglePrintLinkUrls, active: () => printLinkUrls.value },
+    { key: 'paperGuide', label: '参考线', title: paperGuide.value ? '纸张参考线已显示，再点一次关闭' : '在编辑区显示纸张边界', icon: '框', iconComp: ic('guide'), run: togglePaperGuide, active: () => paperGuide.value },
+    { key: 'printUrls', label: '印出链接', title: printLinkUrls.value ? '打印时会印出网址，再点一次关闭' : '打印时在链接后面印出网址', icon: '链', iconComp: ic('printLink'), run: togglePrintLinkUrls, active: () => printLinkUrls.value },
     {
       key: 'pageBreak',
       label: '分页符',
@@ -7102,8 +7102,8 @@ const allTools = computed((): ToolItem[] => {
     { key: 'imageLayout', label: '排法', title: '图片居中、居左、居右或环绕', icon: '▢', iconComp: ic('image'), kind: 'imageLayout', active: () => isImageNodeSelected() },
     { key: 'imageReplace', label: '换图', title: '替换选中图片，保留题注和裁剪', icon: '↻', iconComp: ic('image'), run: () => void replaceImageByUrl(), disabled: () => !isImageNodeSelected() },
     { key: 'imageAlt', label: '替代文本', title: '给选中图片写替代文本', icon: 'Alt', iconComp: ic('image'), run: () => void promptImageAlt(), disabled: () => !isImageNodeSelected() },
-    { key: 'spoiler', label: '揭晓', title: '把选中文字收成揭晓文字', icon: '眼', run: toggleSpoiler },
-    { key: 'dropCap', label: '首字', title: '把段落第一个字放大下沉', icon: 'A', run: toggleDropCap },
+    { key: 'spoiler', label: '揭晓', title: '把选中文字收成揭晓文字', icon: '眼', iconComp: ic('eye'), run: toggleSpoiler },
+    { key: 'dropCap', label: '首字', title: '把段落第一个字放大下沉', icon: 'A', iconComp: ic('dropCap'), run: toggleDropCap },
     {
       key: 'imageRadius',
       label: '圆角',
@@ -7167,6 +7167,8 @@ const allTools = computed((): ToolItem[] => {
       label: group.label,
       title: `插入${group.label}图表：${group.hint}`,
       icon: group.icon,
+      // Telegram 风格：图表一级分类用线稿 SVG，替代原先的彩色 Emoji
+      iconComp: chartGroupIcon(group.id),
       kind: 'echartsGroup' as const,
     })),
     {
@@ -7249,7 +7251,7 @@ const allTools = computed((): ToolItem[] => {
       key: 'markdownInline',
       label: markdownInlineEnabled.value ? 'MD语法·开' : 'MD语法·关',
       title: '输入 **粗体**、*斜体*、[文字](地址)、==高亮== 时直接转成富文本；再点一次关闭',
-      icon: 'Md',
+      icon: 'Md', iconComp: ic('markdown'),
       active: () => markdownInlineEnabled.value,
       run: toggleMarkdownInline,
     },
@@ -7559,15 +7561,15 @@ const allTools = computed((): ToolItem[] => {
       iconComp: ic('table'),
       run: () => { void copyCurrentTable('csv') },
     },
-    { key: 'textTidy', label: '整理', title: '半角、全角、空格和按行整理', icon: '理', kind: 'textTidy' },
-    { key: 'tidyHalf', label: '半角', title: '把全角字母数字转成半角', icon: '半', run: () => runTextMenu('half') },
-    { key: 'tidyFull', label: '全角', title: '把半角字母数字转成全角', icon: '全', run: () => runTextMenu('full') },
-    { key: 'tidyPangu', label: '中英空格', title: '汉字和英文数字之间补空格', icon: '空', run: () => runTextMenu('pangu') },
-    { key: 'tidySqueeze', label: '收空格', title: '连续空格收成一个', icon: '挤', run: () => runTextMenu('squeeze') },
-    { key: 'tableZebra', label: '斑马纹', title: editor.value?.getAttributes('table')?.zebra === true ? '斑马纹已开启，再点一次关闭' : '隔行底色只用于显示', icon: '斑马', run: toggleTableZebra, active: () => editor.value?.getAttributes('table')?.zebra === true, disabled: () => !isInTable() },
-    { key: 'tableEqual', label: '均分列', title: '把当前表格的列宽均分，一步撤销', icon: '均', run: () => runTableOpFromToolbar('equal-cols'), disabled: () => !isInTable() },
-    { key: 'tableFormula', label: '求和', title: '在当前格对上方的数字求和', icon: 'Σ', run: () => runTableOpFromToolbar('cell-formula'), disabled: () => !isInTable() },
-    { key: 'tableSort', label: '升序', title: '按当前列从小到大排序', icon: '序', run: () => runTableOpFromToolbar('sort-asc'), disabled: () => !isInTable() },
+    { key: 'textTidy', label: '整理', title: '半角、全角、空格和按行整理', icon: '理', iconComp: ic('tidy'), kind: 'textTidy' },
+    { key: 'tidyHalf', label: '半角', title: '把全角字母数字转成半角', icon: '半', iconComp: ic('halfWidth'), run: () => runTextMenu('half') },
+    { key: 'tidyFull', label: '全角', title: '把半角字母数字转成全角', icon: '全', iconComp: ic('fullWidth'), run: () => runTextMenu('full') },
+    { key: 'tidyPangu', label: '中英空格', title: '汉字和英文数字之间补空格', icon: '空', iconComp: ic('cjkSpace'), run: () => runTextMenu('pangu') },
+    { key: 'tidySqueeze', label: '收空格', title: '连续空格收成一个', icon: '挤', iconComp: ic('squeezeSpace'), run: () => runTextMenu('squeeze') },
+    { key: 'tableZebra', label: '斑马纹', title: editor.value?.getAttributes('table')?.zebra === true ? '斑马纹已开启，再点一次关闭' : '隔行底色只用于显示', icon: '斑马', iconComp: ic('zebra'), run: toggleTableZebra, active: () => editor.value?.getAttributes('table')?.zebra === true, disabled: () => !isInTable() },
+    { key: 'tableEqual', label: '均分列', title: '把当前表格的列宽均分，一步撤销', icon: '均', iconComp: ic('equalColumns'), run: () => runTableOpFromToolbar('equal-cols'), disabled: () => !isInTable() },
+    { key: 'tableFormula', label: '求和', title: '在当前格对上方的数字求和', icon: 'Σ', iconComp: ic('sigma'), run: () => runTableOpFromToolbar('cell-formula'), disabled: () => !isInTable() },
+    { key: 'tableSort', label: '升序', title: '按当前列从小到大排序', icon: '序', iconComp: ic('sortAsc'), run: () => runTableOpFromToolbar('sort-asc'), disabled: () => !isInTable() },
     {
       key: 'tableStruct',
       label: '行列',
@@ -7586,8 +7588,8 @@ const allTools = computed((): ToolItem[] => {
       applyPreset: (id: string) => runTableOpFromToolbar(id),
       disabled: () => !isInTable(),
     },
-    { key: 'tableSticky', label: '冻结表头', title: tableHeaderSticky.value ? '表头冻结已开启，再点一次关闭' : '滚动时表头保持可见', icon: '表头', run: toggleTableHeaderStickyBar, active: () => tableHeaderSticky.value },
-    { key: 'tableColSticky', label: '冻结首列', title: tableColSticky.value ? '首列冻结已开启，再点一次关闭' : '横向滚动时首列保持可见', icon: '首列', run: toggleTableColStickyBar, active: () => tableColSticky.value },
+    { key: 'tableSticky', label: '冻结表头', title: tableHeaderSticky.value ? '表头冻结已开启，再点一次关闭' : '滚动时表头保持可见', icon: '表头', iconComp: ic('freezeHeader'), run: toggleTableHeaderStickyBar, active: () => tableHeaderSticky.value },
+    { key: 'tableColSticky', label: '冻结首列', title: tableColSticky.value ? '首列冻结已开启，再点一次关闭' : '横向滚动时首列保持可见', icon: '首列', iconComp: ic('freezeColumn'), run: toggleTableColStickyBar, active: () => tableColSticky.value },
     {
       key: 'tableFilter',
       label: '筛选',
