@@ -1,0 +1,425 @@
+/*
+ * 知识库页面 · Telegram Web K 视觉层
+ *
+ * 参照 Telegram Web K / Telegram macOS 客户端的界面语言：
+ *   - 几何：卡片 14px 圆角、输入/按钮 10px~999px、标签 999px；
+ *   - 结构：顶部标题栏 + 分组列表（1px 发丝线分隔）+ 图标磁贴；
+ *   - 语义：选中态 = 浅蓝底 + 品牌蓝；强调色用 Telegram 蓝 #3390ec。
+ *
+ * 约束（AGENTS.md）：
+ *   - 全部规则挂在 .kn-page 下，只影响知识库页面，不污染其它页面；
+ *   - 表面仍走玻璃令牌（--glass-*）：玻璃层负责质感，本文件负责几何与语义；
+ *   - 正文纸面（文档正文）保持不透明白，本文件不触碰。
+ */
+
+/* 令牌统一由全局规范 src/styles/telegram.css 提供（:root），
+   本文件只负责知识库页面的布局与语义，不再重复定义颜色。 */
+.kn-page {
+  --tg-sep: var(--glass-ring, rgba(15, 23, 42, 0.09));
+  --tg-radius-card: var(--tg-radius-lg);
+  --tg-radius-input: var(--tg-input-radius);
+}
+
+/* ---------------- 概览页：面板卡片 ---------------- */
+.kn-page .kn-home__grid {
+  gap: 12px;
+}
+/* Telegram 统计卡：彩色磁贴 + 大数字，去掉企业风的左侧竖条 */
+.kn-page .ent-stat {
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--tg-radius-card);
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.7));
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(var(--glass-blur, 18px)) saturate(var(--glass-saturate, 165%));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 18px)) saturate(var(--glass-saturate, 165%));
+  box-shadow: var(--glass-shadow-sm);
+}
+.kn-page .ent-stat::before {
+  display: none;
+}
+.kn-page .ent-stat:hover {
+  transform: translateY(-2px);
+}
+.kn-page .ent-stat__icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  font-size: 17px;
+  color: #fff;
+  background: var(--ent-stat-accent, var(--tg-blue));
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.18);
+}
+.kn-page .ent-stat__value {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.kn-page .ent-stat__label {
+  font-size: 12px;
+  color: var(--ent-text-3, #8a94a3);
+}
+.kn-page .ent-card {
+  border-radius: var(--tg-radius-card);
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.7));
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(var(--glass-blur, 18px)) saturate(var(--glass-saturate, 165%));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 18px)) saturate(var(--glass-saturate, 165%));
+  box-shadow: var(--glass-shadow-sm);
+}
+.kn-page .ent-card__head {
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--tg-sep);
+  background: rgba(255, 255, 255, 0.34);
+}
+.kn-page .ent-card__icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  font-size: 15px;
+  color: #fff;
+  background: var(--tg-blue);
+  box-shadow: 0 2px 8px rgba(51, 144, 236, 0.32);
+}
+.kn-page .ent-card__title {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.kn-page .ent-card__count {
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.08);
+}
+.kn-page .ent-card__body {
+  padding: 6px 10px 12px;
+}
+
+/* 面板语义色：图标磁贴着色，卡面保持统一玻璃 */
+.kn-page .ent-card--tg-blue .ent-card__icon {
+  background: var(--tg-blue);
+  box-shadow: 0 2px 8px rgba(51, 144, 236, 0.32);
+}
+.kn-page .ent-card--tg-cyan .ent-card__icon {
+  background: #0e8a9b;
+  box-shadow: 0 2px 8px rgba(14, 138, 155, 0.32);
+}
+.kn-page .ent-card--tg-purple .ent-card__icon {
+  background: var(--tg-purple);
+  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.32);
+}
+.kn-page .ent-card--tg-green .ent-card__icon {
+  background: var(--tg-green);
+  box-shadow: 0 2px 8px rgba(79, 174, 78, 0.32);
+}
+.kn-page .ent-card--tg-red .ent-card__icon {
+  background: var(--tg-red);
+  box-shadow: 0 2px 8px rgba(229, 57, 53, 0.32);
+}
+.kn-page .ent-card--tg-amber .ent-card__icon {
+  /* 琥珀底色较亮，用深色字保证对比度 ≥ 4.5:1 */
+  background: var(--tg-yellow);
+  color: #4a3806;
+  box-shadow: 0 2px 8px rgba(247, 188, 47, 0.4);
+}
+
+/* 列表行：发丝线分隔 + hover 灰底 */
+.kn-page .ent-list__row {
+  padding: 9px 8px;
+  margin: 0 -8px;
+  border-bottom: 1px solid var(--tg-sep);
+  border-radius: 0;
+  font-size: 13.5px;
+  transition: background-color 0.14s ease;
+}
+.kn-page .ent-list__row:last-child {
+  border-bottom: 0;
+}
+.kn-page .ent-list__row:hover {
+  background: rgba(15, 23, 42, 0.045);
+}
+.kn-page .ent-list__title {
+  font-weight: 500;
+  color: var(--ent-text, #1f2733);
+}
+.kn-page .ent-list__meta {
+  font-size: 12px;
+  color: var(--ent-text-3, #8a94a3);
+  font-variant-numeric: tabular-nums;
+}
+.kn-page .ent-list__msg {
+  font-size: 12px;
+  color: var(--ent-text-3, #8a94a3);
+}
+.kn-page .ent-badge {
+  border-radius: 999px;
+  font-size: 11px;
+}
+
+/* 空态 */
+.kn-page .ent-empty {
+  padding: 26px 16px;
+  color: var(--ent-text-3, #8a94a3);
+  font-size: 13px;
+}
+
+/* ---------------- 概览页：表单控件 ---------------- */
+.kn-page .kn-home .el-input__wrapper {
+  border-radius: var(--tg-radius-input);
+  box-shadow: none;
+  background: rgba(15, 23, 42, 0.05);
+}
+.kn-page .kn-home .el-button {
+  border-radius: 999px;
+}
+.kn-page .kn-home .el-button--primary {
+  background: var(--tg-blue);
+  border-color: var(--tg-blue);
+}
+
+/* ---------------- 概览页：分段控件（属性看板） ---------------- */
+.kn-page .kn-home .el-radio-group {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.07);
+}
+.kn-page .kn-home .el-radio-button__inner {
+  height: 24px;
+  padding: 0 12px;
+  border-radius: 999px !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  font-size: 12px;
+  line-height: 24px;
+  color: var(--ent-text-2, #5a6472);
+}
+.kn-page .kn-home .el-radio-button__original-radio:checked + .el-radio-button__inner {
+  background: #fff;
+  color: var(--tg-blue);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.16) !important;
+}
+
+/* ---------------- 文档页头部（Telegram Web K 顶部栏） ---------------- */
+.kn-page .doc-view__head {
+  gap: 10px;
+  padding: 10px 14px 12px;
+}
+/* 返回目录：轻量胶囊次级按钮 */
+.kn-page .doc-view__head > .el-button.is-text {
+  height: 30px;
+  padding: 0 12px !important;
+  gap: 5px;
+  border-radius: 999px;
+  font-size: 13px;
+  color: var(--ent-text-2, #5a6472);
+  background: rgba(255, 255, 255, 0.5) !important;
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.7)) !important;
+  box-shadow: var(--glass-shadow-sm);
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+}
+.kn-page .doc-view__head > .el-button.is-text:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--glass-shadow);
+  color: var(--ent-text, #1f2733);
+}
+/* 返回目录：只留图标，32px 方块磁贴 */
+.kn-page .doc-view__head > .el-button.doc-view__back.is-text {
+  width: 32px;
+  height: 32px;
+  padding: 0 !important;
+  justify-content: center;
+  border-radius: 10px;
+  font-size: 15px;
+  background: rgba(255, 255, 255, 0.55) !important;
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.7)) !important;
+  box-shadow: var(--glass-shadow-sm);
+}
+.kn-page .doc-view__head > .el-button.doc-view__back.is-text:hover {
+  background: var(--tg-blue-soft) !important;
+  border-color: rgba(51, 144, 236, 0.4) !important;
+  color: var(--tg-blue) !important;
+}
+/* 面包屑：浅灰药丸 */
+.kn-page .doc-view__crumb {
+  gap: 5px;
+  max-width: 260px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.05);
+  font-size: 12.5px;
+}
+/* 文档图标：磁贴方块 */
+.kn-page .doc-view__head .doc-view__icon {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  font-size: 18px;
+  background: rgba(255, 255, 255, 0.62);
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.7));
+  box-shadow: var(--glass-shadow-sm);
+  transition: background-color 0.16s ease, transform 0.16s ease, border-color 0.16s ease;
+}
+.kn-page .doc-view__head .doc-view__icon:hover {
+  background: var(--tg-blue-soft);
+  border-color: rgba(51, 144, 236, 0.4);
+  transform: translateY(-1px);
+}
+.kn-page .doc-view__title {
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.kn-page .doc-view__title:focus {
+  border-bottom-color: var(--tg-blue);
+}
+/* 动作区：图标簇 + 药丸按钮，主次分明 */
+.kn-page .doc-view__actions {
+  gap: 6px;
+  margin-left: 6px;
+  padding-left: 10px;
+}
+.kn-page .doc-view__actions .mm-bar__group {
+  height: 34px;
+  padding: 2px;
+  gap: 2px;
+  border-radius: 999px;
+}
+.kn-page .doc-view__actions .el-button.mm-bar__btn {
+  height: 28px;
+  padding: 0 10px;
+  gap: 5px;
+  border-radius: 999px;
+  font-size: 12.5px;
+}
+.kn-page .doc-view__actions .el-button.mm-bar__btn {
+  padding: 0 10px;
+}
+/* 图标方块：正方形比例，hover 上浮 */
+.kn-page .doc-view__actions .mm-bar__btn--square,
+.kn-page .doc-view__actions .el-button.mm-bar__btn--square {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 9px;
+  justify-content: center;
+}
+.kn-page .doc-view__actions .el-button.mm-bar__btn--square .el-icon {
+  font-size: 15px;
+}
+/* AI 续写：品牌蓝浅底 */
+.kn-page .kn-doc__assist .el-button.mm-bar__btn {
+  color: var(--tg-blue);
+  background: var(--tg-blue-soft) !important;
+  border-color: transparent !important;
+  font-weight: 600;
+}
+.kn-page .kn-doc__assist .el-button.mm-bar__btn:hover {
+  background: rgba(51, 144, 236, 0.2) !important;
+}
+/* 分享：品牌蓝实心主按钮 */
+.kn-page .doc-view__actions .el-button.mm-bar__btn--primary {
+  height: 30px;
+  padding: 0 14px !important;
+  gap: 5px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #fff !important;
+  background: linear-gradient(135deg, #3d9bec, #2f86e0) !important;
+  border-color: transparent !important;
+  box-shadow: 0 4px 12px rgba(51, 144, 236, 0.32);
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+}
+.kn-page .doc-view__actions .el-button.mm-bar__btn--primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(51, 144, 236, 0.42);
+}
+
+/* ---------------- 知识图谱页 ---------------- */
+.kn-page .kg__head {
+  gap: 10px;
+  padding: 10px 16px;
+}
+.kn-page .kg__title {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.kn-page .kg__hint {
+  font-size: 12.5px;
+}
+/* 搜索框：药丸 + 浅灰底 */
+.kn-page .kg__search {
+  width: 220px;
+}
+.kn-page .kg__search .el-input__wrapper {
+  padding-left: 12px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.05);
+  box-shadow: none;
+}
+.kn-page .kg__search .el-input__inner {
+  font-size: 13px;
+}
+.kn-page .kg__search .el-input__wrapper.is-focus {
+  box-shadow: 0 0 0 2px var(--tg-blue-soft);
+}
+/* 头部操作：统一药丸按钮，高度 30px */
+.kn-page .kg__head-right .el-button {
+  height: 30px;
+  padding: 0 14px;
+  border-radius: 999px;
+  font-size: 12.5px;
+}
+.kn-page .kg__head-right .el-checkbox__label {
+  font-size: 13px;
+}
+/* 缩放控件：药丸，数值可点复位 */
+.kn-page .kg__zoom {
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+}
+.kn-page .kg__zoom button {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  font-size: 15px;
+}
+.kn-page .kg__zoom-value {
+  min-width: 52px;
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.16s ease;
+}
+.kn-page .kg__zoom-value:hover {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+/* ---------------- 减少动效偏好 ---------------- */
+@media (prefers-reduced-motion: reduce) {
+  .kn-page .ent-stat,
+  .kn-page .ent-card,
+  .kn-page .kn-crumb .el-button,
+  .kn-page .doc-view__icon,
+  .kn-page .doc-view__actions .el-button {
+    transition: none;
+  }
+  .kn-page .ent-stat:hover,
+  .kn-page .kn-crumb .el-button:hover,
+  .kn-page .doc-view__icon:hover,
+  .kn-page .doc-view__actions .el-button:hover {
+    transform: none;
+  }
+}

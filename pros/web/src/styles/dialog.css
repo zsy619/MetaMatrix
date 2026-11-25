@@ -1,4 +1,13 @@
-/* 全局弹窗样式（Element Plus 弹窗、消息框与自绘浮层统一走这一套）。 */
+/*
+ * 全局弹窗样式（Element Plus 弹窗、消息框与自绘浮层统一走这一套）。
+ *
+ * ⚠️ 现状说明（2026-11）：本项目的**全局弹窗表面已改由 `styles/telegram.css` 接管**
+ *    （Telegram Web K 规范：实心白底 + 12px 圆角 + 中性投影 + 无竖条标题）。
+ *    telegram.css 在 main.ts 里最后导入，优先级高于本文件，
+ *    因此本文件里 `.el-dialog` / `.el-message-box` 的表面规则已成历史包袱。
+ *    保留本文件仅为兼容尚未迁移的旧选择器；新增弹窗请直接按
+ *    `docs/design/telegram-design-system.md` 写样式，不要在这里再加表面规则。
+ */
 :root {
   /* 弹窗系统：所有弹窗共用同一套底色、圆角与阴影。 */
   --mm-dlg-backdrop: rgba(32, 33, 36, 0.46);

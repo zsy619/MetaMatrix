@@ -30,11 +30,32 @@
 
 ---
 
-## 2. 玻璃拟态设计系统（硬性规则）
+## 2. 全局设计规范：Telegram Web K（硬性规则，优先级最高）
 
-唯一实现入口：`pros/web/src/styles/glass.css`（在 `main.ts` **最后**导入，优先级最高）。
+**唯一实现入口：`pros/web/src/styles/telegram.css`**，在 `main.ts` **最后**导入（晚于 `glass.css` / `enterprise.css`），
+冲突时以本规范为准。完整规范文档：`docs/design/telegram-design-system.md`（色彩 / 圆角 / 尺寸 / 弹窗 / 表单 / 动效）。
 
-### 2.1 三条不可破坏的实现约束
+- **所有弹出框**（`el-dialog`、`el-message-box`、`el-drawer`、下拉/气泡/选择器、面板最大化 `.pm-card`、
+  RTE `.rte-modal`、版本历史 / 公式 / 附件预览 / 画布属性等自绘浮层）统一走本套表面：
+  纯白底、圆角 `12px`、中性投影 `0 24px 64px rgba(15,23,42,.18)`、遮罩 `rgba(0,0,0,.45)` + `blur(3px)`。
+- **标题**：左对齐 `16px/600`，**不再加竖条装饰**；关闭按钮 `28×28`、圆角 `8px`、hover 填充浅灰。
+- **按钮**：圆角 `12px`，高度 `32/36/40`；主按钮实心 `--tg-blue(#3390ec)`，次按钮白底 + 发丝线；
+  弹窗底部动作区右对齐，主次按钮最小宽度 `88px`。
+- **输入类**：圆角 `12px`、白底 + `1px` 发丝线，聚焦转品牌蓝并带 `3px` 柔光环。
+- **分段控件**（目录/收藏/归档、概览/内容/图谱、树结构/最近更新等）：灰底圆角容器 + 白色药丸选中块，
+  **单项不再各自描边**，整组看起来是一个按钮组。
+- **令牌只从 `telegram.css` 的 `:root` 取**（`--tg-*`），不要在组件里另起一套颜色。
+- 文字对比度 ≥ 4.5:1；正文纸面（富文本正文、思维导图画布、多维表格内容区）保持不透明。
+- 动效统一 `160ms cubic-bezier(.2,.8,.3,1)`；`prefers-reduced-motion` 下关闭过渡。
+
+---
+
+## 2.1 玻璃拟态设计系统（页面外壳材质，优先级低于第 2 节）
+
+唯一实现入口：`pros/web/src/styles/glass.css`（在 `main.ts` 于 `telegram.css` **之前**导入）。
+玻璃负责「页面外壳」质感（极光背景、侧栏、卡片外壳）；**表面之上的弹窗/浮层/表单一律按第 2 节 Telegram 规范**。
+
+### 2.1.1 三条不可破坏的实现约束
 
 1. **背景必须分层**：`html` 承担底色，`body` / `#app` 必须 `background: transparent`，
    极光渐变放 `body::before`（`position: fixed; inset: 0; z-index: -1`）。
@@ -44,7 +65,7 @@
    只把"外壳 / 工具栏 / 弹窗"做成玻璃，保证长文与数据的可读性。
 3. **文字对比度 ≥ 4.5:1**：玻璃只改表面质感，不改文字颜色层级。
 
-### 2.2 令牌（只用这些，不要另起一套）
+### 2.1.2 令牌（只用这些，不要另起一套）
 
 `--glass-blur: 18px` / `--glass-blur-sm: 10px` / `--glass-saturate: 165%` /
 `--glass-bg: rgba(255,255,255,.24)` / `--glass-bg-strong` / `--glass-bg-soft` /
@@ -52,12 +73,12 @@
 `--glass-ring: rgba(15,23,42,.09)` / `--glass-shadow` / `--glass-shadow-sm` /
 `--glass-sheen`（顶部反光）/ `--glass-aurora`（页面极光背景）。
 
-### 2.3 组件规则
+### 2.1.3 组件规则
 
 - **表格**：`.el-table` 表头 `rgba(255,255,255,.62)` + blur，行悬停 `rgba(255,255,255,.58~.62)`，
   表格外框用玻璃卡片容器（圆角 + 1px 玻璃描边 + `--glass-shadow-sm`）。
-- **弹窗**：`.el-dialog` / `.el-message-box` / 各类 overlay 统一玻璃材质，
-  顶部 42% 高度叠加 `--glass-sheen` 反光；遮罩 `rgba(15,23,42,.34)` + `blur(10px)`。
+- **弹窗**：已改为按第 2 节 Telegram 规范（实心白底 + 12px 圆角），玻璃只保留给页面外壳；
+  不要再给 `.el-dialog` / `.el-message-box` 加反光与玻璃底。
 - **工具栏按钮悬停（全局一致）**：白玻璃片 + 顶部高光 + `translateY(-1px)` + `--glass-shadow-sm`；
   主按钮保留品牌色渐变。禁止出现与整体风格冲突的不透明底色悬停（如 `--mm-hover` 这类旧灰底）；
   需要覆盖组件 scoped 旧规则时用 `!important`，并写清原因。

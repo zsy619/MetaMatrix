@@ -1,0 +1,536 @@
+/*
+ * ============================================================================
+ * 全局设计规范 · Telegram Web K（morethanwords/tweb）
+ * ----------------------------------------------------------------------------
+ * 本文件是项目 UI 的唯一全局规范来源，优先级高于 glass.css / enterprise.css：
+ *   main.ts 里最后导入，覆盖玻璃层的旧规则。
+ *
+ * 规范要点（详见 docs/design/telegram-design-system.md）：
+ *   - 主色 #3390ec；白底 + 浅灰分层；发丝线分隔；大留白；
+ *   - 圆角层级：6 / 8 / 12 / 16 / 999（药丸）；
+ *   - 按钮：32 / 36 / 40px 高，12px 圆角，主按钮实心蓝；
+ *   - 弹窗：白底 + 12px 圆角 + 中性投影，标题 16px/600，底部按钮右对齐；
+ *   - 浮层（下拉 / 气泡 / 选择器）：白底 12px 圆角 + 1px 发丝线；
+ *   - 动效：160ms cubic-bezier(.2,.8,.3,1)。
+ *
+ * 约束：
+ *   - 只改「表面几何与语义色」，不动 html/body/#app 的背景分层
+ *     （玻璃层依赖 body::before 的极光底，破坏会导致 backdrop-filter 失效）；
+ *   - 正文纸面（富文本正文、思维导图画布、多维表格内容区）保持不透明。
+ * ============================================================================
+ */
+
+:root {
+  /* ---------------- 语义色 ---------------- */
+  --tg-blue: #3390ec;
+  --tg-blue-hover: #2b87dd;
+  --tg-blue-active: #2482d1;
+  --tg-blue-soft: rgba(51, 144, 236, 0.12);
+  --tg-green: #4fae4e;
+  --tg-red: #e53935;
+  --tg-yellow: #f7bc2f;
+  --tg-purple: #8b5cf6;
+
+  /* ---------------- 文字层级 ---------------- */
+  --tg-text: #0f0f0f;
+  --tg-text-2: #707579;
+  --tg-text-3: #8e8e8e;
+  --tg-text-inverse: #ffffff;
+
+  /* ---------------- 表面层级 ---------------- */
+  --tg-surface: #ffffff;
+  --tg-surface-2: #f4f4f5;
+  --tg-surface-3: #ececf1;
+  --tg-surface-raised: rgba(255, 255, 255, 0.98);
+  --tg-border: #e6e6e6;
+  --tg-border-strong: #d8d8dc;
+
+  /* ---------------- 几何 ---------------- */
+  --tg-radius-xs: 6px;
+  --tg-radius-sm: 8px;
+  --tg-radius-md: 12px;
+  --tg-radius-lg: 16px;
+  --tg-radius-pill: 999px;
+
+  /* ---------------- 投影 / 动效 ---------------- */
+  --tg-shadow-1: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --tg-shadow-2: 0 8px 24px rgba(15, 23, 42, 0.1);
+  --tg-shadow-3: 0 24px 64px rgba(15, 23, 42, 0.18);
+  --tg-backdrop: rgba(0, 0, 0, 0.45);
+  --tg-dur: 160ms;
+  --tg-ease: cubic-bezier(0.2, 0.8, 0.3, 1);
+
+  /* ---------------- 尺寸 ---------------- */
+  --tg-btn-h-sm: 32px;
+  --tg-btn-h-md: 36px;
+  --tg-btn-h-lg: 40px;
+  --tg-btn-radius: 12px;
+  --tg-input-h: 36px;
+  --tg-input-radius: 12px;
+
+  /* 让 Element Plus 的所有组件默认落到 Telegram 基线 */
+  --el-color-primary: #3390ec;
+  --el-color-primary-light-3: #66b0f0;
+  --el-color-primary-light-5: #99c8f4;
+  --el-color-primary-light-7: #ccdff9;
+  --el-color-primary-light-8: #e5effd;
+  --el-color-primary-light-9: #f2f7fe;
+  --el-color-primary-dark-2: #2a77d0;
+  --el-border-radius-base: 10px;
+  --el-border-radius-small: 8px;
+  --el-text-color-primary: #0f0f0f;
+  --el-text-color-regular: #707579;
+  --el-text-color-secondary: #8e8e8e;
+  --el-border-color: #e6e6e6;
+  --el-border-color-light: #ececf1;
+  --el-fill-color-blank: #ffffff;
+  --el-fill-color-light: #f4f4f5;
+}
+
+/* ============================================================================
+ * 1. 遮罩
+ * ========================================================================== */
+.el-overlay,
+.pm-overlay,
+body .overlay,
+body .rev-overlay,
+body .ap-overlay,
+body .bfp-modal-overlay,
+body .cm-modal-overlay,
+body .rte-modal-overlay,
+body .ng-ce-overlay {
+  background: var(--tg-backdrop);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+
+/* ============================================================================
+ * 2. 弹窗（Element Plus Dialog）
+ * ========================================================================== */
+.el-dialog {
+  --el-dialog-border-radius: var(--tg-radius-md);
+  border-radius: var(--tg-radius-md) !important;
+  background: var(--tg-surface) !important;
+  border: 1px solid var(--tg-border);
+  box-shadow: var(--tg-shadow-3);
+  overflow: hidden;
+}
+/* Telegram 弹窗是实心白底，不叠顶部反光 */
+.el-dialog::before {
+  display: none !important;
+}
+/* 标题：16px/600，无竖条 */
+.el-dialog__header {
+  margin: 0;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--tg-border);
+  background: var(--tg-surface);
+}
+.el-dialog__title {
+  padding-left: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--tg-text);
+  letter-spacing: 0;
+}
+.el-dialog__title::before {
+  display: none !important;
+}
+/* 关闭按钮：28px 方块，浅灰 hover */
+.el-dialog__headerbtn {
+  top: 12px;
+  right: 12px;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--tg-radius-sm);
+  color: var(--tg-text-2);
+  transition: background-color var(--tg-dur) var(--tg-ease), color var(--tg-dur) var(--tg-ease);
+}
+.el-dialog__headerbtn:hover {
+  background: var(--tg-surface-2);
+  color: var(--tg-text);
+  backdrop-filter: none;
+}
+/* 正文 */
+.el-dialog__body {
+  padding: 16px 20px;
+  color: var(--tg-text);
+  background: var(--tg-surface);
+}
+/* 底部动作区 */
+.el-dialog__footer {
+  padding: 12px 16px 14px;
+  border-top: 1px solid var(--tg-border);
+  background: var(--tg-surface);
+}
+.el-dialog__footer .el-button {
+  border-radius: var(--tg-btn-radius);
+  font-weight: 500;
+  min-width: 88px;
+  height: var(--tg-btn-h-md);
+  transition: background-color var(--tg-dur) var(--tg-ease), border-color var(--tg-dur) var(--tg-ease),
+    transform var(--tg-dur) var(--tg-ease), box-shadow var(--tg-dur) var(--tg-ease);
+}
+.el-dialog__footer .el-button--primary {
+  border-color: transparent;
+  background: var(--tg-blue);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(51, 144, 236, 0.28);
+}
+.el-dialog__footer .el-button--primary:hover {
+  background: var(--tg-blue-hover);
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(51, 144, 236, 0.36);
+}
+
+/* ============================================================================
+ * 3. 消息框（MessageBox / confirm）
+ * ========================================================================== */
+.el-message-box {
+  border-radius: var(--tg-radius-md) !important;
+  background: var(--tg-surface) !important;
+  border: 1px solid var(--tg-border);
+  box-shadow: var(--tg-shadow-3);
+  overflow: hidden;
+  padding: 0;
+}
+.el-message-box::before {
+  display: none !important;
+}
+.el-message-box__header {
+  padding: 16px 20px 8px;
+  border-bottom: 0;
+}
+.el-message-box__title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--tg-text);
+}
+.el-message-box__content {
+  padding: 8px 20px 16px;
+  color: var(--tg-text);
+}
+.el-message-box__btns {
+  padding: 12px 16px 16px;
+  gap: 8px;
+  border-top: 1px solid var(--tg-border);
+}
+.el-message-box__btns .el-button {
+  border-radius: var(--tg-btn-radius);
+  font-weight: 500;
+  min-width: 84px;
+  height: var(--tg-btn-h-md);
+}
+.el-message-box__btns .el-button--primary {
+  border-color: transparent;
+  background: var(--tg-blue);
+  color: #fff;
+}
+.el-message-box__btns .el-button--primary:hover {
+  background: var(--tg-blue-hover);
+  color: #fff;
+}
+
+/* ============================================================================
+ * 4. 抽屉（Drawer）
+ * ========================================================================== */
+.el-drawer {
+  background: var(--tg-surface);
+  border: 0;
+  box-shadow: var(--tg-shadow-3);
+}
+.el-drawer__header {
+  margin-bottom: 0;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--tg-border);
+  color: var(--tg-text);
+  font-size: 15px;
+  font-weight: 600;
+}
+.el-drawer__body {
+  padding: 16px;
+  color: var(--tg-text);
+}
+.el-drawer__footer {
+  padding: 12px 16px;
+  border-top: 1px solid var(--tg-border);
+}
+
+/* ============================================================================
+ * 5. 浮层：下拉 / 气泡 / 选择器 / 日期面板
+ * ========================================================================== */
+.el-popover.el-popper,
+.el-dropdown__popper,
+.el-select__popper,
+.el-picker__popper,
+.el-autocomplete__popper,
+.el-cascader__dropdown {
+  background: var(--tg-surface) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: 1px solid var(--tg-border);
+  border-radius: var(--tg-radius-md);
+  box-shadow: var(--tg-shadow-2);
+  padding: 6px;
+}
+.el-popover.el-popper .el-popper__arrow,
+.el-dropdown__popper .el-popper__arrow,
+.el-select__popper .el-popper__arrow,
+.el-picker__popper .el-popper__arrow,
+.el-autocomplete__popper .el-popper__arrow,
+.el-cascader__dropdown .el-popper__arrow {
+  background: var(--tg-surface);
+  border-color: var(--tg-border);
+}
+.el-dropdown-menu,
+.el-select-dropdown__list,
+.el-popper ul.el-scrollbar__view {
+  padding: 0;
+}
+.el-dropdown-menu__item,
+.el-select-dropdown__item,
+.el-popper li {
+  border-radius: var(--tg-radius-sm);
+  font-size: 13.5px;
+  color: var(--tg-text);
+  transition: background-color var(--tg-dur) var(--tg-ease), color var(--tg-dur) var(--tg-ease);
+}
+.el-dropdown-menu__item:not(.is-disabled):hover,
+.el-select-dropdown__item.is-hovering,
+.el-popper li:hover {
+  background: var(--tg-surface-2);
+  color: var(--tg-text);
+}
+/* 气泡 / 提示 */
+.el-tooltip__popper,
+.el-popper.is-dark {
+  background: #182533 !important;
+  border: 0;
+  border-radius: var(--tg-radius-xs);
+  box-shadow: none;
+  font-size: 12.5px;
+}
+/* 日期 / 时间面板 */
+.el-picker-panel,
+.el-date-picker__popper,
+.el-date-range-picker__popper {
+  border-radius: var(--tg-radius-md);
+  border: 1px solid var(--tg-border);
+  box-shadow: var(--tg-shadow-2);
+  color: var(--tg-text);
+}
+.el-date-picker__header-label,
+.el-picker-panel__icon-btn,
+.el-date-table td.available:hover,
+.el-date-table td.today span {
+  color: var(--tg-blue);
+}
+
+/* ============================================================================
+ * 6. 按钮（全局基线）
+ * ========================================================================== */
+.el-button {
+  border-radius: var(--tg-btn-radius);
+  font-weight: 500;
+  transition: background-color var(--tg-dur) var(--tg-ease), border-color var(--tg-dur) var(--tg-ease),
+    color var(--tg-dur) var(--tg-ease), transform var(--tg-dur) var(--tg-ease),
+    box-shadow var(--tg-dur) var(--tg-ease);
+}
+.el-button--primary:not(.is-text):not(.is-link) {
+  background: var(--tg-blue);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(51, 144, 236, 0.26);
+}
+.el-button--primary:not(.is-text):not(.is-link):hover {
+  background: var(--tg-blue-hover);
+  border-color: transparent;
+  color: #fff;
+  transform: translateY(-1px);
+}
+.el-button--success:not(.is-text):not(.is-link) {
+  background: var(--tg-green);
+  border-color: transparent;
+  color: #fff;
+}
+.el-button--danger:not(.is-text):not(.is-link) {
+  background: var(--tg-red);
+  border-color: transparent;
+  color: #fff;
+}
+/* 普通按钮：白底 + 发丝线 */
+.el-button:not(.is-text):not(.is-link):not(.el-button--primary):not(.el-button--danger):not(.el-button--success):not(.el-button--warning):not(.el-button--info) {
+  background: var(--tg-surface);
+  border-color: var(--tg-border);
+  color: var(--tg-text);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.el-button:not(.is-text):not(.is-link):not(.el-button--primary):not(.el-button--danger):not(.el-button--success):not(.el-button--warning):not(.el-button--info):hover {
+  background: var(--tg-surface-2);
+  border-color: var(--tg-border-strong);
+  color: var(--tg-text);
+  box-shadow: var(--tg-shadow-1);
+}
+.el-button.is-text:not(.is-link),
+.el-button.is-link {
+  border-radius: var(--tg-radius-sm);
+  color: var(--tg-blue);
+}
+.el-button.is-text:not(.is-link):hover {
+  background: var(--tg-surface-2);
+  color: var(--tg-blue-hover);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* ============================================================================
+ * 7. 表单控件
+ * ========================================================================== */
+.el-input__wrapper,
+.el-select__wrapper,
+.el-textarea__inner {
+  border-radius: var(--tg-input-radius);
+  background: var(--tg-surface);
+  box-shadow: 0 0 0 1px var(--tg-border) inset;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  transition: box-shadow var(--tg-dur) var(--tg-ease);
+}
+.el-input__wrapper:hover,
+.el-select__wrapper:hover,
+.el-textarea__inner:hover {
+  box-shadow: 0 0 0 1px var(--tg-border-strong) inset;
+}
+.el-input__wrapper.is-focus,
+.el-select__wrapper.is-focused,
+.el-textarea__inner:focus {
+  box-shadow: 0 0 0 1px var(--tg-blue) inset, 0 0 0 3px rgba(51, 144, 236, 0.16);
+}
+.el-input__inner,
+.el-select__placeholder,
+.el-textarea__inner {
+  font-size: 13.5px;
+  color: var(--tg-text);
+}
+.el-input__inner::placeholder,
+.el-textarea__inner::placeholder {
+  color: var(--tg-text-3);
+}
+.el-checkbox,
+.el-radio {
+  font-size: 13.5px;
+  color: var(--tg-text);
+}
+.el-checkbox__inner,
+.el-radio__inner {
+  border-radius: var(--tg-radius-xs);
+  border-color: var(--tg-border-strong);
+}
+.el-checkbox__input.is-checked .el-checkbox__inner,
+.el-checkbox__input.is-indeterminate .el-checkbox__inner,
+.el-radio__input.is-checked .el-radio__inner {
+  background: var(--tg-blue);
+  border-color: var(--tg-blue);
+}
+.el-switch.is-checked .el-switch__core {
+  background: var(--tg-blue);
+  border-color: var(--tg-blue);
+}
+
+/* ============================================================================
+ * 8. 分段 / 标签 / 表格
+ * ========================================================================== */
+.el-radio-button__inner {
+  border-radius: var(--tg-radius-pill);
+  font-weight: 500;
+}
+.el-tag {
+  border-radius: var(--tg-radius-xs);
+  font-weight: 500;
+}
+.el-table th.el-table__cell {
+  background: var(--tg-surface-2);
+  color: var(--tg-text-2);
+}
+.el-table {
+  --el-table-border-color: var(--tg-border);
+  --el-table-header-text-color: var(--tg-text-2);
+  --el-table-row-hover-bg-color: var(--tg-surface-2);
+}
+
+/* ============================================================================
+ * 9. 自绘浮层（面板最大化 / RTE / 版本历史 / 公式 / 附件预览）
+ * ========================================================================== */
+body .overlay .card,
+body .ap-overlay .ap-card,
+body .bfp-modal-overlay .bfp-modal,
+body .cm-modal-overlay .cm-modal,
+body .rte-modal-overlay .rte-modal,
+body .rev-overlay .rev-panel,
+body .ng-ce-overlay .ng-ce-card {
+  border-radius: var(--tg-radius-md);
+  border: 1px solid var(--tg-border);
+  background: var(--tg-surface);
+  box-shadow: var(--tg-shadow-3);
+  color: var(--tg-text);
+}
+/* 面板最大化容器：底部圆角 + 中性投影 */
+.pm-card {
+  border-radius: var(--tg-radius-md);
+  border: 1px solid var(--tg-border);
+  background: var(--tg-surface);
+  box-shadow: var(--tg-shadow-3);
+}
+
+/* ============================================================================
+ * 10. 滚动条（全局细窄圆角）
+ * ========================================================================== */
+.el-dialog__body,
+.el-message-box__content,
+.el-drawer__body,
+.el-popper,
+.el-select-dropdown__list {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd3e0 transparent;
+}
+.el-dialog__body::-webkit-scrollbar,
+.el-message-box__content::-webkit-scrollbar,
+.el-drawer__body::-webkit-scrollbar,
+.el-popper::-webkit-scrollbar,
+.el-select-dropdown__list::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.el-dialog__body::-webkit-scrollbar-thumb,
+.el-message-box__content::-webkit-scrollbar-thumb,
+.el-drawer__body::-webkit-scrollbar-thumb,
+.el-popper::-webkit-scrollbar-thumb,
+.el-select-dropdown__list::-webkit-scrollbar-thumb {
+  background: #cbd3e0;
+  border: 2px solid transparent;
+  border-radius: var(--tg-radius-pill);
+  background-clip: content-box;
+}
+.el-dialog__body::-webkit-scrollbar-thumb:hover,
+.el-message-box__content::-webkit-scrollbar-thumb:hover,
+.el-drawer__body::-webkit-scrollbar-thumb:hover,
+.el-popper::-webkit-scrollbar-thumb:hover,
+.el-select-dropdown__list::-webkit-scrollbar-thumb:hover {
+  background: #aab4c2;
+  background-clip: content-box;
+}
+
+/* ============================================================================
+ * 11. 无障碍：减少动效
+ * ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  .el-dialog,
+  .el-message-box,
+  .el-button,
+  .el-input__wrapper,
+  .el-dialog__headerbtn {
+    transition: none !important;
+  }
+}
