@@ -78,11 +78,11 @@ const cards = computed(() => {
   if (!s) return []
   return [
     { label: '目录节点', value: s.nodeCount, icon: Grid, tone: 'info' },
-    { label: '内容文档', value: s.docCount, icon: Reading, tone: 'info' },
-    { label: '文件夹', value: s.folderCount, icon: Folder, tone: 'cyan' },
-    { label: '标签', value: s.tagCount, icon: PriceTag, tone: 'purple' },
-    { label: '评论', value: s.commentCount, icon: ChatDotRound, tone: 'success' },
-    { label: '未解决评论', value: s.openComments, icon: Tickets, tone: 'warning' },
+    { label: '内容文档', value: s.docCount, icon: Reading, tone: 'cyan' },
+    { label: '文件夹', value: s.folderCount, icon: Folder, tone: 'purple' },
+    { label: '标签', value: s.tagCount, icon: PriceTag, tone: 'success' },
+    { label: '评论', value: s.commentCount, icon: ChatDotRound, tone: 'warning' },
+    { label: '未解决评论', value: s.openComments, icon: Tickets, tone: 'danger' },
   ]
 })
 
@@ -242,7 +242,7 @@ onMounted(load)
 
       <div class="kn-home__grid">
         <!-- 健康度检查 -->
-        <section class="ent-card">
+        <section class="ent-card ent-card--tg-red">
           <div class="ent-card__head">
             <span class="ent-card__icon"><el-icon><Warning /></el-icon></span>
             <span class="ent-card__title">健康度检查</span>
@@ -274,7 +274,7 @@ onMounted(load)
         </section>
 
         <!-- 质量体检 -->
-        <section class="ent-card">
+        <section class="ent-card ent-card--tg-purple">
           <div class="ent-card__head">
             <span class="ent-card__icon"><el-icon><Tickets /></el-icon></span>
             <span class="ent-card__title">质量体检</span>
@@ -306,7 +306,7 @@ onMounted(load)
         </section>
 
         <!-- 最近活动 -->
-        <section class="ent-card">
+        <section class="ent-card ent-card--tg-blue">
           <div class="ent-card__head">
             <span class="ent-card__icon"><el-icon><Promotion /></el-icon></span>
             <span class="ent-card__title">最近活动</span>
@@ -331,7 +331,7 @@ onMounted(load)
         </section>
 
         <!-- 疑似重复文档 -->
-        <section class="ent-card kn-home__panel--similar">
+        <section class="ent-card ent-card--tg-cyan kn-home__panel--similar">
           <div class="ent-card__head">
             <span class="ent-card__icon"><el-icon><CopyDocument /></el-icon></span>
             <span class="ent-card__title">疑似重复文档</span>
@@ -362,7 +362,7 @@ onMounted(load)
         </section>
 
         <!-- 业务标签词库 -->
-        <section class="ent-card">
+        <section class="ent-card ent-card--tg-green">
           <div class="ent-card__head">
             <span class="ent-card__icon"><el-icon><Collection /></el-icon></span>
             <span class="ent-card__title">业务标签词库</span>
@@ -393,7 +393,7 @@ onMounted(load)
         </section>
 
         <!-- 最近更新 -->
-        <section class="ent-card">
+        <section class="ent-card ent-card--tg-blue">
           <div class="ent-card__head">
             <span class="ent-card__icon"><el-icon><Promotion /></el-icon></span>
             <span class="ent-card__title">最近更新</span>
@@ -424,7 +424,7 @@ onMounted(load)
         </section>
 
         <!-- 属性看板 -->
-        <section class="ent-card kn-home__panel--board">
+        <section class="ent-card ent-card--tg-amber kn-home__panel--board">
           <div class="ent-card__head">
             <span class="ent-card__icon"><el-icon><Grid /></el-icon></span>
             <span class="ent-card__title">属性看板</span>
@@ -471,7 +471,7 @@ onMounted(load)
 
 <style scoped>
 .kn-home {
-  padding: 20px 24px 32px;
+  padding: 18px 20px 28px;
   overflow: auto;
   background: transparent;
   /* 面板按自身宽度排版：右侧主区被拖窄时自动降列。 */
@@ -493,9 +493,9 @@ onMounted(load)
 }
 .kn-home__head h2 {
   margin: 0;
-  font-size: 20px;
-  font-weight: 650;
-  letter-spacing: -0.01em;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
   color: var(--ent-text, #1f2733);
 }
 .kn-home__head p {
@@ -512,12 +512,19 @@ onMounted(load)
   flex: 0 1 auto;
   max-width: 100%;
 }
+/* Telegram 胶囊按钮 */
+.kn-home__actions :deep(.el-button) {
+  height: 30px;
+  padding: 0 14px;
+  border-radius: 999px;
+  font-size: 13px;
+}
 
 /* KPI 区 */
 .kn-home__cards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 12px;
+  gap: 10px;
   margin-bottom: 14px;
 }
 
@@ -525,7 +532,7 @@ onMounted(load)
 .kn-home__grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
+  gap: 12px;
   align-items: stretch;
 }
 
@@ -592,10 +599,10 @@ onMounted(load)
   width: 260px;
   max-height: 340px;
   overflow-y: auto;
-  background: var(--ent-surface-2, #f8fafc);
-  border: 1px solid var(--ent-border, #e6e9ef);
-  border-radius: var(--ent-radius-sm, 8px);
-  padding: 10px;
+  background: rgba(15, 23, 42, 0.045);
+  border: 1px solid var(--tg-sep, var(--ent-border, #e6e9ef));
+  border-radius: 12px;
+  padding: 8px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -613,7 +620,7 @@ onMounted(load)
   min-width: 18px;
   padding: 0 6px;
   border-radius: 999px;
-  background: var(--ent-surface-3, #f1f5f9);
+  background: rgba(15, 23, 42, 0.08);
   color: var(--ent-text-2, #5a6472);
   font-size: 11px;
   line-height: 17px;
@@ -626,18 +633,19 @@ onMounted(load)
   gap: 3px;
   text-align: left;
   cursor: pointer;
-  border: 1px solid var(--ent-border, #e6e9ef);
-  border-radius: var(--ent-radius-xs, 6px);
-  background: var(--ent-surface, #fff);
+  border: 1px solid var(--tg-sep, var(--ent-border, #e6e9ef));
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.72);
   padding: 8px 10px;
   font-size: 13px;
   color: var(--ent-text, #1f2733);
-  box-shadow: var(--ent-shadow-xs, 0 1px 2px rgba(15, 23, 42, 0.05));
+  box-shadow: none;
   transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
 }
 .kn-board__card:hover {
-  border-color: var(--ent-primary, #1a73e8);
-  box-shadow: var(--ent-shadow-md, 0 6px 16px rgba(15, 23, 42, 0.08));
+  border-color: var(--tg-blue, #3390ec);
+  background: #fff;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.1);
   transform: translateY(-1px);
 }
 .kn-board__card-title {

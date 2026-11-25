@@ -402,6 +402,13 @@ function fitView() {
   offsetY.value = (h - (maxY - minY) * next) / 2 - minY * next
 }
 
+/** 重置缩放：回到 100% 并把原点归零。 */
+function resetZoom() {
+  scale.value = 1
+  offsetX.value = 0
+  offsetY.value = 0
+}
+
 function zoomBy(factor: number) {
   const { w, h } = size.value
   const next = Math.min(3, Math.max(0.3, scale.value * factor))
@@ -566,7 +573,9 @@ onBeforeUnmount(() => {
       <div class="kg__zoom">
         <button type="button" title="放大" @click="zoomBy(1.2)">+</button>
         <button type="button" title="缩小" @click="zoomBy(1 / 1.2)">−</button>
-        <span class="kg__zoom-value">{{ Math.round(scale * 100) }}%</span>
+        <button type="button" class="kg__zoom-value" title="重置为 100%" @click="resetZoom">
+          {{ Math.round(scale * 100) }}%
+        </button>
       </div>
 
       <!-- 悬停浮层 -->

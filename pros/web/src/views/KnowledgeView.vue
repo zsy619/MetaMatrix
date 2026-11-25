@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft } from '@element-plus/icons-vue'
+import { ArrowLeft, Document, Odometer, Share } from '@element-plus/icons-vue'
 import * as projectsApi from '../api/projects'
 import * as knowledgeApi from '../api/knowledge'
 import * as documentsApi from '../api/documents'
@@ -291,9 +291,15 @@ loadProject()
         <main class="kn-main">
           <div class="kn-main__tabs">
             <el-radio-group v-model="mainTab" size="small">
-              <el-radio-button value="home" @click="openHome()">概览</el-radio-button>
-              <el-radio-button value="doc" @click="showHome = false">内容</el-radio-button>
-              <el-radio-button value="graph">图谱</el-radio-button>
+              <el-radio-button value="home" @click="openHome()">
+                <el-icon class="kn-main__tab-icon"><Odometer /></el-icon>概览
+              </el-radio-button>
+              <el-radio-button value="doc" @click="showHome = false">
+                <el-icon class="kn-main__tab-icon"><Document /></el-icon>内容
+              </el-radio-button>
+              <el-radio-button value="graph">
+                <el-icon class="kn-main__tab-icon"><Share /></el-icon>图谱
+              </el-radio-button>
             </el-radio-group>
           </div>
           <KnowledgeGraph
@@ -374,12 +380,12 @@ loadProject()
 .kn-crumb {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
-  border-bottom: 1px solid var(--glass-ring, rgba(15, 23, 42, 0.09));
+  gap: 10px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--tg-sep, var(--glass-ring, rgba(15, 23, 42, 0.09)));
   font-size: 13px;
   color: var(--ent-text-2, #5a6472);
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.34);
   backdrop-filter: blur(var(--glass-blur, 18px)) saturate(var(--glass-saturate, 165%));
   -webkit-backdrop-filter: blur(var(--glass-blur, 18px)) saturate(var(--glass-saturate, 165%));
 }
@@ -387,7 +393,23 @@ loadProject()
   color: var(--ent-text-3, #8a94a3);
 }
 .kn-crumb :deep(.el-button) {
+  height: 32px;
+  padding: 0 12px 0 8px;
+  border-radius: 999px;
   font-weight: 500;
+  font-size: 13px;
+  color: var(--ent-text, #1f2733);
+  transition: background-color 0.16s ease, transform 0.16s ease;
+}
+.kn-crumb :deep(.el-button:hover) {
+  background: rgba(255, 255, 255, 0.72);
+  transform: translateY(-1px);
+}
+.kn-crumb :deep(.el-button .el-icon) {
+  font-size: 15px;
+}
+.kn-crumb > span:last-child {
+  font-size: 14px;
 }
 
 .kn-layout {
@@ -416,13 +438,54 @@ loadProject()
 /* 视图切换：分段控件贴顶，右侧留白 */
 .kn-main__tabs {
   padding: 10px 16px;
-  border-bottom: 1px solid var(--glass-ring, rgba(15, 23, 42, 0.09));
-  background: rgba(255, 255, 255, 0.3);
+  border-bottom: 1px solid var(--tg-sep, var(--glass-ring, rgba(15, 23, 42, 0.09)));
+  background: rgba(255, 255, 255, 0.28);
   backdrop-filter: blur(var(--glass-blur, 18px)) saturate(var(--glass-saturate, 165%));
   -webkit-backdrop-filter: blur(var(--glass-blur, 18px)) saturate(var(--glass-saturate, 165%));
 }
+/* Telegram / iOS 风格分段控件：灰底容器 + 白色选中块 */
+.kn-main__tabs :deep(.el-radio-group) {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.07);
+}
 .kn-main__tabs :deep(.el-radio-button__inner) {
-  padding: 7px 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  /* 去掉单项描边，整组表现为一个分段控件 */
+  outline: none !important;
+  height: 26px;
+  padding: 0 16px;
+  border: 0 !important;
+  border-radius: 999px !important;
+  box-shadow: none !important;
+  background: transparent;
+  color: var(--ent-text-2, #5a6472);
+  font-size: 13px;
+  line-height: 26px;
+  transition: background-color 0.16s ease, color 0.16s ease;
+}
+.kn-main__tabs :deep(.el-radio-button__original-radio:focus-visible + .el-radio-button__inner) {
+  outline: 2px solid var(--tg-blue, #3390ec) !important;
+  outline-offset: 1px;
+}
+.kn-main__tabs :deep(.el-radio-button__original-radio:checked + .el-radio-button__inner) {
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--tg-blue, #3390ec);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.16) !important;
+}
+/* 分段控件图标：概览 / 内容 / 图谱 三个入口统一尺寸 */
+.kn-main__tabs :deep(.kn-main__tab-icon) {
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0.85;
+}
+.kn-main__tabs :deep(.el-radio-button__original-radio:checked + .el-radio-button__inner) .kn-main__tab-icon {
+  opacity: 1;
 }
 
 .kn-main__empty {

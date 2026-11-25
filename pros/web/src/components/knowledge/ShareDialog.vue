@@ -184,7 +184,6 @@ onMounted(load)
   >
     <template #header>
       <div class="share-dialog__head">
-        <span class="share-dialog__bar" />
         <span class="share-dialog__title">分享设置</span>
       </div>
     </template>
@@ -320,12 +319,10 @@ onMounted(load)
 .share__panel {
   padding: 14px 16px 12px;
   margin-bottom: 18px;
-  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.7));
-  border-radius: var(--ent-radius-md, 12px);
-  background: rgba(255, 255, 255, 0.42);
-  backdrop-filter: blur(var(--glass-blur-sm, 10px)) saturate(var(--glass-saturate, 165%));
-  -webkit-backdrop-filter: blur(var(--glass-blur-sm, 10px)) saturate(var(--glass-saturate, 165%));
-  box-shadow: var(--glass-shadow-sm, 0 6px 18px rgba(15, 23, 42, 0.1));
+  border: 1px solid var(--tg-border, #e6e6e6);
+  border-radius: var(--tg-radius-md, 12px);
+  background: var(--tg-surface, #ffffff);
+  box-shadow: var(--tg-shadow-1, 0 1px 2px rgba(15, 23, 42, 0.06));
 }
 .share__hint {
   margin: 10px 0 0;
@@ -337,7 +334,38 @@ onMounted(load)
   display: flex;
   align-items: center;
   gap: 14px;
-  color: var(--ent-primary, #1a73e8);
+  color: #3390ec;
+}
+/* Telegram 风格控件：10px 圆角输入 + 浅灰底，主按钮为品牌蓝药丸 */
+.share__create :deep(.el-input__wrapper),
+.share__create :deep(.el-select__wrapper) {
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.05);
+  box-shadow: none;
+}
+.share__create :deep(.el-input__wrapper.is-focus),
+.share__create :deep(.el-select__wrapper.is-focused) {
+  box-shadow: 0 0 0 2px rgba(51, 144, 236, 0.16);
+}
+.share__create :deep(.el-input__inner),
+.share__create :deep(.el-select__placeholder) {
+  font-size: 13px;
+}
+.share__create :deep(.el-button--primary) {
+  height: 32px;
+  padding: 0 18px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(135deg, #3d9bec, #2f86e0);
+  border-color: transparent;
+  box-shadow: 0 4px 12px rgba(51, 144, 236, 0.32);
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+}
+.share__create :deep(.el-button--primary:hover) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(51, 144, 236, 0.42);
 }
 /* Element Plus 给复选框留了 30px 右间距，这里按组内间距重排。 */
 .share__switches :deep(.el-checkbox) {

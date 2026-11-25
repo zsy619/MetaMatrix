@@ -2,6 +2,7 @@
 import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Odometer, Share } from '@element-plus/icons-vue'
 import * as knowledgeApi from '../../api/knowledge'
 import * as knowledgeApiV6 from '../../api/knowledge_v6'
 import * as knowledgeApiV5 from '../../api/knowledge_v5'
@@ -1383,8 +1384,12 @@ onBeforeUnmount(() => {
     <div class="kn-tree__head">
       <span class="kn-tree__title">知识库</span>
       <div class="kn-tree__actions">
-        <el-button size="small" text @click="emit('home')">概览</el-button>
-        <el-button size="small" text @click="emit('graph')">图谱</el-button>
+        <el-button size="small" text @click="emit('home')">
+          <el-icon class="kn-tree__action-icon"><Odometer /></el-icon>概览
+        </el-button>
+        <el-button size="small" text @click="emit('graph')">
+          <el-icon class="kn-tree__action-icon"><Share /></el-icon>图谱
+        </el-button>
         <el-dropdown trigger="click">
           <el-button size="small" text title="更多">⋯</el-button>
           <template #dropdown>
@@ -1699,7 +1704,7 @@ onBeforeUnmount(() => {
     />
 
     <!-- 统一快速创建面板（021/023） -->
-    <el-dialog v-model="quickOpen" title="快速创建" width="560px" append-to-body>
+    <el-dialog v-model="quickOpen" title="快速创建" width="620px" append-to-body>
       <div class="kn-quick">
         <el-input
           ref="quickTitleInput"
@@ -1867,30 +1872,111 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 12px 14px 10px;
-  border-bottom: 1px solid var(--ent-border, #e6e9ef);
+  gap: 6px;
+  padding: 12px 10px 10px 14px;
+  border-bottom: 1px solid var(--tg-sep, var(--ent-border, #e6e9ef));
 }
 .kn-tree__title {
+  /* 标题宽度固定；空间不够时由右侧操作区换行，保证「+ 新建」始终可见 */
+  flex: 0 0 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 15px;
-  font-weight: 650;
+  font-size: 17px;
+  font-weight: 600;
   letter-spacing: -0.01em;
   color: var(--ent-text, #1f2733);
 }
 .kn-tree__actions {
   display: flex;
-  gap: 2px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 3px;
   align-items: center;
-  flex: none;
+  /* 允许收缩 + 换行：侧栏再窄也不会把「+ 新建」挤出可视区 */
+  flex: 0 1 auto;
+  min-width: 0;
 }
+/* Element Plus 默认给相邻按钮加 12px 外边距，头部放不下，这里去掉 */
+.kn-tree__actions :deep(.el-button + .el-button) {
+  margin-left: 0;
+}
+.kn-tree__actions :deep(.el-button + .el-dropdown) {
+  margin-left: 0;
+}
+/* 头部按钮统一 28px 高：文字按钮做胶囊，⋯ 做圆形图标按钮，新建做品牌蓝实心 */
 .kn-tree__actions :deep(.el-button) {
+  height: 28px;
+  padding: 0 7px;
+  border-radius: 999px;
   font-weight: 500;
+  font-size: 12.5px;
+  color: var(--ent-text-2, #5a6472);
+  transition: background-color 0.16s ease, color 0.16s ease, transform 0.16s ease;
+}
+.kn-tree__actions :deep(.el-button:hover) {
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--ent-text, #1f2733);
+  transform: translateY(-1px);
+}
+.kn-tree__actions :deep(.el-button .el-icon) {
+  font-size: 14px;
+}
+/* 概览 / 图谱 前置图标与文字留一点缝 */
+.kn-tree__actions :deep(.kn-tree__action-icon) {
+  margin-right: 3px;
+  vertical-align: -2px;
+}
+/* 「⋯」只占一个图标位，做圆形 */
+.kn-tree__actions :deep(.el-button[title='更多']) {
+  width: 28px;
+  padding: 0;
+  font-size: 15px;
+  line-height: 26px;
+  border-radius: 999px;
+}
+/* 「+ 新建」：唯一的主操作，品牌蓝实心 */
+.kn-tree__actions :deep(.kn-create__btn) {
+  color: #fff;
+  background: linear-gradient(135deg, #3d97ff, #1a6df0);
+  border: 0;
+  box-shadow: 0 3px 10px rgba(26, 109, 240, 0.3);
+}
+.kn-tree__actions :deep(.kn-create__btn:hover) {
+  color: #fff;
+  background: linear-gradient(135deg, #4aa2ff, #2a7bf5);
+  box-shadow: 0 5px 14px rgba(26, 109, 240, 0.36);
 }
 
 /* 视图切换（目录/收藏/归档/回收站） */
 .kn-tree__views {
-  padding: 10px 10px 0;
+  padding: 10px 12px 0;
+}
+/* Telegram 分段：灰底容器 + 白色选中块，回收站角标挂在文字右侧。
+   按钮组形态：容器内按钮紧贴排列，整组看起来是一个可点的分段控件。 */
+.kn-tree__views :deep(.el-radio-group) {
+  display: inline-flex;
+  gap: 2px;
+  flex-wrap: nowrap;
+  max-width: 100%;
+  padding: 3px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.07);
+}
+/* 去掉按钮自身的描边，交由外层容器统一表达「一组」 */
+.kn-tree__views :deep(.el-radio-button__inner),
+.kn-tree__sort :deep(.el-radio-button__inner) {
+  outline: none !important;
+}
+.kn-tree__views :deep(.el-radio-button__original-radio:focus-visible + .el-radio-button__inner),
+.kn-tree__sort :deep(.el-radio-button__original-radio:focus-visible + .el-radio-button__inner) {
+  outline: 2px solid var(--tg-blue, #3390ec) !important;
+  outline-offset: 1px;
+}
+.kn-tree__views :deep(.el-radio-button) {
+  /* 不强制等宽：等宽会把「回收站 12」的角标挤掉 */
+  flex: 0 0 auto;
 }
 .kn-tree__count {
   display: inline-flex;
@@ -1899,10 +1985,11 @@ onBeforeUnmount(() => {
   box-sizing: border-box;
   height: 12px;
   min-width: 14px;
-  margin-left: 4px;
+  flex: none;
+  margin-left: 5px;
   padding: 0 4px;
-  border-radius: 6px;
-  background: var(--ent-surface-3, #f1f5f9);
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.08);
   color: var(--ent-text-2, #5a6472);
   font-size: 10px;
   line-height: 12px;
@@ -1913,19 +2000,64 @@ onBeforeUnmount(() => {
    统一锁死按钮高度并用 flex 居中，角标不再影响按钮高度。 */
 .kn-tree__views :deep(.el-radio-button__inner) {
   box-sizing: border-box;
-  height: 22px;
+  width: 100%;
+  height: 26px;
   display: inline-flex;
   align-items: center;
+  padding: 0 6px;
+  border: 0 !important;
+  border-radius: 999px !important;
+  box-shadow: none !important;
+  background: transparent;
+  color: var(--ent-text-2, #5a6472);
+  font-size: 12px;
+  transition: background-color 0.16s ease, color 0.16s ease;
+}
+.kn-tree__views :deep(.el-radio-button__original-radio:checked + .el-radio-button__inner) {
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--tg-blue, #3390ec);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.16) !important;
 }
 .kn-tree__sort {
-  margin-top: 8px;
+  margin-top: 10px;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+/* 树结构 / 最近更新：与上面同一套胶囊分段 */
+.kn-tree__sort :deep(.el-radio-group) {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.07);
+}
+.kn-tree__sort :deep(.el-radio-button__inner) {
+  height: 24px;
+  padding: 0 12px;
+  border: 0 !important;
+  border-radius: 999px !important;
+  box-shadow: none !important;
+  background: transparent;
+  color: var(--ent-text-2, #5a6472);
+  font-size: 12px;
+  line-height: 24px;
+  transition: background-color 0.16s ease, color 0.16s ease;
+}
+.kn-tree__sort :deep(.el-radio-button__original-radio:checked + .el-radio-button__inner) {
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--tg-blue, #3390ec);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.16) !important;
 }
 .kn-tree__semantic {
-  height: 24px;
+  height: 26px;
   margin: 0;
+  padding: 0 10px 0 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.5);
   font-size: 12px;
 }
 .kn-tree__semantic :deep(.el-checkbox__label) {
@@ -1936,7 +2068,28 @@ onBeforeUnmount(() => {
 .kn-tree__dialog-text { margin: 0 0 10px; font-size: 13px; color: var(--ent-text, #1f2733); }
 
 /* 搜索区 */
-.kn-tree__search { padding: 8px 10px 10px; position: relative; }
+.kn-tree__search { padding: 10px 12px; position: relative; }
+/* Telegram 搜索框：圆角浅灰底，聚焦时一圈品牌蓝 */
+.kn-tree__search :deep(.el-input__wrapper) {
+  border-radius: var(--tg-radius-input, 10px);
+  background: rgba(15, 23, 42, 0.06);
+  box-shadow: none;
+  padding: 0 12px;
+}
+.kn-tree__search :deep(.el-input__wrapper.is-focus) {
+  box-shadow: 0 0 0 2px var(--tg-blue-soft, rgba(51, 144, 236, 0.12));
+}
+.kn-tree__search :deep(.el-input__inner) {
+  height: 32px;
+  font-size: 13px;
+}
+.kn-tree__search :deep(.el-input__inner::placeholder) {
+  color: var(--ent-text-3, #8a94a3);
+}
+.kn-tree__search :deep(.el-input__prefix-inner .el-icon) {
+  color: var(--ent-text-3, #8a94a3);
+  font-size: 14px;
+}
 .kn-tree__filters { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
 .kn-tree__filters :deep(.el-select) { flex: 1 1 40%; min-width: 84px; }
 .kn-tree__group { font-size: 11px; color: var(--ent-text-2, #5a6472); }
@@ -1999,34 +2152,58 @@ onBeforeUnmount(() => {
 
 /* 目录树 */
 .kn-tree :deep(.el-tree) {
-  flex: 1; overflow: auto; padding: 6px 8px;
-  --el-tree-node-hover-bg-color: var(--ent-surface-2, #f8fafc);
+  flex: 1; overflow: auto; padding: 6px 8px 16px;
+  --el-tree-node-hover-bg-color: rgba(15, 23, 42, 0.05);
 }
 .kn-tree :deep(.el-tree-node__content) {
-  height: 30px;
-  border-radius: var(--ent-radius-xs, 6px);
+  height: 34px;
+  border-radius: 10px;
+}
+/* 当前文档：Telegram 浅蓝选中态 */
+.kn-tree :deep(.el-tree-node.is-current > .el-tree-node__content) {
+  background: var(--tg-blue-soft, rgba(51, 144, 236, 0.12));
 }
 .kn-tree__node {
-  display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0;
+  display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0;
   height: 100%;
 }
+/* 悬停统计挪到右侧（图标 → 标题 → 统计 → 操作），标题不再被挤成省略号 */
+.kn-tree__node-icon { order: 1; }
+.kn-tree__node-label { order: 2; }
+.kn-tree__node-stats { order: 3; }
+.kn-tree__node-tools { order: 4; }
+/* 节点图标磁贴：圆角方块 + 细描边，像 Telegram 的 App 图标 */
 .kn-tree__node-icon {
-  flex: none; width: 18px; text-align: center; cursor: pointer;
-  border-radius: 4px; transition: background-color 0.16s ease;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  text-align: center;
+  cursor: pointer;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: inset 0 0 0 1px var(--tg-sep, var(--ent-border, #e6e9ef));
+  font-size: 14px;
+  line-height: 1;
+  transition: background-color 0.16s ease, box-shadow 0.16s ease;
 }
-.kn-tree__node-icon:hover { background: var(--ent-surface-3, #f1f5f9); }
+.kn-tree__node-icon:hover {
+  background: #fff;
+  box-shadow: inset 0 0 0 1px var(--tg-blue, #3390ec);
+}
 .kn-tree__node-stats {
   flex: none;
-  font-size: 10px;
+  font-size: 10.5px;
   color: var(--ent-text-2, #5a6472);
-  background: var(--ent-surface-3, #f1f5f9);
-  border-radius: 4px;
+  background: rgba(15, 23, 42, 0.06);
+  border-radius: 999px;
   padding: 1px 4px;
   white-space: nowrap;
 }
 .kn-tree__node-label {
   flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  font-size: 13px; color: var(--ent-text, #1f2733);
+  font-size: 14px; color: var(--ent-text, #1f2733);
 }
 .kn-tree__node-label.is-stale { color: var(--ent-text-3, #8a94a3); text-decoration: line-through; }
 .kn-tree__alias { color: var(--ent-text-3, #8a94a3); font-size: 11px; margin-left: 4px; }
@@ -2038,11 +2215,12 @@ onBeforeUnmount(() => {
 .kn-tree__node-tools:focus-within { opacity: 1; }
 .kn-tree__more, .kn-tree__star {
   cursor: pointer; font-size: 13px; color: var(--ent-text-3, #8a94a3);
-  padding: 2px 5px; border: 0; background: none; border-radius: 4px;
-  line-height: 1.4;
+  padding: 0; border: 0; background: none;
+  width: 22px; height: 22px; line-height: 20px; text-align: center;
+  border-radius: 999px;
 }
 .kn-tree__more:hover, .kn-tree__star:hover {
-  background: var(--ent-surface-3, #f1f5f9);
+  background: rgba(15, 23, 42, 0.07);
   color: var(--ent-text, #1f2733);
 }
 .kn-tree__star.is-on { color: #f5a623; opacity: 1; }
@@ -2055,28 +2233,56 @@ onBeforeUnmount(() => {
 
 /* 新建面板 */
 .kn-quick { display: flex; flex-direction: column; gap: 12px; }
-.kn-quick__grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+/* 快速创建：Telegram 风格磁贴卡片（图标方块 + 文案，hover 上浮） */
+.kn-quick__grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .kn-quick__card {
-  display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 6px;
-  border: 1px solid var(--ent-border, #e6e9ef); border-radius: var(--ent-radius-sm, 8px);
-  background: transparent; cursor: pointer; font-size: 12px; color: var(--ent-text, #1f2733);
-  transition: border-color 0.18s ease, background-color 0.18s ease, transform 0.18s ease;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px;
+  padding: 16px 8px 14px;
+  border: 1px solid var(--glass-ring, rgba(15, 23, 42, 0.09));
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(var(--glass-blur-sm, 10px));
+  -webkit-backdrop-filter: blur(var(--glass-blur-sm, 10px));
+  box-shadow: var(--glass-shadow-sm, 0 6px 18px rgba(15, 23, 42, 0.1));
+  cursor: pointer; font-size: 13px; color: var(--ent-text, #1f2733);
+  transition: border-color 0.18s ease, background-color 0.18s ease, transform 0.18s ease,
+    box-shadow 0.18s ease;
 }
 .kn-quick__card:hover {
-  border-color: var(--ent-primary, #1a73e8);
-  background: var(--ent-primary-soft, #eaf1fe);
-  transform: translateY(-1px);
+  border-color: rgba(51, 144, 236, 0.45);
+  background: rgba(255, 255, 255, 0.78);
+  transform: translateY(-2px);
+  box-shadow: var(--glass-shadow, 0 12px 30px rgba(15, 23, 42, 0.16));
 }
-.kn-quick__icon { font-size: 20px; }
+/* 图标磁贴 */
+.kn-quick__icon {
+  display: grid; place-items: center;
+  width: 42px; height: 42px; border-radius: 13px;
+  font-size: 21px; line-height: 1;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: inset 0 0 0 1px var(--glass-ring, rgba(15, 23, 42, 0.09));
+  transition: box-shadow 0.18s ease, background-color 0.18s ease;
+}
+.kn-quick__card:hover .kn-quick__icon {
+  background: #fff;
+  box-shadow: inset 0 0 0 1px rgba(51, 144, 236, 0.4);
+}
 .kn-quick__label { font-size: 12px; color: var(--ent-text-2, #5a6472); }
 .kn-quick__template-list {
   display: flex; flex-direction: column; gap: 4px; max-height: 220px; overflow: auto;
 }
 .kn-quick__template {
-  display: flex; align-items: center; gap: 8px; padding: 6px 8px;
-  border-radius: var(--ent-radius-xs, 6px); cursor: grab; font-size: 13px;
+  display: flex; align-items: center; gap: 10px; padding: 7px 10px;
+  border-radius: 10px; cursor: grab; font-size: 13px;
+  transition: background-color 0.16s ease;
 }
-.kn-quick__template:hover { background: var(--ent-surface-2, #f8fafc); }
+.kn-quick__template > span:first-child {
+  display: grid; place-items: center;
+  width: 24px; height: 24px; border-radius: 7px; font-size: 14px;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: inset 0 0 0 1px var(--glass-ring, rgba(15, 23, 42, 0.09));
+}
+.kn-quick__template:hover { background: rgba(15, 23, 42, 0.045); }
 .kn-quick__template-label { flex: 1; }
 .kn-preview { max-height: 420px; overflow: auto; font-size: 13px; }
 .kn-preview__hint { font-size: 12px; color: var(--ent-text-2, #5a6472); }

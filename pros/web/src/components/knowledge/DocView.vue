@@ -4,12 +4,20 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   ArrowLeft,
+  ChatDotRound,
+  Select,
   Clock,
+  Collection,
   Connection,
+  CopyDocument,
   Download,
+  Link,
+  List,
   Lock,
+  MagicStick,
   Memo,
   MoreFilled,
+  Setting,
   Share,
   Tickets,
 } from '@element-plus/icons-vue'
@@ -103,6 +111,11 @@ const outlineItems = ref<knowledgeApiV5.OutlineItem[]>([])
 let presenceTimer: ReturnType<typeof setInterval> | null = null
 
 const panelId = computed(() => `doc:${props.documentId}`)
+/** 面包屑去掉最后一级：右侧已经有大标题，重复显示没有意义。 */
+const crumbTrail = computed(() => {
+  const list = props.breadcrumb ?? []
+  return list.length > 1 ? list.slice(0, -1) : []
+})
 /** 阅读位置记忆作用域：同一篇文档下次打开回到上次滚动的地方。 */
 const scrollMemoryKey = computed(() => `doc:${props.documentId}`)
 const router = useRouter()
@@ -593,11 +606,19 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
 <template>
   <section class="doc-view">
     <header class="doc-view__head">
-      <el-button text :icon="ArrowLeft" @click="emit('back')">返回目录</el-button>
-      <nav v-if="breadcrumb?.length" class="doc-view__crumb">
-        <template v-for="(item, index) in breadcrumb" :key="item.id">
+      <el-button
+        class="doc-view__back"
+        text
+        :icon="ArrowLeft"
+        title="返回目录"
+        aria-label="返回目录"
+        @click="emit('back')"
+      />
+      <!-- 路径只显示到父级：最后一级就是右侧的大标题，重复展示会显得冗余 -->
+      <nav v-if="crumbTrail.length" class="doc-view__crumb">
+        <template v-for="(item, index) in crumbTrail" :key="item.id">
           <span class="doc-view__crumb-item">{{ item.title }}</span>
-          <span v-if="index < breadcrumb.length - 1" class="doc-view__crumb-sep">/</span>
+          <span v-if="index < crumbTrail.length - 1" class="doc-view__crumb-sep">/</span>
         </template>
       </nav>
       <el-popover v-if="icon" v-model:visible="iconOpen" trigger="click" :width="420">
@@ -645,21 +666,68 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
       </div>
       <!-- 工具栏：按使用频率排序，「更多」收口放最后 -->
       <div class="doc-view__actions">
-        <div class="mm-bar__group">
-        <el-button class="mm-bar__btn" text size="small" :icon="Tickets" @click="insertToc">目录</el-button>
-        <WriteAssist
-          :document-id="props.documentId"
-          :paragraph="currentParagraph()"
-          @insert="insertSuggestion"
-        />
-        <el-button class="mm-bar__btn" text size="small" :icon="Memo" @click="minutesVisible = true">会议纪要</el-button>
-        <el-button class="mm-bar__btn" text size="small" :icon="Connection" @click="toggleCollab">
-          {{ collabOn ? '退出协同' : '协同编辑' }}
+        <!-- 次要操作：图标方块成组（Telegram 式紧凑工具簇） -->
+        <div class="mm-bar__group mm-bar__group--icons">
+          <el-button
+            class="mm-bar__btn mm-bar__btn--square"
+            text
+            :icon="Tickets"
+            title="插入目录"
+            aria-label="插入目录"
+            @click="insertToc"
+          />
+          <el-button
+            class="mm-bar__btn mm-bar__btn--square"
+            text
+            :icon="Memo"
+            title="会议纪要"
+            aria-label="会议纪要"
+            @click="minutesVisible = true"
+          />
+          <el-button
+            class="mm-bar__btn mm-bar__btn--square"
+            text
+            :icon="Clock"
+            title="版本历史"
+            aria-label="版本历史"
+            @click="sidebarTab = 'history'"
+          />
+          <el-button
+            class="mm-bar__btn mm-bar__btn--square"
+            :class="{ 'is-on': collabOn }"
+            text
+            :icon="Connection"
+            :title="collabOn ? '退出协同编辑' : '开启协同编辑'"
+            :aria-label="collabOn ? '退出协同编辑' : '开启协同编辑'"
+            @click="toggleCollab"
+          />
+        </div>
+        <div class="kn-doc__assist">
+          <WriteAssist
+            :document-id="props.documentId"
+            :paragraph="currentParagraph()"
+            @insert="insertSuggestion"
+          />
+        </div>
+        <!-- 主要操作：分享（品牌蓝实心） -->
+        <el-button
+          class="mm-bar__btn mm-bar__btn--primary"
+          text
+          :icon="Share"
+          title="分享"
+          @click="shareVisible = true"
+        >
+          分享
         </el-button>
-        <el-button class="mm-bar__btn" text size="small" :icon="Clock" @click="sidebarTab = 'history'">历史</el-button>
-        <el-button class="mm-bar__btn" text size="small" :icon="Share" @click="shareVisible = true">分享</el-button>
         <el-dropdown trigger="click" @command="(format: string) => exportAs(format)">
-          <el-button class="mm-bar__btn" text size="small" :icon="Download" :loading="exporting">导出</el-button>
+          <el-button
+            class="mm-bar__btn mm-bar__btn--square"
+            text
+            :icon="Download"
+            :loading="exporting"
+            title="导出"
+            aria-label="导出"
+          />
           <template #dropdown>
             <el-dropdown-menu>
               <el-dropdown-item command="markdown">Markdown</el-dropdown-item>
@@ -672,7 +740,13 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
           </template>
         </el-dropdown>
         <el-dropdown trigger="click">
-          <el-button class="mm-bar__btn" text size="small" :icon="MoreFilled">更多</el-button>
+          <el-button
+            class="mm-bar__btn mm-bar__btn--square"
+            text
+            :icon="MoreFilled"
+            title="更多"
+            aria-label="更多"
+          />
           <template #dropdown>
             <el-dropdown-menu>
               <el-dropdown-item @click="saveAsTemplate">另存为模板</el-dropdown-item>
@@ -682,7 +756,6 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
             </el-dropdown-menu>
           </template>
         </el-dropdown>
-        </div>
       </div>
     </header>
 
@@ -716,14 +789,22 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
       />
       <aside class="doc-view__sidebar">
         <el-tabs v-model="sidebarTab" class="doc-view__tabs">
-          <el-tab-pane label="大纲" name="outline">
+          <el-tab-pane name="outline">
+              <template #label>
+                <el-icon class="doc-view__tab-icon"><List /></el-icon>大纲
+              </template>
+            
             <DocOutline
               :html="html"
               :document-id="documentId"
               @reordered="loadOutline"
             />
           </el-tab-pane>
-          <el-tab-pane label="任务" name="tasks">
+          <el-tab-pane name="tasks">
+              <template #label>
+                <el-icon class="doc-view__tab-icon"><Select /></el-icon>任务
+              </template>
+            
             <div class="doc-view__tasks">
               <p v-if="!tasks.length" class="doc-view__tasks-empty">正文里还没有待办块。</p>
               <label v-for="task in tasks" :key="task.index" class="doc-view__task">
@@ -735,10 +816,18 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
               </label>
             </div>
           </el-tab-pane>
-          <el-tab-pane label="属性" name="properties">
+          <el-tab-pane name="properties">
+              <template #label>
+                <el-icon class="doc-view__tab-icon"><Setting /></el-icon>属性
+              </template>
+            
             <DocProperties :document-id="documentId" />
           </el-tab-pane>
-          <el-tab-pane label="评论" name="comments">
+          <el-tab-pane name="comments">
+              <template #label>
+                <el-icon class="doc-view__tab-icon"><ChatDotRound /></el-icon>评论
+              </template>
+            
             <DocComments
               :document-id="documentId"
               :quote="quote"
@@ -747,19 +836,39 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
               @quoted="quote = ''; anchorFrom = -1; anchorTo = -1"
             />
           </el-tab-pane>
-          <el-tab-pane label="反向引用" name="backrefs">
+          <el-tab-pane name="backrefs">
+              <template #label>
+                <el-icon class="doc-view__tab-icon"><Link /></el-icon>反向引用
+              </template>
+            
             <DocBackrefs :document-id="documentId" :project-id="projectId" @back="emit('back')" />
           </el-tab-pane>
-          <el-tab-pane label="历史" name="history">
+          <el-tab-pane name="history">
+              <template #label>
+                <el-icon class="doc-view__tab-icon"><Clock /></el-icon>历史
+              </template>
+            
             <DocHistory :document-id="documentId" @restored="onRestored" />
           </el-tab-pane>
-          <el-tab-pane label="版本" name="versions">
+          <el-tab-pane name="versions">
+              <template #label>
+                <el-icon class="doc-view__tab-icon"><CopyDocument /></el-icon>版本
+              </template>
+            
             <DocVersions :document-id="documentId" @restored="onRestored" />
           </el-tab-pane>
-          <el-tab-pane label="智能" name="ai">
+          <el-tab-pane name="ai">
+              <template #label>
+                <el-icon class="doc-view__tab-icon"><MagicStick /></el-icon>智能
+              </template>
+            
             <AiPanel :project-id="projectId" :document-id="documentId" />
           </el-tab-pane>
-          <el-tab-pane label="相关" name="related">
+          <el-tab-pane name="related">
+              <template #label>
+                <el-icon class="doc-view__tab-icon"><Collection /></el-icon>相关
+              </template>
+            
             <p v-if="relatedLoading" class="doc-view__related-empty">加载中…</p>
             <p v-else-if="!relatedDocs.length" class="doc-view__related-empty">暂无相关文档。</p>
             <ul v-else class="doc-view__related">
@@ -930,23 +1039,48 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
   -webkit-backdrop-filter: blur(var(--glass-blur, 18px)) saturate(var(--glass-saturate, 165%));
 }
 
-/* ---------------- 侧栏页签：药丸分段 + 自动换行 ---------------- */
-/* 9 个页签一行放不下，Element Plus 默认会出左右滚动箭头；
-   这里改成可换行的药丸标签，去掉箭头，选中态用品牌色。 */
+/* ---------------- 侧栏页签：Telegram 分段按钮组 + 单行横向滚动 ---------------- */
+/* 9 个页签一行放不下：保持单行不换行，用原生横向滚动条（滚动条隐藏），
+   滚轮/触控板可左右滑动；整组表现为一个分段按钮组：
+   灰色圆角容器 + 白色药丸选中块 + 每项带图标，单项不再各自描边。 */
 .doc-view__tabs :deep(.el-tabs__header) {
-  margin: 0 0 8px;
+  margin: 0 0 10px;
+  padding: 0;
 }
+/* 胶囊外壳画在 nav-wrap 上（不随内容滚动），滚动区只做内容渐隐，
+   这样右侧「还有更多页签」的提示不会被胶囊圆角切掉。 */
 .doc-view__tabs :deep(.el-tabs__nav-wrap) {
+  position: relative;
   height: auto;
-  overflow: visible;
+  overflow: hidden;
+  padding: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.42);
+  backdrop-filter: blur(12px) saturate(165%);
+  -webkit-backdrop-filter: blur(12px) saturate(165%);
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
 }
 .doc-view__tabs :deep(.el-tabs__nav-scroll) {
-  overflow: visible;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  border-radius: inherit;
+  /* 右侧渐隐：提示还可以继续横向滑动 */
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 22px), transparent 100%);
+  mask-image: linear-gradient(to right, #000 calc(100% - 22px), transparent 100%);
+}
+.doc-view__tabs :deep(.el-tabs__nav-scroll::-webkit-scrollbar) {
+  display: none;
+  height: 0;
 }
 .doc-view__tabs :deep(.el-tabs__nav) {
   height: auto;
-  flex-wrap: wrap;
-  gap: 6px;
+  flex-wrap: nowrap;
+  gap: 2px;
+  width: max-content;
+  min-width: 100%;
 }
 .doc-view__tabs :deep(.el-tabs__nav-prev),
 .doc-view__tabs :deep(.el-tabs__nav-next) {
@@ -956,30 +1090,44 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
   display: none;
 }
 .doc-view__tabs :deep(.el-tabs__item) {
-  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
   line-height: 26px;
-  padding: 0 12px;
-  border: 1px solid var(--glass-ring, rgba(15, 23, 42, 0.09));
+  padding: 0 10px;
+  border: 0;
   border-radius: 999px;
-  background: var(--glass-bg-soft, rgba(255, 255, 255, 0.45));
-  color: var(--mm-muted, #86909c);
+  background: transparent;
+  color: var(--tg-text-2, #707579);
   font-size: 12.5px;
-  transition:
-    background 0.16s ease,
-    color 0.16s ease,
-    transform 0.16s ease,
-    box-shadow 0.16s ease;
+  font-weight: 400;
+  white-space: nowrap;
+  transition: background 0.16s ease, color 0.16s ease, box-shadow 0.16s ease,
+    transform 0.16s ease;
 }
 .doc-view__tabs :deep(.el-tabs__item:hover) {
-  color: var(--mm-text, #1d2129);
-  background: var(--glass-bg-hover, rgba(255, 255, 255, 0.72));
-  transform: translateY(-1px);
+  color: var(--tg-text, #0f0f0f);
+  background: rgba(255, 255, 255, 0.72);
+}
+.doc-view__tabs :deep(.el-tabs__item:hover .doc-view__tab-icon) {
+  color: var(--tg-blue, #3390ec);
 }
 .doc-view__tabs :deep(.el-tabs__item.is-active) {
-  color: #fff;
-  border-color: transparent;
-  background: linear-gradient(135deg, #3370ff, #5b8cff);
-  box-shadow: 0 2px 8px rgba(51, 112, 255, 0.32);
+  color: var(--tg-blue, #3390ec);
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.14), 0 0 0 1px rgba(51, 144, 236, 0.12);
+}
+/* 页签图标：与文字基线对齐 */
+.doc-view__tab-icon {
+  font-size: 13.5px;
+  line-height: 1;
+  opacity: 0.9;
+}
+.doc-view__tabs :deep(.el-tabs__item.is-active) .doc-view__tab-icon {
+  color: var(--tg-blue, #3390ec);
+  opacity: 1;
 }
 .doc-view__tabs :deep(.el-tabs__content) {
   padding-top: 4px;

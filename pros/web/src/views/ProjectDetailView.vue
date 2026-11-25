@@ -2,7 +2,7 @@
 import { computed, defineAsyncComponent, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowLeft, Delete, DocumentAdd, Edit } from '@element-plus/icons-vue'
+import { ArrowLeft, Delete, DocumentAdd, Edit, MoreFilled, Picture } from '@element-plus/icons-vue'
 import { Collection } from '@element-plus/icons-vue'
 import * as projectsApi from '../api/projects'
 import * as documentsApi from '../api/documents'
@@ -190,9 +190,11 @@ onMounted(load)
 <template>
   <div class="pg-page">
     <nav class="pg-crumb">
-      <el-button text :icon="ArrowLeft" @click="goBack">返回项目列表</el-button>
+      <button class="pg-icon-btn" type="button" title="返回项目列表" aria-label="返回项目列表" @click="goBack">
+        <el-icon><ArrowLeft /></el-icon>
+      </button>
       <span class="pg-crumb__sep">/</span>
-      <span>{{ project?.name || '…' }}</span>
+      <span class="pg-crumb__current">项目</span>
     </nav>
 
     <header class="pg-head">
@@ -210,16 +212,29 @@ onMounted(load)
         </div>
       </div>
       <div class="pg-head__actions">
-        <el-button size="small" :icon="Collection" @click="goKnowledge">知识库</el-button>
-        <el-button size="small" :icon="Edit" @click="openEdit">编辑信息</el-button>
-        <el-button size="small" :icon="DocumentAdd" @click="createCanvas">新建画布</el-button>
-        <el-button size="small" type="danger" plain :icon="Delete" @click="deleteProject">删除项目</el-button>
+        <div class="pg-act-group">
+          <button type="button" class="pg-act" title="打开知识库" @click="goKnowledge">
+            <el-icon><Collection /></el-icon><span>知识库</span>
+          </button>
+          <button type="button" class="pg-act" title="编辑项目信息" @click="openEdit">
+            <el-icon><Edit /></el-icon><span>编辑信息</span>
+          </button>
+          <button type="button" class="pg-act" title="新建画布" @click="createCanvas">
+            <el-icon><DocumentAdd /></el-icon><span>新建画布</span>
+          </button>
+        </div>
+        <button type="button" class="pg-act pg-act--danger" title="删除项目" @click="deleteProject">
+          <el-icon><Delete /></el-icon><span>删除项目</span>
+        </button>
       </div>
     </header>
 
     <p v-if="error" class="pg-error">{{ error }}</p>
     <div v-if="loading" class="pg-empty"><AppLoading /></div>
-    <div v-else-if="!canvases.length" class="pg-empty">这个项目还没有画布。点右上角「新建画布」。</div>
+    <div v-else-if="!canvases.length" class="pg-empty">
+      <span class="pg-empty__icon"><el-icon><Picture /></el-icon></span>
+      <p>这个项目还没有画布。点右上角「新建画布」。</p>
+    </div>
 
     <div v-else class="pg-list">
       <article
@@ -261,8 +276,17 @@ onMounted(load)
           <p class="pg-canvas__meta">更新于 {{ new Date(canvas.updatedAt).toLocaleString() }}</p>
         </div>
         <div class="pg-canvas__actions" @click.stop>
-          <el-button size="small" text :icon="Edit" @click="renameCanvas(canvas)">重命名</el-button>
-          <el-button size="small" text type="danger" :icon="Delete" @click="deleteCanvas(canvas)">删除</el-button>
+          <el-dropdown trigger="click" @command="(cmd: string) => cmd === 'rename' ? renameCanvas(canvas) : deleteCanvas(canvas)">
+            <button class="pg-more-btn" type="button" title="更多操作" aria-label="更多操作">
+              <el-icon><MoreFilled /></el-icon>
+            </button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="rename"><el-icon><Edit /></el-icon>重命名</el-dropdown-item>
+                <el-dropdown-item command="delete" divided><el-icon><Delete /></el-icon>删除</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
         </div>
       </article>
     </div>
@@ -316,10 +340,26 @@ onMounted(load)
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
   font-size: 13px;
   color: var(--mm-muted);
 }
+.pg-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--mm-text, #1d2129);
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+  transition: background-color 120ms ease, transform 120ms ease;
+}
+.pg-icon-btn:hover { background: #fff; transform: translateY(-1px); }
+.pg-crumb__current { color: var(--mm-text, #1d2129); font-weight: 500; }
 
 .pg-crumb__sep {
   color: var(--mm-faint);
@@ -397,9 +437,38 @@ onMounted(load)
 
 .pg-head__actions {
   display: flex;
+  align-items: center;
   gap: 8px;
   flex: none;
+  flex-wrap: wrap;
 }
+/* 头部动作按钮组：统一高度、比例一致，图标 + 文字 */
+.pg-act-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.7);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+}
+.pg-act {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 13px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #3c4043;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+.pg-act:hover { background: rgba(22, 93, 255, 0.1); color: #1456f0; }
+.pg-act--danger { background: rgba(244, 63, 94, 0.1); color: #e11d48; }
+.pg-act--danger:hover { background: rgba(244, 63, 94, 0.18); color: #be123c; }
 
 .pg-error {
   margin: 0 0 16px;
@@ -411,16 +480,31 @@ onMounted(load)
 }
 
 .pg-empty {
-  padding: 48px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 56px 0;
   text-align: center;
   color: var(--mm-faint);
   font-size: 14px;
 }
+.pg-empty__icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--el-color-primary, #165dff);
+  font-size: 24px;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+}
 
 .pg-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 12px;
 }
 
 .pg-canvas {
@@ -428,15 +512,19 @@ onMounted(load)
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 14px 18px;
-  border: 1px solid var(--mm-line);
-  border-radius: 12px;
-  background: var(--mm-surface);
+  padding: 14px 16px;
+  border: 1px solid rgba(15, 23, 42, 0.07);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
   cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .pg-canvas:hover {
-  border-color: var(--mm-blue);
+  border-color: rgba(22, 93, 255, 0.28);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.09);
 }
 
 .pg-canvas__main {
@@ -450,12 +538,12 @@ onMounted(load)
 
 .pg-canvas__icon {
   border: 0;
-  background: none;
+  background: rgba(22, 93, 255, 0.08);
   font-size: 22px;
   line-height: 1;
   cursor: pointer;
-  padding: 2px 4px;
-  border-radius: 6px;
+  padding: 8px 10px;
+  border-radius: 12px;
 }
 .pg-canvas__icon:hover {
   background: var(--el-fill-color-light, #f2f3f5);
@@ -479,6 +567,19 @@ onMounted(load)
   gap: 4px;
   flex: none;
 }
+.pg-more-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #5b6675;
+  cursor: pointer;
+}
+.pg-more-btn:hover { background: rgba(15, 23, 42, 0.06); color: #1d2129; }
 
 .pg-field {
   display: block;

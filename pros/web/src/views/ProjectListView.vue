@@ -2,7 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowLeft, Delete, Edit, Plus } from '@element-plus/icons-vue'
+import { ArrowLeft, Delete, Edit, FolderOpened, MoreFilled, Plus } from '@element-plus/icons-vue'
 import * as projectsApi from '../api/projects'
 import type { ProjectSummary } from '../types/project'
 import { friendlyApiMessage } from '../utils/apiMessage'
@@ -85,23 +85,31 @@ onMounted(load)
 <template>
   <div class="pg-page">
     <nav class="pg-crumb">
-      <el-button text :icon="ArrowLeft" @click="goHome">返回首页</el-button>
+      <button class="pg-icon-btn" type="button" title="返回首页" aria-label="返回首页" @click="goHome">
+        <el-icon><ArrowLeft /></el-icon>
+      </button>
       <span class="pg-crumb__sep">/</span>
-      <span>项目</span>
+      <span class="pg-crumb__current">项目</span>
     </nav>
 
     <header class="pg-head">
-      <div>
+      <div class="pg-head__text">
         <h1 class="pg-title">项目</h1>
         <p class="pg-sub">用项目把多张画布组织在一起。</p>
       </div>
-      <el-button type="primary" :icon="Plus" @click="createOpen = true">新建项目</el-button>
+      <button class="pg-primary-btn" type="button" @click="createOpen = true">
+        <el-icon><Plus /></el-icon>
+        <span>新建项目</span>
+      </button>
     </header>
 
     <p v-if="error" class="pg-error">{{ error }}</p>
 
     <div v-if="loading" class="pg-empty"><AppLoading /></div>
-    <div v-else-if="!projects.length" class="pg-empty">还没有项目。点右上角「新建项目」开始。</div>
+    <div v-else-if="!projects.length" class="pg-empty">
+      <span class="pg-empty__icon"><el-icon><FolderOpened /></el-icon></span>
+      <p>还没有项目。点右上角「新建项目」开始。</p>
+    </div>
 
     <div v-else class="pg-grid">
       <article
@@ -127,8 +135,17 @@ onMounted(load)
           </div>
         </div>
         <div class="pg-card__actions" @click.stop>
-          <el-button size="small" text :icon="Edit" @click="renameProject(project)">重命名</el-button>
-          <el-button size="small" text type="danger" :icon="Delete" @click="deleteProject(project)">删除</el-button>
+          <el-dropdown trigger="click" @command="(cmd: string) => cmd === 'rename' ? renameProject(project) : deleteProject(project)">
+            <button class="pg-more-btn" type="button" title="更多操作" aria-label="更多操作">
+              <el-icon><MoreFilled /></el-icon>
+            </button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="rename"><el-icon><Edit /></el-icon>重命名</el-dropdown-item>
+                <el-dropdown-item command="delete" divided><el-icon><Delete /></el-icon>删除</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
         </div>
       </article>
     </div>
@@ -148,10 +165,26 @@ onMounted(load)
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
   font-size: 13px;
   color: var(--mm-muted);
 }
+.pg-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--mm-text, #1d2129);
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+  transition: background-color 120ms ease, transform 120ms ease;
+}
+.pg-icon-btn:hover { background: #fff; transform: translateY(-1px); }
+.pg-crumb__current { color: var(--mm-text, #1d2129); font-weight: 500; }
 
 .pg-crumb a {
   color: var(--mm-blue);
@@ -176,6 +209,23 @@ onMounted(load)
   font-weight: 700;
   color: var(--mm-text);
 }
+.pg-primary-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--el-color-primary, #165dff);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(22, 93, 255, 0.24);
+  transition: filter 120ms ease, transform 120ms ease;
+}
+.pg-primary-btn:hover { filter: brightness(1.06); transform: translateY(-1px); }
 
 .pg-sub {
   margin: 4px 0 0;
@@ -193,10 +243,25 @@ onMounted(load)
 }
 
 .pg-empty {
-  padding: 48px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 56px 0;
   text-align: center;
   color: var(--mm-faint);
   font-size: 14px;
+}
+.pg-empty__icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--el-color-primary, #165dff);
+  font-size: 24px;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
 }
 
 .pg-grid {
@@ -210,17 +275,19 @@ onMounted(load)
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  padding: 18px;
-  border: 1px solid var(--mm-line);
+  padding: 16px 16px 15px;
+  border: 1px solid rgba(15, 23, 42, 0.07);
   border-radius: 14px;
-  background: var(--mm-surface);
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
   cursor: pointer;
-  transition: border-color 0.15s ease, transform 0.15s ease;
+  transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .pg-card:hover {
-  border-color: var(--mm-blue);
-  transform: translateY(-1px);
+  border-color: rgba(22, 93, 255, 0.28);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.09);
 }
 
 .pg-card__main {
@@ -232,13 +299,13 @@ onMounted(load)
 
 .pg-card__emoji {
   flex: none;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   display: grid;
   place-items: center;
-  border-radius: 12px;
-  background: #f1f3f4;
-  font-size: 22px;
+  border-radius: 13px;
+  background: rgba(22, 93, 255, 0.08);
+  font-size: 23px;
   line-height: 1;
 }
 
@@ -292,8 +359,19 @@ onMounted(load)
 
 .pg-card__actions {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
   flex: none;
 }
+.pg-more-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #5b6675;
+  cursor: pointer;
+}
+.pg-more-btn:hover { background: rgba(15, 23, 42, 0.06); color: #1d2129; }
 </style>
