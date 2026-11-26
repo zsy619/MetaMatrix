@@ -35,6 +35,19 @@ type documentSaveOperationSQLite struct {
 
 func (documentSaveOperationSQLite) TableName() string { return "document_save_operations" }
 
+// docAuditEventSQLite 是 doc_audit_events 的 SQLite 影子模型：只把时间列换成可回读类型。
+type docAuditEventSQLite struct {
+	ID         uuid.UUID `gorm:"type:uuid;primaryKey"`
+	DocumentID uuid.UUID `gorm:"type:uuid;not null;index:idx_doc_audit_doc_created,priority:1"`
+	UserID     uuid.UUID `gorm:"type:uuid;not null;index"`
+	Action     string    `gorm:"type:varchar(32);not null"`
+	BlockID    string    `gorm:"type:varchar(128);not null;default:''"`
+	Detail     string    `gorm:"type:text;not null;default:''"`
+	CreatedAt  time.Time `gorm:"not null;index:idx_doc_audit_doc_created,priority:2"`
+}
+
+func (docAuditEventSQLite) TableName() string { return "doc_audit_events" }
+
 // openDocumentsSQLite 为普通行为测试提供独立的内存数据库。
 // 并发竞争不在 SQLite 上断言，因为它不能模拟 PostgreSQL 的并行写锁语义。
 func openDocumentsSQLite(t *testing.T) *gorm.DB {
@@ -59,6 +72,7 @@ func openDocumentsSQLite(t *testing.T) *gorm.DB {
 		&backupContentBlockSQLite{},
 		&documentSaveOperationSQLite{},
 		&pageReferencesSQLite{},
+		&docAuditEventSQLite{},
 	); err != nil {
 		t.Fatal(err)
 	}

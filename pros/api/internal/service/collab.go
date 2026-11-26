@@ -62,7 +62,7 @@ type CollabService struct {
 	presence      PresenceStore
 	derivedDelay  time.Duration
 	derivedMu     sync.Mutex
-	derivedTimers map[uuid.UUID]*time.Timer
+	derivedTimers map[uuid.UUID]*derivedWork
 }
 
 // NewCollabService 构造协同服务。presence 必须与知识库共用同一实例，避免两套在线状态。
@@ -75,7 +75,7 @@ func NewCollabService(db *gorm.DB, presence PresenceStore) *CollabService {
 		docs:          NewDocumentsService(db),
 		presence:      presence,
 		derivedDelay:  defaultDerivedDelay,
-		derivedTimers: make(map[uuid.UUID]*time.Timer),
+		derivedTimers: make(map[uuid.UUID]*derivedWork),
 	}
 }
 
@@ -212,7 +212,7 @@ func (s *CollabService) Append(actorID, docID, authorID uuid.UUID, in CollabOper
 		return nil, err
 	}
 	if shouldDerive {
-		s.scheduleDerived(docID)
+		s.scheduleDerived(docID, actorID)
 	}
 	return out, nil
 }
@@ -270,40 +270,58 @@ func (s *CollabService) ListPresence(actorID, docID uuid.UUID) ([]PresenceUser, 
 	return s.presence.List(docID), nil
 }
 
+// derivedWork 记录一次抖动抽取任务，并记下触发双写的最后一位作者，供审计使用。
+type derivedWork struct {
+	timer   *time.Timer
+	actorID uuid.UUID
+}
+
 // FlushDerived 立即执行抖动中的抽取与修订快照，供测试与关闭房间时收尾。
 func (s *CollabService) FlushDerived(docID uuid.UUID) error {
 	s.derivedMu.Lock()
-	if t, ok := s.derivedTimers[docID]; ok {
-		t.Stop()
+	var actorID uuid.UUID
+	if w, ok := s.derivedTimers[docID]; ok {
+		w.timer.Stop()
+		actorID = w.actorID
 		delete(s.derivedTimers, docID)
 	}
 	s.derivedMu.Unlock()
-	return s.materializeDerived(docID)
+	return s.materializeDerived(docID, actorID)
 }
 
-func (s *CollabService) scheduleDerived(docID uuid.UUID) {
+func (s *CollabService) scheduleDerived(docID, actorID uuid.UUID) {
 	s.derivedMu.Lock()
 	defer s.derivedMu.Unlock()
 	if s.derivedTimers == nil {
-		s.derivedTimers = make(map[uuid.UUID]*time.Timer)
+		s.derivedTimers = make(map[uuid.UUID]*derivedWork)
 	}
-	if t, ok := s.derivedTimers[docID]; ok {
-		t.Stop()
+	if w, ok := s.derivedTimers[docID]; ok {
+		w.timer.Stop()
 	}
 	delay := s.derivedDelay
 	if delay < 0 {
 		return
 	}
-	s.derivedTimers[docID] = time.AfterFunc(delay, func() {
-		if err := s.materializeDerived(docID); err != nil {
-			log.Printf("collab derived materialize %s: %v", docID, err)
-		}
-	})
+	s.derivedTimers[docID] = &derivedWork{
+		actorID: actorID,
+		timer: time.AfterFunc(delay, func() {
+			s.derivedMu.Lock()
+			var actor uuid.UUID
+			if w, ok := s.derivedTimers[docID]; ok {
+				actor = w.actorID
+				delete(s.derivedTimers, docID)
+			}
+			s.derivedMu.Unlock()
+			if err := s.materializeDerived(docID, actor); err != nil {
+				log.Printf("collab derived materialize %s: %v", docID, err)
+			}
+		}),
+	}
 }
 
 // materializeDerived 用最新 current_data 重建检索块，并在内容相对 head 有变化时补自动修订快照。
-// 不在每次 WS update 的同一事务里跑，避免按键级全删全建。
-func (s *CollabService) materializeDerived(docID uuid.UUID) error {
+// 不在每次 WS update 的同一事务里跑，避免按键级全删全建。审计也只在这个抖动点写一条。
+func (s *CollabService) materializeDerived(docID, actorID uuid.UUID) error {
 	return s.db.Transaction(func(tx *gorm.DB) error {
 		var doc model.CanvasDocument
 		q := tx.Where("id = ?", docID)
@@ -325,6 +343,11 @@ func (s *CollabService) materializeDerived(docID uuid.UUID) error {
 		}
 		// 知识库历史快照失败不阻断主链路，与普通保存一致。
 		_ = SnapshotDocVersion(tx, &doc)
+		if actorID != uuid.Nil && len(doc.CurrentData) > 0 {
+			if err := appendDocAudit(tx, actorID, docID, AuditActionCollabSave, doc.CurrentData); err != nil {
+				return err
+			}
+		}
 		return nil
 	})
 }

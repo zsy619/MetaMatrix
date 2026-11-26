@@ -53,6 +53,8 @@ func AutoMigrate(gdb *gorm.DB) error {
 		&model.DocCRDTUpdate{},
 		// 正文协同操作日志（与文档保存版本对齐），独立于旧 HTML 级 doc_crdt_updates。
 		&model.DocOperation{},
+		// 用户+文档级审计骨架（A3）；块类型/父子等到 B2。
+		&model.DocAuditEvent{},
 		&model.KnowledgeChunk{},
 		// 知识库 5.0：评论已读位与业务标签词库。
 		&model.DocCommentRead{},

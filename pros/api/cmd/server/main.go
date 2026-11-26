@@ -100,6 +100,7 @@ func main() {
 	dirH := handler.NewDirectoryHandler(dirSvc)
 	knH := handler.NewKnowledgeHandler(knSvc, cfg.JWTSecret)
 	collabH := handler.NewCollabHandler(service.NewCollabService(gdb, knSvc.PresenceStore()), cfg.JWTSecret)
+	auditH := handler.NewDocAuditHandler(service.NewDocAuditService(gdb), cfg.JWTSecret)
 	// 历史版本保留条数可配置（111）。
 	service.VersionKeep = cfg.KnowledgeVersionKeep
 	// 回收站自动清理：超期节点由定时任务清除（073）。
@@ -387,6 +388,7 @@ func main() {
 		// 正文协同操作日志：HTTP 仍走 Bearer 鉴权。WebSocket 在组外单独挂载。
 		knowledgeDocs.GET("/:id/operations", collabH.ListOperations)
 		knowledgeDocs.POST("/:id/operations", collabH.AppendOperation)
+		knowledgeDocs.GET("/:id/audit", auditH.ListAudit)
 		// 知识库 5.0：自定义字段、评论增强、任务块、大纲与目录、docx 导出。
 		knowledgeDocs.PUT("/:id/properties/fields", knH.UpdateDocFields)
 		knowledgeDocs.POST("/:id/comments/:commentId/reaction", knH.ToggleCommentReaction)

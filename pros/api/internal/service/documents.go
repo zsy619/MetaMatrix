@@ -1130,6 +1130,9 @@ func (s *DocumentsService) Update(ownerID, docID uuid.UUID, in UpdateDocumentInp
 			if _, err := syncExtract(tx, docID, in.CurrentData, now, doc.CanvasType); err != nil {
 				return err
 			}
+			if err := appendDocAudit(tx, ownerID, docID, AuditActionSave, in.CurrentData); err != nil {
+				return err
+			}
 		}
 		if err := tx.Where("id = ?", docID).First(doc).Error; err != nil {
 			return err
@@ -1437,8 +1440,10 @@ func (s *DocumentsService) Restore(ownerID, docID uuid.UUID, in RestoreInput) (*
 		}); err != nil {
 			return err
 		}
-		_, err := syncExtract(tx, docID, payload, now, doc.CanvasType)
-		return err
+		if _, err := syncExtract(tx, docID, payload, now, doc.CanvasType); err != nil {
+			return err
+		}
+		return appendDocAudit(tx, ownerID, docID, AuditActionRestore, payload)
 	})
 	if err != nil {
 		if errors.Is(err, ErrSaveConflict) {
