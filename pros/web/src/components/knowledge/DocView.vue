@@ -39,6 +39,8 @@ const IconPicker = defineAsyncComponent(() => import('../common/IconPicker.vue')
 import { getDocument, updateDocument } from '../../api/documents'
 import { apiRequestBlob, getToken } from '../../api/http'
 import { LiveCollabSession, createCollabYDoc } from './collab/yDocCollab'
+import { isCollabWritable } from './collab/collabOfflineQueue'
+import DocAudit from './DocAudit.vue'
 import type { Doc as YDoc } from 'yjs'
 import type { DocumentFull } from '../../api/documents'
 import {
@@ -85,7 +87,7 @@ const dirty = ref(false)
 const saveTimer = ref<ReturnType<typeof setTimeout> | null>(null)
 const exporting = ref(false)
 const iconOpen = ref(false)
-const sidebarTab = ref<'outline' | 'tasks' | 'properties' | 'comments' | 'backrefs' | 'history' | 'versions' | 'ai'>('outline')
+const sidebarTab = ref<'outline' | 'tasks' | 'properties' | 'comments' | 'backrefs' | 'history' | 'versions' | 'audit' | 'ai'>('outline')
 const shareVisible = ref(false)
 const minutesVisible = ref(false)
 /** 协同编辑：开启后走正文 Yjs（A2a WebSocket），关掉后回到单人 HTTP 保存。 */
@@ -93,6 +95,8 @@ const collabOn = ref(false)
 /** 正文 Yjs 协同会话。旧 HTML 级 crdtDoc 旁路已只读，本按钮不再调用它。 */
 const liveSession = ref<LiveCollabSession | null>(null)
 const liveYDoc = shallowRef<YDoc | null>(null)
+/** 协同进房后的可写状态：浏览者为 false，编辑器强制只读。 */
+const collabWritable = ref(true)
 /** 切换协同时重挂编辑器，以便按需接入 Collaboration 扩展。 */
 const editorSessionKey = ref(0)
 const presence = ref<PresenceUser[]>([])
@@ -191,6 +195,7 @@ function stopLiveCollab() {
   liveSession.value = null
   liveYDoc.value?.destroy()
   liveYDoc.value = null
+  collabWritable.value = true
   if (collabOn.value) editorSessionKey.value += 1
   collabOn.value = false
 }
@@ -216,14 +221,23 @@ async function toggleCollab() {
     onError: () => {
       ElMessage.warning('协同同步暂时不可用，已继续本地编辑')
     },
+    onHello: (info) => {
+      const writable = isCollabWritable(info)
+      const changed = collabWritable.value !== writable
+      collabWritable.value = writable
+      if (changed && !writable) {
+        ElMessage.info('当前是只读协同，无法编辑正文')
+      }
+    },
   })
   try {
     await session.start()
     liveYDoc.value = ydoc
     liveSession.value = session
+    collabWritable.value = isCollabWritable({ canWrite: session.canWrite, role: session.role })
     collabOn.value = true
     editorSessionKey.value += 1
-    ElMessage.success('已进入协同模式')
+    ElMessage.success(collabWritable.value ? '已进入协同模式' : '已进入只读协同模式')
   } catch {
     session.stop()
     ydoc.destroy()
@@ -783,6 +797,10 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
       <el-icon><Lock /></el-icon>
       此文档已被锁定，当前为只读状态。
     </div>
+    <div v-else-if="collabOn && !collabWritable" class="doc-view__lock">
+      <el-icon><Lock /></el-icon>
+      协同房间为只读，浏览者不能编辑正文。
+    </div>
 
     <div v-if="loading" class="doc-view__empty"><AppLoading /></div>
     <div v-else-if="!doc" class="doc-view__empty">文档不存在或已被删除。</div>
@@ -797,6 +815,7 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
         :scroll-memory-key="scrollMemoryKey"
         :knowledge-project-id="projectId"
         :collab-document="liveYDoc"
+        :editable="collabWritable"
         :compact="false"
         :expanded="true"
         :show-title="false"
@@ -878,6 +897,12 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
               </template>
             
             <DocVersions :document-id="documentId" @restored="onRestored" />
+          </el-tab-pane>
+          <el-tab-pane name="audit">
+              <template #label>
+                <el-icon class="doc-view__tab-icon"><Tickets /></el-icon>审计
+              </template>
+            <DocAudit :document-id="documentId" />
           </el-tab-pane>
           <el-tab-pane name="ai">
               <template #label>

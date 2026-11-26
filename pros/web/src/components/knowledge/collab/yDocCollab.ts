@@ -1,4 +1,9 @@
 import * as Y from 'yjs'
+import {
+  defaultOfflineQueueStore,
+  isCollabWritable,
+  type OfflineQueueStore,
+} from './collabOfflineQueue'
 
 const REMOTE_ORIGIN = 'remote'
 const DEFAULT_HEARTBEAT_MS = 20_000
@@ -82,16 +87,20 @@ export type LiveCollabOptions = {
   reconnectBaseMs?: number
   schedule?: (fn: () => void, ms: number) => ReturnType<typeof setTimeout>
   clearSchedule?: (id: ReturnType<typeof setTimeout>) => void
+  /** 未发出增量的持久化存储；默认 IndexedDB（失败则 localStorage）。不写入凭证。 */
+  offlineStore?: OfflineQueueStore
 }
 
 /**
  * 把本地 Y.Doc 接到 Hertz 协同通道：发送本地增量（可附 HTML 供服务端双写），
  * 并应用远端 ops / update。断线后自动重连并先 sync 再冲刷待发增量。
- * 持久化离线队列（刷新页面后恢复）留给后续，本包只在会话内存里暂存未发出的更新。
+ * 未发出的 Yjs 更新按文档隔离写入本地持久化队列，刷新或重新进房后恢复并重试；
+ * 发送成功后从队列移除。浏览者（hello.canWrite=false / role=viewer）不发送本地增量。
  * 旧 HTML 级 crdtDoc 旁路已只读，新的协同编辑只走本通道。
  */
 export class LiveCollabSession {
   private readonly opts: LiveCollabOptions
+  private readonly offline: OfflineQueueStore
   private socket: CollabSocket | null = null
   private unbind: (() => void) | null = null
   private opened = false
@@ -101,25 +110,35 @@ export class LiveCollabSession {
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null
   private attempts = 0
+  private connectWait: ((err?: Error) => void) | null = null
   canWrite = true
   role = ''
 
   constructor(opts: LiveCollabOptions) {
     this.opts = opts
+    this.offline = opts.offlineStore ?? defaultOfflineQueueStore()
   }
 
   async start(): Promise<void> {
     this.stopped = false
+    // 先挂上插座监听再等本地队列：否则测试和浏览器可能在 restore 完成前就触发 open。
+    const restoring = this.restoreQueue()
     if (!this.unbind) {
       this.unbind = bindLocalUpdates(this.opts.ydoc, (update) => {
+        if (!this.writable()) return
         if (!this.opened) {
-          this.pending.push(update)
+          this.enqueue(update)
           return
         }
         this.sendUpdate(update)
       })
     }
-    await this.connect()
+    try {
+      await this.connect()
+    } finally {
+      await restoring
+      if (this.opened && this.writable()) this.flushPending()
+    }
   }
 
   noteHtml(_html: string): void {
@@ -129,6 +148,8 @@ export class LiveCollabSession {
 
   stop(): void {
     this.stopped = true
+    this.connectWait?.(new Error('collab stopped'))
+    this.connectWait = null
     this.clearReconnect()
     this.clearHeartbeat()
     this.unbind?.()
@@ -140,6 +161,7 @@ export class LiveCollabSession {
     }
     this.socket = null
     this.opened = false
+    // 内存队列清空，但持久化队列保留，刷新 / 再次进房后还能恢复。
     this.pending = []
   }
 
@@ -150,13 +172,20 @@ export class LiveCollabSession {
     const socket = factory(url)
     this.socket = socket
     await new Promise<void>((resolve, reject) => {
+      this.connectWait = (err) => {
+        this.connectWait = null
+        if (err) reject(err)
+        else resolve()
+      }
       const onOpen = () => {
         this.opened = true
         this.attempts = 0
+        this.connectWait = null
         resolve()
       }
       const onError = () => {
         this.opts.onError?.(new Error('collab socket error'))
+        this.connectWait = null
         reject(new Error('collab socket error'))
       }
       const onClose = () => {
@@ -182,19 +211,62 @@ export class LiveCollabSession {
     this.flushPending()
   }
 
+  private writable(): boolean {
+    return isCollabWritable({ canWrite: this.canWrite, role: this.role })
+  }
+
+  private enqueue(update: Uint8Array): void {
+    this.pending.push(update)
+    void this.persistQueue()
+  }
+
+  private async restoreQueue(): Promise<void> {
+    try {
+      const payloads = await this.offline.load(this.opts.documentId)
+      if (!payloads.length) return
+      const restored = payloads.map((p) => decodeYUpdate(p))
+      this.pending = [...restored, ...this.pending]
+    } catch {
+      /* 本地队列损坏时忽略，避免挡住进房 */
+    }
+  }
+
+  private async persistQueue(): Promise<void> {
+    try {
+      const payloads = this.pending.map((u) => encodeYUpdate(u))
+      if (payloads.length === 0) await this.offline.clear(this.opts.documentId)
+      else await this.offline.save(this.opts.documentId, payloads)
+    } catch {
+      /* 持久化失败不阻断在线协同 */
+    }
+  }
+
   private flushPending(): void {
+    if (!this.writable()) return
     const queued = this.pending
     this.pending = []
     for (const update of queued) this.sendUpdate(update)
+    void this.persistQueue()
   }
 
   private sendUpdate(update: Uint8Array): void {
-    this.sendJSON({
-      type: 'update',
-      kind: 'update',
-      payload: encodeYUpdate(update),
-      html: this.opts.htmlProvider?.() ?? '',
-    })
+    if (!this.writable()) return
+    if (!this.socket || !this.opened) {
+      this.enqueue(update)
+      return
+    }
+    try {
+      this.socket.send(
+        JSON.stringify({
+          type: 'update',
+          kind: 'update',
+          payload: encodeYUpdate(update),
+          html: this.opts.htmlProvider?.() ?? '',
+        }),
+      )
+    } catch {
+      this.enqueue(update)
+    }
   }
 
   private startHeartbeat(): void {
@@ -258,6 +330,10 @@ export class LiveCollabSession {
     if (msg.type === 'hello') {
       this.canWrite = msg.canWrite !== false
       this.role = msg.role ?? ''
+      if (!this.writable()) {
+        this.pending = []
+        void this.persistQueue()
+      }
       this.opts.onHello?.({ canWrite: this.canWrite, role: this.role })
       return
     }

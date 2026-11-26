@@ -176,3 +176,20 @@ export const CRDT_BYPASS_READ_ONLY = 'html crdt bypass is read-only'
 export function appendCrdtUpdate(_documentId: string, _kind: 'update' | 'snapshot', _payload: string): Promise<{ seq: number }> {
   return Promise.reject(new Error(CRDT_BYPASS_READ_ONLY))
 }
+
+/** 用户+文档级审计记录（A3 骨架，只读）。 */
+export type DocAuditEvent = {
+  id: string
+  documentId: string
+  userId: string
+  action: string
+  blockId: string
+  detail: string
+  createdAt: string
+}
+
+export function listDocAudit(documentId: string, limit = 50) {
+  const q = limit ? `?limit=${encodeURIComponent(String(limit))}` : ''
+  return apiRequest<DocAuditEvent[]>(`/documents/${documentId}/audit${q}`, { cache: 'no-store' })
+}
+

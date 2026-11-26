@@ -276,6 +276,8 @@ const props = withDefaults(
      * 从第一天携带 A1 的 data-block-id。不传时保持单人编辑与原保存路径。
      */
     collabDocument?: import('yjs').Doc | null
+    /** 为 false 时编辑器不可写（协同浏览者进房后强制只读）。默认 true。 */
+    editable?: boolean
     /**
      * 是否按「纸张」排版（默认 true，A4 + 窄边距）。
      * 画布里嵌入的紧凑区块传 false：正文按内容流式排版，不再撑出 A4 纸张高度，
@@ -301,6 +303,7 @@ const props = withDefaults(
     knowledgeProjectId: '',
     pageSheet: true,
     scrollMemoryKey: '',
+    editable: true,
   },
 )
 
@@ -1207,6 +1210,17 @@ const editor = useRteExtensions({
   mentionDocuments: () => knowledgeDocs.mentionDocuments(),
   reapplyTableFilter: (ed, transaction, appended) => reapplyTableFilter(ed as never, transaction, appended),
 })
+
+watch(
+  [editor, () => props.editable],
+  () => {
+    const ed = editor.value
+    if (!ed) return
+    const next = props.editable !== false
+    if (ed.isEditable !== next) ed.setEditable(next)
+  },
+  { immediate: true },
+)
 
 watch([writingPaper, editor], () => {
   const ed = editor.value
