@@ -9,9 +9,12 @@ import {
   Awareness,
   collabCaretColor,
   onlineAwarenessMembers,
+  presenceUserIds,
+  pruneAwarenessByPresence,
   relativeCursor,
   relayAwareness,
   remoteCaretStates,
+  encodeAwarenessUpdate,
 } from './collabAwareness'
 import { encodeYUpdate, LiveCollabSession } from './yDocCollab'
 import { isCollabWritable, memoryOfflineQueueStore } from './collabOfflineQueue'
@@ -271,8 +274,101 @@ describe('LiveCollabSession awareness 通道', () => {
       }),
     )
     expect((seenB.at(-1) as { userId: string }[]).map((u) => u.userId)).toEqual(['u-b'])
+    // Leave 只更新名单时，也必须清掉 Alice 的光标/选区。
+    expect(remoteCaretStates(sessionB.awareness).some((item) => item.user?.name === 'Alice')).toBe(false)
     sessionA.stop()
     sessionB.stop()
+  })
+
+  it('Leave 后即使没收到 null awareness，presence 也会清掉鬼光标', () => {
+    const docA = trackDoc(new Y.Doc())
+    const docB = trackDoc(new Y.Doc())
+    const awA = new Awareness(docA)
+    const awB = new Awareness(docB)
+    awA.setLocalState({
+      user: { name: 'Alice', color: '#dc2626', id: 'u-a' },
+      cursor: relativeCursor(docA, 'default', 0, 2),
+    })
+    awB.setLocalState({ user: { name: 'Bob', color: '#2563eb', id: 'u-b' } })
+    relayAwareness(awA, awB)
+    expect(remoteCaretStates(awB).some((item) => item.user?.id === 'u-a' && item.cursor)).toBe(true)
+
+    pruneAwarenessByPresence(awB, presenceUserIds([{ userId: 'u-b' }]))
+    expect(remoteCaretStates(awB).some((item) => item.user?.id === 'u-a')).toBe(false)
+    expect(onlineAwarenessMembers(awB).map((m) => m.id)).toEqual(['u-b'])
+  })
+
+  it('重连后会重新上报本地 awareness，并按新的 presence 同步远端光标', async () => {
+    const ydoc = trackDoc(new Y.Doc())
+    const sockets: ReturnType<typeof createFakeSocket>[] = []
+    const session = new LiveCollabSession({
+      documentId: 'd-re',
+      token: 't',
+      ydoc,
+      socketURL: 'ws://example.test/collab',
+      heartbeatIntervalMs: 0,
+      reconnectBaseMs: 5,
+      schedule: (fn, ms) => setTimeout(fn, ms),
+      clearSchedule: (id) => clearTimeout(id),
+      offlineStore: memoryOfflineQueueStore(),
+      socketFactory: () => {
+        const sock = createFakeSocket()
+        sockets.push(sock)
+        queueMicrotask(() => sock.open())
+        return sock
+      },
+      user: { name: 'Bob', color: '#2563eb', id: 'u-b' },
+    })
+    const started = session.start()
+    await started
+    const first = sockets[0]!
+    expect(first.sent.some((s) => s.includes('"type":"awareness"'))).toBe(true)
+    expect(first.sent.some((s) => s.includes('"type":"awareness-sync"'))).toBe(true)
+
+    const aliceDoc = trackDoc(new Y.Doc())
+    const awAlice = new Awareness(aliceDoc)
+    awAlice.setLocalState({
+      user: { name: 'Alice', color: '#dc2626', id: 'u-a' },
+      cursor: relativeCursor(aliceDoc, 'default', 1, 3),
+    })
+    first.deliver(
+      JSON.stringify({
+        type: 'awareness',
+        payload: encodeYUpdate(encodeAwarenessUpdate(awAlice, [awAlice.clientID])),
+      }),
+    )
+    const carolDoc = trackDoc(new Y.Doc())
+    const awCarol = new Awareness(carolDoc)
+    awCarol.setLocalState({ user: { name: 'Carol', color: '#059669', id: 'u-c' } })
+    first.deliver(
+      JSON.stringify({
+        type: 'awareness',
+        payload: encodeYUpdate(encodeAwarenessUpdate(awCarol, [awCarol.clientID])),
+      }),
+    )
+    expect(remoteCaretStates(session.awareness).map((item) => item.user?.id).sort()).toEqual(['u-a', 'u-c'])
+
+    first.close()
+    await new Promise((r) => setTimeout(r, 20))
+    const second = sockets[1]
+    expect(second).toBeTruthy()
+    expect(second!.sent.some((s) => s.includes('"type":"awareness"'))).toBe(true)
+    expect(second!.sent.some((s) => s.includes('"type":"awareness-sync"'))).toBe(true)
+
+    // 重连后服务端会再推 presence：Carol 已离房，鬼光标应被清掉；Alice 仍在。
+    second!.deliver(
+      JSON.stringify({
+        type: 'presence',
+        users: [
+          { userId: 'u-a', name: 'Alice', avatar: '', editing: true, cursor: '', lastSeen: '' },
+          { userId: 'u-b', name: 'Bob', avatar: '', editing: true, cursor: '', lastSeen: '' },
+        ],
+      }),
+    )
+    const ids = remoteCaretStates(session.awareness).map((item) => item.user?.id)
+    expect(ids).toContain('u-a')
+    expect(ids).not.toContain('u-c')
+    session.stop()
   })
 })
 

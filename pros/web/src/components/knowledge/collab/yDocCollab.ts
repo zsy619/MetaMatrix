@@ -10,6 +10,8 @@ import {
   encodeAwarenessUpdate,
   type CollabCaretProvider,
   type CollabCaretUser,
+  presenceUserIds,
+  pruneAwarenessByPresence,
 } from './collabAwareness'
 
 const AWARENESS_REMOTE = 'remote'
@@ -242,6 +244,8 @@ export class LiveCollabSession {
     this.sendJSON({ type: 'sync', after: this.lastSeq })
     this.flushPending()
     this.flushAwareness()
+    // 请房间里其他人再发一遍光标，并让服务端把 awareness-sync 转出去。
+    this.sendJSON({ type: 'awareness-sync' })
   }
 
   private writable(): boolean {
@@ -354,6 +358,7 @@ export class LiveCollabSession {
       seq?: number
       canWrite?: boolean
       role?: string
+      userId?: string
     }
     try {
       msg = JSON.parse(raw) as typeof msg
@@ -386,7 +391,20 @@ export class LiveCollabSession {
       return
     }
     if (msg.type === 'presence' && msg.users) {
+      pruneAwarenessByPresence(this.awareness, presenceUserIds(msg.users))
       this.opts.onPresence?.(msg.users)
+      return
+    }
+    if (msg.type === 'awareness-leave' && msg.userId) {
+      const keep = new Set<string>()
+      this.awareness.getStates().forEach((state, clientId) => {
+        if (clientId === this.awareness.clientID) return
+        const id = (state as { user?: { id?: string } } | null)?.user?.id
+        if (id && id !== msg.userId) keep.add(id)
+      })
+      const localId = (this.awareness.getLocalState() as { user?: { id?: string } } | null)?.user?.id
+      if (localId) keep.add(localId)
+      pruneAwarenessByPresence(this.awareness, keep)
       return
     }
     if (msg.type === 'awareness' && msg.payload) {
@@ -409,7 +427,7 @@ export class LiveCollabSession {
   private bindAwareness(): void {
     if (this.unbindAwareness) return
     const onUpdate = (_changes: unknown, origin: unknown) => {
-      if (origin === AWARENESS_REMOTE) return
+      if (origin === AWARENESS_REMOTE || origin === 'presence') return
       this.flushAwareness()
     }
     this.awareness.on('update', onUpdate)

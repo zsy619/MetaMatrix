@@ -235,6 +235,7 @@ type wsOut struct {
 	CanWrite bool                   `json:"canWrite,omitempty"`
 	Role     string                 `json:"role,omitempty"`
 	Payload  string                 `json:"payload,omitempty"`
+	UserID   string                 `json:"userId,omitempty"`
 }
 
 func (h *CollabHandler) handleWSMessage(client *collabClient, message []byte) {
@@ -402,6 +403,7 @@ func (h *CollabHandler) depart(client *collabClient) {
 		return
 	}
 	_ = h.svc.Leave(client.userID, client.docID)
+	h.hub.broadcast(client.docID, nil, wsOut{Type: "awareness-leave", UserID: client.userID.String()})
 	if users, err := h.svc.ListPresence(client.userID, client.docID); err == nil {
 		h.hub.broadcast(client.docID, nil, wsOut{Type: "presence", Users: users})
 	}

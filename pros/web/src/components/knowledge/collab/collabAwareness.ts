@@ -3,6 +3,7 @@ import {
   Awareness,
   applyAwarenessUpdate,
   encodeAwarenessUpdate,
+  removeAwarenessStates,
 } from 'y-protocols/awareness'
 
 /** 协作者光标/选区配色。必须是 #RRGGBB，CollaborationCaret 才会绘制选区。 */
@@ -100,4 +101,32 @@ export function onlineAwarenessMembers(awareness: Awareness): AwarenessMember[] 
   return out
 }
 
-export { Awareness, applyAwarenessUpdate, encodeAwarenessUpdate }
+/** 把已离房用户的远端光标/选区从 awareness 清掉，避免只更新名单后留下鬼光标。 */
+export function pruneAwarenessByPresence(
+  awareness: Awareness,
+  presentUserIds: Iterable<string>,
+  localClientId = awareness.clientID,
+): number[] {
+  const present = new Set(Array.from(presentUserIds).filter(Boolean))
+  const stale: number[] = []
+  awareness.getStates().forEach((state, clientId) => {
+    if (clientId === localClientId || !state) return
+    const id = (state as { user?: { id?: string } }).user?.id
+    if (!id || present.has(id)) return
+    stale.push(clientId)
+  })
+  if (stale.length) removeAwarenessStates(awareness, stale, 'presence')
+  return stale
+}
+
+export function presenceUserIds(users: unknown[]): string[] {
+  const out: string[] = []
+  for (const item of users) {
+    if (!item || typeof item !== 'object') continue
+    const id = (item as { userId?: unknown }).userId
+    if (typeof id === 'string' && id) out.push(id)
+  }
+  return out
+}
+
+export { Awareness, applyAwarenessUpdate, encodeAwarenessUpdate, removeAwarenessStates }
