@@ -116,8 +116,20 @@ func main() {
 			}
 		}
 	}()
+	blobs, blobNote := media.ResolveBlobBackend(cfg.MediaRoot, media.ObjectConfig{
+		Mode:      cfg.MediaObject.Mode,
+		Endpoint:  cfg.MediaObject.Endpoint,
+		Bucket:    cfg.MediaObject.Bucket,
+		Region:    cfg.MediaObject.Region,
+		AccessKey: cfg.MediaObject.AccessKey,
+		SecretKey: cfg.MediaObject.SecretKey,
+		Prefix:    cfg.MediaObject.Prefix,
+		UseSSL:    cfg.MediaObject.UseSSL,
+	})
+	log.Printf("media storage: %s", blobNote)
 	mediaSvc := &media.Service{
 		Store:  media.NewGormStore(gdb),
+		Blobs:  blobs,
 		Root:   cfg.MediaRoot,
 		Secret: cfg.MediaSignSecret,
 		Feishu: media.FeishuCreds{
