@@ -151,6 +151,9 @@ func (s *CollabService) Append(actorID, docID, authorID uuid.UUID, in CollabOper
 			if err != nil {
 				return err
 			}
+			if err := GuardLockedBlockMutations(tx, docID, data, access.Role, access.CanWrite); err != nil {
+				return err
+			}
 			// 双写必须按所有者条件更新行：成员编辑不能改 WHERE owner_user_id。
 			if err := bumpSaveVersion(tx, doc.OwnerUserID, docID, nil, map[string]interface{}{
 				"current_data": data,

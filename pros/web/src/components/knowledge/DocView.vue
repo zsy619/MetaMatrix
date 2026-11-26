@@ -36,7 +36,7 @@ import MeetingMinutesDialog from './MeetingMinutesDialog.vue'
 import ShareDialog from './ShareDialog.vue'
 // 图标库按需加载。
 const IconPicker = defineAsyncComponent(() => import('../common/IconPicker.vue'))
-import { getDocument, updateDocument } from '../../api/documents'
+import { getDocument, getDocumentBlock, updateBlockPermission, updateDocument } from '../../api/documents'
 import { apiRequestBlob, getToken } from '../../api/http'
 import { LiveCollabSession, createCollabYDoc } from './collab/yDocCollab'
 import { isCollabWritable } from './collab/collabOfflineQueue'
@@ -59,6 +59,8 @@ import type { PresenceUser } from '../../api/knowledge'
 import { friendlyApiMessage } from '../../utils/apiMessage'
 import AppLoading from '../common/AppLoading.vue'
 import SaveConflictPanel from './SaveConflictPanel.vue'
+import BlockPermissionPanel from './BlockPermissionPanel.vue'
+import { readBlockId } from '../../extensions/blockIdentity'
 import { resolveConflictHtml, type SaveConflictChoice } from './saveConflict'
 
 const props = defineProps<{
@@ -94,6 +96,10 @@ const conflictOpen = ref(false)
 const conflictMineHtml = ref('')
 const conflictTheirsHtml = ref('')
 const conflictRemoteVersion = ref<number | undefined>()
+const selectedBlockId = ref('')
+const selectedBlockPermission = ref('')
+const selectedBlockPermHint = ref('')
+const permSaving = ref(false)
 const exporting = ref(false)
 const iconOpen = ref(false)
 const sidebarTab = ref<'outline' | 'tasks' | 'properties' | 'comments' | 'backrefs' | 'history' | 'versions' | 'audit' | 'ai'>('outline')
@@ -106,6 +112,10 @@ const liveSession = ref<LiveCollabSession | null>(null)
 const liveYDoc = shallowRef<YDoc | null>(null)
 /** 协同进房后的可写状态：浏览者为 false，编辑器强制只读。 */
 const collabWritable = ref(true)
+const permissionActor = computed(() => ({
+  canWrite: !props.locked && collabWritable.value,
+  role: liveSession.value?.role || (props.locked ? 'viewer' : 'owner'),
+}))
 const authStore = useAuthStore()
 const collabUser = computed(() => {
   const user = authStore.user
@@ -292,6 +302,7 @@ async function applyEditorTemplate() {
 
 /** 点击 @ 文档 mention 节点跳转到目标文档。 */
 function onEditorClick(e: MouseEvent) {
+  refreshSelectedBlock(e)
   const target = e.target as HTMLElement
   const mention = target.closest('.rte-mention[data-type="mention"]') as HTMLElement | null
   if (mention) {
@@ -332,8 +343,74 @@ function onEditorClick(e: MouseEvent) {
   }
 }
 
+
+function refreshSelectedBlock(e?: Event) {
+  const inst = editorRef.value as unknown as {
+    editor?: { state?: { selection?: any; doc?: any } }
+  } | null
+  const sel = inst?.editor?.state?.selection
+  const doc = inst?.editor?.state?.doc
+  let id = ''
+  if (e?.target instanceof Element) {
+    const host = e.target.closest('[data-block-id]') as HTMLElement | null
+    if (host) id = (host.getAttribute('data-block-id') || '').trim()
+  }
+  if (sel && doc) {
+    const node = typeof sel.node === 'object' ? sel.node : null
+    if (node) id = readBlockId(node) || ''
+    if (!id && sel.$from) {
+      for (let depth = sel.$from.depth; depth > 0; depth -= 1) {
+        const got = readBlockId(sel.$from.node(depth))
+        if (got) {
+          id = got
+          break
+        }
+      }
+    }
+  }
+  if (id !== selectedBlockId.value) {
+    selectedBlockId.value = id
+    selectedBlockPermission.value = ''
+    selectedBlockPermHint.value = ''
+    if (id) void loadBlockPermission(id)
+  }
+}
+
+async function loadBlockPermission(blockId: string) {
+  try {
+    const row = await getDocumentBlock(props.documentId, blockId)
+    if (selectedBlockId.value !== blockId) return
+    selectedBlockPermission.value = row.permission || ''
+    selectedBlockPermHint.value = ''
+  } catch (err: unknown) {
+    if (selectedBlockId.value !== blockId) return
+    const status = (err as { status?: number }).status
+    selectedBlockPermHint.value = status === 404 ? '保存文档后才能设置这块的权限' : '无法读取块级权限'
+  }
+}
+
+async function onBlockPermissionChange(permission: string) {
+  const blockId = selectedBlockId.value
+  if (!blockId) return
+  permSaving.value = true
+  try {
+    const row = await updateBlockPermission(props.documentId, blockId, permission)
+    if (selectedBlockId.value === blockId) {
+      selectedBlockPermission.value = row.permission || permission
+      selectedBlockPermHint.value = ''
+    }
+    ElMessage.success('块级权限已更新')
+  } catch (err) {
+    ElMessage.error(friendlyApiMessage(err, '设置块级权限失败'))
+  } finally {
+    permSaving.value = false
+  }
+}
+
 /** 划线评论：记录选中的文本与字符区间，作为评论引用与跳转锚点。 */
-function onSelectionChange() {
+function onSelectionChange(e?: Event) {
+  refreshSelectedBlock(e)
+
   const selection = window.getSelection()
   const text = selection?.toString().trim() ?? ''
   if (text.length < 2 || text.length > 500) {
@@ -1004,6 +1081,16 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
       :parent-id="props.nodeId ?? null"
     />
     <ShareDialog :document-id="documentId" :visible="shareVisible" @close="shareVisible = false" />
+    <BlockPermissionPanel
+      v-if="selectedBlockId"
+      :block-id="selectedBlockId"
+      :permission="selectedBlockPermission"
+      :role="permissionActor.role"
+      :can-write="permissionActor.canWrite"
+      :saving="permSaving"
+      :unavailable="selectedBlockPermHint"
+      @change="onBlockPermissionChange"
+    />
     <SaveConflictPanel
       v-if="conflictOpen"
       :versions="{ mineHtml: conflictMineHtml, theirsHtml: conflictTheirsHtml }"

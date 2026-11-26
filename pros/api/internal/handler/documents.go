@@ -104,6 +104,8 @@ func handleDocErr(c *app.RequestContext, err error, doc interface{}) bool {
 		// 批次号唯一标识一次导入意图；相同号码对应另一份文件时绝不能继续写入，
 		// 否则客户端拿错批次号重试会把两份备份混在同一幂等结果里。
 		Fail(c, http.StatusConflict, "importBatchId was reused with a different backup", "backup_import_conflict")
+	case errors.Is(err, service.ErrCollabReadOnly), errors.Is(err, service.ErrBlockPermission):
+		Forbidden(c, "no permission to edit this block")
 	case errors.Is(err, service.ErrValidation), errors.Is(err, service.ErrInvalidHead):
 		Fail(c, http.StatusBadRequest, "validation failed", "validation_error")
 	case errors.Is(err, service.ErrPayloadTooLarge):

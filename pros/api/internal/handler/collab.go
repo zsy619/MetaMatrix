@@ -136,6 +136,8 @@ func handleCollabErr(c *app.RequestContext, err error) bool {
 		Fail(c, http.StatusBadRequest, "validation failed", "validation_error")
 	case errors.Is(err, service.ErrCollabReadOnly), errors.Is(err, service.ErrSpaceForbidden):
 		Forbidden(c, "collab room is read-only")
+	case errors.Is(err, service.ErrBlockPermission):
+		Forbidden(c, "no permission to edit this block")
 	case errors.Is(err, service.ErrSaveConflict):
 		Conflict(c, err.Error(), nil)
 	default:

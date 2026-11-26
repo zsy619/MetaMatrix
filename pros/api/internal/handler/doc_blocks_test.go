@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"testing"
@@ -48,6 +49,19 @@ func (s stubDocBlocks) GetBlock(actorID, docID, blockID uuid.UUID) (*model.DocBl
 		}
 	}
 	return nil, service.ErrDocumentNotFound
+}
+
+func (s stubDocBlocks) UpdatePermission(actorID, docID, blockID uuid.UUID, permission string) (*model.DocBlock, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	row, err := s.GetBlock(actorID, docID, blockID)
+	if err != nil {
+		return nil, err
+	}
+	out := *row
+	out.Permission = permission
+	return &out, nil
 }
 
 func (s stubDocBlocks) ListBlockRefs(actorID, docID, blockID uuid.UUID) ([]model.DocBlockRef, error) {
@@ -125,5 +139,57 @@ func TestListBlocksHTTP(t *testing.T) {
 		ut.Header{Key: "Authorization", Value: "Bearer " + tok})
 	if missing.Code != http.StatusNotFound {
 		t.Fatalf("missing block code = %d, want 404", missing.Code)
+	}
+}
+
+func TestUpdateBlockPermissionHTTP(t *testing.T) {
+	userID := uuid.New()
+	docID := uuid.New()
+	blockID := uuid.MustParse("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+	okBackend := stubDocBlocks{
+		actor: userID,
+		doc:   docID,
+		rows: []model.DocBlock{{
+			ID: blockID, DocumentID: docID, BlockType: "paragraph",
+			ContentText: "子块", CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
+		}},
+	}
+	engine := route.NewEngine(config.NewOptions(nil))
+	h := NewDocBlockHandler(okBackend, blockSecret)
+	engine.Use(middleware.AuthRequired(blockSecret))
+	engine.PATCH("/documents/:id/blocks/:blockId/permission", h.UpdatePermission)
+	tok, err := middleware.SignToken(blockSecret, userID, "owner@test.local", time.Hour)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := []byte(`{"permission":"readonly"}`)
+	rec := ut.PerformRequest(engine, http.MethodPatch, "/documents/"+docID.String()+"/blocks/"+blockID.String()+"/permission",
+		&ut.Body{Body: bytes.NewReader(body), Len: len(body)},
+		ut.Header{Key: "Authorization", Value: "Bearer " + tok},
+		ut.Header{Key: "Content-Type", Value: "application/json"},
+	)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("set permission code = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	var got map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got["permission"] != "readonly" {
+		t.Fatalf("got = %+v", got)
+	}
+
+	denied := stubDocBlocks{actor: userID, doc: docID, err: service.ErrBlockPermission, rows: okBackend.rows}
+	engine2 := route.NewEngine(config.NewOptions(nil))
+	h2 := NewDocBlockHandler(denied, blockSecret)
+	engine2.Use(middleware.AuthRequired(blockSecret))
+	engine2.PATCH("/documents/:id/blocks/:blockId/permission", h2.UpdatePermission)
+	forbid := ut.PerformRequest(engine2, http.MethodPatch, "/documents/"+docID.String()+"/blocks/"+blockID.String()+"/permission",
+		&ut.Body{Body: bytes.NewReader(body), Len: len(body)},
+		ut.Header{Key: "Authorization", Value: "Bearer " + tok},
+		ut.Header{Key: "Content-Type", Value: "application/json"},
+	)
+	if forbid.Code != http.StatusForbidden {
+		t.Fatalf("denied code = %d, body = %s, want 403", forbid.Code, forbid.Body.String())
 	}
 }

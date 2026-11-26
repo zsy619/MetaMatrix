@@ -16,6 +16,7 @@ type docBlockBackend interface {
 	ListBlocks(actorID, docID uuid.UUID) ([]model.DocBlock, error)
 	GetBlock(actorID, docID, blockID uuid.UUID) (*model.DocBlock, error)
 	ListBlockRefs(actorID, docID, blockID uuid.UUID) ([]model.DocBlockRef, error)
+	UpdatePermission(actorID, docID, blockID uuid.UUID, permission string) (*model.DocBlock, error)
 }
 
 // DocBlockHandler 提供派生块只读 API。本轮不做前端 UI。
@@ -37,6 +38,7 @@ type docBlockJSON struct {
 	AnchorKey   string         `json:"anchorKey,omitempty"`
 	ContentText string         `json:"contentText,omitempty"`
 	Attrs       map[string]any `json:"attrs,omitempty"`
+	Permission  string         `json:"permission,omitempty"`
 }
 
 // ListBlocks GET /documents/:id/blocks
@@ -143,6 +145,7 @@ func toDocBlockJSON(row model.DocBlock) docBlockJSON {
 		Ordinal:     row.Ordinal,
 		AnchorKey:   row.AnchorKey,
 		ContentText: row.ContentText,
+		Permission:  row.Permission,
 	}
 	if row.ParentID != nil {
 		s := row.ParentID.String()
@@ -155,4 +158,33 @@ func toDocBlockJSON(row model.DocBlock) docBlockJSON {
 		}
 	}
 	return out
+}
+
+// UpdatePermission PATCH /documents/:id/blocks/:blockId/permission
+func (h *DocBlockHandler) UpdatePermission(ctx context.Context, c *app.RequestContext) {
+	uid, ok := middleware.UserIDFromCtx(c)
+	if !ok {
+		Unauthorized(c, "unauthorized")
+		return
+	}
+	docID, ok := parseID(c, "id")
+	if !ok {
+		return
+	}
+	blockID, ok := parseID(c, "blockId")
+	if !ok {
+		return
+	}
+	var body struct {
+		Permission string `json:"permission"`
+	}
+	if err := c.BindJSON(&body); err != nil {
+		Fail(c, http.StatusBadRequest, "validation failed", "validation_error")
+		return
+	}
+	row, err := h.svc.UpdatePermission(uid, docID, blockID, body.Permission)
+	if handleCollabErr(c, err) {
+		return
+	}
+	c.JSON(http.StatusOK, toDocBlockJSON(*row))
 }

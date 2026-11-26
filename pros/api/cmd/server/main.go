@@ -406,6 +406,7 @@ func main() {
 		knowledgeDocs.GET("/:id/blocks", blockH.ListBlocks)
 		knowledgeDocs.GET("/:id/blocks/:blockId/refs", blockH.ListBlockRefs)
 		knowledgeDocs.GET("/:id/blocks/:blockId", blockH.GetBlock)
+		knowledgeDocs.PATCH("/:id/blocks/:blockId/permission", blockH.UpdatePermission)
 		// 知识库 5.0：自定义字段、评论增强、任务块、大纲与目录、docx 导出。
 		knowledgeDocs.PUT("/:id/properties/fields", knH.UpdateDocFields)
 		knowledgeDocs.POST("/:id/comments/:commentId/reaction", knH.ToggleCommentReaction)

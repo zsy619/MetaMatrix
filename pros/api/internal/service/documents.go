@@ -1117,6 +1117,13 @@ func (s *DocumentsService) Update(ownerID, docID uuid.UUID, in UpdateDocumentInp
 			"updated_at":       now,
 		}
 		if contentChanged {
+			role, canWrite, err := actorDocAccess(tx, ownerID, docID)
+			if err != nil {
+				return err
+			}
+			if err := GuardLockedBlockMutations(tx, docID, in.CurrentData, role, canWrite); err != nil {
+				return err
+			}
 			// 只有内容确实变化才重写大 JSON；元数据保存不再触碰 current_data。
 			updates["current_data"] = datatypes.JSON(in.CurrentData)
 		}
