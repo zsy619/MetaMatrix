@@ -41,22 +41,23 @@ type backupUserSQLite struct {
 func (backupUserSQLite) TableName() string { return "core_users" }
 
 type backupDocumentSQLite struct {
-	ID             uuid.UUID      `gorm:"type:uuid;primaryKey"`
-	OwnerUserID    uuid.UUID      `gorm:"type:uuid;not null;index:idx_docs_owner_updated,priority:1;index:idx_docs_owner_type,priority:1;index:idx_docs_owner_template,priority:1"`
-	CanvasType     string         `gorm:"type:varchar(64);not null;index:idx_docs_owner_type,priority:2"`
-	Title          string         `gorm:"type:varchar(255);not null"`
-	Icon           string         `gorm:"type:varchar(16);not null;default:''"`
-	Notes          string         `gorm:"type:text"`
-	SchemaVersion  int            `gorm:"not null;default:1"`
-	SaveVersion    int64          `gorm:"not null;default:1"`
-	CurrentData    datatypes.JSON `gorm:"type:jsonb;not null"`
-	ContentText    string         `gorm:"type:text;not null;default:''"`
-	HeadRevisionID *uuid.UUID     `gorm:"type:uuid"`
-	TemplateID     *string        `gorm:"type:varchar(64);index:idx_docs_owner_template,priority:2"`
-	ProjectID      *uuid.UUID     `gorm:"type:uuid;index"`
-	CreatedAt      time.Time      `gorm:"not null"`
-	UpdatedAt      time.Time      `gorm:"not null;index:idx_docs_owner_updated,priority:2,sort:desc"`
-	DeletedAt      gorm.DeletedAt `gorm:"index"`
+	ID              uuid.UUID      `gorm:"type:uuid;primaryKey"`
+	OwnerUserID     uuid.UUID      `gorm:"type:uuid;not null;index:idx_docs_owner_updated,priority:1;index:idx_docs_owner_type,priority:1;index:idx_docs_owner_template,priority:1"`
+	CanvasType      string         `gorm:"type:varchar(64);not null;index:idx_docs_owner_type,priority:2"`
+	Title           string         `gorm:"type:varchar(255);not null"`
+	Icon            string         `gorm:"type:varchar(16);not null;default:''"`
+	Notes           string         `gorm:"type:text"`
+	SchemaVersion   int            `gorm:"not null;default:1"`
+	SaveVersion     int64          `gorm:"not null;default:1"`
+	CurrentData     datatypes.JSON `gorm:"type:jsonb;not null"`
+	ContentText     string         `gorm:"type:text;not null;default:''"`
+	ContentMarkdown string         `gorm:"type:text;not null;default:''" json:"markdown"`
+	HeadRevisionID  *uuid.UUID     `gorm:"type:uuid"`
+	TemplateID      *string        `gorm:"type:varchar(64);index:idx_docs_owner_template,priority:2"`
+	ProjectID       *uuid.UUID     `gorm:"type:uuid;index"`
+	CreatedAt       time.Time      `gorm:"not null"`
+	UpdatedAt       time.Time      `gorm:"not null;index:idx_docs_owner_updated,priority:2,sort:desc"`
+	DeletedAt       gorm.DeletedAt `gorm:"index"`
 }
 
 func (backupDocumentSQLite) TableName() string { return "kb_documents" }

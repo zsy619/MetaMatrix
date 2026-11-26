@@ -533,7 +533,7 @@ func (s *Service) UpdateField(ctx context.Context, userID, projectID, fieldID uu
 		return nil, err
 	}
 	updates := map[string]any{
-		"version":  gorm.Expr("version + 1"),
+		"version": gorm.Expr("version + 1"),
 	}
 	cfg := map[string]any{}
 	if len(field.Config) > 0 {
@@ -954,6 +954,58 @@ func (s *Service) DeleteRecord(ctx context.Context, userID, projectID, recordID 
 	})
 }
 
+// BatchFailure 记录一条批量操作里的失败明细。
+type BatchFailure struct {
+	// Target 是失败对象的标识（记录 ID、导入行号等）。
+	Target string `json:"target"`
+	// Message 是失败原因（可直接展示给用户）。
+	Message string `json:"message"`
+}
+
+// BatchCreatePartial 批量创建记录，**允许部分成功**。
+//
+// 与 BatchCreate 的区别：单条失败不再中断整批，而是收集到 failures 里返回，
+// 便于界面给出「成功 N 条 / 失败 M 条 + 失败明细」。
+func (s *Service) BatchCreatePartial(ctx context.Context, userID, projectID, tableID uuid.UUID, items []RecordInput) ([]RecordRow, []BatchFailure) {
+	rows := make([]RecordRow, 0, len(items))
+	failures := make([]BatchFailure, 0)
+	for i, item := range items {
+		row, err := s.CreateRecord(ctx, userID, projectID, tableID, item)
+		if err != nil {
+			failures = append(failures, BatchFailure{Target: fmt.Sprintf("第 %d 行", i+1), Message: err.Error()})
+			continue
+		}
+		rows = append(rows, *row)
+	}
+	return rows, failures
+}
+
+// BatchUpdatePartial 批量更新记录，**允许部分成功**。
+func (s *Service) BatchUpdatePartial(ctx context.Context, userID, projectID, tableID uuid.UUID, ids []uuid.UUID, fields map[string]any) ([]RecordRow, []BatchFailure) {
+	rows := make([]RecordRow, 0, len(ids))
+	failures := make([]BatchFailure, 0)
+	for _, id := range ids {
+		row, err := s.UpdateRecord(ctx, userID, projectID, id, RecordInput{Fields: fields})
+		if err != nil {
+			failures = append(failures, BatchFailure{Target: id.String(), Message: err.Error()})
+			continue
+		}
+		rows = append(rows, *row)
+	}
+	return rows, failures
+}
+
+// BatchDeletePartial 批量删除记录，**允许部分成功**。
+func (s *Service) BatchDeletePartial(ctx context.Context, userID, projectID, tableID uuid.UUID, ids []uuid.UUID) []BatchFailure {
+	failures := make([]BatchFailure, 0)
+	for _, id := range ids {
+		if err := s.DeleteRecord(ctx, userID, projectID, id); err != nil {
+			failures = append(failures, BatchFailure{Target: id.String(), Message: err.Error()})
+		}
+	}
+	return failures
+}
+
 // BatchCreate 批量创建记录（默认整批成功或整批失败）。
 func (s *Service) BatchCreate(ctx context.Context, userID, projectID, tableID uuid.UUID, items []RecordInput) ([]RecordRow, error) {
 	out := make([]RecordRow, 0, len(items))
@@ -1069,6 +1121,64 @@ func (s *Service) validateDocRefs(ctx context.Context, projectID uuid.UUID, idx 
 		}
 	}
 	return nil
+}
+
+// BaseEmbedder 描述一篇内嵌了本 Base 的文档。
+type BaseEmbedder struct {
+	// NodeID 是知识库节点 ID（可直接跳转）。
+	NodeID uuid.UUID `json:"nodeId"`
+	// DocumentID 是文档 ID。
+	DocumentID uuid.UUID `json:"documentId"`
+	// Title 是文档标题。
+	Title string `json:"title"`
+	// TableID 是被内嵌的表（一个文档可以内嵌同一 Base 的多张表）。
+	TableID string `json:"tableId"`
+}
+
+// ListBaseEmbedders 列出所有内嵌了本 Base 的文档。
+//
+// 文档里的内嵌块以 `<div data-type="baseEmbed" data-base-id=... data-table-id=...>` 存 HTML，
+// 这里扫当前空间的文档正文，命中 `data-base-id` 即认为内嵌了本 Base。
+func (s *Service) ListBaseEmbedders(ctx context.Context, userID, projectID, baseID uuid.UUID) ([]BaseEmbedder, error) {
+	if err := s.assertAccess(userID, projectID, RoleViewer); err != nil {
+		return nil, err
+	}
+	var app BaseApp
+	if err := s.db.WithContext(ctx).Where("id = ? AND project_id = ?", baseID, projectID).First(&app).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrBaseNotFound
+		}
+		return nil, err
+	}
+	type row struct {
+		NodeID     uuid.UUID
+		DocumentID uuid.UUID
+		Title      string
+		HTML       string
+	}
+	var rows []row
+	if err := s.db.WithContext(ctx).Model(&model.KnowledgeNode{}).
+		Select("kb_nodes.id AS node_id, kb_nodes.document_id, kb_nodes.title, COALESCE(d.current_data->>'html','') AS html").
+		// 文档表在「全库表名前缀统一」后叫 kb_documents（见 internal/db/table_naming.go）。
+		Joins("JOIN kb_documents d ON d.id = kb_nodes.document_id AND d.deleted_at IS NULL").
+		Where("kb_nodes.project_id = ? AND kb_nodes.node_type = 'doc' AND kb_nodes.trashed_at IS NULL AND kb_nodes.document_id IS NOT NULL", projectID).
+		Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	marker := `data-base-id="` + app.ID.String() + `"`
+	out := make([]BaseEmbedder, 0)
+	for _, item := range rows {
+		if !strings.Contains(item.HTML, marker) {
+			continue
+		}
+		out = append(out, BaseEmbedder{
+			NodeID:     item.NodeID,
+			DocumentID: item.DocumentID,
+			Title:      item.Title,
+			TableID:    app.ID.String(),
+		})
+	}
+	return out, nil
 }
 
 // reindexTable 按当前字段能力重建整表投影。

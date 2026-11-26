@@ -232,6 +232,11 @@ func syncExtract(tx *gorm.DB, docID uuid.UUID, data []byte, now time.Time, canva
 		Update("content_text", ext.PlainText).Error; err != nil {
 		return "", err
 	}
+	// Markdown 源码单独存一列：库里不再只有 HTML
+	if err := tx.Model(&model.CanvasDocument{}).Where("id = ?", docID).
+		Update("content_markdown", ext.Markdown).Error; err != nil {
+		return "", err
+	}
 	if err := tx.Where("document_id = ?", docID).Delete(&model.CanvasContentBlock{}).Error; err != nil {
 		return "", err
 	}

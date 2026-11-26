@@ -297,6 +297,7 @@ func main() {
 		baseGroup.GET("/events", baseH.Events)
 		baseGroup.GET("/:baseId/audit", baseH.ListAudit)
 		baseGroup.GET("/doc-backrefs/:nodeId", baseH.ListDocBackrefs)
+		baseGroup.GET("/embedders/:baseId", baseH.ListBaseEmbedders)
 		baseGroup.GET("/:baseId/tables", baseH.ListTables)
 		baseGroup.POST("/:baseId/tables", baseH.CreateTable)
 		baseGroup.GET("/tables/:tableId", baseH.ListFields)

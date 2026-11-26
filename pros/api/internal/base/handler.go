@@ -549,6 +549,8 @@ func (h *Handler) BatchRecords(ctx context.Context, c *app.RequestContext) {
 		IDs    []string       `json:"ids"`
 		Fields map[string]any `json:"fields"`
 		Rows   []RecordInput  `json:"rows"`
+		// Partial=true 时允许「部分成功」：逐条执行，失败项收集成明细返回。
+		Partial bool `json:"partial"`
 	}
 	if err := c.BindAndValidate(&body); err != nil {
 		fail(c, http.StatusBadRequest, "invalid body", "40001", err.Error())
@@ -556,6 +558,16 @@ func (h *Handler) BatchRecords(ctx context.Context, c *app.RequestContext) {
 	}
 	switch body.Action {
 	case "create":
+		if body.Partial {
+			rows, failures := h.svc.BatchCreatePartial(ctx, uid, projectID, tableID, body.Rows)
+			c.JSON(http.StatusOK, map[string]any{
+				"rows":      rows,
+				"failures":  failures,
+				"succeeded": len(rows),
+				"failed":    len(failures),
+			})
+			return
+		}
 		rows, err := h.svc.BatchCreate(ctx, uid, projectID, tableID, body.Rows)
 		if err != nil {
 			handleErr(c, err)
@@ -571,6 +583,16 @@ func (h *Handler) BatchRecords(ctx context.Context, c *app.RequestContext) {
 				return
 			}
 			ids = append(ids, id)
+		}
+		if body.Partial {
+			rows, failures := h.svc.BatchUpdatePartial(ctx, uid, projectID, tableID, ids, body.Fields)
+			c.JSON(http.StatusOK, map[string]any{
+				"rows":      rows,
+				"failures":  failures,
+				"succeeded": len(rows),
+				"failed":    len(failures),
+			})
+			return
 		}
 		rows, err := h.svc.BatchUpdate(ctx, uid, projectID, tableID, ids, body.Fields)
 		if err != nil {
@@ -588,6 +610,16 @@ func (h *Handler) BatchRecords(ctx context.Context, c *app.RequestContext) {
 			}
 			ids = append(ids, id)
 		}
+		if body.Partial {
+			failures := h.svc.BatchDeletePartial(ctx, uid, projectID, tableID, ids)
+			c.JSON(http.StatusOK, map[string]any{
+				"rows":      []RecordRow{},
+				"failures":  failures,
+				"succeeded": len(ids) - len(failures),
+				"failed":    len(failures),
+			})
+			return
+		}
 		if err := h.svc.BatchDelete(ctx, uid, projectID, tableID, ids); err != nil {
 			handleErr(c, err)
 			return
@@ -596,6 +628,28 @@ func (h *Handler) BatchRecords(ctx context.Context, c *app.RequestContext) {
 	default:
 		fail(c, http.StatusBadRequest, "unknown batch action", "40001", body.Action)
 	}
+}
+
+// ListBaseEmbedders 列出内嵌了本 Base 的文档。
+func (h *Handler) ListBaseEmbedders(ctx context.Context, c *app.RequestContext) {
+	uid, ok := h.owner(c)
+	if !ok {
+		return
+	}
+	projectID, ok := projectID(c)
+	if !ok {
+		return
+	}
+	baseID, ok := pathUUID(c, "baseId")
+	if !ok {
+		return
+	}
+	items, err := h.svc.ListBaseEmbedders(ctx, uid, projectID, baseID)
+	if err != nil {
+		handleErr(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, items)
 }
 
 // —— View ——

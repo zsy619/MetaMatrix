@@ -187,7 +187,7 @@ func (s *Service) buildFilterSQL(tableID uuid.UUID, idx *fieldIndex, g FilterGro
 		if !handler.Definition().Capabilities.Filterable {
 			return "", nil, fmt.Errorf("%w: field %s is not filterable", ErrQueryInvalid, meta.Name)
 		}
-		sql, params, err := s.conditionSQL(fieldID, handler, cond)
+		sql, params, err := s.conditionSQL(fieldID, handler, meta.Type, cond)
 		if err != nil {
 			return "", nil, err
 		}
@@ -214,7 +214,7 @@ func (s *Service) buildFilterSQL(tableID uuid.UUID, idx *fieldIndex, g FilterGro
 }
 
 // conditionSQL 编译单个条件。
-func (s *Service) conditionSQL(fieldID uuid.UUID, handler FieldHandler, cond Condition) (string, []any, error) {
+func (s *Service) conditionSQL(fieldID uuid.UUID, handler FieldHandler, fieldType string, cond Condition) (string, []any, error) {
 	op := strings.ToLower(strings.TrimSpace(cond.Operator))
 	projected := handler.ProjectedType()
 
@@ -278,6 +278,15 @@ func (s *Service) conditionSQL(fieldID uuid.UUID, handler FieldHandler, cond Con
 			return "", nil, fmt.Errorf("%w: operator %s is not supported for multi-value fields", ErrQueryInvalid, op)
 		}
 	default:
+		// 「关联文档」是多值文本（ID 以「、」连接）：条件值可以是单个 ID，也可以是 ID 数组，
+		// 命中语义是「包含其中任意一个」。
+		if fieldType == string(FieldDoc) {
+			if sql, params, ok, err := docConditionSQL(fieldID, op, cond.Value); err != nil {
+				return "", nil, err
+			} else if ok {
+				return sql, params, nil
+			}
+		}
 		text := fmt.Sprintf("%v", cond.Value)
 		switch op {
 		case "eq", "is":
@@ -410,6 +419,11 @@ func (s *Service) Query(ctx context.Context, userID, projectID uuid.UUID, req Qu
 	// 统计与取数共用同一别名 r，保证筛选条件里的 r.id 可用。
 	base := s.db.WithContext(ctx).Table("base_records AS r").
 		Where("r.table_id = ? AND r.deleted_at IS NULL", tableID)
+
+	// 「关联文档」字段的条件值允许写文档标题：先把标题解析成节点 ID。
+	if len(req.Filters.Conditions) > 0 || len(req.Filters.Children) > 0 {
+		req.Filters = s.resolveDocTitleFilters(ctx, projectID, idx, req.Filters)
+	}
 
 	where, args, err := s.buildFilterSQL(tableID, idx, req.Filters)
 	if err != nil {
@@ -562,6 +576,139 @@ func (s *Service) docFieldIDs(idx *fieldIndex) []uuid.UUID {
 func (s *Service) docKeywordNodeIDs(ctx context.Context, projectID uuid.UUID, kw string) []string {
 	var ids []uuid.UUID
 	like := "%" + escapeLike(kw) + "%"
+	if err := s.db.WithContext(ctx).Model(&model.KnowledgeNode{}).
+		Where("project_id = ? AND trashed_at IS NULL AND title ILIKE ?", projectID, like).
+		Limit(20).
+		Pluck("id", &ids).Error; err != nil {
+		return nil
+	}
+	out := make([]string, 0, len(ids))
+	for _, id := range ids {
+		out = append(out, id.String())
+	}
+	return out
+}
+
+// docConditionSQL 编译「关联文档」字段的条件。
+//
+// 值可以是：
+//   - 单个节点 ID；
+//   - 节点 ID 数组（命中其中任意一个即算命中）。
+//
+// 返回 ok=false 表示该操作符走通用文本分支。
+func docConditionSQL(fieldID uuid.UUID, op string, value any) (string, []any, bool, error) {
+	values := stringSlice(value)
+	switch op {
+	case "contains", "eq", "is", "in":
+		values = multiValueArgs(values)
+		if len(values) == 0 {
+			return "", nil, false, fmt.Errorf("%w: empty value", ErrQueryInvalid)
+		}
+		parts := make([]string, 0, len(values))
+		args := make([]any, 0, len(values)*2+1)
+		for _, item := range values {
+			parts = append(parts, "v.value_text ILIKE ?")
+			args = append(args, "%"+escapeLike(item)+"%")
+		}
+		return fmt.Sprintf("EXISTS (SELECT 1 FROM base_record_values v WHERE v.record_id = r.id AND v.field_id = ? AND (%s))", strings.Join(parts, " OR ")),
+			append([]any{fieldID}, args...), true, nil
+	case "notcontains", "ne":
+		values = multiValueArgs(values)
+		if len(values) == 0 {
+			return "", nil, false, fmt.Errorf("%w: empty value", ErrQueryInvalid)
+		}
+		parts := make([]string, 0, len(values))
+		args := make([]any, 0, len(values)*2+1)
+		for _, item := range values {
+			parts = append(parts, "v.value_text ILIKE ?")
+			args = append(args, "%"+escapeLike(item)+"%")
+		}
+		return fmt.Sprintf("NOT EXISTS (SELECT 1 FROM base_record_values v WHERE v.record_id = r.id AND v.field_id = ? AND (%s))", strings.Join(parts, " OR ")),
+			append([]any{fieldID}, args...), true, nil
+	default:
+		return "", nil, false, nil
+	}
+}
+
+// multiValueArgs 摊平多值条件里的嵌套数组（前端多选会传二维数组）。
+func multiValueArgs(values []string) []string {
+	out := make([]string, 0, len(values))
+	for _, item := range values {
+		trimmed := strings.TrimSpace(item)
+		if trimmed == "" {
+			continue
+		}
+		out = append(out, trimmed)
+	}
+	return out
+}
+
+// resolveDocTitleFilters 把「关联文档」字段条件里的**标题文本**解析成节点 ID 列表。
+//
+// 之所以要这一步：`doc` 字段存的是节点 ID，用户在筛选面板里按直觉写的是文档标题，
+// 直接拿标题去匹配 ID 永远命中不了。这里把标题反查成 ID，再走正常的多值匹配。
+//
+// 已经是 UUID 的值原样保留；解析不到标题时也原样保留（自然不命中）。
+func (s *Service) resolveDocTitleFilters(ctx context.Context, projectID uuid.UUID, idx *fieldIndex, g FilterGroup) FilterGroup {
+	out := g
+	out.Logic = g.Logic
+	out.Conditions = make([]Condition, 0, len(g.Conditions))
+	for _, cond := range g.Conditions {
+		fieldID, err := uuid.Parse(cond.FieldID)
+		if err == nil {
+			if meta, ok := idx.byID[fieldID]; ok && meta.Type == string(FieldDoc) {
+				cond.Value = s.resolveDocConditionValue(ctx, projectID, cond.Value)
+			}
+		}
+		out.Conditions = append(out.Conditions, cond)
+	}
+	if len(g.Children) > 0 {
+		out.Children = make([]FilterGroup, 0, len(g.Children))
+		for _, child := range g.Children {
+			out.Children = append(out.Children, s.resolveDocTitleFilters(ctx, projectID, idx, child))
+		}
+	}
+	return out
+}
+
+// resolveDocConditionValue 解析条件值：UUID 原样返回；否则按标题反查节点 ID。
+func (s *Service) resolveDocConditionValue(ctx context.Context, projectID uuid.UUID, value any) any {
+	raw := stringSlice(value)
+	if len(raw) == 0 {
+		return value
+	}
+	resolved := make([]string, 0, len(raw))
+	changed := false
+	for _, item := range raw {
+		trimmed := strings.TrimSpace(item)
+		if trimmed == "" {
+			continue
+		}
+		if _, err := uuid.Parse(trimmed); err == nil {
+			resolved = append(resolved, trimmed)
+			continue
+		}
+		ids := s.docTitleNodeIDs(ctx, projectID, trimmed)
+		if len(ids) == 0 {
+			resolved = append(resolved, trimmed)
+			continue
+		}
+		resolved = append(resolved, ids...)
+		changed = true
+	}
+	if !changed {
+		return value
+	}
+	if len(resolved) == 1 {
+		return resolved[0]
+	}
+	return resolved
+}
+
+// docTitleNodeIDs 按标题反查知识库节点（最多 20 个）。
+func (s *Service) docTitleNodeIDs(ctx context.Context, projectID uuid.UUID, title string) []string {
+	var ids []uuid.UUID
+	like := "%" + escapeLike(title) + "%"
 	if err := s.db.WithContext(ctx).Model(&model.KnowledgeNode{}).
 		Where("project_id = ? AND trashed_at IS NULL AND title ILIKE ?", projectID, like).
 		Limit(20).
