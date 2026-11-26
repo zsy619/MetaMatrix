@@ -1074,6 +1074,7 @@ function rteAuthor() {
 
 const {
   suggesting,
+  suggestionEnabled,
   suggestionAuthor,
   suggestionColor,
   toggleSuggesting,
@@ -1209,7 +1210,7 @@ const editor = useRteExtensions({
     toggleOutlinePanel()
   },
   undoToolbarGroupOrder: () => undoToolbarGroupOrder(),
-  suggestingEnabled: () => suggesting.value,
+  suggestingEnabled: () => suggestionEnabled(),
   suggestionAuthor,
   bumpSuggestions: () => bumpSuggestions(),
   mentionPeople: () => directoryPeople.mentionPeople(),
@@ -1224,6 +1225,7 @@ watch(
     if (!ed) return
     const next = props.editable !== false
     if (ed.isEditable !== next) ed.setEditable(next)
+    if (!next && suggesting.value) suggesting.value = false
   },
   { immediate: true },
 )
