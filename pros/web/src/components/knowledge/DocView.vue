@@ -58,6 +58,8 @@ import * as knowledgeApiV5 from '../../api/knowledge_v5'
 import type { PresenceUser } from '../../api/knowledge'
 import { friendlyApiMessage } from '../../utils/apiMessage'
 import AppLoading from '../common/AppLoading.vue'
+import SaveConflictPanel from './SaveConflictPanel.vue'
+import { resolveConflictHtml, type SaveConflictChoice } from './saveConflict'
 
 const props = defineProps<{
   documentId: string
@@ -88,6 +90,10 @@ const loading = ref(false)
 const saving = ref(false)
 const dirty = ref(false)
 const saveTimer = ref<ReturnType<typeof setTimeout> | null>(null)
+const conflictOpen = ref(false)
+const conflictMineHtml = ref('')
+const conflictTheirsHtml = ref('')
+const conflictRemoteVersion = ref<number | undefined>()
 const exporting = ref(false)
 const iconOpen = ref(false)
 const sidebarTab = ref<'outline' | 'tasks' | 'properties' | 'comments' | 'backrefs' | 'history' | 'versions' | 'audit' | 'ai'>('outline')
@@ -608,35 +614,62 @@ async function save() {
   }
 }
 
-/** 409 冲突处置：查看差异 / 强制覆盖 / 放弃本地修改。 */
+/** 409 冲突处置：拉取对方版本，打开「谁的版本」面板。 */
 async function resolveConflict() {
+  const mine = html.value
   try {
-    await ElMessageBox.confirm(
-      '文档已被其他端更新。可以放弃本地修改重新加载，或强制覆盖对方的修改。',
-      '保存冲突',
-      {
-        confirmButtonText: '强制覆盖',
-        cancelButtonText: '重新加载',
-        distinguishCancelAndClose: true,
-        type: 'warning',
-      },
-    )
-  } catch (action) {
-    // 取消 = 放弃本地修改并重新加载；关闭弹窗同样按重新加载处理。
+    const latest = await getDocument(props.documentId)
+    const data = latest.currentData as { html?: string }
+    conflictMineHtml.value = mine
+    conflictTheirsHtml.value = data.html ?? ''
+    conflictRemoteVersion.value = latest.saveVersion
+    conflictOpen.value = true
+  } catch (err) {
+    ElMessage.error(friendlyApiMessage(err, '无法拉取对方版本，冲突仍未解决'))
+  }
+}
+
+async function applyConflictChoice(choice: SaveConflictChoice) {
+  const next = resolveConflictHtml(choice, {
+    mineHtml: conflictMineHtml.value,
+    theirsHtml: conflictTheirsHtml.value,
+  })
+  conflictOpen.value = false
+  if (choice === 'theirs') {
+    html.value = next
     await load()
-    ElMessage.info('已重新加载最新内容')
+    ElMessage.info('已使用对方的版本')
     return
   }
+  html.value = next
   try {
+    const payload = { type: 'doc', html: next }
+    if (choice === 'mine') {
+      doc.value = await updateDocument(props.documentId, {
+        title: title.value.trim() || '无标题',
+        currentData: payload as never,
+        operationId: `doc-force-${Date.now()}`,
+      })
+      dirty.value = false
+      ElMessage.success('已使用你的版本覆盖保存')
+      return
+    }
     doc.value = await updateDocument(props.documentId, {
       title: title.value.trim() || '无标题',
-      currentData: { type: 'doc', html: html.value } as never,
-      operationId: `doc-force-${Date.now()}`,
+      currentData: payload as never,
+      expectedSaveVersion: conflictRemoteVersion.value,
+      operationId: `doc-merge-${Date.now()}`,
     })
     dirty.value = false
-    ElMessage.success('已强制覆盖')
-  } catch (err) {
-    ElMessage.error(friendlyApiMessage(err, '强制覆盖失败'))
+    ElMessage.success('已合并两边并保存')
+  } catch (err: unknown) {
+    const status = (err as { status?: number }).status
+    if (status === 409) {
+      await resolveConflict()
+      ElMessage.warning('保存时再次冲突，请重新选择')
+      return
+    }
+    ElMessage.error(friendlyApiMessage(err, '解决冲突失败'))
   }
 }
 
@@ -971,6 +1004,12 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
       :parent-id="props.nodeId ?? null"
     />
     <ShareDialog :document-id="documentId" :visible="shareVisible" @close="shareVisible = false" />
+    <SaveConflictPanel
+      v-if="conflictOpen"
+      :versions="{ mineHtml: conflictMineHtml, theirsHtml: conflictTheirsHtml }"
+      :remote-version="conflictRemoteVersion"
+      @choose="applyConflictChoice"
+    />
   </section>
 </template>
 
