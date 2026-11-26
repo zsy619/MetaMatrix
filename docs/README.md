@@ -19,6 +19,8 @@
 | [rte-collab-block-roadmap.md](./rte-collab-block-roadmap.md) | 富文本协同与块实体化：修正后的实施顺序（A 块身份 ‖ 协同底座 ‖ 存储消息 → B 协作光标/块实体化 → C 收口） |
 | [base-engine-多维表格技术方案.md](./base-engine-多维表格技术方案.md) | 多维表格 Base Engine 技术方案：领域模型、字段注册表、查询/公式引擎、实时协同与富文本融合路径 |
 | [base-engine-多维表格验收报告.md](./base-engine-多维表格验收报告.md) | 多维表格 Base Engine 重构验收报告：交付清单、逐项证据、门禁结果与已知限制 |
-| [db-table-naming.md](./db-table-naming.md) | 数据库表命名规范：core / kb / base / media 四域前缀、39 张表改名对照与迁移方式 |
+| [db-table-naming.md](./db-table-naming.md) | 数据库表命名规范：core / kb / base / media 四域前缀、39 张表改名对照、迁移方式与对智能体的强制条款 |
+| [db-tables.json](./db-tables.json) | 全库 39 张表的机器可读清单（name / domain / purpose / model），改表前先查 |
+| [GLOBAL_RULES/db-naming.md](./GLOBAL_RULES/db-naming.md) | 表命名全局规则速查：对人类与所有智能体强制 |
 | [GLOBAL_RULES/](./GLOBAL_RULES/) | 全局交互规则 |
 | [_sources/](./_sources/) | 原始材料归档 |

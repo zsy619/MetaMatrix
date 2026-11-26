@@ -110,7 +110,64 @@ Go 结构体名**不变**（`CanvasDocument`、`DocProperty`、`MediaAsset` …�
 - 新旧表同时存在（手工改过 / 上一步只改了一半）时只打告警，不动数据。
 - 手工执行版本：`pros/api/migrations/012_table_naming.sql`（幂等）。
 
-## 六、新增表时怎么做
+## 六、对智能体 / 自动化代理的强制要求
+
+本节是本规范的**执行条款**：任何 AI 智能体（Claude Code、Codex、Grok、DeepSeek Hermes 及其它
+自动化代理）与人类贡献者一律同等对待。没有"上下文没提到就可以自己起名"这回事。
+
+### 6.1 开工前必须做的三件事
+
+1. 读 `docs/db-tables.json`（39 张表的机器可读清单）：确认要建的表**不存在同义表**。
+   历史教训：库里曾同时存在 `doc_properties` / `document_save_operations` / `knowledge_nodes` /
+   `canvas_documents` 四套指向同一实体的前缀，排查时只能全库翻。
+2. 读 `pros/api/internal/model/table_registry.go`：确认域归属（core / kb / base / media）。
+3. 判断这是**新表**还是**改已有表**：改表要走 `ensure*Schema` 补丁 + 影子模型同步，不能只改 `TableName()`。
+
+### 6.2 落地动作（缺一不可）
+
+| # | 动作 | 落点 |
+| --- | --- | --- |
+| 1 | 定义结构体，显式写 `TableName()` | `pros/api/internal/model/**` |
+| 2 | 在登记表登记一行（name / domain / purpose / model） | `model/table_registry.go` → `TableRegistry` |
+| 3 | 在自动迁移列表注册 | `internal/db/db.go` → `AutoMigrate` |
+| 4 | 改已有表结构时补迁移 + 同步影子模型 | `internal/db/db.go` → `ensure*Schema`；各 `*_test.go` 的 `xxxSQLite` |
+| 5 | 重新生成表清单 | `cd pros/api && go run ./cmd/dbtables > ../../docs/db-tables.json` |
+| 6 | 跑守卫测试 | `cd pros/api && go test ./internal/model/... ./internal/db/...` |
+
+### 6.3 机器守卫（CI 强制，不是建议）
+
+守卫测试位于 `internal/model/table_naming_test.go` 与 `internal/db/table_naming_test.go`，
+由 CI 的 `go test ./internal/...` 执行。以下情况**直接失败**：
+
+- 表模型（带 `gorm` 主键的结构体）没有显式 `TableName()`；
+- 表名域前缀不在白名单内（出现第 5 套前缀）；
+- 表名实体名不是复数，且未在登记表标注 `MassNoun`；
+- 表名未在 `TableRegistry` 登记，或登记表与模型不一致；
+- `docs/db-tables.json` 与登记表不一致；
+- 改名清单自身不自洽（目标名重复 / 不合规 / 未登记）；
+- `migrations/*.sql` 里出现不合规的表名；
+- 登记表里的表既没有 migration 建表、也没在 `AutoMigrate` 注册（新环境建不出来）。
+
+**智能体不得绕过、注释或删改守卫测试**。规则若确需调整，改规则本体（登记表 + 文档 + 测试），
+不要为了让自己那次改动过 CI 而放宽校验。
+
+### 6.4 命名决策速查
+
+| 你要建的东西 | 归属域 | 建议表名 |
+| --- | --- | --- |
+| 账号、登录态、会话 | core | `core_sessions` |
+| 审计、埋点、操作留痕 | core | `core_xxx_logs` |
+| 目录树节点 | kb | `kb_nodes` / `kb_node_xxx` |
+| 文档正文与派生数据 | kb | `kb_documents` / `kb_xxx_blocks` |
+| 评论、协作、presence | kb | `kb_comments` / `kb_xxx_presences` |
+| 检索、向量、标签 | kb | `kb_chunks` / `kb_tags` |
+| 多维表格的一切 | base | `base_xxx` |
+| 素材库的一切 | media | `media_xxx` |
+
+判断口诀：**与账号/项目/审计有关 → core；与知识库内容有关 → kb；与多维表格引擎有关 → base；
+与文件素材有关 → media。**
+
+## 七、新增表时怎么做
 
 1. 在 `pros/api/internal/model/` 对应文件里定义结构体，显式写 `TableName()`，
    名字从上面四个域里挑（默认 `core_`，业务内容一律 `kb_`）。
@@ -122,7 +179,7 @@ Go 结构体名**不变**（`CanvasDocument`、`DocProperty`、`MediaAsset` …�
    现有旧索引名（如 `idx_docs_content_tsv`、`idx_dp_owner`）暂未重命名，
    后续新增索引按新规则走。
 
-## 七、注意
+## 八、注意
 
 - `pros/sync-schema.sh` 是「本地 → 远程只增不删」的同步工具，不做表改名；
   远程库改名靠服务端启动时的 `ensureTableNamingSchema`。

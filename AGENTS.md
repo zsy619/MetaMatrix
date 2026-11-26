@@ -161,18 +161,45 @@ cd pros/web && npx vitest run && npx vue-tsc -b --pretty false
 
 ---
 
-## 9. 数据库表命名规范（硬性规则）
+## 9. 数据库表命名规范（全局硬规则，对所有智能体一视同仁）
 
-完整规范见 `docs/db-table-naming.md`。要点：
+> **适用范围**：人类贡献者与**任何 AI 智能体 / 自动化代理**（Claude Code、Codex、Grok、
+> DeepSeek Hermes 及其它会自动改代码、写迁移的机器人），在**任何分支、任何环境**下
+> 新增或修改数据库表时都必须遵守。智能体不得因为"上下文里没提到"就另起一套命名。
+>
+> - 规范原文：`docs/db-table-naming.md`
+> - 机器可读表清单（39 张表，改表前先查）：`docs/db-tables.json`
+> - 单一事实源（代码）：`pros/api/internal/model/table_registry.go`
+> - 守卫测试：`pros/api/internal/model/table_naming_test.go`、`pros/api/internal/db/table_naming_test.go`
 
-- **表名 = 域前缀 + 实体名（复数）**，域前缀**只有 4 个**：
-  `core_`（平台：账号/项目/审计/备份/密码重置/页面引用）、
-  `kb_`（知识库：目录树/文档/版本/属性/评论/协同/检索/模板）、
-  `base_`（多维表格引擎）、`media_`（素材）。不得再引入第 5 套前缀。
-- 模型必须**显式写 `TableName()`**，不允许依赖 GORM 默认推导。
-- 改表名/改表结构：在 `internal/db/db.go` 加 `ensure*Schema` 补丁，
-  并同步 SQLite 影子模型（`xxxSQLite`）；只改 `TableName()` 会让 GORM 新建空表、旧数据留在旧表。
-- 改名迁移必须排在 `gdb.AutoMigrate` **之前**（`ensureTableNamingSchema`），
- 否则会先建空表再改名，表看似"数据丢了"。
-- 索引命名 `idx_<域>_<实体>_<列>`、唯一索引 `uniq_<域>_<实体>_<语义>`。
+**规则四条**
 
+1. 表名 = 域前缀 + 实体名，域前缀**只有 4 个**：`core_` / `kb_` / `base_` / `media_`。
+   - `core_` 平台域：账号、项目、审计、备份、密码重置、页面引用
+   - `kb_` 知识库域：目录树、文档正文、版本、页面属性、评论、协同增量、检索切片、模板
+   - `base_` 多维表格域；`media_` 素材域
+   - **不得引入第 5 套前缀**（历史遗留的 `doc_` / `document_` / `canvas_` / `knowledge_` 已全部并入）。
+2. 实体名一律**复数**（以 `s` 结尾）。确实是不可数名词（当前只有 `node_data`、`presence`）时，
+   在 `model.TableRegistry` 里标注 `MassNoun: true` 显式登记，不许随手破例。
+3. 模型**必须显式写 `TableName()`**，不允许依赖 GORM 按结构体名推导。
+4. 改表名或改表结构：在 `internal/db/db.go` 加 `ensure*Schema` 补丁 + 同步 SQLite 影子模型；
+   改名迁移必须排在 `gdb.AutoMigrate` **之前**（`ensureTableNamingSchema`），
+   否则会先建空表再改名，表看似"数据丢了"。
+
+**新增表的标准动作（智能体照此执行即可）**
+
+1. 先查 `docs/db-tables.json`，确认没有同义表（避免 `kb_docs` 与 `kb_documents` 并存）。
+2. 在 `model` 定义结构体，显式写 `TableName()`。
+3. 在 `internal/model/table_registry.go` 的 `TableRegistry` 登记一行
+   （name / domain / purpose / model，必要时 `MassNoun: true`）。
+4. 在 `internal/db/db.go` 的 `AutoMigrate` 列表注册。
+5. 改已有表结构时加 `ensure*Schema` 补丁，并同步各 `*_test.go` 里的 SQLite 影子模型。
+6. 重新生成表清单：`cd pros/api && go run ./cmd/dbtables > ../../docs/db-tables.json`。
+7. 跑门禁：`cd pros/api && go test ./internal/model/... ./internal/db/...`。
+
+**CI 强制**：`go test ./internal/...` 覆盖上面两个守卫测试包——
+表名不合规、漏写 `TableName()`、登记表与模型不一致、迁移脚本里出现违规表名，**都会直接红**。
+不要绕过、注释或删改守卫测试；规则要改，就改规则本体并同步文档。
+
+**索引命名**（约定，暂不强制）：`idx_<域>_<实体>_<列>`、唯一索引 `uniq_<域>_<实体>_<语义>`。
+存量旧索引名（`idx_docs_content_tsv`、`idx_dp_owner` 等）暂未重命名，新增索引按新规则走。
