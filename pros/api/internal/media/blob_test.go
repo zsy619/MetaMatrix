@@ -178,3 +178,58 @@ func TestOpenFallsBackToLocalDisk(t *testing.T) {
 		t.Fatalf("fallback read %q", body)
 	}
 }
+
+func TestS3BlobsPutRetriesTransientStatus(t *testing.T) {
+	store := map[string][]byte{}
+	puts := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPut {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		puts++
+		if puts == 1 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		b, _ := io.ReadAll(r.Body)
+		store[strings.TrimPrefix(r.URL.Path, "/bucket/")] = b
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(srv.Close)
+	host := strings.TrimPrefix(srv.URL, "http://")
+	blobs := NewS3Blobs(ObjectConfig{
+		Endpoint: host, Bucket: "bucket", Region: "us-east-1",
+		AccessKey: "test-access", SecretKey: "test-secret", UseSSL: false,
+	}, srv.Client())
+	if err := blobs.Put(context.Background(), "u/file/ab/retry.txt", bytes.NewReader([]byte("ok")), 2); err != nil {
+		t.Fatal(err)
+	}
+	if puts != 2 {
+		t.Fatalf("puts = %d, want 2", puts)
+	}
+	if string(store["u/file/ab/retry.txt"]) != "ok" {
+		t.Fatalf("stored = %q", store["u/file/ab/retry.txt"])
+	}
+}
+
+func TestS3BlobsPutDoesNotRetryForbidden(t *testing.T) {
+	puts := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		puts++
+		w.WriteHeader(http.StatusForbidden)
+	}))
+	t.Cleanup(srv.Close)
+	host := strings.TrimPrefix(srv.URL, "http://")
+	blobs := NewS3Blobs(ObjectConfig{
+		Endpoint: host, Bucket: "bucket", Region: "us-east-1",
+		AccessKey: "test-access", SecretKey: "test-secret", UseSSL: false,
+	}, srv.Client())
+	err := blobs.Put(context.Background(), "u/file/ab/no.txt", bytes.NewReader([]byte("x")), 1)
+	if err == nil {
+		t.Fatal("expected forbidden")
+	}
+	if puts != 1 {
+		t.Fatalf("puts = %d, want 1 (no retry on 403)", puts)
+	}
+}

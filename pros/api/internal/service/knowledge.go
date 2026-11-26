@@ -3,6 +3,7 @@ package service
 import (
 	"errors"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -40,6 +41,10 @@ type KnowledgeService struct {
 	feishuBaseURL   string
 	// mail 用于评论通知。未注入或 SMTP 不齐时邮件路跳过，站内通知仍写。
 	mail mail.Sender
+	// mailRetryWait 为负时测试跳过等待；0 表示用默认间隔。
+	mailRetryWait time.Duration
+	mailOnce      sync.Once
+	mailLimiter   *mail.WindowLimiter
 }
 
 func NewKnowledgeService(db *gorm.DB) *KnowledgeService {

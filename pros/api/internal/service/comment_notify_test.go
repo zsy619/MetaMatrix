@@ -102,3 +102,44 @@ func TestCommentNotifyWritesInAppAndMailAndDegradesWithoutSMTP(t *testing.T) {
 		t.Fatalf("in-app after disabled mail = %d, want 3", len(after))
 	}
 }
+
+func TestCommentNotifyIsIdempotentPerUserAndComment(t *testing.T) {
+	db, owner, project, svc := openKnowledgeV2SQLite(t)
+	author := uuid.New()
+	now := time.Now().UTC()
+	for _, u := range []struct {
+		id    uuid.UUID
+		email string
+	}{
+		{owner, "owner@idem.test"},
+		{author, "author@idem.test"},
+	} {
+		if err := db.Create(&model.User{
+			ID: u.id, Email: u.email, PasswordHash: "x", CreatedAt: now, UpdatedAt: now,
+		}).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	node, err := svc.CreateDocWithNode(owner, project.ID, nil, "幂等", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec := &recordingSender{}
+	svc.SetMailSender(rec)
+	svc.mailRetryWait = -1
+	comment, err := svc.AddCommentDetailed(author, *node.DocumentID, nil, "", "只通知一次", -1, -1, nil, nil, -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc.notifyNewComment(comment)
+	notes, err := svc.ListNotifications(owner, false, 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(notes) != 1 {
+		t.Fatalf("notes = %d, want 1 after replay", len(notes))
+	}
+	if len(rec.messages) != 1 {
+		t.Fatalf("mail = %d, want 1 after replay", len(rec.messages))
+	}
+}

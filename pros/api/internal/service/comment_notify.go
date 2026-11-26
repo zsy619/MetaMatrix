@@ -63,6 +63,9 @@ func (s *KnowledgeService) notifyNewComment(comment *model.DocComment) {
 			Body:      body,
 			CreatedAt: time.Now().UTC(),
 		}
+		if s.alreadyNotified(userID, comment.ID, kind) {
+			continue
+		}
 		if err := s.db.Create(&n).Error; err != nil {
 			log.Printf("in-app comment notification skipped: %v", err)
 			continue
@@ -137,11 +140,21 @@ func (s *KnowledgeService) deliverCommentMail(userID uuid.UUID, subject, body st
 	if email == "" {
 		return
 	}
-	err := s.mail.Send(context.Background(), mail.Message{
+	if !s.commentMailAllowed(email) {
+		log.Printf("comment mail skipped: rate limited for %s; in-app notification kept", email)
+		return
+	}
+	wait := s.mailRetryWait
+	if wait == 0 {
+		wait = mail.DefaultRetryWait
+	} else if wait < 0 {
+		wait = 0
+	}
+	err := mail.SendWithRetry(context.Background(), s.mail, mail.Message{
 		To:      email,
 		Subject: subject,
 		Text:    body,
-	})
+	}, mail.DefaultRetryAttempts, wait)
 	if err == nil {
 		return
 	}
@@ -150,6 +163,23 @@ func (s *KnowledgeService) deliverCommentMail(userID uuid.UUID, subject, body st
 		return
 	}
 	log.Printf("comment mail skipped: %v; in-app notification kept", err)
+}
+
+func (s *KnowledgeService) alreadyNotified(userID, commentID uuid.UUID, kind string) bool {
+	var n int64
+	if err := s.db.Model(&model.UserNotification{}).
+		Where("user_id = ? AND comment_id = ? AND kind = ?", userID, commentID, kind).
+		Count(&n).Error; err != nil {
+		return false
+	}
+	return n > 0
+}
+
+func (s *KnowledgeService) commentMailAllowed(email string) bool {
+	s.mailOnce.Do(func() {
+		s.mailLimiter = mail.NewWindowLimiter(mail.DefaultMailRateMax, mail.DefaultMailRateWindow)
+	})
+	return s.mailLimiter.Allow(strings.ToLower(strings.TrimSpace(email)))
 }
 
 // ListNotifications 列出当前用户的站内通知，新的在前。

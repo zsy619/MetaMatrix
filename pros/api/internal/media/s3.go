@@ -72,6 +72,28 @@ func NewS3Blobs(cfg ObjectConfig, client *http.Client) *S3Blobs {
 func (s *S3Blobs) Name() string { return "s3" }
 
 func (s *S3Blobs) Put(ctx context.Context, key string, r io.Reader, size int64) error {
+	body, rewind, err := rewindable(r, size)
+	if err != nil {
+		return err
+	}
+	attempts := 1
+	if rewind != nil {
+		attempts = 3
+	}
+	var last error
+	for i := 0; i < attempts; i++ {
+		if i > 0 && rewind != nil {
+			body = rewind()
+		}
+		last = s.putOnce(ctx, key, body, size)
+		if last == nil || !isTransientBlobError(last) {
+			return last
+		}
+	}
+	return last
+}
+
+func (s *S3Blobs) putOnce(ctx context.Context, key string, r io.Reader, size int64) error {
 	req, err := s.newRequest(ctx, http.MethodPut, key, r, size)
 	if err != nil {
 		return err
@@ -82,8 +104,8 @@ func (s *S3Blobs) Put(ctx context.Context, key string, r io.Reader, size int64) 
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= 300 {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
-		return fmt.Errorf("s3 put: status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+		b, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
+		return s3StatusError{op: "put", status: resp.StatusCode, body: string(b)}
 	}
 	return nil
 }
@@ -100,7 +122,7 @@ func (s *S3Blobs) Open(ctx context.Context, key string) (io.ReadCloser, int64, e
 	if resp.StatusCode >= 300 {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
 		_ = resp.Body.Close()
-		return nil, 0, fmt.Errorf("s3 get: status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+		return nil, 0, s3StatusError{op: "get", status: resp.StatusCode, body: string(body)}
 	}
 	return resp.Body, resp.ContentLength, nil
 }
@@ -117,7 +139,7 @@ func (s *S3Blobs) Remove(ctx context.Context, key string) error {
 	defer resp.Body.Close()
 	if resp.StatusCode >= 300 && resp.StatusCode != http.StatusNotFound {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
-		return fmt.Errorf("s3 delete: status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+		return s3StatusError{op: "delete", status: resp.StatusCode, body: string(body)}
 	}
 	return nil
 }
