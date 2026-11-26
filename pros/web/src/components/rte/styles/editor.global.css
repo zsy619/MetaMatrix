@@ -4124,6 +4124,15 @@ input.rte-timeline-title:focus {
 .rte-database-block__day-title { font-size: 12px; font-weight: 600; margin-bottom: 6px; }
 .rte-database-block__gallery-field { font-size: 12px; color: var(--mm-text-2, #4e5969); }
 .rte-database-block__gallery-label { margin-right: 6px; color: var(--mm-text-3, #86909c); }
+.rte-database-block__sync { display: flex; gap: 4px; }
+.rte-database-block__sync-btn {
+  padding: 2px 8px;
+  border: 1px solid var(--mm-line, #e5e6eb);
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 12px;
+}
 .rte-outline-item.is-empty {
   color: #d83931;
 }

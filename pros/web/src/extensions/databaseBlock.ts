@@ -46,6 +46,7 @@ declare module '@tiptap/core' {
 }
 
 export { DATABASE_BLOCK_HTML_TYPE, DATABASE_BLOCK_NAME }
+export { DATABASE_BLOCK_SYNC_EVENT, type DatabaseBlockSyncDetail } from './databaseBlockEvents'
 export type { DatabaseBlockPayload, DatabaseBlockViewType }
 
 export type DatabaseBlockOpenTarget = {

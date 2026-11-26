@@ -53,6 +53,8 @@ import {
   getRelatedDocs,
   listVersionAuthors,
   saveDocAsTemplate,
+  getNodeData,
+  saveNodeData,
 } from '../../api/knowledge'
 import * as knowledgeApiV5 from '../../api/knowledge_v5'
 import type { PresenceUser } from '../../api/knowledge'
@@ -61,6 +63,8 @@ import AppLoading from '../common/AppLoading.vue'
 import SaveConflictPanel from './SaveConflictPanel.vue'
 import BlockPermissionPanel from './BlockPermissionPanel.vue'
 import { readBlockId } from '../../extensions/blockIdentity'
+import { DATABASE_BLOCK_SYNC_EVENT, type DatabaseBlockSyncDetail } from '../../extensions/databaseBlockEvents'
+import { syncLinkedDatabaseBlock } from '../../extensions/databaseBlockSync'
 import { resolveConflictHtml, type SaveConflictChoice } from './saveConflict'
 
 const props = defineProps<{
@@ -750,17 +754,39 @@ async function applyConflictChoice(choice: SaveConflictChoice) {
   }
 }
 
+
+async function onDatabaseBlockSync(ev: Event) {
+  const detail = (ev as CustomEvent<DatabaseBlockSyncDetail>).detail
+  if (!detail?.sheetNodeId) return
+  const inst = editorRef.value as unknown as {
+    editor?: Parameters<typeof syncLinkedDatabaseBlock>[0]
+  } | null
+  const editor = inst?.editor
+  if (!editor) return
+  try {
+    const result = await syncLinkedDatabaseBlock(editor, props.projectId, detail, {
+      load: getNodeData,
+      save: saveNodeData,
+    })
+    ElMessage.success(result === 'pulled' ? '已从知识库表格拉取' : '已写回知识库表格')
+  } catch (err) {
+    ElMessage.error(friendlyApiMessage(err, '同步知识库表格失败'))
+  }
+}
+
 watch(() => props.documentId, load, { immediate: true })
 watch(() => props.editorTemplate, () => void applyEditorTemplate())
 
 onMounted(() => {
   window.addEventListener('beforeunload', onBeforeUnload)
+  window.addEventListener(DATABASE_BLOCK_SYNC_EVENT, onDatabaseBlockSync)
   void syncPresence()
   presenceTimer = setInterval(() => void syncPresence(), 12000)
 })
 
 onUnmounted(() => {
   window.removeEventListener('beforeunload', onBeforeUnload)
+  window.removeEventListener(DATABASE_BLOCK_SYNC_EVENT, onDatabaseBlockSync)
   if (presenceTimer) clearInterval(presenceTimer)
   stopLiveCollab()
 })

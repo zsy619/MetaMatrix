@@ -2,6 +2,7 @@ import type { NodeViewRendererProps } from '@tiptap/core'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { FILTER_OPS, type SheetFilter, type SheetFilterOp } from '../components/knowledge/sheetModel'
 import { BLOCK_IDENTITY_ATTR } from './blockIdentity'
+import { DATABASE_BLOCK_SYNC_EVENT } from './databaseBlockEvents'
 import { DATABASE_BLOCK_HTML_TYPE } from './databaseBlockSheet'
 import {
   DATABASE_VIEW_LABELS,
@@ -59,6 +60,18 @@ export function createDatabaseBlockView({ node, getPos, editor }: NodeViewRender
     )
   }
 
+  const emitSync = (direction: 'pull' | 'push') => {
+    const pos = typeof getPos === 'function' ? getPos() : undefined
+    const sheetNodeId = String((typeof pos === 'number' && pos >= 0 ? editor.state.doc.nodeAt(pos) : current)?.attrs.sheetNodeId || current.attrs.sheetNodeId || '').trim()
+    if (typeof pos !== 'number' || pos < 0 || !sheetNodeId) return
+    dom.dispatchEvent(
+      new CustomEvent(DATABASE_BLOCK_SYNC_EVENT, {
+        bubbles: true,
+        detail: { direction, sheetNodeId, pos },
+      }),
+    )
+  }
+
   const render = () => {
     const payload = readPayload()
     const view = activeDatabaseView(payload)
@@ -94,6 +107,13 @@ export function createDatabaseBlockView({ node, getPos, editor }: NodeViewRender
       const open = el('span', 'rte-database-block__hint', '打开知识库表格')
       open.setAttribute('data-open-sheet-label', 'true')
       head.append(open)
+      const sync = el('div', 'rte-database-block__sync')
+      sync.append(
+        syncBtn('从知识库拉取', 'pull', editable, () => emitSync('pull')),
+        syncBtn('写回知识库', 'push', editable, () => emitSync('push')),
+      )
+      const note = el('span', 'rte-database-block__hint', '手动同步快照，不是实时双向')
+      head.append(sync, note)
     }
     dom.append(head)
     dom.append(renderFilterBuilder(payload, filters, join, editable, writePayload))
@@ -320,6 +340,21 @@ function joinBtn(
   btn.className = active ? 'rte-database-block__join-btn is-active' : 'rte-database-block__join-btn'
   btn.textContent = label
   btn.dataset.join = typ
+  btn.disabled = !enabled
+  btn.addEventListener('click', (event) => {
+    event.preventDefault()
+    event.stopPropagation()
+    onClick()
+  })
+  return btn
+}
+
+function syncBtn(label: string, direction: 'pull' | 'push', enabled: boolean, onClick: () => void) {
+  const btn = document.createElement('button')
+  btn.type = 'button'
+  btn.className = 'rte-database-block__sync-btn'
+  btn.textContent = label
+  btn.dataset.sync = direction
   btn.disabled = !enabled
   btn.addEventListener('click', (event) => {
     event.preventDefault()
