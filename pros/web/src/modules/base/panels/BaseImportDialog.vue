@@ -28,6 +28,8 @@ const fileName = ref('')
 const rows = ref<string[][]>([])
 /** 列索引 → 目标字段 ID（空串表示忽略该列）。 */
 const mapping = ref<Record<number, string>>({})
+/** 导入失败明细（行号 + 原因）。 */
+const importFailures = ref<{ target: string; message: string }[]>([])
 const busy = ref(false)
 const useHeader = ref(true)
 
@@ -129,9 +131,19 @@ async function runImport() {
   })
   busy.value = true
   try {
-    await batchRecords(props.projectId, props.tableId, { action: 'create', rows: payload })
-    ElMessage.success(`已导入 ${payload.length} 条记录`)
-    emit('imported', payload.length)
+    const res = (await batchRecords(props.projectId, props.tableId, {
+      action: 'create',
+      rows: payload,
+      partial: true,
+    })) as { succeeded: number; failed: number; failures: { target: string; message: string }[] }
+    const failures = res.failures ?? []
+    if (!res.failed) {
+      ElMessage.success(`已导入 ${res.succeeded} 条记录`)
+      emit('imported', res.succeeded)
+    } else {
+      ElMessage.warning(`导入完成：成功 ${res.succeeded} 条，失败 ${res.failed} 条`)
+      importFailures.value = failures
+    }
   } catch (err) {
     ElMessage.error((err as Error).message || '导入失败')
   } finally {
@@ -195,6 +207,16 @@ async function runImport() {
         </div>
       </template>
       <el-empty v-else description="选择一个 CSV 文件开始导入" :image-size="80" />
+
+      <div v-if="importFailures.length" class="be-import__failures">
+        <div class="be-import__failures-head">失败明细（{{ importFailures.length }}）</div>
+        <ul>
+          <li v-for="(item, index) in importFailures" :key="index">
+            <span class="be-import__failures-target">{{ item.target }}</span>
+            <span class="be-import__failures-msg">{{ item.message }}</span>
+          </li>
+        </ul>
+      </div>
     </div>
 
     <template #footer>
@@ -256,5 +278,43 @@ async function runImport() {
   background: var(--tg-surface-2);
   color: var(--tg-text-2);
   font-weight: 600;
+}
+</style>
+
+<style scoped>
+.be-import__failures {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--tg-border);
+  border-radius: var(--tg-radius-md);
+  background: var(--tg-surface-2);
+}
+.be-import__failures-head {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--tg-text-2);
+  margin-bottom: 6px;
+}
+.be-import__failures ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 160px;
+  overflow: auto;
+}
+.be-import__failures li {
+  display: flex;
+  gap: 8px;
+  font-size: 12px;
+  padding: 3px 0;
+  border-top: 1px solid var(--tg-border);
+}
+.be-import__failures-target {
+  flex: none;
+  color: var(--tg-text-2);
+}
+.be-import__failures-msg {
+  color: var(--tg-red);
+  word-break: break-all;
 }
 </style>

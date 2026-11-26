@@ -19,10 +19,12 @@ import {
   CopyDocument,
   DataBoard,
   Delete,
+  Document,
   Download,
   Filter,
   Grid,
   InfoFilled,
+  Link,
   MagicStick,
   MoreFilled,
   Picture,
@@ -57,6 +59,8 @@ import {
   queryRecords,
   updateRecord,
   updateView,
+  listBaseEmbedders,
+  type BaseEmbedder,
 } from './api'
 import type {
   BaseInfo,
@@ -109,6 +113,9 @@ const showFormula = ref(false)
 const showExport = ref(false)
 const showImport = ref(false)
 const showBatch = ref(false)
+/** 内嵌了本 Base 的文档（反向索引）。 */
+const embedders = ref<BaseEmbedder[]>([])
+const showEmbedders = ref(false)
 const showViewSettings = ref(false)
 const formulaField = ref<FieldMeta | undefined>(undefined)
 const activeRecord = ref<RecordRow | undefined>(undefined)
@@ -160,11 +167,30 @@ async function bootstrap() {
       activeTableId.value = tables.value[0]?.id ?? ''
     }
     if (activeTableId.value) await loadTable()
+    await loadEmbedders()
   } catch (err) {
     ElMessage.error((err as Error).message || '多维表格加载失败')
   } finally {
     loading.value = false
   }
+}
+
+/** 内嵌引用：哪些文档把本 Base 嵌进了正文。 */
+async function loadEmbedders() {
+  if (!base.value?.id) {
+    embedders.value = []
+    return
+  }
+  try {
+    embedders.value = await listBaseEmbedders(props.projectId, base.value.id)
+  } catch {
+    embedders.value = []
+  }
+}
+
+function openEmbedder(item: BaseEmbedder) {
+  showEmbedders.value = false
+  emit('open-doc', item.nodeId)
 }
 
 /** 关联文档字段：拉取知识库目录，得到节点 ID → 标题。 */
@@ -694,6 +720,11 @@ onBeforeUnmount(() => {
       <div class="be-btngroup">
         <el-button size="small" :icon="Download" @click="openExport">导出</el-button>
         <el-button size="small" :icon="Upload" @click="openImport">导入</el-button>
+        <el-tooltip content="哪些文档内嵌了这张表" placement="bottom">
+          <el-button size="small" :icon="Link" :class="{ 'is-active': embedders.length }" @click="showEmbedders = true">
+            内嵌{{ embedders.length ? ` ${embedders.length}` : '' }}
+          </el-button>
+        </el-tooltip>
       </div>
       <div class="be-header__spacer" />
       <el-button size="small" type="primary" :icon="Plus" @click="onAddRow">新增记录</el-button>
@@ -762,6 +793,7 @@ onBeforeUnmount(() => {
           :rows="rows"
           :group-field-id="groupFieldId"
           :editable="canEdit"
+          :view-config="activeView?.config"
           @update-cell="onCellUpdate"
           @open-record="onOpenRecord"
           @add-row="onAddRow"
@@ -819,6 +851,7 @@ onBeforeUnmount(() => {
       :filters="filters"
       :sorts="sorts"
       :groups="groups"
+      :doc-options="docOptions"
       @close="showQueryPanel = false"
       @apply="applyQuery"
     />
@@ -872,6 +905,33 @@ onBeforeUnmount(() => {
     />
 
     <el-dialog
+      v-if="showEmbedders"
+      :model-value="true"
+      title="内嵌引用"
+      width="520px"
+      append-to-body
+      destroy-on-close
+      @close="showEmbedders = false"
+    >
+      <div class="be-panel">
+        <div class="be-panel__hint">
+          下面这些文档把这张多维表格嵌进了正文（数据实时同步，不是快照）。
+        </div>
+        <ul v-if="embedders.length" class="be-embedders">
+          <li v-for="item in embedders" :key="item.nodeId" @click="openEmbedder(item)">
+            <el-icon><Document /></el-icon>
+            <span class="be-embedders__title">{{ item.title }}</span>
+            <span class="be-embedders__hint">点击打开</span>
+          </li>
+        </ul>
+        <el-empty v-else description="还没有文档内嵌这张表" :image-size="72" />
+      </div>
+      <template #footer>
+        <el-button @click="showEmbedders = false">关闭</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog
       v-if="showExport"
       :model-value="true"
       title="导出数据"
@@ -898,3 +958,35 @@ onBeforeUnmount(() => {
     </el-dialog>
   </div>
 </template>
+
+<style scoped>
+.be-embedders {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.be-embedders li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: var(--tg-radius-sm);
+  cursor: pointer;
+  transition: background var(--tg-dur) var(--tg-ease);
+}
+.be-embedders li:hover { background: var(--tg-surface-2); }
+.be-embedders__title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--tg-text);
+  font-size: 13px;
+}
+.be-embedders__hint {
+  flex: none;
+  font-size: 12px;
+  color: var(--tg-text-3);
+}
+</style>

@@ -47,6 +47,7 @@ import {
   type RteSlashItem,
 } from './rteSlashItems'
 import { mentionSectionLabel } from './rteMentionItems'
+import { ensureBase, listTables, listViews } from '../modules/base/api'
 import {
   FEISHU_BATCH3_SHORTCUTS,
 } from '../utils/rteBatch3'
@@ -91,7 +92,17 @@ import {
   visibleBlockMenuItems,
   type BlockMenuState,
 } from './rte/rteBlockMenu'
-import { pushRecentColor, themeColorLabel } from './rte/rteColorPalette'
+import {
+  colorsEqual,
+  highlightColorLabel,
+  isLightHighlight,
+  pushRecentColor,
+  textColorLabel,
+  WORD_HIGHLIGHT_SOFT,
+  WORD_HIGHLIGHT_VIVID,
+  WORD_STANDARD_COLOR_ITEMS,
+  WORD_THEME_FLAT,
+} from './rte/rteColorPalette'
 import {
   EMPTY_WATERMARK,
   readWatermark,
@@ -456,6 +467,33 @@ const directoryPeople = useDirectoryPeople({
   permission: () => mentionPermission.value,
 })
 const knowledgeDocs = useKnowledgeDocs(() => props.knowledgeProjectId)
+
+/**
+ * 多维表格节点 → 文档内嵌 Base 视图块的引用参数。
+ * ensureBase 会复用已有 Base（同一知识库节点），不会重复建表。
+ */
+async function resolveBaseEmbed(nodeId: string) {
+  const pid = props.knowledgeProjectId
+  if (!pid || !nodeId) return null
+  try {
+    const base = await ensureBase(pid, nodeId)
+    const tables = await listTables(pid, base.id)
+    const table = tables[0]
+    if (!table) return null
+    const views = await listViews(pid, table.id)
+    const view = views.find((item) => item.isDefault) ?? views[0]
+    return {
+      projectId: pid,
+      baseId: base.id,
+      tableId: table.id,
+      viewId: view?.id ?? '',
+      nodeId,
+      title: table.name,
+    }
+  } catch {
+    return null
+  }
+}
 
 /** —— 大纲右键菜单 —— */
 const outlineMenuOpen = ref(false)
@@ -1199,6 +1237,7 @@ const editor = useRteExtensions({
   bumpSuggestions: () => bumpSuggestions(),
   mentionPeople: () => directoryPeople.mentionPeople(),
   mentionDocuments: () => knowledgeDocs.mentionDocuments(),
+  mentionBaseEmbed: (nodeId: string) => resolveBaseEmbed(nodeId),
   reapplyTableFilter: (ed, transaction, appended) => reapplyTableFilter(ed as never, transaction, appended),
 })
 
@@ -3967,9 +4006,6 @@ function currentHighlightColor(): string {
   }
   return String(attrs.color).toLowerCase()
 }
-function colorsEqual(a: string, b: string) {
-  return (a || '').toLowerCase() === (b || '').toLowerCase()
-}
 function setAlign(align: 'left' | 'center' | 'right' | 'justify') {
   applyTextAlignToSelection(editor.value, align)
 }
@@ -6356,76 +6392,6 @@ function onToolMenuLeave(event: MouseEvent, key: string, close: () => void) {
 const customColorOpen = ref(false)
 const customColorHex = ref('#165dff')
 
-/**
- * Word 风格字体颜色：主题颜色（10 列 × 6 行：基色 + 明暗变体）+ 标准颜色一行。
- * 色值对齐 Office 常见主题调色板。
- */
-const WORD_THEME_COLORS: string[][] = [
-  ['#FFFFFF', '#F2F2F2', '#D8D8D8', '#BFBFBF', '#A5A5A5', '#7F7F7F'],
-  ['#000000', '#7F7F7F', '#595959', '#3F3F3F', '#262626', '#0C0C0C'],
-  ['#E7E6E6', '#D0CECE', '#AEABAB', '#757070', '#3A3838', '#171616'],
-  ['#44546A', '#D6DCE4', '#ADB9CA', '#8496B0', '#323F4F', '#222A35'],
-  ['#5B9BD5', '#DEEBF6', '#BDD7EE', '#9CC2E5', '#2E75B5', '#1F4E79'],
-  ['#ED7D31', '#FBE4D5', '#F7CAAC', '#F4B183', '#C55A11', '#833C0B'],
-  ['#A5A5A5', '#EDEDED', '#DBDBDB', '#C9C9C9', '#7B7B7B', '#525252'],
-  ['#FFC000', '#FFF2CC', '#FFE699', '#FFD966', '#BF9000', '#7F6000'],
-  ['#4472C4', '#D6DCE4', '#B4C6E7', '#8EA9DB', '#2F5496', '#1F3864'],
-  ['#70AD47', '#E2EFD9', '#C5E0B3', '#A8D08D', '#548235', '#375623'],
-]
-
-/** 按行展开主题色网格（第 0 行为基色，其后为明暗），供 CSS grid 按行渲染 */
-const WORD_THEME_ROWS = (() => {
-  const rows: string[][] = []
-  const cols = WORD_THEME_COLORS.length
-  const depth = WORD_THEME_COLORS[0]?.length ?? 0
-  for (let r = 0; r < depth; r++) {
-    rows.push(Array.from({ length: cols }, (_, c) => WORD_THEME_COLORS[c][r]))
-  }
-  return rows
-})()
-
-/** 办公常用高亮：柔和底色（主色板）+ 经典荧光笔 */
-const WORD_HIGHLIGHT_SOFT = [
-  { color: '#FFF3BF', label: '淡黄' },
-  { color: '#D8F5A2', label: '浅绿' },
-  { color: '#A5D8FF', label: '浅蓝' },
-  { color: '#FFC9C9', label: '浅粉' },
-  { color: '#E5DBFF', label: '浅紫' },
-  { color: '#FFE8CC', label: '浅橙' },
-  { color: '#C3FAE8', label: '薄荷绿' },
-  { color: '#D0EBFF', label: '天空蓝' },
-  { color: '#FFDEEB', label: '玫瑰粉' },
-  { color: '#E9ECEF', label: '浅灰' },
-]
-
-const WORD_HIGHLIGHT_VIVID = [
-  { color: '#FFFF00', label: '荧光黄' },
-  { color: '#00FF00', label: '荧光绿' },
-  { color: '#00FFFF', label: '青绿' },
-  { color: '#FF00FF', label: '品红' },
-  { color: '#FF6B6B', label: '珊瑚红' },
-  { color: '#74C0FC', label: '亮蓝' },
-  { color: '#B197FC', label: '亮紫' },
-  { color: '#FFD43B', label: '金黄' },
-  { color: '#69DB7C', label: '草绿' },
-  { color: '#ADB5BD', label: '中灰' },
-]
-
-/** 兼容旧引用：合并列表 */
-const WORD_HIGHLIGHT_COLORS = [...WORD_HIGHLIGHT_SOFT, ...WORD_HIGHLIGHT_VIVID]
-
-const WORD_STANDARD_COLOR_ITEMS = [
-  { color: '#C00000', label: '深红' },
-  { color: '#FF0000', label: '红色' },
-  { color: '#FFC000', label: '橙色' },
-  { color: '#FFFF00', label: '黄色' },
-  { color: '#92D050', label: '浅绿' },
-  { color: '#00B050', label: '绿色' },
-  { color: '#00B0F0', label: '青绿' },
-  { color: '#0070C0', label: '蓝色' },
-  { color: '#002060', label: '深蓝' },
-  { color: '#7030A0', label: '紫色' },
-]
 
 const customHighlightOpen = ref(false)
 const customHighlightHex = ref('#FFF3BF')
@@ -6437,32 +6403,6 @@ function announceRte(msg: string) {
   rteAriaStatus.value = msg
 }
 
-function highlightColorLabel(color: string): string {
-  const c = (color || '').toLowerCase()
-  if (!c) return '无'
-  if (c === '__default__') return '默认高亮'
-  const hit = WORD_HIGHLIGHT_COLORS.find((h) => h.color.toLowerCase() === c)
-  return hit?.label || color
-}
-
-function isLightHighlight(color: string): boolean {
-  const c = (color || '').toLowerCase()
-  if (!c || c === '__default__') return true
-  const hex = c.startsWith('#') ? c.slice(1) : c
-  if (hex.length !== 3 && hex.length !== 6) return false
-  const full =
-    hex.length === 3
-      ? hex
-          .split('')
-          .map((ch) => ch + ch)
-          .join('')
-      : hex
-  const r = parseInt(full.slice(0, 2), 16)
-  const g = parseInt(full.slice(2, 4), 16)
-  const b = parseInt(full.slice(4, 6), 16)
-  // 相对亮度
-  return (r * 299 + g * 587 + b * 114) / 1000 > 180
-}
 
 function currentHighlightLabel(): string {
   return highlightColorLabel(currentHighlightColor())
@@ -6533,18 +6473,6 @@ function onCustomColorNativeInput(event: Event) {
   if (el?.value) customColorHex.value = el.value
 }
 
-/** 主题色按行展平后的一维列表（10 列 × 6 行） */
-const WORD_THEME_FLAT = WORD_THEME_ROWS.flat()
-
-function textColorLabel(color: string): string {
-  const c = (color || '').toLowerCase()
-  if (!c) return '自动'
-  const standard = WORD_STANDARD_COLOR_ITEMS.find((item) => item.color.toLowerCase() === c)
-  if (standard) return standard.label
-  const index = WORD_THEME_FLAT.findIndex((item) => item.toLowerCase() === c)
-  if (index >= 0) return themeColorLabel(index)
-  return color
-}
 
 function moreSubmenuOpen(t: ToolItem): boolean {
   if (t.kind === 'presetMenu') return presetMenuKey.value === t.key

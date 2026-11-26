@@ -53,6 +53,17 @@ export function useKnowledgeDocs(projectId: () => string) {
             })
           }
         }
+        // 多维表格节点：作为「内嵌表格视图块」候选（canvasType='base'）。
+        for (const n of nodes) {
+          if (n.nodeType !== 'sheet') continue
+          byId.set(`base:${n.id}`, {
+            documentId: n.id,
+            title: n.title,
+            icon: n.icon || '📊',
+            canvasType: 'base',
+            nodeId: n.id,
+          })
+        }
         docs.value = [...byId.values()]
         loaded.value = true
         return docs.value

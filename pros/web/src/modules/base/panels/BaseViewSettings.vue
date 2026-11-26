@@ -21,6 +21,8 @@ const emit = defineEmits<{
 const name = ref(props.view.name)
 const visibility = ref<Record<string, boolean>>({})
 const widths = ref<Record<string, number>>({})
+/** 画廊卡片要展示的字段（按勾选顺序）。 */
+const galleryFields = ref<string[]>([])
 
 watch(
   () => props.view,
@@ -34,6 +36,8 @@ watch(
       visibility.value[field.id] = vis[field.id] !== false
       widths.value[field.id] = w[field.id] ?? (field.isPrimary ? 200 : 140)
     }
+    const layout = (view.config?.layout ?? {}) as { galleryFields?: string[] }
+    galleryFields.value = Array.isArray(layout.galleryFields) ? [...layout.galleryFields] : []
   },
   { immediate: true, deep: true },
 )
@@ -45,6 +49,10 @@ function save() {
       ...props.view.config,
       fieldVisibility: visibility.value,
       fieldWidths: widths.value,
+      layout: {
+        ...((props.view.config?.layout ?? {}) as Record<string, unknown>),
+        galleryFields: galleryFields.value,
+      },
     },
   })
 }
@@ -63,6 +71,24 @@ function save() {
       <el-input v-model="name" placeholder="视图名称" maxlength="40" show-word-limit />
 
       <div class="be-panel__hint">字段显隐与列宽会保存到当前视图，切换视图时自动生效。</div>
+
+      <template v-if="view.type === 'gallery'">
+        <div class="be-panel__hint">画廊卡片展示的字段（按勾选顺序，最多 4 个）。</div>
+        <el-select
+          v-model="galleryFields"
+          multiple
+          :multiple-limit="4"
+          placeholder="选择卡片字段"
+          style="width: 100%"
+        >
+          <el-option
+            v-for="field in fields.filter((item) => !item.isPrimary)"
+            :key="field.id"
+            :label="field.name"
+            :value="field.id"
+          />
+        </el-select>
+      </template>
 
       <div class="be-view-settings__list">
         <div v-for="field in fields" :key="field.id" class="be-view-settings__row">

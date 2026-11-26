@@ -7,7 +7,7 @@
 import { computed, ref } from 'vue'
 import { ArrowLeft, ArrowRight, Grid, Plus } from '@element-plus/icons-vue'
 import BaseFieldCell from '../fields/BaseFieldCell.vue'
-import type { FieldMeta, RecordRow, ViewType } from '../types'
+import type { FieldMeta, RecordRow, ViewConfig, ViewType } from '../types'
 
 const props = defineProps<{
   type: Extract<ViewType, 'kanban' | 'calendar' | 'gallery'>
@@ -15,6 +15,8 @@ const props = defineProps<{
   rows: RecordRow[]
   groupFieldId?: string
   editable?: boolean
+  /** 视图配置（画廊卡片字段从 layout.galleryFields 取）。 */
+  viewConfig?: ViewConfig
 }>()
 
 const emit = defineEmits<{
@@ -29,6 +31,17 @@ const draggingId = ref('')
 const dragOverKey = ref('')
 
 const coverField = computed(() => props.fields.find((f) => f.type === 'attachment'))
+
+/** 画廊卡片展示的字段：优先用视图配置里勾选的字段，否则取前 2 个非主字段。 */
+const galleryFields = computed<FieldMeta[]>(() => {
+  const configured = (props.viewConfig?.layout as { galleryFields?: string[] } | undefined)?.galleryFields
+  if (Array.isArray(configured) && configured.length) {
+    return configured
+      .map((id) => props.fields.find((f) => f.id === id))
+      .filter((f): f is FieldMeta => Boolean(f))
+  }
+  return props.fields.filter((f) => !f.isPrimary && f.type !== 'formula').slice(0, 2)
+})
 const titleField = computed(() => props.fields.find((f) => f.isPrimary) ?? props.fields[0])
 
 function cellValue(row: RecordRow, fieldId?: string) {
@@ -124,6 +137,27 @@ const calendarDays = computed(() => {
 
 const dateField = computed(() => props.fields.find((f) => f.type === 'date' || f.type === 'datetime'))
 
+/** 日历拖拽：当前悬停的日期格。 */
+const dragOverDay = ref('')
+
+/** 把记录拖到某一天 = 改写它的日期字段。 */
+function onDayDragOver(dayKey: string) {
+  if (!draggingId.value) return
+  dragOverDay.value = dayKey
+}
+
+function onDayDrop(dayKey: string) {
+  const field = dateField.value
+  const recordId = draggingId.value
+  dragOverDay.value = ''
+  if (!field || !recordId) return
+  const row = props.rows.find((item) => item.id === recordId)
+  if (!row) return
+  const current = String(cellValue(row, field.id) ?? '').slice(0, 10)
+  if (current === dayKey) return
+  emit('update-cell', { recordId, fieldId: field.id, value: dayKey })
+}
+
 const rowsByDay = computed(() => {
   const map = new Map<string, RecordRow[]>()
   if (!dateField.value) return map
@@ -207,12 +241,24 @@ const rowsByDay = computed(() => {
         <span v-for="day in ['日', '一', '二', '三', '四', '五', '六']" :key="day">{{ day }}</span>
       </div>
       <div class="base-board__days">
-        <div v-for="day in calendarDays" :key="day.key" class="base-board__day" :class="{ 'is-out': !day.inMonth }">
+        <div
+          v-for="day in calendarDays"
+          :key="day.key"
+          class="base-board__day"
+          :class="{ 'is-out': !day.inMonth, 'is-drag-over': dragOverDay === day.key }"
+          @dragover.prevent="onDayDragOver(day.key)"
+          @dragleave="dragOverDay === day.key && (dragOverDay = '')"
+          @drop.prevent="onDayDrop(day.key)"
+        >
           <span class="base-board__day-num">{{ day.date.getDate() }}</span>
           <button
             v-for="row in rowsByDay.get(day.key) ?? []"
             :key="row.id"
             class="base-board__event"
+            :draggable="editable && !!dateField"
+            :class="{ 'is-dragging': draggingId === row.id }"
+            @dragstart="onDragStart(row)"
+            @dragend="onDragEnd"
             @click="emit('open-record', row.id)"
           >
             {{ primaryText(row) }}
@@ -236,11 +282,7 @@ const rowsByDay = computed(() => {
           <span v-else class="base-board__tile-icon"><el-icon><Grid /></el-icon></span>
         </div>
         <strong class="base-board__tile-title">{{ primaryText(row) }}</strong>
-        <div
-          v-for="field in fields.filter((f) => !f.isPrimary && f.type !== 'formula').slice(0, 2)"
-          :key="field.id"
-          class="base-board__tile-row"
-        >
+        <div v-for="field in galleryFields" :key="field.id" class="base-board__tile-row">
           <span class="base-board__card-label">{{ field.name }}</span>
           <BaseFieldCell
             :field="field"
@@ -313,6 +355,12 @@ const rowsByDay = computed(() => {
 .base-board__card.is-dragging {
   opacity: 0.5;
   transform: rotate(-1deg);
+}
+
+.base-board__day.is-drag-over {
+  outline: 2px solid var(--tg-blue);
+  outline-offset: -2px;
+  background: var(--tg-blue-soft);
 }
 
 .base-board__column.is-drag-over {

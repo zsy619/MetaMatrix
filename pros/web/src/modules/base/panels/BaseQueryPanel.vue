@@ -14,6 +14,8 @@ const props = defineProps<{
   filters?: FilterGroup
   sorts?: SortRule[]
   groups?: GroupRule[]
+  /** 「关联文档」字段的候选（知识库节点），用于按标题筛选。 */
+  docOptions?: Array<{ id: string; title: string }>
 }>()
 
 const emit = defineEmits<{
@@ -119,7 +121,11 @@ function addGroup() {
 }
 
 function apply() {
-  const valid = conditions.value.filter((item) => item.fieldId && needsValue(item.operator) && item.value !== '')
+  const valid = conditions.value.filter((item) => {
+    if (!item.fieldId || !needsValue(item.operator)) return false
+    if (Array.isArray(item.value)) return item.value.length > 0
+    return item.value !== ''
+  })
   emit('apply', {
     filters: { logic: logic.value, conditions: valid, children: [] },
     sorts: sorts.value.filter((item) => item.fieldId),
@@ -184,6 +190,23 @@ function apply() {
                   :key="opt"
                   :label="opt"
                   :value="opt"
+                />
+              </el-select>
+              <el-select
+                v-else-if="fieldOf(cond.fieldId)?.type === 'doc'"
+                v-model="cond.value"
+                multiple
+                filterable
+                collapse-tags
+                collapse-tags-tooltip
+                style="flex: 1"
+                placeholder="按文档标题筛选"
+              >
+                <el-option
+                  v-for="doc in props.docOptions ?? []"
+                  :key="doc.id"
+                  :label="doc.title"
+                  :value="doc.id"
                 />
               </el-select>
               <el-switch

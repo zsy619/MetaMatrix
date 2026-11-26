@@ -11,7 +11,7 @@ import DocView from '../components/knowledge/DocView.vue'
 import CanvasPanel from '../components/knowledge/CanvasPanel.vue'
 import SpaceHome from '../components/knowledge/SpaceHome.vue'
 import KnowledgeGraph from '../components/knowledge/KnowledgeGraph.vue'
-import SheetEditor from '../components/knowledge/SheetEditor.vue'
+import BaseEngineView from '../modules/base/BaseEngineView.vue'
 import MindmapEditor from '../components/knowledge/MindmapEditor.vue'
 import FolderPanel from '../components/knowledge/FolderPanel.vue'
 import type { KnowledgeNode } from '../api/knowledge'
@@ -90,6 +90,28 @@ function openDocById(documentId: string) {
   canvasNode.value = null
   folderView.value = null
   void router.replace({ name: 'knowledge-doc', params: { projectId: projectId.value, documentId } })
+}
+
+/** 多维表格里的「关联文档」字段：按节点 ID 在目录树里找，再走既有打开逻辑。 */
+function openKnowledgeNodeById(nodeId: string) {
+  const node = treeRef.value?.nodeById(nodeId)
+  if (!node) {
+    ElMessage.warning('关联的文档已不存在或被删除')
+    return
+  }
+  if (node.nodeType === 'canvas') {
+    openCanvasNode(node)
+    return
+  }
+  if (node.nodeType === 'sheet' || node.nodeType === 'mindmap') {
+    openStructuredNode(node)
+    return
+  }
+  if (!node.documentId) {
+    ElMessage.warning('该关联文档还没有正文，先在目录里写点内容再打开')
+    return
+  }
+  openDoc(node)
 }
 
 function backToTree() {
@@ -307,12 +329,13 @@ loadProject()
             :project-id="projectId"
             @open-node="openDocById"
           />
-          <SheetEditor
+          <BaseEngineView
             v-else-if="structuredNode && structuredNode.nodeType === 'sheet'"
             :key="structuredNode.id"
             :project-id="projectId"
             :node-id="structuredNode.id"
             :title="structuredNode.title"
+            @open-doc="openKnowledgeNodeById"
           />
           <MindmapEditor
             v-else-if="structuredNode && structuredNode.nodeType === 'mindmap'"
@@ -353,6 +376,7 @@ loadProject()
             :node-id="treeRef?.nodeOf(activeDocumentId)?.id"
             @back="backToTree"
             @open-related="openDocById"
+            @open-node="openKnowledgeNodeById"
             @title-change="(title) => treeRef?.setDocTitle(activeDocumentId, title)"
             @icon-change="(icon) => treeRef?.setDocIcon(activeDocumentId, icon)"
             @editor-template-applied="pendingEditorTemplate = ''"

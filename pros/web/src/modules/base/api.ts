@@ -86,6 +86,23 @@ export function listDocBackrefs(projectId: string, nodeId: string) {
   return apiRequest<DocBackref[]>(`${baseUrl(projectId)}/doc-backrefs/${nodeId}`)
 }
 
+/** 内嵌了某个 Base 的文档（文档 ↔ 表格的反向索引）。 */
+export type BaseEmbedder = {
+  /** 知识库节点 ID（可直接跳转）。 */
+  nodeId: string
+  /** 文档 ID。 */
+  documentId: string
+  /** 文档标题。 */
+  title: string
+  /** 被内嵌的 Base ID。 */
+  tableId: string
+}
+
+/** 列出所有内嵌了本 Base 的文档。 */
+export function listBaseEmbedders(projectId: string, baseId: string) {
+  return apiRequest<BaseEmbedder[]>(`${baseUrl(projectId)}/embedders/${baseId}`)
+}
+
 /** 建字段。 */
 export function createField(
   projectId: string,
@@ -163,15 +180,34 @@ export function deleteRecord(projectId: string, recordId: string) {
 }
 
 /** 批量操作。 */
+/** 批量操作里的一条失败明细。 */
+export type BatchFailure = {
+  /** 失败对象标识（记录 ID、导入行号等）。 */
+  target: string
+  /** 失败原因（可直接展示）。 */
+  message: string
+}
+
+/** 批量操作「部分成功」的结果。 */
+export type BatchPartialResult = {
+  rows: RecordRow[]
+  failures: BatchFailure[]
+  succeeded: number
+  failed: number
+}
+
 export function batchRecords(
   projectId: string,
   tableId: string,
-  payload: { action: 'create' | 'update' | 'delete'; ids?: string[]; fields?: Record<string, unknown>; rows?: unknown[] },
+  payload: { action: 'create' | 'update' | 'delete'; ids?: string[]; fields?: Record<string, unknown>; rows?: unknown[]; partial?: boolean },
 ) {
-  return apiRequest<RecordRow[] | { ok: boolean }>(`${baseUrl(projectId)}/tables/${tableId}/records/batch`, {
-    method: 'POST',
-    body: payload,
-  })
+  return apiRequest<RecordRow[] | BatchPartialResult | { ok: boolean }>(
+    `${baseUrl(projectId)}/tables/${tableId}/records/batch`,
+    {
+      method: 'POST',
+      body: payload,
+    },
+  )
 }
 
 /** 统一查询：筛选、排序、分组、分页都在服务端完成。 */
