@@ -36,7 +36,7 @@ import MeetingMinutesDialog from './MeetingMinutesDialog.vue'
 import ShareDialog from './ShareDialog.vue'
 // 图标库按需加载。
 const IconPicker = defineAsyncComponent(() => import('../common/IconPicker.vue'))
-import { getDocument, getDocumentBlock, updateBlockPermission, updateDocument } from '../../api/documents'
+import { getDocument, getDocumentBlock, listDocumentBlocks, updateBlockPermission, updateDocument } from '../../api/documents'
 import { apiRequestBlob, getToken } from '../../api/http'
 import { LiveCollabSession, createCollabYDoc } from './collab/yDocCollab'
 import { isCollabWritable } from './collab/collabOfflineQueue'
@@ -63,6 +63,7 @@ import AppLoading from '../common/AppLoading.vue'
 import SaveConflictPanel from './SaveConflictPanel.vue'
 import BlockPermissionPanel from './BlockPermissionPanel.vue'
 import { readBlockId } from '../../extensions/blockIdentity'
+import { setBlockPermissionGuardState } from '../../extensions/blockPermissionGuard'
 import { DATABASE_BLOCK_SYNC_EVENT, type DatabaseBlockSyncDetail } from '../../extensions/databaseBlockEvents'
 import { syncLinkedDatabaseBlock } from '../../extensions/databaseBlockSync'
 import { resolveConflictHtml, type SaveConflictChoice } from './saveConflict'
@@ -393,6 +394,36 @@ async function loadBlockPermission(blockId: string) {
   }
 }
 
+
+async function refreshBlockPermissionGuard(attempt = 0) {
+  const inst = editorRef.value as unknown as {
+    editor?: Parameters<typeof setBlockPermissionGuardState>[0]
+  } | null
+  const editor = inst?.editor
+  if (!editor) {
+    if (attempt < 8) window.setTimeout(() => void refreshBlockPermissionGuard(attempt + 1), 80)
+    return
+  }
+  const actor = permissionActor.value
+  try {
+    const rows = await listDocumentBlocks(props.documentId)
+    const permissions: Record<string, string> = {}
+    for (const row of rows) {
+      if (row.id) permissions[row.id] = row.permission || ''
+    }
+    setBlockPermissionGuardState(editor, {
+      role: actor.role,
+      canWrite: actor.canWrite,
+      permissions,
+    })
+  } catch {
+    setBlockPermissionGuardState(editor, {
+      role: actor.role,
+      canWrite: actor.canWrite,
+    })
+  }
+}
+
 async function onBlockPermissionChange(permission: string) {
   const blockId = selectedBlockId.value
   if (!blockId) return
@@ -403,6 +434,7 @@ async function onBlockPermissionChange(permission: string) {
       selectedBlockPermission.value = row.permission || permission
       selectedBlockPermHint.value = ''
     }
+    await refreshBlockPermissionGuard()
     ElMessage.success('块级权限已更新')
   } catch (err) {
     ElMessage.error(friendlyApiMessage(err, '设置块级权限失败'))
@@ -775,6 +807,11 @@ async function onDatabaseBlockSync(ev: Event) {
 }
 
 watch(() => props.documentId, load, { immediate: true })
+watch(
+  () => [props.documentId, permissionActor.value.role, permissionActor.value.canWrite, editorSessionKey.value, doc.value?.id] as const,
+  () => { void refreshBlockPermissionGuard() },
+)
+
 watch(() => props.editorTemplate, () => void applyEditorTemplate())
 
 onMounted(() => {

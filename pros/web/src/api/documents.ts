@@ -224,6 +224,10 @@ export type DocumentBlock = {
   contentText?: string
 }
 
+export function listDocumentBlocks(documentId: string) {
+  return apiRequest<DocumentBlock[]>(`/documents/${documentId}/blocks`, { cache: 'no-store' })
+}
+
 export function getDocumentBlock(documentId: string, blockId: string) {
   return apiRequest<DocumentBlock>(`/documents/${documentId}/blocks/${blockId}`, { cache: 'no-store' })
 }

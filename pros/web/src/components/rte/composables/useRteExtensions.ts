@@ -109,6 +109,7 @@ import { MediaHydrate } from '../../../extensions/mediaHydrate'
 import { RteInlineMarkdown } from '../../../extensions/rteInlineMarkdown'
 import { RteAutoLink } from '../../../extensions/rteAutoLink'
 import { BlockIdentity } from '../../../extensions/blockIdentity'
+import { BlockPermissionGuard } from '../../../extensions/blockPermissionGuard'
 
 type LateFn = (...args: any[]) => any
 
@@ -327,6 +328,7 @@ const editor = useEditor({
     LetterSpacing,
     ParagraphAttrs,
     BlockIdentity,
+    BlockPermissionGuard,
     ...(collabYDoc ? [Collaboration.configure({ document: collabYDoc })] : []),
     ...(collabYDoc && collabProvider
       ? [

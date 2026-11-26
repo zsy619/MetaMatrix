@@ -12,6 +12,7 @@ import {
   canEnableSuggestionMode,
   shouldTrackAsSuggestion,
 } from '../../knowledge/collab/collabReviewPolicy'
+import { canEditRange } from '../../../extensions/blockPermissionGuard'
 
 /** 建议模式开关，以及接受 / 拒绝。正文里的标记就是修订本身。 */
 export function useSuggestionMode(deps: {
@@ -80,6 +81,13 @@ export function useSuggestionMode(deps: {
     if (!canApplySuggestionDecision(writableCtx())) {
       ElMessage.warning('没有编辑权限，不能接受或拒绝修订')
       return
+    }
+    if (id) {
+      const hit = suggestionRanges.value.find((range) => range.id === id)
+      if (hit && !canEditRange(ed, hit.from, hit.to)) {
+        ElMessage.warning('这块是只读的，不能接受或拒绝修订')
+        return
+      }
     }
     const ok = dispatchSuggestionDecision(ed, mode, id)
     if (!ok) ElMessage.info(id ? '这里没有可处理的修订' : '没有修订')

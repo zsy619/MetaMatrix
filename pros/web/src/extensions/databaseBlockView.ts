@@ -1,7 +1,8 @@
 import type { NodeViewRendererProps } from '@tiptap/core'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { FILTER_OPS, type SheetFilter, type SheetFilterOp } from '../components/knowledge/sheetModel'
-import { BLOCK_IDENTITY_ATTR } from './blockIdentity'
+import { BLOCK_IDENTITY_ATTR, readBlockId } from './blockIdentity'
+import { canEditStoredBlock, guardStorageFrom } from './blockPermissionGuard'
 import { DATABASE_BLOCK_SYNC_EVENT } from './databaseBlockEvents'
 import { DATABASE_BLOCK_HTML_TYPE } from './databaseBlockSheet'
 import {
@@ -45,6 +46,8 @@ export function createDatabaseBlockView({ node, getPos, editor }: NodeViewRender
 
   const writePayload = (payload: DatabaseBlockPayload) => {
     if (!editor.isEditable) return
+    const currentId = readBlockId((typeof getPos === 'function' ? editor.state.doc.nodeAt(getPos() as number) : current) || current)
+    if (currentId && !canEditStoredBlock(guardStorageFrom(editor), currentId)) return
     const pos = typeof getPos === 'function' ? getPos() : undefined
     if (typeof pos !== 'number' || pos < 0) return
     const target = editor.state.doc.nodeAt(pos)
@@ -79,7 +82,8 @@ export function createDatabaseBlockView({ node, getPos, editor }: NodeViewRender
     const title = String(current.attrs.title || '').trim() || '多维表格'
     const linked = Boolean(String(current.attrs.sheetNodeId || '').trim())
     const rows = visibleDatabaseRows(payload)
-    const editable = editor.isEditable
+    const blockId = readBlockId(current)
+    const editable = editor.isEditable && (!blockId || canEditStoredBlock(guardStorageFrom(editor), blockId))
     const join = databaseFilterJoin(payload)
     const filters = [...(view.filters || [])]
 
