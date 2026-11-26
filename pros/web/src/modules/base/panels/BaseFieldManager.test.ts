@@ -123,4 +123,14 @@ describe('字段管理面板', () => {
     await wrapper.findAll('button[aria-label="下移字段"]')[0].trigger('click')
     expect(reorderFields).toHaveBeenCalledWith('p1', 't1', ['f2', 'f1'])
   })
+
+  it('字段操作用图标按钮，不再占文字宽度', () => {
+    const wrapper = mountPanel()
+    for (const label of ['重命名字段', '切换必填', '修改字段类型', '删除字段', '上移字段', '下移字段']) {
+      expect(wrapper.find(`button[aria-label="${label}"]`).exists()).toBe(true)
+    }
+    // 旧的操作按钮文案不应再出现
+    expect(wrapper.text()).not.toContain('改名')
+    expect(wrapper.text()).not.toContain('删除')
+  })
 })

@@ -7,7 +7,17 @@
  */
 import { computed, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowDown, ArrowUp, Delete, Edit, MagicStick, Plus } from '@element-plus/icons-vue'
+import {
+  ArrowDown,
+  ArrowUp,
+  Delete,
+  Edit,
+  MagicStick,
+  Plus,
+  Star,
+  StarFilled,
+  Switch,
+} from '@element-plus/icons-vue'
 import {
   createField,
   deleteField,
@@ -228,23 +238,46 @@ async function moveField(index: number, delta: number) {
                 @click="moveField(index, 1)"
               />
             </el-tooltip>
-            <el-button size="small" :icon="Edit" @click="rename(field)">改名</el-button>
-            <el-button
-              v-if="field.type === 'formula'"
-              size="small"
-              :icon="MagicStick"
-              @click="emit('edit-formula', field)"
-            >
-              公式
-            </el-button>
-            <el-button size="small" @click="toggleRequired(field)">
-              {{ field.required ? '取消必填' : '设为必填' }}
-            </el-button>
+            <el-tooltip content="改名" placement="top">
+              <el-button
+                size="small"
+                circle
+                :icon="Edit"
+                aria-label="重命名字段"
+                @click="rename(field)"
+              />
+            </el-tooltip>
+            <el-tooltip v-if="field.type === 'formula'" content="编辑公式" placement="top">
+              <el-button
+                size="small"
+                circle
+                :icon="MagicStick"
+                aria-label="编辑公式"
+                @click="emit('edit-formula', field)"
+              />
+            </el-tooltip>
+            <el-tooltip :content="field.required ? '取消必填' : '设为必填'" placement="top">
+              <el-button
+                size="small"
+                circle
+                :icon="field.required ? StarFilled : Star"
+                :type="field.required ? 'danger' : undefined"
+                :plain="field.required"
+                aria-label="切换必填"
+                @click="toggleRequired(field)"
+              />
+            </el-tooltip>
             <el-dropdown
               trigger="click"
               @command="(type: string) => changeType(field, type)"
             >
-              <el-button size="small">改类型</el-button>
+              <el-button
+                size="small"
+                circle
+                :icon="Switch"
+                title="改类型"
+                aria-label="修改字段类型"
+              />
               <template #dropdown>
                 <el-dropdown-menu>
                   <el-dropdown-item
@@ -261,9 +294,17 @@ async function moveField(index: number, delta: number) {
                 </el-dropdown-menu>
               </template>
             </el-dropdown>
-            <el-button size="small" :icon="Delete" type="danger" plain @click="removeField(field)">
-              删除
-            </el-button>
+            <el-tooltip content="删除" placement="top">
+              <el-button
+                size="small"
+                circle
+                :icon="Delete"
+                type="danger"
+                plain
+                aria-label="删除字段"
+                @click="removeField(field)"
+              />
+            </el-tooltip>
           </div>
         </div>
         <el-empty v-if="!fields.length" description="还没有字段，先添加一个吧" :image-size="72" />
