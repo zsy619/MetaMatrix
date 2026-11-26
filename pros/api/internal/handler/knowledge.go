@@ -66,6 +66,8 @@ func handleKnowledgeErr(c *app.RequestContext, err error) bool {
 		Forbidden(c, "share not allowed for current user")
 	case errors.Is(err, service.ErrSpaceForbidden):
 		Forbidden(c, "space access denied")
+	case errors.Is(err, service.ErrCRDTReadOnly):
+		Fail(c, http.StatusForbidden, "html crdt bypass is read-only", "crdt_read_only")
 	default:
 		log.Printf("knowledge error: %v", err)
 		Internal(c, "request failed")

@@ -19,6 +19,11 @@ import (
 
 var ErrSpaceForbidden = errors.New("space access denied")
 
+// ErrCRDTReadOnly 表示旧 HTML 级协同旁路（doc_crdt_updates）已降为只读。
+// 历史增量仍可通过 CRDTUpdates / CRDTDocuments 读取，但不得再追加写入。
+// 新的协同编辑走正文 Yjs 通道（doc_operation / Hertz WebSocket）。
+var ErrCRDTReadOnly = errors.New("html crdt bypass is read-only")
+
 // 空间角色。
 const (
 	SpaceRoleAdmin  = "admin"
@@ -339,30 +344,12 @@ type CRDTUpdate struct {
 	Payload []byte `json:"payload"`
 }
 
-// AppendCRDT 追加一条协同编辑增量。
-//
-// 服务端只追加不合并：Yjs 更新可交换且幂等，客户端各自合并即可对齐。
+// AppendCRDT 曾用于追加 HTML 级协同增量。A2b 起该旁路只读，调用一律拒绝写入。
 func (s *KnowledgeService) AppendCRDT(docID, authorID uuid.UUID, kind string, payload []byte) (int64, error) {
-	if len(payload) == 0 || len(payload) > 4<<20 {
-		return 0, ErrValidation
-	}
-	if kind != "update" && kind != "snapshot" {
-		kind = "update"
-	}
-	row := model.DocCRDTUpdate{
-		DocID: docID, Kind: kind, Payload: payload,
-		AuthorUserID: authorID, CreatedAt: time.Now().UTC(),
-	}
-	if err := s.db.Create(&row).Error; err != nil {
-		return 0, err
-	}
-	// 只保留最近的增量，避免日志无限增长。
-	s.db.Where("doc_id = ? AND kind = ? AND id < ?", docID, "update", row.ID-500).
-		Delete(&model.DocCRDTUpdate{})
-	return row.ID, nil
+	return 0, ErrCRDTReadOnly
 }
 
-// CRDTUpdates 读取某篇文档在 after 之后的增量。
+// CRDTUpdates 读取某篇文档在 after 之后的历史增量（只读回放）。
 func (s *KnowledgeService) CRDTUpdates(docID uuid.UUID, after int64, limit int) ([]CRDTUpdate, error) {
 	if limit <= 0 || limit > 500 {
 		limit = 200

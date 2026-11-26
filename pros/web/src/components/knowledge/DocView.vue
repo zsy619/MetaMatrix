@@ -88,9 +88,9 @@ const iconOpen = ref(false)
 const sidebarTab = ref<'outline' | 'tasks' | 'properties' | 'comments' | 'backrefs' | 'history' | 'versions' | 'ai'>('outline')
 const shareVisible = ref(false)
 const minutesVisible = ref(false)
-/** 协同编辑（079）：开启后本地改动先写入 CRDT，再由服务端增量同步给其他人。 */
+/** 协同编辑：开启后走正文 Yjs（A2a WebSocket），关掉后回到单人 HTTP 保存。 */
 const collabOn = ref(false)
-/** 正文 Yjs 协同会话。旧的 HTML 级 crdtDoc 旁路仍保留，本包不调用、不修改。 */
+/** 正文 Yjs 协同会话。旧 HTML 级 crdtDoc 旁路已只读，本按钮不再调用它。 */
 const liveSession = ref<LiveCollabSession | null>(null)
 const liveYDoc = shallowRef<YDoc | null>(null)
 /** 切换协同时重挂编辑器，以便按需接入 Collaboration 扩展。 */
@@ -195,7 +195,7 @@ function stopLiveCollab() {
   collabOn.value = false
 }
 
-/** 开启 / 关闭正文 Yjs 协同（Hertz WebSocket）。 */
+/** 开启 / 关闭正文 Yjs 协同（编辑模式之一）。关闭后走单人保存，不再写 doc_crdt_updates。 */
 async function toggleCollab() {
   if (collabOn.value) {
     stopLiveCollab()

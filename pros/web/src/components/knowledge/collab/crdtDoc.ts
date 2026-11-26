@@ -1,14 +1,12 @@
 import * as Y from 'yjs'
-import { appendCrdtUpdate, fetchCrdtUpdates, type CRDTUpdate } from '../../../api/knowledge_v6'
+import { fetchCrdtUpdates, type CRDTUpdate } from '../../../api/knowledge_v6'
 
 /**
- * 文档级 CRDT 同步（清单 079）。
+ * 历史 HTML 级 CRDT 旁路（清单 079 / A2b 只读）。
  *
- * 服务端只存 Yjs 增量，合并在客户端做：Yjs 更新可交换且幂等，
- * 各自拉取同一批增量后得到一致结果，不需要 WebSocket 通道。
- *
- * 粒度是「顶层块」：正文按顶层元素拆块，块内是 Y.Map（键 h → HTML）。
- * 两个人改不同块互不覆盖；改同一块时后写覆盖（块级 LWW）。
+ * 曾用 HTTP 轮询把顶层块的 LWW 增量写入 doc_crdt_updates。
+ * A2b 起新的协同编辑走正文 Yjs（/documents/:id/collab），本模块只保留
+ * 拆块规则与历史增量回放。默认不可写入；writable 仅供孤立的算法单测使用。
  */
 
 export type CollabTransport = {
@@ -23,9 +21,8 @@ export function httpTransport(documentId: string): CollabTransport {
       const data = await fetchCrdtUpdates(documentId, after)
       return data.updates ?? []
     },
-    async postUpdate(kind, payload) {
-      const data = await appendCrdtUpdate(documentId, kind, payload)
-      return data.seq
+    async postUpdate() {
+      throw new Error('html crdt bypass is read-only')
     },
   }
 }
@@ -94,6 +91,11 @@ export type CollabDocOptions = {
   documentId?: string
   transport?: CollabTransport
   pollMs?: number
+  /**
+   * 仅供历史 LWW 算法单测打开。生产路径（HTTP 传输）必须为 false，
+   * 以免再向 doc_crdt_updates 写入。
+   */
+  writable?: boolean
   /** 远端合并后回调。 */
   onRemote?: (html: string) => void
   /** 本地与服务端都失败时回调，便于提示「协同同步不可用」。 */
@@ -110,6 +112,7 @@ export class CollabDoc {
   private timer: ReturnType<typeof setInterval> | null = null
   private lastSeq = 0
   private started = false
+  private readonly writable: boolean
   /** 本地正在写：避免把本地改动当成远端改动再回灌。 */
   private applyingLocal = false
 
@@ -117,10 +120,12 @@ export class CollabDoc {
     this.blocks = this.doc.getArray<Y.Map<string>>('blocks')
     this.transport = opts.transport ?? (opts.documentId ? httpTransport(opts.documentId) : null)
     this.pollMs = opts.pollMs ?? 2500
+    this.writable = opts.writable === true
     this.onRemote = opts.onRemote
     this.onError = opts.onError
     this.doc.on('update', (update: Uint8Array, origin: unknown) => {
       if (origin === 'remote') return
+      if (!this.writable) return
       void this.postUpdate(update)
     })
   }

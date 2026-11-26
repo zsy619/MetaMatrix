@@ -88,7 +88,7 @@ export type LiveCollabOptions = {
  * 把本地 Y.Doc 接到 Hertz 协同通道：发送本地增量（可附 HTML 供服务端双写），
  * 并应用远端 ops / update。断线后自动重连并先 sync 再冲刷待发增量。
  * 持久化离线队列（刷新页面后恢复）留给后续，本包只在会话内存里暂存未发出的更新。
- * 不修改旧的 HTML 级 crdtDoc 旁路。
+ * 旧 HTML 级 crdtDoc 旁路已只读，新的协同编辑只走本通道。
  */
 export class LiveCollabSession {
   private readonly opts: LiveCollabOptions

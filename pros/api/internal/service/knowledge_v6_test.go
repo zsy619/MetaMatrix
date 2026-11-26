@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -137,21 +138,37 @@ func TestKnowledgeV6TemplatePublishAndCRDT(t *testing.T) {
 		t.Fatal("expected template unpublished")
 	}
 
-	// 协同增量：追加后能按 seq 读回。
+	// 历史增量仍可读；新写入走正文 Yjs，本旁路不得再追加。
 	docID := uuid.New()
-	seq, err := svc.AppendCRDT(docID, owner, "update", []byte{1, 2, 3})
-	if err != nil {
-		t.Fatal(err)
+	if _, err := svc.AppendCRDT(docID, owner, "update", []byte{1, 2, 3}); !errors.Is(err, ErrCRDTReadOnly) {
+		t.Fatalf("AppendCRDT err = %v, want ErrCRDTReadOnly", err)
 	}
-	if seq <= 0 {
-		t.Fatalf("seq = %d, want > 0", seq)
+	if err := svc.db.Create(&model.DocCRDTUpdate{
+		DocID: docID, Kind: "update", Payload: []byte{1, 2, 3},
+		AuthorUserID: owner, CreatedAt: time.Now().UTC(),
+	}).Error; err != nil {
+		t.Fatal(err)
 	}
 	updates, err := svc.CRDTUpdates(docID, 0, 10)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(updates) != 1 || len(updates[0].Payload) != 3 {
-		t.Fatalf("updates = %+v, want one payload of 3 bytes", updates)
+		t.Fatalf("updates = %+v, want one historical payload of 3 bytes", updates)
+	}
+	var written int64
+	if err := svc.db.Model(&model.DocCRDTUpdate{}).Where("doc_id = ?", docID).Count(&written).Error; err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.AppendCRDT(docID, owner, "update", []byte{9, 9}); !errors.Is(err, ErrCRDTReadOnly) {
+		t.Fatalf("second AppendCRDT err = %v, want ErrCRDTReadOnly", err)
+	}
+	var after int64
+	if err := svc.db.Model(&model.DocCRDTUpdate{}).Where("doc_id = ?", docID).Count(&after).Error; err != nil {
+		t.Fatal(err)
+	}
+	if after != written {
+		t.Fatalf("doc_crdt_updates count = %d, want %d (write path must not insert)", after, written)
 	}
 }
 
