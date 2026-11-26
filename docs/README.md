@@ -16,5 +16,6 @@
 | [rte-page-margin-symmetry.md](./rte-page-margin-symmetry.md) | 富文本纸张左右留白对称：块手柄列与页边距的取值口径 |
 | [rte-chart-group-menu.md](./rte-chart-group-menu.md) | 图表一级分类下拉面板：39 类别专属图标 + 标题栏/子列表/底部入口 |
 | [rte-block-panel-ui.md](./rte-block-panel-ui.md) | 「+」块操作面板：基础区四列带标签格子 + 分组发丝线层级 |
+| [db-table-naming.md](./db-table-naming.md) | 数据库表命名规范：core / kb / base / media 四域前缀、39 张表改名对照与迁移方式 |
 | [GLOBAL_RULES/](./GLOBAL_RULES/) | 全局交互规则 |
 | [_sources/](./_sources/) | 原始材料归档 |

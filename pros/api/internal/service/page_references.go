@@ -80,7 +80,7 @@ func blockKindAt(ranges []blockRange, pos int) string {
 
 // RebuildPageReferences 全量重建一篇文档的出向引用索引。
 // 在 syncExtract 同事务内调用：先删旧记录，再扫描 current_data 里的 mention/embed。
-// data 是 canvas_documents.current_data（JSON），doc 类型的 html 字段里含 mention/embed 节点。
+// data 是 kb_documents.current_data（JSON），doc 类型的 html 字段里含 mention/embed 节点。
 func RebuildPageReferences(tx *gorm.DB, sourceDocID uuid.UUID, data datatypes.JSON, now time.Time) error {
 	if err := tx.Where("source_doc_id = ?", sourceDocID).
 		Delete(&model.PageReference{}).Error; err != nil {
@@ -166,9 +166,9 @@ func extractLabel(html, nodeMatch string) string {
 // Backrefs 返回引用了 targetDocID 的文档 id 列表。
 func (s *KnowledgeService) Backrefs(ownerID, targetDocID uuid.UUID) ([]model.PageReference, error) {
 	var refs []model.PageReference
-	err := s.db.Joins("JOIN canvas_documents ON canvas_documents.id = page_references.source_doc_id").
-		Where("page_references.target_doc_id = ? AND canvas_documents.owner_user_id = ?", targetDocID, ownerID).
-		Order("page_references.created_at DESC").
+	err := s.db.Joins("JOIN kb_documents ON kb_documents.id = core_page_references.source_doc_id").
+		Where("core_page_references.target_doc_id = ? AND kb_documents.owner_user_id = ?", targetDocID, ownerID).
+		Order("core_page_references.created_at DESC").
 		Find(&refs).Error
 	if err != nil {
 		return nil, err

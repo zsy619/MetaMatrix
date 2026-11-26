@@ -770,7 +770,7 @@ func (linkHandler) Normalize(v any, _ map[string]any) (any, error) {
 
 // docHandler 关联知识库文档。
 //
-// 值是知识库节点 ID 列表（knowledge_nodes.id），
+// 值是知识库节点 ID 列表（kb_nodes.id），
 // 空间归属校验在 service 层做（registry 只管形状）。
 type docHandler struct{}
 

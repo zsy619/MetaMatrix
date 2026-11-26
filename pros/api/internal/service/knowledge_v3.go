@@ -803,7 +803,7 @@ func (s *KnowledgeService) askSpace(ownerID uuid.UUID, projectID *uuid.UUID, que
 	if projectID != nil {
 		q = q.Where("project_id = ?", *projectID)
 	} else {
-		q = q.Where("project_id IN (SELECT id FROM projects WHERE owner_user_id = ?)", ownerID)
+		q = q.Where("project_id IN (SELECT id FROM core_projects WHERE owner_user_id = ?)", ownerID)
 	}
 	var docs []model.CanvasDocument
 	if err := q.Find(&docs).Error; err != nil {

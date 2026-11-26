@@ -2,7 +2,7 @@
 /**
  * 视图配置：名称、字段显隐、列宽。
  *
- * 配置写回视图记录（base_view.config），
+ * 配置写回视图记录（base_views.config），
  * 切换视图时自动生效，换设备也保持一致。
  */
 import { ref, watch } from 'vue'

@@ -25,7 +25,7 @@ type statsSQLDocument struct {
 	DeletedAt   gorm.DeletedAt
 }
 
-func (statsSQLDocument) TableName() string { return "canvas_documents" }
+func (statsSQLDocument) TableName() string { return "kb_documents" }
 
 type statsSQLRevision struct {
 	ID           uuid.UUID `gorm:"type:uuid;primaryKey"`
@@ -34,7 +34,7 @@ type statsSQLRevision struct {
 	CreatedAt    time.Time
 }
 
-func (statsSQLRevision) TableName() string { return "canvas_revisions" }
+func (statsSQLRevision) TableName() string { return "kb_revisions" }
 
 func TestStatsSQLMatchesAggregateDocumentStats(t *testing.T) {
 	db := newStatsSQLTestDB(t)

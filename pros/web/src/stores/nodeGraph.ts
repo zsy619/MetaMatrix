@@ -62,7 +62,7 @@ function newId(prefix: string): string {
 /**
  * 节点画布的文档状态。
  *
- * 画布内容存在服务端 canvas_documents.current_data（JSONB），
+ * 画布内容存在服务端 kb_documents.current_data（JSONB），
  * 这里只负责：加载 / 编辑 / 自动保存 / 撤销重做 / 选中态。
  */
 export const useNodeGraphStore = defineStore('nodeGraph', () => {

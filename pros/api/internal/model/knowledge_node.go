@@ -8,8 +8,8 @@ import (
 
 // KnowledgeNode 是知识库目录树的一个节点。
 //
-// 目录树与文档解耦：节点只存父子关系和排序，文档内容仍在 canvas_documents。
-// document_id 为 NULL 表示文件夹；非 NULL 指向一篇 canvas_documents。
+// 目录树与文档解耦：节点只存父子关系和排序，文档内容仍在 kb_documents。
+// document_id 为 NULL 表示文件夹；非 NULL 指向一篇 kb_documents。
 // 文档被删后 document_id 置 NULL（ON DELETE SET NULL），节点保留为「已失效」占位，
 // 与 nodeGraph 画布引用节点的失效语义一致。
 type KnowledgeNode struct {
@@ -50,4 +50,4 @@ type KnowledgeNode struct {
 	UpdatedAt           time.Time `gorm:"type:timestamptz;not null" json:"updatedAt"`
 }
 
-func (KnowledgeNode) TableName() string { return "knowledge_nodes" }
+func (KnowledgeNode) TableName() string { return "kb_nodes" }

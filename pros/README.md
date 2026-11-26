@@ -75,7 +75,7 @@ npm run dev                   # http://localhost:5173 （/api 代理到 :3000）
 从节点连接点拖到另一个节点建立连线（可双击连线加标签）；Delete 删除选中节点与连线，
 Cmd/Ctrl+Z 撤销。所有改动自动保存（800ms 防抖 + 本地草稿兜底）。
 
-画布内容整体存在 `canvas_documents.current_data`（JSONB，类型 `node-graph`），
+画布内容整体存在 `kb_documents.current_data`（JSONB，类型 `node-graph`），
 不单独建节点表；项目本身是 `projects` 表。见 `docs/API.md` 的「项目」一节。
 
 产品文档在上级 `docs/`。

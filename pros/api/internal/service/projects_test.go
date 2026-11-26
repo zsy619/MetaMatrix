@@ -14,7 +14,7 @@ import (
 	"gorm.io/gorm/logger"
 )
 
-// projectSQLite 是 projects 表的 SQLite 影子模型：只把时间列换成 SQLite 认得的类型，
+// projectSQLite 是 core_projects 表的 SQLite 影子模型：只把时间列换成 SQLite 认得的类型，
 // 列名与索引保持与生产模型一致，这样测的是真实的 SQL 路径。
 type projectSQLite struct {
 	ID          uuid.UUID `gorm:"type:uuid;primaryKey"`
@@ -26,9 +26,9 @@ type projectSQLite struct {
 	UpdatedAt   time.Time `gorm:"not null;index:idx_projects_owner_updated,priority:2,sort:desc"`
 }
 
-func (projectSQLite) TableName() string { return "projects" }
+func (projectSQLite) TableName() string { return "core_projects" }
 
-// pageReferencesSQLite 是 page_references 的 SQLite 影子模型：保存时的事务会
+// pageReferencesSQLite 是 core_page_references 的 SQLite 影子模型：保存时的事务会
 // 全量重建该表，缺表会让项目删除测试直接报 no such table。
 type pageReferencesSQLite struct {
 	ID          uuid.UUID `gorm:"type:uuid;primaryKey"`
@@ -40,7 +40,7 @@ type pageReferencesSQLite struct {
 	CreatedAt   time.Time `gorm:"not null"`
 }
 
-func (pageReferencesSQLite) TableName() string { return "page_references" }
+func (pageReferencesSQLite) TableName() string { return "core_page_references" }
 
 func openProjectsSQLite(t *testing.T) *gorm.DB {
 	t.Helper()

@@ -21,7 +21,7 @@ type DocCommentRead struct {
 	CreatedAt time.Time `gorm:"type:timestamptz;not null" json:"createdAt"`
 }
 
-func (DocCommentRead) TableName() string { return "doc_comment_reads" }
+func (DocCommentRead) TableName() string { return "kb_comment_reads" }
 
 // KnowledgeTagDict 是空间的业务词库：统一标签命名与推荐来源。
 type KnowledgeTagDict struct {
@@ -36,4 +36,4 @@ type KnowledgeTagDict struct {
 	CreatedAt time.Time `gorm:"type:timestamptz;not null" json:"createdAt"`
 }
 
-func (KnowledgeTagDict) TableName() string { return "knowledge_tag_dict" }
+func (KnowledgeTagDict) TableName() string { return "kb_tags" }

@@ -24,7 +24,7 @@ export type DocumentSummary = {
 }
 
 /**
- * 内容分类：把同一张 canvas_documents 表里的内容切成互不重叠的集合。
+ * 内容分类：把同一张 kb_documents 表里的内容切成互不重叠的集合。
  *
  * - canvas    普通画布（除知识库富文本外的一切）
  * - node-graph 项目节点画布
@@ -305,7 +305,7 @@ export function renameDocument(id: string, title: string, expectedSaveVersion?: 
 }
 
 /**
- * Clone a document server-side. The server inserts a new canvas_documents row
+ * Clone a document server-side. The server inserts a new kb_documents row
  * with a fresh id and a deep copy of the source payload.
  */
 export function cloneDocument(

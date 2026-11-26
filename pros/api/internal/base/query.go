@@ -221,7 +221,7 @@ func (s *Service) conditionSQL(fieldID uuid.UUID, handler FieldHandler, cond Con
 	// 空/非空判定统一走投影表存在性判断。
 	switch op {
 	case "isempty", "isnotempty":
-		sub := "SELECT 1 FROM base_record_value v WHERE v.record_id = r.id AND v.field_id = ?"
+		sub := "SELECT 1 FROM base_record_values v WHERE v.record_id = r.id AND v.field_id = ?"
 		if op == "isempty" {
 			sub += " AND COALESCE(v.value_text,'') = '' AND COALESCE(v.value_number,0) = 0 AND COALESCE(v.value_bool,false) = false AND v.value_date IS NULL AND v.value_json IS NULL"
 			return "NOT EXISTS (" + sub + ")", []any{fieldID}, nil
@@ -240,7 +240,7 @@ func (s *Service) conditionSQL(fieldID uuid.UUID, handler FieldHandler, cond Con
 		if col == "" {
 			return "", nil, fmt.Errorf("%w: operator %s is not supported for numbers", ErrQueryInvalid, op)
 		}
-		return fmt.Sprintf("EXISTS (SELECT 1 FROM base_record_value v WHERE v.record_id = r.id AND v.field_id = ? AND v.value_number %s ?)", col), []any{fieldID, num}, nil
+		return fmt.Sprintf("EXISTS (SELECT 1 FROM base_record_values v WHERE v.record_id = r.id AND v.field_id = ? AND v.value_number %s ?)", col), []any{fieldID, num}, nil
 	case ProjectedDate:
 		ts, err := parseTime(cond.Value)
 		if err != nil {
@@ -250,14 +250,14 @@ func (s *Service) conditionSQL(fieldID uuid.UUID, handler FieldHandler, cond Con
 		if col == "" {
 			return "", nil, fmt.Errorf("%w: operator %s is not supported for dates", ErrQueryInvalid, op)
 		}
-		return fmt.Sprintf("EXISTS (SELECT 1 FROM base_record_value v WHERE v.record_id = r.id AND v.field_id = ? AND v.value_date %s ?)", col), []any{fieldID, ts}, nil
+		return fmt.Sprintf("EXISTS (SELECT 1 FROM base_record_values v WHERE v.record_id = r.id AND v.field_id = ? AND v.value_date %s ?)", col), []any{fieldID, ts}, nil
 	case ProjectedBool:
 		b := toBool(cond.Value)
 		switch op {
 		case "eq":
-			return "EXISTS (SELECT 1 FROM base_record_value v WHERE v.record_id = r.id AND v.field_id = ? AND v.value_bool = ?)", []any{fieldID, b}, nil
+			return "EXISTS (SELECT 1 FROM base_record_values v WHERE v.record_id = r.id AND v.field_id = ? AND v.value_bool = ?)", []any{fieldID, b}, nil
 		case "ne":
-			return "EXISTS (SELECT 1 FROM base_record_value v WHERE v.record_id = r.id AND v.field_id = ? AND v.value_bool <> ?)", []any{fieldID, b}, nil
+			return "EXISTS (SELECT 1 FROM base_record_values v WHERE v.record_id = r.id AND v.field_id = ? AND v.value_bool <> ?)", []any{fieldID, b}, nil
 		default:
 			return "", nil, fmt.Errorf("%w: operator %s is not supported for checkboxes", ErrQueryInvalid, op)
 		}
@@ -268,12 +268,12 @@ func (s *Service) conditionSQL(fieldID uuid.UUID, handler FieldHandler, cond Con
 			if len(values) == 0 {
 				return "", nil, fmt.Errorf("%w: empty value", ErrQueryInvalid)
 			}
-			return "EXISTS (SELECT 1 FROM base_record_value v WHERE v.record_id = r.id AND v.field_id = ? AND v.value_json @> ?::jsonb)", []any{fieldID, jsonArrayArg(values)}, nil
+			return "EXISTS (SELECT 1 FROM base_record_values v WHERE v.record_id = r.id AND v.field_id = ? AND v.value_json @> ?::jsonb)", []any{fieldID, jsonArrayArg(values)}, nil
 		case "notcontains", "ne":
 			if len(values) == 0 {
 				return "", nil, fmt.Errorf("%w: empty value", ErrQueryInvalid)
 			}
-			return "NOT EXISTS (SELECT 1 FROM base_record_value v WHERE v.record_id = r.id AND v.field_id = ? AND v.value_json @> ?::jsonb)", []any{fieldID, jsonArrayArg(values)}, nil
+			return "NOT EXISTS (SELECT 1 FROM base_record_values v WHERE v.record_id = r.id AND v.field_id = ? AND v.value_json @> ?::jsonb)", []any{fieldID, jsonArrayArg(values)}, nil
 		default:
 			return "", nil, fmt.Errorf("%w: operator %s is not supported for multi-value fields", ErrQueryInvalid, op)
 		}
@@ -281,29 +281,29 @@ func (s *Service) conditionSQL(fieldID uuid.UUID, handler FieldHandler, cond Con
 		text := fmt.Sprintf("%v", cond.Value)
 		switch op {
 		case "eq", "is":
-			return "EXISTS (SELECT 1 FROM base_record_value v WHERE v.record_id = r.id AND v.field_id = ? AND v.value_text = ?)", []any{fieldID, text}, nil
+			return "EXISTS (SELECT 1 FROM base_record_values v WHERE v.record_id = r.id AND v.field_id = ? AND v.value_text = ?)", []any{fieldID, text}, nil
 		case "ne", "isnot":
-			return "EXISTS (SELECT 1 FROM base_record_value v WHERE v.record_id = r.id AND v.field_id = ? AND v.value_text <> ?)", []any{fieldID, text}, nil
+			return "EXISTS (SELECT 1 FROM base_record_values v WHERE v.record_id = r.id AND v.field_id = ? AND v.value_text <> ?)", []any{fieldID, text}, nil
 		case "contains":
-			return "EXISTS (SELECT 1 FROM base_record_value v WHERE v.record_id = r.id AND v.field_id = ? AND v.value_text ILIKE ?)", []any{fieldID, "%" + escapeLike(text) + "%"}, nil
+			return "EXISTS (SELECT 1 FROM base_record_values v WHERE v.record_id = r.id AND v.field_id = ? AND v.value_text ILIKE ?)", []any{fieldID, "%" + escapeLike(text) + "%"}, nil
 		case "notcontains":
-			return "NOT EXISTS (SELECT 1 FROM base_record_value v WHERE v.record_id = r.id AND v.field_id = ? AND v.value_text ILIKE ?)", []any{fieldID, "%" + escapeLike(text) + "%"}, nil
+			return "NOT EXISTS (SELECT 1 FROM base_record_values v WHERE v.record_id = r.id AND v.field_id = ? AND v.value_text ILIKE ?)", []any{fieldID, "%" + escapeLike(text) + "%"}, nil
 		case "startswith":
-			return "EXISTS (SELECT 1 FROM base_record_value v WHERE v.record_id = r.id AND v.field_id = ? AND v.value_text ILIKE ?)", []any{fieldID, escapeLike(text) + "%"}, nil
+			return "EXISTS (SELECT 1 FROM base_record_values v WHERE v.record_id = r.id AND v.field_id = ? AND v.value_text ILIKE ?)", []any{fieldID, escapeLike(text) + "%"}, nil
 		case "endswith":
-			return "EXISTS (SELECT 1 FROM base_record_value v WHERE v.record_id = r.id AND v.field_id = ? AND v.value_text ILIKE ?)", []any{fieldID, "%" + escapeLike(text)}, nil
+			return "EXISTS (SELECT 1 FROM base_record_values v WHERE v.record_id = r.id AND v.field_id = ? AND v.value_text ILIKE ?)", []any{fieldID, "%" + escapeLike(text)}, nil
 		case "in":
 			values := stringSlice(cond.Value)
 			if len(values) == 0 {
 				return "", nil, fmt.Errorf("%w: empty in list", ErrQueryInvalid)
 			}
-			return "EXISTS (SELECT 1 FROM base_record_value v WHERE v.record_id = r.id AND v.field_id = ? AND v.value_text = ANY(?))", []any{fieldID, values}, nil
+			return "EXISTS (SELECT 1 FROM base_record_values v WHERE v.record_id = r.id AND v.field_id = ? AND v.value_text = ANY(?))", []any{fieldID, values}, nil
 		case "notin":
 			values := stringSlice(cond.Value)
 			if len(values) == 0 {
 				return "", nil, fmt.Errorf("%w: empty not-in list", ErrQueryInvalid)
 			}
-			return "NOT EXISTS (SELECT 1 FROM base_record_value v WHERE v.record_id = r.id AND v.field_id = ? AND v.value_text = ANY(?))", []any{fieldID, values}, nil
+			return "NOT EXISTS (SELECT 1 FROM base_record_values v WHERE v.record_id = r.id AND v.field_id = ? AND v.value_text = ANY(?))", []any{fieldID, values}, nil
 		default:
 			return "", nil, fmt.Errorf("%w: operator %s is not supported for text", ErrQueryInvalid, op)
 		}
@@ -408,7 +408,7 @@ func (s *Service) Query(ctx context.Context, userID, projectID uuid.UUID, req Qu
 	}
 
 	// 统计与取数共用同一别名 r，保证筛选条件里的 r.id 可用。
-	base := s.db.WithContext(ctx).Table("base_record AS r").
+	base := s.db.WithContext(ctx).Table("base_records AS r").
 		Where("r.table_id = ? AND r.deleted_at IS NULL", tableID)
 
 	where, args, err := s.buildFilterSQL(tableID, idx, req.Filters)
@@ -430,7 +430,7 @@ func (s *Service) Query(ctx context.Context, userID, projectID uuid.UUID, req Qu
 
 	orderSQL, orderArgs := s.buildOrderSQL(idx, req.Sorts, req.Groups)
 
-	query := s.db.WithContext(ctx).Table("base_record AS r").
+	query := s.db.WithContext(ctx).Table("base_records AS r").
 		Select("r.id AS id, r.version AS version, r.data AS data, r.updated_at AS updated_at").
 		Where("r.table_id = ? AND r.deleted_at IS NULL", tableID)
 	if where != "" {
@@ -446,14 +446,14 @@ func (s *Service) Query(ctx context.Context, userID, projectID uuid.UUID, req Qu
 		if err != nil {
 			continue
 		}
-		query = query.Joins("LEFT JOIN base_record_value gv ON gv.record_id = r.id AND gv.field_id = ?", fieldID)
+		query = query.Joins("LEFT JOIN base_record_values gv ON gv.record_id = r.id AND gv.field_id = ?", fieldID)
 	}
 	for _, sort := range req.Sorts {
 		fieldID, err := uuid.Parse(sort.FieldID)
 		if err != nil {
 			continue
 		}
-		query = query.Joins("LEFT JOIN base_record_value sv ON sv.record_id = r.id AND sv.field_id = ?", fieldID)
+		query = query.Joins("LEFT JOIN base_record_values sv ON sv.record_id = r.id AND sv.field_id = ?", fieldID)
 	}
 	if orderSQL != "" {
 		query = query.Order(clause.Expr{SQL: orderSQL, Vars: orderArgs})
@@ -520,7 +520,7 @@ func fieldMetas(idx *fieldIndex) []FieldMeta {
 // 关键字先在当前空间的目录树里找出标题命中的节点 ID，再回表匹配 doc 字段的投影值。
 func (s *Service) keywordCondition(ctx context.Context, projectID uuid.UUID, idx *fieldIndex, kw, recordAlias string) (string, []any) {
 	like := "%" + escapeLike(kw) + "%"
-	cond := fmt.Sprintf(`EXISTS (SELECT 1 FROM base_record_value v WHERE v.record_id = %s AND v.value_text ILIKE ?)`, recordAlias)
+	cond := fmt.Sprintf(`EXISTS (SELECT 1 FROM base_record_values v WHERE v.record_id = %s AND v.value_text ILIKE ?)`, recordAlias)
 	args := []any{like}
 
 	docIDs := s.docFieldIDs(idx)
@@ -541,7 +541,7 @@ func buildKeywordCondition(cond string, args []any, docFieldIDs []uuid.UUID, nod
 	parts := make([]string, 0, len(nodeIDs))
 	docArgs := make([]any, 0, len(nodeIDs)*2)
 	for _, nodeID := range nodeIDs {
-		parts = append(parts, `EXISTS (SELECT 1 FROM base_record_value dv WHERE dv.record_id = `+recordAlias+` AND dv.field_id IN (?) AND dv.value_text ILIKE ?)`)
+		parts = append(parts, `EXISTS (SELECT 1 FROM base_record_values dv WHERE dv.record_id = `+recordAlias+` AND dv.field_id IN (?) AND dv.value_text ILIKE ?)`)
 		docArgs = append(docArgs, docFieldIDs, "%"+escapeLike(nodeID)+"%")
 	}
 	return "(" + cond + " OR " + strings.Join(parts, " OR ") + ")", append(args, docArgs...)

@@ -16,7 +16,7 @@ function cloneSnapshot(snapshot: CanvasDocumentJSON): CanvasDocumentJSON {
 
 /**
  * Frontend undo/redo memory stack.
- * Independent from server-side canvas_revisions.
+ * Independent from server-side kb_revisions.
  */
 export const useHistoryStore = defineStore('history', () => {
   const past = ref<CanvasDocumentJSON[]>([])

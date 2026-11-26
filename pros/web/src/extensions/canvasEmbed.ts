@@ -7,7 +7,7 @@ import { Node, mergeAttributes } from '@tiptap/core'
  * 快照渲染需要复用整个画布渲染栈，成本过高；引用卡片已满足
  * 「文档引用文档」的语义与反向引用索引（后端扫 data-doc-id）。
  *
- * 后端 page_references 用 data-type="canvasEmbed" data-doc-id 匹配。
+ * 后端 core_page_references 用 data-type="canvasEmbed" data-doc-id 匹配。
  */
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {

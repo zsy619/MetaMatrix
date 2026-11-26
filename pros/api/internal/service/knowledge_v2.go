@@ -21,7 +21,7 @@ import (
 
 // 知识库 2.0：属性、模板、评论、回收站、收藏、空间看板、事件与导出。
 //
-// 这些能力都挂在既有 canvas_documents / knowledge_nodes 之上：
+// 这些能力都挂在既有 kb_documents / kb_nodes 之上：
 // 不新增内容表，只新增「围绕目录与文档的元数据」，与飞书知识库的
 // 「目录 + 页面属性 + 评论 + 模板 + 回收站」一一对应。
 
@@ -327,7 +327,7 @@ func (s *KnowledgeService) CopyNode(ownerID, projectID, nodeID uuid.UUID, newPar
 	return copied, nil
 }
 
-// copyDocument 复制一篇文档的正文，产出新的 canvas_documents 行。
+// copyDocument 复制一篇文档的正文，产出新的 kb_documents 行。
 // 复制的是「内容快照」：不复制修订历史（飞书复制页面同理，版本独立）。
 func (s *KnowledgeService) copyDocument(ownerID, docID uuid.UUID, title string) (uuid.UUID, error) {
 	var src model.CanvasDocument

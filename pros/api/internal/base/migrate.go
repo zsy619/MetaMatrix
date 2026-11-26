@@ -67,7 +67,7 @@ var legacyTypeMap = map[string]FieldType{
 
 // MigrateLegacySheet 把遗留 JSONB 表格迁移到 Base Engine。
 //
-// 幂等：base_app.migrated 标记为 legacy_sheet:<nodeId> 后不再重复迁移。
+// 幂等：base_apps.migrated 标记为 legacy_sheet:<nodeId> 后不再重复迁移。
 // 迁移失败时不写任何表数据（整体事务回滚），旧数据保持可读。
 func (s *Service) MigrateLegacySheet(ctx context.Context, userID, projectID, nodeID uuid.UUID, raw []byte) (*BaseInfo, error) {
 	if err := s.assertAccess(userID, projectID, RoleEditor); err != nil {
@@ -313,7 +313,7 @@ func legacyFilterOp(op string) string {
 
 // MigrateIfNeeded 在存在旧版 sheet 数据时自动迁移到 Base Engine。
 //
-// 迁移是幂等的：base_app.migrated 有标记后不再重复执行。
+// 迁移是幂等的：base_apps.migrated 有标记后不再重复执行。
 func (s *Service) MigrateIfNeeded(ctx context.Context, userID, projectID, nodeID uuid.UUID) error {
 	var app BaseApp
 	if err := s.db.WithContext(ctx).Where("project_id = ? AND node_id = ?", projectID, nodeID).First(&app).Error; err != nil {

@@ -20,7 +20,7 @@ type docCommentReadSQLite struct {
 	CreatedAt time.Time `gorm:"not null"`
 }
 
-func (docCommentReadSQLite) TableName() string { return "doc_comment_reads" }
+func (docCommentReadSQLite) TableName() string { return "kb_comment_reads" }
 
 type knowledgeTagDictSQLite struct {
 	ID        uuid.UUID `gorm:"type:uuid;primaryKey"`
@@ -31,7 +31,7 @@ type knowledgeTagDictSQLite struct {
 	CreatedAt time.Time `gorm:"not null"`
 }
 
-func (knowledgeTagDictSQLite) TableName() string { return "knowledge_tag_dict" }
+func (knowledgeTagDictSQLite) TableName() string { return "kb_tags" }
 
 func openKnowledgeV5SQLite(t *testing.T) (*gorm.DB, uuid.UUID, *model.Project, *KnowledgeService) {
 	t.Helper()

@@ -38,7 +38,7 @@ type backupUserSQLite struct {
 	UpdatedAt    time.Time `gorm:"not null"`
 }
 
-func (backupUserSQLite) TableName() string { return "users" }
+func (backupUserSQLite) TableName() string { return "core_users" }
 
 type backupDocumentSQLite struct {
 	ID             uuid.UUID      `gorm:"type:uuid;primaryKey"`
@@ -59,7 +59,7 @@ type backupDocumentSQLite struct {
 	DeletedAt      gorm.DeletedAt `gorm:"index"`
 }
 
-func (backupDocumentSQLite) TableName() string { return "canvas_documents" }
+func (backupDocumentSQLite) TableName() string { return "kb_documents" }
 
 type backupRevisionSQLite struct {
 	ID             uuid.UUID      `gorm:"type:uuid;primaryKey"`
@@ -74,7 +74,7 @@ type backupRevisionSQLite struct {
 	CreatedAt      time.Time      `gorm:"not null;index:idx_revisions_document,priority:2,sort:desc"`
 }
 
-func (backupRevisionSQLite) TableName() string { return "canvas_revisions" }
+func (backupRevisionSQLite) TableName() string { return "kb_revisions" }
 
 type backupContentBlockSQLite struct {
 	ID          uuid.UUID `gorm:"type:uuid;primaryKey"`
@@ -87,7 +87,7 @@ type backupContentBlockSQLite struct {
 	UpdatedAt   time.Time `gorm:"not null"`
 }
 
-func (backupContentBlockSQLite) TableName() string { return "canvas_content_blocks" }
+func (backupContentBlockSQLite) TableName() string { return "kb_content_blocks" }
 
 type backupImportSQLite struct {
 	ID                 uuid.UUID      `gorm:"type:uuid;primaryKey"`
@@ -100,7 +100,7 @@ type backupImportSQLite struct {
 	UpdatedAt          time.Time      `gorm:"not null"`
 }
 
-func (backupImportSQLite) TableName() string { return "backup_imports" }
+func (backupImportSQLite) TableName() string { return "core_backup_imports" }
 
 func newBackupTestService(t *testing.T, maxOpenConns int) (*DocumentsService, *gorm.DB, uuid.UUID, uuid.UUID) {
 	t.Helper()
@@ -544,7 +544,7 @@ func TestRestoreBackupDatabaseErrorIsNotSkipped(t *testing.T) {
 	if err := db.Callback().Create().Before("gorm:create").Register(
 		"test_fail_second_backup_document",
 		func(tx *gorm.DB) {
-			if tx.Statement.Table == "canvas_documents" && documentCreates.Add(1) == 2 {
+			if tx.Statement.Table == "kb_documents" && documentCreates.Add(1) == 2 {
 				tx.AddError(injected)
 			}
 		},

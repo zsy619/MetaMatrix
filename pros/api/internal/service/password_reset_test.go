@@ -56,7 +56,7 @@ type usersLite struct {
 	UpdatedAt    time.Time
 }
 
-func (usersLite) TableName() string { return "users" }
+func (usersLite) TableName() string { return "core_users" }
 
 // resetTokensLite mirrors model.PasswordResetToken with SQLite friendly time
 // columns.
@@ -76,7 +76,7 @@ type resetTokensLite struct {
 	CreatedAt   time.Time `gorm:"not null"`
 }
 
-func (resetTokensLite) TableName() string { return "password_reset_tokens" }
+func (resetTokensLite) TableName() string { return "core_password_reset_tokens" }
 
 // newResetService builds a service over an in-memory database with one
 // registered user.

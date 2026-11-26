@@ -73,7 +73,7 @@
 
 1. **块树 vs 富文本流**：飞书/Notion = 块树（每块独立 id，可并行编辑、可单块 AI 改写）；Tiptap 传统 = 单文档流（ProseMirror 节点树仍可给节点加 id，但默认不暴露）。→ 我们要往块树靠，但**不必换内核**，只需给顶层块加稳定 id 并把块内容映射到 Y.Map（现有 `crdtDoc.ts` 已近此形）。
 2. **OT vs CRDT**：OT 需要中心化转换服务器且对离线/乱序敏感；CRDT 可交换、可幂等、离线友好 → 我们已选 CRDT（Yjs），**不要中途混入 OT**。
-3. **存储形态**：HTML（我们现状 `canvas_documents.current_data`）/ 块 JSON（飞书）/ OOXML（OnlyOffice）。HTML 便于渲染与导出，但**不适合机器改写与结构化检索**；建议长期以**块 JSON 为事实源、HTML 为派生视图**。
+3. **存储形态**：HTML（我们现状 `kb_documents.current_data`）/ 块 JSON（飞书）/ OOXML（OnlyOffice）。HTML 便于渲染与导出，但**不适合机器改写与结构化检索**；建议长期以**块 JSON 为事实源、HTML 为派生视图**。
 4. **渲染载体**：DOM 渲染（ProseMirror/Lexical/BlockNote，可访问性好、选区天然）vs Canvas 渲染（性能天花板高，但 a11y 与富文本交互成本极高）。→ 保持 DOM 渲染；画布类产品走现有自研 Canvas，不混进文档内核。
 
 ---
@@ -87,9 +87,9 @@
 - 编辑器体系：`src/components/rte/**`（ribbon 工具栏、块面板、图表、公式栏、评论线程、模板、Markdown 导入等）+ `src/utils/rte*.ts`。
 
 **后端**（Go + Hertz + GORM + PostgreSQL）
-- `pros/api/internal/model/knowledge_v3.go`：doc 正文以 **HTML** 存 `canvas_documents.current_data`；结构化节点存 `knowledge_node_data`。
-- `pros/api/internal/model/knowledge_v6.go`：`DocCRDTUpdate`（`doc_crdt_updates`，seq 增量日志）、`KnowledgePresence`（`doc_presence`，DB 落库 + TTL）、`KnowledgeChunk`（RAG 切片）。
-- 版本 `knowledge_doc_versions`、评论 `doc_comments`、分享 `knowledge_shares`。
+- `pros/api/internal/model/knowledge_v3.go`：doc 正文以 **HTML** 存 `kb_documents.current_data`；结构化节点存 `kb_node_data`。
+- `pros/api/internal/model/knowledge_v6.go`：`DocCRDTUpdate`（`kb_crdt_updates`，seq 增量日志）、`KnowledgePresence`（`doc_presence`，DB 落库 + TTL）、`KnowledgeChunk`（RAG 切片）。
+- 版本 `kb_doc_versions`、评论 `kb_comments`、分享 `kb_shares`。
 - **全仓无 WebSocket 依赖**（grep `websocket|hocuspocus|gobwas` 无命中）；后端路由不带 `/api` 前缀。
 
 **缺口清单**

@@ -98,7 +98,7 @@
 - **当前限制（写代码要尊重）**：思维导图、多维表格的分享页是只读预览，
   不支持在线编辑与评论落地；`AddShareComment` / `UpdateShareContent` 对非 doc 类型直接报错。
 - 节点分享走 `/projects/:projectId/knowledge/nodes/:nodeId/shares`；文档分享走 `/documents/:id/shares`。
-- 改既有表结构（如 `knowledge_shares`）时，在 `internal/db/db.go` 的 `ensure*Schema` 里补迁移
+- 改既有表结构（如 `kb_shares`）时，在 `internal/db/db.go` 的 `ensure*Schema` 里补迁移
   （放开 NOT NULL、加列、加索引、回填存量），不要只依赖 AutoMigrate。
 - 单元测试里的 SQLite 影子模型（`knowledge_v3_test.go` 等）必须与 GORM 模型同步增删字段，
   否则报 `table X has no column named Y`。
@@ -158,4 +158,21 @@ cd pros/web && npx vitest run && npx vue-tsc -b --pretty false
 - 中文回复，结论先行；复杂任务先给 3 步计划再给结果。
 - 用户要"截图确认"时，回复里必须带图，并附上关键 DOM 数值。
 - 交付说明显式写出：**跳过了什么、没检查什么、用户需要承担的风险**。
+
+---
+
+## 9. 数据库表命名规范（硬性规则）
+
+完整规范见 `docs/db-table-naming.md`。要点：
+
+- **表名 = 域前缀 + 实体名（复数）**，域前缀**只有 4 个**：
+  `core_`（平台：账号/项目/审计/备份/密码重置/页面引用）、
+  `kb_`（知识库：目录树/文档/版本/属性/评论/协同/检索/模板）、
+  `base_`（多维表格引擎）、`media_`（素材）。不得再引入第 5 套前缀。
+- 模型必须**显式写 `TableName()`**，不允许依赖 GORM 默认推导。
+- 改表名/改表结构：在 `internal/db/db.go` 加 `ensure*Schema` 补丁，
+  并同步 SQLite 影子模型（`xxxSQLite`）；只改 `TableName()` 会让 GORM 新建空表、旧数据留在旧表。
+- 改名迁移必须排在 `gdb.AutoMigrate` **之前**（`ensureTableNamingSchema`），
+ 否则会先建空表再改名，表看似"数据丢了"。
+- 索引命名 `idx_<域>_<实体>_<列>`、唯一索引 `uniq_<域>_<实体>_<语义>`。
 

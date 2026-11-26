@@ -29,7 +29,7 @@ type baseTableSQLite struct {
 	DeletedAt      gorm.DeletedAt `gorm:"index"`
 }
 
-func (baseTableSQLite) TableName() string { return "base_table" }
+func (baseTableSQLite) TableName() string { return "base_tables" }
 
 type baseFieldSQLite struct {
 	ID         uuid.UUID      `gorm:"type:uuid;primaryKey"`
@@ -48,7 +48,7 @@ type baseFieldSQLite struct {
 	UpdatedAt  time.Time      `gorm:"type:datetime;not null"`
 }
 
-func (baseFieldSQLite) TableName() string { return "base_field" }
+func (baseFieldSQLite) TableName() string { return "base_fields" }
 
 // newFieldOrderFixture 造一个「项目 + 表 + 三个字段」的最小环境。
 func newFieldOrderFixture(t *testing.T) (*Service, uuid.UUID, uuid.UUID, uuid.UUID) {
@@ -60,12 +60,12 @@ func newFieldOrderFixture(t *testing.T) (*Service, uuid.UUID, uuid.UUID, uuid.UU
 	if err := db.AutoMigrate(&baseTableSQLite{}, &baseFieldSQLite{}); err != nil {
 		t.Fatalf("migrate failed: %v", err)
 	}
-	if err := db.Exec(`CREATE TABLE IF NOT EXISTS projects (id uuid primary key, owner_user_id uuid)`).Error; err != nil {
-		t.Fatalf("create projects failed: %v", err)
+	if err := db.Exec(`CREATE TABLE IF NOT EXISTS core_projects (id uuid primary key, owner_user_id uuid)`).Error; err != nil {
+		t.Fatalf("create core_projects failed: %v", err)
 	}
 	userID := uuid.New()
 	projectID := uuid.New()
-	if err := db.Exec(`INSERT INTO projects (id, owner_user_id) VALUES (?, ?)`, projectID, userID).Error; err != nil {
+	if err := db.Exec(`INSERT INTO core_projects (id, owner_user_id) VALUES (?, ?)`, projectID, userID).Error; err != nil {
 		t.Fatalf("insert project failed: %v", err)
 	}
 	tableID := uuid.New()

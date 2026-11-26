@@ -198,7 +198,7 @@ type backupHandlerDocumentSQLite struct {
 	DeletedAt      gorm.DeletedAt `gorm:"index"`
 }
 
-func (backupHandlerDocumentSQLite) TableName() string { return "canvas_documents" }
+func (backupHandlerDocumentSQLite) TableName() string { return "kb_documents" }
 
 type backupHandlerImportSQLite struct {
 	ID                 uuid.UUID      `gorm:"type:uuid;primaryKey"`
@@ -211,7 +211,7 @@ type backupHandlerImportSQLite struct {
 	UpdatedAt          time.Time      `gorm:"not null"`
 }
 
-func (backupHandlerImportSQLite) TableName() string { return "backup_imports" }
+func (backupHandlerImportSQLite) TableName() string { return "core_backup_imports" }
 
 func TestBackupHandlerStreamsCompleteJSONThroughHertz(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open("file:"+t.Name()+"?mode=memory&cache=shared"), &gorm.Config{})

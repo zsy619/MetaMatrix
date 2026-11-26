@@ -22,13 +22,13 @@ type User struct {
 	UpdatedAt    time.Time `gorm:"type:timestamptz;not null" json:"updatedAt"`
 }
 
-func (User) TableName() string { return "users" }
+func (User) TableName() string { return "core_users" }
 
 // Project 是画布的容器：一个项目下有多张画布。
 //
 // 为什么单独建表而画布内容仍留在 JSONB：
 //   - 画布内容（节点、连线）属于「一份画布」，按 GLOBAL_RULES 统一放
-//     canvas_documents.current_data，不按画布类型建业务表。
+//     kb_documents.current_data，不按画布类型建业务表。
 //   - 项目本身是画布之外的实体，有独立的生命周期（新建、重命名、删除），
 //     需要自己的表来回答「这个用户有哪些项目」。
 type Project struct {
@@ -43,7 +43,7 @@ type Project struct {
 	UpdatedAt time.Time `gorm:"type:timestamptz;not null;index:idx_projects_owner_updated,priority:2,sort:desc" json:"updatedAt"`
 }
 
-func (Project) TableName() string { return "projects" }
+func (Project) TableName() string { return "core_projects" }
 
 // ProjectSummary 是项目列表项：附带该项目的画布数量。
 type ProjectSummary struct {
@@ -86,7 +86,7 @@ type CanvasDocument struct {
 	Blocks    []CanvasContentBlock `gorm:"foreignKey:DocumentID;constraint:OnDelete:CASCADE" json:"-"`
 }
 
-func (CanvasDocument) TableName() string { return "canvas_documents" }
+func (CanvasDocument) TableName() string { return "kb_documents" }
 
 type CanvasRevision struct {
 	ID             uuid.UUID      `gorm:"type:uuid;primaryKey" json:"id"`
@@ -104,7 +104,7 @@ type CanvasRevision struct {
 	Author   *User          `gorm:"foreignKey:AuthorUserID" json:"-"`
 }
 
-func (CanvasRevision) TableName() string { return "canvas_revisions" }
+func (CanvasRevision) TableName() string { return "kb_revisions" }
 
 // CanvasContentBlock is the structured extraction layer for search / AI.
 type CanvasContentBlock struct {
@@ -120,7 +120,7 @@ type CanvasContentBlock struct {
 	Document CanvasDocument `gorm:"foreignKey:DocumentID;constraint:OnDelete:CASCADE" json:"-"`
 }
 
-func (CanvasContentBlock) TableName() string { return "canvas_content_blocks" }
+func (CanvasContentBlock) TableName() string { return "kb_content_blocks" }
 
 // DocumentSummary is list response without full JSON payload.
 type DocumentSummary struct {

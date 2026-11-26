@@ -30,4 +30,4 @@ type BackupImport struct {
 	UpdatedAt          time.Time      `gorm:"type:timestamptz;not null" json:"updatedAt"`
 }
 
-func (BackupImport) TableName() string { return "backup_imports" }
+func (BackupImport) TableName() string { return "core_backup_imports" }

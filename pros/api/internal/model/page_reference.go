@@ -20,4 +20,4 @@ type PageReference struct {
 	CreatedAt   time.Time `gorm:"type:timestamptz;not null" json:"createdAt"`
 }
 
-func (PageReference) TableName() string { return "page_references" }
+func (PageReference) TableName() string { return "core_page_references" }

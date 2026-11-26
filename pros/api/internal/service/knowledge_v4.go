@@ -469,7 +469,7 @@ func (s *KnowledgeService) searchSpaceExtended(ownerID uuid.UUID, projectID *uui
 	if projectID != nil {
 		q = q.Where("project_id = ?", *projectID)
 	} else {
-		q = q.Where("project_id IN (SELECT id FROM projects WHERE owner_user_id = ?)", ownerID)
+		q = q.Where("project_id IN (SELECT id FROM core_projects WHERE owner_user_id = ?)", ownerID)
 	}
 	if f.NodeType != "" {
 		q = q.Where("node_type = ?", f.NodeType)
@@ -490,8 +490,8 @@ func (s *KnowledgeService) searchSpaceExtended(ownerID uuid.UUID, projectID *uui
 	if query != "" {
 		// 拼音列由前端用 pinyin-pro 生成，中文场景可直接按拼音或首字母命中。
 		q = q.Where("LOWER(title) LIKE ? OR LOWER(summary) LIKE ? OR LOWER(alias) LIKE ? OR LOWER(pinyin) LIKE ?"+
-			" OR document_id IN (SELECT id FROM canvas_documents WHERE LOWER(content_text) LIKE ?)"+
-			" OR document_id IN (SELECT doc_id FROM doc_comments WHERE LOWER(content) LIKE ?)",
+			" OR document_id IN (SELECT id FROM kb_documents WHERE LOWER(content_text) LIKE ?)"+
+			" OR document_id IN (SELECT doc_id FROM kb_comments WHERE LOWER(content) LIKE ?)",
 			like, like, like, like, like, like)
 	}
 	var nodes []model.KnowledgeNode
@@ -526,7 +526,7 @@ func (s *KnowledgeService) searchSpaceExtended(ownerID uuid.UUID, projectID *uui
 		if projectID != nil {
 			docQ = docQ.Where("project_id = ?", *projectID)
 		} else {
-			docQ = docQ.Where("project_id IN (SELECT id FROM projects WHERE owner_user_id = ?)", ownerID)
+			docQ = docQ.Where("project_id IN (SELECT id FROM core_projects WHERE owner_user_id = ?)", ownerID)
 		}
 		var docs []model.CanvasDocument
 		if err := docQ.Order("updated_at DESC").Limit(f.Limit).Find(&docs).Error; err != nil {

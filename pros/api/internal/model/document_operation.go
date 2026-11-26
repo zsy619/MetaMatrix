@@ -25,4 +25,4 @@ type DocumentSaveOperation struct {
 	UpdatedAt         time.Time      `gorm:"type:timestamptz;not null" json:"-"`
 }
 
-func (DocumentSaveOperation) TableName() string { return "document_save_operations" }
+func (DocumentSaveOperation) TableName() string { return "kb_save_operations" }

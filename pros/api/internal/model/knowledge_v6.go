@@ -22,7 +22,7 @@ type KnowledgeMember struct {
 	UpdatedAt time.Time `gorm:"type:timestamptz;not null" json:"updatedAt"`
 }
 
-func (KnowledgeMember) TableName() string { return "knowledge_members" }
+func (KnowledgeMember) TableName() string { return "kb_members" }
 
 // KnowledgePresence 是 presence 的共享存储（清单 078）。
 //
@@ -38,7 +38,7 @@ type KnowledgePresence struct {
 	LastSeen time.Time `gorm:"type:timestamptz;not null;index:idx_presence_seen" json:"lastSeen"`
 }
 
-func (KnowledgePresence) TableName() string { return "knowledge_presence" }
+func (KnowledgePresence) TableName() string { return "kb_presence" }
 
 // DocCRDTUpdate 是协同编辑的增量日志（清单 079）。
 //
@@ -55,7 +55,7 @@ type DocCRDTUpdate struct {
 	CreatedAt    time.Time `gorm:"type:timestamptz;not null" json:"createdAt"`
 }
 
-func (DocCRDTUpdate) TableName() string { return "doc_crdt_updates" }
+func (DocCRDTUpdate) TableName() string { return "kb_crdt_updates" }
 
 // KnowledgeChunk 是文档的向量切片（清单 106）。
 //
@@ -72,4 +72,4 @@ type KnowledgeChunk struct {
 	UpdatedAt time.Time      `gorm:"type:timestamptz;not null" json:"updatedAt"`
 }
 
-func (KnowledgeChunk) TableName() string { return "knowledge_chunks" }
+func (KnowledgeChunk) TableName() string { return "kb_chunks" }

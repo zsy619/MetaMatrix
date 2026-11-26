@@ -34,7 +34,7 @@ type BaseApp struct {
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
-func (BaseApp) TableName() string { return "base_app" }
+func (BaseApp) TableName() string { return "base_apps" }
 
 // BaseTable 是一张数据表。
 type BaseTable struct {
@@ -52,7 +52,7 @@ type BaseTable struct {
 	DeletedAt      gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
-func (BaseTable) TableName() string { return "base_table" }
+func (BaseTable) TableName() string { return "base_tables" }
 
 // BaseField 定义记录中某个数据项的类型与规则。
 type BaseField struct {
@@ -72,7 +72,7 @@ type BaseField struct {
 	UpdatedAt  time.Time      `gorm:"type:timestamptz;not null" json:"updatedAt"`
 }
 
-func (BaseField) TableName() string { return "base_field" }
+func (BaseField) TableName() string { return "base_fields" }
 
 // BaseRecord 是记录主表：data 是权威存储，键为字段 ID。
 //
@@ -89,7 +89,7 @@ type BaseRecord struct {
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
-func (BaseRecord) TableName() string { return "base_record" }
+func (BaseRecord) TableName() string { return "base_records" }
 
 // BaseRecordValue 是查询投影表：把高频筛选/排序字段类型化，便于建索引。
 // 它不是权威数据源，与 BaseRecord 同事务写入。
@@ -107,7 +107,7 @@ type BaseRecordValue struct {
 	UpdatedAt   time.Time      `gorm:"type:timestamptz;not null" json:"updatedAt"`
 }
 
-func (BaseRecordValue) TableName() string { return "base_record_value" }
+func (BaseRecordValue) TableName() string { return "base_record_values" }
 
 // BaseView 是视图配置：只描述如何展示，不拥有记录数据。
 type BaseView struct {
@@ -124,7 +124,7 @@ type BaseView struct {
 	UpdatedAt time.Time      `gorm:"type:timestamptz;not null" json:"updatedAt"`
 }
 
-func (BaseView) TableName() string { return "base_view" }
+func (BaseView) TableName() string { return "base_views" }
 
 // BaseRecordLink 存记录之间的关联关系。
 type BaseRecordLink struct {
@@ -138,7 +138,7 @@ type BaseRecordLink struct {
 	CreatedAt      time.Time `gorm:"type:timestamptz;not null" json:"createdAt"`
 }
 
-func (BaseRecordLink) TableName() string { return "base_record_link" }
+func (BaseRecordLink) TableName() string { return "base_record_links" }
 
 // BaseFieldFormula 保存公式定义与解析后的 AST。
 type BaseFieldFormula struct {
@@ -153,7 +153,7 @@ type BaseFieldFormula struct {
 	UpdatedAt       time.Time      `gorm:"type:timestamptz;not null" json:"updatedAt"`
 }
 
-func (BaseFieldFormula) TableName() string { return "base_field_formula" }
+func (BaseFieldFormula) TableName() string { return "base_field_formulas" }
 
 // BaseFormulaDependency 记录公式字段依赖了哪些字段。
 type BaseFormulaDependency struct {
@@ -165,7 +165,7 @@ type BaseFormulaDependency struct {
 	DependencyTableID *uuid.UUID `gorm:"type:uuid" json:"dependencyTableId"`
 }
 
-func (BaseFormulaDependency) TableName() string { return "base_formula_dependency" }
+func (BaseFormulaDependency) TableName() string { return "base_formula_dependencies" }
 
 // BaseOperationLog 是操作审计：记录谁在什么时候改了什么。
 type BaseOperationLog struct {
@@ -182,7 +182,7 @@ type BaseOperationLog struct {
 	CreatedAt  time.Time      `gorm:"type:timestamptz;not null" json:"createdAt"`
 }
 
-func (BaseOperationLog) TableName() string { return "base_operation_log" }
+func (BaseOperationLog) TableName() string { return "base_operation_logs" }
 
 // BaseEventOutbox 是事务性发件箱：业务数据与事件同事务落库，再异步发布。
 type BaseEventOutbox struct {
@@ -200,4 +200,4 @@ type BaseEventOutbox struct {
 	PublishedAt   *time.Time     `gorm:"type:timestamptz" json:"publishedAt"`
 }
 
-func (BaseEventOutbox) TableName() string { return "base_event_outbox" }
+func (BaseEventOutbox) TableName() string { return "base_event_outboxes" }

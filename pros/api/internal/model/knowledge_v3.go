@@ -9,7 +9,7 @@ import (
 
 // KnowledgeNodeData 是「多维表格 / 思维导图」这类非正文节点的结构化数据。
 //
-// 正文节点（doc）用 canvas_documents.current_data 存 HTML；
+// 正文节点（doc）用 kb_documents.current_data 存 HTML；
 // 表格与导图有自己的形状，放进同一张表用 kind 区分，避免为每种节点类型建表。
 type KnowledgeNodeData struct {
 	NodeID    uuid.UUID      `gorm:"type:uuid;primaryKey" json:"nodeId"`
@@ -19,7 +19,7 @@ type KnowledgeNodeData struct {
 	UpdatedAt time.Time      `gorm:"type:timestamptz;not null" json:"updatedAt"`
 }
 
-func (KnowledgeNodeData) TableName() string { return "knowledge_node_data" }
+func (KnowledgeNodeData) TableName() string { return "kb_node_data" }
 
 // KnowledgeShare 是知识库内容的分享链接。
 //
@@ -52,11 +52,11 @@ type KnowledgeShare struct {
 	CreatedAt  time.Time `gorm:"type:timestamptz;not null" json:"createdAt"`
 }
 
-func (KnowledgeShare) TableName() string { return "knowledge_shares" }
+func (KnowledgeShare) TableName() string { return "kb_shares" }
 
 // KnowledgeDocVersion 是知识库文档的历史快照（飞书「历史版本」）。
 //
-// 与 canvas_revisions 独立：这里只关心「可读可对比的正文快照」，
+// 与 kb_revisions 独立：这里只关心「可读可对比的正文快照」，
 // 每次保存自动追加一条，最多保留 keepVersionLimit 条。
 type KnowledgeDocVersion struct {
 	ID           uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
@@ -70,4 +70,4 @@ type KnowledgeDocVersion struct {
 	CreatedAt time.Time `gorm:"type:timestamptz;not null;index:idx_kdv_doc,priority:2,sort:desc" json:"createdAt"`
 }
 
-func (KnowledgeDocVersion) TableName() string { return "knowledge_doc_versions" }
+func (KnowledgeDocVersion) TableName() string { return "kb_doc_versions" }

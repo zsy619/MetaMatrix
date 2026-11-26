@@ -1,7 +1,7 @@
 /**
  * 节点画布（node-graph）文档类型。
  *
- * 画布内容整体作为 JSON 存进 canvas_documents.current_data，
+ * 画布内容整体作为 JSON 存进 kb_documents.current_data，
  * 与其它 76 个画布模板一样不单独建表（见 docs/GLOBAL_RULES）。
  */
 
@@ -25,7 +25,7 @@ export interface GraphNode {
   content?: string
   /** 画布节点指向 92 个画布之一（模板 id）。创建时选定，之后不可更改。 */
   refTemplateId?: string
-  /** 画布节点指向本项目里的画布（canvas_documents.id）。 */
+  /** 画布节点指向本项目里的画布（kb_documents.id）。 */
   refCanvasId?: string
   /** 锁定后不能拖动、改接或编辑，只能解锁后操作。 */
   locked?: boolean

@@ -63,11 +63,11 @@ func (s *Service) spaceRole(userID, projectID uuid.UUID) string {
 	var count int64
 	if err := s.db.Model(&struct {
 		ID uuid.UUID `gorm:"type:uuid;primaryKey"`
-	}{}).Table("projects").Where("id = ? AND owner_user_id = ?", projectID, userID).Count(&count).Error; err == nil && count > 0 {
+	}{}).Table("core_projects").Where("id = ? AND owner_user_id = ?", projectID, userID).Count(&count).Error; err == nil && count > 0 {
 		return RoleAdmin
 	}
 	var role string
-	err := s.db.Table("knowledge_members").Select("role").Where("project_id = ? AND user_id = ?", projectID, userID).Limit(1).Scan(&role).Error
+	err := s.db.Table("kb_members").Select("role").Where("project_id = ? AND user_id = ?", projectID, userID).Limit(1).Scan(&role).Error
 	if err == nil && role != "" {
 		return role
 	}
@@ -1677,7 +1677,7 @@ func (s *Service) ListDocBackrefs(ctx context.Context, userID, projectID, nodeID
 	var hits []hitRow
 	like := "%" + escapeLike(nodeID.String()) + "%"
 	if err := s.db.WithContext(ctx).
-		Table("base_record_value v").
+		Table("base_record_values v").
 		Select("v.record_id AS record_id, v.field_id AS field_id, v.table_id AS table_id").
 		Where("v.field_id IN ? AND v.value_text ILIKE ?", fieldIDs, like).
 		Limit(200).
@@ -1698,7 +1698,7 @@ func (s *Service) ListDocBackrefs(ctx context.Context, userID, projectID, nodeID
 		ValueText string
 	}
 	if err := s.db.WithContext(ctx).
-		Table("base_record_value v").
+		Table("base_record_values v").
 		Select("v.record_id AS record_id, v.value_text AS value_text").
 		Where("v.record_id IN ?", recordIDs).
 		Scan(&titles).Error; err != nil {

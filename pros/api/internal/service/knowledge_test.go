@@ -11,7 +11,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// knowledgeNodeSQLite 是 knowledge_nodes 的 SQLite 影子模型：只把时间列换成 SQLite 认得的类型。
+// knowledgeNodeSQLite 是 kb_nodes 的 SQLite 影子模型：只把时间列换成 SQLite 认得的类型。
 type knowledgeNodeSQLite struct {
 	ID           uuid.UUID  `gorm:"type:uuid;primaryKey"`
 	ProjectID    uuid.UUID  `gorm:"type:uuid;not null"`
@@ -35,7 +35,7 @@ type knowledgeNodeSQLite struct {
 	UpdatedAt    time.Time  `gorm:"not null"`
 }
 
-func (knowledgeNodeSQLite) TableName() string { return "knowledge_nodes" }
+func (knowledgeNodeSQLite) TableName() string { return "kb_nodes" }
 
 func TestKnowledgeDocsNestAndShareTitleWithDocument(t *testing.T) {
 	db := openProjectsSQLite(t)
