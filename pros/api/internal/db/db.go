@@ -55,8 +55,10 @@ func AutoMigrate(gdb *gorm.DB) error {
 		&model.DocOperation{},
 		// 用户+文档级审计骨架（A3）；块类型/父子等到 B2。
 		&model.DocAuditEvent{},
-		// B2 第一刀：派生块表 doc_blocks（upsert + 软删）。
+		// B2：派生块表、块修订与块引用。
 		&model.DocBlock{},
+		&model.DocBlockRevision{},
+		&model.DocBlockRef{},
 		&model.KnowledgeChunk{},
 		// 知识库 5.0：评论已读位与业务标签词库。
 		&model.DocCommentRead{},
@@ -85,6 +87,9 @@ func AutoMigrate(gdb *gorm.DB) error {
 	}
 	if err := ensureShareSchema(gdb); err != nil {
 		log.Printf("ensureShareSchema warning: %v", err)
+	}
+	if err := ensureCommentBlockAnchors(gdb); err != nil {
+		log.Printf("ensureCommentBlockAnchors warning: %v", err)
 	}
 	log.Println("AutoMigrate OK: users, canvas_documents, canvas_revisions, canvas_content_blocks, document_save_operations, backup_imports, media_category, media_asset, media_reference, password_reset_tokens")
 	return nil

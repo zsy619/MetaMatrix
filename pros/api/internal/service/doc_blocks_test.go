@@ -149,3 +149,147 @@ func TestCollabFlushWritesDocBlocks(t *testing.T) {
 func errorsIsNotFound(err error) bool {
 	return errors.Is(err, ErrDocumentNotFound)
 }
+
+func TestDocBlockRefsWriteReverseLookupAndCommentBackfill(t *testing.T) {
+	db := openDocumentsSQLite(t)
+	if err := db.AutoMigrate(&docCommentSQLite{}); err != nil {
+		t.Fatal(err)
+	}
+	svc := NewDocumentsService(db)
+	blocks := NewDocBlockService(db)
+	ownerID := uuid.New()
+	if err := db.Create(&model.User{ID: ownerID, Email: ownerID.String() + "@blocks.test", PasswordHash: "x"}).Error; err != nil {
+		t.Fatal(err)
+	}
+	src := "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+	dst := "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+	oldKey := "h-intro"
+	title := "引用文档"
+	canvasType := DocCanvasType
+	html := `<p data-block-id="` + src + `">见<span data-type="cross-ref" data-target="` + oldKey + `" data-label="§ 引言">§ 引言</span></p>` +
+		`<h2 id="` + oldKey + `" data-block-id="` + dst + `">引言段落</h2>`
+	doc, err := svc.Create(ownerID, CreateDocumentInput{
+		Title: &title, CanvasType: &canvasType, Data: docHTMLPayload(html),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var stored []model.DocBlock
+	if err := db.Where("document_id = ? AND deleted_at IS NULL", doc.ID).Order("ordinal ASC").Find(&stored).Error; err != nil {
+		t.Fatal(err)
+	}
+	if len(stored) != 2 {
+		t.Fatalf("blocks = %d, want 2", len(stored))
+	}
+	var heading model.DocBlock
+	for _, row := range stored {
+		if row.ID.String() == dst {
+			heading = row
+		}
+	}
+	if heading.AnchorKey != oldKey {
+		t.Fatalf("anchor_key = %q, want %s", heading.AnchorKey, oldKey)
+	}
+
+	var revs int64
+	if err := db.Model(&model.DocBlockRevision{}).Where("document_id = ?", doc.ID).Count(&revs).Error; err != nil {
+		t.Fatal(err)
+	}
+	if revs < 2 {
+		t.Fatalf("revisions = %d, want at least 2", revs)
+	}
+
+	refs, err := blocks.ListBlockRefs(ownerID, doc.ID, heading.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(refs) != 1 {
+		t.Fatalf("refs = %+v, want 1", refs)
+	}
+	if refs[0].SourceBlockID.String() != src || refs[0].TargetBlockID == nil || refs[0].TargetBlockID.String() != dst || refs[0].Lost || refs[0].AnchorKey != oldKey {
+		t.Fatalf("ref = %+v", refs[0])
+	}
+
+	stranger := uuid.New()
+	if _, err := blocks.ListBlockRefs(stranger, doc.ID, heading.ID); !errors.Is(err, ErrDocumentNotFound) {
+		t.Fatalf("stranger refs err = %v, want not found", err)
+	}
+
+	now := stored[0].UpdatedAt
+	comment := model.DocComment{
+		ID: uuid.New(), DocID: doc.ID, AuthorUserID: ownerID,
+		Quote: "引言段落", Content: "这块要改", Anchor: -1, AnchorFrom: -1, AnchorTo: -1, BlockOffset: -1,
+		CreatedAt: now, UpdatedAt: now,
+	}
+	if err := db.Create(&comment).Error; err != nil {
+		t.Fatal(err)
+	}
+	n, err := BackfillCommentAnchors(db, doc.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 1 {
+		t.Fatalf("backfilled = %d, want 1", n)
+	}
+	var got model.DocComment
+	if err := db.Where("id = ?", comment.ID).First(&got).Error; err != nil {
+		t.Fatal(err)
+	}
+	if got.BlockID == nil || got.BlockID.String() != dst || got.BlockOffset != 0 {
+		t.Fatalf("comment anchors = %+v", got)
+	}
+
+	// 对不上的旧评论保持降级：不写 block_id。
+	orphan := model.DocComment{
+		ID: uuid.New(), DocID: doc.ID, AuthorUserID: ownerID,
+		Quote: "已经删掉的句子", Content: "找不到", Anchor: -1, AnchorFrom: -1, AnchorTo: -1, BlockOffset: -1,
+		CreatedAt: now, UpdatedAt: now,
+	}
+	if err := db.Create(&orphan).Error; err != nil {
+		t.Fatal(err)
+	}
+	n, err = BackfillCommentAnchors(db, doc.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 0 {
+		t.Fatalf("orphan backfill = %d, want 0", n)
+	}
+	if err := db.Where("id = ?", orphan.ID).First(&orphan).Error; err != nil {
+		t.Fatal(err)
+	}
+	if orphan.BlockID != nil {
+		t.Fatalf("orphan should stay degraded, got block %v", orphan.BlockID)
+	}
+}
+
+func TestRebuildPageReferencesSetsSourceBlockID(t *testing.T) {
+	db := openDocumentsSQLite(t)
+	svc := NewDocumentsService(db)
+	ownerID := uuid.New()
+	if err := db.Create(&model.User{ID: ownerID, Email: ownerID.String() + "@pref.test", PasswordHash: "x"}).Error; err != nil {
+		t.Fatal(err)
+	}
+	src := "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
+	targetDoc := uuid.New()
+	title := "提及文档"
+	canvasType := DocCanvasType
+	html := `<p data-block-id="` + src + `"><span data-type="mention" data-id="` + targetDoc.String() + `">@另一篇</span></p>`
+	doc, err := svc.Create(ownerID, CreateDocumentInput{
+		Title: &title, CanvasType: &canvasType, Data: docHTMLPayload(html),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var refs []model.PageReference
+	if err := db.Where("source_doc_id = ?", doc.ID).Find(&refs).Error; err != nil {
+		t.Fatal(err)
+	}
+	if len(refs) != 1 {
+		t.Fatalf("page refs = %+v, want 1", refs)
+	}
+	if refs[0].TargetDocID != targetDoc || refs[0].SourceBlockID == nil || refs[0].SourceBlockID.String() != src {
+		t.Fatalf("page ref = %+v", refs[0])
+	}
+}

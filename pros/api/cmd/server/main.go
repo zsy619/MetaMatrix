@@ -391,6 +391,7 @@ func main() {
 		knowledgeDocs.POST("/:id/operations", collabH.AppendOperation)
 		knowledgeDocs.GET("/:id/audit", auditH.ListAudit)
 		knowledgeDocs.GET("/:id/blocks", blockH.ListBlocks)
+		knowledgeDocs.GET("/:id/blocks/:blockId/refs", blockH.ListBlockRefs)
 		knowledgeDocs.GET("/:id/blocks/:blockId", blockH.GetBlock)
 		// 知识库 5.0：自定义字段、评论增强、任务块、大纲与目录、docx 导出。
 		knowledgeDocs.PUT("/:id/properties/fields", knH.UpdateDocFields)

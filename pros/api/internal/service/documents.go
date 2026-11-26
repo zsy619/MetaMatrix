@@ -274,7 +274,10 @@ func syncExtract(tx *gorm.DB, docID uuid.UUID, data []byte, now time.Time, canva
 // rebuildRefs 全量重建 doc 的出向引用索引（mention/embed → page_references）。
 // 非 doc 类型（画布 JSON）跳过：只有 doc 类型的 current_data 有 html 字段。
 func rebuildRefs(tx *gorm.DB, docID uuid.UUID, data []byte, now time.Time) error {
-	return RebuildPageReferences(tx, docID, datatypes.JSON(data), now)
+	if err := RebuildPageReferences(tx, docID, datatypes.JSON(data), now); err != nil {
+		return err
+	}
+	return syncDocBlockRefs(tx, docID, data, now)
 }
 
 func truncateStr(s string, n int) string {

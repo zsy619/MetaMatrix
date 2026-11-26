@@ -80,12 +80,13 @@ func collectDocBlocks(nodes []*htmlElem, ancestorIDs []string, out *[]Block) {
 					parent = ancestorIDs[len(ancestorIDs)-1]
 				}
 				*out = append(*out, Block{
-					ID:       id,
-					ParentID: parent,
-					Type:     blockTypeOf(n),
-					Depth:    depth,
-					Text:     truncate(innerText(n), maxDocBlockText),
-					Attrs:    blockAttrs(n),
+					ID:        id,
+					ParentID:  parent,
+					Type:      blockTypeOf(n),
+					Depth:     depth,
+					Text:      truncate(innerText(n), maxDocBlockText),
+					Attrs:     blockAttrs(n),
+					AnchorKey: blockAnchorKey(n, id),
 				})
 			}
 			next := append(append([]string{}, ancestorIDs...), id)
@@ -98,6 +99,102 @@ func collectDocBlocks(nodes []*htmlElem, ancestorIDs []string, out *[]Block) {
 
 func isBlockID(id string) bool {
 	return uuidPattern.MatchString(id)
+}
+
+func blockAnchorKey(n *htmlElem, blockID string) string {
+	for _, key := range []string{"id", "data-xref-id", "data-bookmark-id"} {
+		v := strings.TrimSpace(n.attrs[key])
+		if v == "" || strings.EqualFold(v, blockID) {
+			continue
+		}
+		return v
+	}
+	return ""
+}
+
+// BlockRef 是 HTML 里扫描到的一块引用（交叉引用 / mention / 画布嵌入）。
+type BlockRef struct {
+	SourceID  string
+	TargetKey string
+	RefType   string
+	Label     string
+	Lost      bool
+}
+
+// ExtractDocBlockRefs 从 current_data.html 抽块级引用。
+func ExtractDocBlockRefs(raw json.RawMessage) []BlockRef {
+	if len(raw) == 0 {
+		return nil
+	}
+	var body struct {
+		HTML string `json:"html"`
+	}
+	if err := json.Unmarshal(raw, &body); err != nil || strings.TrimSpace(body.HTML) == "" {
+		return nil
+	}
+	return ExtractHTMLBlockRefs(body.HTML)
+}
+
+// ExtractHTMLBlockRefs 按最近祖先 data-block-id 记录引用源。
+func ExtractHTMLBlockRefs(html string) []BlockRef {
+	var out []BlockRef
+	walkBlockRefs(parseHTMLFragment(html), "", &out)
+	return out
+}
+
+func walkBlockRefs(nodes []*htmlElem, source string, out *[]BlockRef) {
+	for _, n := range nodes {
+		if n == nil {
+			continue
+		}
+		next := source
+		if id := strings.TrimSpace(n.attrs["data-block-id"]); isBlockID(id) {
+			next = id
+		}
+		dt := strings.TrimSpace(n.attrs["data-type"])
+		switch dt {
+		case "cross-ref", "crossRef":
+			*out = append(*out, BlockRef{
+				SourceID:  next,
+				TargetKey: firstAttr(n, "data-target", "data-id"),
+				RefType:   "crossref",
+				Label:     firstNonEmpty(strings.TrimSpace(n.attrs["data-label"]), innerText(n)),
+				Lost:      n.attrs["data-lost"] == "true",
+			})
+		case "mention":
+			*out = append(*out, BlockRef{
+				SourceID:  next,
+				TargetKey: strings.TrimSpace(n.attrs["data-id"]),
+				RefType:   "mention",
+				Label:     innerText(n),
+			})
+		case "canvasEmbed":
+			*out = append(*out, BlockRef{
+				SourceID:  next,
+				TargetKey: firstAttr(n, "data-doc-id", "data-id"),
+				RefType:   "embed",
+			})
+		}
+		walkBlockRefs(n.children, next, out)
+	}
+}
+
+func firstAttr(n *htmlElem, keys ...string) string {
+	for _, k := range keys {
+		if v := strings.TrimSpace(n.attrs[k]); v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+func firstNonEmpty(vals ...string) string {
+	for _, v := range vals {
+		if strings.TrimSpace(v) != "" {
+			return strings.TrimSpace(v)
+		}
+	}
+	return ""
 }
 
 func blockTypeOf(n *htmlElem) string {

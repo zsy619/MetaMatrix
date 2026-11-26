@@ -50,6 +50,16 @@ func (s stubDocBlocks) GetBlock(actorID, docID, blockID uuid.UUID) (*model.DocBl
 	return nil, service.ErrDocumentNotFound
 }
 
+func (s stubDocBlocks) ListBlockRefs(actorID, docID, blockID uuid.UUID) ([]model.DocBlockRef, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	if actorID != s.actor || docID != s.doc {
+		return nil, service.ErrDocumentNotFound
+	}
+	return nil, nil
+}
+
 func TestListBlocksHTTP(t *testing.T) {
 	userID := uuid.New()
 	docID := uuid.New()

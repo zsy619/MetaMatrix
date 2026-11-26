@@ -23,9 +23,11 @@ type DocBlock struct {
 	ContentJSON datatypes.JSON `gorm:"type:jsonb" json:"contentJson"`
 	Attrs       datatypes.JSON `gorm:"type:jsonb" json:"attrs"`
 	RevisionID  *uuid.UUID     `gorm:"type:uuid" json:"revisionId"`
-	CreatedAt   time.Time      `gorm:"type:timestamptz;not null" json:"createdAt"`
-	UpdatedAt   time.Time      `gorm:"type:timestamptz;not null" json:"updatedAt"`
-	DeletedAt   *time.Time     `gorm:"type:timestamptz;index:idx_doc_blocks_deleted" json:"deletedAt"`
+	// Permission 预留块级权限字段，本轮不做 ACL UI。
+	Permission string     `gorm:"type:varchar(32);not null;default:''" json:"permission,omitempty"`
+	CreatedAt  time.Time  `gorm:"type:timestamptz;not null" json:"createdAt"`
+	UpdatedAt  time.Time  `gorm:"type:timestamptz;not null" json:"updatedAt"`
+	DeletedAt  *time.Time `gorm:"type:timestamptz;index:idx_doc_blocks_deleted" json:"deletedAt"`
 
 	Document CanvasDocument `gorm:"foreignKey:DocumentID;constraint:OnDelete:CASCADE" json:"-"`
 }

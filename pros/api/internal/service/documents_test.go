@@ -60,12 +60,41 @@ type docBlockSQLite struct {
 	ContentJSON datatypes.JSON `gorm:"type:json"`
 	Attrs       datatypes.JSON `gorm:"type:json"`
 	RevisionID  *uuid.UUID     `gorm:"type:uuid"`
+	Permission  string         `gorm:"type:varchar(32);not null;default:''"`
 	CreatedAt   time.Time      `gorm:"not null"`
 	UpdatedAt   time.Time      `gorm:"not null"`
 	DeletedAt   *time.Time     `gorm:"index:idx_doc_blocks_deleted"`
 }
 
 func (docBlockSQLite) TableName() string { return "doc_blocks" }
+
+type docBlockRevisionSQLite struct {
+	ID          uuid.UUID      `gorm:"type:uuid;primaryKey"`
+	DocumentID  uuid.UUID      `gorm:"type:uuid;not null;index:idx_doc_block_revs_doc"`
+	BlockID     uuid.UUID      `gorm:"type:uuid;not null;index:idx_doc_block_revs_block_created,priority:1"`
+	RevisionID  *uuid.UUID     `gorm:"type:uuid"`
+	ContentText string         `gorm:"type:text;not null;default:''"`
+	ContentJSON datatypes.JSON `gorm:"type:json"`
+	Attrs       datatypes.JSON `gorm:"type:json"`
+	CreatedAt   time.Time      `gorm:"not null;index:idx_doc_block_revs_block_created,priority:2"`
+}
+
+func (docBlockRevisionSQLite) TableName() string { return "doc_block_revisions" }
+
+type docBlockRefSQLite struct {
+	ID            uuid.UUID  `gorm:"type:uuid;primaryKey"`
+	DocumentID    uuid.UUID  `gorm:"type:uuid;not null;index:idx_doc_block_refs_doc"`
+	SourceBlockID uuid.UUID  `gorm:"type:uuid;not null;index:idx_doc_block_refs_source"`
+	TargetBlockID *uuid.UUID `gorm:"type:uuid;index:idx_doc_block_refs_target"`
+	TargetDocID   *uuid.UUID `gorm:"type:uuid"`
+	RefType       string     `gorm:"type:varchar(32);not null"`
+	AnchorKey     string     `gorm:"type:varchar(128);not null;default:''"`
+	TargetLabel   string     `gorm:"type:varchar(255);not null;default:''"`
+	Lost          bool       `gorm:"not null;default:false"`
+	CreatedAt     time.Time  `gorm:"not null"`
+}
+
+func (docBlockRefSQLite) TableName() string { return "doc_block_refs" }
 
 // openDocumentsSQLite 为普通行为测试提供独立的内存数据库。
 // 并发竞争不在 SQLite 上断言，因为它不能模拟 PostgreSQL 的并行写锁语义。
@@ -93,6 +122,8 @@ func openDocumentsSQLite(t *testing.T) *gorm.DB {
 		&pageReferencesSQLite{},
 		&docAuditEventSQLite{},
 		&docBlockSQLite{},
+		&docBlockRevisionSQLite{},
+		&docBlockRefSQLite{},
 	); err != nil {
 		t.Fatal(err)
 	}

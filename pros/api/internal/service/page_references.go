@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"metamatrix/api/internal/content"
 	"metamatrix/api/internal/model"
 
 	"github.com/google/uuid"
@@ -101,7 +102,20 @@ func scanPageReferences(data datatypes.JSON, sourceDocID uuid.UUID, now time.Tim
 	var out []model.PageReference
 	seen := map[string]bool{}
 	ranges := scanBlockRanges(html)
-	add := func(targetID, refType, label, blockType string) {
+	sourceByKey := map[string]string{}
+	for _, ref := range content.ExtractHTMLBlockRefs(html) {
+		if ref.RefType != "mention" && ref.RefType != "embed" {
+			continue
+		}
+		if ref.TargetKey == "" || ref.SourceID == "" {
+			continue
+		}
+		key := ref.RefType + ":" + ref.TargetKey
+		if _, ok := sourceByKey[key]; !ok {
+			sourceByKey[key] = ref.SourceID
+		}
+	}
+	add := func(targetID, refType, label, blockType, sourceBlock string) {
 		if targetID == "" || targetID == sourceDocID.String() {
 			return
 		}
@@ -114,7 +128,7 @@ func scanPageReferences(data datatypes.JSON, sourceDocID uuid.UUID, now time.Tim
 			return
 		}
 		seen[key] = true
-		out = append(out, model.PageReference{
+		row := model.PageReference{
 			ID:          uuid.New(),
 			SourceDocID: sourceDocID,
 			TargetDocID: uid,
@@ -122,14 +136,23 @@ func scanPageReferences(data datatypes.JSON, sourceDocID uuid.UUID, now time.Tim
 			BlockType:   blockType,
 			TargetLabel: label,
 			CreatedAt:   now,
-		})
+		}
+		if sourceBlock == "" {
+			sourceBlock = sourceByKey[key]
+		}
+		if sid, err := uuid.Parse(sourceBlock); err == nil {
+			row.SourceBlockID = &sid
+		}
+		out = append(out, row)
 	}
 	for _, m := range mentionNodeRe.FindAllStringSubmatchIndex(html, -1) {
 		matched := html[m[0]:m[1]]
-		add(html[m[2]:m[3]], "mention", extractLabel(html, matched), blockKindAt(ranges, m[2]))
+		tid := html[m[2]:m[3]]
+		add(tid, "mention", extractLabel(html, matched), blockKindAt(ranges, m[2]), sourceByKey["mention:"+tid])
 	}
 	for _, m := range canvasEmbedRe.FindAllStringSubmatchIndex(html, -1) {
-		add(html[m[2]:m[3]], "embed", "", blockKindAt(ranges, m[2]))
+		tid := html[m[2]:m[3]]
+		add(tid, "embed", "", blockKindAt(ranges, m[2]), sourceByKey["embed:"+tid])
 	}
 	return out
 }
@@ -168,6 +191,19 @@ func (s *KnowledgeService) Backrefs(ownerID, targetDocID uuid.UUID) ([]model.Pag
 	var refs []model.PageReference
 	err := s.db.Joins("JOIN canvas_documents ON canvas_documents.id = page_references.source_doc_id").
 		Where("page_references.target_doc_id = ? AND canvas_documents.owner_user_id = ?", targetDocID, ownerID).
+		Order("page_references.created_at DESC").
+		Find(&refs).Error
+	if err != nil {
+		return nil, err
+	}
+	return refs, nil
+}
+
+// ListPageRefsByTargetBlock 反查指向某块的文档级引用。
+func (s *KnowledgeService) ListPageRefsByTargetBlock(ownerID, targetBlockID uuid.UUID) ([]model.PageReference, error) {
+	var refs []model.PageReference
+	err := s.db.Joins("JOIN canvas_documents ON canvas_documents.id = page_references.source_doc_id").
+		Where("page_references.target_block_id = ? AND canvas_documents.owner_user_id = ?", targetBlockID, ownerID).
 		Order("page_references.created_at DESC").
 		Find(&refs).Error
 	if err != nil {

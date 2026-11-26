@@ -47,6 +47,7 @@ type Block struct {
 	Type       string
 	Depth      int
 	Attrs      map[string]string
+	AnchorKey  string
 }
 
 // AttachmentMeta describes an attachment without embedding huge payloads.

@@ -97,3 +97,32 @@ func TestExtractHTMLBlocksSkipsNodesWithoutBlockID(t *testing.T) {
 		t.Fatalf("blocks = %+v", blocks)
 	}
 }
+
+func TestExtractHTMLBlocksKeepsLegacyAnchorKey(t *testing.T) {
+	html := `<h2 id="h-intro" data-block-id="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa">引言</h2>` +
+		`<img data-block-id="bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb" data-xref-id="fig-2" alt="图">`
+	blocks := ExtractHTMLBlocks(html)
+	if len(blocks) != 2 {
+		t.Fatalf("blocks = %d, want 2", len(blocks))
+	}
+	if blocks[0].AnchorKey != "h-intro" || blocks[0].Type != "heading" {
+		t.Fatalf("heading = %+v", blocks[0])
+	}
+	if blocks[1].AnchorKey != "fig-2" || blocks[1].Type != "image" {
+		t.Fatalf("image = %+v", blocks[1])
+	}
+}
+
+func TestExtractHTMLBlockRefsCapturesSourceAndTarget(t *testing.T) {
+	src := "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+	dst := "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+	html := `<p data-block-id="` + src + `">见<span data-type="cross-ref" data-target="` + dst + `" data-label="§ 目标">§ 目标</span></p>` +
+		`<h2 id="h-old" data-block-id="` + dst + `">目标</h2>`
+	refs := ExtractHTMLBlockRefs(html)
+	if len(refs) != 1 {
+		t.Fatalf("refs = %#v", refs)
+	}
+	if refs[0].SourceID != src || refs[0].TargetKey != dst || refs[0].RefType != "crossref" || refs[0].Lost {
+		t.Fatalf("ref = %+v", refs[0])
+	}
+}

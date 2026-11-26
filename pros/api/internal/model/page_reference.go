@@ -15,9 +15,13 @@ type PageReference struct {
 	TargetDocID uuid.UUID `gorm:"type:uuid;not null;index:idx_pr_target" json:"targetDocId"`
 	RefType     string    `gorm:"type:varchar(16);not null" json:"refType"` // mention | embed
 	// BlockType 记录引用所在的结构块：table | whiteboard | flowchart | ""（正文）。
-	BlockType   string    `gorm:"type:varchar(16);not null;default:''" json:"blockType"`
-	TargetLabel string    `gorm:"type:varchar(255);not null;default:''" json:"targetLabel"`
-	CreatedAt   time.Time `gorm:"type:timestamptz;not null" json:"createdAt"`
+	BlockType   string `gorm:"type:varchar(16);not null;default:''" json:"blockType"`
+	TargetLabel string `gorm:"type:varchar(255);not null;default:''" json:"targetLabel"`
+	// SourceBlockID / TargetBlockID 把文档级引用扩到块级；老引用可只填 AnchorKey。
+	SourceBlockID *uuid.UUID `gorm:"type:uuid;index:idx_pr_source_block" json:"sourceBlockId,omitempty"`
+	TargetBlockID *uuid.UUID `gorm:"type:uuid;index:idx_pr_target_block" json:"targetBlockId,omitempty"`
+	AnchorKey     string     `gorm:"type:varchar(128);not null;default:''" json:"anchorKey"`
+	CreatedAt     time.Time  `gorm:"type:timestamptz;not null" json:"createdAt"`
 }
 
 func (PageReference) TableName() string { return "page_references" }

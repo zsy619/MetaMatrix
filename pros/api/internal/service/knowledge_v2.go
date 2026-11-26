@@ -641,6 +641,7 @@ func (s *KnowledgeService) AddComment(ownerID, docID uuid.UUID, parentID *uuid.U
 		ParentID:     parentID,
 		Quote:        quote,
 		Content:      content,
+		BlockOffset:  -1,
 		CreatedAt:    now,
 		UpdatedAt:    now,
 	}

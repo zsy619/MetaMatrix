@@ -9,6 +9,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	doccontent "metamatrix/api/internal/content"
 	"metamatrix/api/internal/model"
 
 	"github.com/google/uuid"
@@ -24,7 +25,7 @@ import (
 const maxMentionUsers = 20
 
 // AddCommentDetailed 加评论：支持划线区间锚点与 @ 成员。
-func (s *KnowledgeService) AddCommentDetailed(ownerID, docID uuid.UUID, parentID *uuid.UUID, quote, content string, anchorFrom, anchorTo int, mentions []string) (*model.DocComment, error) {
+func (s *KnowledgeService) AddCommentDetailed(ownerID, docID uuid.UUID, parentID *uuid.UUID, quote, content string, anchorFrom, anchorTo int, mentions []string, blockID *uuid.UUID, blockOffset int) (*model.DocComment, error) {
 	content = strings.TrimSpace(content)
 	if content == "" || utf8.RuneCountInString(content) > maxCommentRunes {
 		return nil, ErrValidation
@@ -44,6 +45,21 @@ func (s *KnowledgeService) AddCommentDetailed(ownerID, docID uuid.UUID, parentID
 			ids = append(ids, m)
 		}
 	}
+	if blockOffset < 0 {
+		blockOffset = -1
+	}
+	if blockID == nil {
+		var doc model.CanvasDocument
+		if err := s.db.Select("id", "current_data").Where("id = ?", docID).First(&doc).Error; err == nil {
+			blocks := doccontent.ExtractDocBlocks([]byte(doc.CurrentData))
+			if bid, off, ok := doccontent.ResolveCommentAnchor(blocks, quote, anchorFrom); ok {
+				if id, err := uuid.Parse(bid); err == nil {
+					blockID = &id
+					blockOffset = off
+				}
+			}
+		}
+	}
 	now := time.Now().UTC()
 	comment := &model.DocComment{
 		ID:           uuid.New(),
@@ -54,6 +70,8 @@ func (s *KnowledgeService) AddCommentDetailed(ownerID, docID uuid.UUID, parentID
 		Anchor:       anchorFrom,
 		AnchorFrom:   anchorFrom,
 		AnchorTo:     anchorTo,
+		BlockID:      blockID,
+		BlockOffset:  blockOffset,
 		Mentions:     strings.Join(ids, ","),
 		Reactions:    datatypes.JSON([]byte(`{}`)),
 		Content:      content,

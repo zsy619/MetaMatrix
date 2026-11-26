@@ -68,6 +68,8 @@ type docCommentSQLite struct {
 	Anchor       int            `gorm:"not null;default:-1"`
 	AnchorFrom   int            `gorm:"not null;default:-1"`
 	AnchorTo     int            `gorm:"not null;default:-1"`
+	BlockID      *uuid.UUID     `gorm:"type:uuid;index:idx_dc_block"`
+	BlockOffset  int            `gorm:"not null;default:-1"`
 	Mentions     string         `gorm:"type:varchar(512);not null;default:''"`
 	Reactions    datatypes.JSON `gorm:"type:jsonb;not null;default:'{}'"`
 	Content      string         `gorm:"type:text;not null"`

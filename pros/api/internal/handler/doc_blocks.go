@@ -15,6 +15,7 @@ import (
 type docBlockBackend interface {
 	ListBlocks(actorID, docID uuid.UUID) ([]model.DocBlock, error)
 	GetBlock(actorID, docID, blockID uuid.UUID) (*model.DocBlock, error)
+	ListBlockRefs(actorID, docID, blockID uuid.UUID) ([]model.DocBlockRef, error)
 }
 
 // DocBlockHandler 提供派生块只读 API。本轮不做前端 UI。
@@ -80,6 +81,58 @@ func (h *DocBlockHandler) GetBlock(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 	c.JSON(http.StatusOK, toDocBlockJSON(*row))
+}
+
+// ListBlockRefs GET /documents/:id/blocks/:blockId/refs
+func (h *DocBlockHandler) ListBlockRefs(ctx context.Context, c *app.RequestContext) {
+	uid, ok := middleware.UserIDFromCtx(c)
+	if !ok {
+		Unauthorized(c, "unauthorized")
+		return
+	}
+	docID, ok := parseID(c, "id")
+	if !ok {
+		return
+	}
+	blockID, ok := parseID(c, "blockId")
+	if !ok {
+		return
+	}
+	rows, err := h.svc.ListBlockRefs(uid, docID, blockID)
+	if handleCollabErr(c, err) {
+		return
+	}
+	out := make([]docBlockRefJSON, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, toDocBlockRefJSON(row))
+	}
+	c.JSON(http.StatusOK, out)
+}
+
+type docBlockRefJSON struct {
+	ID            string  `json:"id"`
+	SourceBlockID string  `json:"sourceBlockId"`
+	TargetBlockID *string `json:"targetBlockId,omitempty"`
+	RefType       string  `json:"refType"`
+	AnchorKey     string  `json:"anchorKey,omitempty"`
+	TargetLabel   string  `json:"targetLabel,omitempty"`
+	Lost          bool    `json:"lost"`
+}
+
+func toDocBlockRefJSON(row model.DocBlockRef) docBlockRefJSON {
+	out := docBlockRefJSON{
+		ID:            row.ID.String(),
+		SourceBlockID: row.SourceBlockID.String(),
+		RefType:       row.RefType,
+		AnchorKey:     row.AnchorKey,
+		TargetLabel:   row.TargetLabel,
+		Lost:          row.Lost,
+	}
+	if row.TargetBlockID != nil {
+		s := row.TargetBlockID.String()
+		out.TargetBlockID = &s
+	}
+	return out
 }
 
 func toDocBlockJSON(row model.DocBlock) docBlockJSON {
