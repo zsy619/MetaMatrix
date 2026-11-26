@@ -78,4 +78,13 @@ describe('字段管理面板', () => {
       expect(option.find('.be-type-icon svg').exists()).toBe(true)
     }
   })
+
+  it('下拉里的图标按类型着色', () => {
+    const wrapper = mountPanel()
+    const icons = wrapper.findAll('.be-type-icon')
+    expect(icons.length).toBe(DEFINITIONS.length * 2)
+    for (const icon of icons) {
+      expect(icon.attributes('style')).toMatch(/color:\s*#/)
+    }
+  })
 })

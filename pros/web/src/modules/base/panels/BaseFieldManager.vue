@@ -15,7 +15,7 @@ import {
   updateField,
 } from '../api'
 import { allFieldPlugins, defaultConfig, fieldPlugin } from '../fields/registry'
-import { fieldTypeIcon } from '../fields/icons'
+import { fieldTypeColor, fieldTypeIcon } from '../fields/icons'
 import type { FieldMeta, FieldTypeDefinition } from '../types'
 
 const props = defineProps<{
@@ -176,7 +176,12 @@ async function removeField(field: FieldMeta) {
       <div class="be-panel">
         <div v-for="field in fields" :key="field.id" class="be-field-row">
           <div class="be-field-row__name">
-            <el-icon class="be-field-row__icon"><component :is="iconOf(field.type)" /></el-icon>
+            <el-icon
+              class="be-field-row__icon"
+              :style="{ color: fieldTypeColor(field.type) }"
+            >
+              <component :is="iconOf(field.type)" />
+            </el-icon>
             <span class="be-field-row__label">{{ field.name }}</span>
             <span class="be-field-row__type">{{ labelOf(field.type) }}</span>
             <el-tag v-if="field.isPrimary" size="small" type="primary" effect="plain">主字段</el-tag>
@@ -249,6 +254,7 @@ async function removeField(field: FieldMeta) {
 <style scoped>
 .be-field-row__icon {
   color: var(--tg-text-2);
+  font-size: 14px;
 }
 
 /* 类型图标：固定槽位宽度，保证下拉列表里的文字左边缘对齐 */

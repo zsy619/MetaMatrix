@@ -27,6 +27,7 @@ import {
   User,
 } from '@element-plus/icons-vue'
 import type { FieldType } from '../types'
+import { fieldPlugin } from './registry'
 
 const ICONS: Record<FieldType, Component> = {
   text: EditPen,
@@ -53,4 +54,9 @@ const ICONS: Record<FieldType, Component> = {
 /** 取字段类型图标组件；未知类型回退到文本图标。 */
 export function fieldTypeIcon(type: string): Component {
   return ICONS[type as FieldType] ?? EditPen
+}
+
+/** 取字段类型的主题色；与 registry 里登记的 color 一致。 */
+export function fieldTypeColor(type: string): string {
+  return fieldPlugin(type)?.color ?? '#3390ec'
 }

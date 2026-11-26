@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { h } from 'vue'
-import { fieldTypeIcon } from './icons'
+import { fieldTypeColor, fieldTypeIcon } from './icons'
 import type { FieldType } from '../types'
 
 const ALL_TYPES: FieldType[] = [
@@ -41,5 +41,12 @@ describe('多维表格字段类型图标', () => {
     const icon = fieldTypeIcon('not_a_real_type')
     expect(icon).toBeTruthy()
     expect(mount({ render: () => h(icon) }).find('svg').exists()).toBe(true)
+  })
+
+  it('每种字段类型都有主题色，未知类型回退品牌蓝', () => {
+    for (const type of ALL_TYPES) {
+      expect(fieldTypeColor(type), `类型 ${type} 缺少颜色`).toMatch(/^#[0-9a-f]{6}$/i)
+    }
+    expect(fieldTypeColor('not_a_real_type')).toBe('#3390ec')
   })
 })
