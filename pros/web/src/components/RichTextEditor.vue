@@ -272,6 +272,11 @@ const props = withDefaults(
     /** 知识库项目 id：提供后 @ 菜单可 @ 当前项目知识库里的文档。 */
     knowledgeProjectId?: string
     /**
+     * 正文协同用的 Y.Doc。传入后走 @tiptap/extension-collaboration，
+     * 从第一天携带 A1 的 data-block-id。不传时保持单人编辑与原保存路径。
+     */
+    collabDocument?: import('yjs').Doc | null
+    /**
      * 是否按「纸张」排版（默认 true，A4 + 窄边距）。
      * 画布里嵌入的紧凑区块传 false：正文按内容流式排版，不再撑出 A4 纸张高度，
      * 也不会把页面大小写回文档。最大化/独立文档仍走默认的纸张视图。
@@ -1131,6 +1136,7 @@ const editor = useRteExtensions({
   syncLastEmittedHtml: (ed: { getHTML: () => string }) => {
     lastEmittedHtmlNorm = normalizeHtml(ed.getHTML())
   },
+  collabDocument: () => props.collabDocument ?? null,
   setHeading,
   syncSelectedFormFromEditor,
   toggleShortcutsPanel,

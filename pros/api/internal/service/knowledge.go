@@ -43,6 +43,11 @@ func NewKnowledgeService(db *gorm.DB) *KnowledgeService {
 	return &KnowledgeService{db: db, presence: newHybridPresenceStore(db)}
 }
 
+// PresenceStore 返回知识库正在使用的 presence 存储，供正文协同通道复用同一实例。
+func (s *KnowledgeService) PresenceStore() PresenceStore {
+	return s.presence
+}
+
 type KnowledgeNodeInput struct {
 	ParentID   *uuid.UUID
 	NodeType   string // folder | doc

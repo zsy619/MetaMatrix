@@ -2,6 +2,8 @@ import { nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useEditor } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
+import Collaboration from '@tiptap/extension-collaboration'
+import type { Doc as YDoc } from 'yjs'
 import Placeholder from '@tiptap/extension-placeholder'
 import Underline from '@tiptap/extension-underline'
 import { TextStyle, FontSize, FontFamily, LineHeight } from '@tiptap/extension-text-style'
@@ -200,6 +202,8 @@ export function useRteExtensions(deps: {
   ) => void
   /** 打开或回填块 ID 后，只同步 lastEmitted 基线，不向父级 emit / 保存。 */
   syncLastEmittedHtml?: (ed: { getHTML: () => string }) => void
+  /** 传入 Y.Doc 时启用正文协同；撤销改由 Collaboration 接管。不传则保持单人编辑。 */
+  collabDocument?: () => YDoc | null
 }) {
   const {
     closeTableCtx,
@@ -275,9 +279,10 @@ function qrHref(node: Element | null): string {
   }
 }
 
+  const collabYDoc = deps.collabDocument?.() ?? null
 const editor = useEditor({
 
-  content: initialEditorContent(),
+  content: collabYDoc ? undefined : initialEditorContent(),
   extensions: [
     StarterKit.configure({
       heading: { levels: [1, 2, 3, 4, 5, 6] },
@@ -296,6 +301,8 @@ const editor = useEditor({
       underline: false,
       // 拖拽图片到同行时更明显的落点指示（飞书式并排）
       dropcursor: { color: '#5b8cff', width: 2 },
+      // Collaboration 自带撤销；与 StarterKit 的 UndoRedo 同时开会冲突。
+      ...(collabYDoc ? { undoRedo: false as const } : {}),
     }),
     Underline,
     Subscript,
@@ -313,6 +320,7 @@ const editor = useEditor({
     LetterSpacing,
     ParagraphAttrs,
     BlockIdentity,
+    ...(collabYDoc ? [Collaboration.configure({ document: collabYDoc })] : []),
     PageBreak,
     Columns,
     Column,
@@ -1002,6 +1010,13 @@ const editor = useEditor({
   },
   onCreate: ({ editor: ed }) => {
     editorReady.value = true
+    // 协同文档若还没有片段，把当前 HTML 写入 Y.Doc，并回填 data-block-id。
+    if (collabYDoc && collabYDoc.getXmlFragment('default').length === 0) {
+      const initial = initialEditorContent()
+      if (typeof initial === 'string' && initial.trim()) {
+        ed.commands.setContent(initial)
+      }
+    }
     ed.commands.ensureBlockIdentities()
     deps.syncLastEmittedHtml?.(ed)
   },

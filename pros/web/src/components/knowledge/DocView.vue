@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
@@ -33,12 +33,13 @@ import DocVersions from './DocVersions.vue'
 import AiPanel from './AiPanel.vue'
 import WriteAssist from './WriteAssist.vue'
 import MeetingMinutesDialog from './MeetingMinutesDialog.vue'
-import type { CollabDoc } from './collab/crdtDoc'
 import ShareDialog from './ShareDialog.vue'
 // 图标库按需加载。
 const IconPicker = defineAsyncComponent(() => import('../common/IconPicker.vue'))
 import { getDocument, updateDocument } from '../../api/documents'
-import { apiRequestBlob } from '../../api/http'
+import { apiRequestBlob, getToken } from '../../api/http'
+import { LiveCollabSession, createCollabYDoc } from './collab/yDocCollab'
+import type { Doc as YDoc } from 'yjs'
 import type { DocumentFull } from '../../api/documents'
 import {
   exportKnowledgeDoc,
@@ -89,7 +90,11 @@ const shareVisible = ref(false)
 const minutesVisible = ref(false)
 /** 协同编辑（079）：开启后本地改动先写入 CRDT，再由服务端增量同步给其他人。 */
 const collabOn = ref(false)
-const collab = ref<CollabDoc | null>(null)
+/** 正文 Yjs 协同会话。旧的 HTML 级 crdtDoc 旁路仍保留，本包不调用、不修改。 */
+const liveSession = ref<LiveCollabSession | null>(null)
+const liveYDoc = shallowRef<YDoc | null>(null)
+/** 切换协同时重挂编辑器，以便按需接入 Collaboration 扩展。 */
+const editorSessionKey = ref(0)
 const presence = ref<PresenceUser[]>([])
 const quote = ref('')
 /** 划线区间：正文字符偏移（041）。 */
@@ -157,8 +162,13 @@ async function loadLastEditor() {
 
 function onHtml(next: string) {
   html.value = next
-  // 协同模式下本地改动先写进 CRDT：增量会同步给其他协作者。
-  collab.value?.applyLocal(next)
+  if (liveSession.value) {
+    liveSession.value.noteHtml(next)
+    dirty.value = true
+    // 实时协同下 current_data 由服务端随 Yjs 增量双写，避免和 HTTP 保存抢同一把版本锁。
+    // 单人编辑仍走下面的 scheduleSave，保存管线没有关掉。
+    return
+  }
   dirty.value = true
   scheduleSave()
 }
@@ -176,36 +186,47 @@ function insertSuggestion(text: string) {
   }
 }
 
-/** 开启 / 关闭协同编辑。 */
+function stopLiveCollab() {
+  liveSession.value?.stop()
+  liveSession.value = null
+  liveYDoc.value?.destroy()
+  liveYDoc.value = null
+  if (collabOn.value) editorSessionKey.value += 1
+  collabOn.value = false
+}
+
+/** 开启 / 关闭正文 Yjs 协同（Hertz WebSocket）。 */
 async function toggleCollab() {
   if (collabOn.value) {
-    collab.value?.stop()
-    collab.value = null
-    collabOn.value = false
+    stopLiveCollab()
     ElMessage.info('已退出协同模式')
     return
   }
+  const token = getToken()
+  if (!token) {
+    ElMessage.error('登录已失效，无法开启协同')
+    return
+  }
+  const ydoc = createCollabYDoc()
+  const session = new LiveCollabSession({
+    documentId: props.documentId,
+    token,
+    ydoc,
+    htmlProvider: () => html.value,
+    onError: () => {
+      ElMessage.warning('协同同步暂时不可用，已继续本地编辑')
+    },
+  })
   try {
-    // yjs（CRDT）只在真正开启协同时下载，不占文档首屏带宽。
-    const { CollabDoc: CollabDocCtor } = await import('./collab/crdtDoc')
-    const instance = new CollabDocCtor({
-      documentId: props.documentId,
-      onRemote: (merged) => {
-        if (!merged || merged === html.value) return
-        html.value = merged
-        // 远端内容已合并进 CRDT，不再触发一次本地保存，避免两边互相覆盖。
-        dirty.value = false
-      },
-      onError: () => {
-        ElMessage.warning('协同同步暂时不可用，已继续本地编辑')
-      },
-    })
-    const merged = await instance.start(html.value)
-    if (merged && merged !== html.value) html.value = merged
-    collab.value = instance
+    await session.start()
+    liveYDoc.value = ydoc
+    liveSession.value = session
     collabOn.value = true
+    editorSessionKey.value += 1
     ElMessage.success('已进入协同模式')
   } catch {
+    session.stop()
+    ydoc.destroy()
     ElMessage.error('协同模式开启失败')
   }
 }
@@ -591,8 +612,7 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('beforeunload', onBeforeUnload)
   if (presenceTimer) clearInterval(presenceTimer)
-  collab.value?.stop()
-  collab.value = null
+  stopLiveCollab()
 })
 
 function onBeforeUnload(e: BeforeUnloadEvent) {
@@ -770,11 +790,13 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
       <div v-if="locked" class="doc-view__readonly" v-html="html" />
       <RichTextEditor
         v-else
+        :key="`${documentId}-${editorSessionKey}`"
         ref="editorRef"
         class="doc-view__editor"
         :panel-id="panelId"
         :scroll-memory-key="scrollMemoryKey"
         :knowledge-project-id="projectId"
+        :collab-document="liveYDoc"
         :compact="false"
         :expanded="true"
         :show-title="false"
