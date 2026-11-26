@@ -55,6 +55,8 @@ func AutoMigrate(gdb *gorm.DB) error {
 		&model.DocOperation{},
 		// 用户+文档级审计骨架（A3）；块类型/父子等到 B2。
 		&model.DocAuditEvent{},
+		// B2 第一刀：派生块表 doc_blocks（upsert + 软删）。
+		&model.DocBlock{},
 		&model.KnowledgeChunk{},
 		// 知识库 5.0：评论已读位与业务标签词库。
 		&model.DocCommentRead{},

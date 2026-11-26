@@ -236,6 +236,9 @@ func syncExtract(tx *gorm.DB, docID uuid.UUID, data []byte, now time.Time, canva
 		return "", err
 	}
 	if len(ext.Blocks) == 0 {
+		if err := syncDocBlocks(tx, docID, data, now); err != nil {
+			return "", err
+		}
 		return ext.PlainText, rebuildRefs(tx, docID, data, now)
 	}
 	rows := make([]model.CanvasContentBlock, 0, len(ext.Blocks))
@@ -256,7 +259,14 @@ func syncExtract(tx *gorm.DB, docID uuid.UUID, data []byte, now time.Time, canva
 	}
 	if IsCanvasType(canvasType) {
 		// 画布 JSON 没有 mention/embed 节点，引用索引只对知识库文档有意义。
+		// 派生块表仍要走一遍：无 html 时只会把旧行软删，不影响画布全删全建路径。
+		if err := syncDocBlocks(tx, docID, data, now); err != nil {
+			return "", err
+		}
 		return ext.PlainText, nil
+	}
+	if err := syncDocBlocks(tx, docID, data, now); err != nil {
+		return "", err
 	}
 	return ext.PlainText, rebuildRefs(tx, docID, data, now)
 }

@@ -48,6 +48,25 @@ type docAuditEventSQLite struct {
 
 func (docAuditEventSQLite) TableName() string { return "doc_audit_events" }
 
+type docBlockSQLite struct {
+	ID          uuid.UUID      `gorm:"type:uuid;primaryKey"`
+	DocumentID  uuid.UUID      `gorm:"type:uuid;not null;index:idx_doc_blocks_doc_ordinal,priority:1"`
+	ParentID    *uuid.UUID     `gorm:"type:uuid;index:idx_doc_blocks_parent"`
+	BlockType   string         `gorm:"type:varchar(64);not null"`
+	Ordinal     int            `gorm:"not null;default:0;index:idx_doc_blocks_doc_ordinal,priority:2"`
+	Depth       int            `gorm:"not null;default:0"`
+	AnchorKey   string         `gorm:"type:varchar(128);not null;default:''"`
+	ContentText string         `gorm:"type:text;not null;default:''"`
+	ContentJSON datatypes.JSON `gorm:"type:json"`
+	Attrs       datatypes.JSON `gorm:"type:json"`
+	RevisionID  *uuid.UUID     `gorm:"type:uuid"`
+	CreatedAt   time.Time      `gorm:"not null"`
+	UpdatedAt   time.Time      `gorm:"not null"`
+	DeletedAt   *time.Time     `gorm:"index:idx_doc_blocks_deleted"`
+}
+
+func (docBlockSQLite) TableName() string { return "doc_blocks" }
+
 // openDocumentsSQLite 为普通行为测试提供独立的内存数据库。
 // 并发竞争不在 SQLite 上断言，因为它不能模拟 PostgreSQL 的并行写锁语义。
 func openDocumentsSQLite(t *testing.T) *gorm.DB {
@@ -73,6 +92,7 @@ func openDocumentsSQLite(t *testing.T) *gorm.DB {
 		&documentSaveOperationSQLite{},
 		&pageReferencesSQLite{},
 		&docAuditEventSQLite{},
+		&docBlockSQLite{},
 	); err != nil {
 		t.Fatal(err)
 	}

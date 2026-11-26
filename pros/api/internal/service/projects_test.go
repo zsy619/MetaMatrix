@@ -65,6 +65,7 @@ func openProjectsSQLite(t *testing.T) *gorm.DB {
 		&documentSaveOperationSQLite{},
 		&pageReferencesSQLite{},
 		&docAuditEventSQLite{},
+		&docBlockSQLite{},
 	); err != nil {
 		t.Fatal(err)
 	}

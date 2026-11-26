@@ -38,7 +38,7 @@ func openPostgresForServiceTest(t *testing.T) *gorm.DB {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = sqlDB.Close() })
-	if err := db.AutoMigrate(&model.User{}, &model.CanvasDocument{}, &model.CanvasRevision{}, &model.CanvasContentBlock{}, &model.DocumentSaveOperation{}, &model.PasswordResetToken{}, &model.PageReference{}, &model.DocAuditEvent{}); err != nil {
+	if err := db.AutoMigrate(&model.User{}, &model.CanvasDocument{}, &model.CanvasRevision{}, &model.CanvasContentBlock{}, &model.DocumentSaveOperation{}, &model.PasswordResetToken{}, &model.PageReference{}, &model.DocAuditEvent{}, &model.DocBlock{}); err != nil {
 		t.Fatal(err)
 	}
 	return db
@@ -67,6 +67,7 @@ func newDocumentFixture(t *testing.T, db *gorm.DB) (*DocumentsService, uuid.UUID
 			db.Where("document_id IN ?", docIDs).Delete(&model.CanvasContentBlock{})
 			db.Where("document_id IN ?", docIDs).Delete(&model.CanvasRevision{})
 			db.Where("document_id IN ?", docIDs).Delete(&model.DocAuditEvent{})
+			db.Where("document_id IN ?", docIDs).Delete(&model.DocBlock{})
 		}
 		db.Where("owner_user_id = ?", ownerID).Delete(&model.CanvasDocument{})
 		db.Where("id = ?", ownerID).Delete(&model.User{})
