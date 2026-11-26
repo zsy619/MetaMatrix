@@ -59,6 +59,18 @@ func AutoMigrate(gdb *gorm.DB) error {
 		&model.KnowledgeNodeData{},
 		&model.KnowledgeShare{},
 		&model.KnowledgeDocVersion{},
+		// 多维表格 Base Engine：Base/表/字段/记录/投影/视图/关联/公式/审计/事件。
+		&model.BaseApp{},
+		&model.BaseTable{},
+		&model.BaseField{},
+		&model.BaseRecord{},
+		&model.BaseRecordValue{},
+		&model.BaseView{},
+		&model.BaseRecordLink{},
+		&model.BaseFieldFormula{},
+		&model.BaseFormulaDependency{},
+		&model.BaseOperationLog{},
+		&model.BaseEventOutbox{},
 	); err != nil {
 		return fmt.Errorf("automigrate: %w", err)
 	}
@@ -80,7 +92,29 @@ func AutoMigrate(gdb *gorm.DB) error {
 	if err := ensureShareSchema(gdb); err != nil {
 		log.Printf("ensureShareSchema warning: %v", err)
 	}
+	if err := ensureMarkdownSchema(gdb); err != nil {
+		log.Printf("ensureMarkdownSchema warning: %v", err)
+	}
+	if err := ensureBaseEngineIndexes(gdb); err != nil {
+		log.Printf("ensureBaseEngineIndexes warning: %v", err)
+	}
 	log.Println("AutoMigrate OK: users, canvas_documents, canvas_revisions, canvas_content_blocks, document_save_operations, backup_imports, media_category, media_asset, media_reference, password_reset_tokens")
+	return nil
+}
+
+// ensureMarkdownSchema 给文档表补 Markdown 源码列。
+//
+// AutoMigrate 会加列，但线上库可能存在历史版本，这里显式补一次，
+// 保证「库里存的不只是 HTML，还有 Markdown 源码」。
+func ensureMarkdownSchema(gdb *gorm.DB) error {
+	stmts := []string{
+		`ALTER TABLE canvas_documents ADD COLUMN IF NOT EXISTS content_markdown text NOT NULL DEFAULT ''`,
+	}
+	for _, stmt := range stmts {
+		if err := gdb.Exec(stmt).Error; err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -203,4 +237,28 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+// ensureBaseEngineIndexes 给 Base Engine 补查询投影与事件表的索引。
+//
+// 记录主数据在 JSONB，筛选与排序走类型化投影表（base_record_value），
+// 因此这里为投影表的「字段 + 值」建复合索引，让动态字段的排序与范围筛选可控。
+func ensureBaseEngineIndexes(gdb *gorm.DB) error {
+	stmts := []string{
+		`CREATE INDEX IF NOT EXISTS idx_base_record_table ON base_record (table_id, id) WHERE deleted_at IS NULL`,
+		`CREATE INDEX IF NOT EXISTS idx_base_record_data_gin ON base_record USING GIN (data jsonb_path_ops)`,
+		`CREATE INDEX IF NOT EXISTS idx_base_record_updated ON base_record (table_id, updated_at DESC) WHERE deleted_at IS NULL`,
+		`CREATE INDEX IF NOT EXISTS idx_base_value_number ON base_record_value (table_id, field_id, value_number, record_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_base_value_text ON base_record_value (table_id, field_id, value_text, record_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_base_value_date ON base_record_value (table_id, field_id, value_date, record_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_base_value_record ON base_record_value (record_id, field_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_base_outbox_pending ON base_event_outbox (status, created_at)`,
+		`CREATE INDEX IF NOT EXISTS idx_base_audit_base ON base_operation_log (base_id, created_at DESC)`,
+	}
+	for _, stmt := range stmts {
+		if err := gdb.Exec(stmt).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }

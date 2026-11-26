@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"metamatrix/api/internal/ai"
+	"metamatrix/api/internal/base"
 	"metamatrix/api/internal/config"
 	"metamatrix/api/internal/db"
 	"metamatrix/api/internal/handler"
@@ -99,6 +100,12 @@ func main() {
 	projH := handler.NewProjectsHandler(projSvc)
 	dirH := handler.NewDirectoryHandler(dirSvc)
 	knH := handler.NewKnowledgeHandler(knSvc, cfg.JWTSecret)
+	// 多维表格 Base Engine：独立领域（表/字段/记录/视图/公式/事件），
+	// 与富文本文档引擎解耦，只共享用户、空间权限与审计。
+	baseSvc := base.NewService(gdb)
+	baseH := base.NewHandler(baseSvc)
+	baseSvc.StartOutboxPublisher(context.Background())
+
 	// 历史版本保留条数可配置（111）。
 	service.VersionKeep = cfg.KnowledgeVersionKeep
 	// 回收站自动清理：超期节点由定时任务清除（073）。
@@ -279,6 +286,40 @@ func main() {
 		projects.GET("/:id/refs", projH.Refs)
 		projects.PUT("/:id", projH.Rename)
 		projects.DELETE("/:id", projH.Delete)
+	}
+
+	// 多维表格 Base Engine：Base/表/字段/记录/视图/公式 + SSE 事件流。
+	baseGroup := h.Group("/projects/:projectId/base", middleware.AuthRequired(cfg.JWTSecret))
+	{
+		baseGroup.POST("/ensure", baseH.EnsureBase)
+		baseGroup.GET("/bases", baseH.ListBases)
+		baseGroup.GET("/field-types", baseH.FieldTypes)
+		baseGroup.GET("/events", baseH.Events)
+		baseGroup.GET("/:baseId/audit", baseH.ListAudit)
+		baseGroup.GET("/doc-backrefs/:nodeId", baseH.ListDocBackrefs)
+		baseGroup.GET("/:baseId/tables", baseH.ListTables)
+		baseGroup.POST("/:baseId/tables", baseH.CreateTable)
+		baseGroup.GET("/tables/:tableId", baseH.ListFields)
+		baseGroup.PATCH("/tables/:tableId", baseH.UpdateTable)
+		baseGroup.DELETE("/tables/:tableId", baseH.DeleteTable)
+		baseGroup.GET("/tables/:tableId/fields", baseH.ListFields)
+		baseGroup.POST("/tables/:tableId/fields", baseH.CreateField)
+		baseGroup.PATCH("/tables/:tableId/fields/order", baseH.ReorderFields)
+		baseGroup.POST("/tables/:tableId/records", baseH.CreateRecord)
+		baseGroup.POST("/tables/:tableId/query", baseH.QueryRecords)
+		baseGroup.POST("/tables/:tableId/records/batch", baseH.BatchRecords)
+		baseGroup.GET("/tables/:tableId/views", baseH.ListViews)
+		baseGroup.POST("/tables/:tableId/views", baseH.CreateView)
+		baseGroup.POST("/tables/:tableId/formulas/validate", baseH.ValidateFormula)
+		baseGroup.POST("/tables/:tableId/formulas/preview", baseH.PreviewFormula)
+		baseGroup.PATCH("/fields/:fieldId", baseH.UpdateField)
+		baseGroup.DELETE("/fields/:fieldId", baseH.DeleteField)
+		baseGroup.POST("/fields/:fieldId/migrate", baseH.MigrateField)
+		baseGroup.PUT("/fields/:fieldId/formula", baseH.SaveFormula)
+		baseGroup.PATCH("/records/:recordId", baseH.UpdateRecord)
+		baseGroup.DELETE("/records/:recordId", baseH.DeleteRecord)
+		baseGroup.PATCH("/views/:viewId", baseH.UpdateView)
+		baseGroup.DELETE("/views/:viewId", baseH.DeleteView)
 	}
 
 	// 知识库目录树：挂在项目下的文档/文件夹组织。
