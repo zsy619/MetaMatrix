@@ -1128,6 +1128,9 @@ const editor = useRteExtensions({
   },
   openPrintPreview,
   scheduleHtmlEmit,
+  syncLastEmittedHtml: (ed: { getHTML: () => string }) => {
+    lastEmittedHtmlNorm = normalizeHtml(ed.getHTML())
+  },
   setHeading,
   syncSelectedFormFromEditor,
   toggleShortcutsPanel,

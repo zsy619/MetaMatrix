@@ -104,6 +104,7 @@ import { RteMarkdownInputRules } from '../../../extensions/rteMarkdownInputRules
 import { MediaHydrate } from '../../../extensions/mediaHydrate'
 import { RteInlineMarkdown } from '../../../extensions/rteInlineMarkdown'
 import { RteAutoLink } from '../../../extensions/rteAutoLink'
+import { BlockIdentity } from '../../../extensions/blockIdentity'
 
 type LateFn = (...args: any[]) => any
 
@@ -197,6 +198,8 @@ export function useRteExtensions(deps: {
     transaction: { mapping: { map: (pos: number, assoc?: number) => number } },
     appended?: ReadonlyArray<{ mapping: { map: (pos: number, assoc?: number) => number } }>,
   ) => void
+  /** 打开或回填块 ID 后，只同步 lastEmitted 基线，不向父级 emit / 保存。 */
+  syncLastEmittedHtml?: (ed: { getHTML: () => string }) => void
 }) {
   const {
     closeTableCtx,
@@ -309,6 +312,7 @@ const editor = useEditor({
     LineHeight,
     LetterSpacing,
     ParagraphAttrs,
+    BlockIdentity,
     PageBreak,
     Columns,
     Column,
@@ -996,8 +1000,10 @@ const editor = useEditor({
       return false
     },
   },
-  onCreate: () => {
+  onCreate: ({ editor: ed }) => {
     editorReady.value = true
+    ed.commands.ensureBlockIdentities()
+    deps.syncLastEmittedHtml?.(ed)
   },
   onUpdate: ({ editor: ed }) => {
     scheduleHtmlEmit(ed)
