@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import {
   htmlPreviewText,
+  mergeConflictHtml,
   type SaveConflictChoice,
   type SaveConflictVersions,
 } from './saveConflict'
@@ -19,6 +20,7 @@ const minePreview = computed(() => htmlPreviewText(props.versions.mineHtml))
 const theirsPreview = computed(() => htmlPreviewText(props.versions.theirsHtml))
 const theirsHeading = computed(() => props.versions.theirsLabel || '对方的版本')
 const mineHeading = computed(() => props.versions.mineLabel || '你的版本')
+const mergePreview = computed(() => htmlPreviewText(mergeConflictHtml(props.versions), 360))
 </script>
 
 <template>
@@ -38,6 +40,10 @@ const mineHeading = computed(() => props.versions.mineLabel || '你的版本')
         <pre class="save-conflict-panel__preview">{{ theirsPreview || '（空）' }}</pre>
       </section>
     </div>
+    <section class="save-conflict-panel__merge" data-side="merge">
+      <h3>合并预览</h3>
+      <pre class="save-conflict-panel__preview">{{ mergePreview || '（空）' }}</pre>
+    </section>
     <footer class="save-conflict-panel__actions">
       <button type="button" data-action="theirs" @click="emit('choose', 'theirs')">用对方的版本</button>
       <button type="button" data-action="merge" @click="emit('choose', 'merge')">合并两边</button>

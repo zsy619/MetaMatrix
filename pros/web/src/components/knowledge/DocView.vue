@@ -714,6 +714,7 @@ async function save() {
     })
     doc.value = updated
     dirty.value = false
+    void refreshBlockPermissionGuard()
   } catch (err: unknown) {
     const status = (err as { status?: number }).status
     if (status === 409) {

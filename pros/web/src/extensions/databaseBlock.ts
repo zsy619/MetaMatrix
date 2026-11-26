@@ -10,7 +10,9 @@ import {
   defaultDatabasePayload,
   payloadFromAttrs,
   DATABASE_VIEW_LABELS,
+  addDatabaseRow,
   pullSheetIntoPayload,
+  removeDatabaseRow,
   setDatabaseFilterJoin,
   setDatabaseFilters,
   setDatabaseViewType,
@@ -40,6 +42,8 @@ declare module '@tiptap/core' {
       setDatabaseBlockFilters: (filters: SheetFilter[]) => ReturnType
       setDatabaseBlockFilterJoin: (join: 'and' | 'or') => ReturnType
       importDatabaseBlockSheet: (sheet: SheetData) => ReturnType
+      addDatabaseBlockRow: () => ReturnType
+      removeDatabaseBlockRow: (rowId: string) => ReturnType
       updateDatabaseBlockCell: (rowId: string, fieldId: string, value: string) => ReturnType
     }
   }
@@ -224,6 +228,32 @@ export const DatabaseBlock = Node.create({
           const node = state.doc.nodeAt(pos)
           if (!node || node.type.name !== DATABASE_BLOCK_NAME) return false
           const next = attrsFromPayload(pullSheetIntoPayload(payloadFromAttrs(node.attrs), sheet))
+          if (dispatch) {
+            dispatch(tr.setNodeMarkup(pos, undefined, { ...node.attrs, ...next }))
+          }
+          return true
+        },
+      addDatabaseBlockRow:
+        () =>
+        ({ state, tr, dispatch }) => {
+          const pos = currentDatabasePos(state)
+          if (pos == null) return false
+          const node = state.doc.nodeAt(pos)
+          if (!node || node.type.name !== DATABASE_BLOCK_NAME) return false
+          const next = attrsFromPayload(addDatabaseRow(payloadFromAttrs(node.attrs)))
+          if (dispatch) {
+            dispatch(tr.setNodeMarkup(pos, undefined, { ...node.attrs, ...next }))
+          }
+          return true
+        },
+      removeDatabaseBlockRow:
+        (rowId) =>
+        ({ state, tr, dispatch }) => {
+          const pos = currentDatabasePos(state)
+          if (pos == null) return false
+          const node = state.doc.nodeAt(pos)
+          if (!node || node.type.name !== DATABASE_BLOCK_NAME) return false
+          const next = attrsFromPayload(removeDatabaseRow(payloadFromAttrs(node.attrs), rowId))
           if (dispatch) {
             dispatch(tr.setNodeMarkup(pos, undefined, { ...node.attrs, ...next }))
           }

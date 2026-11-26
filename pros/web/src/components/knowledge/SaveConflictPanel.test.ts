@@ -22,6 +22,9 @@ describe('SaveConflictPanel', () => {
     expect(wrapper.text()).toContain('远端已保存')
     expect(wrapper.text()).toContain('你的版本')
     expect(wrapper.text()).toContain('云端版本')
+    expect(wrapper.text()).toContain('合并预览')
+    expect(wrapper.get('[data-side="merge"]').text()).toContain('远端已保存')
+    expect(wrapper.get('[data-side="merge"]').text()).toContain('本地草稿加粗')
 
     await wrapper.get('[data-action="mine"]').trigger('click')
     await wrapper.get('[data-action="theirs"]').trigger('click')

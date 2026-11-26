@@ -16,6 +16,8 @@ import {
   databaseGroups,
   dateField,
   payloadFromAttrs,
+  addDatabaseRow,
+  removeDatabaseRow,
   setDatabaseFilterJoin,
   setDatabaseFilters,
   setDatabaseViewType,
@@ -183,6 +185,7 @@ export function createDatabaseBlockView({ node, getPos, editor }: NodeViewRender
       for (const col of payload.sheet.fields) {
         hr.append(el('th', '', col.name))
       }
+      hr.append(el('th', '', ''))
       thead.append(hr)
       const tbody = document.createElement('tbody')
       for (const row of rows) {
@@ -200,12 +203,38 @@ export function createDatabaseBlockView({ node, getPos, editor }: NodeViewRender
           td.append(cell)
           tr.append(td)
         }
+        const delCell = document.createElement('td')
+        const del = document.createElement('button')
+        del.type = 'button'
+        del.className = 'rte-database-block__filter-remove'
+        del.textContent = '删除'
+        del.disabled = !editable || payload.sheet.rows.length <= 1
+        del.addEventListener('click', (event) => {
+          event.preventDefault()
+          event.stopPropagation()
+          writePayload(removeDatabaseRow(payload, row.id))
+        })
+        delCell.append(del)
+        tr.append(delCell)
         tbody.append(tr)
       }
       table.append(thead, tbody)
       dom.append(table)
     }
-    dom.append(el('div', 'rte-database-block__meta', `${rows.length} 行`))
+    const foot = el('div', 'rte-database-block__foot')
+    foot.append(el('div', 'rte-database-block__meta', `${rows.length} 行`))
+    const add = document.createElement('button')
+    add.type = 'button'
+    add.className = 'rte-database-block__add-row'
+    add.textContent = '+ 添加记录'
+    add.disabled = !editable
+    add.addEventListener('click', (event) => {
+      event.preventDefault()
+      event.stopPropagation()
+      writePayload(addDatabaseRow(payload))
+    })
+    foot.append(add)
+    dom.append(foot)
   }
 
   render()

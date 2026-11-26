@@ -303,3 +303,25 @@ describe('databaseBlock 比较筛选', () => {
     expect(visibleDatabaseRows(restored)).toHaveLength(1)
   })
 })
+
+describe('databaseBlock 增删行', () => {
+  it('添加和删除行刷新后仍保持，且不丢 blockId', () => {
+    const ed = mount()
+    ed.commands.insertDatabaseBlock()
+    const id = readBlockId(databaseNodes(ed)[0]!.node)
+    const before = payloadFromAttrs(databaseNodes(ed)[0]!.node.attrs)
+    expect(before.sheet.rows).toHaveLength(2)
+    expect(ed.commands.addDatabaseBlockRow()).toBe(true)
+    expect(readBlockId(databaseNodes(ed)[0]!.node)).toBe(id)
+    const added = payloadFromAttrs(databaseNodes(ed)[0]!.node.attrs)
+    expect(added.sheet.rows).toHaveLength(3)
+    const drop = added.sheet.rows[0]!.id
+    expect(ed.commands.removeDatabaseBlockRow(drop)).toBe(true)
+    const html = ed.getHTML()
+    const again = mount(html)
+    expect(readBlockId(databaseNodes(again)[0]!.node)).toBe(id)
+    const restored = payloadFromAttrs(databaseNodes(again)[0]!.node.attrs)
+    expect(restored.sheet.rows).toHaveLength(2)
+    expect(restored.sheet.rows.map((row) => row.id)).not.toContain(drop)
+  })
+})

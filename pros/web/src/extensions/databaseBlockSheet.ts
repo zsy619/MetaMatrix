@@ -209,6 +209,21 @@ export function updateDatabaseCell(
   return { sheet, activeViewId: payload.activeViewId }
 }
 
+export function addDatabaseRow(payload: DatabaseBlockPayload): DatabaseBlockPayload {
+  const sheet = cloneSheet(payload.sheet)
+  sheet.rows = [...sheet.rows, createRow(sheet.fields)]
+  return { sheet, activeViewId: payload.activeViewId }
+}
+
+export function removeDatabaseRow(payload: DatabaseBlockPayload, rowId: string): DatabaseBlockPayload {
+  const sheet = cloneSheet(payload.sheet)
+  if (sheet.rows.length <= 1) return payload
+  const next = sheet.rows.filter((row) => row.id !== rowId)
+  if (next.length === sheet.rows.length) return payload
+  sheet.rows = next
+  return { sheet, activeViewId: payload.activeViewId }
+}
+
 export function firstFilterableField(payload: DatabaseBlockPayload): SheetField | undefined {
   return payload.sheet.fields.find((field) => field.type === 'text' || field.type === 'longtext') ?? payload.sheet.fields[0]
 }
