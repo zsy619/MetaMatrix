@@ -648,6 +648,7 @@ func (s *KnowledgeService) AddComment(ownerID, docID uuid.UUID, parentID *uuid.U
 	if err := s.db.Create(comment).Error; err != nil {
 		return nil, err
 	}
+	s.notifyNewComment(comment)
 	return comment, nil
 }
 

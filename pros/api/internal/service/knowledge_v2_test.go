@@ -102,6 +102,21 @@ type knowledgeViewSQLite struct {
 
 func (knowledgeViewSQLite) TableName() string { return "knowledge_views" }
 
+type userNotificationSQLite struct {
+	ID        uuid.UUID  `gorm:"type:uuid;primaryKey"`
+	UserID    uuid.UUID  `gorm:"type:uuid;not null;index:idx_un_user_created,priority:1"`
+	ActorID   uuid.UUID  `gorm:"type:uuid;not null"`
+	DocID     *uuid.UUID `gorm:"type:uuid;index"`
+	CommentID *uuid.UUID `gorm:"type:uuid;index"`
+	Kind      string     `gorm:"type:varchar(32);not null"`
+	Title     string     `gorm:"type:varchar(255);not null;default:''"`
+	Body      string     `gorm:"type:text;not null;default:''"`
+	ReadAt    *time.Time `gorm:"index"`
+	CreatedAt time.Time  `gorm:"not null;index:idx_un_user_created,priority:2"`
+}
+
+func (userNotificationSQLite) TableName() string { return "user_notifications" }
+
 func openKnowledgeV2SQLite(t *testing.T) (*gorm.DB, uuid.UUID, *model.Project, *KnowledgeService) {
 	t.Helper()
 	db := openProjectsSQLite(t)
@@ -112,6 +127,7 @@ func openKnowledgeV2SQLite(t *testing.T) (*gorm.DB, uuid.UUID, *model.Project, *
 		&docCommentSQLite{},
 		&knowledgeEventSQLite{},
 		&knowledgeViewSQLite{},
+		&userNotificationSQLite{},
 	); err != nil {
 		t.Fatal(err)
 	}

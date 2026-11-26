@@ -75,6 +75,7 @@ func main() {
 		Timeout:  cfg.Mail.Timeout,
 	})
 	log.Printf("MetaMatrix mail transport: %s", mailDesc)
+	knSvc.SetMailSender(mailSender)
 
 	resetSvc := service.NewPasswordResetService(gdb, mailSender, service.PasswordResetOptions{
 		Limits: service.ResetLimits{
@@ -432,6 +433,8 @@ func main() {
 
 	// 活动日志查询（当前账号自己的记录）。
 	h.GET("/logs", middleware.AuthRequired(cfg.JWTSecret), logsH.List)
+	h.GET("/notifications", middleware.AuthRequired(cfg.JWTSecret), knH.ListNotifications)
+	h.POST("/notifications/:id/read", middleware.AuthRequired(cfg.JWTSecret), knH.MarkNotificationRead)
 
 	log.Printf("MetaMatrix API (Hertz+GORM) listening on http://localhost:%d", cfg.Port)
 	h.Spin()

@@ -7,6 +7,7 @@ import (
 	"unicode/utf8"
 
 	"metamatrix/api/internal/ai"
+	"metamatrix/api/internal/mail"
 	"metamatrix/api/internal/model"
 
 	"github.com/google/uuid"
@@ -37,6 +38,8 @@ type KnowledgeService struct {
 	feishuAppSecret string
 	feishuWebhook   string
 	feishuBaseURL   string
+	// mail 用于评论通知。未注入或 SMTP 不齐时邮件路跳过，站内通知仍写。
+	mail mail.Sender
 }
 
 func NewKnowledgeService(db *gorm.DB) *KnowledgeService {
