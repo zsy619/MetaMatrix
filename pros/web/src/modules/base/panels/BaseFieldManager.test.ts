@@ -14,6 +14,7 @@ vi.mock('../api', () => ({
   createField: vi.fn(),
   deleteField: vi.fn(),
   migrateField: vi.fn(),
+  reorderFields: vi.fn(),
   updateField: vi.fn(),
 }))
 
@@ -30,7 +31,11 @@ const FIELDS: FieldMeta[] = [
 const stubs = {
   'el-dialog': { template: '<div><slot /></div>' },
   'el-icon': { template: '<i class="ic"><slot /></i>' },
-  'el-button': { template: '<button><slot /></button>' },
+  'el-button': {
+    props: ['disabled'],
+    template: '<button :disabled="disabled" :aria-label="$attrs[\'aria-label\']" @click="$emit(\'click\')"><slot /></button>',
+  },
+  'el-tooltip': { template: '<div><slot /></div>' },
   'el-input': { template: '<input />' },
   'el-select': { template: '<div><slot /></div>' },
   'el-option': { template: '<div class="opt"><slot /></div>' },
@@ -43,12 +48,12 @@ const stubs = {
   'el-dropdown-item': { template: '<div class="menu-item"><slot /></div>' },
 }
 
-function mountPanel() {
+function mountPanel(props: { fields?: FieldMeta[] } = {}) {
   return mount(BaseFieldManager, {
     props: {
       projectId: 'p1',
       tableId: 't1',
-      fields: FIELDS,
+      fields: props.fields ?? FIELDS,
       definitions: DEFINITIONS,
     },
     global: { stubs },
@@ -86,5 +91,36 @@ describe('字段管理面板', () => {
     for (const icon of icons) {
       expect(icon.attributes('style')).toMatch(/color:\s*#/)
     }
+  })
+
+  it('每个字段都有上移 / 下移按钮，首尾按钮禁用', async () => {
+    const { reorderFields } = await import('../api')
+    const wrapper = mountPanel({
+      fields: [
+        FIELDS[0],
+        { ...FIELDS[0], id: 'f2', name: '金额' },
+        { ...FIELDS[0], id: 'f3', name: '日期' },
+      ],
+    })
+    const up = wrapper.findAll('button[aria-label="上移字段"]')
+    const down = wrapper.findAll('button[aria-label="下移字段"]')
+    expect(up.length).toBe(3)
+    expect(down.length).toBe(3)
+    expect(up[0].attributes('disabled')).toBeDefined()
+    expect(down[2].attributes('disabled')).toBeDefined()
+    expect(reorderFields).not.toHaveBeenCalled()
+  })
+
+  it('下移字段时提交新的字段顺序', async () => {
+    const { reorderFields } = await import('../api')
+    vi.mocked(reorderFields).mockResolvedValue([])
+    const wrapper = mountPanel({
+      fields: [
+        FIELDS[0],
+        { ...FIELDS[0], id: 'f2', name: '金额' },
+      ],
+    })
+    await wrapper.findAll('button[aria-label="下移字段"]')[0].trigger('click')
+    expect(reorderFields).toHaveBeenCalledWith('p1', 't1', ['f2', 'f1'])
   })
 })

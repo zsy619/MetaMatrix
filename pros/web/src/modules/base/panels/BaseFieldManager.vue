@@ -7,11 +7,12 @@
  */
 import { computed, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Delete, Edit, MagicStick, Plus } from '@element-plus/icons-vue'
+import { ArrowDown, ArrowUp, Delete, Edit, MagicStick, Plus } from '@element-plus/icons-vue'
 import {
   createField,
   deleteField,
   migrateField,
+  reorderFields,
   updateField,
 } from '../api'
 import { allFieldPlugins, defaultConfig, fieldPlugin } from '../fields/registry'
@@ -33,6 +34,7 @@ const emit = defineEmits<{
 
 const plugins = allFieldPlugins()
 const busy = ref(false)
+const reordering = ref(false)
 
 const newName = ref('')
 const newType = ref<string>('text')
@@ -157,6 +159,24 @@ async function removeField(field: FieldMeta) {
     ElMessage.error((err as Error).message || '删除失败')
   }
 }
+
+/** 上移 / 下移字段：把新顺序整体提交给服务端，一次事务写回 sort_order。 */
+async function moveField(index: number, delta: number) {
+  const target = index + delta
+  if (target < 0 || target >= props.fields.length || !props.tableId) return
+  const ids = props.fields.map((item) => item.id)
+  const [moved] = ids.splice(index, 1)
+  ids.splice(target, 0, moved)
+  reordering.value = true
+  try {
+    await reorderFields(props.projectId, props.tableId, ids)
+    emit('changed')
+  } catch (err) {
+    ElMessage.error((err as Error).message || '排序失败')
+  } finally {
+    reordering.value = false
+  }
+}
 </script>
 
 <template>
@@ -174,7 +194,7 @@ async function removeField(field: FieldMeta) {
       </div>
 
       <div class="be-panel">
-        <div v-for="field in fields" :key="field.id" class="be-field-row">
+        <div v-for="(field, index) in fields" :key="field.id" class="be-field-row">
           <div class="be-field-row__name">
             <el-icon
               class="be-field-row__icon"
@@ -188,6 +208,26 @@ async function removeField(field: FieldMeta) {
             <el-tag v-if="field.required" size="small" type="danger" effect="plain">必填</el-tag>
           </div>
           <div class="be-field-row__actions">
+            <el-tooltip content="上移" placement="top">
+              <el-button
+                size="small"
+                circle
+                :icon="ArrowUp"
+                :disabled="index === 0 || reordering"
+                aria-label="上移字段"
+                @click="moveField(index, -1)"
+              />
+            </el-tooltip>
+            <el-tooltip content="下移" placement="top">
+              <el-button
+                size="small"
+                circle
+                :icon="ArrowDown"
+                :disabled="index === fields.length - 1 || reordering"
+                aria-label="下移字段"
+                @click="moveField(index, 1)"
+              />
+            </el-tooltip>
             <el-button size="small" :icon="Edit" @click="rename(field)">改名</el-button>
             <el-button
               v-if="field.type === 'formula'"

@@ -102,11 +102,24 @@ export function createField(
 export function updateField(
   projectId: string,
   fieldId: string,
-  payload: { name?: string; config?: Record<string, unknown>; required?: boolean },
+  payload: {
+    name?: string;
+    config?: Record<string, unknown>;
+    required?: boolean;
+    sortOrder?: number;
+  },
 ) {
   return apiRequest<FieldMeta>(`${baseUrl(projectId)}/fields/${fieldId}`, {
     method: 'PATCH',
     body: payload,
+  })
+}
+
+/** 重排字段：传入该表全部字段 id 的新顺序。 */
+export function reorderFields(projectId: string, tableId: string, fieldIds: string[]) {
+  return apiRequest<FieldMeta[]>(`${baseUrl(projectId)}/tables/${tableId}/fields/order`, {
+    method: 'PATCH',
+    body: { fieldIds },
   })
 }
 
