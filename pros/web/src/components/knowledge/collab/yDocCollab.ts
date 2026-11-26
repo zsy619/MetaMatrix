@@ -4,6 +4,15 @@ import {
   isCollabWritable,
   type OfflineQueueStore,
 } from './collabOfflineQueue'
+import {
+  Awareness,
+  applyAwarenessUpdate,
+  encodeAwarenessUpdate,
+  type CollabCaretProvider,
+  type CollabCaretUser,
+} from './collabAwareness'
+
+const AWARENESS_REMOTE = 'remote'
 
 const REMOTE_ORIGIN = 'remote'
 const DEFAULT_HEARTBEAT_MS = 20_000
@@ -89,6 +98,8 @@ export type LiveCollabOptions = {
   clearSchedule?: (id: ReturnType<typeof setTimeout>) => void
   /** 未发出增量的持久化存储；默认 IndexedDB（失败则 localStorage）。不写入凭证。 */
   offlineStore?: OfflineQueueStore
+  /** 写入 awareness 的本地用户（名称与配色）。浏览者也可以上报光标。 */
+  user?: CollabCaretUser
 }
 
 /**
@@ -111,12 +122,18 @@ export class LiveCollabSession {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null
   private attempts = 0
   private connectWait: ((err?: Error) => void) | null = null
+  private unbindAwareness: (() => void) | null = null
+  readonly awareness: Awareness
+  readonly provider: CollabCaretProvider
   canWrite = true
   role = ''
 
   constructor(opts: LiveCollabOptions) {
     this.opts = opts
     this.offline = opts.offlineStore ?? defaultOfflineQueueStore()
+    this.awareness = new Awareness(opts.ydoc)
+    this.provider = { awareness: this.awareness }
+    if (opts.user) this.awareness.setLocalStateField('user', opts.user)
   }
 
   async start(): Promise<void> {
@@ -133,6 +150,7 @@ export class LiveCollabSession {
         this.sendUpdate(update)
       })
     }
+    this.bindAwareness()
     try {
       await this.connect()
     } finally {
@@ -152,10 +170,24 @@ export class LiveCollabSession {
     this.connectWait = null
     this.clearReconnect()
     this.clearHeartbeat()
+    try {
+      this.awareness.setLocalState(null)
+      this.flushAwareness()
+    } catch {
+      /* ignore */
+    }
+    this.unbindAwareness?.()
+    this.unbindAwareness = null
     this.unbind?.()
     this.unbind = null
     try {
       this.socket?.close()
+    } catch {
+      /* ignore */
+    }
+    try {
+      // 清掉 y-protocols 的 30s 检查定时器，避免测试进程挂起。
+      this.awareness.destroy()
     } catch {
       /* ignore */
     }
@@ -209,6 +241,7 @@ export class LiveCollabSession {
     this.startHeartbeat()
     this.sendJSON({ type: 'sync', after: this.lastSeq })
     this.flushPending()
+    this.flushAwareness()
   }
 
   private writable(): boolean {
@@ -356,8 +389,44 @@ export class LiveCollabSession {
       this.opts.onPresence?.(msg.users)
       return
     }
+    if (msg.type === 'awareness' && msg.payload) {
+      try {
+        applyAwarenessUpdate(this.awareness, decodeYUpdate(msg.payload), AWARENESS_REMOTE)
+      } catch {
+        /* 损坏的 awareness 包忽略 */
+      }
+      return
+    }
+    if (msg.type === 'awareness-sync') {
+      this.flushAwareness()
+      return
+    }
     if (msg.type === 'error' && msg.message) {
       this.opts.onError?.(new Error(msg.message))
+    }
+  }
+
+  private bindAwareness(): void {
+    if (this.unbindAwareness) return
+    const onUpdate = (_changes: unknown, origin: unknown) => {
+      if (origin === AWARENESS_REMOTE) return
+      this.flushAwareness()
+    }
+    this.awareness.on('update', onUpdate)
+    this.unbindAwareness = () => {
+      this.awareness.off('update', onUpdate)
+    }
+  }
+
+  private flushAwareness(): void {
+    if (!this.socket || !this.opened) return
+    const clients = new Set<number>([this.awareness.clientID])
+    for (const id of this.awareness.getStates().keys()) clients.add(id)
+    try {
+      const update = encodeAwarenessUpdate(this.awareness, Array.from(clients))
+      this.sendJSON({ type: 'awareness', payload: encodeYUpdate(update) })
+    } catch {
+      /* 编码失败不阻断正文协同 */
     }
   }
 }

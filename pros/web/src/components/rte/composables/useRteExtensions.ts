@@ -3,6 +3,7 @@ import { ElMessage } from 'element-plus'
 import { useEditor } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 import Collaboration from '@tiptap/extension-collaboration'
+import CollaborationCaret from '@tiptap/extension-collaboration-caret'
 import type { Doc as YDoc } from 'yjs'
 import Placeholder from '@tiptap/extension-placeholder'
 import Underline from '@tiptap/extension-underline'
@@ -204,6 +205,9 @@ export function useRteExtensions(deps: {
   syncLastEmittedHtml?: (ed: { getHTML: () => string }) => void
   /** 传入 Y.Doc 时启用正文协同；撤销改由 Collaboration 接管。不传则保持单人编辑。 */
   collabDocument?: () => YDoc | null
+  /** 已有 Y.Doc / awareness 时接入 CollaborationCaret，展示他人光标与选区。 */
+  collabProvider?: () => { awareness: unknown } | null
+  collabUser?: () => { name: string; color: string }
 }) {
   const {
     closeTableCtx,
@@ -280,6 +284,8 @@ function qrHref(node: Element | null): string {
 }
 
   const collabYDoc = deps.collabDocument?.() ?? null
+  const collabProvider = deps.collabProvider?.() ?? null
+  const collabUser = deps.collabUser?.() ?? { name: '协作者', color: '#2563eb' }
 const editor = useEditor({
 
   content: collabYDoc ? undefined : initialEditorContent(),
@@ -321,6 +327,14 @@ const editor = useEditor({
     ParagraphAttrs,
     BlockIdentity,
     ...(collabYDoc ? [Collaboration.configure({ document: collabYDoc })] : []),
+    ...(collabYDoc && collabProvider
+      ? [
+          CollaborationCaret.configure({
+            provider: collabProvider,
+            user: collabUser,
+          }),
+        ]
+      : []),
     PageBreak,
     Columns,
     Column,

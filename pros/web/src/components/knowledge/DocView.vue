@@ -40,6 +40,8 @@ import { getDocument, updateDocument } from '../../api/documents'
 import { apiRequestBlob, getToken } from '../../api/http'
 import { LiveCollabSession, createCollabYDoc } from './collab/yDocCollab'
 import { isCollabWritable } from './collab/collabOfflineQueue'
+import { collabCaretColor } from './collab/collabAwareness'
+import { useAuthStore } from '../../stores/auth'
 import DocAudit from './DocAudit.vue'
 import type { Doc as YDoc } from 'yjs'
 import type { DocumentFull } from '../../api/documents'
@@ -97,6 +99,13 @@ const liveSession = ref<LiveCollabSession | null>(null)
 const liveYDoc = shallowRef<YDoc | null>(null)
 /** 协同进房后的可写状态：浏览者为 false，编辑器强制只读。 */
 const collabWritable = ref(true)
+const authStore = useAuthStore()
+const collabUser = computed(() => {
+  const user = authStore.user
+  const name = (user?.displayName || user?.email || '协作者').trim() || '协作者'
+  const id = user?.id || 'anon'
+  return { name, color: collabCaretColor(id), id }
+})
 /** 切换协同时重挂编辑器，以便按需接入 Collaboration 扩展。 */
 const editorSessionKey = ref(0)
 const presence = ref<PresenceUser[]>([])
@@ -229,6 +238,10 @@ async function toggleCollab() {
         ElMessage.info('当前是只读协同，无法编辑正文')
       }
     },
+    onPresence: (users) => {
+      if (Array.isArray(users)) presence.value = users as PresenceUser[]
+    },
+    user: collabUser.value,
   })
   try {
     await session.start()
@@ -687,16 +700,20 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
         <span v-if="lastEditor" class="doc-view__last-editor">
           最后编辑：{{ lastEditor }}
         </span>
-        <el-avatar-group v-if="presence.length" class="doc-view__presence" :size="24">
-          <el-avatar
-            v-for="user in presence"
-            :key="user.userId"
-            :src="user.avatar || undefined"
-            :title="`${user.name}${user.editing ? '（正在编辑）' : ''}`"
-          >
-            {{ user.name.slice(0, 1) }}
-          </el-avatar>
-        </el-avatar-group>
+        <div v-if="presence.length" class="doc-view__presence">
+          <el-avatar-group :size="24">
+            <el-avatar
+              v-for="user in presence"
+              :key="user.userId"
+              :src="user.avatar || undefined"
+              :style="{ outline: `2px solid ${collabCaretColor(user.userId)}` }"
+              :title="`${user.name}${user.editing ? '（正在编辑）' : ''}`"
+            >
+              {{ user.name.slice(0, 1) }}
+            </el-avatar>
+          </el-avatar-group>
+          <span v-if="collabOn" class="doc-view__presence-count">在线 {{ presence.length }}</span>
+        </div>
       </div>
       <!-- 工具栏：按使用频率排序，「更多」收口放最后 -->
       <div class="doc-view__actions">
@@ -815,6 +832,8 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
         :scroll-memory-key="scrollMemoryKey"
         :knowledge-project-id="projectId"
         :collab-document="liveYDoc"
+        :collab-provider="liveSession?.provider ?? null"
+        :collab-user="collabUser"
         :editable="collabWritable"
         :compact="false"
         :expanded="true"
@@ -1018,6 +1037,17 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
 }
 .doc-view__presence {
   margin-right: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.doc-view__presence :deep(.el-avatar) {
+  outline-offset: 1px;
+}
+.doc-view__presence-count {
+  font-size: 12px;
+  color: var(--mm-muted, #86909c);
+  white-space: nowrap;
 }
 .doc-view__empty {
   flex: 1;

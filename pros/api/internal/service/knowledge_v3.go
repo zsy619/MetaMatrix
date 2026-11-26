@@ -683,6 +683,18 @@ func (r *PresenceRegistry) Heartbeat(docID, userID uuid.UUID, name, avatar strin
 	}
 }
 
+// Leave 立刻从内存表移除该用户，不依赖 TTL。
+func (r *PresenceRegistry) Leave(docID, userID uuid.UUID) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if room, ok := r.entries[docID]; ok {
+		delete(room, userID)
+		if len(room) == 0 {
+			delete(r.entries, docID)
+		}
+	}
+}
+
 // List 返回文档当前在线的人（超过 TTL 的自动剔除）。
 func (r *PresenceRegistry) List(docID uuid.UUID) []PresenceUser {
 	r.mu.Lock()

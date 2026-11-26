@@ -244,6 +244,8 @@ func (s *KnowledgeService) PublishTemplate(userID, templateID uuid.UUID, publish
 type PresenceStore interface {
 	Heartbeat(docID, userID uuid.UUID, name, avatar string, editing bool, cursor string)
 	List(docID uuid.UUID) []PresenceUser
+	// Leave 立即把该用户从文档在线名单里移除（离房或连接断开，不必等 TTL）。
+	Leave(docID, userID uuid.UUID)
 }
 
 // dbPresenceStore 把 presence 落到 knowledge_presence 表。
@@ -267,6 +269,13 @@ func (s *dbPresenceStore) Heartbeat(docID, userID uuid.UUID, name, avatar string
 			"cursor": cursor, "last_seen": now,
 		}).FirstOrCreate(&row).Error; err != nil {
 		log.Printf("presence heartbeat failed: doc=%s user=%s err=%v", docID, userID, err)
+	}
+}
+
+func (s *dbPresenceStore) Leave(docID, userID uuid.UUID) {
+	if err := s.db.Where("doc_id = ? AND user_id = ?", docID, userID).
+		Delete(&model.KnowledgePresence{}).Error; err != nil {
+		log.Printf("presence leave failed: doc=%s user=%s err=%v", docID, userID, err)
 	}
 }
 
@@ -314,6 +323,14 @@ func (s *hybridPresenceStore) Heartbeat(docID, userID uuid.UUID, name, avatar st
 			"cursor": cursor, "last_seen": now,
 		}).FirstOrCreate(&row).Error; err != nil {
 		log.Printf("presence heartbeat failed: doc=%s user=%s err=%v", docID, userID, err)
+	}
+}
+
+func (s *hybridPresenceStore) Leave(docID, userID uuid.UUID) {
+	s.mem.Leave(docID, userID)
+	if err := s.db.Where("doc_id = ? AND user_id = ?", docID, userID).
+		Delete(&model.KnowledgePresence{}).Error; err != nil {
+		log.Printf("presence leave failed: doc=%s user=%s err=%v", docID, userID, err)
 	}
 }
 

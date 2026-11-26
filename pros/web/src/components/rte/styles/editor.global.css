@@ -6779,3 +6779,25 @@ html.rte-image-preview-open .tippy-box {
 .rte-more-group > .rte-more-group-settings:hover {
   opacity: 1;
 }
+
+/* B1：协作光标与选区（CollaborationCaret 默认类名） */
+.collaboration-carets__caret {
+  border-left: 2px solid;
+  margin-left: -1px;
+  pointer-events: none;
+  position: relative;
+  word-break: normal;
+}
+.collaboration-carets__label {
+  position: absolute;
+  top: -1.35em;
+  left: -1px;
+  font-size: 11px;
+  line-height: 1.2;
+  color: #fff;
+  padding: 1px 5px;
+  border-radius: 3px 3px 3px 0;
+  white-space: nowrap;
+  user-select: none;
+  pointer-events: none;
+}

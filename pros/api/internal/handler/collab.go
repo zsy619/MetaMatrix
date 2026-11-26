@@ -26,6 +26,7 @@ type collabBackend interface {
 	List(ownerID, docID uuid.UUID, after int64, limit int) ([]service.CollabOperation, error)
 	Heartbeat(ownerID, docID uuid.UUID, editing bool, cursor string) error
 	ListPresence(ownerID, docID uuid.UUID) ([]service.PresenceUser, error)
+	Leave(ownerID, docID uuid.UUID) error
 }
 
 // CollabHandler 提供正文协同的 HTTP 操作日志与 Hertz WebSocket 通道。
@@ -171,7 +172,7 @@ func (h *CollabHandler) ServeWS(ctx context.Context, c *app.RequestContext) {
 		defer conn.Close()
 		client := &collabClient{conn: conn, docID: docID, userID: uid, canWrite: access.CanWrite, role: access.Role}
 		h.hub.add(client)
-		defer h.hub.remove(client)
+		defer h.depart(client)
 
 		_ = client.writeJSON(wsOut{Type: "hello", CanWrite: access.CanWrite, Role: access.Role})
 
@@ -185,6 +186,8 @@ func (h *CollabHandler) ServeWS(ctx context.Context, c *app.RequestContext) {
 		if users, err := h.svc.ListPresence(uid, docID); err == nil {
 			_ = client.writeJSON(wsOut{Type: "presence", Users: users})
 		}
+		// 请房间里已有连接再发一遍自己的 awareness，让新进房的人立刻看到光标。
+		h.hub.broadcast(docID, client, wsOut{Type: "awareness-sync"})
 
 		done := make(chan struct{})
 		defer close(done)
@@ -210,6 +213,7 @@ func (h *CollabHandler) ServeWS(ctx context.Context, c *app.RequestContext) {
 }
 
 const maxCollabPayloadJSON = (4 << 20) + 4096
+const maxAwarenessPayload = 64 << 10
 
 type wsIn struct {
 	Type    string `json:"type"`
@@ -230,6 +234,7 @@ type wsOut struct {
 	Seq      int64                  `json:"seq,omitempty"`
 	CanWrite bool                   `json:"canWrite,omitempty"`
 	Role     string                 `json:"role,omitempty"`
+	Payload  string                 `json:"payload,omitempty"`
 }
 
 func (h *CollabHandler) handleWSMessage(client *collabClient, message []byte) {
@@ -286,6 +291,16 @@ func (h *CollabHandler) handleWSMessage(client *collabClient, message []byte) {
 		if users, err := h.svc.ListPresence(client.userID, client.docID); err == nil {
 			h.hub.broadcast(client.docID, nil, wsOut{Type: "presence", Users: users})
 		}
+	case "awareness":
+		// awareness 是短暂的光标/选区状态，不落库；浏览者也可以上报，以便别人看见只读光标。
+		raw, err := base64.StdEncoding.DecodeString(in.Payload)
+		if err != nil || len(raw) == 0 || len(raw) > maxAwarenessPayload {
+			_ = client.writeJSON(wsOut{Type: "error", Message: "payload must be non-empty base64"})
+			return
+		}
+		h.hub.broadcast(client.docID, client, wsOut{Type: "awareness", Payload: in.Payload})
+	case "awareness-sync":
+		h.hub.broadcast(client.docID, client, wsOut{Type: "awareness-sync"})
 	default:
 		_ = client.writeJSON(wsOut{Type: "error", Message: "unknown type"})
 	}
@@ -366,6 +381,29 @@ func (h *collabHub) remove(c *collabClient) {
 	delete(room, c)
 	if len(room) == 0 {
 		delete(h.rooms, c.docID)
+	}
+}
+
+func (h *collabHub) hasUser(docID, userID uuid.UUID) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	for c := range h.rooms[docID] {
+		if c.userID == userID {
+			return true
+		}
+	}
+	return false
+}
+
+// depart 在连接结束时从房间移除；若该用户没有其它连接，立刻踢出在线名单并广播。
+func (h *CollabHandler) depart(client *collabClient) {
+	h.hub.remove(client)
+	if h.hub.hasUser(client.docID, client.userID) {
+		return
+	}
+	_ = h.svc.Leave(client.userID, client.docID)
+	if users, err := h.svc.ListPresence(client.userID, client.docID); err == nil {
+		h.hub.broadcast(client.docID, nil, wsOut{Type: "presence", Users: users})
 	}
 }
 

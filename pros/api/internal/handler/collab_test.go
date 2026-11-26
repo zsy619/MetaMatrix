@@ -42,6 +42,9 @@ func (s stubCollab) Heartbeat(ownerID, docID uuid.UUID, editing bool, cursor str
 func (s stubCollab) ListPresence(ownerID, docID uuid.UUID) ([]service.PresenceUser, error) {
 	return nil, s.listErr
 }
+func (s stubCollab) Leave(ownerID, docID uuid.UUID) error {
+	return s.listErr
+}
 
 func newCollabAuthEngine(backend collabBackend) *route.Engine {
 	engine := route.NewEngine(config.NewOptions(nil))

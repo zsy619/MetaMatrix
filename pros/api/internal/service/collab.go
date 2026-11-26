@@ -270,6 +270,15 @@ func (s *CollabService) ListPresence(actorID, docID uuid.UUID) ([]PresenceUser, 
 	return s.presence.List(docID), nil
 }
 
+// Leave 把当前用户从在线名单移除。只读进房的成员离房时也会调用。
+func (s *CollabService) Leave(actorID, docID uuid.UUID) error {
+	if _, err := s.Authorize(actorID, docID); err != nil {
+		return err
+	}
+	s.presence.Leave(docID, actorID)
+	return nil
+}
+
 // derivedWork 记录一次抖动抽取任务，并记下触发双写的最后一位作者，供审计使用。
 type derivedWork struct {
 	timer   *time.Timer

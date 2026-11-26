@@ -276,6 +276,10 @@ const props = withDefaults(
      * 从第一天携带 A1 的 data-block-id。不传时保持单人编辑与原保存路径。
      */
     collabDocument?: import('yjs').Doc | null
+    /** 协同光标用的 awareness provider（Y.Doc 已接同一条 Hertz 通道）。 */
+    collabProvider?: { awareness: unknown } | null
+    /** 本地协作者名称与配色；用于 CollaborationCaret，不会在本地再画自己的光标。 */
+    collabUser?: { name: string; color: string } | null
     /** 为 false 时编辑器不可写（协同浏览者进房后强制只读）。默认 true。 */
     editable?: boolean
     /**
@@ -1140,6 +1144,8 @@ const editor = useRteExtensions({
     lastEmittedHtmlNorm = normalizeHtml(ed.getHTML())
   },
   collabDocument: () => props.collabDocument ?? null,
+  collabProvider: () => props.collabProvider ?? null,
+  collabUser: () => props.collabUser ?? { name: '协作者', color: '#2563eb' },
   setHeading,
   syncSelectedFormFromEditor,
   toggleShortcutsPanel,

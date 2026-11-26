@@ -229,6 +229,49 @@ func TestCollabPresenceUsesSharedStore(t *testing.T) {
 	}
 }
 
+func TestCollabLeaveRemovesFromPresence(t *testing.T) {
+	db := openCollabSQLite(t)
+	store := newHybridPresenceStore(db)
+	svc := NewCollabService(db, store)
+	_, ownerID, docID, _ := newCollabFixture(t, db)
+	projectID := attachCollabProject(t, db, ownerID, docID)
+	viewerID := addCollabMember(t, db, projectID, ownerID, SpaceRoleViewer, "只读成员")
+
+	if err := svc.Heartbeat(ownerID, docID, true, "para:1"); err != nil {
+		t.Fatalf("owner heartbeat: %v", err)
+	}
+	if err := svc.Heartbeat(viewerID, docID, false, ""); err != nil {
+		t.Fatalf("viewer heartbeat: %v", err)
+	}
+	users, err := svc.ListPresence(ownerID, docID)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(users) != 2 {
+		t.Fatalf("presence = %+v, want 2 users", users)
+	}
+	if err := svc.Leave(viewerID, docID); err != nil {
+		t.Fatalf("viewer leave: %v", err)
+	}
+	users, err = svc.ListPresence(ownerID, docID)
+	if err != nil {
+		t.Fatalf("list after leave: %v", err)
+	}
+	if len(users) != 1 || users[0].UserID != ownerID.String() {
+		t.Fatalf("after leave = %+v, want only owner", users)
+	}
+	if got := store.List(docID); len(got) != 1 || got[0].UserID != ownerID.String() {
+		t.Fatalf("shared store after leave = %+v", got)
+	}
+	stranger := uuid.New()
+	if err := svc.Leave(stranger, docID); !errors.Is(err, ErrDocumentNotFound) {
+		t.Fatalf("stranger leave err = %v, want ErrDocumentNotFound", err)
+	}
+	if got := store.List(docID); len(got) != 1 {
+		t.Fatalf("stranger leave must not clear room, got %+v", got)
+	}
+}
+
 func TestCollabEditorMemberCanWriteAndViewerIsReadOnly(t *testing.T) {
 	db := openCollabSQLite(t)
 	svc, ownerID, docID, _ := newCollabFixture(t, db)
