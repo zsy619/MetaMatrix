@@ -126,3 +126,19 @@ func TestExtractHTMLBlockRefsCapturesSourceAndTarget(t *testing.T) {
 		t.Fatalf("ref = %+v", refs[0])
 	}
 }
+
+func TestExtractDatabaseBlockHasIdentity(t *testing.T) {
+	html := `<div data-type="database-block" data-block-id="bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb" data-sheet-node-id="sheet-1" data-title="销售表">销售表</div>`
+	blocks := ExtractHTMLBlocks(html)
+	if len(blocks) != 1 {
+		t.Fatalf("blocks = %+v", blocks)
+	}
+	b := blocks[0]
+	if b.ID != "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb" || b.Type != "databaseBlock" {
+		t.Fatalf("block = %+v", b)
+	}
+	refs := ExtractHTMLBlockRefs(html)
+	if len(refs) != 1 || refs[0].TargetKey != "sheet-1" || refs[0].RefType != "sheet" {
+		t.Fatalf("refs = %+v", refs)
+	}
+}

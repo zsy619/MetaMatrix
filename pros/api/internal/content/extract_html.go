@@ -26,10 +26,11 @@ var tagBlockTypes = map[string]string{
 }
 
 var dataTypeAliases = map[string]string{
-	"toggle-block":  "toggleBlock",
-	"timeline-item": "timelineItem",
-	"tab-pane":      "tabPane",
-	"tabs-block":    "tabsBlock",
+	"toggle-block":   "toggleBlock",
+	"timeline-item":  "timelineItem",
+	"tab-pane":       "tabPane",
+	"tabs-block":     "tabsBlock",
+	"database-block": "databaseBlock",
 }
 
 const maxDocBlockText = 8000
@@ -174,6 +175,15 @@ func walkBlockRefs(nodes []*htmlElem, source string, out *[]BlockRef) {
 				TargetKey: firstAttr(n, "data-doc-id", "data-id"),
 				RefType:   "embed",
 			})
+		case "databaseBlock", "database-block":
+			if key := firstAttr(n, "data-sheet-node-id", "data-id"); key != "" {
+				*out = append(*out, BlockRef{
+					SourceID:  next,
+					TargetKey: key,
+					RefType:   "sheet",
+					Label:     firstNonEmpty(n.attrs["data-title"], innerText(n)),
+				})
+			}
 		}
 		walkBlockRefs(n.children, next, out)
 	}

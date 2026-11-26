@@ -75,6 +75,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   back: []
   'open-related': [documentId: string]
+  'open-sheet-node': [payload: { nodeId: string; title: string }]
   'title-change': [title: string]
   'icon-change': [icon: string]
   'editor-template-applied': []
@@ -308,6 +309,18 @@ function onEditorClick(e: MouseEvent) {
       void router.push({
         name: 'node-graph',
         params: { projectId: props.projectId, canvasId: docId },
+      })
+    }
+    return
+  }
+  const sheet = target.closest('[data-type="database-block"], [data-type="databaseBlock"]') as HTMLElement | null
+  if (sheet) {
+    const nodeId = (sheet.getAttribute('data-sheet-node-id') || '').trim()
+    if (nodeId) {
+      e.preventDefault()
+      emit('open-sheet-node', {
+        nodeId,
+        title: (sheet.getAttribute('data-title') || '').trim() || '多维表格',
       })
     }
   }

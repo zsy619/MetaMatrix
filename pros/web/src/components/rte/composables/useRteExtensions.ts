@@ -98,6 +98,7 @@ import { MermaidBlock } from '../../../extensions/mermaidBlock'
 import { EchartsBlock } from '../../../extensions/echartsBlock'
 import { CrossRef, findCrossRefPos } from '../../../extensions/crossRef'
 import { CanvasEmbed } from '../../../extensions/canvasEmbed'
+import { DatabaseBlock, readDatabaseBlockOpenTarget } from '../../../extensions/databaseBlock'
 import { ListStyleAttrs } from '../../../extensions/listStyleAttrs'
 import { TianziGrid } from '../../../extensions/rteTianziGrid'
 import { HeadingManualNum } from '../../../extensions/headingManualNum'
@@ -361,6 +362,7 @@ const editor = useEditor({
     EchartsBlock,
     CrossRef,
     CanvasEmbed,
+    DatabaseBlock,
     ListStyleAttrs,
     TianziGrid,
     HeadingManualNum,
@@ -698,6 +700,14 @@ const editor = useEditor({
       if (math) {
         event.preventDefault()
         openFormulaFromChip(math)
+        return true
+      }
+      const dbOpen = readDatabaseBlockOpenTarget(target)
+      if (dbOpen) {
+        event.preventDefault()
+        target?.dispatchEvent?.(
+          new CustomEvent('rte-open-database-block', { bubbles: true, detail: dbOpen }),
+        )
         return true
       }
       const xref = target?.closest?.('[data-type="cross-ref"]') as HTMLElement | null

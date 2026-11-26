@@ -65,6 +65,7 @@ export const IDENTITY_ATTR_TYPES = [
   'formDateInput',
   'formSwitch',
   'formShowIf',
+  'databaseBlock',
 ] as const
 
 /** 这些容器的直接子块也是身份块（D3：顶层 + 一级嵌套）。 */

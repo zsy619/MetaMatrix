@@ -4611,6 +4611,9 @@ function applySlashCommandItem(item: RteSlashItem) {
     case 'table':
       openTableDialog()
       break
+    case 'databaseBlock':
+      editor.value?.chain().focus().insertDatabaseBlock().run()
+      break
     case 'mention':
       insertMentionFromToolbar()
       break

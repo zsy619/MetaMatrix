@@ -3989,6 +3989,27 @@ input.rte-timeline-title:focus {
 }
 .rte-canvas-embed__icon { font-size: 18px; }
 .rte-canvas-embed__title { font-size: 14px; color: var(--mm-text, #1d2129); }
+
+.rte-database-block {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+  padding: 10px 14px;
+  border: 1px solid var(--mm-line, #e5e6eb);
+  border-left: 3px solid var(--mm-green, #00b42a);
+  border-radius: 6px;
+  background: var(--mm-fill, #f7f8fa);
+  cursor: pointer;
+  user-select: none;
+}
+.rte-database-block.is-empty {
+  border-left-color: var(--mm-text-3, #86909c);
+  color: var(--mm-text-3, #86909c);
+}
+.rte-database-block__icon { font-size: 18px; }
+.rte-database-block__title { font-size: 14px; color: var(--mm-text, #1d2129); font-weight: 600; }
+.rte-database-block__hint { font-size: 12px; color: var(--mm-text-3, #86909c); margin-left: auto; }
 .rte-outline-item.is-empty {
   color: #d83931;
 }
