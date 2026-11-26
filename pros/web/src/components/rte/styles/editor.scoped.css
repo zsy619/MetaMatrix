@@ -5131,3 +5131,180 @@ html.rte-toolbar-dragging .rte-root:not(.expanded) .rte-toolbar-tools > .rte-too
   border-right-color: #3a3f47;
 }
 
+
+/* —— 导入 Markdown：所见即所得预览弹窗 —— */
+.rte-md-import-dialog {
+  display: flex;
+  flex-direction: column;
+  width: min(1080px, 94vw);
+  max-height: 88vh;
+  box-sizing: border-box;
+  padding: 18px 20px 16px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.18);
+}
+.rte-md-import-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.rte-md-import-title-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+.rte-md-import-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--tg-text-1, #1d2129);
+}
+.rte-md-import-file {
+  font-size: 12px;
+  color: var(--tg-text-3, #86909c);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 46ch;
+}
+.rte-md-import-close {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--tg-text-3, #86909c);
+  cursor: pointer;
+  font-size: 14px;
+}
+.rte-md-import-close:hover {
+  background: rgba(15, 23, 42, 0.06);
+  color: var(--tg-text-1, #1d2129);
+}
+.rte-md-import-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+/* 分段控件：灰底容器 + 白色药丸选中块 */
+.rte-md-import-seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.06);
+}
+.rte-md-import-seg button {
+  height: 26px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--tg-text-2, #4e5969);
+  font-size: 13px;
+  cursor: pointer;
+}
+.rte-md-import-seg button.is-active {
+  background: #fff;
+  color: var(--tg-text-1, #1d2129);
+  font-weight: 500;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+.rte-md-import-stats {
+  font-size: 12px;
+  color: var(--tg-text-3, #86909c);
+}
+.rte-md-import-body {
+  display: grid;
+  gap: 12px;
+  min-height: 320px;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+.rte-md-import-body[data-view='split'] {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+.rte-md-import-body[data-view='preview'],
+.rte-md-import-body[data-view='source'] {
+  grid-template-columns: minmax(0, 1fr);
+}
+.rte-md-import-source {
+  margin: 0;
+  padding: 14px 16px;
+  max-height: 58vh;
+  overflow: auto;
+  border-radius: 10px;
+  background: #f7f8fa;
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  font-family: 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--tg-text-2, #4e5969);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.rte-md-import-preview-root {
+  overflow: auto;
+  max-height: 58vh;
+  padding: 18px 20px;
+  border-radius: 10px;
+  background: #f7f8fa;
+  border: 1px solid rgba(15, 23, 42, 0.06);
+}
+/* 预览沿用正文排版，但不要块手柄列留白 */
+.rte-md-import-preview {
+  padding-left: 0 !important;
+  min-height: 0;
+  background: #fff;
+  border-radius: 8px;
+  padding: 20px 22px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+/* 动作区右对齐（弹窗规范：主次按钮最小宽度 88px） */
+.rte-md-import-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 14px;
+}
+.rte-md-import-actions .rte-modal-confirm {
+  background: var(--tg-blue, #3390ec);
+}
+.rte-md-import-actions .rte-modal-confirm:hover {
+  background: #2b82d9;
+}
+.rte-md-import-actions .rte-modal-cancel,
+.rte-md-import-actions .rte-modal-confirm,
+.rte-md-import-action {
+  height: 36px;
+  min-width: 88px;
+  padding: 0 16px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.rte-md-import-action {
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: #fff;
+  color: var(--tg-text-1, #1d2129);
+}
+.rte-md-import-action:hover {
+  background: rgba(15, 23, 42, 0.04);
+}
+@media (max-width: 900px) {
+  .rte-md-import-body[data-view='split'] {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}

@@ -5355,6 +5355,8 @@ function noteDialogClosed() {
 useOverlayStack({
   askOpen: () => askOpen,
   linkImportOpen: () => linkImportOpen,
+  markdownImportOpen: () => markdownImportOpen,
+  closeMarkdownImport: () => closeMarkdownImport(),
   imageDialogOpen: () => imageDialogOpen,
   videoDialogOpen: () => videoDialogOpen,
   audioDialogOpen: () => audioDialogOpen,
@@ -5965,6 +5967,15 @@ const {
   onImportFileChange,
   confirmImportLink,
   markdownToHtml,
+  markdownImportOpen,
+  markdownFileName,
+  markdownSource,
+  markdownHtml,
+  markdownStats,
+  markdownView,
+  openMarkdownImport,
+  closeMarkdownImport,
+  confirmMarkdownImport,
 } = useImport({
   editor,
   closeMore: () => {
@@ -6137,6 +6148,8 @@ function looksLikeMarkdown(text: string): boolean {
     else if (/^[-*+]\s+\S/.test(line)) hits += 1
     else if (/^\d+\.\s+\S/.test(line)) hits += 1
     else if (/^>\s+\S/.test(line)) hits += 1
+    else if (/^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)+\|?\s*$/.test(line)) hits += 3
+    else if (/^\s*\|.*\|\s*$/.test(line)) hits += 1
     else if (/^```/.test(line)) hits += 2
     else if (/\*\*[^*]+\*\*/.test(line) || /__[^_]+__/.test(line)) hits += 1
     else if (/\[[^\]]+\]\(https?:[^)]+\)/.test(line)) hits += 1
@@ -8333,6 +8346,15 @@ provideRteBindings({
   linkImportOpen,
   linkImportUrl,
   linkPopoverStyle,
+  markdownImportOpen,
+  markdownFileName,
+  markdownSource,
+  markdownHtml,
+  markdownStats,
+  markdownView,
+  openMarkdownImport,
+  closeMarkdownImport,
+  confirmMarkdownImport,
   linkText,
   listBookmarks,
   listDepthLabel,
@@ -8787,6 +8809,117 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
       multiple
       @change="onLocalAudioFilesChange"
     />
+
+    <!-- 导入 Markdown：所见即所得预览（源码 / 预览并排，确认后再落库） -->
+    <Teleport to="body">
+      <div
+        v-if="markdownImportOpen"
+        class="rte-modal-overlay rte-md-import-overlay"
+        @mousedown.self="closeMarkdownImport"
+      >
+        <div
+          class="rte-md-import-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-label="导入 Markdown"
+          @mousedown.stop
+          @keydown.esc.prevent="closeMarkdownImport"
+        >
+          <header class="rte-md-import-head">
+            <div class="rte-md-import-title-wrap">
+              <h3 class="rte-md-import-title">导入 Markdown</h3>
+              <span class="rte-md-import-file" :title="markdownFileName">{{ markdownFileName }}</span>
+            </div>
+            <button
+              type="button"
+              class="rte-md-import-close"
+              title="关闭"
+              aria-label="关闭"
+              @click="closeMarkdownImport"
+            >
+              ✕
+            </button>
+          </header>
+
+          <div class="rte-md-import-toolbar">
+            <div class="rte-md-import-seg" role="tablist" aria-label="预览方式">
+              <button
+                type="button"
+                :class="{ 'is-active': markdownView === 'split' }"
+                role="tab"
+                :aria-selected="markdownView === 'split'"
+                title="源码与预览并排"
+                @click="markdownView = 'split'"
+              >
+                并排
+              </button>
+              <button
+                type="button"
+                :class="{ 'is-active': markdownView === 'preview' }"
+                role="tab"
+                :aria-selected="markdownView === 'preview'"
+                title="只看渲染结果"
+                @click="markdownView = 'preview'"
+              >
+                预览
+              </button>
+              <button
+                type="button"
+                :class="{ 'is-active': markdownView === 'source' }"
+                role="tab"
+                :aria-selected="markdownView === 'source'"
+                title="只看 Markdown 源码"
+                @click="markdownView = 'source'"
+              >
+                源码
+              </button>
+            </div>
+            <span class="rte-md-import-stats">{{ markdownStats }}</span>
+          </div>
+
+          <div class="rte-md-import-body" :data-view="markdownView">
+            <pre
+              v-show="markdownView !== 'preview'"
+              class="rte-md-import-source"
+            >{{ markdownSource }}</pre>
+            <div class="rte-root rte-md-import-preview-root">
+              <div
+                class="ProseMirror rte-md-import-preview"
+                v-show="markdownView !== 'source'"
+                v-html="markdownHtml"
+              />
+            </div>
+          </div>
+
+          <div class="rte-modal-actions rte-md-import-actions">
+            <button
+              type="button"
+              class="rte-modal-cancel"
+              title="不导入这份文档"
+              @click="closeMarkdownImport"
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              class="rte-md-import-action"
+              title="用预览里的内容替换整篇正文"
+              @click="confirmMarkdownImport('replace')"
+            >
+              替换全文
+            </button>
+            <button
+              type="button"
+              class="rte-modal-confirm"
+              title="把预览里的内容插入到当前光标处"
+              @click="confirmMarkdownImport('cursor')"
+            >
+              插入到光标
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 

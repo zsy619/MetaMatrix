@@ -86,15 +86,21 @@ assert.match(
   scopedCss,
   /\.rte-root\.expanded:not\(\.is-page-sheet\) :deep\(\.ProseMirror\) \{[^}]*padding:\s*16px max\(14px, var\(--rte-gutter-size\)\) 48px;/,
 )
-// A4 纸张：窄边距也要留出手柄列，虚线框与正文起点对齐。
+// A4 纸张：左右留白只按页边距走，不再被「块手柄列」撑宽（手柄列落在左侧页边距里），
+// 保证左右留白与底边距一致、纸张四边对称。
 assert.match(
   globalCss,
-  /\.rte-root\.is-page-sheet \.rte-body \{[^}]*padding-left:\s*max\(var\(--rte-margin-left, 31\.8mm\), var\(--rte-gutter-size, 50px\)\);/,
+  /\.rte-root\.is-page-sheet \.rte-body \{[^}]*padding-left:\s*max\(var\(--rte-margin-left, 25\.4mm\), 26px\);/,
 )
 assert.match(
   globalCss,
-  /\.rte-root\.is-page-sheet \.rte-body::before \{[^}]*inset:[^;]*max\(var\(--rte-margin-left, 31\.8mm\), var\(--rte-gutter-size, 50px\)\);/,
+  /\.rte-root\.is-page-sheet \.rte-body \{[^}]*padding-right:\s*var\(--rte-margin-right, 25\.4mm\);/,
 )
+assert.match(
+  globalCss,
+  /\.rte-root\.is-page-sheet \.rte-body::before \{[^}]*inset:[^;]*max\(var\(--rte-margin-left, 25\.4mm\), 26px\);/,
+)
+assert.doesNotMatch(globalCss, /\.rte-root\.is-page-sheet \.rte-body \{[^}]*padding-left:[^;]*--rte-gutter-size/)
 // 手柄容器不得拦截正文点击，只有按钮本身可点。
 assert.match(scopedCss, /\.rte-block-tools \{[^}]*pointer-events:\s*none;/)
 assert.match(scopedCss, /\.rte-block-handle \{[^}]*pointer-events:\s*auto;/)

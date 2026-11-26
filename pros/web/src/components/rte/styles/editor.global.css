@@ -2712,9 +2712,9 @@ html.rte-toolbar-dragging * {
   align-items: flex-start;
   box-sizing: border-box;
   height: calc(28px + var(--rte-break-gap, 0px));
-  margin-left: calc(-1 * max(var(--rte-margin-left, 12.7mm), var(--rte-gutter-size, 50px)));
-  margin-right: calc(-1 * max(var(--rte-margin-right, 12.7mm), var(--rte-gutter-size, 50px)));
-  padding: 4px max(var(--rte-margin-right, 12.7mm), var(--rte-gutter-size, 50px)) 0 max(var(--rte-margin-left, 12.7mm), var(--rte-gutter-size, 50px));
+  margin-left: calc(-1 * max(var(--rte-margin-left, 12.7mm), 26px));
+  margin-right: calc(-1 * var(--rte-margin-right, 12.7mm));
+  padding: 4px var(--rte-margin-right, 12.7mm) 0 max(var(--rte-margin-left, 12.7mm), 26px);
   background-image:
     linear-gradient(#e8eaed, #e8eaed),
     repeating-linear-gradient(90deg, #c9cdd4 0 8px, transparent 8px 14px);
@@ -4173,11 +4173,11 @@ input.rte-timeline-title:focus {
   max-width: none;
   min-height: var(--rte-sheet-min-height, 1123px);
   margin: 16px auto 28px;
-  padding: var(--rte-margin-top, 25.4mm) var(--rte-margin-right, 31.8mm) var(--rte-margin-bottom, 25.4mm) var(--rte-margin-left, 31.8mm);
-  /* 左右留白对称：两侧都按「页边距 / 块手柄列宽度」取大值预留。
-     只给左侧留手柄列会让版心整体偏左（左侧 74px、右侧 48px），观感上纸张不正。 */
-  padding-left: max(var(--rte-margin-left, 31.8mm), var(--rte-gutter-size, 50px));
-  padding-right: max(var(--rte-margin-right, 31.8mm), var(--rte-gutter-size, 50px));
+  padding: var(--rte-margin-top, 25.4mm) var(--rte-margin-right, 25.4mm) var(--rte-margin-bottom, 25.4mm) var(--rte-margin-left, 25.4mm);
+  /* 左右留白只按页边距走：块手柄列改为落在左侧页边距里（正文列左边界与虚线框对齐），
+     不再把左右留白撑到比底边距还宽，纸张四边观感一致。 */
+  padding-left: max(var(--rte-margin-left, 25.4mm), 26px);
+  padding-right: var(--rte-margin-right, 25.4mm);
   box-sizing: border-box;
   background: #fff;
   box-shadow:
@@ -4187,9 +4187,8 @@ input.rte-timeline-title:focus {
 .rte-root.is-page-sheet .rte-body::before {
   content: '';
   position: absolute;
-  /* 虚线框与正文起始位置对齐（含两侧留白）。 */
-  inset: var(--rte-margin-top, 25.4mm) var(--rte-margin-right, 31.8mm) var(--rte-margin-bottom, 25.4mm) max(var(--rte-margin-left, 31.8mm), var(--rte-gutter-size, 50px));
-  right: max(var(--rte-margin-right, 31.8mm), var(--rte-gutter-size, 50px));
+  /* 虚线框与正文起始位置对齐（四边留白一致）。 */
+  inset: var(--rte-margin-top, 25.4mm) var(--rte-margin-right, 25.4mm) var(--rte-margin-bottom, 25.4mm) max(var(--rte-margin-left, 25.4mm), 26px);
   border: 1px dashed rgba(51, 112, 255, 0.35);
   pointer-events: none;
   z-index: 2;

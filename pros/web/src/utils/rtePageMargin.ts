@@ -18,16 +18,17 @@ export type PageMargin = PageMarginBox & {
 export const PAGE_MARGIN_MIN_MM = 0
 export const PAGE_MARGIN_MAX_MM = 80
 
+/** 四边留白一致：左右不再比上下更宽，纸张观感端正。 */
 export const PAGE_MARGIN_PRESETS: ReadonlyArray<{
   id: Exclude<PageMarginPreset, 'custom'>
   label: string
   hint: string
   box: PageMarginBox
 }> = [
-  { id: 'normal', label: '常规', hint: '上下 25.4mm，左右 31.8mm', box: { top: 25.4, right: 31.8, bottom: 25.4, left: 31.8 } },
+  { id: 'normal', label: '常规', hint: '四边 25.4mm', box: { top: 25.4, right: 25.4, bottom: 25.4, left: 25.4 } },
   { id: 'narrow', label: '窄', hint: '四边 12.7mm', box: { top: 12.7, right: 12.7, bottom: 12.7, left: 12.7 } },
-  { id: 'moderate', label: '适中', hint: '上下 25.4mm，左右 19.1mm', box: { top: 25.4, right: 19.1, bottom: 25.4, left: 19.1 } },
-  { id: 'wide', label: '宽', hint: '上下 25.4mm，左右 50.8mm', box: { top: 25.4, right: 50.8, bottom: 25.4, left: 50.8 } },
+  { id: 'moderate', label: '适中', hint: '四边 19.1mm', box: { top: 19.1, right: 19.1, bottom: 19.1, left: 19.1 } },
+  { id: 'wide', label: '宽', hint: '四边 38.1mm', box: { top: 38.1, right: 38.1, bottom: 38.1, left: 38.1 } },
   { id: 'none', label: '无边距', hint: '四边 0', box: { top: 0, right: 0, bottom: 0, left: 0 } },
 ]
 

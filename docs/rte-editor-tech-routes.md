@@ -1,0 +1,162 @@
+# 类飞书文档编辑器：实现技术路线调研
+
+> 调研日期：2026-11-26　范围：面向「元矩阵」知识库文档（doc）编辑器的技术路线选型
+> 关联文档：`docs/rte-prosemirror-feishu.md`（功能对照）、`docs/rte-feature-matrix.md`、`docs/rte-feishu-gap.md`
+
+---
+
+## 0. 结论先行
+
+1. **不建议换内核**：现有 `Tiptap 3 + ProseMirror` 已是飞书级编辑器的合格底座（schema 可控、命令体系成熟、Vue 3 绑定完善）。换成 Lexical / BlockNote / Slate 属于「重写而非演进」，收益不足以覆盖改造成本。
+2. **真正的短板是协同，不是编辑器**：当前协同只有「顶层块级 LWW」的 HTTP 增量同步，且**尚未接入主编辑器**；字符级 CRDT、WebSocket 通道、光标 presence 才是与飞书差距的主体。
+3. **默认推荐路线（路线 B 演化版）**：
+   - P0：把现有 Yjs 块级 LWW 升级为 **Y.Doc 级字符级 CRDT**，继续复用 HTTP 增量接口（后端零改造即可跑通），并接入 `RichTextEditor`。
+   - P1：引入 **Hocuspocus（y-websocket 官方服务端）**，获得 WebSocket + awareness（实时光标/选区/在线名单），Go 侧只保留持久化与鉴权。
+   - P2：**块级 JSON 双写**，对齐飞书 docx v1 的块 API 数据模型，为跨端渲染、AI 局部改写、评论锚点铺路。
+4. **不推荐现在嵌入 OnlyOffice / Collabora**：那是「OOXML 保真 + 表格/排版引擎」路线，会牺牲我们已有的自定义富文本能力（时间线、图表、公式栏、模板中心、面板化 UI），且引入 iframe 通信与独立鉴权模型；只有在客户明确要求「Word 文档双向保真」时再启用。
+5. **自研编辑器内核**（路线 E）不推荐：schema、选区、输入法（IME）、撤销栈、协同、粘贴净化、辅助功能（a11y）每一项都是数千行级工程量，无差异化收益。
+
+---
+
+## 1. 五条路线卡片
+
+### 路线 A｜自研 ProseMirror + 自研协同
+- **形态**：直接用 `prosemirror-model / view / transform / state`，自己写 schema、插件、命令、协同层。
+- **优势**：控制力最强，无框架锁定；协作与业务深度绑定。
+- **代价**：IMEs、选区/手势、撤销重做、粘贴净化、a11y、表格、协同合并都要自己踩坑。
+- **适用**：只有当产品里有 ProseMirror 无法表达的核心交互（如本项目的「块级属性面板 + 双向绑定属性」）时，作为**在 ProseMirror 之上写插件**是可行的；但重写内核不可取。
+- 结论：作为「插件层」接受，作为「内核层」否决。
+
+### 路线 B｜Tiptap + ProseMirror + Yjs + Hocuspocus（官方栈）✅ 推荐
+- **形态**：`@tiptap/core` 提供 schema/命令/扩展；`y-prosemirror` 把 ProseMirror 文档与 Y.Doc 双向绑定；`yjs` 提供 CRDT 合并；`@hocuspocus/provider` + Hocuspocus 服务端负责 WebSocket 通道、awareness 与持久化钩子。
+- **优势**：
+  - Tiptap 3 已内置 `@tiptap/extension-collaboration`（Yjs）与 `CollaborationCaret`（远端光标）路径，接入成本低；
+  - ProseMirror 生态的表格、批注、提及、数学公式等扩展可平移；
+  - Hocuspocus 官方文档提供「协作编辑指南」，与我们的 Go 服务端可用「授权 + 存 Yjs 更新」的最小耦合方式对接。
+- **代价**：需要维护一套 WebSocket 服务（可用 Node 侧车进程），运维多一个组件；awareness 状态需自行持久化策略。
+- 契合度：**最高**。项目 `package.json` 已有 `@tiptap/* ^3.32.0` 与 `yjs ^13.6.33`，`prosemirror-yjs` 是其近邻依赖，接入增量小。
+
+### 路线 C｜Lexical / BlockNote / Slate
+- **Lexical**（Meta）：React 优先的编辑器内核，节点模型精细、有 `yjs` 官方集成与 devtools；**与 Vue 3 的绑定需自写**，且本项目富文本组件体量大，迁移成本高。
+- **BlockNote**：建立在 Lexical/ProseMirror 之上的「块编辑器」体验，开箱即有 AI 与协作者集成，适合「Notion 式块文档」；但其 schema 与本项目自定义块（时间线、图表、公式栏）需要逐个重写，且**已有 CSS/UI 资产无法复用**。
+- **Slate**：数据模型最灵活，JSON 树直存，但性能与生态弱于 ProseMirror/Lexical，且官方协作方案偏弱。
+- 结论：**不换**。若未来要做「飞书白板式多模态块」而非富文本流，才值得评估 BlockNote 作为参考实现。
+
+### 路线 D｜嵌入 OnlyOffice / Collabora（OOXML 引擎）
+- **形态**：DocumentServer / Collabora 以 iframe 嵌入，提供 Word 级排版、协同（OnlyOffice 内部用自研 CRDT）、PDF 导出。
+- **优势**：OOXML 双向保真、复杂表格与分页、Office 兼容。
+- **代价**：
+  - 编辑体验与我们的 Telegram 视觉规范、ribbon 工具栏、块级面板完全割裂，只能作为「附件级 Office 编辑」；
+  - 协同会话是独立的 iframe 生命周期，与我们的评论/版本/知识库树**无法打通**；
+  - 部署重（DocumentServer 需 Postgres + RabbitMQ 级别的运维）、二次开发需用其插件 API。
+- 结论：**作为附件能力可选，不作为主编辑器路线**。
+
+### 路线 E｜自研内核 / Canvas 渲染编辑器
+- 形式：自研 DOM/Canvas 渲染 + 自研选区/IME/撤销。
+- 结论：**否决**。此类工程在飞书、Notion 这类团队均投入数百人年；我们的差异化在知识库与画布业务，而非内核。
+
+---
+
+## 2. 行业事实归纳（可核验）
+
+- **飞书开放平台 docx v1**：文档以「块（block）」为基本单元，通过 `GET /open-apis/docx/v1/documents/:document_id/blocks` 获取块列表，块有 `block_type` 与 `children` 结构 —— 说明飞书是**块树数据模型**，不是单一富文本流。（页面为 SPA，正文未逐页抓取，结论来自其接口目录与官方文档描述）
+- **Google Docs**：早期基于 OT（Operational Transformation）引擎；公开技术分享中常被概括为 "Jupiter" 客户端与 "Wave" 服务端管线。
+- **Microsoft Fluid Framework**：以 Fluid Container / Data Structures 为基础的 **CRDT** 路线，官方开源。
+- **Etherpad**：经典 **OT** 协同编辑器（可自托管，附 Etherpad CLI 工具）。
+- **Automerge**：CRDT 库，主打 JSON 文档与本地优先。
+- **Local-first 七原则**（Ink & Switch 提出）：本地优先、远端同步、多设备并发、无网络也能工作、协作与协作引擎解耦、保留历史与隐私、数据可导出与再导入 —— 可作为我们「离线编辑 + 后端同步」的验收标准。
+- **编辑器内 AI 的主流做法**：块级 JSON + 节点级定位（按 block id 增删改）优于对整段 HTML 做字符串操作 —— 这也是飞书「AI 划词/块改写」的底层前提。
+
+---
+
+## 3. 四条分水岭（选型时真正要看的）
+
+1. **块树 vs 富文本流**：飞书/Notion = 块树（每块独立 id，可并行编辑、可单块 AI 改写）；Tiptap 传统 = 单文档流（ProseMirror 节点树仍可给节点加 id，但默认不暴露）。→ 我们要往块树靠，但**不必换内核**，只需给顶层块加稳定 id 并把块内容映射到 Y.Map（现有 `crdtDoc.ts` 已近此形）。
+2. **OT vs CRDT**：OT 需要中心化转换服务器且对离线/乱序敏感；CRDT 可交换、可幂等、离线友好 → 我们已选 CRDT（Yjs），**不要中途混入 OT**。
+3. **存储形态**：HTML（我们现状 `canvas_documents.current_data`）/ 块 JSON（飞书）/ OOXML（OnlyOffice）。HTML 便于渲染与导出，但**不适合机器改写与结构化检索**；建议长期以**块 JSON 为事实源、HTML 为派生视图**。
+4. **渲染载体**：DOM 渲染（ProseMirror/Lexical/BlockNote，可访问性好、选区天然）vs Canvas 渲染（性能天花板高，但 a11y 与富文本交互成本极高）。→ 保持 DOM 渲染；画布类产品走现有自研 Canvas，不混进文档内核。
+
+---
+
+## 4. 我们现状盘点（代码级证据）
+
+**前端**
+- `pros/web/package.json`：`@tiptap/core|pm|starter-kit|vue-3|table|task-list|code-block-lowlight|color|highlight|link|image|mention|...` 均 `^3.32.0`；**已依赖 `yjs ^13.6.33`**。
+- `pros/web/src/components/knowledge/collab/crdtDoc.ts`：自研协同层，基于 Yjs，粒度是**顶层块 LWW**（`Y.Map<HTML>`），传输层 `httpTransport()` 走 `fetchCrdtUpdates` / `appendCrdtUpdate`（HTTP 拉/推增量，无 WebSocket）。
+- 使用方：`pros/web/src/components/knowledge/DocView.vue`（**动态 import** 后初始化）——**尚未接入 `RichTextEditor.vue` 主编辑器**，即「协同能力存在但用户用不到」。
+- 编辑器体系：`src/components/rte/**`（ribbon 工具栏、块面板、图表、公式栏、评论线程、模板、Markdown 导入等）+ `src/utils/rte*.ts`。
+
+**后端**（Go + Hertz + GORM + PostgreSQL）
+- `pros/api/internal/model/knowledge_v3.go`：doc 正文以 **HTML** 存 `canvas_documents.current_data`；结构化节点存 `knowledge_node_data`。
+- `pros/api/internal/model/knowledge_v6.go`：`DocCRDTUpdate`（`doc_crdt_updates`，seq 增量日志）、`KnowledgePresence`（`doc_presence`，DB 落库 + TTL）、`KnowledgeChunk`（RAG 切片）。
+- 版本 `knowledge_doc_versions`、评论 `doc_comments`、分享 `knowledge_shares`。
+- **全仓无 WebSocket 依赖**（grep `websocket|hocuspocus|gobwas` 无命中）；后端路由不带 `/api` 前缀。
+
+**缺口清单**
+- G1 无 WebSocket 通道 → 协同只能轮询，实时光标不可得。
+- G2 CRDT 粒度为块级 LWW → 同块并发编辑互相覆盖（同段落打字会丢字）。
+- G3 协同层未接入主编辑器 → 用户实际没有协同编辑能力。
+- G4 正文事实源是 HTML → 块级 AI 改写、增量结构化检索、跨端渲染困难。
+- G5 presence 落 DB + TTL，非实时广播 → 只能做「最后心跳」不能做「谁在线谁在编辑哪段」。
+
+---
+
+## 5. 三阶段落地路线
+
+### P0｜字符级 CRDT 接入主编辑器（后端零改造，2～3 周量级）
+- 用 `y-prosemirror` / `@tiptap/extension-collaboration` 把 `RichTextEditor.vue` 的 doc 纳入 Y.Doc，替换现有块级 LWW 传输层。
+- 传输继续走现有 HTTP 增量接口（`doc_crdt_updates` + seq），**不引入新中间件**，先拿到「不丢字 + 离线可编辑」。
+- 落库策略：定期 `Y.encodeStateAsUpdate` 快照 + 保留增量日志（`update`/`snapshot` 两种 kind 已有字段）。
+- 验收：两人同时改同一段落，字符不丢；断网 10 分钟继续写，恢复后自动合并。
+
+### P1｜Hocuspocus WebSocket + awareness（3～5 周量级）
+- 部署 Hocuspocus（Node）作为协作侧车；Go 服务只负责**签发协作 token**（用户/权限/文档 id）与**持久化回调**（把 Yjs 更新写回 `doc_crdt_updates`）。
+- `CollaborationCaret` 渲染远端光标与选区；awareness 承载在线名单、当前选区、正在输入的状态（替换 G5 的 TTL 心跳）。
+- 冲突与权限：协作 token 由后端签发，遵循现有分享/白名单语义（`knowledge_shares` 的 `AllowUsers`、口令、口令摘要规则）。
+- 验收：光标实时可见；并发编辑 P95 延迟 < 200ms；权限撤销后 WS 立即断连。
+
+### P2｜块级 JSON 双写，对齐飞书 docx API（4～8 周量级）
+- 为顶层块生成稳定 `block_id`（沿用 `splitBlocks` 的顶层块边界），落库 `knowledge_doc_blocks`（块类型、块 JSON、顺序、父子关系）。
+- 保留 HTML 作为派生视图（渲染/导出），实现「块 JSON → HTML」单向编译，避免双向同步地狱。
+- 对外提供 `GET /documents/:id/blocks`（对齐飞书 `GET /open-apis/docx/v1/documents/:id/blocks` 的形状），为跨端、AI 局部改写、评论锚点、目录大纲提供稳定接口。
+- 验收：单块 AI 改写只影响该块；块级评论可精确定位；大纲/目录由块树生成。
+
+### 不做的事（明确否决）
+- 不嵌 OnlyOffice/Collabora 作为主编辑器（仅保留为「附件级 Office 编辑」的可选插件位）。
+- 不引入 OT 引擎，不与 Yjs 混用。
+- 不自研编辑器内核；DOM 渲染保持不变。
+
+---
+
+## 6. 风险与默认决策
+
+- **WebSocket 运维复杂度**：Hocuspocus 多一个进程与鉴权面；若团队无 Node 运维能力，退路是「Go 自研 WS 网关 + y-websocket 协议」，成本更高但可控 —— 建议先用官方 Hocuspocus 验证语义，再决定是否 Go 化。
+- **HTML 事实源的迁移成本**：P2 双写需要一次性 HTML→块 JSON 编译器 + 回归用例；可复用现有 `rteMarkdown.ts` 式的「解析器 + 夹具 + 文档级断言」测试模式。
+- **规模不匹配**：若真实并发用户数 < 10，协同投入的 ROI 主要是「体验可信」而非「性能必需」——此时 P0（P0.5 折中：仅做块级 CRDT + 冲突提示）可能已足够。
+- **默认决策**：先做 P0，保留 P1 的接口边界（transport 抽象已在 `crdtDoc.ts` 中存在，替换成本低），P2 视 AI 功能排期触发。
+
+---
+
+## 7. 引用与核验说明
+
+**已 HTTP 200 核验可访问（2026-11-26）**
+- Tiptap 协作编辑指南：https://tiptap.dev/docs/hocuspocus/guides/collaborative-editing
+- Yjs 文档：https://docs.yjs.dev ；仓库 https://github.com/yjs/yjs
+- Tiptap 仓库：https://github.com/ueberdosis/tiptap
+- ProseMirror 参考文档：https://prosemirror.net/docs/ref
+- Lexical：https://lexical.dev
+- BlockNote：https://www.blocknotejs.org/docs
+- Automerge：https://automerge.org
+- Local-first：https://www.inkandswitch.com/local-first
+- OnlyOffice DocumentServer：https://github.com/ONLYOFFICE/DocumentServer
+- Collabora Online：https://github.com/CollaboraOnline/online
+- Etherpad：https://etherpad.org
+- Editor.js：https://editorjs.io
+- Fluid Framework：https://github.com/microsoft/FluidFramework
+- Notion 指南：https://www.notion.com/help/guides
+
+**未逐页核验（公开资料/接口目录层面结论）**
+- 飞书 docx v1 块接口：https://open.feishu.cn/document/server-docs/docs/docs/docx-v1/document-block/list （SPA 页面，正文未抓取；「块为基本单元」结论来自接口目录与文档描述）
+- Google Docs 内部引擎命名（Jupiter/Wave）、飞书内部协同算法：**未逐页核验**，属公开技术分享的二手结论，引用时建议标注「据公开资料」。
+
+**本仓库证据**：见第 4 节所列文件与依赖（可用 `grep`/`cat` 复核）。
