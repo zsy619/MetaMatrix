@@ -40,11 +40,15 @@ export type SheetFilter = {
 
 export type SheetViewType = 'grid' | 'kanban' | 'gallery' | 'calendar'
 
+export type SheetFilterJoin = 'and' | 'or'
+
 export type SheetView = {
   id: string
   name: string
   type: SheetViewType
   filters: SheetFilter[]
+  /** 多条件组合方式；缺省为且。 */
+  filterJoin?: SheetFilterJoin
   /** 排序字段 id */
   sortBy: string | null
   sortOrder: 'asc' | 'desc'
@@ -211,12 +215,15 @@ export function filterRows(
   rows: SheetRow[],
   filters: SheetFilter[],
   keyword: string,
+  join: SheetFilterJoin = 'and',
 ): SheetRow[] {
   const kw = keyword.trim().toLowerCase()
+  const active = filters.filter((f) => f.fieldId)
   return rows.filter((row) => {
-    for (const f of filters) {
-      if (!f.fieldId) continue
-      if (!matchesFilter(row, f)) return false
+    if (active.length) {
+      const matched = active.map((f) => matchesFilter(row, f))
+      const pass = join === 'or' ? matched.some(Boolean) : matched.every(Boolean)
+      if (!pass) return false
     }
     if (!kw) return true
     return Object.values(row.cells).some((v) => cellText(v).toLowerCase().includes(kw))

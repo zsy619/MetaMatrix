@@ -1,6 +1,6 @@
 import { Node, mergeAttributes } from '@tiptap/core'
 import { NodeSelection } from '@tiptap/pm/state'
-import type { SheetFilter } from '../components/knowledge/sheetModel'
+import type { SheetData, SheetFilter } from '../components/knowledge/sheetModel'
 import { createDatabaseBlockView } from './databaseBlockView'
 import {
   activeDatabaseView,
@@ -9,11 +9,15 @@ import {
   DATABASE_BLOCK_NAME,
   defaultDatabasePayload,
   payloadFromAttrs,
+  DATABASE_VIEW_LABELS,
+  pullSheetIntoPayload,
+  setDatabaseFilterJoin,
   setDatabaseFilters,
   setDatabaseViewType,
   type DatabaseBlockPayload,
   type DatabaseBlockViewType,
   updateDatabaseCell,
+  viewTypeOf,
   visibleDatabaseRows,
 } from './databaseBlockSheet'
 
@@ -34,6 +38,8 @@ declare module '@tiptap/core' {
       }) => ReturnType
       setDatabaseBlockView: (type: DatabaseBlockViewType) => ReturnType
       setDatabaseBlockFilters: (filters: SheetFilter[]) => ReturnType
+      setDatabaseBlockFilterJoin: (join: 'and' | 'or') => ReturnType
+      importDatabaseBlockSheet: (sheet: SheetData) => ReturnType
       updateDatabaseBlockCell: (rowId: string, fieldId: string, value: string) => ReturnType
     }
   }
@@ -128,10 +134,10 @@ export const DatabaseBlock = Node.create({
   renderHTML({ node, HTMLAttributes }) {
     const payload = payloadFromAttrs(node.attrs as { sheet?: string; viewType?: string })
     const view = activeDatabaseView(payload)
-    const typ = view.type === 'kanban' ? 'kanban' : 'grid'
+    const typ = viewTypeOf(view)
     const rows = visibleDatabaseRows(payload)
     const linked = Boolean(String(node.attrs.sheetNodeId || '').trim())
-    const title = String(node.attrs.title || '').trim() || (linked ? '多维表格' : '多维表格')
+    const title = String(node.attrs.title || '').trim() || '多维表格'
     const snapshot = attrsFromPayload(payload)
     return [
       'div',
@@ -144,7 +150,7 @@ export const DatabaseBlock = Node.create({
         'data-open-sheet': linked ? 'true' : 'false',
       }),
       ['span', { class: 'rte-database-block__title' }, title],
-      ['span', { class: 'rte-database-block__hint' }, typ === 'kanban' ? '看板' : '表格'],
+      ['span', { class: 'rte-database-block__hint' }, DATABASE_VIEW_LABELS[typ]],
       ['span', { class: 'rte-database-block__meta' }, `${rows.length} 行`],
     ]
   },
@@ -191,6 +197,32 @@ export const DatabaseBlock = Node.create({
           const node = state.doc.nodeAt(pos)
           if (!node || node.type.name !== DATABASE_BLOCK_NAME) return false
           const next = attrsFromPayload(setDatabaseFilters(payloadFromAttrs(node.attrs), filters))
+          if (dispatch) {
+            dispatch(tr.setNodeMarkup(pos, undefined, { ...node.attrs, ...next }))
+          }
+          return true
+        },
+      setDatabaseBlockFilterJoin:
+        (join) =>
+        ({ state, tr, dispatch }) => {
+          const pos = currentDatabasePos(state)
+          if (pos == null) return false
+          const node = state.doc.nodeAt(pos)
+          if (!node || node.type.name !== DATABASE_BLOCK_NAME) return false
+          const next = attrsFromPayload(setDatabaseFilterJoin(payloadFromAttrs(node.attrs), join))
+          if (dispatch) {
+            dispatch(tr.setNodeMarkup(pos, undefined, { ...node.attrs, ...next }))
+          }
+          return true
+        },
+      importDatabaseBlockSheet:
+        (sheet) =>
+        ({ state, tr, dispatch }) => {
+          const pos = currentDatabasePos(state)
+          if (pos == null) return false
+          const node = state.doc.nodeAt(pos)
+          if (!node || node.type.name !== DATABASE_BLOCK_NAME) return false
+          const next = attrsFromPayload(pullSheetIntoPayload(payloadFromAttrs(node.attrs), sheet))
           if (dispatch) {
             dispatch(tr.setNodeMarkup(pos, undefined, { ...node.attrs, ...next }))
           }

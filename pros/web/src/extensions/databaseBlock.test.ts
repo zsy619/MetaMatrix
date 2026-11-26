@@ -20,6 +20,7 @@ import {
 import {
   firstFilterableField,
   payloadFromAttrs,
+  pushSheetFromPayload,
   visibleDatabaseRows,
 } from './databaseBlockSheet'
 
@@ -201,5 +202,86 @@ describe('databaseBlock 筛选与视图', () => {
     expect(readBlockId(databaseNodes(again)[0]!.node)).toBe(id)
     const restored = payloadFromAttrs(databaseNodes(again)[0]!.node.attrs)
     expect(restored.sheet.rows.find((item) => item.id === target.id)?.cells[field.id]).toBe('改过的名称')
+  })
+})
+
+describe('databaseBlock 多条件且或与画廊日历', () => {
+  it('多条件且/或筛选刷新后仍保持', () => {
+    const ed = mount()
+    ed.commands.insertDatabaseBlock({ title: '任务表' })
+    const payload = payloadFromAttrs(databaseNodes(ed)[0]!.node.attrs)
+    const name = firstFilterableField(payload)!
+    const status = payload.sheet.fields.find((field) => field.type === 'select')!
+    const id = readBlockId(databaseNodes(ed)[0]!.node)
+    expect(
+      ed.commands.setDatabaseBlockFilters([
+        { fieldId: name.id, op: 'contains', value: '项' },
+        { fieldId: status.id, op: 'is', value: '进行中' },
+      ]),
+    ).toBe(true)
+    expect(ed.commands.setDatabaseBlockFilterJoin('and')).toBe(true)
+    const andRows = visibleDatabaseRows(payloadFromAttrs(databaseNodes(ed)[0]!.node.attrs))
+    expect(andRows).toHaveLength(0)
+    expect(ed.commands.setDatabaseBlockFilterJoin('or')).toBe(true)
+    const orPayload = payloadFromAttrs(databaseNodes(ed)[0]!.node.attrs)
+    expect(visibleDatabaseRows(orPayload).map((row) => String(row.cells[name.id])).sort()).toEqual(['另一项', '示例任务'])
+    const html = ed.getHTML()
+    const again = mount(html)
+    const restored = payloadFromAttrs(databaseNodes(again)[0]!.node.attrs)
+    expect(readBlockId(databaseNodes(again)[0]!.node)).toBe(id)
+    expect(restored.sheet.views.find((view) => view.id === restored.activeViewId)?.filterJoin).toBe('or')
+    expect(visibleDatabaseRows(restored)).toHaveLength(2)
+  })
+
+  it('切换画廊和日历后刷新仍保持', () => {
+    const ed = mount()
+    ed.commands.insertDatabaseBlock()
+    const id = readBlockId(databaseNodes(ed)[0]!.node)
+    expect(ed.commands.setDatabaseBlockView('gallery')).toBe(true)
+    expect(payloadFromAttrs(databaseNodes(ed)[0]!.node.attrs).sheet.views.find((view) => view.id === payloadFromAttrs(databaseNodes(ed)[0]!.node.attrs).activeViewId)?.type).toBe('gallery')
+    const galleryHtml = ed.getHTML()
+    expect(galleryHtml).toContain('data-view-type="gallery"')
+    const gallery = mount(galleryHtml)
+    expect(readBlockId(databaseNodes(gallery)[0]!.node)).toBe(id)
+    expect(payloadFromAttrs(databaseNodes(gallery)[0]!.node.attrs).sheet.views.find((view) => view.id === payloadFromAttrs(databaseNodes(gallery)[0]!.node.attrs).activeViewId)?.type).toBe('gallery')
+
+    expect(ed.commands.setDatabaseBlockView('calendar')).toBe(true)
+    expect(ed.getHTML()).toContain('data-view-type="calendar"')
+    const again = mount(ed.getHTML())
+    expect(readBlockId(databaseNodes(again)[0]!.node)).toBe(id)
+    expect(payloadFromAttrs(databaseNodes(again)[0]!.node.attrs).sheet.views.find((view) => view.id === payloadFromAttrs(databaseNodes(again)[0]!.node.attrs).activeViewId)?.type).toBe('calendar')
+  })
+})
+
+describe('databaseBlock 与树上表快照同步', () => {
+  it('importDatabaseBlockSheet 拉取树上表后刷新仍保持', () => {
+    const ed = mount()
+    ed.commands.insertDatabaseBlock({ sheetNodeId: 'tree-sheet', title: '关联表' })
+    const before = payloadFromAttrs(databaseNodes(ed)[0]!.node.attrs)
+    const name = firstFilterableField(before)!
+    const id = readBlockId(databaseNodes(ed)[0]!.node)
+    const tree = JSON.parse(JSON.stringify(before.sheet))
+    tree.rows[0].cells[name.id] = '树上改过'
+    expect(ed.commands.importDatabaseBlockSheet(tree)).toBe(true)
+    expect(readBlockId(databaseNodes(ed)[0]!.node)).toBe(id)
+    const pulled = payloadFromAttrs(databaseNodes(ed)[0]!.node.attrs)
+    expect(pulled.sheet.rows[0]!.cells[name.id]).toBe('树上改过')
+    const again = mount(ed.getHTML())
+    expect(readBlockId(databaseNodes(again)[0]!.node)).toBe(id)
+    expect(payloadFromAttrs(databaseNodes(again)[0]!.node.attrs).sheet.rows[0]!.cells[name.id]).toBe('树上改过')
+  })
+
+  it('pushSheetFromPayload 写回树上表时保留树上视图', () => {
+    const ed = mount()
+    ed.commands.insertDatabaseBlock({ sheetNodeId: 'tree-sheet' })
+    const payload = payloadFromAttrs(databaseNodes(ed)[0]!.node.attrs)
+    const name = firstFilterableField(payload)!
+    const target = payload.sheet.rows[1]!
+    expect(ed.commands.updateDatabaseBlockCell(target.id, name.id, '块内改过')).toBe(true)
+    const next = payloadFromAttrs(databaseNodes(ed)[0]!.node.attrs)
+    const treeViews = [{ ...payload.sheet.views[0]!, name: '树上表格' }]
+    const pushed = pushSheetFromPayload(next, { ...payload.sheet, views: treeViews })
+    expect(pushed.views[0]!.name).toBe('树上表格')
+    expect(pushed.rows.find((row) => row.id === target.id)?.cells[name.id]).toBe('块内改过')
   })
 })

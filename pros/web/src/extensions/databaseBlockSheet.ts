@@ -3,12 +3,14 @@ import {
   createField,
   createRow,
   createView,
+  FILTER_OPS,
   filterRows,
   groupRows,
   migrateSheet,
   type SheetData,
   type SheetField,
   type SheetFilter,
+  type SheetFilterOp,
   type SheetRow,
   type SheetView,
   type SheetViewType,
@@ -23,27 +25,48 @@ export type DatabaseBlockPayload = {
   activeViewId: string
 }
 
-export const DATABASE_VIEW_TYPES = ['grid', 'kanban'] as const
+export const DATABASE_VIEW_TYPES = ['grid', 'kanban', 'gallery', 'calendar'] as const
 export type DatabaseBlockViewType = (typeof DATABASE_VIEW_TYPES)[number]
+
+export const DATABASE_VIEW_LABELS: Record<DatabaseBlockViewType, string> = {
+  grid: '表格',
+  kanban: '看板',
+  gallery: '画廊',
+  calendar: '日历',
+}
+
+export type DatabaseFilterJoin = 'and' | 'or'
+
+export const DATABASE_FILTER_OPS = FILTER_OPS
 
 export function isDatabaseViewType(value: string): value is DatabaseBlockViewType {
   return (DATABASE_VIEW_TYPES as readonly string[]).includes(value)
 }
 
+export function isFilterJoin(value: string): value is DatabaseFilterJoin {
+  return value === 'and' || value === 'or'
+}
+
 export function defaultDatabaseSheet(): SheetData {
   const name = { ...createField('text', '名称'), width: 160 }
   const status = { ...createField('select', '状态'), options: ['未开始', '进行中', '已完成'] }
-  const fields = [name, status]
+  const due = { ...createField('date', '截止日期'), width: 140 }
+  const fields = [name, status, due]
   const grid = createView('grid', '表格')
   const board = createView('kanban', '看板')
   board.groupBy = status.id
+  const gallery = createView('gallery', '画廊')
+  const calendar = createView('calendar', '日历')
+  calendar.groupBy = due.id
   const rowA = createRow(fields)
   rowA.cells[name.id] = '示例任务'
   rowA.cells[status.id] = '进行中'
+  rowA.cells[due.id] = '2026-11-27'
   const rowB = createRow(fields)
   rowB.cells[name.id] = '另一项'
   rowB.cells[status.id] = '未开始'
-  return { fields, rows: [rowA, rowB], views: [grid, board] }
+  rowB.cells[due.id] = '2026-12-01'
+  return { fields, rows: [rowA, rowB], views: [grid, board, gallery, calendar] }
 }
 
 export function defaultDatabasePayload(): DatabaseBlockPayload {
@@ -65,7 +88,7 @@ export function parseDatabasePayload(raw: unknown): DatabaseBlockPayload {
   if (!parsed || typeof parsed !== 'object') return defaultDatabasePayload()
   const rec = parsed as { sheet?: unknown; activeViewId?: unknown }
   const sheet = migrateSheet(rec.sheet ?? parsed)
-  const views = ensureGridAndKanban(sheet)
+  const views = ensureDatabaseViews(sheet)
   sheet.views = views
   const want = typeof rec.activeViewId === 'string' ? rec.activeViewId : ''
   const active = views.find((view) => view.id === want) ?? views[0]!
@@ -84,38 +107,56 @@ export function payloadFromAttrs(attrs: { sheet?: string; viewType?: string }): 
 }
 
 export function attrsFromPayload(payload: DatabaseBlockPayload): { sheet: string; viewType: DatabaseBlockViewType } {
-  const view = activeDatabaseView(payload)
-  const typ: DatabaseBlockViewType = view.type === 'kanban' ? 'kanban' : 'grid'
-  return { sheet: serializeDatabasePayload(payload), viewType: typ }
+  return { sheet: serializeDatabasePayload(payload), viewType: viewTypeOf(activeDatabaseView(payload)) }
 }
 
 export function activeDatabaseView(payload: DatabaseBlockPayload): SheetView {
   return payload.sheet.views.find((view) => view.id === payload.activeViewId) ?? payload.sheet.views[0]!
 }
 
+export function viewTypeOf(view: SheetView): DatabaseBlockViewType {
+  return isDatabaseViewType(view.type) ? view.type : 'grid'
+}
+
 export function setDatabaseViewType(payload: DatabaseBlockPayload, type: DatabaseBlockViewType): DatabaseBlockPayload {
   const sheet = cloneSheet(payload.sheet)
-  sheet.views = ensureGridAndKanban(sheet)
-  const match = sheet.views.find((view) => (view.type === 'kanban' ? 'kanban' : 'grid') === type)
+  sheet.views = ensureDatabaseViews(sheet)
+  const match = sheet.views.find((view) => viewTypeOf(view) === type)
   return { sheet, activeViewId: (match ?? sheet.views[0]!).id }
+}
+
+export function normalizeFilters(filters: SheetFilter[]): SheetFilter[] {
+  return filters
+    .filter((item) => item.fieldId)
+    .map((item) => ({
+      fieldId: item.fieldId,
+      op: normalizeFilterOp(item.op),
+      value: item.value ?? '',
+    }))
 }
 
 export function setDatabaseFilters(payload: DatabaseBlockPayload, filters: SheetFilter[]): DatabaseBlockPayload {
   const sheet = cloneSheet(payload.sheet)
   const view = sheet.views.find((item) => item.id === payload.activeViewId) ?? sheet.views[0]!
-  view.filters = filters
-    .filter((item) => item.fieldId)
-    .map((item) => ({
-      fieldId: item.fieldId,
-      op: item.op || 'contains',
-      value: item.value ?? '',
-    }))
+  view.filters = normalizeFilters(filters)
   return { sheet, activeViewId: view.id }
+}
+
+export function setDatabaseFilterJoin(payload: DatabaseBlockPayload, join: DatabaseFilterJoin): DatabaseBlockPayload {
+  const sheet = cloneSheet(payload.sheet)
+  const view = sheet.views.find((item) => item.id === payload.activeViewId) ?? sheet.views[0]!
+  view.filterJoin = join
+  return { sheet, activeViewId: view.id }
+}
+
+export function databaseFilterJoin(payload: DatabaseBlockPayload): DatabaseFilterJoin {
+  const join = activeDatabaseView(payload).filterJoin
+  return join === 'or' ? 'or' : 'and'
 }
 
 export function visibleDatabaseRows(payload: DatabaseBlockPayload): SheetRow[] {
   const view = activeDatabaseView(payload)
-  return filterRows(payload.sheet.rows, view.filters || [], '')
+  return filterRows(payload.sheet.rows, view.filters || [], '', databaseFilterJoin(payload))
 }
 
 export function databaseGroups(payload: DatabaseBlockPayload) {
@@ -125,6 +166,32 @@ export function databaseGroups(payload: DatabaseBlockPayload) {
     payload.sheet.fields.find((item) => item.type === 'select') ??
     null
   return groupRows(visibleDatabaseRows(payload), field)
+}
+
+export function dateField(payload: DatabaseBlockPayload): SheetField | undefined {
+  const view = activeDatabaseView(payload)
+  return (
+    payload.sheet.fields.find((item) => item.id === view.groupBy && item.type === 'date') ??
+    payload.sheet.fields.find((item) => item.type === 'date')
+  )
+}
+
+export function calendarGroups(payload: DatabaseBlockPayload) {
+  const field = dateField(payload)
+  const rows = visibleDatabaseRows(payload)
+  const map = new Map<string, { key: string; label: string; rows: SheetRow[] }>()
+  for (const row of rows) {
+    const key = field ? cellText(row.cells[field.id]).trim() : ''
+    const label = key || '未定日期'
+    const group = map.get(key) ?? { key, label, rows: [] }
+    group.rows.push(row)
+    map.set(key, group)
+  }
+  return [...map.values()].sort((a, b) => {
+    if (!a.key) return 1
+    if (!b.key) return -1
+    return a.key.localeCompare(b.key)
+  })
 }
 
 export function updateDatabaseCell(
@@ -150,29 +217,84 @@ export function cellPreview(value: unknown): string {
   return cellText(value as never)
 }
 
-function ensureGridAndKanban(sheet: SheetData): SheetView[] {
-  const views = (sheet.views || []).map((view) => ({ ...view, filters: [...(view.filters || [])] }))
-  if (!views.some((view) => view.type === 'grid' || !view.type)) {
-    views.unshift(createView('grid', '表格'))
-  }
-  if (!views.some((view) => view.type === 'kanban')) {
-    const board = createView('kanban', '看板')
-    const group = sheet.fields.find((field) => field.type === 'select')
-    if (group) board.groupBy = group.id
-    views.push(board)
-  }
-  return views.map((view) => ({
-    ...view,
-    type: (view.type === 'kanban' ? 'kanban' : 'grid') as SheetViewType,
-  }))
-}
-
-function cloneSheet(sheet: SheetData): SheetData {
+export function cloneSheet(sheet: SheetData): SheetData {
   return {
     fields: sheet.fields.map((field) => ({ ...field, options: field.options ? [...field.options] : undefined })),
     rows: sheet.rows.map((row) => ({ id: row.id, cells: { ...row.cells } })),
-    views: sheet.views.map((view) => ({ ...view, filters: [...(view.filters || [])] })),
+    views: sheet.views.map((view) => ({
+      ...view,
+      filters: [...(view.filters || [])],
+      filterJoin: view.filterJoin,
+    })),
   }
+}
+
+/** 用树上表的字段和行覆盖内嵌快照，尽量保留当前视图、筛选和且/或。不是实时双向同步。 */
+export function pullSheetIntoPayload(payload: DatabaseBlockPayload, tree: SheetData): DatabaseBlockPayload {
+  const incoming = migrateSheet(tree)
+  const sheet = cloneSheet(payload.sheet)
+  sheet.fields = incoming.fields.map((field) => ({ ...field, options: field.options ? [...field.options] : undefined }))
+  sheet.rows = incoming.rows.map((row) => ({ id: row.id, cells: { ...row.cells } }))
+  const ids = new Set(sheet.fields.map((field) => field.id))
+  sheet.views = ensureDatabaseViews(sheet).map((view) => ({
+    ...view,
+    groupBy: view.groupBy && ids.has(view.groupBy) ? view.groupBy : defaultGroupBy(sheet, view.type),
+    filters: (view.filters || []).filter((item) => ids.has(item.fieldId)),
+  }))
+  const active = sheet.views.find((view) => view.id === payload.activeViewId) ?? sheet.views[0]!
+  return { sheet, activeViewId: active.id }
+}
+
+/** 把内嵌快照的字段和行写回树上表，保留树上已有视图。不是实时双向同步。 */
+export function pushSheetFromPayload(payload: DatabaseBlockPayload, tree: SheetData): SheetData {
+  const incoming = migrateSheet(tree)
+  const ids = new Set(payload.sheet.fields.map((field) => field.id))
+  const views = (incoming.views.length ? incoming.views : [createView('grid', '表格视图')]).map((view) => ({
+    ...view,
+    filters: [...(view.filters || [])].filter((item) => ids.has(item.fieldId)),
+    groupBy: view.groupBy && ids.has(view.groupBy) ? view.groupBy : view.groupBy,
+    filterJoin: view.filterJoin,
+  }))
+  return {
+    fields: payload.sheet.fields.map((field) => ({ ...field, options: field.options ? [...field.options] : undefined })),
+    rows: payload.sheet.rows.map((row) => ({ id: row.id, cells: { ...row.cells } })),
+    views,
+  }
+}
+
+function ensureDatabaseViews(sheet: SheetData): SheetView[] {
+  const views: SheetView[] = (sheet.views || []).map((view) => ({
+    ...view,
+    type: normalizeViewType(view.type),
+    filters: [...(view.filters || [])],
+    filterJoin: view.filterJoin === 'or' ? 'or' : 'and',
+  }))
+  const add = (type: DatabaseBlockViewType, name: string, groupBy?: string) => {
+    if (views.some((view) => viewTypeOf(view) === type)) return
+    const view = createView(type, name)
+    if (groupBy) view.groupBy = groupBy
+    views.push(view)
+  }
+  add('grid', '表格')
+  add('kanban', '看板', sheet.fields.find((field) => field.type === 'select')?.id)
+  add('gallery', '画廊')
+  add('calendar', '日历', sheet.fields.find((field) => field.type === 'date')?.id)
+  return views
+}
+
+function defaultGroupBy(sheet: SheetData, type: SheetViewType): string | null {
+  if (type === 'kanban') return sheet.fields.find((field) => field.type === 'select')?.id ?? null
+  if (type === 'calendar') return sheet.fields.find((field) => field.type === 'date')?.id ?? null
+  return null
+}
+
+function normalizeViewType(type: string | undefined): SheetViewType {
+  if (isDatabaseViewType(type || '')) return type as DatabaseBlockViewType
+  return 'grid'
+}
+
+function normalizeFilterOp(op: string | undefined): SheetFilterOp {
+  return FILTER_OPS.some((item) => item.op === op) ? (op as SheetFilterOp) : 'contains'
 }
 
 function coerceCell(field: SheetField, value: string) {
