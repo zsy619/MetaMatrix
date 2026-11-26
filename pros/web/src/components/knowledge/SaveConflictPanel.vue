@@ -26,7 +26,7 @@ const mineHeading = computed(() => props.versions.mineLabel || '你的版本')
     <h2 id="save-conflict-title">保存冲突</h2>
     <p class="save-conflict-panel__hint">
       远端已有更新{{ remoteVersion != null && remoteVersion !== '' ? `（版本 ${remoteVersion}）` : '' }}。
-      请选择保留谁的版本，或把两边合在一起。合并不会丢掉审阅标记。
+      请选择保留谁的版本，或把两边合在一起。若正文有稳定块 ID，合并会按块去重并对冲突块并排保留；否则仍是先对方后本地整篇拼接。合并不清洗审阅标记，也不是飞书级三方合并。
     </p>
     <div class="save-conflict-panel__cols">
       <section class="save-conflict-panel__col" data-side="mine">

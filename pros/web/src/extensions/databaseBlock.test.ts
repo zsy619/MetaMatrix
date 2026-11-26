@@ -285,3 +285,21 @@ describe('databaseBlock 与树上表快照同步', () => {
     expect(pushed.rows.find((row) => row.id === target.id)?.cells[name.id]).toBe('块内改过')
   })
 })
+
+describe('databaseBlock 比较筛选', () => {
+  it('数字大于筛选刷新后仍保持', () => {
+    const ed = mount()
+    ed.commands.insertDatabaseBlock()
+    const payload = payloadFromAttrs(databaseNodes(ed)[0]!.node.attrs)
+    const due = payload.sheet.fields.find((field) => field.type === 'date')!
+    expect(due).toBeTruthy()
+    expect(ed.commands.setDatabaseBlockFilters([{ fieldId: due.id, op: 'gt', value: '2026-11-27' }])).toBe(true)
+    const visible = visibleDatabaseRows(payloadFromAttrs(databaseNodes(ed)[0]!.node.attrs))
+    expect(visible).toHaveLength(1)
+    expect(visible[0]!.cells[due.id]).toBe('2026-12-01')
+    const again = mount(ed.getHTML())
+    const restored = payloadFromAttrs(databaseNodes(again)[0]!.node.attrs)
+    expect(restored.sheet.views.find((view) => view.id === restored.activeViewId)?.filters[0]?.op).toBe('gt')
+    expect(visibleDatabaseRows(restored)).toHaveLength(1)
+  })
+})

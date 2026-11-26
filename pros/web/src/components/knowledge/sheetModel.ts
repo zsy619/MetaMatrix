@@ -30,7 +30,7 @@ export type SheetRow = {
   cells: Record<string, SheetCellValue>
 }
 
-export type SheetFilterOp = 'contains' | 'is' | 'isNot' | 'empty' | 'notEmpty'
+export type SheetFilterOp = 'contains' | 'is' | 'isNot' | 'empty' | 'notEmpty' | 'gt' | 'gte' | 'lt' | 'lte'
 
 export type SheetFilter = {
   fieldId: string
@@ -92,6 +92,10 @@ export const FILTER_OPS: Array<{ op: SheetFilterOp; label: string }> = [
   { op: 'isNot', label: '不等于' },
   { op: 'empty', label: '为空' },
   { op: 'notEmpty', label: '不为空' },
+  { op: 'gt', label: '大于' },
+  { op: 'gte', label: '大于等于' },
+  { op: 'lt', label: '小于' },
+  { op: 'lte', label: '小于等于' },
 ]
 
 export function fieldMeta(type: SheetFieldType): FieldTypeMeta {
@@ -206,9 +210,25 @@ export function matchesFilter(row: SheetRow, filter: SheetFilter): boolean {
       return text === ''
     case 'notEmpty':
       return text !== ''
+    case 'gt':
+      return compareCell(text, needle) > 0
+    case 'gte':
+      return compareCell(text, needle) >= 0
+    case 'lt':
+      return compareCell(text, needle) < 0
+    case 'lte':
+      return compareCell(text, needle) <= 0
     default:
       return true
   }
+}
+
+function compareCell(text: string, needle: string): number {
+  if (text === '' || needle === '') return text === needle ? 0 : text === '' ? -1 : 1
+  const left = Number(text)
+  const right = Number(needle)
+  if (text.trim() !== '' && needle.trim() !== '' && Number.isFinite(left) && Number.isFinite(right)) return left - right
+  return text.localeCompare(needle, 'zh-CN')
 }
 
 export function filterRows(
