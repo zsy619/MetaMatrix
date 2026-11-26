@@ -21,6 +21,12 @@ type stubCollab struct {
 	listErr error
 }
 
+func (s stubCollab) Authorize(userID, docID uuid.UUID) (*service.CollabAccess, error) {
+	if s.listErr != nil {
+		return nil, s.listErr
+	}
+	return &service.CollabAccess{CanWrite: true, Role: "owner"}, nil
+}
 func (s stubCollab) Append(ownerID, docID, authorID uuid.UUID, in service.CollabOperationInput) (*service.CollabOperation, error) {
 	return nil, s.listErr
 }

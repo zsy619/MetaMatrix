@@ -52,20 +52,25 @@ type SpaceMember struct {
 	IsOwner bool `json:"isOwner"`
 }
 
-// SpaceRole 返回该用户在空间里的角色；不在空间里返回空串。
-func (s *KnowledgeService) SpaceRole(userID, projectID uuid.UUID) string {
+// lookupSpaceRole 查询用户在空间中的角色。项目所有者视为 admin；无成员关系返回空串。
+func lookupSpaceRole(db *gorm.DB, userID, projectID uuid.UUID) string {
 	var count int64
-	if err := s.db.Model(&model.Project{}).
+	if err := db.Model(&model.Project{}).
 		Where("id = ? AND owner_user_id = ?", projectID, userID).
 		Count(&count).Error; err == nil && count > 0 {
 		return SpaceRoleAdmin
 	}
 	var member model.KnowledgeMember
-	if err := s.db.Where("project_id = ? AND user_id = ?", projectID, userID).
+	if err := db.Where("project_id = ? AND user_id = ?", projectID, userID).
 		First(&member).Error; err == nil {
 		return member.Role
 	}
 	return ""
+}
+
+// SpaceRole 返回该用户在空间里的角色；不在空间里返回空串。
+func (s *KnowledgeService) SpaceRole(userID, projectID uuid.UUID) string {
+	return lookupSpaceRole(s.db, userID, projectID)
 }
 
 // assertSpaceAccess 校验用户对空间的权限：read | write | admin。

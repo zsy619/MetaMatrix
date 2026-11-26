@@ -136,3 +136,104 @@ describe('yDocCollab', () => {
     session.stop()
   })
 })
+
+function createFakeSocket() {
+  const listeners: Record<string, Array<(ev: Event) => void>> = {}
+  const sent: string[] = []
+  const fake = {
+    readyState: 1,
+    sent,
+    listeners,
+    send(data: string) {
+      sent.push(String(data))
+    },
+    close() {
+      this.readyState = 3
+      ;(listeners.close ||= []).forEach((fn) => fn(new Event('close')))
+    },
+    addEventListener(type: string, fn: EventListener) {
+      ;(listeners[type] ||= []).push(fn as (ev: Event) => void)
+    },
+    removeEventListener() {},
+    open() {
+      this.readyState = 1
+      ;(listeners.open ||= []).forEach((fn) => fn(new Event('open')))
+    },
+  }
+  return fake
+}
+
+describe('LiveCollabSession 心跳与重连', () => {
+  it('按间隔发出应用层 ping，stop 后不再重连', async () => {
+    const ydoc = new Y.Doc()
+    const first = createFakeSocket()
+    const sockets = [first]
+    const scheduled: Array<() => void> = []
+    const session = new LiveCollabSession({
+      documentId: 'd1',
+      token: 't',
+      ydoc,
+      socketURL: 'ws://example.test/collab',
+      heartbeatIntervalMs: 5,
+      reconnectBaseMs: 1,
+      socketFactory: () => {
+        const s = sockets[sockets.length - 1]!
+        return s
+      },
+      schedule: (fn) => {
+        scheduled.push(fn)
+        return 1 as unknown as ReturnType<typeof setTimeout>
+      },
+      clearSchedule: () => undefined,
+    })
+    const started = session.start()
+    first.open()
+    await started
+    await new Promise((r) => setTimeout(r, 12))
+    expect(first.sent.some((s) => s.includes('"type":"ping"'))).toBe(true)
+    session.stop()
+    first.close()
+    expect(scheduled.length).toBe(0)
+  })
+
+  it('断线后重连会带上 lastSeq，并把断线期间的本地增量发出去', async () => {
+    const ydoc = new Y.Doc()
+    const first = createFakeSocket()
+    const second = createFakeSocket()
+    const sockets = [first, second]
+    let idx = 0
+    const scheduled: Array<() => void> = []
+    const session = new LiveCollabSession({
+      documentId: 'd1',
+      token: 't',
+      ydoc,
+      socketURL: 'ws://example.test/collab',
+      heartbeatIntervalMs: 0,
+      reconnectBaseMs: 1,
+      socketFactory: () => sockets[Math.min(idx++, sockets.length - 1)]!,
+      schedule: (fn) => {
+        scheduled.push(fn)
+        return scheduled.length as unknown as ReturnType<typeof setTimeout>
+      },
+      clearSchedule: () => undefined,
+    })
+    const started = session.start()
+    first.open()
+    await started
+    first.listeners.message?.forEach((fn) =>
+      fn({ data: JSON.stringify({ type: 'ops', ops: [{ seq: 3 }] }) } as MessageEvent),
+    )
+    first.close()
+    expect(scheduled.length).toBe(1)
+    ydoc.getMap('m').set('offline', 'yes')
+    const connecting = Promise.resolve().then(() => scheduled[0]!())
+    // 先触发重连，再打开第二根插座。
+    await Promise.resolve()
+    second.open()
+    await connecting
+    await new Promise((r) => setTimeout(r, 0))
+    expect(second.sent.some((s) => s.includes('"after":3'))).toBe(true)
+    expect(second.sent.some((s) => s.includes('"type":"update"'))).toBe(true)
+    session.stop()
+  })
+})

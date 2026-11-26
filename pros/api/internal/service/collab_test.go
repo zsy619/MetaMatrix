@@ -2,7 +2,10 @@ package service
 
 import (
 	"encoding/json"
+
 	"errors"
+	"metamatrix/api/internal/model"
+	"strings"
 	"testing"
 	"time"
 
@@ -26,10 +29,52 @@ func (docOperationSQLite) TableName() string { return "doc_operation" }
 func openCollabSQLite(t *testing.T) *gorm.DB {
 	t.Helper()
 	db := openDocumentsSQLite(t)
-	if err := db.AutoMigrate(&docOperationSQLite{}, &knowledgePresenceSQLite{}, &backupUserSQLite{}); err != nil {
+	if err := db.AutoMigrate(
+		&docOperationSQLite{},
+		&knowledgePresenceSQLite{},
+		&backupUserSQLite{},
+		&projectSQLite{},
+		&knowledgeMemberSQLite{},
+		&knowledgeDocVersionSQLite{},
+	); err != nil {
 		t.Fatal(err)
 	}
 	return db
+}
+
+func attachCollabProject(t *testing.T, db *gorm.DB, ownerID, docID uuid.UUID) uuid.UUID {
+	t.Helper()
+	now := time.Now().UTC()
+	projectID := uuid.New()
+	if err := db.Create(&projectSQLite{
+		ID: projectID, OwnerUserID: ownerID, Name: "协同空间", Emoji: "📁",
+		CreatedAt: now, UpdatedAt: now,
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Model(&backupDocumentSQLite{}).Where("id = ?", docID).Update("project_id", projectID).Error; err != nil {
+		t.Fatal(err)
+	}
+	return projectID
+}
+
+func addCollabMember(t *testing.T, db *gorm.DB, projectID, ownerID uuid.UUID, role, name string) uuid.UUID {
+	t.Helper()
+	now := time.Now().UTC()
+	memberID := uuid.New()
+	if err := db.Create(&backupUserSQLite{
+		ID: memberID, Email: memberID.String() + "@collab.test", DisplayName: name, PasswordHash: "x",
+		CreatedAt: now, UpdatedAt: now,
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&knowledgeMemberSQLite{
+		ID: uuid.New(), ProjectID: projectID, UserID: memberID, Role: role, CreatedBy: ownerID,
+		CreatedAt: now, UpdatedAt: now,
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+	return memberID
 }
 
 func newCollabFixture(t *testing.T, db *gorm.DB) (*CollabService, uuid.UUID, uuid.UUID, int64) {
@@ -181,5 +226,135 @@ func TestCollabPresenceUsesSharedStore(t *testing.T) {
 	also := store.List(docID)
 	if len(also) != 1 || also[0].UserID != ownerID.String() {
 		t.Fatalf("shared store list = %+v", also)
+	}
+}
+
+func TestCollabEditorMemberCanWriteAndViewerIsReadOnly(t *testing.T) {
+	db := openCollabSQLite(t)
+	svc, ownerID, docID, _ := newCollabFixture(t, db)
+	projectID := attachCollabProject(t, db, ownerID, docID)
+	editorID := addCollabMember(t, db, projectID, ownerID, SpaceRoleEditor, "编辑成员")
+	viewerID := addCollabMember(t, db, projectID, ownerID, SpaceRoleViewer, "只读成员")
+	stranger := uuid.New()
+
+	edAccess, err := svc.Authorize(editorID, docID)
+	if err != nil || !edAccess.CanWrite || edAccess.Role != SpaceRoleEditor {
+		t.Fatalf("editor access = %+v, err=%v", edAccess, err)
+	}
+	vwAccess, err := svc.Authorize(viewerID, docID)
+	if err != nil || vwAccess.CanWrite || vwAccess.Role != SpaceRoleViewer {
+		t.Fatalf("viewer access = %+v, err=%v, want read-only", vwAccess, err)
+	}
+	if _, err := svc.Authorize(stranger, docID); !errors.Is(err, ErrDocumentNotFound) {
+		t.Fatalf("stranger err = %v, want ErrDocumentNotFound", err)
+	}
+
+	op, err := svc.Append(editorID, docID, editorID, CollabOperationInput{Payload: []byte{0x11}, HTML: "<p>成员写入</p>"})
+	if err != nil {
+		t.Fatalf("editor append: %v", err)
+	}
+	if op.AuthorUserID != editorID {
+		t.Fatalf("author = %s, want editor", op.AuthorUserID)
+	}
+
+	if _, err := svc.Append(viewerID, docID, viewerID, CollabOperationInput{Payload: []byte{0x12}}); !errors.Is(err, ErrCollabReadOnly) {
+		t.Fatalf("viewer append err = %v, want ErrCollabReadOnly", err)
+	}
+	rows, err := svc.List(viewerID, docID, 0, 10)
+	if err != nil {
+		t.Fatalf("viewer list: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("viewer should see owner-space ops, got %d", len(rows))
+	}
+	if err := svc.Heartbeat(viewerID, docID, false, ""); err != nil {
+		t.Fatalf("viewer heartbeat: %v", err)
+	}
+}
+
+func TestCollabDerivedExtractAndCheckpointAfterFlush(t *testing.T) {
+	db := openCollabSQLite(t)
+	docs := NewDocumentsService(db)
+	svc, ownerID, _, _ := newCollabFixture(t, db)
+	title := "抽取文档"
+	canvasType := DocCanvasType
+	doc, err := docs.Create(ownerID, CreateDocumentInput{
+		Title:      &title,
+		CanvasType: &canvasType,
+		Data:       json.RawMessage(`{"type":"doc","html":"<p>初稿</p>"}`),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	html := `<p data-block-id="22222222-2222-4222-8222-222222222222">检索可见正文</p>`
+	if _, err := svc.Append(ownerID, doc.ID, ownerID, CollabOperationInput{
+		Payload: []byte{0x21},
+		HTML:    html,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	// 尚未 Flush 时不应强迫按键级抽取已经完成；给一个短窗口后强制执行。
+	if err := svc.FlushDerived(doc.ID); err != nil {
+		t.Fatalf("flush: %v", err)
+	}
+
+	fresh, err := docs.GetOwned(ownerID, doc.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(fresh.ContentText, "检索可见正文") {
+		t.Fatalf("content_text = %q, want extracted html text", fresh.ContentText)
+	}
+	var blocks int64
+	if err := db.Model(&model.CanvasContentBlock{}).Where("document_id = ?", doc.ID).Count(&blocks).Error; err != nil {
+		t.Fatal(err)
+	}
+	if blocks == 0 {
+		t.Fatal("expected canvas_content_blocks after flush")
+	}
+	if fresh.HeadRevisionID == nil || (doc.HeadRevisionID != nil && *fresh.HeadRevisionID == *doc.HeadRevisionID) {
+		t.Fatalf("head revision should advance after checkpoint, was %v now %v", doc.HeadRevisionID, fresh.HeadRevisionID)
+	}
+	var versions int64
+	if err := db.Model(&model.KnowledgeDocVersion{}).Where("document_id = ?", doc.ID).Count(&versions).Error; err != nil {
+		t.Fatal(err)
+	}
+	if versions == 0 {
+		t.Fatal("expected knowledge_doc_versions snapshot after flush")
+	}
+}
+
+func TestCollabAppendWithoutHTMLDoesNotScheduleExtract(t *testing.T) {
+	db := openCollabSQLite(t)
+	docs := NewDocumentsService(db)
+	svc, ownerID, _, _ := newCollabFixture(t, db)
+	title := "无导出"
+	canvasType := DocCanvasType
+	doc, err := docs.Create(ownerID, CreateDocumentInput{
+		Title:      &title,
+		CanvasType: &canvasType,
+		Data:       json.RawMessage(`{"type":"doc","html":"<p>初稿</p>"}`),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	before := doc.ContentText
+	if _, err := svc.Append(ownerID, doc.ID, ownerID, CollabOperationInput{Payload: []byte{0x31}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.FlushDerived(doc.ID); err != nil {
+		t.Fatal(err)
+	}
+	fresh, err := docs.GetOwned(ownerID, doc.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fresh.SaveVersion != doc.SaveVersion {
+		t.Fatalf("save_version changed without html")
+	}
+	// Flush 仍会按当前 current_data 跑一次抽取；初稿文本应保持稳定而不是被清空。
+	if fresh.ContentText == "" && before != "" {
+		t.Fatalf("extract wiped content_text")
 	}
 }

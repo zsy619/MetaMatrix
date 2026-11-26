@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strconv"
 	"sync"
+	"time"
 
 	"metamatrix/api/internal/middleware"
 	"metamatrix/api/internal/service"
@@ -20,6 +21,7 @@ import (
 
 // collabBackend 是协同 handler 依赖的服务面，便于鉴权测试注入桩实现。
 type collabBackend interface {
+	Authorize(userID, docID uuid.UUID) (*service.CollabAccess, error)
 	Append(ownerID, docID, authorID uuid.UUID, in service.CollabOperationInput) (*service.CollabOperation, error)
 	List(ownerID, docID uuid.UUID, after int64, limit int) ([]service.CollabOperation, error)
 	Heartbeat(ownerID, docID uuid.UUID, editing bool, cursor string) error
@@ -131,6 +133,8 @@ func handleCollabErr(c *app.RequestContext, err error) bool {
 		NotFound(c, "document not found")
 	case errors.Is(err, service.ErrValidation):
 		Fail(c, http.StatusBadRequest, "validation failed", "validation_error")
+	case errors.Is(err, service.ErrCollabReadOnly), errors.Is(err, service.ErrSpaceForbidden):
+		Forbidden(c, "collab room is read-only")
 	case errors.Is(err, service.ErrSaveConflict):
 		Conflict(c, err.Error(), nil)
 	default:
@@ -157,20 +161,20 @@ func (h *CollabHandler) ServeWS(ctx context.Context, c *app.RequestContext) {
 	if !ok {
 		return
 	}
-	// 握手前先确认文档归属，避免无权限连接占用升级。
-	if _, err := h.svc.List(uid, docID, 0, 1); err != nil {
-		handleCollabErr(c, err)
+	access, err := h.svc.Authorize(uid, docID)
+	if handleCollabErr(c, err) {
 		return
 	}
 	_ = h.svc.Heartbeat(uid, docID, true, "")
 
-	err := collabUpgrader.Upgrade(c, func(conn *websocket.Conn) {
+	err = collabUpgrader.Upgrade(c, func(conn *websocket.Conn) {
 		defer conn.Close()
-		client := &collabClient{conn: conn, docID: docID, userID: uid}
+		client := &collabClient{conn: conn, docID: docID, userID: uid, canWrite: access.CanWrite, role: access.Role}
 		h.hub.add(client)
 		defer h.hub.remove(client)
 
-		// 新连接先把已有增量发给客户端，便于从空 Y.Doc 收敛。
+		_ = client.writeJSON(wsOut{Type: "hello", CanWrite: access.CanWrite, Role: access.Role})
+
 		if ops, err := h.svc.List(uid, docID, 0, 0); err == nil {
 			payload := wsOut{Type: "ops", Ops: make([]operationJSON, 0, len(ops))}
 			for _, op := range ops {
@@ -182,12 +186,21 @@ func (h *CollabHandler) ServeWS(ctx context.Context, c *app.RequestContext) {
 			_ = client.writeJSON(wsOut{Type: "presence", Users: users})
 		}
 
+		done := make(chan struct{})
+		defer close(done)
+		go keepCollabAlive(client, done)
+
 		conn.SetReadLimit(maxCollabPayloadJSON)
+		_ = conn.SetReadDeadline(time.Now().Add(collabPongWait))
+		conn.SetPongHandler(func(string) error {
+			return conn.SetReadDeadline(time.Now().Add(collabPongWait))
+		})
 		for {
 			_, message, err := conn.ReadMessage()
 			if err != nil {
 				return
 			}
+			_ = conn.SetReadDeadline(time.Now().Add(collabPongWait))
 			h.handleWSMessage(client, message)
 		}
 	})
@@ -209,12 +222,14 @@ type wsIn struct {
 }
 
 type wsOut struct {
-	Type    string                 `json:"type"`
-	Ops     []operationJSON        `json:"ops,omitempty"`
-	Op      *operationJSON         `json:"op,omitempty"`
-	Users   []service.PresenceUser `json:"users,omitempty"`
-	Message string                 `json:"message,omitempty"`
-	Seq     int64                  `json:"seq,omitempty"`
+	Type     string                 `json:"type"`
+	Ops      []operationJSON        `json:"ops,omitempty"`
+	Op       *operationJSON         `json:"op,omitempty"`
+	Users    []service.PresenceUser `json:"users,omitempty"`
+	Message  string                 `json:"message,omitempty"`
+	Seq      int64                  `json:"seq,omitempty"`
+	CanWrite bool                   `json:"canWrite,omitempty"`
+	Role     string                 `json:"role,omitempty"`
 }
 
 func (h *CollabHandler) handleWSMessage(client *collabClient, message []byte) {
@@ -224,6 +239,9 @@ func (h *CollabHandler) handleWSMessage(client *collabClient, message []byte) {
 		return
 	}
 	switch in.Type {
+	case "ping":
+		_ = client.writeJSON(wsOut{Type: "pong"})
+		_ = h.svc.Heartbeat(client.userID, client.docID, true, in.Cursor)
 	case "sync":
 		ops, err := h.svc.List(client.userID, client.docID, in.After, 0)
 		if err != nil {
@@ -236,6 +254,10 @@ func (h *CollabHandler) handleWSMessage(client *collabClient, message []byte) {
 		}
 		_ = client.writeJSON(out)
 	case "update":
+		if !client.canWrite {
+			_ = client.writeJSON(wsOut{Type: "error", Message: "collab room is read-only"})
+			return
+		}
 		raw, err := base64.StdEncoding.DecodeString(in.Payload)
 		if err != nil || len(raw) == 0 {
 			_ = client.writeJSON(wsOut{Type: "error", Message: "payload must be non-empty base64"})
@@ -272,20 +294,46 @@ func (h *CollabHandler) handleWSMessage(client *collabClient, message []byte) {
 func ptrOp(op operationJSON) *operationJSON { return &op }
 
 type collabClient struct {
-	conn   *websocket.Conn
-	docID  uuid.UUID
-	userID uuid.UUID
-	mu     sync.Mutex
+	conn     *websocket.Conn
+	docID    uuid.UUID
+	userID   uuid.UUID
+	canWrite bool
+	role     string
+	mu       sync.Mutex
 }
+
+const (
+	collabPingInterval = 20 * time.Second
+	collabPongWait     = 60 * time.Second
+)
 
 func (c *collabClient) writeJSON(v any) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
 	}
+	return c.writeRaw(websocket.TextMessage, b)
+}
+
+func (c *collabClient) writeRaw(messageType int, data []byte) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	return c.conn.WriteMessage(websocket.TextMessage, b)
+	return c.conn.WriteMessage(messageType, data)
+}
+
+func keepCollabAlive(client *collabClient, done <-chan struct{}) {
+	ticker := time.NewTicker(collabPingInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-done:
+			return
+		case <-ticker.C:
+			if err := client.writeRaw(websocket.PingMessage, nil); err != nil {
+				return
+			}
+		}
+	}
 }
 
 type collabHub struct {
