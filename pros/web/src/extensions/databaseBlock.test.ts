@@ -17,6 +17,11 @@ import {
   DatabaseBlock,
   readDatabaseBlockOpenTarget,
 } from './databaseBlock'
+import {
+  firstFilterableField,
+  payloadFromAttrs,
+  visibleDatabaseRows,
+} from './databaseBlockSheet'
 
 let editor: Editor | undefined
 
@@ -144,5 +149,57 @@ describe('databaseBlock B3 skeleton', () => {
       sheetNodeId: 'abc',
       title: '库存',
     })
+  })
+})
+
+
+describe('databaseBlock 筛选与视图', () => {
+  it('筛选后序列化往返，刷新后仍只显示匹配行', () => {
+    const ed = mount()
+    ed.commands.insertDatabaseBlock({ title: '任务表' })
+    const node = databaseNodes(ed)[0]!.node
+    const field = firstFilterableField(payloadFromAttrs(node.attrs))
+    expect(field).toBeTruthy()
+    expect(ed.commands.setDatabaseBlockFilters([{ fieldId: field!.id, op: 'contains', value: '示例' }])).toBe(true)
+    const filtered = payloadFromAttrs(databaseNodes(ed)[0]!.node.attrs)
+    expect(visibleDatabaseRows(filtered).map((row) => String(row.cells[field!.id]))).toEqual(['示例任务'])
+    const id = readBlockId(databaseNodes(ed)[0]!.node)
+    const html = ed.getHTML()
+    expect(html).toContain('data-sheet=')
+    expect(html).toContain('data-view-type=')
+    const again = mount(html)
+    const restored = payloadFromAttrs(databaseNodes(again)[0]!.node.attrs)
+    expect(readBlockId(databaseNodes(again)[0]!.node)).toBe(id)
+    expect(visibleDatabaseRows(restored)).toHaveLength(1)
+    expect(visibleDatabaseRows(restored)[0]!.cells[field!.id]).toBe('示例任务')
+  })
+
+  it('切换看板视图后刷新仍保持', () => {
+    const ed = mount()
+    ed.commands.insertDatabaseBlock()
+    const id = readBlockId(databaseNodes(ed)[0]!.node)
+    expect(ed.commands.setDatabaseBlockView('kanban')).toBe(true)
+    expect(payloadFromAttrs(databaseNodes(ed)[0]!.node.attrs).sheet.views.find((view) => view.id === payloadFromAttrs(databaseNodes(ed)[0]!.node.attrs).activeViewId)?.type).toBe('kanban')
+    const again = mount(ed.getHTML())
+    const payload = payloadFromAttrs(databaseNodes(again)[0]!.node.attrs)
+    expect(readBlockId(databaseNodes(again)[0]!.node)).toBe(id)
+    expect(payload.sheet.views.find((view) => view.id === payload.activeViewId)?.type).toBe('kanban')
+    expect(ed.getHTML()).toContain('data-view-type="kanban"')
+  })
+
+  it('块内改单元格不丢 blockId，刷新后仍在', () => {
+    const ed = mount()
+    ed.commands.insertDatabaseBlock()
+    const row = databaseNodes(ed)[0]!
+    const id = readBlockId(row.node)
+    const payload = payloadFromAttrs(row.node.attrs)
+    const field = firstFilterableField(payload)!
+    const target = payload.sheet.rows[1]!
+    expect(ed.commands.updateDatabaseBlockCell(target.id, field.id, '改过的名称')).toBe(true)
+    expect(readBlockId(databaseNodes(ed)[0]!.node)).toBe(id)
+    const again = mount(ed.getHTML())
+    expect(readBlockId(databaseNodes(again)[0]!.node)).toBe(id)
+    const restored = payloadFromAttrs(databaseNodes(again)[0]!.node.attrs)
+    expect(restored.sheet.rows.find((item) => item.id === target.id)?.cells[field.id]).toBe('改过的名称')
   })
 })

@@ -1,11 +1,28 @@
 import { Node, mergeAttributes } from '@tiptap/core'
+import { NodeSelection } from '@tiptap/pm/state'
+import type { SheetFilter } from '../components/knowledge/sheetModel'
+import { createDatabaseBlockView } from './databaseBlockView'
+import {
+  activeDatabaseView,
+  attrsFromPayload,
+  DATABASE_BLOCK_HTML_TYPE,
+  DATABASE_BLOCK_NAME,
+  defaultDatabasePayload,
+  payloadFromAttrs,
+  setDatabaseFilters,
+  setDatabaseViewType,
+  type DatabaseBlockPayload,
+  type DatabaseBlockViewType,
+  updateDatabaseCell,
+  visibleDatabaseRows,
+} from './databaseBlockSheet'
 
 /**
- * 正文内嵌多维表格块（路线图 B3 最小骨架）。
+ * 正文内嵌多维表格块（B3）。
  *
- * 本身是带 A1 `data-block-id` 的身份块，可引用知识库树上既有的 `kind=sheet`
- * 节点（data-sheet-node-id）。不取代、不删除树上的独立表格。
- * 本轮不做筛选、视图切换、块内协同编辑。
+ * 带 A1 `data-block-id`，可引用知识库树上既有的 `kind=sheet`，
+ * 同时在块属性里保存一份可筛选、可切换视图、可在块内编辑的快照。
+ * 不取代、不删除树上的独立表格。
  */
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
@@ -13,13 +30,17 @@ declare module '@tiptap/core' {
       insertDatabaseBlock: (attrs?: {
         sheetNodeId?: string
         title?: string
+        payload?: DatabaseBlockPayload
       }) => ReturnType
+      setDatabaseBlockView: (type: DatabaseBlockViewType) => ReturnType
+      setDatabaseBlockFilters: (filters: SheetFilter[]) => ReturnType
+      updateDatabaseBlockCell: (rowId: string, fieldId: string, value: string) => ReturnType
     }
   }
 }
 
-export const DATABASE_BLOCK_NAME = 'databaseBlock'
-export const DATABASE_BLOCK_HTML_TYPE = 'database-block'
+export { DATABASE_BLOCK_HTML_TYPE, DATABASE_BLOCK_NAME }
+export type { DatabaseBlockPayload, DatabaseBlockViewType }
 
 export type DatabaseBlockOpenTarget = {
   sheetNodeId: string
@@ -38,6 +59,29 @@ export function readDatabaseBlockOpenTarget(
     host.querySelector('.rte-database-block__title')?.textContent?.trim() ||
     '多维表格'
   return { sheetNodeId, title }
+}
+
+function currentDatabasePos(state: { selection: any; doc: any }): number | null {
+  const sel = state.selection
+  if (sel instanceof NodeSelection && sel.node.type.name === DATABASE_BLOCK_NAME) {
+    return sel.from
+  }
+  let found: number | null = null
+  const from = Math.max(0, (sel.from ?? 0) - 1)
+  const to = Math.min(state.doc.content.size, (sel.to ?? sel.from ?? 0) + 1)
+  state.doc.nodesBetween(from, to, (node: { type: { name: string } }, pos: number) => {
+    if (node.type.name === DATABASE_BLOCK_NAME && found == null) {
+      found = pos
+      return false
+    }
+    return true
+  })
+  if (found != null) return found
+  state.doc.descendants((node: { type: { name: string } }, pos: number) => {
+    if (found == null && node.type.name === DATABASE_BLOCK_NAME) found = pos
+    return found == null
+  })
+  return found
 }
 
 export const DatabaseBlock = Node.create({
@@ -60,6 +104,17 @@ export const DatabaseBlock = Node.create({
         parseHTML: (el: HTMLElement) => el.getAttribute('data-title') || '',
         renderHTML: (attrs: { title?: string }) => (attrs.title ? { 'data-title': attrs.title } : {}),
       },
+      viewType: {
+        default: 'grid',
+        parseHTML: (el: HTMLElement) => el.getAttribute('data-view-type') || 'grid',
+        renderHTML: (attrs: { viewType?: string }) =>
+          attrs.viewType ? { 'data-view-type': attrs.viewType } : {},
+      },
+      sheet: {
+        default: '',
+        parseHTML: (el: HTMLElement) => el.getAttribute('data-sheet') || '',
+        renderHTML: (attrs: { sheet?: string }) => (attrs.sheet ? { 'data-sheet': attrs.sheet } : {}),
+      },
     }
   },
 
@@ -71,36 +126,89 @@ export const DatabaseBlock = Node.create({
   },
 
   renderHTML({ node, HTMLAttributes }) {
+    const payload = payloadFromAttrs(node.attrs as { sheet?: string; viewType?: string })
+    const view = activeDatabaseView(payload)
+    const typ = view.type === 'kanban' ? 'kanban' : 'grid'
+    const rows = visibleDatabaseRows(payload)
     const linked = Boolean(String(node.attrs.sheetNodeId || '').trim())
-    const title = String(node.attrs.title || '').trim() || (linked ? '多维表格' : '未关联表格')
-    const hint = linked ? '打开知识库表格' : '嵌入位：可关联知识库中的独立表格'
+    const title = String(node.attrs.title || '').trim() || (linked ? '多维表格' : '多维表格')
+    const snapshot = attrsFromPayload(payload)
     return [
       'div',
       mergeAttributes(HTMLAttributes, {
         'data-type': DATABASE_BLOCK_HTML_TYPE,
-        class: linked ? 'rte-database-block is-linked' : 'rte-database-block is-empty',
+        'data-view-type': typ,
+        'data-sheet': snapshot.sheet,
+        class: linked ? 'rte-database-block is-linked' : 'rte-database-block',
         contenteditable: 'false',
-        role: 'button',
         'data-open-sheet': linked ? 'true' : 'false',
       }),
-      ['span', { class: 'rte-database-block__icon' }, '▦'],
       ['span', { class: 'rte-database-block__title' }, title],
-      ['span', { class: 'rte-database-block__hint' }, hint],
+      ['span', { class: 'rte-database-block__hint' }, typ === 'kanban' ? '看板' : '表格'],
+      ['span', { class: 'rte-database-block__meta' }, `${rows.length} 行`],
     ]
+  },
+
+  addNodeView() {
+    return (props) => createDatabaseBlockView(props)
   },
 
   addCommands() {
     return {
       insertDatabaseBlock:
         (attrs) =>
-        ({ commands }) =>
-          commands.insertContent({
+        ({ commands }) => {
+          const payload = attrs?.payload ?? defaultDatabasePayload()
+          const snap = attrsFromPayload(payload)
+          return commands.insertContent({
             type: DATABASE_BLOCK_NAME,
             attrs: {
               sheetNodeId: attrs?.sheetNodeId || '',
               title: attrs?.title || '',
+              sheet: snap.sheet,
+              viewType: snap.viewType,
             },
-          }),
+          })
+        },
+      setDatabaseBlockView:
+        (type) =>
+        ({ state, tr, dispatch }) => {
+          const pos = currentDatabasePos(state)
+          if (pos == null) return false
+          const node = state.doc.nodeAt(pos)
+          if (!node || node.type.name !== DATABASE_BLOCK_NAME) return false
+          const next = attrsFromPayload(setDatabaseViewType(payloadFromAttrs(node.attrs), type))
+          if (dispatch) {
+            dispatch(tr.setNodeMarkup(pos, undefined, { ...node.attrs, ...next }))
+          }
+          return true
+        },
+      setDatabaseBlockFilters:
+        (filters) =>
+        ({ state, tr, dispatch }) => {
+          const pos = currentDatabasePos(state)
+          if (pos == null) return false
+          const node = state.doc.nodeAt(pos)
+          if (!node || node.type.name !== DATABASE_BLOCK_NAME) return false
+          const next = attrsFromPayload(setDatabaseFilters(payloadFromAttrs(node.attrs), filters))
+          if (dispatch) {
+            dispatch(tr.setNodeMarkup(pos, undefined, { ...node.attrs, ...next }))
+          }
+          return true
+        },
+      updateDatabaseBlockCell:
+        (rowId, fieldId, value) =>
+        ({ state, tr, dispatch }) => {
+          const pos = currentDatabasePos(state)
+          if (pos == null) return false
+          const node = state.doc.nodeAt(pos)
+          if (!node || node.type.name !== DATABASE_BLOCK_NAME) return false
+          const next = attrsFromPayload(updateDatabaseCell(payloadFromAttrs(node.attrs), rowId, fieldId, value))
+          if (dispatch) {
+            dispatch(tr.setNodeMarkup(pos, undefined, { ...node.attrs, ...next }))
+          }
+          return true
+        },
     }
   },
 })
