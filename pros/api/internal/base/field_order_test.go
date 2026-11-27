@@ -50,6 +50,42 @@ type baseFieldSQLite struct {
 
 func (baseFieldSQLite) TableName() string { return "base_fields" }
 
+// baseRecordSQLite / baseRecordValueSQLite 是 SQLite 影子模型：
+// 字段与 model.BaseRecord / model.BaseRecordValue 保持一致（只把时间列改成 datetime）。
+// UpdateField 会触发 reindexTable，需要这两张表存在。
+type baseRecordSQLite struct {
+	ID        uuid.UUID      `gorm:"type:uuid;primaryKey"`
+	TableID   uuid.UUID      `gorm:"type:uuid;not null"`
+	Data      datatypes.JSON `gorm:"type:json;not null;default:'{}'"`
+	Version   int64          `gorm:"not null;default:1"`
+	SortOrder int64          `gorm:"not null;default:0"`
+	// Visibility 是记录级可见范围（space / restricted），与 GORM 模型保持一致。
+	Visibility string         `gorm:"type:varchar(16);not null;default:'space'"`
+	CreatedBy  uuid.UUID      `gorm:"type:uuid;not null"`
+	UpdatedBy  uuid.UUID      `gorm:"type:uuid;not null"`
+	CreatedAt  time.Time      `gorm:"type:datetime;not null"`
+	UpdatedAt  time.Time      `gorm:"type:datetime;not null"`
+	DeletedAt  gorm.DeletedAt `gorm:"index"`
+}
+
+func (baseRecordSQLite) TableName() string { return "base_records" }
+
+type baseRecordValueSQLite struct {
+	ID          uuid.UUID      `gorm:"type:uuid;primaryKey"`
+	TableID     uuid.UUID      `gorm:"type:uuid;not null"`
+	RecordID    uuid.UUID      `gorm:"type:uuid;not null"`
+	FieldID     uuid.UUID      `gorm:"type:uuid;not null"`
+	ValueType   string         `gorm:"type:varchar(24);not null;default:'text'"`
+	ValueText   string         `gorm:"type:text;not null;default:''"`
+	ValueNumber float64        `gorm:"type:double precision;not null;default:0"`
+	ValueDate   *time.Time     `gorm:"type:datetime"`
+	ValueBool   bool           `gorm:"not null;default:false"`
+	ValueJSON   datatypes.JSON `gorm:"type:json"`
+	UpdatedAt   time.Time      `gorm:"type:datetime;not null"`
+}
+
+func (baseRecordValueSQLite) TableName() string { return "base_record_values" }
+
 // newFieldOrderFixture 造一个「项目 + 表 + 三个字段」的最小环境。
 func newFieldOrderFixture(t *testing.T) (*Service, uuid.UUID, uuid.UUID, uuid.UUID) {
 	t.Helper()
@@ -57,7 +93,7 @@ func newFieldOrderFixture(t *testing.T) (*Service, uuid.UUID, uuid.UUID, uuid.UU
 	if err != nil {
 		t.Fatalf("open sqlite failed: %v", err)
 	}
-	if err := db.AutoMigrate(&baseTableSQLite{}, &baseFieldSQLite{}); err != nil {
+	if err := db.AutoMigrate(&baseTableSQLite{}, &baseFieldSQLite{}, &baseRecordSQLite{}, &baseRecordValueSQLite{}, &baseRecordLinkSQLite{}); err != nil {
 		t.Fatalf("migrate failed: %v", err)
 	}
 	if err := db.Exec(`CREATE TABLE IF NOT EXISTS core_projects (id uuid primary key, owner_user_id uuid)`).Error; err != nil {
@@ -133,3 +169,45 @@ func TestReorderFields(t *testing.T) {
 		t.Fatal("expected mismatch error")
 	}
 }
+
+// baseViewSQLite / baseViewPrefSQLite 是视图与视图个人偏好的 SQLite 影子模型。
+type baseViewSQLite struct {
+	ID        uuid.UUID `gorm:"type:uuid;primaryKey"`
+	TableID   uuid.UUID `gorm:"type:uuid;not null"`
+	Name      string    `gorm:"type:varchar(128);not null;default:''"`
+	Type      string    `gorm:"type:varchar(32);not null;default:'grid'"`
+	Config    string    `gorm:"type:text;not null;default:'{}'"`
+	IsDefault bool      `gorm:"not null;default:false"`
+	Scope     string    `gorm:"type:varchar(16);not null;default:'shared'"`
+	OwnerID   uuid.UUID `gorm:"type:uuid;not null"`
+	Version   int64     `gorm:"not null;default:1"`
+	Status    int       `gorm:"not null;default:1"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+func (baseViewSQLite) TableName() string { return "base_views" }
+
+type baseViewPrefSQLite struct {
+	ID        uuid.UUID `gorm:"type:uuid;primaryKey"`
+	ViewID    uuid.UUID `gorm:"type:uuid;not null;uniqueIndex:uniq_base_view_pref_view_user"`
+	UserID    uuid.UUID `gorm:"type:uuid;not null;uniqueIndex:uniq_base_view_pref_view_user"`
+	ProjectID uuid.UUID `gorm:"type:uuid;not null"`
+	Config    string    `gorm:"type:text;not null;default:'{}'"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+func (baseViewPrefSQLite) TableName() string { return "base_view_prefs" }
+
+// baseRecordGrantSQLite 是「记录可见成员授权」的 SQLite 影子模型。
+type baseRecordGrantSQLite struct {
+	ID        uuid.UUID `gorm:"type:uuid;primaryKey"`
+	RecordID  uuid.UUID `gorm:"type:uuid;not null;uniqueIndex:uniq_base_record_grant"`
+	UserID    uuid.UUID `gorm:"type:uuid;not null;uniqueIndex:uniq_base_record_grant"`
+	ProjectID uuid.UUID `gorm:"type:uuid;not null"`
+	CreatedBy uuid.UUID `gorm:"type:uuid;not null"`
+	CreatedAt time.Time
+}
+
+func (baseRecordGrantSQLite) TableName() string { return "base_record_grants" }

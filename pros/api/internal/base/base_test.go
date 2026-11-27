@@ -210,3 +210,18 @@ func TestBuildKeywordConditionWithoutDocFields(t *testing.T) {
 		t.Fatalf("expected unchanged condition, got %s / %v", cond, args)
 	}
 }
+
+// 旧表空列名必须补名：否则迁移后表头只剩图标、没有标题。
+func TestLegacyFieldNameFallback(t *testing.T) {
+	used := map[string]bool{}
+	if got := legacyFieldName("  ", 0, used); got != "列 1" {
+		t.Fatalf("expected 列 1, got %q", got)
+	}
+	used["列 1"] = true
+	if got := legacyFieldName("", 0, used); got != "列 1 2" {
+		t.Fatalf("expected de-duplicated name, got %q", got)
+	}
+	if got := legacyFieldName(" 预算 ", 2, used); got != "预算" {
+		t.Fatalf("expected trimmed name, got %q", got)
+	}
+}

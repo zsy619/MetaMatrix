@@ -349,13 +349,13 @@ func (p *parser) parsePrimary() (*ASTNode, error) {
 type formulaFunc struct {
 	minArgs int
 	maxArgs int
-	compute func(args []any) (any, error)
+	compute func(ctx EvalContext, args []any) (any, error)
 }
 
 // FormulaFunctions 是允许在公式中调用的函数集合。
 // 新增函数只需在这里注册一行，解析器与求值器无需改动。
 var FormulaFunctions = map[string]formulaFunc{
-	"SUM": {0, 255, func(args []any) (any, error) {
+	"SUM": {0, 255, func(_ EvalContext, args []any) (any, error) {
 		return aggregate(args, func(nums []float64) float64 {
 			s := 0.0
 			for _, n := range nums {
@@ -364,7 +364,7 @@ var FormulaFunctions = map[string]formulaFunc{
 			return s
 		})
 	}},
-	"AVERAGE": {0, 255, func(args []any) (any, error) {
+	"AVERAGE": {0, 255, func(_ EvalContext, args []any) (any, error) {
 		return aggregate(args, func(nums []float64) float64 {
 			if len(nums) == 0 {
 				return 0
@@ -376,10 +376,10 @@ var FormulaFunctions = map[string]formulaFunc{
 			return s / float64(len(nums))
 		})
 	}},
-	"COUNT": {0, 255, func(args []any) (any, error) {
+	"COUNT": {0, 255, func(_ EvalContext, args []any) (any, error) {
 		return aggregate(args, func(nums []float64) float64 { return float64(len(nums)) })
 	}},
-	"MIN": {0, 255, func(args []any) (any, error) {
+	"MIN": {0, 255, func(_ EvalContext, args []any) (any, error) {
 		return aggregate(args, func(nums []float64) float64 {
 			if len(nums) == 0 {
 				return 0
@@ -393,7 +393,7 @@ var FormulaFunctions = map[string]formulaFunc{
 			return m
 		})
 	}},
-	"MAX": {0, 255, func(args []any) (any, error) {
+	"MAX": {0, 255, func(_ EvalContext, args []any) (any, error) {
 		return aggregate(args, func(nums []float64) float64 {
 			if len(nums) == 0 {
 				return 0
@@ -407,14 +407,14 @@ var FormulaFunctions = map[string]formulaFunc{
 			return m
 		})
 	}},
-	"CONCATENATE": {1, 255, func(args []any) (any, error) {
+	"CONCATENATE": {1, 255, func(_ EvalContext, args []any) (any, error) {
 		var sb strings.Builder
 		for _, a := range args {
 			sb.WriteString(valueToText(a))
 		}
 		return sb.String(), nil
 	}},
-	"ROUND": {1, 2, func(args []any) (any, error) {
+	"ROUND": {1, 2, func(_ EvalContext, args []any) (any, error) {
 		if len(args) == 0 {
 			return nil, newFormulaError(ErrCodeValue, "ROUND 缺少参数")
 		}
@@ -433,14 +433,14 @@ var FormulaFunctions = map[string]formulaFunc{
 		shift := math.Pow(10, float64(digits))
 		return math.Round(n*shift) / shift, nil
 	}},
-	"ABS": {1, 1, func(args []any) (any, error) {
+	"ABS": {1, 1, func(_ EvalContext, args []any) (any, error) {
 		n, ok := toFloat(args[0])
 		if !ok {
 			return nil, newFormulaError(ErrCodeValue, "ABS 参数不是数字")
 		}
 		return math.Abs(n), nil
 	}},
-	"IF": {2, 3, func(args []any) (any, error) {
+	"IF": {2, 3, func(_ EvalContext, args []any) (any, error) {
 		if len(args) < 2 {
 			return nil, newFormulaError(ErrCodeValue, "IF 参数不足")
 		}
@@ -452,7 +452,7 @@ var FormulaFunctions = map[string]formulaFunc{
 		}
 		return nil, nil
 	}},
-	"AND": {1, 255, func(args []any) (any, error) {
+	"AND": {1, 255, func(_ EvalContext, args []any) (any, error) {
 		for _, a := range args {
 			if !truthy(a) {
 				return false, nil
@@ -460,7 +460,7 @@ var FormulaFunctions = map[string]formulaFunc{
 		}
 		return true, nil
 	}},
-	"OR": {1, 255, func(args []any) (any, error) {
+	"OR": {1, 255, func(_ EvalContext, args []any) (any, error) {
 		for _, a := range args {
 			if truthy(a) {
 				return true, nil
@@ -468,8 +468,8 @@ var FormulaFunctions = map[string]formulaFunc{
 		}
 		return false, nil
 	}},
-	"NOT": {1, 1, func(args []any) (any, error) { return !truthy(args[0]), nil }},
-	"DATE": {1, 3, func(args []any) (any, error) {
+	"NOT": {1, 1, func(_ EvalContext, args []any) (any, error) { return !truthy(args[0]), nil }},
+	"DATE": {1, 3, func(_ EvalContext, args []any) (any, error) {
 		y, m, d := 1970, 1, 1
 		h, mi := 0, 0
 		if len(args) > 0 {
@@ -497,8 +497,8 @@ var FormulaFunctions = map[string]formulaFunc{
 		}
 		return time.Date(y, time.Month(m), d, h, mi, 0, 0, time.UTC).Format("2006-01-02 15:04:05"), nil
 	}},
-	"TODAY": {0, 0, func(args []any) (any, error) {
-		return time.Now().Format("2006-01-02"), nil
+	"TODAY": {0, 0, func(ctx EvalContext, args []any) (any, error) {
+		return formulaNow(ctx).Format("2006-01-02"), nil
 	}},
 }
 
@@ -638,14 +638,23 @@ func EvaluateFormula(node *ASTNode, ctx EvalContext) (any, error) {
 				return nil, newFormulaError(ErrCodeValue, fmt.Sprintf("%s 参数数量不正确", n.Name))
 			}
 			args := make([]any, 0, len(n.Args))
-			for _, a := range n.Args {
+			for i, a := range n.Args {
 				v, err := evalNode(a, depth+1)
 				if err != nil {
+					// IFERROR 是唯一「能吞掉参数错误」的函数：
+					// 第一个参数求值失败时，直接返回兜底值。
+					if n.Name == "IFERROR" && i == 0 {
+						fallback, ferr := evalNode(n.Args[1], depth+1)
+						if ferr != nil {
+							return nil, ferr
+						}
+						return fallback, nil
+					}
 					return nil, err
 				}
 				args = append(args, v)
 			}
-			return fn.compute(args)
+			return fn.compute(ctx, args)
 		default:
 			return nil, newFormulaError(ErrCodeParse, "未知节点 "+n.Type)
 		}

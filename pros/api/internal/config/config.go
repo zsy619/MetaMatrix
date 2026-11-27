@@ -39,6 +39,11 @@ type Config struct {
 	// AI holds the optional external model settings. Empty means the
 	// knowledge base falls back to its local implementations.
 	AI AIConfig
+	// BaseRateLimitRPS 是多维表格接口的每用户限流（每秒请求数）。
+	// 0 表示不限流；默认 40（够用，也不会把正常操作误伤）。
+	BaseRateLimitRPS int
+	// BaseRateLimitBurst 是多维表格接口允许的突发请求数。
+	BaseRateLimitBurst int
 }
 
 // AIConfig describes the external model endpoint.
@@ -159,6 +164,8 @@ func Load() Config {
 		FeishuAppID:            os.Getenv("FEISHU_APP_ID"),
 		FeishuAppSecret:        os.Getenv("FEISHU_APP_SECRET"),
 		FeishuBlockID:          os.Getenv("FEISHU_DOC_BLOCK_ID"),
+		BaseRateLimitRPS:       intEnv("BASE_RATE_LIMIT_RPS", 40),
+		BaseRateLimitBurst:     intEnv("BASE_RATE_LIMIT_BURST", 80),
 		Mail:                   loadMailConfig(),
 		PasswordReset:          loadPasswordResetConfig(),
 		KnowledgeTrashKeepDays: intEnv("KNOWLEDGE_TRASH_KEEP_DAYS", 30),

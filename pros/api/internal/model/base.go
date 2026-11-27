@@ -78,18 +78,44 @@ func (BaseField) TableName() string { return "base_fields" }
 //
 // Version 是乐观锁版本，任何写入都必须带 expectedVersion。
 type BaseRecord struct {
-	ID        uuid.UUID      `gorm:"type:uuid;primaryKey" json:"id"`
-	TableID   uuid.UUID      `gorm:"type:uuid;not null;index:idx_base_record_table" json:"tableId"`
+	ID      uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
+	TableID uuid.UUID `gorm:"type:uuid;not null;index:idx_base_record_table;index:idx_base_record_table_sort,priority:1;index:idx_base_record_scope,priority:1" json:"tableId"`
+	// SortOrder 是手动排序位（画廊 / 表格的默认顺序）。越小越靠前。
+	SortOrder int64          `gorm:"not null;default:0;index:idx_base_record_table_sort,priority:2" json:"sortOrder"`
 	Data      datatypes.JSON `gorm:"type:jsonb;not null;default:'{}'" json:"data"`
 	Version   int64          `gorm:"not null;default:1" json:"version"`
-	CreatedBy uuid.UUID      `gorm:"type:uuid;not null;index" json:"createdBy"`
-	UpdatedBy uuid.UUID      `gorm:"type:uuid;not null;index" json:"updatedBy"`
-	CreatedAt time.Time      `gorm:"type:timestamptz;not null" json:"createdAt"`
-	UpdatedAt time.Time      `gorm:"type:timestamptz;not null" json:"updatedAt"`
-	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+	// Visibility 是记录级可见范围：
+	//   space     —— 空间内可见（默认）；
+	//   restricted —— 仅创建者与空间管理者可见。
+	// 记录级过滤在 Query Engine 生成 SQL 时注入，不做查询后内存删除。
+	Visibility string         `gorm:"type:varchar(16);not null;default:'space';index:idx_base_record_scope,priority:2" json:"visibility"`
+	CreatedBy  uuid.UUID      `gorm:"type:uuid;not null;index" json:"createdBy"`
+	UpdatedBy  uuid.UUID      `gorm:"type:uuid;not null;index" json:"updatedBy"`
+	CreatedAt  time.Time      `gorm:"type:timestamptz;not null" json:"createdAt"`
+	UpdatedAt  time.Time      `gorm:"type:timestamptz;not null" json:"updatedAt"`
+	DeletedAt  gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 func (BaseRecord) TableName() string { return "base_records" }
+
+// BaseRecordGrant 是「记录级可见范围 = 指定成员」时的授权名单。
+//
+// 为什么单独一张表：
+//   - 记录本身的可见范围（space / restricted / custom）是**列**级语义，
+//     「哪些人额外被授权」是**行**级语义，放 JSONB 里既查不动也加不了索引；
+//   - 查询注入要靠它做 `id IN (SELECT record_id FROM base_record_grants WHERE user_id = ?)`，
+//     有索引才走得动；
+//   - 一个记录可能被授权给多人，天然是多对多。
+type BaseRecordGrant struct {
+	ID        uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
+	RecordID  uuid.UUID `gorm:"type:uuid;not null;uniqueIndex:uniq_base_record_grant;index:idx_base_record_grant_record" json:"recordId"`
+	UserID    uuid.UUID `gorm:"type:uuid;not null;uniqueIndex:uniq_base_record_grant;index:idx_base_record_grant_user" json:"userId"`
+	ProjectID uuid.UUID `gorm:"type:uuid;not null;index" json:"projectId"`
+	CreatedBy uuid.UUID `gorm:"type:uuid;not null" json:"createdBy"`
+	CreatedAt time.Time `gorm:"type:timestamptz;not null" json:"createdAt"`
+}
+
+func (BaseRecordGrant) TableName() string { return "base_record_grants" }
 
 // BaseRecordValue 是查询投影表：把高频筛选/排序字段类型化，便于建索引。
 // 它不是权威数据源，与 BaseRecord 同事务写入。
@@ -117,14 +143,38 @@ type BaseView struct {
 	Type      string         `gorm:"type:varchar(32);not null;default:'grid'" json:"type"`
 	Config    datatypes.JSON `gorm:"type:jsonb;not null;default:'{}'" json:"config"`
 	IsDefault bool           `gorm:"not null;default:false" json:"isDefault"`
-	OwnerID   uuid.UUID      `gorm:"type:uuid;not null;index" json:"ownerId"`
-	Version   int64          `gorm:"not null;default:1" json:"version"`
-	Status    int            `gorm:"not null;default:1" json:"status"`
+	// Scope 是视图可见范围：
+	//   shared  —— 空间内共享（默认），配置对所有成员生效；
+	//   personal —— 仅创建者可见，用于「我自己的一套视图」。
+	Scope     string    `gorm:"type:varchar(16);not null;default:'shared'" json:"scope"`
+	OwnerID   uuid.UUID `gorm:"type:uuid;not null;index" json:"ownerId"`
+	Version   int64     `gorm:"not null;default:1" json:"version"`
+	Status    int       `gorm:"not null;default:1" json:"status"`
+	CreatedAt time.Time `gorm:"type:timestamptz;not null" json:"createdAt"`
+	UpdatedAt time.Time `gorm:"type:timestamptz;not null" json:"updatedAt"`
+}
+
+func (BaseView) TableName() string { return "base_views" }
+
+// BaseViewPref 是「视图个人偏好」。
+//
+// 为什么单独一张表，而不是把 personal 段塞进 base_views.config：
+//   - 共享配置（列宽 / 显隐 / 布局）是视图级资产，任何成员改都互相可见；
+//   - 个人偏好是「我自己的列宽 / 我自己隐藏了哪列」，必须按人隔离；
+//   - 塞在一起时，A 改共享配置会连带覆盖 B 的个人偏好（写覆盖），
+//     而且 A 能读到 B 的偏好（读泄露）—— 两者都是协作里的真实事故。
+// 因此个人偏好独立成表，键是 (view_id, user_id)。
+type BaseViewPref struct {
+	ID        uuid.UUID      `gorm:"type:uuid;primaryKey" json:"id"`
+	ViewID    uuid.UUID      `gorm:"type:uuid;not null;uniqueIndex:uniq_base_view_pref_view_user" json:"viewId"`
+	UserID    uuid.UUID      `gorm:"type:uuid;not null;uniqueIndex:uniq_base_view_pref_view_user;index:idx_base_view_pref_user" json:"userId"`
+	ProjectID uuid.UUID      `gorm:"type:uuid;not null;index" json:"projectId"`
+	Config    datatypes.JSON `gorm:"type:jsonb;not null;default:'{}'" json:"config"`
 	CreatedAt time.Time      `gorm:"type:timestamptz;not null" json:"createdAt"`
 	UpdatedAt time.Time      `gorm:"type:timestamptz;not null" json:"updatedAt"`
 }
 
-func (BaseView) TableName() string { return "base_views" }
+func (BaseViewPref) TableName() string { return "base_view_prefs" }
 
 // BaseRecordLink 存记录之间的关联关系。
 type BaseRecordLink struct {
