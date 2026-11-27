@@ -7,6 +7,7 @@
  */
 import { ref, watch } from "vue";
 import { Delete, InfoFilled, Plus, Sort } from "@element-plus/icons-vue";
+import { ElMessage } from "element-plus";
 import type {
   Condition,
   FieldMeta,
@@ -14,6 +15,13 @@ import type {
   GroupRule,
   SortRule,
 } from "../types";
+import {
+  MAX_FILTERS,
+  MAX_GROUPS,
+  MAX_SORTS,
+  normalizeGroups,
+  normalizeSorts,
+} from "../viewQuery";
 
 const props = defineProps<{
   fields: FieldMeta[];
@@ -23,7 +31,7 @@ const props = defineProps<{
   /** 当前查询条件的保存范围（第十三轮）：shared = 写进视图共享段；personal = 只写我的偏好。 */
   scope?: "shared" | "personal";
   /** 「仅我」模式下与共享条件的组合方式（第十四轮）。 */
-  combine?: "override" | "and";
+  combine?: "override" | "and" | "or";
   /** 「关联文档」字段的候选（知识库节点），用于按标题筛选。 */
   docOptions?: Array<{ id: string; title: string }>;
   /**
@@ -55,8 +63,9 @@ watch(
       ...item,
     }));
     logic.value = props.filters?.logic ?? "AND";
-    sorts.value = (props.sorts ?? []).map((item) => ({ ...item }));
-    groups.value = (props.groups ?? []).map((item) => ({ ...item }));
+    // 存量视图可能存着重复 / 超限规则，进来先归一化。
+    sorts.value = normalizeSorts(props.sorts).map((item) => ({ ...item }));
+    groups.value = normalizeGroups(props.groups).map((item) => ({ ...item }));
   },
   { immediate: true, deep: true },
 );
@@ -153,20 +162,44 @@ function optionsOf(field?: FieldMeta) {
 function addCondition() {
   const field = props.fields[0];
   if (!field) return;
+  if (conditions.value.length >= MAX_FILTERS) {
+    ElMessage.warning(`筛选条件最多 ${MAX_FILTERS} 条`);
+    return;
+  }
   conditions.value.push({ fieldId: field.id, operator: "contains", value: "" });
 }
 
 function addSort() {
+  if (sorts.value.length >= MAX_SORTS) {
+    ElMessage.warning(`排序规则最多 ${MAX_SORTS} 条`);
+    return;
+  }
   const field = props.fields[0];
   if (!field) return;
-  sorts.value.push({ fieldId: field.id, order: "asc" });
+  // 同一字段不重复排序：后端按列排序，重复列没有意义。
+  const next = props.fields.find(
+    (item) => !sorts.value.some((rule) => rule.fieldId === item.id),
+  );
+  if (!next) {
+    ElMessage.warning("该字段已经排过序");
+    return;
+  }
+  sorts.value.push({ fieldId: next.id, order: "asc" });
 }
 
 function addGroup() {
+  if (groups.value.length >= MAX_GROUPS) {
+    ElMessage.warning(`分组规则最多 ${MAX_GROUPS} 条`);
+    return;
+  }
+  // 同一字段不重复分组；优先挑单选 / 多选字段。
+  const unused = props.fields.filter(
+    (item) => !groups.value.some((rule) => rule.fieldId === item.id),
+  );
   const field =
-    props.fields.find(
+    unused.find(
       (item) => item.type === "single_select" || item.type === "multi_select",
-    ) ?? props.fields[0];
+    ) ?? unused[0];
   if (!field) return;
   groups.value.push({ fieldId: field.id, order: "asc" });
 }
@@ -179,8 +212,8 @@ function apply() {
   });
   emit("apply", {
     filters: { logic: logic.value, conditions: valid, children: [] },
-    sorts: sorts.value.filter((item) => item.fieldId),
-    groups: groups.value.filter((item) => item.fieldId),
+    sorts: normalizeSorts(sorts.value),
+    groups: normalizeGroups(groups.value),
   });
 }
 </script>
@@ -200,7 +233,10 @@ function apply() {
       <span v-if="props.scope === 'personal'">
         这些条件只保存到<b>我的偏好</b>，其他人打开这个视图不受影响<template
           v-if="props.combine === 'and'"
-          >； 当前为<b>叠加</b>口径，最终筛选 = 视图共享条件 AND
+          >； 当前为<b>同时满足</b>口径，最终筛选 = 视图共享条件 AND
+          我的条件</template
+        ><template v-else-if="props.combine === 'or'"
+          >； 当前为<b>任一满足</b>口径，最终筛选 = 视图共享条件 OR
           我的条件</template
         >。
       </span>
@@ -217,7 +253,11 @@ function apply() {
               <el-radio-button value="OR">任一满足</el-radio-button>
             </el-radio-group>
             <div style="flex: 1" />
-            <el-button size="small" :icon="Plus" @click="addCondition"
+            <el-button
+              size="small"
+              :icon="Plus"
+              :disabled="conditions.length >= MAX_FILTERS"
+              @click="addCondition"
               >添加条件</el-button
             >
           </div>
@@ -339,7 +379,11 @@ function apply() {
         <div class="be-panel">
           <div class="be-panel__row">
             <div style="flex: 1" />
-            <el-button size="small" :icon="Sort" @click="addSort"
+            <el-button
+              size="small"
+              :icon="Sort"
+              :disabled="sorts.length >= MAX_SORTS"
+              @click="addSort"
               >添加排序</el-button
             >
           </div>
@@ -375,7 +419,11 @@ function apply() {
         <div class="be-panel">
           <div class="be-panel__row">
             <div style="flex: 1" />
-            <el-button size="small" :icon="Plus" @click="addGroup"
+            <el-button
+              size="small"
+              :icon="Plus"
+              :disabled="groups.length >= MAX_GROUPS"
+              @click="addGroup"
               >添加分组</el-button
             >
           </div>

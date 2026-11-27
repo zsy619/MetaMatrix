@@ -4,11 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+
+	"metamatrix/api/internal/model"
 )
 
 // ---------------------------------------------------------------------------
@@ -81,10 +84,10 @@ func linkFieldSpecs(idx *fieldIndex) []linkFieldSpec {
 
 // validateLinkRefs 校验 link 字段的值指向真实存在的记录。
 //
-// 规则：
-//   - 目标表必须属于同一个 Base（跨 Base 引用不允许）；
-//   - 目标记录必须存在且未删除。
-func (s *Service) validateLinkRefs(ctx context.Context, baseID uuid.UUID, idx *fieldIndex, values map[string]any) error {
+// 规则（跨 Base 关联）：
+//   - 目标表必须属于**同一个空间**（同一 project）下的任意 Base；
+//   - 目标记录必须存在、未删除，且对当前操作者**可见**（记录级可见范围生效）。
+func (s *Service) validateLinkRefs(ctx context.Context, baseID, projectID, userID uuid.UUID, idx *fieldIndex, values map[string]any) error {
 	for _, spec := range linkFieldSpecs(idx) {
 		raw, ok := values[spec.fieldID.String()]
 		if !ok {
@@ -111,7 +114,7 @@ func (s *Service) validateLinkRefs(ctx context.Context, baseID uuid.UUID, idx *f
 			if count == 0 {
 				return fmt.Errorf("%w: %s 关联的记录不存在", ErrFieldValueInvalid, spec.fieldName)
 			}
-			// 目标记录必须属于同一个 Base（跨 Base 引用不允许）。
+			// 目标记录必须属于同一个空间（允许跨 Base 引用），且对操作者可见。
 			var target BaseRecord
 			if err := s.db.WithContext(ctx).
 				Select("table_id").Where("id = ? AND deleted_at IS NULL", targetID).
@@ -124,8 +127,22 @@ func (s *Service) validateLinkRefs(ctx context.Context, baseID uuid.UUID, idx *f
 				First(&targetTable).Error; err != nil {
 				return err
 			}
-			if targetTable.BaseID != baseID {
-				return fmt.Errorf("%w: %s 关联的记录不在当前表格空间", ErrFieldValueInvalid, spec.fieldName)
+			var targetApp model.BaseApp
+			if err := s.db.WithContext(ctx).
+				Select("project_id").Where("id = ? AND status = 1", targetTable.BaseID).
+				First(&targetApp).Error; err != nil {
+				// 查不到 Base 元信息（精简部署 / 历史数据）：退回到「同 Base 才允许」。
+				if targetTable.BaseID != baseID {
+					return fmt.Errorf("%w: %s 关联的记录不在当前空间", ErrFieldValueInvalid, spec.fieldName)
+				}
+			} else if targetApp.ProjectID != projectID {
+				return fmt.Errorf("%w: %s 关联的记录不在当前空间", ErrFieldValueInvalid, spec.fieldName)
+			}
+			// 记录级可见范围：看不见的记录不能被关联（否则等于绕过权限拿到线索）。
+			if userID != uuid.Nil {
+				if _, err := s.scopeLoadRecord(ctx, userID, projectID, targetID); err != nil {
+					return fmt.Errorf("%w: %s 关联的记录不可见", ErrFieldValueInvalid, spec.fieldName)
+				}
 			}
 		}
 	}
@@ -137,11 +154,39 @@ func (s *Service) validateLinkRefs(ctx context.Context, baseID uuid.UUID, idx *f
 // 只维护本表 link 字段产生的 source → target 关系；
 // 目标表由字段配置决定（未配置时取记录实际所在表）。
 func (s *Service) syncRecordLinks(tx *gorm.DB, table *BaseTable, idx *fieldIndex, recordID uuid.UUID, data map[string]any) error {
+	// 关系表可能还没迁移（老库 / 精简影子库）：先判断再写，
+	// 否则失败的语句会毒死 Postgres 事务，把记录写入一起打回。
+	return s.syncRecordLinksWith(tx, table, idx, recordID, data, tx.Migrator().HasTable(&BaseRecordLink{}))
+}
+
+// syncRecordLinksWith 是 syncRecordLinks 的「已知关系表是否存在」版本。
+//
+// 批量写入时表是否存在只需要探一次（每行探一次 = 每行一次
+// information_schema 查询，500 行白白多 500 次往返）。
+func (s *Service) syncRecordLinksWith(tx *gorm.DB, table *BaseTable, idx *fieldIndex, recordID uuid.UUID, data map[string]any, hasLinkTable bool) error {
+	if !hasLinkTable {
+		return nil
+	}
+	specs := linkFieldSpecs(idx)
+	if len(specs) == 0 {
+		// 本表没有 link 字段 → 没有任何关联关系要维护。
+		//
+		// 少两次 DELETE 往返：批量写入时这两条语句会被放大 N 倍。
+		// 历史关联不会残留 —— 删除 link 字段时已在 DeleteField 里一并清理。
+		return nil
+	}
 	if err := tx.Where("source_table_id = ? AND source_record_id = ?", table.ID, recordID).
 		Delete(&BaseRecordLink{}).Error; err != nil {
 		return err
 	}
-	for _, spec := range linkFieldSpecs(idx) {
+	// 反向关系表同步清理（派生索引，删掉本记录产生的旧反向边）。
+	// 表还不存在（老库未迁移）时忽略：反查会退回旧的全表扫描。
+	if err := tx.Where("source_record_id = ?", recordID).
+		Delete(&BaseRecordReverseLink{}).Error; err != nil &&
+		!strings.Contains(err.Error(), "no such table") {
+		return err
+	}
+	for _, spec := range specs {
 		raw, ok := data[spec.fieldID.String()]
 		if !ok {
 			continue
@@ -163,6 +208,7 @@ func (s *Service) syncRecordLinks(tx *gorm.DB, table *BaseTable, idx *fieldIndex
 			}
 			link := BaseRecordLink{
 				ID:             uuid.New(),
+				TenantID:       table.TenantID,
 				SourceTableID:  table.ID,
 				SourceRecordID: recordID,
 				FieldID:        spec.fieldID,
@@ -173,6 +219,28 @@ func (s *Service) syncRecordLinks(tx *gorm.DB, table *BaseTable, idx *fieldIndex
 			}
 			if err := tx.Create(&link).Error; err != nil {
 				return err
+			}
+			// 反向关系（派生索引）：target → source，供「谁关联了我」走索引反查。
+			// 反向表可能还没迁移（老库 / 精简影子库）：先判断表存在再写，
+			// 否则失败的 INSERT 会让 Postgres 事务进入 aborted 状态，把主流程一起打回。
+			if !tx.Migrator().HasTable(&BaseRecordReverseLink{}) {
+				continue
+			}
+			reverse := BaseRecordReverseLink{
+				ID:             uuid.New(),
+				TenantID:       table.TenantID,
+				ProjectID:      table.TenantID,
+				SourceTableID:  table.ID,
+				SourceRecordID: recordID,
+				FieldID:        spec.fieldID,
+				TargetTableID:  targetTableID,
+				TargetRecordID: targetID,
+				SortOrder:      i,
+				CreatedAt:      time.Now(),
+			}
+			if err := tx.Create(&reverse).Error; err != nil {
+				// 反向表是派生索引，写失败不阻断主流程（反查会退回旧的全表扫描）。
+				_ = err
 			}
 		}
 	}
@@ -241,6 +309,10 @@ func (s *Service) ListRecordRelations(ctx context.Context, userID, projectID, re
 // 事实来源是记录自身的 JSONB（与文档反向引用同一思路），
 // 因此老数据（关系表未回填）也能立刻查出结果。
 func (s *Service) inboundRelations(ctx context.Context, baseID uuid.UUID, recordID uuid.UUID, visibleUser *recordViewer) ([]RecordRelation, error) {
+	// 优先走反向关系表（走索引，跨 Base 也能反查）；没有记录时退回旧的全表扫描。
+	if rows, err := s.inboundRelationsFromIndex(ctx, recordID, visibleUser); err == nil && len(rows) > 0 {
+		return rows, nil
+	}
 	out := []RecordRelation{}
 	var tables []BaseTable
 	if err := s.db.WithContext(ctx).Where("base_id = ? AND deleted_at IS NULL", baseID).Find(&tables).Error; err != nil {
@@ -303,18 +375,54 @@ func (s *Service) inboundRelations(ctx context.Context, baseID uuid.UUID, record
 
 // ListLinkTargets 列出目标表的记录候选，供前端「关联记录」选择器使用。
 func (s *Service) ListLinkTargets(ctx context.Context, userID, projectID, tableID uuid.UUID, keyword string, limit int) ([]LinkTarget, error) {
-	if err := s.assertAccess(userID, projectID, RoleViewer); err != nil {
+	page, err := s.ListLinkTargetsPage(ctx, userID, projectID, tableID, keyword, limit, "", nil)
+	if err != nil {
 		return nil, err
+	}
+	return page.Items, nil
+}
+
+// LinkTargetPage 是一页关联候选（游标分页）。
+type LinkTargetPage struct {
+	Items []LinkTarget `json:"items"`
+	// NextCursor 为空表示没有更多了。
+	NextCursor string `json:"nextCursor,omitempty"`
+	HasMore    bool   `json:"hasMore"`
+}
+
+// ListLinkTargetsPage 分页列出关联候选（支持远程搜索 + 游标翻页）。
+//
+// 约定：
+//   - keyword 非空时按「主字段 / 任意文本值」模糊匹配（远程搜索）；
+//   - cursor 是上一页最后一行的 (sort_order, id)，用它做 keyset 翻页；
+//   - targetTableID 非空时跨表取候选（支持跨 Base 关联）。
+func (s *Service) ListLinkTargetsPage(
+	ctx context.Context,
+	userID, projectID, tableID uuid.UUID,
+	keyword string,
+	limit int,
+	cursor string,
+	targetTableID *uuid.UUID,
+) (LinkTargetPage, error) {
+	if err := s.assertAccess(userID, projectID, RoleViewer); err != nil {
+		return LinkTargetPage{}, err
 	}
 	table, _, err := s.loadTableSchema(ctx, userID, projectID, tableID)
 	if err != nil {
-		return nil, err
+		return LinkTargetPage{}, err
 	}
 	if limit <= 0 || limit > 200 {
 		limit = 50
 	}
+	// 目标表：默认当前表；跨表时目标表必须在同一空间内。
+	targetTable := *table
+	if targetTableID != nil && *targetTableID != uuid.Nil && *targetTableID != table.ID {
+		if err := s.assertTableInSpace(ctx, projectID, *targetTableID, &targetTable); err != nil {
+			return LinkTargetPage{}, err
+		}
+	}
 	q := s.db.WithContext(ctx).Model(&BaseRecord{}).
-		Where("table_id = ? AND deleted_at IS NULL", table.ID)
+		Where("table_id = ? AND deleted_at IS NULL", targetTable.ID)
 	// 记录级可见范围：受限记录不能出现在候选里（否则等于泄露标题）。
 	q = s.applyRecordScope(q, userID, projectID, "")
 	kw := strings.TrimSpace(keyword)
@@ -325,9 +433,20 @@ func (s *Service) ListLinkTargets(ctx context.Context, userID, projectID, tableI
 			WHERE v.record_id = base_records.id AND LOWER(v.value_text) LIKE LOWER(?)
 		)`, like)
 	}
+	// 游标（keyset）：按 (sort_order, id) 续翻，避免深翻页时全表扫描。
+	if cursor != "" {
+		lastSort, lastID, ok := decodeLinkCursor(cursor)
+		if ok {
+			q = q.Where("(sort_order > ? OR (sort_order = ? AND id > ?))", lastSort, lastSort, lastID)
+		}
+	}
 	var rows []BaseRecord
-	if err := q.Order("sort_order ASC, id ASC").Limit(limit).Find(&rows).Error; err != nil {
-		return nil, err
+	if err := q.Order("sort_order ASC, id ASC").Limit(limit + 1).Find(&rows).Error; err != nil {
+		return LinkTargetPage{}, err
+	}
+	hasMore := len(rows) > limit
+	if hasMore {
+		rows = rows[:limit]
 	}
 	out := make([]LinkTarget, 0, len(rows))
 	for _, row := range rows {
@@ -337,12 +456,58 @@ func (s *Service) ListLinkTargets(ctx context.Context, userID, projectID, tableI
 		}
 		out = append(out, LinkTarget{
 			ID:       row.ID.String(),
-			TableID:  table.ID.String(),
-			Title:    recordTitleFrom(data, table.PrimaryFieldID),
-			Subtitle: table.Name,
+			TableID:  targetTable.ID.String(),
+			Title:    recordTitleFrom(data, targetTable.PrimaryFieldID),
+			Subtitle: targetTable.Name,
 		})
 	}
-	return out, nil
+	page := LinkTargetPage{Items: out, HasMore: hasMore}
+	if hasMore && len(rows) > 0 {
+		last := rows[len(rows)-1]
+		page.NextCursor = encodeLinkCursor(last.SortOrder, last.ID)
+	}
+	return page, nil
+}
+
+// assertTableInSpace 校验目标表属于同一空间，并写入目标表。
+func (s *Service) assertTableInSpace(ctx context.Context, projectID, tableID uuid.UUID, out *BaseTable) error {
+	var tb BaseTable
+	if err := s.db.WithContext(ctx).Where("id = ? AND status = 1", tableID).First(&tb).Error; err != nil {
+		return fmt.Errorf("%w: 目标表不存在", ErrFieldValueInvalid)
+	}
+	var app model.BaseApp
+	if err := s.db.WithContext(ctx).
+		Select("project_id").Where("id = ? AND status = 1", tb.BaseID).
+		First(&app).Error; err != nil {
+		return fmt.Errorf("%w: 目标表不在当前空间", ErrFieldValueInvalid)
+	}
+	if app.ProjectID != projectID {
+		return fmt.Errorf("%w: 目标表不在当前空间", ErrFieldValueInvalid)
+	}
+	*out = tb
+	return nil
+}
+
+// encodeLinkCursor 生成游标。
+func encodeLinkCursor(sortOrder int64, id uuid.UUID) string {
+	return fmt.Sprintf("%d:%s", sortOrder, id.String())
+}
+
+// decodeLinkCursor 解析游标；格式非法时返回 false（调用方按「从头开始」处理）。
+func decodeLinkCursor(cursor string) (int64, uuid.UUID, bool) {
+	parts := strings.SplitN(cursor, ":", 2)
+	if len(parts) != 2 {
+		return 0, uuid.Nil, false
+	}
+	sortOrder, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil {
+		return 0, uuid.Nil, false
+	}
+	id, err := uuid.Parse(parts[1])
+	if err != nil {
+		return 0, uuid.Nil, false
+	}
+	return sortOrder, id, true
 }
 
 // recordBrief 取记录的最小信息（所属表 + 标题）。
@@ -448,4 +613,57 @@ func titleString(v any) string {
 	default:
 		return ""
 	}
+}
+
+// inboundRelationsFromIndex 用反向关系表反查「谁关联了我」。
+//
+// 反向表是派生索引：写入时与 base_record_links 同步维护。
+// 老数据可能没写进反向表，所以查不到时由调用方退回全表扫描。
+func (s *Service) inboundRelationsFromIndex(ctx context.Context, recordID uuid.UUID, visibleUser *recordViewer) ([]RecordRelation, error) {
+	var rows []BaseRecordReverseLink
+	if err := s.db.WithContext(ctx).
+		Where("target_record_id = ?", recordID).
+		Order("created_at ASC, id ASC").
+		Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, nil
+	}
+	out := make([]RecordRelation, 0, len(rows))
+	for _, row := range rows {
+		var source BaseRecord
+		if err := s.db.WithContext(ctx).
+			Where("id = ? AND deleted_at IS NULL", row.SourceRecordID).
+			First(&source).Error; err != nil {
+			continue
+		}
+		if visibleUser != nil && !s.recordScopeAllows(source, visibleUser.userID, visibleUser.projectID) {
+			continue
+		}
+		var tb BaseTable
+		if err := s.db.WithContext(ctx).Where("id = ?", row.SourceTableID).First(&tb).Error; err != nil {
+			continue
+		}
+		fieldName := ""
+		var field BaseField
+		if err := s.db.WithContext(ctx).Where("id = ?", row.FieldID).First(&field).Error; err == nil {
+			fieldName = field.Name
+		}
+		title, err := s.recordTitle(ctx, source.ID, visibleUser)
+		if err != nil {
+			title = "未命名记录"
+		}
+		out = append(out, RecordRelation{
+			Direction:     "inbound",
+			TableID:       tb.ID.String(),
+			TableName:     tb.Name,
+			FieldID:       row.FieldID.String(),
+			FieldName:     fieldName,
+			RecordID:      source.ID.String(),
+			RecordTitle:   title,
+			TargetTableID: tb.ID.String(),
+		})
+	}
+	return out, nil
 }

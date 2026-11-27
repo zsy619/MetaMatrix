@@ -6,18 +6,21 @@
  * 组件本身不直接调接口，保证写入路径只有一条。
  */
 import { computed, ref, watch } from 'vue'
-import { Delete, Document, Link, Lock, Share, Unlock, User } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
+import { Delete, Document, Link, Lock, Plus, Refresh, Share, Unlock, User } from '@element-plus/icons-vue'
 import BaseFieldCell from '../fields/BaseFieldCell.vue'
 import { fieldTypeColor, fieldTypeIcon } from '../fields/icons'
 import {
+  fetchRecord,
   listRecordDocReferences,
   listRecordGrants,
   listRecordRelations,
+  listSpaceDepartments,
   type RecordDocReference,
   type RecordRelationSet,
 } from '../api'
 import { listSpaceMembers, type SpaceMember } from '../../../api/knowledge_v6'
-import type { FieldMeta, RecordGrant, RecordRow, RecordVisibility } from '../types'
+import type { FieldMeta, GrantSubject, RecordGrant, RecordRow, RecordVisibility } from '../types'
 import { isComputedField } from '../fields/registry'
 
 const props = defineProps<{
@@ -35,11 +38,37 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'close'): void
   (e: 'update', payload: { fieldId: string; value: unknown }): void
-  (e: 'update-visibility', payload: { visibility: RecordVisibility; grants?: string[] }): void
+  (e: 'update-visibility', payload: {
+    visibility: RecordVisibility;
+    grants?: string[];
+    grantSubjects?: GrantSubject[];
+  }): void
   (e: 'delete', recordId: string): void
   (e: 'open-node', nodeId: string): void
   (e: 'open-record-ref', payload: { tableId: string; recordId: string; title: string }): void
+  (e: 'refreshed', row: RecordRow): void
 }>()
+
+/**
+ * 重新读取服务端最新值。
+ *
+ * 抽屉里的数据来自列表查询的结果快照，别人改了同一条记录时这里会滞后。
+ * 这里走只读 GET（GET /base/records/:recordId）拉最新的一份，
+ * 同时也是「按 ID 直读单条记录」这条只读接口的真实用例。
+ */
+const refreshing = ref(false)
+async function refreshFromServer() {
+  if (!props.row?.id || !props.projectId) return
+  refreshing.value = true
+  try {
+    const fresh = await fetchRecord(props.projectId, props.row.id)
+    emit('refreshed', fresh)
+  } catch (err) {
+    ElMessage.error((err as Error).message || '刷新失败')
+  } finally {
+    refreshing.value = false
+  }
+}
 
 /** 引用本记录的文档。 */
 const docRefs = ref<RecordDocReference[]>([])
@@ -118,7 +147,7 @@ const isCustom = computed(() => visibility.value === 'custom')
 /** 可见范围标签文案。 */
 const scopeLabel = computed(() => {
   if (visibility.value === 'restricted') return '仅自己可见'
-  if (visibility.value === 'custom') return `指定成员（${grantUserIds.value.length} 人）`
+  if (visibility.value === 'custom') return `指定成员（${grantSubjects.value.length} 项）`
   return '空间可见'
 })
 
@@ -136,6 +165,16 @@ const membersLoading = ref(false)
 const grants = ref<RecordGrant[]>([])
 /** 正在编辑的可见成员（多选）。 */
 const grantUserIds = ref<string[]>([])
+/** 空间里出现过的部门（用于「按部门授权」）。 */
+const departments = ref<string[]>([])
+/** 待添加成员的临时选择。 */
+const pendingUserId = ref('')
+/** 待添加部门的临时选择。 */
+const pendingDepartment = ref('')
+/** 当前授权名单（用户 + 部门），带显示名与有效期。 */
+const grantSubjects = ref<
+  Array<{ type: 'user' | 'department'; id: string; name: string; expiresAt?: string | null }>
+>([])
 
 async function loadMembers() {
   if (!props.projectId || spaceMembers.value.length) return
@@ -149,18 +188,38 @@ async function loadMembers() {
   }
 }
 
+async function loadDepartments() {
+  if (!props.projectId || departments.value.length) return
+  try {
+    departments.value = await listSpaceDepartments(props.projectId)
+  } catch {
+    departments.value = []
+  }
+}
+
 async function loadGrants(recordId: string) {
   if (!props.projectId) {
     grants.value = []
     grantUserIds.value = []
+    grantSubjects.value = []
     return
   }
   try {
     grants.value = await listRecordGrants(props.projectId, recordId)
     grantUserIds.value = grants.value.map((item) => item.userId)
+    grantSubjects.value = grants.value.map((item) => {
+      const type = item.subjectType === 'department' ? 'department' : 'user'
+      return {
+        type,
+        id: type === 'department' ? item.subjectId || item.name.replace(/^部门：/, '') : item.userId,
+        name: item.name || (type === 'department' ? item.subjectId || '' : item.userId.slice(0, 8)),
+        expiresAt: item.expiresAt ?? null,
+      }
+    })
   } catch {
     grants.value = []
     grantUserIds.value = []
+    grantSubjects.value = []
   }
 }
 
@@ -170,9 +229,11 @@ watch(
     if (id) {
       void loadGrants(id)
       void loadMembers()
+      void loadDepartments()
     } else {
       grants.value = []
       grantUserIds.value = []
+      grantSubjects.value = []
     }
   },
   { immediate: true },
@@ -201,33 +262,114 @@ const grantOptions = computed(() => {
 function onVisibilityChange(value: RecordVisibility) {
   if (value === 'custom') {
     // 选人时先不给名单，等用户挑完再提交。
-    emit('update-visibility', { visibility: 'custom', grants: grantUserIds.value })
+    emit('update-visibility', {
+      visibility: 'custom',
+      grants: grantUserIds.value,
+      grantSubjects: subjectsPayload(),
+    })
     return
   }
   emit('update-visibility', { visibility: value })
 }
 
-/** 可见成员变化：立刻提交（与范围切换分开，避免误改范围）。 */
-function onGrantsChange(value: string[]) {
-  grantUserIds.value = value
+/** ISO 时间 → 本地时间输入框文本（datetime-picker 的 value-format）。 */
+function toLocalInput(iso?: string | null): string {
+  if (!iso) return "";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(
+    date.getHours(),
+  )}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
+/** 当前授权名单 → 后端结构。 */
+function subjectsPayload(): GrantSubject[] {
+  return grantSubjects.value.map((item) => ({
+    type: item.type,
+    id: item.id,
+    expiresAt: item.expiresAt ?? null,
+  }))
+}
+
+/** 授权名单变化：立刻提交（与范围切换分开，避免误改范围）。 */
+function commitSubjects(next: typeof grantSubjects.value) {
+  grantSubjects.value = next
+  grantUserIds.value = next.filter((item) => item.type === 'user').map((item) => item.id)
   if (visibility.value === 'custom') {
-    emit('update-visibility', { visibility: 'custom', grants: value })
+    emit('update-visibility', {
+      visibility: 'custom',
+      grants: grantUserIds.value,
+      grantSubjects: subjectsPayload(),
+    })
   }
+}
+
+/** 添加一个成员到授权名单。 */
+function addUserGrant() {
+  const id = pendingUserId.value
+  if (!id) return
+  if (grantSubjects.value.some((item) => item.type === 'user' && item.id === id)) {
+    pendingUserId.value = ''
+    return
+  }
+  const member = spaceMembers.value.find((item) => item.userId === id)
+  commitSubjects([
+    ...grantSubjects.value,
+    { type: 'user', id, name: member?.name || member?.email || id.slice(0, 8), expiresAt: null },
+  ])
+  pendingUserId.value = ''
+}
+
+/** 添加一个部门到授权名单。 */
+function addDepartmentGrant() {
+  const dept = pendingDepartment.value
+  if (!dept) return
+  if (grantSubjects.value.some((item) => item.type === 'department' && item.id === dept)) {
+    pendingDepartment.value = ''
+    return
+  }
+  commitSubjects([
+    ...grantSubjects.value,
+    { type: 'department', id: dept, name: `部门：${dept}`, expiresAt: null },
+  ])
+  pendingDepartment.value = ''
+}
+
+/** 移除一个授权对象。 */
+function removeGrant(index: number) {
+  const next = grantSubjects.value.filter((_, i) => i !== index)
+  commitSubjects(next)
+}
+
+/** 设置授权对象的有效期（清空表示永久）。 */
+function onGrantExpiryChange(index: number, value: string | null) {
+  const next = grantSubjects.value.map((item, i) =>
+    i === index ? { ...item, expiresAt: value ? new Date(value).toISOString() : null } : item,
+  )
+  commitSubjects(next)
 }
 
 /** 按空间角色批量授权（把该角色的成员全部加入可见名单）。 */
 function grantByRole(role: SpaceMember['role']) {
-  const ids = new Set(grantUserIds.value)
+  const next = [...grantSubjects.value]
+  const ids = new Set(next.filter((item) => item.type === 'user').map((item) => item.id))
   for (const item of spaceMembers.value) {
-    if (item.role === role) ids.add(item.userId)
+    if (item.role !== role || ids.has(item.userId)) continue
+    ids.add(item.userId)
+    next.push({
+      type: 'user',
+      id: item.userId,
+      name: item.name || item.email,
+      expiresAt: null,
+    })
   }
-  const next = Array.from(ids)
-  onGrantsChange(next)
+  commitSubjects(next)
 }
 
 /** 清空可见名单。 */
 function clearGrants() {
-  onGrantsChange([])
+  commitSubjects([])
 }
 </script>
 
@@ -241,6 +383,21 @@ function clearGrants() {
     destroy-on-close
     @close="emit('close')"
   >
+    <template #header>
+      <div class="be-record__head">
+        <span>{{ row ? '记录详情' : '记录' }}</span>
+        <el-button
+          v-if="row && projectId"
+          size="small"
+          text
+          :icon="Refresh"
+          :loading="refreshing"
+          @click="refreshFromServer"
+        >
+          刷新最新值
+        </el-button>
+      </div>
+    </template>
     <div v-if="row" class="be-record">
       <div v-for="field in orderedFields" :key="field.id" class="be-record__field">
         <div class="be-record__label">
@@ -365,31 +522,84 @@ function clearGrants() {
         <div v-if="isCustom" class="be-record__scope-grants">
           <div class="be-record__scope-grants-label">
             <el-icon><User /></el-icon>
-            <span>可见成员</span>
-            <el-tag size="small" effect="plain" type="info">{{ grantUserIds.length }} 人</el-tag>
+            <span>可见范围</span>
+            <el-tag size="small" effect="plain" type="info">{{ grantSubjects.length }} 项</el-tag>
           </div>
-          <el-select
-            :model-value="grantUserIds"
-            class="be-record__scope-grants-select"
-            multiple
-            collapse-tags
-            collapse-tags-tooltip
-            filterable
-            :loading="membersLoading"
-            placeholder="选择能看到这条记录的成员"
-            popper-class="be-scope-popper"
-            @update:model-value="(value: string[]) => onGrantsChange(value)"
-          >
-            <el-option
-              v-for="opt in grantOptions"
-              :key="opt.value"
-              :label="opt.label"
-              :value="opt.value"
-            />
-          </el-select>
+          <!-- 已授权列表：每个对象可单独设置有效期 -->
+          <ul v-if="grantSubjects.length" class="be-record__scope-grants-list">
+            <li
+              v-for="(item, index) in grantSubjects"
+              :key="`${item.type}-${item.id}`"
+              class="be-record__scope-grants-item"
+            >
+              <el-tag size="small" effect="plain" :type="item.type === 'department' ? 'success' : 'info'">
+                {{ item.type === 'department' ? '部门' : '成员' }}
+              </el-tag>
+              <span class="be-record__scope-grants-item-name">{{ item.name }}</span>
+              <el-date-picker
+                :model-value="toLocalInput(item.expiresAt)"
+                type="datetime"
+                size="small"
+                value-format="YYYY-MM-DD HH:mm:ss"
+                placeholder="有效期（永久）"
+                class="be-record__scope-grants-item-date"
+                @update:model-value="(value: string | null) => onGrantExpiryChange(index, value)"
+              />
+              <el-button
+                size="small"
+                text
+                type="danger"
+                :icon="Delete"
+                @click="removeGrant(index)"
+              />
+            </li>
+          </ul>
+          <div v-else class="be-panel__hint">还没有授权对象，添加后对方才能看到这条记录。</div>
+          <!-- 添加成员 -->
+          <div class="be-record__scope-grants-add">
+            <el-select
+              v-model="pendingUserId"
+              class="be-record__scope-grants-select"
+              filterable
+              clearable
+              :loading="membersLoading"
+              placeholder="选择成员"
+              popper-class="be-scope-popper"
+            >
+              <el-option
+                v-for="opt in grantOptions"
+                :key="opt.value"
+                :label="opt.label"
+                :value="opt.value"
+              />
+            </el-select>
+            <el-button size="small" :icon="Plus" :disabled="!pendingUserId" @click="addUserGrant">
+              添加成员
+            </el-button>
+          </div>
+          <!-- 添加部门 -->
+          <div v-if="departments.length" class="be-record__scope-grants-add">
+            <el-select
+              v-model="pendingDepartment"
+              class="be-record__scope-grants-select"
+              clearable
+              placeholder="选择部门"
+              popper-class="be-scope-popper"
+            >
+              <el-option v-for="dept in departments" :key="dept" :label="dept" :value="dept" />
+            </el-select>
+            <el-button
+              size="small"
+              :icon="Plus"
+              :disabled="!pendingDepartment"
+              @click="addDepartmentGrant"
+            >
+              添加部门
+            </el-button>
+          </div>
           <div class="be-panel__hint">
-            只有选中的成员能看到这条记录；未选中的成员在表格、关联候选、
-            文档反向引用里都看不到它。
+            只有名单里的成员 / 部门能看到这条记录；未授权的成员在表格、关联候选、
+            文档反向引用里都看不到它。设置有效期后，授权到期自动失效。
           </div>
           <div class="be-record__scope-grants-quick">
             <span class="be-record__scope-grants-label-text">按角色批量授权</span>
@@ -481,6 +691,47 @@ function clearGrants() {
 
 .be-record__scope-grants-select {
   width: 100%;
+}
+
+.be-record__scope-grants-list {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.be-record__scope-grants-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border: 1px solid var(--tg-border, #e2e8f0);
+  border-radius: var(--tg-radius-sm, 8px);
+  background: var(--tg-surface-1, #fff);
+}
+
+.be-record__scope-grants-item-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--tg-text-1, #0f172a);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.be-record__scope-grants-item-date {
+  width: 176px;
+  flex-shrink: 0;
+}
+
+.be-record__scope-grants-add {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
 }
 
 .be-record__scope-grants-quick {

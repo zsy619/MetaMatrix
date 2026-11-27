@@ -219,6 +219,12 @@
       "model": "BaseFieldFormula"
     },
     {
+      "name": "base_field_policies",
+      "domain": "base",
+      "purpose": "字段级权限策略（隐藏 / 只读 / 条件可见）",
+      "model": "BaseFieldPolicy"
+    },
+    {
       "name": "base_fields",
       "domain": "base",
       "purpose": "多维表格字段",
@@ -229,6 +235,12 @@
       "domain": "base",
       "purpose": "公式依赖图",
       "model": "BaseFormulaDependency"
+    },
+    {
+      "name": "base_import_jobs",
+      "domain": "base",
+      "purpose": "大批量导入后台任务",
+      "model": "BaseImportJob"
     },
     {
       "name": "base_operation_logs",
@@ -249,6 +261,12 @@
       "model": "BaseRecordLink"
     },
     {
+      "name": "base_record_reverse_links",
+      "domain": "base",
+      "purpose": "记录反向关联索引（谁关联了我）",
+      "model": "BaseRecordReverseLink"
+    },
+    {
       "name": "base_record_values",
       "domain": "base",
       "purpose": "记录的类型化投影值",
@@ -265,6 +283,12 @@
       "domain": "base",
       "purpose": "多维表格数据表",
       "model": "BaseTable"
+    },
+    {
+      "name": "base_user_groups",
+      "domain": "base",
+      "purpose": "通讯录分组（人员字段可引用）",
+      "model": "BaseUserGroup"
     },
     {
       "name": "base_view_prefs",

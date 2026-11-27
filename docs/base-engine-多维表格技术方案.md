@@ -2220,3 +2220,766 @@ IF / AND / OR / NOT / DATE / TODAY`，业务里最常用的文本处理、时间
 
 截图：`/tmp/basev/g1_table.png`（表格）、`g2_drawer.png`（记录详情抽屉）、
 `g3_viewsettings.png`（视图配置弹窗）、`h_看板.png`（看板视图）。
+
+---
+
+## 45. 批次 G：列头操作菜单 + 飞书交互补齐（表格可用性最后一公里）
+
+> 第 44 章把「长什么样」对齐了飞书；本章补齐「怎么用」——
+> 飞书多维表格最核心的效率点是**列头 ▾ 菜单**（排序 / 筛选 / 冻结 / 隐藏 / 列宽 / 字段设置），
+> 之前这些能力全部藏在「视图配置」弹窗里，位置太深。
+
+### 45.1 列头操作菜单（新增 `grid/BaseColumnMenu.vue`）
+
+- **入口**：列头右侧的 ▾ 按钮，**hover 列头才出现**（飞书行为），点击展开浮层面板。
+- **菜单项**：升序排列 / 降序排列 / 清除本列排序（仅当该列已排序时出现）/
+  筛选此列 / 冻结到左侧（已冻结时变「取消冻结此列」）/ 隐藏此列 / 编辑字段 / 列宽。
+- **浮层形态**：`248px` 宽、白底、`8px` 圆角、`0 8px 24px rgba(31,35,41,.12)` 投影、
+  菜单项 32px、hover 灰底；顶部一行「字段名 + 类型徽标」。
+- **受控显隐**（`v-model:visible`）：不用 Element Plus 默认的 `trigger="click"` 自动开关。
+  原因：排序 / 隐藏列会让列头重新渲染，自动模式下弹层的内部显隐状态会与实际显示脱节，
+  第二次点击变成「关闭」而不是「打开」。改成受控 + 动作后立即收起即可根治。
+- **排序标记**：已排序列在字段名右侧显示主色小箭头（升序 ▲ / 降序 ▼）。
+
+### 45.2 动作落库口径
+
+- **排序 / 清除排序**：改写 `sorts` → `runQuery()` → `persistViewConfig()`
+  （共享段或「仅我」段，按当前查询条件的保存范围决定，与工具栏一致）。
+- **筛选此列**：打开「筛选与排序」面板并**预置该字段的空条件**
+  （`BaseQueryPanel` 新增 `focusFieldId`）。
+  - 坑：`focusFieldId` 的 watch 必须在 `numericTypes` 等 const **之后**定义，
+    否则 `immediate: true` 会在 setup 阶段触发 TDZ 报错
+    （`ReferenceError: Cannot access 'numericTypes' before initialization`），
+    面板直接打不开。
+- **冻结 / 隐藏 / 列宽**：写进**个人偏好段**（`config.personal[uid]`），
+  识别不出当前用户时**拒绝写入**并提示（宁可提示也不静默改成共享配置）。
+  冻结语义是「从左到右直到该列」的**连续段**（与 vxe 的 `fixed` 一致）。
+- **编辑字段**：打开字段管理面板并**滚动定位 + 高亮**该字段行。
+
+### 45.3 其它飞书交互补齐
+
+- **表头类型图标灰化**：飞书的字段类型图标是灰的（颜色由用户自定义图标承载），
+  改为 CSS `--fs-text-3` + hover 变 `--fs-text-2`，并加 `title` 提示「字段类型：X」。
+- **右侧记录列表卡片化**：标题 14px/600 一行 + 摘要一行
+  （取主字段外前两个有值字段，人员显示**姓名**、关联记录显示**记录标题**而不是 UUID）。
+- **单元格长文本 tooltip**：文本单元格加 `title`，长内容悬停可见全文。
+- **附件缩略图**：32×32、圆角 4px、1px `#DEE0E3`；非图片附件改为飞书式文件胶囊。
+- **聚焦单元格**：描边色从 Telegram 蓝改为飞书主色 `#3370FF`。
+- **加载骨架**：无数据加载中时显示 8 行灰色渐次呼吸骨架，替代转圈。
+- **空态**：表格视图由 vxe 的 `#empty` 插槽渲染（灰图标 + 「暂无记录」+ 「新增第一条记录」）；
+  引擎级空态只在看板 / 日历 / 画廊 / 表单视图兜底，**避免两个空态同时出现**。
+- **底部条常驻**：`.base-grid` 改 flex 布局（网格 `flex:1`），
+  底部「+ 新增记录 / 共 N 行」不再被 `height:100%` 挤出可视区。
+
+### 45.4 实测（DOM 数值）
+
+| 指标 | 值 |
+| --- | --- |
+| 列菜单面板 | 宽 `248px`、圆角 `8px`、投影 `rgba(31,35,41,.12) 0 8px 24px`、白底 |
+| 菜单项 | 7 项（未排序）/ 8 项（已排序，多「清除本列排序」） |
+| 排序标记 | 颜色 `rgb(51,112,255)`、字号 `12px`；清除后标记数 `0` |
+| 排序生效 | 升序后「华东智造集团 / 锦程物流 / 南山数科」（服务端排序，拼音序） |
+| 筛选此列 | 打开「筛选与排序」弹窗，字段下拉已预置（例：`更新人` / `包含`） |
+| 编辑字段 | 打开「字段管理」，**高亮 1 行**且滚动定位到该字段 |
+| 隐藏此列 | 表头列数 `38 → 36`（含固定区镜像，实际隐藏 1 列） |
+| 记录列表摘要 | `创建时间 2026-11-27 10:37:23 · 创建人 Demo`（人名不再 UUID） |
+| console 错误 | `0`（表格 / 看板 / 画廊 / 日历 / 菜单 / 弹窗全通） |
+
+截图：`/tmp/basev/j1_table.png`（表格 + 卡片化记录列表）、`j2_colmenu.png`（列菜单）、
+`j3_filter.png`（筛选此列预置）、`j4_fieldmanager.png`（字段定位高亮）、
+`k1_empty.png`（空态）、`l1_sortmark.png`（排序标记）。
+
+---
+
+## 46. 批次 H：表格效率最后一公里（列宽拖拽 / 单元格右键 / Tab 导航）
+
+对标飞书多维表格 Bitable 的「高手感」部分：这一批不加算法规格，补的是**每天用几百次**的操作。
+
+### 46.1 列宽拖拽把手（自研，vxe 无现成事件）
+
+- **为什么自研**：`vxe-table@4.24.5` 的 `resizable` 依赖 `column-resize` 事件，
+  本项目的列宽最终要落到**视图个人偏好**（不是表格自身），vxe 自带把手只改内部列宽，
+  与「谁在改、写到哪」对不上，因此关掉 vxe 把手（数据列 `resizable: false`），
+  自研列头右侧 7px 的拖拽把手。
+- **实现**：`grid/BaseGrid.vue`
+  - `dragWidths` 记录拖拽中的临时宽度（跟手），`widthOf(fieldId, index)` 取值优先级
+    `拖拽值 > 视图配置 > 默认（首列 200 / 其余 140）`；
+  - `startResize()` 在 `mousedown` 后挂 `mousemove` / `mouseup`，
+    宽度夹取在 `[80, 600]`，松手时 `emit('column-width', { fieldId, width })`，
+    由上层写进**个人偏好段**（`config.personal[uid].fieldWidths`）；
+  - 拖拽期间不发请求，避免每像素写库。
+- **视觉**：把手 7px 命中区，hover 时在列头右侧显示 2px 竖线（`--fs-border-strong`），
+  hover 把手本身变主色 `--fs-blue`；`cursor: col-resize`。
+
+### 46.2 单元格右键菜单（飞书同款）
+
+- **入口**：任意单元格 `@contextmenu.prevent`；右键同时把**焦点移到该格**，
+  这样「粘贴到此处」「清空内容」直接作用于右键的那一格。
+- **菜单项**（9 项，分组用分隔线）：
+  复制单元格 / 粘贴到此处 / 清空内容 / 打开记录详情 ‖
+  按此列升序 / 按此列降序 / 筛选此列 ‖ 冻结此列 / 隐藏此列。
+- **浮层形态**（`feishu.css`）：白底、8px 圆角、`0 8px 24px rgba(31,35,41,.12)` 投影、
+  面板 `min-width:200px`、菜单项 32px、hover 灰底 `--fs-bg-hover`、分隔线 `--fs-border-light`。
+- **边缘回夹**：先落位再 `nextTick` 量实际尺寸，贴近窗口右 / 下边缘时把坐标拉回可视区，
+  菜单不会被裁掉。
+- **收起时机**（飞书行为）：
+  - 执行任一动作后收起；
+  - 点击菜单外部（`mousedown` 捕获阶段）收起；
+  - `Esc` 收起；
+  - 滚动 / 缩放窗口收起（避免菜单悬在旧位置）。
+  - 监听在 `onMounted` 注册、`onBeforeUnmount` 注销，避免泄漏。
+
+### 46.3 键盘导航补齐（Tab / Shift+Tab）
+
+- 方向键、Enter/F2、Delete、Ctrl+C/V 已有；本批补 **Tab / Shift+Tab**。
+- **线性移动**（新增 `moveFocusLinear(direction)`）：到行尾自动回到**下一行首格**，
+  `Shift+Tab` 到行首自动回到**上一行末格**；没有下一行 / 上一行时停在边界格，不丢焦点。
+- 之前的 `moveFocus(0, ±1)` 是**夹取**（到行尾就停），与 Excel / 飞书的「回车到下一行」不一致，故单列一份。
+
+### 46.4 实测（DOM 数值）
+
+| 指标 | 值 |
+| --- | --- |
+| 右键菜单面板 | 宽 `200px`、圆角 `8px`、投影 `rgba(31,35,41,.12) 0 8px 24px`、底色 `rgb(255,255,255)` |
+| 菜单项 | `9` 项（复制/粘贴/清空/记录详情 ‖ 升序/降序/筛选 ‖ 冻结/隐藏） |
+| 菜单收起 | `Esc` 后节点数 `0`；点击空白后节点数 `0` |
+| 列宽拖拽 | `140px → 220px`（拖 +80px），松手后写视图个人偏好 |
+| 落库确认 | `config.personal[uid].fieldWidths = {"38c3aabe…":220,"486a0608…":220}` |
+| Tab 导航 | 焦点 `2026-11-27 10:37:23` → `主合同C`（换格生效） |
+| console 错误 | `0` |
+
+截图：`/tmp/basev/m1_ctxmenu.png`（单元格右键菜单）、`/tmp/basev/m2_resize.png`（列宽拖拽后）。
+
+---
+
+## 47. 批次 I：列顺序拖拽 + 表头右键菜单 + 列宽自适应 + 列序稳定化
+
+批次 H 把「鼠标能做的事」补齐了；本批解决**视图级的列顺序**，并顺手修掉一个
+「每次刷新列顺序都会变」的历史缺陷。
+
+### 47.1 列顺序拖拽（飞书：每个视图的列顺序可以不同）
+
+- **落库位置**：视图**个人偏好段** `config.personal[uid].fieldOrder`（字段 ID 数组）。
+  - 与列宽 / 显隐 / 冻结同口径：改的是「我看的顺序」，不动共享配置，不影响别人；
+  - 不在数组里的字段（新建字段）按原有顺序排在**最后**，不会消失。
+- **前端**（`grid/BaseGrid.vue`）：
+  - `visibleFields` 按 `fieldOrder` 排序（`rank` 映射，未列出的排后面）；
+  - 表头 `draggable="true"`，`dragstart` 记录被拖字段，
+    `dragover` 按指针落在目标列**左半 / 右半**判定插前还是插后，
+    `drop` 抛 `column-reorder`；
+  - **必须 `preventDefault()`**，否则浏览器不派发 `drop`（踩坑：拖拽「看起来没反应」）。
+  - 视觉：被拖表头 `opacity .45`；落点用 2px 主色竖线（`--fs-blue`）提示插前 / 插后。
+- **上层**（`BaseEngineView.vue`）：`onColumnReorder()` 重排数组后写个人偏好段。
+- **冻结列保护**：冻结列必须保持「从左起连续」，所以**冻结段内不允许拖动**，
+  拖到冻结列上会提示「冻结列已固定在左侧，不能调整顺序」。
+
+### 47.2 表头右键菜单（与列头 ▾ 菜单同源）
+
+- 表头 `contextmenu` 复用批次 H 的浮层容器（`.be-ctxmenu`），但菜单项**按入口切换**：
+  - 表头菜单：按此列升序 / 按此列降序 / 清除本列排序（已排序时出现）/ 筛选此列 ‖
+    冻结此列（已冻结显示「取消冻结此列」）/ 隐藏此列 ‖ 自动适应列宽 / 编辑字段；
+  - 单元格菜单：复制 / 粘贴 / 清空 / 打开记录详情 ‖ 升序 / 降序 / 筛选 ‖ 冻结 / 隐藏。
+- 实现上把菜单项抽成 `ctxItems` 计算属性（`{key,label,icon,sep,run}`），
+  模板统一 `v-for` 渲染，新增入口不用再复制一遍模板。
+
+### 47.3 双击列宽把手 → 按内容自适应
+
+- 双击列宽把手（飞书 / Excel 同款）按**当前列内容**估算宽度：
+  中文按 13px、其余字符按 7px 折算显示宽度，取「最长内容 + 32px 内边距」与
+  「字段名 + 88px」的较大值，最后夹取到 `[80, 600]`。
+- 表头右键菜单里的「自动适应列宽」是同一套逻辑。
+
+### 47.4 列序稳定化（修历史缺陷：刷新一次列顺序变一次）
+
+- **现象**：同一张表每次刷新，列的先后顺序都不一样。
+- **根因**：历史数据的字段 `sort_order` 全部相同（迁移时未回填），
+  服务端 `ORDER BY sort_order ASC` 在同值行上的相对次序**由数据库自行决定**，
+  前端再按 `sortOrder` 排序也无法稳定。
+- **修复**：
+  - 服务端 `internal/base/service.go::loadFieldIndex` 改为
+    `ORDER BY sort_order ASC, created_at ASC, id ASC`；
+  - 前端 `sortFields()` 增加 `name.localeCompare('zh-Hans-CN')` 兜底，
+    同 `sortOrder` 时按字段名稳定排序。
+
+### 47.5 实测（DOM 数值）
+
+| 指标 | 值 |
+| --- | --- |
+| 拖拽落点指示 | `.base-grid__head.is-drop-before`，指示线 `2px`、颜色 `rgb(51,112,255)` |
+| 被拖表头 | `class="base-grid__head is-dragging"`（`opacity .45`） |
+| 拖拽结果 | 第 3 列拖到首位 → `创建时间` 移到 `创建年份` 之前 |
+| 落库 | `config.personal[uid].fieldOrder` 写入 17 个字段 ID |
+| 刷新后 | 列顺序保持不变（`fieldOrder` 生效） |
+| 表头右键菜单 | 7 项（升序 / 降序 / 筛选 ‖ 冻结 / 隐藏 ‖ 自动适应列宽 / 编辑字段） |
+| 双击自适应 | 列宽 `140 → 114`（按内容收敛），并落库 `fieldWidths` |
+| console 错误 | `0` |
+
+截图：`/tmp/basev/n1_drag.png`（拖拽后列序）、`n2_headmenu.png`（表头右键菜单）、
+`n3_autofit.png`（自动适应列宽）、`n7_dropmark.png`（拖拽落点指示线）。
+
+---
+
+## 48. 批次 J / K / L：第五节未完成项全量落地
+
+> 对应《多维表格重构完成度核对清单》第五节：P0（XLSX 导入、记录级授权有效期）、
+> P1（跨 Base 关联、link 候选分页、自定义排序 keyset、SSE 增量、字段策略独立表、
+> 查询 OR 叠加、反向关系独立表）、P2（行级重试与类型转换、批量拖拽排序、
+> 压测扩容、配置包加密 + 幂等清理调度）。
+
+### 48.1 P0-1：XLSX 导入（零依赖解析）
+
+- 新增 `pros/web/src/modules/base/import/xlsx.ts`：`readXlsx(buffer)` → `{name, rows}[][]`。
+  - ZIP：支持 STORE(0) 与 DEFLATE(8) 两种压缩方式；
+    解压用浏览器原生 `DecompressionStream('deflate-raw')`；
+  - 坑：写入用 `stream.writable.getWriter()`，读取用 `stream.readable.getReader()`
+    ——ReadableStream 上没有 `getWriter`；
+  - 单元格类型：`t="s"`（sharedStrings）/ `inlineStr` / `t="str"` / `t="b"` / 数字；
+  - 日期：`styles.xml` 的 numFmtId 命中 `14~22 / 27~36 / 45~47 / 50~58` 时按日期格式化，
+    同时兼容 1900 / 1904 两种日期系统；
+  - 测试自建 ZIP（两种压缩方式都覆盖），**中央目录条目必须带 nameBytes**，否则解出乱码。
+- `BaseImportDialog.vue` 的 `accept` 扩展为 `.csv,.txt,.xlsx`，按扩展名分派解析器，
+  多工作表时提供下拉切换。
+
+### 48.2 P0-2：记录级授权有效期 + 按部门授权
+
+- `model.BaseRecordGrant` 新增三列：
+  `SubjectType`（user / department）、`SubjectID`（用户 ID 或部门名）、`ExpiresAt`（到期失效）。
+  - 部门授权用 `departmentPseudoUserID()`（`uuid.NewSHA1` 派生伪 ID）占位，
+    复用 `(record_id, user_id)` 唯一索引，不与真实用户冲突。
+- 迁移：`ensureBaseRecordGrants` 补三列 + 回填 `subject_id = user_id::text` +
+  `subject_type='user'` + 索引 `idx_base_record_grant_subject`。
+- 命中口径（`hasRecordGrant` / `applyRecordScope`）：直接授权 **或** 部门授权，且未过期。
+  - 部门名在 Go 侧解析（`userDepartment()`），**不把 `core_users` 写进 SQL** ——
+    影子库没有该表，写进 SQL 会让整条查询直接报错。
+- 新接口 `GET /projects/:id/base/departments`：列出空间成员出现过的部门（去重排序）。
+- 前端：记录详情抽屉的「可见范围」区改为**授权名单列表 + 有效期 + 部门**：
+  每项一个 `datetime-picker`（空 = 永久），可单独移除；下方「添加成员」「添加部门」两个入口。
+  - 时区口径：显示用 `toLocalInput()`（ISO → 本地时间串），
+    回写用 `new Date(value).toISOString()`，避免「显示 UTC、实际本地」的错位。
+
+### 48.3 P1-1：跨 Base 关联
+
+- 原来 link 字段只允许指向**同一个 Base** 内的记录；现在允许指向**同一空间**下的任意 Base。
+- 校验链（`validateLinkRefs`）：目标记录存在 → 目标表存在 → 目标 Base 属于同一 `project_id`
+  → 目标记录对当前操作者**可见**（记录级可见范围生效，看不见的记录不能被关联，
+  否则等于绕过权限拿到线索）。
+- 兜底：查不到 Base 元信息（精简部署 / 历史数据）时退回「同 Base 才允许」，不破坏存量数据。
+
+### 48.4 P1-2：link 候选分页 + 远程搜索
+
+- `ListLinkTargetsPage` 返回 `{items, nextCursor, hasMore}`；
+  游标是 `sort_order:id` 的 keyset，翻页不再 `OFFSET`。
+- 支持 `keyword` 模糊搜索（命中任意文本投影）与 `targetTableId`（跨表取候选）。
+- 前端 `listLinkTargetsPage` + 下拉底部「加载更多」（游标续拉）。
+
+### 48.5 P1-3：自定义排序走 keyset
+
+- 原来只有「无自定义排序 / 无分组」才走 keyset；现在**单个文本 / 数字排序字段**也走 keyset：
+  锚点 = (排序值, `sort_order`, `id`)，深翻页不再全表扫描。
+- 游标格式 `k2:<fieldId>:<b64值>:<sortOrder>:<id>`（空值用 `k2n:` 前缀）。
+- NULL 处理：排序列 `NULLS LAST`，NULL 行永远在最后；
+  锚点非 NULL 时条件含 `OR 该列为 NULL`，锚点为 NULL 时条件为「该列为 NULL 且 (sort_order,id) 更大」，
+  避免重复吐 NULL 行。
+- 数值列比较用 `CAST(? AS DOUBLE PRECISION)`（Postgres / SQLite 都支持）；
+  日期 / 布尔 / JSON 列的 NULL 语义两库不一致，仍退回 OFFSET。
+
+### 48.6 P1-4：SSE 增量
+
+- `ReplaySinceTime(ctx, projectID, since, limit)`：按**时间水位**回放增量事件。
+- SSE 连接支持 `?since=<RFC3339>`（与 `Last-Event-ID` / `?lastEventId=` 并存）：
+  客户端不必记住事件 ID，只要给「上次同步到的时刻」就能拿增量。
+
+### 48.7 P1-5：字段策略独立表（双写）
+
+- 新表 `base_field_policies`（`base_` 域，符合命名规范）：
+  `project_id / table_id / field_id / policy(jsonb)`，`field_id` 唯一。
+- 迁移 `ensureBaseFieldPolicies`：建表 + 唯一索引 + **从 `base_fields.config->'permissions'` 回填**存量策略。
+- 双写：字段创建 / 修改 / 删除时同步该表；读取时以**表为准**覆盖 `config.permissions`，
+  表里没有记录时沿用 config（历史数据兜底）。
+
+### 48.8 P1-6：查询条件 OR 叠加
+
+- 组合口径从 `override | and` 扩到 `override | and | or`：
+  - `and` → 共享条件 AND 我的条件；
+  - `or` → 共享条件 OR 我的条件（任一满足）。
+- 前端工具栏用三段按钮组「只用我的 / 同时满足 / 任一满足」表达；
+  后端 `FilterGroup.logic` 本身已支持 `AND/OR`，无需改动 SQL 生成。
+
+### 48.9 P1-7：反向关系独立表
+
+- 新表 `base_record_reverse_links`：正向边 `source → target` 的**反向索引**
+  （`target_record_id` 建索引），与 `base_record_links` 双写。
+- 反查「谁关联了我」优先走该表（走索引、跨 Base 也能反查）；
+  查不到（旧数据未回填）时退回原来的「同 Base 全表扫描 JSONB」逻辑。
+- 写入反向边失败不阻断主流程（它是派生索引）。
+
+### 48.10 P2-1：导入行级重试与类型转换
+
+- 导入前做**类型转换预检**：数字 / 金额 / 百分比 / 评分列出现非数字时拦下并提示「第 N 行 · 列名」。
+- 失败行进入**行内修正表**：每个单元格可编辑，底部「修正后重试」；
+  重试时只提交失败行，并把返回的「第 N 行」映射回原始行号（用户已改的内容不丢）。
+
+### 48.11 P2-2：批量拖拽排序
+
+- 表格行首列加**拖拽把手**（hover 行时出现，`16×20`，`cursor: grab`）：
+  - 拖的是「当前选中集合」还是「当前行」：被拖行在选中集合里 → 整批移动；
+  - 落点按鼠标在行内的上下半区判定「插到前面 / 后面」，落点有 `2px` 蓝色指示线；
+  - 松手后由上层算新的完整顺序并调用 `reorderRecords`（服务端顺序是权威）。
+- 拖拽行数 ≥ 2 时提示「已把 N 行移动到目标位置」。
+
+### 48.12 P2-3：压测扩容
+
+- `cmd/loadtest` 新增扩容档位 `-scale small|medium|large`：
+  `small = 1000 行 / 10 并发`、`medium = 2000 行 / 25 并发`、`large = 5000 行 / 50 并发`
+  （命令行显式给出的参数优先；已有 `-table` 时不会自动切临时表模式）。
+- 连接池从 `32` 提到 `64`（`MaxIdleConnsPerHost / MaxConnsPerHost`），避免压出的是「客户端排队」。
+- 新增两个场景：**深翻页**（按真实游标顺序翻 N 页，验证 keyset 深翻页不随页数变慢）、
+  **批量写入**（默认 500 行/批）。
+
+### 48.13 P2-4：配置包 AES-GCM 加密 + 幂等清理调度
+
+- 加密（`internal/base/configbundle_crypt.go`）：
+  - 算法 `AES-256-GCM`，KDF `PBKDF2-HMAC-SHA256`（自带实现，12 万次迭代，16B 随机盐）；
+  - AAD 固定为 `metamatrix/config-bundle/v1`，防止别的密文挪过来用；
+  - 口令 < 8 位直接拒绝（避免弱口令把包「加密成明文」）；
+  - 与签名（HMAC）职责分离：签名保证「完整 + 本平台导出」，加密保证「只有持口令者能读」。
+- 接口：`POST /tables/:tableId/config-export-encrypted`（body `{passphrase}`）、
+  `POST /tables/config-import-encrypted`（body `{baseId, passphrase, bundle}`，带幂等键）。
+- 幂等清理调度：`StartIdempotencyPurge` 默认每小时清理一次过期幂等记录
+  （保留期 7 天），周期可用 `BASE_IDEMPOTENCY_PURGE_INTERVAL` 覆盖；服务启动时拉起。
+
+---
+
+## 49. 批次 M：可观测性与工程化补齐（待补齐清单 18 项）
+
+> 本章对应「待补齐清单」18 项（P0 4 项 / P1 5 项 / P2 9 项），全部已实现并通过门禁。
+> 编号延续上一轮「遗留缺口清单」的 P0/P1/P2 序列。
+
+### 49.1 P0：只读 GET 接口（P0-1）
+
+原方案 §10 只有写接口与 `POST /tables/:tableId/query`，缺「按 ID 直接读单个对象」的
+只读通道，导致外部集成只能整表拉取再本地过滤。新增三条只读 GET：
+
+| 接口 | 返回 | 说明 |
+| --- | --- | --- |
+| `GET /base/bases/:baseId` | Base 元信息 + 表清单 + 视图清单 | `GetBaseDetail` |
+| `GET /base/records/:recordId` | 单条记录 + 字段值 + 授权可见性判定 | `GetRecord` |
+| `GET /base/views/:viewId` | 视图配置（筛选 / 排序 / 分组 / 冻结列） | `GetView` |
+
+- 三条接口全部走既有 `assertAccess` + `datascope` 可见性判定，
+  **不是**裸读：跨空间访问按「不存在」处理，字段级策略同样生效。
+- 落点：`internal/base/read.go`（service）+ `internal/base/handler.go`（handler）
+  + `cmd/server/main.go:382-384`（路由）。
+
+### 49.2 P0：视图查询接口（P0-2）
+
+`POST /base/views/:viewId/query` —— 以**视图自带配置**为默认口径执行查询，
+请求体可覆盖 `filter / sort / groupBy / limit / cursor`：
+
+- 不传覆盖 → 完全按视图保存的配置查（视图即查询）；
+- 传覆盖 → 临时覆盖（不落库），用于「在这个视图基础上再加个筛选看看」；
+- 覆盖后的查询走与 `POST /tables/:tableId/query` 完全相同的 SQL 生成管线，
+  不会出现「视图查询与表格查询结果不一致」。
+- 落点：`internal/base/read.go::QueryByView`。
+
+### 49.3 P0：事件类型补齐（P0-3）
+
+原方案 §8.2 事件清单只有 5 种（`record.created/updated/deleted`、`table.created/updated`），
+订阅端拿不到结构变更与批量变更。现补到 **10 种**：
+
+| 事件 | 触发时机 |
+| --- | --- |
+| `record.batch_updated` | 批量修改完成（逐条 `record.updated` 之外再发汇总事件） |
+| `field.created` | 新建字段 |
+| `field.updated` | 字段元信息变更 / 字段类型迁移 |
+| `field.deleted` | 删除字段 |
+| `view.updated` | 视图配置变更 |
+| `formula.calculated` | 公式重算完成 |
+| `schema.changed` | 表结构整体变更（建表 / 删表 / 字段增删的汇总信号） |
+
+- 落点：`internal/base/service.go::emitSchemaChanged / emitFieldEvent / emitViewEvent / emitRecordEvent`，
+  事件写入与业务写入同事务，保证「数据改了但事件没发」不会发生。
+- `schema.changed` 携带 `schemaVersion`，订阅端可据此判断是否需要重拉表结构。
+
+### 49.4 P0：字段类型迁移回滚（P0-4）
+
+`POST /base/fields/:fieldId/migrate`（字段类型迁移）原先**就地改列类型**：
+一旦新类型与存量数据不兼容（例如 text → number 遇到非数字），要么报错、
+要么写坏存量。改为**重建投影**：
+
+- `reindexTableTx` 在**同一事务内**重建该表的投影表（`base_records` 重新落 `base_record_values`）；
+- 中途任一步失败 → 整个事务回滚，原表原样保留（**可回滚**）；
+- 成功后同步推进 `base_apps.schema_version` 与 `base_tables.schema_version`，
+  订阅端能通过 `schema.changed` 感知版本跃迁。
+
+### 49.5 P1：异步导入任务（P1-5）
+
+大批量导入原为同步 HTTP 请求：数据量大就超时，网关断开则**导入进度全丢**。
+改为异步任务：
+
+| 接口 | 说明 |
+| --- | --- |
+| `POST /base/tables/:tableId/import-jobs` | 提交导入任务，立即返回 `jobId`（状态 `pending`） |
+| `GET /base/import-jobs/:jobId` | 查询任务状态 / 进度 / 失败明细 |
+| `GET /base/tables/:tableId/import-jobs` | 列出该表的导入任务 |
+| `POST /base/import-jobs/:jobId/cancel` | 取消排队中或运行中的任务 |
+
+- 新表 `base_import_jobs`（`base_` 域）：`project_id / table_id / status / total / succeeded /
+  failed / payload(jsonb) / error / started_at / finished_at`。
+- 后台 worker：`StartImportJobWorker` 拉取排队任务执行；
+  `resumeStalledImportJobs` 在服务启动时把「上次进程被杀导致卡在 running」的任务重置为 pending，
+  避免任务永久卡死。
+- 前端 `modules/base/api.ts`：`createImportJob / fetchImportJob / listImportJobs / cancelImportJob`。
+
+### 49.6 P1：可观测性指标（P1-6）
+
+| 接口 | 用途 |
+| --- | --- |
+| `GET /base/metrics` | JSON 快照：查询 P50 / P95 / P99、慢查询条数、outbox published / failed / dead、幂等冲突数、当前订阅数 |
+| `GET /base/metrics/prometheus` | Prometheus 文本格式，可直接被 Prometheus 抓取 |
+
+- 落点：`internal/base/metrics.go`。
+- 指标口径：
+  - 查询延迟分位数按**滑动窗口内已完成的查询**统计（不是全部历史）；
+  - 慢查询 = 超过阈值（默认 200ms）的查询，条数随窗口滚动；
+  - `outboxDead` 对应死信数（见 49.13），是运维最关心的告警指标。
+
+### 49.7 P1：数据库连接池（P1-7）
+
+`DB_MAX_OPEN_CONNS` 由 **30 提到 50**，并纳入分层配置（见 49.15）。
+理由：Base Engine 的导入任务 worker、outbox 发布器、限流校验、SSE 订阅是**并发长期占用**连接，
+30 的上限在「一个空间批量导入 + 其他人同时查」时会出现
+`too many connections` / 连接等待放大。50 与 Postgres 默认 `max_connections=100` 留有余量。
+
+### 49.8 P1：跨实例事件（P1-8）
+
+Outbox 原为「本实例内广播」，多实例部署时**订阅端只能收到本实例产生的事件**。
+改为共享总线 + 每实例水位：
+
+- 所有实例共用 `base_event_outboxes` 表作为事件总线；
+- 每个实例记录自己的 `outboxCursor`（已投递到哪个事件位点）；
+- 实例启动时从自己的水位继续拉取，**不重复、不漏**；
+- 订阅端连接到任意实例都能收到全量事件。
+
+### 49.9 P1：字段类型兼容路径（P1-9）
+
+`GET /base/fields/types`（旧路径）与 `GET /base/field-types`（新路径）返回**同一份**数据，
+避免外部集成因路径改名而 404。
+
+### 49.10 P2：FieldHandler 扩展（P2-10）
+
+原 `FieldHandler` 只有 `ValidateConfig / ValidateValue / Normalize`，
+**序列化、筛选、排序 SQL 编译**都写死在 `conditionSQL` / `buildOrderSQL` 里，
+新字段类型必须改核心文件。新增富接口 `RichFieldHandler`：
+
+```go
+type RichFieldHandler interface {
+    FieldHandler
+    Serialize(v any, cfg map[string]any) (SerializedValue, error)
+    Deserialize(v SerializedValue, cfg map[string]any) (any, error)
+    BuildFilter(fieldID uuid.UUID, fieldType string, cond Condition) (string, []any, error)
+    BuildSort(fieldID uuid.UUID, fieldType string, dir string, alias string) (string, error)
+}
+```
+
+- 未实现富接口的类型走 `defaultRichHandler` 兜底，**行为与改造前完全一致**（不改变现有查询结果）；
+- `conditionSQL` / `buildOrderSQL` 改为**委托**给 handler，自定义类型可完全接管；
+- 落点：`internal/base/fieldhandler_ext.go`。
+
+### 49.11 P2：租户列显式化（P2-11）
+
+多维表格的租户边界是「知识库空间」= `project_id`，此前所有查询都要 `JOIN base_apps`
+才能拿到租户：跨空间过滤成本高、容易漏写过滤条件。新增**显式 `tenant_id` 列**：
+
+- **17 张 `base_*` 表**全部加 `tenant_id uuid NOT NULL DEFAULT '00000000-…'`（零值 = 未标注）；
+- 口径：`tenant_id` 与 `project_id` 同值（当前实现里空间即租户）；
+- 迁移 `ensureBaseTenantID`（`internal/db/db.go`）：
+  - 直接持有 `project_id` 的表直接回填；
+  - 派生表沿 `base_apps → base_tables → base_fields / base_records → base_record_values` 链路回填，
+    **回填顺序必须满足依赖**（值依赖记录、记录依赖表）；
+  - 回填条件必须同时覆盖 `IS NULL` 与**零值 UUID**
+    （列是 `NOT NULL DEFAULT 零值`，只判 `IS NULL` 会**静默失效**——这是本轮实测修掉的真实缺陷）；
+  - `UPDATE ... FROM` 场景下同名列**必须带目标表别名**，否则 Postgres 报 `column reference is ambiguous`；
+  - 回填不到的孤儿行（指向已删除的 field / table）按派生数据清理，避免租户统计失真；
+- 每表加 `idx_<table>_tenant` 索引，租户过滤走索引而不是全表扫。
+
+### 49.12 P2：租户级动态限流（P2-12）
+
+原限流是**全局固定 40rps**：小空间浪费配额、大空间直接被限。新增租户桶 + 用户桶双层：
+
+- `internal/middleware/ratelimit.go` 重写：
+  - `SetQuotaResolver(func(tenantID) Quota)` —— 按租户动态给配额；
+  - `SetTenantQuota` —— 静态设置租户配额；
+  - `TenantFromPath` —— 从路径解析租户（`/projects/:projectId/...`）；
+  - 用户桶仍保留（防单用户刷爆单空间）。
+- `cmd/server/main.go` 按该空间 `kb_members` 人数**动态放大**配额
+  （成员越多配额越高），上限由 `cfg.BaseTenantScaleMax` 兜底，防止超级大空间把单实例打满。
+- 超限统一返回 `42901`。
+
+### 49.13 P2：操作日志归档与 Outbox 死信（P2-13 / P2-14）
+
+`internal/base/maintenance.go`：
+
+- `ArchiveOperationLogs` —— 审计日志按保留期归档（冷数据移出热表）；
+- `PurgeOutbox` —— 清理已投递且超过保留期的 outbox 记录；
+- `PurgeImportJobs` —— 清理已结束且超过保留期的导入任务；
+- `StartMaintenance` —— 服务启动时拉起后台维护循环。
+
+Outbox 死信治理（`internal/base/events.go` + `maintenance.go`）：
+
+- 新增状态 `OutboxStatusDead`：重试次数超限的消息**不再无限重试**，标记为死信；
+- `markOutboxFailed` 记录失败次数与原因；
+- `GET /base/outbox/dead-letters` 列出死信；
+- `POST /base/outbox/dead-letters/:eventId/retry` 人工重投；
+- 指标 `metamatrix_base_outbox_dead_total` 暴露死信总数（接 Prometheus）。
+
+**重投必须同时刷新 `created_at`（真实缺陷，本轮修掉）**：
+
+发布器按「时间 + ID」水位**单调向前**读事件（`readOutboxSince`），已经读过的行不会再被读到。
+死信是之前读过的旧行 —— 只把 `status` 改回 `pending` 的话，它会永远躺在 `pending` 里等下一次发布，
+**看起来「重投成功」，实际永远不会送达**。因此 `RetryDeadLetter` 同时把
+`created_at` 刷成当前时刻（让事件重新进入水位窗口）、`retry_count` 归零、`published_at` 清空，
+`id` 保持不变（订阅端不会把它当成新事件重复处理）。
+回归用例：`internal/base/deadletter_test.go::TestDeadLetterRetryIsActuallyRedelivered`。
+
+### 49.14 P2：通讯录分组与 user_group 字段（P2-15）
+
+- 新表 `base_user_groups`（`base_` 域）：`project_id / name / description / member_ids(jsonb)`；
+- 4 个接口：`GET/POST /base/user-groups`、`PATCH/DELETE /base/user-groups/:groupId`；
+- 新增字段类型 `FieldUserGroup`（单选 / 多选通讯录分组），取值校验成员必须存在于该空间；
+- 落点：`internal/base/usergroup.go` + `internal/model/base.go` + `internal/base/registry.go`。
+
+### 49.15 P2：分层 YAML 配置（P2-16）
+
+配置从「环境变量 + 硬编码」改为**三层 YAML**：
+
+```
+pros/api/configs/default.yaml   # 基线默认值（所有键的兜底）
+pros/api/configs/dev.yaml       # APP_ENV=dev 覆盖
+pros/api/configs/prod.yaml      # APP_ENV=prod 覆盖
+```
+
+- 加载顺序：`default.yaml` → `${APP_ENV}.yaml` → **环境变量最高优先级**；
+- `internal/config/layered.go` 实现三层合并与类型转换（YAML 里的值按环境变量同名字段覆盖）；
+- 新增依赖 `gopkg.in/yaml.v3`；
+- 连接池、限流、导入任务保留期、维护周期、租户配额上限全部改为配置项。
+
+### 49.16 P2：E2E 与并发验收（P2-17 / P2-18）
+
+- **专项 E2E**：`pros/web/scripts/base-engine-e2e.mjs` —— 27 项断言覆盖
+  只读 GET / 视图查询 / 事件 / 异步导入 / 指标 / 限流 / 通讯录分组 / 死信 / 浏览器冒烟；
+  脚本**跑完自动删除 E2E 空间**，不留脏数据（此前每跑一次残留一个空间）。
+- **并发与顺序**：`internal/base/event_order_test.go` 覆盖
+  乱序事件归一化、版本号单调、`formula.calculated` 晚于 `record.updated`。
+
+### 49.17 本批次一并修掉的真实缺陷
+
+1. **跨空间越权**：`loadTableSchema` / `scopeLoadRecord` 补租户校验
+   （Base 属于别的空间 → 按「不存在」处理；孤儿表放行以兼容历史数据）。
+2. **Postgres 事务中毒**：`syncFieldPolicy` / `writeEventOptional` / `syncRecordLinks` /
+   `recomputeFormulas` 原先「吞掉错误」，但 Postgres 里**一条失败语句会毒死整个事务**
+   （后续语句全部报 `current transaction is aborted`）。改为**先 `HasTable` 判断表存在再执行语句**。
+3. **`tenant_id` 回填静默失效**：见 49.11。
+4. **回填链路对「`project_id` 本身为零值」的脏数据无能为力**：
+   `base_record_reverse_links` 的 `project_id` 是零值，走 `project_id → tenant_id` 必然回填成零值。
+   改为「优先经 `base_apps` 关联取租户」，反向关系表额外走「源记录 → 记录 → 表 → 空间」链路。
+5. **空间删除不清理多维表格数据**：`ProjectsService.Delete` 只清画布文档，
+   `base_*` 数据整片残留 —— 后果是多维表格列表出现**孤儿 Base**、租户统计失真、
+   `tenant_id` 回填找不到归属。新增 `deleteProjectBaseData` 级联硬删
+   （值 / 授权 / 链接 → 记录 → 字段 / 视图 → 表 → Base，以及按 `project_id` 直清的日志 / outbox / 导入任务 / 分组）。
+   补用例 `TestProjectsServiceDeleteRemovesBaseData`（8 张表逐一断言归零）。
+
+
+---
+
+## 50. 批次 M 前端接线：把 18 项从「有接口」变成「能真用」
+
+> 批次 M 的 18 项此前**只有后端接口**，`src/modules/base/api.ts` 里 15 个新函数
+> **一个调用点都没有** —— 是死代码。用户在界面上点不到任何一处。
+> 本章把四条链路接进界面，并给出浏览器实测证据。
+
+### 50.1 运行监控面板（新增 `panels/BaseOpsPanel.vue`）
+
+工具栏新增「运行监控」入口（`DataLine` 图标），抽屉分四个页签：
+
+| 页签 | 接入的接口 | 界面能力 |
+| --- | --- | --- |
+| 运行指标 | `GET /base/metrics` | 10 张指标卡（P50 / P95 / P99 / 慢查询 / 已投递 / 投递失败 / 死信 / 幂等冲突 / 实时订阅 / 错误数）；P95 > 200ms、存在死信时卡片变色告警 |
+| 事件死信 | `GET /base/outbox/dead-letters`、`POST …/retry` | 死信列表（事件类型 / 重试次数 / 产生时间）+ 「重投」按钮；重投后自动刷新指标 |
+| 导入任务 | `GET /base/tables/:id/import-jobs`、`GET /base/import-jobs/:jobId`、`POST …/cancel` | 任务列表 + 进度条 + 状态标签（排队中 / 执行中 / 已完成 / 部分失败 / 失败 / 已取消）+ 取消按钮；运行中的任务每 1.5s 自动轮询 |
+| 通讯录分组 | `GET/POST/PATCH/DELETE /base/user-groups` | 分组列表 + 新建 / 编辑 / 删除；成员用空间成员下拉多选；成员名在表格里翻译成姓名 |
+
+### 50.2 异步导入（导入弹窗接入 `POST /base/tables/:id/import-jobs`）
+
+- 导入弹窗新增**异步模式开关**（`el-switch`）：
+  - 同步模式：保持原行为（`POST /tables/:id/records/batch`），适合小批量；
+  - 异步模式：提交为后台任务，弹窗内显示进度条（进度 / 状态 / 成功数 / 总数），
+    **关掉弹窗任务仍在服务端继续跑**，进度可在「运行监控 · 导入任务」查看。
+- 行数 ≥ 500 时开关上标注「建议开启」（大批量同步导入会长时间占用一个 HTTP 连接，
+  网关断开就前功尽弃）。
+- 轮询在弹窗关闭时停止；任务终态时提示并抛 `imported` 事件刷新列表。
+
+### 50.3 只读 GET 接口的三个真实用例
+
+| 接口 | 界面入口 | 语义 |
+| --- | --- | --- |
+| `GET /base/views/:viewId` | 切换视图时 | 先用列表里的配置立即生效（不等待网络），随后读服务端最新配置覆盖 —— 视图被别人改过时不会看到旧口径 |
+| `GET /base/records/:recordId` | 记录详情抽屉「刷新最新值」 | 抽屉里的数据本来是列表快照，别人改了同一条记录时这里会滞后；点按钮拉服务端最新一份并同步回列表 |
+| `GET /base/bases/:baseId` | Base 设置弹窗「读取服务端最新信息」 | 读服务端权威状态（Base 元信息 + 表清单 + 视图清单），而不是前端缓存 |
+
+### 50.4 视图即查询（`POST /base/views/:viewId/query` 接入主查询路径）
+
+主列表的查询原本一律走表级接口 `POST /tables/:tableId/query`，视图配置由前端合并后传入。
+现在按口径分流：
+
+- **生效口径完全等于视图自带配置**（共享口径、无个人覆盖、无关键词搜索）
+  → 走 `POST /base/views/:viewId/query`，**由服务端按视图配置执行**（视图配置为默认，请求体可覆盖）；
+- **叠加了个人条件 / 关键词搜索**
+  → 仍走表级接口，因为表级接口才能表达「共享条件 AND/OR 我的条件」这种合并口径。
+
+这样「视图即查询」才是一条真实的主路径，而不是一个没人调的接口。
+
+### 50.5 浏览器实测（`scripts/base-ops-panel-e2e.mjs`，`npm run test:e2e:base:ops`）
+
+```
+PASS 页面出现「运行监控」入口 — count=1
+PASS 运行指标页签渲染出指标卡片 — 10 张卡片
+PASS 指标卡片含延迟数值 — P50 延迟 3.9 ms
+PASS 事件死信页签可切换
+PASS 导入任务页签可切换
+PASS 新建通讯录分组后表格出现该分组 — 1 行
+PASS 分组名称正确写入 — 销售一部
+PASS 页面无 JS 报错
+```
+
+截图：`$TMPDIR/metamatrix-base-e2e/base-ops-metrics.png`、`base-ops-groups.png`。
+
+### 50.6 实测中修掉的布局缺陷
+
+「刷新」按钮在抽屉里被 flex 拉伸成整行（`.be-ops` 默认 `align-items: stretch`），
+看起来像一条横幅。改为 `align-items: flex-start` + `.be-ops__section { width: 100% }`，
+按钮回到常规尺寸、内容区仍占满宽度。
+
+## 51. 批次 N：写路径吞吐治理（死锁根因 + 往返数与行数脱钩）
+
+> 批次 M 的 18 项全部交付后，验收用 `cmd/loadtest -scale large`
+> （5000 行 × 20 字段 / 50 并发）复测，发现**写路径整体不成立**：
+> 单条更新与批量写入全部超时，数据库里一排 `idle in transaction`。
+> 本章记录根因与治理 —— 这是 18 项里「异步导入任务」能真正跑起来的前提。
+
+### 51.1 现象与取证
+
+压测（50 并发 / 500 行一批）下的三组现象：
+
+| 场景 | 现象 |
+| --- | --- |
+| 首屏查询 / 视图配置 / 表结构 | 全部 0 错，P95 42ms / 7ms —— **读路径健康** |
+| 单条 PATCH | 50 并发全部超时 |
+| 批量写入 500 行 | 全部 `context deadline exceeded` |
+
+`pg_stat_activity` 里同时挂着 50 条 `idle in transaction`，
+最后一条语句是 `INSERT INTO "base_event_outboxes"` —— 事务写完事件就停住了，
+客户端再也没发下一条语句。
+
+`kill -QUIT <api-pid>` 抓到的 Go 栈直接指到根因：
+
+```
+metamatrix/api/internal/base.(*Service).spaceRoleWithError
+metamatrix/api/internal/base.(*Service).roleOf
+metamatrix/api/internal/base.(*Service).subjectOf
+metamatrix/api/internal/base.(*Service).createRecordInTx
+metamatrix/api/internal/base.(*Service).BatchCreate.func1
+gorm.io/gorm.(*DB).Transaction
+```
+
+### 51.2 根因一：事务内发起走连接池的查询（死锁）
+
+`BatchCreate` 的旧实现是「整批一个事务 + 逐行 `createRecordInTx`」，
+而 `createRecordInTx` 内部会调 `subjectOf` 解析权限身份 —— 它走的是 `s.db`，
+也就是**连接池里的另一条连接**。于是每个请求的连接占用变成：
+
+```
+事务占 1 条  +  事务内再查库要 1 条  =  2 条
+```
+
+50 并发 × 2 条 = 100 条需求，而连接池只有 50 条 → 每个请求都在等一条永远不会
+空出来的连接 → 互相等待 → 整体死锁。这不是「慢」，是**必然卡死**。
+
+> 同类问题还有一处：校验（文档引用 / 关联记录是否存在）也要查库。
+> 治理原则统一为：**校验在事务开启前完成，事务内只有纯写入语句**。
+
+### 51.3 根因二：往返数与行数成正比（N+1）
+
+| 位置 | 旧实现（每行） | 新实现（每批） |
+| --- | --- | --- |
+| 投影写入 | 每字段 1 次 DELETE + 1 次 INSERT，且每次还要单独查字段类型 | 1 次 `DELETE … WHERE field_id IN (…)` + 1 次 `CreateInBatches` |
+| 公式计算 | `WHERE status = 1` **全库**扫公式，再在内存里过滤本表 | `WHERE field_id IN (本表字段)`，且**整批只查一次** |
+| 表结构 / 字段索引 / 权限身份 | 每行重查一遍 | 提到循环外（`writeIO`） |
+| 排序位基线 | 每行 `MAX(sort_order)` | 事务内取一次，逐行递增 |
+| 审计 / 发件箱 | 每行各 1 次 INSERT | 攒成缓冲，事务收尾批量插入 |
+| 关系表维护 | 每行 2 次 DELETE（无 link 字段也照删） | 无 link 字段直接跳过 |
+
+### 51.4 根因三：`gorm.SavePoint` 在 pgx 下会破坏事务连接复用
+
+部分成功批量写入用存档点实现「单行失败不影响同行其它行」。旧代码用
+`tx.SavePoint(sp)` / `tx.RollbackTo(sp)`，有两个硬伤：
+
+1. **驱动吞错误**：`gorm.io/driver/postgres` 的实现是
+   `tx.Exec("SAVEPOINT " + name); return nil` —— 错误被丢弃，
+   `tx.SavePoint(...).Error` **永远为 nil**，失败判断形同虚设；
+2. **换连接池**：`gorm v1.31.2` 的 `DB.SavePoint` 会「关闭预编译语句 +
+   把 `Statement.ConnPool` 从 `*PreparedStmtTX` 换回 `preparedStmtTX.Tx`」，
+   在 pgx 组合下事务后续语句会拿不到原来的连接 ——
+   表现正是「事务停在 outbox 写入之后不再前进」。
+
+治理：改用**原生 SQL** 建立存档点，不碰连接池：
+
+```go
+tx.Exec("SAVEPOINT " + sp)            // 建点
+tx.Exec("ROLLBACK TO SAVEPOINT " + sp) // 回滚到本行
+```
+
+### 51.5 治理后的写路径结构
+
+```go
+// 一次写入的共享上下文：schema / 字段元数据 / 权限身份 / 公式 / 表探测
+type writeIO struct { table, idx, projFields, subj, formulas, pendingAudits, pendingEvents }
+```
+
+- `newWriteIO()` **在事务开启前**组装（所有读取都走独立连接）；
+- `prepareRecord()` 在事务外做归一化与校验；
+- `persistRecord()` 在事务内只做写入：插记录 → 写投影 → 维护关系 →
+  审计与事件进缓冲；
+- 事务收尾 `flushPending()` 批量落审计与事件；
+- 部分成功模式按 `baseBatchChunk = 50` 分块，每块一个事务、每行一个存档点；
+- 整批成功模式（`BatchCreate`）保持**一个事务**，语义仍是「全成功或全失败」。
+
+### 51.6 治理结果（`cmd/loadtest -scale large`，50 并发，5000 行 × 20 字段）
+
+| 场景 | 请求数 | 错误数 | QPS | P50 | P95 | P99 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 首屏查询（100 条 × 20 字段） | 18158 | **0** | 1210.5 | 40ms | 57ms | 70ms |
+| 常规筛选（关键字） | 2309 | **0** | 153.9 | 304ms | 607ms | 811ms |
+| 视图配置读取 | 174999 | **0** | 11666.6 | 4ms | 6ms | 8ms |
+| 表结构读取 | 29144 | **0** | 1942.9 | 25ms | 33ms | 39ms |
+| 单条更新 | 18769 | **0** | 1251.3 | 39ms | 50ms | 57ms |
+| 批量 100 条编辑 | 912 | **0** | 60.8 | 837ms | 889ms | 907ms |
+| 深翻页（keyset 翻 20 页） | 18293 | **0** | 1219.5 | 40ms | 57ms | 68ms |
+| 批量写入（500 行/批） | 200 | **0** | 13.3 | 4.066s | 4.884s | 5.087s |
+
+- 治理前：单条更新与批量写入**全部超时**（死锁）；
+- 治理后：**8 个场景全部 0 错**，批量写入折算 ≈ **6,600 行/秒**（50 并发）；
+- 串行基准（同一脚本播种 5000 行）：**17.7s → 4.45s**（约 4 倍）。
+
+### 51.7 回归用例
+
+`internal/base/batch_deadlock_test.go`：
+
+| 用例 | 作用 |
+| --- | --- |
+| `TestBatchCreateUnderTightPoolDoesNotDeadlock` | 连接池压到 **4 条**、8 并发批量写 —— 旧实现必然死锁，修复后 0.24s 完成 |
+| `TestBatchCreatePartialUnderTightPoolDoesNotDeadlock` | 同上，覆盖「部分成功」路径 |
+| `TestBatchWriteSortOrderIsUniqueWithinRequest` | 跨块（57 行）写入后排序位不重复 |
+
+> 反向验证：把「事务内查一次权限」这一行临时加回去，
+> 上述用例立刻从 0.24s 变成 200s 超时 —— 用例确实咬住了这个缺陷。

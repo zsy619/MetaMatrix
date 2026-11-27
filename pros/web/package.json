@@ -18,6 +18,9 @@
     "test:smoke": "node scripts/smoke-flow.mjs",
     "test:e2e:clone": "node scripts/clone-canvas-e2e.mjs",
     "gen:api": "node scripts/gen-api-types.mjs",
+    "test:e2e:base": "node scripts/base-engine-e2e.mjs",
+    "test:e2e:base:audit": "node scripts/base-engine-audit.mjs",
+    "test:e2e:base:ops": "node scripts/base-ops-panel-e2e.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

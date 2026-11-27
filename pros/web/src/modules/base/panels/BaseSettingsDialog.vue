@@ -7,8 +7,8 @@
  */
 import { computed, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Delete, EditPen } from '@element-plus/icons-vue'
-import { deleteBase, updateBase } from '../api'
+import { Delete, EditPen, Refresh } from '@element-plus/icons-vue'
+import { deleteBase, fetchBaseDetail, updateBase } from '../api'
 import type { BaseInfo } from '../types'
 
 const props = defineProps<{
@@ -33,6 +33,33 @@ const description = ref('')
 const icon = ref('')
 const saving = ref(false)
 const removing = ref(false)
+const reloading = ref(false)
+
+/**
+ * 重新读取服务端最新的 Base 详情。
+ *
+ * 走只读 GET（GET /base/bases/:baseId）：拿到的是服务端权威状态
+ * （Base 元信息 + 表清单 + 视图清单），不是前端缓存的那一份。
+ */
+async function reloadFromServer() {
+  if (!props.base) return
+  reloading.value = true
+  try {
+    const detail = await fetchBaseDetail(props.projectId, props.base.id)
+    const fresh = detail?.base
+    if (fresh) {
+      name.value = fresh.name ?? ''
+      description.value = fresh.description ?? ''
+      icon.value = fresh.icon ?? ''
+      emit('saved', fresh)
+    }
+    ElMessage.success('已读取服务端最新信息')
+  } catch (err) {
+    ElMessage.error((err as Error)?.message || '读取失败')
+  } finally {
+    reloading.value = false
+  }
+}
 
 watch(
   () => [props.modelValue, props.base] as const,
@@ -105,6 +132,12 @@ async function remove() {
     modal-class="be-modal"
     :close-on-click-modal="false"
   >
+    <div class="be-settings__reload">
+      <el-button size="small" text :icon="Refresh" :loading="reloading" @click="reloadFromServer">
+        读取服务端最新信息
+      </el-button>
+      <span class="be-panel__hint">用只读接口重新拉一次 Base 详情（GET /base/bases/:id）</span>
+    </div>
     <el-form label-width="72px" label-position="left">
       <el-form-item label="名称">
         <el-input v-model="name" maxlength="120" show-word-limit placeholder="多维表格名称" />
@@ -140,6 +173,13 @@ async function remove() {
 </template>
 
 <style scoped>
+.be-settings__reload {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
 .be-settings__footer {
   display: flex;
   align-items: center;

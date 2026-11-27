@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
+  MAX_GROUPS,
+  MAX_SORTS,
   mergeFilters,
   normalizeCombine,
   normalizeFilters,
+  normalizeGroups,
+  normalizeSorts,
   resolveFilters,
   resolveGroups,
   resolveSorts,
@@ -62,5 +66,25 @@ describe('base view query', () => {
     expect(resolveSorts(sharedSorts, [{ fieldId: 'f3', order: 'desc' }], 'override')).toEqual([
       { fieldId: 'f3', order: 'desc' },
     ])
+  })
+
+  it('重复的排序 / 分组规则会去重：历史视图里存了 9 条同字段分组', () => {
+    const nine = Array.from({ length: 9 }, () => ({
+      fieldId: 'f1',
+      order: 'asc' as const,
+    }))
+    expect(normalizeGroups(nine)).toEqual([{ fieldId: 'f1', order: 'asc' }])
+    expect(resolveGroups(nine, undefined, 'and')).toHaveLength(1)
+  })
+
+  it('排序 / 分组规则会截断到后端上限，避免整表查询 422', () => {
+    const many = Array.from({ length: 12 }, (_, i) => ({
+      fieldId: `f${i}`,
+      order: 'asc' as const,
+    }))
+    expect(normalizeSorts(many)).toHaveLength(MAX_SORTS)
+    expect(normalizeGroups(many)).toHaveLength(MAX_GROUPS)
+    expect(normalizeSorts([{ fieldId: '', order: 'asc' }])).toEqual([])
+    expect(normalizeGroups(undefined)).toEqual([])
   })
 })

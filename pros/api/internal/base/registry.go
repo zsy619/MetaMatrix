@@ -30,6 +30,7 @@ const (
 	FieldPhone        FieldType = "phone"
 	FieldURL          FieldType = "url"
 	FieldUser         FieldType = "user"
+	FieldUserGroup    FieldType = "user_group"
 	FieldAttachment   FieldType = "attachment"
 	FieldFormula      FieldType = "formula"
 	FieldLink         FieldType = "link"
@@ -644,6 +645,55 @@ func (userHandler) Text(v any) string {
 	return strings.Join(stringSlice(v), ", ")
 }
 
+// userGroupHandler 是「通讯录分组」字段类型。
+//
+// 值存的是「分组 ID 列表」（可多选），展示名由前端按 /user-groups 接口解析；
+// 服务端不做名字缓存，避免分组改名后出现「旧名字」的脏数据。
+type userGroupHandler struct{}
+
+func (userGroupHandler) Definition() FieldDefinition {
+	return FieldDefinition{
+		Type: FieldUserGroup, Label: "通讯录分组", Icon: "user", Version: 1, Color: "#3390ec",
+		Description: "空间内的成员分组，可多选",
+		ConfigSchema: map[string]any{
+			"multiple": map[string]any{"type": "boolean", "default": true},
+		},
+		Capabilities: FieldCapabilities{Editable: true, Filterable: true, Sortable: false, Groupable: true, Indexable: true},
+	}
+}
+func (userGroupHandler) ValidateConfig(map[string]any) error { return nil }
+func (userGroupHandler) ValidateValue(v any, _ map[string]any) error {
+	if v == nil {
+		return nil
+	}
+	if _, ok := v.(string); ok {
+		return nil
+	}
+	if _, ok := v.([]string); ok {
+		return nil
+	}
+	if _, ok := v.([]any); ok {
+		return nil
+	}
+	return errors.New("user group value must be a group id or a list of group ids")
+}
+func (userGroupHandler) Normalize(v any, _ map[string]any) (any, error) {
+	if v == nil {
+		return []string{}, nil
+	}
+	if s, ok := v.(string); ok {
+		if s == "" {
+			return []string{}, nil
+		}
+		return []string{s}, nil
+	}
+	return stringSlice(v), nil
+}
+func (userGroupHandler) ProjectedType() string { return ProjectedJSON }
+func (userGroupHandler) Text(v any) string {
+	return strings.Join(stringSlice(v), ", ")
+}
+
 type attachmentHandler struct{}
 
 func (attachmentHandler) Definition() FieldDefinition {
@@ -972,6 +1022,7 @@ func NewRegistry() *Registry {
 	r.register(contactHandler{kind: FieldPhone})
 	r.register(contactHandler{kind: FieldURL})
 	r.register(userHandler{})
+	r.register(userGroupHandler{})
 	r.register(attachmentHandler{})
 	r.register(formulaHandler{})
 	r.register(linkHandler{})
@@ -984,10 +1035,6 @@ func NewRegistry() *Registry {
 	r.register(systemFieldHandler{kind: FieldCreatedBy, label: "创建人", icon: "user", color: "#3390ec", projected: ProjectedText})
 	r.register(systemFieldHandler{kind: FieldUpdatedBy, label: "更新人", icon: "user", color: "#3390ec", projected: ProjectedText})
 	return r
-}
-
-func (r *Registry) register(h FieldHandler) {
-	r.handlers[h.Definition().Type] = h
 }
 
 // Get 返回字段处理器。

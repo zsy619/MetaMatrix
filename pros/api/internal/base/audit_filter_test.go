@@ -21,7 +21,7 @@ func newAuditFixture(t *testing.T) (*Service, uuid.UUID, uuid.UUID, uuid.UUID, u
 		`CREATE TABLE IF NOT EXISTS core_projects (id uuid primary key, owner_user_id uuid)`,
 		`CREATE TABLE IF NOT EXISTS kb_members (id uuid primary key, project_id uuid, user_id uuid, role varchar(16))`,
 		`CREATE TABLE IF NOT EXISTS base_operation_logs (
-			id uuid primary key, project_id uuid, base_id uuid, table_id uuid, record_id uuid,
+			id uuid primary key, tenant_id uuid, project_id uuid, base_id uuid, table_id uuid, record_id uuid,
 			operator_id uuid, operation varchar(32), before_data json, after_data json,
 			request_id varchar(64), created_at datetime)`,
 	} {
@@ -118,4 +118,3 @@ func TestAuditFilterInvalidPrefixIgnored(t *testing.T) {
 		t.Fatalf("expected 2 rows (filter ignored), got %d", total)
 	}
 }
-

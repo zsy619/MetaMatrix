@@ -27,7 +27,12 @@ import (
 func main() {
 	cfg := config.Load()
 
-	gdb, err := db.Connect(cfg.DatabaseURL)
+	gdb, err := db.ConnectWithPool(cfg.DatabaseURL, db.PoolOptions{
+		MaxOpenConns:       cfg.DBMaxOpenConns,
+		MaxIdleConns:       cfg.DBMaxIdleConns,
+		ConnMaxLifetimeMin: cfg.DBConnMaxLifetimeMin,
+		ConnMaxIdleMin:     cfg.DBConnMaxIdleMin,
+	})
 	if err != nil {
 		log.Fatalf("db connect: %v", err)
 	}
@@ -121,6 +126,19 @@ func main() {
 	baseSvc.StartOutboxPublisher(context.Background())
 	// 每日按天重算 TODAY() 这类时间敏感公式（配合查询时的惰性补算）。
 	baseSvc.StartDailyTimeRecalc(context.Background())
+	// 幂等记录清理调度：过期键定期清掉，避免唯一索引无限膨胀。
+	baseSvc.StartIdempotencyPurge(context.Background())
+	// 异步导入任务 worker：大批量导入不阻塞 HTTP 请求，进度可轮询、可取消。
+	baseSvc.StartImportJobWorker(context.Background())
+	// 后台维护：操作审计归档、事件发件箱清理与死信治理、导入任务清理。
+	baseSvc.SetMaintenanceConfig(base.MaintenanceConfig{
+		OperationLogKeepDays: cfg.BaseOperationLogKeepDays,
+		OutboxKeepDays:       cfg.BaseOutboxKeepDays,
+		OutboxDeadKeepDays:   cfg.BaseOutboxDeadKeepDays,
+		OutboxMaxRetries:     cfg.BaseOutboxMaxRetries,
+		ImportJobKeepDays:    cfg.BaseImportKeepDays,
+	})
+	baseSvc.StartMaintenance(context.Background())
 
 	// 历史版本保留条数可配置（111）。
 	service.VersionKeep = cfg.KnowledgeVersionKeep
@@ -321,6 +339,29 @@ func main() {
 	// 多维表格 Base Engine：Base/表/字段/记录/视图/公式 + SSE 事件流。
 	// 多维表格域限流（共享方案 §10.9）：按用户 + 接口限速，超限返回 42901。
 	baseLimiter := middleware.NewRateLimiter(float64(cfg.BaseRateLimitRPS), cfg.BaseRateLimitBurst)
+	// 租户级动态配额：空间成员越多，配额越高（上限由配置控制），
+	// 这样小空间不会因为多人同时操作而误伤，大空间也不会把服务打满。
+	baseLimiter.SetQuotaResolver(func(tenantID string) middleware.Quota {
+		if tenantID == "" {
+			return middleware.Quota{}
+		}
+		var members int64
+		if err := gdb.Table("kb_members").Where("project_id = ?", tenantID).Count(&members).Error; err != nil {
+			// 查不到成员数就按默认配额走，不能因为统计失败就拒绝请求。
+			return middleware.Quota{}
+		}
+		if members <= 1 {
+			return middleware.Quota{}
+		}
+		scale := float64(members)
+		if max := float64(cfg.BaseTenantScaleMax); max > 0 && scale > max {
+			scale = max
+		}
+		return middleware.Quota{
+			RPS:   float64(cfg.BaseRateLimitRPS) * scale,
+			Burst: int(float64(cfg.BaseRateLimitBurst) * scale),
+		}
+	})
 	// OpenAPI 文档（共享方案 §10.9）：接口元数据 + 前端类型生成的唯一来源。
 	h.GET("/openapi.json", api.OpenAPIHandler)
 
@@ -332,6 +373,16 @@ func main() {
 		baseGroup.PATCH("/bases/:baseId", baseH.UpdateBase)
 		baseGroup.DELETE("/bases/:baseId", baseH.DeleteBase)
 		baseGroup.GET("/field-types", baseH.FieldTypes)
+		// 兼容路径：/fields/types 与 /field-types 等价。
+		baseGroup.GET("/fields/types", baseH.FieldTypes)
+		// 可观测性：JSON 快照与 Prometheus 文本。
+		baseGroup.GET("/metrics", baseH.Metrics)
+		baseGroup.GET("/metrics/prometheus", baseH.MetricsPrometheus)
+		// 只读 GET 接口（技术文档 §10）：Base / 记录 / 视图详情。
+		baseGroup.GET("/bases/:baseId", baseH.GetBase)
+		baseGroup.GET("/records/:recordId", baseH.GetRecord)
+		baseGroup.GET("/views/:viewId", baseH.GetView)
+		baseGroup.POST("/views/:viewId/query", baseH.QueryView)
 		baseGroup.GET("/events", baseH.Events)
 		baseGroup.GET("/:baseId/audit", baseH.ListAudit)
 		baseGroup.GET("/doc-backrefs/:nodeId", baseH.ListDocBackrefs)
@@ -366,6 +417,19 @@ func main() {
 		baseGroup.GET("/records/:recordId/grants", baseH.ListRecordGrants)
 		baseGroup.GET("/records/:recordId/relations", baseH.ListRecordRelations)
 		baseGroup.GET("/tables/:tableId/link-targets", baseH.ListLinkTargets)
+		// 异步导入任务：提交即返回 jobId，进度可轮询、可取消。
+		baseGroup.POST("/tables/:tableId/import-jobs", baseH.CreateImportJob)
+		baseGroup.GET("/tables/:tableId/import-jobs", baseH.ListImportJobs)
+		baseGroup.GET("/import-jobs/:jobId", baseH.GetImportJob)
+		baseGroup.POST("/import-jobs/:jobId/cancel", baseH.CancelImportJob)
+		// 通讯录分组：人员字段可以引用「一个组」而不是一个人。
+		baseGroup.GET("/user-groups", baseH.ListUserGroups)
+		baseGroup.POST("/user-groups", baseH.CreateUserGroup)
+		baseGroup.PATCH("/user-groups/:groupId", baseH.UpdateUserGroup)
+		baseGroup.DELETE("/user-groups/:groupId", baseH.DeleteUserGroup)
+		// 事件死信治理：运维查看 / 人工重投。
+		baseGroup.GET("/outbox/dead-letters", baseH.ListDeadLetters)
+		baseGroup.POST("/outbox/dead-letters/:eventId/retry", baseH.RetryDeadLetter)
 		// 引用 / 汇总字段（lookup / rollup）：读配置 + 手动触发重算。
 		baseGroup.GET("/tables/:tableId/computed-fields", baseH.ListComputedFields)
 		baseGroup.POST("/tables/:tableId/lookup-rollup/recalc", baseH.RecalcLookupRollup)

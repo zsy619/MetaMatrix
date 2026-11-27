@@ -33,7 +33,7 @@ type ConfigBundle struct {
 	SignatureAlgorithm string `json:"signatureAlgorithm,omitempty"`
 	// Signature 是包体签名（base64）。为空表示这是未签名的包（外部导入）。
 	Signature string `json:"signature,omitempty"`
-	Table         struct {
+	Table     struct {
 		Name        string `json:"name"`
 		Description string `json:"description,omitempty"`
 	} `json:"table"`

@@ -85,6 +85,28 @@ var RouteTable = []Operation{
 	{Method: "DELETE", Path: "/projects/{projectId}/base/records/{recordId}", Summary: "删记录", Tag: "record", Params: []Param{{Name: "projectId", In: "path", Required: true, Schema: "string"}, {Name: "recordId", In: "path", Required: true, Schema: "string"}}, Response: "DeleteResult"},
 	{Method: "PATCH", Path: "/projects/{projectId}/base/views/{viewId}", Summary: "改视图", Tag: "view", Params: []Param{{Name: "projectId", In: "path", Required: true, Schema: "string"}, {Name: "viewId", In: "path", Required: true, Schema: "string"}}, RequestBody: "UpdateViewRequest", Response: "BaseView"},
 	{Method: "DELETE", Path: "/projects/{projectId}/base/views/{viewId}", Summary: "删视图", Tag: "view", Params: []Param{{Name: "projectId", In: "path", Required: true, Schema: "string"}, {Name: "viewId", In: "path", Required: true, Schema: "string"}}, Response: "DeleteResult"},
+	// —— 只读 GET 接口（技术文档 §10）——
+	{Method: "GET", Path: "/projects/{projectId}/base/bases/{baseId}", Summary: "Base 详情", Tag: "base", Params: []Param{{Name: "projectId", In: "path", Required: true, Schema: "string"}, {Name: "baseId", In: "path", Required: true, Schema: "string"}}, Response: "BaseDetail"},
+	{Method: "GET", Path: "/projects/{projectId}/base/records/{recordId}", Summary: "记录详情", Tag: "record", Params: []Param{{Name: "projectId", In: "path", Required: true, Schema: "string"}, {Name: "recordId", In: "path", Required: true, Schema: "string"}}, Response: "RecordRow"},
+	{Method: "GET", Path: "/projects/{projectId}/base/views/{viewId}", Summary: "视图详情", Tag: "view", Params: []Param{{Name: "projectId", In: "path", Required: true, Schema: "string"}, {Name: "viewId", In: "path", Required: true, Schema: "string"}}, Response: "BaseView"},
+	{Method: "POST", Path: "/projects/{projectId}/base/views/{viewId}/query", Summary: "按视图配置查询记录", Tag: "view", Params: []Param{{Name: "projectId", In: "path", Required: true, Schema: "string"}, {Name: "viewId", In: "path", Required: true, Schema: "string"}}, RequestBody: "QueryRequest", Response: "QueryResult"},
+	// —— 兼容与可观测性 ——
+	{Method: "GET", Path: "/projects/{projectId}/base/fields/types", Summary: "字段类型与能力清单（兼容路径）", Tag: "base", Params: []Param{{Name: "projectId", In: "path", Required: true, Schema: "string"}}, Response: "FieldTypeDefinitionList"},
+	{Method: "GET", Path: "/projects/{projectId}/base/metrics", Summary: "Base Engine 指标快照", Tag: "base", Params: []Param{{Name: "projectId", In: "path", Required: true, Schema: "string"}}, Response: "BaseMetricsSnapshot"},
+	{Method: "GET", Path: "/projects/{projectId}/base/metrics/prometheus", Summary: "Base Engine Prometheus 文本指标", Tag: "base", Params: []Param{{Name: "projectId", In: "path", Required: true, Schema: "string"}}, Response: "EventStream"},
+	// —— 异步导入任务 ——
+	{Method: "POST", Path: "/projects/{projectId}/base/tables/{tableId}/import-jobs", Summary: "提交异步导入任务", Tag: "import", Params: []Param{{Name: "projectId", In: "path", Required: true, Schema: "string"}, {Name: "tableId", In: "path", Required: true, Schema: "string"}}, RequestBody: "ImportJobRequest", Response: "ImportJobInfo"},
+	{Method: "GET", Path: "/projects/{projectId}/base/tables/{tableId}/import-jobs", Summary: "导入任务列表", Tag: "import", Params: []Param{{Name: "projectId", In: "path", Required: true, Schema: "string"}, {Name: "tableId", In: "path", Required: true, Schema: "string"}}, Response: "ImportJobInfoList"},
+	{Method: "GET", Path: "/projects/{projectId}/base/import-jobs/{jobId}", Summary: "导入任务进度", Tag: "import", Params: []Param{{Name: "projectId", In: "path", Required: true, Schema: "string"}, {Name: "jobId", In: "path", Required: true, Schema: "string"}}, Response: "ImportJobInfo"},
+	{Method: "POST", Path: "/projects/{projectId}/base/import-jobs/{jobId}/cancel", Summary: "取消导入任务", Tag: "import", Params: []Param{{Name: "projectId", In: "path", Required: true, Schema: "string"}, {Name: "jobId", In: "path", Required: true, Schema: "string"}}, Response: "ImportJobInfo"},
+	// —— 通讯录分组 ——
+	{Method: "GET", Path: "/projects/{projectId}/base/user-groups", Summary: "通讯录分组列表", Tag: "usergroup", Params: []Param{{Name: "projectId", In: "path", Required: true, Schema: "string"}}, Response: "UserGroupInfoList"},
+	{Method: "POST", Path: "/projects/{projectId}/base/user-groups", Summary: "新建通讯录分组", Tag: "usergroup", Params: []Param{{Name: "projectId", In: "path", Required: true, Schema: "string"}}, RequestBody: "UserGroupInput", Response: "UserGroupInfo"},
+	{Method: "PATCH", Path: "/projects/{projectId}/base/user-groups/{groupId}", Summary: "修改通讯录分组", Tag: "usergroup", Params: []Param{{Name: "projectId", In: "path", Required: true, Schema: "string"}, {Name: "groupId", In: "path", Required: true, Schema: "string"}}, RequestBody: "UserGroupInput", Response: "UserGroupInfo"},
+	{Method: "DELETE", Path: "/projects/{projectId}/base/user-groups/{groupId}", Summary: "删除通讯录分组", Tag: "usergroup", Params: []Param{{Name: "projectId", In: "path", Required: true, Schema: "string"}, {Name: "groupId", In: "path", Required: true, Schema: "string"}}, Response: "DeleteResult"},
+	// —— 事件死信治理 ——
+	{Method: "GET", Path: "/projects/{projectId}/base/outbox/dead-letters", Summary: "死信事件列表", Tag: "event", Params: []Param{{Name: "projectId", In: "path", Required: true, Schema: "string"}}, Response: "DeadLetterList"},
+	{Method: "POST", Path: "/projects/{projectId}/base/outbox/dead-letters/{eventId}/retry", Summary: "人工重投死信", Tag: "event", Params: []Param{{Name: "projectId", In: "path", Required: true, Schema: "string"}, {Name: "eventId", In: "path", Required: true, Schema: "string"}}, Response: "DeleteResult"},
 }
 
 // Schemas 是接口用到的数据结构（简化定义：类型 + 字段）。
@@ -121,6 +143,13 @@ var Schemas = map[string]map[string]string{
 	"DeleteResult":           {"id": "string", "deleted": "boolean?"},
 	"ErrorResponse":          {"code": "string", "message": "string", "data": "object?"},
 	"EventStream":            {"event": "string", "data": "object?"},
+	"BaseDetail":             {"base": "BaseInfo", "tables": "BaseTable[]", "views": "BaseView[]"},
+	"BaseMetricsSnapshot":    {"operations": "object", "errors": "number", "slowQueries": "number", "p50Millis": "number", "p95Millis": "number", "p99Millis": "number", "outboxPublished": "number", "outboxFailed": "number", "outboxDead": "number", "idempotencyConflicts": "number", "activeSubscribers": "number"},
+	"ImportJobRequest":       {"rows": "object[]", "mode": "string?"},
+	"ImportJobInfo":          {"id": "string", "tableId": "string", "status": "string", "mode": "string", "total": "number", "processed": "number", "succeeded": "number", "failed": "number", "failures": "object[]?", "error": "string?"},
+	"UserGroupInput":         {"name": "string", "description": "string?", "members": "string[]?", "sortOrder": "number?"},
+	"UserGroupInfo":          {"id": "string", "name": "string", "description": "string", "members": "string[]", "memberCount": "number", "sortOrder": "number", "createdAt": "string"},
+	"DeadLetter":             {"id": "string", "eventType": "string", "retryCount": "number", "status": "string", "createdAt": "string"},
 }
 
 // ListSchemas 把 `XxxList` 映射到元素类型。
@@ -142,6 +171,9 @@ var ListSchemas = map[string]string{
 	"BaseEmbedderList":        "object",
 	"BatchResult":             "object",
 	"ImportConfigResult":      "object",
+	"ImportJobInfoList":       "ImportJobInfo",
+	"UserGroupInfoList":       "UserGroupInfo",
+	"DeadLetterList":          "DeadLetter",
 }
 
 // BuildOpenAPI 生成 OpenAPI 3.0 文档（map 形式）。

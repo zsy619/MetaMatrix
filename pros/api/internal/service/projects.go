@@ -256,6 +256,93 @@ func (s *ProjectsService) Delete(ownerID, id uuid.UUID) error {
 			}
 		}
 
+		if err := deleteProjectBaseData(tx, id); err != nil {
+			return err
+		}
+
 		return tx.Unscoped().Where("id = ? AND owner_user_id = ?", id, ownerID).Delete(&model.Project{}).Error
 	})
+}
+
+// deleteProjectBaseData 级联清理空间下的多维表格数据。
+//
+// 空间删除后 base_* 数据若残留，会造成：多维表格列表出现「孤儿 Base」、
+// 租户统计失真、tenant_id 回填找不到归属。因此删除空间必须一并清干净。
+func deleteProjectBaseData(tx *gorm.DB, projectID uuid.UUID) error {
+	var baseIDs []uuid.UUID
+	if err := tx.Model(&model.BaseApp{}).
+		Where("project_id = ?", projectID).
+		Pluck("id", &baseIDs).Error; err != nil {
+		return err
+	}
+	if len(baseIDs) > 0 {
+		var tableIDs []uuid.UUID
+		if err := tx.Model(&model.BaseTable{}).
+			Where("base_id IN ?", baseIDs).
+			Pluck("id", &tableIDs).Error; err != nil {
+			return err
+		}
+		var recordIDs []uuid.UUID
+		if err := tx.Model(&model.BaseRecord{}).
+			Where("table_id IN ?", tableIDs).
+			Pluck("id", &recordIDs).Error; err != nil {
+			return err
+		}
+		var fieldIDs []uuid.UUID
+		if err := tx.Model(&model.BaseField{}).
+			Where("table_id IN ?", tableIDs).
+			Pluck("id", &fieldIDs).Error; err != nil {
+			return err
+		}
+		var viewIDs []uuid.UUID
+		if err := tx.Model(&model.BaseView{}).
+			Where("table_id IN ?", tableIDs).
+			Pluck("id", &viewIDs).Error; err != nil {
+			return err
+		}
+		// 顺序：叶子 → 根（值 / 授权 / 链接 → 记录 → 字段 / 视图 → 表 → Base）。
+		steps := []struct {
+			model any
+			cond  any
+			args  []any
+		}{
+			{&model.BaseRecordValue{}, "record_id IN ?", []any{recordIDs}},
+			{&model.BaseRecordGrant{}, "record_id IN ?", []any{recordIDs}},
+			{&model.BaseRecordLink{}, "source_record_id IN ?", []any{recordIDs}},
+			{&model.BaseRecordReverseLink{}, "source_record_id IN ?", []any{recordIDs}},
+			{&model.BaseFieldFormula{}, "field_id IN ?", []any{fieldIDs}},
+			{&model.BaseFormulaDependency{}, "table_id IN ?", []any{tableIDs}},
+			{&model.BaseFieldPolicy{}, "field_id IN ?", []any{fieldIDs}},
+			{&model.BaseViewPref{}, "view_id IN ?", []any{viewIDs}},
+			{&model.BaseRecord{}, "table_id IN ?", []any{tableIDs}},
+			{&model.BaseField{}, "table_id IN ?", []any{tableIDs}},
+			{&model.BaseView{}, "table_id IN ?", []any{tableIDs}},
+			{&model.BaseTable{}, "base_id IN ?", []any{baseIDs}},
+		}
+		for _, st := range steps {
+			if len(st.args) == 0 {
+				continue
+			}
+			// 空间删除是硬删除：base_* 数据没有恢复需求，
+			// 软删会留下「已删除空间的多维表格」残影（列表出现孤儿 Base）。
+			if err := tx.Unscoped().Where(st.cond, st.args...).Delete(st.model).Error; err != nil {
+				return err
+			}
+		}
+	}
+	// 直接持 project_id 的表：按项目直接清。
+	for _, m := range []any{
+		&model.BaseOperationLog{},
+		&model.BaseEventOutbox{},
+		&model.BaseImportJob{},
+		&model.BaseUserGroup{},
+		&model.BaseFieldPolicy{},
+		&model.BaseRecordGrant{},
+		&model.BaseViewPref{},
+	} {
+		if err := tx.Unscoped().Where("project_id = ?", projectID).Delete(m).Error; err != nil {
+			return err
+		}
+	}
+	return tx.Unscoped().Where("project_id = ?", projectID).Delete(&model.BaseApp{}).Error
 }

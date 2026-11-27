@@ -18,6 +18,7 @@ import type {
   QueryResult,
   RecordRow,
   RecordGrant,
+  GrantSubject,
   RecordVisibility,
   ViewScope,
   ViewConfig,
@@ -269,16 +270,22 @@ export function updateRecord(
   expectedVersion?: number,
   visibility?: RecordVisibility,
   grants?: string[],
+  grantSubjects?: GrantSubject[],
 ) {
   return apiRequest<RecordRow>(`${baseUrl(projectId)}/records/${recordId}`, {
     method: 'PATCH',
-    body: { fields, expectedVersion, visibility, grants },
+    body: { fields, expectedVersion, visibility, grants, grantSubjects },
   })
 }
 
 /** 列出记录的可见成员（指定成员可见时有效）。 */
 export function listRecordGrants(projectId: string, recordId: string) {
   return apiRequest<RecordGrant[]>(`${baseUrl(projectId)}/records/${recordId}/grants`)
+}
+
+/** 列出空间成员出现过的部门（用于「按部门授权」）。 */
+export function listSpaceDepartments(projectId: string) {
+  return apiRequest<string[]>(`${baseUrl(projectId)}/departments`, { cache: 'no-store' })
 }
 
 /** 删除记录。 */
@@ -377,12 +384,38 @@ export type LinkTarget = {
   subtitle?: string
 }
 
-/** 列出目标表的记录候选（关联记录选择器）。 */
-export function listLinkTargets(projectId: string, tableId: string, keyword?: string, limit = 50) {
+/** 一页关联候选（游标分页）。 */
+export type LinkTargetPage = {
+  items: LinkTarget[]
+  nextCursor?: string
+  hasMore: boolean
+}
+
+/** 列出目标表的记录候选（关联记录选择器，支持远程搜索 + 游标翻页）。 */
+export function listLinkTargetsPage(
+  projectId: string,
+  tableId: string,
+  options: { keyword?: string; limit?: number; cursor?: string; targetTableId?: string } = {},
+) {
   const query = new URLSearchParams()
-  if (keyword) query.set('keyword', keyword)
-  query.set('limit', String(limit))
-  return apiRequest<LinkTarget[]>(`${baseUrl(projectId)}/tables/${tableId}/link-targets?${query.toString()}`)
+  if (options.keyword) query.set('keyword', options.keyword)
+  query.set('limit', String(options.limit ?? 50))
+  if (options.cursor) query.set('cursor', options.cursor)
+  if (options.targetTableId) query.set('targetTableId', options.targetTableId)
+  return apiRequest<LinkTargetPage>(
+    `${baseUrl(projectId)}/tables/${tableId}/link-targets?${query.toString()}`,
+  )
+}
+
+/** 列出目标表的记录候选（兼容旧调用：只取第一页 items）。 */
+export async function listLinkTargets(
+  projectId: string,
+  tableId: string,
+  keyword?: string,
+  limit = 50,
+) {
+  const page = await listLinkTargetsPage(projectId, tableId, { keyword, limit })
+  return page.items
 }
 
 /** 统一查询：筛选、排序、分组、分页都在服务端完成。 */
@@ -471,6 +504,39 @@ export function exportTableConfig(projectId: string, tableId: string) {
   return apiRequest<ConfigBundle>(`${baseUrl(projectId)}/tables/${tableId}/config-export`)
 }
 
+/** 加密后的配置包（AES-256-GCM 密文体）。 */
+export type EncryptedBundle = {
+  formatVersion: number
+  algorithm: string
+  kdf: string
+  iterations: number
+  salt: string
+  nonce: string
+  ciphertext: string
+  exportedAt?: string
+}
+
+/** 导出一张表的**加密**配置包（口令保护，只有拿到口令的人能导入）。 */
+export function exportTableConfigEncrypted(projectId: string, tableId: string, passphrase: string) {
+  return apiRequest<EncryptedBundle>(
+    `${baseUrl(projectId)}/tables/${tableId}/config-export-encrypted`,
+    { method: 'POST', body: { passphrase } },
+  )
+}
+
+/** 导入**加密**配置包。 */
+export function importTableConfigEncrypted(
+  projectId: string,
+  baseId: string,
+  passphrase: string,
+  bundle: EncryptedBundle,
+) {
+  return apiRequest<{ tableId: string; table: BaseTable; warnings?: string[] }>(
+    `${baseUrl(projectId)}/tables/config-import-encrypted`,
+    { method: 'POST', body: { baseId, passphrase, bundle } },
+  )
+}
+
 /** 从配置包导入（新建一张表，不覆盖原表）。 */
 export function importTableConfig(projectId: string, baseId: string, bundle: ConfigBundle) {
   return apiRequest<{ tableId: string; table: BaseTable; warnings?: string[] }>(
@@ -518,4 +584,198 @@ export function recalcLookupRollup(projectId: string, tableId: string) {
 /** 取公式依赖图（我依赖谁 / 谁依赖我）。 */
 export function fetchFormulaDependencies(projectId: string, fieldId: string) {
   return apiRequest<FormulaDependency[]>(`${baseUrl(projectId)}/fields/${fieldId}/formula/dependencies`)
+}
+
+/* ————————————————————————————————————————————————————————————
+ * 只读 GET 接口（技术文档 §10）
+ * ———————————————————————————————————————————————————————————— */
+
+/** Base 详情（Base + 表 + 视图）。 */
+export function fetchBaseDetail(projectId: string, baseId: string) {
+  return apiRequest<{ base: BaseInfo; tables?: BaseTable[]; views?: BaseView[] }>(
+    `${baseUrl(projectId)}/bases/${baseId}`,
+  )
+}
+
+/** 单条记录详情。 */
+export function fetchRecord(projectId: string, recordId: string) {
+  return apiRequest<RecordRow>(`${baseUrl(projectId)}/records/${recordId}`)
+}
+
+/** 视图详情。 */
+export function fetchView(projectId: string, viewId: string) {
+  return apiRequest<BaseView>(`${baseUrl(projectId)}/views/${viewId}`)
+}
+
+/**
+ * 按视图配置查询记录。
+ *
+ * 请求体可覆盖视图里的筛选 / 排序 / 分组；不传时用视图自带的配置。
+ */
+export function queryByView(
+  projectId: string,
+  viewId: string,
+  payload: Partial<QueryRequest> = {},
+) {
+  return apiRequest<QueryResult>(`${baseUrl(projectId)}/views/${viewId}/query`, {
+    method: 'POST',
+    body: payload,
+  })
+}
+
+/* ————————————————————————————————————————————————————————————
+ * 可观测性（技术文档 §15.2）
+ * ———————————————————————————————————————————————————————————— */
+
+/** Base Engine 指标快照。 */
+export type BaseMetricsSnapshot = {
+  operations: Record<string, number>
+  errors: number
+  slowQueries: number
+  p50Millis: number
+  p95Millis: number
+  p99Millis: number
+  outboxPublished: number
+  outboxFailed: number
+  outboxDead: number
+  idempotencyConflicts: number
+  activeSubscribers: number
+}
+
+/** 取指标快照。 */
+export function fetchBaseMetrics(projectId: string) {
+  return apiRequest<BaseMetricsSnapshot>(`${baseUrl(projectId)}/metrics`)
+}
+
+/** Prometheus 文本指标的地址（供采集器 / 运维面板直接拉）。 */
+export function baseMetricsPrometheusUrl(projectId: string) {
+  return `${baseUrl(projectId)}/metrics/prometheus`
+}
+
+/* ————————————————————————————————————————————————————————————
+ * 异步导入任务（技术文档 §16.2）
+ * ———————————————————————————————————————————————————————————— */
+
+export type ImportJobStatus = 'pending' | 'running' | 'succeeded' | 'partial' | 'failed' | 'cancelled'
+
+export type ImportJobFailure = {
+  row: number
+  field?: string
+  reason: string
+}
+
+export type ImportJobInfo = {
+  id: string
+  tableId: string
+  status: ImportJobStatus
+  mode: 'atomic' | 'partial'
+  total: number
+  processed: number
+  succeeded: number
+  failed: number
+  failures?: ImportJobFailure[]
+  error?: string
+}
+
+/** 提交异步导入任务（提交即返回 jobId，不阻塞请求）。 */
+export function createImportJob(
+  projectId: string,
+  tableId: string,
+  payload: { rows: Record<string, unknown>[]; mode?: 'atomic' | 'partial' },
+) {
+  return apiRequest<ImportJobInfo>(`${baseUrl(projectId)}/tables/${tableId}/import-jobs`, {
+    method: 'POST',
+    body: payload,
+  })
+}
+
+/** 查询导入任务进度。 */
+export function fetchImportJob(projectId: string, jobId: string) {
+  return apiRequest<ImportJobInfo>(`${baseUrl(projectId)}/import-jobs/${jobId}`)
+}
+
+/** 列出某张表的导入任务。 */
+export function listImportJobs(projectId: string, tableId: string) {
+  return apiRequest<ImportJobInfo[]>(`${baseUrl(projectId)}/tables/${tableId}/import-jobs`)
+}
+
+/** 取消导入任务。 */
+export function cancelImportJob(projectId: string, jobId: string) {
+  return apiRequest<ImportJobInfo>(`${baseUrl(projectId)}/import-jobs/${jobId}/cancel`, {
+    method: 'POST',
+  })
+}
+
+/* ————————————————————————————————————————————————————————————
+ * 通讯录分组（人员字段可引用「一个组」）
+ * ———————————————————————————————————————————————————————————— */
+
+export type UserGroupInfo = {
+  id: string
+  name: string
+  description: string
+  members: string[]
+  memberCount: number
+  sortOrder: number
+  createdAt: string
+}
+
+/** 列出通讯录分组。 */
+export function listUserGroups(projectId: string) {
+  return apiRequest<UserGroupInfo[]>(`${baseUrl(projectId)}/user-groups`)
+}
+
+/** 新建通讯录分组。 */
+export function createUserGroup(
+  projectId: string,
+  payload: { name: string; description?: string; members?: string[]; sortOrder?: number },
+) {
+  return apiRequest<UserGroupInfo>(`${baseUrl(projectId)}/user-groups`, {
+    method: 'POST',
+    body: payload,
+  })
+}
+
+/** 修改通讯录分组。 */
+export function updateUserGroup(
+  projectId: string,
+  groupId: string,
+  payload: { name?: string; description?: string; members?: string[]; sortOrder?: number },
+) {
+  return apiRequest<UserGroupInfo>(`${baseUrl(projectId)}/user-groups/${groupId}`, {
+    method: 'PATCH',
+    body: payload,
+  })
+}
+
+/** 删除通讯录分组。 */
+export function deleteUserGroup(projectId: string, groupId: string) {
+  return apiRequest<{ ok?: boolean }>(`${baseUrl(projectId)}/user-groups/${groupId}`, {
+    method: 'DELETE',
+  })
+}
+
+/* ————————————————————————————————————————————————————————————
+ * 事件死信治理
+ * ———————————————————————————————————————————————————————————— */
+
+export type DeadLetter = {
+  id: string
+  eventType: string
+  retryCount: number
+  status: string
+  createdAt: string
+}
+
+/** 列出死信事件。 */
+export function listDeadLetters(projectId: string) {
+  return apiRequest<DeadLetter[]>(`${baseUrl(projectId)}/outbox/dead-letters`)
+}
+
+/** 人工重投一条死信。 */
+export function retryDeadLetter(projectId: string, eventId: string) {
+  return apiRequest<{ ok?: boolean }>(
+    `${baseUrl(projectId)}/outbox/dead-letters/${eventId}/retry`,
+    { method: 'POST' },
+  )
 }

@@ -27,6 +27,7 @@ import {
   Files,
   Grid,
   Histogram,
+  DataLine,
   InfoFilled,
   Link,
   Lock,
@@ -52,6 +53,7 @@ import BaseImportDialog from "./panels/BaseImportDialog.vue";
 import BaseTableConfigDialog from "./panels/BaseTableConfigDialog.vue";
 import BaseQueryPanel from "./panels/BaseQueryPanel.vue";
 import BaseAuditPanel from "./panels/BaseAuditPanel.vue";
+import BaseOpsPanel from "./panels/BaseOpsPanel.vue";
 import BaseRecordDrawer from "./panels/BaseRecordDrawer.vue";
 import BaseViewSettings from "./panels/BaseViewSettings.vue";
 import BaseViewCreateDialog from "./panels/BaseViewCreateDialog.vue";
@@ -60,6 +62,8 @@ import { BaseRealtime, type BaseEvent } from "./realtime";
 import {
   normalizeFilters as normalizeFiltersPure,
   normalizeCombine,
+  normalizeGroups,
+  normalizeSorts,
   resolveFilters,
   resolveGroups,
   resolveSorts,
@@ -81,6 +85,8 @@ import {
   listTables,
   reorderRecords,
   listViews,
+  fetchView,
+  queryByView,
   queryRecords,
   updateRecord,
   updateView,
@@ -99,6 +105,7 @@ import type {
   PersonalViewConfig,
   RecordRow,
   RecordVisibility,
+  GrantSubject,
   SortRule,
   ViewConfig,
   ViewScope,
@@ -173,6 +180,8 @@ const embedders = ref<BaseEmbedder[]>([]);
 const showEmbedders = ref(false);
 /** 操作记录（审计）面板。 */
 const showAudit = ref(false);
+/** 运行监控面板（指标 / 死信 / 导入任务 / 通讯录分组）。 */
+const showOps = ref(false);
 const showViewSettings = ref(false);
 const formulaField = ref<FieldMeta | undefined>(undefined);
 const activeRecord = ref<RecordRow | undefined>(undefined);
@@ -224,6 +233,8 @@ const effectiveViewConfig = computed<ViewConfig>(() => {
     },
     fieldWidths: { ...(config.fieldWidths ?? {}), ...(mine.fieldWidths ?? {}) },
     frozenFields: mine.frozenFields ?? config.frozenFields,
+    // 列顺序：个人段优先（飞书：每个视图 / 每个人的列顺序可以不同）。
+    fieldOrder: mine.fieldOrder ?? config.fieldOrder,
     layout: { ...(config.layout ?? {}), ...(mine.layout ?? {}) },
     // 个人查询条件覆盖共享条件（第十三轮）。
     filters: mine.query?.filters ?? config.filters,
@@ -240,8 +251,10 @@ const sharedQuery = computed(() => {
   const config = activeView.value?.config ?? {};
   return {
     filters: normalizeFilters(config.filters),
-    sorts: (config.sorts ?? []) as SortRule[],
-    groups: (config.groups ?? []) as GroupRule[],
+    // 存量视图里可能存着重复 / 超限的规则（历史数据），
+    // 这里去重截断，避免整表查询被后端 422 拦下。
+    sorts: normalizeSorts(config.sorts as SortRule[]),
+    groups: normalizeGroups(config.groups as GroupRule[]),
   };
 });
 
@@ -260,7 +273,11 @@ const personalQuery = computed(() => {
  */
 const effectiveQuery = computed(() => {
   if (queryScope.value !== "personal" || !personalQuery.value) {
-    return { filters: filters.value, sorts: sorts.value, groups: groups.value };
+    return {
+      filters: filters.value,
+      sorts: normalizeSorts(sorts.value),
+      groups: normalizeGroups(groups.value),
+    };
   }
   return {
     filters: resolveFilters(
@@ -442,8 +459,8 @@ function applyViewConfig() {
   if (mine) {
     // 「仅我」模式：面板编辑的是**我的**条件；生效口径由 combine 决定。
     filters.value = normalizeFilters(mine.filters);
-    sorts.value = mine.sorts ?? [];
-    groups.value = mine.groups ?? [];
+    sorts.value = normalizeSorts(mine.sorts);
+    groups.value = normalizeGroups(mine.groups);
     queryScope.value = "personal";
     combineMode.value = normalizeCombine(mine.combine);
   } else {
@@ -455,12 +472,18 @@ function applyViewConfig() {
   }
 }
 
-/** 列顺序：主字段永远第一，其余按 sortOrder。 */
+/**
+ * 列顺序：主字段永远第一，其余按 sortOrder。
+ *
+ * sortOrder 相同（历史数据）时按**字段名**兜底排序，
+ * 否则同值字段的相对次序取决于服务端返回顺序，刷新一次列顺序就变一次。
+ */
 function sortFields(list: FieldMeta[]): FieldMeta[] {
   return [...list].sort(
     (a, b) =>
       Number(Boolean(b.isPrimary)) - Number(Boolean(a.isPrimary)) ||
-      a.sortOrder - b.sortOrder,
+      a.sortOrder - b.sortOrder ||
+      a.name.localeCompare(b.name, "zh-Hans-CN"),
   );
 }
 
@@ -473,17 +496,31 @@ async function runQuery(append = false) {
   if (!activeTableId.value) return;
   loading.value = true;
   try {
-    const result = await queryRecords(props.projectId, {
-      tableId: activeTableId.value,
-      viewId: activeViewId.value || undefined,
-      // 用「生效口径」（第十四轮：可能是共享 + 我的叠加）。
-      filters: effectiveQuery.value.filters,
-      sorts: effectiveQuery.value.sorts,
-      groups: effectiveQuery.value.groups,
-      pageSize: PAGE_SIZE,
-      cursor: append ? cursor.value : undefined,
-      keyword: keyword.value.trim() || undefined,
-    });
+    // 「视图即查询」：
+    // 当生效口径**完全等于视图自带的配置**时，走 POST /views/:viewId/query，
+    // 由服务端按视图配置执行（视图配置为默认，请求体可覆盖）；
+    // 否则（叠加了个人条件 / 关键词搜索）走表级查询接口，
+    // 因为表级接口才能表达「共享条件 AND/OR 我的条件」这种合并口径。
+    const useViewQuery =
+      !!activeViewId.value &&
+      !keyword.value.trim() &&
+      queryScope.value !== "personal";
+    const result = useViewQuery
+      ? await queryByView(props.projectId, activeViewId.value, {
+          pageSize: PAGE_SIZE,
+          cursor: append ? cursor.value : undefined,
+        })
+      : await queryRecords(props.projectId, {
+          tableId: activeTableId.value,
+          viewId: activeViewId.value || undefined,
+          // 用「生效口径」（第十四轮：可能是共享 + 我的叠加）。
+          filters: effectiveQuery.value.filters,
+          sorts: effectiveQuery.value.sorts,
+          groups: effectiveQuery.value.groups,
+          pageSize: PAGE_SIZE,
+          cursor: append ? cursor.value : undefined,
+          keyword: keyword.value.trim() || undefined,
+        });
     rows.value = append ? [...rows.value, ...result.records] : result.records;
     fields.value = result.fields?.length
       ? sortFields(result.fields)
@@ -509,8 +546,21 @@ async function switchTable(tableId: string) {
 
 async function switchView(view: BaseView) {
   activeViewId.value = view.id;
+  // 先用列表里的视图配置立即生效（不等待网络），随后从服务端读最新配置覆盖。
   applyViewConfig();
   await runQuery();
+  // 视图可能被其他人改过：走只读 GET（GET /base/views/:viewId）读最新一份。
+  try {
+    const fresh = await fetchView(props.projectId, view.id);
+    if (fresh && fresh.id === activeViewId.value) {
+      const idx = views.value.findIndex((item) => item.id === fresh.id);
+      if (idx >= 0) views.value[idx] = { ...views.value[idx], ...fresh };
+      applyViewConfig();
+      await runQuery();
+    }
+  } catch {
+    // 读不到就沿用列表里的配置，不打断切换。
+  }
 }
 
 async function addTable() {
@@ -665,6 +715,35 @@ async function onReorderRows(ids: string[]) {
   }
 }
 
+/** 批量拖拽排序：把选中的行拖到目标行之前 / 之后。 */
+async function onRowsReorder(payload: {
+  ids: string[];
+  targetId: string;
+  position: "before" | "after";
+}) {
+  if (!activeTableId.value || !canEdit.value) return;
+  const current = rows.value.map((row) => row.id);
+  const moving = payload.ids.filter((id) => current.includes(id));
+  if (!moving.length) return;
+  const rest = current.filter((id) => !moving.includes(id));
+  const targetIndex = rest.indexOf(payload.targetId);
+  if (targetIndex < 0) return;
+  const insertAt =
+    payload.position === "before" ? targetIndex : targetIndex + 1;
+  const next = [...rest.slice(0, insertAt), ...moving, ...rest.slice(insertAt)];
+  try {
+    await reorderRecords(props.projectId, activeTableId.value, next);
+    await runQuery();
+    ElMessage.success(
+      moving.length > 1
+        ? `已把 ${moving.length} 行移动到目标位置`
+        : "已移动到目标位置",
+    );
+  } catch (err) {
+    ElMessage.error((err as Error).message || "排序保存失败");
+  }
+}
+
 /** 同一条记录的写入串行化：避免批量粘贴时版本号互相打架。 */
 const writeQueue = new Map<string, Promise<void>>();
 
@@ -672,6 +751,7 @@ const writeQueue = new Map<string, Promise<void>>();
 async function onVisibilityUpdate(payload: {
   visibility: RecordVisibility;
   grants?: string[];
+  grantSubjects?: GrantSubject[];
 }) {
   const row = activeRecord.value;
   if (!row) return;
@@ -685,13 +765,14 @@ async function onVisibilityUpdate(payload: {
       row.version,
       payload.visibility,
       payload.grants,
+      payload.grantSubjects,
     );
     Object.assign(row, saved);
     const label =
       payload.visibility === "restricted"
         ? "已设为仅自己可见"
         : payload.visibility === "custom"
-          ? `已设为指定成员可见（${payload.grants?.length ?? 0} 人）`
+          ? `已设为指定成员可见（${payload.grantSubjects?.length ?? payload.grants?.length ?? 0} 项）`
           : "已恢复空间可见";
     ElMessage.success(label);
     // 可见范围变了，列表内容也可能变（受限记录不再出现在别人的列表里）。
@@ -823,6 +904,18 @@ async function onOpenRecordRef(payload: {
   }
 }
 
+/**
+ * 抽屉里点了「刷新最新值」：把服务端返回的最新行同步回列表。
+ *
+ * 这样「只读 GET 单条记录」不只是个接口，而是真的让用户看到别人的最新改动。
+ */
+function onRecordRefreshed(fresh: RecordRow) {
+  activeRecord.value = fresh;
+  const idx = rows.value.findIndex((item) => item.id === fresh.id);
+  if (idx >= 0) rows.value[idx] = fresh;
+  ElMessage.success("已同步服务端最新值");
+}
+
 async function onDeleteRecord(recordId: string) {
   try {
     await ElMessageBox.confirm(
@@ -856,8 +949,8 @@ async function applyQuery(payload: {
   groups: GroupRule[];
 }) {
   filters.value = payload.filters;
-  sorts.value = payload.sorts;
-  groups.value = payload.groups;
+  sorts.value = normalizeSorts(payload.sorts);
+  groups.value = normalizeGroups(payload.groups);
   showQueryPanel.value = false;
   await runQuery();
   await persistViewConfig();
@@ -884,7 +977,12 @@ async function persistViewConfig() {
           filters: filters.value,
           sorts: sorts.value,
           groups: groups.value,
-          combine: combineMode.value === "and" ? "and" : "override",
+          combine:
+            combineMode.value === "and"
+              ? "and"
+              : combineMode.value === "or"
+                ? "or"
+                : "override",
         };
       } else {
         // 共享模式：写共享段，并丢掉我自己的查询覆盖。
@@ -942,20 +1040,20 @@ async function onQueryScopeChange(kind: string | number | boolean | undefined) {
   ElMessage.success("已恢复视图的共享筛选与排序");
 }
 
-/** 切换叠加口径（第十四轮）：共享 AND 我的 / 只用我的。 */
-function onCombineToggle(value: string | number | boolean | undefined) {
-  combineMode.value = value === true || value === "and" ? "and" : "override";
-  void onCombineChange();
-}
-
-async function onCombineChange() {
-  await runQuery();
-  await persistViewConfig();
-  ElMessage.success(
-    combineMode.value === "and"
-      ? "已切换为「共享条件 + 我的条件」叠加"
-      : "已切换为「只用我的条件」",
-  );
+/** 切换条件组合口径：只用我的 / 与共享同时满足 / 与共享任一满足。 */
+function onCombineChange(value: string | number | boolean | undefined) {
+  combineMode.value = value === "or" ? "or" : value === "and" ? "and" : "override";
+  void (async () => {
+    await runQuery();
+    await persistViewConfig();
+    ElMessage.success(
+      combineMode.value === "and"
+        ? "已切换为「共享条件 AND 我的条件」"
+        : combineMode.value === "or"
+          ? "已切换为「共享条件 OR 我的条件」"
+          : "已切换为「只用我的条件」",
+    );
+  })();
 }
 
 function clearQuery() {
@@ -1015,6 +1113,7 @@ async function applyFieldConfig(
     fieldVisibility?: Record<string, boolean>;
     fieldWidths?: Record<string, number>;
     frozenFields?: string[];
+    fieldOrder?: string[];
   }) => void,
 ) {
   const view = activeView.value;
@@ -1078,6 +1177,44 @@ async function onColumnWidth(payload: { fieldId: string; width: number }) {
       ...(cfg.fieldWidths ?? {}),
       [payload.fieldId]: payload.width,
     };
+  });
+}
+
+/**
+ * 拖拽表头调整列顺序。
+ *
+ * 口径与列宽 / 显隐一致：写**个人偏好段**（每个视图的列顺序可以各看各的）。
+ */
+async function onColumnReorder(payload: {
+  fieldId: string;
+  targetFieldId: string;
+  position: "before" | "after";
+}) {
+  const current = effectiveViewConfig.value.fieldOrder?.length
+    ? [...effectiveViewConfig.value.fieldOrder]
+    : visibleFieldOrder();
+  const from = current.indexOf(payload.fieldId);
+  if (from < 0) return;
+  // 冻结列必须保持「从左起连续」，所以冻结段内不允许调整顺序。
+  const frozen = effectiveViewConfig.value.frozenFields ?? [];
+  const targetAt = current.indexOf(payload.targetFieldId);
+  if (
+    frozen.includes(payload.fieldId) ||
+    (targetAt >= 0 && frozen.includes(payload.targetFieldId))
+  ) {
+    ElMessage.warning("冻结列已固定在左侧，不能调整顺序");
+    return;
+  }
+  const next = current.filter((id) => id !== payload.fieldId);
+  const targetIndex = next.indexOf(payload.targetFieldId);
+  if (targetIndex < 0) return;
+  next.splice(
+    payload.position === "before" ? targetIndex : targetIndex + 1,
+    0,
+    payload.fieldId,
+  );
+  await applyFieldConfig((cfg) => {
+    cfg.fieldOrder = next;
   });
 }
 
@@ -1523,20 +1660,17 @@ onBeforeUnmount(() => {
               <el-radio-button value="personal">仅我</el-radio-button>
             </el-radio-group>
           </el-tooltip>
-          <el-tooltip
+          <el-radio-group
             v-if="queryScope === 'personal'"
-            content="叠加共享条件：视图的共享条件 AND 我的条件；关闭则只看我的条件"
-            placement="bottom"
+            :model-value="combineMode"
+            size="small"
+            class="be-query-combine-group"
+            @change="onCombineChange"
           >
-            <label class="be-query-combine">
-              <el-switch
-                :model-value="combineMode === 'and'"
-                size="small"
-                @change="onCombineToggle"
-              />
-              <span>叠加共享条件</span>
-            </label>
-          </el-tooltip>
+            <el-radio-button value="override">只用我的</el-radio-button>
+            <el-radio-button value="and">同时满足</el-radio-button>
+            <el-radio-button value="or">任一满足</el-radio-button>
+          </el-radio-group>
         </div>
         <!-- 结构组 -->
         <div class="be-btngroup">
@@ -1584,6 +1718,11 @@ onBeforeUnmount(() => {
           <el-tooltip content="谁在什么时候改了什么" placement="bottom">
             <el-button size="small" :icon="Clock" @click="showAudit = true"
               >操作记录</el-button
+            >
+          </el-tooltip>
+          <el-tooltip content="运行指标 / 事件死信 / 导入任务 / 通讯录分组" placement="bottom">
+            <el-button size="small" :icon="DataLine" @click="showOps = true"
+              >运行监控</el-button
             >
           </el-tooltip>
           <el-tooltip
@@ -1669,6 +1808,7 @@ onBeforeUnmount(() => {
           :loading="loading"
           :editable="canEdit"
           :field-widths="effectiveViewConfig.fieldWidths"
+          :field-order="effectiveViewConfig.fieldOrder"
           :frozen-field-ids="effectiveViewConfig.frozenFields"
           :hidden-field-ids="hiddenFieldIds"
           :doc-titles="docTitles"
@@ -1681,6 +1821,7 @@ onBeforeUnmount(() => {
           @open-record="onOpenRecord"
           @add-row="onAddRow"
           @selection-change="(ids) => (selectedIds = ids)"
+          @rows-reorder="onRowsReorder"
           @open-doc="(nodeId) => emit('open-doc', nodeId)"
           @open-record-ref="onOpenRecordRef"
           @column-sort="onColumnSort"
@@ -1689,6 +1830,7 @@ onBeforeUnmount(() => {
           @column-freeze="onColumnFreeze"
           @column-hide="onColumnHide"
           @column-width="onColumnWidth"
+          @column-reorder="onColumnReorder"
           @column-settings="onColumnSettings"
         />
         <BaseFormView
@@ -1861,6 +2003,7 @@ onBeforeUnmount(() => {
       @delete="onDeleteRecord"
       @open-node="(nodeId) => emit('open-doc', nodeId)"
       @open-record-ref="onOpenRecordRef"
+      @refreshed="onRecordRefreshed"
     />
 
     <BaseViewCreateDialog
@@ -1956,6 +2099,13 @@ onBeforeUnmount(() => {
       :base-id="base.id"
       :fields="fields"
       @close="showAudit = false"
+    />
+
+    <BaseOpsPanel
+      v-if="showOps"
+      :project-id="projectId"
+      :table-id="activeTableId"
+      @close="showOps = false"
     />
 
     <el-dialog

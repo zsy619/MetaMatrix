@@ -9,7 +9,7 @@ import { computed, ref, watch } from "vue";
 import { ElMessage } from "element-plus";
 import { Check, Lock, Paperclip, Picture, View } from "@element-plus/icons-vue";
 import { uploadMediaFile } from "../../../api/mediaUpload";
-import { listLinkTargets } from "../api";
+import { listLinkTargetsPage } from "../api";
 import { fieldPlugin, isComputedField } from "./registry";
 import {
   ensureUserNames,
@@ -169,6 +169,10 @@ const linkCandidates = computed(() => props.linkOptions ?? []);
 /** 远程搜索结果（覆盖预置候选）。 */
 const linkRemote = ref<Array<{ id: string; title: string }>>([]);
 const linkSearching = ref(false);
+/** 远程搜索的下一页游标（空表示没有更多）。 */
+const linkCursor = ref("");
+/** 远程搜索的当前关键字。 */
+const linkKeyword = ref("");
 
 /** 下拉候选：优先远程搜索结果，并补上已选中的记录（保证回显标题）。 */
 const linkSelectOptions = computed(() => {
@@ -185,20 +189,46 @@ const linkSelectOptions = computed(() => {
 /** 远程搜索目标表记录。 */
 async function searchLinks(keyword: string) {
   if (!props.projectId || !props.linkTargetTableId) return;
+  linkKeyword.value = keyword;
+  linkCursor.value = "";
   linkSearching.value = true;
   try {
-    const items = await listLinkTargets(
+    const page = await listLinkTargetsPage(
       props.projectId,
       props.linkTargetTableId,
-      keyword,
-      50,
+      { keyword, limit: 50 },
     );
-    linkRemote.value = items.map((item) => ({
+    linkRemote.value = page.items.map((item) => ({
       id: item.id,
       title: item.title,
     }));
+    linkCursor.value = page.nextCursor ?? "";
   } catch {
     linkRemote.value = [];
+    linkCursor.value = "";
+  } finally {
+    linkSearching.value = false;
+  }
+}
+
+/** 追加下一页候选（游标翻页）。 */
+async function loadMoreLinks() {
+  if (!props.projectId || !props.linkTargetTableId || !linkCursor.value) return;
+  linkSearching.value = true;
+  try {
+    const page = await listLinkTargetsPage(props.projectId, props.linkTargetTableId, {
+      keyword: linkKeyword.value,
+      limit: 50,
+      cursor: linkCursor.value,
+    });
+    const known = new Set(linkRemote.value.map((item) => item.id));
+    for (const item of page.items) {
+      if (known.has(item.id)) continue;
+      linkRemote.value.push({ id: item.id, title: item.title });
+    }
+    linkCursor.value = page.nextCursor ?? "";
+  } catch {
+    linkCursor.value = "";
   } finally {
     linkSearching.value = false;
   }
@@ -487,6 +517,17 @@ watch(
             :label="item.title"
             :value="item.id"
           />
+          <template #footer>
+            <el-button
+              v-if="linkCursor"
+              size="small"
+              text
+              :loading="linkSearching"
+              @click.stop="loadMoreLinks"
+            >
+              加载更多
+            </el-button>
+          </template>
         </el-select>
         <el-input
           v-else

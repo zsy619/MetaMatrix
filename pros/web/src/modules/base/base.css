@@ -263,6 +263,11 @@
   background: rgba(51, 144, 236, 0.12);
 }
 
+/* 条件组合口径按钮组（覆盖 / 同时满足 / 任一满足）。 */
+.be-query-combine-group {
+  margin-left: 8px;
+}
+
 /* 「叠加共享条件」开关（第十四轮）。 */
 .be-query-combine {
   display: inline-flex;

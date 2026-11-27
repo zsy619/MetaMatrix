@@ -5,16 +5,35 @@
  * 业务层只依赖 GridAdapter 接口（setColumns/setRows/updateCell），
  * 换网格组件时不需要改 Field / Record / View 层逻辑。
  */
-import { computed, ref, watch } from "vue";
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+} from "vue";
+import type { Component } from "vue";
 import { VxeGrid } from "vxe-table";
 import "vxe-table/dist/style.css";
 import {
   CaretBottom,
   CaretTop,
+  CopyDocument,
+  Delete,
   Document,
+  DocumentCopy,
+  Filter,
   Grid,
+  Hide,
   Lock,
   Plus,
+  Tickets,
+  Sort,
+  Unlock,
+  Operation,
+  Rank,
+  Setting,
 } from "@element-plus/icons-vue";
 import BaseFieldCell from "../fields/BaseFieldCell.vue";
 import BaseColumnMenu from "./BaseColumnMenu.vue";
@@ -31,6 +50,12 @@ const props = defineProps<{
   fieldWidths?: Record<string, number>;
   /** 视图里隐藏的字段。 */
   hiddenFieldIds?: string[];
+  /**
+   * 列顺序（视图级个人偏好，存字段 ID 数组）。
+   *
+   * 不在数组里的字段按原有顺序排在后面（新增字段不会消失）。
+   */
+  fieldOrder?: string[];
   /**
    * 冻结列（§6.3 ViewConfig.frozenFields）：
    * 存的是字段 ID 列表，必须是可见列里从左起连续的 N 列。
@@ -71,7 +96,21 @@ const emit = defineEmits<{
   (e: "column-hide", payload: { fieldId: string }): void;
   (e: "column-width", payload: { fieldId: string; width: number }): void;
   (e: "column-settings", payload: { fieldId: string }): void;
+  /** 拖拽表头调整列顺序（写视图个人偏好）。 */
+  (
+    e: "column-reorder",
+    payload: {
+      fieldId: string;
+      targetFieldId: string;
+      position: "before" | "after";
+    },
+  ): void;
   (e: "selection-change", ids: string[]): void;
+  /**
+   * 批量拖拽排序：把选中的若干行拖到目标行之前 / 之后。
+   * ids 是被拖动的行 ID（保持它们当前的相对顺序），targetId + position 决定落点。
+   */
+  (e: "rows-reorder", payload: { ids: string[]; targetId: string; position: "before" | "after" }): void;
   (e: "open-doc", nodeId: string): void;
   (
     e: "open-record-ref",
@@ -100,6 +139,34 @@ function focusIndex(): { row: number; col: number } {
     visibleFields.value.findIndex((item) => item.id === focus.value?.fieldId),
   );
   return { row, col };
+}
+
+/**
+ * Tab / Shift+Tab 线性移动（飞书 / Excel）。
+ *
+ * 到行尾自动回到下一行首格，回车到上一行末格；
+ * 没有下一行 / 上一行时停在当前边界格，不丢焦点。
+ */
+function moveFocusLinear(direction: 1 | -1) {
+  if (!visibleFields.value.length || !props.rows.length) return;
+  const { row, col } = focusIndex();
+  const colCount = visibleFields.value.length;
+  const rowCount = props.rows.length;
+  let nextRow = row;
+  let nextCol = col + direction;
+  if (nextCol >= colCount) {
+    nextCol = 0;
+    nextRow = row + 1;
+    if (nextRow >= rowCount) return; // 最后一行末格：停住
+  } else if (nextCol < 0) {
+    nextCol = colCount - 1;
+    nextRow = row - 1;
+    if (nextRow < 0) return; // 第一行首格：停住
+  }
+  const nextField = visibleFields.value[nextCol];
+  const nextRecord = props.rows[nextRow];
+  if (!nextField || !nextRecord) return;
+  focus.value = { rowId: nextRecord.id, fieldId: nextField.id };
 }
 
 function moveFocus(deltaRow: number, deltaCol: number) {
@@ -172,6 +239,13 @@ function onKeydown(event: KeyboardEvent) {
       };
       break;
     }
+    case "Tab": {
+      // 飞书 / Excel：Tab 跳下一格，Shift+Tab 回上一格
+      if (!focus.value) return;
+      event.preventDefault();
+      moveFocusLinear(event.shiftKey ? -1 : 1);
+      break;
+    }
     case "Escape":
       focus.value = null;
       break;
@@ -229,7 +303,19 @@ function onPaste(event: ClipboardEvent) {
 
 const visibleFields = computed(() => {
   const hidden = new Set(props.hiddenFieldIds ?? []);
-  return props.fields.filter((field) => !hidden.has(field.id));
+  const list = props.fields.filter((field) => !hidden.has(field.id));
+  const order = props.fieldOrder ?? [];
+  if (!order.length) return list;
+  const rank = new Map(order.map((id, index) => [id, index]));
+  return [...list].sort((a, b) => {
+    const ra = rank.get(a.id);
+    const rb = rank.get(b.id);
+    // 未出现在顺序表里的字段（新增字段）排到最后，保持相对顺序。
+    if (ra === undefined && rb === undefined) return 0;
+    if (ra === undefined) return 1;
+    if (rb === undefined) return -1;
+    return ra - rb;
+  });
 });
 
 /** 行选择：用自绘复选框，样式与项目其它列表保持一致。 */
@@ -266,8 +352,193 @@ const someChecked = computed(
   () => selected.value.length > 0 && !allChecked.value,
 );
 
+/**
+ * 列宽来源：拖拽中的临时值 > 视图配置 > 默认值。
+ *
+ * 拖拽时先改本地值（保证跟手），松手再冒泡给上层写进视图配置。
+ */
+const dragWidths = ref<Record<string, number>>({});
+
+function widthOf(fieldId: string, index: number): number {
+  return (
+    dragWidths.value[fieldId] ??
+    props.fieldWidths?.[fieldId] ??
+    (index === 0 ? 200 : 140)
+  );
+}
+
+const MIN_COL_WIDTH = 80;
+const MAX_COL_WIDTH = 600;
+
+/** 列宽拖拽（自研把手）。 */
+function startResize(event: MouseEvent, field: FieldMeta, index: number) {
+  event.preventDefault();
+  event.stopPropagation();
+  const startX = event.clientX;
+  const startWidth = widthOf(field.id, index);
+  let next = startWidth;
+
+  const onMove = (move: MouseEvent) => {
+    next = Math.min(
+      MAX_COL_WIDTH,
+      Math.max(MIN_COL_WIDTH, Math.round(startWidth + (move.clientX - startX))),
+    );
+    dragWidths.value = { ...dragWidths.value, [field.id]: next };
+  };
+  const onUp = () => {
+    window.removeEventListener("mousemove", onMove);
+    window.removeEventListener("mouseup", onUp);
+    if (next !== startWidth) {
+      emit("column-width", { fieldId: field.id, width: next });
+    }
+  };
+  window.addEventListener("mousemove", onMove);
+  window.addEventListener("mouseup", onUp);
+}
+
+/**
+ * 自动适应列宽（双击列宽把手 / 表头右键「自动适应列宽」）。
+ *
+ * 按**当前列内容**的最长文本估算：中文按 13px、英文按 7px 折算，
+ * 再加上单元格左右内边距，最后夹取到 [80, 600]。
+ */
+function autoFitWidth(fieldId: string) {
+  const field = fieldOf(fieldId);
+  if (!field) return;
+  let longest = 0;
+  for (const row of props.rows) {
+    const text = cellText(row, fieldId);
+    // 中文按 13px / 其它字符按 7px 估算显示宽度。
+    const width = Array.from(text).reduce(
+      (sum, ch) => sum + (/[\u4e00-\u9fa5]/.test(ch) ? 13 : 7),
+      0,
+    );
+    if (width > longest) longest = width;
+  }
+  const nameWidth = Array.from(field.name).reduce(
+    (sum, ch) => sum + (/[\u4e00-\u9fa5]/.test(ch) ? 13 : 8),
+    0,
+  );
+  const width = Math.min(
+    MAX_COL_WIDTH,
+    Math.max(MIN_COL_WIDTH, Math.max(longest + 32, nameWidth + 88)),
+  );
+  dragWidths.value = { ...dragWidths.value, [fieldId]: width };
+  emit("column-width", { fieldId, width });
+}
+
+/* —— 拖拽表头调整列顺序（飞书：视图级列顺序）—— */
+
+/** 正在被拖动的字段。 */
+const dragFieldId = ref<string | null>(null);
+/** 拖拽落点：目标字段 + 插到它前面还是后面。 */
+const dropTarget = ref<{
+  fieldId: string;
+  position: "before" | "after";
+} | null>(null);
+
+function onHeadDragStart(event: DragEvent, fieldId: string) {
+  dragFieldId.value = fieldId;
+  event.dataTransfer?.setData("text/plain", fieldId);
+  if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+}
+
+function onHeadDragOver(event: DragEvent, fieldId: string) {
+  if (!dragFieldId.value || dragFieldId.value === fieldId) return;
+  // 必须 preventDefault，否则浏览器不会派发 drop 事件。
+  event.preventDefault();
+  const el = event.currentTarget as HTMLElement | null;
+  if (!el) return;
+  const rect = el.getBoundingClientRect();
+  const position =
+    event.clientX - rect.left < rect.width / 2 ? "before" : "after";
+  if (
+    dropTarget.value?.fieldId !== fieldId ||
+    dropTarget.value?.position !== position
+  ) {
+    dropTarget.value = { fieldId, position };
+  }
+}
+
+function onHeadDrop(_event: DragEvent, _fieldId: string) {
+  const from = dragFieldId.value;
+  const target = dropTarget.value;
+  if (from && target && from !== target.fieldId) {
+    emit("column-reorder", {
+      fieldId: from,
+      targetFieldId: target.fieldId,
+      position: target.position,
+    });
+  }
+  onHeadDragEnd();
+}
+
+function onHeadDragEnd() {
+  dragFieldId.value = null;
+  dropTarget.value = null;
+}
+
+/** 拖拽中的插入指示：落在目标列的左半 / 右半。 */
+function dropClassOf(fieldId: string) {
+  const target = dropTarget.value;
+  if (!target || target.fieldId !== fieldId) return "";
+  return target.position === "before" ? "is-drop-before" : "is-drop-after";
+}
+
 /** 右对齐的字段类型。 */
 const NUMERIC_TYPES = new Set(["number", "currency", "percent", "rating"]);
+
+// —— 批量拖拽排序 ——
+
+/** 正在拖动的行 ID 集合（保持当前相对顺序）。 */
+const dragRowIds = ref<string[]>([]);
+/** 当前拖动经过的行（用于高亮落点）。 */
+const dragOverRow = ref<{ id: string; position: "before" | "after" } | null>(null);
+
+/** 开始拖动：拖的是「选中集合」还是「当前行」。 */
+function onRowDragStart(event: DragEvent, rowId: string) {
+  const ids = selected.value.includes(rowId)
+    ? selected.value.filter((id) => props.rows.some((row) => row.id === id))
+    : [rowId];
+  if (!ids.length) return;
+  dragRowIds.value = ids;
+  event.dataTransfer?.setData("text/plain", ids.join(","));
+  if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+}
+
+/** 拖动经过某行：按鼠标在行内的上下半区决定「插到前面 / 后面」。 */
+function onRowDragOver(event: DragEvent, rowId: string) {
+  if (!dragRowIds.value.length) return;
+  event.preventDefault();
+  const el = event.currentTarget as HTMLElement | null;
+  let position: "before" | "after" = "before";
+  if (el) {
+    const rect = el.getBoundingClientRect();
+    position = event.clientY < rect.top + rect.height / 2 ? "before" : "after";
+  }
+  dragOverRow.value = { id: rowId, position };
+  if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+}
+
+/** 放下：把拖动的行放到目标位置。 */
+function onRowDrop(event: DragEvent, rowId: string) {
+  event.preventDefault();
+  const ids = dragRowIds.value;
+  const position = (dragOverRow.value?.position ?? "before") as
+    | "before"
+    | "after";
+  dragOverRow.value = null;
+  dragRowIds.value = [];
+  if (!ids.length) return;
+  if (ids.includes(rowId)) return;
+  emit("rows-reorder", { ids, targetId: rowId, position });
+}
+
+/** 结束拖动：清状态。 */
+function onRowDragEnd() {
+  dragRowIds.value = [];
+  dragOverRow.value = null;
+}
 
 const columns = computed(() => [
   {
@@ -288,9 +559,11 @@ const columns = computed(() => [
   ...visibleFields.value.map((field, index) => ({
     field: field.id,
     title: field.name,
-    width: props.fieldWidths?.[field.id],
-    minWidth: props.fieldWidths?.[field.id] ?? (index === 0 ? 200 : 140),
-    resizable: true,
+    width: widthOf(field.id, index),
+    minWidth: widthOf(field.id, index),
+    // 列宽由自研拖拽把手控制（拖完即存视图配置），
+    // 关掉 vxe 自带把手，避免两套把手打架。
+    resizable: false,
     sortable: false,
     // 数字 / 金额 / 百分比右对齐（与飞书多维表格一致，便于纵向比数）。
     align: NUMERIC_TYPES.has(field.type) ? ("right" as const) : undefined,
@@ -370,6 +643,276 @@ function linkTargetTableOf(fieldId: string): string {
 
 function onCellUpdate(recordId: string, fieldId: string, value: unknown) {
   emit("update-cell", { recordId, fieldId, value });
+}
+
+/* —— 单元格右键菜单（飞书多维表格同款）—— */
+
+/** 右键菜单上下文；null 表示不显示。 */
+const ctxMenu = ref<{
+  x: number;
+  y: number;
+  /** cell = 单元格菜单；head = 表头菜单（飞书两套菜单项不同）。 */
+  kind: "cell" | "head";
+  fieldId: string;
+  /** 单元格菜单才有记录 ID；表头菜单为空串。 */
+  recordId: string;
+  sortOrder?: "asc" | "desc" | null;
+  frozen?: boolean;
+} | null>(null);
+
+/** 落位后按实际尺寸回夹，保证菜单完整可见。 */
+async function placeCtxMenu(payload: NonNullable<typeof ctxMenu.value>) {
+  ctxMenu.value = payload;
+  await nextTick();
+  const panel = document.querySelector(".be-ctxmenu__panel");
+  if (!panel) return;
+  const rect = panel.getBoundingClientRect();
+  let x = payload.x;
+  let y = payload.y;
+  if (x + rect.width + 8 > window.innerWidth) {
+    x = Math.max(8, window.innerWidth - rect.width - 8);
+  }
+  if (y + rect.height + 8 > window.innerHeight) {
+    y = Math.max(8, window.innerHeight - rect.height - 8);
+  }
+  ctxMenu.value = { ...payload, x, y };
+}
+
+async function onCellContextMenu(
+  event: MouseEvent,
+  row: RecordRow,
+  fieldId: string,
+) {
+  // 右键即把焦点移到该格，粘贴 / 清空都作用在右键的那一格。
+  focusCell(row.id, fieldId);
+  await placeCtxMenu({
+    x: event.clientX,
+    y: event.clientY,
+    kind: "cell",
+    fieldId,
+    recordId: row.id,
+  });
+}
+
+/** 表头右键菜单（飞书：与列头 ▾ 菜单同源，只是入口不同）。 */
+async function onHeadContextMenu(event: MouseEvent, field: FieldMeta) {
+  await placeCtxMenu({
+    x: event.clientX,
+    y: event.clientY,
+    kind: "head",
+    fieldId: field.id,
+    recordId: "",
+    sortOrder: sortOrderOf(field.id),
+    frozen: props.frozenFieldIds?.includes(field.id) ?? false,
+  });
+}
+
+function closeCtxMenu() {
+  ctxMenu.value = null;
+}
+
+/** 右键菜单项（单元格 / 表头两套）。 */
+interface CtxItem {
+  key: string;
+  label: string;
+  icon: Component;
+  /** 前面是否插入分隔线。 */
+  sep?: boolean;
+  run: () => void;
+}
+
+const ctxItems = computed<CtxItem[]>(() => {
+  const m = ctxMenu.value;
+  if (!m) return [];
+  const fieldId = m.fieldId;
+  if (m.kind === "head") {
+    const items: CtxItem[] = [
+      {
+        key: "asc",
+        label: "按此列升序",
+        icon: CaretTop,
+        run: () => emit("column-sort", { fieldId, order: "asc" }),
+      },
+      {
+        key: "desc",
+        label: "按此列降序",
+        icon: CaretBottom,
+        run: () => emit("column-sort", { fieldId, order: "desc" }),
+      },
+    ];
+    if (m.sortOrder) {
+      items.push({
+        key: "clear",
+        label: "清除本列排序",
+        icon: Sort,
+        run: () => emit("column-clear-sort", { fieldId }),
+      });
+    }
+    items.push(
+      {
+        key: "filter",
+        label: "筛选此列",
+        icon: Filter,
+        run: () => emit("column-filter", { fieldId }),
+      },
+      {
+        key: "freeze",
+        label: m.frozen ? "取消冻结此列" : "冻结此列",
+        icon: m.frozen ? Unlock : Lock,
+        sep: true,
+        run: () => emit("column-freeze", { fieldId }),
+      },
+      {
+        key: "hide",
+        label: "隐藏此列",
+        icon: Hide,
+        run: () => emit("column-hide", { fieldId }),
+      },
+      {
+        key: "fit",
+        label: "自动适应列宽",
+        icon: Operation,
+        sep: true,
+        run: () => autoFitWidth(fieldId),
+      },
+      {
+        key: "settings",
+        label: "编辑字段",
+        icon: Setting,
+        run: () => emit("column-settings", { fieldId }),
+      },
+    );
+    return items;
+  }
+  return [
+    {
+      key: "copy",
+      label: "复制单元格",
+      icon: CopyDocument,
+      run: () => ctxCopy(),
+    },
+    {
+      key: "paste",
+      label: "粘贴到此处",
+      icon: DocumentCopy,
+      run: () => ctxPaste(),
+    },
+    {
+      key: "clear",
+      label: "清空内容",
+      icon: Delete,
+      run: () => ctxClear(),
+    },
+    {
+      key: "record",
+      label: "打开记录详情",
+      icon: Tickets,
+      run: () => ctxOpenRecord(),
+    },
+    {
+      key: "asc",
+      label: "按此列升序",
+      icon: CaretTop,
+      sep: true,
+      run: () => emit("column-sort", { fieldId, order: "asc" }),
+    },
+    {
+      key: "desc",
+      label: "按此列降序",
+      icon: CaretBottom,
+      run: () => emit("column-sort", { fieldId, order: "desc" }),
+    },
+    {
+      key: "filter",
+      label: "筛选此列",
+      icon: Filter,
+      run: () => emit("column-filter", { fieldId }),
+    },
+    {
+      key: "freeze",
+      label: "冻结此列",
+      icon: Lock,
+      sep: true,
+      run: () => emit("column-freeze", { fieldId }),
+    },
+    {
+      key: "hide",
+      label: "隐藏此列",
+      icon: Hide,
+      run: () => emit("column-hide", { fieldId }),
+    },
+  ];
+});
+
+/** 点击菜单外部 / 按 Esc / 滚动 / 缩放时收起右键菜单（飞书行为）。 */
+function onGlobalPointerDown(event: MouseEvent) {
+  if (!ctxMenu.value) return;
+  const target = event.target as HTMLElement | null;
+  if (target?.closest?.(".be-ctxmenu")) return;
+  closeCtxMenu();
+}
+
+function onGlobalKeydown(event: KeyboardEvent) {
+  if (event.key === "Escape" && ctxMenu.value) closeCtxMenu();
+}
+
+onMounted(() => {
+  window.addEventListener("mousedown", onGlobalPointerDown, true);
+  window.addEventListener("keydown", onGlobalKeydown);
+  window.addEventListener("scroll", closeCtxMenu, true);
+  window.addEventListener("resize", closeCtxMenu);
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener("mousedown", onGlobalPointerDown, true);
+  window.removeEventListener("keydown", onGlobalKeydown);
+  window.removeEventListener("scroll", closeCtxMenu, true);
+  window.removeEventListener("resize", closeCtxMenu);
+});
+
+/** 右键菜单动作：复制单元格。 */
+function ctxCopy() {
+  if (!ctxMenu.value) return;
+  const row = props.rows.find((item) => item.id === ctxMenu.value?.recordId);
+  if (!row) return;
+  const text = cellText(row, ctxMenu.value.fieldId);
+  void navigator.clipboard?.writeText(text).catch(() => undefined);
+  closeCtxMenu();
+}
+
+/**
+ * 右键菜单动作：粘贴到该单元格。
+ *
+ * 右键时已经把焦点移到目标格，所以直接复用键盘粘贴的同一套逻辑
+ * （以焦点为起点按 TSV 展开），不会出现两套粘贴行为不一致。
+ */
+function ctxPaste() {
+  if (!ctxMenu.value) return;
+  void navigator.clipboard
+    ?.readText()
+    .then((text) => {
+      if (text) applyPaste(text);
+    })
+    .catch(() => undefined);
+  closeCtxMenu();
+}
+
+/** 右键菜单动作：清空该单元格。 */
+function ctxClear() {
+  if (!ctxMenu.value) return;
+  emit("update-cell", {
+    recordId: ctxMenu.value.recordId,
+    fieldId: ctxMenu.value.fieldId,
+    value: null,
+  });
+  closeCtxMenu();
+}
+
+/** 右键菜单动作：打开记录详情。 */
+function ctxOpenRecord() {
+  if (!ctxMenu.value) return;
+  emit("open-record", ctxMenu.value.recordId);
+  closeCtxMenu();
 }
 </script>
 
@@ -459,7 +1002,22 @@ function onCellUpdate(recordId: string, fieldId: string, value: unknown) {
       </template>
       <!-- 列头：字段名 + 类型图标（飞书多维表格同款，一眼看出每列是什么类型） -->
       <template #fieldHeader="{ column }">
-        <span class="base-grid__head">
+        <span
+          class="base-grid__head"
+          :class="[
+            dropClassOf(column.field),
+            { 'is-dragging': dragFieldId === column.field },
+          ]"
+          draggable="true"
+          title="拖动可调整列顺序"
+          @dragstart="onHeadDragStart($event, column.field)"
+          @dragover="onHeadDragOver($event, column.field)"
+          @drop="onHeadDrop($event, column.field)"
+          @dragend="onHeadDragEnd"
+          @contextmenu.prevent="
+            onHeadContextMenu($event, fieldFor(column.field))
+          "
+        >
           <el-icon
             class="base-grid__head-icon"
             :title="`字段类型：${fieldTypeLabel(fieldFor(column.field).type)}`"
@@ -497,19 +1055,58 @@ function onCellUpdate(recordId: string, fieldId: string, value: unknown) {
             @width="emit('column-width', $event)"
             @settings="emit('column-settings', $event)"
           />
+          <!-- 列宽拖拽把手（飞书：列头右侧竖线，拖完即存视图配置；双击自动适应） -->
+          <span
+            class="base-grid__resize"
+            title="拖动调整列宽，双击自动适应"
+            @mousedown.stop="
+              startResize(
+                $event,
+                fieldFor(column.field),
+                visibleFields.indexOf(fieldFor(column.field)),
+              )
+            "
+            @dblclick.stop="autoFitWidth(column.field)"
+          />
         </span>
       </template>
       <template #select="{ row }">
-        <el-checkbox
-          :model-value="isSelected(row.id)"
-          @change="(checked: boolean) => toggleRow(row.id, checked)"
-        />
+        <div
+          class="base-grid__select"
+          :class="{
+            'is-dragging': dragRowIds.includes(row.id),
+            'is-drop-before':
+              dragOverRow?.id === row.id &&
+              dragOverRow?.position === 'before',
+            'is-drop-after':
+              dragOverRow?.id === row.id &&
+              dragOverRow?.position === 'after',
+          }"
+          @dragover="onRowDragOver($event, row.id)"
+          @drop="onRowDrop($event, row.id)"
+        >
+          <el-checkbox
+            :model-value="isSelected(row.id)"
+            @change="(checked: boolean) => toggleRow(row.id, checked)"
+          />
+          <span
+            class="base-grid__drag-handle"
+            draggable="true"
+            title="拖动可调整行顺序（多选时可整批拖动）"
+            @dragstart="onRowDragStart($event, row.id)"
+            @dragend="onRowDragEnd"
+            @click.stop
+          >
+            <el-icon><Rank /></el-icon>
+          </span>
+        </div>
       </template>
       <template #cell="{ row, column }">
         <div
           class="base-grid__cell"
           @click.stop="focusCell(row.id, column.field)"
           @dblclick.stop="focusCell(row.id, column.field)"
+          @contextmenu.prevent="onCellContextMenu($event, row, column.field)"
         >
           <BaseFieldCell
             :field="fieldFor(column.field)"
@@ -542,6 +1139,33 @@ function onCellUpdate(recordId: string, fieldId: string, value: unknown) {
         </div>
       </template>
     </vxe-grid>
+    <!-- 单元格右键菜单（飞书多维表格同款） -->
+    <Teleport to="body">
+      <div
+        v-if="ctxMenu"
+        class="be-ctxmenu"
+        :style="{ left: `${ctxMenu.x}px`, top: `${ctxMenu.y}px` }"
+        @click="closeCtxMenu"
+      >
+        <div class="be-ctxmenu__panel" @click.stop>
+          <template v-for="item in ctxItems" :key="item.key">
+            <div v-if="item.sep" class="be-ctxmenu__sep" />
+            <button
+              class="be-ctxmenu__item"
+              type="button"
+              @click="
+                item.run();
+                closeCtxMenu();
+              "
+            >
+              <el-icon><component :is="item.icon" /></el-icon>
+              <span>{{ item.label }}</span>
+            </button>
+          </template>
+        </div>
+      </div>
+    </Teleport>
+
     <div class="base-grid__footer">
       <el-button text size="small" @click="emit('add-row')">
         <el-icon><Plus /></el-icon>新增记录
@@ -727,5 +1351,62 @@ function onCellUpdate(recordId: string, fieldId: string, value: unknown) {
 .base-grid__empty-btn:hover {
   border-color: var(--fs-blue, #3370ff);
   background: var(--fs-blue-soft, #eef3ff);
+}
+</style>
+
+<style scoped>
+.base-grid__select {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+.base-grid__drag-handle {
+  position: absolute;
+  left: 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 20px;
+  color: var(--tg-text-3);
+  cursor: grab;
+  opacity: 0;
+  transition: opacity 0.16s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.vxe-body--row:hover .base-grid__drag-handle,
+.base-grid__drag-handle:focus-visible,
+.base-grid__drag-handle:hover {
+  opacity: 1;
+}
+
+.base-grid__drag-handle:active {
+  cursor: grabbing;
+}
+
+.base-grid__select.is-dragging {
+  opacity: 0.5;
+}
+
+.base-grid__select.is-drop-before::before,
+.base-grid__select.is-drop-after::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--tg-blue, #3390ec);
+  border-radius: 1px;
+}
+
+.base-grid__select.is-drop-before::before {
+  top: -1px;
+}
+
+.base-grid__select.is-drop-after::after {
+  bottom: -1px;
 }
 </style>

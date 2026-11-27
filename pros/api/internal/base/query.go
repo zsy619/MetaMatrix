@@ -138,6 +138,14 @@ type pageCursor struct {
 	// sortOrder / id 是 keyset 游标的锚点（最后一行的排序位与 ID）。
 	sortOrder int64
 	id        uuid.UUID
+	// sortKey 为 true 表示这是「自定义排序字段」的 keyset 游标。
+	sortKey bool
+	// sortFieldID 是排序字段 ID（自定义排序游标用）。
+	sortFieldID uuid.UUID
+	// sortValue 是排序字段的锚点值（字符串形态）。
+	sortValue string
+	// sortValueNull 为 true 表示锚点行的排序值为 NULL。
+	sortValueNull bool
 }
 
 // encodeCursor 把偏移量编码成不透明游标（旧格式，兼容保留）。
@@ -149,6 +157,31 @@ func encodeCursor(offset int) string {
 func encodeKeysetCursor(sortOrder int64, id uuid.UUID) string {
 	raw := fmt.Sprintf("k:%d:%s", sortOrder, id.String())
 	return base64.StdEncoding.EncodeToString([]byte(raw))
+}
+
+// encodeSortKeyCursor 生成「自定义排序字段」的 keyset 游标（v3）。
+//
+// 锚点 = (排序字段值, sort_order, id)，深翻页同样不需要 OFFSET 全表扫描。
+func encodeSortKeyCursor(fieldID uuid.UUID, value string, isNull bool, sortOrder int64, id uuid.UUID) string {
+	raw := fmt.Sprintf("k2:%s:%s:%d:%s", fieldID.String(), encodeCursorValue(value), sortOrder, id.String())
+	if isNull {
+		raw = fmt.Sprintf("k2n:%s:%d:%s", fieldID.String(), sortOrder, id.String())
+	}
+	return base64.StdEncoding.EncodeToString([]byte(raw))
+}
+
+// encodeCursorValue 对锚点值做 URL 安全编码（值里可能含 ':' 与中文）。
+func encodeCursorValue(value string) string {
+	return base64.RawURLEncoding.EncodeToString([]byte(value))
+}
+
+// decodeCursorValue 解码锚点值。
+func decodeCursorValue(value string) (string, error) {
+	raw, err := base64.RawURLEncoding.DecodeString(value)
+	if err != nil {
+		return "", ErrQueryInvalid
+	}
+	return string(raw), nil
 }
 
 // decodeCursor 解析游标。
@@ -178,6 +211,52 @@ func decodeCursor(cursor string) (pageCursor, error) {
 			return pageCursor{}, ErrQueryInvalid
 		}
 		return pageCursor{keyset: true, sortOrder: sortOrder, id: id}, nil
+	case strings.HasPrefix(s, "k2n:"):
+		parts := strings.SplitN(strings.TrimPrefix(s, "k2n:"), ":", 3)
+		if len(parts) != 3 {
+			return pageCursor{}, ErrQueryInvalid
+		}
+		fieldID, err := uuid.Parse(parts[0])
+		if err != nil {
+			return pageCursor{}, ErrQueryInvalid
+		}
+		sortOrder, err := strconv.ParseInt(parts[1], 10, 64)
+		if err != nil {
+			return pageCursor{}, ErrQueryInvalid
+		}
+		id, err := uuid.Parse(parts[2])
+		if err != nil {
+			return pageCursor{}, ErrQueryInvalid
+		}
+		return pageCursor{
+			keyset: true, sortKey: true, sortFieldID: fieldID,
+			sortValueNull: true, sortOrder: sortOrder, id: id,
+		}, nil
+	case strings.HasPrefix(s, "k2:"):
+		parts := strings.SplitN(strings.TrimPrefix(s, "k2:"), ":", 5)
+		if len(parts) != 4 {
+			return pageCursor{}, ErrQueryInvalid
+		}
+		fieldID, err := uuid.Parse(parts[0])
+		if err != nil {
+			return pageCursor{}, ErrQueryInvalid
+		}
+		value, err := decodeCursorValue(parts[1])
+		if err != nil {
+			return pageCursor{}, ErrQueryInvalid
+		}
+		sortOrder, err := strconv.ParseInt(parts[2], 10, 64)
+		if err != nil {
+			return pageCursor{}, ErrQueryInvalid
+		}
+		id, err := uuid.Parse(parts[3])
+		if err != nil {
+			return pageCursor{}, ErrQueryInvalid
+		}
+		return pageCursor{
+			keyset: true, sortKey: true, sortFieldID: fieldID,
+			sortValue: value, sortOrder: sortOrder, id: id,
+		}, nil
 	case strings.HasPrefix(s, "o:"):
 		n, err := strconv.Atoi(strings.TrimPrefix(s, "o:"))
 		if err != nil || n < 0 {
@@ -267,9 +346,19 @@ func (s *Service) buildFilterSQL(tableID uuid.UUID, idx *fieldIndex, g FilterGro
 }
 
 // conditionSQL 编译单个条件。
+//
+// 优先走字段处理器自身的扩展实现（FieldHandler 扩展 §12），
+// 没有自定义实现时回落到通用实现 defaultConditionSQL。
 func (s *Service) conditionSQL(fieldID uuid.UUID, handler FieldHandler, fieldType string, cond Condition) (string, []any, error) {
+	if rh, ok := handler.(RichFieldHandler); ok {
+		return rh.BuildFilter(fieldID, fieldType, cond)
+	}
+	return defaultConditionSQL(fieldID, handler.ProjectedType(), fieldType, cond)
+}
+
+// defaultConditionSQL 是通用筛选编译实现。
+func defaultConditionSQL(fieldID uuid.UUID, projected string, fieldType string, cond Condition) (string, []any, error) {
 	op := strings.ToLower(strings.TrimSpace(cond.Operator))
-	projected := handler.ProjectedType()
 
 	// 空/非空判定：有非空投影值才算「非空」。原先 isempty 去找「全空行」再取反，
 	// 会把已有文本或数字的记录也判成空。
@@ -409,12 +498,11 @@ func (s *Service) buildOrderSQL(idx *fieldIndex, sorts []SortRule, groups []Grou
 		if !ok || !handler.Definition().Capabilities.Groupable {
 			continue
 		}
-		col := sortColumn(handler.ProjectedType())
-		dir := "ASC"
-		if strings.EqualFold(g.Order, "desc") {
-			dir = "DESC"
+		expr, err := sortExprFor(handler, fieldID, g.Order, "gv")
+		if err != nil {
+			continue
 		}
-		parts = append(parts, fmt.Sprintf("gv.%s %s NULLS LAST", col, dir))
+		parts = append(parts, expr)
 	}
 
 	for _, sort := range sorts {
@@ -426,18 +514,29 @@ func (s *Service) buildOrderSQL(idx *fieldIndex, sorts []SortRule, groups []Grou
 		if !ok || !handler.Definition().Capabilities.Sortable {
 			continue
 		}
-		col := sortColumn(handler.ProjectedType())
-		dir := "ASC"
-		if strings.EqualFold(sort.Order, "desc") {
-			dir = "DESC"
+		expr, err := sortExprFor(handler, fieldID, sort.Order, "sv")
+		if err != nil {
+			continue
 		}
-		parts = append(parts, fmt.Sprintf("sv.%s %s NULLS LAST", col, dir))
+		parts = append(parts, expr)
 	}
 
 	// 手动排序位是默认次序；有用户排序时作为稳定的次级排序。
 	parts = append(parts, "r.sort_order ASC")
 	parts = append(parts, "r.id ASC")
 	return strings.Join(parts, ", ")
+}
+
+// sortExprFor 借助字段处理器的扩展实现生成排序表达式。
+func sortExprFor(handler FieldHandler, fieldID uuid.UUID, order string, alias string) (string, error) {
+	if rh, ok := handler.(RichFieldHandler); ok {
+		return rh.BuildSort(fieldID, string(handler.Definition().Type), order, alias)
+	}
+	dir := "ASC"
+	if strings.EqualFold(order, "desc") {
+		dir = "DESC"
+	}
+	return fmt.Sprintf("%s.%s %s NULLS LAST", alias, sortColumn(handler.ProjectedType()), dir), nil
 }
 
 func sortColumn(projected string) string {
@@ -455,8 +554,92 @@ func sortColumn(projected string) string {
 	}
 }
 
+// sortKeyPlan 描述「自定义排序字段」的 keyset 翻页方案。
+//
+// 只支持**单个**文本 / 数字排序字段：
+//   - 文本列直接比较；
+//   - 数字列用 CAST(... AS DOUBLE PRECISION) 比较（Postgres / SQLite 都支持）；
+//   - 日期 / 布尔 / JSON 列的 NULL 语义在两种数据库里不一致，退回 OFFSET 翻页。
+type sortKeyPlan struct {
+	fieldID uuid.UUID
+	// column 是比较用的列表达式（sv.value_text / sv.value_number）。
+	column string
+	// selectExpr 是把锚点值取回 Go 的表达式（数字列转成文本）。
+	selectExpr string
+	// asc 为 true 表示升序。
+	asc bool
+}
+
+// planSortKey 判断当前查询能否走「自定义排序字段」的 keyset 翻页。
+func planSortKey(idx *fieldIndex, sorts []SortRule, groups []GroupRule) *sortKeyPlan {
+	if len(groups) != 0 || len(sorts) != 1 {
+		return nil
+	}
+	fieldID, err := uuid.Parse(sorts[0].FieldID)
+	if err != nil {
+		return nil
+	}
+	handler, ok := idx.handler(fieldID)
+	if !ok || !handler.Definition().Capabilities.Sortable {
+		return nil
+	}
+	switch handler.ProjectedType() {
+	case ProjectedText:
+		return &sortKeyPlan{
+			fieldID: fieldID, column: "sv.value_text",
+			selectExpr: "sv.value_text", asc: !strings.EqualFold(sorts[0].Order, "desc"),
+		}
+	case ProjectedNumber:
+		return &sortKeyPlan{
+			fieldID: fieldID, column: "sv.value_number",
+			selectExpr: "CAST(sv.value_number AS TEXT)",
+			asc:        !strings.EqualFold(sorts[0].Order, "desc"),
+		}
+	default:
+		return nil
+	}
+}
+
+// whereClauseForSortKey 构造 keyset 的 WHERE 条件。
+//
+// NULL 处理：排序列用 NULLS LAST，所以 NULL 行永远排在最后。
+//   - 锚点非 NULL：条件 = (值更大 或 值相同且 (sort_order, id) 更大) 或 该列为 NULL；
+//   - 锚点为 NULL：条件 = 该列为 NULL 且 (sort_order, id) 更大（避免重复吐 NULL 行）。
+func whereClauseForSortKey(plan *sortKeyPlan, cur pageCursor) (string, []any) {
+	cmp := plan.column + " > ?"
+	eq := plan.column + " = ?"
+	if plan.column == "sv.value_number" {
+		cmp = plan.column + " > CAST(? AS DOUBLE PRECISION)"
+		eq = plan.column + " = CAST(? AS DOUBLE PRECISION)"
+	}
+	if !plan.asc {
+		cmp = plan.column + " < ?"
+		if plan.column == "sv.value_number" {
+			cmp = plan.column + " < CAST(? AS DOUBLE PRECISION)"
+		}
+	}
+	tie := "(r.sort_order > ? OR (r.sort_order = ? AND r.id > ?))"
+	if cur.sortValueNull {
+		return "(" + plan.column + " IS NULL AND " + tie + ")",
+			[]any{cur.sortOrder, cur.sortOrder, cur.id}
+	}
+	clause := "(" + cmp + " OR (" + eq + " AND " + tie + ") OR " + plan.column + " IS NULL)"
+	return clause, []any{
+		cur.sortValue, cur.sortValue,
+		cur.sortOrder, cur.sortOrder, cur.id,
+	}
+}
+
 // Query 执行统一查询：筛选、排序、分组、分页都在服务端完成。
 func (s *Service) Query(ctx context.Context, userID, projectID uuid.UUID, req QueryRequest) (*QueryResult, error) {
+	started := time.Now()
+	result, err := s.query(ctx, userID, projectID, req)
+	ObserveOperation(OpQuery, time.Since(started), err)
+	return result, err
+}
+
+// query 是 Query 的真实实现（耗时统计包在 Query 里）。
+func (s *Service) query(ctx context.Context, userID, projectID uuid.UUID, req QueryRequest) (*QueryResult, error) {
 	tableID, err := uuid.Parse(req.TableID)
 	if err != nil {
 		return nil, fmt.Errorf("%w: bad table id", ErrQueryInvalid)
@@ -492,6 +675,12 @@ func (s *Service) Query(ctx context.Context, userID, projectID uuid.UUID, req Qu
 		return nil, err
 	}
 	offset := cur.offset
+	// 自定义排序字段的 keyset 方案（单字段、文本 / 数字）。
+	sortPlan := planSortKey(idx, req.Sorts, req.Groups)
+	if cur.keyset && sortPlan != nil && cur.sortFieldID != sortPlan.fieldID {
+		// 游标来自另一个排序字段的查询 → 拒绝，避免串页。
+		return nil, ErrQueryInvalid
+	}
 
 	// 统计与取数共用同一别名 r，保证筛选条件里的 r.id 可用。
 	base := s.db.WithContext(ctx).Table("base_records AS r").
@@ -524,8 +713,13 @@ func (s *Service) Query(ctx context.Context, userID, projectID uuid.UUID, req Qu
 
 	orderSQL := s.buildOrderSQL(idx, req.Sorts, req.Groups)
 
+	selectCols := "r.id AS id, r.version AS version, r.data AS data, r.updated_at AS updated_at, r.visibility AS visibility, r.created_by AS created_by, r.sort_order AS sort_order"
+	if sortPlan != nil {
+		// 追加排序列投影：用于生成「自定义排序」的 keyset 游标锚点。
+		selectCols += ", " + sortPlan.selectExpr + " AS sort_key_value"
+	}
 	query := s.db.WithContext(ctx).Table("base_records AS r").
-		Select("r.id AS id, r.version AS version, r.data AS data, r.updated_at AS updated_at, r.visibility AS visibility, r.created_by AS created_by, r.sort_order AS sort_order").
+		Select(selectCols).
 		Where("r.table_id = ? AND r.deleted_at IS NULL", tableID)
 	// 记录级可见范围：取数与计数必须用同一套过滤，否则 total 与实际行数对不上。
 	query = s.applyRecordScope(query, userID, projectID, "r")
@@ -570,11 +764,17 @@ func (s *Service) Query(ctx context.Context, userID, projectID uuid.UUID, req Qu
 	// 因此这里的判定是「无自定义排序 / 分组」，而不是「收到的游标是不是 keyset」。
 	canUseKeyset := len(req.Sorts) == 0 && len(req.Groups) == 0
 	useKeyset := canUseKeyset && (cur.keyset || cur.offset == 0)
-	if useKeyset && cur.keyset {
+	// 自定义排序字段也走 keyset：锚点 = (排序值, sort_order, id)。
+	useSortKey := sortPlan != nil
+	if useSortKey && cur.keyset {
+		clause, args := whereClauseForSortKey(sortPlan, cur)
+		query = query.Where(clause, args...)
+	}
+	if useKeyset && cur.keyset && !useSortKey {
 		// 已经有锚点 → 直接用 (sort_order, id) 定位。
 		query = query.Where("(r.sort_order > ? OR (r.sort_order = ? AND r.id > ?))", cur.sortOrder, cur.sortOrder, cur.id)
 	}
-	if useKeyset {
+	if useKeyset || useSortKey {
 		// 多取一条用来判断「还有没有下一页」，取完再裁掉。
 		query = query.Limit(pageSize + 1)
 	} else {
@@ -582,20 +782,21 @@ func (s *Service) Query(ctx context.Context, userID, projectID uuid.UUID, req Qu
 	}
 
 	type rawRow struct {
-		ID         uuid.UUID      `gorm:"column:id"`
-		SortOrder  int64          `gorm:"column:sort_order"`
-		Version    int64          `gorm:"column:version"`
-		Data       datatypes.JSON `gorm:"column:data"`
-		UpdatedAt  time.Time      `gorm:"column:updated_at"`
-		Visibility string         `gorm:"column:visibility"`
-		CreatedBy  uuid.UUID      `gorm:"column:created_by"`
+		ID           uuid.UUID      `gorm:"column:id"`
+		SortOrder    int64          `gorm:"column:sort_order"`
+		Version      int64          `gorm:"column:version"`
+		Data         datatypes.JSON `gorm:"column:data"`
+		UpdatedAt    time.Time      `gorm:"column:updated_at"`
+		Visibility   string         `gorm:"column:visibility"`
+		CreatedBy    uuid.UUID      `gorm:"column:created_by"`
+		SortKeyValue *string        `gorm:"column:sort_key_value"`
 	}
 	var raw []rawRow
 	if err := query.Scan(&raw).Error; err != nil {
 		return nil, err
 	}
 
-	keysetHasMore := useKeyset && len(raw) > pageSize
+	keysetHasMore := (useKeyset || useSortKey) && len(raw) > pageSize
 	if keysetHasMore {
 		raw = raw[:pageSize]
 	}
@@ -638,6 +839,21 @@ func (s *Service) Query(ctx context.Context, userID, projectID uuid.UUID, req Qu
 		if len(rows) > 0 && result.Page.HasMore {
 			last := raw[len(raw)-1]
 			result.Page.NextCursor = encodeKeysetCursor(last.SortOrder, last.ID)
+		}
+	} else if useSortKey {
+		// 自定义排序的 keyset 游标：锚点带上排序字段值。
+		result.Page.HasMore = keysetHasMore
+		result.Page.Offset = -1
+		if len(rows) > 0 && result.Page.HasMore {
+			last := raw[len(rows)-1]
+			value := ""
+			isNull := last.SortKeyValue == nil
+			if last.SortKeyValue != nil {
+				value = *last.SortKeyValue
+			}
+			result.Page.NextCursor = encodeSortKeyCursor(
+				sortPlan.fieldID, value, isNull, last.SortOrder, last.ID,
+			)
 		}
 	} else if int64(offset+len(rows)) < total {
 		result.Page.NextCursor = encodeCursor(offset + len(rows))
