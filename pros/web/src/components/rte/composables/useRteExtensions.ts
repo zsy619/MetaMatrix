@@ -99,6 +99,7 @@ import { EchartsBlock } from '../../../extensions/echartsBlock'
 import { CrossRef, findCrossRefPos } from '../../../extensions/crossRef'
 import { CanvasEmbed } from '../../../extensions/canvasEmbed'
 import { DatabaseBlock, readDatabaseBlockOpenTarget } from '../../../extensions/databaseBlock'
+import { BaseEmbed } from '../../../extensions/baseEmbed'
 import { ListStyleAttrs } from '../../../extensions/listStyleAttrs'
 import { TianziGrid } from '../../../extensions/rteTianziGrid'
 import { HeadingManualNum } from '../../../extensions/headingManualNum'
@@ -135,6 +136,8 @@ export function useRteExtensions(deps: {
   mentionPeople?: () => Promise<any[]>
   /** 知识库文档候选（@ 文档 mention）。宿主从知识树 API 取当前项目的文档节点。 */
   mentionDocuments?: () => Promise<any[]>
+  /** 多维表格节点 → 文档内嵌 Base 视图块引用参数。 */
+  mentionBaseEmbed?: (nodeId: string) => Promise<any | null>
   openTableContextMenu: LateFn
   pastePlainTextMode: { value: boolean }
   shortcutsOpen: { value: boolean }
@@ -273,6 +276,7 @@ export function useRteExtensions(deps: {
   const undoToolbarGroupOrder = (...args: any[]) => deps.undoToolbarGroupOrder(...args)
   const mentionPeople = deps.mentionPeople
   const mentionDocuments = deps.mentionDocuments
+  const mentionBaseEmbed = deps.mentionBaseEmbed
   let wordPasteHinted = false
 
 function qrHref(node: Element | null): string {
@@ -365,6 +369,7 @@ const editor = useEditor({
     CrossRef,
     CanvasEmbed,
     DatabaseBlock,
+    BaseEmbed,
     ListStyleAttrs,
     TianziGrid,
     HeadingManualNum,
@@ -477,6 +482,7 @@ const editor = useEditor({
       ui: mentionUi,
       people: mentionPeople,
       documents: mentionDocuments,
+      resolveBaseEmbed: mentionBaseEmbed,
     }),
     SlashCommands.configure({
       ui: slashUi,

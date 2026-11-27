@@ -59,6 +59,7 @@ import {
 import * as knowledgeApiV5 from '../../api/knowledge_v5'
 import type { PresenceUser } from '../../api/knowledge'
 import { friendlyApiMessage } from '../../utils/apiMessage'
+import { htmlToMarkdown } from '../../utils/rteExportMd'
 import AppLoading from '../common/AppLoading.vue'
 import SaveConflictPanel from './SaveConflictPanel.vue'
 import BlockPermissionPanel from './BlockPermissionPanel.vue'
@@ -86,6 +87,7 @@ const emit = defineEmits<{
   back: []
   'open-related': [documentId: string]
   'open-sheet-node': [payload: { nodeId: string; title: string }]
+  'open-node': [nodeId: string]
   'title-change': [title: string]
   'icon-change': [icon: string]
   'editor-template-applied': []
@@ -141,6 +143,7 @@ const quote = ref('')
 const anchorFrom = ref(-1)
 const anchorTo = ref(-1)
 const editorRef = ref<InstanceType<typeof RichTextEditor>>()
+/** 反向引用面板：多维表格引用需要知识库节点 ID（关联文档字段存的是节点 ID）。 */
 const appliedTemplate = ref('')
 /** 专注模式：隐藏侧栏与头部，只留正文。 */
 const focusMode = ref(false)
@@ -732,7 +735,8 @@ async function save() {
   }
   saving.value = true
   try {
-    const payload = { type: 'doc', html: html.value }
+    // 正文仍然以 HTML 为事实源，同时把 Markdown 源码一起存进库（content_markdown 列）
+    const payload = { type: 'doc', html: html.value, markdown: htmlToMarkdown(html.value) }
     const updated = await updateDocument(props.documentId, {
       title: title.value.trim() || '无标题',
       currentData: payload as never,
@@ -859,12 +863,20 @@ watch(
   () => [props.documentId, permissionActor.value.role, permissionActor.value.canWrite, editorSessionKey.value, doc.value?.id] as const,
   () => { void refreshBlockPermissionGuard() },
 )
+/** 节点 ID 变化时，反查「哪些多维表格记录引用了本文档」。 */
 
 watch(() => props.editorTemplate, () => void applyEditorTemplate())
+
+/** 文档内嵌 Base 视图块里的「打开源表格」：跳到对应的多维表格节点。 */
+function onOpenBaseNode(e: Event) {
+  const nodeId = (e as CustomEvent<{ nodeId?: string }>).detail?.nodeId
+  if (nodeId) emit('open-node', nodeId)
+}
 
 onMounted(() => {
   window.addEventListener('beforeunload', onBeforeUnload)
   window.addEventListener(DATABASE_BLOCK_SYNC_EVENT, onDatabaseBlockSync)
+  window.addEventListener('rte:open-base-node', onOpenBaseNode)
   void syncPresence()
   presenceTimer = setInterval(() => void syncPresence(), 12000)
 })
@@ -872,6 +884,7 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('beforeunload', onBeforeUnload)
   window.removeEventListener(DATABASE_BLOCK_SYNC_EVENT, onDatabaseBlockSync)
+  window.removeEventListener('rte:open-base-node', onOpenBaseNode)
   if (presenceTimer) clearInterval(presenceTimer)
   unbindEditorSelection()
   stopLiveCollab()
@@ -1140,7 +1153,13 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
                 <el-icon class="doc-view__tab-icon"><Link /></el-icon>反向引用
               </template>
             
-            <DocBackrefs :document-id="documentId" :project-id="projectId" @back="emit('back')" />
+            <DocBackrefs
+              :document-id="documentId"
+              :project-id="projectId"
+              :node-id="props.nodeId"
+              @back="emit('back')"
+              @open-node="(nodeId) => emit('open-node', nodeId)"
+            />
           </el-tab-pane>
           <el-tab-pane name="history">
               <template #label>

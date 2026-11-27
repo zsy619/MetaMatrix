@@ -52,7 +52,7 @@ func clampProjectProgress(progress int) int {
 
 // ProjectsService 管理「项目」这一层实体。
 //
-// 画布内容本身仍然落在 canvas_documents.current_data（JSONB），这里只管
+// 画布内容本身仍然落在 kb_documents.current_data（JSONB），这里只管
 // 项目这一层容器：新建、重命名、删除，以及回答「这个项目下有哪些画布」。
 type ProjectsService struct {
 	db *gorm.DB
@@ -118,15 +118,15 @@ func validateProjectName(name string) (string, error) {
 func (s *ProjectsService) List(ownerID uuid.UUID) ([]model.ProjectSummary, error) {
 	rows := []model.ProjectSummary{}
 	err := s.db.Model(&model.Project{}).
-		Select(`projects.id, projects.name, projects.emoji, projects.progress,
-			projects.created_at, projects.updated_at,
-			(SELECT COUNT(*) FROM canvas_documents d
-			  WHERE d.project_id = projects.id AND d.deleted_at IS NULL
+		Select(`core_projects.id, core_projects.name, core_projects.emoji, core_projects.progress,
+			core_projects.created_at, core_projects.updated_at,
+			(SELECT COUNT(*) FROM kb_documents d
+			  WHERE d.project_id = core_projects.id AND d.deleted_at IS NULL
 			    AND d.canvas_type = ?) AS canvas_count`,
 			NodeGraphCanvasType).
-		Where("projects.owner_user_id = ?", ownerID).
-		Order("projects.updated_at DESC").
-		Order("projects.id ASC").
+		Where("core_projects.owner_user_id = ?", ownerID).
+		Order("core_projects.updated_at DESC").
+		Order("core_projects.id ASC").
 		Scan(&rows).Error
 	if err != nil {
 		return nil, err

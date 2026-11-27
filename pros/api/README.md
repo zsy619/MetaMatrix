@@ -2,7 +2,7 @@
 
 CloudWeGo **Hertz** + **GORM** + **PostgreSQL**（JSONB）后端。支持多用户 JWT 鉴权与全部画布模板的统一文档存储（`canvas_type` + `current_data` JSONB，不按画布分表）。
 
-在 JSONB 真源之上提供 **抽取层**：`content_text` / `content_tsv` / `canvas_content_blocks`，服务检索、版本文本对比与 AI 上下文导出。
+在 JSONB 真源之上提供 **抽取层**：`content_text` / `content_tsv` / `kb_content_blocks`，服务检索、版本文本对比与 AI 上下文导出。
 
 ## 环境
 
@@ -44,7 +44,7 @@ go mod tidy
 go run ./cmd/server
 ```
 
-启动时 `AutoMigrate` + `ensureSearchSchema`（`users` / `canvas_documents` / `canvas_revisions` / `canvas_content_blocks`，以及 `content_text` / GENERATED `content_tsv`、GIN/trgm 索引）。SQL 文档见：
+启动时 `AutoMigrate` + `ensureSearchSchema`（`core_users` / `kb_documents` / `kb_revisions` / `kb_content_blocks`，以及 `content_text` / GENERATED `content_tsv`、GIN/trgm 索引）。SQL 文档见：
 
 - `migrations/001_init.sql`
 - `migrations/002_search_ai.sql`

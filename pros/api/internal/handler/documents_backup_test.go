@@ -182,23 +182,24 @@ func TestHandleDocErrMapsBackupImportConflictTo409(t *testing.T) {
 // 导致查询时无法 Scan 回 time.Time。表名和列名与生产模型保持一致，handler 和
 // service 仍执行真实导出代码，没有用 mock 替代本次要验证的 HTTP/数据库路径。
 type backupHandlerDocumentSQLite struct {
-	ID             uuid.UUID      `gorm:"type:uuid;primaryKey"`
-	OwnerUserID    uuid.UUID      `gorm:"type:uuid;not null;index"`
-	CanvasType     string         `gorm:"type:varchar(64);not null"`
-	Title          string         `gorm:"type:varchar(255);not null"`
-	Notes          string         `gorm:"type:text"`
-	SchemaVersion  int            `gorm:"not null;default:1"`
-	SaveVersion    int64          `gorm:"not null;default:1"`
-	CurrentData    datatypes.JSON `gorm:"type:jsonb;not null"`
-	ContentText    string         `gorm:"type:text;not null;default:''"`
-	HeadRevisionID *uuid.UUID     `gorm:"type:uuid"`
-	TemplateID     *string        `gorm:"type:varchar(64)"`
-	CreatedAt      time.Time      `gorm:"not null"`
-	UpdatedAt      time.Time      `gorm:"not null"`
-	DeletedAt      gorm.DeletedAt `gorm:"index"`
+	ID              uuid.UUID      `gorm:"type:uuid;primaryKey"`
+	OwnerUserID     uuid.UUID      `gorm:"type:uuid;not null;index"`
+	CanvasType      string         `gorm:"type:varchar(64);not null"`
+	Title           string         `gorm:"type:varchar(255);not null"`
+	Notes           string         `gorm:"type:text"`
+	SchemaVersion   int            `gorm:"not null;default:1"`
+	SaveVersion     int64          `gorm:"not null;default:1"`
+	CurrentData     datatypes.JSON `gorm:"type:jsonb;not null"`
+	ContentText     string         `gorm:"type:text;not null;default:''"`
+	ContentMarkdown string         `gorm:"type:text;not null;default:''" json:"markdown"`
+	HeadRevisionID  *uuid.UUID     `gorm:"type:uuid"`
+	TemplateID      *string        `gorm:"type:varchar(64)"`
+	CreatedAt       time.Time      `gorm:"not null"`
+	UpdatedAt       time.Time      `gorm:"not null"`
+	DeletedAt       gorm.DeletedAt `gorm:"index"`
 }
 
-func (backupHandlerDocumentSQLite) TableName() string { return "canvas_documents" }
+func (backupHandlerDocumentSQLite) TableName() string { return "kb_documents" }
 
 type backupHandlerImportSQLite struct {
 	ID                 uuid.UUID      `gorm:"type:uuid;primaryKey"`
@@ -211,7 +212,7 @@ type backupHandlerImportSQLite struct {
 	UpdatedAt          time.Time      `gorm:"not null"`
 }
 
-func (backupHandlerImportSQLite) TableName() string { return "backup_imports" }
+func (backupHandlerImportSQLite) TableName() string { return "core_backup_imports" }
 
 func TestBackupHandlerStreamsCompleteJSONThroughHertz(t *testing.T) {
 	db, err := gorm.Open(sqlite.Open("file:"+t.Name()+"?mode=memory&cache=shared"), &gorm.Config{})

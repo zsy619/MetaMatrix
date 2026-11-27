@@ -41,6 +41,21 @@ export type RteMentionOptions = {
    * 没提供时 @ 菜单里没有文档候选。
    */
   documents?: () => Promise<RteDocCandidate[]>
+  /**
+   * 把多维表格节点解析成「文档内嵌 Base 视图块」的引用参数。
+   * 宿主负责 ensureBase → listTables → listViews，解析失败返回 null（降级为普通卡片）。
+   */
+  resolveBaseEmbed?: (nodeId: string) => Promise<RteBaseEmbedAttrs | null>
+}
+
+/** 文档内嵌 Base 视图块的引用参数。 */
+export type RteBaseEmbedAttrs = {
+  projectId: string
+  baseId: string
+  tableId: string
+  viewId?: string
+  nodeId?: string
+  title?: string
 }
 
 /**
@@ -51,6 +66,7 @@ export function createRteMention(options: RteMentionOptions) {
   const ui = options.ui
   const people = options.people
   const documents = options.documents
+  const resolveBaseEmbed = options.resolveBaseEmbed
   return Mention.configure({
     HTMLAttributes: {
       class: 'rte-mention',
@@ -118,6 +134,33 @@ export function createRteMention(options: RteMentionOptions) {
               { type: 'text', text: ' ' },
             ])
             .run()
+          return
+        }
+        if (item.kind === 'document' && item.canvasType === 'base' && item.nodeId) {
+          // 多维表格：插入「文档内嵌 Base 视图块」，渲染时实时取数。
+          if (!resolveBaseEmbed) return
+          void (async () => {
+            const attrs = await resolveBaseEmbed(item.nodeId as string)
+            if (!attrs) return
+            editor
+              .chain()
+              .focus()
+              .insertContentAt(range, [
+                {
+                  type: 'baseEmbed',
+                  attrs: {
+                    projectId: attrs.projectId,
+                    baseId: attrs.baseId,
+                    tableId: attrs.tableId,
+                    viewId: attrs.viewId || '',
+                    nodeId: attrs.nodeId || item.nodeId,
+                    title: attrs.title || item.label,
+                  },
+                },
+                { type: 'paragraph', attrs: {} },
+              ])
+              .run()
+          })()
           return
         }
         if (item.kind === 'document' && item.documentId) {

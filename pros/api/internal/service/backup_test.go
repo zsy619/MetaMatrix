@@ -38,28 +38,29 @@ type backupUserSQLite struct {
 	UpdatedAt    time.Time `gorm:"not null"`
 }
 
-func (backupUserSQLite) TableName() string { return "users" }
+func (backupUserSQLite) TableName() string { return "core_users" }
 
 type backupDocumentSQLite struct {
-	ID             uuid.UUID      `gorm:"type:uuid;primaryKey"`
-	OwnerUserID    uuid.UUID      `gorm:"type:uuid;not null;index:idx_docs_owner_updated,priority:1;index:idx_docs_owner_type,priority:1;index:idx_docs_owner_template,priority:1"`
-	CanvasType     string         `gorm:"type:varchar(64);not null;index:idx_docs_owner_type,priority:2"`
-	Title          string         `gorm:"type:varchar(255);not null"`
-	Icon           string         `gorm:"type:varchar(16);not null;default:''"`
-	Notes          string         `gorm:"type:text"`
-	SchemaVersion  int            `gorm:"not null;default:1"`
-	SaveVersion    int64          `gorm:"not null;default:1"`
-	CurrentData    datatypes.JSON `gorm:"type:jsonb;not null"`
-	ContentText    string         `gorm:"type:text;not null;default:''"`
-	HeadRevisionID *uuid.UUID     `gorm:"type:uuid"`
-	TemplateID     *string        `gorm:"type:varchar(64);index:idx_docs_owner_template,priority:2"`
-	ProjectID      *uuid.UUID     `gorm:"type:uuid;index"`
-	CreatedAt      time.Time      `gorm:"not null"`
-	UpdatedAt      time.Time      `gorm:"not null;index:idx_docs_owner_updated,priority:2,sort:desc"`
-	DeletedAt      gorm.DeletedAt `gorm:"index"`
+	ID              uuid.UUID      `gorm:"type:uuid;primaryKey"`
+	OwnerUserID     uuid.UUID      `gorm:"type:uuid;not null;index:idx_docs_owner_updated,priority:1;index:idx_docs_owner_type,priority:1;index:idx_docs_owner_template,priority:1"`
+	CanvasType      string         `gorm:"type:varchar(64);not null;index:idx_docs_owner_type,priority:2"`
+	Title           string         `gorm:"type:varchar(255);not null"`
+	Icon            string         `gorm:"type:varchar(16);not null;default:''"`
+	Notes           string         `gorm:"type:text"`
+	SchemaVersion   int            `gorm:"not null;default:1"`
+	SaveVersion     int64          `gorm:"not null;default:1"`
+	CurrentData     datatypes.JSON `gorm:"type:jsonb;not null"`
+	ContentText     string         `gorm:"type:text;not null;default:''"`
+	ContentMarkdown string         `gorm:"type:text;not null;default:''" json:"markdown"`
+	HeadRevisionID  *uuid.UUID     `gorm:"type:uuid"`
+	TemplateID      *string        `gorm:"type:varchar(64);index:idx_docs_owner_template,priority:2"`
+	ProjectID       *uuid.UUID     `gorm:"type:uuid;index"`
+	CreatedAt       time.Time      `gorm:"not null"`
+	UpdatedAt       time.Time      `gorm:"not null;index:idx_docs_owner_updated,priority:2,sort:desc"`
+	DeletedAt       gorm.DeletedAt `gorm:"index"`
 }
 
-func (backupDocumentSQLite) TableName() string { return "canvas_documents" }
+func (backupDocumentSQLite) TableName() string { return "kb_documents" }
 
 type backupRevisionSQLite struct {
 	ID             uuid.UUID      `gorm:"type:uuid;primaryKey"`
@@ -74,7 +75,7 @@ type backupRevisionSQLite struct {
 	CreatedAt      time.Time      `gorm:"not null;index:idx_revisions_document,priority:2,sort:desc"`
 }
 
-func (backupRevisionSQLite) TableName() string { return "canvas_revisions" }
+func (backupRevisionSQLite) TableName() string { return "kb_revisions" }
 
 type backupContentBlockSQLite struct {
 	ID          uuid.UUID `gorm:"type:uuid;primaryKey"`
@@ -87,7 +88,7 @@ type backupContentBlockSQLite struct {
 	UpdatedAt   time.Time `gorm:"not null"`
 }
 
-func (backupContentBlockSQLite) TableName() string { return "canvas_content_blocks" }
+func (backupContentBlockSQLite) TableName() string { return "kb_content_blocks" }
 
 type backupImportSQLite struct {
 	ID                 uuid.UUID      `gorm:"type:uuid;primaryKey"`
@@ -100,7 +101,7 @@ type backupImportSQLite struct {
 	UpdatedAt          time.Time      `gorm:"not null"`
 }
 
-func (backupImportSQLite) TableName() string { return "backup_imports" }
+func (backupImportSQLite) TableName() string { return "core_backup_imports" }
 
 func newBackupTestService(t *testing.T, maxOpenConns int) (*DocumentsService, *gorm.DB, uuid.UUID, uuid.UUID) {
 	t.Helper()
@@ -547,7 +548,7 @@ func TestRestoreBackupDatabaseErrorIsNotSkipped(t *testing.T) {
 	if err := db.Callback().Create().Before("gorm:create").Register(
 		"test_fail_second_backup_document",
 		func(tx *gorm.DB) {
-			if tx.Statement.Table == "canvas_documents" && documentCreates.Add(1) == 2 {
+			if tx.Statement.Table == "kb_documents" && documentCreates.Add(1) == 2 {
 				tx.AddError(injected)
 			}
 		},

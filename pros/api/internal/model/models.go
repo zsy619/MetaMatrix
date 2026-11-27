@@ -22,13 +22,13 @@ type User struct {
 	UpdatedAt    time.Time `gorm:"type:timestamptz;not null" json:"updatedAt"`
 }
 
-func (User) TableName() string { return "users" }
+func (User) TableName() string { return "core_users" }
 
 // Project 是画布的容器：一个项目下有多张画布。
 //
 // 为什么单独建表而画布内容仍留在 JSONB：
 //   - 画布内容（节点、连线）属于「一份画布」，按 GLOBAL_RULES 统一放
-//     canvas_documents.current_data，不按画布类型建业务表。
+//     kb_documents.current_data，不按画布类型建业务表。
 //   - 项目本身是画布之外的实体，有独立的生命周期（新建、重命名、删除），
 //     需要自己的表来回答「这个用户有哪些项目」。
 type Project struct {
@@ -38,12 +38,12 @@ type Project struct {
 	// Emoji 是项目的基本信息之一：一个表情让列表一眼能认出项目。
 	Emoji string `gorm:"type:varchar(16);not null;default:'📁'" json:"emoji"`
 	// Progress 是项目进度（0-100），由使用者自己维护。
-	Progress int       `gorm:"not null;default:0" json:"progress"`
+	Progress  int       `gorm:"not null;default:0" json:"progress"`
 	CreatedAt time.Time `gorm:"type:timestamptz;not null" json:"createdAt"`
 	UpdatedAt time.Time `gorm:"type:timestamptz;not null;index:idx_projects_owner_updated,priority:2,sort:desc" json:"updatedAt"`
 }
 
-func (Project) TableName() string { return "projects" }
+func (Project) TableName() string { return "core_projects" }
 
 // ProjectSummary 是项目列表项：附带该项目的画布数量。
 type ProjectSummary struct {
@@ -57,24 +57,28 @@ type ProjectSummary struct {
 }
 
 type CanvasDocument struct {
-	ID            uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
-	OwnerUserID   uuid.UUID `gorm:"type:uuid;not null;index:idx_docs_owner_updated,priority:1;index:idx_docs_owner_type,priority:1;index:idx_docs_owner_template,priority:1" json:"ownerUserId"`
-	CanvasType    string    `gorm:"type:varchar(64);not null;index:idx_docs_owner_type,priority:2" json:"canvasType"`
-	Title         string    `gorm:"type:varchar(255);not null" json:"title"`
+	ID          uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
+	OwnerUserID uuid.UUID `gorm:"type:uuid;not null;index:idx_docs_owner_updated,priority:1;index:idx_docs_owner_type,priority:1;index:idx_docs_owner_template,priority:1" json:"ownerUserId"`
+	CanvasType  string    `gorm:"type:varchar(64);not null;index:idx_docs_owner_type,priority:2" json:"canvasType"`
+	Title       string    `gorm:"type:varchar(255);not null" json:"title"`
 	// Icon 是画布标题前的图标（emoji）。知识库目录树另有自己的节点图标列。
-	Icon          string    `gorm:"type:varchar(16);not null;default:''" json:"icon"`
-	Notes         string    `gorm:"type:text" json:"notes"`
-	SchemaVersion int       `gorm:"not null;default:1" json:"schemaVersion"`
+	Icon          string `gorm:"type:varchar(16);not null;default:''" json:"icon"`
+	Notes         string `gorm:"type:text" json:"notes"`
+	SchemaVersion int    `gorm:"not null;default:1" json:"schemaVersion"`
 	// SaveVersion 是文档内容的单调递增版本号，专门用于并发控制。
 	//
 	// head_revision_id 只表达“当前指向哪个修订版”，普通自动保存不会推进它，
 	// 所以它不能充当每次保存的并发令牌。SaveVersion 每次成功写入都会 +1，
 	// 客户端带上读到的版本号，服务端用 WHERE save_version = ? 做原子比较并交换。
-	SaveVersion    int64          `gorm:"not null;default:1" json:"saveVersion"`
-	CurrentData    datatypes.JSON `gorm:"type:jsonb;not null" json:"currentData"`
-	ContentText    string         `gorm:"type:text;not null;default:''" json:"-"`
-	HeadRevisionID *uuid.UUID     `gorm:"type:uuid" json:"headRevisionId"`
-	TemplateID     *string        `gorm:"type:varchar(64);index:idx_docs_owner_template,priority:2" json:"templateId"`
+	SaveVersion int64          `gorm:"not null;default:1" json:"saveVersion"`
+	CurrentData datatypes.JSON `gorm:"type:jsonb;not null" json:"currentData"`
+	ContentText string         `gorm:"type:text;not null;default:''" json:"-"`
+	// ContentMarkdown 是富文本文档的 Markdown 源码。
+	// 富文本仍然是事实源（content_text / current_data），
+	// 这列是同步出来的 Markdown 视图，方便检索、导出与二次加工。
+	ContentMarkdown string     `gorm:"type:text;not null;default:''" json:"markdown"`
+	HeadRevisionID  *uuid.UUID `gorm:"type:uuid" json:"headRevisionId"`
+	TemplateID      *string    `gorm:"type:varchar(64);index:idx_docs_owner_template,priority:2" json:"templateId"`
 	// ProjectID 指向所属项目。可空：旧画布不属于任何项目，行为与迁移前完全一致。
 	ProjectID *uuid.UUID     `gorm:"type:uuid;index" json:"projectId"`
 	CreatedAt time.Time      `gorm:"type:timestamptz;not null" json:"createdAt"`
@@ -86,7 +90,7 @@ type CanvasDocument struct {
 	Blocks    []CanvasContentBlock `gorm:"foreignKey:DocumentID;constraint:OnDelete:CASCADE" json:"-"`
 }
 
-func (CanvasDocument) TableName() string { return "canvas_documents" }
+func (CanvasDocument) TableName() string { return "kb_documents" }
 
 type CanvasRevision struct {
 	ID             uuid.UUID      `gorm:"type:uuid;primaryKey" json:"id"`
@@ -104,7 +108,7 @@ type CanvasRevision struct {
 	Author   *User          `gorm:"foreignKey:AuthorUserID" json:"-"`
 }
 
-func (CanvasRevision) TableName() string { return "canvas_revisions" }
+func (CanvasRevision) TableName() string { return "kb_revisions" }
 
 // CanvasContentBlock is the structured extraction layer for search / AI.
 type CanvasContentBlock struct {
@@ -120,7 +124,7 @@ type CanvasContentBlock struct {
 	Document CanvasDocument `gorm:"foreignKey:DocumentID;constraint:OnDelete:CASCADE" json:"-"`
 }
 
-func (CanvasContentBlock) TableName() string { return "canvas_content_blocks" }
+func (CanvasContentBlock) TableName() string { return "kb_content_blocks" }
 
 // DocumentSummary is list response without full JSON payload.
 type DocumentSummary struct {

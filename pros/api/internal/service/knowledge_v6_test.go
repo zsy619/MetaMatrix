@@ -23,7 +23,7 @@ type knowledgeMemberSQLite struct {
 	UpdatedAt time.Time `gorm:"not null"`
 }
 
-func (knowledgeMemberSQLite) TableName() string { return "knowledge_members" }
+func (knowledgeMemberSQLite) TableName() string { return "kb_members" }
 
 type knowledgePresenceSQLite struct {
 	DocID    uuid.UUID `gorm:"type:uuid;primaryKey"`
@@ -35,7 +35,7 @@ type knowledgePresenceSQLite struct {
 	LastSeen time.Time `gorm:"not null;index:idx_presence_seen"`
 }
 
-func (knowledgePresenceSQLite) TableName() string { return "knowledge_presence" }
+func (knowledgePresenceSQLite) TableName() string { return "kb_presence" }
 
 type docCRDTUpdateSQLite struct {
 	ID           int64     `gorm:"primaryKey;autoIncrement"`
@@ -46,7 +46,7 @@ type docCRDTUpdateSQLite struct {
 	CreatedAt    time.Time `gorm:"not null"`
 }
 
-func (docCRDTUpdateSQLite) TableName() string { return "doc_crdt_updates" }
+func (docCRDTUpdateSQLite) TableName() string { return "kb_crdt_updates" }
 
 type knowledgeChunkSQLite struct {
 	ID        uuid.UUID      `gorm:"type:uuid;primaryKey"`
@@ -58,7 +58,7 @@ type knowledgeChunkSQLite struct {
 	UpdatedAt time.Time      `gorm:"not null"`
 }
 
-func (knowledgeChunkSQLite) TableName() string { return "knowledge_chunks" }
+func (knowledgeChunkSQLite) TableName() string { return "kb_chunks" }
 
 func openKnowledgeV6SQLite(t *testing.T) (*gorm.DB, uuid.UUID, *model.Project, *KnowledgeService) {
 	t.Helper()
@@ -180,7 +180,7 @@ func TestKnowledgeV6SemanticAndMinutes(t *testing.T) {
 	}
 	docID := *node.DocumentID
 	// 写入正文后建索引。
-	if err := svc.db.Exec("UPDATE canvas_documents SET content_text = ? WHERE id = ?",
+	if err := svc.db.Exec("UPDATE kb_documents SET content_text = ? WHERE id = ?",
 		"增长来自渠道优化，转化率提升明显。下一步聚焦留存。", docID).Error; err != nil {
 		t.Fatal(err)
 	}

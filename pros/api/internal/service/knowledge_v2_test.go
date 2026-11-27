@@ -34,7 +34,7 @@ type knowledgeTemplateSQLite struct {
 	UpdatedAt   time.Time      `gorm:"not null"`
 }
 
-func (knowledgeTemplateSQLite) TableName() string { return "knowledge_templates" }
+func (knowledgeTemplateSQLite) TableName() string { return "kb_templates" }
 
 type docPropertySQLite struct {
 	DocID          uuid.UUID      `gorm:"type:uuid;primaryKey"`
@@ -57,7 +57,7 @@ type docPropertySQLite struct {
 	UpdatedAt      time.Time      `gorm:"not null"`
 }
 
-func (docPropertySQLite) TableName() string { return "doc_properties" }
+func (docPropertySQLite) TableName() string { return "kb_doc_properties" }
 
 type docCommentSQLite struct {
 	ID           uuid.UUID      `gorm:"type:uuid;primaryKey"`
@@ -78,7 +78,7 @@ type docCommentSQLite struct {
 	UpdatedAt    time.Time      `gorm:"not null"`
 }
 
-func (docCommentSQLite) TableName() string { return "doc_comments" }
+func (docCommentSQLite) TableName() string { return "kb_comments" }
 
 type knowledgeEventSQLite struct {
 	ID          uuid.UUID  `gorm:"type:uuid;primaryKey"`
@@ -91,7 +91,7 @@ type knowledgeEventSQLite struct {
 	CreatedAt   time.Time  `gorm:"not null;index:idx_ke_created"`
 }
 
-func (knowledgeEventSQLite) TableName() string { return "knowledge_events" }
+func (knowledgeEventSQLite) TableName() string { return "kb_events" }
 
 type knowledgeViewSQLite struct {
 	ID       uuid.UUID `gorm:"type:uuid;primaryKey"`
@@ -100,7 +100,7 @@ type knowledgeViewSQLite struct {
 	ViewedAt time.Time `gorm:"not null;index:idx_kv_user"`
 }
 
-func (knowledgeViewSQLite) TableName() string { return "knowledge_views" }
+func (knowledgeViewSQLite) TableName() string { return "kb_views" }
 
 type userNotificationSQLite struct {
 	ID        uuid.UUID  `gorm:"type:uuid;primaryKey"`

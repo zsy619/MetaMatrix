@@ -17,7 +17,7 @@ import (
 // email cannot be replayed after the user requests a fresh one.
 type PasswordResetToken struct {
 	ID uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
-	// UserID is the account the code resets. It is the link back to users.
+	// UserID is the account the code resets. It is the link back to core_users.
 	UserID uuid.UUID `gorm:"type:uuid;not null;index:idx_reset_user_created,priority:1" json:"userId"`
 	// Email is a copy of the target address. It lets the service find the
 	// active code without a join, and keeps the audit trail readable.
@@ -57,7 +57,7 @@ type PasswordResetToken struct {
 	CreatedAt  time.Time  `gorm:"type:timestamptz;not null;index:idx_reset_user_created,priority:2" json:"createdAt"`
 }
 
-func (PasswordResetToken) TableName() string { return "password_reset_tokens" }
+func (PasswordResetToken) TableName() string { return "core_password_reset_tokens" }
 
 // IsUsable reports whether the code may still be redeemed at time now.
 func (t PasswordResetToken) IsUsable(now time.Time) bool {

@@ -4,6 +4,10 @@
 
 编辑器仍是 **一个 Tiptap 3 / ProseMirror 实例**（`pros/web/src/components/rte/composables/useRteExtensions.ts`）。没有另加编辑器，没有 Yjs。
 
+> 2026-11-26 更新：本文「没有 Yjs」只对**正文主编辑器**成立。知识库文档另有一层 Yjs CRDT（`pros/web/src/components/knowledge/collab/crdtDoc.ts`，顶层块 LWW + 2.5s HTTP 轮询），正文未接。
+> 协同与块实体化的现状、实施顺序见 [rte-collab-block-roadmap.md](./rte-collab-block-roadmap.md)。
+> 2026-11-26 再修订：下文「实时光标 / 无 Yjs / 明确不做」已过时，不再作为任务结论；协作光标列为路线图 B1，不在本矩阵里继续标「不做」。
+
 本文件覆盖工具栏 11 组（外加「其他」空组）和正文旁路入口。**覆盖全部入口不等于全部已经深度优化。** 判定只根据当前代码和本轮实际跑过的检查。飞书网页没有打开，不能写成飞书级。
 
 历史对照仍见 `docs/rte-prosemirror-feishu.md`。素材库七项见 `docs/acceptance/media-1106/README.md`（飞书租户凭证仍未验证）。
@@ -212,7 +216,7 @@
 | 块手柄 | 已实现。不遮首字的脚本本轮没重跑 | `useBlockHandle.ts` |
 | 保存重开正文 | HTML 回写 `modelValue`。本轮用挂载测试确认标题和加粗还在，并用标题编号测试确认开关写入画布 JSON | `RichTextEditor.char.test.ts` |
 | 投票、白板、多维表格、思维笔记 | 没有对应节点 | 缺口，P3，不做 |
-| 实时光标 | 无 Yjs | 缺口，明确不做 |
+| 实时光标 | 正文无 Awareness；知识库仅有 HTML 级 CRDT 旁路 | 缺口，改为路线图 B1（依赖 A2），不再「明确不做」 |
 
 ## 剩余批次（本轮不做）
 

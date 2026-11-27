@@ -22,6 +22,8 @@ export type RteMentionItem = {
   documentId?: string
   /** document mention 目标类型：doc 走 inline mention，其他走 canvasEmbed 块。 */
   canvasType?: string
+  /** 多维表格节点 ID（canvasType === 'base' 时有效）。 */
+  nodeId?: string
 }
 
 type RteBlockCandidate = {
@@ -37,6 +39,8 @@ export type RteDocCandidate = {
   icon?: string
   /** 目标文档类型：doc 走 mention，其他（node-graph/quadrant 等）走 canvasEmbed 块。 */
   canvasType?: string
+  /** 知识库节点 ID（多维表格候选用）。 */
+  nodeId?: string
 }
 
 /**
@@ -106,6 +110,7 @@ export function mergeMentionCandidates(
       kind: 'document' as const,
       documentId: d.documentId,
       canvasType: d.canvasType,
+      nodeId: d.nodeId,
     }))
   const blockItems: RteMentionItem[] = blocks
     .filter((block) => {

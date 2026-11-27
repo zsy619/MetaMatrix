@@ -1,0 +1,561 @@
+/**
+ * Base Engine（多维表格）样式。
+ *
+ * 令牌只从 telegram.css 的 :root 取（--tg-*），不在这里另起一套颜色。
+ */
+
+.be-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  position: relative;
+  background: var(--tg-surface);
+  color: var(--tg-text);
+}
+
+.be-shell.is-loading {
+  opacity: 0.72;
+}
+
+/* —— 顶部标题条 —— */
+
+.be-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--tg-border);
+  background: var(--tg-surface);
+}
+
+.be-header__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.be-header__name {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.2;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.be-header__sub {
+  font-size: 12px;
+  color: var(--tg-text-2);
+  white-space: nowrap;
+}
+
+.be-header__spacer {
+  flex: 1;
+}
+
+/* —— 工具栏 —— */
+
+.be-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--tg-border);
+  background: var(--tg-surface);
+  flex-wrap: wrap;
+}
+
+.be-toolbar__search {
+  width: 220px;
+}
+
+/* 按钮分组：Telegram 分段控件形态 —— 灰底容器 + 无边框药丸（整组是一个按钮组） */
+.be-btngroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--tg-radius-pill);
+  background: var(--tg-surface-2);
+  box-shadow: inset 0 0 0 1px var(--tg-border);
+}
+
+/*
+ * 覆盖 telegram.css 的全局按钮基线（白底 + 发丝线）。
+ * 原因：telegram.css 里 `.el-button:not(...)` 的特异性高于本文件原规则，
+ * 会让组内按钮各自变成独立白底卡片；这里重复 :not 链把特异性拉平再覆盖。
+ */
+.be-btngroup .el-button.el-button:not(.is-text):not(.is-link):not(.el-button--primary):not(.el-button--danger):not(.el-button--success):not(.el-button--warning):not(.el-button--info) {
+  border: none;
+  background: transparent;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: var(--tg-radius-pill);
+  color: var(--tg-text-2);
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  transition: background-color 160ms cubic-bezier(0.2, 0.8, 0.3, 1),
+    color 160ms cubic-bezier(0.2, 0.8, 0.3, 1), box-shadow 160ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.be-btngroup .el-button.el-button:not(.is-text):not(.is-link):not(.el-button--primary):not(.el-button--danger):not(.el-button--success):not(.el-button--warning):not(.el-button--info):hover {
+  background: var(--tg-surface);
+  color: var(--tg-text);
+  box-shadow: var(--tg-shadow-1);
+}
+
+.be-btngroup .el-button.is-active {
+  background: var(--tg-surface);
+  color: var(--tg-blue);
+  box-shadow: var(--tg-shadow-1);
+}
+
+.be-btngroup .el-button.is-disabled,
+.be-btngroup .el-button:disabled {
+  opacity: 0.45;
+}
+
+.be-toolbar__count {
+  font-size: 12px;
+  color: var(--tg-text-2);
+  white-space: nowrap;
+}
+
+/* —— 视图标签 —— */
+
+.be-views {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 14px 0;
+  border-bottom: 1px solid var(--tg-border);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.be-views::-webkit-scrollbar {
+  display: none;
+}
+
+.be-views__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border: none;
+  border-radius: var(--tg-radius-sm) var(--tg-radius-sm) 0 0;
+  background: transparent;
+  color: var(--tg-text-2);
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color var(--tg-dur) var(--tg-ease), background var(--tg-dur) var(--tg-ease);
+}
+
+.be-views__item:hover {
+  color: var(--tg-text);
+  background: var(--tg-surface-2);
+}
+
+.be-views__item.is-active {
+  color: var(--tg-blue);
+  font-weight: 600;
+  box-shadow: inset 0 -2px 0 var(--tg-blue);
+}
+
+/* —— 主体 —— */
+
+.be-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.be-body__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.be-body__side {
+  width: 300px;
+  flex-shrink: 0;
+  border-left: 1px solid var(--tg-border);
+  padding: 12px;
+  overflow-y: auto;
+  background: var(--tg-surface);
+}
+
+.be-record-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.be-record-list__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--tg-radius-sm);
+  background: transparent;
+  color: var(--tg-text);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--tg-dur) var(--tg-ease);
+}
+
+.be-record-list__item:hover {
+  background: var(--tg-surface-2);
+}
+
+.be-record-list__item.is-active {
+  background: var(--tg-blue-soft);
+  color: var(--tg-blue);
+}
+
+.be-record-list__title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.be-record-list__meta {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--tg-text-3);
+}
+
+.be-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--tg-text-2);
+}
+
+.be-empty__icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  background: var(--tg-surface-2);
+  color: var(--tg-text-3);
+  font-size: 24px;
+}
+
+/* —— 批量操作浮条 —— */
+
+.be-batch-bar {
+  position: absolute;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-radius: var(--tg-radius-pill);
+  background: var(--tg-surface-raised);
+  border: 1px solid var(--tg-border);
+  box-shadow: var(--tg-shadow-2);
+}
+
+.be-batch-bar__count {
+  font-size: 13px;
+  color: var(--tg-text-2);
+}
+
+.be-fade-enter-active,
+.be-fade-leave-active {
+  transition: opacity var(--tg-dur) var(--tg-ease), transform var(--tg-dur) var(--tg-ease);
+}
+
+.be-fade-enter-from,
+.be-fade-leave-to {
+  opacity: 0;
+  transform: translate(-50%, 8px);
+}
+
+/* —— 旧版只读降级 —— */
+
+.be-legacy {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.be-legacy__table {
+  border: 1px solid var(--tg-border);
+  border-radius: var(--tg-radius-md);
+  overflow: auto;
+}
+
+.be-legacy__table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.be-legacy__table th,
+.be-legacy__table td {
+  border-bottom: 1px solid var(--tg-border);
+  padding: 8px 12px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.be-legacy__table th {
+  background: var(--tg-surface-2);
+  color: var(--tg-text-2);
+  font-weight: 600;
+}
+
+/* —— VXE Table 主题覆写 —— */
+
+.be-grid .vxe-table {
+  background: var(--tg-surface);
+  color: var(--tg-text);
+  font-size: 13px;
+}
+
+.be-grid .vxe-table--body-wrapper,
+.be-grid .vxe-table--header-wrapper {
+  background: var(--tg-surface);
+}
+
+.be-grid .vxe-header--column {
+  background: var(--tg-surface-2);
+  color: var(--tg-text-2);
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.be-grid .vxe-cell {
+  padding: 0 10px;
+  border-bottom: 1px solid var(--tg-border);
+  color: var(--tg-text);
+  overflow: hidden;
+}
+
+.be-grid .vxe-row--hover .vxe-cell,
+.be-grid .vxe-row--row-hover .vxe-cell {
+  background: var(--tg-blue-soft);
+}
+
+.be-grid .vxe-body--column {
+  background: var(--tg-surface);
+}
+
+.be-grid .vxe-table--border-line {
+  border-color: var(--tg-border);
+}
+
+.be-grid .vxe-header--checkbox-column .vxe-checkbox--icon,
+.be-grid .vxe-cell--checkbox .vxe-checkbox--icon {
+  border-color: var(--tg-border-strong);
+}
+
+.be-grid .vxe-loading-box {
+  background: rgba(255, 255, 255, 0.7);
+}
+
+/* —— 状态点 —— */
+
+.be-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--tg-text-2);
+}
+
+.be-status__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--tg-text-3);
+}
+
+.be-status.is-open .be-status__dot {
+  background: var(--tg-green);
+}
+
+.be-status.is-connecting .be-status__dot {
+  background: var(--tg-yellow);
+}
+
+.be-status.is-closed .be-status__dot {
+  background: var(--tg-red);
+}
+
+/* —— 面板通用 —— */
+
+.be-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.be-panel__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.be-panel__hint {
+  font-size: 12px;
+  color: var(--tg-text-2);
+  line-height: 1.6;
+}
+
+.be-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.be-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: var(--tg-radius-xs);
+  background: var(--tg-surface-2);
+  color: var(--tg-text-2);
+  font-size: 12px;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.be-chip:hover {
+  color: var(--tg-text);
+  border-color: var(--tg-border-strong);
+}
+
+.be-chip.is-active {
+  background: var(--tg-blue-soft);
+  color: var(--tg-blue);
+}
+
+.be-field-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--tg-border);
+  border-radius: var(--tg-radius-md);
+  background: var(--tg-surface);
+}
+
+.be-field-row__name {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.be-field-row__label {
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.be-field-row__type {
+  font-size: 11px;
+  color: var(--tg-text-2);
+  padding: 1px 6px;
+  border-radius: var(--tg-radius-xs);
+  background: var(--tg-surface-2);
+}
+
+/* —— 记录详情 —— */
+
+.be-record {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.be-record__field {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 12px;
+  align-items: start;
+}
+
+.be-record__label {
+  font-size: 13px;
+  color: var(--tg-text-2);
+  padding-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 字段类型图标：与下拉列表同色同尺寸 */
+.be-record__type-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+/* —— 公式编辑 —— */
+
+.be-formula__editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.be-formula__result {
+  border-radius: var(--tg-radius-md);
+  border: 1px solid var(--tg-border);
+  background: var(--tg-surface-2);
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--tg-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.be-formula__result.is-error {
+  color: var(--tg-red);
+  border-color: rgba(229, 57, 53, 0.35);
+  background: rgba(229, 57, 53, 0.06);
+}
+
+/* —— 导出预览 —— */
+
+.be-export__preview {
+  max-height: 320px;
+  overflow: auto;
+  border-radius: var(--tg-radius-md);
+  border: 1px solid var(--tg-border);
+  background: var(--tg-surface-2);
+  padding: 10px 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.7;
+  white-space: pre;
+}

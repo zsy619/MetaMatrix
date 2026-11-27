@@ -25,7 +25,7 @@ type KnowledgeTemplate struct {
 	// Scope 是模板作用域：builtin | team | personal | project。
 	Scope string `gorm:"type:varchar(16);not null;default:'personal'" json:"scope"`
 	HTML  string `gorm:"type:text;not null;default:''" json:"html"`
-	// Properties 是模板携带的页面属性定义：创建文档时自动写入 doc_properties。
+	// Properties 是模板携带的页面属性定义：创建文档时自动写入 kb_doc_properties。
 	Properties datatypes.JSON `gorm:"type:jsonb;not null;default:'[]'" json:"properties"`
 	Builtin    bool           `gorm:"not null;default:false" json:"builtin"`
 	// Published 表示团队共享模板已发布（清单 026）：发布后空间成员都能看到。
@@ -38,7 +38,7 @@ type KnowledgeTemplate struct {
 	UpdatedAt time.Time `gorm:"type:timestamptz;not null" json:"updatedAt"`
 }
 
-func (KnowledgeTemplate) TableName() string { return "knowledge_templates" }
+func (KnowledgeTemplate) TableName() string { return "kb_templates" }
 
 // DocProperty 是文档的页面属性（飞书「页面属性」）。
 //
@@ -78,7 +78,7 @@ type DocProperty struct {
 	CreatedAt time.Time          `gorm:"type:timestamptz;not null" json:"createdAt"`
 }
 
-func (DocProperty) TableName() string { return "doc_properties" }
+func (DocProperty) TableName() string { return "kb_doc_properties" }
 
 // DocComment 是文档评论（飞书评论 / 划线评论）。
 //
@@ -109,7 +109,7 @@ type DocComment struct {
 	UpdatedAt time.Time `gorm:"type:timestamptz;not null" json:"updatedAt"`
 }
 
-func (DocComment) TableName() string { return "doc_comments" }
+func (DocComment) TableName() string { return "kb_comments" }
 
 // KnowledgeEvent 是知识库变更事件（outbox）。
 //
@@ -125,7 +125,7 @@ type KnowledgeEvent struct {
 	CreatedAt   time.Time  `gorm:"type:timestamptz;not null;index:idx_ke_created" json:"createdAt"`
 }
 
-func (KnowledgeEvent) TableName() string { return "knowledge_events" }
+func (KnowledgeEvent) TableName() string { return "kb_events" }
 
 // KnowledgeView 是「最近浏览」记录。
 //
@@ -137,4 +137,4 @@ type KnowledgeView struct {
 	ViewedAt time.Time `gorm:"type:timestamptz;not null;index:idx_kv_user,priority:2,sort:desc" json:"viewedAt"`
 }
 
-func (KnowledgeView) TableName() string { return "knowledge_views" }
+func (KnowledgeView) TableName() string { return "kb_views" }

@@ -63,6 +63,9 @@ type ExtractResult struct {
 	PlainText   string
 	Blocks      []Block
 	Attachments []AttachmentMeta
+	// Markdown 是文档自带的 Markdown 源码（富文本编辑器保存时一起传上来）。
+	// 它不参与检索，所以单独存列，不混进 PlainText。
+	Markdown string
 }
 
 // Extract walks JSON and collects searchable / AI-ready text.
@@ -74,6 +77,7 @@ func Extract(raw json.RawMessage) ExtractResult {
 	var blocks []Block
 	var atts []AttachmentMeta
 	var texts []string
+	var markdown string
 	order := 0
 
 	var walk func(v interface{}, path string, panelID, panelTitle string)
@@ -123,6 +127,11 @@ func Extract(raw json.RawMessage) ExtractResult {
 					if strings.Contains(strings.ToLower(childPath), "attachments/") {
 						continue
 					}
+					// Markdown 源码单独抽出来存列，不进检索文本
+					if strings.EqualFold(k, "markdown") && markdown == "" {
+						markdown = s
+						continue
+					}
 					if keepString(k, s) {
 						texts = append(texts, s)
 						blocks = append(blocks, Block{
@@ -160,7 +169,7 @@ func Extract(raw json.RawMessage) ExtractResult {
 
 	walk(root, "", "", "")
 	plain := strings.TrimSpace(strings.Join(dedupePreserve(texts), "\n"))
-	return ExtractResult{PlainText: plain, Blocks: blocks, Attachments: atts}
+	return ExtractResult{PlainText: plain, Blocks: blocks, Attachments: atts, Markdown: markdown}
 }
 
 func looksLikePanelPath(path string) bool {

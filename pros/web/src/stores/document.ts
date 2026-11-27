@@ -2578,7 +2578,7 @@ export const useDocumentStore = defineStore('document', () => {
   /**
    * Clone the current server document.
    *
-   * The server inserts a new canvas_documents row (new UUID) whose current_data
+   * The server inserts a new kb_documents row (new UUID) whose current_data
    * is a deep copy of the source, including attachments / panel materials.
    * The clone is then loaded into the editor and its id returned.
    */

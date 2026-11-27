@@ -80,7 +80,7 @@
 | GET | `/documents/:id/export` | `format=json` 或 `md` |
 | PUT | `/documents/:id` | 保存。`expectedHeadRevisionId` 不一致时 409，响应带云端最新正文 |
 | PATCH | `/documents/:id/title` | `{ title }`，只改标题 |
-| POST | `/documents/:id/clone` | 克隆画布。正文不变、新 id、新建一条 `canvas_documents` 行；标题默认加「（副本）」，可传 `{ title, notes }` 覆盖；同时写入一条 `label=clone` 的初始版本，源文档不被修改 |
+| POST | `/documents/:id/clone` | 克隆画布。正文不变、新 id、新建一条 `kb_documents` 行；标题默认加「（副本）」，可传 `{ title, notes }` 覆盖；同时写入一条 `label=clone` 的初始版本，源文档不被修改 |
 | DELETE | `/documents/:id` | 软删除（归档） |
 | GET | `/documents/:id/ai-context` | 面板文本上下文 |
 | POST | `/documents/:id/revisions` | 手动存版 |
@@ -92,7 +92,7 @@
 ## 项目
 
 项目是画布的容器：一个项目下有多张画布。画布内容（节点、连线）仍然存在
-`canvas_documents.current_data`（JSONB），项目本身只有一行元数据。
+`kb_documents.current_data`（JSONB），项目本身只有一行元数据。
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |

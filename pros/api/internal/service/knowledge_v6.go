@@ -248,7 +248,7 @@ type PresenceStore interface {
 	Leave(docID, userID uuid.UUID)
 }
 
-// dbPresenceStore 把 presence 落到 knowledge_presence 表。
+// dbPresenceStore 把 presence 落到 kb_presence 表。
 type dbPresenceStore struct {
 	db *gorm.DB
 }

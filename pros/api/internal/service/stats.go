@@ -700,10 +700,10 @@ func recentEdits(docs []StatsDoc, loc *time.Location, limit int) []RecentEdit {
 const statsRecentLimit = 8
 
 // statsRevisionScope 是所有修订统计共用的权限与归档边界，任何 COUNT、按日聚合
-// 或原始行查询都不能省略它。canvas_revisions 本身没有软删字段，归档文档通过 JOIN 排除。
+// 或原始行查询都不能省略它。kb_revisions 本身没有软删字段，归档文档通过 JOIN 排除。
 const statsRevisionScope = `
-FROM canvas_revisions r
-INNER JOIN canvas_documents d ON d.id = r.document_id
+FROM kb_revisions r
+INNER JOIN kb_documents d ON d.id = r.document_id
 WHERE d.owner_user_id = ? AND d.deleted_at IS NULL
   AND (r.author_user_id IS NULL OR r.author_user_id = ?)
 `

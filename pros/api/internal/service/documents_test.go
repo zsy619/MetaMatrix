@@ -33,7 +33,7 @@ type documentSaveOperationSQLite struct {
 	UpdatedAt         time.Time      `gorm:"not null"`
 }
 
-func (documentSaveOperationSQLite) TableName() string { return "document_save_operations" }
+func (documentSaveOperationSQLite) TableName() string { return "kb_save_operations" }
 
 // docAuditEventSQLite 是 doc_audit_events 的 SQLite 影子模型：只把时间列换成可回读类型。
 type docAuditEventSQLite struct {
@@ -656,7 +656,7 @@ type documentQueryCounter struct {
 
 func (l *documentQueryCounter) Trace(ctx context.Context, begin time.Time, fc func() (string, int64), err error) {
 	sql, _ := fc()
-	if strings.Contains(sql, "canvas_documents") && strings.Contains(strings.ToUpper(sql), "SELECT") {
+	if strings.Contains(sql, "kb_documents") && strings.Contains(strings.ToUpper(sql), "SELECT") {
 		l.documents++
 	}
 	l.Interface.Trace(ctx, begin, fc, err)
@@ -710,7 +710,7 @@ func TestAICorpusKeepsSearchOrderPermissionsAndTruncation(t *testing.T) {
 	}
 	// 一次 Search + 一次批量文档读取；旧实现会至少再按每篇文档读取一次。
 	if recorder.documents != 2 {
-		t.Fatalf("canvas_documents SELECT count = %d, want 2 (N+1 regression)", recorder.documents)
+		t.Fatalf("kb_documents SELECT count = %d, want 2 (N+1 regression)", recorder.documents)
 	}
 	longItem := corpus[2]
 	if utf8.RuneCountInString(longItem.PlainText) != 4001 || !strings.HasSuffix(longItem.PlainText, "…") {

@@ -2,7 +2,7 @@
 /**
  * 思维导图（KityMinder 式）：左侧大纲、右侧导图，双向联动。
  *
- * 数据是 nodeGraph 的 nodes/edges 存进 knowledge_node_data（kind=mindmap），
+ * 数据是 nodeGraph 的 nodes/edges 存进 kb_node_data（kind=mindmap），
  * 自动布局复用 nodeGraph 的 computeLayout。
  */
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'

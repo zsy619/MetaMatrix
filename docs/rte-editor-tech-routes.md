@@ -1,7 +1,9 @@
 # 类飞书文档编辑器：实现技术路线调研
 
 > 调研日期：2026-11-26　范围：面向「元矩阵」知识库文档（doc）编辑器的技术路线选型
-> 关联文档：`docs/rte-prosemirror-feishu.md`（功能对照）、`docs/rte-feature-matrix.md`、`docs/rte-feishu-gap.md`
+> 关联文档：`docs/rte-prosemirror-feishu.md`（功能对照）、`docs/rte-feature-matrix.md`、`docs/rte-feishu-gap.md`、`docs/rte-collab-block-roadmap.md`（实施顺序，以此为准）
+> 2026-11-26 修订：调研结论（继续走 Tiptap + Yjs + Hocuspocus）仍有效；下文旧「P0 先上字符级 CRDT 并复用 HTTP、后端零改造 → P1 再上 WebSocket → P2 再补块 ID」的落地顺序已废止，任务清单以 [rte-collab-block-roadmap.md](./rte-collab-block-roadmap.md) 的 A0/A/B/C 为准。
+> 状态更新：2026-11-26 20:51（Asia/Shanghai）只回写第 5 节任务索引的勾选与说明，其它正文不改。
 
 ---
 
@@ -10,9 +12,9 @@
 1. **不建议换内核**：现有 `Tiptap 3 + ProseMirror` 已是飞书级编辑器的合格底座（schema 可控、命令体系成熟、Vue 3 绑定完善）。换成 Lexical / BlockNote / Slate 属于「重写而非演进」，收益不足以覆盖改造成本。
 2. **真正的短板是协同，不是编辑器**：当前协同只有「顶层块级 LWW」的 HTTP 增量同步，且**尚未接入主编辑器**；字符级 CRDT、WebSocket 通道、光标 presence 才是与飞书差距的主体。
 3. **默认推荐路线（路线 B 演化版）**：
-   - P0：把现有 Yjs 块级 LWW 升级为 **Y.Doc 级字符级 CRDT**，继续复用 HTTP 增量接口（后端零改造即可跑通），并接入 `RichTextEditor`。
-   - P1：引入 **Hocuspocus（y-websocket 官方服务端）**，获得 WebSocket + awareness（实时光标/选区/在线名单），Go 侧只保留持久化与鉴权。
-   - P2：**块级 JSON 双写**，对齐飞书 docx v1 的块 API 数据模型，为跨端渲染、AI 局部改写、评论锚点铺路。
+   - 实施顺序已改，见 [rte-collab-block-roadmap.md](./rte-collab-block-roadmap.md)：先 A0（D1/D2/D5 与门禁基线）→ A1 稳定块身份与 A2 协同底座（WS + 字符级 Yjs，旧 HTML CRDT 按 D1 收口）并行，A3 存储/通知可并行但块级审计依赖 A1 → B1 光标、B2 块实体化、B3 内嵌数据库块 → C 收口。
+   - 不再采用「先复用 HTTP、后端零改造上字符级 CRDT，块身份留到最后」的路径：块 ID 必须先于或至少同步于协同协议；先协同后补 ID 会使已协同历史文档都要补偿回填。
+   - 栈选型不变：Tiptap Collaboration / CollaborationCaret + Y.Doc + WebSocket（Hocuspocus 或 Hertz websocket），块表双写放在 B2。
 4. **不推荐现在嵌入 OnlyOffice / Collabora**：那是「OOXML 保真 + 表格/排版引擎」路线，会牺牲我们已有的自定义富文本能力（时间线、图表、公式栏、模板中心、面板化 UI），且引入 iframe 通信与独立鉴权模型；只有在客户明确要求「Word 文档双向保真」时再启用。
 5. **自研编辑器内核**（路线 E）不推荐：schema、选区、输入法（IME）、撤销栈、协同、粘贴净化、辅助功能（a11y）每一项都是数千行级工程量，无差异化收益。
 
@@ -73,7 +75,7 @@
 
 1. **块树 vs 富文本流**：飞书/Notion = 块树（每块独立 id，可并行编辑、可单块 AI 改写）；Tiptap 传统 = 单文档流（ProseMirror 节点树仍可给节点加 id，但默认不暴露）。→ 我们要往块树靠，但**不必换内核**，只需给顶层块加稳定 id 并把块内容映射到 Y.Map（现有 `crdtDoc.ts` 已近此形）。
 2. **OT vs CRDT**：OT 需要中心化转换服务器且对离线/乱序敏感；CRDT 可交换、可幂等、离线友好 → 我们已选 CRDT（Yjs），**不要中途混入 OT**。
-3. **存储形态**：HTML（我们现状 `canvas_documents.current_data`）/ 块 JSON（飞书）/ OOXML（OnlyOffice）。HTML 便于渲染与导出，但**不适合机器改写与结构化检索**；建议长期以**块 JSON 为事实源、HTML 为派生视图**。
+3. **存储形态**：HTML（我们现状 `kb_documents.current_data`）/ 块 JSON（飞书）/ OOXML（OnlyOffice）。HTML 便于渲染与导出，但**不适合机器改写与结构化检索**；建议长期以**块 JSON 为事实源、HTML 为派生视图**。
 4. **渲染载体**：DOM 渲染（ProseMirror/Lexical/BlockNote，可访问性好、选区天然）vs Canvas 渲染（性能天花板高，但 a11y 与富文本交互成本极高）。→ 保持 DOM 渲染；画布类产品走现有自研 Canvas，不混进文档内核。
 
 ---
@@ -81,15 +83,15 @@
 ## 4. 我们现状盘点（代码级证据）
 
 **前端**
-- `pros/web/package.json`：`@tiptap/core|pm|starter-kit|vue-3|table|task-list|code-block-lowlight|color|highlight|link|image|mention|...` 均 `^3.32.0`；**已依赖 `yjs ^13.6.33`**。
+- `pros/web/package.json`：`@tiptap/core|pm|starter-kit|vue-3|table|...` 均 `^3.32.0`；**已依赖 `yjs ^13.6.33`**。提交 `4f438f1` 另预装 `@tiptap/extension-collaboration` 与 `@tiptap/extension-collaboration-caret`（^3.32.0），源码仍为零引用。若工作区未提交改动去掉了这两项，以提交为准，开工前先核对。
 - `pros/web/src/components/knowledge/collab/crdtDoc.ts`：自研协同层，基于 Yjs，粒度是**顶层块 LWW**（`Y.Map<HTML>`），传输层 `httpTransport()` 走 `fetchCrdtUpdates` / `appendCrdtUpdate`（HTTP 拉/推增量，无 WebSocket）。
 - 使用方：`pros/web/src/components/knowledge/DocView.vue`（**动态 import** 后初始化）——**尚未接入 `RichTextEditor.vue` 主编辑器**，即「协同能力存在但用户用不到」。
 - 编辑器体系：`src/components/rte/**`（ribbon 工具栏、块面板、图表、公式栏、评论线程、模板、Markdown 导入等）+ `src/utils/rte*.ts`。
 
 **后端**（Go + Hertz + GORM + PostgreSQL）
-- `pros/api/internal/model/knowledge_v3.go`：doc 正文以 **HTML** 存 `canvas_documents.current_data`；结构化节点存 `knowledge_node_data`。
-- `pros/api/internal/model/knowledge_v6.go`：`DocCRDTUpdate`（`doc_crdt_updates`，seq 增量日志）、`KnowledgePresence`（`doc_presence`，DB 落库 + TTL）、`KnowledgeChunk`（RAG 切片）。
-- 版本 `knowledge_doc_versions`、评论 `doc_comments`、分享 `knowledge_shares`。
+- `pros/api/internal/model/knowledge_v3.go`：doc 正文以 **HTML** 存 `kb_documents.current_data`；结构化节点存 `kb_node_data`。
+- `pros/api/internal/model/knowledge_v6.go`：`DocCRDTUpdate`（`kb_crdt_updates`，seq 增量日志）、`KnowledgePresence`（`doc_presence`，DB 落库 + TTL）、`KnowledgeChunk`（RAG 切片）。
+- 版本 `kb_doc_versions`、评论 `kb_comments`、分享 `kb_shares`。
 - **全仓无 WebSocket 依赖**（grep `websocket|hocuspocus|gobwas` 无命中）；后端路由不带 `/api` 前缀。
 
 **缺口清单**
@@ -101,25 +103,22 @@
 
 ---
 
-## 5. 三阶段落地路线
+## 5. 落地任务清单（顺序以路线图为准）
 
-### P0｜字符级 CRDT 接入主编辑器（后端零改造，2～3 周量级）
-- 用 `y-prosemirror` / `@tiptap/extension-collaboration` 把 `RichTextEditor.vue` 的 doc 纳入 Y.Doc，替换现有块级 LWW 传输层。
-- 传输继续走现有 HTTP 增量接口（`doc_crdt_updates` + seq），**不引入新中间件**，先拿到「不丢字 + 离线可编辑」。
-- 落库策略：定期 `Y.encodeStateAsUpdate` 快照 + 保留增量日志（`update`/`snapshot` 两种 kind 已有字段）。
-- 验收：两人同时改同一段落，字符不丢；断网 10 分钟继续写，恢复后自动合并。
+实施顺序、工期拆分（A2a / A2b）、回填冲突策略和门禁，一律以 [rte-collab-block-roadmap.md](./rte-collab-block-roadmap.md) 为准。本节不再维护一套与之冲突的 P0/P1/P2 排期。
 
-### P1｜Hocuspocus WebSocket + awareness（3～5 周量级）
-- 部署 Hocuspocus（Node）作为协作侧车；Go 服务只负责**签发协作 token**（用户/权限/文档 id）与**持久化回调**（把 Yjs 更新写回 `doc_crdt_updates`）。
-- `CollaborationCaret` 渲染远端光标与选区；awareness 承载在线名单、当前选区、正在输入的状态（替换 G5 的 TTL 心跳）。
-- 冲突与权限：协作 token 由后端签发，遵循现有分享/白名单语义（`knowledge_shares` 的 `AllowUsers`、口令、口令摘要规则）。
-- 验收：光标实时可见；并发编辑 P95 延迟 < 200ms；权限撤销后 WS 立即断连。
+与路线图对齐的任务索引：
 
-### P2｜块级 JSON 双写，对齐飞书 docx API（4～8 周量级）
-- 为顶层块生成稳定 `block_id`（沿用 `splitBlocks` 的顶层块边界），落库 `knowledge_doc_blocks`（块类型、块 JSON、顺序、父子关系）。
-- 保留 HTML 作为派生视图（渲染/导出），实现「块 JSON → HTML」单向编译，避免双向同步地狱。
-- 对外提供 `GET /documents/:id/blocks`（对齐飞书 `GET /open-apis/docx/v1/documents/:id/blocks` 的形状），为跨端、AI 局部改写、评论锚点、目录大纲提供稳定接口。
-- 验收：单块 AI 改写只影响该块；块级评论可精确定位；大纲/目录由块树生成。
+- [x] A0：D1 / D2 已于 2026-11-26 19:04 拍板；D3 / D4 / D5 建议随 A1 落地（**多人同时首开旧文档仍未实机验证**）；门禁已在干净 worktree 重测并回写路线图 §5（`4f438f1` / `311593e`：vue-tsc 62、vitest 6 失败 / 1919 通过；勿用 `54abf501` 口径）。协作扩展以 `main` @ `311593e` 已有包为准；Mac 工作区仍有未提交删除这两个包，未带进功能分支，不要在 Mac 上覆盖 `package.json`。
+- [x] A1：代码已 squash 合入 `main` `311593e`（PR #297）；复制 / 拖拽 / 粘贴有单测覆盖。**浏览器实机（复制 / 拖拽 / 系统粘贴、老文档打开保存、多人首开）未验证，不能算验收通过。**
+- [ ] A2a：功能分支已有 Hertz WebSocket + Collaboration + 心跳重连、成员进房、抖动抽取；`2e45f76` 补了浏览者前端只读与持久离线队列，**尚未合入 main**。双浏览器收敛与只读/离线队列均未实机验证。
+- [ ] A2b：功能分支 `agent/met-4-a2a-collab-20261126` @ `64d39ab` 已将 `crdtDoc.ts` / `kb_crdt_updates` 与 `POST /:id/crdt` 降为历史只读（写入被拒绝，历史 GET 仍可用），单测已锁住「旧旁路不再写入」，**尚未合入 main**。开启/关闭协同按 D1 改为正文 Yjs 编辑模式；关闭后走单人保存。未在真实浏览器验证。不计入 A2a 的 8–12 人日。
+- [ ] A3：功能分支 `bc0404e` 已做用户+文档级审计骨架，`2e45f76` 已在 DocView 侧栏加只读列表，**尚未合入 main**；块类型/父子未做。MinIO 与评论通知未做。审计列表未实机验证。
+- [ ] B1：协作光标 / 选区 / 在线名单（原 P1 的 awareness 验收仍适用：光标可见、权限撤销后通道断开；P95 延迟目标未实机验证）。本轮不把 caret 塞进 A2a。
+- [ ] B2：块表双写、稳定 block API、评论锚点（原 P2 验收仍适用，但块 ID 来自 A1，而不是在本阶段才从 `splitBlocks` 临时生成）
+- [ ] B3 / C：见路线图
+
+以下旧「P0 后端零改造 + 复用 HTTP → P1 WS → P2 再补块 ID」方案仅作 2026-11-26 调研原文归档，**不再作为任务清单执行**：P0 把块身份留到最后、并假设后端零改造即可完成字符级协同，这两点已被路线图否决。调研里仍有价值的部分是验收意图（同段落不丢字、断网恢复可合并、光标可见、块级 API），已并入上表与路线图对应阶段。
 
 ### 不做的事（明确否决）
 - 不嵌 OnlyOffice/Collabora 作为主编辑器（仅保留为「附件级 Office 编辑」的可选插件位）。
@@ -132,8 +131,8 @@
 
 - **WebSocket 运维复杂度**：Hocuspocus 多一个进程与鉴权面；若团队无 Node 运维能力，退路是「Go 自研 WS 网关 + y-websocket 协议」，成本更高但可控 —— 建议先用官方 Hocuspocus 验证语义，再决定是否 Go 化。
 - **HTML 事实源的迁移成本**：P2 双写需要一次性 HTML→块 JSON 编译器 + 回归用例；可复用现有 `rteMarkdown.ts` 式的「解析器 + 夹具 + 文档级断言」测试模式。
-- **规模不匹配**：若真实并发用户数 < 10，协同投入的 ROI 主要是「体验可信」而非「性能必需」——此时 P0（P0.5 折中：仅做块级 CRDT + 冲突提示）可能已足够。
-- **默认决策**：先做 P0，保留 P1 的接口边界（transport 抽象已在 `crdtDoc.ts` 中存在，替换成本低），P2 视 AI 功能排期触发。
+- **规模不匹配**：若真实并发用户数 < 10，协同投入的 ROI 主要是「体验可信」而非「性能必需」。即便如此，也不应在 HTML 级 LWW 上长期停驻，更不要把「只做块级 CRDT + 冲突提示」当成可以跳过 A1 块身份的理由。
+- **默认决策（2026-11-26 修订）**：栈选型仍是路线 B；落地顺序改为路线图的 A0 → A1 ‖ A2 ‖ A3 → B → C。不再「先做旧 P0、块身份留到 P2」。`crdtDoc.ts` 的 transport 抽象仍可参考，但 HTML 级 LWW 不是目标态。是否继续复用 HTTP 增量，服从路线图 D1/D2，而不是作为默认的「后端零改造」前提。
 
 ---
 
@@ -160,3 +159,4 @@
 - Google Docs 内部引擎命名（Jupiter/Wave）、飞书内部协同算法：**未逐页核验**，属公开技术分享的二手结论，引用时建议标注「据公开资料」。
 
 **本仓库证据**：见第 4 节所列文件与依赖（可用 `grep`/`cat` 复核）。
+

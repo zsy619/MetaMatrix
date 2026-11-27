@@ -28,4 +28,4 @@ type ActivityLog struct {
 	CreatedAt time.Time `gorm:"type:timestamptz;not null;index:idx_activity_user_created,priority:2,sort:desc" json:"createdAt"`
 }
 
-func (ActivityLog) TableName() string { return "activity_logs" }
+func (ActivityLog) TableName() string { return "core_activity_logs" }

@@ -1,4 +1,4 @@
-/** 多维表格（飞书 Bitable）数据模型：字段、记录、视图。节点数据整块存在 knowledge_node_data.data。 */
+/** 多维表格（飞书 Bitable）数据模型：字段、记录、视图。节点数据整块存在 kb_node_data.data。 */
 
 export type SheetFieldType =
   | 'text'

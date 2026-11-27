@@ -225,11 +225,16 @@ func (s *DocumentsService) reloadDoc(ownerID, docID uuid.UUID) *model.CanvasDocu
 	return fresh
 }
 
-// syncExtract rewrites content_text and rebuilds canvas_content_blocks inside tx.
+// syncExtract rewrites content_text and rebuilds kb_content_blocks inside tx.
 func syncExtract(tx *gorm.DB, docID uuid.UUID, data []byte, now time.Time, canvasType string) (string, error) {
 	ext := content.Extract(data)
 	if err := tx.Model(&model.CanvasDocument{}).Where("id = ?", docID).
 		Update("content_text", ext.PlainText).Error; err != nil {
+		return "", err
+	}
+	// Markdown 源码单独存一列：库里不再只有 HTML
+	if err := tx.Model(&model.CanvasDocument{}).Where("id = ?", docID).
+		Update("content_markdown", ext.Markdown).Error; err != nil {
 		return "", err
 	}
 	if err := tx.Where("document_id = ?", docID).Delete(&model.CanvasContentBlock{}).Error; err != nil {
@@ -271,7 +276,7 @@ func syncExtract(tx *gorm.DB, docID uuid.UUID, data []byte, now time.Time, canva
 	return ext.PlainText, rebuildRefs(tx, docID, data, now)
 }
 
-// rebuildRefs 全量重建 doc 的出向引用索引（mention/embed → page_references）。
+// rebuildRefs 全量重建 doc 的出向引用索引（mention/embed → core_page_references）。
 // 非 doc 类型（画布 JSON）跳过：只有 doc 类型的 current_data 有 html 字段。
 func rebuildRefs(tx *gorm.DB, docID uuid.UUID, data []byte, now time.Time) error {
 	if err := RebuildPageReferences(tx, docID, datatypes.JSON(data), now); err != nil {
@@ -313,7 +318,7 @@ func validatePayload(data []byte) error {
 
 // DocCanvasType 是知识库富文本的 canvas_type。
 //
-// canvas_documents 同时收画布和知识库文档，两者共用修订历史、乐观锁与抽取层。
+// kb_documents 同时收画布和知识库文档，两者共用修订历史、乐观锁与抽取层。
 // 「画布」不是一个表，而是 canvas_type <> 'doc' 的一个集合：画布消费端
 // （项目列表计数、项目详情、画布选择器、引用图）统一用 IsCanvasType 判定，
 // 不在调用点各自硬编码字符串。
@@ -326,7 +331,7 @@ const DocCanvasType = "doc"
 // 都是别的内容类别，混进项目画布列表会变成打不开的假条目。
 const NodeGraphCanvasType = "node-graph"
 
-// 内容分类：把同一张 canvas_documents 表里的不同内容切成互不重叠的集合。
+// 内容分类：把同一张 kb_documents 表里的不同内容切成互不重叠的集合。
 //
 // - CategoryCanvas    普通画布集合（除知识库富文本外的一切）
 // - CategoryNodeGraph 项目节点画布集合（canvas_type = 'node-graph'）
@@ -711,7 +716,7 @@ type CloneDocumentInput struct {
 // never share mutable state. The bytes are copied verbatim (no re-encoding),
 // so the clone stores exactly the payload the source has in the database.
 //
-// Note: canvas_documents.current_data is a JSONB column, so Postgres
+// Note: kb_documents.current_data is a JSONB column, so Postgres
 // normalises the key order of whatever is written. The clone therefore has
 // the same stored representation as its source (byte for byte), while the
 // key order may differ from the very first client request that created the
@@ -1212,7 +1217,7 @@ func NormalizeBatchIDs(raw []string) ([]uuid.UUID, error) {
 	return out, nil
 }
 
-// Archive soft-deletes the caller's documents. Rows stay in canvas_documents.
+// Archive soft-deletes the caller's documents. Rows stay in kb_documents.
 func (s *DocumentsService) Archive(ownerID uuid.UUID, ids []uuid.UUID) (int64, error) {
 	res := s.db.Where("owner_user_id = ? AND id IN ?", ownerID, ids).Delete(&model.CanvasDocument{})
 	return res.RowsAffected, res.Error
@@ -1527,7 +1532,7 @@ SELECT id, title, notes, template_id, canvas_type, created_at, updated_at,
     WHEN content_text ILIKE ? THEN 0.3
     ELSE 0
   END AS rank
-FROM canvas_documents
+FROM kb_documents
 WHERE owner_user_id = ? AND deleted_at IS NULL
   AND (
     content_tsv @@ plainto_tsquery('simple', ?)
@@ -1603,7 +1608,7 @@ func (s *DocumentsService) attachBlockMatches(rows []model.SearchHit, q string) 
 	var matches []blockMatch
 	err := s.db.Raw(`
 SELECT DISTINCT ON (document_id) document_id, panel_id, panel_title, substr(text_content, 1, 180) AS text_content
-FROM canvas_content_blocks
+FROM kb_content_blocks
 WHERE document_id IN ? AND text_content ILIKE ? ESCAPE '\'
 ORDER BY document_id, sort_order
 `, ids, "%"+escapeLike(q)+"%").Scan(&matches).Error

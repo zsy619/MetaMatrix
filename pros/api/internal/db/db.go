@@ -22,6 +22,10 @@ func Connect(databaseURL string) (*gorm.DB, error) {
 }
 
 func AutoMigrate(gdb *gorm.DB) error {
+	// 改名必须排在 AutoMigrate 前面：先建表再改名会把旧数据留在旧表里。
+	if err := ensureTableNamingSchema(gdb); err != nil {
+		return fmt.Errorf("table naming schema: %w", err)
+	}
 	if err := gdb.AutoMigrate(
 		&model.User{},
 		&model.Project{},
@@ -68,10 +72,22 @@ func AutoMigrate(gdb *gorm.DB) error {
 		&model.KnowledgeNodeData{},
 		&model.KnowledgeShare{},
 		&model.KnowledgeDocVersion{},
+		// 多维表格 Base Engine：Base/表/字段/记录/投影/视图/关联/公式/审计/事件。
+		&model.BaseApp{},
+		&model.BaseTable{},
+		&model.BaseField{},
+		&model.BaseRecord{},
+		&model.BaseRecordValue{},
+		&model.BaseView{},
+		&model.BaseRecordLink{},
+		&model.BaseFieldFormula{},
+		&model.BaseFormulaDependency{},
+		&model.BaseOperationLog{},
+		&model.BaseEventOutbox{},
 	); err != nil {
 		return fmt.Errorf("automigrate: %w", err)
 	}
-	if err := gdb.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS uniq_media_user_sha ON media_asset (user_id, sha256)`).Error; err != nil {
+	if err := gdb.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS uniq_media_user_sha ON media_assets (user_id, sha256)`).Error; err != nil {
 		return fmt.Errorf("media unique index: %w", err)
 	}
 	if err := ensureSearchSchema(gdb); err != nil {
@@ -92,7 +108,29 @@ func AutoMigrate(gdb *gorm.DB) error {
 	if err := ensureCommentBlockAnchors(gdb); err != nil {
 		log.Printf("ensureCommentBlockAnchors warning: %v", err)
 	}
-	log.Println("AutoMigrate OK: users, canvas_documents, canvas_revisions, canvas_content_blocks, document_save_operations, backup_imports, media_category, media_asset, media_reference, password_reset_tokens")
+	if err := ensureMarkdownSchema(gdb); err != nil {
+		log.Printf("ensureMarkdownSchema warning: %v", err)
+	}
+	if err := ensureBaseEngineIndexes(gdb); err != nil {
+		log.Printf("ensureBaseEngineIndexes warning: %v", err)
+	}
+	log.Println("AutoMigrate OK: core_users, core_projects, kb_documents, kb_revisions, kb_content_blocks, kb_save_operations, core_backup_imports, media_categories, media_assets, media_references, core_password_reset_tokens")
+	return nil
+}
+
+// ensureMarkdownSchema 给文档表补 Markdown 源码列。
+//
+// AutoMigrate 会加列，但线上库可能存在历史版本，这里显式补一次，
+// 保证「库里存的不只是 HTML，还有 Markdown 源码」。
+func ensureMarkdownSchema(gdb *gorm.DB) error {
+	stmts := []string{
+		`ALTER TABLE kb_documents ADD COLUMN IF NOT EXISTS content_markdown text NOT NULL DEFAULT ''`,
+	}
+	for _, stmt := range stmts {
+		if err := gdb.Exec(stmt).Error; err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -102,10 +140,10 @@ func AutoMigrate(gdb *gorm.DB) error {
 // 所以 document_id 变可空必须显式 ALTER。
 func ensureShareSchema(gdb *gorm.DB) error {
 	stmts := []string{
-		`ALTER TABLE knowledge_shares ALTER COLUMN document_id DROP NOT NULL`,
-		`ALTER TABLE knowledge_shares ADD COLUMN IF NOT EXISTS node_id uuid`,
-		`ALTER TABLE knowledge_shares ADD COLUMN IF NOT EXISTS kind varchar(16) NOT NULL DEFAULT 'doc'`,
-		`CREATE INDEX IF NOT EXISTS idx_shares_node ON knowledge_shares (node_id)`,
+		`ALTER TABLE kb_shares ALTER COLUMN document_id DROP NOT NULL`,
+		`ALTER TABLE kb_shares ADD COLUMN IF NOT EXISTS node_id uuid`,
+		`ALTER TABLE kb_shares ADD COLUMN IF NOT EXISTS kind varchar(16) NOT NULL DEFAULT 'doc'`,
+		`CREATE INDEX IF NOT EXISTS idx_shares_node ON kb_shares (node_id)`,
 	}
 	for _, stmt := range stmts {
 		if err := gdb.Exec(stmt).Error; err != nil {
@@ -113,8 +151,8 @@ func ensureShareSchema(gdb *gorm.DB) error {
 		}
 	}
 	// 存量分享链接补类型：画布文档按画布渲染，其余按富文本。
-	if err := gdb.Exec(`UPDATE knowledge_shares s SET kind = 'canvas'
-  FROM canvas_documents d
+	if err := gdb.Exec(`UPDATE kb_shares s SET kind = 'canvas'
+  FROM kb_documents d
   WHERE d.id = s.document_id AND d.canvas_type <> '' AND d.canvas_type <> 'doc'`).Error; err != nil {
 		log.Printf("share kind backfill warning: %v", err)
 	}
@@ -128,8 +166,8 @@ func ensureShareSchema(gdb *gorm.DB) error {
 // table, which is exactly the kind of query an attacker can hammer.
 func ensureResetIndexes(gdb *gorm.DB) error {
 	stmts := []string{
-		`CREATE INDEX IF NOT EXISTS idx_reset_email_created ON password_reset_tokens (email, created_at DESC)`,
-		`CREATE INDEX IF NOT EXISTS idx_reset_ip_created ON password_reset_tokens (request_ip, created_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_reset_email_created ON core_password_reset_tokens (email, created_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_reset_ip_created ON core_password_reset_tokens (request_ip, created_at DESC)`,
 	}
 	for _, stmt := range stmts {
 		if err := gdb.Exec(stmt).Error; err != nil {
@@ -142,8 +180,8 @@ func ensureResetIndexes(gdb *gorm.DB) error {
 // ensureSearchSchema adds content_tsv GENERATED column, GIN indexes, pg_trgm when available.
 func ensureSearchSchema(gdb *gorm.DB) error {
 	stmts := []string{
-		`ALTER TABLE canvas_documents ADD COLUMN IF NOT EXISTS content_text TEXT NOT NULL DEFAULT ''`,
-		`ALTER TABLE canvas_documents ADD COLUMN IF NOT EXISTS notes TEXT`,
+		`ALTER TABLE kb_documents ADD COLUMN IF NOT EXISTS content_text TEXT NOT NULL DEFAULT ''`,
+		`ALTER TABLE kb_documents ADD COLUMN IF NOT EXISTS notes TEXT`,
 		`CREATE EXTENSION IF NOT EXISTS pg_trgm`,
 	}
 	for _, s := range stmts {
@@ -156,11 +194,11 @@ func ensureSearchSchema(gdb *gorm.DB) error {
 	_ = gdb.Raw(`
 SELECT EXISTS (
   SELECT 1 FROM information_schema.columns
-  WHERE table_name = 'canvas_documents' AND column_name = 'content_tsv'
+  WHERE table_name = 'kb_documents' AND column_name = 'content_tsv'
 )`).Scan(&hasTSV).Error
 	if !hasTSV {
 		if err := gdb.Exec(`
-ALTER TABLE canvas_documents
+ALTER TABLE kb_documents
   ADD COLUMN content_tsv tsvector
   GENERATED ALWAYS AS (to_tsvector('simple', coalesce(content_text, ''))) STORED
 `).Error; err != nil {
@@ -168,10 +206,10 @@ ALTER TABLE canvas_documents
 		}
 	}
 	indexStmts := []string{
-		`CREATE INDEX IF NOT EXISTS idx_docs_content_tsv ON canvas_documents USING GIN (content_tsv)`,
-		`CREATE INDEX IF NOT EXISTS idx_docs_content_trgm ON canvas_documents USING GIN (content_text gin_trgm_ops)`,
-		`CREATE INDEX IF NOT EXISTS idx_blocks_document_panel ON canvas_content_blocks (document_id, panel_id)`,
-		`CREATE INDEX IF NOT EXISTS idx_blocks_text_trgm ON canvas_content_blocks USING GIN (text_content gin_trgm_ops)`,
+		`CREATE INDEX IF NOT EXISTS idx_docs_content_tsv ON kb_documents USING GIN (content_tsv)`,
+		`CREATE INDEX IF NOT EXISTS idx_docs_content_trgm ON kb_documents USING GIN (content_text gin_trgm_ops)`,
+		`CREATE INDEX IF NOT EXISTS idx_blocks_document_panel ON kb_content_blocks (document_id, panel_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_blocks_text_trgm ON kb_content_blocks USING GIN (text_content gin_trgm_ops)`,
 	}
 	for _, s := range indexStmts {
 		if err := gdb.Exec(s).Error; err != nil {
@@ -185,13 +223,13 @@ ALTER TABLE canvas_documents
 // Partial indexes keep archived rows out of the common updated_at ordering.
 func ensureQueryIndexes(gdb *gorm.DB) error {
 	stmts := []string{
-		`CREATE INDEX IF NOT EXISTS idx_docs_owner_updated ON canvas_documents (owner_user_id, updated_at DESC)`,
-		`CREATE INDEX IF NOT EXISTS idx_docs_owner_active_updated ON canvas_documents (owner_user_id, updated_at DESC) WHERE deleted_at IS NULL`,
-		`CREATE INDEX IF NOT EXISTS idx_docs_owner_archived ON canvas_documents (owner_user_id, updated_at DESC) WHERE deleted_at IS NOT NULL`,
+		`CREATE INDEX IF NOT EXISTS idx_docs_owner_updated ON kb_documents (owner_user_id, updated_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_docs_owner_active_updated ON kb_documents (owner_user_id, updated_at DESC) WHERE deleted_at IS NULL`,
+		`CREATE INDEX IF NOT EXISTS idx_docs_owner_archived ON kb_documents (owner_user_id, updated_at DESC) WHERE deleted_at IS NOT NULL`,
 		// keyset 排序包含 id 决胜键；索引保持完全同序，深页翻页不需要额外排序或 offset 扫描。
-		`CREATE INDEX IF NOT EXISTS idx_docs_owner_keyset ON canvas_documents (owner_user_id, updated_at DESC, id ASC)`,
-		`CREATE INDEX IF NOT EXISTS idx_revisions_doc_created ON canvas_revisions (document_id, created_at DESC)`,
-		`CREATE INDEX IF NOT EXISTS idx_revisions_doc_keyset ON canvas_revisions (document_id, created_at DESC, id ASC)`,
+		`CREATE INDEX IF NOT EXISTS idx_docs_owner_keyset ON kb_documents (owner_user_id, updated_at DESC, id ASC)`,
+		`CREATE INDEX IF NOT EXISTS idx_revisions_doc_created ON kb_revisions (document_id, created_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_revisions_doc_keyset ON kb_revisions (document_id, created_at DESC, id ASC)`,
 	}
 	for _, stmt := range stmts {
 		if err := gdb.Exec(stmt).Error; err != nil {
@@ -204,9 +242,9 @@ func ensureQueryIndexes(gdb *gorm.DB) error {
 // backfillKnowledgeAuthors 回填存量目录节点的作者：旧数据没有 created_by，
 // 作者维度检索与图谱归属会失效。
 func backfillKnowledgeAuthors(gdb *gorm.DB) error {
-	return gdb.Exec(`UPDATE knowledge_nodes n
+	return gdb.Exec(`UPDATE kb_nodes n
   SET created_by = p.owner_user_id
-  FROM projects p
+  FROM core_projects p
   WHERE n.project_id = p.id AND n.created_by IS NULL`).Error
 }
 
@@ -215,4 +253,28 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+// ensureBaseEngineIndexes 给 Base Engine 补查询投影与事件表的索引。
+//
+// 记录主数据在 JSONB，筛选与排序走类型化投影表（base_record_values），
+// 因此这里为投影表的「字段 + 值」建复合索引，让动态字段的排序与范围筛选可控。
+func ensureBaseEngineIndexes(gdb *gorm.DB) error {
+	stmts := []string{
+		`CREATE INDEX IF NOT EXISTS idx_base_record_table ON base_records (table_id, id) WHERE deleted_at IS NULL`,
+		`CREATE INDEX IF NOT EXISTS idx_base_record_data_gin ON base_records USING GIN (data jsonb_path_ops)`,
+		`CREATE INDEX IF NOT EXISTS idx_base_record_updated ON base_records (table_id, updated_at DESC) WHERE deleted_at IS NULL`,
+		`CREATE INDEX IF NOT EXISTS idx_base_value_number ON base_record_values (table_id, field_id, value_number, record_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_base_value_text ON base_record_values (table_id, field_id, value_text, record_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_base_value_date ON base_record_values (table_id, field_id, value_date, record_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_base_value_record ON base_record_values (record_id, field_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_base_outbox_pending ON base_event_outboxes (status, created_at)`,
+		`CREATE INDEX IF NOT EXISTS idx_base_audit_base ON base_operation_logs (base_id, created_at DESC)`,
+	}
+	for _, stmt := range stmts {
+		if err := gdb.Exec(stmt).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }

@@ -22,7 +22,7 @@ type knowledgeNodeDataSQLite struct {
 	UpdatedAt time.Time      `gorm:"not null"`
 }
 
-func (knowledgeNodeDataSQLite) TableName() string { return "knowledge_node_data" }
+func (knowledgeNodeDataSQLite) TableName() string { return "kb_node_data" }
 
 type knowledgeShareSQLite struct {
 	ID           uuid.UUID  `gorm:"type:uuid;primaryKey"`
@@ -40,7 +40,7 @@ type knowledgeShareSQLite struct {
 	CreatedAt    time.Time  `gorm:"not null"`
 }
 
-func (knowledgeShareSQLite) TableName() string { return "knowledge_shares" }
+func (knowledgeShareSQLite) TableName() string { return "kb_shares" }
 
 type knowledgeDocVersionSQLite struct {
 	ID           uuid.UUID `gorm:"type:uuid;primaryKey"`
@@ -53,7 +53,7 @@ type knowledgeDocVersionSQLite struct {
 	CreatedAt    time.Time `gorm:"not null;index"`
 }
 
-func (knowledgeDocVersionSQLite) TableName() string { return "knowledge_doc_versions" }
+func (knowledgeDocVersionSQLite) TableName() string { return "kb_doc_versions" }
 
 func openKnowledgeV3SQLite(t *testing.T) (*gorm.DB, uuid.UUID, *model.Project, *KnowledgeService) {
 	t.Helper()
