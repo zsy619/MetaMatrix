@@ -63,6 +63,9 @@ type CollabService struct {
 	derivedDelay  time.Duration
 	derivedMu     sync.Mutex
 	derivedTimers map[uuid.UUID]*derivedWork
+	// compactLimit 是 FlushDerived 后触发压缩的操作条数阈值。
+	// 0 使用默认 200；-1 禁用自动压缩。CompactOperations 本身不受此限制。
+	compactLimit int
 }
 
 // NewCollabService 构造协同服务。presence 必须与知识库共用同一实例，避免两套在线状态。
@@ -298,7 +301,10 @@ func (s *CollabService) FlushDerived(docID uuid.UUID) error {
 		delete(s.derivedTimers, docID)
 	}
 	s.derivedMu.Unlock()
-	return s.materializeDerived(docID, actorID)
+	if err := s.materializeDerived(docID, actorID); err != nil {
+		return err
+	}
+	return s.maybeCompactOperations(docID)
 }
 
 func (s *CollabService) scheduleDerived(docID, actorID uuid.UUID) {
@@ -326,6 +332,10 @@ func (s *CollabService) scheduleDerived(docID, actorID uuid.UUID) {
 			s.derivedMu.Unlock()
 			if err := s.materializeDerived(docID, actor); err != nil {
 				log.Printf("collab derived materialize %s: %v", docID, err)
+				return
+			}
+			if err := s.maybeCompactOperations(docID); err != nil {
+				log.Printf("collab compact operations %s: %v", docID, err)
 			}
 		}),
 	}
