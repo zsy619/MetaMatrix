@@ -131,7 +131,12 @@ function inlineMd(el: HTMLElement): string {
     }
     else if (tag === 'a') {
       const href = e.getAttribute('href') || ''
-      out += `[${inlineMd(e)}](${href})`
+      if (/^\s*(javascript|data|vbscript):/i.test(href)) out += inlineMd(e)
+      else out += `[${inlineMd(e)}](${href})`
+    } else if (tag === 'img') {
+      out += imageMarkdown(e).trim()
+    } else if (tag === 'del' || tag === 's' || tag === 'strike') {
+      out += `~~${inlineMd(e)}~~`
     } else if (tag === 'br') out += '  \n'
     else if (tag === 'mark') out += `==${inlineMd(e)}==`
     else out += inlineMd(e)

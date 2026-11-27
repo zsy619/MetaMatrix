@@ -610,7 +610,9 @@ function parseList(lines: string[], start: number, ctx: Ctx): ListResult {
   }
 
   const tag = ordered ? 'ol' : 'ul'
-  return { html: `<${tag}>${items.join('')}</${tag}>`, next: i }
+  const allTasks = !ordered && items.length > 0 && items.every((item) => item.includes('data-type="taskItem"'))
+  const attrs = allTasks ? ' data-type="taskList"' : ''
+  return { html: `<${tag}${attrs}>${items.join('')}</${tag}>`, next: i }
 }
 
 /**
