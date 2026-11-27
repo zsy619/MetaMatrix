@@ -53,12 +53,23 @@ function hasBlockIds(html: string): boolean {
   return /data-block-id\s*=\s*["'][^"']+["']/i.test(html)
 }
 
+function readBlockIdFromElement(el: Element): string {
+  const own = (el.getAttribute('data-block-id') || '').trim()
+  if (own) return own
+  // 顶层是 callout / 引用等包装时，若内部恰好一个稳定块 ID，用该 ID 对照，仍保留外包 HTML。
+  const ids = [...el.querySelectorAll('[data-block-id]')]
+    .map((node) => (node.getAttribute('data-block-id') || '').trim())
+    .filter(Boolean)
+  const unique = [...new Set(ids)]
+  return unique.length === 1 ? unique[0]! : ''
+}
+
 function topLevelBlocks(html: string): { id: string; html: string }[] {
   if (typeof document === 'undefined' || !document.createElement) return [{ id: '', html }]
   const root = document.createElement('div')
   root.innerHTML = html
   return [...root.children].map((el) => ({
-    id: (el.getAttribute('data-block-id') || '').trim(),
+    id: readBlockIdFromElement(el),
     html: el.outerHTML,
   }))
 }
