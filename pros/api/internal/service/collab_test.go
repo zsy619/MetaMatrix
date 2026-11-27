@@ -401,3 +401,93 @@ func TestCollabAppendWithoutHTMLDoesNotScheduleExtract(t *testing.T) {
 		t.Fatalf("extract wiped content_text")
 	}
 }
+
+func TestInspectDualWriteReportsOpsAheadAndRecovered(t *testing.T) {
+	db := openCollabSQLite(t)
+	docs := NewDocumentsService(db)
+	svc, ownerID, _, _ := newCollabFixture(t, db)
+	title := "双写校验"
+	canvasType := DocCanvasType
+	doc, err := docs.Create(ownerID, CreateDocumentInput{
+		Title:      &title,
+		CanvasType: &canvasType,
+		Data:       json.RawMessage(`{"type":"doc","html":"<p>初稿</p>"}`),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	before, err := svc.InspectDualWrite(doc.ID)
+	if err != nil {
+		t.Fatalf("inspect empty: %v", err)
+	}
+	if !before.Consistent || before.Reason != "no_ops" {
+		t.Fatalf("empty report = %+v, want consistent no_ops", before)
+	}
+
+	if _, err := svc.Append(ownerID, doc.ID, ownerID, CollabOperationInput{Payload: []byte{0x01}}); err != nil {
+		t.Fatal(err)
+	}
+	ahead, err := svc.InspectDualWrite(doc.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ahead.Consistent || ahead.Reason != "ops_ahead_of_current_data" || ahead.OpsWithoutHTML != 1 {
+		t.Fatalf("ahead report = %+v", ahead)
+	}
+
+	html := `<p data-block-id="33333333-3333-4333-8333-333333333333">双写正文</p>`
+	if _, err := svc.Append(ownerID, doc.ID, ownerID, CollabOperationInput{Payload: []byte{0x02}, HTML: html}); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.FlushDerived(doc.ID); err != nil {
+		t.Fatal(err)
+	}
+	// 后续带 HTML 的双写已追上 current_data；历史裸增量不再算「落后」。保存仍是双写。
+	still, err := svc.InspectDualWrite(doc.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !still.Consistent || still.Reason != "dual_write_in_sync" || still.OpsWithoutHTML != 0 {
+		t.Fatalf("after later html dual-write, report = %+v, want dual_write_in_sync", still)
+	}
+	if !still.HasCurrentHTML || still.LastHTMLSaveVersion == 0 {
+		t.Fatalf("expected current_data html after dual write: %+v", still)
+	}
+	if !still.HeadMatchesCurrent {
+		t.Fatalf("head should match current_data after flush: %+v", still)
+	}
+}
+
+func TestInspectDualWriteInSyncAfterHTMLOnly(t *testing.T) {
+	db := openCollabSQLite(t)
+	docs := NewDocumentsService(db)
+	svc, ownerID, _, _ := newCollabFixture(t, db)
+	title := "双写一致"
+	canvasType := DocCanvasType
+	doc, err := docs.Create(ownerID, CreateDocumentInput{
+		Title:      &title,
+		CanvasType: &canvasType,
+		Data:       json.RawMessage(`{"type":"doc","html":"<p>初稿</p>"}`),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	html := `<p data-block-id="44444444-4444-4444-8444-444444444444">一致正文</p>`
+	if _, err := svc.Append(ownerID, doc.ID, ownerID, CollabOperationInput{Payload: []byte{0x11}, HTML: html}); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.FlushDerived(doc.ID); err != nil {
+		t.Fatal(err)
+	}
+	got, err := svc.InspectDualWrite(doc.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.Consistent || got.Reason != "dual_write_in_sync" || got.OpsWithoutHTML != 0 {
+		t.Fatalf("report = %+v, want dual_write_in_sync", got)
+	}
+	if !got.HasCurrentHTML || !got.HeadMatchesCurrent {
+		t.Fatalf("expected html and matching head: %+v", got)
+	}
+}
