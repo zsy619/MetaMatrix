@@ -15,6 +15,7 @@ import {
   removeDatabaseRow,
   setDatabaseFilterJoin,
   setDatabaseFilters,
+  setDatabaseSort,
   setDatabaseViewType,
   type DatabaseBlockPayload,
   type DatabaseBlockViewType,
@@ -41,6 +42,7 @@ declare module '@tiptap/core' {
       setDatabaseBlockView: (type: DatabaseBlockViewType) => ReturnType
       setDatabaseBlockFilters: (filters: SheetFilter[]) => ReturnType
       setDatabaseBlockFilterJoin: (join: 'and' | 'or') => ReturnType
+      setDatabaseBlockSort: (fieldId: string | null, order?: 'asc' | 'desc') => ReturnType
       importDatabaseBlockSheet: (sheet: SheetData) => ReturnType
       addDatabaseBlockRow: () => ReturnType
       removeDatabaseBlockRow: (rowId: string) => ReturnType
@@ -215,6 +217,19 @@ export const DatabaseBlock = Node.create({
           const node = state.doc.nodeAt(pos)
           if (!node || node.type.name !== DATABASE_BLOCK_NAME) return false
           const next = attrsFromPayload(setDatabaseFilterJoin(payloadFromAttrs(node.attrs), join))
+          if (dispatch) {
+            dispatch(tr.setNodeMarkup(pos, undefined, { ...node.attrs, ...next }))
+          }
+          return true
+        },
+      setDatabaseBlockSort:
+        (fieldId, order = 'asc') =>
+        ({ state, tr, dispatch }) => {
+          const pos = currentDatabasePos(state)
+          if (pos == null) return false
+          const node = state.doc.nodeAt(pos)
+          if (!node || node.type.name !== DATABASE_BLOCK_NAME) return false
+          const next = attrsFromPayload(setDatabaseSort(payloadFromAttrs(node.attrs), fieldId, order))
           if (dispatch) {
             dispatch(tr.setNodeMarkup(pos, undefined, { ...node.attrs, ...next }))
           }

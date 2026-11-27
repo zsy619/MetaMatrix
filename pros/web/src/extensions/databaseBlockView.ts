@@ -20,6 +20,7 @@ import {
   removeDatabaseRow,
   setDatabaseFilterJoin,
   setDatabaseFilters,
+  setDatabaseSort,
   setDatabaseViewType,
   type DatabaseBlockPayload,
   type DatabaseBlockViewType,
@@ -182,8 +183,25 @@ export function createDatabaseBlockView({ node, getPos, editor }: NodeViewRender
       table.className = 'rte-database-block__grid'
       const thead = document.createElement('thead')
       const hr = document.createElement('tr')
+      const view = activeDatabaseView(payload)
       for (const col of payload.sheet.fields) {
-        hr.append(el('th', '', col.name))
+        const th = document.createElement('th')
+        const btn = document.createElement('button')
+        btn.type = 'button'
+        btn.className = 'rte-database-block__sort'
+        const mark = view.sortBy === col.id ? (view.sortOrder === 'desc' ? ' ↓' : ' ↑') : ''
+        btn.textContent = `${col.name}${mark}`
+        btn.disabled = !editable
+        if (view.sortBy === col.id) btn.setAttribute('aria-sort', view.sortOrder === 'desc' ? 'descending' : 'ascending')
+        btn.addEventListener('click', (event) => {
+          event.preventDefault()
+          event.stopPropagation()
+          if (view.sortBy !== col.id) writePayload(setDatabaseSort(payload, col.id, 'asc'))
+          else if (view.sortOrder === 'asc') writePayload(setDatabaseSort(payload, col.id, 'desc'))
+          else writePayload(setDatabaseSort(payload, null))
+        })
+        th.append(btn)
+        hr.append(th)
       }
       hr.append(el('th', '', ''))
       thead.append(hr)

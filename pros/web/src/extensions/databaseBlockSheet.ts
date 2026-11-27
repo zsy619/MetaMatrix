@@ -6,6 +6,7 @@ import {
   FILTER_OPS,
   filterRows,
   groupRows,
+  sortRows,
   migrateSheet,
   type SheetData,
   type SheetField,
@@ -154,9 +155,22 @@ export function databaseFilterJoin(payload: DatabaseBlockPayload): DatabaseFilte
   return join === 'or' ? 'or' : 'and'
 }
 
+export function setDatabaseSort(
+  payload: DatabaseBlockPayload,
+  fieldId: string | null,
+  order: 'asc' | 'desc' = 'asc',
+): DatabaseBlockPayload {
+  const sheet = cloneSheet(payload.sheet)
+  const view = sheet.views.find((item) => item.id === payload.activeViewId) ?? sheet.views[0]!
+  view.sortBy = fieldId
+  view.sortOrder = fieldId ? order : 'asc'
+  return { sheet, activeViewId: view.id }
+}
+
 export function visibleDatabaseRows(payload: DatabaseBlockPayload): SheetRow[] {
   const view = activeDatabaseView(payload)
-  return filterRows(payload.sheet.rows, view.filters || [], '', databaseFilterJoin(payload))
+  const filtered = filterRows(payload.sheet.rows, view.filters || [], '', databaseFilterJoin(payload))
+  return sortRows(filtered, view.sortBy, view.sortOrder)
 }
 
 export function databaseGroups(payload: DatabaseBlockPayload) {

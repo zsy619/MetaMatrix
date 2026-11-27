@@ -4066,6 +4066,17 @@ input.rte-timeline-title:focus {
   padding: 4px;
   text-align: left;
 }
+.rte-database-block__sort {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.rte-database-block__sort:disabled {
+  cursor: default;
+}
 .rte-database-block__board {
   display: flex;
   gap: 8px;

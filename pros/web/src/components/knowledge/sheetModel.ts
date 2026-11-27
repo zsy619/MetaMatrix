@@ -665,6 +665,6 @@ function csvCell(value: string): string {
 
 /** 按视图的筛选与排序得到行集合。 */
 export function viewRows(data: SheetData, view: SheetView): SheetRow[] {
-  const filtered = filterRows(data.rows, view.filters, '')
+  const filtered = filterRows(data.rows, view.filters, '', view.filterJoin === 'or' ? 'or' : 'and')
   return sortRows(filtered, view.sortBy, view.sortOrder)
 }

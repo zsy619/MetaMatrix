@@ -325,3 +325,24 @@ describe('databaseBlock 增删行', () => {
     expect(restored.sheet.rows.map((row) => row.id)).not.toContain(drop)
   })
 })
+
+describe('databaseBlock 列排序', () => {
+  it('按字段升序后刷新仍保持顺序', () => {
+    const ed = mount()
+    ed.commands.insertDatabaseBlock({ title: '表' })
+    const id = readBlockId(databaseNodes(ed)[0]!.node)
+    const payload = payloadFromAttrs(databaseNodes(ed)[0]!.node.attrs)
+    const name = payload.sheet.fields[0]!
+    expect(visibleDatabaseRows(payload).map((row) => row.cells[name.id])).toEqual(['示例任务', '另一项'])
+    expect(ed.commands.setDatabaseBlockSort(name.id, 'asc')).toBe(true)
+    const sorted = payloadFromAttrs(databaseNodes(ed)[0]!.node.attrs)
+    expect(sorted.sheet.views.find((view) => view.id === sorted.activeViewId)?.sortBy).toBe(name.id)
+    expect(visibleDatabaseRows(sorted).map((row) => row.cells[name.id])).toEqual(['另一项', '示例任务'])
+    const again = mount(ed.getHTML())
+    expect(readBlockId(databaseNodes(again)[0]!.node)).toBe(id)
+    const restored = payloadFromAttrs(databaseNodes(again)[0]!.node.attrs)
+    expect(restored.sheet.views.find((view) => view.id === restored.activeViewId)?.sortBy).toBe(name.id)
+    expect(visibleDatabaseRows(restored).map((row) => row.cells[name.id])).toEqual(['另一项', '示例任务'])
+  })
+})
+
