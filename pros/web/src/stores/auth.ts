@@ -51,6 +51,31 @@ export const useAuthStore = defineStore('auth', () => {
   const isAuthenticated = computed(() => Boolean(token.value))
 
   /**
+   * 当前登录用户 ID。
+   *
+   * 优先用缓存的 user 对象；但缓存可能缺失（清了 localStorage 的 user、
+   * 或者接口刷新失败），这时退回解析 JWT 里的 uid / sub ——
+   * 拿不到用户 ID 的功能（比如「视图个人偏好」）会静默退化成共享配置，
+   * 属于「保存到了别的地方」这种很难自查的问题，所以这里给足兜底。
+   */
+  const currentUserId = computed(() => {
+    if (user.value?.id) return user.value.id
+    const raw = token.value
+    if (!raw) return ''
+    try {
+      const part = raw.split('.')[1]
+      if (!part) return ''
+      // base64url → base64，并补齐 padding（atob 对缺失的 '=' 会直接抛错）。
+      const normalized = part.replace(/-/g, '+').replace(/_/g, '/')
+      const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4)
+      const payload = JSON.parse(atob(padded)) as { uid?: string; sub?: string }
+      return payload.uid ?? payload.sub ?? ''
+    } catch {
+      return ''
+    }
+  })
+
+  /**
    * 解析 JWT 里的 exp 字段（秒级时间戳），返回毫秒时间戳。
    * 解析不出来返回 null，表示"看不懂这个 token 的有效期"。
    */
@@ -318,6 +343,7 @@ export const useAuthStore = defineStore('auth', () => {
     loading,
     error,
     isAuthenticated,
+    currentUserId,
     hasUsableSession,
     register,
     login,

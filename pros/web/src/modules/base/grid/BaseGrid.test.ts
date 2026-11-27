@@ -33,6 +33,10 @@ const stubs = {
   'el-icon': { template: '<i class="ic"><slot /></i>' },
   'el-checkbox': { template: '<span />' },
   'el-button': { template: '<button><slot /></button>' },
+  // popover 在 happy-dom 下不渲染，替身把 reference 与内容都渲染出来
+  'el-popover': {
+    template: '<div><slot name="reference" /><slot /></div>',
+  },
 }
 
 describe('网格列头', () => {
@@ -49,15 +53,25 @@ describe('网格列头', () => {
     }
   })
 
-  it('列头图标按字段类型着色', () => {
+  it('列头图标不再行内着色，改用类型提示（飞书：灰色图标）', () => {
     const wrapper = mount(BaseGrid, {
       props: { fields: FIELDS, rows: ROWS },
       global: { stubs, directives: { loading: {} } },
     })
-    const colors = wrapper.findAll('.base-grid__head-icon').map((el) => el.attributes('style'))
-    expect(colors.length).toBe(FIELDS.length)
-    for (const style of colors) {
-      expect(style).toMatch(/color:\s*#/)
+    const icons = wrapper.findAll('.base-grid__head-icon')
+    expect(icons.length).toBe(FIELDS.length)
+    for (const icon of icons) {
+      // 颜色改由 feishu.css 的 `--fs-text-3` 统一承担，不再写行内 color
+      expect(icon.attributes('style')).toBeUndefined()
+      expect(icon.attributes('title')).toMatch(/字段类型：/)
     }
+  })
+
+  it('列头带列操作入口（飞书：hover 出现的 ▾）', () => {
+    const wrapper = mount(BaseGrid, {
+      props: { fields: FIELDS, rows: ROWS },
+      global: { stubs, directives: { loading: {} } },
+    })
+    expect(wrapper.findAll('.be-colmenu__trigger').length).toBe(FIELDS.length)
   })
 })

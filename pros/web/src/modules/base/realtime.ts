@@ -25,6 +25,13 @@ export type RealtimeOptions = {
   projectId: string
   onEvent: (event: BaseEvent) => void
   onStatus?: (status: 'connecting' | 'open' | 'closed') => void
+  /**
+   * 断线重连成功后回调。
+   *
+   * 补拉（Last-Event-ID）只保证「不漏事件」，不保证「本地状态是最新的」，
+   * 所以重连后还要让上层做一次全量刷新。
+   */
+  onResync?: () => void
 }
 
 export class BaseRealtime {
@@ -32,6 +39,10 @@ export class BaseRealtime {
   private timer: ReturnType<typeof setTimeout> | null = null
   private stopped = false
   private options: RealtimeOptions
+  /** 最后收到的事件 ID：重连时作为 Last-Event-ID 交给服务端补拉。 */
+  private lastEventId = ''
+  /** 是否已经连过一次：用于区分「首次连接」与「断线重连」。 */
+  private everConnected = false
 
   constructor(options: RealtimeOptions) {
     this.options = options
@@ -67,10 +78,19 @@ export class BaseRealtime {
     }
     this.controller = new AbortController()
     this.options.onStatus?.('connecting')
+    const isReconnect = this.everConnected
     try {
       // SSE 走原生 fetch（EventSource 不支持请求头），路径需带 API 前缀。
+      // 重连时带上 Last-Event-ID，服务端把断线期间错过的事件补发。
+      const headers: Record<string, string> = {
+        Authorization: `Bearer ${token}`,
+        Accept: 'text/event-stream',
+      }
+      if (isReconnect && this.lastEventId) {
+        headers['Last-Event-ID'] = this.lastEventId
+      }
       const res = await fetch(`/api/projects/${this.options.projectId}/base/events`, {
-        headers: { Authorization: `Bearer ${token}`, Accept: 'text/event-stream' },
+        headers,
         signal: this.controller.signal,
       })
       if (!res.ok || !res.body) {
@@ -78,6 +98,11 @@ export class BaseRealtime {
         return
       }
       this.options.onStatus?.('open')
+      if (isReconnect) {
+        // 补拉只保证不漏事件；重连成功后仍要全量刷新一次（数据可能已被别人改过）。
+        this.options.onResync?.()
+      }
+      this.everConnected = true
       const reader = res.body.getReader()
       const decoder = new TextDecoder()
       let buffer = ''
@@ -90,7 +115,10 @@ export class BaseRealtime {
           const chunk = buffer.slice(0, index)
           buffer = buffer.slice(index + 2)
           const event = parseEvent(chunk)
-          if (event) this.options.onEvent(event)
+          if (event) {
+            if (event.eventId) this.lastEventId = event.eventId
+            this.options.onEvent(event)
+          }
           index = buffer.indexOf('\n\n')
         }
       }

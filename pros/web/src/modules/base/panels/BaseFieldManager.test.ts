@@ -52,6 +52,7 @@ function mountPanel(props: { fields?: FieldMeta[] } = {}) {
   return mount(BaseFieldManager, {
     props: {
       projectId: 'p1',
+      baseId: 'b1',
       tableId: 't1',
       fields: props.fields ?? FIELDS,
       definitions: DEFINITIONS,
