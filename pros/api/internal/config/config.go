@@ -44,6 +44,10 @@ type Config struct {
 	BaseRateLimitRPS int
 	// BaseRateLimitBurst 是多维表格接口允许的突发请求数。
 	BaseRateLimitBurst int
+	// RedisURL 是可选的 Redis 地址，用于跨实例 presence / 光标广播。
+	// 留空或连不上时降级为同实例（内存+kb_presence），服务仍启动。
+	// Redis 不是文档或 Yjs 持久化。
+	RedisURL string
 }
 
 // AIConfig describes the external model endpoint.
@@ -166,6 +170,7 @@ func Load() Config {
 		FeishuBlockID:          os.Getenv("FEISHU_DOC_BLOCK_ID"),
 		BaseRateLimitRPS:       intEnv("BASE_RATE_LIMIT_RPS", 40),
 		BaseRateLimitBurst:     intEnv("BASE_RATE_LIMIT_BURST", 80),
+		RedisURL:               firstNonEmpty(os.Getenv("REDIS_URL"), os.Getenv("PRESENCE_REDIS_URL")),
 		Mail:                   loadMailConfig(),
 		PasswordReset:          loadPasswordResetConfig(),
 		KnowledgeTrashKeepDays: intEnv("KNOWLEDGE_TRASH_KEEP_DAYS", 30),
@@ -319,4 +324,13 @@ func durationEnv(key string, fallback time.Duration) time.Duration {
 		return fallback
 	}
 	return d
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, v := range values {
+		if s := strings.TrimSpace(v); s != "" {
+			return s
+		}
+	}
+	return ""
 }

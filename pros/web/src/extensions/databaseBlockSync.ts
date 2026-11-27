@@ -120,11 +120,36 @@ function writeSyncedFp(editor: DatabaseBlockSyncEditor, pos: number, fp: string)
   editor.view.dispatch(editor.state.tr.setNodeMarkup(pos, undefined, { ...node.attrs, syncedFp: fp }))
 }
 
+const MAX_SHEET_SYNC_RETRIES = 3
+
 export async function syncLinkedDatabaseBlock(
   editor: DatabaseBlockSyncEditor,
   projectId: string,
   detail: DatabaseBlockSyncDetail,
   io: DatabaseBlockSyncIo,
+): Promise<DatabaseBlockSyncResult> {
+  return syncLinkedDatabaseBlockAttempt(editor, projectId, detail, io, 0)
+}
+
+async function treeFingerprintOrThrow(
+  projectId: string,
+  sheetNodeId: string,
+  io: DatabaseBlockSyncIo,
+): Promise<{ tree: ReturnType<typeof migrateSheet>; fingerprint: string; kindError: boolean }> {
+  const remote = await io.load(projectId, sheetNodeId)
+  if (remote.kind && remote.kind !== 'sheet') {
+    return { tree: migrateSheet({}), fingerprint: '', kindError: true }
+  }
+  const tree = migrateSheet(remote.data)
+  return { tree, fingerprint: sheetContentFingerprint(tree), kindError: false }
+}
+
+async function syncLinkedDatabaseBlockAttempt(
+  editor: DatabaseBlockSyncEditor,
+  projectId: string,
+  detail: DatabaseBlockSyncDetail,
+  io: DatabaseBlockSyncIo,
+  attempt: number,
 ): Promise<DatabaseBlockSyncResult> {
   const sheetNodeId = (detail.sheetNodeId || '').trim()
   if (!sheetNodeId) throw new Error('未关联知识库表格')
@@ -147,6 +172,15 @@ export async function syncLinkedDatabaseBlock(
     if (!merged) {
       recordStatus(readBlockId(node as never) || String(node.attrs.dataBlockId || ''), sheetNodeId, drift, conflict)
       return { action: 'aborted', droppedFilters: 0, diverged, drift, ...(conflict ? { conflict } : {}) }
+    }
+    const stale = await treeFingerprintOrThrow(projectId, sheetNodeId, io)
+    if (stale.kindError) throw new Error('关联节点不是多维表格')
+    if (stale.fingerprint !== sheetContentFingerprint(tree)) {
+      if (attempt + 1 >= MAX_SHEET_SYNC_RETRIES) {
+        recordStatus(readBlockId(node as never) || String(node.attrs.dataBlockId || ''), sheetNodeId, drift, conflict)
+        return { action: 'aborted', droppedFilters: 0, diverged, drift, ...(conflict ? { conflict } : {}) }
+      }
+      return syncLinkedDatabaseBlockAttempt(editor, projectId, detail, io, attempt + 1)
     }
     const before = countViewFilters(local)
     const tr = editor.state.tr.setSelection(NodeSelection.create(editor.state.doc as never, detail.pos))
@@ -181,6 +215,15 @@ export async function syncLinkedDatabaseBlock(
     writeSyncedFp(editor, detail.pos, sheetContentFingerprint(tree))
     recordStatus(readBlockId(node as never) || String(node.attrs.dataBlockId || ''), sheetNodeId, 'in-sync')
     return { action: 'pulled', droppedFilters: Math.max(0, before - after), diverged, drift }
+  }
+  const stalePush = await treeFingerprintOrThrow(projectId, sheetNodeId, io)
+  if (stalePush.kindError) throw new Error('关联节点不是多维表格')
+  if (stalePush.fingerprint !== sheetContentFingerprint(tree)) {
+    if (attempt + 1 >= MAX_SHEET_SYNC_RETRIES) {
+      recordStatus(readBlockId(node as never) || String(node.attrs.dataBlockId || ''), sheetNodeId, drift, conflict)
+      return { action: 'aborted', droppedFilters: 0, diverged, drift, ...(conflict ? { conflict } : {}) }
+    }
+    return syncLinkedDatabaseBlockAttempt(editor, projectId, detail, io, attempt + 1)
   }
   const next = pushSheetFromPayload(payloadFromAttrs(node.attrs as { sheet?: string; viewType?: string }), tree)
   await io.save(projectId, sheetNodeId, 'sheet', next)
@@ -237,7 +280,7 @@ function currentLinkedBlockPos(editor: DatabaseBlockSyncEditor, item: Pick<Datab
   return null
 }
 
-/** 对照后自动处理单边改动：树上有更新则拉取，仅内嵌改过则写回。两边都改过时，不相交的字段/行/单元格会合并到两边；相交冲突或尚未对照仍不覆盖。不是实时双向同步。 */
+/** 对照后自动处理单边改动：树上有更新则拉取，仅内嵌改过则写回。两边都改过时，不相交的字段/行/单元格会合并到两边；写回前若树上又有新快照则重新对照，避免盲覆盖。相交冲突或尚未对照仍不覆盖。仍不是 CRDT 实时双向同步。 */
 export async function applySafeLinkedDatabaseBlocks(
   editor: DatabaseBlockSyncEditor,
   projectId: string,

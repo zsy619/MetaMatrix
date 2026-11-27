@@ -67,7 +67,8 @@ import { readBlockId } from '../../extensions/blockIdentity'
 import { setBlockPermissionGuardState } from '../../extensions/blockPermissionGuard'
 import { canEditBlockContent } from './blockPermission'
 import { DATABASE_BLOCK_SYNC_EVENT, type DatabaseBlockSyncDetail } from '../../extensions/databaseBlockEvents'
-import { applySafeLinkedDatabaseBlocks, probeLinkedDatabaseBlocks, syncLinkedDatabaseBlock } from '../../extensions/databaseBlockSync'
+import { syncLinkedDatabaseBlock, type DatabaseBlockSafeSyncSummary } from '../../extensions/databaseBlockSync'
+import { createLiveLinkedDatabaseSync, transactionTouchesLinkedSheet, type LiveLinkedDatabaseSync } from '../../extensions/databaseBlockLiveSync'
 import { describeSheetContentConflict } from '../../extensions/databaseBlockSheet'
 import { resolveConflictHtml, type BlockConflictChoice, type SaveConflictChoice } from './saveConflict'
 
@@ -158,7 +159,8 @@ const tasks = ref<knowledgeApiV5.DocTask[]>([])
 /** 正文标题层级（051 目录块 / 046 大纲）。 */
 const outlineItems = ref<knowledgeApiV5.OutlineItem[]>([])
 let presenceTimer: ReturnType<typeof setInterval> | null = null
-let sheetProbeTimer: ReturnType<typeof setInterval> | null = null
+let liveSheetSync: LiveLinkedDatabaseSync | null = null
+let boundLiveSheetEditor: { on?: (ev: string, fn: (payload: { transaction: { docChanged?: boolean; before?: unknown; doc?: unknown } }) => void) => void; off?: (ev: string, fn: (payload: { transaction: { docChanged?: boolean; before?: unknown; doc?: unknown } }) => void) => void } | null = null
 
 function editorForSheetSync() {
   const inst = editorRef.value as unknown as {
@@ -171,33 +173,58 @@ function onWindowFocusProbe() {
   void probeLinkedSheets()
 }
 
-let sheetProbeInFlight = false
+function describeSafeSyncToast(summary: DatabaseBlockSafeSyncSummary): string | null {
+  if (!summary.pulled && !summary.pushed && !summary.merged) return null
+  const parts: string[] = []
+  if (summary.pulled) parts.push(`已自动拉取 ${summary.pulled} 张树上有更新的表`)
+  if (summary.pushed) parts.push(`已自动写回 ${summary.pushed} 张仅内嵌改过的表`)
+  if (summary.merged) parts.push(`已自动合并 ${summary.merged} 张不相交改动的表`)
+  return `${parts.join('，')}。相交冲突仍需确认，不是实时双向同步。`
+}
+
+function onEditorSheetTransaction(payload: { transaction: { docChanged?: boolean; before?: unknown; doc?: unknown } }) {
+  if (transactionTouchesLinkedSheet(payload.transaction)) liveSheetSync?.notifyLocalChange()
+}
+
+function bindLiveSheetEditor(editor: typeof boundLiveSheetEditor) {
+  if (boundLiveSheetEditor && boundLiveSheetEditor !== editor) {
+    boundLiveSheetEditor.off?.('transaction', onEditorSheetTransaction)
+    boundLiveSheetEditor = null
+  }
+  if (!editor?.on || boundLiveSheetEditor === editor) return
+  editor.on('transaction', onEditorSheetTransaction)
+  boundLiveSheetEditor = editor
+}
+
+function unbindLiveSheetEditor() {
+  boundLiveSheetEditor?.off?.('transaction', onEditorSheetTransaction)
+  boundLiveSheetEditor = null
+}
+
+function ensureLiveSheetSync() {
+  if (!liveSheetSync) {
+    liveSheetSync = createLiveLinkedDatabaseSync({
+      getEditor: () => editorForSheetSync(),
+      projectId: () => props.projectId,
+      io: { load: getNodeData, save: saveNodeData },
+      canWrite: () => permissionActor.value.canWrite,
+    })
+    liveSheetSync.arm()
+  }
+  const editor = editorForSheetSync()
+  if (editor) bindLiveSheetEditor(editor as typeof boundLiveSheetEditor)
+  return liveSheetSync
+}
 
 async function probeLinkedSheets() {
   const editor = editorForSheetSync()
-  if (!editor || !props.projectId || sheetProbeInFlight) return
-  sheetProbeInFlight = true
+  if (!editor || !props.projectId) return
   try {
-    const io = {
-      load: getNodeData,
-      save: saveNodeData,
-    }
-    // 只读浏览只对照标状态，不自动写回或拉取。
-    if (!permissionActor.value.canWrite) {
-      await probeLinkedDatabaseBlocks(editor, props.projectId, io)
-      return
-    }
-    const summary = await applySafeLinkedDatabaseBlocks(editor, props.projectId, io)
-    if (summary.pulled || summary.pushed) {
-      const parts: string[] = []
-      if (summary.pulled) parts.push(`已自动拉取 ${summary.pulled} 张树上有更新的表`)
-      if (summary.pushed) parts.push(`已自动写回 ${summary.pushed} 张仅内嵌改过的表`)
-      ElMessage.success(`${parts.join('，')}。两边都改过的表仍需确认，不是实时双向同步。`)
-    }
+    const summary = await ensureLiveSheetSync().tick()
+    const message = summary ? describeSafeSyncToast(summary) : null
+    if (message) ElMessage.success(message)
   } catch {
     // 对照失败不打断编辑；状态保持上次结果或尚未对照。
-  } finally {
-    sheetProbeInFlight = false
   }
 }
 
@@ -942,7 +969,7 @@ onMounted(() => {
   window.addEventListener('focus', onWindowFocusProbe)
   void syncPresence()
   presenceTimer = setInterval(() => void syncPresence(), 12000)
-  sheetProbeTimer = setInterval(() => void probeLinkedSheets(), 15000)
+  ensureLiveSheetSync()
 })
 
 onUnmounted(() => {
@@ -951,7 +978,9 @@ onUnmounted(() => {
   window.removeEventListener('rte:open-base-node', onOpenBaseNode)
   window.removeEventListener('focus', onWindowFocusProbe)
   if (presenceTimer) clearInterval(presenceTimer)
-  if (sheetProbeTimer) clearInterval(sheetProbeTimer)
+  liveSheetSync?.disarm()
+  liveSheetSync = null
+  unbindLiveSheetEditor()
   unbindEditorSelection()
   stopLiveCollab()
 })

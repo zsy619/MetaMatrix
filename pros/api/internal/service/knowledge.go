@@ -30,7 +30,7 @@ const (
 
 type KnowledgeService struct {
 	db *gorm.DB
-	// presence 是在线协作状态存储：数据库为主、内存兜底（多实例共享同一份状态）。
+	// presence 是在线协作状态存储：默认内存+kb_presence；配置 REDIS_URL 且连得上时改用 Redis（短暂状态，不是文档持久化）。
 	presence PresenceStore
 	// ai 是可选的外部模型客户端：没配置时所有智能化能力走本地降级。
 	ai *ai.Client
@@ -49,6 +49,14 @@ type KnowledgeService struct {
 
 func NewKnowledgeService(db *gorm.DB) *KnowledgeService {
 	return &KnowledgeService{db: db, presence: newHybridPresenceStore(db)}
+}
+
+// SetPresenceStore 替换在线状态存储（例如启动时改用可选 Redis）。空值忽略。
+func (s *KnowledgeService) SetPresenceStore(store PresenceStore) {
+	if store == nil {
+		return
+	}
+	s.presence = store
 }
 
 // PresenceStore 返回知识库正在使用的 presence 存储，供正文协同通道复用同一实例。

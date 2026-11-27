@@ -101,8 +101,15 @@ func main() {
 	docH := handler.NewDocumentsHandler(docSvc)
 	projH := handler.NewProjectsHandler(projSvc)
 	dirH := handler.NewDirectoryHandler(dirSvc)
+	presenceStore, presenceBus, presenceCloser, presenceBackend := service.ResolvePresence(gdb, cfg.RedisURL)
+	if presenceCloser != nil {
+		defer presenceCloser()
+	}
+	knSvc.SetPresenceStore(presenceStore)
+	log.Printf("MetaMatrix presence backend: %s (REDIS_URL empty or unreachable stays same-instance; redis is not document persistence)", presenceBackend)
 	knH := handler.NewKnowledgeHandler(knSvc, cfg.JWTSecret)
 	collabH := handler.NewCollabHandler(service.NewCollabService(gdb, knSvc.PresenceStore()), cfg.JWTSecret)
+	collabH.SetBus(presenceBus)
 	auditH := handler.NewDocAuditHandler(service.NewDocAuditService(gdb), cfg.JWTSecret)
 	blockH := handler.NewDocBlockHandler(service.NewDocBlockService(gdb), cfg.JWTSecret)
 	// 多维表格 Base Engine：独立领域（表/字段/记录/视图/公式/事件），

@@ -30,14 +30,53 @@ type collabBackend interface {
 }
 
 // CollabHandler 提供正文协同的 HTTP 操作日志与 Hertz WebSocket 通道。
+type collabBus interface {
+	Publish(docID uuid.UUID, body []byte)
+	Start(handler func(docID uuid.UUID, body []byte))
+	Close()
+}
+
 type CollabHandler struct {
 	svc    collabBackend
 	secret string
 	hub    *collabHub
+	bus    collabBus
 }
 
 func NewCollabHandler(svc collabBackend, secret string) *CollabHandler {
 	return &CollabHandler{svc: svc, secret: secret, hub: newCollabHub()}
+}
+
+// SetBus 接入可选的跨实例总线。未设置时 presence / awareness 只在本实例广播。
+func (h *CollabHandler) SetBus(bus collabBus) {
+	if bus == nil {
+		return
+	}
+	h.bus = bus
+	bus.Start(h.onRemoteCollabEvent)
+}
+
+func (h *CollabHandler) onRemoteCollabEvent(docID uuid.UUID, body []byte) {
+	var msg wsOut
+	if err := json.Unmarshal(body, &msg); err != nil {
+		return
+	}
+	switch msg.Type {
+	case "presence", "awareness", "awareness-sync", "awareness-leave":
+		h.hub.broadcast(docID, nil, msg)
+	}
+}
+
+func (h *CollabHandler) broadcastLocalAndRemote(docID uuid.UUID, except *collabClient, msg wsOut) {
+	h.hub.broadcast(docID, except, msg)
+	if h.bus == nil {
+		return
+	}
+	raw, err := json.Marshal(msg)
+	if err != nil {
+		return
+	}
+	h.bus.Publish(docID, raw)
 }
 
 type appendOperationBody struct {
@@ -189,7 +228,7 @@ func (h *CollabHandler) ServeWS(ctx context.Context, c *app.RequestContext) {
 			_ = client.writeJSON(wsOut{Type: "presence", Users: users})
 		}
 		// 请房间里已有连接再发一遍自己的 awareness，让新进房的人立刻看到光标。
-		h.hub.broadcast(docID, client, wsOut{Type: "awareness-sync"})
+		h.broadcastLocalAndRemote(docID, client, wsOut{Type: "awareness-sync"})
 
 		done := make(chan struct{})
 		defer close(done)
@@ -292,7 +331,7 @@ func (h *CollabHandler) handleWSMessage(client *collabClient, message []byte) {
 			return
 		}
 		if users, err := h.svc.ListPresence(client.userID, client.docID); err == nil {
-			h.hub.broadcast(client.docID, nil, wsOut{Type: "presence", Users: users})
+			h.broadcastLocalAndRemote(client.docID, nil, wsOut{Type: "presence", Users: users})
 		}
 	case "awareness":
 		// awareness 是短暂的光标/选区状态，不落库；浏览者也可以上报，以便别人看见只读光标。
@@ -301,9 +340,9 @@ func (h *CollabHandler) handleWSMessage(client *collabClient, message []byte) {
 			_ = client.writeJSON(wsOut{Type: "error", Message: "payload must be non-empty base64"})
 			return
 		}
-		h.hub.broadcast(client.docID, client, wsOut{Type: "awareness", Payload: in.Payload})
+		h.broadcastLocalAndRemote(client.docID, client, wsOut{Type: "awareness", Payload: in.Payload})
 	case "awareness-sync":
-		h.hub.broadcast(client.docID, client, wsOut{Type: "awareness-sync"})
+		h.broadcastLocalAndRemote(client.docID, client, wsOut{Type: "awareness-sync"})
 	default:
 		_ = client.writeJSON(wsOut{Type: "error", Message: "unknown type"})
 	}
@@ -405,9 +444,9 @@ func (h *CollabHandler) depart(client *collabClient) {
 		return
 	}
 	_ = h.svc.Leave(client.userID, client.docID)
-	h.hub.broadcast(client.docID, nil, wsOut{Type: "awareness-leave", UserID: client.userID.String()})
+	h.broadcastLocalAndRemote(client.docID, nil, wsOut{Type: "awareness-leave", UserID: client.userID.String()})
 	if users, err := h.svc.ListPresence(client.userID, client.docID); err == nil {
-		h.hub.broadcast(client.docID, nil, wsOut{Type: "presence", Users: users})
+		h.broadcastLocalAndRemote(client.docID, nil, wsOut{Type: "presence", Users: users})
 	}
 }
 
