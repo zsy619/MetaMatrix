@@ -10,7 +10,7 @@ import {
   describeSheetDrift,
   getDatabaseBlockSyncStatus,
 } from './databaseBlockSyncStatus'
-import { DATABASE_BLOCK_HTML_TYPE } from './databaseBlockSheet'
+import { DATABASE_BLOCK_HTML_TYPE, describeSheetContentConflict } from './databaseBlockSheet'
 import {
   DATABASE_VIEW_LABELS,
   DATABASE_VIEW_TYPES,
@@ -132,10 +132,16 @@ export function createDatabaseBlockView({ node, getPos, editor }: NodeViewRender
         syncBtn('安全同步', 'safe', editable, () => emitSync('safe')),
       )
       const statusKey = databaseBlockSyncKey(blockId || '', sheetNodeId)
-      const drift = getDatabaseBlockSyncStatus(statusKey)?.drift
+      const status = getDatabaseBlockSyncStatus(statusKey)
+      const drift = status?.drift
       if (drift) {
         const badge = el('span', `rte-database-block__sync-status is-${drift}`, describeSheetDrift(drift))
         badge.setAttribute('data-sync-status', drift)
+        if (drift === 'both' && status?.conflict) {
+          const detail = describeSheetContentConflict(status.conflict)
+          badge.setAttribute('title', detail)
+          badge.setAttribute('data-sync-conflict', detail)
+        }
         sync.append(badge)
       }
       const note = el('span', 'rte-database-block__hint', '打开或对照后会自动同步单边改动，两边都改过仍需确认，不是实时双向')

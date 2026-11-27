@@ -9,6 +9,8 @@ import {
   payloadFromAttrs,
   pushSheetFromPayload,
   sheetContentFingerprint,
+  summarizeSheetContentConflict,
+  type SheetContentConflictSummary,
   type SheetDrift,
   unsafeSyncDirection,
 } from './databaseBlockSheet'
@@ -41,6 +43,7 @@ export type DatabaseBlockProbe = {
   blockId: string
   sheetNodeId: string
   drift: SheetDrift
+  conflict?: SheetContentConflictSummary
 }
 
 type LinkedDatabaseBlock = {
@@ -72,8 +75,17 @@ function listLinkedDatabaseBlocks(editor: DatabaseBlockSyncEditor): LinkedDataba
   return out
 }
 
-function recordStatus(blockId: string, sheetNodeId: string, drift: SheetDrift) {
-  setDatabaseBlockSyncStatus(databaseBlockSyncKey(blockId, sheetNodeId), drift)
+function recordStatus(
+  blockId: string,
+  sheetNodeId: string,
+  drift: SheetDrift,
+  conflict?: SheetContentConflictSummary,
+) {
+  setDatabaseBlockSyncStatus(databaseBlockSyncKey(blockId, sheetNodeId), drift, conflict)
+}
+
+function conflictIfBoth(drift: SheetDrift, local: Parameters<typeof summarizeSheetContentConflict>[0], remote: Parameters<typeof summarizeSheetContentConflict>[1]) {
+  return drift === 'both' ? summarizeSheetContentConflict(local, remote) : undefined
 }
 
 function resolveDirection(requested: DatabaseBlockSyncDirection, drift: SheetDrift): DatabaseBlockSyncDirection | 'noop' {
@@ -89,6 +101,7 @@ export type DatabaseBlockSyncResult = {
   droppedFilters: number
   diverged: boolean
   drift: SheetDrift
+  conflict?: SheetContentConflictSummary
 }
 
 function writeSyncedFp(editor: DatabaseBlockSyncEditor, pos: number, fp: string) {
@@ -113,14 +126,15 @@ export async function syncLinkedDatabaseBlock(
   const local = payloadFromAttrs(node.attrs as { sheet?: string; viewType?: string }).sheet
   const drift = classifySheetDrift(local, tree, String(node.attrs.syncedFp || ''))
   const diverged = drift === 'both'
+  const conflict = conflictIfBoth(drift, local, tree)
   const resolved = resolveDirection(detail.direction, drift)
   if (resolved === 'noop') {
-    recordStatus(readBlockId(node as never) || String(node.attrs.dataBlockId || ''), sheetNodeId, drift)
-    return { action: 'noop', droppedFilters: 0, diverged: false, drift }
+    recordStatus(readBlockId(node as never) || String(node.attrs.dataBlockId || ''), sheetNodeId, drift, conflict)
+    return { action: 'noop', droppedFilters: 0, diverged: false, drift, ...(conflict ? { conflict } : {}) }
   }
   if (resolved === 'safe' || (!detail.force && unsafeSyncDirection(resolved, drift))) {
-    recordStatus(readBlockId(node as never) || String(node.attrs.dataBlockId || ''), sheetNodeId, drift)
-    return { action: 'aborted', droppedFilters: 0, diverged, drift }
+    recordStatus(readBlockId(node as never) || String(node.attrs.dataBlockId || ''), sheetNodeId, drift, conflict)
+    return { action: 'aborted', droppedFilters: 0, diverged, drift, ...(conflict ? { conflict } : {}) }
   }
   const direction = resolved
   if (direction === 'pull') {
@@ -162,8 +176,9 @@ export async function probeLinkedDatabaseBlocks(
       const tree = migrateSheet(remote.data)
       const local = payloadFromAttrs(item.attrs as { sheet?: string; viewType?: string }).sheet
       const drift = classifySheetDrift(local, tree, String(item.attrs.syncedFp || ''))
-      recordStatus(item.blockId, item.sheetNodeId, drift)
-      out.push({ pos: item.pos, blockId: item.blockId, sheetNodeId: item.sheetNodeId, drift })
+      const conflict = conflictIfBoth(drift, local, tree)
+      recordStatus(item.blockId, item.sheetNodeId, drift, conflict)
+      out.push({ pos: item.pos, blockId: item.blockId, sheetNodeId: item.sheetNodeId, drift, conflict })
     } catch {
       recordStatus(item.blockId, item.sheetNodeId, 'unknown')
       out.push({ pos: item.pos, blockId: item.blockId, sheetNodeId: item.sheetNodeId, drift: 'unknown' })

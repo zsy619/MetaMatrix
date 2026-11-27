@@ -353,8 +353,14 @@ export function countViewFilters(sheet: SheetData): number {
   return (sheet.views || []).reduce((n, view) => n + (view.filters || []).length, 0)
 }
 
-/** 只比较字段和行，不含视图。用来判断手动同步是否两边都改过。 */
-export function sheetContentFingerprint(sheet: SheetData): string {
+function sortedCellMap(cells: Record<string, unknown> | undefined): Record<string, unknown> {
+  const src = cells || {}
+  const out: Record<string, unknown> = {}
+  for (const key of Object.keys(src).sort()) out[key] = src[key]
+  return out
+}
+
+function fingerprintFromParts(sheet: SheetData, stableCells: boolean): string {
   const fields = (sheet.fields || []).map((field) => ({
     id: field.id,
     type: field.type,
@@ -363,26 +369,142 @@ export function sheetContentFingerprint(sheet: SheetData): string {
   }))
   const rows = (sheet.rows || []).map((row) => ({
     id: row.id,
-    cells: row.cells || {},
+    cells: stableCells ? sortedCellMap(row.cells) : (row.cells || {}),
   }))
   return JSON.stringify({ fields, rows })
+}
+
+/** 旧指纹：单元格键顺序随插入顺序，相同内容可能得到不同字符串。仅用于识别历史 syncedFp。 */
+export function legacySheetContentFingerprint(sheet: SheetData): string {
+  return fingerprintFromParts(sheet, false)
+}
+
+/** 只比较字段和行，不含视图。单元格键按名字排序，避免键顺序把相同内容判成已改。 */
+export function sheetContentFingerprint(sheet: SheetData): string {
+  return fingerprintFromParts(sheet, true)
+}
+
+function canonicalizeStoredFingerprint(storedFp: string): string | null {
+  try {
+    const parsed = JSON.parse(storedFp) as { fields?: unknown; rows?: Array<{ id?: string; cells?: Record<string, unknown> }> }
+    if (!parsed || !Array.isArray(parsed.fields) || !Array.isArray(parsed.rows)) return null
+    const rows = parsed.rows.map((row) => ({
+      id: row.id,
+      cells: sortedCellMap(row.cells),
+    }))
+    return JSON.stringify({ fields: parsed.fields, rows })
+  } catch {
+    return null
+  }
+}
+
+/** 当前指纹、历史指纹，或把历史指纹的单元格键排序后，与现表一致即视为未改。 */
+export function sheetFingerprintMatches(sheet: SheetData, storedFp?: string | null): boolean {
+  const fp = (storedFp || '').trim()
+  if (!fp) return false
+  const current = sheetContentFingerprint(sheet)
+  if (fp === current || fp === legacySheetContentFingerprint(sheet)) return true
+  return canonicalizeStoredFingerprint(fp) === current
 }
 
 /** 对照上次成功同步的指纹，判断内嵌快照和树上表各自有没有改动。没有指纹时无法判断单边改动。 */
 export type SheetDrift = 'unknown' | 'in-sync' | 'local-only' | 'remote-only' | 'both'
 
 export function classifySheetDrift(local: SheetData, remote: SheetData, syncedFp?: string | null): SheetDrift {
-  const localFp = sheetContentFingerprint(local)
-  const remoteFp = sheetContentFingerprint(remote)
-  if (localFp === remoteFp) return 'in-sync'
+  if (sheetContentFingerprint(local) === sheetContentFingerprint(remote)) return 'in-sync'
   const fp = (syncedFp || '').trim()
   if (!fp) return 'unknown'
-  const localChanged = localFp !== fp
-  const remoteChanged = remoteFp !== fp
+  const localChanged = !sheetFingerprintMatches(local, fp)
+  const remoteChanged = !sheetFingerprintMatches(remote, fp)
   if (localChanged && remoteChanged) return 'both'
   if (localChanged) return 'local-only'
   if (remoteChanged) return 'remote-only'
   return 'in-sync'
+}
+
+export type SheetContentConflictSummary = {
+  localOnlyFields: number
+  remoteOnlyFields: number
+  changedFields: number
+  localOnlyRows: number
+  remoteOnlyRows: number
+  changedRows: number
+  changedCells: number
+}
+
+function fieldSignature(field: { id: string; type: string; name: string; options?: string[] }): string {
+  return JSON.stringify({
+    type: field.type,
+    name: field.name,
+    options: field.options ? [...field.options] : undefined,
+  })
+}
+
+function cellSignature(value: unknown): string {
+  return JSON.stringify(value ?? null)
+}
+
+/** 按字段/行 ID 统计双边各改了什么。只是对照摘要，不是自动合并。 */
+export function summarizeSheetContentConflict(local: SheetData, remote: SheetData): SheetContentConflictSummary {
+  const localFields = new Map((local.fields || []).map((field) => [field.id, field]))
+  const remoteFields = new Map((remote.fields || []).map((field) => [field.id, field]))
+  let localOnlyFields = 0
+  let remoteOnlyFields = 0
+  let changedFields = 0
+  for (const [id, field] of localFields) {
+    const other = remoteFields.get(id)
+    if (!other) localOnlyFields += 1
+    else if (fieldSignature(field) !== fieldSignature(other)) changedFields += 1
+  }
+  for (const id of remoteFields.keys()) {
+    if (!localFields.has(id)) remoteOnlyFields += 1
+  }
+  const localRows = new Map((local.rows || []).map((row) => [row.id, row]))
+  const remoteRows = new Map((remote.rows || []).map((row) => [row.id, row]))
+  let localOnlyRows = 0
+  let remoteOnlyRows = 0
+  let changedRows = 0
+  let changedCells = 0
+  for (const [id, row] of localRows) {
+    const other = remoteRows.get(id)
+    if (!other) {
+      localOnlyRows += 1
+      continue
+    }
+    const keys = new Set([...Object.keys(row.cells || {}), ...Object.keys(other.cells || {})])
+    let cells = 0
+    for (const key of keys) {
+      if (cellSignature((row.cells || {})[key]) !== cellSignature((other.cells || {})[key])) cells += 1
+    }
+    if (cells) {
+      changedRows += 1
+      changedCells += cells
+    }
+  }
+  for (const id of remoteRows.keys()) {
+    if (!localRows.has(id)) remoteOnlyRows += 1
+  }
+  return {
+    localOnlyFields,
+    remoteOnlyFields,
+    changedFields,
+    localOnlyRows,
+    remoteOnlyRows,
+    changedRows,
+    changedCells,
+  }
+}
+
+export function describeSheetContentConflict(summary: SheetContentConflictSummary): string {
+  const parts: string[] = []
+  if (summary.localOnlyFields) parts.push(`仅内嵌多 ${summary.localOnlyFields} 个字段`)
+  if (summary.remoteOnlyFields) parts.push(`树上多 ${summary.remoteOnlyFields} 个字段`)
+  if (summary.changedFields) parts.push(`${summary.changedFields} 个字段定义不同`)
+  if (summary.localOnlyRows) parts.push(`仅内嵌多 ${summary.localOnlyRows} 行`)
+  if (summary.remoteOnlyRows) parts.push(`树上多 ${summary.remoteOnlyRows} 行`)
+  if (summary.changedRows) parts.push(`${summary.changedRows} 行内容不同（${summary.changedCells} 个单元格）`)
+  if (!parts.length) return '两边字段与行已不一致，需确认后才会覆盖，不会自动合并。'
+  return `两边都改过：${parts.join('，')}。需确认后才会覆盖，不会自动合并。`
 }
 
 export function sheetsDiverged(local: SheetData, remote: SheetData, syncedFp?: string | null): boolean {

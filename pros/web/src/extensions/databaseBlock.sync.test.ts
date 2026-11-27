@@ -1,10 +1,20 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it } from 'vitest'
 import { Editor } from '@tiptap/core'
+import type { SheetData } from '../components/knowledge/sheetModel'
 import StarterKit from '@tiptap/starter-kit'
 import { BlockIdentity, collectIdentityNodes, readBlockId } from './blockIdentity'
 import { DATABASE_BLOCK_NAME, DatabaseBlock } from './databaseBlock'
-import { firstFilterableField, payloadFromAttrs, sheetContentFingerprint } from './databaseBlockSheet'
+import {
+  classifySheetDrift,
+  describeSheetContentConflict,
+  firstFilterableField,
+  legacySheetContentFingerprint,
+  payloadFromAttrs,
+  sheetContentFingerprint,
+  sheetFingerprintMatches,
+  summarizeSheetContentConflict,
+} from './databaseBlockSheet'
 import { applySafeLinkedDatabaseBlocks, probeLinkedDatabaseBlocks, syncLinkedDatabaseBlock } from './databaseBlockSync'
 import {
   clearDatabaseBlockSyncStatus,
@@ -163,7 +173,7 @@ describe('databaseBlock 关联树上表同步', () => {
         throw new Error('aborted pull should not save')
       },
     })
-    expect(aborted).toEqual({ action: 'aborted', droppedFilters: 0, diverged: true, drift: 'both' })
+    expect(aborted).toEqual({ action: 'aborted', droppedFilters: 0, diverged: true, drift: 'both', conflict: { localOnlyFields: 0, remoteOnlyFields: 0, changedFields: 0, localOnlyRows: 0, remoteOnlyRows: 0, changedRows: 1, changedCells: 1 } })
     expect(payloadFromAttrs(databasePos(ed).node.attrs).sheet.rows[0]!.cells[name.id]).toBe('块内又改了')
     const forced = await syncLinkedDatabaseBlock(ed, 'proj', {
       direction: 'pull',
@@ -334,7 +344,7 @@ describe('databaseBlock 关联树上表同步', () => {
         return {}
       },
     })
-    expect(result).toEqual({ action: 'aborted', droppedFilters: 0, diverged: true, drift: 'both' })
+    expect(result).toEqual({ action: 'aborted', droppedFilters: 0, diverged: true, drift: 'both', conflict: { localOnlyFields: 0, remoteOnlyFields: 0, changedFields: 0, localOnlyRows: 0, remoteOnlyRows: 0, changedRows: 1, changedCells: 1 } })
     expect(saved).toBe(false)
     expect(payloadFromAttrs(databasePos(ed).node.attrs).sheet.rows[0]!.cells[name.id]).toBe('块内又改了')
   })
@@ -444,8 +454,20 @@ describe('databaseBlock 关联树上表同步', () => {
     expect(summary.pushed).toBe(0)
     expect(summary.skipped).toBe(1)
     expect(summary.probed[0]!.drift).toBe('both')
+    expect(summary.probed[0]!.conflict).toEqual({
+      localOnlyFields: 0,
+      remoteOnlyFields: 0,
+      changedFields: 0,
+      localOnlyRows: 0,
+      remoteOnlyRows: 0,
+      changedRows: 1,
+      changedCells: 1,
+    })
     expect(saved).toBe(false)
     expect(payloadFromAttrs(databasePos(ed).node.attrs).sheet.rows[0]!.cells[name.id]).toBe('块内又改了')
+    const id = readBlockId(databasePos(ed).node)
+    expect(id).toBeTruthy()
+    expect(getDatabaseBlockSyncStatus(databaseBlockSyncKey(id!, 'tree-1'))?.conflict?.changedCells).toBe(1)
   })
 
   it('尚未对照时自动安全同步会跳过，避免覆盖未知差异', async () => {
@@ -469,5 +491,77 @@ describe('databaseBlock 关联树上表同步', () => {
     expect(summary.probed[0]!.drift).toBe('unknown')
     expect(saved).toBe(false)
     expect(payloadFromAttrs(databasePos(ed).node.attrs).sheet.rows[0]!.cells[name.id]).not.toBe('树上未对照值')
+  })
+})
+
+describe('sheet 指纹与双边差异摘要', () => {
+  const base: SheetData = {
+    fields: [{ id: 'n', name: '名称', type: 'text' }],
+    rows: [
+      { id: 'r1', cells: { n: '甲' } },
+      { id: 'r2', cells: { n: '乙' } },
+    ],
+    views: [],
+  }
+
+  it('单元格键顺序不同仍视为同一指纹，历史指纹也能对上', () => {
+    const stable: SheetData = { ...base, rows: [{ id: 'r1', cells: { b: 2, a: 1 } }, { id: 'r2', cells: { n: '乙' } }] }
+    const shuffled: SheetData = { ...base, rows: [{ id: 'r1', cells: { a: 1, b: 2 } }, { id: 'r2', cells: { n: '乙' } }] }
+    expect(sheetContentFingerprint(stable)).toBe(sheetContentFingerprint(shuffled))
+    expect(legacySheetContentFingerprint(stable)).not.toBe(legacySheetContentFingerprint(shuffled))
+    expect(sheetFingerprintMatches(shuffled, legacySheetContentFingerprint(stable))).toBe(true)
+    expect(classifySheetDrift(shuffled, shuffled, legacySheetContentFingerprint(stable))).toBe('in-sync')
+    expect(classifySheetDrift(stable, shuffled, legacySheetContentFingerprint(stable))).toBe('in-sync')
+  })
+
+  it('只有键顺序变化时，不会把历史指纹误判成两边都改过', () => {
+    const original: SheetData = { ...base, rows: [{ id: 'r1', cells: { b: 2, a: 1 } }] }
+    const same: SheetData = { ...base, rows: [{ id: 'r1', cells: { a: 1, b: 2 } }] }
+    expect(classifySheetDrift(same, same, legacySheetContentFingerprint(original))).toBe('in-sync')
+    expect(classifySheetDrift(same, original, legacySheetContentFingerprint(original))).toBe('in-sync')
+  })
+
+  it('历史指纹不会把仅单边改过误判成两边都改过', () => {
+    const original: SheetData = { ...base, rows: [{ id: 'r1', cells: { b: 2, a: 1 } }] }
+    const local: SheetData = { ...base, rows: [{ id: 'r1', cells: { a: 1, b: 2 } }] }
+    const remote: SheetData = { ...base, rows: [{ id: 'r1', cells: { a: 1, b: 9 } }] }
+    const fp = legacySheetContentFingerprint(original)
+    expect(classifySheetDrift(local, remote, fp)).toBe('remote-only')
+    expect(classifySheetDrift(remote, local, fp)).toBe('local-only')
+  })
+
+  it('双边各改一行时摘要能分开统计，且说明不是自动合并', () => {
+    const local: SheetData = {
+      ...base,
+      rows: [
+        { id: 'r1', cells: { n: '本地甲' } },
+        { id: 'r2', cells: { n: '乙' } },
+        { id: 'r3', cells: { n: '仅本地' } },
+      ],
+    }
+    const remote: SheetData = {
+      ...base,
+      fields: [...base.fields, { id: 'd', name: '备注', type: 'text' }],
+      rows: [
+        { id: 'r1', cells: { n: '甲' } },
+        { id: 'r2', cells: { n: '树上乙' } },
+      ],
+    }
+    expect(classifySheetDrift(local, remote, sheetContentFingerprint(base))).toBe('both')
+    const summary = summarizeSheetContentConflict(local, remote)
+    expect(summary).toEqual({
+      localOnlyFields: 0,
+      remoteOnlyFields: 1,
+      changedFields: 0,
+      localOnlyRows: 1,
+      remoteOnlyRows: 0,
+      changedRows: 2,
+      changedCells: 2,
+    })
+    const text = describeSheetContentConflict(summary)
+    expect(text).toContain('树上多 1 个字段')
+    expect(text).toContain('仅内嵌多 1 行')
+    expect(text).toContain('2 行内容不同')
+    expect(text).toContain('不会自动合并')
   })
 })
