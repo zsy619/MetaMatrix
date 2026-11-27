@@ -14,6 +14,7 @@ import {
   type SheetField,
   type SheetFilter,
   type SheetFilterOp,
+  type SheetCellValue,
   type SheetRow,
   type SheetView,
   type SheetViewType,
@@ -422,6 +423,19 @@ export function classifySheetDrift(local: SheetData, remote: SheetData, syncedFp
   return 'in-sync'
 }
 
+export type SheetThreeWaySummary = {
+  localOnlyFields: number
+  remoteOnlyFields: number
+  conflictFields: number
+  localOnlyRows: number
+  remoteOnlyRows: number
+  conflictRows: number
+  localOnlyCells: number
+  remoteOnlyCells: number
+  conflictCells: number
+  autoMergeable: boolean
+}
+
 export type SheetContentConflictSummary = {
   localOnlyFields: number
   remoteOnlyFields: number
@@ -430,6 +444,8 @@ export type SheetContentConflictSummary = {
   remoteOnlyRows: number
   changedRows: number
   changedCells: number
+  /** 有上次同步基线时，按单元格/字段做三方对照；不相交时才可自动合并。 */
+  threeWay?: SheetThreeWaySummary
 }
 
 function fieldSignature(field: { id: string; type: string; name: string; options?: string[] }): string {
@@ -496,6 +512,7 @@ export function summarizeSheetContentConflict(local: SheetData, remote: SheetDat
 }
 
 export function describeSheetContentConflict(summary: SheetContentConflictSummary): string {
+  if (summary.threeWay) return describeSheetThreeWay(summary.threeWay)
   const parts: string[] = []
   if (summary.localOnlyFields) parts.push(`仅内嵌多 ${summary.localOnlyFields} 个字段`)
   if (summary.remoteOnlyFields) parts.push(`树上多 ${summary.remoteOnlyFields} 个字段`)
@@ -505,6 +522,267 @@ export function describeSheetContentConflict(summary: SheetContentConflictSummar
   if (summary.changedRows) parts.push(`${summary.changedRows} 行内容不同（${summary.changedCells} 个单元格）`)
   if (!parts.length) return '两边字段与行已不一致，需确认后才会覆盖，不会自动合并。'
   return `两边都改过：${parts.join('，')}。需确认后才会覆盖，不会自动合并。`
+}
+
+/** 从上次成功同步的指纹还原字段和行，作为三方对照的基线。解析不了则无法判断相交改动。 */
+export function sheetContentFromFingerprint(storedFp?: string | null): { fields: SheetField[]; rows: SheetRow[] } | null {
+  const fp = (storedFp || '').trim()
+  if (!fp) return null
+  try {
+    const parsed = JSON.parse(fp) as { fields?: unknown; rows?: unknown }
+    if (!parsed || !Array.isArray(parsed.fields) || !Array.isArray(parsed.rows)) return null
+    const fields: SheetField[] = []
+    for (const raw of parsed.fields) {
+      if (!raw || typeof raw !== 'object') return null
+      const field = raw as Partial<SheetField>
+      if (!field.id || !field.type || !field.name) return null
+      fields.push({
+        id: String(field.id),
+        type: field.type,
+        name: String(field.name),
+        options: field.options ? [...field.options] : undefined,
+      })
+    }
+    const rows: SheetRow[] = []
+    for (const raw of parsed.rows) {
+      if (!raw || typeof raw !== 'object') return null
+      const row = raw as { id?: string; cells?: Record<string, unknown> }
+      if (!row.id) return null
+      const cells: Record<string, SheetCellValue> = {}
+      for (const [key, value] of Object.entries(row.cells || {})) {
+        cells[key] = value as SheetCellValue
+      }
+      rows.push({ id: String(row.id), cells })
+    }
+    return { fields, rows }
+  } catch {
+    return null
+  }
+}
+
+function cloneField(field: SheetField): SheetField {
+  return { ...field, options: field.options ? [...field.options] : undefined }
+}
+
+function cloneRow(row: SheetRow): SheetRow {
+  return { id: row.id, cells: { ...row.cells } }
+}
+
+function emptySummary(): SheetThreeWaySummary {
+  return {
+    localOnlyFields: 0,
+    remoteOnlyFields: 0,
+    conflictFields: 0,
+    localOnlyRows: 0,
+    remoteOnlyRows: 0,
+    conflictRows: 0,
+    localOnlyCells: 0,
+    remoteOnlyCells: 0,
+    conflictCells: 0,
+    autoMergeable: true,
+  }
+}
+
+type ThreeWayMerge = {
+  summary: SheetThreeWaySummary
+  fields: SheetField[]
+  rows: SheetRow[]
+}
+
+function classifyAndMergeAgainstBase(
+  local: SheetData,
+  remote: SheetData,
+  base: { fields: SheetField[]; rows: SheetRow[] },
+): ThreeWayMerge {
+  const summary = emptySummary()
+  const baseFields = new Map(base.fields.map((field) => [field.id, field]))
+  const localFields = new Map((local.fields || []).map((field) => [field.id, field]))
+  const remoteFields = new Map((remote.fields || []).map((field) => [field.id, field]))
+  const fieldIds: string[] = []
+  const seenFields = new Set<string>()
+  for (const field of [...(remote.fields || []), ...(local.fields || []), ...base.fields]) {
+    if (seenFields.has(field.id)) continue
+    seenFields.add(field.id)
+    fieldIds.push(field.id)
+  }
+  const mergedFields: SheetField[] = []
+  for (const id of fieldIds) {
+    const baseField = baseFields.get(id)
+    const localField = localFields.get(id)
+    const remoteField = remoteFields.get(id)
+    if (baseField) {
+      const localChanged = !!localField && fieldSignature(localField) !== fieldSignature(baseField)
+      const remoteChanged = !!remoteField && fieldSignature(remoteField) !== fieldSignature(baseField)
+      const localDeleted = !localField
+      const remoteDeleted = !remoteField
+      if (localDeleted && remoteDeleted) continue
+      if (localDeleted && remoteChanged) {
+        summary.conflictFields += 1
+        continue
+      }
+      if (remoteDeleted && localChanged) {
+        summary.conflictFields += 1
+        continue
+      }
+      if (localDeleted) continue
+      if (remoteDeleted) continue
+      if (localChanged && remoteChanged && fieldSignature(localField!) !== fieldSignature(remoteField!)) {
+        summary.conflictFields += 1
+        continue
+      }
+      if (localChanged && !remoteChanged) summary.localOnlyFields += 1
+      else if (remoteChanged && !localChanged) summary.remoteOnlyFields += 1
+      mergedFields.push(cloneField(remoteChanged ? remoteField! : localField!))
+      continue
+    }
+    if (localField && remoteField) {
+      if (fieldSignature(localField) !== fieldSignature(remoteField)) {
+        summary.conflictFields += 1
+        continue
+      }
+      summary.localOnlyFields += 1
+      summary.remoteOnlyFields += 1
+      mergedFields.push(cloneField(remoteField))
+      continue
+    }
+    if (localField) {
+      summary.localOnlyFields += 1
+      mergedFields.push(cloneField(localField))
+      continue
+    }
+    if (remoteField) {
+      summary.remoteOnlyFields += 1
+      mergedFields.push(cloneField(remoteField))
+    }
+  }
+
+  const baseRows = new Map(base.rows.map((row) => [row.id, row]))
+  const localRows = new Map((local.rows || []).map((row) => [row.id, row]))
+  const remoteRows = new Map((remote.rows || []).map((row) => [row.id, row]))
+  const rowIds: string[] = []
+  const seenRows = new Set<string>()
+  for (const row of [...(remote.rows || []), ...(local.rows || []), ...base.rows]) {
+    if (seenRows.has(row.id)) continue
+    seenRows.add(row.id)
+    rowIds.push(row.id)
+  }
+  const mergedRows: SheetRow[] = []
+  for (const id of rowIds) {
+    const baseRow = baseRows.get(id)
+    const localRow = localRows.get(id)
+    const remoteRow = remoteRows.get(id)
+    if (baseRow) {
+      const localDeleted = !localRow
+      const remoteDeleted = !remoteRow
+      if (localDeleted && remoteDeleted) continue
+      const localRowChanged = !!localRow && rowSignature(localRow) !== rowSignature(baseRow)
+      const remoteRowChanged = !!remoteRow && rowSignature(remoteRow) !== rowSignature(baseRow)
+      if (localDeleted && remoteRowChanged) {
+        summary.conflictRows += 1
+        continue
+      }
+      if (remoteDeleted && localRowChanged) {
+        summary.conflictRows += 1
+        continue
+      }
+      if (localDeleted || remoteDeleted) {
+        if (localDeleted) summary.localOnlyRows += 1
+        if (remoteDeleted) summary.remoteOnlyRows += 1
+        continue
+      }
+      const mergedCells: Record<string, SheetCellValue> = {}
+      const keys = new Set([
+        ...Object.keys(baseRow.cells || {}),
+        ...Object.keys(localRow!.cells || {}),
+        ...Object.keys(remoteRow!.cells || {}),
+      ])
+      let rowConflict = false
+      for (const key of keys) {
+        const baseVal = (baseRow.cells || {})[key]
+        const localVal = (localRow!.cells || {})[key]
+        const remoteVal = (remoteRow!.cells || {})[key]
+        const localChanged = cellSignature(localVal) !== cellSignature(baseVal)
+        const remoteChanged = cellSignature(remoteVal) !== cellSignature(baseVal)
+        if (localChanged && remoteChanged && cellSignature(localVal) !== cellSignature(remoteVal)) {
+          summary.conflictCells += 1
+          rowConflict = true
+          mergedCells[key] = remoteVal
+          continue
+        }
+        if (localChanged && !remoteChanged) summary.localOnlyCells += 1
+        else if (remoteChanged && !localChanged) summary.remoteOnlyCells += 1
+        mergedCells[key] = remoteChanged ? remoteVal : localVal
+      }
+      if (rowConflict) continue
+      mergedRows.push({ id, cells: mergedCells })
+      continue
+    }
+    if (localRow && remoteRow) {
+      if (rowSignature(localRow) !== rowSignature(remoteRow)) {
+        summary.conflictRows += 1
+        continue
+      }
+      summary.localOnlyRows += 1
+      summary.remoteOnlyRows += 1
+      mergedRows.push(cloneRow(remoteRow))
+      continue
+    }
+    if (localRow) {
+      summary.localOnlyRows += 1
+      mergedRows.push(cloneRow(localRow))
+      continue
+    }
+    if (remoteRow) {
+      summary.remoteOnlyRows += 1
+      mergedRows.push(cloneRow(remoteRow))
+    }
+  }
+
+  summary.autoMergeable = summary.conflictFields === 0 && summary.conflictRows === 0 && summary.conflictCells === 0
+  return { summary, fields: mergedFields, rows: mergedRows }
+}
+
+function rowSignature(row: SheetRow): string {
+  return JSON.stringify({ id: row.id, cells: sortedCellMap(row.cells) })
+}
+
+/** 相对上次同步基线，统计不相交改动与相交冲突。没有基线时返回 null。 */
+export function classifySheetThreeWay(local: SheetData, remote: SheetData, syncedFp?: string | null): SheetThreeWaySummary | null {
+  const base = sheetContentFromFingerprint(syncedFp)
+  if (!base) return null
+  return classifyAndMergeAgainstBase(local, remote, base).summary
+}
+
+/** 不相交的字段/行/单元格改动合成一份快照；有相交冲突或没有基线时返回 null。树上视图保留在结果里，内嵌视图由拉取逻辑自行保留。不是实时双向同步。 */
+export function mergeSheetNonOverlapping(local: SheetData, remote: SheetData, syncedFp?: string | null): SheetData | null {
+  const base = sheetContentFromFingerprint(syncedFp)
+  if (!base) return null
+  const result = classifyAndMergeAgainstBase(local, remote, base)
+  if (!result.summary.autoMergeable) return null
+  return {
+    fields: result.fields,
+    rows: result.rows,
+    views: (remote.views || []).map((view) => ({
+      ...view,
+      filters: [...(view.filters || [])],
+    })),
+  }
+}
+
+export function describeSheetThreeWay(summary: SheetThreeWaySummary): string {
+  const parts: string[] = []
+  if (summary.localOnlyFields) parts.push(`仅内嵌多或改 ${summary.localOnlyFields} 个字段`)
+  if (summary.remoteOnlyFields) parts.push(`树上多或改 ${summary.remoteOnlyFields} 个字段`)
+  if (summary.conflictFields) parts.push(`${summary.conflictFields} 个字段两边都改且不一致`)
+  if (summary.localOnlyRows) parts.push(`仅内嵌增删 ${summary.localOnlyRows} 行`)
+  if (summary.remoteOnlyRows) parts.push(`树上增删 ${summary.remoteOnlyRows} 行`)
+  if (summary.conflictRows) parts.push(`${summary.conflictRows} 行删除与改动冲突`)
+  if (summary.localOnlyCells) parts.push(`仅内嵌改 ${summary.localOnlyCells} 个单元格`)
+  if (summary.remoteOnlyCells) parts.push(`树上改 ${summary.remoteOnlyCells} 个单元格`)
+  if (summary.conflictCells) parts.push(`${summary.conflictCells} 个单元格两边都改且不一致`)
+  const head = parts.length ? `两边都改过：${parts.join('，')}。` : '两边都改过。'
+  if (summary.autoMergeable) return `${head}不相交的改动会自动合并到两边。不是实时双向同步。`
+  return `${head}有相交改动，需确认后才会覆盖，不会自动合并。`
 }
 
 export function sheetsDiverged(local: SheetData, remote: SheetData, syncedFp?: string | null): boolean {
