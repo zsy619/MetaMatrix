@@ -93,4 +93,70 @@ describe('saveConflict 按块合并', () => {
     expect(keepTheirs).toContain('远端改')
     expect(keepTheirs).not.toContain('本地改')
   })
+
+  it('顶层包装内仅一个块 ID 时按该块对照，并保留外包 HTML', () => {
+    const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+    const mine = `<blockquote data-callout="note"><p data-block-id="${id}">本地${mark}</p></blockquote>`
+    const theirs = `<blockquote data-callout="note"><p data-block-id="${id}">远端<span data-suggestion="delete">旧句</span></p></blockquote>`
+    const versions = { mineHtml: mine, theirsHtml: theirs, mineLabel: '我的', theirsLabel: '对方' }
+    const summary = summarizeBlockMerge(versions)
+    expect(summary).toEqual({ hasBlockIds: true, same: 0, conflict: 1, onlyTheirs: 0, onlyMine: 0 })
+    expect(listConflictBlocks(versions)).toEqual([{ id, mineHtml: mine, theirsHtml: theirs }])
+    const merged = mergeConflictHtml(versions)
+    expect(merged).toContain(mine)
+    expect(merged).toContain(theirs)
+    expect(merged).toContain('data-callout="note"')
+    expect(htmlHasSuggestionMarks(merged)).toBe(true)
+    expect(merged).toContain('data-suggestion="insert"')
+    expect(merged).toContain('data-suggestion="delete"')
+    const keepMine = mergeConflictHtml(versions, { [id]: 'mine' })
+    expect(keepMine).toBe(
+      `<p data-conflict-merge="true">以下为按块合并的结果：相同块只保留一份；有冲突的块按你的选择保留一方或并排保留。不是飞书级三方合并。</p>` + mine,
+    )
+    expect(htmlHasSuggestionMarks(keepMine)).toBe(true)
+    expect(keepMine).toContain('data-suggestion="insert"')
+    expect(keepMine).not.toContain('data-suggestion="delete"')
+  })
+
+  it('首尾冲突块可分别选择，且预览 HTML 与落地主函数一致', () => {
+    const first = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+    const mid = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+    const last = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
+    const mine = [
+      `<p data-block-id="${first}">首本地${mark}</p>`,
+      `<p data-block-id="${mid}">中间相同</p>`,
+      `<p data-block-id="${last}">尾本地</p>`,
+    ].join('')
+    const theirs = [
+      `<p data-block-id="${first}">首对方</p>`,
+      `<p data-block-id="${mid}">中间相同</p>`,
+      `<p data-block-id="${last}">尾对方<span data-suggestion="delete">旧句</span></p>`,
+    ].join('')
+    const versions = { mineHtml: mine, theirsHtml: theirs, mineLabel: '我的', theirsLabel: '对方' }
+    expect(summarizeBlockMerge(versions)).toEqual({ hasBlockIds: true, same: 1, conflict: 2, onlyTheirs: 0, onlyMine: 0 })
+    const choices = { [first]: 'mine' as const, [last]: 'theirs' as const }
+    const applied = resolveConflictHtml('merge', versions, choices)
+    const previewSource = mergeConflictHtml(versions, choices)
+    expect(applied).toBe(previewSource)
+    expect(htmlPreviewText(applied, 360)).toBe(htmlPreviewText(previewSource, 360))
+    expect(applied).toContain('首本地')
+    expect(applied).toContain('data-suggestion="insert"')
+    expect(applied).not.toContain('首对方')
+    expect(applied).toContain('尾对方')
+    expect(applied).toContain('data-suggestion="delete"')
+    expect(applied).not.toContain('尾本地')
+    expect(applied).toContain('中间相同')
+    expect(applied.match(/中间相同/g)).toHaveLength(1)
+    expect(htmlHasSuggestionMarks(applied)).toBe(true)
+  })
+
+  it('同一包装内多个不同块 ID 时不误判为单块', () => {
+    const a = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+    const b = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+    const mine = `<div class="wrap"><p data-block-id="${a}">甲本地</p><p data-block-id="${b}">乙本地</p></div>`
+    const theirs = `<div class="wrap"><p data-block-id="${a}">甲对方</p><p data-block-id="${b}">乙对方</p></div>`
+    const summary = summarizeBlockMerge({ mineHtml: mine, theirsHtml: theirs })
+    expect(summary.hasBlockIds).toBe(false)
+    expect(listConflictBlocks({ mineHtml: mine, theirsHtml: theirs })).toEqual([])
+  })
 })
