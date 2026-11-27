@@ -68,7 +68,7 @@ import { setBlockPermissionGuardState } from '../../extensions/blockPermissionGu
 import { canEditBlockContent } from './blockPermission'
 import { DATABASE_BLOCK_SYNC_EVENT, type DatabaseBlockSyncDetail } from '../../extensions/databaseBlockEvents'
 import { probeLinkedDatabaseBlocks, syncLinkedDatabaseBlock } from '../../extensions/databaseBlockSync'
-import { resolveConflictHtml, type SaveConflictChoice } from './saveConflict'
+import { resolveConflictHtml, type BlockConflictChoice, type SaveConflictChoice } from './saveConflict'
 
 const props = defineProps<{
   documentId: string
@@ -801,11 +801,11 @@ async function resolveConflict() {
   }
 }
 
-async function applyConflictChoice(choice: SaveConflictChoice) {
+async function applyConflictChoice(choice: SaveConflictChoice, blockChoices?: Record<string, BlockConflictChoice>) {
   const next = resolveConflictHtml(choice, {
     mineHtml: conflictMineHtml.value,
     theirsHtml: conflictTheirsHtml.value,
-  })
+  }, blockChoices)
   conflictOpen.value = false
   if (choice === 'theirs') {
     html.value = next

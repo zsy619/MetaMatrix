@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import {
   describeBlockMerge,
   htmlPreviewText,
+  listConflictBlocks,
   mergeConflictHtml,
   summarizeBlockMerge,
+  type BlockConflictChoice,
   type SaveConflictChoice,
   type SaveConflictVersions,
 } from './saveConflict'
@@ -15,15 +17,43 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  choose: [choice: SaveConflictChoice]
+  choose: [choice: SaveConflictChoice, blockChoices?: Record<string, BlockConflictChoice>]
 }>()
+
+const blockChoices = ref<Record<string, BlockConflictChoice>>({})
+const conflictBlocks = computed(() => listConflictBlocks(props.versions))
+watch(
+  conflictBlocks,
+  (blocks) => {
+    const next: Record<string, BlockConflictChoice> = {}
+    for (const block of blocks) next[block.id] = blockChoices.value[block.id] || 'both'
+    blockChoices.value = next
+  },
+  { immediate: true },
+)
 
 const minePreview = computed(() => htmlPreviewText(props.versions.mineHtml))
 const theirsPreview = computed(() => htmlPreviewText(props.versions.theirsHtml))
 const theirsHeading = computed(() => props.versions.theirsLabel || '对方的版本')
 const mineHeading = computed(() => props.versions.mineLabel || '你的版本')
-const mergePreview = computed(() => htmlPreviewText(mergeConflictHtml(props.versions), 360))
+const mergePreview = computed(() => htmlPreviewText(mergeConflictHtml(props.versions, blockChoices.value), 360))
 const mergeSummary = computed(() => describeBlockMerge(summarizeBlockMerge(props.versions)))
+
+function previewBlock(html: string) {
+  return htmlPreviewText(html, 120)
+}
+
+function setBlockChoice(id: string, choice: BlockConflictChoice) {
+  blockChoices.value = { ...blockChoices.value, [id]: choice }
+}
+
+function choose(choice: SaveConflictChoice) {
+  if (choice === 'merge' && Object.keys(blockChoices.value).length) {
+    emit('choose', 'merge', { ...blockChoices.value })
+    return
+  }
+  emit('choose', choice)
+}
 </script>
 
 <template>
@@ -31,7 +61,7 @@ const mergeSummary = computed(() => describeBlockMerge(summarizeBlockMerge(props
     <h2 id="save-conflict-title">保存冲突</h2>
     <p class="save-conflict-panel__hint">
       远端已有更新{{ remoteVersion != null && remoteVersion !== '' ? `（版本 ${remoteVersion}）` : '' }}。
-      请选择保留谁的版本，或把两边合在一起。若正文有稳定块 ID，合并会按块去重并对冲突块并排保留；否则仍是先对方后本地整篇拼接。合并不清洗审阅标记，也不是飞书级三方合并。
+      请选择保留谁的版本，或把两边合在一起。若正文有稳定块 ID，合并会按块去重，冲突块可选择保留哪一边或并排保留；否则仍是先对方后本地整篇拼接。合并不清洗审阅标记，也不是飞书级三方合并。
     </p>
     <div class="save-conflict-panel__cols">
       <section class="save-conflict-panel__col" data-side="mine">
@@ -43,15 +73,50 @@ const mergeSummary = computed(() => describeBlockMerge(summarizeBlockMerge(props
         <pre class="save-conflict-panel__preview">{{ theirsPreview || '（空）' }}</pre>
       </section>
     </div>
+    <section v-if="conflictBlocks.length" class="save-conflict-panel__blocks">
+      <h3>冲突块</h3>
+      <p class="save-conflict-panel__hint">可按块选择保留哪一边；未改的默认并排保留。不是飞书级三方合并。</p>
+      <article
+        v-for="block in conflictBlocks"
+        :key="block.id"
+        class="save-conflict-panel__block"
+        :data-conflict-block="block.id"
+      >
+        <div class="save-conflict-panel__block-previews">
+          <pre class="save-conflict-panel__preview" data-side="theirs">{{ previewBlock(block.theirsHtml) || '（空）' }}</pre>
+          <pre class="save-conflict-panel__preview" data-side="mine">{{ previewBlock(block.mineHtml) || '（空）' }}</pre>
+        </div>
+        <div class="save-conflict-panel__block-actions">
+          <button
+            type="button"
+            data-block-choice="theirs"
+            :class="{ 'is-active': (blockChoices[block.id] || 'both') === 'theirs' }"
+            @click="setBlockChoice(block.id, 'theirs')"
+          >用对方的</button>
+          <button
+            type="button"
+            data-block-choice="both"
+            :class="{ 'is-active': (blockChoices[block.id] || 'both') === 'both' }"
+            @click="setBlockChoice(block.id, 'both')"
+          >并排保留</button>
+          <button
+            type="button"
+            data-block-choice="mine"
+            :class="{ 'is-active': (blockChoices[block.id] || 'both') === 'mine' }"
+            @click="setBlockChoice(block.id, 'mine')"
+          >用我的</button>
+        </div>
+      </article>
+    </section>
     <section class="save-conflict-panel__merge" data-side="merge">
       <h3>合并预览</h3>
       <p class="save-conflict-panel__hint">{{ mergeSummary }}</p>
       <pre class="save-conflict-panel__preview">{{ mergePreview || '（空）' }}</pre>
     </section>
     <footer class="save-conflict-panel__actions">
-      <button type="button" data-action="theirs" @click="emit('choose', 'theirs')">用对方的版本</button>
-      <button type="button" data-action="merge" @click="emit('choose', 'merge')">合并两边</button>
-      <button type="button" class="is-primary" data-action="mine" @click="emit('choose', 'mine')">用我的版本</button>
+      <button type="button" data-action="theirs" @click="choose('theirs')">用对方的版本</button>
+      <button type="button" data-action="merge" @click="choose('merge')">合并两边</button>
+      <button type="button" class="is-primary" data-action="mine" @click="choose('mine')">用我的版本</button>
     </footer>
   </div>
 </template>
@@ -119,5 +184,38 @@ const mergeSummary = computed(() => describeBlockMerge(summarizeBlockMerge(props
   border-color: var(--mm-blue, #1677ff);
   background: var(--mm-blue, #1677ff);
   color: #fff;
+}
+
+.save-conflict-panel__blocks {
+  margin-top: 12px;
+}
+.save-conflict-panel__block {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--mm-line, #e5e6eb);
+  border-radius: 6px;
+}
+.save-conflict-panel__block-previews {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.save-conflict-panel__block-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+.save-conflict-panel__block-actions button {
+  padding: 4px 8px;
+  border: 1px solid var(--mm-line, #e5e6eb);
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 12px;
+}
+.save-conflict-panel__block-actions button.is-active {
+  border-color: var(--mm-blue, #1677ff);
+  color: var(--mm-blue, #1677ff);
 }
 </style>
