@@ -49,6 +49,12 @@ const ICONS: Record<FieldType, Component> = {
   formula: TrendCharts,
   link: Connection,
   doc: Document,
+  lookup: Connection,
+  rollup: TrendCharts,
+  created_at: Clock,
+  updated_at: Clock,
+  created_by: User,
+  updated_by: User,
 }
 
 /** 取字段类型图标组件；未知类型回退到文本图标。 */

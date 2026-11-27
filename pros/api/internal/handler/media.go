@@ -468,7 +468,7 @@ func (h *MediaHandler) fail(c *app.RequestContext, err error) {
 		Fail(c, http.StatusRequestedRangeNotSatisfiable, "bad range", "bad_range")
 	case errors.Is(err, media.ErrChunkIncomplete):
 		Conflict(c, "upload is missing parts", nil)
-	case errors.Is(err, media.ErrBadMediaType), errors.Is(err, media.ErrTooLarge), errors.Is(err, media.ErrPathEscape), errors.Is(err, media.ErrCategoryCycle):
+	case errors.Is(err, media.ErrBadMediaType), errors.Is(err, media.ErrTooLarge), errors.Is(err, media.ErrPathEscape), errors.Is(err, media.ErrCategoryCycle), errors.Is(err, media.ErrExtensionBlocked):
 		BadRequest(c, err.Error())
 	default:
 		Internal(c, "media request failed")

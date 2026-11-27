@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -77,6 +78,13 @@ type RecordRow struct {
 	Fields  map[string]any `json:"fields"`
 	Updated time.Time      `json:"updatedAt"`
 	Group   string         `json:"group,omitempty"`
+	// Visibility 是记录级可见范围（space / restricted）。
+	Visibility string `json:"visibility,omitempty"`
+	// CreatedBy 是记录创建者（受限记录只有他和管理者看得到）。
+	CreatedBy string `json:"createdBy,omitempty"`
+	// ConditionalHidden 是「因条件可见策略而对本行隐藏」的字段 ID 列表：
+	// 这些字段的值不过网，界面据此显示占位符（而不是看起来像空值）。
+	ConditionalHidden []string `json:"conditionalHidden,omitempty"`
 }
 
 // QueryResult 是查询返回结构。
@@ -109,31 +117,76 @@ type FieldMeta struct {
 	IsPrimary bool           `json:"isPrimary"`
 	SortOrder int            `json:"sortOrder"`
 	Version   int64          `json:"version"`
+	// ReadOnly 表示**当前用户**对该字段只读（字段级权限策略计算结果）。
+	ReadOnly bool `json:"readOnly"`
+	// Conditional 表示该字段配置了「条件可见」策略：
+	// 只有满足条件的记录才看得到它（字段本身仍然存在于字段列表里）。
+	Conditional bool `json:"conditional"`
 }
 
-// encodeCursor 把偏移量编码成不透明游标。
+// pageCursor 是解析后的分页游标。
+//
+// 两种形态：
+//   - **keyset（v2）**：记录「最后一条的 sort_order + id」，配合 WHERE 条件翻页。
+//     深翻页（第 1000 页）与第 1 页耗时同量级（不再 OFFSET 扫描前面所有行）。
+//   - **offset（旧格式）**：`o:<n>`，仅为兼容历史客户端保留，仍按 OFFSET 翻页。
+type pageCursor struct {
+	// offset 是旧格式游标的偏移量。
+	offset int
+	// keyset 为 true 表示这是 keyset 游标。
+	keyset bool
+	// sortOrder / id 是 keyset 游标的锚点（最后一行的排序位与 ID）。
+	sortOrder int64
+	id        uuid.UUID
+}
+
+// encodeCursor 把偏移量编码成不透明游标（旧格式，兼容保留）。
 func encodeCursor(offset int) string {
 	return base64.StdEncoding.EncodeToString([]byte("o:" + strconv.Itoa(offset)))
 }
 
-// decodeCursor 解析游标，返回偏移量。
-func decodeCursor(cursor string) (int, error) {
+// encodeKeysetCursor 生成 keyset 游标（v2）。
+func encodeKeysetCursor(sortOrder int64, id uuid.UUID) string {
+	raw := fmt.Sprintf("k:%d:%s", sortOrder, id.String())
+	return base64.StdEncoding.EncodeToString([]byte(raw))
+}
+
+// decodeCursor 解析游标。
+//
+// 兼容两种格式：`k:<sort_order>:<id>`（keyset）与 `o:<n>`（旧偏移量）。
+func decodeCursor(cursor string) (pageCursor, error) {
 	if cursor == "" {
-		return 0, nil
+		return pageCursor{}, nil
 	}
 	raw, err := base64.StdEncoding.DecodeString(cursor)
 	if err != nil {
-		return 0, ErrQueryInvalid
+		return pageCursor{}, ErrQueryInvalid
 	}
 	s := string(raw)
-	if !strings.HasPrefix(s, "o:") {
-		return 0, ErrQueryInvalid
+	switch {
+	case strings.HasPrefix(s, "k:"):
+		parts := strings.SplitN(strings.TrimPrefix(s, "k:"), ":", 2)
+		if len(parts) != 2 {
+			return pageCursor{}, ErrQueryInvalid
+		}
+		sortOrder, err := strconv.ParseInt(parts[0], 10, 64)
+		if err != nil {
+			return pageCursor{}, ErrQueryInvalid
+		}
+		id, err := uuid.Parse(parts[1])
+		if err != nil {
+			return pageCursor{}, ErrQueryInvalid
+		}
+		return pageCursor{keyset: true, sortOrder: sortOrder, id: id}, nil
+	case strings.HasPrefix(s, "o:"):
+		n, err := strconv.Atoi(strings.TrimPrefix(s, "o:"))
+		if err != nil || n < 0 {
+			return pageCursor{}, ErrQueryInvalid
+		}
+		return pageCursor{offset: n}, nil
+	default:
+		return pageCursor{}, ErrQueryInvalid
 	}
-	n, err := strconv.Atoi(strings.TrimPrefix(s, "o:"))
-	if err != nil || n < 0 {
-		return 0, ErrQueryInvalid
-	}
-	return n, nil
 }
 
 // countConditions 统计条件总数，用于限制查询规模。
@@ -262,6 +315,16 @@ func (s *Service) conditionSQL(fieldID uuid.UUID, handler FieldHandler, fieldTyp
 			return "", nil, fmt.Errorf("%w: operator %s is not supported for checkboxes", ErrQueryInvalid, op)
 		}
 	case ProjectedJSON:
+		// 附件字段的值是 `url#文件名` 数组：按文件名做模糊匹配，而不是 JSON 包含判断。
+		if fieldType == string(FieldAttachment) {
+			text := fmt.Sprintf("%v", cond.Value)
+			switch op {
+			case "contains", "eq":
+				return "EXISTS (SELECT 1 FROM base_record_values v WHERE v.record_id = r.id AND v.field_id = ? AND v.value_json::text ILIKE ?)", []any{fieldID, "%" + escapeLike(text) + "%"}, nil
+			case "notcontains", "ne":
+				return "NOT EXISTS (SELECT 1 FROM base_record_values v WHERE v.record_id = r.id AND v.field_id = ? AND v.value_json::text ILIKE ?)", []any{fieldID, "%" + escapeLike(text) + "%"}, nil
+			}
+		}
 		values := stringSlice(cond.Value)
 		switch op {
 		case "contains", "eq":
@@ -329,9 +392,12 @@ func jsonArrayArg(values []string) string {
 }
 
 // buildOrderSQL 编译排序片段。
-func (s *Service) buildOrderSQL(idx *fieldIndex, sorts []SortRule, groups []GroupRule) (string, []any) {
+//
+// 返回的是可直接拼进 ORDER BY 的原始 SQL 片段（不含占位符）：
+// 分组 / 排序列名来自字段类型白名单，排序值本身来自 LEFT JOIN 的投影表，
+// 因此这里不需要绑定任何参数。
+func (s *Service) buildOrderSQL(idx *fieldIndex, sorts []SortRule, groups []GroupRule) string {
 	parts := []string{}
-	args := []any{}
 
 	for _, g := range groups {
 		fieldID, err := uuid.Parse(g.FieldID)
@@ -348,7 +414,6 @@ func (s *Service) buildOrderSQL(idx *fieldIndex, sorts []SortRule, groups []Grou
 			dir = "DESC"
 		}
 		parts = append(parts, fmt.Sprintf("gv.%s %s NULLS LAST", col, dir))
-		args = append(args, fieldID)
 	}
 
 	for _, sort := range sorts {
@@ -366,11 +431,12 @@ func (s *Service) buildOrderSQL(idx *fieldIndex, sorts []SortRule, groups []Grou
 			dir = "DESC"
 		}
 		parts = append(parts, fmt.Sprintf("sv.%s %s NULLS LAST", col, dir))
-		args = append(args, fieldID)
 	}
 
+	// 手动排序位是默认次序；有用户排序时作为稳定的次级排序。
+	parts = append(parts, "r.sort_order ASC")
 	parts = append(parts, "r.id ASC")
-	return strings.Join(parts, ", "), args
+	return strings.Join(parts, ", ")
 }
 
 func sortColumn(projected string) string {
@@ -398,6 +464,15 @@ func (s *Service) Query(ctx context.Context, userID, projectID uuid.UUID, req Qu
 	if err != nil {
 		return nil, err
 	}
+	// 惰性补算：跨天打开表格时，先把 TODAY() 这类时间敏感公式重算一遍，
+	// 否则用户会看到昨天的值。失败不阻断查询（最坏情况是显示旧值）。
+	if err := s.EnsureTableTimeRecalc(ctx, tableID); err != nil {
+		log.Printf("base: lazy time recalc for %s failed: %v", tableID, err)
+	}
+	// 字段级权限：隐藏字段对当前角色既不返回元信息，也不返回值。
+	subj := s.subjectOf(userID, projectID)
+	rawIdx := idx
+	idx = filterIndexForSubject(idx, subj)
 	if len(req.Sorts) > MaxSorts {
 		return nil, fmt.Errorf("%w: too many sorts", ErrQueryTooLarge)
 	}
@@ -411,14 +486,18 @@ func (s *Service) Query(ctx context.Context, userID, projectID uuid.UUID, req Qu
 	if pageSize > MaxPageSize {
 		pageSize = MaxPageSize
 	}
-	offset, err := decodeCursor(req.Cursor)
+	cur, err := decodeCursor(req.Cursor)
 	if err != nil {
 		return nil, err
 	}
+	offset := cur.offset
 
 	// 统计与取数共用同一别名 r，保证筛选条件里的 r.id 可用。
 	base := s.db.WithContext(ctx).Table("base_records AS r").
 		Where("r.table_id = ? AND r.deleted_at IS NULL", tableID)
+	// 记录级可见范围：在 SQL 层注入（不是查完再在内存里删），
+	// 否则分页总数 / 筛选 / 排序都会算错，且受限记录的值会先进内存。
+	base = s.applyRecordScope(base, userID, projectID, "r")
 
 	// 「关联文档」字段的条件值允许写文档标题：先把标题解析成节点 ID。
 	if len(req.Filters.Conditions) > 0 || len(req.Filters.Children) > 0 {
@@ -442,11 +521,13 @@ func (s *Service) Query(ctx context.Context, userID, projectID uuid.UUID, req Qu
 		return nil, err
 	}
 
-	orderSQL, orderArgs := s.buildOrderSQL(idx, req.Sorts, req.Groups)
+	orderSQL := s.buildOrderSQL(idx, req.Sorts, req.Groups)
 
 	query := s.db.WithContext(ctx).Table("base_records AS r").
-		Select("r.id AS id, r.version AS version, r.data AS data, r.updated_at AS updated_at").
+		Select("r.id AS id, r.version AS version, r.data AS data, r.updated_at AS updated_at, r.visibility AS visibility, r.created_by AS created_by, r.sort_order AS sort_order").
 		Where("r.table_id = ? AND r.deleted_at IS NULL", tableID)
+	// 记录级可见范围：取数与计数必须用同一套过滤，否则 total 与实际行数对不上。
+	query = s.applyRecordScope(query, userID, projectID, "r")
 	if where != "" {
 		query = query.Where(where, args...)
 	}
@@ -470,32 +551,68 @@ func (s *Service) Query(ctx context.Context, userID, projectID uuid.UUID, req Qu
 		query = query.Joins("LEFT JOIN base_record_values sv ON sv.record_id = r.id AND sv.field_id = ?", fieldID)
 	}
 	if orderSQL != "" {
-		query = query.Order(clause.Expr{SQL: orderSQL, Vars: orderArgs})
+		// 注意：GORM 的 Order 只认 string / clause.OrderBy / clause.OrderByColumn，
+		// 传 clause.Expr 会被静默丢弃（排序不生效）。这里用 Raw 片段保证拼出的
+		// 多列 ORDER BY 原样落到 SQL 上。
+		query = query.Order(clause.OrderBy{
+			Columns: []clause.OrderByColumn{{
+				Column: clause.Column{Name: orderSQL, Raw: true},
+			}},
+		})
 	}
-	query = query.Limit(pageSize).Offset(offset)
+	// keyset 翻页：按 (sort_order, id) 走索引，避免深翻页的 OFFSET 全表扫描。
+	// 仅在「没有自定义排序 / 分组」时启用 —— 自定义排序的主键列不固定，
+	// 用 (sort_order, id) 做锚点会漏行或重复。
+	//
+	// 关键：**首页也要进入 keyset 模式**，否则首页只能吐出旧格式的 `o:<n>` 游标，
+	// 客户端下一页拿到的仍是 offset 游标，keyset 永远走不到（形同虚设）。
+	// 因此这里的判定是「无自定义排序 / 分组」，而不是「收到的游标是不是 keyset」。
+	canUseKeyset := len(req.Sorts) == 0 && len(req.Groups) == 0
+	useKeyset := canUseKeyset && (cur.keyset || cur.offset == 0)
+	if useKeyset && cur.keyset {
+		// 已经有锚点 → 直接用 (sort_order, id) 定位。
+		query = query.Where("(r.sort_order > ? OR (r.sort_order = ? AND r.id > ?))", cur.sortOrder, cur.sortOrder, cur.id)
+	}
+	if useKeyset {
+		// 多取一条用来判断「还有没有下一页」，取完再裁掉。
+		query = query.Limit(pageSize + 1)
+	} else {
+		query = query.Limit(pageSize).Offset(offset)
+	}
 
 	type rawRow struct {
-		ID        uuid.UUID      `gorm:"column:id"`
-		Version   int64          `gorm:"column:version"`
-		Data      datatypes.JSON `gorm:"column:data"`
-		UpdatedAt time.Time      `gorm:"column:updated_at"`
+		ID         uuid.UUID      `gorm:"column:id"`
+		SortOrder  int64          `gorm:"column:sort_order"`
+		Version    int64          `gorm:"column:version"`
+		Data       datatypes.JSON `gorm:"column:data"`
+		UpdatedAt  time.Time      `gorm:"column:updated_at"`
+		Visibility string         `gorm:"column:visibility"`
+		CreatedBy  uuid.UUID      `gorm:"column:created_by"`
 	}
 	var raw []rawRow
 	if err := query.Scan(&raw).Error; err != nil {
 		return nil, err
 	}
 
+	keysetHasMore := useKeyset && len(raw) > pageSize
+	if keysetHasMore {
+		raw = raw[:pageSize]
+	}
 	rows := make([]RecordRow, 0, len(raw))
 	for _, item := range raw {
 		fields := map[string]any{}
 		if len(item.Data) > 0 {
 			_ = json.Unmarshal(item.Data, &fields)
 		}
+		fields, condHidden := stripHiddenFieldsWithReasons(fields, rawIdx, subj)
 		rows = append(rows, RecordRow{
-			ID:      item.ID,
-			Version: item.Version,
-			Fields:  fields,
-			Updated: item.UpdatedAt,
+			ID:                item.ID,
+			Version:           item.Version,
+			Fields:            fields,
+			Updated:           item.UpdatedAt,
+			Visibility:        item.Visibility,
+			CreatedBy:         item.CreatedBy.String(),
+			ConditionalHidden: condHidden,
 		})
 	}
 
@@ -506,14 +623,22 @@ func (s *Service) Query(ctx context.Context, userID, projectID uuid.UUID, req Qu
 		SchemaVersion: table.SchemaVersion,
 		Records:       rows,
 		Total:         total,
-		Fields:        fieldMetas(idx),
+		Fields:        fieldMetasForSubject(idx, subj),
 		Page: PageInfo{
 			HasMore:  int64(offset+len(rows)) < total,
 			PageSize: pageSize,
 			Offset:   offset,
 		},
 	}
-	if int64(offset+len(rows)) < total {
+	if useKeyset {
+		// keyset 模式没有绝对偏移量，用「是否取满一页」判断还有没有下一页。
+		result.Page.HasMore = keysetHasMore
+		result.Page.Offset = -1
+		if len(rows) > 0 && result.Page.HasMore {
+			last := raw[len(raw)-1]
+			result.Page.NextCursor = encodeKeysetCursor(last.SortOrder, last.ID)
+		}
+	} else if int64(offset+len(rows)) < total {
 		result.Page.NextCursor = encodeCursor(offset + len(rows))
 	}
 	return result, nil
@@ -534,8 +659,30 @@ func fieldMetas(idx *fieldIndex) []FieldMeta {
 // 关键字先在当前空间的目录树里找出标题命中的节点 ID，再回表匹配 doc 字段的投影值。
 func (s *Service) keywordCondition(ctx context.Context, projectID uuid.UUID, idx *fieldIndex, kw, recordAlias string) (string, []any) {
 	like := "%" + escapeLike(kw) + "%"
-	cond := fmt.Sprintf(`EXISTS (SELECT 1 FROM base_record_values v WHERE v.record_id = %s AND v.value_text ILIKE ?)`, recordAlias)
+	// 字段级权限：关键字搜索只扫**当前角色可见**的字段，
+	// 否则访客能靠「搜到 / 搜不到」反推隐藏字段的内容。
+	visibleIDs := make([]uuid.UUID, 0, len(idx.byID))
+	for id := range idx.byID {
+		visibleIDs = append(visibleIDs, id)
+	}
+	fieldGuard := ""
+	fieldGuardJSON := ""
+	fieldArgs := []any{}
+	if len(visibleIDs) > 0 {
+		fieldGuard = " AND v.field_id IN ?"
+		fieldGuardJSON = " AND vj.field_id IN ?"
+		fieldArgs = append(fieldArgs, visibleIDs)
+	}
+	// 文本投影：普通文本 / 单选 / 日期字符串等。
+	cond := fmt.Sprintf(`EXISTS (SELECT 1 FROM base_record_values v WHERE v.record_id = %s AND v.value_text ILIKE ?%s)`, recordAlias, fieldGuard)
+	// JSON 投影：附件（值里带文件名）、关联记录（值里带记录 ID）等。
+	// 附件字段投影成 JSON，只扫 value_text 搜不到文件名，这里补一条 JSON 文本匹配。
+	jsonCond := fmt.Sprintf(`EXISTS (SELECT 1 FROM base_record_values vj WHERE vj.record_id = %s AND vj.value_json IS NOT NULL AND vj.value_json::text ILIKE ?%s)`, recordAlias, fieldGuardJSON)
+	cond = "(" + cond + " OR " + jsonCond + ")"
 	args := []any{like}
+	args = append(args, fieldArgs...)
+	args = append(args, like)
+	args = append(args, fieldArgs...)
 
 	docIDs := s.docFieldIDs(idx)
 	if len(docIDs) == 0 {

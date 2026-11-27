@@ -5,132 +5,183 @@
  * 三者最终都编译成服务端的 QueryRequest，
  * 前端不执行任何数据运算，保证与后端口径一致。
  */
-import { ref, watch } from 'vue'
-import { Delete, Plus, Sort } from '@element-plus/icons-vue'
-import type { Condition, FieldMeta, FilterGroup, GroupRule, SortRule } from '../types'
+import { ref, watch } from "vue";
+import { Delete, InfoFilled, Plus, Sort } from "@element-plus/icons-vue";
+import type {
+  Condition,
+  FieldMeta,
+  FilterGroup,
+  GroupRule,
+  SortRule,
+} from "../types";
 
 const props = defineProps<{
-  fields: FieldMeta[]
-  filters?: FilterGroup
-  sorts?: SortRule[]
-  groups?: GroupRule[]
+  fields: FieldMeta[];
+  filters?: FilterGroup;
+  sorts?: SortRule[];
+  groups?: GroupRule[];
+  /** 当前查询条件的保存范围（第十三轮）：shared = 写进视图共享段；personal = 只写我的偏好。 */
+  scope?: "shared" | "personal";
+  /** 「仅我」模式下与共享条件的组合方式（第十四轮）。 */
+  combine?: "override" | "and";
   /** 「关联文档」字段的候选（知识库节点），用于按标题筛选。 */
-  docOptions?: Array<{ id: string; title: string }>
-}>()
+  docOptions?: Array<{ id: string; title: string }>;
+  /**
+   * 打开面板时要聚焦的字段（列头菜单「筛选此列」）。
+   * 非空时自动切到「筛选」页签，并给该字段补一条空条件。
+   */
+  focusFieldId?: string;
+}>();
 
 const emit = defineEmits<{
-  (e: 'close'): void
-  (e: 'apply', payload: { filters: FilterGroup; sorts: SortRule[]; groups: GroupRule[] }): void
-}>()
+  (e: "close"): void;
+  (
+    e: "apply",
+    payload: { filters: FilterGroup; sorts: SortRule[]; groups: GroupRule[] },
+  ): void;
+}>();
 
-const activeTab = ref<'filter' | 'sort' | 'group'>('filter')
+const activeTab = ref<"filter" | "sort" | "group">("filter");
 
-const conditions = ref<Condition[]>([])
-const sorts = ref<SortRule[]>([])
-const groups = ref<GroupRule[]>([])
-const logic = ref<'AND' | 'OR'>('AND')
+const conditions = ref<Condition[]>([]);
+const sorts = ref<SortRule[]>([]);
+const groups = ref<GroupRule[]>([]);
+const logic = ref<"AND" | "OR">("AND");
 
 watch(
   () => [props.filters, props.sorts, props.groups],
   () => {
-    conditions.value = (props.filters?.conditions ?? []).map((item) => ({ ...item }))
-    logic.value = props.filters?.logic ?? 'AND'
-    sorts.value = (props.sorts ?? []).map((item) => ({ ...item }))
-    groups.value = (props.groups ?? []).map((item) => ({ ...item }))
+    conditions.value = (props.filters?.conditions ?? []).map((item) => ({
+      ...item,
+    }));
+    logic.value = props.filters?.logic ?? "AND";
+    sorts.value = (props.sorts ?? []).map((item) => ({ ...item }));
+    groups.value = (props.groups ?? []).map((item) => ({ ...item }));
   },
   { immediate: true, deep: true },
-)
+);
 
-const numericTypes = ['number', 'currency', 'percent', 'rating']
-const temporalTypes = ['date', 'datetime']
-const multiTypes = ['multi_select', 'user', 'attachment', 'link']
+const numericTypes = ["number", "currency", "percent", "rating"];
+const temporalTypes = ["date", "datetime"];
+const multiTypes = ["multi_select", "user", "attachment", "link"];
 
 function fieldOf(fieldId?: string) {
-  return props.fields.find((item) => item.id === fieldId)
+  return props.fields.find((item) => item.id === fieldId);
 }
 
 function operatorsFor(type?: string) {
-  if (!type) return []
+  if (!type) return [];
   if (numericTypes.includes(type) || temporalTypes.includes(type)) {
     return [
-      { value: 'eq', label: '等于' },
-      { value: 'ne', label: '不等于' },
-      { value: 'gt', label: '大于' },
-      { value: 'gte', label: '大于等于' },
-      { value: 'lt', label: '小于' },
-      { value: 'lte', label: '小于等于' },
-      { value: 'isempty', label: '为空' },
-      { value: 'isnotempty', label: '不为空' },
-    ]
+      { value: "eq", label: "等于" },
+      { value: "ne", label: "不等于" },
+      { value: "gt", label: "大于" },
+      { value: "gte", label: "大于等于" },
+      { value: "lt", label: "小于" },
+      { value: "lte", label: "小于等于" },
+      { value: "isempty", label: "为空" },
+      { value: "isnotempty", label: "不为空" },
+    ];
   }
-  if (type === 'checkbox') {
+  if (type === "checkbox") {
     return [
-      { value: 'eq', label: '是' },
-      { value: 'ne', label: '否' },
-      { value: 'isempty', label: '为空' },
-      { value: 'isnotempty', label: '不为空' },
-    ]
+      { value: "eq", label: "是" },
+      { value: "ne", label: "否" },
+      { value: "isempty", label: "为空" },
+      { value: "isnotempty", label: "不为空" },
+    ];
+  }
+  if (type === "attachment") {
+    return [
+      { value: "contains", label: "文件名包含" },
+      { value: "notcontains", label: "文件名不包含" },
+      { value: "isempty", label: "为空" },
+      { value: "isnotempty", label: "不为空" },
+    ];
   }
   if (multiTypes.includes(type)) {
     return [
-      { value: 'contains', label: '包含' },
-      { value: 'notcontains', label: '不包含' },
-      { value: 'eq', label: '等于' },
-      { value: 'ne', label: '不等于' },
-      { value: 'isempty', label: '为空' },
-      { value: 'isnotempty', label: '不为空' },
-    ]
+      { value: "contains", label: "包含" },
+      { value: "notcontains", label: "不包含" },
+      { value: "eq", label: "等于" },
+      { value: "ne", label: "不等于" },
+      { value: "isempty", label: "为空" },
+      { value: "isnotempty", label: "不为空" },
+    ];
   }
   return [
-    { value: 'contains', label: '包含' },
-    { value: 'notcontains', label: '不包含' },
-    { value: 'eq', label: '等于' },
-    { value: 'ne', label: '不等于' },
-    { value: 'startswith', label: '开头是' },
-    { value: 'endswith', label: '结尾是' },
-    { value: 'isempty', label: '为空' },
-    { value: 'isnotempty', label: '不为空' },
-  ]
+    { value: "contains", label: "包含" },
+    { value: "notcontains", label: "不包含" },
+    { value: "eq", label: "等于" },
+    { value: "ne", label: "不等于" },
+    { value: "startswith", label: "开头是" },
+    { value: "endswith", label: "结尾是" },
+    { value: "isempty", label: "为空" },
+    { value: "isnotempty", label: "不为空" },
+  ];
 }
 
 function needsValue(op: string) {
-  return op !== 'isempty' && op !== 'isnotempty'
+  return op !== "isempty" && op !== "isnotempty";
 }
 
+/** 列头「筛选此列」：自动切到筛选页签并给该字段补一条空条件。 */
+watch(
+  () => props.focusFieldId,
+  (fieldId) => {
+    if (!fieldId) return;
+    const field = props.fields.find((item) => item.id === fieldId);
+    if (!field) return;
+    activeTab.value = "filter";
+    if (!conditions.value.some((item) => item.fieldId === fieldId)) {
+      const operators = operatorsFor(field.type);
+      conditions.value.push({
+        fieldId,
+        operator: operators[0]?.value ?? "contains",
+        value: "",
+      });
+    }
+  },
+  { immediate: true },
+);
+
 function optionsOf(field?: FieldMeta) {
-  const raw = field?.config?.options
-  return Array.isArray(raw) ? raw.map((item) => String(item)) : []
+  const raw = field?.config?.options;
+  return Array.isArray(raw) ? raw.map((item) => String(item)) : [];
 }
 
 function addCondition() {
-  const field = props.fields[0]
-  if (!field) return
-  conditions.value.push({ fieldId: field.id, operator: 'contains', value: '' })
+  const field = props.fields[0];
+  if (!field) return;
+  conditions.value.push({ fieldId: field.id, operator: "contains", value: "" });
 }
 
 function addSort() {
-  const field = props.fields[0]
-  if (!field) return
-  sorts.value.push({ fieldId: field.id, order: 'asc' })
+  const field = props.fields[0];
+  if (!field) return;
+  sorts.value.push({ fieldId: field.id, order: "asc" });
 }
 
 function addGroup() {
-  const field = props.fields.find((item) => item.type === 'single_select' || item.type === 'multi_select') ?? props.fields[0]
-  if (!field) return
-  groups.value.push({ fieldId: field.id, order: 'asc' })
+  const field =
+    props.fields.find(
+      (item) => item.type === "single_select" || item.type === "multi_select",
+    ) ?? props.fields[0];
+  if (!field) return;
+  groups.value.push({ fieldId: field.id, order: "asc" });
 }
 
 function apply() {
   const valid = conditions.value.filter((item) => {
-    if (!item.fieldId || !needsValue(item.operator)) return false
-    if (Array.isArray(item.value)) return item.value.length > 0
-    return item.value !== ''
-  })
-  emit('apply', {
+    if (!item.fieldId || !needsValue(item.operator)) return false;
+    if (Array.isArray(item.value)) return item.value.length > 0;
+    return item.value !== "";
+  });
+  emit("apply", {
     filters: { logic: logic.value, conditions: valid, children: [] },
     sorts: sorts.value.filter((item) => item.fieldId),
     groups: groups.value.filter((item) => item.fieldId),
-  })
+  });
 }
 </script>
 
@@ -140,9 +191,23 @@ function apply() {
     title="筛选与排序"
     width="760px"
     append-to-body
+    modal-class="be-modal"
     destroy-on-close
     @close="emit('close')"
   >
+    <div class="be-panel__hint be-query__scope-hint">
+      <el-icon><InfoFilled /></el-icon>
+      <span v-if="props.scope === 'personal'">
+        这些条件只保存到<b>我的偏好</b>，其他人打开这个视图不受影响<template
+          v-if="props.combine === 'and'"
+          >； 当前为<b>叠加</b>口径，最终筛选 = 视图共享条件 AND
+          我的条件</template
+        >。
+      </span>
+      <span v-else>
+        这些条件会保存到<b>视图共享配置</b>，所有人打开这个视图都会看到（可在工具栏切到「仅我」）。
+      </span>
+    </div>
     <el-tabs v-model="activeTab" class="be-panel">
       <el-tab-pane label="筛选" name="filter">
         <div class="be-panel">
@@ -152,11 +217,22 @@ function apply() {
               <el-radio-button value="OR">任一满足</el-radio-button>
             </el-radio-group>
             <div style="flex: 1" />
-            <el-button size="small" :icon="Plus" @click="addCondition">添加条件</el-button>
+            <el-button size="small" :icon="Plus" @click="addCondition"
+              >添加条件</el-button
+            >
           </div>
-          <div v-for="(cond, index) in conditions" :key="index" class="be-panel__row">
+          <div
+            v-for="(cond, index) in conditions"
+            :key="index"
+            class="be-panel__row"
+          >
             <el-select v-model="cond.fieldId" style="width: 160px">
-              <el-option v-for="field in fields" :key="field.id" :label="field.name" :value="field.id" />
+              <el-option
+                v-for="field in fields"
+                :key="field.id"
+                :label="field.name"
+                :value="field.id"
+              />
             </el-select>
             <el-select v-model="cond.operator" style="width: 130px">
               <el-option
@@ -216,7 +292,9 @@ function apply() {
                 inactive-value="false"
               />
               <el-input-number
-                v-else-if="numericTypes.includes(fieldOf(cond.fieldId)?.type ?? '')"
+                v-else-if="
+                  numericTypes.includes(fieldOf(cond.fieldId)?.type ?? '')
+                "
                 v-model="cond.value"
                 style="flex: 1"
                 :controls="false"
@@ -235,12 +313,25 @@ function apply() {
                 value-format="YYYY-MM-DD"
                 style="flex: 1"
               />
-              <el-input v-else v-model="cond.value" style="flex: 1" placeholder="筛选值" />
+              <el-input
+                v-else
+                v-model="cond.value"
+                style="flex: 1"
+                placeholder="筛选值"
+              />
             </template>
             <div v-else style="flex: 1" />
-            <el-button :icon="Delete" text @click="conditions.splice(index, 1)" />
+            <el-button
+              :icon="Delete"
+              text
+              @click="conditions.splice(index, 1)"
+            />
           </div>
-          <el-empty v-if="!conditions.length" description="暂无筛选条件" :image-size="64" />
+          <el-empty
+            v-if="!conditions.length"
+            description="暂无筛选条件"
+            :image-size="64"
+          />
         </div>
       </el-tab-pane>
 
@@ -248,12 +339,23 @@ function apply() {
         <div class="be-panel">
           <div class="be-panel__row">
             <div style="flex: 1" />
-            <el-button size="small" :icon="Sort" @click="addSort">添加排序</el-button>
+            <el-button size="small" :icon="Sort" @click="addSort"
+              >添加排序</el-button
+            >
           </div>
-          <div v-for="(rule, index) in sorts" :key="index" class="be-panel__row">
+          <div
+            v-for="(rule, index) in sorts"
+            :key="index"
+            class="be-panel__row"
+          >
             <span class="be-panel__hint">{{ index + 1 }}</span>
             <el-select v-model="rule.fieldId" style="flex: 1">
-              <el-option v-for="field in fields" :key="field.id" :label="field.name" :value="field.id" />
+              <el-option
+                v-for="field in fields"
+                :key="field.id"
+                :label="field.name"
+                :value="field.id"
+              />
             </el-select>
             <el-radio-group v-model="rule.order" size="small">
               <el-radio-button value="asc">升序</el-radio-button>
@@ -261,7 +363,11 @@ function apply() {
             </el-radio-group>
             <el-button :icon="Delete" text @click="sorts.splice(index, 1)" />
           </div>
-          <el-empty v-if="!sorts.length" description="暂无排序规则" :image-size="64" />
+          <el-empty
+            v-if="!sorts.length"
+            description="暂无排序规则"
+            :image-size="64"
+          />
         </div>
       </el-tab-pane>
 
@@ -269,11 +375,22 @@ function apply() {
         <div class="be-panel">
           <div class="be-panel__row">
             <div style="flex: 1" />
-            <el-button size="small" :icon="Plus" @click="addGroup">添加分组</el-button>
+            <el-button size="small" :icon="Plus" @click="addGroup"
+              >添加分组</el-button
+            >
           </div>
-          <div v-for="(rule, index) in groups" :key="index" class="be-panel__row">
+          <div
+            v-for="(rule, index) in groups"
+            :key="index"
+            class="be-panel__row"
+          >
             <el-select v-model="rule.fieldId" style="flex: 1">
-              <el-option v-for="field in fields" :key="field.id" :label="field.name" :value="field.id" />
+              <el-option
+                v-for="field in fields"
+                :key="field.id"
+                :label="field.name"
+                :value="field.id"
+              />
             </el-select>
             <el-radio-group v-model="rule.order" size="small">
               <el-radio-button value="asc">升序</el-radio-button>
@@ -281,7 +398,11 @@ function apply() {
             </el-radio-group>
             <el-button :icon="Delete" text @click="groups.splice(index, 1)" />
           </div>
-          <el-empty v-if="!groups.length" description="暂无分组规则" :image-size="64" />
+          <el-empty
+            v-if="!groups.length"
+            description="暂无分组规则"
+            :image-size="64"
+          />
         </div>
       </el-tab-pane>
     </el-tabs>
@@ -292,3 +413,19 @@ function apply() {
     </template>
   </el-dialog>
 </template>
+
+<style scoped>
+.be-query__scope-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+  font-size: 12px;
+  color: var(--tg-text-2);
+}
+
+.be-query__scope-hint b {
+  color: var(--tg-text);
+  font-weight: 600;
+}
+</style>

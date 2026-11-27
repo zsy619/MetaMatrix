@@ -17,6 +17,7 @@
     "test:e2e:compact": "node scripts/rte-compact-toolbar-e2e.mjs",
     "test:smoke": "node scripts/smoke-flow.mjs",
     "test:e2e:clone": "node scripts/clone-canvas-e2e.mjs",
+    "gen:api": "node scripts/gen-api-types.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -71,9 +72,11 @@
     "vue-router": "^5.4.0",
     "vxe-pc-ui": "^4.21.7",
     "vxe-table": "^4.24.5",
+    "y-protocols": "^1.0.7",
     "yjs": "^13.6.33"
   },
   "devDependencies": {
+    "@tiptap/y-tiptap": "3.3.1",
     "@types/jszip": "^3.4.0",
     "@types/katex": "^0.16.8",
     "@types/node": "^24.19.2",

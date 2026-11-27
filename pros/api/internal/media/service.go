@@ -3,6 +3,8 @@ package media
 import (
 	"context"
 	"encoding/hex"
+	"errors"
+	"fmt"
 	"io"
 	"mime"
 	"path/filepath"
@@ -119,6 +121,11 @@ func (s *Service) Save(ctx context.Context, userID uuid.UUID, in SaveInput) (Ass
 		categoryID = &id
 	}
 	ext := SanitizeExt(in.OriginalName)
+	// 危险扩展名拦截（共享方案 §15.4 安全验收：上传文件必须进行类型限制）。
+	// 媒体分类只区分 image/audio/video/file，这里再补一层「可执行脚本」黑名单。
+	if err := checkExtensionAllowed(ext); err != nil {
+		return AssetView{}, err
+	}
 	rel, sha, size, err := s.writeHashed(userID.String(), mediaType, ext, in.Body)
 	if err != nil {
 		return AssetView{}, err
@@ -473,4 +480,32 @@ func cleanName(name string) string {
 		base = string(rs[:255])
 	}
 	return base
+}
+
+// blockedExtensions 是禁止上传的可执行 / 脚本类扩展名。
+//
+// 依据共享技术方案 §15.4「上传文件必须进行权限验证和文件类型限制」。
+// 命中即拒绝，不做「改后缀放行」——那等于没限制。
+var blockedExtensions = map[string]bool{
+	"exe": true, "bat": true, "cmd": true, "com": true, "scr": true,
+	"msi": true, "msp": true, "jar": true, "sh": true, "bash": true,
+	"zsh": true, "ps1": true, "psm1": true, "vbs": true, "vbe": true,
+	"jse": true, "wsf": true, "wsh": true, "hta": true, "cpl": true,
+	"reg": true, "apk": true, "dll": true, "so": true, "dylib": true,
+	"app": true, "pkg": true, "deb": true, "rpm": true,
+}
+
+// ErrExtensionBlocked 表示上传文件的扩展名在黑名单里。
+var ErrExtensionBlocked = errors.New("file extension is not allowed")
+
+// checkExtensionAllowed 检查扩展名是否被允许。
+func checkExtensionAllowed(ext string) error {
+	ext = strings.ToLower(strings.TrimPrefix(strings.TrimSpace(ext), "."))
+	if ext == "" || ext == "bin" {
+		return nil
+	}
+	if blockedExtensions[ext] {
+		return fmt.Errorf("%w: .%s", ErrExtensionBlocked, ext)
+	}
+	return nil
 }

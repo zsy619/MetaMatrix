@@ -446,6 +446,37 @@ body .ng-ce-overlay {
   border-radius: var(--tg-radius-pill);
   font-weight: 500;
 }
+
+/*
+ * 分段控件形态归一（Element Plus 默认样式修正）
+ *
+ * EP 默认把分段控件做成「连成一条」：首/末段只画半边圆角、每段套一圈 outline、
+ * 选中段用 `box-shadow: -1px 0 0 0 <primary>` 模拟边框（整体左移 1px）。
+ * 在本项目「灰底容器 + 独立药丸」的规范下，这三件事叠加出来的就是：
+ * 选中项一头圆一头方、相对文字左移 1px、多一圈空心框 —— 也就是用户反馈的「错位」。
+ *
+ * 这里统一成：每一段都是一颗独立药丸（整圆角、无描边框、选中态不位移）。
+ * 键盘聚焦的可见性改由下面 focus-visible 单独保留。
+ */
+.el-radio-button .el-radio-button__inner,
+.el-radio-button:first-child .el-radio-button__inner,
+.el-radio-button:last-child .el-radio-button__inner,
+.el-radio-button:first-child:last-child .el-radio-button__inner {
+  border-radius: var(--tg-radius-pill);
+  outline: none;
+  box-shadow: none;
+}
+
+.el-radio-button.is-active .el-radio-button__original-radio:not(:disabled) + .el-radio-button__inner {
+  box-shadow: none;
+}
+
+.el-radio-button .el-radio-button__original-radio:focus-visible + .el-radio-button__inner {
+  outline: 2px solid var(--tg-blue);
+  outline-offset: 1px;
+  border-radius: var(--tg-radius-pill);
+}
+
 .el-tag {
   border-radius: var(--tg-radius-xs);
   font-weight: 500;

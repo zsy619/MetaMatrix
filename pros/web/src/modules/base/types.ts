@@ -21,6 +21,24 @@ export type FieldType =
   | 'formula'
   | 'link'
   | 'doc'
+  | 'lookup'
+  | 'rollup'
+  | 'created_at'
+  | 'updated_at'
+  | 'created_by'
+  | 'updated_by'
+
+/** 计算字段（引用 / 汇总）的配置。 */
+export type ComputedFieldConfig = {
+  /** 目标表 ID。 */
+  targetTableId?: string
+  /** 目标字段 ID。 */
+  targetFieldId?: string
+  /** 本表承载关联关系的字段 ID（省略则自动推断）。 */
+  linkFieldId?: string
+  /** 汇总方式。 */
+  rollupType?: 'sum' | 'avg' | 'count' | 'countUnique' | 'min' | 'max'
+}
 
 /** 字段能力：决定哪些视图操作可用。 */
 export type FieldCapabilities = {
@@ -54,14 +72,34 @@ export type FieldMeta = {
   isPrimary: boolean
   sortOrder: number
   version: number
+  /** 当前用户对该字段只读（服务端按字段级权限策略计算）。 */
+  readOnly?: boolean
+  /** 该字段配置了「条件可见」策略（只有满足条件的记录看得到它）。 */
+  conditional?: boolean
 }
+
+/** 字段级条件（条件可见 / 条件隐藏）。 */
+export type FieldCondition = {
+  fieldId: string
+  operator: string
+  value?: unknown
+}
+
+/** 记录级可见范围。 */
+export type RecordVisibility = 'space' | 'restricted' | 'custom'
 
 /** 记录（行）。 */
 export type RecordRow = {
   id: string
   version: number
   fields: Record<string, unknown>
+  /** 因「条件可见」策略而对本行隐藏的字段 ID（值不过网）。 */
+  conditionalHidden?: string[]
   updatedAt: string
+  /** 记录级可见范围：space = 空间内可见；restricted = 仅创建者与空间管理者可见；custom = 指定成员可见。 */
+  visibility?: RecordVisibility
+  /** 记录创建者（受限记录只有他和管理者看得到）。 */
+  createdBy?: string
 }
 
 /** 表。 */
@@ -80,18 +118,57 @@ export type BaseTable = {
 }
 
 /** 视图。 */
-export type ViewType = 'grid' | 'kanban' | 'calendar' | 'gallery'
+export type ViewType = 'grid' | 'kanban' | 'calendar' | 'gallery' | 'form' | 'gantt'
 
 /** 视图配置。 */
+/** 个人偏好段：只影响自己，不改共享配置。 */
+export type PersonalViewConfig = {
+  fieldVisibility?: Record<string, boolean>
+  fieldWidths?: Record<string, number>
+  /** 冻结列（字段 ID 列表，必须从左起连续）。 */
+  frozenFields?: string[]
+  layout?: Record<string, unknown>
+  /**
+   * 个人查询偏好（第十三轮）。
+   *
+   * 筛选 / 排序 / 分组过去写在共享段里，A 改了就抹掉 B 的查询条件。
+   * 现在可以把「我的查询条件」放进个人段：只有自己看得到自己的那份，
+   * 共享段仍然是「视图给所有人看到的默认查询条件」。
+   */
+  query?: {
+    filters?: FilterGroup
+    sorts?: SortRule[]
+    groups?: GroupRule[]
+    /**
+     * 与共享条件的组合方式（第十四轮）：
+     * override = 我的条件完全覆盖共享条件（历史行为）；
+     * and = 共享条件 AND 我的条件（叠加口径）。
+     */
+    combine?: 'override' | 'and'
+  }
+}
+
 export type ViewConfig = {
   fieldVisibility?: Record<string, boolean>
   fieldWidths?: Record<string, number>
+  /** 冻结列（§6.3 ViewConfig.frozenFields）。 */
+  frozenFields?: string[]
   filters?: FilterGroup
   sorts?: SortRule[]
   groups?: GroupRule[]
   pagination?: { pageSize: number }
   layout?: Record<string, unknown>
+  /**
+   * 个人偏好（按用户 ID 分桶）。
+   *
+   * 技术方案风险表：「共享视图与个人偏好混存 → 用户互相覆盖」。
+   * 共享视图里的列宽 / 字段显隐写进这里，只有自己看得到自己的那份。
+   */
+  personal?: Record<string, PersonalViewConfig>
 }
+
+/** 视图可见范围：shared = 空间共享；personal = 仅自己可见。 */
+export type ViewScope = 'shared' | 'personal'
 
 export type BaseView = {
   id: string
@@ -100,6 +177,8 @@ export type BaseView = {
   type: ViewType
   config: ViewConfig
   isDefault: boolean
+  /** 视图可见范围（后端缺省为 shared）。 */
+  scope?: ViewScope
   ownerId: string
   version: number
   createdAt: string
@@ -155,4 +234,78 @@ export type FormulaValidation = {
   errorCode?: string
   dependencies?: string[]
   value?: unknown
+}
+
+/** 记录级可见成员（授权名单里的一人）。 */
+export type RecordGrant = {
+  userId: string
+  name: string
+  email?: string
+}
+
+/** 配置包里的字段（key 为包内稳定引用键，导入时据此重映射条件引用）。 */
+export type ConfigBundleField = {
+  key: string
+  name: string
+  type: string
+  required?: boolean
+  isPrimary?: boolean
+  sortOrder: number
+  config?: Record<string, unknown>
+  /** 公式字段的表达式（公式存在独立表里，不在 config 中）。 */
+  formula?: string
+}
+
+/** 配置包里的视图（只含共享配置，个人偏好不导出）。 */
+export type ConfigBundleView = {
+  name: string
+  type: string
+  config?: Record<string, unknown>
+}
+
+/** 表配置包：字段结构 + 策略 + 视图。 */
+export type ConfigBundle = {
+  formatVersion: number
+  exportedAt: string
+  table: { name: string; description?: string }
+  fields: ConfigBundleField[]
+  views: ConfigBundleView[]
+}
+
+/** 表结构快照（GET /tables/:tableId/schema）。 */
+export type TableSchema = {
+  table: BaseTable
+  fields: FieldMeta[]
+  views: BaseView[]
+  schemaVersion: number
+  formulas: Array<{ fieldId: string; fieldName: string; expression: string }>
+}
+
+/** 引用 / 汇总字段摘要（GET /tables/:tableId/computed-fields）。 */
+export type ComputedFieldSummary = {
+  fieldId: string
+  fieldName: string
+  type: 'lookup' | 'rollup'
+  targetTableId: string
+  targetFieldId: string
+  linkFieldId: string
+  rollupType: string
+}
+
+/** 公式依赖方向。 */
+export type FormulaDependency = {
+  fieldId: string
+  fieldName: string
+  tableId: string
+  direction: 'down' | 'up'
+}
+
+/** 公式定义（GET /fields/:fieldId/formula）。 */
+export type FieldFormulaDefinition = {
+  fieldId: string
+  fieldName: string
+  tableId: string
+  expression: string
+  version: number
+  dependencies: FormulaDependency[]
 }

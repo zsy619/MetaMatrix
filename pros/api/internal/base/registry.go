@@ -34,6 +34,10 @@ const (
 	FieldFormula      FieldType = "formula"
 	FieldLink         FieldType = "link"
 	FieldDoc          FieldType = "doc"
+	// FieldLookup 引用字段：把关联记录里的某个字段「引」过来（可多值）。
+	FieldLookup FieldType = "lookup"
+	// FieldRollup 汇总字段：对关联记录里的某个字段做聚合（求和 / 平均 / 计数…）。
+	FieldRollup FieldType = "rollup"
 )
 
 // 字段值在查询投影表里的物理列类型。
@@ -649,7 +653,9 @@ func (attachmentHandler) Definition() FieldDefinition {
 		ConfigSchema: map[string]any{
 			"maxCount": map[string]any{"type": "integer", "default": 10, "min": 1, "max": 50},
 		},
-		Capabilities: FieldCapabilities{Editable: true, Filterable: false, Sortable: false, Groupable: false, Indexable: false},
+		// 可索引：附件值里带文件名，索引后关键字搜索能按文件名命中（值仍以 JSON 投影存储）。
+		// 可筛选：按「文件名包含」过滤（走 value_json 文本匹配，不做 JSON 包含判断）。
+		Capabilities: FieldCapabilities{Editable: true, Filterable: true, Sortable: false, Groupable: false, Indexable: true},
 	}
 }
 func (attachmentHandler) ValidateConfig(cfg map[string]any) error {
@@ -840,6 +846,115 @@ type Registry struct {
 }
 
 // NewRegistry 返回内置的字段注册表。
+
+// —— Lookup / Rollup ——
+//
+// 两者都是**计算字段**：值由服务端按关联关系算出来，界面上不可直接编辑。
+// 配置：
+//
+//	{"targetTableId": "...", "targetFieldId": "...", "linkFieldId": "...", "rollupType": "sum"}
+//
+// linkFieldId 可省略，省略时自动使用本表中指向 targetTableId 的第一个关联字段。
+
+type lookupHandler struct{}
+
+func (lookupHandler) Definition() FieldDefinition {
+	return FieldDefinition{
+		Type: FieldLookup, Label: "引用字段", Icon: "lookup", Version: 1, Color: "#0ea5e9",
+		Description: "把关联记录里的字段值引过来（跨表取值）",
+		ConfigSchema: map[string]any{
+			"targetTableId": map[string]any{"type": "string", "default": ""},
+			"targetFieldId": map[string]any{"type": "string", "default": ""},
+			"linkFieldId":   map[string]any{"type": "string", "default": ""},
+		},
+		Capabilities: FieldCapabilities{Editable: false, Filterable: true, Sortable: true, Groupable: true, Indexable: true, Computed: true},
+	}
+}
+
+func (lookupHandler) ValidateConfig(cfg map[string]any) error {
+	return validateComputedConfig(cfg)
+}
+
+func (lookupHandler) ValidateValue(v any, _ map[string]any) error    { return nil }
+func (lookupHandler) Normalize(v any, _ map[string]any) (any, error) { return v, nil }
+func (lookupHandler) ProjectedType() string                          { return ProjectedJSON }
+func (lookupHandler) Text(v any) string {
+	switch t := v.(type) {
+	case nil:
+		return ""
+	case []any:
+		parts := make([]string, 0, len(t))
+		for _, item := range t {
+			parts = append(parts, fmt.Sprintf("%v", item))
+		}
+		return strings.Join(parts, ", ")
+	case []string:
+		return strings.Join(t, ", ")
+	default:
+		return fmt.Sprintf("%v", v)
+	}
+}
+
+type rollupHandler struct{}
+
+func (rollupHandler) Definition() FieldDefinition {
+	return FieldDefinition{
+		Type: FieldRollup, Label: "汇总字段", Icon: "rollup", Version: 1, Color: "#f97316",
+		Description: "对关联记录里的字段做聚合（求和 / 平均 / 计数 / 去重计数）",
+		ConfigSchema: map[string]any{
+			"targetTableId": map[string]any{"type": "string", "default": ""},
+			"targetFieldId": map[string]any{"type": "string", "default": ""},
+			"linkFieldId":   map[string]any{"type": "string", "default": ""},
+			"rollupType":    map[string]any{"type": "string", "default": "sum", "enum": []any{"sum", "avg", "count", "countUnique", "min", "max"}},
+		},
+		Capabilities: FieldCapabilities{Editable: false, Filterable: true, Sortable: true, Groupable: true, Indexable: true, Computed: true},
+	}
+}
+
+func (rollupHandler) ValidateConfig(cfg map[string]any) error {
+	if err := validateComputedConfig(cfg); err != nil {
+		return err
+	}
+	if v, ok := cfg["rollupType"]; ok {
+		kind, ok := v.(string)
+		if !ok {
+			return errors.New("rollupType must be a string")
+		}
+		switch kind {
+		case "sum", "avg", "count", "countUnique", "min", "max":
+		default:
+			return fmt.Errorf("unsupported rollupType %q", kind)
+		}
+	}
+	return nil
+}
+
+func (rollupHandler) ValidateValue(v any, _ map[string]any) error    { return nil }
+func (rollupHandler) Normalize(v any, _ map[string]any) (any, error) { return v, nil }
+func (rollupHandler) ProjectedType() string                          { return ProjectedNumber }
+func (rollupHandler) Text(v any) string {
+	switch t := v.(type) {
+	case nil:
+		return ""
+	case float64:
+		return strconv.FormatFloat(t, 'f', -1, 64)
+	default:
+		return fmt.Sprintf("%v", v)
+	}
+}
+
+// validateComputedConfig 校验计算字段（引用 / 汇总）的公共配置。
+func validateComputedConfig(cfg map[string]any) error {
+	for _, key := range []string{"targetTableId", "targetFieldId", "linkFieldId"} {
+		if v, ok := cfg[key]; ok {
+			if _, ok := v.(string); !ok {
+				return fmt.Errorf("%s must be a string", key)
+			}
+		}
+	}
+	return nil
+}
+
 func NewRegistry() *Registry {
 	r := &Registry{handlers: map[FieldType]FieldHandler{}}
 	r.register(textHandler{})
@@ -861,6 +976,13 @@ func NewRegistry() *Registry {
 	r.register(formulaHandler{})
 	r.register(linkHandler{})
 	r.register(docHandler{})
+	r.register(lookupHandler{})
+	r.register(rollupHandler{})
+	// 系统字段（只读，服务端自动维护）。
+	r.register(systemFieldHandler{kind: FieldCreatedAt, label: "创建时间", icon: "clock", color: "#8b5cf6", projected: ProjectedDate})
+	r.register(systemFieldHandler{kind: FieldUpdatedAt, label: "更新时间", icon: "clock", color: "#8b5cf6", projected: ProjectedDate})
+	r.register(systemFieldHandler{kind: FieldCreatedBy, label: "创建人", icon: "user", color: "#3390ec", projected: ProjectedText})
+	r.register(systemFieldHandler{kind: FieldUpdatedBy, label: "更新人", icon: "user", color: "#3390ec", projected: ProjectedText})
 	return r
 }
 

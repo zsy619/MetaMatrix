@@ -106,14 +106,19 @@ func (s *Service) MigrateLegacySheet(ctx context.Context, userID, projectID, nod
 		sortIdx int
 	}
 	newFields := []newField{}
+	usedNames := map[string]bool{}
 	for i, f := range legacy.Fields {
 		ftype, ok := legacyTypeMap[f.Type]
 		if !ok {
 			ftype = FieldText
 		}
+		// 旧表允许「空列名」；直接搬过来会让新表**表头没有标题**（只剩图标）。
+		// 这里补一个可读的名字，并在同表内去重。
+		name := legacyFieldName(f.Name, i, usedNames)
+		usedNames[name] = true
 		newFields = append(newFields, newField{
 			id:      uuid.New(),
-			name:    strings.TrimSpace(f.Name),
+			name:    name,
 			ftype:   ftype,
 			options: f.Options,
 			primary: i == 0,
@@ -348,4 +353,20 @@ func (s *Service) EnsureBaseWithMigration(ctx context.Context, userID, projectID
 		return info, nil
 	}
 	return s.MigrateLegacySheet(ctx, userID, projectID, nodeID, legacyRaw)
+}
+
+// legacyFieldName 给旧表列名兜底。
+//
+// 旧表允许「空列名」（列标题被清空），直接搬过来会让新表表头只剩一个类型图标、
+// 看不到标题 —— 这里补成「列 N」，并保证同表内不重名。
+func legacyFieldName(raw string, index int, used map[string]bool) string {
+	name := strings.TrimSpace(raw)
+	if name == "" {
+		name = fmt.Sprintf("列 %d", index+1)
+	}
+	base := name
+	for seq := 2; used[name]; seq++ {
+		name = fmt.Sprintf("%s %d", base, seq)
+	}
+	return name
 }

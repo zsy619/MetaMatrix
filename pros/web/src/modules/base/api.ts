@@ -6,6 +6,9 @@
 import { apiRequest } from '../../api/http'
 import type {
   BaseInfo,
+  FieldFormulaDefinition,
+  FormulaDependency,
+  TableSchema,
   BaseTable,
   BaseView,
   FieldMeta,
@@ -14,7 +17,12 @@ import type {
   QueryRequest,
   QueryResult,
   RecordRow,
+  RecordGrant,
+  RecordVisibility,
+  ViewScope,
   ViewConfig,
+  ConfigBundle,
+  ComputedFieldSummary,
 } from './types'
 
 function baseUrl(projectId: string) {
@@ -32,6 +40,36 @@ export function ensureBase(projectId: string, nodeId: string, name?: string) {
 /** 列出空间内的 Base。 */
 export function listBases(projectId: string) {
   return apiRequest<BaseInfo[]>(`${baseUrl(projectId)}/bases`)
+}
+
+/** 创建一个独立 Base（不依赖知识库节点）。 */
+export function createBase(
+  projectId: string,
+  payload: { name?: string; description?: string; icon?: string } = {},
+) {
+  return apiRequest<BaseInfo>(`${baseUrl(projectId)}/bases`, {
+    method: 'POST',
+    body: payload,
+  })
+}
+
+/** 改 Base 元信息（名称 / 描述 / 图标）。 */
+export function updateBase(
+  projectId: string,
+  baseId: string,
+  payload: { name?: string; description?: string; icon?: string },
+) {
+  return apiRequest<BaseInfo>(`${baseUrl(projectId)}/bases/${baseId}`, {
+    method: 'PATCH',
+    body: payload,
+  })
+}
+
+/** 删除 Base（软删，级联表 / 字段 / 记录 / 视图）。 */
+export function deleteBase(projectId: string, baseId: string) {
+  return apiRequest<{ id: string; deleted: boolean }>(`${baseUrl(projectId)}/bases/${baseId}`, {
+    method: 'DELETE',
+  })
 }
 
 /** 列出支持的字段类型与能力。 */
@@ -103,6 +141,68 @@ export function listBaseEmbedders(projectId: string, baseId: string) {
   return apiRequest<BaseEmbedder[]>(`${baseUrl(projectId)}/embedders/${baseId}`)
 }
 
+/** 操作记录（审计日志）条目。 */
+export type BaseAuditLog = {
+  id: string
+  projectId: string
+  baseId: string
+  tableId?: string
+  recordId?: string
+  operatorId: string
+  /** 操作者显示名（后端解析，缺失时回退短 ID）。 */
+  operatorName?: string
+  /** record.created / record.updated / record.deleted / field.* 等。 */
+  operation: string
+  beforeData?: Record<string, unknown> | null
+  afterData?: Record<string, unknown> | null
+  /** 被操作的数据表名（审计可能来自 base 内其它表）。 */
+  tableName?: string
+  /** 字段 ID → 字段名（由服务端按该条记录所属表解析）。 */
+  fieldNames?: Record<string, string>
+  requestId?: string
+  createdAt: string
+}
+
+/** 审计查询条件（分页 + 筛选）。 */
+export type AuditQuery = {
+  /** 单页条数（1~200）。 */
+  limit?: number
+  /** 偏移量（配合「加载更多」）。 */
+  offset?: number
+  /** 操作类型过滤；空表示不过滤。 */
+  action?: string
+  /** 起始时间（RFC3339）。 */
+  from?: string
+  /** 结束时间（RFC3339）。 */
+  to?: string
+  /** 操作者过滤（用户 ID）。 */
+  operator?: string
+  /** 记录过滤（记录 ID）。 */
+  recordId?: string
+}
+
+/** 审计分页结果。 */
+export type AuditPage = {
+  items: BaseAuditLog[]
+  total: number
+  limit: number
+  offset: number
+}
+
+/** 列出操作记录（分页 + 筛选）。 */
+export function listAudit(projectId: string, baseId: string, query: AuditQuery = {}) {
+  const params = new URLSearchParams()
+  if (query.limit) params.set('limit', String(query.limit))
+  if (query.offset) params.set('offset', String(query.offset))
+  if (query.action) params.set('action', query.action)
+  if (query.from) params.set('from', query.from)
+  if (query.to) params.set('to', query.to)
+  if (query.operator) params.set('operator', query.operator)
+  if (query.recordId) params.set('recordId', query.recordId)
+  const qs = params.toString()
+  return apiRequest<AuditPage>(`${baseUrl(projectId)}/${baseId}/audit${qs ? `?${qs}` : ''}`)
+}
+
 /** 建字段。 */
 export function createField(
   projectId: string,
@@ -167,11 +267,18 @@ export function updateRecord(
   recordId: string,
   fields: Record<string, unknown>,
   expectedVersion?: number,
+  visibility?: RecordVisibility,
+  grants?: string[],
 ) {
   return apiRequest<RecordRow>(`${baseUrl(projectId)}/records/${recordId}`, {
     method: 'PATCH',
-    body: { fields, expectedVersion },
+    body: { fields, expectedVersion, visibility, grants },
   })
+}
+
+/** 列出记录的可见成员（指定成员可见时有效）。 */
+export function listRecordGrants(projectId: string, recordId: string) {
+  return apiRequest<RecordGrant[]>(`${baseUrl(projectId)}/records/${recordId}/grants`)
 }
 
 /** 删除记录。 */
@@ -210,6 +317,74 @@ export function batchRecords(
   )
 }
 
+/** 记录 → 文档的引用关系（文档内嵌了本表，或正文提到了本记录）。 */
+export type RecordDocReference = {
+  /** 知识库节点 ID（可直接跳转）。 */
+  nodeId: string
+  /** 文档 ID。 */
+  documentId: string
+  /** 文档标题。 */
+  title: string
+  /** embed = 内嵌了本表；mention = 正文提到了本记录。 */
+  kind: 'embed' | 'mention'
+}
+
+/** 列出引用了本记录的文档。 */
+export function listRecordDocReferences(projectId: string, recordId: string) {
+  return apiRequest<RecordDocReference[]>(`${baseUrl(projectId)}/records/${recordId}/doc-references`)
+}
+
+/** 按给定顺序重排记录（手动排序位）。 */
+export function reorderRecords(projectId: string, tableId: string, ids: string[]) {
+  return apiRequest<{ ok: boolean; count: number }>(`${baseUrl(projectId)}/tables/${tableId}/records/reorder`, {
+    method: 'POST',
+    body: { ids },
+  })
+}
+
+/** 记录关联关系（正向 = 我关联了谁；反向 = 谁关联了我）。 */
+export type RecordRelation = {
+  direction: 'outbound' | 'inbound'
+  /** 关联方所在的数据表。 */
+  tableId: string
+  tableName: string
+  /** 承载关联的字段。 */
+  fieldId: string
+  fieldName: string
+  /** 关联到的记录。 */
+  recordId: string
+  recordTitle: string
+  /** 被指向的表（跳转用）。 */
+  targetTableId: string
+}
+
+export type RecordRelationSet = {
+  recordId: string
+  outbound: RecordRelation[]
+  inbound: RecordRelation[]
+}
+
+/** 列出记录的正向 / 反向关联关系。 */
+export function listRecordRelations(projectId: string, recordId: string) {
+  return apiRequest<RecordRelationSet>(`${baseUrl(projectId)}/records/${recordId}/relations`)
+}
+
+/** 关联记录选择器的一条候选。 */
+export type LinkTarget = {
+  id: string
+  tableId: string
+  title: string
+  subtitle?: string
+}
+
+/** 列出目标表的记录候选（关联记录选择器）。 */
+export function listLinkTargets(projectId: string, tableId: string, keyword?: string, limit = 50) {
+  const query = new URLSearchParams()
+  if (keyword) query.set('keyword', keyword)
+  query.set('limit', String(limit))
+  return apiRequest<LinkTarget[]>(`${baseUrl(projectId)}/tables/${tableId}/link-targets?${query.toString()}`)
+}
+
 /** 统一查询：筛选、排序、分组、分页都在服务端完成。 */
 export function queryRecords(projectId: string, payload: QueryRequest) {
   return apiRequest<QueryResult>(`${baseUrl(projectId)}/tables/${payload.tableId}/query`, {
@@ -224,10 +399,17 @@ export function listViews(projectId: string, tableId: string) {
 }
 
 /** 新建视图。 */
-export function createView(projectId: string, tableId: string, name: string, type: string, config: ViewConfig) {
+export function createView(
+  projectId: string,
+  tableId: string,
+  name: string,
+  type: string,
+  config: ViewConfig,
+  scope?: ViewScope,
+) {
   return apiRequest<BaseView>(`${baseUrl(projectId)}/tables/${tableId}/views`, {
     method: 'POST',
-    body: { name, type, config },
+    body: { name, type, config, scope },
   })
 }
 
@@ -280,4 +462,60 @@ export function saveFormula(projectId: string, fieldId: string, expression: stri
 /** 事件流地址（SSE）。 */
 export function eventsUrl(projectId: string) {
   return `${baseUrl(projectId)}/events`
+}
+
+// —— 表配置包（第十六轮）——
+
+/** 导出一张表的配置包。 */
+export function exportTableConfig(projectId: string, tableId: string) {
+  return apiRequest<ConfigBundle>(`${baseUrl(projectId)}/tables/${tableId}/config-export`)
+}
+
+/** 从配置包导入（新建一张表，不覆盖原表）。 */
+export function importTableConfig(projectId: string, baseId: string, bundle: ConfigBundle) {
+  return apiRequest<{ tableId: string; table: BaseTable; warnings?: string[] }>(
+    `${baseUrl(projectId)}/tables/config-import`,
+    {
+      method: 'POST',
+      body: { baseId, bundle },
+    },
+  )
+}
+
+/** 把配置包合并进一张已有表（按字段名匹配，已存在的字段跳过）。 */
+export function mergeTableConfig(projectId: string, tableId: string, bundle: ConfigBundle) {
+  return apiRequest<{ tableId: string; table: BaseTable; warnings?: string[] }>(
+    `${baseUrl(projectId)}/tables/${tableId}/config-merge`,
+    {
+      method: 'POST',
+      body: { bundle },
+    },
+  )
+}
+
+/** 取表结构快照（表 + 字段 + 视图 + 公式）。 */
+export function fetchTableSchema(projectId: string, tableId: string) {
+  return apiRequest<TableSchema>(`${baseUrl(projectId)}/tables/${tableId}/schema`)
+}
+
+/** 取公式字段的定义（表达式 + AST + 依赖）。 */
+export function fetchFieldFormula(projectId: string, fieldId: string) {
+  return apiRequest<FieldFormulaDefinition>(`${baseUrl(projectId)}/fields/${fieldId}/formula`)
+}
+
+/** 取引用 / 汇总字段配置。 */
+export function fetchComputedFields(projectId: string, tableId: string) {
+  return apiRequest<ComputedFieldSummary[]>(`${baseUrl(projectId)}/tables/${tableId}/computed-fields`)
+}
+
+/** 手动重算引用 / 汇总字段（跨表计算默认异步，界面可手动触发）。 */
+export function recalcLookupRollup(projectId: string, tableId: string) {
+  return apiRequest<{ updated: number }>(`${baseUrl(projectId)}/tables/${tableId}/lookup-rollup/recalc`, {
+    method: 'POST',
+  })
+}
+
+/** 取公式依赖图（我依赖谁 / 谁依赖我）。 */
+export function fetchFormulaDependencies(projectId: string, fieldId: string) {
+  return apiRequest<FormulaDependency[]>(`${baseUrl(projectId)}/fields/${fieldId}/formula/dependencies`)
 }

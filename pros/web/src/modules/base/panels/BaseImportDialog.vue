@@ -7,7 +7,7 @@
  */
 import { computed, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Upload } from '@element-plus/icons-vue'
+import { Refresh, Upload } from '@element-plus/icons-vue'
 import { batchRecords } from '../api'
 import { parseDelimited } from '../csv'
 import type { FieldMeta } from '../types'
@@ -110,6 +110,51 @@ function convert(value: string, field?: FieldMeta): unknown {
   }
 }
 
+/** 最近一次导入的行数据：用于「重试失败行」。 */
+const lastPayload = ref<Array<{ fields: Record<string, unknown> }>>([])
+
+/** 从失败明细里解析出失败的行号（后端 target 形如「第 3 行」）。 */
+function failedRows(failures: { target: string }[]): number[] {
+  const out: number[] = []
+  for (const item of failures) {
+    const matched = /第\s*(\d+)\s*行/.exec(item.target)
+    if (!matched) continue
+    const index = Number(matched[1]) - 1
+    if (Number.isFinite(index) && index >= 0) out.push(index)
+  }
+  return out
+}
+
+/** 只重试失败的行（成功的行不会重复导入）。 */
+async function retryFailedRows() {
+  const rows = failedRows(importFailures.value)
+  const payload = lastPayload.value
+  if (!rows.length || !payload.length) {
+    ElMessage.info('没有可重试的失败行')
+    return
+  }
+  busy.value = true
+  try {
+    const res = (await batchRecords(props.projectId, props.tableId, {
+      action: 'create',
+      rows: rows.map((index) => payload[index]).filter(Boolean),
+      partial: true,
+    })) as { succeeded: number; failed: number; failures: { target: string; message: string }[] }
+    if (!res.failed) {
+      ElMessage.success(`重试成功 ${res.succeeded} 条`)
+      importFailures.value = []
+      emit('imported', res.succeeded)
+    } else {
+      importFailures.value = res.failures ?? []
+      ElMessage.warning(`重试后仍失败 ${res.failed} 条`)
+    }
+  } catch (err) {
+    ElMessage.error((err as Error).message || '重试失败')
+  } finally {
+    busy.value = false
+  }
+}
+
 async function runImport() {
   if (!props.tableId) {
     ElMessage.warning('当前多维表格还没有数据表，请先新建数据表')
@@ -137,6 +182,7 @@ async function runImport() {
       partial: true,
     })) as { succeeded: number; failed: number; failures: { target: string; message: string }[] }
     const failures = res.failures ?? []
+    lastPayload.value = payload
     if (!res.failed) {
       ElMessage.success(`已导入 ${res.succeeded} 条记录`)
       emit('imported', res.succeeded)
@@ -158,6 +204,7 @@ async function runImport() {
     title="导入数据（CSV）"
     width="860px"
     append-to-body
+    modal-class="be-modal"
     destroy-on-close
     @close="emit('close')"
   >
@@ -209,7 +256,18 @@ async function runImport() {
       <el-empty v-else description="选择一个 CSV 文件开始导入" :image-size="80" />
 
       <div v-if="importFailures.length" class="be-import__failures">
-        <div class="be-import__failures-head">失败明细（{{ importFailures.length }}）</div>
+        <div class="be-import__failures-head">
+          <span>失败明细（{{ importFailures.length }}）</span>
+          <el-button
+            size="small"
+            text
+            :icon="Refresh"
+            :loading="busy"
+            @click="retryFailedRows"
+          >
+            重试失败行
+          </el-button>
+        </div>
         <ul>
           <li v-for="(item, index) in importFailures" :key="index">
             <span class="be-import__failures-target">{{ item.target }}</span>
@@ -290,6 +348,9 @@ async function runImport() {
   background: var(--tg-surface-2);
 }
 .be-import__failures-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   font-size: 12px;
   font-weight: 600;
   color: var(--tg-text-2);

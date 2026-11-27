@@ -58,18 +58,57 @@
 
 /* —— 工具栏 —— */
 
+/*
+ * 工具栏：固定单行 + 横向滚动。
+ *
+ * 之前用 flex-wrap: wrap，窗口稍窄时按钮组换行，
+ * 而外层容器高度固定 → 换行的那一行被裁掉，工具栏「变形」。
+ * 现在：按钮组放在可横向滚动的容器里（不换行、不会被裁），
+ * 「新增记录 / 共 N 条」留在滚动容器外，右侧常驻可见。
+ */
 .be-toolbar {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   padding: 8px 14px;
   border-bottom: 1px solid var(--tg-border);
   background: var(--tg-surface);
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+
+.be-toolbar__scroll {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.be-toolbar__scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* 右侧还有内容时给一层渐隐，提示可以横向滚动。 */
+.be-toolbar__scroll.is-overflowing {
+  mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+  -webkit-mask-image: linear-gradient(
+    to right,
+    #000 calc(100% - 28px),
+    transparent
+  );
+}
+
+.be-toolbar__scroll > * {
+  flex-shrink: 0;
 }
 
 .be-toolbar__search {
-  width: 220px;
+  width: 200px;
 }
 
 /* 按钮分组：Telegram 分段控件形态 —— 灰底容器 + 无边框药丸（整组是一个按钮组） */
@@ -84,11 +123,69 @@
 }
 
 /*
+ * 「共享 / 仅我」分段控件：查询条件的保存范围。
+ * 放在按钮组里，与筛选 / 排序 / 重置同一组，视觉上是一个整体。
+ */
+.be-query-scope.el-radio-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 6px;
+}
+
+/* Element Plus 给首/末段做了「半边圆角」+ 负 box-shadow，
+   选中段就会变成一头圆一头方、还带 1px 偏移 —— 视觉上就是「错位」。
+   这里把圆角、阴影全部收成整颗药丸，两段对齐。 */
+.be-query-scope .el-radio-button {
+  margin: 0;
+}
+
+.be-query-scope .el-radio-button__inner,
+.be-query-scope .el-radio-button:first-child .el-radio-button__inner,
+.be-query-scope .el-radio-button:last-child .el-radio-button__inner {
+  height: 26px;
+  padding: 0 12px;
+  border: none;
+  border-radius: var(--tg-radius-pill);
+  font-size: 12px;
+  line-height: 26px;
+  color: var(--tg-text-2);
+  background: transparent;
+  /* Element Plus 给每段都画了一圈 outline（用来拼成连续分段控件）。
+     这里每段都是独立药丸，outline 会变成「多一个空心框」→ 去掉；
+     键盘聚焦的可见性用下面的 focus-visible 单独保留。 */
+  outline: none;
+  box-shadow: none;
+}
+
+.be-query-scope
+  .el-radio-button__original-radio:focus-visible
+  + .el-radio-button__inner {
+  outline: 2px solid var(--tg-blue);
+  outline-offset: 1px;
+}
+
+.be-query-scope .el-radio-button.is-active .el-radio-button__inner,
+.be-query-scope
+  .el-radio-button__original-radio:checked
+  + .el-radio-button__inner {
+  color: #fff;
+  background: var(--tg-blue);
+  /* 原因：Element Plus 用 `box-shadow: -1px 0 0 0 <primary>` 模拟选中态边框，
+     会让选中的那一段整体左移 1px —— 视觉上就是「错位」。
+     这里显式清掉，选中段就是一个完整药丸。 */
+  box-shadow: none !important;
+}
+
+/*
  * 覆盖 telegram.css 的全局按钮基线（白底 + 发丝线）。
  * 原因：telegram.css 里 `.el-button:not(...)` 的特异性高于本文件原规则，
  * 会让组内按钮各自变成独立白底卡片；这里重复 :not 链把特异性拉平再覆盖。
  */
-.be-btngroup .el-button.el-button:not(.is-text):not(.is-link):not(.el-button--primary):not(.el-button--danger):not(.el-button--success):not(.el-button--warning):not(.el-button--info) {
+.be-btngroup
+  .el-button.el-button:not(.is-text):not(.is-link):not(.el-button--primary):not(
+    .el-button--danger
+  ):not(.el-button--success):not(.el-button--warning):not(.el-button--info) {
   border: none;
   background: transparent;
   height: 28px;
@@ -98,11 +195,18 @@
   box-shadow: none;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
-  transition: background-color 160ms cubic-bezier(0.2, 0.8, 0.3, 1),
-    color 160ms cubic-bezier(0.2, 0.8, 0.3, 1), box-shadow 160ms cubic-bezier(0.2, 0.8, 0.3, 1);
+  transition:
+    background-color 160ms cubic-bezier(0.2, 0.8, 0.3, 1),
+    color 160ms cubic-bezier(0.2, 0.8, 0.3, 1),
+    box-shadow 160ms cubic-bezier(0.2, 0.8, 0.3, 1);
 }
 
-.be-btngroup .el-button.el-button:not(.is-text):not(.is-link):not(.el-button--primary):not(.el-button--danger):not(.el-button--success):not(.el-button--warning):not(.el-button--info):hover {
+.be-btngroup
+  .el-button.el-button:not(.is-text):not(.is-link):not(.el-button--primary):not(
+    .el-button--danger
+  ):not(.el-button--success):not(.el-button--warning):not(
+    .el-button--info
+  ):hover {
   background: var(--tg-surface);
   color: var(--tg-text);
   box-shadow: var(--tg-shadow-1);
@@ -141,6 +245,36 @@
   display: none;
 }
 
+.be-views__lock {
+  margin-left: 2px;
+  font-size: 12px;
+  color: var(--tg-warning, #f59e0b);
+}
+
+/* 「我的条件」标记：这个视图上当前用户有一份自己的筛选 / 排序（第十四轮）。 */
+.be-views__mine {
+  margin-left: 4px;
+  padding: 0 6px;
+  height: 16px;
+  line-height: 16px;
+  border-radius: var(--tg-radius-pill);
+  font-size: 10px;
+  color: var(--tg-blue, #3390ec);
+  background: rgba(51, 144, 236, 0.12);
+}
+
+/* 「叠加共享条件」开关（第十四轮）。 */
+.be-query-combine {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  font-size: 12px;
+  color: var(--tg-text-2);
+  cursor: pointer;
+  user-select: none;
+}
+
 .be-views__item {
   display: inline-flex;
   align-items: center;
@@ -154,7 +288,9 @@
   font-size: 13px;
   cursor: pointer;
   white-space: nowrap;
-  transition: color var(--tg-dur) var(--tg-ease), background var(--tg-dur) var(--tg-ease);
+  transition:
+    color var(--tg-dur) var(--tg-ease),
+    background var(--tg-dur) var(--tg-ease);
 }
 
 .be-views__item:hover {
@@ -283,7 +419,9 @@
 
 .be-fade-enter-active,
 .be-fade-leave-active {
-  transition: opacity var(--tg-dur) var(--tg-ease), transform var(--tg-dur) var(--tg-ease);
+  transition:
+    opacity var(--tg-dur) var(--tg-ease),
+    transform var(--tg-dur) var(--tg-ease);
 }
 
 .be-fade-enter-from,
@@ -529,6 +667,48 @@
   gap: 8px;
 }
 
+/* 函数库：与 Telegram 表面一致，固定高度 + 内部滚动。 */
+.be-formula__funcs {
+  border: 1px solid var(--tg-border);
+  border-radius: var(--tg-radius-md);
+  background: var(--tg-surface-2);
+  padding: 8px 10px 10px;
+}
+
+.be-formula__funcs-scroll {
+  max-height: 176px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.be-formula__func-group + .be-formula__func-group {
+  margin-top: 8px;
+}
+
+.be-formula__func-group-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--tg-text-3);
+  letter-spacing: 0.3px;
+  margin-bottom: 4px;
+}
+
+/* 函数胶囊：等宽字体，方便扫读函数名。 */
+.be-chip--func {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  letter-spacing: 0.2px;
+  background: var(--tg-surface-1);
+  border-color: var(--tg-border);
+  color: var(--tg-text-2);
+}
+
+.be-chip--func:hover {
+  background: var(--tg-blue-soft);
+  border-color: var(--tg-blue);
+  color: var(--tg-blue);
+}
+
 .be-formula__result {
   border-radius: var(--tg-radius-md);
   border: 1px solid var(--tg-border);
@@ -558,4 +738,36 @@
   font-size: 12px;
   line-height: 1.7;
   white-space: pre;
+}
+
+/* —— 记录级可见范围：下拉项是两行（标题 + 说明） —— */
+/*
+ * Element Plus 的 .el-select-dropdown__item 固定 34px 行高 + 单行排版，
+ * 两行内容会被裁掉并与下一项重叠（下拉挂在 body 上，scoped 样式够不着，
+ * 所以放到全局 base.css，用 popper-class 精确命中）。
+ */
+.be-scope-popper .el-select-dropdown__item {
+  height: auto;
+  min-height: 34px;
+  line-height: 1.45;
+  padding: 7px 14px;
+}
+
+.be-scope-popper .el-select-dropdown__item .be-record__scope-option {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  line-height: 1.45;
+}
+
+.be-scope-popper .be-record__scope-option-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--tg-text-1, #0f172a);
+}
+
+.be-scope-popper .be-record__scope-option-hint {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--tg-text-3, #94a3b8);
 }

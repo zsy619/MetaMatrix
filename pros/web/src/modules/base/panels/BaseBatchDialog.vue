@@ -8,7 +8,7 @@
  */
 import { computed, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Delete, Edit } from '@element-plus/icons-vue'
+import { Delete, Edit, Refresh } from '@element-plus/icons-vue'
 import { batchRecords, type BatchFailure } from '../api'
 import type { FieldMeta } from '../types'
 
@@ -29,6 +29,15 @@ const fieldId = ref('')
 const value = ref<unknown>('')
 /** 最近一次批量操作的结果明细。 */
 const result = ref<{ succeeded: number; failed: number; failures: BatchFailure[] } | null>(null)
+/** 最近一次批量操作的动作与参数：用于「重试失败项」。 */
+const lastAction = ref<'update' | 'delete' | null>(null)
+const lastFields = ref<Record<string, unknown> | null>(null)
+/** 可重试的失败项（记录 ID 形态的失败项）。 */
+const retryableIds = computed(() =>
+  (result.value?.failures ?? [])
+    .map((item) => item.target)
+    .filter((target) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(target)),
+)
 
 const editableFields = computed(() => props.fields.filter((field) => field.type !== 'formula'))
 const field = computed(() => editableFields.value.find((item) => item.id === fieldId.value))
@@ -65,6 +74,8 @@ async function applyUpdate() {
       partial: true,
     })) as { succeeded: number; failed: number; failures: BatchFailure[] }
     result.value = { succeeded: res.succeeded, failed: res.failed, failures: res.failures ?? [] }
+    lastAction.value = 'update'
+    lastFields.value = { [field.value.id]: normalizedValue() }
     if (!res.failed) {
       ElMessage.success(`已更新 ${res.succeeded} 条记录`)
       emit('done')
@@ -87,6 +98,8 @@ async function removeAll() {
       partial: true,
     })) as { succeeded: number; failed: number; failures: BatchFailure[] }
     result.value = { succeeded: res.succeeded, failed: res.failed, failures: res.failures ?? [] }
+    lastAction.value = 'delete'
+    lastFields.value = null
     if (!res.failed) {
       ElMessage.success(`已删除 ${res.succeeded} 条记录`)
       emit('done')
@@ -99,6 +112,43 @@ async function removeAll() {
     busy.value = false
   }
 }
+
+/**
+ * 只重试失败的记录（成功的不会再写一次）。
+ *
+ * 若用户在上方改了「字段 / 新值」，重试会用**当前选择**的值 —— 即「改完值再重试」；
+ * 否则沿用上一次的参数。
+ */
+async function retryFailed() {
+  const ids = retryableIds.value
+  if (!ids.length || !lastAction.value) {
+    ElMessage.info('没有可重试的失败项')
+    return
+  }
+  const useCurrent = Boolean(field.value) && lastAction.value === 'update'
+  const fields = useCurrent ? { [field.value!.id]: normalizedValue() } : (lastFields.value ?? undefined)
+  busy.value = true
+  try {
+    const res = (await batchRecords(props.projectId, props.tableId, {
+      action: lastAction.value,
+      ids,
+      fields,
+      partial: true,
+    })) as { succeeded: number; failed: number; failures: BatchFailure[] }
+    const failures = res.failures ?? []
+    result.value = { succeeded: res.succeeded, failed: res.failed, failures }
+    if (!res.failed) {
+      ElMessage.success(`重试成功 ${res.succeeded} 条`)
+      emit('done')
+    } else {
+      ElMessage.warning(`重试后仍失败 ${res.failed} 条`)
+    }
+  } catch (err) {
+    ElMessage.error((err as Error).message || '重试失败')
+  } finally {
+    busy.value = false
+  }
+}
 </script>
 
 <template>
@@ -107,12 +157,14 @@ async function removeAll() {
     :title="`批量操作 · 已选 ${recordIds.length} 条`"
     width="560px"
     append-to-body
+    modal-class="be-modal"
     destroy-on-close
     @close="emit('close')"
   >
     <div class="be-panel">
       <div class="be-panel__hint">
         批量操作逐条执行：成功与失败分开统计，失败明细列在下方（不会静默丢弃）。
+        改完「字段 / 新值」后点「重试失败项」= 用新值重试（只重试失败的那些记录）。
       </div>
       <div class="be-panel__row">
         <el-select v-model="fieldId" style="width: 200px" placeholder="选择字段">
@@ -163,6 +215,17 @@ async function removeAll() {
       <div class="be-batch-result__head">
         <el-tag type="success" size="small" effect="plain">成功 {{ result.succeeded }}</el-tag>
         <el-tag v-if="result.failed" type="danger" size="small" effect="plain">失败 {{ result.failed }}</el-tag>
+        <el-button
+          v-if="result.failed && retryableIds.length"
+          class="be-batch-result__retry"
+          size="small"
+          text
+          :icon="Refresh"
+          :loading="busy"
+          @click="retryFailed"
+        >
+          重试失败项（{{ retryableIds.length }}）
+        </el-button>
       </div>
       <ul v-if="result.failures.length" class="be-batch-result__list">
         <li v-for="(item, index) in result.failures" :key="index">
@@ -194,6 +257,9 @@ async function removeAll() {
   gap: 8px;
   align-items: center;
   margin-bottom: 8px;
+}
+.be-batch-result__retry {
+  margin-left: auto;
 }
 .be-batch-result__list {
   list-style: none;

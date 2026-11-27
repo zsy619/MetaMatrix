@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -150,6 +151,9 @@ func (s *Service) publishPending(ctx context.Context) {
 			_ = json.Unmarshal(row.Payload, &event.Payload)
 		}
 		if event.Payload != nil {
+			// 兜底：SSE 只广播「哪些字段变了」，绝不广播字段值。
+			// 字段值可能落在被隐藏 / 只读字段上，广播出去会绕过字段级权限策略。
+			delete(event.Payload, "fields")
 			if v, ok := event.Payload["version"].(float64); ok {
 				event.Version = int64(v)
 			}
@@ -162,4 +166,60 @@ func (s *Service) publishPending(ctx context.Context) {
 			log.Printf("base outbox publish failed: %v", err)
 		}
 	}
+}
+
+// ReplaySince 回放 lastEventID 之后的事件（断线补拉）。
+//
+// 客户端在 SSE 帧里记住最后一个 eventId，重连时带上 `Last-Event-ID`，
+// 服务端把这段窗口内错过的事件按顺序补发，避免「断线期间别人改了数据，
+// 自己这边一直看着旧值」——事件体只带字段 ID 不带值，补发不会泄露内容。
+func (s *Service) ReplaySince(ctx context.Context, projectID uuid.UUID, lastEventID string, limit int) ([]BaseEvent, error) {
+	lastEventID = strings.TrimSpace(lastEventID)
+	if lastEventID == "" {
+		return nil, nil
+	}
+	if limit <= 0 || limit > 500 {
+		limit = 200
+	}
+	var anchor BaseEventOutbox
+	if err := s.db.WithContext(ctx).
+		Where("id = ? AND project_id = ?", lastEventID, projectID).
+		First(&anchor).Error; err != nil {
+		// 锚点不在库里（被清理 / 跨空间）：不补发，客户端会走一次全量刷新。
+		return nil, nil
+	}
+	var rows []BaseEventOutbox
+	if err := s.db.WithContext(ctx).
+		Where("project_id = ? AND created_at > ?", projectID, anchor.CreatedAt).
+		Order("created_at ASC, id ASC").
+		Limit(limit).
+		Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	out := make([]BaseEvent, 0, len(rows))
+	for _, row := range rows {
+		event := BaseEvent{
+			EventID:   row.ID,
+			EventType: row.EventType,
+			ProjectID: row.ProjectID,
+			BaseID:    row.BaseID,
+			TableID:   row.TableID,
+			Timestamp: row.CreatedAt,
+			Payload:   map[string]any{},
+		}
+		if len(row.Payload) > 0 {
+			_ = json.Unmarshal(row.Payload, &event.Payload)
+		}
+		// 兜底：补发也不带字段值。
+		delete(event.Payload, "fields")
+		if v, ok := event.Payload["version"].(float64); ok {
+			event.Version = int64(v)
+		}
+		if row.AggregateID != uuid.Nil {
+			id := row.AggregateID
+			event.RecordID = &id
+		}
+		out = append(out, event)
+	}
+	return out, nil
 }

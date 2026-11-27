@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"metamatrix/api/internal/ai"
+	"metamatrix/api/internal/api"
 	"metamatrix/api/internal/base"
 	"metamatrix/api/internal/config"
 	"metamatrix/api/internal/db"
@@ -108,7 +109,11 @@ func main() {
 	// 与富文本文档引擎解耦，只共享用户、空间权限与审计。
 	baseSvc := base.NewService(gdb)
 	baseH := base.NewHandler(baseSvc)
+	// 配置包签名密钥由 JWT_SECRET 派生（不新增配置项），导出即签名、导入即校验。
+	baseSvc.SetBundleSigningKey(cfg.JWTSecret)
 	baseSvc.StartOutboxPublisher(context.Background())
+	// 每日按天重算 TODAY() 这类时间敏感公式（配合查询时的惰性补算）。
+	baseSvc.StartDailyTimeRecalc(context.Background())
 
 	// 历史版本保留条数可配置（111）。
 	service.VersionKeep = cfg.KnowledgeVersionKeep
@@ -307,10 +312,18 @@ func main() {
 	}
 
 	// 多维表格 Base Engine：Base/表/字段/记录/视图/公式 + SSE 事件流。
-	baseGroup := h.Group("/projects/:projectId/base", middleware.AuthRequired(cfg.JWTSecret))
+	// 多维表格域限流（共享方案 §10.9）：按用户 + 接口限速，超限返回 42901。
+	baseLimiter := middleware.NewRateLimiter(float64(cfg.BaseRateLimitRPS), cfg.BaseRateLimitBurst)
+	// OpenAPI 文档（共享方案 §10.9）：接口元数据 + 前端类型生成的唯一来源。
+	h.GET("/openapi.json", api.OpenAPIHandler)
+
+	baseGroup := h.Group("/projects/:projectId/base", middleware.AuthRequired(cfg.JWTSecret), middleware.RateLimit(baseLimiter))
 	{
 		baseGroup.POST("/ensure", baseH.EnsureBase)
 		baseGroup.GET("/bases", baseH.ListBases)
+		baseGroup.POST("/bases", baseH.CreateBase)
+		baseGroup.PATCH("/bases/:baseId", baseH.UpdateBase)
+		baseGroup.DELETE("/bases/:baseId", baseH.DeleteBase)
 		baseGroup.GET("/field-types", baseH.FieldTypes)
 		baseGroup.GET("/events", baseH.Events)
 		baseGroup.GET("/:baseId/audit", baseH.ListAudit)
@@ -322,19 +335,33 @@ func main() {
 		baseGroup.PATCH("/tables/:tableId", baseH.UpdateTable)
 		baseGroup.DELETE("/tables/:tableId", baseH.DeleteTable)
 		baseGroup.GET("/tables/:tableId/fields", baseH.ListFields)
+		baseGroup.GET("/tables/:tableId/schema", baseH.TableSchema)
 		baseGroup.POST("/tables/:tableId/fields", baseH.CreateField)
 		baseGroup.PATCH("/tables/:tableId/fields/order", baseH.ReorderFields)
 		baseGroup.POST("/tables/:tableId/records", baseH.CreateRecord)
 		baseGroup.POST("/tables/:tableId/query", baseH.QueryRecords)
 		baseGroup.POST("/tables/:tableId/records/batch", baseH.BatchRecords)
+		baseGroup.POST("/tables/:tableId/records/reorder", baseH.ReorderRecords)
 		baseGroup.GET("/tables/:tableId/views", baseH.ListViews)
 		baseGroup.POST("/tables/:tableId/views", baseH.CreateView)
 		baseGroup.POST("/tables/:tableId/formulas/validate", baseH.ValidateFormula)
 		baseGroup.POST("/tables/:tableId/formulas/preview", baseH.PreviewFormula)
+		baseGroup.GET("/tables/:tableId/config-export", baseH.ExportTableConfig)
+		baseGroup.POST("/tables/config-import", baseH.ImportTableConfig)
+		baseGroup.POST("/tables/:tableId/config-merge", baseH.MergeTableConfig)
 		baseGroup.PATCH("/fields/:fieldId", baseH.UpdateField)
 		baseGroup.DELETE("/fields/:fieldId", baseH.DeleteField)
 		baseGroup.POST("/fields/:fieldId/migrate", baseH.MigrateField)
 		baseGroup.PUT("/fields/:fieldId/formula", baseH.SaveFormula)
+		baseGroup.GET("/fields/:fieldId/formula", baseH.GetFieldFormula)
+		baseGroup.GET("/fields/:fieldId/formula/dependencies", baseH.ListFormulaDependencies)
+		baseGroup.GET("/records/:recordId/doc-references", baseH.ListRecordDocReferences)
+		baseGroup.GET("/records/:recordId/grants", baseH.ListRecordGrants)
+		baseGroup.GET("/records/:recordId/relations", baseH.ListRecordRelations)
+		baseGroup.GET("/tables/:tableId/link-targets", baseH.ListLinkTargets)
+		// 引用 / 汇总字段（lookup / rollup）：读配置 + 手动触发重算。
+		baseGroup.GET("/tables/:tableId/computed-fields", baseH.ListComputedFields)
+		baseGroup.POST("/tables/:tableId/lookup-rollup/recalc", baseH.RecalcLookupRollup)
 		baseGroup.PATCH("/records/:recordId", baseH.UpdateRecord)
 		baseGroup.DELETE("/records/:recordId", baseH.DeleteRecord)
 		baseGroup.PATCH("/views/:viewId", baseH.UpdateView)

@@ -5,104 +5,142 @@
  * 公式语法使用 {字段名} 引用其它字段，
  * 服务端负责解析成 AST、建立依赖图并重算历史记录。
  */
-import { computed, ref } from 'vue'
-import { ElMessage } from 'element-plus'
-import { Check, MagicStick } from '@element-plus/icons-vue'
-import { createField, previewFormula, saveFormula, validateFormula } from '../api'
-import type { FieldMeta, FormulaValidation } from '../types'
+import { computed, nextTick, ref } from "vue";
+import { ElMessage } from "element-plus";
+import { Check, MagicStick } from "@element-plus/icons-vue";
+import {
+  createField,
+  previewFormula,
+  saveFormula,
+  validateFormula,
+} from "../api";
+import { FORMULA_FUNCTION_GROUPS } from "../fields/formulaFunctions";
+import type { FieldMeta, FormulaValidation } from "../types";
 
 const props = defineProps<{
-  projectId: string
-  tableId: string
-  fields: FieldMeta[]
-  field?: FieldMeta
-  sample?: Record<string, unknown>
-}>()
+  projectId: string;
+  tableId: string;
+  fields: FieldMeta[];
+  field?: FieldMeta;
+  sample?: Record<string, unknown>;
+}>();
 
 const emit = defineEmits<{
-  (e: 'close'): void
-  (e: 'saved'): void
-}>()
+  (e: "close"): void;
+  (e: "saved"): void;
+}>();
 
-const expression = ref('')
-const validation = ref<FormulaValidation | null>(null)
-const preview = ref<FormulaValidation | null>(null)
-const busy = ref(false)
-const name = ref(props.field?.name ?? '')
+const expression = ref("");
+const validation = ref<FormulaValidation | null>(null);
+const preview = ref<FormulaValidation | null>(null);
+const busy = ref(false);
+const name = ref(props.field?.name ?? "");
 
-const usableFields = computed(() => props.fields.filter((item) => item.type !== 'formula'))
+const usableFields = computed(() =>
+  props.fields.filter((item) => item.type !== "formula"),
+);
 
 function insertField(field: FieldMeta) {
-  expression.value = `${expression.value}{${field.name}}`
+  expression.value = `${expression.value}{${field.name}}`;
+}
+
+/** 插入函数：写入「函数名(」并把光标落在括号中间。 */
+async function insertFunction(name: string) {
+  expression.value = `${expression.value}${name}(`;
+  await nextTick();
+  // 直接取真实 textarea：Element Plus 实例暴露的形态随版本变化，
+  // DOM 查询最稳，也避免依赖内部实现。
+  const el = document.querySelector<HTMLTextAreaElement>(
+    ".be-formula__editor textarea",
+  );
+  if (!el) return;
+  el.focus();
+  const pos = el.selectionStart ?? el.value.length;
+  el.setSelectionRange(pos, pos);
 }
 
 async function validate() {
   if (!props.tableId) {
-    validation.value = { valid: false, error: '当前多维表格还没有数据表，请先新建数据表' }
-    return
+    validation.value = {
+      valid: false,
+      error: "当前多维表格还没有数据表，请先新建数据表",
+    };
+    return;
   }
   if (!expression.value.trim()) {
-    validation.value = { valid: false, error: '公式不能为空' }
-    return
+    validation.value = { valid: false, error: "公式不能为空" };
+    return;
   }
   try {
-    validation.value = await validateFormula(props.projectId, props.tableId, expression.value.trim())
+    validation.value = await validateFormula(
+      props.projectId,
+      props.tableId,
+      expression.value.trim(),
+    );
   } catch (err) {
-    validation.value = { valid: false, error: (err as Error).message }
+    validation.value = { valid: false, error: (err as Error).message };
   }
 }
 
 async function runPreview() {
   if (!props.tableId) {
-    preview.value = { valid: false, error: '当前多维表格还没有数据表，请先新建数据表' }
-    return
+    preview.value = {
+      valid: false,
+      error: "当前多维表格还没有数据表，请先新建数据表",
+    };
+    return;
   }
   try {
-    const sample: Record<string, unknown> = {}
+    const sample: Record<string, unknown> = {};
     for (const field of usableFields.value) {
-      const value = props.sample?.[field.id]
-      if (value !== undefined) sample[field.name] = value
+      const value = props.sample?.[field.id];
+      if (value !== undefined) sample[field.name] = value;
     }
-    preview.value = await previewFormula(props.projectId, props.tableId, expression.value.trim(), sample)
+    preview.value = await previewFormula(
+      props.projectId,
+      props.tableId,
+      expression.value.trim(),
+      sample,
+    );
   } catch (err) {
-    preview.value = { valid: false, error: (err as Error).message }
+    preview.value = { valid: false, error: (err as Error).message };
   }
 }
 
 async function save() {
   if (!props.tableId) {
-    ElMessage.warning('当前多维表格还没有数据表，请先新建数据表')
-    return
+    ElMessage.warning("当前多维表格还没有数据表，请先新建数据表");
+    return;
   }
-  const expr = expression.value.trim()
+  const expr = expression.value.trim();
   if (!expr) {
-    ElMessage.warning('公式不能为空')
-    return
+    ElMessage.warning("公式不能为空");
+    return;
   }
-  busy.value = true
+  busy.value = true;
   try {
-    let fieldId = props.field?.id
+    let fieldId = props.field?.id;
     if (!fieldId) {
-      const fieldName = name.value.trim()
+      const fieldName = name.value.trim();
       if (!fieldName) {
-        ElMessage.warning('请填写公式字段名称')
-        busy.value = false
-        return
+        ElMessage.warning("请填写公式字段名称");
+        busy.value = false;
+        return;
       }
       const created = await createField(props.projectId, props.tableId, {
         name: fieldName,
-        type: 'formula',
+        type: "formula",
         config: {},
-      })
-      fieldId = created.id
+      });
+      fieldId = created.id;
     }
-    await saveFormula(props.projectId, fieldId, expr)
-    ElMessage.success('公式已保存并完成重算')
-    emit('saved')
+    await saveFormula(props.projectId, fieldId, expr);
+    ElMessage.success("公式已保存并完成重算");
+    emit("saved");
   } catch (err) {
-    ElMessage.error((err as Error).message || '公式保存失败')
+    ElMessage.error((err as Error).message || "公式保存失败");
   } finally {
-    busy.value = false
+    busy.value = false;
   }
 }
 </script>
@@ -113,6 +151,7 @@ async function save() {
     :title="field ? `编辑公式 · ${field.name}` : '新增公式字段'"
     width="640px"
     append-to-body
+    modal-class="be-modal"
     destroy-on-close
     @close="emit('close')"
   >
@@ -132,6 +171,34 @@ async function save() {
         placeholder="例如：IF({金额} > 1000, {金额} * 0.1, 0)"
       />
 
+      <div class="be-formula__funcs">
+        <div class="be-panel__hint">函数库（点击插入）：</div>
+        <div class="be-formula__funcs-scroll">
+          <div
+            v-for="group in FORMULA_FUNCTION_GROUPS"
+            :key="group.group"
+            class="be-formula__func-group"
+          >
+            <div class="be-formula__func-group-title">{{ group.group }}</div>
+            <div class="be-chip-list">
+              <el-tooltip
+                v-for="fn in group.items"
+                :key="fn.name"
+                :content="`${fn.signature} —— ${fn.desc}`"
+                placement="top"
+              >
+                <span
+                  class="be-chip be-chip--func"
+                  @click="insertFunction(fn.name)"
+                >
+                  {{ fn.name }}
+                </span>
+              </el-tooltip>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="be-panel__hint">点击字段插入引用：</div>
       <div class="be-chip-list">
         <span
@@ -149,17 +216,25 @@ async function save() {
         <el-button :icon="MagicStick" @click="runPreview">预览</el-button>
       </div>
 
-      <div v-if="validation" class="be-formula__result" :class="{ 'is-error': !validation.valid }">
+      <div
+        v-if="validation"
+        class="be-formula__result"
+        :class="{ 'is-error': !validation.valid }"
+      >
         <template v-if="validation.valid">
           公式合法
           <template v-if="validation.dependencies?.length">
-            ，依赖字段：{{ validation.dependencies.join('、') }}
+            ，依赖字段：{{ validation.dependencies.join("、") }}
           </template>
         </template>
         <template v-else>{{ validation.error }}</template>
       </div>
 
-      <div v-if="preview" class="be-formula__result" :class="{ 'is-error': !preview.valid }">
+      <div
+        v-if="preview"
+        class="be-formula__result"
+        :class="{ 'is-error': !preview.valid }"
+      >
         <template v-if="preview.valid">样例结果：{{ preview.value }}</template>
         <template v-else>{{ preview.error }}</template>
       </div>
@@ -167,7 +242,9 @@ async function save() {
 
     <template #footer>
       <el-button @click="emit('close')">取消</el-button>
-      <el-button type="primary" :loading="busy" @click="save">保存公式</el-button>
+      <el-button type="primary" :loading="busy" @click="save"
+        >保存公式</el-button
+      >
     </template>
   </el-dialog>
 </template>

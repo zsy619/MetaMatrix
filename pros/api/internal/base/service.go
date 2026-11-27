@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"metamatrix/api/internal/model"
 )
@@ -21,6 +22,8 @@ type Service struct {
 	db       *gorm.DB
 	registry *Registry
 	events   *EventHub
+	// bundleSecret 是配置包签名密钥（由 JWT_SECRET 派生注入）。
+	bundleSecret string
 }
 
 // NewService 构造 Base Engine 服务。
@@ -49,6 +52,12 @@ var (
 	ErrVersionConflict   = errors.New("record version conflict")
 	ErrSchemaConflict    = errors.New("schema version conflict")
 	ErrFieldValueInvalid = errors.New("field value invalid")
+	// ErrFieldTypeIncompatible：字段类型迁移不兼容（§10.1 → 42202）。
+	ErrFieldTypeIncompatible = errors.New("field type incompatible")
+	// ErrFormulaParse：公式解析失败（§10.1 → 42203）。
+	ErrFormulaParse = errors.New("formula parse error")
+	// ErrRateLimited：请求过于频繁（§10.1 → 42901）。
+	ErrRateLimited = errors.New("too many requests")
 )
 
 // 权限角色：沿用知识库空间角色。
@@ -60,18 +69,34 @@ const (
 
 // spaceRole 返回用户在空间内的角色。
 func (s *Service) spaceRole(userID, projectID uuid.UUID) string {
+	role, _ := s.spaceRoleWithError(userID, projectID)
+	return role
+}
+
+// spaceRoleWithError 取用户在空间中的角色。
+//
+// 关键点：**数据库瞬时错误不能被当成「不是成员」**。
+// 旧实现把查询错误一律吞掉并返回空角色，导致高并发下（连接池忙、上下文超时）
+// 权限校验直接返回 `base not found`（404），把「数据库抖动」伪装成「资源不存在」。
+// 现在把错误原样向上抛，调用方按 500 处理；真正的「查不到成员」才返回空角色。
+func (s *Service) spaceRoleWithError(userID, projectID uuid.UUID) (string, error) {
 	var count int64
 	if err := s.db.Model(&struct {
 		ID uuid.UUID `gorm:"type:uuid;primaryKey"`
 	}{}).Table("core_projects").Where("id = ? AND owner_user_id = ?", projectID, userID).Count(&count).Error; err == nil && count > 0 {
-		return RoleAdmin
+		return RoleAdmin, nil
+	} else if err != nil {
+		return "", err
 	}
 	var role string
 	err := s.db.Table("kb_members").Select("role").Where("project_id = ? AND user_id = ?", projectID, userID).Limit(1).Scan(&role).Error
-	if err == nil && role != "" {
-		return role
+	if err != nil {
+		return "", err
 	}
-	return ""
+	if role != "" {
+		return role, nil
+	}
+	return "", nil
 }
 
 func roleRank(role string) int {
@@ -89,7 +114,11 @@ func roleRank(role string) int {
 
 // assertAccess 校验空间权限。
 func (s *Service) assertAccess(userID, projectID uuid.UUID, need string) error {
-	role := s.spaceRole(userID, projectID)
+	role, err := s.spaceRoleWithError(userID, projectID)
+	if err != nil {
+		// 数据库错误 ≠ 无权限：原样返回，避免把 500 误报成 404。
+		return fmt.Errorf("resolve space role: %w", err)
+	}
 	if role == "" {
 		return ErrBaseNotFound
 	}
@@ -158,7 +187,7 @@ func (s *Service) seedDefaultTable(ctx context.Context, userID, projectID, baseI
 	if err != nil {
 		return
 	}
-	_, _ = s.CreateView(ctx, userID, projectID, table.ID, "表格视图", "grid", map[string]any{})
+	_, _ = s.CreateView(ctx, userID, projectID, table.ID, "表格视图", "grid", map[string]any{}, ViewScopeShared)
 }
 
 // GetBase 按 ID 取 Base。
@@ -206,6 +235,130 @@ func baseInfoOf(app *BaseApp) *BaseInfo {
 		CreatedAt:     app.CreatedAt,
 		UpdatedAt:     app.UpdatedAt,
 	}
+}
+
+// BaseUpdateInput 是 Base 元信息更新入参（指针区分「没传」与「置空」）。
+type BaseUpdateInput struct {
+	Name        *string `json:"name"`
+	Description *string `json:"description"`
+	Icon        *string `json:"icon"`
+}
+
+// CreateBase 创建一个不依赖知识库节点的独立 Base。
+//
+// 与 EnsureBase 的区别：EnsureBase 是「按 nodeId 幂等取或建」，
+// 这里则是显式创建一个新的 Base（可后续再挂到知识库节点上）。
+func (s *Service) CreateBase(ctx context.Context, userID, projectID uuid.UUID, in BaseUpdateInput) (*BaseInfo, error) {
+	if err := s.assertAccess(userID, projectID, RoleEditor); err != nil {
+		return nil, err
+	}
+	name := strings.TrimSpace(derefStr(in.Name))
+	if name == "" {
+		name = "多维表格"
+	}
+	if len(name) > 120 {
+		name = name[:120]
+	}
+	app := BaseApp{
+		ID:          uuid.New(),
+		ProjectID:   projectID,
+		Name:        name,
+		Description: strings.TrimSpace(derefStr(in.Description)),
+		Icon:        strings.TrimSpace(derefStr(in.Icon)),
+		OwnerID:     userID,
+		Status:      1,
+	}
+	if err := s.db.WithContext(ctx).Create(&app).Error; err != nil {
+		return nil, err
+	}
+	s.seedDefaultTable(ctx, userID, projectID, app.ID)
+	return baseInfoOf(&app), nil
+}
+
+// UpdateBase 更新 Base 的名称 / 描述 / 图标。
+//
+// 只改元信息，不动结构（表 / 字段），因此**不推进 schemaVersion**：
+// 结构版本只应被结构变更推进。
+func (s *Service) UpdateBase(ctx context.Context, userID, projectID, baseID uuid.UUID, in BaseUpdateInput) (*BaseInfo, error) {
+	if err := s.assertAccess(userID, projectID, RoleEditor); err != nil {
+		return nil, err
+	}
+	var app BaseApp
+	if err := s.db.WithContext(ctx).Where("id = ? AND project_id = ?", baseID, projectID).First(&app).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrBaseNotFound
+		}
+		return nil, err
+	}
+	if in.Name != nil {
+		name := strings.TrimSpace(*in.Name)
+		if name == "" {
+			return nil, fmt.Errorf("%w: base name is required", ErrFieldValueInvalid)
+		}
+		if len(name) > 120 {
+			name = name[:120]
+		}
+		app.Name = name
+	}
+	if in.Description != nil {
+		app.Description = strings.TrimSpace(*in.Description)
+	}
+	if in.Icon != nil {
+		app.Icon = strings.TrimSpace(*in.Icon)
+	}
+	if err := s.db.WithContext(ctx).Model(&BaseApp{}).Where("id = ?", app.ID).
+		Updates(map[string]any{"name": app.Name, "description": app.Description, "icon": app.Icon}).Error; err != nil {
+		return nil, err
+	}
+	return baseInfoOf(&app), nil
+}
+
+// DeleteBase 删除 Base（软删）。
+//
+// 权限要求：空间管理员（editor 不能删整库）。
+// 级联：Base 下的表 / 字段 / 记录 / 视图一并软删，避免留下孤儿数据。
+func (s *Service) DeleteBase(ctx context.Context, userID, projectID, baseID uuid.UUID) error {
+	if err := s.assertAccess(userID, projectID, RoleAdmin); err != nil {
+		return err
+	}
+	var app BaseApp
+	if err := s.db.WithContext(ctx).Where("id = ? AND project_id = ?", baseID, projectID).First(&app).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrBaseNotFound
+		}
+		return err
+	}
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var tableIDs []uuid.UUID
+		if err := tx.Model(&BaseTable{}).Where("base_id = ?", baseID).Pluck("id", &tableIDs).Error; err != nil {
+			return err
+		}
+		if len(tableIDs) > 0 {
+			if err := tx.Where("table_id IN ?", tableIDs).Delete(&BaseField{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("table_id IN ?", tableIDs).Delete(&BaseView{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("table_id IN ?", tableIDs).Delete(&BaseRecordValue{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("table_id IN ?", tableIDs).Delete(&BaseRecord{}).Error; err != nil {
+				return err
+			}
+		}
+		if err := tx.Where("base_id = ?", baseID).Delete(&BaseTable{}).Error; err != nil {
+			return err
+		}
+		return tx.Delete(&BaseApp{}, "id = ?", baseID).Error
+	})
+}
+
+func derefStr(p *string) string {
+	if p == nil {
+		return ""
+	}
+	return *p
 }
 
 // MarkMigrationFailed 记录迁移失败。
@@ -408,13 +561,8 @@ func (s *Service) ListFields(ctx context.Context, userID, projectID, tableID uui
 	if err := s.assertAccess(userID, projectID, RoleViewer); err != nil {
 		return nil, err
 	}
-	idx, err := s.loadFieldIndex(ctx, tableID)
-	if err != nil {
-		return nil, err
-	}
-	metas := fieldMetas(idx)
-	sort.Slice(metas, func(i, j int) bool { return metas[i].SortOrder < metas[j].SortOrder })
-	return metas, nil
+	// 字段级权限：对当前角色隐藏的字段不返回（连元信息都不给）。
+	return s.viewerFields(ctx, userID, projectID, tableID)
 }
 
 // loadFieldIndex 加载表字段元信息与处理器。
@@ -475,7 +623,7 @@ func (s *Service) CreateField(ctx context.Context, userID, projectID, tableID uu
 		return nil, fmt.Errorf("%w: field name is required", ErrFieldValueInvalid)
 	}
 	if err := s.registry.ValidateFieldType(in.Type); err != nil {
-		return nil, fmt.Errorf("%w: %s", ErrFieldValueInvalid, err.Error())
+		return nil, fmt.Errorf("%w: %s", ErrFieldTypeIncompatible, err.Error())
 	}
 	handler, _ := s.registry.Get(FieldType(in.Type))
 	cfg := in.Config
@@ -483,7 +631,7 @@ func (s *Service) CreateField(ctx context.Context, userID, projectID, tableID uu
 		cfg = map[string]any{}
 	}
 	if err := handler.ValidateConfig(cfg); err != nil {
-		return nil, fmt.Errorf("%w: %s", ErrFieldValueInvalid, err.Error())
+		return nil, fmt.Errorf("%w: %s", ErrFieldTypeIncompatible, err.Error())
 	}
 	rawCfg, _ := json.Marshal(cfg)
 	field := BaseField{
@@ -540,12 +688,38 @@ func (s *Service) UpdateField(ctx context.Context, userID, projectID, fieldID uu
 		_ = json.Unmarshal(field.Config, &cfg)
 	}
 	if in.Name != nil {
-		updates["name"] = strings.TrimSpace(*in.Name)
+		// 字段名不能为空：空名会让表头「没有标题」（只剩一个类型图标），
+		// 而且用户在字段管理器里误清空输入框就会永久留下一个无名列。
+		trimmed := strings.TrimSpace(*in.Name)
+		if trimmed == "" {
+			return nil, fmt.Errorf("%w: field name is required", ErrFieldValueInvalid)
+		}
+		updates["name"] = trimmed
 	}
 	if in.Config != nil {
+		// 字段级权限策略（config.permissions）独立于类型配置：
+		// 改类型配置（选项 / 精度 / 上限…）时不能把策略冲掉，这里单独保留并合入。
+		if perm, ok := cfg["permissions"]; ok {
+			if _, provided := in.Config["permissions"]; !provided {
+				merged := make(map[string]any, len(in.Config)+1)
+				for k, v := range in.Config {
+					merged[k] = v
+				}
+				merged["permissions"] = perm
+				in.Config = merged
+			}
+		}
+		// 显式提交了 permissions 但内容为空 → 视为「清除权限策略」。
+		// 前端要能取消权限，就必须有一条明确的「清空」通道：
+		// 靠「不传 permissions」来表达清除是行不通的（那会被当成「没改」）。
+		if perm, provided := in.Config["permissions"]; provided {
+			if isEmptyPermissions(perm) {
+				delete(in.Config, "permissions")
+			}
+		}
 		handler, _ := s.registry.Get(FieldType(field.Type))
 		if err := handler.ValidateConfig(in.Config); err != nil {
-			return nil, fmt.Errorf("%w: %s", ErrFieldValueInvalid, err.Error())
+			return nil, fmt.Errorf("%w: %s", ErrFieldTypeIncompatible, err.Error())
 		}
 		rawCfg, _ := json.Marshal(in.Config)
 		updates["config"] = datatypes.JSON(rawCfg)
@@ -564,6 +738,7 @@ func (s *Service) UpdateField(ctx context.Context, userID, projectID, fieldID uu
 	if in.Name != nil {
 		name = strings.TrimSpace(*in.Name)
 	}
+
 	required := field.Required
 	if in.Required != nil {
 		required = *in.Required
@@ -572,10 +747,29 @@ func (s *Service) UpdateField(ctx context.Context, userID, projectID, fieldID uu
 	if in.SortOrder != nil {
 		sortOrder = *in.SortOrder
 	}
-	return &FieldMeta{
+	meta := &FieldMeta{
 		ID: field.ID.String(), Name: name, Type: field.Type, Config: cfg,
 		Required: required, IsPrimary: field.IsPrimary, SortOrder: sortOrder, Version: field.Version + 1,
-	}, nil
+	}
+	// 字段能力变化（例如附件从不可索引改为可索引）后，重建整表投影，
+	// 否则存量记录仍然没有投影行，关键字搜索搜不到。
+	if err := s.reindexTable(ctx, field.TableID); err != nil {
+		return nil, err
+	}
+	// 权限策略变了 → 广播 permission.changed，让订阅端重新拉字段元信息与数据
+	// （技术方案第 8 章：权限变更后失效订阅）。
+	if in.Config != nil {
+		if _, ok := in.Config["permissions"]; ok {
+			var table BaseTable
+			if err := s.db.WithContext(ctx).Select("id, base_id").Where("id = ?", field.TableID).First(&table).Error; err == nil {
+				_ = s.writeEventTyped(s.db, projectID, table.BaseID, &field.TableID, &field.ID, "field", "permission.changed", map[string]any{
+					"scope":   "field",
+					"fieldId": field.ID.String(),
+				})
+			}
+		}
+	}
+	return meta, nil
 }
 
 // ReorderFields 按给定顺序重排表字段。
@@ -645,7 +839,14 @@ func (s *Service) DeleteField(ctx context.Context, userID, projectID, fieldID uu
 		if err := tx.Where("field_id = ?", fieldID).Delete(&BaseRecordValue{}).Error; err != nil {
 			return err
 		}
-		if err := tx.Where("field_id = ?", fieldID).Delete(&BaseFormulaDependency{}).Error; err != nil {
+		// 公式依赖表没有 field_id 列（它是 formula_field_id / dependency_field_id），
+		// 按 field_id 删会直接报「column field_id does not exist」。
+		if err := tx.Where("formula_field_id = ? OR dependency_field_id = ?", fieldID, fieldID).
+			Delete(&BaseFormulaDependency{}).Error; err != nil {
+			return err
+		}
+		// 公式定义本身也要清掉，否则留下指向已删字段的孤儿公式。
+		if err := tx.Where("field_id = ?", fieldID).Delete(&BaseFieldFormula{}).Error; err != nil {
 			return err
 		}
 		// 清掉记录里残留的字段值。
@@ -663,7 +864,8 @@ func (s *Service) DeleteField(ctx context.Context, userID, projectID, fieldID uu
 			}
 			delete(data, fieldID.String())
 			raw, _ := json.Marshal(data)
-			if err := tx.Model(&BaseRecord{}).Where("id = ?", rec.ID).Update("data", raw).Error; err != nil {
+			// 同上：删字段属于结构变更，不应改写记录的「最后更新时间」。
+			if err := tx.Model(&BaseRecord{}).Where("id = ?", rec.ID).UpdateColumn("data", raw).Error; err != nil {
 				return err
 			}
 		}
@@ -692,14 +894,19 @@ func (s *Service) recalcTableFormulas(ctx context.Context, tableID uuid.UUID) er
 		if len(rec.Data) > 0 {
 			_ = json.Unmarshal(rec.Data, &data)
 		}
+		// 系统字段按记录自身的创建 / 更新信息回填。
+		applySystemFields(idx, data, rec.CreatedAt, rec.UpdatedAt, rec.CreatedBy, rec.UpdatedBy)
 		computed, err := s.recomputeFormulas(s.db.WithContext(ctx), &table, idx, data)
 		if err != nil {
 			// 循环依赖等问题不影响其它记录的回填。
 			continue
 		}
 		raw, _ := json.Marshal(computed)
+		// UpdateColumns 而非 Updates：跳过 GORM 的 updated_at 自动写入，
+		// 否则「系统重算」会把记录的「最后更新时间」刷成重算时刻，
+		// 用户看到的更新时间就不再是「最后一次被人编辑的时间」。
 		if err := s.db.WithContext(ctx).Model(&BaseRecord{}).Where("id = ?", rec.ID).
-			Updates(map[string]any{"data": raw, "version": gorm.Expr("version + 1")}).Error; err != nil {
+			UpdateColumns(map[string]any{"data": raw, "version": gorm.Expr("version + 1")}).Error; err != nil {
 			return err
 		}
 		if err := s.syncAllProjections(s.db.WithContext(ctx), tableID, rec.ID, computed); err != nil {
@@ -722,7 +929,13 @@ func (s *Service) MigrateField(ctx context.Context, userID, projectID, fieldID u
 		return nil, err
 	}
 	if err := s.registry.ValidateFieldType(newType); err != nil {
-		return nil, fmt.Errorf("%w: %s", ErrFieldValueInvalid, err.Error())
+		return nil, fmt.Errorf("%w: %s", ErrFieldTypeIncompatible, err.Error())
+	}
+	// 系统字段（创建人 / 创建时间 …）的值由服务端维护，
+	// 不允许把普通字段迁成系统字段，也不允许把系统字段迁成普通字段
+	// （否则存量值与自动维护的值会互相打架）。
+	if IsSystemField(FieldType(newType)) || IsSystemField(FieldType(field.Type)) {
+		return nil, fmt.Errorf("%w: 系统字段不支持类型迁移", ErrFieldTypeIncompatible)
 	}
 	newHandler, _ := s.registry.Get(FieldType(newType))
 	var records []BaseRecord
@@ -747,10 +960,10 @@ func (s *Service) MigrateField(ctx context.Context, userID, projectID, fieldID u
 		}
 		value, err := newHandler.Normalize(raw, nil)
 		if err != nil {
-			return nil, fmt.Errorf("%w: 存量数据无法迁移到 %s：%v", ErrFieldValueInvalid, newType, err)
+			return nil, fmt.Errorf("%w: 存量数据无法迁移到 %s：%v", ErrFieldTypeIncompatible, newType, err)
 		}
 		if err := newHandler.ValidateValue(value, nil); err != nil {
-			return nil, fmt.Errorf("%w: 存量数据无法迁移到 %s：%v", ErrFieldValueInvalid, newType, err)
+			return nil, fmt.Errorf("%w: 存量数据无法迁移到 %s：%v", ErrFieldTypeIncompatible, newType, err)
 		}
 		plans = append(plans, plan{record: rec, data: data, value: value})
 	}
@@ -758,7 +971,8 @@ func (s *Service) MigrateField(ctx context.Context, userID, projectID, fieldID u
 		for _, p := range plans {
 			p.data[fieldID.String()] = p.value
 			raw, _ := json.Marshal(p.data)
-			if err := tx.Model(&BaseRecord{}).Where("id = ?", p.record.ID).Update("data", raw).Error; err != nil {
+			// 类型迁移同样不改写「最后更新时间」。
+			if err := tx.Model(&BaseRecord{}).Where("id = ?", p.record.ID).UpdateColumn("data", raw).Error; err != nil {
 				return err
 			}
 			if err := s.syncProjection(tx, field.TableID, p.record.ID, fieldID, p.value); err != nil {
@@ -793,6 +1007,11 @@ type RecordInput struct {
 	Fields          map[string]any `json:"fields"`
 	ExpectedVersion int64          `json:"expectedVersion"`
 	SchemaVersion   int64          `json:"schemaVersion"`
+	// Visibility 是记录级可见范围（space / restricted / custom）；nil 表示不改。
+	Visibility *string `json:"visibility"`
+	// Grants 是「指定成员可见」时的授权成员 ID 列表；nil 表示不改，
+	// 空数组表示清空授权名单（此时除创建者与管理者外谁都看不到）。
+	Grants *[]string `json:"grants"`
 }
 
 // CreateRecord 新建记录。
@@ -811,14 +1030,44 @@ func (s *Service) CreateRecord(ctx context.Context, userID, projectID, tableID u
 	if err := s.validateDocRefs(ctx, projectID, idx, normalized); err != nil {
 		return nil, err
 	}
-	rec := BaseRecord{
-		ID:        uuid.New(),
-		TableID:   tableID,
-		Version:   1,
-		CreatedBy: userID,
-		UpdatedBy: userID,
+	if err := s.validateLinkRefs(ctx, table.BaseID, idx, normalized); err != nil {
+		return nil, err
 	}
+	// 条件可见字段：新记录自身也要满足条件才能写入（合并后的值 = 本次提交）。
+	if err := s.assertWritableFields(idx, s.subjectOf(userID, projectID), normalized, normalized); err != nil {
+		return nil, err
+	}
+	// 新记录排到当前表末尾（手动排序位）。
+	var maxSort int64
+	if err := s.db.WithContext(ctx).Model(&BaseRecord{}).
+		Where("table_id = ? AND deleted_at IS NULL", tableID).
+		Select("COALESCE(MAX(sort_order), -1)").Scan(&maxSort).Error; err != nil {
+		return nil, err
+	}
+	// 新记录默认「空间可见」；创建者即受限记录的唯一可见者。
+	visibility := RecordVisibilitySpace
+	if in.Visibility != nil {
+		v, verr := NormalizeRecordVisibility(*in.Visibility)
+		if verr != nil {
+			return nil, verr
+		}
+		visibility = v
+	}
+	rec := BaseRecord{
+		ID:         uuid.New(),
+		TableID:    tableID,
+		SortOrder:  maxSort + 1,
+		Version:    1,
+		Visibility: visibility,
+		CreatedBy:  userID,
+		UpdatedBy:  userID,
+	}
+	now := time.Now()
+	rec.CreatedAt = now
+	rec.UpdatedAt = now
 	if err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// 系统字段（创建时间 / 创建人 …）先落库，公式才能引用它们。
+		applySystemFields(idx, normalized, now, now, userID, userID)
 		normalized, err = s.recomputeFormulas(tx, table, idx, normalized)
 		if err != nil {
 			return err
@@ -831,17 +1080,30 @@ func (s *Service) CreateRecord(ctx context.Context, userID, projectID, tableID u
 		if err := s.syncAllProjections(tx, tableID, rec.ID, normalized); err != nil {
 			return err
 		}
+		if err := s.syncRecordLinks(tx, table, idx, rec.ID, normalized); err != nil {
+			return err
+		}
 		if err := s.writeAudit(tx, projectID, table.BaseID, &tableID, &rec.ID, userID, "record.created", nil, normalized, ""); err != nil {
 			return err
 		}
+		// 事件只广播「哪些字段变了」，不广播值：
+		// SSE 订阅不区分角色，带值会绕过字段级权限（隐藏字段泄露）。
 		return s.writeEvent(tx, projectID, table.BaseID, &tableID, &rec.ID, "record.created", map[string]any{
-			"version": rec.Version,
-			"fields":  normalized,
+			"version":  rec.Version,
+			"fieldIds": fieldIDsOf(normalized),
 		})
 	}); err != nil {
 		return nil, err
 	}
-	return &RecordRow{ID: rec.ID, Version: rec.Version, Fields: normalized, Updated: rec.UpdatedAt}, nil
+	stripped, condHidden := stripHiddenFieldsWithReasons(normalized, idx, s.subjectOf(userID, projectID))
+	return &RecordRow{
+		ID: rec.ID, Version: rec.Version,
+		Fields:            stripped,
+		Updated:           rec.UpdatedAt,
+		Visibility:        rec.Visibility,
+		CreatedBy:         rec.CreatedBy.String(),
+		ConditionalHidden: condHidden,
+	}, nil
 }
 
 // UpdateRecord 更新记录（乐观锁）。
@@ -849,11 +1111,8 @@ func (s *Service) UpdateRecord(ctx context.Context, userID, projectID, recordID 
 	if err := s.assertAccess(userID, projectID, RoleEditor); err != nil {
 		return nil, err
 	}
-	var rec BaseRecord
-	if err := s.db.WithContext(ctx).Where("id = ?", recordID).First(&rec).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrRecordNotFound
-		}
+	rec, err := s.scopeLoadRecord(ctx, userID, projectID, recordID)
+	if err != nil {
 		return nil, err
 	}
 	table, idx, err := s.loadTableSchema(ctx, userID, projectID, rec.TableID)
@@ -881,45 +1140,177 @@ func (s *Service) UpdateRecord(ctx context.Context, userID, projectID, recordID 
 	if err := s.validateDocRefs(ctx, projectID, idx, patch); err != nil {
 		return nil, err
 	}
+	if err := s.validateLinkRefs(ctx, table.BaseID, idx, patch); err != nil {
+		return nil, err
+	}
+	// 条件可见字段：按「旧值 + 本次提交」合并后的记录判断可见性。
+	merged := make(map[string]any, len(data)+len(patch))
+	for k, v := range data {
+		merged[k] = v
+	}
+	for k, v := range patch {
+		merged[k] = v
+	}
+	if err := s.assertWritableFields(idx, s.subjectOf(userID, projectID), patch, merged); err != nil {
+		return nil, err
+	}
 	for k, v := range patch {
 		data[k] = v
 	}
-	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		data, err = s.recomputeFormulas(tx, table, idx, data)
+	// 记录级可见范围变更：只有空间管理者可以改（否则谁都能把自己记录藏起来，
+	// 也无法把别人的受限记录放出来）。
+	var newVisibility string
+	if in.Visibility != nil {
+		v, err := NormalizeRecordVisibility(*in.Visibility)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		raw, _ := json.Marshal(data)
-		res := tx.Model(&BaseRecord{}).
-			Where("id = ? AND version = ? AND deleted_at IS NULL", rec.ID, rec.Version).
-			Updates(map[string]any{
+		if v != rec.Visibility {
+			if roleRank(s.roleOf(userID, projectID)) < roleRank(RoleAdmin) {
+				return nil, fmt.Errorf("%w: 只有空间管理者可以修改记录可见范围", ErrForbidden)
+			}
+			newVisibility = v
+		}
+	}
+	// 授权名单（指定成员可见）：同样只有管理者能改。
+	grantUsers, err := s.normalizeGrantUsers(in.Grants)
+	if err != nil {
+		return nil, err
+	}
+	if grantUsers != nil && roleRank(s.roleOf(userID, projectID)) < roleRank(RoleAdmin) {
+		return nil, fmt.Errorf("%w: 只有空间管理者可以修改记录可见成员", ErrForbidden)
+	}
+	if grantUsers != nil && len(*grantUsers) > 0 {
+		// 只能授权给「空间内的人」：给外人授权属于看起来生效、实际无效的假权限。
+		members, err := s.spaceMemberIDs(ctx, projectID)
+		if err != nil {
+			return nil, err
+		}
+		for _, uid := range *grantUsers {
+			if !members[uid] {
+				return nil, fmt.Errorf("%w: 可见成员必须是空间成员", ErrFieldValueInvalid)
+			}
+		}
+	}
+	if newVisibility != "" && newVisibility != RecordVisibilityCustom && grantUsers != nil && len(*grantUsers) > 0 {
+		return nil, fmt.Errorf("%w: 只有「指定成员可见」才能配置可见成员", ErrFieldValueInvalid)
+	}
+	// 冲突策略（对标飞书 / Airtable 的字段级合并）：
+	//   - 客户端显式带 expectedVersion → 严格乐观锁，版本过期直接报冲突，不重试。
+	//   - 客户端没带 expectedVersion → 有限重试：重新锁行取最新值，把本次提交的
+	//     字段合并上去再写。这样两个人同时改**同一记录的不同字段**时不会互相打断，
+	//     只有真正改到同一字段才会出现「后写覆盖先写」（与主流多维表格一致）。
+	const maxConflictRetry = 3
+	for attempt := 0; ; attempt++ {
+		err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+			// 锁行取最新记录：后写者基于最新值合并，而不是覆盖别人刚写的字段。
+			var locked BaseRecord
+			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+				Where("id = ? AND deleted_at IS NULL", rec.ID).First(&locked).Error; err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					return ErrRecordNotFound
+				}
+				return err
+			}
+			if in.ExpectedVersion > 0 && locked.Version != in.ExpectedVersion {
+				return fmt.Errorf("%w: 当前版本 %d，客户端版本 %d", ErrVersionConflict, locked.Version, in.ExpectedVersion)
+			}
+			base := map[string]any{}
+			if len(locked.Data) > 0 {
+				_ = json.Unmarshal(locked.Data, &base)
+			}
+			merged := make(map[string]any, len(base)+len(patch))
+			for k, v := range base {
+				merged[k] = v
+			}
+			for k, v := range patch {
+				merged[k] = v
+			}
+			// 系统字段：创建信息沿用记录原值，更新信息取本次操作。
+			applySystemFields(idx, merged, locked.CreatedAt, time.Now(), locked.CreatedBy, userID)
+			computed, err := s.recomputeFormulas(tx, table, idx, merged)
+			if err != nil {
+				return err
+			}
+			raw, _ := json.Marshal(computed)
+			updates := map[string]any{
 				"data":       raw,
 				"version":    gorm.Expr("version + 1"),
 				"updated_by": userID,
 				"updated_at": time.Now(),
-			})
-		if res.Error != nil {
-			return res.Error
-		}
-		if res.RowsAffected == 0 {
-			return fmt.Errorf("%w: 记录已被他人修改", ErrVersionConflict)
-		}
-		rec.Version++
-		if err := s.syncAllProjections(tx, rec.TableID, rec.ID, data); err != nil {
-			return err
-		}
-		if err := s.writeAudit(tx, projectID, table.BaseID, &rec.TableID, &rec.ID, userID, "record.updated", before, data, ""); err != nil {
-			return err
-		}
-		return s.writeEvent(tx, projectID, table.BaseID, &rec.TableID, &rec.ID, "record.updated", map[string]any{
-			"version": rec.Version,
-			"fields":  patch,
+			}
+			if newVisibility != "" {
+				updates["visibility"] = newVisibility
+				// 同步回内存对象，保证响应里返回的是「改完之后」的可见范围，
+				// 否则前端拿到旧值会以为没生效（记录级策略是安全边界，不能有歧义）。
+				rec.Visibility = newVisibility
+			}
+			res := tx.Model(&BaseRecord{}).
+				Where("id = ? AND version = ? AND deleted_at IS NULL", locked.ID, locked.Version).
+				Updates(updates)
+			if res.Error != nil {
+				return res.Error
+			}
+			if res.RowsAffected == 0 {
+				return fmt.Errorf("%w: 记录已被他人修改", ErrVersionConflict)
+			}
+			rec.Version = locked.Version + 1
+			rec.Data = raw
+			rec.UpdatedAt = time.Now()
+			// 审计的「修改前」必须是这次写入前的真实值（合并后的基线）。
+			before = base
+			data = computed
+			if err := s.syncAllProjections(tx, rec.TableID, rec.ID, data); err != nil {
+				return err
+			}
+			if err := s.syncRecordLinks(tx, table, idx, rec.ID, data); err != nil {
+				return err
+			}
+			if err := s.writeAudit(tx, projectID, table.BaseID, &rec.TableID, &rec.ID, userID, "record.updated", before, data, ""); err != nil {
+				return err
+			}
+			if grantUsers != nil {
+				if err := s.saveRecordGrants(ctx, tx, projectID, rec.ID, userID, *grantUsers); err != nil {
+					return err
+				}
+			}
+			if err := s.writeEvent(tx, projectID, table.BaseID, &rec.TableID, &rec.ID, "record.updated", map[string]any{
+				"version":  rec.Version,
+				"fieldIds": fieldIDsOf(patch),
+			}); err != nil {
+				return err
+			}
+			// 可见范围 / 授权名单变了 → 广播权限变更事件，让订阅端重新拉取
+			// （技术方案第 8 章：权限变更后失效订阅）。
+			if newVisibility != "" || grantUsers != nil {
+				if err := s.writeEvent(tx, projectID, table.BaseID, &rec.TableID, &rec.ID, "permission.changed", map[string]any{
+					"scope":      "record",
+					"visibility": rec.Visibility,
+					"recordId":   rec.ID.String(),
+				}); err != nil {
+					return err
+				}
+			}
+			return nil
 		})
-	})
-	if err != nil {
+		if err == nil {
+			break
+		}
+		// 冲突重试：仅在客户端没有指定 expectedVersion 时允许自动合并重试。
+		if errors.Is(err, ErrVersionConflict) && in.ExpectedVersion == 0 && attempt+1 < maxConflictRetry {
+			continue
+		}
 		return nil, err
 	}
-	return &RecordRow{ID: rec.ID, Version: rec.Version, Fields: data, Updated: rec.UpdatedAt}, nil
+	stripped, condHidden := stripHiddenFieldsWithReasons(data, idx, s.subjectOf(userID, projectID))
+	return &RecordRow{
+		ID: rec.ID, Version: rec.Version,
+		Fields:            stripped,
+		Updated:           rec.UpdatedAt,
+		Visibility:        rec.Visibility,
+		CreatedBy:         rec.CreatedBy.String(),
+		ConditionalHidden: condHidden,
+	}, nil
 }
 
 // DeleteRecord 软删除记录。
@@ -927,11 +1318,8 @@ func (s *Service) DeleteRecord(ctx context.Context, userID, projectID, recordID 
 	if err := s.assertAccess(userID, projectID, RoleEditor); err != nil {
 		return err
 	}
-	var rec BaseRecord
-	if err := s.db.WithContext(ctx).Where("id = ?", recordID).First(&rec).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return ErrRecordNotFound
-		}
+	rec, err := s.scopeLoadRecord(ctx, userID, projectID, recordID)
+	if err != nil {
 		return err
 	}
 	var table BaseTable
@@ -943,6 +1331,14 @@ func (s *Service) DeleteRecord(ctx context.Context, userID, projectID, recordID 
 			return err
 		}
 		if err := tx.Where("record_id = ?", recordID).Delete(&BaseRecordValue{}).Error; err != nil {
+			return err
+		}
+		// 关联关系随记录一起失效（正向）。
+		if err := tx.Where("source_record_id = ?", recordID).Delete(&BaseRecordLink{}).Error; err != nil {
+			return err
+		}
+		// 反向关系来自记录 JSONB，删除后自然查不到；这里同步清理关系表里的入边。
+		if err := tx.Where("target_record_id = ?", recordID).Delete(&BaseRecordLink{}).Error; err != nil {
 			return err
 		}
 		if err := s.writeAudit(tx, projectID, table.BaseID, &rec.TableID, &rec.ID, userID, "record.deleted", nil, nil, ""); err != nil {
@@ -1004,6 +1400,62 @@ func (s *Service) BatchDeletePartial(ctx context.Context, userID, projectID, tab
 		}
 	}
 	return failures
+}
+
+// ReorderRecords 按给定顺序重排记录（手动排序位）。
+//
+// ids 是目标顺序（可以只是当前视图里可见的那部分记录）；
+// 其余记录保持相对次序并排到 ids 之后，因此不会因为分页/筛选而错乱。
+func (s *Service) ReorderRecords(ctx context.Context, userID, projectID, tableID uuid.UUID, ids []uuid.UUID) error {
+	if err := s.assertAccess(userID, projectID, RoleEditor); err != nil {
+		return err
+	}
+	if len(ids) == 0 {
+		return fmt.Errorf("%w: empty reorder list", ErrFieldValueInvalid)
+	}
+	var table BaseTable
+	if err := s.db.WithContext(ctx).Where("id = ? AND deleted_at IS NULL", tableID).First(&table).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrTableNotFound
+		}
+		return err
+	}
+	// 目标顺序里的记录必须都属于本表。
+	var owned []uuid.UUID
+	if err := s.db.WithContext(ctx).Model(&BaseRecord{}).
+		Where("table_id = ? AND id IN ? AND deleted_at IS NULL", tableID, ids).
+		Pluck("id", &owned).Error; err != nil {
+		return err
+	}
+	if len(owned) != len(ids) {
+		return fmt.Errorf("%w: reorder contains unknown record", ErrFieldValueInvalid)
+	}
+	// 表内其余记录：保持原相对次序，排到目标顺序之后。
+	var rest []BaseRecord
+	if err := s.db.WithContext(ctx).Where("table_id = ? AND id NOT IN ? AND deleted_at IS NULL", tableID, ids).
+		Order("sort_order ASC, id ASC").Limit(5000).Find(&rest).Error; err != nil {
+		return err
+	}
+	ordered := make([]uuid.UUID, 0, len(ids)+len(rest))
+	ordered = append(ordered, ids...)
+	for _, item := range rest {
+		ordered = append(ordered, item.ID)
+	}
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		for i, id := range ordered {
+			if err := tx.Model(&BaseRecord{}).
+				Where("id = ? AND table_id = ?", id, tableID).
+				Updates(map[string]any{
+					"sort_order": int64(i),
+					"version":    gorm.Expr("version + 1"),
+					"updated_by": userID,
+					"updated_at": time.Now(),
+				}).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 // BatchCreate 批量创建记录（默认整批成功或整批失败）。
@@ -1181,6 +1633,69 @@ func (s *Service) ListBaseEmbedders(ctx context.Context, userID, projectID, base
 	return out, nil
 }
 
+// RecordDocReference 是「引用了本记录的文档」条目。
+type RecordDocReference struct {
+	// NodeID 是知识库节点 ID（可直接跳转）。
+	NodeID uuid.UUID `json:"nodeId"`
+	// DocumentID 是文档 ID。
+	DocumentID uuid.UUID `json:"documentId"`
+	// Title 是文档标题。
+	Title string `json:"title"`
+	// Kind：embed = 文档内嵌了本记录所属的表；mention = 文档正文里提到了本记录 ID。
+	Kind string `json:"kind"`
+}
+
+// ListRecordDocReferences 列出「引用了本记录」的文档。
+//
+// 两种口径：
+//   - embed：文档正文里内嵌了本记录所属 Base 的视图块（data-base-id 命中）；
+//   - mention：文档正文里出现了本记录 ID（例如复制粘贴了记录链接）。
+//
+// 对应技术方案第 11 章「文档反向引用某条记录」。
+func (s *Service) ListRecordDocReferences(ctx context.Context, userID, projectID, recordID uuid.UUID) ([]RecordDocReference, error) {
+	if err := s.assertAccess(userID, projectID, RoleViewer); err != nil {
+		return nil, err
+	}
+	record, err := s.scopeLoadRecord(ctx, userID, projectID, recordID)
+	if err != nil {
+		return nil, err
+	}
+	var table BaseTable
+	if err := s.db.WithContext(ctx).Where("id = ?", record.TableID).First(&table).Error; err != nil {
+		return nil, err
+	}
+	type row struct {
+		NodeID     uuid.UUID
+		DocumentID uuid.UUID
+		Title      string
+		HTML       string
+	}
+	var rows []row
+	if err := s.db.WithContext(ctx).Model(&model.KnowledgeNode{}).
+		Select("kb_nodes.id AS node_id, kb_nodes.document_id, kb_nodes.title, COALESCE(d.current_data->>'html','') AS html").
+		Joins("JOIN kb_documents d ON d.id = kb_nodes.document_id AND d.deleted_at IS NULL").
+		Where("kb_nodes.project_id = ? AND kb_nodes.node_type = 'doc' AND kb_nodes.trashed_at IS NULL AND kb_nodes.document_id IS NOT NULL", projectID).
+		Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	embedMarker := `data-base-id="` + table.BaseID.String() + `"`
+	mentionMarker := recordID.String()
+	out := make([]RecordDocReference, 0)
+	for _, item := range rows {
+		switch {
+		case strings.Contains(item.HTML, embedMarker):
+			out = append(out, RecordDocReference{
+				NodeID: item.NodeID, DocumentID: item.DocumentID, Title: item.Title, Kind: "embed",
+			})
+		case strings.Contains(item.HTML, mentionMarker):
+			out = append(out, RecordDocReference{
+				NodeID: item.NodeID, DocumentID: item.DocumentID, Title: item.Title, Kind: "mention",
+			})
+		}
+	}
+	return out, nil
+}
+
 // reindexTable 按当前字段能力重建整表投影。
 //
 // 背景：字段的「可筛选」能力与「可索引」能力必须一致——
@@ -1316,6 +1831,11 @@ func (s *Service) recomputeFormulas(tx *gorm.DB, table *BaseTable, idx *fieldInd
 			_ = json.Unmarshal(f.AST, &node)
 		}
 		asts[id] = &node
+		// 无依赖的公式（例如 TODAY()、1 + 1）也必须进入计算顺序，
+		// 否则 deps 里没有它的键，topoOrder 会把它整条漏掉（公式值永远算不出来）。
+		if _, ok := deps[id]; !ok {
+			deps[id] = nil
+		}
 		for _, dep := range FormulaDependencies(&node) {
 			depID, ok := nameToID[dep]
 			if !ok {
@@ -1402,9 +1922,11 @@ type ViewInfo struct {
 	Type      string         `json:"type"`
 	Config    map[string]any `json:"config"`
 	IsDefault bool           `json:"isDefault"`
-	OwnerID   uuid.UUID      `json:"ownerId"`
-	Version   int64          `json:"version"`
-	CreatedAt time.Time      `json:"createdAt"`
+	// Scope 是视图可见范围：shared（空间共享）/ personal（仅创建者）。
+	Scope     string    `json:"scope"`
+	OwnerID   uuid.UUID `json:"ownerId"`
+	Version   int64     `json:"version"`
+	CreatedAt time.Time `json:"createdAt"`
 }
 
 // ListViews 列出表视图。
@@ -1412,54 +1934,173 @@ func (s *Service) ListViews(ctx context.Context, userID, projectID, tableID uuid
 	if err := s.assertAccess(userID, projectID, RoleViewer); err != nil {
 		return nil, err
 	}
+	// 个人视图只有创建者能看到（共享视图对空间成员可见）。
 	var rows []BaseView
-	if err := s.db.WithContext(ctx).Where("table_id = ? AND status = 1", tableID).Order("created_at ASC").Find(&rows).Error; err != nil {
+	if err := s.db.WithContext(ctx).
+		Where("table_id = ? AND status = 1 AND (scope = ? OR scope = '' OR owner_id = ?)", tableID, ViewScopeShared, userID).
+		Order("created_at ASC").Find(&rows).Error; err != nil {
 		return nil, err
 	}
 	out := make([]ViewInfo, 0, len(rows))
 	for _, v := range rows {
-		out = append(out, viewInfoOf(&v))
+		out = append(out, viewInfoOf(&v, userID))
+	}
+	if err := s.attachViewPrefs(ctx, userID, projectID, out); err != nil {
+		return nil, err
 	}
 	return out, nil
 }
 
-func viewInfoOf(v *BaseView) ViewInfo {
+// attachViewPrefs 把「当前用户」的个人偏好挂到视图列表上。
+//
+// 只挂当前用户的 —— 别人的个人偏好是别人的事，不下发（也不该被读到）。
+func (s *Service) attachViewPrefs(ctx context.Context, userID, projectID uuid.UUID, infos []ViewInfo) error {
+	if len(infos) == 0 {
+		return nil
+	}
+	ids := make([]uuid.UUID, 0, len(infos))
+	index := map[uuid.UUID]int{}
+	for i, info := range infos {
+		ids = append(ids, info.ID)
+		index[info.ID] = i
+	}
+	var prefs []BaseViewPref
+	if err := s.db.WithContext(ctx).
+		Where("view_id IN ? AND user_id = ?", ids, userID).
+		Find(&prefs).Error; err != nil {
+		return err
+	}
+	for _, pref := range prefs {
+		i, ok := index[pref.ViewID]
+		if !ok {
+			continue
+		}
+		personal := map[string]any{}
+		if len(pref.Config) > 0 {
+			_ = json.Unmarshal(pref.Config, &personal)
+		}
+		if infos[i].Config == nil {
+			infos[i].Config = map[string]any{}
+		}
+		infos[i].Config["personal"] = map[string]any{viewPersonalKey(userID): personal}
+	}
+	return nil
+}
+
+// viewInfoOf 输出视图信息（共享配置部分）。
+//
+// 个人偏好不在这份 config 里 —— 它存在 base_view_prefs，
+// 由 ListViews / UpdateView 按「当前用户」单独挂到 config.personal[uid] 上。
+func viewInfoOf(v *BaseView, userID uuid.UUID) ViewInfo {
 	cfg := map[string]any{}
 	if len(v.Config) > 0 {
 		_ = json.Unmarshal(v.Config, &cfg)
 	}
+	scope := v.Scope
+	if scope == "" {
+		scope = ViewScopeShared
+	}
 	return ViewInfo{
 		ID: v.ID, TableID: v.TableID, Name: v.Name, Type: v.Type, Config: cfg,
-		IsDefault: v.IsDefault, OwnerID: v.OwnerID, Version: v.Version, CreatedAt: v.CreatedAt,
+		IsDefault: v.IsDefault, Scope: scope, OwnerID: v.OwnerID, Version: v.Version, CreatedAt: v.CreatedAt,
 	}
 }
 
-// CreateView 新建视图。
-func (s *Service) CreateView(ctx context.Context, userID, projectID, tableID uuid.UUID, name, viewType string, config map[string]any) (*ViewInfo, error) {
-	if err := s.assertAccess(userID, projectID, RoleEditor); err != nil {
-		return nil, err
+// splitViewPersonal 把「共享段」与「个人段」拆开。
+//
+// shared —— 视图级共享配置（列宽 / 显隐 / 布局），存在 base_views.config；
+// personal —— 当前用户的个人偏好，存在 base_view_prefs。
+//
+// 返回的 personalOK=false 表示本次请求里根本没带 personal 段
+// （调用方据此区分「没动」和「删掉了自己的偏好」）。
+func splitViewPersonal(cfg map[string]any) (shared map[string]any, personal map[string]any, personalOK bool) {
+	shared = map[string]any{}
+	if cfg == nil {
+		return shared, nil, false
 	}
+	for k, v := range cfg {
+		if k == "personal" {
+			continue
+		}
+		shared[k] = v
+	}
+	if p, ok := cfg["personal"].(map[string]any); ok {
+		return shared, p, true
+	}
+	return shared, nil, false
+}
+
+// viewPersonalKey 是个人偏好在响应里的键（当前用户 uid）。
+func viewPersonalKey(userID uuid.UUID) string { return userID.String() }
+
+// CreateView 新建视图。
+// ValidViewTypes 是允许的视图类型。
+//
+//	grid    —— 表格视图
+//	kanban  —— 看板视图
+//	calendar—— 日历视图
+//	gallery —— 画廊视图
+//	form    —— 表单视图（一次填一条记录）
+//	gantt   —— 甘特视图（按开始 / 结束日期排布）
+var ValidViewTypes = []string{"grid", "kanban", "calendar", "gallery", "form", "gantt"}
+
+// IsValidViewType 判断视图类型是否受支持。
+func IsValidViewType(t string) bool {
+	for _, item := range ValidViewTypes {
+		if item == t {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *Service) CreateView(ctx context.Context, userID, projectID, tableID uuid.UUID, name, viewType string, config map[string]any, scope string) (*ViewInfo, error) {
 	if strings.TrimSpace(name) == "" {
 		name = "新视图"
 	}
 	if viewType == "" {
 		viewType = "grid"
 	}
-	raw, _ := json.Marshal(config)
+	if !IsValidViewType(viewType) {
+		return nil, fmt.Errorf("%w: unsupported view type %q", ErrQueryInvalid, viewType)
+	}
+	if scope != ViewScopePersonal {
+		scope = ViewScopeShared
+	}
+	// 共享视图需要编辑者；个人视图只有自己看得到，访客也能建（第十三轮）。
+	need := RoleEditor
+	if scope == ViewScopePersonal {
+		need = RoleViewer
+	}
+	if err := s.assertAccess(userID, projectID, need); err != nil {
+		return nil, err
+	}
+	shared, personal, _ := splitViewPersonal(config)
+	raw, _ := json.Marshal(shared)
 	view := BaseView{
 		ID: uuid.New(), TableID: tableID, Name: name, Type: viewType, Config: raw,
-		OwnerID: userID, Version: 1, Status: 1,
+		Scope: scope, OwnerID: userID, Version: 1, Status: 1,
 	}
 	if err := s.db.WithContext(ctx).Create(&view).Error; err != nil {
 		return nil, err
 	}
-	info := viewInfoOf(&view)
+	// 新建视图时如果带了个人段，落进 base_view_prefs。
+	if len(personal) > 0 {
+		if pref, ok := personal[viewPersonalKey(userID)]; ok {
+			if err := s.saveViewPref(ctx, projectID, view.ID, userID, pref); err != nil {
+				return nil, err
+			}
+		}
+	}
+	info := viewInfoOf(&view, userID)
 	return &info, nil
 }
 
 // UpdateView 更新视图配置（乐观锁）。
 func (s *Service) UpdateView(ctx context.Context, userID, projectID, viewID uuid.UUID, name, viewType *string, config map[string]any, version int64) (*ViewInfo, error) {
-	if err := s.assertAccess(userID, projectID, RoleEditor); err != nil {
+	// 访客也能改「自己的个人偏好」（第十三轮）：
+	// 只写 base_view_prefs 里自己的那一份，不影响共享配置。
+	if err := s.assertAccess(userID, projectID, RoleViewer); err != nil {
 		return nil, err
 	}
 	var view BaseView
@@ -1469,16 +2110,40 @@ func (s *Service) UpdateView(ctx context.Context, userID, projectID, viewID uuid
 		}
 		return nil, err
 	}
+	// 个人视图只有创建者能改；共享视图的空间成员都能改（保持既有协作方式）。
+	if view.Scope == ViewScopePersonal && view.OwnerID != userID {
+		return nil, ErrViewNotFound
+	}
+	// 共享段（视图名 / 类型 / 共享配置）需要编辑者及以上；
+	// 但「自己的个人视图」只有自己看得到，访客也能完整编辑。
+	canEditShared := roleRank(s.spaceRole(userID, projectID)) >= roleRank(RoleEditor) ||
+		(view.Scope == ViewScopePersonal && view.OwnerID == userID)
+	if !canEditShared {
+		// 访客只能改自己的偏好；视图名与共享配置的改动一律忽略。
+		if name != nil || viewType != nil {
+			name, viewType = nil, nil
+		}
+	}
 	updates := map[string]any{"version": gorm.Expr("version + 1")}
 	if name != nil {
 		updates["name"] = strings.TrimSpace(*name)
 	}
 	if viewType != nil && *viewType != "" {
+		if !IsValidViewType(*viewType) {
+			return nil, fmt.Errorf("%w: unsupported view type %q", ErrQueryInvalid, *viewType)
+		}
 		updates["type"] = *viewType
 	}
+	var personal map[string]any
+	personalOK := false
 	if config != nil {
-		raw, _ := json.Marshal(config)
-		updates["config"] = raw
+		// 共享段整体替换；个人段单独落到 base_view_prefs，互不覆盖。
+		shared, p, ok := splitViewPersonal(config)
+		personal, personalOK = p, ok
+		if canEditShared {
+			raw, _ := json.Marshal(shared)
+			updates["config"] = raw
+		}
 	}
 	query := s.db.WithContext(ctx).Model(&view)
 	if version > 0 {
@@ -1491,12 +2156,51 @@ func (s *Service) UpdateView(ctx context.Context, userID, projectID, viewID uuid
 	if res.RowsAffected == 0 {
 		return nil, fmt.Errorf("%w: 视图已被他人修改", ErrVersionConflict)
 	}
+	// 个人偏好：带了就 upsert，没带自己的键就删掉（共享模式下「取消我的偏好」）。
+	if personalOK {
+		if pref, ok := personal[viewPersonalKey(userID)]; ok {
+			if err := s.saveViewPref(ctx, projectID, viewID, userID, pref); err != nil {
+				return nil, err
+			}
+		} else if err := s.deleteViewPref(ctx, viewID, userID); err != nil {
+			return nil, err
+		}
+	}
 	var fresh BaseView
 	if err := s.db.WithContext(ctx).Where("id = ?", viewID).First(&fresh).Error; err != nil {
 		return nil, err
 	}
-	info := viewInfoOf(&fresh)
-	return &info, nil
+	info := viewInfoOf(&fresh, userID)
+	list := []ViewInfo{info}
+	if err := s.attachViewPrefs(ctx, userID, projectID, list); err != nil {
+		return nil, err
+	}
+	return &list[0], nil
+}
+
+// saveViewPref 写入（或覆盖）某个视图的个人偏好。
+func (s *Service) saveViewPref(ctx context.Context, projectID, viewID, userID uuid.UUID, pref any) error {
+	raw, err := json.Marshal(pref)
+	if err != nil {
+		return err
+	}
+	row := BaseViewPref{
+		ID: uuid.New(), ViewID: viewID, UserID: userID, ProjectID: projectID,
+		Config: raw, CreatedAt: time.Now(), UpdatedAt: time.Now(),
+	}
+	return s.db.WithContext(ctx).
+		Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "view_id"}, {Name: "user_id"}},
+			DoUpdates: clause.AssignmentColumns([]string{"config", "updated_at"}),
+		}).
+		Create(&row).Error
+}
+
+// deleteViewPref 删除某个视图的个人偏好。
+func (s *Service) deleteViewPref(ctx context.Context, viewID, userID uuid.UUID) error {
+	return s.db.WithContext(ctx).
+		Where("view_id = ? AND user_id = ?", viewID, userID).
+		Delete(&BaseViewPref{}).Error
 }
 
 // DeleteView 删除视图。
@@ -1504,7 +2208,21 @@ func (s *Service) DeleteView(ctx context.Context, userID, projectID, viewID uuid
 	if err := s.assertAccess(userID, projectID, RoleEditor); err != nil {
 		return err
 	}
-	return s.db.WithContext(ctx).Where("id = ?", viewID).Delete(&BaseView{}).Error
+	var view BaseView
+	if err := s.db.WithContext(ctx).Where("id = ?", viewID).First(&view).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrViewNotFound
+		}
+		return err
+	}
+	if view.Scope == ViewScopePersonal && view.OwnerID != userID {
+		return ErrViewNotFound
+	}
+	if err := s.db.WithContext(ctx).Where("id = ?", viewID).Delete(&BaseView{}).Error; err != nil {
+		return err
+	}
+	// 视图删了，它所有人的个人偏好也没意义了。
+	return s.db.WithContext(ctx).Where("view_id = ?", viewID).Delete(&BaseViewPref{}).Error
 }
 
 // —— Formula ——
@@ -1617,7 +2335,7 @@ func (s *Service) SaveFormula(ctx context.Context, userID, projectID, fieldID uu
 	}
 	node, err := ParseFormula(expression)
 	if err != nil {
-		return err
+		return fmt.Errorf("%w: %v", ErrFormulaParse, err)
 	}
 	rawAST, _ := json.Marshal(node)
 	deps := FormulaDependencies(node)
@@ -1669,7 +2387,20 @@ func (s *Service) SaveFormula(ctx context.Context, userID, projectID, fieldID uu
 				return err
 			}
 		}
-		return s.bumpSchema(tx, field.TableID)
+		if err := s.bumpSchema(tx, field.TableID); err != nil {
+			return err
+		}
+		// 公式变更要广播事件：订阅端据此刷新公式列（此前保存公式不通知，
+		// 协作端要等下一次拉取才看到新公式结果）。
+		var ownerTable BaseTable
+		if err := tx.Where("id = ?", field.TableID).First(&ownerTable).Error; err != nil {
+			return err
+		}
+		return s.writeEventTyped(tx, projectID, ownerTable.BaseID, &field.TableID, &fieldID, "field", "field.formula.saved", map[string]any{
+			"fieldId":      fieldID.String(),
+			"expression":   expression,
+			"dependencies": deps,
+		})
 	})
 	if err != nil {
 		return err
@@ -1695,10 +2426,18 @@ func (s *Service) writeAudit(tx *gorm.DB, projectID, baseID uuid.UUID, tableID, 
 }
 
 func (s *Service) writeEvent(tx *gorm.DB, projectID, baseID uuid.UUID, tableID, aggregateID *uuid.UUID, eventType string, payload map[string]any) error {
+	return s.writeEventTyped(tx, projectID, baseID, tableID, aggregateID, "record", eventType, payload)
+}
+
+// writeEventTyped 写一条领域事件（outbox）。
+//
+// aggregateType 区分事件归属（record / field / view），
+// 订阅端据此决定要不要重新拉取。
+func (s *Service) writeEventTyped(tx *gorm.DB, projectID, baseID uuid.UUID, tableID, aggregateID *uuid.UUID, aggregateType, eventType string, payload map[string]any) error {
 	raw, _ := json.Marshal(payload)
 	row := BaseEventOutbox{
 		ID: uuid.New(), ProjectID: projectID, BaseID: baseID, TableID: tableID,
-		AggregateType: "record", AggregateID: derefUUID(aggregateID), EventType: eventType,
+		AggregateType: aggregateType, AggregateID: derefUUID(aggregateID), EventType: eventType,
 		Payload: raw, Status: "pending", CreatedAt: time.Now(),
 	}
 	return tx.Create(&row).Error
@@ -1821,7 +2560,13 @@ func (s *Service) ListDocBackrefs(ctx context.Context, userID, projectID, nodeID
 		}
 	}
 
+	// 记录级可见范围：受限记录不应出现在文档的「反向引用」里。
+	visible := s.visibleRecordIDs(ctx, userID, projectID, recordIDs)
+
 	for _, h := range hits {
+		if !visible[h.RecordID] {
+			continue
+		}
 		table := tableByID[h.TableID]
 		field := fieldByID[h.FieldID]
 		out = append(out, DocBackref{
@@ -1838,18 +2583,289 @@ func (s *Service) ListDocBackrefs(ctx context.Context, userID, projectID, nodeID
 	return out, nil
 }
 
-// ListAudit 列出操作审计。
-func (s *Service) ListAudit(ctx context.Context, userID, projectID, baseID uuid.UUID, limit int) ([]BaseOperationLog, error) {
+// AuditQuery 是操作审计的查询条件（分页 + 筛选）。
+type AuditQuery struct {
+	// Limit 是单页条数（1~200，默认 50）。
+	Limit int
+	// Offset 是偏移量（配合「加载更多」）。
+	Offset int
+	// Action 是操作类型过滤（record.created / field.updated / …）；空表示不过滤。
+	Action string
+	// From / To 是时间范围（含端点）；nil 表示不限。
+	From *time.Time
+	To   *time.Time
+	// OperatorID 是操作者过滤（用户 ID）；uuid.Nil 表示不过滤。
+	OperatorID uuid.UUID
+	// RecordID 是记录过滤（记录 ID）；uuid.Nil 表示不过滤。
+	RecordID uuid.UUID
+	// RecordPrefix 是记录 ID 的前缀过滤（用户只记得前几位时用）；空表示不过滤。
+	RecordPrefix string
+}
+
+// canonicalUUIDPrefix 把用户输入的记录 ID 前缀转成 UUID 规范写法的前缀，
+// 便于「只记得前几位」时也能筛到记录；非法输入返回 ok=false（调用方忽略该条件）。
+func canonicalUUIDPrefix(input string) (string, bool) {
+	clean := strings.ToLower(strings.ReplaceAll(strings.TrimSpace(input), "-", ""))
+	if len(clean) == 0 || len(clean) > 32 {
+		return "", false
+	}
+	for _, r := range clean {
+		if (r < '0' || r > '9') && (r < 'a' || r > 'f') {
+			return "", false
+		}
+	}
+	switch {
+	case len(clean) <= 8:
+		return clean, true
+	case len(clean) <= 13:
+		return clean[:8] + "-" + clean[8:], true
+	case len(clean) <= 18:
+		return clean[:8] + "-" + clean[8:12] + "-" + clean[12:], true
+	case len(clean) <= 23:
+		return clean[:8] + "-" + clean[8:12] + "-" + clean[12:16] + "-" + clean[16:], true
+	default:
+		return clean[:8] + "-" + clean[8:12] + "-" + clean[12:16] + "-" + clean[16:20] + "-" + clean[20:], true
+	}
+}
+
+// ListAudit 列出操作审计（分页 + 筛选），并返回符合条件的总条数。
+func (s *Service) ListAudit(ctx context.Context, userID, projectID, baseID uuid.UUID, q AuditQuery) ([]BaseOperationLog, int64, error) {
+	if err := s.assertAccess(userID, projectID, RoleViewer); err != nil {
+		return nil, 0, err
+	}
+	if q.Limit <= 0 || q.Limit > 200 {
+		q.Limit = 50
+	}
+	if q.Offset < 0 {
+		q.Offset = 0
+	}
+	base := s.db.WithContext(ctx).Model(&BaseOperationLog{}).
+		Where("project_id = ? AND base_id = ?", projectID, baseID)
+	if action := strings.TrimSpace(q.Action); action != "" {
+		base = base.Where("operation = ?", action)
+	}
+	if q.From != nil {
+		base = base.Where("created_at >= ?", *q.From)
+	}
+	if q.To != nil {
+		base = base.Where("created_at <= ?", *q.To)
+	}
+	if q.OperatorID != uuid.Nil {
+		base = base.Where("operator_id = ?", q.OperatorID)
+	}
+	if q.RecordID != uuid.Nil {
+		base = base.Where("record_id = ?", q.RecordID)
+	} else if prefix := strings.TrimSpace(q.RecordPrefix); prefix != "" {
+		if canonical, ok := canonicalUUIDPrefix(prefix); ok {
+			// Postgres 用 ::text，SQLite（单测影子库）用 CAST。
+			expr := "record_id::text LIKE ?"
+			if s.db.Dialector.Name() != "postgres" {
+				expr = "CAST(record_id AS TEXT) LIKE ?"
+			}
+			base = base.Where(expr, canonical+"%")
+		}
+	}
+	var total int64
+	if err := base.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	var rows []BaseOperationLog
+	if err := base.Order("created_at DESC").Limit(q.Limit).Offset(q.Offset).Find(&rows).Error; err != nil {
+		return nil, 0, err
+	}
+	return rows, total, nil
+}
+
+// 视图可见范围（技术方案风险表：共享视图与个人偏好混存 → 视图分「共享 / 个人」）。
+const (
+	// ViewScopeShared：空间内共享视图，配置对所有成员生效。
+	ViewScopeShared = "shared"
+	// ViewScopePersonal：个人视图，只有创建者能看到与编辑。
+	ViewScopePersonal = "personal"
+)
+
+// —— 公式只读接口（§10.7） ——
+
+// FormulaDefinition 是公式字段的只读定义。
+type FormulaDefinition struct {
+	FieldID      uuid.UUID       `json:"fieldId"`
+	FieldName    string          `json:"fieldName"`
+	TableID      uuid.UUID       `json:"tableId"`
+	Expression   string          `json:"expression"`
+	AST          *ASTNode        `json:"ast,omitempty"`
+	Version      int64           `json:"version"`
+	Dependencies []FormulaDepRef `json:"dependencies"`
+}
+
+// FormulaDepRef 是依赖图里的一条边。
+type FormulaDepRef struct {
+	FieldID   uuid.UUID `json:"fieldId"`
+	FieldName string    `json:"fieldName"`
+	TableID   uuid.UUID `json:"tableId"`
+	// Direction：down = 本公式依赖它；up = 它依赖本公式。
+	Direction string `json:"direction"`
+}
+
+// GetFieldFormula 读取公式定义。
+func (s *Service) GetFieldFormula(ctx context.Context, userID, projectID, fieldID uuid.UUID) (*FormulaDefinition, error) {
 	if err := s.assertAccess(userID, projectID, RoleViewer); err != nil {
 		return nil, err
 	}
-	if limit <= 0 || limit > 200 {
-		limit = 50
-	}
-	var rows []BaseOperationLog
-	if err := s.db.WithContext(ctx).Where("project_id = ? AND base_id = ?", projectID, baseID).
-		Order("created_at DESC").Limit(limit).Find(&rows).Error; err != nil {
+	var field BaseField
+	if err := s.db.WithContext(ctx).Where("id = ?", fieldID).First(&field).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrFieldNotFound
+		}
 		return nil, err
 	}
-	return rows, nil
+	def := &FormulaDefinition{
+		FieldID:   field.ID,
+		FieldName: field.Name,
+		TableID:   field.TableID,
+	}
+	var formula BaseFieldFormula
+	err := s.db.WithContext(ctx).Where("field_id = ?", fieldID).First(&formula).Error
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+	if err == nil {
+		def.Expression = formula.Expression
+		def.Version = formula.FormulaVersion
+		if len(formula.AST) > 0 {
+			var node ASTNode
+			if err := json.Unmarshal(formula.AST, &node); err == nil {
+				def.AST = &node
+			}
+		}
+	}
+	deps, err := s.ListFormulaDependencies(ctx, userID, projectID, fieldID)
+	if err != nil {
+		return nil, err
+	}
+	def.Dependencies = deps
+	return def, nil
+}
+
+// ListFormulaDependencies 列出公式依赖图（双向）。
+//
+// down = 本公式依赖的字段；up = 依赖本公式的字段。
+func (s *Service) ListFormulaDependencies(ctx context.Context, userID, projectID, fieldID uuid.UUID) ([]FormulaDepRef, error) {
+	if err := s.assertAccess(userID, projectID, RoleViewer); err != nil {
+		return nil, err
+	}
+	var field BaseField
+	if err := s.db.WithContext(ctx).Where("id = ?", fieldID).First(&field).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrFieldNotFound
+		}
+		return nil, err
+	}
+	idx, err := s.loadFieldIndex(ctx, field.TableID)
+	if err != nil {
+		return nil, err
+	}
+	out := []FormulaDepRef{}
+	// 我依赖谁
+	var down []BaseFormulaDependency
+	if err := s.db.WithContext(ctx).Where("formula_field_id = ?", fieldID).Find(&down).Error; err != nil {
+		return nil, err
+	}
+	for _, row := range down {
+		name := ""
+		if meta, ok := idx.byID[row.DependencyFieldID]; ok {
+			name = meta.Name
+		}
+		depTableID := field.TableID
+		if row.DependencyTableID != nil {
+			depTableID = *row.DependencyTableID
+		}
+		out = append(out, FormulaDepRef{
+			FieldID: row.DependencyFieldID, FieldName: name,
+			TableID: depTableID, Direction: "down",
+		})
+	}
+	// 谁依赖我
+	var up []BaseFormulaDependency
+	if err := s.db.WithContext(ctx).Where("dependency_field_id = ?", fieldID).Find(&up).Error; err != nil {
+		return nil, err
+	}
+	for _, row := range up {
+		name := ""
+		if meta, ok := idx.byID[row.FormulaFieldID]; ok {
+			name = meta.Name
+		}
+		out = append(out, FormulaDepRef{
+			FieldID: row.FormulaFieldID, FieldName: name,
+			TableID: row.TableID, Direction: "up",
+		})
+	}
+	return out, nil
+}
+
+// TableSchema 是「表结构快照」（§10.3 GET /tables/{tableId}/schema）。
+//
+// 一次性返回结构相关的全部元信息，便于外部系统（导入 / 迁移 / 审计）只调一个接口拿到全貌。
+type TableSchema struct {
+	Table         TableInfo    `json:"table"`
+	Fields        []FieldMeta  `json:"fields"`
+	Views         []ViewInfo   `json:"views"`
+	SchemaVersion int64        `json:"schemaVersion"`
+	Formulas      []FormulaDef `json:"formulas"`
+}
+
+// FormulaDef 是公式字段的简要定义。
+type FormulaDef struct {
+	FieldID    uuid.UUID `json:"fieldId"`
+	FieldName  string    `json:"fieldName"`
+	Expression string    `json:"expression"`
+}
+
+// TableSchema 返回一张表的结构快照。
+func (s *Service) TableSchema(ctx context.Context, userID, projectID, tableID uuid.UUID) (*TableSchema, error) {
+	if err := s.assertAccess(userID, projectID, RoleViewer); err != nil {
+		return nil, err
+	}
+	table, _, err := s.loadTableSchema(ctx, userID, projectID, tableID)
+	if err != nil {
+		return nil, err
+	}
+	info, err := s.tableInfo(ctx, table)
+	if err != nil {
+		return nil, err
+	}
+	fields, err := s.ListFields(ctx, userID, projectID, tableID)
+	if err != nil {
+		return nil, err
+	}
+	views, err := s.ListViews(ctx, userID, projectID, tableID)
+	if err != nil {
+		return nil, err
+	}
+	formulas := []FormulaDef{}
+	for _, meta := range fields {
+		if meta.Type != string(FieldFormula) {
+			continue
+		}
+		var row BaseFieldFormula
+		if err := s.db.WithContext(ctx).Where("field_id = ?", meta.ID).First(&row).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				continue
+			}
+			return nil, err
+		}
+		fieldID, err := uuid.Parse(meta.ID)
+		if err != nil {
+			continue
+		}
+		formulas = append(formulas, FormulaDef{
+			FieldID: fieldID, FieldName: meta.Name, Expression: row.Expression,
+		})
+	}
+	return &TableSchema{
+		Table:         *info,
+		Fields:        fields,
+		Views:         views,
+		SchemaVersion: table.SchemaVersion,
+		Formulas:      formulas,
+	}, nil
 }
