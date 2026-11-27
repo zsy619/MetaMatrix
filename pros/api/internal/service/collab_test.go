@@ -24,7 +24,7 @@ type docOperationSQLite struct {
 	CreatedAt    time.Time `gorm:"not null"`
 }
 
-func (docOperationSQLite) TableName() string { return "doc_operation" }
+func (docOperationSQLite) TableName() string { return "kb_doc_operations" }
 
 func openCollabSQLite(t *testing.T) *gorm.DB {
 	t.Helper()

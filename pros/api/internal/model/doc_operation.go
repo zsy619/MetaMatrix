@@ -23,4 +23,4 @@ type DocOperation struct {
 	CreatedAt    time.Time `gorm:"not null" json:"createdAt"`
 }
 
-func (DocOperation) TableName() string { return "doc_operation" }
+func (DocOperation) TableName() string { return "kb_doc_operations" }

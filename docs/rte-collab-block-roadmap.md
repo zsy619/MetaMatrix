@@ -106,7 +106,7 @@
 - 状态（2026-11-26 19:45）：功能分支 `agent/met-4-a2a-collab-20261126` 已有 A2a（至 `4a615d3`）与 A2b（`64d39ab`），**未合入 main**。双浏览器收敛未实机验证，不能算验收通过。下列实现项仅表示功能分支已有代码，不代表 main 现状。
 - [ ] **WS 通道**：功能分支已用 Hertz `hertz-contrib/websocket`（复用现有鉴权与进程，含应用层 ping 与断线重连）；`2e45f76` 已补持久化离线队列（按文档隔离，IndexedDB / localStorage，刷新后恢复，发送成功后清除），浏览者进房后前端只读且不发本地增量。**尚未合入 main**。未实机验证。
 - [ ] 正文接入 `Collaboration` 扩展绑定 Y.Doc，协议从第一天携带 `data-block-id`（功能分支已实现，未合入 main）
-- [ ] 增量落库 `doc_operation`，与文档版本体系对齐（功能分支已实现；双写后抖动执行 `syncExtract` 与自动修订快照，未合入 main）
+- [ ] 增量落库 `kb_doc_operations`，与文档版本体系对齐（功能分支已实现；双写后抖动执行 `syncExtract` 与自动修订快照，未合入 main）
 - [ ] presence 存储接口沿用既有约定、不写死 Redis（功能分支已复用 `PresenceStore`，未合入 main）
 - [ ] 冲突合并的验收标准包含"块级收敛"，不再单列自研工作包（进程内两编辑器单测已覆盖；**双浏览器未实机验证**）
 - [ ] **按 D1 处置旧协同旁路（A2b）**：功能分支 `64d39ab` 已将 `AppendCRDT` / `POST /documents/:id/crdt` / `httpTransport.postUpdate` / `appendCrdtUpdate` 降为只读拒绝写入，历史 `GET` / `CRDTUpdates` 仍可读；`CollabDoc` 默认不可写。单测已锁住「旧旁路不再写入」。**尚未合入 main**。未在真实浏览器验证开启/关闭协同。
@@ -129,9 +129,9 @@
 
 #### B2 块实体化主体（15–18 人日）
 
-- [ ] 数据模型：`doc_blocks`（`id / document_id / parent_id / block_type / ordinal / depth / anchor_key /
+- [ ] 数据模型：`kb_doc_blocks`（`id / document_id / parent_id / block_type / ordinal / depth / anchor_key /
       content_text / content_json / attrs / revision_id / created_at / updated_at / deleted_at`）、
-      `doc_block_revisions`、`doc_block_refs`
+      `kb_doc_block_revisions`、`kb_doc_block_refs`
 - [ ] 索引：`(document_id, ordinal)`、`(parent_id)`、`(deleted_at)`、`(target_block_id)`
 - [ ] 迁移：`internal/db/db.go` AutoMigrate 注册 + `ensure*Schema` 补丁；
       **同步 SQLite 影子模型**（否则测试报 `table X has no column named Y`）

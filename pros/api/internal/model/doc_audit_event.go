@@ -20,4 +20,4 @@ type DocAuditEvent struct {
 	CreatedAt  time.Time `gorm:"not null;index:idx_doc_audit_doc_created,priority:2,sort:desc" json:"createdAt"`
 }
 
-func (DocAuditEvent) TableName() string { return "doc_audit_events" }
+func (DocAuditEvent) TableName() string { return "kb_doc_audit_events" }

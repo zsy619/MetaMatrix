@@ -19,4 +19,4 @@ type DocBlockRevision struct {
 	CreatedAt   time.Time      `gorm:"type:timestamptz;not null;index:idx_doc_block_revs_block_created,priority:2" json:"createdAt"`
 }
 
-func (DocBlockRevision) TableName() string { return "doc_block_revisions" }
+func (DocBlockRevision) TableName() string { return "kb_doc_block_revisions" }

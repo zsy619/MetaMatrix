@@ -32,4 +32,4 @@ type DocBlock struct {
 	Document CanvasDocument `gorm:"foreignKey:DocumentID;constraint:OnDelete:CASCADE" json:"-"`
 }
 
-func (DocBlock) TableName() string { return "doc_blocks" }
+func (DocBlock) TableName() string { return "kb_doc_blocks" }

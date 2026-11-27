@@ -20,4 +20,4 @@ type DocBlockRef struct {
 	CreatedAt     time.Time  `gorm:"type:timestamptz;not null" json:"createdAt"`
 }
 
-func (DocBlockRef) TableName() string { return "doc_block_refs" }
+func (DocBlockRef) TableName() string { return "kb_doc_block_refs" }

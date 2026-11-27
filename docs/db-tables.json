@@ -37,6 +37,12 @@
       "model": "Project"
     },
     {
+      "name": "core_user_notifications",
+      "domain": "core",
+      "purpose": "站内通知（评论/回复/@）",
+      "model": "UserNotification"
+    },
+    {
       "name": "core_users",
       "domain": "core",
       "purpose": "账号（登录、密码重置、目录通讯录）",
@@ -71,6 +77,36 @@
       "domain": "kb",
       "purpose": "协同编辑增量（Yjs / CRDT）",
       "model": "DocCRDTUpdate"
+    },
+    {
+      "name": "kb_doc_audit_events",
+      "domain": "kb",
+      "purpose": "用户+文档级审计（谁在何时改了哪个块）",
+      "model": "DocAuditEvent"
+    },
+    {
+      "name": "kb_doc_block_refs",
+      "domain": "kb",
+      "purpose": "块级引用反查",
+      "model": "DocBlockRef"
+    },
+    {
+      "name": "kb_doc_block_revisions",
+      "domain": "kb",
+      "purpose": "块修订历史",
+      "model": "DocBlockRevision"
+    },
+    {
+      "name": "kb_doc_blocks",
+      "domain": "kb",
+      "purpose": "正文派生块表（稳定 data-block-id，含块级权限）",
+      "model": "DocBlock"
+    },
+    {
+      "name": "kb_doc_operations",
+      "domain": "kb",
+      "purpose": "正文 Yjs 协同操作日志（不是保存幂等的 kb_save_operations）",
+      "model": "DocOperation"
     },
     {
       "name": "kb_doc_properties",

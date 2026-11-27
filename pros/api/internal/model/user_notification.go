@@ -20,4 +20,4 @@ type UserNotification struct {
 	CreatedAt time.Time  `gorm:"type:timestamptz;not null;index:idx_un_user_created,priority:2" json:"createdAt"`
 }
 
-func (UserNotification) TableName() string { return "user_notifications" }
+func (UserNotification) TableName() string { return "core_user_notifications" }

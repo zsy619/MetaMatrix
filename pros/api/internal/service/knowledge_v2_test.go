@@ -115,7 +115,7 @@ type userNotificationSQLite struct {
 	CreatedAt time.Time  `gorm:"not null;index:idx_un_user_created,priority:2"`
 }
 
-func (userNotificationSQLite) TableName() string { return "user_notifications" }
+func (userNotificationSQLite) TableName() string { return "core_user_notifications" }
 
 func openKnowledgeV2SQLite(t *testing.T) (*gorm.DB, uuid.UUID, *model.Project, *KnowledgeService) {
 	t.Helper()

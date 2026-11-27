@@ -61,6 +61,13 @@ var tableRenames = []tableRename{
 	{old: "media_category", new: "media_categories"},
 	{old: "media_asset", new: "media_assets"},
 	{old: "media_reference", new: "media_references"},
+	// 本功能分支新建表：对齐四域前缀。kb_doc_operations 不是 kb_save_operations。
+	{old: "user_notifications", new: "core_user_notifications"},
+	{old: "doc_audit_events", new: "kb_doc_audit_events"},
+	{old: "doc_block_refs", new: "kb_doc_block_refs"},
+	{old: "doc_block_revisions", new: "kb_doc_block_revisions"},
+	{old: "doc_blocks", new: "kb_doc_blocks"},
+	{old: "doc_operation", new: "kb_doc_operations"},
 }
 
 // ensureTableNamingSchema 把旧表名改成新表名。

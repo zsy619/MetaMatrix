@@ -46,7 +46,7 @@ type docAuditEventSQLite struct {
 	CreatedAt  time.Time `gorm:"not null;index:idx_doc_audit_doc_created,priority:2"`
 }
 
-func (docAuditEventSQLite) TableName() string { return "doc_audit_events" }
+func (docAuditEventSQLite) TableName() string { return "kb_doc_audit_events" }
 
 type docBlockSQLite struct {
 	ID          uuid.UUID      `gorm:"type:uuid;primaryKey"`
@@ -66,7 +66,7 @@ type docBlockSQLite struct {
 	DeletedAt   *time.Time     `gorm:"index:idx_doc_blocks_deleted"`
 }
 
-func (docBlockSQLite) TableName() string { return "doc_blocks" }
+func (docBlockSQLite) TableName() string { return "kb_doc_blocks" }
 
 type docBlockRevisionSQLite struct {
 	ID          uuid.UUID      `gorm:"type:uuid;primaryKey"`
@@ -79,7 +79,7 @@ type docBlockRevisionSQLite struct {
 	CreatedAt   time.Time      `gorm:"not null;index:idx_doc_block_revs_block_created,priority:2"`
 }
 
-func (docBlockRevisionSQLite) TableName() string { return "doc_block_revisions" }
+func (docBlockRevisionSQLite) TableName() string { return "kb_doc_block_revisions" }
 
 type docBlockRefSQLite struct {
 	ID            uuid.UUID  `gorm:"type:uuid;primaryKey"`
@@ -94,7 +94,7 @@ type docBlockRefSQLite struct {
 	CreatedAt     time.Time  `gorm:"not null"`
 }
 
-func (docBlockRefSQLite) TableName() string { return "doc_block_refs" }
+func (docBlockRefSQLite) TableName() string { return "kb_doc_block_refs" }
 
 // openDocumentsSQLite 为普通行为测试提供独立的内存数据库。
 // 并发竞争不在 SQLite 上断言，因为它不能模拟 PostgreSQL 的并行写锁语义。
