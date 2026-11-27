@@ -67,3 +67,27 @@ func TestUnknownEmailModeTypoFallsBackToUniform(t *testing.T) {
 		t.Fatalf("UnknownEmailMode = %q, want %q", got, UnknownEmailUniform)
 	}
 }
+
+func TestRedisURLDefaultsEmpty(t *testing.T) {
+	t.Setenv("REDIS_URL", "")
+	t.Setenv("PRESENCE_REDIS_URL", "")
+	if got := Load().RedisURL; got != "" {
+		t.Fatalf("RedisURL = %q, want empty", got)
+	}
+}
+
+func TestRedisURLFromEnv(t *testing.T) {
+	t.Setenv("REDIS_URL", "  redis://localhost:6379/0 ")
+	t.Setenv("PRESENCE_REDIS_URL", "")
+	if got := Load().RedisURL; got != "redis://localhost:6379/0" {
+		t.Fatalf("RedisURL = %q", got)
+	}
+}
+
+func TestPresenceRedisURLFallback(t *testing.T) {
+	t.Setenv("REDIS_URL", "")
+	t.Setenv("PRESENCE_REDIS_URL", "redis://127.0.0.1:6379/1")
+	if got := Load().RedisURL; got != "redis://127.0.0.1:6379/1" {
+		t.Fatalf("RedisURL = %q", got)
+	}
+}

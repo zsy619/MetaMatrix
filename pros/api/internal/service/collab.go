@@ -55,7 +55,7 @@ type CollabAccess struct {
 }
 
 // CollabService 负责正文协同：操作日志、current_data 双写、presence。
-// presence 复用知识库既有 PresenceStore，存储实现（内存+表 / 以后换 Redis）对调用方透明。
+// presence 复用知识库既有 PresenceStore，存储实现（内存+表 / 可选 Redis）对调用方透明。
 type CollabService struct {
 	db            *gorm.DB
 	docs          *DocumentsService

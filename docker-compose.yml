@@ -1,4 +1,5 @@
 # One command from the repository root: Postgres, API, and the web app.
+# Redis is optional for cross-instance presence; leave REDIS_URL empty to stay same-instance.
 # Local Go development can still use pros/api/docker-compose.yml for Postgres only.
 services:
   postgres:
@@ -34,6 +35,8 @@ services:
       LOGIN_WINDOW: ${LOGIN_WINDOW:-15m}
       LOGIN_PAIR_LIMIT: ${LOGIN_PAIR_LIMIT:-8}
       LOGIN_IP_LIMIT: ${LOGIN_IP_LIMIT:-30}
+      # 可选。留空则同实例降级（内存+kb_presence）。跨实例光标/在线时再设 REDIS_URL=redis://redis:6379/0。
+      REDIS_URL: ${REDIS_URL:-}
     ports:
       - "3000:3000"
 
@@ -46,6 +49,22 @@ services:
         condition: service_healthy
     ports:
       - "8080:80"
+
+
+  # 可选：跨实例 presence / 光标广播。不是文档或 Yjs 持久化，无数据卷。
+  # api 不硬依赖本服务；不设 REDIS_URL 时即使本容器未启动，API 也能起来。
+  redis:
+    image: redis:7-alpine
+    container_name: metamatrix-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
 volumes:
   metamatrix_pgdata:
