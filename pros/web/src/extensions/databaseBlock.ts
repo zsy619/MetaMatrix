@@ -15,6 +15,7 @@ import {
   removeDatabaseRow,
   setDatabaseFilterJoin,
   setDatabaseFilters,
+  setDatabaseCalendarMonth,
   setDatabaseSort,
   setDatabaseViewType,
   type DatabaseBlockPayload,
@@ -43,6 +44,7 @@ declare module '@tiptap/core' {
       setDatabaseBlockFilters: (filters: SheetFilter[]) => ReturnType
       setDatabaseBlockFilterJoin: (join: 'and' | 'or') => ReturnType
       setDatabaseBlockSort: (fieldId: string | null, order?: 'asc' | 'desc') => ReturnType
+      setDatabaseBlockCalendarMonth: (yearMonth: string) => ReturnType
       importDatabaseBlockSheet: (sheet: SheetData) => ReturnType
       addDatabaseBlockRow: () => ReturnType
       removeDatabaseBlockRow: (rowId: string) => ReturnType
@@ -230,6 +232,19 @@ export const DatabaseBlock = Node.create({
           const node = state.doc.nodeAt(pos)
           if (!node || node.type.name !== DATABASE_BLOCK_NAME) return false
           const next = attrsFromPayload(setDatabaseSort(payloadFromAttrs(node.attrs), fieldId, order))
+          if (dispatch) {
+            dispatch(tr.setNodeMarkup(pos, undefined, { ...node.attrs, ...next }))
+          }
+          return true
+        },
+      setDatabaseBlockCalendarMonth:
+        (yearMonth) =>
+        ({ state, tr, dispatch }) => {
+          const pos = currentDatabasePos(state)
+          if (pos == null) return false
+          const node = state.doc.nodeAt(pos)
+          if (!node || node.type.name !== DATABASE_BLOCK_NAME) return false
+          const next = attrsFromPayload(setDatabaseCalendarMonth(payloadFromAttrs(node.attrs), yearMonth))
           if (dispatch) {
             dispatch(tr.setNodeMarkup(pos, undefined, { ...node.attrs, ...next }))
           }

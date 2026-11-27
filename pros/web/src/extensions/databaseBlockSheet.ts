@@ -2,6 +2,8 @@ import {
   cellText,
   createField,
   createRow,
+  calendarBuckets,
+  calendarMonthDays,
   createView,
   FILTER_OPS,
   filterRows,
@@ -206,6 +208,93 @@ export function calendarGroups(payload: DatabaseBlockPayload) {
     if (!b.key) return -1
     return a.key.localeCompare(b.key)
   })
+}
+
+
+export function parseCalendarMonth(value: string | null | undefined): { year: number; month: number } | null {
+  const match = /^(\d{4})-(\d{2})$/.exec((value || '').trim())
+  if (!match) return null
+  const year = Number(match[1])
+  const month = Number(match[2])
+  if (month < 1 || month > 12) return null
+  return { year, month }
+}
+
+export function formatCalendarMonth(year: number, month: number): string {
+  return `${year}-${String(month).padStart(2, '0')}`
+}
+
+export function shiftCalendarMonth(yearMonth: string, delta: number): string {
+  const parsed = parseCalendarMonth(yearMonth) ?? { year: 2026, month: 11 }
+  const next = new Date(parsed.year, parsed.month - 1 + delta, 1)
+  return formatCalendarMonth(next.getFullYear(), next.getMonth() + 1)
+}
+
+export function defaultCalendarMonth(payload: DatabaseBlockPayload): string {
+  const stored = parseCalendarMonth(activeDatabaseView(payload).calendarMonth)
+  if (stored) return formatCalendarMonth(stored.year, stored.month)
+  const field = dateField(payload)
+  if (field) {
+    for (const row of visibleDatabaseRows(payload)) {
+      const day = cellText(row.cells[field.id]).trim().slice(0, 10)
+      const parsed = parseCalendarMonth(day.slice(0, 7))
+      if (parsed) return formatCalendarMonth(parsed.year, parsed.month)
+    }
+  }
+  const now = new Date()
+  return formatCalendarMonth(now.getFullYear(), now.getMonth() + 1)
+}
+
+export function setDatabaseCalendarMonth(payload: DatabaseBlockPayload, yearMonth: string): DatabaseBlockPayload {
+  const sheet = cloneSheet(payload.sheet)
+  const view = sheet.views.find((item) => item.id === payload.activeViewId) ?? sheet.views[0]!
+  view.calendarMonth = parseCalendarMonth(yearMonth)
+    ? yearMonth
+    : defaultCalendarMonth({ sheet, activeViewId: view.id })
+  return { sheet, activeViewId: view.id }
+}
+
+export type CalendarMonthCell = {
+  date: string
+  day: number | null
+  inMonth: boolean
+  rows: SheetRow[]
+}
+
+export function calendarMonthMatrix(payload: DatabaseBlockPayload, yearMonth?: string): {
+  yearMonth: string
+  label: string
+  weeks: CalendarMonthCell[][]
+  undated: number
+} {
+  const field = dateField(payload)
+  const ym = parseCalendarMonth(yearMonth) ? yearMonth! : defaultCalendarMonth(payload)
+  const parsed = parseCalendarMonth(ym) ?? { year: 2026, month: 11 }
+  const rows = visibleDatabaseRows(payload)
+  const buckets = calendarBuckets(rows, field?.id ?? null)
+  let undated = 0
+  if (field) {
+    for (const row of rows) {
+      if (!cellText(row.cells[field.id]).trim().slice(0, 10)) undated += 1
+    }
+  } else {
+    undated = rows.length
+  }
+  const days = calendarMonthDays(parsed.year, parsed.month - 1)
+  const cells: CalendarMonthCell[] = days.map((date) => ({
+    date,
+    day: date ? Number(date.slice(-2)) : null,
+    inMonth: Boolean(date),
+    rows: date ? (buckets.get(date) ?? []) : [],
+  }))
+  const weeks: CalendarMonthCell[][] = []
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7))
+  return {
+    yearMonth: formatCalendarMonth(parsed.year, parsed.month),
+    label: `${parsed.year} 年 ${parsed.month} 月`,
+    weeks,
+    undated,
+  }
 }
 
 export function updateDatabaseCell(

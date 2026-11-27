@@ -18,6 +18,7 @@ import {
   readDatabaseBlockOpenTarget,
 } from './databaseBlock'
 import {
+  calendarMonthMatrix,
   firstFilterableField,
   payloadFromAttrs,
   pushSheetFromPayload,
@@ -343,6 +344,31 @@ describe('databaseBlock 列排序', () => {
     const restored = payloadFromAttrs(databaseNodes(again)[0]!.node.attrs)
     expect(restored.sheet.views.find((view) => view.id === restored.activeViewId)?.sortBy).toBe(name.id)
     expect(visibleDatabaseRows(restored).map((row) => row.cells[name.id])).toEqual(['另一项', '示例任务'])
+  })
+})
+
+describe('databaseBlock 日历月历', () => {
+  it('按月铺开展示记录，切换月份后刷新仍保持', () => {
+    const ed = mount()
+    ed.commands.insertDatabaseBlock({ title: '表' })
+    const id = readBlockId(databaseNodes(ed)[0]!.node)
+    expect(ed.commands.setDatabaseBlockView('calendar')).toBe(true)
+    const payload = payloadFromAttrs(databaseNodes(ed)[0]!.node.attrs)
+    const november = calendarMonthMatrix(payload)
+    expect(november.yearMonth).toBe('2026-11')
+    const name = payload.sheet.fields[0]!
+    const cell = november.weeks.flat().find((item) => item.date === '2026-11-27')
+    expect(cell?.rows.map((row) => row.cells[name.id])).toEqual(['示例任务'])
+    expect(november.weeks.flat().some((item) => item.date === '2026-12-01')).toBe(false)
+    expect(ed.commands.setDatabaseBlockCalendarMonth('2026-12')).toBe(true)
+    const december = calendarMonthMatrix(payloadFromAttrs(databaseNodes(ed)[0]!.node.attrs))
+    expect(december.yearMonth).toBe('2026-12')
+    expect(december.weeks.flat().find((item) => item.date === '2026-12-01')?.rows.map((row) => row.cells[name.id])).toEqual(['另一项'])
+    const again = mount(ed.getHTML())
+    expect(readBlockId(databaseNodes(again)[0]!.node)).toBe(id)
+    const restored = payloadFromAttrs(databaseNodes(again)[0]!.node.attrs)
+    expect(restored.sheet.views.find((view) => view.id === restored.activeViewId)?.calendarMonth).toBe('2026-12')
+    expect(calendarMonthMatrix(restored).yearMonth).toBe('2026-12')
   })
 })
 

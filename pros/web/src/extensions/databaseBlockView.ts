@@ -10,7 +10,9 @@ import {
   DATABASE_VIEW_TYPES,
   activeDatabaseView,
   attrsFromPayload,
-  calendarGroups,
+  calendarMonthMatrix,
+  setDatabaseCalendarMonth,
+  shiftCalendarMonth,
   cellPreview,
   databaseFilterJoin,
   databaseGroups,
@@ -165,17 +167,49 @@ export function createDatabaseBlockView({ node, getPos, editor }: NodeViewRender
       if (!dateField(payload)) {
         cal.append(el('div', 'rte-database-block__hint', '没有日期字段，无法按日历排列'))
       } else {
-        for (const group of calendarGroups(payload)) {
-          const day = el('div', 'rte-database-block__day')
-          day.append(el('div', 'rte-database-block__day-title', group.label))
-          for (const row of group.rows) {
-            const card = el('div', 'rte-database-block__card')
-            const main = payload.sheet.fields[0]
-            card.textContent = main ? cellPreview(row.cells[main.id]) || '（空）' : row.id
-            day.append(card)
+        const month = calendarMonthMatrix(payload)
+        const nav = el('div', 'rte-database-block__month-nav')
+        const prev = document.createElement('button')
+        prev.type = 'button'
+        prev.className = 'rte-database-block__filter-join'
+        prev.textContent = '←'
+        prev.disabled = !editable
+        prev.addEventListener('click', (event) => {
+          event.preventDefault()
+          event.stopPropagation()
+          writePayload(setDatabaseCalendarMonth(payload, shiftCalendarMonth(month.yearMonth, -1)))
+        })
+        const next = document.createElement('button')
+        next.type = 'button'
+        next.className = 'rte-database-block__filter-join'
+        next.textContent = '→'
+        next.disabled = !editable
+        next.addEventListener('click', (event) => {
+          event.preventDefault()
+          event.stopPropagation()
+          writePayload(setDatabaseCalendarMonth(payload, shiftCalendarMonth(month.yearMonth, 1)))
+        })
+        nav.append(prev, el('div', 'rte-database-block__month-label', month.label), next)
+        cal.append(nav)
+        const week = el('div', 'rte-database-block__month-week')
+        for (const name of ['一', '二', '三', '四', '五', '六', '日']) week.append(el('span', '', name))
+        cal.append(week)
+        const grid = el('div', 'rte-database-block__month-grid')
+        const main = payload.sheet.fields[0]
+        for (const row of month.weeks) {
+          for (const cell of row) {
+            const box = el('div', cell.inMonth ? 'rte-database-block__month-cell' : 'rte-database-block__month-cell is-empty')
+            if (cell.day != null) box.append(el('div', 'rte-database-block__month-date', String(cell.day)))
+            for (const item of cell.rows) {
+              const card = el('div', 'rte-database-block__card')
+              card.textContent = main ? cellPreview(item.cells[main.id]) || '（空）' : item.id
+              box.append(card)
+            }
+            grid.append(box)
           }
-          cal.append(day)
         }
+        cal.append(grid)
+        if (month.undated) cal.append(el('div', 'rte-database-block__hint', `${month.undated} 条记录没有日期，未放入月历`))
       }
       dom.append(cal)
     } else {

@@ -54,6 +54,8 @@ export type SheetView = {
   sortOrder: 'asc' | 'desc'
   /** 分组字段 id（看板按它分列，表格按它分组） */
   groupBy: string | null
+  /** 日历视图当前月份，YYYY-MM；缺省时按记录日期或今天。 */
+  calendarMonth?: string | null
 }
 
 export type SheetData = {

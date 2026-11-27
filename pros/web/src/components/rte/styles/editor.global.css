@@ -4121,6 +4121,43 @@ input.rte-timeline-title:focus {
 .rte-database-block__filter-field,
 .rte-database-block__filter-op { font: inherit; font-size: 12px; max-width: 120px; }
 .rte-database-block__gallery,
+.rte-database-block__month-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.rte-database-block__month-label {
+  font-size: 12px;
+  font-weight: 600;
+}
+.rte-database-block__month-week,
+.rte-database-block__month-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 2px;
+}
+.rte-database-block__month-week {
+  font-size: 11px;
+  color: var(--mm-text-3, #86909c);
+  margin-bottom: 2px;
+  text-align: center;
+}
+.rte-database-block__month-cell {
+  min-height: 54px;
+  border: 1px solid var(--mm-line, #e5e6eb);
+  padding: 2px 4px;
+  background: #fff;
+}
+.rte-database-block__month-cell.is-empty {
+  background: #f7f8fa;
+  min-height: 24px;
+}
+.rte-database-block__month-date {
+  font-size: 11px;
+  color: var(--mm-text-2, #4e5969);
+  margin-bottom: 2px;
+}
 .rte-database-block__calendar { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-start; }
 .rte-database-block__gallery-card,
 .rte-database-block__day {
