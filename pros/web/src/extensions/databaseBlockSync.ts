@@ -171,3 +171,39 @@ export async function probeLinkedDatabaseBlocks(
   }
   return out
 }
+
+export type DatabaseBlockSafeSyncSummary = {
+  probed: DatabaseBlockProbe[]
+  pulled: number
+  pushed: number
+  skipped: number
+}
+
+/** 对照后只自动处理单边改动：树上有更新则拉取，仅内嵌改过则写回。两边都改过或尚未对照不会覆盖。不是实时双向同步。 */
+export async function applySafeLinkedDatabaseBlocks(
+  editor: DatabaseBlockSyncEditor,
+  projectId: string,
+  io: DatabaseBlockSyncIo,
+  probes?: DatabaseBlockProbe[],
+): Promise<DatabaseBlockSafeSyncSummary> {
+  const probed = probes ?? await probeLinkedDatabaseBlocks(editor, projectId, io)
+  let pulled = 0
+  let pushed = 0
+  let skipped = 0
+  for (const item of probed) {
+    if (item.drift !== 'remote-only' && item.drift !== 'local-only') {
+      skipped += 1
+      continue
+    }
+    const result = await syncLinkedDatabaseBlock(editor, projectId, {
+      direction: 'safe',
+      sheetNodeId: item.sheetNodeId,
+      pos: item.pos,
+    }, io)
+    if (result.action === 'pulled') pulled += 1
+    else if (result.action === 'pushed') pushed += 1
+    else skipped += 1
+  }
+  return { probed, pulled, pushed, skipped }
+}
+

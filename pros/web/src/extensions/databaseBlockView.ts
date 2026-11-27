@@ -138,7 +138,7 @@ export function createDatabaseBlockView({ node, getPos, editor }: NodeViewRender
         badge.setAttribute('data-sync-status', drift)
         sync.append(badge)
       }
-      const note = el('span', 'rte-database-block__hint', '对照后可安全同步单边改动，不是实时双向')
+      const note = el('span', 'rte-database-block__hint', '打开或对照后会自动同步单边改动，两边都改过仍需确认，不是实时双向')
       head.append(sync, note)
     }
     dom.append(head)

@@ -67,7 +67,7 @@ import { readBlockId } from '../../extensions/blockIdentity'
 import { setBlockPermissionGuardState } from '../../extensions/blockPermissionGuard'
 import { canEditBlockContent } from './blockPermission'
 import { DATABASE_BLOCK_SYNC_EVENT, type DatabaseBlockSyncDetail } from '../../extensions/databaseBlockEvents'
-import { probeLinkedDatabaseBlocks, syncLinkedDatabaseBlock } from '../../extensions/databaseBlockSync'
+import { applySafeLinkedDatabaseBlocks, probeLinkedDatabaseBlocks, syncLinkedDatabaseBlock } from '../../extensions/databaseBlockSync'
 import { resolveConflictHtml, type BlockConflictChoice, type SaveConflictChoice } from './saveConflict'
 
 const props = defineProps<{
@@ -170,16 +170,33 @@ function onWindowFocusProbe() {
   void probeLinkedSheets()
 }
 
+let sheetProbeInFlight = false
+
 async function probeLinkedSheets() {
   const editor = editorForSheetSync()
-  if (!editor || !props.projectId) return
+  if (!editor || !props.projectId || sheetProbeInFlight) return
+  sheetProbeInFlight = true
   try {
-    await probeLinkedDatabaseBlocks(editor, props.projectId, {
+    const io = {
       load: getNodeData,
       save: saveNodeData,
-    })
+    }
+    // 只读浏览只对照标状态，不自动写回或拉取。
+    if (!permissionActor.value.canWrite) {
+      await probeLinkedDatabaseBlocks(editor, props.projectId, io)
+      return
+    }
+    const summary = await applySafeLinkedDatabaseBlocks(editor, props.projectId, io)
+    if (summary.pulled || summary.pushed) {
+      const parts: string[] = []
+      if (summary.pulled) parts.push(`已自动拉取 ${summary.pulled} 张树上有更新的表`)
+      if (summary.pushed) parts.push(`已自动写回 ${summary.pushed} 张仅内嵌改过的表`)
+      ElMessage.success(`${parts.join('，')}。两边都改过的表仍需确认，不是实时双向同步。`)
+    }
   } catch {
     // 对照失败不打断编辑；状态保持上次结果或尚未对照。
+  } finally {
+    sheetProbeInFlight = false
   }
 }
 
