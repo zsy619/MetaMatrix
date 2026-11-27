@@ -3,12 +3,15 @@ module metamatrix/api
 go 1.27.0
 
 require (
+	github.com/alicebob/miniredis/v2 v2.35.0
 	github.com/cloudwego/hertz v0.10.6
 	github.com/glebarez/sqlite v1.11.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
 	github.com/hertz-contrib/cors v0.1.0
+	github.com/hertz-contrib/websocket v0.2.0
 	github.com/joho/godotenv v1.5.1
+	github.com/redis/go-redis/v9 v9.14.0
 	github.com/wI2L/jsondiff v0.6.0
 	golang.org/x/crypto v0.58.0
 	gorm.io/datatypes v1.2.7
@@ -18,7 +21,6 @@ require (
 
 require (
 	filippo.io/edwards25519 v1.1.0 // indirect
-	github.com/alicebob/miniredis/v2 v2.35.0 // indirect
 	github.com/bytedance/gopkg v0.1.4 // indirect
 	github.com/bytedance/sonic v1.15.0 // indirect
 	github.com/bytedance/sonic/loader v0.5.0 // indirect
@@ -31,7 +33,6 @@ require (
 	github.com/fsnotify/fsnotify v1.5.4 // indirect
 	github.com/glebarez/go-sqlite v1.21.2 // indirect
 	github.com/go-sql-driver/mysql v1.8.1 // indirect
-	github.com/hertz-contrib/websocket v0.2.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/pgx/v5 v5.10.0 // indirect
@@ -40,7 +41,6 @@ require (
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.9 // indirect
 	github.com/mattn/go-isatty v0.0.17 // indirect
-	github.com/redis/go-redis/v9 v9.14.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/tidwall/gjson v1.17.1 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
