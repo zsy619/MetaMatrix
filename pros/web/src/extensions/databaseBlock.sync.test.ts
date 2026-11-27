@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it } from 'vitest'
 import { Editor } from '@tiptap/core'
+import type { SheetData } from '../components/knowledge/sheetModel'
 import StarterKit from '@tiptap/starter-kit'
 import { BlockIdentity, collectIdentityNodes, readBlockId } from './blockIdentity'
 import { DATABASE_BLOCK_NAME, DatabaseBlock } from './databaseBlock'
@@ -494,8 +495,8 @@ describe('databaseBlock 关联树上表同步', () => {
 })
 
 describe('sheet 指纹与双边差异摘要', () => {
-  const base = {
-    fields: [{ id: 'n', name: '名称', type: 'text' as const }],
+  const base: SheetData = {
+    fields: [{ id: 'n', name: '名称', type: 'text' }],
     rows: [
       { id: 'r1', cells: { n: '甲' } },
       { id: 'r2', cells: { n: '乙' } },
@@ -504,8 +505,8 @@ describe('sheet 指纹与双边差异摘要', () => {
   }
 
   it('单元格键顺序不同仍视为同一指纹，历史指纹也能对上', () => {
-    const stable = { ...base, rows: [{ id: 'r1', cells: { b: 2, a: 1 } }, { id: 'r2', cells: { n: '乙' } }] }
-    const shuffled = { ...base, rows: [{ id: 'r1', cells: { a: 1, b: 2 } }, { id: 'r2', cells: { n: '乙' } }] }
+    const stable: SheetData = { ...base, rows: [{ id: 'r1', cells: { b: 2, a: 1 } }, { id: 'r2', cells: { n: '乙' } }] }
+    const shuffled: SheetData = { ...base, rows: [{ id: 'r1', cells: { a: 1, b: 2 } }, { id: 'r2', cells: { n: '乙' } }] }
     expect(sheetContentFingerprint(stable)).toBe(sheetContentFingerprint(shuffled))
     expect(legacySheetContentFingerprint(stable)).not.toBe(legacySheetContentFingerprint(shuffled))
     expect(sheetFingerprintMatches(shuffled, legacySheetContentFingerprint(stable))).toBe(true)
@@ -514,23 +515,23 @@ describe('sheet 指纹与双边差异摘要', () => {
   })
 
   it('只有键顺序变化时，不会把历史指纹误判成两边都改过', () => {
-    const original = { ...base, rows: [{ id: 'r1', cells: { b: 2, a: 1 } }] }
-    const same = { ...base, rows: [{ id: 'r1', cells: { a: 1, b: 2 } }] }
+    const original: SheetData = { ...base, rows: [{ id: 'r1', cells: { b: 2, a: 1 } }] }
+    const same: SheetData = { ...base, rows: [{ id: 'r1', cells: { a: 1, b: 2 } }] }
     expect(classifySheetDrift(same, same, legacySheetContentFingerprint(original))).toBe('in-sync')
     expect(classifySheetDrift(same, original, legacySheetContentFingerprint(original))).toBe('in-sync')
   })
 
   it('历史指纹不会把仅单边改过误判成两边都改过', () => {
-    const original = { ...base, rows: [{ id: 'r1', cells: { b: 2, a: 1 } }] }
-    const local = { ...base, rows: [{ id: 'r1', cells: { a: 1, b: 2 } }] }
-    const remote = { ...base, rows: [{ id: 'r1', cells: { a: 1, b: 9 } }] }
+    const original: SheetData = { ...base, rows: [{ id: 'r1', cells: { b: 2, a: 1 } }] }
+    const local: SheetData = { ...base, rows: [{ id: 'r1', cells: { a: 1, b: 2 } }] }
+    const remote: SheetData = { ...base, rows: [{ id: 'r1', cells: { a: 1, b: 9 } }] }
     const fp = legacySheetContentFingerprint(original)
     expect(classifySheetDrift(local, remote, fp)).toBe('remote-only')
     expect(classifySheetDrift(remote, local, fp)).toBe('local-only')
   })
 
   it('双边各改一行时摘要能分开统计，且说明不是自动合并', () => {
-    const local = {
+    const local: SheetData = {
       ...base,
       rows: [
         { id: 'r1', cells: { n: '本地甲' } },
@@ -538,9 +539,9 @@ describe('sheet 指纹与双边差异摘要', () => {
         { id: 'r3', cells: { n: '仅本地' } },
       ],
     }
-    const remote = {
+    const remote: SheetData = {
       ...base,
-      fields: [...base.fields, { id: 'd', name: '备注', type: 'text' as const }],
+      fields: [...base.fields, { id: 'd', name: '备注', type: 'text' }],
       rows: [
         { id: 'r1', cells: { n: '甲' } },
         { id: 'r2', cells: { n: '树上乙' } },
