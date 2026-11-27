@@ -51,7 +51,7 @@ describe('databaseBlock 关联树上表同步', () => {
         throw new Error('pull should not save')
       },
     })
-    expect(result).toBe('pulled')
+    expect(result).toEqual({ action: 'pulled', droppedFilters: 0 })
     const next = databasePos(ed)
     expect(readBlockId(next.node)).toBe(id)
     expect(payloadFromAttrs(next.node.attrs).sheet.rows[0]!.cells[name.id]).toBe('树上最新')
@@ -80,7 +80,7 @@ describe('databaseBlock 关联树上表同步', () => {
         return { kind, data }
       },
     })
-    expect(result).toBe('pushed')
+    expect(result).toEqual({ action: 'pushed', droppedFilters: 0 })
     const pushed = saved as { views: Array<{ name: string }>; rows: Array<{ id: string; cells: Record<string, unknown> }> }
     expect(pushed.views[0]!.name).toBe('树上表格')
     expect(pushed.rows.find((item) => item.id === target.id)?.cells[name.id]).toBe('块内最新')
@@ -101,3 +101,29 @@ describe('databaseBlock 关联树上表同步', () => {
     ).rejects.toThrow('关联节点不是多维表格')
   })
 })
+
+  it('拉取时丢掉指向已删除字段的筛选，并清掉无效排序', async () => {
+    const ed = mount()
+    ed.commands.insertDatabaseBlock({ sheetNodeId: 'tree-1' })
+    const gone = 'field-gone'
+    expect(ed.commands.setDatabaseBlockFilters([{ fieldId: gone, op: 'contains', value: 'x' }])).toBe(true)
+    expect(ed.commands.setDatabaseBlockSort(gone, 'asc')).toBe(true)
+    const tree = JSON.parse(JSON.stringify(payloadFromAttrs(databasePos(ed).node.attrs).sheet))
+    const result = await syncLinkedDatabaseBlock(ed, 'proj', {
+      direction: 'pull',
+      sheetNodeId: 'tree-1',
+      pos: databasePos(ed).pos,
+    }, {
+      load: async () => ({ kind: 'sheet', data: tree }),
+      save: async () => {
+        throw new Error('pull should not save')
+      },
+    })
+    expect(result.action).toBe('pulled')
+    expect(result.droppedFilters).toBeGreaterThan(0)
+    const next = payloadFromAttrs(databasePos(ed).node.attrs)
+    const view = next.sheet.views.find((item) => item.id === next.activeViewId)!
+    expect(view.filters.some((item) => item.fieldId === gone)).toBe(false)
+    expect(view.sortBy).toBeNull()
+  })
+

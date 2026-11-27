@@ -348,6 +348,11 @@ export function cloneSheet(sheet: SheetData): SheetData {
 }
 
 /** 用树上表的字段和行覆盖内嵌快照，尽量保留当前视图、筛选和且/或。不是实时双向同步。 */
+
+export function countViewFilters(sheet: SheetData): number {
+  return (sheet.views || []).reduce((n, view) => n + (view.filters || []).length, 0)
+}
+
 export function pullSheetIntoPayload(payload: DatabaseBlockPayload, tree: SheetData): DatabaseBlockPayload {
   const incoming = migrateSheet(tree)
   const sheet = cloneSheet(payload.sheet)
@@ -357,6 +362,7 @@ export function pullSheetIntoPayload(payload: DatabaseBlockPayload, tree: SheetD
   sheet.views = ensureDatabaseViews(sheet).map((view) => ({
     ...view,
     groupBy: view.groupBy && ids.has(view.groupBy) ? view.groupBy : defaultGroupBy(sheet, view.type),
+    sortBy: view.sortBy && ids.has(view.sortBy) ? view.sortBy : null,
     filters: (view.filters || []).filter((item) => ids.has(item.fieldId)),
   }))
   const active = sheet.views.find((view) => view.id === payload.activeViewId) ?? sheet.views[0]!

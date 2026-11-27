@@ -828,7 +828,10 @@ async function onDatabaseBlockSync(ev: Event) {
       load: getNodeData,
       save: saveNodeData,
     })
-    ElMessage.success(result === 'pulled' ? '已从知识库表格拉取' : '已写回知识库表格')
+    ElMessage.success(result.action === 'pulled' ? '已从知识库表格拉取' : '已写回知识库表格')
+    if (result.action === 'pulled' && result.droppedFilters > 0) {
+      ElMessage.warning(`有 ${result.droppedFilters} 条筛选条件因字段已不存在被去掉`)
+    }
   } catch (err) {
     ElMessage.error(friendlyApiMessage(err, '同步知识库表格失败'))
   }
