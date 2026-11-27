@@ -159,4 +159,32 @@ describe('saveConflict 按块合并', () => {
     expect(summary.hasBlockIds).toBe(false)
     expect(listConflictBlocks({ mineHtml: mine, theirsHtml: theirs })).toEqual([])
   })
+
+  it('多层包装内仍按唯一块 ID 对照，一边有包装另一边是裸块也能对齐', () => {
+    const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+    const mine = `<blockquote data-callout="note"><div class="inner"><p data-block-id="${id}">本地${mark}</p></div></blockquote>`
+    const theirs = `<p data-block-id="${id}">远端<span data-suggestion="delete">旧句</span></p>`
+    const versions = { mineHtml: mine, theirsHtml: theirs, mineLabel: '我的', theirsLabel: '对方' }
+    expect(summarizeBlockMerge(versions)).toEqual({ hasBlockIds: true, same: 0, conflict: 1, onlyTheirs: 0, onlyMine: 0 })
+    expect(listConflictBlocks(versions)).toEqual([{ id, mineHtml: mine, theirsHtml: theirs }])
+    const keepMine = resolveConflictHtml('merge', versions, { [id]: 'mine' })
+    expect(keepMine).toContain(mine)
+    expect(keepMine).not.toContain('远端')
+    expect(htmlHasSuggestionMarks(keepMine)).toBe(true)
+    expect(keepMine).toContain('data-suggestion="insert"')
+    expect(keepMine).not.toContain('data-suggestion="delete"')
+    const keepTheirs = resolveConflictHtml('merge', versions, { [id]: 'theirs' })
+    expect(keepTheirs).toContain(theirs)
+    expect(keepTheirs).not.toContain('本地')
+    expect(keepTheirs).toContain('data-suggestion="delete"')
+    expect(keepTheirs).not.toContain('data-suggestion="insert"')
+    const both = resolveConflictHtml('merge', versions, { [id]: 'both' })
+    expect(both).toBe(mergeConflictHtml(versions, { [id]: 'both' }))
+    expect(htmlPreviewText(both, 360)).toBe(htmlPreviewText(mergeConflictHtml(versions, { [id]: 'both' }), 360))
+    expect(both).toContain(mine)
+    expect(both).toContain(theirs)
+    expect(htmlHasSuggestionMarks(both)).toBe(true)
+    expect(both).toContain('data-suggestion="insert"')
+    expect(both).toContain('data-suggestion="delete"')
+  })
 })
