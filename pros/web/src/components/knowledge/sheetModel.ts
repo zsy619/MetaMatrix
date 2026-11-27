@@ -30,7 +30,7 @@ export type SheetRow = {
   cells: Record<string, SheetCellValue>
 }
 
-export type SheetFilterOp = 'contains' | 'is' | 'isNot' | 'empty' | 'notEmpty' | 'gt' | 'gte' | 'lt' | 'lte'
+export type SheetFilterOp = 'contains' | 'notContains' | 'is' | 'isNot' | 'empty' | 'notEmpty' | 'gt' | 'gte' | 'lt' | 'lte'
 
 export type SheetFilter = {
   fieldId: string
@@ -90,6 +90,7 @@ export const FIELD_TYPES: FieldTypeMeta[] = [
 
 export const FILTER_OPS: Array<{ op: SheetFilterOp; label: string }> = [
   { op: 'contains', label: '包含' },
+  { op: 'notContains', label: '不包含' },
   { op: 'is', label: '等于' },
   { op: 'isNot', label: '不等于' },
   { op: 'empty', label: '为空' },
@@ -99,6 +100,22 @@ export const FILTER_OPS: Array<{ op: SheetFilterOp; label: string }> = [
   { op: 'lt', label: '小于' },
   { op: 'lte', label: '小于等于' },
 ]
+
+export function defaultFilterOp(type: SheetFieldType): SheetFilterOp {
+  switch (type) {
+    case 'number':
+    case 'progress':
+    case 'rating':
+      return 'gte'
+    case 'date':
+    case 'select':
+    case 'multiSelect':
+    case 'checkbox':
+      return 'is'
+    default:
+      return 'contains'
+  }
+}
 
 export function fieldMeta(type: SheetFieldType): FieldTypeMeta {
   return FIELD_TYPES.find((m) => m.type === type) ?? FIELD_TYPES[0]
@@ -204,6 +221,8 @@ export function matchesFilter(row: SheetRow, filter: SheetFilter): boolean {
   switch (filter.op) {
     case 'contains':
       return text.toLowerCase().includes(needle.toLowerCase())
+    case 'notContains':
+      return !text.toLowerCase().includes(needle.toLowerCase())
     case 'is':
       return text === needle
     case 'isNot':

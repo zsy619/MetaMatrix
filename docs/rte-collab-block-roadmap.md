@@ -2,7 +2,9 @@
 
 日期：2026-11-26。基线：`main` @ `4f438f1`。
 修订：2026-11-26 16:10（Asia/Shanghai）按可行性评审收紧——A3 依赖、A2 工期、D5 并发回填、门禁基线重测、协作扩展工作区差异；并同步相关任务清单。
-状态更新：2026-11-26 20:51（Asia/Shanghai）——D1/D2 已拍板，A1 已合入 `main` @ `311593e`（PR #297）。功能分支 `agent/met-4-a2a-collab-20261126` 已有 A2a / A2b、A3 审计骨架（`bc0404e`），以及缺口补丁 `2e45f76`（浏览者前端只读、持久离线队列、审计只读列表），**尚未合入 main**。MinIO、评论通知、B1 caret、B / C 未做。浏览器实机与双浏览器收敛仍未验证，不能写成验收通过。
+状态更新：2026-11-26 20:51（Asia/Shanghai）——D1/D2 已拍板，A1 已合入 `main` @ `311593e`（PR #297）。当时功能分支 `agent/met-4-a2a-collab-20261126` 已有 A2a / A2b、A3 审计骨架（`bc0404e`）以及缺口补丁 `2e45f76`。
+状态更新：2026-11-27（Asia/Shanghai）——该功能分支经 [PR #298](https://github.com/zsy619/MetaMatrix/pull/298) squash 合入 `main`（`a61a7649e742b37f2e65bc63085ba073555fdd57`），含 A2–C 已落地部分（见各节勾选与提交说明）。实时双向同步、飞书级多维表/合并/ACL、跨实例 presence 仍缺。浏览器实机、双浏览器收敛、真实 MinIO 与发信仍未验证，不能写成验收通过。
+状态更新：2026-11-27（Asia/Shanghai）——新分支 `agent/met-4-deepen-20261127`（从当时 `origin/main` @ `a61a764` 拉出）：`e7958b8` 单边表格覆盖需确认、选区不能跨过只读块；`c939375` 内嵌表对照树上表并安全同步单边改动（打开/聚焦/定时对照，仍不是实时双向）；`09aa8e4` 筛选「不包含」与按字段类型的默认条件；`dfeabab` 保存冲突可按块选择保留哪一边。尚未合入 main。实时双向同步、飞书级多维表/合并/ACL、跨实例 presence 仍缺。实机、双浏览器、真实 MinIO 与发信仍未验证，不能写成验收通过。
 
 来源：ChatGPT 分享《飞书文档编辑器技术架构深度分析》（五大技术体系：Block 模型 / 编辑器内核 / 多人协同 / 块级交互 / 文档服务），
 对照当前代码得出缺口清单；本文归档**修正后的实施顺序**及其技术要点与工作任务。
@@ -38,7 +40,7 @@
 - [x] **D2 书面拍板**：同日采纳——Y.Doc 快照为实时事实源，`current_data` 为导出/检索派生；A2 期先双写、保留回滚。不要把保存管线改成只写 Y.Doc。
 - [x] **D3 / D4 / D5 书面拍板**：建议已随 A1 落地（v1 块边界为顶层 + 一级嵌套；前端生成 UUID；懒回填 + 随正常保存持久化，打开不单独强制保存）。**多人同时首次打开旧文档仍未实机验证。**
 - [x] **门禁基线重测**：已在干净 worktree 实跑，数字回写 §5。`4f438f1` / `311593e`：`vue-tsc` 62 error，`vitest` 6 失败 / 1919 通过；`9701171`：`vue-tsc` 62 且集合相同，`vitest` 6 失败 / 1924 通过；本轮缺口补丁 `4a615d3`：`vue-tsc` 62 集合仍相同，`vitest` 6 失败 / 1926 通过。旧基线 `54abf501` **不可当作当前门禁**。
-- [x] **确认协作扩展依赖**：以 `main` @ `311593e` 已有的 `@tiptap/extension-collaboration` / `collaboration-caret` 为准；A2a 功能分支已引用 Collaboration（caret 仍未接线，留给 B1）。Mac 工作区仍有未提交删除这两个包的改动，**未带进功能分支**；不要在 Mac 上恢复或覆盖 `package.json`。
+- [x] **确认协作扩展依赖**：以 `main` 已有的 `@tiptap/extension-collaboration` / `collaboration-caret` 为准；A2a 已引用 Collaboration，B1 @ `7d62fa0` 已接入 CollaborationCaret，已随 [PR #298](https://github.com/zsy619/MetaMatrix/pull/298) 合入 `main`（`a61a764`）。不要为更新协作依赖而覆盖其它本地 `package.json` 改动。
 - [x] 不使用 `git stash` 做门禁对比：本轮均用独立 worktree，未 stash / reset --hard / clean。
 
 ---
@@ -56,13 +58,13 @@
 - [x] **成员角色** `admin | editor | viewer`：`pros/api/internal/model/knowledge_v6.go:14`，路由 `pros/api/cmd/server/main.go:335-337`
 - [x] **跨文档块引用**已有 `blockId` 概念（命名先例）：`pros/web/src/extensions/syncBlock.ts:50`
 - [x] **块级交互**：块手柄 / 拖拽 / 复制 / 删除 / 上移下移 / 转换 —— `pros/web/src/components/rte/composables/useBlockHandle.ts:14`
-- [x] **协作扩展已写入 `main` @ `311593e` 的 `package.json`**：`@tiptap/extension-collaboration` / `@tiptap/extension-collaboration-caret` ^3.32.0。A2a 功能分支已引用 Collaboration；caret 仍为零引用（B1）。Mac 工作区若仍有未提交删除这两项，不要覆盖 `package.json`。
+- [x] **协作扩展已写入 `package.json`**：`@tiptap/extension-collaboration` / `@tiptap/extension-collaboration-caret` ^3.32.0。A2a 已引用 Collaboration；B1 @ `7d62fa0` 已接入 CollaborationCaret，已随 [PR #298](https://github.com/zsy619/MetaMatrix/pull/298) 合入 `main`（`a61a764`）。不要为更新协作依赖而覆盖其它本地 `package.json` 改动。
 
 ### 1.2 真正缺失的三件事
 
 - [x] **块内稳定 ID**：A1 代码已 squash 合入 `main` @ `311593e`（PR #297）。身份块使用 `dataBlockId` → HTML `data-block-id`，与 heading `id` / 图表 `xrefId` / syncBlock `blockId` 并存；复制换新 ID、拖拽保持、懒回填不单独保存。单测覆盖复制 / 拖拽 / 粘贴。**浏览器实机（复制 / 拖拽 / 系统粘贴、老文档打开保存、多人同时首开）尚未验证，不能写成验收通过。** 标题 `attrs.id`、图片/表格 `xrefId` 仍作既有锚点保留，不再是唯一身份。
-- [ ] **块实体层**：无父子层级、无块类型、无稳定主键、无版本归属；`kb_content_blocks` 每次保存全删全建
-- [ ] **块级引用**：交叉引用定位先比 ID、再按标题文本兜底 —— `pros/web/src/utils/rteBlockRef.ts:15`；复制或改名即失效
+- [x] **块实体层**：`kb_doc_blocks` / `kb_doc_block_revisions` / `kb_doc_block_refs` 已随 [PR #298](https://github.com/zsy619/MetaMatrix/pull/298) 合入 `main`（`a61a764`，见 B2）。兼容期内旧表 `kb_content_blocks` 仍全删全建。不是飞书级字段/组织 ACL。
+- [x] **块级引用**：交叉引用优先 `blockId`，旧 ID 降为 `anchor_key`，标题文本仅作降级并打 `lost`（`4d087e9`，已随 PR #298 合入）。老引用不硬切。**未实机验证。**
 
 ### 1.3 协同现状（决定顺序的关键）
 
@@ -70,11 +72,10 @@
       —— 自研 `splitBlocks` 扫 HTML 标签切顶层块，**块内 LWW**；HTTP 拉取，轮询 2.5s（同文件 `:119`）
 - [x] 服务端只存增量：`kb_crdt_updates`（`pros/api/internal/model/knowledge_v6.go:48`），
       路由 `GET/POST /knowledge/documents/:id/crdt`（`pros/api/cmd/server/main.go:382-383`）
-- [ ] **正文主编辑器未接 Yjs（这是 `main` 现状）**：`main` 仍是单写者 + 乐观并发（`SaveVersion` / `HeadRevisionID` / `ErrSaveConflict`）。功能分支 `agent/met-4-a2a-collab-20261126` @ `4a615d3`（及垂直切片 `9701171`）已把正文按需接入 Collaboration，**尚未合入 main**；双浏览器收敛未实机验证。
-- [ ] **无 WebSocket 通道（这是 `main` 现状）**：`main` 仍无 WebSocket；`docker-compose.yml` 只有 Postgres + API + nginx，**无 Redis**。功能分支已有 Hertz `hertz-contrib/websocket` 垂直切片（`/documents/:id/collab`，含心跳与重连），**未合入 main**，不能把「无 WebSocket」勾掉当成 main 已具备。
-- [ ] **无 Awareness**：协作光标 / 选区 / 在线名单在正文内全无；
-      `pros/web/src/components/canvas/nodeGraph/presence.ts` 只覆盖节点图画布，且仅同浏览器多标签（BroadcastChannel）
-- [ ] **协同是可选旁路（这是 `main` 现状）**：`main` 上「开启/关闭协同编辑」仍可指向 HTML 级旁路。功能分支已按 D1 重定义：开启走正文 Yjs（A2a），关闭回到单人保存，且不再写入 `kb_crdt_updates`（A2b @ `64d39ab`），**尚未合入 main**。
+- [x] **正文主编辑器已按需接入 Yjs**：保存仍可走单写者 + 乐观并发（`SaveVersion` / `HeadRevisionID` / `ErrSaveConflict`）；A2a @ `4a615d3`（及垂直切片 `9701171`）把正文按需接入 Collaboration，已随 [PR #298](https://github.com/zsy619/MetaMatrix/pull/298) 合入 `main`（`a61a764`）。**双浏览器收敛未实机验证。**
+- [x] **WebSocket 通道已落地（同实例）**：Hertz `hertz-contrib/websocket` 垂直切片（`/documents/:id/collab`，含心跳与重连），已随 PR #298 合入 `main`（`a61a764`）。`docker-compose.yml` 仍只有 Postgres + API + nginx，**无 Redis**；跨实例通道未做。未实机验证。
+- [x] **正文内 Awareness 已落地（同实例）**：B1（`7d62fa0`）及离房清鬼光标/重连同步（`43d5450`）已随 PR #298 合入 `main`（`a61a764`）。正文内可见他人光标与选区、在线名单；**未实机验证**。跨实例 presence 仍缺。节点图 `presence.ts` 仍只覆盖同浏览器多标签。
+- [x] **旧 HTML 级协同旁路已按 D1 收口（A2b）**：开启走正文 Yjs（A2a），关闭回到单人保存，且不再写入 `kb_crdt_updates`（A2b @ `64d39ab`），已随 PR #298 合入 `main`（`a61a764`）。未在真实浏览器验证开启/关闭协同。
 
 ---
 
@@ -103,58 +104,51 @@
 
 任务：
 
-- 状态（2026-11-26 19:45）：功能分支 `agent/met-4-a2a-collab-20261126` 已有 A2a（至 `4a615d3`）与 A2b（`64d39ab`），**未合入 main**。双浏览器收敛未实机验证，不能算验收通过。下列实现项仅表示功能分支已有代码，不代表 main 现状。
-- [ ] **WS 通道**：功能分支已用 Hertz `hertz-contrib/websocket`（复用现有鉴权与进程，含应用层 ping 与断线重连）；`2e45f76` 已补持久化离线队列（按文档隔离，IndexedDB / localStorage，刷新后恢复，发送成功后清除），浏览者进房后前端只读且不发本地增量。**尚未合入 main**。未实机验证。
-- [ ] 正文接入 `Collaboration` 扩展绑定 Y.Doc，协议从第一天携带 `data-block-id`（功能分支已实现，未合入 main）
-- [ ] 增量落库 `kb_doc_operations`，与文档版本体系对齐（功能分支已实现；双写后抖动执行 `syncExtract` 与自动修订快照，未合入 main）
-- [ ] presence 存储接口沿用既有约定、不写死 Redis（功能分支已复用 `PresenceStore`，未合入 main）
+- 状态（2026-11-27）：A2a（至 `4a615d3`）与 A2b（`64d39ab`）已随 [PR #298](https://github.com/zsy619/MetaMatrix/pull/298) squash 合入 `main`（`a61a764`）。双浏览器收敛仍未实机验证，不能算验收通过。
+- [x] **WS 通道**（已随 PR #298 合入 `main`（`a61a764`），`4a615d3` / `2e45f76`）：Hertz `hertz-contrib/websocket`（复用现有鉴权与进程，含应用层 ping 与断线重连）；持久化离线队列（按文档隔离，IndexedDB / localStorage，刷新后恢复，发送成功后清除）；浏览者进房后前端只读且不发本地增量。**未实机验证。**
+- [x] 正文接入 `Collaboration` 扩展绑定 Y.Doc，协议从第一天携带 `data-block-id`（已随 PR #298 合入 `main`（`a61a764`））
+- [x] 增量落库 `kb_doc_operations`，与文档版本体系对齐（已随 PR #298 合入 `main`（`a61a764`）；双写后抖动执行 `syncExtract` 与自动修订快照）。`kb_save_operations`（保存幂等）与此不是同一张表。
+- [x] presence 存储接口沿用既有约定、不写死 Redis（已随 PR #298 合入 `main`（`a61a764`），复用 `PresenceStore`）。跨实例 presence 仍缺。
 - [ ] 冲突合并的验收标准包含"块级收敛"，不再单列自研工作包（进程内两编辑器单测已覆盖；**双浏览器未实机验证**）
-- [ ] **按 D1 处置旧协同旁路（A2b）**：功能分支 `64d39ab` 已将 `AppendCRDT` / `POST /documents/:id/crdt` / `httpTransport.postUpdate` / `appendCrdtUpdate` 降为只读拒绝写入，历史 `GET` / `CRDTUpdates` 仍可读；`CollabDoc` 默认不可写。单测已锁住「旧旁路不再写入」。**尚未合入 main**。未在真实浏览器验证开启/关闭协同。
+- [x] **按 D1 处置旧协同旁路（A2b）**（已随 PR #298 合入 `main`（`a61a764`），`64d39ab`）：`AppendCRDT` / `POST /documents/:id/crdt` / `httpTransport.postUpdate` / `appendCrdtUpdate` 降为只读拒绝写入，历史 `GET` / `CRDTUpdates` 仍可读；`CollabDoc` 默认不可写。单测已锁住「旧旁路不再写入」。未在真实浏览器验证开启/关闭协同。
 - [ ] 验收：两个浏览器同开一篇文档，输入可互相收敛——**未在真实浏览器验证**，不能勾选
 
 #### A3 存储与消息（部分可并行，4–6 人日不含完整块级审计）
 
 与协同无依赖的是对象存储和评论通知，**不是**全部 A3 项。
 
-- [ ] 附件从本地磁盘 + 自建分片上传（`/upload/chunk/*`）迁到 MinIO / S3（可与 A1/A2 并行）
-- [ ] 评论通知链路（站内 / 邮件）：评论线程今天已可用（写在文档 JSON 内）（可与 A1/A2 并行）
-- [ ] **用户维度审计流水「谁在何时改了哪个块」**（依赖 A1 稳定 blockId；完整块类型 / 父子等到 B2）。功能分支 `bc0404e` 已做用户+文档级骨架；`2e45f76` 已在 DocView 侧栏增加只读列表。**尚未合入 main**。块类型/父子未做。MinIO 与评论通知仍未做。审计列表未实机验证。
+- [x] 附件对象存储配置接口（已随 PR #298 合入 `main`（`a61a764`），`f27817e`）：`WriteHashed` / Open / Delete 走 `BlobBackend`；S3 兼容（MinIO）用 SigV4，凭据只读环境变量；缺端点/桶/密钥时回退本地磁盘。分片上传仍先在本地临时目录组装再写入当前后端。**代码已备，缺运维配置，生产数据未切换。** 未对真实 MinIO 做迁移或验收。
+- [x] 评论通知链路（站内 / 邮件）（已随 PR #298 合入 `main`（`a61a764`），`c037783`）：新评论/回复/@ 写 `core_user_notifications`，并尝试发信；SMTP 未配置或发送失败只记日志，不让评论写入失败。测试不发真实邮件。未实机验证、未真实发信。
+- [x] **用户维度审计流水「谁在何时改了哪个块」**（已随 PR #298 合入 `main`（`a61a764`），骨架+只读列表 `bc0404e` / `2e45f76`，表为 `kb_doc_audit_events`）。块模型见 B2。审计列表未实机验证。
 
 ### Phase B —— A1 + A2 之后（约 2 周）
 
 #### B1 协作光标与在线名单（3–5 人日）
 
-- [ ] 依赖 A2 的 presence 通道；用 Yjs relative position，**不依赖块表**
-- [ ] 正文内协作者光标、选区、在线成员列表
+- [x] 依赖 A2 的 presence 通道；用 Yjs relative position，**不依赖块表**（已随 PR #298 合入 `main`（`a61a764`），`7d62fa0`）。复用 Hertz WebSocket 与 `PresenceStore`，用 `y-protocols` Awareness 传光标/选区，并接入 `@tiptap/extension-collaboration-caret`。未实机验证。跨实例 presence 仍缺。
+- [x] 正文内协作者光标、选区、在线成员列表（已随 PR #298 合入 `main`（`a61a764`），`7d62fa0` / `43d5450`）。正文渲染他人光标/选区（名称与配色），DocView 展示在线名单；离房或断开后从名单移除，并清掉远端鬼光标；重连会再上报本地 awareness 并按新的 presence 修剪远端状态。浏览者只读约束保留。未实机验证。
 
 #### B2 块实体化主体（15–18 人日）
 
-- [ ] 数据模型：`kb_doc_blocks`（`id / document_id / parent_id / block_type / ordinal / depth / anchor_key /
-      content_text / content_json / attrs / revision_id / created_at / updated_at / deleted_at`）、
-      `kb_doc_block_revisions`、`kb_doc_block_refs`
-- [ ] 索引：`(document_id, ordinal)`、`(parent_id)`、`(deleted_at)`、`(target_block_id)`
-- [ ] 迁移：`internal/db/db.go` AutoMigrate 注册 + `ensure*Schema` 补丁；
-      **同步 SQLite 影子模型**（否则测试报 `table X has no column named Y`）
-- [ ] 抽取器升级：`content.Block`（`extract.go:38`）增 `ID / ParentID / Type / Depth / Attrs`，从 panel/path 两层改为递归树展开
-- [ ] 保存管线：`syncExtract`（`documents.go:229`）由「全删全建」改为 **upsert + 软删**，
-      否则块 ID 每次保存被打乱，实体化白做；块表写入与 `current_data` 同事务；
-      `DocumentSaveOperation` 幂等键覆盖块 upsert
-- [ ] 引用体系：统一 ID 命名空间（heading / image / table / bookmark 收敛到 `blockId`，旧 ID 降级为 `anchor_key`）；
-      `findCrossRefPos`（`rteBlockRef.ts:15`）改为按 blockId 定位，标题文本仅作降级并打 `lost` 标记；
-      `core_page_references` 扩到块级（`source_block_id` / `target_block_id`）并支持反查
-- [ ] 批注锚点：`DocComment` 增 `block_id` + 块内 offset 双锚点，`ensure*Schema` 回填，旧评论走降级路径
-- [ ] API：`GET /documents/:id/blocks`、`GET /documents/:id/blocks/:blockId`、块级引用反查；预留块级权限字段
-- [ ] 兼容期双写：老 `kb_content_blocks` 保持不变，新表并行写
+- [x] 数据模型（已随 PR #298 合入 `main`（`a61a764`））：`kb_doc_blocks`（`23ad7ce`，后补预留 `permission` 字段；有别于已有的 `kb_content_blocks`），以及 `kb_doc_block_revisions`、`kb_doc_block_refs`（`4d087e9`）。块级权限界面见 C2 `f1022ac`。
+- [x] 索引：`(document_id, ordinal)`、`(parent_id)`、`(deleted_at)`（`23ad7ce`，非唯一以兼容软删）；`(target_block_id)` 已建在 `kb_doc_block_refs`（`4d087e9`）。已随 PR #298 合入 `main`（`a61a764`）。
+- [x] 迁移（已随 PR #298 合入 `main`（`a61a764`），`23ad7ce`）：`internal/db/db.go` AutoMigrate 已注册，并同步 documents / projects / 并发 / backup 测试库 SQLite 影子模型。
+- [x] 抽取器升级（已随 PR #298 合入 `main`（`a61a764`），`23ad7ce`）：`content.Block` 增 `ID / ParentID / Type / Depth / Attrs`。按 D3 只抽「顶层 + 一级嵌套」，身份用 A1 `data-block-id`，不做全量递归。
+- [x] 保存管线对新表 `kb_doc_blocks` 为 **upsert + 软删**（已随 PR #298 合入 `main`（`a61a764`），`23ad7ce`），与 `current_data` 同事务；单人保存与协同 `FlushDerived` 都写入。**旧表 `kb_content_blocks` 仍全删全建**（兼容期双写，有意保留）。
+- [x] 引用体系（已随 PR #298 合入 `main`（`a61a764`），`4d087e9`）：heading / image / table / bookmark 优先 `blockId`，旧 ID 降为 `anchor_key`；`findCrossRef` / `findCrossRefPos` 按 blockId 定位，标题文本仅作降级并打 `lost`。既有 `core_page_references` 表扩了 `source_block_id` / `target_block_id` / `anchor_key`；`kb_doc_block_refs` 写入交叉引用并支持反查。老引用不硬切。
+- [x] 批注锚点（已随 PR #298 合入 `main`（`a61a764`），`4d087e9`）：`DocComment` 增 `block_id` + `block_offset`，`ensureCommentBlockAnchors` 回填，对不上的旧评论保留 Quote / Anchor 降级。
+- [x] API（已随 PR #298 合入 `main`（`a61a764`））：`GET /documents/:id/blocks`、`GET /documents/:id/blocks/:blockId`（`23ad7ce`）；`GET /documents/:id/blocks/:blockId/refs` 块级引用反查（`4d087e9`）；`PATCH /documents/:id/blocks/:blockId/permission`（`f1022ac`）。默认不含软删行；无权限与文档不存在一样 404。列表/详情含 `permission`。块级权限界面见 C2 `f1022ac`。
+- [x] 兼容期双写（已随 PR #298 合入 `main`（`a61a764`），`23ad7ce`）：老 `kb_content_blocks` 保持不变，新表 `kb_doc_blocks` 并行写。
 
 #### B3 正文内嵌数据库块（并行，随时插队）
 
-- [ ] 多维表格从「知识库树上的独立 `kind=sheet`」下沉为可内嵌的正文块（作为正文块时仍应带 A1 的稳定 blockId，不可在身份语义未定前当已完成项勾掉）
+- [x] 多维表格可内嵌为带 A1 稳定 `data-block-id` 的正文块（已随 PR #298 合入 `main`（`a61a764`）；骨架 `0c56be1`，最小筛选/视图/块内协同 `8dc02c4`，组合筛选与画廊/日历 `6b5081e`，手动同步 `bf2f17d`，比较筛选与增删行/排序/月历 `3667a89` / `00d7b1d` / `f5383d9` / `66745b8`，拉取提示 `be92160`，分叉确认 `f59ce93`）。斜杠可插入。筛选构建器支持多条件且/或，以及包含/等于/比较等算子，刷新后保持。视图：表格/看板/画廊/可翻页月历，可按列排序，可增删行与改单元格，刷新后由 `data-sheet` / `data-view-type` 保持。关联树上既有 `kind=sheet` 时可手动拉取或写回快照（最后写入为准，不是实时双向）；拉取会丢掉失效筛选并提示，并清掉无效排序。上次同步后若两边都改过，会先确认再覆盖，仍不是实时双向。月历可回到今天；画廊在无匹配行时给提示。独立 `kind=sheet` **未删除**。双编辑器单测不丢稳定 `data-block-id`。日历是月历不是完整日程/重复事件；不是飞书多维表。未实机验证。 本轮加深（功能分支 `agent/met-4-deepen-20261127`，尚未合入 main）：`e7958b8` 仅一边改过时，朝会覆盖那一侧的方向需确认；`c939375` 打开文档、窗口聚焦和定时对照会标出「树上有更新 / 有未写回改动 / 两边都改过」，「安全同步」只处理单边改动，两边都改过仍要手动选择方向；`09aa8e4` 筛选增加「不包含」，添加条件时按字段类型给出默认比较方式，单选/复选框用选项选择值。仍不是实时双向同步，内嵌仍是快照。未实机验证。
 
 ### Phase C —— 收口
 
-- [ ] C1 协同下的冲突呈现与「谁的版本」合并 UI
-- [ ] C2 协同 × 权限 / 审阅语义（修订建议与协同同时开启如何共存、块级权限）
-- [ ] C3 存储与通知的规模化收尾
+- [x] C1 协同下的冲突呈现与「谁的版本」合并 UI（已随 PR #298 合入 `main`（`a61a764`），最小可用界面 `2001978`，按块 ID 合并与预览 `3667a89` / `00d7b1d`，对照摘要 `55f2135`）。409 时并排预览你的 / 对方的版本，可选我的、对方的，或合并两边；有 `data-block-id` 时按块合并（相同块保留一份，冲突块并排并加标记），无 ID 时仍拼接对方+我的。合并不清洗审阅标记。冲突面板有合并预览。不是飞书级三方合并。未实机验证。 本轮加深（`dfeabab`，尚未合入 main）：冲突面板列出冲突块，可分别选择用我的、用对方的或并排保留；未选择的冲突块仍并排保留。不是飞书级三方合并。未实机验证。
+- [x] C2 协同 × 权限 / 审阅语义的最小共存（已随 PR #298 合入 `main`（`a61a764`），审阅共存 `2b2f3f3`，块级权限 `f1022ac`，编辑器内只读 `b89034d` / `97b8c81`）：浏览者只读仍有效；建议模式与接受/拒绝修订不绕过 canWrite 与块只读；冲突选择或合并保留 `data-suggestion` 标记。可在界面设置 inherit/edit/owner/readonly；仅 owner/admin 可改；保存与协同追加按 `kb_doc_blocks.permission` 拦截，浏览者/无 canWrite 不能绕过。无权限（readonly / 无 canWrite）的块在编辑器内只读，建议接受/拒绝不能绕过；选中只读块时有横幅；协同远端 y-sync 更新仍可写入以免挡收包。不是飞书级 ACL，无字段级权限。未实机验证。 本轮缺口补丁（`e7958b8`，尚未合入 main）：选区从可写块跨过中间只读块时，视为不可编辑。未实机验证。
+- [x] C3 存储与通知的规模化收尾中能安全落地的部分（已随 PR #298 合入 `main`（`a61a764`），`4d66db4`）：通知按用户+评论+类型幂等；邮件最多重试一次并做单进程限流；S3 可重放流对 429/5xx 重试。说明见 `pros/api/docs/storage-and-notifications.md`。跨实例 presence、生产 MinIO 切换、真实发信**未验证**。
 
 ---
 
@@ -163,7 +157,7 @@
 ### D1 正文接 Y.Doc 后，知识库现有 HTML 级 CRDT 如何处置
 
 - [x] 建议（已于 2026-11-26 19:04 拍板）：知识库文档**也走正文 Yjs**，`kb_crdt_updates` 降为历史 / 只读；处置本身仍属 A2b
-- [x] 代价（功能分支 `64d39ab` 已重定义，**未合入 main**）：「开启/关闭协同编辑」改为编辑模式之一——开启走正文 Yjs，关闭回到单人保存，且不再写 `kb_crdt_updates`
+- [x] 代价（`64d39ab` 已重定义，已随 [PR #298](https://github.com/zsy619/MetaMatrix/pull/298) 合入 `main`（`a61a764`））：「开启/关闭协同编辑」改为编辑模式之一——开启走正文 Yjs，关闭回到单人保存，且不再写 `kb_crdt_updates`
 - [ ] 不处置的后果：两套协同语义并存（内核级 + 旁路字符串级），必然分裂成两种产品行为
 - [ ] 工作量：处置本身计入 A2b，不计入 A2a 的 8–12 人日
 
@@ -223,6 +217,10 @@ cd pros/web && npx vitest run && npx vue-tsc -b --pretty false
   - A2b `64d39ab`（2026-11-26 19:45 左右，Asia/Shanghai）：相对 `4a615d3`，`vue-tsc` 仍 62、集合完全一致；`vitest` 6 失败 / 1928 通过 / 1 跳过（再多 2 个「默认不写 / httpTransport 拒绝写入」用例）；失败名单与基线相同；`go build` 与 `go test`（service / handler / middleware）通过。
   - A3 审计骨架 `bc0404e`（2026-11-26 20:26 左右，Asia/Shanghai）：相对 `64d39ab`，`vue-tsc` 仍 62、集合完全一致；`vitest` 仍 6 失败 / 1928 通过 / 1 跳过，失败名单不变；`go build` 与 `go test`（service / handler / middleware）通过，新增审计单测全过。
   - 缺口补丁 `2e45f76`（2026-11-26 20:51 左右，Asia/Shanghai）：相对 `bc0404e`，`vue-tsc` 仍 62、集合完全一致；`vitest` 6 失败 / 1934 通过 / 1 跳过（多 6 个只读/离线队列/审计列表用例），失败名单不变。本轮无 Go 代码改动。
+  - B1 `7d62fa0`（2026-11-26 21:05 左右，Asia/Shanghai）：相对 `2e45f76`，`vue-tsc` 仍 62、集合完全一致；`vitest` 6 失败 / 1940 通过 / 1 跳过（多 6 个光标/名单/只读用例），失败名单不变；`go build` 与 `go test`（service / handler）通过。
+  - B1 完善 `43d5450` + B2 第一刀 `23ad7ce`（2026-11-26 21:48 左右，Asia/Shanghai）：相对 `7d62fa0`，`vue-tsc` 仍 62、集合完全一致；`vitest` 6 失败 / 1942 通过 / 1 跳过（多 2 个离房清光标 / 重连同步用例），失败名单不变；`go build` 与 `go test`（content / service / handler）通过。
+  - 合入 `main`：功能分支经 [PR #298](https://github.com/zsy619/MetaMatrix/pull/298) squash 为 `a61a7649e742b37f2e65bc63085ba073555fdd57`（2026-11-27）。合入前门禁（head `efb9fd8`）：`vue-tsc` 仍 62（集合与历史预先存在的那批相同），`vitest` 6 失败 / 2010 通过 / 1 跳过，失败名单不变；Go 构建与相关测试通过。未等 CI 全绿。
+  - 加深分支 `agent/met-4-deepen-20261127`（相对 `a61a764`，2026-11-27，Asia/Shanghai；均尚未合入 main）：失败名单与基线相同，`vue-tsc` 仍 62（22 个文件，集合不变）。`e7958b8`：`vitest` 6 失败 / 2013 通过 / 1 跳过。`c939375`：6 失败 / 2015 通过 / 1 跳过。`09aa8e4`：6 失败 / 2018 通过 / 1 跳过。`dfeabab`：6 失败 / 2020 通过 / 1 跳过。本轮无 Go 代码改动。
 - 判定回归时用干净 worktree 对同一条命令对比上表，不要沿用 `54abf501`。
 - 判定回归：在干净工作树对同一条命令对比基线。**不要用 `git stash`** 制造干净树（当前仓库可能有未提交的 `package.json` 等改动，stash 有误伤风险）。可用独立 worktree 检出基线 SHA 来对比。
 - 历史噪声不算回归；**本批次新引入的**类型错误或测试失败必须停并回报，不连续蛮干。
@@ -231,8 +229,8 @@ cd pros/web && npx vitest run && npx vue-tsc -b --pretty false
 
 ## 6. 未验证与不承诺
 
-- 本文档只做**代码级核查**，未在浏览器里点过协同、块实体、协作光标任何交互。
+- 本文档只做**代码级核查**。A2–C 的代码已随 [PR #298](https://github.com/zsy619/MetaMatrix/pull/298) 合入 `main`（`a61a764`），但未在浏览器里点过协同、块实体、协作光标任何交互，不能写成验收通过。
 - 未跑 Safari / Firefox，未验证深色模式下的块手柄与协作光标可读性。
 - 工期是按当前代码规模估的粗算，不是承诺；A2 的真实成本取决于 D1 / D2 的选择，须按 A2a / A2b 拆开评估。
 - 飞书侧行为未逐项打开网页核对，本文只引用分享文档中的技术分析，不把推测写成飞书实现。
-- 本文件在 2026-11-26 评审时于 Mac 工作区为未跟踪文件；是否入库由后续提交决定，不在本文兼职发布流程。
+- 本文件已随仓库入库。2026-11-27 将本地更完整的勾选与提交说明，按新表名和已合入状态合并进 `main` @ `a61a764` 的工作区副本；该合并本身仍是未提交的文档改动。

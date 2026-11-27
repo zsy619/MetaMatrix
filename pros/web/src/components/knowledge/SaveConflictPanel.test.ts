@@ -32,4 +32,24 @@ describe('SaveConflictPanel', () => {
     expect(wrapper.emitted('choose')).toEqual([['mine'], ['theirs'], ['merge']])
     wrapper.unmount()
   })
+
+  it('冲突块可选保留我的版本再合并', async () => {
+    const id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
+    const wrapper = mount(SaveConflictPanel, {
+      props: {
+        versions: {
+          mineHtml: `<p data-block-id="${id}">本地改</p>`,
+          theirsHtml: `<p data-block-id="${id}">远端改</p>`,
+        },
+      },
+    })
+    expect(wrapper.get(`[data-conflict-block="${id}"]`).text()).toContain('本地改')
+    expect(wrapper.get(`[data-conflict-block="${id}"]`).text()).toContain('远端改')
+    await wrapper.get(`[data-conflict-block="${id}"] [data-block-choice="mine"]`).trigger('click')
+    expect(wrapper.get('[data-side="merge"]').text()).toContain('本地改')
+    expect(wrapper.get('[data-side="merge"]').text()).not.toContain('远端改')
+    await wrapper.get('[data-action="merge"]').trigger('click')
+    expect(wrapper.emitted('choose')).toEqual([['merge', { [id]: 'mine' }]])
+    wrapper.unmount()
+  })
 })

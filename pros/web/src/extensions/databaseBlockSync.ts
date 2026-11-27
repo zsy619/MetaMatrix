@@ -1,14 +1,21 @@
 import { NodeSelection } from '@tiptap/pm/state'
 import { migrateSheet, type SheetData } from '../components/knowledge/sheetModel'
-import type { DatabaseBlockSyncDetail } from './databaseBlockEvents'
+import { readBlockId } from './blockIdentity'
+import type { DatabaseBlockSyncDetail, DatabaseBlockSyncDirection } from './databaseBlockEvents'
 import { DATABASE_BLOCK_NAME } from './databaseBlockSheet'
 import {
+  classifySheetDrift,
   countViewFilters,
   payloadFromAttrs,
   pushSheetFromPayload,
   sheetContentFingerprint,
-  sheetsDiverged,
+  type SheetDrift,
+  unsafeSyncDirection,
 } from './databaseBlockSheet'
+import {
+  databaseBlockSyncKey,
+  setDatabaseBlockSyncStatus,
+} from './databaseBlockSyncStatus'
 
 export type DatabaseBlockSyncIo = {
   load: (projectId: string, nodeId: string) => Promise<{ kind?: string; data: unknown }>
@@ -16,17 +23,72 @@ export type DatabaseBlockSyncIo = {
 }
 
 export type DatabaseBlockSyncEditor = {
-  state: { doc: { nodeAt: (pos: number) => { type: { name: string }; attrs: Record<string, unknown> } | null } ; tr: any }
+  state: {
+    doc: {
+      nodeAt: (pos: number) => { type: { name: string }; attrs: Record<string, unknown> } | null
+      descendants?: (fn: (node: { type: { name: string }; attrs: Record<string, unknown> }, pos: number) => boolean | void) => void
+    }
+    tr: any
+  }
   view: { dispatch: (tr: any) => void }
   commands: {
     importDatabaseBlockSheet: (sheet: SheetData) => boolean
   }
 }
 
+export type DatabaseBlockProbe = {
+  pos: number
+  blockId: string
+  sheetNodeId: string
+  drift: SheetDrift
+}
+
+type LinkedDatabaseBlock = {
+  pos: number
+  blockId: string
+  sheetNodeId: string
+  attrs: Record<string, unknown>
+}
+
+function listLinkedDatabaseBlocks(editor: DatabaseBlockSyncEditor): LinkedDatabaseBlock[] {
+  const out: LinkedDatabaseBlock[] = []
+  const visit = (node: { type: { name: string }; attrs: Record<string, unknown> }, pos: number) => {
+    if (node.type.name !== DATABASE_BLOCK_NAME) return
+    const sheetNodeId = String(node.attrs.sheetNodeId || '').trim()
+    if (!sheetNodeId) return
+    out.push({
+      pos,
+      blockId: readBlockId(node as never) || String(node.attrs.dataBlockId || ''),
+      sheetNodeId,
+      attrs: node.attrs,
+    })
+  }
+  if (typeof editor.state.doc.descendants === 'function') {
+    editor.state.doc.descendants((node, pos) => {
+      visit(node, pos)
+      return true
+    })
+  }
+  return out
+}
+
+function recordStatus(blockId: string, sheetNodeId: string, drift: SheetDrift) {
+  setDatabaseBlockSyncStatus(databaseBlockSyncKey(blockId, sheetNodeId), drift)
+}
+
+function resolveDirection(requested: DatabaseBlockSyncDirection, drift: SheetDrift): DatabaseBlockSyncDirection | 'noop' {
+  if (requested !== 'safe') return requested
+  if (drift === 'remote-only') return 'pull'
+  if (drift === 'local-only') return 'push'
+  if (drift === 'in-sync') return 'noop'
+  return 'safe'
+}
+
 export type DatabaseBlockSyncResult = {
-  action: 'pulled' | 'pushed' | 'aborted'
+  action: 'pulled' | 'pushed' | 'aborted' | 'noop'
   droppedFilters: number
   diverged: boolean
+  drift: SheetDrift
 }
 
 function writeSyncedFp(editor: DatabaseBlockSyncEditor, pos: number, fp: string) {
@@ -49,11 +111,19 @@ export async function syncLinkedDatabaseBlock(
   if (remote.kind && remote.kind !== 'sheet') throw new Error('关联节点不是多维表格')
   const tree = migrateSheet(remote.data)
   const local = payloadFromAttrs(node.attrs as { sheet?: string; viewType?: string }).sheet
-  const diverged = sheetsDiverged(local, tree, String(node.attrs.syncedFp || ''))
-  if (diverged && !detail.force) {
-    return { action: 'aborted', droppedFilters: 0, diverged: true }
+  const drift = classifySheetDrift(local, tree, String(node.attrs.syncedFp || ''))
+  const diverged = drift === 'both'
+  const resolved = resolveDirection(detail.direction, drift)
+  if (resolved === 'noop') {
+    recordStatus(readBlockId(node as never) || String(node.attrs.dataBlockId || ''), sheetNodeId, drift)
+    return { action: 'noop', droppedFilters: 0, diverged: false, drift }
   }
-  if (detail.direction === 'pull') {
+  if (resolved === 'safe' || (!detail.force && unsafeSyncDirection(resolved, drift))) {
+    recordStatus(readBlockId(node as never) || String(node.attrs.dataBlockId || ''), sheetNodeId, drift)
+    return { action: 'aborted', droppedFilters: 0, diverged, drift }
+  }
+  const direction = resolved
+  if (direction === 'pull') {
     const before = countViewFilters(local)
     const tr = editor.state.tr.setSelection(NodeSelection.create(editor.state.doc as never, detail.pos))
     editor.view.dispatch(tr)
@@ -64,10 +134,40 @@ export async function syncLinkedDatabaseBlock(
       : null
     const after = afterPayload ? countViewFilters(afterPayload.sheet) : before
     writeSyncedFp(editor, detail.pos, sheetContentFingerprint(tree))
-    return { action: 'pulled', droppedFilters: Math.max(0, before - after), diverged }
+    recordStatus(readBlockId(node as never) || String(node.attrs.dataBlockId || ''), sheetNodeId, 'in-sync')
+    return { action: 'pulled', droppedFilters: Math.max(0, before - after), diverged, drift }
   }
   const next = pushSheetFromPayload(payloadFromAttrs(node.attrs as { sheet?: string; viewType?: string }), tree)
   await io.save(projectId, sheetNodeId, 'sheet', next)
   writeSyncedFp(editor, detail.pos, sheetContentFingerprint(next))
-  return { action: 'pushed', droppedFilters: 0, diverged }
+  recordStatus(readBlockId(node as never) || String(node.attrs.dataBlockId || ''), sheetNodeId, 'in-sync')
+  return { action: 'pushed', droppedFilters: 0, diverged, drift }
+}
+
+
+export async function probeLinkedDatabaseBlocks(
+  editor: DatabaseBlockSyncEditor,
+  projectId: string,
+  io: DatabaseBlockSyncIo,
+): Promise<DatabaseBlockProbe[]> {
+  const out: DatabaseBlockProbe[] = []
+  for (const item of listLinkedDatabaseBlocks(editor)) {
+    try {
+      const remote = await io.load(projectId, item.sheetNodeId)
+      if (remote.kind && remote.kind !== 'sheet') {
+        recordStatus(item.blockId, item.sheetNodeId, 'unknown')
+        out.push({ pos: item.pos, blockId: item.blockId, sheetNodeId: item.sheetNodeId, drift: 'unknown' })
+        continue
+      }
+      const tree = migrateSheet(remote.data)
+      const local = payloadFromAttrs(item.attrs as { sheet?: string; viewType?: string }).sheet
+      const drift = classifySheetDrift(local, tree, String(item.attrs.syncedFp || ''))
+      recordStatus(item.blockId, item.sheetNodeId, drift)
+      out.push({ pos: item.pos, blockId: item.blockId, sheetNodeId: item.sheetNodeId, drift })
+    } catch {
+      recordStatus(item.blockId, item.sheetNodeId, 'unknown')
+      out.push({ pos: item.pos, blockId: item.blockId, sheetNodeId: item.sheetNodeId, drift: 'unknown' })
+    }
+  }
+  return out
 }

@@ -3,7 +3,9 @@ import {
   calendarBuckets,
   calendarMonthDays,
   createField,
+  defaultFilterOp,
   evaluateFormula,
+  matchesFilter,
   parseCSV,
   summaryValues,
   toCSV,
@@ -66,5 +68,20 @@ describe('calendar', () => {
     const days = calendarMonthDays(2026, 10)
     expect(days[0]).toBe('')
     expect(days.filter(Boolean)).toHaveLength(30)
+  })
+})
+
+describe('defaultFilterOp 与 notContains', () => {
+  it('按字段类型给出默认运算符', () => {
+    expect(defaultFilterOp('text')).toBe('contains')
+    expect(defaultFilterOp('number')).toBe('gte')
+    expect(defaultFilterOp('date')).toBe('is')
+    expect(defaultFilterOp('select')).toBe('is')
+  })
+
+  it('不包含能排除命中文本', () => {
+    const row: SheetRow = { id: 'r1', cells: { n: '示例任务' } }
+    expect(matchesFilter(row, { fieldId: 'n', op: 'notContains', value: '示例' })).toBe(false)
+    expect(matchesFilter(row, { fieldId: 'n', op: 'notContains', value: '其他' })).toBe(true)
   })
 })

@@ -4,6 +4,7 @@ import {
   describeBlockMerge,
   htmlHasSuggestionMarks,
   htmlPreviewText,
+  listConflictBlocks,
   mergeConflictHtml,
   resolveConflictHtml,
   summarizeBlockMerge,
@@ -62,7 +63,6 @@ describe('saveConflict 按块合并', () => {
     expect(merged).toContain('data-suggestion="insert"')
     expect(merged).toContain('data-suggestion="delete"')
   })
-})
 
   it('能统计相同、冲突和单边块', () => {
     const same = '<p data-block-id="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa">同一段</p>'
@@ -79,3 +79,18 @@ describe('saveConflict 按块合并', () => {
     expect(describeBlockMerge(summary)).toContain('仅你的 1 块')
   })
 
+  it('可按冲突块选择保留我的或对方的版本', () => {
+    const id = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
+    const mine = `<p data-block-id="${id}">本地改</p>`
+    const theirs = `<p data-block-id="${id}">远端改</p>`
+    const versions = { mineHtml: mine, theirsHtml: theirs }
+    expect(listConflictBlocks(versions)).toEqual([{ id, mineHtml: mine, theirsHtml: theirs }])
+    const keepMine = mergeConflictHtml(versions, { [id]: 'mine' })
+    expect(keepMine).toContain('本地改')
+    expect(keepMine).not.toContain('远端改')
+    expect(keepMine).not.toContain('data-conflict-side')
+    const keepTheirs = resolveConflictHtml('merge', versions, { [id]: 'theirs' })
+    expect(keepTheirs).toContain('远端改')
+    expect(keepTheirs).not.toContain('本地改')
+  })
+})

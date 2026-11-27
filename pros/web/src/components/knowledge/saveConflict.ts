@@ -2,6 +2,8 @@
 
 export type SaveConflictChoice = 'mine' | 'theirs' | 'merge'
 
+export type BlockConflictChoice = 'mine' | 'theirs' | 'both'
+
 export type SaveConflictVersions = {
   mineHtml: string
   theirsHtml: string
@@ -27,11 +29,11 @@ export function htmlPreviewText(html: string, max = 280): string {
 }
 
 /** 保留两边 HTML，包括 data-suggestion 审阅标记；不做接受/拒绝清洗。 */
-export function mergeConflictHtml(versions: SaveConflictVersions): string {
+export function mergeConflictHtml(versions: SaveConflictVersions, blockChoices?: Record<string, BlockConflictChoice>): string {
   const mine = versions.mineHtml ?? ''
   const theirs = versions.theirsHtml ?? ''
   if (mine === theirs) return mine
-  if (hasBlockIds(mine) || hasBlockIds(theirs)) return mergeByBlockId(versions)
+  if (hasBlockIds(mine) || hasBlockIds(theirs)) return mergeByBlockId(versions, blockChoices)
   return concatConflictHtml(versions)
 }
 
@@ -108,15 +110,40 @@ export function summarizeBlockMerge(versions: SaveConflictVersions): BlockMergeS
   return { hasBlockIds, same, conflict, onlyTheirs, onlyMine }
 }
 
+export type ConflictBlockPair = {
+  id: string
+  mineHtml: string
+  theirsHtml: string
+}
+
+export function listConflictBlocks(versions: SaveConflictVersions): ConflictBlockPair[] {
+  const mineBlocks = topLevelBlocks(versions.mineHtml ?? '')
+  const theirsBlocks = topLevelBlocks(versions.theirsHtml ?? '')
+  const mineById = new Map<string, string>()
+  for (const block of mineBlocks) {
+    if (block.id && !mineById.has(block.id)) mineById.set(block.id, block.html)
+  }
+  const seen = new Set<string>()
+  const out: ConflictBlockPair[] = []
+  for (const block of theirsBlocks) {
+    if (!block.id || seen.has(block.id)) continue
+    const mine = mineById.get(block.id)
+    if (!mine || mine === block.html) continue
+    seen.add(block.id)
+    out.push({ id: block.id, mineHtml: mine, theirsHtml: block.html })
+  }
+  return out
+}
+
 export function describeBlockMerge(summary: BlockMergeSummary): string {
   if (!summary.hasBlockIds) return '正文缺少稳定块 ID，合并将先保留对方全文再附上你的全文。'
   const parts = [`相同 ${summary.same} 块`, `内容冲突 ${summary.conflict} 块`]
   if (summary.onlyTheirs) parts.push(`仅对方 ${summary.onlyTheirs} 块`)
   if (summary.onlyMine) parts.push(`仅你的 ${summary.onlyMine} 块`)
-  return `按块对照：${parts.join('，')}。冲突块会并排保留，不是飞书级三方合并。`
+  return `按块对照：${parts.join('，')}。未指定的冲突块会并排保留，也可按块选择保留哪一边。不是飞书级三方合并。`
 }
 
-export function mergeByBlockId(versions: SaveConflictVersions): string {
+export function mergeByBlockId(versions: SaveConflictVersions, blockChoices?: Record<string, BlockConflictChoice>): string {
   const mineBlocks = topLevelBlocks(versions.mineHtml ?? '')
   const theirsBlocks = topLevelBlocks(versions.theirsHtml ?? '')
   if (!mineBlocks.length && !theirsBlocks.length) return concatConflictHtml(versions)
@@ -126,7 +153,7 @@ export function mergeByBlockId(versions: SaveConflictVersions): string {
   }
   const used = new Set<string>()
   const out: string[] = [
-    `<p data-conflict-merge="true">以下为按块合并的结果：相同块只保留一份；有冲突的块先保留对方的，再附上你的。不是飞书级三方合并。</p>`,
+    `<p data-conflict-merge="true">以下为按块合并的结果：相同块只保留一份；有冲突的块按你的选择保留一方或并排保留。不是飞书级三方合并。</p>`,
   ]
   for (const block of theirsBlocks) {
     if (block.id && mineById.has(block.id)) {
@@ -135,10 +162,17 @@ export function mergeByBlockId(versions: SaveConflictVersions): string {
       if (mine.html === block.html) {
         out.push(block.html)
       } else {
-        out.push(`<h3 data-conflict-side="theirs" data-conflict-block="${escapeText(block.id)}">${escapeText(versions.theirsLabel || '对方的版本')}</h3>`)
-        out.push(block.html)
-        out.push(`<h3 data-conflict-side="mine" data-conflict-block="${escapeText(block.id)}">${escapeText(versions.mineLabel || '你的版本')}</h3>`)
-        out.push(mine.html)
+        const pick = blockChoices?.[block.id] || 'both'
+        if (pick === 'theirs') {
+          out.push(block.html)
+        } else if (pick === 'mine') {
+          out.push(mine.html)
+        } else {
+          out.push(`<h3 data-conflict-side="theirs" data-conflict-block="${escapeText(block.id)}">${escapeText(versions.theirsLabel || '对方的版本')}</h3>`)
+          out.push(block.html)
+          out.push(`<h3 data-conflict-side="mine" data-conflict-block="${escapeText(block.id)}">${escapeText(versions.mineLabel || '你的版本')}</h3>`)
+          out.push(mine.html)
+        }
       }
       continue
     }
@@ -151,10 +185,14 @@ export function mergeByBlockId(versions: SaveConflictVersions): string {
   return out.join('')
 }
 
-export function resolveConflictHtml(choice: SaveConflictChoice, versions: SaveConflictVersions): string {
+export function resolveConflictHtml(
+  choice: SaveConflictChoice,
+  versions: SaveConflictVersions,
+  blockChoices?: Record<string, BlockConflictChoice>,
+): string {
   if (choice === 'mine') return versions.mineHtml
   if (choice === 'theirs') return versions.theirsHtml
-  return mergeConflictHtml(versions)
+  return mergeConflictHtml(versions, blockChoices)
 }
 
 export function htmlHasSuggestionMarks(html: string): boolean {

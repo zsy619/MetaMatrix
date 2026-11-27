@@ -57,10 +57,25 @@ export function blockIdCovering(doc: PMNode, pos: number): string {
 
 export function canEditRange(editor: { storage?: unknown; state: { doc: PMNode } }, from: number, to: number): boolean {
   const storage = guardStorageFrom(editor)
-  const start = blockIdCovering(editor.state.doc, from)
-  if (start && !canEditStoredBlock(storage, start)) return false
-  const end = blockIdCovering(editor.state.doc, Math.max(from, to - 1))
-  return !end || canEditStoredBlock(storage, end)
+  const doc = editor.state.doc
+  const lo = Math.max(0, Math.min(from, to, doc.content.size))
+  const hi = Math.max(0, Math.min(Math.max(from, to), doc.content.size))
+  const ids = new Set<string>()
+  const start = blockIdCovering(doc, lo)
+  if (start) ids.add(start)
+  if (hi > lo) {
+    doc.nodesBetween(lo, hi, (node) => {
+      const id = readBlockId(node)
+      if (id) ids.add(id)
+      return true
+    })
+  }
+  const end = blockIdCovering(doc, Math.max(lo, hi - 1))
+  if (end) ids.add(end)
+  for (const id of ids) {
+    if (!canEditStoredBlock(storage, id)) return false
+  }
+  return true
 }
 
 export function lockedBlockFingerprints(doc: PMNode, storage: BlockPermissionGuardStorage): Map<string, string> {

@@ -5,13 +5,19 @@ import StarterKit from '@tiptap/starter-kit'
 import { BlockIdentity, collectIdentityNodes, readBlockId } from './blockIdentity'
 import { DATABASE_BLOCK_NAME, DatabaseBlock } from './databaseBlock'
 import { firstFilterableField, payloadFromAttrs, sheetContentFingerprint } from './databaseBlockSheet'
-import { syncLinkedDatabaseBlock } from './databaseBlockSync'
+import { probeLinkedDatabaseBlocks, syncLinkedDatabaseBlock } from './databaseBlockSync'
+import {
+  clearDatabaseBlockSyncStatus,
+  databaseBlockSyncKey,
+  getDatabaseBlockSyncStatus,
+} from './databaseBlockSyncStatus'
 
 let editor: Editor | undefined
 
 afterEach(() => {
   editor?.destroy()
   editor = undefined
+  clearDatabaseBlockSyncStatus()
 })
 
 function mount() {
@@ -51,7 +57,7 @@ describe('databaseBlock 关联树上表同步', () => {
         throw new Error('pull should not save')
       },
     })
-    expect(result).toEqual({ action: 'pulled', droppedFilters: 0, diverged: false })
+    expect(result).toEqual({ action: 'pulled', droppedFilters: 0, diverged: false, drift: 'unknown' })
     const next = databasePos(ed)
     expect(readBlockId(next.node)).toBe(id)
     expect(payloadFromAttrs(next.node.attrs).sheet.rows[0]!.cells[name.id]).toBe('树上最新')
@@ -81,7 +87,7 @@ describe('databaseBlock 关联树上表同步', () => {
         return { kind, data }
       },
     })
-    expect(result).toEqual({ action: 'pushed', droppedFilters: 0, diverged: false })
+    expect(result).toEqual({ action: 'pushed', droppedFilters: 0, diverged: false, drift: 'unknown' })
     const pushed = saved as { views: Array<{ name: string }>; rows: Array<{ id: string; cells: Record<string, unknown> }> }
     expect(pushed.views[0]!.name).toBe('树上表格')
     expect(pushed.rows.find((item) => item.id === target.id)?.cells[name.id]).toBe('块内最新')
@@ -101,7 +107,6 @@ describe('databaseBlock 关联树上表同步', () => {
       }),
     ).rejects.toThrow('关联节点不是多维表格')
   })
-})
 
   it('拉取时丢掉指向已删除字段的筛选，并清掉无效排序', async () => {
     const ed = mount()
@@ -158,7 +163,7 @@ describe('databaseBlock 关联树上表同步', () => {
         throw new Error('aborted pull should not save')
       },
     })
-    expect(aborted).toEqual({ action: 'aborted', droppedFilters: 0, diverged: true })
+    expect(aborted).toEqual({ action: 'aborted', droppedFilters: 0, diverged: true, drift: 'both' })
     expect(payloadFromAttrs(databasePos(ed).node.attrs).sheet.rows[0]!.cells[name.id]).toBe('块内又改了')
     const forced = await syncLinkedDatabaseBlock(ed, 'proj', {
       direction: 'pull',
@@ -176,3 +181,161 @@ describe('databaseBlock 关联树上表同步', () => {
     expect(payloadFromAttrs(databasePos(ed).node.attrs).sheet.rows[0]!.cells[name.id]).toBe('树上又改了')
   })
 
+  it('仅内嵌改过时，未确认的拉取会中止', async () => {
+    const ed = mount()
+    ed.commands.insertDatabaseBlock({ sheetNodeId: 'tree-1' })
+    const local = payloadFromAttrs(databasePos(ed).node.attrs)
+    const name = firstFilterableField(local)!
+    const tree = JSON.parse(JSON.stringify(local.sheet))
+    await syncLinkedDatabaseBlock(ed, 'proj', {
+      direction: 'pull',
+      sheetNodeId: 'tree-1',
+      pos: databasePos(ed).pos,
+    }, {
+      load: async () => ({ kind: 'sheet', data: tree }),
+      save: async () => {
+        throw new Error('setup pull should not save')
+      },
+    })
+    const target = payloadFromAttrs(databasePos(ed).node.attrs).sheet.rows[0]!
+    expect(ed.commands.updateDatabaseBlockCell(target.id, name.id, '块内改了')).toBe(true)
+    const aborted = await syncLinkedDatabaseBlock(ed, 'proj', {
+      direction: 'pull',
+      sheetNodeId: 'tree-1',
+      pos: databasePos(ed).pos,
+    }, {
+      load: async () => ({ kind: 'sheet', data: tree }),
+      save: async () => {
+        throw new Error('aborted pull should not save')
+      },
+    })
+    expect(aborted).toEqual({ action: 'aborted', droppedFilters: 0, diverged: false, drift: 'local-only' })
+    expect(payloadFromAttrs(databasePos(ed).node.attrs).sheet.rows[0]!.cells[name.id]).toBe('块内改了')
+    const forced = await syncLinkedDatabaseBlock(ed, 'proj', {
+      direction: 'pull',
+      sheetNodeId: 'tree-1',
+      pos: databasePos(ed).pos,
+      force: true,
+    }, {
+      load: async () => ({ kind: 'sheet', data: tree }),
+      save: async () => {
+        throw new Error('force pull should not save')
+      },
+    })
+    expect(forced.action).toBe('pulled')
+    expect(forced.drift).toBe('local-only')
+    expect(payloadFromAttrs(databasePos(ed).node.attrs).sheet.rows[0]!.cells[name.id]).not.toBe('块内改了')
+  })
+
+  it('仅树上改过时，未确认的写回会中止', async () => {
+    const ed = mount()
+    ed.commands.insertDatabaseBlock({ sheetNodeId: 'tree-1' })
+    const local = payloadFromAttrs(databasePos(ed).node.attrs)
+    const name = firstFilterableField(local)!
+    const tree = JSON.parse(JSON.stringify(local.sheet))
+    await syncLinkedDatabaseBlock(ed, 'proj', {
+      direction: 'pull',
+      sheetNodeId: 'tree-1',
+      pos: databasePos(ed).pos,
+    }, {
+      load: async () => ({ kind: 'sheet', data: tree }),
+      save: async () => {
+        throw new Error('setup pull should not save')
+      },
+    })
+    const changedTree = JSON.parse(JSON.stringify(tree))
+    changedTree.rows[0].cells[name.id] = '树上改了'
+    let saved = false
+    const aborted = await syncLinkedDatabaseBlock(ed, 'proj', {
+      direction: 'push',
+      sheetNodeId: 'tree-1',
+      pos: databasePos(ed).pos,
+    }, {
+      load: async () => ({ kind: 'sheet', data: changedTree }),
+      save: async () => {
+        saved = true
+        throw new Error('aborted push should not save')
+      },
+    })
+    expect(aborted).toEqual({ action: 'aborted', droppedFilters: 0, diverged: false, drift: 'remote-only' })
+    expect(saved).toBe(false)
+  })
+
+  it('对照会标出树上有更新，安全同步只拉取单边改动', async () => {
+    const ed = mount()
+    ed.commands.insertDatabaseBlock({ sheetNodeId: 'tree-1' })
+    const local = payloadFromAttrs(databasePos(ed).node.attrs)
+    const name = firstFilterableField(local)!
+    const tree = JSON.parse(JSON.stringify(local.sheet))
+    await syncLinkedDatabaseBlock(ed, 'proj', {
+      direction: 'pull',
+      sheetNodeId: 'tree-1',
+      pos: databasePos(ed).pos,
+    }, {
+      load: async () => ({ kind: 'sheet', data: tree }),
+      save: async () => {
+        throw new Error('setup pull should not save')
+      },
+    })
+    const changedTree = JSON.parse(JSON.stringify(tree))
+    changedTree.rows[0].cells[name.id] = '树上新值'
+    const io = {
+      load: async () => ({ kind: 'sheet', data: changedTree }),
+      save: async () => {
+        throw new Error('safe pull should not save')
+      },
+    }
+    const probed = await probeLinkedDatabaseBlocks(ed, 'proj', io)
+    expect(probed).toHaveLength(1)
+    expect(probed[0]!.drift).toBe('remote-only')
+    const id = readBlockId(databasePos(ed).node)
+    expect(id).toBeTruthy()
+    expect(getDatabaseBlockSyncStatus(databaseBlockSyncKey(id!, 'tree-1'))?.drift).toBe('remote-only')
+    const result = await syncLinkedDatabaseBlock(ed, 'proj', {
+      direction: 'safe',
+      sheetNodeId: 'tree-1',
+      pos: databasePos(ed).pos,
+    }, io)
+    expect(result.action).toBe('pulled')
+    expect(result.drift).toBe('remote-only')
+    expect(payloadFromAttrs(databasePos(ed).node.attrs).sheet.rows[0]!.cells[name.id]).toBe('树上新值')
+    expect(getDatabaseBlockSyncStatus(databaseBlockSyncKey(id!, 'tree-1'))?.drift).toBe('in-sync')
+  })
+
+  it('两边都改过时安全同步不会覆盖', async () => {
+    const ed = mount()
+    ed.commands.insertDatabaseBlock({ sheetNodeId: 'tree-1' })
+    const local = payloadFromAttrs(databasePos(ed).node.attrs)
+    const name = firstFilterableField(local)!
+    const tree = JSON.parse(JSON.stringify(local.sheet))
+    await syncLinkedDatabaseBlock(ed, 'proj', {
+      direction: 'pull',
+      sheetNodeId: 'tree-1',
+      pos: databasePos(ed).pos,
+    }, {
+      load: async () => ({ kind: 'sheet', data: tree }),
+      save: async () => {
+        throw new Error('setup pull should not save')
+      },
+    })
+    const target = payloadFromAttrs(databasePos(ed).node.attrs).sheet.rows[0]!
+    expect(ed.commands.updateDatabaseBlockCell(target.id, name.id, '块内又改了')).toBe(true)
+    const changedTree = JSON.parse(JSON.stringify(tree))
+    changedTree.rows[0].cells[name.id] = '树上又改了'
+    let saved = false
+    const result = await syncLinkedDatabaseBlock(ed, 'proj', {
+      direction: 'safe',
+      sheetNodeId: 'tree-1',
+      pos: databasePos(ed).pos,
+    }, {
+      load: async () => ({ kind: 'sheet', data: changedTree }),
+      save: async () => {
+        saved = true
+        return {}
+      },
+    })
+    expect(result).toEqual({ action: 'aborted', droppedFilters: 0, diverged: true, drift: 'both' })
+    expect(saved).toBe(false)
+    expect(payloadFromAttrs(databasePos(ed).node.attrs).sheet.rows[0]!.cells[name.id]).toBe('块内又改了')
+  })
+})

@@ -368,10 +368,32 @@ export function sheetContentFingerprint(sheet: SheetData): string {
   return JSON.stringify({ fields, rows })
 }
 
-export function sheetsDiverged(local: SheetData, remote: SheetData, syncedFp?: string | null): boolean {
+/** 对照上次成功同步的指纹，判断内嵌快照和树上表各自有没有改动。没有指纹时无法判断单边改动。 */
+export type SheetDrift = 'unknown' | 'in-sync' | 'local-only' | 'remote-only' | 'both'
+
+export function classifySheetDrift(local: SheetData, remote: SheetData, syncedFp?: string | null): SheetDrift {
+  const localFp = sheetContentFingerprint(local)
+  const remoteFp = sheetContentFingerprint(remote)
+  if (localFp === remoteFp) return 'in-sync'
   const fp = (syncedFp || '').trim()
-  if (!fp) return false
-  return sheetContentFingerprint(local) !== fp && sheetContentFingerprint(remote) !== fp
+  if (!fp) return 'unknown'
+  const localChanged = localFp !== fp
+  const remoteChanged = remoteFp !== fp
+  if (localChanged && remoteChanged) return 'both'
+  if (localChanged) return 'local-only'
+  if (remoteChanged) return 'remote-only'
+  return 'in-sync'
+}
+
+export function sheetsDiverged(local: SheetData, remote: SheetData, syncedFp?: string | null): boolean {
+  return classifySheetDrift(local, remote, syncedFp) === 'both'
+}
+
+export function unsafeSyncDirection(direction: 'pull' | 'push', drift: SheetDrift): boolean {
+  if (drift === 'both') return true
+  if (direction === 'pull' && drift === 'local-only') return true
+  if (direction === 'push' && drift === 'remote-only') return true
+  return false
 }
 
 export function currentCalendarMonth(now = new Date()): string {

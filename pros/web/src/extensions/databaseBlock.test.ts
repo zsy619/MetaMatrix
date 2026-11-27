@@ -305,6 +305,22 @@ describe('databaseBlock 比较筛选', () => {
   })
 })
 
+describe('databaseBlock 不包含筛选', () => {
+  it('不包含条件刷新后仍保持', () => {
+    const ed = mount()
+    ed.commands.insertDatabaseBlock()
+    const payload = payloadFromAttrs(databaseNodes(ed)[0]!.node.attrs)
+    const name = firstFilterableField(payload)!
+    expect(ed.commands.setDatabaseBlockFilters([{ fieldId: name.id, op: 'notContains', value: '示例' }])).toBe(true)
+    const visible = visibleDatabaseRows(payloadFromAttrs(databaseNodes(ed)[0]!.node.attrs))
+    expect(visible.map((row) => String(row.cells[name.id]))).toEqual(['另一项'])
+    const again = mount(ed.getHTML())
+    const restored = payloadFromAttrs(databaseNodes(again)[0]!.node.attrs)
+    expect(restored.sheet.views.find((view) => view.id === restored.activeViewId)?.filters[0]?.op).toBe('notContains')
+    expect(visibleDatabaseRows(restored).map((row) => String(row.cells[name.id]))).toEqual(['另一项'])
+  })
+})
+
 describe('databaseBlock 增删行', () => {
   it('添加和删除行刷新后仍保持，且不丢 blockId', () => {
     const ed = mount()
