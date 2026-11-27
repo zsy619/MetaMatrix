@@ -301,7 +301,7 @@ func (h *CollabHandler) handleWSMessage(client *collabClient, message []byte) {
 		}
 		_ = client.writeJSON(out)
 	case "update":
-		if !client.canWrite {
+		if err := h.refreshWriteAccess(client); err != nil || !client.canWrite {
 			_ = client.writeJSON(wsOut{Type: "error", Message: "collab room is read-only"})
 			return
 		}
@@ -316,6 +316,11 @@ func (h *CollabHandler) handleWSMessage(client *collabClient, message []byte) {
 			HTML:    in.HTML,
 		})
 		if err != nil {
+			if isCollabWriteDenied(err) {
+				client.canWrite = false
+				_ = client.writeJSON(wsOut{Type: "error", Message: "collab room is read-only"})
+				return
+			}
 			_ = client.writeJSON(wsOut{Type: "error", Message: "append failed"})
 			return
 		}
@@ -357,6 +362,8 @@ type collabClient struct {
 	canWrite bool
 	role     string
 	mu       sync.Mutex
+	// writeFn 便于单测注入，不经过真实 WebSocket。
+	writeFn func(v any) error
 }
 
 const (
@@ -365,11 +372,38 @@ const (
 )
 
 func (c *collabClient) writeJSON(v any) error {
+	if c.writeFn != nil {
+		return c.writeFn(v)
+	}
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
 	}
 	return c.writeRaw(websocket.TextMessage, b)
+}
+
+// refreshWriteAccess 在提交增量前重新鉴权，避免连接建立后权限被收回仍继续写入。
+// 角色或写权限变化时补发 hello，让前端更新只读状态。已建立的套接字不会被主动踢下线。
+func (h *CollabHandler) refreshWriteAccess(client *collabClient) error {
+	access, err := h.svc.Authorize(client.userID, client.docID)
+	if err != nil {
+		client.canWrite = false
+		client.role = ""
+		return err
+	}
+	changed := client.canWrite != access.CanWrite || client.role != access.Role
+	client.canWrite = access.CanWrite
+	client.role = access.Role
+	if changed {
+		_ = client.writeJSON(wsOut{Type: "hello", CanWrite: access.CanWrite, Role: access.Role})
+	}
+	return nil
+}
+
+func isCollabWriteDenied(err error) bool {
+	return errors.Is(err, service.ErrCollabReadOnly) ||
+		errors.Is(err, service.ErrDocumentNotFound) ||
+		errors.Is(err, service.ErrSpaceForbidden)
 }
 
 func (c *collabClient) writeRaw(messageType int, data []byte) error {
