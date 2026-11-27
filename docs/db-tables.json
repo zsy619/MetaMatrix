@@ -19,6 +19,12 @@
       "model": "BackupImport"
     },
     {
+      "name": "core_idempotency_keys",
+      "domain": "core",
+      "purpose": "幂等键记录（批量创建 / 导入 / 重试去重）",
+      "model": "IdempotencyKey"
+    },
+    {
       "name": "core_page_references",
       "domain": "core",
       "purpose": "文档反向引用索引（@提及 / 内嵌块）",
@@ -231,6 +237,12 @@
       "model": "BaseOperationLog"
     },
     {
+      "name": "base_record_grants",
+      "domain": "base",
+      "purpose": "记录可见成员授权（记录级可见性 custom）",
+      "model": "BaseRecordGrant"
+    },
+    {
       "name": "base_record_links",
       "domain": "base",
       "purpose": "记录关联关系",
@@ -253,6 +265,12 @@
       "domain": "base",
       "purpose": "多维表格数据表",
       "model": "BaseTable"
+    },
+    {
+      "name": "base_view_prefs",
+      "domain": "base",
+      "purpose": "视图个人偏好（列宽 / 字段显隐 / 个人查询条件）",
+      "model": "BaseViewPref"
     },
     {
       "name": "base_views",
