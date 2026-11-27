@@ -161,7 +161,7 @@ func (s *Service) recalcComputedFields(ctx context.Context, table *BaseTable, id
 			Updates(map[string]any{"data": raw, "version": gorm.Expr("version + 1")}).Error; err != nil {
 			return updated, err
 		}
-		if err := s.syncAllProjections(s.db.WithContext(ctx), table.ID, rec.ID, data); err != nil {
+		if err := s.syncAllProjections(s.db.WithContext(ctx), table.ID, rec.ID, table.TenantID, data); err != nil {
 			return updated, err
 		}
 		updated++

@@ -1,0 +1,9 @@
+# 生产环境层：只写与默认值不同的项。
+#
+# 生产密钥不要写在这里 —— 用环境变量覆盖（JWT_SECRET / DATABASE_URL 等）。
+server:
+  port: 3000
+base:
+  rateLimit:
+    rps: 40
+    burst: 80

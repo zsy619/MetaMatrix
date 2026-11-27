@@ -14,6 +14,7 @@ import (
 // baseAppSQLite 是 base_apps 的 SQLite 影子模型（时间列改 datetime）。
 type baseAppSQLite struct {
 	ID            uuid.UUID      `gorm:"type:uuid;primaryKey"`
+	TenantID      uuid.UUID      `gorm:"type:uuid;not null;default:'00000000-0000-0000-0000-000000000000'"`
 	ProjectID     uuid.UUID      `gorm:"type:uuid;not null"`
 	NodeID        *uuid.UUID     `gorm:"type:uuid;uniqueIndex"`
 	Name          string         `gorm:"type:varchar(128);not null;default:''"`

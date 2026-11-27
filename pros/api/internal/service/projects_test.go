@@ -45,6 +45,133 @@ type pageReferencesSQLite struct {
 
 func (pageReferencesSQLite) TableName() string { return "core_page_references" }
 
+// base*SQLite 是多维表格各表的 SQLite 影子模型。
+// 空间删除会级联清理 base_* 数据，缺表会让删除路径报 no such table。
+type baseAppSQLite struct {
+	ID        uuid.UUID      `gorm:"type:uuid;primaryKey"`
+	ProjectID uuid.UUID      `gorm:"type:uuid;not null;index"`
+	DeletedAt gorm.DeletedAt `gorm:"index"`
+}
+
+func (baseAppSQLite) TableName() string { return "base_apps" }
+
+type baseTableSQLite struct {
+	ID        uuid.UUID      `gorm:"type:uuid;primaryKey"`
+	BaseID    uuid.UUID      `gorm:"type:uuid;not null;index"`
+	DeletedAt gorm.DeletedAt `gorm:"index"`
+}
+
+func (baseTableSQLite) TableName() string { return "base_tables" }
+
+type baseFieldSQLite struct {
+	ID      uuid.UUID `gorm:"type:uuid;primaryKey"`
+	TableID uuid.UUID `gorm:"type:uuid;not null;index"`
+}
+
+func (baseFieldSQLite) TableName() string { return "base_fields" }
+
+type baseRecordSQLite struct {
+	ID        uuid.UUID      `gorm:"type:uuid;primaryKey"`
+	TableID   uuid.UUID      `gorm:"type:uuid;not null;index"`
+	DeletedAt gorm.DeletedAt `gorm:"index"`
+}
+
+func (baseRecordSQLite) TableName() string { return "base_records" }
+
+type baseRecordValueSQLite struct {
+	ID       uuid.UUID `gorm:"type:uuid;primaryKey"`
+	RecordID uuid.UUID `gorm:"type:uuid;not null;index"`
+}
+
+func (baseRecordValueSQLite) TableName() string { return "base_record_values" }
+
+type baseRecordGrantSQLite struct {
+	ID        uuid.UUID `gorm:"type:uuid;primaryKey"`
+	RecordID  uuid.UUID `gorm:"type:uuid;not null;index"`
+	ProjectID uuid.UUID `gorm:"type:uuid;not null;index"`
+}
+
+func (baseRecordGrantSQLite) TableName() string { return "base_record_grants" }
+
+type baseRecordLinkSQLite struct {
+	ID             uuid.UUID `gorm:"type:uuid;primaryKey"`
+	SourceRecordID uuid.UUID `gorm:"type:uuid;not null;index"`
+}
+
+func (baseRecordLinkSQLite) TableName() string { return "base_record_links" }
+
+type baseRecordReverseLinkSQLite struct {
+	ID             uuid.UUID `gorm:"type:uuid;primaryKey"`
+	SourceRecordID uuid.UUID `gorm:"type:uuid;not null;index"`
+}
+
+func (baseRecordReverseLinkSQLite) TableName() string { return "base_record_reverse_links" }
+
+type baseViewSQLite struct {
+	ID      uuid.UUID `gorm:"type:uuid;primaryKey"`
+	TableID uuid.UUID `gorm:"type:uuid;not null;index"`
+}
+
+func (baseViewSQLite) TableName() string { return "base_views" }
+
+type baseViewPrefSQLite struct {
+	ID        uuid.UUID `gorm:"type:uuid;primaryKey"`
+	ViewID    uuid.UUID `gorm:"type:uuid;not null;index"`
+	ProjectID uuid.UUID `gorm:"type:uuid;not null;index"`
+}
+
+func (baseViewPrefSQLite) TableName() string { return "base_view_prefs" }
+
+type baseFieldFormulaSQLite struct {
+	ID      uuid.UUID `gorm:"type:uuid;primaryKey"`
+	FieldID uuid.UUID `gorm:"type:uuid;not null;index"`
+}
+
+func (baseFieldFormulaSQLite) TableName() string { return "base_field_formulas" }
+
+type baseFormulaDependencySQLite struct {
+	ID      uuid.UUID `gorm:"type:uuid;primaryKey"`
+	TableID uuid.UUID `gorm:"type:uuid;not null;index"`
+}
+
+func (baseFormulaDependencySQLite) TableName() string { return "base_formula_dependencies" }
+
+type baseFieldPolicySQLite struct {
+	ID        uuid.UUID `gorm:"type:uuid;primaryKey"`
+	FieldID   uuid.UUID `gorm:"type:uuid;not null;index"`
+	ProjectID uuid.UUID `gorm:"type:uuid;not null;index"`
+}
+
+func (baseFieldPolicySQLite) TableName() string { return "base_field_policies" }
+
+type baseOperationLogSQLite struct {
+	ID        uuid.UUID `gorm:"type:uuid;primaryKey"`
+	ProjectID uuid.UUID `gorm:"type:uuid;not null;index"`
+}
+
+func (baseOperationLogSQLite) TableName() string { return "base_operation_logs" }
+
+type baseEventOutboxSQLite struct {
+	ID        uuid.UUID `gorm:"type:uuid;primaryKey"`
+	ProjectID uuid.UUID `gorm:"type:uuid;not null;index"`
+}
+
+func (baseEventOutboxSQLite) TableName() string { return "base_event_outboxes" }
+
+type baseImportJobSQLite struct {
+	ID        uuid.UUID `gorm:"type:uuid;primaryKey"`
+	ProjectID uuid.UUID `gorm:"type:uuid;not null;index"`
+}
+
+func (baseImportJobSQLite) TableName() string { return "base_import_jobs" }
+
+type baseUserGroupSQLite struct {
+	ID        uuid.UUID `gorm:"type:uuid;primaryKey"`
+	ProjectID uuid.UUID `gorm:"type:uuid;not null;index"`
+}
+
+func (baseUserGroupSQLite) TableName() string { return "base_user_groups" }
+
 func openProjectsSQLite(t *testing.T) *gorm.DB {
 	t.Helper()
 	db, err := gorm.Open(sqlite.Open("file:projects-"+uuid.NewString()+"?mode=memory&cache=shared"), &gorm.Config{
@@ -71,6 +198,23 @@ func openProjectsSQLite(t *testing.T) *gorm.DB {
 		&docBlockSQLite{},
 		&docBlockRevisionSQLite{},
 		&docBlockRefSQLite{},
+		&baseAppSQLite{},
+		&baseTableSQLite{},
+		&baseFieldSQLite{},
+		&baseRecordSQLite{},
+		&baseRecordValueSQLite{},
+		&baseRecordGrantSQLite{},
+		&baseRecordLinkSQLite{},
+		&baseRecordReverseLinkSQLite{},
+		&baseViewSQLite{},
+		&baseViewPrefSQLite{},
+		&baseFieldFormulaSQLite{},
+		&baseFormulaDependencySQLite{},
+		&baseFieldPolicySQLite{},
+		&baseOperationLogSQLite{},
+		&baseEventOutboxSQLite{},
+		&baseImportJobSQLite{},
+		&baseUserGroupSQLite{},
 	); err != nil {
 		t.Fatal(err)
 	}
@@ -250,5 +394,74 @@ func TestProjectsServiceRefsReturnsReferenceGraph(t *testing.T) {
 	}
 	if len(refs[canvasB.ID.String()]) != 0 {
 		t.Fatalf("refs[%s] = %v, want empty", canvasB.ID, refs[canvasB.ID.String()])
+	}
+}
+
+func TestProjectsServiceDeleteRemovesBaseData(t *testing.T) {
+	db := openProjectsSQLite(t)
+	svc := NewProjectsService(db)
+	owner := uuid.New()
+
+	project, err := svc.Create(owner, "多维表格空间", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	baseID := uuid.New()
+	tableID := uuid.New()
+	recordID := uuid.New()
+	fieldID := uuid.New()
+	viewID := uuid.New()
+	if err := db.Create(&baseAppSQLite{ID: baseID, ProjectID: project.ID}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&baseTableSQLite{ID: tableID, BaseID: baseID}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&baseFieldSQLite{ID: fieldID, TableID: tableID}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&baseRecordSQLite{ID: recordID, TableID: tableID}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&baseRecordValueSQLite{ID: uuid.New(), RecordID: recordID}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&baseViewSQLite{ID: viewID, TableID: tableID}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&baseEventOutboxSQLite{ID: uuid.New(), ProjectID: project.ID}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&baseUserGroupSQLite{ID: uuid.New(), ProjectID: project.ID}).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	if err := svc.Delete(owner, project.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	// 空间没了，多维表格的数据必须一起走，否则列表里会出现孤儿 Base。
+	for _, tc := range []struct {
+		name  string
+		model any
+		where string
+		args  []any
+	}{
+		{"base_apps", &baseAppSQLite{}, "project_id = ?", []any{project.ID}},
+		{"base_event_outboxes", &baseEventOutboxSQLite{}, "project_id = ?", []any{project.ID}},
+		{"base_user_groups", &baseUserGroupSQLite{}, "project_id = ?", []any{project.ID}},
+		{"base_tables", &baseTableSQLite{}, "base_id = ?", []any{baseID}},
+		{"base_fields", &baseFieldSQLite{}, "table_id = ?", []any{tableID}},
+		{"base_records", &baseRecordSQLite{}, "table_id = ?", []any{tableID}},
+		{"base_record_values", &baseRecordValueSQLite{}, "record_id = ?", []any{recordID}},
+		{"base_views", &baseViewSQLite{}, "table_id = ?", []any{tableID}},
+	} {
+		var n int64
+		if err := db.Unscoped().Model(tc.model).Where(tc.where, tc.args...).Count(&n).Error; err != nil {
+			t.Fatalf("%s count error: %v", tc.name, err)
+		}
+		if n != 0 {
+			t.Fatalf("%s rows left = %d", tc.name, n)
+		}
 	}
 }

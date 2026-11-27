@@ -7,6 +7,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -153,3 +156,32 @@ func trimKey(key string) string {
 
 // ensure gorm imported for interface check.
 var _ = gorm.ErrRecordNotFound
+
+// StartIdempotencyPurge 启动幂等记录清理调度。
+//
+// 幂等记录保留 7 天（IdempotencyTTL）；没有调度就会一直堆着，
+// 唯一索引也会越来越大。调度周期默认 1 小时，可通过环境变量覆盖。
+func (s *Service) StartIdempotencyPurge(ctx context.Context) {
+	interval := 1 * time.Hour
+	if raw := strings.TrimSpace(os.Getenv("BASE_IDEMPOTENCY_PURGE_INTERVAL")); raw != "" {
+		if parsed, err := time.ParseDuration(raw); err == nil && parsed > 0 {
+			interval = parsed
+		}
+	}
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				if n, err := s.PurgeIdempotency(ctx); err != nil {
+					log.Printf("base: idempotency purge failed: %v", err)
+				} else if n > 0 {
+					log.Printf("base: idempotency purged %d expired rows", n)
+				}
+			}
+		}
+	}()
+}

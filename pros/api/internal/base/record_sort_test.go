@@ -17,7 +17,7 @@ func newRecordSortFixture(t *testing.T) (*Service, uuid.UUID, uuid.UUID, uuid.UU
 	if err != nil {
 		t.Fatalf("open sqlite failed: %v", err)
 	}
-	if err := db.AutoMigrate(&baseTableSQLite{}, &baseFieldSQLite{}, &baseRecordSQLite{}, &baseRecordValueSQLite{}, &baseRecordLinkSQLite{}, &baseRecordGrantSQLite{}); err != nil {
+	if err := db.AutoMigrate(&baseTableSQLite{}, &baseFieldSQLite{}, &baseRecordSQLite{}, &baseRecordValueSQLite{}, &baseRecordLinkSQLite{}, &baseRecordReverseLinkSQLite{}, &baseRecordGrantSQLite{}); err != nil {
 		t.Fatalf("migrate failed: %v", err)
 	}
 	if err := db.Exec(`CREATE TABLE IF NOT EXISTS core_projects (id uuid primary key, owner_user_id uuid)`).Error; err != nil {
@@ -27,13 +27,13 @@ func newRecordSortFixture(t *testing.T) (*Service, uuid.UUID, uuid.UUID, uuid.UU
 		t.Fatalf("create base_field_formulas failed: %v", err)
 	}
 	if err := db.Exec(`CREATE TABLE IF NOT EXISTS base_operation_logs (
-		id uuid primary key, project_id uuid, base_id uuid, table_id uuid, record_id uuid,
+		id uuid primary key, tenant_id uuid, project_id uuid, base_id uuid, table_id uuid, record_id uuid,
 		operator_id uuid, operation varchar(32), before_data json, after_data json,
 		request_id varchar(64), created_at datetime)`).Error; err != nil {
 		t.Fatalf("create base_operation_logs failed: %v", err)
 	}
 	if err := db.Exec(`CREATE TABLE IF NOT EXISTS base_event_outboxes (
-		id uuid primary key, project_id uuid, base_id uuid, table_id uuid,
+		id uuid primary key, tenant_id uuid, project_id uuid, base_id uuid, table_id uuid,
 		aggregate_type varchar(32), aggregate_id uuid, event_type varchar(64),
 		payload json, status varchar(16), retry_count integer,
 		created_at datetime, published_at datetime)`).Error; err != nil {
@@ -163,3 +163,50 @@ func TestReorderRecordsPersistsOrder(t *testing.T) {
 
 // 保持 datatypes 引用，避免影子模型被裁剪。
 var _ = datatypes.JSON{}
+
+// 自定义排序 + keyset 翻页：逐页取回全部记录，且不重复、不遗漏。
+func TestQuerySortKeysetPaging(t *testing.T) {
+	svc, userID, projectID, tableID, fieldID := newRecordSortFixture(t)
+	ctx := context.Background()
+
+	values := []float64{50, 10, 40, 20, 30}
+	for _, v := range values {
+		if _, err := svc.CreateRecord(ctx, userID, projectID, tableID, RecordInput{
+			Fields: map[string]any{fieldID: v},
+		}); err != nil {
+			t.Fatalf("create record failed: %v", err)
+		}
+	}
+
+	seen := []float64{}
+	cursor := ""
+	for page := 0; page < 10; page++ {
+		res, err := svc.Query(ctx, userID, projectID, QueryRequest{
+			TableID:  tableID.String(),
+			PageSize: 2,
+			Sorts:    []SortRule{{FieldID: fieldID, Order: "asc"}},
+			Cursor:   cursor,
+		})
+		if err != nil {
+			t.Fatalf("query failed: %v", err)
+		}
+		for _, row := range res.Records {
+			if v, ok := row.Fields[fieldID].(float64); ok {
+				seen = append(seen, v)
+			}
+		}
+		if !res.Page.HasMore {
+			break
+		}
+		cursor = res.Page.NextCursor
+	}
+	want := []float64{10, 20, 30, 40, 50}
+	if len(seen) != len(want) {
+		t.Fatalf("paged values = %v, want %v", seen, want)
+	}
+	for i := range want {
+		if seen[i] != want[i] {
+			t.Fatalf("paged values = %v, want %v", seen, want)
+		}
+	}
+}

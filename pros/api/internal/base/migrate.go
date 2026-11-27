@@ -130,6 +130,7 @@ func (s *Service) MigrateLegacySheet(ctx context.Context, userID, projectID, nod
 	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		table := BaseTable{
 			ID:            tableID,
+			TenantID:      projectID,
 			BaseID:        app.ID,
 			Name:          app.Name,
 			Description:   "由旧版多维表格迁移而来",
@@ -152,7 +153,7 @@ func (s *Service) MigrateLegacySheet(ctx context.Context, userID, projectID, nod
 			}
 			rawCfg, _ := json.Marshal(cfg)
 			field := BaseField{
-				ID: f.id, TableID: tableID, Name: f.name, Type: string(f.ftype), Config: rawCfg,
+				ID: f.id, TenantID: projectID, TableID: tableID, Name: f.name, Type: string(f.ftype), Config: rawCfg,
 				IsPrimary: f.primary, SortOrder: f.sortIdx, Version: 1, Status: 1,
 			}
 			if err := tx.Create(&field).Error; err != nil {
@@ -199,13 +200,13 @@ func (s *Service) MigrateLegacySheet(ctx context.Context, userID, projectID, nod
 			}
 			rawData, _ := json.Marshal(data)
 			rec := BaseRecord{
-				ID: uuid.New(), TableID: tableID, Data: rawData, Version: 1,
+				ID: uuid.New(), TenantID: projectID, TableID: tableID, Data: rawData, Version: 1,
 				CreatedBy: userID, UpdatedBy: userID,
 			}
 			if err := tx.Create(&rec).Error; err != nil {
 				return err
 			}
-			if err := s.syncAllProjections(tx, tableID, rec.ID, data); err != nil {
+			if err := s.syncAllProjections(tx, tableID, rec.ID, projectID, data); err != nil {
 				return err
 			}
 		}

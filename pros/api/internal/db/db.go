@@ -20,6 +20,19 @@ import (
 )
 
 func Connect(databaseURL string) (*gorm.DB, error) {
+	return ConnectWithPool(databaseURL, PoolOptions{})
+}
+
+// PoolOptions 是连接池参数（来自分层配置）。
+type PoolOptions struct {
+	MaxOpenConns       int
+	MaxIdleConns       int
+	ConnMaxLifetimeMin int
+	ConnMaxIdleMin     int
+}
+
+// ConnectWithPool 建立连接并按配置设置连接池。
+func ConnectWithPool(databaseURL string, opts PoolOptions) (*gorm.DB, error) {
 	gdb, err := gorm.Open(postgres.Open(databaseURL), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Warn),
 	})
@@ -36,11 +49,23 @@ func Connect(databaseURL string) (*gorm.DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("get sql.DB: %w", err)
 	}
-	pool.SetMaxOpenConns(intEnv("DB_MAX_OPEN_CONNS", 30))
-	pool.SetMaxIdleConns(intEnv("DB_MAX_IDLE_CONNS", 10))
-	pool.SetConnMaxLifetime(time.Duration(intEnv("DB_CONN_MAX_LIFETIME_MIN", 30)) * time.Minute)
-	pool.SetConnMaxIdleTime(time.Duration(intEnv("DB_CONN_MAX_IDLE_MIN", 5)) * time.Minute)
+	// 50 / 10 是技术文档 §16.3 给出的建议值：
+	// 30 条连接在「多维表格并发查询 + 压测」场景下会成为瓶颈
+	// （连接池打满 → 等待 → P95 抖动）。Postgres 默认 max_connections=100，
+	// 50 条留有余量且不会顶满。
+	pool.SetMaxOpenConns(intEnv("DB_MAX_OPEN_CONNS", pickInt(opts.MaxOpenConns, 50)))
+	pool.SetMaxIdleConns(intEnv("DB_MAX_IDLE_CONNS", pickInt(opts.MaxIdleConns, 10)))
+	pool.SetConnMaxLifetime(time.Duration(intEnv("DB_CONN_MAX_LIFETIME_MIN", pickInt(opts.ConnMaxLifetimeMin, 30))) * time.Minute)
+	pool.SetConnMaxIdleTime(time.Duration(intEnv("DB_CONN_MAX_IDLE_MIN", pickInt(opts.ConnMaxIdleMin, 5))) * time.Minute)
 	return gdb, nil
+}
+
+// pickInt 返回配置值；<=0 时用缺省值。
+func pickInt(v, def int) int {
+	if v <= 0 {
+		return def
+	}
+	return v
 }
 
 // intEnv 读取整数型环境变量，缺省或非法时返回默认值。
@@ -111,16 +136,22 @@ func AutoMigrate(gdb *gorm.DB) error {
 		&model.BaseApp{},
 		&model.BaseTable{},
 		&model.BaseField{},
+		&model.BaseFieldPolicy{},
 		&model.BaseRecord{},
 		&model.BaseRecordGrant{},
 		&model.BaseRecordValue{},
 		&model.BaseView{},
 		&model.BaseViewPref{},
 		&model.BaseRecordLink{},
+		&model.BaseRecordReverseLink{},
 		&model.BaseFieldFormula{},
 		&model.BaseFormulaDependency{},
 		&model.BaseOperationLog{},
 		&model.BaseEventOutbox{},
+		// 大批量导入的后台任务（技术文档 §16.2：超大导入不在单次请求内处理）。
+		&model.BaseImportJob{},
+		// 通讯录分组：人员字段可以引用一个组而不是一个人。
+		&model.BaseUserGroup{},
 		// 幂等键：批量创建 / 导入 / 重试去重（共享方案 §10.9）。
 		&model.IdempotencyKey{},
 	); err != nil {
@@ -173,6 +204,15 @@ func AutoMigrate(gdb *gorm.DB) error {
 	}
 	if err := ensureIdempotencySchema(gdb); err != nil {
 		log.Printf("ensureIdempotencySchema warning: %v", err)
+	}
+	if err := ensureBaseFieldPolicies(gdb); err != nil {
+		log.Printf("ensureBaseFieldPolicies warning: %v", err)
+	}
+	if err := ensureBaseReverseLinks(gdb); err != nil {
+		log.Printf("ensureBaseReverseLinks warning: %v", err)
+	}
+	if err := ensureBaseTenantID(gdb); err != nil {
+		log.Printf("ensureBaseTenantID warning: %v", err)
 	}
 	log.Println("AutoMigrate OK: core_users, core_projects, kb_documents, kb_revisions, kb_content_blocks, kb_save_operations, core_backup_imports, media_categories, media_assets, media_references, core_password_reset_tokens")
 	return nil
@@ -482,6 +522,21 @@ func ensureBaseRecordGrants(gdb *gorm.DB) error {
 			return err
 		}
 	}
+	// 授权对象类型 / 有效期（2026-11-27 补齐「记录级授权有效期 + 按部门授权」）。
+	alter := []string{
+		`ALTER TABLE base_record_grants ADD COLUMN IF NOT EXISTS subject_type varchar(16) NOT NULL DEFAULT 'user'`,
+		`ALTER TABLE base_record_grants ADD COLUMN IF NOT EXISTS subject_id varchar(128) NOT NULL DEFAULT ''`,
+		`ALTER TABLE base_record_grants ADD COLUMN IF NOT EXISTS expires_at timestamptz`,
+		// 存量数据回填：原来是「按用户授权」。
+		`UPDATE base_record_grants SET subject_id = user_id::text WHERE subject_id = ''`,
+		`UPDATE base_record_grants SET subject_type = 'user' WHERE subject_type IS NULL OR subject_type = ''`,
+		`CREATE INDEX IF NOT EXISTS idx_base_record_grant_subject ON base_record_grants (subject_type, subject_id)`,
+	}
+	for _, stmt := range alter {
+		if err := gdb.Exec(stmt).Error; err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -573,6 +628,210 @@ func ensureIdempotencySchema(gdb *gorm.DB) error {
 	// 清理 7 天前的幂等记录，避免表无限增长。
 	if err := gdb.Exec(`DELETE FROM core_idempotency_keys WHERE created_at < now() - interval '7 days'`).Error; err != nil {
 		return err
+	}
+	return nil
+}
+
+// ensureBaseFieldPolicies 建「字段级权限策略」独立表，并把存量策略从
+// base_fields.config.permissions 回填进来（双写期以本表为准）。
+func ensureBaseFieldPolicies(gdb *gorm.DB) error {
+	stmts := []string{
+		`CREATE TABLE IF NOT EXISTS base_field_policies (
+			id uuid PRIMARY KEY,
+			project_id uuid NOT NULL,
+			table_id uuid NOT NULL,
+			field_id uuid NOT NULL,
+			policy jsonb NOT NULL DEFAULT '{}'::jsonb,
+			created_at timestamptz NOT NULL DEFAULT now(),
+			updated_at timestamptz NOT NULL DEFAULT now()
+		)`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS uniq_base_field_policy_field ON base_field_policies (field_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_base_field_policy_project ON base_field_policies (project_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_base_field_policy_table ON base_field_policies (table_id)`,
+	}
+	for _, stmt := range stmts {
+		if err := gdb.Exec(stmt).Error; err != nil {
+			return err
+		}
+	}
+	// 回填：把字段配置里的 permissions 抽到独立表（只回填还没有记录的字段）。
+	backfill := `
+		INSERT INTO base_field_policies (id, project_id, table_id, field_id, policy, created_at, updated_at)
+		SELECT gen_random_uuid(), COALESCE(a.project_id, uuid_nil()), f.table_id, f.id,
+		       (f.config->'permissions')::jsonb, now(), now()
+		FROM base_fields f
+		LEFT JOIN base_tables t ON t.id = f.table_id
+		LEFT JOIN base_apps a ON a.id = t.base_id
+		WHERE f.config ? 'permissions'
+		  AND NOT EXISTS (SELECT 1 FROM base_field_policies p WHERE p.field_id = f.id)`
+	if err := gdb.Exec(backfill).Error; err != nil {
+		// 回填失败不影响主流程（下次启动会再试）。
+		log.Printf("ensureBaseFieldPolicies backfill warning: %v", err)
+	}
+	return nil
+}
+
+// ensureBaseReverseLinks 建「反向关系」独立表（与 base_record_links 双写）。
+func ensureBaseReverseLinks(gdb *gorm.DB) error {
+	stmts := []string{
+		`CREATE TABLE IF NOT EXISTS base_record_reverse_links (
+			id uuid PRIMARY KEY,
+			project_id uuid NOT NULL,
+			source_table_id uuid NOT NULL,
+			source_record_id uuid NOT NULL,
+			field_id uuid NOT NULL,
+			target_table_id uuid NOT NULL,
+			target_record_id uuid NOT NULL,
+			sort_order integer NOT NULL DEFAULT 0,
+			created_at timestamptz NOT NULL DEFAULT now()
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_base_reverse_link_target_record ON base_record_reverse_links (target_record_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_base_reverse_link_source_record ON base_record_reverse_links (source_record_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_base_reverse_link_field ON base_record_reverse_links (field_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_base_reverse_link_project ON base_record_reverse_links (project_id)`,
+	}
+	for _, stmt := range stmts {
+		if err := gdb.Exec(stmt).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// ensureBaseTenantID 给多维表格各表补「显式租户列」tenant_id。
+//
+// 为什么要有这一列：
+//   - 本系统的租户边界是「知识库空间」= project_id，早期所有查询都靠
+//     JOIN base_apps 才能拿到租户，跨空间过滤成本高、容易漏；
+//   - 租户级限流、租户级审计、租户级索引都需要一个「可以直接过滤」的列；
+//   - 将来若把空间拆成独立租户（多租户 SaaS 形态），列已经在，迁移成本最低。
+//
+// 口径：tenant_id 与 project_id 同值（当前实现里空间即租户）。
+// 存量数据按「表 → Base → 空间」链路回填，回填不到的行保持零值 UUID，
+// 由应用层按「零值 = 未标注」处理，不影响既有查询。
+func ensureBaseTenantID(gdb *gorm.DB) error {
+	// 零值 UUID = 「尚未标注租户」。列是 NOT NULL DEFAULT 零值，
+	// 所以回填条件必须同时覆盖 IS NULL 与零值两种情况，只判 IS NULL 会静默失效。
+	// unassigned 返回「该行尚未标注租户」的判定条件（必须带目标表别名，
+	// UPDATE ... FROM 场景下同名列不限定会报 column reference is ambiguous）。
+	unassigned := func(alias string) string {
+		return fmt.Sprintf(`(%s.tenant_id IS NULL OR %s.tenant_id = '00000000-0000-0000-0000-000000000000')`, alias, alias)
+	}
+
+	// 直接持有 project_id 的表：直接回填。
+	direct := []string{
+		"base_apps",
+		"base_operation_logs",
+		"base_event_outboxes",
+		"base_field_policies",
+		"base_record_grants",
+		"base_record_reverse_links",
+		"base_view_prefs",
+		"base_import_jobs",
+		"base_user_groups",
+	}
+	for _, table := range direct {
+		if err := addTenantColumn(gdb, table); err != nil {
+			return err
+		}
+	}
+	// 派生表：沿链路回填。顺序必须满足依赖（表 → 字段/记录 → 值/公式）。
+	derived := []struct {
+		table string
+		sql   string
+	}{
+		{
+			table: "base_tables",
+			sql:   `UPDATE base_tables t SET tenant_id = a.tenant_id FROM base_apps a WHERE a.id = t.base_id AND ` + unassigned("t"),
+		},
+		{
+			table: "base_fields",
+			sql:   `UPDATE base_fields f SET tenant_id = t.tenant_id FROM base_tables t WHERE t.id = f.table_id AND ` + unassigned("f"),
+		},
+		{
+			table: "base_records",
+			sql:   `UPDATE base_records r SET tenant_id = t.tenant_id FROM base_tables t WHERE t.id = r.table_id AND ` + unassigned("r"),
+		},
+		{
+			table: "base_record_values",
+			sql:   `UPDATE base_record_values v SET tenant_id = r.tenant_id FROM base_records r WHERE r.id = v.record_id AND ` + unassigned("v"),
+		},
+		{
+			table: "base_views",
+			sql:   `UPDATE base_views v SET tenant_id = t.tenant_id FROM base_tables t WHERE t.id = v.table_id AND ` + unassigned("v"),
+		},
+		{
+			table: "base_record_links",
+			sql:   `UPDATE base_record_links l SET tenant_id = t.tenant_id FROM base_tables t WHERE t.id = l.source_table_id AND ` + unassigned("l"),
+		},
+		{
+			table: "base_field_formulas",
+			sql:   `UPDATE base_field_formulas f SET tenant_id = b.tenant_id FROM base_fields b WHERE b.id = f.field_id AND ` + unassigned("f"),
+		},
+		{
+			table: "base_formula_dependencies",
+			sql:   `UPDATE base_formula_dependencies d SET tenant_id = t.tenant_id FROM base_tables t WHERE t.id = d.table_id AND ` + unassigned("d"),
+		},
+		{
+			// 反向关系：project_id 可能是历史脏数据（零值），因此优先走「源记录 → 表 → 空间」链路。
+			table: "base_record_reverse_links",
+			sql:   `UPDATE base_record_reverse_links l SET tenant_id = r.tenant_id FROM base_records r WHERE r.id = l.source_record_id AND ` + unassigned("l"),
+		},
+	}
+	for _, item := range derived {
+		if err := addTenantColumn(gdb, item.table); err != nil {
+			return err
+		}
+	}
+	// 回填按依赖顺序执行：先 base_apps，再表，再字段/记录，最后值/公式。
+	for _, item := range derived {
+		if err := gdb.Exec(item.sql).Error; err != nil {
+			return fmt.Errorf("backfill tenant_id for %s: %w", item.table, err)
+		}
+	}
+	// base_apps 自身：tenant_id = project_id。
+	if err := gdb.Exec(fmt.Sprintf(
+		`UPDATE base_apps SET tenant_id = project_id WHERE %s`, unassigned("base_apps"),
+	)).Error; err != nil {
+		return fmt.Errorf("backfill tenant_id for base_apps: %w", err)
+	}
+	// 其余直接持 project_id 的表：经 base_apps 关联取租户。
+	// 不能直接写 tenant_id = project_id —— 历史脏数据里 project_id 本身可能是零值，
+	// 那样回填后 tenant_id 仍是零值，等于没回填。
+	for _, table := range direct {
+		if table == "base_apps" {
+			continue
+		}
+		stmt := fmt.Sprintf(
+			`UPDATE %s t SET tenant_id = a.tenant_id FROM base_apps a WHERE a.project_id = t.project_id AND %s`,
+			table, unassigned("t"),
+		)
+		if err := gdb.Exec(stmt).Error; err != nil {
+			return fmt.Errorf("backfill tenant_id for %s: %w", table, err)
+		}
+	}
+	// 租户级索引：租户过滤（限流 / 审计 / 清理）走索引而不是全表扫。
+	for _, table := range []string{
+		"base_apps", "base_tables", "base_fields", "base_records", "base_record_values",
+		"base_views", "base_operation_logs", "base_event_outboxes", "base_import_jobs",
+		"base_field_policies", "base_record_grants", "base_record_reverse_links",
+		"base_view_prefs", "base_record_links", "base_field_formulas", "base_formula_dependencies",
+		"base_user_groups",
+	} {
+		idx := "idx_" + table + "_tenant"
+		stmt := fmt.Sprintf(`CREATE INDEX IF NOT EXISTS %s ON %s (tenant_id)`, idx, table)
+		if err := gdb.Exec(stmt).Error; err != nil {
+			return fmt.Errorf("create %s: %w", idx, err)
+		}
+	}
+	return nil
+}
+
+// addTenantColumn 给表补 tenant_id 列（已存在则跳过）。
+func addTenantColumn(gdb *gorm.DB, table string) error {
+	stmt := fmt.Sprintf(`ALTER TABLE %s ADD COLUMN IF NOT EXISTS tenant_id uuid`, table)
+	if err := gdb.Exec(stmt).Error; err != nil {
+		return fmt.Errorf("add tenant_id to %s: %w", table, err)
 	}
 	return nil
 }

@@ -370,6 +370,117 @@ func (h *Handler) FieldTypes(ctx context.Context, c *app.RequestContext) {
 	c.JSON(http.StatusOK, h.svc.Registry().Definitions())
 }
 
+// Metrics 输出 Base Engine 的运行指标。
+//
+//   - Accept: application/json（默认）→ JSON 快照
+//   - Accept: text/plain → Prometheus 文本
+func (h *Handler) Metrics(ctx context.Context, c *app.RequestContext) {
+	accept := strings.ToLower(string(c.GetHeader("Accept")))
+	if strings.Contains(accept, "text/plain") {
+		c.String(http.StatusOK, PrometheusBaseMetrics())
+		return
+	}
+	c.JSON(http.StatusOK, SnapshotBaseMetrics())
+}
+
+// MetricsPrometheus 单独暴露 Prometheus 文本（路径固定，方便采集器配置）。
+func (h *Handler) MetricsPrometheus(ctx context.Context, c *app.RequestContext) {
+	c.String(http.StatusOK, PrometheusBaseMetrics())
+}
+
+// GetBase Base 详情（技术文档 §10：GET /bases/{baseId}）。
+func (h *Handler) GetBase(ctx context.Context, c *app.RequestContext) {
+	uid, ok := h.owner(c)
+	if !ok {
+		return
+	}
+	projectID, ok := projectID(c)
+	if !ok {
+		return
+	}
+	baseID, ok := pathUUID(c, "baseId")
+	if !ok {
+		return
+	}
+	info, err := h.svc.GetBaseDetail(ctx, uid, projectID, baseID)
+	if err != nil {
+		handleErr(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, info)
+}
+
+// GetRecord 记录详情（技术文档 §10：GET /records/{recordId}）。
+func (h *Handler) GetRecord(ctx context.Context, c *app.RequestContext) {
+	uid, ok := h.owner(c)
+	if !ok {
+		return
+	}
+	projectID, ok := projectID(c)
+	if !ok {
+		return
+	}
+	recordID, ok := pathUUID(c, "recordId")
+	if !ok {
+		return
+	}
+	row, err := h.svc.GetRecord(ctx, uid, projectID, recordID)
+	if err != nil {
+		handleErr(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, row)
+}
+
+// GetView 视图详情（技术文档 §10：GET /views/{viewId}）。
+func (h *Handler) GetView(ctx context.Context, c *app.RequestContext) {
+	uid, ok := h.owner(c)
+	if !ok {
+		return
+	}
+	projectID, ok := projectID(c)
+	if !ok {
+		return
+	}
+	viewID, ok := pathUUID(c, "viewId")
+	if !ok {
+		return
+	}
+	info, err := h.svc.GetView(ctx, uid, projectID, viewID)
+	if err != nil {
+		handleErr(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, info)
+}
+
+// QueryView 按视图配置查询数据（技术文档 §10：POST /views/{viewId}/query）。
+func (h *Handler) QueryView(ctx context.Context, c *app.RequestContext) {
+	uid, ok := h.owner(c)
+	if !ok {
+		return
+	}
+	projectID, ok := projectID(c)
+	if !ok {
+		return
+	}
+	viewID, ok := pathUUID(c, "viewId")
+	if !ok {
+		return
+	}
+	var body QueryRequest
+	if err := c.BindAndValidate(&body); err != nil {
+		fail(c, http.StatusBadRequest, "invalid body", "40001", err.Error())
+		return
+	}
+	result, err := h.svc.QueryByView(ctx, uid, projectID, viewID, body)
+	if err != nil {
+		handleErr(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, result)
+}
+
 // CreateField 创建字段。
 func (h *Handler) CreateField(ctx context.Context, c *app.RequestContext) {
 	uid, ok := h.owner(c)
@@ -910,7 +1021,15 @@ func (h *Handler) ListLinkTargets(ctx context.Context, c *app.RequestContext) {
 			limit = parsed
 		}
 	}
-	items, err := h.svc.ListLinkTargets(ctx, uid, projectID, tableID, c.Query("keyword"), limit)
+	var targetTableID *uuid.UUID
+	if raw := c.Query("targetTableId"); raw != "" {
+		if parsed, err := uuid.Parse(raw); err == nil {
+			targetTableID = &parsed
+		}
+	}
+	items, err := h.svc.ListLinkTargetsPage(
+		ctx, uid, projectID, tableID, c.Query("keyword"), limit, c.Query("cursor"), targetTableID,
+	)
 	if err != nil {
 		handleErr(c, err)
 		return
@@ -1138,6 +1257,24 @@ func (h *Handler) ListRecordGrants(ctx context.Context, c *app.RequestContext) {
 	c.JSON(http.StatusOK, rows)
 }
 
+// ListSpaceDepartments 列出空间成员出现过的部门（用于「按部门授权」）。
+func (h *Handler) ListSpaceDepartments(ctx context.Context, c *app.RequestContext) {
+	uid, ok := h.owner(c)
+	if !ok {
+		return
+	}
+	projectID, ok := projectID(c)
+	if !ok {
+		return
+	}
+	rows, err := h.svc.ListSpaceDepartments(ctx, uid, projectID)
+	if err != nil {
+		handleErr(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, rows)
+}
+
 // ListAudit 列出操作审计。
 func (h *Handler) ListAudit(ctx context.Context, c *app.RequestContext) {
 	uid, ok := h.owner(c)
@@ -1243,6 +1380,13 @@ func (h *Handler) Events(ctx context.Context, c *app.RequestContext) {
 	if lastEventID == "" {
 		lastEventID = c.Query("lastEventId")
 	}
+	// 时间水位：客户端只要给「上次同步到的时刻」就能拿增量（不必记住事件 ID）。
+	var since time.Time
+	if raw := c.Query("since"); raw != "" {
+		if parsed, err := time.Parse(time.RFC3339, raw); err == nil {
+			since = parsed
+		}
+	}
 
 	go func() {
 		defer cancel()
@@ -1253,6 +1397,20 @@ func (h *Handler) Events(ctx context.Context, c *app.RequestContext) {
 		// 先补发断线期间错过的事件，再进入实时订阅。
 		if lastEventID != "" {
 			missed, err := h.svc.ReplaySince(ctx, projectID, lastEventID, 200)
+			if err == nil {
+				for _, event := range missed {
+					payload, mErr := marshalEvent(event)
+					if mErr != nil {
+						continue
+					}
+					if _, wErr := pw.Write(payload); wErr != nil {
+						return
+					}
+				}
+			}
+		}
+		if !since.IsZero() {
+			missed, err := h.svc.ReplaySinceTime(ctx, projectID, since, 200)
 			if err == nil {
 				for _, event := range missed {
 					payload, mErr := marshalEvent(event)
@@ -1336,6 +1494,98 @@ func (h *Handler) ExportTableConfig(ctx context.Context, c *app.RequestContext) 
 }
 
 // ImportTableConfig 从配置包导入（新建一张表，不覆盖原表）。
+// ExportTableConfigEncrypted 导出一张表的**加密**配置包（口令由调用方提供）。
+//
+// 与普通导出的区别：包体是 AES-256-GCM 密文，只有知道口令的人能导入。
+func (h *Handler) ExportTableConfigEncrypted(ctx context.Context, c *app.RequestContext) {
+	uid, ok := h.owner(c)
+	if !ok {
+		return
+	}
+	projectID, ok := projectID(c)
+	if !ok {
+		return
+	}
+	tableID, ok := pathUUID(c, "tableId")
+	if !ok {
+		return
+	}
+	var body struct {
+		Passphrase string `json:"passphrase"`
+	}
+	if err := c.BindAndValidate(&body); err != nil {
+		fail(c, http.StatusBadRequest, "invalid body", "40001", err.Error())
+		return
+	}
+	bundle, err := h.svc.ExportTableConfig(ctx, uid, projectID, tableID)
+	if err != nil {
+		handleErr(c, err)
+		return
+	}
+	enc, err := EncryptBundle(bundle, body.Passphrase)
+	if err != nil {
+		fail(c, http.StatusBadRequest, "invalid passphrase", "40001", err.Error())
+		return
+	}
+	raw, err := json.MarshalIndent(enc, "", "  ")
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "internal error", "50001", err.Error())
+		return
+	}
+	c.Response.Header.Set("Content-Type", "application/json; charset=utf-8")
+	c.Response.Header.Set("Content-Disposition",
+		fmt.Sprintf("attachment; filename=\"%s.config.enc.json\"", sanitizeFileName(bundle.Table.Name)))
+	c.Data(http.StatusOK, "application/json; charset=utf-8", raw)
+}
+
+// ImportTableConfigEncrypted 导入**加密**配置包。
+func (h *Handler) ImportTableConfigEncrypted(ctx context.Context, c *app.RequestContext) {
+	uid, ok := h.owner(c)
+	if !ok {
+		return
+	}
+	projectID, ok := projectID(c)
+	if !ok {
+		return
+	}
+	var body struct {
+		BaseID     string           `json:"baseId"`
+		Passphrase string           `json:"passphrase"`
+		Bundle     *EncryptedBundle `json:"bundle"`
+	}
+	if err := c.BindAndValidate(&body); err != nil {
+		fail(c, http.StatusBadRequest, "invalid body", "40001", err.Error())
+		return
+	}
+	baseID, err := uuid.Parse(body.BaseID)
+	if err != nil {
+		fail(c, http.StatusBadRequest, "invalid base id", "40001", err.Error())
+		return
+	}
+	bundle, err := DecryptBundle(body.Bundle, body.Passphrase)
+	if err != nil {
+		fail(c, http.StatusBadRequest, "cannot decrypt bundle", "40001", err.Error())
+		return
+	}
+	outcome, err := h.svc.Idempotent(ctx, uid, projectID, "base.importTableConfigEncrypted", idempotencyKey(c), body, http.StatusCreated,
+		func(ctx context.Context) (any, error) {
+			result, err := h.svc.ImportTableConfig(ctx, uid, projectID, baseID, bundle)
+			if err != nil {
+				return nil, err
+			}
+			return map[string]any{
+				"tableId":  result.Table.ID,
+				"table":    result.Table,
+				"warnings": result.Warnings,
+			}, nil
+		})
+	if err != nil {
+		handleErr(c, err)
+		return
+	}
+	c.JSON(outcome.Status, outcome.Body)
+}
+
 func (h *Handler) ImportTableConfig(ctx context.Context, c *app.RequestContext) {
 	uid, ok := h.owner(c)
 	if !ok {
@@ -1499,4 +1749,225 @@ func (h *Handler) TableSchema(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 	c.JSON(http.StatusOK, schema)
+}
+
+// CreateImportJob 提交异步导入任务（技术文档 §16.2）。
+func (h *Handler) CreateImportJob(ctx context.Context, c *app.RequestContext) {
+	uid, ok := h.owner(c)
+	if !ok {
+		return
+	}
+	projectID, ok := projectID(c)
+	if !ok {
+		return
+	}
+	tableID, ok := pathUUID(c, "tableId")
+	if !ok {
+		return
+	}
+	var payload ImportJobPayload
+	if err := c.BindAndValidate(&payload); err != nil {
+		fail(c, http.StatusBadRequest, "invalid body", "40001", err.Error())
+		return
+	}
+	job, err := h.svc.CreateImportJob(ctx, uid, projectID, tableID, payload)
+	if err != nil {
+		handleErr(c, err)
+		return
+	}
+	c.JSON(http.StatusAccepted, job)
+}
+
+// GetImportJob 查询导入任务进度。
+func (h *Handler) GetImportJob(ctx context.Context, c *app.RequestContext) {
+	uid, ok := h.owner(c)
+	if !ok {
+		return
+	}
+	projectID, ok := projectID(c)
+	if !ok {
+		return
+	}
+	jobID, ok := pathUUID(c, "jobId")
+	if !ok {
+		return
+	}
+	job, err := h.svc.GetImportJob(ctx, uid, projectID, jobID)
+	if err != nil {
+		handleErr(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, job)
+}
+
+// ListImportJobs 列出某张表的导入任务。
+func (h *Handler) ListImportJobs(ctx context.Context, c *app.RequestContext) {
+	uid, ok := h.owner(c)
+	if !ok {
+		return
+	}
+	projectID, ok := projectID(c)
+	if !ok {
+		return
+	}
+	tableID, ok := pathUUID(c, "tableId")
+	if !ok {
+		return
+	}
+	limit := 20
+	if raw := string(c.Query("limit")); raw != "" {
+		if parsed, perr := strconv.Atoi(raw); perr == nil {
+			limit = parsed
+		}
+	}
+	jobs, err := h.svc.ListImportJobs(ctx, uid, projectID, tableID, limit)
+	if err != nil {
+		handleErr(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, jobs)
+}
+
+// CancelImportJob 取消导入任务。
+func (h *Handler) CancelImportJob(ctx context.Context, c *app.RequestContext) {
+	uid, ok := h.owner(c)
+	if !ok {
+		return
+	}
+	projectID, ok := projectID(c)
+	if !ok {
+		return
+	}
+	jobID, ok := pathUUID(c, "jobId")
+	if !ok {
+		return
+	}
+	job, err := h.svc.CancelImportJob(ctx, uid, projectID, jobID)
+	if err != nil {
+		handleErr(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, job)
+}
+
+// ListUserGroups 列出通讯录分组。
+func (h *Handler) ListUserGroups(ctx context.Context, c *app.RequestContext) {
+	uid, ok := h.owner(c)
+	if !ok {
+		return
+	}
+	projectID, ok := projectID(c)
+	if !ok {
+		return
+	}
+	groups, err := h.svc.ListUserGroups(ctx, uid, projectID)
+	if err != nil {
+		handleErr(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, groups)
+}
+
+// CreateUserGroup 新建通讯录分组。
+func (h *Handler) CreateUserGroup(ctx context.Context, c *app.RequestContext) {
+	uid, ok := h.owner(c)
+	if !ok {
+		return
+	}
+	projectID, ok := projectID(c)
+	if !ok {
+		return
+	}
+	var in UserGroupInput
+	if err := c.BindAndValidate(&in); err != nil {
+		fail(c, http.StatusBadRequest, "invalid body", "40001", err.Error())
+		return
+	}
+	group, err := h.svc.CreateUserGroup(ctx, uid, projectID, in)
+	if err != nil {
+		handleErr(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, group)
+}
+
+// UpdateUserGroup 修改通讯录分组。
+func (h *Handler) UpdateUserGroup(ctx context.Context, c *app.RequestContext) {
+	uid, ok := h.owner(c)
+	if !ok {
+		return
+	}
+	projectID, ok := projectID(c)
+	if !ok {
+		return
+	}
+	groupID, ok := pathUUID(c, "groupId")
+	if !ok {
+		return
+	}
+	var in UserGroupInput
+	if err := c.BindAndValidate(&in); err != nil {
+		fail(c, http.StatusBadRequest, "invalid body", "40001", err.Error())
+		return
+	}
+	group, err := h.svc.UpdateUserGroup(ctx, uid, projectID, groupID, in)
+	if err != nil {
+		handleErr(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, group)
+}
+
+// DeleteUserGroup 删除通讯录分组。
+func (h *Handler) DeleteUserGroup(ctx context.Context, c *app.RequestContext) {
+	uid, ok := h.owner(c)
+	if !ok {
+		return
+	}
+	projectID, ok := projectID(c)
+	if !ok {
+		return
+	}
+	groupID, ok := pathUUID(c, "groupId")
+	if !ok {
+		return
+	}
+	if err := h.svc.DeleteUserGroup(ctx, uid, projectID, groupID); err != nil {
+		handleErr(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, map[string]any{"ok": true})
+}
+
+// ListDeadLetters 列出死信事件（运维排查）。
+func (h *Handler) ListDeadLetters(ctx context.Context, c *app.RequestContext) {
+	if _, ok := h.owner(c); !ok {
+		return
+	}
+	projectID, ok := projectID(c)
+	if !ok {
+		return
+	}
+	rows, err := h.svc.ListDeadLetters(ctx, projectID, 50)
+	if err != nil {
+		handleErr(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, rows)
+}
+
+// RetryDeadLetter 人工重投一条死信。
+func (h *Handler) RetryDeadLetter(ctx context.Context, c *app.RequestContext) {
+	if _, ok := h.owner(c); !ok {
+		return
+	}
+	eventID, ok := pathUUID(c, "eventId")
+	if !ok {
+		return
+	}
+	if err := h.svc.RetryDeadLetter(ctx, eventID); err != nil {
+		handleErr(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, map[string]any{"ok": true})
 }

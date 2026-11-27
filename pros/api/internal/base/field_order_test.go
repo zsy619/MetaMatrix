@@ -16,6 +16,7 @@ import (
 // 否则 SQLite 会按字符串存 timestamptz，扫回 time.Time 直接失败。
 type baseTableSQLite struct {
 	ID             uuid.UUID      `gorm:"type:uuid;primaryKey"`
+	TenantID       uuid.UUID      `gorm:"type:uuid;not null;default:'00000000-0000-0000-0000-000000000000'"`
 	BaseID         uuid.UUID      `gorm:"type:uuid;not null"`
 	Name           string         `gorm:"type:varchar(128);not null;default:''"`
 	Description    string         `gorm:"type:text;not null;default:''"`
@@ -33,6 +34,7 @@ func (baseTableSQLite) TableName() string { return "base_tables" }
 
 type baseFieldSQLite struct {
 	ID         uuid.UUID      `gorm:"type:uuid;primaryKey"`
+	TenantID   uuid.UUID      `gorm:"type:uuid;not null;default:'00000000-0000-0000-0000-000000000000'"`
 	TableID    uuid.UUID      `gorm:"type:uuid;not null"`
 	Name       string         `gorm:"type:varchar(128);not null;default:''"`
 	Type       string         `gorm:"type:varchar(48);not null;default:'text'"`
@@ -55,6 +57,7 @@ func (baseFieldSQLite) TableName() string { return "base_fields" }
 // UpdateField 会触发 reindexTable，需要这两张表存在。
 type baseRecordSQLite struct {
 	ID        uuid.UUID      `gorm:"type:uuid;primaryKey"`
+	TenantID  uuid.UUID      `gorm:"type:uuid;not null;default:'00000000-0000-0000-0000-000000000000'"`
 	TableID   uuid.UUID      `gorm:"type:uuid;not null"`
 	Data      datatypes.JSON `gorm:"type:json;not null;default:'{}'"`
 	Version   int64          `gorm:"not null;default:1"`
@@ -72,6 +75,7 @@ func (baseRecordSQLite) TableName() string { return "base_records" }
 
 type baseRecordValueSQLite struct {
 	ID          uuid.UUID      `gorm:"type:uuid;primaryKey"`
+	TenantID    uuid.UUID      `gorm:"type:uuid;not null;default:'00000000-0000-0000-0000-000000000000'"`
 	TableID     uuid.UUID      `gorm:"type:uuid;not null"`
 	RecordID    uuid.UUID      `gorm:"type:uuid;not null"`
 	FieldID     uuid.UUID      `gorm:"type:uuid;not null"`
@@ -173,6 +177,7 @@ func TestReorderFields(t *testing.T) {
 // baseViewSQLite / baseViewPrefSQLite 是视图与视图个人偏好的 SQLite 影子模型。
 type baseViewSQLite struct {
 	ID        uuid.UUID `gorm:"type:uuid;primaryKey"`
+	TenantID  uuid.UUID `gorm:"type:uuid;not null;default:'00000000-0000-0000-0000-000000000000'"`
 	TableID   uuid.UUID `gorm:"type:uuid;not null"`
 	Name      string    `gorm:"type:varchar(128);not null;default:''"`
 	Type      string    `gorm:"type:varchar(32);not null;default:'grid'"`
@@ -190,6 +195,7 @@ func (baseViewSQLite) TableName() string { return "base_views" }
 
 type baseViewPrefSQLite struct {
 	ID        uuid.UUID `gorm:"type:uuid;primaryKey"`
+	TenantID  uuid.UUID `gorm:"type:uuid;not null;default:'00000000-0000-0000-0000-000000000000'"`
 	ViewID    uuid.UUID `gorm:"type:uuid;not null;uniqueIndex:uniq_base_view_pref_view_user"`
 	UserID    uuid.UUID `gorm:"type:uuid;not null;uniqueIndex:uniq_base_view_pref_view_user"`
 	ProjectID uuid.UUID `gorm:"type:uuid;not null"`
@@ -202,12 +208,32 @@ func (baseViewPrefSQLite) TableName() string { return "base_view_prefs" }
 
 // baseRecordGrantSQLite 是「记录可见成员授权」的 SQLite 影子模型。
 type baseRecordGrantSQLite struct {
-	ID        uuid.UUID `gorm:"type:uuid;primaryKey"`
-	RecordID  uuid.UUID `gorm:"type:uuid;not null;uniqueIndex:uniq_base_record_grant"`
-	UserID    uuid.UUID `gorm:"type:uuid;not null;uniqueIndex:uniq_base_record_grant"`
-	ProjectID uuid.UUID `gorm:"type:uuid;not null"`
-	CreatedBy uuid.UUID `gorm:"type:uuid;not null"`
-	CreatedAt time.Time
+	ID          uuid.UUID `gorm:"type:uuid;primaryKey"`
+	TenantID    uuid.UUID `gorm:"type:uuid;not null;default:'00000000-0000-0000-0000-000000000000'"`
+	RecordID    uuid.UUID `gorm:"type:uuid;not null;uniqueIndex:uniq_base_record_grant"`
+	UserID      uuid.UUID `gorm:"type:uuid;not null;uniqueIndex:uniq_base_record_grant"`
+	SubjectType string    `gorm:"type:text;not null;default:'user'"`
+	SubjectID   string    `gorm:"type:text;not null;default:''"`
+	ExpiresAt   *time.Time
+	ProjectID   uuid.UUID `gorm:"type:uuid;not null"`
+	CreatedBy   uuid.UUID `gorm:"type:uuid;not null"`
+	CreatedAt   time.Time
 }
 
 func (baseRecordGrantSQLite) TableName() string { return "base_record_grants" }
+
+// baseRecordReverseLinkSQLite 是「反向关系」表的 SQLite 影子模型。
+type baseRecordReverseLinkSQLite struct {
+	ID             uuid.UUID `gorm:"type:uuid;primaryKey"`
+	TenantID       uuid.UUID `gorm:"type:uuid;not null;default:'00000000-0000-0000-0000-000000000000'"`
+	ProjectID      uuid.UUID `gorm:"type:uuid;not null"`
+	SourceTableID  uuid.UUID `gorm:"type:uuid;not null"`
+	SourceRecordID uuid.UUID `gorm:"type:uuid;not null"`
+	FieldID        uuid.UUID `gorm:"type:uuid;not null"`
+	TargetTableID  uuid.UUID `gorm:"type:uuid;not null"`
+	TargetRecordID uuid.UUID `gorm:"type:uuid;not null"`
+	SortOrder      int       `gorm:"not null;default:0"`
+	CreatedAt      time.Time
+}
+
+func (baseRecordReverseLinkSQLite) TableName() string { return "base_record_reverse_links" }

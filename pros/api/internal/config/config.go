@@ -48,6 +48,25 @@ type Config struct {
 	// 留空或连不上时降级为同实例（内存+kb_presence），服务仍启动。
 	// Redis 不是文档或 Yjs 持久化。
 	RedisURL string
+	// BaseTenantScaleMax 是租户级动态配额的放大倍数上限（按空间成员数缩放）。
+	BaseTenantScaleMax int
+	// BaseImportBatchSize 是异步导入任务单批写入条数。
+	BaseImportBatchSize int
+	// BaseImportKeepDays 是导入任务记录的保留天数。
+	BaseImportKeepDays int
+	// BaseOperationLogKeepDays 是多维表格操作审计的保留天数（超期归档清理）。
+	BaseOperationLogKeepDays int
+	// BaseOutboxKeepDays 是已发布事件的保留天数（断线补拉窗口）。
+	BaseOutboxKeepDays int
+	// BaseOutboxMaxRetries 是事件发布失败的最大重试次数，超出进入死信队列。
+	BaseOutboxMaxRetries int
+	// BaseOutboxDeadKeepDays 是死信事件的保留天数。
+	BaseOutboxDeadKeepDays int
+	// DBMaxOpenConns / DBMaxIdleConns 是数据库连接池配置。
+	DBMaxOpenConns       int
+	DBMaxIdleConns       int
+	DBConnMaxLifetimeMin int
+	DBConnMaxIdleMin     int
 }
 
 // AIConfig describes the external model endpoint.
@@ -130,51 +149,52 @@ const (
 
 func Load() Config {
 	_ = godotenv.Load()
-	port := 3000
-	if v := os.Getenv("PORT"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil {
-			port = n
-		}
-	}
-	secret := os.Getenv("JWT_SECRET")
-	if secret == "" {
-		secret = "metamatrix-dev-jwt-secret"
-	}
-	dbURL := os.Getenv("DATABASE_URL")
-	if dbURL == "" {
-		dbURL = "postgresql://metamatrix:metamatrix@localhost:5432/metamatrix"
-	}
-	signSecret := os.Getenv("MEDIA_SIGN_SECRET")
+	// 分层配置：configs/default.yaml → configs/${APP_ENV}.yaml → 环境变量。
+	// 环境变量优先级最高（生产改密 / 改地址不必动配置文件）。
+	layer := loadLayered()
+	port := layer.int("PORT", func(c yamlConfig) *int { return c.Server.Port }, 3000)
+	secret := layer.str("JWT_SECRET", func(c yamlConfig) *string { return c.Auth.JWTSecret }, "metamatrix-dev-jwt-secret")
+	dbURL := layer.str("DATABASE_URL", func(c yamlConfig) *string { return c.Database.URL },
+		"postgresql://metamatrix:metamatrix@localhost:5432/metamatrix")
+	signSecret := layer.str("MEDIA_SIGN_SECRET", func(c yamlConfig) *string { return c.Media.SignSecret }, "")
 	if signSecret == "" {
 		signSecret = secret
 	}
-	mediaRoot := os.Getenv("MEDIA_ROOT")
-	if mediaRoot == "" {
-		mediaRoot = "data/media"
-	}
+	mediaRoot := layer.str("MEDIA_ROOT", func(c yamlConfig) *string { return c.Media.Root }, "data/media")
 	return Config{
-		DatabaseURL:            dbURL,
-		Port:                   port,
-		JWTSecret:              secret,
-		LoginWindow:            durationEnv("LOGIN_WINDOW", 15*time.Minute),
-		LoginPairLimit:         intEnv("LOGIN_PAIR_LIMIT", 8),
-		LoginIPLimit:           intEnv("LOGIN_IP_LIMIT", 30),
-		CaptchaTTL:             captchaTTLDEnv(),
-		CaptchaDebug:           boolEnv("CAPTCHA_DEBUG", false),
-		CaptchaDebugLoopback:   boolEnv("CAPTCHA_DEBUG_LOOPBACK", runningInCI()),
-		MediaRoot:              mediaRoot,
-		MediaSignSecret:        signSecret,
-		MediaObject:            loadMediaObjectConfig(),
-		FeishuAppID:            os.Getenv("FEISHU_APP_ID"),
-		FeishuAppSecret:        os.Getenv("FEISHU_APP_SECRET"),
-		FeishuBlockID:          os.Getenv("FEISHU_DOC_BLOCK_ID"),
-		BaseRateLimitRPS:       intEnv("BASE_RATE_LIMIT_RPS", 40),
-		BaseRateLimitBurst:     intEnv("BASE_RATE_LIMIT_BURST", 80),
-		RedisURL:               firstNonEmpty(os.Getenv("REDIS_URL"), os.Getenv("PRESENCE_REDIS_URL")),
-		Mail:                   loadMailConfig(),
-		PasswordReset:          loadPasswordResetConfig(),
-		KnowledgeTrashKeepDays: intEnv("KNOWLEDGE_TRASH_KEEP_DAYS", 30),
-		KnowledgeVersionKeep:   intEnv("KNOWLEDGE_VERSION_KEEP", 50),
+		DatabaseURL:              dbURL,
+		Port:                     port,
+		JWTSecret:                secret,
+		LoginWindow:              layer.duration("LOGIN_WINDOW", func(c yamlConfig) *string { return c.Auth.LoginWindow }, 15*time.Minute),
+		LoginPairLimit:           layer.int("LOGIN_PAIR_LIMIT", func(c yamlConfig) *int { return c.Auth.LoginPairLimit }, 8),
+		LoginIPLimit:             layer.int("LOGIN_IP_LIMIT", func(c yamlConfig) *int { return c.Auth.LoginIPLimit }, 30),
+		CaptchaTTL:               layer.duration("CAPTCHA_TTL", func(c yamlConfig) *string { return c.Captcha.TTL }, 5*time.Minute),
+		CaptchaDebug:             layer.bool("CAPTCHA_DEBUG", func(c yamlConfig) *bool { return c.Captcha.Debug }, false),
+		CaptchaDebugLoopback:     boolEnv("CAPTCHA_DEBUG_LOOPBACK", runningInCI()),
+		MediaRoot:                mediaRoot,
+		MediaSignSecret:          signSecret,
+		MediaObject:              loadMediaObjectConfig(),
+		FeishuAppID:              os.Getenv("FEISHU_APP_ID"),
+		FeishuAppSecret:          os.Getenv("FEISHU_APP_SECRET"),
+		FeishuBlockID:            os.Getenv("FEISHU_DOC_BLOCK_ID"),
+		BaseRateLimitRPS:         layer.int("BASE_RATE_LIMIT_RPS", func(c yamlConfig) *int { return c.Base.RateLimit.RPS }, 40),
+		BaseRateLimitBurst:       layer.int("BASE_RATE_LIMIT_BURST", func(c yamlConfig) *int { return c.Base.RateLimit.Burst }, 80),
+		BaseTenantScaleMax:       layer.int("BASE_TENANT_SCALE_MAX", func(c yamlConfig) *int { return c.Base.RateLimit.TenantScaleMax }, 8),
+		BaseImportBatchSize:      layer.int("BASE_IMPORT_BATCH_SIZE", func(c yamlConfig) *int { return c.Base.Import.BatchSize }, 200),
+		BaseImportKeepDays:       layer.int("BASE_IMPORT_KEEP_DAYS", func(c yamlConfig) *int { return c.Base.Import.KeepDays }, 30),
+		BaseOperationLogKeepDays: layer.int("BASE_OPERATION_LOG_KEEP_DAYS", func(c yamlConfig) *int { return c.Base.OperationLog.KeepDays }, 90),
+		BaseOutboxKeepDays:       layer.int("BASE_OUTBOX_KEEP_DAYS", func(c yamlConfig) *int { return c.Base.Outbox.KeepDays }, 7),
+		BaseOutboxMaxRetries:     layer.int("BASE_OUTBOX_MAX_RETRIES", func(c yamlConfig) *int { return c.Base.Outbox.MaxRetries }, 5),
+		BaseOutboxDeadKeepDays:   layer.int("BASE_OUTBOX_DEAD_KEEP_DAYS", func(c yamlConfig) *int { return c.Base.Outbox.DeadKeepDays }, 30),
+		DBMaxOpenConns:           layer.int("DB_MAX_OPEN_CONNS", func(c yamlConfig) *int { return c.Database.MaxOpenConns }, 50),
+		DBMaxIdleConns:           layer.int("DB_MAX_IDLE_CONNS", func(c yamlConfig) *int { return c.Database.MaxIdleConns }, 10),
+		DBConnMaxLifetimeMin:     layer.int("DB_CONN_MAX_LIFETIME_MIN", func(c yamlConfig) *int { return c.Database.ConnMaxLifeMin }, 30),
+		DBConnMaxIdleMin:         layer.int("DB_CONN_MAX_IDLE_MIN", func(c yamlConfig) *int { return c.Database.ConnMaxIdleMin }, 5),
+		RedisURL:                 firstNonEmpty(os.Getenv("REDIS_URL"), os.Getenv("PRESENCE_REDIS_URL")),
+		Mail:                     loadMailConfig(),
+		PasswordReset:            loadPasswordResetConfig(),
+		KnowledgeTrashKeepDays:   intEnv("KNOWLEDGE_TRASH_KEEP_DAYS", 30),
+		KnowledgeVersionKeep:     intEnv("KNOWLEDGE_VERSION_KEEP", 50),
 		AI: AIConfig{
 			BaseURL:        strings.TrimSpace(os.Getenv("AI_BASE_URL")),
 			APIKey:         strings.TrimSpace(os.Getenv("AI_API_KEY")),

@@ -8,6 +8,12 @@
 
 export type AuditList = object[]
 
+export interface BaseDetail {
+  base: BaseInfo
+  tables: BaseTable[]
+  views: BaseView[]
+}
+
 export type BaseEmbedderList = object[]
 
 export interface BaseInfo {
@@ -22,6 +28,20 @@ export interface BaseInfo {
 }
 
 export type BaseInfoList = BaseInfo[]
+
+export interface BaseMetricsSnapshot {
+  activeSubscribers: number
+  errors: number
+  idempotencyConflicts: number
+  operations: Record<string, unknown>
+  outboxDead: number
+  outboxFailed: number
+  outboxPublished: number
+  p50Millis: number
+  p95Millis: number
+  p99Millis: number
+  slowQueries: number
+}
 
 export interface BaseTable {
   baseId: string
@@ -66,6 +86,8 @@ export interface BatchRequest {
 
 export type BatchResult = object[]
 
+export type ComputedFieldList = object[]
+
 export interface ConfigBundle {
   fields: object[]
   formulas: object[]
@@ -86,6 +108,16 @@ export interface CreateViewRequest {
   scope?: string | null
   type: string
 }
+
+export interface DeadLetter {
+  createdAt: string
+  eventType: string
+  id: string
+  retryCount: number
+  status: string
+}
+
+export type DeadLetterList = DeadLetter[]
 
 export interface DeleteResult {
   deleted?: boolean | null
@@ -190,6 +222,26 @@ export interface ImportConfigRequest {
 
 export type ImportConfigResult = object[]
 
+export interface ImportJobInfo {
+  error?: string | null
+  failed: number
+  failures?: object[] | null
+  id: string
+  mode: string
+  processed: number
+  status: string
+  succeeded: number
+  tableId: string
+  total: number
+}
+
+export type ImportJobInfoList = ImportJobInfo[]
+
+export interface ImportJobRequest {
+  mode?: string | null
+  rows: object[]
+}
+
 export type LinkTargetList = object[]
 
 export interface MigrateFieldRequest {
@@ -210,6 +262,8 @@ export interface QueryResult {
   records: RecordRow[]
   total: number
 }
+
+export type RecalcResult = object[]
 
 export type RecordDocReferenceList = object[]
 
@@ -259,4 +313,23 @@ export interface UpdateViewRequest {
   name?: string | null
   type?: string | null
   version?: number | null
+}
+
+export interface UserGroupInfo {
+  createdAt: string
+  description: string
+  id: string
+  memberCount: number
+  members: string[]
+  name: string
+  sortOrder: number
+}
+
+export type UserGroupInfoList = UserGroupInfo[]
+
+export interface UserGroupInput {
+  description?: string | null
+  members?: string[] | null
+  name: string
+  sortOrder?: number | null
 }

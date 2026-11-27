@@ -91,6 +91,15 @@ func (c *client) jget(ctx context.Context, path string, out any) error {
 	return json.Unmarshal(b, out)
 }
 
+// jpost 发一个 JSON POST 并解析响应。
+func (c *client) jpost(ctx context.Context, path string, body any, out any) error {
+	_, b, err := c.do(ctx, http.MethodPost, path, mustJSON(body))
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(b, out)
+}
+
 func percentile(sorted []time.Duration, p float64) time.Duration {
 	if len(sorted) == 0 {
 		return 0
@@ -110,8 +119,15 @@ func main() {
 		duration    = flag.Duration("duration", 20*time.Second, "每场景压测时长")
 		seedRows    = flag.Int("seed-rows", 0, ">0 时先建临时表并播种 N 条记录（压测后自动删除临时表）")
 		seedFields  = flag.Int("seed-fields", 20, "临时表的文本字段数量")
+		scale       = flag.String("scale", "medium", "扩容档位：small(1000 行/10 并发) / medium(2000 行/25 并发) / large(5000 行/50 并发)")
+		skipSeed    = flag.Bool("skip-seed", false, "不播种数据，直接用 -table 压测")
+		deepPages   = flag.Int("deep-pages", 20, "深翻页场景翻多少页（验证 keyset 翻页不随页数变慢）")
+		batchSize   = flag.Int("batch-size", 500, "批量写入场景每批多少行")
 	)
 	flag.Parse()
+
+	// 扩容档位：按档位调并发与播种规模（显式传入的参数优先）。
+	applyScale(*scale, seedRows, concurrency, *tableID)
 
 	tokenBytes, err := os.ReadFile(*tokenFile)
 	if err != nil {
@@ -121,12 +137,14 @@ func main() {
 		base:  strings.TrimRight(*baseURL, "/"),
 		token: strings.TrimSpace(string(tokenBytes)),
 		http: &http.Client{
-			Timeout: 30 * time.Second,
+			Timeout: 120 * time.Second,
 			Transport: &http.Transport{
-				MaxIdleConns:        64,
-				MaxIdleConnsPerHost: 32,
-				MaxConnsPerHost:     32,
-				IdleConnTimeout:     30 * time.Second,
+				// 扩容档位最高 50 并发 + 批量写入，连接池要跟得上，
+				// 否则压出来的是「客户端排队」而不是「服务端能力」。
+				MaxIdleConns:        256,
+				MaxIdleConnsPerHost: 64,
+				MaxConnsPerHost:     64,
+				IdleConnTimeout:     60 * time.Second,
 			},
 		},
 		project: *projectID,
@@ -141,12 +159,14 @@ func main() {
 	}
 
 	prefix := "/projects/" + c.project + "/base"
+	// 深翻页场景用的游标集合（Setup 里顺序翻页时采集）。
+	pageCursors := make([]string, 0, 64)
 	records := make([]string, 0, 200)
 	textField := ""
 
 	// 压测数据准备：建一张**临时表**并播种若干行，压测结束后删除，
 	// 不污染业务数据（交付前不留痕）。
-	if *seedRows > 0 {
+	if *seedRows > 0 && !*skipSeed {
 		tbl, err := c.seedTempTable(context.Background(), prefix, *seedRows, *seedFields)
 		if err != nil {
 			fatal("准备压测数据失败: %v", err)
@@ -233,6 +253,68 @@ func main() {
 			Body: func(worker int) []byte {
 				ids := workerChunk(records, worker, 25)
 				return mustJSON(map[string]any{"action": "update", "ids": ids, "fields": map[string]any{textField: "loadtest-" + fmt.Sprint(rand.Int())}})
+			},
+		},
+		{
+			// 深翻页：走 keyset 游标翻到第 N 页，验证「深翻页不随页数变慢」。
+			Name: fmt.Sprintf("深翻页（keyset 翻 %d 页）", *deepPages), Target: func(int) string { return prefix + "/tables/" + c.table + "/query" }, Method: http.MethodPost,
+			Setup: func(ctx context.Context, cl *client) error {
+				// 先顺序翻到第 N 页，把每一页的游标存下来（真实深翻页路径）。
+				cursor := ""
+				for i := 0; i < *deepPages; i++ {
+					_, next, err := cl.queryPage(ctx, cl.table, cursor, 100)
+					if err != nil {
+						return err
+					}
+					if next == "" {
+						break
+					}
+					cursor = next
+					pageCursors = append(pageCursors, cursor)
+				}
+				return nil
+			},
+			Body: func(worker int) []byte {
+				// 每个 worker 用不同的游标起点，模拟真实深翻页路径。
+				body := map[string]any{"tableId": c.table, "pageSize": 100}
+				if len(pageCursors) > 0 {
+					body["cursor"] = pageCursors[worker%len(pageCursors)]
+				}
+				return mustJSON(body)
+			},
+		},
+		{
+			// 批量写入：单批 500 行（扩容档位下的写放大场景）。
+			Name: fmt.Sprintf("批量写入（%d 行/批）", *batchSize), Target: func(int) string { return prefix + "/tables/" + c.table + "/records/batch" }, Method: http.MethodPost,
+			Setup: func(ctx context.Context, cl *client) error {
+				if textField == "" {
+					var schema struct {
+						Fields []struct {
+							ID   string `json:"id"`
+							Type string `json:"type"`
+						} `json:"fields"`
+					}
+					if err := cl.jget(ctx, prefix+"/tables/"+c.table+"/schema", &schema); err != nil {
+						return err
+					}
+					for _, f := range schema.Fields {
+						if f.Type == "text" {
+							textField = f.ID
+							break
+						}
+					}
+					if textField == "" && len(schema.Fields) > 0 {
+						textField = schema.Fields[0].ID
+					}
+				}
+				return nil
+			},
+			Body: func(worker int) []byte {
+				rows := make([]map[string]any, 0, *batchSize)
+				for i := 0; i < *batchSize; i++ {
+					rows = append(rows, map[string]any{"fields": map[string]any{textField: fmt.Sprintf("loadtest-%d-%d-%d", worker, i, rand.Int())}})
+				}
+				return mustJSON(map[string]any{"action": "create", "rows": rows, "partial": true})
 			},
 		},
 	}
@@ -456,4 +538,49 @@ func (c *client) dropTempTable(ctx context.Context, prefix, tableID string) erro
 func fatal(format string, args ...any) {
 	fmt.Fprintf(os.Stderr, format+"\n", args...)
 	os.Exit(1)
+}
+
+// applyScale 按「扩容档位」调整播种规模与并发数。
+//
+// 显式在命令行给出的参数优先（用 flag.Visit 判断）；
+// 已经有 -table（压现成表）时不会自动切到临时表模式。
+func applyScale(scale string, seedRows, concurrency *int, tableID string) {
+	set := map[string]bool{}
+	flag.Visit(func(f *flag.Flag) { set[f.Name] = true })
+	var rows, conc int
+	switch scale {
+	case "small":
+		rows, conc = 1000, 10
+	case "medium":
+		rows, conc = 2000, 25
+	case "large":
+		rows, conc = 5000, 50
+	default:
+		return
+	}
+	if !set["seed-rows"] && tableID == "" && *seedRows == 0 {
+		*seedRows = rows
+	}
+	if !set["concurrency"] {
+		*concurrency = conc
+	}
+}
+
+// queryPage 拉一页并返回（记录条数，下一页游标）。
+func (c *client) queryPage(ctx context.Context, tableID, cursor string, pageSize int) (int, string, error) {
+	body := map[string]any{"tableId": tableID, "pageSize": pageSize}
+	if cursor != "" {
+		body["cursor"] = cursor
+	}
+	var out struct {
+		Records []json.RawMessage `json:"records"`
+		Page    struct {
+			NextCursor string `json:"nextCursor"`
+			HasMore    bool   `json:"hasMore"`
+		} `json:"page"`
+	}
+	if err := c.jpost(ctx, "/projects/"+c.project+"/base/tables/"+tableID+"/query", body, &out); err != nil {
+		return 0, "", err
+	}
+	return len(out.Records), out.Page.NextCursor, nil
 }

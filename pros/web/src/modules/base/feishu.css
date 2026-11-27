@@ -867,3 +867,131 @@
   background: #fff;
   color: var(--fs-text-1);
 }
+
+/* —— 列宽拖拽把手（飞书：列头右侧竖线，hover 变蓝）—— */
+
+.be-grid .vxe-header--column {
+  position: relative;
+}
+
+.base-grid__resize {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 7px;
+  height: 100%;
+  cursor: col-resize;
+  background: transparent;
+  transition: background-color 160ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.base-grid__resize::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 2px;
+  width: 2px;
+  height: 16px;
+  margin-top: -8px;
+  border-radius: 1px;
+  background: var(--fs-border-strong, #d0d3d6);
+  opacity: 0;
+  transition: opacity 160ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.be-grid .vxe-header--column:hover .base-grid__resize::after,
+.base-grid__resize:hover::after {
+  opacity: 1;
+}
+
+.base-grid__resize:hover::after {
+  background: var(--fs-blue, #3370ff);
+}
+
+/* —— 单元格右键菜单（飞书多维表格同款）—— */
+
+.be-ctxmenu {
+  position: fixed;
+  z-index: 3000;
+}
+
+.be-ctxmenu__panel {
+  min-width: 200px;
+  max-width: 240px;
+  padding: 4px;
+  border: 1px solid var(--fs-border, #dee0e3);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(31, 35, 41, 0.12);
+}
+
+.be-ctxmenu__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 32px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--fs-text-1, #1f2329);
+  font-size: 13px;
+  line-height: 1;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 160ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.be-ctxmenu__item .el-icon {
+  font-size: 14px;
+  color: var(--fs-text-3, #8f959e);
+}
+
+.be-ctxmenu__item:hover {
+  background: var(--fs-bg-hover, #f2f3f5);
+}
+
+.be-ctxmenu__item:hover .el-icon {
+  color: var(--fs-text-1, #1f2329);
+}
+
+.be-ctxmenu__sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--fs-border-light, #eff0f1);
+}
+
+/* —— 表头拖拽排序（飞书：拖动列头调整列顺序）—— */
+
+.base-grid__head {
+  position: relative;
+  cursor: grab;
+}
+
+.base-grid__head:active {
+  cursor: grabbing;
+}
+
+.base-grid__head.is-dragging {
+  opacity: 0.45;
+}
+
+.base-grid__head.is-drop-before::before,
+.base-grid__head.is-drop-after::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--fs-blue, #3370ff);
+}
+
+.base-grid__head.is-drop-before::before {
+  left: -1px;
+}
+
+.base-grid__head.is-drop-after::after {
+  right: -1px;
+}

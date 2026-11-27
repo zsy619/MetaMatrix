@@ -90,6 +90,8 @@ func newConcFixture(t *testing.T) *concFixture {
 		&model.BaseRecord{}, &model.BaseRecordValue{}, &model.BaseView{},
 		&model.BaseRecordLink{}, &model.BaseEventOutbox{}, &model.BaseOperationLog{},
 		&model.BaseFieldFormula{}, &model.BaseFormulaDependency{},
+		&model.BaseRecordReverseLink{}, &model.BaseRecordGrant{}, &model.BaseFieldPolicy{},
+		&model.BaseViewPref{}, &model.BaseImportJob{}, &model.BaseUserGroup{},
 	); err != nil {
 		t.Fatalf("migrate failed: %v", err)
 	}
@@ -105,6 +107,14 @@ func newConcFixture(t *testing.T) *concFixture {
 		}).Error; err != nil {
 			t.Fatalf("insert member failed: %v", err)
 		}
+	}
+	// 建一个真实的 Base 行：租户边界校验（记录 → 表 → Base → 空间）
+	// 依赖 base_apps 有对应行，否则会被当成「孤儿表」放行，测不到隔离性。
+	if err := db.Create(&model.BaseApp{
+		ID: baseID, TenantID: projectID, ProjectID: projectID,
+		Name: "并发 Base", OwnerID: userA, Status: 1, SchemaVersion: 1,
+	}).Error; err != nil {
+		t.Fatalf("insert base app failed: %v", err)
 	}
 	svc := NewService(db)
 	ctx := context.Background()

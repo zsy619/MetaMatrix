@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -24,14 +25,28 @@ type Service struct {
 	events   *EventHub
 	// bundleSecret 是配置包签名密钥（由 JWT_SECRET 派生注入）。
 	bundleSecret string
+	// outboxMu / outboxAt 是本实例的事件读取水位（多实例各自读全量、推给各自的订阅者）。
+	outboxMu sync.Mutex
+	outboxAt outboxCursor
+	// maintenanceMu / maintenance 是后台维护任务（归档、死信治理、清理）的参数。
+	maintenanceMu sync.Mutex
+	maintenance   MaintenanceConfig
 }
+
+// baseBatchChunk 是批量写入时「一个事务写多少行」。
+//
+// 取 50 是权衡结果：事务太大 → 行锁长期持有，多个并发批次互相等锁，
+// 整批写入会直接卡死；事务太小 → 往返数又跟行数成正比。
+// 50 行一批在压测里既能压住往返数，又能让事务在几十毫秒内提交。
+const baseBatchChunk = 50
 
 // NewService 构造 Base Engine 服务。
 func NewService(db *gorm.DB) *Service {
 	return &Service{
-		db:       db,
-		registry: NewRegistry(),
-		events:   NewEventHub(),
+		db:          db,
+		registry:    NewRegistry(),
+		events:      NewEventHub(),
+		maintenance: DefaultMaintenanceConfig(),
 	}
 }
 
@@ -162,6 +177,7 @@ func (s *Service) EnsureBase(ctx context.Context, userID, projectID, nodeID uuid
 	}
 	app = BaseApp{
 		ID:        uuid.New(),
+		TenantID:  projectID,
 		ProjectID: projectID,
 		NodeID:    &nodeID,
 		Name:      strings.TrimSpace(name),
@@ -261,6 +277,7 @@ func (s *Service) CreateBase(ctx context.Context, userID, projectID uuid.UUID, i
 	}
 	app := BaseApp{
 		ID:          uuid.New(),
+		TenantID:    projectID,
 		ProjectID:   projectID,
 		Name:        name,
 		Description: strings.TrimSpace(derefStr(in.Description)),
@@ -272,6 +289,11 @@ func (s *Service) CreateBase(ctx context.Context, userID, projectID uuid.UUID, i
 		return nil, err
 	}
 	s.seedDefaultTable(ctx, userID, projectID, app.ID)
+	// 播种默认表是一次结构变更（会推进 Base 的 schemaVersion），
+	// 这里重新读一次，保证返回给调用方的结构版本与库里一致。
+	if err := s.db.WithContext(ctx).Where("id = ?", app.ID).First(&app).Error; err != nil {
+		return nil, err
+	}
 	return baseInfoOf(&app), nil
 }
 
@@ -448,6 +470,7 @@ func (s *Service) CreateTable(ctx context.Context, userID, projectID, baseID uui
 	}
 	table := BaseTable{
 		ID:          uuid.New(),
+		TenantID:    projectID,
 		BaseID:      baseID,
 		Name:        name,
 		Description: strings.TrimSpace(description),
@@ -460,6 +483,7 @@ func (s *Service) CreateTable(ctx context.Context, userID, projectID, baseID uui
 		}
 		primary := BaseField{
 			ID:        uuid.New(),
+			TenantID:  projectID,
 			TableID:   table.ID,
 			Name:      "名称",
 			Type:      string(FieldText),
@@ -529,8 +553,60 @@ func (s *Service) DeleteTable(ctx context.Context, userID, projectID, tableID uu
 
 // bumpSchema 推进表的结构版本。
 func (s *Service) bumpSchema(tx *gorm.DB, tableID uuid.UUID) error {
-	return tx.Model(&BaseTable{}).Where("id = ?", tableID).
-		UpdateColumn("schema_version", gorm.Expr("schema_version + 1")).Error
+	if err := tx.Model(&BaseTable{}).Where("id = ?", tableID).
+		UpdateColumn("schema_version", gorm.Expr("schema_version + 1")).Error; err != nil {
+		return err
+	}
+	// 表结构变了 → 广播 schema.changed（技术文档 §8.2 事件清单）。
+	// 订阅端据此重新拉字段元信息；不带这条事件时，客户端会继续用旧 schema 渲染。
+	return s.emitSchemaChanged(tx, tableID)
+}
+
+// emitSchemaChanged 在事务内写一条 schema.changed 事件。
+func (s *Service) emitSchemaChanged(tx *gorm.DB, tableID uuid.UUID) error {
+	var table BaseTable
+	if err := tx.Select("id, base_id").Where("id = ?", tableID).First(&table).Error; err != nil {
+		// 表刚被删掉（软删）时拿不到 base_id —— 结构变更事件可以省略。
+		return nil
+	}
+	var app BaseApp
+	if err := tx.Select("id, project_id").Where("id = ?", table.BaseID).First(&app).Error; err != nil {
+		return nil
+	}
+	// Base 级结构版本同步推进：文档 §4 要求「字段 / 表变更会推进 Base 的结构版本」。
+	// 之前只推进了表级版本，导致 Base.schemaVersion 永远停在 1，
+	// 客户端拿它判断「结构有没有变」时形同虚设。
+	if err := tx.Model(&BaseApp{}).Where("id = ?", table.BaseID).
+		UpdateColumn("schema_version", gorm.Expr("schema_version + 1")).Error; err != nil {
+		return err
+	}
+	return s.writeEventOptional(tx, app.ProjectID, table.BaseID, &table.ID, nil, "table", "schema.changed", map[string]any{
+		"tableId": table.ID.String(),
+		"baseId":  table.BaseID.String(),
+	})
+}
+
+// emitFieldEvent 广播字段级事件（field.created / field.updated / field.deleted）。
+func (s *Service) emitFieldEvent(tx *gorm.DB, projectID, tableID, fieldID uuid.UUID, eventType string, payload map[string]any) error {
+	var table BaseTable
+	if err := tx.Select("id, base_id").Where("id = ?", tableID).First(&table).Error; err != nil {
+		return nil
+	}
+	return s.writeEventOptional(tx, projectID, table.BaseID, &table.ID, &fieldID, "field", eventType, payload)
+}
+
+// emitViewEvent 广播视图事件（view.updated）。
+func (s *Service) emitViewEvent(tx *gorm.DB, projectID, tableID, viewID uuid.UUID, eventType string, payload map[string]any) error {
+	var table BaseTable
+	if err := tx.Select("id, base_id").Where("id = ?", tableID).First(&table).Error; err != nil {
+		return nil
+	}
+	return s.writeEventOptional(tx, projectID, table.BaseID, &table.ID, &viewID, "view", eventType, payload)
+}
+
+// emitRecordEvent 广播记录级事件（record.batch_updated 等）。
+func (s *Service) emitRecordEvent(tx *gorm.DB, projectID, baseID, tableID, recordID uuid.UUID, eventType string, payload map[string]any) error {
+	return s.writeEventOptional(tx, projectID, baseID, &tableID, &recordID, "record", eventType, payload)
 }
 
 // —— Field ——
@@ -568,7 +644,9 @@ func (s *Service) ListFields(ctx context.Context, userID, projectID, tableID uui
 // loadFieldIndex 加载表字段元信息与处理器。
 func (s *Service) loadFieldIndex(ctx context.Context, tableID uuid.UUID) (*fieldIndex, error) {
 	var rows []BaseField
-	if err := s.db.WithContext(ctx).Where("table_id = ? AND status = 1", tableID).Order("sort_order ASC").Find(&rows).Error; err != nil {
+	// sort_order 相同的字段（历史数据）必须有稳定的次序，
+	// 否则每次刷新列顺序都可能变（PostgreSQL 不保证同值行的相对顺序）。
+	if err := s.db.WithContext(ctx).Where("table_id = ? AND status = 1", tableID).Order("sort_order ASC, created_at ASC, id ASC").Find(&rows).Error; err != nil {
 		return nil, err
 	}
 	idx := &fieldIndex{byID: map[uuid.UUID]FieldMeta{}, handlers: map[uuid.UUID]FieldHandler{}}
@@ -591,7 +669,86 @@ func (s *Service) loadFieldIndex(ctx context.Context, tableID uuid.UUID) (*field
 			idx.handlers[f.ID] = handler
 		}
 	}
+	// 字段级权限策略以 base_field_policies 表为准（config 里那份是双写副本）。
+	s.overlayFieldPolicies(ctx, tableID, idx)
 	return idx, nil
+}
+
+// overlayFieldPolicies 把独立表里的字段策略覆盖到字段元信息上。
+//
+// 双写期内表为准、config 为副本；表里没有记录时沿用 config（历史数据兜底）。
+func (s *Service) overlayFieldPolicies(ctx context.Context, tableID uuid.UUID, idx *fieldIndex) {
+	if idx == nil || len(idx.byID) == 0 {
+		return
+	}
+	var rows []BaseFieldPolicy
+	if err := s.db.WithContext(ctx).Where("table_id = ?", tableID).Find(&rows).Error; err != nil {
+		// 表还不存在（老库未迁移）时静默降级到 config 里的策略。
+		return
+	}
+	for _, row := range rows {
+		fieldID, err := uuid.Parse(row.FieldID.String())
+		if err != nil {
+			continue
+		}
+		meta, ok := idx.byID[fieldID]
+		if !ok {
+			continue
+		}
+		policy := map[string]any{}
+		if len(row.Policy) > 0 {
+			_ = json.Unmarshal(row.Policy, &policy)
+		}
+		if meta.Config == nil {
+			meta.Config = map[string]any{}
+		}
+		meta.Config["permissions"] = policy
+		idx.byID[fieldID] = meta
+	}
+}
+
+// syncFieldPolicy 双写字段策略到独立表（与 base_fields.config.permissions 保持一致）。
+func (s *Service) syncFieldPolicy(ctx context.Context, tx *gorm.DB, projectID, tableID, fieldID uuid.UUID, cfg map[string]any) {
+	if tx == nil {
+		tx = s.db
+	}
+	// 独立策略表可能还没迁移（老库 / 精简影子库）。
+	// **必须先判断表是否存在再执行语句**：Postgres 里一条失败语句会让整个
+	// 事务进入 aborted 状态，之后所有语句都会失败 —— 「吞掉错误」是拦不住的。
+	if !tx.Migrator().HasTable(&BaseFieldPolicy{}) {
+		return
+	}
+	raw, ok := cfg["permissions"]
+	if !ok {
+		// 没有策略 → 删除独立表记录。
+		_ = tx.WithContext(ctx).Where("field_id = ?", fieldID).Delete(&BaseFieldPolicy{}).Error
+		return
+	}
+	policy, err := json.Marshal(raw)
+	if err != nil {
+		return
+	}
+	now := time.Now()
+	var existing BaseFieldPolicy
+	err = tx.WithContext(ctx).Where("field_id = ?", fieldID).First(&existing).Error
+	if err == nil {
+		_ = tx.WithContext(ctx).Model(&BaseFieldPolicy{}).Where("id = ?", existing.ID).
+			Updates(map[string]any{"policy": policy, "updated_at": now}).Error
+		return
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return
+	}
+	_ = tx.WithContext(ctx).Create(&BaseFieldPolicy{
+		ID:        uuid.New(),
+		TenantID:  projectID,
+		ProjectID: projectID,
+		TableID:   tableID,
+		FieldID:   fieldID,
+		Policy:    policy,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}).Error
 }
 
 // loadTableSchema 加载表与字段元信息，并做空间权限校验。
@@ -606,11 +763,60 @@ func (s *Service) loadTableSchema(ctx context.Context, userID, projectID, tableI
 		}
 		return nil, nil, err
 	}
+	// 租户边界校验：表 → Base → 空间。
+	//
+	// assertAccess 只证明「这个用户是 projectID 的成员」，
+	// 并不能证明「这张表属于 projectID」。没有这一步的话，
+	// 只要猜到别的空间的 tableId 就能读到它的字段与数据 —— 跨空间越权。
+	if err := s.assertBaseInProject(ctx, projectID, table.BaseID); err != nil {
+		return nil, nil, err
+	}
 	idx, err := s.loadFieldIndex(ctx, tableID)
 	if err != nil {
 		return nil, nil, err
 	}
 	return &table, idx, nil
+}
+
+// assertBaseInProject 校验 Base 属于指定空间。
+//
+// 口径：Base 记录存在但属于别的空间 → 拒绝（跨空间越权）；
+// Base 记录完全不存在（孤儿表 / 影子库）→ 放行，不阻断业务。
+func (s *Service) assertBaseInProject(ctx context.Context, projectID, baseID uuid.UUID) error {
+	if baseID == uuid.Nil {
+		return ErrBaseNotFound
+	}
+	var app BaseApp
+	if err := s.db.WithContext(ctx).
+		Select("id, project_id").
+		Where("id = ? AND deleted_at IS NULL", baseID).
+		First(&app).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// Base 不存在 → 孤儿表，放行（不因为数据不完整就拒绝正常操作）。
+			return nil
+		}
+		// 影子库（精简测试库）没有 base_apps 表 → 无法验证归属，放行。
+		if isMissingTable(err) {
+			return nil
+		}
+		return err
+	}
+	if app.ProjectID != projectID {
+		// Base 属于别的空间 → 跨空间越权，按「不存在」处理。
+		return ErrBaseNotFound
+	}
+	return nil
+}
+
+// isMissingTable 判断错误是否是「表不存在」。
+func isMissingTable(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "no such table") ||
+		strings.Contains(msg, "doesn't exist") ||
+		strings.Contains(msg, "does not exist")
 }
 
 // CreateField 创建字段。
@@ -636,6 +842,7 @@ func (s *Service) CreateField(ctx context.Context, userID, projectID, tableID uu
 	rawCfg, _ := json.Marshal(cfg)
 	field := BaseField{
 		ID:        uuid.New(),
+		TenantID:  projectID,
 		TableID:   tableID,
 		Name:      name,
 		Type:      in.Type,
@@ -650,14 +857,23 @@ func (s *Service) CreateField(ctx context.Context, userID, projectID, tableID uu
 		if err := tx.Create(&field).Error; err != nil {
 			return err
 		}
-		return s.bumpSchema(tx, tableID)
+		// 字段策略双写：config.permissions → base_field_policies。
+		s.syncFieldPolicy(ctx, tx, projectID, tableID, field.ID, cfg)
+		if err := s.bumpSchema(tx, tableID); err != nil {
+			return err
+		}
+		return s.emitFieldEvent(tx, projectID, tableID, field.ID, "field.created", map[string]any{
+			"fieldId": field.ID.String(),
+			"name":    field.Name,
+			"type":    field.Type,
+		})
 	})
 	if err != nil {
 		return nil, err
 	}
 	// 新字段可能是可筛选类型（长文本 / 关联记录 / 关联文档），
 	// 存量记录里的同名字段值需要补投影，否则筛选会「命中为空」。
-	if err := s.reindexTable(ctx, tableID); err != nil {
+	if err := s.reindexTable(ctx, tableID, projectID); err != nil {
 		return nil, err
 	}
 	return &FieldMeta{
@@ -734,10 +950,17 @@ func (s *Service) UpdateField(ctx context.Context, userID, projectID, fieldID uu
 	if err := s.db.WithContext(ctx).Model(&field).Updates(updates).Error; err != nil {
 		return nil, err
 	}
+	// 字段策略双写：独立表始终与 config.permissions 保持一致。
+	s.syncFieldPolicy(ctx, s.db, projectID, field.TableID, field.ID, cfg)
 	name := field.Name
 	if in.Name != nil {
 		name = strings.TrimSpace(*in.Name)
 	}
+	// 字段元信息变了 → 广播 field.updated（技术文档 §8.2）。
+	_ = s.emitFieldEvent(s.db.WithContext(ctx), projectID, field.TableID, field.ID, "field.updated", map[string]any{
+		"fieldId": field.ID.String(),
+		"name":    name,
+	})
 
 	required := field.Required
 	if in.Required != nil {
@@ -753,7 +976,7 @@ func (s *Service) UpdateField(ctx context.Context, userID, projectID, fieldID uu
 	}
 	// 字段能力变化（例如附件从不可索引改为可索引）后，重建整表投影，
 	// 否则存量记录仍然没有投影行，关键字搜索搜不到。
-	if err := s.reindexTable(ctx, field.TableID); err != nil {
+	if err := s.reindexTable(ctx, field.TableID, projectID); err != nil {
 		return nil, err
 	}
 	// 权限策略变了 → 广播 permission.changed，让订阅端重新拉字段元信息与数据
@@ -836,6 +1059,23 @@ func (s *Service) DeleteField(ctx context.Context, userID, projectID, fieldID uu
 		if err := tx.Where("id = ?", fieldID).Delete(&BaseField{}).Error; err != nil {
 			return err
 		}
+		// 字段策略独立表同步清理，避免留下指向已删字段的孤儿策略。
+		// 表还不存在（老库未迁移 / 精简影子库）时忽略，不阻断删字段。
+		if err := tx.Where("field_id = ?", fieldID).Delete(&BaseFieldPolicy{}).Error; err != nil &&
+			!strings.Contains(err.Error(), "no such table") {
+			return err
+		}
+		// 删掉该字段产生的历史关联（正反向都要清）。
+		// 不清的话，表里最后一个 link 字段被删除后，残留的关联边
+		// 仍会被「谁关联了我」反查命中。
+		if err := tx.Where("field_id = ?", fieldID).Delete(&BaseRecordLink{}).Error; err != nil &&
+			!strings.Contains(err.Error(), "no such table") {
+			return err
+		}
+		if err := tx.Where("field_id = ?", fieldID).Delete(&BaseRecordReverseLink{}).Error; err != nil &&
+			!strings.Contains(err.Error(), "no such table") {
+			return err
+		}
 		if err := tx.Where("field_id = ?", fieldID).Delete(&BaseRecordValue{}).Error; err != nil {
 			return err
 		}
@@ -869,7 +1109,13 @@ func (s *Service) DeleteField(ctx context.Context, userID, projectID, fieldID uu
 				return err
 			}
 		}
-		return s.bumpSchema(tx, field.TableID)
+		if err := s.bumpSchema(tx, field.TableID); err != nil {
+			return err
+		}
+		return s.emitFieldEvent(tx, projectID, field.TableID, field.ID, "field.deleted", map[string]any{
+			"fieldId": field.ID.String(),
+			"name":    field.Name,
+		})
 	})
 }
 
@@ -909,7 +1155,7 @@ func (s *Service) recalcTableFormulas(ctx context.Context, tableID uuid.UUID) er
 			UpdateColumns(map[string]any{"data": raw, "version": gorm.Expr("version + 1")}).Error; err != nil {
 			return err
 		}
-		if err := s.syncAllProjections(s.db.WithContext(ctx), tableID, rec.ID, computed); err != nil {
+		if err := s.syncAllProjections(s.db.WithContext(ctx), tableID, rec.ID, table.TenantID, computed); err != nil {
 			return err
 		}
 	}
@@ -975,7 +1221,7 @@ func (s *Service) MigrateField(ctx context.Context, userID, projectID, fieldID u
 			if err := tx.Model(&BaseRecord{}).Where("id = ?", p.record.ID).UpdateColumn("data", raw).Error; err != nil {
 				return err
 			}
-			if err := s.syncProjection(tx, field.TableID, p.record.ID, fieldID, p.value); err != nil {
+			if err := s.syncProjection(tx, field.TableID, p.record.ID, fieldID, projectID, p.value); err != nil {
 				return err
 			}
 		}
@@ -985,13 +1231,25 @@ func (s *Service) MigrateField(ctx context.Context, userID, projectID, fieldID u
 		}).Error; err != nil {
 			return err
 		}
-		return s.bumpSchema(tx, field.TableID)
+		if err := s.bumpSchema(tx, field.TableID); err != nil {
+			return err
+		}
+		// 类型迁移是结构变更 → 广播 field.updated + schema.changed。
+		if err := s.emitFieldEvent(tx, projectID, field.TableID, fieldID, "field.updated", map[string]any{
+			"fieldId": fieldID.String(),
+			"type":    newType,
+			"migrate": true,
+		}); err != nil {
+			return err
+		}
+		// 投影重建与数据迁移必须同事务：否则迁移失败回滚后，
+		// 数据是旧类型、投影却是新类型，两边对不上。
+		if err := s.reindexTableTx(tx, field.TableID, projectID); err != nil {
+			return err
+		}
+		return nil
 	})
 	if err != nil {
-		return nil, err
-	}
-	// 类型变了，投影类型可能也变（如 text → doc）：重建全表投影。
-	if err := s.reindexTable(ctx, field.TableID); err != nil {
 		return nil, err
 	}
 	return &FieldMeta{
@@ -1012,17 +1270,176 @@ type RecordInput struct {
 	// Grants 是「指定成员可见」时的授权成员 ID 列表；nil 表示不改，
 	// 空数组表示清空授权名单（此时除创建者与管理者外谁都看不到）。
 	Grants *[]string `json:"grants"`
+	// GrantSubjects 是更完整的授权名单（支持部门 + 有效期）。
+	// 与 Grants 二选一：传了 GrantSubjects 就以它为准。
+	GrantSubjects *[]GrantSubject `json:"grantSubjects"`
 }
 
 // CreateRecord 新建记录。
 func (s *Service) CreateRecord(ctx context.Context, userID, projectID, tableID uuid.UUID, in RecordInput) (*RecordRow, error) {
-	if err := s.assertAccess(userID, projectID, RoleEditor); err != nil {
-		return nil, err
+	started := time.Now()
+	row, err := s.createRecord(ctx, userID, projectID, tableID, in)
+	ObserveOperation(OpCreateRecord, time.Since(started), err)
+	return row, err
+}
+
+// createRecord 是 CreateRecord 的真实实现（耗时统计包在 CreateRecord 里）。
+// writeIO 是一次写入里「所有行共享」的上下文。
+//
+// 解决两个问题：
+//  1. 表结构 / 字段元数据 / 权限身份 / 排序位基线都提到循环外 ——
+//     批量写入不再逐行重查（500 行就是几千次重复往返）。
+//  2. 「公式表 / 关系表是否存在」的探测也只做一次 —— 事务里每行查一次
+//     information_schema，500 行就是 1000 次无谓往返。
+type writeIO struct {
+	table      *BaseTable
+	idx        *fieldIndex
+	projFields []BaseField
+	subj       policySubject
+
+	tablesProbed bool
+	hasFormulas  bool
+	hasLinks     bool
+
+	// formulas 是本表的公式定义（一次写入只查一次）。
+	//
+	// 旧实现每写一行都要 `SELECT ... WHERE field_id IN (本表字段)`，
+	// 500 行就是 500 次重复查询；公式定义在一次写入期间不会变，缓存即可。
+	formulasLoaded bool
+	formulas       map[string]BaseFieldFormula
+
+	// pendingAudits / pendingEvents 是「攒一批再落库」的审计与事件。
+	//
+	// 每行单独 INSERT 审计 + 发件箱，批量写入时往返数被放大 N 倍；
+	// 改成事务收尾时批量插入，往返数与行数脱钩。
+	pendingAudits []BaseOperationLog
+	pendingEvents []BaseEventOutbox
+}
+
+// tableFormulas 载入本表公式（一次写入只载一次）。
+func (io *writeIO) tableFormulas(tx *gorm.DB) map[string]BaseFieldFormula {
+	if io.formulasLoaded {
+		return io.formulas
 	}
+	io.formulasLoaded = true
+	io.formulas = loadTableFormulas(tx, io.idx, io.hasFormulas)
+	return io.formulas
+}
+
+// flushPending 把累积的审计与事件批量落库（与业务数据同事务）。
+func (io *writeIO) flushPending(tx *gorm.DB) error {
+	if len(io.pendingAudits) > 0 {
+		if err := tx.CreateInBatches(&io.pendingAudits, 200).Error; err != nil {
+			return err
+		}
+		io.pendingAudits = io.pendingAudits[:0]
+	}
+	if len(io.pendingEvents) > 0 {
+		if err := tx.CreateInBatches(&io.pendingEvents, 200).Error; err != nil {
+			return err
+		}
+		io.pendingEvents = io.pendingEvents[:0]
+	}
+	return nil
+}
+
+// truncatePending 丢弃已被回滚的行产生的审计与事件。
+//
+// 批量写入里单行失败会 ROLLBACK TO SAVEPOINT，那一行的审计 / 事件
+// 也不能留下 —— 否则会出现「记录没写成、审计却写了」的假象。
+func (io *writeIO) truncatePending(audits, events int) {
+	if audits <= len(io.pendingAudits) {
+		io.pendingAudits = io.pendingAudits[:audits]
+	}
+	if events <= len(io.pendingEvents) {
+		io.pendingEvents = io.pendingEvents[:events]
+	}
+}
+
+// newWriteIO 组装一次写入的共享上下文。
+//
+// **必须在开启事务之前调用**：权限身份（subjectOf）与字段元数据的读取
+// 都要走独立连接；如果放在事务开启之后做，就会出现
+// 「事务占着 1 条连接 + 查询再要 1 条」，并发一上来就把连接池打满，
+// 所有请求互相等待 —— 压测里表现为整批写入卡死、库里一排 idle in transaction。
+func (s *Service) newWriteIO(ctx context.Context, userID, projectID, tableID uuid.UUID) (*writeIO, error) {
 	table, idx, err := s.loadTableSchema(ctx, userID, projectID, tableID)
 	if err != nil {
 		return nil, err
 	}
+	projFields, err := s.loadProjectionFields(ctx, tableID)
+	if err != nil {
+		return nil, err
+	}
+	return &writeIO{
+		table:      table,
+		idx:        idx,
+		projFields: projFields,
+		subj:       s.subjectOf(userID, projectID),
+	}, nil
+}
+
+// probeTables 探测「公式表 / 关系表是否存在」，一次写入只探一次。
+func (io *writeIO) probeTables(tx *gorm.DB) {
+	if io.tablesProbed {
+		return
+	}
+	io.tablesProbed = true
+	io.hasFormulas = tx.Migrator().HasTable(&BaseFieldFormula{})
+	io.hasLinks = tx.Migrator().HasTable(&BaseRecordLink{})
+}
+
+// allocSortBase 取表内当前最大排序位（-1 表示空表）。
+//
+// 在事务内取，保证同一批里的排序位连续，且不会与已提交的行撞号。
+func allocSortBase(tx *gorm.DB, tableID uuid.UUID) (int64, error) {
+	var max int64
+	if err := tx.Model(&BaseRecord{}).
+		Where("table_id = ? AND deleted_at IS NULL", tableID).
+		Select("COALESCE(MAX(sort_order), -1)").Scan(&max).Error; err != nil {
+		return 0, err
+	}
+	return max, nil
+}
+
+// createRecord 创建单条记录。
+func (s *Service) createRecord(ctx context.Context, userID, projectID, tableID uuid.UUID, in RecordInput) (*RecordRow, error) {
+	if err := s.assertAccess(userID, projectID, RoleEditor); err != nil {
+		return nil, err
+	}
+	io, err := s.newWriteIO(ctx, userID, projectID, tableID)
+	if err != nil {
+		return nil, err
+	}
+	// 校验放在事务外（校验要查库，走独立连接）。
+	prepared, err := s.prepareRecord(ctx, userID, projectID, io.table, io.idx, in, io.subj)
+	if err != nil {
+		return nil, err
+	}
+	// sortBase 传 -1：在事务内按当前表末尾分配排序位。
+	return s.persistRecord(ctx, userID, projectID, io, -1, prepared, nil)
+}
+
+// preparedRecord 是「校验通过、可以落库」的记录内容。
+type preparedRecord struct {
+	normalized map[string]any
+	visibility string
+}
+
+// prepareRecord 做写入前的归一化与校验（不碰事务）。
+//
+// 为什么要拆出来：**校验要查库（文档引用 / 关联记录是否有效）**，
+// 如果放在事务内做，这些查询会走另一条连接；批量写入并发时
+// 「事务占一条 + 校验再要一条」会把连接池打满，形成互相等待的死锁。
+// 所以校验一律在事务开启之前完成。
+func (s *Service) prepareRecord(
+	ctx context.Context,
+	userID, projectID uuid.UUID,
+	table *BaseTable,
+	idx *fieldIndex,
+	in RecordInput,
+	subject policySubject,
+) (*preparedRecord, error) {
 	normalized, err := s.normalizeValues(idx, in.Fields)
 	if err != nil {
 		return nil, err
@@ -1030,18 +1447,11 @@ func (s *Service) CreateRecord(ctx context.Context, userID, projectID, tableID u
 	if err := s.validateDocRefs(ctx, projectID, idx, normalized); err != nil {
 		return nil, err
 	}
-	if err := s.validateLinkRefs(ctx, table.BaseID, idx, normalized); err != nil {
+	if err := s.validateLinkRefs(ctx, table.BaseID, projectID, userID, idx, normalized); err != nil {
 		return nil, err
 	}
 	// 条件可见字段：新记录自身也要满足条件才能写入（合并后的值 = 本次提交）。
-	if err := s.assertWritableFields(idx, s.subjectOf(userID, projectID), normalized, normalized); err != nil {
-		return nil, err
-	}
-	// 新记录排到当前表末尾（手动排序位）。
-	var maxSort int64
-	if err := s.db.WithContext(ctx).Model(&BaseRecord{}).
-		Where("table_id = ? AND deleted_at IS NULL", tableID).
-		Select("COALESCE(MAX(sort_order), -1)").Scan(&maxSort).Error; err != nil {
+	if err := s.assertWritableFields(idx, subject, normalized, normalized); err != nil {
 		return nil, err
 	}
 	// 新记录默认「空间可见」；创建者即受限记录的唯一可见者。
@@ -1053,49 +1463,91 @@ func (s *Service) CreateRecord(ctx context.Context, userID, projectID, tableID u
 		}
 		visibility = v
 	}
+	return &preparedRecord{normalized: normalized, visibility: visibility}, nil
+}
+
+// persistRecord 把已校验的记录写进库（事务内）。
+//
+// outerTx 非空时复用外部事务（批量写入用）。
+// sortBase < 0 表示「在事务内按当前表末尾分配排序位」。
+//
+// 事务内**只允许出现纯写入语句**：任何走 s.db 的查询都会再要一条连接，
+// 与「事务已经占住一条」叠加后，连接池一满就整体死锁。
+func (s *Service) persistRecord(
+	ctx context.Context,
+	userID, projectID uuid.UUID,
+	io *writeIO,
+	sortBase int64,
+	prepared *preparedRecord,
+	outerTx *gorm.DB,
+) (*RecordRow, error) {
+	normalized := prepared.normalized
 	rec := BaseRecord{
 		ID:         uuid.New(),
-		TableID:    tableID,
-		SortOrder:  maxSort + 1,
+		TenantID:   projectID,
+		TableID:    io.table.ID,
 		Version:    1,
-		Visibility: visibility,
+		Visibility: prepared.visibility,
 		CreatedBy:  userID,
 		UpdatedBy:  userID,
 	}
 	now := time.Now()
 	rec.CreatedAt = now
 	rec.UpdatedAt = now
-	if err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	write := func(tx *gorm.DB) error {
+		io.probeTables(tx)
+		if sortBase < 0 {
+			base, err := allocSortBase(tx, io.table.ID)
+			if err != nil {
+				return err
+			}
+			sortBase = base
+		}
+		rec.SortOrder = sortBase + 1
 		// 系统字段（创建时间 / 创建人 …）先落库，公式才能引用它们。
-		applySystemFields(idx, normalized, now, now, userID, userID)
-		normalized, err = s.recomputeFormulas(tx, table, idx, normalized)
+		applySystemFields(io.idx, normalized, now, now, userID, userID)
+		computed, err := s.applyFormulas(io.table, io.idx, normalized, io.tableFormulas(tx))
 		if err != nil {
 			return err
 		}
+		normalized = computed
 		raw, _ := json.Marshal(normalized)
 		rec.Data = raw
 		if err := tx.Create(&rec).Error; err != nil {
 			return err
 		}
-		if err := s.syncAllProjections(tx, tableID, rec.ID, normalized); err != nil {
+		if err := s.syncProjectionsWithFields(tx, io.table.ID, rec.ID, projectID, normalized, io.projFields); err != nil {
 			return err
 		}
-		if err := s.syncRecordLinks(tx, table, idx, rec.ID, normalized); err != nil {
+		if err := s.syncRecordLinksWith(tx, io.table, io.idx, rec.ID, normalized, io.hasLinks); err != nil {
 			return err
 		}
-		if err := s.writeAudit(tx, projectID, table.BaseID, &tableID, &rec.ID, userID, "record.created", nil, normalized, ""); err != nil {
-			return err
-		}
+		// 审计与事件先入缓冲，事务收尾时批量落库（往返数与行数脱钩）。
+		io.pendingAudits = append(io.pendingAudits, newAuditRow(
+			projectID, io.table.BaseID, &io.table.ID, &rec.ID, userID, "record.created", nil, normalized, ""))
 		// 事件只广播「哪些字段变了」，不广播值：
 		// SSE 订阅不区分角色，带值会绕过字段级权限（隐藏字段泄露）。
-		return s.writeEvent(tx, projectID, table.BaseID, &tableID, &rec.ID, "record.created", map[string]any{
-			"version":  rec.Version,
-			"fieldIds": fieldIDsOf(normalized),
-		})
+		io.pendingEvents = append(io.pendingEvents, newEventRow(
+			projectID, io.table.BaseID, &io.table.ID, &rec.ID, "record", "record.created", map[string]any{
+				"version":  rec.Version,
+				"fieldIds": fieldIDsOf(normalized),
+			}))
+		return nil
+	}
+	if outerTx != nil {
+		// 外部事务：审计 / 事件由调用方在事务收尾时批量落库。
+		if err := write(outerTx.WithContext(ctx)); err != nil {
+			return nil, err
+		}
+	} else if err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := write(tx); err != nil {
+			return err
+		}
+		return io.flushPending(tx)
 	}); err != nil {
 		return nil, err
 	}
-	stripped, condHidden := stripHiddenFieldsWithReasons(normalized, idx, s.subjectOf(userID, projectID))
+	stripped, condHidden := stripHiddenFieldsWithReasons(normalized, io.idx, io.subj)
 	return &RecordRow{
 		ID: rec.ID, Version: rec.Version,
 		Fields:            stripped,
@@ -1106,11 +1558,34 @@ func (s *Service) CreateRecord(ctx context.Context, userID, projectID, tableID u
 	}, nil
 }
 
+// loadProjectionFields 读取表内参与查询投影的字段元数据（含类型）。
+func (s *Service) loadProjectionFields(ctx context.Context, tableID uuid.UUID) ([]BaseField, error) {
+	var fields []BaseField
+	if err := s.db.WithContext(ctx).Where("table_id = ? AND status = 1", tableID).Find(&fields).Error; err != nil {
+		return nil, err
+	}
+	return fields, nil
+}
+
 // UpdateRecord 更新记录（乐观锁）。
 func (s *Service) UpdateRecord(ctx context.Context, userID, projectID, recordID uuid.UUID, in RecordInput) (*RecordRow, error) {
+	started := time.Now()
+	row, err := s.updateRecord(ctx, userID, projectID, recordID, in)
+	ObserveOperation(OpUpdateRecord, time.Since(started), err)
+	return row, err
+}
+
+// updateRecord 是 UpdateRecord 的真实实现（耗时统计包在 UpdateRecord 里）。
+func (s *Service) updateRecord(ctx context.Context, userID, projectID, recordID uuid.UUID, in RecordInput) (*RecordRow, error) {
 	if err := s.assertAccess(userID, projectID, RoleEditor); err != nil {
 		return nil, err
 	}
+	// 权限身份只解析一次。
+	//
+	// 旧实现每次更新要查 4~5 次角色（assertWritableFields / 可见范围 /
+	// 授权名单 / 收尾的字段裁剪），每次都是 1~2 条 SQL；
+	// 批量更新 100 行就是几百次重复往返，P95 直接被拖到秒级。
+	subj := s.subjectOf(userID, projectID)
 	rec, err := s.scopeLoadRecord(ctx, userID, projectID, recordID)
 	if err != nil {
 		return nil, err
@@ -1140,7 +1615,7 @@ func (s *Service) UpdateRecord(ctx context.Context, userID, projectID, recordID 
 	if err := s.validateDocRefs(ctx, projectID, idx, patch); err != nil {
 		return nil, err
 	}
-	if err := s.validateLinkRefs(ctx, table.BaseID, idx, patch); err != nil {
+	if err := s.validateLinkRefs(ctx, table.BaseID, projectID, userID, idx, patch); err != nil {
 		return nil, err
 	}
 	// 条件可见字段：按「旧值 + 本次提交」合并后的记录判断可见性。
@@ -1151,7 +1626,7 @@ func (s *Service) UpdateRecord(ctx context.Context, userID, projectID, recordID 
 	for k, v := range patch {
 		merged[k] = v
 	}
-	if err := s.assertWritableFields(idx, s.subjectOf(userID, projectID), patch, merged); err != nil {
+	if err := s.assertWritableFields(idx, subj, patch, merged); err != nil {
 		return nil, err
 	}
 	for k, v := range patch {
@@ -1166,33 +1641,47 @@ func (s *Service) UpdateRecord(ctx context.Context, userID, projectID, recordID 
 			return nil, err
 		}
 		if v != rec.Visibility {
-			if roleRank(s.roleOf(userID, projectID)) < roleRank(RoleAdmin) {
+			if roleRank(subj.role) < roleRank(RoleAdmin) {
 				return nil, fmt.Errorf("%w: 只有空间管理者可以修改记录可见范围", ErrForbidden)
 			}
 			newVisibility = v
 		}
 	}
 	// 授权名单（指定成员可见）：同样只有管理者能改。
-	grantUsers, err := s.normalizeGrantUsers(in.Grants)
+	// GrantSubjects（用户 / 部门 + 有效期）优先；否则回落到旧的 grants（用户 ID 列表）。
+	grantSubjects, err := s.resolveGrantSubjects(ctx, projectID, &in)
 	if err != nil {
 		return nil, err
 	}
-	if grantUsers != nil && roleRank(s.roleOf(userID, projectID)) < roleRank(RoleAdmin) {
+	if grantSubjects != nil && roleRank(subj.role) < roleRank(RoleAdmin) {
 		return nil, fmt.Errorf("%w: 只有空间管理者可以修改记录可见成员", ErrForbidden)
 	}
-	if grantUsers != nil && len(*grantUsers) > 0 {
-		// 只能授权给「空间内的人」：给外人授权属于看起来生效、实际无效的假权限。
+	if grantSubjects != nil && len(*grantSubjects) > 0 {
+		// 只能授权给「空间内的人 / 空间内存在的部门」：
+		// 给外人或不存在���部门授权属于看起来生效、实际无效的假权限。
 		members, err := s.spaceMemberIDs(ctx, projectID)
 		if err != nil {
 			return nil, err
 		}
-		for _, uid := range *grantUsers {
-			if !members[uid] {
-				return nil, fmt.Errorf("%w: 可见成员必须是空间成员", ErrFieldValueInvalid)
+		departments, err := s.spaceMemberDepartments(ctx, projectID)
+		if err != nil {
+			return nil, err
+		}
+		for _, subject := range *grantSubjects {
+			switch subject.Type {
+			case GrantSubjectDepartment:
+				if !departments[subject.ID] {
+					return nil, fmt.Errorf("%w: 部门不在空间成员中: %s", ErrFieldValueInvalid, subject.ID)
+				}
+			default:
+				uid, parseErr := uuid.Parse(subject.ID)
+				if parseErr != nil || !members[uid] {
+					return nil, fmt.Errorf("%w: 可见成员必须是空间成员", ErrFieldValueInvalid)
+				}
 			}
 		}
 	}
-	if newVisibility != "" && newVisibility != RecordVisibilityCustom && grantUsers != nil && len(*grantUsers) > 0 {
+	if newVisibility != "" && newVisibility != RecordVisibilityCustom && grantSubjects != nil && len(*grantSubjects) > 0 {
 		return nil, fmt.Errorf("%w: 只有「指定成员可见」才能配置可见成员", ErrFieldValueInvalid)
 	}
 	// 冲突策略（对标飞书 / Airtable 的字段级合并）：
@@ -1260,7 +1749,7 @@ func (s *Service) UpdateRecord(ctx context.Context, userID, projectID, recordID 
 			// 审计的「修改前」必须是这次写入前的真实值（合并后的基线）。
 			before = base
 			data = computed
-			if err := s.syncAllProjections(tx, rec.TableID, rec.ID, data); err != nil {
+			if err := s.syncAllProjections(tx, rec.TableID, rec.ID, projectID, data); err != nil {
 				return err
 			}
 			if err := s.syncRecordLinks(tx, table, idx, rec.ID, data); err != nil {
@@ -1269,8 +1758,8 @@ func (s *Service) UpdateRecord(ctx context.Context, userID, projectID, recordID 
 			if err := s.writeAudit(tx, projectID, table.BaseID, &rec.TableID, &rec.ID, userID, "record.updated", before, data, ""); err != nil {
 				return err
 			}
-			if grantUsers != nil {
-				if err := s.saveRecordGrants(ctx, tx, projectID, rec.ID, userID, *grantUsers); err != nil {
+			if grantSubjects != nil {
+				if err := s.saveRecordGrants(ctx, tx, projectID, rec.ID, userID, *grantSubjects); err != nil {
 					return err
 				}
 			}
@@ -1282,7 +1771,7 @@ func (s *Service) UpdateRecord(ctx context.Context, userID, projectID, recordID 
 			}
 			// 可见范围 / 授权名单变了 → 广播权限变更事件，让订阅端重新拉取
 			// （技术方案第 8 章：权限变更后失效订阅）。
-			if newVisibility != "" || grantUsers != nil {
+			if newVisibility != "" || grantSubjects != nil {
 				if err := s.writeEvent(tx, projectID, table.BaseID, &rec.TableID, &rec.ID, "permission.changed", map[string]any{
 					"scope":      "record",
 					"visibility": rec.Visibility,
@@ -1302,7 +1791,7 @@ func (s *Service) UpdateRecord(ctx context.Context, userID, projectID, recordID 
 		}
 		return nil, err
 	}
-	stripped, condHidden := stripHiddenFieldsWithReasons(data, idx, s.subjectOf(userID, projectID))
+	stripped, condHidden := stripHiddenFieldsWithReasons(data, idx, subj)
 	return &RecordRow{
 		ID: rec.ID, Version: rec.Version,
 		Fields:            stripped,
@@ -1365,15 +1854,127 @@ type BatchFailure struct {
 func (s *Service) BatchCreatePartial(ctx context.Context, userID, projectID, tableID uuid.UUID, items []RecordInput) ([]RecordRow, []BatchFailure) {
 	rows := make([]RecordRow, 0, len(items))
 	failures := make([]BatchFailure, 0)
+	// 表结构 / 字段元数据 / 排序位基线只在循环外取一次。
+	//
+	// 旧实现逐行调 CreateRecord，每行都要重查一遍表结构、字段索引、
+	// 字段策略、空间角色、MAX(sort_order) —— 500 行就是几千次重复往返，
+	// 「批量写入 500 行」在压测里要 18 秒。提到循环外后往返数与行数脱钩。
+	io, err := s.newWriteIO(ctx, userID, projectID, tableID)
+	if err != nil {
+		return rows, batchAllFailed(len(items), err)
+	}
+	// **先校验、后开事务**。
+	//
+	// 校验里的「文档引用 / 关联记录是否存在」要查库，走的是独立连接。
+	// 如果一边开着事务一边校验，每行都要「占着 1 条连接 + 再要 1 条连接」，
+	// 50 并发时正好把 50 条的连接池打满 → 所有请求互相等待 → 整体卡死
+	// （压测表现：批量写入 120 秒超时，库里 50 个事务全部 idle in transaction）。
+	// 所以先把所有行的校验做完，再开事务写入。
+	preparedRows := make([]*preparedRecord, len(items))
+	prepareFailed := make([]bool, len(items))
 	for i, item := range items {
-		row, err := s.CreateRecord(ctx, userID, projectID, tableID, item)
+		p, err := s.prepareRecord(ctx, userID, projectID, io.table, io.idx, item, io.subj)
 		if err != nil {
 			failures = append(failures, BatchFailure{Target: fmt.Sprintf("第 %d 行", i+1), Message: err.Error()})
+			prepareFailed[i] = true
 			continue
 		}
-		rows = append(rows, *row)
+		preparedRows[i] = p
+	}
+	// 分块写入：每块 baseBatchChunk 行共用一个事务，块内每行一个 SAVEPOINT。
+	//
+	// 为什么不是「整批一个事务」：500 行一个大事务会把 base_records 的行锁
+	// 一直按住到提交，多个并发批次互相等锁，直接把写入卡死（压测里整批超时）。
+	// 分块后事务足够短（几十毫秒），并发批次互不阻塞；
+	// 单行失败只 ROLLBACK TO SAVEPOINT 自己的存档点，不影响同块其它行。
+	for start := 0; start < len(items); start += baseBatchChunk {
+		end := start + baseBatchChunk
+		if end > len(items) {
+			end = len(items)
+		}
+		rowsBefore := len(rows)
+		tx := s.db.WithContext(ctx).Begin()
+		if tx.Error != nil {
+			failures = append(failures, batchChunkFailures(start, end, tx.Error)...)
+			continue
+		}
+		chunkOK := true
+		// 表结构探测与排序位基线都在事务内做一次（复用同一条连接）。
+		io.probeTables(tx)
+		sortBase, allocErr := allocSortBase(tx, tableID)
+		if allocErr != nil {
+			tx.Rollback()
+			failures = append(failures, batchChunkFailures(start, end, allocErr)...)
+			continue
+		}
+		for j := start; j < end; j++ {
+			idxInBatch := j
+			if prepareFailed[idxInBatch] {
+				continue
+			}
+			// 存档点用原生 SQL 建立。
+			//
+			// 不能用 gorm 的 tx.SavePoint：它会「关闭预编译语句 + 换掉
+			// Statement.ConnPool」，在 pgx 驱动下会让事务的后续语句
+			// 拿不到原来的连接，表现为事务停在 outbox 写入之后不再前进。
+			// 原生 SAVEPOINT / ROLLBACK TO 只发普通 SQL，不动连接池。
+			sp := fmt.Sprintf("sp_%d", idxInBatch)
+			if err := tx.Exec("SAVEPOINT " + sp).Error; err != nil {
+				failures = append(failures, BatchFailure{Target: fmt.Sprintf("第 %d 行", idxInBatch+1), Message: err.Error()})
+				chunkOK = false
+				break
+			}
+			// 本行写入前的审计 / 事件缓冲长度：失败时据此回退。
+			auditsBefore := len(io.pendingAudits)
+			eventsBefore := len(io.pendingEvents)
+			row, err := s.persistRecord(ctx, userID, projectID, io, sortBase, preparedRows[idxInBatch], tx)
+			if err != nil {
+				// 回滚到本行的存档点，事务恢复可写，后续行继续。
+				_ = tx.Exec("ROLLBACK TO SAVEPOINT " + sp).Error
+				// 这一行没有落库，它的审计 / 事件也不能留下。
+				io.truncatePending(auditsBefore, eventsBefore)
+				failures = append(failures, BatchFailure{Target: fmt.Sprintf("第 %d 行", idxInBatch+1), Message: err.Error()})
+				continue
+			}
+			rows = append(rows, *row)
+			// 下一行接在本行之后，保证同一批里的排序位不重复。
+			sortBase++
+		}
+		if chunkOK {
+			// 审计与事件批量落库（与记录同事务）。
+			if err := io.flushPending(tx); err != nil {
+				tx.Rollback()
+				rows = rows[:rowsBefore]
+				failures = append(failures, batchChunkFailures(start, end, err)...)
+				continue
+			}
+			if err := tx.Commit().Error; err != nil {
+				failures = append(failures, batchChunkFailures(start, end, err)...)
+				// 提交失败：本块整体作废，已收集的行也要撤掉。
+				rows = rows[:rowsBefore]
+				continue
+			}
+		} else {
+			tx.Rollback()
+			rows = rows[:rowsBefore]
+			io.truncatePending(0, 0)
+		}
 	}
 	return rows, failures
+}
+
+// batchAllFailed 生成「整批都失败」的失败明细。
+func batchAllFailed(n int, err error) []BatchFailure {
+	return batchChunkFailures(0, n, err)
+}
+
+// batchChunkFailures 生成某一段行号的失败明细。
+func batchChunkFailures(start, end int, err error) []BatchFailure {
+	failures := make([]BatchFailure, 0, end-start)
+	for i := start; i < end; i++ {
+		failures = append(failures, BatchFailure{Target: fmt.Sprintf("第 %d 行", i+1), Message: err.Error()})
+	}
+	return failures
 }
 
 // BatchUpdatePartial 批量更新记录，**允许部分成功**。
@@ -1461,12 +2062,48 @@ func (s *Service) ReorderRecords(ctx context.Context, userID, projectID, tableID
 // BatchCreate 批量创建记录（默认整批成功或整批失败）。
 func (s *Service) BatchCreate(ctx context.Context, userID, projectID, tableID uuid.UUID, items []RecordInput) ([]RecordRow, error) {
 	out := make([]RecordRow, 0, len(items))
-	for _, item := range items {
-		row, err := s.CreateRecord(ctx, userID, projectID, tableID, item)
+	// 同 BatchCreatePartial：schema / 权限身份提到循环外。
+	io, err := s.newWriteIO(ctx, userID, projectID, tableID)
+	if err != nil {
+		return nil, err
+	}
+	// **校验全部在事务外完成**。
+	//
+	// 校验要查库（文档引用 / 关联记录是否存在），走的是独立连接。
+	// 如果放在事务内做，每个请求就是「事务占 1 条 + 校验再要 1 条」，
+	// 50 并发正好打满 50 条的连接池 → 所有请求互相等待 → 整体死锁
+	// （压测表现：批量写入 120 秒超时，库里一排 idle in transaction）。
+	prepared := make([]*preparedRecord, len(items))
+	for i, item := range items {
+		p, err := s.prepareRecord(ctx, userID, projectID, io.table, io.idx, item, io.subj)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("第 %d 行: %w", i+1, err)
 		}
-		out = append(out, *row)
+		prepared[i] = p
+	}
+	// 整批一个事务：语义是「全成功或全失败」，任何一行出错整批回滚。
+	//
+	// 事务内只有纯写入语句（不再有任何 s.db 查询），所以不会出现
+	// 「事务 + 校验」两条连接同时占用的死锁。
+	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		io.probeTables(tx)
+		base, err := allocSortBase(tx, tableID)
+		if err != nil {
+			return err
+		}
+		for i := range prepared {
+			row, err := s.persistRecord(ctx, userID, projectID, io, base, prepared[i], tx)
+			if err != nil {
+				return fmt.Errorf("第 %d 行: %w", i+1, err)
+			}
+			out = append(out, *row)
+			base++
+		}
+		// 审计与事件批量落库（与记录同事务）。
+		return io.flushPending(tx)
+	})
+	if err != nil {
+		return nil, err
 	}
 	return out, nil
 }
@@ -1480,6 +2117,23 @@ func (s *Service) BatchUpdate(ctx context.Context, userID, projectID, tableID uu
 			return nil, err
 		}
 		out = append(out, *row)
+	}
+	// 批量修改完成 → 广播 record.batch_updated（技术文档 §8.2）。
+	// 逐条更新已经各自发了 record.updated；这条汇总事件让订阅端
+	// 能识别「这是一次批量操作」，避免把 N 条更新当成 N 次独立协作。
+	if len(ids) > 0 {
+		var table BaseTable
+		if err := s.db.WithContext(ctx).Select("id, base_id").Where("id = ?", tableID).First(&table).Error; err == nil {
+			recordIDs := make([]string, 0, len(ids))
+			for _, id := range ids {
+				recordIDs = append(recordIDs, id.String())
+			}
+			_ = s.emitRecordEvent(s.db.WithContext(ctx), projectID, table.BaseID, tableID, ids[0], "record.batch_updated", map[string]any{
+				"tableId":   tableID.String(),
+				"recordIds": recordIDs,
+				"count":     len(ids),
+			})
+		}
 	}
 	return out, nil
 }
@@ -1701,7 +2355,7 @@ func (s *Service) ListRecordDocReferences(ctx context.Context, userID, projectID
 // 背景：字段的「可筛选」能力与「可索引」能力必须一致——
 // 早期版本里长文本 / 关联记录 / 关联文档声明了 Filterable 却没开 Indexable，
 // 导致这些字段既不写投影也筛不出结果。字段新建或改类型后必须重建一次。
-func (s *Service) reindexTable(ctx context.Context, tableID uuid.UUID) error {
+func (s *Service) reindexTable(ctx context.Context, tableID uuid.UUID, tenantID uuid.UUID) error {
 	var records []BaseRecord
 	if err := s.db.WithContext(ctx).
 		Where("table_id = ? AND deleted_at IS NULL", tableID).
@@ -1713,27 +2367,56 @@ func (s *Service) reindexTable(ctx context.Context, tableID uuid.UUID) error {
 		return nil
 	}
 	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		for _, rec := range records {
-			data := map[string]any{}
-			if len(rec.Data) > 0 {
-				if err := json.Unmarshal(rec.Data, &data); err != nil {
-					continue
-				}
-			}
-			if err := s.syncAllProjections(tx, tableID, rec.ID, data); err != nil {
-				return err
-			}
-		}
-		return nil
+		return s.reindexTableTx(tx, tableID, tenantID)
 	})
 }
 
+// reindexTableTx 在已有事务里重建整表投影。
+//
+// 字段类型迁移时必须走这个版本：投影重建要和数据迁移在**同一个事务**里，
+// 否则会出现「类型已改、投影还是旧结构」的中间态（回滚时数据与投影对不上）。
+func (s *Service) reindexTableTx(tx *gorm.DB, tableID uuid.UUID, tenantID uuid.UUID) error {
+	var records []BaseRecord
+	if err := tx.Where("table_id = ? AND deleted_at IS NULL", tableID).
+		Limit(5000).
+		Find(&records).Error; err != nil {
+		return err
+	}
+	if len(records) == 0 {
+		return nil
+	}
+	for _, rec := range records {
+		data := map[string]any{}
+		if len(rec.Data) > 0 {
+			if err := json.Unmarshal(rec.Data, &data); err != nil {
+				continue
+			}
+		}
+		if err := s.syncAllProjections(tx, tableID, rec.ID, tenantID, data); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // syncAllProjections 把记录的所有字段写入查询投影表。
-func (s *Service) syncAllProjections(tx *gorm.DB, tableID, recordID uuid.UUID, data map[string]any) error {
+func (s *Service) syncAllProjections(tx *gorm.DB, tableID, recordID uuid.UUID, tenantID uuid.UUID, data map[string]any) error {
 	var fields []BaseField
 	if err := tx.Where("table_id = ? AND status = 1", tableID).Find(&fields).Error; err != nil {
 		return err
 	}
+	return s.syncProjectionsWithFields(tx, tableID, recordID, tenantID, data, fields)
+}
+
+// syncProjectionsWithFields 用**已加载好的字段列表**写投影。
+//
+// 为什么要单独一个版本：批量写入（一次 500 行）时，
+// 每个字段都单独发一次 DELETE + 一次 INSERT，还额外查一次字段类型，
+// 20 个字段就是 60 次往返 —— 500 行就是 3 万次往返，写入直接被拖到十几秒。
+// 这里改成「一次 DELETE（这些字段）+ 一次批量 INSERT」，往返数与字段数无关。
+func (s *Service) syncProjectionsWithFields(tx *gorm.DB, tableID, recordID uuid.UUID, tenantID uuid.UUID, data map[string]any, fields []BaseField) error {
+	rows := make([]BaseRecordValue, 0, len(fields))
+	fieldIDs := make([]uuid.UUID, 0, len(fields))
 	for _, f := range fields {
 		handler, ok := s.registry.Get(FieldType(f.Type))
 		if !ok || !handler.Definition().Capabilities.Indexable {
@@ -1743,21 +2426,47 @@ func (s *Service) syncAllProjections(tx *gorm.DB, tableID, recordID uuid.UUID, d
 		if !exists {
 			continue
 		}
-		if err := s.syncProjection(tx, tableID, recordID, f.ID, value); err != nil {
-			return err
+		row, ok := projectionRow(handler, tableID, recordID, f.ID, tenantID, value)
+		if !ok {
+			continue
 		}
+		rows = append(rows, row)
+		fieldIDs = append(fieldIDs, f.ID)
 	}
-	return nil
+	if len(rows) == 0 {
+		return nil
+	}
+	// 覆盖式写入：先删后插，避免唯一键冲突与残留。
+	// 一次删掉本次要写的全部字段，而不是逐字段删。
+	if err := tx.Where("record_id = ? AND field_id IN ?", recordID, fieldIDs).
+		Delete(&BaseRecordValue{}).Error; err != nil {
+		return err
+	}
+	return tx.CreateInBatches(&rows, 100).Error
 }
 
 // syncProjection 写入单条投影记录。
-func (s *Service) syncProjection(tx *gorm.DB, tableID, recordID, fieldID uuid.UUID, value any) error {
+func (s *Service) syncProjection(tx *gorm.DB, tableID, recordID, fieldID uuid.UUID, tenantID uuid.UUID, value any) error {
 	handler, ok := s.registry.Get(FieldType(fieldMustType(s, fieldID)))
 	if !ok {
 		return nil
 	}
+	row, ok := projectionRow(handler, tableID, recordID, fieldID, tenantID, value)
+	if !ok {
+		return nil
+	}
+	// 覆盖式写入：先删后插，避免唯一键冲突与残留。
+	if err := tx.Where("record_id = ? AND field_id = ?", recordID, fieldID).Delete(&BaseRecordValue{}).Error; err != nil {
+		return err
+	}
+	return tx.Create(&row).Error
+}
+
+// projectionRow 按字段处理器把值转成投影行。
+func projectionRow(handler FieldHandler, tableID, recordID, fieldID, tenantID uuid.UUID, value any) (BaseRecordValue, bool) {
 	row := BaseRecordValue{
 		ID:        uuid.New(),
+		TenantID:  tenantID,
 		TableID:   tableID,
 		RecordID:  recordID,
 		FieldID:   fieldID,
@@ -1780,11 +2489,7 @@ func (s *Service) syncProjection(tx *gorm.DB, tableID, recordID, fieldID uuid.UU
 	default:
 		row.ValueText = handler.Text(value)
 	}
-	// 覆盖式写入：先删后插，避免唯一键冲突与残留。
-	if err := tx.Where("record_id = ? AND field_id = ?", recordID, fieldID).Delete(&BaseRecordValue{}).Error; err != nil {
-		return err
-	}
-	return tx.Create(&row).Error
+	return row, true
 }
 
 // fieldMustType 读取字段类型；读不到时回退为文本。
@@ -1800,20 +2505,52 @@ func fieldMustType(s *Service, fieldID uuid.UUID) string {
 //
 // 计算顺序由依赖图拓扑决定；循环依赖直接报错，不做半吊子计算。
 func (s *Service) recomputeFormulas(tx *gorm.DB, table *BaseTable, idx *fieldIndex, data map[string]any) (map[string]any, error) {
+	// 公式表可能还没迁移（老库 / 精简影子库）：先判断再查，
+	// 否则失败的 SELECT 会毒死 Postgres 事务，后续写入全部失败。
+	return s.recomputeFormulasWith(tx, table, idx, data, tx.Migrator().HasTable(&BaseFieldFormula{}))
+}
+
+// recomputeFormulasWith 是 recomputeFormulas 的「已知表是否存在」版本。
+//
+// 批量写入时 HasTable 只需要探一次：每行探一次就是每行一次
+// information_schema 查询，500 行会白白多出 500 次往返。
+func (s *Service) recomputeFormulasWith(tx *gorm.DB, table *BaseTable, idx *fieldIndex, data map[string]any, hasFormulaTable bool) (map[string]any, error) {
+	return s.applyFormulas(table, idx, data, loadTableFormulas(tx, idx, hasFormulaTable))
+}
+
+// loadTableFormulas 载入本表（status = 1）的公式定义。
+//
+// 只取本表字段对应的公式。
+//
+// 旧实现是 `WHERE status = 1` 全表扫描：库里每个表的公式都被拉出来，
+// 再在内存里按本表字段过滤。表一多，每次写记录都要搬运全库公式行，
+// 批量写入时这个开销被放大几百倍。
+func loadTableFormulas(tx *gorm.DB, idx *fieldIndex, hasFormulaTable bool) map[string]BaseFieldFormula {
+	if !hasFormulaTable {
+		return nil
+	}
+	fieldIDs := make([]uuid.UUID, 0, len(idx.byID))
+	for fid := range idx.byID {
+		fieldIDs = append(fieldIDs, fid)
+	}
+	if len(fieldIDs) == 0 {
+		return nil
+	}
 	var formulas []BaseFieldFormula
-	if err := tx.Where("status = 1").Find(&formulas).Error; err != nil {
-		return data, nil
+	if err := tx.Where("status = 1 AND field_id IN ?", fieldIDs).Find(&formulas).Error; err != nil {
+		return nil
 	}
-	if len(formulas) == 0 {
-		return data, nil
-	}
-	// 只处理本表的公式字段。
 	byID := map[string]BaseFieldFormula{}
 	for _, f := range formulas {
 		if _, ok := idx.byID[f.FieldID]; ok {
 			byID[f.FieldID.String()] = f
 		}
 	}
+	return byID
+}
+
+// applyFormulas 按依赖顺序计算公式字段并写回数据。
+func (s *Service) applyFormulas(table *BaseTable, idx *fieldIndex, data map[string]any, byID map[string]BaseFieldFormula) (map[string]any, error) {
 	if len(byID) == 0 {
 		return data, nil
 	}
@@ -2078,7 +2815,7 @@ func (s *Service) CreateView(ctx context.Context, userID, projectID, tableID uui
 	shared, personal, _ := splitViewPersonal(config)
 	raw, _ := json.Marshal(shared)
 	view := BaseView{
-		ID: uuid.New(), TableID: tableID, Name: name, Type: viewType, Config: raw,
+		ID: uuid.New(), TenantID: projectID, TableID: tableID, Name: name, Type: viewType, Config: raw,
 		Scope: scope, OwnerID: userID, Version: 1, Status: 1,
 	}
 	if err := s.db.WithContext(ctx).Create(&view).Error; err != nil {
@@ -2166,6 +2903,11 @@ func (s *Service) UpdateView(ctx context.Context, userID, projectID, viewID uuid
 			return nil, err
 		}
 	}
+	// 视图配置变了 → 广播 view.updated（技术文档 §8.2）。
+	_ = s.emitViewEvent(s.db.WithContext(ctx), projectID, view.TableID, viewID, "view.updated", map[string]any{
+		"viewId": viewID.String(),
+		"scope":  view.Scope,
+	})
 	var fresh BaseView
 	if err := s.db.WithContext(ctx).Where("id = ?", viewID).First(&fresh).Error; err != nil {
 		return nil, err
@@ -2185,7 +2927,7 @@ func (s *Service) saveViewPref(ctx context.Context, projectID, viewID, userID uu
 		return err
 	}
 	row := BaseViewPref{
-		ID: uuid.New(), ViewID: viewID, UserID: userID, ProjectID: projectID,
+		ID: uuid.New(), TenantID: projectID, ViewID: viewID, UserID: userID, ProjectID: projectID,
 		Config: raw, CreatedAt: time.Now(), UpdatedAt: time.Now(),
 	}
 	return s.db.WithContext(ctx).
@@ -2348,7 +3090,7 @@ func (s *Service) SaveFormula(ctx context.Context, userID, projectID, fieldID uu
 		}
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			formula = BaseFieldFormula{
-				ID: uuid.New(), FieldID: fieldID, Expression: expression, AST: rawAST,
+				ID: uuid.New(), TenantID: projectID, FieldID: fieldID, Expression: expression, AST: rawAST,
 				CalculationMode: "sync", FormulaVersion: 1, Status: 1,
 			}
 			if err := tx.Create(&formula).Error; err != nil {
@@ -2380,7 +3122,7 @@ func (s *Service) SaveFormula(ctx context.Context, userID, projectID, fieldID uu
 				continue
 			}
 			row := BaseFormulaDependency{
-				ID: uuid.New(), TableID: field.TableID, FormulaFieldID: fieldID,
+				ID: uuid.New(), TenantID: projectID, TableID: field.TableID, FormulaFieldID: fieldID,
 				DependencyFieldID: depID, DependencyType: "field", DependencyTableID: &field.TableID,
 			}
 			if err := tx.Create(&row).Error; err != nil {
@@ -2409,20 +3151,37 @@ func (s *Service) SaveFormula(ctx context.Context, userID, projectID, fieldID uu
 	if err := s.recalcTableFormulas(ctx, tableID); err != nil {
 		return err
 	}
+	// 公式重算完成 → 广播 formula.calculated（技术文档 §8.2）。
+	// 与 field.formula.saved 配对：前者说「定义变了」，后者说「值算好了」。
+	var ownerTable BaseTable
+	if err := s.db.WithContext(ctx).Select("id, base_id").Where("id = ?", tableID).First(&ownerTable).Error; err == nil {
+		_ = s.writeEventOptional(s.db.WithContext(ctx), projectID, ownerTable.BaseID, &tableID, &fieldID, "field", "formula.calculated", map[string]any{
+			"fieldId":    fieldID.String(),
+			"tableId":    tableID.String(),
+			"expression": expression,
+		})
+	}
 	return nil
 }
 
 // —— 审计与事件 ——
 
 func (s *Service) writeAudit(tx *gorm.DB, projectID, baseID uuid.UUID, tableID, recordID *uuid.UUID, operatorID uuid.UUID, operation string, before, after map[string]any, requestID string) error {
+	row := newAuditRow(projectID, baseID, tableID, recordID, operatorID, operation, before, after, requestID)
+	return tx.Create(&row).Error
+}
+
+// newAuditRow 构造一条操作审计行（不落库）。
+//
+// 批量写入时先攒行、最后批量插入，往返数与行数脱钩。
+func newAuditRow(projectID, baseID uuid.UUID, tableID, recordID *uuid.UUID, operatorID uuid.UUID, operation string, before, after map[string]any, requestID string) BaseOperationLog {
 	beforeRaw, _ := json.Marshal(before)
 	afterRaw, _ := json.Marshal(after)
-	row := BaseOperationLog{
-		ID: uuid.New(), ProjectID: projectID, BaseID: baseID, TableID: tableID, RecordID: recordID,
+	return BaseOperationLog{
+		ID: uuid.New(), TenantID: projectID, ProjectID: projectID, BaseID: baseID, TableID: tableID, RecordID: recordID,
 		OperatorID: operatorID, Operation: operation, BeforeData: beforeRaw, AfterData: afterRaw,
 		RequestID: requestID, CreatedAt: time.Now(),
 	}
-	return tx.Create(&row).Error
 }
 
 func (s *Service) writeEvent(tx *gorm.DB, projectID, baseID uuid.UUID, tableID, aggregateID *uuid.UUID, eventType string, payload map[string]any) error {
@@ -2434,13 +3193,43 @@ func (s *Service) writeEvent(tx *gorm.DB, projectID, baseID uuid.UUID, tableID, 
 // aggregateType 区分事件归属（record / field / view），
 // 订阅端据此决定要不要重新拉取。
 func (s *Service) writeEventTyped(tx *gorm.DB, projectID, baseID uuid.UUID, tableID, aggregateID *uuid.UUID, aggregateType, eventType string, payload map[string]any) error {
+	row := newEventRow(projectID, baseID, tableID, aggregateID, aggregateType, eventType, payload)
+	return tx.Create(&row).Error
+}
+
+// newEventRow 构造一条发件箱事件行（不落库）。
+//
+// 批量写入时先攒行、最后批量插入，往返数与行数脱钩。
+func newEventRow(projectID, baseID uuid.UUID, tableID, aggregateID *uuid.UUID, aggregateType, eventType string, payload map[string]any) BaseEventOutbox {
 	raw, _ := json.Marshal(payload)
-	row := BaseEventOutbox{
-		ID: uuid.New(), ProjectID: projectID, BaseID: baseID, TableID: tableID,
+	return BaseEventOutbox{
+		ID: uuid.New(), TenantID: projectID, ProjectID: projectID, BaseID: baseID, TableID: tableID,
 		AggregateType: aggregateType, AggregateID: derefUUID(aggregateID), EventType: eventType,
 		Payload: raw, Status: "pending", CreatedAt: time.Now(),
 	}
-	return tx.Create(&row).Error
+}
+
+// writeEventOptional 写一条「可有可无」的事件。
+//
+// 结构类事件（schema.changed / field.* / view.updated）不应该因为
+// 发件箱表还没建好（精简影子库 / 老库未迁移）就把整个业务操作打回。
+// 这里吞掉「表不存在」类错误，其余错误照常返回。
+func (s *Service) writeEventOptional(tx *gorm.DB, projectID, baseID uuid.UUID, tableID, aggregateID *uuid.UUID, aggregateType, eventType string, payload map[string]any) error {
+	// 同上：发件箱表没迁移时不能直接执行 INSERT —— 失败的语句会毒死整个事务。
+	if !tx.Migrator().HasTable(&BaseEventOutbox{}) {
+		return nil
+	}
+	err := s.writeEventTyped(tx, projectID, baseID, tableID, aggregateID, aggregateType, eventType, payload)
+	if err == nil {
+		return nil
+	}
+	msg := strings.ToLower(err.Error())
+	if strings.Contains(msg, "no such table") ||
+		strings.Contains(msg, "doesn't exist") ||
+		strings.Contains(msg, "does not exist") {
+		return nil
+	}
+	return err
 }
 
 func derefUUID(id *uuid.UUID) uuid.UUID {

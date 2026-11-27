@@ -923,3 +923,433 @@ cd pros/web && npx vite build                                                   
 - **门禁**：`go build ./...` + `go test ./internal/base/...` 全绿；
   `vitest` 2050 passed / 6 failed（6 个全在 `rte/**`，基线一致）；
   `vue-tsc` 62 errors（基线一致）；`vite build` 通过。
+
+### 3.74 批次 G：列头操作菜单 + 飞书交互补齐（技术方案第 45 章）
+
+- **列头操作菜单**（新增 `src/modules/base/grid/BaseColumnMenu.vue`）：
+  hover 列头出现 ▾，菜单含升序 / 降序 / 清除本列排序 / 筛选此列 / 冻结到左侧 /
+  隐藏此列 / 编辑字段 / 列宽；面板 `248px`、白底、8px 圆角、
+  `0 8px 24px rgba(31,35,41,.12)` 投影。
+  - 弹层显隐**受控**（`v-model:visible`）：修掉「排序后列头重渲染导致第二次点击变成关闭」的坑。
+  - 动作落库：排序 → `sorts` + `runQuery` + `persistViewConfig`；
+    筛选此列 → 打开面板并预置该字段（`focusFieldId`）；
+    冻结 / 隐藏 / 列宽 → 写个人偏好段（识别不到用户则拒绝写入并提示）；
+    编辑字段 → 打开字段管理并滚动定位 + 高亮该行。
+- **实测**：升序后数据按拼音序重排；排序标记主色 `rgb(51,112,255)` / `12px`，
+  「清除本列排序」后标记数归 `0`；筛选此列弹窗预置 `更新人 / 包含`；
+  编辑字段高亮 `1` 行；隐藏此列后表头列数 `38 → 36`；
+  记录列表摘要显示 `创建时间 … · 创建人 Demo`（人名 / 记录标题，不再 UUID）；
+  **console 0 error**。
+- **其它补齐**：表头类型图标灰化 + 类型提示；记录列表卡片化；单元格长文本 tooltip；
+  附件缩略图 32×32 / 4px；聚焦单元格描边改 `#3370FF`；加载骨架 8 行；
+  表格空态（vxe `#empty`）与引擎空态去重；底部「+ 新增记录」条常驻可见。
+- **测试**：新增 `BaseColumnMenu.test.ts` 4 例（菜单项齐备 / 已排序多一项 /
+  动作冒泡带字段 ID / 已冻结文案切换）；`BaseGrid.test.ts` 同步改为「灰图标 + 类型提示」契约，
+  并补 1 例（列头有 ▾ 入口）。
+- **门禁**：`go build ./...` + `go test ./internal/base/...` 全绿；
+  `vitest` 2055 passed / 6 failed（6 个全在 `rte/**`，基线一致）；
+  `vue-tsc` 62 errors（基线一致）；`vite build` 通过。
+
+### 3.75 批次 H：列宽拖拽 / 单元格右键菜单 / Tab 导航（技术方案第 46 章）
+
+- **列宽拖拽把手**（自研）：vxe `resizable` 只改内部列宽、无法落库到视图个人偏好，
+  故关掉 vxe 把手改为列头右侧 7px 自研把手；`dragWidths` 跟手，
+  松手 `emit('column-width')` → 写 `config.personal[uid].fieldWidths`；
+  宽度夹取 `[80, 600]`；hover 显示 2px 竖线，hover 把手变主色。
+- **单元格右键菜单**（飞书同款，9 项）：复制单元格 / 粘贴到此处 / 清空内容 / 打开记录详情 ‖
+  按此列升序 / 按此列降序 / 筛选此列 ‖ 冻结此列 / 隐藏此列；
+  右键即把焦点移到该格；先落位后按实测尺寸**回夹**到窗口可视区；
+  点击外部 / `Esc` / 滚动 / 缩放均收起。
+- **Tab 导航**：新增 `moveFocusLinear()`，到行尾回下一行首格、`Shift+Tab` 回上一行末格，
+  边界行停住不丢焦点。
+- **实测**：菜单面板 `200px` / 圆角 `8px` / 投影 `rgba(31,35,41,.12) 0 8px 24px` / 白底；
+  `Esc` 与点击外部后菜单节点数均为 `0`；列宽 `140 → 220` 并落库
+  （`personal[uid].fieldWidths` 出现 `220`）；Tab 焦点从 `2026-11-27 10:37:23` 跳到 `主合同C`；
+  **console 0 error**。
+- **测试**：`BaseGrid.test.ts` 新增 3 例（Tab/Shift+Tab 焦点流转、右键菜单项齐备 + 外部点击收起、
+  拖拽把手冒泡 `column-width` 且宽度落在区间内），共 6 例通过。
+- **门禁**：`go build ./...` + `go test ./internal/base/...` 全绿；
+  `vitest` 2063 passed / 6 failed（6 个全在 `rte/**`，基线一致）；
+  `vue-tsc` 62 errors（基线一致）；`vite build` 通过。
+
+### 3.76 批次 I：列顺序拖拽 / 表头右键菜单 / 列宽自适应 / 列序稳定化（技术方案第 47 章）
+
+- **列顺序拖拽**：视图**个人偏好段**新增 `fieldOrder`（字段 ID 数组），
+  表头 `draggable` + `dragover` 判定插前 / 插后 + `drop` 抛 `column-reorder`，
+  落库后刷新仍保持；不在顺序表里的新字段排在最后，不会消失。
+  - 坑：`dragover` **必须 `preventDefault()`**，否则浏览器不派发 `drop`。
+  - 冻结列保持「从左起连续」，冻结段内禁止拖动（提示「冻结列已固定在左侧」）。
+- **表头右键菜单**：复用批次 H 的 `.be-ctxmenu` 浮层，菜单项按入口切换；
+  菜单项抽成 `ctxItems`（`key/label/icon/sep/run`），模板统一 `v-for`。
+- **双击列宽把手**：按列内容估算宽度（中文 13px / 其它 7px + 内边距），
+  夹取 `[80,600]`；表头右键「自动适应列宽」同源。
+- **列序稳定化（缺陷修复）**：历史字段 `sort_order` 相同导致每次刷新列顺序都变；
+  服务端改 `ORDER BY sort_order ASC, created_at ASC, id ASC`，
+  前端 `sortFields` 增加 `name.localeCompare('zh-Hans-CN')` 兜底。
+- **实测**：拖拽落点指示线 `2px` / `rgb(51,112,255)`；被拖表头 `is-dragging`；
+  第 3 列拖到首位后表头顺序变化；`personal[uid].fieldOrder` 写入 17 个字段 ID；
+  刷新后顺序保持；表头右键 7 项；双击列宽 `140 → 114` 并落库；**console 0 error**。
+- **测试**：`BaseGrid.test.ts` 新增 3 例（`fieldOrder` 排序生效、表头右键菜单项齐备 +
+  外部点击收起、双击把手冒泡 `column-width` 且宽度在区间内），共 9 例通过。
+- **门禁**：`go build ./...` + `go test ./internal/base/...` 全绿；
+  `vitest` 2066 passed / 6 failed（6 个全在 `rte/**`，基线一致）；
+  `vue-tsc` 62 errors（基线一致）；`vite build` 通过。
+
+### 3.77 批次 J：XLSX 导入 + 记录级授权有效期 / 按部门授权（技术方案第 48.1~48.2 节）
+
+- **XLSX 导入（零依赖）**：`src/modules/base/import/xlsx.ts` 自研 ZIP + XML 解析，
+  支持 STORE / DEFLATE、sharedStrings / inlineStr / 布尔 / 数字 / 日期（含 1900、1904 日期系统）；
+  `BaseImportDialog` 支持多工作表切换。
+  - 测试：`xlsx.test.ts` 3 例（自建 ZIP，覆盖两种压缩方式）全绿。
+  - 坑：中央目录条目必须带 `nameBytes`；ReadableStream 上没有 `getWriter`。
+- **记录级授权有效期 + 按部门授权**：
+  - `base_record_grants` 增加 `subject_type / subject_id / expires_at`（迁移 + 回填 + 索引）；
+  - 部门授权用派生伪 ID 复用唯一索引；部门名在 Go 侧解析，**不写进 SQL**（影子库无 `core_users`）；
+  - 新接口 `GET /base/departments`；
+  - 前端授权区改为「名单 + 有效期 + 部门」，显示走本地时间、回写走 ISO。
+  - 测试：`grant_subject_test.go` 2 例（过期后不可见 / 部门授权可见 + 部门列表）通过。
+- **实测（DOM 数值）**：
+  - 授权项 `tag=部门`、`name=部门：销售部`、有效期输入框 `2026-12-31 23:20:06`；
+  - 落库 `base_record_grants.subject_type='department'`、`subject_id='销售部'`、
+    `expires_at=2026-12-31 15:20:06+00`（= 本地 23:20:06，时区口径一致）；
+  - 提示「已设为指定成员可见（1 项）」。
+- **门禁**：`go build ./...` + `go test ./internal/base/...` 全绿；
+  `vitest` 2069 passed / 6 failed（6 个全在 `rte/**`，基线一致）；`vue-tsc` 62 errors（基线）；`vite build` 通过。
+
+### 3.78 批次 K：跨 Base 关联 / 候选分页 / 自定义排序 keyset / SSE 增量 / 策略独立表 / OR 叠加 / 反向关系表（技术方案第 48.3~48.9 节）
+
+- **跨 Base 关联**：link 字段允许指向**同一空间**下的任意 Base；
+  校验链 = 记录存在 → 表存在 → Base 属于同一 project → 记录对操作者可见；
+  Base 元信息缺失时退回「同 Base 才允许」。
+- **link 候选分页**：`GET /link-targets` 改为 `{items, nextCursor, hasMore}`，
+  游标 = `sort_order:id`（keyset），支持 `keyword` 远程搜索与 `targetTableId` 跨表；
+  前端下拉底部「加载更多」续拉。
+- **自定义排序 keyset**：单文本 / 单数字排序字段走 `k2:` 游标，
+  锚点 = (排序值, sort_order, id)；NULL 行按 `NULLS LAST` 单独处理，避免重复与漏行。
+  - 测试：`TestQuerySortKeysetPaging` 通过（2 条/页翻完 5 条，顺序 10→50，无重复无遗漏）。
+- **SSE 增量**：`ReplaySinceTime` + `?since=<RFC3339>`；与 `Last-Event-ID` 并存。
+- **字段策略独立表**：`base_field_policies` 建表 + 回填存量 + 字段增删改**双写**；
+  读取以表为准，表空则回落 config。
+- **查询 OR 叠加**：组合口径扩到 `override | and | or`；工具栏改为三段按钮组。
+- **反向关系独立表**：`base_record_reverse_links` 与 `base_record_links` 双写，
+  反查优先走索引表，查不到退回旧的全表扫描。
+- **实测**：`GET /base/departments` → `["销售部"]`；
+  `GET /link-targets?limit=3` → `{"items":[…3 条…],"nextCursor":"3:22dc337a-…","hasMore":true}`。
+- **门禁**：`go build ./...` + `go test ./internal/base/...` 全绿；前端门禁同 3.77。
+
+### 3.79 批次 L：行级重试 / 批量拖拽 / 压测扩容 / 包加密 + 幂等调度（技术方案第 48.10~48.13 节）
+
+- **行级重试与类型转换**：导入前类型预检（数字列非数字直接拦下并指出「第 N 行 · 列名」）；
+  失败行进入**行内修正表**，逐格可改，「修正后重试」只提交失败行并把返回行号映射回原始行。
+  - 实测：导入 `客户名称,阶段` 两列 CSV，阶段值非法 → 失败明细「第 1 行 … unknown option: 不存在的阶段」，
+    修正区 1 行 2 个输入框；改成合法选项后「修正后导入成功 1 条」，失败明细清空。
+  - 调试数据已清理（两条临时记录已删除）。
+- **批量拖拽排序**：行首拖拽把手（hover 出现，`16×20`，`cursor: grab`）；
+  拖选中集合 = 整批移动；落点按行内上下半区判定前 / 后，`2px` 蓝色指示线。
+  - 实测：DOM 内把手 8 个（vxe 固定列渲染两份），hover 后 `opacity: 1`、`cursor: grab`。
+- **压测扩容**：`cmd/loadtest` 新增 `-scale small|medium|large`
+  （1000 行/10 并发、2000 行/25 并发、5000 行/50 并发）、`-deep-pages`、`-batch-size`；
+  连接池提升到 64；新增「深翻页」「批量写入」两个场景。
+- **配置包 AES-GCM 加密**：PBKDF2-HMAC-SHA256（12 万次）+ AES-256-GCM，AAD 固定；
+  口令 < 8 位拒绝；新增 `config-export-encrypted` / `config-import-encrypted` 两个接口。
+  - 测试：`configbundle_crypt_test.go` 2 例（往返还原、口令错误失败、短口令拒绝）通过。
+- **幂等清理调度**：`StartIdempotencyPurge` 每小时清理过期幂等记录，
+  周期由 `BASE_IDEMPOTENCY_PURGE_INTERVAL` 覆盖；服务启动时拉起。
+- **门禁**：`go build ./...` + `go test ./internal/base/...` 全绿；
+  `vitest` 2069 passed / 6 failed（`rte/**` 基线）；`vue-tsc` 62 errors（基线）；`vite build` 通过。
+
+### 3.80 批次 M：可观测性与工程化补齐（待补齐清单 18 项全交付）
+
+> 对应技术方案第 49 章。18 项 = P0 4 项 / P1 5 项 / P2 9 项，全部实现并通过门禁。
+
+#### 3.80.1 逐项销项
+
+| 编号 | 事项 | 状态 | 落点 |
+| --- | --- | --- | --- |
+| P0-1 | 只读 GET（Base / 记录 / 视图） | ✅ | `internal/base/read.go`；`GET /base/bases/:baseId`、`GET /base/records/:recordId`、`GET /base/views/:viewId` |
+| P0-2 | 视图查询接口 | ✅ | `POST /base/views/:viewId/query`（视图配置为默认口径，请求体可覆盖） |
+| P0-3 | 事件类型补齐（5 → 10） | ✅ | `record.batch_updated` / `field.created` / `field.updated` / `field.deleted` / `view.updated` / `formula.calculated` / `schema.changed` |
+| P0-4 | 字段类型迁移可回滚 | ✅ | `reindexTableTx` 同事务重建投影；同步推进 `base_apps.schema_version` |
+| P1-5 | 异步导入任务 | ✅ | `internal/base/importjob.go` + `base_import_jobs` 表 + 4 个接口 + worker + 卡死任务恢复 |
+| P1-6 | 可观测性指标 | ✅ | `internal/base/metrics.go`；`GET /base/metrics`、`GET /base/metrics/prometheus`（P50/P95/P99、慢查询、outbox、幂等冲突、订阅数） |
+| P1-7 | 连接池 30 → 50 | ✅ | `DB_MAX_OPEN_CONNS` 默认 50，纳入分层配置 |
+| P1-8 | 跨实例事件 | ✅ | Outbox 共享总线 + 每实例 `outboxCursor` 水位 |
+| P1-9 | 字段类型兼容路径 | ✅ | `GET /base/fields/types` 与 `/base/field-types` 同源 |
+| P2-10 | FieldHandler 扩展 | ✅ | `internal/base/fieldhandler_ext.go`：`RichFieldHandler`（Serialize / Deserialize / BuildFilter / BuildSort）+ `defaultRichHandler` 兜底，行为不变 |
+| P2-11 | tenant_id 显式化 | ✅ | 17 张 `base_*` 表加 `tenant_id` + `ensureBaseTenantID` 回填 + 17 个租户索引 |
+| P2-12 | 租户级动态限流 | ✅ | `internal/middleware/ratelimit.go` 重写：租户桶 + 用户桶 + `SetQuotaResolver`；按 `kb_members` 动态放大（上限 `BASE_TENANT_SCALE_MAX`，默认 8） |
+| P2-13 | 操作日志归档 | ✅ | `internal/base/maintenance.go`：`ArchiveOperationLogs` / `PurgeOutbox` / `PurgeImportJobs` / `StartMaintenance` |
+| P2-14 | Outbox 死信与重试 | ✅ | `OutboxStatusDead` + `GET /base/outbox/dead-letters` + `POST /base/outbox/dead-letters/:eventId/retry` + `metamatrix_base_outbox_dead_total` |
+| P2-15 | user_group 字段 | ✅ | `base_user_groups` 表 + 4 个接口 + `FieldUserGroup` 类型 + 成员校验 |
+| P2-16 | 分层 YAML 配置 | ✅ | `configs/{default,dev,prod}.yaml` + `internal/config/layered.go`（default → `${APP_ENV}` → 环境变量） |
+| P2-17 | Base 专项 E2E | ✅ | `pros/web/scripts/base-engine-e2e.mjs`（27 项断言，跑完自动清理 E2E 空间） |
+| P2-18 | 并发 / 顺序验收 | ✅ | `internal/base/event_order_test.go`：乱序归一化、版本号单调、公式事件时序 |
+
+#### 3.80.2 E2E 实测输出（27 项全 PASS）
+
+```
+PASS 创建空间 / 创建 Base / 默认数据表已播种 / 创建文本字段 / 创建 user_group 字段
+PASS 新建通讯录分组 / 分组列表可读 / 修改通讯录分组
+PASS 创建记录 / GET 记录详情 / GET Base 详情 / 创建视图 / GET 视图详情
+PASS POST 视图查询 / 视图查询支持覆盖筛选
+PASS 提交异步导入任务 — status=pending
+PASS 导入任务跑完 — status=succeeded succeeded=25/25
+PASS 导入任务列表可读
+PASS 指标快照可读 — p95=13.99ms outboxPublished=30 outboxDead=0
+PASS 字段类型含 user_group — 26 种类型
+PASS 兼容路径 /fields/types 可用 / 死信列表可读 / 删除通讯录分组
+PASS 浏览器打开空间页面并截图 / 页面无 JS 报错
+PASS 清理 E2E 空间
+```
+
+截图：`/var/folders/79/7p7x5gyx04lcn5yq6r6hhq_m0000gn/T/metamatrix-base-e2e/base-knowledge.png`
+
+#### 3.80.3 门禁实测
+
+| 门禁 | 结果 |
+| --- | --- |
+| `cd pros/api && go build ./...` | ✅ 通过 |
+| `cd pros/api && go test ./internal/...` | ✅ 全绿（含 `internal/model` / `internal/db` 表名守卫测试） |
+| 真实 Postgres 并发/顺序用例（`TestConcurrency*` / `TestEventOrder*` / `TestTenant*`） | ✅ 通过 |
+| `cd pros/web && npx vitest run` | 285 passed / 6 failed —— 6 个失败文件全部在 `rte/**`，与基线一致 |
+| `cd pros/web && npx vue-tsc -b --pretty false` | 62 errors —— 全部为基线文件（`rte/**` + `FdeSheetCanvas.vue` + `LaunchSplash.vue`），**`modules/base` 0 错误** |
+| `node scripts/base-engine-e2e.mjs` | ✅ 27/27 PASS |
+
+#### 3.80.4 数据库实测
+
+- 17 张 `base_*` 表全部含 `tenant_id uuid NOT NULL DEFAULT 零值`，且 `idx_<table>_tenant` 索引齐备；
+- 存量数据回填后 `base_apps / base_tables / base_fields / base_records / base_record_values /
+  base_views / base_record_links / base_field_formulas / base_formula_dependencies /
+  base_user_groups / base_import_jobs` 的**零值 tenant 行数均为 0**；
+- 回填过程中清掉 2 行**孤儿派生数据**（指向已删除 field / table 的公式行）。
+- 新增表：`base_import_jobs`、`base_user_groups`（均已在 `internal/model/table_registry.go` 登记）。
+
+#### 3.80.5 本批次修掉的真实缺陷（源码走查 + 实测暴露）
+
+1. **`tenant_id` 回填静默失效** —— 回填条件只判 `IS NULL`，但列是 `NOT NULL DEFAULT 零值`，
+   `IS NULL` 永不匹配；且 `UPDATE ... FROM` 下同名列不限定别名会报 `column reference is ambiguous`。
+   两处均已修复，存量数据已回填完毕。
+2. **Postgres 事务中毒** —— `syncFieldPolicy` / `writeEventOptional` / `syncRecordLinks` /
+   `recomputeFormulas` 原本「吞错误」，但 Postgres 中一条失败语句会毒死整个事务，
+   后续语句全部 `current transaction is aborted`。改为**先 `HasTable` 判断表存在再执行**。
+3. **跨空间越权** —— `loadTableSchema` / `scopeLoadRecord` 补租户校验
+   （Base 属于别空间 → 按不存在处理；孤儿表放行）。
+4. **E2E 脏数据残留** —— 脚本每次运行新建一个空间且不清理；已加末尾自动删除，
+   并清理了历史残留的 2 个 `Base E2E 空间`。
+5. **回填链路对 `project_id` 为零值的脏数据失效** —— `base_record_reverse_links` 的
+   `project_id` 自身是零值，走 `project_id → tenant_id` 回填必然仍是零值；
+   改为「优先经 `base_apps` 关联取租户」，反向关系表额外走「源记录 → 记录 → 表 → 空间」链路。
+6. **空间删除不清理多维表格数据** —— `ProjectsService.Delete` 只清画布文档，`base_*` 整片残留，
+   导致多维表格列表出现孤儿 Base、租户统计失真、`tenant_id` 回填找不到归属。
+   新增 `deleteProjectBaseData` 级联硬删 + 用例 `TestProjectsServiceDeleteRemovesBaseData`（8 张表逐一断言）。
+
+#### 3.80.6 本批次未做 / 需用户承担的风险
+
+- **未做** 5000 行 / 50 并发的完整实跑压测（`cmd/loadtest` 已具备该档位，但本轮未实际执行到该规模），
+  只做了 E2E + 单元 + 并发用例验证；
+- **远端库（101.132.237.173）未执行** 本批次的迁移
+  （`base_import_jobs` / `base_user_groups` 建表 + `tenant_id` 列与回填）；
+- **未提交 git、未推 main、未同步远端服务器**（按约定）；
+- 已知基线噪声未消除：`vue-tsc` 62 errors、`vitest` 6 个 `rte/**` 失败文件（与本轮改动无关）。
+
+### 3.81 批次 M · 运行时取证审计（18 项逐项行为证明）
+
+> 上一节 3.80 证明的是「18 项都实现了」；本节证明的是「**每一项的行为真的成立**」，
+> 包含**负向断言**（越权被拒 / 不兼容迁移被拒 / 超限返回 429 / 事件真的推出来）。
+> 这一步额外暴露并修掉了 1 个真实缺陷（死信重投实际不投递）。
+
+#### 3.81.1 审计脚本
+
+`pros/web/scripts/base-engine-audit.mjs`（`npm run test:e2e:base:audit`）——
+与 `base-engine-e2e.mjs` 的分工：
+
+- `base-engine-e2e.mjs`：**功能能不能用**（建 Base / 建字段 / 导入 / 视图查询 / 浏览器冒烟）；
+- `base-engine-audit.mjs`：**每项承诺的行为是否真的成立**（含负向断言）。
+
+#### 3.81.2 审计输出（27 项全 PASS，含 4 项负向断言）
+
+```
+PASS P0-1 GET /bases/:baseId — status=200
+PASS P0-1 GET /records/:recordId — status=200
+PASS P0-1 GET /views/:viewId — status=200
+PASS P0-1 跨空间读记录被拒 — status=404          ← 负向断言
+PASS P0-2 POST /views/:viewId/query — records=1
+PASS P0-2 视图查询支持覆盖筛选 — 命中=1
+PASS P0-3 事件含 record.created — schema.changed,field.created,record.created
+PASS P0-3 事件含 field.created / schema.changed
+PASS P0-4 字段类型迁移成功 — status=200
+PASS P0-4 不兼容迁移被拒或安全完成 — status=422 {"code":"42202",...}   ← 负向断言
+PASS P0-4 迁移后数据仍可读 — records=1
+PASS P1-5 提交导入任务 — status=202
+PASS P1-5 导入任务跑完 — status=succeeded ok=2
+PASS P1-5 导入任务列表可读 — n=1
+PASS P1-6 GET /base/metrics — operations,errors,slowQueries,p50Millis,p95Millis,p99Millis,
+                               slowThresholdMillis,outboxPublished,outboxFailed,outboxDead,
+                               idempotencyConflicts,activeSubscribers
+PASS P1-6 Prometheus 格式 — # HELP metamatrix_base_operations_total ...
+PASS P1-9 /fields/types 与 /field-types 同源 — 26/26
+PASS P2-10 扩展后排序查询仍正常 — records=3
+PASS P2-12 超限返回 429 — 命中 429                                        ← 负向断言
+PASS P2-14 死信列表可读 — n=0
+PASS P2-15 通讯录分组增查 / user_group 字段可建 / 分组可删
+PASS P2-11 空间可删 — status=200
+ALL PASS
+```
+
+> `P0-4` 的负向断言实测返回 `42202 field type incompatible`，
+> 且迁移后 `records=1` 仍在 —— 证明「拒绝迁移」没有破坏存量数据。
+
+#### 3.81.3 其余 4 项：真实 Postgres 用例覆盖
+
+| 项 | 用例 | 实测 |
+| --- | --- | --- |
+| P1-7 连接池 | `internal/db/pool_test.go::TestConnectWithPoolAppliesConfiguredLimits` | 默认 `MaxOpenConnections=50`；环境变量 `DB_MAX_OPEN_CONNS=17` 生效；`PoolOptions{64}` 生效 |
+| P1-8 跨实例事件 | `internal/base/cross_instance_event_test.go::TestCrossInstanceEventDeliveredToOtherInstance` | 实例 A 写事件 → 实例 B 的订阅者收到（`eventId` / `eventType` / `projectID` 全对）；再拉一次**不重复投递**（水位单调） |
+| P2-14 死信重投 | `internal/base/deadletter_test.go::TestDeadLetterRetryIsActuallyRedelivered` | 重投后 `status=pending`、`retry_count=0`、`created_at` 已刷新 → 订阅者**真的收到** → 状态回到 `published` |
+| P2-16 分层配置 | `internal/config/layered_priority_test.go::TestLayeredConfigPriority` | 环境层(77) > 基础层(50)；环境变量(123) > 环境层；切 `APP_ENV=dev` 得 11；YAML 写坏退回代码默认值(50) |
+
+#### 3.81.4 审计暴露并修掉的真实缺陷（1 个）
+
+**死信重投实际不会投递**：`RetryDeadLetter` 原本只把 `status` 改回 `pending`，
+但发布器按「时间 + ID」水位**单调向前**读事件（`readOutboxSince`），已读过的行不会再被读到 ——
+死信因此会永远卡在 `pending`，**接口返回成功但事件永远不会送达**。
+
+修复：`RetryDeadLetter` 同时把 `created_at` 刷成当前时刻（重新进入水位窗口）、
+`retry_count` 归零、`published_at` 清空，`id` 不变（订阅端不会当新事件重复处理）。
+回归用例 `TestDeadLetterRetryIsActuallyRedelivered` 锁住该行为。
+
+#### 3.81.5 门禁复测（含本轮新增 3 个 Go 用例）
+
+| 门禁 | 结果 |
+| --- | --- |
+| `go build ./...` | ✅ |
+| `go test ./internal/...` | ✅ 全绿（含 `internal/model` / `internal/db` 表名守卫） |
+| 真实 Postgres 专项（并发 9 + 事件顺序 3 + 租户 1 + 跨实例 1 + 死信 1 + 连接池 1 + 分层配置 1） | ✅ **17/17 PASS** |
+| `npm run test:e2e:base:audit` | ✅ 27/27 PASS |
+| `npm run test:e2e:base` | ✅ 27/27 PASS |
+| `vitest` | 285 passed / 6 failed（`rte/**` 基线） |
+| `vue-tsc` | 62 errors（全部基线文件，`modules/base` 0 错误） |
+| `vite build` | ✅ |
+
+### 3.82 批次 M 前端接线：18 项从「有接口」变成「能真用」
+
+> 上一节证明了 18 项后端行为成立；本节补上一个此前被忽略的事实：
+> `src/modules/base/api.ts` 里 15 个新函数**调用点全为 0** —— 全是死代码，
+> 用户在界面上点不到任何一处。本节把四条链路接进界面并给出浏览器实测证据。
+
+#### 3.82.1 前端接线清单
+
+| 接口 | 界面落点 | 说明 |
+| --- | --- | --- |
+| `GET /base/metrics` | 运行监控 · 运行指标 | 10 张指标卡；P95 > 200ms / 有死信时卡片变色告警 |
+| `GET /base/outbox/dead-letters` + `retry` | 运行监控 · 事件死信 | 死信列表 + 重投按钮，重投后刷新指标 |
+| `GET/POST /base/import-jobs` + `cancel` | 运行监控 · 导入任务 | 进度条 + 状态标签 + 取消；运行中每 1.5s 轮询 |
+| `GET/POST/PATCH/DELETE /base/user-groups` | 运行监控 · 通讯录分组 | 列表 + 新建 / 编辑 / 删除，成员下拉多选并翻译姓名 |
+| `POST /base/tables/:id/import-jobs` | 导入弹窗「异步模式」 | ≥500 行建议开启；关窗后任务继续跑，进度在运行监控查看 |
+| `GET /base/views/:viewId` | 切换视图时 | 列表配置先生效，服务端最新配置随后覆盖 |
+| `GET /base/records/:recordId` | 记录抽屉「刷新最新值」 | 拉服务端最新一份并同步回列表 |
+| `GET /base/bases/:baseId` | Base 设置「读取服务端最新信息」 | 读服务端权威状态而非前端缓存 |
+| `POST /base/views/:viewId/query` | 主列表查询路径 | 生效口径 = 视图配置时走视图查询（服务端执行）；叠加个人条件时仍走表级接口 |
+
+#### 3.82.2 浏览器实测（`npm run test:e2e:base:ops`，13 项全 PASS）
+
+```
+PASS 准备账号与空间
+PASS 页面出现「运行监控」入口 — count=1
+PASS 运行指标页签渲染出指标卡片 — 10 张卡片
+PASS 指标卡片含延迟数值 — P50 延迟 3.9 ms
+PASS 指标页签截图 — …/metamatrix-base-e2e/base-ops-metrics.png
+PASS 事件死信页签可切换
+PASS 导入任务页签可切换
+PASS 新建通讯录分组后表格出现该分组 — 1 行
+PASS 分组名称正确写入 — 分组名称 … 销售一部 … 编辑 删除
+PASS 分组页签截图 — …/metamatrix-base-e2e/base-ops-groups.png
+PASS 页面无 JS 报错
+PASS 清理 E2E 空间
+ALL PASS
+```
+
+- 实测中修掉的布局缺陷：「刷新」按钮在抽屉里被 flex 拉伸成整行（`.be-ops` 默认
+  `align-items: stretch`），改为 `align-items: flex-start` + `.be-ops__section { width: 100% }`。
+- 实测踩到的两个坑（已写进脚本，避免回归）：
+  - 新用户首次进入会弹**启动引导**（`LaunchSplash`），它会拦截所有点击 → 脚本先点「跳过」；
+  - 多维表格界面挂在知识库的 **sheet 类型节点**上，且节点带 `documentId` 时单击会走文档视图
+    → 建节点时不传 `createDoc`，并点左侧树 `.kn-tree__node` 进入。
+
+#### 3.82.3 门禁复测
+
+| 门禁 | 结果 |
+| --- | --- |
+| `go build ./...` / `go test ./internal/... -count=1`（真实 PG） | ✅ 全绿 |
+| `vitest` | 285 passed / 6 failed（`rte/**` 基线） |
+| `vue-tsc` | 62 errors（全部基线文件），`modules/base` **0 错误** |
+| `vite build` | ✅ |
+| `npm run test:e2e:base` | ✅ 27/27 |
+| `npm run test:e2e:base:audit` | ✅ 27/27 |
+| `npm run test:e2e:base:ops` | ✅ 13/13 |
+
+### 3.83 批次 N：写路径吞吐治理（死锁根因修复 + 往返数与行数脱钩）
+
+> 批次 M 的 18 项交付后，用 `cmd/loadtest -scale large`（5000 行 × 20 字段 / 50 并发）
+> 复测，发现**写路径整体不成立**：读路径全绿，但单条更新与批量写入全部超时。
+> 本节记录取证、根因与治理结果。
+
+#### 3.83.1 取证
+
+| 证据 | 内容 |
+| --- | --- |
+| `pg_stat_activity` | 50 条 `idle in transaction`，最后一条语句是 `INSERT INTO "base_event_outboxes"` |
+| `kill -QUIT <api-pid>` 的 Go 栈 | `BatchCreate.func1 → createRecordInTx → subjectOf → roleOf → spaceRoleWithError → Count` |
+| 连接池 | `DB_MAX_OPEN_CONNS=50`，50 并发下每个请求实际要占 **2** 条 |
+
+#### 3.83.2 三个根因与治理
+
+| # | 根因 | 治理 |
+| --- | --- | --- |
+| 1 | **事务内发起走连接池的查询**（权限身份 / 字段校验）→ 事务占 1 条 + 查询再要 1 条，连接池打满即死锁 | 校验与身份解析全部移到事务开启之前；事务内只有纯写入语句 |
+| 2 | **往返数与行数成正比**（投影 N+1、全库公式扫描、逐行重查 schema 与权限、逐行审计与事件 INSERT、无 link 字段也照删关系） | 引入 `writeIO` 共享上下文；投影批量写；公式按表过滤且整批只查一次；审计与事件攒批落库；无 link 字段跳过关系维护 |
+| 3 | **`gorm.SavePoint` 在 pgx 下破坏事务连接复用**，且驱动吞掉错误（`SavePoint().Error` 恒为 nil） | 改用原生 `SAVEPOINT` / `ROLLBACK TO SAVEPOINT` |
+
+附带修正：删除 link 字段时一并清理其正反向历史关联，避免残留边被反查命中。
+
+#### 3.83.3 治理结果
+
+| 指标 | 治理前 | 治理后 |
+| --- | --- | --- |
+| 50 并发 × 500 行批量写入 | **全部超时（死锁）** | **3.9s 完成，0 错**（≈ 6,600 行/秒） |
+| 50 并发单条 PATCH | **全部超时** | **211ms，P95 50ms，0 错** |
+| 串行播种 5000 行 | 17.7s | **4.45s** |
+| `loadtest -scale large` 全场景 | 写场景超时 | **8 个场景全部 0 错** |
+
+`loadtest -scale large`（50 并发 / 每场景 15s）：
+
+| 场景 | 请求数 | 错误数 | QPS | P95 | P99 |
+| --- | --- | --- | --- | --- | --- |
+| 首屏查询（100 条 × 20 字段） | 18158 | 0 | 1210.5 | 57ms | 70ms |
+| 常规筛选（关键字） | 2309 | 0 | 153.9 | 607ms | 811ms |
+| 视图配置读取 | 174999 | 0 | 11666.6 | 6ms | 8ms |
+| 表结构读取 | 29144 | 0 | 1942.9 | 33ms | 39ms |
+| 单条更新 | 18769 | 0 | 1251.3 | 50ms | 57ms |
+| 批量 100 条编辑 | 912 | 0 | 60.8 | 889ms | 907ms |
+| 深翻页（keyset 翻 20 页） | 18293 | 0 | 1219.5 | 57ms | 68ms |
+| 批量写入（500 行/批） | 200 | 0 | 13.3 | 4.884s | 5.087s |
+
+#### 3.83.4 回归用例（`internal/base/batch_deadlock_test.go`）
+
+| 用例 | 作用 | 结果 |
+| --- | --- | --- |
+| `TestBatchCreateUnderTightPoolDoesNotDeadlock` | 连接池压到 4 条 + 8 并发批量写 | ✅ 0.24s（把「事务内查权限」加回去即 200s 超时） |
+| `TestBatchCreatePartialUnderTightPoolDoesNotDeadlock` | 同上，覆盖「部分成功」路径 | ✅ 0.25s |
+| `TestBatchWriteSortOrderIsUniqueWithinRequest` | 跨块 57 行写入后排序位唯一 | ✅ |
+
+#### 3.83.5 门禁复测
+
+| 门禁 | 结果 |
+| --- | --- |
+| `go build ./...` | ✅ |
+| `go test ./internal/... -count=1`（真实 PG，`DATABASE_URL` 指向开发库） | ✅ 全绿（11 包） |
+| `vitest` | 285 passed / 6 failed（`rte/**` 基线，与本轮无关） |
+| `vue-tsc` | 62 errors（全部基线文件），`modules/base` **0 错误** |
+| `vite build` | ✅ |
+| `npm run test:e2e:base` | ✅ 27/27 |
+| `cmd/loadtest -scale large` | ✅ 8 场景全部 0 错 |

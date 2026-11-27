@@ -14,6 +14,7 @@ import (
 // baseRecordLinkSQLite 是 base_record_links 的 SQLite 影子模型。
 type baseRecordLinkSQLite struct {
 	ID             uuid.UUID `gorm:"type:uuid;primaryKey"`
+	TenantID       uuid.UUID `gorm:"type:uuid;not null;default:'00000000-0000-0000-0000-000000000000'"`
 	SourceTableID  uuid.UUID `gorm:"type:uuid;not null"`
 	SourceRecordID uuid.UUID `gorm:"type:uuid;not null"`
 	FieldID        uuid.UUID `gorm:"type:uuid;not null"`
@@ -38,7 +39,7 @@ func newRelationFixture(t *testing.T) (*Service, uuid.UUID, uuid.UUID, uuid.UUID
 	if err := db.AutoMigrate(
 		&baseTableSQLite{}, &baseFieldSQLite{},
 		&baseRecordSQLite{}, &baseRecordValueSQLite{}, &baseRecordGrantSQLite{},
-		&baseRecordLinkSQLite{},
+		&baseRecordLinkSQLite{}, &baseRecordReverseLinkSQLite{},
 	); err != nil {
 		t.Fatalf("migrate failed: %v", err)
 	}
@@ -46,11 +47,11 @@ func newRelationFixture(t *testing.T) (*Service, uuid.UUID, uuid.UUID, uuid.UUID
 		`CREATE TABLE IF NOT EXISTS core_projects (id uuid primary key, owner_user_id uuid)`,
 		`CREATE TABLE IF NOT EXISTS base_field_formulas (id uuid primary key, table_id uuid, field_id uuid, status integer)`,
 		`CREATE TABLE IF NOT EXISTS base_operation_logs (
-			id uuid primary key, project_id uuid, base_id uuid, table_id uuid, record_id uuid,
+			id uuid primary key, tenant_id uuid, project_id uuid, base_id uuid, table_id uuid, record_id uuid,
 			operator_id uuid, operation varchar(32), before_data json, after_data json,
 			request_id varchar(64), created_at datetime)`,
 		`CREATE TABLE IF NOT EXISTS base_event_outboxes (
-			id uuid primary key, project_id uuid, base_id uuid, table_id uuid,
+			id uuid primary key, tenant_id uuid, project_id uuid, base_id uuid, table_id uuid,
 			aggregate_type varchar(32), aggregate_id uuid, event_type varchar(64),
 			payload json, status varchar(16), retry_count integer,
 			created_at datetime, published_at datetime)`,
