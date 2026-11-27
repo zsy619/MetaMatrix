@@ -353,6 +353,35 @@ export function countViewFilters(sheet: SheetData): number {
   return (sheet.views || []).reduce((n, view) => n + (view.filters || []).length, 0)
 }
 
+/** 只比较字段和行，不含视图。用来判断手动同步是否两边都改过。 */
+export function sheetContentFingerprint(sheet: SheetData): string {
+  const fields = (sheet.fields || []).map((field) => ({
+    id: field.id,
+    type: field.type,
+    name: field.name,
+    options: field.options ? [...field.options] : undefined,
+  }))
+  const rows = (sheet.rows || []).map((row) => ({
+    id: row.id,
+    cells: row.cells || {},
+  }))
+  return JSON.stringify({ fields, rows })
+}
+
+export function sheetsDiverged(local: SheetData, remote: SheetData, syncedFp?: string | null): boolean {
+  const fp = (syncedFp || '').trim()
+  if (!fp) return false
+  return sheetContentFingerprint(local) !== fp && sheetContentFingerprint(remote) !== fp
+}
+
+export function currentCalendarMonth(now = new Date()): string {
+  return formatCalendarMonth(now.getFullYear(), now.getMonth() + 1)
+}
+
+export function currentCalendarDay(now = new Date()): string {
+  return `${currentCalendarMonth(now)}-${String(now.getDate()).padStart(2, '0')}`
+}
+
 export function pullSheetIntoPayload(payload: DatabaseBlockPayload, tree: SheetData): DatabaseBlockPayload {
   const incoming = migrateSheet(tree)
   const sheet = cloneSheet(payload.sheet)

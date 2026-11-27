@@ -11,6 +11,8 @@ import {
   activeDatabaseView,
   attrsFromPayload,
   calendarMonthMatrix,
+  currentCalendarDay,
+  currentCalendarMonth,
   setDatabaseCalendarMonth,
   shiftCalendarMonth,
   cellPreview,
@@ -161,6 +163,7 @@ export function createDatabaseBlockView({ node, getPos, editor }: NodeViewRender
         }
         gallery.append(card)
       }
+      if (!rows.length) gallery.append(el('div', 'rte-database-block__hint', '没有符合筛选的记录'))
       dom.append(gallery)
     } else if (typ === 'calendar') {
       const cal = el('div', 'rte-database-block__calendar')
@@ -189,16 +192,32 @@ export function createDatabaseBlockView({ node, getPos, editor }: NodeViewRender
           event.stopPropagation()
           writePayload(setDatabaseCalendarMonth(payload, shiftCalendarMonth(month.yearMonth, 1)))
         })
-        nav.append(prev, el('div', 'rte-database-block__month-label', month.label), next)
+        const todayBtn = document.createElement('button')
+        todayBtn.type = 'button'
+        todayBtn.className = 'rte-database-block__filter-join'
+        todayBtn.textContent = '今天'
+        todayBtn.disabled = !editable
+        todayBtn.addEventListener('click', (event) => {
+          event.preventDefault()
+          event.stopPropagation()
+          writePayload(setDatabaseCalendarMonth(payload, currentCalendarMonth()))
+        })
+        nav.append(prev, el('div', 'rte-database-block__month-label', month.label), next, todayBtn)
         cal.append(nav)
         const week = el('div', 'rte-database-block__month-week')
         for (const name of ['一', '二', '三', '四', '五', '六', '日']) week.append(el('span', '', name))
         cal.append(week)
         const grid = el('div', 'rte-database-block__month-grid')
         const main = payload.sheet.fields[0]
+        const today = currentCalendarDay()
         for (const row of month.weeks) {
           for (const cell of row) {
-            const box = el('div', cell.inMonth ? 'rte-database-block__month-cell' : 'rte-database-block__month-cell is-empty')
+            const klass = [
+              'rte-database-block__month-cell',
+              cell.inMonth ? '' : 'is-empty',
+              cell.date === today ? 'is-today' : '',
+            ].filter(Boolean).join(' ')
+            const box = el('div', klass)
             if (cell.day != null) box.append(el('div', 'rte-database-block__month-date', String(cell.day)))
             for (const item of cell.rows) {
               const card = el('div', 'rte-database-block__card')
@@ -274,7 +293,7 @@ export function createDatabaseBlockView({ node, getPos, editor }: NodeViewRender
       dom.append(table)
     }
     const foot = el('div', 'rte-database-block__foot')
-    foot.append(el('div', 'rte-database-block__meta', `${rows.length} 行`))
+    foot.append(el('div', 'rte-database-block__meta', rows.length === payload.sheet.rows.length ? `${rows.length} 行` : `显示 ${rows.length} / ${payload.sheet.rows.length} 行`))
     const add = document.createElement('button')
     add.type = 'button'
     add.className = 'rte-database-block__add-row'

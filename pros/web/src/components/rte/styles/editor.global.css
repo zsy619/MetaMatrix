@@ -4153,6 +4153,9 @@ input.rte-timeline-title:focus {
   background: #f7f8fa;
   min-height: 24px;
 }
+.rte-database-block__month-cell.is-today {
+  outline: 1px solid var(--mm-primary, #165dff);
+}
 .rte-database-block__month-date {
   font-size: 11px;
   color: var(--mm-text-2, #4e5969);

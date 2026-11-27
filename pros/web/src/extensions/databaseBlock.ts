@@ -130,6 +130,11 @@ export const DatabaseBlock = Node.create({
         parseHTML: (el: HTMLElement) => el.getAttribute('data-sheet') || '',
         renderHTML: (attrs: { sheet?: string }) => (attrs.sheet ? { 'data-sheet': attrs.sheet } : {}),
       },
+      syncedFp: {
+        default: '',
+        parseHTML: (el: HTMLElement) => el.getAttribute('data-synced-fp') || '',
+        renderHTML: (attrs: { syncedFp?: string }) => (attrs.syncedFp ? { 'data-synced-fp': attrs.syncedFp } : {}),
+      },
     }
   },
 
@@ -154,6 +159,7 @@ export const DatabaseBlock = Node.create({
         'data-type': DATABASE_BLOCK_HTML_TYPE,
         'data-view-type': typ,
         'data-sheet': snapshot.sheet,
+        ...(String(node.attrs.syncedFp || '').trim() ? { 'data-synced-fp': String(node.attrs.syncedFp) } : {}),
         class: linked ? 'rte-database-block is-linked' : 'rte-database-block',
         contenteditable: 'false',
         'data-open-sheet': linked ? 'true' : 'false',

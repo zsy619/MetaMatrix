@@ -824,14 +824,31 @@ async function onDatabaseBlockSync(ev: Event) {
   const editor = inst?.editor
   if (!editor) return
   try {
-    const result = await syncLinkedDatabaseBlock(editor, props.projectId, detail, {
+    const io = {
       load: getNodeData,
       save: saveNodeData,
-    })
+    }
+    let result = await syncLinkedDatabaseBlock(editor, props.projectId, detail, io)
+    if (result.action === 'aborted' && result.diverged) {
+      const cover = detail.direction === 'pull' ? '拉取会用树上表格覆盖内嵌块' : '写回会用内嵌块覆盖树上表格'
+      try {
+        await ElMessageBox.confirm(`两边都改过。${cover}，这只是手动快照，不是实时同步。确定继续？`, '表格已分叉', {
+          type: 'warning',
+          confirmButtonText: '继续覆盖',
+          cancelButtonText: '取消',
+        })
+      } catch {
+        ElMessage.info('已取消同步')
+        return
+      }
+      result = await syncLinkedDatabaseBlock(editor, props.projectId, { ...detail, force: true }, io)
+    }
+    if (result.action === 'aborted') return
     ElMessage.success(result.action === 'pulled' ? '已从知识库表格拉取' : '已写回知识库表格')
     if (result.action === 'pulled' && result.droppedFilters > 0) {
       ElMessage.warning(`有 ${result.droppedFilters} 条筛选条件因字段已不存在被去掉`)
     }
+    if (result.diverged) ElMessage.warning('已按你确认的方向覆盖，另一边未合并的改动会丢掉')
   } catch (err) {
     ElMessage.error(friendlyApiMessage(err, '同步知识库表格失败'))
   }
