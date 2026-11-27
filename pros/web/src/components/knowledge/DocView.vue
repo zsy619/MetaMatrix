@@ -833,10 +833,15 @@ async function onDatabaseBlockSync(ev: Event) {
       save: saveNodeData,
     }
     let result = await syncLinkedDatabaseBlock(editor, props.projectId, detail, io)
-    if (result.action === 'aborted' && result.diverged) {
-      const cover = detail.direction === 'pull' ? '拉取会用树上表格覆盖内嵌块' : '写回会用内嵌块覆盖树上表格'
+    if (result.action === 'aborted' && (result.diverged || result.drift === 'local-only' || result.drift === 'remote-only')) {
+      const cover = result.drift === 'local-only'
+        ? '内嵌块有尚未写回的改动，拉取会丢掉这些改动'
+        : result.drift === 'remote-only'
+          ? '树上表格有更新，写回会丢掉树上的改动'
+          : (detail.direction === 'pull' ? '拉取会用树上表格覆盖内嵌块' : '写回会用内嵌块覆盖树上表格')
+      const head = result.drift === 'both' ? '两边都改过。' : ''
       try {
-        await ElMessageBox.confirm(`两边都改过。${cover}，这只是手动快照，不是实时同步。确定继续？`, '表格已分叉', {
+        await ElMessageBox.confirm(`${head}${cover}。这只是手动快照，不是实时同步。确定继续？`, '表格已分叉', {
           type: 'warning',
           confirmButtonText: '继续覆盖',
           cancelButtonText: '取消',

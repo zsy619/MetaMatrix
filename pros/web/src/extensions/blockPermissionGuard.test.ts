@@ -68,6 +68,21 @@ describe('编辑器内块级只读', () => {
     expect(ed.state.doc.textContent).toContain('已改')
   })
 
+  it('选区跨过中间只读块时不能编辑', () => {
+    const ed = mount('<p>开头</p><p>锁定</p><p>结尾</p>')
+    const first = paragraphId(ed, 0)
+    const locked = paragraphId(ed, 1)
+    const last = paragraphId(ed, 2)
+    setBlockPermissionGuardState(ed, {
+      role: 'owner',
+      canWrite: true,
+      permissions: { [locked.id!]: 'readonly' },
+    })
+    expect(canEditRange(ed, first.pos + 1, first.pos + 2)).toBe(true)
+    expect(canEditRange(ed, last.pos + 1, last.pos + 2)).toBe(true)
+    expect(canEditRange(ed, first.pos + 1, last.pos + 2)).toBe(false)
+  })
+
   it('无 canWrite 时不能改任何带身份的块', () => {
     const ed = mount('<p>正文</p>')
     const row = paragraphId(ed, 0)

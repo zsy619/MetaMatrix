@@ -3,11 +3,13 @@ import { migrateSheet, type SheetData } from '../components/knowledge/sheetModel
 import type { DatabaseBlockSyncDetail } from './databaseBlockEvents'
 import { DATABASE_BLOCK_NAME } from './databaseBlockSheet'
 import {
+  classifySheetDrift,
   countViewFilters,
   payloadFromAttrs,
   pushSheetFromPayload,
   sheetContentFingerprint,
-  sheetsDiverged,
+  type SheetDrift,
+  unsafeSyncDirection,
 } from './databaseBlockSheet'
 
 export type DatabaseBlockSyncIo = {
@@ -24,9 +26,10 @@ export type DatabaseBlockSyncEditor = {
 }
 
 export type DatabaseBlockSyncResult = {
-  action: 'pulled' | 'pushed' | 'aborted'
+  action: 'pulled' | 'pushed' | 'aborted' | 'noop'
   droppedFilters: number
   diverged: boolean
+  drift: SheetDrift
 }
 
 function writeSyncedFp(editor: DatabaseBlockSyncEditor, pos: number, fp: string) {
@@ -49,11 +52,13 @@ export async function syncLinkedDatabaseBlock(
   if (remote.kind && remote.kind !== 'sheet') throw new Error('关联节点不是多维表格')
   const tree = migrateSheet(remote.data)
   const local = payloadFromAttrs(node.attrs as { sheet?: string; viewType?: string }).sheet
-  const diverged = sheetsDiverged(local, tree, String(node.attrs.syncedFp || ''))
-  if (diverged && !detail.force) {
-    return { action: 'aborted', droppedFilters: 0, diverged: true }
+  const drift = classifySheetDrift(local, tree, String(node.attrs.syncedFp || ''))
+  const diverged = drift === 'both'
+  const direction = detail.direction === 'push' ? 'push' : 'pull'
+  if (!detail.force && unsafeSyncDirection(direction, drift)) {
+    return { action: 'aborted', droppedFilters: 0, diverged, drift }
   }
-  if (detail.direction === 'pull') {
+  if (direction === 'pull') {
     const before = countViewFilters(local)
     const tr = editor.state.tr.setSelection(NodeSelection.create(editor.state.doc as never, detail.pos))
     editor.view.dispatch(tr)
@@ -64,10 +69,10 @@ export async function syncLinkedDatabaseBlock(
       : null
     const after = afterPayload ? countViewFilters(afterPayload.sheet) : before
     writeSyncedFp(editor, detail.pos, sheetContentFingerprint(tree))
-    return { action: 'pulled', droppedFilters: Math.max(0, before - after), diverged }
+    return { action: 'pulled', droppedFilters: Math.max(0, before - after), diverged, drift }
   }
   const next = pushSheetFromPayload(payloadFromAttrs(node.attrs as { sheet?: string; viewType?: string }), tree)
   await io.save(projectId, sheetNodeId, 'sheet', next)
   writeSyncedFp(editor, detail.pos, sheetContentFingerprint(next))
-  return { action: 'pushed', droppedFilters: 0, diverged }
+  return { action: 'pushed', droppedFilters: 0, diverged, drift }
 }
