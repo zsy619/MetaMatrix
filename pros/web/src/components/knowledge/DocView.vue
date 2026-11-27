@@ -64,6 +64,7 @@ import SaveConflictPanel from './SaveConflictPanel.vue'
 import BlockPermissionPanel from './BlockPermissionPanel.vue'
 import { readBlockId } from '../../extensions/blockIdentity'
 import { setBlockPermissionGuardState } from '../../extensions/blockPermissionGuard'
+import { canEditBlockContent } from './blockPermission'
 import { DATABASE_BLOCK_SYNC_EVENT, type DatabaseBlockSyncDetail } from '../../extensions/databaseBlockEvents'
 import { syncLinkedDatabaseBlock } from '../../extensions/databaseBlockSync'
 import { resolveConflictHtml, type SaveConflictChoice } from './saveConflict'
@@ -121,6 +122,10 @@ const permissionActor = computed(() => ({
   canWrite: !props.locked && collabWritable.value,
   role: liveSession.value?.role || (props.locked ? 'viewer' : 'owner'),
 }))
+const selectedBlockLocked = computed(() =>
+  Boolean(selectedBlockId.value) &&
+  !canEditBlockContent(selectedBlockPermission.value, permissionActor.value.role, permissionActor.value.canWrite),
+)
 const authStore = useAuthStore()
 const collabUser = computed(() => {
   const user = authStore.user
@@ -395,6 +400,27 @@ async function loadBlockPermission(blockId: string) {
 }
 
 
+let boundSelectionEditor: { on?: (ev: string, fn: () => void) => void; off?: (ev: string, fn: () => void) => void } | null = null
+
+function onEditorSelectionUpdate() {
+  refreshSelectedBlock()
+}
+
+function bindEditorSelection(editor: typeof boundSelectionEditor) {
+  if (boundSelectionEditor && boundSelectionEditor !== editor) {
+    boundSelectionEditor.off?.('selectionUpdate', onEditorSelectionUpdate)
+    boundSelectionEditor = null
+  }
+  if (!editor?.on || boundSelectionEditor === editor) return
+  editor.on('selectionUpdate', onEditorSelectionUpdate)
+  boundSelectionEditor = editor
+}
+
+function unbindEditorSelection() {
+  boundSelectionEditor?.off?.('selectionUpdate', onEditorSelectionUpdate)
+  boundSelectionEditor = null
+}
+
 async function refreshBlockPermissionGuard(attempt = 0) {
   const inst = editorRef.value as unknown as {
     editor?: Parameters<typeof setBlockPermissionGuardState>[0]
@@ -404,6 +430,7 @@ async function refreshBlockPermissionGuard(attempt = 0) {
     if (attempt < 8) window.setTimeout(() => void refreshBlockPermissionGuard(attempt + 1), 80)
     return
   }
+  bindEditorSelection(editor as typeof boundSelectionEditor)
   const actor = permissionActor.value
   try {
     const rows = await listDocumentBlocks(props.documentId)
@@ -826,6 +853,7 @@ onUnmounted(() => {
   window.removeEventListener('beforeunload', onBeforeUnload)
   window.removeEventListener(DATABASE_BLOCK_SYNC_EVENT, onDatabaseBlockSync)
   if (presenceTimer) clearInterval(presenceTimer)
+  unbindEditorSelection()
   stopLiveCollab()
 })
 
@@ -1004,6 +1032,10 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
     <div v-else-if="collabOn && !collabWritable" class="doc-view__lock">
       <el-icon><Lock /></el-icon>
       协同房间为只读，浏览者不能编辑正文。
+    </div>
+    <div v-else-if="selectedBlockLocked" class="doc-view__lock">
+      <el-icon><Lock /></el-icon>
+      当前选中块只读，不能在编辑器里改这块，建议模式的接受或拒绝也不会绕过。
     </div>
 
     <div v-if="loading" class="doc-view__empty"><AppLoading /></div>

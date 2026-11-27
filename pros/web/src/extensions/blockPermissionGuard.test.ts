@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it } from 'vitest'
 import { Editor } from '@tiptap/core'
+import { ySyncPluginKey } from '@tiptap/y-tiptap'
 import StarterKit from '@tiptap/starter-kit'
 import { SuggestionDelete, SuggestionInsert } from './suggestionMarks'
 import { dispatchSuggestionDecision } from '../utils/rteSuggestions'
@@ -114,5 +115,19 @@ describe('编辑器内块级只读', () => {
     const after = payloadFromAttrs(collectIdentityNodes(ed.state.doc).find(({ node }) => node.type.name === DATABASE_BLOCK_NAME)!.node.attrs)
     expect(after.sheet.rows[0]!.cells[field.id]).not.toBe('不该写进去')
     expect(after.sheet.rows[0]!.cells[field.id]).toBe(payload.sheet.rows[0]!.cells[field.id])
+  })
+
+  it('协同远端更新仍可写入只读块，不把协同收包挡掉', () => {
+    const ed = mount('<p>锁定这段</p>')
+    const locked = paragraphId(ed, 0)
+    setBlockPermissionGuardState(ed, {
+      role: 'owner',
+      canWrite: true,
+      permissions: { [locked.id!]: 'readonly' },
+    })
+    const tr = ed.state.tr.insertText('远端', locked.pos + 1)
+    tr.setMeta(ySyncPluginKey, { isChangeOrigin: true })
+    ed.view.dispatch(tr)
+    expect(ed.state.doc.textContent).toContain('远端')
   })
 })
