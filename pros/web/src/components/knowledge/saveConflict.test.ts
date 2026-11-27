@@ -1,10 +1,12 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from 'vitest'
 import {
+  describeBlockMerge,
   htmlHasSuggestionMarks,
   htmlPreviewText,
   mergeConflictHtml,
   resolveConflictHtml,
+  summarizeBlockMerge,
 } from './saveConflict'
 
 const mark = '<span data-suggestion="insert" data-author-name="李四">新增句</span>'
@@ -61,3 +63,19 @@ describe('saveConflict 按块合并', () => {
     expect(merged).toContain('data-suggestion="delete"')
   })
 })
+
+  it('能统计相同、冲突和单边块', () => {
+    const same = '<p data-block-id="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa">同一段</p>'
+    const mineOnly = '<p data-block-id="bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb">仅本地</p>'
+    const conflictMine = '<p data-block-id="cccccccc-cccc-4ccc-8ccc-cccccccccccc">本地改</p>'
+    const conflictTheirs = '<p data-block-id="cccccccc-cccc-4ccc-8ccc-cccccccccccc">远端改</p>'
+    const summary = summarizeBlockMerge({
+      mineHtml: same + mineOnly + conflictMine,
+      theirsHtml: same + conflictTheirs,
+    })
+    expect(summary).toEqual({ hasBlockIds: true, same: 1, conflict: 1, onlyTheirs: 0, onlyMine: 1 })
+    expect(describeBlockMerge(summary)).toContain('相同 1 块')
+    expect(describeBlockMerge(summary)).toContain('内容冲突 1 块')
+    expect(describeBlockMerge(summary)).toContain('仅你的 1 块')
+  })
+

@@ -62,6 +62,60 @@ function topLevelBlocks(html: string): { id: string; html: string }[] {
 }
 
 /** 按稳定 data-block-id 合并：相同块只保留一份，内容冲突则先对方后本地并排保留。不是飞书级三方合并。 */
+export type BlockMergeSummary = {
+  hasBlockIds: boolean
+  same: number
+  conflict: number
+  onlyTheirs: number
+  onlyMine: number
+}
+
+export function summarizeBlockMerge(versions: SaveConflictVersions): BlockMergeSummary {
+  const mineBlocks = topLevelBlocks(versions.mineHtml ?? '')
+  const theirsBlocks = topLevelBlocks(versions.theirsHtml ?? '')
+  const mineById = new Map<string, string>()
+  for (const block of mineBlocks) {
+    if (block.id && !mineById.has(block.id)) mineById.set(block.id, block.html)
+  }
+  const theirsIds = new Set<string>()
+  let same = 0
+  let conflict = 0
+  let onlyTheirs = 0
+  for (const block of theirsBlocks) {
+    if (!block.id) {
+      onlyTheirs += 1
+      continue
+    }
+    if (theirsIds.has(block.id)) continue
+    theirsIds.add(block.id)
+    const mine = mineById.get(block.id)
+    if (!mine) onlyTheirs += 1
+    else if (mine === block.html) same += 1
+    else conflict += 1
+  }
+  let onlyMine = 0
+  const seenMine = new Set<string>()
+  for (const block of mineBlocks) {
+    if (!block.id) {
+      onlyMine += 1
+      continue
+    }
+    if (seenMine.has(block.id)) continue
+    seenMine.add(block.id)
+    if (!theirsIds.has(block.id)) onlyMine += 1
+  }
+  const hasBlockIds = mineById.size > 0 || theirsIds.size > 0
+  return { hasBlockIds, same, conflict, onlyTheirs, onlyMine }
+}
+
+export function describeBlockMerge(summary: BlockMergeSummary): string {
+  if (!summary.hasBlockIds) return '正文缺少稳定块 ID，合并将先保留对方全文再附上你的全文。'
+  const parts = [`相同 ${summary.same} 块`, `内容冲突 ${summary.conflict} 块`]
+  if (summary.onlyTheirs) parts.push(`仅对方 ${summary.onlyTheirs} 块`)
+  if (summary.onlyMine) parts.push(`仅你的 ${summary.onlyMine} 块`)
+  return `按块对照：${parts.join('，')}。冲突块会并排保留，不是飞书级三方合并。`
+}
+
 export function mergeByBlockId(versions: SaveConflictVersions): string {
   const mineBlocks = topLevelBlocks(versions.mineHtml ?? '')
   const theirsBlocks = topLevelBlocks(versions.theirsHtml ?? '')

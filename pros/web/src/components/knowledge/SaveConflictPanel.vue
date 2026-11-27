@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import {
+  describeBlockMerge,
   htmlPreviewText,
   mergeConflictHtml,
+  summarizeBlockMerge,
   type SaveConflictChoice,
   type SaveConflictVersions,
 } from './saveConflict'
@@ -21,6 +23,7 @@ const theirsPreview = computed(() => htmlPreviewText(props.versions.theirsHtml))
 const theirsHeading = computed(() => props.versions.theirsLabel || '对方的版本')
 const mineHeading = computed(() => props.versions.mineLabel || '你的版本')
 const mergePreview = computed(() => htmlPreviewText(mergeConflictHtml(props.versions), 360))
+const mergeSummary = computed(() => describeBlockMerge(summarizeBlockMerge(props.versions)))
 </script>
 
 <template>
@@ -42,6 +45,7 @@ const mergePreview = computed(() => htmlPreviewText(mergeConflictHtml(props.vers
     </div>
     <section class="save-conflict-panel__merge" data-side="merge">
       <h3>合并预览</h3>
+      <p class="save-conflict-panel__hint">{{ mergeSummary }}</p>
       <pre class="save-conflict-panel__preview">{{ mergePreview || '（空）' }}</pre>
     </section>
     <footer class="save-conflict-panel__actions">
