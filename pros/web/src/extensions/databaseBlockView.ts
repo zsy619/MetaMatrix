@@ -4,6 +4,12 @@ import { FILTER_OPS, type SheetFilter, type SheetFilterOp } from '../components/
 import { BLOCK_IDENTITY_ATTR, readBlockId } from './blockIdentity'
 import { canEditStoredBlock, guardStorageFrom } from './blockPermissionGuard'
 import { DATABASE_BLOCK_SYNC_EVENT } from './databaseBlockEvents'
+import {
+  DATABASE_BLOCK_STATUS_EVENT,
+  databaseBlockSyncKey,
+  describeSheetDrift,
+  getDatabaseBlockSyncStatus,
+} from './databaseBlockSyncStatus'
 import { DATABASE_BLOCK_HTML_TYPE } from './databaseBlockSheet'
 import {
   DATABASE_VIEW_LABELS,
@@ -42,7 +48,7 @@ export function createDatabaseBlockView({ node, getPos, editor }: NodeViewRender
   dom.contentEditable = 'false'
 
   const signature = (target: PMNode) =>
-    `${target.attrs.sheet || ''}|${target.attrs.viewType || ''}|${target.attrs.title || ''}|${target.attrs.sheetNodeId || ''}`
+    `${target.attrs.sheet || ''}|${target.attrs.viewType || ''}|${target.attrs.title || ''}|${target.attrs.sheetNodeId || ''}|${target.attrs.syncedFp || ''}`
   let last = signature(node)
 
   const readPayload = (): DatabaseBlockPayload => {
@@ -70,7 +76,7 @@ export function createDatabaseBlockView({ node, getPos, editor }: NodeViewRender
     )
   }
 
-  const emitSync = (direction: 'pull' | 'push') => {
+  const emitSync = (direction: 'pull' | 'push' | 'safe') => {
     const pos = typeof getPos === 'function' ? getPos() : undefined
     const sheetNodeId = String((typeof pos === 'number' && pos >= 0 ? editor.state.doc.nodeAt(pos) : current)?.attrs.sheetNodeId || current.attrs.sheetNodeId || '').trim()
     if (typeof pos !== 'number' || pos < 0 || !sheetNodeId) return
@@ -87,7 +93,8 @@ export function createDatabaseBlockView({ node, getPos, editor }: NodeViewRender
     const view = activeDatabaseView(payload)
     const typ = viewTypeOf(view)
     const title = String(current.attrs.title || '').trim() || '多维表格'
-    const linked = Boolean(String(current.attrs.sheetNodeId || '').trim())
+    const sheetNodeId = String(current.attrs.sheetNodeId || '').trim()
+    const linked = Boolean(sheetNodeId)
     const rows = visibleDatabaseRows(payload)
     const blockId = readBlockId(current)
     const editable = editor.isEditable && (!blockId || canEditStoredBlock(guardStorageFrom(editor), blockId))
@@ -122,8 +129,16 @@ export function createDatabaseBlockView({ node, getPos, editor }: NodeViewRender
       sync.append(
         syncBtn('从知识库拉取', 'pull', editable, () => emitSync('pull')),
         syncBtn('写回知识库', 'push', editable, () => emitSync('push')),
+        syncBtn('安全同步', 'safe', editable, () => emitSync('safe')),
       )
-      const note = el('span', 'rte-database-block__hint', '手动同步快照，不是实时双向')
+      const statusKey = databaseBlockSyncKey(blockId || '', sheetNodeId)
+      const drift = getDatabaseBlockSyncStatus(statusKey)?.drift
+      if (drift) {
+        const badge = el('span', `rte-database-block__sync-status is-${drift}`, describeSheetDrift(drift))
+        badge.setAttribute('data-sync-status', drift)
+        sync.append(badge)
+      }
+      const note = el('span', 'rte-database-block__hint', '对照后可安全同步单边改动，不是实时双向')
       head.append(sync, note)
     }
     dom.append(head)
@@ -308,6 +323,13 @@ export function createDatabaseBlockView({ node, getPos, editor }: NodeViewRender
     dom.append(foot)
   }
 
+  const onStatus = () => {
+    render()
+  }
+  if (typeof window !== 'undefined') {
+    window.addEventListener(DATABASE_BLOCK_STATUS_EVENT, onStatus)
+  }
+
   render()
 
   return {
@@ -319,6 +341,11 @@ export function createDatabaseBlockView({ node, getPos, editor }: NodeViewRender
       last = next
       render()
       return true
+    },
+    destroy() {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener(DATABASE_BLOCK_STATUS_EVENT, onStatus)
+      }
     },
     ignoreMutation: () => true,
     stopEvent: (event: Event) => {
@@ -453,7 +480,7 @@ function joinBtn(
   return btn
 }
 
-function syncBtn(label: string, direction: 'pull' | 'push', enabled: boolean, onClick: () => void) {
+function syncBtn(label: string, direction: 'pull' | 'push' | 'safe', enabled: boolean, onClick: () => void) {
   const btn = document.createElement('button')
   btn.type = 'button'
   btn.className = 'rte-database-block__sync-btn'

@@ -67,7 +67,7 @@ import { readBlockId } from '../../extensions/blockIdentity'
 import { setBlockPermissionGuardState } from '../../extensions/blockPermissionGuard'
 import { canEditBlockContent } from './blockPermission'
 import { DATABASE_BLOCK_SYNC_EVENT, type DatabaseBlockSyncDetail } from '../../extensions/databaseBlockEvents'
-import { syncLinkedDatabaseBlock } from '../../extensions/databaseBlockSync'
+import { probeLinkedDatabaseBlocks, syncLinkedDatabaseBlock } from '../../extensions/databaseBlockSync'
 import { resolveConflictHtml, type SaveConflictChoice } from './saveConflict'
 
 const props = defineProps<{
@@ -157,6 +157,31 @@ const tasks = ref<knowledgeApiV5.DocTask[]>([])
 /** 正文标题层级（051 目录块 / 046 大纲）。 */
 const outlineItems = ref<knowledgeApiV5.OutlineItem[]>([])
 let presenceTimer: ReturnType<typeof setInterval> | null = null
+let sheetProbeTimer: ReturnType<typeof setInterval> | null = null
+
+function editorForSheetSync() {
+  const inst = editorRef.value as unknown as {
+    editor?: Parameters<typeof syncLinkedDatabaseBlock>[0]
+  } | null
+  return inst?.editor
+}
+
+function onWindowFocusProbe() {
+  void probeLinkedSheets()
+}
+
+async function probeLinkedSheets() {
+  const editor = editorForSheetSync()
+  if (!editor || !props.projectId) return
+  try {
+    await probeLinkedDatabaseBlocks(editor, props.projectId, {
+      load: getNodeData,
+      save: saveNodeData,
+    })
+  } catch {
+    // 对照失败不打断编辑；状态保持上次结果或尚未对照。
+  }
+}
 
 const panelId = computed(() => `doc:${props.documentId}`)
 /** 面包屑去掉最后一级：右侧已经有大标题，重复显示没有意义。 */
@@ -187,6 +212,8 @@ async function load() {
     ElMessage.error(friendlyApiMessage(err, '加载文档失败'))
   } finally {
     loading.value = false
+    await nextTick()
+    void probeLinkedSheets()
   }
 }
 
@@ -822,10 +849,7 @@ async function applyConflictChoice(choice: SaveConflictChoice) {
 async function onDatabaseBlockSync(ev: Event) {
   const detail = (ev as CustomEvent<DatabaseBlockSyncDetail>).detail
   if (!detail?.sheetNodeId) return
-  const inst = editorRef.value as unknown as {
-    editor?: Parameters<typeof syncLinkedDatabaseBlock>[0]
-  } | null
-  const editor = inst?.editor
+  const editor = editorForSheetSync()
   if (!editor) return
   try {
     const io = {
@@ -833,6 +857,16 @@ async function onDatabaseBlockSync(ev: Event) {
       save: saveNodeData,
     }
     let result = await syncLinkedDatabaseBlock(editor, props.projectId, detail, io)
+    if (detail.direction === 'safe') {
+      if (result.action === 'noop') {
+        ElMessage.info('已与知识库表格一致')
+        return
+      }
+      if (result.action === 'aborted') {
+        ElMessage.warning('两边都改过或尚未对照，请手动选择拉取或写回。安全同步不会覆盖另一侧的改动。')
+        return
+      }
+    }
     if (result.action === 'aborted' && (result.diverged || result.drift === 'local-only' || result.drift === 'remote-only')) {
       const cover = result.drift === 'local-only'
         ? '内嵌块有尚未写回的改动，拉取会丢掉这些改动'
@@ -882,15 +916,19 @@ onMounted(() => {
   window.addEventListener('beforeunload', onBeforeUnload)
   window.addEventListener(DATABASE_BLOCK_SYNC_EVENT, onDatabaseBlockSync)
   window.addEventListener('rte:open-base-node', onOpenBaseNode)
+  window.addEventListener('focus', onWindowFocusProbe)
   void syncPresence()
   presenceTimer = setInterval(() => void syncPresence(), 12000)
+  sheetProbeTimer = setInterval(() => void probeLinkedSheets(), 15000)
 })
 
 onUnmounted(() => {
   window.removeEventListener('beforeunload', onBeforeUnload)
   window.removeEventListener(DATABASE_BLOCK_SYNC_EVENT, onDatabaseBlockSync)
   window.removeEventListener('rte:open-base-node', onOpenBaseNode)
+  window.removeEventListener('focus', onWindowFocusProbe)
   if (presenceTimer) clearInterval(presenceTimer)
+  if (sheetProbeTimer) clearInterval(sheetProbeTimer)
   unbindEditorSelection()
   stopLiveCollab()
 })

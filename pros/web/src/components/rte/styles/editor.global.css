@@ -4198,6 +4198,26 @@ input.rte-timeline-title:focus {
   cursor: pointer;
   font-size: 12px;
 }
+.rte-database-block__sync-status {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--mm-text-2, #4e5969);
+  background: var(--mm-fill, #f7f8fa);
+}
+.rte-database-block__sync-status.is-remote-only,
+.rte-database-block__sync-status.is-both {
+  color: #ad4e00;
+  background: #fff7e6;
+}
+.rte-database-block__sync-status.is-local-only {
+  color: #0958d9;
+  background: #e6f4ff;
+}
+.rte-database-block__sync-status.is-in-sync {
+  color: #237804;
+  background: #f6ffed;
+}
 .rte-outline-item.is-empty {
   color: #d83931;
 }
