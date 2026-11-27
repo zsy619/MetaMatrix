@@ -49,12 +49,21 @@ func AutoMigrate(gdb *gorm.DB) error {
 		&model.KnowledgeTemplate{},
 		&model.DocProperty{},
 		&model.DocComment{},
+		&model.UserNotification{},
 		&model.KnowledgeEvent{},
 		&model.KnowledgeView{},
 		// 知识库 6.0：空间成员、presence 共享存储、协同增量、向量切片。
 		&model.KnowledgeMember{},
 		&model.KnowledgePresence{},
 		&model.DocCRDTUpdate{},
+		// 正文协同操作日志（与文档保存版本对齐），独立于旧 HTML 级 doc_crdt_updates。
+		&model.DocOperation{},
+		// 用户+文档级审计骨架（A3）；块类型/父子等到 B2。
+		&model.DocAuditEvent{},
+		// B2：派生块表、块修订与块引用。
+		&model.DocBlock{},
+		&model.DocBlockRevision{},
+		&model.DocBlockRef{},
 		&model.KnowledgeChunk{},
 		// 知识库 5.0：评论已读位与业务标签词库。
 		&model.DocCommentRead{},
@@ -95,6 +104,9 @@ func AutoMigrate(gdb *gorm.DB) error {
 	}
 	if err := ensureShareSchema(gdb); err != nil {
 		log.Printf("ensureShareSchema warning: %v", err)
+	}
+	if err := ensureCommentBlockAnchors(gdb); err != nil {
+		log.Printf("ensureCommentBlockAnchors warning: %v", err)
 	}
 	if err := ensureMarkdownSchema(gdb); err != nil {
 		log.Printf("ensureMarkdownSchema warning: %v", err)

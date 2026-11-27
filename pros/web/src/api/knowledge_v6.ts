@@ -155,7 +155,7 @@ export function createDocFromTranscript(
   })
 }
 
-/** 协同编辑增量。 */
+/** 旧 HTML 级协同旁路的历史增量（只读回放）。新的协同走 /documents/:id/collab。 */
 export type CRDTUpdate = {
   seq: number
   kind: 'update' | 'snapshot'
@@ -170,9 +170,26 @@ export function fetchCrdtUpdates(documentId: string, after = 0) {
   )
 }
 
-export function appendCrdtUpdate(documentId: string, kind: 'update' | 'snapshot', payload: string) {
-  return apiRequest<{ seq: number }>(`/documents/${documentId}/crdt`, {
-    method: 'POST',
-    body: { kind, payload },
-  })
+/** 旧 HTML 级协同旁路已只读，禁止再 POST /documents/:id/crdt。 */
+export const CRDT_BYPASS_READ_ONLY = 'html crdt bypass is read-only'
+
+export function appendCrdtUpdate(_documentId: string, _kind: 'update' | 'snapshot', _payload: string): Promise<{ seq: number }> {
+  return Promise.reject(new Error(CRDT_BYPASS_READ_ONLY))
 }
+
+/** 用户+文档级审计记录（A3 骨架，只读）。 */
+export type DocAuditEvent = {
+  id: string
+  documentId: string
+  userId: string
+  action: string
+  blockId: string
+  detail: string
+  createdAt: string
+}
+
+export function listDocAudit(documentId: string, limit = 50) {
+  const q = limit ? `?limit=${encodeURIComponent(String(limit))}` : ''
+  return apiRequest<DocAuditEvent[]>(`/documents/${documentId}/audit${q}`, { cache: 'no-store' })
+}
+

@@ -217,6 +217,28 @@ export function getDocument(id: string) {
   return apiRequest<DocumentFull>(`/documents/${id}`, { cache: 'no-store' })
 }
 
+export type DocumentBlock = {
+  id: string
+  blockType: string
+  permission?: string
+  contentText?: string
+}
+
+export function listDocumentBlocks(documentId: string) {
+  return apiRequest<DocumentBlock[]>(`/documents/${documentId}/blocks`, { cache: 'no-store' })
+}
+
+export function getDocumentBlock(documentId: string, blockId: string) {
+  return apiRequest<DocumentBlock>(`/documents/${documentId}/blocks/${blockId}`, { cache: 'no-store' })
+}
+
+export function updateBlockPermission(documentId: string, blockId: string, permission: string) {
+  return apiRequest<DocumentBlock>(`/documents/${documentId}/blocks/${blockId}/permission`, {
+    method: 'PATCH',
+    body: { permission },
+  })
+}
+
 export type BackupDocument = {
   title: string
   notes?: string

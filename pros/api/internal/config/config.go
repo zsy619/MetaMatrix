@@ -23,9 +23,11 @@ type Config struct {
 	CaptchaDebugLoopback bool
 	MediaRoot            string
 	MediaSignSecret      string
-	FeishuAppID          string
-	FeishuAppSecret      string
-	FeishuBlockID        string
+	// MediaObject 是附件对象存储（S3 / MinIO）配置。不齐时回退本地磁盘。
+	MediaObject     MediaObjectConfig
+	FeishuAppID     string
+	FeishuAppSecret string
+	FeishuBlockID   string
 	// Mail holds the outbound mail settings.
 	Mail MailConfig
 	// PasswordReset holds the reset code settings.
@@ -153,6 +155,7 @@ func Load() Config {
 		CaptchaDebugLoopback:   boolEnv("CAPTCHA_DEBUG_LOOPBACK", runningInCI()),
 		MediaRoot:              mediaRoot,
 		MediaSignSecret:        signSecret,
+		MediaObject:            loadMediaObjectConfig(),
 		FeishuAppID:            os.Getenv("FEISHU_APP_ID"),
 		FeishuAppSecret:        os.Getenv("FEISHU_APP_SECRET"),
 		FeishuBlockID:          os.Getenv("FEISHU_DOC_BLOCK_ID"),
@@ -166,6 +169,33 @@ func Load() Config {
 			Model:          strings.TrimSpace(os.Getenv("AI_MODEL")),
 			EmbeddingModel: strings.TrimSpace(os.Getenv("AI_EMBEDDING_MODEL")),
 		},
+	}
+}
+
+// MediaObjectConfig 描述 S3 兼容对象存储。密钥只从环境变量读取，不写进代码。
+type MediaObjectConfig struct {
+	Mode      string
+	Endpoint  string
+	Bucket    string
+	Region    string
+	AccessKey string
+	SecretKey string
+	Prefix    string
+	UseSSL    bool
+}
+
+func loadMediaObjectConfig() MediaObjectConfig {
+	endpoint := strings.TrimSpace(os.Getenv("MEDIA_S3_ENDPOINT"))
+	useSSL := boolEnv("MEDIA_S3_USE_SSL", strings.HasPrefix(strings.ToLower(endpoint), "https://"))
+	return MediaObjectConfig{
+		Mode:      strings.ToLower(strings.TrimSpace(os.Getenv("MEDIA_STORE"))),
+		Endpoint:  endpoint,
+		Bucket:    strings.TrimSpace(os.Getenv("MEDIA_S3_BUCKET")),
+		Region:    strings.TrimSpace(os.Getenv("MEDIA_S3_REGION")),
+		AccessKey: strings.TrimSpace(os.Getenv("MEDIA_S3_ACCESS_KEY")),
+		SecretKey: os.Getenv("MEDIA_S3_SECRET_KEY"),
+		Prefix:    strings.TrimSpace(os.Getenv("MEDIA_S3_PREFIX")),
+		UseSSL:    useSSL,
 	}
 }
 

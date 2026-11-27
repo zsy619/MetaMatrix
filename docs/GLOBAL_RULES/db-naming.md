@@ -18,7 +18,7 @@
 
 | 用途 | 位置 |
 | --- | --- |
-| 表清单（39 张，机器可读） | `docs/db-tables.json` |
+| 表清单（机器可读） | `docs/db-tables.json` |
 | 登记表（代码） | `pros/api/internal/model/table_registry.go` |
 | 守卫测试 | `pros/api/internal/model/table_naming_test.go`、`pros/api/internal/db/table_naming_test.go` |
 | 生成器 | `cd pros/api && go run ./cmd/dbtables > ../../docs/db-tables.json` |

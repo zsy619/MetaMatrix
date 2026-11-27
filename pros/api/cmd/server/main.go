@@ -76,6 +76,7 @@ func main() {
 		Timeout:  cfg.Mail.Timeout,
 	})
 	log.Printf("MetaMatrix mail transport: %s", mailDesc)
+	knSvc.SetMailSender(mailSender)
 
 	resetSvc := service.NewPasswordResetService(gdb, mailSender, service.PasswordResetOptions{
 		Limits: service.ResetLimits{
@@ -100,6 +101,9 @@ func main() {
 	projH := handler.NewProjectsHandler(projSvc)
 	dirH := handler.NewDirectoryHandler(dirSvc)
 	knH := handler.NewKnowledgeHandler(knSvc, cfg.JWTSecret)
+	collabH := handler.NewCollabHandler(service.NewCollabService(gdb, knSvc.PresenceStore()), cfg.JWTSecret)
+	auditH := handler.NewDocAuditHandler(service.NewDocAuditService(gdb), cfg.JWTSecret)
+	blockH := handler.NewDocBlockHandler(service.NewDocBlockService(gdb), cfg.JWTSecret)
 	// 多维表格 Base Engine：独立领域（表/字段/记录/视图/公式/事件），
 	// 与富文本文档引擎解耦，只共享用户、空间权限与审计。
 	baseSvc := base.NewService(gdb)
@@ -120,8 +124,20 @@ func main() {
 			}
 		}
 	}()
+	blobs, blobNote := media.ResolveBlobBackend(cfg.MediaRoot, media.ObjectConfig{
+		Mode:      cfg.MediaObject.Mode,
+		Endpoint:  cfg.MediaObject.Endpoint,
+		Bucket:    cfg.MediaObject.Bucket,
+		Region:    cfg.MediaObject.Region,
+		AccessKey: cfg.MediaObject.AccessKey,
+		SecretKey: cfg.MediaObject.SecretKey,
+		Prefix:    cfg.MediaObject.Prefix,
+		UseSSL:    cfg.MediaObject.UseSSL,
+	})
+	log.Printf("media storage: %s", blobNote)
 	mediaSvc := &media.Service{
 		Store:  media.NewGormStore(gdb),
+		Blobs:  blobs,
 		Root:   cfg.MediaRoot,
 		Secret: cfg.MediaSignSecret,
 		Feishu: media.FeishuCreds{
@@ -158,6 +174,8 @@ func main() {
 	h := server.Default(
 		server.WithHostPorts(fmt.Sprintf(":%d", cfg.Port)),
 	)
+	// WebSocket 劫持后不能把连接放回池里，否则升级后的协同通道会被回收。
+	h.NoHijackConnPool = true
 
 	h.Use(middleware.SecurityHeaders())
 	h.Use(middleware.AccessLog())
@@ -423,6 +441,14 @@ func main() {
 		knowledgeDocs.POST("/:id/suggest", knH.SuggestWriting)
 		knowledgeDocs.GET("/:id/crdt", knH.CRDTUpdates)
 		knowledgeDocs.POST("/:id/crdt", knH.AppendCRDT)
+		// 正文协同操作日志：HTTP 仍走 Bearer 鉴权。WebSocket 在组外单独挂载。
+		knowledgeDocs.GET("/:id/operations", collabH.ListOperations)
+		knowledgeDocs.POST("/:id/operations", collabH.AppendOperation)
+		knowledgeDocs.GET("/:id/audit", auditH.ListAudit)
+		knowledgeDocs.GET("/:id/blocks", blockH.ListBlocks)
+		knowledgeDocs.GET("/:id/blocks/:blockId/refs", blockH.ListBlockRefs)
+		knowledgeDocs.GET("/:id/blocks/:blockId", blockH.GetBlock)
+		knowledgeDocs.PATCH("/:id/blocks/:blockId/permission", blockH.UpdatePermission)
 		// 知识库 5.0：自定义字段、评论增强、任务块、大纲与目录、docx 导出。
 		knowledgeDocs.PUT("/:id/properties/fields", knH.UpdateDocFields)
 		knowledgeDocs.POST("/:id/comments/:commentId/reaction", knH.ToggleCommentReaction)
@@ -436,6 +462,9 @@ func main() {
 		knowledgeDocs.GET("/:id/docx", knH.ExportDocx)
 	}
 
+	// 正文协同 WebSocket：鉴权在 handler 内接受 Bearer 或 query token（浏览器握手不能自定义头）。
+	h.GET("/documents/:id/collab", collabH.ServeWS)
+
 	// 跨项目检索与问答：本人全部项目的语料。
 	h.GET("/knowledge/search/global", middleware.AuthRequired(cfg.JWTSecret), knH.GlobalSearch)
 	h.POST("/knowledge/ask/global", middleware.AuthRequired(cfg.JWTSecret), knH.AskGlobal)
@@ -447,6 +476,8 @@ func main() {
 
 	// 活动日志查询（当前账号自己的记录）。
 	h.GET("/logs", middleware.AuthRequired(cfg.JWTSecret), logsH.List)
+	h.GET("/notifications", middleware.AuthRequired(cfg.JWTSecret), knH.ListNotifications)
+	h.POST("/notifications/:id/read", middleware.AuthRequired(cfg.JWTSecret), knH.MarkNotificationRead)
 
 	log.Printf("MetaMatrix API (Hertz+GORM) listening on http://localhost:%d", cfg.Port)
 	h.Spin()

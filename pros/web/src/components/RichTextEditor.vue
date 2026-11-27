@@ -283,6 +283,17 @@ const props = withDefaults(
     /** 知识库项目 id：提供后 @ 菜单可 @ 当前项目知识库里的文档。 */
     knowledgeProjectId?: string
     /**
+     * 正文协同用的 Y.Doc。传入后走 @tiptap/extension-collaboration，
+     * 从第一天携带 A1 的 data-block-id。不传时保持单人编辑与原保存路径。
+     */
+    collabDocument?: import('yjs').Doc | null
+    /** 协同光标用的 awareness provider（Y.Doc 已接同一条 Hertz 通道）。 */
+    collabProvider?: { awareness: unknown } | null
+    /** 本地协作者名称与配色；用于 CollaborationCaret，不会在本地再画自己的光标。 */
+    collabUser?: { name: string; color: string } | null
+    /** 为 false 时编辑器不可写（协同浏览者进房后强制只读）。默认 true。 */
+    editable?: boolean
+    /**
      * 是否按「纸张」排版（默认 true，A4 + 窄边距）。
      * 画布里嵌入的紧凑区块传 false：正文按内容流式排版，不再撑出 A4 纸张高度，
      * 也不会把页面大小写回文档。最大化/独立文档仍走默认的纸张视图。
@@ -307,6 +318,7 @@ const props = withDefaults(
     knowledgeProjectId: '',
     pageSheet: true,
     scrollMemoryKey: '',
+    editable: true,
   },
 )
 
@@ -1100,6 +1112,7 @@ function rteAuthor() {
 
 const {
   suggesting,
+  suggestionEnabled,
   suggestionAuthor,
   suggestionColor,
   toggleSuggesting,
@@ -1169,6 +1182,9 @@ const editor = useRteExtensions({
   syncLastEmittedHtml: (ed: { getHTML: () => string }) => {
     lastEmittedHtmlNorm = normalizeHtml(ed.getHTML())
   },
+  collabDocument: () => props.collabDocument ?? null,
+  collabProvider: () => props.collabProvider ?? null,
+  collabUser: () => props.collabUser ?? { name: '协作者', color: '#2563eb' },
   setHeading,
   syncSelectedFormFromEditor,
   toggleShortcutsPanel,
@@ -1232,7 +1248,7 @@ const editor = useRteExtensions({
     toggleOutlinePanel()
   },
   undoToolbarGroupOrder: () => undoToolbarGroupOrder(),
-  suggestingEnabled: () => suggesting.value,
+  suggestingEnabled: () => suggestionEnabled(),
   suggestionAuthor,
   bumpSuggestions: () => bumpSuggestions(),
   mentionPeople: () => directoryPeople.mentionPeople(),
@@ -1240,6 +1256,18 @@ const editor = useRteExtensions({
   mentionBaseEmbed: (nodeId: string) => resolveBaseEmbed(nodeId),
   reapplyTableFilter: (ed, transaction, appended) => reapplyTableFilter(ed as never, transaction, appended),
 })
+
+watch(
+  [editor, () => props.editable],
+  () => {
+    const ed = editor.value
+    if (!ed) return
+    const next = props.editable !== false
+    if (ed.isEditable !== next) ed.setEditable(next)
+    if (!next && suggesting.value) suggesting.value = false
+  },
+  { immediate: true },
+)
 
 watch([writingPaper, editor], () => {
   const ed = editor.value
@@ -4620,6 +4648,9 @@ function applySlashCommandItem(item: RteSlashItem) {
       break
     case 'table':
       openTableDialog()
+      break
+    case 'databaseBlock':
+      editor.value?.chain().focus().insertDatabaseBlock().run()
       break
     case 'mention':
       insertMentionFromToolbar()

@@ -23,6 +23,8 @@ export function rteSlashGlyph(item: {
       return '—'
     case 'table':
       return '表'
+    case 'databaseBlock':
+      return '库'
     case 'columns':
       return '栏'
     case 'dateChip':

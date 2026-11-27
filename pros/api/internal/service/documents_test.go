@@ -35,6 +35,67 @@ type documentSaveOperationSQLite struct {
 
 func (documentSaveOperationSQLite) TableName() string { return "kb_save_operations" }
 
+// docAuditEventSQLite 是 doc_audit_events 的 SQLite 影子模型：只把时间列换成可回读类型。
+type docAuditEventSQLite struct {
+	ID         uuid.UUID `gorm:"type:uuid;primaryKey"`
+	DocumentID uuid.UUID `gorm:"type:uuid;not null;index:idx_doc_audit_doc_created,priority:1"`
+	UserID     uuid.UUID `gorm:"type:uuid;not null;index"`
+	Action     string    `gorm:"type:varchar(32);not null"`
+	BlockID    string    `gorm:"type:varchar(128);not null;default:''"`
+	Detail     string    `gorm:"type:text;not null;default:''"`
+	CreatedAt  time.Time `gorm:"not null;index:idx_doc_audit_doc_created,priority:2"`
+}
+
+func (docAuditEventSQLite) TableName() string { return "kb_doc_audit_events" }
+
+type docBlockSQLite struct {
+	ID          uuid.UUID      `gorm:"type:uuid;primaryKey"`
+	DocumentID  uuid.UUID      `gorm:"type:uuid;not null;index:idx_doc_blocks_doc_ordinal,priority:1"`
+	ParentID    *uuid.UUID     `gorm:"type:uuid;index:idx_doc_blocks_parent"`
+	BlockType   string         `gorm:"type:varchar(64);not null"`
+	Ordinal     int            `gorm:"not null;default:0;index:idx_doc_blocks_doc_ordinal,priority:2"`
+	Depth       int            `gorm:"not null;default:0"`
+	AnchorKey   string         `gorm:"type:varchar(128);not null;default:''"`
+	ContentText string         `gorm:"type:text;not null;default:''"`
+	ContentJSON datatypes.JSON `gorm:"type:json"`
+	Attrs       datatypes.JSON `gorm:"type:json"`
+	RevisionID  *uuid.UUID     `gorm:"type:uuid"`
+	Permission  string         `gorm:"type:varchar(32);not null;default:''"`
+	CreatedAt   time.Time      `gorm:"not null"`
+	UpdatedAt   time.Time      `gorm:"not null"`
+	DeletedAt   *time.Time     `gorm:"index:idx_doc_blocks_deleted"`
+}
+
+func (docBlockSQLite) TableName() string { return "kb_doc_blocks" }
+
+type docBlockRevisionSQLite struct {
+	ID          uuid.UUID      `gorm:"type:uuid;primaryKey"`
+	DocumentID  uuid.UUID      `gorm:"type:uuid;not null;index:idx_doc_block_revs_doc"`
+	BlockID     uuid.UUID      `gorm:"type:uuid;not null;index:idx_doc_block_revs_block_created,priority:1"`
+	RevisionID  *uuid.UUID     `gorm:"type:uuid"`
+	ContentText string         `gorm:"type:text;not null;default:''"`
+	ContentJSON datatypes.JSON `gorm:"type:json"`
+	Attrs       datatypes.JSON `gorm:"type:json"`
+	CreatedAt   time.Time      `gorm:"not null;index:idx_doc_block_revs_block_created,priority:2"`
+}
+
+func (docBlockRevisionSQLite) TableName() string { return "kb_doc_block_revisions" }
+
+type docBlockRefSQLite struct {
+	ID            uuid.UUID  `gorm:"type:uuid;primaryKey"`
+	DocumentID    uuid.UUID  `gorm:"type:uuid;not null;index:idx_doc_block_refs_doc"`
+	SourceBlockID uuid.UUID  `gorm:"type:uuid;not null;index:idx_doc_block_refs_source"`
+	TargetBlockID *uuid.UUID `gorm:"type:uuid;index:idx_doc_block_refs_target"`
+	TargetDocID   *uuid.UUID `gorm:"type:uuid"`
+	RefType       string     `gorm:"type:varchar(32);not null"`
+	AnchorKey     string     `gorm:"type:varchar(128);not null;default:''"`
+	TargetLabel   string     `gorm:"type:varchar(255);not null;default:''"`
+	Lost          bool       `gorm:"not null;default:false"`
+	CreatedAt     time.Time  `gorm:"not null"`
+}
+
+func (docBlockRefSQLite) TableName() string { return "kb_doc_block_refs" }
+
 // openDocumentsSQLite 为普通行为测试提供独立的内存数据库。
 // 并发竞争不在 SQLite 上断言，因为它不能模拟 PostgreSQL 的并行写锁语义。
 func openDocumentsSQLite(t *testing.T) *gorm.DB {
@@ -59,6 +120,10 @@ func openDocumentsSQLite(t *testing.T) *gorm.DB {
 		&backupContentBlockSQLite{},
 		&documentSaveOperationSQLite{},
 		&pageReferencesSQLite{},
+		&docAuditEventSQLite{},
+		&docBlockSQLite{},
+		&docBlockRevisionSQLite{},
+		&docBlockRefSQLite{},
 	); err != nil {
 		t.Fatal(err)
 	}

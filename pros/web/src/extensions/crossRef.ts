@@ -2,9 +2,9 @@ import { Node, mergeAttributes } from '@tiptap/core'
 import { Plugin } from '@tiptap/pm/state'
 import type { EditorState, Transaction } from '@tiptap/pm/state'
 import type { Editor } from '@tiptap/core'
-import { findCrossRefPos } from '../utils/rteBlockRef'
+import { findCrossRef, findCrossRefPos } from '../utils/rteBlockRef'
 
-export { findCrossRefPos }
+export { findCrossRef, findCrossRefPos }
 
 export type CrossRefKind = 'heading' | 'figure' | 'table' | 'bookmark'
 
@@ -37,13 +37,15 @@ export function collectCrossRefTargets(editor: Editor): CrossRefTarget[] {
     if (node.type.name === 'heading') {
       const level = node.attrs.level || 1
       const text = node.textContent.trim() || `标题 ${level}`
-      const id = String(node.attrs.id || `h-${pos}`)
+      const blockId = String(node.attrs.dataBlockId || '').trim()
+      const id = blockId || String(node.attrs.id || `h-${pos}`)
       out.push({ id, kind: 'heading', label: `§ ${text}`, pos })
     }
     if (node.type.name === 'image') {
       fig += 1
       const cap = String(node.attrs.caption || '').trim()
-      const id = String(node.attrs.xrefId || `fig-${pos}`)
+      const blockId = String(node.attrs.dataBlockId || '').trim()
+      const id = blockId || String(node.attrs.xrefId || `fig-${pos}`)
       out.push({
         id,
         kind: 'figure',
@@ -66,7 +68,8 @@ export function collectCrossRefTargets(editor: Editor): CrossRefTarget[] {
     }
     if (node.type.name === 'table') {
       tbl += 1
-      const id = String(node.attrs.xrefId || `tbl-${pos}`)
+      const blockId = String(node.attrs.dataBlockId || '').trim()
+      const id = blockId || String(node.attrs.xrefId || `tbl-${pos}`)
       out.push({
         id,
         kind: 'table',
@@ -198,22 +201,6 @@ export function syncXrefTransaction(state: EditorState): Transaction | null {
       })
     }
   }
-  const labels = new Map<string, string>()
-  let fig = 0
-  let tbl = 0
-  tr.doc.descendants((node) => {
-    if (node.type.name === 'heading' && node.attrs.id) {
-      labels.set(String(node.attrs.id), `§ ${node.textContent.trim() || '标题'}`)
-    }
-    if (node.type.name === 'image' && node.attrs.xrefId) {
-      fig += 1
-      labels.set(String(node.attrs.xrefId), String(node.attrs.caption || '').trim() || `图 ${fig}`)
-    }
-    if (node.type.name === 'table' && node.attrs.xrefId) {
-      tbl += 1
-              labels.set(String(node.attrs.xrefId), String(node.attrs.caption || '').trim() || `表 ${tbl}`)
-    }
-  })
   const refs: Array<{ pos: number }> = []
   tr.doc.descendants((node, pos) => {
     if (node.type.name === 'crossRef') refs.push({ pos })
@@ -222,16 +209,23 @@ export function syncXrefTransaction(state: EditorState): Transaction | null {
     const pos = refs[index]!.pos
     const node = tr.doc.nodeAt(pos)
     if (!node || node.type.name !== 'crossRef') continue
-    const next = labels.get(String(node.attrs.targetId || ''))
-    if (!next) {
-      const current = String(node.attrs.label || '引用')
+    const targetId = String(node.attrs.targetId || '')
+    const current = String(node.attrs.label || '引用')
+    const hit = findCrossRef(tr.doc, targetId, current)
+    if (!hit) {
       const lostLabel = current.startsWith('失锚') ? current : `失锚：${current}`
       if (node.attrs.lost && current === lostLabel) continue
       tr = tr.setNodeMarkup(pos, undefined, { ...node.attrs, lost: true, label: lostLabel })
       continue
     }
-    if (!node.attrs.lost && node.attrs.label === next) continue
-    tr = tr.setNodeMarkup(pos, undefined, { ...node.attrs, lost: false, label: next })
+    const target = tr.doc.nodeAt(hit.pos)
+    let nextLabel = current.startsWith('失锚') ? current.replace(/^失锚：/, '') : current
+    if (target?.type.name === 'heading') {
+      nextLabel = `§ ${target.textContent.trim() || '标题'}`
+    }
+    const lost = hit.lost || hit.via === 'label'
+    if (node.attrs.lost === lost && node.attrs.label === nextLabel) continue
+    tr = tr.setNodeMarkup(pos, undefined, { ...node.attrs, lost, label: nextLabel })
   }
   if (!tr.docChanged) return null
   tr.setMeta('xrefSync', true)

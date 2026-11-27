@@ -31,13 +31,16 @@ func (projectSQLite) TableName() string { return "core_projects" }
 // pageReferencesSQLite 是 core_page_references 的 SQLite 影子模型：保存时的事务会
 // 全量重建该表，缺表会让项目删除测试直接报 no such table。
 type pageReferencesSQLite struct {
-	ID          uuid.UUID `gorm:"type:uuid;primaryKey"`
-	SourceDocID uuid.UUID `gorm:"type:uuid;not null;index:idx_pr_source,priority:1"`
-	TargetDocID uuid.UUID `gorm:"type:uuid;not null;index:idx_pr_target"`
-	RefType     string    `gorm:"type:varchar(16);not null"`
-	BlockType   string    `gorm:"type:varchar(16);not null;default:''"`
-	TargetLabel string    `gorm:"type:varchar(255);not null;default:''"`
-	CreatedAt   time.Time `gorm:"not null"`
+	ID            uuid.UUID  `gorm:"type:uuid;primaryKey"`
+	SourceDocID   uuid.UUID  `gorm:"type:uuid;not null;index:idx_pr_source,priority:1"`
+	TargetDocID   uuid.UUID  `gorm:"type:uuid;not null;index:idx_pr_target"`
+	RefType       string     `gorm:"type:varchar(16);not null"`
+	BlockType     string     `gorm:"type:varchar(16);not null;default:''"`
+	TargetLabel   string     `gorm:"type:varchar(255);not null;default:''"`
+	SourceBlockID *uuid.UUID `gorm:"type:uuid;index:idx_pr_source_block"`
+	TargetBlockID *uuid.UUID `gorm:"type:uuid;index:idx_pr_target_block"`
+	AnchorKey     string     `gorm:"type:varchar(128);not null;default:''"`
+	CreatedAt     time.Time  `gorm:"not null"`
 }
 
 func (pageReferencesSQLite) TableName() string { return "core_page_references" }
@@ -64,6 +67,10 @@ func openProjectsSQLite(t *testing.T) *gorm.DB {
 		&backupContentBlockSQLite{},
 		&documentSaveOperationSQLite{},
 		&pageReferencesSQLite{},
+		&docAuditEventSQLite{},
+		&docBlockSQLite{},
+		&docBlockRevisionSQLite{},
+		&docBlockRefSQLite{},
 	); err != nil {
 		t.Fatal(err)
 	}

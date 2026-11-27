@@ -128,6 +128,16 @@ function openStructuredNode(node: KnowledgeNode) {
   void router.replace({ name: 'knowledge', params: { projectId: projectId.value } })
 }
 
+/** 正文内嵌数据库块：打开知识库树上既有的独立表格，不另建一份。 */
+function openSheetFromEmbed(payload: { nodeId: string; title: string }) {
+  const node = treeRef.value?.nodeById(payload.nodeId)
+  if (!node || node.nodeType !== 'sheet') {
+    ElMessage.warning('未找到对应的知识库表格，嵌入块只打开树上已有的独立表')
+    return
+  }
+  openStructuredNode(node)
+}
+
 /** 画布节点：跳到画布编辑器，按模板 id 选组件，带文档 id 打开本项目这一份。 */
 function openCanvasNode(node: KnowledgeNode, templateId?: string) {
   const id = (templateId || node.documentTemplateId || node.documentCanvasType || '').replace(/_/g, '-')
@@ -376,6 +386,7 @@ loadProject()
             :node-id="treeRef?.nodeOf(activeDocumentId)?.id"
             @back="backToTree"
             @open-related="openDocById"
+            @open-sheet-node="openSheetFromEmbed"
             @open-node="openKnowledgeNodeById"
             @title-change="(title) => treeRef?.setDocTitle(activeDocumentId, title)"
             @icon-change="(icon) => treeRef?.setDocIcon(activeDocumentId, icon)"

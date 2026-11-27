@@ -30,7 +30,7 @@
 账号、项目、审计、备份、密码重置、页面引用等与业务内容无关的表。
 
 `core_users`、`core_projects`、`core_activity_logs`、`core_backup_imports`、
-`core_password_reset_tokens`、`core_page_references`
+`core_password_reset_tokens`、`core_page_references`、`core_user_notifications`
 
 ### kb —— 知识库域
 
@@ -39,7 +39,8 @@
 `kb_nodes`、`kb_node_data`、`kb_documents`、`kb_revisions`、`kb_content_blocks`、
 `kb_doc_properties`、`kb_comments`、`kb_comment_reads`、`kb_crdt_updates`、
 `kb_save_operations`、`kb_doc_versions`、`kb_shares`、`kb_members`、`kb_presence`、
-`kb_chunks`、`kb_events`、`kb_views`、`kb_templates`、`kb_tags`
+`kb_chunks`、`kb_events`、`kb_views`、`kb_templates`、`kb_tags`、
+`kb_doc_operations`、`kb_doc_audit_events`、`kb_doc_blocks`、`kb_doc_block_revisions`、`kb_doc_block_refs`
 
 ### base —— 多维表格域
 
@@ -82,6 +83,12 @@ Base Engine 自成一套引擎，表前缀保持 `base_` 不变，本次只把�
 | `doc_comment_reads` | `kb_comment_reads` | kb |
 | `doc_crdt_updates` | `kb_crdt_updates` | kb |
 | `document_save_operations` | `kb_save_operations` | kb |
+| `doc_operation` | `kb_doc_operations` | kb |
+| `doc_audit_events` | `kb_doc_audit_events` | kb |
+| `doc_blocks` | `kb_doc_blocks` | kb |
+| `doc_block_revisions` | `kb_doc_block_revisions` | kb |
+| `doc_block_refs` | `kb_doc_block_refs` | kb |
+| `user_notifications` | `core_user_notifications` | core |
 | `base_app` | `base_apps` | base |
 | `base_table` | `base_tables` | base |
 | `base_field` | `base_fields` | base |
@@ -117,7 +124,7 @@ Go 结构体名**不变**（`CanvasDocument`、`DocProperty`、`MediaAsset` …�
 
 ### 6.1 开工前必须做的三件事
 
-1. 读 `docs/db-tables.json`（39 张表的机器可读清单）：确认要建的表**不存在同义表**。
+1. 读 `docs/db-tables.json`（机器可读清单）：确认要建的表**不存在同义表**。
    历史教训：库里曾同时存在 `doc_properties` / `document_save_operations` / `knowledge_nodes` /
    `canvas_documents` 四套指向同一实体的前缀，排查时只能全库翻。
 2. 读 `pros/api/internal/model/table_registry.go`：确认域归属（core / kb / base / media）。

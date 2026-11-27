@@ -19,6 +19,11 @@ import (
 
 var ErrSpaceForbidden = errors.New("space access denied")
 
+// ErrCRDTReadOnly 表示旧 HTML 级协同旁路（doc_crdt_updates）已降为只读。
+// 历史增量仍可通过 CRDTUpdates / CRDTDocuments 读取，但不得再追加写入。
+// 新的协同编辑走正文 Yjs 通道（doc_operation / Hertz WebSocket）。
+var ErrCRDTReadOnly = errors.New("html crdt bypass is read-only")
+
 // 空间角色。
 const (
 	SpaceRoleAdmin  = "admin"
@@ -52,20 +57,25 @@ type SpaceMember struct {
 	IsOwner bool `json:"isOwner"`
 }
 
-// SpaceRole 返回该用户在空间里的角色；不在空间里返回空串。
-func (s *KnowledgeService) SpaceRole(userID, projectID uuid.UUID) string {
+// lookupSpaceRole 查询用户在空间中的角色。项目所有者视为 admin；无成员关系返回空串。
+func lookupSpaceRole(db *gorm.DB, userID, projectID uuid.UUID) string {
 	var count int64
-	if err := s.db.Model(&model.Project{}).
+	if err := db.Model(&model.Project{}).
 		Where("id = ? AND owner_user_id = ?", projectID, userID).
 		Count(&count).Error; err == nil && count > 0 {
 		return SpaceRoleAdmin
 	}
 	var member model.KnowledgeMember
-	if err := s.db.Where("project_id = ? AND user_id = ?", projectID, userID).
+	if err := db.Where("project_id = ? AND user_id = ?", projectID, userID).
 		First(&member).Error; err == nil {
 		return member.Role
 	}
 	return ""
+}
+
+// SpaceRole 返回该用户在空间里的角色；不在空间里返回空串。
+func (s *KnowledgeService) SpaceRole(userID, projectID uuid.UUID) string {
+	return lookupSpaceRole(s.db, userID, projectID)
 }
 
 // assertSpaceAccess 校验用户对空间的权限：read | write | admin。
@@ -234,6 +244,8 @@ func (s *KnowledgeService) PublishTemplate(userID, templateID uuid.UUID, publish
 type PresenceStore interface {
 	Heartbeat(docID, userID uuid.UUID, name, avatar string, editing bool, cursor string)
 	List(docID uuid.UUID) []PresenceUser
+	// Leave 立即把该用户从文档在线名单里移除（离房或连接断开，不必等 TTL）。
+	Leave(docID, userID uuid.UUID)
 }
 
 // dbPresenceStore 把 presence 落到 kb_presence 表。
@@ -257,6 +269,13 @@ func (s *dbPresenceStore) Heartbeat(docID, userID uuid.UUID, name, avatar string
 			"cursor": cursor, "last_seen": now,
 		}).FirstOrCreate(&row).Error; err != nil {
 		log.Printf("presence heartbeat failed: doc=%s user=%s err=%v", docID, userID, err)
+	}
+}
+
+func (s *dbPresenceStore) Leave(docID, userID uuid.UUID) {
+	if err := s.db.Where("doc_id = ? AND user_id = ?", docID, userID).
+		Delete(&model.KnowledgePresence{}).Error; err != nil {
+		log.Printf("presence leave failed: doc=%s user=%s err=%v", docID, userID, err)
 	}
 }
 
@@ -307,6 +326,14 @@ func (s *hybridPresenceStore) Heartbeat(docID, userID uuid.UUID, name, avatar st
 	}
 }
 
+func (s *hybridPresenceStore) Leave(docID, userID uuid.UUID) {
+	s.mem.Leave(docID, userID)
+	if err := s.db.Where("doc_id = ? AND user_id = ?", docID, userID).
+		Delete(&model.KnowledgePresence{}).Error; err != nil {
+		log.Printf("presence leave failed: doc=%s user=%s err=%v", docID, userID, err)
+	}
+}
+
 func (s *hybridPresenceStore) List(docID uuid.UUID) []PresenceUser {
 	cutoff := time.Now().UTC().Add(-presenceTTL)
 	var rows []model.KnowledgePresence
@@ -334,30 +361,12 @@ type CRDTUpdate struct {
 	Payload []byte `json:"payload"`
 }
 
-// AppendCRDT 追加一条协同编辑增量。
-//
-// 服务端只追加不合并：Yjs 更新可交换且幂等，客户端各自合并即可对齐。
+// AppendCRDT 曾用于追加 HTML 级协同增量。A2b 起该旁路只读，调用一律拒绝写入。
 func (s *KnowledgeService) AppendCRDT(docID, authorID uuid.UUID, kind string, payload []byte) (int64, error) {
-	if len(payload) == 0 || len(payload) > 4<<20 {
-		return 0, ErrValidation
-	}
-	if kind != "update" && kind != "snapshot" {
-		kind = "update"
-	}
-	row := model.DocCRDTUpdate{
-		DocID: docID, Kind: kind, Payload: payload,
-		AuthorUserID: authorID, CreatedAt: time.Now().UTC(),
-	}
-	if err := s.db.Create(&row).Error; err != nil {
-		return 0, err
-	}
-	// 只保留最近的增量，避免日志无限增长。
-	s.db.Where("doc_id = ? AND kind = ? AND id < ?", docID, "update", row.ID-500).
-		Delete(&model.DocCRDTUpdate{})
-	return row.ID, nil
+	return 0, ErrCRDTReadOnly
 }
 
-// CRDTUpdates 读取某篇文档在 after 之后的增量。
+// CRDTUpdates 读取某篇文档在 after 之后的历史增量（只读回放）。
 func (s *KnowledgeService) CRDTUpdates(docID uuid.UUID, after int64, limit int) ([]CRDTUpdate, error) {
 	if limit <= 0 || limit > 500 {
 		limit = 200

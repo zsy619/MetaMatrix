@@ -30,7 +30,7 @@ export type SheetRow = {
   cells: Record<string, SheetCellValue>
 }
 
-export type SheetFilterOp = 'contains' | 'is' | 'isNot' | 'empty' | 'notEmpty'
+export type SheetFilterOp = 'contains' | 'is' | 'isNot' | 'empty' | 'notEmpty' | 'gt' | 'gte' | 'lt' | 'lte'
 
 export type SheetFilter = {
   fieldId: string
@@ -40,16 +40,22 @@ export type SheetFilter = {
 
 export type SheetViewType = 'grid' | 'kanban' | 'gallery' | 'calendar'
 
+export type SheetFilterJoin = 'and' | 'or'
+
 export type SheetView = {
   id: string
   name: string
   type: SheetViewType
   filters: SheetFilter[]
+  /** 多条件组合方式；缺省为且。 */
+  filterJoin?: SheetFilterJoin
   /** 排序字段 id */
   sortBy: string | null
   sortOrder: 'asc' | 'desc'
   /** 分组字段 id（看板按它分列，表格按它分组） */
   groupBy: string | null
+  /** 日历视图当前月份，YYYY-MM；缺省时按记录日期或今天。 */
+  calendarMonth?: string | null
 }
 
 export type SheetData = {
@@ -88,6 +94,10 @@ export const FILTER_OPS: Array<{ op: SheetFilterOp; label: string }> = [
   { op: 'isNot', label: '不等于' },
   { op: 'empty', label: '为空' },
   { op: 'notEmpty', label: '不为空' },
+  { op: 'gt', label: '大于' },
+  { op: 'gte', label: '大于等于' },
+  { op: 'lt', label: '小于' },
+  { op: 'lte', label: '小于等于' },
 ]
 
 export function fieldMeta(type: SheetFieldType): FieldTypeMeta {
@@ -202,21 +212,40 @@ export function matchesFilter(row: SheetRow, filter: SheetFilter): boolean {
       return text === ''
     case 'notEmpty':
       return text !== ''
+    case 'gt':
+      return compareCell(text, needle) > 0
+    case 'gte':
+      return compareCell(text, needle) >= 0
+    case 'lt':
+      return compareCell(text, needle) < 0
+    case 'lte':
+      return compareCell(text, needle) <= 0
     default:
       return true
   }
+}
+
+function compareCell(text: string, needle: string): number {
+  if (text === '' || needle === '') return text === needle ? 0 : text === '' ? -1 : 1
+  const left = Number(text)
+  const right = Number(needle)
+  if (text.trim() !== '' && needle.trim() !== '' && Number.isFinite(left) && Number.isFinite(right)) return left - right
+  return text.localeCompare(needle, 'zh-CN')
 }
 
 export function filterRows(
   rows: SheetRow[],
   filters: SheetFilter[],
   keyword: string,
+  join: SheetFilterJoin = 'and',
 ): SheetRow[] {
   const kw = keyword.trim().toLowerCase()
+  const active = filters.filter((f) => f.fieldId)
   return rows.filter((row) => {
-    for (const f of filters) {
-      if (!f.fieldId) continue
-      if (!matchesFilter(row, f)) return false
+    if (active.length) {
+      const matched = active.map((f) => matchesFilter(row, f))
+      const pass = join === 'or' ? matched.some(Boolean) : matched.every(Boolean)
+      if (!pass) return false
     }
     if (!kw) return true
     return Object.values(row.cells).some((v) => cellText(v).toLowerCase().includes(kw))
@@ -638,6 +667,6 @@ function csvCell(value: string): string {
 
 /** 按视图的筛选与排序得到行集合。 */
 export function viewRows(data: SheetData, view: SheetView): SheetRow[] {
-  const filtered = filterRows(data.rows, view.filters, '')
+  const filtered = filterRows(data.rows, view.filters, '', view.filterJoin === 'or' ? 'or' : 'and')
   return sortRows(filtered, view.sortBy, view.sortOrder)
 }

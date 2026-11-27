@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"net/http"
+	"strings"
 	"time"
 
 	"metamatrix/api/internal/middleware"
@@ -393,6 +394,9 @@ type commentBody struct {
 	AnchorTo   int `json:"anchorTo"`
 	// Mentions 是被 @ 的用户 ID。
 	Mentions []string `json:"mentions"`
+	// BlockID / BlockOffset 是块级双锚点；可不传，服务端按 quote / 偏移回填。
+	BlockID     *string `json:"blockId"`
+	BlockOffset *int    `json:"blockOffset"`
 }
 
 func (h *KnowledgeHandler) ListComments(ctx context.Context, c *app.RequestContext) {
@@ -442,8 +446,21 @@ func (h *KnowledgeHandler) AddComment(ctx context.Context, c *app.RequestContext
 		BadRequest(c, "invalid parentId")
 		return
 	}
+	var blockID *uuid.UUID
+	if body.BlockID != nil && strings.TrimSpace(*body.BlockID) != "" {
+		id, err := uuid.Parse(strings.TrimSpace(*body.BlockID))
+		if err != nil {
+			BadRequest(c, "invalid blockId")
+			return
+		}
+		blockID = &id
+	}
+	blockOffset := -1
+	if body.BlockOffset != nil {
+		blockOffset = *body.BlockOffset
+	}
 	comment, err := h.svc.AddCommentDetailed(uid, docID, parentID, body.Quote, body.Content,
-		body.AnchorFrom, body.AnchorTo, body.Mentions)
+		body.AnchorFrom, body.AnchorTo, body.Mentions, blockID, blockOffset)
 	if handleKnowledgeErr(c, err) {
 		return
 	}

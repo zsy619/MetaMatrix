@@ -241,6 +241,9 @@ func syncExtract(tx *gorm.DB, docID uuid.UUID, data []byte, now time.Time, canva
 		return "", err
 	}
 	if len(ext.Blocks) == 0 {
+		if err := syncDocBlocks(tx, docID, data, now); err != nil {
+			return "", err
+		}
 		return ext.PlainText, rebuildRefs(tx, docID, data, now)
 	}
 	rows := make([]model.CanvasContentBlock, 0, len(ext.Blocks))
@@ -261,7 +264,14 @@ func syncExtract(tx *gorm.DB, docID uuid.UUID, data []byte, now time.Time, canva
 	}
 	if IsCanvasType(canvasType) {
 		// 画布 JSON 没有 mention/embed 节点，引用索引只对知识库文档有意义。
+		// 派生块表仍要走一遍：无 html 时只会把旧行软删，不影响画布全删全建路径。
+		if err := syncDocBlocks(tx, docID, data, now); err != nil {
+			return "", err
+		}
 		return ext.PlainText, nil
+	}
+	if err := syncDocBlocks(tx, docID, data, now); err != nil {
+		return "", err
 	}
 	return ext.PlainText, rebuildRefs(tx, docID, data, now)
 }
@@ -269,7 +279,10 @@ func syncExtract(tx *gorm.DB, docID uuid.UUID, data []byte, now time.Time, canva
 // rebuildRefs 全量重建 doc 的出向引用索引（mention/embed → core_page_references）。
 // 非 doc 类型（画布 JSON）跳过：只有 doc 类型的 current_data 有 html 字段。
 func rebuildRefs(tx *gorm.DB, docID uuid.UUID, data []byte, now time.Time) error {
-	return RebuildPageReferences(tx, docID, datatypes.JSON(data), now)
+	if err := RebuildPageReferences(tx, docID, datatypes.JSON(data), now); err != nil {
+		return err
+	}
+	return syncDocBlockRefs(tx, docID, data, now)
 }
 
 func truncateStr(s string, n int) string {
@@ -1109,6 +1122,13 @@ func (s *DocumentsService) Update(ownerID, docID uuid.UUID, in UpdateDocumentInp
 			"updated_at":       now,
 		}
 		if contentChanged {
+			role, canWrite, err := actorDocAccess(tx, ownerID, docID)
+			if err != nil {
+				return err
+			}
+			if err := GuardLockedBlockMutations(tx, docID, in.CurrentData, role, canWrite); err != nil {
+				return err
+			}
 			// 只有内容确实变化才重写大 JSON；元数据保存不再触碰 current_data。
 			updates["current_data"] = datatypes.JSON(in.CurrentData)
 		}
@@ -1133,6 +1153,9 @@ func (s *DocumentsService) Update(ownerID, docID uuid.UUID, in UpdateDocumentInp
 		if contentChanged {
 			// syncExtract 会删除并重建内容块；哈希未变时跳过可避免整块写放大和 ID 抖动。
 			if _, err := syncExtract(tx, docID, in.CurrentData, now, doc.CanvasType); err != nil {
+				return err
+			}
+			if err := appendDocAudit(tx, ownerID, docID, AuditActionSave, in.CurrentData); err != nil {
 				return err
 			}
 		}
@@ -1442,8 +1465,10 @@ func (s *DocumentsService) Restore(ownerID, docID uuid.UUID, in RestoreInput) (*
 		}); err != nil {
 			return err
 		}
-		_, err := syncExtract(tx, docID, payload, now, doc.CanvasType)
-		return err
+		if _, err := syncExtract(tx, docID, payload, now, doc.CanvasType); err != nil {
+			return err
+		}
+		return appendDocAudit(tx, ownerID, docID, AuditActionRestore, payload)
 	})
 	if err != nil {
 		if errors.Is(err, ErrSaveConflict) {

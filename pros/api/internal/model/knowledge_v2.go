@@ -94,6 +94,9 @@ type DocComment struct {
 	// AnchorFrom / AnchorTo 是划线区间（正文字符偏移）：-1 表示整篇评论。
 	AnchorFrom int `gorm:"not null;default:-1" json:"anchorFrom"`
 	AnchorTo   int `gorm:"not null;default:-1" json:"anchorTo"`
+	// BlockID + BlockOffset 是块级双锚点；旧评论由 ensure*Schema 回填，对不上则留空走降级。
+	BlockID     *uuid.UUID `gorm:"type:uuid;index:idx_dc_block" json:"blockId,omitempty"`
+	BlockOffset int        `gorm:"not null;default:-1" json:"blockOffset"`
 	// Mentions 是被 @ 的用户 ID（逗号分隔）。
 	Mentions string `gorm:"type:varchar(512);not null;default:''" json:"mentions"`
 	// Reactions 是表情回应：{"👍": ["userId"]}。

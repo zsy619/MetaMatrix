@@ -35,12 +35,19 @@ const maxURLLen = 200
 const maxStringLen = 8000
 
 // Block is one extracted text unit (panel / path scoped).
+// ID / ParentID / Type / Depth / Attrs 供 B2 派生块表使用；画布 JSON 抽取可以留空。
 type Block struct {
 	PanelID    string
 	PanelTitle string
 	BlockPath  string
 	Text       string
 	SortOrder  int
+	ID         string
+	ParentID   string
+	Type       string
+	Depth      int
+	Attrs      map[string]string
+	AnchorKey  string
 }
 
 // AttachmentMeta describes an attachment without embedding huge payloads.

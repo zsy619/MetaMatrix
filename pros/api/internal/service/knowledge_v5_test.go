@@ -122,7 +122,7 @@ func TestKnowledgeV5CommentAnchorsReactionsAndACL(t *testing.T) {
 		t.Fatal(err)
 	}
 	docID := *node.DocumentID
-	comment, err := svc.AddCommentDetailed(owner, docID, nil, "原文", "改这里", 10, 20, []string{owner.String()})
+	comment, err := svc.AddCommentDetailed(owner, docID, nil, "原文", "改这里", 10, 20, []string{owner.String()}, nil, -1)
 	if err != nil {
 		t.Fatal(err)
 	}

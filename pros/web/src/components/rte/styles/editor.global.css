@@ -3989,6 +3989,215 @@ input.rte-timeline-title:focus {
 }
 .rte-canvas-embed__icon { font-size: 18px; }
 .rte-canvas-embed__title { font-size: 14px; color: var(--mm-text, #1d2129); }
+
+.rte-database-block {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+  padding: 10px 14px;
+  border: 1px solid var(--mm-line, #e5e6eb);
+  border-left: 3px solid var(--mm-green, #00b42a);
+  border-radius: 6px;
+  background: var(--mm-fill, #f7f8fa);
+  cursor: pointer;
+  user-select: none;
+}
+.rte-database-block.is-empty {
+  border-left-color: var(--mm-text-3, #86909c);
+  color: var(--mm-text-3, #86909c);
+}
+.rte-database-block__icon { font-size: 18px; }
+.rte-database-block__title { font-size: 14px; color: var(--mm-text, #1d2129); font-weight: 600; }
+.rte-database-block__hint { font-size: 12px; color: var(--mm-text-3, #86909c); margin-left: auto; }
+
+.rte-database-block.is-live {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  cursor: default;
+  user-select: auto;
+}
+.rte-database-block__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.rte-database-block__views { display: flex; gap: 4px; }
+.rte-database-block__view {
+  padding: 2px 8px;
+  border: 1px solid var(--mm-line, #e5e6eb);
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 12px;
+}
+.rte-database-block__view.is-active {
+  border-color: var(--mm-blue, #1677ff);
+  color: var(--mm-blue, #1677ff);
+}
+.rte-database-block__filter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--mm-text-2, #4e5969);
+}
+.rte-database-block__filter-input,
+.rte-database-block__cell {
+  padding: 2px 6px;
+  border: 1px solid var(--mm-line, #e5e6eb);
+  border-radius: 4px;
+  font: inherit;
+  min-width: 0;
+  width: 100%;
+  background: #fff;
+}
+.rte-database-block__grid {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.rte-database-block__grid th,
+.rte-database-block__grid td {
+  border: 1px solid var(--mm-line, #e5e6eb);
+  padding: 4px;
+  text-align: left;
+}
+.rte-database-block__sort {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.rte-database-block__sort:disabled {
+  cursor: default;
+}
+.rte-database-block__board {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  overflow: auto;
+}
+.rte-database-block__column {
+  flex: 1;
+  min-width: 120px;
+  padding: 8px;
+  border-radius: 6px;
+  background: #fff;
+  border: 1px solid var(--mm-line, #e5e6eb);
+}
+.rte-database-block__column-title { font-size: 12px; font-weight: 600; margin-bottom: 6px; }
+.rte-database-block__card {
+  padding: 6px 8px;
+  margin-bottom: 6px;
+  border-radius: 4px;
+  background: var(--mm-fill, #f7f8fa);
+  font-size: 12px;
+}
+.rte-database-block__meta { font-size: 11px; color: var(--mm-text-3, #86909c); }
+.rte-database-block__filters { display: flex; flex-direction: column; gap: 6px; }
+.rte-database-block__filters-head,
+.rte-database-block__filter-row,
+.rte-database-block__join { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.rte-database-block__join-btn,
+.rte-database-block__filter-add,
+.rte-database-block__filter-remove {
+  padding: 2px 8px;
+  border: 1px solid var(--mm-line, #e5e6eb);
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 12px;
+}
+.rte-database-block__join-btn.is-active {
+  border-color: var(--mm-blue, #1677ff);
+  color: var(--mm-blue, #1677ff);
+}
+.rte-database-block__filter-field,
+.rte-database-block__filter-op { font: inherit; font-size: 12px; max-width: 120px; }
+.rte-database-block__gallery,
+.rte-database-block__month-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.rte-database-block__month-label {
+  font-size: 12px;
+  font-weight: 600;
+}
+.rte-database-block__month-week,
+.rte-database-block__month-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 2px;
+}
+.rte-database-block__month-week {
+  font-size: 11px;
+  color: var(--mm-text-3, #86909c);
+  margin-bottom: 2px;
+  text-align: center;
+}
+.rte-database-block__month-cell {
+  min-height: 54px;
+  border: 1px solid var(--mm-line, #e5e6eb);
+  padding: 2px 4px;
+  background: #fff;
+}
+.rte-database-block__month-cell.is-empty {
+  background: #f7f8fa;
+  min-height: 24px;
+}
+.rte-database-block__month-cell.is-today {
+  outline: 1px solid var(--mm-primary, #165dff);
+}
+.rte-database-block__month-date {
+  font-size: 11px;
+  color: var(--mm-text-2, #4e5969);
+  margin-bottom: 2px;
+}
+.rte-database-block__calendar { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-start; }
+.rte-database-block__gallery-card,
+.rte-database-block__day {
+  flex: 1;
+  min-width: 140px;
+  padding: 8px;
+  border: 1px solid var(--mm-line, #e5e6eb);
+  border-radius: 6px;
+  background: #fff;
+}
+.rte-database-block__gallery-title,
+.rte-database-block__day-title { font-size: 12px; font-weight: 600; margin-bottom: 6px; }
+.rte-database-block__gallery-field { font-size: 12px; color: var(--mm-text-2, #4e5969); }
+.rte-database-block__gallery-label { margin-right: 6px; color: var(--mm-text-3, #86909c); }
+.rte-database-block__sync { display: flex; gap: 4px; }
+.rte-database-block__foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.rte-database-block__add-row {
+  padding: 2px 8px;
+  border: 1px solid var(--mm-line, #e5e6eb);
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 12px;
+}
+[data-block-readonly="true"],
+.rte-database-block.is-block-readonly {
+  outline: 1px dashed var(--mm-text-3, #86909c);
+  cursor: default;
+}
+.rte-database-block__sync-btn {
+  padding: 2px 8px;
+  border: 1px solid var(--mm-line, #e5e6eb);
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 12px;
+}
 .rte-outline-item.is-empty {
   color: #d83931;
 }
@@ -6778,4 +6987,26 @@ html.rte-image-preview-open .tippy-box {
 }
 .rte-more-group > .rte-more-group-settings:hover {
   opacity: 1;
+}
+
+/* B1：协作光标与选区（CollaborationCaret 默认类名） */
+.collaboration-carets__caret {
+  border-left: 2px solid;
+  margin-left: -1px;
+  pointer-events: none;
+  position: relative;
+  word-break: normal;
+}
+.collaboration-carets__label {
+  position: absolute;
+  top: -1.35em;
+  left: -1px;
+  font-size: 11px;
+  line-height: 1.2;
+  color: #fff;
+  padding: 1px 5px;
+  border-radius: 3px 3px 3px 0;
+  white-space: nowrap;
+  user-select: none;
+  pointer-events: none;
 }

@@ -239,6 +239,15 @@ func (s *ProjectsService) Delete(ownerID, id uuid.UUID) error {
 			if err := tx.Where("document_id IN ?", docIDs).Delete(&model.CanvasContentBlock{}).Error; err != nil {
 				return err
 			}
+			if err := tx.Where("document_id IN ?", docIDs).Delete(&model.DocBlockRef{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("document_id IN ?", docIDs).Delete(&model.DocBlockRevision{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("document_id IN ?", docIDs).Delete(&model.DocBlock{}).Error; err != nil {
+				return err
+			}
 			if err := tx.Where("document_id IN ?", docIDs).Delete(&model.DocumentSaveOperation{}).Error; err != nil {
 				return err
 			}

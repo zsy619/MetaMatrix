@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
@@ -33,12 +33,17 @@ import DocVersions from './DocVersions.vue'
 import AiPanel from './AiPanel.vue'
 import WriteAssist from './WriteAssist.vue'
 import MeetingMinutesDialog from './MeetingMinutesDialog.vue'
-import type { CollabDoc } from './collab/crdtDoc'
 import ShareDialog from './ShareDialog.vue'
 // 图标库按需加载。
 const IconPicker = defineAsyncComponent(() => import('../common/IconPicker.vue'))
-import { getDocument, updateDocument } from '../../api/documents'
-import { apiRequestBlob } from '../../api/http'
+import { getDocument, getDocumentBlock, listDocumentBlocks, updateBlockPermission, updateDocument } from '../../api/documents'
+import { apiRequestBlob, getToken } from '../../api/http'
+import { LiveCollabSession, createCollabYDoc } from './collab/yDocCollab'
+import { isCollabWritable } from './collab/collabOfflineQueue'
+import { collabCaretColor } from './collab/collabAwareness'
+import { useAuthStore } from '../../stores/auth'
+import DocAudit from './DocAudit.vue'
+import type { Doc as YDoc } from 'yjs'
 import type { DocumentFull } from '../../api/documents'
 import {
   exportKnowledgeDoc,
@@ -48,12 +53,22 @@ import {
   getRelatedDocs,
   listVersionAuthors,
   saveDocAsTemplate,
+  getNodeData,
+  saveNodeData,
 } from '../../api/knowledge'
 import * as knowledgeApiV5 from '../../api/knowledge_v5'
 import type { PresenceUser } from '../../api/knowledge'
 import { friendlyApiMessage } from '../../utils/apiMessage'
 import { htmlToMarkdown } from '../../utils/rteExportMd'
 import AppLoading from '../common/AppLoading.vue'
+import SaveConflictPanel from './SaveConflictPanel.vue'
+import BlockPermissionPanel from './BlockPermissionPanel.vue'
+import { readBlockId } from '../../extensions/blockIdentity'
+import { setBlockPermissionGuardState } from '../../extensions/blockPermissionGuard'
+import { canEditBlockContent } from './blockPermission'
+import { DATABASE_BLOCK_SYNC_EVENT, type DatabaseBlockSyncDetail } from '../../extensions/databaseBlockEvents'
+import { syncLinkedDatabaseBlock } from '../../extensions/databaseBlockSync'
+import { resolveConflictHtml, type SaveConflictChoice } from './saveConflict'
 
 const props = defineProps<{
   documentId: string
@@ -71,6 +86,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   back: []
   'open-related': [documentId: string]
+  'open-sheet-node': [payload: { nodeId: string; title: string }]
   'open-node': [nodeId: string]
   'title-change': [title: string]
   'icon-change': [icon: string]
@@ -84,14 +100,43 @@ const loading = ref(false)
 const saving = ref(false)
 const dirty = ref(false)
 const saveTimer = ref<ReturnType<typeof setTimeout> | null>(null)
+const conflictOpen = ref(false)
+const conflictMineHtml = ref('')
+const conflictTheirsHtml = ref('')
+const conflictRemoteVersion = ref<number | undefined>()
+const selectedBlockId = ref('')
+const selectedBlockPermission = ref('')
+const selectedBlockPermHint = ref('')
+const permSaving = ref(false)
 const exporting = ref(false)
 const iconOpen = ref(false)
-const sidebarTab = ref<'outline' | 'tasks' | 'properties' | 'comments' | 'backrefs' | 'history' | 'versions' | 'ai'>('outline')
+const sidebarTab = ref<'outline' | 'tasks' | 'properties' | 'comments' | 'backrefs' | 'history' | 'versions' | 'audit' | 'ai'>('outline')
 const shareVisible = ref(false)
 const minutesVisible = ref(false)
-/** 协同编辑（079）：开启后本地改动先写入 CRDT，再由服务端增量同步给其他人。 */
+/** 协同编辑：开启后走正文 Yjs（A2a WebSocket），关掉后回到单人 HTTP 保存。 */
 const collabOn = ref(false)
-const collab = ref<CollabDoc | null>(null)
+/** 正文 Yjs 协同会话。旧 HTML 级 crdtDoc 旁路已只读，本按钮不再调用它。 */
+const liveSession = ref<LiveCollabSession | null>(null)
+const liveYDoc = shallowRef<YDoc | null>(null)
+/** 协同进房后的可写状态：浏览者为 false，编辑器强制只读。 */
+const collabWritable = ref(true)
+const permissionActor = computed(() => ({
+  canWrite: !props.locked && collabWritable.value,
+  role: liveSession.value?.role || (props.locked ? 'viewer' : 'owner'),
+}))
+const selectedBlockLocked = computed(() =>
+  Boolean(selectedBlockId.value) &&
+  !canEditBlockContent(selectedBlockPermission.value, permissionActor.value.role, permissionActor.value.canWrite),
+)
+const authStore = useAuthStore()
+const collabUser = computed(() => {
+  const user = authStore.user
+  const name = (user?.displayName || user?.email || '协作者').trim() || '协作者'
+  const id = user?.id || 'anon'
+  return { name, color: collabCaretColor(id), id }
+})
+/** 切换协同时重挂编辑器，以便按需接入 Collaboration 扩展。 */
+const editorSessionKey = ref(0)
 const presence = ref<PresenceUser[]>([])
 const quote = ref('')
 /** 划线区间：正文字符偏移（041）。 */
@@ -160,8 +205,13 @@ async function loadLastEditor() {
 
 function onHtml(next: string) {
   html.value = next
-  // 协同模式下本地改动先写进 CRDT：增量会同步给其他协作者。
-  collab.value?.applyLocal(next)
+  if (liveSession.value) {
+    liveSession.value.noteHtml(next)
+    dirty.value = true
+    // 实时协同下 current_data 由服务端随 Yjs 增量双写，避免和 HTTP 保存抢同一把版本锁。
+    // 单人编辑仍走下面的 scheduleSave，保存管线没有关掉。
+    return
+  }
   dirty.value = true
   scheduleSave()
 }
@@ -179,36 +229,61 @@ function insertSuggestion(text: string) {
   }
 }
 
-/** 开启 / 关闭协同编辑。 */
+function stopLiveCollab() {
+  liveSession.value?.stop()
+  liveSession.value = null
+  liveYDoc.value?.destroy()
+  liveYDoc.value = null
+  collabWritable.value = true
+  if (collabOn.value) editorSessionKey.value += 1
+  collabOn.value = false
+}
+
+/** 开启 / 关闭正文 Yjs 协同（编辑模式之一）。关闭后走单人保存，不再写 doc_crdt_updates。 */
 async function toggleCollab() {
   if (collabOn.value) {
-    collab.value?.stop()
-    collab.value = null
-    collabOn.value = false
+    stopLiveCollab()
     ElMessage.info('已退出协同模式')
     return
   }
+  const token = getToken()
+  if (!token) {
+    ElMessage.error('登录已失效，无法开启协同')
+    return
+  }
+  const ydoc = createCollabYDoc()
+  const session = new LiveCollabSession({
+    documentId: props.documentId,
+    token,
+    ydoc,
+    htmlProvider: () => html.value,
+    onError: () => {
+      ElMessage.warning('协同同步暂时不可用，已继续本地编辑')
+    },
+    onHello: (info) => {
+      const writable = isCollabWritable(info)
+      const changed = collabWritable.value !== writable
+      collabWritable.value = writable
+      if (changed && !writable) {
+        ElMessage.info('当前是只读协同，无法编辑正文')
+      }
+    },
+    onPresence: (users) => {
+      if (Array.isArray(users)) presence.value = users as PresenceUser[]
+    },
+    user: collabUser.value,
+  })
   try {
-    // yjs（CRDT）只在真正开启协同时下载，不占文档首屏带宽。
-    const { CollabDoc: CollabDocCtor } = await import('./collab/crdtDoc')
-    const instance = new CollabDocCtor({
-      documentId: props.documentId,
-      onRemote: (merged) => {
-        if (!merged || merged === html.value) return
-        html.value = merged
-        // 远端内容已合并进 CRDT，不再触发一次本地保存，避免两边互相覆盖。
-        dirty.value = false
-      },
-      onError: () => {
-        ElMessage.warning('协同同步暂时不可用，已继续本地编辑')
-      },
-    })
-    const merged = await instance.start(html.value)
-    if (merged && merged !== html.value) html.value = merged
-    collab.value = instance
+    await session.start()
+    liveYDoc.value = ydoc
+    liveSession.value = session
+    collabWritable.value = isCollabWritable({ canWrite: session.canWrite, role: session.role })
     collabOn.value = true
-    ElMessage.success('已进入协同模式')
+    editorSessionKey.value += 1
+    ElMessage.success(collabWritable.value ? '已进入协同模式' : '已进入只读协同模式')
   } catch {
+    session.stop()
+    ydoc.destroy()
     ElMessage.error('协同模式开启失败')
   }
 }
@@ -240,6 +315,7 @@ async function applyEditorTemplate() {
 
 /** 点击 @ 文档 mention 节点跳转到目标文档。 */
 function onEditorClick(e: MouseEvent) {
+  refreshSelectedBlock(e)
   const target = e.target as HTMLElement
   const mention = target.closest('.rte-mention[data-type="mention"]') as HTMLElement | null
   if (mention) {
@@ -265,11 +341,142 @@ function onEditorClick(e: MouseEvent) {
         params: { projectId: props.projectId, canvasId: docId },
       })
     }
+    return
+  }
+  const sheet = target.closest('[data-type="database-block"], [data-type="databaseBlock"]') as HTMLElement | null
+  if (sheet) {
+    const nodeId = (sheet.getAttribute('data-sheet-node-id') || '').trim()
+    if (nodeId) {
+      e.preventDefault()
+      emit('open-sheet-node', {
+        nodeId,
+        title: (sheet.getAttribute('data-title') || '').trim() || '多维表格',
+      })
+    }
+  }
+}
+
+
+function refreshSelectedBlock(e?: Event) {
+  const inst = editorRef.value as unknown as {
+    editor?: { state?: { selection?: any; doc?: any } }
+  } | null
+  const sel = inst?.editor?.state?.selection
+  const doc = inst?.editor?.state?.doc
+  let id = ''
+  if (e?.target instanceof Element) {
+    const host = e.target.closest('[data-block-id]') as HTMLElement | null
+    if (host) id = (host.getAttribute('data-block-id') || '').trim()
+  }
+  if (sel && doc) {
+    const node = typeof sel.node === 'object' ? sel.node : null
+    if (node) id = readBlockId(node) || ''
+    if (!id && sel.$from) {
+      for (let depth = sel.$from.depth; depth > 0; depth -= 1) {
+        const got = readBlockId(sel.$from.node(depth))
+        if (got) {
+          id = got
+          break
+        }
+      }
+    }
+  }
+  if (id !== selectedBlockId.value) {
+    selectedBlockId.value = id
+    selectedBlockPermission.value = ''
+    selectedBlockPermHint.value = ''
+    if (id) void loadBlockPermission(id)
+  }
+}
+
+async function loadBlockPermission(blockId: string) {
+  try {
+    const row = await getDocumentBlock(props.documentId, blockId)
+    if (selectedBlockId.value !== blockId) return
+    selectedBlockPermission.value = row.permission || ''
+    selectedBlockPermHint.value = ''
+  } catch (err: unknown) {
+    if (selectedBlockId.value !== blockId) return
+    const status = (err as { status?: number }).status
+    selectedBlockPermHint.value = status === 404 ? '保存文档后才能设置这块的权限' : '无法读取块级权限'
+  }
+}
+
+
+let boundSelectionEditor: { on?: (ev: string, fn: () => void) => void; off?: (ev: string, fn: () => void) => void } | null = null
+
+function onEditorSelectionUpdate() {
+  refreshSelectedBlock()
+}
+
+function bindEditorSelection(editor: typeof boundSelectionEditor) {
+  if (boundSelectionEditor && boundSelectionEditor !== editor) {
+    boundSelectionEditor.off?.('selectionUpdate', onEditorSelectionUpdate)
+    boundSelectionEditor = null
+  }
+  if (!editor?.on || boundSelectionEditor === editor) return
+  editor.on('selectionUpdate', onEditorSelectionUpdate)
+  boundSelectionEditor = editor
+}
+
+function unbindEditorSelection() {
+  boundSelectionEditor?.off?.('selectionUpdate', onEditorSelectionUpdate)
+  boundSelectionEditor = null
+}
+
+async function refreshBlockPermissionGuard(attempt = 0) {
+  const inst = editorRef.value as unknown as {
+    editor?: Parameters<typeof setBlockPermissionGuardState>[0]
+  } | null
+  const editor = inst?.editor
+  if (!editor) {
+    if (attempt < 8) window.setTimeout(() => void refreshBlockPermissionGuard(attempt + 1), 80)
+    return
+  }
+  bindEditorSelection(editor as typeof boundSelectionEditor)
+  const actor = permissionActor.value
+  try {
+    const rows = await listDocumentBlocks(props.documentId)
+    const permissions: Record<string, string> = {}
+    for (const row of rows) {
+      if (row.id) permissions[row.id] = row.permission || ''
+    }
+    setBlockPermissionGuardState(editor, {
+      role: actor.role,
+      canWrite: actor.canWrite,
+      permissions,
+    })
+  } catch {
+    setBlockPermissionGuardState(editor, {
+      role: actor.role,
+      canWrite: actor.canWrite,
+    })
+  }
+}
+
+async function onBlockPermissionChange(permission: string) {
+  const blockId = selectedBlockId.value
+  if (!blockId) return
+  permSaving.value = true
+  try {
+    const row = await updateBlockPermission(props.documentId, blockId, permission)
+    if (selectedBlockId.value === blockId) {
+      selectedBlockPermission.value = row.permission || permission
+      selectedBlockPermHint.value = ''
+    }
+    await refreshBlockPermissionGuard()
+    ElMessage.success('块级权限已更新')
+  } catch (err) {
+    ElMessage.error(friendlyApiMessage(err, '设置块级权限失败'))
+  } finally {
+    permSaving.value = false
   }
 }
 
 /** 划线评论：记录选中的文本与字符区间，作为评论引用与跳转锚点。 */
-function onSelectionChange() {
+function onSelectionChange(e?: Event) {
+  refreshSelectedBlock(e)
+
   const selection = window.getSelection()
   const text = selection?.toString().trim() ?? ''
   if (text.length < 2 || text.length > 500) {
@@ -538,6 +745,7 @@ async function save() {
     })
     doc.value = updated
     dirty.value = false
+    void refreshBlockPermissionGuard()
   } catch (err: unknown) {
     const status = (err as { status?: number }).status
     if (status === 409) {
@@ -551,39 +759,110 @@ async function save() {
   }
 }
 
-/** 409 冲突处置：查看差异 / 强制覆盖 / 放弃本地修改。 */
+/** 409 冲突处置：拉取对方版本，打开「谁的版本」面板。 */
 async function resolveConflict() {
+  const mine = html.value
   try {
-    await ElMessageBox.confirm(
-      '文档已被其他端更新。可以放弃本地修改重新加载，或强制覆盖对方的修改。',
-      '保存冲突',
-      {
-        confirmButtonText: '强制覆盖',
-        cancelButtonText: '重新加载',
-        distinguishCancelAndClose: true,
-        type: 'warning',
-      },
-    )
-  } catch (action) {
-    // 取消 = 放弃本地修改并重新加载；关闭弹窗同样按重新加载处理。
+    const latest = await getDocument(props.documentId)
+    const data = latest.currentData as { html?: string }
+    conflictMineHtml.value = mine
+    conflictTheirsHtml.value = data.html ?? ''
+    conflictRemoteVersion.value = latest.saveVersion
+    conflictOpen.value = true
+  } catch (err) {
+    ElMessage.error(friendlyApiMessage(err, '无法拉取对方版本，冲突仍未解决'))
+  }
+}
+
+async function applyConflictChoice(choice: SaveConflictChoice) {
+  const next = resolveConflictHtml(choice, {
+    mineHtml: conflictMineHtml.value,
+    theirsHtml: conflictTheirsHtml.value,
+  })
+  conflictOpen.value = false
+  if (choice === 'theirs') {
+    html.value = next
     await load()
-    ElMessage.info('已重新加载最新内容')
+    ElMessage.info('已使用对方的版本')
     return
   }
+  html.value = next
   try {
+    const payload = { type: 'doc', html: next }
+    if (choice === 'mine') {
+      doc.value = await updateDocument(props.documentId, {
+        title: title.value.trim() || '无标题',
+        currentData: payload as never,
+        operationId: `doc-force-${Date.now()}`,
+      })
+      dirty.value = false
+      ElMessage.success('已使用你的版本覆盖保存')
+      return
+    }
     doc.value = await updateDocument(props.documentId, {
       title: title.value.trim() || '无标题',
-      currentData: { type: 'doc', html: html.value } as never,
-      operationId: `doc-force-${Date.now()}`,
+      currentData: payload as never,
+      expectedSaveVersion: conflictRemoteVersion.value,
+      operationId: `doc-merge-${Date.now()}`,
     })
     dirty.value = false
-    ElMessage.success('已强制覆盖')
+    ElMessage.success('已合并两边并保存')
+  } catch (err: unknown) {
+    const status = (err as { status?: number }).status
+    if (status === 409) {
+      await resolveConflict()
+      ElMessage.warning('保存时再次冲突，请重新选择')
+      return
+    }
+    ElMessage.error(friendlyApiMessage(err, '解决冲突失败'))
+  }
+}
+
+
+async function onDatabaseBlockSync(ev: Event) {
+  const detail = (ev as CustomEvent<DatabaseBlockSyncDetail>).detail
+  if (!detail?.sheetNodeId) return
+  const inst = editorRef.value as unknown as {
+    editor?: Parameters<typeof syncLinkedDatabaseBlock>[0]
+  } | null
+  const editor = inst?.editor
+  if (!editor) return
+  try {
+    const io = {
+      load: getNodeData,
+      save: saveNodeData,
+    }
+    let result = await syncLinkedDatabaseBlock(editor, props.projectId, detail, io)
+    if (result.action === 'aborted' && result.diverged) {
+      const cover = detail.direction === 'pull' ? '拉取会用树上表格覆盖内嵌块' : '写回会用内嵌块覆盖树上表格'
+      try {
+        await ElMessageBox.confirm(`两边都改过。${cover}，这只是手动快照，不是实时同步。确定继续？`, '表格已分叉', {
+          type: 'warning',
+          confirmButtonText: '继续覆盖',
+          cancelButtonText: '取消',
+        })
+      } catch {
+        ElMessage.info('已取消同步')
+        return
+      }
+      result = await syncLinkedDatabaseBlock(editor, props.projectId, { ...detail, force: true }, io)
+    }
+    if (result.action === 'aborted') return
+    ElMessage.success(result.action === 'pulled' ? '已从知识库表格拉取' : '已写回知识库表格')
+    if (result.action === 'pulled' && result.droppedFilters > 0) {
+      ElMessage.warning(`有 ${result.droppedFilters} 条筛选条件因字段已不存在被去掉`)
+    }
+    if (result.diverged) ElMessage.warning('已按你确认的方向覆盖，另一边未合并的改动会丢掉')
   } catch (err) {
-    ElMessage.error(friendlyApiMessage(err, '强制覆盖失败'))
+    ElMessage.error(friendlyApiMessage(err, '同步知识库表格失败'))
   }
 }
 
 watch(() => props.documentId, load, { immediate: true })
+watch(
+  () => [props.documentId, permissionActor.value.role, permissionActor.value.canWrite, editorSessionKey.value, doc.value?.id] as const,
+  () => { void refreshBlockPermissionGuard() },
+)
 /** 节点 ID 变化时，反查「哪些多维表格记录引用了本文档」。 */
 
 watch(() => props.editorTemplate, () => void applyEditorTemplate())
@@ -596,6 +875,7 @@ function onOpenBaseNode(e: Event) {
 
 onMounted(() => {
   window.addEventListener('beforeunload', onBeforeUnload)
+  window.addEventListener(DATABASE_BLOCK_SYNC_EVENT, onDatabaseBlockSync)
   window.addEventListener('rte:open-base-node', onOpenBaseNode)
   void syncPresence()
   presenceTimer = setInterval(() => void syncPresence(), 12000)
@@ -603,10 +883,11 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('beforeunload', onBeforeUnload)
+  window.removeEventListener(DATABASE_BLOCK_SYNC_EVENT, onDatabaseBlockSync)
   window.removeEventListener('rte:open-base-node', onOpenBaseNode)
   if (presenceTimer) clearInterval(presenceTimer)
-  collab.value?.stop()
-  collab.value = null
+  unbindEditorSelection()
+  stopLiveCollab()
 })
 
 function onBeforeUnload(e: BeforeUnloadEvent) {
@@ -667,16 +948,20 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
         <span v-if="lastEditor" class="doc-view__last-editor">
           最后编辑：{{ lastEditor }}
         </span>
-        <el-avatar-group v-if="presence.length" class="doc-view__presence" :size="24">
-          <el-avatar
-            v-for="user in presence"
-            :key="user.userId"
-            :src="user.avatar || undefined"
-            :title="`${user.name}${user.editing ? '（正在编辑）' : ''}`"
-          >
-            {{ user.name.slice(0, 1) }}
-          </el-avatar>
-        </el-avatar-group>
+        <div v-if="presence.length" class="doc-view__presence">
+          <el-avatar-group :size="24">
+            <el-avatar
+              v-for="user in presence"
+              :key="user.userId"
+              :src="user.avatar || undefined"
+              :style="{ outline: `2px solid ${collabCaretColor(user.userId)}` }"
+              :title="`${user.name}${user.editing ? '（正在编辑）' : ''}`"
+            >
+              {{ user.name.slice(0, 1) }}
+            </el-avatar>
+          </el-avatar-group>
+          <span v-if="collabOn" class="doc-view__presence-count">在线 {{ presence.length }}</span>
+        </div>
       </div>
       <!-- 工具栏：按使用频率排序，「更多」收口放最后 -->
       <div class="doc-view__actions">
@@ -777,6 +1062,14 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
       <el-icon><Lock /></el-icon>
       此文档已被锁定，当前为只读状态。
     </div>
+    <div v-else-if="collabOn && !collabWritable" class="doc-view__lock">
+      <el-icon><Lock /></el-icon>
+      协同房间为只读，浏览者不能编辑正文。
+    </div>
+    <div v-else-if="selectedBlockLocked" class="doc-view__lock">
+      <el-icon><Lock /></el-icon>
+      当前选中块只读，不能在编辑器里改这块，建议模式的接受或拒绝也不会绕过。
+    </div>
 
     <div v-if="loading" class="doc-view__empty"><AppLoading /></div>
     <div v-else-if="!doc" class="doc-view__empty">文档不存在或已被删除。</div>
@@ -784,11 +1077,16 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
       <div v-if="locked" class="doc-view__readonly" v-html="html" />
       <RichTextEditor
         v-else
+        :key="`${documentId}-${editorSessionKey}`"
         ref="editorRef"
         class="doc-view__editor"
         :panel-id="panelId"
         :scroll-memory-key="scrollMemoryKey"
         :knowledge-project-id="projectId"
+        :collab-document="liveYDoc"
+        :collab-provider="liveSession?.provider ?? null"
+        :collab-user="collabUser"
+        :editable="collabWritable"
         :compact="false"
         :expanded="true"
         :show-title="false"
@@ -877,6 +1175,12 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
             
             <DocVersions :document-id="documentId" @restored="onRestored" />
           </el-tab-pane>
+          <el-tab-pane name="audit">
+              <template #label>
+                <el-icon class="doc-view__tab-icon"><Tickets /></el-icon>审计
+              </template>
+            <DocAudit :document-id="documentId" />
+          </el-tab-pane>
           <el-tab-pane name="ai">
               <template #label>
                 <el-icon class="doc-view__tab-icon"><MagicStick /></el-icon>智能
@@ -912,6 +1216,22 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
       :parent-id="props.nodeId ?? null"
     />
     <ShareDialog :document-id="documentId" :visible="shareVisible" @close="shareVisible = false" />
+    <BlockPermissionPanel
+      v-if="selectedBlockId"
+      :block-id="selectedBlockId"
+      :permission="selectedBlockPermission"
+      :role="permissionActor.role"
+      :can-write="permissionActor.canWrite"
+      :saving="permSaving"
+      :unavailable="selectedBlockPermHint"
+      @change="onBlockPermissionChange"
+    />
+    <SaveConflictPanel
+      v-if="conflictOpen"
+      :versions="{ mineHtml: conflictMineHtml, theirsHtml: conflictTheirsHtml }"
+      :remote-version="conflictRemoteVersion"
+      @choose="applyConflictChoice"
+    />
   </section>
 </template>
 
@@ -991,6 +1311,17 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
 }
 .doc-view__presence {
   margin-right: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.doc-view__presence :deep(.el-avatar) {
+  outline-offset: 1px;
+}
+.doc-view__presence-count {
+  font-size: 12px;
+  color: var(--mm-muted, #86909c);
+  white-space: nowrap;
 }
 .doc-view__empty {
   flex: 1;

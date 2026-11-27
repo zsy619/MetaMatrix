@@ -2,6 +2,9 @@ import { nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useEditor } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
+import Collaboration from '@tiptap/extension-collaboration'
+import CollaborationCaret from '@tiptap/extension-collaboration-caret'
+import type { Doc as YDoc } from 'yjs'
 import Placeholder from '@tiptap/extension-placeholder'
 import Underline from '@tiptap/extension-underline'
 import { TextStyle, FontSize, FontFamily, LineHeight } from '@tiptap/extension-text-style'
@@ -95,6 +98,7 @@ import { MermaidBlock } from '../../../extensions/mermaidBlock'
 import { EchartsBlock } from '../../../extensions/echartsBlock'
 import { CrossRef, findCrossRefPos } from '../../../extensions/crossRef'
 import { CanvasEmbed } from '../../../extensions/canvasEmbed'
+import { DatabaseBlock, readDatabaseBlockOpenTarget } from '../../../extensions/databaseBlock'
 import { BaseEmbed } from '../../../extensions/baseEmbed'
 import { ListStyleAttrs } from '../../../extensions/listStyleAttrs'
 import { TianziGrid } from '../../../extensions/rteTianziGrid'
@@ -106,6 +110,7 @@ import { MediaHydrate } from '../../../extensions/mediaHydrate'
 import { RteInlineMarkdown } from '../../../extensions/rteInlineMarkdown'
 import { RteAutoLink } from '../../../extensions/rteAutoLink'
 import { BlockIdentity } from '../../../extensions/blockIdentity'
+import { BlockPermissionGuard } from '../../../extensions/blockPermissionGuard'
 
 type LateFn = (...args: any[]) => any
 
@@ -203,6 +208,11 @@ export function useRteExtensions(deps: {
   ) => void
   /** 打开或回填块 ID 后，只同步 lastEmitted 基线，不向父级 emit / 保存。 */
   syncLastEmittedHtml?: (ed: { getHTML: () => string }) => void
+  /** 传入 Y.Doc 时启用正文协同；撤销改由 Collaboration 接管。不传则保持单人编辑。 */
+  collabDocument?: () => YDoc | null
+  /** 已有 Y.Doc / awareness 时接入 CollaborationCaret，展示他人光标与选区。 */
+  collabProvider?: () => { awareness: unknown } | null
+  collabUser?: () => { name: string; color: string }
 }) {
   const {
     closeTableCtx,
@@ -279,9 +289,12 @@ function qrHref(node: Element | null): string {
   }
 }
 
+  const collabYDoc = deps.collabDocument?.() ?? null
+  const collabProvider = deps.collabProvider?.() ?? null
+  const collabUser = deps.collabUser?.() ?? { name: '协作者', color: '#2563eb' }
 const editor = useEditor({
 
-  content: initialEditorContent(),
+  content: collabYDoc ? undefined : initialEditorContent(),
   extensions: [
     StarterKit.configure({
       heading: { levels: [1, 2, 3, 4, 5, 6] },
@@ -300,6 +313,8 @@ const editor = useEditor({
       underline: false,
       // 拖拽图片到同行时更明显的落点指示（飞书式并排）
       dropcursor: { color: '#5b8cff', width: 2 },
+      // Collaboration 自带撤销；与 StarterKit 的 UndoRedo 同时开会冲突。
+      ...(collabYDoc ? { undoRedo: false as const } : {}),
     }),
     Underline,
     Subscript,
@@ -317,6 +332,16 @@ const editor = useEditor({
     LetterSpacing,
     ParagraphAttrs,
     BlockIdentity,
+    BlockPermissionGuard,
+    ...(collabYDoc ? [Collaboration.configure({ document: collabYDoc })] : []),
+    ...(collabYDoc && collabProvider
+      ? [
+          CollaborationCaret.configure({
+            provider: collabProvider,
+            user: collabUser,
+          }),
+        ]
+      : []),
     PageBreak,
     Columns,
     Column,
@@ -343,6 +368,7 @@ const editor = useEditor({
     EchartsBlock,
     CrossRef,
     CanvasEmbed,
+    DatabaseBlock,
     BaseEmbed,
     ListStyleAttrs,
     TianziGrid,
@@ -684,6 +710,14 @@ const editor = useEditor({
         openFormulaFromChip(math)
         return true
       }
+      const dbOpen = readDatabaseBlockOpenTarget(target)
+      if (dbOpen) {
+        event.preventDefault()
+        target?.dispatchEvent?.(
+          new CustomEvent('rte-open-database-block', { bubbles: true, detail: dbOpen }),
+        )
+        return true
+      }
       const xref = target?.closest?.('[data-type="cross-ref"]') as HTMLElement | null
       if (xref) {
         const ed = editor.value
@@ -1008,6 +1042,13 @@ const editor = useEditor({
   },
   onCreate: ({ editor: ed }) => {
     editorReady.value = true
+    // 协同文档若还没有片段，把当前 HTML 写入 Y.Doc，并回填 data-block-id。
+    if (collabYDoc && collabYDoc.getXmlFragment('default').length === 0) {
+      const initial = initialEditorContent()
+      if (typeof initial === 'string' && initial.trim()) {
+        ed.commands.setContent(initial)
+      }
+    }
     ed.commands.ensureBlockIdentities()
     deps.syncLastEmittedHtml?.(ed)
   },
