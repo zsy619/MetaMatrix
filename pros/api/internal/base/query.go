@@ -271,15 +271,16 @@ func (s *Service) conditionSQL(fieldID uuid.UUID, handler FieldHandler, fieldTyp
 	op := strings.ToLower(strings.TrimSpace(cond.Operator))
 	projected := handler.ProjectedType()
 
-	// 空/非空判定统一走投影表存在性判断。
+	// 空/非空判定：有非空投影值才算「非空」。原先 isempty 去找「全空行」再取反，
+	// 会把已有文本或数字的记录也判成空。
 	switch op {
 	case "isempty", "isnotempty":
-		sub := "SELECT 1 FROM base_record_values v WHERE v.record_id = r.id AND v.field_id = ?"
+		emptyVal := "COALESCE(v.value_text,'') = '' AND COALESCE(v.value_number,0) = 0 AND COALESCE(v.value_bool,false) = false AND v.value_date IS NULL AND v.value_json IS NULL"
+		nonEmpty := "SELECT 1 FROM base_record_values v WHERE v.record_id = r.id AND v.field_id = ? AND NOT (" + emptyVal + ")"
 		if op == "isempty" {
-			sub += " AND COALESCE(v.value_text,'') = '' AND COALESCE(v.value_number,0) = 0 AND COALESCE(v.value_bool,false) = false AND v.value_date IS NULL AND v.value_json IS NULL"
-			return "NOT EXISTS (" + sub + ")", []any{fieldID}, nil
+			return "NOT EXISTS (" + nonEmpty + ")", []any{fieldID}, nil
 		}
-		return "EXISTS (" + sub + ")", []any{fieldID}, nil
+		return "EXISTS (" + nonEmpty + ")", []any{fieldID}, nil
 	}
 
 	// 值比较走投影表，文本用 ILIKE 模糊匹配。
