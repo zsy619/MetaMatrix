@@ -68,6 +68,7 @@ import { setBlockPermissionGuardState } from '../../extensions/blockPermissionGu
 import { canEditBlockContent } from './blockPermission'
 import { DATABASE_BLOCK_SYNC_EVENT, type DatabaseBlockSyncDetail } from '../../extensions/databaseBlockEvents'
 import { applySafeLinkedDatabaseBlocks, probeLinkedDatabaseBlocks, syncLinkedDatabaseBlock } from '../../extensions/databaseBlockSync'
+import { describeSheetContentConflict } from '../../extensions/databaseBlockSheet'
 import { resolveConflictHtml, type BlockConflictChoice, type SaveConflictChoice } from './saveConflict'
 
 const props = defineProps<{
@@ -880,7 +881,10 @@ async function onDatabaseBlockSync(ev: Event) {
         return
       }
       if (result.action === 'aborted') {
-        ElMessage.warning('两边都改过或尚未对照，请手动选择拉取或写回。安全同步不会覆盖另一侧的改动。')
+        const detail = result.drift === 'both' && result.conflict
+          ? describeSheetContentConflict(result.conflict)
+          : '两边都改过或尚未对照，请手动选择拉取或写回。安全同步不会覆盖另一侧的改动。'
+        ElMessage.warning(detail)
         return
       }
     }
@@ -890,7 +894,9 @@ async function onDatabaseBlockSync(ev: Event) {
         : result.drift === 'remote-only'
           ? '树上表格有更新，写回会丢掉树上的改动'
           : (detail.direction === 'pull' ? '拉取会用树上表格覆盖内嵌块' : '写回会用内嵌块覆盖树上表格')
-      const head = result.drift === 'both' ? '两边都改过。' : ''
+      const head = result.drift === 'both'
+        ? (result.conflict ? `${describeSheetContentConflict(result.conflict)}` : '两边都改过。')
+        : ''
       try {
         await ElMessageBox.confirm(`${head}${cover}。这只是手动快照，不是实时同步。确定继续？`, '表格已分叉', {
           type: 'warning',

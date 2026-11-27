@@ -1,10 +1,11 @@
-import type { SheetDrift } from './databaseBlockSheet'
+import type { SheetContentConflictSummary, SheetDrift } from './databaseBlockSheet'
 
 export const DATABASE_BLOCK_STATUS_EVENT = 'mm-database-block-status'
 
 export type DatabaseBlockSyncStatus = {
   drift: SheetDrift
   checkedAt: number
+  conflict?: SheetContentConflictSummary
 }
 
 const statuses = new Map<string, DatabaseBlockSyncStatus>()
@@ -17,14 +18,18 @@ export function getDatabaseBlockSyncStatus(key: string): DatabaseBlockSyncStatus
   return statuses.get(key)
 }
 
-export function setDatabaseBlockSyncStatus(key: string, drift: SheetDrift) {
+export function setDatabaseBlockSyncStatus(
+  key: string,
+  drift: SheetDrift,
+  conflict?: SheetContentConflictSummary,
+) {
   const trimmed = (key || '').trim()
   if (!trimmed) return
-  const next: DatabaseBlockSyncStatus = { drift, checkedAt: Date.now() }
+  const next: DatabaseBlockSyncStatus = { drift, checkedAt: Date.now(), conflict }
   statuses.set(trimmed, next)
   if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
     window.dispatchEvent(
-      new CustomEvent(DATABASE_BLOCK_STATUS_EVENT, { detail: { key: trimmed, drift } }),
+      new CustomEvent(DATABASE_BLOCK_STATUS_EVENT, { detail: { key: trimmed, drift, conflict } }),
     )
   }
 }
