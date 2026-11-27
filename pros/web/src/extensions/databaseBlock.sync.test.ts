@@ -1,15 +1,19 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it } from 'vitest'
 import { Editor } from '@tiptap/core'
+import { NodeSelection } from '@tiptap/pm/state'
 import type { SheetData } from '../components/knowledge/sheetModel'
 import StarterKit from '@tiptap/starter-kit'
 import { BlockIdentity, collectIdentityNodes, readBlockId } from './blockIdentity'
 import { DATABASE_BLOCK_NAME, DatabaseBlock } from './databaseBlock'
 import {
   classifySheetDrift,
+  classifySheetThreeWay,
   describeSheetContentConflict,
+  describeSheetThreeWay,
   firstFilterableField,
   legacySheetContentFingerprint,
+  mergeSheetNonOverlapping,
   payloadFromAttrs,
   sheetContentFingerprint,
   sheetFingerprintMatches,
@@ -173,7 +177,8 @@ describe('databaseBlock 关联树上表同步', () => {
         throw new Error('aborted pull should not save')
       },
     })
-    expect(aborted).toEqual({ action: 'aborted', droppedFilters: 0, diverged: true, drift: 'both', conflict: { localOnlyFields: 0, remoteOnlyFields: 0, changedFields: 0, localOnlyRows: 0, remoteOnlyRows: 0, changedRows: 1, changedCells: 1 } })
+    expect(aborted).toMatchObject({ action: 'aborted', droppedFilters: 0, diverged: true, drift: 'both', conflict: { localOnlyFields: 0, remoteOnlyFields: 0, changedFields: 0, localOnlyRows: 0, remoteOnlyRows: 0, changedRows: 1, changedCells: 1 } })
+    expect(aborted.conflict?.threeWay).toMatchObject({ conflictCells: 1, autoMergeable: false })
     expect(payloadFromAttrs(databasePos(ed).node.attrs).sheet.rows[0]!.cells[name.id]).toBe('块内又改了')
     const forced = await syncLinkedDatabaseBlock(ed, 'proj', {
       direction: 'pull',
@@ -344,7 +349,8 @@ describe('databaseBlock 关联树上表同步', () => {
         return {}
       },
     })
-    expect(result).toEqual({ action: 'aborted', droppedFilters: 0, diverged: true, drift: 'both', conflict: { localOnlyFields: 0, remoteOnlyFields: 0, changedFields: 0, localOnlyRows: 0, remoteOnlyRows: 0, changedRows: 1, changedCells: 1 } })
+    expect(result).toMatchObject({ action: 'aborted', droppedFilters: 0, diverged: true, drift: 'both', conflict: { localOnlyFields: 0, remoteOnlyFields: 0, changedFields: 0, localOnlyRows: 0, remoteOnlyRows: 0, changedRows: 1, changedCells: 1 } })
+    expect(result.conflict?.threeWay).toMatchObject({ conflictCells: 1, autoMergeable: false })
     expect(saved).toBe(false)
     expect(payloadFromAttrs(databasePos(ed).node.attrs).sheet.rows[0]!.cells[name.id]).toBe('块内又改了')
   })
@@ -454,7 +460,7 @@ describe('databaseBlock 关联树上表同步', () => {
     expect(summary.pushed).toBe(0)
     expect(summary.skipped).toBe(1)
     expect(summary.probed[0]!.drift).toBe('both')
-    expect(summary.probed[0]!.conflict).toEqual({
+    expect(summary.probed[0]!.conflict).toMatchObject({
       localOnlyFields: 0,
       remoteOnlyFields: 0,
       changedFields: 0,
@@ -463,6 +469,11 @@ describe('databaseBlock 关联树上表同步', () => {
       changedRows: 1,
       changedCells: 1,
     })
+    expect(summary.probed[0]!.conflict?.threeWay).toMatchObject({
+      conflictCells: 1,
+      autoMergeable: false,
+    })
+    expect(summary.merged).toBe(0)
     expect(saved).toBe(false)
     expect(payloadFromAttrs(databasePos(ed).node.attrs).sheet.rows[0]!.cells[name.id]).toBe('块内又改了')
     const id = readBlockId(databasePos(ed).node)
@@ -563,5 +574,153 @@ describe('sheet 指纹与双边差异摘要', () => {
     expect(text).toContain('仅内嵌多 1 行')
     expect(text).toContain('2 行内容不同')
     expect(text).toContain('不会自动合并')
+    const threeWay = classifySheetThreeWay(local, remote, sheetContentFingerprint(base))
+    expect(threeWay).toMatchObject({
+      remoteOnlyFields: 1,
+      localOnlyRows: 1,
+      localOnlyCells: 1,
+      remoteOnlyCells: 1,
+      conflictCells: 0,
+      conflictRows: 0,
+      conflictFields: 0,
+      autoMergeable: true,
+    })
+    const merged = mergeSheetNonOverlapping(local, remote, sheetContentFingerprint(base))
+    expect(merged).toBeTruthy()
+    expect(merged!.fields.map((field) => field.id).sort()).toEqual(['d', 'n'])
+    expect(merged!.rows.find((row) => row.id === 'r1')?.cells.n).toBe('本地甲')
+    expect(merged!.rows.find((row) => row.id === 'r2')?.cells.n).toBe('树上乙')
+    expect(merged!.rows.find((row) => row.id === 'r3')?.cells.n).toBe('仅本地')
+    expect(describeSheetThreeWay(threeWay!)).toContain('不相交的改动会自动合并到两边')
+    expect(describeSheetThreeWay(threeWay!)).toContain('不是实时双向同步')
+  })
+
+  it('同一单元格两边都改过时不能自动合并', () => {
+    const local: SheetData = { ...base, rows: [{ id: 'r1', cells: { n: '本地甲' } }, { id: 'r2', cells: { n: '乙' } }] }
+    const remote: SheetData = { ...base, rows: [{ id: 'r1', cells: { n: '树上甲' } }, { id: 'r2', cells: { n: '乙' } }] }
+    const threeWay = classifySheetThreeWay(local, remote, sheetContentFingerprint(base))
+    expect(threeWay).toMatchObject({ conflictCells: 1, autoMergeable: false })
+    expect(mergeSheetNonOverlapping(local, remote, sheetContentFingerprint(base))).toBeNull()
+    expect(describeSheetThreeWay(threeWay!)).toContain('不会自动合并')
+  })
+
+  it('一边删除一行、另一边改同一行时不能自动合并', () => {
+    const local: SheetData = { ...base, rows: [{ id: 'r1', cells: { n: '本地甲' } }] }
+    const remote: SheetData = { ...base, rows: [{ id: 'r1', cells: { n: '甲' } }, { id: 'r2', cells: { n: '树上乙' } }] }
+    const threeWay = classifySheetThreeWay(local, remote, sheetContentFingerprint(base))
+    expect(threeWay).toMatchObject({ conflictRows: 1, autoMergeable: false })
+    expect(mergeSheetNonOverlapping(local, remote, sheetContentFingerprint(base))).toBeNull()
+  })
+})
+
+describe('databaseBlock 不相交改动自动合并与多块对照', () => {
+  function allDatabasePos(ed: Editor) {
+    return collectIdentityNodes(ed.state.doc).filter(({ node }) => node.type.name === DATABASE_BLOCK_NAME)
+  }
+
+  it('自动安全同步会把不相交的改动合并到两边', async () => {
+    const ed = mount()
+    ed.commands.insertDatabaseBlock({ sheetNodeId: 'tree-1' })
+    const local = payloadFromAttrs(databasePos(ed).node.attrs)
+    const name = firstFilterableField(local)!
+    const tree = JSON.parse(JSON.stringify(local.sheet))
+    await syncLinkedDatabaseBlock(ed, 'proj', {
+      direction: 'pull',
+      sheetNodeId: 'tree-1',
+      pos: databasePos(ed).pos,
+    }, {
+      load: async () => ({ kind: 'sheet', data: tree }),
+      save: async () => {
+        throw new Error('setup pull should not save')
+      },
+    })
+    const rows = payloadFromAttrs(databasePos(ed).node.attrs).sheet.rows
+    expect(rows.length).toBeGreaterThan(1)
+    expect(ed.commands.updateDatabaseBlockCell(rows[0]!.id, name.id, '块内甲')).toBe(true)
+    const changedTree = JSON.parse(JSON.stringify(tree))
+    changedTree.rows[1].cells[name.id] = '树上乙'
+    let saved: unknown
+    const summary = await applySafeLinkedDatabaseBlocks(ed, 'proj', {
+      load: async () => ({ kind: 'sheet', data: changedTree }),
+      save: async (_project: string, nodeId: string, kind: string, data: unknown) => {
+        expect(nodeId).toBe('tree-1')
+        expect(kind).toBe('sheet')
+        saved = data
+        return { kind, data }
+      },
+    })
+    expect(summary.merged).toBe(1)
+    expect(summary.pulled).toBe(0)
+    expect(summary.pushed).toBe(0)
+    expect(summary.skipped).toBe(0)
+    const sheet = payloadFromAttrs(databasePos(ed).node.attrs).sheet
+    expect(sheet.rows[0]!.cells[name.id]).toBe('块内甲')
+    expect(sheet.rows[1]!.cells[name.id]).toBe('树上乙')
+    const pushed = saved as { rows: Array<{ id: string; cells: Record<string, unknown> }> }
+    expect(pushed.rows[0]!.cells[name.id]).toBe('块内甲')
+    expect(pushed.rows[1]!.cells[name.id]).toBe('树上乙')
+    const id = readBlockId(databasePos(ed).node)
+    expect(getDatabaseBlockSyncStatus(databaseBlockSyncKey(id!, 'tree-1'))?.drift).toBe('in-sync')
+  })
+
+  it('自动安全同步会连续处理两块：先拉后写，不沿用过期位置', async () => {
+    const ed = mount()
+    ed.commands.insertDatabaseBlock({ sheetNodeId: 'tree-a' })
+    ed.commands.setTextSelection(ed.state.doc.content.size)
+    ed.commands.insertContent({ type: 'paragraph' })
+    ed.commands.setTextSelection(ed.state.doc.content.size)
+    ed.commands.insertDatabaseBlock({ sheetNodeId: 'tree-b' })
+    const blocks = allDatabasePos(ed)
+    expect(blocks).toHaveLength(2)
+    const first = payloadFromAttrs(blocks[0]!.node.attrs)
+    const second = payloadFromAttrs(blocks[1]!.node.attrs)
+    const firstField = firstFilterableField(first)!
+    const secondField = firstFilterableField(second)!
+    const treeA = JSON.parse(JSON.stringify(first.sheet))
+    const treeB = JSON.parse(JSON.stringify(second.sheet))
+    const trees: Record<string, SheetData> = { 'tree-a': treeA, 'tree-b': treeB }
+    for (const item of allDatabasePos(ed)) {
+      const sheetNodeId = String(item.node.attrs.sheetNodeId)
+      await syncLinkedDatabaseBlock(ed, 'proj', {
+        direction: 'pull',
+        sheetNodeId,
+        pos: item.pos,
+      }, {
+        load: async () => ({ kind: 'sheet', data: trees[sheetNodeId] }),
+        save: async () => {
+          throw new Error('setup pull should not save')
+        },
+      })
+    }
+    const afterSync = allDatabasePos(ed)
+    const blockB = afterSync.find((item) => String(item.node.attrs.sheetNodeId) === 'tree-b')
+    if (!blockB) throw new Error('missing tree-b')
+    const changedA = JSON.parse(JSON.stringify(treeA))
+    changedA.rows[0].cells[firstField.id] = '树上甲'
+    trees['tree-a'] = changedA
+    const localB = payloadFromAttrs(blockB.node.attrs).sheet.rows[0]!
+    ed.view.dispatch(ed.state.tr.setSelection(NodeSelection.create(ed.state.doc, blockB.pos)))
+    expect(ed.commands.updateDatabaseBlockCell(localB.id, secondField.id, '块内乙')).toBe(true)
+    const saved: Record<string, unknown> = {}
+    const summary = await applySafeLinkedDatabaseBlocks(ed, 'proj', {
+      load: async (_project, nodeId) => ({ kind: 'sheet', data: trees[nodeId] }),
+      save: async (_project, nodeId, kind, data) => {
+        expect(kind).toBe('sheet')
+        saved[nodeId] = data
+        trees[nodeId] = data as SheetData
+        return { kind, data }
+      },
+    })
+    expect(summary.pulled).toBe(1)
+    expect(summary.pushed).toBe(1)
+    expect(summary.skipped).toBe(0)
+    const latest = allDatabasePos(ed)
+    const latestA = latest.find((item) => String(item.node.attrs.sheetNodeId) === 'tree-a')
+    const latestB = latest.find((item) => String(item.node.attrs.sheetNodeId) === 'tree-b')
+    if (!latestA || !latestB) throw new Error('missing blocks after sync')
+    expect(payloadFromAttrs(latestA.node.attrs).sheet.rows[0]!.cells[firstField.id]).toBe('树上甲')
+    expect(payloadFromAttrs(latestB.node.attrs).sheet.rows[0]!.cells[secondField.id]).toBe('块内乙')
+    const pushedB = saved['tree-b'] as { rows: Array<{ cells: Record<string, unknown> }> }
+    expect(pushedB.rows[0]!.cells[secondField.id]).toBe('块内乙')
   })
 })

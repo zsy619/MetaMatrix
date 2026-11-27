@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from 'vitest'
 import {
+  blockHtmlEquivalent,
   describeBlockMerge,
   htmlHasSuggestionMarks,
   htmlPreviewText,
@@ -186,5 +187,21 @@ describe('saveConflict 按块合并', () => {
     expect(htmlHasSuggestionMarks(both)).toBe(true)
     expect(both).toContain('data-suggestion="insert"')
     expect(both).toContain('data-suggestion="delete"')
+  })
+
+  it('属性顺序或标签空白不同但 DOM 等价时视为同一块，不误报冲突', () => {
+    const id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+    const mine = `<p  data-block-id="${id}" class="note">同一句<span data-suggestion="insert">新</span></p>`
+    const theirs = `<p class="note" data-block-id="${id}">同一句<span data-suggestion="insert">新</span></p>`
+    expect(blockHtmlEquivalent(mine, theirs)).toBe(true)
+    const versions = { mineHtml: mine, theirsHtml: theirs }
+    expect(summarizeBlockMerge(versions)).toEqual({ hasBlockIds: true, same: 1, conflict: 0, onlyTheirs: 0, onlyMine: 0 })
+    expect(listConflictBlocks(versions)).toEqual([])
+    const merged = resolveConflictHtml('merge', versions)
+    expect(merged).toContain(`data-block-id="${id}"`)
+    expect(merged).toContain('同一句')
+    expect(merged.match(/同一句/g)).toHaveLength(1)
+    expect(htmlHasSuggestionMarks(merged)).toBe(true)
+    expect(merged).toContain('data-suggestion="insert"')
   })
 })
