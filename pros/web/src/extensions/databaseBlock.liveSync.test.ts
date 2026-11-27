@@ -9,7 +9,12 @@ import { firstFilterableField, payloadFromAttrs, sheetContentFingerprint } from 
 import { applySafeLinkedDatabaseBlocks, syncLinkedDatabaseBlock } from './databaseBlockSync'
 import { clearDatabaseBlockSyncStatus, databaseBlockSyncKey, getDatabaseBlockSyncStatus } from './databaseBlockSyncStatus'
 import {
+  LIVE_SYNC_ACTIVE_MS,
+  LIVE_SYNC_CATCHUP_MS,
+  LIVE_SYNC_POLL_MS,
   createLiveLinkedDatabaseSync,
+  nextLiveSyncPollMs,
+  shouldCatchUpPoll,
   transactionTouchesLinkedSheet,
 } from './databaseBlockLiveSync'
 
@@ -171,6 +176,47 @@ describe('createLiveLinkedDatabaseSync', () => {
     expect(summary?.merged).toBe(0)
     expect(saved).toBe(false)
     expect(getDatabaseBlockSyncStatus(databaseBlockSyncKey(readBlockId(databasePos(ed).node) || '', 'tree-1'))?.drift).toBe('remote-only')
+  })
+
+  it('可写时空闲轮询改用主动间隔，仍有分叉时再缩短追赶间隔', async () => {
+    expect(nextLiveSyncPollMs({ canWrite: false })).toBe(LIVE_SYNC_POLL_MS)
+    expect(nextLiveSyncPollMs({ canWrite: true })).toBe(LIVE_SYNC_ACTIVE_MS)
+    expect(shouldCatchUpPoll({ probed: [{ pos: 0, blockId: 'a', sheetNodeId: 't', drift: 'both' }], pulled: 0, pushed: 0, merged: 0, skipped: 1 })).toBe(true)
+    expect(nextLiveSyncPollMs({
+      canWrite: true,
+      summary: { probed: [{ pos: 0, blockId: 'a', sheetNodeId: 't', drift: 'remote-only' }], pulled: 1, pushed: 0, merged: 0, skipped: 0 },
+    })).toBe(LIVE_SYNC_CATCHUP_MS)
+    expect(shouldCatchUpPoll({ probed: [{ pos: 0, blockId: 'a', sheetNodeId: 't', drift: 'in-sync' }], pulled: 0, pushed: 0, merged: 0, skipped: 1 })).toBe(false)
+
+    const ed = mount()
+    ed.commands.insertDatabaseBlock({ sheetNodeId: 'tree-1' })
+    const local = payloadFromAttrs(databasePos(ed).node.attrs)
+    const store = memorySheetIo({ 'tree-1': local.sheet })
+    await linkToStore(ed, store)
+    const intervals: number[] = []
+    const live = createLiveLinkedDatabaseSync({
+      getEditor: () => ed,
+      projectId: () => 'proj',
+      io: store.io,
+      canWrite: () => true,
+      pollMs: 5000,
+      activeMs: 1000,
+      catchUpMs: 200,
+      setIntervalFn: (_fn, ms) => {
+        intervals.push(Number(ms))
+        return intervals.length as unknown as ReturnType<typeof setInterval>
+      },
+      clearIntervalFn: () => undefined,
+    })
+    live.arm()
+    expect(live.currentPollMs()).toBe(1000)
+    expect(intervals[0]).toBe(1000)
+    const name = firstFilterableField(local)!
+    store.trees['tree-1'] = JSON.parse(JSON.stringify(store.trees['tree-1']))
+    store.trees['tree-1']!.rows[0]!.cells[name.id] = '树上最新'
+    await live.tick()
+    expect(live.currentPollMs()).toBe(200)
+    live.disarm()
   })
 })
 
