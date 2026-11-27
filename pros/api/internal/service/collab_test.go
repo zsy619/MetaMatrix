@@ -491,3 +491,177 @@ func TestInspectDualWriteInSyncAfterHTMLOnly(t *testing.T) {
 		t.Fatalf("expected html and matching head: %+v", got)
 	}
 }
+
+func TestCollabRevokeEditorMidSessionBlocksAppend(t *testing.T) {
+	db := openCollabSQLite(t)
+	svc, ownerID, docID, _ := newCollabFixture(t, db)
+	projectID := attachCollabProject(t, db, ownerID, docID)
+	editorID := addCollabMember(t, db, projectID, ownerID, SpaceRoleEditor, "会被收回的编辑")
+
+	first, err := svc.Append(editorID, docID, editorID, CollabOperationInput{Payload: []byte{0x41}, HTML: "<p>收回前</p>"})
+	if err != nil {
+		t.Fatalf("editor append before revoke: %v", err)
+	}
+
+	if err := db.Model(&knowledgeMemberSQLite{}).
+		Where("project_id = ? AND user_id = ?", projectID, editorID).
+		Update("role", SpaceRoleViewer).Error; err != nil {
+		t.Fatal(err)
+	}
+
+	access, err := svc.Authorize(editorID, docID)
+	if err != nil || access.CanWrite || access.Role != SpaceRoleViewer {
+		t.Fatalf("after revoke access = %+v err=%v, want viewer read-only", access, err)
+	}
+	if _, err := svc.Append(editorID, docID, editorID, CollabOperationInput{Payload: []byte{0x42}, HTML: "<p>收回后</p>"}); !errors.Is(err, ErrCollabReadOnly) {
+		t.Fatalf("append after revoke err = %v, want ErrCollabReadOnly", err)
+	}
+
+	rows, err := svc.List(ownerID, docID, 0, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rows) != 1 || rows[0].Seq != first.Seq {
+		t.Fatalf("ops after revoke = %+v, want only seq %d", rows, first.Seq)
+	}
+}
+
+func TestCompactOperationsDeletesBeforeSnapshotAndLeavesInspectConsistent(t *testing.T) {
+	db := openCollabSQLite(t)
+	docs := NewDocumentsService(db)
+	svc, ownerID, _, _ := newCollabFixture(t, db)
+	svc.compactLimit = -1 // 本用例只测手动压缩
+	title := "压缩日志"
+	canvasType := DocCanvasType
+	doc, err := docs.Create(ownerID, CreateDocumentInput{
+		Title:      &title,
+		CanvasType: &canvasType,
+		Data:       json.RawMessage(`{"type":"doc","html":"<p>初稿</p>"}`),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := svc.Append(ownerID, doc.ID, ownerID, CollabOperationInput{Payload: []byte{0x01}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Append(ownerID, doc.ID, ownerID, CollabOperationInput{Payload: []byte{0x02}}); err != nil {
+		t.Fatal(err)
+	}
+	noop, err := svc.CompactOperations(doc.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if noop.Reason != "no_snapshot" || noop.Deleted != 0 || noop.Kept != 2 {
+		t.Fatalf("no snapshot compact = %+v, want no_snapshot kept=2", noop)
+	}
+
+	html := `<p data-block-id="55555555-5555-4555-8555-555555555555">快照正文</p>`
+	snap, err := svc.Append(ownerID, doc.ID, ownerID, CollabOperationInput{
+		Kind:    collabOpSnapshot,
+		Payload: []byte{0x03},
+		HTML:    html,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Append(ownerID, doc.ID, ownerID, CollabOperationInput{Payload: []byte{0x04}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.FlushDerived(doc.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := svc.CompactOperations(doc.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Reason != "compacted_before_snapshot" || got.SnapshotSeq != snap.Seq || got.Deleted != 2 || got.Kept != 2 {
+		t.Fatalf("compact = %+v, want deleted 2 kept 2 at snapshot %d", got, snap.Seq)
+	}
+
+	var kinds []string
+	if err := db.Model(&model.DocOperation{}).
+		Where("document_id = ?", doc.ID).
+		Order("seq asc").
+		Pluck("kind", &kinds).Error; err != nil {
+		t.Fatal(err)
+	}
+	if len(kinds) != 2 || kinds[0] != collabOpSnapshot || kinds[1] != collabOpUpdate {
+		t.Fatalf("remaining kinds = %v, want snapshot then update", kinds)
+	}
+
+	ahead, err := svc.InspectDualWrite(doc.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 快照之后还有一条未带 HTML 的增量，压缩不得把它删掉，双写校验应如实报落后。
+	if ahead.Consistent || ahead.Reason != "ops_ahead_of_current_data" || ahead.OpsWithoutHTML != 1 {
+		t.Fatalf("inspect after compact with later bare update = %+v, want ops_ahead_of_current_data", ahead)
+	}
+	if ahead.LastSnapshotSeq != snap.Seq {
+		t.Fatalf("last snapshot seq = %d, want %d", ahead.LastSnapshotSeq, snap.Seq)
+	}
+
+	laterHTML := `<p data-block-id="55555555-5555-4555-8555-555555555555">压缩后追上</p>`
+	if _, err := svc.Append(ownerID, doc.ID, ownerID, CollabOperationInput{Payload: []byte{0x05}, HTML: laterHTML}); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.FlushDerived(doc.ID); err != nil {
+		t.Fatal(err)
+	}
+	report, err := svc.InspectDualWrite(doc.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !report.Consistent || report.Reason != "dual_write_in_sync" {
+		t.Fatalf("inspect after compact and later html = %+v, want still dual_write_in_sync (still dual-write)", report)
+	}
+	if report.LastSnapshotSeq != snap.Seq {
+		t.Fatalf("last snapshot seq = %d, want %d", report.LastSnapshotSeq, snap.Seq)
+	}
+}
+
+func TestFlushDerivedCompactsWhenOverLimit(t *testing.T) {
+	db := openCollabSQLite(t)
+	docs := NewDocumentsService(db)
+	svc, ownerID, _, _ := newCollabFixture(t, db)
+	svc.compactLimit = 3
+	title := "自动压缩"
+	canvasType := DocCanvasType
+	doc, err := docs.Create(ownerID, CreateDocumentInput{
+		Title:      &title,
+		CanvasType: &canvasType,
+		Data:       json.RawMessage(`{"type":"doc","html":"<p>初稿</p>"}`),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Append(ownerID, doc.ID, ownerID, CollabOperationInput{Payload: []byte{0x11}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Append(ownerID, doc.ID, ownerID, CollabOperationInput{Payload: []byte{0x12}}); err != nil {
+		t.Fatal(err)
+	}
+	html := `<p data-block-id="66666666-6666-4666-8666-666666666666">自动快照</p>`
+	if _, err := svc.Append(ownerID, doc.ID, ownerID, CollabOperationInput{
+		Kind:    collabOpSnapshot,
+		Payload: []byte{0x13},
+		HTML:    html,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Append(ownerID, doc.ID, ownerID, CollabOperationInput{Payload: []byte{0x14}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.FlushDerived(doc.ID); err != nil {
+		t.Fatal(err)
+	}
+	var kept int64
+	if err := db.Model(&model.DocOperation{}).Where("document_id = ?", doc.ID).Count(&kept).Error; err != nil {
+		t.Fatal(err)
+	}
+	if kept != 2 {
+		t.Fatalf("kept after flush compact = %d, want 2 (snapshot + later update)", kept)
+	}
+}

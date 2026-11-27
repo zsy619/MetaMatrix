@@ -17,6 +17,7 @@ type DualWriteReport struct {
 	HeadRevisionHash    string `json:"headRevisionHash"`
 	HeadMatchesCurrent  bool   `json:"headMatchesCurrent"`
 	LastOpSeq           int64  `json:"lastOpSeq"`
+	LastSnapshotSeq     int64  `json:"lastSnapshotSeq"`
 	LastHTMLSaveVersion int64  `json:"lastHtmlSaveVersion"`
 	OpsWithoutHTML      int64  `json:"opsWithoutHtml"`
 	Consistent          bool   `json:"consistent"`
@@ -69,6 +70,12 @@ func (s *CollabService) InspectDualWrite(docID uuid.UUID) (*DualWriteReport, err
 		Select("COALESCE(MAX(seq), 0)").Scan(&lastSeq).Error; err != nil {
 		return nil, err
 	}
+	var lastSnap int64
+	if err := s.db.Model(&model.DocOperation{}).
+		Where("document_id = ? AND kind = ?", docID, collabOpSnapshot).
+		Select("COALESCE(MAX(seq), 0)").Scan(&lastSnap).Error; err != nil {
+		return nil, err
+	}
 	if err := s.db.Model(&model.DocOperation{}).
 		Where("document_id = ? AND save_version > 0", docID).
 		Select("COALESCE(MAX(save_version), 0)").Scan(&lastHTML).Error; err != nil {
@@ -86,6 +93,7 @@ func (s *CollabService) InspectDualWrite(docID uuid.UUID) (*DualWriteReport, err
 		return nil, err
 	}
 	report.LastOpSeq = lastSeq
+	report.LastSnapshotSeq = lastSnap
 	report.LastHTMLSaveVersion = lastHTML
 	report.OpsWithoutHTML = opsWithout
 
