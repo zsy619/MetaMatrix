@@ -2,12 +2,10 @@
 import { computed } from 'vue'
 import { canvasChromeStyle } from './canvasChrome'
 import type { BusinessModelBlockId, BusinessModelCanvasDocumentJSON } from '../../types/canvas'
-import { isBusinessModelCanvasDoc } from '../../types/canvas'
-import { useDocumentStore } from '../../stores/document'
 import { FIVE_STEP_NEGATE_WARM, FIVE_STEP_PALETTE, type FiveStepPalette } from './fiveStepPalette'
+import FiveStepPanel from './FiveStepPanel.vue'
 
 const props = defineProps<{ doc: BusinessModelCanvasDocumentJSON }>()
-const documentStore = useDocumentStore()
 const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 
 const order: BusinessModelBlockId[] = [
@@ -46,13 +44,6 @@ function toneStyle(id: BusinessModelBlockId) {
     '--col-topic': tone.topic,
   }
 }
-
-function update(id: BusinessModelBlockId, text: string) {
-  documentStore.mutateCanvas((doc) => {
-    if (!isBusinessModelCanvasDoc(doc)) return
-    doc.blocks = doc.blocks.map((item) => (item.id === id ? { ...item, text } : item))
-  })
-}
 </script>
 
 <template>
@@ -68,13 +59,14 @@ function update(id: BusinessModelBlockId, text: string) {
         <header>
           <h3>{{ block(id)?.title }}</h3>
         </header>
-        <div class="bmc-body">
-          <p>{{ block(id)?.hint }}</p>
-          <textarea
-            :value="block(id)?.text || ''"
-            :aria-label="block(id)?.title"
-            placeholder="写在这里"
-            @change="update(id, ($event.target as HTMLTextAreaElement).value)"
+        <div v-if="block(id)" class="bmc-panel">
+          <FiveStepPanel
+            chrome="fill"
+            density="compact"
+            :block="block(id)!"
+            :header="block(id)!.title"
+            :palette="tones[id]"
+            :topic-placeholder="block(id)!.hint || '主题'"
           />
         </div>
       </section>
@@ -140,38 +132,7 @@ h3 {
   letter-spacing: 0.04em;
   text-align: center;
 }
-.bmc-body { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; padding: 8px; }
-p {
-  margin: 0 0 8px;
-  padding-left: 8px;
-  border-left: 3px solid var(--col-topic);
-  color: #3c3428;
-  font-size: 15px;
-  font-weight: 650;
-  line-height: 1.5;
-  flex: none;
-}
-textarea {
-  flex: 1 1 auto;
-  min-height: 88px;
-  width: 100%;
-  border: 1px dashed rgba(60, 50, 20, 0.22);
-  border-radius: 8px;
-  padding: 10px 12px;
-  resize: none;
-  font: inherit;
-  font-size: 15px;
-  line-height: 1.55;
-  background: rgba(255, 255, 255, 0.55);
-  color: #202124;
-}
-textarea::placeholder { color: #5c564c; }
-textarea:focus {
-  outline: none;
-  border-style: solid;
-  border-color: var(--cv-focus, #163044);
-  background: #fff;
-}
+.bmc-panel { flex: 1 1 auto; min-height: 0; display: flex; }
 
 @media (max-width: 900px) {
   .bmc { padding-bottom: 28px; }
@@ -199,17 +160,9 @@ textarea:focus {
     min-height: 0;
   }
 
-  .bmc-body {
+  .bmc-panel {
     flex: 0 0 auto;
     height: auto;
-  }
-
-  textarea {
-    flex: 0 0 auto;
-    height: auto;
-    min-height: 120px;
-    field-sizing: content;
-    overflow: hidden;
   }
 }
 </style>

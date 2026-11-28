@@ -10,14 +10,14 @@
   },
   "title": "商业模式画布",
   "blocks": [
-    { "id": "partners", "title": "重要伙伴", "hint": "谁能帮我们做成这件事", "text": "" },
-    { "id": "activities", "title": "关键活动", "hint": "必须亲自做的事", "text": "" },
-    { "id": "resources", "title": "核心资源", "hint": "人、资产、品牌、数据", "text": "" },
-    { "id": "value", "title": "价值主张", "hint": "为谁解决什么问题", "text": "" },
-    { "id": "relationships", "title": "客户关系", "hint": "怎么获得并留住客户", "text": "" },
-    { "id": "channels", "title": "渠道通路", "hint": "客户在哪里碰到我们", "text": "" },
-    { "id": "segments", "title": "客户细分", "hint": "最重要的那一群人", "text": "" },
-    { "id": "costs", "title": "成本结构", "hint": "主要花在哪里", "text": "" },
-    { "id": "revenue", "title": "收入来源", "hint": "钱从哪里来", "text": "" }
+    { "id": "partners", "title": "重要伙伴", "hint": "谁能帮我们做成这件事", "items": [] },
+    { "id": "activities", "title": "关键活动", "hint": "必须亲自做的事", "items": [] },
+    { "id": "resources", "title": "核心资源", "hint": "人、资产、品牌、数据", "items": [] },
+    { "id": "value", "title": "价值主张", "hint": "为谁解决什么问题", "items": [] },
+    { "id": "relationships", "title": "客户关系", "hint": "怎么获得并留住客户", "items": [] },
+    { "id": "channels", "title": "渠道通路", "hint": "客户在哪里碰到我们", "items": [] },
+    { "id": "segments", "title": "客户细分", "hint": "最重要的那一群人", "items": [] },
+    { "id": "costs", "title": "成本结构", "hint": "主要花在哪里", "items": [] },
+    { "id": "revenue", "title": "收入来源", "hint": "钱从哪里来", "items": [] }
   ]
 }

@@ -195,6 +195,7 @@ import {
   isPlayingToWinDoc,
   isSceneThreeHighDoc,
   isFdeSheetDoc,
+  isBusinessModelCanvasDoc,
   coerceYModelDoc,
   normalizeYModelDoc,
 } from '../types/canvas'
@@ -962,7 +963,7 @@ export const TEMPLATE_META: Record<
   'business-model-canvas': {
     name: '商业模式画布',
     badge: '商业 · 九宫',
-    description: '九格铺满页面：伙伴与客户分列两侧，价值主张居中，成本和收入垫底。',
+    description: '九格铺满页面，每格用和五步法一样的富文本。价值主张居中，成本和收入垫底。',
     category: 'growth',
   },
   'cash-flow': {
@@ -1889,6 +1890,7 @@ export const useDocumentStore = defineStore('document', () => {
     if (isGoldenCircleDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
     if (isSoarDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
     if (isPlayingToWinDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
+    if (isBusinessModelCanvasDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
     // 旧版把「依次回答」存在 step.answer 里，新版改成内容块，迁移一次避免丢答案。
     if (isHackerFiveStepsDoc(next)) {
       const byId = new Map(next.blocks.map((b) => [b.id, b]))
@@ -3128,7 +3130,7 @@ export const useDocumentStore = defineStore('document', () => {
 
   /**
    * 内容主题词，写在 block.keyword 上（current_data，不另建表）。
-   * 人类-AI 双三角、五步法，以及 SWOT / 精益画布 / 价值主张画布共用。
+   * 人类-AI 双三角、五步法、商业模式画布，以及 SWOT / 精益画布 / 价值主张画布共用。
    */
   function updateBlockKeyword(blockId: string, keyword: string): boolean {
     const doc = current_data.value
@@ -3136,6 +3138,7 @@ export const useDocumentStore = defineStore('document', () => {
       !doc ||
       (!isDualTriangleDoc(doc) &&
         !isFiveStepFamilyDoc(doc) &&
+        !isBusinessModelCanvasDoc(doc) &&
         !isSwotDoc(doc) &&
         !isLeanCanvasDoc(doc) &&
         !isValuePropositionDoc(doc) &&
