@@ -1845,6 +1845,9 @@ type BatchFailure struct {
 	Target string `json:"target"`
 	// Message 是失败原因（可直接展示给用户）。
 	Message string `json:"message"`
+	// Cause 是原始错误（不参与序列化）：全成功模式要把它原样抛回去，
+	// 否则「记录不存在」会被伪装成「字段值非法」。
+	Cause error `json:"-"`
 }
 
 // BatchCreatePartial 批量创建记录，**允许部分成功**。
@@ -1979,17 +1982,7 @@ func batchChunkFailures(start, end int, err error) []BatchFailure {
 
 // BatchUpdatePartial 批量更新记录，**允许部分成功**。
 func (s *Service) BatchUpdatePartial(ctx context.Context, userID, projectID, tableID uuid.UUID, ids []uuid.UUID, fields map[string]any) ([]RecordRow, []BatchFailure) {
-	rows := make([]RecordRow, 0, len(ids))
-	failures := make([]BatchFailure, 0)
-	for _, id := range ids {
-		row, err := s.UpdateRecord(ctx, userID, projectID, id, RecordInput{Fields: fields})
-		if err != nil {
-			failures = append(failures, BatchFailure{Target: id.String(), Message: err.Error()})
-			continue
-		}
-		rows = append(rows, *row)
-	}
-	return rows, failures
+	return s.batchUpdate(ctx, userID, projectID, tableID, ids, fields, false)
 }
 
 // BatchDeletePartial 批量删除记录，**允许部分成功**。
@@ -2110,13 +2103,13 @@ func (s *Service) BatchCreate(ctx context.Context, userID, projectID, tableID uu
 
 // BatchUpdate 批量更新记录。
 func (s *Service) BatchUpdate(ctx context.Context, userID, projectID, tableID uuid.UUID, ids []uuid.UUID, fields map[string]any) ([]RecordRow, error) {
-	out := make([]RecordRow, 0, len(ids))
-	for _, id := range ids {
-		row, err := s.UpdateRecord(ctx, userID, projectID, id, RecordInput{Fields: fields})
-		if err != nil {
-			return nil, err
+	out, failures := s.batchUpdate(ctx, userID, projectID, tableID, ids, fields, true)
+	if len(failures) > 0 {
+		// 全成功模式：任一行失败即报错（已写入的行保持已写入，与旧实现一致）。
+		if failures[0].Cause != nil {
+			return nil, failures[0].Cause
 		}
-		out = append(out, *row)
+		return nil, fmt.Errorf("%w: %s", ErrFieldValueInvalid, failures[0].Message)
 	}
 	// 批量修改完成 → 广播 record.batch_updated（技术文档 §8.2）。
 	// 逐条更新已经各自发了 record.updated；这条汇总事件让订阅端

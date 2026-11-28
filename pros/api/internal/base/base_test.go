@@ -187,13 +187,13 @@ func strPtr(s string) *string { return &s }
 func TestBuildKeywordConditionAddsDocTitleBranch(t *testing.T) {
 	docField := uuid.New()
 	nodeID := "11111111-2222-3333-4444-555555555502"
-	baseCond := `EXISTS (SELECT 1 FROM base_record_values v WHERE v.record_id = r.id AND v.value_text ILIKE ?)`
-	cond, args := buildKeywordCondition(baseCond, []any{"%星海%"}, []uuid.UUID{docField}, []string{nodeID}, "r.id")
-	if !strings.Contains(cond, "dv.value_text ILIKE ?") {
+	tableID := uuid.New()
+	cond, args := buildDocTitleBranch(tableID, []uuid.UUID{docField}, []string{nodeID})
+	if !strings.Contains(cond, "dv.value_text ILIKE ANY") {
 		t.Fatalf("expected doc-title branch, got %s", cond)
 	}
-	if !strings.HasPrefix(cond, "(") {
-		t.Fatalf("expected combined condition, got %s", cond)
+	if !strings.Contains(cond, "r.id IN (SELECT dv.record_id") {
+		t.Fatalf("expected semi-join doc-title branch, got %s", cond)
 	}
 	if len(args) != 3 {
 		t.Fatalf("expected 3 args, got %d (%v)", len(args), args)
@@ -204,10 +204,9 @@ func TestBuildKeywordConditionAddsDocTitleBranch(t *testing.T) {
 }
 
 func TestBuildKeywordConditionWithoutDocFields(t *testing.T) {
-	baseCond := `EXISTS (SELECT 1 FROM base_record_values v WHERE v.record_id = r.id AND v.value_text ILIKE ?)`
-	cond, args := buildKeywordCondition(baseCond, []any{"%x%"}, nil, []string{"y"}, "r.id")
-	if cond != baseCond || len(args) != 1 {
-		t.Fatalf("expected unchanged condition, got %s / %v", cond, args)
+	cond, args := buildDocTitleBranch(uuid.New(), nil, []string{"y"})
+	if cond != "" || len(args) != 0 {
+		t.Fatalf("expected empty branch, got %s / %v", cond, args)
 	}
 }
 

@@ -123,6 +123,7 @@ func main() {
 		skipSeed    = flag.Bool("skip-seed", false, "不播种数据，直接用 -table 压测")
 		deepPages   = flag.Int("deep-pages", 20, "深翻页场景翻多少页（验证 keyset 翻页不随页数变慢）")
 		batchSize   = flag.Int("batch-size", 500, "批量写入场景每批多少行")
+		scenarioSel = flag.String("scenarios", "", "只跑匹配这些关键词的场景（逗号分隔，留空跑全部）")
 	)
 	flag.Parse()
 
@@ -182,6 +183,16 @@ func main() {
 		fmt.Printf("- 临时压测表：%s（%d 行 × %d 字段）\n", tbl, *seedRows, *seedFields)
 	}
 
+	// 写路径场景的公共前置：目标记录 ID 与可写的文本字段 ID。
+	//
+	// 为什么放在场景循环之外：这两个值被「单条更新 / 批量编辑 / 批量写入」共用，
+	// 以前是在「单条更新」的 Setup 里解析的。一旦用 -scenarios 把那个场景过滤掉，
+	// textField 就一直是空串，批量场景带着空字段 ID 发请求，
+	// 压出来的是一地 422「bad field id」，而不是真实的性能数据。
+	if err := resolveWritePrereqs(context.Background(), c, prefix, &records, &textField); err != nil {
+		fatal("准备写路径压测前置失败: %v", err)
+	}
+
 	scenarios := []scenario{
 		{
 			Name: "首屏查询（100 条 × 20 字段）", Target: func(int) string { return prefix + "/tables/" + c.table + "/query" }, Method: http.MethodPost,
@@ -206,32 +217,7 @@ func main() {
 		{
 			Name: "单条更新", Target: func(worker int) string { return prefix + "/records/" + workerRecord(records, worker) }, Method: http.MethodPatch,
 			Setup: func(ctx context.Context, cl *client) error {
-				recs, err := cl.queryIDs(ctx, 200)
-				if err != nil {
-					return err
-				}
-				records = recs
-				if textField == "" {
-					var schema struct {
-						Fields []struct {
-							ID   string `json:"id"`
-							Type string `json:"type"`
-						} `json:"fields"`
-					}
-					if err := cl.jget(ctx, prefix+"/tables/"+c.table+"/schema", &schema); err != nil {
-						return err
-					}
-					for _, f := range schema.Fields {
-						if f.Type == "text" {
-							textField = f.ID
-							break
-						}
-					}
-					if textField == "" && len(schema.Fields) > 0 {
-						textField = schema.Fields[0].ID
-					}
-				}
-				return nil
+				return resolveWritePrereqs(ctx, cl, prefix, &records, &textField)
 			},
 			Body: func(worker int) []byte {
 				return mustJSON(map[string]any{"fields": map[string]any{textField: "loadtest-" + fmt.Sprint(rand.Int())}})
@@ -241,14 +227,7 @@ func main() {
 		{
 			Name: "批量 100 条编辑", Target: func(int) string { return prefix + "/tables/" + c.table + "/records/batch" }, Method: http.MethodPost,
 			Setup: func(ctx context.Context, cl *client) error {
-				if len(records) == 0 {
-					recs, err := cl.queryIDs(ctx, 200)
-					if err != nil {
-						return err
-					}
-					records = recs
-				}
-				return nil
+				return resolveWritePrereqs(ctx, cl, prefix, &records, &textField)
 			},
 			Body: func(worker int) []byte {
 				ids := workerChunk(records, worker, 25)
@@ -287,27 +266,7 @@ func main() {
 			// 批量写入：单批 500 行（扩容档位下的写放大场景）。
 			Name: fmt.Sprintf("批量写入（%d 行/批）", *batchSize), Target: func(int) string { return prefix + "/tables/" + c.table + "/records/batch" }, Method: http.MethodPost,
 			Setup: func(ctx context.Context, cl *client) error {
-				if textField == "" {
-					var schema struct {
-						Fields []struct {
-							ID   string `json:"id"`
-							Type string `json:"type"`
-						} `json:"fields"`
-					}
-					if err := cl.jget(ctx, prefix+"/tables/"+c.table+"/schema", &schema); err != nil {
-						return err
-					}
-					for _, f := range schema.Fields {
-						if f.Type == "text" {
-							textField = f.ID
-							break
-						}
-					}
-					if textField == "" && len(schema.Fields) > 0 {
-						textField = schema.Fields[0].ID
-					}
-				}
-				return nil
+				return resolveWritePrereqs(ctx, cl, prefix, &records, &textField)
 			},
 			Body: func(worker int) []byte {
 				rows := make([]map[string]any, 0, *batchSize)
@@ -327,6 +286,20 @@ func main() {
 	fmt.Println("| --- | --- | --- | --- | --- | --- | --- | --- |")
 
 	for _, sc := range scenarios {
+		// 场景过滤：只跑名字里含指定关键词的场景（便于对比单项优化的前后数据）。
+		if *scenarioSel != "" {
+			matched := false
+			for _, key := range strings.Split(*scenarioSel, ",") {
+				key = strings.TrimSpace(key)
+				if key != "" && strings.Contains(sc.Name, key) {
+					matched = true
+					break
+				}
+			}
+			if !matched {
+				continue
+			}
+		}
 		if sc.Setup != nil {
 			if err := sc.Setup(context.Background(), c); err != nil {
 				fmt.Printf("| %s | - | - | - | - | - | - | setup 失败：%v |\n", sc.Name, err)
@@ -441,6 +414,46 @@ func workerChunk(ids []string, worker, size int) []string {
 		end = len(ids)
 	}
 	return ids[start:end]
+}
+
+// resolveWritePrereqs 解析写路径场景共用的两个前置：
+//   - records：用于更新的目标记录 ID（最多 200 条，按 ID 分配给并发协）；
+//   - textField：一个可写的文本字段 ID（没有文本字段就退回第一个字段）。
+//
+// 幂等：已解析出结果就直接返回，重复调用不产生额外请求。
+func resolveWritePrereqs(ctx context.Context, c *client, prefix string, records *[]string, textField *string) error {
+	if len(*records) == 0 {
+		recs, err := c.queryIDs(ctx, 200)
+		if err != nil {
+			return err
+		}
+		*records = recs
+	}
+	if *textField != "" {
+		return nil
+	}
+	var schema struct {
+		Fields []struct {
+			ID   string `json:"id"`
+			Type string `json:"type"`
+		} `json:"fields"`
+	}
+	if err := c.jget(ctx, prefix+"/tables/"+c.table+"/schema", &schema); err != nil {
+		return err
+	}
+	for _, f := range schema.Fields {
+		if f.Type == "text" {
+			*textField = f.ID
+			break
+		}
+	}
+	if *textField == "" && len(schema.Fields) > 0 {
+		*textField = schema.Fields[0].ID
+	}
+	if *textField == "" {
+		return fmt.Errorf("表 %s 没有任何可用字段", c.table)
+	}
+	return nil
 }
 
 func mustJSON(v any) []byte {
