@@ -33,8 +33,8 @@ export const GUIDE_LANES: Record<TemplateCategory, GuideLane[]> = {
     {
       id: 'evaluate',
       title: '评估与取舍',
-      hint: '需求、AI 边界、ROI 权衡',
-      ids: ['demand-triangle', 'ai-tradeoff', 'key-resistance', 'roi-tradeoff', 'roi-decision'],
+      hint: '需求、AI 边界、ROI 权衡、平衡计分卡',
+      ids: ['demand-triangle', 'ai-tradeoff', 'key-resistance', 'roi-tradeoff', 'roi-decision', 'balanced-scorecard'],
     },
     {
       id: 'choice',
@@ -54,14 +54,14 @@ export const GUIDE_LANES: Record<TemplateCategory, GuideLane[]> = {
     {
       id: 'customer',
       title: '产品与客户',
-      hint: '旅程、卡诺、同理心、营销 4P、内核、转化取舍',
-      ids: ['customer-journey', 'kano', 'empathy-map', 'marketing-mix', 'product-content', 'product-features-5d', 'conversion-tradeoff'],
+      hint: '旅程、卡诺、同理心、营销 4P、AARRR、内核、转化取舍',
+      ids: ['customer-journey', 'kano', 'empathy-map', 'marketing-mix', 'aarr', 'product-content', 'product-features-5d', 'conversion-tradeoff'],
     },
     {
       id: 'model',
       title: '商业模式',
-      hint: '商业模式、精益、价值主张、安索夫',
-      ids: ['business-model-canvas', 'lean-canvas', 'value-proposition', 'ansoff'],
+      hint: '商业模式、精益、价值主张、安索夫、BCG、蓝海 ERRC',
+      ids: ['business-model-canvas', 'lean-canvas', 'value-proposition', 'ansoff', 'bcg', 'errc'],
     },
     {
       id: 'formula',

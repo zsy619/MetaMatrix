@@ -65,6 +65,10 @@ import {
   isAnsoffDoc,
   isEmpathyDoc,
   isMarketingMixDoc,
+  isBcgDoc,
+  isScorecardDoc,
+  isErrcDoc,
+  isAarrDoc,
   isValueChainDoc,
   isSevenSDoc,
   isRiceDoc,
@@ -149,6 +153,10 @@ const PestleCanvas = defineAsyncComponent(() => import('./PestleCanvas.vue'))
 const AnsoffCanvas = defineAsyncComponent(() => import('./AnsoffCanvas.vue'))
 const EmpathyCanvas = defineAsyncComponent(() => import('./EmpathyCanvas.vue'))
 const MarketingMixCanvas = defineAsyncComponent(() => import('./MarketingMixCanvas.vue'))
+const BcgCanvas = defineAsyncComponent(() => import('./BcgCanvas.vue'))
+const ScorecardCanvas = defineAsyncComponent(() => import('./ScorecardCanvas.vue'))
+const ErrcCanvas = defineAsyncComponent(() => import('./ErrcCanvas.vue'))
+const AarrCanvas = defineAsyncComponent(() => import('./AarrCanvas.vue'))
 const ValueChainCanvas = defineAsyncComponent(() => import('./ValueChainCanvas.vue'))
 const SevenSCanvas = defineAsyncComponent(() => import('./SevenSCanvas.vue'))
 const RiceCanvas = defineAsyncComponent(() => import('./RiceCanvas.vue'))
@@ -337,6 +345,10 @@ const pestleDoc = computed(() => (isPestleDoc(current_data.value) ? current_data
 const ansoffDoc = computed(() => (isAnsoffDoc(current_data.value) ? current_data.value : null))
 const empathyDoc = computed(() => (isEmpathyDoc(current_data.value) ? current_data.value : null))
 const marketingMixDoc = computed(() => (isMarketingMixDoc(current_data.value) ? current_data.value : null))
+const bcgDoc = computed(() => (isBcgDoc(current_data.value) ? current_data.value : null))
+const scorecardDoc = computed(() => (isScorecardDoc(current_data.value) ? current_data.value : null))
+const errcDoc = computed(() => (isErrcDoc(current_data.value) ? current_data.value : null))
+const aarrDoc = computed(() => (isAarrDoc(current_data.value) ? current_data.value : null))
 const valueChainDoc = computed(() => (isValueChainDoc(current_data.value) ? current_data.value : null))
 const sevenSDoc = computed(() => (isSevenSDoc(current_data.value) ? current_data.value : null))
 const riceDoc = computed(() => (isRiceDoc(current_data.value) ? current_data.value : null))
@@ -552,6 +564,18 @@ const quadrantDoc = computed(() =>
         </template>
         <template v-else-if="marketingMixDoc">
           <MarketingMixCanvas :doc="marketingMixDoc" />
+        </template>
+        <template v-else-if="bcgDoc">
+          <BcgCanvas :doc="bcgDoc" />
+        </template>
+        <template v-else-if="scorecardDoc">
+          <ScorecardCanvas :doc="scorecardDoc" />
+        </template>
+        <template v-else-if="errcDoc">
+          <ErrcCanvas :doc="errcDoc" />
+        </template>
+        <template v-else-if="aarrDoc">
+          <AarrCanvas :doc="aarrDoc" />
         </template>
         <template v-else-if="valueChainDoc">
           <ValueChainCanvas :doc="valueChainDoc" />

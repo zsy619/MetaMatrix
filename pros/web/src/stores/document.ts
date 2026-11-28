@@ -123,6 +123,10 @@ import type {
   AnsoffDocumentJSON,
   EmpathyDocumentJSON,
   MarketingMixDocumentJSON,
+  BcgDocumentJSON,
+  ScorecardDocumentJSON,
+  ErrcDocumentJSON,
+  AarrDocumentJSON,
   ValueChainDocumentJSON,
   SevenSDocumentJSON,
   RiceDocumentJSON,
@@ -191,6 +195,10 @@ import {
   isAnsoffDoc,
   isEmpathyDoc,
   isMarketingMixDoc,
+  isBcgDoc,
+  isScorecardDoc,
+  isErrcDoc,
+  isAarrDoc,
   isValueChainDoc,
   isSevenSDoc,
   isJourneyDoc,
@@ -274,6 +282,10 @@ import pestleTemplate from '../templates/pestle-v1.json'
 import ansoffTemplate from '../templates/ansoff-v1.json'
 import empathyTemplate from '../templates/empathy-map-v1.json'
 import marketingMixTemplate from '../templates/marketing-mix-v1.json'
+import bcgTemplate from '../templates/bcg-v1.json'
+import scorecardTemplate from '../templates/balanced-scorecard-v1.json'
+import errcTemplate from '../templates/errc-v1.json'
+import aarrTemplate from '../templates/aarr-v1.json'
 import valueChainTemplate from '../templates/value-chain-v1.json'
 import sevenSTemplate from '../templates/seven-s-v1.json'
 import riceTemplate from '../templates/rice-v1.json'
@@ -361,6 +373,10 @@ export type TemplateId =
   | 'ansoff'
   | 'empathy-map'
   | 'marketing-mix'
+  | 'bcg'
+  | 'balanced-scorecard'
+  | 'errc'
+  | 'aarr'
   | 'value-chain'
   | 'seven-s'
   | 'rice'
@@ -452,6 +468,10 @@ export const TEMPLATES: Record<TemplateId, CanvasDocumentJSON> = {
   ansoff: ansoffTemplate as AnsoffDocumentJSON,
   'empathy-map': empathyTemplate as EmpathyDocumentJSON,
   'marketing-mix': marketingMixTemplate as MarketingMixDocumentJSON,
+  bcg: bcgTemplate as BcgDocumentJSON,
+  'balanced-scorecard': scorecardTemplate as ScorecardDocumentJSON,
+  errc: errcTemplate as ErrcDocumentJSON,
+  aarr: aarrTemplate as AarrDocumentJSON,
   'value-chain': valueChainTemplate as ValueChainDocumentJSON,
   'seven-s': sevenSTemplate as SevenSDocumentJSON,
   rice: riceTemplate as RiceDocumentJSON,
@@ -1062,6 +1082,30 @@ export const TEMPLATE_META: Record<
     name: '营销 4P',
     badge: '营销 · 4P',
     description: '产品、价格、渠道、推广。四项决定要对着同一群客户。',
+    category: 'growth',
+  },
+  bcg: {
+    name: 'BCG 矩阵',
+    badge: '组合 · BCG',
+    description: '按市场增长和份额把业务分成明星、问题、现金牛和瘦狗，决定钱往哪放。',
+    category: 'growth',
+  },
+  'balanced-scorecard': {
+    name: '平衡计分卡',
+    badge: '战略 · 计分卡',
+    description: '财务、客户、内部流程、学习成长四列。不只看赚钱，也看怎么赚到。',
+    category: 'method',
+  },
+  errc: {
+    name: '蓝海 ERRC',
+    badge: '战略 · ERRC',
+    description: '剔除、减少、增加、创造。用来离开同行都在比的那几项。',
+    category: 'growth',
+  },
+  aarr: {
+    name: '海盗指标 AARRR',
+    badge: '增长 · AARRR',
+    description: '获取、激活、留存、推荐、收入。找出用户在哪一段漏掉。',
     category: 'growth',
   },
   'value-chain': {
@@ -1928,6 +1972,10 @@ export const useDocumentStore = defineStore('document', () => {
     if (isAnsoffDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
     if (isEmpathyDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
     if (isMarketingMixDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
+    if (isBcgDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
+    if (isScorecardDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
+    if (isErrcDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
+    if (isAarrDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
     if (isValueChainDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
     if (isSevenSDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
     if (isJourneyDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
@@ -3197,6 +3245,10 @@ export const useDocumentStore = defineStore('document', () => {
         !isAnsoffDoc(doc) &&
         !isEmpathyDoc(doc) &&
         !isMarketingMixDoc(doc) &&
+        !isBcgDoc(doc) &&
+        !isScorecardDoc(doc) &&
+        !isErrcDoc(doc) &&
+        !isAarrDoc(doc) &&
         !isValueChainDoc(doc) &&
         !isSevenSDoc(doc) &&
         !isJourneyDoc(doc) &&

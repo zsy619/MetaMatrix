@@ -2251,6 +2251,86 @@ export interface MarketingMixDocumentJSON {
   blocks: MarketingMixBlock[]
 }
 
+export type BcgBlockId = 'star' | 'question' | 'cow' | 'dog'
+
+export interface BcgBlock {
+  id: BcgBlockId
+  title: string
+  hint: string
+  keyword?: string
+  items: QuadrantItem[]
+  text?: string
+}
+
+export interface BcgDocumentJSON {
+  id: string
+  type: 'bcg'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  blocks: BcgBlock[]
+}
+
+export type ScorecardBlockId = 'financial' | 'customer' | 'process' | 'learning'
+
+export interface ScorecardBlock {
+  id: ScorecardBlockId
+  title: string
+  hint: string
+  keyword?: string
+  items: QuadrantItem[]
+  text?: string
+}
+
+export interface ScorecardDocumentJSON {
+  id: string
+  type: 'balanced_scorecard'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  blocks: ScorecardBlock[]
+}
+
+export type ErrcBlockId = 'eliminate' | 'reduce' | 'raise' | 'create'
+
+export interface ErrcBlock {
+  id: ErrcBlockId
+  title: string
+  hint: string
+  keyword?: string
+  items: QuadrantItem[]
+  text?: string
+}
+
+export interface ErrcDocumentJSON {
+  id: string
+  type: 'errc'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  blocks: ErrcBlock[]
+}
+
+export type AarrBlockId = 'acquisition' | 'activation' | 'retention' | 'referral' | 'revenue'
+
+export interface AarrBlock {
+  id: AarrBlockId
+  title: string
+  hint: string
+  keyword?: string
+  items: QuadrantItem[]
+  text?: string
+}
+
+export interface AarrDocumentJSON {
+  id: string
+  type: 'aarr'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  blocks: AarrBlock[]
+}
+
 export type ValueChainBlockId =
   | 'infrastructure'
   | 'hr'
@@ -2801,6 +2881,10 @@ export type CanvasDocumentJSON = (
   | AnsoffDocumentJSON
   | EmpathyDocumentJSON
   | MarketingMixDocumentJSON
+  | BcgDocumentJSON
+  | ScorecardDocumentJSON
+  | ErrcDocumentJSON
+  | AarrDocumentJSON
   | ValueChainDocumentJSON
   | SevenSDocumentJSON
   | RiceDocumentJSON
@@ -2868,6 +2952,10 @@ export type BlockCanvasDocumentJSON =
   | AnsoffDocumentJSON
   | EmpathyDocumentJSON
   | MarketingMixDocumentJSON
+  | BcgDocumentJSON
+  | ScorecardDocumentJSON
+  | ErrcDocumentJSON
+  | AarrDocumentJSON
   | ValueChainDocumentJSON
   | SevenSDocumentJSON
   | JourneyDocumentJSON
@@ -3582,6 +3670,23 @@ export function isMarketingMixDoc(
 }
 
 
+export function isBcgDoc(doc: CanvasDocumentJSON | null | undefined): doc is BcgDocumentJSON {
+  return !!doc && doc.type === 'bcg'
+}
+
+export function isScorecardDoc(doc: CanvasDocumentJSON | null | undefined): doc is ScorecardDocumentJSON {
+  return !!doc && doc.type === 'balanced_scorecard'
+}
+
+export function isErrcDoc(doc: CanvasDocumentJSON | null | undefined): doc is ErrcDocumentJSON {
+  return !!doc && doc.type === 'errc'
+}
+
+export function isAarrDoc(doc: CanvasDocumentJSON | null | undefined): doc is AarrDocumentJSON {
+  return !!doc && doc.type === 'aarr'
+}
+
+
 export function isBlockCanvasDoc(
   doc: CanvasDocumentJSON | null | undefined,
 ): doc is BlockCanvasDocumentJSON {
@@ -3643,7 +3748,11 @@ export function isBlockCanvasDoc(
     isPestleDoc(doc) ||
     isAnsoffDoc(doc) ||
     isEmpathyDoc(doc) ||
-    isMarketingMixDoc(doc)
+    isMarketingMixDoc(doc) ||
+    isBcgDoc(doc) ||
+    isScorecardDoc(doc) ||
+    isErrcDoc(doc) ||
+    isAarrDoc(doc)
   )
 }
 

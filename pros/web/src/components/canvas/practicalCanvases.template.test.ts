@@ -21,11 +21,15 @@ import { cloneTemplate, isTemplateId, TEMPLATE_META, useDocumentStore } from '..
 import {
   isFiveForcesDoc,
   isAnsoffDoc,
+  isAarrDoc,
+  isBcgDoc,
   isBreakEvenDoc,
   isEmpathyDoc,
+  isErrcDoc,
   isIncomeStatementDoc,
   isMarketingMixDoc,
   isPestleDoc,
+  isScorecardDoc,
   isRiceDoc,
   isSevenSDoc,
   isImpactEffortDoc,
@@ -162,6 +166,20 @@ describe('实用商业画布', () => {
     expect(isMarketingMixDoc(mix) && mix.blocks).toHaveLength(4)
   })
 
+  it('BCG、平衡计分卡、ERRC 和 AARRR 都登记在模板库', () => {
+    for (const id of ['bcg', 'balanced-scorecard', 'errc', 'aarr'] as const) {
+      expect(isTemplateId(id)).toBe(true)
+    }
+    const bcg = cloneTemplate('bcg')
+    const scorecard = cloneTemplate('balanced-scorecard')
+    const errc = cloneTemplate('errc')
+    const aarr = cloneTemplate('aarr')
+    expect(isBcgDoc(bcg) && bcg.blocks.map((block) => block.id)).toEqual(['star', 'question', 'cow', 'dog'])
+    expect(isScorecardDoc(scorecard) && scorecard.blocks).toHaveLength(4)
+    expect(isErrcDoc(errc) && errc.blocks).toHaveLength(4)
+    expect(isAarrDoc(aarr) && aarr.blocks).toHaveLength(5)
+  })
+
   it('价值链、7S、RICE 和盈亏平衡都能算出结果', () => {
     for (const id of ['value-chain', 'seven-s', 'rice', 'break-even'] as const) expect(isTemplateId(id)).toBe(true)
     const chain = cloneTemplate('value-chain')
@@ -266,6 +284,10 @@ describe('实用商业画布', () => {
       ansoff: 'growth',
       'empathy-map': 'growth',
       'marketing-mix': 'growth',
+      bcg: 'growth',
+      'balanced-scorecard': 'method',
+      errc: 'growth',
+      aarr: 'growth',
       'value-chain': 'industry',
       'seven-s': 'org',
       rice: 'method',
