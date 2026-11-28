@@ -149,6 +149,8 @@ function parseReferenceLink(text: string, start: number, ctx: Ctx): LinkLike | n
 }
 
 const EMPHASIS_PATTERNS: RegExp[] = [
+  /^\*\*\*([^\s*][\s\S]*?)\*\*\*/,
+  /^___([^\s_][\s\S]*?)___/,
   /^\*\*([^\s*][\s\S]*?)\*\*/,
   /^__([^\s_][\s\S]*?)__/,
   /^\*([^\s*][\s\S]*?)\*(?!\*)/,
@@ -240,8 +242,15 @@ export function renderInlineMarkdown(source: string, ctx: Ctx): string {
         if (!match) continue
         if (match[0][0] !== ch) continue
         const inner = match[1] ?? ''
-        const tag = match[0].startsWith('**') || match[0].startsWith('__') ? 'strong' : 'em'
-        out += `<${tag}>${renderInlineMarkdown(inner, ctx)}</${tag}>`
+        const raw = match[0]
+        const rendered = renderInlineMarkdown(inner, ctx)
+        if (raw.startsWith('***') || raw.startsWith('___')) {
+          out += `<strong><em>${rendered}</em></strong>`
+        } else if (raw.startsWith('**') || raw.startsWith('__')) {
+          out += `<strong>${rendered}</strong>`
+        } else {
+          out += `<em>${rendered}</em>`
+        }
         i += match[0].length
         matched = true
         break

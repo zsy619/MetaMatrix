@@ -20,6 +20,7 @@ const REMOTE_ORIGIN = 'remote'
 const DEFAULT_HEARTBEAT_MS = 20_000
 const DEFAULT_RECONNECT_BASE_MS = 500
 const MAX_RECONNECT_MS = 10_000
+const DEFAULT_SNAPSHOT_EVERY = 50
 
 export function createCollabYDoc(): Y.Doc {
   return new Y.Doc()
@@ -90,6 +91,8 @@ export type LiveCollabOptions = {
   onError?: (err: Error) => void
   onPresence?: (users: unknown[]) => void
   onHello?: (info: { canWrite: boolean; role: string }) => void
+  /** 写权限被收回或连接被服务端踢掉时调用；宿主应立刻把编辑器改为只读。 */
+  onRevoked?: (info: { canWrite: boolean; role: string; message: string }) => void
   socketURL?: string
   socketFactory?: (url: string) => CollabSocket
   /** 应用层心跳间隔。0 表示关闭（协议层 ping 仍由服务端发起）。 */
@@ -102,6 +105,11 @@ export type LiveCollabOptions = {
   offlineStore?: OfflineQueueStore
   /** 写入 awareness 的本地用户（名称与配色）。浏览者也可以上报光标。 */
   user?: CollabCaretUser
+  /**
+   * 每发送这么多条增量后再发一份 Y.encodeStateAsUpdate 快照，方便服务端丢掉已被覆盖的操作日志。
+   * 默认 50；0 表示不自动发快照。这不是完整文档历史 GC。
+   */
+  snapshotEvery?: number
 }
 
 /**
@@ -124,6 +132,7 @@ export class LiveCollabSession {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null
   private attempts = 0
   private connectWait: ((err?: Error) => void) | null = null
+  private sentSinceSnapshot = 0
   private unbindAwareness: (() => void) | null = null
   readonly awareness: Awareness
   readonly provider: CollabCaretProvider
@@ -301,8 +310,31 @@ export class LiveCollabSession {
           html: this.opts.htmlProvider?.() ?? '',
         }),
       )
+      this.sentSinceSnapshot += 1
+      this.maybeSendSnapshot()
     } catch {
       this.enqueue(update)
+    }
+  }
+
+  /** 用当前 Y.Doc 的整包状态发 snapshot，供服务端压缩更早的增量。失败不影响后续增量。 */
+  private maybeSendSnapshot(): void {
+    const every = this.opts.snapshotEvery ?? DEFAULT_SNAPSHOT_EVERY
+    if (every <= 0 || this.sentSinceSnapshot < every) return
+    if (!this.writable() || !this.socket || !this.opened) return
+    try {
+      const snapshot = Y.encodeStateAsUpdate(this.opts.ydoc)
+      this.socket.send(
+        JSON.stringify({
+          type: 'update',
+          kind: 'snapshot',
+          payload: encodeYUpdate(snapshot),
+          html: this.opts.htmlProvider?.() ?? '',
+        }),
+      )
+      this.sentSinceSnapshot = 0
+    } catch {
+      /* 快照失败时下次达到阈值再试，不丢增量 */
     }
   }
 
@@ -366,13 +398,11 @@ export class LiveCollabSession {
       return
     }
     if (msg.type === 'hello') {
-      this.canWrite = msg.canWrite !== false
-      this.role = msg.role ?? ''
-      if (!this.writable()) {
-        this.pending = []
-        void this.persistQueue()
-      }
-      this.opts.onHello?.({ canWrite: this.canWrite, role: this.role })
+      this.applyAccess({ canWrite: msg.canWrite, role: msg.role })
+      return
+    }
+    if (msg.type === 'revoked') {
+      this.applyAccess({ canWrite: false, role: msg.role }, msg.message || 'collab room is read-only')
       return
     }
     if (msg.type === 'pong') return
@@ -420,7 +450,25 @@ export class LiveCollabSession {
       return
     }
     if (msg.type === 'error' && msg.message) {
+      if (isCollabRevokedMessage(msg.message)) {
+        this.applyAccess({ canWrite: false, role: this.role }, msg.message)
+        return
+      }
       this.opts.onError?.(new Error(msg.message))
+    }
+  }
+
+
+  private applyAccess(info: { canWrite?: boolean; role?: string }, revokedMessage?: string): void {
+    this.canWrite = info.canWrite !== false
+    if (typeof info.role === 'string') this.role = info.role
+    if (!this.writable()) {
+      this.pending = []
+      void this.persistQueue()
+    }
+    this.opts.onHello?.({ canWrite: this.canWrite, role: this.role })
+    if (revokedMessage) {
+      this.opts.onRevoked?.({ canWrite: this.canWrite, role: this.role, message: revokedMessage })
     }
   }
 
@@ -448,3 +496,10 @@ export class LiveCollabSession {
     }
   }
 }
+
+/** 服务端因权限收回踢连接时的错误文案。网络抖动不得走这条，以免误把编辑器打成只读。 */
+export function isCollabRevokedMessage(message: string): boolean {
+  const text = String(message || '').toLowerCase()
+  return text.includes('read-only') || text.includes('access revoked')
+}
+

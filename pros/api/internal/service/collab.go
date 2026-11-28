@@ -1,6 +1,7 @@
 package service
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"log"
@@ -220,7 +221,21 @@ func (s *CollabService) Append(actorID, docID, authorID uuid.UUID, in CollabOper
 	if shouldDerive {
 		s.scheduleDerived(docID, actorID)
 	}
+	if kind == collabOpSnapshot {
+		s.compactAfterSnapshot(docID)
+	}
 	return out, nil
+}
+
+// compactAfterSnapshot 在刚写入 snapshot 后删除更早的操作日志。
+// compactLimit < 0 时跳过（测试里用来只测手动压缩）。这仍不是完整的 Yjs 文档 GC。
+func (s *CollabService) compactAfterSnapshot(docID uuid.UUID) {
+	if s.compactLimit < 0 {
+		return
+	}
+	if _, err := s.CompactOperations(docID); err != nil {
+		log.Printf("collab compact after snapshot %s: %v", docID, err)
+	}
 }
 
 // List 读取 after 之后的协同操作，按 Seq 升序。只读进房的成员也可以拉增量。
@@ -400,12 +415,16 @@ func maybeCollabCheckpoint(tx *gorm.DB, doc *model.CanvasDocument, now time.Time
 	}
 	revID := uuid.New()
 	label := "auto-checkpoint"
+	payload := datatypes.JSON(doc.CurrentData)
+	if state, ok := latestYjsSnapshotPayload(tx, doc.ID); ok {
+		payload = attachYjsState(payload, state)
+	}
 	rev := &model.CanvasRevision{
 		ID:           revID,
 		DocumentID:   doc.ID,
 		ParentID:     doc.HeadRevisionID,
 		RevisionType: "snapshot",
-		Payload:      datatypes.JSON(doc.CurrentData),
+		Payload:      payload,
 		AuthorUserID: &doc.OwnerUserID,
 		Label:        &label,
 		ContentHash:  &newHash,
@@ -420,6 +439,34 @@ func maybeCollabCheckpoint(tx *gorm.DB, doc *model.CanvasDocument, now time.Time
 	}
 	doc.HeadRevisionID = &revID
 	return pruneAutomaticCheckpoints(tx, doc.ID)
+}
+
+func latestYjsSnapshotPayload(tx *gorm.DB, docID uuid.UUID) ([]byte, bool) {
+	var row model.DocOperation
+	err := tx.Where("document_id = ? AND kind = ?", docID, collabOpSnapshot).
+		Order("seq DESC").Limit(1).First(&row).Error
+	if err != nil || len(row.Payload) == 0 {
+		return nil, false
+	}
+	return row.Payload, true
+}
+
+func attachYjsState(existing datatypes.JSON, state []byte) datatypes.JSON {
+	var m map[string]interface{}
+	if len(existing) > 0 {
+		if err := json.Unmarshal(existing, &m); err != nil {
+			m = map[string]interface{}{}
+		}
+	}
+	if m == nil {
+		m = map[string]interface{}{}
+	}
+	m["yjsState"] = base64.StdEncoding.EncodeToString(state)
+	raw, err := json.Marshal(m)
+	if err != nil {
+		return existing
+	}
+	return datatypes.JSON(raw)
 }
 
 func currentDataWithHTML(existing datatypes.JSON, html string) (datatypes.JSON, error) {

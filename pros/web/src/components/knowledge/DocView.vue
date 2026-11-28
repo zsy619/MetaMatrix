@@ -329,7 +329,12 @@ async function toggleCollab() {
     token,
     ydoc,
     htmlProvider: () => html.value,
-    onError: () => {
+    onError: (err) => {
+      // 权限收回走 onRevoked / hello，不要提示「继续本地编辑」。
+      if (err && /read-only|access revoked/i.test(String(err.message || ''))) {
+        collabWritable.value = false
+        return
+      }
       ElMessage.warning('协同同步暂时不可用，已继续本地编辑')
     },
     onHello: (info) => {
@@ -339,6 +344,10 @@ async function toggleCollab() {
       if (changed && !writable) {
         ElMessage.info('当前是只读协同，无法编辑正文')
       }
+    },
+    onRevoked: (info) => {
+      collabWritable.value = isCollabWritable(info)
+      ElMessage.info('写权限已收回，已改为只读')
     },
     onPresence: (users) => {
       if (Array.isArray(users)) presence.value = users as PresenceUser[]

@@ -215,7 +215,7 @@ func (h *CollabHandler) ServeWS(ctx context.Context, c *app.RequestContext) {
 		h.hub.add(client)
 		defer h.depart(client)
 
-		_ = client.writeJSON(wsOut{Type: "hello", CanWrite: access.CanWrite, Role: access.Role})
+		_ = client.writeJSON(wsOut{Type: "hello", CanWrite: boolPtr(access.CanWrite), Role: access.Role})
 
 		if ops, err := h.svc.List(uid, docID, 0, 0); err == nil {
 			payload := wsOut{Type: "ops", Ops: make([]operationJSON, 0, len(ops))}
@@ -232,7 +232,7 @@ func (h *CollabHandler) ServeWS(ctx context.Context, c *app.RequestContext) {
 
 		done := make(chan struct{})
 		defer close(done)
-		go keepCollabAlive(client, done)
+		go h.keepCollabAlive(client, done)
 
 		conn.SetReadLimit(maxCollabPayloadJSON)
 		_ = conn.SetReadDeadline(time.Now().Add(collabPongWait))
@@ -273,7 +273,8 @@ type wsOut struct {
 	Users    []service.PresenceUser `json:"users,omitempty"`
 	Message  string                 `json:"message,omitempty"`
 	Seq      int64                  `json:"seq,omitempty"`
-	CanWrite bool                   `json:"canWrite,omitempty"`
+	// canWrite 必须能发出 false：omitempty 会把「已收回写权限」丢掉，前端会误当成仍可写。
+	CanWrite *bool                  `json:"canWrite,omitempty"`
 	Role     string                 `json:"role,omitempty"`
 	Payload  string                 `json:"payload,omitempty"`
 	UserID   string                 `json:"userId,omitempty"`
@@ -287,6 +288,9 @@ func (h *CollabHandler) handleWSMessage(client *collabClient, message []byte) {
 	}
 	switch in.Type {
 	case "ping":
+		if !h.enforceAccess(client) {
+			return
+		}
 		_ = client.writeJSON(wsOut{Type: "pong"})
 		_ = h.svc.Heartbeat(client.userID, client.docID, true, in.Cursor)
 	case "sync":
@@ -301,8 +305,7 @@ func (h *CollabHandler) handleWSMessage(client *collabClient, message []byte) {
 		}
 		_ = client.writeJSON(out)
 	case "update":
-		if err := h.refreshWriteAccess(client); err != nil || !client.canWrite {
-			_ = client.writeJSON(wsOut{Type: "error", Message: "collab room is read-only"})
+		if !h.enforceAccess(client) {
 			return
 		}
 		raw, err := base64.StdEncoding.DecodeString(in.Payload)
@@ -317,8 +320,7 @@ func (h *CollabHandler) handleWSMessage(client *collabClient, message []byte) {
 		})
 		if err != nil {
 			if isCollabWriteDenied(err) {
-				client.canWrite = false
-				_ = client.writeJSON(wsOut{Type: "error", Message: "collab room is read-only"})
+				h.revokeAndKick(client, "collab room is read-only")
 				return
 			}
 			_ = client.writeJSON(wsOut{Type: "error", Message: "append failed"})
@@ -361,9 +363,65 @@ type collabClient struct {
 	userID   uuid.UUID
 	canWrite bool
 	role     string
+	kicked   bool
 	mu       sync.Mutex
 	// writeFn 便于单测注入，不经过真实 WebSocket。
 	writeFn func(v any) error
+	// closeFn 便于单测注入关闭；生产环境关闭底层连接，打断 ReadMessage。
+	closeFn func()
+}
+
+func boolPtr(v bool) *bool { return &v }
+
+func canWriteOf(msg wsOut) bool {
+	return msg.CanWrite != nil && *msg.CanWrite
+}
+
+func (c *collabClient) closeConn() {
+	c.mu.Lock()
+	if c.kicked {
+		c.mu.Unlock()
+		return
+	}
+	c.kicked = true
+	closeFn := c.closeFn
+	conn := c.conn
+	c.mu.Unlock()
+	if closeFn != nil {
+		closeFn()
+		return
+	}
+	if conn != nil {
+		_ = conn.Close()
+	}
+}
+
+// enforceAccess 在写入或心跳时重新鉴权。
+// 写权限被收回，或鉴权失败时：通知前端立刻只读，并关掉已建立的套接字（不只拒绝这一次 update）。
+// 本来就是浏览者的连接保持打开，以便继续收增量。
+func (h *CollabHandler) enforceAccess(client *collabClient) bool {
+	wasWrite := client.canWrite
+	err := h.refreshWriteAccess(client)
+	if err != nil {
+		h.revokeAndKick(client, "collab access revoked")
+		return false
+	}
+	if wasWrite && !client.canWrite {
+		h.revokeAndKick(client, "collab room is read-only")
+		return false
+	}
+	return true
+}
+
+func (h *CollabHandler) revokeAndKick(client *collabClient, reason string) {
+	client.canWrite = false
+	_ = client.writeJSON(wsOut{
+		Type:     "revoked",
+		CanWrite: boolPtr(false),
+		Role:     client.role,
+		Message:  reason,
+	})
+	client.closeConn()
 }
 
 const (
@@ -395,7 +453,7 @@ func (h *CollabHandler) refreshWriteAccess(client *collabClient) error {
 	client.canWrite = access.CanWrite
 	client.role = access.Role
 	if changed {
-		_ = client.writeJSON(wsOut{Type: "hello", CanWrite: access.CanWrite, Role: access.Role})
+		_ = client.writeJSON(wsOut{Type: "hello", CanWrite: boolPtr(access.CanWrite), Role: access.Role})
 	}
 	return nil
 }
@@ -412,7 +470,7 @@ func (c *collabClient) writeRaw(messageType int, data []byte) error {
 	return c.conn.WriteMessage(messageType, data)
 }
 
-func keepCollabAlive(client *collabClient, done <-chan struct{}) {
+func (h *CollabHandler) keepCollabAlive(client *collabClient, done <-chan struct{}) {
 	ticker := time.NewTicker(collabPingInterval)
 	defer ticker.Stop()
 	for {
@@ -420,6 +478,9 @@ func keepCollabAlive(client *collabClient, done <-chan struct{}) {
 		case <-done:
 			return
 		case <-ticker.C:
+			if !h.enforceAccess(client) {
+				return
+			}
 			if err := client.writeRaw(websocket.PingMessage, nil); err != nil {
 				return
 			}
