@@ -169,6 +169,11 @@ func (s *Service) dependentTableIDs(ctx context.Context, targetTableID uuid.UUID
 		        AND (config->>'targetTableId' = ? OR config->>'targetTableId' = ?)`,
 			lower, upper).
 		Scan(&ids).Error; err != nil {
+		// 字段表还不存在（老库未迁移 / 精简影子库）→ 视为「没有依赖方」。
+		// 反查只是加速用的旁路，不能因为它把写入路径搞挂。
+		if isMissingTable(err) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	return ids, nil

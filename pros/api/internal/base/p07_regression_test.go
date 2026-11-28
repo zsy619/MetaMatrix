@@ -126,8 +126,11 @@ func TestBatchUpdateSelectCountNotLinearInRows(t *testing.T) {
 // TestKeywordSearchSkipsJSONBranchWhenNoJSONField 锁住关键字检索的分支裁剪。
 //
 // 关键字检索最贵的一段是 JSON 分支：`value_json::text ILIKE ?`
-// 每行都要把 JSONB 序列化成文本，而且**走不了任何索引**。
-// 所以表里没有 JSON 类字段时，这条分支必须整个消失。
+// 每行都要把 JSON 序列化成文本，而且**走不了任何索引**。
+//
+// 现在 JSON 字段的可搜内容（附件名 / 成员 ID / 关联记录 ID）
+// 由 `projectionRow` 落进 value_text，于是它们跟着文本字段走索引，
+// **这条分支整条消失** —— 无论表里有没有 JSON 字段。
 func TestKeywordSearchSkipsJSONBranchWhenNoJSONField(t *testing.T) {
 	f := newConcFixture(t)
 	ctx := context.Background()
@@ -138,13 +141,13 @@ func TestKeywordSearchSkipsJSONBranchWhenNoJSONField(t *testing.T) {
 	}
 	cond, _, complete := f.svc.compileKeyword(ctx, f.projectID, f.tableID, idx, "关键字")
 	if strings.Contains(cond, "value_json") {
-		t.Fatalf("没有 JSON 字段的表不应拼出 JSON 检索分支，实际条件：%s", cond)
+		t.Fatalf("检索条件不应出现 JSON 分支，实际条件：%s", cond)
 	}
 	if complete == nil {
 		t.Fatalf("纯文本表的关键字检索应能拿到完整命中集合")
 	}
 
-	// 加一个 JSON 字段（附件）后，JSON 分支必须出现。
+	// 加一个 JSON 字段（附件）后，**仍然不能**出现 JSON 分支。
 	jsonMeta, err := f.svc.CreateField(ctx, f.userA, f.projectID, f.tableID, FieldInput{
 		Name: "附件字段", Type: string(FieldAttachment),
 	})
@@ -155,14 +158,38 @@ func TestKeywordSearchSkipsJSONBranchWhenNoJSONField(t *testing.T) {
 	if err != nil {
 		t.Fatalf("重新加载字段索引失败：%v", err)
 	}
-	cond2, _, complete2 := f.svc.compileKeyword(ctx, f.projectID, f.tableID, idx2, "关键字")
-	if !strings.Contains(cond2, "value_json") {
-		t.Fatalf("有 JSON 字段时应拼出 JSON 检索分支，实际条件：%s", cond2)
+	cond2, _, _ := f.svc.compileKeyword(ctx, f.projectID, f.tableID, idx2, "关键字")
+	if strings.Contains(cond2, "value_json") {
+		t.Fatalf("有 JSON 字段时也不应拼出 JSON 检索分支，实际条件：%s", cond2)
 	}
-	if complete2 != nil {
-		t.Fatalf("存在 JSON 字段时命中集合不完整，不应返回完整集合")
+	// JSON 字段的可搜文本要落到 value_text —— 投影行里必须有内容。
+	row, err := f.svc.CreateRecord(ctx, f.userA, f.projectID, f.tableID, RecordInput{
+		Fields: map[string]any{
+			f.fieldA.String(): "初值",
+			jsonMeta.ID:       []string{"季度报表.xlsx"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("创建记录失败：%v", err)
 	}
-	_ = jsonMeta
+	var proj BaseRecordValue
+	if err := f.db.Where("record_id = ? AND field_id = ?", row.ID, uuid.MustParse(jsonMeta.ID)).
+		First(&proj).Error; err != nil {
+		t.Fatalf("读取投影失败：%v", err)
+	}
+	if !strings.Contains(proj.ValueText, "季度报表.xlsx") {
+		t.Fatalf("JSON 字段的可搜文本未落到 value_text，实际：%q", proj.ValueText)
+	}
+	// 附件名应该能被关键字搜到。
+	res, err := f.svc.Query(ctx, f.userA, f.projectID, QueryRequest{
+		TableID: f.tableID.String(), PageSize: 50, Keyword: "季度报表",
+	})
+	if err != nil {
+		t.Fatalf("关键字查询失败：%v", err)
+	}
+	if res.Total != 1 || len(res.Records) != 1 || res.Records[0].ID != row.ID {
+		t.Fatalf("附件名应能被关键字命中，实际 total=%d rows=%d", res.Total, len(res.Records))
+	}
 }
 
 // TestCrossTableDependencyEdgePersisted 锁住跨表依赖边（A-06）。

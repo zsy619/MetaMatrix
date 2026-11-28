@@ -204,6 +204,10 @@ func AutoMigrate(gdb *gorm.DB) error {
 	if err := ensureBaseAuditChangeSet(gdb); err != nil {
 		log.Printf("ensureBaseAuditChangeSet warning: %v", err)
 	}
+	// JSON 型投影补可搜文本：让附件 / 成员 / 关联记录也能走索引检索。
+	if err := ensureBaseSearchableText(gdb); err != nil {
+		log.Printf("ensureBaseSearchableText warning: %v", err)
+	}
 	if err := ensureBaseRecordSortOrder(gdb); err != nil {
 		log.Printf("ensureBaseRecordSortOrder warning: %v", err)
 	}

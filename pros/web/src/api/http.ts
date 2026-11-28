@@ -22,6 +22,16 @@ export class ApiError extends Error {
   code?: string
   body?: unknown
   requestId?: string
+  /**
+   * detail 是服务端给的**具体原因**（如 SQL 报错原文）。
+   *
+   * 为什么单独留一个字段而不是拼进 message：
+   * message 是「面向人的一句话」，detail 是「排障用的原文」。
+   * 服务端 500 的 message 往往是「服务器错误」这种没有信息量的文案，
+   * 光看它没法定位问题；detail 里有真正的因果
+   * （如 `table name "sv" specified more than once`）。
+   */
+  detail?: string
 
   constructor(status: number, message: string, code?: string, body?: unknown) {
     super(message)
@@ -217,7 +227,12 @@ async function performOnce(
   }
 
   if (!res.ok) {
-    const obj = (data || {}) as { message?: string; code?: string; requestId?: string }
+    const obj = (data || {}) as {
+      message?: string
+      code?: string
+      requestId?: string
+      detail?: string
+    }
     const err = new ApiError(
       res.status,
       obj.message || res.statusText || 'request failed',
@@ -225,6 +240,16 @@ async function performOnce(
       data,
     )
     if (obj.requestId) err.requestId = obj.requestId
+    // 服务端的 detail 是具体原因。5xx 时 message 多半是「服务器错误」这种
+    // 没有信息量的文案，把 detail 拼进去，界面才能直接看出问题在哪
+    // （例如多字段排序的 `table name "sv" specified more than once`）。
+    const detail = typeof obj.detail === 'string' ? obj.detail.trim() : ''
+    if (detail) {
+      err.detail = detail
+      if (res.status >= 500 && !err.message.includes(detail)) {
+        err.message = `${err.message}：${detail}`
+      }
+    }
     throw err
   }
 

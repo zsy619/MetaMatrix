@@ -2679,6 +2679,16 @@ func projectionRow(handler FieldHandler, tableID, recordID, fieldID, tenantID uu
 	case ProjectedJSON:
 		raw, _ := json.Marshal(value)
 		row.ValueJSON = raw
+		// **同时落一份可搜文本**（附件名 / 成员 ID / 关联记录 ID …）。
+		//
+		// 为什么：关键字检索原来对 JSON 字段走 `value_json::text ILIKE ?` ——
+		// 这条分支每行都要把 JSONB 序列化成文本，而且**走不了任何索引**
+		//（jsonb::text 不是 IMMUTABLE，建不了表达式索引），
+		// 是整个检索路径上最贵的一段。
+		//
+		// 可搜文本落到 value_text 之后，JSON 字段就能跟着文本字段
+		// 一起走 GIN 三值组索引，JSON 分支可以整体去掉。
+		row.ValueText = searchableJSONText(value)
 	default:
 		row.ValueText = handler.Text(value)
 	}

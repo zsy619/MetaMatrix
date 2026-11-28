@@ -58,17 +58,19 @@ func (s *Service) compileKeyword(
 	parts := make([]string, 0, 3)
 	args := make([]any, 0, 8)
 	// 文本投影：普通文本 / 长文本 / 单选 / 公式 / 关联文档 / 联系人。
+	//
+	// **JSON 投影（附件 / 成员 / 关联记录）也归到这里** ——
+	// 它们的可搜内容（文件名 / 成员 ID / 关联记录 ID）已经由
+	// `projectionRow` 顺手落进 value_text，
+	// 于是可以跟着文本字段一起走 GIN 三值组索引。
+	//
+	// 旧实现对 JSON 走的是 `value_json::text ILIKE ?`：
+	// 每行都要把 JSONB 序列化成文本再比，而且**走不了任何索引**
+	//（`jsonb::text` 不是 IMMUTABLE，建不了表达式索引）——
+	// 这是整个检索路径上最贵的一段。现在它整条消失了。
 	if len(textIDs) > 0 {
 		parts = append(parts, "r.id IN (SELECT v.record_id FROM base_record_values v WHERE v.table_id = ? AND v.field_id IN ? AND v.value_text ILIKE ?)")
 		args = append(args, tableID, textIDs, like)
-	}
-	// JSON 投影：附件 / 成员 / 关联记录等（值里带文件名或 ID）。
-	//
-	// 只有表里真的存在 JSON 字段时才拼这一支：没有就直接省掉，
-	// 这是最贵的一段（每行都要把 JSON 序列化成文本）。
-	if len(jsonIDs) > 0 {
-		parts = append(parts, "r.id IN (SELECT vj.record_id FROM base_record_values vj WHERE vj.table_id = ? AND vj.field_id IN ? AND vj.value_json IS NOT NULL AND vj.value_json::text ILIKE ?)")
-		args = append(args, tableID, jsonIDs, like)
 	}
 	// 「关联文档」按**文档标题**检索：先在目录树里找标题命中的节点，
 	// 再回表匹配 doc 字段的投影值。
@@ -170,6 +172,14 @@ func buildDocTitleBranch(tableID uuid.UUID, docFieldIDs []uuid.UUID, nodeIDs []s
 //
 // 只有 ProjectedText 的字段会写 value_text；数字 / 日期 / 布尔只写各自的类型列，
 // value_text 恒为空 —— 把它们放进搜索范围既搜不到东西，又要多扫一遍投影。
+//
+// **JSON 投影字段也算文本可搜**：`projectionRow` 给它们额外落了一份
+// 可搜文本（附件名 / 成员 ID / 关联记录 ID）到 value_text，
+// 所以检索时它们与文本字段走同一条（可走索引的）分支。
+//
+// jsonIDs 仍然返回 —— 调用方用它判断「命中集合是否完整」
+// （JSON 字段的可搜文本是**投影时快照**，不是实时值，
+// 严格说与实时 JSON 内容可能有出入，所以不进入「完整命中集合」快路径）。
 func keywordFieldIDs(idx *fieldIndex) (textIDs []uuid.UUID, jsonIDs []uuid.UUID) {
 	textIDs = make([]uuid.UUID, 0, len(idx.byID))
 	jsonIDs = make([]uuid.UUID, 0, 2)
@@ -180,7 +190,10 @@ func keywordFieldIDs(idx *fieldIndex) (textIDs []uuid.UUID, jsonIDs []uuid.UUID)
 		}
 		switch handler.ProjectedType() {
 		case ProjectedJSON:
+			// 走文本分支（可搜文本已落到 value_text），但仍记进 jsonIDs：
+			// 命中集合不再算「完整」，避免快路径漏结果。
 			jsonIDs = append(jsonIDs, id)
+			textIDs = append(textIDs, id)
 		case ProjectedText:
 			textIDs = append(textIDs, id)
 		}

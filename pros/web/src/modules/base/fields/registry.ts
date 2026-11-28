@@ -298,6 +298,20 @@ export function isComputedField(type: string): boolean {
   return registry.get(type as FieldType)?.computed === true;
 }
 
+/**
+ * 是否是「**快照型**计算字段」（引用 / 汇总）。
+ *
+ * 与 `isComputedField` 的区别：后者把公式、创建时间这类字段也算进去 ——
+ * 它们的值是**写入时算好的**，永远是新的；
+ * 而引用 / 汇总的值是「最近一次**重算**的结果」，
+ * 改了关联表之后要等服务端重算完才准（重算也可能失败）。
+ *
+ * 所以只有这两类字段需要在界面上提示「值可能过期」。
+ */
+export function isSnapshotField(type: string): boolean {
+  return type === "lookup" || type === "rollup";
+}
+
 /** 全部内置字段插件。 */
 export function allFieldPlugins(): FieldPlugin[] {
   return plugins;
