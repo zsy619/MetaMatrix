@@ -66,7 +66,9 @@ type KnowledgeDocVersion struct {
 	AuthorUserID uuid.UUID `gorm:"type:uuid;not null;index" json:"authorUserId"`
 	SaveVersion  int64     `gorm:"not null;default:0" json:"saveVersion"`
 	// Label 是版本备注：如「发布版」。
-	Label     string    `gorm:"type:varchar(64);not null;default:''" json:"label"`
+	Label string `gorm:"type:varchar(64);not null;default:''" json:"label"`
+	// YjsState 是协同整包（base64）。空表示该版本只有 HTML 快照，不是完整版本树。
+	YjsState  string    `gorm:"type:text;not null;default:''" json:"yjsState,omitempty"`
 	CreatedAt time.Time `gorm:"type:timestamptz;not null;index:idx_kdv_doc,priority:2,sort:desc" json:"createdAt"`
 }
 

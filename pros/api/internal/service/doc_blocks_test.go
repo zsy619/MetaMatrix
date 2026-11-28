@@ -3,6 +3,7 @@ package service
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"metamatrix/api/internal/model"
 
@@ -291,5 +292,39 @@ func TestRebuildPageReferencesSetsSourceBlockID(t *testing.T) {
 	}
 	if refs[0].TargetDocID != targetDoc || refs[0].SourceBlockID == nil || refs[0].SourceBlockID.String() != src {
 		t.Fatalf("page ref = %+v", refs[0])
+	}
+}
+
+func TestDocBlockSaveRemapsCommentOffset(t *testing.T) {
+	db := openDocumentsSQLite(t)
+	if err := db.AutoMigrate(&docCommentSQLite{}); err != nil {
+		t.Fatal(err)
+	}
+	svc, ownerID, doc := newDocumentFixture(t, db)
+	id := "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+	html := `<p data-block-id="` + id + `">hello 世界</p>`
+	if _, err := svc.Update(ownerID, doc.ID, UpdateDocumentInput{CurrentData: docHTMLPayload(html)}); err != nil {
+		t.Fatal(err)
+	}
+	blockID := uuid.MustParse(id)
+	now := time.Now()
+	comment := model.DocComment{
+		ID: uuid.New(), DocID: doc.ID, AuthorUserID: ownerID,
+		Quote: "世界", Content: "改这里", Anchor: -1, AnchorFrom: 6, AnchorTo: 8,
+		BlockID: &blockID, BlockOffset: 6, CreatedAt: now, UpdatedAt: now,
+	}
+	if err := db.Create(&comment).Error; err != nil {
+		t.Fatal(err)
+	}
+	html2 := `<p data-block-id="` + id + `">ABC hello 世界</p>`
+	if _, err := svc.Update(ownerID, doc.ID, UpdateDocumentInput{CurrentData: docHTMLPayload(html2)}); err != nil {
+		t.Fatal(err)
+	}
+	var got model.DocComment
+	if err := db.Where("id = ?", comment.ID).First(&got).Error; err != nil {
+		t.Fatal(err)
+	}
+	if got.BlockID == nil || got.BlockID.String() != id || got.BlockOffset != 10 {
+		t.Fatalf("remapped comment = %+v, want offset 10", got)
 	}
 }

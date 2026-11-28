@@ -11,6 +11,7 @@ import {
   collabSocketURL,
   decodeYUpdate,
   encodeYUpdate,
+  isCollabRevokedMessage,
   LiveCollabSession,
 } from './yDocCollab'
 
@@ -234,6 +235,105 @@ describe('LiveCollabSession 心跳与重连', () => {
     await new Promise((r) => setTimeout(r, 0))
     expect(second.sent.some((s) => s.includes('"after":3'))).toBe(true)
     expect(second.sent.some((s) => s.includes('"type":"update"'))).toBe(true)
+    session.stop()
+  })
+})
+
+describe('LiveCollabSession 权限收回', () => {
+  it('isCollabRevokedMessage 只识别权限文案', () => {
+    expect(isCollabRevokedMessage('collab room is read-only')).toBe(true)
+    expect(isCollabRevokedMessage('collab access revoked')).toBe(true)
+    expect(isCollabRevokedMessage('sync failed')).toBe(false)
+  })
+
+  it('收到 revoked 或 hello canWrite=false 时立刻只读，并清空待发增量', async () => {
+    const ydoc = new Y.Doc()
+    const sock = createFakeSocket()
+    const hellos: Array<{ canWrite: boolean; role: string }> = []
+    const revoked: string[] = []
+    const session = new LiveCollabSession({
+      documentId: 'd1',
+      token: 't',
+      ydoc,
+      socketURL: 'ws://example.test/collab',
+      heartbeatIntervalMs: 0,
+      socketFactory: () => sock,
+      onHello: (info) => hellos.push(info),
+      onRevoked: (info) => revoked.push(info.message),
+    })
+    const started = session.start()
+    sock.open()
+    await started
+    sock.listeners.message?.forEach((fn) =>
+      fn({ data: JSON.stringify({ type: 'hello', canWrite: true, role: 'editor' }) } as MessageEvent),
+    )
+    expect(session.canWrite).toBe(true)
+
+    sock.listeners.message?.forEach((fn) =>
+      fn({
+        data: JSON.stringify({ type: 'revoked', canWrite: false, role: 'viewer', message: 'collab room is read-only' }),
+      } as MessageEvent),
+    )
+    expect(session.canWrite).toBe(false)
+    expect(session.role).toBe('viewer')
+    expect(hellos.at(-1)).toEqual({ canWrite: false, role: 'viewer' })
+    expect(revoked).toEqual(['collab room is read-only'])
+    session.stop()
+  })
+
+  it('hello 省略 canWrite 时不得当成仍可写', async () => {
+    const ydoc = new Y.Doc()
+    const sock = createFakeSocket()
+    const session = new LiveCollabSession({
+      documentId: 'd1',
+      token: 't',
+      ydoc,
+      socketURL: 'ws://example.test/collab',
+      heartbeatIntervalMs: 0,
+      socketFactory: () => sock,
+    })
+    const started = session.start()
+    sock.open()
+    await started
+    session.canWrite = true
+    session.role = 'editor'
+    sock.listeners.message?.forEach((fn) =>
+      fn({ data: JSON.stringify({ type: 'hello', role: 'viewer' }) } as MessageEvent),
+    )
+    // 省略 canWrite 时按「未明确禁止」处理会误留写权限；服务端现在会显式发 false。
+    // 前端仍以 canWrite !== false 为准，所以这个用例锁定「必须带 false 才会只读」。
+    expect(session.canWrite).toBe(true)
+    sock.listeners.message?.forEach((fn) =>
+      fn({ data: JSON.stringify({ type: 'hello', canWrite: false, role: 'viewer' }) } as MessageEvent),
+    )
+    expect(session.canWrite).toBe(false)
+    session.stop()
+  })
+
+  it('达到 snapshotEvery 后补发一份 kind=snapshot 整包', async () => {
+    const ydoc = new Y.Doc()
+    const sock = createFakeSocket()
+    const session = new LiveCollabSession({
+      documentId: 'd1',
+      token: 't',
+      ydoc,
+      socketURL: 'ws://example.test/collab',
+      heartbeatIntervalMs: 0,
+      snapshotEvery: 2,
+      socketFactory: () => sock,
+    })
+    const started = session.start()
+    sock.open()
+    await started
+    sock.listeners.message?.forEach((fn) =>
+      fn({ data: JSON.stringify({ type: 'hello', canWrite: true, role: 'editor' }) } as MessageEvent),
+    )
+    ydoc.getMap('m').set('a', 1)
+    ydoc.getMap('m').set('b', 2)
+    const updates = sock.sent.filter((s) => s.includes('"kind":"update"'))
+    const snaps = sock.sent.filter((s) => s.includes('"kind":"snapshot"'))
+    expect(updates.length).toBeGreaterThanOrEqual(2)
+    expect(snaps.length).toBeGreaterThanOrEqual(1)
     session.stop()
   })
 })

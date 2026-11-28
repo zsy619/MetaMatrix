@@ -151,6 +151,11 @@ func syncDocBlocks(tx *gorm.DB, docID uuid.UUID, data []byte, now time.Time) err
 					return err
 				}
 			}
+			if prev.ContentText != b.Text {
+				if err := remapDocBlockComments(tx, id, prev.ContentText, b.Text); err != nil {
+					return err
+				}
+			}
 			continue
 		}
 		row := model.DocBlock{
@@ -183,6 +188,30 @@ func syncDocBlocks(tx *gorm.DB, docID uuid.UUID, data []byte, now time.Time) err
 		}
 		if err := tx.Model(&model.DocBlock{}).Where("id = ? AND document_id = ?", row.ID, docID).
 			Update("deleted_at", now).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func remapDocBlockComments(tx *gorm.DB, blockID uuid.UUID, oldText, newText string) error {
+	if oldText == newText {
+		return nil
+	}
+	if !tx.Migrator().HasTable(&model.DocComment{}) {
+		return nil
+	}
+	var comments []model.DocComment
+	if err := tx.Where("block_id = ?", blockID).Find(&comments).Error; err != nil {
+		return err
+	}
+	for _, row := range comments {
+		off, ok := content.MapCommentAnchor(oldText, newText, row.Quote, row.BlockOffset)
+		if !ok || off == row.BlockOffset {
+			continue
+		}
+		if err := tx.Model(&model.DocComment{}).Where("id = ?", row.ID).
+			Update("block_offset", off).Error; err != nil {
 			return err
 		}
 	}

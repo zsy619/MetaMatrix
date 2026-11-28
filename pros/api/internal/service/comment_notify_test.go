@@ -33,6 +33,12 @@ func TestCommentNotifyWritesInAppAndMailAndDegradesWithoutSMTP(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if err := db.AutoMigrate(&knowledgeMemberSQLite{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.SetMemberRole(owner, project.ID, author, SpaceRoleEditor); err != nil {
+		t.Fatal(err)
+	}
 	rec := &recordingSender{}
 	svc.SetMailSender(rec)
 
@@ -122,6 +128,12 @@ func TestCommentNotifyIsIdempotentPerUserAndComment(t *testing.T) {
 	}
 	node, err := svc.CreateDocWithNode(owner, project.ID, nil, "幂等", "")
 	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.AutoMigrate(&knowledgeMemberSQLite{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.SetMemberRole(owner, project.ID, author, SpaceRoleEditor); err != nil {
 		t.Fatal(err)
 	}
 	rec := &recordingSender{}

@@ -205,16 +205,165 @@ func TestHandleWSUpdateReauthorizesAfterRevoke(t *testing.T) {
 	if client.canWrite {
 		t.Fatal("client.canWrite should be cleared after revoke")
 	}
-	var sawHello, sawReadonly bool
+	var sawHello, sawRevoked bool
 	for _, msg := range out {
-		if msg.Type == "hello" && !msg.CanWrite && msg.Role == "viewer" {
+		if msg.Type == "hello" && !canWriteOf(msg) && msg.Role == "viewer" {
 			sawHello = true
 		}
-		if msg.Type == "error" && msg.Message == "collab room is read-only" {
-			sawReadonly = true
+		if msg.Type == "revoked" && !canWriteOf(msg) && msg.Message == "collab room is read-only" {
+			sawRevoked = true
 		}
 	}
-	if !sawHello || !sawReadonly {
-		t.Fatalf("after revoke messages = %+v, want hello(canWrite=false) and read-only error", out)
+	if !sawHello || !sawRevoked {
+		t.Fatalf("after revoke messages = %+v, want hello(canWrite=false) and revoked", out)
+	}
+	if !client.kicked {
+		t.Fatal("established socket should be closed after write access is revoked")
+	}
+}
+
+func TestHandleWSPingKicksAfterRevoke(t *testing.T) {
+	backend := &revokeAwareCollab{canWrite: true, role: "editor"}
+	h := NewCollabHandler(backend, collabSecret)
+	var closed bool
+	var out []wsOut
+	client := &collabClient{
+		docID:    uuid.New(),
+		userID:   uuid.New(),
+		canWrite: true,
+		role:     "editor",
+		writeFn: func(v any) error {
+			msg, ok := v.(wsOut)
+			if !ok {
+				t.Fatalf("writeJSON got %T", v)
+			}
+			out = append(out, msg)
+			return nil
+		},
+		closeFn: func() { closed = true },
+	}
+
+	backend.mu.Lock()
+	backend.canWrite = false
+	backend.role = "viewer"
+	backend.mu.Unlock()
+
+	body, err := json.Marshal(wsIn{Type: "ping"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	h.handleWSMessage(client, body)
+	if client.canWrite {
+		t.Fatal("client.canWrite should be cleared after revoke on ping")
+	}
+	var sawRevoked bool
+	for _, msg := range out {
+		if msg.Type == "revoked" && !canWriteOf(msg) {
+			sawRevoked = true
+		}
+	}
+	if !sawRevoked || !closed {
+		t.Fatalf("ping after revoke: out=%+v closed=%v, want revoked and socket close", out, closed)
+	}
+	for _, msg := range out {
+		if msg.Type == "pong" {
+			t.Fatal("must not pong after kicking a revoked writer")
+		}
+	}
+}
+
+func TestHandleWSKeepsViewerSocket(t *testing.T) {
+	backend := &revokeAwareCollab{canWrite: false, role: "viewer"}
+	h := NewCollabHandler(backend, collabSecret)
+	var closed bool
+	var out []wsOut
+	client := &collabClient{
+		docID:    uuid.New(),
+		userID:   uuid.New(),
+		canWrite: false,
+		role:     "viewer",
+		writeFn: func(v any) error {
+			msg, ok := v.(wsOut)
+			if !ok {
+				t.Fatalf("writeJSON got %T", v)
+			}
+			out = append(out, msg)
+			return nil
+		},
+		closeFn: func() { closed = true },
+	}
+	body, err := json.Marshal(wsIn{Type: "ping"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	h.handleWSMessage(client, body)
+	if closed || client.kicked {
+		t.Fatal("viewer sockets must stay open")
+	}
+	var sawPong bool
+	for _, msg := range out {
+		if msg.Type == "pong" {
+			sawPong = true
+		}
+		if msg.Type == "revoked" {
+			t.Fatalf("viewer ping must not revoke, out=%+v", out)
+		}
+	}
+	if !sawPong {
+		t.Fatalf("viewer ping out=%+v, want pong", out)
+	}
+}
+
+func TestHandleWSKicksWhenAuthorizeFails(t *testing.T) {
+	backend := &revokeAwareCollab{canWrite: true, role: "editor"}
+	h := NewCollabHandler(backend, collabSecret)
+	var closed bool
+	var out []wsOut
+	client := &collabClient{
+		docID:    uuid.New(),
+		userID:   uuid.New(),
+		canWrite: true,
+		role:     "editor",
+		writeFn: func(v any) error {
+			msg, ok := v.(wsOut)
+			if !ok {
+				t.Fatalf("writeJSON got %T", v)
+			}
+			out = append(out, msg)
+			return nil
+		},
+		closeFn: func() { closed = true },
+	}
+	backend.mu.Lock()
+	backend.authErr = service.ErrSpaceForbidden
+	backend.mu.Unlock()
+
+	payload := base64.StdEncoding.EncodeToString([]byte{0x01})
+	body, err := json.Marshal(wsIn{Type: "update", Payload: payload})
+	if err != nil {
+		t.Fatal(err)
+	}
+	h.handleWSMessage(client, body)
+	if backend.appends != 0 {
+		t.Fatalf("append after forbidden authorize = %d", backend.appends)
+	}
+	var sawRevoked bool
+	for _, msg := range out {
+		if msg.Type == "revoked" && msg.Message == "collab access revoked" {
+			sawRevoked = true
+		}
+	}
+	if !sawRevoked || !closed {
+		t.Fatalf("authorize failure: out=%+v closed=%v, want revoked and close", out, closed)
+	}
+}
+
+func TestHelloJSONKeepsCanWriteFalse(t *testing.T) {
+	raw, err := json.Marshal(wsOut{Type: "hello", CanWrite: boolPtr(false), Role: "viewer"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), `"canWrite":false`) {
+		t.Fatalf("hello JSON dropped canWrite=false: %s", raw)
 	}
 }

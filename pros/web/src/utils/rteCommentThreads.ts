@@ -19,6 +19,8 @@ export type CommentThread = {
   resolved: boolean
   createdAt: number
   resolvedAt?: number
+  /** Yjs 相对位置（JSON 字符串）。画布评论的主锚点仍是 commentAnchor mark，这个作协同后的降级找回。 */
+  yRel?: string
   messages: CommentMessage[]
 }
 
@@ -74,12 +76,14 @@ export function normalizeCommentThreads(raw: unknown): CommentThread[] {
     if (!messages.length) continue
     const createdAt = Number(row.createdAt)
     const resolvedAt = Number(row.resolvedAt)
+    const yRel = typeof row.yRel === 'string' ? row.yRel.trim() : ''
     out.push({
       id,
       quote: String(row.quote ?? '').slice(0, 500),
       resolved: row.resolved === true,
       createdAt: Number.isFinite(createdAt) ? createdAt : messages[0]!.createdAt,
       ...(Number.isFinite(resolvedAt) ? { resolvedAt } : {}),
+      ...(yRel ? { yRel } : {}),
       messages,
     })
   }
@@ -118,15 +122,18 @@ export function createCommentThread(input: {
   author: CommentAuthor
   body: string
   now?: number
+  yRel?: string
 }): CommentThread | null {
   const body = input.body.trim()
   if (!body) return null
   const now = input.now ?? Date.now()
+  const yRel = input.yRel?.trim()
   return {
     id: input.id || createCommentId('t'),
     quote: input.quote.trim().slice(0, 500),
     resolved: false,
     createdAt: now,
+    ...(yRel ? { yRel } : {}),
     messages: [
       {
         id: createCommentId('m'),

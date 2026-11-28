@@ -13,9 +13,10 @@ import { diffDocVersions, labelDocVersion, listDocVersions, listVersionAuthors }
 import { listVersionComments } from '../../api/knowledge_v5'
 import type { DocComment } from '../../api/knowledge'
 import type { DocVersion } from '../../api/knowledge'
+import type { RestoredVersion } from './collab/yDocVersion'
 
 const props = defineProps<{ documentId: string }>()
-const emit = defineEmits<{ restored: [html: string] }>()
+const emit = defineEmits<{ restored: [payload: RestoredVersion] }>()
 
 const versions = ref<DocVersion[]>([])
 const loading = ref(false)
@@ -144,7 +145,7 @@ async function showComments(version: DocVersion) {
 }
 
 function restore(version: DocVersion) {
-  emit('restored', version.html)
+  emit('restored', { html: version.html, yjsState: version.yjsState || null })
   ElMessage.success('已载入该版本，保存后生效')
 }
 

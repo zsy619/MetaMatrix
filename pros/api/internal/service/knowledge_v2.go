@@ -426,12 +426,16 @@ func (s *KnowledgeService) BatchNodes(ownerID, projectID uuid.UUID, ids []uuid.U
 
 // GetDocProps 读文档属性；没有记录时返回默认值（draft）。
 func (s *KnowledgeService) GetDocProps(ownerID, docID uuid.UUID) (*model.DocProperty, error) {
+	doc, err := s.accessDocument(ownerID, docID, SpaceRoleViewer)
+	if err != nil {
+		return nil, err
+	}
 	var props model.DocProperty
-	err := s.db.Where("doc_id = ? AND owner_user_id = ?", docID, ownerID).First(&props).Error
+	err = s.db.Where("doc_id = ?", docID).First(&props).Error
 	if err == gorm.ErrRecordNotFound {
 		blank := &model.DocProperty{
 			DocID:       docID,
-			OwnerUserID: ownerID,
+			OwnerUserID: doc.OwnerUserID,
 			Status:      "draft",
 			CreatedAt:   time.Now().UTC(),
 			UpdatedAt:   time.Now().UTC(),
@@ -489,6 +493,9 @@ type DocPropsInput struct {
 
 // UpsertDocProps 写文档属性。
 func (s *KnowledgeService) UpsertDocProps(ownerID, docID uuid.UUID, in DocPropsInput) (*model.DocProperty, error) {
+	if _, err := s.accessDocument(ownerID, docID, SpaceRoleEditor); err != nil {
+		return nil, err
+	}
 	props, err := s.GetDocProps(ownerID, docID)
 	if err != nil {
 		return nil, err
@@ -618,6 +625,9 @@ func validateRequiredFields(props *model.DocProperty) error {
 
 // ListComments 返回一篇文档的评论（未解决的在前）。
 func (s *KnowledgeService) ListComments(ownerID, docID uuid.UUID) ([]model.DocComment, error) {
+	if _, err := s.accessDocument(ownerID, docID, SpaceRoleViewer); err != nil {
+		return nil, err
+	}
 	var rows []model.DocComment
 	err := s.db.Where("doc_id = ?", docID).
 		Order("resolved ASC").Order("created_at ASC").Find(&rows).Error
@@ -629,6 +639,9 @@ func (s *KnowledgeService) ListComments(ownerID, docID uuid.UUID) ([]model.DocCo
 
 // AddComment 加一条评论。
 func (s *KnowledgeService) AddComment(ownerID, docID uuid.UUID, parentID *uuid.UUID, quote, content string) (*model.DocComment, error) {
+	if _, err := s.accessDocument(ownerID, docID, SpaceRoleViewer); err != nil {
+		return nil, err
+	}
 	content = strings.TrimSpace(content)
 	if content == "" || utf8.RuneCountInString(content) > maxCommentRunes {
 		return nil, ErrValidation

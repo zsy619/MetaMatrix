@@ -1,6 +1,7 @@
 package service
 
 import (
+	"encoding/base64"
 	"encoding/json"
 
 	"errors"
@@ -368,6 +369,56 @@ func TestCollabDerivedExtractAndCheckpointAfterFlush(t *testing.T) {
 	}
 }
 
+func TestCollabCheckpointEmbedsYjsState(t *testing.T) {
+	db := openCollabSQLite(t)
+	docs := NewDocumentsService(db)
+	svc, ownerID, _, _ := newCollabFixture(t, db)
+	svc.compactLimit = -1
+	title := "Yjs版本"
+	canvasType := DocCanvasType
+	doc, err := docs.Create(ownerID, CreateDocumentInput{
+		Title:      &title,
+		CanvasType: &canvasType,
+		Data:       json.RawMessage(`{"type":"doc","html":"<p>初稿</p>"}`),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	html := `<p data-block-id="77777777-7777-4777-8777-777777777777">快照正文</p>`
+	if _, err := svc.Append(ownerID, doc.ID, ownerID, CollabOperationInput{
+		Kind:    collabOpSnapshot,
+		Payload: []byte{0x01, 0x02, 0x03},
+		HTML:    html,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.FlushDerived(doc.ID); err != nil {
+		t.Fatal(err)
+	}
+	fresh, err := docs.GetOwned(ownerID, doc.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fresh.HeadRevisionID == nil {
+		t.Fatal("expected checkpoint revision")
+	}
+	var rev model.CanvasRevision
+	if err := db.Where("id = ?", *fresh.HeadRevisionID).First(&rev).Error; err != nil {
+		t.Fatal(err)
+	}
+	var payload map[string]interface{}
+	if err := json.Unmarshal(rev.Payload, &payload); err != nil {
+		t.Fatal(err)
+	}
+	state, _ := payload["yjsState"].(string)
+	raw, err := base64.StdEncoding.DecodeString(state)
+	if err != nil || string(raw) != string([]byte{0x01, 0x02, 0x03}) {
+		t.Fatalf("revision yjsState = %q decoded %v, want snapshot payload", state, raw)
+	}
+	if htmlVal, _ := payload["html"].(string); !strings.Contains(htmlVal, "快照正文") {
+		t.Fatalf("revision html = %v, want 快照正文", payload["html"])
+	}
+}
 func TestCollabAppendWithoutHTMLDoesNotScheduleExtract(t *testing.T) {
 	db := openCollabSQLite(t)
 	docs := NewDocumentsService(db)
@@ -663,5 +714,52 @@ func TestFlushDerivedCompactsWhenOverLimit(t *testing.T) {
 	}
 	if kept != 2 {
 		t.Fatalf("kept after flush compact = %d, want 2 (snapshot + later update)", kept)
+	}
+}
+
+func TestAppendSnapshotCompactsEarlierOps(t *testing.T) {
+	db := openCollabSQLite(t)
+	docs := NewDocumentsService(db)
+	svc, ownerID, _, _ := newCollabFixture(t, db)
+	// 使用默认阈值：写入 snapshot 就应立刻压缩，不必等 FlushDerived。
+	title := "快照即压缩"
+	canvasType := DocCanvasType
+	doc, err := docs.Create(ownerID, CreateDocumentInput{
+		Title:      &title,
+		CanvasType: &canvasType,
+		Data:       json.RawMessage(`{"type":"doc","html":"<p>初稿</p>"}`),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Append(ownerID, doc.ID, ownerID, CollabOperationInput{Payload: []byte{0x21}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Append(ownerID, doc.ID, ownerID, CollabOperationInput{Payload: []byte{0x22}}); err != nil {
+		t.Fatal(err)
+	}
+	snap, err := svc.Append(ownerID, doc.ID, ownerID, CollabOperationInput{
+		Kind:    collabOpSnapshot,
+		Payload: []byte{0x23},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var kinds []string
+	if err := db.Model(&model.DocOperation{}).
+		Where("document_id = ?", doc.ID).
+		Order("seq asc").
+		Pluck("kind", &kinds).Error; err != nil {
+		t.Fatal(err)
+	}
+	if len(kinds) != 1 || kinds[0] != collabOpSnapshot {
+		t.Fatalf("after snapshot append kinds = %v, want only snapshot", kinds)
+	}
+	var seqs []int64
+	if err := db.Model(&model.DocOperation{}).Where("document_id = ?", doc.ID).Pluck("seq", &seqs).Error; err != nil {
+		t.Fatal(err)
+	}
+	if len(seqs) != 1 || seqs[0] != snap.Seq {
+		t.Fatalf("kept seq = %v, want [%d]", seqs, snap.Seq)
 	}
 }

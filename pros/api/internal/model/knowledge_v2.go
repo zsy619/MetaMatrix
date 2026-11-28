@@ -97,6 +97,8 @@ type DocComment struct {
 	// BlockID + BlockOffset 是块级双锚点；旧评论由 ensure*Schema 回填，对不上则留空走降级。
 	BlockID     *uuid.UUID `gorm:"type:uuid;index:idx_dc_block" json:"blockId,omitempty"`
 	BlockOffset int        `gorm:"not null;default:-1" json:"blockOffset"`
+	// YRel 是可选的 Yjs 相对位置 JSON。空时仍走 Quote / 块偏移降级。
+	YRel string `gorm:"type:text;not null;default:''" json:"yRel,omitempty"`
 	// Mentions 是被 @ 的用户 ID（逗号分隔）。
 	Mentions string `gorm:"type:varchar(512);not null;default:''" json:"mentions"`
 	// Reactions 是表情回应：{"👍": ["userId"]}。

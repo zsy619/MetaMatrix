@@ -139,4 +139,64 @@ describe('Markdown 导入导出往返与边界', () => {
     expect(again).toContain('src="https://example.com/a.png"')
     expect(again).toContain('href="https://example.com/doc"')
   })
+
+  it('四级到六级标题与 Setext 标题往返后仍在', () => {
+    const md = '#### 四级\n\n##### 五级\n\n###### 六级\n\nSetext 一级\n=======\n\nSetext 二级\n-------\n'
+    const { html, back } = roundtrip(md)
+    expect(html).toMatch(/<h4[^>]*>四级<\/h4>/)
+    expect(html).toMatch(/<h5[^>]*>五级<\/h5>/)
+    expect(html).toMatch(/<h6[^>]*>六级<\/h6>/)
+    expect(html).toMatch(/<h1[^>]*>Setext 一级<\/h1>/)
+    expect(html).toMatch(/<h2[^>]*>Setext 二级<\/h2>/)
+    expect(back).toContain('#### 四级')
+    expect(back).toContain('###### 六级')
+    expect(back).toMatch(/Setext 一级/)
+    expect(back).toMatch(/Setext 二级/)
+  })
+
+  it('反斜杠转义、行尾硬换行与自动链接往返', () => {
+    const md = '这是 \\*不是斜体\\*，上一行  \n下一行，见 <https://example.com>。'
+    const { html, back } = roundtrip(md)
+    expect(html).not.toMatch(/<em>不是斜体<\/em>|<i>不是斜体<\/i>/)
+    expect(html).toContain('不是斜体')
+    expect(html).toMatch(/<br\s*\/?>/i)
+    expect(html).toContain('href="https://example.com"')
+    expect(back).toContain('https://example.com')
+    expect(back).toContain('不是斜体')
+  })
+
+  it('嵌套引用往返后仍是引用', () => {
+    const md = '> 外层\n> > 内层'
+    const { html, back } = roundtrip(md)
+    expect(html).toContain('<blockquote')
+    expect(html).toContain('外层')
+    expect(html).toContain('内层')
+    expect(back).toMatch(/^>/m)
+    expect(back).toContain('外层')
+    expect(back).toContain('内层')
+  })
+
+  it('表格对齐标记导入后单元格内容仍在，导出仍是表格', () => {
+    const md = '| 左 | 中 | 右 |\n| :--- | :---: | ---: |\n| a | b | c |'
+    const { html, back } = roundtrip(md)
+    expect(html).toContain('<table')
+    expect(html).toContain('左')
+    expect(html).toContain('c')
+    expect(back).toContain('|')
+    expect(back).toContain('左')
+    expect(back).toContain('c')
+  })
+
+  it('粗斜体组合与图片/链接标题往返', () => {
+    const md = '这是 ***又粗又斜***，图 ![说明](https://example.com/a.png "题")，链 [文档](https://example.com/doc "悬停")。'
+    const { html, back } = roundtrip(md)
+    expect(html).toMatch(/<strong>|<b>/)
+    expect(html).toMatch(/<em>|<i>/)
+    expect(html).toContain('又粗又斜')
+    expect(html).toContain('src="https://example.com/a.png"')
+    expect(html).toContain('href="https://example.com/doc"')
+    expect(back).toContain('https://example.com/a.png')
+    expect(back).toContain('https://example.com/doc')
+    expect(back).toContain('又粗又斜')
+  })
 })

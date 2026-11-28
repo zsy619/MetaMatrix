@@ -397,6 +397,8 @@ type commentBody struct {
 	// BlockID / BlockOffset 是块级双锚点；可不传，服务端按 quote / 偏移回填。
 	BlockID     *string `json:"blockId"`
 	BlockOffset *int    `json:"blockOffset"`
+	// YRel 是可选的 Yjs 相对位置。
+	YRel string `json:"yRel"`
 }
 
 func (h *KnowledgeHandler) ListComments(ctx context.Context, c *app.RequestContext) {
@@ -460,7 +462,7 @@ func (h *KnowledgeHandler) AddComment(ctx context.Context, c *app.RequestContext
 		blockOffset = *body.BlockOffset
 	}
 	comment, err := h.svc.AddCommentDetailed(uid, docID, parentID, body.Quote, body.Content,
-		body.AnchorFrom, body.AnchorTo, body.Mentions, blockID, blockOffset)
+		body.AnchorFrom, body.AnchorTo, body.Mentions, blockID, blockOffset, body.YRel)
 	if handleKnowledgeErr(c, err) {
 		return
 	}

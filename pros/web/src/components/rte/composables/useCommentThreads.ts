@@ -12,12 +12,14 @@ import {
   type CommentThread,
   type CommentThreadsByPanelId,
 } from '../../../utils/rteCommentThreads'
+import { decodeCommentRel, encodeCommentRel } from '../../../utils/rteCommentMapping'
 
 export type CommentDraft = {
   from: number
   to: number
   quote: string
   body: string
+  yRel?: string
 }
 
 /** 选区评论：线程在画布 JSON，锚点留在正文。 */
@@ -70,7 +72,12 @@ export function useCommentThreads(deps: {
         return false
       }
     })
-    return found
+    if (found != null) return found
+    const thread = threads.value.find((item) => item.id === threadId)
+    if (!thread?.yRel) return null
+    const recovered = decodeCommentRel(ed.state, thread.yRel)
+    if (!recovered || recovered.lost) return null
+    return recovered.from
   }
 
   function removeAnchor(threadId: string) {
@@ -90,7 +97,7 @@ export function useCommentThreads(deps: {
       ElMessage.warning('请先选中要评论的文字')
       return
     }
-    draft.value = { from, to, quote: quote.slice(0, 500), body: '' }
+    draft.value = { from, to, quote: quote.slice(0, 500), body: '', yRel: encodeCommentRel(ed.state, from, to) || undefined }
     commentsOpen.value = true
     activeThreadId.value = ''
   }
@@ -104,16 +111,25 @@ export function useCommentThreads(deps: {
     const ed = deps.editor().value
     if (!pending || !ed) return
     const author = deps.author()
-    const thread = createCommentThread({ quote: pending.quote, author, body: pending.body })
+    const recovered = pending.yRel ? decodeCommentRel(ed.state, pending.yRel) : null
+    const range =
+      recovered && !recovered.lost
+        ? { from: recovered.from, to: recovered.to }
+        : { from: pending.from, to: pending.to }
+    const current = ed.state.doc.textBetween(range.from, range.to, '\n', '\n').trim()
+    let from = range.from
+    let to = range.to
+    if (current !== pending.quote) {
+      ElMessage.warning('选区已经变化，请重新选中文字再评论')
+      return
+    }
+    const yRel = encodeCommentRel(ed.state, from, to) || pending.yRel
+    const thread = createCommentThread({ quote: pending.quote, author, body: pending.body, yRel })
     if (!thread) {
       ElMessage.warning('请填写评论')
       return
     }
-    const current = ed.state.doc.textBetween(pending.from, pending.to, '\n', '\n').trim()
-    let anchored = false
-    if (current === pending.quote) {
-      anchored = ed.chain().focus().setTextSelection({ from: pending.from, to: pending.to }).setCommentAnchor(thread.id).run()
-    }
+    const anchored = ed.chain().focus().setTextSelection({ from, to }).setCommentAnchor(thread.id).run()
     if (!anchored) {
       ElMessage.warning('选区已经变化，请重新选中文字再评论')
       return
@@ -183,7 +199,15 @@ export function useCommentThreads(deps: {
       ElMessage.warning('这段文字钉不住')
       return
     }
-    persist(threads.value.map((item) => (item.id === threadId ? { ...item, quote: quote.slice(0, 500) } : item)))
+    const yRel = encodeCommentRel(ed.state, from, to) || undefined
+    persist(
+      threads.value.map((item) => {
+        if (item.id !== threadId) return item
+        const next = { ...item, quote: quote.slice(0, 500) }
+        if (yRel) next.yRel = yRel
+        return next
+      }),
+    )
     orphansOnly.value = false
     activeThreadId.value = threadId
     ElMessage.success('已重新钉住')

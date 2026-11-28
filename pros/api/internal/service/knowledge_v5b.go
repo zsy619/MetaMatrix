@@ -25,7 +25,17 @@ import (
 const maxMentionUsers = 20
 
 // AddCommentDetailed 加评论：支持划线区间锚点与 @ 成员。
-func (s *KnowledgeService) AddCommentDetailed(ownerID, docID uuid.UUID, parentID *uuid.UUID, quote, content string, anchorFrom, anchorTo int, mentions []string, blockID *uuid.UUID, blockOffset int) (*model.DocComment, error) {
+func firstYRel(values []string) string {
+	if len(values) == 0 {
+		return ""
+	}
+	return strings.TrimSpace(values[0])
+}
+
+func (s *KnowledgeService) AddCommentDetailed(ownerID, docID uuid.UUID, parentID *uuid.UUID, quote, content string, anchorFrom, anchorTo int, mentions []string, blockID *uuid.UUID, blockOffset int, yRel ...string) (*model.DocComment, error) {
+	if _, err := s.accessDocument(ownerID, docID, SpaceRoleViewer); err != nil {
+		return nil, err
+	}
 	content = strings.TrimSpace(content)
 	if content == "" || utf8.RuneCountInString(content) > maxCommentRunes {
 		return nil, ErrValidation
@@ -72,6 +82,7 @@ func (s *KnowledgeService) AddCommentDetailed(ownerID, docID uuid.UUID, parentID
 		AnchorTo:     anchorTo,
 		BlockID:      blockID,
 		BlockOffset:  blockOffset,
+		YRel:         firstYRel(yRel),
 		Mentions:     strings.Join(ids, ","),
 		Reactions:    datatypes.JSON([]byte(`{}`)),
 		Content:      content,
@@ -94,6 +105,9 @@ func (s *KnowledgeService) ToggleReaction(ownerID, commentID uuid.UUID, emoji st
 	var comment model.DocComment
 	if err := s.db.Where("id = ?", commentID).First(&comment).Error; err != nil {
 		return nil, ErrNodeNotFound
+	}
+	if _, err := s.accessDocument(ownerID, comment.DocID, SpaceRoleViewer); err != nil {
+		return nil, err
 	}
 	reactions := map[string][]string{}
 	if len(comment.Reactions) > 0 {
@@ -128,6 +142,9 @@ func (s *KnowledgeService) ToggleReaction(ownerID, commentID uuid.UUID, emoji st
 
 // MarkCommentsRead 把当前用户的评论已读位置推进到现在。
 func (s *KnowledgeService) MarkCommentsRead(ownerID, docID uuid.UUID) error {
+	if _, err := s.accessDocument(ownerID, docID, SpaceRoleViewer); err != nil {
+		return err
+	}
 	now := time.Now().UTC()
 	var read model.DocCommentRead
 	err := s.db.Where("user_id = ? AND doc_id = ?", ownerID, docID).First(&read).Error
@@ -294,9 +311,11 @@ func (s *KnowledgeService) SetDocTask(ownerID, docID uuid.UUID, index int, check
 
 // OutlineItem 是正文里的一级标题。
 type OutlineItem struct {
-	Index int    `json:"index"`
-	Level int    `json:"level"`
-	Text  string `json:"text"`
+	Index   int    `json:"index"`
+	Level   int    `json:"level"`
+	Text    string `json:"text"`
+	BlockID string `json:"blockId,omitempty"`
+	HTMLID  string `json:"htmlId,omitempty"`
 }
 
 // DocOutline 解析正文标题层级：大纲面板与目录块共用。
@@ -311,12 +330,37 @@ func (s *KnowledgeService) DocOutline(ownerID, docID uuid.UUID) ([]OutlineItem, 
 // OutlineFromHTML 从 HTML 里抽标题层级。
 func OutlineFromHTML(html string) []OutlineItem {
 	items := []OutlineItem{}
-	for _, m := range headingRe.FindAllStringSubmatch(html, -1) {
+	re := regexp.MustCompile(`(?is)<h([1-6])([^>]*)>(.*?)</h[1-6]>`)
+	for _, m := range re.FindAllStringSubmatch(html, -1) {
 		level, _ := strconv.Atoi(m[1])
-		text := strings.TrimSpace(stripHTML(m[2]))
-		items = append(items, OutlineItem{Index: len(items), Level: level, Text: text})
+		text := strings.TrimSpace(stripHTML(m[3]))
+		if text == "" {
+			continue
+		}
+		attrs := m[2]
+		items = append(items, OutlineItem{
+			Index:   len(items),
+			Level:   level,
+			Text:    text,
+			BlockID: htmlAttr(attrs, "data-block-id"),
+			HTMLID:  htmlAttr(attrs, "id"),
+		})
 	}
 	return items
+}
+
+func htmlAttr(attrs, name string) string {
+	re := regexp.MustCompile(`(?i)(?:^|\s)` + regexp.QuoteMeta(name) + `\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))`)
+	m := re.FindStringSubmatch(attrs)
+	if len(m) == 0 {
+		return ""
+	}
+	for _, g := range m[1:] {
+		if strings.TrimSpace(g) != "" {
+			return strings.TrimSpace(g)
+		}
+	}
+	return ""
 }
 
 // section 是「标题 + 其后内容」组成的一节：大纲拖拽排序按节移动。
