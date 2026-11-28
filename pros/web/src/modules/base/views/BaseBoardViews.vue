@@ -557,10 +557,6 @@ const rowsByDay = computed(() => {
 }
 
 /* 看板多选（E-02）：勾选的卡片高亮 + 左上角复选框。 */
-.base-board__card {
-  position: relative;
-}
-
 .base-board__card.is-selected {
   outline: 2px solid var(--tg-blue, #3390ec);
   outline-offset: -1px;
@@ -580,9 +576,9 @@ const rowsByDay = computed(() => {
 .base-board__card.is-selected .base-board__card-check {
   opacity: 1;
 }
-
-
-  /* 飞书看板卡片：白底 + 1px #DEE0E3 描边 + 6px 圆角 */
+/* 飞书看板卡片：白底 + 1px #DEE0E3 描边 + 6px 圆角 */
+.base-board__card {
+  position: relative;
   background: #fff;
   border: 1px solid var(--fs-border, #dee0e3);
   border-radius: 6px;
