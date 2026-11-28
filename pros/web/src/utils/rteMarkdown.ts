@@ -9,8 +9,8 @@
  * - 代码：``` 围栏代码块（含语言）、缩进代码块
  * - 表格：GFM 管道表格（含对齐行）
  * - 分隔线：--- / *** / ___
- * - 行内：转义 \X、行内代码、粗体、斜体、粗斜体、删除线、链接、图片、
- *         引用式链接、自动链接、硬换行
+ * - 行内：转义 \X、行内代码、粗体、斜体、粗斜体、删除线、高亮（==文字==）、链接、图片、
+ *         引用式链接、脚注（[^id] / [^id]: 注文）、自动链接、硬换行
  *
  * 安全约定：
  * - 危险协议（javascript: / data:）的链接按纯文本输出；
@@ -29,8 +29,12 @@ export type MarkdownToHtmlOptions = {
 
 type LinkDef = { url: string; title?: string }
 
+type FootnoteDef = { label: string; text: string; n: number }
+
 type Ctx = {
   refs: Map<string, LinkDef>
+  footnotes: Map<string, FootnoteDef>
+  footnoteSeq: number
   softBreak: SoftBreakMode
 }
 
@@ -166,7 +170,7 @@ export function renderInlineMarkdown(source: string, ctx: Ctx): string {
     const ch = text[i]
 
     // 反斜杠转义
-    if (ch === '\\' && i + 1 < text.length && /[\\`*{}\[\]()#+\-.!_>~|]/.test(text[i + 1]!)) {
+    if (ch === '\\' && i + 1 < text.length && /[\\`*{}\[\]()#+\-.!_>~|=]/.test(text[i + 1]!)) {
       out += escapeText(text[i + 1]!)
       i += 2
       continue
@@ -199,6 +203,28 @@ export function renderInlineMarkdown(source: string, ctx: Ctx): string {
       }
     }
 
+    // 脚注引用 [^label]
+    if (ch === '[' && text[i + 1] === '^') {
+      const close = text.indexOf(']', i + 2)
+      if (close > i + 2) {
+        const label = text.slice(i + 2, close)
+        if (label && !/[\s\]]/.test(label)) {
+          const def = ctx.footnotes.get(label.trim().toLowerCase())
+          if (def) {
+            if (!def.n) {
+              ctx.footnoteSeq += 1
+              def.n = ctx.footnoteSeq
+            }
+            const id = escapeAttr(`fn-${def.label}`)
+            const note = escapeAttr(def.text)
+            out += `<sup class="rte-footnote" data-type="footnote" data-fn-id="${id}" data-fn-text="${note}" title="${note}" data-fn-n="${def.n}">${def.n}</sup>`
+            i = close + 1
+            continue
+          }
+        }
+      }
+    }
+
     // 链接（行内式 / 引用式）
     if (ch === '[') {
       const link = parseInlineLink(text, i) ?? parseReferenceLink(text, i, ctx)
@@ -219,6 +245,16 @@ export function renderInlineMarkdown(source: string, ctx: Ctx): string {
       const match = /^<((?:https?|mailto|tel):[^>\s]+)>/.exec(text.slice(i))
       if (match) {
         out += `<a href="${escapeAttr(match[1]!)}" class="rte-link">${escapeText(match[1]!)}</a>`
+        i += match[0].length
+        continue
+      }
+    }
+
+    // 高亮 ==文字==
+    if (ch === '=' && text[i + 1] === '=') {
+      const match = /^==([^=\n][^=\n]*?)==/.exec(text.slice(i))
+      if (match) {
+        out += `<mark>${renderInlineMarkdown(match[1] ?? '', ctx)}</mark>`
         i += match[0].length
         continue
       }
@@ -321,6 +357,7 @@ const RE_QUOTE = /^ {0,3}>\s?(.*)$/
 const RE_UL = /^(\s*)([-*+])(\s+)(.*)$/
 const RE_OL = /^(\s*)(\d{1,9})([.)])(\s+)(.*)$/
 const RE_REF_DEF = /^ {0,3}\[([^\]]+)\]:\s*(<[^>]*>|\S+)(?:\s+(?:"([^"]*)"|'([^']*)'|\(([^)]*)\)))?\s*$/
+const RE_FOOTNOTE_DEF = /^ {0,3}\[\^([^\]\s]+)\]:(?:\s+(.*))?$/
 const RE_SETEXT = /^ {0,3}(=+|-+)\s*$/
 
 function isBlockStart(line: string): boolean {
@@ -347,14 +384,14 @@ function parseBlocks(lines: string[], ctx: Ctx): string[] {
       continue
     }
 
-    // 引用式链接定义
+    // 引用式链接定义（脚注定义已在前置收集里抽走，这里再拦一层以免把 [^id] 当成链接）
     const refDef = RE_REF_DEF.exec(line)
-    if (refDef && !line.trim().startsWith('>')) {
+    if (refDef && !line.trim().startsWith('>') && !RE_FOOTNOTE_DEF.test(line)) {
       const key = (refDef[1] ?? '').trim().toLowerCase()
       let url = refDef[2] ?? ''
       if (url.startsWith('<') && url.endsWith('>')) url = url.slice(1, -1)
       const title = refDef[3] ?? refDef[4] ?? refDef[5]
-      if (key && !ctx.refs.has(key)) {
+      if (key && !key.startsWith('^') && !ctx.refs.has(key)) {
         ctx.refs.set(key, { url: unescapeMarkdown(url), title: title ? unescapeMarkdown(title) : undefined })
       }
       i += 1
@@ -630,43 +667,78 @@ function parseList(lines: string[], start: number, ctx: Ctx): ListResult {
 export function markdownToHtml(md: string, options: MarkdownToHtmlOptions = {}): string {
   const src = normalizeSource(md)
   if (!src.trim()) return '<p></p>'
-  const ctx: Ctx = { refs: new Map(), softBreak: options.softBreak ?? 'br' }
-  // 引用式链接的定义可以出现在文档任意位置，先全量收集再解析正文。
+  const ctx: Ctx = { refs: new Map(), footnotes: new Map(), footnoteSeq: 0, softBreak: options.softBreak ?? 'br' }
+  // 引用式链接和脚注定义可以出现在文档任意位置，先全量收集再解析正文。
   const lines = collectReferenceDefinitions(src.split('\n'), ctx)
   const html = parseBlocks(lines, ctx).join('\n')
   return html || '<p></p>'
 }
 
-/** 抽出引用式链接定义（跳过代码块内部），返回剩余正文行。 */
+/** 抽出引用式链接定义与脚注定义（跳过代码块内部），返回剩余正文行。 */
 function collectReferenceDefinitions(lines: string[], ctx: Ctx): string[] {
   const rest: string[] = []
   let fenceMarker = ''
-  for (const line of lines) {
+  let i = 0
+  while (i < lines.length) {
+    const line = lines[i] ?? ''
     const fence = RE_FENCE.exec(line)
     if (fence) {
       const marker = fence[1]![0]!
       if (!fenceMarker) fenceMarker = marker
       else if (marker === fenceMarker) fenceMarker = ''
       rest.push(line)
+      i += 1
       continue
     }
     if (!fenceMarker) {
+      const note = RE_FOOTNOTE_DEF.exec(line)
+      if (note) {
+        const label = (note[1] ?? '').trim()
+        const key = label.toLowerCase()
+        const chunks: string[] = [note[2] ?? '']
+        i += 1
+        while (i < lines.length) {
+          const current = lines[i] ?? ''
+          if (!current.trim()) {
+            const following = lines[i + 1] ?? ''
+            if (/^ {2,}\S/.test(following) || /^ {2,}/.test(following) && following.trim()) {
+              chunks.push('')
+              i += 1
+              continue
+            }
+            break
+          }
+          if (/^ {2,}/.test(current)) {
+            chunks.push(current.replace(/^ {2,}/, ''))
+            i += 1
+            continue
+          }
+          break
+        }
+        const textBody = chunks.join('\n').trim()
+        if (key && !ctx.footnotes.has(key)) {
+          ctx.footnotes.set(key, { label, text: textBody, n: 0 })
+        }
+        continue
+      }
       const def = RE_REF_DEF.exec(line)
       if (def) {
         const key = (def[1] ?? '').trim().toLowerCase()
         let url = def[2] ?? ''
         if (url.startsWith('<') && url.endsWith('>')) url = url.slice(1, -1)
         const title = def[3] ?? def[4] ?? def[5]
-        if (key && !ctx.refs.has(key)) {
+        if (key && !key.startsWith('^') && !ctx.refs.has(key)) {
           ctx.refs.set(key, {
             url: unescapeMarkdown(url),
             title: title ? unescapeMarkdown(title) : undefined,
           })
         }
+        i += 1
         continue
       }
     }
     rest.push(line)
+    i += 1
   }
   return rest
 }
