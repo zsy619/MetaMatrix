@@ -763,3 +763,213 @@ func TestAppendSnapshotCompactsEarlierOps(t *testing.T) {
 		t.Fatalf("kept seq = %v, want [%d]", seqs, snap.Seq)
 	}
 }
+
+func TestCompactOperationsIsIdempotentAfterPrefixRemoved(t *testing.T) {
+	db := openCollabSQLite(t)
+	docs := NewDocumentsService(db)
+	svc, ownerID, _, _ := newCollabFixture(t, db)
+	svc.compactLimit = -1
+	title := "压缩幂等"
+	canvasType := DocCanvasType
+	doc, err := docs.Create(ownerID, CreateDocumentInput{
+		Title:      &title,
+		CanvasType: &canvasType,
+		Data:       json.RawMessage(`{"type":"doc","html":"<p>初稿</p>"}`),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Append(ownerID, doc.ID, ownerID, CollabOperationInput{Payload: []byte{0x31}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Append(ownerID, doc.ID, ownerID, CollabOperationInput{Payload: []byte{0x32}}); err != nil {
+		t.Fatal(err)
+	}
+	snap, err := svc.Append(ownerID, doc.ID, ownerID, CollabOperationInput{
+		Kind:    collabOpSnapshot,
+		Payload: []byte{0x33},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := svc.CompactOperations(doc.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.Reason != "compacted_before_snapshot" || first.Deleted != 2 || first.Kept != 1 || first.SnapshotSeq != snap.Seq {
+		t.Fatalf("first compact = %+v, want deleted 2 kept 1", first)
+	}
+	second, err := svc.CompactOperations(doc.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if second.Reason != "already_compacted" || second.Deleted != 0 || second.Kept != 1 || second.SnapshotSeq != snap.Seq {
+		t.Fatalf("second compact = %+v, want already_compacted", second)
+	}
+}
+
+func TestMaybeCompactIgnoresGrowthAfterSnapshot(t *testing.T) {
+	db := openCollabSQLite(t)
+	docs := NewDocumentsService(db)
+	svc, ownerID, _, _ := newCollabFixture(t, db)
+	svc.compactLimit = -1
+	title := "快照后增长不触发压缩"
+	canvasType := DocCanvasType
+	doc, err := docs.Create(ownerID, CreateDocumentInput{
+		Title:      &title,
+		CanvasType: &canvasType,
+		Data:       json.RawMessage(`{"type":"doc","html":"<p>初稿</p>"}`),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Append(ownerID, doc.ID, ownerID, CollabOperationInput{
+		Kind:    collabOpSnapshot,
+		Payload: []byte{0x41},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 5; i++ {
+		if _, err := svc.Append(ownerID, doc.ID, ownerID, CollabOperationInput{Payload: []byte{byte(0x42 + i)}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	idle, err := svc.CompactOperations(doc.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if idle.Reason != "already_compacted" || idle.Kept != 6 {
+		t.Fatalf("compact with only post-snapshot ops = %+v, want already_compacted kept=6", idle)
+	}
+	svc.compactLimit = 3
+	if err := svc.FlushDerived(doc.ID); err != nil {
+		t.Fatal(err)
+	}
+	var kept int64
+	if err := db.Model(&model.DocOperation{}).Where("document_id = ?", doc.ID).Count(&kept).Error; err != nil {
+		t.Fatal(err)
+	}
+	if kept != 6 {
+		t.Fatalf("kept after flush = %d, want 6 (snapshot 后的增量不应被阈值误删)", kept)
+	}
+}
+
+func TestMaybeCompactUsesDeletablePrefixNotTotalCount(t *testing.T) {
+	db := openCollabSQLite(t)
+	docs := NewDocumentsService(db)
+	svc, ownerID, _, _ := newCollabFixture(t, db)
+	svc.compactLimit = -1
+	title := "按可删前缀计阈值"
+	canvasType := DocCanvasType
+	doc, err := docs.Create(ownerID, CreateDocumentInput{
+		Title:      &title,
+		CanvasType: &canvasType,
+		Data:       json.RawMessage(`{"type":"doc","html":"<p>初稿</p>"}`),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 4; i++ {
+		if _, err := svc.Append(ownerID, doc.ID, ownerID, CollabOperationInput{Payload: []byte{byte(0x51 + i)}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := svc.Append(ownerID, doc.ID, ownerID, CollabOperationInput{
+		Kind:    collabOpSnapshot,
+		Payload: []byte{0x55},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 5; i++ {
+		if _, err := svc.Append(ownerID, doc.ID, ownerID, CollabOperationInput{Payload: []byte{byte(0x56 + i)}}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	svc.compactLimit = 3
+	if err := svc.FlushDerived(doc.ID); err != nil {
+		t.Fatal(err)
+	}
+	var kinds []string
+	if err := db.Model(&model.DocOperation{}).
+		Where("document_id = ?", doc.ID).
+		Order("seq asc").
+		Pluck("kind", &kinds).Error; err != nil {
+		t.Fatal(err)
+	}
+	if len(kinds) != 6 || kinds[0] != collabOpSnapshot {
+		t.Fatalf("kinds after flush = %v, want snapshot + 5 updates", kinds)
+	}
+}
+
+func TestRestoreWritesSnapshotAndDropsAheadOps(t *testing.T) {
+	db := openCollabSQLite(t)
+	docs := NewDocumentsService(db)
+	svc, ownerID, _, _ := newCollabFixture(t, db)
+	svc.compactLimit = -1
+	title := "恢复后协同一致"
+	canvasType := DocCanvasType
+	doc, err := docs.Create(ownerID, CreateDocumentInput{
+		Title:      &title,
+		CanvasType: &canvasType,
+		Data:       json.RawMessage(`{"type":"doc","html":"<p>初稿</p>"}`),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	oldHTML := `<p data-block-id="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa">恢复目标</p>`
+	if _, err := svc.Append(ownerID, doc.ID, ownerID, CollabOperationInput{
+		Kind:    collabOpSnapshot,
+		Payload: []byte{0xAA},
+		HTML:    oldHTML,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.FlushDerived(doc.ID); err != nil {
+		t.Fatal(err)
+	}
+	fresh, err := docs.GetOwned(ownerID, doc.ID)
+	if err != nil || fresh.HeadRevisionID == nil {
+		t.Fatalf("checkpoint after first snapshot: doc=%v err=%v", fresh, err)
+	}
+	oldRev := *fresh.HeadRevisionID
+	newHTML := `<p data-block-id="bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb">较新正文</p>`
+	if _, err := svc.Append(ownerID, doc.ID, ownerID, CollabOperationInput{
+		Kind:    collabOpSnapshot,
+		Payload: []byte{0xBB},
+		HTML:    newHTML,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.Append(ownerID, doc.ID, ownerID, CollabOperationInput{Payload: []byte{0xCC}}); err != nil {
+		t.Fatal(err)
+	}
+	restored, err := docs.Restore(ownerID, doc.ID, RestoreInput{RevisionID: oldRev})
+	if err != nil {
+		t.Fatalf("restore: %v", err)
+	}
+	state, ok := yjsStateBytes(restored.CurrentData)
+	if !ok || string(state) != string([]byte{0xAA}) {
+		t.Fatalf("restored yjsState = %v ok=%v, want 0xAA", state, ok)
+	}
+	html, _ := currentDataHTML(restored.CurrentData)
+	if !strings.Contains(html, "恢复目标") || strings.Contains(html, "较新正文") {
+		t.Fatalf("restored html = %q, want 恢复目标 without 较新正文", html)
+	}
+	ops, err := svc.List(ownerID, doc.ID, 0, 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ops) != 1 || ops[0].Kind != collabOpSnapshot || string(ops[0].Payload) != string([]byte{0xAA}) {
+		t.Fatalf("ops after restore = %+v, want single snapshot 0xAA", ops)
+	}
+	report, err := svc.InspectDualWrite(doc.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !report.Consistent || report.Reason != "dual_write_in_sync" {
+		t.Fatalf("inspect after restore = %+v, want dual_write_in_sync", report)
+	}
+	if report.LastSnapshotSeq != ops[0].Seq {
+		t.Fatalf("last snapshot seq = %d, want %d", report.LastSnapshotSeq, ops[0].Seq)
+	}
+}
