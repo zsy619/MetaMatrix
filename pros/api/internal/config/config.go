@@ -177,8 +177,9 @@ func Load() Config {
 		FeishuAppID:              os.Getenv("FEISHU_APP_ID"),
 		FeishuAppSecret:          os.Getenv("FEISHU_APP_SECRET"),
 		FeishuBlockID:            os.Getenv("FEISHU_DOC_BLOCK_ID"),
-		BaseRateLimitRPS:         layer.int("BASE_RATE_LIMIT_RPS", func(c yamlConfig) *int { return c.Base.RateLimit.RPS }, 40),
-		BaseRateLimitBurst:       layer.int("BASE_RATE_LIMIT_BURST", func(c yamlConfig) *int { return c.Base.RateLimit.Burst }, 80),
+		// 0 是有效取值（= 不限流），不能用 layer.int —— 它会把 0 当成「没设置」。
+		BaseRateLimitRPS:         layer.intAllowZero("BASE_RATE_LIMIT_RPS", func(c yamlConfig) *int { return c.Base.RateLimit.RPS }, 200),
+		BaseRateLimitBurst:       layer.int("BASE_RATE_LIMIT_BURST", func(c yamlConfig) *int { return c.Base.RateLimit.Burst }, 400),
 		BaseTenantScaleMax:       layer.int("BASE_TENANT_SCALE_MAX", func(c yamlConfig) *int { return c.Base.RateLimit.TenantScaleMax }, 8),
 		BaseImportBatchSize:      layer.int("BASE_IMPORT_BATCH_SIZE", func(c yamlConfig) *int { return c.Base.Import.BatchSize }, 200),
 		BaseImportKeepDays:       layer.int("BASE_IMPORT_KEEP_DAYS", func(c yamlConfig) *int { return c.Base.Import.KeepDays }, 30),

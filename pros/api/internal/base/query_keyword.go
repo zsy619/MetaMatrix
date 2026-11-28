@@ -39,6 +39,17 @@ func (s *Service) compileKeyword(
 	if len(textIDs) == 0 && len(jsonIDs) == 0 {
 		return "", nil
 	}
+	// 「纯文本搜索」走候选集快路径：
+	// 先探一次（带上限），能确定命中集合时直接用记录 ID，
+	// 主查询退化成主键扫描；探不到上限就回落到半连接。
+	//
+	// 有 JSON 分支或「按文档标题」分支时不走快路径 ——
+	// 候选集只覆盖文本字段，不完整，用了会漏结果。
+	if len(textIDs) > 0 && len(jsonIDs) == 0 && len(s.docFieldIDs(idx)) == 0 {
+		if cond, args, ok := s.keywordCandidateCondition(ctx, tableID, textIDs, like); ok {
+			return cond, args
+		}
+	}
 	parts := make([]string, 0, 3)
 	args := make([]any, 0, 8)
 	// 文本投影：普通文本 / 长文本 / 单选 / 公式 / 关联文档 / 联系人。
@@ -69,6 +80,63 @@ func (s *Service) compileKeyword(
 		return "", nil
 	}
 	return "(" + strings.Join(parts, " OR ") + ")", args
+}
+
+// keywordCandidateCap 是「候选集快路径」能接纳的最大命中行数。
+//
+// 超过这个数就说明命中面很大 —— 此时半连接才是对的计划，
+// 硬把 ID 塞进 IN 列表既慢又不准。
+const keywordCandidateCap = 2000
+
+// keywordCandidateCondition 用「带上限的探测」拿到命中记录集合。
+//
+// 为什么要这一步：半连接版本每次关键字搜索都要扫一遍本表全部投影行
+// （`value_text ILIKE '%kw%'` 走不了 B-tree），实测 5 万行的表里
+// 「搜不到任何结果」也要 41ms —— 而这次搜索毫无产出。
+//
+// 探测用 `LIMIT cap+1`：
+//   - 一行都没探到 → 确实没有命中，直接返回恒假条件，主查询空转；
+//   - 探到不超过 cap 行 → 这就是**全部**命中行（没触发 LIMIT），
+//     去重后就是完整命中集合，主查询退化成主键扫描；
+//   - 探满了 cap+1 行 → 命中面太大，回落半连接。
+//
+// 正确性前提：只有「没触发 LIMIT」时才能认定集合完整，
+// 所以上限判断用的是探到的行数而不是去重后的数量 —— 去重只会更少，
+// 用原始行数判断更保守。
+func (s *Service) keywordCandidateCondition(ctx context.Context, tableID uuid.UUID, textIDs []uuid.UUID, like string) (string, []any, bool) {
+	type candidate struct {
+		RecordID uuid.UUID `gorm:"column:record_id"`
+	}
+	var rows []candidate
+	if err := s.db.WithContext(ctx).
+		Raw("SELECT record_id FROM base_record_values WHERE table_id = ? AND field_id IN ? AND value_text ILIKE ? LIMIT ?",
+			tableID, textIDs, like, keywordCandidateCap+1).
+		Scan(&rows).Error; err != nil {
+		// 探测失败（表不存在 / 索引缺失等）→ 老老实实走半连接。
+		return "", nil, false
+	}
+	if len(rows) == 0 {
+		// 没有任何命中：恒假条件，主查询直接空转。
+		return "1 = 0", nil, true
+	}
+	if len(rows) > keywordCandidateCap {
+		// 命中面太大：回落到半连接。
+		return "", nil, false
+	}
+	// 没触发 LIMIT → 探到的就是全部命中行；去重后是完整命中集合。
+	seen := make(map[uuid.UUID]bool, len(rows))
+	ids := make([]uuid.UUID, 0, len(rows))
+	for _, row := range rows {
+		if row.RecordID == uuid.Nil || seen[row.RecordID] {
+			continue
+		}
+		seen[row.RecordID] = true
+		ids = append(ids, row.RecordID)
+	}
+	if len(ids) == 0 {
+		return "1 = 0", nil, true
+	}
+	return "r.id IN ?", []any{ids}, true
 }
 
 // buildDocTitleBranch 编译「按文档标题命中」的分支。

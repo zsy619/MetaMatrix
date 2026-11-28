@@ -214,6 +214,27 @@ func (l layered) int(envKey string, pick func(c yamlConfig) *int, fallback int) 
 	return fallback
 }
 
+// intAllowZero 取整数配置，但**允许 0 作为有效取值**。
+//
+// 为什么要单独一个版本：`int` 会把 0 当成「没设置」而回退到 yaml，
+// 于是「0 表示不限流 / 不保留 / 永不过期」这类语义明确的 0 配置根本配不进去。
+// 限流器 RPS 就是这种情况 —— middleware.NewRateLimiter 约定 rps <= 0 即关闭限流，
+// 但配置层把 0 吃掉了，文档里写的「0 表示不限流」实际永远不生效。
+func (l layered) intAllowZero(envKey string, pick func(c yamlConfig) *int, fallback int) int {
+	if raw := strings.TrimSpace(os.Getenv(envKey)); raw != "" {
+		if n, err := strconv.Atoi(raw); err == nil && n >= 0 {
+			return n
+		}
+	}
+	if v := pick(l.env); v != nil {
+		return *v
+	}
+	if v := pick(l.defaults); v != nil {
+		return *v
+	}
+	return fallback
+}
+
 // bool 取布尔配置。
 func (l layered) bool(envKey string, pick func(c yamlConfig) *bool, fallback bool) bool {
 	if raw := strings.TrimSpace(os.Getenv(envKey)); raw != "" {

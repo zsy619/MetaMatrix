@@ -48,8 +48,10 @@ knowledge:
 
 base:
   rateLimit:
-    rps: 40
-    burst: 80
+    # 实测：多维表格查询 1650+ QPS、批量编辑 138 QPS（50 并发）。
+    # 默认 40 比实测能力低一个数量级，正常使用会被误伤成 429。
+    rps: 200
+    burst: 400
     # 租户级动态配额的上下限倍数（按空间成员数缩放）。
     tenantScaleMax: 8
   import:

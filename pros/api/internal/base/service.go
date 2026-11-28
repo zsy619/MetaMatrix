@@ -31,6 +31,35 @@ type Service struct {
 	// maintenanceMu / maintenance 是后台维护任务（归档、死信治理、清理）的参数。
 	maintenanceMu sync.Mutex
 	maintenance   MaintenanceConfig
+	// recalcMu / recalcStates 是「依赖重算」的合并调度状态。
+	//
+	// 批量写入会连续触发几十次写入，没有合并就是几十个 goroutine
+	// 同时重算同一批依赖方 —— 数据库直接被打满。
+	//
+	// 状态机：dirty = 「有新的写入要重算」，
+	// running = 「已有一轮重算在跑」；
+	// 写入到达时只置 dirty，由当前那一轮结束后统一再跑一轮，
+	// 连续写入会被合并成一次重算（而不是被去抖窗口**吞掉**）。
+	recalcMu     sync.Mutex
+	recalcStates map[uuid.UUID]*recalcState
+	// recalcSem 是「依赖重算」的全局并发闸门（容量 1）。
+	//
+	// 没有闸门时，50 并发写入会同时拉起 50 轮重算，
+	// 每轮都在扫依赖表的整表数据 —— 连接池直接被打满，
+	// 连只读接口都开始报「failed to connect ... tls error: EOF」。
+	recalcSem chan struct{}
+	// depCache 缓存「这张表有没有被引用 / 汇总字段依赖」的判定结果。
+	//
+	// 字段结构变化不频繁，没必要每次写入都去全库扫一遍依赖关系；
+	// 缓存 60s，结构变更时由 invalidateDepCache 主动失效。
+	depCache map[uuid.UUID]depCacheEntry
+	depMu    sync.Mutex
+}
+
+// depCacheEntry 是依赖判定的缓存项。
+type depCacheEntry struct {
+	has bool
+	at  time.Time
 }
 
 // baseBatchChunk 是批量写入时「一个事务写多少行」。
@@ -43,10 +72,13 @@ const baseBatchChunk = 50
 // NewService 构造 Base Engine 服务。
 func NewService(db *gorm.DB) *Service {
 	return &Service{
-		db:          db,
-		registry:    NewRegistry(),
-		events:      NewEventHub(),
-		maintenance: DefaultMaintenanceConfig(),
+		db:           db,
+		registry:     NewRegistry(),
+		events:       NewEventHub(),
+		maintenance:  DefaultMaintenanceConfig(),
+		recalcStates: map[uuid.UUID]*recalcState{},
+		recalcSem:    make(chan struct{}, 1),
+		depCache:     map[uuid.UUID]depCacheEntry{},
 	}
 }
 
@@ -362,10 +394,8 @@ func (s *Service) DeleteBase(ctx context.Context, userID, projectID, baseID uuid
 			if err := tx.Where("table_id IN ?", tableIDs).Delete(&BaseView{}).Error; err != nil {
 				return err
 			}
-			if err := tx.Where("table_id IN ?", tableIDs).Delete(&BaseRecordValue{}).Error; err != nil {
-				return err
-			}
-			if err := tx.Where("table_id IN ?", tableIDs).Delete(&BaseRecord{}).Error; err != nil {
+			// 记录硬删（不留墓碑），理由同 DeleteTable。
+			if err := purgeTableRecords(tx, tableIDs); err != nil {
 				return err
 			}
 		}
@@ -505,6 +535,8 @@ func (s *Service) CreateTable(ctx context.Context, userID, projectID, baseID uui
 	if err != nil {
 		return nil, err
 	}
+	// 结构变更 → 依赖判定缓存失效（依赖关系是跨表的）。
+	s.invalidateDepCache()
 	return s.tableInfo(ctx, &table)
 }
 
@@ -540,15 +572,88 @@ func (s *Service) DeleteTable(ctx context.Context, userID, projectID, tableID uu
 	if err := s.assertAccess(userID, projectID, RoleEditor); err != nil {
 		return err
 	}
+	// 结构变更 → 依赖判定缓存失效（依赖关系是跨表的）。
+	s.invalidateDepCache()
 	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("id = ?", tableID).Delete(&BaseTable{}).Error; err != nil {
+		// 记录**硬删**：表都没了，这些记录永远没人读得到。
+		//
+		// 旧实现是软删（留墓碑），实测压测跑几轮后 base_records 里
+		// 堆着 40 多万条墓碑 —— 每条都要占堆与索引空间，
+		// 拖慢每一次记录扫描；表删除却没人能恢复它们，纯属垃圾。
+		if err := purgeTableRecords(tx, []uuid.UUID{tableID}); err != nil {
 			return err
 		}
-		if err := tx.Where("table_id = ?", tableID).Delete(&BaseRecord{}).Error; err != nil {
-			return err
-		}
-		return tx.Where("table_id = ?", tableID).Delete(&BaseRecordValue{}).Error
+		return tx.Where("id = ?", tableID).Delete(&BaseTable{}).Error
 	})
+}
+
+// purgeTableRecords 清理一批表的记录数据（**硬删**，不留墓碑）。
+//
+// 删表 / 删 Base 时调用：这些记录已经不可达，软删只是让表无限膨胀。
+// 顺序有讲究：先删值行与关联边（它们引用记录 ID），再删记录本体。
+func purgeTableRecords(tx *gorm.DB, tableIDs []uuid.UUID) error {
+	if len(tableIDs) == 0 {
+		return nil
+	}
+	var recordIDs []uuid.UUID
+	if err := tx.Model(&BaseRecord{}).Unscoped().
+		Where("table_id IN ?", tableIDs).Pluck("id", &recordIDs).Error; err != nil {
+		return err
+	}
+	if len(recordIDs) == 0 {
+		return nil
+	}
+	// Postgres 单条语句的参数上限是 65535（extended protocol），
+	// 几万条记录一次性 IN (...) 会直接报
+	// `extended protocol limited to 65535 parameters` —— 所以必须分块。
+	const purgeChunk = 1000
+	if tx.Migrator().HasTable(&BaseRecordValue{}) {
+		for _, chunk := range chunkUUIDs(recordIDs, purgeChunk) {
+			if err := tx.Unscoped().Where("record_id IN ?", chunk).Delete(&BaseRecordValue{}).Error; err != nil {
+				return err
+			}
+		}
+	}
+	if tx.Migrator().HasTable(&BaseRecordLink{}) {
+		for _, chunk := range chunkUUIDs(recordIDs, purgeChunk) {
+			if err := tx.Unscoped().Where("source_record_id IN ? OR target_record_id IN ?", chunk, chunk).
+				Delete(&BaseRecordLink{}).Error; err != nil {
+				return err
+			}
+		}
+	}
+	if tx.Migrator().HasTable(&BaseRecordGrant{}) {
+		for _, chunk := range chunkUUIDs(recordIDs, purgeChunk) {
+			if err := tx.Unscoped().Where("record_id IN ?", chunk).Delete(&BaseRecordGrant{}).Error; err != nil {
+				return err
+			}
+		}
+	}
+	for _, chunk := range chunkUUIDs(recordIDs, purgeChunk) {
+		if err := tx.Unscoped().Where("id IN ?", chunk).Delete(&BaseRecord{}).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// chunkUUIDs 把 ID 列表切成不超过 size 的小批。
+func chunkUUIDs(ids []uuid.UUID, size int) [][]uuid.UUID {
+	if len(ids) == 0 {
+		return nil
+	}
+	if size <= 0 {
+		size = 1000
+	}
+	out := make([][]uuid.UUID, 0, (len(ids)+size-1)/size)
+	for start := 0; start < len(ids); start += size {
+		end := start + size
+		if end > len(ids) {
+			end = len(ids)
+		}
+		out = append(out, ids[start:end])
+	}
+	return out
 }
 
 // bumpSchema 推进表的结构版本。
@@ -876,6 +981,8 @@ func (s *Service) CreateField(ctx context.Context, userID, projectID, tableID uu
 	if err := s.reindexTable(ctx, tableID, projectID); err != nil {
 		return nil, err
 	}
+	// 结构变更 → 依赖判定缓存失效（依赖关系是跨表的）。
+	s.invalidateDepCache()
 	return &FieldMeta{
 		ID: field.ID.String(), Name: field.Name, Type: field.Type, Config: cfg,
 		Required: field.Required, IsPrimary: field.IsPrimary, SortOrder: field.SortOrder, Version: field.Version,
@@ -992,6 +1099,8 @@ func (s *Service) UpdateField(ctx context.Context, userID, projectID, fieldID uu
 			}
 		}
 	}
+	// 结构变更 → 依赖判定缓存失效（依赖关系是跨表的）。
+	s.invalidateDepCache()
 	return meta, nil
 }
 
@@ -1048,6 +1157,8 @@ func (s *Service) DeleteField(ctx context.Context, userID, projectID, fieldID uu
 	if err := s.assertAccess(userID, projectID, RoleEditor); err != nil {
 		return err
 	}
+	// 结构变更 → 依赖判定缓存失效（依赖关系是跨表的）。
+	s.invalidateDepCache()
 	var field BaseField
 	if err := s.db.WithContext(ctx).Where("id = ?", fieldID).First(&field).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -1089,25 +1200,26 @@ func (s *Service) DeleteField(ctx context.Context, userID, projectID, fieldID uu
 		if err := tx.Where("field_id = ?", fieldID).Delete(&BaseFieldFormula{}).Error; err != nil {
 			return err
 		}
-		// 清掉记录里残留的字段值。
-		var records []BaseRecord
-		if err := tx.Where("table_id = ?", field.TableID).Find(&records).Error; err != nil {
+		// 清掉记录里残留的字段值（按 id 游标分批，避免整表载入内存）。
+		if err := iterateRecordsByCursor(tx, field.TableID, true, func(chunk []BaseRecord) error {
+			for _, rec := range chunk {
+				data := map[string]any{}
+				if len(rec.Data) > 0 {
+					_ = json.Unmarshal(rec.Data, &data)
+				}
+				if _, ok := data[fieldID.String()]; !ok {
+					continue
+				}
+				delete(data, fieldID.String())
+				raw, _ := json.Marshal(data)
+				// 同上：删字段属于结构变更，不应改写记录的「最后更新时间」。
+				if err := tx.Model(&BaseRecord{}).Where("id = ?", rec.ID).UpdateColumn("data", raw).Error; err != nil {
+					return err
+				}
+			}
+			return nil
+		}); err != nil {
 			return err
-		}
-		for _, rec := range records {
-			data := map[string]any{}
-			if len(rec.Data) > 0 {
-				_ = json.Unmarshal(rec.Data, &data)
-			}
-			if _, ok := data[fieldID.String()]; !ok {
-				continue
-			}
-			delete(data, fieldID.String())
-			raw, _ := json.Marshal(data)
-			// 同上：删字段属于结构变更，不应改写记录的「最后更新时间」。
-			if err := tx.Model(&BaseRecord{}).Where("id = ?", rec.ID).UpdateColumn("data", raw).Error; err != nil {
-				return err
-			}
 		}
 		if err := s.bumpSchema(tx, field.TableID); err != nil {
 			return err
@@ -1131,35 +1243,39 @@ func (s *Service) recalcTableFormulas(ctx context.Context, tableID uuid.UUID) er
 	if err != nil {
 		return err
 	}
-	var records []BaseRecord
-	if err := s.db.WithContext(ctx).Where("table_id = ?", tableID).Find(&records).Error; err != nil {
+	// 字段元数据只查一次（旧实现每条记录都查一遍 base_fields）。
+	fields, err := s.loadIndexableFields(s.db.WithContext(ctx), tableID)
+	if err != nil {
 		return err
 	}
-	for _, rec := range records {
-		data := map[string]any{}
-		if len(rec.Data) > 0 {
-			_ = json.Unmarshal(rec.Data, &data)
+	// 按 id 游标分批，避免把整表 JSONB 一次性读进内存。
+	return iterateRecordsByCursor(s.db.WithContext(ctx), tableID, false, func(chunk []BaseRecord) error {
+		for _, rec := range chunk {
+			data := map[string]any{}
+			if len(rec.Data) > 0 {
+				_ = json.Unmarshal(rec.Data, &data)
+			}
+			// 系统字段按记录自身的创建 / 更新信息回填。
+			applySystemFields(idx, data, rec.CreatedAt, rec.UpdatedAt, rec.CreatedBy, rec.UpdatedBy)
+			computed, err := s.recomputeFormulas(s.db.WithContext(ctx), &table, idx, data)
+			if err != nil {
+				// 循环依赖等问题不影响其它记录的回填。
+				continue
+			}
+			raw, _ := json.Marshal(computed)
+			// UpdateColumns 而非 Updates：跳过 GORM 的 updated_at 自动写入，
+			// 否则「系统重算」会把记录的「最后更新时间」刷成重算时刻，
+			// 用户看到的更新时间就不再是「最后一次被人编辑的时间」。
+			if err := s.db.WithContext(ctx).Model(&BaseRecord{}).Where("id = ?", rec.ID).
+				UpdateColumns(map[string]any{"data": raw, "version": gorm.Expr("version + 1")}).Error; err != nil {
+				return err
+			}
+			if err := s.syncProjectionsWithFields(s.db.WithContext(ctx), tableID, rec.ID, table.TenantID, computed, fields); err != nil {
+				return err
+			}
 		}
-		// 系统字段按记录自身的创建 / 更新信息回填。
-		applySystemFields(idx, data, rec.CreatedAt, rec.UpdatedAt, rec.CreatedBy, rec.UpdatedBy)
-		computed, err := s.recomputeFormulas(s.db.WithContext(ctx), &table, idx, data)
-		if err != nil {
-			// 循环依赖等问题不影响其它记录的回填。
-			continue
-		}
-		raw, _ := json.Marshal(computed)
-		// UpdateColumns 而非 Updates：跳过 GORM 的 updated_at 自动写入，
-		// 否则「系统重算」会把记录的「最后更新时间」刷成重算时刻，
-		// 用户看到的更新时间就不再是「最后一次被人编辑的时间」。
-		if err := s.db.WithContext(ctx).Model(&BaseRecord{}).Where("id = ?", rec.ID).
-			UpdateColumns(map[string]any{"data": raw, "version": gorm.Expr("version + 1")}).Error; err != nil {
-			return err
-		}
-		if err := s.syncAllProjections(s.db.WithContext(ctx), tableID, rec.ID, table.TenantID, computed); err != nil {
-			return err
-		}
-	}
-	return nil
+		return nil
+	})
 }
 
 // MigrateField 迁移字段类型：先预检存量数据，再逐条转换。
@@ -1184,46 +1300,62 @@ func (s *Service) MigrateField(ctx context.Context, userID, projectID, fieldID u
 		return nil, fmt.Errorf("%w: 系统字段不支持类型迁移", ErrFieldTypeIncompatible)
 	}
 	newHandler, _ := s.registry.Get(FieldType(newType))
-	var records []BaseRecord
-	if err := s.db.WithContext(ctx).Where("table_id = ?", field.TableID).Find(&records).Error; err != nil {
+	// 预检：无法转换的值直接报错，不做静默丢弃。
+	//
+	// 旧实现把**整表**记录读进内存再逐条预检（`Find(&records)`），
+	// 大表直接吃满堆；这里改成按 id 游标分批，边扫边校验，
+	// 内存占用与表大小无关。
+	if err := iterateRecordsByCursor(s.db.WithContext(ctx), field.TableID, false, func(chunk []BaseRecord) error {
+		for _, rec := range chunk {
+			data := map[string]any{}
+			if len(rec.Data) > 0 {
+				_ = json.Unmarshal(rec.Data, &data)
+			}
+			raw, ok := data[fieldID.String()]
+			if !ok {
+				continue
+			}
+			value, err := newHandler.Normalize(raw, nil)
+			if err != nil {
+				return fmt.Errorf("%w: 存量数据无法迁移到 %s：%v", ErrFieldTypeIncompatible, newType, err)
+			}
+			if err := newHandler.ValidateValue(value, nil); err != nil {
+				return fmt.Errorf("%w: 存量数据无法迁移到 %s：%v", ErrFieldTypeIncompatible, newType, err)
+			}
+		}
+		return nil
+	}); err != nil {
 		return nil, err
 	}
-	// 预检：无法转换的值直接报错，不做静默丢弃。
-	type plan struct {
-		record BaseRecord
-		data   map[string]any
-		value  any
-	}
-	plans := make([]plan, 0, len(records))
-	for _, rec := range records {
-		data := map[string]any{}
-		if len(rec.Data) > 0 {
-			_ = json.Unmarshal(rec.Data, &data)
-		}
-		raw, ok := data[fieldID.String()]
-		if !ok {
-			continue
-		}
-		value, err := newHandler.Normalize(raw, nil)
-		if err != nil {
-			return nil, fmt.Errorf("%w: 存量数据无法迁移到 %s：%v", ErrFieldTypeIncompatible, newType, err)
-		}
-		if err := newHandler.ValidateValue(value, nil); err != nil {
-			return nil, fmt.Errorf("%w: 存量数据无法迁移到 %s：%v", ErrFieldTypeIncompatible, newType, err)
-		}
-		plans = append(plans, plan{record: rec, data: data, value: value})
-	}
 	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		for _, p := range plans {
-			p.data[fieldID.String()] = p.value
-			raw, _ := json.Marshal(p.data)
-			// 类型迁移同样不改写「最后更新时间」。
-			if err := tx.Model(&BaseRecord{}).Where("id = ?", p.record.ID).UpdateColumn("data", raw).Error; err != nil {
-				return err
+		// 应用迁移：同样按游标分批，不再把整表读进内存。
+		if err := iterateRecordsByCursor(tx, field.TableID, false, func(chunk []BaseRecord) error {
+			for _, rec := range chunk {
+				data := map[string]any{}
+				if len(rec.Data) > 0 {
+					_ = json.Unmarshal(rec.Data, &data)
+				}
+				raw, ok := data[fieldID.String()]
+				if !ok {
+					continue
+				}
+				value, err := newHandler.Normalize(raw, nil)
+				if err != nil {
+					return fmt.Errorf("%w: 存量数据无法迁移到 %s：%v", ErrFieldTypeIncompatible, newType, err)
+				}
+				data[fieldID.String()] = value
+				encoded, _ := json.Marshal(data)
+				// 类型迁移同样不改写「最后更新时间」。
+				if err := tx.Model(&BaseRecord{}).Where("id = ?", rec.ID).UpdateColumn("data", encoded).Error; err != nil {
+					return err
+				}
+				if err := s.syncProjection(tx, field.TableID, rec.ID, fieldID, projectID, value); err != nil {
+					return err
+				}
 			}
-			if err := s.syncProjection(tx, field.TableID, p.record.ID, fieldID, projectID, p.value); err != nil {
-				return err
-			}
+			return nil
+		}); err != nil {
+			return err
 		}
 		if err := tx.Model(&field).Updates(map[string]any{
 			"type":    newType,
@@ -1252,6 +1384,8 @@ func (s *Service) MigrateField(ctx context.Context, userID, projectID, fieldID u
 	if err != nil {
 		return nil, err
 	}
+	// 结构变更 → 依赖判定缓存失效（依赖关系是跨表的）。
+	s.invalidateDepCache()
 	return &FieldMeta{
 		ID: field.ID.String(), Name: field.Name, Type: newType, Required: field.Required,
 		IsPrimary: field.IsPrimary, SortOrder: field.SortOrder, Version: field.Version + 1,
@@ -1307,6 +1441,10 @@ type writeIO struct {
 	// 500 行就是 500 次重复查询；公式定义在一次写入期间不会变，缓存即可。
 	formulasLoaded bool
 	formulas       map[string]BaseFieldFormula
+
+	// suppressRecordEvents 为 true 时不逐条发 record.updated 事件，
+	// 改由批量路径在块尾发一条 record.batch_updated（避免发件箱事件风暴）。
+	suppressRecordEvents bool
 
 	// pendingAudits / pendingEvents 是「攒一批再落库」的审计与事件。
 	//
@@ -1548,6 +1686,9 @@ func (s *Service) persistRecord(
 		return nil, err
 	}
 	stripped, condHidden := stripHiddenFieldsWithReasons(normalized, io.idx, io.subj)
+	// 写完就触发依赖重算：别的表里的引用 / 汇总列要跟着更新，
+	// 否则用户改了关联字段，引用列还是旧值（以前只能手点「重算」）。
+	s.scheduleDependentRecalc(io.table.ID)
 	return &RecordRow{
 		ID: rec.ID, Version: rec.Version,
 		Fields:            stripped,
@@ -1749,7 +1890,8 @@ func (s *Service) updateRecord(ctx context.Context, userID, projectID, recordID 
 			// 审计的「修改前」必须是这次写入前的真实值（合并后的基线）。
 			before = base
 			data = computed
-			if err := s.syncAllProjections(tx, rec.TableID, rec.ID, projectID, data); err != nil {
+			// 复用已加载的字段索引，不再额外查一次 base_fields。
+			if err := s.syncProjectionsWithFields(tx, rec.TableID, rec.ID, projectID, data, projectionFieldsFromIndex(idx)); err != nil {
 				return err
 			}
 			if err := s.syncRecordLinks(tx, table, idx, rec.ID, data); err != nil {
@@ -1792,6 +1934,8 @@ func (s *Service) updateRecord(ctx context.Context, userID, projectID, recordID 
 		return nil, err
 	}
 	stripped, condHidden := stripHiddenFieldsWithReasons(data, idx, subj)
+	// 写完就触发依赖重算（引用 / 汇总列跟着更新）。
+	s.scheduleDependentRecalc(rec.TableID)
 	return &RecordRow{
 		ID: rec.ID, Version: rec.Version,
 		Fields:            stripped,
@@ -1815,7 +1959,7 @@ func (s *Service) DeleteRecord(ctx context.Context, userID, projectID, recordID 
 	if err := s.db.WithContext(ctx).Where("id = ?", rec.TableID).First(&table).Error; err != nil {
 		return err
 	}
-	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Where("id = ?", recordID).Delete(&BaseRecord{}).Error; err != nil {
 			return err
 		}
@@ -1837,6 +1981,12 @@ func (s *Service) DeleteRecord(ctx context.Context, userID, projectID, recordID 
 			"version": rec.Version,
 		})
 	})
+	if err != nil {
+		return err
+	}
+	// 记录没了，别的表里引用它的引用 / 汇总列也要跟着更新。
+	s.scheduleDependentRecalc(table.ID)
+	return nil
 }
 
 // BatchFailure 记录一条批量操作里的失败明细。
@@ -2025,16 +2175,20 @@ func (s *Service) ReorderRecords(ctx context.Context, userID, projectID, tableID
 		return fmt.Errorf("%w: reorder contains unknown record", ErrFieldValueInvalid)
 	}
 	// 表内其余记录：保持原相对次序，排到目标顺序之后。
-	var rest []BaseRecord
-	if err := s.db.WithContext(ctx).Where("table_id = ? AND id NOT IN ? AND deleted_at IS NULL", tableID, ids).
-		Order("sort_order ASC, id ASC").Limit(5000).Find(&rest).Error; err != nil {
+	//
+	// 旧的 `Limit(5000)` 会让第 5001 条以后的记录被排除在重排之外，
+	// 它们保留旧 sort_order，可能与前 5000 条撞号 → 顺序错乱。
+	// 这里按 (sort_order, id) 游标分批取全表 ID（只取 ID，不读 JSONB）。
+	rest := make([]uuid.UUID, 0, len(ids)+512)
+	if err := iterateRecordIDsBySortOrder(s.db.WithContext(ctx), tableID, ids, func(chunk []uuid.UUID) error {
+		rest = append(rest, chunk...)
+		return nil
+	}); err != nil {
 		return err
 	}
 	ordered := make([]uuid.UUID, 0, len(ids)+len(rest))
 	ordered = append(ordered, ids...)
-	for _, item := range rest {
-		ordered = append(ordered, item.ID)
-	}
+	ordered = append(ordered, rest...)
 	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		for i, id := range ordered {
 			if err := tx.Model(&BaseRecord{}).
@@ -2349,16 +2503,6 @@ func (s *Service) ListRecordDocReferences(ctx context.Context, userID, projectID
 // 早期版本里长文本 / 关联记录 / 关联文档声明了 Filterable 却没开 Indexable，
 // 导致这些字段既不写投影也筛不出结果。字段新建或改类型后必须重建一次。
 func (s *Service) reindexTable(ctx context.Context, tableID uuid.UUID, tenantID uuid.UUID) error {
-	var records []BaseRecord
-	if err := s.db.WithContext(ctx).
-		Where("table_id = ? AND deleted_at IS NULL", tableID).
-		Limit(5000).
-		Find(&records).Error; err != nil {
-		return err
-	}
-	if len(records) == 0 {
-		return nil
-	}
 	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		return s.reindexTableTx(tx, tableID, tenantID)
 	})
@@ -2369,27 +2513,70 @@ func (s *Service) reindexTable(ctx context.Context, tableID uuid.UUID, tenantID 
 // 字段类型迁移时必须走这个版本：投影重建要和数据迁移在**同一个事务**里，
 // 否则会出现「类型已改、投影还是旧结构」的中间态（回滚时数据与投影对不上）。
 func (s *Service) reindexTableTx(tx *gorm.DB, tableID uuid.UUID, tenantID uuid.UUID) error {
-	var records []BaseRecord
-	if err := tx.Where("table_id = ? AND deleted_at IS NULL", tableID).
-		Limit(5000).
-		Find(&records).Error; err != nil {
+	// 字段元数据只查一次（旧实现每条记录都查一遍 base_fields）。
+	fields, err := s.loadIndexableFields(tx, tableID)
+	if err != nil {
 		return err
 	}
-	if len(records) == 0 {
+	if len(fields) == 0 {
 		return nil
 	}
-	for _, rec := range records {
-		data := map[string]any{}
-		if len(rec.Data) > 0 {
-			if err := json.Unmarshal(rec.Data, &data); err != nil {
-				continue
+	// 按 id 游标分批：旧的 `Limit(5000)` 会让第 5001 行以后的投影停留在旧结构，
+	// 出现「类型迁移成功了但后半张表没迁过去」的数据 / 投影不一致。
+	return iterateRecordsByCursor(tx, tableID, false, func(chunk []BaseRecord) error {
+		for _, rec := range chunk {
+			data := map[string]any{}
+			if len(rec.Data) > 0 {
+				if err := json.Unmarshal(rec.Data, &data); err != nil {
+					continue
+				}
+			}
+			if err := s.syncProjectionsWithFields(tx, tableID, rec.ID, tenantID, data, fields); err != nil {
+				return err
 			}
 		}
-		if err := s.syncAllProjections(tx, tableID, rec.ID, tenantID, data); err != nil {
-			return err
-		}
+		return nil
+	})
+}
+
+// loadIndexableFields 读一张表的「可索引字段」元数据。
+//
+// 投影重建 / 公式回填都要用字段元数据，
+// 之前是每条记录查一次（5000 行 = 5000 次重复查询）。
+func (s *Service) loadIndexableFields(tx *gorm.DB, tableID uuid.UUID) ([]BaseField, error) {
+	var fields []BaseField
+	if err := tx.Where("table_id = ? AND status = 1", tableID).Find(&fields).Error; err != nil {
+		return nil, err
 	}
-	return nil
+	out := make([]BaseField, 0, len(fields))
+	for _, f := range fields {
+		handler, ok := s.registry.Get(FieldType(f.Type))
+		if !ok || !handler.Definition().Capabilities.Indexable {
+			continue
+		}
+		out = append(out, f)
+	}
+	return out, nil
+}
+
+// projectionFieldsFromIndex 从已加载的字段索引里取出「可索引字段」元数据。
+//
+// 单条更新路径已经把字段索引加载好了（idx），却仍然调用
+// syncAllProjections 再查一遍 base_fields —— 一次多余的往返。
+// 这里直接复用已有索引，把这次查询省掉。
+func projectionFieldsFromIndex(idx *fieldIndex) []BaseField {
+	if idx == nil {
+		return nil
+	}
+	out := make([]BaseField, 0, len(idx.byID))
+	for id, meta := range idx.byID {
+		handler, ok := idx.handler(id)
+		if !ok || !handler.Definition().Capabilities.Indexable {
+			continue
+		}
+		out = append(out, BaseField{ID: id, Type: meta.Type})
+	}
+	return out
 }
 
 // syncAllProjections 把记录的所有字段写入查询投影表。

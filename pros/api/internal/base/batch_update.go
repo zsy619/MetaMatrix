@@ -51,6 +51,8 @@ func (s *Service) batchUpdate(
 	if err != nil {
 		return rows, batchAllFailed(len(ids), err)
 	}
+	// 逐条 record.updated 事件关闭，改用块级 record.batch_updated（见 P-05）。
+	io.suppressRecordEvents = true
 	// 补丁只归一化一次：同一批所有行改的是同一批字段。
 	patch, err := s.normalizeValues(io.idx, fields)
 	if err != nil {
@@ -151,6 +153,18 @@ func (s *Service) batchUpdate(
 			}
 		}
 		if chunkOK {
+			// 块级汇总事件：一块（≤50 行）只写一条 record.batch_updated。
+			chunkRecordIDs := make([]string, 0, end-start)
+			for j := start; j < end; j++ {
+				chunkRecordIDs = append(chunkRecordIDs, targets[j].id.String())
+			}
+			io.pendingEvents = append(io.pendingEvents, newEventRow(
+				projectID, io.table.BaseID, &io.table.ID, &targets[start].id, "record", "record.batch_updated", map[string]any{
+					"tableId":   io.table.ID.String(),
+					"recordIds": chunkRecordIDs,
+					"count":     len(chunkRecordIDs),
+					"fieldIds":  fieldIDsOf(patch),
+				}))
 			// 投影统一落库（覆盖式写入：先删后插）。
 			if err := deleteProjectionPairs(tx, projPairs); err != nil {
 				tx.Rollback()
@@ -259,11 +273,16 @@ func (s *Service) persistBatchUpdate(
 		// 审计与事件先进缓冲，块尾批量落库。
 		io.pendingAudits = append(io.pendingAudits, newAuditRow(
 			projectID, io.table.BaseID, &io.table.ID, &locked.ID, userID, "record.updated", base, computed, ""))
-		io.pendingEvents = append(io.pendingEvents, newEventRow(
-			projectID, io.table.BaseID, &io.table.ID, &locked.ID, "record", "record.updated", map[string]any{
-				"version":  locked.Version + 1,
-				"fieldIds": fieldIDsOf(patch),
-			}))
+		// 批量写**不逐条发事件**：100 行批量改会往发件箱塞 100 条 record.updated，
+		// 实测发件箱里 record.updated 累计 27 万条 —— 订阅端每次都要处理 100 个事件。
+		// 改成「每块一条 record.batch_updated」，审计仍然逐条保留（审计要能回放）。
+		if !io.suppressRecordEvents {
+			io.pendingEvents = append(io.pendingEvents, newEventRow(
+				projectID, io.table.BaseID, &io.table.ID, &locked.ID, "record", "record.updated", map[string]any{
+					"version":  locked.Version + 1,
+					"fieldIds": fieldIDsOf(patch),
+				}))
+		}
 		// 投影行只收集不写入，块尾统一 DELETE + INSERT。
 		projRows := s.projectionRowsForRecord(projectID, io.table.ID, locked.ID, computed, io.projFields)
 		stripped, condHidden := stripHiddenFieldsWithReasons(computed, io.idx, io.subj)

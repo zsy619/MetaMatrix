@@ -3,11 +3,13 @@ package middleware
 import (
 	"context"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"
+	"github.com/google/uuid"
 )
 
 // RateLimiter 是「按租户 + 用户 + 路径」的令牌桶限流器。
@@ -210,6 +212,44 @@ func (l *RateLimiter) resolveQuota(tenantID string) Quota {
 	return def
 }
 
+// PathClass 把请求路径归一化成「接口类别」。
+//
+// 目的：限流按「用户 × 接口类别」生效。原始路径里带 UUID（表 ID / 记录 ID / 视图 ID…），
+// 换个 ID 就是新令牌桶，限流形同虚设；归一化后同一类接口共用一个桶。
+//
+// 规则：路径里形如 UUID / 纯数字 / 长十六进制串的段替换成 `:id`。
+func PathClass(path string) string {
+	segs := strings.Split(strings.Trim(path, "/"), "/")
+	for i, seg := range segs {
+		if isIDSegment(seg) {
+			segs[i] = ":id"
+		}
+	}
+	return "/" + strings.Join(segs, "/")
+}
+
+// isIDSegment 判断一个路径段是否是「资源 ID」。
+func isIDSegment(seg string) bool {
+	if seg == "" {
+		return false
+	}
+	// UUID（含带横线 / 不带横线两种写法）。
+	if _, err := uuid.Parse(seg); err == nil {
+		return true
+	}
+	// 纯数字 ID。
+	if _, err := strconv.Atoi(seg); err == nil {
+		return true
+	}
+	// 32 位十六进制（部分 ID 用这种形式）。
+	if len(seg) == 32 {
+		if _, err := strconv.ParseUint(seg, 16, 64); err == nil {
+			return true
+		}
+	}
+	return false
+}
+
 // pathClassOf 从「用户 + 路径」的键里取出路径部分做分类。
 func pathClassOf(userKey string) string {
 	idx := strings.Index(userKey, "|")
@@ -253,7 +293,10 @@ func RateLimit(limiter *RateLimiter) app.HandlerFunc {
 		}
 		path := string(c.Request.URI().Path())
 		tenant := TenantFromPath(path)
-		userKey := uid.String() + "|" + path
+		// 限流维度是「用户 × 接口类别」，**不是**「用户 × 完整路径」——
+		// 完整路径里带表 ID / 记录 ID / 视图 ID，每换一个 ID 就是一个新令牌桶，
+		// 限流等于没开。归一化后同一类接口共用一个桶。
+		userKey := uid.String() + "|" + PathClass(path)
 		if tenant == "" {
 			if !limiter.Allow(userKey) {
 				rateLimited(c)
