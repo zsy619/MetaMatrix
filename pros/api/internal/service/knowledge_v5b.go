@@ -264,7 +264,7 @@ func ExtractTasks(html string) []DocTask {
 
 // ListDocTasks 列出文档正文里的待办块。
 func (s *KnowledgeService) ListDocTasks(ownerID, docID uuid.UUID) ([]DocTask, error) {
-	doc, err := s.GetOwnedDocument(ownerID, docID)
+	doc, err := s.accessDocument(ownerID, docID, SpaceRoleViewer)
 	if err != nil {
 		return nil, err
 	}
@@ -273,7 +273,7 @@ func (s *KnowledgeService) ListDocTasks(ownerID, docID uuid.UUID) ([]DocTask, er
 
 // SetDocTask 勾选/取消勾选某个待办块，并回写正文。
 func (s *KnowledgeService) SetDocTask(ownerID, docID uuid.UUID, index int, checked bool) error {
-	doc, err := s.GetOwnedDocument(ownerID, docID)
+	doc, err := s.accessDocument(ownerID, docID, SpaceRoleEditor)
 	if err != nil {
 		return err
 	}
@@ -320,7 +320,7 @@ type OutlineItem struct {
 
 // DocOutline 解析正文标题层级：大纲面板与目录块共用。
 func (s *KnowledgeService) DocOutline(ownerID, docID uuid.UUID) ([]OutlineItem, error) {
-	doc, err := s.GetOwnedDocument(ownerID, docID)
+	doc, err := s.accessDocument(ownerID, docID, SpaceRoleViewer)
 	if err != nil {
 		return nil, err
 	}
@@ -330,8 +330,11 @@ func (s *KnowledgeService) DocOutline(ownerID, docID uuid.UUID) ([]OutlineItem, 
 // OutlineFromHTML 从 HTML 里抽标题层级。
 func OutlineFromHTML(html string) []OutlineItem {
 	items := []OutlineItem{}
-	re := regexp.MustCompile(`(?is)<h([1-6])([^>]*)>(.*?)</h[1-6]>`)
+	re := regexp.MustCompile(`(?is)<h([1-6])([^>]*)>(.*?)</h([1-6])>`)
 	for _, m := range re.FindAllStringSubmatch(html, -1) {
+		if m[1] != m[4] {
+			continue
+		}
 		level, _ := strconv.Atoi(m[1])
 		text := strings.TrimSpace(stripHTML(m[3]))
 		if text == "" {
@@ -389,7 +392,7 @@ func splitSections(html string) (string, []section) {
 
 // ReorderOutline 按大纲顺序重排正文各节：order 是原大纲索引的新顺序。
 func (s *KnowledgeService) ReorderOutline(ownerID, docID uuid.UUID, order []int) error {
-	doc, err := s.GetOwnedDocument(ownerID, docID)
+	doc, err := s.accessDocument(ownerID, docID, SpaceRoleEditor)
 	if err != nil {
 		return err
 	}
@@ -616,21 +619,28 @@ func htmlPayload(html string) []byte {
 }
 
 // saveDocHTML 直接回写文档正文并留一条历史快照：服务端改稿（勾选待办、拖拽大纲）用。
-func (s *KnowledgeService) saveDocHTML(ownerID, docID uuid.UUID, payload []byte) error {
+func (s *KnowledgeService) saveDocHTML(actorID, docID uuid.UUID, payload []byte) error {
+	if _, err := s.accessDocument(actorID, docID, SpaceRoleEditor); err != nil {
+		return err
+	}
 	return s.db.Transaction(func(tx *gorm.DB) error {
 		var doc model.CanvasDocument
-		if err := tx.Where("id = ? AND owner_user_id = ?", docID, ownerID).First(&doc).Error; err != nil {
+		if err := tx.Where("id = ?", docID).First(&doc).Error; err != nil {
 			return ErrDocumentNotFound
 		}
 		var body struct {
 			HTML string `json:"html"`
 		}
 		_ = json.Unmarshal(payload, &body)
-		doc.CurrentData = datatypes.JSON(payload)
-		doc.ContentText = stripHTML(body.HTML)
-		doc.SaveVersion = doc.SaveVersion + 1
-		doc.UpdatedAt = time.Now().UTC()
-		if err := tx.Save(&doc).Error; err != nil {
+		now := time.Now().UTC()
+		if err := bumpSaveVersion(tx, doc.OwnerUserID, docID, nil, map[string]interface{}{
+			"current_data": datatypes.JSON(payload),
+			"content_text": stripHTML(body.HTML),
+			"updated_at":   now,
+		}); err != nil {
+			return err
+		}
+		if err := tx.Where("id = ?", docID).First(&doc).Error; err != nil {
 			return err
 		}
 		return SnapshotDocVersion(tx, &doc)

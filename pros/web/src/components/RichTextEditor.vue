@@ -195,7 +195,7 @@ import RtePortals from './rte/RtePortals.vue'
 import { bindAskMore, useAskDialog } from './rte/composables/useAskDialog'
 import { useRtePageLayout } from './rte/composables/useRtePageLayout'
 import { usePageChrome } from './rte/composables/usePageChrome'
-import { EMPTY_PAGE_CHROME, PAGE_NUMBER_OPTIONS, type PanelPageChrome } from '../utils/rtePageChrome'
+import { EMPTY_PAGE_CHROME, PAGE_NUMBER_OPTIONS, normalizePageChrome, type PanelPageChrome } from '../utils/rtePageChrome'
 import {
   pageSetupDraftDirty,
   pageSetupDraftOf,
@@ -994,7 +994,7 @@ function applyPageSetupSnap(snap: PageSetupSnap) {
     chrome.footer !== pageChrome.value.footer ||
     chrome.pageNumber !== pageChrome.value.pageNumber
   ) {
-    replacePageChrome({ ...chrome })
+    replacePageChrome(normalizePageChrome(chrome))
   }
 }
 
@@ -7216,7 +7216,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'comment',
       label: '评论',
-      title: commentsOpen.value ? '评论已打开，再点一次收起' : '给选中文字加评论',
+      title: commentsOpen.value ? '评论已打开，再点一次收起' : '对选区添加评论',
       icon: '💬',
       iconComp: ic('note'),
       active: () => commentsOpen.value,

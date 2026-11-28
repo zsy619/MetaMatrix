@@ -1468,6 +1468,9 @@ func (s *DocumentsService) Restore(ownerID, docID uuid.UUID, in RestoreInput) (*
 		if _, err := syncExtract(tx, docID, payload, now, doc.CanvasType); err != nil {
 			return err
 		}
+		if err := recordRestoreSnapshot(tx, docID, ownerID, payload); err != nil {
+			return err
+		}
 		return appendDocAudit(tx, ownerID, docID, AuditActionRestore, payload)
 	})
 	if err != nil {

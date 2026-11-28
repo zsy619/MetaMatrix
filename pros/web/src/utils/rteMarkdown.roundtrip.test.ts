@@ -199,4 +199,51 @@ describe('Markdown 导入导出往返与边界', () => {
     expect(back).toContain('https://example.com/doc')
     expect(back).toContain('又粗又斜')
   })
+
+  it('高亮 ==文字== 往返为 mark，转义的等号不当高亮', () => {
+    const md = '这是 ==高亮== 与 **粗** 的组合，还有 ==**粗亮**==。字面 \\== 不是高亮。'
+    const { html, back } = roundtrip(md)
+    expect(html).toMatch(/<mark>高亮<\/mark>/)
+    expect(html).toMatch(/<mark>.*粗亮.*<\/mark>/)
+    expect(html).not.toMatch(/<mark>不是高亮<\/mark>/)
+    expect(back).toContain('==高亮==')
+    expect(back).toContain('==')
+    expect(back).toContain('粗亮')
+  })
+
+  it('脚注定义不落正文，引用往返后仍指向同一注文', () => {
+    const md = [
+      '参见[^a]与再次引用[^a]，另见[^b]。',
+      '',
+      '[^a]: 出处甲',
+      '[^b]: 出处乙',
+      '    续行说明',
+    ].join('\n')
+    const { html, back } = roundtrip(md)
+    expect(html).toContain('data-type="footnote"')
+    expect(html).toContain('data-fn-id="fn-a"')
+    expect(html).toContain('data-fn-text="出处甲"')
+    expect(html).toContain('data-fn-text="出处乙')
+    expect(html).toContain('续行说明')
+    expect(html).not.toContain('[^a]:')
+    expect((html.match(/data-fn-id="fn-a"/g) || []).length).toBe(2)
+    expect((html.match(/data-fn-id="fn-b"/g) || []).length).toBe(1)
+    expect(back).toContain('[^a]')
+    expect(back).toContain('[^b]')
+    expect(back).toMatch(/\[\^a\]:\s*出处甲/)
+    expect(back).toMatch(/\[\^b\]:\s*出处乙/)
+    expect(back).toContain('续行说明')
+    expect(back).not.toMatch(/\[出处甲\]/)
+  })
+
+  it('编辑器形态的脚注标记导出为 Markdown 脚注', () => {
+    const html = '<p>结论<sup class="rte-footnote" data-type="footnote" data-fn-id="fn-x9k2-ab12" data-fn-text="原始出处" title="原始出处" data-fn-n="1">1</sup></p>'
+    const md = htmlToMarkdown(html)
+    expect(md).toContain('[^')
+    expect(md).toContain(']: 原始出处')
+    expect(md).toContain('结论')
+    const again = markdownToHtml(md)
+    expect(again).toContain('data-type="footnote"')
+    expect(again).toContain('原始出处')
+  })
 })

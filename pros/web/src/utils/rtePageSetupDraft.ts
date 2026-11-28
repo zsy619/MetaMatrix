@@ -2,7 +2,7 @@
  * 页面设置弹窗的草稿。确认前不写文档。
  * 没改过的尺寸和边距返回 null，调用方不要落库，避免把已有页面设置重写一遍。
  */
-import { normalizePageChrome, type PanelPageChrome } from './rtePageChrome'
+import { normalizePageChrome, type StoredPageChrome } from './rtePageChrome'
 import { marginsEqual, PAGE_MARGIN_PRESETS, type PageMargin } from './rtePageMargin'
 import { normalizePageSize, type RtePageSizeId } from './rtePageSize'
 
@@ -17,16 +17,17 @@ export type PageSetupDraft = {
 export type PageSetupSnap = {
   size: RtePageSizeId
   margin: PageMargin
-  chrome: PanelPageChrome
+  chrome: StoredPageChrome
 }
 
 export function pageSetupDraftOf(snap: PageSetupSnap): PageSetupDraft {
+  const chrome = normalizePageChrome(snap.chrome)
   return {
     size: snap.size,
     marginPreset: snap.margin.preset,
-    header: snap.chrome.header,
-    footer: snap.chrome.footer,
-    pageNumber: snap.chrome.pageNumber,
+    header: chrome.header,
+    footer: chrome.footer,
+    pageNumber: chrome.pageNumber,
   }
 }
 
@@ -40,7 +41,7 @@ export function pageSetupDraftDirty(base: PageSetupDraft, draft: PageSetupDraft)
   )
 }
 
-function chromeEqual(a: PanelPageChrome, b: PanelPageChrome): boolean {
+function chromeEqual(a: StoredPageChrome, b: StoredPageChrome): boolean {
   const left = normalizePageChrome(a)
   const right = normalizePageChrome(b)
   return (

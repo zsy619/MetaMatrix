@@ -1,6 +1,7 @@
 package service
 
 import (
+	"bytes"
 	"encoding/json"
 	"strings"
 
@@ -12,16 +13,18 @@ import (
 // DualWriteReport 描述 Yjs 操作日志与 current_data 双写的一致性。
 // A2 期仍是双写：本报告只做校验，不把保存改成只写 Y.Doc。
 type DualWriteReport struct {
-	HasCurrentHTML      bool   `json:"hasCurrentHtml"`
-	CurrentHTMLHash     string `json:"currentHtmlHash"`
-	HeadRevisionHash    string `json:"headRevisionHash"`
-	HeadMatchesCurrent  bool   `json:"headMatchesCurrent"`
-	LastOpSeq           int64  `json:"lastOpSeq"`
-	LastSnapshotSeq     int64  `json:"lastSnapshotSeq"`
-	LastHTMLSaveVersion int64  `json:"lastHtmlSaveVersion"`
-	OpsWithoutHTML      int64  `json:"opsWithoutHtml"`
-	Consistent          bool   `json:"consistent"`
-	Reason              string `json:"reason"`
+	HasCurrentHTML          bool   `json:"hasCurrentHtml"`
+	CurrentHTMLHash         string `json:"currentHtmlHash"`
+	HeadRevisionHash        string `json:"headRevisionHash"`
+	HeadMatchesCurrent      bool   `json:"headMatchesCurrent"`
+	LastOpSeq               int64  `json:"lastOpSeq"`
+	LastSnapshotSeq         int64  `json:"lastSnapshotSeq"`
+	LastHTMLSaveVersion     int64  `json:"lastHtmlSaveVersion"`
+	OpsWithoutHTML          int64  `json:"opsWithoutHtml"`
+	CurrentHasYjsState      bool   `json:"currentHasYjsState"`
+	YjsStateMatchesSnapshot bool   `json:"yjsStateMatchesSnapshot"`
+	Consistent              bool   `json:"consistent"`
+	Reason                  string `json:"reason"`
 }
 
 func currentDataHTML(data datatypes.JSON) (string, bool) {
@@ -113,6 +116,18 @@ func (s *CollabService) InspectDualWrite(docID uuid.UUID) (*DualWriteReport, err
 	default:
 		report.Consistent = true
 		report.Reason = "dual_write_in_sync"
+	}
+
+	// 仅在 current_data 与最新 snapshot 都带了 yjs 快照时对照。缺少任一侧仍属双写期，不改原结论。
+	// 两边都有却对不上，说明 HTML 看似同步，协同状态已经分叉。这不是改成 Y.Doc-only。
+	currentState, hasCurrent := yjsStateBytes(doc.CurrentData)
+	report.CurrentHasYjsState = hasCurrent
+	if snapState, hasSnap := latestYjsSnapshotPayload(s.db, docID); hasCurrent && hasSnap {
+		report.YjsStateMatchesSnapshot = bytes.Equal(currentState, snapState)
+		if !report.YjsStateMatchesSnapshot && report.Consistent {
+			report.Consistent = false
+			report.Reason = "yjs_state_diverged"
+		}
 	}
 	return report, nil
 }

@@ -161,11 +161,16 @@ describe('RteTableFormulaBar', () => {
     focusCell(3, 1)
     await flushPromises()
     const input = wrapper.find('.rte-formula-input')
-    await input.setValue('=ROUND(B2)')
+    await input.setValue('=NOTAFUNC(B2)')
     await input.trigger('keydown.enter')
     await flushPromises()
-
     expect(wrapper.find('.rte-formula-error').text()).toBe('#NAME?')
+
+    await input.setValue('=SQRT(-1)')
+    await input.trigger('keydown.enter')
+    await flushPromises()
+    expect(wrapper.find('.rte-formula-error').text()).toBe('#VALUE!')
+    expect(ed.getHTML()).toContain('#VALUE!')
     wrapper.unmount()
   })
 

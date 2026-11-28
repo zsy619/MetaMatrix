@@ -668,7 +668,7 @@ function run(action: () => void) {
         type="button"
         class="rte-bubble-btn"
         title="给选中文字加一条评论"
-        aria-label="评论"
+        aria-label="对选区添加评论"
         @click="rte.beginComment"
       >
         评

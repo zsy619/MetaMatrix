@@ -251,8 +251,9 @@ function onChangeChartType(event: Event) {
       <label class="rte-cp-type-row">
         <span class="rte-cp-type-label">图表类型</span>
         <select
-          class="rte-cp-type-select"
+          class="rte-cp-type-select rte-cp-chart-type"
           :value="panel.target?.chartType || ''"
+          aria-label="图表类型"
           title="换成另一种图"
           @change="onChangeChartType"
         >

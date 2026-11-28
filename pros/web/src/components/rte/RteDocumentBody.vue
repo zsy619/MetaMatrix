@@ -1045,7 +1045,7 @@ function blockInsertTitle(label: string, slashId: string | undefined): string {
         data-rte-own
         type="button"
         class="rte-mobile-btn"
-        aria-label="评论"
+        aria-label="对选区添加评论"
         title="给选中的文字写评论"
         @mousedown.prevent
         @click="rte.beginComment"

@@ -259,3 +259,24 @@ cd pros/web && npx vitest run && npx vue-tsc -b --pretty false
 - 35：大纲/目录抽出 h1–h6 与 `data-block-id`；TocBlock 条目可点击跳转；侧栏大纲按块身份定位；插入目录优先走 `insertToc` 命令。Slash 的 Home/End 原已可用。历史恢复会先退出实时协同再写入 HTML，避免服务端较新增量立刻覆盖。真实浏览器点验仍未做
 - 15：新增 `accessDocument`（所有者或空间角色；外人视为文档不存在）。空间浏览者可看属性/版本/评论并评论；编辑者可改属性、给版本加备注。属性按 `doc_id` 读取，不再因调用者不是所有者而返回空白稿。`KnowledgeDocVersion` 增加 `yjsState`，`DocComment` 增加可选 `yRel`。没有改成 `doc_*` 全套同名模型，也不是飞书级组织/字段 ACL
 - 34（加深，仍不是完整版本树）：知识库版本可带上 `yjsState`；历史页事件带上该字段。恢复时退出协同并按 HTML 落回，不把旧快照 apply 到已经超前的 Y.Doc，也不在恢复后立刻重连协同
+
+---
+
+## MET-11 深化（仅本分支，未合入 main）
+
+分支 `agent/met-11-deepen-20261128`，从 `origin/main` @ `918a633db3071a087410d5a2262a5b412ee49026` 拉出。下面只记录本分支已完成的事，未推送、未开 PR、未合入。不是飞书级，也不是已达最终设计。实机验收未做。47–51 未做。
+
+- 历史 6 个 vitest 失败已按根因修好：标题 HTML 带块身份仍识别为 h2；页眉页脚空字段不落库；公式栏用未知函数 / 非法值覆盖 `#NAME?` / `#VALUE!`；评论按钮可达名称并走「注释与引用」栏；图表类型下拉有独立 `aria-label`；`chartDataTable` 拆到 300 行以下并修了原文件里的类型问题。
+- 28/40：自建 Markdown 补齐 `==高亮==` 与 `[^id]` / `[^id]:` 脚注（含缩进续行）往返；脚注定义不再被当成引用式链接。未加入官方 `@tiptap/markdown`。
+- 17/41：自动压缩按「最新 snapshot 之前仍可删除的前缀」计阈值，快照后的增量再长也不误触发；重复压缩返回 `already_compacted`。这仍不是完整的 Yjs 文档 GC。
+- 34：画布 `Restore` 在同一事务写入协同 snapshot 并删除更早日志；知识库恢复先退出协同再写 HTML，且仅当正文未改时把 `yjsState` 一并保存。仍不是完整 Yjs Snapshot 版本树。
+- 35：块身份失效时大纲/目录按 html id 或标题文本回退；`sameOutline` 比较 htmlId；错配的标题闭合标签不再抽进服务端大纲。
+- 15：`DocOutline` / `ListDocTasks` 对浏览者可读；`SetDocTask` / `ReorderOutline` / `saveDocHTML` 对编辑者可写（按文档所有者回写）。不是组织或字段级 ACL。
+- 43：按线程 id 撤销评论锚点时，其它线程标记仍保留（单测已补）。
+- 08/32（单测加固，不宣称完成 50）：Redis presence 补了 TTL 过期、文档隔离、心跳覆盖、畸形/外文档 key 跳过，以及总线忽略空消息、非 JSON、坏 docId 和本实例回环的单测。不是真实双 API + 双浏览器验收。
+- 16（仍双写，短于 Y.Doc-only）：`InspectDualWrite` 在 `current_data.yjsState` 与最新 snapshot 都存在且字节不一致时标 `Consistent=false`、`Reason=yjs_state_diverged`；并暴露 `CurrentHasYjsState` / `YjsStateMatchesSnapshot`。缺一侧不改原先 HTML 双写结论。
+- 页眉页脚写入路径（`setPanelPageChrome` / `PageSetupSnap` / `replacePageChrome` / `publish` / `applyPageSetupSnap`）接受紧凑入参并先规范化，消掉历史测试与刚引入的 `RichTextEditor.vue` 类型诊断。
+
+对照现状后未再改代码的项：C1 保存冲突（块 ident / DOM 等价 / mine-theirs-both）与嵌入树快照安全推拉（1s/800ms、双方脏则中止、只读探测）已有足够单测，未见可再加深且不踩 47/48 的产品缺口；建议/评论/只读流程未找到可复现的新 RTE bug。其余未完成项属于架构锁（独立 Hocuspocus / 换 MySQL / 生产 MinIO / 一次切 Y.Doc-only / 官方 `@tiptap/markdown`）、47–51、未选定产品决策，或必须实机浏览器才能验，本分支停止加码，没有为空转改无关文件。
+
+本轮门禁（干净工作树，相对合入 #310 后的 `origin/main`，以及相对本分支第一轮 `8520e72` 的 55/20、0 failed / 2134 passed / 1 skipped）：`vue-tsc` 52 错 / 18 文件（较第一轮再减 3 错、2 个文件，来自紧凑页眉入参被正式接受；无新增文件、无新增诊断）；`vitest` 仍为 0 failed / 2134 passed / 1 skipped（298 files）；Go `internal/service` `internal/handler` `internal/middleware` `internal/config` 测试与 `go build ./cmd/server` 通过。

@@ -256,19 +256,43 @@ export function readPageChrome(
   return normalizePageChrome(map[panelId])
 }
 
+/** 落库时的页眉页脚：空字符串、无页码、装订线 0 都不写进 JSON。 */
+export type StoredPageChrome = {
+  header?: string
+  headerEven?: string
+  footer?: string
+  footerEven?: string
+  pageNumber?: string
+  gutter?: number
+}
+
+export function compactPageChrome(chrome: PanelPageChrome): StoredPageChrome {
+  const out: StoredPageChrome = {}
+  if (chrome.header) out.header = chrome.header
+  if (chrome.headerEven) out.headerEven = chrome.headerEven
+  if (chrome.footer) out.footer = chrome.footer
+  if (chrome.footerEven) out.footerEven = chrome.footerEven
+  if (chrome.pageNumber !== 'none') out.pageNumber = chrome.pageNumber
+  if (chrome.gutter) out.gutter = chrome.gutter
+  return out
+}
+
 export function writePageChrome(
-  map: Record<string, { header?: string; footer?: string; pageNumber?: string }> | null | undefined,
+  map: Record<string, StoredPageChrome> | null | undefined,
   panelId: string,
   chrome: PanelPageChrome,
-): Record<string, PanelPageChrome> | undefined {
-  const next: Record<string, PanelPageChrome> = {}
+): Record<string, StoredPageChrome> | undefined {
+  const next: Record<string, StoredPageChrome> = {}
   if (map) {
-    for (const [id, value] of Object.entries(map)) next[id] = normalizePageChrome(value)
+    for (const [id, value] of Object.entries(map)) {
+      const packed = compactPageChrome(normalizePageChrome(value))
+      if (Object.keys(packed).length) next[id] = packed
+    }
   }
   if (!panelId) return Object.keys(next).length ? next : undefined
   const normalized = normalizePageChrome(chrome)
   if (pageChromeIsEmpty(normalized)) delete next[panelId]
-  else next[panelId] = normalized
+  else next[panelId] = compactPageChrome(normalized)
   return Object.keys(next).length ? next : undefined
 }
 

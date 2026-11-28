@@ -68,7 +68,8 @@ export function sameOutline(a: OutlineHeading[], b: OutlineHeading[]): boolean {
       (item, index) =>
         item.level === b[index]?.level &&
         item.text === b[index]?.text &&
-        (item.blockId || '') === (b[index]?.blockId || ''),
+        (item.blockId || '') === (b[index]?.blockId || '') &&
+        (item.htmlId || '') === (b[index]?.htmlId || ''),
     )
   )
 }
@@ -102,20 +103,36 @@ function cssIdent(value: string): string {
 /** 把光标移到标题并滚入视野。找不到时返回 false。 */
 export function selectOutlineHeading(editor: Editor, heading: OutlineHeading): boolean {
   let found: number | null = null
+  const wantHtmlId = String(heading.htmlId || '').trim()
   editor.state.doc.descendants((node, pos) => {
     if (found != null || node.type.name !== 'heading') return
-    const level = Number(node.attrs.level) || 1
-    const text = node.textContent.trim()
     const blockId = String(node.attrs[BLOCK_IDENTITY_ATTR] || '').trim()
     if (heading.blockId && blockId && blockId === heading.blockId) {
       found = pos
       return false
     }
-    if (!heading.blockId && text === heading.text && level === heading.level) {
-      found = pos
-      return false
-    }
   })
+  if (found == null && wantHtmlId) {
+    editor.state.doc.descendants((node, pos) => {
+      if (found != null || node.type.name !== 'heading') return
+      const htmlId = String(node.attrs.id || '').trim()
+      if (htmlId && htmlId === wantHtmlId) {
+        found = pos
+        return false
+      }
+    })
+  }
+  if (found == null) {
+    editor.state.doc.descendants((node, pos) => {
+      if (found != null || node.type.name !== 'heading') return
+      const level = Number(node.attrs.level) || 1
+      const text = node.textContent.trim()
+      if (text === heading.text && level === heading.level) {
+        found = pos
+        return false
+      }
+    })
+  }
   if (found == null) return false
   return editor.chain().focus().setTextSelection(found + 1).scrollIntoView().run()
 }

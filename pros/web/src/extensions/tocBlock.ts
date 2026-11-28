@@ -63,6 +63,7 @@ export const TocBlock = Node.create({
           'data-outline-level': String(item.level || 1),
           'data-outline-text': item.text || '',
           ...(item.blockId ? { 'data-block-id': item.blockId } : {}),
+          ...(item.htmlId ? { 'data-outline-id': item.htmlId } : {}),
         },
         item.text || '',
       ]),
@@ -95,6 +96,7 @@ export const TocBlock = Node.create({
                 level: Number(el.getAttribute('data-outline-level')) || 1,
                 text: el.getAttribute('data-outline-text') || el.textContent?.trim() || '',
                 blockId: el.getAttribute('data-block-id') || undefined,
+                htmlId: el.getAttribute('data-outline-id') || undefined,
               }
               return selectOutlineHeading(editor, heading)
             },

@@ -1,6 +1,8 @@
 package service
 
 import (
+	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -125,4 +127,103 @@ func TestRedisPresenceBusCrossInstance(t *testing.T) {
 		}
 	}
 	t.Fatalf("timeout waiting for cross-instance awareness, last=%q", received)
+}
+
+func TestRedisPresenceExpiresAfterTTLAndStaysOnOwnDoc(t *testing.T) {
+	mr := miniredis.RunT(t)
+	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	t.Cleanup(func() { _ = rdb.Close() })
+	store := &redisPresenceStore{rdb: rdb}
+	docA, docB := uuid.New(), uuid.New()
+	user := uuid.New()
+	store.Heartbeat(docA, user, "甲", "", true, "p:a")
+	store.Heartbeat(docB, user, "甲", "", false, "p:b")
+	if got := store.List(docA); len(got) != 1 || got[0].Cursor != "p:a" || !got[0].Editing {
+		t.Fatalf("docA = %+v", got)
+	}
+	if got := store.List(docB); len(got) != 1 || got[0].Cursor != "p:b" || got[0].Editing {
+		t.Fatalf("docB = %+v", got)
+	}
+	store.Heartbeat(docA, user, "甲", "", false, "p:a2")
+	if got := store.List(docA); len(got) != 1 || got[0].Cursor != "p:a2" || got[0].Editing {
+		t.Fatalf("overwrite = %+v", got)
+	}
+	mr.FastForward(presenceTTL + time.Second)
+	if got := store.List(docA); len(got) != 0 {
+		t.Fatalf("after TTL docA = %+v, want empty", got)
+	}
+	if got := store.List(docB); len(got) != 0 {
+		t.Fatalf("after TTL docB = %+v, want empty", got)
+	}
+}
+
+func TestRedisPresenceListSkipsMalformedAndForeignKeys(t *testing.T) {
+	mr := miniredis.RunT(t)
+	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	t.Cleanup(func() { _ = rdb.Close() })
+	store := &redisPresenceStore{rdb: rdb}
+	doc, good, bad := uuid.New(), uuid.New(), uuid.New()
+	store.Heartbeat(doc, good, "甲", "", true, "p")
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if err := rdb.Set(ctx, redisPresenceKey(doc, bad), "not-json", presenceTTL).Err(); err != nil {
+		t.Fatal(err)
+	}
+	if err := rdb.Set(ctx, presenceRedisPrefix+"not-a-doc:"+good.String(), `{"userId":"x","name":"串"}`, presenceTTL).Err(); err != nil {
+		t.Fatal(err)
+	}
+	got := store.List(doc)
+	if len(got) != 1 || got[0].Name != "甲" {
+		t.Fatalf("list = %+v, want only 甲", got)
+	}
+}
+
+func TestRedisPresenceBusIgnoresMalformedEmptyAndSelf(t *testing.T) {
+	mr := miniredis.RunT(t)
+	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	t.Cleanup(func() { _ = rdb.Close() })
+	a := newRedisInstanceBus(rdb)
+	b := newRedisInstanceBus(rdb)
+	got := make(chan string, 8)
+	b.Start(func(docID uuid.UUID, body []byte) { got <- docID.String() + "|" + string(body) })
+	a.Start(func(_ uuid.UUID, body []byte) { got <- "self:" + string(body) })
+	defer a.Close()
+	defer b.Close()
+
+	doc := uuid.New()
+	a.Publish(doc, nil)
+	a.Publish(doc, []byte{})
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if err := rdb.Publish(ctx, collabBusChannel, "not-json").Err(); err != nil {
+		t.Fatal(err)
+	}
+	bad, err := json.Marshal(busEnvelope{Origin: "other", DocID: "not-a-uuid", Body: []byte(`{"x":1}`)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := rdb.Publish(ctx, collabBusChannel, bad).Err(); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case msg := <-got:
+		t.Fatalf("unexpected bus delivery: %s", msg)
+	case <-time.After(200 * time.Millisecond):
+	}
+
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		a.Publish(doc, []byte(`{"ok":true}`))
+		select {
+		case msg := <-got:
+			if msg == doc.String()+"|{\"ok\":true}" {
+				return
+			}
+			if len(msg) >= 5 && msg[:5] == "self:" {
+				t.Fatalf("publisher received its own event: %s", msg)
+			}
+		case <-time.After(50 * time.Millisecond):
+		}
+	}
+	t.Fatal("valid cross-instance message was not delivered")
 }
