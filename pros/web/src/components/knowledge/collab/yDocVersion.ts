@@ -57,3 +57,26 @@ export function parseRestoredVersion(payload: RestoredVersion | string | null | 
   const yjsState = readYjsStateFromPayload(payload)
   return yjsState ? { html, yjsState } : { html }
 }
+
+/** 恢复时先退出协同，再交给调用方写入 HTML / yjsState。 */
+export function planVersionRestore(
+  collabOn: boolean,
+  payload: RestoredVersion | string | null | undefined,
+): { stopCollab: boolean; html: string; yjsState?: string } {
+  const restored = parseRestoredVersion(payload)
+  return {
+    stopCollab: Boolean(collabOn),
+    html: restored.html,
+    ...(restored.yjsState ? { yjsState: restored.yjsState } : {}),
+  }
+}
+
+/** 仅当正文仍是恢复出来的 HTML 时附带 yjsState，避免用户改稿后把旧协同快照写回去。 */
+export function attachRestoredYjsState<T extends { html: string }>(
+  payload: T,
+  restored: { html: string; yjsState?: string | null } | null | undefined,
+): T & { yjsState?: string } {
+  const state = restored?.yjsState?.trim()
+  if (!state || payload.html !== restored?.html) return payload
+  return { ...payload, yjsState: state }
+}

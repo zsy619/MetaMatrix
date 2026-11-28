@@ -39,7 +39,7 @@ const IconPicker = defineAsyncComponent(() => import('../common/IconPicker.vue')
 import { getDocument, getDocumentBlock, listDocumentBlocks, updateBlockPermission, updateDocument } from '../../api/documents'
 import { apiRequestBlob, getToken } from '../../api/http'
 import { LiveCollabSession, createCollabYDoc } from './collab/yDocCollab'
-import { parseRestoredVersion, type RestoredVersion } from './collab/yDocVersion'
+import { attachRestoredYjsState, planVersionRestore, type RestoredVersion } from './collab/yDocVersion'
 import { isCollabWritable } from './collab/collabOfflineQueue'
 import { collabCaretColor } from './collab/collabAwareness'
 import { useAuthStore } from '../../stores/auth'
@@ -812,14 +812,17 @@ async function exportAs(format: string) {
   }
 }
 
+const restoredSnapshot = ref<{ html: string; yjsState?: string } | null>(null)
+
 /** 恢复历史版本：写入 HTML，并退出正在进行的协同，避免服务端较新增量立刻覆盖这次恢复。 */
 function onRestored(payload: RestoredVersion | string) {
-  const restored = parseRestoredVersion(payload)
-  html.value = restored.html
-  if (collabOn.value) {
+  const plan = planVersionRestore(collabOn.value, payload)
+  if (plan.stopCollab) {
     stopLiveCollab()
     ElMessage.info('已退出协同并载入该版本，保存后可重新开启协同')
   }
+  html.value = plan.html
+  restoredSnapshot.value = plan.yjsState ? { html: plan.html, yjsState: plan.yjsState } : null
   dirty.value = true
   scheduleSave()
 }
@@ -848,7 +851,10 @@ async function save() {
   saving.value = true
   try {
     // 正文仍然以 HTML 为事实源，同时把 Markdown 源码一起存进库（content_markdown 列）
-    const payload = { type: 'doc', html: html.value, markdown: htmlToMarkdown(html.value) }
+    const payload = attachRestoredYjsState(
+      { type: 'doc', html: html.value, markdown: htmlToMarkdown(html.value) },
+      restoredSnapshot.value,
+    )
     const updated = await updateDocument(props.documentId, {
       title: title.value.trim() || '无标题',
       currentData: payload as never,
@@ -857,6 +863,7 @@ async function save() {
     })
     doc.value = updated
     dirty.value = false
+    restoredSnapshot.value = null
     void refreshBlockPermissionGuard()
   } catch (err: unknown) {
     const status = (err as { status?: number }).status
