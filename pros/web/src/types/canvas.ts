@@ -1224,11 +1224,18 @@ export type RoiDecisionFixedBlockId =
   | 'timeWindow'
   | 'conclusion'
 
+/** 这一行收益和成本比下来的判断 */
+export type RoiDecisionVerdict = '' | 'worth' | 'even' | 'poor'
+
+/** 整张画布的决定 */
+export type RoiDecisionChoice = '' | 'do' | 'validate' | 'stop'
+
 export interface RoiDecisionRow {
   id: string
   dimension: string
   benefitBlockId: string
   costBlockId: string
+  verdict?: RoiDecisionVerdict
 }
 
 export interface RoiDecisionBlock {
@@ -1244,6 +1251,10 @@ export interface RoiDecisionDocumentJSON {
   schemaVersion: number
   theme: CanvasTheme
   title: string
+  /** 这次要决定的事 */
+  decision?: string
+  /** 最终选择 */
+  choice?: RoiDecisionChoice
   rows: RoiDecisionRow[]
   blocks: RoiDecisionBlock[]
 }
@@ -2973,7 +2984,11 @@ export function isDualTriangleDoc(
   return !!doc && doc.type === 'dual_triangle'
 }
 
-/** Coerce legacy / poisoned drafts into canonical y_model before type guards. */
+/**
+ * Coerce a real Y-model draft into canonical y_model before type guards.
+ * A document that already has another canvas type stays that type, even when
+ * the previously open template was y-model.
+ */
 export function coerceYModelDoc(
   doc: CanvasDocumentJSON,
   templateId?: string | null,
@@ -2981,13 +2996,13 @@ export function coerceYModelDoc(
   const raw = doc as CanvasDocumentJSON & { type?: string; id?: string }
   // Cast: poisoned drafts may carry hyphenated "y-model" outside the union.
   const type = raw.type as string | undefined
+  if (type === 'y_model') return doc
+  if (type && type !== 'y-model') return doc
   const looksY =
-    type === 'y_model' ||
     type === 'y-model' ||
     raw.id === 'canvas_y_model' ||
     templateId === 'y-model'
   if (!looksY) return doc
-  if (type === 'y_model') return doc
   return { ...doc, type: 'y_model' } as YModelDocumentJSON
 }
 

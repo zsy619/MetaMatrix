@@ -37,6 +37,8 @@ const props = withDefaults(
     editor?: 'default' | 'card'
     /** card 模式下的抬头色 */
     accent?: string
+    /** 空正文时的提示。不传则沿用原来的「写在这里」。 */
+    placeholder?: string
   }>(),
   {
     compact: false,
@@ -44,6 +46,7 @@ const props = withDefaults(
     showAdd: false,
     editor: 'default',
     accent: '',
+    placeholder: '',
   },
 )
 
@@ -204,7 +207,7 @@ function onCloseMaximize(event?: Event) {
         :show-bottom-bar="false"
         :show-publish-actions="false"
         :show-markdown-hint="false"
-        :placeholder="isCard ? '点击填写…' : '写在这里'"
+        :placeholder="placeholder || (isCard ? '点击填写…' : '写在这里')"
         :model-value="editorHtml"
         @update:model-value="onEditorHtml"
         @focus="onEditorFocus"
@@ -289,7 +292,7 @@ function onCloseMaximize(event?: Event) {
             :show-title="false"
             :show-bottom-bar="true"
             :show-publish-actions="false"
-            placeholder="请输入正文"
+            :placeholder="placeholder || '请输入正文'"
             :model-value="editorHtml"
             @update:model-value="onEditorHtml"
             @focus="onEditorFocus"

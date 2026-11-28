@@ -3,8 +3,10 @@ import { computed, onMounted } from 'vue'
 import { canvasChromeStyle } from './canvasChrome'
 import type {
   RoiDecisionBlock,
+  RoiDecisionChoice,
   RoiDecisionDocumentJSON,
   RoiDecisionRow,
+  RoiDecisionVerdict,
 } from '../../types/canvas'
 import { useDocumentStore } from '../../stores/document'
 import YModelBlockCard from './YModelBlock.vue'
@@ -21,19 +23,53 @@ documentStore.ensureRoiDecisionBlocks()
 
 const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 
+const VERDICTS: Array<{ id: RoiDecisionVerdict; label: string }> = [
+  { id: 'worth', label: '划算' },
+  { id: 'even', label: '持平' },
+  { id: 'poor', label: '不划算' },
+]
+
+const CHOICES: Array<{ id: RoiDecisionChoice; label: string }> = [
+  { id: 'do', label: '去做' },
+  { id: 'validate', label: '先小范围验证' },
+  { id: 'stop', label: '不做' },
+]
+
 const byId = computed(() => {
   const map = new Map<string, RoiDecisionBlock>()
   for (const b of props.doc.blocks) map.set(b.id, b)
   return map
 })
 
+const readout = computed(() => {
+  const rows = props.doc.rows
+  const judged = rows.filter((row) => row.verdict === 'worth' || row.verdict === 'even' || row.verdict === 'poor').length
+  return `${rows.length} 个维度，${judged} 个已判断`
+})
+
 function block(id: string): RoiDecisionBlock | undefined {
   return byId.value.get(id)
+}
+
+function onDecisionInput(event: Event) {
+  documentStore.updateRoiDecisionDecision((event.target as HTMLInputElement).value)
 }
 
 function onDimensionInput(rowId: string, event: Event) {
   const value = (event.target as HTMLInputElement).value
   documentStore.updateRoiDecisionDimension(rowId, value)
+}
+
+function onVerdict(rowId: string, verdict: RoiDecisionVerdict) {
+  documentStore.updateRoiDecisionVerdict(rowId, verdict)
+}
+
+function onChoice(choice: RoiDecisionChoice) {
+  documentStore.updateRoiDecisionChoice(choice)
+}
+
+function verdictLabel(row: RoiDecisionRow): string {
+  return VERDICTS.find((item) => item.id === row.verdict)?.label || '还没判断'
 }
 
 function onAddRow() {
@@ -61,12 +97,41 @@ onMounted(() => {
     :style="chrome"
     aria-label="ROI决策评估"
   >
-    <!-- Top matrix: 维度 | 收益项 | 成本项 -->
+    <header class="rd-decision">
+      <label class="rd-decision-field">
+        <span class="rd-decision-kicker">这次要决定</span>
+        <input
+          class="rd-decision-input"
+          type="text"
+          :value="doc.decision || ''"
+          maxlength="80"
+          placeholder="例如：要不要做这个功能"
+          aria-label="这次要决定的事"
+          @input="onDecisionInput"
+        />
+      </label>
+      <p class="rd-readout">{{ readout }}</p>
+    </header>
+
+    <!-- Top matrix: 维度 | 收益项 | 成本项 | 判断 | 操作 -->
     <div class="rd-matrix" role="table" aria-label="维度收益成本矩阵">
       <div class="rd-matrix-headers" role="row">
-        <div class="rd-col-header rd-col-header--dim" role="columnheader" :style="toneVars(0)">维度</div>
-        <div class="rd-col-header" role="columnheader" :style="toneVars(1)">收益项</div>
-        <div class="rd-col-header" role="columnheader" :style="toneVars(2)">成本项</div>
+        <div class="rd-col-header rd-col-header--dim" role="columnheader" :style="toneVars(0)">
+          <span>维度</span>
+          <small>从哪个角度看</small>
+        </div>
+        <div class="rd-col-header" role="columnheader" :style="toneVars(1)">
+          <span>收益项</span>
+          <small>得到什么</small>
+        </div>
+        <div class="rd-col-header" role="columnheader" :style="toneVars(2)">
+          <span>成本项</span>
+          <small>付出什么</small>
+        </div>
+        <div class="rd-col-header rd-col-header--judge" role="columnheader">
+          <span>判断</span>
+          <small>划不划算</small>
+        </div>
         <div class="rd-col-header rd-col-header--actions" aria-hidden="true" />
       </div>
 
@@ -96,9 +161,11 @@ onMounted(() => {
             role="cell"
             :style="toneVars(1)"
           >
+            <p class="rd-cell-label">收益项 · 得到什么</p>
             <YModelBlockCard
               :block="block(row.benefitBlockId)!"
               hide-title
+              placeholder="写具体结果"
             />
           </section>
           <section
@@ -113,9 +180,11 @@ onMounted(() => {
             role="cell"
             :style="toneVars(2)"
           >
+            <p class="rd-cell-label">成本项 · 付出什么</p>
             <YModelBlockCard
               :block="block(row.costBlockId)!"
               hide-title
+              placeholder="时间、钱、人力"
             />
           </section>
           <section
@@ -124,6 +193,22 @@ onMounted(() => {
             role="cell"
             :style="toneVars(2)"
           />
+          <div class="rd-judge" role="cell">
+            <p class="rd-cell-label">判断</p>
+            <div class="rd-verdicts" role="group" :aria-label="`${row.dimension || '未命名'}的判断，当前${verdictLabel(row)}`">
+              <button
+                v-for="item in VERDICTS"
+                :key="item.id"
+                type="button"
+                class="rd-verdict"
+                :class="`rd-verdict--${item.id}`"
+                :aria-pressed="row.verdict === item.id"
+                @click="onVerdict(row.id, item.id)"
+              >
+                {{ item.label }}
+              </button>
+            </div>
+          </div>
           <div class="rd-row-actions">
             <button
               type="button"
@@ -152,26 +237,55 @@ onMounted(() => {
       <section class="rd-mid-col tbl-tone" :style="toneVars(3)" v-if="block('opportunityCost')">
         <header class="rd-mid-head">
           <h2 class="rd-mid-title">机会成本</h2>
+          <p class="rd-mid-hint">不做的话，这些资源会用在哪</p>
         </header>
         <div class="rd-panel">
-          <YModelBlockCard :block="block('opportunityCost')!" hide-title />
+          <YModelBlockCard
+            :block="block('opportunityCost')!"
+            hide-title
+            placeholder="不做的话，这些资源会用在哪"
+          />
         </div>
       </section>
       <section class="rd-mid-col tbl-tone" :style="toneVars(4)" v-if="block('timeWindow')">
         <header class="rd-mid-head">
           <h2 class="rd-mid-title">时间窗口</h2>
+          <p class="rd-mid-hint">现在做和以后做，差在哪里</p>
         </header>
         <div class="rd-panel">
-          <YModelBlockCard :block="block('timeWindow')!" hide-title />
+          <YModelBlockCard
+            :block="block('timeWindow')!"
+            hide-title
+            placeholder="现在做和以后做，差在哪里"
+          />
         </div>
       </section>
     </div>
 
     <!-- Bottom: 最终结论 -->
     <section class="rd-conclusion tbl-tone" :style="toneVars(5)" v-if="block('conclusion')" aria-label="最终结论">
-      <div class="rd-conclusion-label">最终结论</div>
+      <div class="rd-conclusion-bar">
+        <div class="rd-conclusion-label">最终结论</div>
+        <div class="rd-choices" role="group" aria-label="最终选择">
+          <button
+            v-for="item in CHOICES"
+            :key="item.id"
+            type="button"
+            class="rd-choice"
+            :class="`rd-choice--${item.id}`"
+            :aria-pressed="doc.choice === item.id"
+            @click="onChoice(item.id)"
+          >
+            {{ item.label }}
+          </button>
+        </div>
+      </div>
       <div class="rd-panel rd-panel--conclusion">
-        <YModelBlockCard :block="block('conclusion')!" hide-title />
+        <YModelBlockCard
+          :block="block('conclusion')!"
+          hide-title
+          placeholder="写下决定，以及还要验证什么"
+        />
       </div>
     </section>
   </div>
@@ -221,7 +335,7 @@ onMounted(() => {
 .rd-matrix-headers {
   flex-shrink: 0;
   display: grid;
-  grid-template-columns: minmax(96px, 0.7fr) minmax(0, 1.4fr) minmax(0, 1.4fr) 52px;
+  grid-template-columns: minmax(96px, 0.7fr) minmax(0, 1.4fr) minmax(0, 1.4fr) 118px 52px;
   background: transparent;
   border-bottom: 1px solid var(--cv-frame, #ececec);
 }
@@ -258,7 +372,7 @@ onMounted(() => {
 
 .rd-row {
   display: grid;
-  grid-template-columns: minmax(96px, 0.7fr) minmax(0, 1.4fr) minmax(0, 1.4fr) 52px;
+  grid-template-columns: minmax(96px, 0.7fr) minmax(0, 1.4fr) minmax(0, 1.4fr) 118px 52px;
   grid-auto-rows: max-content;
   /* Empty rows stay readable; taller notes extend the row */
   min-height: 400px;
@@ -682,4 +796,138 @@ onMounted(() => {
     border-bottom: 1px solid var(--cv-frame, #ececec);
   }
 }
+
+/* ---- PR #295 evaluation chrome, kept on top of main's tall-row matrix ---- */
+.rd-decision {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--cv-frame, #ececec);
+  background: #fff;
+}
+.rd-decision-field {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.rd-decision-kicker {
+  font-size: 13px;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  color: var(--tbl-topic, #1c4c7c);
+}
+.rd-decision-input {
+  width: 100%;
+  border: none;
+  border-bottom: 1.5px solid transparent;
+  background: transparent;
+  padding: 2px 0 6px;
+  font-size: 22px;
+  font-weight: 750;
+  line-height: 1.35;
+  color: #202124;
+  font-family: inherit;
+  outline: none;
+}
+.rd-decision-input:focus { border-bottom-color: var(--cv-focus, #1c4c7c); }
+.rd-decision-input::placeholder { color: #9aa0a6; font-weight: 600; }
+.rd-readout {
+  flex-shrink: 0;
+  margin: 0 0 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #eef3f8;
+  color: #1c4c7c;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.rd-col-header span {
+  display: block;
+  font-weight: 800;
+}
+.rd-col-header small {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.92;
+}
+.rd-col-header--judge {
+  background: #3e4a59;
+}
+.rd-judge {
+  min-width: 0;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 8px;
+  border-right: 1px solid var(--cv-frame, #ececec);
+  background: #f7f8f9;
+}
+.rd-cell-label {
+  display: none;
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--tbl-topic, #1c4c7c);
+}
+.rd-verdicts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rd-verdict,
+.rd-choice {
+  min-height: 36px;
+  border-radius: 8px;
+  border: 1px solid #d7dce2;
+  background: #fff;
+  color: #3c4043;
+  font-size: 14px;
+  font-weight: 750;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 6px 8px;
+}
+.rd-verdict--worth[aria-pressed='true'] { background: #187a4e; border-color: #187a4e; color: #fff; }
+.rd-verdict--even[aria-pressed='true'] { background: #a67c00; border-color: #a67c00; color: #fff; }
+.rd-verdict--poor[aria-pressed='true'] { background: #a84562; border-color: #a84562; color: #fff; }
+.rd-mid-hint {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.92;
+}
+.rd-conclusion-bar {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--tbl-header, #2a649f);
+  color: #fff;
+}
+.rd-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.rd-choice--do[aria-pressed='true'] { background: #187a4e; border-color: #187a4e; color: #fff; }
+.rd-choice--validate[aria-pressed='true'] { background: #a67c00; border-color: #a67c00; color: #fff; }
+.rd-choice--stop[aria-pressed='true'] { background: #a84562; border-color: #a84562; color: #fff; }
+
+@media (max-width: 720px) {
+  .rd-decision { flex-direction: column; align-items: stretch; }
+  .rd-readout { margin: 0; white-space: normal; }
+  .rd-cell-label { display: block; }
+  .rd-verdicts { flex-direction: row; flex-wrap: wrap; }
+}
+
 </style>
