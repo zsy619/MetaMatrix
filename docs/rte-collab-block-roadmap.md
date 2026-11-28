@@ -259,3 +259,19 @@ cd pros/web && npx vitest run && npx vue-tsc -b --pretty false
 - 35：大纲/目录抽出 h1–h6 与 `data-block-id`；TocBlock 条目可点击跳转；侧栏大纲按块身份定位；插入目录优先走 `insertToc` 命令。Slash 的 Home/End 原已可用。历史恢复会先退出实时协同再写入 HTML，避免服务端较新增量立刻覆盖。真实浏览器点验仍未做
 - 15：新增 `accessDocument`（所有者或空间角色；外人视为文档不存在）。空间浏览者可看属性/版本/评论并评论；编辑者可改属性、给版本加备注。属性按 `doc_id` 读取，不再因调用者不是所有者而返回空白稿。`KnowledgeDocVersion` 增加 `yjsState`，`DocComment` 增加可选 `yRel`。没有改成 `doc_*` 全套同名模型，也不是飞书级组织/字段 ACL
 - 34（加深，仍不是完整版本树）：知识库版本可带上 `yjsState`；历史页事件带上该字段。恢复时退出协同并按 HTML 落回，不把旧快照 apply 到已经超前的 Y.Doc，也不在恢复后立刻重连协同
+
+---
+
+## MET-11 深化（仅本分支，未合入 main）
+
+分支 `agent/met-11-deepen-20261128`，从 `origin/main` @ `918a633db3071a087410d5a2262a5b412ee49026` 拉出。下面只记录本分支已完成的事，未推送、未开 PR、未合入。不是飞书级，也不是已达最终设计。实机验收未做。47–51 未做。
+
+- 历史 6 个 vitest 失败已按根因修好：标题 HTML 带块身份仍识别为 h2；页眉页脚空字段不落库；公式栏用未知函数 / 非法值覆盖 `#NAME?` / `#VALUE!`；评论按钮可达名称并走「注释与引用」栏；图表类型下拉有独立 `aria-label`；`chartDataTable` 拆到 300 行以下并修了原文件里的类型问题。
+- 28/40：自建 Markdown 补齐 `==高亮==` 与 `[^id]` / `[^id]:` 脚注（含缩进续行）往返；脚注定义不再被当成引用式链接。未加入官方 `@tiptap/markdown`。
+- 17/41：自动压缩按「最新 snapshot 之前仍可删除的前缀」计阈值，快照后的增量再长也不误触发；重复压缩返回 `already_compacted`。这仍不是完整的 Yjs 文档 GC。
+- 34：画布 `Restore` 在同一事务写入协同 snapshot 并删除更早日志；知识库恢复先退出协同再写 HTML，且仅当正文未改时把 `yjsState` 一并保存。仍不是完整 Yjs Snapshot 版本树。
+- 35：块身份失效时大纲/目录按 html id 或标题文本回退；`sameOutline` 比较 htmlId；错配的标题闭合标签不再抽进服务端大纲。
+- 15：`DocOutline` / `ListDocTasks` 对浏览者可读；`SetDocTask` / `ReorderOutline` / `saveDocHTML` 对编辑者可写（按文档所有者回写）。不是组织或字段级 ACL。
+- 43：按线程 id 撤销评论锚点时，其它线程标记仍保留（单测已补）。
+
+本轮门禁（干净工作树，相对合入 #310 后的 `origin/main`）：`vue-tsc` 55 错 / 20 文件（基线约 60/21）；`vitest` 0 failed / 2134 passed / 1 skipped（基线 6 failed / 2119 passed 量级）；Go `internal/service` `internal/handler` `internal/middleware` `internal/config` 测试与 `go build ./cmd/server` 通过。
