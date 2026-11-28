@@ -132,9 +132,16 @@ const q3 = await call(`${bp1}/tables/${tableId}/query`, { method: 'POST', token,
 log('P2-10 扩展后排序查询仍正常', q3.status === 200 && Array.isArray(q3.data?.records), `records=${q3.data?.records?.length}`)
 
 // —— P2-12 租户级限流 ——
+//
+// 限流档位已按实测能力调高（默认 rps 200 / burst 400，见 P-08），
+// 所以不能再用「串行 400 次」去撞 —— 串行速率接近令牌补充速率，永远撞不���。
+// 改成**并发打满**：每轮 50 个并发，直到出现 429。
 let limited = false
-for (let i = 0; i < 400; i++) { const rr = await call(`${bp1}/bases`, { token }); if (rr.status === 429) { limited = true; break } }
-log('P2-12 超限返回 429', limited, limited ? '命中 429' : '400 次未触发')
+outer: for (let round = 0; round < 40 && !limited; round++) {
+  const batch = await Promise.all(Array.from({ length: 50 }, () => call(`${bp1}/bases`, { token })))
+  if (batch.some(r => r.status === 429)) { limited = true; break outer }
+}
+log('P2-12 超限返回 429', limited, limited ? '命中 429' : '并发 2000 次未触发')
 
 // —— P2-14 死信 ——
 const dl = await call(`${bp1}/outbox/dead-letters`, { token })
