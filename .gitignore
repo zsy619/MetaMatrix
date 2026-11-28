@@ -145,6 +145,10 @@ pgdata/
 *.rej
 pros/api/data
 
+# ---------- 发布产物（output/） ----------
+# 仓库根的发布打包目录，由 scripts/build-release.sh 生成，不入库
+/output/
+
 # ---------- Python 缓存（schema 同步脚本） ----------
 __pycache__/
 *.pyc
