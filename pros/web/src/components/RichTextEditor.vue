@@ -7216,7 +7216,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'comment',
       label: '评论',
-      title: commentsOpen.value ? '评论已打开，再点一次收起' : '给选中文字加评论',
+      title: commentsOpen.value ? '评论已打开，再点一次收起' : '对选区添加评论',
       icon: '💬',
       iconComp: ic('note'),
       active: () => commentsOpen.value,

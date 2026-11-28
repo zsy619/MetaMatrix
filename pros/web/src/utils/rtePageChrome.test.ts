@@ -58,11 +58,8 @@ assert.deepEqual(
   {
     p1: {
       header: '机密',
-      headerEven: '',
       footer: '内部',
-      footerEven: '',
       pageNumber: 'page-n-of-m',
-      gutter: 0,
     },
   },
 )

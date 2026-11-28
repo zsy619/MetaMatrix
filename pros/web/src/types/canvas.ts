@@ -110,7 +110,7 @@ export type WithPanelAttachments = {
    * 富文本页眉、页脚和页码样式。缺省为空：不占版心。
    * 键与面板 id 对齐。
    */
-  pageChromeByPanelId?: Record<string, { header: string; footer: string; pageNumber: string }>
+  pageChromeByPanelId?: Record<string, { header?: string; headerEven?: string; footer?: string; footerEven?: string; pageNumber?: string; gutter?: number }>
   /**
    * 富文本标题自动编号。只在打开时写入 true。
    * 键与面板 id 对齐。旧文档没有这个字段，等于关闭。

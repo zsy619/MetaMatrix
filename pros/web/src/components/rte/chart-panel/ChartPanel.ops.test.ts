@@ -111,7 +111,7 @@ describe('图表操作落点', () => {
     const editor = (wrapper.vm as unknown as { editor: any }).editor
     const pos = await openPanelOnChart(editor)
 
-    const select = document.querySelector('.rte-cp-type-select') as HTMLSelectElement
+    const select = document.querySelector('select[aria-label="图表类型"]') as HTMLSelectElement
     expect(select).toBeTruthy()
     select.value = 'pie'
     select.dispatchEvent(new Event('change'))

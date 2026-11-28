@@ -39,6 +39,11 @@ describe('评论与斜杠回写', () => {
       editor: { commands: { setTextSelection: (range: { from: number; to: number }) => boolean } }
     }).editor
     editor.commands.setTextSelection({ from: 1, to: 5 })
+    const notesTab = wrapper.find('[data-ribbon-tab="notes"]')
+    if (notesTab.exists()) {
+      await notesTab.trigger('click')
+      await nextTick()
+    }
     await wrapper.get('button[aria-label="对选区添加评论"]').trigger('click')
     const box = wrapper.get('textarea[aria-label="评论内容"]')
     await box.setValue('请补充依据')
