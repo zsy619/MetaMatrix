@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { Aim, Minus, Plus, Rank, Sort } from '@element-plus/icons-vue'
 import { canvasChromeStyle } from './canvasChrome'
 import type { BusinessFormulaDocumentJSON } from '../../types/canvas'
 import { useDocumentStore } from '../../stores/document'
@@ -573,29 +574,31 @@ onUnmounted(() => {
 
     <section class="bf-main">
       <div class="bf-toolbar">
-        <div class="bf-tool-group">
+        <div class="bf-tool-group mm-bar__group">
           <button
             type="button"
-            class="bf-tool-btn"
+            class="bf-tool-btn mm-bar__btn"
             :class="{ active: effectiveLayout === 'horizontal' }"
             title="横向布局"
+            aria-label="横向布局"
             @click="setLayout('horizontal')"
           >
-            横排
+            <el-icon><Sort /></el-icon>
           </button>
           <button
             type="button"
-            class="bf-tool-btn"
+            class="bf-tool-btn mm-bar__btn"
             :class="{ active: effectiveLayout === 'vertical' }"
             title="纵向布局"
+            aria-label="纵向布局"
             @click="setLayout('vertical')"
           >
-            竖排
+            <el-icon><Rank /></el-icon>
           </button>
         </div>
-        <div class="bf-tool-group">
+        <div class="bf-tool-group mm-bar__group">
           <select
-            class="bf-select"
+            class="bf-select mm-bar__select"
             :value="palette"
             @change="setPalette(($event.target as HTMLSelectElement).value as any)"
           >
@@ -604,15 +607,33 @@ onUnmounted(() => {
             </option>
           </select>
         </div>
-        <div class="bf-tool-group">
-          <button type="button" class="bf-tool-btn" title="居中" @click="resetView">
-            居中
+        <div class="bf-tool-group mm-bar__group">
+          <button
+            type="button"
+            class="bf-tool-btn mm-bar__btn"
+            title="居中"
+            aria-label="居中"
+            @click="resetView"
+          >
+            <el-icon><Aim /></el-icon>
           </button>
-          <button type="button" class="bf-tool-btn" title="放大" @click="zoomIn">
-            ＋
+          <button
+            type="button"
+            class="bf-tool-btn mm-bar__btn mm-bar__btn--square"
+            title="放大"
+            aria-label="放大"
+            @click="zoomIn"
+          >
+            <el-icon><Plus /></el-icon>
           </button>
-          <button type="button" class="bf-tool-btn" title="缩小" @click="zoomOut">
-            －
+          <button
+            type="button"
+            class="bf-tool-btn mm-bar__btn mm-bar__btn--square"
+            title="缩小"
+            aria-label="缩小"
+            @click="zoomOut"
+          >
+            <el-icon><Minus /></el-icon>
           </button>
         </div>
       </div>
@@ -1142,48 +1163,26 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 8px;
-  padding: 10px 12px;
-  border-bottom: 1px solid #e8eaed;
-  background: #ffffff;
+  gap: 6px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--glass-ring, rgba(15, 23, 42, 0.09));
+  background: rgba(255, 255, 255, 0.38);
+  backdrop-filter: blur(var(--glass-blur-sm, 10px));
+  -webkit-backdrop-filter: blur(var(--glass-blur-sm, 10px));
 }
 
 .bf-tool-group {
   display: flex;
   align-items: center;
-  gap: 6px;
 }
 
 .bf-tool-btn {
-  border: 1px solid var(--cv-frame, #ececec);
-  background: #ffffff;
-  color: #3c4043;
-  border-radius: 8px;
-  min-width: 44px;
-  height: 40px;
-  padding: 0 12px;
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  font-size: 15px;
-  font-weight: 650;
+  min-width: 34px;
 }
 
-.bf-tool-btn:hover,
 .bf-tool-btn.active {
-  background: var(--cv-hover-wash, #e8f1fa);
-  border-color: var(--cv-focus, #1c4c7c);
-  color: var(--cv-focus, #1c4c7c);
-}
-
-.bf-select {
-  border: 1px solid var(--cv-frame, #ececec);
-  background: #ffffff;
-  color: #202124;
-  border-radius: 8px;
-  height: 40px;
-  padding: 0 12px;
-  font-size: 15px;
+  background: rgba(47, 140, 255, 0.14);
+  color: var(--mm-blue, #1677ff);
 }
 
 .bf-diagram {

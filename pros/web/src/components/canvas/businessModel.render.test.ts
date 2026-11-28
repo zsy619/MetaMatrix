@@ -1,7 +1,4 @@
 // @vitest-environment happy-dom
-import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -10,6 +7,15 @@ vi.mock('../../api/documents', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../api/documents')>()
   return { ...actual, cloneDocument: vi.fn(), listDocuments: vi.fn() }
 })
+
+vi.mock('../RichTextEditor.vue', () => ({
+  default: {
+    name: 'RichTextEditor',
+    props: { modelValue: { type: String, default: '' } },
+    emits: ['update:modelValue'],
+    template: '<div class="rte-stub">{{ modelValue }}</div>',
+  },
+}))
 
 import { useDocumentStore } from '../../stores/document'
 import BusinessModelCanvas from './BusinessModelCanvas.vue'
@@ -31,13 +37,15 @@ describe('商业模式画布', () => {
     for (const title of ['重要伙伴', '价值主张', '客户细分', '成本结构', '收入来源']) {
       expect(wrapper.text()).toContain(title)
     }
-    const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'BusinessModelCanvas.vue'), 'utf8')
-    expect(source).toContain('field-sizing: content')
-    const area = wrapper.get('textarea[aria-label="价值主张"]')
-    await area.setValue('帮团队把报价从一天缩短到一小时')
-    await area.trigger('change')
+    const topic = wrapper.get('.bmc-cell--value input[aria-label="内容主题"]').element as HTMLInputElement
+    expect(topic.placeholder).toBe('为谁解决什么问题')
+    expect(wrapper.findAll('.rte-stub')).toHaveLength(9)
+    const added = store.addBlockItem('value', { text: '帮团队把报价从一天缩短到一小时' })
+    expect(added?.text).toContain('报价')
     const doc = store.current_data as BusinessModelCanvasDocumentJSON
-    expect(doc.blocks.find((item) => item.id === 'value')?.text).toBe('帮团队把报价从一天缩短到一小时')
+    const value = doc.blocks.find((item) => item.id === 'value')
+    expect(value?.items.some((item) => item.text.includes('报价'))).toBe(true)
+    expect(value?.text).toBeUndefined()
     wrapper.unmount()
   })
 })

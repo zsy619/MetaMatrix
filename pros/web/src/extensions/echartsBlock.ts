@@ -360,10 +360,9 @@ export const EchartsBlock = Node.create({
 
       const render = async () => {
         if (destroyed || !previewEl) return
-        const seq = (renderSeq += 1)
         const parsed = safeParseEchartsOption(current.attrs.option || '')
-        // 接口拉到的数据优先（只影响显示，不写回文档）
         const effective = remoteOption || (parsed.ok ? parsed.option : {})
+        // 接口拉到的数据优先（只影响显示，不写回文档）
         liveSource = effective
         watchDark()
         // 无障碍摘要：先更新，option 解析失败时也要把摘要清空
@@ -382,6 +381,9 @@ export const EchartsBlock = Node.create({
           const viewport = window.innerHeight || previewEl.ownerDocument.documentElement.clientHeight || 0
           const inView = rect.height === 0 || (rect.bottom > 0 && rect.top < viewport)
           if (!inView) {
+            // 不在视口内：交给 IntersectionObserver，等滚入可见再渲染。
+            // 注意：这里不递增 renderSeq，否则会把正在加载 echarts/echarts-gl 的
+            // 渲染（seq=1）误判为过期而 abort，导致图表永远不渲染。
             const obs = new IntersectionObserver((entries) => {
               if (!entries.some((entry) => entry.isIntersecting)) return
               obs.disconnect()
@@ -391,6 +393,9 @@ export const EchartsBlock = Node.create({
             return
           }
         }
+        // 只有真正要执行渲染（通过了 IO 检查）才占用一个 seq。
+        // 这样 IO defer 的 render 不会打断正在进行的异步加载。
+        const seq = (renderSeq += 1)
         if (!parsed.ok) {
           chart?.dispose()
           chart = null
@@ -409,7 +414,9 @@ export const EchartsBlock = Node.create({
             await loadEchartsGl()
           }
           // 加载期间可能又改了 option，旧的渲染结果直接丢掉
-          if (destroyed || !previewEl || seq !== renderSeq) return
+          if (destroyed || !previewEl || seq !== renderSeq) {
+            return
+          }
           const renderer = echartsRendererFor(effective)
           if (chart && chartRenderer !== renderer) {
             // 渲染器不能热切换（SVG ↔ Canvas），重建实例

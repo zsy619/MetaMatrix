@@ -1640,6 +1640,127 @@ export interface BusinessFormulaDocumentJSON {
 }
 
 /* ------------------------------------------------------------------ *
+ * 业务公式ABC模型
+ * ------------------------------------------------------------------ */
+
+export type AbcModelBlockId = 'ambition' | 'basis' | 'connection'
+
+export interface AbcModelBlock {
+  id: AbcModelBlockId
+  title: string
+  hint: string
+  text: string
+  items: QuadrantItem[]
+}
+
+export interface AbcModelDocumentJSON {
+  id: string
+  type: 'abc_model'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  blocks: AbcModelBlock[]
+  formula: string
+}
+
+/* ------------------------------------------------------------------ *
+ * 业务公式十大经典范式
+ * ------------------------------------------------------------------ */
+
+export interface BusinessFormulaPatternParam {
+  name: string
+  desc: string
+  unit: string
+  defaultValue: number
+}
+
+export interface BusinessFormulaPattern {
+  id: number
+  name: string
+  category: 'revenue' | 'competition' | 'operation'
+  badge: string
+  badgeText: string
+  desc: string
+  formula: string
+  params: BusinessFormulaPatternParam[]
+}
+
+export interface BusinessFormulaPatternsDocumentJSON {
+  id: string
+  type: 'business_formula_patterns'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  patterns: BusinessFormulaPattern[]
+  savedParams: Record<number, Record<string, number>>
+}
+
+/* ------------------------------------------------------------------ *
+ * 业务公式修炼爬山
+ * ------------------------------------------------------------------ */
+
+export interface CultivationLevel {
+  level: number
+  name: string
+  subtitle: string
+  color: string
+  stage: 'beginner' | 'intermediate' | 'advanced'
+  problem: string
+  problems: string[]
+  paths: string[]
+  description: string
+}
+
+export interface CultivationMountainDocumentJSON {
+  id: string
+  type: 'cultivation_mountain'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  levels: CultivationLevel[]
+  currentLevel: number
+  assessmentAnswers: number[]
+}
+
+/* ------------------------------------------------------------------ *
+ * 调用黑客五部曲
+ * ------------------------------------------------------------------ */
+
+export interface HackerFiveStep {
+  id: string
+  /** 第几步（1-5） */
+  index: number
+  /** 关键工作 */
+  work: string
+  /** 依次回答：这一步要回答的问题 */
+  question: string
+  /** 真正难点 */
+  difficulty: string
+  /** 「依次回答」内容块 id，指向 doc.blocks */
+  blockId: string
+  /** 旧版纯文本答案（已迁移到 blocks，仅为容错） */
+  answer?: string
+}
+
+/** 「依次回答」内容块，与 Y 模型 / 五步法共用 items 结构 */
+export interface HackerFiveStepBlock {
+  id: string
+  title: string
+  items: QuadrantItem[]
+}
+
+export interface HackerFiveStepsDocumentJSON {
+  id: string
+  type: 'hacker_five_steps'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  steps: HackerFiveStep[]
+  /** 五个「依次回答」内容块，与 steps[i].blockId 一一对应 */
+  blocks: HackerFiveStepBlock[]
+}
+
+/* ------------------------------------------------------------------ *
  * 苦练基本功三环分析法
  * ------------------------------------------------------------------ */
 
@@ -1842,7 +1963,12 @@ export interface BusinessModelBlock {
   id: BusinessModelBlockId
   title: string
   hint: string
-  text: string
+  /** 内容主题词，和五步法格子一样可编辑 */
+  keyword?: string
+  /** 富文本条目。旧文档里的 text 会在打开时迁到这里。 */
+  items: QuadrantItem[]
+  /** 旧版纯文本。打开后迁入 items，不再写回。 */
+  text?: string
 }
 
 export interface BusinessModelCanvasDocumentJSON {
@@ -2054,6 +2180,166 @@ export interface IncomeStatementDocumentJSON {
   theme: CanvasTheme
   title: string
   sections: IncomeSection[]
+}
+
+export type PestleBlockId = 'political' | 'economic' | 'social' | 'technological' | 'legal' | 'environmental'
+
+export interface PestleBlock {
+  id: PestleBlockId
+  title: string
+  hint: string
+  keyword?: string
+  items: QuadrantItem[]
+  text?: string
+}
+
+export interface PestleDocumentJSON {
+  id: string
+  type: 'pestle'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  blocks: PestleBlock[]
+}
+
+export type AnsoffBlockId = 'penetration' | 'product' | 'market' | 'diversification'
+
+export interface AnsoffBlock {
+  id: AnsoffBlockId
+  title: string
+  hint: string
+  keyword?: string
+  items: QuadrantItem[]
+  text?: string
+}
+
+export interface AnsoffDocumentJSON {
+  id: string
+  type: 'ansoff'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  blocks: AnsoffBlock[]
+}
+
+export type EmpathyBlockId = 'says' | 'thinks' | 'does' | 'feels' | 'pains' | 'gains'
+
+export interface EmpathyBlock {
+  id: EmpathyBlockId
+  title: string
+  hint: string
+  keyword?: string
+  items: QuadrantItem[]
+  text?: string
+}
+
+export interface EmpathyDocumentJSON {
+  id: string
+  type: 'empathy_map'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  blocks: EmpathyBlock[]
+}
+
+export type MarketingMixBlockId = 'product' | 'price' | 'place' | 'promotion'
+
+export interface MarketingMixBlock {
+  id: MarketingMixBlockId
+  title: string
+  hint: string
+  keyword?: string
+  items: QuadrantItem[]
+  text?: string
+}
+
+export interface MarketingMixDocumentJSON {
+  id: string
+  type: 'marketing_mix'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  blocks: MarketingMixBlock[]
+}
+
+export type BcgBlockId = 'star' | 'question' | 'cow' | 'dog'
+
+export interface BcgBlock {
+  id: BcgBlockId
+  title: string
+  hint: string
+  keyword?: string
+  items: QuadrantItem[]
+  text?: string
+}
+
+export interface BcgDocumentJSON {
+  id: string
+  type: 'bcg'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  blocks: BcgBlock[]
+}
+
+export type ScorecardBlockId = 'financial' | 'customer' | 'process' | 'learning'
+
+export interface ScorecardBlock {
+  id: ScorecardBlockId
+  title: string
+  hint: string
+  keyword?: string
+  items: QuadrantItem[]
+  text?: string
+}
+
+export interface ScorecardDocumentJSON {
+  id: string
+  type: 'balanced_scorecard'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  blocks: ScorecardBlock[]
+}
+
+export type ErrcBlockId = 'eliminate' | 'reduce' | 'raise' | 'create'
+
+export interface ErrcBlock {
+  id: ErrcBlockId
+  title: string
+  hint: string
+  keyword?: string
+  items: QuadrantItem[]
+  text?: string
+}
+
+export interface ErrcDocumentJSON {
+  id: string
+  type: 'errc'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  blocks: ErrcBlock[]
+}
+
+export type AarrBlockId = 'acquisition' | 'activation' | 'retention' | 'referral' | 'revenue'
+
+export interface AarrBlock {
+  id: AarrBlockId
+  title: string
+  hint: string
+  keyword?: string
+  items: QuadrantItem[]
+  text?: string
+}
+
+export interface AarrDocumentJSON {
+  id: string
+  type: 'aarr'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  blocks: AarrBlock[]
 }
 
 export type ValueChainBlockId =
@@ -2582,6 +2868,10 @@ export type CanvasDocumentJSON = (
   | PmSolutionTriangleDocumentJSON
   | GrowthAssumptionsDocumentJSON
   | BusinessFormulaDocumentJSON
+  | AbcModelDocumentJSON
+  | BusinessFormulaPatternsDocumentJSON
+  | CultivationMountainDocumentJSON
+  | HackerFiveStepsDocumentJSON
   | ThreeRingBasicsDocumentJSON
   | LeadershipTriangleDocumentJSON
   | ContextSixElementsDocumentJSON
@@ -2598,6 +2888,14 @@ export type CanvasDocumentJSON = (
   | PdcaDocumentJSON
   | FiveForcesDocumentJSON
   | IncomeStatementDocumentJSON
+  | PestleDocumentJSON
+  | AnsoffDocumentJSON
+  | EmpathyDocumentJSON
+  | MarketingMixDocumentJSON
+  | BcgDocumentJSON
+  | ScorecardDocumentJSON
+  | ErrcDocumentJSON
+  | AarrDocumentJSON
   | ValueChainDocumentJSON
   | SevenSDocumentJSON
   | RiceDocumentJSON
@@ -2610,6 +2908,7 @@ export type CanvasDocumentJSON = (
   | GoldenCircleDocumentJSON
   | SoarDocumentJSON
   | PlayingToWinDocumentJSON
+  | HackerFiveStepsDocumentJSON
   | TenCheckDocumentJSON
   | SceneThreeHighDocumentJSON
   | AiBoundaryDocumentJSON
@@ -2660,6 +2959,14 @@ export type BlockCanvasDocumentJSON =
   | StakeholderDocumentJSON
   | PdcaDocumentJSON
   | FiveForcesDocumentJSON
+  | PestleDocumentJSON
+  | AnsoffDocumentJSON
+  | EmpathyDocumentJSON
+  | MarketingMixDocumentJSON
+  | BcgDocumentJSON
+  | ScorecardDocumentJSON
+  | ErrcDocumentJSON
+  | AarrDocumentJSON
   | ValueChainDocumentJSON
   | SevenSDocumentJSON
   | JourneyDocumentJSON
@@ -3164,6 +3471,34 @@ export function isBusinessFormulaDoc(
   return !!doc && doc.type === 'business_formula'
 }
 
+/** 业务公式ABC模型 */
+export function isAbcModelDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is AbcModelDocumentJSON {
+  return !!doc && doc.type === 'abc_model'
+}
+
+/** 业务公式十大经典范式 */
+export function isBusinessFormulaPatternsDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is BusinessFormulaPatternsDocumentJSON {
+  return !!doc && doc.type === 'business_formula_patterns'
+}
+
+/** 业务公式修炼爬山 */
+export function isCultivationMountainDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is CultivationMountainDocumentJSON {
+  return !!doc && doc.type === 'cultivation_mountain'
+}
+
+/** 调用黑客五部曲 */
+export function isHackerFiveStepsDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is HackerFiveStepsDocumentJSON {
+  return !!doc && doc.type === 'hacker_five_steps'
+}
+
 /** 苦练基本功三环分析法 */
 export function isThreeRingBasicsDoc(
   doc: CanvasDocumentJSON | null | undefined,
@@ -3325,6 +3660,48 @@ export function isIncomeStatementDoc(
 }
 
 
+export function isPestleDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is PestleDocumentJSON {
+  return !!doc && doc.type === 'pestle'
+}
+
+export function isAnsoffDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is AnsoffDocumentJSON {
+  return !!doc && doc.type === 'ansoff'
+}
+
+export function isEmpathyDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is EmpathyDocumentJSON {
+  return !!doc && doc.type === 'empathy_map'
+}
+
+export function isMarketingMixDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is MarketingMixDocumentJSON {
+  return !!doc && doc.type === 'marketing_mix'
+}
+
+
+export function isBcgDoc(doc: CanvasDocumentJSON | null | undefined): doc is BcgDocumentJSON {
+  return !!doc && doc.type === 'bcg'
+}
+
+export function isScorecardDoc(doc: CanvasDocumentJSON | null | undefined): doc is ScorecardDocumentJSON {
+  return !!doc && doc.type === 'balanced_scorecard'
+}
+
+export function isErrcDoc(doc: CanvasDocumentJSON | null | undefined): doc is ErrcDocumentJSON {
+  return !!doc && doc.type === 'errc'
+}
+
+export function isAarrDoc(doc: CanvasDocumentJSON | null | undefined): doc is AarrDocumentJSON {
+  return !!doc && doc.type === 'aarr'
+}
+
+
 export function isBlockCanvasDoc(
   doc: CanvasDocumentJSON | null | undefined,
 ): doc is BlockCanvasDocumentJSON {
@@ -3380,7 +3757,17 @@ export function isBlockCanvasDoc(
     isVrioDoc(doc) ||
     isGoldenCircleDoc(doc) ||
     isSoarDoc(doc) ||
-    isPlayingToWinDoc(doc)
+    isPlayingToWinDoc(doc) ||
+    isHackerFiveStepsDoc(doc) ||
+    isBusinessModelCanvasDoc(doc) ||
+    isPestleDoc(doc) ||
+    isAnsoffDoc(doc) ||
+    isEmpathyDoc(doc) ||
+    isMarketingMixDoc(doc) ||
+    isBcgDoc(doc) ||
+    isScorecardDoc(doc) ||
+    isErrcDoc(doc) ||
+    isAarrDoc(doc)
   )
 }
 

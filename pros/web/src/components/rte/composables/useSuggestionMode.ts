@@ -7,6 +7,12 @@ import {
   suggestionColor,
   type SuggestionAuthor,
 } from '../../../utils/rteSuggestions'
+import {
+  canApplySuggestionDecision,
+  canEnableSuggestionMode,
+  shouldTrackAsSuggestion,
+} from '../../knowledge/collab/collabReviewPolicy'
+import { canEditRange } from '../../../extensions/blockPermissionGuard'
 
 /** 建议模式开关，以及接受 / 拒绝。正文里的标记就是修订本身。 */
 export function useSuggestionMode(deps: {
@@ -15,12 +21,23 @@ export function useSuggestionMode(deps: {
 }) {
   const suggesting = ref(false)
 
-  const suggestionEnabled = () => suggesting.value && deps.editor().value?.isEditable !== false
+  const writableCtx = () => ({
+    editable: deps.editor().value?.isEditable,
+  })
+
+  const suggestionEnabled = () =>
+    shouldTrackAsSuggestion({ ...writableCtx(), suggestionMode: suggesting.value })
 
   function toggleSuggesting() {
+    if (!suggesting.value && !canEnableSuggestionMode(writableCtx())) {
+      suggesting.value = false
+      ElMessage.warning('只读或没有编辑权限时不能开启建议模式')
+      return
+    }
     suggesting.value = !suggesting.value
     ElMessage.success(suggesting.value ? '已进入建议模式。之后的增删会记成修订。' : '已回到直接编辑')
   }
+
 
   const suggestionTick = ref(0)
   function bump() {
@@ -61,6 +78,17 @@ export function useSuggestionMode(deps: {
   function decide(mode: 'accept' | 'reject', id?: string) {
     const ed = deps.editor().value
     if (!ed) return
+    if (!canApplySuggestionDecision(writableCtx())) {
+      ElMessage.warning('没有编辑权限，不能接受或拒绝修订')
+      return
+    }
+    if (id) {
+      const hit = suggestionRanges.value.find((range) => range.id === id)
+      if (hit && !canEditRange(ed, hit.from, hit.to)) {
+        ElMessage.warning('这块是只读的，不能接受或拒绝修订')
+        return
+      }
+    }
     const ok = dispatchSuggestionDecision(ed, mode, id)
     if (!ok) ElMessage.info(id ? '这里没有可处理的修订' : '没有修订')
     bump()

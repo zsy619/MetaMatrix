@@ -7,6 +7,7 @@
  * 3D·GL 单独成组（需要 echarts-gl，渲染器也不同），工具栏里永远独立一块。
  */
 import { ECHARTS_CATEGORIES } from './templates'
+import { CHART_GROUP_IDS } from './chartGroupIds'
 
 /** 图表子分组定义。 */
 export type ChartGroupDef = {
@@ -22,63 +23,63 @@ export type ChartGroupDef = {
 /** 9 个子分组（3D·GL 独立一组）。 */
 export const CHART_GROUPS: readonly ChartGroupDef[] = [
   {
-    id: 'basic',
+    id: CHART_GROUP_IDS[0], // basic
     icon: '📈',
     label: '基础',
     hint: '折线 / 柱状 / 饼图 / 散点',
     categoryIds: ['line', 'bar', 'pie', 'scatter', 'pictorialBar'],
   },
   {
-    id: 'stats',
+    id: CHART_GROUP_IDS[1], // stats
     icon: '📊',
     label: '统计',
     hint: '分布 / 指标 / 转化',
     categoryIds: ['boxplot', 'heatmap', 'themeRiver', 'gauge', 'funnel'],
   },
   {
-    id: 'relation',
+    id: CHART_GROUP_IDS[2], // relation
     icon: '🕸️',
     label: '关系',
     hint: '节点连线与流量',
     categoryIds: ['graph', 'lines', 'sankey', 'chord'],
   },
   {
-    id: 'hierarchy',
+    id: CHART_GROUP_IDS[3], // hierarchy
     icon: '🌳',
     label: '层级',
     hint: '树状结构占比',
     categoryIds: ['tree', 'treemap', 'sunburst'],
   },
   {
-    id: 'geo',
+    id: CHART_GROUP_IDS[4], // geo
     icon: '🗺️',
     label: '地理',
     hint: '区域分布',
     categoryIds: ['map'],
   },
   {
-    id: 'finance',
+    id: CHART_GROUP_IDS[5], // finance
     icon: '💹',
     label: '金融',
     hint: '行情走势',
     categoryIds: ['candlestick'],
   },
   {
-    id: 'coordinate',
+    id: CHART_GROUP_IDS[6], // coordinate
     icon: '🎯',
     label: '坐标系',
     hint: '多维与时间轴',
     categoryIds: ['radar', 'parallel', 'calendar', 'matrix'],
   },
   {
-    id: 'component',
+    id: CHART_GROUP_IDS[7], // component
     icon: '🧩',
     label: '组件',
     hint: '数据与叠加组件',
     categoryIds: ['dataset', 'dataZoom', 'graphic', 'rich', 'custom'],
   },
   {
-    id: 'gl',
+    id: CHART_GROUP_IDS[8], // gl
     icon: '🧊',
     label: '3D·GL',
     hint: 'WebGL 三维图（独立渲染器）',

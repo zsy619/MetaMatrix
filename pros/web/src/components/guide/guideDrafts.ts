@@ -13,7 +13,16 @@ export function readLocalDrafts(entries: { key: string; value: string }[], limit
   const drafts: LocalDraft[] = []
   for (const entry of entries) {
     if (!entry.key.startsWith(META_PREFIX)) continue
-    const templateId = entry.key.slice(META_PREFIX.length)
+    let templateId = entry.key.slice(META_PREFIX.length)
+    // 新键格式是 doc-meta:<用户 id>:<template:模板 | doc:文档 id>。
+    // 草稿列表面向“未建档的模板草稿”，所以只认 template: 分区；
+    // 旧的无前缀键继续按模板 id 读取，保证升级后仍能看到历史草稿。
+    const sep = templateId.indexOf(':')
+    if (sep !== -1) {
+      const scoped = templateId.slice(sep + 1)
+      if (!scoped.startsWith('template:')) continue
+      templateId = scoped.slice('template:'.length)
+    }
     if (!isTemplateId(templateId)) continue
     let meta: { title?: unknown; updatedAt?: unknown }
     try {

@@ -1,0 +1,13 @@
+{
+  "id": "canvas_bcg",
+  "type": "bcg",
+  "schemaVersion": 1,
+  "theme": { "background": { "pattern": "none", "color": "#f7f7f7" }, "page": "#f7f7f7", "frame": "#ececec", "hairline": "rgba(60, 50, 20, 0.08)" },
+  "title": "BCG 矩阵",
+  "blocks": [
+    { "id": "star", "title": "明星", "hint": "高增长、高份额。继续投入", "items": [{ "id": "bcg_star", "text": "项目画布：增长快，客户愿意续费" }] },
+    { "id": "question", "title": "问题", "hint": "高增长、低份额。选一个押注", "items": [{ "id": "bcg_q", "text": "咨询交付：市场在长，我们份额还小" }] },
+    { "id": "cow", "title": "现金牛", "hint": "低增长、高份额。拿出现金", "items": [{ "id": "bcg_cow", "text": "年度复盘服务：稳定，不再加功能" }] },
+    { "id": "dog", "title": "瘦狗", "hint": "低增长、低份额。考虑退出", "items": [{ "id": "bcg_dog", "text": "一次性定制报表" }] }
+  ]
+}

@@ -1,5 +1,10 @@
 import { Plugin } from '@tiptap/pm/state'
 import type { EditorView } from '@tiptap/pm/view'
+import {
+  applyMediaPlaceholder,
+  placeholderKind,
+  type MediaPlaceholderStatus,
+} from '../utils/mediaPlaceholder'
 
 const editingCaptions = new WeakMap<EditorView, Set<number>>()
 
@@ -22,12 +27,24 @@ function captionHost(view: EditorView, pos: number): HTMLElement | null {
   return dom.parentElement
 }
 
+/**
+ * 裂图换成自绘占位图。
+ *
+ * 浏览器自带的裂图图标 + alt 文本（文件名）又丑又占版面，
+ * 这里改成按文件类型配色的占位图：正在加载 / 素材失效 / 加载失败。
+ */
 function markBrokenImages(view: EditorView) {
   view.dom.querySelectorAll('img.rte-image').forEach((node) => {
     if (!(node instanceof HTMLImageElement) || node.dataset.brokenBound) return
     node.dataset.brokenBound = '1'
-    node.addEventListener('error', () => node.classList.add('is-broken'))
-    if (node.complete && node.naturalWidth === 0 && node.src) node.classList.add('is-broken')
+    const showPlaceholder = (status: MediaPlaceholderStatus) => {
+      // 已经是占位图就不重复换，避免 data URI 反复写入触发观察器
+      if (node.dataset.mediaPlaceholder === '1') return
+      const name = node.getAttribute('alt') || node.dataset.mediaOrigSrc?.split('/').pop() || '图片'
+      applyMediaPlaceholder(node, { name, kind: placeholderKind(name), status })
+    }
+    node.addEventListener('error', () => showPlaceholder('error'))
+    if (node.complete && node.naturalWidth === 0 && node.src) showPlaceholder('error')
   })
 }
 

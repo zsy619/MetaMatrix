@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { inject } from 'vue'
+import { computed, inject } from 'vue'
 import { EditorContent } from '@tiptap/vue-3'
 import { BubbleMenu } from '@tiptap/vue-3/menus'
 import FormPropertyInspector from '../FormPropertyInspector.vue'
@@ -10,15 +10,53 @@ import RteImageLightbox from './RteImageLightbox.vue'
 import RteSelectionBubble from './RteSelectionBubble.vue'
 import RteSourceCodeEditor from './RteSourceCodeEditor.vue'
 import RteTableFormulaBar from './RteTableFormulaBar.vue'
+import RteWordStatsPanel from './RteWordStatsPanel.vue'
 import { RTE_BINDINGS } from './bindings'
 import { blockHandleTitle, cropTitle, emptyGuideTitle, imagePlaceTitle, imageWidthTitle, toolbarMenuItemTitle, wordStatTitle } from '../../utils/rteToolbarOptimize'
+import { buildWordStatsPanelData } from '../../utils/rteWordStats'
+import {
+  BLOCK_PANEL_INSERT_SECTIONS,
+  BLOCK_PANEL_QUICK_ACTIONS,
+  BLOCK_PANEL_TURN_ACTIONS,
+  type BlockPanelEntry,
+} from '../../utils/rteBlockPanelMenu'
 import { useParentScopeStamp } from './inheritScope'
 import RteMenuGlyph from './RteMenuGlyph.vue'
+import { RTE_SLASH_ITEMS } from '../rteSlashItems'
 
-const rte = inject(RTE_BINDINGS)
+// 非空断言仅用于让闭包内的命令函数保留注入类型；下一行仍保留运行时防线。
+const rte = inject(RTE_BINDINGS)!
 if (!rte) throw new Error('RteDocumentBody 必须放在 RichTextEditor 里')
 const vRteFloat = rte.vRteFloat
 useParentScopeStamp()
+
+/** 字数面板数据（与工具栏下拉面板共用同一口径）。 */
+const wordStatsPanelProps = computed(() => buildWordStatsPanelData(rte))
+
+function findBlockSlashItem(id: string | undefined) {
+  if (!id) return undefined
+  return RTE_SLASH_ITEMS.find((item) => item.id === id)
+}
+
+function runBlockInsert(slashId: string | undefined) {
+  if (!slashId) return
+  const item = findBlockSlashItem(slashId)
+  if (item) rte.applyBlockInsertItem(item)
+}
+
+function runBlockQuickAction(action: BlockPanelEntry) {
+  if (action.turn) rte.turnHoveredBlock(action.turn)
+  else if (action.slashId) runBlockInsert(action.slashId)
+}
+
+function runBlockTurn(action: BlockPanelEntry) {
+  if (action.turn) rte.turnHoveredBlock(action.turn)
+}
+
+function blockInsertTitle(label: string, slashId: string | undefined): string {
+  const description = findBlockSlashItem(slashId)?.description
+  return description ? `${label}：${description}` : `插入${label}`
+}
 </script>
 
 <template>
@@ -378,39 +416,26 @@ useParentScopeStamp()
           @mousedown.stop
           @click.stop
         >
+          <!--
+            左侧只留这一个「+」：点开是块操作面板（插入 / 转换 / 块操作），
+            拖动可调整块顺序。手柄不再拆成 ⠿ 与 ⋮ 两个图标。
+          -->
           <button data-rte-own
-            v-if="rte.expanded"
             type="button"
-            class="rte-block-handle"
+            class="rte-block-handle rte-block-add"
             draggable="true"
-            title="拖动排序，点击打开块操作"
-            aria-label="拖动调整块顺序"
-            @click.stop="rte.onBlockGripClick"
+            title="点击打开块操作面板，拖动可调整块顺序"
+            aria-label="块操作面板"
+            aria-haspopup="menu"
+            :aria-expanded="rte.blockMenuOpen"
+            @mouseenter="rte.onBlockAddEnter()"
+            @mouseleave="rte.onBlockPanelLeave($event)"
+            @click.stop="rte.onBlockAddClick()"
             @dragstart="rte.onBlockDragStart"
             @dragend="rte.onBlockDragEnd"
           >
-            <svg data-rte-own viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
-              <circle data-rte-own cx="5.5" cy="3.5" r="1.15" fill="currentColor" />
-              <circle data-rte-own cx="10.5" cy="3.5" r="1.15" fill="currentColor" />
-              <circle data-rte-own cx="5.5" cy="8" r="1.15" fill="currentColor" />
-              <circle data-rte-own cx="10.5" cy="8" r="1.15" fill="currentColor" />
-              <circle data-rte-own cx="5.5" cy="12.5" r="1.15" fill="currentColor" />
-              <circle data-rte-own cx="10.5" cy="12.5" r="1.15" fill="currentColor" />
-            </svg>
-          </button>
-          <button data-rte-own
-            type="button"
-            class="rte-block-handle"
-            :title="blockHandleTitle('menu')"
-            :aria-label="blockHandleTitle('menu')"
-            aria-haspopup="menu"
-            :aria-expanded="rte.blockMenuOpen"
-            @click.stop="rte.toggleBlockMenu"
-          >
-            <svg data-rte-own viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
-              <circle data-rte-own cx="8" cy="3.5" r="1.25" fill="currentColor" />
-              <circle data-rte-own cx="8" cy="8" r="1.25" fill="currentColor" />
-              <circle data-rte-own cx="8" cy="12.5" r="1.25" fill="currentColor" />
+            <svg data-rte-own viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+              <path data-rte-own d="M8 3.4v9.2M3.4 8h9.2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
             </svg>
           </button>
         </div>
@@ -418,33 +443,68 @@ useParentScopeStamp()
           v-if="rte.blockMenuOpen"
           class="rte-block-menu"
           role="menu"
-          aria-label="块操作"
+          aria-label="块操作面板"
           :style="{ top: rte.blockHandle.top + 26 + 'px', left: rte.blockHandle.left + 'px' }"
           @mousedown.stop
           @click.stop
+          @mouseenter="rte.onBlockPanelEnter()"
+          @mouseleave="rte.onBlockPanelLeave($event)"
           @keydown="rte.onBlockMenuKeydown"
         >
-          <button data-rte-own type="button" role="menuitem" :title="blockHandleTitle('insert')" @click="rte.insertBelowHoveredBlock">在下方插入</button>
-          <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
-          <button data-rte-own type="button" role="menuitem" :title="blockHandleTitle('paragraph')" @click="rte.turnHoveredBlock('paragraph')">正文</button>
-          <button data-rte-own type="button" role="menuitem" :title="blockHandleTitle('h1')" @click="rte.turnHoveredBlock('h1')">标题 1</button>
-          <button data-rte-own type="button" role="menuitem" :title="blockHandleTitle('h2')" @click="rte.turnHoveredBlock('h2')">标题 2</button>
-          <button data-rte-own type="button" role="menuitem" :title="blockHandleTitle('h3')" @click="rte.turnHoveredBlock('h3')">标题 3</button>
-          <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
-          <button data-rte-own type="button" role="menuitem" :title="blockHandleTitle('bullet')" @click="rte.turnHoveredBlock('bullet')">无序列表</button>
-          <button data-rte-own type="button" role="menuitem" :title="blockHandleTitle('ordered')" @click="rte.turnHoveredBlock('ordered')">有序列表</button>
-          <button data-rte-own type="button" role="menuitem" :title="blockHandleTitle('task')" @click="rte.turnHoveredBlock('task')">任务列表</button>
-          <button data-rte-own type="button" role="menuitem" :title="blockHandleTitle('quote')" @click="rte.turnHoveredBlock('quote')">引用</button>
-          <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
-          <button data-rte-own type="button" role="menuitem" :title="blockHandleTitle('info')" @click="rte.turnHoveredBlock('info')">提示</button>
-          <button data-rte-own type="button" role="menuitem" :title="blockHandleTitle('warn')" @click="rte.turnHoveredBlock('warn')">警告</button>
-          <button data-rte-own type="button" role="menuitem" :title="blockHandleTitle('success')" @click="rte.turnHoveredBlock('success')">成功</button>
-          <button data-rte-own type="button" role="menuitem" :title="blockHandleTitle('error')" @click="rte.turnHoveredBlock('error')">错误</button>
-          <div data-rte-own class="rte-menu-sep" aria-hidden="true" />
-          <button data-rte-own type="button" role="menuitem" :title="blockHandleTitle('copy')" @click="rte.copyHoveredBlock">复制块</button>
-          <button data-rte-own type="button" role="menuitem" :title="blockHandleTitle('up')" @click="rte.moveHoveredBlock(-1)">上移</button>
-          <button data-rte-own type="button" role="menuitem" :title="blockHandleTitle('down')" @click="rte.moveHoveredBlock(1)">下移</button>
-          <button data-rte-own type="button" role="menuitem" class="is-danger" :title="blockHandleTitle('delete')" @click="rte.deleteHoveredBlock">删除</button>
+          <!-- 插入区：快捷图标与分组命令均复用上方配置。 -->
+          <div data-rte-own class="rte-block-menu-section">基础</div>
+          <div data-rte-own class="rte-block-quick-grid">
+            <button data-rte-own
+              v-for="action in BLOCK_PANEL_QUICK_ACTIONS"
+              :key="action.id"
+              type="button"
+              class="rte-block-quick"
+              role="menuitem"
+              :title="action.label"
+              :aria-label="action.label"
+              :data-command="action.slashId ?? action.turn"
+              @click="runBlockQuickAction(action)"
+            >
+              <RteMenuGlyph :id="action.id" :label="action.label" />
+              <span data-rte-own class="rte-block-quick-label">{{ action.label }}</span>
+            </button>
+          </div>
+          <template v-for="section in BLOCK_PANEL_INSERT_SECTIONS" :key="section.label">
+            <div data-rte-own class="rte-block-menu-section">{{ section.label }}</div>
+            <button data-rte-own
+              v-for="item in section.items"
+              :key="item.slashId"
+              type="button"
+              class="rte-block-menu-item"
+              role="menuitem"
+              :title="blockInsertTitle(item.label, item.slashId)"
+              :aria-label="item.label"
+              :data-command="item.slashId"
+              @click="runBlockInsert(item.slashId)"
+            >
+              <RteMenuGlyph :id="item.id" :label="item.label" />
+              <span data-rte-own>{{ item.label }}</span>
+            </button>
+          </template>
+
+          <!-- 块操作区：转换与块管理，跟插入区同属一个面板。 -->
+          <div data-rte-own class="rte-block-menu-section">块操作</div>
+          <button data-rte-own type="button" class="rte-block-menu-item" role="menuitem" :title="blockHandleTitle('insert')" @click="rte.insertBelowHoveredBlock"><RteMenuGlyph id="insertBelow" label="在下方插入" /><span data-rte-own>在下方插入</span></button>
+          <div data-rte-own class="rte-block-menu-sublabel">转换为</div>
+          <button data-rte-own
+            v-for="item in BLOCK_PANEL_TURN_ACTIONS"
+            :key="'turn-' + item.id"
+            type="button"
+            class="rte-block-menu-item"
+            role="menuitem"
+            :title="blockHandleTitle(item.turn ?? '')"
+            :data-command="item.turn"
+            @click="runBlockTurn(item)"
+          ><RteMenuGlyph :id="item.id" :label="item.label" /><span data-rte-own>{{ item.label }}</span></button>
+          <button data-rte-own type="button" class="rte-block-menu-item" role="menuitem" :title="blockHandleTitle('copy')" @click="rte.copyHoveredBlock"><RteMenuGlyph id="copyBlock" label="复制块" /><span data-rte-own>复制块</span></button>
+          <button data-rte-own type="button" class="rte-block-menu-item" role="menuitem" :title="blockHandleTitle('up')" @click="rte.moveHoveredBlock(-1)"><RteMenuGlyph id="moveUp" label="上移" /><span data-rte-own>上移</span></button>
+          <button data-rte-own type="button" class="rte-block-menu-item" role="menuitem" :title="blockHandleTitle('down')" @click="rte.moveHoveredBlock(1)"><RteMenuGlyph id="moveDown" label="下移" /><span data-rte-own>下移</span></button>
+          <button data-rte-own type="button" role="menuitem" class="rte-block-menu-item is-danger" :title="blockHandleTitle('delete')" @click="rte.deleteHoveredBlock"><RteMenuGlyph id="deleteBlock" label="删除" /><span data-rte-own>删除</span></button>
         </div>
         <div data-rte-own
           v-if="rte.blockDropLine != null"
@@ -639,19 +699,7 @@ useParentScopeStamp()
     </div>
 
     <div data-rte-own v-if="rte.wordCountDockOpen" class="rte-word-dock" role="dialog" aria-label="字数统计">
-      <div data-rte-own class="rte-word-dock-row" :title="wordStatTitle('chars')"><span data-rte-own>字符</span><strong data-rte-own>{{ rte.charCount }}</strong></div>
-      <div data-rte-own class="rte-word-dock-row" :title="wordStatTitle('words')"><span data-rte-own>词数</span><strong data-rte-own>{{ rte.wordCount }}</strong></div>
-      <div data-rte-own class="rte-word-dock-row" :title="wordStatTitle('cn')"><span data-rte-own>中文</span><strong data-rte-own>{{ rte.wordParts.cn }}</strong></div>
-      <div data-rte-own class="rte-word-dock-row" :title="wordStatTitle('ascii')"><span data-rte-own>英文词</span><strong data-rte-own>{{ rte.wordParts.en }}</strong></div>
-      <div data-rte-own class="rte-word-dock-row" :title="wordStatTitle('images')"><span data-rte-own>图片</span><strong data-rte-own>{{ rte.wordParts.images }}</strong></div>
-      <div data-rte-own class="rte-word-dock-row" :title="wordStatTitle('minutes')"><span data-rte-own>阅读</span><strong data-rte-own>约 {{ rte.readingMinutes }} 分钟</strong></div>
-      <div data-rte-own class="rte-word-dock-row" :title="wordStatTitle('paragraphs')"><span data-rte-own>段落</span><strong data-rte-own>{{ rte.docExtraStats.paragraphs }}</strong></div>
-      <div data-rte-own class="rte-word-dock-row" :title="wordStatTitle('headings')"><span data-rte-own>标题</span><strong data-rte-own>{{ rte.docExtraStats.headings }}</strong></div>
-      <div data-rte-own class="rte-word-dock-row" :title="wordStatTitle('selectionChars')">
-        <span data-rte-own>选区</span>
-        <strong data-rte-own>{{ rte.selectionStats.hasSelection ? rte.selectionStats.chars : '—' }}</strong>
-      </div>
-      <button data-rte-own type="button" class="rte-word-dock-close" :title="wordStatTitle('close')" @click="rte.wordCountDockOpen = false">关闭</button>
+      <RteWordStatsPanel v-bind="wordStatsPanelProps" @close="rte.wordCountDockOpen = false" />
     </div>
 
     <div data-rte-own v-if="rte.showBottomBar" class="rte-bottom">

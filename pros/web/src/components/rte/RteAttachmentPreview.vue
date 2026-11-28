@@ -10,6 +10,7 @@ import {
   type LoadedAttachment,
 } from '../../utils/rteAttachment'
 import { previewDoc, previewDocx, previewSheets, type SheetPreview } from '../../utils/rteOfficePreview'
+import { applyMediaPlaceholder, placeholderKind } from '../../utils/mediaPlaceholder'
 
 const rte = inject(RTE_BINDINGS)
 if (!rte) throw new Error('RteAttachmentPreview 必须放在 RichTextEditor 里')
@@ -61,6 +62,20 @@ function onKeydown(event: KeyboardEvent) {
     event.preventDefault()
     close()
   }
+}
+
+/**
+ * 预览图读不出来时换一张按类型配色的占位图，
+ * 不要让浏览器画裂图图标 + alt 文本（看起来像坏掉了）。
+ */
+function onImageError(event: Event) {
+  const el = event.target as HTMLImageElement | null
+  if (!el) return
+  applyMediaPlaceholder(el, {
+    name: fileName.value,
+    kind: placeholderKind(fileName.value, loaded.value?.mime || ''),
+    status: 'error',
+  })
 }
 
 function onDownload() {
@@ -133,7 +148,13 @@ onBeforeUnmount(() => {
         <div class="rte-attach-preview-body">
           <p v-if="loading" class="rte-attach-preview-status">正在打开附件…</p>
           <p v-else-if="error" class="rte-attach-preview-status is-error">{{ error }}</p>
-          <img v-else-if="kind === 'image' && objectUrl" :src="objectUrl" :alt="fileName" />
+          <img
+            v-else-if="kind === 'image' && objectUrl"
+            :src="objectUrl"
+            :alt="fileName"
+            class="rte-attach-image"
+            @error="onImageError"
+          />
           <iframe v-else-if="kind === 'pdf' && objectUrl" :src="objectUrl" :title="fileName"></iframe>
           <audio v-else-if="kind === 'audio' && objectUrl" :src="objectUrl" :aria-label="fileName" controls></audio>
           <video v-else-if="kind === 'video' && objectUrl" :src="objectUrl" :aria-label="fileName" controls></video>

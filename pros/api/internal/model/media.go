@@ -17,7 +17,7 @@ type MediaCategory struct {
 	CreatedAt time.Time  `gorm:"not null" json:"createdAt"`
 }
 
-func (MediaCategory) TableName() string { return "media_category" }
+func (MediaCategory) TableName() string { return "media_categories" }
 
 // MediaAsset is one stored file. storage_path is relative to the disk root and is not serialized.
 // The unique key is (user_id, sha256): the same bytes may exist once per user, not globally.
@@ -41,7 +41,7 @@ type MediaAsset struct {
 	CreatedAt        time.Time      `gorm:"not null" json:"createdAt"`
 }
 
-func (MediaAsset) TableName() string { return "media_asset" }
+func (MediaAsset) TableName() string { return "media_assets" }
 
 // MediaReference records where an asset is used. user_id is the owner, taken from the login.
 // inserted_path is the stable internal route (/media/{id}), never a disk path.
@@ -55,4 +55,4 @@ type MediaReference struct {
 	CreatedAt    time.Time `gorm:"not null" json:"createdAt"`
 }
 
-func (MediaReference) TableName() string { return "media_reference" }
+func (MediaReference) TableName() string { return "media_references" }

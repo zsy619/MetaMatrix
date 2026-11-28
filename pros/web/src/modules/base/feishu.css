@@ -1,0 +1,997 @@
+/**
+ * 飞书多维表格（Bitable）视觉规范层。
+ *
+ * 为什么单独一层：
+ *   - 全局 Telegram 规范（`src/styles/telegram.css`）是**全站**表面规范，
+ *     不动它、也不改其它模块；
+ *   - 多维表格是「表格类」界面，飞书 Bitable 的取色与密度（表头灰底、40px 行高、
+ *     #3370FF 主色、#DEE0E3 描边）与通用聊天界面差别明显，
+ *     用一层**模块内**覆盖让表格区严格对齐飞书。
+ *
+ * 飞书 Bitable 关键取值：
+ *   主色 #3370FF / hover #245BDB / 浅底 #EEF3FF
+ *   文字 #1F2329（主） / #646A73（次） / #8F959E（弱）
+ *   描边 #DEE0E3（竖线 / 外框） / #EFF0F1（行分隔）
+ *   页面底 #F5F6F7 / 表头底 #F7F8FA / hover #F2F3F5
+ *   圆角 6px（控件） / 8px（卡片、弹窗）
+ *   行高 40px、表头 40px、正文 14px
+ */
+
+:root {
+  /* —— 飞书 Bitable 令牌 —— */
+  --fs-blue: #3370ff;
+  --fs-blue-hover: #245bdb;
+  --fs-blue-active: #1f5fcc;
+  --fs-blue-soft: #eef3ff;
+  --fs-text-1: #1f2329;
+  --fs-text-2: #646a73;
+  --fs-text-3: #8f959e;
+  --fs-text-disabled: #bbbfc4;
+  --fs-border: #dee0e3;
+  --fs-border-light: #eff0f1;
+  --fs-bg-page: #f5f6f7;
+  --fs-bg-header: #f7f8fa;
+  --fs-bg-hover: #f2f3f5;
+  --fs-bg-active: #eef3ff;
+  --fs-radius: 6px;
+  --fs-radius-lg: 8px;
+  --fs-shadow-1:
+    0 2px 4px rgba(31, 35, 41, 0.04), 0 4px 8px rgba(31, 35, 41, 0.08);
+  --fs-shadow-2: 0 8px 24px rgba(31, 35, 41, 0.12);
+  --fs-row-h: 40px;
+}
+
+.be-shell {
+  background: var(--fs-bg-page);
+  color: var(--fs-text-1);
+}
+
+/* —— 顶部标题条 —— */
+
+.be-header {
+  height: 52px;
+  padding: 0 16px;
+  background: #fff;
+  border-bottom: 1px solid var(--fs-border);
+}
+
+.be-header__name {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--fs-text-1);
+  letter-spacing: 0.2px;
+}
+
+.be-header__sub {
+  font-size: 12px;
+  color: var(--fs-text-3);
+}
+
+/* —— 工具栏 —— */
+
+.be-toolbar {
+  height: 48px;
+  padding: 8px 16px;
+  gap: 8px;
+  background: #fff;
+  border-bottom: 1px solid var(--fs-border);
+}
+
+/* 飞书工具栏按钮：图标 + 文字、轻量无边框、hover 才出灰底。 */
+.be-btngroup {
+  padding: 0;
+  gap: 2px;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+/*
+ * 选择器要复刻 base.css 的高特异性写法（`.el-button.el-button:not(...)`），
+ * 否则压不过 base.css 里的 Telegram 药丸按钮（原因：base.css 用了 :not() 叠加，
+ * 特异性高达 0,6,0，普通 `.be-btngroup .el-button` 只有 0,2,0）。
+ */
+.be-btngroup
+  .el-button.el-button:not(.is-text):not(.is-link):not(.el-button--primary):not(
+    .el-button--danger
+  ):not(.el-button--success):not(.el-button--warning):not(.el-button--info) {
+  height: 30px;
+  padding: 0 10px;
+  border-radius: var(--fs-radius);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--fs-text-2);
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  transition:
+    background-color 160ms cubic-bezier(0.2, 0.8, 0.3, 1),
+    color 160ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.be-btngroup
+  .el-button.el-button:not(.is-text):not(.is-link):not(.el-button--primary):not(
+    .el-button--danger
+  ):not(.el-button--success):not(.el-button--warning):not(
+    .el-button--info
+  ):hover {
+  background: var(--fs-bg-hover);
+  color: var(--fs-text-1);
+  box-shadow: none;
+  transform: none;
+}
+
+/* 已生效的条件（筛选 / 排序）：飞书是浅蓝底 + 蓝字。 */
+.be-btngroup .el-button.is-active {
+  background: var(--fs-bg-active);
+  color: var(--fs-blue);
+  box-shadow: none;
+}
+
+.be-btngroup .el-button.is-disabled,
+.be-btngroup .el-button:disabled {
+  color: var(--fs-text-disabled);
+  background: transparent;
+}
+
+/* 工具栏里的主按钮（新增记录）：飞书是实心主色 + 4px 圆角。 */
+.be-toolbar .el-button--primary {
+  background: var(--fs-blue);
+  border-color: var(--fs-blue);
+  color: #fff;
+  border-radius: var(--fs-radius);
+  height: 30px;
+  padding: 0 12px;
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: none;
+}
+
+.be-toolbar .el-button--primary:hover {
+  background: var(--fs-blue-hover);
+  border-color: var(--fs-blue-hover);
+  transform: none;
+  box-shadow: none;
+}
+
+/* 「共享 / 仅我」分段控件：飞书是灰色药丸容器 + 白底选中块。 */
+.be-query-scope .el-radio-button__inner {
+  height: 26px;
+  line-height: 24px;
+  padding: 0 10px;
+  border-radius: var(--fs-radius);
+  font-size: 12px;
+  color: var(--fs-text-2);
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+.be-query-scope .el-radio-button.is-active .el-radio-button__inner {
+  background: var(--fs-blue-soft);
+  color: var(--fs-blue);
+  font-weight: 500;
+  box-shadow: none;
+}
+
+/* 搜索框：飞书是浅灰底、无描边、圆角 6px。 */
+.be-toolbar__search {
+  width: 220px;
+}
+
+.be-toolbar__search .el-input__wrapper {
+  background: var(--fs-bg-page);
+  border-radius: var(--fs-radius);
+  box-shadow: none;
+  padding: 0 10px;
+}
+
+.be-toolbar__search .el-input__wrapper:hover {
+  background: var(--fs-bg-hover);
+}
+
+.be-toolbar__search .el-input__inner {
+  font-size: 13px;
+  color: var(--fs-text-1);
+}
+
+.be-toolbar__count {
+  font-size: 12px;
+  color: var(--fs-text-3);
+}
+
+/* —— 视图标签 —— */
+
+.be-views {
+  height: 40px;
+  padding: 0 12px;
+  gap: 2px;
+  background: #fff;
+  border-bottom: 1px solid var(--fs-border);
+}
+
+.be-views__item {
+  position: relative;
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 0;
+  font-size: 13px;
+  color: var(--fs-text-2);
+  background: transparent;
+}
+
+.be-views__item:hover {
+  background: var(--fs-bg-hover);
+  color: var(--fs-text-1);
+}
+
+/* 选中态：飞书是「加粗 + 底部 2px 主色下划线」，不是药丸。 */
+.be-views__item.is-active {
+  color: var(--fs-text-1);
+  font-weight: 600;
+  background: transparent;
+}
+
+.be-views__item.is-active::after {
+  content: "";
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 0;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--fs-blue);
+}
+
+.be-views__lock {
+  color: var(--fs-text-3);
+}
+
+/* —— 列头：类型图标 + 字段名 + 操作 ▾（飞书多维表格同款）—— */
+
+/* 飞书的字段类型图标是灰的，颜色信息由用户自定义图标承载。 */
+.be-grid .base-grid__head-icon {
+  color: var(--fs-text-3);
+  transition: color 160ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.be-grid .vxe-header--column:hover .base-grid__head-icon {
+  color: var(--fs-text-2);
+}
+
+/* 列头右侧的 ▾：默认隐藏，hover 列头时出现（飞书行为）。 */
+.be-colmenu__trigger {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--fs-text-3);
+  font-size: 12px;
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 160ms cubic-bezier(0.2, 0.8, 0.3, 1),
+    background-color 160ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.be-grid .vxe-header--column:hover .be-colmenu__trigger,
+.be-colmenu__trigger:focus-visible {
+  opacity: 1;
+}
+
+.be-colmenu__trigger:hover {
+  background: var(--fs-bg-hover);
+  color: var(--fs-text-1);
+}
+
+/* —— 列操作菜单面板 —— */
+
+.be-colmenu__popper.el-popper {
+  padding: 0;
+  border: 1px solid var(--fs-border);
+  border-radius: var(--fs-radius-lg);
+  box-shadow: var(--fs-shadow-2);
+  background: #fff;
+  overflow: hidden;
+}
+
+.be-colmenu__panel {
+  padding: 6px 0;
+  min-width: 248px;
+}
+
+.be-colmenu__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px 8px;
+  border-bottom: 1px solid var(--fs-border-light);
+  margin-bottom: 4px;
+}
+
+.be-colmenu__head-icon {
+  font-size: 14px;
+  flex: none;
+}
+
+.be-colmenu__head-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fs-text-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.be-colmenu__head-type {
+  margin-left: auto;
+  flex: none;
+  font-size: 12px;
+  color: var(--fs-text-3);
+  background: var(--fs-bg-page);
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+
+.be-colmenu__group {
+  padding: 2px 0;
+}
+
+.be-colmenu__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 32px;
+  padding: 0 12px;
+  border: none;
+  background: transparent;
+  color: var(--fs-text-1);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 160ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.be-colmenu__item:hover {
+  background: var(--fs-bg-hover);
+}
+
+.be-colmenu__item .el-icon {
+  font-size: 14px;
+  color: var(--fs-text-2);
+  flex: none;
+}
+
+.be-colmenu__label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.be-colmenu__check {
+  color: var(--fs-blue) !important;
+}
+
+.be-colmenu__value {
+  font-size: 12px;
+  color: var(--fs-text-3);
+}
+
+.be-colmenu__sep {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--fs-border-light);
+}
+
+.be-colmenu__width {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px 6px;
+}
+
+.be-colmenu__width-label {
+  font-size: 12px;
+  color: var(--fs-text-2);
+  flex: none;
+}
+
+.be-colmenu__width-ok {
+  flex: none;
+  height: 24px;
+  padding: 0 10px;
+  border: none;
+  border-radius: var(--fs-radius);
+  background: var(--fs-blue);
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.be-colmenu__width-ok:hover {
+  background: var(--fs-blue-hover);
+}
+
+/* —— 表格主体 —— */
+
+.be-body {
+  padding: 12px 16px 0;
+  gap: 12px;
+}
+
+.be-body__main {
+  background: #fff;
+  border: 1px solid var(--fs-border);
+  border-radius: var(--fs-radius-lg);
+  overflow: hidden;
+  box-shadow: var(--fs-shadow-1);
+}
+
+.be-body__side {
+  width: 320px;
+  background: #fff;
+  border: 1px solid var(--fs-border);
+  border-radius: var(--fs-radius-lg);
+  box-shadow: var(--fs-shadow-1);
+}
+
+/* —— 网格（vxe-table）—— */
+
+.be-grid .vxe-table {
+  font-size: 14px;
+  color: var(--fs-text-1);
+  background: #fff;
+}
+
+.be-grid .vxe-table--body-wrapper,
+.be-grid .vxe-table--header-wrapper {
+  background: #fff;
+}
+
+.be-grid .vxe-header--column {
+  height: 40px;
+  background: var(--fs-bg-header);
+  color: var(--fs-text-1);
+  font-size: 13px;
+  font-weight: 500;
+  border-bottom: 1px solid var(--fs-border);
+  border-right: 1px solid var(--fs-border-light);
+}
+
+.be-grid .vxe-header--column .vxe-cell {
+  background: var(--fs-bg-header);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--fs-text-1);
+  padding: 0 12px;
+}
+
+.be-grid .vxe-cell {
+  padding: 0 12px;
+  font-size: 14px;
+  color: var(--fs-text-1);
+  border-bottom: 1px solid var(--fs-border-light);
+  border-right: 1px solid var(--fs-border-light);
+  background: #fff;
+}
+
+/*
+ * 飞书行高固定 40px。
+ *
+ * vxe-table 自带 `padding: 6px` + `min-height: 40px`（内容盒模型），
+ * 叠起来行高会到 45px 且内容上下居中偏下；这里把内边距清零、
+ * 让 wrapper 撑满 40px，行高才真正等于 40px。
+ * 用 !important 是为了压过 vxe 的内联/组件级样式（原因：第三方组件内联样式优先级高）。
+ */
+.be-grid .vxe-body--row {
+  height: var(--fs-row-h) !important;
+}
+
+.be-grid .vxe-cell {
+  padding: 0 12px !important;
+  min-height: var(--fs-row-h) !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 20px;
+  display: flex;
+  align-items: center;
+}
+
+.be-grid .vxe-cell > .vxe-cell--wrapper {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.be-grid .vxe-cell > * {
+  min-width: 0;
+}
+
+/* 行 hover：飞书是很浅的灰，不是蓝。 */
+.be-grid .vxe-row--hover .vxe-cell,
+.be-grid .vxe-row--row-hover .vxe-cell {
+  background: var(--fs-bg-header);
+}
+
+.be-grid .vxe-body--column {
+  background: #fff;
+}
+
+.be-grid .vxe-table--border-line {
+  border-color: var(--fs-border);
+}
+
+.be-grid .vxe-header--checkbox-column,
+.be-grid .vxe-cell--checkbox {
+  width: 48px;
+}
+
+.be-grid .vxe-header--checkbox-column .vxe-checkbox--icon,
+.be-grid .vxe-cell--checkbox .vxe-checkbox--icon {
+  border-color: var(--fs-text-disabled);
+  border-radius: 3px;
+}
+
+/* 选中单元格：飞书是主色描边。 */
+.be-grid .vxe-cell--active {
+  border: 1px solid var(--fs-blue) !important;
+  border-radius: 2px;
+}
+
+/* —— 右侧记录面板 —— */
+
+/* 飞书记录卡片：标题一行 + 摘要一行，整卡可点。 */
+.be-record-list__item {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  border-radius: var(--fs-radius);
+  border: 1px solid transparent;
+  padding: 8px 10px;
+  min-width: 0;
+}
+
+.be-record-list__item:hover {
+  background: var(--fs-bg-hover);
+  border-color: var(--fs-border-light);
+}
+
+.be-record-list__item.is-active {
+  background: var(--fs-blue-soft);
+  border-color: rgba(51, 112, 255, 0.28);
+}
+
+.be-record-list__item.is-active .be-record-list__title {
+  color: var(--fs-blue);
+}
+
+.be-record-list__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--fs-text-1);
+  width: 100%;
+}
+
+.be-record-list__meta {
+  flex: none;
+  width: 100%;
+  font-size: 12px;
+  color: var(--fs-text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* —— 字段管理面板里的字段行（飞书：单行卡片 + hover 高亮）—— */
+
+.be-field-row {
+  border: 1px solid var(--fs-border-light);
+  border-radius: var(--fs-radius);
+  background: #fff;
+  transition:
+    border-color 160ms cubic-bezier(0.2, 0.8, 0.3, 1),
+    background-color 160ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.be-field-row:hover {
+  border-color: var(--fs-border);
+  background: var(--fs-bg-header);
+}
+
+/* 列头菜单「编辑字段」跳过来的高亮行。 */
+.be-field-row.is-focus {
+  border-color: var(--fs-blue);
+  background: var(--fs-blue-soft);
+}
+
+/* —— 空态 —— */
+
+.be-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 48px 0;
+  color: var(--fs-text-3);
+  font-size: 13px;
+}
+
+.be-empty__icon {
+  font-size: 40px;
+  color: var(--fs-text-disabled);
+}
+
+.be-empty .el-button {
+  height: 30px;
+  border-radius: var(--fs-radius);
+  background: var(--fs-blue);
+  border-color: var(--fs-blue);
+  font-size: 13px;
+  padding: 0 14px;
+}
+
+.be-empty .el-button:hover {
+  background: var(--fs-blue-hover);
+  border-color: var(--fs-blue-hover);
+}
+
+/* —— 批量操作条 —— */
+
+.be-batch-bar {
+  background: #fff;
+  border: 1px solid var(--fs-border);
+  border-radius: var(--fs-radius-lg);
+  box-shadow: var(--fs-shadow-2);
+  padding: 8px 12px;
+}
+
+.be-batch-bar__count {
+  font-size: 13px;
+  color: var(--fs-text-1);
+}
+
+/* —— 面板通用件 —— */
+
+.be-panel {
+  border-radius: var(--fs-radius-lg);
+  border: 1px solid var(--fs-border);
+  background: #fff;
+}
+
+.be-panel__hint {
+  font-size: 12px;
+  color: var(--fs-text-3);
+}
+
+.be-chip {
+  height: 24px;
+  padding: 0 8px;
+  border-radius: var(--fs-radius);
+  background: var(--fs-bg-page);
+  color: var(--fs-text-2);
+  font-size: 12px;
+  border: 1px solid transparent;
+}
+
+.be-chip:hover {
+  background: var(--fs-bg-hover);
+  color: var(--fs-text-1);
+  border-color: var(--fs-border-light);
+}
+
+.be-chip.is-active {
+  background: var(--fs-blue-soft);
+  color: var(--fs-blue);
+}
+
+.be-chip--func {
+  background: var(--fs-bg-page);
+  border-color: var(--fs-border-light);
+}
+
+.be-chip--func:hover {
+  background: var(--fs-blue-soft);
+  border-color: rgba(51, 112, 255, 0.24);
+  color: var(--fs-blue);
+}
+
+/* —— 表单控件（面板内）—— */
+
+.be-shell .el-input__wrapper,
+.be-shell .el-select__wrapper,
+.be-shell .el-textarea__inner {
+  border-radius: var(--fs-radius);
+}
+
+.be-shell .el-input__wrapper.is-focus,
+.be-shell .el-select__wrapper.is-focused,
+.be-shell .el-textarea__inner:focus {
+  box-shadow: 0 0 0 2px rgba(51, 112, 255, 0.16);
+}
+
+.be-shell .el-button {
+  border-radius: var(--fs-radius);
+  font-size: 13px;
+}
+
+.be-shell .el-button--primary {
+  background: var(--fs-blue);
+  border-color: var(--fs-blue);
+}
+
+.be-shell .el-button--primary:hover {
+  background: var(--fs-blue-hover);
+  border-color: var(--fs-blue-hover);
+}
+
+/* —— 弹窗：飞书是 8px 圆角 + 轻投影 —— */
+
+/*
+ * 注意：Element Plus 的 `modal-class` 落在 `.el-overlay` 上（铺满全屏），
+ * 真正的面板是它内部的 `.el-dialog` / `.el-drawer`，
+ * 所以圆角、投影、描边必须作用在子面板上，否则会被全屏遮罩吃掉。
+ */
+.be-modal .el-dialog {
+  border-radius: var(--fs-radius-lg) !important;
+  background: #fff !important;
+  border: 1px solid var(--fs-border) !important;
+  box-shadow: var(--fs-shadow-2) !important;
+  overflow: hidden;
+}
+
+.be-modal .el-dialog__header {
+  padding: 16px 20px 12px;
+  margin: 0;
+  background: #fff;
+  border-bottom: 1px solid var(--fs-border-light);
+}
+
+.be-modal .el-dialog__title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--fs-text-1);
+  letter-spacing: 0;
+}
+
+.be-modal .el-dialog__headerbtn {
+  top: 12px;
+  right: 12px;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--fs-radius);
+  color: var(--fs-text-2);
+}
+
+.be-modal .el-dialog__headerbtn:hover {
+  background: var(--fs-bg-hover);
+  color: var(--fs-text-1);
+}
+
+.be-modal .el-dialog__body {
+  padding: 16px 20px;
+  background: #fff;
+  color: var(--fs-text-1);
+}
+
+.be-modal .el-dialog__footer {
+  padding: 12px 20px;
+  background: #fff;
+  border-top: 1px solid var(--fs-border-light);
+}
+
+/* 弹窗底部动作区：飞书是右对齐 + 6px 圆角按钮，主色 #3370FF。 */
+.be-modal .el-dialog__footer .el-button {
+  min-width: 88px;
+  height: 32px;
+  border-radius: var(--fs-radius);
+  font-weight: 500;
+}
+
+.be-modal .el-dialog__footer .el-button--primary {
+  background: var(--fs-blue);
+  border-color: var(--fs-blue);
+  color: #fff;
+  box-shadow: none;
+}
+
+.be-modal .el-dialog__footer .el-button--primary:hover {
+  background: var(--fs-blue-hover);
+  border-color: var(--fs-blue-hover);
+  transform: none;
+  box-shadow: none;
+}
+
+/* 弹窗内的表单控件同样走飞书取值。 */
+.be-modal .el-input__wrapper,
+.be-modal .el-textarea__inner,
+.be-modal .el-select__wrapper {
+  border-radius: var(--fs-radius);
+  box-shadow: 0 0 0 1px var(--fs-border) inset;
+}
+
+.be-modal .el-input__wrapper:hover,
+.be-modal .el-select__wrapper:hover {
+  box-shadow: 0 0 0 1px var(--fs-text-3) inset;
+}
+
+.be-modal .el-input__wrapper.is-focus,
+.be-modal .el-select__wrapper.is-focused {
+  box-shadow:
+    0 0 0 1px var(--fs-blue) inset,
+    0 0 0 3px rgba(51, 112, 255, 0.12);
+}
+
+.be-modal .el-form-item__label {
+  color: var(--fs-text-2);
+  font-size: 13px;
+}
+
+/* —— 记录详情抽屉：飞书右侧面板形态 —— */
+
+.be-drawer .el-drawer {
+  border-left: 1px solid var(--fs-border);
+  border-radius: 0;
+  background: #fff;
+  box-shadow: -4px 0 16px rgba(31, 35, 41, 0.06);
+}
+
+.be-drawer .el-drawer__header {
+  margin: 0;
+  padding: 14px 20px;
+  background: #fff;
+  border-bottom: 1px solid var(--fs-border-light);
+  color: var(--fs-text-1);
+}
+
+.be-drawer .el-drawer__title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--fs-text-1);
+}
+
+.be-drawer .el-drawer__body {
+  padding: 16px 20px;
+  background: #fff;
+  color: var(--fs-text-1);
+}
+
+/* —— 列宽拖拽把手（飞书：列头右侧竖线，hover 变蓝）—— */
+
+.be-grid .vxe-header--column {
+  position: relative;
+}
+
+.base-grid__resize {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 7px;
+  height: 100%;
+  cursor: col-resize;
+  background: transparent;
+  transition: background-color 160ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.base-grid__resize::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 2px;
+  width: 2px;
+  height: 16px;
+  margin-top: -8px;
+  border-radius: 1px;
+  background: var(--fs-border-strong, #d0d3d6);
+  opacity: 0;
+  transition: opacity 160ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.be-grid .vxe-header--column:hover .base-grid__resize::after,
+.base-grid__resize:hover::after {
+  opacity: 1;
+}
+
+.base-grid__resize:hover::after {
+  background: var(--fs-blue, #3370ff);
+}
+
+/* —— 单元格右键菜单（飞书多维表格同款）—— */
+
+.be-ctxmenu {
+  position: fixed;
+  z-index: 3000;
+}
+
+.be-ctxmenu__panel {
+  min-width: 200px;
+  max-width: 240px;
+  padding: 4px;
+  border: 1px solid var(--fs-border, #dee0e3);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(31, 35, 41, 0.12);
+}
+
+.be-ctxmenu__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 32px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--fs-text-1, #1f2329);
+  font-size: 13px;
+  line-height: 1;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 160ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.be-ctxmenu__item .el-icon {
+  font-size: 14px;
+  color: var(--fs-text-3, #8f959e);
+}
+
+.be-ctxmenu__item:hover {
+  background: var(--fs-bg-hover, #f2f3f5);
+}
+
+.be-ctxmenu__item:hover .el-icon {
+  color: var(--fs-text-1, #1f2329);
+}
+
+.be-ctxmenu__sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--fs-border-light, #eff0f1);
+}
+
+/* —— 表头拖拽排序（飞书：拖动列头调整列顺序）—— */
+
+.base-grid__head {
+  position: relative;
+  cursor: grab;
+}
+
+.base-grid__head:active {
+  cursor: grabbing;
+}
+
+.base-grid__head.is-dragging {
+  opacity: 0.45;
+}
+
+.base-grid__head.is-drop-before::before,
+.base-grid__head.is-drop-after::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--fs-blue, #3370ff);
+}
+
+.base-grid__head.is-drop-before::before {
+  left: -1px;
+}
+
+.base-grid__head.is-drop-after::after {
+  right: -1px;
+}

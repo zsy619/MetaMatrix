@@ -206,6 +206,11 @@ export const IconExportPng = svgIconNodes([
   h('circle', { cx: 9, cy: 10, r: 1.6 }),
   h('path', { d: 'M21 16l-5-5-4 4-2-2-5 5' }),
 ])
+/**
+ * 「更多」三点。
+ * 原来是 filled 实心圆（stroke:none），与全站 1.7px 描边线稿不同源；
+ * 统一改成描边圆点（stroke-width 1.7 + round），保证整条功能区只有一套绘制语言。
+ */
 export const IconMore: Component = {
   name: 'IconMore',
   inheritAttrs: false,
@@ -216,17 +221,20 @@ export const IconMore: Component = {
         viewBox: '0 0 24 24',
         width: 24,
         height: 24,
-        fill: 'currentColor',
-        stroke: 'none',
+        fill: 'none',
+        stroke: 'currentColor',
+        'stroke-width': 1.7,
+        'stroke-linecap': 'round',
+        'stroke-linejoin': 'round',
         xmlns: 'http://www.w3.org/2000/svg',
         'aria-hidden': 'true',
         focusable: 'false',
         ...(this.$attrs || {}),
       },
       [
-        h('circle', { cx: 5.5, cy: 12, r: 1.8 }),
-        h('circle', { cx: 12, cy: 12, r: 1.8 }),
-        h('circle', { cx: 18.5, cy: 12, r: 1.8 }),
+        h('circle', { cx: 5.5, cy: 12, r: 1.6 }),
+        h('circle', { cx: 12, cy: 12, r: 1.6 }),
+        h('circle', { cx: 18.5, cy: 12, r: 1.6 }),
       ],
     )
   },
@@ -483,6 +491,228 @@ export const IconQr = svgIcon([
   'M18 18h2v2h-2z',
 ])
 
+/** Telegram 风格：单行紧凑图标条。 */
+export const IconToolbarTelegram = svgIcon([
+  'M4 7h16',
+  'M4 12h11',
+  'M4 17h7',
+])
+/** 完整功能区：标签页 + 分组卡片。 */
+export const IconToolbarRibbon = svgIcon([
+  'M3.5 5.5h17v3.6h-17z',
+  'M5.5 11.6h4v6.9h-4z',
+  'M11 11.6h4v6.9h-4z',
+  'M16.5 11.6h2v6.9h-2z',
+])
+
+
+/* ==========================================================================
+   Telegram 风格补充图标（单色线稿）
+   规格与既有 svgIcon 助手完全一致：viewBox 0 0 24 24、stroke-width 1.7、
+   圆头圆角、fill none、宽高 24（不随父级 font-size 变化）。
+   用途：替换 Ribbon 里原先用「汉字 / Emoji」当图标的按钮，保证整条功能区
+   只有一套绘制语言（全部为 currentColor 描边线稿）。
+   ========================================================================== */
+
+/** 纸样（纸张设置）。 */
+export const IconPaperSample = svgIconNodes([
+  h('path', { d: 'M6 2.5h8l5 5V21a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1z' }),
+  h('path', { d: 'M14 2.5V8h5.5' }),
+  h('rect', { x: 8, y: 12.5, width: 8, height: 6, rx: 1 }),
+])
+
+/** 参考线（页面边界 / 辅助线）。 */
+export const IconGuide = svgIconNodes([
+  h('rect', { x: 4.5, y: 3, width: 15, height: 18, rx: 2 }),
+  h('path', { d: 'M8 7.5h8' }),
+  h('path', { d: 'M8 12h8' }),
+  h('path', { d: 'M8 16.5h5' }),
+])
+
+/** 印出链接（打印时输出网址）。 */
+export const IconPrintLink = svgIconNodes([
+  h('path', { d: 'M7 8.5V3.5h10v5' }),
+  h('rect', { x: 3.5, y: 8.5, width: 17, height: 7.5, rx: 2 }),
+  h('path', { d: 'M7 15.5v5h10v-5' }),
+  h('path', { d: 'M10 12.2h4' }),
+])
+
+/** 揭晓（折叠 / 隐藏文字）。 */
+export const IconEye = svgIconNodes([
+  h('path', { d: 'M2.6 12S6 6.2 12 6.2 21.4 12 21.4 12 18 17.8 12 17.8 2.6 12 2.6 12z' }),
+  h('circle', { cx: 12, cy: 12, r: 2.8 }),
+])
+
+/** 首字下沉。 */
+export const IconDropCap = svgIconNodes([
+  h('path', { d: 'M3.5 18.5L8 6.5l4.5 12' }),
+  h('path', { d: 'M5.4 14.6h5.2' }),
+  h('path', { d: 'M15 8.5h5.5M15 12h5.5M15 15.5h3.5' }),
+])
+
+/** Markdown。 */
+export const IconMarkdown = svgIconNodes([
+  h('path', { d: 'M2.6 16.5v-9h2.9l3 4.6 3-4.6h2.6v9' }),
+  h('path', { d: 'M17.5 4.5v9' }),
+  h('path', { d: 'M14.4 10.4l3.1 3.1 3.1-3.1' }),
+])
+
+/** 整理（清理杂项）。 */
+export const IconTidy = svgIconNodes([
+  h('path', { d: 'M3.5 20.5l7.2-7.2' }),
+  h('path', { d: 'M12.4 4.1l1.1 2.4 2.6.3-2 1.8.6 2.6-2.3-1.3-2.3 1.3.6-2.6-2-1.8 2.6-.3z' }),
+  h('path', { d: 'M18.6 3.2v3M20.1 4.7h-3' }),
+])
+
+/** 半角。 */
+export const IconHalfWidth = svgIconNodes([
+  h('path', { d: 'M7.5 4.5H6A1.5 1.5 0 0 0 4.5 6v12A1.5 1.5 0 0 0 6 19.5h1.5' }),
+  h('path', { d: 'M16.5 4.5H18A1.5 1.5 0 0 1 19.5 6v12a1.5 1.5 0 0 1-1.5 1.5h-1.5' }),
+  h('rect', { x: 9.5, y: 7.5, width: 5, height: 9, rx: 1 }),
+  h('path', { d: 'M12 7.5v9' }),
+])
+
+/** 全角。 */
+export const IconFullWidth = svgIconNodes([
+  h('path', { d: 'M7.5 4.5H6A1.5 1.5 0 0 0 4.5 6v12A1.5 1.5 0 0 0 6 19.5h1.5' }),
+  h('path', { d: 'M16.5 4.5H18A1.5 1.5 0 0 1 19.5 6v12a1.5 1.5 0 0 1-1.5 1.5h-1.5' }),
+  h('rect', { x: 9, y: 7, width: 6, height: 10, rx: 1 }),
+  h('path', { d: 'M9 12h6' }),
+])
+
+/** 中英文之间加空格。 */
+export const IconCjkSpace = svgIconNodes([
+  h('rect', { x: 2.6, y: 8, width: 6, height: 8, rx: 1 }),
+  h('rect', { x: 15.4, y: 8, width: 6, height: 8, rx: 1 }),
+  h('path', { d: 'M10.2 12h3.6' }),
+])
+
+/** 收紧空格。 */
+export const IconSqueezeSpace = svgIconNodes([
+  h('path', { d: 'M9.5 5.5L5 12l4.5 6.5' }),
+  h('path', { d: 'M14.5 5.5L19 12l-4.5 6.5' }),
+])
+
+/** 斑马纹（表格隔行底色）。 */
+export const IconZebra = svgIconNodes([
+  h('rect', { x: 3.5, y: 4.5, width: 17, height: 15, rx: 1.5 }),
+  h('path', { d: 'M3.5 9.5h17M3.5 14.5h17' }),
+  h('path', { d: 'M8.5 4.5v15M15.5 4.5v15' }),
+])
+
+/** 均分列。 */
+export const IconEqualColumns = svgIconNodes([
+  h('rect', { x: 3.5, y: 4.5, width: 17, height: 15, rx: 1.5 }),
+  h('path', { d: 'M12 4.5v15' }),
+])
+
+/** 求和（表格公式）。 */
+export const IconSigma = svgIcon(['M17.5 5H7l5.5 7-5.5 7h10.5'])
+
+/** 升序。 */
+export const IconSortAsc = svgIconNodes([
+  h('path', { d: 'M6.5 20V5' }),
+  h('path', { d: 'M3 8.5L6.5 5 10 8.5' }),
+  h('path', { d: 'M12.5 8h8M12.5 12h8M12.5 16h5' }),
+])
+
+/** 冻结表头。 */
+export const IconFreezeHeader = svgIconNodes([
+  h('rect', { x: 3.5, y: 4.5, width: 17, height: 15, rx: 1.5 }),
+  h('path', { d: 'M3.5 9.5h17' }),
+  h('rect', { x: 9.6, y: 12.6, width: 4.8, height: 4, rx: 0.9 }),
+  h('path', { d: 'M10.6 12.6v-1.3a1.4 1.4 0 0 1 2.8 0v1.3' }),
+])
+
+/** 冻结首列。 */
+export const IconFreezeColumn = svgIconNodes([
+  h('rect', { x: 3.5, y: 4.5, width: 17, height: 15, rx: 1.5 }),
+  h('path', { d: 'M9 4.5v15' }),
+  h('rect', { x: 4.8, y: 11.6, width: 3.4, height: 3.6, rx: 0.8 }),
+  h('path', { d: 'M5.7 11.6v-1a0.9 0.9 0 0 1 1.8 0v1' }),
+])
+
+/* —— 图表一级分类图标（替换原先的 Emoji） —— */
+
+/** 基础：折线图。 */
+export const IconChartBasic = svgIconNodes([
+  h('path', { d: 'M4 3.5v16.5h16.5' }),
+  h('path', { d: 'M7 15.5l3.6-4.2 3 2.6 4.9-6.4' }),
+])
+
+/** 统计：柱状图。 */
+export const IconChartStats = svgIconNodes([
+  h('path', { d: 'M4 3.5v16.5h16.5' }),
+  h('path', { d: 'M7.6 16.5v-4.2M12 16.5V8.6M16.4 16.5v-6.4' }),
+])
+
+/** 关系：节点连线。 */
+export const IconChartRelation = svgIconNodes([
+  h('circle', { cx: 12, cy: 5.8, r: 2.3 }),
+  h('circle', { cx: 5.6, cy: 17.4, r: 2.3 }),
+  h('circle', { cx: 18.4, cy: 17.4, r: 2.3 }),
+  h('path', { d: 'M10.6 7.7L7 15.6M13.4 7.7l3.6 7.9M7.9 17.4h8.2' }),
+])
+
+/** 层级：树状结构。 */
+export const IconChartHierarchy = svgIconNodes([
+  h('rect', { x: 9, y: 3, width: 6, height: 5, rx: 1 }),
+  h('rect', { x: 3, y: 16, width: 6, height: 5, rx: 1 }),
+  h('rect', { x: 15, y: 16, width: 6, height: 5, rx: 1 }),
+  h('path', { d: 'M12 8v4M6 16v-2.2h12V16' }),
+])
+
+/** 地理：地图定位。 */
+export const IconChartGeo = svgIconNodes([
+  h('path', { d: 'M12 21.2s6-5.4 6-9.6a6 6 0 1 0-12 0c0 4.2 6 9.6 6 9.6z' }),
+  h('circle', { cx: 12, cy: 11.4, r: 2.2 }),
+])
+
+/** 金融：K 线。 */
+export const IconChartFinance = svgIconNodes([
+  h('path', { d: 'M4 3.5v16.5h16.5' }),
+  h('path', { d: 'M8 7v7M8 16.5h4M8 14v2.5' }),
+  h('path', { d: 'M15.5 9v9M15.5 11h3.5M15.5 15.5h3.5' }),
+])
+
+/** 坐标系：雷达 / 坐标轴。 */
+export const IconChartCoordinate = svgIconNodes([
+  h('circle', { cx: 12, cy: 12, r: 8.5 }),
+  h('path', { d: 'M12 3.5v17M3.5 12h17' }),
+  h('circle', { cx: 12, cy: 12, r: 2.4 }),
+])
+
+/** 组件：拼图。 */
+export const IconChartComponent = svgIconNodes([
+  h('path', {
+    d: 'M9.6 3.5h4.8v2.2a1.8 1.8 0 1 0 3.6 0V3.5H20.5v4.8h-2.2a1.8 1.8 0 1 0 0 3.6h2.2v4.8h-4.8v-2.2a1.8 1.8 0 1 0-3.6 0v2.2H7.7v-4.8H9.9a1.8 1.8 0 1 0 0-3.6H7.7V3.5h1.9z',
+  }),
+])
+
+/** 3D·GL：立方体。 */
+export const IconChartGL = svgIconNodes([
+  h('path', { d: 'M12 2.8l8.4 4.6v9.2L12 21.2 3.6 16.6V7.4L12 2.8z' }),
+  h('path', { d: 'M3.6 7.4L12 12l8.4-4.6M12 12v9.2' }),
+])
+
+/** 图表一级分类 id → Telegram 风格图标。 */
+export const chartGroupIconMap: Record<string, Component> = {
+  basic: IconChartBasic,
+  stats: IconChartStats,
+  relation: IconChartRelation,
+  hierarchy: IconChartHierarchy,
+  geo: IconChartGeo,
+  finance: IconChartFinance,
+  coordinate: IconChartCoordinate,
+  component: IconChartComponent,
+  gl: IconChartGL,
+}
+
+/** 取图表一级分类图标；未知 id 回退到基础折线图。 */
+export function chartGroupIcon(groupId: string): Component {
+  return chartGroupIconMap[groupId] || IconChartBasic
+}
+
 export const toolbarIconMap: Record<string, Component> = {
   undo: IconUndo,
   redo: IconRedo,
@@ -542,6 +772,8 @@ export const toolbarIconMap: Record<string, Component> = {
   exportText: IconExportText,
   exportPng: IconExportPng,
   more: IconMore,
+  tgStyle: IconToolbarTelegram,
+  ribbonStyle: IconToolbarRibbon,
   importDoc: IconDocument,
   importLink: IconConnection,
   form: IconForm,
@@ -549,6 +781,23 @@ export const toolbarIconMap: Record<string, Component> = {
   formCheckbox: IconFormCheckbox,
   formText: IconFormText,
   template: IconTemplate,
+  paperSample: IconPaperSample,
+  guide: IconGuide,
+  printLink: IconPrintLink,
+  eye: IconEye,
+  dropCap: IconDropCap,
+  markdown: IconMarkdown,
+  tidy: IconTidy,
+  halfWidth: IconHalfWidth,
+  fullWidth: IconFullWidth,
+  cjkSpace: IconCjkSpace,
+  squeezeSpace: IconSqueezeSpace,
+  zebra: IconZebra,
+  equalColumns: IconEqualColumns,
+  sigma: IconSigma,
+  sortAsc: IconSortAsc,
+  freezeHeader: IconFreezeHeader,
+  freezeColumn: IconFreezeColumn,
 }
 
 export { IconDocument as Document, IconConnection as Connection, IconLink as LinkIcon }
