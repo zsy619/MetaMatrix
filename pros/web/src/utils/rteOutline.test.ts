@@ -7,6 +7,7 @@ import {
   findOutlineElement,
   outlineFromHTML,
   outlineFromPmDoc,
+  sameOutline,
   selectOutlineHeading,
 } from './rteOutline'
 
@@ -61,5 +62,35 @@ describe('大纲跳转', () => {
       if ($pos.node(d).type.name === 'heading') heading = $pos.node(d).textContent
     }
     expect(heading).toBe('乙')
+  })
+
+  it('块身份失效时按标题文本回退，同名时仍可用 DOM 上的 id', () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    host.innerHTML = '<h2 id="sec.2">相同</h2><h2 id="sec.3">相同</h2>'
+    const el = findOutlineElement(host, { level: 2, text: '相同', blockId: 'stale', htmlId: 'sec.3' })
+    expect(el?.id).toBe('sec.3')
+
+    const editor = new Editor({
+      element: host,
+      extensions: [StarterKit.configure({ dropcursor: false, undoRedo: false }), BlockIdentity],
+      content:
+        '<h2 data-block-id="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa">甲</h2><p>段</p><h2 data-block-id="bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb">乙</h2>',
+    })
+    editors.push(editor)
+    expect(selectOutlineHeading(editor, { level: 2, text: '乙', blockId: 'missing-id' })).toBe(true)
+    const $pos = editor.state.doc.resolve(editor.state.selection.from)
+    let heading = ''
+    for (let d = $pos.depth; d > 0; d -= 1) {
+      if ($pos.node(d).type.name === 'heading') heading = $pos.node(d).textContent
+    }
+    expect(heading).toBe('乙')
+  })
+})
+
+describe('sameOutline', () => {
+  it('比较 htmlId，避免只改锚点时目录不刷新', () => {
+    expect(sameOutline([{ level: 1, text: 'A', htmlId: 'a' }], [{ level: 1, text: 'A', htmlId: 'a' }])).toBe(true)
+    expect(sameOutline([{ level: 1, text: 'A', htmlId: 'a' }], [{ level: 1, text: 'A', htmlId: 'b' }])).toBe(false)
   })
 })

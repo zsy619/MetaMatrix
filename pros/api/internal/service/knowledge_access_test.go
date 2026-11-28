@@ -152,3 +152,71 @@ func mustCanvasDoc(t *testing.T, db *gorm.DB, id uuid.UUID) *model.CanvasDocumen
 	}
 	return &doc
 }
+
+func TestOutlineFromHTMLRejectsMismatchedClosingTag(t *testing.T) {
+	items := OutlineFromHTML(`<h1 data-block-id="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa">甲</h2><h2 id="sec">乙</h2>`)
+	if len(items) != 1 || items[0].Text != "乙" || items[0].HTMLID != "sec" || items[0].Level != 2 {
+		t.Fatalf("items = %+v, want only 乙", items)
+	}
+}
+
+func TestViewerCanReadOutlineTasksAndPropsButCannotMutate(t *testing.T) {
+	db, owner, project, svc := openKnowledgeAccessSQLite(t)
+	node, err := svc.CreateDocWithNode(owner, project.ID, nil, "大纲文档", "📄")
+	if err != nil {
+		t.Fatal(err)
+	}
+	docID := *node.DocumentID
+	html := `<h1 data-block-id="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa">一级</h1><h2>二级</h2><ul data-type="taskList"><li data-type="taskItem" data-checked="false"><p>待办</p></li></ul>`
+	if err := db.Model(&model.CanvasDocument{}).Where("id = ?", docID).Update("current_data", datatypes.JSON(htmlPayload(html))).Error; err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.UpsertDocProps(owner, docID, DocPropsInput{Status: strPtr("published"), Summary: strPtr("可见摘要")}); err != nil {
+		t.Fatal(err)
+	}
+	editor := addCollabMember(t, db, project.ID, owner, SpaceRoleEditor, "编辑成员")
+	viewer := addCollabMember(t, db, project.ID, owner, SpaceRoleViewer, "浏览成员")
+	stranger := uuid.New()
+
+	outline, err := svc.DocOutline(viewer, docID)
+	if err != nil || len(outline) != 2 || outline[0].Text != "一级" || outline[0].BlockID == "" {
+		t.Fatalf("viewer outline = %v %+v", err, outline)
+	}
+	if _, err := svc.DocOutline(stranger, docID); !errors.Is(err, ErrDocumentNotFound) {
+		t.Fatalf("stranger DocOutline = %v, want ErrDocumentNotFound", err)
+	}
+	props, err := svc.GetDocProps(viewer, docID)
+	if err != nil || props.Summary != "可见摘要" {
+		t.Fatalf("viewer props = %+v %v", props, err)
+	}
+	tasks, err := svc.ListDocTasks(viewer, docID)
+	if err != nil || len(tasks) != 1 {
+		t.Fatalf("viewer tasks = %v %+v", err, tasks)
+	}
+	if err := svc.SetDocTask(viewer, docID, 0, true); !errors.Is(err, ErrSpaceForbidden) {
+		t.Fatalf("viewer SetDocTask = %v, want ErrSpaceForbidden", err)
+	}
+	if err := svc.ReorderOutline(viewer, docID, []int{1, 0}); !errors.Is(err, ErrSpaceForbidden) {
+		t.Fatalf("viewer ReorderOutline = %v, want ErrSpaceForbidden", err)
+	}
+	if _, err := svc.ListDocVersions(viewer, docID, 10); err != nil {
+		t.Fatalf("viewer ListDocVersions = %v", err)
+	}
+	if err := svc.SetDocTask(editor, docID, 0, true); err != nil {
+		t.Fatal(err)
+	}
+	after, err := svc.ListDocTasks(viewer, docID)
+	if err != nil || len(after) != 1 || !after[0].Checked {
+		t.Fatalf("after editor SetDocTask = %v %+v", err, after)
+	}
+	if err := svc.ReorderOutline(editor, docID, []int{1, 0}); err != nil {
+		t.Fatal(err)
+	}
+	reordered, err := svc.DocOutline(viewer, docID)
+	if err != nil || len(reordered) != 2 || reordered[0].Text != "二级" || reordered[1].Text != "一级" {
+		t.Fatalf("reordered outline = %v %+v", err, reordered)
+	}
+	if _, err := svc.LabelVersion(stranger, docID, uuid.New(), "x"); !errors.Is(err, ErrDocumentNotFound) {
+		t.Fatalf("stranger LabelVersion = %v, want ErrDocumentNotFound", err)
+	}
+}

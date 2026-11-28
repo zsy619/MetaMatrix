@@ -4,7 +4,7 @@ import { Editor } from '@tiptap/core'
 import StarterKit from '@tiptap/starter-kit'
 import { BlockIdentity } from './blockIdentity'
 import { TocBlock } from './tocBlock'
-import { outlineFromPmDoc } from '../utils/rteOutline'
+import { outlineFromPmDoc, selectOutlineHeading } from '../utils/rteOutline'
 
 const editors: Editor[] = []
 afterEach(() => {
@@ -43,5 +43,18 @@ describe('TocBlock', () => {
       if ($pos.node(d).type.name === 'heading') heading = $pos.node(d).textContent
     }
     expect(heading).toBe('乙')
+  })
+
+  it('标题改名后目录条目跟着更新', () => {
+    const { host, editor } = makeEditor(
+      '<h2 data-block-id="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa">甲</h2><p>段</p><h2 data-block-id="bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb">乙</h2>',
+    )
+    expect(editor.commands.insertToc()).toBe(true)
+    const first = outlineFromPmDoc(editor.state.doc)[0]
+    expect(first).toBeTruthy()
+    expect(selectOutlineHeading(editor, first!)).toBe(true)
+    editor.chain().insertContent('改').run()
+    const buttons = [...host.querySelectorAll('.rte-toc-item')] as HTMLElement[]
+    expect(buttons.map((el) => el.textContent)).toEqual(['改甲', '乙'])
   })
 })
