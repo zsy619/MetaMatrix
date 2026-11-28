@@ -93,6 +93,8 @@ export type RecordRow = {
   id: string;
   version: number;
   fields: Record<string, unknown>;
+  /** 分组视图下这一行所属的分组键（服务端算好）。 */
+  group?: string;
   /** 因「条件可见」策略而对本行隐藏的字段 ID（值不过网）。 */
   conditionalHidden?: string[];
   updatedAt: string;
@@ -157,6 +159,13 @@ export type PersonalViewConfig = {
 };
 
 export type ViewConfig = {
+  /**
+   * 配置版本（E-05 收口）。
+   *
+   * 与后端 `base_views.version` 对齐：服务端每次保存视图配置都会把
+   * 新的行版本写进这里，客户端据此判断「手上这份配置是不是最新的」。
+   */
+  version?: number;
   fieldVisibility?: Record<string, boolean>;
   fieldWidths?: Record<string, number>;
   /** 列顺序（字段 ID 数组）；个人段的 fieldOrder 优先。 */
@@ -231,6 +240,46 @@ export type QueryResult = {
   fields: FieldMeta[];
 };
 
+/** 汇总请求（E-07 汇总行 / 分组小计）。 */
+export type SummaryRequest = {
+  tableId: string;
+  filters?: FilterGroup;
+  keyword?: string;
+  /** 参与汇总的字段；不传 = 全部可见字段。 */
+  fields?: Array<{ fieldId: string; functions?: string[] }>;
+  /** 分组小计的分组字段。 */
+  groupFieldId?: string;
+};
+
+/** 单个字段的聚合结果。 */
+export type SummaryValue = {
+  fieldId: string;
+  sum?: number;
+  avg?: number;
+  min?: number;
+  max?: number;
+  /** 参与聚合的行数。 */
+  count: number;
+  /** 非空计数 / 空值计数。 */
+  filled: number;
+  empty: number;
+};
+
+/** 一个分组的小计。 */
+export type SummaryGroup = {
+  key: string;
+  count: number;
+  values: SummaryValue[];
+};
+
+/** 汇总结果。 */
+export type SummaryResult = {
+  tableId: string;
+  total: number;
+  values: SummaryValue[];
+  groups: SummaryGroup[];
+};
+
 /** Base 概要。 */
 export type BaseInfo = {
   id: string;
@@ -261,7 +310,8 @@ export type RecordGrant = {
   name: string;
   email?: string;
   /** 授权对象类型：user（默认）/ department（按部门）。 */
-  subjectType?: 'user' | 'department';
+  /** 授权对象类型：user / department（部门名）/ group（通讯录分组 ID）。 */
+  subjectType?: 'user' | 'department' | 'group';
   /** 授权对象 ID：用户 ID 或部门名。 */
   subjectId?: string;
   /** 有效期截止时间；为空表示永久有效。 */
@@ -270,8 +320,9 @@ export type RecordGrant = {
 
 /** 记录可见范围的授权对象（用户 / 部门 + 有效期）。 */
 export type GrantSubject = {
-  type: 'user' | 'department';
-  /** 用户 ID 或部门名。 */
+  /** user = 个人；department = 部门（core_users.department）；group = 通讯录分组。 */
+  type: 'user' | 'department' | 'group';
+  /** 用户 ID / 部门名 / 分组 ID。 */
   id: string;
   /** 有效期截止时间（ISO 字符串）；为空表示永久。 */
   expiresAt?: string | null;

@@ -28,6 +28,7 @@ import {
   Grid,
   Histogram,
   DataLine,
+  DataAnalysis,
   InfoFilled,
   Link,
   Lock,
@@ -92,6 +93,8 @@ import {
   updateView,
   listBaseEmbedders,
   listLinkTargets,
+  fetchTableSummary,
+  transferRecord,
   recalcLookupRollup,
   type BaseEmbedder,
 } from "./api";
@@ -108,13 +111,14 @@ import type {
   RecordVisibility,
   GrantSubject,
   SortRule,
+  SummaryResult,
   ViewConfig,
   ViewScope,
   ViewType,
 } from "./types";
 import "./base.css";
 import "./feishu.css";
-import { buildXlsxBlob } from "./export/xlsx";
+import { buildXlsxBlob, XLSX_STYLE } from "./export/xlsx";
 
 const props = defineProps<{
   projectId: string;
@@ -145,6 +149,14 @@ const loading = ref(false);
 const keyword = ref("");
 const selectedIds = ref<string[]>([]);
 const sideOpen = ref(true);
+/** 汇总结果（E-07）：底部合计行 + 分组小计行。 */
+const summaryResult = ref<SummaryResult | null>(null);
+/** 跨表复制 / 移动对话框（E-03）。 */
+const transferVisible = ref(false);
+const transferRecordId = ref("");
+const transferTargetTableId = ref("");
+const transferMode = ref<"copy" | "move">("copy");
+const transferring = ref(false);
 
 const filters = ref<FilterGroup>({
   logic: "AND",
@@ -493,6 +505,116 @@ function normalizeFilters(raw: unknown): FilterGroup {
   return normalizeFiltersPure(raw);
 }
 
+/** 汇总是否开启（个人偏好，存视图个人段的 layout）。 */
+const summaryEnabled = computed(
+  () => effectiveViewConfig.value.layout?.summaryEnabled === true,
+);
+
+/** 汇总口径：合计 / 平均 / 计数。 */
+const summaryFunction = computed<"sum" | "avg" | "count">(() => {
+  const raw = effectiveViewConfig.value.layout?.summaryFunction;
+  return raw === "avg" || raw === "count" ? raw : "sum";
+});
+
+/** 分组小计用的分组字段（第一个分组规则）。 */
+const summaryGroupFieldId = computed(() => effectiveQuery.value.groups[0]?.fieldId ?? "");
+
+/**
+ * 拉取汇总（E-07）。
+ *
+ * 口径与服务端列表一致（同一套筛选 + 关键字），
+ * 所以「合计」永远等于用户看到的那些行的合计。
+ */
+async function loadSummary() {
+  if (!activeTableId.value || !summaryEnabled.value) {
+    summaryResult.value = null;
+    return;
+  }
+  try {
+    summaryResult.value = await fetchTableSummary(props.projectId, {
+      tableId: activeTableId.value,
+      filters: effectiveQuery.value.filters,
+      keyword: keyword.value.trim() || undefined,
+      groupFieldId: summaryGroupFieldId.value || undefined,
+    });
+  } catch {
+    // 汇总失败不打断主流程（用户还是要看列表的）。
+    summaryResult.value = null;
+  }
+}
+
+/**
+ * 打开「复制 / 移动到其他表」对话框（E-03）。
+ *
+ * 跨表搬运按**字段名**映射、只搬同类型字段（服务端口径）。
+ */
+function openTransfer(recordId: string) {
+  transferRecordId.value = recordId;
+  transferTargetTableId.value = tables.value.find((t) => t.id !== activeTableId.value)?.id ?? "";
+  transferMode.value = "copy";
+  transferVisible.value = true;
+}
+
+/** 执行跨表复制 / 移动。 */
+async function confirmTransfer() {
+  if (!transferTargetTableId.value || !transferRecordId.value) {
+    ElMessage.warning("请选择目标表");
+    return;
+  }
+  transferring.value = true;
+  try {
+    const result = await transferRecord(props.projectId, activeTableId.value, {
+      recordId: transferRecordId.value,
+      targetTableId: transferTargetTableId.value,
+      mode: transferMode.value,
+    });
+    const copied = Object.keys(result.copiedFields ?? {}).length;
+    const skipped = Object.keys(result.skippedFields ?? {}).length;
+    transferVisible.value = false;
+    ElMessage.success(
+      `已${transferMode.value === "move" ? "移动" : "复制"} ${copied} 个字段` +
+        (skipped ? `，跳过 ${skipped} 个（类型不同或无同名字段）` : ""),
+    );
+    await runQuery();
+  } catch (err) {
+    ElMessage.error((err as Error).message || "跨表操作失败");
+  } finally {
+    transferring.value = false;
+  }
+}
+
+/** 开关汇总行。 */
+async function toggleSummary() {
+  const next = !summaryEnabled.value;
+  await applyFieldConfig((cfg) => {
+    cfg.layout = {
+      ...(cfg.layout ?? {}),
+      summaryEnabled: next,
+      summaryFunction: summaryFunction.value,
+    };
+  });
+  if (next) {
+    await loadSummary();
+    ElMessage.success("已开启汇总行");
+  } else {
+    summaryResult.value = null;
+    ElMessage.success("已关闭汇总行");
+  }
+}
+
+/** 切换汇总口径。 */
+async function onSummaryFunctionChange(value: string | number | boolean | undefined) {
+  const next = value === "avg" || value === "count" ? value : "sum";
+  await applyFieldConfig((cfg) => {
+    cfg.layout = {
+      ...(cfg.layout ?? {}),
+      summaryEnabled: true,
+      summaryFunction: next,
+    };
+  });
+  await loadSummary();
+}
+
 async function runQuery(append = false) {
   if (!activeTableId.value) return;
   loading.value = true;
@@ -529,6 +651,7 @@ async function runQuery(append = false) {
     total.value = result.total;
     cursor.value = result.page?.nextCursor;
     await loadLinkIndex();
+    await loadSummary();
   } catch (err) {
     ElMessage.error((err as Error).message || "查询失败");
   } finally {
@@ -1115,6 +1238,8 @@ async function applyFieldConfig(
     fieldWidths?: Record<string, number>;
     frozenFields?: string[];
     fieldOrder?: string[];
+    /** 布局类偏好（汇总行开关 / 口径等）。 */
+    layout?: Record<string, unknown>;
   }) => void,
 ) {
   const view = activeView.value;
@@ -1447,6 +1572,14 @@ function buildExportXlsx() {
       columnWidths: cols.map((f) =>
         Math.min(40, Math.max(12, f.name.length * 2 + 6)),
       ),
+      // 列级数字格式（A-09）：金额带 ¥、百分比显示 85%、数字千分位右对齐。
+      columnStyles: cols.map((f) => {
+        if (f.type === "currency") return XLSX_STYLE.currency;
+        if (f.type === "percent") return XLSX_STYLE.percent;
+        if (f.type === "number" || f.type === "rating") return XLSX_STYLE.number;
+        if (f.type === "date" || f.type === "datetime") return XLSX_STYLE.date;
+        return XLSX_STYLE.general;
+      }),
     },
   ]);
 }
@@ -1707,6 +1840,31 @@ onBeforeUnmount(() => {
           <el-button size="small" :icon="MagicStick" @click="openFormula">
             公式
           </el-button>
+          <!-- 汇总行（E-07）：底部合计 + 分组小计 -->
+          <el-tooltip
+            content="在表格底部显示合计 / 平均 / 计数；有分组时每个分组后显示小计"
+            placement="bottom"
+          >
+            <el-button
+              size="small"
+              :icon="DataAnalysis"
+              :class="{ 'is-active': summaryEnabled }"
+              @click="toggleSummary"
+            >
+              汇总
+            </el-button>
+          </el-tooltip>
+          <el-radio-group
+            v-if="summaryEnabled"
+            :model-value="summaryFunction"
+            size="small"
+            class="be-summary-fn-group"
+            @change="onSummaryFunctionChange"
+          >
+            <el-radio-button value="sum">合计</el-radio-button>
+            <el-radio-button value="avg">平均</el-radio-button>
+            <el-radio-button value="count">计数</el-radio-button>
+          </el-radio-group>
           <el-button
             size="small"
             :icon="Setting"
@@ -1844,10 +2002,14 @@ onBeforeUnmount(() => {
           :link-options="linkOptions"
           :sorts="effectiveQuery.sorts"
           :project-id="projectId"
+          :summary="summaryResult"
+          :summary-group-field-id="summaryGroupFieldId"
+          :summary-function="summaryFunction"
           @update-cell="onCellUpdate"
           @open-record="onOpenRecord"
           @add-row="onAddRow"
           @selection-change="(ids) => (selectedIds = ids)"
+          @transfer-record="openTransfer"
           @rows-reorder="onRowsReorder"
           @open-doc="(nodeId) => emit('open-doc', nodeId)"
           @open-record-ref="onOpenRecordRef"
@@ -2167,6 +2329,59 @@ onBeforeUnmount(() => {
         <el-button :icon="CopyDocument" @click="copyExport">复制</el-button>
         <el-button :icon="Download" @click="downloadExport">下载文件</el-button>
         <el-button type="primary" @click="showExport = false">完成</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 跨表复制 / 移动（E-03） -->
+    <el-dialog
+      v-if="transferVisible"
+      :model-value="true"
+      title="复制 / 移动到其他表"
+      width="480px"
+      append-to-body
+      modal-class="be-modal"
+      destroy-on-close
+      @close="transferVisible = false"
+    >
+      <div class="be-panel">
+        <el-form label-width="72px" label-position="left">
+          <el-form-item label="目标表">
+            <el-select
+              v-model="transferTargetTableId"
+              class="be-transfer__select"
+              style="width: 100%"
+              placeholder="选择目标表"
+            >
+              <el-option
+                v-for="table in tables.filter((item) => item.id !== activeTableId)"
+                :key="table.id"
+                :label="table.name"
+                :value="table.id"
+              />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="方式">
+            <el-radio-group v-model="transferMode" size="small">
+              <el-radio-button value="copy">复制一份</el-radio-button>
+              <el-radio-button value="move">移动（删源）</el-radio-button>
+            </el-radio-group>
+          </el-form-item>
+        </el-form>
+        <div class="be-panel__hint">
+          按「字段名」映射，只搬运类型相同的字段（计算字段、类型不同的字段会被跳过）——
+          不做隐式转换，避免目标表里出现你没写过的值。
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="transferVisible = false">取消</el-button>
+        <el-button
+          type="primary"
+          :loading="transferring"
+          :disabled="!transferTargetTableId"
+          @click="confirmTransfer"
+        >
+          确认
+        </el-button>
       </template>
     </el-dialog>
   </div>

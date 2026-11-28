@@ -45,6 +45,25 @@ const monthOffset = ref(0);
 /** 看板拖拽：正在拖动的记录、悬停的目标列。 */
 const draggingId = ref("");
 const dragOverKey = ref("");
+/** 看板多选：批量拖拽（E-02）。 */
+const selectedIds = ref<string[]>([]);
+/** 本次拖拽涉及的全部记录（多选时 > 1）。 */
+const draggingIds = ref<string[]>([]);
+
+/** 切换一张卡片的选中状态。 */
+function toggleSelected(id: string) {
+  const index = selectedIds.value.indexOf(id);
+  if (index >= 0) {
+    selectedIds.value = selectedIds.value.filter((item) => item !== id);
+  } else {
+    selectedIds.value = [...selectedIds.value, id];
+  }
+}
+
+/** 卡片是否在选中集合里。 */
+function isSelected(id: string): boolean {
+  return selectedIds.value.includes(id);
+}
 
 const coverField = computed(() =>
   props.fields.find((f) => f.type === "attachment"),
@@ -123,6 +142,11 @@ const groups = computed(() => {
 /** 拖拽落列：把记录的分组字段改成目标列的值。 */
 function onDragStart(row: RecordRow, event?: DragEvent) {
   draggingId.value = row.id;
+  // 多选批量拖拽（E-02）：拖的是「选中的那一批」，没选中就只拖这一张。
+  draggingIds.value =
+    selectedIds.value.includes(row.id) && selectedIds.value.length > 1
+      ? [...selectedIds.value]
+      : [row.id];
   // HTML5 拖拽必须写一次 data，否则部分浏览器不会触发 drop。
   if (event?.dataTransfer) {
     event.dataTransfer.effectAllowed = "move";
@@ -133,6 +157,7 @@ function onDragStart(row: RecordRow, event?: DragEvent) {
 function onDragEnd() {
   draggingId.value = "";
   dragOverKey.value = "";
+  draggingIds.value = [];
 }
 
 function onDragOver(key: string) {
@@ -142,24 +167,27 @@ function onDragOver(key: string) {
 
 function onDrop(key: string) {
   const field = groupField.value;
-  const recordId = draggingId.value;
+  const batch = draggingIds.value.length ? [...draggingIds.value] : [draggingId.value];
   onDragEnd();
-  if (!field || !recordId || key === "全部") return;
-  const row = props.rows.find((item) => item.id === recordId);
-  if (!row) return;
-  const current = cellValue(row, field.id);
-  if (field.type === "multi_select") {
-    const list = Array.isArray(current) ? current.map(String) : [];
-    if (!list.includes(key))
-      emit("update-cell", {
-        recordId,
-        fieldId: field.id,
-        value: [...list, key],
-      });
-    return;
+  if (!field || !batch.length || key === "全部") return;
+  // 批量拖拽（E-02）：一次把整批记录挪到目标列。
+  for (const recordId of batch) {
+    const row = props.rows.find((item) => item.id === recordId);
+    if (!row) continue;
+    const current = cellValue(row, field.id);
+    if (field.type === "multi_select") {
+      const list = Array.isArray(current) ? current.map(String) : [];
+      if (!list.includes(key))
+        emit("update-cell", {
+          recordId,
+          fieldId: field.id,
+          value: [...list, key],
+        });
+      continue;
+    }
+    if (String(current ?? "") === key) continue;
+    emit("update-cell", { recordId, fieldId: field.id, value: key });
   }
-  if (String(current ?? "") === key) return;
-  emit("update-cell", { recordId, fieldId: field.id, value: key });
 }
 
 // —— 画廊 ——
@@ -289,12 +317,23 @@ const rowsByDay = computed(() => {
             v-for="row in group.rows"
             :key="row.id"
             class="base-board__card"
-            :class="{ 'is-dragging': draggingId === row.id }"
+            :class="{
+              'is-dragging': draggingId === row.id,
+              'is-selected': isSelected(row.id),
+            }"
             :draggable="editable && !!groupField"
             @dragstart="onDragStart(row, $event)"
             @dragend="onDragEnd"
             @click="emit('open-record', row.id)"
           >
+            <!-- 多选：勾选后可整批拖到别的列（E-02） -->
+            <el-checkbox
+              v-if="editable && !!groupField"
+              class="base-board__card-check"
+              :model-value="isSelected(row.id)"
+              @click.stop
+              @change="toggleSelected(row.id)"
+            />
             <strong class="base-board__card-title">{{
               primaryText(row)
             }}</strong>
@@ -517,7 +556,32 @@ const rowsByDay = computed(() => {
   gap: 8px;
 }
 
+/* 看板多选（E-02）：勾选的卡片高亮 + 左上角复选框。 */
 .base-board__card {
+  position: relative;
+}
+
+.base-board__card.is-selected {
+  outline: 2px solid var(--tg-blue, #3390ec);
+  outline-offset: -1px;
+  background: var(--tg-surface-2, #f6f8fa);
+}
+
+.base-board__card-check {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 2;
+  opacity: 0;
+  transition: opacity var(--tg-dur, 160ms) var(--tg-ease, ease);
+}
+
+.base-board__card:hover .base-board__card-check,
+.base-board__card.is-selected .base-board__card-check {
+  opacity: 1;
+}
+
+
   /* 飞书看板卡片：白底 + 1px #DEE0E3 描边 + 6px 圆角 */
   background: #fff;
   border: 1px solid var(--fs-border, #dee0e3);

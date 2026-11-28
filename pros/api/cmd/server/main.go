@@ -398,6 +398,8 @@ func main() {
 		baseGroup.PATCH("/tables/:tableId/fields/order", baseH.ReorderFields)
 		baseGroup.POST("/tables/:tableId/records", baseH.CreateRecord)
 		baseGroup.POST("/tables/:tableId/query", baseH.QueryRecords)
+		baseGroup.POST("/tables/:tableId/summary", baseH.SummaryRecords)
+		baseGroup.POST("/tables/:tableId/records/transfer", baseH.TransferRecord)
 		baseGroup.POST("/tables/:tableId/records/batch", baseH.BatchRecords)
 		baseGroup.POST("/tables/:tableId/records/reorder", baseH.ReorderRecords)
 		baseGroup.GET("/tables/:tableId/views", baseH.ListViews)

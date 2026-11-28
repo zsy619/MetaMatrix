@@ -5,9 +5,16 @@
  * 渲染与编辑分离：Grid 里展示用 renderer，编辑时用 editor；
  * 公式字段只读，值由服务端计算。
  */
-import { computed, ref, watch } from "vue";
+import { computed, nextTick, ref, watch } from "vue";
 import { ElMessage } from "element-plus";
-import { Check, Lock, Paperclip, Picture, View } from "@element-plus/icons-vue";
+import {
+  Check,
+  Link as LinkIcon,
+  Lock,
+  Paperclip,
+  Picture,
+  View,
+} from "@element-plus/icons-vue";
 import { uploadMediaFile } from "../../../api/mediaUpload";
 import { listLinkTargetsPage } from "../api";
 import { fieldPlugin, isComputedField } from "./registry";
@@ -17,6 +24,13 @@ import {
   resolveUserNames,
 } from "./userNames";
 import type { FieldMeta } from "../types";
+import {
+  applyCommand,
+  matchCommands,
+  parseSlashQuery,
+  selectedText,
+  type CellCommand,
+} from "./slashCommands";
 
 const props = defineProps<{
   field: FieldMeta;
@@ -338,11 +352,178 @@ function onDoubleClick() {
 
 function commit() {
   if (!editing.value) return;
+  // 命令面板开着时回车是「选命令」，不是「提交单元格」。
+  if (slashOpen.value) return;
   editing.value = false;
   const normalized =
     plugin.value?.normalize(draft.value, props.field.config ?? {}) ??
     draft.value;
   emit("update:modelValue", normalized);
+}
+
+// —— 斜杠命令 / 浮动工具条（E-06）——
+
+/** 文本类字段才支持命令（数字 / 日期用输入控件，命令没意义）。 */
+const commandEnabled = computed(() =>
+  ["text", "long_text", "email", "phone", "url"].includes(props.field.type),
+);
+
+/** 命令面板是否打开。 */
+const slashOpen = ref(false);
+/** 斜杠后输入的过滤词。 */
+const slashQuery = ref("");
+/** 当前高亮的命令下标。 */
+const slashIndex = ref(0);
+/** 过滤后的命令列表。 */
+const slashItems = computed(() => matchCommands(slashQuery.value));
+
+/** 浮动工具条（选中文本后出现）。 */
+const bubbleOpen = ref(false);
+/** 浮动工具条对应的选区。 */
+const bubbleRange = ref<{ start: number; end: number } | null>(null);
+
+/** 输入框组件（命令要改写光标位置）。 */
+const textAreaRef = ref<{ textarea?: HTMLTextAreaElement } | null>(null);
+
+/** 取到底层 textarea 元素。 */
+function textareaEl(): HTMLTextAreaElement | null {
+  return textAreaRef.value?.textarea ?? null;
+}
+
+/** 单元格文本（统一成字符串，命令逻辑只认字符串）。 */
+function draftText(): string {
+  return draft.value === null || draft.value === undefined
+    ? ""
+    : String(draft.value);
+}
+
+/** 当前选区。 */
+function currentRange(): { start: number; end: number } {
+  const el = textareaEl();
+  if (!el) return { start: draftText().length, end: draftText().length };
+  return { start: el.selectionStart ?? 0, end: el.selectionEnd ?? 0 };
+}
+
+/** 输入变化时判断是不是在敲斜杠命令。 */
+watch(draft, () => {
+  if (!editing.value || !commandEnabled.value) {
+    slashOpen.value = false;
+    return;
+  }
+  const parsed = parseSlashQuery(draftText());
+  if (!parsed) {
+    slashOpen.value = false;
+    slashQuery.value = "";
+    return;
+  }
+  slashQuery.value = parsed.query;
+  slashIndex.value = 0;
+  slashOpen.value = true;
+});
+
+/** 执行一条命令并把结果写回草稿。 */
+async function runCommand(cmd: CellCommand) {
+  const range = currentRange();
+  const result = applyCommand(cmd, {
+    text: draftText(),
+    selectionStart: range.start,
+    selectionEnd: range.end,
+  });
+  draft.value = result.text;
+  slashOpen.value = false;
+  bubbleOpen.value = false;
+  bubbleRange.value = null;
+  await nextTick();
+  const el = textareaEl();
+  if (el) {
+    el.focus();
+    el.setSelectionRange(result.selectionStart, result.selectionEnd);
+  }
+}
+
+/** 命令面板的键盘操作（上下选择 / 回车执行 / Esc 关闭）。 */
+function onCommandKeydown(event: KeyboardEvent) {
+  if (!slashOpen.value) return;
+  if (event.key === "ArrowDown") {
+    event.preventDefault();
+    slashIndex.value = (slashIndex.value + 1) % Math.max(1, slashItems.value.length);
+    return;
+  }
+  if (event.key === "ArrowUp") {
+    event.preventDefault();
+    slashIndex.value =
+      (slashIndex.value - 1 + slashItems.value.length) %
+      Math.max(1, slashItems.value.length);
+    return;
+  }
+  if (event.key === "Enter" || event.key === "Tab") {
+    const cmd = slashItems.value[slashIndex.value];
+    if (!cmd) return;
+    event.preventDefault();
+    event.stopPropagation();
+    void runCommand(cmd);
+    return;
+  }
+  if (event.key === "Escape") {
+    event.preventDefault();
+    event.stopPropagation();
+    slashOpen.value = false;
+  }
+}
+
+/** 选中文本后弹出浮动工具条（飞书 Bubble Menu 等价物）。 */
+function onTextSelectionChange() {
+  if (!editing.value || !commandEnabled.value) {
+    bubbleOpen.value = false;
+    return;
+  }
+  const range = currentRange();
+  if (range.end <= range.start) {
+    bubbleOpen.value = false;
+    bubbleRange.value = null;
+    return;
+  }
+  bubbleRange.value = range;
+  bubbleOpen.value = true;
+}
+
+/** 浮动工具条：复制选中的文字。 */
+async function bubbleCopy() {
+  const range = bubbleRange.value;
+  if (!range) return;
+  const text = selectedText({
+    text: draftText(),
+    selectionStart: range.start,
+    selectionEnd: range.end,
+  });
+  try {
+    await navigator.clipboard.writeText(text);
+    ElMessage.success("已复制选中的文字");
+  } catch {
+    ElMessage.warning("复制失败，请手动选择复制");
+  }
+  bubbleOpen.value = false;
+}
+
+/** 浮动工具条里的命令（转大写 / 转小写 / 加链接 / 清空）。 */
+async function bubbleCommand(key: string) {
+  const cmd = matchCommands(key)[0];
+  if (!cmd) return;
+  const range = bubbleRange.value ?? { start: 0, end: 0 };
+  const result = applyCommand(cmd, {
+    text: draftText(),
+    selectionStart: range.start,
+    selectionEnd: range.end,
+  });
+  draft.value = result.text;
+  bubbleOpen.value = false;
+  bubbleRange.value = null;
+  await nextTick();
+  const el = textareaEl();
+  if (el) {
+    el.focus();
+    el.setSelectionRange(result.selectionStart, result.selectionEnd);
+  }
 }
 
 /** 键盘导航：编辑信号命中本单元格时进入编辑态。 */
@@ -531,6 +712,7 @@ watch(
         </el-select>
         <el-input
           v-else
+          ref="textAreaRef"
           v-model="draft"
           size="small"
           type="textarea"
@@ -538,7 +720,71 @@ watch(
           :autosize="field.type !== 'long_text'"
           @blur="commit"
           @keyup.enter="commit"
+          @keydown="onCommandKeydown"
+          @mouseup="onTextSelectionChange"
+          @keyup="onTextSelectionChange"
         />
+        <!-- 斜杠命令面板（E-06）：敲「/」唤出 -->
+        <div v-if="slashOpen" class="base-cell__slash">
+          <button
+            v-for="(cmd, index) in slashItems"
+            :key="cmd.key"
+            type="button"
+            class="base-cell__slash-item"
+            :class="{ 'is-active': index === slashIndex }"
+            @mousedown.prevent="runCommand(cmd)"
+            @mouseenter="slashIndex = index"
+          >
+            <span class="base-cell__slash-label">{{ cmd.label }}</span>
+            <span class="base-cell__slash-key">/{{ cmd.key }}</span>
+          </button>
+          <div v-if="!slashItems.length" class="base-cell__slash-empty">
+            没有匹配的命令
+          </div>
+        </div>
+        <!-- 浮动工具条（E-06 Bubble Menu 等价物）：选中文本后出现 -->
+        <div v-if="bubbleOpen" class="base-cell__bubble">
+          <button
+            type="button"
+            class="base-cell__bubble-btn"
+            title="复制选中的文字"
+            @mousedown.prevent="bubbleCopy"
+          >
+            复制
+          </button>
+          <button
+            type="button"
+            class="base-cell__bubble-btn"
+            title="转为大写"
+            @mousedown.prevent="bubbleCommand('upper')"
+          >
+            Aa
+          </button>
+          <button
+            type="button"
+            class="base-cell__bubble-btn"
+            title="转为小写"
+            @mousedown.prevent="bubbleCommand('lower')"
+          >
+            aa
+          </button>
+          <button
+            type="button"
+            class="base-cell__bubble-btn"
+            title="插入链接"
+            @mousedown.prevent="bubbleCommand('link')"
+          >
+            <el-icon><LinkIcon /></el-icon>
+          </button>
+          <button
+            type="button"
+            class="base-cell__bubble-btn"
+            title="清空内容"
+            @mousedown.prevent="bubbleCommand('clear')"
+          >
+            清空
+          </button>
+        </div>
       </template>
       <span v-else-if="field.type === 'doc'" class="base-cell__doc">
         <template v-if="docIds.length">
@@ -694,6 +940,7 @@ watch(
 }
 
 .base-cell {
+  position: relative;
   min-height: 24px;
   display: flex;
   align-items: center;
@@ -793,6 +1040,87 @@ watch(
 
 .base-cell__link-chip:hover {
   background: rgba(51, 112, 255, 0.18);
+}
+
+/* 斜杠命令面板（E-06）。 */
+.base-cell__slash {
+  position: absolute;
+  left: 0;
+  top: 100%;
+  z-index: 40;
+  min-width: 180px;
+  max-height: 220px;
+  overflow: auto;
+  padding: 4px;
+  margin-top: 4px;
+  background: #fff;
+  border: 1px solid var(--tg-border, #e5e7eb);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.14);
+}
+
+.base-cell__slash-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 13px;
+  color: var(--tg-text-1, #1f2937);
+  cursor: pointer;
+  text-align: left;
+}
+
+.base-cell__slash-item.is-active {
+  background: var(--tg-surface-3, #f1f5f9);
+  color: var(--tg-blue, #3390ec);
+}
+
+.base-cell__slash-key {
+  font-size: 11px;
+  color: var(--tg-text-3, #94a3b8);
+}
+
+.base-cell__slash-empty {
+  padding: 8px 10px;
+  font-size: 12px;
+  color: var(--tg-text-3, #94a3b8);
+}
+
+/* 浮动工具条（E-06）。 */
+.base-cell__bubble {
+  position: absolute;
+  left: 0;
+  bottom: 100%;
+  z-index: 40;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  margin-bottom: 4px;
+  background: #1f2937;
+  border-radius: 8px;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.24);
+}
+
+.base-cell__bubble-btn {
+  min-width: 26px;
+  height: 24px;
+  padding: 0 6px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #f8fafc;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.base-cell__bubble-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
 }
 
 .base-cell.is-focused {

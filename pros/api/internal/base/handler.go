@@ -1751,6 +1751,63 @@ func (h *Handler) TableSchema(ctx context.Context, c *app.RequestContext) {
 	c.JSON(http.StatusOK, schema)
 }
 
+// TransferRecord 跨表复制 / 移动记录（E-03）。
+func (h *Handler) TransferRecord(ctx context.Context, c *app.RequestContext) {
+	uid, ok := h.owner(c)
+	if !ok {
+		return
+	}
+	projectID, ok := projectID(c)
+	if !ok {
+		return
+	}
+	tableID, ok := pathUUID(c, "tableId")
+	if !ok {
+		return
+	}
+	var body TransferRecordInput
+	if err := c.BindAndValidate(&body); err != nil {
+		fail(c, http.StatusBadRequest, "invalid body", "40001", err.Error())
+		return
+	}
+	result, err := h.svc.TransferRecord(ctx, uid, projectID, tableID, body)
+	if err != nil {
+		handleErr(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, result)
+}
+
+// SummaryRecords 计算视图的汇总行 / 分组小计（E-07）。
+func (h *Handler) SummaryRecords(ctx context.Context, c *app.RequestContext) {
+	uid, ok := h.owner(c)
+	if !ok {
+		return
+	}
+	projectID, ok := projectID(c)
+	if !ok {
+		return
+	}
+	tableID, ok := pathUUID(c, "tableId")
+	if !ok {
+		return
+	}
+	var body SummaryRequest
+	if err := c.BindAndValidate(&body); err != nil {
+		fail(c, http.StatusBadRequest, "invalid body", "40001", err.Error())
+		return
+	}
+	if body.TableID == "" {
+		body.TableID = tableID.String()
+	}
+	result, err := h.svc.Summary(ctx, uid, projectID, body)
+	if err != nil {
+		handleErr(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, result)
+}
+
 // CreateImportJob 提交异步导入任务（技术文档 §16.2）。
 func (h *Handler) CreateImportJob(ctx context.Context, c *app.RequestContext) {
 	uid, ok := h.owner(c)

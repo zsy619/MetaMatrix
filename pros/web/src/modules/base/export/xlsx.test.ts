@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { unzipSync, strFromU8 } from 'fflate'
-import { buildXlsx, columnLetter } from './xlsx'
+import { buildXlsx, columnLetter, XLSX_STYLE } from './xlsx'
 
 describe('xlsx 生成器', () => {
   it('列号转列名', () => {
@@ -44,6 +44,32 @@ describe('xlsx 生成器', () => {
     expect(sheet).not.toContain('"集团"')
     const workbook = strFromU8(files['xl/workbook.xml'])
     expect(workbook).toContain('name="客户管理"')
+  })
+
+  it('列级数字格式落到单元格样式（A-09 样式保真）', () => {
+    const bytes = buildXlsx([
+      {
+        name: '样式',
+        rows: [
+          ['客户', '金额', '比例'],
+          ['南山数科', 960000, 0.85],
+        ],
+        columnStyles: [
+          XLSX_STYLE.general,
+          XLSX_STYLE.currency,
+          XLSX_STYLE.percent,
+        ],
+      },
+    ])
+    const files = unzipSync(bytes)
+    const sheet = strFromU8(files['xl/worksheets/sheet1.xml'])
+    // 表头走样式 1，金额列走样式 2，百分比列走样式 3
+    expect(sheet).toContain('<c r="A1" s="1" t="inlineStr">')
+    expect(sheet).toContain('<c r="B2" s="2"><v>960000</v></c>')
+    expect(sheet).toContain('<c r="C2" s="3"><v>0.85</v></c>')
+    const styles = strFromU8(files['xl/styles.xml'])
+    expect(styles).toContain('numFmtId="164"')
+    expect(styles).toContain('numFmtId="165"')
   })
 
   it('空表也能生成合法文件', () => {

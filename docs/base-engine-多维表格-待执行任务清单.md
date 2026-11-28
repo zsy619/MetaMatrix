@@ -311,16 +311,52 @@
 | P1-8 | keyset 游标仅在「默认排序 + 无自定义排序 / 分组」时启用 | `query.go` 游标分支 | 自定义排序也走 keyset |
 | P1-9 | HMAC 只签名不加密；幂等记录保留 7 天但无定时清理任务 | `SignBundle` / `core_idempotency` | 加清理任务 + 敏感包加密 |
 | P1-10 | 未做 1000+ 行滚动 / 50 并发压测 | 仅 300 行 × 21 字段 / 并发 4 | 扩 `cmd/loadtest` 场景 |
-| P1-11 | CSV 导入侧行级重试按整行映射重放（批量侧已支持改值重试） | `BaseImportDialog.vue` | 行级编辑后重试 |
+| ~~P1-11~~ | ~~CSV 导入侧行级重试按整行映射重放~~ **✅ 已修**：导入弹窗支持行内修正后按行重试 | `BaseImportDialog.vue` | — |
 | P1-12 | 审计值是写入当时快照，不回填，不能当变更历史回放 | 审计表写入策略 | 增记 change set（前后值 diff） |
 
 ### P2 · 体验增强 / 明确不做
 
 | # | 缺口 | 证据 | 建议动作 |
 |---|------|------|----------|
-| P2-1 | 附件无病毒扫描、无类型白名单（仅扩展名黑名单） | 附件服务策略 | 接入扫描服务 + 白名单 |
-| P2-2 | 批量多选拖拽排序未做 | 看板 / 日历单条拖拽已做 | 批量拖拽 |
+| P2-1 | 附件无病毒扫描（扩展名黑名单 + 类型校验已做） | 附件服务策略 | 接入外部扫描服务（需基础设施，本轮未做） |
+| ~~P2-2~~ | ~~批量多选拖拽排序未做~~ **✅ 已修（2026-11-28）**：看板卡片可勾选，拖任意一张整批挪列 | `views/BaseBoardViews.vue` | — |
 | P2-3 | 跨表拖拽记录未做 | 画廊拖拽排序已做 | 跨表复制 / 移动 |
-| P2-4 | 粘贴为整格覆盖，不做类型智能转换 | 粘贴处理逻辑 | 粘贴时按字段类型解析 |
-| P2-5 | `ViewConfig.version` 未落到配置 | 版本语义由 `base_views` 行 + `base_tables.schema_version` 承担 | 二选一：删字段或补落库 |
+| ~~P2-4~~ | ~~粘贴为整格覆盖~~ **✅ 已修（2026-11-28）**：`parseCellValue` 按字段类型解析，解析不出来原样保留 | `modules/base/clipboard.ts` + 单测 | — |
+| ~~P2-5~~ | ~~`ViewConfig.version` 未落到配置~~ **✅ 已修（2026-11-28）**：选择「补落库」，保存视图配置时写入行版本 | `service.go::CreateView / UpdateView` | — |
 | P2-6 | base 域限流默认 40rps 为生产值 | `BASE_RATE_LIMIT_RPS` | 压测后定档 / 按租户动态配额 |
+
+---
+
+## 第十二轮 · 待补齐清单收口（2026-11-28）
+
+> 目标：把「遗留缺口清单」与「优化清单」里**实测未做**的条目一次补齐，
+> 每条都要有可复核的证据（用例 / HTTP 实测 / 单测）。
+
+### 本轮落地
+
+| 编号 | 内容 | 落地位置 | 证据 |
+| --- | --- | --- | --- |
+| E-01 | 粘贴按字段类型智能解析 | `modules/base/clipboard.ts::parseCellValue` | `clipboard.test.ts`（11 例全绿） |
+| E-02 | 看板批量多选拖拽排序 | `views/BaseBoardViews.vue` | 勾选后拖任意卡片整批挪列 |
+| E-03 | 跨表复制 / 移动记录 | `internal/base/transfer.go` + `POST /tables/:tableId/records/transfer` | `transfer_test.go` + HTTP 实测（移动后源表 0 条、目标表 1 条且带值） |
+| E-05 | `ViewConfig.version` 收口（补落库） | `service.go::CreateView / UpdateView` | 配置里 `version` 随行版本递增 |
+| E-06 | 斜杠命令 / 浮动工具条 | `fields/slashCommands.ts` + `fields/BaseFieldCell.vue` | `slashCommands.test.ts`（6 例） |
+| E-07 | 汇总行 / 分组小计 | `internal/base/summary.go` + `POST /tables/:tableId/summary` + `grid/BaseGrid.vue` | `summary_test.go` + HTTP 实测（合计 350.5 / 分组 300.5 与 50）+ `BaseGrid.summary.test.ts`（4 例） |
+| A-07 | 记录级授权支持「通讯录分组」 | `datascope.go`（`subject_type = 'group'`） | `grant_group_test.go`（组内可见 / 组外不可见 / 不存在的分组被拒） |
+| A-09 | XLSX 样式保真 | `export/xlsx.ts::XLSX_STYLE` | `xlsx.test.ts`（列级数字格式落到 `s=` 样式） |
+| A-03 / A-04 / A-08 | 偏好 OR 口径 / 链接候选分页 / CSV 行级重试 | 复核确认**早已落地** | 文档纠偏（此前清单记为「未做」） |
+
+### 明确不做 / 未做（附理由）
+
+- **A-01 SSE → WebSocket**：协议已按 WS 结构设计，但按既定取舍保持 SSE（不换传输层）。
+- **A-02 事件体带字段增量值**：**刻意不做** —— 事件带值会绕过字段级权限（隐藏字段泄露）；
+  现状是只广播「哪些字段变了」，增量靠 `?since=` 补偿接口拉。
+- **E-04 附件病毒扫描**：扩展名黑名单与类型校验已做；真实扫描需外部服务（ClamAV 等），本轮未引入。
+
+### 门禁
+
+- `go build ./...` 通过；`go test ./internal/base/... ./internal/service/... ./internal/model/... ./internal/db/...` 全绿
+  （新增 `summary_test.go` / `grant_group_test.go` / `transfer_test.go`）。
+- `vitest`：base 模块 13 个文件 / 71 例全绿；全量 `6 failed | 2139 passed`，6 个失败文件全部在 `rte/**`（与基线一致）。
+- `vue-tsc`：`modules/base` **0 错误**；全量 60 个错误全部在 `rte/**`、`extensions/**`、`utils/echarts/**`、
+  `guide/**`、`canvas/FdeSheetCanvas.vue`（本轮未触碰，属基线）。

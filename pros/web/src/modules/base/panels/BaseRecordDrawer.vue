@@ -14,10 +14,12 @@ import {
   fetchRecord,
   listRecordDocReferences,
   listRecordGrants,
+  listUserGroups,
   listRecordRelations,
   listSpaceDepartments,
   type RecordDocReference,
   type RecordRelationSet,
+  type UserGroupInfo,
 } from '../api'
 import { listSpaceMembers, type SpaceMember } from '../../../api/knowledge_v6'
 import type { FieldMeta, GrantSubject, RecordGrant, RecordRow, RecordVisibility } from '../types'
@@ -171,9 +173,18 @@ const departments = ref<string[]>([])
 const pendingUserId = ref('')
 /** 待添加部门的临时选择。 */
 const pendingDepartment = ref('')
+/** 通讯录分组（用于「按分组授权」，A-07）。 */
+const userGroups = ref<UserGroupInfo[]>([])
+/** 待添加分组的临时选择。 */
+const pendingGroupId = ref('')
 /** 当前授权名单（用户 + 部门），带显示名与有效期。 */
 const grantSubjects = ref<
-  Array<{ type: 'user' | 'department'; id: string; name: string; expiresAt?: string | null }>
+  Array<{
+    type: 'user' | 'department' | 'group';
+    id: string;
+    name: string;
+    expiresAt?: string | null;
+  }>
 >([])
 
 async function loadMembers() {
@@ -197,6 +208,15 @@ async function loadDepartments() {
   }
 }
 
+async function loadUserGroups() {
+  if (!props.projectId || userGroups.value.length) return
+  try {
+    userGroups.value = await listUserGroups(props.projectId)
+  } catch {
+    userGroups.value = []
+  }
+}
+
 async function loadGrants(recordId: string) {
   if (!props.projectId) {
     grants.value = []
@@ -208,11 +228,27 @@ async function loadGrants(recordId: string) {
     grants.value = await listRecordGrants(props.projectId, recordId)
     grantUserIds.value = grants.value.map((item) => item.userId)
     grantSubjects.value = grants.value.map((item) => {
-      const type = item.subjectType === 'department' ? 'department' : 'user'
+      const type =
+        item.subjectType === 'department'
+          ? 'department'
+          : item.subjectType === 'group'
+            ? 'group'
+            : 'user'
       return {
         type,
-        id: type === 'department' ? item.subjectId || item.name.replace(/^部门：/, '') : item.userId,
-        name: item.name || (type === 'department' ? item.subjectId || '' : item.userId.slice(0, 8)),
+        id:
+          type === 'department'
+            ? item.subjectId || item.name.replace(/^部门：/, '')
+            : type === 'group'
+              ? item.subjectId || ''
+              : item.userId,
+        name:
+          item.name ||
+          (type === 'department'
+            ? item.subjectId || ''
+            : type === 'group'
+              ? '分组'
+              : item.userId.slice(0, 8)),
         expiresAt: item.expiresAt ?? null,
       }
     })
@@ -230,6 +266,7 @@ watch(
       void loadGrants(id)
       void loadMembers()
       void loadDepartments()
+      void loadUserGroups()
     } else {
       grants.value = []
       grantUserIds.value = []
@@ -334,6 +371,22 @@ function addDepartmentGrant() {
     { type: 'department', id: dept, name: `部门：${dept}`, expiresAt: null },
   ])
   pendingDepartment.value = ''
+}
+
+/** 添加一个通讯录分组到授权名单（A-07）。 */
+function addGroupGrant() {
+  const id = pendingGroupId.value
+  if (!id) return
+  if (grantSubjects.value.some((item) => item.type === 'group' && item.id === id)) {
+    pendingGroupId.value = ''
+    return
+  }
+  const group = userGroups.value.find((item) => item.id === id)
+  commitSubjects([
+    ...grantSubjects.value,
+    { type: 'group', id, name: `分组：${group?.name || id.slice(0, 8)}`, expiresAt: null },
+  ])
+  pendingGroupId.value = ''
 }
 
 /** 移除一个授权对象。 */
@@ -597,8 +650,28 @@ function clearGrants() {
               添加部门
             </el-button>
           </div>
+          <!-- 添加分组（A-07）：组内成员全部可见 -->
+          <div v-if="userGroups.length" class="be-record__scope-grants-add">
+            <el-select
+              v-model="pendingGroupId"
+              class="be-record__scope-grants-select"
+              clearable
+              placeholder="选择分组"
+              popper-class="be-scope-popper"
+            >
+              <el-option
+                v-for="group in userGroups"
+                :key="group.id"
+                :label="group.name"
+                :value="group.id"
+              />
+            </el-select>
+            <el-button size="small" :icon="Plus" :disabled="!pendingGroupId" @click="addGroupGrant">
+              添加分组
+            </el-button>
+          </div>
           <div class="be-panel__hint">
-            只有名单里的成员 / 部门能看到这条记录；未授权的成员在表格、关联候选、
+            只有名单里的成员 / 部门 / 分组能看到这条记录；未授权的成员在表格、关联候选、
             文档反向引用里都看不到它。设置有效期后，授权到期自动失效。
           </div>
           <div class="be-record__scope-grants-quick">
