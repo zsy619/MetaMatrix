@@ -701,9 +701,12 @@ func (s *Service) query(ctx context.Context, userID, projectID uuid.UUID, req Qu
 	if where != "" {
 		base = base.Where(where, args...)
 	}
-	if kw := strings.TrimSpace(req.Keyword); kw != "" {
-		cond, args := s.keywordCondition(ctx, projectID, idx, kw, "r.id")
-		base = base.Where(cond, args...)
+	// 关键字条件**只编译一次**：计数查询与取数查询共用同一份 SQL 与参数。
+	//
+	// 旧实现两边各编译一次，连「按文档标题找节点」的库查询都跑了两遍。
+	kwCond, kwArgs := s.compileKeyword(ctx, projectID, tableID, idx, req.Keyword)
+	if kwCond != "" {
+		base = base.Where(kwCond, kwArgs...)
 	}
 
 	var total int64
@@ -726,9 +729,8 @@ func (s *Service) query(ctx context.Context, userID, projectID uuid.UUID, req Qu
 	if where != "" {
 		query = query.Where(where, args...)
 	}
-	if kw := strings.TrimSpace(req.Keyword); kw != "" {
-		cond, args := s.keywordCondition(ctx, projectID, idx, kw, "r.id")
-		query = query.Where(cond, args...)
+	if kwCond != "" {
+		query = query.Where(kwCond, kwArgs...)
 	}
 	// 分组/排序需要的投影联表。
 	for _, g := range req.Groups {
@@ -868,61 +870,6 @@ func fieldMetas(idx *fieldIndex) []FieldMeta {
 		out = append(out, meta)
 	}
 	return out
-}
-
-// keywordCondition 构造「关键字搜索」的 SQL 片段。
-//
-// 除了直接命中投影文本，额外支持「关联文档」字段按**文档标题**检索：
-// 关键字先在当前空间的目录树里找出标题命中的节点 ID，再回表匹配 doc 字段的投影值。
-func (s *Service) keywordCondition(ctx context.Context, projectID uuid.UUID, idx *fieldIndex, kw, recordAlias string) (string, []any) {
-	like := "%" + escapeLike(kw) + "%"
-	// 字段级权限：关键字搜索只扫**当前角色可见**的字段，
-	// 否则访客能靠「搜到 / 搜不到」反推隐藏字段的内容。
-	visibleIDs := make([]uuid.UUID, 0, len(idx.byID))
-	for id := range idx.byID {
-		visibleIDs = append(visibleIDs, id)
-	}
-	fieldGuard := ""
-	fieldGuardJSON := ""
-	fieldArgs := []any{}
-	if len(visibleIDs) > 0 {
-		fieldGuard = " AND v.field_id IN ?"
-		fieldGuardJSON = " AND vj.field_id IN ?"
-		fieldArgs = append(fieldArgs, visibleIDs)
-	}
-	// 文本投影：普通文本 / 单选 / 日期字符串等。
-	cond := fmt.Sprintf(`EXISTS (SELECT 1 FROM base_record_values v WHERE v.record_id = %s AND v.value_text ILIKE ?%s)`, recordAlias, fieldGuard)
-	// JSON 投影：附件（值里带文件名）、关联记录（值里带记录 ID）等。
-	// 附件字段投影成 JSON，只扫 value_text 搜不到文件名，这里补一条 JSON 文本匹配。
-	jsonCond := fmt.Sprintf(`EXISTS (SELECT 1 FROM base_record_values vj WHERE vj.record_id = %s AND vj.value_json IS NOT NULL AND vj.value_json::text ILIKE ?%s)`, recordAlias, fieldGuardJSON)
-	cond = "(" + cond + " OR " + jsonCond + ")"
-	args := []any{like}
-	args = append(args, fieldArgs...)
-	args = append(args, like)
-	args = append(args, fieldArgs...)
-
-	docIDs := s.docFieldIDs(idx)
-	if len(docIDs) == 0 {
-		return cond, args
-	}
-	nodeIDs := s.docKeywordNodeIDs(ctx, projectID, kw)
-	return buildKeywordCondition(cond, args, docIDs, nodeIDs, recordAlias)
-}
-
-// buildKeywordCondition 把「按文档标题命中」的分支拼进关键字条件。
-//
-// 单独拆出来是为了能脱离数据库做单测。
-func buildKeywordCondition(cond string, args []any, docFieldIDs []uuid.UUID, nodeIDs []string, recordAlias string) (string, []any) {
-	if len(docFieldIDs) == 0 || len(nodeIDs) == 0 {
-		return cond, args
-	}
-	parts := make([]string, 0, len(nodeIDs))
-	docArgs := make([]any, 0, len(nodeIDs)*2)
-	for _, nodeID := range nodeIDs {
-		parts = append(parts, `EXISTS (SELECT 1 FROM base_record_values dv WHERE dv.record_id = `+recordAlias+` AND dv.field_id IN (?) AND dv.value_text ILIKE ?)`)
-		docArgs = append(docArgs, docFieldIDs, "%"+escapeLike(nodeID)+"%")
-	}
-	return "(" + cond + " OR " + strings.Join(parts, " OR ") + ")", append(args, docArgs...)
 }
 
 // docFieldIDs 取表内全部「关联文档」类型字段 ID。
