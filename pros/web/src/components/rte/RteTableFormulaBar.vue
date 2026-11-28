@@ -14,7 +14,7 @@ import {
   findSelectedCell,
   tableGrid,
 } from '../../utils/rteTableFormulaOps'
-import { evaluateFormula, isFormulaCell } from '../../utils/rteTableFormula'
+import { evaluateFormula, formulaReferences, isFormulaCell } from '../../utils/rteTableFormula'
 import {
   BAR_FALLBACK_HEIGHT,
   placeFormulaBar,
@@ -99,6 +99,10 @@ const result = computed(() => {
 
 /** 输入框里的草稿。 */
 const draft = ref('')
+const refsText = computed(() => {
+  const list = formulaReferences(draft.value)
+  return list.length ? `引用 ${list.join('、')}` : ''
+})
 const editing = ref(false)
 
 watch(
@@ -108,6 +112,33 @@ watch(
   },
   { immediate: true },
 )
+
+let autoApplyTimer: ReturnType<typeof setTimeout> | null = null
+
+/** 公式已经能算出结果时写入单元格，不必再点一次「应用」。 */
+watch(draft, (value) => {
+  if (autoApplyTimer) {
+    clearTimeout(autoApplyTimer)
+    autoApplyTimer = null
+  }
+  if (!editing.value) return
+  const loc = active.value
+  if (!loc || !isFormulaCell(value) || value.trim() === source.value.trim()) return
+  const grid = tableGrid(loc.table)
+  if (!grid[loc.rowIndex]) return
+  const trial = grid.map((row) => [...row])
+  trial[loc.rowIndex]![loc.colIndex] = value.trim()
+  const evaluated = evaluateFormula(value, trial, loc.rowIndex, loc.colIndex)
+  if (!evaluated.ok) return
+  autoApplyTimer = setTimeout(() => {
+    autoApplyTimer = null
+    if (editing.value && draft.value.trim() === value.trim()) apply()
+  }, 280)
+})
+
+onBeforeUnmount(() => {
+  if (autoApplyTimer) clearTimeout(autoApplyTimer)
+})
 
 /** 回写公式并重算。 */
 function apply() {
@@ -196,24 +227,26 @@ watch(barEl, (el) => {
     @mousedown.stop
     @click.stop
   >
-    <span class="rte-formula-address" aria-label="单元格地址">{{ address }}</span>
+    <span class="rte-formula-address" aria-label="单元格地址" :title="'当前单元格 ' + address">{{ address }}</span>
     <span class="rte-formula-sign" aria-hidden="true">=</span>
     <input
       class="rte-formula-input"
       type="text"
       :value="draft"
       placeholder="输入公式，如 =SUM(A1:B3)"
+      title="公式写在等号后面。Enter 写入并重算，Esc 放弃"
       aria-label="单元格公式"
       @input="editing = true; draft = ($event.target as HTMLInputElement).value"
       @keydown.enter.prevent="onEnter"
       @keydown.esc.prevent="onEscape"
     />
+    <span v-if="refsText" class="rte-formula-refs">{{ refsText }}</span>
     <span v-if="result.error" class="rte-formula-error" role="status">{{ result.error }}</span>
     <span v-else class="rte-formula-value" role="status">{{ result.value }}</span>
     <button
       class="rte-formula-apply"
       type="button"
-      title="回车写入并重算"
+      title="把公式写入这个单元格并重算"
       aria-label="写入公式并重算"
       @mousedown.prevent
       @click="apply"
@@ -224,6 +257,15 @@ watch(barEl, (el) => {
 </template>
 
 <style scoped>
+.rte-formula-refs {
+  flex: 0 1 auto;
+  max-width: 180px;
+  overflow: hidden;
+  color: #86909c;
+  font-size: 11px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
 .rte-formula-bar {
   position: absolute;
   z-index: 30;

@@ -20,8 +20,8 @@ defineProps<{
   margin: 0;
   padding: 14px 4px 4px;
   color: #3c4043;
-  font-size: 13px;
-  line-height: 1.7;
+  font-size: 15px;
+  line-height: 1.65;
 }
 
 .fsn-lead {
@@ -43,9 +43,6 @@ defineProps<{
 }
 
 @media (max-width: 840px) {
-  .fsn {
-    font-size: 12px;
-    padding-top: 10px;
-  }
+  .fsn { padding-top: 10px; }
 }
 </style>

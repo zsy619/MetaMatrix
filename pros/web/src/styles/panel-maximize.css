@@ -41,9 +41,10 @@
   align-items: center;
   gap: 12px;
   flex-shrink: 0;
-  padding: 14px 16px 10px;
+  padding: 12px 16px;
   border-bottom: 1px solid var(--cv-frame, #ececec);
-  background: var(--cv-page, #f7f7f7);
+  background: linear-gradient(180deg, #ffffff 0%, var(--cv-page, #f7f7f7) 100%);
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04);
 }
 
 .pm-title {
@@ -57,6 +58,21 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  /* 标题左侧一条主色竖条，和 Element Plus 弹窗标题同一套视觉。 */
+  padding-left: 12px;
+  position: relative;
+}
+
+.pm-title::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 16px;
+  border-radius: 2px;
+  background: var(--mm-blue, #1a73e8);
 }
 
 .pm-actions {
@@ -67,10 +83,10 @@
 }
 
 .pm-actions .pm-icon-btn {
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   font-size: 16px;
-  border-radius: 6px;
+  border-radius: 9px;
   border: 1px solid var(--cv-frame, #ececec);
   background: #fff;
   color: var(--cv-ink, #3c4043);
@@ -93,6 +109,19 @@
   font-size: 20px;
   font-weight: 500;
   border-style: solid;
+}
+
+/* 关闭按钮常态更轻，悬停才实心（与弹窗标题栏的关闭键一致）。 */
+.pm-actions .pm-icon-btn.pm-close {
+  border-color: transparent;
+  background: transparent;
+  color: var(--mm-muted, #5f6368);
+}
+
+.pm-actions .pm-icon-btn.pm-close:hover {
+  background: var(--mm-red-soft, #fce8e6);
+  border-color: transparent;
+  color: var(--mm-red, #d93025);
 }
 
 .pm-body {
@@ -163,15 +192,17 @@
   background: #fce8e6;
 }
 
-/* 面板内嵌最大化按钮：实线，和表头上的浅色按钮同一套 */
+/* 面板内嵌最大化按钮：与全站工具条（mm-bar）同一套外观 */
 .pm-max-btn {
   flex-shrink: 0;
-  width: 20px;
-  height: 20px;
-  border: 1px solid var(--cv-frame, #ececec);
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.92);
-  color: var(--cv-ink, #3c4043);
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.7));
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.52);
+  backdrop-filter: blur(var(--glass-blur-sm, 10px));
+  -webkit-backdrop-filter: blur(var(--glass-blur-sm, 10px));
+  color: var(--ent-text-2, #5a6472);
   font-size: 14px;
   line-height: 1;
   cursor: pointer;
@@ -181,15 +212,19 @@
   justify-content: center;
   box-sizing: border-box;
   transition:
-    background 0.12s ease,
-    border-color 0.12s ease,
-    color 0.12s ease;
+    background-color 0.16s ease,
+    border-color 0.16s ease,
+    color 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s ease;
 }
 
 .pm-max-btn:hover {
-  background: var(--cv-hover-wash, #e8f1fa);
-  border-color: var(--cv-focus, #1c4c7c);
-  color: var(--cv-focus, #1c4c7c);
+  background: rgba(255, 255, 255, 0.86);
+  border-color: transparent;
+  color: var(--mm-text, #1d2129);
+  box-shadow: var(--glass-shadow-sm, 0 6px 18px rgba(15, 23, 42, 0.1));
+  transform: translateY(-1px);
 }
 
 .pm-max-btn.pm-on-dark {

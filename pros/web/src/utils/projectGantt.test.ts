@@ -3,6 +3,15 @@ import type { GanttTask } from '../types/canvas'
 import {
   applyDependencySchedule,
   analyzeSchedule,
+  buildGanttAxis,
+  clampGanttPaneWidth,
+  dayBandPercent,
+  ganttUnitIndex,
+  formatGanttDateTime,
+  ganttRange,
+  normalizeGanttDateTime,
+  shiftIso,
+  zoomGanttScale,
   formatPredecessors,
   indentTask,
   outdentTask,
@@ -124,6 +133,7 @@ describe('项目甘特排程', () => {
       ['c', 'SS', -1],
     ])
     expect(parsePredecessors('1.2', tasks)).toEqual([])
+    expect(parsePredecessors('2FS+0.5', tasks).map((link) => [link.taskId, link.type, link.lag])).toEqual([['b', 'FS', 0.5]])
   })
 
   it('降级升级折叠，删除后子任务挂回上一级', () => {
@@ -148,5 +158,61 @@ describe('项目甘特排程', () => {
     expect(removed.map((item) => item.id)).toEqual(['a', 'c'])
     expect(removed.find((item) => item.id === 'c')?.parentId).toBe('a')
     expect(removed.find((item) => item.id === 'c')?.predecessors).toEqual([])
+  })
+
+  it('拖拽分栏时两侧都留得下', () => {
+    expect(clampGanttPaneWidth(600, 1000)).toBe(600)
+    expect(clampGanttPaneWidth(20, 1000)).toBe(280)
+    expect(clampGanttPaneWidth(990, 1000)).toBe(820)
+    expect(clampGanttPaneWidth(80, 400)).toBe(120)
+    expect(clampGanttPaneWidth(10, 0)).toBe(0)
+  })
+
+  it('时、天、周、月、年可以来回缩放', () => {
+    expect(zoomGanttScale('week', -1)).toBe('day')
+    expect(zoomGanttScale('week', 1)).toBe('month')
+    expect(zoomGanttScale(undefined, -1)).toBe('day')
+    expect(zoomGanttScale('hour', -1)).toBe('hour')
+    expect(zoomGanttScale('year', 1)).toBe('year')
+    const day = dayNumber('2026-11-09')!
+    const hour = buildGanttAxis(day, day, 'hour')
+    expect(hour.ticks).toHaveLength(24)
+    expect(hour.ticks[0]?.label).toBe('00')
+    expect(hour.ticks[12]?.label).toBe('12')
+    expect(hour.groups[0]?.label).toBe('11/09')
+    expect(ganttUnitIndex(day + 12.5 / 24, hour.ticks)).toBeCloseTo(12.5)
+    const oneDay = buildGanttAxis(day, day, 'day')
+    expect(oneDay.ticks.map((tick) => tick.label)).toEqual(['9'])
+    const week = buildGanttAxis(day, dayNumber('2026-11-13')!, 'week')
+    expect(new Date(week.ticks[0]!.start * 86_400_000).getUTCDay()).toBe(1)
+    const month = buildGanttAxis(day, dayNumber('2026-12-11')!, 'month')
+    expect(month.ticks.map((tick) => tick.label)).toEqual(['11月', '12月'])
+    expect(month.groups[0]?.label).toBe('2026')
+    const placed = ganttUnitIndex(day, month.ticks)
+    expect(placed).toBeGreaterThan(0)
+    expect(placed).toBeLessThan(1)
+    const year = buildGanttAxis(day, day, 'year')
+    expect(year.ticks.map((tick) => tick.label)).toEqual(['2026'])
+    expect(year.groups[0]?.label).toBe('2020年代')
+  })
+
+  it('开工和完成写成 yyyy-MM-dd HH:mm', () => {
+    expect(dayNumber('2026-11-13 09:30')).toBe(dayNumber('2026-11-13'))
+    expect(formatGanttDateTime('2026-11-09')).toBe('2026-11-09 00:00')
+    expect(normalizeGanttDateTime('2026-11-09T09:05')).toBe('2026-11-09 09:05')
+    expect(normalizeGanttDateTime('2026-11-09 25:00')).toBeNull()
+    expect(shiftIso('2026-11-09 09:30', 2)).toBe('2026-11-11 09:30')
+    const dated = ganttRange('2026-11-09', '2026-11-13')
+    const timed = ganttRange('2026-11-09 09:30', '2026-11-09 18:00')
+    expect(dated && dated.to - dated.from).toBe(5)
+    expect(timed && timed.to - timed.from).toBeCloseTo(8.5 / 24)
+  })
+
+  it('日期列等分后贴齐时间轴右缘', () => {
+    const first = dayBandPercent(0, 4)
+    const last = dayBandPercent(3, 4)
+    expect(first).toEqual({ left: 0, width: 25 })
+    expect(last.left + last.width).toBe(100)
+    expect(dayBandPercent(0, 0).width).toBe(100)
   })
 })

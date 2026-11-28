@@ -1,30 +1,104 @@
 import { computed, nextTick, ref, type ShallowRef } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import type { Editor } from '@tiptap/core'
 import {
   collectFindMatches,
+  filterFindMatches,
   pickNextMatchIndex,
   replaceAllFindMatches,
   replaceFindMatch,
   selectFindMatch,
   type RteFindMatch,
+  type RteFindScope,
 } from '../../../utils/rteFindReplace'
 import { canRunFindReplace } from '../../../utils/rteRound5'
+import {
+  clampFindDialogPos,
+  readFindDialogPos,
+  writeFindDialogPos,
+  type FindDialogPos,
+} from '../../../utils/rteFindDialogPos'
+
+const FIND_PREFS_KEY = 'rte-find-prefs-v1'
+
+function readFindPrefs(): { scope: RteFindScope; caseSensitive: boolean; wholeWord: boolean; regex: boolean } {
+  const fallback = { scope: 'all' as RteFindScope, caseSensitive: false, wholeWord: false, regex: false }
+  if (typeof localStorage === 'undefined') return fallback
+  try {
+    const raw = JSON.parse(localStorage.getItem(FIND_PREFS_KEY) || '')
+    const scope = raw?.scope
+    return {
+      scope: scope === 'heading' || scope === 'table' || scope === 'code' || scope === 'caption' ? scope : 'all',
+      caseSensitive: !!raw?.caseSensitive,
+      wholeWord: !!raw?.wholeWord,
+      regex: !!raw?.regex,
+    }
+  } catch {
+    return fallback
+  }
+}
 
 /** 查找 / 替换。模板绑定名与原先一致。 */
 export function useFindReplace(deps: {
   editor: ShallowRef<Editor | undefined>
   closeMore: () => void
 }) {
+  const savedPrefs = readFindPrefs()
   const findDialogOpen = ref(false)
+  const findDialogPos = ref<FindDialogPos | null>(readFindDialogPos())
+  const findDialogStyle = computed(() => {
+    const pos = findDialogPos.value
+    if (!pos) return undefined
+    return { left: `${pos.left}px`, top: `${pos.top}px`, right: 'auto' }
+  })
+  let findDrag: { pointerId: number; dx: number; dy: number; width: number; height: number } | null = null
+
+  function placeFindDialog(pos: FindDialogPos, size: { width: number; height: number }) {
+    findDialogPos.value = clampFindDialogPos(pos.left, pos.top, size.width, size.height)
+  }
+
+  function onFindDialogDragStart(event: PointerEvent) {
+    if (event.button !== 0) return
+    const target = event.target
+    if (target instanceof Element && target.closest('input, textarea, select, button, a, label')) return
+    const handle = event.currentTarget
+    const dialog = handle instanceof HTMLElement ? handle.closest('.rte-find-dialog') : null
+    if (!(dialog instanceof HTMLElement)) return
+    const rect = dialog.getBoundingClientRect()
+    findDrag = {
+      pointerId: event.pointerId,
+      dx: event.clientX - rect.left,
+      dy: event.clientY - rect.top,
+      width: rect.width,
+      height: rect.height,
+    }
+    placeFindDialog({ left: rect.left, top: rect.top }, rect)
+    if (handle instanceof HTMLElement) handle.setPointerCapture?.(event.pointerId)
+    event.preventDefault()
+  }
+
+  function onFindDialogDragMove(event: PointerEvent) {
+    if (!findDrag || event.pointerId !== findDrag.pointerId) return
+    placeFindDialog(
+      { left: event.clientX - findDrag.dx, top: event.clientY - findDrag.dy },
+      findDrag,
+    )
+  }
+
+  function onFindDialogDragEnd(event: PointerEvent) {
+    if (!findDrag || event.pointerId !== findDrag.pointerId) return
+    findDrag = null
+    if (findDialogPos.value) writeFindDialogPos(findDialogPos.value)
+  }
   const findQuery = ref('')
   const findReplaceText = ref('')
-  const findCaseSensitive = ref(false)
-  const findWholeWord = ref(false)
+  const findCaseSensitive = ref(savedPrefs.caseSensitive)
+  const findWholeWord = ref(savedPrefs.wholeWord)
   /** 正则查找：按正则表达式匹配（不支持跨文本节点） */
-  const findRegex = ref(false)
+  const findRegex = ref(savedPrefs.regex)
   /** 多行正则：^ $ 匹配行首行尾 */
   const findMultiline = ref(false)
+  const findScope = ref<RteFindScope>(savedPrefs.scope)
   const findMatches = ref<RteFindMatch[]>([])
   const findMatchIndex = ref(-1)
 
@@ -34,17 +108,35 @@ export function useFindReplace(deps: {
       wholeWord: findWholeWord.value,
       regex: findRegex.value,
       multiline: findMultiline.value,
+      foldWidth: !findRegex.value,
     }
   }
 
   function refreshFindMatches(selectNext = false) {
     const ed = deps.editor.value
+    try {
+      localStorage.setItem(
+        FIND_PREFS_KEY,
+        JSON.stringify({
+          scope: findScope.value,
+          caseSensitive: findCaseSensitive.value,
+          wholeWord: findWholeWord.value,
+          regex: findRegex.value,
+        }),
+      )
+    } catch {
+      /* 隐私模式 */
+    }
     if (!ed) {
       findMatches.value = []
       findMatchIndex.value = -1
       return
     }
-    const matches = collectFindMatches(ed.state.doc, findQuery.value, findOpts())
+    const matches = filterFindMatches(
+      ed.state.doc,
+      collectFindMatches(ed.state.doc, findQuery.value, findOpts()),
+      findScope.value,
+    )
     findMatches.value = matches
     if (!matches.length) {
       findMatchIndex.value = -1
@@ -72,6 +164,12 @@ export function useFindReplace(deps: {
       }
     }
     nextTick(() => {
+      const dialog = document.querySelector('.rte-find-dialog') as HTMLElement | null
+      if (dialog && findDialogPos.value) {
+        const rect = dialog.getBoundingClientRect()
+        placeFindDialog(findDialogPos.value, rect)
+        writeFindDialogPos(findDialogPos.value)
+      }
       const el = document.querySelector('.rte-find-query') as HTMLInputElement | null
       el?.focus()
       el?.select()
@@ -114,7 +212,11 @@ export function useFindReplace(deps: {
     }
     replaceFindMatch(ed, matches[idx], findReplaceText.value)
     const nextFrom = matches[idx].from + findReplaceText.value.length
-    const nextMatches = collectFindMatches(ed.state.doc, findQuery.value, findOpts())
+    const nextMatches = filterFindMatches(
+      ed.state.doc,
+      collectFindMatches(ed.state.doc, findQuery.value, findOpts()),
+      findScope.value,
+    )
     findMatches.value = nextMatches
     if (!nextMatches.length) {
       findMatchIndex.value = -1
@@ -126,14 +228,27 @@ export function useFindReplace(deps: {
     if (ni >= 0) selectFindMatch(ed, nextMatches[ni]!)
   }
 
-  function doReplaceAll() {
+  async function doReplaceAll() {
     const ed = deps.editor.value
     if (!ed) return
-    const matches = collectFindMatches(ed.state.doc, findQuery.value, findOpts())
+    const matches = filterFindMatches(
+      ed.state.doc,
+      collectFindMatches(ed.state.doc, findQuery.value, findOpts()),
+      findScope.value,
+    )
     if (!matches.length) {
       ElMessage.info('没有匹配项')
       findMatches.value = []
       findMatchIndex.value = -1
+      return
+    }
+    try {
+      await ElMessageBox.confirm(`将替换 ${matches.length} 处。这一步可以撤销。`, '全部替换', {
+        confirmButtonText: '替换',
+        cancelButtonText: '取消',
+        type: 'warning',
+      })
+    } catch {
       return
     }
     const n = replaceAllFindMatches(ed, matches, findReplaceText.value)
@@ -155,12 +270,17 @@ export function useFindReplace(deps: {
 
   return {
     findDialogOpen,
+    findDialogStyle,
+    onFindDialogDragStart,
+    onFindDialogDragMove,
+    onFindDialogDragEnd,
     findQuery,
     findReplaceText,
     findCaseSensitive,
     findWholeWord,
     findRegex,
     findMultiline,
+    findScope,
     findMatches,
     findMatchIndex,
     refreshFindMatches,

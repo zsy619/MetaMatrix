@@ -9,12 +9,13 @@ import { transformCaseText, type CaseMode } from '../utils/rteCaseTransform'
 import { renumberCaptions } from '../utils/rteCaptionNumber'
 import {
   sortTableByColumn,
+  tableSortBlock,
   upsertTableSumRow,
   currentTableColIndex,
 } from '../utils/rteTableExtras'
 import { TextSelection } from '@tiptap/pm/state'
 
-export { transformCaseText, renumberCaptions, sortTableByColumn, upsertTableSumRow, currentTableColIndex }
+export { transformCaseText, renumberCaptions, sortTableByColumn, tableSortBlock, upsertTableSumRow, currentTableColIndex }
 export type { CaseMode }
 
 export const RTE_ZOOM_PRESETS = [
@@ -38,6 +39,11 @@ export function applyCaseToSelection(editor: Editor, mode: CaseMode): boolean {
   const jobs: Array<{ from: number; to: number; text: string }> = []
   editor.state.doc.nodesBetween(from, to, (node, pos) => {
     if (!node.isText || !node.text) return
+    if (node.marks.some((mark) => mark.type.name === 'code' || mark.type.name === 'link')) return
+    const $pos = editor.state.doc.resolve(pos)
+    for (let depth = $pos.depth; depth > 0; depth -= 1) {
+      if ($pos.node(depth).type.name === 'codeBlock') return
+    }
     const start = Math.max(pos, from)
     const end = Math.min(pos + node.nodeSize, to)
     if (start >= end) return

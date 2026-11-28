@@ -90,3 +90,27 @@ func UserIDFromCtx(c *app.RequestContext) (uuid.UUID, bool) {
 	uid, ok := v.(uuid.UUID)
 	return uid, ok
 }
+
+// TokenFromRequest 取出请求里的 JWT：优先 Authorization Bearer，其次 query token。
+// 浏览器 WebSocket 握手通常不能自定义请求头，协同通道需要允许 ?token=。
+// 现有 AuthRequired 仍然只认 Bearer，避免把 query token 扩散到所有 HTTP 接口。
+func TokenFromRequest(c *app.RequestContext) string {
+	h := string(c.GetHeader("Authorization"))
+	if strings.HasPrefix(h, "Bearer ") {
+		return strings.TrimSpace(strings.TrimPrefix(h, "Bearer "))
+	}
+	return strings.TrimSpace(c.Query("token"))
+}
+
+// AuthenticateToken 校验 JWT 并返回用户 ID。token 为空或非法时返回 false。
+func AuthenticateToken(secret, tokenStr string) (uuid.UUID, bool) {
+	claims, err := ParseToken(secret, tokenStr)
+	if err != nil {
+		return uuid.Nil, false
+	}
+	uid, err := uuid.Parse(claims.UserID)
+	if err != nil {
+		return uuid.Nil, false
+	}
+	return uid, true
+}

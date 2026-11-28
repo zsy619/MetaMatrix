@@ -1,5 +1,12 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+} from 'vue'
 import { canvasChromeStyle } from './canvasChrome'
 import type {
   YModelBlock,
@@ -32,7 +39,6 @@ function block(id: YModelBlockId): YModelBlock | undefined {
 
 const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 
-/** Step2：我的 ____ 认知 */
 const centerPrefix = computed(() => props.doc.center.prefix || '我的')
 const centerSuffix = computed(() => props.doc.center.suffix || '认知')
 const centerBlank = computed({
@@ -49,169 +55,188 @@ const labels = computed(() => {
   return {
     theory: l.theory || '理论',
     facts: l.facts || '事实',
-    anchor: l.anchor || l.problem || '解决真正问题',
     step1: l.step1 || 'Step1',
     step2: l.step2 || 'Step2',
     step3: l.step3 || 'Step3',
     step4: l.step4 || 'Step4',
   }
 })
+
+interface Pt {
+  x: number
+  y: number
+}
+
+interface Stroke {
+  x1: number
+  y1: number
+  x2: number
+  y2: number
+  color: string
+}
+
+const rootRef = ref<HTMLElement | null>(null)
+const vb = ref({ w: 1, h: 1 })
+const strokes = ref<Stroke[]>([])
+
+function boxOf(el: Element, rootRect: DOMRect, sx: number, sy: number) {
+  const r = el.getBoundingClientRect()
+  const left = (r.left - rootRect.left) * sx
+  const top = (r.top - rootRect.top) * sy
+  const right = (r.right - rootRect.left) * sx
+  const bottom = (r.bottom - rootRect.top) * sy
+  return {
+    left,
+    top,
+    right,
+    bottom,
+    cx: (left + right) / 2,
+    cy: (top + bottom) / 2,
+  }
+}
+
+function pair(a: Pt, b: Pt, color: string): Stroke[] {
+  const dx = b.x - a.x
+  const dy = b.y - a.y
+  const len = Math.hypot(dx, dy) || 1
+  const ox = (-dy / len) * 3.5
+  const oy = (dx / len) * 3.5
+  return [-1, 1].map((side) => ({
+    x1: a.x + ox * side,
+    y1: a.y + oy * side,
+    x2: b.x + ox * side,
+    y2: b.y + oy * side,
+    color,
+  }))
+}
+
+function measure() {
+  const root = rootRef.value
+  if (!root) return
+  const rootRect = root.getBoundingClientRect()
+  if (rootRect.width < 2 || rootRect.height < 2) return
+  const sx = root.clientWidth / rootRect.width
+  const sy = root.clientHeight / rootRect.height
+  vb.value = { w: root.clientWidth, h: root.clientHeight }
+  const forkEl = root.querySelector('[data-ym="fork"]')
+  const leftEl = root.querySelector('[data-ym="left-tip"]')
+  const rightEl = root.querySelector('[data-ym="right-tip"]')
+  const stemEl = root.querySelector('[data-ym="stem"]')
+  if (!forkEl || !leftEl || !rightEl || !stemEl) return
+  const fork = boxOf(forkEl, rootRect, sx, sy)
+  const left = boxOf(leftEl, rootRect, sx, sy)
+  const right = boxOf(rightEl, rootRect, sx, sy)
+  const stem = boxOf(stemEl, rootRect, sx, sy)
+  const joint = { x: fork.cx, y: fork.top - 10 }
+  const leftTip = { x: left.cx, y: left.cy }
+  const rightTip = { x: right.cx, y: right.cy }
+  const stemTop = { x: fork.cx, y: fork.bottom + 8 }
+  const stemEnd = { x: fork.cx, y: Math.max(stem.top - 8, stemTop.y + 24) }
+  strokes.value = [
+    ...pair(leftTip, joint, '#A67C00'),
+    ...pair(rightTip, joint, '#0E8A84'),
+    ...pair(stemTop, stemEnd, '#2A649F'),
+  ]
+}
+
+let ro: ResizeObserver | null = null
+
+onMounted(async () => {
+  await nextTick()
+  measure()
+  requestAnimationFrame(measure)
+  if (rootRef.value && typeof ResizeObserver !== 'undefined') {
+    ro = new ResizeObserver(() => measure())
+    ro.observe(rootRef.value)
+  }
+  document.fonts?.ready.then(() => measure()).catch(() => {})
+})
+
+onBeforeUnmount(() => {
+  ro?.disconnect()
+  ro = null
+})
+
+watch(centerBlank, () => nextTick(measure))
 </script>
 
 <template>
-  <div class="y-model-canvas" :style="chrome">
-    <div class="ym-layout">
-      <div class="ym-main">
-        <!-- 左外：使用现成模型/规律（近理论臂） -->
-        <aside class="ym-left-outer">
-          <span class="step-tag step-tag-float">{{ labels.step3 }}</span>
-          <YModelBlockCard
-            v-if="block('theory_existing')"
-            :block="block('theory_existing')!"
-          />
-        </aside>
-
-        <!-- 中区：Y + 顶中双框 + 理论/事实 + Step2/Step1 -->
-        <div class="ym-y-stage">
-          <svg
-            class="ym-y-svg"
-            viewBox="0 0 320 520"
-            preserveAspectRatio="xMidYMid meet"
-            aria-hidden="true"
-          >
-            <defs>
-              <marker
-                id="ymArrow"
-                markerWidth="7"
-                markerHeight="7"
-                refX="6"
-                refY="3.5"
-                orient="auto"
-                markerUnits="strokeWidth"
-              >
-                <path d="M0,0.8 L6.5,3.5 L0,6.2 Z" fill="#6b645c" />
-              </marker>
-              <marker
-                id="ymArrowRev"
-                markerWidth="7"
-                markerHeight="7"
-                refX="0.5"
-                refY="3.5"
-                orient="auto"
-                markerUnits="strokeWidth"
-              >
-                <path d="M6.5,0.8 L0,3.5 L6.5,6.2 Z" fill="#6b645c" />
-              </marker>
-            </defs>
-            <!-- 左臂 -->
-            <line
-              x1="48"
-              y1="72"
-              x2="160"
-              y2="220"
-              stroke="#6b645c"
-              stroke-width="2.4"
-              stroke-linecap="round"
-              marker-start="url(#ymArrowRev)"
-              marker-end="url(#ymArrow)"
-            />
-            <!-- 右臂 -->
-            <line
-              x1="272"
-              y1="72"
-              x2="160"
-              y2="220"
-              stroke="#6b645c"
-              stroke-width="2.4"
-              stroke-linecap="round"
-              marker-start="url(#ymArrowRev)"
-              marker-end="url(#ymArrow)"
-            />
-            <!-- 竖脊 -->
-            <line
-              x1="160"
-              y1="220"
-              x2="160"
-              y2="470"
-              stroke="#6b645c"
-              stroke-width="2.4"
-              stroke-linecap="round"
-              marker-start="url(#ymArrowRev)"
-              marker-end="url(#ymArrow)"
-            />
-          </svg>
-
-          <!-- 理论 / 事实 节点字 -->
-          <h2 class="zone-title zone-theory">{{ labels.theory }}</h2>
-          <h2 class="zone-title zone-facts">{{ labels.facts }}</h2>
-
-          <!-- 顶中：自己建模型 | 提出新假设（Y 叉口上方） -->
-          <div class="ym-top-mid">
-            <YModelBlockCard
-              v-if="block('theory_build')"
-              :block="block('theory_build')!"
-            />
-            <YModelBlockCard
-              v-if="block('facts_hypothesis')"
-              :block="block('facts_hypothesis')!"
-            />
-          </div>
-
-          <!-- Step2 枢纽 -->
-          <div class="ym-y-hub">
-            <span class="step-tag">{{ labels.step2 }}</span>
-            <div class="hub-title-row" aria-label="我的认知">
-              <span class="hub-prefix">{{ centerPrefix }}</span>
-              <input
-                v-model="centerBlank"
-                class="hub-blank"
-                type="text"
-                maxlength="24"
-                placeholder="____"
-                aria-label="填写认知领域"
-              />
-              <span class="hub-suffix">{{ centerSuffix }}</span>
-            </div>
-          </div>
-
-          <!-- Step1 底端锚点 -->
-          <div class="ym-anchor-wrap">
-            <span class="step-tag">{{ labels.step1 }}</span>
-            <p class="ym-anchor">{{ labels.anchor }}</p>
-          </div>
-        </div>
-
-        <!-- 右列：定性定量（近事实）+ 理解因/果（认知右侧） -->
-        <aside class="ym-right-col">
-          <div class="ym-right-top">
-            <YModelBlockCard
-              v-if="block('facts_analysis')"
-              :block="block('facts_analysis')!"
-            />
-          </div>
-          <div class="ym-right-stack">
-            <YModelBlockCard
-              v-if="block('cognition_cause')"
-              :block="block('cognition_cause')!"
-            />
-            <YModelBlockCard
-              v-if="block('cognition_effect')"
-              :block="block('cognition_effect')!"
-            />
-          </div>
-        </aside>
+  <div class="y-model-canvas" :style="chrome" aria-label="一堂Y模型">
+    <div ref="rootRef" class="ym-sheet">
+    <ol class="path">
+      <li class="path-1"><b>1</b>先写问题</li>
+      <li class="path-2"><b>2</b>收成认知</li>
+      <li class="path-theory"><b>3</b>理论校正</li>
+      <li class="path-facts"><b>3</b>事实检验</li>
+      <li class="path-4"><b>4</b>配上工具</li>
+    </ol>
+    <div class="ym-grid">
+      <span class="step step-3"><b>3</b>校正</span>
+      <div class="cell cell-existing lane-theory">
+        <YModelBlockCard v-if="block('theory_existing')" editor="card" :block="block('theory_existing')!" />
+      </div>
+      <h2 class="word word-theory">{{ labels.theory }}</h2>
+      <div class="cell cell-build lane-theory">
+        <YModelBlockCard v-if="block('theory_build')" editor="card" :block="block('theory_build')!" />
+      </div>
+      <div class="cell cell-hypothesis lane-facts">
+        <YModelBlockCard v-if="block('facts_hypothesis')" editor="card" :block="block('facts_hypothesis')!" />
+      </div>
+      <h2 class="word word-facts">{{ labels.facts }}</h2>
+      <div class="cell cell-analysis lane-facts">
+        <YModelBlockCard v-if="block('facts_analysis')" editor="card" :block="block('facts_analysis')!" />
       </div>
 
-      <!-- Step4 底栏：整条虚线框即 tools 富文本块 -->
-      <section class="ym-tools">
-        <span class="step-tag tools-step">{{ labels.step4 }}</span>
-        <div class="tools-block-wrap">
-          <YModelBlockCard
-            v-if="block('tools')"
-            :block="block('tools')!"
-          />
-        </div>
-      </section>
+      <span class="tip tip-left" data-ym="left-tip"></span>
+      <span class="tip tip-right" data-ym="right-tip"></span>
+
+      <span class="step step-2"><b>2</b>认知</span>
+      <div class="hub" data-ym="fork">
+        <span class="hub-prefix">{{ centerPrefix }}</span>
+        <input
+          v-model="centerBlank"
+          class="hub-blank"
+          type="text"
+          maxlength="12"
+          placeholder="____"
+          aria-label="填写认知领域"
+        />
+        <span class="hub-suffix">{{ centerSuffix }}</span>
+      </div>
+      <div class="cell cell-cause lane-mind">
+        <YModelBlockCard v-if="block('cognition_cause')" editor="card" :block="block('cognition_cause')!" />
+      </div>
+
+      <div class="cell cell-effect lane-mind">
+        <YModelBlockCard v-if="block('cognition_effect')" editor="card" :block="block('cognition_effect')!" />
+      </div>
+
+      <span class="step step-1"><b>1</b>问题</span>
+      <div class="cell cell-problem lane-problem" data-ym="stem">
+        <YModelBlockCard v-if="block('scope') || block('problem')" editor="card" :block="(block('scope') || block('problem'))!" />
+      </div>
+    </div>
+
+    <section class="ym-tools" :aria-label="labels.step4">
+      <span class="step step-4"><b>4</b>工具</span>
+      <div class="cell lane-tools">
+        <YModelBlockCard v-if="block('tools')" editor="card" :block="block('tools')!" />
+      </div>
+    </section>
+
+    <svg class="ym-links" :viewBox="`0 0 ${vb.w} ${vb.h}`" aria-hidden="true">
+      <line
+        v-for="(ln, index) in strokes"
+        :key="index"
+        :x1="ln.x1"
+        :y1="ln.y1"
+        :x2="ln.x2"
+        :y2="ln.y2"
+        :stroke="ln.color"
+        stroke-width="2"
+        stroke-linecap="round"
+      />
+    </svg>
     </div>
   </div>
 </template>
@@ -221,370 +246,346 @@ const labels = computed(() => {
   position: absolute;
   inset: 0;
   z-index: 10;
-  overflow: hidden;
   box-sizing: border-box;
-  padding: clamp(10px, 1.3vw, 16px) clamp(12px, 1.6vw, 20px)
-    clamp(8px, 1vw, 12px);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 16px 18px 14px;
+  overflow: auto;
+  color: #202124;
+}
+
+.ym-sheet {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 100%;
   display: flex;
   flex-direction: column;
 }
 
-.ym-layout {
-  flex: 1;
-  min-height: 0;
+.path {
+  position: relative;
+  z-index: 1;
   display: flex;
-  flex-direction: column;
-  gap: clamp(8px, 1vw, 12px);
-  box-sizing: border-box;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
 }
 
-.ym-main {
-  flex: 1;
-  min-height: 0;
+.path li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: #fff;
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.path b {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 12px;
+}
+
+.path-1 { color: #84344c; }
+.path-1 b { background: #a84562; }
+.path-2 { color: #1c4c7c; }
+.path-2 b { background: #2a649f; }
+.path-theory { color: #7a5c00; }
+.path-theory b { background: #a67c00; }
+.path-facts { color: #0b6b66; }
+.path-facts b { background: #0e8a84; }
+.path-4 { color: #125c3b; }
+.path-4 b { background: #187a4e; }
+
+.ym-grid {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 auto;
+  min-height: 680px;
+  min-width: 980px;
   display: grid;
-  grid-template-columns:
-    minmax(140px, 0.85fr)
-    minmax(280px, 1.5fr)
-    minmax(160px, 0.95fr);
-  grid-template-rows: minmax(0, 1fr);
-  gap: clamp(8px, 1.1vw, 14px);
+  grid-template-columns: 76px minmax(180px, 1.15fr) auto minmax(140px, 0.8fr) minmax(140px, 0.8fr) auto minmax(180px, 1.15fr) minmax(200px, 0.95fr);
+  grid-template-rows: 96px minmax(150px, 1fr) auto minmax(110px, 0.7fr) auto;
+  gap: 12px 14px;
   align-items: stretch;
 }
 
-.ym-left-outer,
-.ym-right-col {
-  min-width: 0;
-  min-height: 0;
+.step {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-  z-index: 2;
-  pointer-events: auto;
-}
-
-.ym-left-outer {
-  padding-top: clamp(8px, 1.5vh, 20px);
-}
-
-.step-tag-float {
-  align-self: flex-start;
-}
-
-.ym-left-outer :deep(.ym-block) {
-  flex: 1;
-  min-height: 160px;
-  background: rgba(255, 255, 255, 0.92);
-}
-
-.ym-right-col {
-  padding-top: clamp(4px, 1vh, 12px);
-}
-
-.ym-right-top {
-  flex: 0 1 32%;
-  min-height: 110px;
-  display: flex;
-  flex-direction: column;
-}
-
-.ym-right-top :deep(.ym-block) {
-  flex: 1;
-}
-
-.ym-right-stack {
-  flex: 1;
-  min-height: 0;
-  display: grid;
-  grid-template-rows: 1fr 1fr;
-  gap: 8px;
-  margin-top: auto;
-  padding-top: 8%;
-}
-
-.ym-right-col :deep(.ym-block) {
-  min-height: 0;
-  background: rgba(255, 255, 255, 0.92);
-}
-
-/* ===== 中区 Y ===== */
-.ym-y-stage {
-  position: relative;
-  min-width: 0;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
   align-items: center;
-  z-index: 1;
+  gap: 4px;
+  color: #5f6368;
+  font-size: 13px;
+  font-weight: 700;
+  align-self: center;
+  white-space: nowrap;
 }
 
-.ym-y-svg {
+.step b {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 12px;
+}
+
+.step-1 { color: #84344c; }
+.step-1 b { background: #a84562; }
+.step-2 { color: #1c4c7c; }
+.step-2 b { background: #2a649f; }
+.step-3 { color: #7a5c00; }
+.step-3 b { background: #a67c00; }
+.step-4 { color: #125c3b; }
+.step-4 b { background: #187a4e; }
+
+.step-3 { grid-column: 1; grid-row: 2; }
+.step-2 { grid-column: 1; grid-row: 3; }
+.step-1 { grid-column: 1; grid-row: 5; }
+
+.word {
+  margin: 0;
+  align-self: center;
+  font-size: clamp(26px, 2.6vw, 36px);
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.word-theory { grid-column: 3; grid-row: 2; justify-self: end; color: #7a5c00; }
+.word-facts { grid-column: 6; grid-row: 2; justify-self: start; color: #0b6b66; }
+
+.cell { min-width: 0; min-height: 0; display: flex; }
+.cell :deep(.ym-block) { width: 100%; height: 100%; }
+.cell :deep(.ym-block-body) { overflow: auto; }
+.cell :deep(.ym-block--card) {
+  border-radius: 2px;
+  border: 1.5px dashed #b7b1a8;
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: none;
+}
+.cell :deep(.ym-block--card .ym-block-header) {
+  min-height: 28px;
+  padding: 4px 8px;
+  background: transparent;
+}
+.cell :deep(.ym-block--card .ym-block-title) {
+  color: #8b9096;
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0;
+}
+.cell :deep(.ym-block--card .pm-max-btn) {
+  color: #5f6368;
+  background: transparent;
+}
+.cell :deep(.pa-root:has(.pa-empty)) { display: none; }
+
+.lane-theory :deep(.ym-block--card) { border-color: #c4a35a; background: #fffdf6; }
+.lane-theory :deep(.ym-block-title) { color: #7a5c00; }
+.lane-facts :deep(.ym-block--card) { border-color: #7ec8c4; background: #f4fbfa; }
+.lane-facts :deep(.ym-block-title) { color: #0b6b66; }
+.lane-mind :deep(.ym-block--card) { border-color: #9bb6d6; background: #f5f8fc; }
+.lane-mind :deep(.ym-block-title) { color: #1c4c7c; }
+.lane-problem :deep(.ym-block--card) { border-color: #d7a3b4; background: #fff7f9; }
+.lane-problem :deep(.ym-block-title) { color: #84344c; }
+.lane-tools :deep(.ym-block--card) { border-color: #8fbfa4; background: #fff; }
+.lane-tools :deep(.ym-block-title) { color: #125c3b; }
+
+.cell-existing { grid-column: 2; grid-row: 2; }
+.cell-build { grid-column: 4; grid-row: 1; }
+.cell-hypothesis { grid-column: 5; grid-row: 1; }
+.cell-analysis { grid-column: 7; grid-row: 2; }
+.cell-cause { grid-column: 7 / 9; grid-row: 3; }
+.cell-effect { grid-column: 7 / 9; grid-row: 4; }
+.cell-cause :deep(.ym-block-title),
+.cell-effect :deep(.ym-block-title) {
+  white-space: normal;
+  line-height: 1.3;
+}
+.cell-problem { grid-column: 4 / 6; grid-row: 5; justify-content: center; }
+.cell-problem :deep(.ym-block) { max-width: 420px; }
+
+.tip { width: 8px; height: 8px; }
+.tip-left { grid-column: 4; grid-row: 2; justify-self: start; align-self: start; }
+.tip-right { grid-column: 5; grid-row: 2; justify-self: end; align-self: start; }
+
+.hub {
+  grid-column: 3 / 7;
+  grid-row: 3;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 0 4px;
+}
+
+.hub-prefix,
+.hub-suffix {
+  font-size: clamp(28px, 3vw, 42px);
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  line-height: 1;
+}
+
+.hub-blank {
+  width: 4.2em;
+  border: none;
+  border-bottom: 3px solid #c5221f;
+  background: transparent;
+  text-align: center;
+  font-size: clamp(26px, 2.8vw, 40px);
+  font-weight: 900;
+  color: #202124;
+  outline: none;
+}
+
+.ym-tools {
+  position: relative;
+  z-index: 1;
+  flex: none;
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  border: 1px solid #cfe3d6;
+  border-radius: 12px;
+  gap: 12px;
+  align-items: stretch;
+  min-height: 120px;
+  margin: 14px 0 18px;
+  padding: 12px;
+  background: #eceae6;
+}
+
+.ym-links {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   pointer-events: none;
-  z-index: 0;
-  opacity: 0.9;
-}
-
-.zone-title {
-  position: absolute;
   z-index: 2;
-  margin: 0;
-  font-size: clamp(20px, 2.5vw, 30px);
-  font-weight: 800;
-  color: #202124;
-  letter-spacing: 0.1em;
-  line-height: 1.2;
-  pointer-events: none;
+  overflow: visible;
 }
 
-.zone-theory {
-  top: 2%;
-  left: 4%;
-}
-
-.zone-facts {
-  top: 2%;
-  right: 4%;
-}
-
-.ym-top-mid {
-  position: relative;
-  z-index: 2;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  width: min(100%, 420px);
-  margin-top: 8%;
-  min-height: 120px;
-  max-height: 34%;
-  flex: 0 1 auto;
-  pointer-events: auto;
-}
-
-.ym-top-mid :deep(.ym-block) {
-  min-height: 110px;
-  background: rgba(255, 255, 255, 0.94);
-}
-
-.ym-y-hub {
-  position: relative;
-  z-index: 2;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: 4px;
-  margin-top: auto;
-  margin-bottom: auto;
-  padding: 8px 10px;
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0) 0%,
-    rgba(255, 255, 255, 0.95) 18%,
-    rgba(255, 255, 255, 0.95) 82%,
-    rgba(255, 255, 255, 0) 100%
-  );
-  pointer-events: auto;
-}
-
-.hub-title-row {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 4px;
-  flex-wrap: wrap;
-  justify-content: center;
-}
-
-.hub-prefix,
-.hub-suffix {
-  font-size: clamp(22px, 3vw, 34px);
-  font-weight: 900;
-  color: #202124;
-  letter-spacing: 0.08em;
-  line-height: 1.15;
-}
-
-.hub-blank {
-  width: clamp(64px, 9vw, 110px);
-  min-width: 56px;
-  border: none;
-  border-bottom: 1px solid #8a8175;
-  background: transparent;
-  text-align: center;
-  font-size: clamp(18px, 2.4vw, 28px);
-  font-weight: 800;
-  color: #202124;
-  letter-spacing: 0.04em;
-  line-height: 1.2;
-  padding: 0 4px 2px;
-  outline: none;
-}
-
-.hub-blank:focus {
-  border-bottom-color: var(--cv-focus, #1c4c7c);
-}
-
-.hub-blank::placeholder {
-  color: #202124;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  opacity: 0.55;
-}
-
-.ym-anchor-wrap {
-  position: relative;
-  z-index: 2;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  margin: 0 0 1%;
-  pointer-events: none;
-}
-
-.ym-anchor {
-  margin: 0;
-  font-size: clamp(16px, 2vw, 22px);
-  font-weight: 800;
-  color: #202124;
-  letter-spacing: 0.06em;
-  line-height: 1.2;
-  text-align: center;
-}
-
-.step-tag {
-  display: inline-flex;
-  align-items: center;
-  font-size: clamp(11px, 1.15vw, 13px);
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  white-space: nowrap;
-  line-height: 1.35;
-  flex-shrink: 0;
-  color: #80868b;
-  background: transparent;
-  border: none;
-  padding: 0;
-}
-
-/* Step4 */
-.ym-tools {
-  flex: 0 0 auto;
-  /* Step4 里是整块富文本。正文已改成按内容流式排版（不再是 A4 纸张），
-     但内容仍可能很长：封顶并内部滚动，避免把上面的主区挤成 0 高度、
-     六个方块互相重叠、点不到「最大化」。 */
-  max-height: 38%;
-  overflow-y: auto;
-  display: flex;
-  align-items: stretch;
-  gap: 12px;
-  min-height: 0;
-  z-index: 2;
-  pointer-events: auto;
-  padding: 8px 4px 4px;
-  margin: 0 -4px -4px;
-  background: #eceff1;
-  border-radius: 2px;
-}
-
-.tools-step {
-  flex-shrink: 0;
-  align-self: center;
-  padding-left: 8px;
-  color: #5f6368;
-}
-
-.tools-block-wrap {
-  flex: 1;
-  min-width: 0;
-  min-height: 72px;
-  display: flex;
-  flex-direction: column;
-  margin: 6px 8px 6px 0;
-  overflow: hidden;
-}
-
-.tools-block-wrap :deep(.ym-block) {
-  flex: 1;
-  min-height: 72px;
-  background: rgba(255, 255, 255, 0.72);
-}
-
-@media (min-width: 1100px) {
-  .ym-main {
-    grid-template-columns:
-      minmax(160px, 0.9fr)
-      minmax(320px, 1.55fr)
-      minmax(180px, 1fr);
+@media (max-width: 1100px) {
+  .ym-sheet { flex: 0 0 auto; min-height: max-content; }
+  .ym-grid.ym-grid {
+    display: flex;
+    flex: 0 0 auto;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+    min-height: max-content;
   }
-
-  .ym-top-mid {
-    min-height: 140px;
+  .ym-links,
+  .tip { display: none; }
+  .step-1,
+  .step-2,
+  .step-3,
+  .word-theory,
+  .word-facts,
+  .hub,
+  .cell-existing,
+  .cell-build,
+  .cell-hypothesis,
+  .cell-analysis,
+  .cell-cause,
+  .cell-effect,
+  .cell-problem {
+    grid-column: auto;
+    grid-row: auto;
+    justify-self: stretch;
+    align-self: stretch;
+    max-width: none;
   }
-
-  .tools-block-wrap {
-    min-height: 80px;
-  }
-}
-
-@media (max-width: 960px) {
   .y-model-canvas {
-    overflow-y: auto;
-    overflow-x: hidden;
+    padding-bottom: 96px;
   }
 
-  .ym-layout {
+  .cell {
+    width: 100%;
+    min-height: 180px;
+    height: auto;
+  }
+
+  .cell :deep(.ym-block) {
     height: auto;
     min-height: 0;
-    flex: none;
+    flex: 0 0 auto;
+    overflow: visible;
   }
 
-  .ym-main {
-    grid-template-columns: 1fr 1fr;
-    grid-template-rows: auto auto auto;
-    grid-template-areas:
-      'left right'
-      'stage stage'
-      'stage stage';
-    flex: none;
-  }
-
-  .ym-left-outer {
-    grid-area: left;
-  }
-
-  .ym-right-col {
-    grid-area: right;
-  }
-
-  .ym-y-stage {
-    grid-area: stage;
-    min-height: 360px;
-  }
-
-  .ym-right-stack {
-    padding-top: 0;
-  }
-}
-
-@media (max-width: 640px) {
-  .ym-main {
-    grid-template-columns: 1fr;
-    grid-template-areas:
-      'left'
-      'stage'
-      'right';
-  }
-
-  .ym-top-mid {
-    width: 100%;
+  .cell :deep(.ym-block-body),
+  .cell :deep(.rte-root),
+  .cell :deep(.rte-workspace),
+  .cell :deep(.rte-canvas),
+  .cell :deep(.rte-body),
+  .cell :deep(.ProseMirror) {
+    height: auto;
     max-height: none;
+    max-width: 100%;
+    min-width: 0;
+    overflow: visible;
+    flex: 0 0 auto;
   }
 
-  .tools-block-wrap {
-    min-height: 64px;
+  .cell :deep(.rte-workspace),
+  .cell :deep(.rte-canvas),
+  .cell :deep(.ProseMirror) {
+    width: 100%;
   }
+
+  .cell :deep(.rte-root .ProseMirror),
+  .cell :deep(.rte-root.compact .ProseMirror) {
+    min-height: 96px;
+    font-size: 16px;
+    line-height: 1.65;
+  }
+
+  .cell :deep(.ProseMirror p) {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .cell :deep(.pm-max-btn) {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+  }
+
+  .cell-problem :deep(.ym-block) { max-width: none; }
+  .word { font-size: 22px; letter-spacing: 0.08em; }
+  .step { font-size: 15px; }
+  .hub { flex-wrap: nowrap; justify-content: flex-start; align-items: baseline; gap: 6px; min-width: 0; padding: 4px 0 8px; }
+  .hub-prefix,
+  .hub-suffix { flex: none; font-size: 26px; }
+  .hub-blank { width: 4.6em; min-width: 0; min-height: 44px; font-size: 26px; }
+  .ym-tools { grid-template-columns: 1fr; }
+  .step-1 { order: 1; }
+  .cell-problem { order: 2; }
+  .step-2 { order: 3; }
+  .hub { order: 4; }
+  .cell-cause { order: 5; }
+  .cell-effect { order: 6; }
+  .step-3 { order: 7; }
+  .word-theory { order: 8; }
+  .cell-existing { order: 9; }
+  .cell-build { order: 10; }
+  .word-facts { order: 11; }
+  .cell-hypothesis { order: 12; }
+  .cell-analysis { order: 13; }
 }
 </style>

@@ -39,7 +39,7 @@ func testService(t *testing.T) (*Service, uuid.UUID, uuid.UUID) {
 	if err := db.AutoMigrate(&model.MediaCategory{}, &model.MediaAsset{}, &model.MediaReference{}); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS uniq_media_user_sha ON media_asset (user_id, sha256)`).Error; err != nil {
+	if err := db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS uniq_media_user_sha ON media_assets (user_id, sha256)`).Error; err != nil {
 		t.Fatal(err)
 	}
 	root := t.TempDir()
@@ -117,12 +117,12 @@ func TestDedupOneFileOneRowAndUniqueIndex(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := string(sqlBytes)
-	for _, table := range []string{"media_category", "media_asset", "media_reference"} {
+	for _, table := range []string{"media_categories", "media_assets", "media_references"} {
 		if !strings.Contains(text, "CREATE TABLE IF NOT EXISTS "+table) || !strings.Contains(text, "user_id UUID NOT NULL") {
 			t.Fatalf("migration missing user_id for %s", table)
 		}
 	}
-	if !strings.Contains(text, "CREATE UNIQUE INDEX IF NOT EXISTS uniq_media_user_sha ON media_asset (user_id, sha256)") {
+	if !strings.Contains(text, "CREATE UNIQUE INDEX IF NOT EXISTS uniq_media_user_sha ON media_assets (user_id, sha256)") {
 		t.Fatal("migration missing unique (user_id, sha256)")
 	}
 }

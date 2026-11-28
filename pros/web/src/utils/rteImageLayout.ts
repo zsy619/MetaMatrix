@@ -1,8 +1,9 @@
 /** 图片排版：对齐、环绕、拖放落点和宽度限制。旧文档没有这些属性时居中独占一行。 */
+import { parseAspectRatio } from './rteImageCrop'
 
 export type RteImageAlign = 'left' | 'center' | 'right'
 export type RteImageLayout = 'block' | 'wrap-left' | 'wrap-right'
-export type RteImageDropKind = 'before' | 'after' | 'left' | 'right'
+export type RteImageDropKind = 'before' | 'after' | 'left' | 'right' | 'center'
 
 export type RteImagePlacement = {
   align: RteImageAlign
@@ -40,13 +41,48 @@ export function placementActive(
   return normalizeImageAlign(align) === option.align && normalizeImageLayout(layout) === option.layout
 }
 
-/** 拖到图片左右缘形成并排，其余按块前/块后插入。 */
+/** 上下各 36% 是叠放，左右缘并排，图片正中不落成下沿。 */
 export function imageDropKind(xRatio: number, yRatio: number, overImage: boolean): RteImageDropKind {
   const x = Number.isFinite(xRatio) ? Math.min(1, Math.max(0, xRatio)) : 0.5
   const y = Number.isFinite(yRatio) ? Math.min(1, Math.max(0, yRatio)) : 0.5
+  if (overImage && y <= 0.36) return 'before'
+  if (overImage && y >= 0.64) return 'after'
   if (overImage && x <= 0.35) return 'left'
   if (overImage && x >= 0.65) return 'right'
+  if (overImage) return 'center'
   return y < 0.5 ? 'before' : 'after'
+}
+
+/** 选宽度预设。百分比和「原始」都清掉拖出来的像素宽高，避免和预设抢尺寸。 */
+export function imageDisplayWidthPatch(value: string): { displayWidth: string | null; width: null; height: null } {
+  const next = String(value ?? '').trim()
+  return { displayWidth: next || null, width: null, height: null }
+}
+
+/** 拖出来的像素优先；否则用百分比；都没有就回到图片本身的大小。有裁剪比例时高度交给比例，避免旧像素高度把裁剪框压扁。 */
+export function imageSizeStyle(attrs: {
+  width?: unknown
+  height?: unknown
+  displayWidth?: unknown
+  cropAspect?: unknown
+}): { width: string; height: string } {
+  const width = Number(attrs.width)
+  const height = Number(attrs.height)
+  const hasWidth = Number.isFinite(width) && width > 0
+  const hasHeight = Number.isFinite(height) && height > 0
+  const cropped = parseAspectRatio(typeof attrs.cropAspect === 'string' ? attrs.cropAspect : null) != null
+  if (hasWidth || hasHeight) {
+    if (cropped) {
+      return hasWidth ? { width: `${width}px`, height: 'auto' } : { width: 'auto', height: `${height}px` }
+    }
+    return {
+      width: hasWidth ? `${width}px` : '',
+      height: hasHeight ? `${height}px` : 'auto',
+    }
+  }
+  const display = String(attrs.displayWidth || '').trim()
+  if (display) return { width: display, height: 'auto' }
+  return { width: '', height: '' }
 }
 
 export function clampImageWidth(width: number, maxWidth: number, minWidth = 48): number {
@@ -83,4 +119,19 @@ export function siblingInsertPos(childStarts: number[], childSizes: number[], in
 
 export function containerCanHoldImage(typeName: string): boolean {
   return CONTAINERS.has(typeName)
+}
+
+/** 图片上的链接只留 http(s) 和素材库路径，不接受带账号的地址。 */
+export function imageLinkHref(raw: unknown): string | null {
+  const value = String(raw ?? '').trim()
+  if (!value || value.length > 2000) return null
+  if (/^\/media\/[0-9a-zA-Z-]+$/.test(value)) return value
+  try {
+    const url = new URL(value)
+    if (url.username || url.password) return null
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null
+    return value
+  } catch {
+    return null
+  }
 }

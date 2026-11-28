@@ -12,7 +12,7 @@
 /** 图表数据模型。 */
 export type ChartDataModel = {
   categories: string[]
-  series: Array<{ name: string; data: Array<number | string> }>
+  series: Array<{ name: string; data: Array<number | string | null> }>
 }
 
 /** 表格视图的行数据。 */
@@ -36,13 +36,302 @@ function itemToText(raw: unknown): string {
   return String(raw)
 }
 
-/** 把文本转回数值 / 文本。 */
+/** 把文本转回数值 / 文本。千分位和百分号按数字处理。 */
 export function textToValue(text: string): number | string {
   const trimmed = String(text ?? '').trim()
   if (!trimmed) return ''
-  const num = Number(trimmed)
-  if (Number.isFinite(num) && /^-?\d+(\.\d+)?$/.test(trimmed)) return num
+  const percent = trimmed.endsWith('%')
+  const body = (percent ? trimmed.slice(0, -1) : trimmed).replace(/,/g, '').trim()
+  if (/^-?\d+(\.\d+)?$/.test(body)) {
+    const num = Number(body)
+    return percent ? num / 100 : num
+  }
   return trimmed
+}
+
+function axisEntries(raw: unknown): Record<string, unknown>[] {
+  if (Array.isArray(raw)) return raw.filter(isPlainObject)
+  return isPlainObject(raw) ? [raw] : []
+}
+
+function isCategoryAxis(axis: Record<string, unknown>): boolean {
+  if (axis.type === 'value' || axis.type === 'time' || axis.type === 'log') return false
+  return axis.type === 'category' || Array.isArray(axis.data)
+}
+
+/** 类目在横轴，或只在纵轴（横向柱状图）。 */
+function readCategoryAxis(
+  option: Record<string, unknown>,
+): { key: 'xAxis' | 'yAxis'; index: number; categories: string[] } | null {
+  for (const key of ['xAxis', 'yAxis'] as const) {
+    const axes = axisEntries(option[key])
+    for (let index = 0; index < axes.length; index += 1) {
+      const axis = axes[index]!
+      if (!isCategoryAxis(axis) || !Array.isArray(axis.data)) continue
+      if (key === 'yAxis' && axis.type !== 'category') continue
+      return { key, index, categories: axis.data.map((item) => itemToText(item)) }
+    }
+  }
+  return null
+}
+
+/** 散点是 [x, y] 或 { value: [x, y] }。x 进类目列，y 进系列值，避免收成 "1,2"。 */
+function pointTuple(entry: unknown): Array<number | string> | null {
+  const raw = isPlainObject(entry) && Array.isArray(entry.value) ? entry.value : entry
+  if (!Array.isArray(raw) || raw.length < 2) return null
+  if (raw.some((item) => Array.isArray(item) || isPlainObject(item))) return null
+  return raw.map((item) => itemToValue(item))
+}
+
+function asValueList(raw: unknown): Array<number | string> | null {
+  if (!Array.isArray(raw) || !raw.length) return null
+  if (raw.some((item) => Array.isArray(item) || isPlainObject(item))) return null
+  return raw.map((item) => itemToValue(item))
+}
+
+function isRadarChart(option: Record<string, unknown>, seriesRaw: unknown[]): boolean {
+  if (option.radar) return true
+  return seriesRaw.some((item) => isPlainObject(item) && item.type === 'radar')
+}
+
+function radarIndicatorList(option: Record<string, unknown>): unknown[] {
+  const radar = option.radar
+  const node = Array.isArray(radar) ? radar.find(isPlainObject) : isPlainObject(radar) ? radar : null
+  if (!node || !Array.isArray(node.indicator)) return []
+  return node.indicator
+}
+
+function indicatorName(item: unknown, index: number): string {
+  if (typeof item === 'string' && item.trim()) return item.trim()
+  if (isPlainObject(item)) {
+    const name = itemToText(item.name).trim()
+    if (name) return name
+  }
+  return `指标${index + 1}`
+}
+
+function radarEntryValues(entry: unknown): Array<number | string> | null {
+  if (isPlainObject(entry)) return asValueList(entry.value)
+  return asValueList(entry)
+}
+
+/** 雷达图：指标是行，每个数据项是一列。数值保持数组，不压成一段文本。 */
+function readRadarModel(option: Record<string, unknown>, seriesRaw: unknown[]): ChartDataModel | null {
+  const vectors: ChartDataModel['series'] = []
+  for (const item of seriesRaw) {
+    if (!isPlainObject(item) || !Array.isArray(item.data)) continue
+    const looks =
+      item.type === 'radar' ||
+      item.data.some((entry) => (isPlainObject(entry) ? Array.isArray(entry.value) : Array.isArray(entry)))
+    if (!looks) continue
+    item.data.forEach((entry) => {
+      const values = radarEntryValues(entry)
+      if (!values) return
+      const named = isPlainObject(entry) && typeof entry.name === 'string' ? entry.name.trim() : ''
+      const seriesName = typeof item.name === 'string' ? item.name.trim() : ''
+      const name = named || (item.data.length === 1 ? seriesName : '') || `系列${vectors.length + 1}`
+      vectors.push({ name, data: values })
+    })
+  }
+  if (!vectors.length) return null
+  const indicators = radarIndicatorList(option)
+  const width = Math.max(indicators.length, ...vectors.map((item) => item.data.length))
+  const categories = Array.from({ length: width }, (_, index) => indicatorName(indicators[index], index))
+  return {
+    categories,
+    series: vectors.map((item) => ({
+      name: item.name,
+      data: Array.from({ length: width }, (_, index) => item.data[index] ?? ''),
+    })),
+  }
+}
+
+function writeRadarIndicators(radar: unknown, categories: string[]): unknown {
+  const apply = (node: Record<string, unknown>) => {
+    const indicators = Array.isArray(node.indicator) ? node.indicator : []
+    return {
+      ...node,
+      indicator: categories.map((name, index) => {
+        const origin = indicators[index]
+        if (isPlainObject(origin)) return { ...origin, name }
+        if (typeof origin === 'string') return name
+        return { name, max: 100 }
+      }),
+    }
+  }
+  if (Array.isArray(radar)) {
+    let used = false
+    return radar.map((item) => {
+      if (used || !isPlainObject(item)) return item
+      used = true
+      return apply(item)
+    })
+  }
+  if (isPlainObject(radar)) return apply(radar)
+  return { indicator: categories.map((name) => ({ name, max: 100 })) }
+}
+
+function radarValueList(data: Array<number | string>, width: number): Array<number | string> {
+  return Array.from({ length: width }, (_, index) => {
+    const value = data[index]
+    return value === '' || value == null ? 0 : value
+  })
+}
+
+function writeRadarOption(base: Record<string, unknown>, model: ChartDataModel): Record<string, unknown> {
+  const seriesRaw = Array.isArray(base.series) ? base.series : []
+  let cursor = 0
+  let lastRadar = -1
+  const nextSeries = seriesRaw.map((item, seriesIndex) => {
+    if (!isPlainObject(item) || !Array.isArray(item.data)) return item
+    const looks =
+      item.type === 'radar' ||
+      item.data.some((entry) => (isPlainObject(entry) ? Array.isArray(entry.value) : Array.isArray(entry)))
+    if (!looks) return item
+    lastRadar = seriesIndex
+    const data = item.data.flatMap((entry) => {
+      if (!radarEntryValues(entry)) return [entry]
+      const target = model.series[cursor]
+      cursor += 1
+      if (!target) return []
+      const list = radarValueList(target.data, model.categories.length)
+      if (Array.isArray(entry)) return [list]
+      const origin = isPlainObject(entry) ? entry : {}
+      return [{ ...origin, name: target.name || origin.name, value: list }]
+    })
+    return { ...item, data }
+  })
+  if (lastRadar >= 0 && cursor < model.series.length) {
+    const host = nextSeries[lastRadar]
+    if (isPlainObject(host) && Array.isArray(host.data)) {
+      const extra = model.series.slice(cursor).map((item) => ({
+        name: item.name,
+        value: radarValueList(item.data, model.categories.length),
+      }))
+      nextSeries[lastRadar] = { ...host, data: [...host.data, ...extra] }
+    }
+  }
+  const next: Record<string, unknown> = {
+    ...base,
+    series: nextSeries,
+    radar: writeRadarIndicators(base.radar, model.categories),
+  }
+  if (isPlainObject(base.legend) && Array.isArray(base.legend.data)) {
+    next.legend = {
+      ...base.legend,
+      data: model.series.map((item) => item.name).filter(Boolean),
+    }
+  }
+  return next
+}
+
+function writeAxisData(raw: unknown, index: number, data: string[]): unknown {
+  if (Array.isArray(raw)) {
+    return raw.map((item, itemIndex) =>
+      itemIndex === index && isPlainObject(item) ? { ...item, data } : item,
+    )
+  }
+  if (isPlainObject(raw) && index === 0) return { ...raw, data }
+  return raw
+}
+
+function datasetRecord(option: Record<string, unknown>): Record<string, unknown> | null {
+  const dataset = option.dataset
+  if (Array.isArray(dataset)) {
+    const found = dataset.find((item) => isPlainObject(item) && Array.isArray(item.source))
+    return isPlainObject(found) ? found : null
+  }
+  if (isPlainObject(dataset) && Array.isArray(dataset.source)) return dataset
+  return null
+}
+
+function seriesHasInlineData(seriesRaw: unknown[]): boolean {
+  return seriesRaw.some((item) => isPlainObject(item) && Array.isArray(item.data) && item.data.length > 0)
+}
+
+/** dataset.source：首行是表头的二维表，或对象行。类目在第一列，其余列是系列。 */
+function readDatasetModel(source: unknown[]): ChartDataModel | null {
+  if (source.every((row) => Array.isArray(row))) {
+    const rows = source as unknown[][]
+    if (!rows.length || !rows[0]?.length) return null
+    const headerIsText = rows[0].every((cell) => typeof cell !== 'number')
+    const body = headerIsText ? rows.slice(1) : rows
+    if (!body.length) return null
+    const names = headerIsText
+      ? rows[0].slice(1).map((cell, index) => itemToText(cell) || `系列${index + 1}`)
+      : body[0]!.slice(1).map((_, index) => `系列${index + 1}`)
+    if (!names.length) return null
+    return {
+      categories: body.map((row) => itemToText(row[0])),
+      series: names.map((name, index) => ({
+        name,
+        data: body.map((row) => itemToValue(row[index + 1])),
+      })),
+    }
+  }
+  if (!source.length || !source.every((row) => isPlainObject(row))) return null
+  const rows = source as Record<string, unknown>[]
+  const keys: string[] = []
+  rows.forEach((row) => {
+    Object.keys(row).forEach((key) => {
+      if (!keys.includes(key)) keys.push(key)
+    })
+  })
+  if (keys.length < 2) return null
+  const categoryKey = keys[0]!
+  return {
+    categories: rows.map((row) => itemToText(row[categoryKey])),
+    series: keys.slice(1).map((key) => ({
+      name: key,
+      data: rows.map((row) => itemToValue(row[key])),
+    })),
+  }
+}
+
+function writeDatasetOption(base: Record<string, unknown>, model: ChartDataModel): Record<string, unknown> {
+  const node = datasetRecord(base)
+  const source = Array.isArray(node?.source) ? node.source : []
+  const objectRows = source.length > 0 && source.every((row) => isPlainObject(row))
+  let nextSource: unknown[]
+  if (objectRows) {
+    const sample = source.find((row) => isPlainObject(row)) as Record<string, unknown>
+    const categoryKey = Object.keys(sample)[0] || 'category'
+    nextSource = model.categories.map((category, rowIndex) => {
+      const origin = isPlainObject(source[rowIndex]) ? { ...(source[rowIndex] as Record<string, unknown>) } : {}
+      origin[categoryKey] = category
+      model.series.forEach((item) => {
+        origin[item.name] = item.data[rowIndex] ?? ''
+      })
+      return origin
+    })
+  } else {
+    const first = Array.isArray(source[0]) ? (source[0] as unknown[]) : []
+    const corner = itemToText(first[0]) || '类目'
+    nextSource = [
+      [corner, ...model.series.map((item) => item.name)],
+      ...model.categories.map((category, rowIndex) => [
+        category,
+        ...model.series.map((item) => item.data[rowIndex] ?? ''),
+      ]),
+    ]
+  }
+  const nextDataset = Array.isArray(base.dataset)
+    ? base.dataset.map((item) => (item === node ? { ...node, source: nextSource } : item))
+    : { ...(node || {}), source: nextSource }
+  const seriesRaw = Array.isArray(base.series) ? base.series : []
+  const series = model.series.map((item, index) => {
+    const origin = seriesRaw[index]
+    if (!isPlainObject(origin)) return { type: 'bar', name: item.name }
+    const next = { ...origin }
+    if (!Array.isArray(next.data) || next.data.length === 0) delete next.data
+    if (!next.type) next.type = 'bar'
+    return next
+  })
+  const next: Record<string, unknown> = { ...base, dataset: nextDataset, series }
+  if (isPlainObject(base.legend) && Array.isArray(base.legend.data)) {
+    next.legend = { ...base.legend, data: model.series.map((item) => item.name).filter(Boolean) }
+  }
+  return next
 }
 
 /** 从 option 抽出数据模型。 */
@@ -50,12 +339,19 @@ export function optionToDataModel(option: unknown): ChartDataModel {
   const empty: ChartDataModel = { categories: [], series: [] }
   if (!isPlainObject(option)) return empty
   const seriesRaw = Array.isArray(option.series) ? option.series : []
-  const xAxisRaw = option.xAxis
-  const xAxisFirst = Array.isArray(xAxisRaw) ? xAxisRaw[0] : xAxisRaw
-  const axisCategories =
-    isPlainObject(xAxisFirst) && Array.isArray(xAxisFirst.data)
-      ? xAxisFirst.data.map((item) => itemToText(item))
-      : []
+  if (isRadarChart(option, seriesRaw)) {
+    const radarModel = readRadarModel(option, seriesRaw)
+    if (radarModel) return radarModel
+  }
+  if (!seriesHasInlineData(seriesRaw)) {
+    const source = datasetRecord(option)?.source
+    if (Array.isArray(source)) {
+      const datasetModel = readDatasetModel(source)
+      if (datasetModel) return datasetModel
+    }
+  }
+  const categoryAxis = readCategoryAxis(option)
+  const axisCategories = categoryAxis?.categories ?? []
 
   const series: ChartDataModel['series'] = []
   let categories = axisCategories
@@ -63,6 +359,12 @@ export function optionToDataModel(option: unknown): ChartDataModel {
     if (!isPlainObject(item)) continue
     const dataRaw = Array.isArray(item.data) ? item.data : []
     const name = typeof item.name === 'string' ? item.name : `系列${series.length + 1}`
+    if (item.type === 'scatter' && dataRaw.length && dataRaw.every((entry) => pointTuple(entry))) {
+      const points = dataRaw.map((entry) => pointTuple(entry)!)
+      if (!categories.length) categories = points.map((point) => String(point[0] ?? ''))
+      series.push({ name, data: points.map((point) => point[1] ?? '') })
+      continue
+    }
     if (dataRaw.length && isPlainObject(dataRaw[0])) {
       // { name, value } 形态：类目来自数据项自身
       const values = dataRaw.map((entry) =>
@@ -87,7 +389,7 @@ export function optionToDataModel(option: unknown): ChartDataModel {
 /**
  * 把数据模型写回 option。
  *
- * - 类目轴存在时写回 xAxis.data；
+ * - 类目轴在横轴或纵轴时，写回那一根轴的 data；
  * - 类目轴不存在且数据是 { name, value } 形态时，按类目写回数据项的 name。
  */
 export function dataModelToOption(
@@ -96,38 +398,55 @@ export function dataModelToOption(
 ): Record<string, unknown> {
   const base: Record<string, unknown> = isPlainObject(option) ? { ...option } : {}
   const seriesRaw = Array.isArray(base.series) ? base.series : []
-  const xAxisRaw = base.xAxis
-  const xAxisFirst = Array.isArray(xAxisRaw) ? xAxisRaw[0] : xAxisRaw
-  const hasAxis = isPlainObject(xAxisFirst)
+  if (isRadarChart(base, seriesRaw) && readRadarModel(base, seriesRaw)) {
+    return writeRadarOption(base, model)
+  }
+  if (!seriesHasInlineData(seriesRaw)) {
+    const source = datasetRecord(base)?.source
+    if (Array.isArray(source) && readDatasetModel(source)) return writeDatasetOption(base, model)
+  }
+  const categoryAxis = readCategoryAxis(base)
 
   const nextSeries = seriesRaw.map((item, index) => {
     if (!isPlainObject(item)) return item
     const target = model.series[index]
     if (!target) return item
     const original = Array.isArray(item.data) ? item.data : []
+    const scatter = item.type === 'scatter' && (original.length === 0 || original.every((entry) => pointTuple(entry)))
     const useObjectShape = original.length > 0 && isPlainObject(original[0])
     const data = target.data.map((value, cellIndex) => {
+      if (scatter) {
+        const origin = original[cellIndex]
+        const x = textToValue(String(model.categories[cellIndex] ?? ''))
+        const y = value === '' || value == null ? '' : value
+        if (isPlainObject(origin) && Array.isArray(origin.value)) {
+          const next = origin.value.slice()
+          next[0] = x
+          next[1] = y
+          return { ...origin, value: next }
+        }
+        if (Array.isArray(origin) && origin.length > 2) return [x, y, ...origin.slice(2)]
+        return [x, y]
+      }
       if (!useObjectShape) return value
       const origin = original[cellIndex]
       const name =
-        isPlainObject(origin) && typeof origin.name === 'string'
-          ? origin.name
-          : model.categories[cellIndex] ?? ''
+        model.categories[cellIndex]
+        ?? (isPlainObject(origin) && typeof origin.name === 'string' ? origin.name : '')
       return { ...(isPlainObject(origin) ? origin : {}), name, value }
     })
-    return { ...item, data }
+    return { ...item, name: target.name || item.name, data }
   })
 
   const next: Record<string, unknown> = { ...base, series: nextSeries }
-  if (hasAxis && model.categories.length) {
-    const axisData = model.categories
-    if (Array.isArray(xAxisRaw)) {
-      next.xAxis = xAxisRaw.map((item, index) =>
-        index === 0 && isPlainObject(item) ? { ...item, data: axisData } : item,
-      )
-    } else {
-      next.xAxis = { ...(xAxisFirst as Record<string, unknown>), data: axisData }
+  if (isPlainObject(base.legend) && Array.isArray(base.legend.data)) {
+    next.legend = {
+      ...base.legend,
+      data: model.series.map((item) => item.name).filter(Boolean),
     }
+  }
+  if (categoryAxis) {
+    next[categoryAxis.key] = writeAxisData(base[categoryAxis.key], categoryAxis.index, model.categories)
   }
   return next
 }
@@ -176,7 +495,8 @@ export function dataModelToJson(model: ChartDataModel): string {
 }
 
 /** 把一个数据项转成「数值保持数值、其余转文本」。 */
-function itemToValue(raw: unknown): number | string {
+function itemToValue(raw: unknown): number | string | null {
+  if (raw == null) return null
   if (typeof raw === 'number' && Number.isFinite(raw)) return raw
   return itemToText(raw)
 }

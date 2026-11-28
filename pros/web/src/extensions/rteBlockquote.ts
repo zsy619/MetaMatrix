@@ -55,12 +55,10 @@ export const RteBlockquote = Blockquote.extend({
       ...this.parent?.(),
       setQuoteStyle:
         (style: QuoteStyle) =>
-        ({ commands, editor }) => {
+        ({ chain, editor }) => {
           const s = normalizeStyle(style)
-          if (!editor.isActive(this.name)) {
-            return commands.toggleBlockquote() && commands.updateAttributes(this.name, { quoteStyle: s })
-          }
-          return commands.updateAttributes(this.name, { quoteStyle: s })
+          const next = editor.isActive(this.name) ? chain() : chain().toggleBlockquote()
+          return next.updateAttributes(this.name, { quoteStyle: s }).run()
         },
     }
   },

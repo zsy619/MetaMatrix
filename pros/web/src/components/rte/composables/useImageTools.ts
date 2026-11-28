@@ -11,6 +11,7 @@ import {
 } from '../../../utils/rteImageCropAttrs'
 import {
   collectEditorImages,
+  imageDownloadName,
   indexForImage,
   type RtePreviewImage,
 } from '../../../utils/rteImagePreview'
@@ -19,6 +20,7 @@ import {
 export function useImageTools(deps: {
   editor: ShallowRef<Editor | undefined>
   viewMode: () => { value: string }
+  openQr?: (pos: number) => boolean
 }) {
 /** —— 图片对齐 / 题注 —— */
 const imageBubbleCaption = ref('')
@@ -110,7 +112,7 @@ function imageFromDblClick(target: Element): HTMLImageElement | null {
 
 function onEditorImageDblClick(event: MouseEvent) {
   const target = event.target
-  if (!(target instanceof Element)) return
+  if (!(target instanceof Element) || target.closest('.rte-image-caption')) return
   const img = imageFromDblClick(target)
   if (!img) return
   event.preventDefault()
@@ -124,6 +126,21 @@ function onEditorImageDblClick(event: MouseEvent) {
   } catch {
     pos = null
   }
+  const imagePos = (() => {
+    if (!ed || pos == null) return null
+    const direct = ed.state.doc.nodeAt(pos)
+    if (direct?.type.name === 'image') return pos
+    try {
+      const $pos = ed.state.doc.resolve(Math.min(pos, ed.state.doc.content.size))
+      for (let depth = $pos.depth; depth > 0; depth -= 1) {
+        if ($pos.node(depth).type.name === 'image') return $pos.before(depth)
+      }
+    } catch {
+      return null
+    }
+    return null
+  })()
+  if (imagePos != null && ed?.state.doc.nodeAt(imagePos)?.attrs?.qrMeta && deps.openQr?.(imagePos)) return
   openImagePreview(pos, img.currentSrc || img.src || '')
 }
 
@@ -153,7 +170,10 @@ function downloadSelectedImage() {
   if (!src) return
   const link = document.createElement('a')
   link.href = src
-  link.download = String(attrs?.alt || 'image')
+  link.download = imageDownloadName(
+    { alt: String(attrs?.alt || ''), caption: String(attrs?.caption || ''), src },
+    0,
+  )
   link.click()
 }
 
@@ -215,12 +235,12 @@ function applyCropPreset(preset: CropPreset) {
 }
 
 /** 换图：保留裁剪、题注等其它属性。 */
-function replaceImageSource(src: string) {
+function replaceImageSource(src: string): boolean {
   const ed = deps.editor.value
-  if (!ed || !isImageNodeSelected() || !src) return
+  if (!ed || !isImageNodeSelected() || !src) return false
   const attrs = ed.getAttributes('image') as Record<string, unknown>
   const next = keepCropOnReplace(attrs, src)
-  ed.chain().focus().updateAttributes('image', next).run()
+  return ed.chain().focus().updateAttributes('image', next).run()
 }
 
 /** 改图片替代文字。 */

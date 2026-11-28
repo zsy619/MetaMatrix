@@ -1,8 +1,10 @@
 import { defineStore } from 'pinia'
-import { ref, computed, toRaw } from 'vue'
+import { ref, computed, toRaw, onScopeDispose } from 'vue'
 import { normalizeCanvasTheme } from '../components/canvas/canvasChrome'
 import { ApiError } from '../api/http'
 import * as documentsApi from '../api/documents'
+import type { AnyCanvasDocumentJSON } from '../api/documents'
+import { documentTabs, type DocumentSaveNotice } from './documentTabs'
 import { rememberRecentOpen } from '../utils/canvasTransfer'
 import { normalizePageSize, readPageSize, writePageSizeMap } from '../utils/rtePageSize'
 import { normalizePageMargin, writePageMargin, type PageMargin } from '../utils/rtePageMargin'
@@ -24,6 +26,7 @@ import { normalizeWatermark, writeWatermark, type PanelWatermark } from '../util
 import { normalizeOutboundPolicy, writeOutboundPolicy, type OutboundPolicy } from '../utils/rteOutbound'
 import { writeAuditLog, type AuditEvent } from '../utils/rteAudit'
 import { getToken } from '../api/http'
+import { NODE_GRAPH_TYPE } from '../types/nodeGraph'
 import type {
   BlockCanvasDocumentJSON,
   CanvasDocumentJSON,
@@ -94,6 +97,10 @@ import type {
   GrowthAssumptionsCellKey,
   GrowthAssumptionsRow,
   BusinessFormulaDocumentJSON,
+  AbcModelDocumentJSON,
+  BusinessFormulaPatternsDocumentJSON,
+  CultivationMountainDocumentJSON,
+  HackerFiveStepsDocumentJSON,
   ThreeRingBasicsDocumentJSON,
   ThreeRingBasicsRegionId,
   LeadershipTriangleDocumentJSON,
@@ -112,10 +119,29 @@ import type {
   PdcaDocumentJSON,
   FiveForcesDocumentJSON,
   IncomeStatementDocumentJSON,
+  PestleDocumentJSON,
+  AnsoffDocumentJSON,
+  EmpathyDocumentJSON,
+  MarketingMixDocumentJSON,
   BcgDocumentJSON,
   ScorecardDocumentJSON,
   ErrcDocumentJSON,
   AarrDocumentJSON,
+  ValueChainDocumentJSON,
+  SevenSDocumentJSON,
+  RiceDocumentJSON,
+  BreakEvenDocumentJSON,
+  JourneyDocumentJSON,
+  KanoDocumentJSON,
+  MoscowDocumentJSON,
+  ImpactEffortDocumentJSON,
+  VrioDocumentJSON,
+  GoldenCircleDocumentJSON,
+  SoarDocumentJSON,
+  PlayingToWinDocumentJSON,
+  TenCheckDocumentJSON,
+  SceneThreeHighDocumentJSON,
+  AiBoundaryDocumentJSON,
   PanelAttachment,
   AttachmentsByPanelId,
 } from '../types/canvas'
@@ -124,6 +150,7 @@ import {
   parseDemandTriangleNotesDirId,
   isAiTradeoffDoc,
   isBlockCanvasDoc,
+  isHackerFiveStepsDoc,
   isDeliberatePracticeDoc,
   isDemandTriangleDoc,
   isPmSensitivity6dDoc,
@@ -164,10 +191,27 @@ import {
   isStakeholderDoc,
   isPdcaDoc,
   isFiveForcesDoc,
+  isPestleDoc,
+  isAnsoffDoc,
+  isEmpathyDoc,
+  isMarketingMixDoc,
   isBcgDoc,
   isScorecardDoc,
   isErrcDoc,
   isAarrDoc,
+  isValueChainDoc,
+  isSevenSDoc,
+  isJourneyDoc,
+  isKanoDoc,
+  isMoscowDoc,
+  isImpactEffortDoc,
+  isVrioDoc,
+  isGoldenCircleDoc,
+  isSoarDoc,
+  isPlayingToWinDoc,
+  isSceneThreeHighDoc,
+  isFdeSheetDoc,
+  isBusinessModelCanvasDoc,
   coerceYModelDoc,
   normalizeYModelDoc,
 } from '../types/canvas'
@@ -212,6 +256,10 @@ import productFeatures5dTemplate from '../templates/product-features-5d-v1.json'
 import pmSolutionTriangleTemplate from '../templates/pm-solution-triangle-v1.json'
 import growthAssumptionsTemplate from '../templates/growth-assumptions-v1.json'
 import businessFormulaTemplate from '../templates/business-formula-v1.json'
+import abcModelTemplate from '../templates/abc-model-v1.json'
+import businessFormulaPatternsTemplate from '../templates/business-formula-patterns-v1.json'
+import cultivationMountainTemplate from '../templates/cultivation-mountain-v1.json'
+import hackerFiveStepsTemplate from '../templates/hacker-five-steps-v1.json'
 import threeRingBasicsTemplate from '../templates/three-ring-basics-v1.json'
 import leadershipTriangleTemplate from '../templates/leadership-triangle-v1.json'
 import contextSixElementsTemplate, {
@@ -230,10 +278,33 @@ import stakeholderTemplate from '../templates/stakeholder-map-v1.json'
 import pdcaTemplate from '../templates/pdca-v1.json'
 import fiveForcesTemplate from '../templates/five-forces-v1.json'
 import incomeStatementTemplate from '../templates/income-statement-v1.json'
+import pestleTemplate from '../templates/pestle-v1.json'
+import ansoffTemplate from '../templates/ansoff-v1.json'
+import empathyTemplate from '../templates/empathy-map-v1.json'
+import marketingMixTemplate from '../templates/marketing-mix-v1.json'
 import bcgTemplate from '../templates/bcg-v1.json'
 import scorecardTemplate from '../templates/balanced-scorecard-v1.json'
 import errcTemplate from '../templates/errc-v1.json'
 import aarrTemplate from '../templates/aarr-v1.json'
+import valueChainTemplate from '../templates/value-chain-v1.json'
+import sevenSTemplate from '../templates/seven-s-v1.json'
+import riceTemplate from '../templates/rice-v1.json'
+import breakEvenTemplate from '../templates/break-even-v1.json'
+import journeyTemplate from '../templates/customer-journey-v1.json'
+import kanoTemplate from '../templates/kano-v1.json'
+import moscowTemplate from '../templates/moscow-v1.json'
+import impactEffortTemplate from '../templates/impact-effort-v1.json'
+import vrioTemplate from '../templates/vrio-v1.json'
+import goldenCircleTemplate from '../templates/golden-circle-v1.json'
+import soarTemplate from '../templates/soar-v1.json'
+import playingToWinTemplate from '../templates/playing-to-win-v1.json'
+import tenCheckTemplate from '../templates/ten-check-v1.json'
+import sceneThreeHighTemplate from '../templates/scene-three-high-v1.json'
+import aiBoundaryTemplate from '../templates/ai-boundary-v1.json'
+import fdeReliableQuadrantTemplate from '../templates/fde-reliable-quadrant-v1.json'
+import { FDE_SHEET_META, FDE_SHEET_TEMPLATES, type FdeSheetId } from '../templates/fdeSheets'
+import { isLegacySceneSeed, upgradeSceneScoresToHundred } from '../utils/sceneThreeHigh'
+import { resolveCanvasTemplateId } from '../utils/templateId'
 import { CONTEXT_SIX_ELEMENTS_BLOCK_ID } from '../utils/contextSixElements'
 
 export type TemplateId =
@@ -278,6 +349,10 @@ export type TemplateId =
   | 'pm-solution-triangle'
   | 'growth-assumptions'
   | 'business-formula'
+  | 'abc-model'
+  | 'business-formula-patterns'
+  | 'cultivation-mountain'
+  | 'hacker-five-steps'
   | 'three-ring-basics'
   | 'leadership-triangle'
   | 'context-six-elements'
@@ -294,12 +369,33 @@ export type TemplateId =
   | 'pdca'
   | 'five-forces'
   | 'income-statement'
+  | 'pestle'
+  | 'ansoff'
+  | 'empathy-map'
+  | 'marketing-mix'
   | 'bcg'
   | 'balanced-scorecard'
   | 'errc'
   | 'aarr'
+  | 'value-chain'
+  | 'seven-s'
+  | 'rice'
+  | 'break-even'
+  | 'customer-journey'
+  | 'kano'
+  | 'moscow'
+  | 'impact-effort'
+  | 'vrio'
+  | 'golden-circle'
+  | 'soar'
+  | 'playing-to-win'
+  | 'ten-check'
+  | 'scene-three-high'
+  | 'ai-boundary'
+  | 'fde-reliable-quadrant'
+  | FdeSheetId
 
-const TEMPLATES: Record<TemplateId, CanvasDocumentJSON> = {
+export const TEMPLATES: Record<TemplateId, CanvasDocumentJSON> = {
   'dual-triangle': dualTriangleTemplate as DualTriangleDocumentJSON,
   'dual-triangle-human-ai':
     dualTriangleHumanAiTemplate as DualTriangleDocumentJSON,
@@ -343,6 +439,12 @@ const TEMPLATES: Record<TemplateId, CanvasDocumentJSON> = {
   'pm-solution-triangle': pmSolutionTriangleTemplate as PmSolutionTriangleDocumentJSON,
   'growth-assumptions': growthAssumptionsTemplate as GrowthAssumptionsDocumentJSON,
   'business-formula': businessFormulaTemplate as BusinessFormulaDocumentJSON,
+  'abc-model': abcModelTemplate as AbcModelDocumentJSON,
+  'business-formula-patterns':
+    businessFormulaPatternsTemplate as BusinessFormulaPatternsDocumentJSON,
+  'cultivation-mountain':
+    cultivationMountainTemplate as CultivationMountainDocumentJSON,
+  'hacker-five-steps': hackerFiveStepsTemplate as HackerFiveStepsDocumentJSON,
   'three-ring-basics':
     threeRingBasicsTemplate as ThreeRingBasicsDocumentJSON,
   'leadership-triangle':
@@ -362,20 +464,107 @@ const TEMPLATES: Record<TemplateId, CanvasDocumentJSON> = {
   pdca: pdcaTemplate as PdcaDocumentJSON,
   'five-forces': fiveForcesTemplate as FiveForcesDocumentJSON,
   'income-statement': incomeStatementTemplate as IncomeStatementDocumentJSON,
+  pestle: pestleTemplate as PestleDocumentJSON,
+  ansoff: ansoffTemplate as AnsoffDocumentJSON,
+  'empathy-map': empathyTemplate as EmpathyDocumentJSON,
+  'marketing-mix': marketingMixTemplate as MarketingMixDocumentJSON,
   bcg: bcgTemplate as BcgDocumentJSON,
   'balanced-scorecard': scorecardTemplate as ScorecardDocumentJSON,
   errc: errcTemplate as ErrcDocumentJSON,
   aarr: aarrTemplate as AarrDocumentJSON,
+  'value-chain': valueChainTemplate as ValueChainDocumentJSON,
+  'seven-s': sevenSTemplate as SevenSDocumentJSON,
+  rice: riceTemplate as RiceDocumentJSON,
+  'break-even': breakEvenTemplate as BreakEvenDocumentJSON,
+  'customer-journey': journeyTemplate as JourneyDocumentJSON,
+  kano: kanoTemplate as KanoDocumentJSON,
+  moscow: moscowTemplate as MoscowDocumentJSON,
+  'impact-effort': impactEffortTemplate as ImpactEffortDocumentJSON,
+  vrio: vrioTemplate as VrioDocumentJSON,
+  'golden-circle': goldenCircleTemplate as GoldenCircleDocumentJSON,
+  soar: soarTemplate as SoarDocumentJSON,
+  'playing-to-win': playingToWinTemplate as PlayingToWinDocumentJSON,
+  'ten-check': tenCheckTemplate as TenCheckDocumentJSON,
+  'scene-three-high': sceneThreeHighTemplate as SceneThreeHighDocumentJSON,
+  'ai-boundary': aiBoundaryTemplate as AiBoundaryDocumentJSON,
+  'fde-reliable-quadrant': fdeReliableQuadrantTemplate as QuadrantDocumentJSON,
+  ...FDE_SHEET_TEMPLATES,
 }
 
 export function isTemplateId(id: string): id is TemplateId {
   return id in TEMPLATES
 }
 
+/** 地址里的模板 id。ai-boundary-4734 这种带数字后缀的仍打开 ai-boundary。 */
+export function resolveTemplateId(raw: string | null | undefined): TemplateId | null {
+  return resolveCanvasTemplateId(raw, isTemplateId) as TemplateId | null
+}
+
 
 /** Deep-clone plain canvas JSON. Vue proxies are not structuredClone-safe. */
 function cloneDoc<T>(value: T): T {
   return JSON.parse(JSON.stringify(toRaw(value as object))) as T
+}
+
+/**
+ * 本地草稿必须按「用户 + 文档」隔离。
+ *
+ * 旧实现只按模板 id 存，导致同一模板下的多篇云端文档共用一份草稿；
+ * 键里也没有用户 id，同一浏览器切换账号后可能读到上一个账号的内容。
+ */
+const DRAFT_OWNER_KEY = 'metamatrix:draft-owner'
+const AUTH_USER_KEY = 'metamatrix:auth:user'
+
+/** 当前登录用户 id；未登录时用 anon，保证游客草稿也只归游客。 */
+function currentUserScope(): string {
+  try {
+    const raw = localStorage.getItem(AUTH_USER_KEY)
+    if (!raw) return 'anon'
+    const parsed = JSON.parse(raw) as { id?: string }
+    return parsed?.id || 'anon'
+  } catch {
+    return 'anon'
+  }
+}
+
+/** 草稿分区：已建档文档用 doc:<id>，未建档草稿用 template:<模板>。 */
+export function draftCacheId(
+  templateId: string | null | undefined,
+  documentId: string | null | undefined,
+): string {
+  if (documentId) return `doc:${documentId}`
+  return `template:${templateId || 'unknown'}`
+}
+
+export function draftContentKey(userScope: string, cacheId: string): string {
+  return `metamatrix:doc:${userScope}:${cacheId}`
+}
+
+export function draftMetaKey(userScope: string, cacheId: string): string {
+  return `metamatrix:doc-meta:${userScope}:${cacheId}`
+}
+
+export function draftConflictKey(userScope: string, documentId: string): string {
+  return `metamatrix:save-conflict:${userScope}:${documentId}`
+}
+
+/**
+ * 升级兼容：第一次运行新版本时允许读取旧的无用户前缀草稿。
+ *
+ * 记录一个 owner 标记后就不再跨用户回退，避免切账号时把别人的草稿
+ * 当成自己的内容。这样老用户不会因为换键静默丢草稿，新用户也不会串号。
+ */
+function legacyDraftsUsable(): boolean {
+  try {
+    const owner = localStorage.getItem(DRAFT_OWNER_KEY)
+    if (!owner) {
+      localStorage.setItem(DRAFT_OWNER_KEY, currentUserScope())
+      return true
+    }
+    return owner === currentUserScope()
+  } catch {
+    return false
+  }
 }
 
 /** Blank canvas JSON for a template, without touching the open document. */
@@ -483,14 +672,15 @@ function normalizeHumanAiDualTriangleDoc(
 }
 
 
-export type TemplateCategory = 'method' | 'growth' | 'industry' | 'org' | 'review'
+export type TemplateCategory = 'method' | 'growth' | 'industry' | 'org' | 'review' | 'fde'
 
 export const CATEGORY_LABELS: Record<TemplateCategory, string> = {
   method: '方法框架',
-  growth: '产品增长',
-  industry: '行业调研',
-  org: '组织协作',
+  growth: '产品与经营',
+  industry: '行业与竞争',
+  org: '项目与组织',
   review: '复盘总结',
+  fde: 'FDE',
 }
 
 export const TEMPLATE_META: Record<
@@ -533,7 +723,7 @@ export const TEMPLATE_META: Record<
     name: '需求评估三角形',
     badge: '需求评估 · MVP',
     description: '普遍性 × 频次 × 刚性三维雷达，叠加对比多个业务方向的需求强度。',
-    category: 'growth',
+    category: 'method',
   },
   'five-step-basic': {
     name: '五步法（基础版）',
@@ -575,7 +765,7 @@ export const TEMPLATE_META: Record<
     name: 'AI场景取舍评估',
     badge: '取舍评估 · MVP',
     description: '价值侧 × 成本侧二维取舍，用 1-10 分与事实论证筛选值得做的 AI 场景。',
-    category: 'growth',
+    category: 'method',
   },
   'product-content': {
     name: '产品内核画布',
@@ -599,7 +789,7 @@ export const TEMPLATE_META: Record<
     name: '关键阻力分析画布',
     badge: '关键阻力 · MVP',
     description: '阻力假设 × 消除假设 × 策略文案，动态多行拆解关键转化阻力。',
-    category: 'growth',
+    category: 'method',
   },
   'conversion-tradeoff': {
     name: '转化率取舍画布',
@@ -695,13 +885,13 @@ export const TEMPLATE_META: Record<
     name: '项目管理6维敏感度模型',
     badge: '6维敏感度 · MVP',
     description: '预算/老板/风险/协作/人力/时间六维雷达，拖拽评分评估项目敏感度，并记录备注。',
-    category: 'method',
+    category: 'org',
   },
   'pm-competency': {
     name: '项目管理竞争力测评',
     badge: '竞争力测评 · MVP',
     description: '意识 × 定方案 × 拆计划 × 管执行 × 做复盘五维雷达，0–100 拖拽评分测评项目管理竞争力。',
-    category: 'method',
+    category: 'org',
   },
   'scientific-meeting-10p': {
     name: '科学开会十大原则',
@@ -719,7 +909,7 @@ export const TEMPLATE_META: Record<
     name: '项目管理方案评估三角形',
     badge: '方案评估 · MVP',
     description: '投入产出比ROI × 机会成本 × 机会窗口三角雷达，0–100 拖拽评分评估项目管理方案，并记录备注。',
-    category: 'method',
+    category: 'org',
   },
   'online-offline-comm': {
     name: '线上线下沟通',
@@ -744,6 +934,32 @@ export const TEMPLATE_META: Record<
     badge: '业务公式 · MVP',
     description: '深度解构业务逻辑，发现增长杠杆',
     category: 'growth',
+  },
+  'abc-model': {
+    name: '业务公式ABC模型',
+    badge: '业务公式 · ABC',
+    description:
+      'A 目标 × B 参数 × C 逻辑关系三顶点，把业务目标拆成可计算的公式。',
+    category: 'growth',
+  },
+  'business-formula-patterns': {
+    name: '业务公式十大经典范式',
+    badge: '业务公式 · 范式',
+    description: '收入、竞争、运营三类共十种经典业务公式，可改参数并实时试算。',
+    category: 'growth',
+  },
+  'cultivation-mountain': {
+    name: '业务公式修炼爬山',
+    badge: '业务公式 · 修炼',
+    description: 'L1–L6 六级能力进阶，自评当前层级并规划下一步修炼动作。',
+    category: 'growth',
+  },
+  'hacker-five-steps': {
+    name: '调用黑客五部曲',
+    badge: '调研 · 五部曲',
+    description:
+      '五步把外部情报变成自己的判断：定目标 → 缩范围 → 列清单 → 拿情报 → 正确归因。',
+    category: 'industry',
   },
   'three-ring-basics': {
     name: '苦练基本功三环分析法',
@@ -770,13 +986,13 @@ export const TEMPLATE_META: Record<
     name: '项目甘特图',
     badge: '项目 · 甘特',
     description: '工作分解树、前置与后置、里程碑、比较基准和关键路径。按依赖排程，日周月缩放。',
-    category: 'method',
+    category: 'org',
   },
   'raci-matrix': {
     name: 'RACI 责任矩阵',
     badge: '项目 · RACI',
     description: '工作按树缩进。点格子循环 R 执行、A 负责、C 顾问、I 知情，四种颜色分开。',
-    category: 'method',
+    category: 'org',
   },
   'daily-kanban': {
     name: '每日看板',
@@ -787,7 +1003,7 @@ export const TEMPLATE_META: Record<
   'business-model-canvas': {
     name: '商业模式画布',
     badge: '商业 · 九宫',
-    description: '九格铺满页面：伙伴与客户分列两侧，价值主张居中，成本和收入垫底。',
+    description: '九格铺满页面，每格用和五步法一样的富文本。价值主张居中，成本和收入垫底。',
     category: 'growth',
   },
   'cash-flow': {
@@ -800,7 +1016,7 @@ export const TEMPLATE_META: Record<
     name: 'SWOT 分析',
     badge: '战略 · SWOT',
     description: '优势、劣势、机会、威胁四格铺满页面。先写事实，再决定要做什么。',
-    category: 'growth',
+    category: 'industry',
   },
   'lean-canvas': {
     name: '精益画布',
@@ -818,13 +1034,13 @@ export const TEMPLATE_META: Record<
     name: 'OKR',
     badge: '目标 · OKR',
     description: '一个目标配几条可衡量的关键结果。拖动进度，目标完成度自动取平均。',
-    category: 'method',
+    category: 'org',
   },
   'stakeholder-map': {
     name: '干系人地图',
     badge: '项目 · 干系人',
     description: '按权力和利益分成四格：重点管理、保持满意、随时告知、监督即可。',
-    category: 'method',
+    category: 'org',
   },
   pdca: {
     name: 'PDCA',
@@ -842,6 +1058,30 @@ export const TEMPLATE_META: Record<
     name: '利润表',
     badge: '财务 · 利润',
     description: '收入减去成本是毛利，再减去费用是营业利润。和现金流量放在一起看赚不赚钱。',
+    category: 'growth',
+  },
+  pestle: {
+    name: 'PESTLE',
+    badge: '环境 · PESTLE',
+    description: '政治、经济、社会、技术、法律、环境六股外部力量。先看天气，再谈竞争。',
+    category: 'industry',
+  },
+  ansoff: {
+    name: '安索夫矩阵',
+    badge: '增长 · 安索夫',
+    description: '现有或新产品，进入现有或新市场。四条增长路，风险从左上到右下递增。',
+    category: 'growth',
+  },
+  'empathy-map': {
+    name: '同理心地图',
+    badge: '用户 · 同理心',
+    description: '说、想、做、感受，加上痛点和收益。先写一个具体的人。',
+    category: 'growth',
+  },
+  'marketing-mix': {
+    name: '营销 4P',
+    badge: '营销 · 4P',
+    description: '产品、价格、渠道、推广。四项决定要对着同一群客户。',
     category: 'growth',
   },
   bcg: {
@@ -868,6 +1108,103 @@ export const TEMPLATE_META: Record<
     description: '获取、激活、留存、推荐、收入。找出用户在哪一段漏掉。',
     category: 'growth',
   },
+  'value-chain': {
+    name: '价值链',
+    badge: '运营 · 价值链',
+    description: '上面是支持活动，下面是进料、生产、出货、营销和服务。看成本和优势落在哪一段。',
+    category: 'industry',
+  },
+  'seven-s': {
+    name: '麦肯锡 7S',
+    badge: '组织 · 7S',
+    description: '战略、结构、系统、共同价值观、风格、人员、技能。看这七项是否互相配合。',
+    category: 'org',
+  },
+  rice: {
+    name: 'RICE 排序',
+    badge: '优先级 · RICE',
+    description: '覆盖人数 × 影响 × 信心 ÷ 工作量。分数高的排在前面。',
+    category: 'method',
+  },
+  'break-even': {
+    name: '盈亏平衡',
+    badge: '财务 · 盈亏',
+    description: '单价减单位变动成本，再去除固定成本。算出要卖多少才不亏。',
+    category: 'growth',
+  },
+  'customer-journey': {
+    name: '客户旅程',
+    badge: '用户 · 旅程',
+    description: '认知、考虑、购买、使用、忠诚。每段写接触点、痛点和机会。',
+    category: 'growth',
+  },
+  kano: {
+    name: '卡诺模型',
+    badge: '产品 · 卡诺',
+    description: '必备、期望、兴奋、无差异。先保住必备，再挑能让人惊喜的。',
+    category: 'growth',
+  },
+  moscow: {
+    name: 'MoSCoW',
+    badge: '优先级 · MoSCoW',
+    description: '必须有、应该有、可以有、这次不做。用来给这一期划边界。',
+    category: 'method',
+  },
+  'impact-effort': {
+    name: '影响–努力矩阵',
+    badge: '优先级 · 矩阵',
+    description: '影响高、努力低的立刻做。影响高、努力大的排进计划。',
+    category: 'method',
+  },
+  vrio: {
+    name: 'VRIO',
+    badge: '战略 · 资源',
+    description: '有价值、稀缺、难模仿、有组织。四项都过，才是持续优势。',
+    category: 'method',
+  },
+  'golden-circle': {
+    name: '黄金圈',
+    badge: '战略 · 黄金圈',
+    description: '先写为什么，再用怎么做证明，最后才是做什么。',
+    category: 'method',
+  },
+  soar: {
+    name: 'SOAR',
+    badge: '战略 · SOAR',
+    description: '优势、机会、愿景、成果。从已经做得好的地方往前看。',
+    category: 'method',
+  },
+  'playing-to-win': {
+    name: '制胜选择',
+    badge: '战略 · 选择',
+    description: '制胜愿景、在哪竞争、如何取胜、所需能力、管理体系。五个选择要连得上。',
+    category: 'method',
+  },
+  'ten-check': {
+    name: '十格自检',
+    badge: '自检 · 十格',
+    description: '逐格写事实。出现不合格信号，这一格先不过。',
+    category: 'fde',
+  },
+  'scene-three-high': {
+    name: '选场景三高',
+    badge: '选场景 · 三高',
+    description: '高频、高价值、高边际成本。多个业务叠在雷达上，三项都到 70 分才进下一步。',
+    category: 'fde',
+  },
+  'ai-boundary': {
+    name: '业务别用 AI 的情况',
+    badge: '边界 · 别用 AI',
+    description: '单点因果、错了不可逆、数据拿不到、踩合规红线。哪一项到了 70，这件事就不该交给 AI。',
+    category: 'fde',
+  },
+  'fde-reliable-quadrant': {
+    name: 'FDE 靠谱四维度',
+    badge: 'FDE · 四维度',
+    description: '架构拆解、工具与上下文、评测与可观测、生产可靠与人机协同。前两项看能不能做出来，后两项看能不能交付。',
+    category: 'fde',
+  },
+  ...FDE_SHEET_META,
 }
 
 function createItemId(): string {
@@ -882,18 +1219,68 @@ export const useDocumentStore = defineStore('document', () => {
   const dirty = ref(false)
   const head_revision_id = ref<string | null>(null)
   const document_id = ref<string | null>(null)
+  /**
+   * 最近一次载入的文档类型与所属项目。
+   *
+   * 节点画布不是模板画布：模板视图渲染不了它，载入时只记住归属，
+   * 由调用方跳到节点画布自己的视图。
+   */
+  const loaded_canvas_type = ref('')
+  const loaded_project_id = ref<string | null>(null)
+  /** 后端 save_version：每次保存/存版/恢复都会递增，保存时作为乐观锁提交。 */
+  const save_version = ref(0)
+  /**
+   * 编辑序号：每次内容或元数据变化都 +1。
+   *
+   * 保存请求会记住发出时的序号，响应回来时只有序号没变才允许清 dirty。
+   * 否则“请求飞行期间的新编辑”会被误判为已保存。
+   */
+  const editSeq = ref(0)
+  /**
+   * 文档代次：每次载入/新建/克隆另一篇文档就 +1。
+   * 迟到的保存响应如果发现代次变了，必须丢弃，不能把旧文档的 id 写回新文档。
+   */
+  let docEpoch = 0
   /** Currently loaded template id (for localStorage / panel) */
   const activeTemplateId = ref<TemplateId | null>(null)
   const loading = ref(false)
   const saving = ref(false)
+  /**
+   * 最近一次本地内容/元数据持久化失败原因。
+   * 它与云端保存状态分开：云端成功不能掩盖 localStorage 配额或隐私模式失败。
+   */
+  const localContentPersistError = ref<string | null>(null)
+  const localMetaPersistError = ref<string | null>(null)
+  const localPersistError = computed(
+    () => localContentPersistError.value || localMetaPersistError.value,
+  )
+  /**
+   * 其他标签页已经保存、但当前编辑器尚未纳入的版本。
+   * 不直接抬高 expectedSaveVersion，否则旧草稿可能拿着新版本号覆盖远程内容。
+   */
+  const remoteSaveNotice = ref<DocumentSaveNotice | null>(null)
   /** Local draft kept when a 409 replaces the editor with the server copy. */
-  const conflict = ref<{ draft: CanvasDocumentJSON } | null>(null)
-  const conflictKey = 'metamatrix:save-conflict'
+  const conflict = ref<{ draft: CanvasDocumentJSON; savedAt?: string } | null>(null)
+
+  const unsubscribeRemoteSaves = documentTabs.subscribe((notice) => {
+    if (notice.documentId !== document_id.value) return
+    if (notice.saveVersion <= save_version.value) return
+    // 只记录远程元数据，不在这里直接替换编辑区。若本地有未保存修改，
+    // 下一次 save 会先走冲突草稿流程；没有修改时也不会用旧内容静默覆盖。
+    remoteSaveNotice.value = notice
+  })
+  onScopeDispose(unsubscribeRemoteSaves)
 
   function rememberConflict(id: string, draft: CanvasDocumentJSON) {
-    conflict.value = { draft }
+    const savedAt = new Date().toISOString()
+    conflict.value = { draft, savedAt }
     try {
-      sessionStorage.setItem(conflictKey, JSON.stringify({ id, draft }))
+      // 从 sessionStorage 单槽改为按「用户 + 文档」持久化：
+      // 多篇文档冲突不会互相覆盖，关闭标签页后仍能恢复。
+      localStorage.setItem(
+        draftConflictKey(currentUserScope(), id),
+        JSON.stringify({ id, draft, savedAt }),
+      )
     } catch {
       /* private mode or quota */
     }
@@ -901,8 +1288,9 @@ export const useDocumentStore = defineStore('document', () => {
 
   function discardConflict() {
     conflict.value = null
+    const id = document_id.value
     try {
-      sessionStorage.removeItem(conflictKey)
+      if (id) localStorage.removeItem(draftConflictKey(currentUserScope(), id))
     } catch {
       /* ignore */
     }
@@ -910,11 +1298,14 @@ export const useDocumentStore = defineStore('document', () => {
 
   function hydrateConflict(id: string) {
     try {
-      const raw = sessionStorage.getItem(conflictKey)
-      if (!raw) return
-      const parsed = JSON.parse(raw) as { id?: string; draft?: CanvasDocumentJSON }
-      if (parsed.id === id && parsed.draft) conflict.value = { draft: parsed.draft }
-      else if (parsed.id && parsed.id !== id) conflict.value = null
+      const raw = localStorage.getItem(draftConflictKey(currentUserScope(), id))
+      if (!raw) {
+        conflict.value = null
+        return
+      }
+      const parsed = JSON.parse(raw) as { id?: string; draft?: CanvasDocumentJSON; savedAt?: string }
+      if (parsed.id === id && parsed.draft) conflict.value = { draft: parsed.draft, savedAt: parsed.savedAt }
+      else conflict.value = null
     } catch {
       conflict.value = null
     }
@@ -1497,7 +1888,11 @@ export const useDocumentStore = defineStore('document', () => {
   }
 
   function loadFromTemplate(templateId: TemplateId | string = 'dual-triangle') {
-    const id: TemplateId = isTemplateId(templateId) ? templateId : 'dual-triangle'
+    const id = resolveTemplateId(templateId)
+    if (!id) return
+    // 模板切换也意味着编辑上下文切换，旧文档的保存响应和待确认 id 不能沿用。
+    docEpoch += 1
+    remoteSaveNotice.value = null
     activeTemplateId.value = id
     let local = loadLocal(id)
     const meta = loadLocalMeta(id)
@@ -1536,6 +1931,8 @@ export const useDocumentStore = defineStore('document', () => {
       (templateId && isTemplateId(templateId) && templateId) ||
       activeTemplateId.value ||
       'dual-triangle'
+    docEpoch += 1
+    remoteSaveNotice.value = null
     activeTemplateId.value = id
     const template = TEMPLATES[id]
     current_data.value = normalizeLoadedDoc(
@@ -1571,16 +1968,71 @@ export const useDocumentStore = defineStore('document', () => {
     if (isStakeholderDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
     if (isPdcaDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
     if (isFiveForcesDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
+    if (isPestleDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
+    if (isAnsoffDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
+    if (isEmpathyDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
+    if (isMarketingMixDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
     if (isBcgDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
     if (isScorecardDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
     if (isErrcDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
     if (isAarrDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
+    if (isValueChainDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
+    if (isSevenSDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
+    if (isJourneyDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
+    if (isKanoDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
+    if (isMoscowDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
+    if (isImpactEffortDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
+    if (isVrioDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
+    if (isGoldenCircleDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
+    if (isSoarDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
+    if (isPlayingToWinDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
+    if (isBusinessModelCanvasDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
+    // 旧版把「依次回答」存在 step.answer 里，新版改成内容块，迁移一次避免丢答案。
+    if (isHackerFiveStepsDoc(next)) {
+      const byId = new Map(next.blocks.map((b) => [b.id, b]))
+      for (const step of next.steps) {
+        let block = byId.get(step.blockId)
+        if (!block) {
+          block = { id: step.blockId, title: `第 ${step.index} 步 · ${step.work}`, items: [] }
+          next.blocks.push(block)
+          byId.set(block.id, block)
+        }
+        const legacy = step.answer?.trim()
+        if (block && legacy && !block.items.length) {
+          block.items = [{ id: `${block.id}_legacy`, text: legacy }]
+        }
+      }
+    }
+    if (isSceneThreeHighDoc(next) && isLegacySceneSeed(next.businesses)) {
+      const seed = sceneThreeHighTemplate as SceneThreeHighDocumentJSON
+      next = { ...next, businesses: cloneDoc(seed.businesses), passScore: seed.passScore, verdict: seed.verdict }
+    }
+    if (isSceneThreeHighDoc(next)) {
+      next = upgradeSceneScoresToHundred(next)
+    }
+    if (isFdeSheetDoc(next) && next.id === 'canvas_fde_scenario') {
+      const seed = FDE_SHEET_TEMPLATES['fde-scenario']
+      const byId = new Map(next.blocks.map((block) => [block.id, block]))
+      next = {
+        ...next,
+        lede: seed.lede,
+        blocks: seed.blocks.map((templateBlock) => {
+          const existing = byId.get(templateBlock.id)
+          if (!existing || existing.kind !== templateBlock.kind) return cloneDoc(templateBlock)
+          return { ...existing, title: templateBlock.title, hint: templateBlock.hint }
+        }),
+      }
+    }
     if (
       isDualTriangleDoc(next) &&
       (tid === 'dual-triangle-human-ai' ||
         next.id === 'canvas_dual_triangle_human_ai')
     ) {
       next = normalizeHumanAiDualTriangleDoc(next)
+    }
+    // FDE 四象限的英文水印长短不齐（ARCH/CTXT/EVALUATION…），加载时统一成词首 4 个字母。
+    if (isQuadrantDoc(next) && next.id === 'canvas_fde_reliable') {
+      next = normalizeFdeReliableWatermarks(next)
     }
     if (!next.attachmentsByPanelId) {
       next = { ...next, attachmentsByPanelId: {} }
@@ -1589,6 +2041,25 @@ export const useDocumentStore = defineStore('document', () => {
       ...next,
       theme: normalizeCanvasTheme(next.theme),
     }
+  }
+
+  function normalizeFdeReliableWatermarks(
+    doc: QuadrantDocumentJSON,
+  ): QuadrantDocumentJSON {
+    const letters: Record<string, string> = {
+      A: 'ARCH',
+      C: 'CONT',
+      E: 'EVAL',
+      R: 'RELI',
+    }
+    let changed = false
+    const quadrants = doc.quadrants.map((cell) => {
+      const want = letters[cell.watermark?.letter?.toUpperCase()]
+      if (!want || cell.watermark?.text === want) return cell
+      changed = true
+      return { ...cell, watermark: { ...cell.watermark, text: want } }
+    })
+    return changed ? { ...doc, quadrants } : doc
   }
 
   /** 温和升级进阶版：旧 upper 合并块 → 每提示独立 RTE */
@@ -1917,13 +2388,38 @@ export const useDocumentStore = defineStore('document', () => {
     documentId?: string | null
   }
 
+  /** 当前内容应该落到哪个草稿分区：已建档按文档，未建档按模板。 */
+  function activeCacheId(templateId?: string | null): string {
+    return draftCacheId(
+      templateId || activeTemplateId.value || current_data.value?.id || null,
+      document_id.value,
+    )
+  }
+
   function localMetaKey(templateId?: string | null): string {
+    return draftMetaKey(currentUserScope(), activeCacheId(templateId))
+  }
+
+  function legacyMetaKey(templateId?: string | null): string {
     const id =
       templateId ||
       activeTemplateId.value ||
       current_data.value?.id ||
       'unknown'
     return `metamatrix:doc-meta:${id}`
+  }
+
+  /** 清掉未建档的模板级草稿，避免建云档后旧草稿又被当成“最新本地内容”。 */
+  function clearTemplateDraft(templateId?: string | null): void {
+    const scope = currentUserScope()
+    const key = draftContentKey(scope, draftCacheId(templateId || activeTemplateId.value, null))
+    const meta = draftMetaKey(scope, draftCacheId(templateId || activeTemplateId.value, null))
+    try {
+      localStorage.removeItem(key)
+      localStorage.removeItem(meta)
+    } catch {
+      /* ignore */
+    }
   }
 
   function applyMeta(meta: {
@@ -1945,6 +2441,18 @@ export const useDocumentStore = defineStore('document', () => {
     updated_at.value = null
   }
 
+  /** 把浏览器存储异常转成用户能理解、且不会泄漏草稿内容的提示。 */
+  function localPersistFailure(target: '内容' | '元数据', error: unknown): string {
+    const name =
+      typeof DOMException !== 'undefined' && error instanceof DOMException
+        ? error.name
+        : ''
+    const quota = name === 'QuotaExceededError' || name === 'NS_ERROR_DOM_QUOTA_REACHED'
+    return quota
+      ? `本地${target}保存失败：浏览器存储空间不足。云端状态不受影响，但关闭页面前请先导出或释放空间后重试。`
+      : `本地${target}保存失败：浏览器拒绝了存储写入。云端状态不受影响，请检查隐私设置并重试。`
+  }
+
   function persistLocalMeta(templateId?: string | null): boolean {
     try {
       const now = new Date().toISOString()
@@ -1958,8 +2466,10 @@ export const useDocumentStore = defineStore('document', () => {
         documentId: document_id.value,
       }
       localStorage.setItem(localMetaKey(templateId), JSON.stringify(meta))
+      localMetaPersistError.value = null
       return true
-    } catch {
+    } catch (error) {
+      localMetaPersistError.value = localPersistFailure('元数据', error)
       console.warn('[documentStore.persistLocalMeta] failed')
       return false
     }
@@ -1967,7 +2477,10 @@ export const useDocumentStore = defineStore('document', () => {
 
   function loadLocalMeta(templateId?: string | null): LocalDocMeta | null {
     try {
-      const raw = localStorage.getItem(localMetaKey(templateId))
+      let raw = localStorage.getItem(localMetaKey(templateId))
+      if (!raw && legacyDraftsUsable()) {
+        raw = localStorage.getItem(legacyMetaKey(templateId))
+      }
       if (!raw) return null
       return JSON.parse(raw) as LocalDocMeta
     } catch {
@@ -1978,15 +2491,19 @@ export const useDocumentStore = defineStore('document', () => {
 
   function setDocTitle(v: string) {
     doc_title.value = v
-    dirty.value = true
+    markDirty()
   }
 
   function setDocNotes(v: string) {
     doc_notes.value = v
-    dirty.value = true
+    markDirty()
   }
 
   function localStorageKey(templateId?: string | null): string {
+    return draftContentKey(currentUserScope(), activeCacheId(templateId))
+  }
+
+  function legacyContentKey(templateId?: string | null): string {
     const id =
       templateId ||
       activeTemplateId.value ||
@@ -1996,22 +2513,35 @@ export const useDocumentStore = defineStore('document', () => {
   }
 
   function persistLocal(templateId?: string | null): boolean {
-    if (!current_data.value) return false
-    try {
-      const key = localStorageKey(templateId)
-      localStorage.setItem(key, JSON.stringify(current_data.value))
-      persistLocalMeta(templateId)
-      return true
-    } catch {
-      console.warn('[documentStore.persistLocal] failed')
+    if (!current_data.value) {
+      localContentPersistError.value = '本地内容保存失败：当前没有可写入的画布内容。'
       return false
     }
+
+    let contentSaved = false
+    try {
+      const key = localStorageKey(templateId)
+      // 快照序列化也放在 try 内：循环引用等序列化异常和配额异常一样不能静默吞掉。
+      localStorage.setItem(key, JSON.stringify(current_data.value))
+      localContentPersistError.value = null
+      contentSaved = true
+    } catch (error) {
+      localContentPersistError.value = localPersistFailure('内容', error)
+      console.warn('[documentStore.persistLocal] failed')
+    }
+
+    // 即使内容写入失败也继续尝试元数据，避免一个失败掩盖另一个失败；
+    // 内容和元数据分别记录错误，后续单独写元数据成功也不会误清内容错误。
+    const metaSaved = persistLocalMeta(templateId)
+    return contentSaved && metaSaved
   }
 
   function loadLocal(templateId?: string | null): CanvasDocumentJSON | null {
     try {
-      const key = localStorageKey(templateId)
-      const raw = localStorage.getItem(key)
+      let raw = localStorage.getItem(localStorageKey(templateId))
+      if (!raw && legacyDraftsUsable()) {
+        raw = localStorage.getItem(legacyContentKey(templateId))
+      }
       if (!raw) return null
       return JSON.parse(raw) as CanvasDocumentJSON
     } catch {
@@ -2045,9 +2575,26 @@ export const useDocumentStore = defineStore('document', () => {
     loading.value = true
     try {
       const doc = await documentsApi.getDocument(id)
+      loaded_canvas_type.value = doc.canvasType
+      loaded_project_id.value = doc.projectId ?? null
+      if (doc.canvasType === NODE_GRAPH_TYPE) {
+        // 节点画布由节点画布视图渲染。这里必须停手：
+        // 继续往下走会把节点数据当成模板数据，塞进模板草稿里。
+        return
+      }
       current_data.value = normalizeLoadedDoc(doc.currentData)
       document_id.value = doc.id
       head_revision_id.value = doc.headRevisionId
+      // 换了文档：递增代次，让迟到的旧保存响应自动作废。
+      docEpoch += 1
+      save_version.value = doc.saveVersion ?? 0
+      if (
+        remoteSaveNotice.value?.documentId === doc.id &&
+        remoteSaveNotice.value.saveVersion <= save_version.value
+      ) {
+        // 云端响应已经覆盖或超过广播里的版本，预警不再需要显示。
+        remoteSaveNotice.value = null
+      }
       if (doc.templateId && isTemplateId(doc.templateId)) {
         activeTemplateId.value = doc.templateId
       }
@@ -2059,6 +2606,8 @@ export const useDocumentStore = defineStore('document', () => {
       })
       dirty.value = false
       persistLocal(activeTemplateId.value)
+      // 这条模板级草稿已经被云端文档取代，留着会让下次启动误判有本地更新。
+      clearTemplateDraft(activeTemplateId.value)
       hydrateConflict(doc.id)
       rememberRecentOpen({
         id: doc.id,
@@ -2106,6 +2655,8 @@ export const useDocumentStore = defineStore('document', () => {
       current_data.value = normalizeLoadedDoc(doc.currentData)
       document_id.value = doc.id
       head_revision_id.value = doc.headRevisionId
+      docEpoch += 1
+      save_version.value = doc.saveVersion ?? 0
       activeTemplateId.value = tid
       applyMeta({
         title: doc.title,
@@ -2115,6 +2666,7 @@ export const useDocumentStore = defineStore('document', () => {
       })
       dirty.value = false
       persistLocal(tid)
+      clearTemplateDraft(tid)
       return doc.id
     } finally {
       saving.value = false
@@ -2124,7 +2676,7 @@ export const useDocumentStore = defineStore('document', () => {
   /**
    * Clone the current server document.
    *
-   * The server inserts a new canvas_documents row (new UUID) whose current_data
+   * The server inserts a new kb_documents row (new UUID) whose current_data
    * is a deep copy of the source, including attachments / panel materials.
    * The clone is then loaded into the editor and its id returned.
    */
@@ -2143,6 +2695,8 @@ export const useDocumentStore = defineStore('document', () => {
       current_data.value = normalizeLoadedDoc(doc.currentData)
       document_id.value = doc.id
       head_revision_id.value = doc.headRevisionId
+      docEpoch += 1
+      save_version.value = doc.saveVersion ?? 0
       if (doc.templateId && isTemplateId(doc.templateId)) {
         activeTemplateId.value = doc.templateId
       }
@@ -2154,6 +2708,7 @@ export const useDocumentStore = defineStore('document', () => {
       })
       dirty.value = false
       persistLocal(activeTemplateId.value)
+      clearTemplateDraft(activeTemplateId.value)
       return doc.id
     } finally {
       saving.value = false
@@ -2168,6 +2723,44 @@ export const useDocumentStore = defineStore('document', () => {
     return createOnServer({ templateId: activeTemplateId.value })
   }
 
+  /**
+   * 结果未知的更新操作。网络超时/断网后，只要文档代次、编辑序号和锁版本没变，
+   * 下一次保存就复用 operationId，让服务端把重试识别为同一次写入。
+   */
+  type PendingUpdateOperation = {
+    operationId: string
+    documentId: string
+    epoch: number
+    editSeq: number
+    expectedSaveVersion?: number
+    checkpoint: boolean
+  }
+  let pendingUpdateOperation: PendingUpdateOperation | null = null
+
+  function newOperationId(): string {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID()
+    }
+    return `save_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
+  }
+
+  function clearPendingOperation(operationId: string): void {
+    if (pendingUpdateOperation?.operationId === operationId) pendingUpdateOperation = null
+  }
+
+  /** 409 与跨标签页预警共用同一套“保留草稿、载入云端”流程，避免行为分叉。 */
+  async function handleSaveConflict(id: string): Promise<never> {
+    // 冲突发生时保留响应当下的最新本地修改，包含请求飞行期间继续输入的内容。
+    const draft = current_data.value ? cloneDoc(current_data.value) : null
+    try {
+      await load(id)
+    } catch {
+      throw new Error('保存冲突，但拉取云端版本失败。本地修改还在，请稍后重试。')
+    }
+    if (draft) rememberConflict(id, draft)
+    throw new Error('内容已在其他地方更新，已载入云端版本。')
+  }
+
   /** Save current_data to API (falls back to localStorage when logged out). */
   async function save(opts?: {
     expected_head_revision_id?: string | null
@@ -2178,15 +2771,23 @@ export const useDocumentStore = defineStore('document', () => {
     if (!current_data.value) return
     if (opts?.title != null) doc_title.value = opts.title
     if (opts?.notes != null) doc_notes.value = opts.notes
-    persistLocal(activeTemplateId.value)
+    const localSaved = persistLocal(activeTemplateId.value)
 
     if (!getToken()) {
-      dirty.value = false
+      // 游客模式没有云端副本，只有内容与元数据都写入成功才能宣称草稿已保存。
+      // 失败时保留 dirty，并由 localPersistError 单独驱动可见告警和卸载提醒。
+      if (localSaved) dirty.value = false
       return
     }
 
     const effectiveTitle = (opts?.title != null ? opts.title : doc_title.value).trim()
     const effectiveNotes = opts?.notes != null ? opts.notes : doc_notes.value
+    // 云端请求使用固定快照，不能把仍在响应式变化的 current_data 引用交给自动重试。
+    const dataAtStart = cloneDoc(current_data.value)
+    // 记下请求发出时的编辑序号和文档代次：
+    // 响应回来时如果用户又改了内容，或者已经切到另一篇文档，就不能清 dirty。
+    const seqAtStart = editSeq.value
+    const epochAtStart = docEpoch
 
     saving.value = true
     try {
@@ -2202,38 +2803,106 @@ export const useDocumentStore = defineStore('document', () => {
         })
         return
       }
+
       const expected =
         opts?.expected_head_revision_id !== undefined
           ? opts.expected_head_revision_id
           : head_revision_id.value
+      const expectedSaveVersion = save_version.value || undefined
+      const checkpoint = opts?.checkpoint ?? false
+      const reusable = pendingUpdateOperation
+      const operationId =
+        reusable &&
+        reusable.documentId === id &&
+        reusable.epoch === epochAtStart &&
+        reusable.editSeq === seqAtStart &&
+        reusable.expectedSaveVersion === expectedSaveVersion &&
+        reusable.checkpoint === checkpoint
+          ? reusable.operationId
+          : newOperationId()
+      pendingUpdateOperation = {
+        operationId,
+        documentId: id,
+        epoch: epochAtStart,
+        editSeq: seqAtStart,
+        expectedSaveVersion,
+        checkpoint,
+      }
+
       try {
-        const doc = await documentsApi.updateDocument(id, {
-          title: effectiveTitle || undefined,
-          notes: effectiveNotes,
-          currentData: current_data.value,
-          expectedHeadRevisionId: expected,
-          checkpoint: opts?.checkpoint ?? false,
+        const doc = await documentTabs.withDocumentWriteLock(id, async () => {
+          // 等锁期间切到别的文档时不再发送旧请求；返回 null 让外层按迟到结果丢弃。
+          if (epochAtStart !== docEpoch) return null
+          const remote = remoteSaveNotice.value
+          if (
+            remote &&
+            remote.documentId === id &&
+            remote.saveVersion > (expectedSaveVersion ?? 0)
+          ) {
+            // 已经明确知道另一标签页推进了版本，不必再拿旧草稿发一次必然冲突的 PUT。
+            clearPendingOperation(operationId)
+            return handleSaveConflict(id)
+          }
+          return documentsApi.updateDocument(id, {
+            title: effectiveTitle || undefined,
+            notes: effectiveNotes,
+            currentData: dataAtStart,
+            expectedHeadRevisionId: expected,
+            expectedSaveVersion,
+            checkpoint,
+            operationId,
+          })
         })
+        // 迟到的响应：期间已经打开了别的文档，这次结果必须整体丢弃。
+        if (!doc || epochAtStart !== docEpoch) return
+        clearPendingOperation(operationId)
         document_id.value = doc.id
         head_revision_id.value = doc.headRevisionId
+        save_version.value = doc.saveVersion ?? save_version.value
         applyMeta({
           title: doc.title,
           notes: doc.notes ?? '',
           createdAt: doc.createdAt,
           updatedAt: doc.updatedAt,
         })
-        persistLocalMeta(activeTemplateId.value)
-        dirty.value = false
+        if (
+          remoteSaveNotice.value?.documentId === doc.id &&
+          remoteSaveNotice.value.saveVersion <= save_version.value
+        ) {
+          remoteSaveNotice.value = null
+        }
+        if (editSeq.value === seqAtStart) {
+          // 云端已成功，所以即使本地缓存再次失败也可清 dirty；
+          // localPersistError 会独立保留并提示，不会被这次成功掩盖。
+          dirty.value = false
+          persistLocal(activeTemplateId.value)
+        } else {
+          // 请求飞行期间用户继续编辑了。内容还没进云端，
+          // 必须保持 dirty 并把最新版本重新写进本地草稿。
+          dirty.value = true
+          persistLocal(activeTemplateId.value)
+        }
+        documentTabs.publishSaved(doc.id, save_version.value, doc.updatedAt)
       } catch (e) {
+        if (e instanceof ApiError) {
+          // 收到明确 HTTP 响应后结束这次幂等意图；只有网络结果未知才保留待确认 id。
+          clearPendingOperation(operationId)
+        }
         if (e instanceof ApiError && e.status === 409) {
-          const draft = current_data.value ? cloneDoc(current_data.value) : null
-          try {
-            await load(id)
-          } catch {
-            throw new Error('保存冲突，但拉取云端版本失败。本地修改还在，请稍后重试。')
-          }
-          if (draft) rememberConflict(id, draft)
-          throw new Error('内容已在其他地方更新，已载入云端版本。')
+          await handleSaveConflict(id)
+        }
+        if (e instanceof ApiError && e.status === 404) {
+          // 记住的文档已经不在当前账号名下（换号、归属调整、旧种子数据）：
+          // 丢掉旧 id，按当前内容新建一份属于自己的副本，别把 404 直接甩给用户。
+          document_id.value = null
+          head_revision_id.value = null
+          save_version.value = 0
+          await createOnServer({
+            templateId: activeTemplateId.value || undefined,
+            title: effectiveTitle,
+            notes: effectiveNotes,
+          })
+          return
         }
         throw e
       }
@@ -2251,14 +2920,18 @@ export const useDocumentStore = defineStore('document', () => {
     // flush latest content first
     await save({ checkpoint: false })
     saving.value = true
+    const seqAtStart = editSeq.value
     try {
       const res = await documentsApi.createRevision(document_id.value, {
         expectedHeadRevisionId: head_revision_id.value,
+        expectedSaveVersion: save_version.value || undefined,
         label: label || 'manual-snapshot',
       })
       document_id.value = res.document.id
       head_revision_id.value = res.document.headRevisionId
-      dirty.value = false
+      save_version.value = res.document.saveVersion ?? save_version.value
+      if (editSeq.value === seqAtStart) dirty.value = false
+      else persistLocal(activeTemplateId.value)
     } catch (e) {
       if (e instanceof ApiError && e.status === 409 && document_id.value) {
         await load(document_id.value)
@@ -2277,6 +2950,7 @@ export const useDocumentStore = defineStore('document', () => {
       const doc = await documentsApi.restoreDocument(document_id.value, {
         revisionId,
         expectedHeadRevisionId: head_revision_id.value,
+        expectedSaveVersion: save_version.value || undefined,
       })
       await load(doc.id)
       dirty.value = false
@@ -2298,7 +2972,7 @@ export const useDocumentStore = defineStore('document', () => {
       throw new Error('没有可恢复的本地修改')
     }
     current_data.value = cloneDoc(draft)
-    dirty.value = true
+    markDirty()
     try {
       await save()
       discardConflict()
@@ -2322,6 +2996,8 @@ export const useDocumentStore = defineStore('document', () => {
   }
 
   function markDirty() {
+    // 序号先 +1 再置 dirty：保存方靠它判断“响应回来时是否又有新编辑”。
+    editSeq.value += 1
     dirty.value = true
   }
 
@@ -2335,7 +3011,64 @@ export const useDocumentStore = defineStore('document', () => {
 
   function setCurrentData(data: CanvasDocumentJSON) {
     current_data.value = normalizeLoadedDoc(data)
-    dirty.value = true
+    // 与 markDirty 的其他入口保持一致：外部整篇替换也必须使旧保存快照失效。
+    markDirty()
+  }
+
+  /**
+   * 整篇替换当前编辑上下文（节点画布的「双击编辑」弹窗在用）。
+   *
+   * 与 load/loadFromTemplate 不同：不读后端、不读写本地草稿、不留加载痕迹，
+   * 只是把调用方持有的文档快照挂进 store 供 CanvasViewport 编辑；
+   * 调用方负责在关闭弹窗时用 restoreDocContext 把原状态换回来。
+   * 换文档一律递增代次，弹窗期间飞行的旧保存响应会被自动作废。
+   */
+  function mountDocContext(ctx: {
+    data: AnyCanvasDocumentJSON
+    documentId: string | null
+    templateId?: TemplateId | string | null
+    title?: string
+    headRevisionId?: string | null
+    saveVersion?: number
+  }) {
+    docEpoch += 1
+    remoteSaveNotice.value = null
+    activeTemplateId.value = (ctx.templateId as TemplateId | null) || null
+    current_data.value = normalizeLoadedDoc(ctx.data as CanvasDocumentJSON, ctx.templateId)
+    document_id.value = ctx.documentId
+    head_revision_id.value = ctx.headRevisionId ?? null
+    save_version.value = ctx.saveVersion ?? 0
+    if (ctx.title != null) doc_title.value = ctx.title
+    editSeq.value = 0
+    dirty.value = false
+  }
+
+  /**
+   * 把 mountDocContext 之前的状态换回来（弹窗关闭时调用）。
+   *
+   * 快照由调用方在挂载前自行保存；这里只负责原样落回，
+   * 不触发 normalize（快照里的 data 已经是挂载前的最终形态）、不写本地草稿。
+   */
+  function restoreDocContext(ctx: {
+    data: AnyCanvasDocumentJSON | null
+    documentId: string | null
+    templateId: TemplateId | null
+    title: string
+    headRevisionId: string | null
+    saveVersion: number
+    editSeq: number
+    dirty: boolean
+  }) {
+    docEpoch += 1
+    remoteSaveNotice.value = null
+    current_data.value = ctx.data as CanvasDocumentJSON | null
+    document_id.value = ctx.documentId
+    activeTemplateId.value = ctx.templateId
+    doc_title.value = ctx.title
+    head_revision_id.value = ctx.headRevisionId
+    save_version.value = ctx.saveVersion
+    editSeq.value = ctx.editSeq
+    dirty.value = ctx.dirty
   }
 
   function addItem(
@@ -2493,7 +3226,7 @@ export const useDocumentStore = defineStore('document', () => {
 
   /**
    * 内容主题词，写在 block.keyword 上（current_data，不另建表）。
-   * 人类-AI 双三角、五步法，以及 SWOT / 精益画布 / 价值主张画布共用。
+   * 人类-AI 双三角、五步法、商业模式画布、PESTLE / 安索夫 / 同理心 / 4P，以及 SWOT / 精益画布 / 价值主张画布共用。
    */
   function updateBlockKeyword(blockId: string, keyword: string): boolean {
     const doc = current_data.value
@@ -2501,16 +3234,31 @@ export const useDocumentStore = defineStore('document', () => {
       !doc ||
       (!isDualTriangleDoc(doc) &&
         !isFiveStepFamilyDoc(doc) &&
+        !isBusinessModelCanvasDoc(doc) &&
         !isSwotDoc(doc) &&
         !isLeanCanvasDoc(doc) &&
         !isValuePropositionDoc(doc) &&
         !isStakeholderDoc(doc) &&
         !isPdcaDoc(doc) &&
         !isFiveForcesDoc(doc) &&
+        !isPestleDoc(doc) &&
+        !isAnsoffDoc(doc) &&
+        !isEmpathyDoc(doc) &&
+        !isMarketingMixDoc(doc) &&
         !isBcgDoc(doc) &&
         !isScorecardDoc(doc) &&
         !isErrcDoc(doc) &&
-        !isAarrDoc(doc))
+        !isAarrDoc(doc) &&
+        !isValueChainDoc(doc) &&
+        !isSevenSDoc(doc) &&
+        !isJourneyDoc(doc) &&
+        !isKanoDoc(doc) &&
+        !isMoscowDoc(doc) &&
+        !isImpactEffortDoc(doc) &&
+        !isVrioDoc(doc) &&
+        !isGoldenCircleDoc(doc) &&
+        !isSoarDoc(doc) &&
+        !isPlayingToWinDoc(doc))
     ) {
       return false
     }
@@ -3953,11 +4701,17 @@ export const useDocumentStore = defineStore('document', () => {
   return {
     current_data,
     dirty,
+    editSeq,
+    save_version,
     head_revision_id,
     document_id,
+    loaded_canvas_type,
+    loaded_project_id,
     activeTemplateId,
     loading,
     saving,
+    localPersistError,
+    remoteSaveNotice,
     conflict,
     discardConflict,
     restoreConflictDraft,
@@ -4006,6 +4760,8 @@ export const useDocumentStore = defineStore('document', () => {
     loadLocalMeta,
     setDocTitle,
     setDocNotes,
+    mountDocContext,
+    restoreDocContext,
     exportJson,
     markDirty,
     mutateCanvas,

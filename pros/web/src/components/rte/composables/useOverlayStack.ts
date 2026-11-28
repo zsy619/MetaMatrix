@@ -6,6 +6,7 @@ import { RTE_OVERLAY_CLOSE_ORDER, topOpenModal } from '../../../utils/rteRound8'
 export function useOverlayStack(deps: {
   askOpen: () => { value: boolean }
   linkImportOpen: () => { value: boolean }
+  markdownImportOpen: () => { value: boolean }
   imageDialogOpen: () => { value: boolean }
   videoDialogOpen: () => { value: boolean }
   audioDialogOpen: () => { value: boolean }
@@ -30,6 +31,7 @@ export function useOverlayStack(deps: {
   historyOpen: () => { value: boolean }
   closeAskDialog: (reason: 'cancel' | 'ok') => void
   closeImportLinkDialog: () => void
+  closeMarkdownImport: () => void
   closeImageDialog: () => void
   closeVideoDialog: () => void
   closeAudioDialog: () => void
@@ -49,6 +51,7 @@ function closeTopOverlay(): boolean {
     {
       ask: deps.askOpen().value,
       linkImport: deps.linkImportOpen().value,
+      markdownImport: deps.markdownImportOpen().value,
       image: deps.imageDialogOpen().value,
       video: deps.videoDialogOpen().value,
       audio: deps.audioDialogOpen().value,
@@ -81,6 +84,9 @@ function closeTopOverlay(): boolean {
       break
     case 'linkImport':
       deps.closeImportLinkDialog()
+      break
+    case 'markdownImport':
+      deps.closeMarkdownImport()
       break
     case 'image':
       deps.closeImageDialog()

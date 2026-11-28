@@ -41,6 +41,9 @@ $RECYCLE.BIN/
 !.vscode/extensions.json
 !.vscode/settings.json
 *.code-workspace
+.github
+.omc
+.trae
 
 # JetBrains（GoLand / WebStorm / IntelliJ）
 .idea/
@@ -118,6 +121,10 @@ coverage.html
 # 构建 / 临时目录
 bin/
 tmp/
+# 验收截图等本地产物
+.screenshots/
+# pros/build.sh 的统一产物目录（api 多平台二进制 + web 静态资源）
+/pros/output/
 build/
 
 # ---------- 日志 ----------
@@ -137,3 +144,11 @@ pgdata/
 *.orig
 *.rej
 pros/api/data
+
+# ---------- 发布产物（output/） ----------
+# 仓库根的发布打包目录，由 scripts/build-release.sh 生成，不入库
+/output/
+
+# ---------- Python 缓存（schema 同步脚本） ----------
+__pycache__/
+*.pyc

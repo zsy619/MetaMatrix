@@ -30,7 +30,7 @@ import {
   isFormNodeName,
   type FormNodeName,
 } from '../extensions/forms'
-import { toolbarIconMap, IconTableRows, IconTableCols } from './rteToolbarIcons'
+import { toolbarIconMap, chartGroupIcon, IconTableRows, IconTableCols } from './rteToolbarIcons'
 import { NARROW_LAYOUT_MEDIA_QUERY, resolveToolbarLayout } from '../utils/rteNarrowLayout'
 import { RTE_CODE_LANGUAGES } from '../extensions/codeHighlight'
 import 'highlight.js/styles/github.css'
@@ -47,6 +47,7 @@ import {
   type RteSlashItem,
 } from './rteSlashItems'
 import { mentionSectionLabel } from './rteMentionItems'
+import { ensureBase, listTables, listViews } from '../modules/base/api'
 import {
   FEISHU_BATCH3_SHORTCUTS,
 } from '../utils/rteBatch3'
@@ -56,8 +57,18 @@ import {
 } from '../utils/rtePasteClean'
 import { todayIso } from '../utils/rteRound5'
 import { RTE_PAGE_SIZES } from '../utils/rtePageSize'
+import { applyAutoRuby } from '../utils/rteRuby'
+import { loadPinyin } from '../utils/pinyinRuntime'
+import { tianziCharKey } from '../extensions/rteTianziGrid'
+import {
+  WRITING_PAPERS,
+  readWritingPaper,
+  writeWritingPaper,
+  type WritingPaperId,
+} from '../utils/rteWritingPaper'
 import { PAGE_MARGIN_PRESETS } from '../utils/rtePageMargin'
 import { focusDialogRoot, rememberDialogReturnFocus, restoreDialogReturnFocus } from '../utils/rteRound8'
+import { normalizeLinkHref } from '../utils/rteLinkHref'
 import {
   embedIframeSrc,
 } from '../utils/rteRound6'
@@ -70,6 +81,9 @@ import {
   togglePreviewMode,
 } from '../utils/rteRound7'
 import { type CalloutVariant } from '../extensions/callout'
+import { markdownInlineEnabled, setMarkdownInlineEnabled } from '../extensions/rteInlineMarkdown'
+import { useRteScrollMemory } from './rte/composables/useRteScrollMemory'
+import { MERMAID_TEMPLATES, mermaidTemplate } from '../extensions/mermaidFlow'
 import {
   BLOCK_MENU,
   blockMenuButtonLabel,
@@ -78,7 +92,17 @@ import {
   visibleBlockMenuItems,
   type BlockMenuState,
 } from './rte/rteBlockMenu'
-import { pushRecentColor, themeColorLabel } from './rte/rteColorPalette'
+import {
+  colorsEqual,
+  highlightColorLabel,
+  isLightHighlight,
+  pushRecentColor,
+  textColorLabel,
+  WORD_HIGHLIGHT_SOFT,
+  WORD_HIGHLIGHT_VIVID,
+  WORD_STANDARD_COLOR_ITEMS,
+  WORD_THEME_FLAT,
+} from './rte/rteColorPalette'
 import {
   EMPTY_WATERMARK,
   readWatermark,
@@ -104,7 +128,7 @@ import {
   type AuditEvent,
 } from '../utils/rteAudit'
 import { INLINE_AI_MODES, inlineAiLabel, rewriteWithContext, type InlineAiMode } from '../utils/rteInlineAi'
-import { orderedListContinuation } from '../utils/rteListContinue'
+import { orderedListContinuation, retargetList } from '../utils/rteListContinue'
 import { planListRenumber } from '../utils/rteListRenumber'
 import {
   FIRST_LINE_INDENT,
@@ -114,6 +138,12 @@ import {
 } from '../utils/rtePracticalToolbar'
 import { QUOTE_STYLE_OPTIONS, type QuoteStyle } from '../extensions/rteBlockquote'
 import { collectCrossRefTargets } from '../extensions/crossRef'
+import { deepOptimizeDocument, type OptimizeAction, type OptimizeReportLine } from '../utils/rteDeepOptimize'
+import { cascadeHeadingAt, moveHeadingAt } from '../utils/rteHeadingSection'
+import { syncPrintTableHeads } from '../utils/rtePrintTableHead'
+import { printPageSideCss } from '../utils/rtePageChrome'
+import { setGroupLayout } from '../extensions/imageGroupOps'
+import { continueOrderedList, promoteTableHeader } from '../utils/rteOptimizeActions'
 import {
   applyParagraphStyle,
   PARA_STYLE_OPTIONS,
@@ -143,14 +173,18 @@ import {
   RTE_ZOOM_PRESETS,
   type CaseMode,
 } from './rteWave20'
-import { TEXT_MENU_ITEMS } from '../utils/rteTextTidy'
+import { matchingFootnote } from '../extensions/footnote'
+import { TEXT_MENU_ITEMS, TEXT_TIDY_ACTIONS } from '../utils/rteTextTidy'
 import { applyTextTidy } from '../utils/rteTextPlay'
-import { countWords, normalizeHtml, toEditorContent } from '../utils/rteContent'
+import { countWordParts, countWords, normalizeHtml, toEditorContent } from '../utils/rteContent'
 import { getToken } from '../api/http'
 import { uploadMediaFile } from '../api/mediaUpload'
-import { attachmentInsertHref } from '../utils/rteAttachment'
+import { attachmentInsertHref, rteAttachmentUploadReject } from '../utils/rteAttachment'
+import { imageReplaceSrc } from '../utils/rteImageCrop'
+import { imageDisplayWidthPatch } from '../utils/rteImageLayout'
 import { htmlWithSuggestionsAccepted } from '../utils/rteSuggestions'
 import { buildExportHtmlWithCharts } from '../utils/rteExportChartSnapshots'
+import { rewritePrintMediaSrc } from '../utils/rtePrintMedia'
 import { useCommentThreads } from './rte/composables/useCommentThreads'
 import { useSuggestionMode } from './rte/composables/useSuggestionMode'
 import { RTE_CTX, type RteEditorEmit, type RteEditorProps } from './rte/context'
@@ -179,6 +213,7 @@ import {
   bumpToolbarUndoEpoch,
   COMPACT_PRIMARY_KEY_SET,
 } from '../utils/rteToolbarGroups'
+import { fontSizeCaption, pushRecentValue, recentOptions, zoomToolTitle } from '../utils/rteToolbarOptimize'
 import { useFindReplace } from './rte/composables/useFindReplace'
 import { useExport } from './rte/composables/useExport'
 import { useImport } from './rte/composables/useImport'
@@ -200,6 +235,7 @@ import { useImageTools } from './rte/composables/useImageTools'
 import { useDocChrome } from './rte/composables/useDocChrome'
 import { useRteExtensions } from './rte/composables/useRteExtensions'
 import { useDirectoryPeople } from './rte/composables/useDirectoryPeople'
+import { useKnowledgeDocs } from './rte/composables/useKnowledgeDocs'
 import { useCrossDoc } from './rte/composables/useCrossDoc'
 import type { DirectoryPermission } from '../utils/rteDirectory'
 import { RTE_EMOJI_CATEGORIES } from '../utils/rteEmojiList'
@@ -225,6 +261,7 @@ import {
 } from '../extensions/echartsBlock'
 import { useChartPanelBridge } from './rte/chart-panel/useChartPanelBridge'
 import ChartPanel from './rte/chart-panel/ChartPanel.vue'
+import ColumnsPanel from './rte/ColumnsPanel.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -243,12 +280,30 @@ const props = withDefaults(
     showMarkdownHint?: boolean
     /** 与最大化 key / 相关资料 panelId 对齐，页面大小写入画布 JSON。 */
     panelId?: string
+    /** 知识库项目 id：提供后 @ 菜单可 @ 当前项目知识库里的文档。 */
+    knowledgeProjectId?: string
+    /**
+     * 正文协同用的 Y.Doc。传入后走 @tiptap/extension-collaboration，
+     * 从第一天携带 A1 的 data-block-id。不传时保持单人编辑与原保存路径。
+     */
+    collabDocument?: import('yjs').Doc | null
+    /** 协同光标用的 awareness provider（Y.Doc 已接同一条 Hertz 通道）。 */
+    collabProvider?: { awareness: unknown } | null
+    /** 本地协作者名称与配色；用于 CollaborationCaret，不会在本地再画自己的光标。 */
+    collabUser?: { name: string; color: string } | null
+    /** 为 false 时编辑器不可写（协同浏览者进房后强制只读）。默认 true。 */
+    editable?: boolean
     /**
      * 是否按「纸张」排版（默认 true，A4 + 窄边距）。
      * 画布里嵌入的紧凑区块传 false：正文按内容流式排版，不再撑出 A4 纸张高度，
      * 也不会把页面大小写回文档。最大化/独立文档仍走默认的纸张视图。
      */
     pageSheet?: boolean
+    /**
+     * 阅读位置记忆的作用域（如 doc:xxx）。
+     * 传了才会记住滚动位置并在下次打开时回到原处；不传（画布内嵌面板等）不记忆。
+     */
+    scrollMemoryKey?: string
   }>(),
   {
     title: '',
@@ -260,7 +315,10 @@ const props = withDefaults(
     showPublishActions: false,
     showMarkdownHint: true,
     panelId: '',
+    knowledgeProjectId: '',
     pageSheet: true,
+    scrollMemoryKey: '',
+    editable: true,
   },
 )
 
@@ -273,6 +331,12 @@ const emit = defineEmits<{
 
 const localTitle = ref(props.title ?? '')
 const rteRootEl = ref<HTMLElement | null>(null)
+/**
+ * 阅读位置记忆：同一篇文档下次打开回到上次滚动的地方。
+ * 作用域由外部传入（doc:xxx），不传就不记忆。
+ */
+const scrollMemoryScope = computed(() => props.scrollMemoryKey || '')
+useRteScrollMemory({ rootEl: rteRootEl, scope: scrollMemoryScope })
 watch(
   () => props.title,
   (v) => {
@@ -294,6 +358,7 @@ const {
   closeTableCtx,
   openTableContextMenu,
   tableHeaderSticky,
+  tableColSticky,
   copyCurrentTable,
   promptTableRowFilter,
   reapplyTableFilter,
@@ -331,6 +396,9 @@ const {
   tableAddColBefore,
   tableAddColAfter,
   tableOpItems,
+  tableInsertCounts,
+  normalizeTableInsertCount,
+  rememberTableInsertSelection,
   onTableToolClick,
   onTableToolbarButtonClick,
 } = useTableOps({
@@ -410,6 +478,34 @@ const directoryPeople = useDirectoryPeople({
   editor: () => editor,
   permission: () => mentionPermission.value,
 })
+const knowledgeDocs = useKnowledgeDocs(() => props.knowledgeProjectId)
+
+/**
+ * 多维表格节点 → 文档内嵌 Base 视图块的引用参数。
+ * ensureBase 会复用已有 Base（同一知识库节点），不会重复建表。
+ */
+async function resolveBaseEmbed(nodeId: string) {
+  const pid = props.knowledgeProjectId
+  if (!pid || !nodeId) return null
+  try {
+    const base = await ensureBase(pid, nodeId)
+    const tables = await listTables(pid, base.id)
+    const table = tables[0]
+    if (!table) return null
+    const views = await listViews(pid, table.id)
+    const view = views.find((item) => item.isDefault) ?? views[0]
+    return {
+      projectId: pid,
+      baseId: base.id,
+      tableId: table.id,
+      viewId: view?.id ?? '',
+      nodeId,
+      title: table.name,
+    }
+  } catch {
+    return null
+  }
+}
 
 /** —— 大纲右键菜单 —— */
 const outlineMenuOpen = ref(false)
@@ -451,6 +547,24 @@ function outlineMenuJump() {
   const item = outlineMenuItem()
   closeOutlineMenu()
   if (item) jumpToOutlineHeading(item)
+}
+
+function outlineMenuCascade(delta: 1 | -1) {
+  const item = outlineMenuItem()
+  closeOutlineMenu()
+  const ed = editor.value
+  if (!item || !ed) return
+  if (!cascadeHeadingAt(ed, item.pos, delta)) ElMessage.info('这一级不能再调')
+}
+
+function outlineMenuMove(dir: -1 | 1) {
+  const item = outlineMenuItem()
+  closeOutlineMenu()
+  const ed = editor.value
+  if (!item || !ed) return
+  if (!moveHeadingAt(ed, item.pos, dir)) {
+    ElMessage.info(dir < 0 ? '这一节已经在最上面' : '这一节已经在最下面')
+  }
 }
 
 async function outlineMenuCopyTitle() {
@@ -552,7 +666,19 @@ function resetMentionPermission() {
 
 /** 粘贴为纯文本（工具栏开关；影响后续粘贴） */
 type PasteFormatMode = 'keep' | 'plain' | 'markdown'
-const pasteFormatMode = ref<PasteFormatMode>('keep')
+const PASTE_FORMAT_KEY = 'rte-paste-format'
+function readPasteFormat(): PasteFormatMode {
+  try {
+    const saved = localStorage.getItem(PASTE_FORMAT_KEY)
+    if (saved === 'plain' || saved === 'markdown' || saved === 'keep') return saved
+  } catch {
+    /* 隐私模式 */
+  }
+  return 'keep'
+}
+const pasteFormatMode = ref<PasteFormatMode>(readPasteFormat())
+const taskOpenOnly = ref(false)
+const printLinkUrls = ref(false)
 const pastePlainTextMode = computed(() => pasteFormatMode.value === 'plain')
 /** 浏览器拼写检查（默认关；可工具栏开启） */
 const spellcheckEnabled = ref(false)
@@ -621,12 +747,20 @@ const editorZoom = ref(1)
 const focusMode = ref(false)
 const darkEditor = ref(false)
 const paperGuide = ref(false)
+const writingPaper = ref<WritingPaperId>(readWritingPaper(props.panelId))
+
+function setWritingPaper(id: string) {
+  const next = WRITING_PAPERS.some((item) => item.id === id) ? (id as WritingPaperId) : ''
+  writingPaper.value = next
+  writeWritingPaper(props.panelId, next)
+}
 let applyingViewPref = false
 
 function applyStoredViewPref(panelId: string | undefined) {
   applyingViewPref = true
   const pref = readRteViewPref(typeof localStorage === 'undefined' ? null : localStorage, panelId)
   tableHeaderSticky.value = pref.sticky
+  tableColSticky.value = pref.stickyCol
   darkEditor.value = pref.dark
   editorZoom.value = pref.zoom
   applyingViewPref = false
@@ -634,10 +768,11 @@ function applyStoredViewPref(panelId: string | undefined) {
 
 watch(() => props.panelId, (id) => applyStoredViewPref(id), { immediate: true })
 
-watch([tableHeaderSticky, darkEditor, editorZoom], () => {
+watch([tableHeaderSticky, tableColSticky, darkEditor, editorZoom], () => {
   if (applyingViewPref || !props.panelId) return
   writeRteViewPref(typeof localStorage === 'undefined' ? null : localStorage, props.panelId, {
     sticky: tableHeaderSticky.value,
+    stickyCol: tableColSticky.value,
     dark: darkEditor.value,
     zoom: editorZoom.value,
   })
@@ -655,7 +790,7 @@ const paraStyleOpen = ref(false)
 const listStyleOpen = ref(false)
 const wave21ReportOpen = ref(false)
 const wave21ReportTitle = ref('')
-const wave21ReportLines = ref<Array<{ text: string; pos?: number }>>([])
+const wave21ReportLines = ref<OptimizeReportLine[]>([])
 const snippetDialogOpen = ref(false)
 const snippetList = ref<RteSnippet[]>(loadSnippets())
 const snippetEditing = ref<RteSnippet | null>(null)
@@ -690,6 +825,7 @@ const formatPainter = ref<{
 } | null>(null)
 const formatPainterArmed = computed(() => !!formatPainter.value)
 let formatPainterSkipSelection = false
+let formatPainterClickTimer: ReturnType<typeof setTimeout> | null = null
 
 const emojiOpen = ref(false)
 const emojiTabId = ref(RTE_EMOJI_CATEGORIES[0]?.id ?? 'frequent')
@@ -752,8 +888,13 @@ const externalLinkRows = ref<Array<{ href: string; host: string }>>([])
 const {
   pageChromeActive,
   screenPageLabel,
+  screenHeader,
+  screenFooter,
   previewPageLabel,
   setPageHeader,
+  setPageHeaderEven,
+  setPageFooterEven,
+  setPageGutter,
   setPageFooter,
   setPageNumber,
   replacePageChrome,
@@ -789,6 +930,7 @@ const {
   pageScreenMargin,
   pageSheetStyle,
   printPreviewMarginStyle,
+  printPreviewPaperStyle,
   applyPrintPageStyle,
   undoPageMargin,
   setMarginPreset,
@@ -970,11 +1112,15 @@ function rteAuthor() {
 
 const {
   suggesting,
+  suggestionEnabled,
   suggestionAuthor,
   suggestionColor,
   toggleSuggesting,
   bumpSuggestions,
   suggestionRanges,
+  visibleSuggestionRanges,
+  suggestionAuthors,
+  suggestionAuthorFilter,
   activeSuggestionId,
   acceptAllSuggestions,
   rejectAllSuggestions,
@@ -1007,6 +1153,18 @@ const editor = useRteExtensions({
   undoPageSetup,
   redoPageSetup,
   applyFormatPainterIfNeeded,
+  cancelFormatPainter: () => {
+    const armed = !!formatPainter.value || !!formatPainterClickTimer
+    if (formatPainterClickTimer) {
+      clearTimeout(formatPainterClickTimer)
+      formatPainterClickTimer = null
+    }
+    if (formatPainter.value) {
+      formatPainter.value = null
+      ElMessage.info('已取消格式刷')
+    }
+    return armed
+  },
   initialEditorContent,
   insertFormula,
   looksLikeMarkdown,
@@ -1021,6 +1179,12 @@ const editor = useRteExtensions({
   },
   openPrintPreview,
   scheduleHtmlEmit,
+  syncLastEmittedHtml: (ed: { getHTML: () => string }) => {
+    lastEmittedHtmlNorm = normalizeHtml(ed.getHTML())
+  },
+  collabDocument: () => props.collabDocument ?? null,
+  collabProvider: () => props.collabProvider ?? null,
+  collabUser: () => props.collabUser ?? { name: '协作者', color: '#2563eb' },
   setHeading,
   syncSelectedFormFromEditor,
   toggleShortcutsPanel,
@@ -1084,12 +1248,32 @@ const editor = useRteExtensions({
     toggleOutlinePanel()
   },
   undoToolbarGroupOrder: () => undoToolbarGroupOrder(),
-  suggestingEnabled: () => suggesting.value,
+  suggestingEnabled: () => suggestionEnabled(),
   suggestionAuthor,
   bumpSuggestions: () => bumpSuggestions(),
   mentionPeople: () => directoryPeople.mentionPeople(),
+  mentionDocuments: () => knowledgeDocs.mentionDocuments(),
+  mentionBaseEmbed: (nodeId: string) => resolveBaseEmbed(nodeId),
   reapplyTableFilter: (ed, transaction, appended) => reapplyTableFilter(ed as never, transaction, appended),
 })
+
+watch(
+  [editor, () => props.editable],
+  () => {
+    const ed = editor.value
+    if (!ed) return
+    const next = props.editable !== false
+    if (ed.isEditable !== next) ed.setEditable(next)
+    if (!next && suggesting.value) suggesting.value = false
+  },
+  { immediate: true },
+)
+
+watch([writingPaper, editor], () => {
+  const ed = editor.value
+  if (!ed?.view) return
+  ed.view.dispatch(ed.state.tr.setMeta(tianziCharKey, writingPaper.value === 'tianzi'))
+}, { immediate: true })
 
 // 图表属性面板：选中图表块即弹出（侧栏）
 const chartPanelBridge = useChartPanelBridge(editor)
@@ -1097,10 +1281,12 @@ const chartPanelBridge = useChartPanelBridge(editor)
 const {
   commentsOpen,
   showResolved,
+  orphansOnly,
   draft: commentDraft,
   replyDrafts,
   activeThreadId,
   shownThreads,
+  orphanIds,
   unresolvedCount,
   beginComment,
   cancelDraft,
@@ -1108,6 +1294,7 @@ const {
   submitReply,
   toggleResolved,
   removeMessage,
+  reanchorThread,
   jumpToThread,
 } = useCommentThreads({
   editor: () => editor,
@@ -1355,7 +1542,15 @@ const charCount = computed(() => {
   return Array.from(text.replace(/\s/g, '')).length
 })
 
-const wordCount = computed(() => countWords(editor.value?.getText() ?? ''))
+const wordParts = computed(() => {
+  const parts = countWordParts(editor.value?.getText() ?? '')
+  let images = 0
+  editor.value?.state.doc.descendants((node) => {
+    if (node.type.name === 'image') images += 1
+  })
+  return { ...parts, images }
+})
+const wordCount = computed(() => wordParts.value.total)
 
 const selectionStats = computed(() => {
   void editor.value?.state.selection
@@ -1407,6 +1602,12 @@ function isActive(
   attrs?: Record<string, unknown>,
 ) {
   return editor.value?.isActive(nameOrAttrs as never, attrs) ?? false
+}
+
+function currentOrderedListStyle(): string {
+  const ed = editor.value
+  if (!ed?.isActive('orderedList')) return ''
+  return String(ed.getAttributes('orderedList').listStyleType || 'decimal')
 }
 
 function undo() {
@@ -1513,8 +1714,6 @@ function activateFormatPainter(sticky = false) {
   formatPainterSkipSelection = true
   ElMessage.success(sticky ? '格式刷已锁定（再点取消）' : '格式刷已启用：请选择目标文字')
 }
-
-let formatPainterClickTimer: ReturnType<typeof setTimeout> | null = null
 
 function toggleFormatPainter() {
   if (formatPainter.value) {
@@ -1694,7 +1893,7 @@ const SHORTCUT_GROUPS: { title: string; items: { keys: string; desc: string }[] 
       { keys: 'Ctrl/⌘ + Shift + E', desc: '代码块' },
       { keys: '/', desc: '斜杠命令，快速插入段落类型' },
       { keys: 'Tab / Shift + Tab', desc: '段落、引用与列表缩进；表格内切换单元格' },
-      { keys: 'Ctrl/⌘ + Enter', desc: '折叠块展开或收起' },
+      { keys: 'Ctrl/⌘ + Enter', desc: '打开光标处的链接；折叠块内展开或收起' },
       { keys: 'Ctrl/⌘ + Alt + \\', desc: '只读预览与编辑切换' },
       { keys: 'Ctrl/⌘ + /', desc: '打开快捷键说明' },
       ...FEISHU_BATCH3_SHORTCUTS,
@@ -1808,6 +2007,11 @@ function togglePastePlain() {
 const pasteFormatOpen = ref(false)
 function setPasteFormatMode(mode: PasteFormatMode) {
   pasteFormatMode.value = mode
+  try {
+    localStorage.setItem(PASTE_FORMAT_KEY, mode)
+  } catch {
+    /* 隐私模式 */
+  }
   const labels: Record<PasteFormatMode, string> = {
     keep: '保留原格式',
     plain: '粘贴为纯文本',
@@ -1821,6 +2025,18 @@ function cyclePasteFormatMode() {
   const order: PasteFormatMode[] = ['keep', 'plain', 'markdown']
   const i = order.indexOf(pasteFormatMode.value)
   setPasteFormatMode(order[(i + 1) % order.length]!)
+}
+
+/**
+ * 行内 Markdown 语法开关。
+ * 开启时输入 **粗体**、*斜体*、[文字](地址)、==高亮== 会直接转成富文本；
+ * 关闭后这些符号保持原样，适合需要写出字面符号的场景。
+ */
+function toggleMarkdownInline() {
+  const next = !markdownInlineEnabled.value
+  setMarkdownInlineEnabled(next)
+  ElMessage.success(next ? 'Markdown 行内语法：开' : 'Markdown 行内语法：关')
+  moreOpen.value = false
 }
 
 function syncSpellcheckToDom() {
@@ -1979,7 +2195,8 @@ function currentQuoteStyle(): QuoteStyle {
 function applyQuoteStyle(style: QuoteStyle) {
   const ed = editor.value
   if (!ed) return
-  ed.chain().focus().setQuoteStyle(style).run()
+  const next = ed.isActive('blockquote') ? ed.chain().focus() : ed.chain().focus().toggleBlockquote()
+  next.updateAttributes('blockquote', { quoteStyle: style }).run()
   moreOpen.value = false
   calloutOpen.value = false
 }
@@ -1997,7 +2214,7 @@ function setImageDisplayWidth(w: string) {
   if (!ed || !isImageNodeSelected()) return
   ed.chain()
     .focus()
-    .updateAttributes('image', { displayWidth: w || null })
+    .updateAttributes('image', imageDisplayWidthPatch(w))
     .run()
 }
 
@@ -2139,19 +2356,21 @@ async function insertFootnoteAtCursor() {
     maxlength: 500,
   })
   if (text == null || !text.trim()) return
-  const id = `fn-${Date.now().toString(36)}`
-  const n = collectFootnotes(ed).length + 1
+  const note = text.trim()
+  const existing = matchingFootnote(ed.state.doc, note)
+  const id = existing?.id || `fn-${Date.now().toString(36)}`
+  const n = existing?.n || collectFootnotes(ed).length + 1
   if (ed.state.selection.empty) {
     ed.chain()
       .focus()
       .insertContent({
         type: 'text',
         text: `[${n}]`,
-        marks: [{ type: 'footnote', attrs: { id, text: text.trim(), n } }],
+        marks: [{ type: 'footnote', attrs: { id, text: note, n } }],
       })
       .run()
   } else {
-    ed.chain().focus().setFootnote({ id, text: text.trim() }).run()
+    ed.chain().focus().setFootnote({ id, text: note }).run()
   }
   renumberFootnotes(ed)
   footnotePanelOpen.value = true
@@ -2175,17 +2394,52 @@ function doRenumberCaptions() {
 }
 
 const qrDialogOpen = ref(false)
+const qrEditingPos = ref<number | null>(null)
+const qrDraft = ref<{
+  text: string
+  description: string
+  presetId: string
+  style: string
+  errorLevel: string
+  caption: boolean
+  quiet?: number
+} | null>(null)
 
 function insertQrCode() {
+  qrEditingPos.value = null
+  qrDraft.value = null
   qrDialogOpen.value = true
   moreOpen.value = false
 }
 
-async function insertQrArtwork(dataUrl: string) {
+function openQrEditor(pos: number) {
+  const node = editor.value?.state.doc.nodeAt(pos)
+  const raw = String(node?.attrs?.qrMeta || '')
+  if (!raw) return false
   try {
-    editor.value?.chain().focus().setImage({ src: dataUrl, alt: '二维码' }).run()
+    qrDraft.value = JSON.parse(raw)
+  } catch {
+    return false
+  }
+  qrEditingPos.value = pos
+  qrDialogOpen.value = true
+  return true
+}
+
+async function insertQrArtwork(dataUrl: string, meta?: string) {
+  try {
+    const ed = editor.value
+    if (!ed) return
+    const attrs = { src: dataUrl, alt: '二维码', ...(meta ? { qrMeta: meta } : {}) }
+    if (qrEditingPos.value != null && ed.state.doc.nodeAt(qrEditingPos.value)?.type.name === 'image') {
+      ed.chain().focus().setNodeSelection(qrEditingPos.value).updateAttributes('image', attrs).run()
+      ElMessage.success('已更新二维码')
+    } else {
+      ed.chain().focus().setImage(attrs).run()
+      ElMessage.success('已插入二维码')
+    }
     qrDialogOpen.value = false
-    ElMessage.success('已插入二维码')
+    qrEditingPos.value = null
   } catch (e) {
     console.error(e)
     ElMessage.error('二维码生成失败')
@@ -2196,10 +2450,32 @@ function speakSelection() {
   const ed = editor.value
   if (!ed) return
   const { from, to, empty } = ed.state.selection
-  const text = empty
-    ? ed.getText({ blockSeparator: '。' }).slice(0, 2000)
-    : ed.state.doc.textBetween(from, to, ' ')
-  if (!speakText(text)) ElMessage.warning('当前环境不支持朗读')
+  let text = ''
+  if (!empty) text = ed.state.doc.textBetween(from, to, ' ')
+  else {
+    let sectionStart = 0
+    ed.state.doc.descendants((node, pos) => {
+      if (node.type.name === 'heading' && pos <= from) sectionStart = pos
+    })
+    const bits: string[] = []
+    let inside = false
+    ed.state.doc.descendants((node, pos) => {
+      if (pos < sectionStart) return
+      if (node.type.name === 'heading') {
+        if (inside) return false
+        inside = true
+      }
+      if (!inside && sectionStart === 0) inside = true
+      if (!inside) return
+      if (node.isText && node.text) bits.push(node.text)
+      if (node.type.name === 'image') {
+        const alt = String(node.attrs.alt || node.attrs.caption || '').trim()
+        bits.push(alt || '图片')
+      }
+    })
+    text = bits.join('。')
+  }
+  if (!speakText(text.slice(0, 2000))) ElMessage.warning('当前环境不支持朗读')
   else ElMessage.success('开始朗读（再次可点停止）')
   moreOpen.value = false
 }
@@ -2476,10 +2752,44 @@ async function insertRubyAnnotation() {
   ElMessage.success('已添加注音')
 }
 
+async function insertAutoRuby() {
+  const ed = editor.value
+  if (!ed) return
+  if (ed.state.selection.empty) {
+    ElMessage.info('请先选中要注音的文字')
+    return
+  }
+  // 拼音库按需加载：第一次点「自动注音」时先把它拉进来。
+  await loadPinyin()
+  const marked = applyAutoRuby(ed)
+  if (!marked) {
+    ElMessage.info('选区里没有可以自动注音的汉字')
+    return
+  }
+  ElMessage.success(`已为 ${marked} 个字自动加上拼音`)
+}
+
 function insertTimelineBlock() {
   editor.value?.chain().focus().insertTimeline().run()
   moreOpen.value = false
   ElMessage.success('已插入时间线')
+}
+
+/** 在光标所在节点下方追加节点；光标不在时间线里就新建一条。 */
+function addTimelineNode() {
+  const ed = editor.value
+  if (!ed) return
+  ed.chain().focus().addTimelineItem().run()
+  ElMessage.success('已添加时间线节点')
+}
+
+/** 删除光标所在的节点；只有一个节点时整条时间线一起删。 */
+function deleteTimelineNode() {
+  const ed = editor.value
+  if (!ed) return
+  const ok = ed.chain().focus().deleteTimelineItem().run()
+  if (ok) ElMessage.success('已删除时间线节点')
+  else ElMessage.info('请先把光标放到时间线的某个节点上')
 }
 
 async function insertStatusChipBlock() {
@@ -2553,10 +2863,10 @@ async function insertTabsBlockAtCursor() {
   ElMessage.success('已插入标签页')
 }
 
-function insertMermaidAtCursor() {
-  editor.value?.chain().focus().insertMermaidBlock().run()
+function insertMermaidAtCursor(id?: string) {
+  editor.value?.chain().focus().insertMermaidBlock(mermaidTemplate(id)).run()
   moreOpen.value = false
-  ElMessage.success('已插入流程图（可点块内「编辑源码」）')
+  ElMessage.success('已插入流程图，可直接改步骤名称')
 }
 
 /** 文档里的图表块数量（超过上限会提示）。 */
@@ -2600,6 +2910,7 @@ const echartsDialogType = ref<EchartsChartType>('bar')
 const echartsDialogTemplateId = ref('')
 const echartsDialogTitle = ref('')
 const echartsDialogUseTable = ref(false)
+const echartsDialogTableRef = ref('')
 /** 工具栏下拉里展开的类别（null 表示全折叠）。 */
 const echartsOpenCategory = ref<string | null>(null)
 
@@ -2608,9 +2919,20 @@ function echartsTypeLabel(type: EchartsChartType): string {
 }
 
 /** 插入一个带示例数据的可用图表。 */
+function currentTableXref(): string {
+  const ed = editor.value
+  if (!ed) return ''
+  const { $from } = ed.state.selection
+  for (let depth = $from.depth; depth > 0; depth -= 1) {
+    const node = $from.node(depth)
+    if (node.type.name === 'table') return String(node.attrs.xrefId || '')
+  }
+  return ''
+}
+
 function insertEchartsBlockAtCursor(
   type: EchartsChartType,
-  opts: { title?: string; table?: EchartsTableData | null } = {},
+  opts: { title?: string; table?: EchartsTableData | null; tableRef?: string } = {},
 ) {
   const ed = editor.value
   if (!ed) return
@@ -2631,6 +2953,7 @@ function insertEchartsBlockAtCursor(
       chartType: type,
       theme: 'light',
       renderer: 'svg',
+      tableRef: opts.tableRef || '',
     })
     .run()
   echartsGroupMenuKey.value = null
@@ -2641,7 +2964,7 @@ function insertEchartsBlockAtCursor(
 /** 按模板 id 插入（工具栏下拉 / 对话框共用）。 */
 function insertEchartsTemplateById(
   templateId: string,
-  opts: { title?: string; table?: EchartsTableData | null } = {},
+  opts: { title?: string; table?: EchartsTableData | null; tableRef?: string } = {},
 ) {
   const ed = editor.value
   if (!ed) return
@@ -2665,6 +2988,7 @@ function insertEchartsTemplateById(
       chartType: template.categoryId,
       theme: 'light',
       renderer: template.renderer,
+      tableRef: opts.tableRef || '',
     })
     .run()
   echartsGroupMenuKey.value = null
@@ -2686,6 +3010,7 @@ function openEchartsDialog() {
   echartsDialogTemplateId.value = 'bar-basic'
   echartsDialogTitle.value = ''
   echartsDialogUseTable.value = !!echartsDialogTable.value
+  echartsDialogTableRef.value = currentTableXref()
   echartsDialogOpen.value = true
   echartsGroupMenuKey.value = null
   moreOpen.value = false
@@ -2707,11 +3032,12 @@ function applyEchartsDialog(payload: {
   const table = payload.useTable
     ? echartsDialogTable.value || currentEchartsTableData()
     : null
+  const tableRef = payload.useTable ? echartsDialogTableRef.value || currentTableXref() : ''
   const templateId = payload.templateId || ''
   if (templateId) {
-    insertEchartsTemplateById(templateId, { title: payload.title, table })
+    insertEchartsTemplateById(templateId, { title: payload.title, table, tableRef })
   } else {
-    insertEchartsBlockAtCursor(payload.type, { title: payload.title, table })
+    insertEchartsBlockAtCursor(payload.type, { title: payload.title, table, tableRef })
   }
   echartsDialogOpen.value = false
 }
@@ -3038,6 +3364,79 @@ function rewriteSelection(mode: InlineAiMode) {
 }
 
 
+function runDeepOptimize(options?: { quiet?: boolean }) {
+  const ed = editor.value
+  if (!ed) return
+  const result = deepOptimizeDocument(ed)
+  wave21ReportTitle.value = '深度优化'
+  const lines = result.lines.slice()
+  if (!result.changes.length) lines.unshift({ text: '没有需要自动修改的地方。', done: true })
+  if (suggesting.value && result.changes.length) {
+    lines.splice(result.changes.length, 0, { text: '文字修改已记成修订，可逐条接受或拒绝。', done: true })
+  }
+  wave21ReportLines.value = lines
+  wave21ReportOpen.value = true
+  moreOpen.value = false
+  if (options?.quiet) return
+  const pending = lines.filter((line) => !line.done && line.text !== '下面这些仍要手工处理：').length
+  if (result.changes.length && pending) ElMessage.success(`已深度优化 ${result.changes.length} 项，还有 ${pending} 项待处理`)
+  else if (result.changes.length) ElMessage.success(`已深度优化 ${result.changes.length} 项`)
+  else if (pending) ElMessage.info(`还有 ${pending} 项待处理`)
+  else ElMessage.success('文档已经比较整齐')
+}
+
+function applyOptimizeAction(action: OptimizeAction) {
+  const ed = editor.value
+  if (!ed) return
+  if (action.id === 'continueList') {
+    if (!continueOrderedList(ed.view, action.pos)) {
+      ElMessage.info('这个列表现在接不上编号')
+      return
+    }
+    runDeepOptimize({ quiet: true })
+    ElMessage.success('已接上编号')
+    return
+  }
+  if (action.id === 'makeHeader') {
+    if (!promoteTableHeader(ed.view, action.pos)) {
+      ElMessage.info('这一行现在不能标成表头')
+      return
+    }
+    runDeepOptimize({ quiet: true })
+    ElMessage.success('已把第一行标成表头')
+    return
+  }
+  const layout = action.id === 'layout12' ? '12' : action.id === 'layout21' ? '21' : action.id === 'layoutRows' ? 'rows' : null
+  if (!layout || !setGroupLayout(ed.view, action.pos, layout, { suggest: suggesting.value })) {
+    ElMessage.info('这组图片现在不能套用该布局')
+    return
+  }
+  runDeepOptimize({ quiet: true })
+  ElMessage.success(layout === '12' ? '已排成 12' : layout === '21' ? '已排成 21' : '已排成上下两行')
+}
+
+function appendOptimizeChecklist() {
+  const ed = editor.value
+  if (!ed) return
+  const items = wave21ReportLines.value
+    .filter((line) => !line.done && line.text !== '下面这些仍要手工处理：')
+    .map((line) => line.text)
+  const taskList = ed.schema.nodes.taskList
+  const taskItem = ed.schema.nodes.taskItem
+  const paragraph = ed.schema.nodes.paragraph
+  const heading = ed.schema.nodes.heading
+  if (!items.length || !taskList || !taskItem || !paragraph || !heading) return
+  const list = taskList.create(
+    null,
+    items.map((text) => taskItem.create({ checked: false }, paragraph.create(null, ed.schema.text(text)))),
+  )
+  const title = heading.create({ level: 2 }, ed.schema.text('优化清单'))
+  const end = ed.state.doc.content.size
+  ed.view.dispatch(ed.state.tr.insert(end, [title, list]).scrollIntoView())
+  wave21ReportOpen.value = false
+  ElMessage.success('已把待处理项写到文末')
+}
+
 function runHeadingHierarchyCheck() {
   const ed = editor.value
   if (!ed) return
@@ -3145,6 +3544,13 @@ function deleteSnippet(sn: RteSnippet) {
   ElMessage.success('已删除片段')
 }
 
+function currentImageAttr(name: string): string {
+  const ed = editor.value
+  if (!ed || !isImageNodeSelected()) return ''
+  const value = ed.getAttributes('image')?.[name]
+  return typeof value === 'string' ? value : ''
+}
+
 function setImageBorderRadius(v: string) {
   editor.value?.chain().focus().updateAttributes('image', { borderRadius: v || null }).run()
 }
@@ -3169,10 +3575,20 @@ async function openPrintPreview() {
   const title = (localTitle.value || '').trim()
   const accepted = htmlWithSuggestionsAccepted(ed.getHTML() || '<p></p>')
   // 打印预览里图表要是真图：复用导出用的白底快照（预览纸面里不是空白块）
-  const body = await buildExportHtmlWithCharts({
-    editorHtml: accepted,
-    root: rteRootEl.value,
-  })
+  let body = accepted
+  try {
+    body = await buildExportHtmlWithCharts({
+      editorHtml: accepted,
+      root: rteRootEl.value,
+    })
+  } catch {
+    body = accepted
+  }
+  try {
+    body = await rewritePrintMediaSrc(body, rteRootEl.value)
+  } catch {
+    /* 图片地址换不成时仍用原文，避免预览打不开 */
+  }
   printPreviewHtml.value = title
     ? `<h1 class="rte-print-title">${escapeHtml(title)}</h1>${body}`
     : body
@@ -3194,6 +3610,15 @@ function printEditor() {
     return
   }
   applyPrintPageStyle(pageSize.value)
+  syncPrintTableHeads(root)
+  const oddEvenCss = printPageSideCss(pageChrome.value)
+  let oddEvenStyle: HTMLStyleElement | null = null
+  if (oddEvenCss) {
+    oddEvenStyle = document.createElement('style')
+    oddEvenStyle.id = 'rte-print-odd-even'
+    oddEvenStyle.textContent = oddEvenCss
+    document.head.appendChild(oddEvenStyle)
+  }
   root.classList.add('rte-printing')
   // 嵌入区块本身不套纸张，但打印仍按文档的页面设置（A4 + 窄边距）出纸。
   const paperForPrint = !renderPaper.value && pageSizeMeta.value.paper
@@ -3201,6 +3626,7 @@ function printEditor() {
   // 打印前把图表换成白底静态快照，打印完还原
   window.dispatchEvent(new CustomEvent(RTE_BEFORE_EXPORT_EVENT))
   const cleanup = () => {
+    oddEvenStyle?.remove()
     root.classList.remove('rte-printing')
     if (paperForPrint) root.classList.remove('is-page-sheet')
     window.dispatchEvent(new CustomEvent(RTE_AFTER_EXPORT_EVENT))
@@ -3608,20 +4034,32 @@ function currentHighlightColor(): string {
   }
   return String(attrs.color).toLowerCase()
 }
-function colorsEqual(a: string, b: string) {
-  return (a || '').toLowerCase() === (b || '').toLowerCase()
-}
 function setAlign(align: 'left' | 'center' | 'right' | 'justify') {
   applyTextAlignToSelection(editor.value, align)
 }
 function toggleBulletList() {
+  const ed = editor.value
+  if (ed?.isActive('orderedList') && retargetList(ed, 'bulletList')) return
   chain()?.toggleBulletList().run()
 }
 function toggleOrderedList() {
+  const ed = editor.value
+  if (ed?.isActive('bulletList') && retargetList(ed, 'orderedList')) return
   chain()?.toggleOrderedList().run()
+}
+function padListItem(delta: number) {
+  editor.value?.chain().focus().padListItem(delta).run()
 }
 function toggleTaskList() {
   chain()?.toggleTaskList().run()
+}
+function toggleTaskOpenOnly() {
+  taskOpenOnly.value = !taskOpenOnly.value
+}
+function toggleTableZebra() {
+  const ed = editor.value
+  if (!ed) return
+  ed.chain().focus().toggleTableZebra().run()
 }
 
 /**
@@ -3703,9 +4141,31 @@ function currentLineHeight(): string {
   const v = editor.value?.getAttributes('textStyle')?.lineHeight
   return typeof v === 'string' ? v : ''
 }
+const RECENT_FONT_KEY = 'rte-recent-font-sizes'
+function readRecentFontSizes(): string[] {
+  try {
+    const raw = JSON.parse(localStorage.getItem(RECENT_FONT_KEY) || '[]')
+    return Array.isArray(raw) ? raw.filter((item) => typeof item === 'string').slice(0, 5) : []
+  } catch {
+    return []
+  }
+}
+const recentFontSizes = ref<string[]>(readRecentFontSizes())
+const fontSizeButtonLabel = computed(() => fontSizeCaption(currentFontSize(), FONT_SIZE_OPTIONS))
+const recentFontSizeOptions = computed(() => recentOptions(FONT_SIZE_OPTIONS, recentFontSizes.value))
+const toolbarQuery = ref('')
+
 function applyFontSize(size: string) {
   // 复用选区格式封装：跨段落选区时选区内所有段落一起生效
   applyFontSizeToSelection(editor.value, size)
+  if (size.trim()) {
+    recentFontSizes.value = pushRecentValue(recentFontSizes.value, size.trim(), 5)
+    try {
+      localStorage.setItem(RECENT_FONT_KEY, JSON.stringify(recentFontSizes.value))
+    } catch {
+      /* 隐私模式 */
+    }
+  }
   fontSizeOpen.value = false
   moreFontSizeOpen.value = false
   moreOpen.value = false
@@ -3746,6 +4206,9 @@ const {
   onCanvasBlockHover,
   hideBlockHandle,
   toggleBlockMenu,
+  onBlockAddEnter,
+  onBlockPanelEnter,
+  onBlockPanelLeave,
   openBlockMenuForSelection,
   onBlockMenuKeydown,
   turnHoveredBlock,
@@ -3753,7 +4216,8 @@ const {
   deleteHoveredBlock,
   moveHoveredBlock,
   insertBelowHoveredBlock,
-  onBlockGripClick,
+  prepareInsertBelowHoveredBlock,
+  onBlockAddClick,
   onBlockDragStart,
   onBlockDragEnd,
   onCanvasBlockDragOver,
@@ -3762,7 +4226,6 @@ const {
   editor,
   viewMode: () => viewMode,
   rteRootEl,
-  expanded: () => props.expanded,
 })
 
 const codeChrome = ref<{ top: number; left: number } | null>(null)
@@ -3875,6 +4338,7 @@ const {
 } = useImageTools({
   editor,
   viewMode: () => viewMode,
+  openQr: (pos) => openQrEditor(pos),
 })
 
 /** 图片气泡：换图（保留裁剪与题注）。 */
@@ -3885,14 +4349,54 @@ async function replaceImageByUrl() {
     placeholder: 'https://',
     confirmLabel: '替换',
   })
-  const url = (raw || '').trim()
-  if (!url) return
-  if (!/^https?:\/\//i.test(url) && !url.startsWith('data:image')) {
-    ElMessage.warning('图片地址需要以 http:// 或 https:// 开头')
+  const url = imageReplaceSrc(raw || '')
+  if (!url) {
+    ElMessage.warning('图片地址需要是 http(s) 链接、素材库路径，或 PNG、JPEG、GIF、WebP 图片')
     return
   }
-  replaceImageSource(url)
+  if (!replaceImageSource(url)) return
   ElMessage.success('已替换图片')
+}
+
+async function promptImageAlt() {
+  const ed = editor.value
+  if (!ed || !isImageNodeSelected()) {
+    ElMessage.info('先选中一张图片')
+    return
+  }
+  const current = String(ed.getAttributes('image')?.alt || '')
+  const raw = await openRtePrompt({
+    title: '替代文本',
+    message: '读屏和图片打不开时会读这段说明',
+    defaultValue: current,
+    placeholder: '这张图在说什么',
+  })
+  if (raw == null) return
+  setImageAlt(raw)
+}
+
+function toggleTableHeaderStickyBar() {
+  tableHeaderSticky.value = !tableHeaderSticky.value
+  ElMessage.success(tableHeaderSticky.value ? '表头在滚动时保持可见' : '已取消表头固定')
+}
+
+function toggleTableColStickyBar() {
+  tableColSticky.value = !tableColSticky.value
+  ElMessage.success(tableColSticky.value ? '首列在横向滚动时保持可见' : '已取消首列固定')
+}
+
+function runTableOpFromToolbar(key: string) {
+  const item = tableOpItems.value.find((op) => op.key === key)
+  if (!item || item.disabled?.()) {
+    ElMessage.info('请把光标放进表格')
+    return
+  }
+  item.run()
+}
+
+function togglePrintLinkUrls() {
+  printLinkUrls.value = !printLinkUrls.value
+  ElMessage.success(printLinkUrls.value ? '打印时会在链接后印出网址' : '打印时不再印出网址')
 }
 
 /** —— 跨文档：搜索跳转 + 同步块 —— */
@@ -4145,6 +4649,9 @@ function applySlashCommandItem(item: RteSlashItem) {
     case 'table':
       openTableDialog()
       break
+    case 'databaseBlock':
+      editor.value?.chain().focus().insertDatabaseBlock().run()
+      break
     case 'mention':
       insertMentionFromToolbar()
       break
@@ -4183,6 +4690,9 @@ function applySlashCommandItem(item: RteSlashItem) {
       break
     case 'footnote':
       insertFootnoteAtCursor()
+      break
+    case 'toc':
+      editor.value?.chain().focus().insertContent({ type: 'toc' }).run()
       break
     case 'qrcode':
       void insertQrCode()
@@ -4252,6 +4762,15 @@ function applySlashCommandItem(item: RteSlashItem) {
       insertDocTemplate(action.id)
       break
   }
+}
+
+/**
+ * 「+」面板的统一插入入口。
+ * 先在目标块后建立空段，再复用斜杠命令，避免复制一套插入逻辑或遗留「/」。
+ */
+function applyBlockInsertItem(item: RteSlashItem) {
+  if (!prepareInsertBelowHoveredBlock()) return
+  applySlashCommandItem(item)
 }
 
 function closeTemplateMenus() {
@@ -4558,12 +5077,17 @@ function onFormInspectorMouseUp() {
 /** —— 查找 / 替换 —— */
 const {
   findDialogOpen,
+  findDialogStyle,
+  onFindDialogDragStart,
+  onFindDialogDragMove,
+  onFindDialogDragEnd,
   findQuery,
   findReplaceText,
   findCaseSensitive,
   findWholeWord,
   findRegex,
   findMultiline,
+  findScope,
   refreshFindMatches,
   openFindDialog,
   closeFindDialog,
@@ -4671,7 +5195,7 @@ function unlinkSelection() {
 function openCurrentLink() {
   const ed = editor.value
   const href =
-    (linkDialogOpen.value ? linkHref.value.trim() : '') ||
+    (linkDialogOpen.value ? normalizeLinkHref(linkHref.value) : '') ||
     (ed?.getAttributes('link').href as string | undefined) ||
     ''
   if (!href) {
@@ -4684,7 +5208,8 @@ function openCurrentLink() {
 function confirmInsertLink() {
   const ed = editor.value
   if (!ed) return
-  const href = linkHref.value.trim()
+  // 规范化：去掉末尾粘连的标点、裸域名补 https://
+  const href = normalizeLinkHref(linkHref.value)
   const text = linkText.value.trim()
   if (!href) {
     ElMessage.warning('请输入链接地址')
@@ -4900,6 +5425,8 @@ function noteDialogClosed() {
 useOverlayStack({
   askOpen: () => askOpen,
   linkImportOpen: () => linkImportOpen,
+  markdownImportOpen: () => markdownImportOpen,
+  closeMarkdownImport: () => closeMarkdownImport(),
   imageDialogOpen: () => imageDialogOpen,
   videoDialogOpen: () => videoDialogOpen,
   audioDialogOpen: () => audioDialogOpen,
@@ -5065,9 +5592,9 @@ function confirmInsertFormula() {
 }
 
 const NOTE_TYPES = [
-  { value: '新注释', icon: 'N', label: '新注释' },
-  { value: '重要', icon: '!', label: '重要' },
-  { value: '待办', icon: '✓', label: '待办' },
+  { value: '新注释', icon: 'N', label: '新注释', title: '普通注释，标在选中的文字上' },
+  { value: '重要', icon: '!', label: '重要', title: '标成重要注释' },
+  { value: '待办', icon: '✓', label: '待办', title: '标成待办注释' },
 ] as const
 
 const noteDialogOpen = ref(false)
@@ -5389,7 +5916,13 @@ async function onLocalAttachFilesChange(event: Event) {
   }
   const catId = currentAttachCategoryId()
   const added: StoredAttach[] = []
+  const rejected: string[] = []
   for (const file of files) {
+    const reason = rteAttachmentUploadReject(file.name, file.type || '', file.size)
+    if (reason) {
+      if (!rejected.includes(reason)) rejected.push(reason)
+      continue
+    }
     try {
       const src = attachmentInsertHref((await uploadMediaFile(file, { mediaType: 'file' })).insertedPath)
       if (!src) continue
@@ -5407,17 +5940,19 @@ async function onLocalAttachFilesChange(event: Event) {
     }
   }
   if (!added.length) {
-    rteToast('error', '附件读取失败')
+    rteToast('error', rejected.join('\n') || '附件读取失败')
     return
   }
+  if (rejected.length) rteToast('warning', rejected.join('\n'))
   attachAssets.value = [...added, ...attachAssets.value]
   saveAttachStore()
   const next = new Set(attachSelectedIds.value)
   added.forEach((a) => next.add(a.id))
   attachSelectedIds.value = next
-  insertAttachItems(added)
+  const count = insertAttachItems(added)
+  if (!count) return
   closeAttachDialog()
-  rteToast('success', `已插入 ${added.length} 个附件`)
+  rteToast('success', `已插入 ${count} 个附件`)
 }
 
 const attachmentPreview = ref<{ href: string; name: string } | null>(null)
@@ -5435,16 +5970,16 @@ function closeAttachmentPreview() {
   attachmentPreview.value = null
 }
 
-function insertAttachItems(items: StoredAttach[]) {
+function insertAttachItems(items: StoredAttach[]): number {
   const ed = editor.value
-  if (!ed || !items.length) return
+  if (!ed || !items.length) return 0
   const usable = items.flatMap((item) => {
     const href = attachmentInsertHref(item.src)
     return href ? [{ ...item, href }] : []
   })
   if (!usable.length) {
     rteToast('warning', '附件需要先上传成链接后再插入')
-    return
+    return 0
   }
   if (usable.length < items.length) rteToast('warning', '已跳过还不是链接的附件')
   const nodes: Record<string, unknown>[] = []
@@ -5468,6 +6003,7 @@ function insertAttachItems(items: StoredAttach[]) {
     })
   })
   ed.chain().focus().insertContent(nodes).run()
+  return usable.length
 }
 
 function confirmInsertAttaches() {
@@ -5481,9 +6017,10 @@ function confirmInsertAttaches() {
     rteToast('warning', '所选附件还不是链接，请重新上传')
     return
   }
-  insertAttachItems(usable)
+  const count = insertAttachItems(usable)
+  if (!count) return
   closeAttachDialog()
-  rteToast('success', `已插入 ${usable.length} 个附件`)
+  rteToast('success', `已插入 ${count} 个附件`)
 }
 
 const {
@@ -5500,6 +6037,15 @@ const {
   onImportFileChange,
   confirmImportLink,
   markdownToHtml,
+  markdownImportOpen,
+  markdownFileName,
+  markdownSource,
+  markdownHtml,
+  markdownStats,
+  markdownView,
+  openMarkdownImport,
+  closeMarkdownImport,
+  confirmMarkdownImport,
 } = useImport({
   editor,
   closeMore: () => {
@@ -5512,6 +6058,11 @@ void presentRoot
 const {
   exportMenuOpen,
   exportBusy,
+  // 导出菜单在任务开始后会关闭，因此进度与取消必须交给独立状态条消费。
+  exportProgress,
+  exportPhase,
+  exportStatus,
+  cancelExport,
   closeExportMenu,
   onExportMenu,
   copyAsFeishuHtml,
@@ -5606,6 +6157,8 @@ const {
 })
 
 onMounted(() => {
+  // 后台预热拼音库（拼音检索 / 注音要用），不阻塞首屏。
+  void loadPinyin()
   nextTick(() => {
     syncSpellcheckToDom()
     editor.value?.commands.captureRevisionBaseline()
@@ -5665,6 +6218,8 @@ function looksLikeMarkdown(text: string): boolean {
     else if (/^[-*+]\s+\S/.test(line)) hits += 1
     else if (/^\d+\.\s+\S/.test(line)) hits += 1
     else if (/^>\s+\S/.test(line)) hits += 1
+    else if (/^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)+\|?\s*$/.test(line)) hits += 3
+    else if (/^\s*\|.*\|\s*$/.test(line)) hits += 1
     else if (/^```/.test(line)) hits += 2
     else if (/\*\*[^*]+\*\*/.test(line) || /__[^_]+__/.test(line)) hits += 1
     else if (/\[[^\]]+\]\(https?:[^)]+\)/.test(line)) hits += 1
@@ -5691,6 +6246,37 @@ function onPublish() {
 
 const headingOpen = ref(false)
 const listOpen = ref(false)
+const imageLayoutOpen = ref(false)
+const textTidyOpen = ref(false)
+const presetMenuKey = ref('')
+
+function closePresetMenu() {
+  presetMenuKey.value = ''
+}
+
+function togglePresetMenu(key: string) {
+  closeAllToolbarMenus()
+  textTidyOpen.value = false
+  imageLayoutOpen.value = false
+  presetMenuKey.value = presetMenuKey.value === key ? '' : key
+}
+
+/**
+ * 打开预置菜单（注音 / 着重号 等带 presetOptions 的工具）。
+ * 与「大小写」一致：悬停即展开，点击只保证展开，不做开合切换——
+ * 否则鼠标悬停已经展开后再点击会把面板关掉，手感与参考按钮不一致。
+ */
+function openPresetMenu(key: string) {
+  closeAllToolbarMenus()
+  textTidyOpen.value = false
+  imageLayoutOpen.value = false
+  presetMenuKey.value = key
+}
+
+/** 该 key 是否是带下级的预置菜单工具（注音 / 着重号 …）。 */
+function isPresetMenuTool(key: string): boolean {
+  return allTools.value.some((t) => t.key === key && t.kind === 'presetMenu')
+}
 const formOpen = ref(false)
 const templateOpen = ref(false)
 const moreFormOpen = ref(false)
@@ -5717,6 +6303,7 @@ const moreLineHeightOpen = ref(false)
 let hoverOpenTimer: ReturnType<typeof setTimeout> | null = null
 
 function toolbarSubmenuOpen(key: string): boolean {
+  if (presetMenuKey.value === key) return true
   if (key.startsWith('chart:')) return echartsGroupMenuKey.value === key
   switch (key) {
     case 'heading': return headingOpen.value
@@ -5757,6 +6344,7 @@ function toolbarSubmenuOpen(key: string): boolean {
 function openToolbarSubmenu(key: string) {
   if (toolbarSubmenuOpen(key)) return
   closeAllToolbarMenus()
+  presetMenuKey.value = ''
   paraStyleOpen.value = false
   listStyleOpen.value = false
   linkButtonOpen.value = false
@@ -5764,6 +6352,11 @@ function openToolbarSubmenu(key: string) {
   moreChartGroupKey.value = ''
   if (key.startsWith('chart:')) {
     echartsGroupMenuKey.value = key
+    return
+  }
+  // 预置菜单（注音 / 着重号 …）：与「大小写」一样悬停即展开下拉面板
+  if (isPresetMenuTool(key)) {
+    presetMenuKey.value = key
     return
   }
   switch (key) {
@@ -5830,76 +6423,6 @@ function onToolMenuLeave(event: MouseEvent, key: string, close: () => void) {
 const customColorOpen = ref(false)
 const customColorHex = ref('#165dff')
 
-/**
- * Word 风格字体颜色：主题颜色（10 列 × 6 行：基色 + 明暗变体）+ 标准颜色一行。
- * 色值对齐 Office 常见主题调色板。
- */
-const WORD_THEME_COLORS: string[][] = [
-  ['#FFFFFF', '#F2F2F2', '#D8D8D8', '#BFBFBF', '#A5A5A5', '#7F7F7F'],
-  ['#000000', '#7F7F7F', '#595959', '#3F3F3F', '#262626', '#0C0C0C'],
-  ['#E7E6E6', '#D0CECE', '#AEABAB', '#757070', '#3A3838', '#171616'],
-  ['#44546A', '#D6DCE4', '#ADB9CA', '#8496B0', '#323F4F', '#222A35'],
-  ['#5B9BD5', '#DEEBF6', '#BDD7EE', '#9CC2E5', '#2E75B5', '#1F4E79'],
-  ['#ED7D31', '#FBE4D5', '#F7CAAC', '#F4B183', '#C55A11', '#833C0B'],
-  ['#A5A5A5', '#EDEDED', '#DBDBDB', '#C9C9C9', '#7B7B7B', '#525252'],
-  ['#FFC000', '#FFF2CC', '#FFE699', '#FFD966', '#BF9000', '#7F6000'],
-  ['#4472C4', '#D6DCE4', '#B4C6E7', '#8EA9DB', '#2F5496', '#1F3864'],
-  ['#70AD47', '#E2EFD9', '#C5E0B3', '#A8D08D', '#548235', '#375623'],
-]
-
-/** 按行展开主题色网格（第 0 行为基色，其后为明暗），供 CSS grid 按行渲染 */
-const WORD_THEME_ROWS = (() => {
-  const rows: string[][] = []
-  const cols = WORD_THEME_COLORS.length
-  const depth = WORD_THEME_COLORS[0]?.length ?? 0
-  for (let r = 0; r < depth; r++) {
-    rows.push(Array.from({ length: cols }, (_, c) => WORD_THEME_COLORS[c][r]))
-  }
-  return rows
-})()
-
-/** 办公常用高亮：柔和底色（主色板）+ 经典荧光笔 */
-const WORD_HIGHLIGHT_SOFT = [
-  { color: '#FFF3BF', label: '淡黄' },
-  { color: '#D8F5A2', label: '浅绿' },
-  { color: '#A5D8FF', label: '浅蓝' },
-  { color: '#FFC9C9', label: '浅粉' },
-  { color: '#E5DBFF', label: '浅紫' },
-  { color: '#FFE8CC', label: '浅橙' },
-  { color: '#C3FAE8', label: '薄荷绿' },
-  { color: '#D0EBFF', label: '天空蓝' },
-  { color: '#FFDEEB', label: '玫瑰粉' },
-  { color: '#E9ECEF', label: '浅灰' },
-]
-
-const WORD_HIGHLIGHT_VIVID = [
-  { color: '#FFFF00', label: '荧光黄' },
-  { color: '#00FF00', label: '荧光绿' },
-  { color: '#00FFFF', label: '青绿' },
-  { color: '#FF00FF', label: '品红' },
-  { color: '#FF6B6B', label: '珊瑚红' },
-  { color: '#74C0FC', label: '亮蓝' },
-  { color: '#B197FC', label: '亮紫' },
-  { color: '#FFD43B', label: '金黄' },
-  { color: '#69DB7C', label: '草绿' },
-  { color: '#ADB5BD', label: '中灰' },
-]
-
-/** 兼容旧引用：合并列表 */
-const WORD_HIGHLIGHT_COLORS = [...WORD_HIGHLIGHT_SOFT, ...WORD_HIGHLIGHT_VIVID]
-
-const WORD_STANDARD_COLOR_ITEMS = [
-  { color: '#C00000', label: '深红' },
-  { color: '#FF0000', label: '红色' },
-  { color: '#FFC000', label: '橙色' },
-  { color: '#FFFF00', label: '黄色' },
-  { color: '#92D050', label: '浅绿' },
-  { color: '#00B050', label: '绿色' },
-  { color: '#00B0F0', label: '青绿' },
-  { color: '#0070C0', label: '蓝色' },
-  { color: '#002060', label: '深蓝' },
-  { color: '#7030A0', label: '紫色' },
-]
 
 const customHighlightOpen = ref(false)
 const customHighlightHex = ref('#FFF3BF')
@@ -5911,32 +6434,6 @@ function announceRte(msg: string) {
   rteAriaStatus.value = msg
 }
 
-function highlightColorLabel(color: string): string {
-  const c = (color || '').toLowerCase()
-  if (!c) return '无'
-  if (c === '__default__') return '默认高亮'
-  const hit = WORD_HIGHLIGHT_COLORS.find((h) => h.color.toLowerCase() === c)
-  return hit?.label || color
-}
-
-function isLightHighlight(color: string): boolean {
-  const c = (color || '').toLowerCase()
-  if (!c || c === '__default__') return true
-  const hex = c.startsWith('#') ? c.slice(1) : c
-  if (hex.length !== 3 && hex.length !== 6) return false
-  const full =
-    hex.length === 3
-      ? hex
-          .split('')
-          .map((ch) => ch + ch)
-          .join('')
-      : hex
-  const r = parseInt(full.slice(0, 2), 16)
-  const g = parseInt(full.slice(2, 4), 16)
-  const b = parseInt(full.slice(4, 6), 16)
-  // 相对亮度
-  return (r * 299 + g * 587 + b * 114) / 1000 > 180
-}
 
 function currentHighlightLabel(): string {
   return highlightColorLabel(currentHighlightColor())
@@ -6007,20 +6504,9 @@ function onCustomColorNativeInput(event: Event) {
   if (el?.value) customColorHex.value = el.value
 }
 
-/** 主题色按行展平后的一维列表（10 列 × 6 行） */
-const WORD_THEME_FLAT = WORD_THEME_ROWS.flat()
-
-function textColorLabel(color: string): string {
-  const c = (color || '').toLowerCase()
-  if (!c) return '自动'
-  const standard = WORD_STANDARD_COLOR_ITEMS.find((item) => item.color.toLowerCase() === c)
-  if (standard) return standard.label
-  const index = WORD_THEME_FLAT.findIndex((item) => item.toLowerCase() === c)
-  if (index >= 0) return themeColorLabel(index)
-  return color
-}
 
 function moreSubmenuOpen(t: ToolItem): boolean {
+  if (t.kind === 'presetMenu') return presetMenuKey.value === t.key
   if (t.kind === 'color') return moreColorOpen.value
   if (t.key === 'highlight') return moreHighlightOpen.value
   if (t.kind === 'form') return moreFormOpen.value
@@ -6038,7 +6524,7 @@ function moreSubmenuOpen(t: ToolItem): boolean {
 
 const MORE_HOVER_KINDS = new Set([
   'color', 'form', 'template', 'fontSize', 'fontFamily', 'lineHeight',
-  'callout', 'caseTransform', 'zoom', 'viewExtras', 'echartsGroup',
+  'callout', 'caseTransform', 'zoom', 'viewExtras', 'echartsGroup', 'imageLayout', 'textTidy', 'presetMenu',
 ])
 
 /** 「更多」里带下级的项，鼠标经过就展开，不重复点击把它关掉。 */
@@ -6049,6 +6535,21 @@ function hoverMoreSubmenu(t: ToolItem) {
 }
 
 function onMoreToolClick(t: ToolItem) {
+  if (t.kind === 'presetMenu') {
+    textTidyOpen.value = false
+    imageLayoutOpen.value = false
+    presetMenuKey.value = presetMenuKey.value === t.key ? '' : t.key
+    return
+  }
+  presetMenuKey.value = ''
+  if (t.kind === 'textTidy') {
+    textTidyOpen.value = !textTidyOpen.value
+    return
+  }
+  if (t.kind === 'imageLayout') {
+    imageLayoutOpen.value = !imageLayoutOpen.value
+    return
+  }
   if (t.kind === 'color') {
     moreHighlightOpen.value = false
     moreFormOpen.value = false
@@ -6275,7 +6776,36 @@ function onNarrowMediaChange(event: MediaQueryListEvent) {
   narrowViewport.value = event.matches
 }
 
-/** 实际生效的工具栏形态：窄屏一律紧凑（compact），其余跟随 expanded。 */
+/**
+ * 工具栏样式：tg = Telegram 式紧凑图标条，ribbon = 完整功能区。
+ * 持久化在 localStorage，供用户自己选择（工具栏右侧可一键切换）。
+ */
+const TOOLBAR_STYLE_KEY = 'rte.toolbar.style'
+/** 默认保持既有功能区工具栏；用户主动切到 Telegram 风格后写入 localStorage。 */
+const tgStyle = ref(false)
+try {
+  const saved = localStorage.getItem(TOOLBAR_STYLE_KEY)
+  if (saved === 'ribbon' || saved === 'tg') tgStyle.value = saved === 'tg'
+} catch {
+  /* 读不到偏好就用默认的 Telegram 风格 */
+}
+function setToolbarStyle(style: 'tg' | 'ribbon') {
+  tgStyle.value = style === 'tg'
+  try {
+    localStorage.setItem(TOOLBAR_STYLE_KEY, style)
+  } catch {
+    /* 偏好写不进去也不影响使用 */
+  }
+}
+function toggleTgStyle() {
+  setToolbarStyle(tgStyle.value ? 'ribbon' : 'tg')
+}
+
+/**
+ * 实际生效的工具栏形态：窄屏一律紧凑（compact），其余跟随 expanded。
+ * Telegram 风格只改「呈现」（图标化 + 分组分隔线），不改变功能区 / 紧凑主栏的布局：
+ * 最大化时仍是 Ribbon 功能区菜单，只是按钮换成 Telegram 式纯图标。
+ */
 const effectiveExpanded = computed(
   () => resolveToolbarLayout(props.expanded, narrowViewport.value) === 'expanded',
 )
@@ -6297,7 +6827,10 @@ type ToolItem = {
   title?: string
   icon: string
   iconComp?: Component
-  kind?: 'heading' | 'list' | 'more' | 'btn' | 'color' | 'highlight' | 'align' | 'fontSize' | 'fontFamily' | 'lineHeight' | 'import' | 'export' | 'table' | 'attach' | 'form' | 'template' | 'code' | 'divider' | 'emoji' | 'specialChars' | 'columns' | 'spacing' | 'wordStats' | 'callout' | 'shortcuts' | 'hr' | 'blockOps' | 'insertDate' | 'pasteFormat' | 'caseTransform' | 'zoom' | 'viewExtras' | 'paraStyle' | 'listStyle' | 'linkButton' | 'echarts' | 'echartsGroup'
+  kind?: 'heading' | 'list' | 'more' | 'btn' | 'color' | 'highlight' | 'align' | 'fontSize' | 'fontFamily' | 'lineHeight' | 'import' | 'export' | 'table' | 'attach' | 'form' | 'template' | 'code' | 'divider' | 'emoji' | 'specialChars' | 'columns' | 'spacing' | 'wordStats' | 'callout' | 'shortcuts' | 'hr' | 'blockOps' | 'insertDate' | 'pasteFormat' | 'caseTransform' | 'zoom' | 'viewExtras' | 'paraStyle' | 'listStyle' | 'linkButton' | 'echarts' | 'echartsGroup' | 'imageLayout' | 'textTidy' | 'presetMenu' | 'paperGroup'
+  currentPreset?: () => string
+  presetOptions?: { id: string; label: string }[]
+  applyPreset?: (id: string) => void
   active?: () => boolean
   run?: () => void
 }
@@ -6320,7 +6853,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'undo',
       label: '撤销',
-      title: '撤销 (Ctrl/⌘+Z)',
+      title: editor.value?.can().undo() ? '撤销 (Ctrl/⌘+Z)' : '没有可撤销的操作',
       icon: '↶',
       iconComp: ic('undo'),
       run: undo,
@@ -6329,7 +6862,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'redo',
       label: '重做',
-      title: '重做 (Ctrl/⌘+Shift+Z)',
+      title: editor.value?.can().redo() ? '重做 (Ctrl/⌘+Shift+Z)' : '没有可重做的操作',
       icon: '↷',
       iconComp: ic('redo'),
       run: redo,
@@ -6338,7 +6871,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'clear',
       label: '清除格式',
-      title: '清除格式',
+      title: '清除选中文字的加粗、颜色等格式',
       icon: '⌫',
       iconComp: ic('clear'),
       run: clearFormat,
@@ -6346,7 +6879,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'find',
       label: '查找',
-      title: '查找与替换 (Ctrl/⌘+F)',
+      title: findDialogOpen.value ? '查找与替换已打开 (Ctrl/⌘+F)' : '查找与替换 (Ctrl/⌘+F)',
       icon: '🔍',
       iconComp: ic('find'),
       active: () => findDialogOpen.value,
@@ -6354,8 +6887,12 @@ const allTools = computed((): ToolItem[] => {
     },
     {
       key: 'formatPainter',
-      label: '格式刷',
-      title: '格式刷（单击一次，双击连续）',
+      label: formatPainter.value?.sticky ? '连刷' : formatPainter.value ? '刷中' : '格式刷',
+      title: formatPainter.value?.sticky
+        ? '格式刷连续使用中，按 Esc 退出'
+        : formatPainter.value
+          ? '格式刷已启用，按 Esc 退出'
+          : '格式刷（单击一次，双击连续，Esc 退出）',
       icon: '🖌',
       iconComp: ic('formatPainter'),
       active: () => formatPainterArmed.value,
@@ -6364,7 +6901,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'pastePlain',
       label: '纯文本',
-      title: '粘贴为纯文本（开关）',
+      title: pastePlainTextMode.value ? '纯文本粘贴已开启，再点一次恢复' : '粘贴为纯文本，再点一次关闭',
       icon: 'TXT',
       iconComp: ic('pastePlain'),
       active: () => pastePlainTextMode.value,
@@ -6372,7 +6909,7 @@ const allTools = computed((): ToolItem[] => {
     },
     { key: 'div-ops', label: '', icon: '', kind: 'divider' },
     // —— 字体与颜色 / 段落与列表 ——
-    { key: 'heading', label: '段落', title: '段落样式（正文 / 标题 / 引用）', icon: 'H▾', iconComp: ic('heading'), kind: 'heading', active: () => isActive('heading') || isActive('blockquote') },
+    { key: 'heading', label: '段落', title: '段落样式：正文、标题或引用', icon: 'H▾', iconComp: ic('heading'), kind: 'heading', active: () => isActive('heading') || isActive('blockquote') },
     {
       key: 'bold',
       label: '加粗',
@@ -6412,6 +6949,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'subscript',
       label: '下标',
+      title: '下标 (Ctrl/⌘+,)',
       icon: 'x₂',
       iconComp: ic('subscript'),
       active: () => isActive('subscript'),
@@ -6420,6 +6958,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'superscript',
       label: '上标',
+      title: '上标 (Ctrl/⌘+.)',
       icon: 'x²',
       iconComp: ic('superscript'),
       active: () => isActive('superscript'),
@@ -6427,7 +6966,7 @@ const allTools = computed((): ToolItem[] => {
     },
     {
       key: 'codeInline',
-      label: '行内码',
+      label: '行内代码',
       title: '行内代码 (Ctrl/⌘+E)',
       icon: '`',
       iconComp: ic('codeInline'),
@@ -6437,29 +6976,30 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'highlight',
       label: '高亮',
+      title: '高亮颜色，再点一次可取消',
       icon: '🖍',
       iconComp: ic('highlight'),
       kind: 'highlight',
       active: () => isActive('highlight'),
     },
-    { key: 'color', label: '颜色', icon: 'A', iconComp: ic('color'), kind: 'color' },
-    { key: 'fontSize', label: '字号', icon: 'Aa', iconComp: ic('fontSize'), kind: 'fontSize', active: () => !!currentFontSize() },
-    { key: 'fontFamily', label: '字体', icon: 'F', iconComp: ic('fontFamily'), kind: 'fontFamily', active: () => !!currentFontFamily() },
-    { key: 'lineHeight', label: '行距', icon: '↕', iconComp: ic('lineHeight'), kind: 'lineHeight', active: () => !!currentLineHeight() },
-    { key: 'align', label: '对齐', icon: '≡', iconComp: ic('align'), kind: 'align' },
-    { key: 'list', label: '列表', icon: '☰▾', iconComp: ic('list'), kind: 'list' },
+    { key: 'color', label: '颜色', title: '设置文字颜色', icon: 'A', iconComp: ic('color'), kind: 'color' },
+    { key: 'fontSize', label: '字号', title: '设置字号，如小四、12 磅', icon: 'Aa', iconComp: ic('fontSize'), kind: 'fontSize', active: () => !!currentFontSize() },
+    { key: 'fontFamily', label: '字体', title: '设置字体，如宋体、黑体', icon: 'F', iconComp: ic('fontFamily'), kind: 'fontFamily', active: () => !!currentFontFamily() },
+    { key: 'lineHeight', label: '行距', title: '设置行距，如 1.5 倍', icon: '↕', iconComp: ic('lineHeight'), kind: 'lineHeight', active: () => !!currentLineHeight() },
+    { key: 'align', label: '对齐', title: '左对齐、居中、右对齐或两端对齐', icon: '≡', iconComp: ic('align'), kind: 'align' },
+    { key: 'list', label: '列表', title: '无序、有序或任务列表', icon: '☰▾', iconComp: ic('list'), kind: 'list' },
     {
       key: 'indent',
       label: '缩进',
-      title: '增加缩进',
+      title: '把整段向右缩进',
       icon: '→',
       iconComp: ic('indent'),
       run: indentBlock,
     },
     {
       key: 'outdent',
-      label: '减少',
-      title: '减少缩进',
+      label: '减缩进',
+      title: '把整段向左退回',
       icon: '←',
       iconComp: ic('outdent'),
       run: outdentBlock,
@@ -6467,19 +7007,55 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'firstIndent',
       label: '首行',
-      title: '首行缩进 2 字',
+      title: currentTextIndent() ? '首行缩进已开启，再点一次取消' : '首行缩进 2 字',
       icon: '⇨',
       iconComp: ic('firstIndent'),
       active: () => !!currentTextIndent(),
       run: toggleFirstLineIndent,
     },
-    { key: 'spacing', label: '段距', title: '段前段后 / 字间距', icon: '↕', iconComp: ic('spacing'), kind: 'spacing', active: () => !!(currentLetterSpacing() || currentMarginTop() || currentMarginBottom()) },
+    { key: 'spacing', label: '段距', title: (currentLetterSpacing() || currentMarginTop() || currentMarginBottom()) ? '已设置段距或字间距' : '段前、段后和字间距', icon: '↕', iconComp: ic('spacing'), kind: 'spacing', active: () => !!(currentLetterSpacing() || currentMarginTop() || currentMarginBottom()) },
     { key: 'div-text', label: '', icon: '', kind: 'divider' },
     // —— 高级（段落）——
     {
+      key: 'textDir',
+      label: '方向',
+      title: '段落从左到右或从右到左',
+      icon: '向',
+      iconComp: ic('align'),
+      kind: 'presetMenu',
+      presetOptions: [
+        { id: 'ltr', label: '从左到右' },
+        { id: 'rtl', label: '从右到左' },
+        { id: '', label: '自动' },
+      ],
+      applyPreset: (id: string) => applyTextDir(id === 'rtl' ? 'rtl' : id === 'ltr' ? 'ltr' : ''),
+      currentPreset: () => currentTextDir(),
+    },
+    {
+      key: 'quoteStyle',
+      label: '引用样式',
+      title: '标准、强调或诗文引用',
+      icon: '引',
+      iconComp: ic('quote'),
+      kind: 'presetMenu',
+      presetOptions: QUOTE_STYLE_OPTIONS.map((opt) => ({ id: opt.value, label: opt.label })),
+      applyPreset: (id: string) => applyQuoteStyle(id === 'emphasis' || id === 'verse' ? id : 'default'),
+      currentPreset: () => (isActive('blockquote') ? currentQuoteStyle() : ''),
+    },
+    {
+      key: 'writingPaper',
+      label: '纸样',
+      title: '小红书、公众号、信纸、稿纸、田字格',
+      icon: '纸', iconComp: ic('paperSample'),
+      kind: 'paperGroup',
+      currentPreset: () => writingPaper.value,
+      presetOptions: WRITING_PAPERS.map((item) => ({ id: item.id, label: item.label })),
+      applyPreset: (id: string) => setWritingPaper(id),
+    },
+    {
       key: 'quote',
       label: '引用',
-      title: '引用 (Ctrl/⌘+Shift+9)',
+      title: isActive('blockquote') ? '已在引用中，再点一次取消 (Ctrl/⌘+Shift+9)' : '引用 (Ctrl/⌘+Shift+9)',
       icon: '❝',
       iconComp: ic('quote'),
       active: () => isActive('blockquote'),
@@ -6488,17 +7064,17 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'callout',
       label: '告示',
-      title: '告示框（提示/警告/成功/错误）',
+      title: '插入提示、警告、成功或错误告示',
       icon: '!',
       iconComp: ic('callout'),
       kind: 'callout',
       active: () => isActive('callout'),
     },
-    { key: 'hr', label: '分割线', title: '分割线样式', icon: '┄', iconComp: ic('hr'), kind: 'hr' },
+    { key: 'hr', label: '分割线', title: '插入分割线，并可选择样式。也可输入 ---', icon: '┄', iconComp: ic('hr'), kind: 'hr' },
     {
       key: 'blockOps',
-      label: '块',
-      title: '块操作：全选 / 复制 / 上移 / 下移',
+      label: '块操作',
+      title: '全选、复制、上移或下移当前块',
       icon: '▣',
       iconComp: ic('more'),
       kind: 'blockOps',
@@ -6514,30 +7090,75 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'code',
       label: '代码块',
-      title: '代码块 (Ctrl/⌘+Shift+E)',
+      title: isActive('codeBlock') ? '光标在代码块里，再点一次取消' : '代码块 (Ctrl/⌘+Shift+E)',
       icon: '</>',
       iconComp: ic('code'),
       kind: 'code',
       active: () => isActive('codeBlock'),
       run: toggleCodeBlock,
     },
+    { key: 'pageSetup', label: '页面', title: '纸张、页边距、页眉页脚', icon: '纸', iconComp: ic('pageBreak'), run: openPageSetup },
+    { key: 'printPreview', label: '打印预览', title: '按当前纸张看打印效果', icon: '看', iconComp: ic('print'), run: () => void openPrintPreview() },
+    { key: 'paperGuide', label: '参考线', title: paperGuide.value ? '纸张参考线已显示，再点一次关闭' : '在编辑区显示纸张边界', icon: '框', iconComp: ic('guide'), run: togglePaperGuide, active: () => paperGuide.value },
+    { key: 'printUrls', label: '印出链接', title: printLinkUrls.value ? '打印时会印出网址，再点一次关闭' : '打印时在链接后面印出网址', icon: '链', iconComp: ic('printLink'), run: togglePrintLinkUrls, active: () => printLinkUrls.value },
     {
       key: 'pageBreak',
       label: '分页符',
-      title: '插入分页符（打印/PDF）',
+      title: '插入分页符，打印和导出 PDF 时从这里换页',
       icon: '=======',
       iconComp: ic('pageBreak'),
       run: insertPageBreak,
     },
-    { key: 'columns', label: '分栏', title: '多栏布局', icon: '▥', iconComp: ic('columns'), kind: 'columns' },
+    { key: 'columns', label: '分栏', title: '把内容分成 2 到 6 栏', icon: '▥', iconComp: ic('columns'), kind: 'columns' },
     { key: 'div-block', label: '', icon: '', kind: 'divider' },
     // —— 插入 ——
-    { key: 'image', label: '图片', icon: '🖼', iconComp: ic('image'), run: insertImage },
-    { key: 'video', label: '视频', icon: '▶', iconComp: ic('video'), run: insertVideo },
+    { key: 'image', label: '图片', title: '插入图片，也可直接粘贴', icon: '🖼', iconComp: ic('image'), run: insertImage },
+    { key: 'imageLayout', label: '排法', title: '图片居中、居左、居右或环绕', icon: '▢', iconComp: ic('image'), kind: 'imageLayout', active: () => isImageNodeSelected() },
+    { key: 'imageReplace', label: '换图', title: '替换选中图片，保留题注和裁剪', icon: '↻', iconComp: ic('image'), run: () => void replaceImageByUrl(), disabled: () => !isImageNodeSelected() },
+    { key: 'imageAlt', label: '替代文本', title: '给选中图片写替代文本', icon: 'Alt', iconComp: ic('image'), run: () => void promptImageAlt(), disabled: () => !isImageNodeSelected() },
+    { key: 'spoiler', label: '揭晓', title: '把选中文字收成揭晓文字', icon: '眼', iconComp: ic('eye'), run: toggleSpoiler },
+    { key: 'dropCap', label: '首字', title: '把段落第一个字放大下沉', icon: 'A', iconComp: ic('dropCap'), run: toggleDropCap },
+    {
+      key: 'imageRadius',
+      label: '圆角',
+      title: '给选中图片加圆角',
+      icon: '圆',
+      iconComp: ic('image'),
+      kind: 'presetMenu',
+      presetOptions: IMAGE_RADIUS_PRESETS.map((opt) => ({ id: opt.value, label: opt.label })),
+      applyPreset: (id: string) => setImageBorderRadius(id),
+      currentPreset: () => currentImageAttr('borderRadius'),
+      disabled: () => !isImageNodeSelected(),
+    },
+    {
+      key: 'imageShadow',
+      label: '阴影',
+      title: '给选中图片加阴影',
+      icon: '影',
+      iconComp: ic('image'),
+      kind: 'presetMenu',
+      presetOptions: IMAGE_SHADOW_PRESETS.map((opt) => ({ id: opt.value, label: opt.label })),
+      applyPreset: (id: string) => setImageBoxShadow(id),
+      currentPreset: () => currentImageAttr('boxShadow'),
+      disabled: () => !isImageNodeSelected(),
+    },
+    {
+      key: 'imageBorder',
+      label: '边框',
+      title: '给选中图片加边框',
+      icon: '框',
+      iconComp: ic('image'),
+      kind: 'presetMenu',
+      presetOptions: IMAGE_BORDER_PRESETS.map((opt) => ({ id: opt.value, label: opt.label })),
+      applyPreset: (id: string) => setImageBorderStyle(id),
+      currentPreset: () => currentImageAttr('borderStyle'),
+      disabled: () => !isImageNodeSelected(),
+    },
+    { key: 'video', label: '视频', title: '插入本地或网络视频', icon: '▶', iconComp: ic('video'), run: insertVideo },
     {
       key: 'link',
       label: '链接',
-      title: '插入/编辑链接 (Ctrl/⌘+K)',
+      title: '插入或编辑链接 (Ctrl/⌘+K)',
       icon: '🔗',
       iconComp: ic('link'),
       active: () => isActive('link'),
@@ -6553,18 +7174,21 @@ const allTools = computed((): ToolItem[] => {
       active: () => linkButtonOpen.value || isActive('linkButton'),
       run: () => { void insertLinkButton('blue') },
     },
-    { key: 'formula', label: '公式', icon: 'Σ', iconComp: ic('formula'), run: insertFormula },
+    { key: 'formula', label: '公式', title: '插入数学公式', icon: 'Σ', iconComp: ic('formula'), run: insertFormula },
     // —— 图表：一级分类各一个下拉（基础 / 统计 / 关系 / 层级 / 地理 / 金融 / 坐标系 / 组件 / 3D·GL）——
     ...CHART_GROUPS.map((group) => ({
       key: `chart:${group.id}`,
       label: group.label,
-      title: `插入${group.label}图表`,
+      title: `插入${group.label}图表：${group.hint}`,
       icon: group.icon,
+      // Telegram 风格：图表一级分类用线稿 SVG，替代原先的彩色 Emoji
+      iconComp: chartGroupIcon(group.id),
       kind: 'echartsGroup' as const,
     })),
     {
       key: 'form',
       label: '表单',
+      title: '插入单选、多选、文本、日期等控件',
       icon: '☑▾',
       iconComp: ic('form'),
       kind: 'form',
@@ -6581,31 +7205,31 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'template',
       label: '模板',
-      title: '插入模板',
+      title: '插入会议纪要、周报等模板',
       icon: '📄▾',
       iconComp: ic('template'),
       kind: 'template',
     },
-    { key: 'table', label: '表格', icon: '▦', iconComp: ic('table'), kind: 'table', active: () => isInTable(), run: onTableToolClick },
-    { key: 'attach', label: '附件', icon: '☁▾', iconComp: ic('attach'), kind: 'attach', run: onAttachment },
-    { key: 'note', label: '注释', icon: '[1]', iconComp: ic('note'), run: insertNote },
+    { key: 'table', label: '表格', title: '插入表格，或在表内做行列操作', icon: '▦', iconComp: ic('table'), kind: 'table', active: () => isInTable(), run: onTableToolClick },
+    { key: 'attach', label: '附件', title: '插入或选择附件', icon: '☁▾', iconComp: ic('attach'), kind: 'attach', run: onAttachment },
+    { key: 'note', label: '注释', title: '在光标处插入文内注释', icon: '[1]', iconComp: ic('note'), run: insertNote },
     {
       key: 'comment',
       label: '评论',
-      title: '对选区添加评论',
+      title: commentsOpen.value ? '评论已打开，再点一次收起' : '给选中文字加评论',
       icon: '💬',
       iconComp: ic('note'),
       active: () => commentsOpen.value,
       run: beginComment,
     },
-    { key: 'emoji', label: '表情', title: '插入表情', icon: '☺', iconComp: ic('emoji'), kind: 'emoji' },
-    { key: 'specialChars', label: '字符', title: '插入字符', icon: 'Ω', iconComp: ic('specialChars'), kind: 'specialChars' },
+    { key: 'emoji', label: '表情', title: '插入表情符号', icon: '☺', iconComp: ic('emoji'), kind: 'emoji' },
+    { key: 'specialChars', label: '符号', title: '插入特殊符号，如箭头、希腊字母', icon: 'Ω', iconComp: ic('specialChars'), kind: 'specialChars' },
     { key: 'div-insert', label: '', icon: '', kind: 'divider' },
     // —— 其他 ——
     {
       key: 'print',
       label: '打印',
-      title: '打印预览',
+      title: '打开打印预览',
       icon: '🖨',
       iconComp: ic('print'),
       run: openPrintPreview,
@@ -6613,7 +7237,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'bookmark',
       label: '书签',
-      title: '书签 / 锚点（打开列表；可新建）',
+      title: '打开书签列表，也可新建书签',
       icon: '⚓',
       iconComp: ic('link'),
       active: () => isActive('bookmark') || bookmarkPanelOpen.value,
@@ -6622,7 +7246,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'spellcheck',
       label: '拼写',
-      title: '拼写检查开关（浏览器词典）',
+      title: spellcheckEnabled.value ? '拼写检查已开启，再点一次关闭' : '拼写检查（用浏览器词典）',
       icon: 'Abc',
       iconComp: ic('note'),
       active: () => spellcheckEnabled.value,
@@ -6630,18 +7254,26 @@ const allTools = computed((): ToolItem[] => {
     },
     {
       key: 'pasteFormat',
-      label: '粘贴格式',
-      title: '粘贴格式：保留 / 纯文本 / Markdown（点击切换）',
+      label: pasteFormatMode.value === 'plain' ? '粘贴·纯文本' : pasteFormatMode.value === 'markdown' ? '粘贴·MD' : '粘贴·保留',
+      title: '再点一次，在保留格式、纯文本和 Markdown 之间切换',
       icon: '📋',
       iconComp: ic('import'),
       active: () => pasteFormatMode.value !== 'keep',
       run: cyclePasteFormatMode,
     },
+    {
+      key: 'markdownInline',
+      label: markdownInlineEnabled.value ? 'MD语法·开' : 'MD语法·关',
+      title: '输入 **粗体**、*斜体*、[文字](地址)、==高亮== 时直接转成富文本；再点一次关闭',
+      icon: 'Md', iconComp: ic('markdown'),
+      active: () => markdownInlineEnabled.value,
+      run: toggleMarkdownInline,
+    },
     { key: 'div-wave20a', label: '', icon: '', kind: 'divider' },
     // —— 书写 / 结构 / 审阅 / 视图（Wave20）——
     {
       key: 'caseTransform',
-      label: '文字',
+      label: '大小写',
       title: '大小写、整理、揭晓、首字下沉',
       icon: 'Aa',
       iconComp: ic('fontSize'),
@@ -6650,7 +7282,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'emphasisDot',
       label: '着重号',
-      title: '中文着重号',
+      title: '给选中的汉字加着重号',
       icon: '••',
       iconComp: ic('highlight'),
       active: () => isActive('emphasisDot'),
@@ -6658,8 +7290,8 @@ const allTools = computed((): ToolItem[] => {
     },
     {
       key: 'copyMd',
-      label: '复制MD',
-      title: '复制为 Markdown',
+      label: 'Markdown',
+      title: '把正文复制成 Markdown',
       icon: 'MD',
       iconComp: ic('exportText'),
       run: copyAsMarkdown,
@@ -6667,7 +7299,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'cjkTip',
       label: '禁则',
-      title: '中文禁则 / 避头尾（轻量）',
+      title: '中文标点不要出现在行首或行尾',
       icon: '禁',
       iconComp: ic('note'),
       run: showCjkTypographyTip,
@@ -6683,15 +7315,15 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'audio',
       label: '音频',
-      title: '插入音频',
+      title: '插入可播放的音频',
       icon: '♪',
-      iconComp: ic('video'),
+      iconComp: ic('audio'),
       run: insertAudio,
     },
     {
       key: 'linkCard',
       label: '网页卡',
-      title: '链接卡片 / 受控嵌入',
+      title: '把链接做成一张卡片',
       icon: '⧉',
       iconComp: ic('link'),
       run: insertLinkCardBlock,
@@ -6699,7 +7331,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'footnote',
       label: '脚注',
-      title: '插入脚注 / 打开脚注列表',
+      title: '插入脚注，或打开脚注列表',
       icon: '[n]',
       iconComp: ic('note'),
       active: () => footnotePanelOpen.value,
@@ -6708,7 +7340,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'footnoteList',
       label: '脚注区',
-      title: '脚注汇总',
+      title: '在文末列出全部脚注',
       icon: '脚',
       iconComp: ic('outline'),
       run: openFootnotePanel,
@@ -6716,7 +7348,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'captionNum',
       label: '题注号',
-      title: '题注自动编号（图/表）',
+      title: '给图和表的题注重新编号',
       icon: '№',
       iconComp: ic('note'),
       run: doRenumberCaptions,
@@ -6724,7 +7356,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'qrcode',
       label: '二维码',
-      title: '插入二维码',
+      title: '插入二维码，可改内容和样式',
       icon: '▦',
       iconComp: ic('qrcode'),
       run: insertQrCode,
@@ -6739,7 +7371,7 @@ const allTools = computed((): ToolItem[] => {
     },
     {
       key: 'speakStop',
-      label: '停读',
+      label: '停止',
       title: '停止朗读',
       icon: '⏹',
       iconComp: ic('clear'),
@@ -6748,7 +7380,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'sensitive',
       label: '敏感词',
-      title: '敏感词 / 错别字提示',
+      title: sensitiveOn.value ? '敏感词检查已开启，再点一次关闭' : '检查敏感词和错别字',
       icon: '⚠',
       iconComp: ic('highlight'),
       active: () => sensitiveOn.value,
@@ -6757,7 +7389,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'revision',
       label: '修订',
-      title: '单机修订高亮（相对基线）',
+      title: revisionOn.value ? '修订标记已开启，再点一次关闭' : '标出相对基线的改动',
       icon: '✎+',
       iconComp: ic('highlight'),
       active: () => revisionOn.value,
@@ -6766,7 +7398,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'revisionBase',
       label: '基线',
-      title: '重新标记修订基线',
+      title: '把当前内容记为修订起点',
       icon: '⚓',
       iconComp: ic('note'),
       run: resetRevisionBaseline,
@@ -6774,7 +7406,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'suggest',
       label: '建议',
-      title: '建议模式：插入和删除记成修订',
+      title: suggesting.value ? '建议模式已开启，再点一次关闭' : '把插入和删除记成修订',
       icon: '改',
       iconComp: ic('highlight'),
       active: () => suggesting.value,
@@ -6801,7 +7433,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'zoom',
       label: '缩放',
-      title: '编辑区缩放',
+      title: zoomToolTitle(editorZoom.value),
       icon: '🔍',
       iconComp: ic('wordStats'),
       kind: 'zoom',
@@ -6810,7 +7442,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'viewExtras',
       label: '视图',
-      title: '专注 / 暗色 / 纸张参考线',
+      title: '专注、暗色和纸张参考线',
       icon: '👁',
       iconComp: ic('outline'),
       kind: 'viewExtras',
@@ -6820,7 +7452,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'headingAutoNum',
       label: '标题号',
-      title: '标题自动编号 1 / 1.1 / 1.1.1',
+      title: headingAutoNumber.value ? '标题编号已开启，再点一次关闭' : '标题自动编号 1 / 1.1 / 1.1.1',
       icon: '1.',
       iconComp: ic('list'),
       active: () => headingAutoNumber.value,
@@ -6829,7 +7461,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'paraStyle',
       label: '段样式',
-      title: '段落样式集',
+      title: '套用导语、摘要等段落样式',
       icon: '¶',
       iconComp: ic('fontSize'),
       kind: 'paraStyle',
@@ -6838,7 +7470,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'listStyle',
       label: '编号样式',
-      title: '有序列表编号样式 / 起始',
+      title: '选择数字、字母或罗马数字，并可设置起始号',
       icon: 'a.',
       iconComp: ic('list'),
       kind: 'listStyle',
@@ -6847,31 +7479,56 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'ruby',
       label: '注音',
-      title: '注音 / 拼音（ruby）',
+      title: '手动填写注音，或按选中汉字自动加拼音',
       icon: 'あ',
       iconComp: ic('fontSize'),
-      run: () => { void insertRubyAnnotation() },
+      kind: 'presetMenu',
+      active: () => isActive('ruby'),
+      presetOptions: [
+        { id: 'manual', label: '手动填写' },
+        { id: 'auto', label: '自动注音' },
+      ],
+      applyPreset: (id: string) => {
+        if (id === 'auto') insertAutoRuby()
+        else void insertRubyAnnotation()
+      },
     },
     {
       key: 'timeline',
       label: '时间线',
-      title: '插入时间线',
+      title: '按时间顺序插入一条时间线',
       icon: '⏱',
       iconComp: ic('note'),
       run: insertTimelineBlock,
     },
     {
+      key: 'timelineAdd',
+      label: '加节点',
+      title: '在光标所在节点下方添加一个节点',
+      icon: '＋',
+      iconComp: ic('list'),
+      run: addTimelineNode,
+    },
+    {
+      key: 'timelineDelete',
+      label: '删节点',
+      title: '删除当前时间线里光标所在的节点',
+      icon: '✕',
+      iconComp: ic('clear'),
+      run: deleteTimelineNode,
+    },
+    {
       key: 'statusChip',
       label: '徽章',
-      title: '状态徽章 Chip',
+      title: '插入状态徽章',
       icon: '●',
       iconComp: ic('highlight'),
       run: () => { void insertStatusChipBlock() },
     },
     {
       key: 'progressBar',
-      label: '进度',
-      title: '进度条',
+      label: '进度条',
+      title: '插入一条进度条',
       icon: '▮',
       iconComp: ic('wordStats'),
       run: () => { void insertProgressBarBlock() },
@@ -6879,7 +7536,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'tabsBlock',
       label: '标签页',
-      title: '插入 Tabs',
+      title: '插入多页标签，每页一段内容',
       icon: '⧉',
       iconComp: ic('columns'),
       run: () => { void insertTabsBlockAtCursor() },
@@ -6887,15 +7544,17 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'mermaid',
       label: '流程图',
-      title: 'Mermaid 流程图',
+      title: '插入横向、纵向或判断流程图',
       icon: '⌥',
       iconComp: ic('code'),
-      run: () => { void insertMermaidAtCursor() },
+      kind: 'presetMenu',
+      presetOptions: MERMAID_TEMPLATES.map((item) => ({ id: item.id, label: item.label })),
+      applyPreset: (id: string) => insertMermaidAtCursor(id),
     },
     {
       key: 'xref',
       label: '交叉引用',
-      title: '引用标题 / 图 / 表',
+      title: '引用文中的标题、图或表',
       icon: '※',
       iconComp: ic('link'),
       run: openXrefDialog,
@@ -6903,7 +7562,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'mentionBtn',
       label: '@提及',
-      title: '插入 @ 提及',
+      title: '在正文里 @ 一个人',
       icon: '@',
       iconComp: ic('note'),
       run: insertMentionFromToolbar,
@@ -6911,7 +7570,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'crossDoc',
       label: '跨文档',
-      title: '搜索其它文档，可插入同步块',
+      title: '从其它文档插入一块同步内容',
       icon: '⇄',
       iconComp: ic('link'),
       run: openCrossDoc,
@@ -6919,39 +7578,76 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'mentionPerm',
       label: '@权限',
-      title: '设置本文能 @ 到哪些人',
+      title: '设置本文可以 @ 哪些人',
       icon: '@',
       iconComp: ic('note'),
       run: openMentionPermission,
     },
     {
       key: 'tableCsv',
-      label: '表CSV',
-      title: '复制当前表为 CSV',
+      label: '导出表',
+      title: '把当前表格复制成 CSV',
       icon: 'CSV',
       iconComp: ic('table'),
       run: () => { void copyCurrentTable('csv') },
     },
+    { key: 'textTidy', label: '整理', title: '半角、全角、空格和按行整理', icon: '理', iconComp: ic('tidy'), kind: 'textTidy' },
+    { key: 'tidyHalf', label: '半角', title: '把全角字母数字转成半角', icon: '半', iconComp: ic('halfWidth'), run: () => runTextMenu('half') },
+    { key: 'tidyFull', label: '全角', title: '把半角字母数字转成全角', icon: '全', iconComp: ic('fullWidth'), run: () => runTextMenu('full') },
+    { key: 'tidyPangu', label: '中英空格', title: '汉字和英文数字之间补空格', icon: '空', iconComp: ic('cjkSpace'), run: () => runTextMenu('pangu') },
+    { key: 'tidySqueeze', label: '收空格', title: '连续空格收成一个', icon: '挤', iconComp: ic('squeezeSpace'), run: () => runTextMenu('squeeze') },
+    { key: 'tableZebra', label: '斑马纹', title: editor.value?.getAttributes('table')?.zebra === true ? '斑马纹已开启，再点一次关闭' : '隔行底色只用于显示', icon: '斑马', iconComp: ic('zebra'), run: toggleTableZebra, active: () => editor.value?.getAttributes('table')?.zebra === true, disabled: () => !isInTable() },
+    { key: 'tableEqual', label: '均分列', title: '把当前表格的列宽均分，一步撤销', icon: '均', iconComp: ic('equalColumns'), run: () => runTableOpFromToolbar('equal-cols'), disabled: () => !isInTable() },
+    { key: 'tableFormula', label: '求和', title: '在当前格对上方的数字求和', icon: 'Σ', iconComp: ic('sigma'), run: () => runTableOpFromToolbar('cell-formula'), disabled: () => !isInTable() },
+    { key: 'tableSort', label: '升序', title: '按当前列从小到大排序', icon: '序', iconComp: ic('sortAsc'), run: () => runTableOpFromToolbar('sort-asc'), disabled: () => !isInTable() },
+    {
+      key: 'tableStruct',
+      label: '行列',
+      title: '插入行、删除行、合并、拆分、表头和降序',
+      icon: '表',
+      iconComp: ic('table'),
+      kind: 'presetMenu',
+      presetOptions: [
+        { id: 'row-after', label: '向下插入行' },
+        { id: 'del-row', label: '删除行' },
+        { id: 'merge', label: '合并单元格' },
+        { id: 'split', label: '拆分单元格' },
+        { id: 'header', label: '切换表头行' },
+        { id: 'sort-desc', label: '按列降序' },
+      ],
+      applyPreset: (id: string) => runTableOpFromToolbar(id),
+      disabled: () => !isInTable(),
+    },
+    { key: 'tableSticky', label: '冻结表头', title: tableHeaderSticky.value ? '表头冻结已开启，再点一次关闭' : '滚动时表头保持可见', icon: '表头', iconComp: ic('freezeHeader'), run: toggleTableHeaderStickyBar, active: () => tableHeaderSticky.value },
+    { key: 'tableColSticky', label: '冻结首列', title: tableColSticky.value ? '首列冻结已开启，再点一次关闭' : '横向滚动时首列保持可见', icon: '首列', iconComp: ic('freezeColumn'), run: toggleTableColStickyBar, active: () => tableColSticky.value },
     {
       key: 'tableFilter',
-      label: '表筛选',
-      title: '表格行筛选',
+      label: '筛选',
+      title: '按文字隐藏不匹配的表格行',
       icon: '▽',
       iconComp: ic('table'),
       run: () => { void promptTableRowFilter() },
     },
     {
+      key: 'deepOptimize',
+      label: '一键整理',
+      title: '一键整理标题、空段、空格、标点、间距和题注，并列出仍要处理的项',
+      icon: '✦',
+      iconComp: ic('deepOptimize'),
+      run: runDeepOptimize,
+    },
+    {
       key: 'headingCheck',
-      label: '标题检',
-      title: '标题层级 / 空标题检查',
+      label: '标题检查',
+      title: '检查标题是否跳级或为空',
       icon: 'H✓',
       iconComp: ic('outline'),
       run: runHeadingHierarchyCheck,
     },
     {
       key: 'linkCheck',
-      label: '链检',
-      title: '死链 / 空链检查',
+      label: '链接检查',
+      title: '检查打不开或空着的链接',
       icon: '🔗✓',
       iconComp: ic('link'),
       run: runDeadLinkCheck,
@@ -6959,7 +7655,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'watermark',
       label: '水印',
-      title: '文档水印',
+      title: watermark.value.enabled ? '水印已开启，点此修改' : '给文档加水印',
       icon: '印',
       iconComp: ic('note'),
       active: () => watermark.value.enabled,
@@ -6968,7 +7664,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'outbound',
       label: '外链',
-      title: '外链确认与白名单',
+      title: '设置打开外链前是否先确认',
       icon: '外',
       iconComp: ic('link'),
       run: () => openGovern('outbound'),
@@ -6976,14 +7672,14 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'audit',
       label: '审计',
-      title: '文档操作记录',
+      title: '查看这篇文档的操作记录',
       icon: '录',
       iconComp: ic('wordStats'),
       run: () => openGovern('audit'),
     },
     {
       key: 'inlineAi',
-      label: '文内AI',
+      label: '改写',
       title: '用选区和上文改写，不调用外部模型',
       icon: 'AI',
       iconComp: ic('highlight'),
@@ -6991,7 +7687,7 @@ const allTools = computed((): ToolItem[] => {
     },
     {
       key: 'readTime',
-      label: '时长',
+      label: '阅读时长',
       title: '阅读时长估算',
       icon: '⌛',
       iconComp: ic('wordStats'),
@@ -7000,7 +7696,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'immersive',
       label: '全屏',
-      title: '全屏沉浸编辑（Esc 退出）',
+      title: immersiveFullscreen.value ? '已是全屏，按 Esc 退出' : '全屏编辑，按 Esc 退出',
       icon: '⛶',
       iconComp: ic('outline'),
       active: () => immersiveFullscreen.value,
@@ -7009,7 +7705,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'snippets',
       label: '片段',
-      title: '文本片段 Snippets',
+      title: '插入保存过的文字片段',
       icon: '✂',
       iconComp: ic('note'),
       run: openSnippetDialog,
@@ -7017,7 +7713,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'wordStats',
       label: '字数',
-      title: '字数统计',
+      title: wordStatsOpen.value ? '字数统计已打开' : '查看字数和阅读时长',
       icon: '∑',
       iconComp: ic('wordStats'),
       kind: 'wordStats',
@@ -7026,7 +7722,7 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'outline',
       label: '大纲',
-      title: '标题大纲导航',
+      title: outlineOpen.value ? '大纲已打开，再点一次收起' : '按标题浏览文档',
       icon: '☰',
       iconComp: ic('outline'),
       active: () => outlineOpen.value,
@@ -7035,15 +7731,15 @@ const allTools = computed((): ToolItem[] => {
     {
       key: 'shortcuts',
       label: '快捷键',
-      title: '快捷键速查',
+      title: '查看全部快捷键',
       icon: '⌨',
       iconComp: ic('shortcuts'),
       kind: 'shortcuts',
       active: () => shortcutsOpen.value,
       run: toggleShortcutsPanel,
     },
-    { key: 'import', label: '导入', icon: '⇪▾', iconComp: ic('import'), kind: 'import', run: onImport },
-    { key: 'export', label: '导出', icon: '⇩▾', iconComp: ic('export'), kind: 'export', run: onExportMenu },
+    { key: 'import', label: '导入', title: '导入 Markdown 或文档', icon: '⇪▾', iconComp: ic('import'), kind: 'import', run: onImport },
+    { key: 'export', label: '导出', title: '导出 HTML、文本、图片、PDF 或 Word', icon: '⇩▾', iconComp: ic('export'), kind: 'export', run: onExportMenu },
     // 草稿备份：按产品要求先隐藏入口（保留 onDraftBackup 逻辑）
     // { key: 'draft', label: '草稿备份', icon: '⏱', run: onDraftBackup },
   ]
@@ -7067,6 +7763,7 @@ const {
   toolbarGroupButtonEntries,
   toggleToolbarGroupButton,
   moveToolbarGroupButton,
+  moveToolbarGroupButtonToEdge,
   toolbarDropIndex,
   toolbarDragSource,
   undoToolbarGroupOrder,
@@ -7081,12 +7778,16 @@ const {
   onToolbarGroupDrop,
   onToolbarGroupDragEnd,
   onToolbarGroupKeydown,
+  restoreToolbarGroupButtons,
 } = useToolbarGroups({
   panelId: () => props.panelId,
   expanded: () => effectiveExpanded.value,
   orderMap: () => current_data.value?.toolbarGroupOrderByPanelId,
   setPanelToolbarOrder: (panelId, order) => documentStore.setPanelToolbarOrder(panelId, order),
   buttonConfigMap: () => current_data.value?.toolbarGroupButtonsByPanelId,
+  // 知识库文档页自己加载文档，store 里没有 currentData，
+  // 组内按钮顺序要落到本地镜像，不能只依赖画布 JSON。
+  hasStoreDoc: () => !!current_data.value,
   setPanelGroupButtons: (panelId, groupId, config) =>
     documentStore.setPanelToolbarGroupButtons(panelId, groupId, config),
   tools: () => allTools.value,
@@ -7101,6 +7802,8 @@ const {
   openToolbarRows: () => {
     toolbarRowsOpen.value = true
   },
+  toolbarQuery: () => toolbarQuery.value,
+  focusMode: () => focusMode.value,
 })
 toolbarUndoBridge.disarm = disarmToolbarUndo
 toolbarUndoBridge.isNewer = toolbarUndoIsNewer
@@ -7215,6 +7918,7 @@ provideRteBindings({
   HR_VARIANT_OPTIONS,
   IMAGE_BORDER_PRESETS,
   IMAGE_LAYOUT_OPTIONS,
+  isImageNodeSelected,
   IMAGE_RADIUS_PRESETS,
   IMAGE_SHADOW_PRESETS,
   IMAGE_WIDTH_PRESETS,
@@ -7261,6 +7965,7 @@ provideRteBindings({
   applyMarginBottom,
   applyMarginTop,
   applyBlockMenu,
+  applyBlockInsertItem,
   applyParaStyleId,
   applyQuoteStyle,
   applySelectedFormPatch,
@@ -7414,7 +8119,7 @@ provideRteBindings({
   copyCurrentLinkUrl,
   copyHoveredBlock,
   insertBelowHoveredBlock,
-  onBlockGripClick,
+  onBlockAddClick,
   currentCodeLanguage,
   currentFontFamily,
   currentFontSize,
@@ -7452,6 +8157,9 @@ provideRteBindings({
   emojiTabId,
   estimateReadingMinutes,
   get expanded() { return effectiveExpanded.value },
+  get tgStyle() { return tgStyle.value },
+  toggleTgStyle,
+  setToolbarStyle,
   toolbarRowsOpen,
   toggleToolbarRows,
   exportAsDocx,
@@ -7462,6 +8170,10 @@ provideRteBindings({
   exportAsPng,
   exportBusy,
   exportMenuOpen,
+  exportProgress,
+  exportPhase,
+  exportStatus,
+  cancelExport,
   filteredAttachAssets,
   filteredImageAssets,
   imageThumb,
@@ -7471,11 +8183,16 @@ provideRteBindings({
   filteredXrefTargets,
   findCaseSensitive,
   findDialogOpen,
+  findDialogStyle,
+  onFindDialogDragStart,
+  onFindDialogDragMove,
+  onFindDialogDragEnd,
   findGo,
   findQuery,
   findReplaceText,
   findRegex,
   findMultiline,
+  findScope,
   findStatusText,
   findWholeWord,
   focusMode,
@@ -7560,6 +8277,7 @@ provideRteBindings({
   insertSnippet,
   insertSpecialChar,
   isActive,
+  currentOrderedListStyle,
   isInTable,
   isKaomojiTab,
   isLargeEmojiTab,
@@ -7573,6 +8291,11 @@ provideRteBindings({
   jumpToOutlineHeading,
   jumpToPos,
   jumpWave21Report,
+  applyOptimizeAction,
+  appendOptimizeChecklist,
+  optimizePendingCount: computed(() =>
+    wave21ReportLines.value.filter((line) => !line.done && line.text !== '下面这些仍要手工处理：').length,
+  ),
   lineHeightOpen,
   linkCardDialogOpen,
   linkCardHref,
@@ -7585,10 +8308,26 @@ provideRteBindings({
   linkImportOpen,
   linkImportUrl,
   linkPopoverStyle,
+  markdownImportOpen,
+  markdownFileName,
+  markdownSource,
+  markdownHtml,
+  markdownStats,
+  markdownView,
+  openMarkdownImport,
+  closeMarkdownImport,
+  confirmMarkdownImport,
   linkText,
   listBookmarks,
   listDepthLabel,
   listOpen,
+  imageLayoutOpen,
+  textTidyOpen,
+  presetMenuKey,
+  togglePresetMenu,
+  openPresetMenu,
+  closePresetMenu,
+  TEXT_TIDY_ACTIONS,
   listStyleOpen,
   localTitle,
   markToolbarMenuOpening,
@@ -7604,6 +8343,8 @@ provideRteBindings({
   openOutlineMenu,
   closeOutlineMenu,
   outlineMenuJump,
+  outlineMenuMove,
+  outlineMenuCascade,
   outlineMenuCopyTitle,
   outlineMenuCopyLink,
   mentionEmptyHint,
@@ -7652,9 +8393,12 @@ provideRteBindings({
   noteTypeOpen,
   notesOpen,
   onAttachSelectAllChange,
+  onBlockAddEnter,
   onBlockDragEnd,
   onBlockDragStart,
   onBlockMenuKeydown,
+  onBlockPanelEnter,
+  onBlockPanelLeave,
   onCanvasBlockDragOver,
   onCanvasBlockDrop,
   onCanvasBlockHover,
@@ -7707,6 +8451,7 @@ provideRteBindings({
   pageSize,
   pageSizeMeta,
   paperGuide,
+  writingPaper,
   paraStyleOpen,
   pickImportDocument,
   pickMentionItem,
@@ -7714,7 +8459,13 @@ provideRteBindings({
   pickTableGridSize,
   printPreviewHtml,
   printPreviewMarginStyle,
+  printPreviewPaperStyle,
   printPreviewOpen,
+  printLinkUrls,
+  taskOpenOnly,
+  toggleTaskOpenOnly,
+  toggleTableZebra,
+  padListItem,
   readTimeDialogOpen,
   readingMinutes,
   refreshFindMatches,
@@ -7796,6 +8547,9 @@ provideRteBindings({
   tableGridHover,
   tableMenuOpen,
   tableOpItems,
+  tableInsertCounts,
+  normalizeTableInsertCount,
+  rememberTableInsertSelection,
   tableOpsSheetOpen,
   tableQuickCells,
   tableQuickHover,
@@ -7837,14 +8591,21 @@ provideRteBindings({
   ribbonTab,
   ribbonTabs,
   setRibbonTab,
+  toolbarQuery,
+  fontSizeButtonLabel,
+  recentFontSizeOptions,
+  restoreToolbarGroupButtons,
   toolbarGroupButtonEntries,
   toolbarGroupButtonsGroupId,
   toolbarGroupButtonsOpen,
   toggleToolbarGroupButton,
   moveToolbarGroupButton,
+  moveToolbarGroupButtonToEdge,
   closeToolbarGroupButtons,
   onToolbarGroupContextMenu,
   qrDialogOpen,
+  qrEditingPos,
+  qrDraft,
   insertQrArtwork,
   toolbarOrder,
   triggerLocalAttachPick,
@@ -7862,6 +8623,7 @@ provideRteBindings({
   wave21ReportOpen,
   wave21ReportTitle,
   wordCount,
+  wordParts,
   wordCountDockOpen,
   wordStatsOpen,
   xrefDialogOpen,
@@ -7881,14 +8643,22 @@ provideRteBindings({
   presentUnit,
   previewPageLabel,
   screenPageLabel,
+  screenHeader,
+  screenFooter,
   setPageFooter,
   setPageHeader,
+  setPageHeaderEven,
+  setPageFooterEven,
+  setPageGutter,
   setPageNumber,
   setPresentUnit,
   stepPresent,
   suggesting,
   suggestionColor,
   suggestionRanges,
+  visibleSuggestionRanges,
+  suggestionAuthors,
+  suggestionAuthorFilter,
   activeSuggestionId,
   acceptAllSuggestions,
   rejectAllSuggestions,
@@ -7897,10 +8667,12 @@ provideRteBindings({
   rteAuthor,
   commentsOpen,
   showResolved,
+  orphansOnly,
   commentDraft,
   replyDrafts,
   activeThreadId,
   shownThreads,
+  orphanIds,
   unresolvedCount,
   beginComment,
   cancelDraft,
@@ -7908,10 +8680,11 @@ provideRteBindings({
   submitReply,
   toggleResolved,
   removeMessage,
+  reanchorThread,
   jumpToThread,
 })
 
-defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm })
+defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm, insertDocTemplate })
 </script>
 
 <template>
@@ -7919,6 +8692,7 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
     ref="rteRootEl"
     class="rte-root"
     :data-page-size="pageSize"
+    :data-writing-paper="writingPaper || undefined"
     :data-margin="pageMargin.preset"
     :style="pageSheetStyle"
     :class="{
@@ -7930,6 +8704,8 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
       'mode-preview': viewMode === 'preview',
       'mode-source': viewMode === 'source',
       'is-focus-mode': focusMode,
+      // Telegram 紧凑风格只在非最大化（紧凑条）下生效；最大化始终保持原始 Ribbon 功能区样式
+      'is-tg-style': tgStyle && !effectiveExpanded,
       'is-dark-editor': darkEditor,
       'is-heading-auto-num': headingAutoNumber,
       'is-immersive': immersiveFullscreen,
@@ -7938,6 +8714,9 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
       'has-page-chrome': pageChromeActive,
       'is-page-feishu': pageSize === 'feishu',
       'is-table-sticky': tableHeaderSticky,
+      'is-task-open-only': taskOpenOnly,
+      'is-print-urls': printLinkUrls,
+      'is-table-col-sticky': tableColSticky,
       'is-cjk-typography': true,
       'is-drag-select': dragSelecting,
     }"
@@ -7950,6 +8729,7 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
     <RteDocumentBody />
     <RtePortals />
     <ChartPanel :host="chartPanelBridge.host" />
+    <ColumnsPanel :editor="editor" />
 
     <!-- 隐藏文件选择：导入文档 -->
     <input
@@ -7991,8 +8771,120 @@ defineExpose({ focusEditor, editor, onDraftBackup, openRtePrompt, openRteConfirm
       multiple
       @change="onLocalAudioFilesChange"
     />
+
+    <!-- 导入 Markdown：所见即所得预览（源码 / 预览并排，确认后再落库） -->
+    <Teleport to="body">
+      <div
+        v-if="markdownImportOpen"
+        class="rte-modal-overlay rte-md-import-overlay"
+        @mousedown.self="closeMarkdownImport"
+      >
+        <div
+          class="rte-md-import-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-label="导入 Markdown"
+          @mousedown.stop
+          @keydown.esc.prevent="closeMarkdownImport"
+        >
+          <header class="rte-md-import-head">
+            <div class="rte-md-import-title-wrap">
+              <h3 class="rte-md-import-title">导入 Markdown</h3>
+              <span class="rte-md-import-file" :title="markdownFileName">{{ markdownFileName }}</span>
+            </div>
+            <button
+              type="button"
+              class="rte-md-import-close"
+              title="关闭"
+              aria-label="关闭"
+              @click="closeMarkdownImport"
+            >
+              ✕
+            </button>
+          </header>
+
+          <div class="rte-md-import-toolbar">
+            <div class="rte-md-import-seg" role="tablist" aria-label="预览方式">
+              <button
+                type="button"
+                :class="{ 'is-active': markdownView === 'split' }"
+                role="tab"
+                :aria-selected="markdownView === 'split'"
+                title="源码与预览并排"
+                @click="markdownView = 'split'"
+              >
+                并排
+              </button>
+              <button
+                type="button"
+                :class="{ 'is-active': markdownView === 'preview' }"
+                role="tab"
+                :aria-selected="markdownView === 'preview'"
+                title="只看渲染结果"
+                @click="markdownView = 'preview'"
+              >
+                预览
+              </button>
+              <button
+                type="button"
+                :class="{ 'is-active': markdownView === 'source' }"
+                role="tab"
+                :aria-selected="markdownView === 'source'"
+                title="只看 Markdown 源码"
+                @click="markdownView = 'source'"
+              >
+                源码
+              </button>
+            </div>
+            <span class="rte-md-import-stats">{{ markdownStats }}</span>
+          </div>
+
+          <div class="rte-md-import-body" :data-view="markdownView">
+            <pre
+              v-show="markdownView !== 'preview'"
+              class="rte-md-import-source"
+            >{{ markdownSource }}</pre>
+            <div class="rte-root rte-md-import-preview-root">
+              <div
+                class="ProseMirror rte-md-import-preview"
+                v-show="markdownView !== 'source'"
+                v-html="markdownHtml"
+              />
+            </div>
+          </div>
+
+          <div class="rte-modal-actions rte-md-import-actions">
+            <button
+              type="button"
+              class="rte-modal-cancel"
+              title="不导入这份文档"
+              @click="closeMarkdownImport"
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              class="rte-md-import-action"
+              title="用预览里的内容替换整篇正文"
+              @click="confirmMarkdownImport('replace')"
+            >
+              替换全文
+            </button>
+            <button
+              type="button"
+              class="rte-modal-confirm"
+              title="把预览里的内容插入到当前光标处"
+              @click="confirmMarkdownImport('cursor')"
+            >
+              插入到光标
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
 <style scoped src="./rte/styles/editor.scoped.css"></style>
 <style src="./rte/styles/editor.global.css"></style>
+<style src="./rte/styles/telegram.ui.css"></style>

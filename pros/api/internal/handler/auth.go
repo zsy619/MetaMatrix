@@ -28,9 +28,16 @@ type AuthBackend interface {
 	NewCaptcha(clientKey string, wantAnswer bool) (service.CaptchaChallenge, error)
 }
 
+// ActivityRecorder 是活动日志的落点（登录与退出用）。
+type ActivityRecorder interface {
+	Record(entry model.ActivityLog)
+}
+
 type AuthHandler struct {
 	svc   AuthBackend
 	limit *service.AttemptLimiter
+	// activity 记录登录与退出。为空时不记录（测试与单机模式）。
+	activity ActivityRecorder
 	// captchaDebugAll hands the readable answer to every caller. It is only
 	// safe on a developer machine.
 	captchaDebugAll bool
@@ -45,6 +52,8 @@ type AuthOptions struct {
 	DebugAll bool
 	// DebugLoopback returns the readable captcha answer to loopback callers.
 	DebugLoopback bool
+	// Activity records login and logout events. Nil disables recording.
+	Activity ActivityRecorder
 }
 
 func NewAuthHandler(svc AuthBackend, limit *service.AttemptLimiter, opts ...AuthOptions) *AuthHandler {
@@ -60,6 +69,7 @@ func NewAuthHandler(svc AuthBackend, limit *service.AttemptLimiter, opts ...Auth
 		limit:                limit,
 		captchaDebugAll:      opt.DebugAll,
 		captchaDebugLoopback: opt.DebugLoopback,
+		activity:             opt.Activity,
 	}
 }
 
@@ -142,6 +152,12 @@ func (h *AuthHandler) Register(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 	if err := h.svc.VerifyCaptcha(body.CaptchaID, body.CaptchaCode); err != nil {
+		h.recordActivity(c, model.ActivityLog{
+			Category: "login",
+			Action:   "register_failed",
+			Status:   "failure",
+			Detail:   "验证码错误：" + body.Email,
+		})
 		captchaFailure(c, err)
 		return
 	}
@@ -161,6 +177,13 @@ func (h *AuthHandler) Register(ctx context.Context, c *app.RequestContext) {
 		}
 		return
 	}
+	h.recordActivity(c, model.ActivityLog{
+		UserID:   u.ID,
+		Category: "login",
+		Action:   "register_success",
+		Status:   "success",
+		Detail:   "注册成功：" + u.Email,
+	})
 	c.JSON(http.StatusCreated, map[string]interface{}{
 		"token": token,
 		"user":  service.UserPublic(u),
@@ -179,6 +202,12 @@ func (h *AuthHandler) Login(ctx context.Context, c *app.RequestContext) {
 	if ok, wait := h.limit.Allow(ip, email, now); !ok {
 		middleware.ObserveLoginThrottled()
 		middleware.Audit(c, "login_throttled", "", "rate_limited")
+		h.recordActivity(c, model.ActivityLog{
+			Category: "login",
+			Action:   "login_throttled",
+			Status:   "failure",
+			Detail:   "尝试过于频繁：" + email,
+		})
 		tooManyLogins(c, wait)
 		return
 	}
@@ -194,6 +223,12 @@ func (h *AuthHandler) Login(ctx context.Context, c *app.RequestContext) {
 			h.limit.RecordFailure(ip, email, time.Now())
 			middleware.ObserveLoginFailure()
 			middleware.Audit(c, "login_failure", "", "invalid_credentials")
+			h.recordActivity(c, model.ActivityLog{
+				Category: "login",
+				Action:   "login_failed",
+				Status:   "failure",
+				Detail:   "邮箱或密码不正确：" + email,
+			})
 			if ok, wait := h.limit.Allow(ip, email, time.Now()); !ok {
 				middleware.ObserveLoginThrottled()
 				tooManyLogins(c, wait)
@@ -202,22 +237,68 @@ func (h *AuthHandler) Login(ctx context.Context, c *app.RequestContext) {
 			Fail(c, http.StatusUnauthorized, "invalid email or password", "invalid_credentials")
 			return
 		}
+		h.recordActivity(c, model.ActivityLog{
+			Category: "login",
+			Action:   "login_failed",
+			Status:   "failure",
+			Detail:   "登录异常：" + email,
+		})
 		Internal(c, "login failed")
 		return
 	}
 	h.limit.Reset(ip, email)
+	h.recordActivity(c, model.ActivityLog{
+		UserID:   u.ID,
+		Category: "login",
+		Action:   "login_success",
+		Status:   "success",
+		Detail:   "登录成功：" + u.Email,
+	})
 	c.JSON(http.StatusOK, map[string]interface{}{
 		"token": token,
 		"user":  service.UserPublic(u),
 	})
 }
 
-func clientIP(c *app.RequestContext) string {
-	ip := c.ClientIP()
-	if ip == "" {
-		return "unknown"
+// Logout 记录一次退出登录。
+//
+// 令牌本身是无状态的，服务端不做吊销；这里只把「谁在什么时候退出了」记下来。
+func (h *AuthHandler) Logout(ctx context.Context, c *app.RequestContext) {
+	uid, ok := middleware.UserIDFromCtx(c)
+	if !ok {
+		Fail(c, http.StatusUnauthorized, "unauthorized", "unauthorized")
+		return
 	}
-	return ip
+	h.recordActivity(c, model.ActivityLog{
+		UserID:   uid,
+		Category: "logout",
+		Action:   "logout",
+		Status:   "success",
+		Detail:   "退出登录",
+	})
+	c.JSON(http.StatusOK, map[string]interface{}{"ok": true})
+}
+
+// recordActivity 写一条活动日志；没有配置记录器时什么都不做。
+func (h *AuthHandler) recordActivity(c *app.RequestContext, entry model.ActivityLog) {
+	if h.activity == nil {
+		return
+	}
+	entry.IP = clientIP(c)
+	entry.UserAgent = string(c.GetHeader("User-Agent"))
+	if len(entry.UserAgent) > 240 {
+		entry.UserAgent = entry.UserAgent[:240]
+	}
+	if v, ok := c.Get("requestID"); ok {
+		if id, isString := v.(string); isString {
+			entry.RequestID = id
+		}
+	}
+	h.activity.Record(entry)
+}
+
+func clientIP(c *app.RequestContext) string {
+	return middleware.ClientIP(c)
 }
 
 // remoteIP is the peer address of the socket. Unlike ClientIP it cannot be

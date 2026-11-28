@@ -15,7 +15,7 @@ const fields = computed(
 
 <template>
   <div class="rte-cp-section">
-    <h4 class="rte-cp-section-title">通用</h4>
+    <h4 class="rte-cp-section-title">标题与图例</h4>
     <ChartFieldRow
       v-for="field in fields"
       :key="field.path"

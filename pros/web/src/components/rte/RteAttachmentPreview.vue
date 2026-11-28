@@ -3,11 +3,14 @@ import { computed, inject, onBeforeUnmount, ref, watch } from 'vue'
 import { RTE_BINDINGS } from './bindings'
 import {
   attachmentDisplayName,
+  attachmentTable,
+  attachmentText,
   downloadAttachment,
   loadAttachment,
   type LoadedAttachment,
 } from '../../utils/rteAttachment'
 import { previewDoc, previewDocx, previewSheets, type SheetPreview } from '../../utils/rteOfficePreview'
+import { applyMediaPlaceholder, placeholderKind } from '../../utils/mediaPlaceholder'
 
 const rte = inject(RTE_BINDINGS)
 if (!rte) throw new Error('RteAttachmentPreview 必须放在 RichTextEditor 里')
@@ -25,12 +28,15 @@ const target = computed(() => rte.attachmentPreview as { href: string; name: str
 const open = computed(() => !!target.value)
 const kind = computed(() => loaded.value?.kind || 'file')
 const fileName = computed(() => attachmentDisplayName(loaded.value?.name || target.value?.name || ''))
+const textRows = computed(() => (kind.value === 'text' ? attachmentTable(text.value, fileName.value) : []))
 
 let objectOwned = ''
 
 function objectType(kind: LoadedAttachment['kind'], mime: string): string {
   if (kind === 'pdf') return 'application/pdf'
   if (kind === 'image') return mime.startsWith('image/') ? mime : 'image/png'
+  if (kind === 'audio') return mime.startsWith('audio/') ? mime : 'audio/mpeg'
+  if (kind === 'video') return mime.startsWith('video/') ? mime : 'video/mp4'
   return mime || 'application/octet-stream'
 }
 
@@ -58,6 +64,20 @@ function onKeydown(event: KeyboardEvent) {
   }
 }
 
+/**
+ * 预览图读不出来时换一张按类型配色的占位图，
+ * 不要让浏览器画裂图图标 + alt 文本（看起来像坏掉了）。
+ */
+function onImageError(event: Event) {
+  const el = event.target as HTMLImageElement | null
+  if (!el) return
+  applyMediaPlaceholder(el, {
+    name: fileName.value,
+    kind: placeholderKind(fileName.value, loaded.value?.mime || ''),
+    status: 'error',
+  })
+}
+
 function onDownload() {
   if (!loaded.value) return
   downloadAttachment(loaded.value.blob, loaded.value.name)
@@ -82,13 +102,13 @@ watch(target, async (next) => {
     const file = await loadAttachment(next.href, next.name)
     if (rte.attachmentPreview?.href !== next.href) return
     loaded.value = file
-    if (file.kind === 'text') text.value = await file.blob.text()
+    if (file.kind === 'text') text.value = await attachmentText(file.blob)
     else if (file.kind === 'docx') html.value = await previewDocx(file.blob)
     else if (file.kind === 'doc') html.value = await previewDoc(file.blob)
     else if (file.kind === 'sheet') {
       sheets.value = await previewSheets(file.blob)
       html.value = sheets.value[0]?.html || ''
-    } else if (file.kind === 'image' || file.kind === 'pdf') {
+    }     else if (file.kind === 'image' || file.kind === 'pdf' || file.kind === 'audio' || file.kind === 'video') {
       await openObject(file.blob, objectType(file.kind, file.mime))
       if (rte.attachmentPreview?.href !== next.href) releaseObject()
     }
@@ -128,8 +148,16 @@ onBeforeUnmount(() => {
         <div class="rte-attach-preview-body">
           <p v-if="loading" class="rte-attach-preview-status">正在打开附件…</p>
           <p v-else-if="error" class="rte-attach-preview-status is-error">{{ error }}</p>
-          <img v-else-if="kind === 'image' && objectUrl" :src="objectUrl" :alt="fileName" />
+          <img
+            v-else-if="kind === 'image' && objectUrl"
+            :src="objectUrl"
+            :alt="fileName"
+            class="rte-attach-image"
+            @error="onImageError"
+          />
           <iframe v-else-if="kind === 'pdf' && objectUrl" :src="objectUrl" :title="fileName"></iframe>
+          <audio v-else-if="kind === 'audio' && objectUrl" :src="objectUrl" :aria-label="fileName" controls></audio>
+          <video v-else-if="kind === 'video' && objectUrl" :src="objectUrl" :aria-label="fileName" controls></video>
           <div v-else-if="kind === 'sheet'" class="rte-attach-sheet">
             <div v-if="sheets.length > 1" class="rte-attach-sheet-tabs" role="tablist">
               <button
@@ -156,6 +184,15 @@ onBeforeUnmount(() => {
             class="rte-attach-doc"
             v-html="html"
           ></div>
+          <div v-else-if="kind === 'text' && textRows.length" class="rte-attach-sheet-table">
+            <table>
+              <tbody>
+                <tr v-for="(row, rowIndex) in textRows" :key="rowIndex">
+                  <td v-for="(cell, cellIndex) in row" :key="cellIndex">{{ cell }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
           <pre v-else-if="kind === 'text'">{{ text || '这份文档里没有可预览的文字，可以下载原文件。' }}</pre>
           <p v-else-if="kind === 'docx' || kind === 'doc'" class="rte-attach-preview-status">
             这份文档里没有可预览的文字，可以下载原文件。
@@ -244,6 +281,16 @@ onBeforeUnmount(() => {
   border: 0;
   background: #fff;
 }
+.rte-attach-preview-body audio,
+.rte-attach-preview-body video {
+  display: block;
+  width: 100%;
+  max-height: 100%;
+  background: #111;
+}
+.rte-attach-preview-body video {
+  min-height: 240px;
+}
 .rte-attach-preview-body pre {
   margin: 0;
   padding: 16px;
@@ -292,11 +339,14 @@ onBeforeUnmount(() => {
 .rte-attach-doc :deep(td),
 .rte-attach-doc :deep(th),
 .rte-attach-sheet-table :deep(td),
-.rte-attach-sheet-table :deep(th) {
+.rte-attach-sheet-table :deep(th),
+.rte-attach-sheet-table td,
+.rte-attach-sheet-table th {
   border: 1px solid #e5e6eb;
   padding: 6px 8px;
   text-align: left;
   vertical-align: top;
+  white-space: pre-wrap;
 }
 .rte-attach-doc :deep(img) {
   max-width: 100%;

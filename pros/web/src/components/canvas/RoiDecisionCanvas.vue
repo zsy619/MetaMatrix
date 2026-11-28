@@ -129,10 +129,12 @@ onMounted(() => {
               type="button"
               class="rd-row-delete"
               title="删除本行"
+              aria-label="删除本行"
               :disabled="doc.rows.length <= 1"
               @click="onRemoveRow(row.id)"
             >
-              ×
+              <span class="rd-row-delete-mark" aria-hidden="true">×</span>
+              <span class="rd-row-delete-text">删除本行</span>
             </button>
           </div>
         </div>
@@ -219,7 +221,7 @@ onMounted(() => {
 .rd-matrix-headers {
   flex-shrink: 0;
   display: grid;
-  grid-template-columns: minmax(96px, 0.7fr) minmax(0, 1.4fr) minmax(0, 1.4fr) 36px;
+  grid-template-columns: minmax(96px, 0.7fr) minmax(0, 1.4fr) minmax(0, 1.4fr) 52px;
   background: transparent;
   border-bottom: 1px solid var(--cv-frame, #ececec);
 }
@@ -256,9 +258,11 @@ onMounted(() => {
 
 .rd-row {
   display: grid;
-  grid-template-columns: minmax(96px, 0.7fr) minmax(0, 1.4fr) minmax(0, 1.4fr) 36px;
-  /* Align with global panel min-height (≥400px), including newly added rows */
+  grid-template-columns: minmax(96px, 0.7fr) minmax(0, 1.4fr) minmax(0, 1.4fr) 52px;
+  grid-auto-rows: max-content;
+  /* Empty rows stay readable; taller notes extend the row */
   min-height: 400px;
+  height: auto;
   border-bottom: 1px solid var(--cv-frame, #ececec);
   background: transparent;
 }
@@ -312,7 +316,7 @@ onMounted(() => {
 
 .rd-cell {
   min-width: 0;
-  min-height: inherit;
+  height: auto;
   padding: 6px 8px;
   box-sizing: border-box;
   border-right: 1px solid var(--cv-frame, #ececec);
@@ -326,12 +330,44 @@ onMounted(() => {
 }
 
 .rd-cell :deep(.ym-block) {
-  flex: 1;
-  /* Match .rd-panel :deep(.ym-block) global panel min-height */
-  min-height: 400px;
+  flex: 1 0 auto;
+  height: auto;
+  min-height: 100%;
+  width: 100%;
   background: transparent;
   border: none;
   box-shadow: none;
+}
+
+.rd-cell :deep(.ym-block-body),
+.rd-cell :deep(.rte-root),
+.rd-cell :deep(.rte-workspace),
+.rd-cell :deep(.rte-canvas),
+.rd-cell :deep(.rte-body),
+.rd-cell :deep(.ProseMirror) {
+  height: auto;
+  max-height: none;
+  max-width: 100%;
+  min-width: 0;
+  overflow: visible;
+  flex: 1 0 auto;
+}
+
+.rd-cell :deep(.rte-workspace),
+.rd-cell :deep(.rte-canvas),
+.rd-cell :deep(.ProseMirror) {
+  width: 100%;
+}
+
+.rd-cell :deep(.ProseMirror p) {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.rd-cell :deep(.pm-max-btn) {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
 }
 
 .rd-cell :deep(.ym-block-toolbar) {
@@ -344,9 +380,11 @@ onMounted(() => {
   opacity: 1;
 }
 
-.rd-cell :deep(.ProseMirror) {
+.rd-cell :deep(.rte-root .ProseMirror),
+.rd-cell :deep(.rte-root.compact .ProseMirror) {
   text-align: left;
-  font-size: 14px;
+  min-height: 320px;
+  font-size: 16px;
   line-height: 1.65;
   color: #202124;
 }
@@ -360,16 +398,23 @@ onMounted(() => {
 }
 
 .rd-row-delete {
-  width: 22px;
-  height: 22px;
-  border: none;
-  border-radius: 4px;
-  background: transparent;
-  color: #9aa0a6;
-  font-size: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid #e4e6e8;
+  border-radius: 8px;
+  background: #fff;
+  color: #5f6368;
+  font-size: 22px;
   line-height: 1;
   cursor: pointer;
   padding: 0;
+}
+
+.rd-row-delete-text {
+  display: none;
 }
 
 .rd-row-delete:hover:not(:disabled) {
@@ -393,12 +438,13 @@ onMounted(() => {
 
 .rd-add-btn {
   border: 1px solid var(--cv-frame, #ececec);
-  border-radius: 6px;
+  border-radius: 8px;
   background: #fff;
   color: var(--cv-ink, #3c4043);
-  font-size: 13px;
-  font-weight: 600;
-  padding: 6px 16px;
+  font-size: 15px;
+  font-weight: 650;
+  min-height: 40px;
+  padding: 8px 18px;
   cursor: pointer;
   transition:
     background 0.12s ease,
@@ -459,33 +505,66 @@ onMounted(() => {
 }
 
 .rd-panel {
-  flex: 1;
+  flex: 0 0 auto;
   min-height: 400px;
+  height: auto;
   display: flex;
   flex-direction: column;
   background: transparent;
   padding: 10px 12px 8px;
   box-sizing: border-box;
-  overflow: auto;
+  overflow: visible;
 }
 
 .rd-panel :deep(.ym-block) {
-  flex: 1;
-  min-height: 400px;
+  flex: 1 0 auto;
+  height: auto;
+  min-height: 100%;
+  width: 100%;
   background: transparent;
   border: none;
   box-shadow: none;
 }
 
+.rd-panel :deep(.ym-block-body),
+.rd-panel :deep(.rte-root),
+.rd-panel :deep(.rte-workspace),
+.rd-panel :deep(.rte-canvas),
+.rd-panel :deep(.rte-body),
 .rd-panel :deep(.ProseMirror) {
+  height: auto;
+  max-height: none;
+  max-width: 100%;
+  min-width: 0;
+  overflow: visible;
+  flex: 1 0 auto;
+}
+
+.rd-panel :deep(.rte-workspace),
+.rd-panel :deep(.rte-canvas),
+.rd-panel :deep(.ProseMirror) {
+  width: 100%;
+}
+
+.rd-panel :deep(.rte-root .ProseMirror),
+.rd-panel :deep(.rte-root.compact .ProseMirror) {
   text-align: left;
-  font-size: 14px;
-  line-height: 1.65;
+  min-height: 320px;
+  font-size: 16px;
+  line-height: 1.7;
   color: #202124;
+}
+
+.rd-panel :deep(.pm-max-btn) {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
 }
 
 .rd-panel :deep(.ProseMirror p) {
   margin: 0.35em 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 /* ---- Bottom conclusion ---- */
@@ -515,14 +594,44 @@ onMounted(() => {
 }
 
 @media (max-width: 720px) {
+  .rd-canvas {
+    padding-bottom: 96px;
+  }
+
   .rd-matrix-headers,
   .rd-row {
     grid-template-columns: 1fr;
   }
 
-  .rd-col-header--actions,
-  .rd-row-actions {
+  .rd-col-header--actions {
     display: none;
+  }
+
+  .rd-row-actions {
+    display: flex;
+    justify-content: flex-end;
+    padding: 8px 12px 14px;
+    background: transparent;
+  }
+
+  .rd-row-delete {
+    width: auto;
+    height: 40px;
+    gap: 6px;
+    padding: 0 14px;
+    border-color: #f3c1bc;
+    background: #fff;
+    color: #c5221f;
+    font-size: 15px;
+    font-weight: 650;
+  }
+
+  .rd-row-delete-mark {
+    font-size: 20px;
+  }
+
+  .rd-row-delete-text {
+    display: inline;
   }
 
   .rd-dim,
@@ -544,7 +653,24 @@ onMounted(() => {
   }
 
   .rd-cell {
-    min-height: 200px;
+    min-height: 180px;
+    height: auto;
+  }
+
+  .rd-cell :deep(.rte-root .ProseMirror),
+  .rd-cell :deep(.rte-root.compact .ProseMirror),
+  .rd-panel :deep(.rte-root .ProseMirror),
+  .rd-panel :deep(.rte-root.compact .ProseMirror) {
+    min-height: 96px;
+  }
+
+  .rd-cell :deep(.ym-block-toolbar) {
+    opacity: 1;
+  }
+
+  .rd-panel,
+  .rd-panel--conclusion {
+    min-height: 180px;
   }
 
   .rd-middle {

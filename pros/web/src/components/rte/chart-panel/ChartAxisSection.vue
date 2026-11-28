@@ -17,7 +17,7 @@ const fields = computed(
   <div v-if="fields.length" class="rte-cp-section">
     <h4 class="rte-cp-section-title">坐标轴</h4>
     <div class="rte-cp-sub">
-      <div class="rte-cp-sub-title">X 轴</div>
+      <div class="rte-cp-sub-title">横轴</div>
       <ChartFieldRow
         v-for="field in fields"
         :key="'x-' + field.path"
@@ -27,7 +27,7 @@ const fields = computed(
       />
     </div>
     <div class="rte-cp-sub">
-      <div class="rte-cp-sub-title">Y 轴</div>
+      <div class="rte-cp-sub-title">纵轴</div>
       <ChartFieldRow
         v-for="field in fields"
         :key="'y-' + field.path"

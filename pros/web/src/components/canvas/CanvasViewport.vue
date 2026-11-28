@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, defineAsyncComponent } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useDocumentStore } from '../../stores/document'
 import { useUiStore } from '../../stores/ui'
@@ -41,6 +41,10 @@ import {
   isPmSolutionTriangleDoc,
   isGrowthAssumptionsDoc,
   isBusinessFormulaDoc,
+  isAbcModelDoc,
+  isBusinessFormulaPatternsDoc,
+  isCultivationMountainDoc,
+  isHackerFiveStepsDoc,
   isThreeRingBasicsDoc,
   isLeadershipTriangleDoc,
   isContextSixElementsDoc,
@@ -57,74 +61,118 @@ import {
   isPdcaDoc,
   isFiveForcesDoc,
   isIncomeStatementDoc,
+  isPestleDoc,
+  isAnsoffDoc,
+  isEmpathyDoc,
+  isMarketingMixDoc,
   isBcgDoc,
   isScorecardDoc,
   isErrcDoc,
   isAarrDoc,
+  isValueChainDoc,
+  isSevenSDoc,
+  isRiceDoc,
+  isBreakEvenDoc,
+  isJourneyDoc,
+  isKanoDoc,
+  isMoscowDoc,
+  isImpactEffortDoc,
+  isVrioDoc,
+  isGoldenCircleDoc,
+  isSoarDoc,
+  isPlayingToWinDoc,
+  isTenCheckDoc,
+  isSceneThreeHighDoc,
+  isAiBoundaryDoc,
+  isFdeSheetDoc,
   isYModelDoc,
 } from '../../types/canvas'
-import BackgroundLayer from './BackgroundLayer.vue'
-import QuadrantGrid from './QuadrantGrid.vue'
-import AxesLayer from './AxesLayer.vue'
-import MarkersLayer from './MarkersLayer.vue'
-import DualTriangleCanvas from './DualTriangleCanvas.vue'
-import DualTriangleHumanAiCanvas from './DualTriangleHumanAiCanvas.vue'
-import YModelCanvas from './YModelCanvas.vue'
-import DeliberatePracticeCanvas from './DeliberatePracticeCanvas.vue'
-import DemandTriangleCanvas from './DemandTriangleCanvas.vue'
-import FiveStepCanvas from './FiveStepCanvas.vue'
-import FiveStepDivisionCanvas from './FiveStepDivisionCanvas.vue'
-import FiveStepBasicCanvas from './FiveStepBasicCanvas.vue'
-import FiveStepAdvancedCanvas from './FiveStepAdvancedCanvas.vue'
-import FiveStepProCanvas from './FiveStepProCanvas.vue'
-import FiveStepChallengeCanvas from './FiveStepChallengeCanvas.vue'
-import AiTradeoffCanvas from './AiTradeoffCanvas.vue'
-import ProductContentCanvas from './ProductContentCanvas.vue'
-import OscarCanvas from './OscarCanvas.vue'
-import IndustryAnalysisCanvas from './IndustryAnalysisCanvas.vue'
-import KeyResistanceCanvas from './KeyResistanceCanvas.vue'
-import ConversionTradeoffCanvas from './ConversionTradeoffCanvas.vue'
-import IndustryForecastCanvas from './IndustryForecastCanvas.vue'
-import ScientificMeetingCanvas from './ScientificMeetingCanvas.vue'
-import IpoCanvas from './IpoCanvas.vue'
-import IncidentReviewCanvas from './IncidentReviewCanvas.vue'
-import AnnualSummaryCanvas from './AnnualSummaryCanvas.vue'
-import PeriodSummaryCanvas from './PeriodSummaryCanvas.vue'
-import DeepReviewCanvas from './DeepReviewCanvas.vue'
-import PmRetroValueCanvas from './PmRetroValueCanvas.vue'
-import RoiTradeoffCanvas from './RoiTradeoffCanvas.vue'
-import RoiDecisionCanvas from './RoiDecisionCanvas.vue'
-import TimeMatrixCanvas from './TimeMatrixCanvas.vue'
-import WorkStateZonesCanvas from './WorkStateZonesCanvas.vue'
-import OnlineOfflineCommCanvas from './OnlineOfflineCommCanvas.vue'
-import UnitModelQuadrantCanvas from './UnitModelQuadrantCanvas.vue'
-import PmSensitivity6dCanvas from './PmSensitivity6dCanvas.vue'
-import PmCompetencyCanvas from './PmCompetencyCanvas.vue'
-import ScientificMeeting10pCanvas from './ScientificMeeting10pCanvas.vue'
-import ProductFeatures5dCanvas from './ProductFeatures5dCanvas.vue'
-import PmSolutionTriangleCanvas from './PmSolutionTriangleCanvas.vue'
-import GrowthAssumptionsCanvas from './GrowthAssumptionsCanvas.vue'
-import BusinessFormulaCanvas from './BusinessFormulaCanvas.vue'
-import ThreeRingBasicsCanvas from './ThreeRingBasicsCanvas.vue'
-import LeadershipTriangleCanvas from './LeadershipTriangleCanvas.vue'
-import ContextSixElementsCanvas from './ContextSixElementsCanvas.vue'
-import ProjectGanttCanvas from './ProjectGanttCanvas.vue'
-import RaciMatrixCanvas from './RaciMatrixCanvas.vue'
-import DailyKanbanCanvas from './DailyKanbanCanvas.vue'
-import BusinessModelCanvas from './BusinessModelCanvas.vue'
-import CashFlowCanvas from './CashFlowCanvas.vue'
-import SwotCanvas from './SwotCanvas.vue'
-import LeanCanvas from './LeanCanvas.vue'
-import ValuePropositionCanvas from './ValuePropositionCanvas.vue'
-import OkrCanvas from './OkrCanvas.vue'
-import StakeholderCanvas from './StakeholderCanvas.vue'
-import PdcaCanvas from './PdcaCanvas.vue'
-import FiveForcesCanvas from './FiveForcesCanvas.vue'
-import IncomeStatementCanvas from './IncomeStatementCanvas.vue'
-import BcgCanvas from './BcgCanvas.vue'
-import ScorecardCanvas from './ScorecardCanvas.vue'
-import ErrcCanvas from './ErrcCanvas.vue'
-import AarrCanvas from './AarrCanvas.vue'
+const BackgroundLayer = defineAsyncComponent(() => import('./BackgroundLayer.vue'))
+const QuadrantGrid = defineAsyncComponent(() => import('./QuadrantGrid.vue'))
+const AxesLayer = defineAsyncComponent(() => import('./AxesLayer.vue'))
+const MarkersLayer = defineAsyncComponent(() => import('./MarkersLayer.vue'))
+const DualTriangleCanvas = defineAsyncComponent(() => import('./DualTriangleCanvas.vue'))
+const DualTriangleHumanAiCanvas = defineAsyncComponent(() => import('./DualTriangleHumanAiCanvas.vue'))
+const YModelCanvas = defineAsyncComponent(() => import('./YModelCanvas.vue'))
+const DeliberatePracticeCanvas = defineAsyncComponent(() => import('./DeliberatePracticeCanvas.vue'))
+const DemandTriangleCanvas = defineAsyncComponent(() => import('./DemandTriangleCanvas.vue'))
+const FiveStepCanvas = defineAsyncComponent(() => import('./FiveStepCanvas.vue'))
+const FiveStepDivisionCanvas = defineAsyncComponent(() => import('./FiveStepDivisionCanvas.vue'))
+const FiveStepBasicCanvas = defineAsyncComponent(() => import('./FiveStepBasicCanvas.vue'))
+const FiveStepAdvancedCanvas = defineAsyncComponent(() => import('./FiveStepAdvancedCanvas.vue'))
+const FiveStepProCanvas = defineAsyncComponent(() => import('./FiveStepProCanvas.vue'))
+const FiveStepChallengeCanvas = defineAsyncComponent(() => import('./FiveStepChallengeCanvas.vue'))
+const AiTradeoffCanvas = defineAsyncComponent(() => import('./AiTradeoffCanvas.vue'))
+const ProductContentCanvas = defineAsyncComponent(() => import('./ProductContentCanvas.vue'))
+const OscarCanvas = defineAsyncComponent(() => import('./OscarCanvas.vue'))
+const IndustryAnalysisCanvas = defineAsyncComponent(() => import('./IndustryAnalysisCanvas.vue'))
+const KeyResistanceCanvas = defineAsyncComponent(() => import('./KeyResistanceCanvas.vue'))
+const ConversionTradeoffCanvas = defineAsyncComponent(() => import('./ConversionTradeoffCanvas.vue'))
+const IndustryForecastCanvas = defineAsyncComponent(() => import('./IndustryForecastCanvas.vue'))
+const ScientificMeetingCanvas = defineAsyncComponent(() => import('./ScientificMeetingCanvas.vue'))
+const IpoCanvas = defineAsyncComponent(() => import('./IpoCanvas.vue'))
+const IncidentReviewCanvas = defineAsyncComponent(() => import('./IncidentReviewCanvas.vue'))
+const AnnualSummaryCanvas = defineAsyncComponent(() => import('./AnnualSummaryCanvas.vue'))
+const PeriodSummaryCanvas = defineAsyncComponent(() => import('./PeriodSummaryCanvas.vue'))
+const DeepReviewCanvas = defineAsyncComponent(() => import('./DeepReviewCanvas.vue'))
+const PmRetroValueCanvas = defineAsyncComponent(() => import('./PmRetroValueCanvas.vue'))
+const RoiTradeoffCanvas = defineAsyncComponent(() => import('./RoiTradeoffCanvas.vue'))
+const RoiDecisionCanvas = defineAsyncComponent(() => import('./RoiDecisionCanvas.vue'))
+const TimeMatrixCanvas = defineAsyncComponent(() => import('./TimeMatrixCanvas.vue'))
+const WorkStateZonesCanvas = defineAsyncComponent(() => import('./WorkStateZonesCanvas.vue'))
+const OnlineOfflineCommCanvas = defineAsyncComponent(() => import('./OnlineOfflineCommCanvas.vue'))
+const UnitModelQuadrantCanvas = defineAsyncComponent(() => import('./UnitModelQuadrantCanvas.vue'))
+const PmSensitivity6dCanvas = defineAsyncComponent(() => import('./PmSensitivity6dCanvas.vue'))
+const PmCompetencyCanvas = defineAsyncComponent(() => import('./PmCompetencyCanvas.vue'))
+const ScientificMeeting10pCanvas = defineAsyncComponent(() => import('./ScientificMeeting10pCanvas.vue'))
+const ProductFeatures5dCanvas = defineAsyncComponent(() => import('./ProductFeatures5dCanvas.vue'))
+const PmSolutionTriangleCanvas = defineAsyncComponent(() => import('./PmSolutionTriangleCanvas.vue'))
+const GrowthAssumptionsCanvas = defineAsyncComponent(() => import('./GrowthAssumptionsCanvas.vue'))
+const BusinessFormulaCanvas = defineAsyncComponent(() => import('./BusinessFormulaCanvas.vue'))
+const AbcModelCanvas = defineAsyncComponent(() => import('./AbcModelCanvas.vue'))
+const BusinessFormulaPatternsCanvas = defineAsyncComponent(() => import('./BusinessFormulaPatternsCanvas.vue'))
+const CultivationMountainCanvas = defineAsyncComponent(() => import('./CultivationMountainCanvas.vue'))
+const HackerFiveStepsCanvas = defineAsyncComponent(() => import('./HackerFiveStepsCanvas.vue'))
+const ThreeRingBasicsCanvas = defineAsyncComponent(() => import('./ThreeRingBasicsCanvas.vue'))
+const LeadershipTriangleCanvas = defineAsyncComponent(() => import('./LeadershipTriangleCanvas.vue'))
+const ContextSixElementsCanvas = defineAsyncComponent(() => import('./ContextSixElementsCanvas.vue'))
+const ProjectGanttCanvas = defineAsyncComponent(() => import('./ProjectGanttCanvas.vue'))
+const RaciMatrixCanvas = defineAsyncComponent(() => import('./RaciMatrixCanvas.vue'))
+const DailyKanbanCanvas = defineAsyncComponent(() => import('./DailyKanbanCanvas.vue'))
+const BusinessModelCanvas = defineAsyncComponent(() => import('./BusinessModelCanvas.vue'))
+const CashFlowCanvas = defineAsyncComponent(() => import('./CashFlowCanvas.vue'))
+const SwotCanvas = defineAsyncComponent(() => import('./SwotCanvas.vue'))
+const LeanCanvas = defineAsyncComponent(() => import('./LeanCanvas.vue'))
+const ValuePropositionCanvas = defineAsyncComponent(() => import('./ValuePropositionCanvas.vue'))
+const OkrCanvas = defineAsyncComponent(() => import('./OkrCanvas.vue'))
+const StakeholderCanvas = defineAsyncComponent(() => import('./StakeholderCanvas.vue'))
+const PdcaCanvas = defineAsyncComponent(() => import('./PdcaCanvas.vue'))
+const FiveForcesCanvas = defineAsyncComponent(() => import('./FiveForcesCanvas.vue'))
+const IncomeStatementCanvas = defineAsyncComponent(() => import('./IncomeStatementCanvas.vue'))
+const PestleCanvas = defineAsyncComponent(() => import('./PestleCanvas.vue'))
+const AnsoffCanvas = defineAsyncComponent(() => import('./AnsoffCanvas.vue'))
+const EmpathyCanvas = defineAsyncComponent(() => import('./EmpathyCanvas.vue'))
+const MarketingMixCanvas = defineAsyncComponent(() => import('./MarketingMixCanvas.vue'))
+const BcgCanvas = defineAsyncComponent(() => import('./BcgCanvas.vue'))
+const ScorecardCanvas = defineAsyncComponent(() => import('./ScorecardCanvas.vue'))
+const ErrcCanvas = defineAsyncComponent(() => import('./ErrcCanvas.vue'))
+const AarrCanvas = defineAsyncComponent(() => import('./AarrCanvas.vue'))
+const ValueChainCanvas = defineAsyncComponent(() => import('./ValueChainCanvas.vue'))
+const SevenSCanvas = defineAsyncComponent(() => import('./SevenSCanvas.vue'))
+const RiceCanvas = defineAsyncComponent(() => import('./RiceCanvas.vue'))
+const BreakEvenCanvas = defineAsyncComponent(() => import('./BreakEvenCanvas.vue'))
+const JourneyCanvas = defineAsyncComponent(() => import('./JourneyCanvas.vue'))
+const KanoCanvas = defineAsyncComponent(() => import('./KanoCanvas.vue'))
+const MoscowCanvas = defineAsyncComponent(() => import('./MoscowCanvas.vue'))
+const ImpactEffortCanvas = defineAsyncComponent(() => import('./ImpactEffortCanvas.vue'))
+const VrioCanvas = defineAsyncComponent(() => import('./VrioCanvas.vue'))
+const GoldenCircleCanvas = defineAsyncComponent(() => import('./GoldenCircleCanvas.vue'))
+const SoarCanvas = defineAsyncComponent(() => import('./SoarCanvas.vue'))
+const PlayingToWinCanvas = defineAsyncComponent(() => import('./PlayingToWinCanvas.vue'))
+const TenCheckCanvas = defineAsyncComponent(() => import('./TenCheckCanvas.vue'))
+const SceneThreeHighCanvas = defineAsyncComponent(() => import('./SceneThreeHighCanvas.vue'))
+const AiBoundaryCanvas = defineAsyncComponent(() => import('./AiBoundaryCanvas.vue'))
+const FdeSheetCanvas = defineAsyncComponent(() => import('./FdeSheetCanvas.vue'))
 
 const documentStore = useDocumentStore()
 const ui = useUiStore()
@@ -245,6 +293,18 @@ const growthAssumptionsDoc = computed(() =>
 const businessFormulaDoc = computed(() =>
   isBusinessFormulaDoc(current_data.value) ? current_data.value : null,
 )
+const abcModelDoc = computed(() =>
+  isAbcModelDoc(current_data.value) ? current_data.value : null,
+)
+const businessFormulaPatternsDoc = computed(() =>
+  isBusinessFormulaPatternsDoc(current_data.value) ? current_data.value : null,
+)
+const cultivationMountainDoc = computed(() =>
+  isCultivationMountainDoc(current_data.value) ? current_data.value : null,
+)
+const hackerFiveStepsDoc = computed(() =>
+  isHackerFiveStepsDoc(current_data.value) ? current_data.value : null,
+)
 const threeRingBasicsDoc = computed(() =>
   isThreeRingBasicsDoc(current_data.value) ? current_data.value : null,
 )
@@ -281,10 +341,30 @@ const fiveForcesDoc = computed(() => (isFiveForcesDoc(current_data.value) ? curr
 const incomeStatementDoc = computed(() =>
   isIncomeStatementDoc(current_data.value) ? current_data.value : null,
 )
+const pestleDoc = computed(() => (isPestleDoc(current_data.value) ? current_data.value : null))
+const ansoffDoc = computed(() => (isAnsoffDoc(current_data.value) ? current_data.value : null))
+const empathyDoc = computed(() => (isEmpathyDoc(current_data.value) ? current_data.value : null))
+const marketingMixDoc = computed(() => (isMarketingMixDoc(current_data.value) ? current_data.value : null))
 const bcgDoc = computed(() => (isBcgDoc(current_data.value) ? current_data.value : null))
 const scorecardDoc = computed(() => (isScorecardDoc(current_data.value) ? current_data.value : null))
 const errcDoc = computed(() => (isErrcDoc(current_data.value) ? current_data.value : null))
 const aarrDoc = computed(() => (isAarrDoc(current_data.value) ? current_data.value : null))
+const valueChainDoc = computed(() => (isValueChainDoc(current_data.value) ? current_data.value : null))
+const sevenSDoc = computed(() => (isSevenSDoc(current_data.value) ? current_data.value : null))
+const riceDoc = computed(() => (isRiceDoc(current_data.value) ? current_data.value : null))
+const breakEvenDoc = computed(() => (isBreakEvenDoc(current_data.value) ? current_data.value : null))
+const journeyDoc = computed(() => (isJourneyDoc(current_data.value) ? current_data.value : null))
+const kanoDoc = computed(() => (isKanoDoc(current_data.value) ? current_data.value : null))
+const moscowDoc = computed(() => (isMoscowDoc(current_data.value) ? current_data.value : null))
+const impactEffortDoc = computed(() => (isImpactEffortDoc(current_data.value) ? current_data.value : null))
+const vrioDoc = computed(() => (isVrioDoc(current_data.value) ? current_data.value : null))
+const goldenCircleDoc = computed(() => (isGoldenCircleDoc(current_data.value) ? current_data.value : null))
+const soarDoc = computed(() => (isSoarDoc(current_data.value) ? current_data.value : null))
+const playingToWinDoc = computed(() => (isPlayingToWinDoc(current_data.value) ? current_data.value : null))
+const tenCheckDoc = computed(() => (isTenCheckDoc(current_data.value) ? current_data.value : null))
+const sceneThreeHighDoc = computed(() => (isSceneThreeHighDoc(current_data.value) ? current_data.value : null))
+const aiBoundaryDoc = computed(() => (isAiBoundaryDoc(current_data.value) ? current_data.value : null))
+const fdeSheetDoc = computed(() => (isFdeSheetDoc(current_data.value) ? current_data.value : null))
 const quadrantDoc = computed(() =>
   isQuadrantDoc(current_data.value) ? current_data.value : null,
 )
@@ -413,6 +493,18 @@ const quadrantDoc = computed(() =>
         <template v-else-if="businessFormulaDoc">
           <BusinessFormulaCanvas :doc="businessFormulaDoc" />
         </template>
+        <template v-else-if="abcModelDoc">
+          <AbcModelCanvas :doc="abcModelDoc" />
+        </template>
+        <template v-else-if="businessFormulaPatternsDoc">
+          <BusinessFormulaPatternsCanvas :doc="businessFormulaPatternsDoc" />
+        </template>
+        <template v-else-if="cultivationMountainDoc">
+          <CultivationMountainCanvas :doc="cultivationMountainDoc" />
+        </template>
+        <template v-else-if="hackerFiveStepsDoc">
+          <HackerFiveStepsCanvas :doc="hackerFiveStepsDoc" />
+        </template>
         <template v-else-if="threeRingBasicsDoc">
           <ThreeRingBasicsCanvas :doc="threeRingBasicsDoc" />
         </template>
@@ -461,6 +553,18 @@ const quadrantDoc = computed(() =>
         <template v-else-if="incomeStatementDoc">
           <IncomeStatementCanvas :doc="incomeStatementDoc" />
         </template>
+        <template v-else-if="pestleDoc">
+          <PestleCanvas :doc="pestleDoc" />
+        </template>
+        <template v-else-if="ansoffDoc">
+          <AnsoffCanvas :doc="ansoffDoc" />
+        </template>
+        <template v-else-if="empathyDoc">
+          <EmpathyCanvas :doc="empathyDoc" />
+        </template>
+        <template v-else-if="marketingMixDoc">
+          <MarketingMixCanvas :doc="marketingMixDoc" />
+        </template>
         <template v-else-if="bcgDoc">
           <BcgCanvas :doc="bcgDoc" />
         </template>
@@ -472,6 +576,54 @@ const quadrantDoc = computed(() =>
         </template>
         <template v-else-if="aarrDoc">
           <AarrCanvas :doc="aarrDoc" />
+        </template>
+        <template v-else-if="valueChainDoc">
+          <ValueChainCanvas :doc="valueChainDoc" />
+        </template>
+        <template v-else-if="sevenSDoc">
+          <SevenSCanvas :doc="sevenSDoc" />
+        </template>
+        <template v-else-if="riceDoc">
+          <RiceCanvas :doc="riceDoc" />
+        </template>
+        <template v-else-if="breakEvenDoc">
+          <BreakEvenCanvas :doc="breakEvenDoc" />
+        </template>
+        <template v-else-if="journeyDoc">
+          <JourneyCanvas :doc="journeyDoc" />
+        </template>
+        <template v-else-if="kanoDoc">
+          <KanoCanvas :doc="kanoDoc" />
+        </template>
+        <template v-else-if="moscowDoc">
+          <MoscowCanvas :doc="moscowDoc" />
+        </template>
+        <template v-else-if="impactEffortDoc">
+          <ImpactEffortCanvas :doc="impactEffortDoc" />
+        </template>
+        <template v-else-if="vrioDoc">
+          <VrioCanvas :doc="vrioDoc" />
+        </template>
+        <template v-else-if="goldenCircleDoc">
+          <GoldenCircleCanvas :doc="goldenCircleDoc" />
+        </template>
+        <template v-else-if="soarDoc">
+          <SoarCanvas :doc="soarDoc" />
+        </template>
+        <template v-else-if="playingToWinDoc">
+          <PlayingToWinCanvas :doc="playingToWinDoc" />
+        </template>
+        <template v-else-if="tenCheckDoc">
+          <TenCheckCanvas :doc="tenCheckDoc" />
+        </template>
+        <template v-else-if="sceneThreeHighDoc">
+          <SceneThreeHighCanvas :doc="sceneThreeHighDoc" />
+        </template>
+        <template v-else-if="aiBoundaryDoc">
+          <AiBoundaryCanvas :doc="aiBoundaryDoc" />
+        </template>
+        <template v-else-if="fdeSheetDoc">
+          <FdeSheetCanvas :doc="fdeSheetDoc" />
         </template>
         <template v-else-if="quadrantDoc">
           <BackgroundLayer
@@ -491,14 +643,18 @@ const quadrantDoc = computed(() =>
   </div>
 </template>
 
+<style src="./canvasPolish.css"></style>
+
 <style scoped>
 .viewport-shell {
   width: 100%;
   height: 100%;
   min-height: 0;
   overflow: hidden;
-  background: #efecec;
-  padding: 12px;
+  background:
+    radial-gradient(980px 420px at 18% -10%, rgba(255, 252, 246, 0.7), transparent 58%),
+    #e6dfd4;
+  padding: 16px;
   box-sizing: border-box;
   display: flex;
 }
@@ -521,11 +677,14 @@ const quadrantDoc = computed(() =>
   height: 100%;
   min-width: min(var(--canvas-min-width, 640px), 100%);
   min-height: min(var(--canvas-min-height, 480px), 100%);
-  border-radius: 12px;
+  border-radius: 18px;
   overflow: hidden;
-  box-shadow: 0 8px 24px rgba(60, 50, 20, 0.08);
+  border: 1px solid rgba(62, 48, 28, 0.08);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.75),
+    0 18px 42px rgba(62, 48, 28, 0.14);
   transform-origin: center center;
-  background: #f7f7f7;
+  background: var(--cv-page, #f4f0e8);
 }
 
 .empty {

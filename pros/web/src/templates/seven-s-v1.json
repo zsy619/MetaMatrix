@@ -1,0 +1,16 @@
+{
+  "id": "canvas_seven_s",
+  "type": "seven_s",
+  "schemaVersion": 1,
+  "theme": { "background": { "pattern": "none", "color": "#f7f7f7" }, "page": "#f7f7f7", "frame": "#ececec", "hairline": "rgba(60, 50, 20, 0.08)" },
+  "title": "麦肯锡 7S",
+  "blocks": [
+    { "id": "strategy", "title": "战略", "hint": "要赢在哪里", "items": [{ "id": "s7_st", "text": "给小团队一张能排期的画布" }] },
+    { "id": "structure", "title": "结构", "hint": "谁向谁负责", "items": [{ "id": "s7_su", "text": "项目负责人直接对发起人" }] },
+    { "id": "systems", "title": "系统", "hint": "日常靠什么流程运转", "items": [{ "id": "s7_sy", "text": "里程碑先写 RACI 再进甘特图" }] },
+    { "id": "shared", "title": "共同价值观", "hint": "大家真正相信的", "items": [{ "id": "s7_sh", "text": "计划要对得上事实" }] },
+    { "id": "style", "title": "风格", "hint": "领导怎么做决定", "items": [{ "id": "s7_style", "text": "先看关键路径，再加需求" }] },
+    { "id": "staff", "title": "人员", "hint": "有没有对的人", "items": [{ "id": "s7_staff", "text": "每个里程碑有一个负责人" }] },
+    { "id": "skills", "title": "技能", "hint": "现在会什么、缺什么", "items": [{ "id": "s7_sk", "text": "还要补一次完整的 PDCA" }] }
+  ]
+}

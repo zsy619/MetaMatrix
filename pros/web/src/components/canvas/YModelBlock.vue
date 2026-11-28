@@ -30,11 +30,20 @@ const props = withDefaults(
      * 使用 RichTextEditor 时应为 false（默认）：正文由 RTE 直接编辑，无需按条目添加。
      */
     showAdd?: boolean
+    /**
+     * card：与双三角画布相同，平时只留正文，点进格子才出现工具条。
+     * default：沿用原来的紧凑编辑器，给其他复用这块的画布。
+     */
+    editor?: 'default' | 'card'
+    /** card 模式下的抬头色 */
+    accent?: string
   }>(),
   {
     compact: false,
     hideTitle: false,
     showAdd: false,
+    editor: 'default',
+    accent: '',
   },
 )
 
@@ -58,6 +67,7 @@ const selected = computed(() => {
 })
 
 const isEmpty = computed(() => (props.block?.items?.length ?? 0) === 0)
+const isCard = computed(() => props.editor === 'card')
 
 const editorHtml = computed(() => itemsToHtml(props.block?.items ?? []))
 
@@ -106,7 +116,14 @@ function onCloseMaximize(event?: Event) {
 <template>
   <div
     class="ym-block"
-    :class="{ selected, compact, empty: isEmpty, 'is-source-max': isMaximized }"
+    :class="{
+      selected,
+      compact,
+      empty: isEmpty,
+      'is-source-max': isMaximized,
+      'ym-block--card': isCard,
+    }"
+    :style="isCard && props.accent ? { '--ym-accent': props.accent } : undefined"
     @click.stop="onSelectBlock"
   >
     <div v-if="!hideTitle" class="ym-block-header">
@@ -124,6 +141,7 @@ function onCloseMaximize(event?: Event) {
         <button
           type="button"
           class="pm-max-btn"
+          :class="{ 'pm-on-dark': isCard }"
           title="最大化"
           aria-label="最大化"
           @click="onToggleMaximize"
@@ -183,10 +201,10 @@ function onCloseMaximize(event?: Event) {
         :page-sheet="false"
         :expanded="false"
         :show-title="false"
-        :show-bottom-bar="true"
+        :show-bottom-bar="false"
         :show-publish-actions="false"
-        :show-markdown-hint="true"
-        placeholder="请输入正文"
+        :show-markdown-hint="false"
+        :placeholder="isCard ? '点击填写…' : '写在这里'"
         :model-value="editorHtml"
         @update:model-value="onEditorHtml"
         @focus="onEditorFocus"
@@ -376,10 +394,12 @@ function onCloseMaximize(event?: Event) {
   flex-shrink: 0;
   width: 20px;
   height: 20px;
-  border: 1px solid var(--cv-frame, #ececec);
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.75);
-  color: #5f6368;
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.7));
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.52);
+  backdrop-filter: blur(var(--glass-blur-sm, 10px));
+  -webkit-backdrop-filter: blur(var(--glass-blur-sm, 10px));
+  color: var(--ent-text-2, #5a6472);
   font-size: 14px;
   line-height: 1;
   cursor: pointer;
@@ -388,23 +408,27 @@ function onCloseMaximize(event?: Event) {
   align-items: center;
   justify-content: center;
   transition:
-    background 0.12s ease,
-    border-color 0.12s ease,
-    color 0.12s ease;
+    background-color 0.16s ease,
+    border-color 0.16s ease,
+    color 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s ease;
 }
 
 .ym-block.compact .add-item-btn,
 .ym-block.compact .pm-max-btn {
-  width: 18px;
-  height: 18px;
-  font-size: 13px;
+  width: 28px;
+  height: 28px;
+  font-size: 14px;
 }
 
 .add-item-btn:hover,
 .add-item-btn.muted:hover {
-  background: var(--cv-hover-wash, #e8f1fa);
-  border-color: var(--cv-focus, #1c4c7c);
-  color: var(--cv-focus, #1c4c7c);
+  background: rgba(255, 255, 255, 0.86);
+  border-color: transparent;
+  color: var(--mm-text, #1d2129);
+  box-shadow: var(--glass-shadow-sm, 0 6px 18px rgba(15, 23, 42, 0.1));
+  transform: translateY(-1px);
 }
 
 .ym-block-body {
@@ -510,12 +534,61 @@ function onCloseMaximize(event?: Event) {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  flex: 1 1 auto;
 }
 
 .ym-rte {
   flex: 1;
   min-width: 0;
   min-height: 0;
+}
+
+.ym-block--card {
+  background: #fff;
+  border: 1px solid rgba(62, 48, 28, 0.08);
+  border-radius: 14px;
+  box-shadow: 0 8px 20px rgba(62, 48, 28, 0.05);
+}
+
+.ym-block--card .ym-block-header {
+  background: var(--ym-accent, #2a649f);
+  color: #fff;
+  min-height: 36px;
+  padding: 6px 8px 6px 10px;
+}
+
+.ym-block--card .ym-block-title {
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.ym-block:not(:focus-within) :deep(.rte-toolbar),
+.ym-block:not(:focus-within) :deep(.rte-bottom) {
+  display: none;
+}
+
+.ym-block--card :deep(.rte-root) {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  height: 100%;
+}
+
+.ym-block--card :deep(.rte-canvas) {
+  padding: 6px 10px 8px;
+  background: transparent;
+  min-height: 0;
+}
+
+.ym-block--card :deep(.rte-body),
+.ym-block--card :deep(.ProseMirror) {
+  min-height: 48px;
+  font-size: 14px;
+  line-height: 1.65;
+  color: #202124;
 }
 
 .pm-body {

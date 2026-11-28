@@ -33,10 +33,15 @@ WEB_PORT="${WEB_PORT:-5173}"
 OUT_DIR="${E2E_OUT:-/tmp/metamatrix-e2e}"
 UP_ONLY=0
 KEEP=0
+# --gpu：让 Chrome 用系统显卡跑 WebGL，并对 3D 地球做严格渲染断言。
+# 有显卡的机器加这个参数；无显卡 CI 不要加（默认 SwiftShader）。
+USE_SYSTEM_GL=0
+FORCE_GPU=0
 for arg in "$@"; do
   case "$arg" in
     --up-only) UP_ONLY=1 ;;
     --keep) KEEP=1 ;;
+    --gpu) USE_SYSTEM_GL=1; FORCE_GPU=1 ;;
     -h|--help) sed -n '2,30p' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) echo "unknown argument: $arg" >&2; exit 2 ;;
   esac
@@ -52,12 +57,12 @@ log() { printf '\n== %s\n' "$*"; }
 
 cleanup() {
   local code=$?
-  if [ "$KEEP" = "1" ]; then
-    echo "== --keep：保留服务（api pid=$API_PID web pid=$WEB_PID）"
+  if [ "${KEEP:-0}" = "1" ]; then
+    echo "== --keep：保留服务（api pid=${API_PID:-} web pid=${WEB_PID:-}）"
     return
   fi
-  [ -n "$API_PID" ] && kill "$API_PID" 2>/dev/null || true
-  [ -n "$WEB_PID" ] && kill "$WEB_PID" 2>/dev/null || true
+  [ -n "${API_PID:-}" ] && kill "$API_PID" 2>/dev/null || true
+  [ -n "${WEB_PID:-}" ] && kill "$WEB_PID" 2>/dev/null || true
   exit $code
 }
 trap cleanup EXIT
@@ -72,28 +77,36 @@ need psql
 need go
 
 # ---------------------------------------------------------------- PostgreSQL
+# 探测可用的 PostgreSQL 连接串。
+# 注意：本函数只把连接串写 stdout，进度信息一律写 stderr —— 调用方用
+# `DATABASE_URL="$(pick_database_url)"` 捕获 stdout，若把日志混进来，
+# 连接串会被日志行污染（曾出现 psql: invalid connection option）。
 pick_database_url() {
   if [ -n "${DATABASE_URL:-}" ]; then
-    echo "$DATABASE_URL"
+    printf '%s\n' "$DATABASE_URL"
     return
   fi
   # 1) docker compose（仓库根目录的 compose 把 Postgres 映射到 5433）
   if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
-    log "docker compose 起 Postgres（5433）"
-    (cd "$REPO_DIR" && docker compose up -d postgres) || true
+    log "尝试 docker compose 起 Postgres（5433）" >&2
+    (cd "$REPO_DIR" && docker compose up -d postgres >/dev/null 2>&1) || true
     sleep 3
-    echo "postgresql://metamatrix:metamatrix@127.0.0.1:5433/metamatrix"
-    return
+    # compose 可能因目录名/服务名不可用而失败，只有真的连得上才算数
+    if PGPASSWORD=metamatrix psql -h 127.0.0.1 -p 5433 -U metamatrix -d postgres -c 'select 1' >/dev/null 2>&1; then
+      printf '%s\n' "postgresql://metamatrix:metamatrix@127.0.0.1:5433/metamatrix"
+      return
+    fi
   fi
   # 2) 复用本机已在跑的实例（5434 / 5433 / 5432）
+  #    连 postgres 库探测，目标库还不存在时也能找到端口，后面再 createdb。
   local port
   for port in 5434 5433 5432; do
-    if PGPASSWORD=metamatrix psql -h 127.0.0.1 -p "$port" -U metamatrix -d metamatrix -c 'select 1' >/dev/null 2>&1; then
-      echo "postgresql://metamatrix:metamatrix@127.0.0.1:${port}/metamatrix"
+    if PGPASSWORD=metamatrix psql -h 127.0.0.1 -p "$port" -U metamatrix -d postgres -c 'select 1' >/dev/null 2>&1; then
+      printf '%s\n' "postgresql://metamatrix:metamatrix@127.0.0.1:${port}/metamatrix"
       return
     fi
   done
-  echo ""
+  printf '%s\n' ""
 }
 
 log "找 PostgreSQL"
@@ -169,6 +182,9 @@ fi
 export RTE_WEB_URL="http://127.0.0.1:${WEB_PORT}"
 export RTE_BASELINE_DIR="$OUT_DIR/shots"
 export SMOKE_API="http://127.0.0.1:${API_PORT}"
+# --gpu 模式：让 Chrome 用系统显卡并对 3D 地球做严格渲染断言。
+export E2E_USE_SYSTEM_GL="$USE_SYSTEM_GL"
+export E2E_FORCE_GPU="$FORCE_GPU"
 mkdir -p "$RTE_BASELINE_DIR"
 
 FAILED=0
@@ -196,4 +212,6 @@ if [ "$FAILED" != "0" ]; then
 fi
 
 echo
-echo "e2e 全部通过（截图在 $RTE_BASELINE_DIR）"
+# 变量必须用 ${...} 包住：紧跟其后的全角「）」会被部分 locale 当成变量名的一部分，
+# 在 set -u 下会报 unbound variable。
+echo "e2e 全部通过（截图在 ${RTE_BASELINE_DIR}）"

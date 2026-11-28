@@ -17,7 +17,11 @@ function mountGantt() {
   const store = useDocumentStore()
   store.loadFromTemplate('project-gantt')
   const doc = store.current_data as ProjectGanttDocumentJSON
-  const wrapper = mount(ProjectGanttCanvas, { props: { doc } })
+  // el-icon 只做装饰，测试环境不装 Element Plus，用空壳替身即可
+  const wrapper = mount(ProjectGanttCanvas, {
+    props: { doc },
+    global: { stubs: { 'el-icon': true } },
+  })
   return { store, wrapper, doc }
 }
 
@@ -36,8 +40,24 @@ describe('项目甘特图', () => {
     expect(wrapper.find('.bar.summary').exists()).toBe(true)
     expect(wrapper.find('.milestone.critical').exists()).toBe(true)
     expect(wrapper.findAll('.bar.critical').length).toBeGreaterThan(2)
-    expect(wrapper.findAll('.links > path').length).toBeGreaterThan(2)
+    expect(wrapper.findAll('.links > path.chart-flow-line').length).toBeGreaterThan(2)
+    expect(wrapper.find('.links > path.chart-flow-line.is-selected').exists()).toBe(true)
     expect(wrapper.find('.baseline').exists()).toBe(true)
+    const head = wrapper.get('.chart-head')
+    expect(head.attributes('style')).toContain('width: 100%')
+    expect(head.attributes('style')).toMatch(/min-width:\s*\d+px/)
+    expect(wrapper.get('.chart-body').attributes('style')).toContain('width: 100%')
+    const col = wrapper.get('.col').attributes('style') || ''
+    expect(col).toContain('left: 0%')
+    expect(col).toContain('%')
+    const ticks = wrapper.findAll('.ticks span')
+    expect(ticks.length).toBeGreaterThan(1)
+    const headMin = Number((head.attributes('style') || '').match(/min-width:\s*(\d+)px/)?.[1])
+    expect(headMin).toBe(ticks.length * 84)
+    expect(wrapper.get('td.start').attributes('data-label')).toBe('开工')
+    expect(wrapper.get('td.end').attributes('data-label')).toBe('完成')
+    expect(wrapper.get('[aria-label="时间刻度"]').text()).toContain('时')
+    expect(wrapper.get('[aria-label="时间刻度"]').text()).toContain('年')
     const docRow = wrapper.findAll('tbody tr').find((row) => row.get('input[aria-label="任务名称"]').element instanceof HTMLInputElement && (row.get('input[aria-label="任务名称"]').element as HTMLInputElement).value === '文档')
     expect(docRow).toBeTruthy()
     expect(Number(docRow!.get('[data-slack]').attributes('data-slack'))).toBeGreaterThan(0)
@@ -48,25 +68,34 @@ describe('项目甘特图', () => {
     const { store, wrapper } = mountGantt()
     const docRow = wrapper.findAll('tbody tr').find((row) => (row.get('input[aria-label="任务名称"]').element as HTMLInputElement).value === '文档')
     await docRow!.trigger('click')
-    await wrapper.findAll('button').find((button) => button.text() === '降级')!.trigger('click')
+    await wrapper.get('button[aria-label="降级"]').trigger('click')
     const afterIndent = store.current_data
     expect(isProjectGanttDoc(afterIndent)).toBe(true)
     if (!isProjectGanttDoc(afterIndent)) return
     expect(afterIndent.tasks.find((task) => task.name === '文档')?.parentId).toBe('gantt_2')
     expect(afterIndent.tasks.find((task) => task.id === 'gantt_2')?.kind).toBe('summary')
 
-    await wrapper.findAll('button').find((button) => button.text() === '按依赖排程')!.trigger('click')
+    await wrapper.get('button[aria-label="按依赖排程"]').trigger('click')
     expect(wrapper.get('[role="status"]').text()).toBe('已按依赖排程')
     const scheduled = store.current_data
     if (!isProjectGanttDoc(scheduled)) return
     expect(scheduled.tasks.find((task) => task.name === '方案设计')?.start).toBe('2026-11-16')
 
-    await wrapper.findAll('button').find((button) => button.text() === '插入里程碑')!.trigger('click')
+    await wrapper.get('button[aria-label="插入里程碑"]').trigger('click')
     const inserted = store.current_data
     expect(isProjectGanttDoc(inserted) && inserted.tasks.some((task) => task.kind === 'milestone' && task.name === '里程碑')).toBe(true)
 
-    await wrapper.findAll('button').find((button) => button.text() === '日')!.trigger('click')
+    await wrapper.findAll('button').find((button) => button.text() === '天')!.trigger('click')
     expect(isProjectGanttDoc(store.current_data) && store.current_data.scale).toBe('day')
+    const head = wrapper.get('.chart-head')
+    head.element.dispatchEvent(new WheelEvent('wheel', { deltaY: -80, bubbles: true, cancelable: true }))
+    await nextTick()
+    expect(isProjectGanttDoc(store.current_data) && store.current_data.scale).toBe('hour')
+    expect(wrapper.findAll('.ticks span').some((tick) => tick.text() === '00')).toBe(true)
+    await wrapper.findAll('button').find((button) => button.text() === '年')!.trigger('click')
+    expect(isProjectGanttDoc(store.current_data) && store.current_data.scale).toBe('year')
+    expect(wrapper.findAll('.ticks span').some((tick) => tick.text() === '2026')).toBe(true)
+    expect(wrapper.findAll('.months span').some((group) => group.text() === '2020年代')).toBe(true)
   })
 
   it('旧的平铺任务仍能画出横条', async () => {
@@ -77,8 +106,59 @@ describe('项目甘特图', () => {
     })
     await nextTick()
     expect((wrapper.get('input[aria-label="任务名称"]').element as HTMLInputElement).value).toBe('旧任务')
+    const start = wrapper.get('input[aria-label="开工时间"]')
+    expect((start.element as HTMLInputElement).value).toBe('2026-11-09 00:00')
+    expect(wrapper.get('input[aria-label="选择开工时间"]').attributes('type')).toBe('datetime-local')
+    expect(wrapper.get('input[aria-label="选择开工时间"]').attributes('step')).toBe('60')
+    await start.setValue('2026-11-09 09:30')
+    await start.trigger('change')
+    const saved = store.current_data
+    expect(isProjectGanttDoc(saved) && saved.tasks.find((task) => task.name === '旧任务')?.start).toBe('2026-11-09 09:30')
     expect(wrapper.find('.bar').exists()).toBe(true)
     expect(wrapper.find('.bar.summary').exists()).toBe(false)
     expect(wrapper.find('.milestone').exists()).toBe(false)
+  })
+
+  it('拖动中间竖线改变左栏宽度', async () => {
+    const { wrapper } = mountGantt()
+    const split = wrapper.get('.split').element as HTMLElement
+    const grid = wrapper.get('.grid').element as HTMLElement
+    vi.spyOn(split, 'getBoundingClientRect').mockReturnValue({
+      left: 100,
+      width: 1000,
+      top: 0,
+      height: 400,
+      right: 1100,
+      bottom: 400,
+      x: 100,
+      y: 0,
+      toJSON() { return {} },
+    })
+    const bar = wrapper.get('[aria-label="调节任务表宽度"]')
+    expect(bar.attributes('role')).toBe('separator')
+    await bar.trigger('pointerdown', { button: 0, clientX: 700, pointerId: 1 })
+    bar.element.dispatchEvent(new PointerEvent('pointermove', { clientX: 640, pointerId: 1 }))
+    await nextTick()
+    expect((grid as HTMLElement).style.width).toBe('540px')
+    bar.element.dispatchEvent(new PointerEvent('pointerup', { clientX: 640, pointerId: 1 }))
+    await bar.trigger('keydown', { key: 'ArrowRight' })
+    expect((grid as HTMLElement).style.width).toBe('556px')
+    await bar.trigger('keydown', { key: 'ArrowLeft', shiftKey: true })
+    expect((grid as HTMLElement).style.width).toBe('508px')
+  })
+
+  it('导入 Project XML 后换成文件里的任务', async () => {
+    const { store, wrapper } = mountGantt()
+    const xml = `<?xml version="1.0"?><Project xmlns="http://schemas.microsoft.com/project"><Title>导入计划</Title><Tasks><Task><UID>1</UID><ID>1</ID><Name>立项</Name><OutlineLevel>1</OutlineLevel><Start>2026-12-01T08:00:00</Start><Finish>2026-12-01T17:00:00</Finish><Milestone>1</Milestone></Task></Tasks></Project>`
+    const input = wrapper.get('input[aria-label="导入 Project 文件"]')
+    const file = new File([xml], 'plan.xml', { type: 'text/xml' })
+    Object.defineProperty(input.element, 'files', { value: [file] })
+    await input.trigger('change')
+    await file.text()
+    await nextTick()
+    const doc = store.current_data
+    expect(isProjectGanttDoc(doc) && doc.title).toBe('导入计划')
+    expect(isProjectGanttDoc(doc) && doc.tasks.map((task) => task.name)).toEqual(['立项'])
+    expect(wrapper.text()).toContain('已导入 1 条任务')
   })
 })

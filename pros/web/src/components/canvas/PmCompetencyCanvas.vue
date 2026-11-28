@@ -31,6 +31,13 @@ documentStore.ensurePmCompetencyBlocks()
 
 const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 
+const narrow = ref(false)
+let narrowQuery: MediaQueryList | null = null
+
+function syncNarrow() {
+  narrow.value = !!narrowQuery?.matches
+}
+
 /**
  * 顺时针自顶：意识 → 做复盘 → 管执行 → 拆计划 → 定方案
  * （与参考雷达图一致）
@@ -312,6 +319,9 @@ function onWindowPointerUp() {
 
 onMounted(() => {
   documentStore.ensurePmCompetencyBlocks()
+  narrowQuery = window.matchMedia('(max-width: 800px)')
+  syncNarrow()
+  narrowQuery.addEventListener('change', syncNarrow)
 })
 
 if (typeof window !== 'undefined') {
@@ -320,6 +330,7 @@ if (typeof window !== 'undefined') {
 }
 
 onBeforeUnmount(() => {
+  narrowQuery?.removeEventListener('change', syncNarrow)
   if (typeof window !== 'undefined') {
     window.removeEventListener('pointerup', onWindowPointerUp)
     window.removeEventListener('pointercancel', onWindowPointerUp)
@@ -382,12 +393,25 @@ onBeforeUnmount(() => {
           stroke-width="1.1"
           opacity="0.85"
         />
+        <text
+          v-for="ring in ringOutlines.filter((item) => item.level < LEVELS)"
+          :key="`scale-${ring.level}`"
+          class="radar-scale-tick"
+          :x="polar(0, (R * ring.level) / LEVELS)[0] + 14"
+          :y="polar(0, (R * ring.level) / LEVELS)[1]"
+        >{{ Math.round((SCORE_MAX * ring.level) / LEVELS) }}</text>
         <polygon
           :points="scorePolygon"
           fill="rgba(100, 181, 246, 0.32)"
+          stroke="none"
+        />
+        <polygon
+          class="radar-flow-line is-selected"
+          :points="scorePolygon"
+          fill="none"
           stroke="#42a5f5"
-          stroke-width="2.2"
-          stroke-linejoin="round"
+          stroke-width="2.6"
+          pointer-events="none"
         />
 
         <g
@@ -474,14 +498,15 @@ onBeforeUnmount(() => {
       隐藏挂载五轴 YModelBlock：点击顶点时写入全局 maximizedPanelKey，
       由块内 Teleport .pm-overlay 铺满文档视口（panel-maximize 规则）。
     -->
-    <div class="pmc-block-host" aria-hidden="true">
-      <template v-for="item in axisBlocks" :key="item.axis">
+    <div class="pmc-block-host" :aria-hidden="narrow ? undefined : true">
+      <section v-for="item in axisBlocks" :key="item.axis" class="pmc-card">
+        <h3 class="pmc-card-title">{{ item.title }}</h3>
         <YModelBlockCard
           v-if="item.block"
           :block="item.block"
           hide-title
         />
-      </template>
+      </section>
     </div>
   </div>
 </template>
@@ -491,7 +516,7 @@ onBeforeUnmount(() => {
   position: absolute;
   inset: 0;
   z-index: 10;
-  overflow: hidden;
+  overflow: auto;
   box-sizing: border-box;
   padding: 8px 12px 10px;
   display: flex;
@@ -576,17 +601,18 @@ onBeforeUnmount(() => {
   flex-shrink: 0;
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 8px 10px;
-  padding: 8px 4px 2px;
+  gap: 10px 12px;
+  padding: 10px 4px 4px;
   border-top: 1px solid #e8eaed;
 }
 
 .pmc-slider {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
-  padding: 6px 8px;
+  min-height: 40px;
+  padding: 6px 12px;
   border-radius: 999px;
   background: rgba(244, 245, 247, 0.95);
   border: 1px solid #e8eaed;
@@ -594,29 +620,26 @@ onBeforeUnmount(() => {
 }
 
 .pmc-slider-name {
-  flex: 0 1 auto;
-  max-width: 48%;
-  font-size: 11px;
+  flex: 0 0 auto;
+  font-size: 14px;
   font-weight: 700;
   color: var(--axis, #1565c0);
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .pmc-slider input[type='range'] {
   flex: 1 1 auto;
-  min-width: 0;
-  height: 4px;
+  min-width: 36px;
+  height: 22px;
   accent-color: var(--axis, #1565c0);
   cursor: pointer;
 }
 
 .pmc-slider-val {
   flex: 0 0 auto;
-  min-width: 2em;
+  min-width: 2.2em;
   font-variant-numeric: tabular-nums;
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 800;
   color: var(--axis, #1565c0);
   text-align: right;
@@ -634,6 +657,11 @@ onBeforeUnmount(() => {
   border: 0;
   padding: 0;
   margin: -1px;
+}
+
+.pmc-card-title {
+  display: none;
+  margin: 0;
 }
 
 @media (max-width: 1100px) {
@@ -655,5 +683,63 @@ onBeforeUnmount(() => {
   .pmc-axis-label {
     font-size: 13px;
   }
+}
+
+@media (max-width: 800px) {
+  .pmc-canvas { padding-bottom: 96px; }
+  .pmc-stage { flex: 0 0 auto; min-height: 0; }
+  .pmc-radar { width: 100%; height: auto; max-height: none; aspect-ratio: 800 / 720; }
+  .pmc-sliders { grid-template-columns: 1fr; }
+  .pmc-slider input[type='range'] { height: 36px; }
+  .pmc-block-host {
+    position: static;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: auto;
+    height: auto;
+    margin: 14px 0 0;
+    padding: 0;
+    overflow: visible;
+    clip: auto;
+    clip-path: none;
+    white-space: normal;
+  }
+  .pmc-card {
+    padding: 12px 12px 10px;
+    border: 1px solid var(--cv-frame, #ececec);
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 8px 20px rgba(62, 48, 28, 0.06);
+  }
+  .pmc-card-title {
+    display: block;
+    margin: 0 0 8px;
+    font-size: 16px;
+    font-weight: 750;
+    line-height: 1.35;
+    color: #202124;
+  }
+  .pmc-card :deep(.ym-block),
+  .pmc-card :deep(.ym-block-body),
+  .pmc-card :deep(.rte-root),
+  .pmc-card :deep(.rte-workspace),
+  .pmc-card :deep(.rte-canvas),
+  .pmc-card :deep(.rte-body),
+  .pmc-card :deep(.ProseMirror) {
+    height: auto;
+    max-height: none;
+    max-width: 100%;
+    min-width: 0;
+    overflow: visible;
+    flex: 0 0 auto;
+  }
+  .pmc-card :deep(.ym-block) { min-height: 0; background: transparent; border: none; box-shadow: none; }
+  .pmc-card :deep(.rte-workspace),
+  .pmc-card :deep(.rte-canvas),
+  .pmc-card :deep(.ProseMirror) { width: 100%; }
+  .pmc-card :deep(.ProseMirror) { min-height: 96px; font-size: 15px; line-height: 1.55; }
+  .pmc-card :deep(.ProseMirror p) { max-width: 100%; overflow-wrap: anywhere; }
+  .pmc-card :deep(.pm-max-btn) { width: 36px; height: 36px; border-radius: 8px; }
 }
 </style>

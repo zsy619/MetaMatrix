@@ -5,6 +5,10 @@ import {
   searchDirectoryUsers,
   type DirectoryUser,
 } from './rteDirectory.ts'
+import { loadPinyin } from './pinyinRuntime.ts'
+
+// 拼音库按需加载：先等它就绪再断言（拼音首字母检索依赖它）。
+await loadPinyin()
 
 const users: DirectoryUser[] = [
   { id: 'u1', name: '张三', role: '开发', department: '研发部' },

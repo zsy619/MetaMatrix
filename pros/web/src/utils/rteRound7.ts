@@ -1,3 +1,6 @@
+import type { Editor } from '@tiptap/core'
+import type { Node as PMNode } from '@tiptap/pm/model'
+
 /** 第七轮可单测的缩进、表格粘贴、斜杠/快捷键检索与导出片段。 */
 
 export const MAX_BLOCK_INDENT = 8
@@ -82,6 +85,21 @@ export function looksLikeTsvTable(plain: string): boolean {
   return lines.filter((line) => line.split('\t').length >= 2).length >= 2
 }
 
+/** Excel 序列日：整数落在 1954–2118 之间才转换，避免把普通编号当成日期。 */
+export function excelSerialToDate(serial: number): string | null {
+  if (!Number.isInteger(serial) || serial < 20000 || serial > 80000) return null
+  const ms = Date.UTC(1899, 11, 30) + serial * 86400000
+  const date = new Date(ms)
+  if (Number.isNaN(date.getTime())) return null
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(date.getUTCDate()).padStart(2, '0')
+  return `${date.getUTCFullYear()}-${month}-${day}`
+}
+
+function isDateHeader(text: string): boolean {
+  return /日期|date/i.test(text.trim())
+}
+
 export function tsvToTableHtml(plain: string): string {
   const text = (plain || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim()
   const lines = text.split('\n')
@@ -89,11 +107,19 @@ export function tsvToTableHtml(plain: string): string {
     .filter((line) => line.trim().length > 0)
     .map((line) => line.replace(/\s+$/, '').split('\t'))
   if (!rows.length) return '<p></p>'
+  const dateCols = new Set<number>()
+  rows[0]?.forEach((cell, index) => {
+    if (isDateHeader(cell)) dateCols.add(index)
+  })
   const body = rows
-    .map((cells) => {
+    .map((cells, rowIndex) => {
       const tds = cells
-        .map((cell) => {
-          const value = escapeHtmlText(cell)
+        .map((cell, index) => {
+          let shown = cell
+          if (rowIndex > 0 && dateCols.has(index) && /^\d+$/.test(cell.trim())) {
+            shown = excelSerialToDate(Number(cell.trim())) || cell
+          }
+          const value = escapeHtmlText(shown)
           return `<td><p>${value || '<br>'}</p></td>`
         })
         .join('')
@@ -248,9 +274,195 @@ export function filterLabeledTargets<T extends { label: string; kind?: string }>
           ? 'figure image'
           : item.kind === 'table'
             ? 'table'
-            : ''
+            : item.kind === 'bookmark'
+              ? 'bookmark'
+              : ''
     const kindZh =
-      item.kind === 'heading' ? '标题' : item.kind === 'figure' ? '图' : item.kind === 'table' ? '表' : ''
+      item.kind === 'heading'
+        ? '标题'
+        : item.kind === 'figure'
+          ? '图'
+          : item.kind === 'table'
+            ? '表'
+            : item.kind === 'bookmark'
+              ? '书签'
+              : ''
     return textMatchesQuery(`${item.label} ${kindEn} ${kindZh} ${item.kind || ''}`, q)
   })
+}
+
+/** 制表符分隔。引号里的制表符和换行留在同一个格子。 */
+function splitTsvGrid(plain: string): string[][] {
+  const source = String(plain || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+  const rows: string[][] = []
+  let row: string[] = []
+  let current = ''
+  let quoted = false
+  const pushRow = () => {
+    row.push(current)
+    if (row.some((cell) => cell.length > 0)) rows.push(row)
+    row = []
+    current = ''
+  }
+  for (let index = 0; index < source.length; index += 1) {
+    const char = source[index]
+    if (char === '"') {
+      if (quoted && source[index + 1] === '"') {
+        current += '"'
+        index += 1
+      } else {
+        quoted = !quoted
+      }
+      continue
+    }
+    if (!quoted && char === '\t') {
+      row.push(current)
+      current = ''
+      continue
+    }
+    if (!quoted && char === '\n') {
+      pushRow()
+      continue
+    }
+    current += char
+  }
+  pushRow()
+  return rows
+}
+
+function cellSpan(cell: { attrs: { colspan?: unknown; rowspan?: unknown } }): { colspan: number; rowspan: number } {
+  return {
+    colspan: Math.max(1, Number(cell.attrs.colspan) || 1),
+    rowspan: Math.max(1, Number(cell.attrs.rowspan) || 1),
+  }
+}
+
+/** 子单元格在视觉网格里的起始列。上一行的 rowspan 会把后面的格子往右推。 */
+function visualColumnAt(table: { forEach: (fn: (row: { forEach: (fn: (cell: { attrs: { colspan?: unknown; rowspan?: unknown } }) => void) => void }) => void) => void }, targetRow: number, targetChild: number): number {
+  const occupied: boolean[][] = []
+  let found = targetChild
+  let rowIndex = 0
+  table.forEach((rowNode) => {
+    let visual = 0
+    let child = 0
+    rowNode.forEach((cellNode) => {
+      while (occupied[rowIndex]?.[visual]) visual += 1
+      if (rowIndex === targetRow && child === targetChild) found = visual
+      const { colspan, rowspan } = cellSpan(cellNode)
+      for (let down = 0; down < rowspan; down += 1) {
+        if (!occupied[rowIndex + down]) occupied[rowIndex + down] = []
+        for (let span = 0; span < colspan; span += 1) occupied[rowIndex + down]![visual + span] = true
+      }
+      visual += colspan
+      child += 1
+    })
+    rowIndex += 1
+  })
+  return found
+}
+
+/** 按最后一行的格子结构补一行空行。跨行合并不再往下延伸，避免和新行叠在一起。 */
+function blankRowFrom(row: PMNode, schema: Editor['schema']): PMNode {
+  const paragraph = schema.nodes.paragraph
+  const cells: PMNode[] = []
+  row.forEach((cell) => {
+    const attrs = { ...cell.attrs }
+    if (Number(attrs.rowspan) > 1) attrs.rowspan = 1
+    const para = paragraph?.create()
+    cells.push(cell.type.create(attrs, para || undefined))
+  })
+  return row.type.create({ ...row.attrs }, cells)
+}
+
+/** 光标已经在表格里时，按制表符或换行把纯文本填进后面的格子。超出表格时补行。一次粘贴一步撤销。 */
+export function pasteTsvIntoTable(editor: Editor, plain: string): boolean {
+  const text = String(plain || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+  // 一整列从表格里复制出来时往往只有换行，没有制表符。单行纯文本仍留在当前格子。
+  if (!text.includes('\t') && !text.includes('\n')) return false
+  const { state } = editor
+  const $from = state.selection.$from
+  let cellDepth = -1
+  for (let depth = $from.depth; depth > 0; depth -= 1) {
+    const name = $from.node(depth).type.name
+    if (name === 'tableCell' || name === 'tableHeader') {
+      cellDepth = depth
+      break
+    }
+  }
+  if (cellDepth < 2) return false
+  const table = $from.node(cellDepth - 2)
+  if (table.type.name !== 'table') return false
+  const rows = splitTsvGrid(text)
+  if (!rows.length) return false
+  const tablePos = $from.before(cellDepth - 2)
+  const startRow = $from.index(cellDepth - 2)
+  const startCol = visualColumnAt(table, startRow, $from.index(cellDepth - 1))
+  const header = table.child(0)
+  const dateCols = new Set<number>()
+  if (header) {
+    let col = 0
+    header.forEach((cell) => {
+      if (/日期|date/i.test(cell.textContent)) dateCols.add(col)
+      col += Math.max(1, Number(cell.attrs.colspan) || 1)
+    })
+  }
+  let tr = state.tr
+  let liveTable = table
+  let livePos = tablePos
+  const extra = rows.length - (table.childCount - startRow)
+  if (extra > 0 && table.lastChild) {
+    const blanks = Array.from({ length: extra }, () => blankRowFrom(table.lastChild!, state.schema))
+    tr = tr.insert(tablePos + table.nodeSize - 1, blanks)
+    livePos = tr.mapping.map(tablePos, -1)
+    const grown = tr.doc.nodeAt(livePos)
+    if (grown?.type.name === 'table') liveTable = grown
+  }
+  const stepsBeforeFill = tr.steps.length
+  const jobs: Array<{ from: number; to: number; text: string }> = []
+  const occupied: boolean[][] = []
+  let rowIndex = 0
+  liveTable.forEach((rowNode, rowOffset) => {
+    const gridRow = rowIndex >= startRow ? rows[rowIndex - startRow] : undefined
+    let visual = 0
+    let pasteCol = 0
+    rowNode.forEach((cellNode, cellOffset) => {
+      while (occupied[rowIndex]?.[visual]) visual += 1
+      const { colspan, rowspan } = cellSpan(cellNode)
+      if (gridRow && visual >= startCol) {
+        let value = gridRow[pasteCol]
+        pasteCol += 1
+        if (value != null) {
+          if (dateCols.has(visual) && /^\d+$/.test(value.trim())) {
+            value = excelSerialToDate(Number(value.trim())) || value
+          }
+          const cellPos = livePos + 1 + rowOffset + 1 + cellOffset
+          const para = cellNode.firstChild
+          if (para) {
+            jobs.push({
+              from: cellPos + 2,
+              to: cellPos + 1 + para.nodeSize - 1,
+              text: value,
+            })
+          }
+        }
+      }
+      for (let down = 0; down < rowspan; down += 1) {
+        if (!occupied[rowIndex + down]) occupied[rowIndex + down] = []
+        for (let span = 0; span < colspan; span += 1) occupied[rowIndex + down]![visual + span] = true
+      }
+      visual += colspan
+    })
+    rowIndex += 1
+  })
+  if (!jobs.length) return false
+  jobs.sort((a, b) => b.from - a.from)
+  for (const job of jobs) {
+    const map = tr.mapping.slice(stepsBeforeFill)
+    const mappedFrom = map.map(job.from)
+    const mappedTo = map.map(job.to)
+    const next = job.text ? state.schema.text(job.text) : []
+    tr = tr.replaceWith(mappedFrom, mappedTo, next)
+  }
+  editor.view.dispatch(tr)
+  return true
 }

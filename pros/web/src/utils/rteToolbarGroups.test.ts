@@ -18,12 +18,16 @@ import {
   writeToolbarGroupOrder,
 } from './rteToolbarGroups.ts'
 
-// —— 方案 A：11 个可见分组 + other 兜底 ——
+// —— 方案 A：编辑到文件，另加图片、页面，other 兜底 ——
 assert.deepEqual(DEFAULT_TOOLBAR_GROUP_ORDER, [
   'edit',
   'style',
   'paragraph',
+  'writing',
+  'tidy',
   'insert',
+  'picture',
+  'frame',
   'charts',
   'table',
   'blocks',
@@ -31,13 +35,14 @@ assert.deepEqual(DEFAULT_TOOLBAR_GROUP_ORDER, [
   'review',
   'view',
   'file',
+  'page',
   'other',
 ])
 
 // 每个按钮 key 只挂在一个分组里（图表组是 9 个分类下拉，另有水印、外链、审计、文内 AI）
 const allKeys = TOOLBAR_GROUPS.flatMap((group) => group.keys)
-assert.equal(allKeys.length, 109)
-assert.equal(new Set(allKeys).size, 109)
+assert.equal(allKeys.length, 139)
+assert.equal(new Set(allKeys).size, 139)
 
 const ribbonGroups = RIBBON_TABS.flatMap((tab) => tab.groups)
 assert.deepEqual(ribbonGroups, [...DEFAULT_TOOLBAR_GROUP_ORDER])
@@ -102,7 +107,12 @@ assert.deepEqual(
       'view',
       'file',
       'other',
+      'writing',
+      'tidy',
+      'picture',
+      'frame',
       'charts',
+      'page',
     ],
   },
 )

@@ -21,6 +21,10 @@ export type ChartPanelHostTarget = {
   chartType: string
   option: string
   dataSource: string
+  tableRef: string
+  chartTitle: string
+  chartUnit: string
+  chartSource: string
 }
 
 /** 找到文档里指定 chartId 的图表块位置。 */
@@ -99,6 +103,10 @@ export function useChartPanelHost(editorRef: Ref<Editor | undefined>) {
         ...(typeof patch.chartType === 'string' ? { chartType: patch.chartType } : {}),
         ...(typeof patch.option === 'string' ? { option: patch.option } : {}),
         ...(typeof patch.dataSource === 'string' ? { dataSource: patch.dataSource } : {}),
+        ...(typeof patch.tableRef === 'string' ? { tableRef: patch.tableRef } : {}),
+        ...(typeof patch.chartTitle === 'string' ? { chartTitle: patch.chartTitle } : {}),
+        ...(typeof patch.chartUnit === 'string' ? { chartUnit: patch.chartUnit } : {}),
+        ...(typeof patch.chartSource === 'string' ? { chartSource: patch.chartSource } : {}),
       }
     }
     return true
@@ -230,6 +238,28 @@ export function useChartPanelHost(editorRef: Ref<Editor | undefined>) {
     return ok
   }
 
+  function listTables(): Array<{ id: string; label: string }> {
+    const ed = editorRef.value
+    if (!ed) return []
+    const tables: Array<{ id: string; label: string }> = []
+    let index = 0
+    ed.state.doc.descendants((node) => {
+      if (node.type.name !== 'table') return
+      index += 1
+      const id = String(node.attrs.xrefId || '')
+      if (!id) return
+      const caption = String(node.attrs.caption || '').trim()
+      tables.push({ id, label: caption || `表 ${index}` })
+    })
+    return tables
+  }
+
+  function setTableRef(tableRef: string): boolean {
+    const chartId = target.value?.chartId
+    if (!chartId) return false
+    return applyAttrsById(chartId, { tableRef })
+  }
+
   return reactive({
     open,
     target,
@@ -249,5 +279,7 @@ export function useChartPanelHost(editorRef: Ref<Editor | undefined>) {
     currentDataSource,
     remove,
     removeById,
+    listTables,
+    setTableRef,
   })
 }

@@ -24,5 +24,6 @@ describe('标题自动编号落库', () => {
     expect(css).not.toMatch(/is-heading-auto-num :deep/)
     expect(css).toContain('counter-reset: h5')
     expect(css).toContain('counter-reset: h6')
+    expect(css).toContain('[data-manual-num]::before')
   })
 })

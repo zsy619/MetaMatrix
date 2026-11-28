@@ -1,0 +1,82 @@
+{
+  "id": "canvas_cultivation_mountain",
+  "type": "cultivation_mountain",
+  "schemaVersion": 1,
+  "theme": {
+    "background": { "pattern": "none", "color": "#f7f7f7" },
+    "page": "#f7f7f7",
+    "frame": "#ececec",
+    "hairline": "rgba(60, 50, 20, 0.08)"
+  },
+  "title": "业务公式修炼爬山",
+  "levels": [
+    {
+      "level": 1,
+      "name": "只低头执行",
+      "subtitle": "靠努力埋头执行",
+      "color": "#5B9BE8",
+      "stage": "beginner",
+      "problem": "缺假设驱动",
+      "problems": ["缺少欲望", "没有假设", "重复执行"],
+      "paths": ["培养业务好奇心", "开始思考\"为什么\"", "记录工作中的疑问"],
+      "description": "处于执行层，专注于完成任务，但缺乏对业务本质的思考。"
+    },
+    {
+      "level": 2,
+      "name": "有假设意识",
+      "subtitle": "有散点随机假设",
+      "color": "#3B82F6",
+      "stage": "beginner",
+      "problem": "缺业务公式",
+      "problems": ["思考碎片", "缺少结构", "假设随机"],
+      "paths": ["学习业务公式ABC模型", "尝试拆解简单业务", "建立结构化思维"],
+      "description": "开始思考业务背后的逻辑，但假设零散，缺乏系统性。"
+    },
+    {
+      "level": 3,
+      "name": "有粗糙公式",
+      "subtitle": "有基本业务公式",
+      "color": "#10B981",
+      "stage": "intermediate",
+      "problem": "缺完备公式",
+      "problems": ["维度单一", "不够完备", "层级太浅"],
+      "paths": ["完善公式维度", "增加公式层级", "验证公式准确性"],
+      "description": "能够构建基础业务公式，但公式不够全面和精细。"
+    },
+    {
+      "level": 4,
+      "name": "有全面公式",
+      "subtitle": "有多层细致完备公式",
+      "color": "#F59E0B",
+      "stage": "intermediate",
+      "problem": "缺假设涌现",
+      "problems": ["没有灵感", "缺少氛围", "激励不足"],
+      "paths": ["建立假设生成机制", "营造创新氛围", "设计激励体系"],
+      "description": "拥有完备的业务公式体系，但缺乏持续产生新假设的能力。"
+    },
+    {
+      "level": 5,
+      "name": "有大量假设",
+      "subtitle": "沿着公式大量涌现",
+      "color": "#EF4444",
+      "stage": "advanced",
+      "problem": "缺持续创新",
+      "problems": ["不够本质", "不敢创新", "缺少迭代"],
+      "paths": ["追求第一性原理", "鼓励大胆创新", "建立快速迭代机制"],
+      "description": "能够基于公式持续产生高质量假设，但需要更深层的创新。"
+    },
+    {
+      "level": 6,
+      "name": "创新领先",
+      "subtitle": "无限进步+行业领先",
+      "color": "#8B5CF6",
+      "stage": "advanced",
+      "problem": "最佳实践",
+      "problems": [],
+      "paths": ["持续突破自我", "引领行业发展", "分享最佳实践"],
+      "description": "达到业务公式修炼的最高境界，实现无限进步和行业领先。"
+    }
+  ],
+  "currentLevel": 0,
+  "assessmentAnswers": []
+}

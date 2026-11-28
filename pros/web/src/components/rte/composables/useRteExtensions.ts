@@ -2,6 +2,9 @@ import { nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useEditor } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
+import Collaboration from '@tiptap/extension-collaboration'
+import CollaborationCaret from '@tiptap/extension-collaboration-caret'
+import type { Doc as YDoc } from 'yjs'
 import Placeholder from '@tiptap/extension-placeholder'
 import Underline from '@tiptap/extension-underline'
 import { TextStyle, FontSize, FontFamily, LineHeight } from '@tiptap/extension-text-style'
@@ -12,7 +15,12 @@ import Subscript from '@tiptap/extension-subscript'
 import Superscript from '@tiptap/extension-superscript'
 import TextAlign from '@tiptap/extension-text-align'
 import Link from '@tiptap/extension-link'
+import { isAttachmentAnchor } from '../../../utils/rteAttachment'
+import { handleLinkDoubleClick, linkHrefAtSelection } from './linkDblClick'
 import { Table } from '@tiptap/extension-table'
+import { RteTableView } from '../../../extensions/rteTableView'
+import { TocBlock } from '../../../extensions/tocBlock'
+import { moveTableColumn, moveTableRow } from '../../../utils/rteTableLayout'
 import { TableRow } from '@tiptap/extension-table-row'
 import { RteImage } from '../../../extensions/rteImage'
 import { RteTableCell, RteTableHeader } from '../../../extensions/rteTableCells'
@@ -41,13 +49,24 @@ import { createRteMention } from '../../../extensions/mentionSuggestion'
 import { RteCodeBlockLowlight } from '../../../extensions/codeHighlight'
 import { SlashCommands } from '../../../extensions/slashCommands'
 import { escapeHtml } from '../../../utils/itemsHtml'
-import { FEISHU_HIGHLIGHT_COLORS, isBareHttpUrl, plainTextToPasteContent, sanitizePastedHtml } from '../../../utils/rtePasteClean'
+import {
+  FEISHU_HIGHLIGHT_COLORS,
+  absorbPastedFigureCaptions,
+  isBareHttpUrl,
+  plainTextToPasteContent,
+  sanitizePastedHtml,
+  unwrapSinglePastedList,
+} from '../../../utils/rtePasteClean'
+import { hasMarkdownLinkSyntax, markdownLinksToHtml } from '../../../utils/rteMarkdownLinks'
+import { normalizeLinkHref } from '../../../utils/rteLinkHref'
 import { clearEditorFormat } from '../../../utils/rteClearFormat'
 import { pasteVolume, previewShortcutAllowed } from '../../../utils/rteRound8'
 import { filesFromImageDataUrls, pasteCarriesText } from '../../../utils/rtePasteImage'
+import { pasteIntoCodeBlock } from '../../../utils/rteCodePaste'
 import {
   htmlHasTable,
   looksLikeTsvTable,
+  pasteTsvIntoTable,
   togglePreviewMode,
   tsvToTableHtml,
 } from '../../../utils/rteRound7'
@@ -78,11 +97,20 @@ import { TabsBlock, TabPane } from '../../../extensions/tabsBlock'
 import { MermaidBlock } from '../../../extensions/mermaidBlock'
 import { EchartsBlock } from '../../../extensions/echartsBlock'
 import { CrossRef, findCrossRefPos } from '../../../extensions/crossRef'
+import { CanvasEmbed } from '../../../extensions/canvasEmbed'
+import { DatabaseBlock, readDatabaseBlockOpenTarget } from '../../../extensions/databaseBlock'
+import { BaseEmbed } from '../../../extensions/baseEmbed'
 import { ListStyleAttrs } from '../../../extensions/listStyleAttrs'
+import { TianziGrid } from '../../../extensions/rteTianziGrid'
+import { HeadingManualNum } from '../../../extensions/headingManualNum'
 import { LinkButton } from '../../../extensions/linkButton'
 import { SyncBlock } from '../../../extensions/syncBlock'
 import { RteMarkdownInputRules } from '../../../extensions/rteMarkdownInputRules'
 import { MediaHydrate } from '../../../extensions/mediaHydrate'
+import { RteInlineMarkdown } from '../../../extensions/rteInlineMarkdown'
+import { RteAutoLink } from '../../../extensions/rteAutoLink'
+import { BlockIdentity } from '../../../extensions/blockIdentity'
+import { BlockPermissionGuard } from '../../../extensions/blockPermissionGuard'
 
 type LateFn = (...args: any[]) => any
 
@@ -106,6 +134,10 @@ export function useRteExtensions(deps: {
   mentionUi: any
   /** 组织通讯录真人候选。宿主从通讯录接口取人并按文档权限过滤。 */
   mentionPeople?: () => Promise<any[]>
+  /** 知识库文档候选（@ 文档 mention）。宿主从知识树 API 取当前项目的文档节点。 */
+  mentionDocuments?: () => Promise<any[]>
+  /** 多维表格节点 → 文档内嵌 Base 视图块引用参数。 */
+  mentionBaseEmbed?: (nodeId: string) => Promise<any | null>
   openTableContextMenu: LateFn
   pastePlainTextMode: { value: boolean }
   shortcutsOpen: { value: boolean }
@@ -122,6 +154,7 @@ export function useRteExtensions(deps: {
   undoPageSetup: LateFn
   redoPageSetup: LateFn
   applyFormatPainterIfNeeded: LateFn
+  cancelFormatPainter: () => boolean
   initialEditorContent: LateFn
   insertFormula: LateFn
   looksLikeMarkdown: LateFn
@@ -173,6 +206,13 @@ export function useRteExtensions(deps: {
     transaction: { mapping: { map: (pos: number, assoc?: number) => number } },
     appended?: ReadonlyArray<{ mapping: { map: (pos: number, assoc?: number) => number } }>,
   ) => void
+  /** 打开或回填块 ID 后，只同步 lastEmitted 基线，不向父级 emit / 保存。 */
+  syncLastEmittedHtml?: (ed: { getHTML: () => string }) => void
+  /** 传入 Y.Doc 时启用正文协同；撤销改由 Collaboration 接管。不传则保持单人编辑。 */
+  collabDocument?: () => YDoc | null
+  /** 已有 Y.Doc / awareness 时接入 CollaborationCaret，展示他人光标与选区。 */
+  collabProvider?: () => { awareness: unknown } | null
+  collabUser?: () => { name: string; color: string }
 }) {
   const {
     closeTableCtx,
@@ -235,11 +275,26 @@ export function useRteExtensions(deps: {
   const toggleOutlinePanel = (...args: any[]) => deps.toggleOutlinePanel(...args)
   const undoToolbarGroupOrder = (...args: any[]) => deps.undoToolbarGroupOrder(...args)
   const mentionPeople = deps.mentionPeople
+  const mentionDocuments = deps.mentionDocuments
+  const mentionBaseEmbed = deps.mentionBaseEmbed
   let wordPasteHinted = false
 
+function qrHref(node: Element | null): string {
+  if (!node) return ''
+  try {
+    const meta = JSON.parse(node.getAttribute('data-qr') || '{}') as { text?: string }
+    return String(meta.text || '')
+  } catch {
+    return ''
+  }
+}
+
+  const collabYDoc = deps.collabDocument?.() ?? null
+  const collabProvider = deps.collabProvider?.() ?? null
+  const collabUser = deps.collabUser?.() ?? { name: '协作者', color: '#2563eb' }
 const editor = useEditor({
 
-  content: initialEditorContent(),
+  content: collabYDoc ? undefined : initialEditorContent(),
   extensions: [
     StarterKit.configure({
       heading: { levels: [1, 2, 3, 4, 5, 6] },
@@ -258,6 +313,8 @@ const editor = useEditor({
       underline: false,
       // 拖拽图片到同行时更明显的落点指示（飞书式并排）
       dropcursor: { color: '#5b8cff', width: 2 },
+      // Collaboration 自带撤销；与 StarterKit 的 UndoRedo 同时开会冲突。
+      ...(collabYDoc ? { undoRedo: false as const } : {}),
     }),
     Underline,
     Subscript,
@@ -265,6 +322,8 @@ const editor = useEditor({
     RteCodeBlockLowlight,
     // Markdown 输入规则（# / - / 1. / [ ] / > / ``` / ---），优先于各扩展内置规则
     RteMarkdownInputRules,
+    RteInlineMarkdown,
+    RteAutoLink,
     MediaHydrate,
     TextStyle,
     FontSize,
@@ -272,6 +331,17 @@ const editor = useEditor({
     LineHeight,
     LetterSpacing,
     ParagraphAttrs,
+    BlockIdentity,
+    BlockPermissionGuard,
+    ...(collabYDoc ? [Collaboration.configure({ document: collabYDoc })] : []),
+    ...(collabYDoc && collabProvider
+      ? [
+          CollaborationCaret.configure({
+            provider: collabProvider,
+            user: collabUser,
+          }),
+        ]
+      : []),
     PageBreak,
     Columns,
     Column,
@@ -297,7 +367,12 @@ const editor = useEditor({
     MermaidBlock,
     EchartsBlock,
     CrossRef,
+    CanvasEmbed,
+    DatabaseBlock,
+    BaseEmbed,
     ListStyleAttrs,
+    TianziGrid,
+    HeadingManualNum,
     LinkButton,
     Color,
     Highlight.configure({ multicolor: true }),
@@ -307,6 +382,9 @@ const editor = useEditor({
     }),
     Link.configure({
       openOnClick: false,
+      // 自动链接交给 RteAutoLink：内置 linkify 会把中文标点吞进 href，
+      // 且撤销一次会删掉整条网址，这里换成本项目自带的实现。
+      autolink: false,
       // data/blob：本地附件 DataURL / ObjectURL 可作为链接芯片插入
       protocols: ['http', 'https', 'data', 'blob'],
       HTMLAttributes: { class: 'rte-link' },
@@ -364,7 +442,8 @@ const editor = useEditor({
     }),
     TaskList,
     TaskItem.configure({ nested: true }),
-    Table.configure({ resizable: true, handleWidth: 8 }),
+    Table.configure({ resizable: true, handleWidth: 8, View: RteTableView }),
+    TocBlock,
     TableRow,
     RteTableHeader,
     RteTableCell,
@@ -402,6 +481,8 @@ const editor = useEditor({
     createRteMention({
       ui: mentionUi,
       people: mentionPeople,
+      documents: mentionDocuments,
+      resolveBaseEmbed: mentionBaseEmbed,
     }),
     SlashCommands.configure({
       ui: slashUi,
@@ -433,7 +514,10 @@ const editor = useEditor({
           /* ignore */
         }
       }
-      return sanitizePastedHtml(html)
+      let cleaned = sanitizePastedHtml(html)
+      const ed = editor.value
+      if (ed?.isActive('listItem') || ed?.isActive('taskItem')) cleaned = unwrapSinglePastedList(cleaned)
+      return absorbPastedFigureCaptions(cleaned)
     },
     handlePaste(_view, event) {
       if (viewMode.value !== 'edit') {
@@ -460,6 +544,23 @@ const editor = useEditor({
       if (volume === 'warn') {
         ElMessage.info('正在粘贴较大内容，编辑器可能短暂无响应')
       }
+      /*
+       * 代码块粘贴：一律按原文逐字插入。
+       * 下面几条（Markdown 模式 / 纯文本模式 / Markdown 智能识别）都会把纯文本
+       * 解析成 HTML 再 insertContent，而代码块是 text* 纯文本节点，
+       * 块级 HTML 插不进去 —— 表现就是"粘不进去"。
+       */
+      if (pasteIntoCodeBlock(_view, plain, html)) {
+        event.preventDefault()
+        return true
+      }
+      if (plain && plain.includes('\t')) {
+        const ed = editor.value
+        if (ed && (ed.isActive('tableCell') || ed.isActive('tableHeader')) && pasteTsvIntoTable(ed, plain)) {
+          event.preventDefault()
+          return true
+        }
+      }
       if (
         plain &&
         pasteFormatMode.value === 'keep' &&
@@ -476,7 +577,7 @@ const editor = useEditor({
         event.preventDefault()
         const ed = editor.value
         if (!ed) return true
-        const href = plain.trim()
+        const href = normalizeLinkHref(plain)
         if (!ed.state.selection.empty) {
           ed.chain().focus().setLink({ href }).run()
         } else {
@@ -522,6 +623,21 @@ const editor = useEditor({
         ed.chain().focus().insertContent(mdHtml).run()
         return true
       }
+      /*
+       * 窄口径 Markdown 链接粘贴。
+       *
+       * 只含 "[文字](地址)" 的纯文本不满足 looksLikeMarkdown（要 2 处特征），
+       * 会落到 ProseMirror 默认粘贴；而 Link 扩展自带的粘贴规则会把地址单独
+       * 识别成链接，语法被拆成 "[文字](<a>地址</a>)"。这里先把它转成锚点，结构不丢。
+       */
+      if (plain && !html.trim() && hasMarkdownLinkSyntax(plain)) {
+        event.preventDefault()
+        const ed = editor.value
+        if (!ed) return true
+        const normalized = plain.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+        ed.chain().focus().insertContent(markdownLinksToHtml(normalized)).run()
+        return true
+      }
       return false
     },
     handleDrop(view, event) {
@@ -551,12 +667,55 @@ const editor = useEditor({
     },
     handleClick(_view, _pos, event) {
       const target = event.target as HTMLElement | null
+      if (event.altKey && target) {
+        const ed = editor.value
+        const qr = target.closest('img[data-qr]')
+        const card = target.closest('[data-type="link-card"]')
+        if (ed && (qr || card)) {
+          const href = card?.getAttribute('data-href') || qrHref(qr)
+          if (href) {
+            let found: number | null = null
+            ed.state.doc.descendants((node, pos) => {
+              if (found != null) return false
+              if (qr && node.type.name === 'linkCard' && String(node.attrs.href || '') === href) {
+                found = pos
+                return false
+              }
+              if (card && node.type.name === 'image') {
+                try {
+                  const meta = JSON.parse(String(node.attrs.qrMeta || '{}')) as { text?: string }
+                  if (meta.text === href) {
+                    found = pos
+                    return false
+                  }
+                } catch {
+                  /* 没有二维码数据 */
+                }
+              }
+              return true
+            })
+            if (found != null) {
+              event.preventDefault()
+              jumpToPos(ed, found)
+              return true
+            }
+          }
+        }
+      }
       const math = target?.closest?.(
         '[data-type="math-inline"], [data-type="math-display"], .rte-math',
       ) as HTMLElement | null
       if (math) {
         event.preventDefault()
         openFormulaFromChip(math)
+        return true
+      }
+      const dbOpen = readDatabaseBlockOpenTarget(target)
+      if (dbOpen) {
+        event.preventDefault()
+        target?.dispatchEvent?.(
+          new CustomEvent('rte-open-database-block', { bubbles: true, detail: dbOpen }),
+        )
         return true
       }
       const xref = target?.closest?.('[data-type="cross-ref"]') as HTMLElement | null
@@ -582,15 +741,13 @@ const editor = useEditor({
         deps.onEditorLinkClick?.(href)
         return true
       }
-      const attach = target?.closest?.('a.rte-attachment-link[href]') as HTMLAnchorElement | null
-      if (attach) {
+      const attach = target?.closest?.('a[href]') as HTMLAnchorElement | null
+      if (attach && isAttachmentAnchor(attach.getAttribute('href') || '', attach.textContent || '', attach.className || '')) {
         const href = attach.getAttribute('href')?.trim() || ''
-        if (href) {
-          event.preventDefault()
-          const name = (attach.getAttribute('title') || attach.textContent || '').replace(/^📎\s*/, '').trim()
-          deps.onAttachmentOpen?.(href, name)
-          return true
-        }
+        event.preventDefault()
+        const name = (attach.getAttribute('title') || attach.textContent || '').replace(/^📎\s*/, '').trim()
+        deps.onAttachmentOpen?.(href, name)
+        return true
       }
       const anchor = target?.closest?.('a[href]') as HTMLElement | null
       if (!anchor || viewMode.value === 'edit') return false
@@ -601,6 +758,23 @@ const editor = useEditor({
       return true
     },
     handleDOMEvents: {
+      /*
+       * 编辑态双击链接 = 打开链接。
+       *
+       * 为什么放在 DOM 事件而不是 handleClick：
+       * 单击要留给"选中文字 / 唤出链接气泡"，只有第二次点击才是"我要打开"。
+       * 打开动作统一走 deps.onEditorLinkClick（宿主侧 requestOpenHref），
+       * 复用既有的外链确认、危险协议拦截与审计记录，
+       * 不在这里另起一套 window.open，避免绕开安全策略。
+       */
+      dblclick: (_view, event) => {
+        // 预览态单击已经会打开，双击会重复打开，这里不插手。
+        if (viewMode.value !== 'edit') return false
+        return handleLinkDoubleClick(event as MouseEvent, {
+          onOpen: (href) => deps.onEditorLinkClick?.(href),
+          onAttachmentOpen: (href, name) => deps.onAttachmentOpen?.(href, name),
+        })
+      },
       contextmenu: (_view, event) => {
         const target = event.target as HTMLElement | null
         if (!target?.closest?.('td, th, table, .tableWrapper')) return false
@@ -618,6 +792,26 @@ const editor = useEditor({
       },
     },
     handleKeyDown(view, event) {
+      /*
+       * ⌘/Ctrl + Enter：打开光标所在的链接。
+       * 这是双击打开的键盘等价操作 —— 同一个动作两种输入方式，
+       * 不用鼠标也能打开，同时不占用普通 Enter 的换行语义。
+       */
+      if (
+        event.key === 'Enter' &&
+        (event.metaKey || event.ctrlKey) &&
+        !event.shiftKey &&
+        !event.altKey &&
+        viewMode.value === 'edit'
+      ) {
+        const ed = editor.value
+        if (!ed) return false
+        const href = linkHrefAtSelection(ed)
+        if (!href) return false
+        event.preventDefault()
+        deps.onEditorLinkClick?.(href)
+        return true
+      }
       if (
         event.key === 'End' &&
         !event.shiftKey &&
@@ -634,12 +828,36 @@ const editor = useEditor({
         blockMenuOpen.value = false
         return true
       }
+      if (event.key === 'Escape' && deps.cancelFormatPainter()) {
+        event.preventDefault()
+        return true
+      }
       if (event.key === 'Escape' && findDialogOpen.value) {
         event.preventDefault()
         closeFindDialog()
         return true
       }
       // Extra shortcuts (StarterKit already covers Mod-b/i etc.)
+      if (
+        event.altKey &&
+        !event.metaKey &&
+        !event.ctrlKey &&
+        !event.shiftKey &&
+        (event.key === 'ArrowUp' || event.key === 'ArrowDown' || event.key === 'ArrowLeft' || event.key === 'ArrowRight')
+      ) {
+        const tableEditor = editor.value
+        if (tableEditor?.isActive('table')) {
+          const dir = event.key === 'ArrowUp' || event.key === 'ArrowLeft' ? -1 : 1
+          const moved =
+            event.key === 'ArrowLeft' || event.key === 'ArrowRight'
+              ? moveTableColumn(tableEditor, dir)
+              : moveTableRow(tableEditor, dir)
+          if (moved) {
+            event.preventDefault()
+            return true
+          }
+        }
+      }
       const mod = event.metaKey || event.ctrlKey
       if (!mod) return false
       const ed = editor.value
@@ -658,6 +876,16 @@ const editor = useEditor({
       }
       if (key === 'z' && !event.shiftKey && !event.altKey && (undoPageSetup() || undoPageMargin() || undoToolbarGroupOrder())) {
         event.preventDefault()
+        return true
+      }
+      if (key === 'arrowup' && event.altKey && !event.shiftKey) {
+        event.preventDefault()
+        const { from } = ed.state.selection
+        let headingPos: number | null = null
+        ed.state.doc.descendants((node, pos) => {
+          if (node.type.name === 'heading' && pos <= from) headingPos = pos
+        })
+        if (headingPos != null) ed.chain().focus().setTextSelection(headingPos + 1).run()
         return true
       }
       if (key === '/' && !event.altKey && !event.shiftKey) {
@@ -812,8 +1040,17 @@ const editor = useEditor({
       return false
     },
   },
-  onCreate: () => {
+  onCreate: ({ editor: ed }) => {
     editorReady.value = true
+    // 协同文档若还没有片段，把当前 HTML 写入 Y.Doc，并回填 data-block-id。
+    if (collabYDoc && collabYDoc.getXmlFragment('default').length === 0) {
+      const initial = initialEditorContent()
+      if (typeof initial === 'string' && initial.trim()) {
+        ed.commands.setContent(initial)
+      }
+    }
+    ed.commands.ensureBlockIdentities()
+    deps.syncLastEmittedHtml?.(ed)
   },
   onUpdate: ({ editor: ed }) => {
     scheduleHtmlEmit(ed)

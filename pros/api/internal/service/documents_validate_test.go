@@ -63,10 +63,10 @@ func TestHighlightSnippet(t *testing.T) {
 
 func TestRenameRejectsBlank(t *testing.T) {
 	svc := NewDocumentsService(nil)
-	if err := svc.Rename(uuid.New(), uuid.New(), "   "); err != ErrValidation {
+	if _, err := svc.Rename(uuid.New(), uuid.New(), "   "); err != ErrValidation {
 		t.Fatalf("blank = %v", err)
 	}
-	if err := svc.Rename(uuid.New(), uuid.New(), strings.Repeat("题", maxTitleRunes+1)); err != ErrValidation {
+	if _, err := svc.Rename(uuid.New(), uuid.New(), strings.Repeat("题", maxTitleRunes+1)); err != ErrValidation {
 		t.Fatalf("long = %v", err)
 	}
 }

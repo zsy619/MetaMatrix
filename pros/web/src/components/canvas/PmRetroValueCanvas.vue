@@ -209,4 +209,89 @@ function onTitleInput(event: Event) {
 .prv-panel--left :deep(.ProseMirror p) {
   margin: 0.35em 0;
 }
+
+@media (max-width: 800px) {
+  .prv-canvas {
+    inset: 0;
+    overflow: auto;
+    padding-bottom: 96px;
+    border: none;
+    background: transparent;
+  }
+
+  .prv-grid {
+    flex: 0 0 auto;
+    overflow: visible;
+    grid-template-columns: minmax(0, 1fr);
+    grid-auto-rows: max-content;
+    gap: 12px;
+    padding: 12px;
+  }
+
+  .prv-col {
+    height: auto;
+    min-height: max-content;
+    border: 1px solid var(--cv-frame, #ececec);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+
+  .prv-col-title {
+    font-size: 17px;
+  }
+
+  .prv-panel,
+  .prv-panel--center :deep(.ym-block-body),
+  .prv-panel--center :deep(.rte-root),
+  .prv-panel--center :deep(.ProseMirror) {
+    flex: 0 0 auto;
+    height: auto;
+    overflow: visible;
+  }
+
+  .prv-panel {
+    min-height: 220px;
+  }
+
+  .prv-panel :deep(.ym-block),
+  .prv-panel :deep(.ym-block-body),
+  .prv-panel :deep(.rte-root),
+  .prv-panel :deep(.rte-workspace),
+  .prv-panel :deep(.rte-canvas),
+  .prv-panel :deep(.rte-body),
+  .prv-panel :deep(.ProseMirror) {
+    height: auto;
+    max-height: none;
+    max-width: 100%;
+    min-width: 0;
+    overflow: visible;
+    flex: 0 0 auto;
+  }
+
+  .prv-panel :deep(.ym-block) {
+    min-height: 0;
+  }
+
+  .prv-panel :deep(.rte-workspace),
+  .prv-panel :deep(.rte-canvas),
+  .prv-panel :deep(.ProseMirror) {
+    width: 100%;
+  }
+
+  .prv-panel :deep(.ProseMirror) {
+    min-height: 140px;
+    font-size: 15px;
+  }
+
+  .prv-panel :deep(.ProseMirror p) {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .prv-panel :deep(.pm-max-btn) {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+  }
+}
 </style>

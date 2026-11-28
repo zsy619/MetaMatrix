@@ -20,11 +20,28 @@ vi.mock('../RichTextEditor.vue', () => ({
 import { cloneTemplate, isTemplateId, TEMPLATE_META, useDocumentStore } from '../../stores/document'
 import {
   isFiveForcesDoc,
+  isAnsoffDoc,
   isAarrDoc,
   isBcgDoc,
+  isBreakEvenDoc,
+  isEmpathyDoc,
   isErrcDoc,
   isIncomeStatementDoc,
+  isMarketingMixDoc,
+  isPestleDoc,
   isScorecardDoc,
+  isRiceDoc,
+  isSevenSDoc,
+  isImpactEffortDoc,
+  isJourneyDoc,
+  isKanoDoc,
+  isMoscowDoc,
+  isGoldenCircleDoc,
+  isPlayingToWinDoc,
+  isTenCheckDoc,
+  isSoarDoc,
+  isVrioDoc,
+  isValueChainDoc,
   isLeanCanvasDoc,
   isOkrDoc,
   isPdcaDoc,
@@ -33,10 +50,14 @@ import {
   isValuePropositionDoc,
 } from '../../types/canvas'
 import { formatSuccessors } from '../../utils/projectGantt'
+import GoldenCircleCanvas from './GoldenCircleCanvas.vue'
 import LeanCanvas from './LeanCanvas.vue'
 import OkrCanvas from './OkrCanvas.vue'
+import PlayingToWinCanvas from './PlayingToWinCanvas.vue'
+import SoarCanvas from './SoarCanvas.vue'
 import SwotCanvas from './SwotCanvas.vue'
 import ValuePropositionCanvas from './ValuePropositionCanvas.vue'
+import VrioCanvas from './VrioCanvas.vue'
 
 describe('实用商业画布', () => {
   beforeEach(() => {
@@ -131,6 +152,20 @@ describe('实用商业画布', () => {
     expect(sum('revenue') - sum('cost') - sum('expense')).toBe(110)
   })
 
+  it('PESTLE、安索夫、同理心和 4P 都登记在模板库', () => {
+    for (const id of ['pestle', 'ansoff', 'empathy-map', 'marketing-mix'] as const) {
+      expect(isTemplateId(id)).toBe(true)
+      expect(TEMPLATE_META[id].description.length).toBeGreaterThan(0)
+    }
+    expect(isPestleDoc(cloneTemplate('pestle')) && (cloneTemplate('pestle') as { blocks: unknown[] }).blocks).toHaveLength(6)
+    const ansoff = cloneTemplate('ansoff')
+    const empathy = cloneTemplate('empathy-map')
+    const mix = cloneTemplate('marketing-mix')
+    expect(isAnsoffDoc(ansoff) && ansoff.blocks.map((block) => block.id)).toEqual(['penetration', 'product', 'market', 'diversification'])
+    expect(isEmpathyDoc(empathy) && empathy.blocks).toHaveLength(6)
+    expect(isMarketingMixDoc(mix) && mix.blocks).toHaveLength(4)
+  })
+
   it('BCG、平衡计分卡、ERRC 和 AARRR 都登记在模板库', () => {
     for (const id of ['bcg', 'balanced-scorecard', 'errc', 'aarr'] as const) {
       expect(isTemplateId(id)).toBe(true)
@@ -143,6 +178,135 @@ describe('实用商业画布', () => {
     expect(isScorecardDoc(scorecard) && scorecard.blocks).toHaveLength(4)
     expect(isErrcDoc(errc) && errc.blocks).toHaveLength(4)
     expect(isAarrDoc(aarr) && aarr.blocks).toHaveLength(5)
+  })
+
+  it('价值链、7S、RICE 和盈亏平衡都能算出结果', () => {
+    for (const id of ['value-chain', 'seven-s', 'rice', 'break-even'] as const) expect(isTemplateId(id)).toBe(true)
+    const chain = cloneTemplate('value-chain')
+    const seven = cloneTemplate('seven-s')
+    const rice = cloneTemplate('rice')
+    const point = cloneTemplate('break-even')
+    expect(isValueChainDoc(chain) && chain.blocks).toHaveLength(9)
+    expect(isSevenSDoc(seven) && seven.blocks).toHaveLength(7)
+    expect(isRiceDoc(rice)).toBe(true)
+    if (isRiceDoc(rice)) {
+      const first = rice.items[0]
+      const score = (first.reach * first.impact * (first.confidence / 100)) / first.effort
+      expect(score).toBe(320)
+    }
+    expect(isBreakEvenDoc(point)).toBe(true)
+    if (isBreakEvenDoc(point)) {
+      expect(point.fixedCost / (point.price - point.variableCost)).toBe(200)
+    }
+  })
+
+  it('客户旅程、卡诺、MoSCoW 和影响努力矩阵都登记在模板库', () => {
+    for (const id of ['customer-journey', 'kano', 'moscow', 'impact-effort'] as const) {
+      expect(isTemplateId(id)).toBe(true)
+    }
+    const journey = cloneTemplate('customer-journey')
+    const kano = cloneTemplate('kano')
+    const moscow = cloneTemplate('moscow')
+    const impact = cloneTemplate('impact-effort')
+    expect(isJourneyDoc(journey) && journey.blocks).toHaveLength(5)
+    expect(isKanoDoc(kano) && kano.blocks.map((block) => block.id)).toEqual(['must', 'performance', 'attractive', 'indifferent'])
+    expect(isMoscowDoc(moscow) && moscow.blocks).toHaveLength(4)
+    expect(isImpactEffortDoc(impact) && impact.blocks.map((block) => block.id)).toEqual(['now', 'plan', 'fill', 'avoid'])
+  })
+
+  it('VRIO、黄金圈、SOAR 和制胜选择都登记在模板库', () => {
+    for (const id of ['vrio', 'golden-circle', 'soar', 'playing-to-win'] as const) {
+      expect(isTemplateId(id)).toBe(true)
+      expect(TEMPLATE_META[id].name.length).toBeGreaterThan(0)
+    }
+    const vrio = cloneTemplate('vrio')
+    const circle = cloneTemplate('golden-circle')
+    const soar = cloneTemplate('soar')
+    const playing = cloneTemplate('playing-to-win')
+    expect(isVrioDoc(vrio) && vrio.blocks.map((block) => block.id)).toEqual(['value', 'rarity', 'imitability', 'organization'])
+    expect(isGoldenCircleDoc(circle) && circle.blocks.map((block) => block.id)).toEqual(['why', 'how', 'what'])
+    expect(isSoarDoc(soar) && soar.blocks).toHaveLength(4)
+    expect(isPlayingToWinDoc(playing) && playing.blocks.map((block) => block.id)).toEqual(['aspiration', 'where', 'how', 'capabilities', 'systems'])
+    const ten = cloneTemplate('ten-check')
+    expect(isTenCheckDoc(ten) && ten.rows).toHaveLength(10)
+    expect(isTenCheckDoc(ten) && ten.title).toBe('十格自检')
+    expect(isTenCheckDoc(ten) && ten.rows[0]?.name).toBe('场景')
+    expect(isTenCheckDoc(ten) && ten.rows[9]?.fail).toContain('看着差不多')
+    const store = useDocumentStore()
+    store.loadFromTemplate('vrio')
+    const vrioView = mount(VrioCanvas, { props: { doc: store.current_data as never } })
+    expect(vrioView.findAll('[data-block]')).toHaveLength(4)
+    expect(vrioView.findAll('.rte-stub')).toHaveLength(4)
+    expect(store.updateBlockKeyword('value', '同一套画布')).toBe(true)
+    vrioView.unmount()
+    store.loadFromTemplate('golden-circle')
+    const circleView = mount(GoldenCircleCanvas, { props: { doc: store.current_data as never } })
+    expect(circleView.text()).toContain('为什么')
+    expect(circleView.findAll('.rte-stub')).toHaveLength(3)
+    circleView.unmount()
+    store.loadFromTemplate('soar')
+    const soarView = mount(SoarCanvas, { props: { doc: store.current_data as never } })
+    expect(soarView.findAll('[data-block]')).toHaveLength(4)
+    soarView.unmount()
+    store.loadFromTemplate('playing-to-win')
+    const playingView = mount(PlayingToWinCanvas, { props: { doc: store.current_data as never } })
+    expect(playingView.findAll('[data-block]')).toHaveLength(5)
+    playingView.unmount()
+    store.loadFromTemplate('golden-circle')
+    const source = store.current_data
+    if (!isGoldenCircleDoc(source)) return
+    store.setCurrentData({
+      ...source,
+      blocks: source.blocks.map((block) =>
+        block.id === 'why' ? { id: block.id, title: block.title, hint: block.hint, text: '先写信念\n再写证据' } : block,
+      ),
+    } as typeof source)
+    const migrated = store.current_data
+    expect(isGoldenCircleDoc(migrated) && migrated.blocks.find((block) => block.id === 'why')?.items.map((item) => item.text)).toEqual(['先写信念', '再写证据'])
+  })
+
+  it('通用商业画布不放在 FDE，FDE 画布仍留在 FDE', () => {
+    const restored: Record<string, string> = {
+      'project-gantt': 'org',
+      'raci-matrix': 'org',
+      'daily-kanban': 'org',
+      'business-model-canvas': 'growth',
+      'cash-flow': 'growth',
+      swot: 'industry',
+      'lean-canvas': 'growth',
+      'value-proposition': 'growth',
+      okr: 'org',
+      'stakeholder-map': 'org',
+      pdca: 'org',
+      'five-forces': 'industry',
+      'income-statement': 'growth',
+      pestle: 'industry',
+      ansoff: 'growth',
+      'empathy-map': 'growth',
+      'marketing-mix': 'growth',
+      bcg: 'growth',
+      'balanced-scorecard': 'method',
+      errc: 'growth',
+      aarr: 'growth',
+      'value-chain': 'industry',
+      'seven-s': 'org',
+      rice: 'method',
+      'break-even': 'growth',
+      'customer-journey': 'growth',
+      kano: 'growth',
+      moscow: 'method',
+      'impact-effort': 'method',
+      vrio: 'method',
+      'golden-circle': 'method',
+      soar: 'method',
+      'playing-to-win': 'method',
+    }
+    for (const [id, category] of Object.entries(restored)) {
+      expect(TEMPLATE_META[id as keyof typeof TEMPLATE_META].category).toBe(category)
+    }
+    expect(TEMPLATE_META['ten-check'].category).toBe('fde')
+    expect(TEMPLATE_META['scene-three-high'].category).toBe('fde')
+    expect(TEMPLATE_META['ai-boundary'].category).toBe('fde')
   })
 
   it('甘特图后置任务指向依赖它的行', () => {

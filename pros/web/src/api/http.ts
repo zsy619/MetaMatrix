@@ -39,6 +39,34 @@ type RequestOpts = {
   cache?: RequestCache
   timeoutMs?: number
   retry?: number
+  /** 默认按 JSON 解析；下载备份时直接读取 Blob，避免再拼接整份 JSON 字符串。 */
+  responseType?: 'json' | 'blob'
+}
+
+/**
+ * 401 后的会话刷新结果。
+ * unavailable 表示断网/超时/5xx 等暂时故障，HTTP 层不得据此清除会话。
+ */
+export type UnauthorizedRefreshResult = 'refreshed' | 'invalid' | 'unavailable'
+type UnauthorizedRefreshHandler = () => Promise<UnauthorizedRefreshResult>
+
+// 由 auth store 注册，HTTP 层保持零静态依赖，避免 http ↔ auth 循环导入。
+let unauthorizedRefreshHandler: UnauthorizedRefreshHandler | null = null
+
+export function setUnauthorizedHandler(handler: UnauthorizedRefreshHandler | null): () => void {
+  unauthorizedRefreshHandler = handler
+  // 返回只注销本次注册的函数，避免旧 Pinia 作用域销毁时误清新的 auth store。
+  return () => {
+    if (unauthorizedRefreshHandler === handler) unauthorizedRefreshHandler = null
+  }
+}
+
+/** 只有服务端最终明确拒绝会话时才走全局登出；网络错误不会调用这里。 */
+function invalidateSession(): void {
+  setToken(null)
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('metamatrix:auth:logout'))
+  }
 }
 
 const BASE = (import.meta.env.VITE_API_BASE as string | undefined) || '/api'
@@ -69,7 +97,11 @@ function shouldRetry(status: number, error: unknown): boolean {
   return status === 502 || status === 503 || status === 504
 }
 
-async function performRequest(path: string, opts: RequestOpts = {}): Promise<ApiResult<unknown>> {
+async function performWithRetries(
+  path: string,
+  opts: RequestOpts,
+  serializedBody: string | undefined,
+): Promise<ApiResult<unknown>> {
   const method = (opts.method || 'GET').toUpperCase()
   const retries = opts.retry ?? (method === 'GET' ? 1 : 0)
   const timeoutMs = opts.timeoutMs ?? 20_000
@@ -82,7 +114,7 @@ async function performRequest(path: string, opts: RequestOpts = {}): Promise<Api
     }
     const timed = withTimeout(opts.signal, timeoutMs)
     try {
-      return await performOnce(path, opts, timed.signal)
+      return await performOnce(path, opts, serializedBody, timed.signal)
     } catch (error) {
       timed.cancel()
       lastError = error
@@ -96,12 +128,58 @@ async function performRequest(path: string, opts: RequestOpts = {}): Promise<Api
   throw lastError
 }
 
-async function performOnce(path: string, opts: RequestOpts, signal: AbortSignal): Promise<ApiResult<unknown>> {
+async function performRequest(path: string, opts: RequestOpts = {}): Promise<ApiResult<unknown>> {
+  // JSON 只序列化一次：自动重试和 401 重放必须发送逐字节相同的 body，
+  // 否则响应式对象在两次尝试之间被编辑时，同一个 operationId 会对应不同内容。
+  const serializedBody = opts.body !== undefined ? JSON.stringify(opts.body) : undefined
+  const useAuth = opts.auth !== false
+  let authReplayed = false
+
+  while (true) {
+    try {
+      return await performWithRetries(path, opts, serializedBody)
+    } catch (error) {
+      const unauthorized = useAuth && error instanceof ApiError && error.status === 401
+      if (!unauthorized) throw error
+
+      // refresh 本身不能再次触发刷新；普通请求刷新后也只允许重放一次。
+      if (path === '/auth/refresh' || authReplayed) {
+        invalidateSession()
+        throw error
+      }
+      authReplayed = true
+
+      const refresh = unauthorizedRefreshHandler
+      if (!refresh) {
+        invalidateSession()
+        throw error
+      }
+
+      let outcome: UnauthorizedRefreshResult
+      try {
+        outcome = await refresh()
+      } catch {
+        // 刷新处理器异常不能掩盖原请求，也不能被误当成服务端签发的登出凭据。
+        outcome = 'unavailable'
+      }
+      if (outcome === 'refreshed') continue
+      if (outcome === 'invalid' && getToken()) invalidateSession()
+      throw error
+    }
+  }
+}
+
+async function performOnce(
+  path: string,
+  opts: RequestOpts,
+  serializedBody: string | undefined,
+  signal: AbortSignal,
+): Promise<ApiResult<unknown>> {
   const headers: Record<string, string> = {
     Accept: 'application/json',
     'X-Request-Id': crypto.randomUUID(),
   }
-  if (opts.body !== undefined) {
+  if (serializedBody !== undefined) {
     headers['Content-Type'] = 'application/json'
   }
   const useAuth = opts.auth !== false
@@ -113,7 +191,7 @@ async function performOnce(path: string, opts: RequestOpts, signal: AbortSignal)
   const res = await fetch(`${BASE}${path}`, {
     method: opts.method || 'GET',
     headers,
-    body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+    body: serializedBody,
     signal,
     cache: opts.cache,
   })
@@ -122,19 +200,20 @@ async function performOnce(path: string, opts: RequestOpts, signal: AbortSignal)
     return { data: undefined, headers: res.headers, status: res.status }
   }
 
-  const text = await res.text()
   let data: unknown = null
-  if (text) {
-    try {
-      data = JSON.parse(text)
-    } catch {
-      data = { message: text }
+  if (opts.responseType === 'blob' && res.ok) {
+    // 只有成功响应走 Blob；失败响应仍按统一 JSON 错误契约解析，
+    // 这样 401 刷新、409 冲突和服务端错误消息都不会因下载分支而失效。
+    data = await res.blob()
+  } else {
+    const text = await res.text()
+    if (text) {
+      try {
+        data = JSON.parse(text)
+      } catch {
+        data = { message: text }
+      }
     }
-  }
-
-  if (res.status === 401 && useAuth) {
-    setToken(null)
-    window.dispatchEvent(new CustomEvent('metamatrix:auth:logout'))
   }
 
   if (!res.ok) {
@@ -166,4 +245,13 @@ export async function apiRequestResult<T = unknown>(
 ): Promise<ApiResult<T>> {
   const res = await performRequest(path, opts)
   return { data: res.data as T, headers: res.headers, status: res.status }
+}
+
+/** 下载成功时保留原始字节流；认证、超时、重试和错误解析仍复用统一 HTTP 管线。 */
+export async function apiRequestBlob(
+  path: string,
+  opts: RequestOpts = {},
+): Promise<ApiResult<Blob>> {
+  const res = await performRequest(path, { ...opts, responseType: 'blob' })
+  return { data: res.data as Blob, headers: res.headers, status: res.status }
 }

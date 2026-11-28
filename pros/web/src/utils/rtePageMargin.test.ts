@@ -25,9 +25,10 @@ assert.equal(
   writePageMargin(undefined, 'p', { preset: 'narrow', top: 12.7, right: 12.7, bottom: 12.7, left: 12.7 }, true),
   undefined,
 )
+// 预设一律四边一致（左右不再比上下宽）。
 assert.deepEqual(
-  writePageMargin(undefined, 'p', { preset: 'moderate', top: 25.4, right: 19.1, bottom: 25.4, left: 19.1 }, true),
-  { p: { preset: 'moderate', top: 25.4, right: 19.1, bottom: 25.4, left: 19.1 } },
+  writePageMargin(undefined, 'p', { preset: 'moderate', top: 19.1, right: 19.1, bottom: 19.1, left: 19.1 }, true),
+  { p: { preset: 'moderate', top: 19.1, right: 19.1, bottom: 19.1, left: 19.1 } },
 )
 assert.equal(
   writePageMargin(
@@ -38,10 +39,14 @@ assert.equal(
   ),
   undefined,
 )
-// 历史上显式存过常规的面板保持原值，不被新缺省覆盖。
+// 预设按当前定义渲染：常规四边一致（左右 = 上下 = 25.4mm）。
 assert.deepEqual(
   readPageMargin({ p: { preset: 'normal', top: 25.4, right: 31.8, bottom: 25.4, left: 31.8 } }, 'p', true),
-  { preset: 'normal', top: 25.4, right: 31.8, bottom: 25.4, left: 31.8 },
+  { preset: 'normal', top: 25.4, right: 25.4, bottom: 25.4, left: 25.4 },
+)
+assert.deepEqual(
+  readPageMargin({ p: { preset: 'custom', top: 25.4, right: 31.8, bottom: 25.4, left: 31.8 } }, 'p', true),
+  { preset: 'custom', top: 25.4, right: 31.8, bottom: 25.4, left: 31.8 },
 )
 assert.deepEqual(screenMargin({ preset: 'normal', top: 25.4, right: 31.8, bottom: 25.4, left: 31.8 }, true), {
   top: 0,

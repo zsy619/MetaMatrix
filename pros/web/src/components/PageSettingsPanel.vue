@@ -3,7 +3,6 @@ import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import html2canvas from 'html2canvas'
 import {
   useDocumentStore,
   isTemplateId,
@@ -555,6 +554,8 @@ async function onExportPng() {
     ui.setZoom(1)
     await new Promise((r) => requestAnimationFrame(() => r(null)))
     await new Promise((r) => setTimeout(r, 50))
+    // html2canvas 约 1MB，按需加载：只有真的导出时才拉进来。
+    const { default: html2canvas } = await import('html2canvas')
     const canvas = await html2canvas(el, {
       backgroundColor: '#fcfcfc',
       scale: 2,
@@ -1046,10 +1047,10 @@ function goGuide() {
   --psp-ink: #1f2329;
   --psp-secondary: #646a73;
   --psp-tertiary: #8f959e;
-  --psp-line: #dee0e3;
-  --psp-line-soft: #eff0f1;
-  --psp-hover: #f5f6f7;
-  --psp-bg: #f8f9fa;
+  --psp-line: rgba(62, 48, 28, 0.12);
+  --psp-line-soft: rgba(62, 48, 28, 0.06);
+  --psp-hover: #f3efe6;
+  --psp-bg: #f7f4ee;
   --psp-blue: #3370ff;
   --psp-blue-soft: #e1eaff;
   position: relative;
@@ -1060,8 +1061,8 @@ function goGuide() {
   align-self: stretch;
   min-height: 0;
   height: 100%;
-  background: #fff;
-  border-left: 1px solid var(--psp-line);
+  background: #f7f4ee;
+  border-left: 1px solid rgba(62, 48, 28, 0.1);
   box-sizing: border-box;
   display: flex;
   flex-direction: column;

@@ -1,8 +1,18 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
+const CONFIG_PANEL_KEY = 'metamatrix:config-panel'
+
+function readConfigPanelOpen(): boolean {
+  try {
+    return localStorage.getItem(CONFIG_PANEL_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
 export const useUiStore = defineStore('ui', () => {
-  const configPanelOpen = ref(true)
+  const configPanelOpen = ref(readConfigPanelOpen())
   const versionDrawerOpen = ref(false)
   const zoom = ref(1)
   const snapEnabled = ref(true)
@@ -10,6 +20,11 @@ export const useUiStore = defineStore('ui', () => {
 
   function toggleConfigPanel() {
     configPanelOpen.value = !configPanelOpen.value
+    try {
+      localStorage.setItem(CONFIG_PANEL_KEY, configPanelOpen.value ? '1' : '0')
+    } catch {
+      /* 隐私模式写不进时，这次会话里的开关仍然有效 */
+    }
   }
 
   function toggleVersionDrawer() {

@@ -80,9 +80,17 @@ export function useChartPanelData(ctx: ChartPanelDataContext) {
     const names = ctx.getSeriesNames()
     rows.push({
       category: `类目${rows.length + 1}`,
-      values: rows.length ? [] : names.map(() => 0),
+      values: names.map(() => 0),
     })
     commitRows(rows, names)
+  }
+
+  /** 改系列名。图例里的名字一起换。 */
+  function renameDataSeries(index: number, text: string) {
+    const names = [...ctx.getSeriesNames()]
+    if (index < 0 || index >= names.length) return
+    names[index] = text.trim() || `系列${index + 1}`
+    commitRows(cloneRows(), names)
   }
 
   /** 表格里删除一行。 */
@@ -151,6 +159,7 @@ export function useChartPanelData(ctx: ChartPanelDataContext) {
     setDataCategory,
     setDataCell,
     addDataRow,
+    renameDataSeries,
     removeDataRow,
     addDataSeries,
     removeDataSeries,

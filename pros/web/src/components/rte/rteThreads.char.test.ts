@@ -113,7 +113,8 @@ describe('评论与斜杠回写', () => {
     editor.chain().focus().setTextSelection(1).splitBlock().insertContent('/').run()
     await new Promise((resolve) => setTimeout(resolve, 400))
     await flushPromises()
-    expect(editor.getHTML().startsWith('<p></p><p>/')).toBe(true)
+    // 段上可能带 data-block-id 等属性，只断言结构：空段后面跟以 / 开头的新段
+    expect(editor.getHTML()).toMatch(/^<p(?:\s[^>]*)?><\/p><p(?:\s[^>]*)?>\//)
     expect(document.querySelector('.rte-slash-list')).toBeTruthy()
     wrapper.unmount()
   })

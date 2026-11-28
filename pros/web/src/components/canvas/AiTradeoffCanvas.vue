@@ -231,9 +231,47 @@ const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 }
 
 .at-cell-body :deep(.ym-block) {
-  flex: 1;
+  flex: 0 0 auto;
+  height: auto;
   min-height: 0;
   background: rgba(248, 249, 250, 0.55);
+}
+
+.at-cell-body :deep(.ym-block-body),
+.at-cell-body :deep(.rte-root),
+.at-cell-body :deep(.rte-workspace),
+.at-cell-body :deep(.rte-canvas),
+.at-cell-body :deep(.rte-body),
+.at-cell-body :deep(.ProseMirror) {
+  height: auto;
+  max-height: none;
+  max-width: 100%;
+  min-width: 0;
+  overflow: visible;
+  flex: 0 0 auto;
+}
+
+.at-cell-body :deep(.rte-workspace),
+.at-cell-body :deep(.rte-canvas),
+.at-cell-body :deep(.ProseMirror) {
+  width: 100%;
+}
+
+.at-cell-body :deep(.ProseMirror) {
+  min-height: 96px;
+  font-size: 16px;
+  line-height: 1.65;
+}
+
+.at-cell-body :deep(.ProseMirror p) {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.at-cell-body :deep(.pm-max-btn) {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
 }
 
 .at-footer {
@@ -264,9 +302,14 @@ const chrome = computed(() => canvasChromeStyle(props.doc.theme))
     border-right: none;
   }
 
+  .ai-tradeoff-canvas {
+    padding-bottom: 96px;
+  }
+
   .at-cell {
     border-right: none;
-    min-height: 400px;
+    min-height: 180px;
+    height: auto;
   }
 
   .at-cell--last-row {

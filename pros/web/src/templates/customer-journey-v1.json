@@ -1,0 +1,14 @@
+{
+  "id": "canvas_journey",
+  "type": "customer_journey",
+  "schemaVersion": 1,
+  "theme": { "background": { "pattern": "none", "color": "#f7f7f7" }, "page": "#f7f7f7", "frame": "#ececec", "hairline": "rgba(60, 50, 20, 0.08)" },
+  "title": "客户旅程",
+  "blocks": [
+    { "id": "aware", "title": "认知", "hint": "在哪里第一次听说", "items": [{ "id": "j_aw", "text": "同事转发了一张项目图" }] },
+    { "id": "consider", "title": "考虑", "hint": "拿什么和现有做法比", "items": [{ "id": "j_co", "text": "和聊天记录、周会比谁更清楚" }] },
+    { "id": "buy", "title": "购买", "hint": "谁拍板、卡在哪", "items": [{ "id": "j_bu", "text": "负责人自己试用后再提预算" }] },
+    { "id": "use", "title": "使用", "hint": "第一次真正用起来的动作", "items": [{ "id": "j_us", "text": "改一个日期并看到后置任务" }] },
+    { "id": "loyal", "title": "忠诚", "hint": "为什么下周还回来", "items": [{ "id": "j_lo", "text": "周计划还在这张图上" }] }
+  ]
+}

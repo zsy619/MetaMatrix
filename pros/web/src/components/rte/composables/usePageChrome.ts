@@ -2,12 +2,18 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch, type Ref } 
 import type { Editor } from '@tiptap/core'
 import {
   EMPTY_PAGE_CHROME,
-  estimatePageCount,
+  footerForPage,
   formatPageNumber,
   groupSlides,
+  headerForPage,
   normalizePageChrome,
   pageChromeIsEmpty,
+  pageBreakGap,
+  pageIndexAt,
+  pagesWithBreaks,
   readPageChrome,
+  segmentHeights,
+  unwrapPageBreaks,
   type PanelPageChrome,
   type PresentUnit,
   type SlideSource,
@@ -46,6 +52,8 @@ export function usePageChrome(deps: {
   const screenPageLabel = computed(() =>
     formatPageNumber(deps.pageChrome.value.pageNumber, pageIndex.value, pageCount.value),
   )
+  const screenHeader = computed(() => headerForPage(deps.pageChrome.value, pageIndex.value))
+  const screenFooter = computed(() => footerForPage(deps.pageChrome.value, pageIndex.value))
   const previewPageLabel = computed(() => formatPageNumber(deps.pageChrome.value.pageNumber, 1, pageCount.value))
 
   function syncFromStore() {
@@ -73,6 +81,15 @@ export function usePageChrome(deps: {
 
   function setPageHeader(value: string) {
     publish({ ...deps.pageChrome.value, header: value })
+  }
+  function setPageHeaderEven(value: string) {
+    publish({ ...deps.pageChrome.value, headerEven: value })
+  }
+  function setPageFooterEven(value: string) {
+    publish({ ...deps.pageChrome.value, footerEven: value })
+  }
+  function setPageGutter(value: string) {
+    publish({ ...deps.pageChrome.value, gutter: normalizePageChrome({ gutter: value }).gutter })
   }
 
   function setPageFooter(value: string) {
@@ -117,10 +134,37 @@ export function usePageChrome(deps: {
     const inner = box
       ? Math.max(1, box.heightPx - mmToPx(margin.top) - mmToPx(margin.bottom))
       : Math.max(1, canvas.clientHeight || 1)
-    const content = Math.max(1, body.scrollHeight - mmToPx(margin.top) - mmToPx(margin.bottom))
-    const total = estimatePageCount(content, inner)
+    const topPad = mmToPx(margin.top)
+    const bottomPad = mmToPx(margin.bottom)
+    const content = Math.max(1, body.scrollHeight - topPad - bottomPad)
+    const bodyTop = body.getBoundingClientRect().top
+    const breaks = [...body.querySelectorAll('.rte-page-break')].filter(
+      (node): node is HTMLElement => node instanceof HTMLElement,
+    )
+    const gaps = breaks.map((node) => Number(node.dataset.breakGap) || 0)
+    const tops = breaks.map((node) => node.getBoundingClientRect().top - bodyTop - topPad)
+    const heights = breaks.map((node) => node.offsetHeight)
+    const raw = unwrapPageBreaks(tops, heights, gaps, content)
+    const printing = !!root?.classList.contains('rte-printing')
+    let gapChanged = false
+    breaks.forEach((node, index) => {
+      const gap = box && !printing ? pageBreakGap(raw.offsets[index] ?? 0, raw.heights[index] ?? 0, inner) : 0
+      if ((node.dataset.breakGap || '0') !== String(gap)) {
+        node.dataset.breakGap = String(gap)
+        node.style.setProperty('--rte-break-gap', `${gap}px`)
+        gapChanged = true
+      }
+    })
+    const segments = segmentHeights(raw.offsets, raw.content)
+    if (gapChanged) scheduleMeasure()
+    const total = pagesWithBreaks(segments, inner)
     pageCount.value = total
-    pageIndex.value = Math.min(total, Math.max(1, Math.floor(canvas.scrollTop / inner) + 1))
+    const scroll = canvas.scrollTop
+    let gapAbove = 0
+    breaks.forEach((_, index) => {
+      if (scroll >= (tops[index] ?? 0) + (heights[index] ?? 0)) gapAbove += gaps[index] || 0
+    })
+    pageIndex.value = Math.min(total, pageIndexAt(segments, inner, Math.max(0, scroll - gapAbove)))
     placeChrome()
   }
 
@@ -292,10 +336,15 @@ export function usePageChrome(deps: {
   return {
     pageChromeActive,
     screenPageLabel,
+    screenHeader,
+    screenFooter,
     previewPageLabel,
     pageIndex,
     pageCount,
     setPageHeader,
+    setPageHeaderEven,
+    setPageFooterEven,
+    setPageGutter,
     setPageFooter,
     replacePageChrome,
     setPageNumber,

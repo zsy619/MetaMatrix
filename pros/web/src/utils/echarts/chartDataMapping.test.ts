@@ -7,6 +7,7 @@ import {
   applyMappedDataToOption,
   mapResponseToChartData,
   pickList,
+  tableGridToChartData,
 } from './chartDataMapping'
 
 describe('响应字段映射', () => {
@@ -81,5 +82,21 @@ describe('响应字段映射', () => {
     expect(xAxis.data).toEqual(['一月', '二月', '一月', '二月'])
     const series = next.series as Array<{ data: number[] }>
     expect(series[0]!.data).toEqual([10, 20, 5, 15])
+  })
+
+  it('正文表格第一列是类目，其余列是系列', () => {
+    expect(
+      tableGridToChartData([
+        ['月份', '新增', '活跃'],
+        ['一月', '10', '5'],
+        ['二月', '20', '15'],
+      ]),
+    ).toEqual({
+      categories: ['一月', '二月'],
+      series: [
+        { name: '新增', data: [10, 20] },
+        { name: '活跃', data: [5, 15] },
+      ],
+    })
   })
 })

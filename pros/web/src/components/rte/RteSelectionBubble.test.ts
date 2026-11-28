@@ -16,6 +16,7 @@ import {
   applyFontFamilyToSelection,
   applyFontSizeToSelection,
   applyTextAlignToSelection,
+  resolveFontSizeToken,
 } from './selectionFormat'
 import { useSelectionBubble } from './composables/useSelectionBubble'
 
@@ -78,6 +79,16 @@ function collectParagraphTextStyles(editor: Editor): Array<{ fontSize: string; f
   })
   return rows
 }
+
+describe('字号输入', () => {
+  it('中文号和磅值都能解析', () => {
+    expect(resolveFontSizeToken('小四')).toBe('12pt')
+    expect(resolveFontSizeToken('五号')).toBe('10.5pt')
+    expect(resolveFontSizeToken('12')).toBe('12pt')
+    expect(resolveFontSizeToken('12px')).toBe('12px')
+    expect(resolveFontSizeToken('默认')).toBe('')
+  })
+})
 
 describe('选区浮动工具条 · 跨段落应用格式', () => {
   it('跨段落选区应用字号：两段都生效，第三段不受影响', () => {

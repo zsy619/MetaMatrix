@@ -1,6 +1,6 @@
 -- Documented schema (GORM AutoMigrate applies equivalent at startup).
--- users
-CREATE TABLE IF NOT EXISTS users (
+-- core_users
+CREATE TABLE IF NOT EXISTS core_users (
   id UUID PRIMARY KEY,
   email VARCHAR(255) NOT NULL UNIQUE,
   display_name VARCHAR(128),
@@ -9,10 +9,10 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- canvas_documents
-CREATE TABLE IF NOT EXISTS canvas_documents (
+-- kb_documents
+CREATE TABLE IF NOT EXISTS kb_documents (
   id UUID PRIMARY KEY,
-  owner_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  owner_user_id UUID NOT NULL REFERENCES core_users(id) ON DELETE CASCADE,
   canvas_type VARCHAR(64) NOT NULL,
   title VARCHAR(255) NOT NULL,
   schema_version INT NOT NULL DEFAULT 1,
@@ -22,21 +22,21 @@ CREATE TABLE IF NOT EXISTS canvas_documents (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE INDEX IF NOT EXISTS idx_docs_owner_updated ON canvas_documents (owner_user_id, updated_at DESC);
-CREATE INDEX IF NOT EXISTS idx_docs_owner_type ON canvas_documents (owner_user_id, canvas_type);
-CREATE INDEX IF NOT EXISTS idx_docs_owner_template ON canvas_documents (owner_user_id, template_id);
+CREATE INDEX IF NOT EXISTS idx_docs_owner_updated ON kb_documents (owner_user_id, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_docs_owner_type ON kb_documents (owner_user_id, canvas_type);
+CREATE INDEX IF NOT EXISTS idx_docs_owner_template ON kb_documents (owner_user_id, template_id);
 
--- canvas_revisions
-CREATE TABLE IF NOT EXISTS canvas_revisions (
+-- kb_revisions
+CREATE TABLE IF NOT EXISTS kb_revisions (
   id UUID PRIMARY KEY,
-  document_id UUID NOT NULL REFERENCES canvas_documents(id) ON DELETE CASCADE,
+  document_id UUID NOT NULL REFERENCES kb_documents(id) ON DELETE CASCADE,
   parent_id UUID,
   revision_type VARCHAR(16) NOT NULL,
   payload JSONB NOT NULL,
   base_snapshot_id UUID,
-  author_user_id UUID REFERENCES users(id),
+  author_user_id UUID REFERENCES core_users(id),
   label VARCHAR(255),
   content_hash VARCHAR(64),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE INDEX IF NOT EXISTS idx_revisions_document ON canvas_revisions (document_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_revisions_document ON kb_revisions (document_id, created_at DESC);
