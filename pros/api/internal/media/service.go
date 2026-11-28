@@ -3,9 +3,10 @@ package media
 import (
 	"context"
 	"encoding/hex"
+	"errors"
+	"fmt"
 	"io"
 	"mime"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -21,7 +22,9 @@ var allowedTypes = map[string]bool{"image": true, "audio": true, "video": true, 
 // Service owns hashing, isolation, and signing. userID is always an argument
 // supplied by the authenticated handler.
 type Service struct {
-	Store   Store
+	Store Store
+	// Blobs 是附件对象存储。空则回退本地磁盘（Root）。
+	Blobs   BlobBackend
 	Root    string
 	Secret  string
 	Feishu  FeishuCreds
@@ -118,7 +121,12 @@ func (s *Service) Save(ctx context.Context, userID uuid.UUID, in SaveInput) (Ass
 		categoryID = &id
 	}
 	ext := SanitizeExt(in.OriginalName)
-	rel, sha, size, err := WriteHashed(s.Root, userID.String(), mediaType, ext, in.Body)
+	// 危险扩展名拦截（共享方案 §15.4 安全验收：上传文件必须进行类型限制）。
+	// 媒体分类只区分 image/audio/video/file，这里再补一层「可执行脚本」黑名单。
+	if err := checkExtensionAllowed(ext); err != nil {
+		return AssetView{}, err
+	}
+	rel, sha, size, err := s.writeHashed(userID.String(), mediaType, ext, in.Body)
 	if err != nil {
 		return AssetView{}, err
 	}
@@ -137,7 +145,7 @@ func (s *Service) Save(ctx context.Context, userID uuid.UUID, in SaveInput) (Ass
 		MediaType:        mediaType,
 		OriginalName:     cleanName(in.OriginalName),
 		StoragePath:      rel,
-		StorageDisk:      "local",
+		StorageDisk:      s.blobs().Name(),
 		MimeType:         mimeType,
 		SizeBytes:        size,
 		SHA256:           sha,
@@ -176,7 +184,7 @@ func (s *Service) SyncFeishu(ctx context.Context, userID, id uuid.UUID) error {
 	if plan.Mode == "skip" {
 		return s.Store.UpdateFeishu(ctx, userID, id, "", "", "", FeishuStatusNotConfigured)
 	}
-	f, err := OpenRel(s.Root, row.StoragePath)
+	f, _, err := s.openBlob(ctx, row.StorageDisk, row.StoragePath)
 	if err != nil {
 		_ = s.Store.UpdateFeishu(ctx, userID, id, "", plan.ParentType, plan.ParentNode, FeishuStatusFailed)
 		return err
@@ -244,7 +252,7 @@ func (s *Service) Delete(ctx context.Context, userID, id uuid.UUID) error {
 	if err := s.Store.DeleteAsset(ctx, userID, id); err != nil {
 		return err
 	}
-	return RemoveRel(s.Root, row.StoragePath)
+	return s.removeBlob(ctx, row.StorageDisk, row.StoragePath)
 }
 
 type ReadResult struct {
@@ -263,54 +271,64 @@ func (s *Service) Open(ctx context.Context, userID, id uuid.UUID, expRaw, sig, r
 	if err != nil {
 		return ReadResult{}, err
 	}
-	f, err := OpenRel(s.Root, row.StoragePath)
+	f, size, err := s.openBlob(ctx, row.StorageDisk, row.StoragePath)
 	if err != nil {
 		return ReadResult{}, err
 	}
-	info, err := f.Stat()
-	if err != nil {
-		f.Close()
-		return ReadResult{}, err
-	}
-	br, partial, err := ParseRange(rangeHeader, info.Size())
+	br, partial, err := ParseRange(rangeHeader, size)
 	if err != nil {
 		f.Close()
 		return ReadResult{}, err
 	}
-	if partial || br.Start > 0 {
-		if _, err = f.Seek(br.Start, io.SeekStart); err != nil {
-			f.Close()
-			return ReadResult{}, err
-		}
+	body, err := seekOrSkip(f, br.Start)
+	if err != nil {
+		f.Close()
+		return ReadResult{}, err
 	}
 	return ReadResult{
 		Mime:    row.MimeType,
-		Size:    info.Size(),
+		Size:    size,
 		Range:   br,
 		Partial: partial,
-		Body:    &limitedFile{f: f, remain: br.Length()},
+		Body:    &limitedBody{r: body, remain: br.Length()},
 	}, nil
 }
 
-// limitedFile does not embed *os.File: that would promote WriteTo and ignore the limit.
-type limitedFile struct {
-	f      *os.File
+func seekOrSkip(r io.ReadCloser, start int64) (io.ReadCloser, error) {
+	if start <= 0 {
+		return r, nil
+	}
+	if s, ok := r.(io.Seeker); ok {
+		if _, err := s.Seek(start, io.SeekStart); err != nil {
+			return r, err
+		}
+		return r, nil
+	}
+	if _, err := io.CopyN(io.Discard, r, start); err != nil {
+		return r, err
+	}
+	return r, nil
+}
+
+// limitedBody 不把底层类型嵌入进来，避免 WriteTo 绕过 remain 限制。
+type limitedBody struct {
+	r      io.ReadCloser
 	remain int64
 }
 
-func (l *limitedFile) Read(p []byte) (int, error) {
+func (l *limitedBody) Read(p []byte) (int, error) {
 	if l.remain <= 0 {
 		return 0, io.EOF
 	}
 	if int64(len(p)) > l.remain {
 		p = p[:l.remain]
 	}
-	n, err := l.f.Read(p)
+	n, err := l.r.Read(p)
 	l.remain -= int64(n)
 	return n, err
 }
 
-func (l *limitedFile) Close() error { return l.f.Close() }
+func (l *limitedBody) Close() error { return l.r.Close() }
 
 type RefInput struct {
 	RefType string
@@ -462,4 +480,32 @@ func cleanName(name string) string {
 		base = string(rs[:255])
 	}
 	return base
+}
+
+// blockedExtensions 是禁止上传的可执行 / 脚本类扩展名。
+//
+// 依据共享技术方案 §15.4「上传文件必须进行权限验证和文件类型限制」。
+// 命中即拒绝，不做「改后缀放行」——那等于没限制。
+var blockedExtensions = map[string]bool{
+	"exe": true, "bat": true, "cmd": true, "com": true, "scr": true,
+	"msi": true, "msp": true, "jar": true, "sh": true, "bash": true,
+	"zsh": true, "ps1": true, "psm1": true, "vbs": true, "vbe": true,
+	"jse": true, "wsf": true, "wsh": true, "hta": true, "cpl": true,
+	"reg": true, "apk": true, "dll": true, "so": true, "dylib": true,
+	"app": true, "pkg": true, "deb": true, "rpm": true,
+}
+
+// ErrExtensionBlocked 表示上传文件的扩展名在黑名单里。
+var ErrExtensionBlocked = errors.New("file extension is not allowed")
+
+// checkExtensionAllowed 检查扩展名是否被允许。
+func checkExtensionAllowed(ext string) error {
+	ext = strings.ToLower(strings.TrimPrefix(strings.TrimSpace(ext), "."))
+	if ext == "" || ext == "bin" {
+		return nil
+	}
+	if blockedExtensions[ext] {
+		return fmt.Errorf("%w: .%s", ErrExtensionBlocked, ext)
+	}
+	return nil
 }

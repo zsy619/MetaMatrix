@@ -31,7 +31,7 @@ func newMediaEngine(t *testing.T) (*route.Engine, *media.Service, string) {
 	if err := db.AutoMigrate(&model.MediaCategory{}, &model.MediaAsset{}, &model.MediaReference{}); err != nil {
 		t.Fatal(err)
 	}
-	_ = db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS uniq_media_user_sha ON media_asset (user_id, sha256)`).Error
+	_ = db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS uniq_media_user_sha ON media_assets (user_id, sha256)`).Error
 	svc := &media.Service{
 		Store:   media.NewGormStore(db),
 		Root:    t.TempDir(),

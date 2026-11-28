@@ -1,46 +1,130 @@
 import { Plugin } from '@tiptap/pm/state'
-import { Decoration, DecorationSet } from '@tiptap/pm/view'
-import type { Node as PmNode } from '@tiptap/pm/model'
+import type { EditorView } from '@tiptap/pm/view'
+import {
+  applyMediaPlaceholder,
+  placeholderKind,
+  type MediaPlaceholderStatus,
+} from '../utils/mediaPlaceholder'
 
-/** 把图片题注画在图片正下方。题注存在属性里，不进图片节点的 DOM。 */
-export function imageCaptionDecorations(doc: PmNode): DecorationSet {
-  const widgets: Decoration[] = []
-  doc.descendants((node, pos) => {
-    if (node.type.name !== 'image') return
+const editingCaptions = new WeakMap<EditorView, Set<number>>()
+
+function editingSet(view: EditorView): Set<number> {
+  let set = editingCaptions.get(view)
+  if (!set) {
+    set = new Set()
+    editingCaptions.set(view, set)
+  }
+  return set
+}
+
+/** 题注画在图片格子内部，不作为图片组行里的额外子节点。 */
+function captionHost(view: EditorView, pos: number): HTMLElement | null {
+  const dom = view.nodeDOM(pos)
+  if (!(dom instanceof HTMLElement)) return null
+  if (dom.matches('[data-resize-container], [data-node="image"]') && dom.tagName !== 'IMG') return dom
+  const box = dom.closest('[data-resize-container]')
+  if (box instanceof HTMLElement && box.tagName !== 'IMG') return box
+  return dom.parentElement
+}
+
+/**
+ * 裂图换成自绘占位图。
+ *
+ * 浏览器自带的裂图图标 + alt 文本（文件名）又丑又占版面，
+ * 这里改成按文件类型配色的占位图：正在加载 / 素材失效 / 加载失败。
+ */
+function markBrokenImages(view: EditorView) {
+  view.dom.querySelectorAll('img.rte-image').forEach((node) => {
+    if (!(node instanceof HTMLImageElement) || node.dataset.brokenBound) return
+    node.dataset.brokenBound = '1'
+    const showPlaceholder = (status: MediaPlaceholderStatus) => {
+      // 已经是占位图就不重复换，避免 data URI 反复写入触发观察器
+      if (node.dataset.mediaPlaceholder === '1') return
+      const name = node.getAttribute('alt') || node.dataset.mediaOrigSrc?.split('/').pop() || '图片'
+      applyMediaPlaceholder(node, { name, kind: placeholderKind(name), status })
+    }
+    node.addEventListener('error', () => showPlaceholder('error'))
+    if (node.complete && node.naturalWidth === 0 && node.src) showPlaceholder('error')
+  })
+}
+
+function paintCaptions(view: EditorView) {
+  markBrokenImages(view)
+  const editing = editingSet(view)
+  view.dom.querySelectorAll('.rte-image-caption-inline').forEach((node) => {
+    if (editing.has(Number((node as HTMLElement).dataset.pos))) return
+    node.remove()
+  })
+  view.state.doc.descendants((node, pos) => {
+    if (node.type.name !== 'image' || editing.has(pos)) return
     const text = String(node.attrs.caption || '').trim()
     if (!text) return
-    widgets.push(
-      Decoration.widget(
-        pos + node.nodeSize,
-        () => {
-          const el = document.createElement('div')
-          el.className = 'rte-image-caption'
-          el.setAttribute('contenteditable', 'false')
-          el.textContent = text
-          return el
-        },
-        { side: -1, ignoreSelection: true, key: `${pos}:${text}` },
-      ),
-    )
+    const host = captionHost(view, pos)
+    if (!(host instanceof HTMLElement) || host.tagName === 'IMG') return
+    const cap = document.createElement('div')
+    cap.className = 'rte-image-caption rte-image-caption-inline'
+    cap.dataset.pos = String(pos)
+    cap.setAttribute('contenteditable', 'false')
+    cap.setAttribute('aria-hidden', 'true')
+    cap.title = '双击修改题注'
+    cap.textContent = text
+    const before = node.attrs.captionBefore
+    if (before != null && before !== node.attrs.caption) {
+      cap.classList.add('is-suggestion')
+      cap.title = before ? `原题注：${before}` : '原题注为空'
+    }
+    let cancel = false
+    cap.addEventListener('pointerdown', (event) => event.stopPropagation())
+    cap.addEventListener('dblclick', (event) => {
+      if (!view.editable) return
+      event.preventDefault()
+      event.stopPropagation()
+      cancel = false
+      editing.add(pos)
+      cap.contentEditable = 'true'
+      cap.focus()
+    })
+    cap.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault()
+        cap.blur()
+      } else if (event.key === 'Escape') {
+        cancel = true
+        cap.textContent = text
+        cap.blur()
+      }
+    })
+    cap.addEventListener('blur', () => {
+      cap.contentEditable = 'false'
+      editing.delete(pos)
+      const next = (cap.textContent || '').trim()
+      const current = view.state.doc.nodeAt(pos)
+      if (cancel || !current || current.type.name !== 'image' || next === String(current.attrs.caption || '').trim()) {
+        paintCaptions(view)
+        return
+      }
+      view.dispatch(
+        view.state.tr.setNodeMarkup(pos, undefined, {
+          ...current.attrs,
+          caption: next || null,
+        }),
+      )
+    })
+    host.appendChild(cap)
   })
-  return DecorationSet.create(doc, widgets)
 }
 
 export function createImageCaptionPlugin(): Plugin {
   return new Plugin({
-    state: {
-      init(_config, state) {
-        return imageCaptionDecorations(state.doc)
-      },
-      apply(tr, old) {
-        if (!tr.docChanged) return old.map(tr.mapping, tr.doc)
-        return imageCaptionDecorations(tr.doc)
-      },
-    },
-    props: {
-      decorations(state) {
-        return this.getState(state)
-      },
+    view(editorView) {
+      const paint = () => paintCaptions(editorView)
+      queueMicrotask(paint)
+      return {
+        update: paint,
+        destroy() {
+          editorView.dom.querySelectorAll('.rte-image-caption-inline').forEach((node) => node.remove())
+        },
+      }
     },
   })
 }

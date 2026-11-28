@@ -13,12 +13,19 @@ import {
   nextImageSelection,
   IMAGE_GROUP_GAP_DEFAULT,
   nextGroupGap,
+  normalizeGroupLayout,
+  repairGroupAttrs,
+  planImageStack,
+  planMixedStack,
   normalizeGroupGap,
   normalizeGroupRatios,
   ratioPercents,
   ratiosToAttr,
   removeRatio,
+  resizeCollageColumn,
+  ratiosSkippingHidden,
   resizePair,
+  resizeVisiblePair,
   rowCanAccept,
   rowLayout,
   shouldDissolveGroup,
@@ -101,9 +108,18 @@ assert.equal(nextImageSelection(spots, 2, 'ArrowDown'), 8)
 assert.equal(nextImageSelection(spots, 8, 'ArrowUp'), 1)
 assert.equal(nextImageSelection(spots, 1, 'ArrowLeft'), null)
 assert.equal(groupUsesAspect('custom'), false)
+assert.deepEqual(ratiosSkippingHidden([1, 3, 2], [false, true, false]), [1, 0, 2])
+assert.deepEqual(ratiosSkippingHidden([1, 3], [true, true]), [1, 3])
+const across = resizeVisiblePair([1, 3, 2], 0, 2, 0.25)
+assert.equal(across[1], 3)
+assert.equal(Math.round((across[0]! + across[2]!) * 100) / 100, 3)
+assert.ok(across[0]! < across[2]!)
 const laid = rowLayout(808, [2, 1], 8)
 assert.equal(laid.widths[0]! + laid.widths[1]!, 800)
 assert.equal(laid.height, 267)
+const hiddenRow = rowLayout(640, [1, 0, 2], 8)
+assert.equal(hiddenRow.height, 211)
+assert.equal(hiddenRow.widths[0]! + hiddenRow.widths[1]!, 632)
 assert.ok(laid.widths[0]! > laid.widths[1]!)
 const tall = rowLayout(1008, [0.5, 0.5], 8)
 assert.equal(tall.widths[0]! + tall.widths[1]!, 1000)
@@ -118,5 +134,28 @@ assert.match(imageGroupLayoutCss, /data-resize-wrapper/)
 assert.match(imageGroupLayoutCss, /left:36px;top:8px/)
 assert.doesNotMatch(imageGroupLayoutCss, /:deep/)
 assert.match(imageGroupLayoutCss, /mode-preview[\s\S]*rte-image-drag-handle/)
+assert.match(imageGroupLayoutCss, /data-layout="12"/)
+assert.match(imageGroupLayoutCss, /data-layout="21"/)
+assert.equal(normalizeGroupLayout(undefined), 'row')
+assert.equal(normalizeGroupLayout('12'), '12')
+assert.equal(normalizeGroupLayout('21'), '21')
+assert.deepEqual(planImageStack(3, 2, 1, 'below'), { layout: '12', order: [0, 1, 2] })
+assert.deepEqual(planImageStack(3, 2, 1, 'above'), { layout: '12', order: [0, 2, 1] })
+assert.deepEqual(planImageStack(3, 0, 1, 'above'), { layout: '21', order: [0, 1, 2] })
+assert.deepEqual(planImageStack(3, 0, 1, 'below'), { layout: '21', order: [1, 0, 2] })
+assert.deepEqual(planImageStack(3, 1, 0, 'below'), { layout: '21', order: [0, 1, 2] })
+assert.deepEqual(planImageStack(3, 1, 2, 'above'), { layout: '12', order: [0, 1, 2] })
+assert.deepEqual(planImageStack(3, 0, 2, 'below'), { layout: '12', order: [1, 2, 0] })
+assert.equal(planImageStack(2, 0, 1, 'above'), null)
+assert.deepEqual(planMixedStack(4, 3, 1, 'below'), { order: [0, 1, 3, 2], stackAt: 1 })
+const column = resizeCollageColumn([1, 1, 1], '12', 0.25)
+assert.ok(column[0]! < column[1]! + column[2]!)
+assert.equal(Math.round((column[0]! + column[1]! + column[2]!) * 100) / 100, 3)
+assert.equal(planImageStack(3, 1, 1, 'above'), null)
+const repaired = repairGroupAttrs(2, { layout: '12', ratioMode: 'custom', ratios: '1:1:1', stackAt: 1 })
+assert.equal(repaired?.layout, 'row')
+assert.equal(repaired?.ratios, null)
+assert.equal(repaired?.ratioMode, null)
+assert.equal(repairGroupAttrs(3, { layout: '12', ratioMode: null, ratios: null }), null)
 
 console.log('image group ok')

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { Aim, Minus, Plus, Rank, Sort } from '@element-plus/icons-vue'
 import { canvasChromeStyle } from './canvasChrome'
 import type { BusinessFormulaDocumentJSON } from '../../types/canvas'
 import { useDocumentStore } from '../../stores/document'
@@ -15,6 +16,8 @@ import {
   filterTemplateButtons,
   buildDiagramModel,
   formatFormulaText,
+  NODE_H,
+  NODE_W,
   nodeRectAttrs,
   nodeTextAttrs,
   opCircleClass,
@@ -67,9 +70,16 @@ const filteredSavedFormulas = computed(() => {
 
 const showSavedSearch = computed(() => savedFormulas.value.length > 3)
 
+const narrowDiagram = ref(false)
+const layoutTouched = ref(false)
+
+const effectiveLayout = computed<LayoutDirection>(() =>
+  narrowDiagram.value && !layoutTouched.value ? 'vertical' : layout.value,
+)
+
 const diagram = computed(() => {
   renderTick.value
-  return buildDiagramModel(formulaText.value, layout.value, crossCenter.value)
+  return buildDiagramModel(formulaText.value, effectiveLayout.value, crossCenter.value)
 })
 
 const viewportTransform = computed(
@@ -126,9 +136,13 @@ function onFormulaInput() {
 }
 
 function setLayout(dir: LayoutDirection) {
+  layoutTouched.value = true
   layout.value = dir
   persist()
-  nextTick(() => resetView())
+  nextTick(() => {
+    measureCenter()
+    resetView()
+  })
 }
 
 function setPalette(name: PaletteName) {
@@ -175,10 +189,52 @@ function deleteSaved(index: number, e: Event) {
 }
 
 function resetView() {
+  const host = diagramHost.value
+  const nodes = diagram.value?.nodes ?? []
+  if (host && host.clientWidth > 0 && host.clientWidth < 720 && nodes.length > 0) {
+    const pad = 28
+    let minX = Infinity
+    let minY = Infinity
+    let maxX = -Infinity
+    let maxY = -Infinity
+    for (const node of nodes) {
+      minX = Math.min(minX, node.x)
+      maxX = Math.max(maxX, node.x + NODE_W)
+      minY = Math.min(minY, node.y - NODE_H / 2)
+      maxY = Math.max(maxY, node.y + NODE_H / 2)
+    }
+    minX -= 56
+    maxX += 28
+    minY -= 28
+    maxY += 28
+    const contentW = Math.max(1, maxX - minX)
+    const contentH = Math.max(1, maxY - minY)
+    const availW = Math.max(1, host.clientWidth - pad * 2)
+    const availH = Math.max(1, host.clientHeight - pad * 2)
+    const next = Math.max(0.2, Math.min(1, availW / contentW, availH / contentH))
+    scale.value = next
+    translate.value = {
+      x: pad + (availW - contentW * next) / 2 - minX * next,
+      y: pad + (availH - contentH * next) / 2 - minY * next,
+    }
+    return
+  }
   scale.value = 0.8
   translate.value = {
-    x: layout.value === 'horizontal' ? 50 : 0,
+    x: effectiveLayout.value === 'horizontal' ? 50 : 0,
     y: 100,
+  }
+}
+
+function syncNarrowDiagram() {
+  narrowDiagram.value = window.innerWidth < 900
+}
+
+function onResize() {
+  syncNarrowDiagram()
+  if (narrowDiagram.value) {
+    measureCenter()
+    resetView()
   }
 }
 
@@ -228,7 +284,7 @@ function measureCenter() {
   if (!el) return
   const h = el.clientHeight || 800
   const w = el.clientWidth || 800
-  crossCenter.value = layout.value === 'horizontal' ? h / 2 : w / 2
+  crossCenter.value = effectiveLayout.value === 'horizontal' ? h / 2 : w / 2
 }
 
 function exportSvgImage() {
@@ -333,6 +389,8 @@ function exportSvgImage() {
 onMounted(() => {
   window.addEventListener('mousemove', onMouseMove)
   window.addEventListener('mouseup', onMouseUp)
+  window.addEventListener('resize', onResize)
+  syncNarrowDiagram()
   measureCenter()
   if (!formulaText.value.trim()) {
     formulaText.value = formatFormulaText(DEFAULT_FORMULA_TEXT)
@@ -349,6 +407,7 @@ onMounted(() => {
 onUnmounted(() => {
   window.removeEventListener('mousemove', onMouseMove)
   window.removeEventListener('mouseup', onMouseUp)
+  window.removeEventListener('resize', onResize)
 })
 </script>
 
@@ -515,29 +574,31 @@ onUnmounted(() => {
 
     <section class="bf-main">
       <div class="bf-toolbar">
-        <div class="bf-tool-group">
+        <div class="bf-tool-group mm-bar__group">
           <button
             type="button"
-            class="bf-tool-btn"
-            :class="{ active: layout === 'horizontal' }"
+            class="bf-tool-btn mm-bar__btn"
+            :class="{ active: effectiveLayout === 'horizontal' }"
             title="横向布局"
+            aria-label="横向布局"
             @click="setLayout('horizontal')"
           >
-            横排
+            <el-icon><Sort /></el-icon>
           </button>
           <button
             type="button"
-            class="bf-tool-btn"
-            :class="{ active: layout === 'vertical' }"
+            class="bf-tool-btn mm-bar__btn"
+            :class="{ active: effectiveLayout === 'vertical' }"
             title="纵向布局"
+            aria-label="纵向布局"
             @click="setLayout('vertical')"
           >
-            竖排
+            <el-icon><Rank /></el-icon>
           </button>
         </div>
-        <div class="bf-tool-group">
+        <div class="bf-tool-group mm-bar__group">
           <select
-            class="bf-select"
+            class="bf-select mm-bar__select"
             :value="palette"
             @change="setPalette(($event.target as HTMLSelectElement).value as any)"
           >
@@ -546,15 +607,33 @@ onUnmounted(() => {
             </option>
           </select>
         </div>
-        <div class="bf-tool-group">
-          <button type="button" class="bf-tool-btn" title="居中" @click="resetView">
-            居中
+        <div class="bf-tool-group mm-bar__group">
+          <button
+            type="button"
+            class="bf-tool-btn mm-bar__btn"
+            title="居中"
+            aria-label="居中"
+            @click="resetView"
+          >
+            <el-icon><Aim /></el-icon>
           </button>
-          <button type="button" class="bf-tool-btn" title="放大" @click="zoomIn">
-            ＋
+          <button
+            type="button"
+            class="bf-tool-btn mm-bar__btn mm-bar__btn--square"
+            title="放大"
+            aria-label="放大"
+            @click="zoomIn"
+          >
+            <el-icon><Plus /></el-icon>
           </button>
-          <button type="button" class="bf-tool-btn" title="缩小" @click="zoomOut">
-            －
+          <button
+            type="button"
+            class="bf-tool-btn mm-bar__btn mm-bar__btn--square"
+            title="缩小"
+            aria-label="缩小"
+            @click="zoomOut"
+          >
+            <el-icon><Minus /></el-icon>
           </button>
         </div>
       </div>
@@ -587,13 +666,13 @@ onUnmounted(() => {
                     <circle
                       :cx="link.badgeX"
                       :cy="link.badgeY"
-                      r="14"
+                      r="18"
                       class="bf-op-circle"
                       :class="opCircleClass(link.op)"
                     />
                     <text
                       :x="link.badgeX"
-                      :y="link.badgeY + 5"
+                      :y="link.badgeY + 6"
                       text-anchor="middle"
                       class="bf-op-text"
                     >{{ link.op }}</text>
@@ -668,7 +747,8 @@ onUnmounted(() => {
 }
 
 .bf-sidebar {
-  width: 320px;
+  width: 360px;
+  min-width: 0;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -689,20 +769,20 @@ onUnmounted(() => {
 }
 
 .bf-logo-mark {
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
   display: grid;
   place-items: center;
   background: #f1f3f4;
   color: #202124;
   font-weight: 800;
-  font-size: 14px;
+  font-size: 18px;
 }
 
 .bf-logo h1 {
   margin: 0;
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 800;
   color: #202124;
   letter-spacing: 0.01em;
@@ -710,9 +790,9 @@ onUnmounted(() => {
 
 .bf-sub {
   margin: 8px 0 0;
-  font-size: 12px;
-  color: #9aa0a6;
-  line-height: 1.4;
+  font-size: 14px;
+  color: #5f6368;
+  line-height: 1.45;
 }
 
 .bf-sidebar-content {
@@ -733,18 +813,18 @@ onUnmounted(() => {
   justify-content: space-between;
   gap: 8px;
   margin-bottom: 8px;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 700;
-  color: #5f6368;
+  color: #3c4043;
 }
 
 .bf-count {
-  font-size: 11px;
-  font-weight: 600;
-  color: #9aa0a6;
+  font-size: 13px;
+  font-weight: 650;
+  color: #5f6368;
   background: #f1f3f4;
   border-radius: 999px;
-  padding: 1px 7px;
+  padding: 2px 8px;
 }
 
 .bf-label-actions {
@@ -756,9 +836,11 @@ onUnmounted(() => {
   border: 1px solid var(--cv-frame, #ececec);
   background: #ffffff;
   color: #202124;
-  border-radius: 4px;
-  padding: 3px 8px;
-  font-size: 12px;
+  border-radius: 8px;
+  min-height: 32px;
+  padding: 6px 12px;
+  font-size: 14px;
+  font-weight: 650;
   cursor: pointer;
 }
 
@@ -791,14 +873,14 @@ onUnmounted(() => {
 .bf-search {
   flex: 1;
   min-width: 0;
-  height: 30px;
+  height: 40px;
   box-sizing: border-box;
   border: 1px solid var(--cv-frame, #ececec);
-  border-radius: 4px;
+  border-radius: 8px;
   background: #fafafa;
   color: #202124;
-  padding: 0 10px;
-  font-size: 12px;
+  padding: 0 12px;
+  font-size: 15px;
 }
 
 .bf-search:focus {
@@ -812,11 +894,12 @@ onUnmounted(() => {
   flex-shrink: 0;
   border: 1px solid var(--cv-frame, #ececec);
   background: #ffffff;
-  color: #5f6368;
-  border-radius: 4px;
-  height: 30px;
-  padding: 0 8px;
-  font-size: 11px;
+  color: #3c4043;
+  border-radius: 8px;
+  height: 40px;
+  padding: 0 12px;
+  font-size: 14px;
+  font-weight: 650;
   cursor: pointer;
 }
 
@@ -827,6 +910,8 @@ onUnmounted(() => {
 .bf-chip-row {
   display: flex;
   gap: 6px;
+  max-width: 100%;
+  min-width: 0;
   overflow-x: auto;
   padding-bottom: 6px;
   scrollbar-width: thin;
@@ -840,10 +925,11 @@ onUnmounted(() => {
   flex-shrink: 0;
   border: 1px solid #e8eaed;
   background: #fafafa;
-  color: #5f6368;
+  color: #3c4043;
   border-radius: 999px;
-  padding: 4px 10px;
-  font-size: 11px;
+  min-height: 34px;
+  padding: 6px 12px;
+  font-size: 14px;
   line-height: 1.2;
   cursor: pointer;
   white-space: nowrap;
@@ -871,8 +957,8 @@ onUnmounted(() => {
 .bf-template-grid {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
-  gap: 6px;
-  max-height: 260px;
+  gap: 8px;
+  max-height: 360px;
   overflow: auto;
   padding-right: 2px;
 }
@@ -881,15 +967,17 @@ onUnmounted(() => {
   border: 1px solid #e8eaed;
   background: #fafafa;
   color: #202124;
-  border-radius: 4px;
-  padding: 6px 4px;
-  font-size: 11px;
+  border-radius: 8px;
+  min-height: 68px;
+  padding: 8px 6px;
+  font-size: 14px;
   line-height: 1.25;
   cursor: pointer;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  justify-content: center;
+  gap: 4px;
   text-align: center;
 }
 
@@ -906,29 +994,31 @@ onUnmounted(() => {
 }
 
 .bf-emoji {
-  font-size: 14px;
+  font-size: 18px;
   line-height: 1;
 }
 
 .bf-template-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   max-width: 100%;
+  white-space: normal;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .bf-textarea {
   width: 100%;
-  min-height: 140px;
+  min-height: 168px;
   box-sizing: border-box;
   resize: vertical;
   border: 1px solid var(--cv-frame, #ececec);
-  border-radius: 4px;
+  border-radius: 8px;
   background: #fafafa;
   color: #202124;
-  padding: 10px;
-  font-size: 12px;
-  line-height: 1.5;
+  padding: 12px;
+  font-size: 15px;
+  line-height: 1.65;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
@@ -942,7 +1032,7 @@ onUnmounted(() => {
 .bf-max-hint {
   margin: 0 0 8px;
   color: #5f6368;
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .bf-textarea-overlay {
@@ -981,15 +1071,20 @@ onUnmounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 11px;
+  font-size: 14px;
 }
 
 .bf-saved-del {
-  color: #d93025;
+  color: #c5221f;
   margin-left: 6px;
   flex-shrink: 0;
-  font-size: 12px;
-  opacity: 0.75;
+  min-width: 28px;
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 700;
 }
 
 .bf-saved-btn:hover .bf-saved-del {
@@ -998,8 +1093,8 @@ onUnmounted(() => {
 
 .bf-empty {
   margin: 0;
-  font-size: 12px;
-  color: #9aa0a6;
+  font-size: 14px;
+  color: #5f6368;
   line-height: 1.5;
 }
 
@@ -1023,9 +1118,10 @@ onUnmounted(() => {
 
 .bf-primary {
   border: none;
-  border-radius: 4px;
-  padding: 11px 12px;
-  font-size: 13px;
+  border-radius: 8px;
+  min-height: 46px;
+  padding: 12px 14px;
+  font-size: 16px;
   font-weight: 700;
   cursor: pointer;
   background: var(--cv-focus, #1c4c7c);
@@ -1039,13 +1135,14 @@ onUnmounted(() => {
 
 .bf-secondary {
   border: 1px solid var(--cv-frame, #ececec);
-  border-radius: 4px;
-  padding: 8px 12px;
-  font-size: 12px;
-  font-weight: 600;
+  border-radius: 8px;
+  min-height: 40px;
+  padding: 8px 14px;
+  font-size: 15px;
+  font-weight: 650;
   cursor: pointer;
   background: #ffffff;
-  color: #5f6368;
+  color: #3c4043;
 }
 
 .bf-secondary:hover {
@@ -1065,47 +1162,27 @@ onUnmounted(() => {
 .bf-toolbar {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
-  border-bottom: 1px solid #e8eaed;
-  background: #ffffff;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--glass-ring, rgba(15, 23, 42, 0.09));
+  background: rgba(255, 255, 255, 0.38);
+  backdrop-filter: blur(var(--glass-blur-sm, 10px));
+  -webkit-backdrop-filter: blur(var(--glass-blur-sm, 10px));
 }
 
 .bf-tool-group {
   display: flex;
   align-items: center;
-  gap: 6px;
 }
 
 .bf-tool-btn {
-  border: 1px solid var(--cv-frame, #ececec);
-  background: #ffffff;
-  color: #5f6368;
-  border-radius: 4px;
-  min-width: 40px;
-  height: 32px;
-  padding: 0 8px;
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  font-size: 12px;
+  min-width: 34px;
 }
 
-.bf-tool-btn:hover,
 .bf-tool-btn.active {
-  background: var(--cv-hover-wash, #e8f1fa);
-  border-color: var(--cv-focus, #1c4c7c);
-  color: var(--cv-focus, #1c4c7c);
-}
-
-.bf-select {
-  border: 1px solid var(--cv-frame, #ececec);
-  background: #ffffff;
-  color: #202124;
-  border-radius: 4px;
-  height: 32px;
-  padding: 0 10px;
-  font-size: 13px;
+  background: rgba(47, 140, 255, 0.14);
+  color: var(--mm-blue, #1677ff);
 }
 
 .bf-diagram {
@@ -1134,8 +1211,8 @@ onUnmounted(() => {
 
 .bf-node-text {
   fill: #202124;
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 16px;
+  font-weight: 650;
 }
 
 .bf-op-circle {
@@ -1171,7 +1248,7 @@ onUnmounted(() => {
 
 .bf-op-text {
   fill: #202124;
-  font-size: 14px;
+  font-size: 18px;
   font-weight: 800;
 }
 
@@ -1187,13 +1264,73 @@ onUnmounted(() => {
 
 @media (max-width: 900px) {
   .bf-canvas {
+    inset: 0;
     flex-direction: column;
+    overflow: auto;
+    padding-bottom: 96px;
   }
+
+  .bf-main {
+    order: 1;
+  }
+
   .bf-sidebar {
+    order: 2;
     width: 100%;
-    max-height: 42vh;
+    height: auto;
+    max-height: none;
+    flex: 0 0 auto;
     border-right: none;
-    border-bottom: 1px solid var(--cv-frame, #ececec);
+    border-bottom: none;
+    border-top: 1px solid var(--cv-frame, #ececec);
+  }
+
+  .bf-sidebar-content {
+    overflow: visible;
+    flex: 0 0 auto;
+  }
+
+  .bf-template-grid {
+    grid-template-columns: 1fr 1fr;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .bf-template-label {
+    display: block;
+    overflow: visible;
+    -webkit-line-clamp: unset;
+    font-size: 15px;
+    line-height: 1.35;
+  }
+
+  .bf-chip-row {
+    flex-wrap: wrap;
+    overflow: visible;
+  }
+
+  .bf-chip {
+    white-space: normal;
+    min-height: 36px;
+  }
+
+  .bf-saved-name {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+  }
+
+  .bf-mini-btn {
+    min-height: 40px;
+  }
+
+  .bf-main {
+    flex: 0 0 auto;
+    min-height: 420px;
+  }
+
+  .bf-diagram {
+    min-height: 360px;
   }
 }
 </style>

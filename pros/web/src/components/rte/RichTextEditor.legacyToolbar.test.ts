@@ -43,8 +43,40 @@ async function mountLegacyEditor(doc: unknown, panelId = 'panel-1') {
   return { wrapper, store }
 }
 
-function groupIds(wrapper: ReturnType<typeof mount>): string[] {
-  return wrapper.findAll('.rte-tool-group').map((el) => el.attributes('data-group-id') || '')
+type LegacyRibbonSnapshot = {
+  ids: string[]
+  titles: string[]
+  groupTitles: Record<string, string[]>
+  groupToolCounts: Record<string, number>
+}
+
+/**
+ * 当前 Ribbon 每次只渲染一个栏目，逐栏收集后才能验证整份旧文档的迁移结果。
+ * 全部隐藏的分组会保留设置占位，因此额外记录真实按钮数，不能把占位当成按钮复活。
+ */
+async function readRibbonSnapshot(wrapper: ReturnType<typeof mount>): Promise<LegacyRibbonSnapshot> {
+  const snapshot: LegacyRibbonSnapshot = {
+    ids: [],
+    titles: [],
+    groupTitles: {},
+    groupToolCounts: {},
+  }
+  const tabs = wrapper.findAll('button.rte-ribbon-tab')
+  for (const tab of tabs) {
+    await tab.trigger('click')
+    await nextTick()
+    await flushPromises()
+    for (const group of wrapper.findAll('.rte-tool-group')) {
+      const id = group.attributes('data-group-id') || ''
+      const tools = group.findAll('.rte-tool')
+      const titles = tools.map((tool) => tool.attributes('title') || '')
+      snapshot.ids.push(id)
+      snapshot.titles.push(...titles)
+      snapshot.groupTitles[id] = titles
+      snapshot.groupToolCounts[id] = tools.length
+    }
+  }
+  return snapshot
 }
 
 describe('旧画布 JSON 打开后的工具栏', () => {
@@ -54,63 +86,61 @@ describe('旧画布 JSON 打开后的工具栏', () => {
 
   it('最老一代（text 单入口）：11 组齐全、无重复、无空组', async () => {
     const { wrapper } = await mountLegacyEditor(legacyTextSingleEntry)
-    const ids = groupIds(wrapper)
-    for (const id of VISIBLE_GROUP_IDS) expect(ids, `缺少分组 ${id}`).toContain(id)
-    expect(new Set(ids).size).toBe(ids.length)
-    // 没有空组
-    for (const el of wrapper.findAll('.rte-tool-group')) {
-      expect(el.findAll('.rte-tool').length, '存在空组').toBeGreaterThan(0)
+    const snapshot = await readRibbonSnapshot(wrapper)
+    for (const id of VISIBLE_GROUP_IDS) expect(snapshot.ids, `缺少分组 ${id}`).toContain(id)
+    expect(new Set(snapshot.ids).size).toBe(snapshot.ids.length)
+    // 分组外壳可能用于设置占位，必须用真实按钮数判断是否为空组。
+    for (const id of VISIBLE_GROUP_IDS) {
+      expect(snapshot.groupToolCounts[id] ?? 0, `${id} 是空组`).toBeGreaterThan(0)
     }
     wrapper.unmount()
   })
 
   it('最老一代：隐藏过的注音 / 打印 / 导入按钮迁移后仍然不显示', async () => {
     const { wrapper } = await mountLegacyEditor(legacyTextSingleEntry)
-    const titles = wrapper.findAll('.rte-tool').map((el) => el.attributes('title') || '')
-    expect(titles.some((t) => t.includes('ruby'))).toBe(false)
-    expect(titles.some((t) => t.includes('打印预览'))).toBe(false)
-    expect(titles.some((t) => t.includes('导入'))).toBe(false)
-    // 没隐藏的按钮不能丢
-    expect(titles.some((t) => t.includes('导出'))).toBe(true)
+    const snapshot = await readRibbonSnapshot(wrapper)
+    expect(snapshot.titles.some((t) => t.includes('ruby'))).toBe(false)
+    expect(snapshot.titles.some((t) => t.includes('打印预览'))).toBe(false)
+    expect(snapshot.titles.some((t) => t.includes('导入'))).toBe(false)
+    // 导出位于「文件」栏目，跨栏目快照可以确认未隐藏的按钮没有丢失。
+    expect(snapshot.titles.some((t) => t.includes('导出'))).toBe(true)
     wrapper.unmount()
   })
 
   it('第二代（拆分组 + 旧 echarts 总入口）：11 组齐全，图表变成 9 个分类下拉', async () => {
     const { wrapper } = await mountLegacyEditor(legacySplitGroupsEcharts)
-    const ids = groupIds(wrapper)
-    for (const id of VISIBLE_GROUP_IDS) expect(ids, `缺少分组 ${id}`).toContain(id)
-    expect(new Set(ids).size).toBe(ids.length)
-    // 旧总入口不再是一个按钮，9 个分类下拉都在
-    const chartGroup = wrapper.findAll('.rte-tool-group').find((el) => el.attributes('data-group-id') === 'charts')
-    expect(chartGroup).toBeTruthy()
-    expect(chartGroup!.findAll('.rte-tool').length).toBe(CHART_TOOLBAR_KEYS.length)
-    const titles = chartGroup!.findAll('.rte-tool').map((el) => el.attributes('title') || '')
+    const snapshot = await readRibbonSnapshot(wrapper)
+    for (const id of VISIBLE_GROUP_IDS) expect(snapshot.ids, `缺少分组 ${id}`).toContain(id)
+    expect(new Set(snapshot.ids).size).toBe(snapshot.ids.length)
+    // 旧总入口不再是一个按钮，9 个分类下拉都在图表栏目中。
+    const titles = snapshot.groupTitles.charts ?? []
+    expect(titles.length).toBe(CHART_TOOLBAR_KEYS.length)
     for (const title of titles) expect(title).toContain('图表')
     wrapper.unmount()
   })
 
-  it('旧图表总入口混在链接组里并被隐藏：图表分组整体不渲染', async () => {
+  it('旧图表总入口混在链接组里并被隐藏：图表按钮整体隐藏', async () => {
     const { wrapper } = await mountLegacyEditor(legacyEchartsInInsert)
-    const ids = groupIds(wrapper)
-    expect(ids).not.toContain('charts')
+    const snapshot = await readRibbonSnapshot(wrapper)
+    // 全隐藏分组可以保留设置占位，但其中不能出现任何真实图表按钮。
+    expect(snapshot.groupToolCounts.charts ?? 0).toBe(0)
     for (const id of VISIBLE_GROUP_IDS.filter((x) => x !== 'charts')) {
-      expect(ids, `缺少分组 ${id}`).toContain(id)
+      expect(snapshot.ids, `缺少分组 ${id}`).toContain(id)
     }
-    expect(new Set(ids).size).toBe(ids.length)
-    // 二维码仍然隐藏，链接按钮还在
-    const titles = wrapper.findAll('.rte-tool').map((el) => el.attributes('title') || '')
-    expect(titles.some((t) => t.includes('二维码'))).toBe(false)
+    expect(new Set(snapshot.ids).size).toBe(snapshot.ids.length)
+    // 二维码仍然隐藏，其他未隐藏按钮通过完整快照参与检查。
+    expect(snapshot.titles.some((t) => t.includes('二维码'))).toBe(false)
     wrapper.unmount()
   })
 
-  it('旧图表总入口被隐藏：图表分组整体不渲染，其他分组不受影响', async () => {
+  it('旧图表总入口被隐藏：图表按钮整体隐藏，其他分组不受影响', async () => {
     const { wrapper } = await mountLegacyEditor(legacyEchartsEntryOnly)
-    const ids = groupIds(wrapper)
-    expect(ids).not.toContain('charts')
+    const snapshot = await readRibbonSnapshot(wrapper)
+    expect(snapshot.groupToolCounts.charts ?? 0).toBe(0)
     for (const id of VISIBLE_GROUP_IDS.filter((x) => x !== 'charts')) {
-      expect(ids, `缺少分组 ${id}`).toContain(id)
+      expect(snapshot.ids, `缺少分组 ${id}`).toContain(id)
     }
-    expect(new Set(ids).size).toBe(ids.length)
+    expect(new Set(snapshot.ids).size).toBe(snapshot.ids.length)
     wrapper.unmount()
   })
 })

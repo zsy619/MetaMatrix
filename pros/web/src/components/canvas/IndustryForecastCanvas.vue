@@ -198,11 +198,11 @@ const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 
 .if-subtitle {
   margin: 0;
-  font-size: clamp(12px, 1.15vw, 14px);
+  font-size: clamp(14px, 1.15vw, 15px);
   font-weight: 400;
   color: #fff;
   text-shadow: var(--cv-header-shadow, 0 1px 1px rgba(0, 0, 0, 0.34), 0 0 1px rgba(0, 0, 0, 0.28));
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 .if-body {
@@ -216,12 +216,54 @@ const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 }
 
 .if-body :deep(.ym-block) {
-  flex: 1;
+  flex: 0 0 auto;
+  height: auto;
   min-height: 0;
   background: transparent;
 }
 
+.if-body :deep(.ym-block-body),
+.if-body :deep(.rte-root),
+.if-body :deep(.rte-workspace),
+.if-body :deep(.rte-canvas),
+.if-body :deep(.rte-body),
+.if-body :deep(.ProseMirror) {
+  height: auto;
+  max-height: none;
+  max-width: 100%;
+  min-width: 0;
+  overflow: visible;
+  flex: 0 0 auto;
+}
+
+.if-body :deep(.rte-workspace),
+.if-body :deep(.rte-canvas),
+.if-body :deep(.ProseMirror) {
+  width: 100%;
+}
+
+.if-body :deep(.ProseMirror) {
+  min-height: 140px;
+  font-size: 16px;
+  line-height: 1.7;
+}
+
+.if-body :deep(.ProseMirror p) {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.if-body :deep(.pm-max-btn) {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+}
+
 @media (max-width: 720px) {
+  .industry-forecast-canvas {
+    padding-bottom: 96px;
+  }
+
   .if-row--top {
     flex: none;
     grid-template-columns: 1fr;
@@ -230,12 +272,14 @@ const chrome = computed(() => canvasChromeStyle(props.doc.theme))
 
   .if-cell {
     box-shadow: inset 0 -1px 0 var(--cv-hairline, rgba(60, 50, 20, 0.08));
-    min-height: 400px;
+    min-height: 240px;
+    height: auto;
   }
 
   .if-cell--full {
     flex: none;
-    min-height: 400px;
+    min-height: 240px;
+    height: auto;
   }
 
   .if-cell:last-child,

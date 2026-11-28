@@ -43,6 +43,7 @@ export type RteSlashAction =
   | { type: 'columns'; cols: 2 | 3 }
   | { type: 'docTitle' }
   | { type: 'table' }
+  | { type: 'databaseBlock' }
   | { type: 'image' }
   | { type: 'video' }
   | { type: 'link' }
@@ -55,6 +56,7 @@ export type RteSlashAction =
   | { type: 'audio' }
   | { type: 'linkCard' }
   | { type: 'footnote' }
+  | { type: 'toc' }
   | { type: 'qrcode' }
   | { type: 'timeline' }
   | { type: 'statusChip' }
@@ -270,6 +272,14 @@ const BLOCK_ITEMS: RteSlashItem[] = [
     action: { type: 'table' },
   },
   {
+    id: 'database-block',
+    label: '多维表格',
+    description: '在正文中嵌入知识库表格',
+    group: 'block',
+    keywords: ['database', 'sheet', '表格', '多维', '数据库', '嵌入'],
+    action: { type: 'databaseBlock' },
+  },
+  {
     id: 'callout-info',
     label: '告示框 · 提示',
     description: '信息提示块',
@@ -391,6 +401,14 @@ const MEDIA_ITEMS: RteSlashItem[] = [
     group: 'media',
     keywords: ['embed', 'iframe', '卡片', '网页'],
     action: { type: 'linkCard' },
+  },
+  {
+    id: 'toc',
+    label: '目录',
+    description: '随标题自动更新',
+    group: 'block',
+    keywords: ['toc', '目录', 'outline'],
+    action: { type: 'toc' },
   },
   {
     id: 'footnote',

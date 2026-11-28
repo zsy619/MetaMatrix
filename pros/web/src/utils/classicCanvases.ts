@@ -7,9 +7,9 @@ export function cycleRaci(current: string | undefined): RaciLetter {
   return RACI_CYCLE[(index + 1) % RACI_CYCLE.length] || ''
 }
 
-/** 日期按 UTC 日序号比较，避免本地时区把横条挪一天。 */
+/** 日期按 UTC 日序号比较，避免本地时区把横条挪一天。可以带 HH:mm。 */
 export function dayNumber(iso: string): number | null {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso.trim())
+  const match = /^(\d{4})-(\d{2})-(\d{2})(?:[ T]\d{2}:\d{2})?$/.exec(iso.trim())
   if (!match) return null
   const time = Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
   if (!Number.isFinite(time)) return null

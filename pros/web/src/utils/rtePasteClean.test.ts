@@ -38,13 +38,38 @@ assert.ok(!/onerror/i.test(bypass))
 assert.ok(bypass.includes('实体链'))
 assert.ok(bypass.includes('一项'))
 assert.ok(/data:image\/png/i.test(bypass))
+
+const linked = sanitizePastedHtml(
+  '<a href="https://example.com/doc"><img src="https://example.com/a.png" alt="说明"></a>' +
+    '<a href="javascript:alert(1)"><img src="https://example.com/b.png" alt="坏"></a>',
+)
+assert.ok(linked.includes('data-href="https://example.com/doc"'))
+assert.ok(!/javascript:/i.test(linked))
+assert.equal(safePasteUrl('//cdn.example.com/a.png', 'img'), 'https://cdn.example.com/a.png')
+assert.ok(sanitizePastedHtml('<img src="//cdn.example.com/a.png" alt="图">').includes('https://cdn.example.com/a.png'))
 assert.equal(safePasteUrl('javascript:alert(1)', 'a'), null)
 assert.equal(safePasteUrl('/media/asset-1', 'img'), '/media/asset-1')
+assert.equal((plainTextToPasteContent('甲\n\n\n乙') as unknown[]).length, 2)
+assert.match(sanitizePastedHtml('<table><tr><td colspan="2" rowspan="2">合并</td><td>乙</td></tr></table>'), /colspan="2"/)
+assert.match(sanitizePastedHtml('<table><tr><td colspan="2" rowspan="2">合并</td><td>乙</td></tr></table>'), /rowspan="2"/)
+assert.match(sanitizePastedHtml('<table><tr><td bgcolor="#fff7e8">甲</td></tr></table>'), /data-bg="#fff7e8"/)
 assert.deepEqual(plainTextToPasteContent('甲\n乙'), [
+  {
+    type: 'paragraph',
+    content: [{ type: 'text', text: '甲' }, { type: 'hardBreak' }, { type: 'text', text: '乙' }],
+  },
+])
+assert.deepEqual(plainTextToPasteContent('甲\n\n乙'), [
   { type: 'paragraph', content: [{ type: 'text', text: '甲' }] },
   { type: 'paragraph', content: [{ type: 'text', text: '乙' }] },
 ])
 assert.equal(plainTextToPasteContent('<b>不是标签</b>'), '<b>不是标签</b>')
+const bullets = plainTextToPasteContent('■ 甲\n● 乙') as Array<{ type: string; content: Array<{ content: Array<{ content: Array<{ text: string }> }> }> }>
+assert.equal(bullets[0]?.type, 'bulletList')
+assert.equal(bullets[0]?.content[0]?.content[0]?.content[0]?.text, '甲')
+const numbered = plainTextToPasteContent('3. 甲\n4. 乙') as Array<{ type: string; attrs?: { start: number } }>
+assert.equal(numbered[0]?.type, 'orderedList')
+assert.equal(numbered[0]?.attrs?.start, 3)
 
 assert.equal(FEISHU_TEXT_COLORS.length, 8)
 assert.equal(FEISHU_HIGHLIGHT_COLORS.length, 8)

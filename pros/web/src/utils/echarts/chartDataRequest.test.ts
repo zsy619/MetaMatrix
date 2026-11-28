@@ -53,12 +53,37 @@ describe('请求构造', () => {
     expect(request.headers['X-Api-Key']).toBe('key-1')
   })
 
-  it('读取本系统登录态：直接用系统 token', () => {
+  it('读取本系统登录态：同源接口才带系统 token', () => {
+    const config = createEmptyDataSourceConfig()
+    config.url = '/api/charts/demo'
+    config.auth = 'session'
+    const request = buildDataSourceRequest(config, {}, 'sys-token')
+    expect(request.headers.Authorization).toBe('Bearer sys-token')
+  })
+
+  it('读取本系统登录态：绝对同源地址也允许', () => {
+    const config = createEmptyDataSourceConfig()
+    config.url = `${window.location.origin}/api/charts/demo`
+    config.auth = 'session'
+    const request = buildDataSourceRequest(config, {}, 'sys-token')
+    expect(request.headers.Authorization).toBe('Bearer sys-token')
+  })
+
+  it('读取本系统登录态：外部地址绝不外发系统 JWT', () => {
     const config = createEmptyDataSourceConfig()
     config.url = 'https://example.com/api'
     config.auth = 'session'
     const request = buildDataSourceRequest(config, {}, 'sys-token')
-    expect(request.headers.Authorization).toBe('Bearer sys-token')
+    expect(request.headers.Authorization).toBeUndefined()
+  })
+
+  it('读取本系统登录态：协议相对和异常协议都不外发', () => {
+    const config = createEmptyDataSourceConfig()
+    config.auth = 'session'
+    config.url = '//evil.example.com/api'
+    expect(buildDataSourceRequest(config, {}, 'sys-token').headers.Authorization).toBeUndefined()
+    config.url = 'data:text/plain,hello'
+    expect(buildDataSourceRequest(config, {}, 'sys-token').headers.Authorization).toBeUndefined()
   })
 
   it('自定义 header 也可来自配置本身（非密钥字段）', () => {

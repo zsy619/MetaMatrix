@@ -18,19 +18,27 @@ const tones: Record<StakeholderBlockId, FiveStepPalette> = {
 function block(id: StakeholderBlockId) {
   return props.doc.blocks.find((item) => item.id === id)
 }
+
+const axisNotes: Record<StakeholderBlockId, string> = {
+  satisfy: '权力高 · 利益低',
+  manage: '权力高 · 利益高',
+  monitor: '权力低 · 利益低',
+  inform: '权力低 · 利益高',
+}
 </script>
 
 <template>
-  <div class="sheet" :style="chrome" aria-label="干系人地图">
+  <div class="sheet quad-sheet" :style="chrome" aria-label="干系人地图">
     <header class="sheet-top">
       <h2>{{ doc.title }}</h2>
-      <p>横轴是利益，纵轴是权力。先把人放进格子，再写下一步怎么接触。</p>
+      <p>按权力和利益分成四格：重点管理、保持满意、随时告知、监督即可。再写下一步怎么接触。</p>
     </header>
     <div class="axis">
       <span class="axis-y">权力高</span>
       <div class="grid">
         <section v-for="id in order" :key="id" :data-block="id" :style="{ '--col-header': tones[id].header, '--col-body': tones[id].body }">
           <h3>{{ block(id)?.title }}</h3>
+          <p class="axis-note">{{ axisNotes[id] }}</p>
           <div v-if="block(id)" class="rte-slot">
             <FiveStepPanel chrome="fill" density="compact" :block="block(id)!" :header="block(id)!.title" :palette="tones[id]" :topic-placeholder="block(id)!.hint || '主题'" />
           </div>
@@ -45,12 +53,51 @@ function block(id: StakeholderBlockId) {
 .sheet { position: absolute; inset: 0; box-sizing: border-box; display: flex; flex-direction: column; min-height: 0; padding: 12px 14px 14px; background: var(--cv-page, #f7f7f7); color: #202124; }
 .sheet-top { flex: none; margin-bottom: 8px; }
 .sheet-top h2, .sheet-top p { margin: 0; }
-.sheet-top p { color: #5f6368; font-size: 13px; }
-.axis { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: 28px 1fr; grid-template-rows: 1fr auto; gap: 6px; }
-.axis-y { writing-mode: vertical-rl; transform: rotate(180deg); text-align: center; color: #5f6368; font-size: 12px; letter-spacing: 0.2em; }
-.axis-x { grid-column: 2; text-align: center; color: #5f6368; font-size: 12px; }
+.sheet-top p { color: #3c4043; font-size: 15px; line-height: 1.55; }
+.axis-note { display: none; margin: 0; padding: 8px 12px 0; text-align: center; font-size: 15px; font-weight: 650; line-height: 1.45; color: #3c3424; }
+.axis { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: 40px 1fr; grid-template-rows: 1fr auto; gap: 8px; }
+.axis-y { writing-mode: vertical-rl; text-align: center; color: #3c3424; font-size: 14px; font-weight: 700; letter-spacing: 0.16em; }
+.axis-x { grid-column: 2; text-align: center; color: #3c3424; font-size: 14px; font-weight: 700; letter-spacing: 0.08em; }
 .grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 10px; min-height: 0; }
 section { display: flex; flex-direction: column; min-height: 0; background: var(--col-body); border-radius: 12px; overflow: hidden; }
-h3 { margin: 0; min-height: 40px; display: flex; align-items: center; justify-content: center; background: var(--col-header); color: #fff; letter-spacing: 0.04em; }
+h3 { margin: 0; min-height: 44px; display: flex; align-items: center; justify-content: center; padding: 6px 8px; background: var(--col-header); color: #fff; font-size: 16px; letter-spacing: 0.02em; }
+.axis-y, .axis-x { font-size: 16px; }
 .rte-slot { flex: 1 1 auto; min-height: 0; display: flex; }
+</style>
+
+<style>
+.canvas-viewport .quad-sheet[aria-label='干系人地图'] .sheet-top p {
+  font-size: 15px;
+  line-height: 1.55;
+  color: #3c4043;
+}
+
+@media (max-width: 720px) {
+  .canvas-viewport .quad-sheet[aria-label='干系人地图'] > .axis {
+    grid-template-columns: 1fr;
+    min-height: 0;
+  }
+
+  .canvas-viewport .quad-sheet[aria-label='干系人地图'] > .axis .axis-y,
+  .canvas-viewport .quad-sheet[aria-label='干系人地图'] > .axis .axis-x {
+    display: none;
+  }
+
+  .canvas-viewport .quad-sheet[aria-label='干系人地图'] > .axis .grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: none;
+  }
+
+  .canvas-viewport .quad-sheet[aria-label='干系人地图'] > .axis .grid > section {
+    min-height: 240px;
+  }
+
+  .canvas-viewport .quad-sheet[aria-label='干系人地图'] {
+    padding-bottom: 96px;
+  }
+
+  .canvas-viewport .quad-sheet[aria-label='干系人地图'] .axis-note {
+    display: block;
+  }
+}
 </style>

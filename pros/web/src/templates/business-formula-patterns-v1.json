@@ -1,0 +1,164 @@
+{
+  "id": "canvas_business_formula_patterns",
+  "type": "business_formula_patterns",
+  "schemaVersion": 1,
+  "theme": {
+    "background": { "pattern": "none", "color": "#f7f7f7" },
+    "page": "#f7f7f7",
+    "frame": "#ececec",
+    "hairline": "rgba(60, 50, 20, 0.08)"
+  },
+  "title": "业务公式十大经典范式",
+  "patterns": [
+    {
+      "id": 1,
+      "name": "流量变现型",
+      "category": "revenue",
+      "badge": "standard",
+      "badgeText": "#标准",
+      "desc": "流量×转化×客单价×复购",
+      "formula": "流量 * 转化率 * 客单价 * 复购率",
+      "params": [
+        { "name": "流量", "desc": "每日独立访客数", "unit": "人", "defaultValue": 10000 },
+        { "name": "转化率", "desc": "访客转化为客户的比例", "unit": "%", "defaultValue": 3 },
+        { "name": "客单价", "desc": "平均每个订单金额", "unit": "元", "defaultValue": 200 },
+        { "name": "复购率", "desc": "客户重复购买比例", "unit": "%", "defaultValue": 30 }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "线索转化型",
+      "category": "revenue",
+      "badge": "custom",
+      "badgeText": "#个性",
+      "desc": "浏览量×线索×邀约×预定×合作",
+      "formula": "浏览量 * 线索率 * 邀约率 * 预定率 * 合作率",
+      "params": [
+        { "name": "浏览量", "desc": "页面浏览次数", "unit": "次", "defaultValue": 50000 },
+        { "name": "线索率", "desc": "留下联系方式的比例", "unit": "%", "defaultValue": 5 },
+        { "name": "邀约率", "desc": "接受邀约的比例", "unit": "%", "defaultValue": 40 },
+        { "name": "预定率", "desc": "预定产品/服务的比例", "unit": "%", "defaultValue": 50 },
+        { "name": "合作率", "desc": "最终达成合作的比例", "unit": "%", "defaultValue": 60 }
+      ]
+    },
+    {
+      "id": 3,
+      "name": "门店收入型",
+      "category": "revenue",
+      "badge": "offline",
+      "badgeText": "#线下",
+      "desc": "门前流量×捕获率×付费率×客单价",
+      "formula": "门前流量 * 捕获率 * 付费率 * 客单价",
+      "params": [
+        { "name": "门前流量", "desc": "经过门店的潜在顾客", "unit": "人", "defaultValue": 5000 },
+        { "name": "捕获率", "desc": "进店顾客比例", "unit": "%", "defaultValue": 10 },
+        { "name": "付费率", "desc": "进店后购买的比例", "unit": "%", "defaultValue": 30 },
+        { "name": "客单价", "desc": "平均消费金额", "unit": "元", "defaultValue": 80 }
+      ]
+    },
+    {
+      "id": 4,
+      "name": "用户周期型",
+      "category": "revenue",
+      "badge": "longterm",
+      "badgeText": "#长期",
+      "desc": "获客×激活×留存×收入×推荐",
+      "formula": "获客数 * 激活率 * 留存率 * 人均收入 * 推荐率",
+      "params": [
+        { "name": "获客数", "desc": "新注册用户数量", "unit": "人", "defaultValue": 1000 },
+        { "name": "激活率", "desc": "完成关键行为的比例", "unit": "%", "defaultValue": 60 },
+        { "name": "留存率", "desc": "持续使用的比例", "unit": "%", "defaultValue": 40 },
+        { "name": "人均收入", "desc": "每用户平均收入", "unit": "元", "defaultValue": 100 },
+        { "name": "推荐率", "desc": "推荐新用户的比例", "unit": "%", "defaultValue": 15 }
+      ]
+    },
+    {
+      "id": 5,
+      "name": "脱离成本型",
+      "category": "competition",
+      "badge": "external",
+      "badgeText": "#对外",
+      "desc": "粘性因素1+粘性因素2+粘性因素3+粘性因素4",
+      "formula": "产品粘性 + 服务粘性 + 品牌粘性 + 转换成本",
+      "params": [
+        { "name": "产品粘性", "desc": "产品依赖程度评分", "unit": "分", "defaultValue": 75 },
+        { "name": "服务粘性", "desc": "服务依赖程度评分", "unit": "分", "defaultValue": 70 },
+        { "name": "品牌粘性", "desc": "品牌忠诚度评分", "unit": "分", "defaultValue": 65 },
+        { "name": "转换成本", "desc": "更换供应商的成本", "unit": "分", "defaultValue": 80 }
+      ]
+    },
+    {
+      "id": 6,
+      "name": "工业生产型",
+      "category": "competition",
+      "badge": "internal",
+      "badgeText": "#对内",
+      "desc": "线索量×第一层筛选×第二层筛选×第三层筛选",
+      "formula": "线索量 * 第一层筛选率 * 第二层筛选率 * 第三层筛选率",
+      "params": [
+        { "name": "线索量", "desc": "初始线索数量", "unit": "条", "defaultValue": 10000 },
+        { "name": "第一层筛选率", "desc": "初步筛选通过率", "unit": "%", "defaultValue": 50 },
+        { "name": "第二层筛选率", "desc": "深度筛选通过率", "unit": "%", "defaultValue": 60 },
+        { "name": "第三层筛选率", "desc": "最终筛选通过率", "unit": "%", "defaultValue": 70 }
+      ]
+    },
+    {
+      "id": 7,
+      "name": "连续留存型",
+      "category": "operation",
+      "badge": "standard",
+      "badgeText": "#标准",
+      "desc": "N天活跃留存率（按活跃/订单算）",
+      "formula": "第N天活跃 / 第1天新增 * 100",
+      "params": [
+        { "name": "第N天活跃", "desc": "第N天仍活跃用户", "unit": "人", "defaultValue": 350 },
+        { "name": "第1天新增", "desc": "第一天新增用户", "unit": "人", "defaultValue": 1000 }
+      ]
+    },
+    {
+      "id": 8,
+      "name": "留存节点型",
+      "category": "operation",
+      "badge": "custom",
+      "badgeText": "#自定义",
+      "desc": "14天学籍率×30天20学分率×180天50学分率",
+      "formula": "14天学籍率 * 30天20学分率 * 180天50学分率",
+      "params": [
+        { "name": "14天学籍率", "desc": "14天保留学籍比例", "unit": "%", "defaultValue": 85 },
+        { "name": "30天20学分率", "desc": "30天获得20学分比例", "unit": "%", "defaultValue": 60 },
+        { "name": "180天50学分率", "desc": "180天获得50学分比例", "unit": "%", "defaultValue": 35 }
+      ]
+    },
+    {
+      "id": 9,
+      "name": "连续动作型",
+      "category": "operation",
+      "badge": "standard",
+      "badgeText": "#标准",
+      "desc": "点击×阅读×点击×点击",
+      "formula": "点击率 * 阅读率 * 互动率 * 转化率",
+      "params": [
+        { "name": "点击率", "desc": "内容点击比例", "unit": "%", "defaultValue": 15 },
+        { "name": "阅读率", "desc": "完整阅读比例", "unit": "%", "defaultValue": 40 },
+        { "name": "互动率", "desc": "点赞/评论比例", "unit": "%", "defaultValue": 25 },
+        { "name": "转化率", "desc": "最终转化比例", "unit": "%", "defaultValue": 10 }
+      ]
+    },
+    {
+      "id": 10,
+      "name": "动作节点型",
+      "category": "operation",
+      "badge": "custom",
+      "badgeText": "#自定义",
+      "desc": "学籍×到场×听课×作业率",
+      "formula": "学籍率 * 到场率 * 听课率 * 作业完成率",
+      "params": [
+        { "name": "学籍率", "desc": "注册学籍比例", "unit": "%", "defaultValue": 90 },
+        { "name": "到场率", "desc": "实际到场比例", "unit": "%", "defaultValue": 75 },
+        { "name": "听课率", "desc": "完整听课比例", "unit": "%", "defaultValue": 80 },
+        { "name": "作业完成率", "desc": "按时完成作业比例", "unit": "%", "defaultValue": 65 }
+      ]
+    }
+  ],
+  "savedParams": {}
+}

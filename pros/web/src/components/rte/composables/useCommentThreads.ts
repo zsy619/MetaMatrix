@@ -31,12 +31,23 @@ export function useCommentThreads(deps: {
 }) {
   const commentsOpen = ref(false)
   const showResolved = ref(false)
+  const orphansOnly = ref(false)
   const draft = ref<CommentDraft | null>(null)
   const replyDrafts = ref<Record<string, string>>({})
   const activeThreadId = ref('')
 
   const threads = computed(() => readCommentThreads(deps.getMap(), deps.panelId()))
-  const shownThreads = computed(() => visibleThreads(threads.value, showResolved.value))
+  const orphanIds = computed(() => {
+    const ed = deps.editor().value
+    void ed?.state.doc
+    return threads.value.filter((thread) => anchorPos(thread.id) == null).map((thread) => thread.id)
+  })
+  const shownThreads = computed(() => {
+    const list = visibleThreads(threads.value, showResolved.value)
+    if (!orphansOnly.value) return list
+    const lost = new Set(orphanIds.value)
+    return list.filter((thread) => lost.has(thread.id))
+  })
   const unresolvedCount = computed(() => threads.value.filter((thread) => !thread.resolved).length)
 
   function persist(next: CommentThread[]) {
@@ -124,8 +135,25 @@ export function useCommentThreads(deps: {
     replyDrafts.value = { ...replyDrafts.value, [threadId]: '' }
   }
 
+  function setAnchorResolved(threadId: string, resolved: boolean) {
+    const ed = deps.editor().value
+    const type = ed?.schema.marks.commentAnchor
+    if (!ed || !type) return
+    let tr = ed.state.tr
+    ed.state.doc.descendants((node, pos) => {
+      if (!node.isText) return
+      const mark = node.marks.find((item) => item.type === type && item.attrs.threadId === threadId)
+      if (!mark || Boolean(mark.attrs.resolved) === resolved) return
+      tr = tr.removeMark(pos, pos + node.nodeSize, mark)
+      tr = tr.addMark(pos, pos + node.nodeSize, type.create({ ...mark.attrs, resolved }))
+    })
+    if (tr.docChanged) ed.view.dispatch(tr)
+  }
+
   function toggleResolved(thread: CommentThread) {
-    persist(setThreadResolved(threads.value, thread.id, !thread.resolved))
+    const next = !thread.resolved
+    persist(setThreadResolved(threads.value, thread.id, next))
+    setAnchorResolved(thread.id, next)
   }
 
   function removeMessage(threadId: string, messageId: string) {
@@ -133,6 +161,32 @@ export function useCommentThreads(deps: {
     if (!result) return
     persist(result.threads)
     if (result.removedThread) removeAnchor(threadId)
+  }
+
+  function reanchorThread(threadId: string) {
+    const ed = deps.editor().value
+    if (!ed || !deps.isEditable()) return
+    const { from, to, empty } = ed.state.selection
+    if (empty || from === to) {
+      ElMessage.warning('请先选中要重新钉住的文字')
+      return
+    }
+    const quote = ed.state.doc.textBetween(from, to, '\n', '\n').trim()
+    if (!quote) {
+      ElMessage.warning('请先选中要重新钉住的文字')
+      return
+    }
+    const thread = threads.value.find((item) => item.id === threadId)
+    if (!thread) return
+    const anchored = ed.chain().focus().unsetCommentAnchor(threadId).setTextSelection({ from, to }).setCommentAnchor(threadId).run()
+    if (!anchored) {
+      ElMessage.warning('这段文字钉不住')
+      return
+    }
+    persist(threads.value.map((item) => (item.id === threadId ? { ...item, quote: quote.slice(0, 500) } : item)))
+    orphansOnly.value = false
+    activeThreadId.value = threadId
+    ElMessage.success('已重新钉住')
   }
 
   function jumpToThread(threadId: string) {
@@ -158,10 +212,12 @@ export function useCommentThreads(deps: {
   return {
     commentsOpen,
     showResolved,
+    orphansOnly,
     draft,
     replyDrafts,
     activeThreadId,
     threads,
+    orphanIds,
     shownThreads,
     unresolvedCount,
     beginComment,
@@ -170,6 +226,7 @@ export function useCommentThreads(deps: {
     submitReply,
     toggleResolved,
     removeMessage,
+    reanchorThread,
     jumpToThread,
   }
 }

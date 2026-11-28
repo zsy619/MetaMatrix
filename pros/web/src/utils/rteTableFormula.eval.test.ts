@@ -3,16 +3,56 @@
  * 区域引用、错误码（#REF! / #VALUE! / #DIV/0! / #NAME?）、循环引用。
  */
 import { describe, expect, it } from 'vitest'
+import { remapFormulaRows } from './rteTableExtras'
 import {
   evaluateCellFormula,
   evaluateFormula,
   evaluateTableFormulas,
   formatCellAddress,
+  formulaReferences,
   isFormulaCell,
   parseCellAddress,
   parseCellNumber,
   recalculateTable,
+  remapFormulaByAxis,
 } from './rteTableFormula'
+
+describe('表格结构变化后的公式', () => {
+  const sameCol = (col: number) => col
+  it('删掉的行写成 #REF!，区域会收掉这一行', () => {
+    const mapRow = (row: number) => (row === 2 ? null : row > 2 ? row - 1 : row)
+    expect(remapFormulaByAxis('=A2', mapRow, sameCol)).toBe('=#REF!')
+    expect(remapFormulaByAxis('=SUM(A1:A3)', mapRow, sameCol)).toBe('=SUM(A1:A2)')
+    expect(evaluateFormula('=#REF!', [['1']], 0, 0).error).toBe('#REF!')
+    expect(evaluateFormula('=A1+#REF!', [['4']], 0, 1).error).toBe('#REF!')
+  })
+
+  it('中间插入一行时，求和区域把新行包进来', () => {
+    const mapRow = (row: number) => (row >= 2 ? row + 1 : row)
+    expect(remapFormulaByAxis('=SUM(A1:A3)', mapRow, sameCol)).toBe('=SUM(A1:A4)')
+  })
+
+  it('绝对引用跟着格子走，美元符号留着', () => {
+    const mapRow = (row: number) => row + 1
+    expect(remapFormulaByAxis('=$A$1', mapRow, sameCol)).toBe('=$A$2')
+    expect(remapFormulaByAxis('=SUM($A$1:$A$3)', mapRow, sameCol)).toBe('=SUM($A$2:$A$4)')
+  })
+})
+
+describe('排序后的公式行号', () => {
+  it('行号按新位置改写', () => {
+    const map = new Map<number, number>([[2, 4], [4, 2]])
+    expect(remapFormulaRows('=A2+B4', map)).toBe('=A4+B2')
+    expect(remapFormulaRows('不是公式', map)).toBe('不是公式')
+  })
+})
+
+describe('公式引用', () => {
+  it('列出单元格和区域，并去掉重复', () => {
+    expect(formulaReferences('=SUM(A1:B2)+A1+C3')).toEqual(['A1:B2', 'A1', 'C3'])
+    expect(formulaReferences('不是公式')).toEqual([])
+  })
+})
 
 describe('单元格地址', () => {
   it('解析与格式化互为逆运算', () => {
@@ -93,7 +133,7 @@ describe('错误码', () => {
   })
 
   it('未知函数返回 #NAME?', () => {
-    expect(evaluateFormula('=ROUND(A1)', grid, 0, 0).error).toBe('#NAME?')
+    expect(evaluateFormula('=MODE(A1)', grid, 0, 0).error).toBe('#NAME?')
     expect(evaluateFormula('=NOPE(', grid, 0, 0).error).toBe('#NAME?')
   })
 

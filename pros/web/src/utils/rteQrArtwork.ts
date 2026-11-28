@@ -12,17 +12,17 @@ export type QrModuleStyle =
   | 'cross'
   | 'star'
 
-export const QR_STYLES: readonly { id: QrModuleStyle; label: string }[] = [
-  { id: 'rounded', label: '圆角' },
-  { id: 'dot', label: '圆点' },
-  { id: 'square', label: '方块' },
-  { id: 'diamond', label: '菱形' },
-  { id: 'liquid', label: '液态' },
-  { id: 'bar', label: '横条' },
-  { id: 'column', label: '竖条' },
-  { id: 'triangle', label: '三角' },
-  { id: 'cross', label: '十字' },
-  { id: 'star', label: '星形' },
+export const QR_STYLES: readonly { id: QrModuleStyle; label: string; title: string }[] = [
+  { id: 'rounded', label: '圆角', title: '码点用圆角方块' },
+  { id: 'dot', label: '圆点', title: '码点画成圆点' },
+  { id: 'square', label: '方块', title: '码点用方角方块' },
+  { id: 'diamond', label: '菱形', title: '码点画成菱形' },
+  { id: 'liquid', label: '液态', title: '相邻码点连成一块' },
+  { id: 'bar', label: '横条', title: '码点画成横条' },
+  { id: 'column', label: '竖条', title: '码点画成竖条' },
+  { id: 'triangle', label: '三角', title: '码点画成三角' },
+  { id: 'cross', label: '十字', title: '码点画成十字' },
+  { id: 'star', label: '星形', title: '码点画成星形' },
 ]
 
 export type QrPreset = {
@@ -65,6 +65,9 @@ export type QrArtworkOptions = {
   caption?: boolean
   /** 底部说明。勾选底部文字时，有描述就画描述，否则画二维码内容。 */
   description?: string
+  errorCorrectionLevel?: 'L' | 'M' | 'Q' | 'H'
+  /** 四周留白，按码点个数。只接受 2、4、6。 */
+  quiet?: number
 }
 
 type QrBits = {
@@ -73,8 +76,8 @@ type QrBits = {
   reserved: (row: number, col: number) => boolean
 }
 
-export function qrBits(text: string): QrBits {
-  const created = QRCode.create(text, { errorCorrectionLevel: 'H' }) as {
+export function qrBits(text: string, level: 'L' | 'M' | 'Q' | 'H' = 'H'): QrBits {
+  const created = QRCode.create(text, { errorCorrectionLevel: level }) as {
     modules: {
       size: number
       get: (row: number, col: number) => number
@@ -262,6 +265,23 @@ function markText(text: string): string {
   }
 }
 
+export function qrQuietModules(value: unknown): 2 | 4 | 6 {
+  return value === 2 || value === 6 ? value : 4
+}
+
+export function qrPixelSize(
+  text: string,
+  options: QrArtworkOptions = {},
+): { width: number; height: number; quiet: 2 | 4 | 6; moduleSize: number } {
+  const bits = qrBits(text, options.errorCorrectionLevel || 'H')
+  const quiet = qrQuietModules(options.quiet)
+  const moduleSize = 12
+  const qrSide = (bits.size + quiet * 2) * moduleSize
+  const note = (options.description || '').trim()
+  const captionText = options.caption ? note || text.trim() : ''
+  return { width: qrSide, height: qrSide + (captionText ? 56 : 0), quiet, moduleSize }
+}
+
 export function paintQr(
   ctx: CanvasRenderingContext2D,
   text: string,
@@ -270,15 +290,16 @@ export function paintQr(
   const color = options.color || QR_PRESETS[1]!.color
   const background = options.background || '#ffffff'
   const style = options.style || 'rounded'
-  const bits = qrBits(text)
-  const quiet = 4
-  const moduleSize = 12
-  const qrSide = (bits.size + quiet * 2) * moduleSize
+  const bits = qrBits(text, options.errorCorrectionLevel || 'H')
+  const sized = qrPixelSize(text, options)
+  const quiet = sized.quiet
+  const moduleSize = sized.moduleSize
+  const width = sized.width
+  const height = sized.height
+  const qrSide = width
   const note = (options.description || '').trim()
   const captionText = options.caption ? note || text.trim() : ''
-  const captionHeight = captionText ? 56 : 0
-  const width = qrSide
-  const height = qrSide + captionHeight
+  const captionHeight = captionText ? height - qrSide : 0
   ctx.canvas.width = width
   ctx.canvas.height = height
   ctx.fillStyle = background

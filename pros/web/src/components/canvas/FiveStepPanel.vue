@@ -200,7 +200,7 @@ function onCloseMaximize(event?: Event) {
         :show-bottom-bar="false"
         :show-publish-actions="false"
         :show-markdown-hint="false"
-        placeholder=""
+        placeholder="写在这里"
         :model-value="editorHtml"
         @update:model-value="onEditorHtml"
         @focus="onEditorFocus"
@@ -308,11 +308,11 @@ function onCloseMaximize(event?: Event) {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  min-height: 0;
-  height: 100%;
-  flex: 1;
+  min-height: min-content;
+  height: auto;
+  flex: 1 1 auto;
   background: var(--fsp-body);
-  overflow: hidden;
+  overflow: visible;
   cursor: pointer;
   box-sizing: border-box;
 }
@@ -329,15 +329,19 @@ function onCloseMaximize(event?: Event) {
   justify-content: center;
   flex-shrink: 0;
   min-height: 40px;
-  padding: 8px 36px;
-  background: var(--fsp-header);
+  padding: 8px 52px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--fsp-header) 74%, #fff),
+    var(--fsp-header)
+  );
   color: #fff;
   box-sizing: border-box;
 }
 
 .fsp--compact .fsp-header {
-  min-height: 32px;
-  padding: 5px 32px;
+  min-height: 36px;
+  padding: 6px 48px;
 }
 
 .fsp-title {
@@ -357,7 +361,7 @@ function onCloseMaximize(event?: Event) {
 }
 
 .fsp--compact .fsp-title {
-  font-size: 12.5px;
+  font-size: 15px;
   letter-spacing: 0.01em;
 }
 
@@ -370,8 +374,8 @@ function onCloseMaximize(event?: Event) {
 
 .fsp-actions .pm-max-btn,
 .fsp-float-max {
-  width: 22px;
-  height: 22px;
+  width: 36px;
+  height: 36px;
 }
 
 .fsp-float-max {
@@ -386,7 +390,7 @@ function onCloseMaximize(event?: Event) {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .fsp-topic {
@@ -396,7 +400,9 @@ function onCloseMaximize(event?: Event) {
   padding: 0 0 4px;
   border: none;
   border-bottom: 1px solid transparent;
+  border-left: 3px solid color-mix(in srgb, var(--fsp-topic) 55%, transparent);
   border-radius: 0;
+  padding-left: 8px;
   background: transparent;
   color: var(--fsp-topic);
   font: inherit;
@@ -413,18 +419,18 @@ function onCloseMaximize(event?: Event) {
 .fsp--compact .fsp-topic {
   margin: 6px 10px 0;
   width: calc(100% - 20px);
-  font-size: 13px;
+  font-size: 15px;
 }
 
 .fsp--fill .fsp-topic {
-  width: calc(100% - 40px);
-  margin-right: 28px;
+  width: calc(100% - 52px);
+  margin-right: 8px;
 }
 
 .fsp-topic::placeholder {
   color: var(--fsp-topic);
-  opacity: 0.45;
-  font-weight: 600;
+  opacity: 0.92;
+  font-weight: 650;
 }
 
 .fsp-topic:hover,
@@ -469,14 +475,14 @@ function onCloseMaximize(event?: Event) {
 .fsp :deep(.rte-body),
 .fsp :deep(.ProseMirror) {
   min-height: 48px;
-  font-size: 14px;
-  line-height: 1.65;
+  font-size: 15px;
+  line-height: 1.7;
   color: #202124;
 }
 
 .fsp :deep(.ProseMirror p.is-editor-empty:first-child::before),
 .fsp :deep(.ProseMirror p.is-empty:first-child::before) {
-  content: none;
+  color: #5c564c;
 }
 
 .fsp :deep(.pa-root) {
@@ -501,7 +507,7 @@ function onCloseMaximize(event?: Event) {
 
 .fsp--compact :deep(.pa-title) {
   flex: 1 0 auto;
-  font-size: 10px;
+  font-size: 14px;
 }
 
 .fsp--compact :deep(.pa-actions) {
@@ -510,9 +516,10 @@ function onCloseMaximize(event?: Event) {
 }
 
 .fsp--compact :deep(.pa-btn) {
-  padding: 0 4px;
-  font-size: 10px;
-  line-height: 1.5;
+  min-height: 32px;
+  padding: 4px 8px;
+  font-size: 14px;
+  line-height: 1.4;
 }
 
 .fsp :deep(.pa-empty) {

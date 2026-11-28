@@ -17,6 +17,8 @@ vi.mock('../RichTextEditor.vue', () => ({
       compact: { type: Boolean, default: false },
       expanded: { type: Boolean, default: false },
       pageSheet: { type: Boolean, default: true },
+      showMarkdownHint: { type: Boolean, default: true },
+      placeholder: { type: String, default: '' },
     },
     emits: ['update:modelValue'],
     template: '<div class="rte-stub">{{ modelValue }}</div>',
@@ -50,6 +52,19 @@ describe('画布紧凑区块的纸张模式', () => {
     const maximized = after[0]!
     expect(maximized.props('expanded')).toBe(true)
     expect(maximized.props('pageSheet')).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('Y 模型格子的默认编辑器与双三角一样，先藏起工具条', () => {
+    const wrapper = mount(YModelBlock, {
+      props: { block: BLOCK, editor: 'card', accent: '#A67C00' },
+      global: { stubs: { teleport: true } },
+    })
+    const editor = wrapper.getComponent({ name: 'RichTextEditor' })
+    expect(editor.props('showMarkdownHint')).toBe(false)
+    expect(editor.props('placeholder')).toBe('点击填写…')
+    expect(editor.props('pageSheet')).toBe(false)
+    expect(wrapper.get('.ym-block').classes()).toContain('ym-block--card')
     wrapper.unmount()
   })
 })

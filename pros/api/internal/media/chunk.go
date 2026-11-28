@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -155,35 +156,80 @@ func (s *Service) FinishChunk(ctx context.Context, userID uuid.UUID, uploadID st
 	if len(status.Missing) > 0 {
 		return AssetView{}, ErrChunkIncomplete
 	}
-	files := make([]*os.File, status.PartCount)
-	readers := make([]io.Reader, status.PartCount)
-	defer func() {
-		for _, f := range files {
-			if f != nil {
-				_ = f.Close()
-			}
-		}
-	}()
-	for i := 0; i < status.PartCount; i++ {
-		f, err := os.Open(filepath.Join(dir, partName(i)))
-		if err != nil {
-			return AssetView{}, err
-		}
-		files[i] = f
-		readers[i] = f
-	}
+	// sequentialChunkReader 只在当前分片被读取时持有一个文件描述符。
+	// 旧实现先把所有分片 os.Open 再 io.MultiReader，大文件数千分片时会耗尽进程 FD；
+	// 新实现每读完一个分片立即关闭，再打开下一个，合并顺序与 MultiReader 完全一致。
+	body := &sequentialChunkReader{dir: dir, count: status.PartCount}
+	defer func() { _ = body.Close() }()
 	view, err := s.Save(ctx, userID, SaveInput{
 		OriginalName: session.OriginalName,
 		MediaType:    session.MediaType,
 		MimeType:     session.MimeType,
 		CategoryID:   session.CategoryID,
-		Body:         io.MultiReader(readers...),
+		Body:         body,
 	})
 	if err != nil {
 		return AssetView{}, err
 	}
+	// 只有 Save 完整写盘、计算哈希并成功登记资产后才删除会话；
+	// 任一分片读取失败或数据库保存失败都会保留分片，调用方可以断点重试。
 	_ = os.RemoveAll(dir)
 	return view, nil
+}
+
+// sequentialChunkReader 是 io.MultiReader 的懒打开等价实现。
+// current 是唯一可能打开的分片；index 始终指向下一个待打开分片。
+type sequentialChunkReader struct {
+	dir     string
+	count   int
+	index   int
+	current *os.File
+}
+
+func (r *sequentialChunkReader) Read(p []byte) (int, error) {
+	for {
+		if r.current == nil {
+			if r.index >= r.count {
+				return 0, io.EOF
+			}
+			f, err := os.Open(filepath.Join(r.dir, partName(r.index)))
+			if err != nil {
+				return 0, err
+			}
+			r.current = f
+			r.index++
+		}
+
+		n, readErr := r.current.Read(p)
+		if errors.Is(readErr, io.EOF) {
+			// defer 在循环里会累积 FD，所以必须在每次 EOF 的当下显式关闭。
+			closeErr := r.current.Close()
+			r.current = nil
+			if closeErr != nil {
+				return n, closeErr
+			}
+			if n > 0 {
+				return n, nil
+			}
+			continue
+		}
+		if readErr != nil {
+			_ = r.current.Close()
+			r.current = nil
+			return n, readErr
+		}
+		return n, nil
+	}
+}
+
+func (r *sequentialChunkReader) Close() error {
+	r.index = r.count
+	if r.current == nil {
+		return nil
+	}
+	err := r.current.Close()
+	r.current = nil
+	return err
 }
 
 func (s *Service) loadOwnChunk(userID uuid.UUID, uploadID string) (chunkSession, string, error) {
@@ -198,6 +244,10 @@ func (s *Service) loadOwnChunk(userID uuid.UUID, uploadID string) (chunkSession,
 		}
 		return chunkSession{}, "", err
 	}
+	if err := validateChunkSession(uploadID, session); err != nil {
+		// 损坏或错绑的元数据不能驱动读取、合并或删除，统一按不可见会话处理。
+		return chunkSession{}, "", ErrNotFound
+	}
 	if session.UserID != userID.String() {
 		return chunkSession{}, "", ErrNotFound
 	}
@@ -206,6 +256,90 @@ func (s *Service) loadOwnChunk(userID uuid.UUID, uploadID string) (chunkSession,
 		return chunkSession{}, "", ErrNotFound
 	}
 	return session, dir, nil
+}
+
+// CleanupExpiredChunks 可由服务启动时和后台 ticker 定期直接调用。
+// 它扫描 uploads 根目录，不依赖用户再次访问会话；发现损坏数据时继续处理其他目录，
+// 最后通过 errors.Join 汇总错误，便于启动日志或周期任务监控发现问题。
+func (s *Service) CleanupExpiredChunks() error {
+	uploadsRoot, err := absInside(s.Root, "uploads")
+	if err != nil {
+		return err
+	}
+	rootInfo, err := os.Lstat(uploadsRoot)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	// RemoveAll 会跟随 uploads 这个中间符号链接定位目标，因此链接目录必须拒绝，
+	// 否则一个伪造的 uploads 链接可能把清理操作导向存储根之外。
+	if rootInfo.Mode()&os.ModeSymlink != 0 || !rootInfo.IsDir() {
+		return ErrPathEscape
+	}
+	entries, err := os.ReadDir(uploadsRoot)
+	if err != nil {
+		return err
+	}
+
+	now := s.now()
+	var cleanupErrors []error
+	for _, entry := range entries {
+		dir, err := s.chunkDir(entry.Name())
+		if err != nil {
+			// 非 UUID 文件/目录不是本分片协议创建的数据，不删除也不当作会话。
+			continue
+		}
+		info, err := os.Lstat(dir)
+		if errors.Is(err, os.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			cleanupErrors = append(cleanupErrors, fmt.Errorf("inspect chunk session %s: %w", entry.Name(), err))
+			continue
+		}
+		if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+			continue
+		}
+
+		session, err := readChunkMeta(dir)
+		if err != nil {
+			// 无法解析就无法证明归属和创建时间。保留现场并报告，而不是按目录时间猜着删。
+			cleanupErrors = append(cleanupErrors, fmt.Errorf("read chunk session %s: %w", entry.Name(), err))
+			continue
+		}
+		if err := validateChunkSession(entry.Name(), session); err != nil {
+			cleanupErrors = append(cleanupErrors, fmt.Errorf("validate chunk session %s: %w", entry.Name(), err))
+			continue
+		}
+		if !now.After(session.CreatedAt.Add(chunkTTL)) {
+			continue
+		}
+		if err := os.RemoveAll(dir); err != nil {
+			cleanupErrors = append(cleanupErrors, fmt.Errorf("remove expired chunk session %s: %w", entry.Name(), err))
+		}
+	}
+	return errors.Join(cleanupErrors...)
+}
+
+// validateChunkSession 校验元数据与目录的绑定关系及清理所需的归属字段。
+// 清理任务没有登录用户上下文，能依赖的最低归属证明就是有效 UserID、匹配的会话 ID，
+// 以及 PrepareChunk 写入的合法大小参数；任何一项损坏都选择保留而非误删。
+func validateChunkSession(uploadID string, session chunkSession) error {
+	if session.ID != uploadID {
+		return ErrBadMediaType
+	}
+	if _, err := uuid.Parse(session.UserID); err != nil {
+		return ErrBadMediaType
+	}
+	if session.CreatedAt.IsZero() || session.SizeBytes <= 0 || session.SizeBytes > MaxUploadBytes {
+		return ErrBadMediaType
+	}
+	if session.PartSize < MinPartSize || session.PartSize > MaxPartSize {
+		return ErrBadMediaType
+	}
+	return nil
 }
 
 func (s *Service) chunkDir(uploadID string) (string, error) {

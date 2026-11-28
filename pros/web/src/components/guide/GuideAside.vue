@@ -4,6 +4,7 @@ import type { DocumentSummary } from '../../api/documents'
 import { TEMPLATE_META, type TemplateCategory, type TemplateId } from '../../stores/document'
 import GuideUserCard from './GuideUserCard.vue'
 import GuideThumb from './GuideThumb.vue'
+import GuideProjects from './GuideProjects.vue'
 import LineSkeleton from '../ui/LineSkeleton.vue'
 
 const ASIDE_COLLAPSE_KEY = 'metamatrix:guide:asideCollapsed'
@@ -51,6 +52,7 @@ const CATEGORY_ACCENT: Record<TemplateCategory, string> = {
   industry: '#f9a825',
   org: '#a142f4',
   review: '#ea4335',
+  fde: '#0f766e',
 }
 
 function clampWidth(w: number): number {
@@ -311,6 +313,23 @@ const panelTitle = computed(() => '最近文档')
         </svg>
         <span class="rail-label">工作台</span>
       </router-link>
+      <router-link
+        class="rail-link"
+        :to="{ name: 'projects' }"
+        title="项目"
+        aria-label="打开项目"
+      >
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+          <path
+            d="M2 4.2c0-.66.54-1.2 1.2-1.2h3l1.4 1.7h5.2c.66 0 1.2.54 1.2 1.2v6.1c0 .66-.54 1.2-1.2 1.2H3.2c-.66 0-1.2-.54-1.2-1.2z"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.3"
+            stroke-linejoin="round"
+          />
+        </svg>
+        <span class="rail-label">项目</span>
+      </router-link>
     </div>
 
     <div v-show="!collapsed" class="aside-inner">
@@ -345,6 +364,8 @@ const panelTitle = computed(() => '最近文档')
       </div>
 
       <div class="aside-body">
+        <GuideProjects :authenticated="authenticated" />
+
         <router-link class="workspace-entry" :to="{ name: 'workspace' }">
           <span class="ws-icon" aria-hidden="true">
             <svg viewBox="0 0 16 16" width="15" height="15">

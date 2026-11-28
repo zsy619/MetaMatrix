@@ -5,9 +5,11 @@ import {
   moveImageGroup,
   placeBeside,
   reorderInGroup,
+  setGroupLayout,
   setGroupRatios,
+  stackInGroup,
 } from './imageGroupOps'
-import { installImageGroupLayout, nextImageSelection, rowCanAccept, IMAGE_ROW_LIMIT_TIP, type ImageSpot } from '../utils/rteImageGroup'
+import { installImageGroupLayout, nextImageSelection, normalizeGroupLayout, rowCanAccept, IMAGE_ROW_LIMIT_TIP, type ImageSpot } from '../utils/rteImageGroup'
 import {
   imageDropKind,
   sameImageDrop,
@@ -220,10 +222,29 @@ function imageVisualRect(frame: HTMLElement): DOMRect {
   return frame.getBoundingClientRect()
 }
 
+function hideDropMark() {
+  dropLine?.remove()
+  dropLine = null
+  dropPreview?.remove()
+  dropPreview = null
+}
+
 function placeLine(kind: RteImageDropKind, rect: DOMRect) {
+  if (kind === 'center') {
+    hideDropMark()
+    return
+  }
   const line = ensureLine()
   const preview = ensurePreview()
   line.dataset.kind = kind
+  const label = kind === 'before' ? '上' : kind === 'after' ? '下' : kind === 'left' ? '左' : '右'
+  preview.textContent = label
+  preview.style.display = 'flex'
+  preview.style.alignItems = 'center'
+  preview.style.justifyContent = 'center'
+  preview.style.color = '#fff'
+  preview.style.font = '600 12px/1 sans-serif'
+  preview.style.background = 'rgba(51,112,255,.86)'
   if (kind === 'left' || kind === 'right') {
     const x = kind === 'left' ? rect.left : rect.right
     line.style.left = `${x - 2}px`
@@ -278,6 +299,27 @@ function moveImage(view: EditorView, from: number, insertAt: number): boolean {
   } catch {
     return false
   }
+}
+
+function stackByArrow(view: EditorView, key: 'ArrowUp' | 'ArrowDown'): boolean {
+  const sel = view.state.selection
+  if (!(sel instanceof NodeSelection) || sel.node.type.name !== 'image') return false
+  const $pos = sel.$from
+  if ($pos.parent.type.name !== 'imageGroup') return false
+  const group = $pos.parent
+  if (group.childCount !== 3 || normalizeGroupLayout(group.attrs.layout) !== 'row') return false
+  const index = $pos.index()
+  let target = key === 'ArrowUp' ? index - 1 : index + 1
+  if (target < 0 || target > 2) target = 1
+  if (target === index) return false
+  const groupPos = $pos.before($pos.depth)
+  let cursor = groupPos + 1
+  const positions: number[] = []
+  group.forEach((child) => {
+    positions.push(cursor)
+    cursor += child.nodeSize
+  })
+  return stackInGroup(view, positions[index]!, positions[target]!, key === 'ArrowUp' ? 'above' : 'below')
 }
 
 function nudgeImage(view: EditorView, dir: -1 | 1): boolean {
@@ -420,6 +462,7 @@ function commitDrop(
 ) {
   const plan = readDrop(view, event)
   if (!plan) return
+  if (plan.kind === 'center') return
   if (dragKind === 'group') {
     moveImageGroup(view, from, dropInsertPos(view, plan))
     return
@@ -433,6 +476,15 @@ function commitDrop(
     }
     placeBeside(view, from, plan.imagePos, plan.kind)
     return
+  }
+  if ((plan.kind === 'before' || plan.kind === 'after') && plan.imagePos != null && sameRow(view, from, plan.imagePos)) {
+    const side = plan.kind === 'before' ? 'above' : 'below'
+    if (stackInGroup(view, from, plan.imagePos, side)) return
+    const $target = view.state.doc.resolve(plan.imagePos)
+    if ($target.parent.type.name === 'imageGroup' && $target.parent.childCount === 2) {
+      if (normalizeGroupLayout($target.parent.attrs.layout) === 'rows') return
+      if (setGroupLayout(view, $target.before($target.depth), 'rows')) return
+    }
   }
   extractOrMoveImage(view, from, dropInsertPos(view, plan))
 }
@@ -533,7 +585,7 @@ export function createImageDragPlugin(): Plugin {
             handle.tabIndex = -1
             handle.setAttribute('contenteditable', 'false')
             handle.setAttribute('aria-label', '拖动图片')
-            handle.title = '拖动图片'
+            handle.title = '拖到另一张图的上沿或下沿，可排成 12 或 21'
             frame.appendChild(handle)
           }
           return false
@@ -784,13 +836,10 @@ export function createImageDragPlugin(): Plugin {
           return true
         }
         if (!event.altKey || event.shiftKey || event.metaKey || event.ctrlKey) return false
-        if (event.key === 'ArrowUp') {
+        if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
           event.preventDefault()
-          return nudgeImage(view, -1)
-        }
-        if (event.key === 'ArrowDown') {
-          event.preventDefault()
-          return nudgeImage(view, 1)
+          if (stackByArrow(view, event.key)) return true
+          return nudgeImage(view, event.key === 'ArrowUp' ? -1 : 1)
         }
         if (
           (event.key === 'ArrowLeft' || event.key === 'ArrowRight') &&

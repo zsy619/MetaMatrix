@@ -1,22 +1,32 @@
 import { Extension } from '@tiptap/core'
 import { Plugin } from '@tiptap/pm/state'
+import type { EditorView } from '@tiptap/pm/view'
 import { getToken } from '../api/http'
 import { mediaFetchUrl } from '../utils/mediaPath'
 import { seedMediaThumb } from '../utils/mediaThumb'
+import { applyMediaPlaceholder, placeholderKind } from '../utils/mediaPlaceholder'
 
-const blobs = new Map<string, string>()
-const pending = new Set<string>()
+import {
+  applyMediaBlobToEditor,
+  applyMediaBlobToElement,
+  isMediaHydrateGone,
+  mediaBlobs as blobs,
+  mediaHydrateWaiting,
+  mediaPending as pending,
+  noteMediaHydrateError,
+  noteMediaHydrateStatus,
+  observeMediaBlobRestore,
+  clearMediaHydrateBlobs,
+} from './mediaHydrateState'
 
-/**
- * 释放正文图片的 blob 缓存（登出等场景）。
- *
- * blob: 地址绑定在创建它的文档里，登出后继续留着既占内存，也可能把上一个
- * 会话的预览带给下一个用户，所以登出时统一回收。
- */
-export function clearMediaHydrateBlobs(): void {
-  blobs.forEach((url) => URL.revokeObjectURL(url))
-  blobs.clear()
-  pending.clear()
+// 状态与判定函数都放在 mediaHydrateState（不依赖 TipTap），
+// 这里原样转出，保持既有 import 路径可用。
+export {
+  clearMediaHydrateBlobs,
+  isMediaHydrateGone,
+  mediaHydrateWaiting,
+  noteMediaHydrateError,
+  noteMediaHydrateStatus,
 }
 
 /** Browser fetches go through /api, which the dev server strips before the API. */
@@ -37,28 +47,44 @@ export const MediaHydrate = Extension.create({
             const token = getToken()
             if (!token) return
             const nodes = editorView.dom.querySelectorAll(
-              'img[src^="/media/"], audio[src^="/media/"], video[src^="/media/"]',
+              'img[src^="/media/"], img[data-media-src^="/media/"], audio[src^="/media/"], video[src^="/media/"]',
             )
             nodes.forEach((node) => {
               const el = node as HTMLImageElement
-              const src = el.getAttribute('src') || ''
+              const attr = el.getAttribute('src') || ''
+              // 换成占位图后 src 变成 data URI，真实路径改存在 data-media-src 上
+              const src = el.dataset.mediaSrc || attr
+              if (!src.startsWith('/media/')) return
               const cached = blobs.get(src)
               if (cached) {
                 seedMediaThumb(src, cached)
-                if (el.src !== cached) el.src = cached
+                applyMediaBlobToElement(el, src, cached)
                 return
               }
-              if (!src.startsWith('/media/') || pending.has(src)) return
+              if (isMediaHydrateGone(src)) {
+                markMissing(el)
+                return
+              }
+              // 字节还没到：先换上"正在加载"占位图，别让浏览器画裂图
+              if (el instanceof HTMLImageElement && el.dataset.mediaPlaceholder !== '1') {
+                el.dataset.mediaSrc = src
+                const name = el.getAttribute('alt') || '图片'
+                applyMediaPlaceholder(el, { name, kind: placeholderKind(name), status: 'loading' })
+              }
+              if (pending.has(src) || mediaHydrateWaiting(src)) return
               const id = src.slice('/media/'.length)
               if (!/^[0-9a-zA-Z-]+$/.test(id)) return
               pending.add(src)
-              void hydrate(el, src, id, token).finally(() => pending.delete(src))
+              void hydrate(editorView, el, src, id, token).finally(() => pending.delete(src))
             })
           }
           queueMicrotask(run)
+          // ProseMirror 的节点视图（图片缩放框）会在选中/更新时重建 img 元素，
+          // 新元素又变回文档里的 /media/{id}。观察器负责把缓存里的 blob 贴回去。
+          const stopObserving = observeMediaBlobRestore(editorView.dom)
           return {
             update: run,
-            destroy() {},
+            destroy: stopObserving,
           }
         },
       }),
@@ -66,20 +92,64 @@ export const MediaHydrate = Extension.create({
   },
 })
 
-async function hydrate(el: HTMLImageElement, src: string, id: string, token: string) {
+function markMissing(el: HTMLElement) {
+  el.dataset.mediaMissing = '1'
+  if (!el.title) el.title = '素材已失效或被删除'
+  // 素材没了也要给一张占位图，而不是浏览器裂图
+  if (el instanceof HTMLImageElement && el.dataset.mediaPlaceholder !== '1') {
+    const name = el.getAttribute('alt') || el.dataset.mediaSrc?.split('/').pop() || '图片'
+    applyMediaPlaceholder(el, { name, kind: placeholderKind(name), status: 'missing' })
+  }
+}
+
+async function hydrate(editorView: EditorView, el: HTMLImageElement, src: string, id: string, token: string) {
   const metaUrl = mediaFetchUrl(`/media/${id}`)
   if (!metaUrl) return
-  const metaRes = await fetch(metaUrl, { headers: { Authorization: `Bearer ${token}` } })
-  if (!metaRes.ok) return
-  const meta = (await metaRes.json()) as { previewUrl?: string }
-  const preview = mediaFetchUrl(String(meta.previewUrl || ''))
-  if (!preview) return
-  const fileRes = await fetch(preview, { headers: { Authorization: `Bearer ${token}` } })
-  if (!fileRes.ok) return
+  let metaRes: Response
+  try {
+    metaRes = await fetch(metaUrl, { headers: { Authorization: `Bearer ${token}` } })
+  } catch {
+    noteMediaHydrateError(src)
+    return
+  }
+  const outcome = noteMediaHydrateStatus(src, metaRes.status)
+  if (outcome === 'gone') {
+    markMissing(el)
+    return
+  }
+  if (outcome !== 'ok') return
+  let preview = ''
+  try {
+    const meta = (await metaRes.json()) as { previewUrl?: string }
+    preview = mediaFetchUrl(String(meta.previewUrl || '')) || ''
+  } catch {
+    noteMediaHydrateError(src)
+    return
+  }
+  if (!preview) {
+    noteMediaHydrateError(src)
+    return
+  }
+  let fileRes: Response
+  try {
+    fileRes = await fetch(preview, { headers: { Authorization: `Bearer ${token}` } })
+  } catch {
+    noteMediaHydrateError(src)
+    return
+  }
+  const fileOutcome = noteMediaHydrateStatus(src, fileRes.status)
+  if (fileOutcome === 'gone') {
+    markMissing(el)
+    return
+  }
+  if (fileOutcome !== 'ok') return
   const blobUrl = URL.createObjectURL(await fileRes.blob())
   const old = blobs.get(src)
   if (old) URL.revokeObjectURL(old)
   blobs.set(src, blobUrl)
   seedMediaThumb(src, blobUrl)
-  if (el.isConnected && (el.getAttribute('src') || '').startsWith('/media/')) el.src = blobUrl
+  // 先贴当前文档里所有同源元素（元素可能已被 ProseMirror 重建过），
+  // 再补发起请求的那个元素，避免它被换掉后写到废弃节点上。
+  applyMediaBlobToEditor(editorView.dom, src, blobUrl)
+  if (el.isConnected) applyMediaBlobToElement(el, src, blobUrl)
 }

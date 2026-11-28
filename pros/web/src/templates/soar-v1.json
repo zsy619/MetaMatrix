@@ -1,0 +1,13 @@
+{
+  "id": "canvas_soar",
+  "type": "soar",
+  "schemaVersion": 1,
+  "theme": { "background": { "pattern": "none", "color": "#f7f7f7" }, "page": "#f7f7f7", "frame": "#ececec", "hairline": "rgba(60, 50, 20, 0.08)" },
+  "title": "SOAR",
+  "blocks": [
+    { "id": "strengths", "title": "优势", "hint": "现在已经做得好的", "items": [{ "id": "soar_s", "text": "甘特图、看板和利润表已经能放在一起看" }] },
+    { "id": "opportunities", "title": "机会", "hint": "外部可以接住的需求", "items": [{ "id": "soar_o", "text": "战略讨论还散在聊天记录里" }] },
+    { "id": "aspirations", "title": "愿景", "hint": "想成为什么样", "items": [{ "id": "soar_a", "text": "一次会写完选择，下周还能打开同一页" }] },
+    { "id": "results", "title": "成果", "hint": "怎样知道做到了", "items": [{ "id": "soar_r", "text": "新客户第一次会议就用上制胜选择" }] }
+  ]
+}

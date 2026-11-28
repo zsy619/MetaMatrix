@@ -1,2 +1,9 @@
 allowBuilds:
   core-js: set this to true or false
+  esbuild: set this to true or false
+overrides:
+  prosemirror-view: 1.42.7
+  prosemirror-state: 1.4.4
+  prosemirror-model: 1.25.12
+minimumReleaseAgeExclude:
+  - vxe-table@4.24.5

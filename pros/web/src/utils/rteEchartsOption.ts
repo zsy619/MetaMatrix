@@ -13,7 +13,9 @@
  * - 任何「被截断」的情况（数组超长、字符串超长、层级过深、系列数超限）
  *   一律按错误返回，绝不静默截断后当成功——用户拿到的图表必须和自己写的一致。
  */
+import { optionToDataModel } from './echarts/chartDataTable'
 import { ECHARTS_CATEGORIES, ECHARTS_TEMPLATES, findEchartsTemplate } from './echarts/templates'
+import { FEISHU_TEXT_COLORS } from './rtePasteClean'
 import type { EchartsTemplateDef } from './echarts/types'
 import { CUSTOM_RENDER_ITEM_IDS } from './echarts/customRenderItems'
 
@@ -147,6 +149,7 @@ const ARIA_DECAL_KEYS: readonly string[] = ['show']
 
 const STYLE_KEYS: readonly string[] = [
   'color',
+  'curveness',
   'backgroundColor',
   'borderColor',
   'borderWidth',
@@ -527,8 +530,12 @@ const CHILD_KEYS: Record<string, readonly string[]> = {
     'min',
     'max',
     'interval',
+    'minInterval',
+    'splitNumber',
     'log',
+    'logBase',
     'inverse',
+    'scale',
     'show',
     'position',
     'offset',
@@ -555,8 +562,12 @@ const CHILD_KEYS: Record<string, readonly string[]> = {
     'min',
     'max',
     'interval',
+    'minInterval',
+    'splitNumber',
     'log',
+    'logBase',
     'inverse',
+    'scale',
     'show',
     'position',
     'offset',
@@ -1166,6 +1177,10 @@ function sanitizeSeriesData(raw: unknown, state: SanitizeState): unknown[] {
       out.push(sanitizeDataItemObject(item, state))
       continue
     }
+    if (item == null) {
+      out.push(null)
+      continue
+    }
     // 其他类型直接丢弃
   }
   return out
@@ -1464,25 +1479,546 @@ function toNumber(value: string): number | null {
 const SAMPLE_LABELS = ['一月', '二月', '三月', '四月', '五月', '六月']
 
 /** 内置示例数据的柱状/折线 option。 */
+function categoryOnYAxis(option: Record<string, unknown>): boolean {
+  const raw = option.yAxis
+  const axes = Array.isArray(raw) ? raw : raw ? [raw] : []
+  return axes.some((axis) => {
+    if (!isPlainObject(axis)) return false
+    if (axis.type === 'value' || axis.type === 'time' || axis.type === 'log') return false
+    return axis.type === 'category' || Array.isArray(axis.data)
+  })
+}
+
+function seriesLabelAt(
+  option: Record<string, unknown>,
+  index: number,
+): { show: true; position?: string; formatter?: string } | undefined {
+  const series = option.series
+  if (!Array.isArray(series)) return undefined
+  const item = series[index]
+  if (!isPlainObject(item) || !isPlainObject(item.label) || item.label.show !== true) return undefined
+  const label: { show: true; position?: string; formatter?: string } = { show: true }
+  if (typeof item.label.position === 'string' && item.label.position.trim()) label.position = item.label.position.trim()
+  if (typeof item.label.formatter === 'string') {
+    const formatter = item.label.formatter.trim()
+    if (formatter && !/javascript:|function\s*\(/i.test(formatter)) label.formatter = formatter
+  }
+  return label
+}
+
+const LINE_SYMBOLS = new Set(['circle', 'rect', 'roundRect', 'triangle', 'diamond', 'pin', 'arrow', 'none'])
+
+function seriesSymbolAt(
+  option: Record<string, unknown>,
+  index: number,
+): { symbol?: string; symbolSize?: number | string } | undefined {
+  const series = option.series
+  if (!Array.isArray(series)) return undefined
+  const item = series[index]
+  if (!isPlainObject(item)) return undefined
+  const mark: { symbol?: string; symbolSize?: number | string } = {}
+  if (typeof item.symbol === 'string' && LINE_SYMBOLS.has(item.symbol)) mark.symbol = item.symbol
+  const size = item.symbolSize
+  if (typeof size === 'number' && Number.isFinite(size) && size > 0 && size <= 80) mark.symbolSize = size
+  else if (typeof size === 'string' && /^\d+(\.\d+)?px$/.test(size.trim())) mark.symbolSize = size.trim()
+  return mark.symbol || mark.symbolSize != null ? mark : undefined
+}
+
+function seriesShowSymbol(option: Record<string, unknown>, index: number): boolean | undefined {
+  const series = option.series
+  if (!Array.isArray(series)) return undefined
+  const item = series[index]
+  if (!isPlainObject(item)) return undefined
+  if (item.showSymbol === false) return false
+  if (item.showSymbol === true) return true
+  return undefined
+}
+
+function seriesLineStyleAt(
+  option: Record<string, unknown>,
+  index: number,
+): { width?: number; type?: 'solid' | 'dashed' | 'dotted' } | undefined {
+  const series = option.series
+  if (!Array.isArray(series)) return undefined
+  const item = series[index]
+  if (!isPlainObject(item) || !isPlainObject(item.lineStyle)) return undefined
+  const style: { width?: number; type?: 'solid' | 'dashed' | 'dotted' } = {}
+  if (typeof item.lineStyle.width === 'number' && Number.isFinite(item.lineStyle.width) && item.lineStyle.width > 0 && item.lineStyle.width <= 16) {
+    style.width = item.lineStyle.width
+  }
+  if (item.lineStyle.type === 'solid' || item.lineStyle.type === 'dashed' || item.lineStyle.type === 'dotted') {
+    style.type = item.lineStyle.type
+  }
+  return style.width != null || style.type ? style : undefined
+}
+
+function seriesStepAt(option: Record<string, unknown>, index: number): true | 'start' | 'middle' | 'end' | undefined {
+  const series = option.series
+  if (!Array.isArray(series)) return undefined
+  const item = series[index]
+  if (!isPlainObject(item)) return undefined
+  if (item.step === true || item.step === 'start' || item.step === 'middle' || item.step === 'end') return item.step
+  return undefined
+}
+
+function seriesBarGap(option: Record<string, unknown>, index: number, key: 'barGap' | 'barCategoryGap'): string | undefined {
+  const series = option.series
+  if (!Array.isArray(series)) return undefined
+  const item = series[index]
+  if (!isPlainObject(item)) return undefined
+  const value = item[key]
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value)
+  if (typeof value === 'string' && /^-?\d+(\.\d+)?%?$/.test(value.trim())) return value.trim()
+  return undefined
+}
+
+function seriesBarMeasure(option: Record<string, unknown>, index: number, key: 'barWidth' | 'barMaxWidth'): string | number | undefined {
+  const series = option.series
+  if (!Array.isArray(series)) return undefined
+  const item = series[index]
+  if (!isPlainObject(item)) return undefined
+  const value = item[key]
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) return value
+  if (typeof value === 'string') {
+    const text = value.trim()
+    if (/^\d+(\.\d+)?(%|px)?$/.test(text)) return text
+  }
+  return undefined
+}
+
+function seriesColorAt(option: Record<string, unknown>, index: number): string | undefined {
+  const series = option.series
+  if (!Array.isArray(series)) return undefined
+  const item = series[index]
+  if (!isPlainObject(item)) return undefined
+  const style = item.itemStyle
+  if (!isPlainObject(style) || typeof style.color !== 'string') return undefined
+  const color = style.color.trim()
+  if (!color || /url\(|expression\(|javascript:/i.test(color)) return undefined
+  return color
+}
+
+function seriesStackAt(option: Record<string, unknown>, index: number): string | undefined {
+  const series = option.series
+  if (!Array.isArray(series)) return undefined
+  const item = series[index]
+  if (!isPlainObject(item) || typeof item.stack !== 'string') return undefined
+  const stack = item.stack.trim()
+  return stack || undefined
+}
+
+function tooltipLayout(option: Record<string, unknown>): Record<string, unknown> {
+  const place: Record<string, unknown> = { trigger: 'axis' }
+  const tooltip = option.tooltip
+  if (!isPlainObject(tooltip)) return place
+  if (tooltip.trigger === 'item' || tooltip.trigger === 'axis' || tooltip.trigger === 'none') place.trigger = tooltip.trigger
+  if (typeof tooltip.confine === 'boolean') place.confine = tooltip.confine
+  if (typeof tooltip.show === 'boolean') place.show = tooltip.show
+  for (const key of ['backgroundColor', 'borderColor'] as const) {
+    const value = tooltip[key]
+    if (typeof value === 'string' && value.trim() && value.length <= 40 && !/url\(|expression\(/i.test(value)) {
+      place[key] = value.trim()
+    }
+  }
+  if (typeof tooltip.borderWidth === 'number' && Number.isFinite(tooltip.borderWidth)) place.borderWidth = tooltip.borderWidth
+  return place
+}
+
+function gridMargins(option: Record<string, unknown>): Record<string, unknown> | undefined {
+  const grid = option.grid
+  if (!isPlainObject(grid)) return undefined
+  const place: Record<string, unknown> = {}
+  for (const key of ['left', 'right', 'top', 'bottom'] as const) {
+    const value = grid[key]
+    if (typeof value === 'string' && value.trim()) place[key] = value.trim()
+    else if (typeof value === 'number' && Number.isFinite(value)) place[key] = value
+  }
+  if (grid.containLabel === false) place.containLabel = false
+  return Object.keys(place).length ? place : undefined
+}
+
+function lineLooks(option: Record<string, unknown>): Array<{ straight: boolean; filled: boolean } | null> {
+  if (!Array.isArray(option.series)) return []
+  return option.series.map((item) => {
+    if (!isPlainObject(item) || item.type !== 'line') return null
+    return { straight: item.smooth !== true, filled: isPlainObject(item.areaStyle) }
+  })
+}
+
+function legendLayout(option: Record<string, unknown>): Record<string, unknown> {
+  const legend = option.legend
+  const place: Record<string, unknown> = {}
+  if (isPlainObject(legend)) {
+    for (const key of ['left', 'top', 'right', 'bottom', 'orient'] as const) {
+      const value = legend[key]
+      if (typeof value === 'string' && value.trim()) place[key] = value.trim()
+      else if (typeof value === 'number' && Number.isFinite(value)) place[key] = value
+    }
+  }
+  if (!('left' in place) && !('right' in place) && !('top' in place) && !('bottom' in place)) place.bottom = 0
+  return place
+}
+
+function axisNameLayout(axis: unknown): { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique'; family?: string; leading?: number; alignTo?: 'left' | 'center' | 'right'; valign?: 'top' | 'middle' | 'bottom'; clip?: 'none' | 'truncate' | 'break' | 'breakAll'; badge?: string; box?: number; edge?: string; stroke?: number; radius?: number; pad?: number } {
+  const node = Array.isArray(axis) ? axis[0] : axis
+  if (!isPlainObject(node)) return {}
+  const place: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique'; family?: string; leading?: number; alignTo?: 'left' | 'center' | 'right'; valign?: 'top' | 'middle' | 'bottom'; clip?: 'none' | 'truncate' | 'break' | 'breakAll'; badge?: string; box?: number; edge?: string; stroke?: number; radius?: number; pad?: number } = {}
+  if (node.nameLocation === 'start' || node.nameLocation === 'middle' || node.nameLocation === 'end') {
+    place.location = node.nameLocation
+  }
+  if (typeof node.nameGap === 'number' && Number.isFinite(node.nameGap)) {
+    place.gap = Math.max(0, Math.min(80, node.nameGap))
+  }
+  if (typeof node.nameRotate === 'number' && Number.isFinite(node.nameRotate)) {
+    place.rotate = Math.max(-90, Math.min(90, node.nameRotate))
+  }
+  const style = node.nameTextStyle
+  if (isPlainObject(style) && typeof style.fontSize === 'number' && Number.isFinite(style.fontSize)) {
+    place.font = Math.max(8, Math.min(72, Math.round(style.fontSize)))
+  }
+  if (isPlainObject(style) && typeof style.color === 'string') {
+    const color = style.color.trim()
+    if (/^#[0-9a-fA-F]{3,8}$/.test(color) || /^rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}(?:\s*,\s*(?:0|1|0?\.\d+))?\s*\)$/i.test(color)) {
+      place.ink = color
+    }
+  }
+  if (isPlainObject(style)) {
+    const weight = style.fontWeight
+    if (weight === 'normal' || weight === 'bold' || weight === 'bolder' || weight === 'lighter') place.weight = weight
+    else if (typeof weight === 'number' && Number.isFinite(weight)) {
+      const next = Math.round(weight)
+      if (next >= 100 && next <= 900) place.weight = next
+    }
+    const slant = style.fontStyle
+    if (slant === 'normal' || slant === 'italic' || slant === 'oblique') place.slant = slant
+    if (typeof style.fontFamily === 'string') {
+      const family = style.fontFamily.trim()
+      if (family && family.length <= 40 && !/url\(|expression\(|javascript:|;/i.test(family)) place.family = family
+    }
+    if (typeof style.lineHeight === 'number' && Number.isFinite(style.lineHeight)) {
+      const leading = Math.round(style.lineHeight)
+      if (leading >= 8 && leading <= 80) place.leading = leading
+    }
+    if (style.align === 'left' || style.align === 'center' || style.align === 'right') place.alignTo = style.align
+    if (style.verticalAlign === 'top' || style.verticalAlign === 'middle' || style.verticalAlign === 'bottom') place.valign = style.verticalAlign
+    if (style.overflow === 'none' || style.overflow === 'truncate' || style.overflow === 'break' || style.overflow === 'breakAll') place.clip = style.overflow
+    if (typeof style.backgroundColor === 'string') {
+      const badge = style.backgroundColor.trim()
+      if (/^#[0-9a-fA-F]{3,8}$/.test(badge) || /^rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}(?:\s*,\s*(?:0|1|0?\.\d+))?\s*\)$/i.test(badge)) {
+        place.badge = badge
+      }
+    }
+    if (typeof style.width === 'number' && Number.isFinite(style.width)) {
+      const box = Math.round(style.width)
+      if (box >= 8 && box <= 400) place.box = box
+    }
+    if (typeof style.borderColor === 'string') {
+      const edge = style.borderColor.trim()
+      if (/^#[0-9a-fA-F]{3,8}$/.test(edge) || /^rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}(?:\s*,\s*(?:0|1|0?\.\d+))?\s*\)$/i.test(edge)) {
+        place.edge = edge
+      }
+    }
+    if (typeof style.borderWidth === 'number' && Number.isFinite(style.borderWidth)) {
+      const stroke = Math.round(style.borderWidth)
+      if (stroke >= 0 && stroke <= 16) place.stroke = stroke
+    }
+    if (typeof style.borderRadius === 'number' && Number.isFinite(style.borderRadius)) {
+      const radius = Math.round(style.borderRadius)
+      if (radius >= 0 && radius <= 24) place.radius = radius
+    }
+    if (typeof style.padding === 'number' && Number.isFinite(style.padding)) {
+      const pad = Math.round(style.padding)
+      if (pad >= 0 && pad <= 40) place.pad = pad
+    }
+  }
+  return place
+}
+
+function axisNameTextStyle(place?: { font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique'; family?: string; leading?: number; alignTo?: 'left' | 'center' | 'right'; valign?: 'top' | 'middle' | 'bottom'; clip?: 'none' | 'truncate' | 'break' | 'breakAll'; badge?: string; box?: number; edge?: string; stroke?: number; radius?: number; pad?: number }): { fontSize?: number; color?: string; fontWeight?: string | number; fontStyle?: 'normal' | 'italic' | 'oblique'; fontFamily?: string; lineHeight?: number; align?: 'left' | 'center' | 'right'; verticalAlign?: 'top' | 'middle' | 'bottom'; overflow?: 'none' | 'truncate' | 'break' | 'breakAll'; backgroundColor?: string; width?: number; borderColor?: string; borderWidth?: number; borderRadius?: number; padding?: number } | undefined {
+  if (!place || (place.font == null && !place.ink && place.weight == null && !place.slant && !place.family && place.leading == null && !place.alignTo && !place.valign && !place.clip && !place.badge && place.box == null && !place.edge && place.stroke == null && place.radius == null && place.pad == null)) return undefined
+  return {
+    ...(place.font != null ? { fontSize: place.font } : {}),
+    ...(place.ink ? { color: place.ink } : {}),
+    ...(place.weight != null ? { fontWeight: place.weight } : {}),
+    ...(place.slant ? { fontStyle: place.slant } : {}),
+    ...(place.family ? { fontFamily: place.family } : {}),
+    ...(place.leading != null ? { lineHeight: place.leading } : {}),
+    ...(place.alignTo ? { align: place.alignTo } : {}),
+    ...(place.valign ? { verticalAlign: place.valign } : {}),
+    ...(place.clip ? { overflow: place.clip } : {}),
+    ...(place.badge ? { backgroundColor: place.badge } : {}),
+    ...(place.box != null ? { width: place.box } : {}),
+    ...(place.edge ? { borderColor: place.edge } : {}),
+    ...(place.stroke != null ? { borderWidth: place.stroke } : {}),
+    ...(place.radius != null ? { borderRadius: place.radius } : {}),
+    ...(place.pad != null ? { padding: place.pad } : {}),
+  }
+}
+
+function cartesianNameLayout(option: Record<string, unknown>): {
+  category: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique'; family?: string; leading?: number; alignTo?: 'left' | 'center' | 'right'; valign?: 'top' | 'middle' | 'bottom'; clip?: 'none' | 'truncate' | 'break' | 'breakAll'; badge?: string; box?: number; edge?: string; stroke?: number; radius?: number; pad?: number }
+  value: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique'; family?: string; leading?: number; alignTo?: 'left' | 'center' | 'right'; valign?: 'top' | 'middle' | 'bottom'; clip?: 'none' | 'truncate' | 'break' | 'breakAll'; badge?: string; box?: number; edge?: string; stroke?: number; radius?: number; pad?: number }
+} {
+  const horizontal = categoryOnYAxis(option)
+  return {
+    category: axisNameLayout(horizontal ? option.yAxis : option.xAxis),
+    value: axisNameLayout(horizontal ? option.xAxis : option.yAxis),
+  }
+}
+
+function valueSplitAreaShown(option: Record<string, unknown>): boolean {
+  const axis = categoryOnYAxis(option) ? option.xAxis : option.yAxis
+  const node = Array.isArray(axis) ? axis[0] : axis
+  return isPlainObject(node) && isPlainObject(node.splitArea) && node.splitArea.show === true
+}
+
+function legendHidden(option: Record<string, unknown>): boolean {
+  return isPlainObject(option.legend) && option.legend.show === false
+}
+
+function categorySplitLineHidden(option: Record<string, unknown>): boolean {
+  const axis = categoryOnYAxis(option) ? option.yAxis : option.xAxis
+  const node = Array.isArray(axis) ? axis[0] : axis
+  return isPlainObject(node) && isPlainObject(node.splitLine) && node.splitLine.show === false
+}
+
+function valueAxisLabelHidden(option: Record<string, unknown>): boolean {
+  const axis = categoryOnYAxis(option) ? option.xAxis : option.yAxis
+  const node = Array.isArray(axis) ? axis[0] : axis
+  return isPlainObject(node) && isPlainObject(node.axisLabel) && node.axisLabel.show === false
+}
+
+function valueAxisTickHidden(option: Record<string, unknown>): boolean {
+  const axis = categoryOnYAxis(option) ? option.xAxis : option.yAxis
+  const node = Array.isArray(axis) ? axis[0] : axis
+  return isPlainObject(node) && isPlainObject(node.axisTick) && node.axisTick.show === false
+}
+
+function categoryAxisLabelHidden(option: Record<string, unknown>): boolean {
+  const axis = categoryOnYAxis(option) ? option.yAxis : option.xAxis
+  const node = Array.isArray(axis) ? axis[0] : axis
+  return isPlainObject(node) && isPlainObject(node.axisLabel) && node.axisLabel.show === false
+}
+
+function valueAxisLineHidden(option: Record<string, unknown>): boolean {
+  const axis = categoryOnYAxis(option) ? option.xAxis : option.yAxis
+  const node = Array.isArray(axis) ? axis[0] : axis
+  return isPlainObject(node) && isPlainObject(node.axisLine) && node.axisLine.show === false
+}
+
+function categoryAxisTickHidden(option: Record<string, unknown>): boolean {
+  const axis = categoryOnYAxis(option) ? option.yAxis : option.xAxis
+  const node = Array.isArray(axis) ? axis[0] : axis
+  return isPlainObject(node) && isPlainObject(node.axisTick) && node.axisTick.show === false
+}
+
+function categoryAxisLineHidden(option: Record<string, unknown>): boolean {
+  const axis = categoryOnYAxis(option) ? option.yAxis : option.xAxis
+  const node = Array.isArray(axis) ? axis[0] : axis
+  return isPlainObject(node) && isPlainObject(node.axisLine) && node.axisLine.show === false
+}
+
+function valueSplitLineHidden(option: Record<string, unknown>): boolean {
+  const axis = categoryOnYAxis(option) ? option.xAxis : option.yAxis
+  const node = Array.isArray(axis) ? axis[0] : axis
+  return isPlainObject(node) && isPlainObject(node.splitLine) && node.splitLine.show === false
+}
+
+function categoryBoundaryGap(option: Record<string, unknown>): boolean | undefined {
+  const axis = categoryOnYAxis(option) ? option.yAxis : option.xAxis
+  const node = Array.isArray(axis) ? axis[0] : axis
+  if (!isPlainObject(node)) return undefined
+  if (node.boundaryGap === false) return false
+  if (node.boundaryGap === true) return true
+  return undefined
+}
+
+function categoryLabelRotate(option: Record<string, unknown>): number | undefined {
+  const axis = categoryOnYAxis(option) ? option.yAxis : option.xAxis
+  const node = Array.isArray(axis) ? axis[0] : axis
+  if (!isPlainObject(node) || !isPlainObject(node.axisLabel)) return undefined
+  const rotate = node.axisLabel.rotate
+  if (typeof rotate !== 'number' || !Number.isFinite(rotate) || rotate === 0) return undefined
+  return Math.max(-90, Math.min(90, rotate))
+}
+
+function valueAxisScale(option: Record<string, unknown>): { interval?: number; minInterval?: number; inverse?: boolean; log?: boolean; logBase?: number; fromData?: boolean; side?: 'left' | 'right' | 'top' | 'bottom'; shift?: number; hidden?: boolean; parts?: number } {
+  const horizontal = categoryOnYAxis(option)
+  const axis = horizontal ? option.xAxis : option.yAxis
+  const node = Array.isArray(axis) ? axis[0] : axis
+  if (!isPlainObject(node)) return {}
+  const scale: { interval?: number; minInterval?: number; inverse?: boolean; log?: boolean; logBase?: number; fromData?: boolean; side?: 'left' | 'right' | 'top' | 'bottom'; shift?: number; hidden?: boolean; parts?: number } = {}
+  if (typeof node.interval === 'number' && Number.isFinite(node.interval) && node.interval > 0) scale.interval = node.interval
+  if (typeof node.minInterval === 'number' && Number.isFinite(node.minInterval) && node.minInterval > 0) scale.minInterval = node.minInterval
+  if (node.inverse === true) scale.inverse = true
+  if (node.scale === true) scale.fromData = true
+  const pos = node.position
+  if ((horizontal && (pos === 'top' || pos === 'bottom')) || (!horizontal && (pos === 'left' || pos === 'right'))) {
+    scale.side = pos
+  }
+  if (typeof node.offset === 'number' && Number.isFinite(node.offset) && node.offset !== 0) {
+    scale.shift = Math.max(-200, Math.min(200, node.offset))
+  }
+  if (node.show === false) scale.hidden = true
+  if (typeof node.splitNumber === 'number' && Number.isFinite(node.splitNumber)) {
+    const parts = Math.round(node.splitNumber)
+    if (parts >= 1 && parts <= 20) scale.parts = parts
+  }
+  if (node.type === 'log') scale.log = true
+  if (typeof node.logBase === 'number' && Number.isFinite(node.logBase) && node.logBase > 0 && node.logBase !== 1) {
+    scale.logBase = node.logBase
+  }
+  return scale
+}
+
+function valueAxisBounds(option: Record<string, unknown>): { min?: number; max?: number } {
+  const axis = categoryOnYAxis(option) ? option.xAxis : option.yAxis
+  const node = Array.isArray(axis) ? axis[0] : axis
+  if (!isPlainObject(node)) return {}
+  const read = (key: 'min' | 'max') => {
+    const value = node[key]
+    if (typeof value === 'number' && Number.isFinite(value)) return value
+    if (typeof value === 'string' && value.trim() && Number.isFinite(Number(value.trim()))) return Number(value.trim())
+    return undefined
+  }
+  const min = read('min')
+  const max = read('max')
+  if (min != null && max != null && min > max) return {}
+  return { min, max }
+}
+
+function axisTitle(axis: unknown): string | undefined {
+  const node = Array.isArray(axis) ? axis[0] : axis
+  if (!isPlainObject(node) || typeof node.name !== 'string') return undefined
+  const name = node.name.trim()
+  return name || undefined
+}
+
+function cartesianAxisNames(option: Record<string, unknown>): { category?: string; value?: string } {
+  const horizontal = categoryOnYAxis(option)
+  return {
+    category: axisTitle(horizontal ? option.yAxis : option.xAxis),
+    value: axisTitle(horizontal ? option.xAxis : option.yAxis),
+  }
+}
+
 function buildCartesianOption(
   type: 'bar' | 'line',
   title: string,
   labels: string[],
-  series: Array<{ name: string; data: number[] }>,
+  series: Array<{
+    name: string
+    data: Array<number | null>
+    stack?: string
+    color?: string
+    label?: { show: true; position?: string; formatter?: string }
+    barWidth?: string | number
+    barMaxWidth?: string | number
+    barGap?: string
+    barCategoryGap?: string
+    step?: true | 'start' | 'middle' | 'end'
+    symbol?: string
+    symbolSize?: number | string
+    lineStyle?: { width?: number; type?: 'solid' | 'dashed' | 'dotted' }
+    showSymbol?: boolean
+  }>,
+  horizontal = false,
+  names?: { category?: string; value?: string },
+  bounds?: { min?: number; max?: number },
+  categoryRotate?: number,
+  legendPlace?: Record<string, unknown>,
+  looks?: Array<{ straight: boolean; filled: boolean } | null>,
+  margins?: Record<string, unknown>,
+  tip?: Record<string, unknown>,
+  scale?: { interval?: number; minInterval?: number; inverse?: boolean; log?: boolean; logBase?: number; fromData?: boolean; side?: 'left' | 'right' | 'top' | 'bottom'; shift?: number; hidden?: boolean; parts?: number },
+  boundaryGap?: boolean,
+  namePlace?: {
+    category: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique'; family?: string; leading?: number; alignTo?: 'left' | 'center' | 'right'; valign?: 'top' | 'middle' | 'bottom'; clip?: 'none' | 'truncate' | 'break' | 'breakAll'; badge?: string; box?: number; edge?: string; stroke?: number; radius?: number; pad?: number }
+    value: { location?: 'start' | 'middle' | 'end'; gap?: number; rotate?: number; font?: number; ink?: string; weight?: string | number; slant?: 'normal' | 'italic' | 'oblique'; family?: string; leading?: number; alignTo?: 'left' | 'center' | 'right'; valign?: 'top' | 'middle' | 'bottom'; clip?: 'none' | 'truncate' | 'break' | 'breakAll'; badge?: string; box?: number; edge?: string; stroke?: number; radius?: number; pad?: number }
+  },
+  hideValueSplitLine = false,
+  hideCategoryAxisLine = false,
+  showValueSplitArea = false,
+  hideCategoryAxisTick = false,
+  hideValueAxisLine = false,
+  hideCategoryAxisLabel = false,
+  hideValueAxisTick = false,
+  hideValueAxisLabel = false,
+  hideCategorySplitLine = false,
+  hideLegend = false,
 ): Record<string, unknown> {
+  const category = {
+    type: 'category' as const,
+    data: labels,
+    axisTick: hideCategoryAxisTick ? { alignWithLabel: true, show: false } : { alignWithLabel: true },
+    ...(names?.category ? { name: names.category } : {}),
+    ...(categoryRotate != null || hideCategoryAxisLabel
+      ? {
+          axisLabel: {
+            ...(categoryRotate != null ? { rotate: categoryRotate } : {}),
+            ...(hideCategoryAxisLabel ? { show: false } : {}),
+          },
+        }
+      : {}),
+    ...(boundaryGap != null ? { boundaryGap } : {}),
+    ...(hideCategoryAxisLine ? { axisLine: { show: false } } : {}),
+    ...(hideCategorySplitLine ? { splitLine: { show: false } } : {}),
+    ...(namePlace?.category.location ? { nameLocation: namePlace.category.location } : {}),
+    ...(namePlace?.category.gap != null ? { nameGap: namePlace.category.gap } : {}),
+    ...(namePlace?.category.rotate != null ? { nameRotate: namePlace.category.rotate } : {}),
+    ...(axisNameTextStyle(namePlace?.category) ? { nameTextStyle: axisNameTextStyle(namePlace?.category) } : {}),
+  }
+  const value = {
+    type: scale?.log ? ('log' as const) : ('value' as const),
+    name: names?.value || '数值',
+    ...(bounds?.min != null ? { min: bounds.min } : {}),
+    ...(bounds?.max != null ? { max: bounds.max } : {}),
+    ...(scale?.interval != null ? { interval: scale.interval } : {}),
+    ...(scale?.minInterval != null ? { minInterval: scale.minInterval } : {}),
+    ...(scale?.inverse ? { inverse: true } : {}),
+    ...(scale?.fromData ? { scale: true } : {}),
+    ...(scale?.side ? { position: scale.side } : {}),
+    ...(scale?.shift != null ? { offset: scale.shift } : {}),
+    ...(scale?.hidden ? { show: false } : {}),
+    ...(scale?.parts != null ? { splitNumber: scale.parts } : {}),
+    ...(scale?.logBase != null ? { logBase: scale.logBase } : {}),
+    ...(namePlace?.value.location ? { nameLocation: namePlace.value.location } : {}),
+    ...(namePlace?.value.gap != null ? { nameGap: namePlace.value.gap } : {}),
+    ...(namePlace?.value.rotate != null ? { nameRotate: namePlace.value.rotate } : {}),
+    ...(axisNameTextStyle(namePlace?.value) ? { nameTextStyle: axisNameTextStyle(namePlace?.value) } : {}),
+    ...(hideValueSplitLine ? { splitLine: { show: false } } : {}),
+    ...(showValueSplitArea ? { splitArea: { show: true } } : {}),
+    ...(hideValueAxisLine ? { axisLine: { show: false } } : {}),
+    ...(hideValueAxisTick ? { axisTick: { show: false } } : {}),
+    ...(hideValueAxisLabel ? { axisLabel: { show: false } } : {}),
+  }
   return {
+    color: FEISHU_TEXT_COLORS.filter((item) => item !== '#1f2329' && item !== '#8f959e'),
     title: { text: title, left: 'center' },
-    tooltip: { trigger: 'axis' },
-    legend: { data: series.map((item) => item.name), bottom: 0 },
-    grid: { left: 48, right: 24, top: 48, bottom: 56, containLabel: true },
-    xAxis: { type: 'category', data: labels, axisTick: { alignWithLabel: true } },
-    yAxis: { type: 'value', name: '数值' },
-    series: series.map((item) => ({
+    tooltip: tip || { trigger: 'axis' },
+    legend: { ...(legendPlace || { bottom: 0 }), data: series.map((item) => item.name), ...(hideLegend ? { show: false } : {}) },
+    grid: { left: 48, right: 24, top: 48, bottom: 56, containLabel: true, ...(margins || {}) },
+    xAxis: horizontal ? value : category,
+    yAxis: horizontal ? category : value,
+    series: series.map((item, index) => ({
       name: item.name,
       type,
       data: item.data,
-      smooth: type === 'line' ? true : undefined,
-      areaStyle: type === 'line' ? { opacity: 0.12 } : undefined,
+      ...(item.stack ? { stack: item.stack } : {}),
+      ...(item.color ? { itemStyle: { color: item.color } } : {}),
+      ...(item.label ? { label: item.label } : {}),
+      ...(item.barWidth != null ? { barWidth: item.barWidth } : {}),
+      ...(item.barMaxWidth != null ? { barMaxWidth: item.barMaxWidth } : {}),
+      ...(item.barGap ? { barGap: item.barGap } : {}),
+      ...(item.barCategoryGap ? { barCategoryGap: item.barCategoryGap } : {}),
+      ...(item.step != null ? { step: item.step } : {}),
+      ...(item.symbol ? { symbol: item.symbol } : {}),
+      ...(item.symbolSize != null ? { symbolSize: item.symbolSize } : {}),
+      ...(item.lineStyle ? { lineStyle: item.lineStyle } : {}),
+      ...(item.showSymbol != null ? { showSymbol: item.showSymbol } : {}),
+      smooth: type === 'line' ? looks?.[index]?.straight !== true : undefined,
+      areaStyle:
+        type === 'line' && (looks?.[index] ? looks[index]!.filled : true) ? { opacity: 0.12 } : undefined,
     })),
   }
 }
@@ -1647,6 +2183,44 @@ export function cloneEchartsOption(option: unknown): unknown {
 /**
  * 换图表类型：沿用标题，柱状/折线之间切换时尽量保留原数据。
  */
+function asChartNumber(value: number | string | null): number | null {
+  if (value == null) return null
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  const text = String(value).trim()
+  if (!text) return null
+  const percent = text.endsWith('%')
+  const body = (percent ? text.slice(0, -1) : text).replace(/,/g, '').trim()
+  const num = Number(body)
+  if (!Number.isFinite(num)) return null
+  return percent ? num / 100 : num
+}
+
+function buildPieFromModel(
+  title: string,
+  seriesName: string,
+  categories: string[],
+  values: Array<number | string>,
+): Record<string, unknown> {
+  return {
+    title: { text: title || '占比构成', left: 'center' },
+    tooltip: { trigger: 'item' },
+    legend: { bottom: 0 },
+    series: [
+      {
+        name: seriesName || '占比',
+        type: 'pie',
+        radius: ['38%', '64%'],
+        center: ['50%', '46%'],
+        label: { formatter: '{b} {d}%' },
+        data: categories.map((name, index) => ({
+          name: name || '数据',
+          value: asChartNumber(values[index] ?? 0) ?? 0,
+        })),
+      },
+    ],
+  }
+}
+
 export function retypeEchartsOption(
   option: Record<string, unknown>,
   type: EchartsChartType,
@@ -1656,15 +2230,55 @@ export function retypeEchartsOption(
   const titleNode = base.title
   const titleText =
     isPlainObject(titleNode) && typeof titleNode.text === 'string' ? titleNode.text : ''
-  const next = buildTemplateOption(type, { title: titleText })
-  const oldSeries = Array.isArray(base.series) ? base.series : []
-  const newSeries = Array.isArray(next.series) ? (next.series as Array<Record<string, unknown>>) : []
-  if ((type === 'bar' || type === 'line') && oldSeries.length && newSeries.length) {
-    const first = oldSeries[0]
-    if (isPlainObject(first) && Array.isArray(first.data) && first.data.length) {
-      newSeries[0].data = first.data
-      if (typeof first.name === 'string') newSeries[0].name = first.name
-    }
+  const model = optionToDataModel(base)
+  const usable = model.categories.length > 0 && model.series.some((item) => item.data.length > 0)
+  if (usable && (type === 'bar' || type === 'line')) {
+    return buildCartesianOption(
+      type,
+      titleText || (type === 'line' ? '趋势' : '对比'),
+      model.categories,
+      model.series.map((item, index) => ({
+        name: item.name,
+        data: item.data.map((value) => asChartNumber(value)),
+        stack: seriesStackAt(base, index),
+        color: seriesColorAt(base, index),
+        label: seriesLabelAt(base, index),
+        barWidth: seriesBarMeasure(base, index, 'barWidth'),
+        barMaxWidth: seriesBarMeasure(base, index, 'barMaxWidth'),
+        barGap: seriesBarGap(base, index, 'barGap'),
+        barCategoryGap: seriesBarGap(base, index, 'barCategoryGap'),
+        step: seriesStepAt(base, index),
+        symbol: seriesSymbolAt(base, index)?.symbol,
+        symbolSize: seriesSymbolAt(base, index)?.symbolSize,
+        lineStyle: seriesLineStyleAt(base, index),
+        showSymbol: seriesShowSymbol(base, index),
+      })),
+      categoryOnYAxis(base),
+      cartesianAxisNames(base),
+      valueAxisBounds(base),
+      categoryLabelRotate(base),
+      legendLayout(base),
+      lineLooks(base),
+      gridMargins(base),
+      tooltipLayout(base),
+      valueAxisScale(base),
+      categoryBoundaryGap(base),
+      cartesianNameLayout(base),
+      valueSplitLineHidden(base),
+      categoryAxisLineHidden(base),
+      valueSplitAreaShown(base),
+      categoryAxisTickHidden(base),
+      valueAxisLineHidden(base),
+      categoryAxisLabelHidden(base),
+      valueAxisTickHidden(base),
+      valueAxisLabelHidden(base),
+      categorySplitLineHidden(base),
+      legendHidden(base),
+    )
   }
-  return next
+  if (usable && type === 'pie') {
+    const first = model.series[0]!
+    return buildPieFromModel(titleText, first.name, model.categories, first.data)
+  }
+  return buildTemplateOption(type, { title: titleText })
 }

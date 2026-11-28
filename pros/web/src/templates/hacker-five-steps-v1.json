@@ -1,0 +1,61 @@
+{
+  "id": "canvas_hacker_five_steps",
+  "type": "hacker_five_steps",
+  "schemaVersion": 1,
+  "theme": {
+    "background": { "pattern": "none", "color": "#f7f7f7" },
+    "page": "#f7f7f7",
+    "frame": "#ececec",
+    "hairline": "rgba(60, 50, 20, 0.08)"
+  },
+  "title": "调用黑客五部曲",
+  "steps": [
+    {
+      "id": "step_1",
+      "index": 1,
+      "work": "明确你的调研目标",
+      "question": "你到底想通过调研获得什么？",
+      "difficulty": "最考验调研意识",
+      "blockId": "hfs_answer_1"
+    },
+    {
+      "id": "step_2",
+      "index": 2,
+      "work": "缩小你的调研范围",
+      "question": "你如何判断哪些是关键信息？",
+      "difficulty": "最考验专业能力",
+      "blockId": "hfs_answer_2"
+    },
+    {
+      "id": "step_3",
+      "index": 3,
+      "work": "罗列调研产品清单",
+      "question": "你如何判断哪些是关键产品？",
+      "difficulty": "最考验思路清晰",
+      "blockId": "hfs_answer_3"
+    },
+    {
+      "id": "step_4",
+      "index": 4,
+      "work": "不择手段获取情报",
+      "question": "你打算通过哪些手段获取信息？",
+      "difficulty": "最考验实操经验",
+      "blockId": "hfs_answer_4"
+    },
+    {
+      "id": "step_5",
+      "index": 5,
+      "work": "拿到信息正确判断",
+      "question": "你打算怎么用好这些信息，达成目标？",
+      "difficulty": "最考验正确归因",
+      "blockId": "hfs_answer_5"
+    }
+  ],
+  "blocks": [
+    { "id": "hfs_answer_1", "title": "第 1 步 · 明确你的调研目标", "items": [] },
+    { "id": "hfs_answer_2", "title": "第 2 步 · 缩小你的调研范围", "items": [] },
+    { "id": "hfs_answer_3", "title": "第 3 步 · 罗列调研产品清单", "items": [] },
+    { "id": "hfs_answer_4", "title": "第 4 步 · 不择手段获取情报", "items": [] },
+    { "id": "hfs_answer_5", "title": "第 5 步 · 拿到信息正确判断", "items": [] }
+  ]
+}

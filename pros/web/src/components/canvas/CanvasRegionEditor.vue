@@ -16,7 +16,7 @@ import {
 } from '../../composables/usePanelMaximize'
 import RichTextEditor from '../RichTextEditor.vue'
 import PanelAttachments from './PanelAttachments.vue'
-import { itemsToHtml, syncItemsFromHtml } from '../../utils/itemsHtml'
+import { isEmptyHtml, itemsToHtml, syncItemsFromHtml } from '../../utils/itemsHtml'
 
 const props = withDefaults(
   defineProps<{
@@ -38,6 +38,7 @@ const { isMaximized, toggleMaximize, closeMaximize } =
   usePanelMaximize(maximizeKey)
 
 const editorHtml = computed(() => itemsToHtml(props.items))
+const isBlank = computed(() => isEmptyHtml(editorHtml.value))
 
 /* ---- 行内输入 ---- */
 const inputEl = ref<HTMLElement | null>(null)
@@ -140,6 +141,7 @@ function onCloseMaximize(event?: Event) {
     <div
       ref="inputEl"
       class="region-input"
+      :class="{ 'is-blank': isBlank }"
       contenteditable="true"
       role="textbox"
       aria-multiline="true"
@@ -238,7 +240,7 @@ function onCloseMaximize(event?: Event) {
   top: 2px;
   right: 2px;
   z-index: 3;
-  opacity: 0;
+  opacity: 0.72;
   transition: opacity 0.15s ease;
 }
 
@@ -251,25 +253,38 @@ function onCloseMaximize(event?: Event) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
+  width: 26px;
+  height: 26px;
   padding: 0;
-  border: 1px solid var(--cv-frame, #ececec);
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.95);
-  color: #5f6368;
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.7));
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.52);
+  backdrop-filter: blur(var(--glass-blur-sm, 10px));
+  -webkit-backdrop-filter: blur(var(--glass-blur-sm, 10px));
+  color: var(--ent-text-2, #5a6472);
   cursor: pointer;
+  transition:
+    background-color 0.16s ease,
+    border-color 0.16s ease,
+    color 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s ease;
 }
 
 .region-max-btn:hover {
-  border-color: var(--cv-focus, #1c4c7c);
-  color: var(--cv-focus, #1c4c7c);
+  background: rgba(255, 255, 255, 0.86);
+  border-color: transparent;
+  color: var(--mm-text, #1d2129);
+  box-shadow: var(--glass-shadow-sm, 0 6px 18px rgba(15, 23, 42, 0.1));
+  transform: translateY(-1px);
 }
 
 .region-input {
-  padding: 3px 7px 4px;
-  font-size: 12px;
-  line-height: 1.4;
+  min-height: 32px;
+  box-sizing: border-box;
+  padding: 6px 26px 6px 8px;
+  font-size: 14px;
+  line-height: 1.5;
   color: #3c4043;
   outline: none;
   word-break: break-word;
@@ -277,10 +292,27 @@ function onCloseMaximize(event?: Event) {
   overflow-y: auto;
 }
 
-.region-input:empty::before {
+.region-input:empty::before,
+.region-input.is-blank::before {
   content: attr(data-placeholder);
-  color: #9aa0a6;
+  color: #5c564c;
   pointer-events: none;
+}
+
+.region-input.is-blank :deep(p) {
+  display: none;
+}
+
+.region-input.is-blank {
+  max-height: 32px;
+  white-space: nowrap;
+}
+
+.region-input.is-blank::before {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* 行内内容是运行时写进去的 HTML，没有 scope 属性，这里必须用 :deep */

@@ -1,0 +1,995 @@
+import assert from 'node:assert/strict'
+import {
+  alignChoiceTitle,
+  alignToolTitle,
+  blockHandleTitle,
+  blockMenuTitle,
+  clampToolbarQuery,
+  codeLangTitle,
+  cropTitle,
+  codeBlockToolTitle,
+  cycleSearchIndex,
+  disabledToolTitle,
+  emptyGuideTitle,
+  fontFamilyCaption,
+  fontSizeCaption,
+  formatPainterLabel,
+  groupHandleTitle,
+  hiddenGroupPlaceholders,
+  imagePlaceTitle,
+  isToolbarMenuTrigger,
+  lineHeightCaption,
+  listToolLabel,
+  MENU_CLOSE_DELAY_MS,
+  menuFocusStep,
+  menuTypeaheadIndex,
+  menuToolNeedsCaret,
+  moreToolsCaption,
+  moreToolsTitle,
+  orderToolbarSearchGroups,
+  imageWidthTitle,
+  pageSizeTitle,
+  pasteFormatLabel,
+  pickerTabTitle,
+  pushRecentValue,
+  quoteToolTitle,
+  readStoredRibbonTab,
+  recentOptions,
+  ribbonSearchLabel,
+  ribbonTabForDigit,
+  ribbonTabHint,
+  ribbonTabTabIndex,
+  ribbonTypeaheadQuery,
+  searchEnterActivates,
+  spacingGroupTitle,
+  spacingOptionTitle,
+  toolIsUnavailable,
+  shortcutFromTitle,
+  shortcutNeedles,
+  spellcheckToolTitle,
+  searchGroupCaption,
+  stepRibbonTabBy,
+  tableToolLabel,
+  toolbarGroupReorderAllowed,
+  toolbarMenuItemTitle,
+  toolbarMenuKeyAction,
+  toolsForToolbar,
+  searchToolbarTools,
+  stepRibbonTab,
+  toolbarSearchStatus,
+  wordStatTitle,
+  toolbarActionTitle,
+  TOOLBAR_ACTION_TITLES,
+  zoomToolLabel,
+  zoomToolTitle,
+} from './rteToolbarOptimize.ts'
+
+const tabs = ['edit', 'style', 'paragraph']
+assert.equal(Object.keys(TOOLBAR_ACTION_TITLES).length, 60)
+assert.equal(new Set(Object.values(TOOLBAR_ACTION_TITLES)).size, 60)
+assert.equal(toolbarActionTitle('code-lines').includes('行号'), true)
+assert.equal(toolbarActionTitle('list-continue').includes('不会从 1'), true)
+assert.equal(toolbarActionTitle('missing'), '')
+const aliasGroups = [{
+  id: 'tools',
+  label: '工具',
+  tools: [
+    { key: 'code', label: '代码' },
+    { key: 'lineHeight', label: '行高' },
+    { key: 'attach', label: '附件钮' },
+    { key: 'tidyHalf', label: '半' },
+    { key: 'template', label: '套用' },
+    { key: 'redo', label: '重做钮' },
+    { key: 'find', label: '查找钮' },
+    { key: 'table', label: '表格钮' },
+  ],
+}]
+assert.equal(searchToolbarTools(aliasGroups, '代码块')[0]?.key, 'code')
+assert.equal(searchToolbarTools(aliasGroups, '行距')[0]?.key, 'lineHeight')
+assert.equal(searchToolbarTools(aliasGroups, '回形针')[0]?.key, 'attach')
+assert.equal(searchToolbarTools(aliasGroups, '转半角')[0]?.key, 'tidyHalf')
+assert.equal(searchToolbarTools(aliasGroups, '文档模板')[0]?.key, 'template')
+assert.equal(searchToolbarTools(aliasGroups, '恢复')[0]?.key, 'redo')
+assert.equal(searchToolbarTools(aliasGroups, '寻找')[0]?.key, 'find')
+assert.equal(searchToolbarTools(aliasGroups, '插表')[0]?.key, 'table')
+const moreAliases = [{
+  id: 'more',
+  label: '更多',
+  tools: [
+    { key: 'undo', label: '撤销钮' },
+    { key: 'bold', label: '粗' },
+    { key: 'emoji', label: '表情钮' },
+    { key: 'copyMd', label: '复制' },
+    { key: 'mentionBtn', label: '提及钮' },
+  ],
+}]
+assert.equal(searchToolbarTools(moreAliases, '撤回')[0]?.key, 'undo')
+assert.equal(searchToolbarTools(moreAliases, '加黑')[0]?.key, 'bold')
+assert.equal(searchToolbarTools(moreAliases, '颜文字')[0]?.key, 'emoji')
+assert.equal(searchToolbarTools(moreAliases, '复制md')[0]?.key, 'copyMd')
+assert.equal(searchToolbarTools(moreAliases, '艾特')[0]?.key, 'mentionBtn')
+const spoken = [{
+  id: 'spoken',
+  label: '口语',
+  tools: [
+    { key: 'undo', label: '撤销钮' },
+    { key: 'bold', label: '粗' },
+    { key: 'table', label: '表格钮' },
+    { key: 'speak', label: '朗读钮' },
+    { key: 'clear', label: '清除钮' },
+  ],
+}]
+assert.equal(searchToolbarTools(spoken, '返回')[0]?.key, 'undo')
+assert.equal(searchToolbarTools(spoken, '变粗')[0]?.key, 'bold')
+assert.equal(searchToolbarTools(spoken, '画表')[0]?.key, 'table')
+assert.equal(searchToolbarTools(spoken, '念出来')[0]?.key, 'speak')
+assert.equal(searchToolbarTools(spoken, '去掉格式')[0]?.key, 'clear')
+assert.equal(searchToolbarTools(spoken, '退回')[0]?.key, 'undo')
+assert.equal(searchToolbarTools(spoken, '制表')[0]?.key, 'table')
+assert.equal(searchToolbarTools([{ id: 'h', label: '高', tools: [{ key: 'highlight', label: '亮' }] }], '划重点')[0]?.key, 'highlight')
+assert.equal(searchToolbarTools([{ id: 'c', label: '栏', tools: [{ key: 'columns', label: '栏' }] }], '分列')[0]?.key, 'columns')
+assert.equal(searchToolbarTools([{ id: 'p', label: '页', tools: [{ key: 'printPreview', label: '预览' }] }], '看打印')[0]?.key, 'printPreview')
+assert.equal(searchToolbarTools([{ id: 'd', label: '整', tools: [{ key: 'deepOptimize', label: '整理' }] }], '整理全文')[0]?.key, 'deepOptimize')
+assert.equal(searchToolbarTools([{ id: 'u', label: '撤', tools: [{ key: 'undo', label: '撤' }] }], '上一步')[0]?.key, 'undo')
+assert.equal(searchToolbarTools([{ id: 't', label: '表', tools: [{ key: 'table', label: '表' }] }], '做表')[0]?.key, 'table')
+assert.equal(searchToolbarTools([{ id: 'q', label: '引', tools: [{ key: 'quote', label: '引' }] }], '加引用')[0]?.key, 'quote')
+assert.equal(searchToolbarTools([{ id: 'u', label: '撤', tools: [{ key: 'undo', label: '撤' }] }], '撤销一下')[0]?.key, 'undo')
+assert.equal(searchToolbarTools([{ id: 'h', label: '线', tools: [{ key: 'hr', label: '线' }] }], '画条线')[0]?.key, 'hr')
+assert.equal(searchToolbarTools([{ id: 'z', label: '缩', tools: [{ key: 'zoom', label: '缩' }] }], '拉远')[0]?.key, 'zoom')
+assert.equal(searchToolbarTools([{ id: 'c', label: '色', tools: [{ key: 'color', label: '色' }] }], '字色')[0]?.key, 'color')
+assert.equal(searchToolbarTools([{ id: 'p', label: '页', tools: [{ key: 'pageBreak', label: '页' }] }], '另起一页')[0]?.key, 'pageBreak')
+assert.equal(searchToolbarTools([{ id: 'd', label: '今', tools: [{ key: 'insertDate', label: '今' }] }], '写上今天')[0]?.key, 'insertDate')
+assert.equal(searchToolbarTools([{ id: 'r', label: '音', tools: [{ key: 'ruby', label: '音' }] }], '标音')[0]?.key, 'ruby')
+assert.equal(searchToolbarTools([{ id: 'p', label: '看', tools: [{ key: 'printPreview', label: '看' }] }], '预看')[0]?.key, 'printPreview')
+assert.equal(searchToolbarTools([{ id: 'f', label: '算', tools: [{ key: 'tableFormula', label: '算' }] }], '算一算')[0]?.key, 'tableFormula')
+assert.equal(searchToolbarTools([{ id: 'h', label: '半', tools: [{ key: 'tidyHalf', label: '半' }] }], '变成半角')[0]?.key, 'tidyHalf')
+assert.equal(searchToolbarTools([{ id: 'a', label: '包', tools: [{ key: 'attach', label: '包' }] }], '附上文件')[0]?.key, 'attach')
+assert.equal(searchToolbarTools([{ id: 'i', label: '绕', tools: [{ key: 'imageLayout', label: '绕' }] }], '文字绕图')[0]?.key, 'imageLayout')
+assert.equal(searchToolbarTools([{ id: 'c', label: '栏', tools: [{ key: 'columns', label: '栏' }] }], '左右栏')[0]?.key, 'columns')
+assert.equal(searchToolbarTools([{ id: 'u', label: '撤', tools: [{ key: 'undo', label: '撤' }] }], '退回去')[0]?.key, 'undo')
+assert.equal(searchToolbarTools([{ id: 'p', label: '纸', tools: [{ key: 'writingPaper', label: '纸' }] }], '铺稿纸')[0]?.key, 'writingPaper')
+assert.equal(searchToolbarTools([{ id: 'a', label: '音', tools: [{ key: 'audio', label: '音' }] }], '听一听')[0]?.key, 'audio')
+assert.equal(searchToolbarTools([{ id: 'c', label: '栏', tools: [{ key: 'columns', label: '栏' }] }], '排两栏')[0]?.key, 'columns')
+assert.equal(searchToolbarTools([{ id: 'v', label: '片', tools: [{ key: 'video', label: '片' }] }], '再看片')[0]?.key, 'video')
+assert.equal(searchToolbarTools([{ id: 'r', label: '音', tools: [{ key: 'ruby', label: '音' }] }], '再标音')[0]?.key, 'ruby')
+assert.equal(searchToolbarTools([{ id: 'c', label: '栏', tools: [{ key: 'columns', label: '栏' }] }], '再分栏')[0]?.key, 'columns')
+assert.equal(searchToolbarTools([{ id: 'p', label: '纸', tools: [{ key: 'writingPaper', label: '纸' }] }], '再铺格子')[0]?.key, 'writingPaper')
+assert.equal(searchToolbarTools([{ id: 'r', label: '音', tools: [{ key: 'ruby', label: '音' }] }], '再注音')[0]?.key, 'ruby')
+assert.equal(searchToolbarTools([{ id: 'c', label: '栏', tools: [{ key: 'columns', label: '栏' }] }], '再排成栏')[0]?.key, 'columns')
+assert.equal(searchToolbarTools([{ id: 'w', label: '纸', tools: [{ key: 'writingPaper', label: '纸' }] }], '再铺稿纸')[0]?.key, 'writingPaper')
+for (const [query, key] of [
+  ['改成小四', 'fontSize'],
+  ['换个引号', 'quoteStyle'],
+  ['列成清单', 'list'],
+  ['换成罗马数字', 'listStyle'],
+  ['改成导语', 'paraStyle'],
+  ['再加一行', 'tableStruct'],
+  ['念给我听', 'speak'],
+  ['打开提纲', 'outline'],
+  ['再画条线', 'hr'],
+  ['再贴表情', 'emoji'],
+  ['再做二维码', 'qrcode'],
+  ['再写公式', 'formula'],
+  ['再另起一页', 'pageBreak'],
+  ['再预看', 'printPreview'],
+  ['再加批注', 'comment'],
+  ['再加脚注', 'footnote'],
+  ['再加水印', 'watermark'],
+  ['再加点', 'emphasisDot'],
+  ['只贴字', 'pastePlain'],
+  ['连格式一起贴', 'pasteFormat'],
+  ['再隔行上色', 'tableZebra'],
+  ['再写下标', 'subscript'],
+  ['再写上标', 'superscript'],
+  ['再换一张', 'imageReplace'],
+  ['自动编标题号', 'headingAutoNum'],
+  ['再查错', 'spellcheck'],
+  ['看修订记录', 'revision'],
+  ['再加书签', 'bookmark'],
+  ['要读几分钟', 'readTime'],
+  ['看看快捷键', 'shortcuts'],
+  ['再套一句', 'snippets'],
+  ['再排大事', 'timeline'],
+  ['再做成卡片', 'linkCard'],
+  ['先别读了', 'speakStop'],
+  ['再全屏看', 'immersive'],
+  ['再贴徽章', 'statusChip'],
+  ['再画进度', 'progressBar'],
+  ['再查敏感', 'sensitive'],
+  ['再数字数', 'wordStats'],
+  ['再查标题', 'headingCheck'],
+  ['再查链接', 'linkCheck'],
+  ['再管外链', 'outbound'],
+  ['再加注释', 'note'],
+  ['再做表单', 'form'],
+  ['再调段距', 'spacing'],
+  ['再空两格', 'firstIndent'],
+  ['再往里缩', 'indent'],
+  ['再往外推', 'outdent'],
+  ['再放大首字', 'dropCap'],
+  ['再先藏着', 'spoiler'],
+  ['再加圆角', 'imageRadius'],
+  ['再加投影', 'imageShadow'],
+  ['再加图框', 'imageBorder'],
+  ['再写替代文本', 'imageAlt'],
+  ['再钉住表头', 'tableSticky'],
+  ['再钉住首列', 'tableColSticky'],
+  ['再筛一下', 'tableFilter'],
+  ['再列一样宽', 'tableEqual'],
+  ['再按序排', 'tableSort'],
+  ['再表存出来', 'tableCsv'],
+  ['再提建议', 'suggest'],
+  ['再接受修订', 'suggestAccept'],
+  ['再拒绝修订', 'suggestReject'],
+  ['再整理全文', 'deepOptimize'],
+  ['再折起来', 'toggleBlock'],
+  ['再分几页', 'tabsBlock'],
+  ['再往上挪', 'blockOps'],
+  ['再写上今天', 'insertDate'],
+  ['再改页面', 'pageSetup'],
+  ['再看边界', 'paperGuide'],
+  ['再印网址', 'printUrls'],
+  ['再拷成md', 'copyMd'],
+  ['再看记录', 'audit'],
+  ['再帮我改', 'inlineAi'],
+  ['再行内写', 'codeInline'],
+  ['再换大小写', 'caseTransform'],
+  ['再插符号', 'specialChars'],
+  ['再算一算', 'tableFormula'],
+  ['再避开头', 'cjkTip'],
+  ['再给图编号', 'captionNum'],
+  ['再看脚注清单', 'footnoteList'],
+  ['再做成按钮', 'linkButton'],
+  ['再同步一块', 'crossDoc'],
+  ['再艾特', 'mentionBtn'],
+  ['再设提及权限', 'mentionPerm'],
+  ['再互相引用', 'xref'],
+  ['再画柱子', 'chart:basic'],
+  ['再画漏斗', 'chart:stats'],
+  ['再画地图', 'chart:geo'],
+  ['再画雷达', 'chart:coordinate'],
+  ['再找一找', 'find'],
+  ['再退一步', 'undo'],
+  ['再刷一下', 'formatPainter'],
+  ['再出提示', 'callout'],
+  ['再排两栏', 'columns'],
+  ['再换字形', 'fontFamily'],
+  ['再标个黄', 'highlight'],
+  ['再链一下', 'link'],
+  ['再清干净', 'clear'],
+  ['再打一份', 'print'],
+  ['再念给我听', 'speak'],
+  ['再打开提纲', 'outline'],
+  ['再扫一扫', 'qrcode'],
+  ['再放视频', 'video'],
+  ['再听一听', 'audio'],
+  ['再画桑基', 'chart:relation'],
+  ['再画树图', 'chart:hierarchy'],
+  ['再画蜡烛', 'chart:finance'],
+  ['再做数据集', 'chart:component'],
+  ['再画曲面', 'chart:gl'],
+  ['再写代码', 'code'],
+  ['再拉开行', 'lineHeight'],
+  ['再附上文件', 'attach'],
+  ['再转半角', 'tidyHalf'],
+  ['再转全角', 'tidyFull'],
+  ['再加空格', 'tidyPangu'],
+  ['再挤空格', 'tidySqueeze'],
+  ['再更多看', 'viewExtras'],
+  ['再设基线', 'revisionBase'],
+  ['再用模板', 'template'],
+  ['帮我注音', 'ruby'],
+  ['帮我画流程', 'mermaid'],
+  ['帮我做表', 'table'],
+  ['帮我重做', 'redo'],
+  ['帮我改字号', 'fontSize'],
+  ['帮我换字色', 'color'],
+  ['帮我加引用', 'quote'],
+  ['帮我列个单', 'list'],
+  ['帮我加粗', 'bold'],
+  ['帮我变斜', 'italic'],
+  ['帮我加下划', 'underline'],
+  ['帮我划掉', 'strike'],
+  ['帮我居中', 'align'],
+  ['帮我放张图', 'image'],
+  ['帮我文字绕图', 'imageLayout'],
+  ['帮我改标题', 'heading'],
+  ['帮我拉近', 'zoom'],
+  ['帮我导入', 'import'],
+  ['帮我导出', 'export'],
+  ['帮我理一理', 'textTidy'],
+  ['帮我竖排', 'textDir'],
+  ['帮我铺稿纸', 'writingPaper'],
+  ['帮我画条线', 'hr'],
+  ['帮我插表情', 'emoji'],
+  ['帮我写公式', 'formula'],
+  ['帮我另起一页', 'pageBreak'],
+  ['帮我加批注', 'comment'],
+  ['帮我加水印', 'watermark'],
+  ['帮我加书签', 'bookmark'],
+  ['帮我插符号', 'specialChars'],
+  ['给我找一找', 'find'],
+  ['给我退一步', 'undo'],
+  ['给我刷一下', 'formatPainter'],
+  ['给我出提示', 'callout'],
+  ['给我排两栏', 'columns'],
+  ['给我换字形', 'fontFamily'],
+  ['给我标个黄', 'highlight'],
+  ['给我链一下', 'link'],
+  ['给我清干净', 'clear'],
+  ['给我打一份', 'print'],
+  ['给我念一念', 'speak'],
+  ['给我打开提纲', 'outline'],
+  ['给我做二维码', 'qrcode'],
+  ['给我放视频', 'video'],
+  ['给我听一听', 'audio'],
+  ['给我预看', 'printPreview'],
+  ['给我加脚注', 'footnote'],
+  ['给我加点', 'emphasisDot'],
+  ['给我只贴字', 'pastePlain'],
+  ['给我写下标', 'subscript'],
+  ['给我写上标', 'superscript'],
+  ['给我换一张', 'imageReplace'],
+  ['给我查错', 'spellcheck'],
+  ['给我看修订', 'revision'],
+  ['给我看时长', 'readTime'],
+  ['给我看快捷键', 'shortcuts'],
+  ['给我套一句', 'snippets'],
+  ['给我排大事', 'timeline'],
+  ['给我做成卡片', 'linkCard'],
+  ['给我停读', 'speakStop'],
+  ['我想换引号', 'quoteStyle'],
+  ['我想换编号', 'listStyle'],
+  ['我想改成导语', 'paraStyle'],
+  ['我想加一行', 'tableStruct'],
+  ['我想连格式贴', 'pasteFormat'],
+  ['我想隔行上色', 'tableZebra'],
+  ['我想自动编号', 'headingAutoNum'],
+  ['我想全屏看', 'immersive'],
+  ['我想贴徽章', 'statusChip'],
+  ['我想画进度', 'progressBar'],
+  ['我想查敏感', 'sensitive'],
+  ['我想数字数', 'wordStats'],
+  ['我想查标题', 'headingCheck'],
+  ['我想查链接', 'linkCheck'],
+  ['我想管外链', 'outbound'],
+  ['我想加注释', 'note'],
+  ['我想做表单', 'form'],
+  ['我想调段距', 'spacing'],
+  ['我想空两格', 'firstIndent'],
+  ['我想往里缩', 'indent'],
+  ['我想往外推', 'outdent'],
+  ['我想放大首字', 'dropCap'],
+  ['我想先藏着', 'spoiler'],
+  ['我想加圆角', 'imageRadius'],
+  ['我想加投影', 'imageShadow'],
+  ['我想加图框', 'imageBorder'],
+  ['我想写替代文本', 'imageAlt'],
+  ['我想钉住表头', 'tableSticky'],
+  ['我想钉住首列', 'tableColSticky'],
+  ['我想筛一下', 'tableFilter'],
+  ['请来均分列', 'tableEqual'],
+  ['请来排个序', 'tableSort'],
+  ['请来导出表', 'tableCsv'],
+  ['请来提建议', 'suggest'],
+  ['请来接受修订', 'suggestAccept'],
+  ['请来拒绝修订', 'suggestReject'],
+  ['请来整理全文', 'deepOptimize'],
+  ['请来折起来', 'toggleBlock'],
+  ['请来分几页', 'tabsBlock'],
+  ['请来往上挪', 'blockOps'],
+  ['请来写上今天', 'insertDate'],
+  ['请来改页面', 'pageSetup'],
+  ['请来看边界', 'paperGuide'],
+  ['请来印网址', 'printUrls'],
+  ['请来拷成md', 'copyMd'],
+  ['请来看记录', 'audit'],
+  ['请来改一改', 'inlineAi'],
+  ['请来行内写', 'codeInline'],
+  ['请来换大小写', 'caseTransform'],
+  ['请来算一算', 'tableFormula'],
+  ['请来避开头', 'cjkTip'],
+  ['请来给图编号', 'captionNum'],
+  ['请来看脚注清单', 'footnoteList'],
+  ['请来做成按钮', 'linkButton'],
+  ['请来同步一块', 'crossDoc'],
+  ['请来艾特', 'mentionBtn'],
+  ['请来设提及权限', 'mentionPerm'],
+  ['请来互相引用', 'xref'],
+  ['请来写代码', 'code'],
+  ['请来拉开行', 'lineHeight'],
+  ['麻烦注音', 'ruby'],
+  ['麻烦画流程', 'mermaid'],
+  ['麻烦做表', 'table'],
+  ['麻烦找一找', 'find'],
+  ['麻烦退一步', 'undo'],
+  ['麻烦重做', 'redo'],
+  ['麻烦刷一下', 'formatPainter'],
+  ['麻烦出提示', 'callout'],
+  ['麻烦排两栏', 'columns'],
+  ['麻烦改字号', 'fontSize'],
+  ['麻烦换字形', 'fontFamily'],
+  ['麻烦标个黄', 'highlight'],
+  ['麻烦换字色', 'color'],
+  ['麻烦画柱子', 'chart:basic'],
+  ['麻烦画漏斗', 'chart:stats'],
+  ['麻烦画桑基', 'chart:relation'],
+  ['麻烦画树图', 'chart:hierarchy'],
+  ['麻烦画地图', 'chart:geo'],
+  ['麻烦画蜡烛', 'chart:finance'],
+  ['麻烦画雷达', 'chart:coordinate'],
+  ['麻烦做数据集', 'chart:component'],
+  ['麻烦画曲面', 'chart:gl'],
+  ['麻烦附上文件', 'attach'],
+  ['麻烦转半角', 'tidyHalf'],
+  ['麻烦转全角', 'tidyFull'],
+  ['麻烦加空格', 'tidyPangu'],
+  ['麻烦挤空格', 'tidySqueeze'],
+  ['麻烦更多看', 'viewExtras'],
+  ['麻烦设基线', 'revisionBase'],
+  ['麻烦用模板', 'template'],
+  ['能不能加引用', 'quote'],
+  ['能不能列个单', 'list'],
+  ['能不能加粗', 'bold'],
+  ['能不能变斜', 'italic'],
+  ['能不能加下划', 'underline'],
+  ['能不能划掉', 'strike'],
+  ['能不能居中', 'align'],
+  ['能不能放张图', 'image'],
+  ['能不能文字绕图', 'imageLayout'],
+  ['能不能链一下', 'link'],
+  ['能不能清干净', 'clear'],
+  ['能不能改标题', 'heading'],
+  ['能不能拉近', 'zoom'],
+  ['能不能打一份', 'print'],
+  ['能不能导入', 'import'],
+  ['能不能导出', 'export'],
+  ['能不能理一理', 'textTidy'],
+  ['能不能竖排', 'textDir'],
+  ['能不能铺稿纸', 'writingPaper'],
+  ['能不能念一念', 'speak'],
+  ['能不能打开提纲', 'outline'],
+  ['能不能画条线', 'hr'],
+  ['能不能插表情', 'emoji'],
+  ['能不能做二维码', 'qrcode'],
+  ['能不能写公式', 'formula'],
+  ['能不能放视频', 'video'],
+  ['能不能听一听', 'audio'],
+  ['能不能另起一页', 'pageBreak'],
+  ['能不能加批注', 'comment'],
+  ['能不能加水印', 'watermark'],
+  ['可否注音', 'ruby'],
+  ['可否画流程', 'mermaid'],
+  ['可否做表', 'table'],
+  ['可否找一找', 'find'],
+  ['可否退一步', 'undo'],
+  ['可否重做', 'redo'],
+  ['可否刷一下', 'formatPainter'],
+  ['可否出提示', 'callout'],
+  ['可否排两栏', 'columns'],
+  ['可否改字号', 'fontSize'],
+  ['可否换字形', 'fontFamily'],
+  ['可否标个黄', 'highlight'],
+  ['可否换字色', 'color'],
+  ['可否加书签', 'bookmark'],
+  ['可否加脚注', 'footnote'],
+  ['可否写下标', 'subscript'],
+  ['可否写上标', 'superscript'],
+  ['可否查错', 'spellcheck'],
+  ['可否套一句', 'snippets'],
+  ['可否排大事', 'timeline'],
+  ['可否做成卡片', 'linkCard'],
+  ['可否停读', 'speakStop'],
+  ['可否全屏看', 'immersive'],
+  ['可否做表单', 'form'],
+  ['可否调段距', 'spacing'],
+  ['可否往里缩', 'indent'],
+  ['可否放大首字', 'dropCap'],
+  ['可否钉住表头', 'tableSticky'],
+  ['可否写代码', 'code'],
+  ['可否用模板', 'template'],
+  ['要不要加引用', 'quote'],
+  ['要不要列个单', 'list'],
+  ['要不要加粗', 'bold'],
+  ['要不要变斜', 'italic'],
+  ['要不要加下划', 'underline'],
+  ['要不要划掉', 'strike'],
+  ['要不要居中', 'align'],
+  ['要不要放张图', 'image'],
+  ['要不要文字绕图', 'imageLayout'],
+  ['要不要链一下', 'link'],
+  ['要不要清干净', 'clear'],
+  ['要不要改标题', 'heading'],
+  ['要不要拉近', 'zoom'],
+  ['要不要打一份', 'print'],
+  ['要不要导入', 'import'],
+  ['要不要导出', 'export'],
+  ['要不要理一理', 'textTidy'],
+  ['要不要竖排', 'textDir'],
+  ['要不要铺稿纸', 'writingPaper'],
+  ['要不要念一念', 'speak'],
+  ['要不要打开提纲', 'outline'],
+  ['要不要画条线', 'hr'],
+  ['要不要插表情', 'emoji'],
+  ['要不要做二维码', 'qrcode'],
+  ['要不要写公式', 'formula'],
+  ['要不要放视频', 'video'],
+  ['要不要听一听', 'audio'],
+  ['要不要另起一页', 'pageBreak'],
+  ['要不要加批注', 'comment'],
+  ['要不要加水印', 'watermark'],
+  ['劳驾注音', 'ruby'],
+  ['劳驾画流程', 'mermaid'],
+  ['劳驾做表', 'table'],
+  ['劳驾找一找', 'find'],
+  ['劳驾退一步', 'undo'],
+  ['劳驾重做', 'redo'],
+  ['劳驾刷一下', 'formatPainter'],
+  ['劳驾出提示', 'callout'],
+  ['劳驾排两栏', 'columns'],
+  ['劳驾改字号', 'fontSize'],
+  ['劳驾换字形', 'fontFamily'],
+  ['劳驾标个黄', 'highlight'],
+  ['劳驾换字色', 'color'],
+  ['劳驾加书签', 'bookmark'],
+  ['劳驾加脚注', 'footnote'],
+  ['劳驾写下标', 'subscript'],
+  ['劳驾写上标', 'superscript'],
+  ['劳驾查错', 'spellcheck'],
+  ['劳驾套一句', 'snippets'],
+  ['劳驾排大事', 'timeline'],
+  ['劳驾做成卡片', 'linkCard'],
+  ['劳驾停读', 'speakStop'],
+  ['劳驾全屏看', 'immersive'],
+  ['劳驾做表单', 'form'],
+  ['劳驾调段距', 'spacing'],
+  ['劳驾往里缩', 'indent'],
+  ['劳驾放大首字', 'dropCap'],
+  ['劳驾钉住表头', 'tableSticky'],
+  ['劳驾写代码', 'code'],
+  ['劳驾用模板', 'template'],
+  ['拜托加引用', 'quote'],
+  ['拜托列个单', 'list'],
+  ['拜托加粗', 'bold'],
+  ['拜托变斜', 'italic'],
+  ['拜托加下划', 'underline'],
+  ['拜托划掉', 'strike'],
+  ['拜托居中', 'align'],
+  ['拜托放张图', 'image'],
+  ['拜托文字绕图', 'imageLayout'],
+  ['拜托链一下', 'link'],
+  ['拜托清干净', 'clear'],
+  ['拜托改标题', 'heading'],
+  ['拜托拉近', 'zoom'],
+  ['拜托打一份', 'print'],
+  ['拜托导入', 'import'],
+  ['拜托导出', 'export'],
+  ['拜托理一理', 'textTidy'],
+  ['拜托竖排', 'textDir'],
+  ['拜托铺稿纸', 'writingPaper'],
+  ['拜托念一念', 'speak'],
+  ['拜托打开提纲', 'outline'],
+  ['拜托画条线', 'hr'],
+  ['拜托插表情', 'emoji'],
+  ['拜托做二维码', 'qrcode'],
+  ['拜托写公式', 'formula'],
+  ['拜托放视频', 'video'],
+  ['拜托听一听', 'audio'],
+  ['拜托另起一页', 'pageBreak'],
+  ['拜托加批注', 'comment'],
+  ['拜托加水印', 'watermark'],
+  ['烦请加点', 'emphasisDot'],
+  ['烦请只贴字', 'pastePlain'],
+  ['烦请连格式贴', 'pasteFormat'],
+  ['烦请隔行上色', 'tableZebra'],
+  ['烦请换一张', 'imageReplace'],
+  ['烦请自动编号', 'headingAutoNum'],
+  ['烦请看修订', 'revision'],
+  ['烦请看时长', 'readTime'],
+  ['烦请看快捷键', 'shortcuts'],
+  ['烦请贴徽章', 'statusChip'],
+  ['烦请画进度', 'progressBar'],
+  ['烦请查敏感', 'sensitive'],
+  ['烦请数字数', 'wordStats'],
+  ['烦请查标题', 'headingCheck'],
+  ['烦请查链接', 'linkCheck'],
+  ['烦请管外链', 'outbound'],
+  ['烦请加注释', 'note'],
+  ['烦请空两格', 'firstIndent'],
+  ['烦请往外推', 'outdent'],
+  ['烦请先藏着', 'spoiler'],
+  ['烦请加圆角', 'imageRadius'],
+  ['烦请加投影', 'imageShadow'],
+  ['烦请加图框', 'imageBorder'],
+  ['烦请写替代文本', 'imageAlt'],
+  ['烦请钉住首列', 'tableColSticky'],
+  ['烦请筛一下', 'tableFilter'],
+  ['烦请均分列', 'tableEqual'],
+  ['烦请排个序', 'tableSort'],
+  ['烦请导出表', 'tableCsv'],
+  ['烦请提建议', 'suggest'],
+  ['有劳注音', 'ruby'],
+  ['有劳画流程', 'mermaid'],
+  ['有劳做表', 'table'],
+  ['有劳找一找', 'find'],
+  ['有劳退一步', 'undo'],
+  ['有劳重做', 'redo'],
+  ['有劳刷一下', 'formatPainter'],
+  ['有劳出提示', 'callout'],
+  ['有劳排两栏', 'columns'],
+  ['有劳改字号', 'fontSize'],
+  ['有劳换字形', 'fontFamily'],
+  ['有劳标个黄', 'highlight'],
+  ['有劳换字色', 'color'],
+  ['有劳加书签', 'bookmark'],
+  ['有劳加脚注', 'footnote'],
+  ['有劳写下标', 'subscript'],
+  ['有劳写上标', 'superscript'],
+  ['有劳查错', 'spellcheck'],
+  ['有劳套一句', 'snippets'],
+  ['有劳排大事', 'timeline'],
+  ['有劳做成卡片', 'linkCard'],
+  ['有劳停读', 'speakStop'],
+  ['有劳全屏看', 'immersive'],
+  ['有劳做表单', 'form'],
+  ['有劳调段距', 'spacing'],
+  ['有劳往里缩', 'indent'],
+  ['有劳放大首字', 'dropCap'],
+  ['有劳钉住表头', 'tableSticky'],
+  ['有劳写代码', 'code'],
+  ['有劳用模板', 'template'],
+  ['请您加点', 'emphasisDot'],
+  ['请您只贴字', 'pastePlain'],
+  ['请您连格式贴', 'pasteFormat'],
+  ['请您隔行上色', 'tableZebra'],
+  ['请您换一张', 'imageReplace'],
+  ['请您自动编号', 'headingAutoNum'],
+  ['请您看修订', 'revision'],
+  ['请您看时长', 'readTime'],
+  ['请您看快捷键', 'shortcuts'],
+  ['请您贴徽章', 'statusChip'],
+  ['请您画进度', 'progressBar'],
+  ['请您查敏感', 'sensitive'],
+  ['请您数字数', 'wordStats'],
+  ['请您查标题', 'headingCheck'],
+  ['请您查链接', 'linkCheck'],
+  ['请您管外链', 'outbound'],
+  ['请您加注释', 'note'],
+  ['请您空两格', 'firstIndent'],
+  ['请您往外推', 'outdent'],
+  ['请您先藏着', 'spoiler'],
+  ['请您加圆角', 'imageRadius'],
+  ['请您加投影', 'imageShadow'],
+  ['请您加图框', 'imageBorder'],
+  ['请您写替代文本', 'imageAlt'],
+  ['请您钉住首列', 'tableColSticky'],
+  ['请您筛一下', 'tableFilter'],
+  ['请您均分列', 'tableEqual'],
+  ['请您排个序', 'tableSort'],
+  ['请您导出表', 'tableCsv'],
+  ['请您提建议', 'suggest'],
+  ['请帮我加引用', 'quote'],
+  ['请帮我列个单', 'list'],
+  ['请帮我加粗', 'bold'],
+  ['请帮我变斜', 'italic'],
+  ['请帮我加下划', 'underline'],
+  ['请帮我划掉', 'strike'],
+  ['请帮我居中', 'align'],
+  ['请帮我放张图', 'image'],
+  ['请帮我文字绕图', 'imageLayout'],
+  ['请帮我链一下', 'link'],
+  ['请帮我清干净', 'clear'],
+  ['请帮我改标题', 'heading'],
+  ['请帮我拉近', 'zoom'],
+  ['请帮我打一份', 'print'],
+  ['请帮我导入', 'import'],
+  ['请帮我导出', 'export'],
+  ['请帮我理一理', 'textTidy'],
+  ['请帮我竖排', 'textDir'],
+  ['请帮我铺稿纸', 'writingPaper'],
+  ['请帮我念一念', 'speak'],
+  ['请帮我打开提纲', 'outline'],
+  ['请帮我画条线', 'hr'],
+  ['请帮我插表情', 'emoji'],
+  ['请帮我做二维码', 'qrcode'],
+  ['请帮我写公式', 'formula'],
+  ['请帮我放视频', 'video'],
+  ['请帮我听一听', 'audio'],
+  ['请帮我另起一页', 'pageBreak'],
+  ['请帮我加批注', 'comment'],
+  ['请帮我加水印', 'watermark'],
+  ['劳烦注音', 'ruby'],
+  ['劳烦画流程', 'mermaid'],
+  ['劳烦做表', 'table'],
+  ['劳烦找一找', 'find'],
+  ['劳烦退一步', 'undo'],
+  ['劳烦重做', 'redo'],
+  ['劳烦刷一下', 'formatPainter'],
+  ['劳烦出提示', 'callout'],
+  ['劳烦排两栏', 'columns'],
+  ['劳烦改字号', 'fontSize'],
+  ['劳烦换字形', 'fontFamily'],
+  ['劳烦标个黄', 'highlight'],
+  ['劳烦换字色', 'color'],
+  ['劳烦加书签', 'bookmark'],
+  ['劳烦加脚注', 'footnote'],
+  ['劳烦写下标', 'subscript'],
+  ['劳烦写上标', 'superscript'],
+  ['劳烦查错', 'spellcheck'],
+  ['劳烦套一句', 'snippets'],
+  ['劳烦排大事', 'timeline'],
+  ['劳烦做成卡片', 'linkCard'],
+  ['劳烦停读', 'speakStop'],
+  ['劳烦全屏看', 'immersive'],
+  ['劳烦做表单', 'form'],
+  ['劳烦调段距', 'spacing'],
+  ['劳烦往里缩', 'indent'],
+  ['劳烦放大首字', 'dropCap'],
+  ['劳烦钉住表头', 'tableSticky'],
+  ['劳烦写代码', 'code'],
+  ['劳烦用模板', 'template'],
+  ['烦劳加点', 'emphasisDot'],
+  ['烦劳只贴字', 'pastePlain'],
+  ['烦劳连格式贴', 'pasteFormat'],
+  ['烦劳隔行上色', 'tableZebra'],
+  ['烦劳换一张', 'imageReplace'],
+  ['烦劳自动编号', 'headingAutoNum'],
+  ['烦劳看修订', 'revision'],
+  ['烦劳看时长', 'readTime'],
+  ['烦劳看快捷键', 'shortcuts'],
+  ['烦劳贴徽章', 'statusChip'],
+  ['烦劳画进度', 'progressBar'],
+  ['烦劳查敏感', 'sensitive'],
+  ['烦劳数字数', 'wordStats'],
+  ['烦劳查标题', 'headingCheck'],
+  ['烦劳查链接', 'linkCheck'],
+  ['烦劳管外链', 'outbound'],
+  ['烦劳加注释', 'note'],
+  ['烦劳空两格', 'firstIndent'],
+  ['烦劳往外推', 'outdent'],
+  ['烦劳先藏着', 'spoiler'],
+  ['烦劳加圆角', 'imageRadius'],
+  ['烦劳加投影', 'imageShadow'],
+  ['烦劳加图框', 'imageBorder'],
+  ['烦劳写替代文本', 'imageAlt'],
+  ['烦劳钉住首列', 'tableColSticky'],
+  ['烦劳筛一下', 'tableFilter'],
+  ['烦劳均分列', 'tableEqual'],
+  ['烦劳排个序', 'tableSort'],
+  ['烦劳导出表', 'tableCsv'],
+  ['烦劳提建议', 'suggest'],
+  ['敬请加引用', 'quote'],
+  ['敬请列个单', 'list'],
+  ['敬请加粗', 'bold'],
+  ['敬请变斜', 'italic'],
+  ['敬请加下划', 'underline'],
+  ['敬请划掉', 'strike'],
+  ['敬请居中', 'align'],
+  ['敬请放张图', 'image'],
+  ['敬请文字绕图', 'imageLayout'],
+  ['敬请链一下', 'link'],
+  ['敬请清干净', 'clear'],
+  ['敬请改标题', 'heading'],
+  ['敬请拉近', 'zoom'],
+  ['敬请打一份', 'print'],
+  ['敬请导入', 'import'],
+  ['敬请导出', 'export'],
+  ['敬请理一理', 'textTidy'],
+  ['敬请竖排', 'textDir'],
+  ['敬请铺稿纸', 'writingPaper'],
+  ['敬请念一念', 'speak'],
+  ['敬请打开提纲', 'outline'],
+  ['敬请画条线', 'hr'],
+  ['敬请插表情', 'emoji'],
+  ['敬请做二维码', 'qrcode'],
+  ['敬请写公式', 'formula'],
+  ['敬请放视频', 'video'],
+  ['敬请听一听', 'audio'],
+  ['敬请另起一页', 'pageBreak'],
+  ['敬请加批注', 'comment'],
+  ['敬请加水印', 'watermark'],
+] as const) {
+  assert.equal(searchToolbarTools([{ id: 'g', label: '组', tools: [{ key, label: '钮' }] }], query)[0]?.key, key)
+}
+assert.equal(readStoredRibbonTab('style', tabs), 'style')
+assert.equal(readStoredRibbonTab('missing', tabs), 'edit')
+assert.equal(readStoredRibbonTab(null, []), 'edit')
+
+assert.equal(stepRibbonTab(tabs, 'edit', 'next'), 'style')
+assert.equal(stepRibbonTab(tabs, 'edit', 'prev'), 'paragraph')
+assert.equal(stepRibbonTab(tabs, 'paragraph', 'end'), 'paragraph')
+assert.equal(stepRibbonTab(tabs, 'style', 'home'), 'edit')
+
+const groups = [
+  { id: 'edit', label: '编辑', tools: [{ key: 'undo', label: '撤销' }, { key: 'find', label: '查找' }] },
+  { id: 'style', label: '字体与颜色', tools: [{ key: 'bold', label: '加粗' }] },
+]
+assert.deepEqual(searchToolbarTools(groups, '  '), [])
+assert.deepEqual(searchToolbarTools(groups, '查找'), [
+  { groupId: 'edit', groupLabel: '编辑', key: 'find', label: '查找' },
+])
+assert.equal(searchToolbarTools(groups, 'bold')[0]?.label, '加粗')
+assert.equal(searchToolbarTools([{ id: 'style', label: '字体与颜色', tools: [{ key: 'ruby', label: '注音', title: '手动填写注音' }] }], '拼音')[0]?.key, 'ruby')
+assert.equal(searchToolbarTools([{ id: 'style', label: '字体与颜色', tools: [{ key: 'ruby', label: '注音' }, { key: 'highlight', label: '高亮' }] }], '拼 音')[0]?.key, 'ruby')
+const ranked = searchToolbarTools([
+  { id: 'style', label: '字体', tools: [{ key: 'bold', label: '加粗' }, { key: 'clear', label: '清除格式', title: '加粗后清除' }] },
+], '加粗')
+assert.equal(ranked[0]?.key, 'bold')
+assert.equal(toolbarSearchStatus('  ', 3), '')
+assert.equal(toolbarSearchStatus('拼音', 0), '没有匹配的按钮。试试拼音、表格或饼图')
+assert.equal(toolbarSearchStatus('拼音', 2), '找到 2 个按钮，左右键可在结果间移动')
+assert.equal(ribbonTabTabIndex(true), 0)
+assert.equal(ribbonTabTabIndex(false), -1)
+assert.equal(menuToolNeedsCaret('align'), true)
+assert.equal(menuToolNeedsCaret('bold'), false)
+assert.equal(disabledToolTitle('换图', true), '换图（当前不可用）')
+assert.equal(disabledToolTitle('换图（当前不可用）', true), '换图（当前不可用）')
+assert.equal(disabledToolTitle('换图', false), '换图')
+assert.equal(groupHandleTitle('表格', 10), '拖动表格分组，本组 10 个按钮。Alt+左/右也可移动')
+assert.equal(toolbarSearchStatus('拼音', 2, '注音'), '找到 2 个按钮，首选「注音」，左右键可在结果间移动')
+assert.equal(toolbarSearchStatus('表', 24, '表格', true), '找到 24 个按钮，首选「表格」，只列出前若干个，左右键可在结果间移动')
+const ordered = orderToolbarSearchGroups([
+  { id: 'edit', label: '编辑', tools: [{ key: 'clear', label: '清除格式', title: '加粗后清除' }] },
+  { id: 'style', label: '字体', tools: [{ key: 'bold', label: '加粗' }] },
+], '加粗', 24)
+assert.equal(ordered.groups[0]?.tools[0]?.key, 'bold')
+assert.equal(ordered.capped, false)
+assert.equal(searchGroupCaption('编辑', 2, true), '编辑 · 2')
+assert.equal(searchGroupCaption('编辑', 2, false), '编辑')
+assert.equal(fontFamilyCaption('', [{ label: '默认字体', value: '' }]), '字体')
+assert.equal(fontFamilyCaption('"Songti SC", serif', [{ label: '宋体', value: '"Songti SC", serif' }]), '宋体')
+assert.equal(lineHeightCaption('1.5', [{ label: '默认行高', value: '' }, { label: '1.5 倍', value: '1.5' }]), '1.5 倍')
+assert.equal(alignToolTitle('center'), '当前居中。可选左对齐、居中、右对齐、两端对齐')
+assert.equal(zoomToolTitle(1), '编辑区缩放，当前为实际大小')
+assert.equal(zoomToolTitle(1.25), '编辑区缩放，当前 125%')
+assert.equal(ribbonTabForDigit(['edit', 'style'], 2), 'style')
+assert.equal(ribbonTabForDigit(['edit'], 9), '')
+assert.equal(ribbonTypeaheadQuery('拼', ''), '拼')
+assert.equal(ribbonTypeaheadQuery('Backspace', '拼音'), '拼')
+assert.equal(ribbonTypeaheadQuery('ArrowLeft', '拼'), null)
+assert.equal(toolbarSearchStatus('拼音', 1, '注音'), '找到 1 个按钮，首选「注音」，按 Enter 直接使用')
+assert.equal(ribbonTabHint('table', '表格'), '表格：插入、斑马纹、冻结、行列')
+assert.equal(listToolLabel('ordered'), '有序')
+assert.equal(listToolLabel(''), '列表')
+assert.equal(formatPainterLabel('sticky'), '连刷')
+assert.equal(formatPainterLabel('off'), '格式刷')
+assert.equal(searchEnterActivates(1), true)
+assert.equal(searchEnterActivates(1, true), false)
+assert.equal(searchEnterActivates(2), false)
+assert.equal(cycleSearchIndex(0, 3, -1), 2)
+assert.equal(cycleSearchIndex(2, 3, 1), 0)
+assert.equal(moreToolsCaption(12), '更多 12')
+assert.equal(moreToolsTitle(0), '更多格式与插入')
+assert.equal(ribbonSearchLabel('编辑', 3), '编辑，3 个匹配')
+assert.equal(ribbonSearchLabel('编辑', 0), '编辑')
+assert.equal(clampToolbarQuery('一二三四五六七八九十一二三四五六七八九十一二三四五六七八九十额外啊', 32).length, 32)
+assert.equal(searchToolbarTools([{ id: 'edit', label: '编辑', tools: [{ key: 'find', label: '查找' }] }], '查\u200b找')[0]?.key, 'find')
+assert.equal(toolIsUnavailable({ disabled: () => true }), true)
+assert.equal(searchToolbarTools([{ id: 't', label: '表', tools: [
+  { key: 'off', label: '表格', disabled: () => true },
+  { key: 'on', label: '表格2' },
+] }], '表格')[0]?.key, 'on')
+assert.equal(searchToolbarTools([{ id: 'f', label: '文件', tools: [{ key: 'export', label: '导出' }] }], 'ＰＤＦ')[0]?.key, 'export')
+assert.equal(searchToolbarTools([{ id: 's', label: '字体', tools: [{ key: 'ruby', label: '注音' }] }], '拼\u3000音')[0]?.key, 'ruby')
+assert.equal(toolbarSearchStatus('换图', 1, '换图', false, '图片', true), '找到 1 个按钮，首选「换图」，在图片，当前不可用')
+assert.equal(MENU_CLOSE_DELAY_MS >= 300, true)
+assert.equal(hiddenGroupPlaceholders([{ id: 'edit', label: '编辑', tools: [{ key: 'undo' }] }], ['edit', 'writing'], [{ id: 'edit', label: '编辑', keyCount: 3 }, { id: 'writing', label: '书写', keyCount: 3 }, { id: 'other', label: '其他', keyCount: 0 }]).map((group) => group.id).join(','), 'edit,writing')
+assert.equal(searchToolbarTools([{ id: 'insert', label: '插入', tools: [{ key: 'qrcode', label: '二维码' }] }], 'qr')[0]?.key, 'qrcode')
+assert.equal(toolbarSearchStatus('拼音', 2, '注音', false, '字体与颜色'), '找到 2 个按钮，首选「注音」，在字体与颜色，左右键可在结果间移动')
+assert.equal(toolbarMenuKeyAction('ArrowDown', true, true), 'move')
+assert.equal(toolbarMenuKeyAction('Escape', true, true), 'close')
+assert.equal(toolbarMenuKeyAction('ArrowDown', false, false), 'open')
+assert.equal(toolbarMenuKeyAction('ArrowDown', false, true), 'move')
+assert.equal(toolbarMenuKeyAction('ArrowLeft', false, true), 'ignore')
+assert.equal(isToolbarMenuTrigger({ popup: 'menu' }), true)
+assert.equal(isToolbarMenuTrigger({ caret: true }), true)
+assert.equal(isToolbarMenuTrigger({ popup: 'dialog' }), false)
+assert.equal(menuTypeaheadIndex(['居中', '居左', '居右'], '居', -1), 0)
+assert.equal(menuTypeaheadIndex(['居中', '居左', '居右'], '居', 0), 1)
+assert.equal(menuTypeaheadIndex(['居中', '居左'], '右', -1), -1)
+assert.equal(menuTypeaheadIndex(['左对齐', '居中'], ' ', -1), -1)
+assert.equal(toolbarMenuItemTitle('均分（1:1）'), '把内容分成左右等宽的两栏')
+assert.equal(toolbarMenuItemTitle('全大写'), '把选中的英文变成大写')
+assert.equal(toolbarMenuItemTitle('没有这项'), '')
+assert.equal(toolbarMenuItemTitle('无序列表'), '用圆点列出各项')
+assert.equal(toolbarMenuItemTitle('100%'), '恢复编辑区的实际大小')
+assert.equal(toolbarMenuItemTitle('一键生成…'), '按数据自动生成图表')
+assert.equal(toolbarMenuItemTitle('小红书'), '窄卡片，顶部一条红色')
+assert.equal(toolbarMenuItemTitle('康奈尔'), '左边线索栏，底部总结栏')
+assert.equal(toolbarMenuItemTitle('竖排'), '文字从上往下、从右往左排')
+assert.equal(blockMenuTitle('h1'), '改成一级标题')
+assert.equal(blockMenuTitle('sync'), '插入一块会同步的内容')
+assert.equal(blockMenuTitle('missing'), '')
+assert.equal(wordStatTitle('minutes'), '按大约 400 字一分钟估算')
+assert.equal(wordStatTitle('paragraphs'), '有文字的段落个数，空段不算')
+assert.equal(pickerTabTitle('颜文字'), '用符号拼成的表情')
+assert.equal(pickerTabTitle('拼音'), '拼音声调符号')
+assert.equal(pickerTabTitle('没有'), '')
+assert.equal(wordStatTitle('images'), '文档里的图片张数')
+assert.equal(wordStatTitle('dock'), '打开或收起详细字数')
+assert.equal(spacingGroupTitle('marginTop'), '设置这一段和上一段之间空多少')
+assert.equal(spacingOptionTitle('marginTop', ''), '段前用编辑器原来的距离')
+assert.equal(spacingOptionTitle('marginTop', '1em'), '段前空出一个字')
+assert.equal(spacingOptionTitle('letterSpacing', '0'), '字和字贴紧')
+assert.equal(spacingOptionTitle('textIndent', '2em'), '段首空出两个字')
+assert.equal(spacingOptionTitle('textDir', 'rtl'), '这一段从右往左写')
+assert.equal(spacingOptionTitle('marginTop', '9em'), '')
+assert.equal(codeLangTitle('纯文本'), '不按语言上色，原样显示')
+assert.equal(codeLangTitle('Python'), '按 Python 的语法给这段代码上色')
+assert.equal(codeLangTitle('没有'), '')
+assert.equal(pageSizeTitle('a4'), 'A4 纸，210×297 毫米')
+assert.equal(pageSizeTitle('full'), '编辑区铺满整个面板')
+assert.equal(imageWidthTitle('50%'), '图片缩到编辑区的一半宽')
+assert.equal(imageWidthTitle('没有'), '')
+assert.equal(blockHandleTitle('insert'), '在这一块下面插入空段，并打开插入菜单')
+assert.equal(blockHandleTitle('delete'), '删掉这一块')
+assert.equal(blockHandleTitle('missing'), '')
+assert.equal(cropTitle('16:9'), '裁成宽屏，宽比高是 16 比 9')
+assert.equal(cropTitle('原始'), '取消裁剪，显示整张图')
+assert.equal(cropTitle('没有'), '')
+assert.equal(emptyGuideTitle('heading'), '插入一级标题')
+assert.equal(emptyGuideTitle('columns'), '把内容分成左右等宽的两栏')
+assert.equal(emptyGuideTitle('missing'), '')
+assert.equal(imagePlaceTitle('左环绕'), '图片在左，文字绕着排')
+assert.equal(alignChoiceTitle('justify'), '这一段左右两端对齐')
+assert.equal(alignChoiceTitle('missing'), '')
+assert.equal(stepRibbonTabBy(['a', 'b', 'c', 'd', 'e'], 'b', 3), 'e')
+assert.equal(stepRibbonTabBy(['a', 'b', 'c'], 'a', -3), 'a')
+assert.equal(zoomToolLabel(1), '实际大小')
+assert.equal(zoomToolLabel(1.5), '150%')
+assert.equal(pasteFormatLabel('markdown'), '粘贴·MD')
+assert.equal(tableToolLabel(true), '表操作')
+assert.equal(tableToolLabel(false), '插表格')
+assert.equal(quoteToolTitle(true).startsWith('已在引用中'), true)
+assert.equal(codeBlockToolTitle(false).includes('代码块'), true)
+assert.equal(spellcheckToolTitle(true).includes('已开启'), true)
+assert.equal(searchToolbarTools([{ id: 'review', label: '审阅', tools: [{ key: 'snippets', label: '片段' }] }], '常用语')[0]?.key, 'snippets')
+assert.equal(searchToolbarTools([{ id: 'table', label: '表格', tools: [{ key: 'tableZebra', label: '斑马纹' }, { key: 'table', label: '表格' }] }], '表格')[0]?.key, 'table')
+assert.equal(searchToolbarTools([{ id: 'table', label: '表格', tools: [{ key: 'tableZebra', label: '斑马纹' }] }], '表格').length, 1)
+assert.equal(shortcutFromTitle('加粗 (Ctrl/⌘+B)'), 'Ctrl/⌘+B')
+assert.equal(shortcutFromTitle('没有快捷键'), '')
+assert.ok(shortcutNeedles('加粗 (Ctrl/⌘+B)').includes('ctrl+b'))
+assert.equal(searchToolbarTools([{ id: 'style', label: '字体与颜色', tools: [{ key: 'bold', label: '加粗', title: '加粗 (Ctrl/⌘+B)' }] }], 'ctrl+b')[0]?.key, 'bold')
+assert.equal(searchToolbarTools([{ id: 'insert', label: '插入', tools: [{ key: 'form', label: '表单' }] }], '单选')[0]?.key, 'form')
+assert.equal(searchToolbarTools([{ id: 'review', label: '审阅', tools: [{ key: 'deepOptimize', label: '一键整理' }] }], '深优化')[0]?.key, 'deepOptimize')
+assert.equal(searchToolbarTools([{ id: 'review', label: '审阅', tools: [{ key: 'headingCheck', label: '标题检查' }] }], '标题检')[0]?.key, 'headingCheck')
+assert.equal(searchToolbarTools([{ id: 'table', label: '表格', tools: [{ key: 'tableFormula', label: '求和' }] }], '格公式')[0]?.key, 'tableFormula')
+assert.equal(toolbarGroupReorderAllowed(''), true)
+assert.equal(toolbarGroupReorderAllowed('饼图'), false)
+assert.equal(menuFocusStep(-1, 4, 'ArrowDown'), 0)
+assert.equal(menuFocusStep(-1, 4, 'ArrowUp'), 3)
+assert.equal(menuFocusStep(0, 4, 'End'), 3)
+assert.equal(menuFocusStep(3, 4, 'Home'), 0)
+assert.equal(menuFocusStep(1, 4, 'ArrowDown'), 2)
+assert.equal(menuFocusStep(0, 4, 'Escape'), null)
+assert.equal(menuToolNeedsCaret('wordStats'), true)
+assert.equal(menuToolNeedsCaret('attach'), false)
+const primary = new Set(['undo', 'bold'])
+assert.deepEqual(toolsForToolbar([
+  { key: 'undo' },
+  { key: 'mermaid' },
+  { key: 'div', kind: 'divider' },
+], { expanded: false, querying: false, primary }).map((tool) => tool.key), ['undo'])
+assert.deepEqual(toolsForToolbar([
+  { key: 'undo' },
+  { key: 'mermaid' },
+], { expanded: false, querying: true, primary }).map((tool) => tool.key), ['undo', 'mermaid'])
+assert.equal(searchToolbarTools([{ id: 'charts', label: '图表', tools: [{ key: 'chart:basic', label: '基础' }] }], '饼图')[0]?.key, 'chart:basic')
+assert.equal(searchToolbarTools([{ id: 'insert', label: '插入', tools: [{ key: 'table', label: '表格' }] }], 'a').length, 0)
+
+const sizes = [
+  { label: '默认', value: '' },
+  { label: '小四', value: '12pt' },
+  { label: '五号', value: '10.5pt' },
+]
+assert.equal(fontSizeCaption('', sizes), '字号')
+assert.equal(fontSizeCaption('12pt', sizes), '小四')
+assert.equal(fontSizeCaption('13pt', sizes), '13pt')
+assert.deepEqual(pushRecentValue(['12pt', '10.5pt'], '12pt', 5), ['12pt', '10.5pt'])
+assert.deepEqual(pushRecentValue(['12pt'], '14pt', 2), ['14pt', '12pt'])
+assert.deepEqual(
+  recentOptions(sizes, ['10.5pt', '12pt']).map((item) => item.label),
+  ['五号', '小四'],
+)
+
+console.log('toolbar optimize ok')

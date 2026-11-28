@@ -5,6 +5,7 @@
  * 按 schema 里声明的 kind 渲染对应控件；值统一以字符串 / 布尔传出，
  * 类型转换由 useChartPanel 负责。
  */
+import { computed } from 'vue'
 import type { PanelField } from '../../../utils/echarts/panelSchemas'
 
 const props = defineProps<{
@@ -13,6 +14,14 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{ (e: 'update', value: unknown): void }>()
+
+const currentSelectExtra = computed(() => {
+  if (props.field.kind !== 'select') return ''
+  const value = props.value === null || props.value === undefined ? '' : String(props.value)
+  if (!value) return ''
+  const known = (props.field.options || []).some((opt) => opt.value === value)
+  return known ? '' : value
+})
 
 function onText(event: Event) {
   emit('update', (event.target as HTMLInputElement).value)
@@ -41,14 +50,19 @@ function onJson(event: Event) {
 
 <template>
   <label class="rte-cp-field">
-    <span class="rte-cp-field-label">{{ props.field.label }}</span>
+    <span class="rte-cp-field-label" :title="props.field.hint || undefined">{{ props.field.label }}</span>
     <select
       v-if="props.field.kind === 'select'"
       class="rte-cp-input"
       :value="props.value === null || props.value === undefined ? '' : String(props.value)"
+      :title="props.field.hint || props.field.label"
       @change="onSelect"
     >
       <option value="">未设置</option>
+      <option
+        v-if="currentSelectExtra"
+        :value="currentSelectExtra"
+      >{{ currentSelectExtra }}</option>
       <option v-for="opt in props.field.options || []" :key="opt.value" :value="opt.value">
         {{ opt.label }}
       </option>
@@ -57,6 +71,7 @@ function onJson(event: Event) {
       v-else-if="props.field.kind === 'boolean'"
       type="checkbox"
       :checked="props.value === true"
+      :title="props.field.hint || props.field.label"
       @change="onBoolean"
     />
     <input
@@ -67,6 +82,7 @@ function onJson(event: Event) {
       :max="props.field.max"
       :step="props.field.step"
       :value="props.value === null || props.value === undefined ? '' : String(props.value)"
+      :title="props.field.hint || props.field.label"
       @change="onNumber"
     />
     <input
@@ -74,6 +90,7 @@ function onJson(event: Event) {
       class="rte-cp-color"
       type="color"
       :value="String(props.value || '#ffffff')"
+      :title="props.field.hint || props.field.label"
       @change="onColor"
     />
     <textarea
@@ -82,6 +99,7 @@ function onJson(event: Event) {
       rows="3"
       :placeholder="props.field.placeholder"
       :value="String(props.value ?? '')"
+      :title="props.field.hint || props.field.label"
       @change="onJson"
     ></textarea>
     <input
@@ -90,6 +108,7 @@ function onJson(event: Event) {
       type="text"
       :placeholder="props.field.placeholder"
       :value="String(props.value ?? '')"
+      :title="props.field.hint || props.field.label"
       @change="onText"
     />
     <span v-if="props.field.hint" class="rte-cp-field-hint">{{ props.field.hint }}</span>

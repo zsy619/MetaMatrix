@@ -1,0 +1,224 @@
+/*
+ * 全局弹窗样式（Element Plus 弹窗、消息框与自绘浮层统一走这一套）。
+ *
+ * ⚠️ 现状说明（2026-11）：本项目的**全局弹窗表面已改由 `styles/telegram.css` 接管**
+ *    （Telegram Web K 规范：实心白底 + 12px 圆角 + 中性投影 + 无竖条标题）。
+ *    telegram.css 在 main.ts 里最后导入，优先级高于本文件，
+ *    因此本文件里 `.el-dialog` / `.el-message-box` 的表面规则已成历史包袱。
+ *    保留本文件仅为兼容尚未迁移的旧选择器；新增弹窗请直接按
+ *    `docs/design/telegram-design-system.md` 写样式，不要在这里再加表面规则。
+ */
+:root {
+  /* 弹窗系统：所有弹窗共用同一套底色、圆角与阴影。 */
+  --mm-dlg-backdrop: rgba(32, 33, 36, 0.46);
+  --mm-dlg-radius: 18px;
+  --mm-dlg-shadow:
+    0 32px 80px rgba(15, 23, 42, 0.26),
+    0 8px 20px rgba(15, 23, 42, 0.1);
+}
+
+/* 统一的遮罩：深灰半透明 + 轻微模糊，弹窗层级一眼可辨。 */
+.el-overlay,
+.pm-overlay,
+body .overlay,
+body .rev-overlay,
+body .ap-overlay,
+body .bfp-modal-overlay {
+  background: var(--mm-dlg-backdrop);
+  backdrop-filter: blur(4px);
+}
+
+/*
+ * 登录 / 注册的提交遮罩（.auth-overlay）不在统一遮罩名单里：
+ * 登录卡片按钮内有一条正在推进的品牌进度条，遮罩一旦模糊就会把
+ * 卡片连同进度条一起糊掉，用户看不到自己点击后的反馈。
+ * 该遮罩只需要"吃掉指针事件 + 显示进度"，样式由
+ * components/ui/AuthSubmitOverlay.vue 自行管理（浅色半透明、不做模糊）。
+ */
+
+/* 滚动条：细窄、圆角、悬停变深（弹窗内部统一）。 */
+.el-dialog__body,
+.el-message-box__content,
+.pm-body,
+.ng-picker,
+body .overlay .card,
+body .rev-panel,
+body .ap-card,
+body .bfp-modal {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd3e0 transparent;
+}
+
+.el-dialog__body::-webkit-scrollbar,
+.el-message-box__content::-webkit-scrollbar,
+.pm-body::-webkit-scrollbar,
+.ng-picker::-webkit-scrollbar,
+body .overlay .card::-webkit-scrollbar,
+body .rev-panel::-webkit-scrollbar,
+body .ap-card::-webkit-scrollbar,
+body .bfp-modal::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.el-dialog__body::-webkit-scrollbar-thumb,
+.el-message-box__content::-webkit-scrollbar-thumb,
+.pm-body::-webkit-scrollbar-thumb,
+.ng-picker::-webkit-scrollbar-thumb,
+body .overlay .card::-webkit-scrollbar-thumb,
+body .rev-panel::-webkit-scrollbar-thumb,
+body .ap-card::-webkit-scrollbar-thumb,
+body .bfp-modal::-webkit-scrollbar-thumb {
+  background: #cbd3e0;
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background-clip: content-box;
+}
+
+.el-dialog__body::-webkit-scrollbar-thumb:hover,
+.pm-body::-webkit-scrollbar-thumb:hover,
+.ng-picker::-webkit-scrollbar-thumb:hover,
+body .overlay .card::-webkit-scrollbar-thumb:hover,
+body .rev-panel::-webkit-scrollbar-thumb:hover,
+body .ap-card::-webkit-scrollbar-thumb:hover,
+body .bfp-modal::-webkit-scrollbar-thumb:hover {
+  background: #aab4c2;
+  background-clip: content-box;
+}
+
+/* ---------------- Element Plus 弹窗 ---------------- */
+.el-dialog {
+  --el-dialog-border-radius: var(--mm-dlg-radius);
+  border-radius: var(--mm-dlg-radius);
+  border: 1px solid var(--mm-line);
+  box-shadow: var(--mm-dlg-shadow);
+  overflow: hidden;
+}
+
+/* 标题：左侧一条主色竖条 + 加粗标题。 */
+.el-dialog__header {
+  margin: 0;
+  padding: 16px 20px 14px;
+  border-bottom: 1px solid var(--mm-line);
+  background: linear-gradient(180deg, #ffffff 0%, #fbfbfd 100%);
+}
+
+.el-dialog__title {
+  position: relative;
+  padding-left: 12px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--mm-text);
+  letter-spacing: 0.01em;
+}
+
+.el-dialog__title::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 16px;
+  border-radius: 2px;
+  background: var(--mm-blue);
+}
+
+.el-dialog__headerbtn {
+  top: 14px;
+  right: 14px;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+}
+
+.el-dialog__headerbtn:hover {
+  background: var(--mm-blue-soft);
+  color: var(--mm-blue);
+}
+
+/* 正文：内容再长也在弹窗内滚动，不把整页拖着跑。 */
+.el-dialog__body {
+  padding: 18px 20px;
+  color: var(--mm-text);
+  max-height: calc(100vh - 220px);
+  overflow-y: auto;
+}
+
+.el-dialog__footer {
+  padding: 12px 20px 16px;
+  border-top: 1px solid var(--mm-line);
+  background: #fbfbfd;
+}
+
+/* 底部按钮：主按钮用蓝色渐变，次按钮留白描边。 */
+.el-dialog__footer .el-button {
+  border-radius: 10px;
+  font-weight: 600;
+  min-width: 84px;
+}
+
+.el-dialog__footer .el-button--primary {
+  border-color: transparent;
+  background: linear-gradient(180deg, #2b7cf0 0%, var(--mm-blue) 100%);
+  box-shadow: 0 4px 12px rgba(26, 115, 232, 0.24);
+}
+
+.el-dialog__footer .el-button--primary:hover {
+  background: linear-gradient(180deg, #1a73e8 0%, var(--mm-blue-deep) 100%);
+  color: #fff;
+}
+
+/* ---------------- 消息框 ---------------- */
+.el-message-box {
+  border-radius: var(--mm-dlg-radius);
+  border: 1px solid var(--mm-line);
+  box-shadow: var(--mm-dlg-shadow);
+  overflow: hidden;
+}
+
+.el-message-box__header {
+  padding: 16px 20px 10px;
+  border-bottom: 1px solid var(--mm-line);
+}
+
+.el-message-box__title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--mm-text);
+}
+
+.el-message-box__content {
+  padding: 16px 20px;
+}
+
+.el-message-box__btns {
+  padding: 10px 20px 16px;
+  gap: 8px;
+}
+
+.el-message-box__btns .el-button {
+  border-radius: 10px;
+  font-weight: 600;
+  min-width: 76px;
+}
+
+.el-message-box__btns .el-button--primary {
+  border-color: transparent;
+  background: linear-gradient(180deg, #2b7cf0 0%, var(--mm-blue) 100%);
+  color: #fff;
+}
+
+/* ---------------- 自绘浮层（快捷键 / 版本历史 / 附件预览 / 公式弹窗） ---------------- */
+body .overlay .card,
+body .ap-overlay .ap-card,
+body .bfp-modal-overlay .bfp-modal {
+  border-radius: var(--mm-dlg-radius);
+  border: 1px solid var(--mm-line);
+  box-shadow: var(--mm-dlg-shadow);
+}
+
+body .ap-overlay .ap-card,
+body .bfp-modal-overlay .bfp-modal {
+  overflow: hidden;
+}

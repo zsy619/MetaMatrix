@@ -1,0 +1,5 @@
+# 开发环境层：只写与默认值不同的项。
+server:
+  port: 3000
+captcha:
+  debug: false

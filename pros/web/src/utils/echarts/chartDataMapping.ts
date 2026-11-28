@@ -89,6 +89,27 @@ function toFiniteNumber(raw: unknown): number {
   return Number.isFinite(num) ? num : 0
 }
 
+/** 正文表格：第一列是类目，其余列是系列，第一行是表头。 */
+export function tableGridToChartData(grid: string[][]): MappedChartData | null {
+  if (grid.length < 2) return null
+  const header = grid[0] || []
+  const body = grid.slice(1).filter((row) => row.some((cell) => String(cell || '').trim()))
+  if (!body.length || header.length < 2) return null
+  const categories = body.map((row) => String(row[0] || ''))
+  const series = []
+  for (let column = 1; column < header.length; column += 1) {
+    series.push({
+      name: String(header[column] || '').trim() || `系列${column}`,
+      data: body.map((row) => {
+        const raw = String(row[column] || '').replace(/,/g, '')
+        const value = Number(raw)
+        return Number.isFinite(value) ? value : 0
+      }),
+    })
+  }
+  return series.length ? { categories, series } : null
+}
+
 /** 把映射结果写回 option（类目写 xAxis.data，数值写 series.data）。 */
 export function applyMappedDataToOption(
   option: Record<string, unknown>,

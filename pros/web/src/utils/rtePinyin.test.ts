@@ -6,6 +6,10 @@ import {
   pinyinInitials,
   pinyinSearchScore,
 } from './rtePinyin.ts'
+import { loadPinyin } from './pinyinRuntime.ts'
+
+// 拼音库按需加载：先等它就绪再断言。
+await loadPinyin()
 
 // 首字母
 assert.equal(pinyinInitials('标题'), 'bt')

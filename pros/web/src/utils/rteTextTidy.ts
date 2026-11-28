@@ -15,7 +15,18 @@ export type TextMenuItem = {
   sep?: boolean
 }
 
-/** 大小写菜单里一并放整理、揭晓和首字下沉，避免工具栏再加按钮。 */
+/** 功能区「整理」栏目的下级动作。大小写菜单仍共用同一套 id。 */
+export const TEXT_TIDY_ACTIONS: readonly { id: TextTidyMode; label: string }[] = [
+  { id: 'half', label: '转为半角' },
+  { id: 'full', label: '转为全角' },
+  { id: 'pangu', label: '中英文加空格' },
+  { id: 'squeeze', label: '去掉多余空格' },
+  { id: 'sortLines', label: '按行排序' },
+  { id: 'uniqueLines', label: '去掉重复行' },
+  { id: 'numberLines', label: '给每行编号' },
+]
+
+/** 大小写菜单里一并放整理、揭晓和首字下沉。 */
 export const TEXT_MENU_ITEMS: readonly TextMenuItem[] = [
   { id: 'upper', label: '全大写' },
   { id: 'lower', label: '全小写' },

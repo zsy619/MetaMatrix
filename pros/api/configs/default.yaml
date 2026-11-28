@@ -1,0 +1,96 @@
+# 元矩阵 · 服务端分层配置（基础层）
+#
+# 分层顺序（后者覆盖前者）：
+#   1. 本文件 configs/default.yaml      —— 所有环境的默认值
+#   2. configs/<APP_ENV>.yaml            —— 环境层（dev / prod）
+#   3. 环境变量                          —— 最高优先级（生产改密只改环境变量）
+#   4. api/.env                          —— 本地开发便利文件
+#
+# 键名与进程环境变量的映射见 internal/config/layered.go 的 envKeyMap。
+
+server:
+  port: 3000
+
+database:
+  url: postgresql://metamatrix:metamatrix@localhost:5432/metamatrix
+  # 连接池：多维表格并发查询场景下 30 条会成为瓶颈（文档 §16.3）。
+  maxOpenConns: 50
+  maxIdleConns: 10
+  connMaxLifetimeMin: 30
+  connMaxIdleMin: 5
+
+auth:
+  jwtSecret: metamatrix-dev-jwt-secret
+  loginWindow: 15m
+  loginPairLimit: 8
+  loginIPLimit: 30
+
+captcha:
+  ttl: 5m
+  debug: false
+
+media:
+  root: data/media
+  signSecret: ""
+  object:
+    mode: local
+    endpoint: ""
+    bucket: ""
+    region: ""
+    accessKey: ""
+    secretKey: ""
+    prefix: ""
+    useSSL: false
+
+knowledge:
+  trashKeepDays: 30
+  versionKeep: 50
+
+base:
+  rateLimit:
+    rps: 40
+    burst: 80
+    # 租户级动态配额的上下限倍数（按空间成员数缩放）。
+    tenantScaleMax: 8
+  import:
+    # 异步导入任务单批写入条数。
+    batchSize: 200
+    # 保留的导入任务记录条数（超期自动清理）。
+    keepDays: 30
+  operationLog:
+    # 操作审计保留天数，超期由归档任务清理。
+    keepDays: 90
+  outbox:
+    # 已发布事件保留天数（断线补拉窗口）。
+    keepDays: 7
+    # 超过该重试次数的事件进入死信队列。
+    maxRetries: 5
+    # 死信保留天数，超期清理。
+    deadKeepDays: 30
+
+mail:
+  mode: auto
+  host: ""
+  port: 587
+  username: ""
+  password: ""
+  from: ""
+  fromName: ""
+  insecure: false
+  timeout: 15s
+
+passwordReset:
+  codeTTL: 10m
+  maxAttempts: 5
+  cooldown: 60s
+  hourlyPerAddress: 5
+  dailyPerAddress: 10
+  hourlyPerIP: 20
+  revealCode: false
+  unknownEmailMode: explicit
+
+ai:
+  baseURL: ""
+  apiKey: ""
+  model: ""
+  embeddingModel: ""

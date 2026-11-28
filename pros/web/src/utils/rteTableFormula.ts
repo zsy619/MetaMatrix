@@ -14,6 +14,7 @@
  * - #REF!   引用无效（越界、地址非法）或循环引用
  * - #VALUE! 操作数不是数值 / 公式语法非法
  * - #DIV/0! 除数为 0，或 AVERAGE 没有可参与计算的数字
+ * - #NUM!   数值超出函数定义域
  * - #NAME?  未知函数名
  */
 
@@ -21,13 +22,14 @@
 export type CellAddress = { col: number; row: number }
 
 /** 公式错误码。 */
-export type FormulaErrorCode = '#REF!' | '#VALUE!' | '#DIV/0!' | '#NAME?'
+export type FormulaErrorCode = '#REF!' | '#VALUE!' | '#DIV/0!' | '#NUM!' | '#NAME?'
 
 /** 全部错误码，供 UI 展示 / 校验用。 */
 export const FORMULA_ERROR_CODES: readonly FormulaErrorCode[] = [
   '#REF!',
   '#VALUE!',
   '#DIV/0!',
+  '#NUM!',
   '#NAME?',
 ]
 
@@ -47,6 +49,48 @@ export function parseCellAddress(text: string): CellAddress | null {
   return { col, row }
 }
 
+/** 中文输入法打出来的全角括号、冒号和百分号，收成公式认得的符号。 */
+export function normalizeFormulaPunctuation(text: string): string {
+  return text
+    .replace(/\u00a0|\u3000/g, ' ')
+    .replace(/\uFF08/g, '(')
+    .replace(/\uFF09/g, ')')
+    .replace(/\uFF1A/g, ':')
+    .replace(/\uFF0C/g, ',')
+    .replace(/\uFF05/g, '%')
+    .replace(/\uFF0B/g, '+')
+    .replace(/\uFF0D/g, '-')
+    .replace(/\u00D7/g, '*')
+    .replace(/\u00F7/g, '/')
+    .replace(/\uFF3E/g, '^')
+    .replace(/\uFF1E/g, '>')
+    .replace(/\uFF1C/g, '<')
+    .replace(/\uFF1D/g, '=')
+    .replace(/\u2265/g, '>=')
+    .replace(/\u2264/g, '<=')
+    .replace(/\u2260/g, '<>')
+}
+
+/** 公式里提到的单元格和区域，按出现顺序去重。 */
+export function formulaReferences(formula: string): string[] {
+  const body = String(formula ?? '').trim().replace(/^=/, '')
+  const found = body.match(/\$?[A-Za-z]{1,3}\$?[1-9][0-9]*(?::\$?[A-Za-z]{1,3}\$?[1-9][0-9]*)?/g) || []
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const token of found) {
+    const key = token.replace(/\$/g, '').toUpperCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(key)
+  }
+  return out
+}
+
+function relockRef(text: string, colAbs: boolean, rowAbs: boolean): string {
+  if (text === '#REF!' || (!colAbs && !rowAbs)) return text
+  return text.replace(/([A-Za-z]+)([0-9]+)/g, (_, col: string, row: string) => `${colAbs ? '$' : ''}${col}${rowAbs ? '$' : ''}${row}`)
+}
+
 /** { col: 2, row: 3 } -> 'B3' */
 export function formatCellAddress(addr: CellAddress): string {
   let col = Math.max(1, Math.floor(addr.col))
@@ -58,6 +102,126 @@ export function formatCellAddress(addr: CellAddress): string {
     col = Math.floor((col - 1) / 26)
   }
   return `${letters}${row}`
+}
+
+/**
+ * 行列被插入、删除或对调以后，公式里的地址跟着格子走。
+ * 映射返回 null 表示那一行或那一列已经不在了，写成 #REF!。
+ * 区域还连成一块时收成新的区域；中间插入的空行会把区域撑开。
+ */
+export function remapFormulaByAxis(
+  formula: string,
+  mapRow: (row: number) => number | null,
+  mapCol: (col: number) => number | null,
+): string {
+  const source = String(formula ?? '')
+  if (!source.trim().startsWith('=')) return source
+  const raw = normalizeFormulaPunctuation(source)
+  const held: string[] = []
+  const ranged = raw.replace(
+    /(\$?)([A-Za-z]{1,3})(\$?)([1-9][0-9]*):(\$?)([A-Za-z]{1,3})(\$?)([1-9][0-9]*)/g,
+    (all, c1lock: string, c1: string, r1lock: string, r1: string, c2lock: string, c2: string, r2lock: string, r2: string) => {
+      const from = parseCellAddress(`${c1}${r1}`)
+      const to = parseCellAddress(`${c2}${r2}`)
+      if (!from || !to) return all
+      const token = `\u0000${held.length}\u0000`
+      const next = remapFormulaRange(from, to, mapRow, mapCol)
+      held.push(relockRef(next, c1lock === '$' && c2lock === '$', r1lock === '$' && r2lock === '$'))
+      return token
+    },
+  )
+  const cells = ranged.replace(/(\$?)([A-Za-z]{1,3})(\$?)([1-9][0-9]*)\b/g, (all, colLock: string, col: string, rowLock: string, row: string) => {
+    const addr = parseCellAddress(`${col}${row}`)
+    if (!addr) return all
+    const next = remapOneAddress(addr, mapRow, mapCol, `${col}${row}`)
+    return relockRef(next, colLock === '$', rowLock === '$')
+  })
+  return cells.replace(/\u0000(\d+)\u0000/g, (_all, index: string) => held[Number(index)] ?? '#REF!')
+}
+
+function remapOneAddress(
+  addr: CellAddress,
+  mapRow: (row: number) => number | null,
+  mapCol: (col: number) => number | null,
+  original: string,
+): string {
+  const row = mapRow(addr.row)
+  const col = mapCol(addr.col)
+  if (row == null || col == null) return '#REF!'
+  if (row === addr.row && col === addr.col) return original || formatCellAddress(addr)
+  return formatCellAddress({ col, row })
+}
+
+function remapFormulaRange(
+  from: CellAddress,
+  to: CellAddress,
+  mapRow: (row: number) => number | null,
+  mapCol: (col: number) => number | null,
+): string {
+  const rowFrom = Math.min(from.row, to.row)
+  const rowTo = Math.max(from.row, to.row)
+  const colFrom = Math.min(from.col, to.col)
+  const colTo = Math.max(from.col, to.col)
+  const count = (rowTo - rowFrom + 1) * (colTo - colFrom + 1)
+  if (count > 2000) {
+    const start = remapOneAddress(from, mapRow, mapCol, '')
+    const end = remapOneAddress(to, mapRow, mapCol, '')
+    if (start === '#REF!' || end === '#REF!') return '#REF!'
+    return start === end ? start : `${start}:${end}`
+  }
+  const seen = new Set<string>()
+  let minRow = Number.POSITIVE_INFINITY
+  let maxRow = Number.NEGATIVE_INFINITY
+  let minCol = Number.POSITIVE_INFINITY
+  let maxCol = Number.NEGATIVE_INFINITY
+  for (let row = rowFrom; row <= rowTo; row += 1) {
+    for (let col = colFrom; col <= colTo; col += 1) {
+      const nextRow = mapRow(row)
+      const nextCol = mapCol(col)
+      if (nextRow == null || nextCol == null) continue
+      seen.add(`${nextCol},${nextRow}`)
+      minRow = Math.min(minRow, nextRow)
+      maxRow = Math.max(maxRow, nextRow)
+      minCol = Math.min(minCol, nextCol)
+      maxCol = Math.max(maxCol, nextCol)
+    }
+  }
+  if (!seen.size) return '#REF!'
+  const box = (maxRow - minRow + 1) * (maxCol - minCol + 1)
+  const solid = seen.size === box
+  const inserted = !solid && rangeGapsAreInserts(mapRow, mapCol, minRow, maxRow, minCol, maxCol, seen)
+  if (!solid && !inserted) {
+    const start = remapOneAddress(from, mapRow, mapCol, '')
+    const end = remapOneAddress(to, mapRow, mapCol, '')
+    if (start === '#REF!' || end === '#REF!') return '#REF!'
+    return start === end ? start : `${start}:${end}`
+  }
+  if (minRow === maxRow && minCol === maxCol) return formatCellAddress({ col: minCol, row: minRow })
+  return `${formatCellAddress({ col: minCol, row: minRow })}:${formatCellAddress({ col: maxCol, row: maxRow })}`
+}
+
+/** 区域中间的空档没有任何旧格子移进来，说明那是新插入的行或列。 */
+function rangeGapsAreInserts(
+  mapRow: (row: number) => number | null,
+  mapCol: (col: number) => number | null,
+  minRow: number,
+  maxRow: number,
+  minCol: number,
+  maxCol: number,
+  seen: Set<string>,
+): boolean {
+  for (let row = minRow; row <= maxRow; row += 1) {
+    for (let col = minCol; col <= maxCol; col += 1) {
+      if (seen.has(`${col},${row}`)) continue
+      for (let sourceRow = 1; sourceRow <= 400; sourceRow += 1) {
+        if (mapRow(sourceRow) !== row) continue
+        for (let sourceCol = 1; sourceCol <= 80; sourceCol += 1) {
+          if (mapCol(sourceCol) === col) return false
+        }
+      }
+    }
+  }
+  return true
 }
 
 /** 单元格文本是不是公式。 */
@@ -97,6 +261,8 @@ type LexToken =
   | { t: 'comma' }
   | { t: 'colon' }
   | { t: 'pct' }
+  | { t: 'cmp'; v: string }
+  | { t: 'err'; v: FormulaErrorCode }
 
 class FormulaError extends Error {
   code: FormulaErrorCode
@@ -127,13 +293,27 @@ function lex(src: string): LexToken[] {
       i += m[0].length
       continue
     }
+    if (ch === '#') {
+      const err = /^#(REF!|VALUE!|DIV\/0!|NUM!|NAME\?)/.exec(src.slice(i))
+      if (!err) throw new FormulaError('#VALUE!')
+      tokens.push({ t: 'err', v: err[0] as FormulaErrorCode })
+      i += err[0].length
+      continue
+    }
     if (ch === '(') tokens.push({ t: 'lp' })
     else if (ch === ')') tokens.push({ t: 'rp' })
     else if (ch === ',') tokens.push({ t: 'comma' })
     else if (ch === ':') tokens.push({ t: 'colon' })
     else if (ch === '%') tokens.push({ t: 'pct' })
-    else if (ch === '+' || ch === '-' || ch === '*' || ch === '/') tokens.push({ t: 'op', v: ch })
-    else throw new FormulaError('#VALUE!')
+    else if (ch === '+' || ch === '-' || ch === '*' || ch === '/' || ch === '^') tokens.push({ t: 'op', v: ch })
+    else if (ch === '<' || ch === '>' || ch === '=') {
+      const next = src[i + 1]
+      let op = ch
+      if (ch === '<' && (next === '>' || next === '=')) op = ch + next
+      else if (ch === '>' && next === '=') op = ch + next
+      if (op.length === 2) i += 1
+      tokens.push({ t: 'cmp', v: op })
+    } else throw new FormulaError('#VALUE!')
     i += 1
   }
   return tokens
@@ -141,6 +321,7 @@ function lex(src: string): LexToken[] {
 
 type Node =
   | { k: 'num'; v: number }
+  | { k: 'err'; code: FormulaErrorCode }
   | { k: 'ref'; addr: CellAddress }
   | { k: 'range'; from: CellAddress; to: CellAddress }
   | { k: 'above' }
@@ -148,9 +329,10 @@ type Node =
   | { k: 'unary'; op: string; arg: Node }
   | { k: 'pct'; arg: Node }
   | { k: 'bin'; op: string; l: Node; r: Node }
+  | { k: 'cmp'; op: string; l: Node; r: Node }
   | { k: 'call'; name: string; args: Node[] }
 
-const FUNC_NAMES = new Set(['SUM', 'AVERAGE', 'COUNT', 'MAX', 'MIN'])
+const FUNC_NAMES = new Set(['SUM', 'AVERAGE', 'COUNT', 'MAX', 'MIN', 'IF', 'ROUND', 'AND', 'OR', 'ABS', 'INT', 'MOD', 'POWER', 'SQRT', 'SIGN', 'CEILING', 'FLOOR', 'NOT', 'PRODUCT', 'MEDIAN', 'COUNTA', 'ROUNDUP', 'ROUNDDOWN', 'PI', 'EXP', 'LN', 'LOG', 'LOG10', 'FACT', 'GCD', 'LCM', 'TRUNC', 'QUOTIENT', 'EVEN', 'ODD', 'COMBIN', 'PERMUT', 'DEGREES', 'RADIANS', 'SIN', 'COS', 'TAN', 'ASIN', 'ACOS', 'ATAN', 'ATAN2', 'SINH', 'COSH', 'TANH', 'ASINH', 'ACOSH', 'ATANH', 'COT', 'SEC', 'CSC', 'CSCH', 'SECH', 'COTH'])
 
 class Parser {
   tokens: LexToken[]
@@ -163,6 +345,14 @@ class Parser {
   }
   next(): LexToken | undefined {
     return this.tokens[this.pos++]
+  }
+  parseCompare(): Node {
+    let left = this.parseExpr()
+    const token = this.peek()
+    if (!token || token.t !== 'cmp') return left
+    this.next()
+    const right = this.parseExpr()
+    return { k: 'cmp', op: token.v, l: left, r: right }
   }
   parseExpr(): Node {
     let left = this.parseTerm()
@@ -193,7 +383,14 @@ class Parser {
       const arg = this.parseUnary()
       return t.v === '-' ? { k: 'unary', op: '-', arg } : arg
     }
-    return this.parsePostfix()
+    return this.parsePower()
+  }
+  parsePower(): Node {
+    const left = this.parsePostfix()
+    const token = this.peek()
+    if (!token || token.t !== 'op' || token.v !== '^') return left
+    this.next()
+    return { k: 'bin', op: '^', l: left, r: this.parseUnary() }
   }
   parsePostfix(): Node {
     let node = this.parsePrimary()
@@ -206,6 +403,7 @@ class Parser {
   parsePrimary(): Node {
     const t = this.next()
     if (!t) throw new FormulaError('#VALUE!')
+    if (t.t === 'err') return { k: 'err', code: t.v }
     if (t.t === 'num') return { k: 'num', v: t.v }
     if (t.t === 'lp') {
       const inner = this.parseExpr()
@@ -232,9 +430,8 @@ class Parser {
         const args: Node[] = []
         if (this.peek()?.t !== 'rp') {
           for (;;) {
-            // 参数只能是单元格 / 区域 / 数字 / 嵌套函数，不允许二元运算，
-            // 否则 '=SUM(A1:B2)*2' 里的 '*' 会被吞进参数里。
-            args.push(this.parsePostfix())
+            // 括号里可以是加减和比较。括号外的 * 不会被吃进去，SUM(A1:B2)*2 仍然先求和再乘。
+            args.push(this.parseCompare())
             if (this.peek()?.t === 'comma') {
               this.next()
               continue
@@ -260,7 +457,7 @@ function parseFormula(body: string): Node {
   const tokens = lex(body)
   if (!tokens.length) throw new FormulaError('#VALUE!')
   const parser = new Parser(tokens)
-  const node = parser.parseExpr()
+  const node = parser.parseCompare()
   if (parser.pos !== parser.tokens.length) throw new FormulaError('#VALUE!')
   return node
 }
@@ -277,6 +474,8 @@ type Ctx = {
 
 type CellValue =
   | { kind: 'num'; v: number }
+  | { kind: 'blank' }
+  | { kind: 'missing' }
   | { kind: 'text' }
   | { kind: 'err'; error: FormulaErrorCode }
 
@@ -295,9 +494,9 @@ function cellTextAt(ctx: Ctx, addr: CellAddress): string | null {
 /** 求某个单元格的数值：常量取数字，公式单元格递归求值。 */
 function resolveCell(ctx: Ctx, addr: CellAddress): CellValue {
   const text = cellTextAt(ctx, addr)
-  if (text == null) return { kind: 'err', error: '#REF!' }
+  if (text == null) return { kind: 'missing' }
   const trimmed = text.trim()
-  if (!trimmed) return { kind: 'text' }
+  if (!trimmed) return { kind: 'blank' }
   if (isFormulaCell(trimmed)) {
     const key = visitKey(addr.row, addr.col)
     if (ctx.visiting.has(key)) return { kind: 'err', error: '#REF!' }
@@ -358,23 +557,562 @@ function cellsOf(node: Node, at: CellAddress): CellAddress[] | null {
   return null
 }
 
+function roundHalfAway(value: number, digits: number): number {
+  const factor = 10 ** digits
+  const scaled = value * factor
+  const rounded = Math.sign(scaled) * Math.round(Math.abs(scaled))
+  return rounded / factor
+}
+
+function roundToward(value: number, digits: number): number {
+  const factor = 10 ** digits
+  const scaled = Math.abs(value) * factor
+  const cut = Math.floor(scaled + 1e-10)
+  return (Math.sign(value) * cut) / factor
+}
+
+function evalRoundDown(args: Node[], ctx: Ctx, at: CellAddress): EvalValue {
+  if (!args.length || args.length > 2) return { error: '#VALUE!' }
+  const value = evalNode(args[0]!, ctx, at)
+  if (isError(value)) return value
+  let digits = 0
+  if (args[1]) {
+    const places = evalNode(args[1], ctx, at)
+    if (isError(places)) return places
+    digits = Math.max(-6, Math.min(6, Math.trunc(places)))
+  }
+  return roundToward(value, digits)
+}
+
+function roundAway(value: number, digits: number): number {
+  const factor = 10 ** digits
+  const scaled = Math.abs(value) * factor
+  const raised = Math.ceil(scaled - 1e-10)
+  return (Math.sign(value) * raised) / factor
+}
+
+function evalRoundUp(args: Node[], ctx: Ctx, at: CellAddress): EvalValue {
+  if (!args.length || args.length > 2) return { error: '#VALUE!' }
+  const value = evalNode(args[0]!, ctx, at)
+  if (isError(value)) return value
+  let digits = 0
+  if (args[1]) {
+    const places = evalNode(args[1], ctx, at)
+    if (isError(places)) return places
+    digits = Math.max(-6, Math.min(6, Math.trunc(places)))
+  }
+  return roundAway(value, digits)
+}
+
+function evalRound(args: Node[], ctx: Ctx, at: CellAddress): EvalValue {
+  if (!args.length || args.length > 2) return { error: '#VALUE!' }
+  const value = evalNode(args[0]!, ctx, at)
+  if (isError(value)) return value
+  let digits = 0
+  if (args[1]) {
+    const places = evalNode(args[1], ctx, at)
+    if (isError(places)) return places
+    digits = Math.max(-6, Math.min(6, Math.trunc(places)))
+  }
+  return roundHalfAway(value, digits)
+}
+
+function raisePower(base: number, exp: number): EvalValue {
+  if (base === 0 && exp < 0) return { error: '#DIV/0!' }
+  if (base < 0 && !Number.isInteger(exp)) return { error: '#VALUE!' }
+  const result = base ** exp
+  if (!Number.isFinite(result)) return { error: '#VALUE!' }
+  return result
+}
+
+function evalFloor(args: Node[], ctx: Ctx, at: CellAddress): EvalValue {
+  if (!args.length || args.length > 2) return { error: '#VALUE!' }
+  const value = evalNode(args[0]!, ctx, at)
+  if (isError(value)) return value
+  if (!args[1]) return Math.floor(value)
+  const step = evalNode(args[1], ctx, at)
+  if (isError(step)) return step
+  if (step === 0) return { error: '#DIV/0!' }
+  const result = Math.floor(value / step) * step
+  if (!Number.isFinite(result)) return { error: '#VALUE!' }
+  return result
+}
+
+function evalCeiling(args: Node[], ctx: Ctx, at: CellAddress): EvalValue {
+  if (!args.length || args.length > 2) return { error: '#VALUE!' }
+  const value = evalNode(args[0]!, ctx, at)
+  if (isError(value)) return value
+  if (!args[1]) return Math.ceil(value)
+  const step = evalNode(args[1], ctx, at)
+  if (isError(step)) return step
+  if (step === 0) return { error: '#DIV/0!' }
+  const result = Math.ceil(value / step) * step
+  if (!Number.isFinite(result)) return { error: '#VALUE!' }
+  return result
+}
+
+function evalNot(args: Node[], ctx: Ctx, at: CellAddress): EvalValue {
+  if (args.length !== 1) return { error: '#VALUE!' }
+  const value = evalNode(args[0]!, ctx, at)
+  if (isError(value)) return value
+  return value === 0 ? 1 : 0
+}
+
+function evalSign(args: Node[], ctx: Ctx, at: CellAddress): EvalValue {
+  if (args.length !== 1) return { error: '#VALUE!' }
+  const value = evalNode(args[0]!, ctx, at)
+  if (isError(value)) return value
+  if (value > 0) return 1
+  if (value < 0) return -1
+  return 0
+}
+
+function evalSqrt(args: Node[], ctx: Ctx, at: CellAddress): EvalValue {
+  if (args.length !== 1) return { error: '#VALUE!' }
+  const value = evalNode(args[0]!, ctx, at)
+  if (isError(value)) return value
+  if (value < 0) return { error: '#VALUE!' }
+  return Math.sqrt(value)
+}
+
+function evalPower(args: Node[], ctx: Ctx, at: CellAddress): EvalValue {
+  if (args.length !== 2) return { error: '#VALUE!' }
+  const base = evalNode(args[0]!, ctx, at)
+  if (isError(base)) return base
+  const exp = evalNode(args[1]!, ctx, at)
+  if (isError(exp)) return exp
+  return raisePower(base, exp)
+}
+
+function evalMod(args: Node[], ctx: Ctx, at: CellAddress): EvalValue {
+  if (args.length !== 2) return { error: '#VALUE!' }
+  const value = evalNode(args[0]!, ctx, at)
+  if (isError(value)) return value
+  const divisor = evalNode(args[1]!, ctx, at)
+  if (isError(divisor)) return divisor
+  if (divisor === 0) return { error: '#DIV/0!' }
+  return value - divisor * Math.floor(value / divisor)
+}
+
+function evalInt(args: Node[], ctx: Ctx, at: CellAddress): EvalValue {
+  if (args.length !== 1) return { error: '#VALUE!' }
+  const value = evalNode(args[0]!, ctx, at)
+  if (isError(value)) return value
+  return Math.floor(value)
+}
+
+function evalAbs(args: Node[], ctx: Ctx, at: CellAddress): EvalValue {
+  if (args.length !== 1) return { error: '#VALUE!' }
+  const value = evalNode(args[0]!, ctx, at)
+  if (isError(value)) return value
+  return Math.abs(value)
+}
+
+function evalLogic(name: 'AND' | 'OR', args: Node[], ctx: Ctx, at: CellAddress): EvalValue {
+  if (!args.length) return { error: '#VALUE!' }
+  if (name === 'AND') {
+    for (const arg of args) {
+      const value = evalNode(arg, ctx, at)
+      if (isError(value)) return value
+      if (value === 0) return 0
+    }
+    return 1
+  }
+  for (const arg of args) {
+    const value = evalNode(arg, ctx, at)
+    if (isError(value)) return value
+    if (value !== 0) return 1
+  }
+  return 0
+}
+
+function evalIf(args: Node[], ctx: Ctx, at: CellAddress): EvalValue {
+  if (args.length < 2 || args.length > 3) return { error: '#VALUE!' }
+  const cond = evalNode(args[0]!, ctx, at)
+  if (isError(cond)) return cond
+  const chosen = cond !== 0 ? args[1] : args[2]
+  if (!chosen) return 0
+  return evalNode(chosen, ctx, at)
+}
+
 function evalCall(name: string, args: Node[], ctx: Ctx, at: CellAddress): EvalValue {
+  if (name === 'IF') return evalIf(args, ctx, at)
+  if (name === 'AND' || name === 'OR') return evalLogic(name, args, ctx, at)
+  if (name === 'ABS') return evalAbs(args, ctx, at)
+  if (name === 'INT') return evalInt(args, ctx, at)
+  if (name === 'MOD') return evalMod(args, ctx, at)
+  if (name === 'POWER') return evalPower(args, ctx, at)
+  if (name === 'SQRT') return evalSqrt(args, ctx, at)
+  if (name === 'SIGN') return evalSign(args, ctx, at)
+  if (name === 'NOT') return evalNot(args, ctx, at)
+  if (name === 'CEILING') return evalCeiling(args, ctx, at)
+  if (name === 'FLOOR') return evalFloor(args, ctx, at)
+  if (name === 'PI') return args.length ? { error: '#VALUE!' } : Math.PI
+  if (name === 'EXP') {
+    if (args.length !== 1) return { error: '#VALUE!' }
+    const value = evalNode(args[0]!, ctx, at)
+    if (isError(value)) return value
+    const result = Math.exp(value)
+    return Number.isFinite(result) ? result : { error: '#VALUE!' }
+  }
+  if (name === 'LN') {
+    if (args.length !== 1) return { error: '#VALUE!' }
+    const value = evalNode(args[0]!, ctx, at)
+    if (isError(value)) return value
+    if (value <= 0) return { error: '#VALUE!' }
+    const result = Math.log(value)
+    return Number.isFinite(result) ? result : { error: '#VALUE!' }
+  }
+  if (name === 'LOG') {
+    if (args.length < 1 || args.length > 2) return { error: '#VALUE!' }
+    const value = evalNode(args[0]!, ctx, at)
+    if (isError(value)) return value
+    let base = 10
+    if (args.length === 2) {
+      const next = evalNode(args[1]!, ctx, at)
+      if (isError(next)) return next
+      base = next
+    }
+    if (value <= 0 || base <= 0 || base === 1) return { error: '#VALUE!' }
+    const result = Math.log(value) / Math.log(base)
+    return Number.isFinite(result) ? result : { error: '#VALUE!' }
+  }
+  if (name === 'LOG10') {
+    if (args.length !== 1) return { error: '#VALUE!' }
+    const value = evalNode(args[0]!, ctx, at)
+    if (isError(value)) return value
+    if (value <= 0) return { error: '#VALUE!' }
+    const result = Math.log10(value)
+    return Number.isFinite(result) ? result : { error: '#VALUE!' }
+  }
+  if (name === 'FACT') {
+    if (args.length !== 1) return { error: '#VALUE!' }
+    const value = evalNode(args[0]!, ctx, at)
+    if (isError(value)) return value
+    if (value < 0 || value > 170) return { error: '#VALUE!' }
+    let result = 1
+    for (let n = 2; n <= Math.floor(value); n += 1) result *= n
+    return Number.isFinite(result) ? result : { error: '#VALUE!' }
+  }
+  if (name === 'GCD') {
+    if (!args.length) return { error: '#VALUE!' }
+    const nums: number[] = []
+    for (const arg of args) {
+      const value = evalNode(arg, ctx, at)
+      if (isError(value)) return value
+      if (value < 0) return { error: '#VALUE!' }
+      nums.push(Math.floor(value))
+    }
+    if (nums.every((item) => item === 0)) return { error: '#VALUE!' }
+    const gcd2 = (left: number, right: number): number => {
+      let a = left
+      let b = right
+      while (b) {
+        const next = a % b
+        a = b
+        b = next
+      }
+      return a
+    }
+    return nums.reduce((left, right) => gcd2(left, right))
+  }
+  if (name === 'LCM') {
+    if (!args.length) return { error: '#VALUE!' }
+    const nums: number[] = []
+    for (const arg of args) {
+      const value = evalNode(arg, ctx, at)
+      if (isError(value)) return value
+      if (value < 0) return { error: '#VALUE!' }
+      nums.push(Math.floor(value))
+    }
+    const gcd2 = (left: number, right: number): number => {
+      let a = left
+      let b = right
+      while (b) {
+        const next = a % b
+        a = b
+        b = next
+      }
+      return a
+    }
+    const lcm2 = (left: number, right: number): number => {
+      if (left === 0 || right === 0) return 0
+      return Math.abs((left / gcd2(left, right)) * right)
+    }
+    const result = nums.reduce((left, right) => lcm2(left, right))
+    return Number.isFinite(result) ? result : { error: '#VALUE!' }
+  }
+  if (name === 'TRUNC') {
+    if (!args.length || args.length > 2) return { error: '#VALUE!' }
+    const value = evalNode(args[0]!, ctx, at)
+    if (isError(value)) return value
+    let digits = 0
+    if (args.length === 2) {
+      const next = evalNode(args[1]!, ctx, at)
+      if (isError(next)) return next
+      digits = Math.trunc(next)
+    }
+    const factor = 10 ** digits
+    if (!Number.isFinite(factor) || factor === 0) return { error: '#VALUE!' }
+    const result = Math.trunc(value * factor) / factor
+    return Number.isFinite(result) ? result : { error: '#VALUE!' }
+  }
+  if (name === 'QUOTIENT') {
+    if (args.length !== 2) return { error: '#VALUE!' }
+    const left = evalNode(args[0]!, ctx, at)
+    if (isError(left)) return left
+    const right = evalNode(args[1]!, ctx, at)
+    if (isError(right)) return right
+    if (right === 0) return { error: '#DIV/0!' }
+    const result = Math.trunc(left / right)
+    return Number.isFinite(result) ? result : { error: '#VALUE!' }
+  }
+  if (name === 'EVEN') {
+    if (args.length !== 1) return { error: '#VALUE!' }
+    const value = evalNode(args[0]!, ctx, at)
+    if (isError(value)) return value
+    const sign = value < 0 ? -1 : 1
+    const whole = Math.ceil(Math.abs(value))
+    const even = whole % 2 === 0 ? whole : whole + 1
+    const result = sign * even
+    return Number.isFinite(result) ? result : { error: '#VALUE!' }
+  }
+  if (name === 'ODD') {
+    if (args.length !== 1) return { error: '#VALUE!' }
+    const value = evalNode(args[0]!, ctx, at)
+    if (isError(value)) return value
+    const sign = value < 0 ? -1 : 1
+    const whole = Math.ceil(Math.abs(value))
+    const odd = whole % 2 === 0 ? whole + 1 : whole
+    const result = sign * odd
+    return Number.isFinite(result) ? result : { error: '#VALUE!' }
+  }
+  if (name === 'COMBIN') {
+    if (args.length !== 2) return { error: '#VALUE!' }
+    const total = evalNode(args[0]!, ctx, at)
+    if (isError(total)) return total
+    const pick = evalNode(args[1]!, ctx, at)
+    if (isError(pick)) return pick
+    const n = Math.floor(total)
+    const k0 = Math.floor(pick)
+    if (n < 0 || k0 < 0 || k0 > n || n > 1000) return { error: '#VALUE!' }
+    const k = Math.min(k0, n - k0)
+    let result = 1
+    for (let i = 1; i <= k; i += 1) result = (result * (n - k + i)) / i
+    const rounded = Math.round(result)
+    return Number.isFinite(rounded) ? rounded : { error: '#VALUE!' }
+  }
+  if (name === 'PERMUT') {
+    if (args.length !== 2) return { error: '#VALUE!' }
+    const total = evalNode(args[0]!, ctx, at)
+    if (isError(total)) return total
+    const pick = evalNode(args[1]!, ctx, at)
+    if (isError(pick)) return pick
+    const n = Math.floor(total)
+    const k = Math.floor(pick)
+    if (n < 0 || k < 0 || k > n || n > 1000) return { error: '#VALUE!' }
+    let result = 1
+    for (let i = 0; i < k; i += 1) result *= n - i
+    return Number.isFinite(result) ? result : { error: '#VALUE!' }
+  }
+  if (name === 'DEGREES') {
+    if (args.length !== 1) return { error: '#VALUE!' }
+    const value = evalNode(args[0]!, ctx, at)
+    if (isError(value)) return value
+    const result = (value * 180) / Math.PI
+    return Number.isFinite(result) ? result : { error: '#VALUE!' }
+  }
+  if (name === 'RADIANS') {
+    if (args.length !== 1) return { error: '#VALUE!' }
+    const value = evalNode(args[0]!, ctx, at)
+    if (isError(value)) return value
+    const result = (value * Math.PI) / 180
+    return Number.isFinite(result) ? result : { error: '#VALUE!' }
+  }
+  if (name === 'SIN') {
+    if (args.length !== 1) return { error: '#VALUE!' }
+    const value = evalNode(args[0]!, ctx, at)
+    if (isError(value)) return value
+    const result = Math.sin(value)
+    return Number.isFinite(result) ? result : { error: '#VALUE!' }
+  }
+  if (name === 'COS') {
+    if (args.length !== 1) return { error: '#VALUE!' }
+    const value = evalNode(args[0]!, ctx, at)
+    if (isError(value)) return value
+    const result = Math.cos(value)
+    return Number.isFinite(result) ? result : { error: '#VALUE!' }
+  }
+  if (name === 'TAN') {
+    if (args.length !== 1) return { error: '#VALUE!' }
+    const value = evalNode(args[0]!, ctx, at)
+    if (isError(value)) return value
+    const result = Math.tan(value)
+    return Number.isFinite(result) ? result : { error: '#VALUE!' }
+  }
+  if (name === 'ASIN') {
+    if (args.length !== 1) return { error: '#VALUE!' }
+    const value = evalNode(args[0]!, ctx, at)
+    if (isError(value)) return value
+    if (value < -1 || value > 1) return { error: '#VALUE!' }
+    const result = Math.asin(value)
+    return Number.isFinite(result) ? result : { error: '#VALUE!' }
+  }
+  if (name === 'ACOS') {
+    if (args.length !== 1) return { error: '#VALUE!' }
+    const value = evalNode(args[0]!, ctx, at)
+    if (isError(value)) return value
+    if (value < -1 || value > 1) return { error: '#VALUE!' }
+    const result = Math.acos(value)
+    return Number.isFinite(result) ? result : { error: '#VALUE!' }
+  }
+  if (name === 'ATAN') {
+    if (args.length !== 1) return { error: '#VALUE!' }
+    const value = evalNode(args[0]!, ctx, at)
+    if (isError(value)) return value
+    const result = Math.atan(value)
+    return Number.isFinite(result) ? result : { error: '#VALUE!' }
+  }
+  if (name === 'ATAN2') {
+    if (args.length !== 2) return { error: '#VALUE!' }
+    const x = evalNode(args[0]!, ctx, at)
+    if (isError(x)) return x
+    const y = evalNode(args[1]!, ctx, at)
+    if (isError(y)) return y
+    if (x === 0 && y === 0) return { error: '#DIV/0!' }
+    const result = Math.atan2(y, x)
+    return Number.isFinite(result) ? result : { error: '#VALUE!' }
+  }
+  if (name === 'SINH') {
+    if (args.length !== 1) return { error: '#VALUE!' }
+    const value = evalNode(args[0]!, ctx, at)
+    if (isError(value)) return value
+    const result = Math.sinh(value)
+    return Number.isFinite(result) ? result : { error: '#VALUE!' }
+  }
+  if (name === 'COSH') {
+    if (args.length !== 1) return { error: '#VALUE!' }
+    const value = evalNode(args[0]!, ctx, at)
+    if (isError(value)) return value
+    const result = Math.cosh(value)
+    return Number.isFinite(result) ? result : { error: '#VALUE!' }
+  }
+  if (name === 'TANH') {
+    if (args.length !== 1) return { error: '#VALUE!' }
+    const value = evalNode(args[0]!, ctx, at)
+    if (isError(value)) return value
+    const result = Math.tanh(value)
+    return Number.isFinite(result) ? result : { error: '#VALUE!' }
+  }
+  if (name === 'ASINH') {
+    if (args.length !== 1) return { error: '#VALUE!' }
+    const value = evalNode(args[0]!, ctx, at)
+    if (isError(value)) return value
+    const result = Math.asinh(value)
+    return Number.isFinite(result) ? result : { error: '#VALUE!' }
+  }
+  if (name === 'ACOSH') {
+    if (args.length !== 1) return { error: '#VALUE!' }
+    const value = evalNode(args[0]!, ctx, at)
+    if (isError(value)) return value
+    if (value < 1) return { error: '#NUM!' }
+    const result = Math.acosh(value)
+    return Number.isFinite(result) ? result : { error: '#VALUE!' }
+  }
+  if (name === 'ATANH') {
+    if (args.length !== 1) return { error: '#VALUE!' }
+    const value = evalNode(args[0]!, ctx, at)
+    if (isError(value)) return value
+    if (Math.abs(value) >= 1) return { error: '#NUM!' }
+    const result = Math.atanh(value)
+    return Number.isFinite(result) ? result : { error: '#VALUE!' }
+  }
+  if (name === 'COT') {
+    if (args.length !== 1) return { error: '#VALUE!' }
+    const value = evalNode(args[0]!, ctx, at)
+    if (isError(value)) return value
+    const sine = Math.sin(value)
+    if (sine === 0) return { error: '#DIV/0!' }
+    const result = Math.cos(value) / sine
+    return Number.isFinite(result) ? result : { error: '#VALUE!' }
+  }
+  if (name === 'SEC') {
+    if (args.length !== 1) return { error: '#VALUE!' }
+    const value = evalNode(args[0]!, ctx, at)
+    if (isError(value)) return value
+    const cosine = Math.cos(value)
+    if (Math.abs(cosine) < 1e-10) return { error: '#DIV/0!' }
+    const result = 1 / cosine
+    return Number.isFinite(result) ? result : { error: '#VALUE!' }
+  }
+  if (name === 'CSC') {
+    if (args.length !== 1) return { error: '#VALUE!' }
+    const value = evalNode(args[0]!, ctx, at)
+    if (isError(value)) return value
+    const sine = Math.sin(value)
+    if (Math.abs(sine) < 1e-10) return { error: '#DIV/0!' }
+    const result = 1 / sine
+    return Number.isFinite(result) ? result : { error: '#VALUE!' }
+  }
+  if (name === 'CSCH') {
+    if (args.length !== 1) return { error: '#VALUE!' }
+    const value = evalNode(args[0]!, ctx, at)
+    if (isError(value)) return value
+    const sine = Math.sinh(value)
+    if (Math.abs(sine) < 1e-10) return { error: '#DIV/0!' }
+    const result = 1 / sine
+    return Number.isFinite(result) ? result : { error: '#VALUE!' }
+  }
+  if (name === 'SECH') {
+    if (args.length !== 1) return { error: '#VALUE!' }
+    const value = evalNode(args[0]!, ctx, at)
+    if (isError(value)) return value
+    const cosine = Math.cosh(value)
+    if (Math.abs(cosine) < 1e-10) return { error: '#DIV/0!' }
+    const result = 1 / cosine
+    return Number.isFinite(result) ? result : { error: '#VALUE!' }
+  }
+  if (name === 'COTH') {
+    if (args.length !== 1) return { error: '#VALUE!' }
+    const value = evalNode(args[0]!, ctx, at)
+    if (isError(value)) return value
+    const sine = Math.sinh(value)
+    if (Math.abs(sine) < 1e-10) return { error: '#DIV/0!' }
+    const next = Math.cosh(value) / sine
+    return Number.isFinite(next) ? next : { error: '#VALUE!' }
+  }
+  if (name === 'ROUND') return evalRound(args, ctx, at)
+  if (name === 'ROUNDUP') return evalRoundUp(args, ctx, at)
+  if (name === 'ROUNDDOWN') return evalRoundDown(args, ctx, at)
   const values: number[] = []
+  let filled = 0
   for (const arg of args) {
     const cells = cellsOf(arg, at)
     if (cells) {
+      let sawCell = false
+      let sawMissing = false
       for (const addr of cells) {
         const cell = resolveCell(ctx, addr)
+        if (cell.kind === 'missing') {
+          sawMissing = true
+          continue
+        }
+        sawCell = true
         if (cell.kind === 'err') return cell
+        if (cell.kind === 'blank') continue
+        filled += 1
         if (cell.kind === 'num') values.push(cell.v)
-        // 文本单元格在聚合函数里被忽略
+        // 空白在求和、平均里跳过。文字计入 COUNTA。整段都在表格外才是 #REF!。
       }
+      if (!sawCell && sawMissing) return { error: '#REF!' }
       continue
     }
     const v = evalNode(arg, ctx, at)
     if (isError(v)) return v
     values.push(v)
+    filled += 1
   }
+  if (name === 'COUNTA') return filled
   if (name === 'COUNT') return values.length
   if (name === 'SUM') return values.reduce((a, b) => a + b, 0)
   if (name === 'AVERAGE') {
@@ -383,6 +1121,13 @@ function evalCall(name: string, args: Node[], ctx: Ctx, at: CellAddress): EvalVa
   }
   if (name === 'MAX') return values.length ? Math.max(...values) : 0
   if (name === 'MIN') return values.length ? Math.min(...values) : 0
+  if (name === 'PRODUCT') return values.length ? values.reduce((a, b) => a * b, 1) : 0
+  if (name === 'MEDIAN') {
+    if (!values.length) return { error: '#DIV/0!' }
+    const sorted = [...values].sort((a, b) => a - b)
+    const mid = Math.floor(sorted.length / 2)
+    return sorted.length % 2 ? sorted[mid]! : (sorted[mid - 1]! + sorted[mid]!) / 2
+  }
   return { error: '#NAME?' }
 }
 
@@ -390,6 +1135,8 @@ function evalNode(node: Node, ctx: Ctx, at: CellAddress): EvalValue {
   switch (node.k) {
     case 'num':
       return node.v
+    case 'err':
+      return { error: node.code }
     case 'unary': {
       const v = evalNode(node.arg, ctx, at)
       if (isError(v)) return v
@@ -399,6 +1146,20 @@ function evalNode(node: Node, ctx: Ctx, at: CellAddress): EvalValue {
       const v = evalNode(node.arg, ctx, at)
       if (isError(v)) return v
       return v / 100
+    }
+    case 'cmp': {
+      const l = evalNode(node.l, ctx, at)
+      if (isError(l)) return l
+      const r = evalNode(node.r, ctx, at)
+      if (isError(r)) return r
+      const ok =
+        node.op === '>' ? l > r
+        : node.op === '<' ? l < r
+        : node.op === '>=' ? l >= r
+        : node.op === '<=' ? l <= r
+        : node.op === '<>' ? l !== r
+        : l === r
+      return ok ? 1 : 0
     }
     case 'bin': {
       const l = evalNode(node.l, ctx, at)
@@ -415,6 +1176,8 @@ function evalNode(node: Node, ctx: Ctx, at: CellAddress): EvalValue {
         case '/':
           if (r === 0) return { error: '#DIV/0!' }
           return l / r
+        case '^':
+          return raisePower(l, r)
         default:
           return { error: '#VALUE!' }
       }
@@ -431,6 +1194,8 @@ function evalNode(node: Node, ctx: Ctx, at: CellAddress): EvalValue {
       if (cells.length > 1) return { error: '#VALUE!' }
       const cell = resolveCell(ctx, cells[0]!)
       if (cell.kind === 'err') return cell
+      if (cell.kind === 'missing') return { error: '#REF!' }
+      if (cell.kind === 'blank') return 0
       if (cell.kind === 'text') return { error: '#VALUE!' }
       return cell.v
     }
@@ -441,7 +1206,7 @@ function evalNode(node: Node, ctx: Ctx, at: CellAddress): EvalValue {
 
 /** 求公式主体（不含前导 =）。抛 FormulaError 表示公式非法。 */
 function evalFormulaText(body: string, ctx: Ctx, at: CellAddress): EvalValue {
-  const text = String(body ?? '').trim()
+  const text = normalizeFormulaPunctuation(String(body ?? '')).trim().replace(/\$/g, '')
   if (!text) throw new FormulaError('#VALUE!')
   const node = parseFormula(text)
   return evalNode(node, ctx, at)

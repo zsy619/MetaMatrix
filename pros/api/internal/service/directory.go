@@ -127,7 +127,7 @@ func NewDirectoryService(db *gorm.DB) *DirectoryService {
 // List 按关键词分页列出通讯录用户。
 //
 // 只查 id / email / display_name / department / role / avatar_url，密码哈希等列根本不会进入查询结果。
-// users 表没有软删除与启用状态字段，所以当前不做状态过滤。
+// core_users 表没有软删除与启用状态字段，所以当前不做状态过滤。
 func (s *DirectoryService) List(q string, limit, offset int) ([]DirectoryUserDTO, error) {
 	if s == nil || s.db == nil {
 		return []DirectoryUserDTO{}, nil
