@@ -5,9 +5,10 @@ import { Clock, Files, Refresh, RefreshLeft, Timer } from '@element-plus/icons-v
 import { diffRevisions, listRevisions, materializeRevision } from '../../api/documents'
 import type { RevisionSummary, TextDiffOp } from '../../api/documents'
 import { friendlyApiMessage } from '../../utils/apiMessage'
+import { readYjsStateFromPayload, type RestoredVersion } from './collab/yDocVersion'
 
 const props = defineProps<{ documentId: string }>()
-const emit = defineEmits<{ restored: [html: string] }>()
+const emit = defineEmits<{ restored: [payload: RestoredVersion] }>()
 
 const revisions = ref<RevisionSummary[]>([])
 const loading = ref(false)
@@ -72,8 +73,11 @@ async function restore(rev: RevisionSummary) {
   restoring.value = rev.id
   try {
     const res = await materializeRevision(props.documentId, rev.id)
-    const data = res.data as { html?: string } | undefined
-    emit('restored', data?.html ?? '')
+    const data = res.data as { html?: string; yjsState?: string } | undefined
+    emit('restored', {
+      html: data?.html ?? '',
+      yjsState: readYjsStateFromPayload(data),
+    })
     ElMessage.success('已恢复到历史版本')
   } catch (err) {
     ElMessage.error(friendlyApiMessage(err, '恢复失败'))

@@ -411,7 +411,7 @@ func (s *KnowledgeService) shareWithAccess(token, password string, viewer *uuid.
 
 // LabelVersion 给历史版本加备注（如「发布版」）。
 func (s *KnowledgeService) LabelVersion(ownerID, docID, versionID uuid.UUID, label string) (*model.KnowledgeDocVersion, error) {
-	if _, err := s.docs().GetOwned(ownerID, docID); err != nil {
+	if _, err := s.accessDocument(ownerID, docID, SpaceRoleEditor); err != nil {
 		return nil, err
 	}
 	label = strings.TrimSpace(label)

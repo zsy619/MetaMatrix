@@ -93,6 +93,28 @@ func (s *KnowledgeService) assertSpaceAccess(userID, projectID uuid.UUID, need s
 	return nil
 }
 
+// accessDocument 按文档鉴权：所有者始终可；文档属于项目时按空间角色放行；否则视为文档不存在，避免泄露。
+// 成员角色不够时返回 ErrSpaceForbidden（例如浏览者改版本备注）。
+func (s *KnowledgeService) accessDocument(userID, docID uuid.UUID, need string) (*model.CanvasDocument, error) {
+	var doc model.CanvasDocument
+	if err := s.db.Where("id = ?", docID).First(&doc).Error; err != nil {
+		return nil, ErrDocumentNotFound
+	}
+	if doc.OwnerUserID == userID {
+		return &doc, nil
+	}
+	if doc.ProjectID == nil {
+		return nil, ErrDocumentNotFound
+	}
+	if err := s.assertSpaceAccess(userID, *doc.ProjectID, need); err != nil {
+		if errors.Is(err, ErrProjectMissing) {
+			return nil, ErrDocumentNotFound
+		}
+		return nil, err
+	}
+	return &doc, nil
+}
+
 // ListMembers 列出空间成员（含项目所有者）。
 func (s *KnowledgeService) ListMembers(userID, projectID uuid.UUID) ([]SpaceMember, error) {
 	if err := s.assertSpaceAccess(userID, projectID, SpaceRoleViewer); err != nil {

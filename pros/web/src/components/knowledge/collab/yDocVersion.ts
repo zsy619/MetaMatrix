@@ -43,3 +43,17 @@ export function readYjsStateFromPayload(data: unknown): string | null {
   const state = (data as { yjsState?: unknown }).yjsState
   return typeof state === 'string' && state.trim() ? state.trim() : null
 }
+
+export type RestoredVersion = {
+  html: string
+  yjsState?: string | null
+}
+
+/** 历史页既可能只回 HTML，也可能带 yjsState。调用方应先退出实时协同再应用，避免服务端较新增量把恢复覆盖。 */
+export function parseRestoredVersion(payload: RestoredVersion | string | null | undefined): RestoredVersion {
+  if (typeof payload === 'string') return { html: payload }
+  if (!payload || typeof payload !== 'object') return { html: '' }
+  const html = typeof payload.html === 'string' ? payload.html : ''
+  const yjsState = readYjsStateFromPayload(payload)
+  return yjsState ? { html, yjsState } : { html }
+}

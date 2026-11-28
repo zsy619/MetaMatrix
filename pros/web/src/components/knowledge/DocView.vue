@@ -39,6 +39,7 @@ const IconPicker = defineAsyncComponent(() => import('../common/IconPicker.vue')
 import { getDocument, getDocumentBlock, listDocumentBlocks, updateBlockPermission, updateDocument } from '../../api/documents'
 import { apiRequestBlob, getToken } from '../../api/http'
 import { LiveCollabSession, createCollabYDoc } from './collab/yDocCollab'
+import { parseRestoredVersion, type RestoredVersion } from './collab/yDocVersion'
 import { isCollabWritable } from './collab/collabOfflineQueue'
 import { collabCaretColor } from './collab/collabAwareness'
 import { useAuthStore } from '../../stores/auth'
@@ -323,7 +324,16 @@ async function toggleCollab() {
     ElMessage.error('登录已失效，无法开启协同')
     return
   }
-  const ydoc = createCollabYDoc()
+  const started = await startLiveCollab(token, createCollabYDoc())
+  if (started) {
+    ElMessage.success(collabWritable.value ? '已进入协同模式' : '已进入只读协同模式')
+  } else {
+    ElMessage.error('协同模式开启失败')
+  }
+}
+
+/** 挂上协同会话。恢复历史版本时必须用新的 Y.Doc，不能把旧快照 apply 到已经超前的文档上。 */
+async function startLiveCollab(token: string, ydoc: YDoc): Promise<boolean> {
   const session = new LiveCollabSession({
     documentId: props.documentId,
     token,
@@ -361,11 +371,11 @@ async function toggleCollab() {
     collabWritable.value = isCollabWritable({ canWrite: session.canWrite, role: session.role })
     collabOn.value = true
     editorSessionKey.value += 1
-    ElMessage.success(collabWritable.value ? '已进入协同模式' : '已进入只读协同模式')
+    return true
   } catch {
     session.stop()
     ydoc.destroy()
-    ElMessage.error('协同模式开启失败')
+    return false
   }
 }
 
@@ -632,20 +642,36 @@ async function loadOutline() {
   }
 }
 
-/** 插入目录块（051）：按当前标题生成可点击目录。 */
+/** 插入目录块（051）：优先走 TocBlock，点击条目按块身份跳转。 */
 function insertToc() {
+  type TocEditor = {
+    editor?: {
+      commands?: { insertToc?: () => boolean }
+      getHTML?: () => string
+    }
+  }
+  const inst = editorRef.value as unknown as TocEditor | null
+  if (inst?.editor?.commands?.insertToc?.()) {
+    const next = inst.editor.getHTML?.()
+    if (next) onHtml(next)
+    ElMessage.success('目录已插入')
+    return
+  }
   const items = outlineItems.value.filter((item) => item.text)
   if (!items.length) {
     ElMessage.warning('正文还没有标题，先加几个标题再插入目录')
     return
   }
   const list = items
-    .map((item) => `<li style="margin-left:${(item.level - 1) * 16}px">${item.text}</li>`)
+    .map((item) => {
+      const block = (item as { blockId?: string }).blockId
+      const idAttr = block ? ` data-block-id="${block}"` : ''
+      return `<li class="rte-toc-item" style="margin-left:${(item.level - 1) * 16}px"${idAttr}>${item.text}</li>`
+    })
     .join('')
-  const block = `<h2>目录</h2><ul>${list}</ul>`
-  // TipTap 会丢掉自定义属性，目录块靠「目录」标题来识别与替换。
-  const next = /<h2>目录<\/h2>/.test(html.value)
-    ? html.value.replace(/<h2>目录<\/h2>[\s\S]*?<\/ul>/, block)
+  const block = `<nav data-type="toc" class="rte-toc"><div class="rte-toc-title">目录</div><ul>${list}</ul></nav>`
+  const next = /data-type="toc"/.test(html.value)
+    ? html.value.replace(/<nav[^>]*data-type="toc"[\s\S]*?<\/nav>/, block)
     : `${html.value}${block}`
   onHtml(next)
   ElMessage.success('目录已插入')
@@ -786,9 +812,14 @@ async function exportAs(format: string) {
   }
 }
 
-/** 恢复历史版本：把 html 设为目标版本并标记 dirty，由防抖保存落库。 */
-function onRestored(restoredHtml: string) {
-  html.value = restoredHtml
+/** 恢复历史版本：写入 HTML，并退出正在进行的协同，避免服务端较新增量立刻覆盖这次恢复。 */
+function onRestored(payload: RestoredVersion | string) {
+  const restored = parseRestoredVersion(payload)
+  html.value = restored.html
+  if (collabOn.value) {
+    stopLiveCollab()
+    ElMessage.info('已退出协同并载入该版本，保存后可重新开启协同')
+  }
   dirty.value = true
   scheduleSave()
 }

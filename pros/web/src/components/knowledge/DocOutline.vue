@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { reorderDocOutline } from '../../api/knowledge_v5'
+import { findOutlineElement, outlineFromHTML, type OutlineHeading } from '../../utils/rteOutline'
 
 const props = defineProps<{ html: string; documentId?: string }>()
 const emit = defineEmits<{ reordered: [] }>()
@@ -10,29 +11,8 @@ const emit = defineEmits<{ reordered: [] }>()
 const dragIndex = ref<number | null>(null)
 const overIndex = ref<number | null>(null)
 
-interface Heading {
-  level: number
-  text: string
-  id: string
-}
-
-/** 从编辑器 HTML 抽 h1-h4 作为大纲。
- * TipTap heading 节点序列化为 <h1>...<h4>，id 由 ProseMirror 自动生成或空。
- * 没有 id 的用文本生成锚点。 */
-const headings = computed<Heading[]>(() => {
-  if (!props.html) return []
-  const tmp = document.createElement('div')
-  tmp.innerHTML = props.html
-  const out: Heading[] = []
-  tmp.querySelectorAll('h1,h2,h3,h4').forEach((el, i) => {
-    const level = Number(el.tagName.slice(1))
-    const text = el.textContent?.trim() || ''
-    if (!text) return
-    const id = el.id || `heading-${i}-${text.slice(0, 20)}`
-    out.push({ level, text, id })
-  })
-  return out
-})
+/** 从编辑器 HTML 抽 h1-h6 作为大纲，带上 data-block-id，供点击跳转。 */
+const headings = computed<OutlineHeading[]>(() => outlineFromHTML(props.html))
 
 /** 拖拽开始 / 经过 / 结束。 */
 function onDragStart(index: number, e: DragEvent) {
@@ -63,23 +43,12 @@ async function onDrop(index: number) {
   }
 }
 
-function jump(h: Heading) {
+function jump(h: OutlineHeading) {
   // 编辑器渲染在父级 .doc-view__editor .ProseMirror 里。
   const root = document.querySelector('.doc-view__editor .ProseMirror') as HTMLElement | null
   if (!root) return
-  const target = root.querySelector(`#${CSS.escape(h.id)}`) as HTMLElement | null
-  if (target) {
-    target.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  } else {
-    // 没有匹配 id 时按文本找第一个同级 heading。
-    const all = root.querySelectorAll(`h${h.level}`)
-    for (const el of all) {
-      if (el.textContent?.trim() === h.text) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-        break
-      }
-    }
-  }
+  const target = findOutlineElement(root, h)
+  target?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 </script>
 
@@ -89,7 +58,7 @@ function jump(h: Heading) {
     <ul class="doc-outline__list">
       <li
         v-for="(h, index) in headings"
-        :key="h.id"
+        :key="h.blockId || h.htmlId || (h.level + ':' + h.text + ':' + index)"
         :class="[
           `doc-outline__item is-h${h.level}`,
           { 'is-over': overIndex === index, 'is-dragging': dragIndex === index },
@@ -140,6 +109,8 @@ function jump(h: Heading) {
 .is-h2 { padding-left: 14px; }
 .is-h3 { padding-left: 22px; }
 .is-h4 { padding-left: 30px; font-size: 12px; color: var(--mm-muted, #86909c); }
+.is-h5 { padding-left: 38px; font-size: 12px; color: var(--mm-muted, #86909c); }
+.is-h6 { padding-left: 46px; font-size: 12px; color: var(--mm-muted, #86909c); }
 .doc-outline__item.is-over { outline: 1px dashed var(--mm-blue, #1677ff); }
 .doc-outline__item.is-dragging { opacity: 0.5; }
 </style>

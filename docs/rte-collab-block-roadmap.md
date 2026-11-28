@@ -254,3 +254,8 @@ cd pros/web && npx vitest run && npx vue-tsc -b --pretty false
 - 28/40：扩展自建 Markdown 往返测试（Setext、h4–h6、转义、硬换行、自动链接、嵌套引用、对齐表、`***` 粗斜体），并修好 `***` 解析。未加入官方 `@tiptap/markdown`
 - 45：已对照本工作树安装包的 LICENSE 落盘（见 MET-10 报告）。不是法律放行，也未覆盖未安装的 Hocuspocus
 
+第二批（本分支继续，仍未合入 main）：
+
+- 35：大纲/目录抽出 h1–h6 与 `data-block-id`；TocBlock 条目可点击跳转；侧栏大纲按块身份定位；插入目录优先走 `insertToc` 命令。Slash 的 Home/End 原已可用。历史恢复会先退出实时协同再写入 HTML，避免服务端较新增量立刻覆盖。真实浏览器点验仍未做
+- 15：新增 `accessDocument`（所有者或空间角色；外人视为文档不存在）。空间浏览者可看属性/版本/评论并评论；编辑者可改属性、给版本加备注。属性按 `doc_id` 读取，不再因调用者不是所有者而返回空白稿。`KnowledgeDocVersion` 增加 `yjsState`，`DocComment` 增加可选 `yRel`。没有改成 `doc_*` 全套同名模型，也不是飞书级组织/字段 ACL
+- 34（加深，仍不是完整版本树）：知识库版本可带上 `yjsState`；历史页事件带上该字段。恢复时退出协同并按 HTML 落回，不把旧快照 apply 到已经超前的 Y.Doc，也不在恢复后立刻重连协同

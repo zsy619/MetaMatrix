@@ -338,6 +338,10 @@ export type DocComment = {
   resolved: boolean
   createdAt: string
   updatedAt: string
+  /** 可选的 Yjs 相对位置，缺省时仍走划线/块偏移。 */
+  yRel?: string
+  blockId?: string | null
+  blockOffset?: number
 }
 
 export function listComments(documentId: string) {
@@ -357,6 +361,9 @@ export function addComment(
     anchorTo?: number
     /** 被 @ 的用户 ID。 */
     mentions?: string[]
+    blockId?: string | null
+    blockOffset?: number
+    yRel?: string
   },
 ) {
   return apiRequest<DocComment>(`/documents/${documentId}/comments`, {
@@ -564,6 +571,8 @@ export type DocVersion = {
   /** 版本备注：如「发布版」。 */
   label: string
   createdAt: string
+  /** 协同整包；空表示该版本只有 HTML。 */
+  yjsState?: string
 }
 
 export function listDocVersions(documentId: string, limit = 30) {

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import * as Y from 'yjs'
 import {
   captureYjsVersion,
+  parseRestoredVersion,
   readYjsStateFromPayload,
   restoreYDocFromState,
   tryRestoreFromYSnapshot,
@@ -35,5 +36,13 @@ describe('Yjs 版本快照', () => {
   it('从 JSON 载荷里读 yjsState，缺字段则返回 null', () => {
     expect(readYjsStateFromPayload({ type: 'doc', html: '<p>x</p>', yjsState: 'abc' })).toBe('abc')
     expect(readYjsStateFromPayload({ html: '<p>x</p>' })).toBeNull()
+  })
+})
+
+describe('parseRestoredVersion', () => {
+  it('兼容只回 HTML 的旧事件，并抽出 yjsState', () => {
+    expect(parseRestoredVersion('<p>x</p>')).toEqual({ html: '<p>x</p>' })
+    expect(parseRestoredVersion({ html: '<p>y</p>', yjsState: 'abc' })).toEqual({ html: '<p>y</p>', yjsState: 'abc' })
+    expect(parseRestoredVersion({ html: '<p>z</p>', yjsState: '  ' })).toEqual({ html: '<p>z</p>' })
   })
 })

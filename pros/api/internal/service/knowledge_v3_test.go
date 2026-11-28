@@ -50,6 +50,7 @@ type knowledgeDocVersionSQLite struct {
 	AuthorUserID uuid.UUID `gorm:"type:uuid;not null;index"`
 	SaveVersion  int64     `gorm:"not null;default:0"`
 	Label        string    `gorm:"type:varchar(64);not null;default:''"`
+	YjsState     string    `gorm:"type:text;not null;default:''"`
 	CreatedAt    time.Time `gorm:"not null;index"`
 }
 

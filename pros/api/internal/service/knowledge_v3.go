@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"regexp"
 	"sort"
@@ -382,6 +383,7 @@ func SnapshotDocVersion(tx *gorm.DB, doc *model.CanvasDocument) error {
 		HTML:         html,
 		AuthorUserID: doc.OwnerUserID,
 		SaveVersion:  doc.SaveVersion,
+		YjsState:     yjsStateForDoc(tx, doc),
 		CreatedAt:    time.Now().UTC(),
 	}
 	if err := tx.Create(version).Error; err != nil {
@@ -403,9 +405,27 @@ func SnapshotDocVersion(tx *gorm.DB, doc *model.CanvasDocument) error {
 	return nil
 }
 
+func yjsStateForDoc(tx *gorm.DB, doc *model.CanvasDocument) string {
+	if doc == nil {
+		return ""
+	}
+	if len(doc.CurrentData) > 0 {
+		var payload struct {
+			YjsState string `json:"yjsState"`
+		}
+		if err := json.Unmarshal(doc.CurrentData, &payload); err == nil && strings.TrimSpace(payload.YjsState) != "" {
+			return strings.TrimSpace(payload.YjsState)
+		}
+	}
+	if state, ok := latestYjsSnapshotPayload(tx, doc.ID); ok {
+		return base64.StdEncoding.EncodeToString(state)
+	}
+	return ""
+}
+
 // ListDocVersions 返回文档的历史快照。
 func (s *KnowledgeService) ListDocVersions(ownerID, docID uuid.UUID, limit int) ([]model.KnowledgeDocVersion, error) {
-	if _, err := s.docs().GetOwned(ownerID, docID); err != nil {
+	if _, err := s.accessDocument(ownerID, docID, SpaceRoleViewer); err != nil {
 		return nil, err
 	}
 	if limit <= 0 || limit > VersionKeep {
@@ -419,7 +439,7 @@ func (s *KnowledgeService) ListDocVersions(ownerID, docID uuid.UUID, limit int) 
 
 // VersionDiff 对比两个历史快照，返回统一 diff 文本。
 func (s *KnowledgeService) VersionDiff(ownerID, docID, fromID, toID uuid.UUID) (string, error) {
-	if _, err := s.docs().GetOwned(ownerID, docID); err != nil {
+	if _, err := s.accessDocument(ownerID, docID, SpaceRoleViewer); err != nil {
 		return "", err
 	}
 	load := func(id uuid.UUID) (model.KnowledgeDocVersion, error) {

@@ -135,7 +135,7 @@ export function toggleDocTask(documentId: string, index: number, checked: boolea
 }
 
 /** 正文标题层级。 */
-export type OutlineItem = { index: number; level: number; text: string }
+export type OutlineItem = { index: number; level: number; text: string; blockId?: string; htmlId?: string }
 
 export function getDocOutline(documentId: string) {
   return apiRequest<OutlineItem[]>(`/documents/${documentId}/outline`, { cache: 'no-store' })
