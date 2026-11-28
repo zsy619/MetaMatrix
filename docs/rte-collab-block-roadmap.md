@@ -273,5 +273,10 @@ cd pros/web && npx vitest run && npx vue-tsc -b --pretty false
 - 35：块身份失效时大纲/目录按 html id 或标题文本回退；`sameOutline` 比较 htmlId；错配的标题闭合标签不再抽进服务端大纲。
 - 15：`DocOutline` / `ListDocTasks` 对浏览者可读；`SetDocTask` / `ReorderOutline` / `saveDocHTML` 对编辑者可写（按文档所有者回写）。不是组织或字段级 ACL。
 - 43：按线程 id 撤销评论锚点时，其它线程标记仍保留（单测已补）。
+- 08/32（单测加固，不宣称完成 50）：Redis presence 补了 TTL 过期、文档隔离、心跳覆盖、畸形/外文档 key 跳过，以及总线忽略空消息、非 JSON、坏 docId 和本实例回环的单测。不是真实双 API + 双浏览器验收。
+- 16（仍双写，短于 Y.Doc-only）：`InspectDualWrite` 在 `current_data.yjsState` 与最新 snapshot 都存在且字节不一致时标 `Consistent=false`、`Reason=yjs_state_diverged`；并暴露 `CurrentHasYjsState` / `YjsStateMatchesSnapshot`。缺一侧不改原先 HTML 双写结论。
+- 页眉页脚写入路径（`setPanelPageChrome` / `PageSetupSnap` / `replacePageChrome` / `publish` / `applyPageSetupSnap`）接受紧凑入参并先规范化，消掉历史测试与刚引入的 `RichTextEditor.vue` 类型诊断。
 
-本轮门禁（干净工作树，相对合入 #310 后的 `origin/main`）：`vue-tsc` 55 错 / 20 文件（基线约 60/21）；`vitest` 0 failed / 2134 passed / 1 skipped（基线 6 failed / 2119 passed 量级）；Go `internal/service` `internal/handler` `internal/middleware` `internal/config` 测试与 `go build ./cmd/server` 通过。
+对照现状后未再改代码的项：C1 保存冲突（块 ident / DOM 等价 / mine-theirs-both）与嵌入树快照安全推拉（1s/800ms、双方脏则中止、只读探测）已有足够单测，未见可再加深且不踩 47/48 的产品缺口；建议/评论/只读流程未找到可复现的新 RTE bug。其余未完成项属于架构锁（独立 Hocuspocus / 换 MySQL / 生产 MinIO / 一次切 Y.Doc-only / 官方 `@tiptap/markdown`）、47–51、未选定产品决策，或必须实机浏览器才能验，本分支停止加码，没有为空转改无关文件。
+
+本轮门禁（干净工作树，相对合入 #310 后的 `origin/main`，以及相对本分支第一轮 `8520e72` 的 55/20、0 failed / 2134 passed / 1 skipped）：`vue-tsc` 52 错 / 18 文件（较第一轮再减 3 错、2 个文件，来自紧凑页眉入参被正式接受；无新增文件、无新增诊断）；`vitest` 仍为 0 failed / 2134 passed / 1 skipped（298 files）；Go `internal/service` `internal/handler` `internal/middleware` `internal/config` 测试与 `go build ./cmd/server` 通过。
