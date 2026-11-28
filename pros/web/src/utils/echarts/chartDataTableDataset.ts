@@ -1,6 +1,6 @@
 /** dataset 形态的图表数据读写。 */
 import type { ChartDataModel } from './chartDataTableShared'
-import { isPlainObject, itemToText, itemToValue, textToValue } from './chartDataTableShared'
+import { isPlainObject, itemToText, itemToValue } from './chartDataTableShared'
 
 export function datasetRecord(option: Record<string, unknown>): Record<string, unknown> | null {
   const dataset = option.dataset
