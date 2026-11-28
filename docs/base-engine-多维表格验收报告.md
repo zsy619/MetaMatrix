@@ -1477,3 +1477,93 @@ ALL PASS
 P-02（COUNT 与取数只扫一次）、P-03（两段式排序查询）、P-07 的 N+1 断言、
 A-01~A-09 / E-01~E-07 的能力面扩展，以及**中文全文检索**（`pg_trgm` 对 CJK 无效）
 本轮未做，详见 [优化清单](./base-engine-多维表格-优化清单.md) 第八节。
+
+### 3.86 批次 Q：扫描次数治理 + 跨表依赖反查 + 审计变更集
+
+> 对应技术方案第 54 章。批次 P（第 53 章）修的是正确性缺陷，
+> 批次 Q 处理**扫描次数**、**依赖反查**与**审计可回放**，并更正一条被实测推翻的旧结论。
+
+#### 3.86.1 P-02：关键字查询的扫描次数减半 ✅
+
+| 口径 | 20 万行投影 / 命中 2 万行 | 说明 |
+| --- | --- | --- |
+| 旧：独立 COUNT + 取数 | 62.6ms + 42.9ms = **105.5ms** | 关键字扫描做了两遍 |
+| 新：一次扫描 + 窗口计数 | **44.5ms** | `COUNT(*) OVER ()` 顺带带回总数 |
+
+**边界（三条都有代价）**
+
+1. 没有关键字时仍走独立 COUNT —— COUNT 走索引扫描是毫秒级，
+   窗口计数反而会阻止 top-N 堆排序提前收尾；
+2. 带翻页锚点时仍走独立 COUNT —— 锚点在 WHERE 里，
+   窗口计数会变成「还剩多少条」而不是「一共有多少条」（语义会变）；
+3. 排序 / 分组的 LEFT JOIN 必须 1:1 —— 新增
+   `base_record_values (record_id, field_id)` 唯一索引兜底
+   （`internal/db/base_value_unique.go`，含存量去重 + 幂等重建）。
+
+**落地确认**：本地库 `pg_indexes` 实测存在
+`uniq_base_record_values_record_field`；`base_operation_logs.change_set` 列已存在。
+
+#### 3.86.2 A-06：跨表依赖反查索引 ✅
+
+| 项 | 治理前 | 现状 |
+| --- | --- | --- |
+| 「谁依赖我」怎么查 | 把整个 Base 的表列一遍，**逐表加载字段索引**再逐字段比对 | 一条索引查询（`dependentTableIDs`） |
+| 索引 | 无 | `idx_base_field_target_table ON base_fields ((config->>'targetTableId'))` |
+| 依赖图 | 只有公式字段的依赖 | 引用 / 汇总字段的跨表边也落库（`lookup` / `rollup`），字段增删改时维护、启动时回填 |
+| 依赖边唯一性 | 无约束 | `uniq_base_dep_formula_field_type (formula_field_id, dependency_field_id, dependency_type)` |
+
+回归用例：`TestCrossTableDependencyEdgePersisted`（建字段写边 → 反查命中 → 删字段清边）。
+
+#### 3.86.3 A-05：审计的字段级变更集 ✅
+
+- `base_operation_logs` 新增 `change_set jsonb`（`ensureBaseAuditChangeSet` 幂等补列）；
+- 变更集只记**真正变化**的字段：`added` / `removed` / `modified`
+  （数值按数值比，避免 `1` 与 `1.0` 判成不同；数组按顺序比）；
+- 删除记录时把被删内容写进 before —— 原先是 `nil, nil`，审计里只剩一句「删了」；
+- 变更集与 before / after 走**同一套字段级可见性**，隐藏字段的条目读出时剥掉。
+
+回归用例：`TestAuditChangeSetRecordsFieldLevelDiff`（改 1 个字段 → 变更集 1 条）。
+
+#### 3.86.4 P-07：把往返数锁进用例 ✅
+
+| 用例 | 锁住什么 | 实测 |
+| --- | --- | --- |
+| `TestBatchUpdateSelectCountNotLinearInRows` | 批量更新的 SELECT 次数与行数无关 | 10 行 / 40 行都是 **14 次 SELECT** |
+| `TestKeywordSearchSkipsJSONBranchWhenNoJSONField` | 无 JSON 字段时不得出现 `value_json` 分支 | 有 JSON 字段时必须出现 |
+| `TestCrossTableDependencyEdgePersisted` | 依赖边生命周期 | 见 3.86.2 |
+| `TestAuditChangeSetRecordsFieldLevelDiff` | 变更集粒度 | 见 3.86.3 |
+
+> 计数用 GORM logger 钩子按动词分类，挂 `db.Session(&gorm.Session{Logger: ...})`，
+> 共用同一条连接池，不影响被测逻辑。
+
+#### 3.86.5 更正：「pg_trgm 对中文无效」是错的 ❌→✅
+
+清单长期挂着「中文全文检索未解决」，理由是 `pg_trgm` 对 CJK 无效。
+本轮用真实 Postgres 实测推翻：
+
+```
+EXPLAIN (ANALYZE, BUFFERS) SELECT id FROM tmp_cjk_probe WHERE t ILIKE '%思维导图%';
+-- Bitmap Heap Scan on tmp_cjk_probe
+--   ->  Bitmap Index Scan on tmp_cjk_probe_trgm
+--         Index Cond: (t ~~* '%思维导图%'::text)
+-- Execution Time: 2.485 ms        （5 万行中文表）
+```
+
+`show_trgm('知识库管理')` 返回 6 个三值组 —— 汉字被当成独立词，
+三值组照样落在汉字内部。**不需要 ngram 分词方案。**
+真正的限制是：查询词 < 3 字符用不上索引；GIN 索引是全表级的，热门关键词堆回表开销大；
+JSON 字段分支（`value_json::text ILIKE`）走不了索引 —— 需把可搜文本落到 `value_text`。
+
+#### 3.86.6 门禁
+
+| 门禁 | 结果 |
+| --- | --- |
+| `go build ./...` | ✅ |
+| `go test ./internal/... -count=1`（真实 PG localhost:5433） | ✅ 11 包全绿 |
+| `base-engine-e2e.mjs` | ✅ ALL PASS |
+| `base-engine-audit.mjs` | ✅ ALL PASS |
+| `base-ops-panel-e2e.mjs` | ✅ ALL PASS |
+| `cmd/loadtest -scale large`（50 并发，5000 行 × 20 字段） | 首屏 1756 QPS / 关键字 1733 QPS / 深翻页 1616 QPS，错误 0 |
+
+> 压测机本机 PG 容器 `max_connections=100`，dev 与压测实例各占 50 条，
+> 高并发下偶发 `tls error: EOF` —— HEAD 版本同样复现，属环境噪声。

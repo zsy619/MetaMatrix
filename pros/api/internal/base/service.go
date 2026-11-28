@@ -964,6 +964,10 @@ func (s *Service) CreateField(ctx context.Context, userID, projectID, tableID uu
 		}
 		// 字段策略双写：config.permissions → base_field_policies。
 		s.syncFieldPolicy(ctx, tx, projectID, tableID, field.ID, cfg)
+		// 跨表依赖边：引用 / 汇总字段指向的目标表要进依赖图（A-06）。
+		if err := s.syncComputedDependency(tx, projectID, tableID, field.ID, in.Type, cfg); err != nil {
+			return err
+		}
 		if err := s.bumpSchema(tx, tableID); err != nil {
 			return err
 		}
@@ -1059,6 +1063,10 @@ func (s *Service) UpdateField(ctx context.Context, userID, projectID, fieldID uu
 	}
 	// 字段策略双写：独立表始终与 config.permissions 保持一致。
 	s.syncFieldPolicy(ctx, s.db, projectID, field.TableID, field.ID, cfg)
+	// 跨表依赖边：改了目标表 / 目标字段就要重写依赖图（A-06）。
+	if err := s.syncComputedDependency(s.db.WithContext(ctx), projectID, field.TableID, field.ID, field.Type, cfg); err != nil {
+		return nil, err
+	}
 	name := field.Name
 	if in.Name != nil {
 		name = strings.TrimSpace(*in.Name)
@@ -1974,7 +1982,12 @@ func (s *Service) DeleteRecord(ctx context.Context, userID, projectID, recordID 
 		if err := tx.Where("target_record_id = ?", recordID).Delete(&BaseRecordLink{}).Error; err != nil {
 			return err
 		}
-		if err := s.writeAudit(tx, projectID, table.BaseID, &rec.TableID, &rec.ID, userID, "record.deleted", nil, nil, ""); err != nil {
+		// 删除也要留 before：不然审计里只有一条「删了」，回放不出删掉的是什么。
+		deletedData := map[string]any{}
+		if len(rec.Data) > 0 {
+			_ = json.Unmarshal(rec.Data, &deletedData)
+		}
+		if err := s.writeAudit(tx, projectID, table.BaseID, &rec.TableID, &rec.ID, userID, "record.deleted", deletedData, nil, ""); err != nil {
 			return err
 		}
 		return s.writeEvent(tx, projectID, table.BaseID, &rec.TableID, &rec.ID, "record.deleted", map[string]any{
@@ -3360,6 +3373,8 @@ func newAuditRow(projectID, baseID uuid.UUID, tableID, recordID *uuid.UUID, oper
 	return BaseOperationLog{
 		ID: uuid.New(), TenantID: projectID, ProjectID: projectID, BaseID: baseID, TableID: tableID, RecordID: recordID,
 		OperatorID: operatorID, Operation: operation, BeforeData: beforeRaw, AfterData: afterRaw,
+		// 字段级变更集：只记真正变化的字段，审计才能当变更历史回放（A-05）。
+		ChangeSet: buildChangeSet(before, after),
 		RequestID: requestID, CreatedAt: time.Now(),
 	}
 }

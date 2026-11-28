@@ -87,6 +87,93 @@ func (s *Service) resolveLinkField(idx *fieldIndex, spec computedFieldSpec) (uui
 	return uuid.Nil, false
 }
 
+// syncComputedDependency 维护引用 / 汇总字段的**跨表依赖边**。
+//
+// 背景（A-06）：过去 base_formula_dependencies 里只有公式字段的依赖，
+// 引用 / 汇总字段指向别的表这件事只存在字段配置 JSON 里 ——
+// 「谁依赖我」这条反查链路没有索引，每次判定都要全库扫。
+//
+// 现在把跨表依赖也写进依赖图：
+//   - 公式字段依赖本表字段 → dependency_type = 'field'（原来就有）；
+//   - 引用 / 汇总字段依赖目标表 → dependency_type = 'lookup' / 'rollup'。
+//
+// 这样依赖图就是完整的跨表依赖关系，
+// 既能支撑「谁依赖我」的接口，也能支撑反查索引。
+func (s *Service) syncComputedDependency(tx *gorm.DB, tenantID, tableID, fieldID uuid.UUID, fieldType string, config map[string]any) error {
+	// 先清掉这个字段作为依赖方产生的**非公式依赖**（公式依赖由保存公式的路径维护）。
+	//
+	// 依赖表还不存在（老库未迁移 / 精简影子库）时忽略 ——
+	// 依赖图只是加速用的旁路，不能因为它让建字段失败。
+	if err := tx.Where("formula_field_id = ? AND dependency_type <> 'field'", fieldID).
+		Delete(&BaseFormulaDependency{}).Error; err != nil && !isMissingTable(err) {
+		return err
+	}
+	if fieldType != string(FieldLookup) && fieldType != string(FieldRollup) {
+		return nil
+	}
+	rawTarget, _ := config["targetTableId"].(string)
+	if rawTarget == "" {
+		return nil
+	}
+	target, err := uuid.Parse(rawTarget)
+	if err != nil {
+		return nil
+	}
+	// 被依赖的字段：优先目标字段，其次本地关联字段，都取不到就退化成零值 UUID
+	//（同一字段只会留下一行边，语义不受影响）。
+	depField := uuid.Nil
+	for _, key := range []string{"targetFieldId", "linkFieldId"} {
+		raw, ok := config[key].(string)
+		if !ok || raw == "" {
+			continue
+		}
+		if parsed, err := uuid.Parse(raw); err == nil {
+			depField = parsed
+			break
+		}
+	}
+	row := BaseFormulaDependency{
+		ID: uuid.New(), TenantID: tenantID, TableID: tableID,
+		FormulaFieldID: fieldID, DependencyFieldID: depField,
+		DependencyType: fieldType, DependencyTableID: &target,
+	}
+	if err := tx.Create(&row).Error; err != nil && !isMissingTable(err) {
+		return err
+	}
+	return nil
+}
+
+// dependentTableIDs 反查「哪些表的引用 / 汇总字段指向这张表」。
+//
+// 旧实现（computeHasDependents / RecalcDependentsOfTable 的老写法）：
+// 把整个 Base 下所有表列出来，**逐表加载字段索引**再逐字段比对配置 ——
+// 表一多，写入路径上的依赖判定就变成 O(表数) 次查库。
+//
+// 现在改成一条索引查询：
+//
+//	SELECT DISTINCT table_id FROM base_fields
+//	 WHERE type IN ('lookup','rollup') AND config->>'targetTableId' = ?
+//
+// 走 idx_base_field_target_table 表达式索引，一次查完。
+//
+// 大小写都带上：UUID 的字符串写法有大写 / 小写两种可能，
+// 两个分支都能命中表达式索引（PG 走 BitmapOr）。
+func (s *Service) dependentTableIDs(ctx context.Context, targetTableID uuid.UUID) ([]uuid.UUID, error) {
+	var ids []uuid.UUID
+	lower := strings.ToLower(targetTableID.String())
+	upper := strings.ToUpper(targetTableID.String())
+	if err := s.db.WithContext(ctx).
+		Raw(`SELECT DISTINCT table_id FROM base_fields
+		      WHERE status = 1
+		        AND type IN ('lookup', 'rollup')
+		        AND (config->>'targetTableId' = ? OR config->>'targetTableId' = ?)`,
+			lower, upper).
+		Scan(&ids).Error; err != nil {
+		return nil, err
+	}
+	return ids, nil
+}
+
 // RecalcLookupRollup 重算一张表里的引用 / 汇总字段，返回被更新的记录数。
 //
 // 计算时机遵循「跨表取值走异步 / 分批」的约定：
@@ -366,27 +453,28 @@ func (s *Service) RecalcDependentsOfTable(ctx context.Context, targetTableID uui
 		}
 		return 0, err
 	}
-	var tables []BaseTable
-	if err := s.db.WithContext(ctx).Where("base_id = ? AND status = 1", target.BaseID).Find(&tables).Error; err != nil {
+	// 反查依赖方：一条索引查询拿到「哪些表的引用 / 汇总字段指向这张表」。
+	//
+	// 旧实现是把整个 Base 的表全列一遍、逐表加载字段索引再逐字段比对 ——
+	// 表越多越慢，而且每张表都要查一次库。
+	depTableIDs, err := s.dependentTableIDs(ctx, targetTableID)
+	if err != nil {
 		return 0, err
 	}
 	updated := 0
-	for _, tbl := range tables {
-		if tbl.ID == targetTableID {
+	for _, depTableID := range depTableIDs {
+		if depTableID == targetTableID {
 			continue
+		}
+		var tbl BaseTable
+		if err := s.db.WithContext(ctx).Where("id = ? AND status = 1", depTableID).First(&tbl).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				continue
+			}
+			return updated, err
 		}
 		idx, err := s.loadFieldIndex(ctx, tbl.ID)
 		if err != nil {
-			continue
-		}
-		depends := false
-		for _, spec := range s.collectComputedSpecs(idx) {
-			if spec.targetTableID == targetTableID {
-				depends = true
-				break
-			}
-		}
-		if !depends {
 			continue
 		}
 		n, err := s.recalcComputedFields(ctx, &tbl, idx)
@@ -520,31 +608,17 @@ func (s *Service) tableHasDependents(tableID uuid.UUID) (bool, error) {
 	return has, nil
 }
 
-// computeHasDependents 实际扫描依赖关系（结果会被缓存）。
+// computeHasDependents 实际查询依赖关系（结果会被缓存）。
+//
+// 现在走索引反查（dependentTableIDs），不再逐表加载字段索引。
 func (s *Service) computeHasDependents(tableID uuid.UUID) (bool, error) {
-	var target BaseTable
-	if err := s.db.Where("id = ?", tableID).First(&target).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return false, nil
-		}
+	depTables, err := s.dependentTableIDs(context.Background(), tableID)
+	if err != nil {
 		return false, err
 	}
-	var tables []BaseTable
-	if err := s.db.Where("base_id = ? AND status = 1", target.BaseID).Find(&tables).Error; err != nil {
-		return false, err
-	}
-	for _, tbl := range tables {
-		if tbl.ID == tableID {
-			continue
-		}
-		idx, err := s.loadFieldIndex(context.Background(), tbl.ID)
-		if err != nil {
-			continue
-		}
-		for _, spec := range s.collectComputedSpecs(idx) {
-			if spec.targetTableID == tableID {
-				return true, nil
-			}
+	for _, id := range depTables {
+		if id != tableID {
+			return true, nil
 		}
 	}
 	return false, nil

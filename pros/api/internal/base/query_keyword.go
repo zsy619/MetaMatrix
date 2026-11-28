@@ -24,20 +24,25 @@ import (
 // 新实现：条件只编译一次、只保留表里真实存在的分支、全部走半连接。
 
 // compileKeyword 编译关键字搜索条件（一次查询只编译一次，计数与取数共用）。
+//
+// 第三个返回值是「完整命中集合」：非 nil 时表示这次关键字搜索的命中记录
+// **已经全部拿到手**（快路径探测没探到上限），调用方可以直接用这个集合
+// 算总数，不必再跑一次全表 COUNT（P-02）。
+// nil 表示命中集合不完整（JSON 分支 / 关联文档分支），按老路走精确 COUNT。
 func (s *Service) compileKeyword(
 	ctx context.Context,
 	projectID, tableID uuid.UUID,
 	idx *fieldIndex,
 	kw string,
-) (string, []any) {
+) (string, []any, []uuid.UUID) {
 	kw = strings.TrimSpace(kw)
 	if kw == "" {
-		return "", nil
+		return "", nil, nil
 	}
 	like := "%" + escapeLike(kw) + "%"
 	textIDs, jsonIDs := keywordFieldIDs(idx)
 	if len(textIDs) == 0 && len(jsonIDs) == 0 {
-		return "", nil
+		return "", nil, nil
 	}
 	// 「纯文本搜索」走候选集快路径：
 	// 先探一次（带上限），能确定命中集合时直接用记录 ID，
@@ -46,8 +51,8 @@ func (s *Service) compileKeyword(
 	// 有 JSON 分支或「按文档标题」分支时不走快路径 ——
 	// 候选集只覆盖文本字段，不完整，用了会漏结果。
 	if len(textIDs) > 0 && len(jsonIDs) == 0 && len(s.docFieldIDs(idx)) == 0 {
-		if cond, args, ok := s.keywordCandidateCondition(ctx, tableID, textIDs, like); ok {
-			return cond, args
+		if cond, args, ids, ok := s.keywordCandidateCondition(ctx, tableID, textIDs, like); ok {
+			return cond, args, ids
 		}
 	}
 	parts := make([]string, 0, 3)
@@ -77,9 +82,9 @@ func (s *Service) compileKeyword(
 		}
 	}
 	if len(parts) == 0 {
-		return "", nil
+		return "", nil, nil
 	}
-	return "(" + strings.Join(parts, " OR ") + ")", args
+	return "(" + strings.Join(parts, " OR ") + ")", args, nil
 }
 
 // keywordCandidateCap 是「候选集快路径」能接纳的最大命中行数。
@@ -103,7 +108,7 @@ const keywordCandidateCap = 2000
 // 正确性前提：只有「没触发 LIMIT」时才能认定集合完整，
 // 所以上限判断用的是探到的行数而不是去重后的数量 —— 去重只会更少，
 // 用原始行数判断更保守。
-func (s *Service) keywordCandidateCondition(ctx context.Context, tableID uuid.UUID, textIDs []uuid.UUID, like string) (string, []any, bool) {
+func (s *Service) keywordCandidateCondition(ctx context.Context, tableID uuid.UUID, textIDs []uuid.UUID, like string) (string, []any, []uuid.UUID, bool) {
 	type candidate struct {
 		RecordID uuid.UUID `gorm:"column:record_id"`
 	}
@@ -113,15 +118,17 @@ func (s *Service) keywordCandidateCondition(ctx context.Context, tableID uuid.UU
 			tableID, textIDs, like, keywordCandidateCap+1).
 		Scan(&rows).Error; err != nil {
 		// 探测失败（表不存在 / 索引缺失等）→ 老老实实走半连接。
-		return "", nil, false
+		return "", nil, nil, false
 	}
 	if len(rows) == 0 {
 		// 没有任何命中：恒假条件，主查询直接空转。
-		return "1 = 0", nil, true
+		// 命中集合是「空集」（非 nil）—— 调用方据此知道总数就是 0，
+		// 不必再跑一次 COUNT。
+		return "1 = 0", nil, []uuid.UUID{}, true
 	}
 	if len(rows) > keywordCandidateCap {
 		// 命中面太大：回落到半连接。
-		return "", nil, false
+		return "", nil, nil, false
 	}
 	// 没触发 LIMIT → 探到的就是全部命中行；去重后是完整命中集合。
 	seen := make(map[uuid.UUID]bool, len(rows))
@@ -134,9 +141,11 @@ func (s *Service) keywordCandidateCondition(ctx context.Context, tableID uuid.UU
 		ids = append(ids, row.RecordID)
 	}
 	if len(ids) == 0 {
-		return "1 = 0", nil, true
+		return "1 = 0", nil, []uuid.UUID{}, true
 	}
-	return "r.id IN ?", []any{ids}, true
+	// 「r.id IN ?」把完整命中集合交给调用方：
+	// 总数可以直接按这个集合点查出来，省掉一次全表 COUNT。
+	return "r.id IN ?", []any{ids}, ids, true
 }
 
 // buildDocTitleBranch 编译「按文档标题命中」的分支。

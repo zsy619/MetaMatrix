@@ -28,7 +28,7 @@ func newVersionFixture(t *testing.T) (*Service, uuid.UUID, uuid.UUID, uuid.UUID,
 		`CREATE TABLE IF NOT EXISTS base_field_formulas (id uuid primary key, table_id uuid, field_id uuid, status integer)`,
 		`CREATE TABLE IF NOT EXISTS base_operation_logs (
 			id uuid primary key, tenant_id uuid, project_id uuid, base_id uuid, table_id uuid, record_id uuid,
-			operator_id uuid, operation varchar(32), before_data json, after_data json,
+			operator_id uuid, operation varchar(32), before_data json, after_data json, change_set json,
 			request_id varchar(64), created_at datetime)`,
 		`CREATE TABLE IF NOT EXISTS base_event_outboxes (
 			id uuid primary key, tenant_id uuid, project_id uuid, base_id uuid, table_id uuid,

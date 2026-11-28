@@ -192,6 +192,18 @@ func AutoMigrate(gdb *gorm.DB) error {
 	if err := ensureBaseDedupeIndexes(gdb); err != nil {
 		log.Printf("ensureBaseDedupeIndexes warning: %v", err)
 	}
+	// 投影表 (record_id, field_id) 唯一：排序 JOIN 与窗口计数都依赖 1:1。
+	if err := ensureBaseValueUniqueIndex(gdb); err != nil {
+		log.Printf("ensureBaseValueUniqueIndex warning: %v", err)
+	}
+	// 跨表依赖的反查索引：谁依赖这张表。
+	if err := ensureBaseDependencyIndex(gdb); err != nil {
+		log.Printf("ensureBaseDependencyIndex warning: %v", err)
+	}
+	// 审计的字段级变更集列。
+	if err := ensureBaseAuditChangeSet(gdb); err != nil {
+		log.Printf("ensureBaseAuditChangeSet warning: %v", err)
+	}
 	if err := ensureBaseRecordSortOrder(gdb); err != nil {
 		log.Printf("ensureBaseRecordSortOrder warning: %v", err)
 	}
@@ -406,6 +418,22 @@ func ensureBaseRecordVisibility(gdb *gorm.DB) error {
 		}
 	}
 	return nil
+}
+
+// ensureBaseAuditChangeSet 给操作审计补「字段级变更集」列（A-05）。
+//
+// 审计行原本只有 before / after 两份完整快照：能看出「现在是什么样」，
+// 看不出「到底改了哪几个字段」。新增 change_set 列只记真正变化的字段，
+// 审计才能当变更历史回放。
+//
+// 列可空：存量审计行没有变更集，补 NULL 即可，不用回填。
+func ensureBaseAuditChangeSet(gdb *gorm.DB) error {
+	if !gdb.Migrator().HasTable("base_operation_logs") {
+		return nil
+	}
+	return gdb.Exec(
+		`ALTER TABLE base_operation_logs ADD COLUMN IF NOT EXISTS change_set jsonb`,
+	).Error
 }
 
 // ensureBaseEngineIndexes 给 Base Engine 补查询投影与事件表的索引。

@@ -89,21 +89,32 @@
 
 ## 二、P0 · 性能与规模（🟠）
 
-- [x] **P-01　关键词检索上索引（中文场景要专门方案）**
+- [x] **P-01　关键词检索上索引（中文已实测可用，原结论有误）**
       - 英文 / 数字：`pg_trgm` GIN（`value_text gin_trgm_ops`）已上线
         （`ensureBaseSearchIndex`，建索引失败静默降级）。
-      - 中文：`pg_trgm` 对 CJK 无效，本轮**仍未解决**（见第七节），需要 ngram 分词或应用层 n-gram 列。
-      - **中文**：`pg_trgm` 对 CJK 无效（按字符切分，中文汉字多为 3 字节），
-        要走 `to_tsvector('simple', ...)` + `pg_catalog` 的 ngram 分词，或应用层 n-gram 列 + GIN。
-      - JSON 分支：要么给 `value_json` 建 GIN（`jsonb_path_ops`），
-        要么把附件 / 成员字段的**可搜文本**单独落到 `value_text`（推荐：一次写入，检索走现成索引）。
-      **验收**：10 万行表上关键字查询 P95 < 100ms（当前预期是秒级）。
+      - **中文：实测证明 `pg_trgm` 同样可用**（原清单写的「对 CJK 无效」是错的，
+        证据见技术方案第 54.4 节的 EXPLAIN 输出）。汉字被 Postgres 当成独立词，
+        三值组落在汉字内部，GIN 索引能命中；5 万行中文表上
+        `ILIKE '%思维导图%'` → `Bitmap Index Scan`，耗时 2.5ms。
+      - 真正的限制有两条（与语言无关）：查询词**少于 3 个字符用不上索引**；
+        GIN 索引是**全表级**的，热门关键词命中行多时，位图堆回表是主要开销。
+      - JSON 分支（`value_json::text ILIKE`）仍然全表扫且**走不了索引** ——
+        待把附件 / 成员字段的可搜文本落到 `value_text`（见第八节剩余项）。
+      **验收**：10 万行表上关键字查询 P95 < 100ms ✅
+      （实测 20 万行投影 / 命中 2 万行时，整条查询 44.5ms）。
 
-- [ ] **P-02　COUNT 与取数只扫一次**
-      现在 `total` 与数据查询**各扫一遍同样的 WHERE**（`query.go:711` / `query.go:735`）。
-      - 小结果集：先取 `pageSize+1` 行判 `hasMore`，`total` 改为**估算**（`EXPLAIN` 的 rows 估算）或懒加载；
-      - 大结果集：保留精确 `COUNT`，但加 `LIMIT` 缓存（同一条件 30s 内复用）。
-      **验收**：关键字查询的扫描次数减半。
+- [x] **P-02　COUNT 与取数只扫一次** ✅ 本轮完成
+      旧实现：`total` 与数据查询**各扫一遍同样的 WHERE**（独立 COUNT + 取数查询）。
+      现在：**有关键字时改用窗口计数** `COUNT(*) OVER ()`，一次扫描同时拿到数据与总数。
+      - 实测（20 万行投影 / 命中 2 万行）：旧 **105.5ms**（62.6 + 42.9）→ 新 **44.5ms**；
+      - 边界 1：没有关键字时仍走独立 COUNT（COUNT 走索引扫描是毫秒级，
+        而窗口计数会阻止 top-N 堆排序提前收尾，没有关键字可省就不划算）；
+      - 边界 2：带翻页锚点时仍走独立 COUNT（锚点在 WHERE 里，
+        窗口计数会变成「还剩多少条」而不是「一共有多少条」，语义会变）；
+      - 边界 3：排序 / 分组的 LEFT JOIN 必须 1:1 ——
+        新增 `base_record_values (record_id, field_id)` 唯一索引兜底
+        （`internal/db/base_value_unique.go`，含存量去重）。
+      **验收**：关键字查询的扫描次数减半 ✅（2 → 1）。
 
 - [ ] **P-03　排序 / 分组的 JOIN 数设上限**
       N 个排序列 = N 个 `LEFT JOIN base_record_values`。大表上代价线性放大。
@@ -127,18 +138,20 @@
       `service.go:1094`（删字段清残留值）、`service.go:1135`、`service.go:1188`（类型迁移）
       都是 `Find(&records)` **无 LIMIT 整表载入内存**。改成按 id 游标分批。
 
-- [ ] **P-07　批量更新 / 关键词检索补回归测试（本轮遗留）**
-      - `internal/base/batch_update_test.go`：数据 / `version` / 投影一致性；
-        strict 与非 strict 两条部分失败路径；
-        **N+1 断言**（SQL 次数不随行数线性增长）；
-      - 关键词单测：有 / 无 JSON 投影字段时分支数不同，断言无 JSON 字段时该分支**不出现**。
+- [x] **P-07　批量更新 / 关键词检索补回归测试** ✅ 本轮完成
+      - `internal/base/p07_regression_test.go`：
+        - **N+1 断言**：批量更新 10 行与 40 行的 SELECT 次数**相同**（实测都是 14 次），
+          SQL 次数不随行数线性增长；
+        - **关键字分支断言**：没有 JSON 字段时，检索条件里**不得出现** `value_json` 分支；
+          有 JSON 字段时必须出现；
+        - 跨表依赖边（A-06）与审计变更集（A-05）的回归用例同批补齐。
 
 - [x] **P-08　限流档位按实测能力定档**
       实测：关键字查询 934 QPS、批量编辑 89 QPS；默认 `BASE_RATE_LIMIT_RPS = 40` 差一个数量级。
       - 默认提到 200 / burst 400；
       - 限流维度从「用户 × 路径」细化到「用户 × 接口类别」，避免批量写被查询配额误伤。
 
-- [ ] **P-09　限流「0 = 不限流」失效（✅ 本轮已修，未提交）**
+- [x] **P-09　限流「0 = 不限流」失效**（已修并提交）
       `internal/config/layered.go` 的 `int()` 用 `n > 0` 判环境变量有效性，
       `BASE_RATE_LIMIT_RPS=0` 被当成未设置 → 回落 yaml 的 40 → 限流器永远关不掉。
       已加 `layered.intAllowZero()` 并让 `BaseRateLimitRPS` 改用它。
@@ -155,12 +168,20 @@
       现在只有「AND」或「个人优先、空回落共享」（`viewQuery.ts:120-123`）。
 - [ ] **A-04　链接目标候选分页 + 远程搜索**
       现在一次最多 200 条，无游标、无模糊搜索。
-- [ ] **A-05　审计 change set**
-      审计只存写入快照，无 before / after diff → **审计不能当变更历史回放**。
-      建议增 `before_json` / `after_json` 或独立 `base_audit_changes` 表。
-- [ ] **A-06　引用 / 汇总字段跨表链路**（配合 F-02）
-      依赖图已建（`base_formula_dependencies`），但「哪些表依赖我」没有反查索引 →
-      每次重算都要全表扫依赖表。
+- [x] **A-05　审计 change set** ✅ 本轮完成
+      审计原来只存 before / after 两份**完整快照**，看不出「到底改了哪几个字段」。
+      现在 `base_operation_logs` 增加 `change_set jsonb` 列，
+      记录字段级差异（`added` / `removed` / `modified`），
+      删除记录时把被删内容写进 before（原先是 `nil, nil`，回放不出删掉的是什么）。
+      变更集与 before / after 走同一套字段级可见性 —— 隐藏字段的条目读出时剥掉。
+- [x] **A-06　引用 / 汇总字段跨表链路** ✅ 本轮完成（配合 F-02）
+      「哪些表依赖我」原来没有反查索引：每次重算都要把整个 Base 的表列一遍、
+      逐表加载字段索引再逐字段比对（O(表数) 次查库）。
+      现在：
+      - `idx_base_field_target_table ON base_fields ((config->>'targetTableId'))` 表达式索引；
+      - 引用 / 汇总字段的跨表依赖**落库**到 `base_formula_dependencies`
+        （`dependency_type = 'lookup' / 'rollup'`），字段增删改时维护、启动时回填；
+      - 反查改成一条索引查询（`dependentTableIDs`）。
 - [ ] **A-07　记录级授权的部门来源**
       `base_record_grants.subject_type = department` 已支持，
       但部门名是「派生伪 ID」，没有真实组织架构联动。
@@ -227,21 +248,39 @@
 | P-06 | 删字段 / 类型迁移 / 公式回填 / 重排全部改成游标分批 | `internal/base/cursor.go` |
 | P-08 | 限流默认 rps 40→200、burst 80→400；限流维度改成「用户 × 接口类别」 | `internal/middleware/ratelimit.go::PathClass` |
 
+## 七之二、批次 Q（扫描次数 + 依赖反查 + 审计变更集）已落地的改动
+
+| 项 | 落地内容 | 证据 |
+| --- | --- | --- |
+| P-02 | 有关键字时用窗口计数 `COUNT(*) OVER ()`，统计与取数**只扫一次** | 实测 105.5ms → **44.5ms**（20 万行投影 / 命中 2 万行） |
+| P-02 前置 | `base_record_values (record_id, field_id)` 唯一索引（保证排序 JOIN 1:1） | `internal/db/base_value_unique.go` |
+| P-07 | 批量更新 N+1 断言、关键字分支断言、依赖边断言、审计变更集断言 | `internal/base/p07_regression_test.go`（10 行 / 40 行都是 14 次 SELECT） |
+| A-05 | 审计增加字段级变更集 `change_set jsonb`；删除时把被删内容写进 before | `internal/base/audit_changeset.go` |
+| A-06 | 跨表依赖反查索引 + 依赖边落库 + 索引驱动的依赖方查询 | `internal/db/base_dep_index.go` + `internal/base/lookup.go` |
+| P-01 更正 | 实测推翻「pg_trgm 对中文无效」，中文子串检索**能走 GIN 索引** | 技术方案第 54.4 节（EXPLAIN 输出） |
+
 ## 八、跳过的部分与风险
 
-- [ ] **中文全文检索仍未解决**：`pg_trgm` 对 CJK 无效，中文关键字仍走顺序扫描。
-      需要 ngram 分词（`to_tsvector('simple', …)` + `pg_catalog`）或应用层 n-gram 列 + GIN。
-- [ ] **P-02（COUNT 与取数只扫一次）未做**：把 `total` 改成估算会改变接口语义（分页信息不可靠），
-      风险高于收益，本轮保留精确 COUNT。
+- [x] ~~中文全文检索仍未解决~~ —— **本轮实测推翻**：中文子串检索能走 `pg_trgm` GIN 索引
+      （5 万行表 2.5ms），不需要 ngram 分词。原结论作废。
+- [ ] **JSON 字段的检索仍未走索引**：`value_json::text ILIKE` 无法建索引（`jsonb::text` 不是
+      IMMUTABLE），只能全表扫。**下一步**是把附件名 / 成员名等可搜文本落到 `value_text`，
+      从根上消掉这条分支。
+- [ ] **短关键词用不上索引**：三值组要求查询词 ≥ 3 字符（与语言无关），
+      两字中文仍走顺序扫描。命中面本来就小，暂不处理。
+- [x] ~~P-02 未做~~ —— **本轮完成**（窗口计数，见第七之二节）。
 - [ ] **P-03（排序 / 分组的 JOIN 数上限）未做**：后端已有 `MaxSorts=5 / MaxGroups=3` 的硬校验，
       两段式查询改造成本高，本轮保留现状。
-- [ ] **P-07（批量更新 / 关键字的 N+1 断言用例）只做了一半**：
-      关键字路径已有 `TestKeywordSearchReturnsOnlyMatchingRecords`，
-      批量更新的「SQL 次数不随行数线性增长」断言未写。
-- [ ] **A-01 ~ A-09 / E-01 ~ E-07 全部未做**（SSE→WS、字段级增量、审计 change set、
+- [x] ~~P-07 只做了一半~~ —— **本轮完成**（N+1 断言已补）。
+- [ ] **A-01 ~ A-04 / A-07 ~ A-09 / E-01 ~ E-07 未做**（SSE→WS、字段级增量、
       链接分页、CSV 行级重试、XLSX 样式保真、粘贴智能解析、批量拖拽排序、跨表拖拽、
       附件安全、汇总行等），属于能力面扩展，需要单独排期。
-- [ ] **中文分词依赖部署环境**：服务器容器需确认可装 `pg_trgm` / 中文分词扩展。
+- [ ] **远端库未同步**：本轮新增的索引（`uniq_base_record_values_record_field` /
+      `idx_base_dep_dependency_table` / `idx_base_field_target_table` /
+      `uniq_base_dep_formula_field_type`）与 `change_set` 列只在**本地开发库**生效；
+      远端 `101.132.237.173` 仍缺 base_import_jobs / base_user_groups / tenant_id 迁移。
+      远端部署时服务启动会自动执行 `ensure*Schema` 补上（幂等），
+      但**索引重建在大库上会耗时**，需要评估窗口。
 - [x] E2E 已跑：`base-engine-e2e.mjs` / `base-engine-audit.mjs` / `base-ops-panel-e2e.mjs` 全部 ALL PASS。
 - [x] 浏览器验证：本轮改动均为后端逻辑，UI 无变化；F-01 的 500 用真实 HTTP 复现并用回归用例锁死。
 - [ ] **压测环境噪声**：本机 PG 容器 `max_connections=100`，dev 实例与压测实例各 50 连接，
