@@ -144,6 +144,8 @@ const tableHtml = tsvToTableHtml('甲\t乙\n丙\t丁')
 assert.match(tableHtml, /<table><tbody><tr><td><p>甲<\/p><\/td><td><p>乙<\/p><\/td><\/tr>/)
 assert.doesNotMatch(tableHtml, /<script/)
 assert.match(tsvToTableHtml('a<b>\tok'), /a&lt;b&gt;/)
+assert.match(tsvToTableHtml('名称\t日期\n甲\t44927'), /2023-01-01/)
+assert.match(tsvToTableHtml('编号\t数量\n甲\t44927'), />44927</)
 
 const copied = feishuClipboardDocument('<table><tr><td>1</td></tr></table>', '周报')
 assert.match(copied, /<h1>周报<\/h1>/)

@@ -89,7 +89,7 @@ function apply() {
     <!-- 宿主容器始终存在，CodeMirror 挂载后才有内容 -->
     <div ref="host" class="rte-cp-cm" :class="{ 'is-hidden': loading || failed }"></div>
     <div class="rte-cp-row-actions">
-      <button type="button" class="rte-cp-mini rte-cp-mini-primary" @click="apply">
+      <button type="button" class="rte-cp-mini rte-cp-mini-primary" title="把这段 JSON 写回图表" @click="apply">
         应用 JSON
       </button>
       <span v-if="dirty" class="rte-cp-field-hint">有未应用的改动</span>

@@ -1,4 +1,7 @@
 import { Node, mergeAttributes } from '@tiptap/core'
+import { Plugin } from '@tiptap/pm/state'
+import { tableGrid } from '../utils/rteTableFormulaOps'
+import { applyMappedDataToOption, tableGridToChartData } from '../utils/echarts/chartDataMapping'
 import {
   ECHARTS_CHART_TYPES,
   buildTemplateOption,
@@ -12,7 +15,8 @@ import { applyChartAria } from '../utils/echarts/chartA11yOption'
 import { buildChartA11ySummary, type ChartA11ySummary } from '../utils/echarts/chartA11y'
 import { echartsRendererFor, needsEchartsGl, resolveEchartsRenderItems } from '../utils/echarts/prepare'
 import { loadEchartsGl } from '../utils/echartsGlRuntime'
-import { chartRenderOption, type ChartRenderMode } from '../utils/rteChartTheme'
+import { chartRenderOption, type ChartMotion, type ChartRenderMode } from '../utils/rteChartTheme'
+import { ensureRenderableChartOption } from '../utils/echarts/chartRenderGuard'
 import {
   resolveDataSourceConfig,
   startChartDataPolling,
@@ -41,6 +45,7 @@ declare module '@tiptap/core' {
         renderer?: string
         chartId?: string
         dataSource?: string
+        tableRef?: string
       }) => ReturnType
       /** 更新指定位置的图表块属性。 */
       updateEchartsBlock: (pos: number, attrs: Record<string, unknown>) => ReturnType
@@ -50,8 +55,8 @@ declare module '@tiptap/core' {
   }
 }
 
-/** 图表块默认高度（px）。 */
-const DEFAULT_HEIGHT = 320
+/** 图表块默认高度（px）。留出标题、图例和坐标，避免 320 里挤成一条。 */
+const DEFAULT_HEIGHT = 400
 /** 导出/打印前后的自定义事件，NodeView 靠它做白底快照。 */
 export const RTE_BEFORE_EXPORT_EVENT = 'rte:before-export'
 export const RTE_AFTER_EXPORT_EVENT = 'rte:after-export'
@@ -77,9 +82,19 @@ function chartMode(host: HTMLElement): ChartRenderMode {
   return host.closest('.rte-root')?.classList.contains('is-dark-editor') ? 'dark' : 'light'
 }
 
-/** 渲染副本。用户写过的背景色保留；没写时暗色编辑区才用深底。不写回文档。 */
-function renderOption(option: Record<string, unknown>, mode: ChartRenderMode): Record<string, unknown> {
-  return chartRenderOption(option, mode)
+/** 渲染副本。用户写过的背景色保留。不写回文档。 */
+function renderOption(
+  option: Record<string, unknown>,
+  mode: ChartRenderMode,
+  motion: ChartMotion = 'still',
+): Record<string, unknown> {
+  return ensureRenderableChartOption(chartRenderOption(option, mode, motion))
+}
+
+function chartMotion(opening: boolean): ChartMotion {
+  if (!opening) return 'still'
+  if (typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches) return 'still'
+  return 'play'
 }
 
 export const EchartsBlock = Node.create({
@@ -143,6 +158,30 @@ export const EchartsBlock = Node.create({
           'data-datasource': attrs.dataSource || '',
         }),
       },
+      tableRef: {
+        default: '',
+        parseHTML: (el: HTMLElement) => el.getAttribute('data-table-ref') || '',
+        renderHTML: (attrs: { tableRef?: string }) =>
+          attrs.tableRef ? { 'data-table-ref': attrs.tableRef } : {},
+      },
+      chartTitle: {
+        default: '',
+        parseHTML: (el: HTMLElement) => el.getAttribute('data-chart-title') || '',
+        renderHTML: (attrs: { chartTitle?: string }) =>
+          attrs.chartTitle ? { 'data-chart-title': attrs.chartTitle } : {},
+      },
+      chartUnit: {
+        default: '',
+        parseHTML: (el: HTMLElement) => el.getAttribute('data-chart-unit') || '',
+        renderHTML: (attrs: { chartUnit?: string }) =>
+          attrs.chartUnit ? { 'data-chart-unit': attrs.chartUnit } : {},
+      },
+      chartSource: {
+        default: '',
+        parseHTML: (el: HTMLElement) => el.getAttribute('data-chart-source') || '',
+        renderHTML: (attrs: { chartSource?: string }) =>
+          attrs.chartSource ? { 'data-chart-source': attrs.chartSource } : {},
+      },
     }
   },
 
@@ -158,7 +197,12 @@ export const EchartsBlock = Node.create({
       renderer?: string
       chartId?: string
       dataSource?: string
+      tableRef?: string
+      chartTitle?: string
+      chartUnit?: string
+      chartSource?: string
     }
+    const metaLine = [attrs.chartTitle, attrs.chartUnit, attrs.chartSource].map((item) => String(item || '').trim()).filter(Boolean)
     const chartType = isChartType(attrs.chartType) ? attrs.chartType : 'bar'
     const label = ECHARTS_CHART_TYPES.find((item) => item.value === chartType)?.label || '图表'
     // 导出的 HTML 同样带无障碍摘要（读屏能听到图里是什么）
@@ -176,10 +220,15 @@ export const EchartsBlock = Node.create({
         // 数据接口配置随图表块持久化（不含明文密钥，密钥只存本地）
         'data-chart-id': attrs.chartId || '',
         'data-datasource': attrs.dataSource || '',
+        ...(attrs.tableRef ? { 'data-table-ref': attrs.tableRef } : {}),
+        ...(attrs.chartTitle ? { 'data-chart-title': attrs.chartTitle } : {}),
+        ...(attrs.chartUnit ? { 'data-chart-unit': attrs.chartUnit } : {}),
+        ...(attrs.chartSource ? { 'data-chart-source': attrs.chartSource } : {}),
         role: 'img',
         'aria-label': ariaLabel,
         style: `min-height:${DEFAULT_HEIGHT}px`,
       }),
+      ...(metaLine.length ? [['p', { class: 'rte-chart-meta' }, metaLine.join(' · ')]] : []),
       ['div', { class: 'rte-echarts-fallback' }, `ECharts 图表（${label}）`],
     ]
   },
@@ -239,6 +288,22 @@ export const EchartsBlock = Node.create({
       const hint = document.createElement('div')
       hint.className = 'rte-echarts-hint'
       hint.textContent = '图表内容不参与逐条修订；导出与打印按当前显示呈现。'
+      const metaEl = document.createElement('p')
+      metaEl.className = 'rte-chart-meta'
+      const paintMeta = () => {
+        const line = [current.attrs.chartTitle, current.attrs.chartUnit, current.attrs.chartSource]
+          .map((item) => String(item || '').trim())
+          .filter(Boolean)
+        metaEl.textContent = line.join(' · ')
+        metaEl.style.display = line.length ? '' : 'none'
+        if (current.attrs.chartTitle) dom.dataset.chartTitle = String(current.attrs.chartTitle)
+        else delete dom.dataset.chartTitle
+        if (current.attrs.chartUnit) dom.dataset.chartUnit = String(current.attrs.chartUnit)
+        else delete dom.dataset.chartUnit
+        if (current.attrs.chartSource) dom.dataset.chartSource = String(current.attrs.chartSource)
+        else delete dom.dataset.chartSource
+      }
+      paintMeta()
 
       // 无障碍：图表容器打 role="img" + aria-label（数据摘要），
       // 视觉隐藏的数据表放在**兄弟节点**里（role="img" 的后代会被读屏忽略）。
@@ -246,6 +311,7 @@ export const EchartsBlock = Node.create({
       a11yEl.className = 'rte-sr-only rte-chart-a11y'
 
       dom.appendChild(previewEl)
+      dom.appendChild(metaEl)
       dom.appendChild(a11yEl)
       dom.appendChild(dataErrorEl)
       dom.appendChild(hint)
@@ -294,14 +360,42 @@ export const EchartsBlock = Node.create({
 
       const render = async () => {
         if (destroyed || !previewEl) return
-        const seq = (renderSeq += 1)
         const parsed = safeParseEchartsOption(current.attrs.option || '')
-        // 接口拉到的数据优先（只影响显示，不写回文档）
         const effective = remoteOption || (parsed.ok ? parsed.option : {})
+        // 接口拉到的数据优先（只影响显示，不写回文档）
         liveSource = effective
         watchDark()
         // 无障碍摘要：先更新，option 解析失败时也要把摘要清空
         a11ySummary = applyChartA11y(previewEl, a11yEl, effective)
+        const series = (effective as { series?: unknown }).series
+        const seriesList = Array.isArray(series) ? series : series ? [series] : []
+        const emptyChart = parsed.ok && !remoteOption && !seriesList.length
+        if (emptyChart) {
+          chart?.dispose()
+          chart = null
+          previewEl.textContent = '还没有图表数据'
+          return
+        }
+        if (!chart && typeof IntersectionObserver !== 'undefined') {
+          const rect = previewEl.getBoundingClientRect()
+          const viewport = window.innerHeight || previewEl.ownerDocument.documentElement.clientHeight || 0
+          const inView = rect.height === 0 || (rect.bottom > 0 && rect.top < viewport)
+          if (!inView) {
+            // 不在视口内：交给 IntersectionObserver，等滚入可见再渲染。
+            // 注意：这里不递增 renderSeq，否则会把正在加载 echarts/echarts-gl 的
+            // 渲染（seq=1）误判为过期而 abort，导致图表永远不渲染。
+            const obs = new IntersectionObserver((entries) => {
+              if (!entries.some((entry) => entry.isIntersecting)) return
+              obs.disconnect()
+              void render()
+            })
+            obs.observe(previewEl)
+            return
+          }
+        }
+        // 只有真正要执行渲染（通过了 IO 检查）才占用一个 seq。
+        // 这样 IO defer 的 render 不会打断正在进行的异步加载。
+        const seq = (renderSeq += 1)
         if (!parsed.ok) {
           chart?.dispose()
           chart = null
@@ -320,7 +414,9 @@ export const EchartsBlock = Node.create({
             await loadEchartsGl()
           }
           // 加载期间可能又改了 option，旧的渲染结果直接丢掉
-          if (destroyed || !previewEl || seq !== renderSeq) return
+          if (destroyed || !previewEl || seq !== renderSeq) {
+            return
+          }
           const renderer = echartsRendererFor(effective)
           if (chart && chartRenderer !== renderer) {
             // 渲染器不能热切换（SVG ↔ Canvas），重建实例
@@ -331,6 +427,7 @@ export const EchartsBlock = Node.create({
             }
             chart = null
           }
+          const opening = !chart
           if (!chart) {
             // 面板折叠时容器宽度是 0，这时初始化会得到一张空图。
             // 先不初始化，等容器有宽度了（ResizeObserver 回调里再 render）再画。
@@ -344,8 +441,9 @@ export const EchartsBlock = Node.create({
           }
           // custom 系列的 renderItem 在文档里只存预设名，这里换成内置函数
           // 渲染前补 aria（默认开启 + 自动摘要），ECharts 自身才能把描述播报出来
+          // 只有第一次画出这张图时播放生长动画，之后的刷新和导出停在终帧。
           chart.setOption(
-            applyChartAria(renderOption(resolveEchartsRenderItems(effective), chartMode(dom))),
+            applyChartAria(renderOption(resolveEchartsRenderItems(effective), chartMode(dom), chartMotion(opening))),
             { notMerge: true },
           )
           resizeChart()
@@ -489,6 +587,7 @@ export const EchartsBlock = Node.create({
             ? updated.attrs.chartType
             : 'bar'
           dom.dataset.chartId = updated.attrs.chartId || ''
+          paintMeta()
           applyEditableState()
           void render()
           return true
@@ -537,6 +636,7 @@ export const EchartsBlock = Node.create({
               renderer: attrs?.renderer || 'svg',
               chartId: attrs?.chartId || createChartId(),
               dataSource: attrs?.dataSource || '',
+              tableRef: attrs?.tableRef || '',
             },
           }
           // 插完图表后，选区会落在图表这个原子节点上。再插一次时
@@ -572,5 +672,55 @@ export const EchartsBlock = Node.create({
           return true
         },
     }
+  },
+
+  addProseMirrorPlugins() {
+    return [
+      new Plugin({
+        appendTransaction(transactions, _old, state) {
+          if (!transactions.some((tr) => tr.docChanged)) return null
+          if (transactions.some((tr) => tr.getMeta('chartTableSync'))) return null
+          const tables = new Map<string, ReturnType<typeof tableGrid>>()
+          state.doc.descendants((node) => {
+            if (node.type.name !== 'table') return
+            const id = String(node.attrs.xrefId || '')
+            if (id) tables.set(id, tableGrid(node))
+          })
+          let tr = state.tr
+          const charts: number[] = []
+          state.doc.descendants((node, pos) => {
+            if (node.type.name === 'echartsBlock' && node.attrs.tableRef) charts.push(pos)
+          })
+          for (let index = charts.length - 1; index >= 0; index -= 1) {
+            const pos = charts[index]!
+            const node = tr.doc.nodeAt(pos)
+            if (!node) continue
+            const grid = tables.get(String(node.attrs.tableRef || ''))
+            const mapped = grid ? tableGridToChartData(grid) : null
+            if (!mapped) continue
+            const parsed = safeParseEchartsOption(String(node.attrs.option || ''))
+            if (!parsed.ok) continue
+            const next = applyMappedDataToOption(parsed.option, mapped)
+            const series = Array.isArray(next.series) ? next.series : []
+            const type = node.attrs.chartType === 'line' ? 'line' : 'bar'
+            next.series = mapped.series.map((item, seriesIndex) => {
+              const current = series[seriesIndex]
+              return {
+                ...(current && typeof current === 'object' ? current : { type }),
+                name: item.name,
+                data: item.data,
+              }
+            })
+            const option = serializeEchartsOption(next)
+            if (option === node.attrs.option) continue
+            tr = tr.setNodeMarkup(pos, undefined, { ...node.attrs, option })
+          }
+          if (!tr.docChanged) return null
+          tr.setMeta('chartTableSync', true)
+          tr.setMeta('addToHistory', false)
+          return tr
+        },
+      }),
+    ]
   },
 })

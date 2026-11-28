@@ -2,7 +2,7 @@
 import { Editor } from '@tiptap/core'
 import StarterKit from '@tiptap/starter-kit'
 import { afterEach, describe, expect, it } from 'vitest'
-import { collectFindMatches } from './rteFindReplace'
+import { collectFindMatches, expandFindReplacement, replaceAllFindMatches } from './rteFindReplace'
 
 let editor: Editor | null = null
 
@@ -55,5 +55,28 @@ describe('查找替换支持正则', () => {
   it('全字匹配对正则同样生效', () => {
     const ed = mount('<p>cat cats</p>')
     expect(collectFindMatches(ed.state.doc, 'cat', { regex: true, wholeWord: true }).length).toBe(1)
+  })
+
+  it('全角和半角可以互相找到', () => {
+    const ed = mount('<p>全角Ａ和半角A</p>')
+    expect(collectFindMatches(ed.state.doc, 'A', { foldWidth: true })).toHaveLength(2)
+    expect(collectFindMatches(ed.state.doc, 'Ａ')).toHaveLength(1)
+  })
+
+  it('正则替换可以使用捕获组', () => {
+    const ed = mount('<p>图12</p>')
+    const matches = collectFindMatches(ed.state.doc, '图(\\d+)', { regex: true })
+    expect(matches[0]?.groups).toEqual(['图12', '12'])
+    expect(expandFindReplacement('第 $1 图 $$', matches[0]?.groups)).toBe('第 12 图 $')
+    replaceAllFindMatches(ed, matches, '第$1图')
+    expect(ed.getText()).toBe('第12图')
+  })
+
+  it('替换时保留加粗', () => {
+    const ed = mount('<p><strong>猫</strong>和猫</p>')
+    const matches = collectFindMatches(ed.state.doc, '猫')
+    expect(replaceAllFindMatches(ed, matches, '狗')).toBe(2)
+    expect(ed.getHTML()).toContain('<strong>狗</strong>')
+    expect(ed.getText()).toContain('狗和狗')
   })
 })

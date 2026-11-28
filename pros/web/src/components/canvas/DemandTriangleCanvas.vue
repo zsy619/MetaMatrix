@@ -57,6 +57,20 @@ const notesBlocks = computed(() => {
   return list
 })
 
+const narrow = ref(false)
+let narrowQuery: MediaQueryList | null = null
+
+function syncNarrow() {
+  narrow.value = !!narrowQuery?.matches
+}
+
+function notesTitle(block: DemandTriangleNotesBlock): string {
+  const dirId = String(block.id).slice('notes:'.length)
+  const raw = legendItems.value.find((item) => item.id === dirId)?.text ?? ''
+  const name = raw.replace(/<[^>]+>/g, '').trim()
+  return name ? `${name} · 描述` : block.title
+}
+
 function notesBlockOf(dirId: string): DemandTriangleNotesBlock | undefined {
   const id = demandTriangleNotesBlockId(dirId)
   return props.doc.blocks.find((b) => b.id === id) as
@@ -81,6 +95,11 @@ function dirOf(id: string): DemandTriangleDirection {
       scores: { universality: 0.5, frequency: 0.5, rigidity: 0.5 },
     }
   )
+}
+
+/** 滑杆已填充比例，供 CSS 渐变轨道显示进度 */
+function scorePct(v: number) {
+  return `${Math.round(Math.min(1, Math.max(0, v)) * 100)}%`
 }
 
 function itemSelected(id: string) {
@@ -190,9 +209,13 @@ watch(maximizedPanelKey, (key) => {
 
 onMounted(() => {
   documentStore.ensureDemandTriangleNotesBlocks()
+  narrowQuery = window.matchMedia('(max-width: 960px)')
+  syncNarrow()
+  narrowQuery.addEventListener('change', syncNarrow)
 })
 
 onBeforeUnmount(() => {
+  narrowQuery?.removeEventListener('change', syncNarrow)
   if (
     activeNotesDirId.value &&
     maximizedPanelKey.value === activeNotesMaximizeKey.value
@@ -236,17 +259,27 @@ function scorePolygon(scores: DemandTriangleScores): string {
   }).join(' ')
 }
 
-const overlays = computed(() =>
-  legendItems.value.map((item) => {
+const overlays = computed(() => {
+  const drawn = legendItems.value.map((item) => {
     const d = dirOf(item.id)
     return {
       id: item.id,
       fill: d.color,
       stroke: d.stroke,
       points: scorePolygon(d.scores),
+      selected: itemSelected(item.id),
     }
-  }),
-)
+  })
+  const anySelected = drawn.some((item) => item.selected)
+  const styled = drawn.map((item) => ({
+    ...item,
+    emphasized: !anySelected || item.selected,
+  }))
+  return [
+    ...styled.filter((item) => !item.selected),
+    ...styled.filter((item) => item.selected),
+  ]
+})
 
 /**
  * 轴标题 + 四级刻度：贴着顶点外侧排版（对齐参考图）。
@@ -375,35 +408,41 @@ const vertexPanels = computed(() => {
               @click.stop
             >
               <label class="score-chip" title="普遍性">
-                <span>普</span>
+                <span>普遍</span>
                 <input
                   type="range"
                   min="0.1"
                   max="1"
                   step="0.05"
                   :value="dirOf(item.id).scores.universality"
+                  aria-label="普遍性"
+                  :style="{ '--v': scorePct(dirOf(item.id).scores.universality) }"
                   @input="onScoreInput(item.id, 'universality', $event)"
                 />
               </label>
               <label class="score-chip" title="频次">
-                <span>频</span>
+                <span>频次</span>
                 <input
                   type="range"
                   min="0.1"
                   max="1"
                   step="0.05"
                   :value="dirOf(item.id).scores.frequency"
+                  aria-label="频次"
+                  :style="{ '--v': scorePct(dirOf(item.id).scores.frequency) }"
                   @input="onScoreInput(item.id, 'frequency', $event)"
                 />
               </label>
               <label class="score-chip" title="刚性">
-                <span>刚</span>
+                <span>刚性</span>
                 <input
                   type="range"
                   min="0.1"
                   max="1"
                   step="0.05"
                   :value="dirOf(item.id).scores.rigidity"
+                  aria-label="刚性"
+                  :style="{ '--v': scorePct(dirOf(item.id).scores.rigidity) }"
                   @input="onScoreInput(item.id, 'rigidity', $event)"
                 />
               </label>
@@ -526,35 +565,41 @@ const vertexPanels = computed(() => {
                   @click.stop
                 >
                   <label class="score-chip" title="普遍性">
-                    <span>普</span>
+                    <span>普遍</span>
                     <input
                       type="range"
                       min="0.1"
                       max="1"
                       step="0.05"
                       :value="dirOf(item.id).scores.universality"
+                      aria-label="普遍性"
+                  :style="{ '--v': scorePct(dirOf(item.id).scores.universality) }"
                       @input="onScoreInput(item.id, 'universality', $event)"
                     />
                   </label>
                   <label class="score-chip" title="频次">
-                    <span>频</span>
+                    <span>频次</span>
                     <input
                       type="range"
                       min="0.1"
                       max="1"
                       step="0.05"
                       :value="dirOf(item.id).scores.frequency"
+                      aria-label="频次"
+                  :style="{ '--v': scorePct(dirOf(item.id).scores.frequency) }"
                       @input="onScoreInput(item.id, 'frequency', $event)"
                     />
                   </label>
                   <label class="score-chip" title="刚性">
-                    <span>刚</span>
+                    <span>刚性</span>
                     <input
                       type="range"
                       min="0.1"
                       max="1"
                       step="0.05"
                       :value="dirOf(item.id).scores.rigidity"
+                      aria-label="刚性"
+                  :style="{ '--v': scorePct(dirOf(item.id).scores.rigidity) }"
                       @input="onScoreInput(item.id, 'rigidity', $event)"
                     />
                   </label>
@@ -604,16 +649,32 @@ const vertexPanels = computed(() => {
             opacity="0.7"
           />
 
-          <!-- 业务方向叠绘 -->
-          <polygon
-            v-for="ov in overlays"
-            :key="ov.id"
-            :points="ov.points"
-            :fill="ov.fill"
-            :stroke="ov.stroke"
-            stroke-width="1.8"
-            stroke-linejoin="round"
-          />
+          <text
+            v-for="mark in [75, 50, 25]"
+            :key="`scale-${mark}`"
+            class="radar-scale-tick"
+            :x="polar(0, (R * mark) / 100)[0] + 12"
+            :y="polar(0, (R * mark) / 100)[1]"
+          >{{ mark }}</text>
+          <!-- 业务方向叠绘：选中的方向最后画，描边转得更快 -->
+          <g v-for="ov in overlays" :key="ov.id">
+            <polygon
+              :points="ov.points"
+              :fill="ov.fill"
+              :fill-opacity="ov.emphasized ? 1 : 0.35"
+              stroke="none"
+            />
+            <polygon
+              class="radar-flow-line"
+              :class="{ 'is-selected': ov.selected }"
+              :points="ov.points"
+              fill="none"
+              :stroke="ov.stroke"
+              :stroke-width="ov.selected ? 3 : 1.8"
+              :stroke-opacity="ov.emphasized ? 1 : 0.45"
+              pointer-events="none"
+            />
+          </g>
         </svg>
 
         <!-- 顶点刻度面板：贴着三角边缘，非整屏漂浮 -->
@@ -647,18 +708,29 @@ const vertexPanels = computed(() => {
       </div>
     </div>
 
+    <section class="axis-key" aria-label="三个刻度">
+      <article v-for="vp in vertexPanels" :key="`key-${vp.key}`">
+        <h3>{{ vp.axis.title }}</h3>
+        <p v-for="(lv, index) in vp.axis.levels" :key="`${vp.key}-key-${index}`">
+          <strong>{{ lv.label }}</strong>
+          <span>{{ lv.detail }}</span>
+        </p>
+      </article>
+    </section>
+
     <!--
       隐藏挂载各方向描述 YModelBlock：点击「描述」写入全局 maximizedPanelKey，
       由块内 Teleport .pm-overlay 铺满文档视口（approach B，v-if 避免 undefined block.id）。
     -->
-    <div class="dt-notes-host" aria-hidden="true">
-      <template v-for="block in notesBlocks" :key="block.id">
+    <div class="dt-notes-host" :aria-hidden="narrow ? undefined : true">
+      <section v-for="block in notesBlocks" :key="block.id" class="dt-note-card">
+        <h3 class="dt-note-title">{{ notesTitle(block) }}</h3>
         <YModelBlockCard
           v-if="block"
           :block="block"
           hide-title
         />
-      </template>
+      </section>
     </div>
   </div>
 </template>
@@ -668,11 +740,11 @@ const vertexPanels = computed(() => {
   position: absolute;
   inset: 0;
   z-index: 10;
-  overflow: hidden;
+  overflow: auto;
   box-sizing: border-box;
   padding: 18px 20px 20px;
   display: grid;
-  grid-template-columns: minmax(200px, 280px) minmax(0, 1fr);
+  grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
   grid-template-rows: 1fr;
   gap: 8px 4px;
   font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui,
@@ -705,7 +777,7 @@ const vertexPanels = computed(() => {
 .legend-toolbar {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-shrink: 0;
 }
 
@@ -721,7 +793,7 @@ const vertexPanels = computed(() => {
 .legend-toolbar-actions {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   flex-shrink: 0;
 }
 
@@ -735,11 +807,23 @@ const vertexPanels = computed(() => {
 }
 
 .legend-list-max {
-  gap: 10px;
+  gap: 6px;
+  /* 放大态内容不铺满整屏，条目按内容宽度排布，避免按钮贴到屏幕最右侧 */
+  max-width: 560px;
 }
 
 .legend-list-max .legend-row {
-  padding: 8px 8px 8px 4px;
+  /* 名称列按内容宽度收缩，操作按钮紧跟名称，不再拉到 720px 之外 */
+  grid-template-columns: 12px max-content auto;
+  padding: 6px 8px 6px 4px;
+}
+
+.legend-list-max .legend-name {
+  width: fit-content;
+}
+
+.legend-list-max .legend-row:hover {
+  background: var(--cv-hover-wash, #e8f1fa);
 }
 
 .legend-list {
@@ -748,17 +832,17 @@ const vertexPanels = computed(() => {
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
 }
 
 .legend-row {
   display: grid;
-  grid-template-columns: 14px minmax(0, 1fr) auto;
+  grid-template-columns: 12px minmax(0, 1fr) auto;
   grid-template-rows: auto auto;
-  column-gap: 8px;
-  row-gap: 4px;
+  column-gap: 6px;
+  row-gap: 2px;
   align-items: center;
-  padding: 4px 4px 4px 2px;
+  padding: 3px 4px 3px 2px;
   border-radius: 8px;
   border: 1px solid transparent;
   cursor: pointer;
@@ -770,8 +854,8 @@ const vertexPanels = computed(() => {
 }
 
 .legend-dot {
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   grid-row: 1;
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
@@ -781,6 +865,7 @@ const vertexPanels = computed(() => {
   grid-column: 2;
   grid-row: 1;
   min-width: 0;
+  max-width: 420px;
   border: none;
   outline: none;
   background: transparent;
@@ -798,18 +883,22 @@ const vertexPanels = computed(() => {
 }
 
 .legend-notes-btn {
-  height: 22px;
-  padding: 0 7px;
+  min-height: 22px;
+  padding: 0 9px;
   border: 1px solid var(--cv-frame, #ececec);
-  border-radius: 5px;
+  border-radius: 999px;
   background: rgba(255, 255, 255, 0.92);
-  color: #5f6368;
-  font-size: 11px;
-  font-weight: 650;
+  color: #3c3424;
+  font-size: 12px;
+  font-weight: 600;
   letter-spacing: 0.02em;
   cursor: pointer;
   line-height: 1;
   white-space: nowrap;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease;
 }
 
 .legend-notes-btn:hover {
@@ -822,34 +911,79 @@ const vertexPanels = computed(() => {
   grid-column: 2 / 4;
   grid-row: 2;
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px 8px;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 2px;
 }
 
 .score-chip {
-  display: inline-flex;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
   align-items: center;
-  gap: 4px;
-  font-size: 10px;
-  font-weight: 650;
-  color: #80868b;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #3c3424;
 }
 
 .score-chip input[type='range'] {
-  width: 56px;
-  height: 4px;
-  accent-color: #5f6368;
+  width: 100%;
+  height: 16px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
   cursor: pointer;
 }
 
+.score-chip input[type='range']::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(
+    to right,
+    #1a73e8 0 var(--v, 50%),
+    #dfe3e8 var(--v, 50%) 100%
+  );
+}
+
+.score-chip input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  margin-top: -4px;
+  border-radius: 50%;
+  background: #1a73e8;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.28);
+}
+
+.score-chip input[type='range']::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(
+    to right,
+    #1a73e8 0 var(--v, 50%),
+    #dfe3e8 var(--v, 50%) 100%
+  );
+}
+
+.score-chip input[type='range']::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #1a73e8;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.28);
+}
+
 .legend-remove {
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   border: none;
-  border-radius: 4px;
+  border-radius: 6px;
   background: transparent;
   color: #d93025;
-  font-size: 15px;
+  font-size: 13px;
   cursor: pointer;
   line-height: 1;
 }
@@ -860,21 +994,36 @@ const vertexPanels = computed(() => {
 
 .legend-add {
   align-self: flex-start;
-  width: 24px;
-  height: 24px;
-  border: 1px solid #e4e6e8;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.8);
-  color: #5f6368;
-  font-size: 16px;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.7));
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.52);
+  backdrop-filter: blur(var(--glass-blur-sm, 10px));
+  -webkit-backdrop-filter: blur(var(--glass-blur-sm, 10px));
+  color: var(--ent-text-2, #5a6472);
+  font-size: 15px;
   cursor: pointer;
   line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  box-sizing: border-box;
+  transition:
+    background-color 0.16s ease,
+    border-color 0.16s ease,
+    color 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s ease;
 }
 
 .legend-add:hover {
-  border-color: var(--cv-focus, #1c4c7c);
-  color: var(--cv-focus, #1c4c7c);
-  background: var(--cv-hover-wash, #e8f1fa);
+  background: rgba(255, 255, 255, 0.86);
+  border-color: transparent;
+  color: var(--mm-text, #1d2129);
+  box-shadow: var(--glass-shadow-sm, 0 6px 18px rgba(15, 23, 42, 0.1));
+  transform: translateY(-1px);
 }
 
 .dt-stage {
@@ -940,15 +1089,15 @@ const vertexPanels = computed(() => {
   display: flex;
   align-items: baseline;
   gap: 0;
-  font-size: 12.5px;
-  line-height: 1.45;
-  color: #8a8175;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #5c564c;
   white-space: nowrap;
 }
 
 .axis-level-row strong {
   font-weight: 700;
-  color: #5f6368;
+  color: #3c3424;
 }
 
 .axis-level-sep {
@@ -1002,10 +1151,17 @@ const vertexPanels = computed(() => {
   pointer-events: none;
 }
 
+.dt-note-title {
+  display: none;
+  margin: 0;
+}
+
+.axis-key { display: none; }
+
 @media (max-width: 960px) {
   .dt-canvas {
     grid-template-columns: 1fr;
-    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-rows: auto auto auto;
     overflow-y: auto;
     overflow-x: hidden;
   }
@@ -1015,15 +1171,118 @@ const vertexPanels = computed(() => {
   }
 
   .dt-stage {
-    min-height: 420px;
+    min-height: 360px;
   }
 
-  .axis-level-row {
-    font-size: 11px;
+  .axis-panel { display: none; }
+
+  .axis-key {
+    display: grid;
+    gap: 10px;
   }
 
-  .axis-title {
+  .axis-key article {
+    background: #fff;
+    border: 1px solid #e4e6e8;
+    border-radius: 12px;
+    padding: 12px 14px;
+  }
+
+  .axis-key h3 {
+    margin: 0 0 6px;
     font-size: 16px;
+    letter-spacing: 0.04em;
+  }
+
+  .axis-key p {
+    display: flex;
+    gap: 8px;
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.55;
+    color: #3c4043;
+  }
+
+  .dt-canvas { padding-bottom: 96px; }
+
+  .dt-notes-host {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    opacity: 1;
+    pointer-events: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 12px;
+  }
+
+  .dt-note-card {
+    padding: 12px 12px 10px;
+    border: 1px solid #e4e6e8;
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 8px 20px rgba(62, 48, 28, 0.06);
+  }
+
+  .dt-note-title {
+    display: block;
+    margin: 0 0 8px;
+    font-size: 16px;
+    font-weight: 750;
+    line-height: 1.35;
+    color: #202124;
+  }
+
+  .dt-note-card :deep(.ym-block),
+  .dt-note-card :deep(.ym-block-body),
+  .dt-note-card :deep(.rte-root),
+  .dt-note-card :deep(.rte-workspace),
+  .dt-note-card :deep(.rte-canvas),
+  .dt-note-card :deep(.rte-body),
+  .dt-note-card :deep(.ProseMirror) {
+    height: auto;
+    max-height: none;
+    max-width: 100%;
+    min-width: 0;
+    overflow: visible;
+    flex: 0 0 auto;
+  }
+
+  .dt-note-card :deep(.ym-block) {
+    min-height: 0;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+  }
+
+  .dt-note-card :deep(.rte-workspace),
+  .dt-note-card :deep(.rte-canvas),
+  .dt-note-card :deep(.ProseMirror) {
+    width: 100%;
+  }
+
+  .dt-note-card :deep(.ProseMirror) {
+    min-height: 96px;
+    font-size: 15px;
+    line-height: 1.55;
+  }
+
+  .dt-note-card :deep(.ProseMirror p) {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .dt-note-card :deep(.pm-max-btn) {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+  }
+
+  .legend-notes-btn {
+    min-height: 40px;
+    font-size: 15px;
   }
 }
 </style>

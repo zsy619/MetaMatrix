@@ -69,6 +69,7 @@ describe('三环分析法画布组件', () => {
 
     const regions = wrapper.findAll('[data-region-id]')
     expect(regions).toHaveLength(13)
+    expect(wrapper.findAll('.trb-card-title')).toHaveLength(13)
   })
 
   it('在区域里填写内容后写回文档 JSON', async () => {
@@ -131,6 +132,7 @@ describe('领导核心价值驱动三角画布组件', () => {
     }
 
     expect(wrapper.findAll('[data-region-id]')).toHaveLength(12)
+    expect(wrapper.findAll('.lt-card-title')).toHaveLength(12)
     // 5 层金字塔
     expect(wrapper.findAll('polygon')).toHaveLength(5)
   })

@@ -13,7 +13,7 @@ vi.mock('element-plus', () => ({
 }))
 
 import { useBlockHandle } from './useBlockHandle.ts'
-import { RTE_BLOCK_TOOLS_WIDTH, RTE_BLOCK_TOOLS_WIDTH_SINGLE } from '../../../utils/rteGutter.ts'
+import { RTE_BLOCK_TOOLS_WIDTH } from '../../../utils/rteGutter.ts'
 
 function fakeRect(left: number, top: number, width = 600, height = 20): DOMRect {
   return {
@@ -30,7 +30,7 @@ function fakeRect(left: number, top: number, width = 600, height = 20): DOMRect 
 }
 
 /** 搭一个「画布 + 正文 + 段落」的最小结构，返回几何量。 */
-function setup(opts: { expanded: boolean; proseLeft: number; prosePaddingLeft: number; canvasLeft: number }) {
+function setup(opts: { proseLeft: number; prosePaddingLeft: number; canvasLeft: number }) {
   const root = document.createElement('div')
   const canvas = document.createElement('div')
   canvas.className = 'rte-canvas'
@@ -53,7 +53,6 @@ function setup(opts: { expanded: boolean; proseLeft: number; prosePaddingLeft: n
     editor: ref(undefined),
     viewMode: () => ({ value: 'edit' }),
     rteRootEl: ref(root),
-    expanded: () => opts.expanded,
   })
 
   api.onCanvasBlockHover({
@@ -66,12 +65,11 @@ function setup(opts: { expanded: boolean; proseLeft: number; prosePaddingLeft: n
   return { api, contentLeft, canvasLeft: opts.canvasLeft }
 }
 
-// 展开态：手柄整体落在正文左侧留白里，右边缘不越过正文左边界。
+// 左侧只有一个「+」按钮，整体落在正文左侧留白里，右边缘不越过正文左边界。
 {
   const { api, contentLeft, canvasLeft } = setup({
-    expanded: true,
     proseLeft: 132,
-    prosePaddingLeft: 50,
+    prosePaddingLeft: 74,
     canvasLeft: 100,
   })
   assert.equal(api.blockHandle.value.visible, true)
@@ -84,29 +82,27 @@ function setup(opts: { expanded: boolean; proseLeft: number; prosePaddingLeft: n
   assert.ok(left >= 0, '展开态手柄跑到画布外')
 }
 
-// 收起态：只有 ⋮ 菜单一个按钮，同样不压首字。
+// 紧凑态：同样只有一个按钮，不压首字。
 {
   const { api, contentLeft, canvasLeft } = setup({
-    expanded: false,
     proseLeft: 120,
-    prosePaddingLeft: 26,
+    prosePaddingLeft: 50,
     canvasLeft: 100,
   })
   const left = api.blockHandle.value.left
-  assert.equal(left, contentLeft - canvasLeft - RTE_BLOCK_TOOLS_WIDTH_SINGLE - 4)
-  assert.ok(left + RTE_BLOCK_TOOLS_WIDTH_SINGLE <= contentLeft - 4, '收起态手柄压住了首字')
+  assert.equal(left, contentLeft - canvasLeft - RTE_BLOCK_TOOLS_WIDTH - 4)
+  assert.ok(left + RTE_BLOCK_TOOLS_WIDTH <= contentLeft - 4, '紧凑态手柄压住了首字')
 }
 
-// A4 纸张窄边距：正文左边就是纸内留白起点，手柄要落在纸内而不是纸上。
+// A4 纸张窄边距：74px 纸内留白放得下一个按钮和 4px 正文间距。
 {
   const { api, contentLeft } = setup({
-    expanded: true,
-    proseLeft: 50,
+    proseLeft: 74,
     prosePaddingLeft: 0,
     canvasLeft: 0,
   })
   const left = api.blockHandle.value.left
-  assert.equal(left, 0)
+  assert.ok(left >= 0)
   assert.ok(left + RTE_BLOCK_TOOLS_WIDTH <= contentLeft - 4, 'A4 窄边距下手柄压住了首字')
 }
 

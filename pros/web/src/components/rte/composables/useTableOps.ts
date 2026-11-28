@@ -1,5 +1,5 @@
-import { computed, nextTick, ref, watch, type ShallowRef } from 'vue'
-import { ElMessage } from 'element-plus'
+import { computed, nextTick, reactive, ref, watch, type ShallowRef } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import type { Editor } from '@tiptap/core'
 import { moveTableGridHover, TABLE_QUICK_COLS, TABLE_QUICK_ROWS } from '../../../utils/rteTableGrid'
 import {
@@ -12,10 +12,11 @@ import {
 import {
   setCellVerticalAlign,
   sortTableByColumn,
+  tableSortBlock,
   upsertTableSumRow,
   currentTableColIndex,
 } from '../../rteWave20'
-import { recalculateTable } from '../../../utils/rteTableFormula'
+import { tableFormulaUpdates } from '../../../utils/rteTableFormulaOps'
 import { maskShouldDismiss } from '../../../utils/rteDialogMask'
 import { duplicateTableRow, equalizeTableColumns } from '../../../utils/rteTableLayout'
 
@@ -63,6 +64,7 @@ function closeTableCtx() {
 }
 
 function openTableContextMenu(event: MouseEvent) {
+  rememberTableInsertSelection()
   tableCtx.value = {
     open: true,
     x: event.clientX,
@@ -84,6 +86,7 @@ function openTableContextMenu(event: MouseEvent) {
 }
 
 const tableHeaderSticky = ref(false)
+const tableColSticky = ref(false)
 const tableFilterQuery = ref('')
 const tableFilterPos = ref<number | null>(null)
 
@@ -92,6 +95,14 @@ function reapplyTableFilter(
   transaction: { mapping: { map: (pos: number, assoc?: number) => number } },
   appended: ReadonlyArray<{ mapping: { map: (pos: number, assoc?: number) => number } }> = [],
 ) {
+  if (!tableFilterQuery.value) {
+    ed.state.doc.descendants((node, pos) => {
+      if (node.type.name !== 'table' || !node.attrs.rowFilter) return
+      tableFilterQuery.value = String(node.attrs.rowFilter)
+      tableFilterPos.value = pos
+      return false
+    })
+  }
   if (!tableFilterQuery.value || tableFilterPos.value == null) return
   const pos = mapTableFilterPos(tableFilterPos.value, [transaction, ...appended])
   tableFilterPos.value = pos
@@ -114,11 +125,17 @@ function doSortTable(asc: boolean) {
     ElMessage.info('请将光标放在表格中')
     return
   }
+  const block = tableSortBlock(ed)
+  if (block === 'merged') {
+    ElMessage.warning('表格里有合并的单元格，先拆开再排序')
+    deps.moreOpen().value = false
+    return
+  }
   const col = currentTableColIndex(ed)
-  if (sortTableByColumn(ed, col, asc)) {
-    ElMessage.success(`已按第 ${col + 1} 列${asc ? '升序' : '降序'}排序`)
+  if (block === 'short' || !sortTableByColumn(ed, col, asc)) {
+    ElMessage.warning('至少要有两行数据才能排序')
   } else {
-    ElMessage.warning('排序失败（需至少 2 行）')
+    ElMessage.success(`已按第 ${col + 1} 列${asc ? '升序' : '降序'}排序`)
   }
   deps.moreOpen().value = false
 }
@@ -137,6 +154,12 @@ function doTableSumRow() {
 function toggleTableStickyHeader() {
   tableHeaderSticky.value = !tableHeaderSticky.value
   ElMessage.success(tableHeaderSticky.value ? '已开启表头冻结' : '已关闭表头冻结')
+  deps.moreOpen().value = false
+}
+
+function toggleTableStickyCol() {
+  tableColSticky.value = !tableColSticky.value
+  ElMessage.success(tableColSticky.value ? '已开启首列冻结' : '已关闭首列冻结')
   deps.moreOpen().value = false
 }
 
@@ -162,6 +185,16 @@ async function promptTableRowFilter() {
   if (raw == null) return
   tableFilterQuery.value = raw.trim()
   tableFilterPos.value = tableFilterQuery.value ? findTablePos(ed) : null
+  const filterPos = findTablePos(ed)
+  const filterNode = filterPos == null ? null : ed.state.doc.nodeAt(filterPos)
+  if (filterPos != null && filterNode?.type.name === 'table') {
+    const saved = tableFilterQuery.value || null
+    if ((filterNode.attrs.rowFilter || null) !== saved) {
+      ed.view.dispatch(
+        ed.state.tr.setNodeMarkup(filterPos, undefined, { ...filterNode.attrs, rowFilter: saved }).setMeta('addToHistory', false),
+      )
+    }
+  }
   const hidden = tableFilterPos.value == null && tableFilterQuery.value
     ? -1
     : applyTableRowFilter(ed, tableFilterQuery.value)
@@ -315,13 +348,70 @@ function confirmInsertTable() {
 }
 
 /** —— 表格内常用操作（合并/拆分/插删行列） —— */
+const TABLE_INSERT_MAX = 99
+
 type TableOpItem = {
   key: string
   label: string
+  title?: string
   run: () => void
   disabled?: () => boolean
   danger?: boolean
   sepBefore?: boolean
+  /** 向上/下插行、向左/右插列：各自一个数量。 */
+  insertCount?: boolean
+  active?: () => boolean
+}
+
+const TABLE_READ_TONES = ['', 'blue', 'green', 'orange', 'gray', 'night'] as const
+type TableReadTone = (typeof TABLE_READ_TONES)[number]
+
+type TableInsertKey = 'row-before' | 'row-after' | 'col-before' | 'col-after'
+
+const tableInsertCounts = reactive<Record<TableInsertKey, number>>({
+  'row-before': 1,
+  'row-after': 1,
+  'col-before': 1,
+  'col-after': 1,
+})
+
+function isTableInsertKey(key: string): key is TableInsertKey {
+  return key in tableInsertCounts
+}
+let tableInsertAnchor: { fromJSON: (doc: unknown, json: unknown) => { eq: (other: unknown) => boolean }; json: unknown } | null = null
+
+function clampTableInsertCount(value: unknown): number {
+  const n = Math.floor(Number(value))
+  if (!Number.isFinite(n) || n < 1) return 1
+  return Math.min(TABLE_INSERT_MAX, n)
+}
+
+function normalizeTableInsertCount(key: string) {
+  if (!isTableInsertKey(key)) return
+  tableInsertCounts[key] = clampTableInsertCount(tableInsertCounts[key])
+}
+
+function rememberTableInsertSelection() {
+  const ed = deps.editor().value
+  const sel = ed?.state.selection
+  const ctor = sel?.constructor as { fromJSON?: (doc: unknown, json: unknown) => { eq: (other: unknown) => boolean } } | undefined
+  if (!ed || !sel || typeof ctor?.fromJSON !== 'function') {
+    tableInsertAnchor = null
+    return
+  }
+  tableInsertAnchor = { fromJSON: ctor.fromJSON.bind(ctor), json: sel.toJSON() }
+}
+
+function restoreTableInsertSelection() {
+  const ed = deps.editor().value
+  const anchor = tableInsertAnchor
+  if (!ed || !anchor) return
+  try {
+    const sel = anchor.fromJSON(ed.state.doc, anchor.json)
+    if (sel && !sel.eq(ed.state.selection)) ed.view.dispatch(ed.state.tr.setSelection(sel as never))
+  } catch {
+    /* 文档已经变过时，沿用当前光标 */
+  }
 }
 
 function isInTable() {
@@ -394,17 +484,31 @@ function runTableCommand(command: () => boolean) {
   closeAllTableUi()
 }
 
+function runTableInsert(key: TableInsertKey, command: () => boolean) {
+  const count = clampTableInsertCount(tableInsertCounts[key])
+  tableInsertCounts[key] = count
+  restoreTableInsertSelection()
+  runTableCommand(() => {
+    let ok = false
+    for (let i = 0; i < count; i += 1) {
+      if (!command()) break
+      ok = true
+    }
+    return ok
+  })
+}
+
 function tableAddRowBefore() {
-  runTableCommand(() => deps.editor().value!.chain().focus().addRowBefore().run())
+  runTableInsert('row-before', () => deps.editor().value!.chain().focus().addRowBefore().run())
 }
 function tableAddRowAfter() {
-  runTableCommand(() => deps.editor().value!.chain().focus().addRowAfter().run())
+  runTableInsert('row-after', () => deps.editor().value!.chain().focus().addRowAfter().run())
 }
 function tableAddColBefore() {
-  runTableCommand(() => deps.editor().value!.chain().focus().addColumnBefore().run())
+  runTableInsert('col-before', () => deps.editor().value!.chain().focus().addColumnBefore().run())
 }
 function tableAddColAfter() {
-  runTableCommand(() => deps.editor().value!.chain().focus().addColumnAfter().run())
+  runTableInsert('col-after', () => deps.editor().value!.chain().focus().addColumnAfter().run())
 }
 function tableDeleteRow() {
   runTableCommand(() => deps.editor().value!.chain().focus().deleteRow().run())
@@ -433,8 +537,33 @@ function tableToggleHeaderRow() {
 function tableToggleHeaderColumn() {
   runTableCommand(() => deps.editor().value!.chain().focus().toggleHeaderColumn().run())
 }
-function tableDeleteTable() {
-  runTableCommand(() => deps.editor().value!.chain().focus().deleteTable().run())
+async function tableDeleteTable() {
+  const ed = deps.editor().value
+  if (!ed || !isInTable()) {
+    ElMessage.info('请将光标放在表格中')
+    return
+  }
+  let rows = 0
+  let cols = 0
+  const { $from } = ed.state.selection
+  for (let depth = $from.depth; depth > 0; depth -= 1) {
+    const node = $from.node(depth)
+    if (node.type.name !== 'table') continue
+    rows = node.childCount
+    cols = node.firstChild?.childCount || 0
+    break
+  }
+  try {
+    await ElMessageBox.confirm(`将删除这个 ${rows} 行 ${cols} 列的表格。`, '删除表格', {
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+      type: 'warning',
+    })
+  } catch {
+    return
+  }
+  ed.chain().focus().deleteTable().run()
+  closeAllTableUi()
 }
 function tableClearCellFormat() {
   const ed = deps.editor().value
@@ -476,31 +605,13 @@ function calcTableFormulas() {
     return
   }
   const table = found.node
-  const cells: Array<{ row: number; col: number; formula: string; value: string }> = []
-  const grid: string[][] = []
-  table.forEach((row: any, rowIndex: number) => {
-    const rowGrid: string[] = []
-    row.forEach((cell: any, colIndex: number) => {
-      const stored = typeof cell.attrs?.formula === 'string' ? cell.attrs.formula : ''
-      const text = (cell.textContent || '').trim()
-      const formula = text.startsWith('=') ? text : stored
-      rowGrid.push(formula || text)
-      cells.push({ row: rowIndex, col: colIndex, formula, value: text })
-    })
-    grid.push(rowGrid)
-  })
-  const results = recalculateTable(grid)
-  let changed = 0
-  cells.forEach((cell) => {
-    if (!cell.formula) return
-    const next = results[cell.row]?.[cell.col] ?? ''
-    if (next !== cell.value) changed += 1
-  })
-  if (!changed) {
+  const updates = tableFormulaUpdates(table).filter((item) => item.next !== item.display)
+  if (!updates.length) {
     ElMessage.info('表里没有需要计算的公式')
     closeAllTableUi()
     return
   }
+  const byCell = new Map(updates.map((item) => [`${item.rowIndex}:${item.childIndex}`, item]))
   // 从后往前改，避免前面的替换影响后面的位置
   const tr = ed.state.tr
   const schema = ed.state.schema
@@ -512,9 +623,9 @@ function calcTableFormulas() {
     rowNode.forEach((cell: any) => cellNodes.push(cell))
     for (let colIndex = cellNodes.length - 1; colIndex >= 0; colIndex -= 1) {
       const cellNode = cellNodes[colIndex]
-      const cell = cells.find((c) => c.row === rowIndex && c.col === colIndex)
-      if (!cell || !cell.formula) continue
-      const value = results[rowIndex]?.[colIndex] ?? ''
+      const cell = byCell.get(`${rowIndex}:${colIndex}`)
+      if (!cell) continue
+      const value = cell.next
       // 单元格位置：表内容起点 + 前面各行 + 行内容起点 + 前面各单元格
       let cellPos = found.pos + 1
       for (let r = 0; r < rowIndex; r += 1) cellPos += rowNodes[r].nodeSize
@@ -536,7 +647,7 @@ function calcTableFormulas() {
   ed.view.dispatch(tr)
   closeAllTableUi()
   deps.announceRte('表格公式已计算')
-  ElMessage.success(`已计算 ${changed} 个公式单元格`)
+  ElMessage.success(`已计算 ${updates.length} 个公式单元格`)
 }
 
 function duplicateCurrentTableRow() {
@@ -561,6 +672,33 @@ function equalizeCurrentTableColumns() {
   ElMessage.success('已均分列宽')
 }
 
+function currentTableReadTone(): string {
+  return String(deps.editor().value?.getAttributes('table')?.readTone || '')
+}
+
+function setTableReadTone(tone: TableReadTone) {
+  const ed = deps.editor().value
+  if (!ed || !isInTable()) {
+    ElMessage.info('请把光标放进表格')
+    return
+  }
+  const ok = ed.chain().focus().setTableReadTone(tone).run()
+  if (!ok) {
+    ElMessage.info('请把光标放进表格')
+    return
+  }
+  closeAllTableUi()
+  const done: Record<TableReadTone, string> = {
+    '': '已关闭阅读配色',
+    blue: '已套用商务蓝',
+    green: '已套用护眼绿',
+    orange: '已套用暖橙',
+    gray: '已套用淡灰',
+    night: '已套用夜间',
+  }
+  ElMessage.success(done[tone])
+}
+
 /** 在当前单元格插入公式模板。 */
 function insertCellFormula() {
   const ed = deps.editor().value
@@ -573,12 +711,51 @@ function insertCellFormula() {
   deps.announceRte('已插入公式模板，可在表格菜单里计算')
 }
 
+const TABLE_OP_TITLES: Record<string, string> = {
+  'row-before': '在当前行上面插入行',
+  'row-after': '在当前行下面插入行',
+  'col-before': '在当前列左边插入列',
+  'col-after': '在当前列右边插入列',
+  'dup-row': '在下面复制这一行',
+  'equal-cols': '把各列调成一样宽',
+  'del-row': '删掉当前行',
+  'del-col': '删掉当前列',
+  'merge': '把选中的格子合成一个',
+  'split': '把合并过的格子拆开',
+  'header': '把这一行设成表头，或取消',
+  'header-col': '把这一列设成表头，或取消',
+  'clear-cell': '去掉格子里的底色和对齐',
+  'cell-formula': '在当前格插入求和公式',
+  'calc-formula': '算出表里已有的公式',
+  'valign-top': '文字贴在格子上沿',
+  'valign-middle': '文字放在格子上下正中',
+  'valign-bottom': '文字贴在格子下沿',
+  'align-left': '格子里的文字靠左',
+  'align-center': '格子里的文字居中',
+  'align-right': '格子里的文字靠右',
+  'sort-asc': '按当前列从小到大排序',
+  'sort-desc': '按当前列从大到小排序',
+  'sum-row': '在表底加一行合计',
+  'sticky-header': '滚动时让表头停在上面',
+  'sticky-col': '横向滚动时让首列停在左边',
+  'copy-csv': '把表格复制成逗号分隔的文本',
+  'copy-tsv': '把表格复制成制表符分隔的文本',
+  'row-filter': '按文字隐藏不匹配的行',
+  'del-table': '删掉整张表',
+  'read-off': '去掉阅读配色，恢复普通表格',
+  'read-blue': '用商务蓝显示，不改表格内容',
+  'read-green': '用护眼绿显示，不改表格内容',
+  'read-orange': '用暖橙显示，不改表格内容',
+  'read-gray': '用淡灰显示，不改表格内容',
+  'read-night': '用夜间深色显示，不改表格内容',
+}
+
 const tableOpItems = computed((): TableOpItem[] => {
   void deps.editor().value?.state
-  return [    { key: 'row-before', label: '向上插入行', run: tableAddRowBefore },
-    { key: 'row-after', label: '向下插入行', run: tableAddRowAfter },
-    { key: 'col-before', label: '向左插入列', run: tableAddColBefore },
-    { key: 'col-after', label: '向右插入列', run: tableAddColAfter },
+  const items: TableOpItem[] = [    { key: 'row-before', label: '向上插入行', run: tableAddRowBefore, insertCount: true },
+    { key: 'row-after', label: '向下插入行', run: tableAddRowAfter, insertCount: true },
+    { key: 'col-before', label: '向左插入列', run: tableAddColBefore, insertCount: true },
+    { key: 'col-after', label: '向右插入列', run: tableAddColAfter, insertCount: true },
     { key: 'dup-row', label: '复制当前行', run: duplicateCurrentTableRow },
     { key: 'equal-cols', label: '均分列宽', run: equalizeCurrentTableColumns },
     {
@@ -680,6 +857,11 @@ const tableOpItems = computed((): TableOpItem[] => {
       sepBefore: true,
     },
     {
+      key: 'sticky-col',
+      label: '首列冻结开关',
+      run: () => toggleTableStickyCol(),
+    },
+    {
       key: 'copy-csv',
       label: '复制为 CSV',
       run: () => { void copyCurrentTable('csv') },
@@ -696,6 +878,42 @@ const tableOpItems = computed((): TableOpItem[] => {
       run: () => { void promptTableRowFilter() },
     },
     {
+      key: 'read-off',
+      label: '关闭阅读',
+      run: () => setTableReadTone(''),
+      active: () => currentTableReadTone() === '',
+    },
+    {
+      key: 'read-blue',
+      label: '商务蓝',
+      run: () => setTableReadTone('blue'),
+      active: () => currentTableReadTone() === 'blue',
+    },
+    {
+      key: 'read-green',
+      label: '护眼绿',
+      run: () => setTableReadTone('green'),
+      active: () => currentTableReadTone() === 'green',
+    },
+    {
+      key: 'read-orange',
+      label: '暖橙',
+      run: () => setTableReadTone('orange'),
+      active: () => currentTableReadTone() === 'orange',
+    },
+    {
+      key: 'read-gray',
+      label: '淡灰',
+      run: () => setTableReadTone('gray'),
+      active: () => currentTableReadTone() === 'gray',
+    },
+    {
+      key: 'read-night',
+      label: '夜间',
+      run: () => setTableReadTone('night'),
+      active: () => currentTableReadTone() === 'night',
+    },
+    {
       key: 'del-table',
       label: '删除表格',
       run: tableDeleteTable,
@@ -703,6 +921,7 @@ const tableOpItems = computed((): TableOpItem[] => {
       sepBefore: true,
     },
   ]
+  return items.map((item) => ({ ...item, title: TABLE_OP_TITLES[item.key] || item.label }))
 })
 
 
@@ -716,6 +935,7 @@ function onTableToolClick() {
   deps.closeImportMenu()
   deps.closeExportMenu()
   if (isInTable()) {
+    rememberTableInsertSelection()
     tableMenuOpen.value = false
     tableOpsSheetOpen.value = true
     closeTableCtx()
@@ -737,6 +957,7 @@ function onTableToolbarButtonClick() {
   deps.alignOpen().value = false
   deps.closeFontMenus()
   if (isInTable()) {
+    if (!tableMenuOpen.value) rememberTableInsertSelection()
     tableMenuOpen.value = !tableMenuOpen.value
     tableQuickOpen.value = false
     closeTableCtx()
@@ -756,6 +977,7 @@ function onTableToolbarButtonClick() {
     closeTableCtx,
     openTableContextMenu,
     tableHeaderSticky,
+    tableColSticky,
     tableFilterQuery,
     reapplyTableFilter,
     applyCellValign,
@@ -815,6 +1037,9 @@ function onTableToolbarButtonClick() {
     insertCellFormula,
     calcTableFormulas,
     tableOpItems,
+    tableInsertCounts,
+    normalizeTableInsertCount,
+    rememberTableInsertSelection,
     onTableToolClick,
     onTableToolbarButtonClick,
   }

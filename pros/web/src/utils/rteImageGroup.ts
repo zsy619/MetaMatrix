@@ -74,11 +74,35 @@ export const imageGroupLayoutCss = [
   '.rte-image-group-row>*:nth-child(9){flex:var(--g8,1) 1 0 !important;}',
   '.rte-image-group-row>*:nth-child(10){flex:var(--g9,1) 1 0 !important;}',
   '.rte-image-group-row img{width:100% !important;height:100% !important;object-fit:contain !important;max-width:none !important;display:block;}',
+  '.rte-image-group[data-layout="12"] .rte-image-group-row,.rte-image-group[data-layout="21"] .rte-image-group-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:minmax(0,1fr) minmax(0,1fr);aspect-ratio:2 / 1;height:auto;min-height:160px;}',
+  '.rte-image-group[data-layout="12"] .rte-image-group-row>*:nth-child(1){grid-area:1 / 1 / 3 / 2;flex:none !important;}',
+  '.rte-image-group[data-layout="12"] .rte-image-group-row>*:nth-child(2){grid-area:1 / 2 / 2 / 3;flex:none !important;}',
+  '.rte-image-group[data-layout="12"] .rte-image-group-row>*:nth-child(3){grid-area:2 / 2 / 3 / 3;flex:none !important;}',
+  '.rte-image-group[data-layout="21"] .rte-image-group-row>*:nth-child(1){grid-area:1 / 1 / 2 / 2;flex:none !important;}',
+  '.rte-image-group[data-layout="21"] .rte-image-group-row>*:nth-child(2){grid-area:2 / 1 / 3 / 2;flex:none !important;}',
+  '.rte-image-group[data-layout="21"] .rte-image-group-row>*:nth-child(3){grid-area:1 / 2 / 3 / 3;flex:none !important;}',
+  '.rte-image-group[data-layout="12"] .rte-image-group-row>[data-resize-container][data-node="image"],.rte-image-group[data-layout="21"] .rte-image-group-row>[data-resize-container][data-node="image"]{width:100% !important;height:100% !important;min-height:0;}',
+  '.rte-image-group[data-layout="12"] .rte-image-group-row img,.rte-image-group[data-layout="21"] .rte-image-group-row img{object-fit:cover !important;}',
+  '.rte-root.rte-printing .rte-image-group[data-layout="12"] .rte-image-group-row,.rte-root.rte-printing .rte-image-group[data-layout="21"] .rte-image-group-row{display:grid !important;aspect-ratio:2 / 1 !important;}',
   '.rte-root.rte-printing .rte-image-group-row{height:auto !important;aspect-ratio:var(--rte-row-aspect, auto);}',
   '.rte-image-drag-source{opacity:.35;}',
   '.rte-image-drag-thumb{position:fixed;z-index:10061;width:72px;height:48px;border-radius:4px;background:#fff center/cover no-repeat;box-shadow:0 8px 24px rgba(29,33,41,.28);pointer-events:none;}',
   'body:has(.rte-image-drag-thumb) .rte-image-group-bar,body:has(.rte-image-drag-thumb) .rte-bubble{display:none !important;}',
-  '.rte-image-drag-handle{position:absolute;z-index:8;left:4px;top:8px;width:22px;height:26px;padding:0;border:1px solid #d6e4ff;border-radius:6px;background:#fff;color:#3370ff;font-size:14px;line-height:24px;text-align:center;cursor:grab;opacity:0;pointer-events:auto;box-shadow:0 1px 4px rgba(29,33,41,.12);}',
+  '.rte-image-drag-handle{position:absolute;z-index:8;left:4px;top:8px;width:28px;height:28px;padding:0;border:1px solid #d6e4ff;border-radius:6px;background:#fff;color:#3370ff;font-size:14px;line-height:26px;text-align:center;cursor:grab;opacity:0;pointer-events:auto;box-shadow:0 1px 4px rgba(29,33,41,.12);}',
+  '.rte-image-drag-handle:focus{opacity:1;outline:2px solid #3370ff;outline-offset:1px;}',
+  '.rte-image-group-bar button.rte-image-group-layout,.rte-image-group-bar button.rte-image-group-fit,.rte-image-group-bar button.rte-image-group-alt{width:auto;min-width:28px;padding:0 6px;font-size:12px;}',
+  '.rte-image-group-bar button.rte-image-group-alt,.rte-image-group-bar button.rte-image-group-fill{color:#d83931;}',
+  '[data-resize-container][data-node="image"],[data-node="image"]{position:relative;}',
+  '.rte-image-caption-inline{position:absolute;left:0;right:0;bottom:0;margin:0;padding:2px 6px;background:rgba(255,255,255,.9);font-size:12px;line-height:1.4;text-align:center;pointer-events:auto;z-index:2;cursor:text;}',
+  '.rte-image-caption-inline.is-suggestion{box-shadow:inset 0 -2px 0 #3370ff;background:rgba(51,112,255,.12);}',
+  '.rte-image-group-revision{padding:0 6px;color:#3370ff;font-size:11px;line-height:26px;}',
+  '.rte-image-group-accept,.rte-image-group-reject{width:auto;min-width:36px;padding:0 6px;font-size:12px;}',
+  '.rte-font-size-entry{display:block;width:calc(100% - 12px);margin:4px 6px 6px;padding:4px 6px;border:1px solid #e5e6eb;border-radius:4px;font:inherit;box-sizing:border-box;}',
+  '.rte-image-group[data-fit="contain"] .rte-image-group-row img{object-fit:contain !important;}',
+  '.rte-image-group[data-layout="rows"] .rte-image-group-row{display:flex;flex-direction:column;height:auto;}',
+  '.rte-image-group[data-layout="rows"] .rte-image-group-row>*{flex:none !important;width:100% !important;height:auto !important;}',
+  '.rte-outline-flash{animation:rte-outline-flash .8s ease;}',
+  '@keyframes rte-outline-flash{0%{background:#fff3bf;}100%{background:transparent;}}',
   '[data-resize-container][data-node="image"]:hover>.rte-image-drag-handle,[data-resize-container][data-node="image"].ProseMirror-selectednode>.rte-image-drag-handle,.rte-image-drag-handle.is-dragging{opacity:1;}',
   '.rte-image-group-bar{position:absolute;left:36px;top:8px;z-index:7;display:none;align-items:center;gap:2px;padding:4px;background:#fff;border-radius:8px;box-shadow:0 8px 24px rgba(29,33,41,.12),0 0 0 1px rgba(29,33,41,.06);}',
   '.rte-image-group:hover>.rte-image-group-bar,.rte-image-group.is-selected>.rte-image-group-bar{display:flex;}',
@@ -116,13 +140,24 @@ export function groupUsesAspect(ratioMode: unknown): boolean {
   return ratioMode !== 'custom'
 }
 
-/** 按权重把一行铺满。权重是宽高比时，行高 = 可用宽度 / 权重和，不按视口或固定上限裁切。 */
+/**
+ * 藏起的格子记成 0，不再参与这一行的宽度和行高。
+ * 全被藏起时退回原来的权重，避免行高变成 0。
+ */
+export function ratiosSkippingHidden(ratios: readonly number[], hidden: readonly boolean[]): number[] {
+  const next = ratios.map((n, index) => (hidden[index] ? 0 : Number.isFinite(n) && n > 0 ? n : 1))
+  if (next.some((n) => n > 0)) return next
+  return ratios.map((n) => (Number.isFinite(n) && n > 0 ? n : 1))
+}
+
+/** 按权重把一行铺满。权重是宽高比时，行高 = 可用宽度 / 权重和。0 表示藏起，不占宽度，也不算间距。 */
 export function rowLayout(rowWidth: number, weights: readonly number[], gap = 8): { height: number; widths: number[] } {
-  const clean = weights.map((n) => (Number.isFinite(n) && n > 0 ? n : 1))
-  const sum = clean.reduce((total, n) => total + n, 0) || 1
-  const inner = Math.max(1, rowWidth - gap * Math.max(0, clean.length - 1))
+  const clean = weights.map((n) => (Number.isFinite(n) && n > 0 ? n : 0))
+  const active = clean.some((n) => n > 0) ? clean.filter((n) => n > 0) : clean.map(() => 1)
+  const sum = active.reduce((total, n) => total + n, 0) || 1
+  const inner = Math.max(1, rowWidth - gap * Math.max(0, active.length - 1))
   const height = inner / sum
-  const widths = clean.map((n) => (inner * n) / sum)
+  const widths = active.map((n) => (inner * n) / sum)
   const rounded = widths.map((n) => Math.round(n))
   const drift = Math.round(inner) - rounded.reduce((total, n) => total + n, 0)
   if (rounded.length) rounded[rounded.length - 1] = (rounded[rounded.length - 1] ?? 0) + drift
@@ -179,16 +214,53 @@ export function insertRatio(ratios: readonly number[], index: number): number[] 
 }
 
 /** 拖分隔条时，左右两格的和不变，leftShare 是这一对里左侧所占比例。 */
+export type ImageGroupFit = 'cover' | 'contain'
+
+export function normalizeGroupFit(raw: unknown): ImageGroupFit {
+  return raw === 'contain' ? 'contain' : 'cover'
+}
+
+/** 12/21 拖左右列：左侧份额 leftShare，右侧两格按原比例分剩下的。 */
+export function resizeCollageColumn(ratios: readonly number[], layout: '12' | '21', leftShare: number): number[] {
+  const base = ratios.length === 3 ? ratios.map((n) => (n > 0 ? n : 1)) : [1, 1, 1]
+  const share = Number.isFinite(leftShare) ? Math.min(0.88, Math.max(0.12, leftShare)) : 0.5
+  const total = base[0]! + base[1]! + base[2]!
+  if (layout === '12') {
+    const right = base[1]! + base[2]!
+    const left = Math.round(total * share * 100) / 100
+    const rest = Math.round((total - left) * 100) / 100
+    const top = right > 0 ? Math.round(rest * (base[1]! / right) * 100) / 100 : rest / 2
+    return [left, top, Math.round((rest - top) * 100) / 100]
+  }
+  const leftStack = base[0]! + base[1]!
+  const right = Math.round(total * (1 - share) * 100) / 100
+  const rest = Math.round((total - right) * 100) / 100
+  const top = leftStack > 0 ? Math.round(rest * (base[0]! / leftStack) * 100) / 100 : rest / 2
+  return [top, Math.round((rest - top) * 100) / 100, right]
+}
+
+/** 拖上下两格的高度。12 调右列，21 调左列。 */
+export function resizeCollageStack(ratios: readonly number[], layout: '12' | '21', topShare: number): number[] {
+  const base = ratios.length === 3 ? [...ratios] : [1, 1, 1]
+  const index = layout === '12' ? 1 : 0
+  return resizePair(base, index, topShare)
+}
+
 export function resizePair(ratios: readonly number[], index: number, leftShare: number): number[] {
-  if (index < 0 || index >= ratios.length - 1) return ratios.slice()
-  const total = ratios[index]! + ratios[index + 1]!
+  return resizeVisiblePair(ratios, index, index + 1, leftShare)
+}
+
+/** 调整两张可见图的比例，中间藏起的格子保持原权重。 */
+export function resizeVisiblePair(ratios: readonly number[], leftIndex: number, rightIndex: number, leftShare: number): number[] {
+  if (leftIndex < 0 || rightIndex <= leftIndex || rightIndex >= ratios.length) return ratios.slice()
+  const total = ratios[leftIndex]! + ratios[rightIndex]!
   if (!(total > 0)) return ratios.slice()
   const share = Number.isFinite(leftShare) ? Math.min(0.88, Math.max(0.12, leftShare)) : 0.5
   const left = Math.round(total * share * 100) / 100
   const right = Math.round((total - left) * 100) / 100
   const next = ratios.slice()
-  next[index] = left
-  next[index + 1] = right
+  next[leftIndex] = left
+  next[rightIndex] = right
   return next
 }
 
@@ -208,6 +280,84 @@ export function moveItem<T>(items: readonly T[], from: number, to: number): T[] 
 export function groupInsertIndex(from: number, target: number, side: 'left' | 'right'): number {
   const targetAfter = from < target ? target - 1 : target
   return side === 'left' ? targetAfter : targetAfter + 1
+}
+
+export type ImageGroupLayout = 'row' | '12' | '21' | 'rows' | 'mix'
+
+/**
+ * 张数对不上时，把 12 / 21 / 上下 / 叠放收回横排，并清掉对不上的宽度比例。
+ * 返回 null 表示不用改。
+ */
+export function repairGroupAttrs(
+  childCount: number,
+  attrs: Record<string, unknown>,
+): Record<string, unknown> | null {
+  if (childCount < 2) return null
+  const layout = normalizeGroupLayout(attrs.layout)
+  const stackAt = Number(attrs.stackAt)
+  const layoutBroken =
+    ((layout === '12' || layout === '21') && childCount !== 3) ||
+    (layout === 'rows' && childCount !== 2) ||
+    (layout === 'mix' && !(Number.isInteger(stackAt) && stackAt >= 0 && stackAt + 1 < childCount))
+  const parts = typeof attrs.ratios === 'string' ? attrs.ratios.split(':').filter((part) => part.trim()) : []
+  const ratiosBroken = attrs.ratioMode === 'custom' && parts.length !== childCount
+  if (!layoutBroken && !ratiosBroken) return null
+  return {
+    ...attrs,
+    ...(layoutBroken ? { layout: 'row', stackAt: null, stackSplit: null, layoutBefore: null } : {}),
+    ...(layoutBroken || ratiosBroken ? { ratios: null, ratioMode: null } : {}),
+  }
+}
+
+/** 缺省横排。12 是左一右二，21 是左二右一，rows 是两张上下叠放，mix 是四张及以上里有一列上下叠放。 */
+export function normalizeGroupLayout(raw: unknown): ImageGroupLayout {
+  if (raw === '12' || raw === '21' || raw === 'rows' || raw === 'mix') return raw
+  return 'row'
+}
+
+/**
+ * 三张图里把 from 放到 target 的上沿或下沿。
+ * 叠放落在目标所在的一侧：右侧叠放是 12，左侧叠放是 21。
+ * order 是新的子节点顺序：12 为 [左, 右上, 右下]，21 为 [左上, 左下, 右]。
+ */
+export function planImageStack(
+  count: number,
+  from: number,
+  target: number,
+  side: 'above' | 'below',
+): { layout: '12' | '21'; order: number[] } | null {
+  if (count !== 3 || from === target) return null
+  if (from < 0 || target < 0 || from >= count || target >= count) return null
+  const rest = [0, 1, 2].filter((index) => index !== from)
+  const targetPos = rest.indexOf(target)
+  if (targetPos < 0) return null
+  const top = side === 'above' ? from : target
+  const bottom = side === 'above' ? target : from
+  const other = rest.find((index) => index !== target)
+  if (other == null) return null
+  if (targetPos === rest.length - 1) return { layout: '12', order: [other, top, bottom] }
+  return { layout: '21', order: [top, bottom, other] }
+}
+
+/** 四张及以上：把 from 叠到 target 的上沿或下沿，其余图保持各自一列。stackAt 是叠放上图在新顺序里的下标。 */
+export function planMixedStack(
+  count: number,
+  from: number,
+  target: number,
+  side: 'above' | 'below',
+): { order: number[]; stackAt: number } | null {
+  if (count < 4 || from === target) return null
+  if (from < 0 || target < 0 || from >= count || target >= count) return null
+  const rest = Array.from({ length: count }, (_, index) => index).filter((index) => index !== from)
+  if (!rest.includes(target)) return null
+  const top = side === 'above' ? from : target
+  const bottom = side === 'above' ? target : from
+  const order: number[] = []
+  for (const index of rest) {
+    if (index === target) order.push(top, bottom)
+    else order.push(index)
+  }
+  return { order, stackAt: order.indexOf(top) }
 }
 
 function isEmptyParagraph(node: MiniNode): boolean {

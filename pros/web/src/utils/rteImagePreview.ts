@@ -25,6 +25,7 @@ export function collectEditorImages(doc: DocLike): RtePreviewImage[] {
   const items: RtePreviewImage[] = []
   doc.descendants((node, pos) => {
     if (node.type.name !== 'image') return
+    if (node.attrs.concealed) return
     const src = String(node.attrs.src || '')
     if (!src) return
     items.push({

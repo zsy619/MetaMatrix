@@ -129,4 +129,77 @@ function block(id: RoiTradeoffBlockId): RoiTradeoffBlock | undefined {
 .roi-panel :deep(.ProseMirror p) {
   margin: 0.35em 0;
 }
+
+@media (max-width: 800px) {
+  .roi-canvas {
+    inset: 0;
+    overflow: auto;
+    grid-template-columns: minmax(0, 1fr);
+    grid-auto-rows: max-content;
+    align-content: start;
+    gap: 12px;
+    padding: 12px 12px 96px;
+    background: transparent;
+    border: none;
+  }
+
+  .roi-col {
+    height: auto;
+    min-height: max-content;
+    border: 1px solid #e8e0d0;
+    border-radius: 16px;
+    overflow: hidden;
+  }
+
+  .roi-col-title {
+    font-size: 18px;
+  }
+
+  .roi-panel {
+    flex: 0 0 auto;
+    min-height: 220px;
+    overflow: visible;
+  }
+
+  .roi-panel :deep(.ym-block),
+  .roi-panel :deep(.ym-block-body),
+  .roi-panel :deep(.rte-root),
+  .roi-panel :deep(.rte-workspace),
+  .roi-panel :deep(.rte-canvas),
+  .roi-panel :deep(.rte-body),
+  .roi-panel :deep(.ProseMirror) {
+    height: auto;
+    max-height: none;
+    max-width: 100%;
+    min-width: 0;
+    overflow: visible;
+    flex: 0 0 auto;
+  }
+
+  .roi-panel :deep(.ym-block) {
+    min-height: 0;
+  }
+
+  .roi-panel :deep(.rte-workspace),
+  .roi-panel :deep(.rte-canvas),
+  .roi-panel :deep(.ProseMirror) {
+    width: 100%;
+  }
+
+  .roi-panel :deep(.ProseMirror) {
+    min-height: 160px;
+    font-size: 15px;
+  }
+
+  .roi-panel :deep(.ProseMirror p) {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .roi-panel :deep(.pm-max-btn) {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+  }
+}
 </style>

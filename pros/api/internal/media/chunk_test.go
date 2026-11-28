@@ -3,7 +3,13 @@ package media
 import (
 	"bytes"
 	"context"
+	"errors"
+	"os"
+	"path/filepath"
 	"testing"
+	"time"
+
+	"github.com/google/uuid"
 )
 
 func TestChunkResumeKeepsHashAndIsolatesSession(t *testing.T) {
@@ -71,5 +77,82 @@ func TestChunkResumeKeepsHashAndIsolatesSession(t *testing.T) {
 	}
 	if countFiles(t, svc.Root) != 1 {
 		t.Fatalf("files = %d", countFiles(t, svc.Root))
+	}
+}
+
+func TestCleanupExpiredChunksWithoutVisits(t *testing.T) {
+	svc, user, _ := testService(t)
+	ctx := context.Background()
+	now := time.Unix(1_700_000_000, 0)
+	svc.Now = func() time.Time { return now }
+	prepare := func() ChunkStatus {
+		t.Helper()
+		status, err := svc.PrepareChunk(ctx, user, PrepareInput{
+			OriginalName: "ttl.bin",
+			MediaType:    "file",
+			SizeBytes:    MinPartSize,
+			PartSize:     MinPartSize,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return status
+	}
+	expired := prepare()
+	expiredDir, err := svc.chunkDir(expired.UploadID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// 无人调用 ChunkStatus/PutChunk，仅推进时钟后直接运行启动/周期清理。
+	now = now.Add(chunkTTL + time.Hour)
+	fresh := prepare()
+	freshDir, err := svc.chunkDir(fresh.UploadID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	corruptID := uuid.NewString()
+	corruptDir, err := svc.chunkDir(corruptID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(corruptDir, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(corruptDir, "meta.json"), []byte("{broken"), 0o640); err != nil {
+		t.Fatal(err)
+	}
+
+	// 损坏会话会产生可见错误，但不能阻断另一个已验证过期会话的删除。
+	if err := svc.CleanupExpiredChunks(); err == nil {
+		t.Fatal("corrupt session should be reported")
+	}
+	if _, err := os.Stat(expiredDir); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expired session still exists: %v", err)
+	}
+	if info, err := os.Stat(freshDir); err != nil || !info.IsDir() {
+		t.Fatalf("fresh session was removed: %v", err)
+	}
+	// 无法证明归属和 CreatedAt 的损坏目录必须保留，禁止按目录 mtime 猜测删除。
+	if info, err := os.Stat(corruptDir); err != nil || !info.IsDir() {
+		t.Fatalf("corrupt session should be retained: %v", err)
+	}
+}
+
+func TestCleanupExpiredChunksRejectsUploadsSymlink(t *testing.T) {
+	svc, _, _ := testService(t)
+	outside := t.TempDir()
+	keep := filepath.Join(outside, "keep")
+	if err := os.WriteFile(keep, []byte("do not delete"), 0o640); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(svc.Root, "uploads")); err != nil {
+		t.Skipf("symlink unavailable: %v", err)
+	}
+	if err := svc.CleanupExpiredChunks(); !errors.Is(err, ErrPathEscape) {
+		t.Fatalf("symlink cleanup = %v", err)
+	}
+	if _, err := os.Stat(keep); err != nil {
+		t.Fatalf("cleanup followed uploads symlink: %v", err)
 	}
 }

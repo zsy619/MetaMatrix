@@ -67,7 +67,7 @@ describe('登录页图形验证码', () => {
     const wrapper = await mountView(LoginView)
     await wrapper.find('#login-email').setValue('demo@metamatrix.local')
     await wrapper.find('#login-password').setValue('demo123456')
-    await wrapper.find('#captcha-code').setValue('ab3d')
+    await wrapper.find('#captcha-code').setValue('ab7cd2')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
@@ -76,8 +76,30 @@ describe('登录页图形验证码', () => {
       email: 'demo@metamatrix.local',
       password: 'demo123456',
       captchaId: 'cap-1',
-      captchaCode: 'AB3D',
+      captchaCode: 'AB7CD2',
     })
+  })
+
+  it('答案框渲染六个等分格子并显示已输入的字符', async () => {
+    const wrapper = await mountView(LoginView)
+    const slots = wrapper.findAll('.captcha__slot')
+    expect(slots).toHaveLength(6)
+
+    await wrapper.find('#captcha-code').setValue('a7b')
+    const after = wrapper.findAll('.captcha__slot')
+    expect(after[0].text()).toBe('A')
+    expect(after[1].text()).toBe('7')
+    expect(after[2].text()).toBe('B')
+    expect(after[3].text()).toBe('')
+    expect(after[4].text()).toBe('')
+    expect(after[5].text()).toBe('')
+  })
+
+  it('输入的非法字符被丢弃，只保留合法的大写字母和数字', async () => {
+    const wrapper = await mountView(LoginView)
+    await wrapper.find('#captcha-code').setValue('a1b-c0')
+    // 1 和 0 是服务端不生成的易混字符，必须被过滤掉。
+    expect((wrapper.find('#captcha-code').element as HTMLInputElement).value).toBe('ABC')
   })
 
   it('验证码为空时不提交请求', async () => {
@@ -137,7 +159,7 @@ describe('注册页图形验证码', () => {
 
     await wrapper.find('#reg-email').setValue('new@metamatrix.local')
     await wrapper.find('#reg-password').setValue('demo123456')
-    await wrapper.find('#captcha-code').setValue('AB3D')
+    await wrapper.find('#captcha-code').setValue('AB7CD2')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
@@ -145,7 +167,7 @@ describe('注册页图形验证码', () => {
     expect(register.mock.calls[0][0]).toMatchObject({
       email: 'new@metamatrix.local',
       captchaId: 'cap-1',
-      captchaCode: 'AB3D',
+      captchaCode: 'AB7CD2',
     })
   })
 

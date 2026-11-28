@@ -7,10 +7,10 @@ import {
   type ToolbarGroupButtonConfig,
   type ToolbarGroupButtonsByPanelId,
 } from './rteToolbarGroupButtons'
-import { CHART_GROUPS } from './echarts/chartGroups'
+import { CHART_GROUP_IDS } from './echarts/chartGroupIds'
 
 /** 图表分组在工具栏里的按钮 key（与 CHART_GROUPS 一一对应）。 */
-export const CHART_TOOLBAR_KEYS: readonly string[] = CHART_GROUPS.map((group) => `chart:${group.id}`)
+export const CHART_TOOLBAR_KEYS: readonly string[] = CHART_GROUP_IDS.map((id) => `chart:${id}`)
 
 /** 旧版「图表」总入口的按钮 key：一个下拉里再分区，现在拆成 9 个分类下拉。 */
 export const LEGACY_CHART_ENTRY_KEY = 'echarts'
@@ -83,6 +83,16 @@ export const TOOLBAR_GROUPS: readonly ToolbarGroupDef[] = [
     ],
   },
   {
+    id: 'writing',
+    label: '书写',
+    keys: ['textDir', 'quoteStyle', 'writingPaper'],
+  },
+  {
+    id: 'tidy',
+    label: '整理',
+    keys: ['textTidy', 'tidyHalf', 'tidyFull', 'tidyPangu', 'tidySqueeze'],
+  },
+  {
     id: 'insert',
     label: '插入',
     keys: [
@@ -91,16 +101,31 @@ export const TOOLBAR_GROUPS: readonly ToolbarGroupDef[] = [
       'qrcode', 'emoji', 'specialChars', 'formula',
     ],
   },
+  {
+    id: 'picture',
+    label: '图片',
+    keys: ['imageLayout', 'imageReplace', 'imageAlt', 'spoiler', 'dropCap'],
+  },
+  {
+    id: 'frame',
+    label: '图片效果',
+    keys: ['imageRadius', 'imageShadow', 'imageBorder'],
+  },
   // 图表独立分组：一级分类各占一个下拉按钮（基础 / 统计 / 关系 / 层级 / 地理 / 金融 / 坐标系 / 组件 / 3D·GL）
   { id: 'charts', label: '图表', keys: CHART_TOOLBAR_KEYS },
-  { id: 'table', label: '表格', keys: ['table', 'tableCsv', 'tableFilter'] },
+  {
+    id: 'table',
+    label: '表格',
+    keys: ['table', 'tableCsv', 'tableFilter', 'tableZebra', 'tableSticky', 'tableColSticky', 'tableEqual', 'tableFormula', 'tableSort', 'tableStruct'],
+  },
   {
     id: 'blocks',
     label: '块与结构',
     keys: [
-      'callout', 'hr', 'columns', 'pageBreak', 'toggleBlock', 'tabsBlock',
+      'callout', 'hr', 'columns', 'toggleBlock', 'tabsBlock',
       'blockOps', 'insertDate',
-      'form', 'template', 'timeline', 'statusChip', 'progressBar',
+      'form', 'template', 'timeline', 'timelineAdd', 'timelineDelete',
+      'statusChip', 'progressBar',
       'mermaid', 'snippets', 'crossDoc',
     ],
   },
@@ -117,6 +142,7 @@ export const TOOLBAR_GROUPS: readonly ToolbarGroupDef[] = [
     id: 'review',
     label: '审阅',
     keys: [
+      'deepOptimize',
       'spellcheck', 'sensitive', 'headingCheck', 'linkCheck', 'watermark', 'outbound', 'audit', 'inlineAi', 'cjkTip',
       'revision', 'revisionBase', 'suggest', 'suggestAccept', 'suggestReject',
       'speak', 'speakStop',
@@ -131,6 +157,11 @@ export const TOOLBAR_GROUPS: readonly ToolbarGroupDef[] = [
     id: 'file',
     label: '文件与导出',
     keys: ['print', 'import', 'export', 'copyMd'],
+  },
+  {
+    id: 'page',
+    label: '页面',
+    keys: ['pageSetup', 'pageBreak', 'printPreview', 'paperGuide', 'printUrls'],
   },
   { id: 'other', label: '其他', keys: [] },
 ]
@@ -162,10 +193,12 @@ const GROUP_BY_ID = new Map(TOOLBAR_GROUPS.map((group) => [group.id, group]))
  *   窄屏也能找到入口；图表分类顺序始终等于 `CHART_TOOLBAR_KEYS`（= CHART_GROUPS 顺序）。
  */
 export const COMPACT_PRIMARY_KEYS_BY_GROUP: Record<string, readonly string[]> = {
-  edit: ['undo', 'redo'],
-  style: ['bold', 'italic', 'underline', 'strike', 'color', 'highlight'],
-  paragraph: ['heading', 'list', 'quote', 'code', 'align'],
+  edit: ['undo', 'redo', 'find'],
+  review: ['deepOptimize'],
+  style: ['fontSize', 'bold', 'italic', 'underline', 'strike', 'color', 'highlight'],
+  paragraph: ['heading', 'list', 'quote', 'code', 'align', 'indent'],
   insert: ['link', 'image'],
+  table: ['table'],
 }
 
 /**
@@ -226,12 +259,18 @@ for (const group of TOOLBAR_GROUPS) {
   }
 }
 
-/** 迁移组内配置时旧分组配置的处理顺序（先旧组、后新组）。 */
+/**
+ * 迁移组内配置时的读取顺序：旧分组优先，当前分组随后。
+ *
+ * 当前分组直接取完整默认顺序，不再维护容易漏项的手写清单；否则新增
+ * writing、frame 这类分组后，已保存的按钮显隐与顺序会在再次迁移时丢失。
+ * Set 同时去掉既出现在别名表、又属于当前方案的分组 id，保证只合并一次。
+ */
 const MIGRATION_SOURCE_ORDER: readonly string[] = [
-  ...Object.keys(LEGACY_GROUP_ALIASES),
-  'style',
-  'edit',
-  'file',
+  ...new Set([
+    ...Object.keys(LEGACY_GROUP_ALIASES),
+    ...DEFAULT_TOOLBAR_GROUP_ORDER,
+  ]),
 ]
 
 export function normalizeToolbarGroupOrder(saved: unknown): string[] {

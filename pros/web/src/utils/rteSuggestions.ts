@@ -4,6 +4,7 @@ import { TextSelection, type EditorState, type Transaction } from '@tiptap/pm/st
 import { ReplaceStep } from '@tiptap/pm/transform'
 import { isHistoryTransaction } from '@tiptap/pm/history'
 import { authorColor } from './rteCommentThreads'
+import { canEditRange } from '../extensions/blockPermissionGuard'
 
 export type SuggestionAuthor = { id: string; name: string }
 
@@ -17,6 +18,8 @@ export type SuggestionRange = {
   authorId: string
   authorName: string
   createdAt: string
+  /** 题注和图片组布局存在节点属性里，接受或拒绝时改属性，不删节点。 */
+  structural?: 'caption' | 'layout'
 }
 
 const SUGGESTION_META = 'suggestion-internal'
@@ -180,6 +183,30 @@ export function trackTransaction(
 export function collectSuggestionRanges(doc: PMNode): SuggestionRange[] {
   const ranges: SuggestionRange[] = []
   doc.descendants((node, pos) => {
+    if (node.type.name === 'image' && node.attrs.captionBefore != null && node.attrs.captionBefore !== node.attrs.caption) {
+      ranges.push({
+        id: `cap_${pos}`,
+        kind: 'insert',
+        structural: 'caption',
+        from: pos,
+        to: pos + node.nodeSize,
+        authorId: 'optimize',
+        authorName: `深度优化：题注改为 ${String(node.attrs.caption || '（空）')}`,
+        createdAt: '',
+      })
+    }
+    if (node.type.name === 'imageGroup' && node.attrs.layoutBefore) {
+      ranges.push({
+        id: `lay_${pos}`,
+        kind: 'insert',
+        structural: 'layout',
+        from: pos,
+        to: pos + node.nodeSize,
+        authorId: 'optimize',
+        authorName: `深度优化：图片组改为 ${String(node.attrs.layout || 'row')}`,
+        createdAt: '',
+      })
+    }
     if (!node.isText) return
     for (const mark of node.marks) {
       const kind: SuggestionKind | null =
@@ -214,15 +241,41 @@ export function applySuggestionDecision(
   state: EditorState,
   mode: 'accept' | 'reject',
   id?: string,
+  allowRange?: (from: number, to: number) => boolean,
 ): Transaction | null {
   const ranges = collectSuggestionRanges(state.doc)
-    .filter((range) => !id || range.id === id)
+    .filter((range) => (!id || range.id === id) && (!allowRange || allowRange(range.from, range.to)))
     .sort((a, b) => b.from - a.from)
   if (!ranges.length) return null
   const tr = state.tr
   const insertType = state.schema.marks.suggestionInsert
   const deleteType = state.schema.marks.suggestionDelete
   for (const range of ranges) {
+    if (range.structural) {
+      const node = tr.doc.nodeAt(range.from)
+      if (node?.type.name === 'image' && range.structural === 'caption') {
+        const restored = node.attrs.captionBefore
+        const alt =
+          mode === 'accept' || node.attrs.altBefore == null
+            ? node.attrs.alt
+            : node.attrs.altBefore || null
+        tr.setNodeMarkup(range.from, undefined, {
+          ...node.attrs,
+          caption: mode === 'accept' ? node.attrs.caption : restored || null,
+          captionBefore: null,
+          alt,
+          altBefore: null,
+        })
+      } else if (node?.type.name === 'imageGroup' && range.structural === 'layout') {
+        tr.setNodeMarkup(range.from, undefined, {
+          ...node.attrs,
+          layout: mode === 'accept' ? node.attrs.layout : node.attrs.layoutBefore || 'row',
+          layoutBefore: null,
+          ...(mode === 'reject' ? { ratios: null, ratioMode: null, stackAt: null } : {}),
+        })
+      }
+      continue
+    }
     const remove = mode === 'accept' ? range.kind === 'delete' : range.kind === 'insert'
     if (remove) tr.delete(range.from, range.to)
     else if (range.kind === 'insert' && insertType) tr.removeMark(range.from, range.to, insertType)
@@ -234,7 +287,7 @@ export function applySuggestionDecision(
 }
 
 export function dispatchSuggestionDecision(editor: Editor, mode: 'accept' | 'reject', id?: string): boolean {
-  const tr = applySuggestionDecision(editor.state, mode, id)
+  const tr = applySuggestionDecision(editor.state, mode, id, (from, to) => canEditRange(editor, from, to))
   if (!tr) return false
   editor.view.dispatch(tr.scrollIntoView())
   return true

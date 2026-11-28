@@ -7,7 +7,7 @@
  *
  * 面板只是「编辑区」，真正的写回由宿主（useChartPanelHost）完成。
  */
-import { computed, onBeforeUnmount, onMounted, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import ChartGeneralSection from './ChartGeneralSection.vue'
 import ChartAxisSection from './ChartAxisSection.vue'
@@ -21,14 +21,21 @@ import type { useChartPanelHost } from './useChartPanelHost'
 import { isSameEchartsOption } from '../../../utils/echarts/chartOptionPath'
 import { writeChartSecret } from '../../../utils/echarts/chartSecret'
 import { ECHARTS_CHART_TYPES } from '../../../utils/rteEchartsOption'
+import { chartPanelWidth, measureChartBlockWidth } from '../../../utils/echarts/chartPanelWidth'
 import type { ChartDataSourceConfig } from '../../../utils/echarts/chartDataSource'
 
 const props = defineProps<{ host: ReturnType<typeof useChartPanelHost> }>()
 
 const panel = useChartPanel()
-
 const visible = computed(() => props.host.open && !!props.host.target)
-
+const chartBlockWidth = ref(0)
+function syncChartPanelWidth() {
+  chartBlockWidth.value = measureChartBlockWidth(props.host.target?.chartId || '')
+}
+watch(() => [visible.value, props.host.target?.chartId] as const, () => { void nextTick(syncChartPanelWidth) }, { immediate: true })
+const panelStyle = computed(() => ({
+  '--rte-chart-panel-width': `${chartPanelWidth(chartBlockWidth.value, window.innerWidth || 1280)}px`,
+}))
 /** 把宿主里的目标转成面板需要的形状。 */
 function toPanelTarget() {
   const next = props.host.target
@@ -190,18 +197,63 @@ function onChangeChartType(event: Event) {
 </script>
 
 <template>
-  <aside v-if="visible" class="rte-chart-panel" data-rte-own aria-label="图表属性">
+  <aside v-if="visible" class="rte-chart-panel" data-rte-own aria-label="图表属性" :style="panelStyle">
     <header class="rte-cp-head">
       <div class="rte-cp-title">图表属性</div>
       <div class="rte-cp-subtitle">
         {{ panel.schema.label }}
-        <span class="rte-cp-type">{{ props.host.chartType }}</span>
       </div>
+      <label class="rte-cp-type-row">
+        <span class="rte-cp-type-label">引用表格</span>
+        <select
+          class="rte-cp-type-select"
+          :value="props.host.target?.tableRef || ''"
+          aria-label="引用正文表格"
+          title="用这张表的数据画图。表改了，图跟着变"
+          @change="props.host.setTableRef(($event.target as HTMLSelectElement).value)"
+        >
+          <option value="">不引用</option>
+          <option v-for="table in props.host.listTables()" :key="table.id" :value="table.id">
+            {{ table.label }}
+          </option>
+        </select>
+      </label>
+      <label class="rte-cp-type-row">
+        <span class="rte-cp-type-label">图注</span>
+        <input
+          class="rte-cp-type-select"
+          :value="props.host.target?.chartTitle || ''"
+          aria-label="图表标题"
+          title="写在图下方，和单位、来源排成一行"
+          @change="props.host.patchAttrs({ chartTitle: ($event.target as HTMLInputElement).value })"
+        />
+      </label>
+      <label class="rte-cp-type-row">
+        <span class="rte-cp-type-label">单位</span>
+        <input
+          class="rte-cp-type-select"
+          :value="props.host.target?.chartUnit || ''"
+          aria-label="图表单位"
+          title="单位，跟在标题后面，例如万元"
+          @change="props.host.patchAttrs({ chartUnit: ($event.target as HTMLInputElement).value })"
+        />
+      </label>
+      <label class="rte-cp-type-row">
+        <span class="rte-cp-type-label">来源</span>
+        <input
+          class="rte-cp-type-select"
+          :value="props.host.target?.chartSource || ''"
+          aria-label="图表来源"
+          title="数据来源，跟在单位后面"
+          @change="props.host.patchAttrs({ chartSource: ($event.target as HTMLInputElement).value })"
+        />
+      </label>
       <label class="rte-cp-type-row">
         <span class="rte-cp-type-label">图表类型</span>
         <select
           class="rte-cp-type-select"
           :value="panel.target?.chartType || ''"
+          title="换成另一种图"
           @change="onChangeChartType"
         >
           <option v-for="item in ECHARTS_CHART_TYPES" :key="item.value" :value="item.value">
@@ -209,7 +261,7 @@ function onChangeChartType(event: Event) {
           </option>
         </select>
       </label>
-      <button type="button" class="rte-cp-close" title="关闭面板" @click="props.host.hide()">
+      <button type="button" class="rte-cp-close" title="收起图表属性" @click="props.host.hide()">
         ×
       </button>
     </header>
@@ -230,8 +282,8 @@ function onChangeChartType(event: Event) {
     </div>
 
     <footer class="rte-cp-foot">
-      <button type="button" class="rte-cp-btn rte-cp-btn-danger" @click="onDelete">删除图表</button>
-      <button type="button" class="rte-cp-btn" @click="props.host.hide()">关闭</button>
+      <button type="button" class="rte-cp-btn rte-cp-btn-danger" title="删掉这张图和数据，删前会再确认" @click="onDelete">删除图表</button>
+      <button type="button" class="rte-cp-btn" title="收起图表属性面板" @click="props.host.hide()">关闭</button>
     </footer>
   </aside>
 </template>

@@ -110,10 +110,12 @@ function onRemoveRow(rowId: string) {
               type="button"
               class="ct-row-delete"
               title="删除本行"
+              aria-label="删除本行"
               :disabled="doc.rows.length <= 1"
               @click="onRemoveRow(row.id)"
             >
-              ×
+              <span class="ct-row-delete-mark" aria-hidden="true">×</span>
+              <span class="ct-row-delete-text">删除本行</span>
             </button>
           </div>
         </div>
@@ -157,7 +159,7 @@ function onRemoveRow(rowId: string) {
 .ct-col-headers {
   flex-shrink: 0;
   display: grid;
-  grid-template-columns: minmax(88px, 0.55fr) repeat(3, minmax(0, 1.15fr)) 36px;
+  grid-template-columns: minmax(88px, 0.55fr) repeat(3, minmax(0, 1.15fr)) 52px;
   background: transparent;
   border-bottom: 1px solid var(--cv-frame, #ececec);
 }
@@ -204,7 +206,7 @@ function onRemoveRow(rowId: string) {
 
 .ct-row {
   display: grid;
-  grid-template-columns: minmax(88px, 0.55fr) repeat(3, minmax(0, 1.15fr)) 36px;
+  grid-template-columns: minmax(88px, 0.55fr) repeat(3, minmax(0, 1.15fr)) 52px;
   min-height: 400px;
   border-bottom: 1px solid var(--cv-frame, #ececec);
 }
@@ -259,9 +261,47 @@ function onRemoveRow(rowId: string) {
 }
 
 .ct-cell :deep(.ym-block) {
-  flex: 1;
+  flex: 0 0 auto;
+  height: auto;
   min-height: 0;
   background: rgba(248, 249, 250, 0.55);
+}
+
+.ct-cell :deep(.ym-block-body),
+.ct-cell :deep(.rte-root),
+.ct-cell :deep(.rte-workspace),
+.ct-cell :deep(.rte-canvas),
+.ct-cell :deep(.rte-body),
+.ct-cell :deep(.ProseMirror) {
+  height: auto;
+  max-height: none;
+  max-width: 100%;
+  min-width: 0;
+  overflow: visible;
+  flex: 0 0 auto;
+}
+
+.ct-cell :deep(.rte-workspace),
+.ct-cell :deep(.rte-canvas),
+.ct-cell :deep(.ProseMirror) {
+  width: 100%;
+}
+
+.ct-cell :deep(.ProseMirror) {
+  min-height: 96px;
+  font-size: 16px;
+  line-height: 1.65;
+}
+
+.ct-cell :deep(.ProseMirror p) {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.ct-cell :deep(.pm-max-btn) {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
 }
 
 .ct-row-actions {
@@ -272,16 +312,23 @@ function onRemoveRow(rowId: string) {
 }
 
 .ct-row-delete {
-  width: 22px;
-  height: 22px;
-  border: none;
-  border-radius: 4px;
-  background: transparent;
-  color: #9aa0a6;
-  font-size: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid #e4e6e8;
+  border-radius: 8px;
+  background: #fff;
+  color: #5f6368;
+  font-size: 22px;
   line-height: 1;
   cursor: pointer;
   padding: 0;
+}
+
+.ct-row-delete-text {
+  display: none;
 }
 
 .ct-row-delete:hover:not(:disabled) {
@@ -305,12 +352,13 @@ function onRemoveRow(rowId: string) {
 
 .ct-add-btn {
   border: 1px solid #e4e6e8;
-  border-radius: 6px;
+  border-radius: 8px;
   background: #fff;
-  color: #5f6368;
-  font-size: 13px;
-  font-weight: 600;
-  padding: 6px 16px;
+  color: #3c4043;
+  font-size: 15px;
+  font-weight: 650;
+  min-height: 40px;
+  padding: 8px 18px;
   cursor: pointer;
   transition:
     background 0.12s ease,
@@ -327,6 +375,7 @@ function onRemoveRow(rowId: string) {
 @media (max-width: 720px) {
   .ct-canvas {
     overflow-y: auto;
+    padding-bottom: 96px;
   }
 
   .ct-col-headers,
@@ -334,9 +383,34 @@ function onRemoveRow(rowId: string) {
     grid-template-columns: 1fr;
   }
 
-  .ct-col-header--actions,
-  .ct-row-actions {
+  .ct-col-header--actions {
     display: none;
+  }
+
+  .ct-row-actions {
+    display: flex;
+    justify-content: flex-end;
+    padding: 8px 12px 14px;
+  }
+
+  .ct-row-delete {
+    width: auto;
+    height: 40px;
+    gap: 6px;
+    padding: 0 14px;
+    border-color: #f3c1bc;
+    background: #fff;
+    color: #c5221f;
+    font-size: 15px;
+    font-weight: 650;
+  }
+
+  .ct-row-delete-mark {
+    font-size: 20px;
+  }
+
+  .ct-row-delete-text {
+    display: inline;
   }
 
   .ct-priority,
@@ -354,11 +428,8 @@ function onRemoveRow(rowId: string) {
   }
 
   .ct-cell {
-    min-height: 400px;
-  }
-
-  .ct-cell :deep(.ym-block) {
-    min-height: 0;
+    min-height: 180px;
+    height: auto;
   }
 }
 </style>

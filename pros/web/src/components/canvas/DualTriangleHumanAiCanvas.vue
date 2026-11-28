@@ -190,8 +190,8 @@ const aiRail = computed(() =>
   margin: 0;
   padding: 14px 4px 4px;
   color: #3c4043;
-  font-size: 13px;
-  line-height: 1.7;
+  font-size: 15px;
+  line-height: 1.65;
 }
 
 .hai-footer-lead {
@@ -228,8 +228,39 @@ const aiRail = computed(() =>
   }
 
   .hai-footer {
-    font-size: 12px;
-    padding-top: 10px;
+    font-size: 15px;
+    padding-top: 12px;
+  }
+}
+
+@media (max-width: 720px) {
+  .hai-canvas {
+    padding: 12px 12px 16px;
+  }
+
+  .hai-table {
+    grid-template-columns: 1fr;
+    grid-template-rows: none;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .hai-rail {
+    min-height: 48px;
+    justify-content: flex-start;
+    padding: 10px 14px;
+  }
+
+  .hai-rail-label {
+    writing-mode: horizontal-tb;
+    text-orientation: mixed;
+    font-size: 16px;
+    letter-spacing: 0.06em;
+    line-height: 1.3;
+  }
+
+  .hai-cell {
+    min-height: 240px;
   }
 }
 </style>

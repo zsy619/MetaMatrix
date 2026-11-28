@@ -1,3 +1,4 @@
+import type { Editor } from '@tiptap/core'
 import type { Node as PMNode } from '@tiptap/pm/model'
 import { previousOrderedContinuation, type ListSibling } from './rtePracticalToolbar'
 
@@ -28,18 +29,38 @@ export function orderedListContinuation(
   const index = $pos.index(listDepth - 1)
   const before: ListSibling[] = []
   for (let i = 0; i < index; i += 1) {
-    const child = parent.child(i)
-    if (child.type.name === 'orderedList') {
-      before.push({
-        type: 'orderedList',
-        start: Number(child.attrs.start) || 1,
-        items: listItemCount(child),
-      })
-    } else {
-      before.push({ type: 'other' })
-    }
+    before.push(siblingKind(parent.child(i)))
   }
   const next = previousOrderedContinuation(before)
   if (next == null) return null
   return { listPos: $pos.before(listDepth), next }
+}
+
+function siblingKind(node: PMNode): ListSibling {
+  if (node.type.name === 'orderedList') {
+    return {
+      type: 'orderedList',
+      start: Number(node.attrs.start) || 1,
+      items: listItemCount(node),
+    }
+  }
+  if (node.type.name === 'paragraph' && !node.textContent.trim()) return { type: 'gap' }
+  return { type: 'other' }
+}
+
+/** 有序列表改成无序列表，或反过来，文字留在原处。 */
+export function retargetList(editor: Editor, to: 'bulletList' | 'orderedList'): boolean {
+  const { state } = editor
+  const $from = state.selection.$from
+  for (let depth = $from.depth; depth > 0; depth -= 1) {
+    const node = $from.node(depth)
+    if (node.type.name !== 'orderedList' && node.type.name !== 'bulletList') continue
+    if (node.type.name === to) return true
+    const type = state.schema.nodes[to]
+    if (!type) return false
+    const pos = $from.before(depth)
+    editor.view.dispatch(state.tr.setNodeMarkup(pos, type, to === 'orderedList' ? { start: 1 } : {}))
+    return true
+  }
+  return false
 }

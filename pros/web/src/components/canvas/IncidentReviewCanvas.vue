@@ -144,10 +144,12 @@ function onRemoveRow(rowId: string) {
                 type="button"
                 class="ir-row-delete"
                 title="删除本行"
+                aria-label="删除本行"
                 :disabled="doc.timelineRows.length <= 1"
                 @click="onRemoveRow(row.id)"
               >
-                ×
+                <span class="ir-row-delete-mark" aria-hidden="true">×</span>
+                <span class="ir-row-delete-text">删除本行</span>
               </button>
             </div>
           </div>
@@ -320,8 +322,8 @@ function onRemoveRow(rowId: string) {
 
 .ir-hint {
   margin: 0 14px 10px;
-  font-size: 13px;
-  line-height: 1.55;
+  font-size: 15px;
+  line-height: 1.6;
   color: var(--tbl-topic, #80868b);
   white-space: pre-wrap;
 }
@@ -369,18 +371,58 @@ function onRemoveRow(rowId: string) {
 }
 
 .ir-panel :deep(.ym-block) {
-  flex: 1;
-  min-height: 0;
+  flex: 1 0 auto;
+  height: auto;
+  min-height: 100%;
+  width: 100%;
   background: transparent;
   border: none;
   box-shadow: none;
 }
 
+.ir-panel :deep(.ym-block-body),
+.ir-panel :deep(.rte-root),
+.ir-panel :deep(.rte-workspace),
+.ir-panel :deep(.rte-canvas),
+.ir-panel :deep(.rte-body),
+.ir-panel :deep(.ProseMirror) {
+  height: auto;
+  max-height: none;
+  max-width: 100%;
+  min-width: 0;
+  overflow: visible;
+  flex: 1 0 auto;
+}
+
+.ir-panel :deep(.rte-workspace),
+.ir-panel :deep(.rte-canvas),
+.ir-panel :deep(.ProseMirror) {
+  width: 100%;
+}
+
+.ir-panel :deep(.rte-root .ProseMirror),
+.ir-panel :deep(.rte-root.compact .ProseMirror) {
+  min-height: 320px;
+  font-size: 16px;
+  line-height: 1.7;
+}
+
+.ir-panel :deep(.ProseMirror p) {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.ir-panel :deep(.pm-max-btn) {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+}
+
 .ir-tip {
   margin: 0 14px 12px;
   padding: 10px 12px;
-  font-size: 12.5px;
-  line-height: 1.55;
+  font-size: 15px;
+  line-height: 1.6;
   color: #5f6368;
   border-radius: 4px;
   border: 1px solid transparent;
@@ -399,7 +441,7 @@ function onRemoveRow(rowId: string) {
 .ir-impact-guide {
   margin: 0 14px 12px;
   padding-left: 20px;
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1.7;
   color: #3c4043;
 }
@@ -422,7 +464,7 @@ function onRemoveRow(rowId: string) {
 
 .ir-tl-head {
   display: grid;
-  grid-template-columns: 180px minmax(0, 1fr) 40px;
+  grid-template-columns: 180px minmax(0, 1fr) 52px;
   background: transparent;
   border-bottom: 1px solid var(--cv-frame, #ececec);
 }
@@ -443,9 +485,11 @@ function onRemoveRow(rowId: string) {
 
 .ir-tl-row {
   display: grid;
-  grid-template-columns: 180px minmax(0, 1fr) 40px;
+  grid-template-columns: 180px minmax(0, 1fr) 52px;
+  grid-auto-rows: max-content;
   border-bottom: 1px solid #e8eaed;
   min-height: 400px;
+  height: auto;
 }
 
 .ir-tl-row:last-child {
@@ -472,11 +516,51 @@ function onRemoveRow(rowId: string) {
 }
 
 .ir-tl-cell--behavior :deep(.ym-block) {
-  flex: 1;
-  min-height: 0;
+  flex: 1 0 auto;
+  height: auto;
+  min-height: 100%;
+  width: 100%;
   background: transparent;
   border: none;
   box-shadow: none;
+}
+
+.ir-tl-cell--behavior :deep(.ym-block-body),
+.ir-tl-cell--behavior :deep(.rte-root),
+.ir-tl-cell--behavior :deep(.rte-workspace),
+.ir-tl-cell--behavior :deep(.rte-canvas),
+.ir-tl-cell--behavior :deep(.rte-body),
+.ir-tl-cell--behavior :deep(.ProseMirror) {
+  height: auto;
+  max-height: none;
+  max-width: 100%;
+  min-width: 0;
+  overflow: visible;
+  flex: 1 0 auto;
+}
+
+.ir-tl-cell--behavior :deep(.rte-workspace),
+.ir-tl-cell--behavior :deep(.rte-canvas),
+.ir-tl-cell--behavior :deep(.ProseMirror) {
+  width: 100%;
+}
+
+.ir-tl-cell--behavior :deep(.rte-root .ProseMirror),
+.ir-tl-cell--behavior :deep(.rte-root.compact .ProseMirror) {
+  min-height: 320px;
+  font-size: 16px;
+  line-height: 1.65;
+}
+
+.ir-tl-cell--behavior :deep(.ProseMirror p) {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.ir-tl-cell--behavior :deep(.pm-max-btn) {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
 }
 
 .ir-tl-cell--actions {
@@ -491,7 +575,8 @@ function onRemoveRow(rowId: string) {
   border: 1px solid transparent;
   border-radius: 4px;
   padding: 6px 8px;
-  font-size: 13px;
+  min-height: 40px;
+  font-size: 15px;
   font-family: inherit;
   color: #202124;
   background: transparent;
@@ -509,15 +594,23 @@ function onRemoveRow(rowId: string) {
 }
 
 .ir-row-delete {
-  width: 28px;
-  height: 28px;
-  border: none;
-  border-radius: 4px;
-  background: transparent;
-  color: #9aa0a6;
-  font-size: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid #e4e6e8;
+  border-radius: 8px;
+  background: #fff;
+  color: #5f6368;
+  font-size: 22px;
   line-height: 1;
   cursor: pointer;
+  padding: 0;
+}
+
+.ir-row-delete-text {
+  display: none;
 }
 
 .ir-row-delete:hover:not(:disabled) {
@@ -536,12 +629,13 @@ function onRemoveRow(rowId: string) {
 
 .ir-add-btn {
   border: 1px solid #e4e6e8;
-  border-radius: 4px;
-  background: #fafafa;
+  border-radius: 8px;
+  background: #fff;
   color: var(--cv-focus, #1c4c7c);
-  font-size: 13px;
-  font-weight: 600;
-  padding: 8px 14px;
+  font-size: 15px;
+  font-weight: 650;
+  min-height: 40px;
+  padding: 8px 18px;
   cursor: pointer;
   font-family: inherit;
 }
@@ -549,5 +643,73 @@ function onRemoveRow(rowId: string) {
 .ir-add-btn:hover {
   background: var(--cv-hover-wash, #e8f1fa);
   border-color: var(--cv-focus, #1c4c7c);
+}
+
+@media (max-width: 720px) {
+  .ir-scroll {
+    padding: 16px 12px 96px;
+  }
+
+  .ir-panel,
+  .ir-panel--sub {
+    min-height: 180px;
+    height: auto;
+  }
+
+  .ir-panel :deep(.rte-root .ProseMirror),
+  .ir-panel :deep(.rte-root.compact .ProseMirror),
+  .ir-tl-cell--behavior :deep(.rte-root .ProseMirror),
+  .ir-tl-cell--behavior :deep(.rte-root.compact .ProseMirror) {
+    min-height: 96px;
+  }
+
+  .ir-tl-head,
+  .ir-tl-row {
+    grid-template-columns: 1fr;
+  }
+
+  .ir-tl-col--actions {
+    display: none;
+  }
+
+  .ir-tl-row {
+    min-height: 0;
+  }
+
+  .ir-tl-cell--time {
+    border-right: none;
+    border-bottom: 1px solid #e8eaed;
+  }
+
+  .ir-tl-cell--behavior {
+    min-height: 180px;
+    height: auto;
+  }
+
+  .ir-tl-cell--actions {
+    justify-content: flex-end;
+    padding: 8px 12px 12px;
+    border-left: none;
+  }
+
+  .ir-row-delete {
+    width: auto;
+    height: 40px;
+    gap: 6px;
+    padding: 0 14px;
+    border-color: #f3c1bc;
+    background: #fff;
+    color: #c5221f;
+    font-size: 15px;
+    font-weight: 650;
+  }
+
+  .ir-row-delete-mark {
+    font-size: 20px;
+  }
+
+  .ir-row-delete-text {
+    display: inline;
+  }
 }
 </style>

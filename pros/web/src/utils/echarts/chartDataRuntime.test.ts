@@ -65,13 +65,22 @@ describe('图表数据接口运行时', () => {
     clearChartSecret('chart-2')
   })
 
-  it('读取本系统登录态：复用系统 token', () => {
+  it('读取本系统登录态：同源接口复用系统 token', () => {
+    const config = createEmptyDataSourceConfig()
+    config.enabled = true
+    config.url = '/api/charts/data'
+    config.auth = 'session'
+    const request = resolveChartDataRequest(config, 'chart-3', 'system-token')
+    expect(request.headers.Authorization).toBe('Bearer system-token')
+  })
+
+  it('读取本系统登录态：外部地址不发送系统 token', () => {
     const config = createEmptyDataSourceConfig()
     config.enabled = true
     config.url = 'https://example.com/api/data'
     config.auth = 'session'
-    const request = resolveChartDataRequest(config, 'chart-3', 'system-token')
-    expect(request.headers.Authorization).toBe('Bearer system-token')
+    const request = resolveChartDataRequest(config, 'chart-3b', 'system-token')
+    expect(request.headers.Authorization).toBeUndefined()
   })
 
   it('响应映射：类目 + 数值写进 xAxis / series', async () => {
@@ -200,5 +209,200 @@ describe('图表数据接口运行时', () => {
     await poller.refresh()
     expect(errors.some((item) => item.includes('网络异常'))).toBe(true)
     poller.stop()
+  })
+
+  it('停止会中止在途请求，忽略 AbortSignal 的迟到结果也不会更新或报错', async () => {
+    const config = createEmptyDataSourceConfig()
+    config.enabled = true
+    config.url = 'https://example.com/api/data'
+    config.refreshInterval = 0
+    let resolveFetch!: (response: Response) => void
+    const fetchImpl = vi.fn((_url: RequestInfo | URL, _init?: RequestInit) =>
+      new Promise<Response>(resolve => {
+        resolveFetch = resolve
+      }),
+    )
+    const onOption = vi.fn()
+    const onError = vi.fn()
+    const poller = startChartDataPolling({
+      option: () => ({}),
+      config,
+      chartId: 'chart-stop-pending',
+      onOption,
+      onError,
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    })
+    const signal = fetchImpl.mock.calls[0]?.[1]?.signal
+    expect(signal?.aborted).toBe(false)
+
+    poller.stop()
+    expect(signal?.aborted).toBe(true)
+    // 自定义 fetch 故意无视 signal 并迟到返回，验证请求代次与停止状态仍能守住结果。
+    resolveFetch(jsonResponse([{ name: '迟到', value: 99 }]))
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(onOption).not.toHaveBeenCalled()
+    expect(onError).not.toHaveBeenCalled()
+  })
+
+  it('请求超时会进入 onError，并在本轮结束后继续后续调度', async () => {
+    vi.useFakeTimers()
+    const config = createEmptyDataSourceConfig()
+    config.enabled = true
+    config.url = 'https://example.com/api/data'
+    config.refreshInterval = 5
+    // 第一轮永久 pending 且故意忽略中止；第二轮正常返回，用于证明调度没有被卡死。
+    const fetchImpl = vi.fn()
+      .mockImplementationOnce(() => new Promise<Response>(() => undefined))
+      .mockImplementationOnce(async () => jsonResponse([{ name: '恢复', value: 2 }]))
+    const errors: string[] = []
+    const onOption = vi.fn()
+    const poller = startChartDataPolling({
+      option: () => ({}),
+      config,
+      chartId: 'chart-timeout-continue',
+      onOption,
+      onError: message => errors.push(message),
+      requestTimeoutMs: 1_000,
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    })
+    await vi.advanceTimersByTimeAsync(0)
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
+
+    await vi.advanceTimersByTimeAsync(1_000)
+    expect(errors.some(message => message.includes('超时'))).toBe(true)
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(4_999)
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(fetchImpl).toHaveBeenCalledTimes(2)
+    expect(onOption).toHaveBeenCalledTimes(1)
+    poller.stop()
+  })
+
+  it('页面隐藏时暂停定时刷新，恢复可见时立即刷新一次', async () => {
+    vi.useFakeTimers()
+    const config = createEmptyDataSourceConfig()
+    config.enabled = true
+    config.url = 'https://example.com/api/data'
+    config.refreshInterval = 5
+    let hidden = false
+    let visibilityListener: (() => void) | undefined
+    const visibility = {
+      isHidden: () => hidden,
+      subscribe: (listener: () => void) => {
+        visibilityListener = listener
+        return () => {
+          visibilityListener = undefined
+        }
+      },
+    }
+    const fetchImpl = vi.fn(async () => jsonResponse([{ name: '可见', value: 1 }]))
+    const poller = startChartDataPolling({
+      option: () => ({}),
+      config,
+      chartId: 'chart-visibility',
+      onOption: () => {},
+      visibility,
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    })
+    await vi.advanceTimersByTimeAsync(0)
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
+
+    hidden = true
+    visibilityListener?.()
+    await vi.advanceTimersByTimeAsync(20_000)
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
+
+    hidden = false
+    visibilityListener?.()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(fetchImpl).toHaveBeenCalledTimes(2)
+    poller.stop()
+    expect(visibilityListener).toBeUndefined()
+  })
+
+  it('页面隐藏也会中止在途请求，恢复后新结果生效而旧结果无效', async () => {
+    const config = createEmptyDataSourceConfig()
+    config.enabled = true
+    config.url = 'https://example.com/api/data'
+    config.refreshInterval = 0
+    let hidden = false
+    let visibilityListener: (() => void) | undefined
+    let resolveFirst!: (response: Response) => void
+    const fetchImpl = vi.fn()
+      .mockImplementationOnce(() => new Promise<Response>(resolve => {
+        resolveFirst = resolve
+      }))
+      .mockImplementationOnce(async () => jsonResponse([{ name: '新结果', value: 2 }]))
+    const seen: Array<Record<string, unknown>> = []
+    const poller = startChartDataPolling({
+      option: () => ({}),
+      config,
+      chartId: 'chart-hide-pending',
+      onOption: option => seen.push(option),
+      visibility: {
+        isHidden: () => hidden,
+        subscribe: listener => {
+          visibilityListener = listener
+          return () => undefined
+        },
+      },
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+    })
+    hidden = true
+    visibilityListener?.()
+    hidden = false
+    visibilityListener?.()
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(fetchImpl).toHaveBeenCalledTimes(2)
+    // 等待第二次响应依次完成 text 读取、race 与 option 合并，而不是只等到 fetch 被调用。
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(seen).toHaveLength(1)
+
+    resolveFirst(jsonResponse([{ name: '旧结果', value: 1 }]))
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(seen).toHaveLength(1)
+    poller.stop()
+  })
+
+  it('响应体超过字节上限时明确拒绝，不尝试解析截断内容', async () => {
+    const config = createEmptyDataSourceConfig()
+    config.url = 'https://example.com/api/data'
+    const request = resolveChartDataRequest(config, 'chart-too-large', null)
+    const text = vi.fn(async () => JSON.stringify({ data: 'x'.repeat(100) }))
+    const fetchImpl = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      text,
+    }) as unknown as Response)
+    await expect(
+      fetchChartData(request, fetchImpl as unknown as typeof fetch, {
+        timeoutMs: 0,
+        maxResponseBytes: 32,
+      }),
+    ).rejects.toThrow('大小上限')
+    expect(text).toHaveBeenCalledTimes(1)
+  })
+
+  it('Content-Length 已超限时在读取响应体前拒绝', async () => {
+    const config = createEmptyDataSourceConfig()
+    config.url = 'https://example.com/api/data'
+    const request = resolveChartDataRequest(config, 'chart-content-length', null)
+    const text = vi.fn(async () => '{}')
+    const fetchImpl = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      headers: { get: (name: string) => name.toLowerCase() === 'content-length' ? '100' : null },
+      text,
+    }) as unknown as Response)
+    await expect(
+      fetchChartData(request, fetchImpl as unknown as typeof fetch, {
+        timeoutMs: 0,
+        maxResponseBytes: 32,
+      }),
+    ).rejects.toThrow('大小上限')
+    expect(text).not.toHaveBeenCalled()
   })
 })

@@ -117,13 +117,16 @@ const SECTIONS: {
 }
 
 .as-hint {
-  margin: 12px 16px;
-  padding-left: 12px;
-  border-left: 2px solid var(--tbl-topic, #dadce0);
-  font-size: 13px;
-  font-style: italic;
-  line-height: 1.55;
-  color: var(--tbl-topic, #5f6368);
+  margin: 14px 16px 10px;
+  padding: 8px 12px;
+  border-left: 3px solid var(--tbl-topic, #0e8a84);
+  border-radius: 0 8px 8px 0;
+  background: rgba(255, 255, 255, 0.72);
+  font-size: 15px;
+  font-style: normal;
+  font-weight: 550;
+  line-height: 1.6;
+  color: #202124;
 }
 
 .as-panel {
@@ -139,10 +142,58 @@ const SECTIONS: {
 }
 
 .as-panel :deep(.ym-block) {
-  flex: 1;
+  flex: 0 0 auto;
+  height: auto;
   min-height: 0;
   background: transparent;
   border: none;
   box-shadow: none;
+}
+
+.as-panel :deep(.ym-block-body),
+.as-panel :deep(.rte-root),
+.as-panel :deep(.rte-workspace),
+.as-panel :deep(.rte-canvas),
+.as-panel :deep(.rte-body),
+.as-panel :deep(.ProseMirror) {
+  height: auto;
+  max-height: none;
+  max-width: 100%;
+  min-width: 0;
+  overflow: visible;
+  flex: 0 0 auto;
+}
+
+.as-panel :deep(.rte-workspace),
+.as-panel :deep(.rte-canvas),
+.as-panel :deep(.ProseMirror) {
+  width: 100%;
+}
+
+.as-panel :deep(.ProseMirror) {
+  min-height: 160px;
+  font-size: 16px;
+  line-height: 1.7;
+}
+
+.as-panel :deep(.ProseMirror p) {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.as-panel :deep(.pm-max-btn) {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+}
+
+@media (max-width: 720px) {
+  .as-scroll {
+    padding: 20px 14px 96px;
+  }
+
+  .as-panel {
+    min-height: 240px;
+  }
 }
 </style>

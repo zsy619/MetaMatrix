@@ -14,15 +14,19 @@ export function normalizeHtml(html: string): string {
 }
 
 /** 中文按字、英文按词。 */
-export function countWords(raw: string): number {
+export function countWordParts(raw: string): { cn: number; en: number; total: number } {
   const text = raw.trim()
-  if (!text) return 0
+  if (!text) return { cn: 0, en: 0, total: 0 }
   const cn = (text.match(/[\u4e00-\u9fff]/g) || []).length
   const en = text
     .replace(/[\u4e00-\u9fff]/g, ' ')
     .split(/\s+/)
     .filter(Boolean).length
-  return cn + en
+  return { cn, en, total: cn + en }
+}
+
+export function countWords(raw: string): number {
+  return countWordParts(raw).total
 }
 
 export function rtePlaceholderText(

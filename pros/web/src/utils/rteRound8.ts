@@ -90,6 +90,7 @@ export function resetDialogReturnFocusForTests(): void {
 export const RTE_OVERLAY_CLOSE_ORDER = [
   'ask',
   'linkImport',
+  'markdownImport',
   'image',
   'video',
   'audio',

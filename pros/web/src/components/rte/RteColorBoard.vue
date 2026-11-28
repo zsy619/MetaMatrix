@@ -96,7 +96,6 @@ function applyCustom() {
             'is-light': rte.isLightHighlight(color),
           }"
           :style="{ background: color }"
-          :title="kind === 'text' ? rte.textColorLabel(color) : rte.highlightColorLabel(color)"
           :aria-label="kind === 'text' ? rte.textColorLabel(color) : rte.highlightColorLabel(color)"
           @mouseenter="showHint(kind === 'text' ? rte.textColorLabel(color) : rte.highlightColorLabel(color))"
           @mouseleave="showHint('')"
@@ -120,7 +119,6 @@ function applyCustom() {
             'is-light': rte.isLightHighlight(color),
           }"
           :style="{ background: color }"
-          :title="themeColorLabel(Number(index))"
           :aria-label="themeColorLabel(Number(index))"
           @mouseenter="showHint(themeColorLabel(Number(index)))"
           @mouseleave="showHint('')"
@@ -141,7 +139,6 @@ function applyCustom() {
             'is-light': rte.isLightHighlight(item.color),
           }"
           :style="{ background: item.color }"
-          :title="item.label"
           :aria-label="item.label"
           @mouseenter="showHint(item.label)"
           @mouseleave="showHint('')"
@@ -165,7 +162,6 @@ function applyCustom() {
             'is-light': true,
           }"
           :style="{ background: item.color }"
-          :title="item.label"
           :aria-label="item.label"
           @mouseenter="showHint(item.label)"
           @mouseleave="showHint('')"
@@ -186,7 +182,6 @@ function applyCustom() {
             'is-light': rte.isLightHighlight(item.color),
           }"
           :style="{ background: item.color }"
-          :title="item.label"
           :aria-label="item.label"
           @mouseenter="showHint(item.label)"
           @mouseleave="showHint('')"
@@ -196,7 +191,7 @@ function applyCustom() {
     </template>
 
     <div data-rte-own class="rte-color-hint">{{ hint || '悬停色块可看名称' }}</div>
-    <button data-rte-own type="button" class="rte-color-action" :aria-expanded="customOpen" @click.stop="customOpen = !customOpen">
+    <button data-rte-own type="button" class="rte-color-action" :aria-label="kind === 'text' ? '自己选一个文字颜色' : '自己选一个底色'" :aria-expanded="customOpen" @click.stop="customOpen = !customOpen">
       其他颜色…
     </button>
     <div v-if="customOpen" data-rte-own class="rte-custom-color" @mousedown.stop @click.stop>
@@ -218,7 +213,7 @@ function applyCustom() {
         :aria-label="kind === 'text' ? '文字颜色十六进制' : '高亮颜色十六进制'"
         @keydown.enter.prevent="applyCustom"
       />
-      <button data-rte-own type="button" class="rte-custom-color-ok" @click="applyCustom">确定</button>
+      <button data-rte-own type="button" class="rte-custom-color-ok" aria-label="使用上面填的颜色" @click="applyCustom">确定</button>
     </div>
   </div>
 </template>

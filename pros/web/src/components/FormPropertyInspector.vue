@@ -396,16 +396,16 @@ const showIfNeedsValue = computed(
       <button
         type="button"
         class="fpi-close"
-        title="关闭"
-        aria-label="关闭属性面板"
+        title="收起后，还停在这个字段上时不再自动打开"
+        aria-label="收起表单属性"
         @click="emit('close')"
       >
         ×
       </button>
     </header>
     <div class="fpi-actions">
-      <button type="button" class="fpi-action" @click="emit('duplicate')">复制字段</button>
-      <button type="button" class="fpi-action" @click="emit('check')">检查填写</button>
+      <button type="button" class="fpi-action" title="在这个字段下面再复制一份" @click="emit('duplicate')">复制字段</button>
+      <button type="button" class="fpi-action" title="标出还没填好的必填项，并跳到第一处" @click="emit('check')">检查填写</button>
     </div>
 
     <div class="fpi-body">
@@ -418,6 +418,7 @@ const showIfNeedsValue = computed(
             class="fpi-input"
             type="text"
             maxlength="80"
+            title="填写人看到的名称，最多 80 字"
             placeholder="显示名称"
             @input="onLabelInput"
           />
@@ -430,6 +431,7 @@ const showIfNeedsValue = computed(
             class="fpi-input"
             type="text"
             maxlength="80"
+            title="提交时用的名字，例如 title，最多 80 字"
             placeholder="字段 key，如 title"
             spellcheck="false"
             @input="onNameInput"
@@ -443,6 +445,7 @@ const showIfNeedsValue = computed(
             class="fpi-input"
             type="text"
             maxlength="120"
+            title="生成代码时的绑定路径，例如 form.title"
             placeholder="如 form.xxx / values.xxx"
             spellcheck="false"
             @input="onBindExprInput"
@@ -459,6 +462,7 @@ const showIfNeedsValue = computed(
             v-model="requiredDraft"
             class="fpi-check"
             type="checkbox"
+            title="勾上后，没填会在检查里标出来"
             @change="onRequiredChange"
           />
           <span class="fpi-hint">{{ requiredDraft ? '是' : '否' }}</span>
@@ -470,6 +474,7 @@ const showIfNeedsValue = computed(
             v-model="readonlyDraft"
             class="fpi-check"
             type="checkbox"
+            title="能看能复制，不能改"
             @change="onReadonlyChange"
           />
           <span class="fpi-hint">{{ readonlyDraft ? '是' : '否' }}</span>
@@ -481,6 +486,7 @@ const showIfNeedsValue = computed(
             v-model="disabledDraft"
             class="fpi-check"
             type="checkbox"
+            title="不能操作，通常也不提交"
             @change="onDisabledChange"
           />
           <span class="fpi-hint">{{ disabledDraft ? '是' : '否' }}</span>
@@ -497,6 +503,7 @@ const showIfNeedsValue = computed(
             class="fpi-input"
             type="text"
             maxlength="200"
+            title="显示在标签下方，最多 200 字"
             placeholder="显示在标签下方的说明"
             @input="onHelpTextInput"
           />
@@ -509,6 +516,7 @@ const showIfNeedsValue = computed(
             class="fpi-input"
             type="text"
             maxlength="120"
+            title="还没填写时框里的浅色字，最多 120 字"
             placeholder="未填写时的提示文字"
             @input="onPlaceholderInput"
           />
@@ -526,6 +534,7 @@ const showIfNeedsValue = computed(
             type="number"
             min="0"
             step="1"
+            title="至少要填这么多个字，留空不限制"
             placeholder="可选"
             @input="onMinLengthInput"
           />
@@ -539,6 +548,7 @@ const showIfNeedsValue = computed(
             type="number"
             min="0"
             step="1"
+            title="最多能填这么多个字，留空不限制"
             placeholder="可选"
             @input="onMaxLengthInput"
           />
@@ -551,6 +561,7 @@ const showIfNeedsValue = computed(
             class="fpi-input"
             type="text"
             maxlength="200"
+            title="整串匹配。留空不校验"
             placeholder="如 ^1\\d{10}$"
             spellcheck="false"
             @input="onPatternInput"
@@ -567,6 +578,7 @@ const showIfNeedsValue = computed(
             min="1"
             max="40"
             step="1"
+            title="多行框可见高度，1 到 40 行，默认 4"
             placeholder="4"
             @change="onRowsInput"
             @blur="onRowsInput"
@@ -579,6 +591,7 @@ const showIfNeedsValue = computed(
           <select
             class="fpi-input"
             :value="attrs.kind === 'datetime' ? 'datetime' : 'date'"
+            title="只选日期，或连时间一起选"
             @change="onKindChange"
           >
             <option value="date">日期</option>
@@ -594,6 +607,7 @@ const showIfNeedsValue = computed(
             type="text"
             list="fpi-date-format-presets"
             maxlength="40"
+            title="可下拉选预设，也可手写。日期默认 YYYY-MM-DD"
             placeholder="如 YYYY-MM-DD"
             spellcheck="false"
             @change="onDateFormatInput"
@@ -611,6 +625,7 @@ const showIfNeedsValue = computed(
             v-model="minDraft"
             class="fpi-input"
             type="number"
+            title="允许的最小数字，留空不限制"
             placeholder="可选"
             @input="onMinInput"
           />
@@ -622,6 +637,7 @@ const showIfNeedsValue = computed(
             v-model="maxDraft"
             class="fpi-input"
             type="number"
+            title="允许的最大数字，留空不限制"
             placeholder="可选"
             @input="onMaxInput"
           />
@@ -634,6 +650,7 @@ const showIfNeedsValue = computed(
             class="fpi-input"
             type="number"
             step="any"
+            title="点加减时每次变化多少，默认 1"
             placeholder="1"
             @input="onStepInput"
           />
@@ -644,6 +661,7 @@ const showIfNeedsValue = computed(
           <select
             class="fpi-input"
             :value="layoutDraft"
+            title="选项排成一行、一列，或一行多列"
             @change="onLayoutChange"
           >
             <option value="row">只有一行</option>
@@ -660,6 +678,7 @@ const showIfNeedsValue = computed(
             min="1"
             max="12"
             step="1"
+            title="一行排几列，1 到 12，默认 2"
             :value="layoutColumnsDraft"
             @change="onLayoutColumnsInput"
             @blur="onLayoutColumnsInput"
@@ -673,7 +692,7 @@ const showIfNeedsValue = computed(
         <div class="fpi-field">
           <div class="fpi-label-row">
             <span class="fpi-label">选项列表</span>
-            <button type="button" class="fpi-link" @click="addOption">+ 添加</button>
+            <button type="button" class="fpi-link" title="在列表末尾再加一项" @click="addOption">+ 添加</button>
           </div>
           <div class="fpi-options">
             <div
@@ -686,13 +705,14 @@ const showIfNeedsValue = computed(
                 type="text"
                 :value="opt"
                 :placeholder="`选项 ${idx + 1}`"
+                title="这一项显示的文字，最多 80 字。空项保存时会去掉"
                 maxlength="80"
                 @input="onOptionInput(idx, $event)"
               />
               <button
                 type="button"
                 class="fpi-icon-btn is-move"
-                title="上移选项"
+                title="这一项往前排"
                 :disabled="idx === 0"
                 @click="moveOption(idx, -1)"
               >
@@ -701,7 +721,7 @@ const showIfNeedsValue = computed(
               <button
                 type="button"
                 class="fpi-icon-btn is-move"
-                title="下移选项"
+                title="这一项往后排"
                 :disabled="idx === optionDrafts.length - 1"
                 @click="moveOption(idx, 1)"
               >
@@ -710,7 +730,7 @@ const showIfNeedsValue = computed(
               <button
                 type="button"
                 class="fpi-icon-btn"
-                title="删除选项"
+                title="删掉这一项"
                 @click="removeOption(idx)"
               >
                 −
@@ -729,6 +749,7 @@ const showIfNeedsValue = computed(
             v-model="switchDefault"
             class="fpi-check"
             type="checkbox"
+            title="打开表单时，开关默认是开还是关"
             @change="onSwitchDefaultChange"
           />
           <span class="fpi-hint">{{ switchDefault ? '开' : '关' }}</span>
@@ -745,6 +766,7 @@ const showIfNeedsValue = computed(
               <input
                 type="checkbox"
                 :checked="checkboxDefaults.includes(opt)"
+                :title="'打开表单时默认勾上「' + opt + '」'"
                 @change="
                   onCheckboxDefaultToggle(
                     opt,
@@ -765,6 +787,7 @@ const showIfNeedsValue = computed(
           <select
             v-model="defaultDraft"
             class="fpi-input"
+            title="打开表单时先选中这一项"
             @change="onSelectDefaultChange"
           >
             <option value="">（无）</option>
@@ -784,6 +807,7 @@ const showIfNeedsValue = computed(
             v-model="defaultDraft"
             class="fpi-input"
             :type="attrs.kind === 'datetime' ? 'datetime-local' : 'date'"
+            title="打开表单时先填上这个日期"
             @change="onDefaultInput"
           />
         </label>
@@ -794,6 +818,7 @@ const showIfNeedsValue = computed(
             v-model="defaultDraft"
             class="fpi-input"
             :type="type === 'formNumberInput' ? 'number' : 'text'"
+            title="打开表单时先填上这段"
             placeholder="初始内容"
             @input="onDefaultInput"
           />
@@ -808,6 +833,7 @@ const showIfNeedsValue = computed(
             v-model="showIfEnabled"
             class="fpi-check"
             type="checkbox"
+            title="勾上后，预览里只有条件成立才显示。编辑时始终可见"
             @change="onShowIfEnabledChange"
           />
           <span class="fpi-hint">{{ showIfEnabled ? '是' : '否' }}</span>
@@ -820,6 +846,7 @@ const showIfNeedsValue = computed(
               class="fpi-input"
               type="text"
               maxlength="80"
+              title="看另一个字段的名字，例如 type"
               placeholder="另一字段的字段名，如 type"
               spellcheck="false"
               @input="onShowIfFieldInput"
@@ -830,6 +857,7 @@ const showIfNeedsValue = computed(
             <select
               v-model="showIfOpDraft"
               class="fpi-input"
+              title="等于、不等于、为空或非空"
               @change="onShowIfOpChange"
             >
               <option
@@ -848,6 +876,7 @@ const showIfNeedsValue = computed(
               class="fpi-input"
               type="text"
               maxlength="120"
+              title="等于或不等于时要比较的文字。开关用 true 或 false"
               placeholder="等于 / 不等于 时填写"
               @input="onShowIfValueInput"
             />

@@ -46,7 +46,7 @@ func TestPostgresMediaMigrationAndAPI(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = sqlDB.Close() })
 
-	if err := db.Exec(`DROP TABLE IF EXISTS media_reference, media_asset, media_category CASCADE`).Error; err != nil {
+	if err := db.Exec(`DROP TABLE IF EXISTS media_references, media_assets, media_categories CASCADE`).Error; err != nil {
 		t.Fatal(err)
 	}
 	sqlText, err := os.ReadFile(filepath.Join("..", "..", "migrations", "005_media.sql"))
@@ -74,7 +74,7 @@ func TestPostgresMediaMigrationAndAPI(t *testing.T) {
 			SELECT table_name, is_nullable, data_type
 			FROM information_schema.columns
 			WHERE table_schema = 'public' AND column_name = 'user_id'
-			  AND table_name IN ('media_category', 'media_asset', 'media_reference')
+			  AND table_name IN ('media_categories', 'media_assets', 'media_references')
 			ORDER BY table_name`).Scan(&cols).Error
 		if err != nil {
 			t.Fatal(err)
@@ -95,7 +95,7 @@ func TestPostgresMediaMigrationAndAPI(t *testing.T) {
 			t.Fatalf("unique index def %q", indexdef)
 		}
 		var shaType string
-		if err := db.Raw(`SELECT data_type FROM information_schema.columns WHERE table_name = 'media_asset' AND column_name = 'sha256'`).Scan(&shaType).Error; err != nil {
+		if err := db.Raw(`SELECT data_type FROM information_schema.columns WHERE table_name = 'media_assets' AND column_name = 'sha256'`).Scan(&shaType).Error; err != nil {
 			t.Fatal(err)
 		}
 		if shaType != "character varying" {
@@ -103,7 +103,7 @@ func TestPostgresMediaMigrationAndAPI(t *testing.T) {
 		}
 		user := uuid.New()
 		sha := strings.Repeat("ab", 32)
-		insert := `INSERT INTO media_asset (id, user_id, media_type, original_name, storage_path, storage_disk, mime_type, size_bytes, sha256, feishu_sync_status, status, created_at)
+		insert := `INSERT INTO media_assets (id, user_id, media_type, original_name, storage_path, storage_disk, mime_type, size_bytes, sha256, feishu_sync_status, status, created_at)
 			VALUES (?, ?, 'file', 'a.bin', 'rel/a.bin', 'local', 'application/octet-stream', 1, ?, 'not_configured', 'ready', NOW())`
 		if err := db.Exec(insert, uuid.New(), user, sha).Error; err != nil {
 			t.Fatal(err)
@@ -116,7 +116,7 @@ func TestPostgresMediaMigrationAndAPI(t *testing.T) {
 		if err := db.Exec(insert, uuid.New(), other, sha).Error; err != nil {
 			t.Fatalf("other user should be allowed the same hash: %v", err)
 		}
-		if err := db.Exec(`DELETE FROM media_asset`).Error; err != nil {
+		if err := db.Exec(`DELETE FROM media_assets`).Error; err != nil {
 			t.Fatal(err)
 		}
 	})
@@ -156,14 +156,14 @@ func TestPostgresMediaMigrationAndAPI(t *testing.T) {
 			t.Fatalf("path leaked or wrong: %s", first.Body)
 		}
 		var rows int64
-		if err := db.Raw(`SELECT COUNT(*) FROM media_asset WHERE user_id = ? AND sha256 = ?`, userA, shaHex(body)).Scan(&rows).Error; err != nil {
+		if err := db.Raw(`SELECT COUNT(*) FROM media_assets WHERE user_id = ? AND sha256 = ?`, userA, shaHex(body)).Scan(&rows).Error; err != nil {
 			t.Fatal(err)
 		}
 		if rows != 1 || countMediaFiles(t, root) != 1 {
 			t.Fatalf("rows %d files %d", rows, countMediaFiles(t, root))
 		}
 		var storagePath string
-		if err := db.Raw(`SELECT storage_path FROM media_asset WHERE id = ?`, first.JSON["id"]).Scan(&storagePath).Error; err != nil {
+		if err := db.Raw(`SELECT storage_path FROM media_assets WHERE id = ?`, first.JSON["id"]).Scan(&storagePath).Error; err != nil {
 			t.Fatal(err)
 		}
 		if filepath.IsAbs(storagePath) || strings.Contains(storagePath, root) {
@@ -204,7 +204,7 @@ func TestPostgresMediaMigrationAndAPI(t *testing.T) {
 		}
 		for _, id := range []string{audio.JSON["id"].(string), video.JSON["id"].(string)} {
 			var rel, disk string
-			if err := db.Raw(`SELECT storage_path, storage_disk FROM media_asset WHERE id = ? AND user_id = ?`, id, userA).Row().Scan(&rel, &disk); err != nil {
+			if err := db.Raw(`SELECT storage_path, storage_disk FROM media_assets WHERE id = ? AND user_id = ?`, id, userA).Row().Scan(&rel, &disk); err != nil {
 				t.Fatal(err)
 			}
 			if disk != "local" || filepath.IsAbs(rel) || !strings.Contains(rel, userA.String()+"/") {
@@ -224,7 +224,7 @@ func TestPostgresMediaMigrationAndAPI(t *testing.T) {
 			t.Fatalf("delete referenced %d %s", del.Code, del.Body.String())
 		}
 		var left int64
-		if err := db.Raw(`SELECT COUNT(*) FROM media_asset WHERE id = ?`, id).Scan(&left).Error; err != nil {
+		if err := db.Raw(`SELECT COUNT(*) FROM media_assets WHERE id = ?`, id).Scan(&left).Error; err != nil {
 			t.Fatal(err)
 		}
 		if left != 1 {

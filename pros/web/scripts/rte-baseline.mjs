@@ -23,6 +23,9 @@ const browser = await chromium.launch({
   args: ['--no-sandbox', '--disable-dev-shm-usage'],
 })
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+// 开场动画会铺满视口并让 app-root 进入 inert，先标记“下次不再展示”，
+// 否则登录按钮点不到，CI 里的浏览器用例会一直等下去。
+await page.addInitScript(() => localStorage.setItem('metamatrix:launch-skip', '1'))
 const notes = []
 const log = (step, ok, detail) => {
   notes.push({ step, ok })
@@ -41,7 +44,13 @@ if (debugAnswer) {
   await page.fill('#captcha-code', debugAnswer)
 }
 await page.click('button[type="submit"]')
-await page.waitForTimeout(800)
+// 等令牌真正落到 localStorage 再继续；固定 sleep 会在慢机器上抢跑，
+// 后面的 goto 会被路由守卫弹回登录页。
+await page.waitForFunction(
+  () => !!localStorage.getItem('metamatrix:auth:token'),
+  null,
+  { timeout: 20000 },
+)
 
 /** 页面设置面板在默认宽度、最窄宽度、窗口最大化时都不得出现横向溢出。 */
 async function assertPageSettingsFits() {
@@ -68,6 +77,13 @@ async function assertPageSettingsFits() {
       )
     }, item.width)
     await page.goto(`${web}/canvas/dual-triangle`, { waitUntil: 'domcontentloaded' })
+    // 等应用挂载完成：domcontentloaded 时 Vue 还没渲染，此刻查「页面设置」把手会是 0 个。
+    await page.waitForSelector('.workspace', { timeout: 8000 })
+    // 页面设置面板默认收起，需要通过右侧「页面设置」把手打开（panelOpen 默认 false）。
+    const settingsRail = page.locator('.settings-rail')
+    if (await settingsRail.count()) {
+      await settingsRail.click()
+    }
     await page.waitForSelector('.page-settings-panel', { timeout: 8000 })
     await page.waitForTimeout(250)
     const metrics = await page.evaluate(() => {
@@ -106,8 +122,13 @@ async function openTemplate(path, shot) {
   }
   await max.click()
   await page.waitForSelector('.pm-overlay .ProseMirror', { timeout: 8000 })
-  const paragraph = page.locator('.pm-overlay .ProseMirror p').first()
-  if (await paragraph.count()) await paragraph.click()
+  // 不点第一段：模板里的图片若处于选中态，图片气泡（题注输入框）会浮在段路上，
+  // 点段落会被气泡拦截（Playwright 报 intercepts pointer events）。
+  // 改用键盘聚焦编辑器并移到文末，既稳定又不需要命中坐标。
+  const editor = page.locator('.pm-overlay .ProseMirror').first()
+  await editor.focus()
+  await page.keyboard.press('Control+End')
+  await page.keyboard.press('Enter')
   await page.keyboard.type('基线')
   await page.screenshot({ path: `${out}/${shot}.png` })
   const close = page.locator('.pm-overlay button[aria-label="关闭"], .pm-overlay button[aria-label="还原"]').first()

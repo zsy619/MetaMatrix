@@ -1,0 +1,12 @@
+{
+  "id": "canvas_golden_circle",
+  "type": "golden_circle",
+  "schemaVersion": 1,
+  "theme": { "background": { "pattern": "none", "color": "#f7f7f7" }, "page": "#f7f7f7", "frame": "#ececec", "hairline": "rgba(60, 50, 20, 0.08)" },
+  "title": "黄金圈",
+  "blocks": [
+    { "id": "why", "title": "为什么", "hint": "信念和存在的理由，先写这个", "items": [{ "id": "gc_why", "text": "让一次会议留下可以回看的决定" }] },
+    { "id": "how", "title": "怎么做", "hint": "独特做法，用来证明为什么", "items": [{ "id": "gc_how", "text": "经典框架开箱即用，改内容不改版式" }] },
+    { "id": "what", "title": "做什么", "hint": "别人看得到的产品和服务", "items": [{ "id": "gc_what", "text": "战略、项目、财务和日常管理画布" }] }
+  ]
+}

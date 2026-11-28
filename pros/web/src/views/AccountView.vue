@@ -4,6 +4,19 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { friendlyApiMessage } from '../utils/apiMessage'
 import { downloadBackup, restoreBackup, type BackupBundle } from '../api/documents'
+import { listActivityLogs, type ActivityLogEntry } from '../api/logs'
+import {
+  ArrowLeft,
+  Download,
+  FolderOpened,
+  Lock,
+  Monitor,
+  Refresh,
+  SwitchButton,
+  Tickets,
+  Upload,
+  User,
+} from '@element-plus/icons-vue'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -21,6 +34,52 @@ function readDensity(): 'comfortable' | 'compact' {
   }
 }
 const density = ref(readDensity())
+
+// ---------- 活动日志（登录 / 退出 / 写操作） ----------
+const logs = ref<ActivityLogEntry[]>([])
+const logCategory = ref('')
+const logsBusy = ref(false)
+const logMsg = ref('')
+const logTabs = [
+  { label: '全部', value: '' },
+  { label: '登录', value: 'login' },
+  { label: '退出', value: 'logout' },
+  { label: '操作', value: 'operation' },
+]
+
+async function loadLogs() {
+  logsBusy.value = true
+  logMsg.value = ''
+  try {
+    const res = await listActivityLogs({ category: logCategory.value, limit: 50 })
+    logs.value = res.items || []
+  } catch (e) {
+    logs.value = []
+    logMsg.value = friendlyApiMessage(e, '日志加载失败')
+  } finally {
+    logsBusy.value = false
+  }
+}
+
+function switchLogCategory(value: string) {
+  logCategory.value = value
+  void loadLogs()
+}
+
+function categoryLabel(category: string) {
+  if (category === 'login') return '登录'
+  if (category === 'logout') return '退出'
+  if (category === 'operation') return '操作'
+  return category
+}
+
+function formatTime(iso: string) {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return iso
+  return d.toLocaleString('zh-CN', { hour12: false })
+}
+
+const userInitial = computed(() => (auth.user?.displayName || auth.user?.email || '?').slice(0, 1).toUpperCase())
 
 const expiryLabel = computed(() => {
   const raw = auth.token
@@ -43,6 +102,7 @@ onMounted(async () => {
     return
   }
   if (auth.token) await auth.fetchMe()
+  void loadLogs()
 })
 
 async function submit() {
@@ -89,17 +149,16 @@ async function exportBackup() {
   backupMsg.value = ''
   backupBusy.value = true
   try {
-    const bundle = await downloadBackup()
-    const blob = new Blob([JSON.stringify(bundle)], { type: 'application/json' })
+    // 服务端已经逐批编码为合法 JSON；直接下载响应 Blob，不再读取整份 bundle 后
+    // JSON.stringify 一次，避免导出期间同时占用文档、JSON 字符串和 Blob 三份内存。
+    const blob = await downloadBackup()
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
     link.download = 'metamatrix-backup.json'
     link.click()
     URL.revokeObjectURL(url)
-    backupMsg.value = bundle.truncated
-      ? `已下载最近 ${bundle.count} 份。更早的画布请用数据库备份。`
-      : `已下载 ${bundle.count} 份画布。`
+    backupMsg.value = '备份文件已下载。若画布超过 200 份，文件只包含最近 200 份，更早内容请用数据库备份。'
   } catch (e) {
     backupMsg.value = friendlyApiMessage(e, '导出失败')
   } finally {
@@ -107,17 +166,17 @@ async function exportBackup() {
   }
 }
 
-async function importBackup(event: Event) {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  input.value = ''
+async function importBackup(file: File | undefined) {
   if (!file) return
   backupMsg.value = ''
   backupBusy.value = true
   try {
     const text = await file.text()
     const bundle = JSON.parse(text) as BackupBundle
-    const result = await restoreBackup(bundle)
+    // 一次文件选择就是一次导入意图；restoreBackup 内部的网络重试会复用此 id。
+    // 不使用 X-Request-Id，因为它标识单次 HTTP 尝试，不能跨重试去重。
+    const importBatchId = crypto.randomUUID()
+    const result = await restoreBackup(bundle, importBatchId)
     backupMsg.value = `已作为新画布导入 ${result.imported} 份，跳过 ${result.skipped} 份。`
   } catch (e) {
     backupMsg.value = friendlyApiMessage(e, '导入失败')
@@ -134,120 +193,313 @@ function logout() {
 
 <template>
   <div class="account">
-    <form class="card" @submit.prevent="submit">
-      <router-link class="back" :to="{ name: 'guide' }">← 返回模板库</router-link>
-      <p class="eyebrow">MetaMatrix</p>
-      <h1>账户</h1>
-      <dl>
-        <div>
-          <dt>显示名</dt>
-          <dd>{{ auth.user?.displayName || '未设置' }}</dd>
+    <div class="account__inner">
+      <header class="account__top">
+        <router-link class="account__back" :to="{ name: 'guide' }">
+          <el-icon><ArrowLeft /></el-icon>返回模板库
+        </router-link>
+        <h1 class="account__title">账户设置</h1>
+        <p class="account__subtitle">管理个人资料、界面偏好、画布备份与登录记录。</p>
+      </header>
+
+      <div class="account__grid">
+        <div class="account__col">
+          <section class="acct-card">
+            <header class="acct-card__head">
+              <span class="acct-card__icon"><el-icon><User /></el-icon></span>
+              <div class="acct-card__heading">
+                <h2 class="acct-card__title">个人资料</h2>
+                <p class="acct-card__desc">账号信息与会话状态</p>
+              </div>
+            </header>
+            <div class="acct-profile">
+              <el-avatar :size="52" class="acct-profile__avatar">{{ userInitial }}</el-avatar>
+              <div class="acct-profile__meta">
+                <span class="acct-profile__name">{{ auth.user?.displayName || '未设置' }}</span>
+                <span class="acct-profile__mail">{{ auth.user?.email || '—' }}</span>
+              </div>
+              <el-tag type="success" effect="light" size="small">已登录</el-tag>
+            </div>
+            <dl class="acct-kv">
+              <div>
+                <dt>邮箱</dt>
+                <dd>{{ auth.user?.email || '—' }}</dd>
+              </div>
+              <div>
+                <dt>会话有效至</dt>
+                <dd>{{ expiryLabel }}</dd>
+              </div>
+            </dl>
+          </section>
+
+          <section class="acct-card">
+            <header class="acct-card__head">
+              <span class="acct-card__icon"><el-icon><Monitor /></el-icon></span>
+              <div class="acct-card__heading">
+                <h2 class="acct-card__title">界面密度</h2>
+                <p class="acct-card__desc">只收紧间距，画布分色保持不变</p>
+              </div>
+            </header>
+            <el-radio-group
+              :model-value="density"
+              size="small"
+              @change="(value: string) => setDensity(value as 'comfortable' | 'compact')"
+            >
+              <el-radio-button value="comfortable">标准</el-radio-button>
+              <el-radio-button value="compact">紧凑</el-radio-button>
+            </el-radio-group>
+          </section>
+
+          <section class="acct-card">
+            <header class="acct-card__head">
+              <span class="acct-card__icon"><el-icon><Lock /></el-icon></span>
+              <div class="acct-card__heading">
+                <h2 class="acct-card__title">修改密码</h2>
+                <p class="acct-card__desc">6–72 位，更新后当前登录仍然有效</p>
+              </div>
+            </header>
+            <el-form label-position="top" @submit.prevent="submit">
+              <el-form-item label="当前密码">
+                <el-input
+                  v-model="currentPassword"
+                  type="password"
+                  show-password
+                  autocomplete="current-password"
+                  placeholder="请输入当前密码"
+                />
+              </el-form-item>
+              <el-form-item label="新密码">
+                <el-input
+                  v-model="newPassword"
+                  type="password"
+                  show-password
+                  autocomplete="new-password"
+                  placeholder="请输入新密码"
+                />
+              </el-form-item>
+            </el-form>
+            <el-alert
+              v-if="message"
+              :type="tone === 'ok' ? 'success' : 'error'"
+              :title="message"
+              show-icon
+              :closable="false"
+            />
+            <div class="acct-actions">
+              <el-button type="primary" :icon="Lock" :loading="busy" @click="submit">
+                更新密码
+              </el-button>
+              <el-button :icon="SwitchButton" @click="logout">退出登录</el-button>
+            </div>
+          </section>
+
+          <section class="acct-card">
+            <header class="acct-card__head">
+              <span class="acct-card__icon"><el-icon><FolderOpened /></el-icon></span>
+              <div class="acct-card__heading">
+                <h2 class="acct-card__title">画布备份</h2>
+                <p class="acct-card__desc">仅当前账号未归档的画布，最多 200 份</p>
+              </div>
+            </header>
+            <p class="acct-hint">导入会新建画布，不会覆盖原件；整库恢复仍用数据库备份。</p>
+            <div class="acct-actions">
+              <el-button type="primary" :icon="Download" :loading="backupBusy" @click="exportBackup">
+                下载备份
+              </el-button>
+              <el-upload
+                :auto-upload="false"
+                :show-file-list="false"
+                accept="application/json,.json"
+                :on-change="(file: { raw: File }) => importBackup(file.raw)"
+              >
+                <el-button :icon="Upload" :disabled="backupBusy">从备份导入</el-button>
+              </el-upload>
+            </div>
+            <el-alert v-if="backupMsg" type="info" :title="backupMsg" show-icon :closable="false" />
+          </section>
         </div>
-        <div>
-          <dt>邮箱</dt>
-          <dd>{{ auth.user?.email || '—' }}</dd>
+
+        <div class="account__col">
+          <section class="acct-card">
+            <header class="acct-card__head">
+              <span class="acct-card__icon"><el-icon><Tickets /></el-icon></span>
+              <div class="acct-card__heading">
+                <h2 class="acct-card__title">登录与操作日志</h2>
+                <p class="acct-card__desc">仅记录本账号，其他账号不可见</p>
+              </div>
+              <div class="acct-card__tools">
+                <el-radio-group v-model="logCategory" size="small" @change="switchLogCategory">
+                  <el-radio-button v-for="tab in logTabs" :key="tab.value" :value="tab.value">
+                    {{ tab.label }}
+                  </el-radio-button>
+                </el-radio-group>
+                <el-button :icon="Refresh" :loading="logsBusy" circle title="刷新" @click="loadLogs" />
+              </div>
+            </header>
+            <el-alert v-if="logMsg" type="error" :title="logMsg" show-icon :closable="false" />
+            <el-table v-if="logs.length" :data="logs" size="small" stripe class="acct-table" max-height="560">
+              <el-table-column label="时间" width="180">
+                <template #default="{ row }">{{ formatTime(row.createdAt) }}</template>
+              </el-table-column>
+              <el-table-column label="类别" width="84">
+                <template #default="{ row }">
+                  <el-tag
+                    size="small"
+                    effect="light"
+                    :type="row.category === 'login' ? 'success' : row.category === 'logout' ? 'warning' : 'info'"
+                  >
+                    {{ categoryLabel(row.category) }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="动作" width="170" show-overflow-tooltip>
+                <template #default="{ row }"><code class="acct-code">{{ row.action }}</code></template>
+              </el-table-column>
+              <el-table-column label="结果" width="86">
+                <template #default="{ row }">
+                  <el-tag size="small" effect="light" :type="row.status === 'success' ? 'success' : 'danger'">
+                    {{ row.status === 'success' ? '成功' : '失败' }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="detail" label="详情" min-width="240" show-overflow-tooltip />
+            </el-table>
+            <el-empty v-else-if="!logsBusy" description="暂无记录" :image-size="72" />
+            <el-skeleton v-else :rows="4" animated />
+          </section>
         </div>
-        <div>
-          <dt>会话有效至</dt>
-          <dd>{{ expiryLabel }}</dd>
-        </div>
-      </dl>
-      <h2>界面密度</h2>
-      <p class="hint">只收紧间距。画布分色保持不变，不跟随系统深色模式改色。</p>
-      <div class="actions">
-        <button type="button" class="mm-btn" :class="{ 'mm-btn--primary': density === 'comfortable' }" @click="setDensity('comfortable')">标准</button>
-        <button type="button" class="mm-btn" :class="{ 'mm-btn--primary': density === 'compact' }" @click="setDensity('compact')">紧凑</button>
       </div>
-      <h2>画布备份</h2>
-      <p class="hint">只包含当前账号未归档的画布，最多 200 份。导入会新建画布，不会覆盖原件。整库恢复仍用数据库备份。</p>
-      <div class="actions">
-        <button type="button" class="mm-btn mm-btn--primary" :disabled="backupBusy" @click="exportBackup">下载备份</button>
-        <label class="mm-btn">
-          从备份导入
-          <input class="file-input" type="file" accept="application/json,.json" :disabled="backupBusy" @change="importBackup" />
-        </label>
-      </div>
-      <p v-if="backupMsg" role="status">{{ backupMsg }}</p>
-      <h2>修改密码</h2>
-      <label for="cur-pass">
-        当前密码
-        <input id="cur-pass" v-model="currentPassword" type="password" autocomplete="current-password" required />
-      </label>
-      <label for="new-pass">
-        新密码
-        <input id="new-pass" v-model="newPassword" type="password" autocomplete="new-password" minlength="6" maxlength="72" required />
-      </label>
-      <p v-if="message" :class="tone === 'ok' ? 'ok' : 'err'" role="status">{{ message }}</p>
-      <div class="actions">
-        <button type="submit" class="mm-btn mm-btn--primary" :disabled="busy">
-          {{ busy ? '保存中…' : '更新密码' }}
-        </button>
-        <button type="button" class="mm-btn mm-btn--ghost" @click="logout">退出登录</button>
-      </div>
-    </form>
+    </div>
   </div>
 </template>
 
 <style scoped>
 .account {
   min-height: 100%;
-  display: grid;
-  place-items: center;
-  padding: 32px 16px;
+  overflow: auto;
+  padding: 24px 20px 48px;
   background:
     radial-gradient(ellipse 70% 40% at 50% -10%, var(--mm-blue-soft) 0%, transparent 60%),
     var(--mm-bg);
 }
-.card {
-  width: min(460px, 100%);
-  background: var(--mm-surface);
-  border: 1px solid var(--mm-line);
-  border-radius: var(--mm-radius);
-  padding: 28px 24px;
+.account__inner {
+  width: min(1180px, 100%);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.account__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-start;
+  color: var(--mm-blue);
+  font-size: 13px;
+  font-weight: 650;
+  text-decoration: none;
+}
+.account__back:hover { color: var(--mm-blue-deep); }
+.account__title {
+  margin: 4px 0 0;
+  font-size: 26px;
+  letter-spacing: -0.02em;
+  color: var(--mm-text);
+}
+.account__subtitle {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--mm-muted);
+}
+.account__grid {
+  display: grid;
+  grid-template-columns: minmax(320px, 420px) 1fr;
+  gap: 16px;
+  align-items: start;
+}
+.account__col {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+/* 卡片：企业级分区 + 标题栏 */
+.acct-card {
+  background: var(--ent-surface, #fff);
+  border: 1px solid var(--ent-border, #e6e9ef);
+  border-radius: var(--ent-radius-lg, 16px);
+  box-shadow: var(--ent-shadow-xs, 0 1px 2px rgba(15, 23, 42, 0.05));
+  padding: 16px 18px 18px;
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
-.back {
-  color: var(--mm-blue);
-  text-decoration: none;
-  font-size: 13px;
+.acct-card__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.acct-card__icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--ent-radius-sm, 8px);
+  background: var(--ent-primary-soft, #eaf1fe);
+  color: var(--ent-primary, #1a73e8);
+  font-size: 16px;
+}
+.acct-card__heading { min-width: 0; flex: 1; }
+.acct-card__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--ent-text, #1f2733);
+}
+.acct-card__desc {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--ent-text-3, #8a94a3);
+}
+.acct-card__tools {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.acct-profile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--ent-border, #e6e9ef);
+  border-radius: var(--ent-radius-md, 12px);
+  background: var(--ent-surface-2, #f8fafc);
+}
+.acct-profile__avatar {
+  background: var(--ent-primary, #1a73e8);
+  color: #fff;
   font-weight: 650;
 }
-.eyebrow {
-  margin: 0;
+.acct-profile__meta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.acct-profile__name { font-size: 14px; font-weight: 650; color: var(--ent-text, #1f2733); }
+.acct-profile__mail {
   font-size: 12px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--mm-blue);
-  font-weight: 700;
-}
-h1, h2 { margin: 0; }
-h1 { font-size: 28px; letter-spacing: -0.03em; }
-h2 { font-size: 16px; margin-top: 8px; }
-dl { margin: 0; display: flex; flex-direction: column; gap: 8px; }
-dl div { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; }
-dt { color: var(--mm-muted); }
-dd { margin: 0; text-align: right; }
-label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
-input {
-  border: 1px solid var(--mm-line-strong);
-  border-radius: 10px;
-  padding: 10px 12px;
-  font: inherit;
-}
-.actions { display: flex; gap: 8px; flex-wrap: wrap; }
-.hint { margin: 0; color: var(--mm-muted); font-size: 13px; }
-.file-input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
+  color: var(--ent-text-2, #5a6472);
   overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  border: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.err { color: var(--mm-red); margin: 0; font-size: 13px; }
-.ok { color: var(--mm-green); margin: 0; font-size: 13px; }
+.acct-kv { margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.acct-kv div { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; }
+.acct-kv dt { color: var(--ent-text-2, #5a6472); }
+.acct-kv dd { margin: 0; text-align: right; color: var(--ent-text, #1f2733); }
+.acct-hint { margin: 0; font-size: 12.5px; color: var(--ent-text-2, #5a6472); }
+.acct-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.acct-code { font-size: 12px; color: var(--ent-text-2, #5a6472); }
+.acct-table { border-radius: var(--ent-radius-sm, 8px); }
+@media (max-width: 1024px) {
+  .account__grid { grid-template-columns: 1fr; }
+}
 </style>

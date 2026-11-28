@@ -1357,6 +1357,134 @@ withDefaults(
         <text x="116" y="107" text-anchor="middle" font-size="6.5" fill="#202124">客单</text>
       </svg>
 
+      <!-- 业务公式ABC模型：黑框三角 + 创新公式(绿)/借鉴公式(橙) + 公式块 -->
+      <svg
+        v-else-if="templateId === 'abc-model'"
+        class="thumb-svg"
+        viewBox="0 0 200 140"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <polygon points="100,18 180,122 20,122" fill="none" stroke="#1F1F1F" stroke-width="2.6" stroke-linejoin="round" />
+        <polygon points="100,42 150,100 50,100" fill="#EAF6EF" stroke="#2E9E5B" stroke-width="1.6" stroke-linejoin="round" />
+        <polygon points="100,62 128,92 72,92" fill="#FDF1E3" stroke="#E07B22" stroke-width="1.4" stroke-linejoin="round" />
+        <rect x="72" y="104" width="56" height="13" rx="6.5" fill="#ffffff" stroke="#1F1F1F" stroke-width="1" />
+        <text x="100" y="113.5" text-anchor="middle" font-size="5.5" font-weight="700" fill="#202124">业务公式</text>
+        <text x="100" y="12" text-anchor="middle" font-size="6.5" font-weight="800" fill="#202124">A.目标</text>
+        <text x="20" y="134" text-anchor="middle" font-size="6.5" font-weight="800" fill="#202124">B.参数</text>
+        <text x="180" y="134" text-anchor="middle" font-size="6.5" font-weight="800" fill="#202124">C.逻辑关系</text>
+      </svg>
+
+      <!-- 业务公式十大经典范式：三方向圆 + 环绕的十条范式 -->
+      <svg
+        v-else-if="templateId === 'business-formula-patterns'"
+        class="thumb-svg"
+        viewBox="0 0 200 140"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <line x1="90" y1="40" x2="40" y2="102" stroke="#1F1F1F" stroke-width="1.3" />
+        <line x1="90" y1="40" x2="140" y2="102" stroke="#1F1F1F" stroke-width="1.3" />
+        <line x1="40" y1="102" x2="140" y2="102" stroke="#1F1F1F" stroke-width="1.3" />
+        <circle cx="90" cy="40" r="23" fill="#FDF3E2" stroke="#F0CE8E" stroke-width="1.2" />
+        <circle cx="40" cy="102" r="21" fill="#E2EEF9" stroke="#A3C9EA" stroke-width="1.2" />
+        <circle cx="140" cy="102" r="21" fill="#E9E7F7" stroke="#BDB4E4" stroke-width="1.2" />
+        <text x="90" y="44" text-anchor="middle" font-size="7.5" font-weight="800" fill="#1F1F1F">收入提升</text>
+        <text x="40" y="106" text-anchor="middle" font-size="7.5" font-weight="800" fill="#1F1F1F">竞争提升</text>
+        <text x="140" y="106" text-anchor="middle" font-size="7.5" font-weight="800" fill="#1F1F1F">运营提升</text>
+        <rect x="120" y="12" width="30" height="4" rx="2" fill="#3c4043" />
+        <rect x="120" y="19" width="26" height="4" rx="2" fill="#c9ccd1" />
+        <rect x="120" y="26" width="30" height="4" rx="2" fill="#c9ccd1" />
+        <rect x="120" y="33" width="24" height="4" rx="2" fill="#c9ccd1" />
+        <rect x="6" y="60" width="24" height="4" rx="2" fill="#c9ccd1" />
+        <rect x="6" y="67" width="28" height="4" rx="2" fill="#c9ccd1" />
+        <rect x="166" y="58" width="28" height="4" rx="2" fill="#c9ccd1" />
+        <rect x="166" y="65" width="24" height="4" rx="2" fill="#c9ccd1" />
+        <rect x="166" y="72" width="28" height="4" rx="2" fill="#c9ccd1" />
+        <rect x="166" y="79" width="22" height="4" rx="2" fill="#c9ccd1" />
+      </svg>
+
+      <!-- 业务公式修炼爬山：六级段位矩阵 + 能力段位箭头 + 提升路径条 -->
+      <svg
+        v-else-if="templateId === 'cultivation-mountain'"
+        class="thumb-svg"
+        viewBox="0 0 200 140"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <text x="23.5" y="26" text-anchor="middle" font-size="9" font-weight="800" fill="#5B9BE8">L1</text>
+        <text x="54.5" y="26" text-anchor="middle" font-size="9" font-weight="800" fill="#3B82F6">L2</text>
+        <text x="85.5" y="26" text-anchor="middle" font-size="9" font-weight="800" fill="#10B981">L3</text>
+        <text x="116.5" y="26" text-anchor="middle" font-size="9" font-weight="800" fill="#F59E0B">L4</text>
+        <text x="147.5" y="26" text-anchor="middle" font-size="9" font-weight="800" fill="#EF4444">L5</text>
+        <text x="178.5" y="26" text-anchor="middle" font-size="9" font-weight="800" fill="#8B5CF6">L6</text>
+        <rect x="8" y="32" width="31" height="4" fill="#5B9BE8" />
+        <rect x="39" y="32" width="31" height="4" fill="#3B82F6" />
+        <rect x="70" y="32" width="31" height="4" fill="#10B981" />
+        <rect x="101" y="32" width="31" height="4" fill="#F59E0B" />
+        <rect x="132" y="32" width="31" height="4" fill="#EF4444" />
+        <rect x="163" y="32" width="31" height="4" fill="#8B5CF6" />
+        <rect x="12" y="46" width="23" height="7" rx="2" fill="#ffffff" stroke="#5B9BE8" stroke-opacity="0.4" stroke-width="0.8" />
+        <rect x="12" y="58" width="23" height="7" rx="2" fill="#ffffff" stroke="#5B9BE8" stroke-opacity="0.4" stroke-width="0.8" />
+        <rect x="43" y="46" width="23" height="7" rx="2" fill="#ffffff" stroke="#3B82F6" stroke-opacity="0.4" stroke-width="0.8" />
+        <rect x="43" y="58" width="23" height="7" rx="2" fill="#ffffff" stroke="#3B82F6" stroke-opacity="0.4" stroke-width="0.8" />
+        <rect x="74" y="46" width="23" height="7" rx="2" fill="#ffffff" stroke="#10B981" stroke-opacity="0.4" stroke-width="0.8" />
+        <rect x="74" y="58" width="23" height="7" rx="2" fill="#ffffff" stroke="#10B981" stroke-opacity="0.4" stroke-width="0.8" />
+        <rect x="105" y="46" width="23" height="7" rx="2" fill="#ffffff" stroke="#F59E0B" stroke-opacity="0.4" stroke-width="0.8" />
+        <rect x="105" y="58" width="23" height="7" rx="2" fill="#ffffff" stroke="#F59E0B" stroke-opacity="0.4" stroke-width="0.8" />
+        <rect x="136" y="46" width="23" height="7" rx="2" fill="#ffffff" stroke="#EF4444" stroke-opacity="0.4" stroke-width="0.8" />
+        <rect x="136" y="58" width="23" height="7" rx="2" fill="#ffffff" stroke="#EF4444" stroke-opacity="0.4" stroke-width="0.8" />
+        <rect x="167" y="46" width="23" height="19" rx="2" fill="#ffffff" stroke="#8B5CF6" stroke-opacity="0.4" stroke-width="0.8" />
+        <path d="M8,96 L62,96 L70,110 L62,124 L8,124 Z" fill="#3B82F6" fill-opacity="0.16" />
+        <path d="M70,96 L93,96 L101,110 L93,124 L70,124 Z" fill="#10B981" fill-opacity="0.16" />
+        <path d="M101,96 L124,96 L132,110 L124,124 L101,124 Z" fill="#F59E0B" fill-opacity="0.16" />
+        <path d="M132,96 L186,96 L194,110 L186,124 L132,124 Z" fill="#EF4444" fill-opacity="0.16" />
+      </svg>
+
+      <!-- 调用黑客五部曲：四列五步表 + 步骤圆牌 -->
+      <svg
+        v-else-if="templateId === 'hacker-five-steps'"
+        class="thumb-svg"
+        viewBox="0 0 200 140"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <rect x="10" y="12" width="180" height="18" rx="3" fill="#fdf3e8" stroke="#f4e0cb" stroke-width="0.8" />
+        <text x="25" y="24" text-anchor="middle" font-size="7" font-weight="800" fill="#e8823c">步骤</text>
+        <text x="68" y="24" text-anchor="middle" font-size="7" font-weight="800" fill="#e8823c">关键工作</text>
+        <text x="127" y="24" text-anchor="middle" font-size="7" font-weight="800" fill="#e8823c">依次回答</text>
+        <text x="175" y="24" text-anchor="middle" font-size="7" font-weight="800" fill="#e8823c">难点</text>
+        <circle cx="25" cy="42" r="5.5" fill="#e8823c" />
+        <text x="25" y="44.5" text-anchor="middle" font-size="6" font-weight="800" fill="#ffffff">1</text>
+        <circle cx="25" cy="61" r="5.5" fill="#e8823c" />
+        <text x="25" y="63.5" text-anchor="middle" font-size="6" font-weight="800" fill="#ffffff">2</text>
+        <circle cx="25" cy="80" r="5.5" fill="#e8823c" />
+        <text x="25" y="82.5" text-anchor="middle" font-size="6" font-weight="800" fill="#ffffff">3</text>
+        <circle cx="25" cy="99" r="5.5" fill="#e8823c" />
+        <text x="25" y="101.5" text-anchor="middle" font-size="6" font-weight="800" fill="#ffffff">4</text>
+        <circle cx="25" cy="118" r="5.5" fill="#e8823c" />
+        <text x="25" y="120.5" text-anchor="middle" font-size="6" font-weight="800" fill="#ffffff">5</text>
+        <rect x="46" y="39" width="46" height="4" rx="2" fill="#c9ccd1" />
+        <rect x="46" y="58" width="46" height="4" rx="2" fill="#c9ccd1" />
+        <rect x="46" y="77" width="46" height="4" rx="2" fill="#c9ccd1" />
+        <rect x="46" y="96" width="46" height="4" rx="2" fill="#c9ccd1" />
+        <rect x="46" y="115" width="46" height="4" rx="2" fill="#c9ccd1" />
+        <rect x="101" y="39" width="52" height="4" rx="2" fill="#e4e6e9" />
+        <rect x="101" y="58" width="52" height="4" rx="2" fill="#e4e6e9" />
+        <rect x="101" y="77" width="52" height="4" rx="2" fill="#e4e6e9" />
+        <rect x="101" y="96" width="52" height="4" rx="2" fill="#e4e6e9" />
+        <rect x="101" y="115" width="52" height="4" rx="2" fill="#e4e6e9" />
+        <rect x="164" y="37" width="22" height="9" rx="4.5" fill="#fbe3cc" />
+        <rect x="164" y="56" width="22" height="9" rx="4.5" fill="#fbe3cc" />
+        <rect x="164" y="75" width="22" height="9" rx="4.5" fill="#fbe3cc" />
+        <rect x="164" y="94" width="22" height="9" rx="4.5" fill="#fbe3cc" />
+        <rect x="164" y="113" width="22" height="9" rx="4.5" fill="#fbe3cc" />
+        <line x1="10" y1="50" x2="190" y2="50" stroke="#ececec" stroke-width="1" />
+        <line x1="10" y1="69" x2="190" y2="69" stroke="#ececec" stroke-width="1" />
+        <line x1="10" y1="88" x2="190" y2="88" stroke="#ececec" stroke-width="1" />
+        <line x1="10" y1="107" x2="190" y2="107" stroke="#ececec" stroke-width="1" />
+      </svg>
+
       <!-- 苦练基本功三环分析法：三环交叠 + 六边形 -->
       <svg
         v-else-if="templateId === 'three-ring-basics'"
@@ -1520,6 +1648,206 @@ withDefaults(
         <text x="39" y="31" text-anchor="middle" font-size="8" font-weight="700" fill="#fff">经营</text>
         <text x="100" y="31" text-anchor="middle" font-size="8" font-weight="700" fill="#fff">投资</text>
         <text x="161" y="31" text-anchor="middle" font-size="8" font-weight="700" fill="#fff">筹资</text>
+      </svg>
+      <svg v-else-if="templateId === 'swot'" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <rect x="12" y="16" width="84" height="50" rx="4" fill="#e7f6ef" />
+        <rect x="104" y="16" width="84" height="50" rx="4" fill="#fdecea" />
+        <rect x="12" y="74" width="84" height="50" rx="4" fill="#e8f1fa" />
+        <rect x="104" y="74" width="84" height="50" rx="4" fill="#fbf6e4" />
+        <text x="54" y="44" text-anchor="middle" font-size="11" font-weight="700" fill="#125c3b">S</text>
+        <text x="146" y="44" text-anchor="middle" font-size="11" font-weight="700" fill="#9b1c1c">W</text>
+        <text x="54" y="102" text-anchor="middle" font-size="11" font-weight="700" fill="#1c4c7c">O</text>
+        <text x="146" y="102" text-anchor="middle" font-size="11" font-weight="700" fill="#7a5c00">T</text>
+      </svg>
+      <svg v-else-if="templateId === 'lean-canvas'" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <rect x="8" y="16" width="34" height="74" fill="#fff4ec" />
+        <rect x="44" y="16" width="34" height="36" fill="#e5f6f5" />
+        <rect x="80" y="16" width="40" height="74" fill="#fbf6e4" />
+        <rect x="122" y="16" width="34" height="36" fill="#f3eef8" />
+        <rect x="158" y="16" width="34" height="74" fill="#fbeff2" />
+        <rect x="8" y="92" width="90" height="32" fill="#fbf1eb" />
+        <rect x="102" y="92" width="90" height="32" fill="#e7f6ef" />
+      </svg>
+      <svg v-else-if="templateId === 'value-proposition'" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <rect x="12" y="18" width="82" height="104" rx="8" fill="#e5f6f5" />
+        <rect x="106" y="18" width="82" height="104" rx="41" fill="#fbf6e4" />
+      </svg>
+      <svg v-else-if="templateId === 'okr'" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <rect x="16" y="20" width="168" height="28" rx="4" fill="#2a649f" />
+        <rect x="16" y="56" width="168" height="14" rx="3" fill="#e8f1fa" />
+        <rect x="16" y="76" width="120" height="14" rx="3" fill="#e8f1fa" />
+        <rect x="16" y="102" width="168" height="22" rx="4" fill="#1c4c7c" />
+      </svg>
+      <svg v-else-if="templateId === 'stakeholder-map'" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <rect x="16" y="16" width="80" height="50" rx="4" fill="#fbf6e4" />
+        <rect x="104" y="16" width="80" height="50" rx="4" fill="#fbeff2" />
+        <rect x="16" y="74" width="80" height="50" rx="4" fill="#e5f6f5" />
+        <rect x="104" y="74" width="80" height="50" rx="4" fill="#e8f1fa" />
+      </svg>
+      <svg v-else-if="templateId === 'pdca'" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <rect x="10" y="20" width="42" height="100" rx="4" fill="#fbf6e4" />
+        <rect x="56" y="20" width="42" height="100" rx="4" fill="#e8f1fa" />
+        <rect x="102" y="20" width="42" height="100" rx="4" fill="#e5f6f5" />
+        <rect x="148" y="20" width="42" height="100" rx="4" fill="#e7f6ef" />
+      </svg>
+      <svg v-else-if="templateId === 'five-forces'" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <rect x="74" y="16" width="52" height="28" rx="4" fill="#f3eef8" />
+        <rect x="16" y="52" width="52" height="36" rx="4" fill="#fbf6e4" />
+        <rect x="74" y="52" width="52" height="36" rx="4" fill="#fdecea" />
+        <rect x="132" y="52" width="52" height="36" rx="4" fill="#e8f1fa" />
+        <rect x="74" y="96" width="52" height="28" rx="4" fill="#e5f6f5" />
+      </svg>
+      <svg v-else-if="templateId === 'income-statement'" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <rect x="12" y="20" width="54" height="100" rx="4" fill="#e7f6ef" />
+        <rect x="73" y="20" width="54" height="100" rx="4" fill="#fff4ec" />
+        <rect x="134" y="20" width="54" height="100" rx="4" fill="#e8f1fa" />
+      </svg>
+      <svg v-else-if="templateId === 'value-chain'" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <rect x="12" y="18" width="42" height="36" rx="3" fill="#eef2f6" />
+        <rect x="58" y="18" width="42" height="36" rx="3" fill="#fbf6e4" />
+        <rect x="104" y="18" width="42" height="36" rx="3" fill="#e5f6f5" />
+        <rect x="150" y="18" width="38" height="36" rx="3" fill="#f3eef8" />
+        <rect x="10" y="64" width="34" height="58" rx="3" fill="#e8f1fa" />
+        <rect x="48" y="64" width="34" height="58" rx="3" fill="#e7f6ef" />
+        <rect x="86" y="64" width="34" height="58" rx="3" fill="#fbeff2" />
+        <rect x="124" y="64" width="34" height="58" rx="3" fill="#fbf1eb" />
+        <rect x="162" y="64" width="28" height="58" rx="3" fill="#e5f6f5" />
+      </svg>
+      <svg v-else-if="templateId === 'seven-s'" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <rect x="16" y="16" width="50" height="32" rx="3" fill="#fbf6e4" />
+        <rect x="74" y="16" width="50" height="32" rx="3" fill="#e8f1fa" />
+        <rect x="132" y="16" width="50" height="32" rx="3" fill="#e5f6f5" />
+        <rect x="40" y="54" width="120" height="28" rx="3" fill="#fbeff2" />
+        <rect x="16" y="90" width="50" height="32" rx="3" fill="#f3eef8" />
+        <rect x="74" y="90" width="50" height="32" rx="3" fill="#e7f6ef" />
+        <rect x="132" y="90" width="50" height="32" rx="3" fill="#fbf1eb" />
+      </svg>
+      <svg v-else-if="templateId === 'rice'" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <rect x="16" y="20" width="168" height="22" rx="3" fill="#2a649f" />
+        <rect x="16" y="50" width="168" height="18" rx="3" fill="#e8f0fe" />
+        <rect x="16" y="76" width="140" height="18" rx="3" fill="#e8f0fe" />
+        <rect x="16" y="102" width="110" height="18" rx="3" fill="#e8f0fe" />
+      </svg>
+      <svg v-else-if="templateId === 'break-even'" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <rect x="12" y="28" width="54" height="84" rx="4" fill="#e8f1fa" />
+        <rect x="73" y="28" width="54" height="84" rx="4" fill="#fff4ec" />
+        <rect x="134" y="28" width="54" height="84" rx="4" fill="#e7f6ef" />
+      </svg>
+      <svg v-else-if="templateId === 'customer-journey'" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <rect x="8" y="24" width="34" height="92" rx="4" fill="#e8f1fa" />
+        <rect x="46" y="24" width="34" height="92" rx="4" fill="#f3eef8" />
+        <rect x="84" y="24" width="34" height="92" rx="4" fill="#fbf6e4" />
+        <rect x="122" y="24" width="34" height="92" rx="4" fill="#e5f6f5" />
+        <rect x="160" y="24" width="32" height="92" rx="4" fill="#e7f6ef" />
+      </svg>
+      <svg v-else-if="templateId === 'kano'" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <rect x="10" y="20" width="42" height="100" rx="4" fill="#fdecea" />
+        <rect x="56" y="20" width="42" height="100" rx="4" fill="#e8f1fa" />
+        <rect x="102" y="20" width="42" height="100" rx="4" fill="#fbf6e4" />
+        <rect x="148" y="20" width="42" height="100" rx="4" fill="#f1f3f4" />
+      </svg>
+      <svg v-else-if="templateId === 'moscow'" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <rect x="10" y="20" width="42" height="100" rx="4" fill="#fdecea" />
+        <rect x="56" y="20" width="42" height="100" rx="4" fill="#fbf6e4" />
+        <rect x="102" y="20" width="42" height="100" rx="4" fill="#e8f1fa" />
+        <rect x="148" y="20" width="42" height="100" rx="4" fill="#f1f3f4" />
+      </svg>
+      <svg v-else-if="templateId === 'impact-effort'" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <rect x="16" y="16" width="80" height="50" rx="4" fill="#e7f6ef" />
+        <rect x="104" y="16" width="80" height="50" rx="4" fill="#e8f1fa" />
+        <rect x="16" y="74" width="80" height="50" rx="4" fill="#fbf6e4" />
+        <rect x="104" y="74" width="80" height="50" rx="4" fill="#fdecea" />
+      </svg>
+      <svg v-else-if="templateId === 'vrio'" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <rect x="10" y="20" width="42" height="100" rx="4" fill="#e8f1fa" />
+        <rect x="56" y="20" width="42" height="100" rx="4" fill="#f3eef8" />
+        <rect x="102" y="20" width="42" height="100" rx="4" fill="#fbeff2" />
+        <rect x="148" y="20" width="42" height="100" rx="4" fill="#e7f6ef" />
+      </svg>
+      <svg v-else-if="templateId === 'golden-circle'" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <rect x="28" y="16" width="144" height="32" rx="16" fill="#e8f1fa" />
+        <rect x="46" y="54" width="108" height="32" rx="16" fill="#e5f6f5" />
+        <rect x="64" y="92" width="72" height="32" rx="16" fill="#fbf6e4" />
+      </svg>
+      <svg v-else-if="templateId === 'soar'" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <rect x="16" y="16" width="80" height="50" rx="4" fill="#e7f6ef" />
+        <rect x="104" y="16" width="80" height="50" rx="4" fill="#e8f1fa" />
+        <rect x="16" y="74" width="80" height="50" rx="4" fill="#fbf6e4" />
+        <rect x="104" y="74" width="80" height="50" rx="4" fill="#e5f6f5" />
+      </svg>
+      <svg v-else-if="templateId === 'playing-to-win'" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <rect x="8" y="24" width="34" height="92" rx="4" fill="#fbf6e4" />
+        <rect x="46" y="24" width="34" height="92" rx="4" fill="#e8f1fa" />
+        <rect x="84" y="24" width="34" height="92" rx="4" fill="#fbeff2" />
+        <rect x="122" y="24" width="34" height="92" rx="4" fill="#f3eef8" />
+        <rect x="160" y="24" width="32" height="92" rx="4" fill="#e7f6ef" />
+      </svg>
+      <svg v-else-if="templateId === 'fde-reliable-quadrant'" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+        <rect width="200" height="140" rx="10" fill="#f7f7f7" />
+        <rect x="16" y="14" width="80" height="52" rx="6" fill="#FBEFF2" />
+        <rect x="104" y="14" width="80" height="52" rx="6" fill="#E8F1FA" />
+        <rect x="16" y="74" width="80" height="52" rx="6" fill="#E7F6EF" />
+        <rect x="104" y="74" width="80" height="52" rx="6" fill="#F3EEF8" />
+        <text x="28" y="46" font-size="22" font-weight="700" fill="#A84562">A</text>
+        <text x="116" y="46" font-size="22" font-weight="700" fill="#2A649F">C</text>
+        <text x="28" y="106" font-size="22" font-weight="700" fill="#187A4E">E</text>
+        <text x="116" y="106" font-size="22" font-weight="700" fill="#6B4C9A">R</text>
+      </svg>
+      <svg v-else-if="String(templateId).startsWith('fde-')" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+        <rect width="200" height="140" rx="10" fill="#f7f4ee" />
+        <rect x="16" y="18" width="168" height="22" rx="4" fill="#0f766e" />
+        <rect x="16" y="50" width="168" height="14" rx="3" fill="#fff" />
+        <rect x="16" y="70" width="168" height="14" rx="3" fill="#fff" />
+        <rect x="16" y="90" width="80" height="14" rx="3" fill="#f4fbf6" />
+        <rect x="104" y="90" width="80" height="14" rx="3" fill="#fff6f6" />
+      </svg>
+      <svg v-else-if="templateId === 'ai-boundary'" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+        <rect width="200" height="140" rx="10" fill="#f6f1e6" />
+        <polygon points="100,24 164,70 100,116 36,70" fill="none" stroke="#e6d7c3" stroke-width="1.4" />
+        <polygon points="100,46 132,70 100,98 62,74" fill="rgba(154,52,18,0.28)" stroke="#9a3412" stroke-width="1.4" />
+        <text x="100" y="16" text-anchor="middle" font-size="8" font-weight="700" fill="#1c1917">单点因果</text>
+        <text x="178" y="74" text-anchor="middle" font-size="7" font-weight="700" fill="#1c1917">不可逆</text>
+        <text x="100" y="132" text-anchor="middle" font-size="8" font-weight="700" fill="#1c1917">没数据</text>
+        <text x="22" y="74" text-anchor="middle" font-size="7" font-weight="700" fill="#1c1917">合规</text>
+      </svg>
+      <svg v-else-if="templateId === 'scene-three-high'" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+        <rect width="200" height="140" rx="10" fill="#f7f4ee" />
+        <polygon points="100,28 156,118 44,118" fill="none" stroke="#e4ddd2" stroke-width="1.4" />
+        <polygon points="100,52 136,104 64,104" fill="none" stroke="#e4ddd2" stroke-width="1.1" />
+        <polygon points="100,36 148,112 58,108" fill="rgba(212,175,55,0.38)" stroke="#c9a227" stroke-width="1.4" />
+        <polygon points="100,78 118,100 86,96" fill="rgba(77,182,172,0.42)" stroke="#26a69a" stroke-width="1.4" />
+        <text x="100" y="20" text-anchor="middle" font-size="8" font-weight="700" fill="#3e3428">高频</text>
+        <text x="168" y="128" text-anchor="middle" font-size="7" font-weight="700" fill="#3e3428">高价值</text>
+        <text x="30" y="128" text-anchor="middle" font-size="7" font-weight="700" fill="#3e3428">高边际</text>
+      </svg>
+      <svg v-else-if="templateId === 'ten-check'" class="thumb-svg" viewBox="0 0 200 140" xmlns="http://www.w3.org/2000/svg">
+        <rect width="200" height="140" rx="10" fill="#f7f4ee" />
+        <rect x="16" y="18" width="168" height="16" rx="3" fill="#3e3428" />
+        <rect x="16" y="40" width="168" height="12" rx="2" fill="#fff" />
+        <rect x="16" y="56" width="168" height="12" rx="2" fill="#f4fbf6" />
+        <rect x="16" y="72" width="168" height="12" rx="2" fill="#fff6f6" />
+        <rect x="16" y="88" width="168" height="12" rx="2" fill="#fff" />
+        <rect x="16" y="104" width="168" height="12" rx="2" fill="#fff" />
       </svg>
 
   </div>

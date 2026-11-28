@@ -3,22 +3,12 @@ import { readFileSync } from 'node:fs'
 import {
   blockHandleLeft,
   blockHandleRight,
-  blockToolsWidth,
-  gutterSize,
   RTE_BLOCK_TOOLS_WIDTH,
-  RTE_BLOCK_TOOLS_WIDTH_SINGLE,
-  RTE_GUTTER_SIZE,
   RTE_HANDLE_TEXT_GAP,
 } from './rteGutter.ts'
 
-// —— 尺寸常量：手柄列必须整体放得进正文左侧的留白里 ——
-assert.equal(RTE_BLOCK_TOOLS_WIDTH, 46) // ⠿ 拖拽(22) + 2px 间距 + ⋮ 菜单(22)
-assert.equal(RTE_BLOCK_TOOLS_WIDTH_SINGLE, 22) // 收起态只有 ⋮ 菜单
-assert.equal(RTE_GUTTER_SIZE, RTE_BLOCK_TOOLS_WIDTH + RTE_HANDLE_TEXT_GAP)
-assert.equal(blockToolsWidth(true), RTE_BLOCK_TOOLS_WIDTH)
-assert.equal(blockToolsWidth(false), RTE_BLOCK_TOOLS_WIDTH_SINGLE)
-assert.equal(gutterSize(true), RTE_GUTTER_SIZE)
-assert.equal(gutterSize(false), RTE_BLOCK_TOOLS_WIDTH_SINGLE + RTE_HANDLE_TEXT_GAP)
+// —— 尺寸常量：左侧只留一个「+」按钮 ——
+assert.equal(RTE_BLOCK_TOOLS_WIDTH, 22) // 只有一个「+」按钮(22)
 
 /**
  * 三种版式下手柄都不与首字重叠：
@@ -26,34 +16,30 @@ assert.equal(gutterSize(false), RTE_BLOCK_TOOLS_WIDTH_SINGLE + RTE_HANDLE_TEXT_G
  */
 const cases = [
   {
-    name: '展开态·纸卡片（画布左内边距 32 + 卡片左内边距 50）',
+    name: '展开态·纸卡片（画布左内边距 32 + 卡片左内边距 74）',
     canvasLeft: 0,
-    contentLeft: 32 + 50,
-    toolsWidth: RTE_BLOCK_TOOLS_WIDTH,
+    contentLeft: 32 + 74,
   },
   {
-    name: '展开态·A4 纸张窄边距（纸内左内边距 50）',
+    name: '展开态·A4 纸张窄边距（纸内左内边距 74）',
     canvasLeft: 0,
-    contentLeft: 50,
-    toolsWidth: RTE_BLOCK_TOOLS_WIDTH,
+    contentLeft: 74,
   },
   {
-    name: '收起态·普通面板（画布左内边距 14 + 正文左内边距 26）',
+    name: '紧凑态·普通面板（画布左内边距 14 + 正文左内边距 50）',
     canvasLeft: 0,
-    contentLeft: 14 + 26,
-    toolsWidth: RTE_BLOCK_TOOLS_WIDTH_SINGLE,
+    contentLeft: 14 + 50,
   },
   {
-    name: '铺满版式（正文左内边距 50）',
+    name: '铺满版式（正文左内边距 74）',
     canvasLeft: 0,
-    contentLeft: 50,
-    toolsWidth: RTE_BLOCK_TOOLS_WIDTH,
+    contentLeft: 74,
   },
 ]
 
 for (const item of cases) {
-  const left = blockHandleLeft(item.contentLeft, item.canvasLeft, item.toolsWidth)
-  const right = blockHandleRight(left, item.toolsWidth)
+  const left = blockHandleLeft(item.contentLeft, item.canvasLeft)
+  const right = blockHandleRight(left)
   const textLeft = item.contentLeft
   assert.ok(
     right <= textLeft - RTE_HANDLE_TEXT_GAP,
@@ -66,10 +52,10 @@ for (const item of cases) {
 // 画布本身有偏移时（滚动条/嵌套容器），换算仍然成立。
 {
   const canvasLeft = 120
-  const contentLeft = canvasLeft + 32 + 50
-  const left = blockHandleLeft(contentLeft, canvasLeft, RTE_BLOCK_TOOLS_WIDTH)
-  const right = blockHandleRight(left, RTE_BLOCK_TOOLS_WIDTH)
-  assert.equal(left, 32)
+  const contentLeft = canvasLeft + 32 + 74
+  const left = blockHandleLeft(contentLeft, canvasLeft)
+  const right = blockHandleRight(left)
+  assert.equal(left, 80) // 106 - 按钮 22 - 正文间距 4
   assert.ok(right <= contentLeft - RTE_HANDLE_TEXT_GAP)
 }
 
@@ -83,9 +69,9 @@ const globalCss = readFileSync(
   'utf8',
 )
 
-// 留白宽度：收起态 26px（单按钮），展开态 50px（双按钮 + 间距）。
-assert.match(scopedCss, /\.rte-root \{[^}]*--rte-gutter-size:\s*26px;/)
-assert.match(scopedCss, /\.rte-root\.expanded \{[^}]*--rte-gutter-size:\s*50px;/)
+// 留白宽度：紧凑态 50px（两个按钮），展开态 74px（三个按钮 + 间距）。
+assert.match(scopedCss, /\.rte-root \{[^}]*--rte-gutter-size:\s*50px;/)
+assert.match(scopedCss, /\.rte-root\.expanded \{[^}]*--rte-gutter-size:\s*74px;/)
 // 正文列左侧必须让出这段留白。
 assert.match(scopedCss, /\.rte-root :deep\(\.ProseMirror\) \{\s*padding-left:\s*var\(--rte-gutter-size\);/)
 assert.match(
@@ -100,17 +86,39 @@ assert.match(
   scopedCss,
   /\.rte-root\.expanded:not\(\.is-page-sheet\) :deep\(\.ProseMirror\) \{[^}]*padding:\s*16px max\(14px, var\(--rte-gutter-size\)\) 48px;/,
 )
-// A4 纸张：窄边距也要留出手柄列，虚线框与正文起点对齐。
+// A4 纸张：左右留白只按页边距走，不再被「块手柄列」撑宽（手柄列落在左侧页边距里），
+// 保证左右留白与底边距一致、纸张四边对称。
 assert.match(
   globalCss,
-  /\.rte-root\.is-page-sheet \.rte-body \{[^}]*padding-left:\s*max\(var\(--rte-margin-left, 31\.8mm\), var\(--rte-gutter-size, 26px\)\);/,
+  /\.rte-root\.is-page-sheet \.rte-body \{[^}]*padding-left:\s*max\(var\(--rte-margin-left, 25\.4mm\), 26px\);/,
 )
 assert.match(
   globalCss,
-  /\.rte-root\.is-page-sheet \.rte-body::before \{[^}]*inset:[^;]*max\(var\(--rte-margin-left, 31\.8mm\), var\(--rte-gutter-size, 26px\)\);/,
+  /\.rte-root\.is-page-sheet \.rte-body \{[^}]*padding-right:\s*var\(--rte-margin-right, 25\.4mm\);/,
 )
+assert.match(
+  globalCss,
+  /\.rte-root\.is-page-sheet \.rte-body::before \{[^}]*inset:[^;]*max\(var\(--rte-margin-left, 25\.4mm\), 26px\);/,
+)
+assert.doesNotMatch(globalCss, /\.rte-root\.is-page-sheet \.rte-body \{[^}]*padding-left:[^;]*--rte-gutter-size/)
 // 手柄容器不得拦截正文点击，只有按钮本身可点。
 assert.match(scopedCss, /\.rte-block-tools \{[^}]*pointer-events:\s*none;/)
 assert.match(scopedCss, /\.rte-block-handle \{[^}]*pointer-events:\s*auto;/)
+
+// —— 左侧只保留「+」一个按钮：DOM 里不能再出现第二个手柄按钮 ——
+const bodyVue = readFileSync(
+  new URL('../components/rte/RteDocumentBody.vue', import.meta.url),
+  'utf8',
+)
+assert.equal(
+  bodyVue.split('class="rte-block-handle').length - 1,
+  1,
+  '左侧手柄只能有一个「+」按钮',
+)
+assert.ok(!bodyVue.includes('rte-block-actions'), '「⋮」按钮应当并入「+」的下拉面板')
+// 「+」的美化：悬停背景、图标浮起、焦点环。
+assert.match(scopedCss, /\.rte-block-add:hover \{[^}]*background:\s*#eef0f3;/)
+assert.match(scopedCss, /\.rte-block-add:focus-visible \{[^}]*box-shadow:/)
+assert.match(scopedCss, /\.rte-block-add:hover svg \{[^}]*transform:\s*scale\(/)
 
 console.log('rte gutter ok')

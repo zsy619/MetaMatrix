@@ -1,0 +1,14 @@
+{
+  "id": "canvas_playing_to_win",
+  "type": "playing_to_win",
+  "schemaVersion": 1,
+  "theme": { "background": { "pattern": "none", "color": "#f7f7f7" }, "page": "#f7f7f7", "frame": "#ececec", "hairline": "rgba(60, 50, 20, 0.08)" },
+  "title": "制胜选择",
+  "blocks": [
+    { "id": "aspiration", "title": "制胜愿景", "hint": "赢了要能衡量", "items": [{ "id": "ptw_asp", "text": "中小团队把战略和项目写在同一处" }] },
+    { "id": "where", "title": "在哪竞争", "hint": "做谁，以及不做谁", "items": [{ "id": "ptw_where", "text": "需要一页纸、不需要咨询项目的团队" }] },
+    { "id": "how", "title": "如何取胜", "hint": "凭什么比替代方案强", "items": [{ "id": "ptw_how", "text": "框架开箱即用，改的是内容不是版式" }] },
+    { "id": "capabilities", "title": "所需能力", "hint": "缺了就不成立", "items": [{ "id": "ptw_cap", "text": "模板、富文本和可回看的版本" }] },
+    { "id": "systems", "title": "管理体系", "hint": "怎样复盘并守住", "items": [{ "id": "ptw_sys", "text": "每周看一张画布，过期的选择标出来" }] }
+  ]
+}

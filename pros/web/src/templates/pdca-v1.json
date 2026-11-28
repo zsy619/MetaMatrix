@@ -1,0 +1,18 @@
+{
+  "id": "canvas_pdca",
+  "type": "pdca",
+  "schemaVersion": 1,
+  "theme": {
+    "background": { "pattern": "none", "color": "#f7f7f7" },
+    "page": "#f7f7f7",
+    "frame": "#ececec",
+    "hairline": "rgba(60, 50, 20, 0.08)"
+  },
+  "title": "PDCA",
+  "blocks": [
+    { "id": "plan", "title": "计划", "hint": "这一轮要改进什么，怎么算做成", "items": [{ "id": "pdca_p_1", "text": "把周计划从聊天记录收进甘特图" }] },
+    { "id": "do", "title": "执行", "hint": "按计划做的最小一步", "items": [{ "id": "pdca_d_1", "text": "本周三个任务补上前置关系" }] },
+    { "id": "check", "title": "检查", "hint": "和计划比，事实是什么", "items": [{ "id": "pdca_c_1", "text": "有一个里程碑没有负责人" }] },
+    { "id": "act", "title": "处理", "hint": "留下有效的，改掉无效的", "items": [{ "id": "pdca_a_1", "text": "里程碑必须先写进 RACI 再排期" }] }
+  ]
+}

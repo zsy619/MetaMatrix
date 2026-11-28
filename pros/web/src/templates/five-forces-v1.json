@@ -1,0 +1,19 @@
+{
+  "id": "canvas_five_forces",
+  "type": "five_forces",
+  "schemaVersion": 1,
+  "theme": {
+    "background": { "pattern": "none", "color": "#f7f7f7" },
+    "page": "#f7f7f7",
+    "frame": "#ececec",
+    "hairline": "rgba(60, 50, 20, 0.08)"
+  },
+  "title": "波特五力",
+  "blocks": [
+    { "id": "entrants", "title": "新进入者", "hint": "谁能很快做一件类似的事", "items": [{ "id": "ff_en_1", "text": "通用表格就能拼一张甘特图" }] },
+    { "id": "suppliers", "title": "供应商", "hint": "谁掌握我们离不开的投入", "items": [{ "id": "ff_su_1", "text": "关键实施顾问档期紧" }] },
+    { "id": "rivalry", "title": "行业竞争", "hint": "现有对手靠什么抢同一批客户", "items": [{ "id": "ff_ri_1", "text": "项目软件比的是价格和模板数量" }] },
+    { "id": "buyers", "title": "买方", "hint": "客户怎么压价或转身离开", "items": [{ "id": "ff_bu_1", "text": "团队小，换工具的成本不高" }] },
+    { "id": "substitutes", "title": "替代品", "hint": "客户不用我们也能把事做完的办法", "items": [{ "id": "ff_sub_1", "text": "继续用聊天记录和周会" }] }
+  ]
+}

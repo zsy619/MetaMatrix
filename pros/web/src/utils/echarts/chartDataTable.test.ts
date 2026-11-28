@@ -53,6 +53,35 @@ describe('option ⇄ 数据模型', () => {
     expect(model.series[0]!.data).toEqual([30, 70])
   })
 
+  it('改系列名会写回 series 和图例', () => {
+    const model = optionToDataModel({
+      ...CARTESIAN,
+      legend: { data: ['新增', '活跃'], bottom: 0 },
+    })
+    model.series[0]!.name = '今年'
+    const next = dataModelToOption(
+      { ...CARTESIAN, legend: { data: ['新增', '活跃'], bottom: 0 } },
+      model,
+    )
+    const series = next.series as Array<{ name: string }>
+    const legend = next.legend as { data: string[] }
+    expect(series[0]!.name).toBe('今年')
+    expect(legend.data).toEqual(['今年', '活跃'])
+  })
+
+  it('空点保持 null，写回后折线仍断开', () => {
+    const option = {
+      xAxis: { type: 'category', data: ['一月', '二月', '三月'] },
+      yAxis: { type: 'value' },
+      series: [{ name: '新增', type: 'line', data: [10, null, 30] }],
+    }
+    const model = optionToDataModel(option)
+    expect(model.series[0]!.data).toEqual([10, null, 30])
+    const next = dataModelToOption(option, model)
+    const series = next.series as Array<{ data: unknown[] }>
+    expect(series[0]!.data).toEqual([10, null, 30])
+  })
+
   it('写回 option 时类目进 xAxis.data、数值进 series.data', () => {
     const model = optionToDataModel(CARTESIAN)
     const next = dataModelToOption(CARTESIAN, model)
@@ -68,6 +97,14 @@ describe('option ⇄ 数据模型', () => {
     const next = dataModelToOption(PIE, model)
     const series = next.series as Array<{ data: Array<{ name: string; value: unknown }> }>
     expect(series[0]!.data[0]).toEqual({ name: 'A', value: 30 })
+  })
+
+  it('饼图改类目名会写回扇区名称', () => {
+    const model = optionToDataModel(PIE)
+    model.categories[0] = '直营'
+    const next = dataModelToOption(PIE, model)
+    const series = next.series as Array<{ data: Array<{ name: string; value: unknown }> }>
+    expect(series[0]!.data[0]).toEqual({ name: '直营', value: 30 })
   })
 })
 
@@ -103,8 +140,144 @@ describe('表格 ⇄ 数据模型', () => {
   it('文本转值：数字串转数字，非数字保持文本', () => {
     expect(textToValue('12')).toBe(12)
     expect(textToValue('12.5')).toBe(12.5)
+    expect(textToValue('1,200')).toBe(1200)
+    expect(textToValue('50%')).toBe(0.5)
     expect(textToValue('abc')).toBe('abc')
     expect(textToValue('')).toBe('')
+  })
+})
+
+describe('横向柱状图的类目轴', () => {
+  const horizontal = {
+    xAxis: { type: 'value' },
+    yAxis: { type: 'category', data: ['甲', '乙'] },
+    series: [{ name: '销量', type: 'bar', data: [3, 8] }],
+  }
+
+  it('类目从纵轴读出，改名仍写回纵轴', () => {
+    const model = optionToDataModel(horizontal)
+    expect(model.categories).toEqual(['甲', '乙'])
+    expect(model.series[0]!.data).toEqual([3, 8])
+    model.categories[0] = '华北'
+    const next = dataModelToOption(horizontal, model)
+    expect(next.xAxis).toEqual({ type: 'value' })
+    expect((next.yAxis as { data: string[] }).data).toEqual(['华北', '乙'])
+  })
+
+  it('删光数据行时类目轴也清空', () => {
+    const model = optionToDataModel(CARTESIAN)
+    model.categories = []
+    model.series = model.series.map((item) => ({ ...item, data: [] }))
+    const next = dataModelToOption(CARTESIAN, model)
+    expect((next.xAxis as { data: string[] }).data).toEqual([])
+  })
+})
+
+describe('雷达图的指标和系列', () => {
+  const radar = {
+    radar: {
+      indicator: [
+        { name: '销售', max: 100 },
+        { name: '管理', max: 100 },
+        { name: '技术', max: 80 },
+      ],
+    },
+    legend: { data: ['当前', '对比'] },
+    series: [
+      {
+        name: '能力',
+        type: 'radar',
+        data: [
+          { name: '当前', value: [80, 70, 60] },
+          { name: '对比', value: [60, 75, 90] },
+        ],
+      },
+    ],
+  }
+
+  it('指标是行，每个数据项是一列，数值保持数字', () => {
+    const model = optionToDataModel(radar)
+    expect(model.categories).toEqual(['销售', '管理', '技术'])
+    expect(model.series.map((item) => item.name)).toEqual(['当前', '对比'])
+    expect(model.series[0]!.data).toEqual([80, 70, 60])
+    expect(model.series[1]!.data).toEqual([60, 75, 90])
+  })
+
+  it('改指标名和分数后仍写回数组，并保留指标上限', () => {
+    const model = optionToDataModel(radar)
+    model.categories[0] = '营收'
+    model.series[0]!.data[0] = 88
+    model.series[0]!.name = '今年'
+    const next = dataModelToOption(radar, model)
+    const indicator = (next.radar as { indicator: Array<{ name: string; max: number }> }).indicator
+    expect(indicator[0]).toEqual({ name: '营收', max: 100 })
+    expect(indicator[2]).toEqual({ name: '技术', max: 80 })
+    const series = next.series as Array<{ data: Array<{ name: string; value: unknown[] }> }>
+    expect(series[0]!.data[0]).toEqual({ name: '今年', value: [88, 70, 60] })
+    expect(Array.isArray(series[0]!.data[1]!.value)).toBe(true)
+    expect((next.legend as { data: string[] }).data).toEqual(['今年', '对比'])
+  })
+})
+
+describe('散点图的坐标', () => {
+  const scatter = {
+    xAxis: { type: 'value' },
+    yAxis: { type: 'value' },
+    series: [{ name: '样本', type: 'scatter', symbolSize: 12, data: [[1, 2], [3, 4]] }],
+  }
+
+  it('横纵坐标分开读，不收成一段文字', () => {
+    const model = optionToDataModel(scatter)
+    expect(model.categories).toEqual(['1', '3'])
+    expect(model.series[0]!.data).toEqual([2, 4])
+  })
+
+  it('改坐标后仍写回数组', () => {
+    const model = optionToDataModel(scatter)
+    model.categories[0] = '1.5'
+    model.series[0]!.data[0] = 9
+    const next = dataModelToOption(scatter, model)
+    const series = next.series as Array<{ data: unknown[] }>
+    expect(series[0]!.data).toEqual([[1.5, 9], [3, 4]])
+  })
+})
+
+describe('dataset 里的表', () => {
+  const chart = {
+    dataset: {
+      source: [
+        ['product', '2015', '2016'],
+        ['抹茶', 43, 85],
+        ['奶茶', 83, 73],
+      ],
+    },
+    xAxis: { type: 'category' },
+    yAxis: { type: 'value' },
+    series: [{ type: 'bar' }, { type: 'bar' }],
+  }
+
+  it('没有 series.data 时从 dataset 读出类目和系列', () => {
+    const model = optionToDataModel(chart)
+    expect(model.categories).toEqual(['抹茶', '奶茶'])
+    expect(model.series.map((item) => item.name)).toEqual(['2015', '2016'])
+    expect(model.series[0]!.data).toEqual([43, 83])
+    expect(model.series[1]!.data).toEqual([85, 73])
+  })
+
+  it('改类目和数值后写回 dataset，不另造 series.data', () => {
+    const model = optionToDataModel(chart)
+    model.categories[0] = '绿茶'
+    model.series[0]!.data[0] = 50
+    const next = dataModelToOption(chart, model)
+    const dataset = next.dataset as { source: unknown[][] }
+    expect(dataset.source).toEqual([
+      ['product', '2015', '2016'],
+      ['绿茶', 50, 85],
+      ['奶茶', 83, 73],
+    ])
+    const series = next.series as Array<{ data?: unknown }>
+    expect(series[0]!.data).toBeUndefined()
+    expect(series[1]!.type).toBe('bar')
   })
 })
 

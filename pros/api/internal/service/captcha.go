@@ -10,6 +10,7 @@ import (
 	"image"
 	"image/color"
 	"image/png"
+	"math"
 	"math/big"
 	"strings"
 	"sync"
@@ -28,11 +29,32 @@ var (
 )
 
 const (
-	captchaLength      = 4
-	captchaAlphabet    = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789" // no I/O/0/1 look-alikes
-	captchaWidth       = 200
+	// captchaLength 是答案位数。6 位是可用性和安全性的平衡点：
+	// 4 位在移动端键盘上按得太快容易串位，8 位又要用户对照图片数两遍。
+	captchaLength = 6
+	// captchaAlphabet 是答案字符集：大写字母 + 数字。
+	//
+	// 为什么不含小写字母：服务端比对时统一转大写（见 Verify），所以用户用
+	// 小写键盘敲也能通过，图片里就不必区分大小写。混排大小写会让 "l" 和 "1"、
+	// "O" 和 "0" 这类组合更难分辨，反而降低可读性。
+	//
+	// 为什么不含 I、O、0、1：这四个字符在点阵字体和低质量屏幕上极易互相
+	// 混淆（I 像 1，O 像 0），用户看错就等于答错，直接剔除最省事。
+	//
+	// 熵：32 个字符的 6 位组合有 32^6 ≈ 10.7 亿种，配合每分钟 60 次取图限流
+	// 和单个验证码 5 次错误上限，暴力猜解不具可行性。
+	captchaAlphabet    = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+	captchaWidth       = 240
 	captchaHeight      = 64
 	captchaMaxAttempts = 5
+	// captchaSuperSample 是渲染时的超采样倍数。先画到 N 倍大的画布上，
+	// 最后用盒式滤波缩回原尺寸，点阵字的硬边就变成了平滑的抗锯齿边缘。
+	// 倍数越大越平滑，但 CPU 开销按 N² 增长，3 倍在观感和成本上比较平衡。
+	captchaSuperSample = 3
+	// captchaGlyphScale 是字形在最终图片上的放大倍数（每个点阵像素的边长）。
+	// 5x7 的字模放大 5 倍后是 25x35 像素。画布宽 240，6 个字符均分后每格
+	// 40 像素，字形 25 像素宽，格内左右各留 7 像素，字与字之间不打架。
+	captchaGlyphScale = 5
 	// captchaExpiryGrace keeps an expired entry around briefly so the API can
 	// answer "expired" instead of "invalid" for a late submission.
 	captchaExpiryGrace = 10 * time.Minute
@@ -295,86 +317,112 @@ func randomCaptchaID() (string, error) {
 // text, so any script can decode the data URI and read the captcha without
 // solving it. Rendering glyphs from a bitmap font leaves no machine readable
 // answer in the payload, and PNG keeps the API dependency free.
+//
+// 美化要点：
+//  1. 超采样抗锯齿：先画到 3 倍大的画布上，再盒式滤波缩回 200x64。
+//     点阵字放大后边缘会有明显锯齿，抗锯齿之后字形干净很多。
+//  2. 四个字符按画布宽度四等分居中，间距均匀，不再挤在左侧。
+//  3. 背景换成柔和的垂直渐变 + 细噪点，干扰线改成半透明的波浪曲线，
+//     既保留"机器不好读"的干扰强度，又不会糊住字母。
+//  4. 每个字符带独立的墨色、轻微倾斜和纵向错位，并叠一层浅色浮雕，
+//     立体感更强，人眼读起来更快。
 func renderCaptchaPNG(answer string) string {
-	const (
-		scale   = 5
-		charGap = 12
-		startX  = 12
-		baseY   = 14
-	)
-	img := image.NewRGBA(image.Rect(0, 0, captchaWidth, captchaHeight))
+	const ss = captchaSuperSample
+	// 超采样画布尺寸。
+	w := captchaWidth * ss
+	h := captchaHeight * ss
 
-	// Background: light wash with a subtle vertical gradient.
-	for y := 0; y < captchaHeight; y++ {
-		t := y / captchaHeight
-		for x := 0; x < captchaWidth; x++ {
-			img.Set(x, y, color.RGBA{
-				R: uint8(241 - t*6),
-				G: uint8(245 - t*4),
-				B: uint8(251 - t*2),
-				A: 255,
-			})
+	img := image.NewRGBA(image.Rect(0, 0, w, h))
+
+	// 背景：垂直渐变，从近白过渡到淡蓝灰。
+	for y := 0; y < h; y++ {
+		t := float64(y) / float64(h-1)
+		base := color.RGBA{
+			R: uint8(249 - t*10),
+			G: uint8(251 - t*8),
+			B: uint8(254 - t*4),
+			A: 255,
+		}
+		for x := 0; x < w; x++ {
+			img.SetRGBA(x, y, base)
 		}
 	}
 
-	// Background speckles.
-	for i := 0; i < 90; i++ {
-		x, y := randInt(0, captchaWidth), randInt(0, captchaHeight)
-		img.Set(x, y, color.RGBA{R: 205, G: 214, B: 228, A: 255})
+	// 细噪点：给背景加一点颗粒，避免纯渐变过于"干净"而让干扰线过于突兀。
+	for i := 0; i < 900; i++ {
+		x, y := randInt(0, w), randInt(0, h)
+		blendPixel(img, x, y, color.RGBA{R: 176, G: 190, B: 214, A: 255}, 0.5)
 	}
 
-	// Crossing strokes, drawn as dotted lines so the glyphs stay readable.
-	for i := 0; i < 4; i++ {
-		x1, y1 := randInt(0, captchaWidth), randInt(0, captchaHeight)
-		x2, y2 := randInt(0, captchaWidth), randInt(0, captchaHeight)
-		ink := randomInk()
-		steps := captchaWidth + captchaHeight
-		for s := 0; s < steps; s++ {
-			x := x1 + (x2-x1)*s/steps
-			y := y1 + (y2-y1)*s/steps
-			if x < 0 || y < 0 || x >= captchaWidth || y >= captchaHeight {
-				continue
+	// 干扰线：两条半透明的波浪曲线。用波浪而不是直线，是因为直线很容易被
+	// 简单的预处理算法滤掉，而人在 200x64 的小图上读曲线毫无压力。
+	for i := 0; i < 2; i++ {
+		ink := color.RGBA{R: 118, G: 142, B: 186, A: 255}
+		phase := float64(randInt(0, 628)) / 100
+		amplitude := float64(randInt(8, 22))
+		baseY := float64(randInt(h/5, h-h/5))
+		for x := 0; x < w; x++ {
+			// 正弦曲线，振幅随 x 缓慢起伏，看起来更像手写划痕。
+			y := baseY + amplitude*math.Sin(float64(x)/float64(w)*3.2+phase)
+			for dy := 0; dy < 2; dy++ {
+				blendPixel(img, x, int(y)+dy, ink, 0.55)
 			}
-			img.Set(x, y, color.RGBA{R: ink.R / 2, G: ink.G / 2, B: ink.B / 2, A: 255})
 		}
 	}
 
-	// The characters themselves, each with its own ink, offset and shear.
+	// 字形参数（超采样坐标下）。
+	// block 是一个点阵像素在超采样画布上的边长（整数像素），
+	// scale 则是同一个值的浮点形式，用来算带倾斜和错位的绘制位置。
+	block := captchaGlyphScale * ss
+	scale := float64(block)
+	glyphW := float64(glyphWidth) * scale
+	glyphH := float64(glyphHeight) * scale
+	// 每个字符占据画布宽度的四分之一，在自己那一格里居中。
+	cellW := float64(w) / float64(captchaLength)
+	originY := (float64(h) - glyphH) / 2
+
 	for i, ch := range answer {
 		glyph, ok := captchaGlyphs[ch]
 		if !ok {
 			continue
 		}
 		ink := randomInk()
-		originX := startX + i*(glyphWidth*scale+charGap) + randInt(-3, 4)
-		originY := baseY + randInt(-3, 4)
-		// Shear makes the glyph lean, which is what makes OCR harder while a
-		// human still reads it instantly.
-		shear := randInt(-2, 3)
+		cellCenter := cellW*float64(i) + cellW/2
+		originX := cellCenter - glyphW/2 + float64(randInt(-3, 4))*ss
+		top := originY + float64(randInt(-2, 3))*ss
+		// 轻微倾斜：让字形不那么规整，干扰自动识别，但人眼无压力。
+		shear := float64(randInt(-2, 3)) * ss / 2
+
 		for row := 0; row < glyphHeight; row++ {
 			bits := glyph[row]
-			rowShift := randInt(-1, 2)
+			rowShift := float64(randInt(-1, 2)) * ss
 			for col := 0; col < glyphWidth; col++ {
 				if bits&(1<<uint(glyphWidth-1-col)) == 0 {
 					continue
 				}
-				px := originX + col*scale + rowShift + row*shear/2
-				py := originY + row*scale
-				for dy := 0; dy < scale; dy++ {
-					for dx := 0; dx < scale; dx++ {
-						x, y := px+dx, py+dy
-						if x < 0 || y < 0 || x >= captchaWidth || y >= captchaHeight {
-							continue
-						}
-						img.Set(x, y, ink)
+				px := int(originX + float64(col)*scale + rowShift + float64(row)*shear/2)
+				py := int(top + float64(row)*scale)
+				// 浅色浮雕：先在左上偏移处画一层半透明白，字形就有了立体感。
+				for dy := 0; dy < block; dy++ {
+					for dx := 0; dx < block; dx++ {
+						blendPixel(img, px+dx-ss, py+dy-ss,
+							color.RGBA{R: 255, G: 255, B: 255, A: 255}, 0.55)
+					}
+				}
+				for dy := 0; dy < block; dy++ {
+					for dx := 0; dx < block; dx++ {
+						blendPixel(img, px+dx, py+dy, ink, 1)
 					}
 				}
 			}
 		}
 	}
 
+	// 缩回原尺寸：盒式滤波平均，边缘因此获得抗锯齿。
+	final := downsample(img, ss)
+
 	var buf bytes.Buffer
-	if err := png.Encode(&buf, img); err != nil {
+	if err := png.Encode(&buf, final); err != nil {
 		// PNG encoding of a plain RGBA buffer cannot fail in practice; fall
 		// back to an empty image rather than leaking the answer.
 		return "data:image/png;base64,"
@@ -382,16 +430,68 @@ func renderCaptchaPNG(answer string) string {
 	return "data:image/png;base64," + base64.StdEncoding.EncodeToString(buf.Bytes())
 }
 
+// blendPixel blends a colour into the canvas with the given alpha.
+// Writing through a helper keeps every draw operation alpha correct, which
+// is what makes the soft shadows and interference curves look right.
+func blendPixel(img *image.RGBA, x, y int, c color.RGBA, alpha float64) {
+	if x < 0 || y < 0 || x >= img.Bounds().Dx() || y >= img.Bounds().Dy() {
+		return
+	}
+	if alpha <= 0 {
+		return
+	}
+	if alpha > 1 {
+		alpha = 1
+	}
+	old := img.RGBAAt(x, y)
+	img.SetRGBA(x, y, color.RGBA{
+		R: uint8(float64(c.R)*alpha + float64(old.R)*(1-alpha)),
+		G: uint8(float64(c.G)*alpha + float64(old.G)*(1-alpha)),
+		B: uint8(float64(c.B)*alpha + float64(old.B)*(1-alpha)),
+		A: 255,
+	})
+}
+
+// downsample shrinks the canvas by an integer factor with a box filter.
+// Averaging neighbouring pixels is what turns the hard edges of the bitmap
+// font into smooth, anti-aliased ones.
+func downsample(src *image.RGBA, factor int) *image.RGBA {
+	bounds := src.Bounds()
+	dst := image.NewRGBA(image.Rect(0, 0, bounds.Dx()/factor, bounds.Dy()/factor))
+	samples := float64(factor * factor)
+	for y := 0; y < dst.Bounds().Dy(); y++ {
+		for x := 0; x < dst.Bounds().Dx(); x++ {
+			var r, g, bl float64
+			for dy := 0; dy < factor; dy++ {
+				for dx := 0; dx < factor; dx++ {
+					c := src.RGBAAt(x*factor+dx, y*factor+dy)
+					r += float64(c.R)
+					g += float64(c.G)
+					bl += float64(c.B)
+				}
+			}
+			dst.SetRGBA(x, y, color.RGBA{
+				R: uint8(r / samples),
+				G: uint8(g / samples),
+				B: uint8(bl / samples),
+				A: 255,
+			})
+		}
+	}
+	return dst
+}
+
 // randomInk picks a dark, high contrast colour for a glyph.
 func randomInk() color.RGBA {
 	palette := []color.RGBA{
-		{R: 26, G: 115, B: 232, A: 255},
-		{R: 23, G: 78, B: 166, A: 255},
-		{R: 24, G: 128, B: 56, A: 255},
-		{R: 161, G: 66, B: 244, A: 255},
-		{R: 217, G: 48, B: 37, A: 255},
-		{R: 32, G: 33, B: 36, A: 255},
-		{R: 11, G: 128, B: 67, A: 255},
+		{R: 26, G: 86, B: 219, A: 255},
+		{R: 15, G: 118, B: 110, A: 255},
+		{R: 67, G: 56, B: 202, A: 255},
+		{R: 190, G: 18, B: 60, A: 255},
+		{R: 180, G: 83, B: 9, A: 255},
+		{R: 51, G: 65, B: 85, A: 255},
+		{R: 109, G: 40, B: 217, A: 255},
+		{R: 21, G: 128, B: 61, A: 255},
 	}
 	return palette[randInt(0, len(palette))]
 }

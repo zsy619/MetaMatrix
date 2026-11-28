@@ -133,4 +133,36 @@ h3 {
   text-align: center;
 }
 .bmc-panel { flex: 1 1 auto; min-height: 0; display: flex; }
+
+@media (max-width: 900px) {
+  .bmc { padding-bottom: 28px; }
+
+  .bmc-grid {
+    min-width: 0;
+    grid-template-columns: 1fr;
+    grid-template-rows: none;
+    overflow: visible;
+  }
+
+  h3 { font-size: 16px; }
+
+  .bmc-cell--partners,
+  .bmc-cell--activities,
+  .bmc-cell--resources,
+  .bmc-cell--value,
+  .bmc-cell--relationships,
+  .bmc-cell--channels,
+  .bmc-cell--segments,
+  .bmc-cell--costs,
+  .bmc-cell--revenue {
+    grid-area: auto;
+    height: auto;
+    min-height: 0;
+  }
+
+  .bmc-panel {
+    flex: 0 0 auto;
+    height: auto;
+  }
+}
 </style>

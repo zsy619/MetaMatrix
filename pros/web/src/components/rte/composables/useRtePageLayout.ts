@@ -18,7 +18,7 @@ import {
   type PageMargin,
 } from '../../../utils/rtePageMargin'
 import { bumpToolbarUndoEpoch } from '../../../utils/rteToolbarGroups'
-import { applyChromeReserve, EMPTY_PAGE_CHROME, type PanelPageChrome } from '../../../utils/rtePageChrome'
+import { applyChromeReserve, EMPTY_PAGE_CHROME, printSheetCss, shiftGutterSide, type PanelPageChrome } from '../../../utils/rtePageChrome'
 
 /** 页面大小、页边距和打印 @page。与工具栏分组共用一次 Ctrl+Z。 */
 export function useRtePageLayout(deps: {
@@ -61,12 +61,12 @@ export function useRtePageLayout(deps: {
     if (panelId) return readPageMargin(deps.pageMarginMap(), panelId, pageSizeMeta.value.paper)
     return localPageMargin.value || defaultPageMargin(pageSizeMeta.value.paper)
   })
-  const pageScreenMargin = computed(() =>
-    applyChromeReserve(
-      screenMargin(pageMargin.value, !pageSizeMeta.value.paper),
-      deps.chrome?.() || EMPTY_PAGE_CHROME,
-    ),
-  )
+  const pageScreenMargin = computed(() => {
+    const chrome = deps.chrome?.() || EMPTY_PAGE_CHROME
+    const reserved = applyChromeReserve(screenMargin(pageMargin.value, !pageSizeMeta.value.paper), chrome)
+    const gutter = chrome.gutter || 0
+    return gutter ? { ...reserved, left: reserved.left + gutter } : reserved
+  })
   const pageSheetStyle = computed(() => {
     const box = sheetBox(pageSize.value)
     const margin = pageScreenMargin.value
@@ -82,26 +82,32 @@ export function useRtePageLayout(deps: {
     }
     return style
   })
-  const printPreviewMarginStyle = computed(() => {
-    const box = pageScreenMargin.value
+  function printPreviewPaperStyle(page = 1) {
+    const chrome = deps.chrome?.() || EMPTY_PAGE_CHROME
+    const box = shiftGutterSide(pageScreenMargin.value, chrome.gutter, page)
+    const sheet = sheetBox(pageSize.value)
     return {
       padding: cssPageMargin(box),
-      width: pageSizeMeta.value.paper ? 'min(100%, var(--rte-sheet-width, 210mm))' : '100%',
+      width: sheet ? `${sheet.widthPx}px` : '100%',
+      minHeight: sheet ? `${sheet.heightPx}px` : undefined,
+      maxWidth: '100%',
       margin: '0 auto',
       boxSizing: 'border-box' as const,
     }
-  })
+  }
+  const printPreviewMarginStyle = computed(() => printPreviewPaperStyle(1))
 
   function applyPrintPageStyle(id: RtePageSizeId) {
     const size = cssPageSize(id)
-    const margin = pageScreenMargin.value
+    const chrome = deps.chrome?.() || EMPTY_PAGE_CHROME
+    const box = applyChromeReserve(screenMargin(pageMargin.value, !pageSizeMeta.value.paper), chrome)
     let el = document.getElementById('rte-print-page-size')
     if (!el) {
       el = document.createElement('style')
       el.id = 'rte-print-page-size'
       document.head.appendChild(el)
     }
-    el.textContent = `@media print { @page { size: ${size}; margin: ${cssPageMargin(margin)}; } }`
+    el.textContent = printSheetCss(size, box, chrome.gutter)
   }
 
   function applyPageMargin(next: PageMargin, recordUndo: boolean) {
@@ -194,6 +200,7 @@ export function useRtePageLayout(deps: {
     pageScreenMargin,
     pageSheetStyle,
     printPreviewMarginStyle,
+    printPreviewPaperStyle,
     applyPrintPageStyle,
     undoPageMargin,
     setMarginPreset,

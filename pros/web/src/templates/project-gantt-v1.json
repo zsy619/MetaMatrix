@@ -9,10 +9,78 @@
     "hairline": "rgba(60, 50, 20, 0.08)"
   },
   "title": "项目甘特图",
+  "scale": "week",
   "tasks": [
-    { "id": "gantt_1", "name": "需求澄清", "start": "2026-11-09", "end": "2026-11-13", "progress": 80, "owner": "产品" },
-    { "id": "gantt_2", "name": "方案设计", "start": "2026-11-12", "end": "2026-11-20", "progress": 40, "owner": "设计" },
-    { "id": "gantt_3", "name": "开发实现", "start": "2026-11-18", "end": "2026-12-05", "progress": 10, "owner": "研发" },
-    { "id": "gantt_4", "name": "验收上线", "start": "2026-12-02", "end": "2026-12-08", "progress": 0, "owner": "项目" }
+    {
+      "id": "gantt_sum",
+      "name": "版本发布",
+      "start": "2026-11-09",
+      "end": "2026-12-11",
+      "progress": 28,
+      "owner": "",
+      "kind": "summary"
+    },
+    {
+      "id": "gantt_1",
+      "name": "需求澄清",
+      "start": "2026-11-09",
+      "end": "2026-11-13",
+      "progress": 80,
+      "owner": "产品",
+      "parentId": "gantt_sum",
+      "baselineStart": "2026-11-09",
+      "baselineEnd": "2026-11-12"
+    },
+    {
+      "id": "gantt_2",
+      "name": "方案设计",
+      "start": "2026-11-16",
+      "end": "2026-11-20",
+      "progress": 40,
+      "owner": "设计",
+      "parentId": "gantt_sum",
+      "predecessors": [{ "taskId": "gantt_1", "type": "FS", "lag": 0 }]
+    },
+    {
+      "id": "gantt_3",
+      "name": "文档",
+      "start": "2026-11-16",
+      "end": "2026-11-18",
+      "progress": 20,
+      "owner": "产品",
+      "parentId": "gantt_sum",
+      "predecessors": [{ "taskId": "gantt_1", "type": "FS", "lag": 0 }]
+    },
+    {
+      "id": "gantt_4",
+      "name": "开发实现",
+      "start": "2026-11-23",
+      "end": "2026-12-04",
+      "progress": 10,
+      "owner": "研发",
+      "parentId": "gantt_sum",
+      "predecessors": [{ "taskId": "gantt_2", "type": "FS", "lag": 0 }]
+    },
+    {
+      "id": "gantt_5",
+      "name": "提测",
+      "start": "2026-12-07",
+      "end": "2026-12-07",
+      "progress": 0,
+      "owner": "测试",
+      "kind": "milestone",
+      "parentId": "gantt_sum",
+      "predecessors": [{ "taskId": "gantt_4", "type": "FS", "lag": 0 }]
+    },
+    {
+      "id": "gantt_6",
+      "name": "验收上线",
+      "start": "2026-12-08",
+      "end": "2026-12-11",
+      "progress": 0,
+      "owner": "项目",
+      "parentId": "gantt_sum",
+      "predecessors": [{ "taskId": "gantt_5", "type": "FS", "lag": 0 }]
+    }
   ]
 }

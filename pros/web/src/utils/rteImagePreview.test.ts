@@ -17,7 +17,7 @@ const PIXEL =
   'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
 
 describe('图片预览列表', () => {
-  it('按文档顺序收集单图和图片组', () => {
+  it('按文档顺序收集单图和图片组', async () => {
     const host = document.createElement('div')
     const editor = new Editor({
       element: host,
@@ -39,6 +39,23 @@ describe('图片预览列表', () => {
     const groupTwo = items[2]!
     expect(indexForImage(items, groupTwo.pos, groupTwo.src)).toBe(2)
     expect(indexForImage(items, null, 'https://example.com/c.png')).toBe(3)
+    await new Promise((resolve) => queueMicrotask(resolve))
+    editor.destroy()
+  })
+
+  it('藏起来的图片不进入预览', async () => {
+    const host = document.createElement('div')
+    const editor = new Editor({
+      element: host,
+      extensions: [
+        StarterKit.configure({ dropcursor: false }),
+        RteImage.configure({ inline: false, allowBase64: true }),
+        ImageGroup,
+      ],
+      content: `<div data-type="image-group" data-align="center"><div class="rte-image-group-row"><img src="${PIXEL}" alt="可见"><img src="https://example.com/hidden.png" alt="藏起" data-concealed="1"></div></div>`,
+    })
+    expect(collectEditorImages(editor.state.doc).map((item) => item.alt)).toEqual(['可见'])
+    await new Promise((resolve) => queueMicrotask(resolve))
     editor.destroy()
   })
 

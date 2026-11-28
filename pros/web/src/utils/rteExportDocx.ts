@@ -14,6 +14,7 @@ type InlineMark = {
   underline?: boolean
   strike?: boolean
   code?: boolean
+  footnoteId?: string
 }
 
 type Run = { text: string; marks: InlineMark }
@@ -21,8 +22,11 @@ type Run = { text: string; marks: InlineMark }
 type Block =
   | { kind: 'p'; style?: string; runs: Run[]; indent?: number }
   | { kind: 'listItem'; ordered: boolean; level: number; runs: Run[] }
-  | { kind: 'table'; rows: Run[][][] }
+  | { kind: 'table'; rows: Run[][][]; header?: boolean }
+  | { kind: 'columnTable'; widths: number[]; cells: Run[][][] }
   | { kind: 'image'; src: string; alt: string; width: number; height: number }
+  | { kind: 'imageRow'; images: Array<{ src: string; alt: string; width: number; height: number }> }
+  | { kind: 'pageBreak' }
 
 /** Word 正文可用宽度（px，96dpi）：A4 去掉左右页边距。 */
 const MAX_IMAGE_WIDTH_PX = 600
@@ -47,6 +51,9 @@ function runsToXml(runs: Run[]): string {
       if (r.marks.code) {
         pr.push('<w:rFonts w:ascii="Courier New" w:hAnsi="Courier New"/>')
         pr.push('<w:sz w:val="20"/>')
+      }
+      if (r.marks.footnoteId) {
+        return `<w:r><w:rPr><w:vertAlign w:val="superscript"/></w:rPr><w:footnoteReference w:id="${r.marks.footnoteId}"/></w:r>`
       }
       const rPr = pr.length ? `<w:rPr>${pr.join('')}</w:rPr>` : ''
       return `<w:r>${rPr}<w:t xml:space="preserve">${xmlEscape(r.text)}</w:t></w:r>`
@@ -91,6 +98,11 @@ function collectRuns(node: Node, inherited: InlineMark = {}): Run[] {
       out.push({ text: '\n', marks })
       return
     }
+    if (el.hasAttribute('data-fn-text')) {
+      const id = el.getAttribute('data-fn-export-id') || '1'
+      out.push({ text: '', marks: { ...marks, footnoteId: id } })
+      return
+    }
     // skip script/style
     if (tag === 'script' || tag === 'style') return
     for (const child of Array.from(el.childNodes)) walk(child, next)
@@ -103,7 +115,9 @@ function headingStyle(level: number): string {
   if (level <= 1) return 'Heading1'
   if (level === 2) return 'Heading2'
   if (level === 3) return 'Heading3'
-  return 'Heading4'
+  if (level === 4) return 'Heading4'
+  if (level === 5) return 'Heading5'
+  return 'Heading6'
 }
 
 function parseIndent(el: HTMLElement): number {
@@ -142,6 +156,17 @@ function imageBlockFrom(el: HTMLElement): Block {
   return { kind: 'image', src, alt, width: Math.round(width), height: Math.round(height) }
 }
 
+function pushCaption(blocks: Block[], text: string) {
+  const caption = text.trim()
+  if (!caption) return
+  blocks.push({ kind: 'p', style: 'Caption', runs: [{ text: caption, marks: {} }] })
+}
+
+function pushImage(blocks: Block[], el: HTMLElement) {
+  blocks.push(imageBlockFrom(el))
+  pushCaption(blocks, el.getAttribute('data-caption') || '')
+}
+
 function parseBlocks(root: HTMLElement): Block[] {
   const blocks: Block[] = []
 
@@ -174,6 +199,10 @@ function parseBlocks(root: HTMLElement): Block[] {
         n.remove()
       }
       const runs = collectRuns(clone)
+      if (listEl.getAttribute('data-type') === 'taskList') {
+        const box = li.getAttribute('data-checked') === 'true' ? '☑ ' : '☐ '
+        runs.unshift({ text: box, marks: {} })
+      }
       blocks.push({
         kind: 'listItem',
         ordered,
@@ -188,13 +217,20 @@ function parseBlocks(root: HTMLElement): Block[] {
 
   const walkTable = (table: HTMLElement) => {
     const rows: Run[][][] = []
-    for (const tr of Array.from(table.querySelectorAll(':scope > tbody > tr, :scope > tr, :scope > thead > tr'))) {
+    let header = false
+    const rowEls = Array.from(table.querySelectorAll(':scope > thead > tr, :scope > tbody > tr, :scope > tr'))
+    rowEls.forEach((tr, index) => {
       const cells: Run[][] = []
-      for (const cell of Array.from(tr.children)) {
+      const kids = Array.from(tr.children).filter((cell) => {
         const ct = cell.tagName.toLowerCase()
-        if (ct !== 'td' && ct !== 'th') continue
+        return ct === 'td' || ct === 'th'
+      })
+      if (index === 0 && kids.length && (tr.parentElement?.tagName === 'THEAD' || kids.every((cell) => cell.tagName === 'TH'))) {
+        header = true
+      }
+      for (const cell of kids) {
+        const ct = cell.tagName.toLowerCase()
         const runs = collectRuns(cell)
-        // bold header cells
         if (ct === 'th') {
           cells.push(runs.map((r) => ({ ...r, marks: { ...r.marks, bold: true } })))
         } else {
@@ -202,8 +238,8 @@ function parseBlocks(root: HTMLElement): Block[] {
         }
       }
       if (cells.length) rows.push(cells)
-    }
-    if (rows.length) blocks.push({ kind: 'table', rows })
+    })
+    if (rows.length) blocks.push({ kind: 'table', rows, header })
   }
 
   const visit = (el: HTMLElement) => {
@@ -216,13 +252,52 @@ function parseBlocks(root: HTMLElement): Block[] {
       if (child.nodeType !== Node.ELEMENT_NODE) continue
       const node = child as HTMLElement
       const tag = node.tagName.toLowerCase()
+      if (node.getAttribute('data-page-break') === 'true' || node.classList.contains('rte-page-break')) {
+        blocks.push({ kind: 'pageBreak' })
+        continue
+      }
+      if (node.getAttribute('data-type') === 'callout' || node.classList.contains('rte-callout')) {
+        const text = (node.textContent || '').replace(/\s+/g, ' ').trim()
+        blocks.push({ kind: 'p', runs: [{ text: text ? `【高亮】${text}` : '【高亮】', marks: { bold: true } }] })
+        continue
+      }
+      if (node.getAttribute('data-type') === 'columns' || node.classList.contains('rte-columns')) {
+        const columnNodes = Array.from(node.children).filter((col) => {
+          if (!(col instanceof HTMLElement)) return false
+          return col.getAttribute('data-type') === 'column' || col.classList.contains('rte-column') || col.tagName === 'DIV'
+        })
+        if (columnNodes.length >= 2) {
+          blocks.push({
+            kind: 'columnTable',
+            widths: columnExportWidths(columnNodes.length, node.getAttribute('data-ratios')),
+            cells: columnNodes.map((col) => columnParagraphs(col)),
+          })
+          continue
+        }
+      }
+      if (node.getAttribute('data-type') === 'image-group' || node.classList.contains('rte-image-group')) {
+        const imgs = Array.from(node.querySelectorAll('img'))
+        if (imgs.length >= 2) {
+          const share = Math.max(80, Math.floor(MAX_IMAGE_WIDTH_PX / imgs.length))
+          blocks.push({
+            kind: 'imageRow',
+            images: imgs.map((img) => {
+              const block = imageBlockFrom(img)
+              if (block.kind !== 'image') return { src: '', alt: '图片', width: share, height: share }
+              const ratio = block.height / Math.max(1, block.width)
+              return { src: block.src, alt: block.alt, width: share, height: Math.max(1, Math.round(share * ratio)) }
+            }),
+          })
+          continue
+        }
+      }
       if (/^h[1-6]$/.test(tag)) {
         pushPara(node, headingStyle(parseInt(tag[1], 10)))
       } else if (tag === 'p' || tag === 'div' || tag === 'blockquote') {
         // 段里直接放图片（图表快照）：按图片块处理，不丢图
         const images = Array.from(node.querySelectorAll('img'))
         if (images.length) {
-          for (const img of images) blocks.push(imageBlockFrom(img as HTMLElement))
+          for (const img of images) pushImage(blocks, img as HTMLElement)
           if (tag === 'p') {
             // 图已经单独成块；段里还有文字才再补一个文字段
             const text = collectRuns(node)
@@ -244,10 +319,11 @@ function parseBlocks(root: HTMLElement): Block[] {
       } else if (tag === 'ol') {
         walkList(node, true, 0)
       } else if (tag === 'table') {
+        pushCaption(blocks, node.getAttribute('data-table-caption') || '')
         walkTable(node)
       } else if (tag === 'img') {
         // 图片（图表快照就是图片）：走 media 关系内嵌，不落成占位文案
-        blocks.push(imageBlockFrom(node))
+        pushImage(blocks, node)
       } else if (tag === 'pre' || tag === 'code') {
         const runs = collectRuns(node, { code: true })
         blocks.push({ kind: 'p', runs: runs.length ? runs : [{ text: '', marks: {} }] })
@@ -263,12 +339,58 @@ function parseBlocks(root: HTMLElement): Block[] {
   return blocks
 }
 
-function tableToXml(rows: Run[][][]): string {
+function columnExportWidths(count: number, raw: string | null): number[] {
+  const parts = String(raw || '')
+    .split(':')
+    .map((part) => Number(part.trim()))
+    .filter((part) => Number.isFinite(part) && part > 0)
+  const weights = parts.length === count ? parts : Array.from({ length: count }, () => 1)
+  const sum = weights.reduce((total, part) => total + part, 0) || 1
+  const widths = weights.map((part) => Math.round((9000 * part) / sum))
+  const drift = 9000 - widths.reduce((total, part) => total + part, 0)
+  if (widths.length) widths[widths.length - 1] = (widths[widths.length - 1] ?? 0) + drift
+  return widths
+}
+
+function columnParagraphs(column: HTMLElement): Run[][] {
+  const blocks = Array.from(column.children).filter((child) => /^(P|H[1-6]|LI|BLOCKQUOTE|PRE)$/.test(child.tagName))
+  if (!blocks.length) {
+    const runs = collectRuns(column)
+    return [runs.length ? runs : [{ text: '', marks: {} }]]
+  }
+  return blocks.map((block) => {
+    const runs = collectRuns(block)
+    return runs.length ? runs : [{ text: '', marks: {} }]
+  })
+}
+
+function columnTableToXml(widths: number[], cells: Run[][][]): string {
+  const grid = `<w:tblGrid>${widths.map((width) => `<w:gridCol w:w="${width}"/>`).join('')}</w:tblGrid>`
+  const row = cells
+    .map((paragraphs, index) => {
+      const width = widths[index] ?? widths[widths.length - 1] ?? 4500
+      const body = (paragraphs.length ? paragraphs : [[{ text: '', marks: {} }]]).map((runs) => paraXml(runs)).join('')
+      return (
+        `<w:tc><w:tcPr><w:tcW w:w="${width}" w:type="dxa"/>` +
+        `<w:tcBorders><w:top w:val="nil"/><w:left w:val="nil"/><w:bottom w:val="nil"/><w:right w:val="nil"/></w:tcBorders>` +
+        `</w:tcPr>${body}</w:tc>`
+      )
+    })
+    .join('')
+  return (
+    `<w:tbl><w:tblPr><w:tblW w:w="5000" w:type="pct"/>` +
+    `<w:tblBorders><w:top w:val="nil"/><w:left w:val="nil"/><w:bottom w:val="nil"/>` +
+    `<w:right w:val="nil"/><w:insideH w:val="nil"/><w:insideV w:val="nil"/></w:tblBorders>` +
+    `</w:tblPr>${grid}<w:tr>${row}</w:tr></w:tbl>`
+  )
+}
+
+function tableToXml(rows: Run[][][], header = false): string {
   const gridCols = Math.max(...rows.map((r) => r.length), 1)
   const colW = Math.floor(9000 / gridCols)
   const tblGrid = `<w:tblGrid>${Array.from({ length: gridCols }, () => `<w:gridCol w:w="${colW}"/>`).join('')}</w:tblGrid>`
   const rowXml = rows
-    .map((row) => {
+    .map((row, index) => {
       const cells = []
       for (let i = 0; i < gridCols; i++) {
         const runs = row[i] || [{ text: '', marks: {} }]
@@ -281,7 +403,8 @@ function tableToXml(rows: Run[][][]): string {
             `</w:tcBorders></w:tcPr><w:p>${runsToXml(runs)}</w:p></w:tc>`,
         )
       }
-      return `<w:tr>${cells.join('')}</w:tr>`
+      const repeat = header && index === 0 ? '<w:trPr><w:tblHeader/></w:trPr>' : ''
+      return `<w:tr>${repeat}${cells.join('')}</w:tr>`
     })
     .join('')
   return (
@@ -386,13 +509,47 @@ function blocksToBodyXml(
   }
   let imageIndex = 0
   for (const b of blocks) {
-    if (b.kind === 'p') {
+    if (b.kind === 'pageBreak') {
+      parts.push('<w:p><w:r><w:br w:type="page"/></w:r></w:p>')
+    } else if (b.kind === 'p') {
       parts.push(paraXml(b.runs, { style: b.style, indent: b.indent }))
     } else if (b.kind === 'listItem') {
       const numId = b.ordered ? 2 : 1
       parts.push(paraXml(b.runs, { numId, ilvl: Math.min(8, b.level) }))
     } else if (b.kind === 'table') {
-      parts.push(tableToXml(b.rows))
+      parts.push(tableToXml(b.rows, b.header))
+    } else if (b.kind === 'columnTable') {
+      parts.push(columnTableToXml(b.widths, b.cells))
+    } else if (b.kind === 'imageRow') {
+      const colW = Math.floor(9000 / Math.max(1, b.images.length))
+      const cells = b.images.map((img) => {
+        const resolved = resolveImage?.({ kind: 'image', ...img }) ?? null
+        let inner = paraXml([{ text: img.alt || '图片', marks: {} }])
+        if (resolved) {
+          imageIndex += 1
+          inner = imageXml({
+            rid: resolved.rid,
+            id: imageIndex,
+            name: `Picture ${imageIndex}`,
+            descr: img.alt,
+            width: img.width,
+            height: img.height,
+          })
+        }
+        return (
+          `<w:tc><w:tcPr><w:tcW w:w="${colW}" w:type="dxa"/>` +
+          `<w:tcBorders>` +
+          `<w:top w:val="nil"/><w:left w:val="nil"/><w:bottom w:val="nil"/><w:right w:val="nil"/>` +
+          `</w:tcBorders></w:tcPr>${inner}</w:tc>`
+        )
+      })
+      parts.push(
+        `<w:tbl><w:tblPr><w:tblW w:w="5000" w:type="pct"/>` +
+          `<w:tblBorders><w:top w:val="nil"/><w:left w:val="nil"/><w:bottom w:val="nil"/>` +
+          `<w:right w:val="nil"/><w:insideH w:val="nil"/><w:insideV w:val="nil"/></w:tblBorders>` +
+          `</w:tblPr><w:tblGrid>${b.images.map(() => `<w:gridCol w:w="${colW}"/>`).join('')}</w:tblGrid>` +
+          `<w:tr>${cells.join('')}</w:tr></w:tbl>`,
+      )
     } else if (b.kind === 'image') {
       const resolved = resolveImage?.(b) ?? null
       if (resolved) {
@@ -446,6 +603,9 @@ function stylesXml(): string {
   <w:style w:type="paragraph" w:styleId="Heading2"><w:name w:val="heading 2"/><w:basedOn w:val="Normal"/><w:qFormat/><w:pPr><w:spacing w:before="200" w:after="100"/></w:pPr><w:rPr><w:b/><w:sz w:val="28"/></w:rPr></w:style>
   <w:style w:type="paragraph" w:styleId="Heading3"><w:name w:val="heading 3"/><w:basedOn w:val="Normal"/><w:qFormat/><w:pPr><w:spacing w:before="160" w:after="80"/></w:pPr><w:rPr><w:b/><w:sz w:val="26"/></w:rPr></w:style>
   <w:style w:type="paragraph" w:styleId="Heading4"><w:name w:val="heading 4"/><w:basedOn w:val="Normal"/><w:qFormat/><w:pPr><w:spacing w:before="120" w:after="60"/></w:pPr><w:rPr><w:b/><w:sz w:val="24"/></w:rPr></w:style>
+  <w:style w:type="paragraph" w:styleId="Heading5"><w:name w:val="heading 5"/><w:basedOn w:val="Normal"/><w:qFormat/><w:pPr><w:spacing w:before="100" w:after="40"/></w:pPr><w:rPr><w:b/><w:sz w:val="22"/></w:rPr></w:style>
+  <w:style w:type="paragraph" w:styleId="Heading6"><w:name w:val="heading 6"/><w:basedOn w:val="Normal"/><w:qFormat/><w:pPr><w:spacing w:before="80" w:after="40"/></w:pPr><w:rPr><w:b/><w:sz w:val="21"/></w:rPr></w:style>
+  <w:style w:type="paragraph" w:styleId="Caption"><w:name w:val="caption"/><w:basedOn w:val="Normal"/><w:qFormat/><w:pPr><w:jc w:val="center"/></w:pPr><w:rPr><w:i/><w:sz w:val="20"/></w:rPr></w:style>
 </w:styles>`
 }
 
@@ -464,6 +624,7 @@ export async function buildDocxBlob(opts: {
   /** 内嵌图片：zip 内文件名 + 二进制。 */
   const mediaFiles: { name: string; bytes: Uint8Array; ext: string }[] = []
   const mediaRels: { id: string; target: string }[] = []
+  let footnotesXml = ''
 
   if (opts.bodyHtml && typeof DOMParser !== 'undefined') {
     try {
@@ -472,7 +633,33 @@ export async function buildDocxBlob(opts: {
         'text/html',
       )
       const root = doc.getElementById('rte-docx-root') || doc.body
+      const footnotes: Array<{ id: string; text: string }> = []
+      root.querySelectorAll('[data-fn-text]').forEach((el) => {
+        if (el.getAttribute('data-fn-place') === 'end') return
+        const id = String(footnotes.length + 1)
+        el.setAttribute('data-fn-export-id', id)
+        footnotes.push({ id, text: el.getAttribute('data-fn-text') || '' })
+      })
+      const endnotes: string[] = []
+      root.querySelectorAll('[data-fn-place="end"]').forEach((el, index) => {
+        endnotes.push(`${index + 1}. ${el.getAttribute('data-fn-text') || ''}`)
+      })
       const blocks = parseBlocks(root as HTMLElement)
+      if (footnotes.length) {
+        const notesXml = footnotes
+          .map(
+            (note) =>
+              `<w:footnote w:id="${note.id}"><w:p><w:r><w:t>${xmlEscape(note.text)}</w:t></w:r></w:p></w:footnote>`,
+          )
+          .join('')
+        footnotesXml =
+          `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
+          `<w:footnotes xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">` +
+          `<w:footnote w:type="separator" w:id="-1"><w:p><w:r><w:separator/></w:r></w:p></w:footnote>` +
+          `<w:footnote w:type="continuationSeparator" w:id="0"><w:p><w:r><w:continuationSeparator/></w:r></w:p></w:footnote>` +
+          notesXml +
+          `</w:footnotes>`
+      }
       // 图片块 → media 关系（rId3 起，避开 styles / numbering）
       let mediaSeq = 0
       const resolveImage = (block: Extract<Block, { kind: 'image' }>) => {
@@ -486,6 +673,10 @@ export async function buildDocxBlob(opts: {
         return { rid }
       }
       bodyXml = blocksToBodyXml(blocks, resolveImage)
+      if (endnotes.length) {
+        bodyXml += paraXml([{ text: '尾注', marks: { bold: true } }])
+        bodyXml += endnotes.map((line) => paraXml([{ text: line, marks: {} }])).join('')
+      }
     } catch {
       bodyXml = ''
     }
@@ -531,6 +722,7 @@ export async function buildDocxBlob(opts: {
   <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
   <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
   <Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/>
+  ${footnotesXml ? '<Override PartName="/word/footnotes.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml"/>' : ''}
 </Types>`
 
   const rels = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -549,6 +741,7 @@ export async function buildDocxBlob(opts: {
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
   <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>
+  ${footnotesXml ? '<Relationship Id="rId99" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footnotes" Target="footnotes.xml"/>' : ''}
   ${mediaRelXml}
 </Relationships>`
 
@@ -559,6 +752,7 @@ export async function buildDocxBlob(opts: {
   word?.file('document.xml', documentXml)
   word?.file('styles.xml', stylesXml())
   word?.file('numbering.xml', numberingXml())
+  if (footnotesXml) word?.file('footnotes.xml', footnotesXml)
   word?.folder('_rels')?.file('document.xml.rels', docRels)
   for (const media of mediaFiles) {
     word?.folder('media')?.file(media.name, media.bytes)

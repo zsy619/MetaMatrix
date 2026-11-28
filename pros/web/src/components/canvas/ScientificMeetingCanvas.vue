@@ -114,7 +114,7 @@ function onOrganizer(event: Event) {
   position: absolute;
   inset: 14px 16px 12px;
   z-index: 10;
-  overflow: hidden;
+  overflow: auto;
   box-sizing: border-box;
   padding: 0;
   display: flex;
@@ -126,18 +126,18 @@ function onOrganizer(event: Event) {
 }
 
 .sm-grid {
-  flex: 1;
+  flex: 1 0 auto;
   min-height: 0;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  overflow: hidden;
+  overflow: visible;
 }
 
 .sm-col {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  min-height: 0;
+  min-height: min-content;
   padding: 0;
   box-sizing: border-box;
   border-right: 1px solid var(--cv-frame, #ececec);
@@ -171,34 +171,49 @@ function onOrganizer(event: Event) {
 
 .sm-prompt {
   margin: 0;
-  font-size: clamp(12px, 1.15vw, 14px);
-  font-weight: 400;
-  font-style: italic;
-  color: rgba(255, 255, 255, 0.9);
-  line-height: 1.5;
+  font-size: 15px;
+  font-weight: 550;
+  font-style: normal;
+  color: rgba(255, 255, 255, 0.96);
+  line-height: 1.55;
 }
 
 .sm-panel {
-  flex: 1;
-  min-height: 400px;
+  flex: 1 1 auto;
+  min-height: 280px;
   display: flex;
   flex-direction: column;
-  overflow: auto;
+  overflow: visible;
   box-sizing: border-box;
   padding: 10px 12px 12px;
   background: transparent;
 }
 
 .sm-panel :deep(.ym-block) {
-  flex: 1;
-  min-height: 400px;
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 240px;
+  overflow: visible;
   background: transparent;
   border: none;
   box-shadow: none;
 }
 
+.sm-panel :deep(.ym-block-body),
+.sm-panel :deep(.ym-rte),
+.sm-panel :deep(.rte-root),
+.sm-panel :deep(.rte-workspace),
+.sm-panel :deep(.rte-canvas) {
+  height: auto !important;
+  max-height: none !important;
+  overflow: visible !important;
+}
+
 .sm-panel :deep(.ProseMirror) {
-  font-size: 14px;
+  height: auto !important;
+  min-height: 180px;
+  overflow: visible !important;
+  font-size: 15px;
   line-height: 1.65;
   color: #1a1a1a;
 }
@@ -208,31 +223,39 @@ function onOrganizer(event: Event) {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 24px 48px;
-  padding: 10px 18px 12px;
+  gap: 16px 40px;
+  padding: 12px 18px 14px;
   border-top: 1px solid var(--cv-frame, #ececec);
   background: var(--tbl-body, #fff);
 }
 
 .sm-meta {
   display: inline-flex;
-  align-items: baseline;
-  gap: 4px;
-  font-size: 14px;
-  font-weight: 600;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  font-size: 15px;
+  font-weight: 700;
   color: #1a1a1a;
 }
 
+.sm-meta span {
+  flex: none;
+  white-space: nowrap;
+}
+
 .sm-meta-input {
-  min-width: 8em;
-  max-width: 16em;
+  min-width: 10em;
+  max-width: 18em;
+  min-height: 36px;
   border: none;
-  border-bottom: 1px solid var(--cv-frame, #ececec);
+  border-bottom: 1.5px solid rgba(26, 26, 26, 0.28);
   background: transparent;
   font: inherit;
-  font-weight: 500;
+  font-size: 16px;
+  font-weight: 650;
   color: #1a1a1a;
-  padding: 0 4px 1px;
+  padding: 4px 2px;
   outline: none;
 }
 
@@ -247,11 +270,30 @@ function onOrganizer(event: Event) {
 
 @media (max-width: 720px) {
   .scientific-meeting-canvas {
+    overflow-x: hidden;
     overflow-y: auto;
   }
 
   .sm-grid {
     grid-template-columns: 1fr;
+  }
+
+  .sm-footer {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+  }
+
+  .sm-meta {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .sm-meta-input {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+    max-width: none;
   }
 
   .sm-col {

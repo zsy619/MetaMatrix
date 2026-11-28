@@ -1,0 +1,30 @@
+{
+  "id": "canvas_okr",
+  "type": "okr",
+  "schemaVersion": 1,
+  "theme": {
+    "background": { "pattern": "none", "color": "#f7f7f7" },
+    "page": "#f7f7f7",
+    "frame": "#ececec",
+    "hairline": "rgba(60, 50, 20, 0.08)"
+  },
+  "title": "本季 OKR",
+  "period": "2026 Q4",
+  "objectives": [
+    {
+      "id": "obj_plan",
+      "name": "让项目计划能被别人看懂",
+      "keyResults": [
+        { "id": "kr_gantt", "name": "甘特图能按依赖排出关键路径", "target": "样例项目一键排程", "progress": 40 },
+        { "id": "kr_raci", "name": "每个里程碑都有负责人", "target": "RACI 覆盖全部交付", "progress": 20 }
+      ]
+    },
+    {
+      "id": "obj_value",
+      "name": "说清客户为什么留下",
+      "keyResults": [
+        { "id": "kr_talk", "name": "完成客户访谈", "target": "5 位项目负责人", "progress": 0 }
+      ]
+    }
+  ]
+}
