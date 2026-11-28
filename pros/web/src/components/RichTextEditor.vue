@@ -195,7 +195,7 @@ import RtePortals from './rte/RtePortals.vue'
 import { bindAskMore, useAskDialog } from './rte/composables/useAskDialog'
 import { useRtePageLayout } from './rte/composables/useRtePageLayout'
 import { usePageChrome } from './rte/composables/usePageChrome'
-import { EMPTY_PAGE_CHROME, PAGE_NUMBER_OPTIONS, type PanelPageChrome } from '../utils/rtePageChrome'
+import { EMPTY_PAGE_CHROME, PAGE_NUMBER_OPTIONS, normalizePageChrome, type PanelPageChrome } from '../utils/rtePageChrome'
 import {
   pageSetupDraftDirty,
   pageSetupDraftOf,
@@ -994,7 +994,7 @@ function applyPageSetupSnap(snap: PageSetupSnap) {
     chrome.footer !== pageChrome.value.footer ||
     chrome.pageNumber !== pageChrome.value.pageNumber
   ) {
-    replacePageChrome({ ...chrome })
+    replacePageChrome(normalizePageChrome(chrome))
   }
 }
 

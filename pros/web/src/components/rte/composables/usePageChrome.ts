@@ -15,6 +15,7 @@ import {
   segmentHeights,
   unwrapPageBreaks,
   type PanelPageChrome,
+  type StoredPageChrome,
   type PresentUnit,
   type SlideSource,
 } from '../../../utils/rtePageChrome'
@@ -26,7 +27,7 @@ export function usePageChrome(deps: {
   pageChrome: Ref<PanelPageChrome>
   panelId: () => string | undefined
   chromeMap: () => Record<string, { header?: string; footer?: string; pageNumber?: string }> | null | undefined
-  setPanelPageChrome: (panelId: string, chrome: PanelPageChrome) => void
+  setPanelPageChrome: (panelId: string, chrome: StoredPageChrome) => void
   viewMode: () => string
   editor: () => Editor | undefined
   rootEl: Ref<HTMLElement | null>
@@ -63,7 +64,7 @@ export function usePageChrome(deps: {
 
   watch(() => [deps.panelId(), JSON.stringify(deps.chromeMap() ?? null)] as const, syncFromStore, { immediate: true })
 
-  function publish(next: PanelPageChrome) {
+  function publish(next: StoredPageChrome) {
     if (deps.viewMode() !== 'edit') return
     const normalized = normalizePageChrome(next)
     const panelId = deps.panelId()
@@ -75,7 +76,7 @@ export function usePageChrome(deps: {
     scheduleMeasure()
   }
 
-  function replacePageChrome(next: PanelPageChrome) {
+  function replacePageChrome(next: StoredPageChrome) {
     publish(next)
   }
 
