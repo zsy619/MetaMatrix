@@ -119,6 +119,10 @@ import type {
   PdcaDocumentJSON,
   FiveForcesDocumentJSON,
   IncomeStatementDocumentJSON,
+  PestleDocumentJSON,
+  AnsoffDocumentJSON,
+  EmpathyDocumentJSON,
+  MarketingMixDocumentJSON,
   ValueChainDocumentJSON,
   SevenSDocumentJSON,
   RiceDocumentJSON,
@@ -183,6 +187,10 @@ import {
   isStakeholderDoc,
   isPdcaDoc,
   isFiveForcesDoc,
+  isPestleDoc,
+  isAnsoffDoc,
+  isEmpathyDoc,
+  isMarketingMixDoc,
   isValueChainDoc,
   isSevenSDoc,
   isJourneyDoc,
@@ -262,6 +270,10 @@ import stakeholderTemplate from '../templates/stakeholder-map-v1.json'
 import pdcaTemplate from '../templates/pdca-v1.json'
 import fiveForcesTemplate from '../templates/five-forces-v1.json'
 import incomeStatementTemplate from '../templates/income-statement-v1.json'
+import pestleTemplate from '../templates/pestle-v1.json'
+import ansoffTemplate from '../templates/ansoff-v1.json'
+import empathyTemplate from '../templates/empathy-map-v1.json'
+import marketingMixTemplate from '../templates/marketing-mix-v1.json'
 import valueChainTemplate from '../templates/value-chain-v1.json'
 import sevenSTemplate from '../templates/seven-s-v1.json'
 import riceTemplate from '../templates/rice-v1.json'
@@ -345,6 +357,10 @@ export type TemplateId =
   | 'pdca'
   | 'five-forces'
   | 'income-statement'
+  | 'pestle'
+  | 'ansoff'
+  | 'empathy-map'
+  | 'marketing-mix'
   | 'value-chain'
   | 'seven-s'
   | 'rice'
@@ -432,6 +448,10 @@ export const TEMPLATES: Record<TemplateId, CanvasDocumentJSON> = {
   pdca: pdcaTemplate as PdcaDocumentJSON,
   'five-forces': fiveForcesTemplate as FiveForcesDocumentJSON,
   'income-statement': incomeStatementTemplate as IncomeStatementDocumentJSON,
+  pestle: pestleTemplate as PestleDocumentJSON,
+  ansoff: ansoffTemplate as AnsoffDocumentJSON,
+  'empathy-map': empathyTemplate as EmpathyDocumentJSON,
+  'marketing-mix': marketingMixTemplate as MarketingMixDocumentJSON,
   'value-chain': valueChainTemplate as ValueChainDocumentJSON,
   'seven-s': sevenSTemplate as SevenSDocumentJSON,
   rice: riceTemplate as RiceDocumentJSON,
@@ -1018,6 +1038,30 @@ export const TEMPLATE_META: Record<
     name: '利润表',
     badge: '财务 · 利润',
     description: '收入减去成本是毛利，再减去费用是营业利润。和现金流量放在一起看赚不赚钱。',
+    category: 'growth',
+  },
+  pestle: {
+    name: 'PESTLE',
+    badge: '环境 · PESTLE',
+    description: '政治、经济、社会、技术、法律、环境六股外部力量。先看天气，再谈竞争。',
+    category: 'industry',
+  },
+  ansoff: {
+    name: '安索夫矩阵',
+    badge: '增长 · 安索夫',
+    description: '现有或新产品，进入现有或新市场。四条增长路，风险从左上到右下递增。',
+    category: 'growth',
+  },
+  'empathy-map': {
+    name: '同理心地图',
+    badge: '用户 · 同理心',
+    description: '说、想、做、感受，加上痛点和收益。先写一个具体的人。',
+    category: 'growth',
+  },
+  'marketing-mix': {
+    name: '营销 4P',
+    badge: '营销 · 4P',
+    description: '产品、价格、渠道、推广。四项决定要对着同一群客户。',
     category: 'growth',
   },
   'value-chain': {
@@ -1880,6 +1924,10 @@ export const useDocumentStore = defineStore('document', () => {
     if (isStakeholderDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
     if (isPdcaDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
     if (isFiveForcesDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
+    if (isPestleDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
+    if (isAnsoffDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
+    if (isEmpathyDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
+    if (isMarketingMixDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
     if (isValueChainDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
     if (isSevenSDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
     if (isJourneyDoc(next)) next = { ...next, blocks: migratePlainTextBlocks(next.blocks) }
@@ -3130,7 +3178,7 @@ export const useDocumentStore = defineStore('document', () => {
 
   /**
    * 内容主题词，写在 block.keyword 上（current_data，不另建表）。
-   * 人类-AI 双三角、五步法、商业模式画布，以及 SWOT / 精益画布 / 价值主张画布共用。
+   * 人类-AI 双三角、五步法、商业模式画布、PESTLE / 安索夫 / 同理心 / 4P，以及 SWOT / 精益画布 / 价值主张画布共用。
    */
   function updateBlockKeyword(blockId: string, keyword: string): boolean {
     const doc = current_data.value
@@ -3145,6 +3193,10 @@ export const useDocumentStore = defineStore('document', () => {
         !isStakeholderDoc(doc) &&
         !isPdcaDoc(doc) &&
         !isFiveForcesDoc(doc) &&
+        !isPestleDoc(doc) &&
+        !isAnsoffDoc(doc) &&
+        !isEmpathyDoc(doc) &&
+        !isMarketingMixDoc(doc) &&
         !isValueChainDoc(doc) &&
         !isSevenSDoc(doc) &&
         !isJourneyDoc(doc) &&

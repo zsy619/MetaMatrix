@@ -54,14 +54,14 @@ export const GUIDE_LANES: Record<TemplateCategory, GuideLane[]> = {
     {
       id: 'customer',
       title: '产品与客户',
-      hint: '旅程、卡诺、内核、转化取舍',
-      ids: ['customer-journey', 'kano', 'product-content', 'product-features-5d', 'conversion-tradeoff'],
+      hint: '旅程、卡诺、同理心、营销 4P、内核、转化取舍',
+      ids: ['customer-journey', 'kano', 'empathy-map', 'marketing-mix', 'product-content', 'product-features-5d', 'conversion-tradeoff'],
     },
     {
       id: 'model',
       title: '商业模式',
-      hint: '商业模式、精益、价值主张',
-      ids: ['business-model-canvas', 'lean-canvas', 'value-proposition'],
+      hint: '商业模式、精益、价值主张、安索夫',
+      ids: ['business-model-canvas', 'lean-canvas', 'value-proposition', 'ansoff'],
     },
     {
       id: 'formula',
@@ -80,8 +80,8 @@ export const GUIDE_LANES: Record<TemplateCategory, GuideLane[]> = {
     {
       id: 'research',
       title: '调研与预判',
-      hint: 'OSCAR、行业分析、行业预判',
-      ids: ['oscar', 'industry-analysis', 'industry-forecast', 'hacker-five-steps'],
+      hint: 'OSCAR、行业分析、行业预判、PESTLE',
+      ids: ['oscar', 'industry-analysis', 'industry-forecast', 'hacker-five-steps', 'pestle'],
     },
     {
       id: 'competition',

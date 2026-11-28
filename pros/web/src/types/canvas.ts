@@ -2171,6 +2171,86 @@ export interface IncomeStatementDocumentJSON {
   sections: IncomeSection[]
 }
 
+export type PestleBlockId = 'political' | 'economic' | 'social' | 'technological' | 'legal' | 'environmental'
+
+export interface PestleBlock {
+  id: PestleBlockId
+  title: string
+  hint: string
+  keyword?: string
+  items: QuadrantItem[]
+  text?: string
+}
+
+export interface PestleDocumentJSON {
+  id: string
+  type: 'pestle'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  blocks: PestleBlock[]
+}
+
+export type AnsoffBlockId = 'penetration' | 'product' | 'market' | 'diversification'
+
+export interface AnsoffBlock {
+  id: AnsoffBlockId
+  title: string
+  hint: string
+  keyword?: string
+  items: QuadrantItem[]
+  text?: string
+}
+
+export interface AnsoffDocumentJSON {
+  id: string
+  type: 'ansoff'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  blocks: AnsoffBlock[]
+}
+
+export type EmpathyBlockId = 'says' | 'thinks' | 'does' | 'feels' | 'pains' | 'gains'
+
+export interface EmpathyBlock {
+  id: EmpathyBlockId
+  title: string
+  hint: string
+  keyword?: string
+  items: QuadrantItem[]
+  text?: string
+}
+
+export interface EmpathyDocumentJSON {
+  id: string
+  type: 'empathy_map'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  blocks: EmpathyBlock[]
+}
+
+export type MarketingMixBlockId = 'product' | 'price' | 'place' | 'promotion'
+
+export interface MarketingMixBlock {
+  id: MarketingMixBlockId
+  title: string
+  hint: string
+  keyword?: string
+  items: QuadrantItem[]
+  text?: string
+}
+
+export interface MarketingMixDocumentJSON {
+  id: string
+  type: 'marketing_mix'
+  schemaVersion: number
+  theme: CanvasTheme
+  title: string
+  blocks: MarketingMixBlock[]
+}
+
 export type ValueChainBlockId =
   | 'infrastructure'
   | 'hr'
@@ -2717,6 +2797,10 @@ export type CanvasDocumentJSON = (
   | PdcaDocumentJSON
   | FiveForcesDocumentJSON
   | IncomeStatementDocumentJSON
+  | PestleDocumentJSON
+  | AnsoffDocumentJSON
+  | EmpathyDocumentJSON
+  | MarketingMixDocumentJSON
   | ValueChainDocumentJSON
   | SevenSDocumentJSON
   | RiceDocumentJSON
@@ -2780,6 +2864,10 @@ export type BlockCanvasDocumentJSON =
   | StakeholderDocumentJSON
   | PdcaDocumentJSON
   | FiveForcesDocumentJSON
+  | PestleDocumentJSON
+  | AnsoffDocumentJSON
+  | EmpathyDocumentJSON
+  | MarketingMixDocumentJSON
   | ValueChainDocumentJSON
   | SevenSDocumentJSON
   | JourneyDocumentJSON
@@ -3469,6 +3557,31 @@ export function isIncomeStatementDoc(
 }
 
 
+export function isPestleDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is PestleDocumentJSON {
+  return !!doc && doc.type === 'pestle'
+}
+
+export function isAnsoffDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is AnsoffDocumentJSON {
+  return !!doc && doc.type === 'ansoff'
+}
+
+export function isEmpathyDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is EmpathyDocumentJSON {
+  return !!doc && doc.type === 'empathy_map'
+}
+
+export function isMarketingMixDoc(
+  doc: CanvasDocumentJSON | null | undefined,
+): doc is MarketingMixDocumentJSON {
+  return !!doc && doc.type === 'marketing_mix'
+}
+
+
 export function isBlockCanvasDoc(
   doc: CanvasDocumentJSON | null | undefined,
 ): doc is BlockCanvasDocumentJSON {
@@ -3526,7 +3639,11 @@ export function isBlockCanvasDoc(
     isSoarDoc(doc) ||
     isPlayingToWinDoc(doc) ||
     isHackerFiveStepsDoc(doc) ||
-    isBusinessModelCanvasDoc(doc)
+    isBusinessModelCanvasDoc(doc) ||
+    isPestleDoc(doc) ||
+    isAnsoffDoc(doc) ||
+    isEmpathyDoc(doc) ||
+    isMarketingMixDoc(doc)
   )
 }
 

@@ -1,0 +1,13 @@
+{
+  "id": "canvas_marketing_mix",
+  "type": "marketing_mix",
+  "schemaVersion": 1,
+  "theme": { "background": { "pattern": "none", "color": "#f7f7f7" }, "page": "#f7f7f7", "frame": "#ececec", "hairline": "rgba(60, 50, 20, 0.08)" },
+  "title": "营销 4P",
+  "blocks": [
+    { "id": "product", "title": "产品", "hint": "卖给谁的哪一件具体东西", "items": [{ "id": "mm_prod", "text": "给小团队的项目画布" }] },
+    { "id": "price", "title": "价格", "hint": "怎么收费，和谁比", "items": [{ "id": "mm_price", "text": "按席位，低于单独买一套项目管理软件" }] },
+    { "id": "place", "title": "渠道", "hint": "客户在哪里第一次用到", "items": [{ "id": "mm_place", "text": "现有用户里的项目负责人" }] },
+    { "id": "promotion", "title": "推广", "hint": "用什么话让他愿意试", "items": [{ "id": "mm_promo", "text": "一张图看清这周为什么这样排" }] }
+  ]
+}

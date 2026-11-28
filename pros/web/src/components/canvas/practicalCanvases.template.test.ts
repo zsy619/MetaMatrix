@@ -20,8 +20,12 @@ vi.mock('../RichTextEditor.vue', () => ({
 import { cloneTemplate, isTemplateId, TEMPLATE_META, useDocumentStore } from '../../stores/document'
 import {
   isFiveForcesDoc,
+  isAnsoffDoc,
   isBreakEvenDoc,
+  isEmpathyDoc,
   isIncomeStatementDoc,
+  isMarketingMixDoc,
+  isPestleDoc,
   isRiceDoc,
   isSevenSDoc,
   isImpactEffortDoc,
@@ -144,6 +148,20 @@ describe('实用商业画布', () => {
     expect(sum('revenue') - sum('cost') - sum('expense')).toBe(110)
   })
 
+  it('PESTLE、安索夫、同理心和 4P 都登记在模板库', () => {
+    for (const id of ['pestle', 'ansoff', 'empathy-map', 'marketing-mix'] as const) {
+      expect(isTemplateId(id)).toBe(true)
+      expect(TEMPLATE_META[id].description.length).toBeGreaterThan(0)
+    }
+    expect(isPestleDoc(cloneTemplate('pestle')) && (cloneTemplate('pestle') as { blocks: unknown[] }).blocks).toHaveLength(6)
+    const ansoff = cloneTemplate('ansoff')
+    const empathy = cloneTemplate('empathy-map')
+    const mix = cloneTemplate('marketing-mix')
+    expect(isAnsoffDoc(ansoff) && ansoff.blocks.map((block) => block.id)).toEqual(['penetration', 'product', 'market', 'diversification'])
+    expect(isEmpathyDoc(empathy) && empathy.blocks).toHaveLength(6)
+    expect(isMarketingMixDoc(mix) && mix.blocks).toHaveLength(4)
+  })
+
   it('价值链、7S、RICE 和盈亏平衡都能算出结果', () => {
     for (const id of ['value-chain', 'seven-s', 'rice', 'break-even'] as const) expect(isTemplateId(id)).toBe(true)
     const chain = cloneTemplate('value-chain')
@@ -244,6 +262,10 @@ describe('实用商业画布', () => {
       pdca: 'org',
       'five-forces': 'industry',
       'income-statement': 'growth',
+      pestle: 'industry',
+      ansoff: 'growth',
+      'empathy-map': 'growth',
+      'marketing-mix': 'growth',
       'value-chain': 'industry',
       'seven-s': 'org',
       rice: 'method',
